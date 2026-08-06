@@ -836,6 +836,61 @@ Sub_B788:
     PLB
     RTS
 
+org $C0C6E7
+Sub_C6E7:
+    ; Called from Sub_C73A 6 times, X = gfx index for current 4-tile group.
+    ; Computes X positions for 4 sprite tiles from $4BC2/CA/D2/DA into $4BC0/C8/D0/D8,
+    ; packs their X-overflow bits, and returns the OAM high-table byte in A.
+    ; Entry: M=0 (16-bit A), X = gfx index.  Exit: M=1, A = packed OAM attr byte.
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3                 ; add base X (16-bit)
+    SEP #$20                ; M→1
+    STA.w $4BC0,X           ; store tile 0 X low byte
+    XBA
+    AND #$01
+    STA $E5                 ; tile 0 X overflow bit
+
+    REP #$20                ; M→0
+    LDA.w $4BCA,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC8,X
+    XBA
+    AND #$01
+    STA $E6                 ; tile 1 X overflow bit
+
+    REP #$20
+    LDA.w $4BD2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BD0,X
+    XBA
+    AND #$01
+    STA $E7                 ; tile 2 X overflow bit
+
+    REP #$20
+    LDA.w $4BDA,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BD8,X
+    XBA
+    AND #$01                ; tile 3 X overflow bit in A[0]
+    ASL A
+    ASL A
+    ORA $E7                 ; pack: (bit3<<2) | bit2
+    ASL A
+    ASL A
+    ORA $E6                 ; pack: (bit3<<4) | (bit2<<2) | bit1
+    ASL A
+    ASL A
+    ORA $E5                 ; pack: (bit3<<6) | (bit2<<4) | (bit1<<2) | bit0
+    ORA #$AA                ; set size bits (SNES OAM: bit pairs = [xhi, size])
+    RTS
+
 org $C0C73A
 Sub_C73A:                   ; type 3+ render entry, called via BRL from Sub_B701 type 3+; unmatched
 
