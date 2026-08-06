@@ -1,28 +1,58 @@
 #!/usr/bin/env bash
-# pre-commit hook — verifies byte-exact ROM match before every commit.
+# pre-commit hook — four checks in order:
+#   1. ROM byte-exact match (make diff)
+#   2. Regenerate docs/includes/progress_summary.md and auto-stage it
+#   3. Warn if asm/ was changed but docs/PROGRESS.md wasn't updated
+#   4. Block if asm/ was changed but no docs/devlog/posts/ file is staged
 #
-# Install (after git init):
-#   cp tools/pre-commit .git/hooks/pre-commit
-#   chmod +x .git/hooks/pre-commit
-#
-# Or use the Makefile target:
-#   make install-hook
+# Install:   make install-hook
+# Skip once: git commit --no-verify
 
 set -euo pipefail
 
+RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; RESET='\033[0m'
+fail() { printf "${RED}[pre-commit] %s${RESET}\n" "$*" >&2; exit 1; }
+warn() { printf "${YELLOW}[pre-commit] WARNING: %s${RESET}\n" "$*" >&2; }
+ok()   { printf "${GREEN}[pre-commit] %s${RESET}\n" "$*"; }
+info() { printf '[pre-commit] %s\n' "$*"; }
+
+# ── 1. ROM byte-exact diff ────────────────────────────────────────────────────
 if [ ! -f roms/chrono_trigger.sfc ]; then
-    echo "[pre-commit] No ROM found at roms/chrono_trigger.sfc — skipping diff check."
-    exit 0
+    info "No ROM at roms/chrono_trigger.sfc — skipping diff check."
+else
+    info "Checking ROM match..."
+    if ! make diff --no-print-directory -s 2>/dev/null; then
+        fail "ROM does not match after reassembly. Run 'make diff' to debug."
+    fi
+    ok "MATCH: byte-exact."
 fi
 
-echo "[pre-commit] Running make diff..."
-if ! make diff --no-print-directory -s; then
-    echo ""
-    echo "[pre-commit] FAIL: ROM does not match after reassembly."
-    echo "  Run 'make diff' to see which bytes differ."
-    echo "  Fix the mismatch before committing."
-    exit 1
+# ── 2. Regenerate progress snippet and auto-stage it ─────────────────────────
+info "Regenerating docs/includes/progress_summary.md..."
+python3 tools/progress.py --update-index 2>&1 | grep -E "^Updated|error" || true
+git add docs/includes/progress_summary.md
+
+# ── 3. Stale PROGRESS.md warning ─────────────────────────────────────────────
+STAGED_ASM=$(git diff --cached --name-only | grep '^asm/' | head -5 || true)
+if [ -n "$STAGED_ASM" ]; then
+    if ! git diff --cached --name-only | grep -q '^docs/PROGRESS\.md$'; then
+        warn "asm/ files staged but docs/PROGRESS.md was not updated."
+        warn "If you matched new code, update byte counts before committing."
+        warn "(Continuing — override with your judgment.)"
+        echo ""
+    fi
 fi
 
-echo "[pre-commit] MATCH: byte-exact. Proceeding with commit."
+# ── 4. Devlog gate ───────────────────────────────────────────────────────────
+if [ -n "$STAGED_ASM" ]; then
+    STAGED_DEVLOG=$(git diff --cached --name-only | grep '^docs/devlog/posts/' || true)
+    if [ -z "$STAGED_DEVLOG" ]; then
+        printf "${RED}[pre-commit] BLOCKED: asm/ changes staged but no devlog entry in this commit.${RESET}\n" >&2
+        printf '[pre-commit]   Write a post under docs/devlog/posts/ then git add it.\n' >&2
+        printf '[pre-commit]   To skip (tooling-only commit): git commit --no-verify\n' >&2
+        exit 1
+    fi
+fi
+
+ok "All checks passed."
 exit 0
