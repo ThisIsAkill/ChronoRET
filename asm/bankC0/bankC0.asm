@@ -36,8 +36,626 @@ Sub_EC60:       ; called from main frame loop after VBlankHandler
 
 ; Unmatched routines called from matched code
 
+
+; ============================================================
+; $C0:B309 — Sub_B309 (1016 bytes, $B309–$B700)
+; Sprite descriptor → OAM buffer + WRAM palette copy.
+; Called from PostVBlank's sprite loop for each active descriptor.
+; Dispatches on sprite type (bits 0-1 of $1201,X):
+;   type 0 = 1 tile  (1 OAM byte,  ADC #$0010, 4  palette iters)
+;   type 1 = 2 tiles (2 OAM bytes, ADC #$0020, 8  palette iters)
+;   type 2 = 3 tiles (3 OAM bytes, ADC #$0030, 12 palette iters)
+;   type 3+ = 6 tiles (6 OAM bytes, ADC #$0060, 24 palette iters)
+; Each type has 3 range paths (flag bits 2-3 of $0F80,X) selecting
+;   OAM write-head ($0181/$0185/$0189) and WRAM dest ($01DB/$01DD/$01DF).
+; On entry: M=1, X=0 (16-bit), DP=$0100, $6D = sprite descriptor index.
+; Sets DP=$2100 internally (PPU register aliasing trick), restores via PLD.
+; ============================================================
 org $C0B309
-Sub_B309:       ; called from PostVBlank inner loop (sprite -> OAM buffer)
+Sub_B309:
+    JSR Sub_B701            ; sprite state gate; C=0 proceed, C=1 skip
+    BCC .proceed
+    RTS
+.proceed:
+    LDX $6D                 ; sprite descriptor index
+    LDA $1201,X             ; sprite type byte
+    AND #$03                ; isolate type 0-3
+    BEQ .type0              ; type 0 → $B329
+    CMP #$01
+    BNE .chk_t2
+    BRL .type1              ; type 1 → $B3DF
+.chk_t2:
+    CMP #$02
+    BNE .type3plus_jmp
+    BRL .type2              ; type 2 → $B4B8
+.type3plus_jmp:
+    BRL .type3plus          ; type 3+ → $B5AF
+
+; ============================================================
+; TYPE 0 — 1 OAM byte per range, ADC #$0010, palette loop ×4
+; ============================================================
+.type0:                     ; $B329
+    LDX $6D
+    PHD
+    REP #$20                ; A → 16-bit
+    LDA #$2100
+    TCD                     ; DP = $2100 (PPU register alias base)
+    SEP #$20                ; A → 8-bit
+    LDA $0F80,X             ; sprite flags (abs,X since DP≠$0100)
+    AND #$0C                ; range selection bits 2-3
+    BEQ .t0r1               ; no bits → range 1
+    BIT #$04                ; test bit 2
+    BNE .t0r2               ; bit 2 → range 2
+    BRA .t0r3               ; bit 3 only → range 3
+
+.t0r1:                      ; $B341 — range 1 ($0181 / $01DB)
+    LDA.l $7F4F00,X
+    LDX $0181
+    STA.w $0000,X           ; .w: abs,X not dp,X
+    INX
+    STX $0181
+    LDX $01DB
+    STX $81                 ; DP+$81 = $2181 = WMADDL/H (16-bit X write)
+    LDX $016D               ; abs: sprite index (DP=$2100, not $0100)
+    REP #$20
+    LDA $01DB
+    CLC
+    ADC #$0010
+    STA $01DB
+.t0_gfx:                    ; $B363 — shared sprite-gfx + palette loop (type 0)
+    LDA $1700,X             ; sprite gfx table index (16-bit, M=0)
+    TAX
+    SEP #$20
+    LDA #$04
+    STA $01C9               ; palette loop counter
+.t0_pal:                    ; $B36E
+    LDA.l $7F4BC0,X
+    STA $80                 ; DP+$80 = $2180 = WMDATA (auto-increments WRAM addr)
+    LDA.l $7F4BC1,X
+    STA $80
+    LDA.l $7F4BC6,X
+    STA $80
+    LDA.l $7F4BC7,X
+    STA $80
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $01C9
+    BNE .t0_pal
+    PLD
+    RTS
+
+.t0r2:                      ; $B397 — range 2 ($0185 / $01DD)
+    LDA.l $7F4F00,X
+    LDX $0185
+    STA.w $0000,X
+    INX
+    STX $0185
+    LDX $01DD
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DD
+    CLC
+    ADC #$0010
+    STA $01DD
+    BRA .t0_gfx
+
+.t0r3:                      ; $B3BB — range 3 ($0189 / $01DF)
+    LDA.l $7F4F00,X
+    LDX $0189
+    STA.w $0000,X
+    INX
+    STX $0189
+    LDX $01DF
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DF
+    CLC
+    ADC #$0010
+    STA $01DF
+    BRA .t0_gfx
+
+; ============================================================
+; TYPE 1 — 2 OAM bytes per range (PHA/PLA), ADC #$0020, ×8
+; ============================================================
+.type1:                     ; $B3DF
+    LDX $6D
+    PHD
+    REP #$20
+    LDA #$2100
+    TCD
+    SEP #$20
+    LDA $0F80,X
+    AND #$0C
+    BEQ .t1r1
+    BIT #$04
+    BNE .t1r2_tramp         ; bit 2: conditional long branch via trampoline
+    BRL .t1r3               ; bit 3 only → long branch to range 3
+.t1r2_tramp:
+    BRL .t1r2               ; trampoline: range 2
+
+.t1r1:                      ; $B3FB — range 1 ($0181 / $01DB)
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0181
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0181
+    LDX $01DB
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DB
+    CLC
+    ADC #$0020
+    STA $01DB
+.t1_gfx:                    ; shared gfx+palette loop (type 1)
+    LDA $1700,X
+    TAX
+    SEP #$20
+    LDA #$08
+    STA $01C9
+.t1_pal:
+    LDA.l $7F4BC0,X
+    STA $80
+    LDA.l $7F4BC1,X
+    STA $80
+    LDA.l $7F4BC6,X
+    STA $80
+    LDA.l $7F4BC7,X
+    STA $80
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $01C9
+    BNE .t1_pal
+    PLD
+    RTS
+
+.t1r3:                      ; $B45B — range 3 ($0189 / $01DF)
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0189
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0189
+    LDX $01DF
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DF
+    CLC
+    ADC #$0020
+    STA $01DF
+    BRA .t1_gfx             ; within BRA range (-98)
+
+.t1r2:                      ; $B489 — range 2 ($0185 / $01DD)
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0185
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0185
+    LDX $01DD
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DD
+    CLC
+    ADC #$0020
+    STA $01DD
+    BRL .t1_gfx             ; too far for BRA (-145)
+
+; ============================================================
+; TYPE 2 — 3 OAM bytes per range (2×PHA/PLA), ADC #$0030, ×12
+; ============================================================
+.type2:                     ; $B4B8
+    LDX $6D
+    PHD
+    REP #$20
+    LDA #$2100
+    TCD
+    SEP #$20
+    LDA $0F80,X
+    AND #$0C
+    BEQ .t2r1
+    BIT #$04
+    BNE .t2r2_tramp
+    BRL .t2r3
+.t2r2_tramp:
+    BRL .t2r2
+
+.t2r1:                      ; range 1 ($0181 / $01DB)
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0181
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0181
+    LDX $01DB
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DB
+    CLC
+    ADC #$0030
+    STA $01DB
+.t2_gfx:                    ; shared gfx+palette loop (type 2)
+    LDA $1700,X
+    TAX
+    SEP #$20
+    LDA #$0C
+    STA $01C9
+.t2_pal:
+    LDA.l $7F4BC0,X
+    STA $80
+    LDA.l $7F4BC1,X
+    STA $80
+    LDA.l $7F4BC6,X
+    STA $80
+    LDA.l $7F4BC7,X
+    STA $80
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $01C9
+    BNE .t2_pal
+    PLD
+    RTS
+
+.t2r3:                      ; range 3 ($0189 / $01DF)
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0189
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0189
+    LDX $01DF
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DF
+    CLC
+    ADC #$0030
+    STA $01DF
+    BRA .t2_gfx             ; within BRA range (-108)
+
+.t2r2:                      ; range 2 ($0185 / $01DD)
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0185
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0185
+    LDX $01DD
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DD
+    CLC
+    ADC #$0030
+    STA $01DD
+    BRL .t2_gfx             ; too far for BRA (-165)
+
+; ============================================================
+; TYPE 3+ — 6 OAM bytes per range (5×PHA/PLA), ADC #$0060, ×24
+; ============================================================
+.type3plus:                 ; $B5AF
+    LDX $6D
+    PHD
+    REP #$20
+    LDA #$2100
+    TCD
+    SEP #$20
+    LDA $0F80,X
+    AND #$0C
+    BEQ .t3r1
+    BIT #$04
+    BNE .t3r2_tramp
+    BRL .t3r3
+.t3r2_tramp:
+    BRL .t3r2
+
+.t3r1:                      ; range 1 ($0181 / $01DB)
+    LDA.l $7F4F81,X
+    PHA
+    LDA.l $7F4F80,X
+    PHA
+    LDA.l $7F4B41,X
+    PHA
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0181
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0181
+    LDX $01DB
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DB
+    CLC
+    ADC #$0060
+    STA $01DB
+.t3_gfx:                    ; shared gfx+palette loop (type 3+)
+    LDA $1700,X
+    TAX
+    SEP #$20
+    LDA #$18
+    STA $01C9
+.t3_pal:
+    LDA.l $7F4BC0,X
+    STA $80
+    LDA.l $7F4BC1,X
+    STA $80
+    LDA.l $7F4BC6,X
+    STA $80
+    LDA.l $7F4BC7,X
+    STA $80
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $01C9
+    BNE .t3_pal
+    PLD
+    RTS
+
+.t3r3:                      ; range 3 ($0189 / $01DF)
+    LDA.l $7F4F81,X
+    PHA
+    LDA.l $7F4F80,X
+    PHA
+    LDA.l $7F4B41,X
+    PHA
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0189
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0189
+    LDX $01DF
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DF
+    CLC
+    ADC #$0060
+    STA $01DF
+    BRL .t3_gfx             ; -226, must use BRL
+
+.t3r2:                      ; range 2 ($0185 / $01DD)
+    LDA.l $7F4F81,X
+    PHA
+    LDA.l $7F4F80,X
+    PHA
+    LDA.l $7F4B41,X
+    PHA
+    LDA.l $7F4B40,X
+    PHA
+    LDA.l $7F4F01,X
+    PHA
+    LDA.l $7F4F00,X
+    LDX $0185
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    PLA
+    STA.w $0000,X
+    INX
+    STX $0185
+    LDX $01DD
+    STX $81
+    LDX $016D
+    REP #$20
+    LDA $01DD
+    CLC
+    ADC #$0060
+    STA $01DD
+    BRL .t3_gfx             ; -139, must use BRL
+
+
+; ============================================================
+; $C0:B701 — Sub_B701 (171 bytes, $B701–$B7AB)
+; Sprite state gate called from Sub_B309.
+; Returns C=0 (proceed to render), C=1 (skip).
+; Sub_B788 at $B788 is a secondary entry used by the type 0 negative path.
+; ============================================================
+org $C0B701
+Sub_B701:
+    LDX $6D
+    LDA $1201,X
+    AND #$03
+    BEQ .t0
+    CMP #$01
+    BNE .chk2
+    BRA .t1
+.chk2:
+    CMP #$02
+    BNE .t3plus
+    BRA .t2
+
+.t0:
+    LDA $1B00,X
+    BNE .t0_nz
+    SEC
+    RTS
+.t0_nz:
+    BMI .t0_neg
+.t0_init:
+    JSR Sub_B8CA
+    JSR Sub_E9E2
+    LDX $6D
+    LDA #$80
+    STA $1B00,X
+    CLC
+    RTS
+.t0_neg:
+    AND #$7F
+    BNE .t0_init
+    JSR Sub_B788
+    CLC
+    RTS
+
+.t1:
+    LDA $1B00,X
+    BNE .t1_nz
+.t1_abort:
+    SEC
+    RTS
+.t1_nz:
+    BMI .t1_neg
+    CMP #$02
+    BCC .t1_abort
+.t1_init:
+    JSR Sub_BCDC
+    JSR Sub_E9FF
+    LDX $6D
+    LDA #$80
+    STA $1B00,X
+    CLC
+    RTS
+.t1_neg:
+    AND #$7F
+    CMP #$02
+    BCS .t1_init
+    JSR Sub_BA65
+    CLC
+    RTS
+
+.t2:
+    LDA $1B00,X
+    BNE .t2_nz
+.t2_abort:
+    SEC
+    RTS
+.t2_nz:
+    BMI .t2_neg
+    CMP #$03
+    BCC .t2_abort
+.t2_init:
+    JSR Sub_C2BF
+    JSR Sub_EA1F
+    LDX $6D
+    LDA #$80
+    STA $1B00,X
+    CLC
+    RTS
+.t2_neg:
+    AND #$7F
+    CMP #$03
+    BCS .t2_init
+    JSR Sub_BFF2
+    CLC
+    RTS
+
+.t3plus:
+    BRL Sub_C73A            ; type 3+ delegates to full renderer at $C73A
+
+org $C0B788
+Sub_B788:                   ; sprite renderer, called from Sub_B701 type 0 (state=$80); unmatched
+
+org $C0C73A
+Sub_C73A:                   ; type 3+ render entry, called via BRL from Sub_B701 type 3+; unmatched
 
 org $C0B8CA
 Sub_B8CA:       ; init helper, type 0 sprites (unmatched)

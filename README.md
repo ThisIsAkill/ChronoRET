@@ -12,9 +12,10 @@ Harkinian for Ocarina of Time, or the Chrono Cross decomp already underway).
 
 ## Status
 
-**In progress.** ~1247 bytes matched byte-exact across banks $00, $C0, and $FD.
+**In progress.** ~2569 bytes matched byte-exact across banks $00, $C0, and $FD.
 Matched routines include the full engine spine: reset vectors, hardware init,
-game loop, VBlank handler, per-frame state init, and OAM culling.
+game loop, VBlank handler, per-frame state init, OAM culling, sprite state gate,
+and the full sprite render dispatch (Sub_B309, 1016 bytes).
 See `docs/PROGRESS.md` for the function-level breakdown.
 
 ## You need your own ROM
