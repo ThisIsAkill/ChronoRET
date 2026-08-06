@@ -1207,7 +1207,246 @@ Sub_C73A:
     RTS
 
 org $C0B8CA
-Sub_B8CA:       ; init helper, type 0 sprites (unmatched)
+Sub_B8CA:
+    ; 411 bytes ($B8CA-$BA64). Entry M=1, X=1 (X=gfx_index from caller).
+    ; Packs X-overflow bits into OAM attribute byte, copies raw Y-source table
+    ; ($7F:480X) into staging buf ($7F:4BCX), then dispatches Y-clamp on $C6:$C5.
+    PHB
+    LDA #$7F
+    PHA
+    PLB
+    REP #$20
+    LDA.l $000A80,X
+    AND #$01FF
+    STA $C5
+    LDA.l $000A00,X
+    STA $C3
+    STZ $E5
+    LDA.l $001700,X
+    STA $D9
+    CLC
+    ADC #$0018              ; A = gfx_index + $18 (first tile is highest)
+
+    ; ── X-init loop: copy $7F:4802,X → $7F:4BC2,X; pack 1 overflow bit per tile ─
+.b8ca_x_loop:
+    TAX                     ; X = decremented tile pointer (or gfx+$18 on first pass)
+    LDA.w $4802,X           ; M=0: 16-bit raw X offset
+    STA.w $4BC2,X           ; copy to staging buf
+    CLC
+    ADC $C3                 ; add base X coordinate
+    SEP #$20                ; M=1
+    STA.w $4BC0,X           ; store X low byte
+    XBA
+    AND #$01                ; extract X bit 8 (overflow)
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $D9
+    BEQ .b8ca_x_done        ; exit when X reaches gfx_index (lowest tile)
+    STA $E5
+    REP #$20                ; M=0
+    TXA
+    SEC
+    SBC #$0008              ; step to next lower tile
+    BRA .b8ca_x_loop
+
+    ; ── Finalize OAM byte, dispatch on $C6 ────────────────────────────────────
+.b8ca_x_done:
+    ORA #$AA                ; M=1: set OAM size bits; merge last overflow bit
+    LDX $6D
+    STA.w $4F00,X           ; OAM high-table byte for this sprite slot
+    LDX $D9                 ; restore X = gfx_index for Y-clamp pass
+    LDA $C6
+    BEQ .b8ca_c6_zero
+
+    ; ── C6≠0: 5-tile unrolled, BCC→clamp / carry+CMP/BCS→store ─────────────
+    ; Logic: only carry-set results ≥$E0 pass through; everything else → $E0.
+    LDA.w $4804,X
+    STA.w $4BC4,X           ; copy raw Y-source to staging
+    CLC
+    ADC $C5
+    BCC .b8ca_nz_cl0
+    CMP #$E0
+    BCS .b8ca_nz_st0
+.b8ca_nz_cl0:
+    LDA #$E0
+.b8ca_nz_st0:
+    STA.w $4BC1,X
+
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .b8ca_nz_cl1
+    CMP #$E0
+    BCS .b8ca_nz_st1
+.b8ca_nz_cl1:
+    LDA #$E0
+.b8ca_nz_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .b8ca_nz_cl2
+    CMP #$E0
+    BCS .b8ca_nz_st2
+.b8ca_nz_cl2:
+    LDA #$E0
+.b8ca_nz_st2:
+    STA.w $4BD1,X
+
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .b8ca_nz_cl3
+    CMP #$E0
+    BCS .b8ca_nz_st3
+.b8ca_nz_cl3:
+    LDA #$E0
+.b8ca_nz_st3:
+    STA.w $4BD9,X
+
+    LDA.w $4BE4,X           ; tile 4: read from staging (no raw-table copy)
+    CLC
+    ADC $C5
+    BCC .b8ca_nz_cl4
+    CMP #$E0
+    BCS .b8ca_nz_st4
+.b8ca_nz_cl4:
+    LDA #$E0
+.b8ca_nz_st4:
+    STA.w $4BE1,X
+
+    REP #$20                ; 16-bit epilogue: copy raw 16-bit Y-source → staging
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    SEP #$20
+    PLB
+    RTS                     ; C6≠0 path exit
+
+    ; ── C6=0 dispatch on C5 bit 7 ─────────────────────────────────────────────
+.b8ca_c6_zero:
+    LDA $C5
+    BPL .b8ca_pos_c5        ; bit7=0: positive path
+
+    ; ── C6=0 negative path (C5≥$80): 4 tiles, BCC+6/BCC+2 clamp ─────────────
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCC .b8ca_neg_st0
+    CMP #$E0
+    BCC .b8ca_neg_st0
+    LDA #$E0
+.b8ca_neg_st0:
+    STA.w $4BC1,X
+
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .b8ca_neg_st1
+    CMP #$E0
+    BCC .b8ca_neg_st1
+    LDA #$E0
+.b8ca_neg_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .b8ca_neg_st2
+    CMP #$E0
+    BCC .b8ca_neg_st2
+    LDA #$E0
+.b8ca_neg_st2:
+    STA.w $4BD1,X
+
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .b8ca_neg_st3
+    CMP #$E0
+    BCC .b8ca_neg_st3
+    LDA #$E0
+.b8ca_neg_st3:
+    STA.w $4BD9,X
+    BRA .b8ca_epilogue
+
+    ; ── C6=0 positive path (C5<$80): 4 tiles, BPL+6/BCS+2 clamp ─────────────
+.b8ca_pos_c5:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .b8ca_pos_st0
+    CMP #$E0
+    BCS .b8ca_pos_st0
+    LDA #$E0
+.b8ca_pos_st0:
+    STA.w $4BC1,X
+
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BPL .b8ca_pos_st1
+    CMP #$E0
+    BCS .b8ca_pos_st1
+    LDA #$E0
+.b8ca_pos_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BPL .b8ca_pos_st2
+    CMP #$E0
+    BCS .b8ca_pos_st2
+    LDA #$E0
+.b8ca_pos_st2:
+    STA.w $4BD1,X
+
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BPL .b8ca_pos_st3
+    CMP #$E0
+    BCS .b8ca_pos_st3
+    LDA #$E0
+.b8ca_pos_st3:
+    STA.w $4BD9,X
+    ; fall through to shared epilogue
+
+    ; ── Shared epilogue: 16-bit Y-source copies + PLB + RTS ───────────────────
+.b8ca_epilogue:
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    SEP #$20
+    PLB
+    RTS
 
 org $C0BA65
 Sub_BA65:       ; init helper, type 1 sprites low-state path (unmatched)
