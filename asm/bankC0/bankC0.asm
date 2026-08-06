@@ -35,8 +35,6 @@ org $C0EC60
 Sub_EC60:       ; called from main frame loop after VBlankHandler
 
 ; Unmatched routines called from matched code
-org $C00B86
-FrameStateInit: ; save/reset per-frame state variables
 
 org $C0B309
 Sub_B309:       ; called from PostVBlank inner loop (sprite -> OAM buffer)
@@ -240,6 +238,134 @@ InstallIRQ:
     STX $0505
     LDA #$C0
     STA $0507
+    RTS
+
+; ============================================================
+; $C0:0B86 — FrameStateInit (240 bytes)
+; Called from GameLoop_Main at the start of each scene iteration.
+; Saves active sprite registers, zeros per-frame state, sets defaults.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+; ============================================================
+FrameStateInit:
+    ; Save current sprite registers to "previous frame" slots
+    LDX $00                  ; ($0100) active sprite X
+    STX $0A                  ; ($010A) = saved X
+    LDX $02                  ; ($0102) active sprite Y
+    STX $0C                  ; ($010C) = saved Y
+    LDA $04                  ; ($0104) sprite attribute
+    STA $0E                  ; ($010E) = saved attribute
+    ; Zero per-frame flags and counters
+    STZ $10
+    STZ $11
+    STZ $17
+    STZ $18
+    STZ $38
+    STZ $0F
+    ; Default sprite Y = $E0 (off-screen, below NTSC visible area)
+    LDA #$E0
+    STA $21
+    STZ $19
+    STZ $BC
+    ; WRAM scene state
+    LDA #$02
+    STA $0BDE               ; WRAM $0BDE = 2
+    ; Reset OAM write-head end pointers to full-buffer limits
+    LDX #$0900
+    STX $7D                 ; ($017D) range-2 end = $0900
+    LDX #$0770
+    STX $7F                 ; ($017F) range-3 end = $0770
+    LDX #$08A0
+    STX $7B                 ; ($017B) range-1 end = $08A0
+    ; Palette/color defaults
+    LDA #$E4
+    STA $B1
+    STA $B4
+    STA $B7
+    STA $BA
+    ; Per-frame mode flags
+    LDA #$01
+    STA $1F
+    STA $20
+    LDA #$05
+    STA $68
+    LDA #$5F
+    STA $28
+    ; Zero remaining per-frame variables
+    STZ $53
+    STZ $26
+    STZ $29
+    STZ $2F
+    STZ $2D
+    STZ $30
+    STZ $44
+    STZ $45
+    STZ $46
+    STZ $5F
+    STZ $78
+    STZ $BB
+    STZ $62
+    LDA #$80
+    STA $63
+    STZ $39
+    STZ $54
+    ; 16-bit section: initialize pointer/address variables
+    REP #$20                ; M=0: A -> 16-bit
+    STZ $2B                 ; ($012B-$012C) = 0
+    ; Load 4 × 16-bit seeds from ROM table at $E4:FFE0-FFE7
+    LDA.l $E4FFE0
+    STA $AF                 ; ($01AF-$01B0)
+    LDA.l $E4FFE2
+    STA $B2
+    LDA.l $E4FFE4
+    STA $B5
+    LDA.l $E4FFE6
+    STA $B8
+    STZ.w $0150             ; ($0150-$0151) = 0 (abs mode)
+    LDA #$0000
+    STA.l $7E2000           ; WRAM $7E:2000-2001 = 0
+    STZ $58                 ; ($0158-$0159) = 0
+    ; Back to 8-bit A
+    SEP #$20                ; M=1: A -> 8-bit
+    LDA #$80
+    STA $97
+    STA $99
+    STA $9B
+    STA $8D
+    STA $8E
+    STA $8F
+    STA $91
+    STA $90
+    STA $92
+    STA $93
+    ; Copy dynamic color vars from WRAM $7E:2980-2982
+    LDA.l $7E2980
+    STA $94
+    LDA.l $7E2981
+    STA $95
+    LDA.l $7E2982
+    STA $96
+    LDA #$80
+    STA $EB
+    STA $AE
+    LDA #$01
+    STA $55
+    LDA #$53
+    STA $FC
+    LDA #$65
+    STA $FB
+    LDA #$45
+    STA $FA
+    ; Zero WRAM state
+    LDA #$00
+    STA.l $7E2989
+    LDA #$00
+    STA $0BD9
+    STA $0BDA
+    STA $0BDB
+    STA $0BE9
+    ; Load scene entry value from WRAM $0400
+    LDA $0400
+    STA $F8
     RTS
 
 ; ============================================================

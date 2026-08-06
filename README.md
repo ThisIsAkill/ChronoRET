@@ -12,8 +12,10 @@ Harkinian for Ocarina of Time, or the Chrono Cross decomp already underway).
 
 ## Status
 
-🚧 **Bootstrapping.** No functions matched yet. This repo currently contains
-tooling and project scaffolding only — no game code or assets.
+**In progress.** ~1247 bytes matched byte-exact across banks $00, $C0, and $FD.
+Matched routines include the full engine spine: reset vectors, hardware init,
+game loop, VBlank handler, per-frame state init, and OAM culling.
+See `docs/PROGRESS.md` for the function-level breakdown.
 
 ## You need your own ROM
 
