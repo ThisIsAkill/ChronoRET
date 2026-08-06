@@ -652,7 +652,189 @@ Sub_B701:
     BRL Sub_C73A            ; type 3+ delegates to full renderer at $C73A
 
 org $C0B788
-Sub_B788:                   ; sprite renderer, called from Sub_B701 type 0 (state=$80); unmatched
+Sub_B788:
+    PHB
+    LDA #$7F
+    PHA
+    PLB                     ; DB = $7F — bank $7F staging data now addressable via abs
+    REP #$20                ; M→0 (16-bit A)
+    LDA.l $000A80,X         ; 9-bit X/flip flags (long: DB=$7F doesn't reach bank $00)
+    AND #$01FF
+    STA $C5                 ; dp: C5=lo byte, C6=hi bit (bit 8 of 9-bit value)
+    LDA.l $000A00,X         ; base X coordinate
+    STA $C3                 ; dp: C3=lo, C4=hi
+    STZ $E5
+    LDA.l $001700,X         ; sprite gfx index (16-bit)
+    STA $D9                 ; dp: D9=lo, DA=hi
+    CLC
+    ADC #$0018              ; start loop at gfx_index + $18 (3 tiles above base)
+.b788_loop:
+    TAX
+    LDA.w $4BC2,X           ; raw X offset from pre-built table
+    CLC
+    ADC $C3                 ; add base X
+    SEP #$20                ; M→1 (8-bit A)
+    STA.w $4BC0,X           ; write X position low byte
+    XBA                     ; get high byte (bit 8 of sum = X overflow bit)
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6                 ; pack flip/overflow bits
+    CPX $D9                 ; reached base gfx index?
+    BEQ .b788_post
+    STA $E5
+    REP #$20                ; M→0
+    TXA
+    SEC
+    SBC #$0008              ; step back one tile
+    BRA .b788_loop
+.b788_post:
+    ORA #$AA                ; set high attribute bits
+    LDX $6D                 ; sprite descriptor index
+    STA.w $4F00,X           ; write to OAM slot
+    LDX $D9                 ; restore gfx base index
+    LDA $C6                 ; check bit 8 of position
+    BEQ .b788_no_c6         ; = 0: dispatch on C5 sign
+    ; C6 != 0: 5-tile Y-clamp (BCC→clamp, BCS→keep)
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCC .b788_c6_cl1
+    CMP #$E0
+    BCS .b788_c6_st1
+.b788_c6_cl1:
+    LDA #$E0
+.b788_c6_st1:
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .b788_c6_cl2
+    CMP #$E0
+    BCS .b788_c6_st2
+.b788_c6_cl2:
+    LDA #$E0
+.b788_c6_st2:
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .b788_c6_cl3
+    CMP #$E0
+    BCS .b788_c6_st3
+.b788_c6_cl3:
+    LDA #$E0
+.b788_c6_st3:
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .b788_c6_cl4
+    CMP #$E0
+    BCS .b788_c6_st4
+.b788_c6_cl4:
+    LDA #$E0
+.b788_c6_st4:
+    STA.w $4BD9,X
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCC .b788_c6_cl5
+    CMP #$E0
+    BCS .b788_c6_st5
+.b788_c6_cl5:
+    LDA #$E0
+.b788_c6_st5:
+    STA.w $4BE1,X
+    SEP #$20
+    PLB
+    RTS
+.b788_no_c6:
+    LDA $C5
+    BPL .b788_pos_c5        ; C5 bit 7 = 0: positive path
+    ; negative C5: 4-tile Y-clamp (BCC+BCC→keep, else clamp)
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCC .b788_n1
+    CMP #$E0
+    BCC .b788_n1
+    LDA #$E0
+.b788_n1:
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .b788_n2
+    CMP #$E0
+    BCC .b788_n2
+    LDA #$E0
+.b788_n2:
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .b788_n3
+    CMP #$E0
+    BCC .b788_n3
+    LDA #$E0
+.b788_n3:
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .b788_n4
+    CMP #$E0
+    BCC .b788_n4
+    LDA #$E0
+.b788_n4:
+    STA.w $4BD9,X
+    SEP #$20
+    PLB
+    RTS
+.b788_pos_c5:
+    ; positive C5: 4-tile Y-clamp (BPL+BCS→keep, else clamp)
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .b788_p1
+    CMP #$E0
+    BCS .b788_p1
+    LDA #$E0
+.b788_p1:
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BPL .b788_p2
+    CMP #$E0
+    BCS .b788_p2
+    LDA #$E0
+.b788_p2:
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BPL .b788_p3
+    CMP #$E0
+    BCS .b788_p3
+    LDA #$E0
+.b788_p3:
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BPL .b788_p4
+    CMP #$E0
+    BCS .b788_p4
+    LDA #$E0
+.b788_p4:
+    STA.w $4BD9,X
+    SEP #$20
+    PLB
+    RTS
 
 org $C0C73A
 Sub_C73A:                   ; type 3+ render entry, called via BRL from Sub_B701 type 3+; unmatched
