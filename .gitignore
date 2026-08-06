@@ -1,0 +1,21 @@
+# ROM files — never committed
+roms/
+*.sfc
+*.smc
+
+# Build output
+build/
+site/
+
+# Python cache
+__pycache__/
+*.pyc
+.eggs/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store

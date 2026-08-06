@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# pre-commit hook — verifies byte-exact ROM match before every commit.
+#
+# Install (after git init):
+#   cp tools/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# Or use the Makefile target:
+#   make install-hook
+
+set -euo pipefail
+
+if [ ! -f roms/chrono_trigger.sfc ]; then
+    echo "[pre-commit] No ROM found at roms/chrono_trigger.sfc — skipping diff check."
+    exit 0
+fi
+
+echo "[pre-commit] Running make diff..."
+if ! make diff --no-print-directory -s; then
+    echo ""
+    echo "[pre-commit] FAIL: ROM does not match after reassembly."
+    echo "  Run 'make diff' to see which bytes differ."
+    echo "  Fix the mismatch before committing."
+    exit 1
+fi
+
+echo "[pre-commit] MATCH: byte-exact. Proceeding with commit."
+exit 0

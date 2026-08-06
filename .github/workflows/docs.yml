@@ -1,0 +1,44 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'docs/devlog/**'
+      - 'index.md'
+      - 'mkdocs.yml'
+      - 'asm/**'
+      - 'tools/progress.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MkDocs
+        run: pip install mkdocs-material
+
+      - name: Decode ROM (needed for progress.py if it reads ROM)
+        env:
+          ROM_B64: ${{ secrets.ROM_B64 }}
+        run: |
+          if [ -n "$ROM_B64" ]; then
+            mkdir -p roms
+            echo "$ROM_B64" | base64 -d > roms/chrono_trigger.sfc
+          fi
+
+      - name: Update progress
+        run: python3 tools/progress.py --update || true
+
+      - name: Build and deploy site
+        run: mkdocs gh-deploy --force

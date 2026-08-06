@@ -1,0 +1,74 @@
+name: Byte-exact match check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  match:
+    name: Reassemble and diff
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Restore a cached copy of the ROM (contributors upload it once as a
+      # GitHub Actions secret encoded in base64, then it's cached per-SHA).
+      # See docs/CI_SETUP.md for how to configure ROM_B64 as a repo secret.
+      - name: Restore ROM from secret
+        env:
+          ROM_B64: ${{ secrets.ROM_B64 }}
+        run: |
+          mkdir -p roms
+          if [ -z "$ROM_B64" ]; then
+            echo "::warning::ROM_B64 secret not set — skipping byte-exact check."
+            echo "SKIP_CHECK=1" >> "$GITHUB_ENV"
+          else
+            echo "$ROM_B64" | base64 -d > roms/chrono_trigger.sfc
+            SHA=$(sha256sum roms/chrono_trigger.sfc | cut -d' ' -f1)
+            EXPECTED=$(grep 'SHA256' docs/ROM_HASH.md | grep -oP '[0-9a-f]{64}' || true)
+            if [ -n "$EXPECTED" ] && [ "$SHA" != "$EXPECTED" ]; then
+              echo "::error::ROM checksum mismatch (got $SHA, expected $EXPECTED)"
+              exit 1
+            fi
+          fi
+
+      - name: Install asar
+        if: env.SKIP_CHECK != '1'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake build-essential
+          git clone --depth=1 https://github.com/RPGHacker/asar.git /tmp/asar
+          cmake -S /tmp/asar/src -B /tmp/asar/build -DASAR_GEN_EXE=ON -DASAR_GEN_DLL=OFF
+          cmake --build /tmp/asar/build --target asar
+          sudo cp /tmp/asar/build/asar /usr/local/bin/asar
+          asar --version
+
+      - name: Set up Python
+        if: env.SKIP_CHECK != '1'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check environment
+        if: env.SKIP_CHECK != '1'
+        run: python3 tools/check_env.py
+
+      - name: Build and diff
+        if: env.SKIP_CHECK != '1'
+        run: |
+          make diff
+          echo "MATCH_RESULT=passed" >> "$GITHUB_ENV"
+
+      - name: Show match percentage
+        if: env.SKIP_CHECK != '1'
+        run: |
+          python3 tools/progress.py
+
+      - name: Fail on mismatch
+        if: env.SKIP_CHECK != '1' && env.MATCH_RESULT != 'passed'
+        run: |
+          echo "::error::make diff failed — reassembled ROM does not match original."
+          exit 1
