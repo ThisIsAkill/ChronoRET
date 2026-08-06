@@ -1,7 +1,5 @@
 # Chrono Trigger (SNES) — Matching Decompilation
 
-[![Docs](https://github.com/ThisIsAkill/chrono-trigger-decomp/actions/workflows/docs.yml/badge.svg)](https://github.com/ThisIsAkill/chrono-trigger-decomp/actions/workflows/docs.yml)
-
 An in-progress matching decompilation of the original 1995 SNES release of
 Chrono Trigger. The goal is to reconstruct labeled, human-readable 65816
 assembly (and eventually C, where feasible) that reassembles to a

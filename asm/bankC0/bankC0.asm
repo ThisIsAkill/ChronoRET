@@ -39,6 +39,30 @@ Sub_EC60:       ; called from main frame loop after VBlankHandler
 org $C0B309
 Sub_B309:       ; called from PostVBlank inner loop (sprite -> OAM buffer)
 
+org $C0B8CA
+Sub_B8CA:       ; init helper, type 0 sprites (unmatched)
+
+org $C0BA65
+Sub_BA65:       ; init helper, type 1 sprites low-state path (unmatched)
+
+org $C0BCDC
+Sub_BCDC:       ; init helper, type 1 sprites (unmatched)
+
+org $C0BFF2
+Sub_BFF2:       ; init helper, types 2/3+ low-state path (unmatched)
+
+org $C0C2BF
+Sub_C2BF:       ; init helper, types 2/3+ sprites (unmatched)
+
+org $C0E9E2
+Sub_E9E2:       ; init helper, type 0 sprites pass 2 (unmatched)
+
+org $C0E9FF
+Sub_E9FF:       ; init helper, type 1 sprites pass 2 (unmatched)
+
+org $C0EA1F
+Sub_EA1F:       ; init helper, types 2/3+ sprites pass 2 (unmatched)
+
 ; ============================================================
 ; $C0:0000 — Entry jump table (5 entries, BRA/BRL)
 ; Entry 0 is warm restart (skip one-time init, enter frame loop).
