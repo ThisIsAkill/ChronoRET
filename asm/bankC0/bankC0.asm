@@ -892,7 +892,319 @@ Sub_C6E7:
     RTS
 
 org $C0C73A
-Sub_C73A:                   ; type 3+ render entry, called via BRL from Sub_B701 type 3+; unmatched
+Sub_C73A:
+    ; 592 bytes ($C73A-$C989). Entry M=1, X=1 (from Sub_B701 type-3+ BRL).
+    ; DB=$7F prologue, 6× JSR Sub_C6E7 for OAM X-bits, then 3-way 24-tile Y-clamp.
+
+    ; ── Prologue: DB=$7F ────────────────────────────────────────────────────────
+    PHB
+    LDA #$7F
+    PHA
+    PLB                         ; DB=$7F
+
+    ; ── Load sprite params ───────────────────────────────────────────────────────
+    REP #$20                    ; M→0
+    LDX $6D                     ; sprite/OAM slot index (8-bit X)
+    LDA.l $000A80,X             ; 9-bit Y position value
+    AND #$01FF
+    STA $C5                     ; C5=lo byte, C6=hi bit (bit 8)
+    LDA.l $000A00,X             ; base X coordinate
+    STA $C3
+    LDA.l $001700,X             ; gfx index
+    TAX                         ; X = gfx_index (8-bit capture)
+
+    ; ── 6× JSR Sub_C6E7 ─────────────────────────────────────────────────────────
+    ; Each call: entry M=0, X=gfx_index; exit M=1, A=packed OAM byte.
+    ; After each call (except last): save X, load OAM slot, write OAM byte,
+    ;   restore X, REP, TXA+ADC #$20+TAX to advance gfx_index by $20.
+    JSR Sub_C6E7                ; call 1 — gfx_index
+    STX $D9
+    LDX $6D
+    STA.w $4F00,X
+    LDX $D9
+    REP #$20
+    TXA
+    CLC
+    ADC #$0020
+    TAX
+    JSR Sub_C6E7                ; call 2 — gfx_index+$20
+    STX $D9
+    LDX $6D
+    STA.w $4F01,X
+    LDX $D9
+    REP #$20
+    TXA
+    CLC
+    ADC #$0020
+    TAX
+    JSR Sub_C6E7                ; call 3 — gfx_index+$40
+    STX $D9
+    LDX $6D
+    STA.w $4B40,X
+    LDX $D9
+    REP #$20
+    TXA
+    CLC
+    ADC #$0020
+    TAX
+    JSR Sub_C6E7                ; call 4 — gfx_index+$60
+    STX $D9
+    LDX $6D
+    STA.w $4B41,X
+    LDX $D9
+    REP #$20
+    TXA
+    CLC
+    ADC #$0020
+    TAX
+    JSR Sub_C6E7                ; call 5 — gfx_index+$80
+    STX $D9
+    LDX $6D
+    STA.w $4F80,X
+    LDX $D9
+    REP #$20
+    TXA
+    CLC
+    ADC #$0020
+    TAX
+    JSR Sub_C6E7                ; call 6 — gfx_index+$A0
+    STX $D9
+    LDX $6D
+    STA.w $4F81,X
+    LDX $6D                     ; reload OAM slot (not $D9) for gfx_index lookup
+    REP #$20
+    LDA.l $001700,X             ; reload original gfx_index for Y-clamp pass
+    TAX
+    SEP #$20                    ; M→1
+
+    ; ── Y-position 3-way dispatch ────────────────────────────────────────────────
+    LDA $C6
+    BEQ .c73a_chk_c5            ; C6=0: check C5 next
+    BRL $0049                   ; C6≠0: → .c73a_c6nz [$C820; offset=$C820-$C7D7=$0049]
+.c73a_chk_c5:
+    LDA $C5
+    BMI .c73a_large_c5          ; C5≥$80: no-clamp path
+    BRL $001D                   ; C5<$80: clamp path → .c73a_small_c5 [$C7FB; offset=$C7FB-$C7DE=$001D]
+
+    ; ── C6=0, C5≥$80: 24-tile add with no clamping ───────────────────────────────
+.c73a_large_c5:
+    LDA #$18
+    STA $C9                     ; counter = 24
+.c73a_large_loop:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    STA.w $4BC1,X               ; store Y (no clamp; overflow wraps)
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $C9
+    BNE .c73a_large_loop
+    PLB
+    RTS
+
+    ; ── C6=0, C5<$80: 24-tile add, clamp $80–$DF to $E0 ─────────────────────────
+.c73a_small_c5:
+    LDA #$18
+    STA $C9
+.c73a_small_loop:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .c73a_small_store       ; 0–$7F: store as-is
+    CMP #$E0
+    BCS .c73a_small_store       ; $E0–$FF: already off-screen, store as-is
+    LDA #$E0                    ; $80–$DF: clamp to $E0
+.c73a_small_store:
+    STA.w $4BC1,X
+    REP #$20
+    TXA
+    CLC
+    ADC #$0008
+    TAX
+    SEP #$20
+    DEC $C9
+    BNE .c73a_small_loop
+    PLB
+    RTS
+
+    ; ── C6≠0: unrolled 24-tile Y-clamp (BCS→clamp, BMI→clamp, else store) ────────
+    ; Clamp fires if: sum overflows (BCS) or result is $80–$FF with no overflow (BMI).
+    ; Only 0–$7F passes through unclamped.
+.c73a_c6nz:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl00
+    BPL .c73a_st00
+.c73a_cl00: LDA #$E0
+.c73a_st00: STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl01
+    BPL .c73a_st01
+.c73a_cl01: LDA #$E0
+.c73a_st01: STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl02
+    BPL .c73a_st02
+.c73a_cl02: LDA #$E0
+.c73a_st02: STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl03
+    BPL .c73a_st03
+.c73a_cl03: LDA #$E0
+.c73a_st03: STA.w $4BD9,X
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl04
+    BPL .c73a_st04
+.c73a_cl04: LDA #$E0
+.c73a_st04: STA.w $4BE1,X
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl05
+    BPL .c73a_st05
+.c73a_cl05: LDA #$E0
+.c73a_st05: STA.w $4BE9,X
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl06
+    BPL .c73a_st06
+.c73a_cl06: LDA #$E0
+.c73a_st06: STA.w $4BF1,X
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl07
+    BPL .c73a_st07
+.c73a_cl07: LDA #$E0
+.c73a_st07: STA.w $4BF9,X
+    LDA.w $4C04,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl08
+    BPL .c73a_st08
+.c73a_cl08: LDA #$E0
+.c73a_st08: STA.w $4C01,X
+    LDA.w $4C0C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl09
+    BPL .c73a_st09
+.c73a_cl09: LDA #$E0
+.c73a_st09: STA.w $4C09,X
+    LDA.w $4C14,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl10
+    BPL .c73a_st10
+.c73a_cl10: LDA #$E0
+.c73a_st10: STA.w $4C11,X
+    LDA.w $4C1C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl11
+    BPL .c73a_st11
+.c73a_cl11: LDA #$E0
+.c73a_st11: STA.w $4C19,X
+    LDA.w $4C24,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl12
+    BPL .c73a_st12
+.c73a_cl12: LDA #$E0
+.c73a_st12: STA.w $4C21,X
+    LDA.w $4C2C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl13
+    BPL .c73a_st13
+.c73a_cl13: LDA #$E0
+.c73a_st13: STA.w $4C29,X
+    LDA.w $4C34,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl14
+    BPL .c73a_st14
+.c73a_cl14: LDA #$E0
+.c73a_st14: STA.w $4C31,X
+    LDA.w $4C3C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl15
+    BPL .c73a_st15
+.c73a_cl15: LDA #$E0
+.c73a_st15: STA.w $4C39,X
+    LDA.w $4C44,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl16
+    BPL .c73a_st16
+.c73a_cl16: LDA #$E0
+.c73a_st16: STA.w $4C41,X
+    LDA.w $4C4C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl17
+    BPL .c73a_st17
+.c73a_cl17: LDA #$E0
+.c73a_st17: STA.w $4C49,X
+    LDA.w $4C54,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl18
+    BPL .c73a_st18
+.c73a_cl18: LDA #$E0
+.c73a_st18: STA.w $4C51,X
+    LDA.w $4C5C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl19
+    BPL .c73a_st19
+.c73a_cl19: LDA #$E0
+.c73a_st19: STA.w $4C59,X
+    LDA.w $4C64,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl20
+    BPL .c73a_st20
+.c73a_cl20: LDA #$E0
+.c73a_st20: STA.w $4C61,X
+    LDA.w $4C6C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl21
+    BPL .c73a_st21
+.c73a_cl21: LDA #$E0
+.c73a_st21: STA.w $4C69,X
+    LDA.w $4C74,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl22
+    BPL .c73a_st22
+.c73a_cl22: LDA #$E0
+.c73a_st22: STA.w $4C71,X
+    LDA.w $4C7C,X
+    CLC
+    ADC $C5
+    BCS .c73a_cl23
+    BPL .c73a_st23
+.c73a_cl23: LDA #$E0
+.c73a_st23: STA.w $4C79,X
+    PLB
+    RTS
 
 org $C0B8CA
 Sub_B8CA:       ; init helper, type 0 sprites (unmatched)
