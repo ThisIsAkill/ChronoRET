@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-progress.py — Auto-generate docs/PROGRESS.md stats from asm/ source.
+progress.py — Matched-byte stats and homepage snippet generation.
 
-Scans asm/bank*/*.asm for `org` directives and explicit byte/data
-definitions to compute how many ROM bytes are covered by matched source,
-then updates (or prints) the progress table.
+Scans asm/bank*/*.asm for explicit data definitions (db/dw/dl) to count
+data bytes. Instruction bytes are verified only by `make diff`, not counted
+here — see docs/PROGRESS.md (hand-maintained) for the authoritative total.
 
 Usage:
-    python3 tools/progress.py [--update]
+    python3 tools/progress.py             dry-run: print data-byte stats
+    python3 tools/progress.py --update-index
+        Read docs/PROGRESS.md, regenerate docs/includes/progress_summary.md
+        (the snippet included in docs/index.md), and print data-byte stats.
 
-    --update   Overwrite docs/PROGRESS.md with fresh stats (default: dry-run)
+NOTE: --update no longer overwrites docs/PROGRESS.md.  That file is
+hand-maintained because progress.py only counts data bytes, not instructions.
+Run --update-index instead to sync the homepage table from PROGRESS.md.
 """
 
 import re
@@ -17,10 +22,11 @@ import sys
 import struct
 from pathlib import Path
 
-ROM_PATH     = Path('roms/chrono_trigger.sfc')
-ASM_DIR      = Path('asm')
-PROGRESS_MD  = Path('docs/PROGRESS.md')
-ROM_SIZE     = 0x400000   # 4 MB unheadered
+ROM_PATH        = Path('roms/chrono_trigger.sfc')
+ASM_DIR         = Path('asm')
+PROGRESS_MD     = Path('docs/PROGRESS.md')
+SUMMARY_SNIPPET = Path('docs/includes/progress_summary.md')
+ROM_SIZE        = 0x400000   # 4 MB unheadered
 
 
 def load_rom() -> bytes:
@@ -253,23 +259,95 @@ def format_stats(total_covered: set[int], per_bank: dict[str, set[int]]) -> str:
     return '\n'.join(lines) + '\n'
 
 
+def parse_progress_md() -> tuple[int, dict[str, tuple[str, int]]]:
+    """
+    Parse docs/PROGRESS.md (hand-maintained) to extract:
+      - overall total (from the '~XXXX bytes matched' headline)
+      - per-bank byte counts and descriptions (from '### Bank $XX — ... (NNN bytes)' headings)
+
+    Returns (total_bytes, {bank_id: (description, bytes)})
+    """
+    if not PROGRESS_MD.exists():
+        return 0, {}
+
+    text = PROGRESS_MD.read_text()
+
+    # Overall total: "Overall: **~2569 bytes matched**" or "~2,569 bytes"
+    total = 0
+    m = re.search(r'Overall:.*?~?([\d,]+)\s+bytes', text)
+    if m:
+        total = int(m.group(1).replace(',', ''))
+
+    # Bank sections: "### Bank $C0 — `...` (2098 bytes)"
+    bank_re = re.compile(
+        r'^#{2,3}\s+Bank\s+(\$[0-9A-Fa-f]+)\s+[—–-]\s+`[^`]+`\s+\((\d+)\s+bytes',
+        re.MULTILINE,
+    )
+    banks: dict[str, tuple[str, int]] = {}
+    for m in bank_re.finditer(text):
+        bank_id = m.group(1).upper()
+        byte_count = int(m.group(2))
+        banks[bank_id] = byte_count
+
+    return total, banks
+
+
+def write_summary_snippet(total: int, banks: dict[str, int]) -> None:
+    """Write docs/includes/progress_summary.md from parsed PROGRESS.md data."""
+    bank_descriptions = {
+        '$00': 'Boot vectors, wave tables, ROM header',
+        '$C0': 'Engine core — GameLoop, VBlank, OAM, sprite render',
+        '$FD': 'MainInit (CPU/PPU init sequence)',
+    }
+
+    rows = []
+    grand = 0
+    for bank_id in sorted(banks):
+        desc = bank_descriptions.get(bank_id, '—')
+        n = banks[bank_id]
+        grand += n
+        rows.append(f'| `{bank_id}` | {desc} | Partial | {n:,} |')
+    rows.append('| Everything else | — | Unmapped | 0 |')
+
+    display_total = total if total else grand
+    pct = 100.0 * display_total / ROM_SIZE
+
+    lines = [
+        '| Bank | Region | Status | Bytes |',
+        '|------|--------|--------|-------|',
+    ] + rows + [
+        '',
+        f'**Total matched: ~{display_total:,} bytes out of {ROM_SIZE:,} ({pct:.3f}%)**',
+        '',
+        '*Run `python3 tools/progress.py --update-index` after updating `docs/PROGRESS.md` to regenerate this table.*',
+    ]
+
+    SUMMARY_SNIPPET.write_text('\n'.join(lines) + '\n')
+    print(f'Updated {SUMMARY_SNIPPET}')
+
+
 def main() -> int:
-    update = '--update' in sys.argv
+    update_index = '--update-index' in sys.argv
+    legacy_update = '--update' in sys.argv
+
+    if legacy_update:
+        print(
+            'NOTE: --update no longer writes to docs/PROGRESS.md (that file is\n'
+            'hand-maintained). Use --update-index to regenerate the homepage\n'
+            'snippet from PROGRESS.md instead.\n'
+        )
 
     all_covered, per_bank = scan_all_asm()
-    output = format_stats(all_covered, per_bank)
 
-    if update:
-        PROGRESS_MD.write_text(output)
-        print(f'Updated {PROGRESS_MD}')
-    else:
-        print(output)
-        print(f'(dry run — pass --update to write to {PROGRESS_MD})')
-
-    total = ROM_SIZE
     matched = len(all_covered)
-    pct = 100.0 * matched / total
-    print(f'\nSummary: {matched:,} / {total:,} bytes ({pct:.4f}%)')
+    pct = 100.0 * matched / ROM_SIZE
+    print(f'Data bytes matched: {matched:,} / {ROM_SIZE:,} ({pct:.4f}%)')
+    print('(instruction bytes verified via make diff — see docs/PROGRESS.md for totals)\n')
+
+    if update_index:
+        total, banks = parse_progress_md()
+        write_summary_snippet(total, banks)
+
     return 0
 
 
