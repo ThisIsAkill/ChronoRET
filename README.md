@@ -2,7 +2,7 @@
 
 A personal side project for learning 65816 assembly and SNES reverse engineering.
 I started this to understand how the game actually works at the machine level —
-it's just me working through the code as I go, not a professional or team effort.
+it's just me working through the code as I go, not a professional or team effort.  I am also using claude AI for the commit descriptions, I felt like it's one less thing I can stop worrying about.  That is all the AI is going yo be used for.
 
 The goal is a byte-exact matching decompilation of the 1995 US SNES release:
 labeled, human-readable 65816 assembly that reassembles to an identical ROM.
