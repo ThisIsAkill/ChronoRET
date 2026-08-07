@@ -2680,7 +2680,541 @@ Sub_BFF2:
     RTS
 
 org $C0C2BF
-Sub_C2BF:       ; init helper, types 2/3+ sprites (unmatched)
+Sub_C2BF:
+    ; 1064 bytes ($C2BF-$C6E6). Entry M=1, X=1. Types 2/3+ high-state init.
+    ; Reads X offsets from raw table ($4802,X) AND writes to staging ($4BC2,X).
+    ; Three backward X-loops (D9+$18 down, D9+$20+$18 down, D9+$40+$18 down).
+    ; Then 3-way Y dispatch: C6≠0 → BCS/BPL clamp (12 tiles, raw copy),
+    ;   C6=0 C5≥$80 → negative (raw copy, direct add, no clamp),
+    ;   C6=0 C5<$80 → positive (raw copy, BPL/CMP/BCS clamp, no BMI-split).
+    ; High-state indicator: raw $4802→$4BC2 in X-loops AND $4804→$4BC4 in Y paths.
+    ; Mirrors Sub_BCDC (type 1 high-state) structure, scaled to 12 tiles.
+    PHB
+    LDA #$7F
+    PHA
+    PLB
+    REP #$20
+    LDX $6D
+    LDA.l $000A80,X
+    AND #$01FF
+    STA $C5
+    LDA.l $000A00,X
+    STA $C3
+    STZ $E5
+    LDA.l $001700,X
+    STA $D9
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 1: raw $4802,X → staging $4BC2,X, pack OAM high → $4F00 ──────
+.c2bf_x1_loop:
+    TAX
+    LDA.w $4802,X
+    STA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $D9
+    BEQ .c2bf_x1_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .c2bf_x1_loop
+.c2bf_x1_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F00,X
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0020
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 2: raw $4802,X → staging $4BC2,X, pack OAM high → $4F01 ──────
+.c2bf_x2_loop:
+    TAX
+    LDA.w $4802,X
+    STA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .c2bf_x2_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .c2bf_x2_loop
+.c2bf_x2_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F01,X
+    LDX $D9                     ; extra LDX vs Sub_BFF2 (dead code quirk)
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0040
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 3: raw $4802,X → staging $4BC2,X, pack OAM high → $4B40 ──────
+.c2bf_x3_loop:
+    TAX
+    LDA.w $4802,X
+    STA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .c2bf_x3_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .c2bf_x3_loop
+.c2bf_x3_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4B40,X
+    LDX $D9
+    LDA $C6
+    BEQ .c2bf_c6_zero
+    BRL $0223               ; C6≠0 → $C5C1 (raw signed offset, asar BRL quirk)
+
+    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+.c2bf_c6_zero:
+    LDA $C5
+    BMI .c2bf_neg
+    BRL $00DE               ; C5<$80 → $C483 positive path (raw signed offset)
+
+    ; ── C6=0 negative (C5≥$80): raw copy + direct add, no clamp, 12 tiles ────
+.c2bf_neg:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    STA.w $4BF9,X
+    LDA.w $4844,X
+    STA.w $4C04,X
+    CLC
+    ADC $C5
+    STA.w $4C01,X
+    LDA.w $484C,X
+    STA.w $4C0C,X
+    CLC
+    ADC $C5
+    STA.w $4C09,X
+    LDA.w $4854,X
+    STA.w $4C14,X
+    CLC
+    ADC $C5
+    STA.w $4C11,X
+    LDA.w $485C,X
+    STA.w $4C1C,X
+    CLC
+    ADC $C5
+    STA.w $4C19,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    LDA.w $4846,X
+    STA.w $4C06,X
+    LDA.w $484E,X
+    STA.w $4C0E,X
+    LDA.w $4856,X
+    STA.w $4C16,X
+    LDA.w $485E,X
+    STA.w $4C1E,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6=0 positive (C5<$80): raw copy + BPL/CMP/BCS clamp, 12 tiles ───────
+    ; Same tile structure as Sub_BCDC positive path — no BMI-split.
+    ; Reads $4804,X → $4BC4,X (raw→staging) before computing Y clamp.
+.c2bf_pos:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st0
+    CMP #$E0
+    BCS .c2bf_pos_st0
+    LDA #$E0
+.c2bf_pos_st0:
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st1
+    CMP #$E0
+    BCS .c2bf_pos_st1
+    LDA #$E0
+.c2bf_pos_st1:
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st2
+    CMP #$E0
+    BCS .c2bf_pos_st2
+    LDA #$E0
+.c2bf_pos_st2:
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st3
+    CMP #$E0
+    BCS .c2bf_pos_st3
+    LDA #$E0
+.c2bf_pos_st3:
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st4
+    CMP #$E0
+    BCS .c2bf_pos_st4
+    LDA #$E0
+.c2bf_pos_st4:
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st5
+    CMP #$E0
+    BCS .c2bf_pos_st5
+    LDA #$E0
+.c2bf_pos_st5:
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st6
+    CMP #$E0
+    BCS .c2bf_pos_st6
+    LDA #$E0
+.c2bf_pos_st6:
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st7
+    CMP #$E0
+    BCS .c2bf_pos_st7
+    LDA #$E0
+.c2bf_pos_st7:
+    STA.w $4BF9,X
+    LDA.w $4844,X
+    STA.w $4C04,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st8
+    CMP #$E0
+    BCS .c2bf_pos_st8
+    LDA #$E0
+.c2bf_pos_st8:
+    STA.w $4C01,X
+    LDA.w $484C,X
+    STA.w $4C0C,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st9
+    CMP #$E0
+    BCS .c2bf_pos_st9
+    LDA #$E0
+.c2bf_pos_st9:
+    STA.w $4C09,X
+    LDA.w $4854,X
+    STA.w $4C14,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st10
+    CMP #$E0
+    BCS .c2bf_pos_st10
+    LDA #$E0
+.c2bf_pos_st10:
+    STA.w $4C11,X
+    LDA.w $485C,X
+    STA.w $4C1C,X
+    CLC
+    ADC $C5
+    BPL .c2bf_pos_st11
+    CMP #$E0
+    BCS .c2bf_pos_st11
+    LDA #$E0
+.c2bf_pos_st11:
+    STA.w $4C19,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    LDA.w $4846,X
+    STA.w $4C06,X
+    LDA.w $484E,X
+    STA.w $4C0E,X
+    LDA.w $4856,X
+    STA.w $4C16,X
+    LDA.w $485E,X
+    STA.w $4C1E,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6≠0: raw copy + BCS/BPL clamp (carry first, sign second), 12 tiles ──
+    ; Same BCS/BPL ordering as Sub_BFF2 C6≠0 path.
+.c2bf_nz:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl0
+    BPL .c2bf_nz_st0
+.c2bf_nz_cl0:
+    LDA #$E0
+.c2bf_nz_st0:
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl1
+    BPL .c2bf_nz_st1
+.c2bf_nz_cl1:
+    LDA #$E0
+.c2bf_nz_st1:
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl2
+    BPL .c2bf_nz_st2
+.c2bf_nz_cl2:
+    LDA #$E0
+.c2bf_nz_st2:
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl3
+    BPL .c2bf_nz_st3
+.c2bf_nz_cl3:
+    LDA #$E0
+.c2bf_nz_st3:
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl4
+    BPL .c2bf_nz_st4
+.c2bf_nz_cl4:
+    LDA #$E0
+.c2bf_nz_st4:
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl5
+    BPL .c2bf_nz_st5
+.c2bf_nz_cl5:
+    LDA #$E0
+.c2bf_nz_st5:
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl6
+    BPL .c2bf_nz_st6
+.c2bf_nz_cl6:
+    LDA #$E0
+.c2bf_nz_st6:
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl7
+    BPL .c2bf_nz_st7
+.c2bf_nz_cl7:
+    LDA #$E0
+.c2bf_nz_st7:
+    STA.w $4BF9,X
+    LDA.w $4844,X
+    STA.w $4C04,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl8
+    BPL .c2bf_nz_st8
+.c2bf_nz_cl8:
+    LDA #$E0
+.c2bf_nz_st8:
+    STA.w $4C01,X
+    LDA.w $484C,X
+    STA.w $4C0C,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl9
+    BPL .c2bf_nz_st9
+.c2bf_nz_cl9:
+    LDA #$E0
+.c2bf_nz_st9:
+    STA.w $4C09,X
+    LDA.w $4854,X
+    STA.w $4C14,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl10
+    BPL .c2bf_nz_st10
+.c2bf_nz_cl10:
+    LDA #$E0
+.c2bf_nz_st10:
+    STA.w $4C11,X
+    LDA.w $485C,X
+    STA.w $4C1C,X
+    CLC
+    ADC $C5
+    BCS .c2bf_nz_cl11
+    BPL .c2bf_nz_st11
+.c2bf_nz_cl11:
+    LDA #$E0
+.c2bf_nz_st11:
+    STA.w $4C19,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    LDA.w $4846,X
+    STA.w $4C06,X
+    LDA.w $484E,X
+    STA.w $4C0E,X
+    LDA.w $4856,X
+    STA.w $4C16,X
+    LDA.w $485E,X
+    STA.w $4C1E,X
+    SEP #$20
+    PLB
+    RTS
 
 org $C0E9E2
 Sub_E9E2:
