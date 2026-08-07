@@ -3264,7 +3264,29 @@ Sub_E9FF:
     RTS
 
 org $C0EA1F
-Sub_EA1F:       ; init helper, types 2/3+ sprites pass 2 (unmatched)
+Sub_EA1F:
+    ; 35 bytes ($EA1F–$EA41). Entry M=1, X=0 (16-bit).
+    ; Types 2/3+ init pass 2: searches 2-entry table at $0BC0 for sprite
+    ; slot $6D; marks $0BC0,X $0BC1,X $0BC2,X with $80 (3 OAM slots).
+    SEP #$10                ; X → 8-bit
+    LDX $6D                 ; (discarded; immediately overwritten)
+    LDX #$00                ; X = 0 (loop counter)
+.ea1f_loop:
+    LDA.w $0BC0,X           ; table entry X
+    CMP $6D                 ; match sprite slot?
+    BEQ .ea1f_found
+    INX
+    CPX #$02                ; 2-entry table (0,1)
+    BNE .ea1f_loop
+    REP #$10                ; X → 16-bit (no match)
+    RTS
+.ea1f_found:
+    LDA #$80
+    STA.w $0BC0,X           ; mark slot (byte 0)
+    STA.w $0BC1,X           ; mark slot (byte 1)
+    STA.w $0BC2,X           ; mark slot (byte 2)
+    REP #$10                ; X → 16-bit
+    RTS
 
 ; ============================================================
 ; $C0:0000 — Entry jump table (5 entries, BRA/BRL)
