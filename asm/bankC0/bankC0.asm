@@ -3618,6 +3618,287 @@ FrameStateInit:
     RTS
 
 ; ============================================================
+; $C0:0C76 — Sub_0C76 (258 bytes, $0C76–$0D77)
+; Per-frame state-machine controller, called after FrameStateInit.
+; Dispatches scroll/scene updates, handles mode transitions.
+;
+; dp:$18 = pending-transition flags (bits 1=$02, 3=$08)
+; dp:$17 = active-transition flags (bit 7=negative; bit 6=$40; bit 4=$10)
+; dp:$19 = countdown timer
+; dp:$25 = scene/mode selector
+; dp:$5B = current game mode value (indexed into $7E3000)
+;
+; Fast path (dp:$17 == 0): just service $18 flags and RTS.
+; Negative-$17 path: decrement $19 or hard-restart GameLoop ($0000).
+; Positive-$17 paths:
+;   bit 6 = fade-in loop (calls $881E + EC60 each VBlank)
+;   bit 4 = mode handler dispatch ($E6/$EC/$EE/$FA/$FC or default)
+;   other = color-transition setup, then restart scene.
+; ============================================================
+org $C00C76
+Sub_0C76:
+    ; --- Check pending scroll/fade flags in dp:$18 ---
+    LDA $18
+    BEQ .chk_transition      ; $18=0 → skip, check $17
+    BIT #$02
+    BEQ .chk_flag8           ; bit 1 not set → skip Sub_1F24
+    JSR $1F24                ; Sub_1F24: advance scroll target (scroll-X direction)
+    LDA $18
+.chk_flag8:
+    BIT #$08
+    BEQ .chk_transition      ; bit 3 not set → skip Sub_1F5A
+    JSR $1F5A                ; Sub_1F5A: advance scroll target (scroll-Y direction)
+
+.chk_transition:
+    ; --- Check dp:$17 transition flags ---
+    LDA $17
+    BNE .has_transition
+    RTS                      ; nothing pending — fast exit
+
+.has_transition:
+    BPL .positive_17         ; bit 7 clear → positive flags path
+
+    ; --- Negative $17 path: countdown timer ---
+    LDA $19
+    BEQ .hard_restart        ; $19=0 → warmboot
+    BMI .hard_restart        ; $19 negative → warmboot
+    DEC $19
+    RTS
+
+.hard_restart:
+    ; Full warmboot: disable hw, save dp state, jump back to GameLoop
+    JSR $0B4E                ; InitHW: SEI + forced blank
+    LDX $00
+    STX $05
+    LDY $97
+    LDA $1801,Y
+    STA $07
+    LDA $1881,Y
+    STA $08
+    LDA $1600,Y
+    EOR #$01
+    STA $09
+    LDX $12
+    STX $00
+    LDX $14
+    STX $02
+    LDA $16
+    STA $04
+    LDX #$FF
+    ASL $9A
+    BRL $F339                ; → GameLoop ($0000): restart engine
+
+    ; --- Positive $17 path ---
+.positive_17:
+    BIT #$40
+    BNE .run_fade_loop       ; bit 6 set → fade-in loop
+    BRL .chk_bit10           ; bit 6 clear → check bit 4 ($0D3E)
+
+.run_fade_loop:
+    ; Fade-in loop: decrement $19, call $881E each VBlank until done
+    LDA $19
+    BEQ .enter_transition
+    BMI .enter_transition
+    DEC $19
+    LDA $1F
+    PHA
+    STZ $1F
+    JSR $881E                ; frame update (DMA/controller)
+    PLA
+    STA $1F
+    JSL $FDFFF7              ; wait for VBlank
+    JSR $EC60                ; post-VBlank work
+    BRA .run_fade_loop
+
+.enter_transition:
+    ; Scene transition: reinit HW + set up new color/mode
+    JSR $0B4E                ; InitHW
+    JSR $011B                ; unknown scene-setup routine
+    TDC
+    XBA                      ; B = 0 (dp high byte)
+    LDA $25
+    BEQ .mode_5_setup        ; $25=0 → plain mode 5
+    BMI .negative_25         ; $25 negative → extract mode bits
+
+    ; $25 positive: choose mode 0 or 6 based on bit 0
+    BIT #$01
+    BNE .lda_0
+    LDA #$06
+    BRA .do_jsl_c28000
+
+.lda_0:
+    LDA #$00
+    BRA .do_jsl_c28000
+
+.mode_5_setup:
+    LDA #$05
+    BRL $0CBE                ; → $19C7 (special warm-restart path)
+
+.negative_25:
+    REP #$20                 ; A → 16-bit
+    AND #$003F               ; isolate low 6 bits of $25
+    TAX
+    SEP #$20                 ; A → 8-bit
+    LDA $25
+    ROL
+    ROL
+    ROL
+    AND #$03                 ; bits 7–6 of $25 → 2-bit mode
+
+.do_jsl_c28000:
+    JSL $C28000              ; set BG mode
+    JSR $0B4E                ; InitHW
+    JSR $0B64                ; InstallNMI
+    JSR $0B75                ; InstallIRQ
+    REP #$20
+    LDA #$0100
+    TCD                      ; DP = $0100
+    SEP #$20
+    JSR $01A5                ; unknown init
+    JSR $B192                ; unknown init
+    LDA #$40
+    TRB $17                  ; clear bit 6 of $17
+    LDA #$40
+    TSB $18                  ; set bit 6 of $18
+    BRL $1AE6                ; → $2824 (post-transition work)
+
+    ; --- Bit 4 dispatch ($0D3E) ---
+.chk_bit10:
+    BIT #$10
+    BNE .handle_bit10
+    BRL $0997                ; bit 4 clear → default handler ($16DC)
+
+.handle_bit10:
+    LDA #$10
+    TRB $17                  ; clear bit 4
+    JSR $28C0                ; unknown per-mode init
+    LDX $5B
+    LDA $7E3000,X            ; load current mode byte from WRAM
+    CMP #$E6
+    BNE .chk_ec
+    BRL $001F                ; → mode-E6 handler ($0D78)
+
+.chk_ec:
+    CMP #$EC
+    BNE .chk_ee
+    BRL $00FF                ; → mode-EC handler ($0E5F)
+
+.chk_ee:
+    CMP #$EE
+    BNE .chk_fa
+    BRL $02AD                ; → mode-EE handler ($1014)
+
+.chk_fa:
+    CMP #$FA
+    BNE .chk_fc
+    BRL $045B                ; → mode-FA handler ($11C9)
+
+.chk_fc:
+    CMP #$FC
+    BNE .default_mode
+    BRL $06DF                ; → mode-FC handler ($1454)
+
+.default_mode:
+    BRL $0964                ; → default handler ($16DC)
+
+; ============================================================
+; $C0:1F24 — Sub_1F24 (54 bytes, $1F24–$1F59)
+; Scroll-X target tracker: moves dp:$19 (low nibble) toward dp:$1B.
+; Uses dp:$1C as step delay and dp:$1D as delay counter.
+; When dp:$19 reaches dp:$1B, clears bit 1 of dp:$18.
+; Called from Sub_0C76 when dp:$18 bit 1 is set.
+; ============================================================
+org $C01F24
+Sub_1F24:
+    LDA $19
+    AND #$0F                 ; low nibble of $19 = current scroll-X
+    CMP $1B                  ; compare to target
+    BEQ .x_at_target         ; equal → done
+    BCS .x_above             ; above → count down
+
+    ; $19 below target: decrement delay or step up
+    LDA $1D
+    BEQ .x_reload_up         ; delay exhausted → reload and step
+    DEC $1D
+    RTS
+
+.x_reload_up:
+    LDA $1C
+    STA $1D                  ; reload delay
+    LDA $19
+    AND #$0F
+    INC $19                  ; step up
+    RTS
+
+.x_above:
+    ; $19 above target: decrement delay or step down
+    LDA $1D
+    BEQ .x_reload_dn
+    DEC $1D
+    RTS
+
+.x_reload_dn:
+    LDA $1C
+    STA $1D
+    LDA $19
+    DEC                      ; DEC A ($3A)
+    BEQ .x_at_target_store   ; reached 0 → also done
+    STA $19
+    RTS
+
+.x_at_target_store:
+    STA $19
+
+.x_at_target:
+    LDA #$02
+    TRB $18                  ; clear bit 1 of $18 (X done)
+    RTS
+
+; ============================================================
+; $C0:1F5A — Sub_1F5A (45 bytes, $1F5A–$1F86)
+; Scroll-Y target tracker: moves dp:$21 toward dp:$22.
+; Uses dp:$23/$24 for step delay. Clears bit 3 of dp:$18 when done.
+; Called from Sub_0C76 when dp:$18 bit 3 is set.
+; ============================================================
+org $C01F5A
+Sub_1F5A:
+    LDA $21
+    CMP $22                  ; compare current to target
+    BEQ .y_at_target         ; equal → done
+    BCS .y_above             ; above → count down
+
+    ; below target
+    LDA $24
+    BEQ .y_reload_up
+    DEC $24
+    RTS
+
+.y_reload_up:
+    LDA $23
+    STA $24
+    LDA $21
+    INC $21                  ; step up
+    RTS
+
+.y_above:
+    LDA $24
+    BEQ .y_reload_dn
+    DEC $24
+    RTS
+
+.y_reload_dn:
+    LDA $23
+    STA $24
+    LDA $21
+    DEC $21                  ; step down
+    RTS
+
+.y_at_target:
+    LDA #$08
+    TRB $18                  ; clear bit 3 of $18 (Y done)
+    RTS
+
+; ============================================================
 ; $C0:2DF1 — ClearRAMDMA (45 bytes)
 ; Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0
 ; since M7A=M7B=0). Caller loads $4B/$4C=dest addr, $4D=dest bank,
