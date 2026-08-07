@@ -1855,7 +1855,412 @@ Sub_BA65:
     RTS
 
 org $C0BCDC
-Sub_BCDC:       ; init helper, type 1 sprites (unmatched)
+Sub_BCDC:
+    ; 790 bytes ($BCDC-$BFF1). Entry M=1, X=1. Type 1 high-state init.
+    ; Reads X offsets from raw table ($4802,X) AND writes to staging ($4BC2,X).
+    ; Two X-loops (gfx_index and gfx_index+$20), then 3-way Y-clamp (8 tiles).
+    ; Positive path uses BPL/CMP/BCS — no BMI-split (unlike Sub_BA65).
+    PHB
+    LDA #$7F
+    PHA
+    PLB
+    REP #$20
+    LDX $6D
+    LDA.l $000A80,X
+    AND #$01FF
+    STA $C5
+    LDA.l $000A00,X
+    STA $C3
+    STZ $E5
+    LDA.l $001700,X
+    STA $D9
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 1: raw $4802 → staging $4BC2 → $4BC0, pack OAM → $4F00 ─────────
+.bcdc_x1_loop:
+    TAX
+    LDA.w $4802,X
+    STA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $D9
+    BEQ .bcdc_x1_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .bcdc_x1_loop
+.bcdc_x1_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F00,X
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0020
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 2: same, compare $E7 → $4F01 ─────────────────────────────────
+.bcdc_x2_loop:
+    TAX
+    LDA.w $4802,X
+    STA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .bcdc_x2_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .bcdc_x2_loop
+.bcdc_x2_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F01,X
+    LDX $D9
+    LDA $C6
+    BEQ .bcdc_c6_zero
+    BRL $01A3               ; C6≠0 → $BF1C (raw signed offset, asar BRL quirk)
+
+    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+.bcdc_c6_zero:
+    LDA $C5
+    BMI .bcdc_neg
+    BRL $00C6               ; C5<$80 → $BE46 positive path (raw signed offset)
+
+    ; ── C6=0 negative (C5≥$80): CMP#$E0/BCC clamp ────────────────────────────
+.bcdc_neg:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st0
+    LDA #$E0
+.bcdc_neg_st0:
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st1
+    LDA #$E0
+.bcdc_neg_st1:
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st2
+    LDA #$E0
+.bcdc_neg_st2:
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st3
+    LDA #$E0
+.bcdc_neg_st3:
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st4
+    LDA #$E0
+.bcdc_neg_st4:
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st5
+    LDA #$E0
+.bcdc_neg_st5:
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st6
+    LDA #$E0
+.bcdc_neg_st6:
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .bcdc_neg_st7
+    LDA #$E0
+.bcdc_neg_st7:
+    STA.w $4BF9,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6=0 positive (C5<$80): BPL/CMP/BCS clamp (no BMI-split) ────────────
+.bcdc_pos:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st0
+    CMP #$E0
+    BCS .bcdc_pos_st0
+    LDA #$E0
+.bcdc_pos_st0:
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st1
+    CMP #$E0
+    BCS .bcdc_pos_st1
+    LDA #$E0
+.bcdc_pos_st1:
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st2
+    CMP #$E0
+    BCS .bcdc_pos_st2
+    LDA #$E0
+.bcdc_pos_st2:
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st3
+    CMP #$E0
+    BCS .bcdc_pos_st3
+    LDA #$E0
+.bcdc_pos_st3:
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st4
+    CMP #$E0
+    BCS .bcdc_pos_st4
+    LDA #$E0
+.bcdc_pos_st4:
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st5
+    CMP #$E0
+    BCS .bcdc_pos_st5
+    LDA #$E0
+.bcdc_pos_st5:
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st6
+    CMP #$E0
+    BCS .bcdc_pos_st6
+    LDA #$E0
+.bcdc_pos_st6:
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    BPL .bcdc_pos_st7
+    CMP #$E0
+    BCS .bcdc_pos_st7
+    LDA #$E0
+.bcdc_pos_st7:
+    STA.w $4BF9,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6≠0: BCC→clamp, CMP/BCS→store ──────────────────────────────────────
+.bcdc_nz:
+    LDA.w $4804,X
+    STA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl0
+    CMP #$E0
+    BCS .bcdc_nz_st0
+.bcdc_nz_cl0:
+    LDA #$E0
+.bcdc_nz_st0:
+    STA.w $4BC1,X
+    LDA.w $480C,X
+    STA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl1
+    CMP #$E0
+    BCS .bcdc_nz_st1
+.bcdc_nz_cl1:
+    LDA #$E0
+.bcdc_nz_st1:
+    STA.w $4BC9,X
+    LDA.w $4814,X
+    STA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl2
+    CMP #$E0
+    BCS .bcdc_nz_st2
+.bcdc_nz_cl2:
+    LDA #$E0
+.bcdc_nz_st2:
+    STA.w $4BD1,X
+    LDA.w $481C,X
+    STA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl3
+    CMP #$E0
+    BCS .bcdc_nz_st3
+.bcdc_nz_cl3:
+    LDA #$E0
+.bcdc_nz_st3:
+    STA.w $4BD9,X
+    LDA.w $4824,X
+    STA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl4
+    CMP #$E0
+    BCS .bcdc_nz_st4
+.bcdc_nz_cl4:
+    LDA #$E0
+.bcdc_nz_st4:
+    STA.w $4BE1,X
+    LDA.w $482C,X
+    STA.w $4BEC,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl5
+    CMP #$E0
+    BCS .bcdc_nz_st5
+.bcdc_nz_cl5:
+    LDA #$E0
+.bcdc_nz_st5:
+    STA.w $4BE9,X
+    LDA.w $4834,X
+    STA.w $4BF4,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl6
+    CMP #$E0
+    BCS .bcdc_nz_st6
+.bcdc_nz_cl6:
+    LDA #$E0
+.bcdc_nz_st6:
+    STA.w $4BF1,X
+    LDA.w $483C,X
+    STA.w $4BFC,X
+    CLC
+    ADC $C5
+    BCC .bcdc_nz_cl7
+    CMP #$E0
+    BCS .bcdc_nz_st7
+.bcdc_nz_cl7:
+    LDA #$E0
+.bcdc_nz_st7:
+    STA.w $4BF9,X
+    REP #$20
+    LDA.w $4806,X
+    STA.w $4BC6,X
+    LDA.w $480E,X
+    STA.w $4BCE,X
+    LDA.w $4816,X
+    STA.w $4BD6,X
+    LDA.w $481E,X
+    STA.w $4BDE,X
+    LDA.w $4826,X
+    STA.w $4BE6,X
+    LDA.w $482E,X
+    STA.w $4BEE,X
+    LDA.w $4836,X
+    STA.w $4BF6,X
+    LDA.w $483E,X
+    STA.w $4BFE,X
+    SEP #$20
+    PLB
+    RTS
 
 org $C0BFF2
 Sub_BFF2:       ; init helper, types 2/3+ low-state path (unmatched)
@@ -1887,7 +2292,28 @@ Sub_E9E2:
     RTS
 
 org $C0E9FF
-Sub_E9FF:       ; init helper, type 1 sprites pass 2 (unmatched)
+Sub_E9FF:
+    ; 32 bytes ($E9FF-$EA1E). Entry M=1, X=1.
+    ; Searches 3-entry table at $0BC0 for slot $6D; marks match with $80 in
+    ; both $0BC0,X and $0BC1,X (two entries). Loop limit CPX #$03 vs Sub_E9E2's #$04.
+    SEP #$10
+    LDX $6D
+    LDX #$00
+.e9ff_loop:
+    LDA.w $0BC0,X
+    CMP $6D
+    BEQ .e9ff_found
+    INX
+    CPX #$03
+    BNE .e9ff_loop
+    REP #$10
+    RTS
+.e9ff_found:
+    LDA #$80
+    STA.w $0BC0,X
+    STA.w $0BC1,X
+    REP #$10
+    RTS
 
 org $C0EA1F
 Sub_EA1F:       ; init helper, types 2/3+ sprites pass 2 (unmatched)
