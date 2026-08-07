@@ -1449,7 +1449,410 @@ Sub_B8CA:
     RTS
 
 org $C0BA65
-Sub_BA65:       ; init helper, type 1 sprites low-state path (unmatched)
+Sub_BA65:
+    ; 631 bytes ($BA65-$BCDB). Entry M=1, X=1. Type 1 low-state init.
+    ; Reads X offsets from staging buf ($4BC2,X) — not raw table.
+    ; Two X-loops (gfx_index and gfx_index+$20 slots), then 3-way Y-clamp.
+    PHB
+    LDA #$7F
+    PHA
+    PLB
+    REP #$20
+    LDX $6D
+    LDA.l $000A80,X
+    AND #$01FF
+    STA $C5
+    LDA.l $000A00,X
+    STA $C3
+    STZ $E5
+    LDA.l $001700,X
+    STA $D9
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 1: staging $4BC2 → $4BC0, ORA#$AA → $4F00 ───────────────────
+.b65_x1_loop:
+    TAX
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $D9
+    BEQ .b65_x1_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .b65_x1_loop
+.b65_x1_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F00,X
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0020
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 2: same as loop 1 but compare $E7 → $4F01 ────────────────────
+.b65_x2_loop:
+    TAX
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .b65_x2_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .b65_x2_loop
+.b65_x2_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F01,X
+    LDX $D9
+    LDA $C6
+    BEQ .b65_c6_zero
+    BRL $0154               ; C6≠0 → $BC50 (raw signed offset, asar BRL quirk)
+
+    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+.b65_c6_zero:
+    LDA $C5
+    BPL .b65_pos_c5
+
+    ; ── C6=0 negative (C5≥$80): 8 tiles, CMP#$E0/BCC clamp ─────────────────
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st0
+    LDA #$E0
+.b65_neg_st0:
+    STA.w $4BC1,X
+
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st1
+    LDA #$E0
+.b65_neg_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st2
+    LDA #$E0
+.b65_neg_st2:
+    STA.w $4BD1,X
+
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st3
+    LDA #$E0
+.b65_neg_st3:
+    STA.w $4BD9,X
+
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st4
+    LDA #$E0
+.b65_neg_st4:
+    STA.w $4BE1,X
+
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st5
+    LDA #$E0
+.b65_neg_st5:
+    STA.w $4BE9,X
+
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st6
+    LDA #$E0
+.b65_neg_st6:
+    STA.w $4BF1,X
+
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    CMP #$E0
+    BCC .b65_neg_st7
+    LDA #$E0
+.b65_neg_st7:
+    STA.w $4BF9,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6=0 positive (C5<$80): 8 tiles, BMI-split BPL/CMP/BCS clamp ────────
+    ; Source sign check on staging Y-src: <$80 uses CLC/ADC/BCC path;
+    ; ≥$80 uses CLC/ADC/BPL/CMP/BCS path. Both converge at store label.
+.b65_pos_c5:
+    LDA.w $4BC4,X
+    BMI .b65_pos_b0
+    CLC
+    ADC $C5
+    BCC .b65_pos_st0
+    BRA .b65_pos_p0
+.b65_pos_b0:
+    CLC
+    ADC $C5
+.b65_pos_p0:
+    BPL .b65_pos_st0
+    CMP #$E0
+    BCS .b65_pos_st0
+    LDA #$E0
+.b65_pos_st0:
+    STA.w $4BC1,X
+
+    LDA.w $4BCC,X
+    BMI .b65_pos_b1
+    CLC
+    ADC $C5
+    BCC .b65_pos_st1
+    BRA .b65_pos_p1
+.b65_pos_b1:
+    CLC
+    ADC $C5
+.b65_pos_p1:
+    BPL .b65_pos_st1
+    CMP #$E0
+    BCS .b65_pos_st1
+    LDA #$E0
+.b65_pos_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4BD4,X
+    BMI .b65_pos_b2
+    CLC
+    ADC $C5
+    BCC .b65_pos_st2
+    BRA .b65_pos_p2
+.b65_pos_b2:
+    CLC
+    ADC $C5
+.b65_pos_p2:
+    BPL .b65_pos_st2
+    CMP #$E0
+    BCS .b65_pos_st2
+    LDA #$E0
+.b65_pos_st2:
+    STA.w $4BD1,X
+
+    LDA.w $4BDC,X
+    BMI .b65_pos_b3
+    CLC
+    ADC $C5
+    BCC .b65_pos_st3
+    BRA .b65_pos_p3
+.b65_pos_b3:
+    CLC
+    ADC $C5
+.b65_pos_p3:
+    BPL .b65_pos_st3
+    CMP #$E0
+    BCS .b65_pos_st3
+    LDA #$E0
+.b65_pos_st3:
+    STA.w $4BD9,X
+
+    LDA.w $4BE4,X
+    BMI .b65_pos_b4
+    CLC
+    ADC $C5
+    BCC .b65_pos_st4
+    BRA .b65_pos_p4
+.b65_pos_b4:
+    CLC
+    ADC $C5
+.b65_pos_p4:
+    BPL .b65_pos_st4
+    CMP #$E0
+    BCS .b65_pos_st4
+    LDA #$E0
+.b65_pos_st4:
+    STA.w $4BE1,X
+
+    LDA.w $4BEC,X
+    BMI .b65_pos_b5
+    CLC
+    ADC $C5
+    BCC .b65_pos_st5
+    BRA .b65_pos_p5
+.b65_pos_b5:
+    CLC
+    ADC $C5
+.b65_pos_p5:
+    BPL .b65_pos_st5
+    CMP #$E0
+    BCS .b65_pos_st5
+    LDA #$E0
+.b65_pos_st5:
+    STA.w $4BE9,X
+
+    LDA.w $4BF4,X
+    BMI .b65_pos_b6
+    CLC
+    ADC $C5
+    BCC .b65_pos_st6
+    BRA .b65_pos_p6
+.b65_pos_b6:
+    CLC
+    ADC $C5
+.b65_pos_p6:
+    BPL .b65_pos_st6
+    CMP #$E0
+    BCS .b65_pos_st6
+    LDA #$E0
+.b65_pos_st6:
+    STA.w $4BF1,X
+
+    LDA.w $4BFC,X
+    BMI .b65_pos_b7
+    CLC
+    ADC $C5
+    BCC .b65_pos_st7
+    BRA .b65_pos_p7
+.b65_pos_b7:
+    CLC
+    ADC $C5
+.b65_pos_p7:
+    BPL .b65_pos_st7
+    CMP #$E0
+    BCS .b65_pos_st7
+    LDA #$E0
+.b65_pos_st7:
+    STA.w $4BF9,X
+    SEP #$20
+    PLB
+    RTS
+
+    ; ── C6≠0 path: 8 tiles from staging, BCC→$E0, CMP/BCS→store ────────────
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl0
+    CMP #$E0
+    BCS .b65_nz_st0
+.b65_nz_cl0:
+    LDA #$E0
+.b65_nz_st0:
+    STA.w $4BC1,X
+
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl1
+    CMP #$E0
+    BCS .b65_nz_st1
+.b65_nz_cl1:
+    LDA #$E0
+.b65_nz_st1:
+    STA.w $4BC9,X
+
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl2
+    CMP #$E0
+    BCS .b65_nz_st2
+.b65_nz_cl2:
+    LDA #$E0
+.b65_nz_st2:
+    STA.w $4BD1,X
+
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl3
+    CMP #$E0
+    BCS .b65_nz_st3
+.b65_nz_cl3:
+    LDA #$E0
+.b65_nz_st3:
+    STA.w $4BD9,X
+
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl4
+    CMP #$E0
+    BCS .b65_nz_st4
+.b65_nz_cl4:
+    LDA #$E0
+.b65_nz_st4:
+    STA.w $4BE1,X
+
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl5
+    CMP #$E0
+    BCS .b65_nz_st5
+.b65_nz_cl5:
+    LDA #$E0
+.b65_nz_st5:
+    STA.w $4BE9,X
+
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl6
+    CMP #$E0
+    BCS .b65_nz_st6
+.b65_nz_cl6:
+    LDA #$E0
+.b65_nz_st6:
+    STA.w $4BF1,X
+
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    BCC .b65_nz_cl7
+    CMP #$E0
+    BCS .b65_nz_st7
+.b65_nz_cl7:
+    LDA #$E0
+.b65_nz_st7:
+    STA.w $4BF9,X
+    SEP #$20
+    PLB
+    RTS
 
 org $C0BCDC
 Sub_BCDC:       ; init helper, type 1 sprites (unmatched)
@@ -1461,7 +1864,27 @@ org $C0C2BF
 Sub_C2BF:       ; init helper, types 2/3+ sprites (unmatched)
 
 org $C0E9E2
-Sub_E9E2:       ; init helper, type 0 sprites pass 2 (unmatched)
+Sub_E9E2:
+    ; 29 bytes ($E9E2-$E9FE). Entry M=1, X=1.
+    ; Searches 4-entry table at $0BC0 for the current sprite slot ($6D),
+    ; then marks the matching entry with $80.
+    SEP #$10
+    LDX $6D
+    LDX #$00
+.e9e2_loop:
+    LDA.w $0BC0,X
+    CMP $6D
+    BEQ .e9e2_found
+    INX
+    CPX #$04
+    BNE .e9e2_loop
+    REP #$10
+    RTS
+.e9e2_found:
+    LDA #$80
+    STA.w $0BC0,X
+    REP #$10
+    RTS
 
 org $C0E9FF
 Sub_E9FF:       ; init helper, type 1 sprites pass 2 (unmatched)

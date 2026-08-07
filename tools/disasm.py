@@ -634,7 +634,14 @@ class Disassembler:
             if tgt is not None:
                 self.jumps.add((self.bank << 16) | tgt)
                 self.queue(self.bank, tgt, new_state)
-            # fall through
+            # Queue fall-through as a separate work item instead of continuing
+            # linearly. Linear continuation lets the decoder pass through a
+            # REP/SEP inside the loop body and corrupt the M/X state at the
+            # branch target — the classic "loop-exit BEQ" trap. By terminating
+            # here and re-queuing the fall-through, both paths start from the
+            # correct state captured at the branch instruction.
+            self.queue(self.bank, next_addr, new_state)
+            return None
 
         elif mnemonic in ('RTS', 'RTL', 'RTI'):
             self.returns.append(addr)
