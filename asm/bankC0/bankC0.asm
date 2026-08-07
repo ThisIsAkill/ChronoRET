@@ -4032,6 +4032,7 @@ PV_EndRange3:
 org $C01B90
 Sub_1B90:
     LDA $FC              ; 8-bit arg 0 from dp:$FC
+Sub_1B90_body:           ; ← entry for Sub_1BA7 (uses $FB instead of $FC)
     STA $1E01
     LDY $97              ; 16-bit index from dp:$97
     LDA $0A00,Y          ; arg 1: sound-effect byte from $0A00 table
@@ -5572,3 +5573,346 @@ ModeFC_Handler:
     SEP #$20
     LDA #$10
     TSB $5F                 ; set bit 4 of dp:$5F
+
+; ============================================================
+; $C0:16DC — DefaultHandler (509 bytes, $16DC–$18D8)
+; The "all other modes" arm of Sub_0C76's per-frame dispatch.
+; Reached by two BRL paths from Sub_0C76 (bit-4 clear at $0D42,
+; and fall-through .default_mode at $0D75) and by fall-through
+; from ModeFC_Handler.
+;
+; Structurally distinct from the named mode handlers (E6/EC/EE/FA/FC):
+;   • Uses dp:$5D/$5E as the layer-state index (vs $5B/$5C)
+;   • VRAM write slots $09B2–$09B8 (vs $09CA–$09FA in named handlers)
+;   • Calls Sub_1BA7 (dp:$FB variant of Sub_1B90) instead of Sub_1B90
+;   • Bit-5 section drives a display-mode transition loop:
+;     loops JSR $885A / JSR $00BF until dp:$38 == 0, then selects
+;     one of four per-mode branches (dp:$45 = 1–4) that call
+;     mode-specific renderers ($75E9/$78EC/$7CB5/$74xx) and
+;     tail-call Sub_EC60 via BRL $Dxxx.
+;   • Bit-0 section handles scene-swap (JSR $024C probe, then
+;     JSL $C02C41 / $C10000 init and reinit of dp:$17/$18).
+;
+; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100.
+; Exits via RTS (two paths), or BRL tail-calls to Sub_EC60 ($EC60)
+; or to $00EB (JSR $881E + JSR $00DE + BRL $EC60 fragment).
+; ============================================================
+org $C016DC
+DefaultHandler:
+    ; --- Bit 1 check: VRAM update needed? ---
+    LDA $17                 ; dp:$17 = transition flag byte
+    BIT #$02                ; test bit 1 (VRAM-update-needed flag)
+    BNE .vram_update        ; bit 1 set → do VRAM work
+    BRL $008B               ; bit 1 clear → skip to .bit5_check ($1770)
+                            ; raw signed offset $008B; target $16E5+$8B=$1770
+
+.vram_update:
+    ; Clear flag, trigger SPC command, scan layer-state entry
+    STZ $61                 ; dp:$61 = 0 (sub-index for state scan)
+    LDA #$02
+    TRB $17                 ; clear bit 1
+    JSR Sub_1BA7            ; send SPC command using dp:$FB
+    LDX $5D                 ; X = layer-state index (dp:$5D, 16-bit)
+    LDA.l $7E3000,X         ; load current mode byte from layer-state table
+    CMP #$FE                ; terminal state $FE?
+    BEQ .do_advance         ; yes → advance
+    INC $61                 ; no → sub-index = 1
+    CMP #$E0                ; state $E0?
+    BEQ .do_advance         ; yes → advance
+    BRA .bit5_check         ; no → skip computation (BRA off=$70 → $1770)
+
+.do_advance:
+    INC A                   ; advance mode byte ($FE→$FF, $E0→$E1)
+    STA.l $7E3000,X         ; write back to layer-state table
+
+    ; --- VRAM computation (M=0, 16-bit A) ---
+    ; Computes 4 VRAM scroll-map word indices using dp:$5D (col-like)
+    ; and dp:$5E (row-like) via Sub_1B36, writes to $09B2–$09B8.
+    REP #$20
+    LDA $1D0A               ; scroll param (16-bit abs read)
+    STA $DB                 ; dp:$DB/$DC = col base
+    LDA $1D0E
+    STA $DD                 ; dp:$DD/$DE = row base
+
+    ; Row: (X * 2 - $1D0A + $1D99) & $3F
+    TXA                     ; A = X (layer-state index as col input)
+    ASL                     ; A = X * 2
+    SEC
+    SBC $DB                 ; A -= col base
+    CLC
+    ADC $1D99               ; A += $1D99
+    AND #$003F              ; mask to 6 bits
+    TAY                     ; Y = row
+
+    ; Col: ($5E * 2 - $1D0E + $1D9A) & $1F
+    LDA $5E                 ; dp:$5E (16-bit)
+    ASL                     ; A = $5E * 2
+    SEC
+    SBC $DD                 ; A -= row base
+    CLC
+    ADC $1D9A               ; A += $1D9A
+    AND #$001F              ; mask to 5 bits
+    TAX                     ; X = col (also in A)
+
+    ; Pass 1: (col, row) → $09B2
+    JSR Sub_1B36            ; A = VRAM tile index (A=col, Y=row)
+    CLC
+    ADC $1D7C               ; + tilemap base
+    STA $09B2               ; VRAM slot 1
+
+    ; Pass 2: (col, row+1) → $09B4
+    TYA
+    PHA                     ; save row
+    INC A
+    AND #$003F
+    TAY                     ; Y = row+1
+    TXA                     ; A = col (X preserved through Sub_1B36)
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09B4               ; VRAM slot 2
+
+    ; Pass 3: (col+1, row) → $09B6
+    PLY                     ; Y = original row (restored)
+    TXA
+    INC A
+    AND #$001F
+    TAX                     ; X = col+1 (also in A)
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09B6               ; VRAM slot 3
+
+    ; Pass 4: (col+1, row+1) → $09B8
+    TYA
+    INC A
+    AND #$003F
+    TAY                     ; Y = row+1
+    TXA                     ; A = col+1 (X still = col+1)
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09B8               ; VRAM slot 4
+
+    SEP #$20                ; M=1 (8-bit A)
+    LDA #$02
+    TSB $5F                 ; set bit 1 of dp:$5F (VRAM-done flag)
+
+.bit5_check:
+    ; --- Bit 5 check: display-mode transition? ---
+    LDA $17
+    BIT #$20                ; test bit 5
+    BNE .bit5_set           ; bit 5 set → run transition
+    BRL $0113               ; bit 5 clear → .bit0_check ($188C)
+                            ; raw offset $0113; target $1779+$0113=$188C
+
+.bit5_set:
+    LDA #$20
+    TRB $17                 ; clear bit 5
+
+    ; Loop: JSR $885A (main frame work) + JSR $00BF (VBlankHandler)
+    ; until dp:$38 == 0, then do post-loop work.
+    LDA #$01
+    STA $38                 ; dp:$38 = 1 (loop guard / retry flag)
+
+.loop_885A:
+    JSR $885A               ; frame work (large unmatched routine)
+    JSR $00BF               ; VBlankHandler ($00BF)
+    LDA $38
+    BEQ .loop_done          ; dp:$38 == 0 → exit loop
+    JSR $EC60               ; post-VBlank work (Sub_EC60)
+    BRA .loop_885A
+
+.loop_done:
+    JSR $AF4E               ; unknown routine
+    JSL $FDFFF7             ; wait/sync (FD bank)
+    JSR $EC60               ; post-VBlank work
+
+    ; --- Mode dispatch on dp:$45 (transition sub-mode 1–4) ---
+    LDA $45
+    CMP #$01
+    BNE .not_mode1
+
+    ; dp:$45 == 1
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD                     ; DP = $1D00
+    SEP #$20
+    JSR $75E9               ; mode-1 renderer (DP=$1D00 context)
+    PLD                     ; restore DP
+    JSR $74D4
+    JSR $00DE               ; VBlankHandlerShort
+    LDA #$01
+    STA $46                 ; dp:$46 = 1
+    STZ $45                 ; dp:$45 = 0
+    JSR $EC60
+    JSR $00DE
+    JSR $87F1               ; unknown finalizer
+    BRL $D49B               ; tail → Sub_EC60 ($EC60); raw=$D49B
+
+.not_mode1:
+    CMP #$02
+    BNE .not_mode2
+
+    ; dp:$45 == 2
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD
+    SEP #$20
+    JSR $78EC               ; mode-2 renderer (DP=$1D00 context)
+    PLD
+    JSR $74E8
+    JSR $00DE
+    LDA #$02
+    STA $46
+    STZ $45
+    JSR $EC60
+    JSR $00DE
+    JSR $87F1
+    BRL $D472               ; tail → Sub_EC60; raw=$D472
+
+.not_mode2:
+    CMP #$03
+    BEQ .mode3
+    BRL $006D               ; not 3 → .chk_mode4 ($1862); raw=$006D
+
+.mode3:
+    ; dp:$45 == 3 (two-pass renderer with $7C/$82 swap)
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD
+    SEP #$20
+    JSR $75E9               ; first pass renderer
+    PLD
+    JSR $00DE
+    LDA #$03
+    STA $46
+    STZ $45
+    JSR $EC60
+
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD
+    SEP #$20
+    JSR $78EC               ; second pass renderer
+    LDX $7C                 ; save dp:$7C (16-bit)
+    PHX
+    LDX $82
+    STX $7C
+    PLX
+    STX $82                 ; swap dp:$7C and dp:$82
+    PLD
+    JSR $74D4
+    JSR $74E8
+    JSR $00DE
+    LDA #$02
+    STA $46
+    JSR $EC60
+
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD
+    SEP #$20
+    JSR $75E9               ; third pass renderer
+    LDX $7C                 ; swap dp:$7C and dp:$82 again
+    PHX
+    LDX $82
+    STX $7C
+    PLX
+    STX $82
+    PLD
+    JSR $74D4
+    JSR $00DE
+    LDA #$01
+    STA $46
+    JSR $EC60
+    JSR $00DE
+    JSR $87F1
+    BRL $D3FE               ; tail → Sub_EC60; raw=$D3FE
+
+.chk_mode4:
+    CMP #$04
+    BNE .exit               ; none of 1–4 → RTS
+
+    ; dp:$45 == 4
+    PHD
+    REP #$20
+    LDA #$1D00
+    TCD
+    SEP #$20
+    JSR $7CB5               ; mode-4 renderer (DP=$1D00 context)
+    PLD
+    JSR $74F7
+    JSR $00DE
+    LDA #$04
+    STA $46
+    STZ $45
+    JSR $EC60
+    JSR $00DE
+    JSR $87F1
+    JSR $EC60
+
+.exit:
+    RTS
+
+    ; --- Bit 0 check: scene-swap init (reached via BRL $0113 from .bit5_check) ---
+.bit0_check:
+    ; A still holds dp:$17 from .bit5_check
+    BIT #$01                ; test bit 0 (scene-swap pending)
+    BEQ .exit2              ; bit 0 clear → RTS
+    JSR $024C               ; scene-state probe; C=1 → quick clear, C=0 → full init
+    BCS .clear_bit0         ; carry set → quick path
+
+    ; Full scene-swap init path
+    JSL $C02C41             ; unknown cross-bank init
+    LDA #$80
+    TSB $53                 ; set bit 7 of dp:$53 (DMA inhibit?)
+    JSR $00DE               ; VBlankHandlerShort
+    LDA #$80
+    TRB $53                 ; clear bit 7
+    JSR $EC60               ; post-VBlank
+    JSL $C10000             ; bank-C1 init
+    JSR $0B64               ; InstallNMI
+    JSR $0B75               ; InstallIRQ
+    REP #$20
+    LDA #$0100
+    TCD                     ; DP = $0100
+    SEP #$20
+    LDA #$01
+    TRB $17                 ; clear bit 0 of dp:$17
+    LDA #$01
+    TSB $18                 ; set bit 0 of dp:$18
+    JSR $0283               ; unknown scene post-init
+    JSR $28E1               ; unknown scene post-init
+    JSR $E935               ; unknown scene post-init
+    JSR $00EB               ; JSR $881E + JSR $00DE + BRL $EC60 fragment
+
+.exit2:
+    RTS
+
+.clear_bit0:
+    ; Quick clear path (C=1 from JSR $024C)
+    LDA #$01
+    TRB $17                 ; clear bit 0
+    LDA #$01
+    TSB $18                 ; set bit 0 of dp:$18
+    BRL $E812               ; tail → $00EB fragment; raw=$E812
+
+; ============================================================
+; $C0:1BA7 — Sub_1BA7 (4 bytes, $1BA7–$1BAA)
+; Variant entry of Sub_1B90 that loads dp:$FB as the first
+; SPC command argument instead of dp:$FC.
+; Branches into Sub_1B90_body (STA $1E01 onward) to share the
+; rest of the implementation.
+; Called from DefaultHandler at $16EB.
+; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit).
+; ============================================================
+org $C01BA7
+Sub_1BA7:
+    LDA $FB                 ; dp:$FB = SPC arg 0 (vs $FC in Sub_1B90)
+    BRA Sub_1B90_body       ; join Sub_1B90 at STA $1E01
