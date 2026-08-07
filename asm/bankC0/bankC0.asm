@@ -4294,3 +4294,1281 @@ org $C00DA1
     LDA #$10
     TSB $5F              ; set bit 4 of dp:$5F (scroll-update trigger)
     BRL $087D            ; → $16DC (default mode handler)
+
+; ============================================================
+; $C0:0E5F — ModeEC_Handler (437 bytes, $0E5F–$1013)
+; Mode-$EC scroll-map update. BRL target from Sub_0C76 bit-4 dispatch
+; (mode $EC case, raw offset $00FF from $0D5D).
+; On entry: A=$EC (current mode), X=layer index, M=1, X/Y=16-bit.
+;
+; Prologue: updates 4 entries in the $7E:3000 mode table
+; (current, current+1, current-$100, current-$101), each incremented
+; by 1. Sets dp:$60=$01 (vs STZ in ModeE6_Handler), then calls
+; Sub_1B90 (SPC audio). Confirmed: both Sub_1B36 and Sub_1B90 reused.
+;
+; Computation: 4 passes × 4 VRAM corner indices = 16 JSR Sub_1B36 calls,
+; storing to $09CA–$09E8 (vs 8 calls/$09CA–$09D8 in mode $E6).
+; Pass 1: row=$5B,   col=$5C   (note: uses LDX $5B; TXA anomaly)
+; Pass 2: row=$5B,   col=$5C−1
+; Pass 3: row=$5B+1, col=$5C
+; Pass 4: row=$5B+1, col=$5C−1
+; Ends by setting bit 4 of dp:$5F and BRL to $16DC (default handler).
+; ============================================================
+org $C00E5F
+ModeEC_Handler:
+    INC A                   ; $EC → $ED
+    STA.l $7E3000,X         ; update current layer entry
+    INX                     ; advance to next layer entry
+    LDA.l $7E3000,X         ; load next entry (M=1, byte load)
+    INC A
+    STA.l $7E3000,X         ; update next entry
+    REP #$20                ; M → 0 (16-bit A)
+    TXA                     ; A = X (16-bit layer index)
+    SEC
+    SBC #$0100              ; A = X − $0100
+    TAX                     ; X = previous block
+    SEP #$20                ; M → 1 (8-bit A)
+    LDA.l $7E3000,X         ; load entry at X−$100
+    INC A
+    STA.l $7E3000,X         ; update it
+    DEX                     ; X = X − 1
+    LDA.l $7E3000,X         ; load entry at X−$101
+    INC A
+    STA.l $7E3000,X         ; update it
+    LDA #$01
+    STA $60                 ; dp:$60 = $01 (vs STZ in ModeE6_Handler)
+    JSR Sub_1B90            ; SPC audio command $19
+    ; --- Computation block: 4 passes × 4 VRAM corner indices ---
+    REP #$20                ; M → 0 (16-bit A)
+    LDA $1D0A               ; scroll X base (abs 16-bit)
+    STA $DB                 ; dp:$DB/$DC
+    LDA $1D0E               ; scroll Y base
+    STA $DD                 ; dp:$DD/$DE
+    ; --- Pass 1: row=$5B, col=$5C → $09CA–$09D0 ---
+    ; (anomaly: uses LDX $5B / TXA instead of LDA $5B)
+    LDX $5B                 ; X = dp:$5B (row base, 16-bit X load)
+    TXA                     ; A = row base (16-bit)
+    ASL                     ; A = row*2
+    SEC
+    SBC $DB                 ; A = row*2 − $DB
+    CLC
+    ADC $1D99               ; + row adjustment
+    AND #$003F              ; wrap to 64 rows
+    TAY                     ; Y = tile row
+    LDA $5C                 ; A = col base
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F              ; wrap to 32 cols
+    TAX                     ; X = tile col
+    JSR Sub_1B36            ; A = VRAM index(col, row)
+    CLC
+    ADC $1D7C               ; + VRAM base
+    STA $09CA               ; VRAM word 0
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    CLC
+    ADC $1D7C
+    STA $09CC               ; VRAM word 1
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col+1, row)
+    CLC
+    ADC $1D7C
+    STA $09CE               ; VRAM word 2
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09D0               ; VRAM word 3
+    ; --- Pass 2: row=$5B, col=$5C−1 → $09D2–$09D8 ---
+    LDA $5B                 ; A = row base (normal LDA this time)
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col − 1 (DEC A = 3A)
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col−1, row)
+    CLC
+    ADC $1D7C
+    STA $09D2               ; VRAM word 4
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09D4               ; VRAM word 5
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col, row)
+    CLC
+    ADC $1D7C
+    STA $09D6               ; VRAM word 6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    CLC
+    ADC $1D7C
+    STA $09D8               ; VRAM word 7
+    ; --- Pass 3: row=$5B+1, col=$5C → $09DA–$09E0 ---
+    LDA $5B
+    INC                     ; row + 1 (INC A = 1A)
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL                     ; col unchanged (no DEC)
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    CLC
+    ADC $1D7C
+    STA $09DA               ; VRAM word 8
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    CLC
+    ADC $1D7C
+    STA $09DC               ; VRAM word 9
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09DE               ; VRAM word 10
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col+1, row+2)
+    CLC
+    ADC $1D7C
+    STA $09E0               ; VRAM word 11
+    ; --- Pass 4: row=$5B+1, col=$5C−1 → $09E2–$09E8 ---
+    LDA $5B
+    INC                     ; row + 1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col − 1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09E2               ; VRAM word 12
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col−1, row+2)
+    CLC
+    ADC $1D7C
+    STA $09E4               ; VRAM word 13
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    CLC
+    ADC $1D7C
+    STA $09E6               ; VRAM word 14
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    CLC
+    ADC $1D7C
+    STA $09E8               ; VRAM word 15
+    SEP #$20                ; A → 8-bit
+    LDA #$10
+    TSB $5F                 ; set bit 4 of dp:$5F (scroll-update trigger)
+    BRL $06C8               ; → $16DC (default mode handler)
+
+; ============================================================
+; $C0:1014 — ModeEE_Handler (437 bytes, $1014–$11C8)
+;
+; Scroll mode $EE handler: updates 4 entries in the $7E:3000
+; layer table, then computes VRAM word-indices for 16 tilemap
+; corners (4 passes × 4 corners), storing to $09CA–$09E8.
+;
+; Row range: $5B−1, $5B  (negative direction vs Mode-EC)
+; Col range: $5C, $5C−1
+;
+; Differences from ModeEC_Handler:
+;   - Step 2 uses DEX (not INX) → updates current−1 (not +1)
+;   - Step 4 uses INX (not DEX) → lands at current−$100
+;   - JSR Sub_1B90 is called BEFORE STA $60 (reversed from EC)
+;   - Pass 1 row: LDX $5B; TXA; DEC; ASL (row−1, LDX anomaly)
+;   - Pass 2 row: LDA $5B; DEC; ASL  (row−1 without LDX)
+;   - Passes 3–4 row: LDA $5B; ASL   (row, no dec/inc)
+;   - Passes 1,3 col: LDA $5C; ASL   (col, no dec)
+;   - Passes 2,4 col: LDA $5C; DEC; ASL (col−1)
+;   - Tail BRL: raw offset $0513 → $16DC
+; ============================================================
+org $C01014
+ModeEE_Handler:
+    ; --- Prologue: update 4 mode-table entries (51 bytes) ---
+    INC A                   ; mode byte $EE → $EF
+    STA.l $7E3000,X         ; update current entry
+    DEX                     ; X → current−1
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−1
+    REP #$20                ; M → 0 (16-bit A)
+    TXA
+    SEC
+    SBC #$0100              ; A = current−1−$100 = current−$101
+    TAX
+    SEP #$20                ; M → 1 (8-bit A)
+    LDA.l $7E3000,X         ; load current−$101
+    INC A
+    STA.l $7E3000,X         ; update current−$101
+    INX                     ; X → current−$100
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$100
+    JSR Sub_1B90            ; SPC audio command $19 (called BEFORE STA $60)
+    LDA #$01
+    STA $60                 ; dp:$60 = $01
+
+    ; --- Computation header: load scroll bases (12 bytes) ---
+    REP #$20                ; M → 0 (16-bit A for all computation below)
+    LDA $1D0A               ; scroll X base
+    STA $DB                 ; dp:$DB/$DC
+    LDA $1D0E               ; scroll Y base
+    STA $DD                 ; dp:$DD/$DE
+
+    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
+    ; (LDX $5B anomaly: uses LDX+TXA instead of LDA, same as ModeEC pass 1)
+    LDX $5B                 ; X = dp:$5B (16-bit, row base)
+    TXA                     ; A = row base
+    DEC                     ; A = row−1
+    ASL                     ; A = (row−1)×2
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C                 ; A = col base (16-bit load from dp:$5C/$5D)
+    ASL                     ; A = col×2
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(row−1, col)
+    CLC
+    ADC $1D7C
+    STA $09CA               ; corner (0,0)
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(row, col)
+    CLC
+    ADC $1D7C
+    STA $09CC               ; corner (1,0)
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36            ; A = VRAM index(row−1, col+1)
+    CLC
+    ADC $1D7C
+    STA $09CE               ; corner (0,1)
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36            ; A = VRAM index(row, col+1)
+    CLC
+    ADC $1D7C
+    STA $09D0               ; corner (1,1)
+
+    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
+    LDA $5B
+    DEC                     ; row−1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D2               ; corner (0,0)
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D4               ; corner (1,0)
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D6               ; corner (0,1)
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D8               ; corner (1,1)
+
+    ; --- Pass 3: row = $5B×2, col = $5C×2 → $09DA–$09E0 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DA               ; corner (0,0)
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DC               ; corner (1,0)
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DE               ; corner (0,1)
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E0               ; corner (1,1)
+
+    ; --- Pass 4: row = $5B×2, col = ($5C−1)×2 → $09E2–$09E8 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E2               ; corner (0,0)
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E4               ; corner (1,0)
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E6               ; corner (0,1)
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E8               ; corner (1,1)
+
+    ; --- Tail (9 bytes) ---
+    SEP #$20                ; A → 8-bit
+    LDA #$10
+    TSB $5F                 ; set bit 4 of dp:$5F
+    BRL $0513               ; raw offset → $16DC (default mode handler)
+
+; ============================================================
+; $C0:11C9 — ModeFA_Handler (651 bytes, $11C9–$1453)
+;
+; Scroll mode $FA handler: updates 6 entries in the $7E:3000
+; layer table, then computes VRAM word-indices for 24 tilemap
+; corners (6 passes × 4 corners), storing to $09CA–$09F8.
+;
+; Row range: $5B, $5B+1  (positive direction, same as EC)
+; Col range: $5C, $5C−1, $5C−2  (3 columns)
+;
+; dp:$60 set to $02 (vs $01 for EC/EE)
+; JSR Sub_1B90 called before STA $60 (same as EE)
+; Pass 1 uses LDX $5B anomaly (no DEC/INC, same as EC/EC)
+; Passes 3,6 use double DEC for col (col−2)
+; ============================================================
+org $C011C9
+ModeFA_Handler:
+    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
+    INC A                   ; mode byte $FA → $FB
+    STA.l $7E3000,X         ; update current
+    INX                     ; X → current+1
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current+1
+    REP #$20
+    TXA
+    SEC
+    SBC #$0100              ; A = current+1−$100 = current−$FF
+    TAX
+    SEP #$20
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$FF
+    DEX                     ; X → current−$100
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$100
+    REP #$20
+    TXA
+    SEC
+    SBC #$0100              ; A = current−$200
+    TAX
+    SEP #$20
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$200
+    INX                     ; X → current−$1FF
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$1FF
+    JSR Sub_1B90            ; SPC audio command $19
+    LDA #$02
+    STA $60                 ; dp:$60 = $02
+
+    ; --- Computation header (12 bytes) ---
+    REP #$20
+    LDA $1D0A
+    STA $DB
+    LDA $1D0E
+    STA $DD
+
+    ; --- Pass 1: row = $5B×2, col = $5C×2 → $09CA–$09D0 ---
+    ; (LDX $5B anomaly: no DEC/INC on row)
+    LDX $5B
+    TXA
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D0
+
+    ; --- Pass 2: row = $5B×2, col = ($5C−1)×2 → $09D2–$09D8 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D8
+
+    ; --- Pass 3: row = $5B×2, col = ($5C−2)×2 → $09DA–$09E0 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    DEC                     ; col−2
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E0
+
+    ; --- Pass 4: row = ($5B+1)×2, col = $5C×2 → $09E2–$09E8 ---
+    LDA $5B
+    INC                     ; row+1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E8
+
+    ; --- Pass 5: row = ($5B+1)×2, col = ($5C−1)×2 → $09EA–$09F0 ---
+    LDA $5B
+    INC                     ; row+1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F0
+
+    ; --- Pass 6: row = ($5B+1)×2, col = ($5C−2)×2 → $09F2–$09F8 ---
+    LDA $5B
+    INC                     ; row+1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    DEC                     ; col−2
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F8
+
+    ; --- Tail (9 bytes) ---
+    SEP #$20
+    LDA #$10
+    TSB $5F
+    BRL $0288               ; raw offset → $16DC (default mode handler)
+
+; ============================================================
+; $C0:1454 — ModeFC_Handler (648 bytes, $1454–$16DB)
+;
+; Scroll mode $FC handler: updates 6 entries in the $7E:3000
+; layer table, then computes VRAM word-indices for 24 tilemap
+; corners (6 passes × 4 corners), storing to $09CA–$09F8.
+;
+; Row range: $5B−1, $5B  (negative direction, like EE)
+; Col range: $5C, $5C−1, $5C−2  (3 columns)
+;
+; dp:$60 set to $02 (same as FA)
+; JSR Sub_1B90 called before STA $60 (same as EE/FA)
+; Pass 1 uses LDX $5B anomaly WITH DEC (like ModeEE pass 1)
+; Passes 3,6 use double DEC for col (col−2)
+; NO tail BRL — falls through directly to $16DC (DefaultModeHandler)
+; ============================================================
+org $C01454
+ModeFC_Handler:
+    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
+    INC A                   ; mode byte $FC → $FD
+    STA.l $7E3000,X         ; update current
+    DEX                     ; X → current−1
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−1
+    REP #$20
+    TXA
+    SEC
+    SBC #$0100              ; A = current−1−$100 = current−$101
+    TAX
+    SEP #$20
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$101
+    INX                     ; X → current−$100
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$100
+    REP #$20
+    TXA
+    SEC
+    SBC #$0100              ; A = current−$200
+    TAX
+    SEP #$20
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$200
+    DEX                     ; X → current−$201
+    LDA.l $7E3000,X
+    INC A
+    STA.l $7E3000,X         ; update current−$201
+    JSR Sub_1B90            ; SPC audio command $19
+    LDA #$02
+    STA $60                 ; dp:$60 = $02
+
+    ; --- Computation header (12 bytes) ---
+    REP #$20
+    LDA $1D0A
+    STA $DB
+    LDA $1D0E
+    STA $DD
+
+    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
+    ; (LDX $5B anomaly WITH DEC, same as ModeEE pass 1)
+    LDX $5B
+    TXA
+    DEC                     ; row−1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09CE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D0
+
+    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
+    LDA $5B
+    DEC                     ; row−1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09D8
+
+    ; --- Pass 3: row = ($5B−1)×2, col = ($5C−2)×2 → $09DA–$09E0 ---
+    LDA $5B
+    DEC                     ; row−1
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    DEC                     ; col−2
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09DE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E0
+
+    ; --- Pass 4: row = $5B×2, col = $5C×2 → $09E2–$09E8 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09E8
+
+    ; --- Pass 5: row = $5B×2, col = ($5C−1)×2 → $09EA–$09F0 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EA
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EC
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09EE
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F0
+
+    ; --- Pass 6: row = $5B×2, col = ($5C−2)×2 → $09F2–$09F8 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY
+    LDA $5C
+    DEC                     ; col−1
+    DEC                     ; col−2
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F2
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F4
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36
+    CLC
+    ADC $1D7C
+    STA $09F8
+
+    ; --- Tail (6 bytes, no BRL — falls through to $16DC) ---
+    SEP #$20
+    LDA #$10
+    TSB $5F                 ; set bit 4 of dp:$5F
