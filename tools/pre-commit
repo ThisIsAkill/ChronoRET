@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# pre-commit hook — four checks in order:
+# pre-commit hook — five checks in order:
+#   0. Refuse to commit CLAUDE.md even if force-added (it's gitignored on purpose)
 #   1. ROM byte-exact match (make diff)
 #   2. Regenerate docs/includes/progress_summary.md and auto-stage it
 #   3. Warn if asm/ was changed but docs/PROGRESS.md wasn't updated
@@ -15,6 +16,11 @@ fail() { printf "${RED}[pre-commit] %s${RESET}\n" "$*" >&2; exit 1; }
 warn() { printf "${YELLOW}[pre-commit] WARNING: %s${RESET}\n" "$*" >&2; }
 ok()   { printf "${GREEN}[pre-commit] %s${RESET}\n" "$*"; }
 info() { printf '[pre-commit] %s\n' "$*"; }
+
+# ── 0. CLAUDE.md must never be committed ──────────────────────────────────────
+if git diff --cached --name-only | grep -qx 'CLAUDE.md'; then
+    fail "CLAUDE.md is staged. It's gitignored on purpose — unstage it (git restore --staged CLAUDE.md)."
+fi
 
 # ── 1. ROM byte-exact diff ────────────────────────────────────────────────────
 if [ ! -f roms/chrono_trigger.sfc ]; then

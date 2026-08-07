@@ -4075,6 +4075,177 @@ Sub_2824:
     RTS
 
 ; ============================================================
+; $C0:18D9 — Sub_18D9 (172 bytes, $18D9–$1984)
+; VBlank-sync wait + mode-transition manager.
+; Called from GameLoop frame body at $C0:00A1, before $0C76 dispatch.
+; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
+;
+; Part A — VBlank-sync wait ($18D9–$1915):
+;   If $00F0 bit 0 is SET, AND dp:$11=0, AND dp:$1F≠0:
+;     halve dp:$19 (fade timer), set $0407=$FF, then loop calling JSR $EC60
+;     until $00F0 bit 0 clears (halving $1A each iteration via JSL $FDC2C1).
+;     When bit 0 clears: restore dp:$19 from $1A, clear $0407.
+;
+; Part B — mode-transition dispatch ($1916–$1984):
+;   Check $00F6 bit 0 → if set, call Sub_1985 (mode-5 guard + reinit).
+;   Re-read $00F6, test bit 6:
+;     bit 6 CLEAR: if dp:$62≠0 call Sub_1ADF (mode-index update). RTS.
+;     bit 6 SET:   additional guards (dp:$1F≠0, dp:$62=0, dp:$10=0); then
+;       fade loop (DEC dp:$19, JSR $EC60), full mode-0 reinit:
+;       JSR InitHW/$011B, TDC/XBA/JSL $C28000, JSR InitHW/$0B64/$0B75,
+;       REP #$20/LDA #$0100/TCD/SEP #$20, JSR $01A5/$1A03/$B192/Sub_2824,
+;       STZ $0407, RTS.
+; ============================================================
+org $C018D9
+Sub_18D9:
+    LDA.w $00F0          ; VBlank/HW flags
+    BIT #$01             ; test bit 0 (sync flag)
+    BEQ .after_wait      ; bit 0 clear → skip wait loop
+    LDA $11              ; re-entry guard
+    BNE .after_wait      ; non-zero → skip
+    LDA $1F              ; transition-active flag
+    BEQ .after_wait      ; zero → skip
+    ; All three conditions met: run wait loop
+    LDA $19              ; fade timer
+    STA $1A              ; save copy
+    LSR                  ; halve
+    STA $19
+    LDA #$FF
+    STA $0407            ; mark transition in progress (abs: 8D 07 04)
+.wait_loop:
+    JSR $EC60
+    LDA.w $00F0
+    BIT #$01
+    BNE .wait_exit       ; bit 0 now clear → exit
+    LDA $1A
+    LSR
+    STA $19
+    SEP #$10
+    JSL $FDC2C1
+    STZ $53
+    REP #$10
+    BRA .wait_loop
+.wait_exit:
+    LDA $1A
+    STA $19
+    STZ $0407            ; abs clear: 9C 07 04
+.after_wait:
+    LDA.w $00F6
+    BIT #$01
+    BEQ .no_mode5
+    JSR Sub_1985
+    LDA.w $00F6
+.no_mode5:
+    BIT #$40
+    BNE .bit6_set
+    LDA $62
+    BEQ .done
+    JSR Sub_1ADF
+.done:
+    RTS
+.bit6_set:
+    LDA $1F
+    BNE .chk_62
+    RTS
+.chk_62:
+    LDA $62
+    BEQ .chk_10
+    RTS
+.chk_10:
+    LDA $10
+    BEQ .do_reinit
+    RTS
+.do_reinit:
+.fade_loop:
+    LDA #$FF
+    STA $0407            ; abs: 8D 07 04 (re-sets flag each iteration)
+    LDA $19
+    BEQ .fade_done
+    BMI .fade_done
+    DEC $19
+    SEP #$10
+    JSL $FDC2C1
+    REP #$10
+    JSR $EC60
+    BRA .fade_loop
+.fade_done:
+    JSR $0B4E            ; InitHW
+    JSR $011B            ; scene-setup helper (unmatched)
+    TDC                  ; A = low byte of DP = $00 (DP=$0100)
+    XBA                  ; swap A/B
+    JSL $C28000          ; set BG mode (A in B after XBA)
+    JSR $0B4E            ; InitHW again
+    JSR $0B64            ; InstallNMI
+    JSR $0B75            ; InstallIRQ
+    REP #$20             ; A → 16-bit
+    LDA #$0100
+    TCD                  ; DP = $0100
+    SEP #$20             ; A → 8-bit
+    JSR $01A5            ; engine init helper (unmatched)
+    JSR $1A03            ; scene-data helper (unmatched)
+    JSR $B192            ; WRAM-clear + BRL tail (unmatched)
+    JSR Sub_2824         ; post-transition fade loop
+    STZ $0407            ; abs clear: 9C 07 04
+    RTS
+
+; ============================================================
+; $C0:1985 — Sub_1985 (66 bytes, $1985–$19C6)
+; Mode-5 transition guard + fade.  Falls through to Sub_19C7.
+; Called from Sub_18D9 when $00F6 bit 0 is set.
+; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
+;
+; Guard chain: if dp:$26≠0 → toggle $26 bits 0-1 and return early.
+;   Otherwise check WRAM[$7F0000] ≥ $49 (version gate),
+;   dp:$1F≠0, dp:$62=0, dp:$10=0.
+; If all pass: set $0407=$FF, decrement dp:$19 each frame calling
+;   JSR $EC60 (per-frame work) until dp:$19 reaches 0 or goes negative.
+;   Then JSR $0B4E (InitHW) + JSR $011B (scene setup).
+; Falls through directly into Sub_19C7 for hardware reinit.
+; ============================================================
+org $C01985
+Sub_1985:
+    LDA $26
+    BEQ .continue
+    EOR #$03             ; toggle bits 0-1
+    STA $26
+    RTS
+.continue:
+    LDA.l $7F0000        ; WRAM byte 0 (version/region indicator)
+    SEC
+    SBC #$49
+    BCS .chk_1F          ; ≥ $49 → continue
+    RTS
+.chk_1F:
+    LDA $1F
+    BNE .chk_62          ; non-zero → continue
+    RTS
+.chk_62:
+    LDA $62
+    BEQ .chk_10          ; zero → continue
+    RTS
+.chk_10:
+    LDA $10
+    BEQ .do_fade         ; zero → proceed
+    RTS
+.do_fade:
+.fade_loop:
+    LDA #$FF
+    STA $0407            ; abs: 8D 07 04 (re-sets flag each iteration)
+    LDA $19
+    BEQ .fade_done
+    BMI .fade_done
+    DEC $19
+    SEP #$10
+    JSL $FDC2C1
+    REP #$10
+    JSR $EC60
+    BRA .fade_loop
+.fade_done:
+    JSR $0B4E            ; InitHW
+    JSR $011B            ; scene-setup helper
+    ; fall through to Sub_19C7
+
+; ============================================================
 ; $C0:19C7 — Sub_19C7 (60 bytes, $19C7–$1A02)
 ; Mode-5 warm-restart. BRL target from Sub_0C76 mode-5-setup path.
 ; On entry: M=1 (A=8-bit), X/Y=16-bit.
@@ -4113,7 +4284,74 @@ Sub_19C7:
     RTS
 
 ; ============================================================
-; $C0:0D78 — ModeE6_Handler header ($0D78–$0DA0)
+; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
+; Mode-index update dispatcher.  Pure leaf (no JSR calls).
+; Called from Sub_18D9 when $00F6 bit 6 CLEAR and dp:$62≠0.
+; On entry: M=1 (A 8-bit, holds mode parameter), X/Y 16-bit, DP=$0100.
+;
+; A=1 → .chk_flags: read $00F6 bit 7; if set clear dp:$34 (LDX #0, STX).
+; A=2 → inspect $00F7 bits 2 and 3 for increment/decrement path;
+;        also checks $00F8 bit 7 to set dp:$62=3.
+; A≠1,2 → save dp:$63→dp:$66, force dp:$63=$04, then .chk_flags.
+;
+; .inc_mode63: INC dp:$63; clamp against dp:$65/$64; store dp:$63. RTS.
+; .dec_mode63: DEC dp:$63; clamp against dp:$64/$65; store dp:$63. RTS.
+; ============================================================
+org $C01ADF
+Sub_1ADF:
+    CMP #$01
+    BEQ .chk_flags       ; A=1: go directly to flag check ($1B0C)
+    CMP #$02
+    BNE .update_mode63   ; A≠2: update mode counter ($1AFE)
+    ; A=2 path: check $00F7 buttons
+    LDA.w $00F7
+    BIT #$04
+    BNE .inc_mode63      ; bit 2 set → increment mode ($1B19)
+    BIT #$08
+    BNE .dec_mode63      ; bit 3 set → decrement mode ($1B29)
+    LDA.w $00F8
+    BIT #$80
+    BEQ .rts2            ; bit 7 clear → skip to bare RTS ($1B18)
+    LDA #$03
+    STA $62
+    RTS
+.update_mode63:          ; $1AFE — A≠1,2 path
+    LDA $63
+    BMI .chk_flags       ; negative → skip update
+    CMP #$04
+    BEQ .chk_flags       ; already 4 → skip update
+    STA $66
+    LDA #$04
+    STA $63
+.chk_flags:              ; $1B0C
+    LDA.w $00F6
+    BIT #$80
+    BEQ .rts2            ; bit 7 clear → RTS without clearing $34
+    LDX #$0000
+    STX $34
+.rts2:                   ; $1B18
+    RTS
+.inc_mode63:             ; $1B19
+    LDA $63
+    INC A
+    CMP $65
+    BEQ .store_63
+    BCS .use_64_val
+.store_63:               ; $1B22
+    STA $63
+    RTS
+.use_64_val:             ; $1B25
+    LDA $64
+    BRA .store_63
+.dec_mode63:             ; $1B29
+    LDA $63
+    BEQ .use_65_val
+    DEC A
+    CMP $64
+    BCS .store_63
+.use_65_val:             ; $1B32
+    LDA $65
+    BRA .store_63
 ; Mode-$E6 scroll-map update. BRL target from Sub_0C76 bit-4 dispatch
 ; (mode $E6 case, raw offset $001F from $0D5C).
 ; On entry: A=$E6 (current mode), X=layer index, M=1, X/Y=16-bit.

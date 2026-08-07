@@ -22,3 +22,4 @@ __pycache__/
 
 # IDE config
 .claude/
+CLAUDE.md
