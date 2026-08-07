@@ -17,16 +17,16 @@ incsrc "../hardware.inc"
 
 ; BRL targets (raw hex won't compute relative — must use labels)
 org $C00AFF
-AltEntry2:      ; alternate cold-start entry 2
+AudioDrvSync:     ; JSL re-entry: force 2 audio driver ticks, restore DB/DP; RTL
 
 org $C01BAB
-AltEntry3:      ; alternate cold-start entry 3
+MusicCueDispatch: ; JSL re-entry: SPC start ($14) or fade ($70) per $7E2A1F bit 6; RTL
 
 org $C01BE6
-AltEntry4:      ; alternate cold-start entry 4
+AudioFadeDispatch: ; JSL re-entry: conditional SPC fade/start via $7F01EC counter; RTL
 
 org $C02C41
-AltEntry1:      ; alternate cold-start entry 1
+ScrollStepAccum:  ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
 
 org $C02E1E
 LoadSavePath:   ; entry for mode >= $01FF (load/save/transition)
@@ -3216,6 +3216,34 @@ Sub_C2BF:
     PLB
     RTS
 
+; ============================================================
+; $C0:E935 — Sub_E935 (29 bytes, $E935–$E951)
+; Initialize 8 sprite-slot "uninitialized" flags at $0BC0-$0BC7 to $80.
+; Sets DP=$0B00, stores LDA #$80 to dp:$C0-$C7 (= abs $0BC0-$0BC7),
+; then PLD / RTS.
+; Tail-called via BRL from Sub_B192 at end of sprite table clear.
+; $80 in these slots means "no sprite assigned" (tested in Sub_E9E2/E9FF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP restored by PLD before call.
+; ============================================================
+org $C0E935
+Sub_E935:
+    PHD
+    REP #$20                ; A → 16-bit
+    LDA #$0B00
+    TCD                     ; DP = $0B00
+    SEP #$20                ; A → 8-bit
+    LDA #$80                ; "uninitialized" sentinel
+    STA $C0                 ; dp:$C0 = $0BC0
+    STA $C1
+    STA $C2
+    STA $C3
+    STA $C4
+    STA $C5
+    STA $C6
+    STA $C7                 ; dp:$C7 = $0BC7
+    PLD
+    RTS
+
 org $C0E9E2
 Sub_E9E2:
     ; 29 bytes ($E9E2-$E9FE). Entry M=1, X=1.
@@ -3289,18 +3317,24 @@ Sub_EA1F:
     RTS
 
 ; ============================================================
-; $C0:0000 — Entry jump table (5 entries, BRA/BRL)
-; Entry 0 is warm restart (skip one-time init, enter frame loop).
-; Entries 1-4 are alternate cold-start targets.
+; $C0:0000 — ReentryVectors (14 bytes)
+; Mid-game JSL re-entry vector table.  Other banks JSL into one of
+; these entries; the BRA/BRL tail-dispatches to the target routine,
+; and its RTL returns directly to the JSL caller.
+;   [0] $0000  BRA → GameLoop_Main  (warm restart; no RTL return)
+;   [1] $0002  JSL → ScrollStepAccum  ($C0:2C41)
+;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
+;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
+;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
 ; ============================================================
 org $C00000
 
-EntryTable:
+ReentryVectors:
     BRA GameLoop_Main       ; [0] warm restart — skip init, enter frame loop
-    BRL $2C3C               ; [1] → AltEntry1  ($2C41)
-    BRL $0AF7               ; [2] → AltEntry2  ($0AFF)
-    BRL $1BA0               ; [3] → AltEntry3  ($1BAB)
-    BRL $1BD8               ; [4] → AltEntry4  ($1BE6)
+    BRL $2C3C               ; [1] → ScrollStepAccum  ($2C41)
+    BRL $0AF7               ; [2] → AudioDrvSync      ($0AFF)
+    BRL $1BA0               ; [3] → MusicCueDispatch  ($1BAB)
+    BRL $1BD8               ; [4] → AudioFadeDispatch ($1BE6)
 
 ; ============================================================
 ; $C0:000E — GameLoop: one-time startup init (from MainInit)
@@ -3376,8 +3410,8 @@ GL_ModeOk2:
     SEP #$20
 
     JSR FrameStateInit      ; save/reset per-frame state variables
-    JSR FrameUpdate         ; per-frame logic dispatch
-    JSR $B192
+    JSR LoadLocation        ; one-time location-load (10 JSR + 2 JSL)
+    JSR Sub_B192            ; zero $1Bxx table + init $0BC0-$0BC7
     JSR $56A6
     JSR $28AA
     JSR $2848               ; input polling
@@ -3428,19 +3462,219 @@ Sub_00EB:
     JSR VBlankHandlerShort
     BRL $EB6C               ; → Sub_EC60 ($EC60)
 
-FrameUpdate:
-    JSR $092B
-    JSR $1B53
-    JSR $0960
-    JSR $6DCF
-    JSR $7084
-    JSR $7F7E
-    JSR $A33B
-    JSR $09DD
-    JSR $0A14
-    JSR $56D4
-    JSL $FDFFFA
-    JSL $FDFFF4
+; ============================================================
+; $C0:00F4 — LoadLocation (39 bytes, $00F4–$011A)
+; One-time location-load called once per scene entry from GameLoop_Main.
+; Calls 10 scene-load helpers (JSR) and 2 cross-bank engine inits (JSL).
+; NOT called per frame — only when entering a new location/map.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+LoadLocation:
+    JSR $092B               ; scene init helper
+    JSR $1B53               ; scene init helper
+    JSR $0960               ; scene init helper
+    JSR $6DCF               ; scene init helper
+    JSR $7084               ; scene init helper
+    JSR $7F7E               ; scene init helper
+    JSR $A33B               ; scene init helper
+    JSR $09DD               ; scene init helper
+    JSR $0A14               ; scene init helper
+    JSR $56D4               ; scene init helper
+    JSL $FDFFFA             ; cross-bank engine init 1
+    JSL $FDFFF4             ; cross-bank engine init 2
+    RTS
+
+; ============================================================
+; $C0:011B — Sub_011B (138 bytes, $011B–$01A4)
+; Build scene context workspace before a scene transition.
+; Optionally gates: if dp:$29≠0 → set dp:$29=1, clear dp:$26/$27.
+; Then: JSR Sub_0918 (MVN $7E:0920→$7F:2000, $14E0 bytes).
+; Load dp:$97-indexed scene table rows ($1801,Y / $1881,Y / $1600,Y)
+;   into dp:$02/$03/$04 and loop over 3 sprite slots:
+;   if slot valid: copy $1800,Y/$1880,Y/$0C00,Y (16-bit) →
+;     $7F1D09,X / $7F1D0F,X / $7F1D15,X (X = 0,2,4).
+; Copy dp:$AB/$AC/$AD → $7F1D1B/$1D1C/$1D1D.
+; Copy $7F3728/$3748/$3768/$3781 (scroll pos) → $7F1D1E/$1D20/$1D22/$1D24.
+; Copy $1DF9 → $7F1D26.
+; Called from Sub_0C76 and Sub_18D9 at start of scene transition.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C0011B
+Sub_011B:
+    LDA $29                 ; re-entry gate flag
+    BEQ .call_mvn           ; zero → skip gate
+    LDA #$01
+    STA $29                 ; set re-entry flag = 1
+    LDA #$00
+    STA $26                 ; clear dp:$26
+    STZ $27                 ; clear dp:$27
+.call_mvn:
+    JSR Sub_0918            ; MVN $7E:0920 → $7F:2000 ($14E0 bytes)
+    LDY $97                 ; 16-bit Y: loads dp:$97-$98 (sprite slot 0 index)
+    LDA $1801,Y             ; scene table byte
+    STA $02
+    LDA $1881,Y
+    STA $03
+    LDA $1600,Y
+    STA $04
+    LDX #$0000              ; X = 0 (16-bit loop index)
+.slot_loop:
+    TDC                     ; A = DP ($01); XBA clears B
+    XBA
+    LDA $97,X               ; dp:$97+X = sprite slot index (0,2,4 → $97,$99,$9B)
+    BMI .next_slot          ; $80 = no sprite → skip
+    TAY                     ; Y = sprite slot index
+    REP #$20                ; A → 16-bit
+    LDA $1800,Y             ; scene table word
+    STA $7F1D09,X           ; → workspace entry X
+    LDA $1880,Y
+    STA $7F1D0F,X
+    LDA $0C00,Y
+    STA $7F1D15,X
+    SEP #$20                ; A → 8-bit
+.next_slot:
+    INX
+    INX                     ; X += 2 (step to next slot)
+    CPX #$0006              ; done after 3 iterations (X = 0,2,4)
+    BNE .slot_loop
+    LDA $AB
+    STA.l $7F1D1B           ; dp:$AB → workspace
+    LDA $AC
+    STA.l $7F1D1C
+    LDA $AD
+    STA.l $7F1D1D
+    REP #$20                ; A → 16-bit
+    LDA.l $7F3728           ; current scroll X0
+    STA.l $7F1D1E           ; → workspace scroll X0
+    LDA.l $7F3748
+    STA.l $7F1D20
+    LDA.l $7F3768
+    STA.l $7F1D22
+    LDA.l $7F3781
+    STA.l $7F1D24
+    SEP #$20                ; A → 8-bit
+    LDA.w $1DF9             ; abs: scene entry value
+    STA.l $7F1D26
+    RTS
+
+; ============================================================
+; $C0:01A5 — Sub_01A5 (167 bytes, $01A5–$024B)
+; Full location engine init after a scene transition.
+; 1. JSR Sub_0905 (MVN $7F:2000 → $7E:0920, $14E0 bytes).
+; 2. Audio tick: SEP #$10 / JSL $FDC2C1 / REP #$10 / JSL $FDC1EE.
+; 3. Reset OAM buffer write-head limits: dp:$7D=$0900/$7F=$0770/$7B=$08A0.
+; 4. Call 8 scene-load helpers: $0960/$6DCF/$7084/$7F7E/$A33B/$09DD/$0A14/$56D4.
+; 5. REP #$20: unpack workspace scroll → $7F3728/$3748/$3768/$3781;
+;    restore $1DF9 from $7F1D26.
+; 6. JSR Sub_595C (sprite dispatch from $7F2003 table).
+; 7. TDC/XBA/LDA dp:$AE: if ≥ 0: TAX/STX dp:$6D/JSR $E12A.
+; 8. LDA $7F03FE: if 0 or ≥ 3 skip; else copy 3 sprite slots $1800/$1880,
+;    set dp:$1F=1 / $7F03FE=3.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C001A5
+Sub_01A5:
+    JSR Sub_0905            ; MVN $7F:2000 → $7E:0920 (unpack workspace)
+    SEP #$10                ; X,Y → 8-bit for audio tick
+    JSL $FDC2C1             ; audio driver tick
+    REP #$10                ; X,Y → 16-bit
+    JSL $FDC1EE             ; cross-bank FD audio init
+    LDX #$0900
+    STX $7D                 ; OAM range-2 end = $0900
+    LDX #$0770
+    STX $7F                 ; OAM range-3 end = $0770
+    LDX #$08A0
+    STX $7B                 ; OAM range-1 end = $08A0
+    JSR $0960               ; scene-load helper
+    JSR $6DCF               ; scene-load helper
+    JSR $7084               ; scene-load helper
+    JSR $7F7E               ; scene-load helper
+    JSR $A33B               ; scene-load helper
+    JSR $09DD               ; scene-load helper
+    JSR $0A14               ; scene-load helper
+    JSR $56D4               ; scene-load helper
+    REP #$20                ; A → 16-bit
+    LDA.l $7F1D1E           ; workspace scroll X0
+    STA.l $7F3728           ; → live scroll X0
+    LDA.l $7F1D20
+    STA.l $7F3748
+    LDA.l $7F1D22
+    STA.l $7F3768
+    LDA.l $7F1D24
+    STA.l $7F3781
+    SEP #$20                ; A → 8-bit
+    LDA.l $7F1D26           ; workspace scene-entry value
+    STA.w $1DF9             ; → abs: scene-entry cache
+    JSR $595C               ; sprite dispatch from $7F2003 table
+    TDC                     ; A = DP low byte; XBA sets B = 0
+    XBA
+    LDA $AE                 ; sprite slot index cache
+    BMI .no_e12a            ; $80 → no valid slot
+    TAX                     ; X = slot index (zero-extended)
+    STX $6D                 ; dp:$6D = slot index (16-bit write)
+    JSR $E12A               ; sprite init pass
+.no_e12a:
+    LDA.l $7F03FE           ; transition counter
+    BEQ .done               ; 0 → skip
+    CMP #$03
+    BCS .done               ; ≥ 3 → skip
+    REP #$20                ; A → 16-bit
+    LDX $97                 ; sprite slot 0 index (16-bit)
+    LDA $1800,X             ; source sprite table entry
+    LDX $99                 ; slot 1 index
+    STA $1800,X             ; copy to slot 1
+    LDX $9B                 ; slot 2 index
+    STA $1800,X             ; copy to slot 2
+    LDX $97
+    LDA $1880,X             ; source sprite table entry (second table)
+    LDX $99
+    STA $1880,X
+    LDX $9B
+    STA $1880,X
+    SEP #$20                ; A → 8-bit
+    LDA #$01
+    STA $1F                 ; set transition-active flag
+    LDA #$03
+    STA.l $7F03FE           ; mark transition counter = 3
+.done:
+    RTS
+
+; ============================================================
+; $C0:0905 — Sub_0905 (19 bytes, $0905–$0917)
+; Block-copy $14E0 bytes from $7F:2000 to $00:0920 (= WRAM $7E:0920).
+; Reverse of Sub_0918: unpacks scene workspace back to main WRAM.
+; Called from Sub_01A5 at start of location init.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C00905
+Sub_0905:
+    LDY #$0920              ; MVN dst offset (bank $00 = WRAM $7E)
+    LDX #$2000              ; MVN src offset (bank $7F)
+    REP #$20                ; A → 16-bit
+    LDA #$14DF              ; count = $14E0 bytes (A = count-1)
+    PHB
+    MVN $00,$7F             ; copy from $7F:$2000 to $00:$0920
+    PLB
+    SEP #$20                ; A → 8-bit
+    RTS
+
+; ============================================================
+; $C0:0918 — Sub_0918 (19 bytes, $0918–$092A)
+; Block-copy $14E0 bytes from $00:0920 (= WRAM $7E:0920) to $7F:2000.
+; Saves scene workspace into $7F scratch buffer.
+; Called from Sub_011B during scene transition save.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C00918
+Sub_0918:
+    LDX #$0920              ; MVN src offset (bank $00 = WRAM $7E)
+    LDY #$2000              ; MVN dst offset (bank $7F)
+    REP #$20                ; A → 16-bit
+    LDA #$14DF              ; count = $14E0 bytes (A = count-1)
+    PHB
+    MVN $7F,$00             ; copy from $00:$0920 to $7F:$2000
+    PLB
+    SEP #$20                ; A → 8-bit
     RTS
 
 ; ============================================================
@@ -3713,7 +3947,7 @@ Sub_0C76:
 .enter_transition:
     ; Scene transition: reinit HW + set up new color/mode
     JSR $0B4E                ; InitHW
-    JSR $011B                ; unknown scene-setup routine
+    JSR Sub_011B             ; build scene context workspace
     TDC
     XBA                      ; B = 0 (dp high byte)
     LDA $25
@@ -3754,8 +3988,8 @@ Sub_0C76:
     LDA #$0100
     TCD                      ; DP = $0100
     SEP #$20
-    JSR $01A5                ; unknown init
-    JSR $B192                ; unknown init
+    JSR Sub_01A5             ; full location engine init
+    JSR Sub_B192             ; zero $1Bxx table + init $0BC0-$0BC7
     LDA #$40
     TRB $17                  ; clear bit 6 of $17
     LDA #$40
@@ -3924,6 +4158,36 @@ ClearRAMDMA:
     LDA #$80
     STA.w MDMAEN              ; $420B: enable DMA channel 7 (auto-clears when done)
     RTS
+
+; ============================================================
+; $C0:B192 — Sub_B192 (30 bytes, $B192–$B1B1)
+; Zero $1Bxx sprite table entries, then BRL-tail to Sub_E935.
+; Sets DP=$1B00, reads count from $7F:2000, loops zeroing X=0
+; at dp:$00+Y (Y steps by 2) for count iterations.
+; After loop: REP #$10 / PLD / BRL Sub_E935 (which inits $0BC0-$0BC7=$80).
+; Called from Sub_0C76, Sub_19C7, Sub_18D9 at end of scene reinit.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C0B192
+Sub_B192:
+    PHD
+    REP #$20                ; A → 16-bit
+    LDA #$1B00
+    TCD                     ; DP = $1B00
+    SEP #$20                ; A → 8-bit
+    SEP #$10                ; X,Y → 8-bit
+    LDA.l $7F2000           ; sprite table entry count
+    LDX #$00                ; X = $00 (value to store)
+    LDY #$00                ; Y = table offset
+.zero_loop:
+    STX $00,Y               ; store $00 at $1B00+Y
+    INY
+    INY                     ; Y += 2
+    DEC                     ; A-- (count)
+    BNE .zero_loop
+    REP #$10                ; X,Y → 16-bit
+    PLD
+    BRL $3783               ; → Sub_E935 ($E935): init $0BC0-$0BC7=$80
 
 ; ============================================================
 ; $C0:B271 — PostVBlank (152 bytes)
@@ -4170,7 +4434,7 @@ Sub_18D9:
     BRA .fade_loop
 .fade_done:
     JSR $0B4E            ; InitHW
-    JSR $011B            ; scene-setup helper (unmatched)
+    JSR Sub_011B         ; build scene context workspace
     TDC                  ; A = low byte of DP = $00 (DP=$0100)
     XBA                  ; swap A/B
     JSL $C28000          ; set BG mode (A in B after XBA)
@@ -4181,9 +4445,9 @@ Sub_18D9:
     LDA #$0100
     TCD                  ; DP = $0100
     SEP #$20             ; A → 8-bit
-    JSR $01A5            ; engine init helper (unmatched)
-    JSR $1A03            ; scene-data helper (unmatched)
-    JSR $B192            ; WRAM-clear + BRL tail (unmatched)
+    JSR Sub_01A5         ; full location engine init
+    JSR Sub_1A03         ; restore sprite colors + scene tables
+    JSR Sub_B192         ; zero $1Bxx table + init $0BC0-$0BC7
     JSR Sub_2824         ; post-transition fade loop
     STZ $0407            ; abs clear: 9C 07 04
     RTS
@@ -4242,7 +4506,7 @@ Sub_1985:
     BRA .fade_loop
 .fade_done:
     JSR $0B4E            ; InitHW
-    JSR $011B            ; scene-setup helper
+    JSR Sub_011B         ; build scene context workspace
     ; fall through to Sub_19C7
 
 ; ============================================================
@@ -4267,8 +4531,8 @@ Sub_19C7:
     LDA #$0100
     TCD                  ; DP = $0100
     SEP #$20             ; A → 8-bit
-    JSR $01A5            ; engine init helper
-    JSR $1A03            ; mode-5 scene helper (distinct from $B192 path)
+    JSR Sub_01A5         ; full location engine init
+    JSR Sub_1A03         ; restore sprite colors + scene tables
     REP #$10             ; ensure X/Y 16-bit
     LDA $17              ; load dp:$17 transition flags
     BIT #$40             ; test bit 6
@@ -4278,9 +4542,110 @@ Sub_19C7:
     LDA #$40
     TSB $18              ; set bit 6 of dp:$18
 .no_bit6:
-    JSR $B192
+    JSR Sub_B192         ; zero $1Bxx table + init $0BC0-$0BC7
     JSR Sub_2824         ; post-transition fade loop
     STZ $0407
+    RTS
+
+; ============================================================
+; $C0:1A03 — Sub_1A03 (169 bytes, $1A03–$1AAB)
+; Scene display-state restore: sprite color sync + scene table restore.
+; First checks if palette colors ($7E2980-$2982) have changed vs dp:$94-$96;
+;   if unchanged → early RTS.
+; If changed: call Sub_597D for each active sprite slot (dp:$8D/$8E/$8F/
+;   $91/$90/$92/$93; skip slot if negative = no sprite).
+; Then update color cache: dp:$94/$95/$96 = new $7E2980/$2981/$2982.
+; Loop (X=0,2,4): if slot dp:$97+X valid (not $80):
+;   LDA $7F1D09,X/$0F,X/$15,X (16-bit) → STA $1800,Y/$1880,Y/$0C00,Y.
+; Finally restore dp:$AB/$AC/$AD from $7F1D1B/$1D1C/$1D1D.
+; Essentially the inverse of Sub_011B's scene-table-save pass.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C01A03
+Sub_1A03:
+    LDA.l $7E2980           ; current palette color 0
+    CMP $94                 ; vs cached value
+    BNE .colors_changed
+    LDA.l $7E2981
+    CMP $95
+    BNE .colors_changed
+    LDA.l $7E2982
+    CMP $96
+    BNE .colors_changed
+    RTS                     ; colors unchanged → nothing to do
+
+.colors_changed:
+    STZ $6E                 ; clear sprite-update flag
+    LDA $8D
+    BMI .chk_8E             ; $80 = no sprite
+    STA $6D
+    JSR $597D               ; sprite slot refresh
+.chk_8E:
+    LDA $8E
+    BMI .chk_8F
+    STA $6D
+    JSR $597D
+.chk_8F:
+    LDA $8F
+    BMI .chk_91
+    STA $6D
+    JSR $597D
+.chk_91:
+    LDA $91
+    BMI .chk_90
+    STA $6D
+    JSR $597D
+.chk_90:
+    LDA $90
+    BMI .chk_92
+    STA $6D
+    JSR $597D
+.chk_92:
+    LDA $92
+    BMI .chk_93
+    STA $6D
+    JSR $597D
+.chk_93:
+    LDA $93
+    BMI .update_cache
+    STA $6D
+    JSR $597D
+
+.update_cache:
+    LDA.l $7E2980           ; update color cache
+    STA $94
+    LDA.l $7E2981
+    STA $95
+    LDA.l $7E2982
+    STA $96
+
+    LDX #$0000              ; X = slot loop index (16-bit)
+.restore_loop:
+    TDC                     ; A = DP low; XBA sets B = 0
+    XBA
+    LDA $97,X               ; sprite slot index (dp:$97+X)
+    BMI .next_restore       ; $80 → no sprite
+    TAY                     ; Y = slot index
+    REP #$20                ; A → 16-bit
+    LDA.l $7F1D09,X         ; workspace entry 0
+    STA $1800,Y             ; → scene table
+    LDA.l $7F1D0F,X         ; workspace entry 1
+    STA $1880,Y
+    LDA.l $7F1D15,X         ; workspace entry 2
+    STA $0C00,Y
+    SEP #$20                ; A → 8-bit
+.next_restore:
+    INX
+    INX                     ; X += 2
+    CPX #$0006              ; 3 iterations
+    BNE .restore_loop
+
+    LDA.l $7F1D1B           ; restore dp:$AB/$AC/$AD
+    STA $AB
+    LDA.l $7F1D1C
+    STA $AC
+    LDA.l $7F1D1D
+    STA $AD
     RTS
 
 ; ============================================================
