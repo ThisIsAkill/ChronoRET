@@ -4021,3 +4021,276 @@ PV_EndRange3:
     LDX $DF
     STX $7F                 ; ($017F): range-3 write pointer
     RTS
+
+; ============================================================
+; $C0:1B90 — Sub_1B90 (23 bytes, $1B90–$1BA6)
+; SPC audio command dispatcher. Called from ModeE6_Handler.
+; On entry: M=1 (A=8-bit), X/Y=16-bit.
+; Sets command args at $1E00–$1E02 then calls SPC driver via JSL $C70004.
+; Command $19 cues a sound effect; arg0=dp:$FC, arg1=$0A00+dp:$97 table.
+; ============================================================
+org $C01B90
+Sub_1B90:
+    LDA $FC              ; 8-bit arg 0 from dp:$FC
+    STA $1E01
+    LDY $97              ; 16-bit index from dp:$97
+    LDA $0A00,Y          ; arg 1: sound-effect byte from $0A00 table
+    STA $1E02
+    LDA #$19             ; SPC command byte $19
+    STA $1E00
+    JSL $C70004          ; → SPC700 driver entry
+    RTS
+
+; ============================================================
+; $C0:2824 — Sub_2824 (36 bytes, $2824–$2847)
+; Post-transition setup/fade loop. BRL target from Sub_0C76 transition
+; path (offset $1AE6) and called from Sub_19C7.
+; Calls $286C (scene-init probe). If non-zero return, exits immediately.
+; Otherwise loops up to 15 VBlanks (dp:$19 counter): calls $881E (frame
+; DMA/controller update), $00DE (VBlankHandlerShort), and $EC60 (post-VBlank).
+; Clears dp:$1E and abs:$0407 on exit.
+; On entry: M=1 (A=8-bit), X/Y=16-bit.
+; ============================================================
+org $C02824
+Sub_2824:
+    JSR $286C            ; scene-init probe; sets Z if not ready
+    BNE .done            ; non-zero (Z=0) → done, skip loop
+.loop:
+    INC $19              ; advance transition counter
+    LDA $1F
+    PHA                  ; save dp:$1F
+    STZ $1F              ; clear $1F during update
+    JSR $881E            ; frame DMA/controller update
+    PLA
+    STA $1F              ; restore dp:$1F
+    JSR $00DE            ; VBlankHandlerShort (minimal VBlank)
+    JSR $EC60            ; post-VBlank work
+    LDA $19
+    CMP #$0F
+    BMI .loop            ; loop while dp:$19 < 15
+.done:
+    STZ $1E
+    STZ $0407            ; abs zero: 9C 07 04
+    RTS
+
+; ============================================================
+; $C0:19C7 — Sub_19C7 (60 bytes, $19C7–$1A02)
+; Mode-5 warm-restart. BRL target from Sub_0C76 mode-5-setup path.
+; On entry: M=1 (A=8-bit), X/Y=16-bit.
+; Reinitialises hardware for BG mode 5, sets DP=$0100, calls two engine
+; helpers, conditionally moves bit 6 from dp:$17 to dp:$18, calls $B192,
+; then calls Sub_2824 for the post-transition fade. Clears $0407, returns.
+; ============================================================
+org $C019C7
+Sub_19C7:
+    LDX #$0000           ; clear X (16-bit: A2 00 00)
+    TDC                  ; A = D register low byte
+    XBA                  ; swap A/B: clears B accumulator
+    LDA #$05             ; BG mode 5
+    JSL $C28000          ; set BG mode
+    JSR $0B4E            ; InitHW: SEI + forced blank + disable NMI/DMA
+    JSR $0B64            ; InstallNMI
+    JSR $0B75            ; InstallIRQ
+    REP #$20             ; A → 16-bit
+    LDA #$0100
+    TCD                  ; DP = $0100
+    SEP #$20             ; A → 8-bit
+    JSR $01A5            ; engine init helper
+    JSR $1A03            ; mode-5 scene helper (distinct from $B192 path)
+    REP #$10             ; ensure X/Y 16-bit
+    LDA $17              ; load dp:$17 transition flags
+    BIT #$40             ; test bit 6
+    BEQ .no_bit6
+    LDA #$40
+    TRB $17              ; clear bit 6 of dp:$17
+    LDA #$40
+    TSB $18              ; set bit 6 of dp:$18
+.no_bit6:
+    JSR $B192
+    JSR Sub_2824         ; post-transition fade loop
+    STZ $0407
+    RTS
+
+; ============================================================
+; $C0:0D78 — ModeE6_Handler header ($0D78–$0DA0)
+; Mode-$E6 scroll-map update. BRL target from Sub_0C76 bit-4 dispatch
+; (mode $E6 case, raw offset $001F from $0D5C).
+; On entry: A=$E6 (current mode), X=layer index, M=1, X/Y=16-bit.
+;
+; This block increments both the current and previous layer modes in
+; the $7E:3000 mode table (current: $E6→$E7; previous: whatever→+1).
+; Then triggers an SPC audio command via Sub_1B90, loads two 16-bit
+; scroll base registers ($1D0A→dp:$DB, $1D0E→dp:$DD), and falls into
+; the computation block (org $C00DA1 below) to compute 8 VRAM indices.
+;
+; [Split into two org blocks so Sub_1B36 (which needs M=0) can appear
+;  between them in file order, inheriting the REP #$20 state.]
+; ============================================================
+org $C00D78
+ModeE6_Handler:
+    INC                  ; A = $E7 (current mode $E6 + 1)
+    STA.l $7E3000,X      ; update current layer: $E6 → $E7
+    REP #$20             ; A → 16-bit
+    TXA                  ; A = current layer index (16-bit)
+    SEC
+    SBC #$0100           ; A = previous layer index
+    TAX                  ; X = previous layer
+    LDA.l $7E3000,X      ; load previous layer mode (16-bit)
+    INC                  ; advance previous mode
+    STA.l $7E3000,X      ; write back
+    SEP #$20             ; A → 8-bit
+    STZ $60              ; clear dp:$60 (layer-loop counter)
+    JSR Sub_1B90         ; trigger SPC audio command
+    REP #$20             ; A → 16-bit
+    LDA $1D0A            ; scroll X base (abs 16-bit)
+    STA $DB              ; dp:$DB/$DC = scroll X base
+    LDA $1D0E            ; scroll Y base
+    STA $DD              ; dp:$DD/$DE = scroll Y base
+    ; [M=0 here — Sub_1B36 follows in file order with correct M=0 state]
+
+; ============================================================
+; $C0:1B36 — Sub_1B36 (29 bytes, $1B36–$1B52)
+; VRAM tilemap word-index calculator.
+; On entry (M=0 = 16-bit A): A=tile col (0–31), Y=tile row (0–63).
+; Returns: A = VRAM word index = col*32 + (row<32 ? row : row-32+$0400).
+; Encodes a 32-col × 64-row BG tilemap split across two VRAM pages
+; ($0000 for rows 0–31, $0400 for rows 32–63).
+; Called from ModeE6_Handler computation block to build scroll table.
+; [M=0 (16-bit A) inherited from ModeE6_Handler header above]
+; ============================================================
+org $C01B36
+Sub_1B36:
+    ASL                  ; col × 2
+    ASL                  ; col × 4
+    ASL                  ; col × 8
+    ASL                  ; col × 16
+    ASL                  ; col × 32
+    STA $D9              ; dp:$D9/$DA = col*32 (16-bit store)
+    TYA                  ; A = row
+    CMP #$0020           ; row ≥ 32?
+    BCS .rowhi
+    CLC
+    ADC $D9              ; A = row + col*32
+    RTS
+.rowhi:
+    SEC
+    SBC #$0020           ; row -= 32
+    CLC
+    ADC $D9              ; A = (row-32) + col*32
+    CLC
+    ADC #$0400           ; + $0400 (second tilemap VRAM page)
+    RTS
+    ; [M=0 here — ModeE6_Handler computation block continues below]
+
+; ============================================================
+; $C0:0DA1 — ModeE6_Handler computation block ($0DA1–$0E5E)
+; Computes 8 VRAM scroll-map word indices (2 passes of 4 corners each)
+; and stores to $09CA–$09D8. Pass 1 uses col derived from dp:$5C;
+; pass 2 uses (dp:$5C - 1). Ends by setting bit 4 of dp:$5F and
+; tail-jumping to the default mode handler via BRL $087D (→ $16DC).
+; [M=0 (16-bit A) inherited from Sub_1B36 above]
+; ============================================================
+org $C00DA1
+    ; --- Pass 1: 4-corner VRAM indices at (col, row) + neighbours ---
+    LDA $5B              ; scroll row base (16-bit dp load)
+    ASL
+    SEC
+    SBC $DB              ; subtract scroll X base
+    CLC
+    ADC $1D99            ; add row adjustment
+    AND #$003F           ; wrap to 64 rows
+    TAY                  ; Y = tile row (0–63)
+    LDA $5C              ; scroll col base (16-bit dp load)
+    ASL
+    SEC
+    SBC $DD              ; subtract scroll Y base
+    CLC
+    ADC $1D9A            ; add col adjustment
+    AND #$001F           ; wrap to 32 cols
+    TAX                  ; X = col (A = col too; TAX doesn't modify A)
+    JSR Sub_1B36         ; → A = VRAM index(col, row)
+    CLC
+    ADC $1D7C            ; add VRAM base
+    STA $09CA            ; BG scroll VRAM word 0
+    TYA                  ; A = row
+    PHA                  ; save row on stack
+    INC                  ; row + 1
+    AND #$003F
+    TAY                  ; Y = (row+1) wrapped
+    TXA                  ; A = col (X unchanged by Sub_1B36)
+    JSR Sub_1B36         ; → A = VRAM index(col, row+1)
+    CLC
+    ADC $1D7C
+    STA $09CC            ; BG scroll VRAM word 1
+    PLY                  ; Y = original row
+    TXA                  ; A = col
+    INC                  ; col + 1
+    AND #$001F
+    TAX                  ; X = (col+1) wrapped
+    JSR Sub_1B36         ; → A = VRAM index(col+1, row)
+    CLC
+    ADC $1D7C
+    STA $09CE            ; BG scroll VRAM word 2
+    TYA                  ; A = original row
+    INC                  ; row + 1
+    AND #$003F
+    TAY                  ; Y = (row+1) wrapped
+    TXA                  ; A = col+1
+    JSR Sub_1B36         ; → A = VRAM index(col+1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09D0            ; BG scroll VRAM word 3
+    ; --- Pass 2: same 4-corner pattern, col base decremented by 1 ---
+    LDA $5B
+    ASL
+    SEC
+    SBC $DB
+    CLC
+    ADC $1D99
+    AND #$003F
+    TAY                  ; Y = tile row (same formula)
+    LDA $5C
+    DEC                  ; DEC A (opcode 3A): col base − 1
+    ASL
+    SEC
+    SBC $DD
+    CLC
+    ADC $1D9A
+    AND #$001F
+    TAX
+    JSR Sub_1B36         ; → A = VRAM index(col', row)
+    CLC
+    ADC $1D7C
+    STA $09D2            ; BG scroll VRAM word 4
+    TYA
+    PHA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36         ; → A = VRAM index(col', row+1)
+    CLC
+    ADC $1D7C
+    STA $09D4            ; BG scroll VRAM word 5
+    PLY
+    TXA
+    INC
+    AND #$001F
+    TAX
+    JSR Sub_1B36         ; → A = VRAM index(col'+1, row)
+    CLC
+    ADC $1D7C
+    STA $09D6            ; BG scroll VRAM word 6
+    TYA
+    INC
+    AND #$003F
+    TAY
+    TXA
+    JSR Sub_1B36         ; → A = VRAM index(col'+1, row+1)
+    CLC
+    ADC $1D7C
+    STA $09D8            ; BG scroll VRAM word 7
+    SEP #$20             ; A → 8-bit
+    LDA #$10
+    TSB $5F              ; set bit 4 of dp:$5F (scroll-update trigger)
+    BRL $087D            ; → $16DC (default mode handler)
