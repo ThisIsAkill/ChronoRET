@@ -2263,7 +2263,421 @@ Sub_BCDC:
     RTS
 
 org $C0BFF2
-Sub_BFF2:       ; init helper, types 2/3+ low-state path (unmatched)
+Sub_BFF2:
+    ; 717 bytes ($BFF2–$C2BE). Entry M=1, X=1. Types 2/3+ low-state init.
+    ; Reads X coords from staging ($4BC2,X) directly (no raw-table copy).
+    ; Three backward X-loops pack OAM high bits → $4F00, $4F01, $4B40.
+    ; Then 3-way Y dispatch: C6≠0 → type-3+ (BCS/BPL clamp, 12 tiles),
+    ;   C6=0 C5<0 → negative (direct add, 12 tiles),
+    ;   C6=0 C5≥0 → positive (BMI-split BPL/CMP/BCS clamp, 12 tiles).
+    ; BMI-split IS present here — not isolated to Sub_BA65.
+    PHB
+    LDA #$7F
+    PHA
+    PLB
+    REP #$20
+    LDX $6D
+    LDA.l $000A80,X
+    AND #$01FF
+    STA $C5
+    LDA.l $000A00,X
+    STA $C3
+    STZ $E5
+    LDA.l $001700,X
+    STA $D9
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 1: staging $4BC2 → $4BC0, pack OAM high → $4F00 ─────────────
+.bff2_x1_loop:
+    TAX
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $D9
+    BEQ .bff2_x1_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .bff2_x1_loop
+.bff2_x1_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F00,X
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0020
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 2: same, compare $E7 → $4F01 ─────────────────────────────────
+.bff2_x2_loop:
+    TAX
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .bff2_x2_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .bff2_x2_loop
+.bff2_x2_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4F01,X
+    STZ $E5
+    REP #$20
+    LDA $D9
+    CLC
+    ADC #$0040
+    STA $E7
+    CLC
+    ADC #$0018
+
+    ; ── X-loop 3: same, compare $E7 → $4B40 ─────────────────────────────────
+.bff2_x3_loop:
+    TAX
+    LDA.w $4BC2,X
+    CLC
+    ADC $C3
+    SEP #$20
+    STA.w $4BC0,X
+    XBA
+    AND #$01
+    STA $E6
+    LDA $E5
+    ASL A
+    ASL A
+    ORA $E6
+    CPX $E7
+    BEQ .bff2_x3_done
+    STA $E5
+    REP #$20
+    TXA
+    SEC
+    SBC #$0008
+    BRA .bff2_x3_loop
+.bff2_x3_done:
+    ORA #$AA
+    LDX $6D
+    STA.w $4B40,X
+
+    ; ── Dispatch ──────────────────────────────────────────────────────────────
+    LDX $D9
+    LDA $C6
+    BEQ .bff2_c6_zero
+    BRL $0143               ; C6≠0 → $C209 type-3+ path (raw signed offset)
+
+.bff2_c6_zero:
+    LDA $C5
+    BMI .bff2_neg
+    BRL $006E               ; C5≥0 → $C13B positive path (raw signed offset)
+
+    ; ── Negative (C5<0): direct add, no clamp, 12 tiles ─────────────────────
+.bff2_neg:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    STA.w $4BD9,X
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    STA.w $4BE1,X
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    STA.w $4BE9,X
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    STA.w $4BF1,X
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    STA.w $4BF9,X
+    LDA.w $4C04,X
+    CLC
+    ADC $C5
+    STA.w $4C01,X
+    LDA.w $4C0C,X
+    CLC
+    ADC $C5
+    STA.w $4C09,X
+    LDA.w $4C14,X
+    CLC
+    ADC $C5
+    STA.w $4C11,X
+    LDA.w $4C1C,X
+    CLC
+    ADC $C5
+    STA.w $4C19,X
+    PLB
+    RTS
+
+    ; ── Positive (C5≥0): BMI-split BPL/CMP #$E0/BCS clamp, 12 tiles ─────────
+    ; Same 3-instruction clamp as Sub_BA65 positive path.
+.bff2_pos:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st0
+    CMP #$E0
+    BCS .bff2_pos_st0
+    LDA #$E0
+.bff2_pos_st0:
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st1
+    CMP #$E0
+    BCS .bff2_pos_st1
+    LDA #$E0
+.bff2_pos_st1:
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st2
+    CMP #$E0
+    BCS .bff2_pos_st2
+    LDA #$E0
+.bff2_pos_st2:
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st3
+    CMP #$E0
+    BCS .bff2_pos_st3
+    LDA #$E0
+.bff2_pos_st3:
+    STA.w $4BD9,X
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st4
+    CMP #$E0
+    BCS .bff2_pos_st4
+    LDA #$E0
+.bff2_pos_st4:
+    STA.w $4BE1,X
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st5
+    CMP #$E0
+    BCS .bff2_pos_st5
+    LDA #$E0
+.bff2_pos_st5:
+    STA.w $4BE9,X
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st6
+    CMP #$E0
+    BCS .bff2_pos_st6
+    LDA #$E0
+.bff2_pos_st6:
+    STA.w $4BF1,X
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st7
+    CMP #$E0
+    BCS .bff2_pos_st7
+    LDA #$E0
+.bff2_pos_st7:
+    STA.w $4BF9,X
+    LDA.w $4C04,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st8
+    CMP #$E0
+    BCS .bff2_pos_st8
+    LDA #$E0
+.bff2_pos_st8:
+    STA.w $4C01,X
+    LDA.w $4C0C,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st9
+    CMP #$E0
+    BCS .bff2_pos_st9
+    LDA #$E0
+.bff2_pos_st9:
+    STA.w $4C09,X
+    LDA.w $4C14,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st10
+    CMP #$E0
+    BCS .bff2_pos_st10
+    LDA #$E0
+.bff2_pos_st10:
+    STA.w $4C11,X
+    LDA.w $4C1C,X
+    CLC
+    ADC $C5
+    BPL .bff2_pos_st11
+    CMP #$E0
+    BCS .bff2_pos_st11
+    LDA #$E0
+.bff2_pos_st11:
+    STA.w $4C19,X
+    PLB
+    RTS
+
+    ; ── Type 3+ (C6≠0): BCS/BPL clamp (carry-overflow → $E0), 12 tiles ──────
+.bff2_t3:
+    LDA.w $4BC4,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st0
+    BPL .bff2_t3_skip0
+.bff2_t3_st0:
+    LDA #$E0
+.bff2_t3_skip0:
+    STA.w $4BC1,X
+    LDA.w $4BCC,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st1
+    BPL .bff2_t3_skip1
+.bff2_t3_st1:
+    LDA #$E0
+.bff2_t3_skip1:
+    STA.w $4BC9,X
+    LDA.w $4BD4,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st2
+    BPL .bff2_t3_skip2
+.bff2_t3_st2:
+    LDA #$E0
+.bff2_t3_skip2:
+    STA.w $4BD1,X
+    LDA.w $4BDC,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st3
+    BPL .bff2_t3_skip3
+.bff2_t3_st3:
+    LDA #$E0
+.bff2_t3_skip3:
+    STA.w $4BD9,X
+    LDA.w $4BE4,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st4
+    BPL .bff2_t3_skip4
+.bff2_t3_st4:
+    LDA #$E0
+.bff2_t3_skip4:
+    STA.w $4BE1,X
+    LDA.w $4BEC,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st5
+    BPL .bff2_t3_skip5
+.bff2_t3_st5:
+    LDA #$E0
+.bff2_t3_skip5:
+    STA.w $4BE9,X
+    LDA.w $4BF4,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st6
+    BPL .bff2_t3_skip6
+.bff2_t3_st6:
+    LDA #$E0
+.bff2_t3_skip6:
+    STA.w $4BF1,X
+    LDA.w $4BFC,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st7
+    BPL .bff2_t3_skip7
+.bff2_t3_st7:
+    LDA #$E0
+.bff2_t3_skip7:
+    STA.w $4BF9,X
+    LDA.w $4C04,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st8
+    BPL .bff2_t3_skip8
+.bff2_t3_st8:
+    LDA #$E0
+.bff2_t3_skip8:
+    STA.w $4C01,X
+    LDA.w $4C0C,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st9
+    BPL .bff2_t3_skip9
+.bff2_t3_st9:
+    LDA #$E0
+.bff2_t3_skip9:
+    STA.w $4C09,X
+    LDA.w $4C14,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st10
+    BPL .bff2_t3_skip10
+.bff2_t3_st10:
+    LDA #$E0
+.bff2_t3_skip10:
+    STA.w $4C11,X
+    LDA.w $4C1C,X
+    CLC
+    ADC $C5
+    BCS .bff2_t3_st11
+    BPL .bff2_t3_skip11
+.bff2_t3_st11:
+    LDA #$E0
+.bff2_t3_skip11:
+    STA.w $4C19,X
+    PLB
+    RTS
 
 org $C0C2BF
 Sub_C2BF:       ; init helper, types 2/3+ sprites (unmatched)
