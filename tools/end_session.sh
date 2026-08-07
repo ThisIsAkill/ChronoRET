@@ -25,6 +25,9 @@ ok()   { printf "${GREEN}  ✓ %s${RESET}\n" "$*"; }
 echo ""
 printf "${BOLD}=== End-of-session checklist ===${RESET}\n"
 
+WIKI_DIR="../chrono-trigger-wiki"
+WIKI_DOCS="${WIKI_DIR}/docs"
+
 # ── 1. Regenerate progress snippet ───────────────────────────────────────────
 step 1 "Regenerate progress snippet"
 python3 tools/progress.py --update-index
@@ -32,7 +35,7 @@ python3 tools/progress.py --update-index
 # ── 2. Devlog check ──────────────────────────────────────────────────────────
 step 2 "Check devlog"
 TODAY=$(date +%Y-%m-%d)
-POSTS_DIR="docs/devlog/posts"
+POSTS_DIR="${WIKI_DOCS}/devlog/posts"
 FOUND=$(ls "${POSTS_DIR}/${TODAY}"*.md 2>/dev/null || true)
 
 if [ -n "$FOUND" ]; then
@@ -43,7 +46,7 @@ else
     echo ""
     read -r -p "  Continue without a devlog entry? [y/N] " reply
     if [[ "${reply:-n}" != [Yy]* ]]; then
-        echo "  Aborted. Write a devlog entry and re-run."
+        echo "  Aborted. Write a devlog entry in the wiki repo and re-run."
         exit 1
     fi
 fi
@@ -57,8 +60,9 @@ CHANGED_ASM=$(
 )
 if [ -n "$CHANGED_ASM" ]; then
     warn "asm/ has changes — verify before committing:"
-    warn "  docs/PROGRESS.md  — byte counts + matched function table"
-    warn "  docs/BANK_MAP.md  — region status (Identified → Matched, end addresses)"
+    warn "  ${WIKI_DOCS}/PROGRESS.md  — byte counts + matched function table"
+    warn "  ${WIKI_DOCS}/BANK_MAP.md  — region status (Identified → Matched, end addresses)"
+    warn "(commit wiki repo separately after updating those files)"
 else
     ok "No asm/ changes detected — reminders skipped."
 fi

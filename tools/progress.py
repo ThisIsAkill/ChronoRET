@@ -24,8 +24,9 @@ from pathlib import Path
 
 ROM_PATH        = Path('roms/chrono_trigger.sfc')
 ASM_DIR         = Path('asm')
-PROGRESS_MD     = Path('docs/PROGRESS.md')
-SUMMARY_SNIPPET = Path('docs/includes/progress_summary.md')
+WIKI_DIR        = Path('../chrono-trigger-wiki')
+PROGRESS_MD     = WIKI_DIR / 'docs/PROGRESS.md'
+SUMMARY_SNIPPET = WIKI_DIR / 'docs/includes/progress_summary.md'
 ROM_SIZE        = 0x400000   # 4 MB unheadered
 
 
@@ -342,7 +343,7 @@ def main() -> int:
     matched = len(all_covered)
     pct = 100.0 * matched / ROM_SIZE
     print(f'Data bytes matched: {matched:,} / {ROM_SIZE:,} ({pct:.4f}%)')
-    print('(instruction bytes verified via make diff — see docs/PROGRESS.md for totals)\n')
+    print(f'(instruction bytes verified via make diff — see {PROGRESS_MD} for totals)\n')
 
     if update_index:
         total, banks = parse_progress_md()

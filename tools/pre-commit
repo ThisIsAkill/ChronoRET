@@ -27,30 +27,29 @@ else
     ok "MATCH: byte-exact."
 fi
 
-# ── 2. Regenerate progress snippet and auto-stage it ─────────────────────────
-info "Regenerating docs/includes/progress_summary.md..."
+# ── 2. Regenerate progress snippet in wiki ───────────────────────────────────
+WIKI_DIR="../chrono-trigger-wiki"
+info "Regenerating ${WIKI_DIR}/docs/includes/progress_summary.md..."
 python3 tools/progress.py --update-index 2>&1 | grep -E "^Updated|error" || true
-git add docs/includes/progress_summary.md
+# Note: progress_summary.md lives in the wiki repo — stage it there separately.
 
 # ── 3. Stale PROGRESS.md warning ─────────────────────────────────────────────
 STAGED_ASM=$(git diff --cached --name-only | grep '^asm/' | head -5 || true)
 if [ -n "$STAGED_ASM" ]; then
-    if ! git diff --cached --name-only | grep -q '^docs/PROGRESS\.md$'; then
-        warn "asm/ files staged but docs/PROGRESS.md was not updated."
-        warn "If you matched new code, update byte counts before committing."
-        warn "(Continuing — override with your judgment.)"
-        echo ""
-    fi
+    warn "asm/ files staged — remember to update PROGRESS.md and BANK_MAP.md in the wiki repo."
+    warn "(${WIKI_DIR}/docs/PROGRESS.md  and  ${WIKI_DIR}/docs/BANK_MAP.md)"
+    echo ""
 fi
 
-# ── 4. Devlog gate ───────────────────────────────────────────────────────────
+# ── 4. Devlog reminder (wiki-repo posts can't be checked here) ───────────────
 if [ -n "$STAGED_ASM" ]; then
-    STAGED_DEVLOG=$(git diff --cached --name-only | grep '^docs/devlog/posts/' || true)
-    if [ -z "$STAGED_DEVLOG" ]; then
-        printf "${RED}[pre-commit] BLOCKED: asm/ changes staged but no devlog entry in this commit.${RESET}\n" >&2
-        printf '[pre-commit]   Write a post under docs/devlog/posts/ then git add it.\n' >&2
-        printf '[pre-commit]   To skip (tooling-only commit): git commit --no-verify\n' >&2
-        exit 1
+    TODAY=$(date +%Y-%m-%d)
+    WIKI_POSTS="${WIKI_DIR}/docs/devlog/posts"
+    if ! ls "${WIKI_POSTS}/${TODAY}"*.md 2>/dev/null | grep -q .; then
+        warn "No devlog post for today (${TODAY}) found in wiki."
+        warn "  Expected: ${WIKI_POSTS}/${TODAY}*.md"
+        warn "(Continuing — write a devlog entry in the wiki repo and commit it there.)"
+        echo ""
     fi
 fi
 
