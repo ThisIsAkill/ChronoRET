@@ -3605,7 +3605,7 @@ Sub_01A5:
     SEP #$20                ; A → 8-bit
     LDA.l $7F1D26           ; workspace scene-entry value
     STA.w $1DF9             ; → abs: scene-entry cache
-    JSR $595C               ; sprite dispatch from $7F2003 table
+    JSR Sub_595C            ; sprite dispatch from $7F2003 table
     TDC                     ; A = DP low byte; XBA sets B = 0
     XBA
     LDA $AE                 ; sprite slot index cache
@@ -4579,7 +4579,7 @@ Sub_1A03:
     LDA $8D
     BMI .chk_8E             ; $80 = no sprite
     STA $6D
-    JSR $597D               ; sprite slot refresh
+    JSR Sub_597D            ; sprite slot refresh
 .chk_8E:
     LDA $8E
     BMI .chk_8F
@@ -4646,6 +4646,98 @@ Sub_1A03:
     STA $AC
     LDA.l $7F1D1D
     STA $AD
+    RTS
+
+; ============================================================
+; $C0:595C — Sub_595C (33 bytes, $595C–$597C)
+; Scene entity-table dispatcher.
+; Reads entity-list X base pointer from $7F:2003 (16-bit), zeroes
+; dp:$6D/$6E, then walks entries at $7F:2001,X dispatching each
+; non-zero type byte via the jump table at $5D6E (type × 2 = index).
+; Stops when it reads a zero terminator.
+; Calling convention: callee (via $5D6E) must return with X pointing
+; to the next entity in the list.
+; Called from Sub_01A5 after workspace scroll restore.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C0595C
+Sub_595C:
+    REP #$20                ; A → 16-bit
+    STZ $6D                 ; sprite-slot index = 0 (clears dp:$6D and $6E)
+    LDA.l $7F2003           ; entity-list X base pointer
+    TAX                     ; X = entity list pointer
+    SEP #$20                ; A → 8-bit
+.dispatch_loop:
+    LDA.l $7F2001,X         ; entity type byte
+    BEQ .done               ; zero = end of list
+    TXY                     ; Y = entity pointer (callee uses to locate data)
+    REP #$20                ; A → 16-bit
+    AND #$00FF              ; zero-extend type byte
+    ASL                     ; × 2 = dispatch-table word index
+    TAX                     ; X = dispatch index
+    SEP #$20                ; A → 8-bit
+    JSR ($5D6E,X)           ; call entity handler from dispatch table
+    BRA .dispatch_loop
+.done:
+    RTS
+
+; ============================================================
+; $C0:597D — Sub_597D (92 bytes, $597D–$59D8)
+; Sprite-slot entity dispatcher and slot-data reset.
+; On entry dp:$6D = sprite-slot index (0–6).
+; 1. Computes slot × 16 byte offset into $7F:2001 to find this
+;    slot's entity-list base pointer (16-bit).
+; 2. Inner loop: dispatches each non-zero entity type via $5D6E
+;    until zero terminator.
+; 3. Stores end-of-list pointer + 1 → $1180+slot (16-bit).
+; 4. Zeroes 8 sprite-slot data arrays at $7F:0580/$0600/$0680/
+;    $0700/$0780/$0800/$0880/$0900 (indexed by slot).
+; 5. Sets $1C00+slot = $07.
+; Called from Sub_1A03 for each active sprite slot.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; ============================================================
+org $C0597D
+Sub_597D:
+    LDA $6D                 ; sprite-slot index (8-bit)
+    REP #$20                ; A → 16-bit
+    AND #$00FF              ; zero-extend
+    ASL                     ; × 2
+    ASL                     ; × 4
+    ASL                     ; × 8
+    ASL                     ; × 16 — byte offset into entity table
+    TAX                     ; X = slot offset
+    LDA.l $7F2001,X         ; 16-bit entity-list base pointer for this slot
+    TAX                     ; X = entity-list pointer
+    SEP #$20                ; A → 8-bit
+.inner_loop:
+    LDA.l $7F2001,X         ; entity type byte
+    BEQ .list_done          ; zero = end of sub-list
+    TXY                     ; Y = entity pointer (callee uses to locate data)
+    REP #$20                ; A → 16-bit
+    AND #$00FF              ; zero-extend type
+    ASL                     ; × 2 = dispatch-table word index
+    TAX                     ; X = dispatch index
+    SEP #$20                ; A → 8-bit
+    JSR ($5D6E,X)           ; call entity handler
+    BRA .inner_loop
+.list_done:
+    REP #$20                ; A → 16-bit
+    INX                     ; advance past zero terminator
+    TXA                     ; A = end-of-list pointer + 1
+    LDX $6D                 ; restore slot index (16-bit; $6E = 0)
+    STA.w $1180,X           ; end pointer → $1180+slot
+    LDA #$0000              ; A = 0
+    STA.l $7F0580,X         ; zero sprite-slot data arrays (8 × $0080-stride)
+    STA.l $7F0600,X
+    STA.l $7F0680,X
+    STA.l $7F0700,X
+    STA.l $7F0780,X
+    STA.l $7F0800,X
+    STA.l $7F0880,X
+    STA.l $7F0900,X
+    SEP #$20                ; A → 8-bit
+    LDA #$07                ; slot property value
+    STA.w $1C00,X           ; $1C00+slot = 7
     RTS
 
 ; ============================================================
