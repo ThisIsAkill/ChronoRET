@@ -3217,6 +3217,505 @@ Sub_C2BF:
     RTS
 
 ; ============================================================
+; $C0:E12A — Sub_E12A (1034 bytes, $E12A–$E533)
+; Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene
+; data, DMAs it to VRAM (destination word-addr $0400), then populates
+; the OAM staging buffer at $7F:4BC2+X with palette values, tile
+; indices, and attribute bytes for 24 sprite sub-slots (stride $08).
+;
+; On entry: X = sprite-slot index (16-bit), M=1 (8-bit A), DP=$0100.
+; Source arrays (indexed by slot):
+;   $1200+slot  → dp:$CF  (sprite type/bank byte)
+;   $1280+slot  → dp:$CD/$CE  (sprite-data ptr offset; bank=$7F via $D2)
+;   $1300+slot  → dp:$D5  (scene-data bank for [$D3] pointer)
+;   $1380+slot  → dp:$D3/$D4  (scene-data ptr offset)
+;   $1700+slot  → X (OAM staging buffer X offset for $7F:4BC2 writes)
+; Calls Sub_E534 (bit 14 of scene word set: multi-tile WRAM fill)
+;   and Sub_E687 (bit 14 clear: single WMDATA write per entry).
+; ============================================================
+org $C0E12A
+Sub_E12A:
+; Phase 1: Load descriptor arrays, set up [$CD] and [$D3] pointers.
+    LDA $1200,X             ; sprite type byte for this slot
+    STA $CF                 ; dp:$CF = sprite type
+    LDA #$7F
+    STA $D2                 ; dp:$D2 = $7F (bank byte for [$CD] pointer)
+    REP #$20                ; A → 16-bit
+    LDA $1280,X             ; sprite data pointer offset (bank $7F)
+    STA $CD                 ; dp:$CD/$CE; [$CD] → $7F:XXXX
+    SEP #$20                ; A → 8-bit
+    REP #$20                ; A → 16-bit
+    LDX $6D                 ; X = slot index (re-read; was unchanged)
+    LDA #$3800              ; WRAM staging buffer base
+    STA $0D80,X             ; $0D80+slot = $3800 (chunk base address)
+    STA $D0                 ; dp:$D0 = $3800 (running WMADDL pointer)
+    SEP #$20                ; A → 8-bit
+    LDA #$00
+    STA $0F01,X             ; $0F01+slot = 0 (clear sprite-state flag)
+    LDA $1300,X             ; scene-data bank byte for this slot
+    STA $D5                 ; dp:$D5 = bank for [$D3] pointer
+    REP #$20                ; A → 16-bit
+    LDA $1380,X             ; scene-data pointer offset
+    STA $D3                 ; dp:$D3/$D4; [$D3] → $D5:XXXX (scene data)
+; Phase 2: Set WRAM address registers, then loop 96× dispatching scene
+; data words.  Bit 14 of each word: 0 → Sub_E687 (WMDATA write),
+;                                    1 → Sub_E534 (multi-tile fill).
+; WRAM address advances by $0020 per iteration.
+    SEP #$30                ; A,X,Y → 8-bit (for 1-byte WMADDH write)
+    LDA #$01
+    STA $2183               ; WMADDH = $01 (WRAM address high byte)
+    REP #$30                ; A,X,Y → 16-bit
+    LDA $D0
+    STA $2181               ; WMADDL = $3800 (full WRAM addr: $01:3800)
+    LDA #$0060              ; loop counter = 96 entries
+    STA $C9                 ; dp:$C9 = $60
+    LDY #$0000              ; Y = scene-data word table index
+    BRA .first_iter         ; skip address advance on first iteration
+.next_iter:
+    LDA $D0                 ; advance running WRAM write address
+    CLC
+    ADC #$0020
+    STA $D0
+.first_iter:
+    LDA [$D3],Y             ; read 16-bit scene-data word
+    BIT #$4000              ; test bit 14
+    BNE .big_fill           ; set → multi-tile WRAM fill
+    JSR $E687               ; clear → single WMDATA write
+    INY
+    INY                     ; Y += 2 (advance to next 16-bit entry)
+    DEC $C9
+    BNE .next_iter
+    BRA .dma
+.big_fill:
+    JSR $E534               ; multi-tile WRAM fill
+    INY
+    INY
+    DEC $C9
+    BNE .next_iter
+; Phase 3: DMA $0C00 bytes from $7F:3800 → VRAM at word-addr $0400.
+.dma:
+    SEP #$20                ; A → 8-bit
+    LDA #$80
+    STA $2115               ; VMAIN = $80 (word-addr, inc after high byte)
+    LDA #$18
+    STA $4371               ; BBAD7 = $18 (VMDATA port)
+    LDA #$01
+    STA $4370               ; DMAP7 = $01 (CPU→PPU, auto-inc, word)
+    LDA #$7F
+    STA $4374               ; A1B7 = $7F (source bank)
+    LDY #$0400
+    STY $2116               ; VMADDL = $0400 (VRAM destination)
+    LDY #$3800
+    STY $4372               ; A1T7L = $3800 (DMA source offset)
+    LDY #$0C00
+    STY $4375               ; DAS7L = $0C00 (transfer byte count)
+    LDA #$80
+    STA $420B               ; MDMAEN = $80 (trigger DMA channel 7)
+; Phase 4: Populate OAM staging buffer $7F:4BC2+X.
+; X is loaded from $1700+slot and used as the long-indexed X offset.
+; 24 groups of 8 bytes (stride $08, bases $4BC2/$4BCA/$4BD2/…/$4C7A).
+; Each group: [+0] = signed value, [+1] = sign-ext, [+2] = raw value.
+; Scene data read from [$D3]+$C0 onward, 2 bytes consumed per group.
+    REP #$20                ; A → 16-bit
+    LDX $6D                 ; X = slot index
+    LDA $1700,X             ; OAM staging buffer X offset for this slot
+    REP #$10                ; X → 16-bit (ensure width)
+    TAX                     ; X = OAM staging offset
+    SEP #$20                ; A → 8-bit
+    LDY #$00C0              ; Y = scene-data palette section start
+; 24 palette groups (each: signed+sign-ext at base+0/1, raw at base+2)
+    LDA [$D3],Y             ; group 1 signed value
+    STA.l $7F4BC2,X
+    BPL .sp01
+    LDA #$FF
+    BRA .se01
+.sp01:
+    LDA #$00
+.se01:
+    STA.l $7F4BC3,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BC4,X         ; group 1 raw value
+    INY
+    LDA [$D3],Y             ; group 2 signed value
+    STA.l $7F4BCA,X
+    BPL .sp02
+    LDA #$FF
+    BRA .se02
+.sp02:
+    LDA #$00
+.se02:
+    STA.l $7F4BCB,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BCC,X         ; group 2 raw
+    INY
+    LDA [$D3],Y             ; group 3 signed
+    STA.l $7F4BD2,X
+    BPL .sp03
+    LDA #$FF
+    BRA .se03
+.sp03:
+    LDA #$00
+.se03:
+    STA.l $7F4BD3,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BD4,X         ; group 3 raw
+    INY
+    LDA [$D3],Y             ; group 4 signed
+    STA.l $7F4BDA,X
+    BPL .sp04
+    LDA #$FF
+    BRA .se04
+.sp04:
+    LDA #$00
+.se04:
+    STA.l $7F4BDB,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BDC,X         ; group 4 raw
+    INY
+    LDA [$D3],Y             ; group 5 signed
+    STA.l $7F4BE2,X
+    BPL .sp05
+    LDA #$FF
+    BRA .se05
+.sp05:
+    LDA #$00
+.se05:
+    STA.l $7F4BE3,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BE4,X         ; group 5 raw
+    INY
+    LDA [$D3],Y             ; group 6 signed
+    STA.l $7F4BEA,X
+    BPL .sp06
+    LDA #$FF
+    BRA .se06
+.sp06:
+    LDA #$00
+.se06:
+    STA.l $7F4BEB,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BEC,X         ; group 6 raw
+    INY
+    LDA [$D3],Y             ; group 7 signed
+    STA.l $7F4BF2,X
+    BPL .sp07
+    LDA #$FF
+    BRA .se07
+.sp07:
+    LDA #$00
+.se07:
+    STA.l $7F4BF3,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BF4,X         ; group 7 raw
+    INY
+    LDA [$D3],Y             ; group 8 signed
+    STA.l $7F4BFA,X
+    BPL .sp08
+    LDA #$FF
+    BRA .se08
+.sp08:
+    LDA #$00
+.se08:
+    STA.l $7F4BFB,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4BFC,X         ; group 8 raw
+    INY
+    LDA [$D3],Y             ; group 9 signed
+    STA.l $7F4C02,X
+    BPL .sp09
+    LDA #$FF
+    BRA .se09
+.sp09:
+    LDA #$00
+.se09:
+    STA.l $7F4C03,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C04,X         ; group 9 raw
+    INY
+    LDA [$D3],Y             ; group 10 signed
+    STA.l $7F4C0A,X
+    BPL .sp10
+    LDA #$FF
+    BRA .se10
+.sp10:
+    LDA #$00
+.se10:
+    STA.l $7F4C0B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C0C,X         ; group 10 raw
+    INY
+    LDA [$D3],Y             ; group 11 signed
+    STA.l $7F4C12,X
+    BPL .sp11
+    LDA #$FF
+    BRA .se11
+.sp11:
+    LDA #$00
+.se11:
+    STA.l $7F4C13,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C14,X         ; group 11 raw
+    INY
+    LDA [$D3],Y             ; group 12 signed
+    STA.l $7F4C1A,X
+    BPL .sp12
+    LDA #$FF
+    BRA .se12
+.sp12:
+    LDA #$00
+.se12:
+    STA.l $7F4C1B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C1C,X         ; group 12 raw
+    INY
+    LDA [$D3],Y             ; group 13 signed
+    STA.l $7F4C22,X
+    BPL .sp13
+    LDA #$FF
+    BRA .se13
+.sp13:
+    LDA #$00
+.se13:
+    STA.l $7F4C23,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C24,X         ; group 13 raw
+    INY
+    LDA [$D3],Y             ; group 14 signed
+    STA.l $7F4C2A,X
+    BPL .sp14
+    LDA #$FF
+    BRA .se14
+.sp14:
+    LDA #$00
+.se14:
+    STA.l $7F4C2B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C2C,X         ; group 14 raw
+    INY
+    LDA [$D3],Y             ; group 15 signed
+    STA.l $7F4C32,X
+    BPL .sp15
+    LDA #$FF
+    BRA .se15
+.sp15:
+    LDA #$00
+.se15:
+    STA.l $7F4C33,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C34,X         ; group 15 raw
+    INY
+    LDA [$D3],Y             ; group 16 signed
+    STA.l $7F4C3A,X
+    BPL .sp16
+    LDA #$FF
+    BRA .se16
+.sp16:
+    LDA #$00
+.se16:
+    STA.l $7F4C3B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C3C,X         ; group 16 raw
+    INY
+    LDA [$D3],Y             ; group 17 signed
+    STA.l $7F4C42,X
+    BPL .sp17
+    LDA #$FF
+    BRA .se17
+.sp17:
+    LDA #$00
+.se17:
+    STA.l $7F4C43,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C44,X         ; group 17 raw
+    INY
+    LDA [$D3],Y             ; group 18 signed
+    STA.l $7F4C4A,X
+    BPL .sp18
+    LDA #$FF
+    BRA .se18
+.sp18:
+    LDA #$00
+.se18:
+    STA.l $7F4C4B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C4C,X         ; group 18 raw
+    INY
+    LDA [$D3],Y             ; group 19 signed
+    STA.l $7F4C52,X
+    BPL .sp19
+    LDA #$FF
+    BRA .se19
+.sp19:
+    LDA #$00
+.se19:
+    STA.l $7F4C53,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C54,X         ; group 19 raw
+    INY
+    LDA [$D3],Y             ; group 20 signed
+    STA.l $7F4C5A,X
+    BPL .sp20
+    LDA #$FF
+    BRA .se20
+.sp20:
+    LDA #$00
+.se20:
+    STA.l $7F4C5B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C5C,X         ; group 20 raw
+    INY
+    LDA [$D3],Y             ; group 21 signed
+    STA.l $7F4C62,X
+    BPL .sp21
+    LDA #$FF
+    BRA .se21
+.sp21:
+    LDA #$00
+.se21:
+    STA.l $7F4C63,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C64,X         ; group 21 raw
+    INY
+    LDA [$D3],Y             ; group 22 signed
+    STA.l $7F4C6A,X
+    BPL .sp22
+    LDA #$FF
+    BRA .se22
+.sp22:
+    LDA #$00
+.se22:
+    STA.l $7F4C6B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C6C,X         ; group 22 raw
+    INY
+    LDA [$D3],Y             ; group 23 signed
+    STA.l $7F4C72,X
+    BPL .sp23
+    LDA #$FF
+    BRA .se23
+.sp23:
+    LDA #$00
+.se23:
+    STA.l $7F4C73,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C74,X         ; group 23 raw
+    INY
+    LDA [$D3],Y             ; group 24 signed (last group)
+    STA.l $7F4C7A,X
+    BPL .sp24
+    LDA #$FF
+    BRA .se24
+.sp24:
+    LDA #$00
+.se24:
+    STA.l $7F4C7B,X
+    INY
+    LDA [$D3],Y
+    STA.l $7F4C7C,X         ; group 24 raw (no trailing INY)
+; Phase 5: Write tile-index bytes to [+4] of each of the 24 groups.
+; Groups 1-8:  $40,$42,$44,$46,$48,$4A,$4C,$4E
+; Groups 9-16: $60,$62,$64,$66,$68,$6A,$6C,$6E
+; Groups 17-24:$80,$82,$84,$86,$88,$8A,$8C,$8E
+    LDA #$40
+    STA.l $7F4BC6,X
+    LDA #$42
+    STA.l $7F4BCE,X
+    LDA #$44
+    STA.l $7F4BD6,X
+    LDA #$46
+    STA.l $7F4BDE,X
+    LDA #$48
+    STA.l $7F4BE6,X
+    LDA #$4A
+    STA.l $7F4BEE,X
+    LDA #$4C
+    STA.l $7F4BF6,X
+    LDA #$4E
+    STA.l $7F4BFE,X
+    LDA #$60
+    STA.l $7F4C06,X
+    LDA #$62
+    STA.l $7F4C0E,X
+    LDA #$64
+    STA.l $7F4C16,X
+    LDA #$66
+    STA.l $7F4C1E,X
+    LDA #$68
+    STA.l $7F4C26,X
+    LDA #$6A
+    STA.l $7F4C2E,X
+    LDA #$6C
+    STA.l $7F4C36,X
+    LDA #$6E
+    STA.l $7F4C3E,X
+    LDA #$80
+    STA.l $7F4C46,X
+    LDA #$82
+    STA.l $7F4C4E,X
+    LDA #$84
+    STA.l $7F4C56,X
+    LDA #$86
+    STA.l $7F4C5E,X
+    LDA #$88
+    STA.l $7F4C66,X
+    LDA #$8A
+    STA.l $7F4C6E,X
+    LDA #$8C
+    STA.l $7F4C76,X
+    LDA #$8E
+    STA.l $7F4C7E,X
+; Phase 6: Write attribute byte $22 to [+5] of each of the 24 groups.
+    LDA #$22                ; OAM attribute byte
+    STA.l $7F4BC7,X
+    STA.l $7F4BCF,X
+    STA.l $7F4BD7,X
+    STA.l $7F4BDF,X
+    STA.l $7F4BE7,X
+    STA.l $7F4BEF,X
+    STA.l $7F4BF7,X
+    STA.l $7F4BFF,X
+    STA.l $7F4C07,X
+    STA.l $7F4C0F,X
+    STA.l $7F4C17,X
+    STA.l $7F4C1F,X
+    STA.l $7F4C27,X
+    STA.l $7F4C2F,X
+    STA.l $7F4C37,X
+    STA.l $7F4C3F,X
+    STA.l $7F4C47,X
+    STA.l $7F4C4F,X
+    STA.l $7F4C57,X
+    STA.l $7F4C5F,X
+    STA.l $7F4C67,X
+    STA.l $7F4C6F,X
+    STA.l $7F4C77,X
+    STA.l $7F4C7F,X
+    RTS
+
+; ============================================================
 ; $C0:E935 — Sub_E935 (29 bytes, $E935–$E951)
 ; Initialize 8 sprite-slot "uninitialized" flags at $0BC0-$0BC7 to $80.
 ; Sets DP=$0B00, stores LDA #$80 to dp:$C0-$C7 (= abs $0BC0-$0BC7),
@@ -3612,7 +4111,7 @@ Sub_01A5:
     BMI .no_e12a            ; $80 → no valid slot
     TAX                     ; X = slot index (zero-extended)
     STX $6D                 ; dp:$6D = slot index (16-bit write)
-    JSR $E12A               ; sprite init pass
+    JSR Sub_E12A            ; sprite init pass
 .no_e12a:
     LDA.l $7F03FE           ; transition counter
     BEQ .done               ; 0 → skip
