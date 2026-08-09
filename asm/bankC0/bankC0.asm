@@ -4237,6 +4237,130 @@ Sub_E935:
     PLD
     RTS
 
+; ============================================================
+; $C0:E952 — Sub_E952 (40 bytes, $E952–$E979)
+; Sprite slot allocator — single-slot variant.
+; Scans $0BC0[0..3] for the first entry whose value is negative
+; ($80 = free sentinel set by Sub_E935).  Claims the entry by
+; writing dp:$6D there, then computes the WRAM staging-buffer base
+; address for that sprite slot: $3800 + slotIndex×$0200 (so entries
+; 0–3 map to $3800/$3A00/$3C00/$3E00) and stores the result in
+; $0D80+dp:$6D.
+; Returns: SEC on success (slot allocated), CLC if table is full.
+; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
+; Called from: $CC0D.
+; ============================================================
+org $C0E952
+Sub_E952:
+    LDX #$00
+.e952_loop:
+    LDA $0BC0,X          ; read slot entry X
+    BPL .e952_next       ; $00–$7F = occupied → skip
+    LDA $6D              ; $80+ = free → claim: store slot id
+    STA $0BC0,X
+    TXA                  ; A.lo = table index (0–3)
+    XBA                  ; A.hi ← index; A.lo ← 0
+    REP #$20             ; A → 16-bit
+    AND #$FF00           ; isolate high byte (= index × $0100)
+    ASL                  ; × 2  → index × $0200
+    CLC
+    ADC #$3800           ; WRAM base: $3800 + index × $0200
+    LDX $6D              ; X = sprite slot id
+    STA $0D80,X          ; $0D80+slot ← staging-buffer base
+    SEP #$20             ; A → 8-bit
+    SEC                  ; success
+    RTS
+.e952_next:
+    INX
+    CPX #$04
+    BMI .e952_loop       ; loop for entries 0–3
+    CLC                  ; table full — no slot found
+    RTS
+
+; ============================================================
+; $C0:E97A — Sub_E97A (48 bytes, $E97A–$E9A9)
+; Sprite slot allocator — dual-slot variant.
+; Like Sub_E952 but requires BOTH $0BC0[X] and $0BC1[X] to be free.
+; Claims both entries with dp:$6D; WRAM base computation is identical.
+; Searches entries 0–2 (CPX #$03) since adjacent pairs overlap:
+; position 0 → ($0BC0,$0BC1), position 1 → ($0BC1,$0BC2), etc.
+; Returns: SEC on success, CLC on failure.
+; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
+; Called from: $CF2D, $D299.
+; ============================================================
+org $C0E97A
+Sub_E97A:
+    LDX #$00
+.e97a_loop:
+    LDA $0BC0,X          ; check first sub-slot
+    BPL .e97a_next       ; occupied → skip
+    LDA $0BC1,X          ; check second sub-slot
+    BPL .e97a_next       ; occupied → skip
+    LDA $6D              ; both free → claim both
+    STA $0BC0,X
+    STA $0BC1,X
+    TXA
+    XBA
+    REP #$20
+    AND #$FF00
+    ASL
+    CLC
+    ADC #$3800
+    LDX $6D
+    STA $0D80,X
+    SEP #$20
+    SEC
+    RTS
+.e97a_next:
+    INX
+    CPX #$03             ; search entries 0–2 (3 positions)
+    BMI .e97a_loop
+    CLC
+    RTS
+
+; ============================================================
+; $C0:E9AA — Sub_E9AA (56 bytes, $E9AA–$E9E1)
+; Sprite slot allocator — triple-slot variant.
+; Requires $0BC0[X], $0BC1[X], and $0BC2[X] all free; searches only
+; entries 0–1 (CPX #$02) since three consecutive sub-slots fit in two
+; starting positions.  Claims all three with dp:$6D; same WRAM base.
+; Returns: SEC on success, CLC on failure.
+; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
+; Called from: $D555, $D617.
+; ============================================================
+org $C0E9AA
+Sub_E9AA:
+    LDX #$00
+.e9aa_loop:
+    LDA $0BC0,X
+    BPL .e9aa_next
+    LDA $0BC1,X
+    BPL .e9aa_next
+    LDA $0BC2,X
+    BPL .e9aa_next
+    LDA $6D              ; all three free → claim
+    STA $0BC0,X
+    STA $0BC1,X
+    STA $0BC2,X
+    TXA
+    XBA
+    REP #$20
+    AND #$FF00
+    ASL
+    CLC
+    ADC #$3800
+    LDX $6D
+    STA $0D80,X
+    SEP #$20
+    SEC
+    RTS
+.e9aa_next:
+    INX
+    CPX #$02             ; only entries 0–1 for triple allocation
+    BMI .e9aa_loop
+    CLC
+    RTS
+
 org $C0E9E2
 Sub_E9E2:
     ; 29 bytes ($E9E2-$E9FE). Entry M=1, X=1.
