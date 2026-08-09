@@ -3716,6 +3716,500 @@ Sub_E12A:
     RTS
 
 ; ============================================================
+; $C0:E534 — Sub_E534 (339 bytes, $C0:E534–$E686)
+; FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like
+; lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA.
+;
+; On entry (from Sub_E12A Phase 2, bit 14 of scene word set):
+;   A = 16-bit scene-data word, Y = scene-data table index,
+;   dp:$0A = base offset, dp:$CD/$CE = sprite-data ptr (bank $7F),
+;   WMADDL/WMADDH already set for current WRAM position.
+; Computes byte index = ((A & $FF) | [$0A]) << 4 (M=1 encoding):
+; reads 32 bytes from [$CD]+index, looks each up in $FD00, writes to WMDATA.
+; Note: the header bytes 29 FF 07 0A*4 are a byte-identity shared with
+; Sub_E687 — valid as M=1 "AND #$FF / ORA[$0A] / 4×ASL" or M=0 "AND #$07FF / 5×ASL".
+; Returns with 16-bit A restored, Y restored from dp:$C5.
+; ============================================================
+org $C0E534
+Sub_E534:
+    AND #$FF                ; mask low byte (M=1 encoding: 29 FF)
+    ORA [$0A]               ; merge with dp:[$0A] indirect long
+    ASL
+    ASL
+    ASL
+    ASL                     ; × 16: sprite-data byte index
+    STY $C5                 ; save Y
+    TAY                     ; Y = sprite-data byte index
+    SEP #$20                ; A → 8-bit
+    TDC                     ; A = DP (clears A)
+    XBA                     ; ensure A high byte = 0
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 1)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 2)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 3)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 4)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 5)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 6)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 7)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 8)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 9)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 10)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 11)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 12)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 13)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 14)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 15)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 16)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 17)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 18)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 19)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 20)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 21)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 22)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 23)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 24)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 25)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 26)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 27)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 28)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 29)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 30)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 31)
+    INY
+    LDA [$CD],Y
+    TAX
+    LDA $FD00,X
+    STA $2180               ; WMDATA (byte 32 — no INY)
+    REP #$20                ; A → 16-bit
+    LDY $C5                 ; restore Y
+    RTS
+
+; ============================================================
+; $C0:E687 — Sub_E687 (178 bytes, $C0:E687–$E738)
+; Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM
+; graphics bank into WRAM at the address in dp:$D0.
+;
+; On entry (from Sub_E12A Phase 2, bit 14 of scene word clear):
+;   A = 16-bit scene-data word, Y = scene-data table index,
+;   dp:$0A = base offset, dp:$CD = sprite-data byte base,
+;   dp:$CF = graphics bank selector, dp:$D0 = WRAM write address.
+; Header (M=0 encoding here: AND #$07FF / 5×ASL ≡ same bytes as Sub_E534's header)
+; computes source byte offset X = ((A & $07FF) << 5) + dp:$CD,
+; loads WRAM address Y = dp:$D0, dispatches on dp:$CF:
+;   $7F → Sub_E8C2, $D2 → Sub_E7BC, $D3 → Sub_E83F, $D4 → Sub_E739,
+;   else → inline $D5 copy below.
+; After copy: WMADDL = old_Y + $20, Y restored. Returns 16-bit A.
+; ============================================================
+org $C0E687
+Sub_E687:
+    AND #$07FF              ; (M=0: 29 FF 07) same bytes as Sub_E534's AND #$FF/ORA[$0A]
+    ASL
+    ASL
+    ASL
+    ASL
+    ASL                     ; 5×ASL (same byte sequence as 4×ASL in M=1 above)
+    STY $C5                 ; save Y
+    CLC
+    ADC $CD                 ; X = shifted offset + dp:$CD base
+    TAX
+    LDY $D0                 ; Y = WRAM write address
+    SEP #$20                ; A → 8-bit for bank-selector dispatch
+    LDA $CF                 ; graphics bank selector
+    CMP #$7F
+    BNE .not7f
+    BRL $0220               ; → Sub_E8C2 ($E8C2): copy from $7F using abs,X
+.not7f:
+    SEC
+    SBC #$D2
+    BNE .notd2
+    BRL $0112               ; → Sub_E7BC ($E7BC): copy from bank $D2
+.notd2:
+    DEC
+    BNE .notd3
+    BRL $018F               ; → Sub_E83F ($E83F): copy from bank $D3
+.notd3:
+    DEC
+    BNE .d5copy             ; else → inline $D5 copy
+    BRL $0083               ; → Sub_E739 ($E739): copy from bank $D4
+.d5copy:                    ; dp:$CF = $D5 (or unrecognised) → read from bank $D5
+    PHB
+    LDA #$7F                ; (M=1 after SEP above)
+    PHA
+    PLB                     ; DB = $7F
+    REP #$20                ; A → 16-bit
+    LDA $D50000,X
+    STA.w $0000,Y
+    LDA $D50002,X
+    STA.w $0002,Y
+    LDA $D50004,X
+    STA.w $0004,Y
+    LDA $D50006,X
+    STA.w $0006,Y
+    LDA $D50008,X
+    STA.w $0008,Y
+    LDA $D5000A,X
+    STA.w $000A,Y
+    LDA $D5000C,X
+    STA.w $000C,Y
+    LDA $D5000E,X
+    STA.w $000E,Y
+    LDA $D50010,X
+    STA.w $0010,Y
+    LDA $D50012,X
+    STA.w $0012,Y
+    LDA $D50014,X
+    STA.w $0014,Y
+    LDA $D50016,X
+    STA.w $0016,Y
+    LDA $D50018,X
+    STA.w $0018,Y
+    LDA $D5001A,X
+    STA.w $001A,Y
+    LDA $D5001C,X
+    STA.w $001C,Y
+    LDA $D5001E,X
+    STA.w $001E,Y
+    PLB
+    TYA
+    CLC
+    ADC #$0020
+    STA.w $2181             ; WMADDL = old_Y + $20
+    LDY $C5                 ; restore Y
+    RTS
+
+; ============================================================
+; $C0:E739 — Sub_E739 (131 bytes, $C0:E739–$E7BB)
+; Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
+; Tail-called via BRL from Sub_E687 when dp:$CF = $D4.
+; X = source byte offset, Y = WRAM write address (both from Sub_E687).
+; ============================================================
+org $C0E739
+Sub_E739:
+    PHB
+    db $A9,$7F              ; LDA #$7F (db: M=1 byte encoding in M=0 asar context)
+    PHA
+    PLB                     ; DB = $7F
+    REP #$20                ; A → 16-bit
+    LDA $D40000,X
+    STA.w $0000,Y
+    LDA $D40002,X
+    STA.w $0002,Y
+    LDA $D40004,X
+    STA.w $0004,Y
+    LDA $D40006,X
+    STA.w $0006,Y
+    LDA $D40008,X
+    STA.w $0008,Y
+    LDA $D4000A,X
+    STA.w $000A,Y
+    LDA $D4000C,X
+    STA.w $000C,Y
+    LDA $D4000E,X
+    STA.w $000E,Y
+    LDA $D40010,X
+    STA.w $0010,Y
+    LDA $D40012,X
+    STA.w $0012,Y
+    LDA $D40014,X
+    STA.w $0014,Y
+    LDA $D40016,X
+    STA.w $0016,Y
+    LDA $D40018,X
+    STA.w $0018,Y
+    LDA $D4001A,X
+    STA.w $001A,Y
+    LDA $D4001C,X
+    STA.w $001C,Y
+    LDA $D4001E,X
+    STA.w $001E,Y
+    PLB
+    TYA
+    CLC
+    ADC #$0020
+    STA.w $2181             ; WMADDL = old_Y + $20
+    LDY $C5
+    RTS
+
+; ============================================================
+; $C0:E7BC — Sub_E7BC (131 bytes, $C0:E7BC–$E83E)
+; Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
+; Tail-called via BRL from Sub_E687 when dp:$CF = $D2.
+; ============================================================
+org $C0E7BC
+Sub_E7BC:
+    PHB
+    db $A9,$7F              ; LDA #$7F
+    PHA
+    PLB                     ; DB = $7F
+    REP #$20
+    LDA $D20000,X
+    STA.w $0000,Y
+    LDA $D20002,X
+    STA.w $0002,Y
+    LDA $D20004,X
+    STA.w $0004,Y
+    LDA $D20006,X
+    STA.w $0006,Y
+    LDA $D20008,X
+    STA.w $0008,Y
+    LDA $D2000A,X
+    STA.w $000A,Y
+    LDA $D2000C,X
+    STA.w $000C,Y
+    LDA $D2000E,X
+    STA.w $000E,Y
+    LDA $D20010,X
+    STA.w $0010,Y
+    LDA $D20012,X
+    STA.w $0012,Y
+    LDA $D20014,X
+    STA.w $0014,Y
+    LDA $D20016,X
+    STA.w $0016,Y
+    LDA $D20018,X
+    STA.w $0018,Y
+    LDA $D2001A,X
+    STA.w $001A,Y
+    LDA $D2001C,X
+    STA.w $001C,Y
+    LDA $D2001E,X
+    STA.w $001E,Y
+    PLB
+    TYA
+    CLC
+    ADC #$0020
+    STA.w $2181
+    LDY $C5
+    RTS
+
+; ============================================================
+; $C0:E83F — Sub_E83F (131 bytes, $C0:E83F–$E8C1)
+; Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
+; Tail-called via BRL from Sub_E687 when dp:$CF = $D3.
+; ============================================================
+org $C0E83F
+Sub_E83F:
+    PHB
+    db $A9,$7F              ; LDA #$7F
+    PHA
+    PLB                     ; DB = $7F
+    REP #$20
+    LDA $D30000,X
+    STA.w $0000,Y
+    LDA $D30002,X
+    STA.w $0002,Y
+    LDA $D30004,X
+    STA.w $0004,Y
+    LDA $D30006,X
+    STA.w $0006,Y
+    LDA $D30008,X
+    STA.w $0008,Y
+    LDA $D3000A,X
+    STA.w $000A,Y
+    LDA $D3000C,X
+    STA.w $000C,Y
+    LDA $D3000E,X
+    STA.w $000E,Y
+    LDA $D30010,X
+    STA.w $0010,Y
+    LDA $D30012,X
+    STA.w $0012,Y
+    LDA $D30014,X
+    STA.w $0014,Y
+    LDA $D30016,X
+    STA.w $0016,Y
+    LDA $D30018,X
+    STA.w $0018,Y
+    LDA $D3001A,X
+    STA.w $001A,Y
+    LDA $D3001C,X
+    STA.w $001C,Y
+    LDA $D3001E,X
+    STA.w $001E,Y
+    PLB
+    TYA
+    CLC
+    ADC #$0020
+    STA.w $2181
+    LDY $C5
+    RTS
+
+; ============================================================
+; $C0:E8C2 — Sub_E8C2 (115 bytes, $C0:E8C2–$E934)
+; Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
+; Tail-called via BRL from Sub_E687 when dp:$CF = $7F.
+; Uses absolute,X (BD) rather than long,X (BF): DB is already $7F after PLB.
+; ============================================================
+org $C0E8C2
+Sub_E8C2:
+    PHB
+    db $A9,$7F              ; LDA #$7F
+    PHA
+    PLB                     ; DB = $7F
+    REP #$20
+    LDA.w $0000,X           ; BD: abs,X (DB=$7F → reads $7F:0000+X)
+    STA.w $0000,Y
+    LDA.w $0002,X
+    STA.w $0002,Y
+    LDA.w $0004,X
+    STA.w $0004,Y
+    LDA.w $0006,X
+    STA.w $0006,Y
+    LDA.w $0008,X
+    STA.w $0008,Y
+    LDA.w $000A,X
+    STA.w $000A,Y
+    LDA.w $000C,X
+    STA.w $000C,Y
+    LDA.w $000E,X
+    STA.w $000E,Y
+    LDA.w $0010,X
+    STA.w $0010,Y
+    LDA.w $0012,X
+    STA.w $0012,Y
+    LDA.w $0014,X
+    STA.w $0014,Y
+    LDA.w $0016,X
+    STA.w $0016,Y
+    LDA.w $0018,X
+    STA.w $0018,Y
+    LDA.w $001A,X
+    STA.w $001A,Y
+    LDA.w $001C,X
+    STA.w $001C,Y
+    LDA.w $001E,X
+    STA.w $001E,Y
+    PLB
+    TYA
+    CLC
+    ADC #$0020
+    STA.w $2181
+    LDY $C5
+    RTS
+
+; ============================================================
 ; $C0:E935 — Sub_E935 (29 bytes, $E935–$E951)
 ; Initialize 8 sprite-slot "uninitialized" flags at $0BC0-$0BC7 to $80.
 ; Sets DP=$0B00, stores LDA #$80 to dp:$C0-$C7 (= abs $0BC0-$0BC7),
