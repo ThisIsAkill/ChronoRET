@@ -7728,3 +7728,117 @@ org $C01BA7
 Sub_1BA7:
     LDA $FB                 ; dp:$FB = SPC arg 0 (vs $FC in Sub_1B90)
     BRA Sub_1B90_body       ; join Sub_1B90 at STA $1E01
+
+; ============================================================
+; $C0:CB3A — Sub_CB3A (162 bytes, $CB3A–$CBDB)
+; Animation-frame gate for sprite-slot init routines.
+; Computes a frame-data pointer into dp:$D6 from entity animation
+; state ($1600,X), sprite width ($1480,X), and sprite base offset
+; ($1500,X):
+;   state = 0  → $D6 = $1500,X
+;   state = 2  → $D6 = 2×$1480,X + $1500,X
+;   state > 0  → $D6 = 3×$1480,X + $1500,X
+;   state < 0  → $D6 = $1480,X + $1500,X
+; Then adjusts $D6 by (animType×4 + animRowHi) to reach the
+; current frame entry, and reads the frame byte via [$D6]:
+;   • If byte ≠ $FF: SEC + RTS (caller should init this sprite).
+;   • If byte = $FF and anim type = 2: decrement $7F0B01,X timer;
+;     return CLC + RTS (skip until timer hits 0, then CLC + RTS).
+;   • If byte = $FF and other type: wrap $D6 back by animRowHi,
+;     store $FF into $1681,X, re-read wrapped frame byte; SEC + RTS.
+; Entry: M=1 (A 8-bit), X=0 (X/Y 16-bit); X = entity slot.
+; Exit:  SEC = proceed; CLC = skip this frame.
+; Modifies: dp:$D6 (frame ptr, 16-bit), dp:$D9 (scratch, 16-bit), A.
+; Preserves X (entity slot).
+; Called by: Sub_CBDC ($CBFE), Sub_D28A ($D28C), …
+; ============================================================
+org $C0CB3A
+Sub_CB3A:
+    LDA $1600,X             ; animation state byte
+    BEQ .zero               ; state = 0 → base path
+    CMP #$02
+    BEQ .two                ; state = 2 → double path
+    BPL .plus               ; state > 0, != 2 → triple path
+.neg:                       ; state < 0 (bit 7 set) → single-add path
+    REP #$20
+    LDA $1480,X             ; sprite width
+    CLC
+    ADC $1500,X             ; + base offset
+    STA $D6
+    BRA .common
+.zero:
+    REP #$20
+    LDA $1500,X             ; base offset only
+    STA $D6
+    BRA .common
+.plus:                      ; state > 0, not 2 → triple-add
+    REP #$20
+    LDA $1480,X
+    STA $D9                 ; save width
+    CLC
+    ADC $D9                 ; 2× width
+    ADC $D9                 ; 3× width
+    ADC $1500,X             ; + base offset
+    STA $D6
+    BRA .common
+.two:                       ; state = 2 → double-add
+    REP #$20
+    LDA $1480,X
+    ASL                     ; 2× width
+    CLC
+    ADC $1500,X             ; + base offset
+    STA $D6
+    ; fall through to .common (M=0)
+.common:
+    LDA $1681,X             ; animation row high byte (zero-extended)
+    AND #$00FF
+    STA $D9                 ; save as animRowHi
+    LDA $1780,X             ; animation type field
+    AND #$00FF
+    CMP #$0002              ; type == 2?
+    BNE .not_two
+.type_two:
+    LDA $1781,X             ; type-2 subfield
+    AND #$00FF
+    ASL                     ; × 2
+    ASL                     ; × 4
+    CLC
+    ADC $D9                 ; + animRowHi
+    ADC $D6                 ; + base pointer
+    STA $D6                 ; → adjusted frame pointer
+    SEP #$20
+    LDA [$D6]               ; read frame data byte
+    CMP #$FF
+    BNE .proceed            ; not $FF → sprite is ready
+    LDA $7F0B01,X           ; countdown timer (WRAM)
+    DEC
+    BEQ .skip_store         ; timer hit 0: just clear carry and return
+    STA $7F0B01,X           ; store decremented timer
+.skip_store:
+    CLC
+    RTS                     ; not ready this frame
+.not_two:
+    LDA $1680,X             ; standard anim frame field
+    AND #$00FF
+    ASL                     ; × 2
+    ASL                     ; × 4
+    CLC
+    ADC $D9                 ; + animRowHi
+    ADC $D6                 ; + base pointer
+    STA $D6                 ; → adjusted frame pointer
+    SEP #$20
+    LDA [$D6]               ; read frame data byte
+    CMP #$FF
+    BNE .proceed            ; not $FF → sprite is ready
+    REP #$20
+    LDA $D6                 ; current frame pointer
+    SEC
+    SBC $D9                 ; subtract animRowHi → row start
+    STA $D6
+    SEP #$20
+    LDA #$FF
+    STA $1681,X             ; mark frame row as exhausted
+    LDA [$D6]               ; re-read wrapped frame byte
+.proceed:
+    SEC
+    RTS
