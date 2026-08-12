@@ -14,13 +14,19 @@ Ship of Harkinian project for Ocarina of Time, but strictly one person learning.
 
 ## Status
 
-**In progress.** ~10,184 bytes matched byte-exact across banks $00, $C0, and $FD
-(36 functions, ~0.24% of the 4 MB ROM).
+**In progress.** ~16,460 bytes matched byte-exact across banks $00, $C0, and $FD
+(82 functions, ~4.6% of all game code, ~25.9% of Bank $C0).
+
+Most of the ROM is graphics and music data — only ~359 KB out of 4 MB is actually
+executable 65816 code. Against that real baseline: 16,460 / 359,278 code bytes
+matched (4.6%); Bank $C0 alone is 15,989 / 61,779 bytes (25.9%).
 
 Matched regions so far include the full engine spine — reset vectors, hardware
 init, game loop, VBlank handler, per-frame state init, OAM culling — plus the
 complete sprite subsystem (render dispatch, all type/state init helpers, OAM
-packing) and the per-frame state machine through its mode handler cluster.
+packing), the per-frame state machine through its mode handler cluster, the full
+Sub_E12A tile-streaming cluster, the sprite slot allocators, and the sprite-slot
+init cluster (CB3A–D68A, triple-slot dispatch and first-pass variants).
 
 Progress notes and function-level breakdown live in a companion wiki
 (not yet public).

@@ -34,6 +34,19 @@ LoadSavePath:   ; entry for mode >= $01FF (load/save/transition)
 org $C0EC60
 Sub_EC60:       ; called from main frame loop after VBlankHandler
 
+; Triple-slot dispatch BRL targets (unmatched)
+org $C0D68B
+Sub_D68B:       ; triple-slot, pass 1, non-$68 variant — unmatched
+
+org $C0D738
+Sub_D738:       ; triple-slot, pass 1, $68 variant — unmatched
+
+org $C0D7E5
+Sub_D7E5:       ; triple-slot, pass 2+, non-$68 variant — unmatched
+
+org $C0DA69
+Sub_DA69:       ; triple-slot, pass 2+, $68 variant — unmatched
+
 ; Unmatched routines called from matched code
 
 
@@ -8892,4 +8905,258 @@ Sub_D30D:
     INC $1B00,X
     SEP #$10
     CLC
+    RTS
+
+; ============================================================
+; $C0:D4F7 — Sub_D4F7 (273 bytes, $D4F7–$D607)
+; Triple-slot sprite-init dispatch; analogous to Sub_CEF5 (dual-slot).
+; Sets up tile-bank / graphic-slot params, then dispatches on:
+;   $1B00,X & $7F == 0: pass 0  → $D546 (non-$68) or Sub_D608 ($68)
+;   $1B00,X & $7F == 1: pass 1  → Sub_D68B (non-$68) or Sub_D738 ($68)
+;   $1B00,X & $7F >= 2: pass 2+ → Sub_D7E5 (non-$68) or Sub_DA69 ($68)
+; Type-3 sprites ($1780,X==$03): RTS immediately (no re-init).
+; Body at $D546 (pass 0, non-$68): triple-slot alloc via Sub_E9AA,
+;   8-tile loop to WRAM base, then 8-tile loop to WRAM base+$200; SEC RTS.
+; Called from: sprite-slot entity dispatcher table (entity type dispatch).
+; ============================================================
+org $C0D4F7
+Sub_D4F7:
+    LDA $1200,X             ; sprite graphic-bank id
+    STA $CF
+    LDA #$7F
+    STA $D2
+    REP #$20
+    LDA $1280,X             ; sprite graphic-pointer
+    STA $CD
+    SEP #$20
+    LDA #$E4
+    STA $D8
+    ; type-3 sprites bypass all init
+    LDA $1780,X
+    CMP #$03
+    BNE .d4f7_check_pass
+    RTS
+.d4f7_check_pass:
+    LDA $1B00,X
+    AND #$7F                ; pass counter (low 7 bits)
+    BEQ .d4f7_pass0
+    CMP #$01
+    BEQ .d4f7_pass1
+    ; pass 2+: further dispatch on $0D00,X
+    LDA $0D00,X
+    CMP #$68
+    BEQ .d4f7_p2_68
+    BRL Sub_D7E5            ; pass 2+, non-$68
+.d4f7_p2_68:
+    BRL Sub_DA69            ; pass 2+, $68
+.d4f7_pass0:
+    LDA $0D00,X
+    CMP #$68
+    BEQ .d4f7_p0_68
+    BRA Sub_D546            ; pass 0, non-$68 → tile DMA body below
+.d4f7_p0_68:
+    BRL Sub_D608            ; pass 0, $68 → 16-tile single-pass variant
+.d4f7_pass1:
+    LDA $0D00,X
+    CMP #$68
+    BEQ .d4f7_p1_68
+    BRL Sub_D68B            ; pass 1, non-$68
+.d4f7_p1_68:
+    BRL Sub_D738            ; pass 1, $68
+
+; ============================================================
+; $C0:D546 — Sub_D546 (194 bytes, $D546–$D607)
+; Triple-slot first-pass, non-$68 variant.
+; Reached by BRA from Sub_D4F7 (pass 0, non-$68 path) — shares
+; the same return stack as the caller.  Also the label used as
+; anchor for the cluster tracking table.
+; Algorithm: animation gate (Sub_CB3A) → triple-slot alloc (Sub_E9AA)
+;   → 8 tiles Y=0..7 to WRAM base (bank $7F slot)
+;   → 8 tiles Y=8..15 to WRAM base+$200
+;   → INC $1B00,X; SEC RTS.
+; ============================================================
+Sub_D546:
+    JSR Sub_CB3A
+    BCS .d546_proceed
+    RTS
+.d546_proceed:
+    CMP $0F01,X             ; same frame already loaded?
+    BNE .d546_new_frame
+.d546_cle_rts:              ; shared exit: CLC + RTS (same-frame skip / alloc fail)
+    CLC
+    RTS
+.d546_new_frame:
+    STA $EE                 ; save current frame type
+    JSR Sub_E9AA            ; allocate three sprite slots
+    BCC .d546_cle_rts       ; alloc failed → CLC RTS
+    LDA $EE
+    STA $0F01,X             ; mark frame type as loaded
+    REP #$20
+    LDX $6D
+    LDA $0D80,X             ; WRAM base for this slot group
+    STA $D0
+    SEP #$20
+    LDA $0F01,X             ; frame number → multiply by $78 (120 tiles per frame)
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB
+    LDA $1300,X             ; tile bank byte
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL — frame# × 120 product
+    CLC
+    ADC $1380,X             ; add sprite base offset → frame data pointer
+    STA $D3
+    ; set up WMADDR for WRAM writes (bank $7F = $01)
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    ; first 8-tile loop: Y=0..7 → WRAM base
+    LDA #$0008
+    STA $C9
+    LDY #$0000
+    BRA .d546_loop1_entry
+.d546_loop1_top:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d546_loop1_entry:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d546_loop1_e534
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d546_loop1_top
+    BRA .d546_loop2_init
+.d546_loop1_e534:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d546_loop1_top
+.d546_loop2_init:
+    ; second 8-tile loop: Y=8..15 → WRAM base+$200
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0200
+    STA $D0
+    STA $2181               ; WMADDL — advance WRAM dest to slot+$200
+    REP #$10
+    LDA #$0008
+    STA $C9
+    LDY #$0010              ; word 8 in frame data (Y=16 bytes in)
+    BRA .d546_loop2_entry
+.d546_loop2_top:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d546_loop2_entry:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d546_loop2_e534
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d546_loop2_top
+    BRA .d546_done
+.d546_loop2_e534:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d546_loop2_top
+.d546_done:
+    SEP #$30
+    LDX $6D
+    INC $1B00,X
+    SEC
+    RTS
+
+; ============================================================
+; $C0:D608 — Sub_D608 (131 bytes, $D608–$D68A)
+; Triple-slot first-pass, $68 variant (Obj_BuildFrameSize2_Start).
+; Animation gate → triple-slot alloc → single 16-tile loop to
+; WRAM base; INC $1B00,X; SEC RTS.
+; Reached by BRL from Sub_D4F7 (pass 0, $68 path).
+; ============================================================
+org $C0D608
+Sub_D608:
+    JSR Sub_CB3A
+    BCS .d608_proceed
+    RTS
+.d608_proceed:
+    CMP $0F01,X             ; same frame already loaded?
+    BNE .d608_new_frame
+.d608_cle_rts:
+    CLC
+    RTS
+.d608_new_frame:
+    STA $EE
+    JSR Sub_E9AA            ; triple-slot alloc
+    BCC .d608_cle_rts
+    LDA $EE
+    STA $0F01,X
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    STA $D0
+    SEP #$20
+    LDA $0F01,X             ; frame number
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    ; 16-tile loop (single pass): Y=0..15 → WRAM base
+    LDA #$0010
+    STA $C9
+    LDY #$0000
+    BRA .d608_loop_entry
+.d608_loop_top:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d608_loop_entry:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d608_e534
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d608_loop_top
+    BRA .d608_done
+.d608_e534:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d608_loop_top
+.d608_done:
+    SEP #$30
+    LDX $6D
+    INC $1B00,X
+    SEC
     RTS
