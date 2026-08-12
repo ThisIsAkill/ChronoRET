@@ -7842,3 +7842,1054 @@ Sub_CB3A:
 .proceed:
     SEC
     RTS
+
+; ============================================================
+; $C0:CBDC — Sub_CBDC (492 bytes, $CBDC–$CDC7)
+; Single-slot, animation-gated, 16-tile sprite-slot init.
+; Sets up dp:$CF/$D2 (tile bank ptr) and dp:$CD (table ptr),
+; then either uses $1301,X directly (type-3: $1780,X==$03) or
+; calls Sub_CB3A for the animation gate.  Allocates one VRAM
+; slot via Sub_E952; if same frame as last call (CMP $0F01,X),
+; returns CLC with no work.  On new frame: copies 16 tile
+; entries ($0010 iterations) through Sub_E687/Sub_E534 into
+; WRAM via WMDATA; writes 4-entry (Y/X/attr) OAM staging data
+; to $7F:4802+slot and the DMA descriptor to $09xx; CLC RTS.
+; Entry: M=1, X/Y=16-bit; X = entity slot index.
+; Exit:  CLC always (caller checks separately if needed).
+; ============================================================
+org $C0CBDC
+Sub_CBDC:
+    LDA $1200,X             ; tile-data bank byte
+    STA $CF
+    LDA #$7F
+    STA $D2                 ; dp:$D2 = $7F (pointer bank)
+    REP #$20
+    LDA $1280,X             ; 16-bit tile-table base address
+    STA $CD
+    SEP #$20
+    LDA #$E4
+    STA $D8                 ; palette/attr byte
+    LDA $1780,X             ; animation type field
+    CMP #$03
+    BNE .run_gate           ; not type-3: use animation gate
+    LDA $1301,X             ; type-3: use $1301,X directly as frame byte
+    BRA .frame_check
+.run_gate:
+    JSR $CB3A               ; animation-frame gate (Sub_CB3A)
+    BCS .frame_check        ; gate passed (SEC) → proceed
+    RTS                     ; gate failed (CLC) → skip
+.frame_check:
+    CMP $0F01,X             ; same frame as last?
+    BNE .new_frame
+.no_work:
+    CLC
+    RTS                     ; same frame → no work
+.new_frame:
+    STA $EE                 ; save frame byte
+    JSR $E952               ; single-slot allocator
+    BCC .no_work            ; allocation failed → backward branch to CLC+RTS
+    LDA $EE
+    STA $0F01,X             ; record current frame
+    REP #$20
+    LDX $6D
+    LDA $0D80,X             ; VRAM base for allocated slot
+    STA $D0
+    SEP #$20
+    LDA $0F01,X             ; frame# for multiplier
+    STA $4202               ; WRMPYA
+    LDA #$28
+    STA $4203               ; WRMPYB = 40 (16 tiles × 2.5 bytes)
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL = frame# × 40
+    CLC
+    ADC $1380,X             ; + tile-row base → tile data pointer
+    STA $D3
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH = bank 1
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL = VRAM target
+    LDA #$0010              ; loop count = 16 tiles
+    STA $C9
+    LDY #$0000
+    BRA .check              ; enter loop at condition check
+.next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .fd_path
+    JSR $E687               ; bank-switch tile copy
+    INY
+    INY
+    DEC $C9
+    BNE .next
+    BRA .after_loop
+.fd_path:
+    JSR $E534               ; FD00-table WRAM fill
+    INY
+    INY
+    DEC $C9
+    BNE .next
+.after_loop:
+    ; --- OAM staging: DMA descriptor into $09xx ---
+    SEP #$10                ; X/Y → 8-bit
+    LDX $6D
+    LDA $0D00,X             ; entity tile VRAM index (16-bit A, 8-bit X)
+    AND #$01FF              ; mask to 9-bit VRAM tile number
+    ASL
+    ASL
+    ASL
+    ASL                     ; × 16 = VRAM tile slot address
+    LDX $79                 ; OAM buffer write pointer
+    STA $0950,X             ; slot-A tile#
+    CLC
+    ADC #$0100
+    STA $0970,X             ; slot-B tile# (+256)
+    LDX $6D
+    LDA $0D80,X             ; VRAM base
+    LDX $79
+    STA $0940,X             ; slot-A VRAM base
+    CLC
+    ADC #$0100
+    STA $0960,X             ; slot-B VRAM base
+    LDA #$0100
+    STA $0980,X             ; slot-A size
+    STA $0990,X             ; slot-B size
+    INC $09A0,X             ; bump slot-A entry count
+    INX
+    INX
+    STZ $09A0,X             ; zero slot-B
+    STX $79                 ; save updated buffer ptr
+    ; --- OAM Y / tile entry writes to $7F:4802+slot ---
+    REP #$20
+    LDX $6D
+    LDA $1700,X             ; OAM slot base index (16-bit)
+    REP #$10                ; X → 16-bit
+    TAX                     ; X = OAM slot index
+    SEP #$20
+    LDY #$0020              ; offset into tile data for OAM entries
+    ; tile 0 Y-pos
+    LDA [$D3],Y
+    STA $7F4802,X
+    BPL .y0pos
+    LDA #$FF
+    BRA .y0hi
+.y0pos:
+    LDA #$00
+.y0hi:
+    STA $7F4803,X
+    INY
+    LDA [$D3],Y
+    STA $7F4804,X
+    ; tile 1 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F480A,X
+    BPL .y1pos
+    LDA #$FF
+    BRA .y1hi
+.y1pos:
+    LDA #$00
+.y1hi:
+    STA $7F480B,X
+    INY
+    LDA [$D3],Y
+    STA $7F480C,X
+    ; tile 2 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F4812,X
+    BPL .y2pos
+    LDA #$FF
+    BRA .y2hi
+.y2pos:
+    LDA #$00
+.y2hi:
+    STA $7F4813,X
+    INY
+    LDA [$D3],Y
+    STA $7F4814,X
+    ; tile 3 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F481A,X
+    BPL .y3pos
+    LDA #$FF
+    BRA .y3hi
+.y3pos:
+    LDA #$00
+.y3hi:
+    STA $7F481B,X
+    INY
+    LDA [$D3],Y
+    STA $7F481C,X
+    ; --- OAM X-positions from entity table ---
+    LDY $6D
+    LDA $0D00,Y             ; entity X base
+    STA $7F4806,X
+    INC
+    INC
+    STA $7F480E,X
+    INC
+    INC
+    STA $7F4816,X
+    INC
+    INC
+    STA $7F481E,X
+    ; --- OAM attribute/high bytes (palette + visibility) ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9                 ; palette + priority composite
+    ; tile 0 attr
+    LDA $7F4804,X
+    CMP #$E8
+    BCC .a0within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4807,X
+    BRA .a1test
+.a0within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4807,X
+    ; tile 1 attr
+.a1test:
+    LDA $7F480C,X
+    CMP #$E8
+    BCC .a1within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F480F,X
+    BRA .a2test
+.a1within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F480F,X
+    ; tile 2 attr
+.a2test:
+    LDA $7F4814,X
+    CMP #$E8
+    BCC .a2within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4817,X
+    BRA .a3test
+.a2within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4817,X
+    ; tile 3 attr
+.a3test:
+    LDA $7F481C,X
+    CMP #$E8
+    BCC .a3within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F481F,X
+    BRA .cbdc_done
+.a3within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F481F,X
+.cbdc_done:
+    LDX $6D
+    INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:CDC8 — Sub_CDC8 (301 bytes, $CDC8–$CEF4)
+; Single-slot, no animation gate, OAM-update for $7F:4BC2+slot.
+; Uses the current frame# from $0F01,X directly (no gate call).
+; Computes tile-data pointer from frame# × $28 + $1380,X, then
+; loads OAM slot index from $1700,X and writes 4 Y-entries
+; (with sign-extension) and 4 X-entries (+2 step) to $7F:4BC2+.
+; Sets $1B00,X = $80 (marks entry as "OAM-only updated").
+; Entry: M=1, X/Y=16-bit; X = entity slot.
+; ============================================================
+org $C0CDC8
+Sub_CDC8:
+    LDX $6D
+    LDA $0F01,X             ; current frame# (no gate)
+    STA $4202               ; WRMPYA
+    LDA #$28
+    STA $4203               ; WRMPYB = 40
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; frame# × 40
+    CLC
+    ADC $1380,X
+    STA $D3                 ; tile data pointer
+    LDA $1700,X             ; OAM slot index (16-bit)
+    REP #$10                ; X → 16-bit
+    TAX                     ; X = OAM slot index
+    SEP #$20
+    LDY #$0020              ; offset to OAM position data in tile table
+    ; tile 0 Y-pos → $7F:4BC2+X
+    LDA [$D3],Y
+    STA $7F4BC2,X
+    BPL .y0pos
+    LDA #$FF
+    BRA .y0hi
+.y0pos:
+    LDA #$00
+.y0hi:
+    STA $7F4BC3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BC4,X
+    ; tile 1 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F4BCA,X
+    BPL .y1pos
+    LDA #$FF
+    BRA .y1hi
+.y1pos:
+    LDA #$00
+.y1hi:
+    STA $7F4BCB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BCC,X
+    ; tile 2 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F4BD2,X
+    BPL .y2pos
+    LDA #$FF
+    BRA .y2hi
+.y2pos:
+    LDA #$00
+.y2hi:
+    STA $7F4BD3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BD4,X
+    ; tile 3 Y-pos
+    INY
+    LDA [$D3],Y
+    STA $7F4BDA,X
+    BPL .y3pos
+    LDA #$FF
+    BRA .y3hi
+.y3pos:
+    LDA #$00
+.y3hi:
+    STA $7F4BDB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BDC,X
+    ; --- X-positions from entity table (Y still 8-bit from SEP#10 earlier? no) ---
+    LDY $6D                 ; entity slot index (dp LDY)
+    LDA $0D00,Y             ; entity X base
+    STA $7F4BC6,X
+    INC
+    INC
+    STA $7F4BCE,X
+    INC
+    INC
+    STA $7F4BD6,X
+    INC
+    INC
+    STA $7F4BDE,X
+    ; --- OAM attribute/high bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ; tile 0 attr
+    LDA $7F4BC4,X
+    CMP #$E8
+    BCC .a0within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BC7,X
+    BRA .a1test
+.a0within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4BC7,X
+    ; tile 1 attr
+.a1test:
+    LDA $7F4BCC,X
+    CMP #$E8
+    BCC .a1within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BCF,X
+    BRA .a2test
+.a1within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4BCF,X
+    ; tile 2 attr
+.a2test:
+    LDA $7F4BD4,X
+    CMP #$E8
+    BCC .a2within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BD7,X
+    BRA .a3test
+.a2within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4BD7,X
+    ; tile 3 attr
+.a3test:
+    LDA $7F4BDC,X
+    CMP #$E8
+    BCC .a3within
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BDF,X
+    BRA .cdc8_done
+.a3within:
+    LDA $D9
+    ORA $0C00,Y
+    STA $7F4BDF,X
+.cdc8_done:
+    LDX $6D
+    LDA #$80
+    STA $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:CEF5 — Sub_CEF5 (559 bytes, $CEF5–$D123)
+; Complex sprite-slot dispatch with three paths:
+;   type==3  ($1780,X==$03): full 32-tile dual-slot init via
+;            Sub_E97A + 32-entry loop.
+;   $1B00,X & $7F == 0: tail-call → Sub_D28A (first-pass,
+;            16 tiles, Y=0).
+;   $1B00,X & $7F != 0: tail-call → Sub_D30D (second-pass,
+;            16 tiles, Y=$20, VRAM base+$200).
+; On type-3 success: INC $1B00,X twice; CLC RTS.
+; On dispatch path: returns whatever Sub_D28A / Sub_D30D returns.
+; Entry: M=1, X/Y=16-bit; X = entity slot.
+; ============================================================
+org $C0CEF5
+Sub_CEF5:
+    LDA $1200,X
+    STA $CF
+    LDA #$7F
+    STA $D2
+    REP #$20
+    LDA $1280,X
+    STA $CD
+    SEP #$20
+    LDA #$E4
+    STA $D8
+    LDA $1780,X             ; animation type
+    CMP #$03
+    BNE .check_pass         ; not type-3 → check pass counter
+    BRA .type3_path         ; type-3 → full 32-tile path
+.check_pass:
+    LDA $1B00,X
+    AND #$7F
+    BEQ .first_pass         ; pass counter == 0: first pass
+    BRL $03EF               ; pass counter != 0: tail-call Sub_D30D
+.first_pass:
+    BRL $0369               ; tail-call Sub_D28A
+    ; ---- type-3 full 32-tile path ----
+.type3_path:
+    LDA $1301,X             ; use $1301,X directly as frame byte
+    CMP $0F01,X
+    BNE .t3_new_frame
+.t3_nc_exit:
+    CLC
+    RTS                     ; same frame → no work
+.t3_new_frame:
+    STA $EE
+    JSR $E97A               ; dual-slot allocator
+    BCC .t3_nc_exit         ; allocation failed → backward branch to CLC+RTS
+    LDA $EE
+    STA $0F01,X
+    REP #$20
+    LDX $6D
+    LDA $0D80,X             ; VRAM base
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$50
+    STA $4203               ; WRMPYB = 80
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; frame# × 80
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$20
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0020              ; 32 tiles
+    STA $C9
+    LDY #$0000
+    BRA .t3_check
+.t3_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.t3_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .t3_fd
+    JSR $E687
+    INY
+    INY
+    DEC $C9
+    BNE .t3_next
+    BRA .t3_after_loop
+.t3_fd:
+    JSR $E534
+    INY
+    INY
+    DEC $C9
+    BNE .t3_next
+.t3_after_loop:
+    ; --- OAM staging for 32-tile dual-slot ---
+    SEP #$10
+    LDX $6D
+    LDA $0D00,X
+    AND #$01FF
+    ASL
+    ASL
+    ASL
+    ASL
+    LDX $79
+    STA $0950,X
+    CLC
+    ADC #$0100
+    STA $0970,X
+    LDX $6D
+    LDA $0D80,X
+    LDX $79
+    STA $0940,X
+    CLC
+    ADC #$0200
+    STA $0960,X
+    LDA #$0200
+    STA $0980,X
+    STA $0990,X
+    INC $09A0,X
+    INX
+    INX
+    STZ $09A0,X
+    STX $79
+    ; --- OAM Y/tile writes to $7F:4802+slot (Y from $40) ---
+    REP #$20
+    LDX $6D
+    LDA.l $001700,X
+    REP #$10
+    TAX
+    SEP #$20
+    LDY #$0040              ; offset = 64 (8 tile-entry pairs × 2 bytes, after 32 tiles)
+    ; entry 0 Y-pos
+    LDA [$D3],Y
+    STA $7F4802,X
+    BPL .t3y0pos
+    LDA #$FF
+    BRA .t3y0hi
+.t3y0pos:
+    LDA #$00
+.t3y0hi:
+    STA $7F4803,X
+    INY
+    LDA [$D3],Y
+    STA $7F4804,X
+    ; entry 1
+    INY
+    LDA [$D3],Y
+    STA $7F480A,X
+    BPL .t3y1pos
+    LDA #$FF
+    BRA .t3y1hi
+.t3y1pos:
+    LDA #$00
+.t3y1hi:
+    STA $7F480B,X
+    INY
+    LDA [$D3],Y
+    STA $7F480C,X
+    ; entry 2
+    INY
+    LDA [$D3],Y
+    STA $7F4812,X
+    BPL .t3y2pos
+    LDA #$FF
+    BRA .t3y2hi
+.t3y2pos:
+    LDA #$00
+.t3y2hi:
+    STA $7F4813,X
+    INY
+    LDA [$D3],Y
+    STA $7F4814,X
+    ; entry 3
+    INY
+    LDA [$D3],Y
+    STA $7F481A,X
+    BPL .t3y3pos
+    LDA #$FF
+    BRA .t3y3hi
+.t3y3pos:
+    LDA #$00
+.t3y3hi:
+    STA $7F481B,X
+    INY
+    LDA [$D3],Y
+    STA $7F481C,X
+    ; entry 4
+    INY
+    LDA [$D3],Y
+    STA $7F4822,X
+    BPL .t3y4pos
+    LDA #$FF
+    BRA .t3y4hi
+.t3y4pos:
+    LDA #$00
+.t3y4hi:
+    STA $7F4823,X
+    INY
+    LDA [$D3],Y
+    STA $7F4824,X
+    ; entry 5
+    INY
+    LDA [$D3],Y
+    STA $7F482A,X
+    BPL .t3y5pos
+    LDA #$FF
+    BRA .t3y5hi
+.t3y5pos:
+    LDA #$00
+.t3y5hi:
+    STA $7F482B,X
+    INY
+    LDA [$D3],Y
+    STA $7F482C,X
+    ; entry 6
+    INY
+    LDA [$D3],Y
+    STA $7F4832,X
+    BPL .t3y6pos
+    LDA #$FF
+    BRA .t3y6hi
+.t3y6pos:
+    LDA #$00
+.t3y6hi:
+    STA $7F4833,X
+    INY
+    LDA [$D3],Y
+    STA $7F4834,X
+    ; entry 7
+    INY
+    LDA [$D3],Y
+    STA $7F483A,X
+    BPL .t3y7pos
+    LDA #$FF
+    BRA .t3y7hi
+.t3y7pos:
+    LDA #$00
+.t3y7hi:
+    STA $7F483B,X
+    INY
+    LDA [$D3],Y
+    STA $7F483C,X
+    ; --- X-positions (entity base + 2-step) ---
+    LDY $6D
+    LDA $0D00,Y
+    STA $7F4806,X
+    INC
+    INC
+    STA $7F480E,X
+    INC
+    INC
+    STA $7F4816,X
+    INC
+    INC
+    STA $7F481E,X
+    INC
+    INC
+    STA $7F4826,X
+    INC
+    INC
+    STA $7F482E,X
+    INC
+    INC
+    STA $7F4836,X
+    INC
+    INC
+    STA $7F483E,X
+    ; --- attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9                 ; A still holds the composite value
+    ORA $0C00,Y             ; no LDA $D9 needed: A unchanged since STA $D9
+    STA $7F4807,X
+    STA $7F480F,X
+    STA $7F4817,X
+    STA $7F481F,X
+    LDA $D9                 ; reload for second group (A was modified by ORA $0C00)
+    ORA $0C01,Y
+    STA $7F4827,X
+    STA $7F482F,X
+    STA $7F4837,X
+    STA $7F483F,X
+    LDX $6D
+    INC $1B00,X
+    INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:D28A — Sub_D28A (131 bytes, $D28A–$D30C)
+; Dual-slot, animation-gated, 16-tile sprite-slot init.
+; Called directly and also as a tail-call target (BRL from
+; Sub_CEF5 at $CF1E) for the first-pass case.
+; Calls Sub_CB3A to check the animation gate; on pass, calls
+; Sub_E97A to allocate two VRAM slots; copies 16 tile entries
+; (frame# × $50 offset, 16 iterations via Sub_E687/E534) into
+; WRAM.  Increments $1B00,X on success; SEC RTS.
+; Entry: M=1, X/Y=16-bit; X = entity slot.
+; ============================================================
+org $C0D28A
+Sub_D28A:
+    JSR $CB3A               ; animation-frame gate
+    BCS .d28a_proceed
+    RTS                     ; gate failed → CLC, skip
+.d28a_proceed:
+    CMP $0F01,X             ; same frame?
+    BNE .d28a_new_frame
+.d28a_nc_exit:
+    CLC
+    RTS
+.d28a_new_frame:
+    STA $EE
+    JSR $E97A               ; dual-slot allocator
+    BCC .d28a_nc_exit       ; allocation failed → backward branch to CLC+RTS
+    LDA $EE
+    STA $0F01,X
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$50
+    STA $4203               ; WRMPYB = 80
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; frame# × 80
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0010              ; 16 tiles
+    STA $C9
+    LDY #$0000
+    BRA .d28a_check
+.d28a_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d28a_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d28a_fd
+    JSR $E687
+    INY
+    INY
+    DEC $C9
+    BNE .d28a_next
+    BRA .d28a_done
+.d28a_fd:
+    JSR $E534
+    INY
+    INY
+    DEC $C9
+    BNE .d28a_next
+.d28a_done:
+    SEP #$30
+    LDX $6D
+    INC $1B00,X
+    SEC
+    RTS
+
+; ============================================================
+; $C0:D30D — Sub_D30D (490 bytes, $D30D–$D4F6)
+; Dual-slot second-pass: 16 tiles from Y=$20 into VRAM base+$200.
+; Tail-call target (BRL from Sub_CEF5 $CF1B) for pass counter != 0.
+; Uses existing slot allocation ($0D80,X + $200 for second slot).
+; Copies 16 tile entries starting at tile-data offset Y=$20 through
+; Sub_E687/Sub_E534; writes 8-entry OAM staging to $7F:4802+slot
+; (Y from $40); CLC RTS on success.
+; Entry: M=1, X/Y=16-bit; X = entity slot (via $6D).
+; ============================================================
+org $C0D30D
+Sub_D30D:
+    REP #$20
+    LDA $0D80,X
+    CLC
+    ADC #$0200              ; second-slot VRAM base
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$50
+    STA $4203               ; WRMPYB = 80
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; frame# × 80
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$20
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0010              ; 16 tiles
+    STA $C9
+    LDY #$0020              ; start at tile-data offset 32 (second half)
+    BRA .d30d_check
+.d30d_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d30d_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d30d_fd
+    JSR $E687
+    INY
+    INY
+    DEC $C9
+    BNE .d30d_next
+    BRA .d30d_after_loop
+.d30d_fd:
+    JSR $E534
+    INY
+    INY
+    DEC $C9
+    BNE .d30d_next
+.d30d_after_loop:
+    ; --- OAM staging ---
+    SEP #$10
+    LDX $6D
+    LDA $0D00,X
+    AND #$01FF
+    ASL
+    ASL
+    ASL
+    ASL
+    LDX $79
+    STA $0950,X
+    CLC
+    ADC #$0100
+    STA $0970,X
+    LDX $6D
+    LDA $0D80,X
+    LDX $79
+    STA $0940,X
+    CLC
+    ADC #$0200
+    STA $0960,X
+    LDA #$0200
+    STA $0980,X
+    STA $0990,X
+    INC $09A0,X
+    INX
+    INX
+    STZ $09A0,X
+    STX $79
+    ; --- OAM Y/tile writes (Y from $40) ---
+    LDX $6D
+    LDA.l $001700,X
+    REP #$10
+    TAX
+    SEP #$20
+    LDY #$0040
+    ; entry 0
+    LDA [$D3],Y
+    STA $7F4802,X
+    BPL .d30d_y0pos
+    LDA #$FF
+    BRA .d30d_y0hi
+.d30d_y0pos:
+    LDA #$00
+.d30d_y0hi:
+    STA $7F4803,X
+    INY
+    LDA [$D3],Y
+    STA $7F4804,X
+    ; entry 1
+    INY
+    LDA [$D3],Y
+    STA $7F480A,X
+    BPL .d30d_y1pos
+    LDA #$FF
+    BRA .d30d_y1hi
+.d30d_y1pos:
+    LDA #$00
+.d30d_y1hi:
+    STA $7F480B,X
+    INY
+    LDA [$D3],Y
+    STA $7F480C,X
+    ; entry 2
+    INY
+    LDA [$D3],Y
+    STA $7F4812,X
+    BPL .d30d_y2pos
+    LDA #$FF
+    BRA .d30d_y2hi
+.d30d_y2pos:
+    LDA #$00
+.d30d_y2hi:
+    STA $7F4813,X
+    INY
+    LDA [$D3],Y
+    STA $7F4814,X
+    ; entry 3
+    INY
+    LDA [$D3],Y
+    STA $7F481A,X
+    BPL .d30d_y3pos
+    LDA #$FF
+    BRA .d30d_y3hi
+.d30d_y3pos:
+    LDA #$00
+.d30d_y3hi:
+    STA $7F481B,X
+    INY
+    LDA [$D3],Y
+    STA $7F481C,X
+    ; entry 4
+    INY
+    LDA [$D3],Y
+    STA $7F4822,X
+    BPL .d30d_y4pos
+    LDA #$FF
+    BRA .d30d_y4hi
+.d30d_y4pos:
+    LDA #$00
+.d30d_y4hi:
+    STA $7F4823,X
+    INY
+    LDA [$D3],Y
+    STA $7F4824,X
+    ; entry 5
+    INY
+    LDA [$D3],Y
+    STA $7F482A,X
+    BPL .d30d_y5pos
+    LDA #$FF
+    BRA .d30d_y5hi
+.d30d_y5pos:
+    LDA #$00
+.d30d_y5hi:
+    STA $7F482B,X
+    INY
+    LDA [$D3],Y
+    STA $7F482C,X
+    ; entry 6
+    INY
+    LDA [$D3],Y
+    STA $7F4832,X
+    BPL .d30d_y6pos
+    LDA #$FF
+    BRA .d30d_y6hi
+.d30d_y6pos:
+    LDA #$00
+.d30d_y6hi:
+    STA $7F4833,X
+    INY
+    LDA [$D3],Y
+    STA $7F4834,X
+    ; entry 7
+    INY
+    LDA [$D3],Y
+    STA $7F483A,X
+    BPL .d30d_y7pos
+    LDA #$FF
+    BRA .d30d_y7hi
+.d30d_y7pos:
+    LDA #$00
+.d30d_y7hi:
+    STA $7F483B,X
+    INY
+    LDA [$D3],Y
+    STA $7F483C,X
+    ; --- X-positions ---
+    LDY $6D
+    LDA $0D00,Y
+    STA $7F4806,X
+    INC
+    INC
+    STA $7F480E,X
+    INC
+    INC
+    STA $7F4816,X
+    INC
+    INC
+    STA $7F481E,X
+    INC
+    INC
+    STA $7F4826,X
+    INC
+    INC
+    STA $7F482E,X
+    INC
+    INC
+    STA $7F4836,X
+    INC
+    INC
+    STA $7F483E,X
+    ; --- attribute bytes (lower 4 use $0C00, upper 4 use $0C01) ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9                 ; A still holds composite
+    ORA $0C00,Y             ; no reload needed: A unchanged since STA $D9
+    STA $7F4807,X
+    STA $7F480F,X
+    STA $7F4817,X
+    STA $7F481F,X
+    LDA $D9                 ; reload for upper group
+    ORA $0C01,Y
+    STA $7F4827,X
+    STA $7F482F,X
+    STA $7F4837,X
+    STA $7F483F,X
+    LDX $6D
+    INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
