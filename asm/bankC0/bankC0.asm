@@ -1206,6 +1206,263 @@ Sub_C73A:
     PLB
     RTS
 
+; ============================================================
+; $C0:C98A — Obj_AnimTickAndQueue (236 bytes, $C98A–$CA75)
+; Per-frame animation tick and sprite-frame queuer.
+; Called once per slot from the main entity loop ($C0:A832, $C0:A878).
+; Decrements the per-slot animation timer ($1601,X). When it expires,
+; arbitrates which entity slot becomes the primary/secondary "focus"
+; (tracked in $76/$77), computes the animation frame-entry address from
+; $1580,X + row*4 + column, reads the frame-step byte from bank $E4,
+; stores it back as the new timer, and adjusts $1681,X (column counter).
+; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit). $6D = current entity slot.
+; Modifies: $76, $77, $78, $C1, $1081,X, $1601,X, $1681,X.
+; ============================================================
+org $C0C98A
+Obj_AnimTickAndQueue:
+    LDX $6D               ; current entity slot index
+    LDA $1601,X           ; per-slot animation timer
+    BEQ .tick_done        ; already zero → execute now
+    DEC $1601,X           ; count down
+    BEQ .tick_done        ; just expired → execute
+.rts:
+    RTS                   ; $C996 — timer still running, early exit
+.tick_done:               ; $C997
+    LDA $1100,X           ; sprite state flags
+    BEQ .no_type          ; 0 → slot has no type/owner
+    BMI .rts              ; bit7 set → inactive slot, return
+    CMP #$01
+    BEQ .type_1_or_2      ; type 1
+    CMP #$02
+    BEQ .type_1_or_2      ; type 2
+    CPX $77               ; is this slot already the secondary focus?
+    BEQ .rts              ; yes → no change needed
+    LDA $77               ; load secondary focus slot index
+    BMI .promote_sec      ; negative ($80) = no secondary → promote
+    LDA $1081,X           ; shadow field of current slot
+    BPL .rts              ; non-negative → slot occupied, skip
+.promote_sec:             ; $C9B3
+    TXA                   ; A = current slot index
+    LDX $77               ; X = current secondary focus slot
+    CPX #$80              ; secondary empty ($80)?
+    BPL .set_both2        ; yes → A already holds current slot, set both
+    STA.w $1081,X         ; link old secondary's shadow → current slot
+    STA $77               ; secondary focus = current slot (A)
+    TAX                   ; X = current slot
+    INC $1681,X           ; advance animation column counter
+    BRA .do_anim
+.set_both1:               ; $C9C5 — from .no_type when primary is negative
+    TXA                   ; A = current slot (X = current, A was primary)
+.set_both2:               ; $C9C6 — from .promote_sec / .promote_sec2 when slot empty
+    STA $77               ; secondary focus = current slot
+    STA $76               ; primary focus = current slot
+    TAX                   ; X = current slot
+    INC $1681,X
+    BRA .do_anim
+.no_type:                 ; $C9D0
+    CPX $76               ; is this slot already the primary focus?
+    BEQ .rts              ; yes → no change
+    LDA $76               ; load primary focus slot index
+    BMI .set_both1        ; negative → no primary, set this as both
+    STA.w $1081,X         ; link primary into current's shadow
+    STX $76               ; primary focus = current slot
+    INC $1681,X
+    BRA .do_anim
+.type_1_or_2:             ; $C9E2
+    LDA $78               ; tertiary mode flag
+    CMP #$02
+    BNE .type_sec         ; not 2 → check secondary
+    STZ $78               ; reset tertiary mode
+    BRA .no_type          ; re-run as type-0 path
+.type_sec:                ; $C9EC
+    CPX $77               ; is this slot already the secondary focus?
+    BEQ .rts              ; yes → no change
+    LDA $77
+    BMI .promote_sec2     ; negative → no secondary, promote
+    LDA $1081,X           ; shadow field
+    BPL .rts              ; occupied → skip
+.promote_sec2:            ; $C9F9
+    TXA
+    LDX $77
+    CPX #$80
+    BPL .set_both2        ; empty secondary → set both (skip TXA)
+    STA.w $1081,X
+    STA $77
+    TAX
+    INC $1681,X
+.do_anim:                 ; $CA09 — fall-through from .promote_sec2 and BRAs above
+    LDX $6D               ; reload entity slot
+    LDA $1780,X           ; animation mode byte
+    BEQ .use_primary_row  ; mode 0 → use primary row
+    DEC                   ; mode - 1
+    BEQ .use_primary_row  ; mode 1 → use primary row
+    LDA $1781,X           ; mode >= 2 → use secondary row byte
+    BRA .got_row
+.use_primary_row:         ; $CA18
+    LDA $1680,X           ; primary animation row byte
+.got_row:                 ; $CA1B
+    REP #$20              ; A=16-bit
+    AND #$00FF            ; zero high byte
+    ASL                   ; row × 2
+    ASL                   ; row × 4 (frame row offset)
+    CLC
+    ADC $1580,X           ; + slot base pointer → frame row address
+    STA $C1               ; save frame row address (16-bit)
+    LDA $1681,X           ; animation column counter (16-bit)
+    AND #$00FF            ; zero high byte
+    ADC $C1               ; + frame row = frame-entry address (carry from ADC above)
+    REP #$10              ; X=16-bit
+    TAX                   ; X = 16-bit frame-entry address
+    SEP #$20              ; A=8-bit
+    LDA $E40000,X         ; read frame-step byte from bank $E4 sprite table
+    BNE .got_frame        ; nonzero → use as timer
+    LDX $C1               ; X = frame row base address (16-bit)
+    LDA $E40000,X         ; read row-base frame value from bank $E4
+    SEP #$10              ; X=8-bit
+    LDX $6D               ; reload entity slot
+    STA.w $1601,X         ; store row-base byte as new timer
+    LDA $1780,X           ; check animation mode
+    CMP #$02
+    BNE .mode_simple      ; mode != 2 → simple clear and return
+    LDA $7F0B01,X         ; long: loop-count byte for this slot ($7F:0B01+X)
+    DEC
+    BEQ .loop_end         ; hit 0 → decrement column counter
+    DEC
+    BEQ .loop_one         ; hit 0 (was 2) → bump counter then decrement column
+    STA $7F0B01,X         ; store updated loop count
+    STZ.w $1681,X         ; reset animation column counter
+    RTS
+.loop_one:                ; $CA61
+    INC
+    STA $7F0B01,X
+.loop_end:                ; $CA66
+    DEC $1681,X           ; decrement animation column counter
+    RTS
+.mode_simple:             ; $CA6A
+    STZ.w $1681,X         ; clear animation column counter
+    RTS
+.got_frame:               ; $CA6E — A = nonzero frame-step byte, X still 16-bit
+    SEP #$10              ; X=8-bit
+    LDX $6D               ; reload entity slot
+    STA.w $1601,X         ; store frame-step byte as new animation timer
+    RTS
+
+; ============================================================
+; $C0:CA76 — Field_ProcessAnimQueue (99 bytes, $CA76–$CAD8)
+; VBlank-time sprite animation queue processor.
+; Called from VBlankHandler ($C0:00BF). Guards against $09A0 being
+; nonzero (already processing). Latches the H/V scanline counter and
+; checks the current vertical position: exits if too far into the
+; active display ($6B ≤ V < $F0). If within the safe window, iterates
+; through the focus-slot chain ($76/$77), calling Obj_BuildSpriteFrameStep
+; for each slot. When a step completes (carry clear), the slot's
+; shadow ($1081,X) is marked invalid ($80) and focus variables are
+; updated. Loops back to re-latch V and process the next slot.
+; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit).
+; Modifies: $6D, $76, $77, $79, $1081,X. Reads: $09A0, $6B, $213D.
+; ============================================================
+org $C0CA76
+Field_ProcessAnimQueue:
+    LDA $09A0             ; animation-queue busy / processed flag
+    BEQ .proceed          ; zero → proceed
+    RTS                   ; nonzero → already done this frame, exit
+.proceed:                 ; $CA7C
+    REP #$10              ; X=16-bit (NOP: immediately reset below)
+    SEP #$10              ; X=8-bit
+    STZ $79               ; clear scratch byte
+    LDA $213F             ; STAT78: read PPU status (arms latch)
+.latch:                   ; $CA85 — loop re-entry point for each slot step
+    LDA $2137             ; SLHV:  software-latch H/V counters
+    LDA $213D             ; OPVCT: read vertical counter (low byte)
+    XBA                   ; save low byte in B
+    LDA $213D             ; OPVCT: read vertical counter (high bit)
+    AND #$01              ; keep only bit 0 (9th bit of V)
+    XBA                   ; restore low byte (B = high bit)
+    REP #$20              ; A=16-bit: A[7:0]=V_low, A[15:8]=V_high_bit
+    CMP #$00F0            ; compare with scanline 240 (vblank)
+    BPL .in_window        ; V >= 240 → safe window, proceed
+    CMP $6B               ; compare with threshold
+    BCS .exit_sep         ; V >= $6B → too close to display, exit
+.in_window:               ; $CA9D
+    LDA #$0000            ; clear A (16-bit zero)
+    SEP #$20              ; A=8-bit
+    LDA $76               ; primary focus slot index
+    BMI .exit_rts         ; negative ($80) = no valid slot, exit
+    STA $6D               ; current slot = primary focus
+    LDA $76
+    CMP $77               ; primary == secondary?
+    BEQ .same_slot        ; yes → single-slot path
+    JSR Obj_BuildSpriteFrameStep  ; process primary slot step
+    BCS .latch            ; carry set → step not complete, re-latch
+    LDA $76               ; update primary focus via shadow chain
+    TAX
+    LDA $1081,X           ; next slot in shadow chain
+    STA $76               ; advance primary focus
+    LDA #$80
+    STA.w $1081,X         ; mark old primary as invalid ($80)
+    BRA .latch            ; re-latch and continue
+.same_slot:               ; $CAC2 — $76 == $77
+    JSR Obj_BuildSpriteFrameStep
+    BCS .latch            ; not complete, retry
+    LDA $76
+    TAX
+    LDA #$80
+    STA.w $1081,X         ; mark slot invalid
+    STA $76               ; primary focus = invalid ($80)
+    STA $77               ; secondary focus = invalid ($80)
+    BRA .latch            ; re-latch
+.exit_rts:                ; $CAD5
+    RTS
+.exit_sep:                ; $CAD6
+    SEP #$20              ; A=8-bit
+    RTS
+
+; ============================================================
+; $C0:CAD9 — Obj_BuildSpriteFrameStep (49 bytes, $CAD9–$CB09)
+; Single sprite-frame build step for the current slot ($6D).
+; Validates the slot: skips if $1100,X bit7 set, $1A81,X is zero
+; or negative, or $0F00,X is zero. Then dispatches on bits 0-1 of
+; $1201,X (sprite type/pass index) to the matching frame-builder:
+;   0 → BRL Sub_CBDC (single-slot frame builder)
+;   1 → BRL Sub_CEF5 (8-slot frame builder)
+;   2 → BRL Sub_D4F7 (12-slot frame builder)
+;   3 → CLC + RTS (unrecognised type, no-op)
+; Returns carry set if a frame was produced, carry clear otherwise.
+; Called by: Field_ProcessAnimQueue ($CA76), map-load pass ($C0:B109).
+; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit). $6D = entity slot.
+; ============================================================
+org $C0CAD9
+Obj_BuildSpriteFrameStep:
+    LDX $6D               ; entity slot index
+    LDA $1100,X           ; sprite state flags
+    BPL .active           ; bit7 clear → slot active
+.no_carry_rts:            ; $CAE0 — shared CLC+RTS exit
+    CLC
+    RTS
+.active:                  ; $CAE2
+    LDA $1A81,X           ; timer/state byte
+    BEQ .no_carry_rts     ; zero → not ready
+    BMI .no_carry_rts     ; negative → not ready
+    LDA $0F00,X           ; animation type byte
+    BEQ .no_carry_rts     ; zero → no animation
+    LDA $1201,X           ; sprite pass/type flags
+    AND #$03              ; isolate bits 0-1
+    BEQ .type0            ; 0 → single-slot builder
+    CMP #$01
+    BNE .check2
+    BRA .type1            ; 1 → 8-slot builder
+.check2:
+    CMP #$02
+    BEQ .type2            ; 2 → 12-slot builder
+    CLC
+    RTS                   ; 3 → unhandled, no-op
+.type0:
+    BRL $00D8             ; tail-call Sub_CBDC ($CB04 + $00D8 = $CBDC)
+.type1:
+    BRL $03EE             ; tail-call Sub_CEF5 ($CB07 + $03EE = $CEF5)
+.type2:
+    BRL $09ED             ; tail-call Sub_D4F7 ($CB0A + $09ED = $D4F7)
+
 org $C0B8CA
 Sub_B8CA:
     ; 411 bytes ($B8CA-$BA64). Entry M=1, X=1 (X=gfx_index from caller).
