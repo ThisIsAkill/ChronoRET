@@ -7730,6 +7730,50 @@ Sub_1BA7:
     BRA Sub_1B90_body       ; join Sub_1B90 at STA $1E01
 
 ; ============================================================
+; $C0:CB0A — Sub_CB0A (48 bytes, $CB0A–$CB39)
+; Top-level sprite-slot init dispatcher.
+; Validates the current entity (slot $6D): skips if $1100,X bit7
+; set, $1A81,X is zero or negative, or $0F00,X is zero.
+; Then reads bits 0-1 of $1201,X (sprite type/pass index) and
+; tail-calls the matching initializer:
+;   0 → BRL Sub_CDC8 (single-slot)
+;   1 → BRL Sub_D124 (8-slot OAM init)
+;   2 → BRL Sub_DD28 (12-slot OAM init)
+;   other → CLC + RTS
+; Entry: M=1 (A 8-bit), X/Y=16-bit.
+; ============================================================
+org $C0CB0A
+Sub_CB0A:
+    LDX $6D                  ; entity slot index
+    LDA $1100,X              ; sprite state flag
+    BPL .cb0a_active         ; bit7 clear → entity active
+.cb0a_exit:
+    RTS                      ; shared early-exit RTS at $CB11
+.cb0a_active:                ; $CB12
+    LDA $1A81,X              ; timer/state byte
+    BEQ .cb0a_exit           ; zero → early exit (back to $CB11)
+    BMI .cb0a_exit           ; negative → early exit (back to $CB11)
+    LDA $0F00,X              ; animation type
+    BEQ .cb0a_exit           ; zero → early exit (back to $CB11)
+    LDA $1201,X              ; sprite pass/type flags
+    AND #$03                 ; isolate bits 0-1
+    BEQ .cb0a_type0          ; == 0: single-slot
+    CMP #$01
+    BNE .cb0a_check2
+    BRA .cb0a_type1          ; == 1: dual-slot
+.cb0a_check2:
+    CMP #$02
+    BEQ .cb0a_type2          ; == 2: 12-slot
+    CLC
+    RTS                      ; other: CLC + RTS
+.cb0a_type0:
+    BRL $0294                ; tail-call Sub_CDC8 ($CDC8)
+.cb0a_type1:
+    BRL $05ED                ; tail-call Sub_D124 ($D124)
+.cb0a_type2:
+    BRL $11EE                ; tail-call Sub_DD28 ($DD28)
+
+; ============================================================
 ; $C0:CB3A — Sub_CB3A (162 bytes, $CB3A–$CBDB)
 ; Animation-frame gate for sprite-slot init routines.
 ; Computes a frame-data pointer into dp:$D6 from entity animation
@@ -8554,6 +8598,199 @@ Sub_CEF5:
     LDX $6D
     INC $1B00,X
     INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:D124 — Sub_D124 (358 bytes, $D124–$D289)
+; 8-slot OAM buffer init, pass-1 path (sprite type 1).
+; Called via BRL from Sub_CB0A when bits 0-1 of $1201,X == 1.
+; Computes animation data pointer: frame# × $50 + $1380,X,
+; using $1300,X as the data bank byte (dp:$D5/$D3).
+; Reads OAM buffer index from WRAM table $001700,X (16-bit).
+; Starting at animation data offset Y=$40, reads 8 tile-index/
+; attribute pairs and writes them into the $7F4Bxx OAM staging
+; buffer (8 groups at stride $08: C2–FC).
+; Sets 8 X-position bytes (C6–FE) and priority/attribute bytes
+; (C7/CF/D7/DF from $0C00; E7/EF/F7/FF from $0C01).
+; On completion: sets $1B00,X = $80, SEP #$10, CLC, RTS.
+; Entry: M=1, X/Y=16-bit; X = entity slot.
+; ============================================================
+org $C0D124
+Sub_D124:
+    LDA $0F01,X              ; current animation frame number
+    STA $4202                ; WRMPYA
+    LDA #$50                 ; multiply by $50 = 80 (bytes per frame entry)
+    STA $4203                ; WRMPYB → triggers multiply
+    LDA $1300,X              ; animation data bank byte
+    STA $D5
+    REP #$20                 ; A 16-bit
+    LDA $4216                ; RDMPYL: result of frame# × $50
+    CLC
+    ADC $1380,X              ; add sprite base offset
+    STA $D3                  ; dp:$D3 = animation data ptr (16-bit)
+    REP #$20                 ; (already 16-bit; ensures A mode explicit)
+    LDA.l $001700,X          ; OAM buffer index from WRAM table (16-bit)
+    REP #$10                 ; X/Y 16-bit
+    TAX                      ; X = OAM buffer index
+    SEP #$20                 ; A 8-bit
+    LDY #$0040               ; start at animation data offset $40
+    ; --- 8 OAM tile-entry groups (stride $08) ---
+    ; entry 0: OAM C2/C3/C4
+    LDA [$D3],Y
+    STA $7F4BC2,X
+    BPL .d124_y0p
+    LDA #$FF
+    BRA .d124_y0h
+.d124_y0p:
+    LDA #$00
+.d124_y0h:
+    STA $7F4BC3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BC4,X
+    ; entry 1: OAM CA/CB/CC
+    INY
+    LDA [$D3],Y
+    STA $7F4BCA,X
+    BPL .d124_y1p
+    LDA #$FF
+    BRA .d124_y1h
+.d124_y1p:
+    LDA #$00
+.d124_y1h:
+    STA $7F4BCB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BCC,X
+    ; entry 2: OAM D2/D3/D4
+    INY
+    LDA [$D3],Y
+    STA $7F4BD2,X
+    BPL .d124_y2p
+    LDA #$FF
+    BRA .d124_y2h
+.d124_y2p:
+    LDA #$00
+.d124_y2h:
+    STA $7F4BD3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BD4,X
+    ; entry 3: OAM DA/DB/DC
+    INY
+    LDA [$D3],Y
+    STA $7F4BDA,X
+    BPL .d124_y3p
+    LDA #$FF
+    BRA .d124_y3h
+.d124_y3p:
+    LDA #$00
+.d124_y3h:
+    STA $7F4BDB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BDC,X
+    ; entry 4: OAM E2/E3/E4
+    INY
+    LDA [$D3],Y
+    STA $7F4BE2,X
+    BPL .d124_y4p
+    LDA #$FF
+    BRA .d124_y4h
+.d124_y4p:
+    LDA #$00
+.d124_y4h:
+    STA $7F4BE3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BE4,X
+    ; entry 5: OAM EA/EB/EC
+    INY
+    LDA [$D3],Y
+    STA $7F4BEA,X
+    BPL .d124_y5p
+    LDA #$FF
+    BRA .d124_y5h
+.d124_y5p:
+    LDA #$00
+.d124_y5h:
+    STA $7F4BEB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BEC,X
+    ; entry 6: OAM F2/F3/F4
+    INY
+    LDA [$D3],Y
+    STA $7F4BF2,X
+    BPL .d124_y6p
+    LDA #$FF
+    BRA .d124_y6h
+.d124_y6p:
+    LDA #$00
+.d124_y6h:
+    STA $7F4BF3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BF4,X
+    ; entry 7: OAM FA/FB/FC
+    INY
+    LDA [$D3],Y
+    STA $7F4BFA,X
+    BPL .d124_y7p
+    LDA #$FF
+    BRA .d124_y7h
+.d124_y7p:
+    LDA #$00
+.d124_y7h:
+    STA $7F4BFB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BFC,X
+    ; --- X-positions (8 slots, stride +2 each) ---
+    LDY $6D
+    LDA $0D00,Y              ; base X coordinate
+    STA $7F4BC6,X
+    INC
+    INC
+    STA $7F4BCE,X
+    INC
+    INC
+    STA $7F4BD6,X
+    INC
+    INC
+    STA $7F4BDE,X
+    INC
+    INC
+    STA $7F4BE6,X
+    INC
+    INC
+    STA $7F4BEE,X
+    INC
+    INC
+    STA $7F4BF6,X
+    INC
+    INC
+    STA $7F4BFE,X
+    ; --- priority/attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ORA $0C00,Y
+    STA $7F4BC7,X
+    STA $7F4BCF,X
+    STA $7F4BD7,X
+    STA $7F4BDF,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BE7,X
+    STA $7F4BEF,X
+    STA $7F4BF7,X
+    STA $7F4BFF,X
+    LDX $6D
+    LDA #$80
+    STA.w $1B00,X
     SEP #$10
     CLC
     RTS
@@ -10030,6 +10267,536 @@ Sub_DA69:
     STA $7F485F,X
     LDX $6D
     INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:DD28 — Sub_DD28 (1026 bytes, $DD28–$E129)
+; 12-slot OAM buffer init, pass-1 path (sprite type 2).
+; Called via BRL from Sub_CB0A when bits 0-1 of $1201,X == 2.
+; Two sub-paths selected by $0D00,X:
+;   $0D00,X == $68 → BRL to alt path at $DF2F
+;   otherwise      → main path at $DD34
+; Both paths: multiply frame# × $78 for animation data offset;
+; read 12 tile-entry pairs (Y starts at $60) into $7F4Bxx/$7F4Cxx
+; OAM staging (groups at stride $08: C2–1C).
+; X-positions differ between paths:
+;   main: 8-slot block (C6–FE), gap +$10, 4-slot block (C06–C1E)
+;   alt:  4-slot block (C6–DE), gap +$10, 8-slot block (E6–C1E)
+; Attribute bytes: $0C00 → C7-DF; $0C01 → E7-FF and C07-C1F.
+; On completion: $1B00,X = $80, SEP #$10, CLC, RTS.
+; Entry: M=1, X/Y=16-bit; X = entity slot.
+; ============================================================
+org $C0DD28
+Sub_DD28:
+    LDA $0D00,X              ; sprite type/layout flag
+    CMP #$68
+    BEQ .dd28_alt_branch     ; == $68: use alt path
+    BRA .dd28_main           ; else: main path
+.dd28_alt_branch:
+    BRL $01FB                ; tail-call alt path at $DF2F
+    ; ---- main path ----
+.dd28_main:
+    LDA $0F01,X              ; animation frame number
+    STA $4202                ; WRMPYA
+    LDA #$78                 ; multiply by $78 = 120
+    STA $4203                ; WRMPYB → triggers multiply
+    LDA $1300,X              ; animation data bank byte
+    STA $D5
+    REP #$20                 ; A 16-bit
+    LDA $4216                ; RDMPYL: frame# × $78
+    CLC
+    ADC $1380,X              ; add sprite base offset
+    STA $D3                  ; dp:$D3 = animation data ptr
+    LDA $1700,X              ; OAM buffer index from ROM table ($C01700,X)
+    REP #$10                 ; X/Y 16-bit
+    TAX                      ; X = OAM buffer index
+    SEP #$20                 ; A 8-bit
+    LDY #$0060               ; animation data start offset
+    ; --- 12 OAM tile-entry groups (stride $08) ---
+    ; entry 0: OAM C2/C3/C4
+    LDA [$D3],Y
+    STA $7F4BC2,X
+    BPL .dd28_y0p
+    LDA #$FF
+    BRA .dd28_y0h
+.dd28_y0p:
+    LDA #$00
+.dd28_y0h:
+    STA $7F4BC3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BC4,X
+    ; entry 1: OAM CA/CB/CC
+    INY
+    LDA [$D3],Y
+    STA $7F4BCA,X
+    BPL .dd28_y1p
+    LDA #$FF
+    BRA .dd28_y1h
+.dd28_y1p:
+    LDA #$00
+.dd28_y1h:
+    STA $7F4BCB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BCC,X
+    ; entry 2: OAM D2/D3/D4
+    INY
+    LDA [$D3],Y
+    STA $7F4BD2,X
+    BPL .dd28_y2p
+    LDA #$FF
+    BRA .dd28_y2h
+.dd28_y2p:
+    LDA #$00
+.dd28_y2h:
+    STA $7F4BD3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BD4,X
+    ; entry 3: OAM DA/DB/DC
+    INY
+    LDA [$D3],Y
+    STA $7F4BDA,X
+    BPL .dd28_y3p
+    LDA #$FF
+    BRA .dd28_y3h
+.dd28_y3p:
+    LDA #$00
+.dd28_y3h:
+    STA $7F4BDB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BDC,X
+    ; entry 4: OAM E2/E3/E4
+    INY
+    LDA [$D3],Y
+    STA $7F4BE2,X
+    BPL .dd28_y4p
+    LDA #$FF
+    BRA .dd28_y4h
+.dd28_y4p:
+    LDA #$00
+.dd28_y4h:
+    STA $7F4BE3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BE4,X
+    ; entry 5: OAM EA/EB/EC
+    INY
+    LDA [$D3],Y
+    STA $7F4BEA,X
+    BPL .dd28_y5p
+    LDA #$FF
+    BRA .dd28_y5h
+.dd28_y5p:
+    LDA #$00
+.dd28_y5h:
+    STA $7F4BEB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BEC,X
+    ; entry 6: OAM F2/F3/F4
+    INY
+    LDA [$D3],Y
+    STA $7F4BF2,X
+    BPL .dd28_y6p
+    LDA #$FF
+    BRA .dd28_y6h
+.dd28_y6p:
+    LDA #$00
+.dd28_y6h:
+    STA $7F4BF3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BF4,X
+    ; entry 7: OAM FA/FB/FC
+    INY
+    LDA [$D3],Y
+    STA $7F4BFA,X
+    BPL .dd28_y7p
+    LDA #$FF
+    BRA .dd28_y7h
+.dd28_y7p:
+    LDA #$00
+.dd28_y7h:
+    STA $7F4BFB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BFC,X
+    ; entry 8: OAM $4C02/03/04
+    INY
+    LDA [$D3],Y
+    STA $7F4C02,X
+    BPL .dd28_y8p
+    LDA #$FF
+    BRA .dd28_y8h
+.dd28_y8p:
+    LDA #$00
+.dd28_y8h:
+    STA $7F4C03,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C04,X
+    ; entry 9: OAM $4C0A/0B/0C
+    INY
+    LDA [$D3],Y
+    STA $7F4C0A,X
+    BPL .dd28_y9p
+    LDA #$FF
+    BRA .dd28_y9h
+.dd28_y9p:
+    LDA #$00
+.dd28_y9h:
+    STA $7F4C0B,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C0C,X
+    ; entry 10: OAM $4C12/13/14
+    INY
+    LDA [$D3],Y
+    STA $7F4C12,X
+    BPL .dd28_y10p
+    LDA #$FF
+    BRA .dd28_y10h
+.dd28_y10p:
+    LDA #$00
+.dd28_y10h:
+    STA $7F4C13,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C14,X
+    ; entry 11: OAM $4C1A/1B/1C
+    INY
+    LDA [$D3],Y
+    STA $7F4C1A,X
+    BPL .dd28_y11p
+    LDA #$FF
+    BRA .dd28_y11h
+.dd28_y11p:
+    LDA #$00
+.dd28_y11h:
+    STA $7F4C1B,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C1C,X
+    ; --- X-positions: 8-slot block, gap +$10, 4-slot block ---
+    LDY $6D
+    LDA $0D00,Y              ; base X coordinate
+    STA $7F4BC6,X
+    INC
+    INC
+    STA $7F4BCE,X
+    INC
+    INC
+    STA $7F4BD6,X
+    INC
+    INC
+    STA $7F4BDE,X
+    INC
+    INC
+    STA $7F4BE6,X
+    INC
+    INC
+    STA $7F4BEE,X
+    INC
+    INC
+    STA $7F4BF6,X
+    INC
+    INC
+    STA $7F4BFE,X
+    INC
+    INC
+    CLC
+    ADC #$10                 ; gap: skip $10 pixels
+    STA $7F4C06,X
+    INC
+    INC
+    STA $7F4C0E,X
+    INC
+    INC
+    STA $7F4C16,X
+    INC
+    INC
+    STA $7F4C1E,X
+    ; --- attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ORA $0C00,Y
+    STA $7F4BC7,X
+    STA $7F4BCF,X
+    STA $7F4BD7,X
+    STA $7F4BDF,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BE7,X
+    STA $7F4BEF,X
+    STA $7F4BF7,X
+    STA $7F4BFF,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4C07,X
+    STA $7F4C0F,X
+    STA $7F4C17,X
+    STA $7F4C1F,X
+    LDX $6D
+    LDA #$80
+    STA.w $1B00,X
+    SEP #$10
+    CLC
+    RTS
+    ; ---- alt path ($DF2F): for $0D00,X == $68 ----
+.dd28_alt:
+    LDA $0F01,X              ; animation frame number
+    STA $4202                ; WRMPYA
+    LDA #$78                 ; multiply by $78 = 120
+    STA $4203                ; WRMPYB
+    LDA $1300,X              ; animation data bank byte
+    STA $D5
+    REP #$20                 ; A 16-bit
+    LDA $4216                ; RDMPYL: frame# × $78
+    CLC
+    ADC $1380,X
+    STA $D3
+    LDA $1700,X              ; OAM buffer index from ROM table
+    REP #$10                 ; X/Y 16-bit
+    TAX
+    SEP #$20                 ; A 8-bit
+    LDY #$0060               ; animation data start offset
+    ; --- 12 OAM tile-entry groups (stride $08, same as main path) ---
+    ; entry 0: OAM C2/C3/C4
+    LDA [$D3],Y
+    STA $7F4BC2,X
+    BPL .dd28a_y0p
+    LDA #$FF
+    BRA .dd28a_y0h
+.dd28a_y0p:
+    LDA #$00
+.dd28a_y0h:
+    STA $7F4BC3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BC4,X
+    ; entry 1: OAM CA/CB/CC
+    INY
+    LDA [$D3],Y
+    STA $7F4BCA,X
+    BPL .dd28a_y1p
+    LDA #$FF
+    BRA .dd28a_y1h
+.dd28a_y1p:
+    LDA #$00
+.dd28a_y1h:
+    STA $7F4BCB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BCC,X
+    ; entry 2: OAM D2/D3/D4
+    INY
+    LDA [$D3],Y
+    STA $7F4BD2,X
+    BPL .dd28a_y2p
+    LDA #$FF
+    BRA .dd28a_y2h
+.dd28a_y2p:
+    LDA #$00
+.dd28a_y2h:
+    STA $7F4BD3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BD4,X
+    ; entry 3: OAM DA/DB/DC
+    INY
+    LDA [$D3],Y
+    STA $7F4BDA,X
+    BPL .dd28a_y3p
+    LDA #$FF
+    BRA .dd28a_y3h
+.dd28a_y3p:
+    LDA #$00
+.dd28a_y3h:
+    STA $7F4BDB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BDC,X
+    ; entry 4: OAM E2/E3/E4
+    INY
+    LDA [$D3],Y
+    STA $7F4BE2,X
+    BPL .dd28a_y4p
+    LDA #$FF
+    BRA .dd28a_y4h
+.dd28a_y4p:
+    LDA #$00
+.dd28a_y4h:
+    STA $7F4BE3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BE4,X
+    ; entry 5: OAM EA/EB/EC
+    INY
+    LDA [$D3],Y
+    STA $7F4BEA,X
+    BPL .dd28a_y5p
+    LDA #$FF
+    BRA .dd28a_y5h
+.dd28a_y5p:
+    LDA #$00
+.dd28a_y5h:
+    STA $7F4BEB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BEC,X
+    ; entry 6: OAM F2/F3/F4
+    INY
+    LDA [$D3],Y
+    STA $7F4BF2,X
+    BPL .dd28a_y6p
+    LDA #$FF
+    BRA .dd28a_y6h
+.dd28a_y6p:
+    LDA #$00
+.dd28a_y6h:
+    STA $7F4BF3,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BF4,X
+    ; entry 7: OAM FA/FB/FC
+    INY
+    LDA [$D3],Y
+    STA $7F4BFA,X
+    BPL .dd28a_y7p
+    LDA #$FF
+    BRA .dd28a_y7h
+.dd28a_y7p:
+    LDA #$00
+.dd28a_y7h:
+    STA $7F4BFB,X
+    INY
+    LDA [$D3],Y
+    STA $7F4BFC,X
+    ; entry 8: OAM $4C02/03/04
+    INY
+    LDA [$D3],Y
+    STA $7F4C02,X
+    BPL .dd28a_y8p
+    LDA #$FF
+    BRA .dd28a_y8h
+.dd28a_y8p:
+    LDA #$00
+.dd28a_y8h:
+    STA $7F4C03,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C04,X
+    ; entry 9: OAM $4C0A/0B/0C
+    INY
+    LDA [$D3],Y
+    STA $7F4C0A,X
+    BPL .dd28a_y9p
+    LDA #$FF
+    BRA .dd28a_y9h
+.dd28a_y9p:
+    LDA #$00
+.dd28a_y9h:
+    STA $7F4C0B,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C0C,X
+    ; entry 10: OAM $4C12/13/14
+    INY
+    LDA [$D3],Y
+    STA $7F4C12,X
+    BPL .dd28a_y10p
+    LDA #$FF
+    BRA .dd28a_y10h
+.dd28a_y10p:
+    LDA #$00
+.dd28a_y10h:
+    STA $7F4C13,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C14,X
+    ; entry 11: OAM $4C1A/1B/1C
+    INY
+    LDA [$D3],Y
+    STA $7F4C1A,X
+    BPL .dd28a_y11p
+    LDA #$FF
+    BRA .dd28a_y11h
+.dd28a_y11p:
+    LDA #$00
+.dd28a_y11h:
+    STA $7F4C1B,X
+    INY
+    LDA [$D3],Y
+    STA $7F4C1C,X
+    ; --- X-positions: 4-slot block, gap +$10, 8-slot block ---
+    LDY $6D
+    LDA $0D00,Y              ; base X coordinate
+    STA $7F4BC6,X
+    INC
+    INC
+    STA $7F4BCE,X
+    INC
+    INC
+    STA $7F4BD6,X
+    INC
+    INC
+    STA $7F4BDE,X
+    INC
+    INC
+    CLC
+    ADC #$10                 ; gap: skip $10 pixels after 4th slot
+    STA $7F4BE6,X
+    INC
+    INC
+    STA $7F4BEE,X
+    INC
+    INC
+    STA $7F4BF6,X
+    INC
+    INC
+    STA $7F4BFE,X
+    INC
+    INC
+    STA $7F4C06,X
+    INC
+    INC
+    STA $7F4C0E,X
+    INC
+    INC
+    STA $7F4C16,X
+    INC
+    INC
+    STA $7F4C1E,X
+    ; --- attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ORA $0C00,Y
+    STA $7F4BC7,X
+    STA $7F4BCF,X
+    STA $7F4BD7,X
+    STA $7F4BDF,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4BE7,X
+    STA $7F4BEF,X
+    STA $7F4BF7,X
+    STA $7F4BFF,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4C07,X
+    STA $7F4C0F,X
+    STA $7F4C17,X
+    STA $7F4C1F,X
+    LDX $6D
+    LDA #$80
+    STA.w $1B00,X
     SEP #$10
     CLC
     RTS
