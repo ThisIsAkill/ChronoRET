@@ -34,19 +34,6 @@ LoadSavePath:   ; entry for mode >= $01FF (load/save/transition)
 org $C0EC60
 Sub_EC60:       ; called from main frame loop after VBlankHandler
 
-; Triple-slot dispatch BRL targets (unmatched)
-org $C0D68B
-Sub_D68B:       ; triple-slot, pass 1, non-$68 variant — unmatched
-
-org $C0D738
-Sub_D738:       ; triple-slot, pass 1, $68 variant — unmatched
-
-org $C0D7E5
-Sub_D7E5:       ; triple-slot, pass 2+, non-$68 variant — unmatched
-
-org $C0DA69
-Sub_DA69:       ; triple-slot, pass 2+, $68 variant — unmatched
-
 ; Unmatched routines called from matched code
 
 
@@ -9159,4 +9146,890 @@ Sub_D608:
     LDX $6D
     INC $1B00,X
     SEC
+    RTS
+
+; ============================================================
+; $C0:D68B — Sub_D68B (173 bytes, $D68B–$D737)
+; Triple-slot pass-1, non-$68 variant.
+; Entry from BRL in Sub_D4F7 when $1B00,X&$7F == 1 and $0D00,X != $68.
+; Copies 8 frame tiles at Y=$20–$2F to WRAM at VRAM base+$0100,
+; then 8 tiles at Y=$30–$3F to VRAM base+$0300. INC $1B00,X; SEC RTS.
+; ============================================================
+org $C0D68B
+Sub_D68B:
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0100
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB = 120
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL (= frame# × 120)
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0008
+    STA $C9
+    LDY #$0020
+    BRA .d68b_check
+.d68b_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d68b_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d68b_fd
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d68b_next
+    BRA .d68b_loop2
+.d68b_fd:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d68b_next
+.d68b_loop2:
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0300
+    STA $D0
+    STA $2181               ; WMADDL
+    REP #$10
+    LDA #$0008
+    STA $C9
+    LDY #$0030
+    BRA .d68b_check2
+.d68b_next2:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d68b_check2:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d68b_fd2
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d68b_next2
+    BRA .d68b_done
+.d68b_fd2:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d68b_next2
+.d68b_done:
+    SEP #$30
+    LDX $6D
+    INC $1B00,X
+    SEC
+    RTS
+
+; ============================================================
+; $C0:D738 — Sub_D738 (173 bytes, $D738–$D7E4)
+; Triple-slot pass-1, $68 variant.
+; Entry from BRL in Sub_D4F7 when $1B00,X&$7F == 1 and $0D00,X == $68.
+; Copies 8 frame tiles at Y=$20–$2F to WRAM at VRAM base+$0200,
+; then 8 tiles at Y=$30–$3F to VRAM base+$0400. INC $1B00,X; SEC RTS.
+; ============================================================
+org $C0D738
+Sub_D738:
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0200
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB = 120
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL (= frame# × 120)
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$30
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0008
+    STA $C9
+    LDY #$0020
+    BRA .d738_check
+.d738_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d738_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d738_fd
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d738_next
+    BRA .d738_loop2
+.d738_fd:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d738_next
+.d738_loop2:
+    REP #$20
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0400
+    STA $D0
+    STA $2181               ; WMADDL
+    REP #$10
+    LDA #$0008
+    STA $C9
+    LDY #$0030
+    BRA .d738_check2
+.d738_next2:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d738_check2:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d738_fd2
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d738_next2
+    BRA .d738_done
+.d738_fd2:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d738_next2
+.d738_done:
+    SEP #$30
+    LDX $6D
+    INC $1B00,X
+    SEC
+    RTS
+
+; ============================================================
+; $C0:D7E5 — Sub_D7E5 (644 bytes, $D7E5–$DA68)
+; Triple-slot pass-2+, non-$68 variant.
+; Entry from BRL in Sub_D4F7 when $1B00,X&$7F >= 2 and $0D00,X != $68.
+; Copies 16 frame tiles at Y=$40–$5F to WRAM at VRAM base+$0400, then
+; stages 12-entry OAM descriptors (three 4-tile rows). CLC RTS.
+; ============================================================
+org $C0D7E5
+Sub_D7E5:
+    REP #$20
+    LDA $0D80,X
+    CLC
+    ADC #$0400
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB = 120
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL (= frame# × 120)
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$20
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0010              ; 16 tiles
+    STA $C9
+    LDY #$0040
+    BRA .d7e5_check
+.d7e5_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.d7e5_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .d7e5_fd
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .d7e5_next
+    BRA .d7e5_oam
+.d7e5_fd:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .d7e5_next
+.d7e5_oam:
+    ; --- OAM slot descriptor setup ---
+    SEP #$10                ; X/Y = 8-bit; A stays 16-bit
+    LDX $6D
+    LDA $0D00,X
+    AND #$01FF
+    ASL
+    ASL
+    ASL
+    ASL
+    LDX $79
+    STA $0950,X
+    CLC
+    ADC #$0300
+    STA $0970,X
+    LDX $6D
+    LDA $0D80,X
+    LDX $79
+    STA $0940,X
+    CLC
+    ADC #$0500
+    STA $0960,X
+    LDA #$0500
+    STA $0980,X
+    LDA #$0100
+    STA $0990,X
+    INC $09A0,X
+    INX
+    INX
+    STZ $09A0,X
+    STX $79
+    LDX $6D
+    LDA $1700,X
+    REP #$10                ; X/Y = 16-bit
+    TAX
+    SEP #$20                ; A = 8-bit
+    LDY #$0060
+    ; --- 12 OAM Y/tile entries ---
+    ; entry 0
+    LDA [$D3],Y
+    STA $7F4802,X
+    BPL .d7e5_y0p
+    LDA #$FF
+    BRA .d7e5_y0h
+.d7e5_y0p:
+    LDA #$00
+.d7e5_y0h:
+    STA $7F4803,X
+    INY
+    LDA [$D3],Y
+    STA $7F4804,X
+    ; entry 1
+    INY
+    LDA [$D3],Y
+    STA $7F480A,X
+    BPL .d7e5_y1p
+    LDA #$FF
+    BRA .d7e5_y1h
+.d7e5_y1p:
+    LDA #$00
+.d7e5_y1h:
+    STA $7F480B,X
+    INY
+    LDA [$D3],Y
+    STA $7F480C,X
+    ; entry 2
+    INY
+    LDA [$D3],Y
+    STA $7F4812,X
+    BPL .d7e5_y2p
+    LDA #$FF
+    BRA .d7e5_y2h
+.d7e5_y2p:
+    LDA #$00
+.d7e5_y2h:
+    STA $7F4813,X
+    INY
+    LDA [$D3],Y
+    STA $7F4814,X
+    ; entry 3
+    INY
+    LDA [$D3],Y
+    STA $7F481A,X
+    BPL .d7e5_y3p
+    LDA #$FF
+    BRA .d7e5_y3h
+.d7e5_y3p:
+    LDA #$00
+.d7e5_y3h:
+    STA $7F481B,X
+    INY
+    LDA [$D3],Y
+    STA $7F481C,X
+    ; entry 4
+    INY
+    LDA [$D3],Y
+    STA $7F4822,X
+    BPL .d7e5_y4p
+    LDA #$FF
+    BRA .d7e5_y4h
+.d7e5_y4p:
+    LDA #$00
+.d7e5_y4h:
+    STA $7F4823,X
+    INY
+    LDA [$D3],Y
+    STA $7F4824,X
+    ; entry 5
+    INY
+    LDA [$D3],Y
+    STA $7F482A,X
+    BPL .d7e5_y5p
+    LDA #$FF
+    BRA .d7e5_y5h
+.d7e5_y5p:
+    LDA #$00
+.d7e5_y5h:
+    STA $7F482B,X
+    INY
+    LDA [$D3],Y
+    STA $7F482C,X
+    ; entry 6
+    INY
+    LDA [$D3],Y
+    STA $7F4832,X
+    BPL .d7e5_y6p
+    LDA #$FF
+    BRA .d7e5_y6h
+.d7e5_y6p:
+    LDA #$00
+.d7e5_y6h:
+    STA $7F4833,X
+    INY
+    LDA [$D3],Y
+    STA $7F4834,X
+    ; entry 7
+    INY
+    LDA [$D3],Y
+    STA $7F483A,X
+    BPL .d7e5_y7p
+    LDA #$FF
+    BRA .d7e5_y7h
+.d7e5_y7p:
+    LDA #$00
+.d7e5_y7h:
+    STA $7F483B,X
+    INY
+    LDA [$D3],Y
+    STA $7F483C,X
+    ; entry 8
+    INY
+    LDA [$D3],Y
+    STA $7F4842,X
+    BPL .d7e5_y8p
+    LDA #$FF
+    BRA .d7e5_y8h
+.d7e5_y8p:
+    LDA #$00
+.d7e5_y8h:
+    STA $7F4843,X
+    INY
+    LDA [$D3],Y
+    STA $7F4844,X
+    ; entry 9
+    INY
+    LDA [$D3],Y
+    STA $7F484A,X
+    BPL .d7e5_y9p
+    LDA #$FF
+    BRA .d7e5_y9h
+.d7e5_y9p:
+    LDA #$00
+.d7e5_y9h:
+    STA $7F484B,X
+    INY
+    LDA [$D3],Y
+    STA $7F484C,X
+    ; entry 10
+    INY
+    LDA [$D3],Y
+    STA $7F4852,X
+    BPL .d7e5_y10p
+    LDA #$FF
+    BRA .d7e5_y10h
+.d7e5_y10p:
+    LDA #$00
+.d7e5_y10h:
+    STA $7F4853,X
+    INY
+    LDA [$D3],Y
+    STA $7F4854,X
+    ; entry 11
+    INY
+    LDA [$D3],Y
+    STA $7F485A,X
+    BPL .d7e5_y11p
+    LDA #$FF
+    BRA .d7e5_y11h
+.d7e5_y11p:
+    LDA #$00
+.d7e5_y11h:
+    STA $7F485B,X
+    INY
+    LDA [$D3],Y
+    STA $7F485C,X
+    ; --- X-positions (8 sequential, gap at slot boundary, 4 more) ---
+    LDY $6D
+    LDA $0D00,Y
+    STA $7F4806,X
+    INC
+    INC
+    STA $7F480E,X
+    INC
+    INC
+    STA $7F4816,X
+    INC
+    INC
+    STA $7F481E,X
+    INC
+    INC
+    STA $7F4826,X
+    INC
+    INC
+    STA $7F482E,X
+    INC
+    INC
+    STA $7F4836,X
+    INC
+    INC
+    STA $7F483E,X
+    INC
+    INC
+    CLC
+    ADC #$10
+    STA $7F4846,X
+    INC
+    INC
+    STA $7F484E,X
+    INC
+    INC
+    STA $7F4856,X
+    INC
+    INC
+    STA $7F485E,X
+    ; --- attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ORA $0C00,Y
+    STA $7F4807,X
+    STA $7F480F,X
+    STA $7F4817,X
+    STA $7F481F,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4827,X
+    STA $7F482F,X
+    STA $7F4837,X
+    STA $7F483F,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4847,X
+    STA $7F484F,X
+    STA $7F4857,X
+    STA $7F485F,X
+    LDX $6D
+    INC $1B00,X
+    SEP #$10
+    CLC
+    RTS
+
+; ============================================================
+; $C0:DA69 — Sub_DA69 (703 bytes, $DA69–$DD27)
+; Triple-slot pass-2+, $68 variant.
+; Entry from BRL in Sub_D4F7 when $1B00,X&$7F >= 2 and $0D00,X == $68.
+; Two 8-tile loops: Y=$40 → VRAM base+$0300, Y=$50 → base+$0500;
+; then 12-entry OAM staging for two 8-tile slots. CLC RTS.
+; ============================================================
+org $C0DA69
+Sub_DA69:
+    REP #$20
+    LDA $0D80,X
+    CLC
+    ADC #$0300
+    STA $D0
+    SEP #$20
+    LDA $0F01,X
+    STA $4202               ; WRMPYA
+    LDA #$78
+    STA $4203               ; WRMPYB = 120
+    LDA $1300,X
+    STA $D5
+    REP #$20
+    LDA $4216               ; RDMPYL (= frame# × 120)
+    CLC
+    ADC $1380,X
+    STA $D3
+    SEP #$20
+    LDA #$01
+    STA $2183               ; WMADDH
+    REP #$30
+    LDA $D0
+    STA $2181               ; WMADDL
+    LDA #$0008              ; 8 tiles
+    STA $C9
+    LDY #$0040
+    BRA .da69_check
+.da69_next:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.da69_check:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .da69_fd
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .da69_next
+    BRA .da69_loop2
+.da69_fd:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .da69_next
+.da69_loop2:
+    LDX $6D
+    LDA $0D80,X
+    CLC
+    ADC #$0500
+    STA $D0
+    STA $2181               ; WMADDL
+    LDA #$0008              ; 8 tiles
+    STA $C9
+    LDY #$0050
+    BRA .da69_check2
+.da69_next2:
+    LDA $D0
+    CLC
+    ADC #$0020
+    STA $D0
+.da69_check2:
+    LDA [$D3],Y
+    BIT #$4000
+    BNE .da69_fd2
+    JSR Sub_E687
+    INY
+    INY
+    DEC $C9
+    BNE .da69_next2
+    BRA .da69_oam
+.da69_fd2:
+    JSR Sub_E534
+    INY
+    INY
+    DEC $C9
+    BNE .da69_next2
+.da69_oam:
+    ; --- OAM slot descriptor setup ---
+    SEP #$10                ; X/Y = 8-bit; A stays 16-bit
+    LDX $6D
+    LDA $0D00,X
+    AND #$01FF
+    ASL
+    ASL
+    ASL
+    ASL
+    LDX $79
+    STA $0950,X
+    CLC
+    ADC #$0100
+    STA $0970,X
+    LDX $6D
+    LDA $0D80,X
+    LDX $79
+    STA $0940,X
+    CLC
+    ADC #$0100
+    STA $0960,X
+    LDA #$0100
+    STA $0980,X
+    LDA #$0500
+    STA $0990,X
+    INC $09A0,X
+    INX
+    INX
+    STZ $09A0,X
+    STX $79
+    LDX $6D
+    LDA $1700,X
+    REP #$10                ; X/Y = 16-bit
+    TAX
+    SEP #$20                ; A = 8-bit
+    LDY #$0060
+    ; --- 12 OAM Y/tile entries ---
+    ; entry 0
+    LDA [$D3],Y
+    STA $7F4802,X
+    BPL .da69_y0p
+    LDA #$FF
+    BRA .da69_y0h
+.da69_y0p:
+    LDA #$00
+.da69_y0h:
+    STA $7F4803,X
+    INY
+    LDA [$D3],Y
+    STA $7F4804,X
+    ; entry 1
+    INY
+    LDA [$D3],Y
+    STA $7F480A,X
+    BPL .da69_y1p
+    LDA #$FF
+    BRA .da69_y1h
+.da69_y1p:
+    LDA #$00
+.da69_y1h:
+    STA $7F480B,X
+    INY
+    LDA [$D3],Y
+    STA $7F480C,X
+    ; entry 2
+    INY
+    LDA [$D3],Y
+    STA $7F4812,X
+    BPL .da69_y2p
+    LDA #$FF
+    BRA .da69_y2h
+.da69_y2p:
+    LDA #$00
+.da69_y2h:
+    STA $7F4813,X
+    INY
+    LDA [$D3],Y
+    STA $7F4814,X
+    ; entry 3
+    INY
+    LDA [$D3],Y
+    STA $7F481A,X
+    BPL .da69_y3p
+    LDA #$FF
+    BRA .da69_y3h
+.da69_y3p:
+    LDA #$00
+.da69_y3h:
+    STA $7F481B,X
+    INY
+    LDA [$D3],Y
+    STA $7F481C,X
+    ; entry 4
+    INY
+    LDA [$D3],Y
+    STA $7F4822,X
+    BPL .da69_y4p
+    LDA #$FF
+    BRA .da69_y4h
+.da69_y4p:
+    LDA #$00
+.da69_y4h:
+    STA $7F4823,X
+    INY
+    LDA [$D3],Y
+    STA $7F4824,X
+    ; entry 5
+    INY
+    LDA [$D3],Y
+    STA $7F482A,X
+    BPL .da69_y5p
+    LDA #$FF
+    BRA .da69_y5h
+.da69_y5p:
+    LDA #$00
+.da69_y5h:
+    STA $7F482B,X
+    INY
+    LDA [$D3],Y
+    STA $7F482C,X
+    ; entry 6
+    INY
+    LDA [$D3],Y
+    STA $7F4832,X
+    BPL .da69_y6p
+    LDA #$FF
+    BRA .da69_y6h
+.da69_y6p:
+    LDA #$00
+.da69_y6h:
+    STA $7F4833,X
+    INY
+    LDA [$D3],Y
+    STA $7F4834,X
+    ; entry 7
+    INY
+    LDA [$D3],Y
+    STA $7F483A,X
+    BPL .da69_y7p
+    LDA #$FF
+    BRA .da69_y7h
+.da69_y7p:
+    LDA #$00
+.da69_y7h:
+    STA $7F483B,X
+    INY
+    LDA [$D3],Y
+    STA $7F483C,X
+    ; entry 8
+    INY
+    LDA [$D3],Y
+    STA $7F4842,X
+    BPL .da69_y8p
+    LDA #$FF
+    BRA .da69_y8h
+.da69_y8p:
+    LDA #$00
+.da69_y8h:
+    STA $7F4843,X
+    INY
+    LDA [$D3],Y
+    STA $7F4844,X
+    ; entry 9
+    INY
+    LDA [$D3],Y
+    STA $7F484A,X
+    BPL .da69_y9p
+    LDA #$FF
+    BRA .da69_y9h
+.da69_y9p:
+    LDA #$00
+.da69_y9h:
+    STA $7F484B,X
+    INY
+    LDA [$D3],Y
+    STA $7F484C,X
+    ; entry 10
+    INY
+    LDA [$D3],Y
+    STA $7F4852,X
+    BPL .da69_y10p
+    LDA #$FF
+    BRA .da69_y10h
+.da69_y10p:
+    LDA #$00
+.da69_y10h:
+    STA $7F4853,X
+    INY
+    LDA [$D3],Y
+    STA $7F4854,X
+    ; entry 11
+    INY
+    LDA [$D3],Y
+    STA $7F485A,X
+    BPL .da69_y11p
+    LDA #$FF
+    BRA .da69_y11h
+.da69_y11p:
+    LDA #$00
+.da69_y11h:
+    STA $7F485B,X
+    INY
+    LDA [$D3],Y
+    STA $7F485C,X
+    ; --- X-positions (4 sequential, gap at slot boundary, 8 more) ---
+    LDY $6D
+    LDA $0D00,Y
+    STA $7F4806,X
+    INC
+    INC
+    STA $7F480E,X
+    INC
+    INC
+    STA $7F4816,X
+    INC
+    INC
+    STA $7F481E,X
+    INC
+    INC
+    CLC
+    ADC #$10
+    STA $7F4826,X
+    INC
+    INC
+    STA $7F482E,X
+    INC
+    INC
+    STA $7F4836,X
+    INC
+    INC
+    STA $7F483E,X
+    INC
+    INC
+    STA $7F4846,X
+    INC
+    INC
+    STA $7F484E,X
+    INC
+    INC
+    STA $7F4856,X
+    INC
+    INC
+    STA $7F485E,X
+    ; --- attribute bytes ---
+    LDA $0F81,Y
+    ORA $0D01,Y
+    STA $D9
+    ORA $0C00,Y
+    STA $7F4807,X
+    STA $7F480F,X
+    STA $7F4817,X
+    STA $7F481F,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4827,X
+    STA $7F482F,X
+    STA $7F4837,X
+    STA $7F483F,X
+    LDA $D9
+    ORA $0C01,Y
+    STA $7F4847,X
+    STA $7F484F,X
+    STA $7F4857,X
+    STA $7F485F,X
+    LDX $6D
+    INC $1B00,X
+    SEP #$10
+    CLC
     RTS
