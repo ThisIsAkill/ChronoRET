@@ -17,6 +17,7 @@
 
 incsrc "bank00/bank00.asm"
 incsrc "bankC0/bankC0.asm"
+incsrc "bankC1/bankC1.asm"
 ; incsrc "bank01/bank01.asm"
 ; incsrc "bank02/bank02.asm"
 incsrc "bankFD/bankFD.asm"
