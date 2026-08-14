@@ -652,10 +652,19 @@ class Disassembler:
 
         return next_addr if not is_term else None
 
-    def trace(self, entries: list[int]) -> None:
-        """Trace from a list of word-address entry points."""
+    def trace(self, entries: list[int], initial: CPUState | None = None) -> None:
+        """Trace from a list of word-address entry points.
+
+        initial: CPU state to use at every entry point.  If None, defaults to
+                 native mode / 16-bit X / 8-bit A — the runtime convention for
+                 all Bank $C0+ code.  Pass CPUState(m=True, x=True, e=True) to
+                 get the old emulation-mode behaviour (needed for full linear
+                 scans of bank $00 where the reset vector starts in emu mode).
+        """
+        if initial is None:
+            initial = CPUState(m=True, x=False, e=False)
         for e in entries:
-            self.work.append((e, CPUState(m=True, x=True, e=True)))
+            self.work.append((e, initial.copy()))
 
         while self.work:
             addr, state = self.work.pop()
@@ -726,11 +735,29 @@ class Disassembler:
 # main
 # ---------------------------------------------------------------------------
 def main() -> int:
-    if len(sys.argv) < 3:
-        print(__doc__)
-        return 2
+    import argparse
 
-    rom_path = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description='Recursive-descent 65816 disassembler for Chrono Trigger decomp.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument('rom', help='Path to ROM file (.sfc)')
+    parser.add_argument('bank', help='ROM bank in hex (e.g. C1, 00)')
+    parser.add_argument('entries', nargs='*', help='Entry-point word addresses within the bank (hex)')
+    parser.add_argument(
+        '--state', default=None, metavar='M1X0E0',
+        help=(
+            'Initial CPU state string: three tokens M<0|1> X<0|1> E<0|1> '
+            'in any order/case, e.g. M1X0E0 or m=1,x=0,e=0. '
+            'Default for explicit entries: M1X0E0 (native/16-bit-X/8-bit-A). '
+            'Default for full-bank scan of low banks (<$C0): M1X1E1 (emu mode).'
+        ),
+    )
+
+    args = parser.parse_args()
+
+    rom_path = Path(args.rom)
     if not rom_path.is_file():
         print(f'error: ROM not found: {rom_path}')
         return 2
@@ -742,7 +769,23 @@ def main() -> int:
         if remainder in (0x80000, 0x100000, 0x200000, 0x300000, 0x400000):
             rom = rom[512:]
 
-    bank = int(sys.argv[2], 16)
+    bank = int(args.bank, 16)
+
+    # Parse --state if provided
+    initial: CPUState | None = None
+    if args.state is not None:
+        s = args.state.replace(' ', '').replace(',', '').upper()
+        m_val = x_val = e_val = None
+        import re
+        for match in re.finditer(r'([MXE])=?([01])', s):
+            flag, val = match.group(1), int(match.group(2))
+            if flag == 'M': m_val = bool(val)
+            elif flag == 'X': x_val = bool(val)
+            elif flag == 'E': e_val = bool(val)
+        if None in (m_val, x_val, e_val):
+            print(f'error: --state must specify M, X, and E (got: {args.state!r})')
+            return 2
+        initial = CPUState(m=m_val, x=x_val, e=e_val)
 
     # Determine ROM range for this bank
     rom_start = snes_to_file(bank, 0x8000) if bank < 0x80 else snes_to_file(bank, 0x0000)
@@ -751,16 +794,36 @@ def main() -> int:
     rom_end = rom_start + 0x8000 if bank < 0x80 else rom_start + 0x10000
 
     entries: list[int] = []
-    if len(sys.argv) > 3:
-        entries = [int(a, 16) for a in sys.argv[3:]]
+    if args.entries:
+        entries = [int(a, 16) for a in args.entries]
+        # Default for explicit-entry traces: native mode, 16-bit X, 8-bit A.
+        # This is correct for all Bank $C0+ game code and also for the
+        # battle-engine Banks $C1/$FD etc. that run post-boot in native mode.
+        # Full-bank linear scans keep the old emulation-mode default (below).
+        if initial is None:
+            if bank >= 0xC0:
+                # High banks: native mode, 16-bit X/Y, 8-bit A
+                initial = CPUState(m=True, x=False, e=False)
+            else:
+                # Low banks: use native/16-bit as well — game code runs native
+                # by the time any specific entry is called (reset handler
+                # itself is the one exception, and callers can use --state).
+                initial = CPUState(m=True, x=False, e=False)
     else:
         # Linear scan mode: find every possible instruction start
-        # (heuristic: just queue every byte as a potential entry for completeness)
         start_addr = 0x8000 if bank < 0x80 else 0x0000
         entries = list(range(start_addr, start_addr + (rom_end - rom_start), 1))
+        if initial is None:
+            # For full-bank scans of low banks (like $00 with reset vector in
+            # emulation mode), keep the conservative emu-mode default so that
+            # the XCE instruction at reset is decoded correctly.
+            if bank < 0xC0:
+                initial = CPUState(m=True, x=True, e=True)
+            else:
+                initial = CPUState(m=True, x=False, e=False)
 
     d = Disassembler(rom, bank)
-    d.trace(entries)
+    d.trace(entries, initial)
     d.print_disasm()
     d.print_summary()
     return 0

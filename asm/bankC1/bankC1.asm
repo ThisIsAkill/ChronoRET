@@ -1269,6 +1269,188 @@ BattleUI_NextNamePanel:
 .buildbar_done:
     RTS
 
+; ============================================================
+; BattleUI_UpdateNextPcPanel ($C1:05A7–$C1:06EF, 329 bytes)
+; Peer to BattleUI_BuildStatusBarFrame: refreshes HP/MP display and
+; ATB gauge bars for the next-active PC slot.
+; Logic:
+;   1. Early-exit check: skip refresh if slot 2 is absent ($A6DB<0), a
+;      global inhibit flag is set ($A09A≠0), gauge type is 0 ($9F20==0),
+;      or gauge type is 2 (DEC A leaves A=1≠0). Type 1 jumps to .tp_gauges.
+;   2. Advance next-PC pointer ($A6E0), wrap at 3, check slot presence.
+;   3. Compute tilemap dest Y via long table ($CCFA2F/$CCFA35/$CCFA3B by type).
+;   4. Format and write HP digits ($9499–$949F) with low-HP attr ($2D) if needed.
+;   5. For gauge type 0: write extra HP attr bytes ($0CC9/$0CCB/$0CCD,Y).
+;   6. Format and write MP digits, offset Y by +$10 (type 0) or +$08 (types 1/2).
+;   7. Draw ATB gauge bars for all 3 active slots via Battle_DrawHpBars loop.
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
+; Exit:  M=1; X, Y clobbered; $80/$86/$A2/$A10F/$9499 used as temporaries
+; Calls: Battle_ShiftRight3 ($011B), BattleMsg_FormatNumberDigits ($011F),
+;        BattleMsg_BlankLeadingZeros ($104E), Battle_DivTen9499 ($0174),
+;        BattleUI_DrawSlotGaugeBar ($06F0)
+; Sub-entry: Battle_DrawHpBars ($06DB) — redraw ATB gauge bars for all 3 slots
+org $C105A7
+BattleUI_UpdateNextPcPanel:
+    LDA.w $A6DB                     ; slot 2 state
+    BMI .advance_panel              ; absent → update counter anyway
+    LDA.w $A09A                     ; panel update-inhibit flag
+    BNE .advance_panel              ; inhibited → skip digit refresh
+    LDA.w $9F20                     ; gauge display type
+    BEQ .advance_panel              ; type 0 → skip (fixed HP+MaxHP+MP layout)
+    DEC A                           ; type 1 → A=0; type 2 → A=1
+    BNE .advance_panel              ; type 2 → skip
+    JMP .tp_gauges                  ; type 1 → jump to HP-bar draw section
+.advance_panel:
+    INC.w $A6E0                     ; advance next-PC slot counter
+    LDA.w $A6E0
+    CMP #$03
+    BCC .slot_ok
+    STZ.w $A6E0                     ; wrap to 0
+.slot_ok:
+    LDA.w $A6E0
+    TAX
+    STX.b $80                       ; save slot index (16-bit X → $80/$81)
+    LDA.w $96F5,X                   ; slot presence flag
+    BNE .slot_present
+    JMP UpdateNpc_exit              ; slot empty → nothing to draw
+.slot_present:
+    REP #$21                        ; M=0, C=0
+    LDA.b $80                       ; slot index (16-bit DP load)
+    ASL
+    TAX                             ; X = slot * 2
+    LDA.w $9F20                     ; gauge type (16-bit; low byte = type)
+    BNE .type_not0_a
+    LDA.l $CCFA2F,X                 ; type 0: base Y from HP+MaxHP+MP table
+    BRA .got_base_y
+.type_not0_a:
+    DEC A
+    BNE .type_not1_a
+    LDA.l $CCFA35,X                 ; type 1: base Y from HP+MP table
+    BRA .got_base_y
+.type_not1_a:
+    LDA.l $CCFA3B,X                 ; type 2: base Y from HP+MP+TP table
+.got_base_y:
+    TAY
+    STY.b $86                       ; save base tilemap Y (16-bit)
+    TDC
+    SEP #$20                        ; M=1
+    STZ.w $A10F                     ; clear low-HP flag
+    REP #$20                        ; M=0
+    LDA.b $80                       ; slot index
+    ASL
+    TAX                             ; X = slot * 2
+    LDA.l $CCF8ED,X                 ; battler data-struct offset
+    STA.b $A2                       ; save struct offset (16-bit)
+    TAX
+    LDA.w $5E30,X                   ; CurHP (16-bit)
+    STA.w $9499
+    BEQ .set_low_hp                 ; HP == 0 → always flag low-HP
+    LDA.w $5E32,X                   ; MaxHP (16-bit)
+    JSR Battle_ShiftRight3          ; A = maxHP >> 3 (1/8 threshold)
+    CMP.w $9499                     ; threshold vs curHP
+    BEQ .check_a110                 ; equal → check secondary gate
+    BCC .hp_ok                      ; threshold < curHP → not low-HP
+.check_a110:
+    LDA.w $A110                     ; secondary low-HP gate
+    BEQ .hp_ok
+.set_low_hp:
+    INC.w $A10F                     ; set low-HP flag (M=0 → 16-bit INC)
+.hp_ok:
+    JSR BattleMsg_FormatNumberDigits ; format HP → $949D–$949F (exits M=1)
+    JSR BattleMsg_BlankLeadingZeros  ; suppress leading zeros (M=1)
+    LDA.w $949D                     ; hundreds digit tile
+    STA.w $0CC0,Y
+    LDA.w $949E                     ; tens digit tile
+    STA.w $0CC2,Y
+    LDA.w $949F                     ; ones digit tile
+    STA.w $0CC4,Y
+    LDX.w #$0029                    ; normal attr ($29 = standard palette)
+    LDA.w $A10F                     ; low-HP flag
+    BEQ .normal_attr
+    LDX.w #$002D                    ; low-HP attr ($2D = alt palette)
+.normal_attr:
+    TXA
+    STA.w $0CC1,Y
+    STA.w $0CC3,Y
+    STA.w $0CC5,Y
+    STA.w $0CC7,Y
+    LDA.w $9F20                     ; gauge type
+    BNE .skip_type0_hp_extra        ; type ≠ 0 → skip extra HP cols
+    TXA                             ; type 0: 3 extra attr bytes for MaxHP cols
+    STA.w $0CC9,Y
+    STA.w $0CCB,Y
+    STA.w $0CCD,Y
+.skip_type0_hp_extra:
+    REP #$20                        ; M=0
+    LDX.b $A2                       ; struct offset (16-bit DP load)
+    LDA.w $5E34,X                   ; CurMP (16-bit)
+    STA.w $9499
+    LDA.w $9F20                     ; gauge type (16-bit load; low byte = type)
+    BNE .mp_offset_short
+    CLC
+    LDA.b $86                       ; base tilemap Y
+    db $69,$10,$00                  ; ADC #$0010 (M=0 3-byte encoding)
+    TAY
+    BRA .mp_dest_done
+.mp_offset_short:
+    CLC
+    LDA.b $86
+    db $69,$08,$00                  ; ADC #$0008 (M=0 3-byte encoding)
+.mp_dest_done:
+    TAY
+    JSR Battle_DivTen9499           ; divide MP by 10 three times (exits M=1)
+    LDA.w $9F20                     ; gauge type
+    BNE .mp_not_type0
+    JSR BattleMsg_BlankLeadingZeros
+    BRA .gauge0_mp_path
+.mp_not_type0:
+    JSR BattleMsg_BlankLeadingZeros
+    LDA.w $949E                     ; tens MP digit
+    STA.w $0CC0,Y
+    LDA.w $949F                     ; ones MP digit
+    STA.w $0CC2,Y
+    LDX.w #$0029
+    LDA.w $A10F
+    BEQ .mp_normal_attr
+    LDX.w #$002D
+.mp_normal_attr:
+    TXA
+    STA.w $0CC1,Y
+    STA.w $0CC3,Y
+    BRA .tp_gauges
+.gauge0_mp_path:
+    LDA.w $949E
+    STA.w $0CC2,Y
+    LDA.w $949F
+    STA.w $0CC4,Y
+    LDX.w #$0029
+    LDA.w $A10F
+    BEQ .gauge0_normal_attr
+    LDX.w #$002D
+.gauge0_normal_attr:
+    TXA
+    STA.w $0CC3,Y
+    STA.w $0CC5,Y
+.tp_gauges:
+    LDA.w $9F20                     ; gauge type
+    BEQ UpdateNpc_exit              ; type 0 → skip ATB-gauge pass
+    TDC
+    TAX                             ; X = 0 (slot counter)
+Battle_DrawHpBars:
+    STX.b $80                       ; reset slot counter
+.gauge_loop:
+    LDX.b $80                       ; X = current slot
+    LDA.w $96F5,X                   ; slot presence flag
+    BEQ .next_slot
+    JSR BattleUI_DrawSlotGaugeBar
+.next_slot:
+    INC.b $80
+    LDA.b $80
+    CMP #$03
+    BNE .gauge_loop
+UpdateNpc_exit:
+    RTS
+
 ; $C1:104E — BattleMsg_BlankLeadingZeros (32 bytes, $104E–$106D)
 ; Leading-zero suppression for 3-digit HP/reward display.
 ; Checks $949D (hundreds tile): if == $73 (zero-glyph), replaces with $FF (blank).
