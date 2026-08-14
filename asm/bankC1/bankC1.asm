@@ -300,21 +300,404 @@ BattleMsg_ReencodeTextBuffer:
     RTS
 
 ; ============================================================
-; Forward-reference label stubs for unmatched callees
-; (used by BattleUI_BuildStatusBarFrame below)
+; Status-Bar UI Callees ($C1:06F0–$C1:095C)
+; Matched session 37; called by BattleUI_BuildStatusBarFrame and peers.
 ; ============================================================
 
+; $C1:06F0 — BattleUI_DrawSlotGaugeBar (149 bytes, $06F0–$0784)
+; Render the ATB gauge bar for PC slot $80 into the status-bar tilemap.
+; Computes fill ratio = (ATB_cur * 256) / ATB_max via Battle_Divide, then
+; plots full-fill tiles ($6F), a partial tile ($67+offset), and background
+; tiles ($67) across a 32-unit-wide gauge strip.  Attr byte is $2D if ATB
+; is non-zero, $29 if zero.  Destination is tilemap word-pair at $CCFA35[slot]+$1A.
+; Entry: M=1, X=0 (16-bit), $80 = PC slot index (0–2)
+; Exit:  M=1; Y = last written tilemap position; $82/$83/$86/$AD/$AE/$B1–$B7 clobbered
+; Calls: Battle_ShiftLeft7 ($010D), Battle_Divide ($00D7), Battle_ShiftRight3 ($011B)
 org $C106F0
-BattleUI_DrawSlotGaugeBar:      ; ATB gauge fill + bar-tile render; not yet matched
+BattleUI_DrawSlotGaugeBar:
+    REP #$21                    ; M=0, C=0
+    LDA $80                     ; PC slot index (16-bit DP load; high byte = 0)
+    ASL                         ; × 2 (table index)
+    TAX
+    LDA.l $CCFA35,X             ; tilemap base word-pair offset for this slot
+    db $69,$1A,$00              ; ADC #$001A — gauge row offset within strip (M=0 3-byte)
+    TAY                         ; Y = tilemap destination
+    TDC
+    SEP #$20                    ; M=1
+    LDX $80                     ; X = slot index (16-bit DP load)
+    LDA.w $99DD,X               ; ATB current value for this slot
+    STA $AD
+    STZ $AE
+    LDA.w $9F22,X               ; ATB max value for this slot
+    STA $B3
+    STZ $B4
+    REP #$20                    ; M=0
+    LDA $AD                     ; current ATB (16-bit; $AE=0)
+    JSR Battle_ShiftLeft7       ; A <<= 8 (× 256) — scale to fixed-point
+    STA $B1                     ; 16-bit store: $B1=lo, $B2=hi (dividend for Divide)
+    TDC
+    SEP #$20                    ; M=1
+    JSR Battle_Divide           ; quotient = (ATB*256)/ATBmax → $B5 (0–255 fill ratio)
+    REP #$20                    ; M=0
+    LDA $B5                     ; quotient (16-bit; hi byte=$B6=remainder hi)
+    JSR Battle_ShiftRight3      ; >> 3 → scale 0–255 to 0–31 tile units
+    STA $B5
+    TDC
+    SEP #$20                    ; M=1
+    SEC
+    LDA #$20                    ; 32 = full gauge width
+    SBC $B5                     ; unfilled tile count
+    STA $82
+    LSR
+    LSR
+    LSR                         ; / 8 = number of complete 8-unit blocks
+    STA $83
+    ASL
+    ASL
+    ASL                         ; × 8 = tiles covered by full blocks
+    STA $86
+    SEC
+    LDA $82
+    SBC $86                     ; fractional remainder after full blocks
+    STA $82
+    ; Write 4 background tiles at destination
+    LDA #$67                    ; background gauge tile
+    STA.w $0CC0,Y
+    STA.w $0CC2,Y
+    STA.w $0CC4,Y
+    STA.w $0CC6,Y
+    LDX $80                     ; slot index
+    LDA.w $99DD,X               ; ATB current
+    BNE .has_atb
+    LDA #$29                    ; zero ATB → dim palette attr
+    BRA .set_attr
+.has_atb:
+    LDA #$2D                    ; non-zero ATB → bright palette attr
+.set_attr:
+    STA.w $0CC1,Y
+    STA.w $0CC3,Y
+    STA.w $0CC5,Y
+    STA.w $0CC7,Y
+.full_tile_loop:
+    LDA $83                     ; full-block counter
+    BEQ .partial_tile
+    LDA #$6F                    ; full-fill gauge tile
+    STA.w $0CC0,Y
+    INY
+    INY
+    DEC $83
+    BRA .full_tile_loop
+.partial_tile:
+    CLC
+    LDA $82                     ; fractional remainder
+    BEQ .done                   ; exactly on tile boundary → nothing to add
+    ADC #$67                    ; partial tile = base tile + fill offset
+    STA.w $0CC0,Y
+.done:
+    RTS
 
-org $C1081E
-BattleMenu_DrawReadyWindowEdges: ; ready-window border draw; not yet matched
-
+; $C1:0785 — BattleSys_SlotPanelRefresh (153 bytes, $0785–$081D)
+; Write a 6-row × 7-col panel tile strip for PC slot A into the status-bar
+; tilemap at base offset slot×12.  Two tile tables are used:
+;   $CCFA41 — "empty" panel (slot inactive or same as active PC)
+;   $CCFA6B — "ready" indicator panel (slot is ready / different from active PC)
+; Selection depends on $95F1, $9F25/$9F28 per-slot flags, $A117, $A6DE, and $A6D9.
+; Each row is 7 tiles wide; each tile written as (tile,attr=$29) word-pair.
+; Entry: M=1, X=0 (16-bit), A = PC slot index (0–2)
+; Exit:  M=1; $80/$81/$82 clobbered; X/Y clobbered
+; No calls.
 org $C10785
-BattleSys_SlotPanelRefresh:     ; per-slot panel refresh; not yet matched
+BattleSys_SlotPanelRefresh:
+    STA $80                     ; save slot index
+    ASL
+    ASL                         ; × 4
+    STA $82
+    ASL                         ; × 8
+    CLC
+    ADC $82                     ; slot × 12 (= 6 rows × 2 cols × word-pair stride)
+    TAX
+    STX.b $82                   ; $82/$83 = tilemap base offset (16-bit)
+    LDA.w $95F1                 ; panel-state flag
+    BEQ .empty_panel            ; zero → draw empty panel
+    LDA $80
+    TAX
+    LDA.w $9F25,X               ; per-slot flag A
+    ORA.w $9F28,X               ; OR per-slot flag B
+    BEQ .empty_panel            ; both zero → empty panel
+    LDA.w $A117                 ; timing/animation flag
+    BEQ .ready_panel            ; zero → ready panel
+    LDA.w $A6DE                 ; PC-change flag
+    CMP #$03
+    BEQ .ready_panel            ; = 3 → ready panel
+    LDA $80
+    CMP.w $A115                 ; compare slot with active PC
+    BEQ .empty_panel            ; same PC → empty
+    LDX.w $A115                 ; X = active PC index
+    LDA.w $A6D9,X               ; slot state for active PC
+    BMI .ready_panel            ; negative → ready panel
 
+.empty_panel:
+    TDC
+    TAX                         ; X = table index (starts at 0)
+    LDA #$06
+    STA $80                     ; row counter = 6
+.empty_row_start:
+    LDA #$07
+    STA $81                     ; col counter = 7
+    LDY.b $82                   ; Y = current row base
+.empty_col_loop:
+    LDA.l $CCFA41,X             ; tile from empty-panel table
+    STA.w $0CC0,Y
+    LDA #$29                    ; attr = $29
+    STA.w $0CC1,Y
+    INY
+    INY
+    INX
+    DEC $81
+    BNE .empty_col_loop
+    REP #$21                    ; M=0, C=0
+    LDA $82
+    db $69,$40,$00              ; ADC #$0040 — advance to next row (64 word-pairs)
+    STA $82
+    TDC
+    SEP #$20                    ; M=1
+    DEC $80
+    BNE .empty_row_start
+    BRA .done
+
+.ready_panel:
+    TDC
+    TAX                         ; X = table index
+    LDA #$06
+    STA $80                     ; row counter = 6
+.ready_row_start:
+    LDA #$07
+    STA $81                     ; col counter = 7
+    LDY.b $82
+.ready_col_loop:
+    LDA.l $CCFA6B,X             ; tile from ready-panel table
+    STA.w $0CC0,Y
+    LDA #$29
+    STA.w $0CC1,Y
+    INY
+    INY
+    INX
+    DEC $81
+    BNE .ready_col_loop
+    REP #$21                    ; M=0, C=0
+    LDA $82
+    db $69,$40,$00              ; ADC #$0040
+    STA $82
+    TDC
+    SEP #$20                    ; M=1
+    DEC $80
+    BNE .ready_row_start
+.done:
+    RTS
+
+; $C1:081E — BattleMenu_DrawReadyWindowEdges (202 bytes, $081E–$08E7)
+; Draw the command-window border strips for all active PC slots and then
+; clear/repaint the active-PC column (BattleUI_ClearActivePanelColumn).
+; Iterates slots 0–2 via $A6D9: for each slot whose state is non-negative,
+; selects a column offset and calls BattleMenu_DrawWindowEdgeStrip ($0929).
+; The $84 flag controls left (0) vs right (1) edge.  Then calls
+; BattleUI_SetPanelAttrColumn for the active PC and repaints the status tiles.
+; BattleUI_ClearActivePanelColumn ($0872) is a separate entry point used
+; when only the column redraw is needed (called also from $C10C6E).
+; Entry: M=1, X=0 (16-bit)
+; Exit:  M=1; $80/$82/$84 clobbered; X/Y clobbered
+; Calls: BattleMenu_DrawWindowEdgeStrip ($0929), BattleUI_SetPanelAttrColumn ($08E8)
+org $C1081E
+BattleMenu_DrawReadyWindowEdges:
+    STZ $84                     ; edge flag = 0 (left edge)
+    LDA.w $A6D9                 ; slot-state for PC slot 0
+    BMI .check_slot1            ; negative → skip slot 0 strip
+    LDX.w #$0000                ; col offset = 0
+    STX.b $82
+    JSR BattleMenu_DrawWindowEdgeStrip
+.check_slot1:
+    LDA.w $A6DA                 ; slot-state for PC slot 1
+    BMI .check_slot2            ; negative → skip slot 1 strip
+    LDA.w $A6D9                 ; re-check slot 0
+    BMI .slot1_left             ; slot 0 present → right edge for slot 1
+    LDA #$01
+    STA $84                     ; right-edge flag
+    LDX.w #$000E                ; col offset $0E (right side of 2-slot bar)
+    BRA .slot1_draw
+.slot1_left:
+    LDX.w #$000C                ; col offset $0C (left side, slot 0 absent)
+.slot1_draw:
+    STX.b $82
+    JSR BattleMenu_DrawWindowEdgeStrip
+    STZ $84                     ; reset edge flag
+.check_slot2:
+    LDA.w $A6DB                 ; slot-state for PC slot 2
+    BMI .active_pc_section      ; negative → skip slot 2 strip
+    LDA.w $A6DA                 ; re-check slot 1
+    BMI .slot2_left             ; slot 1 present → right edge for slot 2
+    LDA #$01
+    STA $84
+    LDX.w #$001A                ; col offset $1A (right of 3-slot bar)
+    BRA .slot2_draw
+.slot2_left:
+    LDX.w #$0018                ; col offset $18 (left, slot 1 absent)
+.slot2_draw:
+    STX.b $82
+    JSR BattleMenu_DrawWindowEdgeStrip
+.active_pc_section:
+    LDA.w $A6DD                 ; active PC index
+    TAX
+    LDA.w $A6D9,X               ; slot-state for active PC
+    JSR BattleUI_SetPanelAttrColumn
+    INC.w $A43F                 ; set redraw flag
+
+; $C1:0872 — BattleUI_ClearActivePanelColumn (entry point within above body)
+; Zero a 6-row × 2-col block of tilemap ($0CC0/$0E02 + slot×12) for the
+; current active slot ($95D5), then repaint ATB-source corner tiles if $A43F
+; was set (newly-active PC $A6DD).
+; Entry: M=1, X=0 (16-bit)
+; Exit:  M=1; $80/X/Y clobbered; $A43F = 0
+; No calls.
+BattleUI_ClearActivePanelColumn:
+    LDA.w $95D5                 ; current active slot index
+    ASL
+    ASL
+    STA $80                     ; $80 = slot × 4
+    ASL
+    CLC
+    ADC $80                     ; slot × 12
+    TAX                         ; X = tilemap column offset
+    STZ.w $0CC0,X
+    STZ.w $0D00,X
+    STZ.w $0D40,X
+    STZ.w $0D80,X
+    STZ.w $0DC0,X
+    STZ.w $0E00,X
+    STZ.w $0CC2,X
+    STZ.w $0D02,X
+    STZ.w $0D42,X
+    STZ.w $0D82,X
+    STZ.w $0DC2,X
+    STZ.w $0E02,X
+    LDA.w $A43F                 ; redraw flag
+    BEQ .clear_done             ; zero → just clear flag and return
+    LDA.w $A6DD                 ; newly-active PC index
+    TAX
+    ASL
+    ASL
+    STA $80                     ; $80 = active × 4
+    ASL
+    CLC
+    ADC $80                     ; active × 12
+    TAY
+    STY.b $80                   ; $80/$81 = active × 12 (16-bit DP save)
+    LDA.w $A6D9,X               ; slot-state for active PC
+    TAX
+    LDA.w $95DC,X               ; lookup index from slot-state
+    ASL
+    TAX                         ; X = table index × 2
+    REP #$21                    ; M=0, C=0
+    LDA.l $CCFADD,X             ; 16-bit column offset from table
+    ADC $80                     ; + active × 12
+    TAX                         ; X = absolute tilemap index
+    TDC
+    SEP #$20                    ; M=1
+    LDA.w $9609                 ; transition flag
+    BNE .clear_done             ; non-zero → skip tile repaint
+    LDA #$60                    ; top-left ATB source corner tile
+    STA.w $0CC0,X
+    LDA #$61
+    STA.w $0CC2,X
+    LDA #$62
+    STA.w $0D00,X
+    LDA #$63
+    STA.w $0D02,X
+.clear_done:
+    STZ.w $A43F                 ; clear redraw flag
+    RTS
+
+; $C1:08E8 — BattleUI_SetPanelAttrColumn (65 bytes, $08E8–$0928)
+; For PC slot A: pick the status-bar tilemap column offset from table $CCFA29
+; or $CCFA23 (depending on party layout $9F20) and write attr $29 to a
+; 5-tile-high × 2-col block ($0CC0..$0D08,X stride $02).
+; Entry: M=1, X=0 (16-bit), A = PC slot index (0–2)
+; Exit:  M=1; X = column offset; A = $29; Y unchanged
+; No calls.
 org $C108E8
-BattleUI_SetPanelAttrColumn:    ; tilemap palette/attr column setter; not yet matched
+BattleUI_SetPanelAttrColumn:
+    ASL                         ; slot × 2 (table index)
+    TAX
+    REP #$20                    ; M=0
+    LDA.w $9F20                 ; BattleGaugeDisplayType (16-bit; type 0/1/2)
+    BNE .type_not0
+    LDA.l $CCFA29,X             ; type 0 → column offset table A
+    BRA .got_offset
+.type_not0:
+    DEC A                       ; type − 1
+    BNE .type_not1              ; non-zero → type 2 → also table A
+    LDA.l $CCFA23,X             ; type 1 → column offset table B
+    BRA .got_offset
+.type_not1:
+    LDA.l $CCFA29,X             ; type 2 → table A (same as type 0)
+.got_offset:
+    TAX                         ; X = column offset (tilemap index)
+    TDC
+    SEP #$20                    ; M=1
+    LDA #$29                    ; attr byte
+    STA.w $0CC0,X
+    STA.w $0CC2,X
+    STA.w $0CC4,X
+    STA.w $0CC6,X
+    STA.w $0CC8,X
+    STA.w $0D00,X
+    STA.w $0D02,X
+    STA.w $0D04,X
+    STA.w $0D06,X
+    STA.w $0D08,X
+    RTS
+
+; $C1:0929 — BattleMenu_DrawWindowEdgeStrip (52 bytes, $0929–$095C)
+; Copy a 6-row window-border strip from tile table $D159FC into the
+; command-window tilemap at $0B40+$82.  $84=0 → left edge ($0E/$0F tile pair,
+; 14 bytes per row); $84≠0 → right edge ($0C/$0D tile pair, 12 bytes + 2 INX).
+; Each row advances Y by the row stride (64 via REP/ADC) after writing.
+; Entry: M=1, X=0 (16-bit), $82 = tilemap col offset, $84 = edge flag
+; Exit:  M=1; X/Y/$80/$81/$82 clobbered
+; No calls.
+org $C10929
+BattleMenu_DrawWindowEdgeStrip:
+    TDC
+    TAX                         ; X = 0 (table index into $D159FC)
+    LDA #$06
+    STA $81                     ; row counter = 6
+.row_loop:
+    LDA $84                     ; edge flag
+    BNE .right_edge
+    LDA #$0E                    ; left edge: 14 bytes per row-entry
+    BRA .pick_done
+.right_edge:
+    INX                         ; skip to right-edge entries (offset +2 in table)
+    INX
+    LDA #$0C                    ; right edge: 12 bytes per row-entry
+.pick_done:
+    STA $80                     ; byte count for inner copy
+    LDY.b $82                   ; Y = current tilemap row base
+.inner_loop:
+    LDA.l $D159FC,X             ; window border tile byte
+    STA.w $0B40,Y               ; write to command-window tilemap
+    INX
+    INY
+    DEC $80
+    BNE .inner_loop
+    REP #$21                    ; M=0, C=0
+    LDA $82
+    db $69,$40,$00              ; ADC #$0040 — advance to next row (stride 64)
+    STA $82
+    TDC
+    SEP #$20                    ; M=1
+    DEC $81                     ; row counter
+    BNE .row_loop
+    RTS
 
 ; ============================================================
 ; Trig / Geometry Cluster ($C1:01F9–$C1:0298)
