@@ -1941,6 +1941,646 @@ CODE_JP_C10C00:
     BNE .blank2_loop
     RTS
 
+; ==================================================================
+; BattleMenu_UpdateWindows ($C10C2D–$C10C48, 28 bytes)
+; ==================================================================
+; Per-frame window upkeep dispatcher. Loads active-slot ptr via JSL
+; $CFFD9E, then dispatches on $95DB (submenu type):
+;   0 → BattleMenu_UpdateMainWindow
+;   1 → BattleMenu_UpdateTechMpAvail + BattleMenu_UpdateTechWindow
+;   other → CODE_JP_C1103D (RTS)
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; registers clobbered by callees
+; Callees: JSL $CFFD9E (BattleFx_SetPtrA2FromTable, cross-bank),
+;          BattleMenu_UpdateMainWindow, BattleMenu_UpdateTechMpAvail,
+;          BattleMenu_UpdateTechWindow
+org $C10C2D
+BattleMenu_UpdateWindows:
+    LDA.w $95D5                     ; active PC slot index
+    JSL $CFFD9E                     ; BattleFx_SetPtrA2FromTable (CF bank)
+    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item(→exit)
+    BNE .not_main
+    JMP BattleMenu_UpdateMainWindow ; type 0 → main command window
+.not_main:
+    CMP #$01
+    BNE CODE_C10C46                 ; type != 1 → exit (type 2 = item, just return)
+    JSR BattleMenu_UpdateTechMpAvail ; type 1: refresh tech MP availability first
+    JMP BattleMenu_UpdateTechWindow  ; then update tech window display
+
+CODE_C10C46:                        ; shared exit — jumped to from UpdateMainWindow too
+    JMP CODE_JP_C1103D              ; → shared RTS at $103D
+
+; ==================================================================
+; BattleMenu_UpdateMainWindow ($C10C49–$C10C82, 58 bytes)
+; ==================================================================
+; Main command-window upkeep (submenu type 0):
+; - If $A6DD (active-PC index) changed vs. cached $A6DF:
+;     reload command window map ($C11C3A) + rebuild status frame ($C10299).
+; - Else: per-slot panel refresh ($C105A7); if $A43F set and $A6DD >= 0,
+;     redraw active-panel cursor column ($C10872).
+; - If $95D5 < 0: reload command window map again.
+; - Always: JSL $CFFD02 (queue $0CC0 VRAM upload), INC $99E2.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1
+; Callees: BattleMenu_LoadCommandWindowMap, BattleUI_BuildStatusBarFrame,
+;          BattleUI_UpdateNextPcPanel, BattleUI_ClearActivePanelColumn,
+;          JSL $CFFD02 (Battle_QueueVramUpload_0CC0, cross-bank)
+BattleMenu_UpdateMainWindow:
+    LDA.w $95DB                     ; must still be type 0
+    BNE CODE_C10C46                 ; if not, bail (offset -8 → $0C46)
+    LDA.w $A6DD                     ; current active-PC index
+    CMP.w $A6DF                     ; == cached value?
+    BEQ .same_pc
+    STA.w $A6DF                     ; update cache
+    JSR BattleMenu_LoadCommandWindowMap ; reload tilemap ($1C3A)
+    JSR BattleUI_BuildStatusBarFrame  ; rebuild status bar ($0299)
+    BRA .do_upload
+.same_pc:
+    JSR BattleUI_UpdateNextPcPanel  ; per-slot panel refresh ($05A7)
+    LDA.w $A43F
+    BEQ .do_upload
+    LDA.w $A6DD
+    BMI .do_upload
+    JSR BattleUI_ClearActivePanelColumn ; cursor column redraw ($0872)
+.do_upload:
+    LDA.w $95D5
+    BPL .queue
+    JSR BattleMenu_LoadCommandWindowMap ; reload again if $95D5 negative
+.queue:
+    JSL $CFFD02                     ; Battle_QueueVramUpload_0CC0 (CF bank)
+    INC.w $99E2
+    JMP CODE_JP_C1103D              ; → shared RTS at $103D
+
+; ==================================================================
+; BattleMenu_UpdateTechWindow ($C10C83–$C10E59, 471 bytes)
+; ==================================================================
+; Tech-window content refresh (submenu type 1, called after UpdateTechMpAvail):
+; 1. JSR BattleMenu_RenderTechListRows ($0A88) — renders text into $99E3 buffer.
+; 2. Copies $180 bytes from $99E3 into window tilemap $A6E1 (word-stride).
+; 3. Composes 6-row window border/column structure from $CCFA95 template
+;    into $A70B area (9 tiles per row, 6 rows, with Y advancing by $2E stride).
+; 4. For each of 3 PCs, if $96F5/$96F6/$96F7 != 0 (PC has techs to show):
+;    converts $5E34/$5EB4/$5F34 (MP) to digit tiles via DivTen9499 + BlankLeadingZeros,
+;    stores into $A751/$A7D1/$A851 digit cells; else blanks MP cost.
+; 5. Resolves active cursor tech slot; copies battler data into $9EE3-$9EE9;
+;    for each PC present, converts relevant value to tile digits.
+; 6. Falls through into BattleMenu_DrawTechCursorRow ($0E5A).
+; Entry: M=1, X=0, DB=$7E; $95D5 = active PC slot
+; Exit:  M=1 (via BattleMenu_DrawTechCursorRow → CODE_JP_C1103D)
+; Callees: BattleMenu_RenderTechListRows, Battle_DivTen9499,
+;          BattleMsg_BlankLeadingZeros, BattleMenu_DrawTechCursorRow (fall-through)
+BattleMenu_UpdateTechWindow:
+    JSR BattleMenu_RenderTechListRows ; render tech list into $99E3 buffer
+
+    ; Copy $180-byte text buffer $99E3 → window tilemap $A6E1 (word stride:
+    ; each tile occupies word pair = 2 bytes tile, 2 bytes attr; read/write by 1)
+    TDC
+    TAY
+    TAX
+.copy_loop:
+    LDA.w $99E3,X
+    STA.w $A6E1,Y
+    INX
+    INX
+    INY
+    INY
+    CPY.w #$0180
+    BNE .copy_loop
+
+    ; Compose window border columns from $CCFA95 template:
+    ; outer loop: 6 rows ($80 = row 0..5)
+    ; inner loop: 9 tiles per row ($81 = col 0..8) → store into $A70B,Y
+    TDC
+    TAX
+    TAY
+    STX.b $80                       ; row counter = 0
+.border_row:
+    STZ.b $81                       ; col counter = 0
+.border_col:
+    LDA.l $CCFA95,X                 ; border template byte
+    STA.w $A70B,Y                   ; store into tech window tilemap
+    INX
+    INY
+    INY
+    INC.b $81
+    LDA.b $81
+    CMP #$09
+    BNE .border_col
+    REP #$21                        ; M=0, C=0 for 16-bit add
+    TYA
+    db $69,$2E,$00                  ; ADC #$002E — advance Y by row stride
+    TAY
+    TDC
+    SEP #$20                        ; M=1
+    INC.b $80
+    LDA.b $80
+    CMP #$06
+    BNE .border_row
+
+    ; PC1 MP digits: if $96F5 != 0, convert $5E34 (PC1 MP) → digit tiles
+    LDA.w $96F5
+    BEQ .pc1_mp_absent              ; $96F5=0 → no PC1 tech, blank
+    REP #$20                        ; M=0 for 16-bit PCHP write
+    LDA.w $5E34                     ; PC1 MP low byte
+    STA.w $9499                     ; PCHP = PC1 MP (16-bit)
+    JSR Battle_DivTen9499           ; → M=1; digit tiles in $949C-$949F
+    JSR BattleMsg_BlankLeadingZeros ; suppress leading zeros
+    LDA.w $949E                     ; tens digit
+    STA.w $A751                     ; PC1 tech window tens cell
+    LDA.w $949F                     ; ones digit
+    STA.w $A753                     ; PC1 tech window ones cell
+    LDA #$FF
+    STA.w $A75B                     ; blank PC1 cost hi
+    STA.w $A75D                     ; blank PC1 cost hi+1
+    BRA .pc2_check
+.pc1_mp_absent:
+    LDA #$FF
+    STA.w $A757                     ; blank PC1 MP field
+
+    ; PC2 MP digits: if $96F6 != 0
+.pc2_check:
+    LDA.w $96F6
+    BEQ .pc2_mp_absent
+    REP #$20                        ; M=0
+    LDA.w $5EB4                     ; PC2 MP low byte
+    STA.w $9499
+    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_BlankLeadingZeros
+    LDA.w $949E
+    STA.w $A7D1
+    LDA.w $949F
+    STA.w $A7D3
+    LDA #$FF
+    STA.w $A7DB
+    STA.w $A7DD
+    BRA .pc3_check
+.pc2_mp_absent:
+    LDA #$FF
+    STA.w $A7D7
+
+    ; PC3 MP digits: if $96F7 != 0
+.pc3_check:
+    LDA.w $96F7
+    BEQ .pc3_mp_absent
+    REP #$20                        ; M=0
+    LDA.w $5F34                     ; PC3 MP low byte
+    STA.w $9499
+    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_BlankLeadingZeros
+    LDA.w $949E
+    STA.w $A851
+    LDA.w $949F
+    STA.w $A853
+    LDA #$FF
+    STA.w $A85B
+    STA.w $A85D
+    BRA .cursor_resolve
+.pc3_mp_absent:
+    LDA #$FF
+    STA.w $A857
+
+    ; Resolve active cursor tech slot:
+    ; $95D5 → CCF38C table → base offset; add scroll $95EB + cursor $95DF;
+    ; look up in $9551 table → battler slot. If $FF, blank all and jump to cursor draw.
+.cursor_resolve:
+    LDA.w $95D5
+    TAX
+    LDA.l $CCF38C,X                 ; PC base offset from table
+    STA.b $AF
+    CLC
+    LDA.w $95EB,X                   ; scroll offset (PC1NumberLinesScrolled)
+    ADC.w $95DF,X                   ; + cursor position page
+    CLC
+    ADC.b $AF                       ; + base
+    TAX
+    LDA.w $9551,X                   ; battler slot at cursor row
+    CMP #$FF
+    BNE .slot_present
+    ; slot == $FF: blank relevant tilemap cells and go to cursor draw
+    STA.w $A7DB
+    STA.w $A7DD
+    STA.w $9EE3
+    STA.w $9EE4
+    STA.w $9EE5
+    STA.w $9EE6
+    STA.w $9EE7
+    STA.w $9EE8
+    STA.w $9EE9
+    JMP BattleMenu_DrawTechCursorRow ; → $0E5A
+
+.slot_present:
+    ; slot found — copy battler data from $1A80+slot into $9EE3-$9EE9
+    STA.b $80                       ; save battler slot
+    LDA.w $95D5
+    ASL A
+    TAX
+    LDA.l $CCF395,X                 ; PC tech-table ptr lo
+    STA.b $AF
+    LDA.l $CCF396,X                 ; PC tech-table ptr hi
+    STA.b $B0
+    LDA.b $80
+    TAX
+    LDA.l $CCF3A1,X                 ; battler offset from table
+    STA.b $80
+    CLC
+    LDA.b $AF
+    ADC.b $80
+    STA.b $AF
+    LDA.b $B0
+    ADC #$00
+    STA.b $B0
+    LDX.b $AF
+    LDA.w $1A80,X                   ; battler fields → $9EE3-$9EE9
+    STA.w $9EE3
+    LDA.w $1A81,X
+    STA.w $9EE4
+    LDA.w $1A82,X
+    STA.w $9EE5
+    LDA.w $1A83,X
+    STA.w $9EE6
+    LDA.w $1A84,X
+    STA.w $9EE7
+    LDA.w $1A85,X
+    STA.w $9EE8
+    LDA.w $1A86,X
+    STA.w $9EE9
+
+    ; For each PC present ($9EE6/$9EE8/$9EE9 >= 0), convert HP-related
+    ; value to digit tiles and store into tech window digit cells
+    LDA.w $9EE6
+    BMI .check_pc2_digit            ; negative → PC1 absent, skip
+    REP #$20                        ; M=0: write 16-bit to PCHP
+    STA.w $9499
+    JSR Battle_DivTen9499           ; → M=1; digit tiles in $949E/$949F
+    LDA.w $949E
+    CMP #$73                        ; zero digit?
+    BNE .pc1_nonzero
+    LDA #$FF
+    STA.w $A75D                     ; blank hi digit
+    LDA.w $949F
+    STA.w $A75B
+    BRA .check_pc2_digit
+.pc1_nonzero:                       ; (UNREACH_C10DFD path: digit != $73)
+    STA.w $A75B
+    LDA.w $949F
+    STA.w $A75D
+
+.check_pc2_digit:
+    LDA.w $9EE8
+    BMI .check_pc3_digit
+    REP #$20
+    STA.w $9499
+    JSR Battle_DivTen9499           ; → M=1
+    LDA.w $949E
+    CMP #$73
+    BNE .pc2_nonzero
+    LDA #$FF
+    STA.w $A7DD
+    LDA.w $949F
+    STA.w $A7DB
+    BRA .check_pc3_digit
+.pc2_nonzero:                       ; (UNREACH_C10E27 path)
+    STA.w $A7DB
+    LDA.w $949F
+    STA.w $A7DD
+
+.check_pc3_digit:
+    LDA.w $9EE9
+    BMI BattleMenu_DrawTechCursorRow ; negative → no PC3, go draw cursor
+    REP #$20
+    STA.w $9499
+    JSR Battle_DivTen9499           ; → M=1
+    LDA.w $949E
+    CMP #$73
+    BNE .pc3_nonzero
+    LDA #$FF
+    STA.w $A85D
+    LDA.w $949F
+    STA.w $A85B
+    BRA BattleMenu_DrawTechCursorRow
+.pc3_nonzero:                       ; (UNREACH_C10E51 path)
+    STA.w $A85B
+    LDA.w $949F
+    STA.w $A85D
+    ; fall through into BattleMenu_DrawTechCursorRow at $0E5A
+
+; ==================================================================
+; BattleMenu_DrawTechCursorRow ($C10E5A–$C10EB9, 96 bytes)
+; ==================================================================
+; Clears old cursor tiles then draws row cursor ($60-$63) at the
+; tech-list row given by $95DF[slot] (indexed via $CCFAE3 offset table)
+; into window buffer $A6E1/$A721. Skipped while targeting ($9609 != 0).
+; Then queues the tech window VRAM upload (JSL $CFFD36) and conditionally
+; copies TechBoxBattles ($D15A50) into $0B40 if $A86A != 0.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1 (via CODE_JP_C1103D)
+; Callees: BattleMenu_ClearTechCursorTiles, JSL $CD0027, JSL $CFFD36
+BattleMenu_DrawTechCursorRow:
+    LDA.w $95D5
+    TAX
+    LDA.w $95DF,X                   ; cursor row position (PC1CursorPositionPage)
+    STA.b $80
+    JSR BattleMenu_ClearTechCursorTiles ; clear all cursor tile columns
+    LDA.w $9609                     ; targeting flag
+    BNE .skip_draw                  ; non-zero = targeting, skip cursor draw
+    LDA.b $80                       ; cursor row
+    ASL A
+    TAX
+    REP #$20                        ; M=0: load 16-bit offset from table
+    LDA.l $CCFAE3,X                 ; cursor row tilemap Y offset
+    TAY
+    TDC
+    SEP #$20                        ; M=1
+    LDA #$60
+    STA.w $A6E1,Y                   ; cursor top-left
+    LDA #$61
+    STA.w $A6E3,Y                   ; cursor top-right
+    LDA #$62
+    STA.w $A721,Y                   ; cursor bottom-left
+    LDA #$63
+    STA.w $A723,Y                   ; cursor bottom-right
+.skip_draw:
+    LDA.w $A0DB                     ; SkillItemInfoSetting
+    BPL .queue_upload
+    LDA.w $9EE3                     ; item/skill for info panel
+    JSL $CD0027                     ; BattleMsg_ShowFromTableCC3A09Vec
+.queue_upload:
+    JSL $CFFD36                     ; Battle_QueueVramUpload_A6E1 (CF bank)
+    LDA.w $A86A
+    BEQ .done
+    TDC
+    TAX
+.techbox_loop:
+    LDA.l $D15A50,X                 ; TechBoxBattles data
+    STA.w $0B40,X                   ; copy into WRAM $0B40
+    INX
+    CPX.w #$0180
+    BNE .techbox_loop
+    INC.w $99E2
+    STZ.w $A86A
+.done:
+    JMP CODE_JP_C1103D              ; → shared RTS at $103D
+
+; ==================================================================
+; BattleMenu_ClearTechCursorTiles ($C10EBA–$C10EE0, 39 bytes)
+; ==================================================================
+; Writes $FF over the cursor-column tile slots of all 6 tech-window
+; buffer rows ($A6E3/$A6E5, $A723/$A725, $A763/$A765, $A7A3/$A7A5,
+; $A7E3/$A7E5, $A823/$A825).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; A=$FF; X/Y unchanged
+; No JSR/JSL calls.
+BattleMenu_ClearTechCursorTiles:
+    LDA #$FF
+    STA.w $A6E3
+    STA.w $A6E5
+    STA.w $A723
+    STA.w $A725
+    STA.w $A763
+    STA.w $A765
+    STA.w $A7A3
+    STA.w $A7A5
+    STA.w $A7E3
+    STA.w $A7E5
+    STA.w $A823
+    STA.w $A825
+    RTS
+
+; ==================================================================
+; BattleMenu_UpdateTechMpAvail ($C10EE1–$C1103D, 349 bytes)
+; ==================================================================
+; Per-row tech-availability sweep for the tech window (submenu type 1).
+; For each of 3 tech rows (loop on $82 = 0..2):
+;   - Looks up window-column offset ($CCF39B/C), tech-table ptr ($CCF395/6),
+;     base offset ($CCF38C + scroll $95EB), and row palette slot ($A6D9).
+;   - If slot $94D0,X indicates slot type $FC/$FD (special slots), checks
+;     $A6DE party-size; if condition fails → gray the tech cell (attr $2D).
+;   - Else: resolves battler ptr ($9551 → $CCF3A1 + $AF/$B0),
+;     then checks each PC's MP against the tech MP cost ($1A83/$1A85/$1A86).
+;     If all costs affordable and slot is menu-ready: brightens cell (attr $29).
+;     If not affordable or locked: grays cell (attr $2D).
+;   - Sets $A6E2/A722 columns with computed attr byte (18 entries each).
+;   - On $82 reaching 3: sets $A099 = 1 (mark window as updated).
+; Entry: M=1, X=0, DB=$7E; $95D5 = active PC slot
+; Exit:  M=1 (via CODE_JP_C1103D / fall-through)
+; Callees: BattleSys_SlotMenuReadyPredicate ($103E),
+;          Battle_ShiftRight4 ($011A)
+BattleMenu_UpdateTechMpAvail:
+    LDA.w $95D5
+    ASL A
+    TAX
+    LDA.l $CCF395,X                 ; PC tech-table ptr lo
+    STA.b $AF
+    LDA.l $CCF396,X                 ; PC tech-table ptr hi
+    STA.b $B0
+    LDA.w $95D5
+    TAX
+    TAY
+    LDA.l $CCF38C,X                 ; PC base offset from table
+    STA.b $86
+    LDA.w $95EB,Y                   ; scroll offset (PC1NumberLinesScrolled)
+    CLC
+    ADC.b $86
+    TAX
+    STX.b $86                       ; $86 = base + scroll (row ptr)
+    LDA.w $5E34                     ; PC1 MP lo
+    STA.b $96
+    LDA.w $5E35                     ; PC1 MP hi
+    STA.b $97
+    LDA.w $5EB4                     ; PC2 MP lo
+    STA.b $98
+    LDA.w $5EB5                     ; PC2 MP hi
+    STA.b $99
+    LDA.w $5F34                     ; PC3 MP lo
+    STA.b $9A
+    LDA.w $5F35                     ; PC3 MP hi
+    STA.b $9B
+    TDC
+    TAX
+    STX.b $82                       ; row counter = 0
+    ; outer loop entry point (re-entered via JMP from loop tail):
+CODE_JP_C10F28:
+    LDA.b $82
+    ASL A
+    TAX
+    LDA.l $CCF39B,X                 ; window column ptr lo
+    STA.b $84
+    LDA.l $CCF39C,X                 ; window column ptr hi
+    STA.b $85
+    LDA #$29                        ; default attr = bright (affordable)
+    STA.b $94
+    LDX.b $86
+    LDA.w $94D0,X                   ; slot type byte
+    AND #$F0
+    CMP #$F0
+    BNE _ump_check_battler          ; not special → check battler
+    ; special slot type ($Fxx): further checks
+    LDA.w $94D0,X
+    CMP #$FC
+    BNE _ump_check_fd
+    LDA.w $A6DE                     ; party-size field
+    CMP #$02
+    BCC _ump_set_bright             ; party < 2 → bright (gray the unavail tech)
+    BRA CODE_C10F66_JMP             ; party >= 2 → gray exit
+_ump_check_fd:
+    CMP #$FD
+    BNE CODE_C10F66_JMP             ; not $FC or $FD → gray
+    LDA.w $A6DE
+    CMP #$03
+    BCS CODE_C10F66_JMP             ; party >= 3 → gray
+_ump_set_bright:
+    LDA #$2D                        ; attr = gray (tech unavailable for this party size)
+    STA.b $94
+CODE_C10F66_JMP:                    ; several branches converge here
+    JMP CODE_JP_C1100F              ; → write column attrs
+
+_ump_check_battler:
+    ; resolve battler slot and tech offsets
+    LDA.w $9551,X                   ; battler slot from row ptr
+    TAX
+    LDA.l $CCF3A1,X                 ; battler offset
+    CLC
+    ADC.b $AF                       ; + PC tech-table ptr
+    STA.b $88
+    LDA.b $B0
+    ADC #$00
+    STA.b $89
+    LDX.b $88
+
+    ; check PC1 MP vs tech cost at $1A83,X
+    LDA.w $1A83,X
+    BMI _ump_pc1_ok                 ; negative = cost 0 → ok
+    SEC
+    LDA.b $96                       ; PC1 MP lo
+    SBC.w $1A83,X                   ; − tech cost lo
+    LDA.b $97                       ; PC1 MP hi
+    SBC #$00
+    BCC _L1001                      ; borrow → can't afford
+
+_ump_pc1_ok:
+    ; check PC2 MP vs tech cost at $1A85,X
+    LDA.w $1A85,X
+    BMI _ump_pc2_ok
+    SEC
+    LDA.b $98
+    SBC.w $1A85,X
+    LDA.b $99
+    SBC #$00
+    BCC _L1001
+
+_ump_pc2_ok:
+    ; check PC3 MP vs tech cost at $1A86,X
+    LDA.w $1A86,X
+    BMI _ump_pc3_ok
+    SEC
+    LDA.b $9A
+    SBC.w $1A86,X
+    LDA.b $9B
+    SBC #$00
+    BCC _L1001
+
+_ump_pc3_ok:
+    ; load tech slot id ($1A84,X); check if valid / single / dual
+    LDA.w $1A84,X
+    STA.b $81
+    CMP #$FF                        ; $FF = no tech
+    BEQ _ump_slot_ready             ; → treat as ready (won't show)
+    AND #$0F                        ; tech slot lo nibble
+    STA.b $80
+    JSR BattleSys_SlotMenuReadyPredicate ; A=0 if slot ready
+    BNE _L1001                      ; not ready → gray
+    LDA.b $81
+    AND #$F0
+    CMP #$F0                        ; dual tech marker?
+    BEQ _ump_slot_ready
+    JSR Battle_ShiftRight4          ; shift hi nibble down ($011A)
+    STA.b $80
+    JSR BattleSys_SlotMenuReadyPredicate
+    BNE _L1001
+
+_ump_slot_ready:
+    ; all checks passed: mark bright, check lock status
+    LDA.w $95D5
+    TAX
+    LDA.w $A0D1,X                   ; PC1HasLockStatus
+    BNE _L1001                      ; locked → gray
+    LDX.b $88
+    LDA.w $1A80,X                   ; EventCommand7A7B (battler type)
+    CMP #$74                        ; special type?
+    BNE _ump_write_bright
+    LDX.w $A0FF
+    LDA.w $1C48,X
+    CMP #$42                        ; status check
+    BNE _L1001                      ; fail → gray
+
+_ump_write_bright:
+    LDX.b $88
+    LDA.w $1A82,X
+    AND #$7F                        ; clear gray bit
+    STA.w $1A82,X
+    LDA #$29                        ; bright attr
+    STA.b $94
+    BRA CODE_JP_C1100F              ; → write column attrs
+
+_L1001:                             ; not affordable / locked → gray
+    LDX.b $88
+    LDA.w $1A82,X
+    ORA #$80                        ; set gray bit
+    STA.w $1A82,X
+    LDA #$2D                        ; gray attr
+    STA.b $94
+    ; fall through to CODE_JP_C1100F
+
+CODE_JP_C1100F:                     ; write computed attr to column
+    LDX.b $84                       ; window column ptr
+    LDY.w #$0012                    ; 18 entries
+    LDA.b $94                       ; attr byte
+.col1_loop:
+    STA.w $A6E2,X
+    INX
+    INX
+    DEY
+    BNE .col1_loop
+    LDX.b $84
+    LDY.w #$0012
+.col2_loop:
+    STA.w $A722,X
+    INX
+    INX
+    DEY
+    BNE .col2_loop
+    INC.b $86
+    INC.b $82
+    LDA.b $82
+    CMP #$03
+    BEQ .done
+    JMP CODE_JP_C10F28              ; next row
+.done:
+    LDA #$01
+    STA.w $A099                     ; mark window updated
+CODE_JP_C1103D:                     ; shared exit RTS (jumped to from multiple routines)
+    RTS
+
+; ==================================================================
+; BattleSys_SlotMenuReadyPredicate ($C1103E–$C1104D, 16 bytes)
+; ==================================================================
+; Returns A=0 if battler for slot $80 is menu-ready (slot's $A6D9,X entry
+; is valid / not negative, and $A0D1 lock flag is clear); nonzero otherwise.
+; Entry: M=1, X=0 (16-bit), DB=$7E; $80 = battler slot index
+; Exit:  M=1; A = 0 (ready) or nonzero (not ready); X clobbered
+; No JSR/JSL calls.
+BattleSys_SlotMenuReadyPredicate:
+    LDA.b $80
+    TAX
+    LDA.w $A6D9,X                   ; slot state
+    BMI .not_ready                  ; negative → slot not active
+    TAX
+    LDA.w $A0D1,X                   ; PC1HasLockStatus
+    BNE .not_ready                  ; locked → not ready
+    TDC                             ; A = 0 (ready)
+.not_ready:
+    RTS
+
 ; $C1:104E — BattleMsg_BlankLeadingZeros (32 bytes, $104E–$106D)
 ; Leading-zero suppression for 3-digit HP/reward display.
 ; Checks $949D (hundreds tile): if == $73 (zero-glyph), replaces with $FF (blank).
@@ -1967,4 +2607,25 @@ BattleMsg_BlankLeadingZeros:
     LDA #$FF
     STA.w $949E                     ; blank tens
 .done:
+    RTS
+
+; ==================================================================
+; BattleMenu_LoadCommandWindowMap ($C11C3A–$C11C49, 16 bytes)
+; ==================================================================
+; Loads $180 bytes from bank $D1 (TechBoxBattles at $D15800) into
+; WRAM $7E:0B40. Used to reload the command window tilemap whenever
+; the active PC changes or the menu layout needs refreshing.
+; Entry: M=1, X=0 (16-bit), DB=$7E
+; Exit:  M=1; X=$0180; A = last byte copied; Y unchanged
+; No JSR/JSL calls.
+org $C11C3A
+BattleMenu_LoadCommandWindowMap:
+    TDC
+    TAX
+.load_loop:
+    LDA.l $D15800,X                 ; TechBoxBattles source (bank $D1)
+    STA.w $0B40,X                   ; dest WRAM $0B40
+    INX
+    CPX.w #$0180
+    BNE .load_loop
     RTS
