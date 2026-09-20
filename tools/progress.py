@@ -27,7 +27,15 @@ ASM_DIR         = Path('asm')
 WIKI_DIR        = Path('../chrono-trigger-wiki')
 PROGRESS_MD     = WIKI_DIR / 'docs/PROGRESS.md'
 SUMMARY_SNIPPET = WIKI_DIR / 'docs/includes/progress_summary.md'
+MKDOCS_YML      = WIKI_DIR / 'mkdocs.yml'
+INDEX_MD        = WIKI_DIR / 'docs/index.md'
 ROM_SIZE        = 0x400000   # 4 MB unheadered
+
+# Denominators for the "% of code" stats. These change only if the code/data
+# boundary is re-surveyed (see BANK_MAP.md) -- not on every session.
+TOTAL_CODE_BYTES    = 359278
+BANK_C0_CODE_BYTES  = 61779
+BANK_C1_CODE_BYTES  = 63904
 
 
 def load_rom() -> bytes:
@@ -328,6 +336,87 @@ def write_summary_snippet(total: int, banks: dict[str, int]) -> None:
     print(f'Updated {SUMMARY_SNIPPET}')
 
 
+def fmt_pct(numerator: int, denominator: int) -> str:
+    """'31.56' style: up to 2 decimals, trailing zeros trimmed."""
+    pct = 100.0 * numerator / denominator
+    s = f'{pct:.2f}'.rstrip('0').rstrip('.')
+    return s if '.' in s else s + '.0'
+
+
+def sync_mkdocs_yml(total: int, banks: dict[str, int]) -> None:
+    """
+    Patch the extra.progress numeric fields in mkdocs.yml from parsed
+    PROGRESS.md data. Only touches keys that already exist in the file
+    (bytes_matched, bank_XX_bytes for banks present) -- never adds new keys,
+    never touches functions_matched (not derivable from PROGRESS.md's table
+    structure alone; stays hand-maintained).
+    """
+    if not MKDOCS_YML.exists():
+        return
+    text = MKDOCS_YML.read_text()
+    original = text
+
+    text = re.sub(r'(bytes_matched:\s*)\d+', rf'\g<1>{total}', text)
+    for bank_id, n in banks.items():
+        key = 'bank_' + bank_id.lstrip('$').lower() + '_bytes'
+        text = re.sub(rf'({key}:\s*)\d+', rf'\g<1>{n}', text)
+
+    if text != original:
+        MKDOCS_YML.write_text(text)
+        print(f'Updated {MKDOCS_YML}')
+
+
+def sync_index_md(total: int, banks: dict[str, int]) -> None:
+    """
+    Patch the numeric byte counts in docs/index.md's "Matched regions" table
+    and its bold overall-summary line from parsed PROGRESS.md data. Leaves
+    the prose region descriptions alone -- those are session-written content,
+    not derivable numbers.
+    """
+    if not INDEX_MD.exists():
+        return
+    text = INDEX_MD.read_text()
+    original = text
+
+    # Table rows: | `$XX` | <description> | <bytes> |
+    def replace_row(m: re.Match) -> str:
+        bank_id = m.group(1)
+        n = banks.get(bank_id)
+        if n is None:
+            return m.group(0)
+        return f'| `{bank_id}` |{m.group(2)}| {n:,} |'
+
+    text = re.sub(
+        r'\| `(\$[0-9A-Fa-f]+)` \|(.*)\|\s*[\d,]+\s*\|',
+        replace_row,
+        text,
+    )
+
+    # Bold summary line, e.g.:
+    # **Overall: 24,166 bytes matched — ~6.73% of all game code (359,278 bytes),
+    # ~31.6% of Bank $C0 (61,779 bytes), ~6.57% of Bank $C1 (63,904 bytes).**
+    overall_pct = fmt_pct(total, TOTAL_CODE_BYTES)
+    c0_pct = fmt_pct(banks.get('$C0', 0), BANK_C0_CODE_BYTES)
+    c1_pct = fmt_pct(banks.get('$C1', 0), BANK_C1_CODE_BYTES)
+    new_summary = (
+        f'**Overall: {total:,} bytes matched — ~{overall_pct}% of all game code '
+        f'({TOTAL_CODE_BYTES:,} bytes), ~{c0_pct}% of Bank $C0 '
+        f'({BANK_C0_CODE_BYTES:,} bytes), ~{c1_pct}% of Bank $C1 '
+        f'({BANK_C1_CODE_BYTES:,} bytes).**'
+    )
+    text = re.sub(
+        r'\*\*Overall:.*?bytes\)\.\*\*',
+        lambda _m: new_summary,
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+    if text != original:
+        INDEX_MD.write_text(text)
+        print(f'Updated {INDEX_MD}')
+
+
 def main() -> int:
     update_index = '--update-index' in sys.argv
     legacy_update = '--update' in sys.argv
@@ -349,6 +438,8 @@ def main() -> int:
     if update_index:
         total, banks = parse_progress_md()
         write_summary_snippet(total, banks)
+        sync_mkdocs_yml(total, banks)
+        sync_index_md(total, banks)
 
     return 0
 
