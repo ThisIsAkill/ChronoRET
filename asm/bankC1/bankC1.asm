@@ -24,8 +24,8 @@ BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet match
 org $C11561
 BattleMenu_TargetSelectInput:   ; target-selection submenu input handler; not yet matched
 
-org $C1127B
-BattleMenu_ConfirmCommand:      ; confirm dispatch (attack/magic/item row); not yet matched
+org $C11F79
+BattleMenu_BuildTargetList:     ; builds valid-target list for $960D target mode; not yet matched
 
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
@@ -3002,3 +3002,130 @@ Battle_StopSfx:
     STA.w $1E02
     JSL $C70004
     RTS
+
+; ==================================================================
+; BattleMenu_ConfirmCommand ($C1127B–$C1129B, 33 bytes)
+; ==================================================================
+; Confirm-button dispatch: sets a sentinel at $A0D7 (compared elsewhere,
+; e.g. BattleUI_BuildStatusBarFrame, to force a status-bar refresh),
+; reloads the active-PC pointer via JSL $CFFD9E, then reads the active
+; PC's menu cursor row ($95DC,X: 0/1/2 = Attack/Tech/Item) and tail-
+; jumps to the matching row handler.
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to one of three row handlers, does not fall through
+; Callees: JSL $CFFD9E (BattleFx_SetPtrA2FromTable, cross-bank),
+;          BattleMenu_ChooseAttack, BattleMenu_OpenTechList,
+;          BattleMenu_OpenItemList
+org $C1127B
+BattleMenu_ConfirmCommand:
+    LDA #$FF
+    STA.w $A0D7                     ; sentinel: force refresh elsewhere
+    LDA.w $95D5
+    JSL $CFFD9E                     ; BattleFx_SetPtrA2FromTable (cross-bank)
+    LDA.w $95D5
+    TAX
+    LDA.w $95DC,X                   ; menu cursor row for active PC
+    BNE .not_row0
+    JMP BattleMenu_ChooseAttack
+.not_row0:
+    DEC
+    BNE .not_row1
+    JMP BattleMenu_OpenTechList
+.not_row1:
+    JMP BattleMenu_OpenItemList
+
+; ==================================================================
+; BattleMenu_ChooseAttack ($C1129C–$C112BB, 32 bytes)
+; ==================================================================
+; Row 0 (Attack) confirm: shows the command message, flags two redraws
+; via $A43F, sets target mode $960D=$07 (attack targeting), clears
+; $9615 (submenu-open marker), builds the valid-target list, then
+; enters target-select mode by incrementing $9609.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: JSL $CD002D (BattleMsg_ShowMsg0BIfKeyChangedVec, cross-bank),
+;          BattleMenu_BuildTargetList, Battle_ZeroResultEE
+org $C1129C
+BattleMenu_ChooseAttack:
+    LDA #$FF
+    JSL $CD002D                     ; BattleMsg_ShowMsg0BIfKeyChangedVec (cross-bank)
+    INC.w $A43F                     ; flag redraw
+    INC.w $A43F                     ; flag redraw (twice)
+    LDA #$07
+    STA.w $960D                     ; target mode: attack
+    STZ.w $9615                     ; submenu-open marker: none
+    JSR BattleMenu_BuildTargetList
+    INC.w $A4EE
+    INC.w $9609                     ; enter target-select mode
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_OpenTechList ($C112BC–$C112EC, 49 bytes)
+; ==================================================================
+; Row 1 (Tech) confirm: unless $A0A7 bit 0 is set (tech list locked),
+; renders the tech list rows, builds per-tech availability flags,
+; switches the submenu to tech ($95DB=1, $9615=1), and marks the tech
+; window active ($A86A).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_RenderTechListRows, BattleMenu_BuildTechAvailFlags,
+;          Battle_ZeroResultEE
+org $C112BC
+BattleMenu_OpenTechList:
+    LDA.w $A0A7
+    AND #$01
+    BNE .exit                       ; tech list locked -> no-op
+    LDA #$FF
+    STA.w $9EE7
+    STZ.w $A09A
+    STZ.w $A099
+    INC.w $A862
+    JSR BattleMenu_RenderTechListRows
+    JSR BattleMenu_BuildTechAvailFlags
+    STZ.w $A862
+    LDA #$01
+    STA.w $9615                     ; submenu-open marker: tech
+    LDA #$01
+    STA.w $95DB                     ; submenu type: tech list
+    STZ.w $A869
+    INC.w $A86A                     ; mark tech window active
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_OpenItemList ($C112ED–$C1131F, 51 bytes)
+; ==================================================================
+; Row 2 (Item) confirm: unless $A0A7 is set (item list locked), renders
+; the item list rows, queues the $0E80 tilemap for VRAM upload, copies
+; the $180-byte item-window graphic (ROM $D15BD0, "ItemBoxBattles")
+; into the command-window tilemap $0B40, and switches the submenu to
+; item ($95DB=2).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_RenderItemListRows,
+;          JSL $CFFD6A (Battle_QueueVramUpload_0E80, cross-bank),
+;          Battle_ZeroResultEE
+org $C112ED
+BattleMenu_OpenItemList:
+    LDA.w $A0A7
+    BNE .exit                       ; item list locked -> no-op
+    STZ.w $A09A
+    LDA #$02
+    STA.w $9615                     ; submenu-open marker: item
+    LDA.w $95E6                     ; item-list scroll position
+    STA $80
+    JSR BattleMenu_RenderItemListRows
+    JSL $CFFD6A                     ; Battle_QueueVramUpload_0E80 (cross-bank)
+    TDC
+    TAX
+.copy_loop:
+    LDA.l $D15BD0,X                 ; ItemBoxBattles (bank $D1)
+    STA.w $0B40,X
+    INX
+    CPX #$0180
+    BNE .copy_loop
+    INC.w $99E2
+    LDA #$02
+    STA.w $95DB                     ; submenu type: item list
+.exit:
+    JMP Battle_ZeroResultEE
