@@ -21,15 +21,6 @@ BattleMenu_TechListInput:       ; tech-list submenu input handler; not yet match
 org $C1143D
 BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet matched
 
-org $C1161A
-BattleMenu_CommitAction:        ; builds command record + enqueues confirmed action; not yet matched
-
-org $C1176C
-BattleMenu_TargetNext:          ; cycle target selection forward; not yet matched
-
-org $C11786
-BattleMenu_TargetPrev:          ; cycle target selection backward; not yet matched
-
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
 
@@ -3472,3 +3463,248 @@ BattleMenu_TargetSelectInput:
     JMP BattleMenu_TargetPrev
 .exit:
     JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_CommitAction ($C1161A–$C11749, 308 bytes)
+; ==================================================================
+; Confirms the currently-selected target and builds the command
+; record for the active PC's chosen action (attack/tech/item), then
+; enqueues it and hands the menu focus to the next ready battler.
+;
+; Restores whichever submenu was saved for cancel-to-return ($A86B),
+; then dispatches on $95DB (0=attack, 1=tech, 2=item) to fill in
+; type-specific fields:
+;   attack: $80=$80 (type flag), $82=$FF (no tech/item id)
+;   tech:   saves cursor position if $A0D5 set; consumes the primary
+;           partner slot from $9EE7's low nibble (and, for a triple-
+;           tech, the high nibble too via Battle_ShiftRight4) so those
+;           slots don't also act this round; $80=$20, $82/$84 = tech
+;           id/table row from $9EE7/$9EE3
+;   item:   decrements the item's stock count ($1583,X from $9F36),
+;           $80=$40, $82=$FF, $84=item id ($9F35); clears the item-
+;           list scroll position unless $A0D5 is set
+; All three converge to build/queue the record: save the current
+; menu-cursor row as this PC's remembered row (unless $A114 override
+; is set) via BattleUI's $9916 table, then write an 8-byte command
+; record at $93EE+(sprite index from $CCFAF0 lookup): type byte
+; (bit 6 = "queued"), the $80/$9F38 flag byte, submenu type ($9615),
+; target ($A62D), and the tech/item id pair ($82/$84). Finally clears
+; this PC's roster slot, advances the active-PC index/count, and
+; scans for another valid roster slot to promote (or clears active-PC
+; if none remain — same shape as BattleMenu_RemoveBattlerFromReady's
+; tail).
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_ConsumePartnerSlot, Battle_ShiftRight4,
+;          Battle_ZeroResultEE
+org $C1161A
+BattleMenu_CommitAction:
+    LDA.w $A86B                     ; saved submenu type (cancel target)
+    BEQ .dispatch
+    DEC
+    STA.w $95DB
+    STZ.w $A86B
+.dispatch:
+    DEC.w $9609                     ; leave target-select mode
+    LDA.w $95DB                     ; confirmed submenu: 0=attack,1=tech,2=item
+    BNE .not_attack
+    LDA #$80                        ; type flag: attack
+    STA $80
+    LDA #$FF                        ; no tech/item id
+    STA $82
+    BRA .after_type
+.not_attack:
+    DEC
+    BNE .item_path
+    LDA.w $A0D5                     ; save-skill-cursor setting
+    BEQ .tech_partner_check
+    LDA.w $95D5
+    TAX
+    LDA.w $95EB,X
+    STA.w $A866,X
+    LDA.w $95DF,X
+    STA.w $A863,X
+    LDA.w $9EE3
+    STA.w $A0D8,X
+.tech_partner_check:
+    LDA.w $9EE7                     ; dual/triple-tech partner nibbles
+    CMP #$FF
+    BEQ .tech_type_fields
+    AND #$0F                        ; primary partner slot
+    STA $80
+    JSR BattleMenu_ConsumePartnerSlot
+    LDA.w $9EE7
+    AND #$F0
+    CMP #$F0
+    BEQ .tech_type_fields
+    JSR Battle_ShiftRight4          ; secondary partner slot (triple-tech)
+    STA $80
+    JSR BattleMenu_ConsumePartnerSlot
+.tech_type_fields:
+    LDA.w $9EE7
+    STA $82                          ; tech id
+    LDA.w $9EE3
+    STA $84                          ; tech table row
+    LDA #$20                        ; type flag: tech
+    STA $80
+    BRA .after_type
+.item_path:
+    LDX.w $9F36                     ; item slot
+    DEC.w $1583,X                   ; decrement stock count
+    LDA #$FF
+    STA.w $9920
+    LDA #$40                        ; type flag: item
+    STA $80
+    LDA.w $9F35                     ; item id
+    STA $84
+    LDA #$FF                        ; no tech id
+    STA $82
+    LDA.w $A0D5                     ; save-skill-cursor setting
+    BNE .after_type
+    STZ.w $95E5
+    STZ.w $95E6
+.after_type:
+    LDA.w $A114                     ; cursor-row override flag
+    BNE .cursor_done
+    LDA.w $95D5
+    TAX
+    LDA.w $95DC,X                   ; current menu cursor row
+    STA.w $9916,X                   ; remember for this PC
+    LDA.w $A0D4                     ; cursor-position-save setting
+    BNE .cursor_done
+    STZ.w $95DC
+    STZ.w $95DD
+    STZ.w $95DE
+    STZ.w $9916
+    STZ.w $9917
+    STZ.w $9918
+.cursor_done:
+    STZ.w $A114
+    STZ.w $960E
+    STZ.w $9614
+    STZ.w $A09A
+    LDA.w $99D8                     ; command queue count
+    TAX
+    LDA.w $95D5
+    TAY
+    STA.w $99D4,X                   ; enqueue this PC's slot
+    TAX
+    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    TAX
+    LDA.w $93EE,X
+    AND #$7F
+    ORA #$40                        ; mark queued
+    STA.w $93EE,X
+    LDA $80                          ; type flag
+    ORA.w $9F38,Y
+    STA.w $93EF,X
+    LDA.w $9615                     ; submenu type
+    STA.w $93F0,X
+    LDA.w $A62D                     ; confirmed target
+    STA.w $93F1,X
+    LDA $82                          ; tech id (or $FF)
+    STA.w $93F3,X
+    LDA $84                          ; item id / tech table row
+    STA.w $93F4,X
+    INC.w $99D8
+    STZ.w $95DB                     ; back to main menu
+    LDA #$FE
+    STA.w $A6DF                     ; force command-window reload
+    DEC.w $A6DE                     ; active PC count
+    LDA.w $95D5
+    TAX
+    LDA #$FF
+    STA.w $A6D9,X                   ; clear this PC's roster slot
+    TDC
+    TAX
+.find_next_active:
+    LDA.w $A6D9,X                   ; next roster slot's presence value
+    STA.w $A6DD
+    STA.w $95D5
+    BPL .done                       ; found a valid slot -> promote it
+    INX
+    CPX #$0003
+    BNE .find_next_active
+    LDA #$FF                        ; none left -> no active PC
+    STA.w $A6DD
+    STA.w $95D5
+.done:
+    STZ.w $A862
+    STZ.w $99E0
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ConsumePartnerSlot ($C1174E–$C1176B, 30 bytes)
+; ==================================================================
+; Removes battler slot $80 from the ready/active state as part of
+; committing a dual/triple-tech: if it's currently the active roster
+; slot, decrements the active-PC count; either way marks the slot
+; absent ($A6D9,X = $FF) and clears the "queued" bit of its sprite
+; flag byte at $93EE (via the same $CCFAF0 slot->sprite lookup used in
+; BattleMenu_CommitAction).
+; Entry: M=1, X=0, DB=$7E; $80 = partner battler slot
+; Exit:  M=1; registers clobbered
+; No JSR/JSL calls.
+org $C1174E
+BattleMenu_ConsumePartnerSlot:
+    LDA $80
+    TAX
+    LDA.w $A6D9,X
+    BMI .clear_slot
+    DEC.w $A6DE                     ; active PC count
+.clear_slot:
+    LDA #$FF
+    STA.w $A6D9,X                   ; mark slot absent
+    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    TAX
+    LDA.w $93EE,X
+    AND #$7F                        ; clear "queued" bit
+    STA.w $93EE,X
+    RTS
+
+; ==================================================================
+; BattleMenu_TargetNext ($C1176C–$C11785, 26 bytes)
+; ==================================================================
+; Right/Down while cycling targets: advance $9614 (wrap at 11), skip
+; candidate-list slots whose $99C0,X entry is invalid, store the
+; landed battler id to $A62D.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C1176C
+BattleMenu_TargetNext:
+    INC.w $9614
+    LDA.w $9614
+    CMP #$0B
+    BNE .have_index
+    TDC
+    STA.w $9614
+.have_index:
+    TAX
+    LDA.w $99C0,X                   ; candidate list entry
+    BMI BattleMenu_TargetNext       ; invalid -> keep advancing
+    STA.w $A62D
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_TargetPrev ($C11786–$C1179B, 22 bytes)
+; ==================================================================
+; Left/Up while cycling targets: mirror of TargetNext — decrement
+; $9614 (wrap to 10) instead of incrementing. Falls straight through
+; into Battle_ZeroResultEE (no JMP needed; they're adjacent in ROM).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; falls through to Battle_ZeroResultEE
+; No JSR/JSL calls.
+org $C11786
+BattleMenu_TargetPrev:
+    DEC.w $9614
+    LDA.w $9614
+    BPL .have_index
+    LDA #$0A
+    STA.w $9614
+.have_index:
+    TAX
+    LDA.w $99C0,X                   ; candidate list entry
+    BMI BattleMenu_TargetPrev       ; invalid -> keep decrementing
+    STA.w $A62D
