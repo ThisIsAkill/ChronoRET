@@ -3248,3 +3248,102 @@ BattleMenu_DequeueReadyBattler:
     STA.w $A6DD                     ; make the dequeued battler active
 .exit:
     RTS
+
+; ==================================================================
+; BattleMenu_RemoveBattlerFromReady ($C11BAA–$C11C39, 144 bytes)
+; ==================================================================
+; Service 2 of the cross-bank $C10045 service API (see the entry-vector
+; table near the top of this bank). Removes battler slot $A1 from the
+; menu-ready state, whether it's currently queued (in $95D6-$95D9) or
+; already the active menu PC.
+;
+; If queued: scans the queue for a matching entry and shifts everything
+; after it down by one (a generalized version of DequeueReadyBattler's
+; shift, starting from wherever the match was found instead of always
+; slot 0), then decrements the queue count.
+;
+; If it's the active roster slot ($A6D9,X non-negative): decrements the
+; active-PC count. If it wasn't the currently-displayed active PC
+; ($95D5), just clears its roster presence and forces a redraw. If it
+; WAS the active PC, additionally cancels any open submenu/targeting
+; state ($9609/$960E/$9614/$95DB/$99E0), clears its roster slot, then
+; scans for another valid roster slot to promote to active (or sets
+; "no active PC" if none remain).
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot to remove
+; Exit:  M=1; registers clobbered
+; Callees: BattleMenu_LoadCommandWindowMap
+org $C11BAA
+BattleMenu_RemoveBattlerFromReady:
+    TDC
+    TAX
+    LDA $A1                         ; battler slot to remove
+    STA $80
+    TAX
+    LDA.w $A6D9,X                   ; roster presence value for this slot
+    BPL .active_roster
+    TDC
+    TAX
+    LDA $80
+.scan_queue:
+    CMP.w $95D6,X
+    BEQ .shift_queue
+    INX
+    CPX #$0003
+    BNE .scan_queue
+    RTS                              ; not queued -> nothing to remove
+.shift_queue:
+    LDA.w $95D7,X
+    STA.w $95D6,X
+    INX
+    CPX #$0003
+    BCC .shift_queue
+    DEC.w $95DA                     ; queue count
+    RTS
+.active_roster:
+    DEC.w $A6DE                     ; active PC count
+    CMP.w $95D5                     ; is this slot the current active PC?
+    BEQ .removing_active_pc
+    LDA $A1
+    TAX
+    LDA #$FF
+    STA.w $A6D9,X                   ; clear roster presence
+    LDA #$FE
+    STA.w $A6DF                     ; force command-window reload
+    BRA .redraw
+.removing_active_pc:
+    LDA.w $A86B                     ; saved submenu type (cancel target)
+    BEQ .clear_targeting
+    DEC
+    STA.w $95DB
+    STZ.w $A86B
+    STZ.w $A09A
+.clear_targeting:
+    STZ.w $9609                     ; target-select mode
+    STZ.w $960E
+    STZ.w $9614
+    STZ.w $95DB                     ; submenu type -> main
+    STZ.w $99E0
+    LDA #$FE
+    STA.w $A6DF                     ; force command-window reload
+    LDA $A1
+    TAX
+    LDA #$FF
+    STA.w $A6D9,X                   ; clear roster presence
+    TDC
+    TAX
+.find_next_active:
+    LDA.w $A6D9,X                   ; next roster slot's presence value
+    STA.w $A6DD
+    STA.w $95D5
+    BPL .redraw                     ; found a valid slot -> promote it
+    INX
+    CPX #$0003
+    BNE .find_next_active
+    LDA #$FF                        ; none left -> no active PC
+    STA.w $A6DD
+    STA.w $95D5
+.redraw:
+    JSR BattleMenu_LoadCommandWindowMap
+    STZ.w $A862
+    RTS
