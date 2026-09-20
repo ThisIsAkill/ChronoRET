@@ -24,9 +24,6 @@ BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet match
 org $C11561
 BattleMenu_TargetSelectInput:   ; target-selection submenu input handler; not yet matched
 
-org $C11F79
-BattleMenu_BuildTargetList:     ; builds valid-target list for $960D target mode; not yet matched
-
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
 
@@ -3129,3 +3126,78 @@ BattleMenu_OpenItemList:
     STA.w $95DB                     ; submenu type: item list
 .exit:
     JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_BuildTargetList ($C11F79–$C11FDC, 100 bytes)
+; ==================================================================
+; Resets the target-selection state ($9613/$960A/$960C/$A64F/$A6D8),
+; blanks the 11-entry candidate list ($99C0-$99CA) and selection list
+; ($A62D-$A637) to $FF, then — unless already in a "return to main
+; menu on cancel" state — snapshots the current submenu type into
+; $A86B and reloads the command window map so cancelling target-select
+; comes back to the right screen.
+;
+; The actual target-collection work is fully mode-specific: it clamps
+; $960D (target mode, low 7 bits) to $00-$20, doubles it for a word
+; index, and JSRs indirectly through a jump table at $11FF8 (bank-
+; local target-mode handler table; the individual handlers and the
+; table's contents are a separate, much larger unmatched targeting
+; subsystem — see BANK_MAP.md). After the handler returns, if every
+; slot in the selection list is empty (all $FF), the result byte $9613
+; is set from whatever value fell out of the scan (defensive fallback
+; for "no valid targets").
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; X/Y clobbered
+; Callees: BattleMenu_LoadCommandWindowMap; JSR ($1FF8,X) into the
+;          (unmatched) target-mode handler table
+org $C11F79
+BattleMenu_BuildTargetList:
+    LDA.w $95D5                     ; active PC slot
+    TAX
+    STX.w $960F                     ; remember requesting slot
+    STZ.w $9613                     ; result: no target yet
+    STZ.w $960C
+    STZ.w $960A
+    STZ.w $A64F
+    STZ.w $A6D8
+    LDX #$000B
+    LDA #$FF
+.clear_loop:
+    STA.w $99C0,X                   ; candidate list slot -> empty
+    STA.w $A62D,X                   ; selection list slot -> empty
+    DEX
+    BPL .clear_loop
+    LDA.w $960D                     ; target mode
+    BPL .have_mode
+    LDA.w $A86B                     ; saved submenu type (cancel target)
+    BNE .have_mode
+    LDA.w $95DB                     ; current submenu type
+    INC
+    STA.w $A86B                     ; save it for cancel-to-return
+    STZ.w $95DB
+    LDA #$FE
+    STA.w $A6DF
+    INC.w $A09A
+    JSR BattleMenu_LoadCommandWindowMap
+.have_mode:
+    LDA.w $960D
+    AND #$7F                        ; strip high bit
+    CMP #$21
+    BCC .in_range
+    LDA #$20                        ; clamp to table size
+.in_range:
+    ASL                             ; word index
+    TAX
+    JSR ($1FF8,X)                   ; target-mode handler table (unmatched)
+    TDC
+    TAX
+.scan_empty:
+    LDA.w $A62D,X                   ; selection list slot
+    BPL .done                       ; found a real target -> done
+    INX
+    CPX #$000B
+    BNE .scan_empty
+    STA.w $9613                     ; all empty -> fallback result
+.done:
+    RTS
