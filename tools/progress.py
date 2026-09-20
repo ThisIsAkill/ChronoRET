@@ -281,13 +281,13 @@ def parse_progress_md() -> tuple[int, dict[str, tuple[str, int]]]:
 
     # Bank sections: "### Bank $C0 — `...` (2098 bytes)"
     bank_re = re.compile(
-        r'^#{2,3}\s+Bank\s+(\$[0-9A-Fa-f]+)\s+[—–-]\s+`[^`]+`\s+\((\d+)\s+bytes',
+        r'^#{2,3}\s+Bank\s+(\$[0-9A-Fa-f]+)\s+[—–-]\s+`[^`]+`\s+\(([\d,]+)\s+bytes',
         re.MULTILINE,
     )
     banks: dict[str, tuple[str, int]] = {}
     for m in bank_re.finditer(text):
         bank_id = m.group(1).upper()
-        byte_count = int(m.group(2))
+        byte_count = int(m.group(2).replace(',', ''))
         banks[bank_id] = byte_count
 
     return total, banks
@@ -298,6 +298,7 @@ def write_summary_snippet(total: int, banks: dict[str, int]) -> None:
     bank_descriptions = {
         '$00': 'Boot vectors, wave tables, ROM header',
         '$C0': 'Engine core — GameLoop, VBlank, OAM, sprite render',
+        '$C1': 'Battle engine — math utilities, status-bar UI, menu rendering',
         '$FD': 'MainInit (CPU/PPU init sequence)',
     }
 
