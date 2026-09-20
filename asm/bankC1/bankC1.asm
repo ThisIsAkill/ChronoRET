@@ -12,6 +12,19 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
+; Label stubs — no bytes emitted; used for JSR/JSL targets
+; ============================================================
+
+org $C11153
+BattleMenu_ProcessInput:        ; battle command-window input handler; not yet matched
+
+org $C117DD
+BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
+
+org $C11B67
+BattleMenu_DequeueReadyBattler: ; pops next ATB-ready battler into the menu queue; not yet matched
+
+; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
 
@@ -2628,4 +2641,104 @@ BattleMenu_LoadCommandWindowMap:
     INX
     CPX.w #$0180
     BNE .load_loop
+    RTS
+
+; ==================================================================
+; BattleMenu_RefreshIfDirtyL ($C110E3–$C110F9, 23 bytes)
+; ==================================================================
+; JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the
+; bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3.
+; If the menu-dirty flag $993A is set: clear it and rerun the full
+; menu rebuild chain (dequeue ready battler, update windows, process
+; input, redraw cursor overlay). Returns with RTL (long return) since
+; callers reach this via JSL through the $C10012 vector, not a
+; same-bank JSR.
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; registers clobbered by callees
+; Callees: BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
+;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay
+org $C110E3
+BattleMenu_RefreshIfDirtyL:
+    LDA.w $993A                     ; menu-dirty flag
+    BEQ .exit
+    STZ.w $993A                     ; clear flag
+    STZ $E5
+    JSR BattleMenu_DequeueReadyBattler
+    JSR BattleMenu_UpdateWindows
+    JSR BattleMenu_ProcessInput
+    JSR BattleMenu_UpdateCursorOverlay
+.exit:
+    RTL
+
+; ==================================================================
+; BattleMenu_RefreshIfDirtyAndTick ($C110FA–$C11114, 27 bytes)
+; ==================================================================
+; Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty-
+; flag gate and menu rebuild chain, but always follows up with a
+; cross-bank per-frame service tick (JSL $CD0009) before returning via
+; plain RTS. Called from several places in the battle-phase state
+; machine ($C140A3 and others) once per frame.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; registers clobbered by callees
+; Callees: BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
+;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay,
+;          JSL $CD0009 (cross-bank per-frame service tick)
+org $C110FA
+BattleMenu_RefreshIfDirtyAndTick:
+    LDA.w $993A                     ; menu-dirty flag
+    BEQ .tick
+    STZ.w $993A                     ; clear flag
+    STZ $E5
+    JSR BattleMenu_DequeueReadyBattler
+    JSR BattleMenu_UpdateWindows
+    JSR BattleMenu_ProcessInput
+    JSR BattleMenu_UpdateCursorOverlay
+.tick:
+    JSL $CD0009                     ; per-frame service tick (cross-bank)
+    RTS
+
+; ==================================================================
+; BattleMenu_DrawCursorSprites ($C11115–$C11152, 62 bytes)
+; ==================================================================
+; Builds the 4 OAM entries for the command-window selection cursor at
+; WRAM $0700, positioned relative to the active PC slot ($95D5). Reads
+; a 4-tile x/y/tile/attr template from ROM table $CCF604-$CCF607
+; (indexed by X = 0,4,8,12) and adds per-slot cursor coordinates from
+; $1D0C,Y (X-origin) / $1D23,Y (Y-origin). The attribute byte's low
+; palette bits are replaced from the current cursor-flash palette
+; ($9F46). Also marks OAM high-table byte $0900 = $AA (all 4 sprites
+; present, size bit set). Called from BattleMenu_ProcessInput once per
+; frame while the command menu is active.
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; X=$0010; A/Y clobbered
+; No JSR/JSL calls.
+org $C11115
+BattleMenu_DrawCursorSprites:
+    TDC
+    TAX
+    LDA.w $95D5                     ; active PC slot
+    TAY
+.loop:
+    CLC
+    LDA.l $CCF604,X                 ; template X-offset
+    ADC.w $1D0C,Y                   ; + slot cursor X-origin
+    STA.w $0700,X                   ; OAM X
+    CLC
+    LDA.l $CCF605,X                 ; template Y-offset
+    ADC.w $1D23,Y                   ; + slot cursor Y-origin
+    STA.w $0701,X                   ; OAM Y
+    LDA.l $CCF606,X                 ; template tile index
+    STA.w $0702,X
+    LDA.l $CCF607,X                 ; template attr byte
+    AND #$F1                        ; clear palette bits, keep priority/flip
+    ORA.w $9F46                     ; OR in current cursor-flash palette
+    STA.w $0703,X
+    INX
+    INX
+    INX
+    INX
+    CPX #$0010
+    BNE .loop
+    LDA #$AA
+    STA.w $0900                     ; OAM high-table: all 4 sprites, size bit
     RTS
