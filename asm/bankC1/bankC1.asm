@@ -15,8 +15,17 @@ incsrc "../hardware.inc"
 ; Label stubs — no bytes emitted; used for JSR/JSL targets
 ; ============================================================
 
-org $C11153
-BattleMenu_ProcessInput:        ; battle command-window input handler; not yet matched
+org $C11320
+BattleMenu_TechListInput:       ; tech-list submenu input handler; not yet matched
+
+org $C1143D
+BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet matched
+
+org $C11561
+BattleMenu_TargetSelectInput:   ; target-selection submenu input handler; not yet matched
+
+org $C1127B
+BattleMenu_ConfirmCommand:      ; confirm dispatch (attack/magic/item row); not yet matched
 
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
@@ -2741,4 +2750,255 @@ BattleMenu_DrawCursorSprites:
     BNE .loop
     LDA #$AA
     STA.w $0900                     ; OAM high-table: all 4 sprites, size bit
+    RTS
+
+; ==================================================================
+; BattleMenu_ProcessInput ($C11153–$C111E0, 142 bytes)
+; ==================================================================
+; Battle command-window input handler, called once per frame from the
+; menu dirty-flag gates (RefreshIfDirtyL/AndTick). Reads two pad-edge
+; bytes ($EE, $EF — button/D-pad bits that went low-to-high this
+; frame) and dispatches:
+;   - no active PC ($95D5 < 0) or target-select active ($9609 != 0):
+;     bail out early (ZeroResultEE / TargetSelectInput)
+;   - submenu type ($95DB): 1 = tech list, 2 = item list, 0 = main menu
+;   - main menu: $A862 (force-confirm) or $EE bit $40 (with $A0D4 cursor-
+;     save setting) can jump straight to ConfirmCommand; otherwise polls
+;     $EF for Left/Up/Down/Right (cycle PC / move cursor) and $EE bit
+;     $80 for confirm
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Callees: JSL $CFFAE2 (Battle_MergePendingEntries1580, cross-bank),
+;          BattleMenu_TargetSelectInput, BattleMenu_DrawCursorSprites,
+;          BattleMenu_TechListInput, BattleMenu_ItemListInput,
+;          BattleMenu_ConfirmCommand, BattleMenu_CycleActivePcPrev,
+;          BattleMenu_CycleActivePcNext, BattleMenu_CursorUp,
+;          BattleMenu_CursorDown, Battle_StopSfx, Battle_ZeroResultEE
+org $C11153
+BattleMenu_ProcessInput:
+    JSL $CFFAE2                     ; Battle_MergePendingEntries1580 (cross-bank)
+    LDA.w $95D5                     ; active PC slot index
+    BPL .slot_valid
+    JMP Battle_ZeroResultEE         ; no active PC -> clear pad-edge bytes, return
+.slot_valid:
+    LDA.w $9609                     ; target-select active flag
+    BEQ .not_targeting
+    JMP BattleMenu_TargetSelectInput
+.not_targeting:
+    JSR BattleMenu_DrawCursorSprites
+    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item
+    BEQ .main_menu
+    DEC
+    BNE .item_menu
+    LDA.w $99E1                     ; battle-mode setting
+    STA.w $99E0
+    JMP BattleMenu_TechListInput
+.item_menu:
+    LDA.w $99E1
+    STA.w $99E0
+    JMP BattleMenu_ItemListInput
+.main_menu:
+    STZ.w $A09A
+    STZ.w $99E0
+    LDA.w $A862
+    BNE .confirm                    ; force-confirm flag set -> skip input polling
+    LDA.w $A0D4                     ; cursor-position-save setting
+    BEQ .poll_dpad
+    LDA.w $95D5
+    TAX
+    LDA $EE                         ; pad-edge byte (button bits)
+    AND #$40
+    BEQ .poll_dpad
+    INC.w $A114
+    TDC
+    STA.w $95DC,X                   ; force cursor row 0 for this slot
+    JMP BattleMenu_ConfirmCommand
+.poll_dpad:
+    LDA $EF                         ; pad-edge byte (D-pad bits)
+    AND #$02                        ; Left
+    BEQ .poll_up
+    JMP BattleMenu_CycleActivePcPrev
+.poll_up:
+    LDA $EF
+    AND #$08                        ; Up
+    BEQ .poll_down
+    JSR Battle_StopSfx
+    JMP BattleMenu_CursorUp
+.poll_down:
+    LDA $EF
+    AND #$04                        ; Down
+    BEQ .poll_right
+    JSR Battle_StopSfx
+    JMP BattleMenu_CursorDown
+.poll_right:
+    LDA $EF
+    AND #$01                        ; Right
+    BEQ .poll_confirm
+    JMP BattleMenu_CycleActivePcNext
+.poll_confirm:
+    LDA $EE
+    AND #$80                        ; confirm button
+    BEQ .no_input
+    JSR Battle_StopSfx
+.confirm:
+    JMP BattleMenu_ConfirmCommand
+.no_input:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_CycleActivePcPrev ($C111E1–$C11217, 55 bytes)
+; ==================================================================
+; Left D-pad: decrement active PC index $A6DD (wrap 0..2), skipping
+; slots whose $A6D9 entry is invalid (negative). Plays the cursor-move
+; SFX unless $A6DE (active PC count) is 1. Carries the previous slot's
+; cursor row ($95DC) to the newly-active slot, unless $A0D4 (cursor-
+; position-save setting) is set, in which case it instead overwrites
+; $95DC for the OLD slot from a per-PC default-row table ($9916) — a
+; path the reference disassembly marks as unreachable in practice.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_StopSfx, Battle_ZeroResultEE
+org $C111E1
+BattleMenu_CycleActivePcPrev:
+    LDA.w $A6DE                     ; active PC count
+    DEC
+    BEQ .retry                      ; only 1 PC -> skip the cursor-move sound
+    JSR Battle_StopSfx
+.retry:
+    DEC.w $A6DD                     ; active PC index, wrap 0..2
+    LDA.w $A6DD
+    BPL .have_index
+    LDA #$02
+    STA.w $A6DD
+.have_index:
+    TAX
+    LDA.w $A6D9,X                   ; slot valid?
+    BMI .retry                      ; invalid slot -> keep decrementing
+    TAX
+    LDA.w $95D5                     ; previous active slot
+    TAY
+    LDA.w $A0D4                     ; cursor-position-save setting
+    BNE .default_row                ; (reference: unreachable in practice)
+    LDA.w $95DC,Y                   ; carry cursor row from old slot
+    STA.w $95DC,X
+    BRA .done
+.default_row:
+    LDA.w $9916,Y                   ; per-PC default cursor row
+    STA.w $95DC,Y
+.done:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_CycleActivePcNext ($C11218–$C1124F, 56 bytes)
+; ==================================================================
+; Right D-pad: mirror of CycleActivePcPrev — increment $A6DD (wrap at
+; 3 back to 0) instead of decrementing.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_StopSfx, Battle_ZeroResultEE
+org $C11218
+BattleMenu_CycleActivePcNext:
+    LDA.w $A6DE                     ; active PC count
+    DEC
+    BEQ .retry
+    JSR Battle_StopSfx
+.retry:
+    INC.w $A6DD                     ; active PC index, wrap at 3 -> 0
+    LDA.w $A6DD
+    CMP #$03
+    BNE .have_index
+    STZ.w $A6DD
+    TDC
+.have_index:
+    TAX
+    LDA.w $A6D9,X                   ; slot valid?
+    BMI .retry                      ; invalid slot -> keep incrementing
+    TAX
+    LDA.w $95D5                     ; previous active slot
+    TAY
+    LDA.w $A0D4                     ; cursor-position-save setting
+    BNE .default_row                ; (reference: unreachable in practice)
+    LDA.w $95DC,Y                   ; carry cursor row from old slot
+    STA.w $95DC,X
+    BRA .done
+.default_row:
+    LDA.w $9916,Y                   ; per-PC default cursor row
+    STA.w $95DC,Y
+.done:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_CursorUp ($C11250–$C11263, 20 bytes)
+; ==================================================================
+; Up D-pad: decrement the active PC's menu cursor row $95DC (wrap 0..2),
+; flag a redraw via $A43F.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C11250
+BattleMenu_CursorUp:
+    LDA.w $95D5                     ; active PC slot
+    TAX
+    DEC.w $95DC,X
+    BPL .done
+    LDA #$02
+    STA.w $95DC,X
+.done:
+    INC.w $A43F                     ; flag redraw
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_CursorDown ($C11264–$C1127A, 23 bytes)
+; ==================================================================
+; Down D-pad: increment the active PC's menu cursor row $95DC, wrap at
+; 3 back to 0, flag a redraw via $A43F.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C11264
+BattleMenu_CursorDown:
+    LDA.w $95D5                     ; active PC slot
+    TAX
+    INC.w $95DC,X
+    LDA.w $95DC,X
+    CMP #$03
+    BNE .done
+    STZ.w $95DC,X
+.done:
+    INC.w $A43F                     ; flag redraw
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; Battle_ZeroResultEE ($C1179C–$C117A0, 5 bytes)
+; ==================================================================
+; Clears both pad-edge bytes ($EE, $EF) and returns. Shared tail used
+; by most of the command-window input handlers above once they've
+; consumed this frame's input.
+; Entry: M=1, DB=$7E
+; Exit:  M=1; $EE=$EF=0
+; No JSR/JSL calls.
+org $C1179C
+Battle_ZeroResultEE:
+    STZ $EE
+    STZ $EF
+    RTS
+
+; ==================================================================
+; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
+; ==================================================================
+; SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90
+; pattern): sets $1E00-$1E02 and JSLs into the audio driver entry.
+; Used here to play/cancel a sound cue when the cursor moves or a
+; command is confirmed.
+; Entry: M=1, DB=$7E
+; Exit:  M=1
+; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+org $C11B55
+Battle_StopSfx:
+    STZ.w $1E01
+    LDA #$19
+    STA.w $1E00
+    LDA #$80
+    STA.w $1E02
+    JSL $C70004
     RTS
