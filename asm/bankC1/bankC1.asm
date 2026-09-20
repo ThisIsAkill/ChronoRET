@@ -21,8 +21,14 @@ BattleMenu_TechListInput:       ; tech-list submenu input handler; not yet match
 org $C1143D
 BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet matched
 
-org $C11561
-BattleMenu_TargetSelectInput:   ; target-selection submenu input handler; not yet matched
+org $C1161A
+BattleMenu_CommitAction:        ; builds command record + enqueues confirmed action; not yet matched
+
+org $C1176C
+BattleMenu_TargetNext:          ; cycle target selection forward; not yet matched
+
+org $C11786
+BattleMenu_TargetPrev:          ; cycle target selection backward; not yet matched
 
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
@@ -3347,3 +3353,122 @@ BattleMenu_RemoveBattlerFromReady:
     JSR BattleMenu_LoadCommandWindowMap
     STZ.w $A862
     RTS
+
+; ==================================================================
+; BattleMenu_TargetSelectInput ($C11561–$C11619, 185 bytes)
+; ==================================================================
+; Per-frame input handler while target-select mode is active (entered
+; from BattleMenu_ProcessInput when $9609 != 0). Rebuilds the target
+; list every call, then either cancels back to the previous menu
+; (no valid target, or cancel button $EE bit $08) or polls for
+; confirm ($EE bits $C0) / cycle-target ($EF bits) input.
+;
+; The cancel path restores whichever submenu was open before targeting
+; started ($A86B), redrawing its window contents (tech: just re-flags
+; $A86A; item: reloads the $180-byte ItemBoxBattles graphic). It then
+; falls through to a cursor-highlight update (OAM attr OR $55, four
+; X-position bytes set to $F0) shared with the non-cancel exit path.
+;
+; Contains one 18-byte block of dead code ($115B6-$115C7): a byte-for-
+; byte duplicate of the item-graphic copy loop above it, except its
+; loop-continue branch (BNE) targets the input-polling code at $15E8
+; instead of looping back on itself — meaning on real hardware it always
+; escapes after exactly one iteration rather than functioning as a copy
+; loop. Nothing in this routine's control flow can reach these bytes
+; (both preceding paths branch past them via BRA); reproduced exactly
+; regardless, since matching the ROM means matching orphaned bytes too.
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Callees: BattleMenu_BuildTargetList, Battle_StopSfx,
+;          BattleMenu_CommitAction, BattleMenu_TargetNext,
+;          BattleMenu_TargetPrev, Battle_ZeroResultEE
+org $C11561
+BattleMenu_TargetSelectInput:
+    JSR BattleMenu_BuildTargetList
+    LDA.w $9613                     ; target result (from BuildTargetList)
+    BPL .have_target
+    STZ.w $9614
+    BRA .cancel
+.have_target:
+    LDA $EE                         ; pad-edge byte (button bits)
+    AND #$08                        ; cancel button
+    BEQ .poll_input
+    JSR Battle_StopSfx
+.cancel:
+    STZ.w $9614
+    STZ.w $960E
+    DEC.w $9609                     ; leave target-select mode
+    LDA.w $A86B                     ; saved submenu type
+    BEQ .redraw_cursor
+    DEC
+    STA.w $95DB
+    STZ.w $A09A
+    STZ.w $A86B
+    LDA.w $95DB
+    DEC
+    BEQ .tech_return                ; $95DB was 1 (tech) -> just re-flag it
+    TDC                              ; else (item) -> reload item window gfx
+    TAX
+.copy_loop1:
+    LDA.l $D15BD0,X                 ; ItemBoxBattles (bank $D1)
+    STA.w $0B40,X
+    INX
+    CPX #$0180
+    BNE .copy_loop1
+    LDA #$FF
+    STA.w $9920
+    INC.w $99E2
+    BRA .redraw_cursor
+.tech_return:
+    STZ.w $A869
+    INC.w $A86A
+    BRA .redraw_cursor
+; --- dead code: unreachable, see routine header ---
+    TDC
+    TAX
+.dead_copy_loop:
+    LDA.l $D15BD0,X
+    STA.w $0B40,X
+    INX
+    CPX #$0180
+    BNE .poll_input                 ; escapes into live code after 1 iteration
+    INC.w $99E2
+.redraw_cursor:
+    LDA.w $95DB
+    BNE .cursor_drawn
+    INC.w $A43F
+.cursor_drawn:
+    LDA.w $0900                     ; OAM high-table
+    ORA #$55
+    STA.w $0900
+    LDA #$F0
+    STA.w $0701                     ; cursor sprite X positions
+    STA.w $0705
+    STA.w $0709
+    STA.w $070D
+    BRA .exit
+.poll_input:
+    LDA $EE
+    AND #$C0                        ; confirm buttons
+    BEQ .check_cycle
+    JSR Battle_StopSfx
+    JMP BattleMenu_CommitAction
+.check_cycle:
+    LDA.w $960C                     ; target-all flag
+    BMI .exit                       ; target-all -> no per-target cycling
+    LDA $EF                         ; pad-edge byte (D-pad bits)
+    AND #$05                        ; right/down
+    BEQ .check_prev
+    INC.w $A4EE
+    JSR Battle_StopSfx
+    JMP BattleMenu_TargetNext
+.check_prev:
+    LDA $EF
+    AND #$0A                        ; left/up
+    BEQ .exit
+    INC.w $A4EE
+    JSR Battle_StopSfx
+    JMP BattleMenu_TargetPrev
+.exit:
+    JMP Battle_ZeroResultEE
