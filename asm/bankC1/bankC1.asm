@@ -27,9 +27,6 @@ BattleMenu_TargetSelectInput:   ; target-selection submenu input handler; not ye
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
 
-org $C11B67
-BattleMenu_DequeueReadyBattler: ; pops next ATB-ready battler into the menu queue; not yet matched
-
 ; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
@@ -3200,4 +3197,54 @@ BattleMenu_BuildTargetList:
     BNE .scan_empty
     STA.w $9613                     ; all empty -> fallback result
 .done:
+    RTS
+
+; ==================================================================
+; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
+; ==================================================================
+; Pops the head of the ATB-ready queue ($95D6-$95D9, up to 3 deep,
+; count in $95DA) into the active menu roster: restores that battler's
+; saved cursor position ($A863/$A866 -> $95DF/$95EB), marks it present
+; in the roster ($A6D9,X = X, i.e. identity-maps the slot), forces a
+; command-window reload sentinel ($A6DF = $FE), shifts the queue down
+; one slot, decrements the queue count, and increments the active-PC
+; count ($A6DE). If no PC was already active ($A6DD negative), makes
+; the newly dequeued battler the active one.
+;
+; Note: the second queue-shift step reads $95D8 twice (into both
+; $95D7 and $95D9) rather than reading $95D9 for the second copy —
+; reproduced exactly as found; harmless in practice since $95DA (the
+; live count) never exceeds what the shift correctly updates.
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; X = dequeued slot index (or unchanged if queue was empty)
+; No JSR/JSL calls.
+org $C11B67
+BattleMenu_DequeueReadyBattler:
+    LDA.w $95D6                     ; queue head
+    BMI .exit                       ; queue empty -> nothing to do
+    TAX
+    STZ.w $9F38,X                   ; clear per-slot pending flag
+    LDA.w $A863,X                   ; saved cursor row
+    STA.w $95DF,X
+    LDA.w $A866,X                   ; saved cursor scroll
+    STA.w $95EB,X
+    LDA.w $95D6
+    TAX
+    STA.w $A6D9,X                   ; mark slot present (identity-map)
+    LDA #$FE
+    STA.w $A6DF                     ; force command-window reload
+    LDA.w $95D7
+    STA.w $95D6                     ; shift queue down
+    LDA.w $95D8
+    STA.w $95D7
+    LDA.w $95D8
+    STA.w $95D9
+    DEC.w $95DA                     ; queue count
+    INC.w $A6DE                     ; active PC count
+    LDA.w $A6DD
+    BPL .exit                       ; already have an active PC
+    TXA
+    STA.w $A6DD                     ; make the dequeued battler active
+.exit:
     RTS
