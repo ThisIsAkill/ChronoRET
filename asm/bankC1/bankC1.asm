@@ -15,9 +15,6 @@ incsrc "../hardware.inc"
 ; Label stubs — no bytes emitted; used for JSR/JSL targets
 ; ============================================================
 
-org $C1143D
-BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet matched
-
 org $C117DD
 BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
 
@@ -1533,7 +1530,7 @@ BattleMenu_RenderItemListRows:
 ; $C1:09B0 — BattleMenu_RenderItemRow (215 bytes, $09B0–$0A86) +
 ;             CODE_JP_C10A87 (1 byte, $0A87)
 ; Renders one item-list row for item record at $7E:1580+$80.
-;   - If item ID ($1583,X) = 0 or unconfirmed-animation ($1580,X) = 0 → exit.
+;   - If quantity ($1583,X) = 0 or item id ($1580,X) = 0 → exit.
 ;   - Copies 11-byte item name from $CC:name_table into $94A0, re-encodes,
 ;     then lays tile/attr pairs into display buffers $0EC6 and $0E86.
 ;   - Formats item quantity ($1583,X) as 2-digit display at $0EDE/$0EE0.
@@ -1545,9 +1542,9 @@ BattleMenu_RenderItemListRows:
 org $C109B0
 BattleMenu_RenderItemRow:
     LDX.b $80                       ; item record index (16-bit from DP)
-    LDA.w $1583,X                   ; item ID
+    LDA.w $1583,X                   ; item quantity
     BEQ .empty_slot                 ; 0 → empty, skip
-    LDA.w $1580,X                   ; unconfirmed-animation / display flag
+    LDA.w $1580,X                   ; item id
     BNE .render_item                ; nonzero → render
 .empty_slot:
     JMP CODE_JP_C10A87              ; skip this row
@@ -3920,3 +3917,316 @@ BattleMenu_TechListNext:
     BCS .inc_scroll                 ; still >= 3 -> scroll again
 .exit:
     JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListInput ($C1143D–$C11497, 91 bytes)
+; ==================================================================
+; Per-frame input handler while the item list is open ($95DB==2).
+; Unlike the tech list, item rows have no per-slot "available" flag to
+; skip during cursor movement — up/down just move the cursor one row
+; and scroll via ItemListScrollUp/Down at the edges. $EE bit $20/$10
+; also let the player page the whole list up/down by 3 rows at once.
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Callees: Battle_StopSfx, BattleMenu_ItemConfirm,
+;          BattleMenu_ItemListCancel, BattleMenu_ItemCursorUp,
+;          BattleMenu_ItemCursorDown, BattleMenu_ItemListPageDown,
+;          BattleMenu_ItemListPageUp, BattleMenu_ItemListRefresh,
+;          Battle_ZeroResultEE
+org $C1143D
+BattleMenu_ItemListInput:
+    LDA $EE
+    AND #$80                        ; confirm
+    BEQ .check_cancel
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemConfirm
+.check_cancel:
+    LDA $EE
+    AND #$08                        ; cancel
+    BEQ .check_up
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemListCancel
+.check_up:
+    LDA $EF
+    BIT #$08                        ; up
+    BNE .do_up
+    AND #$02                        ; left
+    BEQ .check_down
+.do_up:
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemCursorUp
+.check_down:
+    LDA $EF
+    BIT #$04                        ; down
+    BNE .do_down
+    AND #$01                        ; right
+    BEQ .check_page_down
+.do_down:
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemCursorDown
+.check_page_down:
+    LDA $EE
+    AND #$20                        ; page down (3 rows)
+    BEQ .check_page_up
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemListPageDown
+.check_page_up:
+    LDA $EE
+    AND #$10                        ; page up (3 rows)
+    BEQ .check_refresh
+    JSR Battle_StopSfx
+    JMP BattleMenu_ItemListPageUp
+.check_refresh:
+    LDA.w $A0D0                     ; refresh-pending flag
+    BEQ .exit
+    JMP BattleMenu_ItemListRefresh
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemConfirm ($C11498–$C114DA, 67 bytes)
+; ==================================================================
+; Confirms the highlighted item: index = (scroll $95E6 + cursor $95E5)
+; * 5 into the item record table at $1580 (id, target mode, flags,
+; quantity — one padding byte, 5-byte stride). Aborts if the flags
+; byte is negative (unusable) or the quantity is zero. Otherwise sets
+; $9F35 = item id, $960D = target mode, $9F36 = record index, builds
+; the target list, and enters target-select mode if a valid target
+; was found.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_Mul8, BattleMenu_BuildTargetList, Battle_ZeroResultEE
+org $C11498
+BattleMenu_ItemConfirm:
+    CLC
+    LDA.w $95E6                     ; item-list scroll position
+    ADC.w $95E5                     ; + cursor row
+    STA $80
+    STA $AD
+    LDA #$05                        ; record stride
+    STA $AE
+    JSR Battle_Mul8                 ; record index * 5
+    LDX $AF
+    LDA.w $1582,X                   ; item status flags
+    BMI .exit                       ; unusable
+    LDA.w $1583,X                   ; item quantity
+    BEQ .exit                       ; none left
+    LDA.w $1580,X                   ; item id
+    STA.w $9F35
+    LDA.w $1581,X                   ; target mode
+    STA.w $960D
+    STX.w $9F36                     ; record index
+    JSR BattleMenu_BuildTargetList
+    LDA.w $9613                     ; target result
+    BPL .have_target
+    STZ.w $9614
+    BRA .exit
+.have_target:
+    INC.w $A4EE
+    INC.w $9609                     ; enter target-select mode
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListCancel ($C114DB–$C114EB, 17 bytes)
+; ==================================================================
+; Closes the item list: back to main menu ($95DB=0), force a command-
+; window reload sentinel, and invalidate the scroll-arrow indicators.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C114DB
+BattleMenu_ItemListCancel:
+    JSR BattleMenu_LoadCommandWindowMap
+    STZ.w $95DB                     ; submenu type -> main
+    LDA #$FF
+    STA.w $A6DF                     ; force command-window reload
+    STA.w $9920                     ; invalidate scroll-arrow indicator
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemCursorUp ($C114EC–$C11501, 22 bytes)
+; ==================================================================
+; Up/Left in the item list: decrement cursor row $95E5, scrolling the
+; list up via ItemListScrollUp when already at the top row.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_ItemListScrollUp, Battle_ZeroResultEE
+org $C114EC
+BattleMenu_ItemCursorUp:
+    LDA.w $95E5                     ; cursor row
+    BNE .move
+    JSR BattleMenu_ItemListScrollUp
+.move:
+    SEC
+    LDA.w $95E5
+    SBC #$01
+    BCC .exit
+    STA.w $95E5
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemCursorDown ($C11502–$C1151B, 26 bytes)
+; ==================================================================
+; Down/Right in the item list: increment cursor row $95E5 (max 2),
+; scrolling the list down via ItemListScrollDown when already at the
+; bottom row.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_ItemListScrollDown, Battle_ZeroResultEE
+org $C11502
+BattleMenu_ItemCursorDown:
+    LDA.w $95E5                     ; cursor row
+    CMP #$02
+    BNE .move
+    JSR BattleMenu_ItemListScrollDown
+.move:
+    CLC
+    LDA.w $95E5
+    ADC #$01
+    CMP #$03
+    BCS .exit
+    STA.w $95E5
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListPageDown ($C1151C–$C11536, 27 bytes)
+; ==================================================================
+; $EE bit $20: page the item list down 3 rows at once, clamped at
+; scroll position $FA. Sets the scroll position and index itself, then
+; JSRs directly into ItemListScrollDown's shared render+indicator tail
+; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
+; that logic — the same "call into another routine's tail" pattern
+; already seen elsewhere in this bank (e.g. Sub_1BA7 in bank $C0).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_ItemListScrollDown_RenderTail, Battle_ZeroResultEE
+org $C1151C
+BattleMenu_ItemListPageDown:
+    CLC
+    LDA.w $95E6                     ; scroll position
+    ADC #$03
+    CMP #$FA
+    BCS .clamp
+    CMP #$00
+    BNE .have_scroll
+.clamp:
+    LDA #$FA
+.have_scroll:
+    STA.w $95E6
+    STA $80
+    JSR BattleMenu_ItemListScrollDown_RenderTail
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListPageUp ($C11537–$C1154A, 20 bytes)
+; ==================================================================
+; $EE bit $10: page the item list up 3 rows at once, clamped at 0.
+; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
+; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_ItemListScrollUp_RenderTail, Battle_ZeroResultEE
+org $C11537
+BattleMenu_ItemListPageUp:
+    SEC
+    LDA.w $95E6                     ; scroll position
+    SBC #$03
+    BCS .have_scroll
+    TDC
+.have_scroll:
+    STA.w $95E6
+    STA $80
+    JSR BattleMenu_ItemListScrollUp_RenderTail
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListRefresh ($C1154B–$C11560, 22 bytes)
+; ==================================================================
+; Re-renders the item list rows and invalidates the scroll-arrow
+; indicators when $A0D0 (refresh-pending flag) is set, clearing it.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_RenderItemListRows, Battle_ZeroResultEE
+org $C1154B
+BattleMenu_ItemListRefresh:
+    LDA.w $95E6                     ; scroll position
+    STA $80
+    JSR BattleMenu_RenderItemListRows
+    LDA #$FF
+    STA.w $991F                     ; scroll-arrow indicator
+    STA.w $9920                     ; scroll-arrow indicator
+    STZ.w $A0D0                     ; clear refresh-pending flag
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_ItemListScrollUp ($C117A1–$C117BE, 30 bytes)
+; ==================================================================
+; Scrolls the item list up one row: decrements $95E6 (min 0), then
+; re-renders and invalidates the scroll-arrow indicators.
+;
+; Contains a redundant double branch: after testing $95E6==0 once,
+; a second BEQ immediately re-tests the same (unchanged) zero flag —
+; its target (skip both the decrement AND the render, straight to the
+; indicator writes) can never actually be reached, since reaching that
+; second branch at all requires the first BEQ to have found the flag
+; clear. Reproduced exactly regardless.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1
+; Callees: BattleMenu_RenderItemListRows
+; Global (non-dot) labels throughout: BattleMenu_ItemListScrollUp_RenderTail
+; is a real external entry point (called directly by BattleMenu_ItemListPageUp,
+; which sets $95E6/$80 itself and skips straight to the render), and per
+; this project's asar-quirk-6 workaround, a JSR target reached from another
+; routine's scope must not be a local .dot label.
+org $C117A1
+BattleMenu_ItemListScrollUp:
+    LDA.w $95E6                     ; scroll position
+    BEQ BattleMenu_ItemListScrollUp_SetScroll
+    BEQ BattleMenu_ItemListScrollUp_SkipRender ; unreachable: flag already tested clear above
+    SEC
+    LDA.w $95E6
+    SBC #$01
+    STA.w $95E6
+BattleMenu_ItemListScrollUp_SetScroll:
+    STA $80
+BattleMenu_ItemListScrollUp_RenderTail:
+    JSR BattleMenu_RenderItemListRows
+BattleMenu_ItemListScrollUp_SkipRender:
+    LDA #$FF
+    STA.w $991F                     ; scroll-arrow indicator
+    STA.w $9920                     ; scroll-arrow indicator
+    RTS
+
+; ==================================================================
+; BattleMenu_ItemListScrollDown ($C117BF–$C117DC, 30 bytes)
+; ==================================================================
+; Scrolls the item list down one row: increments $95E6 (clamped at
+; $FA), then re-renders and invalidates the scroll-arrow indicators.
+; Mirror of ItemListScrollUp, but with a single, genuinely-reachable
+; bounds check instead of the redundant double branch — when already
+; at the clamp, skips both the increment AND the render entirely.
+; BattleMenu_ItemListScrollDown_RenderTail is the external entry point
+; called directly by BattleMenu_ItemListPageDown.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1
+; Callees: BattleMenu_RenderItemListRows
+org $C117BF
+BattleMenu_ItemListScrollDown:
+    LDA.w $95E6                     ; scroll position
+    CMP #$FA
+    BCS BattleMenu_ItemListScrollDown_SkipRender ; already at max -> skip increment and render
+    CLC
+    LDA.w $95E6
+    ADC #$01
+    STA.w $95E6
+    STA $80
+BattleMenu_ItemListScrollDown_RenderTail:
+    JSR BattleMenu_RenderItemListRows
+BattleMenu_ItemListScrollDown_SkipRender:
+    LDA #$FF
+    STA.w $991F                     ; scroll-arrow indicator
+    STA.w $9920                     ; scroll-arrow indicator
+    RTS
