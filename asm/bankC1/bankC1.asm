@@ -15,9 +15,6 @@ incsrc "../hardware.inc"
 ; Label stubs — no bytes emitted; used for JSR/JSL targets
 ; ============================================================
 
-org $C11320
-BattleMenu_TechListInput:       ; tech-list submenu input handler; not yet matched
-
 org $C1143D
 BattleMenu_ItemListInput:       ; item-list submenu input handler; not yet matched
 
@@ -3708,3 +3705,218 @@ BattleMenu_TargetPrev:
     LDA.w $99C0,X                   ; candidate list entry
     BMI BattleMenu_TargetPrev       ; invalid -> keep decrementing
     STA.w $A62D
+
+; ==================================================================
+; BattleMenu_TechListInput ($C11320–$C11368, 73 bytes)
+; ==================================================================
+; Per-frame input handler while the tech list is open ($95DB==1).
+; Computes the currently-highlighted tech's list index into $80
+; (scroll $95EB + cursor $95DF), then polls pad-edge bytes: $EE bit
+; $80 = confirm, $EE bit $08 = cancel, $EF bits $08/$02 = up (via
+; Y-axis bit or Left), $EF bits $04/$01 = down (via Y-axis bit or
+; Right).
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Callees: Battle_StopSfx, BattleMenu_TechConfirm,
+;          BattleMenu_TechListCancel, BattleMenu_TechListPrev,
+;          BattleMenu_TechListNext, Battle_ZeroResultEE
+org $C11320
+BattleMenu_TechListInput:
+    LDA.w $95D5                     ; active PC slot
+    TAX
+    LDA.w $95EB,X                   ; scroll position
+    CLC
+    ADC.w $95DF,X                   ; + cursor row
+    TAX
+    STX $80                          ; highlighted tech list index
+    LDA $EE
+    AND #$80                        ; confirm
+    BEQ .check_cancel
+    JSR Battle_StopSfx
+    JMP BattleMenu_TechConfirm
+.check_cancel:
+    LDA $EE
+    AND #$08                        ; cancel
+    BEQ .check_up
+    JSR Battle_StopSfx
+    JMP BattleMenu_TechListCancel
+.check_up:
+    LDA $EF
+    BIT #$08                        ; up
+    BNE .do_up
+    AND #$02                        ; left
+    BEQ .check_down
+.do_up:
+    JSR Battle_StopSfx
+    JMP BattleMenu_TechListPrev
+.check_down:
+    LDA $EF
+    BIT #$04                        ; down
+    BNE .do_down
+    AND #$01                        ; right
+    BEQ .exit
+.do_down:
+    JSR Battle_StopSfx
+    JMP BattleMenu_TechListNext
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_TechConfirm ($C11369–$C1138E, 38 bytes)
+; ==================================================================
+; Confirms the highlighted tech: aborts if the tech-availability check
+; ($A099) is clear or the tech's flag byte ($9EE5) marks it
+; unavailable (bit 7). Otherwise sets target mode from $9EE4, builds
+; the target list, and — if a valid target was found — enters
+; target-select mode; if not, just resets the target cursor.
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_BuildTargetList, Battle_ZeroResultEE
+org $C11369
+BattleMenu_TechConfirm:
+    LDA.w $A099                     ; tech-availability check
+    BEQ .exit
+    LDA.w $9EE5                     ; tech flag byte
+    BMI .exit                       ; unavailable
+    LDA.w $9EE4                     ; target mode for this tech
+    STA.w $960D
+    JSR BattleMenu_BuildTargetList
+    LDA.w $9613                     ; target result
+    BPL .have_target
+    STZ.w $9614
+    BRA .exit
+.have_target:
+    INC.w $A4EE
+    INC.w $9609                     ; enter target-select mode
+.exit:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_TechListCancel ($C1138F–$C113AC, 30 bytes)
+; ==================================================================
+; Closes the tech list: back to main menu ($95DB=0), force a command-
+; window reload sentinel, and restore this PC's saved cursor/scroll
+; position ($A863/$A866 -> $95DF/$95EB).
+; Entry: M=1, X=0, DB=$7E
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: BattleMenu_LoadCommandWindowMap, Battle_ZeroResultEE
+org $C1138F
+BattleMenu_TechListCancel:
+    JSR BattleMenu_LoadCommandWindowMap
+    STZ.w $95DB                     ; submenu type -> main
+    LDA #$FF
+    STA.w $A6DF                     ; force command-window reload
+    LDA.w $95D5
+    TAX
+    LDA.w $A863,X                   ; saved cursor row
+    STA.w $95DF,X
+    LDA.w $A866,X                   ; saved scroll position
+    STA.w $95EB,X
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_TechListPrev ($C113AD–$C113F3, 71 bytes)
+; ==================================================================
+; Up/Left in the tech list: walks backward from the current index
+; ($80) looking for an entry whose availability byte ($1CDB,X) is
+; nonzero, skipping unavailable techs. Once found, recomputes the
+; cursor row / scroll position pair ($95DF/$95EB) by walking the same
+; distance backward from the current (row, scroll) state, scrolling
+; the list up a row at a time if the new row would go negative.
+; Entry: M=1, X=0, DB=$7E; $80 = current list index
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C113AD
+BattleMenu_TechListPrev:
+    STZ $82                          ; steps walked
+    LDA.w $95D5
+    TAY
+.retry:
+    INC $82
+    SEC
+    LDA $80
+    SBC #$01
+    BCC .no_change                  ; ran off the start -> no-op
+    STA $80
+    TAX
+    LDA.w $1CDB,X                   ; tech availability
+    BEQ .retry                      ; unavailable -> keep walking back
+    LDA.w $95DF,Y                   ; current cursor row
+    STA $83
+    TYX
+.shift_loop:
+    SEC
+    LDA $83
+    SBC #$01
+    STA $83
+    DEC $82
+    BNE .shift_loop
+    LDA $83
+    BPL .no_wrap                    ; row still >= 0, no scroll needed
+    LDA.w $95EB,X                   ; scroll position
+    BEQ .no_change                  ; already at top -> no-op
+    LDA $83
+    STA.w $95DF,X
+.dec_scroll:
+    DEC.w $95EB,X
+    CLC
+    LDA.w $95DF,X
+    ADC #$01
+.no_wrap:
+    STA.w $95DF,X
+    BMI .dec_scroll                 ; still negative -> scroll again
+.no_change:
+    JMP Battle_ZeroResultEE
+
+; ==================================================================
+; BattleMenu_TechListNext ($C113F4–$C1143C, 73 bytes)
+; ==================================================================
+; Down/Right in the tech list: mirror of TechListPrev — walks forward
+; instead of backward, bounded by the list length ($A02A,Y) instead of
+; the start of the list, and scrolls the row/scroll pair down instead
+; of up when the new row would reach 3.
+; Entry: M=1, X=0, DB=$7E; $80 = current list index
+; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Callees: Battle_ZeroResultEE
+org $C113F4
+BattleMenu_TechListNext:
+    STZ $82                          ; steps walked
+    LDA.w $95D5
+    TAY
+.retry:
+    INC $82
+    CLC
+    LDA $80
+    ADC #$01
+    CMP.w $A02A,Y                   ; list length for this PC
+    BCS .exit                       ; ran off the end -> no-op
+    STA $80
+    TAX
+    LDA.w $1CDB,X                   ; tech availability
+    BEQ .retry                      ; unavailable -> keep walking forward
+    LDA.w $95DF,Y                   ; current cursor row
+    STA $83
+    TYX
+.shift_loop:
+    CLC
+    LDA $83
+    ADC #$01
+    STA $83
+    DEC $82
+    BNE .shift_loop
+    LDA $83
+    CMP #$03
+    BCC .no_wrap                    ; row still < 3, no scroll needed
+    LDA $83
+    STA.w $95DF,X
+.inc_scroll:
+    INC.w $95EB,X                   ; scroll position
+    SEC
+    LDA.w $95DF,X
+    SBC #$01
+.no_wrap:
+    STA.w $95DF,X
+    CMP #$03
+    BCS .inc_scroll                 ; still >= 3 -> scroll again
+.exit:
+    JMP Battle_ZeroResultEE
