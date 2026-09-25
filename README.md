@@ -89,3 +89,9 @@ A C layer may come later for tooling purposes, but matching happens at the asm l
 
 Tools and source only. No ROM data, no copyrighted assets, no compressed
 graphics or music are stored here. Contributors must own a legal copy of the game.
+
+This code is MIT-licensed (see `LICENSE`). The ROM and its assets are **not
+included** and remain the property of their copyright holders — supply your
+own legally obtained ROM (see "You need your own ROM" above). Symbol and
+label credit: dscotton/ct_disassembly (public domain), used as a starting
+point for labels and boundaries where not yet independently verified here.
