@@ -2966,6 +2966,136 @@ Battle_ZeroResultEE:
     RTS
 
 ; ==================================================================
+; BattleMenu_ServiceInit ($C10023–$C10044, 34 bytes)
+; ==================================================================
+; Service 0 of the cross-bank $C10045 service API (see
+; BattleMenu_ServiceDispatch immediately below, and
+; BattleMenu_AddBattlerToReady/RemoveBattlerFromReady further down for
+; services 1/2). Confirmed as entry 0 by reading the dispatch table at
+; $C10051 directly.
+;
+; Fires two cross-bank setup calls into bank $CC (not yet matched;
+; likely the sprite/graphics subsystem, going by $CCFAF0/$CCFB8D
+; being data tables in the same bank), two local same-bank helpers
+; that look like per-slot table-init loops ($0299, $283D — not yet
+; matched), a third local helper that copies some per-slot state
+; ($34A7 — not yet matched), then two one-shot cross-bank service
+; calls and a third that's polled in a tight loop until it clears Z
+; (bank $CD, low fixed addresses — same family as the $CD0009
+; "per-frame service tick" used by BattleMenu_RefreshIfDirtyAndTick,
+; not yet matched/named individually). Finally tail-jumps into a
+; larger unmatched routine at $34DB rather than returning directly.
+;
+; Read as a whole this looks like "reset the battle-menu subsystem's
+; per-slot state and hand off to a bigger setup routine" (i.e. a
+; battle-start/menu-reset service), but that's inferred from call
+; shape only — none of its callees are traced yet, so treat the name
+; as provisional until one of them is matched and confirms it.
+;
+; Entry: DB=$7E (no width-sensitive opcodes of its own)
+; Exit:  does not return here; tail-jumps to $34DB
+; Callees: JSL $CCE2E4, JSR $0299, JSR $283D, JSL $CCED87, JSR $34A7,
+;          JSL $CD0003, JSL $CD000C, JSL $CD0012 (all cross-bank/
+;          same-bank, none matched yet)
+org $C10023
+BattleMenu_ServiceInit:
+    JSL $CCE2E4                     ; cross-bank setup call (bank $CC)
+    JSR $0299                       ; local per-slot table init
+    JSR $283D                       ; local per-slot table init
+    JSL $CCED87                     ; cross-bank setup call (bank $CC)
+    JSR $34A7                       ; local per-slot state copy
+    JSL $CD0003                     ; cross-bank service call
+    JSL $CD000C                     ; cross-bank service call
+.wait:
+    JSL $CD0012                     ; cross-bank service call; loop while Z clear
+    BNE .wait
+    JMP $34DB                       ; tail-jump into further (unmatched) setup
+
+; ==================================================================
+; BattleMenu_ServiceDispatch ($C10045–$C10050, 12 bytes)
+; ==================================================================
+; Entry vector for the $C10045 service API used throughout this bank.
+; Callers JSL $C10045 (cross-bank) with A = 8-bit service id; this
+; doubles it into a byte-pair index and JSRs through the table at
+; $C10051. Reading that table directly (10 entries, each a raw
+; $C1-bank word) gives: 0 -> BattleMenu_ServiceInit (above), 1 ->
+; BattleMenu_AddBattlerToReady, 2 -> BattleMenu_RemoveBattlerFromReady
+; (both below), 3-9 -> $C1106E/$C14058/$C12986/$C1006D/$C11FDD/
+; $C1356D/$C1354D (not yet matched; table itself left as unmatched
+; data for now — see BANK_MAP/PROGRESS notes).
+;
+; Entry: A = service id (8-bit); DB=$7E
+; Exit:  register state depends on the chosen service
+; No JSR/JSL calls of its own (dispatches via the table at $C10051).
+org $C10045
+BattleMenu_ServiceDispatch:
+    PHA
+    PHX
+    PHY
+    ASL
+    TAX
+    JSR ($0051,X)
+    PLY
+    PLX
+    PLA
+    RTS
+
+; ==================================================================
+; BattleMenu_AddBattlerToReady ($C11B19–$C11B54, 60 bytes)
+; ==================================================================
+; Service 1 of the cross-bank $C10045 service API (see
+; BattleMenu_ServiceDispatch and BattleMenu_ServiceInit above, and
+; BattleMenu_RemoveBattlerFromReady, Service 2, below). Confirmed by
+; reading the dispatch table at $C10051 directly: JSR ($0051,X) with
+; X = service id * 2 (see the PHA/ASL/TAX at $C10045); entry 1 ->
+; $C11B19 (this routine), entry 2 -> $C11BAA.
+;
+; Marks battler slot $A1 ready: if it's already present in the active
+; roster ($A6D9,X non-negative), does nothing. Otherwise sets the
+; ready bit (bit 7) of its sprite flag byte at $93EE+(sprite index
+; from the $CCFAF0 slot->sprite lookup — the same table
+; BattleMenu_CommitAction/ConsumePartnerSlot use to reach $93EE's bit
+; 6 "queued" flag), pushes the slot onto the ATB-ready queue
+; ($95D6-$95D9 at index $95DA), restores its default menu-cursor row
+; from the $9916 table (the same table BattleMenu_CommitAction saves
+; into and BattleMenu_DequeueReadyBattler's siblings read from),
+; increments the queue count, and plays a "battler ready" cue via the
+; same $1E00-$1E02/JSL $C70004 pattern as Battle_StopSfx below (SFX
+; id $19, param $42 vs StopSfx's $00).
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot to add
+; Exit:  M=1; registers clobbered
+; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+org $C11B19
+BattleMenu_AddBattlerToReady:
+    LDA $A1                         ; battler slot to add
+    TAX
+    LDA.w $A6D9,X                   ; already in the active roster?
+    BPL .exit                       ; yes -> nothing to do
+    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    TAX
+    LDA.w $93EE,X
+    ORA #$80                        ; set "ready" bit
+    STA.w $93EE,X
+    LDA.w $95DA                     ; queue count
+    TAX
+    LDA $A1
+    STA.w $95D6,X                   ; push onto ATB-ready queue
+    TAX
+    LDA.w $9916,X                   ; default menu-cursor row for this PC
+    STA.w $95DC,X
+    INC.w $95DA                     ; queue count
+    LDA #$42
+    STA.w $1E01
+    LDA #$19
+    STA.w $1E00
+    LDA #$80
+    STA.w $1E02
+    JSL $C70004                     ; play "battler ready" cue
+.exit:
+    RTS
+
+; ==================================================================
 ; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
 ; ==================================================================
 ; SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90
