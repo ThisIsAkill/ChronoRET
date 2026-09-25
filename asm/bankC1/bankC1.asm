@@ -15,9 +15,6 @@ incsrc "../hardware.inc"
 ; Label stubs — no bytes emitted; used for JSR/JSL targets
 ; ============================================================
 
-org $C117DD
-BattleMenu_UpdateCursorOverlay: ; per-frame cursor sprite/overlay refresh; not yet matched
-
 ; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
@@ -4229,4 +4226,486 @@ BattleMenu_ItemListScrollDown_SkipRender:
     LDA #$FF
     STA.w $991F                     ; scroll-arrow indicator
     STA.w $9920                     ; scroll-arrow indicator
+    RTS
+
+; ==================================================================
+; BattleMenu_UpdateCursorOverlay ($C117DD–$C11B18, 828 bytes)
+; ==================================================================
+; Per-frame cursor/overlay refresh, called once per frame from the end
+; of the menu rebuild chain (after ProcessInput). Draws whatever cursor
+; graphic belongs on screen right now, dispatching on menu state:
+;
+;   no active PC ($95D5 < 0)     -> hide the 4-sprite main cursor
+;   target-select mode ($9609)   -> draw target-highlight cursor(s)
+;   else, by submenu ($95DB):
+;     0 (main)  -> nothing to do here (DrawCursorSprites already ran
+;                  from ProcessInput); just fall through to the tail
+;     1 (tech)  -> tech-list cursor: normal single highlight, or a
+;                  2-3 sprite cluster over the caster + dual/triple-
+;                  tech partner(s) when the highlighted tech needs them
+;     2 (item)  -> item-list cursor: recomputes the up/down scroll-
+;                  arrow glow and the row-highlight tile quad, queuing
+;                  a VRAM upload ($CFFD6A) only if either changed
+;
+; Also, still within target-select mode, handles the "confirm-target"
+; single-cursor placement (including a special enemy-vs-ally info-
+; panel dispatch via JSL $CD002D/$CD0030) and a separate multi-target
+; ("target all") sweep that walks the 11-entry selection list
+; ($A62D-$A637) a few slots at a time, resuming next frame from a
+; saved index ($960B) — the same incremental-scan pattern used by
+; BattleMenu_BuildTargetList's own list handling.
+;
+; Common idiom used throughout (X = a battler/target slot id, not
+; just a PC index 0-2 — this table is indexed by any of the 11
+; selectable battler slots): compute a live screen position as
+;   base origin ($1D0C,X / $1D23,X, same tables DrawCursorSprites
+;   uses) + per-slot live offset ($9708,X / $9713,X, not yet named
+;   elsewhere — likely each battler's current animated screen
+;   position) - $10 (sprite-origin centering constant), written into
+;   one of the four cursor OAM slots at $0700-$070F.
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
+; Exit:  M=1; pad-edge bytes $EE/$EF cleared (shared tail, same as
+;        Battle_ZeroResultEE elsewhere)
+; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
+;          BattleMenu_DrawCursorSprites, JSL $CD002D
+;          (BattleMsg_ShowMsg0BIfKeyChangedVec), JSL $CD0030 (cross-
+;          bank, sibling message vector — not yet analyzed), JSL
+;          $CFFD6A (Battle_QueueVramUpload_0E80)
+org $C117DD
+BattleMenu_UpdateCursorOverlay:
+    LDA.w $95D5                     ; active PC slot (signed; <0 = none)
+    BPL .check_target_select
+    JMP .no_active_pc
+.check_target_select:
+    LDA.w $9609                     ; target-select mode depth
+    BEQ .dispatch_submenu
+    JMP .target_select
+.dispatch_submenu:
+    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item
+    BEQ .main_menu
+    DEC
+    BNE .item_dispatch
+    JMP .tech_path
+.item_dispatch:
+    JMP .item_path
+.main_menu:
+    JMP .tail
+
+; ------------------------------------------------------------------
+; Tech-list cursor ($17FE-$18A9)
+; ------------------------------------------------------------------
+; $9EE3 (tech id copied from the cursor's tech record by
+; UpdateTechWindow) below $39 means a single-character tech — those
+; never need partner highlighting, so go straight to the normal
+; single cursor. $39 and up are dual/triple techs; $9EE7's low nibble
+; names the primary partner slot (sentinel $FF = "no partner data
+; resolved yet", also falls back to the normal single cursor).
+.tech_path:
+    LDA.w $9EE3                     ; tech id at cursor
+    CMP #$39
+    BCS .tech_check_group
+.tech_single_jmp:
+    JMP .tech_single_cursor
+.tech_check_group:
+    LDA.w $9EE7                     ; dual/triple-tech partner nibbles
+    CMP #$FF
+    BEQ .tech_single_jmp
+    LDA.w $0900                     ; hide all 4 main-cursor OAM slots first
+    ORA #$55
+    STA.w $0900
+    LDA #$F0
+    STA.w $0701
+    STA.w $0705
+    STA.w $0709
+    STA.w $070D
+    LDA #$32
+    STA.w $0703
+    STA.w $0707
+    STA.w $070B
+    STZ.w $0702
+    STZ.w $0706
+    STZ.w $070A
+    ; OAM slot 0: caster (active PC slot)
+    LDA.w $95D5
+    TAX
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0700
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0701
+    ; OAM slot 1: primary partner (low nibble of $9EE7)
+    LDA.w $9EE7
+    AND #$0F
+    TAX
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0704
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0705
+    LDA.w $0900                     ; reveal caster + primary-partner sprites
+    AND #$FE
+    AND #$FB
+    STA.w $0900
+    ; OAM slot 2: second partner, only for a triple-tech (high nibble
+    ; of $9EE7 present; $F = "no third partner")
+    LDA.w $9EE7
+    AND #$F0
+    CMP #$F0
+    BEQ .tech_group_done
+    JSR Battle_ShiftRight4          ; high nibble -> low nibble
+    TAX
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0708
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0709
+    LDA.w $0900                     ; reveal second-partner sprite
+    AND #$EF
+    STA.w $0900
+.tech_group_done:
+    JMP .tail
+.tech_single_cursor:
+    JSR BattleMenu_DrawCursorSprites
+    JMP .tail
+
+; ------------------------------------------------------------------
+; Item-list cursor ($18B0-$1978)
+; ------------------------------------------------------------------
+; Two independent change-tracked updates, each only redrawn (and only
+; queued to VRAM) when its cached compare value differs from the live
+; one; $80 tallies whether either actually changed this frame.
+.item_path:
+    STZ $80
+    ; Scroll-arrow glow: recompute the up/down arrow tile+attr pairs
+    ; ($0EFC/$0EFD = up arrow, $0FFC/$0FFD = down arrow) whenever the
+    ; scroll position ($95E6) differs from the cached value ($9920).
+    ; Tile $FF hides an arrow entirely (nothing further that way);
+    ; attr $A9 (vs the normal $29) is used only on the down arrow, and
+    ; only while it's still visible — drawing attention toward more
+    ; items below except at the very bottom of the list.
+    LDA.w $95E6                     ; scroll position
+    CMP.w $9920                     ; cached scroll-arrow state
+    BNE .arrow_check_zero
+    JMP .row_check
+.arrow_check_zero:
+    LDA.w $95E6
+    BNE .arrow_check_max
+    LDA #$FF                        ; top of list -> hide up arrow
+    STA.w $0EFC
+    LDA #$7F                        ; down arrow visible + flashing
+    STA.w $0FFC
+    LDA #$A9
+    STA.w $0EFD
+    STA.w $0FFD
+    BRA .arrow_done
+.arrow_check_max:
+    LDA.w $95E6
+    CMP #$FA
+    BEQ .arrow_at_max
+    LDA #$7F                        ; middle of list -> both arrows visible
+    STA.w $0EFC
+    STA.w $0FFC
+    LDA #$29                        ; up arrow normal
+    STA.w $0EFD
+    LDA #$A9                        ; down arrow flashing
+    STA.w $0FFD
+    BRA .arrow_done
+.arrow_at_max:
+    LDA #$7F                        ; up arrow visible, normal
+    STA.w $0EFC
+    LDA #$FF                        ; bottom of list -> hide down arrow
+    STA.w $0FFC
+    LDA #$29
+    STA.w $0EFD
+    STA.w $0FFD
+.arrow_done:
+    INC $80
+    ; Row-highlight quad: if either the cursor row ($95E5) or the
+    ; scroll-arrow state changed, blank the old row's 4-tile marker
+    ; (looked up via $CCFAE9) and draw the new one (tiles $60-$63,
+    ; attr $29) — the same tile ids/scheme BattleMenu_DrawTechCursorRow
+    ; uses for its own cursor row.
+.row_check:
+    LDA.w $95E5                     ; cursor row
+    CMP.w $991F                     ; cached row-highlight state
+    BNE .row_redraw
+    LDA.w $95E6
+    CMP.w $9920
+    BEQ .item_upload_check
+    STA.w $9920
+.row_redraw:
+    LDA.w $991F
+    BPL .have_old_row
+    TDC
+.have_old_row:
+    ASL
+    TAX
+    REP #$20                        ; A=16-bit: fetch tile-quad pointer
+    LDA.l $CCFAE9,X
+    TAX
+    TDC
+    SEP #$20                        ; A=8-bit
+    LDA #$FF
+    STA.w $0E80,X
+    STA.w $0E82,X
+    STA.w $0EC0,X
+    STA.w $0EC2,X
+    LDA.w $95E5
+    STA.w $991F                     ; cache new row
+    ASL
+    TAX
+    REP #$20
+    LDA.l $CCFAE9,X
+    TAX
+    TDC
+    SEP #$20
+    LDA #$60
+    STA.w $0E80,X
+    LDA #$61
+    STA.w $0E82,X
+    LDA #$62
+    STA.w $0EC0,X
+    LDA #$63
+    STA.w $0EC2,X
+    LDA #$29
+    STA.w $0E81,X
+    STA.w $0E83,X
+    STA.w $0EC1,X
+    STA.w $0EC3,X
+    INC $80
+.item_upload_check:
+    LDA $80
+    BEQ .item_no_upload
+    JSL $CFFD6A                     ; Battle_QueueVramUpload_0E80 (cross-bank)
+.item_no_upload:
+    JMP .tail
+
+; ------------------------------------------------------------------
+; Target-select cursor ($1979-$1AFD)
+; ------------------------------------------------------------------
+.target_select:
+    LDA.w $9613                     ; target-found flag (0=found, <0=none)
+    BPL .target_have
+    JMP .to_tail
+.target_have:
+    LDA.w $95DB                     ; submenu type
+    DEC
+    BNE .target_hide_tech_cursor_done
+    JSR BattleMenu_ClearTechCursorTiles ; leaving tech list -> clear its cursor tiles
+.target_hide_tech_cursor_done:
+    LDA.w $0900                     ; hide all 4 main-cursor OAM slots first
+    ORA #$55
+    STA.w $0900
+    LDA #$32
+    STA.w $0703
+    STA.w $0707
+    STA.w $070B
+    STA.w $070F
+    STZ.w $0702
+    STZ.w $0706
+    STZ.w $070A
+    STZ.w $070E
+    LDA.w $A62E                     ; second selection-list slot (multi-target?)
+    BMI .target_check_primary
+    JMP .multi_target
+.target_check_primary:
+    LDA.w $A62D                     ; primary selection-list slot
+    BPL .target_single
+    JMP .to_tail
+.target_single:
+    STA.w $A64E                     ; confirmed/highlighted target id
+    TAX
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0700
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0701
+    LDA.w $95DB
+    BNE .after_marker
+    LDA.w $A64E
+    CMP #$03                        ; target id < 3 -> a PC ally slot
+    BCC .after_marker
+    ; enemy target while in the main attack menu: look up the
+    ; enemy's info-panel dispatch id and route through one of two
+    ; cross-bank message calls depending on a per-enemy flag table
+    ASL
+    TAX
+    LDA.w $984D,X                   ; info-panel dispatch id for this target
+    STA.w $0200
+    LDA.l $CCF8ED,X                 ; battler work-area pointer, low
+    STA $80
+    LDA.l $CCF8EE,X                 ; battler work-area pointer, high
+    STA $81
+    LDA.w $9F34
+    BEQ .enemy_marker_check2
+    LDA.w $A64E
+    TAY
+    LDA.w $9F29,Y
+    BNE .ally_target
+.enemy_marker_check2:
+    LDA.w $0200
+    TAX
+    LDA.l $E1DE80,X
+    BEQ .enemy_marker_fallback1
+    LDA #$FF
+    BRA .enemy_marker_send1
+.enemy_marker_fallback1:
+    LDA.w $A64E
+.enemy_marker_send1:
+    JSL $CD0030                     ; cross-bank message call (sibling of $CD002D)
+    BRA .after_marker
+.ally_target:
+    LDX $80
+    LDA.w $5E30,X                   ; ally battler data -> scratch record
+    STA.w $0201
+    LDA.w $5E31,X
+    STA.w $0202
+    LDA.w $5E32,X
+    STA.w $0203
+    LDA.w $5E33,X
+    STA.w $0204
+    LDA.w $0200
+    TAX
+    LDA.l $E1DE80,X
+    BEQ .ally_marker_fallback
+    LDA #$FF
+    BRA .ally_marker_send
+.ally_marker_fallback:
+    LDA.w $A64E
+.ally_marker_send:
+    JSL $CD002D                     ; BattleMsg_ShowMsg0BIfKeyChangedVec (cross-bank)
+.after_marker:
+    LDA.w $0900                     ; reveal OAM slot 0 (single-target cursor)
+    AND #$FE
+    STA.w $0900
+    ; blink-direction latch: nudged whenever the target was just
+    ; cycled/confirmed ($A4EE), based on which half of the screen the
+    ; cursor currently sits in ($0701 vs $2D/$9C)
+    LDA.w $A4EE
+    BEQ .blink_done
+    STZ.w $A4EE
+    LDA.w $960A
+    BEQ .blink_done
+    LDA $EC
+    BNE .blink_check_high
+    LDA.w $0701
+    CMP #$2D
+    BCS .blink_done
+    INC $EC
+    BRA .blink_done
+.blink_check_high:
+    LDA.w $0701
+    CMP #$9C
+    BCC .blink_done
+    STZ $EC
+.blink_done:
+    JMP .to_tail
+
+; ------------------------------------------------------------------
+; Multi-target ("target all") cursor sweep ($1A7B-$1AFA)
+; ------------------------------------------------------------------
+; Walks the 11-entry selection list ($A62D-$A637), drawing one cursor
+; OAM slot per confirmed target (up to the 4 available: $0700-$070F),
+; resuming next frame from a saved scan index ($960B) rather than
+; redoing the whole list every frame.
+.multi_target:
+    LDA.w $A62D
+    BMI .multi_loop_init
+    TAX
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0700
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0701
+    LDA.w $0900
+    AND.l $CCFB8D                   ; reveal OAM slot 0 (visibility-bit-clear table)
+    STA.w $0900
+.multi_loop_init:
+    LDY #$0001
+    STY $82                         ; next OAM slot index (slot 0 handled above)
+    LDA.w $960B                     ; resume index from last frame
+    TAY
+    STY $80
+.multi_loop:
+    LDY $80
+    LDA.w $A62D,Y                   ; selection-list slot
+    BMI .multi_loop_next
+    TAX
+    LDA $82
+    ASL
+    ASL
+    TAY                              ; Y = OAM slot index * 4 (OAM entry stride)
+    CLC
+    LDA.w $1D0C,X
+    ADC.w $9708,X
+    SEC
+    SBC #$10
+    STA.w $0700,Y
+    CLC
+    LDA.w $1D23,X
+    ADC.w $9713,X
+    STA.w $0701,Y
+    LDX $82
+    LDA.w $0900
+    AND.l $CCFB8D,X                 ; reveal this OAM slot
+    STA.w $0900
+.multi_loop_next:
+    INC $80
+    LDA $80
+    CMP #$03
+    BEQ .multi_loop_cap
+    CMP #$06
+    BEQ .multi_loop_cap
+    INC $82
+    LDA $82
+    CMP #$04
+    BNE .multi_loop
+.multi_loop_cap:
+    LDA $80
+    CMP #$06
+    BNE .multi_loop_save
+    TDC
+.multi_loop_save:
+    STA.w $960B                     ; save scan index for next frame
+.to_tail:
+    JMP .tail
+
+.no_active_pc:
+    LDA.w $0900                     ; hide all 4 main-cursor OAM slots
+    ORA #$55
+    STA.w $0900
+    LDA #$F0
+    STA.w $0701
+    STA.w $0705
+    STA.w $0709
+    STA.w $070D
+.tail:
+    STZ $EE                         ; clear pad-edge bytes (same tail idiom
+    STZ $EF                         ; as Battle_ZeroResultEE)
     RTS
