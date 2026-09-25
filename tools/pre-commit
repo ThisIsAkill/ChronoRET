@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# pre-commit hook — five checks in order:
-#   0. Refuse to commit CLAUDE.md even if force-added (it's gitignored on purpose)
-#   1. ROM byte-exact match (make diff)
-#   2. Regenerate docs/includes/progress_summary.md and auto-stage it
-#   3. Warn if asm/ was changed but docs/PROGRESS.md wasn't updated
-#   4. Block if asm/ was changed but no docs/devlog/posts/ file is staged
+# pre-commit / commit-msg hook.
+#   pre-commit:  author/committer identity, blocked-pattern scan, staged
+#                paths, ROM byte-exact match, doc regen, staleness checks
+#   commit-msg:  commit message text against the same blocked-pattern scan
 #
 # Install:   make install-hook
 # Skip once: git commit --no-verify
@@ -17,10 +15,42 @@ warn() { printf "${YELLOW}[pre-commit] WARNING: %s${RESET}\n" "$*" >&2; }
 ok()   { printf "${GREEN}[pre-commit] %s${RESET}\n" "$*"; }
 info() { printf '[pre-commit] %s\n' "$*"; }
 
-# ── 0. CLAUDE.md must never be committed ──────────────────────────────────────
-if git diff --cached --name-only | grep -qx 'CLAUDE.md'; then
-    fail "CLAUDE.md is staged. It's gitignored on purpose — unstage it (git restore --staged CLAUDE.md)."
+# Bracketed so this file does not match itself.
+PATTERN='c[l]aude|a[n]thropic|co-authored-b[y]|generated wit[h]|\bll[m]\b|\ba[i]\b'
+IDENT='Akhil Moola <goudakhil29@gmail.com>'
+
+scan() {
+    # stdin: text to check; $1: label
+    local hits
+    hits=$(grep -inE "$PATTERN" || true)
+    [ -z "$hits" ] || fail "$1 matches blocked pattern:"$'\n'"$hits"
+}
+
+mode=$(basename "$0")
+
+if [ "$mode" = "commit-msg" ]; then
+    grep -v '^#' "$1" | scan "commit message"
+    exit 0
 fi
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+for var in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+    who=$(git var "$var" | sed -E 's/ [0-9]+ [+-][0-9]{4}$//')
+    [ "$who" = "$IDENT" ] || fail "$var is '$who', expected '$IDENT'"
+done
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# ── 0. Local-only docs (session notes, workflow doc) must never be committed ─
+bad=$(printf '%s\n' "$staged" | grep -E '(^|/)(C[L]AUDE\.md|CT_WORKFLOW\.md|KICKOFF[^/]*\.md|\.c[l]aude/|SESSION[^/]*\.md)' || true)
+[ -z "$bad" ] || fail "ignored local file staged:"$'\n'"$bad"
+bad=$(printf '%s\n' "$staged" | grep -iE '\.(sfc|smc)$' || true)
+[ -z "$bad" ] || fail "ROM file staged:"$'\n'"$bad"
+printf '%s\n' "$staged" | scan "staged path"
+
+# Content (added lines only)
+git diff --cached -U0 --no-color --diff-filter=ACMR \
+    | grep -E '^\+' | grep -vE '^\+\+\+ ' | scan "staged content"
 
 # ── 1. ROM byte-exact diff ────────────────────────────────────────────────────
 if [ ! -f roms/chrono_trigger.sfc ]; then
@@ -40,7 +70,7 @@ python3 tools/progress.py --update-index 2>&1 | grep -E "^Updated|error" || true
 # Note: progress_summary.md lives in the wiki repo — stage it there separately.
 
 # ── 3. Stale PROGRESS.md warning ─────────────────────────────────────────────
-STAGED_ASM=$(git diff --cached --name-only | grep '^asm/' | head -5 || true)
+STAGED_ASM=$(printf '%s\n' "$staged" | grep '^asm/' | head -5 || true)
 if [ -n "$STAGED_ASM" ]; then
     warn "asm/ files staged — remember to update PROGRESS.md and BANK_MAP.md in the wiki repo."
     warn "(${WIKI_DIR}/docs/PROGRESS.md  and  ${WIKI_DIR}/docs/BANK_MAP.md)"

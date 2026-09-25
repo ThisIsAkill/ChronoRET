@@ -30,8 +30,9 @@ clean:
 setup:
 	python3 tools/check_env.py
 
-# Install pre-commit hook (requires git repo)
+# Install pre-commit/commit-msg hooks (requires git repo)
 install-hook:
 	cp tools/pre-commit .git/hooks/pre-commit
-	chmod +x .git/hooks/pre-commit
-	@echo "pre-commit hook installed."
+	cp tools/pre-commit .git/hooks/commit-msg
+	chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
+	@echo "pre-commit, commit-msg hooks installed."
