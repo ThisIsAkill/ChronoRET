@@ -2966,6 +2966,60 @@ Battle_ZeroResultEE:
     RTS
 
 ; ==================================================================
+; BattleMenu_AddBattlerToReady ($C11B19–$C11B54, 60 bytes)
+; ==================================================================
+; Service 1 of the cross-bank $C10045 service API (see
+; BattleMenu_RemoveBattlerFromReady, Service 2, below). Confirmed by
+; reading the dispatch table at $C10051 directly: JSR ($0051,X) with
+; X = service id * 2 (see the PHA/ASL/TAX at $C10045); entry 1 ->
+; $C11B19 (this routine), entry 2 -> $C11BAA.
+;
+; Marks battler slot $A1 ready: if it's already present in the active
+; roster ($A6D9,X non-negative), does nothing. Otherwise sets the
+; ready bit (bit 7) of its sprite flag byte at $93EE+(sprite index
+; from the $CCFAF0 slot->sprite lookup — the same table
+; BattleMenu_CommitAction/ConsumePartnerSlot use to reach $93EE's bit
+; 6 "queued" flag), pushes the slot onto the ATB-ready queue
+; ($95D6-$95D9 at index $95DA), restores its default menu-cursor row
+; from the $9916 table (the same table BattleMenu_CommitAction saves
+; into and BattleMenu_DequeueReadyBattler's siblings read from),
+; increments the queue count, and plays a "battler ready" cue via the
+; same $1E00-$1E02/JSL $C70004 pattern as Battle_StopSfx below (SFX
+; id $19, param $42 vs StopSfx's $00).
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot to add
+; Exit:  M=1; registers clobbered
+; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+org $C11B19
+BattleMenu_AddBattlerToReady:
+    LDA $A1                         ; battler slot to add
+    TAX
+    LDA.w $A6D9,X                   ; already in the active roster?
+    BPL .exit                       ; yes -> nothing to do
+    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    TAX
+    LDA.w $93EE,X
+    ORA #$80                        ; set "ready" bit
+    STA.w $93EE,X
+    LDA.w $95DA                     ; queue count
+    TAX
+    LDA $A1
+    STA.w $95D6,X                   ; push onto ATB-ready queue
+    TAX
+    LDA.w $9916,X                   ; default menu-cursor row for this PC
+    STA.w $95DC,X
+    INC.w $95DA                     ; queue count
+    LDA #$42
+    STA.w $1E01
+    LDA #$19
+    STA.w $1E00
+    LDA #$80
+    STA.w $1E02
+    JSL $C70004                     ; play "battler ready" cue
+.exit:
+    RTS
+
+; ==================================================================
 ; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
 ; ==================================================================
 ; SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90
