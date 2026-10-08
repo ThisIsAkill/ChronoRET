@@ -114,12 +114,6 @@ Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
 org $C0AF4E
 Field_UnkAF4E:      ; acts on dp $44 bits 0/1 with $F0 = $3000/$3040 ...
 
-; --- Bank $C0 data tables read by matched code ---
-
-org $C0FD00
-BitReverseTable:    ; 256 bytes: each index with its 8 bits reversed (verified against the ROM);
-                    ; Spr_CopyTileFlipped mirrors tile rows through it (read as $00:FD00, DB=$00)
-
 ; --- Other banks, called from bank $C0 ---
 
 org $C10000
