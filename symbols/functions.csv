@@ -436,16 +436,66 @@ $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
 $C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,
 $C2:0009,$C2:000B,3,BankC2_Entry0009,$C2,Engine,verified,63f34dceaf41,
 $C2:000C,$C2:000E,3,BankC2_Entry000C,$C2,Engine,verified,3cd62bfe166d,
-$C2:000F,$C2:0042,52,BankC2_SceneBoot,$C2,Engine,verified,682c28b9d14c,Starts the bank's scene mode (inferred name: GameLoop_Main sends Loc_Id $01F0-$81EF here; what those locations show is not traced).
+$C2:000F,$C2:0042,52,BankC2_SceneBoot,$C2,Engine,readable,f4efc736e660,Starts the bank's scene mode (inferred name: GameLoop_Main sends Loc_Id $01F0-$81EF here; what those locations show is not traced).
 $C2:0043,$C2:010F,205,BankC2_InitHwRegs,$C2,Engine,verified,d96e085a8e79,"Writes the PPU registers from OBSEL to SETINI (all but INIDISP and the data ports OAMDATA, VMDATAL/H and CGDATA) and the CPU registers WRIO-VTIMEH with fixed values, through DP=$2100 and then DP=$4200"
 $C2:0110,$C2:012E,31,C2Scene_InstallInterrupts,$C2,Engine,verified,f13b4cbdf31e,"Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM trampolines that the native NMI and IRQ stubs in bank $00 jump through, as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the fiel"
 $C2:012F,$C2:015D,47,C2Scene_ClearDp,$C2,Engine,verified,0d6b367fd6c2,"Zeroes the direct page $00-$EF (an STZ of the first word, then an overlapping MVN), then sets the PPU shadows that C2Scene_NmiHandler copies out to their starting values: forced blank, mode 1 with BG3"
-$C2:015E,$C2:0344,487,C2Scene_NmiHandler,$C2,Engine,verified,e5ca264eebdd,"The scene mode's NMI (reached through !NmiTrampoline, installed by C2Scene_InstallInterrupts)."
+$C2:015E,$C2:0344,487,C2Scene_NmiHandler,$C2,Engine,readable,762c159a3bbf,"The scene mode's NMI (reached through !NmiTrampoline, installed by C2Scene_InstallInterrupts)."
 $C2:0345,$C2:0345,1,C2Scene_IrqHandler,$C2,Engine,verified,83e137cdf0d9,(installed by C2Scene_InstallInterrupts; nothing here enables IRQs).
 $C2:0346,$C2:034C,7,C2Scene_WaitFrame,$C2,Engine,verified,3a0410c96062,Waits until the next NMI: spins until C2Scene_FrameCounter changes.
+$C2:034D,$C2:03EE,162,C2Scene_HideAllSprites,$C2,Engine,readable,0253a668e8b4,"Parks all 128 sprites of the OAM shadow below the screen: Y = Oam_HiddenY in every low-table entry, and the high table zeroed (small size, X bit 8 clear)."
+$C2:03EF,$C2:0404,22,C2Scene_VramQInit,$C2,Engine,readable,aaf3b93eabf7,"Empties and unlocks the VRAM upload queue: clears C2Scene_VramQLock and C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF)"
 $C2:0405,$C2:0453,79,C2Scene_VramQFlush,$C2,Engine,verified,c82ffcb74e7f,"Runs the queued VRAM uploads: for each 8-byte C2Scene_VramQ entry up to C2Scene_VramQEnd, one DMA on channel 0 (word writes to VMDATAL/H) from .Bank:.Src, .Size bytes, to VRAM word .Dest with VMAIN = "
+$C2:0454,$C2:046D,26,C2Scene_WaitFrames,$C2,Engine,readable,e8ad439edc74,Waits X frames (C2Scene_WaitFrame each time).
+$C2:046E,$C2:0470,3,C2Scene_WaitOneFrame,$C2,Engine,readable,20930155839b,A JMP to C2Scene_WaitFrame: waits for the next NMI without sending a pending sound command.
+$C2:0471,$C2:0489,25,C2Scene_TaskClearAll,$C2,Engine,readable,27ae59bd54a3,"Frees all 64 task records (zeroes each .Handler) and points C2Scene_TaskCur at the first record, so that tasks spawned before any task runs copy their parameters from record 0."
+$C2:048A,$C2:0493,10,C2Scene_TaskSpawn,$C2,Engine,readable,a32619435854,
+$C2:0494,$C2:04CC,57,C2Scene_TaskSpawn_Search,$C2,Engine,readable,5225bf840030,
+$C2:04CD,$C2:04D8,12,C2Scene_TaskSpawnLow,$C2,Engine,readable,6a8c354d177e,C2Scene_TaskSpawn over records 0-3 only: the same search and setup (it branches into C2Scene_TaskSpawn_Search).
+$C2:04D9,$C2:04FA,34,C2Scene_TaskSpawnScript,$C2,Engine,readable,311a8138d75e,
+$C2:04FB,$C2:051C,34,C2Scene_TaskSpawnScriptLow,$C2,Engine,readable,58557068a39e,C2Scene_TaskSpawnScript in records 0-3 (C2Scene_TaskSpawnLow).
+$C2:051D,$C2:0552,54,C2Scene_TaskRunAll,$C2,Engine,readable,8469509ac0d7,"Runs every live task once (from the NMI, each frame): for each record of C2Scene_TaskRecords with a non-zero .Handler, sets C2Scene_TaskCur to it and calls the handler (C2Scene_TaskCallHandler) with X"
+$C2:0553,$C2:0555,3,C2Scene_TaskCallHandler,$C2,Engine,readable,40d7bad46760,"JMP (C2Scene_TaskHandler): a JSR here calls the task's handler, which returns to C2Scene_TaskRunAll."
+$C2:0B53,$C2:0BF5,163,C2Scene_SprAdd,$C2,Engine,readable,2707be8b2be7,"Takes the first node off the free list and fills it from the running task (C2Scene_TaskCur): .X = .SprX, .Y = .SprY, .Tile = .SprTile, .Attr = .SprAttr, .Frame = C2Scene_SprFramePtr."
+$C2:0BF6,$C2:0C4C,87,C2Scene_SprInitLinks,$C2,Engine,readable,c5855593b677,
+$C2:0C4D,$C2:0CE9,157,C2Scene_SprResetLists,$C2,Engine,readable,d3fd77aa427c,
+$C2:0CEA,$C2:0D07,30,C2Scene_SprDrawList,$C2,Engine,readable,87499f6a8a78,
+$C2:0D08,$C2:0E0C,261,C2Scene_SprDrawNode,$C2,Engine,readable,bfda25262cf6,
+$C2:0E0D,$C2:0E1C,16,C2Scene_OamHiBitsTable,$C2,Engine,readable,1741301fa17f,"The OAM high-table bits of one sprite, indexed by (slot AND 3) * 4 + size * 2 + X bit 8: the 2-bit value size:Xbit8 shifted to the slot's place in its byte (C2Scene_SprDrawNode)."
+$C2:1DB5,$C2:1DD3,31,C2Scene_ClearPalette,$C2,Engine,readable,18f1429517df,"Zeroes C2Scene_PaletteBuf (512 B, $0920-$0B1F: every color black) and the 16 bytes after it, C2Scene_Unk0B20 ($0B20-$0B2F), a word at a time."
 $C2:225A,$C2:225D,4,Trig_Cos1024,$C2,Engine,verified,7080f9fc7e20,"Signed sine or cosine of a 16-bit angle with 1024 steps per turn, read from !Rom_SineTable: A = sin(angle) × 255 (−255..+255; the table holds |sin| as one byte per step, negated for the second half tu"
 $C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
+$C2:232D,$C2:2335,9,C2Scene_ClearUnk1B30,$C2,Engine,readable,a0a52cbf84c0,"Zeroes the two bytes right after the task records, C2Scene_Unk1B30 and C2Scene_Unk1B31 (their use is not traced)."
+$C2:23A8,$C2:23CE,39,C2Scene_Main,$C2,Engine,readable,792aacd9401d,"C2Scene_MainLoop at $C2:23CF) The scene mode's main program, entered once from BankC2_SceneBoot."
+$C2:23CF,$C2:23DA,12,C2Scene_MainLoop,$C2,Engine,readable,c318a513a179,
+$C2:23DB,$C2:23EE,20,C2Scene_ModeTable,$C2,Engine,readable,66dfcc1b4965,C2Scene_MainLoop's handler for each C2Scene_Mode value 0-9.
+$C2:23EF,$C2:2401,19,C2Scene_ModeIdle,$C2,Engine,readable,1d838647aa12,"C2Scene_Mode 0, 1 and 7: if a sound command is pending (C2Scene_SoundCmdState), sends it with Audio_DriverCommand as C2Scene_WaitFrames does; then back to C2Scene_MainLoop."
+$C2:26A8,$C2:26D3,44,C2Scene_ClearVram,$C2,Engine,readable,325d7f351c03,"Zeroes all of VRAM with one DMA on channel 7: word writes to VMDATAL/H from the fixed source C2Scene_ZeroWord, VRAM address 0, a byte count of 0 (= 65536 bytes)."
+$C2:26D4,$C2:26D5,2,C2Scene_ZeroWord,$C2,Engine,readable,74f2b3e91aa1,The fixed DMA source of C2Scene_ClearVram.
+$C2:26D6,$C2:26EF,26,C2Scene_SaveFlagTail,$C2,Engine,readable,d6c92edf10d7,Copies the last 16 bytes of Menu_FlagBlock7F ($7F:01F0-$01FF) to C2Scene_FlagTailCopy and its first byte (Eng_Unk7F0000) to C2Scene_Flag0Copy.
+$C2:26F0,$C2:2702,19,C2Scene_RestoreFlagTail,$C2,Engine,readable,ed14471e3a93,"Copies C2Scene_FlagTailCopy (16 bytes) back to $7F:01F0-$01FF, the end of Menu_FlagBlock7F (C2Scene_Flag0Copy is not written back)."
+$C2:2703,$C2:271F,29,C2Scene_SetStartPos,$C2,Engine,readable,fbdcd397ac8f,"C2Scene_StartX/Y = the field's entry tile (Loc_EntryX/Y, in the field's direct page at $0100) times 8: probably the start position in pixels (inferred only from the scaling)."
+$C2:2720,$C2:274C,45,C2Scene_SetStartScroll,$C2,Engine,readable,ecc38b1d4a6e,"Puts the entry tile (Loc_EntryX/Y) in the middle of the screen: C2Scene_BgTileX (both words) = Loc_EntryX - 16, plus 192 if that is negative; C2Scene_BgTileY (both words) = Loc_EntryY - 14, plus 128 i"
+$C2:57DF,$C2:5822,68,TextWin_Init,$C2,Engine,readable,80927ae627af,"Starts string TextWin_StrIndex: TextWin_TextPtr = the 16-bit entry TextWin_StrIndex of the table at TextWin_StrTable, in the table's bank; state 0 (TextWin_State), status TextWin_StatusStart, TextWin_"
+$C2:5823,$C2:5841,31,TextWin_Step,$C2,Engine,readable,9e8279594b18,"One step of the text box: TextWin_CheckStatus decides from TextWin_Status whether to go on (C=0); if so, the handler of TextWin_State in TextWin_StateTable runs."
+$C2:5842,$C2:5849,8,TextWin_StateTable,$C2,Engine,readable,5cf3e69044c4,TextWin_Step's handler for each TextWin_State (unmatched).
+$C2:584A,$C2:5850,7,TextWin_CheckStatus,$C2,Engine,readable,03a2124da37c,"Jumps to TextWin_Status's handler in TextWin_StatusTable, which returns C=1 to skip this step's state handler (status 0, TextWin_StatusIdle) or C=0 to run it."
+$C2:5851,$C2:5892,66,TextWin_StatusTable,$C2,Engine,readable,cdd63861d029,TextWin_CheckStatus's handler for each TextWin_Status value $00-$20.
+$C2:5893,$C2:5894,2,TextWin_StatusIdle,$C2,Engine,readable,cb8191ca96ea,Status 0: nothing to do; C=1 so TextWin_Step skips the state handler.
+$C2:5895,$C2:5896,2,TextWin_StatusRun,$C2,Engine,readable,90c17750f3f5,"sub-entries TextWin_StatusPenLeft $C2:5897 and TextWin_StatusPenIndent $C2:589B) TextWin_StatusRun: C=0, run the state handler."
+$C2:5897,$C2:589A,4,TextWin_StatusPenLeft,$C2,Engine,readable,cccda450c1f7,
+$C2:589B,$C2:58B1,23,TextWin_StatusPenIndent,$C2,Engine,readable,47b764f0d2e2,
+$C2:8000,$C2:8001,2,BankC2_Entry8000,$C2,Engine,readable,f9cf58c7e936,"BankC2_Entry8004, $8000–$8005) Three BRAs, the bank's second set of fixed entry points, each reached by JSL from other banks: $8000 BankC2_Entry8000 → BankC2_MenuEntry (A = an argument chosen by the c"
+$C2:8002,$C2:8003,2,BankC2_Entry8002,$C2,Engine,readable,1883bd9c0530,
+$C2:8004,$C2:8005,2,BankC2_Entry8004,$C2,Engine,readable,53cd6a095362,
+$C2:8006,$C2:8009,4,BankC2_ReadPadLong,$C2,Engine,readable,bc4fbbd176f9,Menu_ReadPad as a long call (the BankC2_Entry8002 vector).
+$C2:800A,$C2:800D,4,BankC2_CommandLong,$C2,Engine,readable,9ac6093468a6,Menu_Unk8C36 as a long call (the BankC2_Entry8004 vector).
+$C2:84D2,$C2:84EB,26,Menu_ReadPad,$C2,Engine,readable,827b81326a97,"The pad reader behind BankC2_Entry8002, run once a frame by the scene NMI and by other banks: reads joypad 1 (Menu_PollPad), maps it through the button configuration (Menu_MapButtons) and advances the"
+$C2:84EC,$C2:8544,89,Menu_PollPad,$C2,Engine,readable,dc59c9d20eb3,"Waits for the auto-joypad read to finish and rebuilds the pad words from JOY1 (layout as Pad_Pressed: low byte A X L R B Y Select Start, high byte Up Down Left Right in bits 3-0): - Menu_PadPrevHeld ="
+$C2:8545,$C2:8554,16,Menu_MapButtons,$C2,Engine,readable,c146b464f515,"Menu_MapButtonsOne at $C2:8555) Turns the three pad words into the game's button bytes through the configured button map (Menu_ButtonMap, 8 JOY1-layout masks): bit n of the result is set when every bu"
+$C2:8555,$C2:85AD,89,Menu_MapButtonsOne,$C2,Engine,readable,0ecb234d4603,
+$C2:85AE,$C2:85CF,34,Menu_TickPlayTime,$C2,Engine,readable,d89f04199be2,"Adds one frame to the play-time clock unless Menu_PlayTimePaused is set: Menu_PlayTime byte 0 counts up, and each byte that reaches its limit in Menu_PlayTimeLimits goes back to 0 and carries into the"
+$C2:85D0,$C2:85D5,6,Menu_PlayTimeLimits,$C2,Engine,readable,e66d8d45ad06,"The count at which each Menu_PlayTime byte wraps, lowest first: frames (60), seconds (60), minutes in two digits (10, then 6) and hours in two digits (10, 10)."
 $C2:940D,$C2:950F,259,Menu_InitPpuAndRam,$C2,Engine,verified,78d1a70fa43b,"Puts the PPU and CPU registers into the menu's starting state, then clears all of VRAM and most of bank $7E with DMA."
 $C2:9510,$C2:9511,2,Menu_DmaZeroWord,$C2,Engine,verified,0b8bae3fc865,Menu_InitPpuAndRam's VRAM clear and of Menu_DmaClearWram.
 $C2:9512,$C2:9541,48,Menu_DmaClearWram,$C2,Engine,verified,060735f6467b,"Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed source Menu_DmaZeroWord, one register: WMDATA)."

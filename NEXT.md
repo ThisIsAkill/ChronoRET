@@ -60,13 +60,20 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    treasure-record setters (`Map_TreasureRec0` $1D06, `Map_TreasureLocRecs` $1D08) and the
    scroll limits `Map_Unk1D1A`-`1D1D`. Once Field_Unk885A's review can be redone,
    `Map_Unk91AC` / `Map_Unk93E1` could take real names (the layer scroll accumulate / apply).
-3. Bank $C2: the entry vectors, the scene boot (`BankC2_SceneBoot`, `BankC2_InitHwRegs`), the
-   scene interrupts and NMI handler ($C2:0000–$C2:0453 except `$C2:034D`-`$C2:0404`), and
-   `Menu_InitPpuAndRam` with the new-game data init ($C2:940D–$C2:960A) are matched. Next, the
-   scene NMI's unmatched per-frame steps (`C2Scene_Unk034D`, `C2Scene_Unk051D`,
-   `C2Scene_Unk0C4D`, `C2Scene_Unk0CEA`), then the boot steps `C2Scene_Unk03EF` and
-   `C2Scene_Unk1DB5` and `C2Scene_Main` ($C2:23A8); the text-window entries `TextWin_Init`
-   ($C2:57DF) and `TextWin_Step` ($C2:5823) and the joypad entry `BankC2_Entry8002`.
+3. Bank $C2: matched are the entry vectors ($C2:0000, $C2:8000-$800D), the scene boot, NMI and
+   setup steps, the VRAM queue, the task system ($C2:0454-$C2:0555), the sprite list
+   ($C2:0B53-$C2:0E1C), `C2Scene_Main` with its mode table and idle mode ($C2:23A8-$C2:2401),
+   the setup steps around it ($C2:232D, $C2:26A8-$C2:274C), the text-window entries and status
+   dispatch ($C2:57DF-$C2:58B1), the pad reader and play-time clock ($C2:84D2-$C2:85D5), and
+   `Menu_InitPpuAndRam` with the new-game data init ($C2:940D-$C2:960A). Next, in reach order:
+   the last setup step `C2Scene_Unk2C1D` ($C2:2C1D-$C2:2C92, calls `$C2:09C5`, the BG scroll
+   builder from `C2Scene_BgTileX/Y`, and `$C2:274D`); the script task `C2Scene_TaskRunScript`
+   ($C2:0F63, opcode table at `$C2:0F91`) and the sprite-adding caller at `$C2:0ED6`; the scene
+   modes `C2Scene_Mode2`-`C2Scene_Mode8` ($C2:2402-$C2:26A7); the text decoder states
+   `TextWin_State0`-`TextWin_State3` ($C2:58B2 on) and the glyph drawer `$C2:5DC4`; the menu's
+   own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
+   `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
+   `BankC2_Entry8004`.
 
 ## Tables
 

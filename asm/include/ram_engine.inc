@@ -370,6 +370,9 @@ if !ram_engine_inc == 0
                                          ; Select Start (bits 7-0), high = Up Down Left Right (bits
                                          ; 3-0). Inferred from the pad reader at $C2:84F0 and Start
                                          ; (bit 0) toggling the pause loop in Field_PauseAndMenuInput
+; Pad_Unk00F6-$00F9 are written once a frame by Menu_MapButtons ($C2:8545,
+; through BankC2_Entry8002): $F6/$F8 = Pad_Pressed / Menu_PadHeld through
+; the configured button map, $F7/$F9 = their high bytes (the D-pad).
 !Pad_Unk00F6 = $00F6                     ; 8-bit button-style flags (same layout as Pad_Pressed?):
                                          ; bit 6 opens the menu path and bit 0 the
                                          ; Field_FadeToBankC2Mode5 path in Field_PauseAndMenuInput;
