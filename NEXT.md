@@ -12,9 +12,32 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 
 ## Matching
 
-0. Quick wins from `tools/find_duplicates.py` (byte-identical copies of verified routines):
+0. Quick wins from `tools/find_duplicates.py`. Byte-identical (`make duplicates`):
    `Battle_Mul8` again at `$CC:F365`; the two wave tables again at `$FF:F759` and `$FF:F799`.
-   A relocation-tolerant mode (masking absolute JSR/JMP/JSL operands) should find more.
+   Relocation-tolerant (`make duplicates-reloc`: absolute/long operands masked, fragments of
+   6+ instructions, at most 3 operands differing, outside matched code), ranked by size; all
+   checked by disassembly to be code. "part" = a run inside the source routine, not all of it.
+   1. `$CF:FDC8` 78 B: `BattleMsg_FormatNumberDigits` (part, routine 85 B); 3 differ (digit
+      table `$CC:F903` -> `$CC:F90D`)
+   2. `$C0:2848` 36 B: `Field_FadeInAfterReload` (whole); 1 differs (`JSR Field_EndOfFrameShort`
+      -> `JSR Field_EndOfFrame`): the sibling routine right after it
+   3. `$C0:58FD` 33 B: `Evt_RunObjInit+$10` (part); 0 differ
+   4. `$C2:0073` 32 B: `MainInit+$60` (part, PPU write-twice register clears); 0 differ
+   5. `$C2:9445` 32 B: `MainInit+$60` (part, same); 0 differ
+   6. `$CC:F365` 30 B: `Battle_Mul8` (whole, byte-identical); 0 differ
+   7. `$C1:6699` 26 B: `Battle_CalcAngle+$1A` (part); 0 differ
+   8. `$C0:2DD9` 24 B: `ClearRAMDMA+$15` (part, DMA channel 7 setup tail); 0 differ
+   9. `$CF:F9FB` 24 B: `Battle_SinLookup` (part, routine 41 B); 0 differ
+   10. `$FD:C0FE` 24 B: `MainInit+$60` (part); 0 differ
+   11. `$C1:4A11` 24 B: `BattleTgt_AreaLine+$F` (part); 1 differs (`JSR Battle_CalcAngle` ->
+       `JSR $C1:2AE3`)
+   12. `$C0:0304` 24 B: `Field_RestoreState+$F` (part); 3 differ (call targets)
+   13. `$C0:260E` 23 B: `DefaultHandler+$C4` (part); 0 differ
+   14. `$C0:5A46` 23 B: `Field_ProcessAnimQueue+$C` (part); 0 differ
+   15. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
+
+   More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
+   `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 1. `$C1:1C4A–$C1:1F78`: the gap between `BattleMenu_LoadCommandWindowMap` and
    `BattleMenu_BuildTargetList`.
 2. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for
