@@ -29,6 +29,10 @@ if !hardware_inc == 0
 !W34SEL_Bg3Win1Inv     = $03  ; BG3 window 1 enable + invert
 !TM_AllLayers          = $1F  ; BG1-4 + OBJ enabled
 !COLDATA_GreenBlueZero = $C0  ; write green+blue channels, intensity 0
+!INIDISP_BrightnessMask = $0F ; bits 0-3: screen brightness (0-15)
+!DMAP_BtoA             = $80  ; bit 7: transfer direction B-bus -> A-bus
+!BBAD_MPYL             = $34  ; B-bus address of MPYL ($2134), the DMA fill source in ClearRAMDMA
+!MDMAEN_Ch7            = $80  ; bit 7: start DMA channel 7
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

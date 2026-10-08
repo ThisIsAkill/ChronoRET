@@ -1,19 +1,8 @@
 # Functions not yet at the readability standard (see
 # tools/lint_readability.py). This list may only shrink; main is
 # fully gated when it is empty.
-asm/bankC0/bankC0.asm:ClearRAMDMA
 asm/bankC0/bankC0.asm:DefaultHandler
 asm/bankC0/bankC0.asm:Field_ProcessAnimQueue
-asm/bankC0/bankC0.asm:FrameStateInit
-asm/bankC0/bankC0.asm:GL_ModeOk1
-asm/bankC0/bankC0.asm:GL_ModeOk2
-asm/bankC0/bankC0.asm:GameLoop
-asm/bankC0/bankC0.asm:GameLoop_FrameBody
-asm/bankC0/bankC0.asm:GameLoop_Main
-asm/bankC0/bankC0.asm:InitHW
-asm/bankC0/bankC0.asm:InstallIRQ
-asm/bankC0/bankC0.asm:InstallNMI
-asm/bankC0/bankC0.asm:LoadLocation
 asm/bankC0/bankC0.asm:ModeE6_Handler
 asm/bankC0/bankC0.asm:ModeEC_Handler
 asm/bankC0/bankC0.asm:ModeEE_Handler
@@ -21,38 +10,7 @@ asm/bankC0/bankC0.asm:ModeFA_Handler
 asm/bankC0/bankC0.asm:ModeFC_Handler
 asm/bankC0/bankC0.asm:Obj_AnimTickAndQueue
 asm/bankC0/bankC0.asm:Obj_BuildSpriteFrameStep
-asm/bankC0/bankC0.asm:PV_CheckChain
-asm/bankC0/bankC0.asm:PV_EndRange1
-asm/bankC0/bankC0.asm:PV_EndRange2
-asm/bankC0/bankC0.asm:PV_EndRange3
-asm/bankC0/bankC0.asm:PV_FillRange1
-asm/bankC0/bankC0.asm:PV_FillRange2
-asm/bankC0/bankC0.asm:PV_FillRange3
-asm/bankC0/bankC0.asm:PV_NextSprite
-asm/bankC0/bankC0.asm:PV_SpriteLoop
-asm/bankC0/bankC0.asm:PostVBlank
-asm/bankC0/bankC0.asm:ReentryVectors
-asm/bankC0/bankC0.asm:Sub_00EB
-asm/bankC0/bankC0.asm:Sub_011B
-asm/bankC0/bankC0.asm:Sub_01A5
-asm/bankC0/bankC0.asm:Sub_0905
-asm/bankC0/bankC0.asm:Sub_0918
-asm/bankC0/bankC0.asm:Sub_0C76
-asm/bankC0/bankC0.asm:Sub_18D9
-asm/bankC0/bankC0.asm:Sub_1985
-asm/bankC0/bankC0.asm:Sub_19C7
-asm/bankC0/bankC0.asm:Sub_1A03
-asm/bankC0/bankC0.asm:Sub_1ADF
 asm/bankC0/bankC0.asm:Sub_1B36
-asm/bankC0/bankC0.asm:Sub_1B90
-asm/bankC0/bankC0.asm:Sub_1B90_body
-asm/bankC0/bankC0.asm:Sub_1BA7
-asm/bankC0/bankC0.asm:Sub_1F24
-asm/bankC0/bankC0.asm:Sub_1F5A
-asm/bankC0/bankC0.asm:Sub_2824
-asm/bankC0/bankC0.asm:Sub_595C
-asm/bankC0/bankC0.asm:Sub_597D
-asm/bankC0/bankC0.asm:Sub_B192
 asm/bankC0/bankC0.asm:Sub_B309
 asm/bankC0/bankC0.asm:Sub_B701
 asm/bankC0/bankC0.asm:Sub_B788
@@ -93,8 +51,6 @@ asm/bankC0/bankC0.asm:Sub_E9AA
 asm/bankC0/bankC0.asm:Sub_E9E2
 asm/bankC0/bankC0.asm:Sub_E9FF
 asm/bankC0/bankC0.asm:Sub_EA1F
-asm/bankC0/bankC0.asm:VBlankHandler
-asm/bankC0/bankC0.asm:VBlankHandlerShort
 asm/bankC1/bankC1.asm:BattleMenu_BlankMpCostDigits
 asm/bankC1/bankC1.asm:BattleMenu_BuildTargetList
 asm/bankC1/bankC1.asm:BattleMenu_BuildTechAvailFlags
