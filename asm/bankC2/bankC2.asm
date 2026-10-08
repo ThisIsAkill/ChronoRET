@@ -13056,7 +13056,7 @@ C2Scene_Unk8604Init:
 ; caller fills first: the field ($C0:20F4-$C0:2121) sets the string
 ; number, the string table, the output buffer ($7E:F000) and the mode,
 ; and before each step the character count. The text decoder itself
-; (TextWin_StateTable's handlers) is not matched.
+; is TextWin_StateTable's handlers, TextWin_State0-3 (below).
 
 org $C257DF
 ; $C2:57DF — TextWin_Init (68 bytes, $57DF–$5822)
