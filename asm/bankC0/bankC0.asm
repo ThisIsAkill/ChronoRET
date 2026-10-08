@@ -9910,7 +9910,7 @@ Map_Unk8A6D:
     STA.b !Map_Unk1D2E-!DP_Map
     CLC
     ADC.b !Map_LeaderX-!DP_Map
-    ADC.w #!Map_BoxHalfW
+    ADC.w #!Map_BoxHalfW          ; no CLC: the carry from the add above (set when LeaderX >= $10) lands it 1 unit further right (quirk, kept)
     STA.b !Map_ProbeX-!DP_Map
     JSR .test_probe
     BCC .up_left_edge
@@ -10061,7 +10061,7 @@ Map_Unk8A6D:
     STA.b !Map_Unk1D2E-!DP_Map
     CLC
     ADC.b !Map_LeaderX-!DP_Map
-    ADC.w #!Map_BoxHalfW
+    ADC.w #!Map_BoxHalfW          ; no CLC: the carry from the add above (set when LeaderX >= $10) lands it 1 unit further right (quirk, kept)
     STA.b !Map_ProbeX-!DP_Map
     JSR .test_probe
     BCC .dn_left_edge
