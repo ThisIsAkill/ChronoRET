@@ -49,17 +49,34 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    59 callers). Also matched: the turn-list handlers `$C1:8461`-`$C1:8C3D` (`BattleSys_Unk8461`,
    list 12, the battlers' turns, with `BattleSys_Unk883D` / `BattleSys_ClearUnkB192`;
    `BattleSys_ListHandler0`-`11`; `BattleSys_Unk895B`; `BattleSys_Unk8C09`) and the tables
-   `BattleSys_ListHandlerTable` / `BattleSys_ListOffsetTable` (`$C1:B92D`-`$C1:B960`). Next, in
-   reach order: the enemy script code `BattleSys_UnkAFD2` (`$C1:AFD2`-`$C1:B092`, reads `$CC:8B08`),
-   `BattleSys_UnkB488`/`B4AA` and the script-code table `BattleSys_UnkB80DTable` (`$C1:B80D`,
-   157 words, handlers from `$C1:8EA7`), `BattleSys_Unk8CF9` (an enemy's action), `BattleSys_UnkB967`
-   (a PC's command), the turn-list hit helpers `BattleSys_UnkE89F`/`EBF8`/`EC7F`, the other callees of
-   Unk8461 (`$C1:AC46`/`AC57`/`AC5E`, `B575`, `B70E`, `B725`, `B762`, `BCE1`, `BD6F`) and the small
+   `BattleSys_ListHandlerTable` / `BattleSys_ListOffsetTable` (`$C1:B92D`-`$C1:B960`). Also
+   matched: the enemy behaviour-script core (`BattleAi_*`): `BattleAi_TestPassed` /
+   `BattleAi_EnemyTurn` / `BattleAi_Test00` (`$C1:8C3E`-`$C1:8EAA`), the target and action-block
+   helpers `$C1:AC14`-`$C1:AF21` (`BattleAi_ReadTargets`, `ClearTargets`, `SetMainMask`,
+   `SetTargetMask`, `TargetsByPcByte`, `PickPcTarget`, `PickMarkedTarget`, `AddPcByByte`,
+   `NoteFirstTest`, `FillActBlock`, `SetCmdBits`, `ArgToDp0E`, the unreferenced `BattleAi_UnkAED3`,
+   and `BattleSys_UnkAC57`/`AC5E`/`AC85`), `BattleAi_RunMainPart` (`$C1:AFD2`),
+   `BattleAi_FindReactPart` / `BattleAi_PickScript` (`$C1:B488`-`$C1:B4E8`), the four handler
+   tables `BattleAi_TestTable` / `ChooseTable` / `RunTable` / `TargetTable` (`$C1:B80D`-`$C1:B92C`:
+   41 + 23 + 23 + 57 words), and the hit records `Battle_HitEntryOffset` (`$C1:E89F`) and
+   `Battle_RecordHit` / `Battle_ClearCancelledHits` / `Battle_ApplyHits` (`$C1:EBF8`-`$C1:ED88`).
+   Next, in reach order: the script handlers themselves (stubs `BattleAi_TestNN` `$C1:8EAB`-`$C1:980F`,
+   `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN` `$C1:99B8`-`$C1:A3F5`,
+   `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`; their shared helpers `$C1:B279` and the like),
+   `BattleSys_UnkB967` (a PC's command, `$C1:B967`-`$C1:BD6E`, with `BC60`/`BCE1` inside it;
+   it reads per-PC records through `$FD:A849` as `LDA $0001,X`, needs a struct), the action
+   callees `BattleSys_UnkBFA4` (service 4 request), `BattleSys_UnkD7C4`/`D8D1`, `BattleFD_UnkABA2`,
+   `$C1:AF79` (a second Battle_RandRange on `!Battle_UnkB3E6`, called from `$C1:ED95`), the other
+   callees of Unk8461 (`B575`, `B70E`, `B725`, `B762`, `BD6F`) and the small
    per-pass / end callees `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/
    `BC60`/`EA9D`/`EAE8`/`F93E`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
    (its bank-$FD callees are matched, see item 4); the vectors
    `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`) and service 0
-   (`$C1:0023`). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
+   (`$C1:0023`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
+   (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
+   `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits), who sets
+   `!BattleAi_ChosenBlock` to $FF, and the hang in BattleAi_PickPcTarget's marked scan (a quirk, or
+   never reached). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
    statuses; 6, 7 and 11 are empty), who fills `!Battle_ListRuns`/`!Battle_ListReload` and sets a
    list's flags, what `!Battle_UnkAF24`'s script results and the `!Battle_UnkB24A`/`B263`/`B2B6`
    indexing in Unk8461 (by list position, by enemy in Unk8C09) mean; what `!Battle_Unk24`, `!Battle_Unk99CD`,
@@ -144,16 +161,42 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_CopyRegionPlane`, the load-time pass `Field_UnkB0E6` and `Obj_ActivateIfInView`; and
    `SprBuf_FreeObj` ($C0:EA42). `Vblank_UnkA810`, `Field_UnkAF4E` and `Field_UnkB0E6` keep
    their names because verified callers use them; better names once those are re-reviewed:
-   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`. Open from it: the stubs
-   `Obj_Unk6F9A` / `Obj_Unk7170` (dispatch on Obj_Unk1100 through tables $C0:6FA7 / $C0:7181)
-   and `Obj_Unk7056` (the $0B88 entry), who writes `ObjX_LeaveView` ($7F:0A00), and the
-   event-opcode handlers that call `Obj_CalcDirection` / `Obj_SetVelocity*` ($C0:4D22-$C0:55E6,
-   they set `Obj_MoveFrames` / `Obj_ArcGravity`) and the region copy ($C0:3D97). Next, in
-   reach order: `Obj_Unk72B4`/`Obj_Unk734C` (they work
-   on the $0B00/$0B80 tables, up to $C0:7398); the NMI handler's upload calls
-   ($C0:EA9E–$C0:EB86, which also call the Field_Upload* routines and Pal_UploadCgram); the
-   `Evt_Unk0920` list code at $C0:5C90 and the halts at $C0:5CB3; `Vblank_ReadScanlineCounters`
-   ($C0:5A46, walks the `ObjQ_Unk74` list through `Obj_Unk1080`). Open from the hand-off: who
+   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`.
+   Also done (branch match-c0-more): the NMI handler `NmiHandler` ($C0:EA63) with `Field_WaitFrame`
+   (the frame wait; keeps its name for its verified callers, better `Field_WaitFrame`),
+   `Credits_UploadLine`, `Oam_UploadShadow`, `Field_UploadUnk5800` ($C0:6ECB) and the 12 layer
+   edge uploads `Map_UploadRowYInc1`-`Map_UploadColXDec3` with `Map_EdgeDmaRow/Col`
+   ($C0:8445-$C0:87F0); the tile-slot allocator `Obj_Unk6F9A` / `Obj_Unk7056` (`Obj_TileSlot`,
+   was Field_Unk0B88) and the palette-slot allocator `Obj_Unk7170` / `Obj_Unk72B4` /
+   `Obj_Unk734C` with its handlers (`Obj_PalSlot`, was Field_Unk0B80; `Obj_PalPrev/Next`,
+   `Obj_PalSrc`) ($C0:6F9A-$C0:7083, $C0:7170-$C0:7398; the Unk names stay for their callers:
+   better `Obj_TileSlotAlloc/Free`, `Obj_PalSlotAlloc/AllocBtl/Free`); the event helpers
+   `Evt_HasActionTarget`, `Evt_FindSolidObjInFront` with the four in-front tests and
+   `Evt_FindOrAddUnk0920` ($C0:5B8D-$C0:5CC6); the object script scheduler `Vblank_Unk59D9`,
+   `Vblank_ReadScanlineCounters` and `Evt_RunObjScriptSteps` ($C0:59D9-$C0:5AC4; better
+   names `Obj_QueueScripts` / `Obj_RunQueuedScripts`); and the event movement / facing opcodes
+   $7A, $7B, $92, $9C, $9D, $96, $9A, $97, $A0, $A1, $94, $9E, $98, $95, $8F, $9F, $99, $0F,
+   $17, $1B, $1D, $A6, $A7, $1E, $1F, $25, $26, $A8, $A9 with `Obj_SetMoveAnim` /
+   `Obj_SetStandAnim` ($C0:4D06-$C0:56A5). Open from these: `Obj_Unk305D` / `Obj_Unk30B3`
+   (stubs: step to the tile centre / onto another object), the opcodes before them
+   ($C0:4CD5-$C0:4D05: $90, $91, $7E, $7C, $7D share a tail at $C0:4CD9) and the opcode $B5/$B6
+   wrappers at $C0:3546/$C0:354F; the event code at $C0:304F, $C0:4626 and $C0:4781 that calls
+   the helpers; who writes `Field_Unk31`/`Field_Unk36` (NMI upload to VRAM $5800), the
+   `Field_Unk47` bits 1-2, `Obj_Unk1C81`, `ObjX_Unk7F0B00` and
+   `ObjX_LeaveView` ($7F:0A00); the region-copy event opcode $E4 ($C0:3D97); the meaning of
+   `Obj_Unk1100` kinds (0-2 fixed palette slots 5-7, 3/4 tile slots, 5/6 palette slots 1-3).
+   Quirks recorded: `Obj_PalSlotFixed`'s shared path writes `Obj_PalSlot` + an object offset
+   (kinds 0-2), the missing SEC/CLC in `Evt_InFront*` and `Field_UploadUnk5800`, the kind-0
+   head insert in `Vblank_Unk59D9`. Stale headers to fix at their next edit (they still call
+   now-matched sites "unmatched" or "not traced"): VramDma_Upload (`$C0:6EED`),
+   Map_UploadBufTo7400 (`$C0:EAE1`-`$C0:EB5E`), Field_UploadUnk1F00/1D00/1C00/57E0 and
+   Pal_UploadCgram (NMI sites), VramQ_Flush (`$C0:EB8C`), Evt_ClearUnk0920 (`$C0:5C90`),
+   Obj_CalcDirection / Obj_SetVelocity / Obj_SetVelocityChecked (their callers are the event
+   opcodes now), Obj_UpdateInView / Obj_ActivateIfInView / FieldBtl_SaveObj /
+   FieldBtl_RestoreObj (the Obj_Unk* callees are matched), and the `Field_Unk0B80/0B88` uses in
+   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`). Next, in reach
+   order: the rest of the event opcode handlers ($C0:2E67-$C0:4CD4 and $C0:5F6E-$C0:6D2E)
+   and `Evt_OpcodeTable` ($C0:5D6E) once they have names. Open from the hand-off: who
    writes `FieldBtl_Result` = 2 and what the battle does with `FieldBtlObj.Flags` (0 removes the
    object), what `Eng_Unk0010` holds (Scene_Unk0283's `BIT $0010` quirk), the readers of
    `FieldBtlPpu`, `FieldBtl_AttrA/B` and `Field_Unk47`, and what
@@ -226,18 +269,31 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    TextWin_Init's header ("the text decoder ... is not matched"). Open from it: who sets
    C2Scene_TrigFlags (bits 0/1), C2Scene_ObjBusy and the objects' counts (the code at
    $C2:42FC-$C2:5590 reads $0290-$029F heavily), C2Scene_Unk027E state 1, who reads the task
-   byte C2Scene_TrigListA/C set (probably the third watcher at $C2:3404, unreferenced too: it
-   dispatches on C2Scene_Unk027E through $C2:342D, compares C2Scene_Unk027F/0281, runs
-   C2Anim_Run and has handlers out to $C2:3B00 via the tables $C2:345D, $C2:3493, $C2:34A3);
-   C2Scene_Unk1B47 and why C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex.
-   Next, in reach order: that third watcher ($C2:3404-$C2:3BCx, with $C2:3ACB); the glyph
-   drawer `TextWin_DrawGlyph` ($C2:5DC4-$C2:5E35, its blitters $C2:5E36/$C2:5F07, width table
-   $C2:60E6) and the decimal converters `TextWin_Dec8/16/24` ($C2:614B-$C2:6262, with the data
-   `TextWin_CharNamePtrs` $C2:5FD8 and `TextWin_StrNadia` $C2:6146, now stubs); the layer
-   scroll calls at $C2:3702-$C2:371E; the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode
-   7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
-   `$C2:5798` and the data before `TextWin_Init`; its callers at $C2:5700-$C2:5774 read
-   object A); the menu's
+   byte C2Scene_TrigListA/C set (still open); C2Scene_Unk1B47 and why
+   C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex. Also matched: the party
+   leader's task `C2Scene_LeaderTask` with its states, steps and tables (D-pad walking in
+   8-pixel steps that scroll BG1/BG2 through `C2Scene_Unk0568`/`066C` at $C2:3702-$C2:371E,
+   the buttons that set scene modes 3/5/6/9, the idle animation, the ListD member script, and
+   walking onto an object) and its helpers (trail, walk/stand animations, tile property
+   lookups `C2Scene_GetTileProps`/`GetTileProp` over BG2's map and the $7E:7000 pack, step
+   target, object count, `C2Scene_SetEntryTile`) ($C2:3404-$C2:3AE1, $C2:6291-$C2:62EC); the
+   other members' follow task `C2Scene_MemberTask` with its route planner
+   (`C2Scene_MemberRoute`, `C2Scene_PathBlocked`, `C2Scene_ScanRow/ScanCol`) ($C2:3AE2-$C2:42DC);
+   `TextWin_DrawGlyph` with `TextWin_Blit2bpp/4bpp`, their shift tables, the tile offset and
+   width tables, `TextWin_CharNamePtrs`, `TextWin_StrNadia` and `TextWin_Dec8/16/24` with their
+   division loops ($C2:5DC4-$C2:6262); `C2Scene_Unk5775`, `C2Scene_ClearUnk8621` and the data
+   before `TextWin_Init` ($C2:5775-$C2:57DE). Neither party task has a reference (scene data,
+   as the watchers). The headers this batch made stale (C2Scene_Unk0568/066C, C2Anim_Run,
+   C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_SetAnim, C2Scene_TaskRunScript, TextWin_State0
+   and its banner) are fixed and need review again. Still stale: TextWin_State1-3's Entry lines
+   ("DB as TextWin_DrawGlyph needs (not traced)"; it takes any DB). Open from it: who
+   starts the two party tasks and sets `.Slot` (+$24); what the $7E:7000 property nibbles'
+   bit 3 and the other bit 2 uses are; `C2Scene_Unk1BF1/1BF3` and `C2Scene_Unk1BF7` readers;
+   what $7E:8600-$861C hold (`C2Scene_Unk8600/8604`) and the unreferenced `C2Scene_Unk57B0` and
+   `C2Scene_GetMapCell`. Next, in reach order: the object tasks after the members
+   ($C2:42DD on, a state table at $C2:42E6; $C2:42FC-$C2:5590 read objects A/B), the code at
+   $C2:5700-$C2:5774 (calls `C2Scene_ClearUnk8621`); the mode sub-programs `C2Scene_Unk631F`
+   (mode 6, BG mode 7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); the menu's
    own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
    `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,

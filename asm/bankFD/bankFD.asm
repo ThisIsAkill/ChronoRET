@@ -429,7 +429,7 @@ BattleFD_UnkAB30:
 ; The gold and items are proven by what BattleSys_Main pays out; that
 ; .Unk0 and .Unk6 are the other two rewards shown by BattleFD_UnkAD17
 ; (messages 0 and 1) is probable, not traced.
-; Callers (1 JSL site): unmatched ($C1:ECFE).
+; Callers (1 JSL site): Battle_ApplyHits ($C1:ECFE).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $0E (16-bit) = the enemy's slot
 ; Exit:  M=1, X=0; A, X, Y clobbered; DP $04, $06, $10 written;
 ;        !Battle_MathA..MathHi as Battle_Mul16 leaves them; on the item
@@ -641,8 +641,8 @@ BattleFD_UnkAC6E:
 ; ($AD9C-$AE4B: the first four of the $2C-byte record sets the hit
 ; opcodes read).
 ; Callers (9 JSL sites): BattleSys_Unk8461 ($C1:8835), BattleSys_ListHandler1 ($C1:8948),
-;   BattleSys_ListHandler9 ($C1:8BB4), Battle_SetupBattle ($C1:FBAC) and unmatched ($C1:8E88,
-;   $C1:B38A, $C1:BB29, $C1:BC56, $C1:C01D).
+;   BattleSys_ListHandler9 ($C1:8BB4), BattleAi_EnemyTurn ($C1:8E88), Battle_SetupBattle ($C1:FBAC)
+;   and unmatched ($C1:B38A, $C1:BB29, $C1:BC56, $C1:C01D).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 0 (B too); X = $B0; Y unchanged
 org $FDACEE
@@ -660,8 +660,8 @@ BattleFD_UnkACEE:
 ; $FD:ACFD — BattleFD_UnkACFD (12 bytes, $ACFD–$AD08)
 ; Zeroes the $84 bytes of !Battle_UnkB328 ($B328-$B3AB). BattleSys_Main
 ; runs it every pass; what the block holds is not traced.
-; Callers (6 JSL sites): BattleSys_Main ($C1:812C), Battle_SetupBattle ($C1:FD12) and unmatched
-;   ($C1:D523, $C1:D7C4, $C1:D8D1, $C1:ED84).
+; Callers (6 JSL sites): BattleSys_Main ($C1:812C), Battle_ApplyHits ($C1:ED84), Battle_SetupBattle
+;   ($C1:FD12) and unmatched ($C1:D523, $C1:D7C4, $C1:D8D1).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 0 (B too); X = $84; Y unchanged
 org $FDACFD
@@ -3230,8 +3230,8 @@ EngFD_UnkC124:
 ; clear, else the set at $7F:1238; each set holds one $57-byte table per
 ; channel. Which channels run is up to !Field_HdmaEnable (the NMI writes
 ; HDMAEN).
-; Callers (10 JSL sites): Field_RestoreState ($C0:01B0), Scene_ResumeNmi ($C0:0B34) and unmatched
-;   ($C0:0B1F, $C0:EAEF, $C0:EB0F, $C0:EB26, $C0:EB3D, $C0:EB51, $C0:EB65, $C0:EC0F).
+; Callers (10 JSL sites): Field_RestoreState ($C0:01B0), Scene_ResumeNmi ($C0:0B34), NmiHandler
+;   ($C0:EAEF, $C0:EB0F, $C0:EB26, $C0:EB3D, $C0:EB51, $C0:EB65, $C0:EC0F) and unmatched ($C0:0B1F).
 ; Entry: M=1, X=0 (16-bit table addresses), DP any (saved), DB=$00 (reads
 ;        !DP_Field+!WinFx_Size and +!Field_Unk53 absolute)
 ; Exit:  M=1, X=0; DP restored; A clobbered; X = the channel 7 table

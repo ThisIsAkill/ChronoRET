@@ -114,11 +114,16 @@ if !ram_engine_inc == 0
 !Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk30 = $30                       ; 8-bit; zeroed by Field_InitLoadState and by
                                          ; Field_CheckTileInFront as it starts Field_Unk29 = 1
+!Field_Unk31 = $31                       ; 8-bit; Field_UploadUnk5800 uploads to VRAM word
+                                         ; $5800 + this x $200 (no writer traced)
 !Field_Unk32 = $32                       ; 8-bit; zeroed by Field_CheckTileInFront as it starts
                                          ; Field_Unk29 = 1
 !Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
                                          ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
+!Field_Unk36 = $36                       ; 8-bit; NmiHandler runs Field_UploadUnk5800 while it is
+                                         ; nonzero: every frame while bit 7 is clear, once (it is
+                                         ; zeroed first) when bit 7 is set; no writer traced
 !Field_Unk38 = $38                       ; 8-bit step of Field_Unk885A (1, 2; it clears it when done);
                                          ; DefaultHandler sets it to 1. Field_DpadDispatch does
                                          ; nothing while it is nonzero
@@ -141,6 +146,9 @@ if !ram_engine_inc == 0
                                          ; frame
 !Pad_PressedLatch = $51                  ; 8-bit; GameLoop_FrameBody ORs the low byte of Pad_Pressed
                                          ; into it every frame
+!Nmi_FramePending = $52                  ; 8-bit; Field_WaitFrame INCs it and spins until it is 0 again;
+                                         ; NmiHandler does the frame's uploads only while it is
+                                         ; nonzero and zeroes it after them (the frame handshake)
 !Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 flips bit 0 each frame and runs
                                          ; its table 1 handler when it was set, table 0 when clear;
                                          ; Hdma_InitChannelsFD picks the HDMA table set by bits 0-3;
@@ -153,7 +161,9 @@ if !ram_engine_inc == 0
 !Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState; Map_StepTileEffects
                                          ; stores Map_ProbeLevel here and Map_ProbeLevelBlocked
                                          ; compares with it (looks like the leader's current level)
-!Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk58 = $58                       ; 16-bit; zeroed by Field_InitLoadState; Field_WaitFrame counts
+                                         ; it up once per frame wait, ANDed with Field_Unk58Mask
+                                         ; (bits 0-9 wrap at $400, bit 15 kept); no reader traced
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);
                                          ; blocks the pause/menu paths and Field_DpadDispatch when
                                          ; nonzero
@@ -163,7 +173,10 @@ if !ram_engine_inc == 0
 !Field_Unk65 = $65                       ; 8-bit limit for Field_Unk63 (Sub_1ADF)
 !Field_Unk66 = $66                       ; 8-bit; Sub_1ADF saves Field_Unk63 here before forcing it
                                          ; to 4
-!Field_Unk68 = $68                       ; 8-bit; set to 5 by Field_InitLoadState, no other matched use
+!Evt_StepsLeft = $67                     ; 8-bit: opcodes Evt_RunObjScriptSteps may still run for
+                                         ; the current object this frame
+!Field_Unk68 = $68                       ; 8-bit; set to 5 by Field_InitLoadState: the opcodes
+                                         ; Evt_RunObjScriptSteps runs per object per frame, at most
 !Field_UnkAB = $AB                       ; 8-bit; saved to/restored from SceneSave_UnkAB by
                                          ; Field_SaveState/Party_ReinitIfChanged
 !Field_UnkAC = $AC                       ; 8-bit; saved/restored with Field_UnkAB
@@ -299,6 +312,31 @@ if !ram_engine_inc == 0
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
                                          ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
+!ObjFront_SavedY = $C7                   ; Evt_FindSolidObjInFront: 16-bit, the caller's Y
+!ObjFront_FacingX2 = $D9                 ; alias of Eng_Scratch there: 8-bit Obj_Facing x 2 of
+                                         ; Obj_Cur (index into Evt_InFrontTests)
+!ObjFront_X = $DB                        ; alias of Oam_Range1LoPtr's slot there: 16-bit Obj_PosX of
+                                         ; Obj_Cur
+!ObjFront_Y = $DD                        ; alias of Oam_Range2LoPtr's slot there: 16-bit Obj_PosY of
+                                         ; Obj_Cur
+!ObjFront_Other = $E9                    ; 16-bit: the object being tested (high byte $EA zeroed
+                                         ; first, the low byte stored with 8-bit X)
+!ObjFront_OtherHi = $EA                  ; high byte of ObjFront_Other
+!Evt_Unk0920Key = $E3                    ; 8-bit value Evt_FindOrAddUnk0920 looks up in Evt_Unk0920
+                                         ; (set by its callers, event code at $C0:4626 / $C0:4781)
+!EvtArc_Gravity = $C1                    ; alias of Anim_RowAddr in Evt_Op7A_ArcToTile: 8-bit, its
+                                         ; third operand (Obj_ArcGravity, and the frames when there
+                                         ; is no distance)
+!EvtFollow_ScrCol = $DB                  ; alias of Oam_Range1LoPtr's slot in Evt_Op8F_FollowPc: 8-bit
+                                         ; Map_TileOriginX / 2 (the screen's first map column)
+!EvtFollow_ScrRow = $DD                  ; as EvtFollow_ScrCol: Map_TileOriginY / 2
+!EvtFace_Target = $D9                    ; alias of Eng_Scratch in Evt_OpA8_FaceObj: 16-bit, the
+                                         ; target's slot
+!ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
+                                         ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
+                                         ; the slot being tried
+!ObjPal_Owner = $DB                      ; alias of Oam_Range1LoPtr's slot there: 8-bit, the taken
+                                         ; slot's owner while its Obj_PalSrc is compared
 !ObjView_Left = $C3                      ; alias of Spr_BaseX in Obj_UpdateInView / Obj_FlagInView /
                                          ; Obj_ActivateIfInView: 8-bit first column of the view
                                          ; window, in 8-pixel columns (Map_TileOriginX units)
@@ -475,13 +513,16 @@ if !ram_engine_inc == 0
 ; --- Object frame queue and animation (Obj_AnimTickAndQueue, Field_ProcessAnimQueue) (dp) ---
 !ObjQ_ScanlineLimit = $6B                ; 16-bit: Field_ProcessAnimQueue stops building frames once
                                          ; the V counter reaches this (unless past line 240)
-!ObjQ_Unk69 = $69                        ; 16-bit; Scene_PostLoadInit sets ObjQ_Unk69Init; no reader traced
+!ObjQ_Unk69 = $69                        ; 16-bit; Scene_PostLoadInit sets ObjQ_Unk69Init;
+                                         ; Vblank_ReadScanlineCounters stops running scripts once the
+                                         ; V counter reaches it (unless past line 240)
 !ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; no reader traced
 !ObjQ_Unk73 = $73                        ; 8-bit; zeroed by Evt_InitObjects; no reader traced
-!ObjQ_Unk74 = $74                        ; 8-bit; ObjQ_Empty at load (Evt_InitObjects); unmatched code
-                                         ; at $C0:5A66 (Vblank_ReadScanlineCounters) walks a list from
-                                         ; it through Obj_Unk1080: probably a second object list's head
-!ObjQ_Unk75 = $75                        ; 8-bit; as ObjQ_Unk74, probably that list's tail
+!ObjQ_Unk74 = $74                        ; 8-bit; ObjQ_Empty at load (Evt_InitObjects): the head of
+                                         ; the list of objects whose script is due (linked through
+                                         ; Obj_Unk1080; Vblank_Unk59D9 fills it,
+                                         ; Vblank_ReadScanlineCounters runs and empties it)
+!ObjQ_Unk75 = $75                        ; 8-bit; as ObjQ_Unk74: that list's tail
 !ObjQ_Head = $76                         ; 8-bit: first object waiting for a frame build ($80 = queue
                                          ; empty); objects are linked through Obj_QueueNext
 !ObjQ_Tail = $77                         ; 8-bit: last object in the frame-build queue ($80 = empty)
@@ -618,6 +659,7 @@ if !ram_engine_inc == 0
                                          ; CGRAM upload source; LocLoad_Unk7084 fills rows 1-7
 !Pal_LocRows = $7E2022                   ; Pal_Buf row 1, colour 1: where LocLoad_Unk7084 copies the
                                          ; location's seven rows (colour 0 of each row is skipped)
+!Pal_SpriteRows = $7E2100               ; Pal_Buf row 8, the first sprite palette (Obj_PalSlot 0)
 !Pal_CgramBuf = $7E2200                  ; Pal_BufBytes sent to CGRAM by Pal_UploadCgram (NMI side);
                                          ; Pal_LoadUnkRow0 copies all of Pal_Buf here
 !FieldRom_PalRow0Sets = $FFB210          ; ROM: colour sets 16 bytes apart; Pal_LoadUnkRow0 copies 30
@@ -671,6 +713,10 @@ if !ram_engine_inc == 0
                                          ; Evt_InitObjects clears at each location load
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
+!Rom_DirToFacing = $C0F700               ; 256 bytes in ROM: the Obj_Facing (0 up, 1 down, 2 left, 3
+                                         ; right) for each Obj_Direction: $E0-$1F right, $20-$5F
+                                         ; down, $60-$9F left, $A0-$DF up; read absolute through
+                                         ; the bank $00 mirror by the event movement opcodes
 !Rom_AngleTable = $C0F300                ; 32 x 32 bytes in ROM: angle (256 per turn, $40 = a
                                          ; quarter) of the vector (run, rise) at rise x 32 + run;
                                          ; Obj_CalcDirection reads it through DB=$00 (the table the
@@ -732,9 +778,22 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
 
 ; --- OAM shadow ---
-!Field_Unk0B80 = $0B80                   ; 8 bytes set to Field_Unk0B80Empty at each load
-                                         ; (Field_ResetUnk0B80); no reader traced
-!Field_Unk0B88 = $0B88                   ; Field_Unk0B88Bytes bytes, the same (Field_ResetUnk0B88)
+!Obj_PalPrev = $0B00                     ; 8-bit per object (index Obj_Cur): the object before it in
+                                         ; its palette slot's list ($80 = none); Obj_Unk7170 links,
+                                         ; Obj_Unk734C unlinks
+!Obj_PalNext = $0B01                     ; 8-bit per object: the object after it in that list ($80 =
+                                         ; none, i.e. it is the slot's newest)
+!Obj_PalSlot = $0B80                     ; 8 bytes, one per sprite palette (Pal_Buf rows 8-15): the
+                                         ; newest object using it, $80 (Field_Unk0B80Empty) = free;
+                                         ; claimed by Obj_Unk7170 / Obj_Unk72B4, freed by
+                                         ; Obj_Unk734C; reset at load (Field_ResetUnk0B80)
+!Field_Unk0B80 = !Obj_PalSlot            ; older name of Obj_PalSlot, still used by
+                                         ; Field_ResetUnk0B80 (rename there on its next edit)
+!Obj_TileSlot = $0B88                    ; Field_Unk0B88Bytes bytes: the object owning each OBJ tile
+                                         ; slot (Obj_Unk6F9A's allocator), $80 = free; reset at load
+                                         ; (Field_ResetUnk0B88)
+!Field_Unk0B88 = !Obj_TileSlot           ; older name of Obj_TileSlot, still used by
+                                         ; Field_ResetUnk0B88
 !Oam_LowTable = $0700                    ; 512-byte OAM low-table shadow (4 bytes per sprite: X, Y,
                                          ; tile, attr)
 !Oam_HighTable = $0900                   ; 32-byte OAM high-table shadow (2 bits per sprite)
@@ -778,15 +837,24 @@ if !ram_engine_inc == 0
                                          ; and sets 1 (looks like the priority of the running
                                          ; function, lower = more urgent; not established)
 !Obj_Unk1C01 = $1C01                     ; 8-bit per object; nonzero blocks Evt_StartTargetFunc1
-!Obj_Unk1000 = $1000                     ; 8-bit per object; bit 7 blocks Evt_StartTargetFunc1
-!Obj_Unk1001 = $1001                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
+!Obj_Unk1000 = $1000                     ; 8-bit per object; bit 7 blocks Evt_StartTargetFunc1 and
+                                         ; Vblank_Unk59D9's timer; the low bits are the frames between
+                                         ; script runs (reloaded into Obj_Unk1001)
+!Obj_Unk1001 = $1001                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1: the
+                                         ; countdown to the object's next script run (Vblank_Unk59D9)
 !Obj_Unk1A01 = $1A01                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
 !Obj_Unk1A00 = $1A00                     ; 8-bit per object; Obj_Unk1A00Init at load (Evt_InitObjects)
 !Obj_Unk1B80 = $1B80                     ; 16-bit per object; zeroed by Evt_InitObjects
 !Obj_Unk1C80 = $1C80                     ; 8-bit per object; Obj_Unk1C80Init at load (Evt_InitObjects)
+!Obj_Unk1C81 = $1C81                     ; 8-bit per object (odd byte of the $1C80 words): bit 0
+                                         ; (Obj1C81_CentreOnTile) makes the walk-to-tile opcodes run
+                                         ; Obj_Unk305D on arriving, bit 1 (Obj1C81_OntoObj) the
+                                         ; walk-to-object ones Obj_Unk30B3
 !Obj_Unk1900 = $1900                     ; a page ($100 bytes) cleared by Evt_InitObjects; probably a
                                          ; per-object table (the object tables lie around it)
-!Obj_Unk1A80 = $1A80                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
+!Obj_Unk1A80 = $1A80                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1; the event
+                                         ; movement opcodes keep it nonzero while a timed move they
+                                         ; started (arc, direction, a single step) runs
 !Obj_ScreenY = $0A80                     ; 16-bit per object: screen Y of the sprite origin; the
                                          ; builders use the low 9 bits
 !Obj_OamFlags = $0F80                    ; 8-bit per object; bits 2-3 pick the OAM shadow range (0 =
@@ -837,8 +905,9 @@ if !ram_engine_inc == 0
                                          ; (Obj_BuildSpriteFrameStep, Obj_BuildFrameLayout)
 !Obj_OamAttr = $0F81                     ; 8-bit per object: OAM attribute bits (palette/priority)
                                          ; ORed into every tile
-!Obj_Unk1080 = $1080                     ; 8-bit per object; ObjQ_Empty at load (Evt_InitObjects);
-                                         ; probably the link of the ObjQ_Unk74 list
+!Obj_Unk1080 = $1080                     ; 8-bit per object; ObjQ_Empty at load (Evt_InitObjects):
+                                         ; the next object in the ObjQ_Unk74 list ($80 = last / not
+                                         ; queued)
 !Obj_QueueNext = $1081                   ; 8-bit per object: next object in the frame-build queue
                                          ; ($80 = not queued / end)
 !Obj_Unk1100 = $1100                     ; 8-bit per object; bit 7 = skip; 0 = queue at the head; 1/2
@@ -847,6 +916,10 @@ if !ram_engine_inc == 0
                                          ; FieldBtl_SaveObj copies it to FieldBtlObj.Unk05
 !Obj_FixedFrame = $1301                  ; 8-bit per object: frame number used when Obj_AnimMode = 3
                                          ; (no animation lookup)
+!Obj_PalSrc = $1400                      ; 16-bit per object: offset in bank $E4 of its 12 sprite
+                                         ; colours (Obj_Unk7170 / Obj_Unk72B4 copy them to colours
+                                         ; 1-12 of its palette; objects with the same offset share a
+                                         ; palette slot)
 !Obj_AnimFacingStride = $1480            ; 16-bit per object: bytes per facing in its frame-number
                                          ; table (Obj_AnimFrameLookup multiplies by the facing)
 !Obj_AnimFrameTbl = $1500                ; 16-bit per object: offset in bank $E4 of its frame-number
@@ -878,9 +951,10 @@ if !ram_engine_inc == 0
                                          ; copies to SceneSave_Buffer before the menu and
                                          ; Field_RestoreSaveBlock copies back
 !Evt_Unk0920 = $0920                     ; 16 bytes at the start of Field_SaveBlock: a list, Evt_Unk0920Free
-                                         ; = free (Evt_ClearUnk0920); unmatched code at $C0:5C90
-                                         ; searches it for dp $E3 and adds entries
-!Evt_Unk0930 = $0930                     ; 16 bytes: the Obj_Cur of each Evt_Unk0920 entry ($C0:5C90)
+                                         ; = free (Evt_ClearUnk0920); Evt_FindOrAddUnk0920
+                                         ; searches it for Evt_Unk0920Key and adds entries
+!Evt_Unk0930 = $0930                     ; 16 bytes: the Obj_Cur of each Evt_Unk0920 entry
+                                         ; (Evt_FindOrAddUnk0920)
 !SceneSave_Buffer = $7F2000              ; $7F:2000: destination of the Field_SaveBlock copy (same
                                          ; address as Evt_ObjCount, used at a different time)
 
@@ -1005,6 +1079,8 @@ if !ram_engine_inc == 0
 !WinFx_QuadTimer = $7F1CE8               ; 8-bit frames left for hook 6
 !WinFx_QuadPos = $7F1CE9                 ; 4 x (16-bit X, 16-bit Y), 8.8 fixed point: hook 6's points
 !WinFx_QuadVel = $7F1CF9                 ; 4 x (16-bit X, 16-bit Y): added to WinFx_QuadPos per frame
+!Hdma_Unk7F14F0 = $7F14F0                ; 8-bit; NmiHandler stores Map_TilemapVram's high byte | 1
+                                         ; here after redraw steps 1 and 2 (see Hdma_Unk7F14F1)
 !Hdma_Unk7F14F1 = $7F14F1                ; 8-bit; the NMI handler stores a tilemap base | 1 at
                                          ; $7F:14F0 (inferred: BG1SC data for HDMA channel 0, which
                                          ; Hdma_InitChannelsFD points at BG1SC-BG4SC); hook 12
