@@ -30,13 +30,13 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 from `$C1:5ADB`: the action script's opcode handlers, in address order (opcodes
-   $50-$55 share `$C1:5ADB`-`$C1:5CF0`, which sets `!Battle_ActUnkA3D1` at `$C1:5AE0` and clears it
-   at `$C1:5CE9`; then $5D `$C1:5CF1`, $5E `$C1:5D12`, $5F `$C1:5D18`, $60 `$C1:5D1D`, $61-$64
-   `$C1:5D93`, $65-$68 `$C1:5DC1`, $69 `$C1:5DD3`, ...; $47/$48 are `$C1:623C`). Matched so far:
-   `$C1:007E`, `$C1:283D`-`$C1:5ADA` (service 4, its loaders, the reach check and path search, the
-   thread runner and opcodes $00-$4F but $47/$48: moves, curving moves, path walks, place, follow,
-   subscripts, waits, battler flags and the script variables `!Battle_ActVars`),
+1. Bank $C1 from `$C1:6299`: the action script's opcode handlers, in address order ($98/$9C
+   `$C1:6299`-`$C1:672D`, 1,173 B in one piece; $99/$9D `$C1:672E`, $9A `$C1:6743`, $9B `$C1:674A`,
+   $A2 `$C1:6751`, $A4 `$C1:691B`, $A5 `$C1:69BA`, $A8 `$C1:69C3`, $A9 `$C1:6AF0`, $C0 `$C1:6CF3`,
+   ...). Matched so far: `$C1:007E`, `$C1:283D`-`$C1:6298` (service 4, its loaders, the reach check
+   and path search, the thread runner and opcodes $00-$85: moves, curving moves, path walks, place,
+   follow, subscripts, waits, battler flags, the script variables `!Battle_ActVars`, the hit
+   numbers, palettes, object counters, facing, object links, headings, sounds and calc selection),
    `BattleAct_CalcMoveStep` `$C1:65BA` and `BattleAct_AdvanceScript` `$C1:75BB`. The handler table
    `BattleAct_OpcodeTable` (`$C1:7A6B`, 224 words, 115 distinct handlers) is still original bytes:
    match it once its handlers have names (stubs for the rest), together with the 4-word
@@ -44,7 +44,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    "unmatched" (BattleAct_FindPath: `$C1:5479`/`$C1:549B`, now BattleAct_PathToPoint;
    BattleAct_OpLoopAnim: `$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now BattleAct_OpShowAnimEntry;
    BattleAct_OpEndThread: `$C1:577A`, now BattleAct_OpEndIfNoTarget): fix them at their next
-   edit. Leads: `BattleAct_Op70Body` (`$C1:5FC3`) is used by opcode $03; the movers that step
+   edit. Small open helpers next to the handlers: `BattleAct_CalcFacing` (`$C1:75CC`, table
+   `$C1:79A1`, handlers `$C1:75D7` on, result `!Battle_ActFacingOut`). Open readers of what the
+   new opcodes set, all in bank $CF: the hit-number bounce `$CF:E781` and the sprites' use at
+   `$CF:EEA5`, the colour rotation `$CF:E600`, the object links at `$CF:EDD4`/`$CF:F81D`; and
+   `BattleAct_StepPalettes` `$CC:F1E7` in bank $CC. Leads: the movers that step
    `!Battle_ActorMoving` actors are in bank $CF (`$CF:EFC4`, straight mover `$CF:F040`, kind table
    `$CF:F01E`, curving mover kind 7 `$CF:F405`), the path walk stepper is `$CF:EC78` and the
    object follower `$CF:ECC2`, all out of this bank. Still open from service 4:

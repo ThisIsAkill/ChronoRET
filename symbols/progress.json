@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 62063,
+  "emitted_bytes": 64045,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 655,
-      "bytes": 62063
+      "functions": 690,
+      "bytes": 64045
     },
     "readable": {
-      "functions": 655,
-      "bytes": 62063
+      "functions": 690,
+      "bytes": 64045
     },
     "verified": {
-      "functions": 655,
-      "bytes": 62063
+      "functions": 690,
+      "bytes": 64045
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 23333,
+      "emitted_bytes": 25315,
       "matched": {
-        "functions": 282,
-        "bytes": 23333
+        "functions": 317,
+        "bytes": 25315
       },
       "readable": {
-        "functions": 282,
-        "bytes": 23333
+        "functions": 317,
+        "bytes": 25315
       },
       "verified": {
-        "functions": 282,
-        "bytes": 23333
+        "functions": 317,
+        "bytes": 25315
       }
     },
     {
@@ -786,7 +786,7 @@
       "bank": "$C1",
       "start": "$C1:5000",
       "end": "$C1:5FFF",
-      "emitted_bytes": 2779,
+      "emitted_bytes": 4096,
       "functions": [
         "BattleAct_StartBattlerMove",
         "BattleAct_OpCurveTo",
@@ -844,15 +844,50 @@
         "BattleAct_OpAddVarClamped",
         "BattleAct_OpSwapVar1C1D",
         "BattleAct_OpSwapVar1C1E",
-        "BattleAct_OpSwapVar1C1F"
+        "BattleAct_OpSwapVar1C1F",
+        "BattleAct_OpShowHitNumbers",
+        "BattleAct_OpClearUnk9FF7Bit7",
+        "BattleAct_StoreUnk9FF7Bit7",
+        "BattleAct_OpSetUnk9FF7Bit7",
+        "BattleAct_OpNop2",
+        "BattleAct_OpLoadPalEntry",
+        "BattleAct_OpStartPalSeq",
+        "BattleAct_OpStopPalSeq",
+        "BattleAct_OpSetSpecialPalette",
+        "BattleAct_SpecialPaletteBody",
+        "BattleAct_OpRestorePalette",
+        "BattleAct_RestorePaletteBody",
+        "BattleAct_OpStartPalCycle",
+        "BattleAct_OpBlinkPalette",
+        "BattleAct_OpStopPalCycle",
+        "BattleAct_OpIncAllObjUnkA1D8",
+        "BattleAct_OpClearAllObjUnkA1D8",
+        "BattleAct_OpIncObjUnkA1D8",
+        "BattleAct_Op70Body",
+        "BattleAct_OpClearObjUnkA1D8",
+        "BattleAct_OpSetFacing"
       ]
     },
     {
       "bank": "$C1",
       "start": "$C1:6000",
       "end": "$C1:6FFF",
-      "emitted_bytes": 183,
+      "emitted_bytes": 848,
       "functions": [
+        "BattleAct_OpLinkObjBit7",
+        "BattleAct_OpLinkObjBit6",
+        "BattleAct_LinkObjBody",
+        "BattleAct_OpCopyHeading",
+        "BattleAct_OpHeadingFromCalc",
+        "BattleAct_OpAddHeading",
+        "BattleAct_OpSound",
+        "BattleAct_OpSoundCalc",
+        "BattleAct_OpPcAttackSfxA",
+        "BattleAct_OpPcAttackSfxB",
+        "BattleAct_PlayPcAttackSfx",
+        "BattleAct_OpRunVecCD001B",
+        "BattleAct_OpSetCalcSel",
+        "BattleAct_OpSetHeading",
         "BattleAct_CalcMoveStep"
       ]
     },
