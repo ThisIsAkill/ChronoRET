@@ -28,7 +28,7 @@ BattleSys_Unk8C09:                      ; JSR from BattleSys_Main after the shuf
 org $C1B093
 BattleSys_UnkB093:                      ; JSR from BattleSys_Main / Battle_SetupBattle with X = PC slot * $80; not analysed
 org $C1B0B6
-BattleSys_UnkB0B6:                      ; JSR from BattleSys_Main with X = Y * $80, Y = 0-9; not analysed
+BattleSys_UnkB0B6:                      ; JSR from BattleSys_Main with X = Y * $80, Y = 0-10; not analysed
 org $C1B223
 BattleSys_UnkB223:                      ; JSR from each BattleSys_Main pass; not analysed
 org $C1B3BB

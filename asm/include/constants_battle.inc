@@ -495,7 +495,7 @@ if !constants_battle_inc == 0
 !Battle_ListDueBit        = $80   ; !Battle_ListFlags bit: the slot is due
 !Battle_StatsStride       = $80   ; bytes per BattlerStats record
 !Battle_StatusKo          = $80   ; BattlerStats.Status bit 7: KO'd
-!Battle_UnkB0B6Slots      = 10    ; BattleSys_Main runs $C1:B0B6 for Y = 0 to this - 1 (slot 10 not included)
+!Battle_UnkB0B6Slots      = 10    ; BattleSys_Main runs $C1:B0B6 for Y = 0 to this (11 calls: Y is tested after the call)
 !Battle_EndUnk895BArg     = $79   ; A passed to $C1:895B on the !Battle_Unk99CD end (meaning unknown)
 !Battle_EndUnkCD0021Arg   = 8     ; A passed to $CD:0021 on that end (meaning unknown)
 !Battle_RewardBitGold     = $40   ; !Battle_UnkB2AF bit set once the gold is paid

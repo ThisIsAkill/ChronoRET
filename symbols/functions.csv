@@ -484,8 +484,8 @@ $C1:3234,$C1:34A6,627,Battle_TickEnemyGroup,$C1,Battle engine,verified,ec9e166d4
 $C1:34A7,$C1:34DA,52,Battle_DrawAllBattlerFrames,$C1,Battle engine,verified,c3e1b8987a7c,"Draws the starting frame (!Battler_StartFrame) of every present battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets the three PC animation timers to 1, 2 and 3 so the PCs take thei"
 $C1:34DB,$C1:350E,52,Battle_StartPose,$C1,Battle engine,verified,80c585ad73b1,"The last step of the battle set-up (service 0, which JMPs here): turns every PC toward its nearest enemy, then plays animation $0C on the targetable PCs (animation 0 on the others) through Battle_RunP"
 $C1:350F,$C1:354C,62,Battle_FaceAllPcsNearestEnemy,$C1,Battle engine,verified,508575ebb51c,"Sets !Battler_Facing of PCs 2, 1, 0 from the angle to each one's nearest enemy (position query 2 through service 5, as in Battle_UpdatePcFacing, but for every PC at once and without the presence, KO, "
-$C1:354D,$C1:356C,32,BattleSys_DefeatPose,$C1,Battle system,readable,ba85d1fe2f85,"Service 9 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D direct"
-$C1:356D,$C1:35DC,112,BattleSys_VictoryPose,$C1,Battle system,readable,f4a075431813,"Service 8 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D direct"
+$C1:354D,$C1:356C,32,BattleSys_DefeatPose,$C1,Battle system,verified,ba85d1fe2f85,"Service 9 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D direct"
+$C1:356D,$C1:35DC,112,BattleSys_VictoryPose,$C1,Battle system,readable,472d34744885,"Service 8 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D direct"
 $C1:35DD,$C1:3699,189,Battle_RunPcPose,$C1,Battle engine,verified,1ac43637b622,
 $C1:369A,$C1:3713,122,Battle_PoseStep,$C1,Battle engine,verified,b34241c31cd9,
 $C1:3714,$C1:373A,39,Battle_TickEnemyMovers,$C1,Battle engine,verified,18c3997e7812,
@@ -687,15 +687,15 @@ $C1:79D3,$C1:7A62,144,BattleAct_CalcTable,$C1,Battle engine,verified,b95917df986
 $C1:7A63,$C1:7A6A,8,BattleAct_LoaderTable,$C1,Battle engine,verified,53e77eaf08fc,"Action loader per !Battle_ActKind 0-3, called by BattleAct_LoadScript through JSR (BattleAct_LoaderTable,X) with X = kind * 2 (kinds 4 and up are taken as 0)."
 $C1:7A6B,$C1:7C2A,448,BattleAct_OpcodeTable,$C1,Battle engine,verified,ca94c9dc6822,"Handler per action-script opcode, called by BattleAct_RunThread through JSR (BattleAct_OpcodeTable,X) with X = opcode * 2."
 $C1:7C2B,$C1:7C3C,18,BattleAct_ProbeBoxOverlap,$C1,Battle engine,verified,fc44558e5d3f,"Puts battler X's probe (!Battler_ProbeX/Y) at its screen position, builds its box (Battle_CalcBattlerBox) and tests it against the other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP)."
-$C1:7C3D,$C1:7FFF,963,BankC1_OldBuildLeftovers,$C1,Engine,readable,836b2a9ecbe2,"Not code and, as far as found, never read: xref finds no call or jump to $C1:7C3D or to any of the segment starts below, and the absolute $7C3D-$7FFF operands in bank $C1 code are WRAM reads (DB = $7E"
-$C1:8000,$C1:8002,3,BankC1_BattleStartVec,$C1,Engine,readable,be8958424952,Vector into BattleSys_Main.
-$C1:8003,$C1:8005,3,BankC1_Entry8003,$C1,Engine,readable,84b94346c88a,"Long vector into BankC1_RunService (unmatched, $C1:CFC2), which pushes P, X, DP and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets DB=$7E and DP=0, runs entry A (low byte) of its service table at $C1:"
-$C1:8006,$C1:8460,1115,BattleSys_Main,$C1,Battle system,readable,a23e45372cfe,
-$C1:AF22,$C1:AF78,87,Battle_RandRange,$C1,Battle engine,readable,5b8785c73162,"A random number from the low bound X (low byte) up to, but not including, the high bound A: low + (RandomTableFD[!Battle_RandIdx] mod (high - low)), then !Battle_RandIdx + 1."
-$C1:C90B,$C1:C929,31,Battle_Mul16,$C1,Battle engine,readable,6eb417b82d00,16 x 16 -> 32-bit unsigned shift-and-add multiply: !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB.
-$C1:C92A,$C1:C95B,50,Battle_Div32,$C1,Battle engine,readable,98df24afe48c,"32 / 16-bit unsigned restoring divide of !Battle_MathHi:MathA by !Battle_MathB: !Battle_MathRem = the remainder, !Battle_MathLo = the quotient's low word."
-$C1:FA8B,$C1:FDAD,803,Battle_SetupBattle,$C1,Battle engine,readable,0887b3a8f90e,
-$C1:FDAE,$C1:FDBE,17,Battle_CalcUnk56,$C1,Battle engine,readable,4e318f915a63,A / 24 + $44: Battle_SetupBattle's BattlerStats.Unk56 from .Unk3F for a PC whose .Unk2D is 5.
+$C1:7C3D,$C1:7FFF,963,BankC1_OldBuildLeftovers,$C1,Engine,verified,836b2a9ecbe2,"Not code and, as far as found, never read: xref finds no call or jump to $C1:7C3D or to any of the segment starts below, and the absolute $7C3D-$7FFF operands in bank $C1 code are WRAM reads (DB = $7E"
+$C1:8000,$C1:8002,3,BankC1_BattleStartVec,$C1,Engine,verified,be8958424952,Vector into BattleSys_Main.
+$C1:8003,$C1:8005,3,BankC1_Entry8003,$C1,Engine,verified,84b94346c88a,"Long vector into BankC1_RunService (unmatched, $C1:CFC2), which pushes P, X, DP and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets DB=$7E and DP=0, runs entry A (low byte) of its service table at $C1:"
+$C1:8006,$C1:8460,1115,BattleSys_Main,$C1,Battle system,readable,6025337701cd,
+$C1:AF22,$C1:AF78,87,Battle_RandRange,$C1,Battle engine,readable,87f9d12b2984,"A random number from the low bound X (low byte) up to, but not including, the high bound A: low + (RandomTableFD[!Battle_RandIdx] mod (high - low)), then !Battle_RandIdx + 1."
+$C1:C90B,$C1:C929,31,Battle_Mul16,$C1,Battle engine,verified,6eb417b82d00,16 x 16 -> 32-bit unsigned shift-and-add multiply: !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB.
+$C1:C92A,$C1:C95B,50,Battle_Div32,$C1,Battle engine,verified,98df24afe48c,"32 / 16-bit unsigned restoring divide of !Battle_MathHi:MathA by !Battle_MathB: !Battle_MathRem = the remainder, !Battle_MathLo = the quotient's low word."
+$C1:FA8B,$C1:FDAD,803,Battle_SetupBattle,$C1,Battle engine,verified,0887b3a8f90e,
+$C1:FDAE,$C1:FDBE,17,Battle_CalcUnk56,$C1,Battle engine,verified,4e318f915a63,A / 24 + $44: Battle_SetupBattle's BattlerStats.Unk56 from .Unk3F for a PC whose .Unk2D is 5.
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
 $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
 $C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,

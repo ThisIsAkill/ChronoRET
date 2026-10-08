@@ -8179,8 +8179,9 @@ BattleSys_DefeatPose:
 ; unless !Battle_Unk2989 bit 0 is set, plays animation $0A on the
 ; targetable PCs (0 on the others; KO'd PCs left out), falling into
 ; Battle_RunPcPose. The "victory" reading is inferred from the caller
-; (BattleSys_Main at $C1:8186 runs it when all 8 bytes at $AF02 are
-; $FF, presumably no enemy left).
+; (BattleSys_Main at $C1:8186 runs it when each of the 8 !Battler_UnkAEFF
+; enemy bytes is $FF or has !Battle_UnkAF15 bit 6 set, presumably no
+; enemy left).
 ; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher)
 ; Exit:  as Battle_RunPcPose, or after the menu update when bit 0 of
 ;        !Battle_Unk2989 is set
@@ -20898,7 +20899,7 @@ BankC1_Entry8003:
 ;   - no enemy entry left (each of the 8 !Battler_UnkAEFF enemy bytes
 ;     $FF or its !Battle_UnkAF15 bit 6 set): the victory end.
 ;   - otherwise BattleSys_UnkB093 for the 3 PCs and BattleSys_UnkB0B6
-;     for Y = 0-9, then by state: wait mode (!Battle_MenuTimeHold set):
+;     for Y = 0-10 (11 calls; the loop tests Y after the call), then by state: wait mode (!Battle_MenuTimeHold set):
 ;     BattleSys_UnkB3F9 for each PC with a !Battler_UnkAF0A entry;
 ;     !Battle_Unk99CD set (bit 5 clear): the !Battle_Unk99CD end;
 ;     !Battle_UnkAF25 set: BattleSys_Unk8461; else the turn lists:
@@ -20990,7 +20991,7 @@ BattleSys_Main:
     CLC
     ADC.b #!Battle_FirstEnemySlot
 .pool_enemies:
-    STA.w !Battle_UnkB16E,X             ; EnemyCount + 3 down to 4: slots 3.. + 1 (count 0 would not end)
+    STA.w !Battle_UnkB16E,X             ; EnemyCount + 3 down to 4: slots 3.. + 1 (count 0 runs on 256 times, past the 11 bytes)
     INX
     DEC A
     CMP.b #!Battle_FirstEnemySlot
@@ -21532,7 +21533,8 @@ BattleSys_Main:
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
 ;        back); Y unchanged; !Battle_RandMin and !Battle_UnkB31E written;
 ;        on the divide path !Battle_RandIdx advanced and !Battle_MathA,
-;        MathB, MathLo/Hi and MathRem changed (Battle_Div32)
+;        MathB, MathHi and MathRem changed (Battle_Div32; MathLo is
+;        saved and put back)
 ; Callee: Battle_Div32
 org $C1AF22
 Battle_RandRange:
