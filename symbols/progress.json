@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 64045,
+  "emitted_bytes": 66643,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 690,
-      "bytes": 64045
+      "functions": 764,
+      "bytes": 66643
     },
     "readable": {
-      "functions": 690,
-      "bytes": 64045
+      "functions": 764,
+      "bytes": 66643
     },
     "verified": {
       "functions": 690,
@@ -54,14 +54,14 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 5825,
+      "emitted_bytes": 8423,
       "matched": {
-        "functions": 108,
-        "bytes": 5825
+        "functions": 182,
+        "bytes": 8423
       },
       "readable": {
-        "functions": 108,
-        "bytes": 5825
+        "functions": 182,
+        "bytes": 8423
       },
       "verified": {
         "functions": 108,
@@ -960,7 +960,7 @@
       "bank": "$C2",
       "start": "$C2:0000",
       "end": "$C2:0FFF",
-      "emitted_bytes": 2496,
+      "emitted_bytes": 2979,
       "functions": [
         "BankC2_Entry0000",
         "BankC2_Entry0003",
@@ -999,15 +999,89 @@
         "C2Scene_SprResetLists",
         "C2Scene_SprDrawList",
         "C2Scene_SprDrawNode",
-        "C2Scene_OamHiBitsTable"
+        "C2Scene_OamHiBitsTable",
+        "C2Anim_Run",
+        "C2Anim_OpTable",
+        "C2Anim_OpClearByte",
+        "C2Anim_OpIncByte",
+        "C2Anim_OpDecByte",
+        "C2Anim_OpJumpBack",
+        "C2Anim_OpShowFrame",
+        "C2Anim_OpWait",
+        "C2Anim_OpQueueVram",
+        "C2Anim_OpEnd",
+        "C2Scene_TaskMove",
+        "C2Scene_TaskRunScript",
+        "C2Script_OpTable"
       ]
     },
     {
       "bank": "$C2",
       "start": "$C2:1000",
       "end": "$C2:1FFF",
-      "emitted_bytes": 31,
+      "emitted_bytes": 2146,
       "functions": [
+        "C2Script_ResetTask",
+        "C2Script_SetSprPalette",
+        "C2Script_SetSprPriority",
+        "C2Script_SpawnUnk1CF5",
+        "C2Script_SpawnUnk1DD4",
+        "C2Script_GoToLocation",
+        "C2Script_Halt",
+        "C2Script_SetMapCell",
+        "C2Script_SetMemberWord",
+        "C2Script_SpawnScript",
+        "C2Script_ClearTaskByte",
+        "C2Script_IncTaskByte",
+        "C2Script_DecTaskByte",
+        "C2Script_SetTaskByte",
+        "C2Script_OrTaskByte",
+        "C2Script_ClearTaskBits",
+        "C2Script_ClearRamByte",
+        "C2Script_IncRamByte",
+        "C2Script_DecRamByte",
+        "C2Script_SetRamByte",
+        "C2Script_OrRamByte",
+        "C2Script_ClearRamBits",
+        "C2Script_TaskByteToRam",
+        "C2Script_RamByteToTask",
+        "C2Script_CopyTaskByte",
+        "C2Script_CopyRamByte",
+        "C2Script_Jump",
+        "C2Script_LoopTaskByte",
+        "C2Script_IfTaskByteZero",
+        "C2Script_IfTaskByteNonZero",
+        "C2Script_IfTaskByteNe",
+        "C2Script_IfTaskByteEq",
+        "C2Script_IfTaskBitsSet",
+        "C2Script_IfTaskBitsClear",
+        "C2Script_IfRamByteZero",
+        "C2Script_IfRamByteNonZero",
+        "C2Script_IfRamByteNe",
+        "C2Script_IfRamByteEq",
+        "C2Script_IfRamBitsSet",
+        "C2Script_IfRamBitsClear",
+        "C2Script_IfRamByteLess",
+        "C2Script_IfRamByteGe",
+        "C2Script_SpawnUnk20A2",
+        "C2Script_SpawnUnk2105",
+        "C2Script_SpawnUnk21F8",
+        "C2Script_SpawnUnk2194",
+        "C2Script_SetPosition",
+        "C2Script_Skip1",
+        "C2Script_SetXVelocity",
+        "C2Script_SetYVelocity",
+        "C2Script_SetAnim",
+        "C2Script_MoveFrames",
+        "C2Script_ScrollFrames",
+        "C2Script_ScrollLayerFrames",
+        "C2Script_PanKeepFraction",
+        "C2Script_PanTakeX",
+        "C2Script_PanTakeY",
+        "C2Scene_NegateXVel",
+        "C2Scene_NegateYVel",
+        "C2Scene_WrapTaskPos",
+        "C2Scene_SetAnim",
         "C2Scene_ClearPalette"
       ]
     },
