@@ -30,39 +30,38 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 from `$C1:6CF3`: the action script's opcode handlers, in address order ($C0 `$C1:6CF3`,
-   $C1 `$C1:6F31`, $C2 `$C1:6F53`, $C3 `$C1:6F75`, $C4 `$C1:6F9A`, $C5 `$C1:6FEF`, $D0 `$C1:6FFC`,
-   $D1 `$C1:702B`, $D2 `$C1:705A` (calls `BattleAct_CalcMidpointSteps`), $D3 `$C1:720E`, $D4
-   `$C1:7349`, $D6 `$C1:7364`, $D5 `$C1:73AD`, $D7 `$C1:740B`, $D8 `$C1:74B4`, $D9 `$C1:753A`, $DA
-   `$C1:7579`). Matched so far: `$C1:007E`, `$C1:283D`-`$C1:6CF2` (service 4, its loaders, the reach
-   check and path search, the thread runner and opcodes $00-$A9: moves, curving moves, path walks,
-   place, follow, subscripts, waits, battler flags, the script variables `!Battle_ActVars`, the hit
-   numbers, palettes, object counters, facing, object links, headings, sounds, calc selection, the
-   arc moves $98-$9D (mover kind 1), the heading moves $A2/$A8/$A9 (mover kind 2) and the position
-   history $A4/$A5), `BattleAct_AdvanceScript` `$C1:75BB` and `BattleAct_ProbeBoxOverlap`
-   `$C1:7C2B` (right after the opcode table). Movers to read for the new opcodes, all in bank $CF:
-   the arc mover `$CF:F087`, the heading mover `$CF:F194` (and its edge test `$CF:FADD`), the
-   position-history recorder `$CF:ED1D` (who draws the history, and the readers of
-   `!Battler_PosHistUnkAB7D/AB88`, are not found). The handler table
-   `BattleAct_OpcodeTable` (`$C1:7A6B`, 224 words, 115 distinct handlers) is still original bytes:
-   match it once its handlers have names (stubs for the rest), together with the 4-word
-   `BattleAct_LoaderTable` at `$C1:7A63`. Some verified headers still call now-matched sites
-   "unmatched" (BattleAct_CalcMoveStep: `$C1:62F5`/`$C1:6436`, now BattleAct_OpArcToCalc;
-   BattleAct_FindPath: `$C1:5479`/`$C1:549B`, now BattleAct_PathToPoint;
-   BattleAct_OpLoopAnim: `$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now BattleAct_OpShowAnimEntry;
-   BattleAct_OpEndThread: `$C1:577A`, now BattleAct_OpEndIfNoTarget): fix them at their next
-   edit. Small open helpers next to the handlers: `BattleAct_CalcFacing` (`$C1:75CC`, table
-   `$C1:79A1`, handlers `$C1:75D7` on, result `!Battle_ActFacingOut`). Open readers of what the
-   new opcodes set, all in bank $CF: the hit-number bounce `$CF:E781` and the sprites' use at
-   `$CF:EEA5`, the colour rotation `$CF:E600`, the object links at `$CF:EDD4`/`$CF:F81D`; and
-   `BattleAct_StepPalettes` `$CC:F1E7` in bank $CC. Leads: the movers that step
-   `!Battle_ActorMoving` actors are in bank $CF (`$CF:EFC4`, straight mover `$CF:F040`, kind table
-   `$CF:F01E`, curving mover kind 7 `$CF:F405`), the path walk stepper is `$CF:EC78` and the
-   object follower `$CF:ECC2`, all out of this bank. Still open from service 4:
-   `BattleAct_RunCalc` (`$C1:762E`, table `$C1:79D3`), the bank $CC action helpers
-   `$CC:F06B`-`$CC:F2A9` (object lists stepped at `$CC:F278`), and the code at `$C1:ACF0` that
-   fills the action block `$AE91`-`$AE9B`. Open from the movers: the stepper at `$CF:F978`
-   (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
+1. Bank $C1 after the opcode handlers: all of `$C1:283D`-`$C1:75CB` is matched (service 4, its
+   loaders, the reach check and path search, the thread runner and every opcode handler $00-$DA,
+   the last ones being the circle / ellipse moves $C0-$C3 (mover kinds 3 and 5), the
+   `!Battler_UnkA4AF` steppers $C4/$C5, `!Battler_UnkA5D8` $D0/$D1, the kind-4 move $D2 and the
+   midpoint move $D3 with their starters $D4-$D6, the point-along $D7, the shake $D8 (kind 6) and
+   the attribute values $D9/$DA), plus `$C1:007E`, `BattleAct_LoaderTable` and
+   `BattleAct_OpcodeTable` (`$C1:7A63`-`$C1:7C2A`) and `BattleAct_ProbeBoxOverlap` `$C1:7C2B`.
+   Next, in order: `BattleAct_CalcFacing` (`$C1:75CC`, table `$C1:79A1`, handlers `$C1:75D7` on,
+   result `!Battle_ActFacingOut`) and `BattleAct_RunCalc` (`$C1:762E`, table `$C1:79D3`) with their
+   handlers, which fill the gap `$C1:75CC`-`$C1:7A62`; then `$C1:7C3D` on. Verified headers that
+   still call now-matched sites "unmatched" (fix them at their next edit): BattleAct_CalcMoveStep
+   (`$C1:62F5`/`$C1:6436`, now BattleAct_OpArcToCalc; `$C1:7261`, now BattleAct_OpMoveToMidpoint;
+   `$C1:7468`, now BattleAct_OpPointTowardCalc); BattleAct_StartBattlerMove (`$C1:7231`, now
+   BattleAct_OpMoveToMidpoint); BattleAct_CalcMidpointSteps (`$C1:7095`/`$C1:715C`, now
+   BattleAct_OpMoveKind4ToCalc); BattleAct_FindPath (`$C1:5479`/`$C1:549B`, now
+   BattleAct_PathToPoint); BattleAct_OpLoopAnim (`$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now
+   BattleAct_OpShowAnimEntry); BattleAct_OpEndThread (`$C1:577A`, now BattleAct_OpEndIfNoTarget);
+   the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched.
+   Open readers, all out of this bank: the movers in bank $CF (dispatch `$CF:EFC4`, kind table
+   `$CF:F01E`: straight `$CF:F040`, arc `$CF:F087`, heading `$CF:F194` with its edge test
+   `$CF:FADD`, circle `$CF:F1F8`, kind 4 `$CF:F23D` with its near test `$CF:F957`, ellipse
+   `$CF:F354`, shake `$CF:F39F`, curving `$CF:F405`; the objects' movers read the circle arrays at
+   `$CF:F6B6`/`$CF:F858`), the position-history recorder `$CF:ED1D`, the path walk stepper
+   `$CF:EC78`, the object follower `$CF:ECC2`, the hit-number bounce `$CF:E781` and the sprites'
+   use at `$CF:EEA5`, the attribute values at `$CF:EEF8`/`$CF:FE36` (filled at `$CC:E3FC`), the
+   colour rotation `$CF:E600`, the object links at `$CF:EDD4`/`$CF:F81D`, and in bank $CC
+   `BattleAct_StepPalettes` `$CC:F1E7` and the action helpers `$CC:F06B`-`$CC:F2A9` (object lists
+   stepped at `$CC:F278`). Not found: who draws the position history and who reads
+   `!Battler_PosHistUnkAB7D/AB88`, `!Battler_UnkA5D8` and the battlers' `!Battle_ActorCircleX/Y`.
+   Still open from service 4: the code at `$C1:ACF0` that fills the action block
+   `$AE91`-`$AE9B`. Open from the movers: the stepper at `$CF:F978` (`!Enemy_Stepping`), and who
+   writes `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
    `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
    `Field_ServiceUnk54` $C0:274D) and the first of their callees: `Field_FindObjInFront` and

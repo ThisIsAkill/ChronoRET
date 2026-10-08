@@ -24,14 +24,6 @@ org $C1762E
 BattleAct_RunCalc:                      ; JSR: A = handler number; calls entry A of the word table at $C1:79D3, keeping
                                         ; X and Y; the handlers leave results in !Battle_ActCalcOutA/B (not analysed)
 
-org $C17A63
-BattleAct_LoaderTable:                  ; 4 words: action loader per !Battle_ActKind (JSR (T,X) in BattleAct_LoadScript)
-
-org $C17A6B
-BattleAct_OpcodeTable:                  ; 224 words ($7A6B-$7C2A): handler per script opcode $00-$DA (JSR (T,X) in
-                                        ; BattleAct_RunThread), then 5 unreachable entries ($DB-$DF); 75 entries are
-                                        ; BattleAct_OpEndScript
-
 ; --- Bank $C3 ---
 
 org $C30002
