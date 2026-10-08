@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 30462,
+  "emitted_bytes": 31511,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 255,
-      "bytes": 30462
+      "functions": 280,
+      "bytes": 31511
     },
     "readable": {
-      "functions": 255,
-      "bytes": 30462
+      "functions": 280,
+      "bytes": 31511
     },
     "verified": {
       "functions": 45,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 10504,
+      "emitted_bytes": 11553,
       "matched": {
-        "functions": 134,
-        "bytes": 10504
+        "functions": 159,
+        "bytes": 11553
       },
       "readable": {
-        "functions": 134,
-        "bytes": 10504
+        "functions": 159,
+        "bytes": 11553
       },
       "verified": {
         "functions": 17,
@@ -461,7 +461,7 @@
       "bank": "$C1",
       "start": "$C1:2000",
       "end": "$C1:2FFF",
-      "emitted_bytes": 2438,
+      "emitted_bytes": 3487,
       "functions": [
         "BattleTgt_SingleAlly",
         "BattleTgt_CollectValidTargets",
@@ -497,7 +497,32 @@
         "Battle_CacheBattlerCoordsAll",
         "Battle_CalcBattlerBox",
         "Battle_BoxOverlapsOthers",
-        "Battle_BoxHitsBlockedCell"
+        "Battle_BoxHitsBlockedCell",
+        "BattlePos_Query",
+        "BattlePos_NearestPc",
+        "BattlePos_FarthestPc",
+        "BattlePos_NearestEnemy",
+        "BattlePos_FarthestEnemy",
+        "BattlePos_WithinDist40XY",
+        "BattlePos_WithinDist32XY",
+        "BattlePos_WithinDist64XY",
+        "BattlePos_WithinDist4XY",
+        "BattlePos_WithinDist4XYTwin",
+        "BattlePos_WithinDist16XY",
+        "BattlePos_WithinDist48",
+        "BattlePos_WithinDist32",
+        "BattlePos_CheckPairDist",
+        "BattlePos_CheckDist",
+        "BattlePos_SameRowBand",
+        "BattlePos_SubjectAbove",
+        "BattlePos_SubjectLeft",
+        "BattlePos_PathClear",
+        "BattlePos_SubjectLowerHalf",
+        "BattlePos_SubjectUpperHalf",
+        "BattlePos_SubjectRightPart",
+        "BattlePos_SubjectLeftPart",
+        "BattlePos_DistDifference",
+        "BattlePos_ModeTable"
       ]
     },
     {
