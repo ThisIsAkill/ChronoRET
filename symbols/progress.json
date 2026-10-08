@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 49461,
+  "emitted_bytes": 51397,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 480,
-      "bytes": 49461
+      "functions": 530,
+      "bytes": 51397
     },
     "readable": {
-      "functions": 480,
-      "bytes": 49461
+      "functions": 530,
+      "bytes": 51397
     },
     "verified": {
-      "functions": 480,
-      "bytes": 49461
+      "functions": 530,
+      "bytes": 51397
     }
   },
   "banks": [
@@ -54,18 +54,18 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 1459,
+      "emitted_bytes": 3395,
       "matched": {
-        "functions": 21,
-        "bytes": 1459
+        "functions": 71,
+        "bytes": 3395
       },
       "readable": {
-        "functions": 21,
-        "bytes": 1459
+        "functions": 71,
+        "bytes": 3395
       },
       "verified": {
-        "functions": 21,
-        "bytes": 1459
+        "functions": 71,
+        "bytes": 3395
       }
     },
     {
@@ -837,7 +837,7 @@
       "bank": "$C2",
       "start": "$C2:0000",
       "end": "$C2:0FFF",
-      "emitted_bytes": 924,
+      "emitted_bytes": 2080,
       "functions": [
         "BankC2_Entry0000",
         "BankC2_Entry0003",
@@ -851,24 +851,55 @@
         "C2Scene_NmiHandler",
         "C2Scene_IrqHandler",
         "C2Scene_WaitFrame",
-        "C2Scene_VramQFlush"
+        "C2Scene_HideAllSprites",
+        "C2Scene_VramQInit",
+        "C2Scene_VramQFlush",
+        "C2Scene_WaitFrames",
+        "C2Scene_WaitOneFrame",
+        "C2Scene_TaskClearAll",
+        "C2Scene_TaskSpawn",
+        "C2Scene_TaskSpawn_Search",
+        "C2Scene_TaskSpawnLow",
+        "C2Scene_TaskSpawnScript",
+        "C2Scene_TaskSpawnScriptLow",
+        "C2Scene_TaskRunAll",
+        "C2Scene_TaskCallHandler",
+        "C2Scene_SprAdd",
+        "C2Scene_SprInitLinks",
+        "C2Scene_SprResetLists",
+        "C2Scene_SprDrawList",
+        "C2Scene_SprDrawNode",
+        "C2Scene_OamHiBitsTable"
       ]
     },
     {
       "bank": "$C2",
       "start": "$C2:1000",
       "end": "$C2:1FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 31,
+      "functions": [
+        "C2Scene_ClearPalette"
+      ]
     },
     {
       "bank": "$C2",
       "start": "$C2:2000",
       "end": "$C2:2FFF",
-      "emitted_bytes": 25,
+      "emitted_bytes": 289,
       "functions": [
         "Trig_Cos1024",
-        "Trig_Sin1024"
+        "Trig_Sin1024",
+        "C2Scene_ClearUnk1B30",
+        "C2Scene_Main",
+        "C2Scene_MainLoop",
+        "C2Scene_ModeTable",
+        "C2Scene_ModeIdle",
+        "C2Scene_ClearVram",
+        "C2Scene_ZeroWord",
+        "C2Scene_SaveFlagTail",
+        "C2Scene_RestoreFlagTail",
+        "C2Scene_SetStartPos",
+        "C2Scene_SetStartScroll"
       ]
     },
     {
@@ -889,8 +920,18 @@
       "bank": "$C2",
       "start": "$C2:5000",
       "end": "$C2:5FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 211,
+      "functions": [
+        "TextWin_Init",
+        "TextWin_Step",
+        "TextWin_StateTable",
+        "TextWin_CheckStatus",
+        "TextWin_StatusTable",
+        "TextWin_StatusIdle",
+        "TextWin_StatusRun",
+        "TextWin_StatusPenLeft",
+        "TextWin_StatusPenIndent"
+      ]
     },
     {
       "bank": "$C2",
@@ -910,8 +951,20 @@
       "bank": "$C2",
       "start": "$C2:8000",
       "end": "$C2:8FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 274,
+      "functions": [
+        "BankC2_Entry8000",
+        "BankC2_Entry8002",
+        "BankC2_Entry8004",
+        "BankC2_ReadPadLong",
+        "BankC2_CommandLong",
+        "Menu_ReadPad",
+        "Menu_PollPad",
+        "Menu_MapButtons",
+        "Menu_MapButtonsOne",
+        "Menu_TickPlayTime",
+        "Menu_PlayTimeLimits"
+      ]
     },
     {
       "bank": "$C2",

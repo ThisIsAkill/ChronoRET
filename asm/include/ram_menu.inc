@@ -52,6 +52,20 @@ if !ram_menu_inc == 0
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 
+; --- Joypad (Menu_PollPad / Menu_MapButtons), dp $F0-$FF with DP=$0000 ---
+; Pad_Pressed ($00F0) and Pad_Unk00F6-$00F9 are named in ram_engine.inc,
+; where the field reads them.
+!Menu_PadHeld = $00F2                    ; 16-bit buttons held now (layout as Pad_Pressed)
+!Menu_PadRepeat = $00F4                  ; 16-bit; newly pressed, plus the held buttons each time
+                                         ; Menu_PadRepeatTimer runs out (auto-repeat)
+!Menu_PadRepeatMapped = $00FA            ; 8-bit Menu_PadRepeat through the button map (Menu_MapButtons)
+!Menu_PadRepeatDpad = $00FB              ; 8-bit copy of Menu_PadRepeat's high byte (the D-pad)
+!Menu_PadRepeatDelay = $00FC             ; 8-bit; frames before (and between) auto-repeats: what
+                                         ; Menu_PadRepeatTimer reloads from (the menu's NMI code sets it
+                                         ; at $C2:847C and $C2:84B8)
+!Menu_PadRepeatTimer = $00FD             ; 8-bit auto-repeat countdown
+!Menu_PadPrevHeld = $00FE                ; 16-bit Menu_PadHeld of the frame before
+
 ; ==== Scene mode (BankC2_Entry0000) direct page ====
 ; BankC2_SceneBoot sets DP=$0000; C2Scene_ClearDp zeroes $00-$EF and
 ; C2Scene_NmiHandler copies the shadows below to the PPU every frame (that
@@ -98,9 +112,24 @@ if !ram_menu_inc == 0
 !C2Scene_NmiFlags = $4C                  ; 8-bit; bit 0: run the NMI update (set again at its end),
                                          ; bit 1: upload C2Scene_PaletteBuf (one-shot); C2Scene_Main sets
                                          ; both ($C2:23C6)
-!C2Scene_Unk4D = $4D                     ; 8-bit; zeroed by the NMI after C2Scene_Unk0C4D
+!C2Scene_OamNext = $4D                   ; 8-bit; next OAM slot C2Scene_SprDrawNode fills (it uses the
+                                         ; low 7 bits for the low table); the NMI zeroes it after
+                                         ; C2Scene_SprResetLists with a 16-bit STZ (M=0 there), which
+                                         ; zeroes C2Scene_TaskCur's low byte too
+!C2Scene_TaskCur = $4E                   ; 16-bit address of the C2Scene_Task record being run
+                                         ; (C2Scene_TaskRunAll); C2Scene_TaskSpawn copies a new task's
+                                         ; parameters from it
+!C2Scene_TaskHandler = $50               ; 16-bit; the running task's .Handler, the target of
+                                         ; C2Scene_TaskCallHandler's JMP (abs)
+!C2Scene_SprFramePtr = $55               ; 24-bit pointer to a sprite frame (a count byte, then 4-byte
+                                         ; pieces): input of C2Scene_SprAdd, and the walk pointer of
+                                         ; C2Scene_SprDrawNode
 !C2Scene_VramQLock = $5E                 ; 8-bit; non-zero: C2Scene_VramQFlush does nothing
 !C2Scene_VramQEnd = $5F                  ; 8-bit byte offset past the last C2Scene_VramQ entry (0 = empty)
+!C2Scene_BgTileX = $E3                   ; 2 words, X in tiles (C2Scene_SetStartScroll sets both alike);
+                                         ; probably the BG1/BG2 scroll ($C2:09DB, unmatched, stores 8x
+                                         ; them into the scroll shadows)
+!C2Scene_BgTileY = $E7                   ; 2 words, Y in tiles (as C2Scene_BgTileX)
 !C2Scene_VramQBufPtr = $E0               ; 24-bit; reset to C2Scene_VramQBuf after each flush (probably
                                          ; where the next queued data is written; unverified)
 
@@ -113,7 +142,72 @@ struct C2Scene_VramQ $0060
 .Vmain: skip 1          ; VMAIN value for the transfer
 endstruct align 8
 
+; Scratch: the scene code uses dp $00-$1B as temporaries (the PPU shadows
+; start at $1C). Each routine gives the slots it uses an alias next to its
+; header.
+!C2Tmp_00 = $00                          ; 1-2 B scratch
+!C2Tmp_01 = $01                          ; 1 B scratch
+!C2Tmp_02 = $02                          ; 1-2 B scratch
+!C2Tmp_04 = $04                          ; 1-2 B scratch
+!C2Tmp_05 = $05                          ; 1 B scratch
+!C2Tmp_06 = $06                          ; 1-2 B scratch
+!C2Tmp_08 = $08                          ; 1-2 B scratch
+!C2Tmp_09 = $09                          ; 1-2 B scratch
+!C2Tmp_0A = $0A                          ; 1-2 B scratch
+!C2Tmp_0C = $0C                          ; 1-2 B scratch
+!C2Tmp_0E = $0E                          ; 1-2 B scratch
+!C2Tmp_10 = $10                          ; 1-2 B scratch
+!C2Tmp_13 = $13                          ; 1-2 B scratch
+!C2Tmp_16 = $16                          ; 1 B scratch
+
+; ==== Text window (TextWin_Init / TextWin_Step) ====
+; A block at $0200 that both run on as their direct page; names are dp
+; offsets (DP=!TextWin_Dp). The callers fill the first part (the field at
+; $C0:20F4-$C0:2121, absolute $020C-$0214).
+!TextWin_Dp = $0200                      ; the block's address, loaded into D
+!TextWin_StrIndex = $0C                  ; 8-bit string number: index into TextWin_StrTable
+!TextWin_StrTable = $0D                  ; 24-bit pointer to a table of 16-bit string addresses (in the
+                                         ; table's bank)
+!TextWin_GfxBuf = $10                    ; 24-bit output buffer (the field passes $7E:F000); probably the
+                                         ; glyph pixels ($C2:5DC4 reads it, unmatched)
+!TextWin_StepCount = $13                 ; 8-bit; the field sets 1 before each TextWin_Step; state 0
+                                         ; decrements it per glyph and sets status $10 at 0 (probably
+                                         ; characters per step)
+!TextWin_Mode = $14                      ; 8-bit; the field passes 0. Bit 7 or the value TextWin_ModeUnk2:
+                                         ; pen X starts at 0; low nibble 0 or not picks the glyph
+                                         ; routine at $C2:5E10 (unmatched)
+!TextWin_Status = $15                    ; 8-bit; TextWin_CheckStatus dispatches on it ($00-$20): 0
+                                         ; = idle; TextWin_Init sets TextWin_StatusStart; the field
+                                         ; reads it after each step
+!TextWin_Unk17 = $17                     ; 8-bit; zeroed with each pen reset; +1 per glyph ($C2:5E30)
+!TextWin_State = $30                     ; 8-bit index into TextWin_StateTable
+!TextWin_TextPtr = $31                   ; 24-bit pointer to the next byte of the string
+!TextWin_PenX = $34                      ; 8-bit pen X in pixels (inferred: $C2:5DC4 uses bits 0-2 as the
+                                         ; shift within a tile and bits 3-7 as the tile)
+!TextWin_Unk3D = $3D                     ; 24-bit; TextWin_Init sets it to $00:0200 (= TextWin_Dp); use not
+                                         ; traced
+
 ; --- Scene mode absolute RAM ---
+!C2Scene_Unk0B20 = $0B20                 ; 16 B $0B20-$0B2F zeroed by C2Scene_ClearPalette (right after
+                                         ; C2Scene_PaletteBuf); use unknown
+!C2Scene_TaskRecords = $0B30             ; 64 C2Scene_Task records, $0B30-$1B2F (C2Scene_TaskRunAll walks
+                                         ; them all; C2Scene_TaskClearAll frees them all)
+!C2Scene_TaskRecordsEnd = $1B30          ; first address past the records
+!C2Scene_Unk1B30 = $1B30                 ; 8-bit; zeroed by C2Scene_ClearUnk1B30; use unknown
+!C2Scene_Unk1B31 = $1B31                 ; 8-bit; zeroed by C2Scene_ClearUnk1B30; use unknown
+!C2Scene_Flag0Copy = $1BA6               ; 8-bit copy of Eng_Unk7F0000 (C2Scene_SaveFlagTail)
+!C2Scene_FlagTailCopy = $1BA7            ; 16 B copy of $7F:01F0-$01FF, the end of Menu_FlagBlock7F
+                                         ; (C2Scene_SaveFlagTail; C2Scene_RestoreFlagTail writes it back)
+!C2Scene_StartX = $0283                  ; 16-bit; Loc_EntryX * 8 (C2Scene_SetStartPos): probably pixels
+!C2Scene_StartY = $0285                  ; 16-bit; Loc_EntryY * 8
+!C2Scene_SoundCmdState = $1BEC           ; 8-bit: 0 = nothing to send; 1 = a command waits in the
+                                         ; driver block $1E00-$1E03 (set by the unmatched code at
+                                         ; $C2:2ED9, which copies it from $1BE8-$1BEB);
+                                         ; C2Scene_SoundCmdSending while Audio_DriverCommand runs.
+                                         ; C2Scene_WaitFrames and C2Scene_MainLoop send it, once per frame
+!C2Scene_Unk1BF6 = $1BF6                 ; 8-bit; zeroed by C2Scene_Main; use unknown
+!C2Scene_Mode = $027C                    ; 8-bit; selects C2Scene_MainLoop's handler (index into
+                                         ; C2Scene_ModeTable); who sets it is not traced
 !C2Scene_PaletteBuf = $0920              ; 512 B CGRAM shadow, uploaded by the NMI when C2Scene_NmiFlags
                                          ; bit 1 is set
 !C2Scene_VramQBuf = $7EF000              ; see C2Scene_VramQBufPtr
@@ -132,5 +226,52 @@ struct C2Scene_HdmaTable $7E8A35
 endstruct align 13
 !C2Scene_HdmaTableA918 = $7EA918         ; probably an HDMA table of 3-byte entries (count, word):
                                          ; the NMI writes the word of entries 0-3
+
+;
+; A scene task: one 64-byte record of C2Scene_TaskRecords, run once per
+; frame by C2Scene_TaskRunAll (from the NMI) while .Handler is non-zero.
+; Fields from .Params on are copied from the spawning task by
+; C2Scene_TaskSpawn; what most of them hold depends on the handler.
+struct C2Scene_Task $0000
+.Handler:    skip 2     ; +$00 handler address in bank $C2 (0 = free slot)
+.Unk02:      skip 1     ; +$02 zeroed by C2Scene_TaskSpawn
+.Frames:     skip 2     ; +$03 +1 after each frame the handler returns C=0
+.Params:     skip 2     ; +$05 first byte copied from the spawner
+.ScriptPtr:  skip 2     ; +$07 C2Scene_TaskSpawnScript: 16-bit address of the script
+.ScriptBank: skip 1     ; +$09 C2Scene_TaskSpawnScript: its bank
+.Unk0A:      skip 1     ; +$0A zeroed by C2Scene_TaskSpawnScript
+             skip 4
+.SprAttr:    skip 1     ; +$0F C2Scene_SprAdd: the new node's .Attr
+.SprTile:    skip 2     ; +$10 C2Scene_SprAdd: the new node's .Tile
+             skip 2
+.SprX:       skip 2     ; +$14 C2Scene_SprAdd: the new node's .X
+             skip 2
+.SprY:       skip 2     ; +$18 C2Scene_SprAdd: the new node's .Y
+             skip $26
+endstruct
+
+; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),
+; 16 B, at C2Scene_SprNodes + $10 * n. The list heads C2Scene_SprActiveHead
+; and C2Scene_SprFreeHead are only .Prev and .Next.
+struct C2Scene_SprNode $0000
+.Prev:  skip 2          ; address of the previous node (or of the head)
+.Next:  skip 2          ; address of the next node (or of the head)
+.X:     skip 2          ; 16-bit screen (or, with C2Scene_SprAttrScroll, BG2) X
+.Y:     skip 2          ; 16-bit Y; the active list is kept in falling .Y order
+.Attr:  skip 1          ; C2Scene_SprAttr* flags; bits 1-5 become OAM attribute bits 1-5
+                        ; (palette and priority)
+.Tile:  skip 2          ; bits 0-13 added to each piece's tile word; bit 14
+                        ; (C2Scene_SprTileLarge in the high byte) large sprites; bit 15
+                        ; (C2Scene_SprTileBehind) appended at the end of the list
+.Frame: skip 3          ; 24-bit pointer to the frame (see C2Scene_SprFramePtr)
+        skip 2
+endstruct
+
+!C2Scene_SprNodes = $7EB000              ; 64 C2Scene_SprNode records, $7E:B000-$B3FF
+!C2Scene_SprLinkInit = $7EB400           ; 64 x 4 B: each node's .Prev and .Next on a free list
+                                         ; (built by C2Scene_SprInitLinks, copied into the nodes every
+                                         ; frame by C2Scene_SprResetLists)
+!C2Scene_SprActiveHead = $7EB500         ; 4 B .Prev/.Next: head of the list C2Scene_SprDrawList draws
+!C2Scene_SprFreeHead = $7EB504           ; 4 B .Prev/.Next: head of the free nodes
 
 endif
