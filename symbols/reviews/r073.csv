@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:3B8E,C2Scene_MemberLeaveA,2026-10-08,rev73a,approved,5b6c0bfcdc96,"Fix checked: vs C2Scene_LeaderLeaveA it omits StartX/Y, .Unk26, facing and SetEntryTile, as now stated. .State=0, SprX/Y from ObjAX/Y, DEC Unk0294, C=0, A=ObjAY, DP/DB verified."
+$C2:57DF,TextWin_Init,2026-10-08,rev73a,approved,c4aa90a3d217,"Checked [StrTable],Y ptr+bank, State/Status/Unk17/Unk3D=$00:0200, PenX 8 or 0 (ModeUnk2/bit7), X=0 need, P/DP restore, banner ($C0:20F4-2121, State0-3 at $58B2+). nit: $0006 has no callers"
