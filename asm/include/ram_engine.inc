@@ -108,7 +108,8 @@ if !ram_engine_inc == 0
 !Field_Unk2A = $2A                       ; 8-bit; Field_CheckTileInFront stores the treasure outcome
                                          ; here (TreasureKind_*) as it starts Field_Unk29 = 1
 !Field_Unk2B = $2B                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
-!Field_Unk2D = $2D                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk2D = $2D                       ; 8-bit; the message pointer's bank byte: set by Evt_OpB8_SetMsgPtr,
+                                         ; zeroed by Field_InitLoadState; 0 makes the message opcodes halt
 !Field_Unk2E = $2E                       ; 8-bit; Field_CheckTileInFront stores the leader's object
                                          ; slot here as it starts Field_Unk29 = 1
 !Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code

@@ -8359,8 +8359,9 @@ ClearRAMDMA:
 ; Evt_FindOrAddUnk0920 ($C0:5CB3) when Evt_Unk0920 has no free entry,
 ; $01F0 and $000F from LocLoad_CheckEvtData (refused event data, see
 ; there), $1639 from Evt_UnusedOpcode ($C0:5F71), the handler that
-; Evt_OpcodeTable gives unused event opcodes); the conditions behind
-; the message opcodes' and $C0:46D4/483D's halts are not traced.
+; Evt_OpcodeTable gives unused event opcodes). The message opcodes
+; ($BB, $C0-$C4) halt when Field_Unk2D (the message pointer's bank
+; byte) is 0; the conditions behind $C0:46D4/483D are not traced.
 ; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_OpBB_Msg ($C0:3577),
 ;   Evt_OpC1_MsgUnk30_1 ($C0:35BC), Evt_OpC2_MsgUnk30_2 ($C0:3603), Evt_OpC0_MsgChoice ($C0:364A),
 ;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4), Evt_FindOrAddUnk0920
@@ -9099,7 +9100,7 @@ Obj_Unk30B3:
 ;   third word of the object's function table), Obj_Unk1C00 =
 ;   Obj_Unk1C00Func2 (2) and Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001 = 0.
 ;   Either way it then runs Evt_PushTarget.
-; Called by the opcode $B0 handler (unmatched) when Evt_HasActionTarget
+; Called by Evt_OpB0_PartyControl (its kind-0 path) when Evt_HasActionTarget
 ;   finds an object in front of the leader.
 ; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3054).
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_UnkEB and
