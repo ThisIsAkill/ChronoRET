@@ -64,6 +64,22 @@ includes the one before:
 
 ## Workflow tools
 
+- `make draft ADDR=C1:3714` (`tools/draft.py`) starts a match from source instead of raw
+  bytes. It disassembles the routine from that address until it ends (every path has returned
+  or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),
+  tracking M/X, DP and DB, and writes `build/draft_C13714.asm`: asar source with a header
+  skeleton (Entry state, widths at the return, `Callers:` from xref, callees), `.loc_XXXX`
+  labels, and every operand the project already has a name for (RAM and DP defines, struct
+  fields, registers, matched labels and stubs, constants used in the same context elsewhere),
+  with explicit widths. It then assembles the draft in place of the region in a temporary copy
+  of the tree, confirms `make diff` and that every byte of the region is emitted, and prints
+  what the lint still finds. The default entry state is M=1, X=0, DP=0, DB=$7E; pass another
+  with `DRAFT_ARGS="--x 1 --dp 0100 --db 00"`. What is left is the matcher's: every `TODO`
+  (purpose, literals with no name yet, constants it would not guess, the stubs it lists for
+  unknown targets, direct-page aliases), and a check of every name it chose — it names by
+  address and by use elsewhere, not by meaning. Where M/X becomes unknown (a `PLP` without a
+  matching `PHP`, paths that disagree) it stops and says so. `python3 tools/draft.py ADDR
+  --compare` drafts an already matched routine and compares it with the hand-written source.
 - `make xref ADDR=C100D7` (also `$C1:00D7` quoted, or a label; `tools/xref.py`) lists every
   `JSR`/`JMP` (same bank), `JSL`/`JML` (any mirror) and `BRL` to an address, plus 8-bit branches
   with `XREF_FLAGS=--branches` and machine output with `--json`. Each hit is CONFIRMED (on an

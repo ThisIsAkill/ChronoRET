@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate progress test-hooks duplicates duplicates-reloc xref clean check-rom setup tables-scan
+.PHONY: all build diff verify lint gate progress test-hooks duplicates duplicates-reloc xref clean check-rom setup tables-scan draft
 
 all: build diff
 
@@ -63,6 +63,14 @@ tables-scan: check-rom
 # Prove the pre-commit firewall rejects planted ROMs, notes and blocked words.
 test-hooks:
 	tools/test_hooks.sh
+
+# Draft source for an unmatched routine, checked byte-exact, in build/:
+#   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
+draft: check-rom
+	@if [ -z '$(value ADDR)' ]; then echo "Usage: make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS='--m 1 --x 0 --dp 0 --db 7E']"; exit 1; fi
+	@mkdir -p $(BUILD_DIR)
+	@a='$(value ADDR)'; a=$${a#\$$}; out=$(BUILD_DIR)/draft_$$(echo "$$a" | tr -d ':').asm; \
+	python3 tools/draft.py "$$a" $(if $(value END),'$(value END)') $(DRAFT_ARGS) --check -o "$$out"
 
 # What a function needs before it reaches main.
 gate: diff verify lint
