@@ -56,11 +56,11 @@ if !ram_engine_inc == 0
 !Loc_ReturnFacing = $09                  ; 8-bit return facing (leader facing EOR 1 = turned around,
                                          ; Field_SceneChangeTick)
 !Loc_PrevId = $0A                        ; 16-bit Loc_Id as it was at the last location load
-                                         ; (FrameStateInit)
+                                         ; (Field_InitLoadState)
 !Loc_PrevX = $0C                         ; 16-bit store of Loc_EntryX/Y at the last location load
-                                         ; (FrameStateInit)
+                                         ; (Field_InitLoadState)
 !Loc_PrevFacing = $0E                    ; 8-bit Loc_EntryFacing at the last location load
-                                         ; (FrameStateInit)
+                                         ; (Field_InitLoadState)
 !Loc_DestId = $12                        ; 16-bit warp destination location; Field_SceneChangeTick
                                          ; copies it to Loc_Id before restarting
 !Loc_DestX = $14                         ; 16-bit load: destination tile X/Y, copied to Loc_EntryX/Y
@@ -69,7 +69,7 @@ if !ram_engine_inc == 0
                                          ; Field_SceneChangeTick
 
 ; --- Field state flags (dp) ---
-!Field_Unk0F = $0F                       ; 8-bit; only zeroed (FrameStateInit) in matched code
+!Field_Unk0F = $0F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk10 = $10                       ; 8-bit; must be 0 for the menu/pause entry paths in
                                          ; Field_PauseAndMenuInput and Field_FadeToBankC2Mode5
 !Field_Unk11 = $11                       ; 8-bit; must be 0 for the Start-pause loop in
@@ -91,21 +91,23 @@ if !ram_engine_inc == 0
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5); saved
                                          ; and cleared around Field_FrameUpdate during fades.
                                          ; Inferred: player control enable
-!Field_Unk20 = $20                       ; 8-bit; set to 1 by FrameStateInit, no other matched use
-!Field_ExitMenuArg = $25                 ; 8-bit; picks the BankC2_Entry8000 argument on the fade-out
+!Field_Unk20 = $20                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
+!Field_BankC2Arg = $25                   ; 8-bit; picks the BankC2_Entry8000 argument on the fade-out
                                          ; path of Field_SceneChangeTick (0 -> Field_RunBankC2Mode5
                                          ; with 5; bit 7 -> bits 7-6 as A, bits 5-0 as X; else bit 0
-                                         ; ? 0 : 6)
+                                         ; ? 0 : 6). What bank $C2 does with it is not traced (was
+                                         ; Field_ExitMenuArg; nothing shows it picks a menu)
 !Field_Unk26 = $26                       ; 8-bit state index; EngFD_UnkC2C1 dispatches on it;
                                          ; Field_FadeToBankC2Mode5 toggles bits 0-1
 !Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState
-!Field_Unk28 = $28                       ; 8-bit; set to $5F by FrameStateInit, no other matched use
+!Field_HdmaEnable = $28                  ; 8-bit HDMA channel mask: the NMI handler writes it to HDMAEN
+                                         ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
 !Field_Unk29 = $29                       ; 8-bit countdown; Field_Unk1F87 dispatches on it;
                                          ; Field_SaveState forces it to 1 when nonzero
-!Field_Unk2B = $2B                       ; 16-bit; only zeroed (FrameStateInit) in matched code
-!Field_Unk2D = $2D                       ; 8-bit; only zeroed (FrameStateInit) in matched code
-!Field_Unk2F = $2F                       ; 8-bit; only zeroed (FrameStateInit) in matched code
-!Field_Unk30 = $30                       ; 8-bit; only zeroed (FrameStateInit) in matched code
+!Field_Unk2B = $2B                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk2D = $2D                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk30 = $30                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk34 = $34                       ; 16-bit counter; Field_Unk1AAC counts it up, Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
 !Field_Unk38 = $38                       ; 8-bit; Field_Unk885A dispatches on it ($0138);
@@ -120,10 +122,10 @@ if !ram_engine_inc == 0
 !Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 skips when bit 0 is set;
                                          ; DefaultHandler sets/clears bit 7; Field_PauseAndMenuInput
                                          ; clears it in the pause loop
-!Field_Unk54 = $54                       ; 8-bit; only zeroed (FrameStateInit) in matched code;
+!Field_Unk54 = $54                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code;
                                          ; Field_Unk274D tests bits 2-5
-!Field_Unk55 = $55                       ; 8-bit; set to 1 by FrameStateInit, no other matched use
-!Field_Unk58 = $58                       ; 16-bit; only zeroed (FrameStateInit) in matched code
+!Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
+!Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);
                                          ; blocks the pause/menu paths when nonzero
 !Field_Unk63 = $63                       ; 8-bit index stepped up/down by Sub_1ADF and clamped to
@@ -132,22 +134,22 @@ if !ram_engine_inc == 0
 !Field_Unk65 = $65                       ; 8-bit limit for Field_Unk63 (Sub_1ADF)
 !Field_Unk66 = $66                       ; 8-bit; Sub_1ADF saves Field_Unk63 here before forcing it
                                          ; to 4
-!Field_Unk68 = $68                       ; 8-bit; set to 5 by FrameStateInit, no other matched use
+!Field_Unk68 = $68                       ; 8-bit; set to 5 by Field_InitLoadState, no other matched use
 !Field_UnkAB = $AB                       ; 8-bit; saved to/restored from SceneSave_UnkAB by
                                          ; Field_SaveState/Party_ReinitIfChanged
 !Field_UnkAC = $AC                       ; 8-bit; saved/restored with Field_UnkAB
 !Field_UnkAD = $AD                       ; 8-bit; saved/restored with Field_UnkAB
 !Field_E4Ptr0 = $AF                      ; 24-bit pointer into bank $E4; low word from RomE4_PtrInit,
-                                         ; bank byte $E4 (FrameStateInit)
+                                         ; bank byte $E4 (Field_InitLoadState)
 !Field_E4Ptr1 = $B2                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_E4Ptr2 = $B5                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_E4Ptr3 = $B8                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_UnkBB = $BB                       ; 8-bit; zeroed at load; LocLoad_Unk0A14 skips its work when
                                          ; nonzero
-!Field_UnkBC = $BC                       ; 8-bit; only zeroed (FrameStateInit) in matched code
+!Field_UnkBC = $BC                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_UnkEB = $EB                       ; 8-bit; $80 at load; Field_FrameUpdate sets it to $80,
                                          ; Field_Unk1AAC reads it
-!Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by FrameStateInit
+!Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by Field_InitLoadState
 !Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
                                          ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
                                          ; (swapping the two tilemap bases) for 3, then clears it
@@ -182,9 +184,9 @@ if !ram_engine_inc == 0
 !Obj_Cur = $6D                           ; 16-bit current object slot offset (object number x 2; high
                                          ; byte kept 0); index into the Obj_* tables
 !Obj_CurHi = $6E                         ; 8-bit high byte of Obj_Cur; zeroed so 16-bit X loads of
-                                         ; Obj_Cur work (PostVBlank, Party_ReinitIfChanged)
+                                         ; Obj_Cur work (Oam_BuildShadow, Party_ReinitIfChanged)
 !Chr_ObjSlot = $8D                       ; 7 bytes, one per playable character: that character's
-                                         ; object slot, $80 = none (FrameStateInit sets $80;
+                                         ; object slot, $80 = none (Field_InitLoadState sets $80;
                                          ; Party_ReinitIfChanged re-inits each live one when the
                                          ; party changes)
 !Party_MembersCache = $94                ; 3 bytes: copy of Party_Members taken at load;
@@ -197,9 +199,9 @@ if !ram_engine_inc == 0
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
 
-; --- OAM shadow build (PostVBlank / Spr_AppendToOam) (dp) ---
+; --- OAM shadow build (Oam_BuildShadow / Spr_AppendToOam) (dp) ---
 !Oam_Range1PrevEnd = $7B                 ; 16-bit OAM shadow address where range 1 ended last frame;
-                                         ; PostVBlank hides entries from the new end up to here
+                                         ; Oam_BuildShadow hides entries from the new end up to here
 !Oam_Range2PrevEnd = $7D                 ; 16-bit previous-frame end of range 2 (as
                                          ; Oam_Range1PrevEnd)
 !Oam_Range3PrevEnd = $7F                 ; 16-bit previous-frame end of range 3 (as
@@ -208,12 +210,12 @@ if !ram_engine_inc == 0
                                          ; range 1 (starts $0907); Spr_AppendToOam stores one byte
                                          ; per 4 tiles
 !Oam_Range1HiUnk = $83                   ; 16-bit; zeroed with Oam_Range1HiPtr each frame
-                                         ; (PostVBlank), no other matched use
+                                         ; (Oam_BuildShadow), no other matched use
 !Oam_Range2HiPtr = $85                   ; 16-bit high-table write pointer for range 2 (starts $091A)
-!Oam_Range2HiUnk = $87                   ; 16-bit; zeroed each frame (PostVBlank), no other matched
+!Oam_Range2HiUnk = $87                   ; 16-bit; zeroed each frame (Oam_BuildShadow), no other matched
                                          ; use
 !Oam_Range3HiPtr = $89                   ; 16-bit high-table write pointer for range 3 (starts $0901)
-!Oam_Range3HiUnk = $8B                   ; 16-bit; zeroed each frame (PostVBlank), no other matched
+!Oam_Range3HiUnk = $8B                   ; 16-bit; zeroed each frame (Oam_BuildShadow), no other matched
                                          ; use
 !Oam_Range1LoPtr = $DB                   ; 16-bit write pointer into the OAM low-table shadow for
                                          ; range 1 (starts $0770); Spr_AppendToOam aims WMADD here
@@ -326,16 +328,16 @@ if !ram_engine_inc == 0
 !Pad_Unk00F7 = $00F7                     ; 8-bit; Sub_1ADF: bit 2 steps Field_Unk63 up, bit 3 steps
                                          ; it down (Down/Up in the Pad_Pressed layout?)
 !Pad_Unk00F8 = $00F8                     ; 8-bit; Sub_1ADF: bit 7 sets Field_Unk62 = 3
-!Eng_Unk0400 = $0400                     ; 8-bit; FrameStateInit copies it to Field_Unk0400Copy
+!Eng_Unk0400 = $0400                     ; 8-bit; Field_InitLoadState copies it to Field_Unk0400Copy
 !Field_FadeBusy = $0407                  ; 8-bit; $FF while a pause/fade loop runs
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5),
                                          ; cleared after (Field_FadeInAfterReload,
                                          ; Field_RunBankC2Mode5)
-!Field_Unk0BD9 = $0BD9                   ; 8-bit; zeroed by FrameStateInit, no other matched use
-!Field_Unk0BDA = $0BDA                   ; 8-bit; zeroed by FrameStateInit, no other matched use
-!Field_Unk0BDB = $0BDB                   ; 8-bit; zeroed by FrameStateInit, no other matched use
-!Field_Unk0BDE = $0BDE                   ; 8-bit; set to 2 by FrameStateInit, no other matched use
-!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by FrameStateInit, no other matched use
+!Field_Unk0BD9 = $0BD9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk0BDA = $0BDA                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk0BDB = $0BDB                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk0BDE = $0BDE                   ; 8-bit; set to 2 by Field_InitLoadState, no other matched use
+!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
                                          ; (Field_SaveState / Field_RestoreState)
 !Audio_CmdId = $1E00                     ; 8-bit sound-driver command byte ($19 = play sound effect),
@@ -344,17 +346,17 @@ if !ram_engine_inc == 0
                                          ; Audio_PlayTileSfxA)
 !Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
                                          ; Obj_ScreenX in Audio_PlaySfxAtLeader)
-!Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by FrameStateInit, no other matched use
+!Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Party_Members = $7E2980                 ; 3 bytes: character id of each party member
                                          ; (Party_ReinitIfChanged re-inits the character objects when
                                          ; they change)
-!Field_Unk7E2989 = $7E2989               ; 8-bit; zeroed by FrameStateInit, no other matched use
+!Field_Unk7E2989 = $7E2989               ; 8-bit; zeroed by Field_InitLoadState, no other matched use
 !Eng_Unk7F0000 = $7F0000                 ; 8-bit; Field_FadeToBankC2Mode5 only proceeds when it is >=
                                          ; $49 (purpose unknown)
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
 !RomE4_PtrInit = $E4FFE0                 ; 4 words in ROM: initial low words of Field_E4Ptr0-3
-                                         ; (FrameStateInit)
+                                         ; (Field_InitLoadState)
 
 ; --- Location event data / saved field state ---
 !Evt_ObjCount = $7F2000                  ; 8-bit count of location objects; Obj_ResetStates clears
@@ -369,16 +371,19 @@ if !ram_engine_inc == 0
 !SceneSave_PartyPrio = $7F1D15           ; 3 words: party members' Obj_PrioLow/High word (as above)
 !SceneSave_UnkAB = $7F1D1B               ; 3 bytes: Field_UnkAB/AC/AD saved by Field_SaveState,
                                          ; restored by Party_ReinitIfChanged
-!SceneSave_Scroll = $7F1D1E              ; 4 words: Map_ScrollA-D saved by Field_SaveState, restored
-                                         ; by Field_RestoreState
+!SceneSave_MapWords = $7F1D1E            ; 4 words: Map_Unk7F3728/3748/3768/3781 saved by
+                                         ; Field_SaveState, restored by Field_RestoreState
 !SceneSave_Unk1DF9 = $7F1D26             ; 8-bit Field_Unk1DF9 saved by Field_SaveState, restored by
                                          ; Field_RestoreState
-!Map_ScrollA = $7F3728                   ; 16-bit; one of four words saved/restored around the menu
-                                         ; (Field_SaveState/Field_RestoreState); earlier notes call
-                                         ; it scroll X0
-!Map_ScrollB = $7F3748                   ; 16-bit; saved/restored with Map_ScrollA
-!Map_ScrollC = $7F3768                   ; 16-bit; saved/restored with Map_ScrollA
-!Map_ScrollD = $7F3781                   ; 16-bit; saved/restored with Map_ScrollA
+!Map_Unk7F3728 = $7F3728                 ; 16-bit; saved/restored around bank $C2 (Field_SaveState,
+                                         ; Field_RestoreState). An event opcode handler at $C0:3311
+                                         ; stores two script bytes AND $7F into its low and high
+                                         ; byte (an X/Y-like pair, inferred). Earlier notes called
+                                         ; it scroll X0; nothing shows it is a scroll value
+!Map_Unk7F3748 = $7F3748                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3398)
+!Map_Unk7F3768 = $7F3768                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3421)
+!Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728; no event
+                                         ; handler stores it in matched or traced code
 !ObjX_Unk7F0580 = $7F0580                ; per-object word ($80-byte table in bank $7F), zeroed by
                                          ; Evt_RunObjInit
 !ObjX_Unk7F0600 = $7F0600                ; per-object word, zeroed by Evt_RunObjInit
@@ -400,7 +405,7 @@ if !ram_engine_inc == 0
                                          ; Audio_PlaySfxAtLeader passes the leader's low byte as
                                          ; Audio_CmdArg1, presumably for panning
 !Obj_DrawBucket = $0E00                  ; 64 words: first object of each draw bucket (low byte; bit
-                                         ; 7 = empty); PostVBlank walks them from the last
+                                         ; 7 = empty); Oam_BuildShadow walks them from the last
 !Obj_DrawNext = $0E81                    ; 8-bit per object: next object in the same draw bucket (bit
                                          ; 7 = end)
 !Obj_ScriptPos = $1180                   ; 16-bit per object: Evt_Data offset where the object's
@@ -555,7 +560,7 @@ if !ram_engine_inc == 0
                                          ; Field_ProcessAnimQueue waits while the first entry is
                                          ; pending
 
-; One OAM low-table entry; used as abs,X with X = the entry's address (PostVBlank)
+; One OAM low-table entry; used as abs,X with X = the entry's address (Oam_BuildShadow)
 struct OamEntry $0000
     .X: skip 1           ; X position (low 8 bits)
     .Y: skip 1           ; Y position

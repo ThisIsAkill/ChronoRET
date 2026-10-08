@@ -8,12 +8,12 @@ if !constants_engine_inc == 0
 !constants_engine_inc = 1
 
 ; --- Crash trap ---
-!CrashMarkerRead = $ABCDEF   ; read forever by BRK_Handler; a ROM address (HiROM mirror of
+!CrashMarkerRead = $ABCDEF               ; read forever by BRK_Handler; a ROM address (HiROM mirror of
                              ; file offset $2BCDEF), value discarded. Inferred: chosen to be
                              ; recognizable on a bus trace, not to fetch data.
 
 ; --- Addressing ---
-!BankWrap = $10000   ; one bank: a BRL whose 16-bit offset wraps around the bank
+!BankWrap = $10000                       ; one bank: a BRL whose 16-bit offset wraps around the bank
                      ; boundary is written `BRL Target-!BankWrap` so asar computes
                      ; the same (in-range, wrapped) offset the ROM has
 
@@ -56,7 +56,7 @@ if !constants_engine_inc == 0
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
 
-; --- OAM shadow ranges (PostVBlank, FrameStateInit, Field_RestoreState) ---
+; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
                                          ; 28)
 !Oam_Range1Limit = $08A0                 ; low-table address range 1 may not reach (entry 104)
@@ -77,9 +77,9 @@ if !constants_engine_inc == 0
                                          ; function
 !ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
 
-; --- Field defaults (FrameStateInit) ---
+; --- Field defaults (Field_InitLoadState) ---
 !Fade_FixedColorInit = $E0               ; Fade_FixedColor at load: all colour channels, intensity 0
-!Field_Unk28Init = $5F                   ; Field_Unk28 at load
+!Field_HdmaEnableInit = $5F              ; Field_HdmaEnable at load: HDMA channels 0-4 and 6
 !Field_Unk63Idle = $80                   ; Field_Unk63 at load (negative = Sub_1ADF leaves it alone)
 !Field_UnkEBInit = $80                   ; Field_UnkEB at load
 !Audio_SfxDefaultA = $53                 ; Audio_SfxTileAnimA at load
@@ -94,11 +94,11 @@ if !constants_engine_inc == 0
 !FadeFlag_Reloaded = $40                 ; Field_FadeFlags bit 6: set after a reload
 !Fade_BrightnessMax = $0F                ; full screen brightness (INIDISP bits 0-3)
 !Field_FadeBusyOn = $FF                  ; Field_FadeBusy while a pause/fade loop runs
-!Field_ExitArgXMask = $003F              ; Field_ExitMenuArg bits 5-0 (handed over in X)
+!Field_ExitArgXMask = $003F              ; Field_BankC2Arg bits 5-0 (handed over in X)
 !Eng_Unk7F0000Min = $49                  ; Field_FadeToBankC2Mode5 runs only when Eng_Unk7F0000 >=
                                          ; this
 !ExitMenu_Mode5 = $05                    ; BankC2_Entry8000 argument used by Field_RunBankC2Mode5
-!ExitMenu_Mode6 = $06                    ; BankC2_Entry8000 argument when Field_ExitMenuArg bit 0 is
+!ExitMenu_Mode6 = $06                    ; BankC2_Entry8000 argument when Field_BankC2Arg bit 0 is
                                          ; clear
 !SceneFlag_Battle = $01                  ; Field_SceneFlags bit 0: start a battle (DefaultHandler
                                          ; JSLs EngCall_BattleMain)
@@ -109,7 +109,7 @@ if !constants_engine_inc == 0
                                          ; the battle path
 !VramQueue_TileStep = $02                ; Field_VramQueueFlags bit 1: TileAnim_StepVramAddrs ready
 !VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
-!Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one VBlankHandlerShort
+!Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one Field_EndOfFrameShort
                                          ; before the battle (DefaultHandler)
 
 ; --- Pad ---

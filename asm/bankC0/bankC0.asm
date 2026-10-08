@@ -14,7 +14,7 @@ incsrc "../hardware.inc"
 ; ============================================================
 ; $C0:B309 — Spr_AppendToOam (1016 bytes, $B309–$B700)
 ; (was Sub_B309.) Appends object Obj_Cur's sprite to the OAM shadow.
-; Called from PostVBlank for every object in the draw buckets.
+; Called from Oam_BuildShadow for every object in the draw buckets.
 ; First Spr_PrepareTiles brings the object's SprTile records up to
 ; date (C=1: nothing to draw). Then, by size class (Obj_SprSize bits
 ; 0-1: 4/8/12/24 tiles = 1/2/3/6 high-table bytes) and by the OAM
@@ -1368,7 +1368,7 @@ Obj_AnimTickAndQueue:
 ; ============================================================
 ; $C0:CA76 — Field_ProcessAnimQueue (99 bytes, $CA76–$CAD8)
 ; Builds queued object frames while there is time left in the frame,
-; called from VBlankHandler. Skips the frame if the previous VRAM
+; called from Field_EndOfFrame. Skips the frame if the previous VRAM
 ; upload queue (VramQ_Valid) is still pending. Otherwise, while the
 ; V counter is past line 240 or below ObjQ_ScanlineLimit, it takes the
 ; queue head into Obj_Cur and runs Obj_BuildSpriteFrameStep; when that
@@ -4762,6 +4762,14 @@ GameLoop:
     LDA.b #!BankC2_BootArg
     JSL BankC2_Entry8004
 
+; GameLoop_Main ($C0:005D): warm-restart entry. Reached by falling out
+; of GameLoop, by ReentryVectors[0] (JSL $C0:0000 from other banks) and
+; by Field_SceneChangeTick's warp (BRL ReentryVectors after resetting the
+; stack). Reinstalls the interrupt trampolines and dispatches on Loc_Id.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y). DB is set to $00 by
+; InitHW. DP is not known here (DP=$0100 when falling out of GameLoop,
+; anything on a JSL from another bank), so Loc_Id is read as the
+; absolute address !DP_Field+!Loc_Id; GameLoop_LoadField sets DP=$0100.
 GameLoop_Main:
     JSR InitHW              ; forced blank, disable NMI/DMA
     JSR InstallNMI          ; reinstall NMI handler
@@ -4770,22 +4778,28 @@ GameLoop_Main:
     ; Dispatch on the location index (Loc_Id, WRAM $0100, 16-bit)
     LDX.w !DP_Field+!Loc_Id
     CPX.w #!Loc_FirstBankC2
-    BMI GL_ModeOk1
+    BMI GameLoop_NotBankC2
     JML BankC2_Entry0000    ; Loc_Id >= $01F0 → handled in bank $C2
 
-GL_ModeOk1:
+; GameLoop_NotBankC2 (was GL_ModeOk1): the path for Loc_Id below
+; Loc_FirstBankC2. Both tests here and above are BMI on X minus the
+; limit, i.e. signed compares; Loc_Id >= Loc_LoadSave goes to
+; LoadSavePath with X = LoadSave_EntryX.
+GameLoop_NotBankC2:
     CPX.w #!Loc_LoadSave
-    BMI GL_ModeOk2
+    BMI GameLoop_LoadField
     LDX.w #!LoadSave_EntryX
-    BRL LoadSavePath               ; → LoadSavePath ($2E1E)
+    BRL LoadSavePath
 
-GL_ModeOk2:
+; GameLoop_LoadField (was GL_ModeOk2): loads the field location Loc_Id
+; and falls into the per-frame loop.
+GameLoop_LoadField:
     REP #$20
     LDA.w #!DP_Field
     TCD                     ; DP = $0100
     SEP #$20
 
-    JSR FrameStateInit      ; reset the field page for this location
+    JSR Field_InitLoadState ; reset the field page for this location
     JSR LoadLocation        ; location-load steps (10 JSR + 2 JSL)
     JSR Obj_ResetStates     ; clear Obj_State, then SprBuf_FreeAll
     JSR Scene_PostLoadInit
@@ -4804,19 +4818,22 @@ GameLoop_FrameBody:
     JSL Field_Unk1F87
     JSR Field_EventHookDispatch
     JSR Field_Unk274D
-    JSR VBlankHandler       ; sync to VBlank (tail-jumps via BRL to PostVBlank)
-    JSR Sub_EC60
+    JSR Field_EndOfFrame    ; end-of-frame work and OAM shadow build
+    JSR Sub_EC60            ; wait for the NMI (the frame wait)
     BRA GameLoop_FrameBody
 
 ; ============================================================
-; $C0:00BF — VBlankHandler
-; End-of-frame work, called once per frame from GameLoop_FrameBody
-; (not an interrupt handler despite the name): Vblank_* helpers,
-; EngFD_UnkC2C1, FdVec_FFF7 (earlier notes: waits for VBlank),
-; Field_ProcessAnimQueue, then tail-jumps to PostVBlank, whose RTS
+; $C0:00BF — Field_EndOfFrame (was VBlankHandler)
+; End-of-frame work, called once per frame from GameLoop_FrameBody just
+; before Sub_EC60 waits for the NMI; it is not an interrupt handler
+; and waits for nothing itself. Runs the Vblank_* helpers,
+; EngFD_UnkC2C1, FdVec_FFF7 (ticks the counter table at $0520),
+; Field_ProcessAnimQueue, then tail-jumps to Oam_BuildShadow, whose RTS
 ; returns to this routine's caller.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit (from Oam_BuildShadow): M=1, X=0, DP and DB unchanged.
 ; ============================================================
-VBlankHandler:
+Field_EndOfFrame:
     SEP #$10                ; X/Y → 8-bit
     JSR Vblank_Unk59D9
     JSR Vblank_ReadScanlineCounters
@@ -4827,10 +4844,14 @@ VBlankHandler:
     JSR Vblank_UnkA810
     JSR Field_ProcessAnimQueue
     REP #$10
-    BRL PostVBlank-!BankWrap ; offset wraps around the bank to $B271
+    BRL Oam_BuildShadow-!BankWrap ; offset wraps around the bank to $B271
 
-; VBlankHandlerShort: the EngFD_UnkC2C1 + FdVec_FFF7 part only.
-VBlankHandlerShort:
+; Field_EndOfFrameShort (was VBlankHandlerShort): the EngFD_UnkC2C1 +
+; FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops
+; (Field_IdleFrame, Field_FadeInAfterReload, DefaultHandler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100. Sets 8-bit X/Y
+; around EngFD_UnkC2C1, which needs it; exit M=1, X=0.
+Field_EndOfFrameShort:
     SEP #$10
     JSL EngFD_UnkC2C1
     REP #$10
@@ -4838,10 +4859,10 @@ VBlankHandlerShort:
     RTS
 
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
-; game logic: Field_FrameUpdate, VBlankHandlerShort, Sub_EC60.
+; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60.
 Field_IdleFrame:
     JSR Field_FrameUpdate
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ============================================================
@@ -4874,8 +4895,11 @@ LoadLocation:
 ;   - copy Field_SaveBlock to SceneSave_Buffer (Field_StashSaveBlock);
 ;   - the leader's tile X/Y and facing become the entry point
 ;     (Loc_EntryX/Y/Facing);
-;   - each party member's Obj_PosX/PosY/Unk0C00 → SceneSave_Party*;
-;   - Field_UnkAB-AD, Map_ScrollA-D and Field_Unk1DF9 → SceneSave_*.
+;   - each party member's Obj_PosX, Obj_PosY and Obj_PrioLow word
+;     (16-bit, so Obj_PrioHigh too) → SceneSave_Party*;
+;   - Field_UnkAB-AD → SceneSave_UnkAB, the four words Map_Unk7F3728,
+;     Map_Unk7F3748, Map_Unk7F3768, Map_Unk7F3781 → SceneSave_MapWords,
+;     Field_Unk1DF9 → SceneSave_Unk1DF9.
 ; Called from Field_SceneChangeTick, Field_PauseAndMenuInput and
 ; Field_FadeToBankC2Mode5.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
@@ -4925,14 +4949,14 @@ Field_SaveState:
     LDA.b !Field_UnkAD
     STA.l !SceneSave_UnkAB+2
     REP #$20                ; A → 16-bit
-    LDA.l !Map_ScrollA
-    STA.l !SceneSave_Scroll
-    LDA.l !Map_ScrollB
-    STA.l !SceneSave_Scroll+2
-    LDA.l !Map_ScrollC
-    STA.l !SceneSave_Scroll+4
-    LDA.l !Map_ScrollD
-    STA.l !SceneSave_Scroll+6
+    LDA.l !Map_Unk7F3728
+    STA.l !SceneSave_MapWords
+    LDA.l !Map_Unk7F3748
+    STA.l !SceneSave_MapWords+2
+    LDA.l !Map_Unk7F3768
+    STA.l !SceneSave_MapWords+4
+    LDA.l !Map_Unk7F3781
+    STA.l !SceneSave_MapWords+6
     SEP #$20                ; A → 8-bit
     LDA.w !Field_Unk1DF9
     STA.l !SceneSave_Unk1DF9
@@ -4946,7 +4970,8 @@ Field_SaveState:
 ; 3. Previous-frame OAM range ends = full limits.
 ; 4. Re-run eight location-load steps (LoadLocation's list without
 ;    LocLoad_Unk092B / LocLoad_AudioSetup).
-; 5. Restore Map_ScrollA-D and Field_Unk1DF9 from SceneSave_*.
+; 5. Restore Map_Unk7F3728/3748/3768/3781 and Field_Unk1DF9 from
+;    SceneSave_*.
 ; 6. Evt_RunObj0Func1.
 ; 7. If Field_UnkAEObj names an object, run Spr_LoadLargeObj on it.
 ; 8. If Field_Unk7F03FE is 1 or 2: put party members 2 and 3 on the
@@ -4975,14 +5000,14 @@ Field_RestoreState:
     JSR LocLoad_Unk0A14
     JSR LocLoad_Unk56D4
     REP #$20                ; A → 16-bit
-    LDA.l !SceneSave_Scroll
-    STA.l !Map_ScrollA
-    LDA.l !SceneSave_Scroll+2
-    STA.l !Map_ScrollB
-    LDA.l !SceneSave_Scroll+4
-    STA.l !Map_ScrollC
-    LDA.l !SceneSave_Scroll+6
-    STA.l !Map_ScrollD
+    LDA.l !SceneSave_MapWords
+    STA.l !Map_Unk7F3728
+    LDA.l !SceneSave_MapWords+2
+    STA.l !Map_Unk7F3748
+    LDA.l !SceneSave_MapWords+4
+    STA.l !Map_Unk7F3768
+    LDA.l !SceneSave_MapWords+6
+    STA.l !Map_Unk7F3781
     SEP #$20                ; A → 8-bit
     LDA.l !SceneSave_Unk1DF9
     STA.w !Field_Unk1DF9
@@ -4990,11 +5015,11 @@ Field_RestoreState:
     TDC                     ; C = D = $0100
     XBA                     ; B = 0 for the TAX below
     LDA.b !Field_UnkAEObj
-    BMI .no_e12a            ; Obj_None
+    BMI .no_large_obj       ; Obj_None
     TAX
     STX.b !Obj_Cur          ; 16-bit store
     JSR Spr_LoadLargeObj
-.no_e12a:
+.no_large_obj:
     LDA.l !Field_Unk7F03FE
     BEQ .done               ; 0 → skip
     CMP #$03
@@ -5024,7 +5049,8 @@ Field_RestoreState:
 ; $C0:0905 — Field_RestoreSaveBlock (19 bytes, $0905–$0917)
 ; (was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over
 ; Field_SaveBlock ($7E:0920, $14E0 bytes). Reverse of
-; Field_StashSaveBlock; called first thing in Field_RestoreState.
+; Field_StashSaveBlock. Called first thing in Field_RestoreState, and
+; from Scene_Unk0283 ($C0:0286).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C00905
@@ -5042,7 +5068,8 @@ Field_RestoreSaveBlock:
 ; ============================================================
 ; $C0:0918 — Field_StashSaveBlock (19 bytes, $0918–$092A)
 ; (was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to
-; SceneSave_Buffer ($7F:2000). Called from Field_SaveState.
+; SceneSave_Buffer ($7F:2000). Called from Field_SaveState and from
+; Scene_Unk024C ($C0:0268).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C00918
@@ -5093,6 +5120,8 @@ InstallNMI:
 ; ============================================================
 ; $C0:0B75 — InstallIRQ (17 bytes)
 ; Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
+; Called with M=1 (8-bit A), X=0 (16-bit X); absolute stores, so DP
+; does not matter (DB=$00 from InitHW or reset).
 ; ============================================================
 InstallIRQ:
     LDA.b #!Op_JML
@@ -5104,13 +5133,15 @@ InstallIRQ:
     RTS
 
 ; ============================================================
-; $C0:0B86 — FrameStateInit (240 bytes)
-; Called once per location load from GameLoop_Main (not per frame,
-; despite the name). Remembers where the location was entered, then
-; resets the field direct page to its load-time defaults.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+; $C0:0B86 — Field_InitLoadState (240 bytes)
+; (was FrameStateInit.) Called once per location load from
+; GameLoop_LoadField, not per frame. Remembers where the location was
+; entered, then resets the field direct page to its load-time defaults
+; (including Field_HdmaEnable, the HDMAEN value the NMI handler writes).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: same widths.
 ; ============================================================
-FrameStateInit:
+Field_InitLoadState:
     ; Remember the location and entry point this load started from
     LDX.b !Loc_Id
     STX.b !Loc_PrevId
@@ -5150,8 +5181,8 @@ FrameStateInit:
     STA.b !Field_Unk20
     LDA #$05
     STA.b !Field_Unk68
-    LDA.b #!Field_Unk28Init
-    STA.b !Field_Unk28
+    LDA.b #!Field_HdmaEnableInit
+    STA.b !Field_HdmaEnable
     STZ.b !Field_Unk53
     STZ.b !Field_Unk26
     STZ.b !Field_Unk29
@@ -5228,7 +5259,7 @@ FrameStateInit:
 
 ; ============================================================
 ; $C0:0C76 — Field_SceneChangeTick (258 bytes, $0C76–$0D77)
-; (was Field_SceneChangeTick.) Runs every frame from GameLoop_FrameBody.
+; (was Sub_0C76.) Runs every frame from GameLoop_FrameBody.
 ; Steps the two fades requested in Field_FadeFlags, then acts on
 ; Field_SceneFlags:
 ;   0           nothing to do.
@@ -5239,11 +5270,14 @@ FrameStateInit:
 ;   bit 6       count Fade_Brightness down (one frame per step, with
 ;               Field_FrameUpdate), save the field state and call
 ;               BankC2_Entry8000 with an argument chosen by
-;               Field_ExitMenuArg, then restore the field and fade in.
+;               Field_BankC2Arg, then restore the field and fade in.
 ;   bit 4       run the tile-animation handler for the mode byte at
 ;               Map_TileProps[Field_TileAnimX/Y] (ModeE6..ModeFC_Handler);
 ;               any other mode goes to DefaultHandler.
 ;   otherwise   DefaultHandler.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00. The
+; warp path never returns; the others return (or tail-jump) with M=1,
+; X=0 and DP=$0100.
 ; ============================================================
 org $C00C76
 Field_SceneChangeTick:
@@ -5251,10 +5285,10 @@ Field_SceneChangeTick:
     LDA.b !Field_FadeFlags
     BEQ .chk_transition      ; no fade running
     BIT.b #!FadeFlag_Brightness
-    BEQ .chk_flag8
+    BEQ .chk_fixed_color
     JSR Fade_StepBrightness
     LDA.b !Field_FadeFlags
-.chk_flag8:
+.chk_fixed_color:
     BIT.b #!FadeFlag_FixedColor
     BEQ .chk_transition
     JSR Fade_StepFixedColor
@@ -5265,7 +5299,7 @@ Field_SceneChangeTick:
     RTS                      ; nothing pending — fast exit
 
 .has_transition:
-    BPL .positive_17         ; bit 7 clear → bits 6/4 paths
+    BPL .not_warp            ; bit 7 clear → bits 6/4 paths
 
     ; --- Bit 7: fade out, then warp to Loc_Dest* ---
     LDA.b !Fade_Brightness
@@ -5292,15 +5326,15 @@ Field_SceneChangeTick:
     STX.b !Loc_EntryX
     LDA.b !Loc_DestFacing
     STA.b !Loc_EntryFacing
-    LDX.w #!StackTop         ; reset the stack (earlier listings split
-    TXS                      ; these 4 bytes as LDX #$FF / ASL $9A)
+    LDX.w #!StackTop
+    TXS                      ; reset the stack: the warp never returns
     BRL ReentryVectors       ; → GameLoop_Main (warm restart into the new location)
 
-    ; --- Positive $17 path ---
-.positive_17:
+    ; --- Bit 7 clear: bit 6 (reload through bank $C2) or bit 4 ---
+.not_warp:
     BIT.b #!SceneFlag_Reload
     BNE .run_fade_loop       ; bit 6 set → fade out and reload
-    BRL .chk_bit10           ; bit 6 clear → check bit 4
+    BRL .chk_tile_anim       ; bit 6 clear → check bit 4
 
 .run_fade_loop:
     ; Fade out one brightness step per frame, input disabled
@@ -5324,37 +5358,37 @@ Field_SceneChangeTick:
     JSR Field_SaveState
     TDC
     XBA                      ; B = 0 (dp high byte)
-    LDA.b !Field_ExitMenuArg
-    BEQ .mode_5_setup        ; 0 → argument 5 via Field_RunBankC2Mode5
-    BMI .negative_25         ; bit 7 → argument from bits 7-6
+    LDA.b !Field_BankC2Arg
+    BEQ .arg_5               ; 0 → argument 5 via Field_RunBankC2Mode5
+    BMI .arg_from_bits       ; bit 7 → argument from bits 7-6
 
-    ; $25 positive: choose mode 0 or 6 based on bit 0
+    ; Field_BankC2Arg bit 7 clear: argument 6 if bit 0 is clear, else 0
     BIT #$01
-    BNE .lda_0
+    BNE .arg_0
     LDA.b #!ExitMenu_Mode6
-    BRA .do_jsl_c28000
+    BRA .call_bank_c2
 
-.lda_0:
+.arg_0:
     LDA #$00
-    BRA .do_jsl_c28000
+    BRA .call_bank_c2
 
-.mode_5_setup:
-    LDA.b #!ExitMenu_Mode5
-    BRL Field_RunBankC2Mode5                ; → $19C7 (special warm-restart path)
+.arg_5:
+    LDA.b #!ExitMenu_Mode5   ; (Field_RunBankC2Mode5 loads 5 again itself)
+    BRL Field_RunBankC2Mode5 ; bank-$C2 call with A = 5, then reload
 
-.negative_25:
+.arg_from_bits:
     REP #$20                 ; A → 16-bit
-    AND.w #!Field_ExitArgXMask ; bits 5-0 of Field_ExitMenuArg → X
+    AND.w #!Field_ExitArgXMask ; bits 5-0 of Field_BankC2Arg → X
     TAX
     SEP #$20                 ; A → 8-bit
-    LDA.b !Field_ExitMenuArg
+    LDA.b !Field_BankC2Arg
     ROL
     ROL
     ROL
-    AND #$03                 ; bits 7-6 of Field_ExitMenuArg → A
+    AND #$03                 ; bits 7-6 of Field_BankC2Arg → A
 
-.do_jsl_c28000:
-    JSL BankC2_Entry8000     ; A = argument (callers once guessed "set BG mode")
+.call_bank_c2:
+    JSL BankC2_Entry8000     ; A = argument
     JSR InitHW
     JSR InstallNMI
     JSR InstallIRQ
@@ -5371,40 +5405,40 @@ Field_SceneChangeTick:
     BRL Field_FadeInAfterReload
 
     ; --- Bit 4: tile-animation mode handlers ---
-.chk_bit10:
+.chk_tile_anim:
     BIT.b #!SceneFlag_TileAnim
-    BNE .handle_bit10
+    BNE .run_tile_anim
     BRL DefaultHandler
 
-.handle_bit10:
+.run_tile_anim:
     LDA.b #!SceneFlag_TileAnim
     TRB.b !Field_SceneFlags
-    JSR TileAnimList_AddCurrent ; remember this tile in the $7F:1CC8 list
+    JSR TileAnimList_AddCurrent ; remember this tile in the tile-animation list
     LDX.b !Field_TileAnimX   ; 16-bit: row*256 + column
     LDA.l !Map_TileProps,X   ; mode byte of the tile
     CMP.b #!TileAnim_ModeE6
     BNE .chk_ec
-    BRL ModeE6_Handler                ; → mode-E6 handler ($0D78)
+    BRL ModeE6_Handler
 
 .chk_ec:
     CMP.b #!TileAnim_ModeEC
     BNE .chk_ee
-    BRL ModeEC_Handler                ; → mode-EC handler ($0E5F)
+    BRL ModeEC_Handler
 
 .chk_ee:
     CMP.b #!TileAnim_ModeEE
     BNE .chk_fa
-    BRL ModeEE_Handler                ; → mode-EE handler ($1014)
+    BRL ModeEE_Handler
 
 .chk_fa:
     CMP.b #!TileAnim_ModeFA
     BNE .chk_fc
-    BRL ModeFA_Handler                ; → mode-FA handler ($11C9)
+    BRL ModeFA_Handler
 
 .chk_fc:
     CMP.b #!TileAnim_ModeFC
     BNE .default_mode
-    BRL ModeFC_Handler                ; → mode-FC handler ($1454)
+    BRL ModeFC_Handler
 
 .default_mode:
     BRL DefaultHandler
@@ -5414,53 +5448,57 @@ Field_SceneChangeTick:
 ; (was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit
 ; toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and
 ; clears FadeFlag_Brightness when it gets there (or reaches 0 going down).
-; Called from Field_SceneChangeTick while that flag is set. Earlier notes
-; read this as a scroll tracker; the 0-15 range, the fade-in to 15 in
-; Field_FadeInAfterReload and the pause dimming in
-; Field_PauseAndMenuInput point to screen brightness.
+; Called from Field_SceneChangeTick while that flag is set. The NMI
+; handler writes Fade_Brightness to INIDISP ($C0:EC4E; 0 becomes forced
+; blank), which fixes the name; earlier notes read this as a scroll
+; tracker.
+; On entry: M=1 (8-bit A), X/Y not used, DP=$0100. Exit: M=1.
+;
+; Quirk: the step-up path loads Fade_Brightness and masks it before the
+; INC, which works on memory, so A is dead there (kept from the original).
 ; ============================================================
 org $C01F24
 Fade_StepBrightness:
     LDA.b !Fade_Brightness
     AND.b #!INIDISP_BrightnessMask ; brightness bits only
     CMP.b !Fade_BrightnessTarget
-    BEQ .x_at_target         ; equal → done
-    BCS .x_above             ; above → count down
+    BEQ .at_target           ; equal → done
+    BCS .above               ; above → count down
 
     ; below target: wait out the delay, then step up
     LDA.b !Fade_BrightnessTimer
-    BEQ .x_reload_up         ; delay exhausted → reload and step
+    BEQ .reload_up           ; delay exhausted → reload and step
     DEC.b !Fade_BrightnessTimer
     RTS
 
-.x_reload_up:
+.reload_up:
     LDA.b !Fade_BrightnessDelay
     STA.b !Fade_BrightnessTimer ; reload the delay
     LDA.b !Fade_Brightness
-    AND.b #!INIDISP_BrightnessMask
+    AND.b #!INIDISP_BrightnessMask ; dead: the INC below works on memory
     INC.b !Fade_Brightness   ; step up
     RTS
 
-.x_above:
+.above:
     ; above target: wait out the delay, then step down
     LDA.b !Fade_BrightnessTimer
-    BEQ .x_reload_dn
+    BEQ .reload_dn
     DEC.b !Fade_BrightnessTimer
     RTS
 
-.x_reload_dn:
+.reload_dn:
     LDA.b !Fade_BrightnessDelay
     STA.b !Fade_BrightnessTimer
     LDA.b !Fade_Brightness
     DEC
-    BEQ .x_at_target_store   ; reached 0 → also done
+    BEQ .at_zero             ; reached 0 → also done
     STA.b !Fade_Brightness
     RTS
 
-.x_at_target_store:
+.at_zero:
     STA.b !Fade_Brightness
 
-.x_at_target:
+.at_target:
     LDA.b #!FadeFlag_Brightness
     TRB.b !Field_FadeFlags   ; brightness fade done
     RTS
@@ -5470,43 +5508,48 @@ Fade_StepBrightness:
 ; (was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit
 ; toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and
 ; clears FadeFlag_FixedColor when it gets there. Called from
-; Field_SceneChangeTick while that flag is set. (Earlier notes read
-; this as a scroll-Y tracker; its load value $E0 is a COLDATA value.)
+; Field_SceneChangeTick while that flag is set. The NMI handler writes
+; Fade_FixedColor to COLDATA ($C0:EC42), which fixes the name; earlier
+; notes read this as a scroll-Y tracker.
+; On entry: M=1 (8-bit A), X/Y not used, DP=$0100. Exit: M=1.
+;
+; Quirk: both step paths load Fade_FixedColor before an INC/DEC that
+; works on memory, so that A is dead (kept from the original).
 ; ============================================================
 org $C01F5A
 Fade_StepFixedColor:
     LDA.b !Fade_FixedColor
     CMP.b !Fade_FixedColorTarget
-    BEQ .y_at_target         ; equal → done
-    BCS .y_above             ; above → count down
+    BEQ .at_target           ; equal → done
+    BCS .above               ; above → count down
 
     ; below target
     LDA.b !Fade_FixedColorTimer
-    BEQ .y_reload_up
+    BEQ .reload_up
     DEC.b !Fade_FixedColorTimer
     RTS
 
-.y_reload_up:
+.reload_up:
     LDA.b !Fade_FixedColorDelay
     STA.b !Fade_FixedColorTimer
-    LDA.b !Fade_FixedColor
+    LDA.b !Fade_FixedColor   ; dead: the INC below works on memory
     INC.b !Fade_FixedColor   ; step up
     RTS
 
-.y_above:
+.above:
     LDA.b !Fade_FixedColorTimer
-    BEQ .y_reload_dn
+    BEQ .reload_dn
     DEC.b !Fade_FixedColorTimer
     RTS
 
-.y_reload_dn:
+.reload_dn:
     LDA.b !Fade_FixedColorDelay
     STA.b !Fade_FixedColorTimer
-    LDA.b !Fade_FixedColor
+    LDA.b !Fade_FixedColor   ; dead: the DEC below works on memory
     DEC.b !Fade_FixedColor   ; step down
     RTS
 
-.y_at_target:
+.at_target:
     LDA.b #!FadeFlag_FixedColor
     TRB.b !Field_FadeFlags   ; fixed-colour fade done
     RTS
@@ -5516,6 +5559,9 @@ Fade_StepFixedColor:
 ; Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0
 ; since M7A=M7B=0). Caller sets DmaFill_Dest / DmaFill_Bank /
 ; DmaFill_Size first.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: DmaFill_Dest and
+; DmaFill_Size are word loads), DP=$0100 (the DmaFill_* names are dp
+; offsets), DB=$00 (absolute register stores). Exit: same.
 ; ============================================================
 org $C02DF1
 ClearRAMDMA:
@@ -5539,11 +5585,13 @@ ClearRAMDMA:
     RTS
 
 ; ============================================================
-; $C0:B192 — Obj_ResetStates (30 bytes, $B192–$B1B1)
+; $C0:B192 — Obj_ResetStates (32 bytes, $B192–$B1B1)
 ; (was Sub_B192.) Clears Obj_State for every object the location
 ; defines (count in Evt_ObjCount), pointing DP at the Obj_State table
 ; so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll
-; (which sets $0BC0-$0BC7 to $80). Called at the end of every reload.
+; (which marks every SprBuf_Owner entry free). Called at the end of
+; every reload. The DEC/BNE count assumes Evt_ObjCount >= 1: a count of
+; 0 would run 256 times, with the 8-bit Y wrapping round the page.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0B192
@@ -5565,12 +5613,13 @@ Obj_ResetStates:
     BNE .zero_loop
     REP #$10                ; X,Y → 16-bit
     PLD
-    BRL SprBuf_FreeAll            ; sets $0BC0-$0BC7 to $80
+    BRL SprBuf_FreeAll      ; marks every SprBuf_Owner entry free
 
 ; ============================================================
-; $C0:B271 — PostVBlank (152 bytes)
-; Rebuilds the OAM shadow ($0700 low table, $0900 high table) for
-; the frame. The shadow is split into three ranges, each with a
+; $C0:B271 — Oam_BuildShadow (152 bytes)
+; (was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high
+; table) for the next frame; it runs before Sub_EC60's wait for the
+; NMI, not after a VBlank. The shadow is split into three ranges, each with a
 ; low-table pointer (Oam_RangeNLoPtr) and a high-table pointer
 ; (Oam_RangeNHiPtr); Spr_AppendToOam appends each object's tiles to the range
 ; chosen by its flags. Objects are visited bucket by bucket from
@@ -5578,12 +5627,13 @@ Obj_ResetStates:
 ; Afterwards, entries between each range's new end and last frame's
 ; end (Oam_RangeNPrevEnd) are parked off screen with Y = $E0.
 ;
-; Entered via BRL tail-call from VBlankHandler ($C0:00BF), DP=$0100.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y).
-; RTS returns to VBlankHandler's caller.
+; Entered via BRL tail-call from Field_EndOfFrame.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
+; absolute stores to OamEntry and WMADDH need bank $00).
+; Exit: same; RTS returns to Field_EndOfFrame's caller.
 ; ============================================================
 org $C0B271
-PostVBlank:
+Oam_BuildShadow:
     LDX.w #!Oam_Range3HiStart
     STX.b !Oam_Range3HiPtr
     LDX #$0000
@@ -5606,22 +5656,22 @@ PostVBlank:
     LDX.w #!Oam_Range2Start
     STX.b !Oam_Range2LoPtr
     LDY.w #!Obj_DrawBucketLast ; 64 buckets x 2, last first
-PV_SpriteLoop:
+PV_BucketLoop:              ; (was PV_SpriteLoop) one Obj_DrawBucket entry
     LDA.w !Obj_DrawBucket,Y
-    BMI PV_NextSprite       ; bit 7: empty bucket
+    BMI PV_NextBucket       ; bit 7: empty bucket
     STA.b !Obj_Cur          ; first object in the bucket
     JSR Spr_AppendToOam
 PV_CheckChain:
     LDX.b !Obj_Cur
     LDA.w !Obj_DrawNext,X   ; next object in the same bucket
-    BMI PV_NextSprite
+    BMI PV_NextBucket
     STA.b !Obj_Cur
     JSR Spr_AppendToOam
     BRA PV_CheckChain
-PV_NextSprite:
+PV_NextBucket:              ; (was PV_NextSprite)
     DEY
     DEY
-    BPL PV_SpriteLoop
+    BPL PV_BucketLoop
     LDX.b !Oam_Range1LoPtr
     LDA.b #!Oam_HiddenY     ; Y=$E0 parks the entry below the screen
 PV_FillRange1:
@@ -5671,10 +5721,12 @@ PV_EndRange3:
 ; $C0:1B90 — Audio_PlayTileSfxA (23 bytes, $1B90–$1BA6)
 ; (was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the
 ; sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id,
-; Arg1 = the party leader's Obj_SfxArg. Called from the Mode*_Handler
-; tile animations. Audio_PlaySfxAtLeader (was Sub_1B90_body) is the
-; shared tail, entered by Audio_PlayTileSfxB with its own effect id.
-; On entry: M=1 (A=8-bit), X/Y=16-bit.
+; Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for
+; panning). Called from the Mode*_Handler tile animations.
+; Audio_PlaySfxAtLeader (was Sub_1B90_body) is the shared tail, entered
+; by Audio_PlayTileSfxB with its own effect id in A.
+; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Audio_SfxTileAnimA
+; and Party_ObjSlot are dp), DB=$00.
 ; ============================================================
 org $C01B90
 Audio_PlayTileSfxA:
@@ -5697,7 +5749,8 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; Clears Field_Unk1E and Field_FadeBusy on exit. Tail of
 ; Field_SceneChangeTick's reload path; also called after the
 ; bank-$C2 round trips.
-; On entry: M=1 (A=8-bit), X/Y=16-bit.
+; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
+; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
 ; ============================================================
 org $C02824
 Field_FadeInAfterReload:
@@ -5711,7 +5764,7 @@ Field_FadeInAfterReload:
     JSR Field_FrameUpdate
     PLA
     STA.b !Field_ControlEnabled
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     JSR Sub_EC60
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax
@@ -5736,18 +5789,19 @@ Field_FadeInAfterReload:
 ;   Pad_Pressed layout) → if control is enabled and Field_Unk62 /
 ;   Field_Unk10 are 0, fade out, save the field, call
 ;   BankC2_Entry8000 with A = 1 (TDC/XBA leaves DP's high byte in A;
-;   very likely the main menu), and reload; otherwise run Sub_1ADF
-;   when Field_Unk62 is set.
+;   very likely the main menu), and reload. When bit 6 is clear, run
+;   Sub_1ADF if Field_Unk62 is set.
+; Exit: M=1, X/Y 16-bit, DP=$0100.
 ; ============================================================
 org $C018D9
 Field_PauseAndMenuInput:
     LDA.w !Pad_Pressed
     BIT.b #!Pad_Start
-    BEQ .after_wait      ; Start not pressed
+    BEQ .chk_pad_f6      ; Start not pressed
     LDA.b !Field_Unk11
-    BNE .after_wait
+    BNE .chk_pad_f6
     LDA.b !Field_ControlEnabled
-    BEQ .after_wait
+    BEQ .chk_pad_f6
     ; Pause: dim to half brightness until Start is pressed again
     LDA.b !Fade_Brightness
     STA.b !Fade_BrightnessSaved
@@ -5755,11 +5809,11 @@ Field_PauseAndMenuInput:
     STA.b !Fade_Brightness
     LDA.b #!Field_FadeBusyOn
     STA.w !Field_FadeBusy
-.wait_loop:
+.pause_loop:
     JSR Sub_EC60
     LDA.w !Pad_Pressed
     BIT.b #!Pad_Start
-    BNE .wait_exit       ; Start pressed again → resume
+    BNE .unpause         ; Start pressed again → resume
     LDA.b !Fade_BrightnessSaved
     LSR
     STA.b !Fade_Brightness
@@ -5767,12 +5821,12 @@ Field_PauseAndMenuInput:
     JSL EngFD_UnkC2C1
     STZ.b !Field_Unk53
     REP #$10
-    BRA .wait_loop
-.wait_exit:
+    BRA .pause_loop
+.unpause:
     LDA.b !Fade_BrightnessSaved
     STA.b !Fade_Brightness
     STZ.w !Field_FadeBusy
-.after_wait:
+.chk_pad_f6:
     LDA.w !Pad_Unk00F6
     BIT.b #!Pad_Unk00F6Mode5
     BEQ .no_mode5
@@ -5780,25 +5834,24 @@ Field_PauseAndMenuInput:
     LDA.w !Pad_Unk00F6
 .no_mode5:
     BIT.b #!Pad_Unk00F6Menu
-    BNE .bit6_set
+    BNE .menu_request
     LDA.b !Field_Unk62
     BEQ .done
     JSR Sub_1ADF
 .done:
     RTS
-.bit6_set:
+.menu_request:
     LDA.b !Field_ControlEnabled
-    BNE .chk_62
+    BNE .chk_unk62
     RTS
-.chk_62:
+.chk_unk62:
     LDA.b !Field_Unk62
-    BEQ .chk_10
+    BEQ .chk_unk10
     RTS
-.chk_10:
+.chk_unk10:
     LDA.b !Field_Unk10
-    BEQ .do_reinit
+    BEQ .fade_loop
     RTS
-.do_reinit:
 .fade_loop:
     LDA.b #!Field_FadeBusyOn
     STA.w !Field_FadeBusy ; (set again every frame)
@@ -5838,7 +5891,8 @@ Field_PauseAndMenuInput:
 ; its bits 0-1. Otherwise, if Eng_Unk7F0000 >= $49, control is enabled
 ; and Field_Unk62 / Field_Unk10 are 0, it fades out (one step per
 ; frame), saves the field and falls through to Field_RunBankC2Mode5.
-; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
+; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100, DB=$00.
+; Exit: M=1, X/Y 16-bit, DP=$0100 on every path.
 ; ============================================================
 org $C01985
 Field_FadeToBankC2Mode5:
@@ -5851,21 +5905,20 @@ Field_FadeToBankC2Mode5:
     LDA.l !Eng_Unk7F0000
     SEC
     SBC.b #!Eng_Unk7F0000Min
-    BCS .chk_1F          ; ≥ $49 → continue
+    BCS .chk_control     ; ≥ Eng_Unk7F0000Min → continue
     RTS
-.chk_1F:
+.chk_control:
     LDA.b !Field_ControlEnabled
-    BNE .chk_62          ; non-zero → continue
+    BNE .chk_unk62       ; non-zero → continue
     RTS
-.chk_62:
+.chk_unk62:
     LDA.b !Field_Unk62
-    BEQ .chk_10          ; zero → continue
+    BEQ .chk_unk10       ; zero → continue
     RTS
-.chk_10:
+.chk_unk10:
     LDA.b !Field_Unk10
-    BEQ .do_fade         ; zero → proceed
+    BEQ .fade_loop       ; zero → proceed
     RTS
-.do_fade:
 .fade_loop:
     LDA.b #!Field_FadeBusyOn
     STA.w !Field_FadeBusy ; (set again every frame)
@@ -5890,7 +5943,7 @@ Field_FadeToBankC2Mode5:
 ; the field: restore state, re-init changed party members, move a
 ; pending SceneFlag_Reload over to FadeFlag_Reloaded, reset object
 ; states and fade in. Reached from Field_SceneChangeTick (when
-; Field_ExitMenuArg is 0) and by fall-through from
+; Field_BankC2Arg is 0) and by fall-through from
 ; Field_FadeToBankC2Mode5. On entry: M=1 (A=8-bit), X/Y=16-bit.
 ; ============================================================
 org $C019C7
@@ -5928,58 +5981,59 @@ Field_RunBankC2Mode5:
 ; (was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no
 ; longer matches the copy taken at load (Party_MembersCache), re-run
 ; the init function of every character object that exists
-; (Chr_ObjSlot, order $8D $8E $8F $91 $90 $92 $93) and refresh the
-; copy. Earlier notes read $7E:2980-2982 as palette colours; they are
-; the party's character ids. Either way, then put the party members
+; (Chr_ObjSlot entries in the order 0, 1, 2, 4, 3, 5, 6) and refresh
+; the copy. Party_Members holds the party's character ids (earlier notes
+; read them as palette colours). Either way, then put the party members
 ; back where Field_SaveState left them (SceneSave_Party*) and restore
 ; Field_UnkAB-AD — the second half of Field_SaveState's work.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: same.
 ; ============================================================
 org $C01A03
 Party_ReinitIfChanged:
     LDA.l !Party_Members
     CMP.b !Party_MembersCache
-    BNE .colors_changed
+    BNE .party_changed
     LDA.l !Party_Members+1
     CMP.b !Party_MembersCache+1
-    BNE .colors_changed
+    BNE .party_changed
     LDA.l !Party_Members+2
     CMP.b !Party_MembersCache+2
-    BNE .colors_changed
+    BNE .party_changed
     RTS                     ; party unchanged → nothing to do
 
-.colors_changed:
+.party_changed:
     STZ.b !Obj_CurHi        ; keep Obj_Cur's high byte 0
     LDA.b !Chr_ObjSlot
-    BMI .chk_8E             ; Obj_None
+    BMI .chk_chr1           ; Obj_None
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_8E:
+.chk_chr1:
     LDA.b !Chr_ObjSlot+1
-    BMI .chk_8F
+    BMI .chk_chr2
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_8F:
+.chk_chr2:
     LDA.b !Chr_ObjSlot+2
-    BMI .chk_91
+    BMI .chk_chr4
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_91:
+.chk_chr4:
     LDA.b !Chr_ObjSlot+4
-    BMI .chk_90
+    BMI .chk_chr3
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_90:
+.chk_chr3:
     LDA.b !Chr_ObjSlot+3
-    BMI .chk_92
+    BMI .chk_chr5
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_92:
+.chk_chr5:
     LDA.b !Chr_ObjSlot+5
-    BMI .chk_93
+    BMI .chk_chr6
     STA.b !Obj_Cur
     JSR Evt_RunObjInit
-.chk_93:
+.chk_chr6:
     LDA.b !Chr_ObjSlot+6
     BMI .update_cache
     STA.b !Obj_Cur
@@ -6029,7 +6083,8 @@ Party_ReinitIfChanged:
 ; executing opcodes through Evt_OpcodeTable until opcode $00. Each
 ; opcode handler gets Y = the opcode's offset and must return with X
 ; at the next opcode. (Earlier notes called the opcodes "entity type
-; bytes".) Called from Field_RestoreState.
+; bytes".) Called from Field_RestoreState, Scene_Unk0283 ($C0:0330)
+; and Scene_PostLoadInit ($C0:56C8, on every location load).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0595C
@@ -6111,7 +6166,7 @@ Evt_RunObjInit:
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
 ; Leaf routine run by Field_PauseAndMenuInput when Field_Unk62 is set
 ; (and Pad_Unk00F6 bit 6 is clear); A = Field_Unk62.
-; On entry: M=1, X/Y 16-bit, DP=$0100.
+; On entry: M=1, X/Y 16-bit, DP=$0100, DB=$00. Exit: same.
 ;
 ; A=1    → if Pad_Unk00F6 bit 7 is set, clear Field_Unk34.
 ; A=2    → Pad_Unk00F7 bit 2 steps Field_Unk63 up (wrapping from
@@ -6127,20 +6182,20 @@ Sub_1ADF:
     CMP #$01
     BEQ .chk_flags       ; A=1
     CMP #$02
-    BNE .update_mode63   ; A≠1,2
+    BNE .force_unk63     ; A≠1,2
     ; A=2
     LDA.w !Pad_Unk00F7
     BIT.b #!Pad_HiDown
-    BNE .inc_mode63
+    BNE .step_up
     BIT.b #!Pad_HiUp
-    BNE .dec_mode63
+    BNE .step_down
     LDA.w !Pad_Unk00F8
     BIT.b #!Pad_Unk00F8Bit7
-    BEQ .rts2
+    BEQ .done
     LDA #$03
     STA.b !Field_Unk62
     RTS
-.update_mode63:          ; A≠1,2
+.force_unk63:           ; A≠1,2
     LDA.b !Field_Unk63
     BMI .chk_flags       ; negative → leave it
     CMP #$04
@@ -6151,32 +6206,32 @@ Sub_1ADF:
 .chk_flags:
     LDA.w !Pad_Unk00F6
     BIT.b #!Pad_Unk00F6Bit7
-    BEQ .rts2            ; bit 7 clear → leave Field_Unk34
+    BEQ .done            ; bit 7 clear → leave Field_Unk34
     LDX #$0000
     STX.b !Field_Unk34
-.rts2:                   ; $1B18
+.done:
     RTS
-.inc_mode63:             ; $1B19
+.step_up:                ; past Field_Unk65 → wrap to Field_Unk64
     LDA.b !Field_Unk63
     INC A
     CMP.b !Field_Unk65
-    BEQ .store_63
-    BCS .use_64_val
-.store_63:               ; $1B22
+    BEQ .store
+    BCS .wrap_to_low
+.store:
     STA.b !Field_Unk63
     RTS
-.use_64_val:             ; $1B25
+.wrap_to_low:
     LDA.b !Field_Unk64
-    BRA .store_63
-.dec_mode63:             ; $1B29
+    BRA .store
+.step_down:              ; below Field_Unk64 (or from 0) → wrap to Field_Unk65
     LDA.b !Field_Unk63
-    BEQ .use_65_val
+    BEQ .wrap_to_high
     DEC A
     CMP.b !Field_Unk64
-    BCS .store_63
-.use_65_val:             ; $1B32
+    BCS .store
+.wrap_to_high:
     LDA.b !Field_Unk65
-    BRA .store_63
+    BRA .store
 
 ; ============================================================
 ; $C0:0D78 — ModeE6_Handler (231 bytes, $0D78–$0E5E)
@@ -7594,7 +7649,7 @@ ModeFC_Handler:
 ;         Field_TileStepX/Y if its state is $FE or $E0, play
 ;         Audio_SfxTileAnimB and queue its four 8x8-tile VRAM
 ;         addresses in TileAnim_StepVramAddrs (VramQueue_TileStep).
-;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + VBlankHandler
+;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + Field_EndOfFrame
 ;         frames until Field_Unk38 clears, then redraw map layers
 ;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
 ;         tail into Sub_EC60.
@@ -7701,13 +7756,13 @@ DefaultHandler:
     LDA.b #!SceneFlag_MapRedraw
     TRB.b !Field_SceneFlags
 
-    ; Run Field_Unk885A + VBlankHandler frames until it clears Field_Unk38
+    ; Run Field_Unk885A + Field_EndOfFrame frames until it clears Field_Unk38
     LDA #$01
     STA.b !Field_Unk38
 
 .loop_885A:
     JSR Field_Unk885A
-    JSR VBlankHandler
+    JSR Field_EndOfFrame
     LDA.b !Field_Unk38
     BEQ .loop_done
     JSR Sub_EC60
@@ -7732,12 +7787,12 @@ DefaultHandler:
     JSR Field_BuildC800Mode1
     PLD
     JSR Field_Unk74D4
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$01
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
     BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
@@ -7754,12 +7809,12 @@ DefaultHandler:
     JSR Field_BuildC800Mode2
     PLD
     JSR Field_Unk74E8
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$02
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
     BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
@@ -7778,7 +7833,7 @@ DefaultHandler:
     SEP #$20
     JSR Field_BuildC800Mode1
     PLD
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$03
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
@@ -7799,7 +7854,7 @@ DefaultHandler:
     PLD
     JSR Field_Unk74D4
     JSR Field_Unk74E8
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$02
     STA.b !Field_MapRedrawDone
     JSR Sub_EC60
@@ -7818,11 +7873,11 @@ DefaultHandler:
     STX.b !Map_TilemapVram2-!DP_Map
     PLD
     JSR Field_Unk74D4
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$01
     STA.b !Field_MapRedrawDone
     JSR Sub_EC60
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
     BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
@@ -7839,12 +7894,12 @@ DefaultHandler:
     JSR Field_BuildC800Mode4
     PLD
     JSR Field_Unk74F7
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA #$04
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
     JSR Sub_EC60
 
@@ -7862,7 +7917,7 @@ DefaultHandler:
     JSL ScrollStepAccum
     LDA.b #!Field_Unk53Bit7
     TSB.b !Field_Unk53
-    JSR VBlankHandlerShort
+    JSR Field_EndOfFrameShort
     LDA.b #!Field_Unk53Bit7
     TRB.b !Field_Unk53
     JSR Sub_EC60
@@ -7897,7 +7952,8 @@ DefaultHandler:
 ; (was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as
 ; Audio_PlayTileSfxA with the other effect id, sharing its tail
 ; Audio_PlaySfxAtLeader. Called from DefaultHandler.
-; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit).
+; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100
+; (Audio_SfxTileAnimB is dp), DB=$00.
 ; ============================================================
 org $C01BA7
 Audio_PlayTileSfxB:

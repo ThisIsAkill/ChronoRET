@@ -12,8 +12,8 @@
       "bytes": 29032
     },
     "verified": {
-      "functions": 75,
-      "bytes": 2059
+      "functions": 74,
+      "bytes": 2045
     }
   },
   "banks": [
@@ -30,8 +30,8 @@
         "bytes": 19585
       },
       "verified": {
-        "functions": 28,
-        "bytes": 267
+        "functions": 27,
+        "bytes": 253
       }
     },
     {
@@ -79,11 +79,11 @@
         "ReentryVectors",
         "GameLoop",
         "GameLoop_Main",
-        "GL_ModeOk1",
-        "GL_ModeOk2",
+        "GameLoop_NotBankC2",
+        "GameLoop_LoadField",
         "GameLoop_FrameBody",
-        "VBlankHandler",
-        "VBlankHandlerShort",
+        "Field_EndOfFrame",
+        "Field_EndOfFrameShort",
         "Field_IdleFrame",
         "LoadLocation",
         "Field_SaveState",
@@ -93,7 +93,7 @@
         "InitHW",
         "InstallNMI",
         "InstallIRQ",
-        "FrameStateInit",
+        "Field_InitLoadState",
         "Field_SceneChangeTick",
         "ModeE6_Handler",
         "ModeEC_Handler"
@@ -198,10 +198,10 @@
       "emitted_bytes": 3503,
       "functions": [
         "Obj_ResetStates",
-        "PostVBlank",
-        "PV_SpriteLoop",
+        "Oam_BuildShadow",
+        "PV_BucketLoop",
         "PV_CheckChain",
-        "PV_NextSprite",
+        "PV_NextBucket",
         "PV_FillRange1",
         "PV_EndRange1",
         "PV_FillRange2",
