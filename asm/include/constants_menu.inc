@@ -162,6 +162,19 @@ if !constants_menu_inc == 0
 !C2Scene_ColRowStep = 4                  ; buffer bytes per metatile row (two tile words)
 !C2Scene_MapScreenCols = $20             ; tile columns in the left 32x32 screen of a 64x32 map
 !C2Scene_MapScreen2Skip = $03E0          ; added to reach the right screen: $400 words - 32
+; BG layer scroll (C2Scene_Unk0568 / C2Scene_Unk066C and their edge builders)
+!C2Scene_PxInTileMask = $0007            ; pixel bits within one tile
+!C2Scene_MapHeightPx = (!C2Scene_MapHeightMask+1) ; 1024: BG pixel Y of a layer wraps here
+!C2Scene_EdgeAheadCols = $20             ; the column built on a scroll right: 32 tiles right of the edge
+!C2Scene_EdgeAheadRows = $1C             ; the row built on a scroll down: 28 tiles (224 px) below it
+!C2Scene_EdgeRightPx = $0100             ; its pixel X: 256 px right of the scroll
+!C2Scene_EdgeBottomPx = $00E0            ; its pixel Y: 224 px below the scroll
+!C2Scene_EdgeColTiles = $1E              ; tiles built per column (30: 240 px)
+!C2Scene_EdgeRowTiles = $22              ; tiles built per row (34: 272 px)
+!C2Scene_PxTileRowMask = $00F8           ; pixel Y bits giving the tile row within 256 px
+!C2Scene_PxTileColMask = $01F8           ; pixel X bits giving the tile column within 512 px
+!C2Scene_RowBufMask = $7F                ; byte offset wraps within one 64-tile row
+!C2Scene_RowBufHalf = $40                ; bytes of one 32x32 screen's part of a row (32 words)
 
 ; --- Scene tasks and sprite list ---
 !C2Scene_TaskSize = $40                  ; bytes per C2Scene_Task record
@@ -207,7 +220,7 @@ if !constants_menu_inc == 0
 !C2Scene_ModeUnk2 = 2                    ; C2Scene_Mode set by C2Script_GoToLocation (C2Scene_Mode2:
                                          ; restores the flag tail and turns the NMI off; probably leaves
                                          ; the scene)
-!C2SceneRom_TurnAround = $C22509         ; 4 B: facing 0-3 -> 1, 0, 3, 2 (the facing EOR 1, as the field's
+!C2SceneRom_TurnAround = C2Scene_TurnAround ; 4 B at $C2:2509: facing 0-3 -> 1, 0, 3, 2 (the facing EOR 1, as the field's
                                          ; Loc_ReturnFacing; read by C2Script_GoToLocation)
 !C2Scene_NoBg3PanBit0 = $10              ; C2Scene_FlagTailCopy byte 0 bit 4: C2Script_ScrollFrames leaves
                                          ; BG3 alone (as do the two below; meaning not traced)
@@ -249,6 +262,35 @@ if !constants_menu_inc == 0
 !C2Scene_MosaicSizeStep = $10            ; one step of the size
 !C2Scene_SoundCmdQueued = 1             ; C2Scene_SoundCmdState: a command waits in the driver block
 !C2Scene_SoundCmdSending = $FF           ; C2Scene_SoundCmdState while the command is being sent
+; --- Scene modes (C2Scene_ModeTable's handlers) ---
+!C2Scene_ModeIdle1 = 1                   ; C2Scene_Mode the handlers of modes 3, 5, 6, 8 and 9 set when done
+                                         ; (an idle mode: C2Scene_ModeIdle)
+!C2Scene_ModeMenu = 5                    ; the mode that calls BankC2_Entry8000 with C2Scene_MenuArgMenu (9
+                                         ; passes ExitMenu_Mode5)
+!C2Scene_ModeIdle7 = 7                   ; the third idle mode (C2Scene_ModeIdle)
+!C2Scene_MenuArgMenu = 1                 ; BankC2_Entry8000 argument of mode 5, the value the field passes on
+                                         ; a menu request ($C0:1960); probably the main menu
+!C2Scene_ListANoLoc = $01FF              ; C2Scene_ListAEntry.Loc AND C2Scene_LocIdMask = this: no location;
+                                         ; .EntryX then picks a C2Scene_ListD script (C2Scene_Mode3)
+!C2Scene_FadeOutWaitFrames = $12         ; frames C2Scene_Mode3 and C2Scene_Mode8 wait for C2Scene_ScrFadeOut
+!C2Scene_FadeWaitFrames = $11            ; frames modes 5 and 9 wait for each fade script, mode 8 after its
+                                         ; fade-in
+!C2Scene_Unk7F01F4Bits = $0A             ; C2Scene_Unk7F01F4 bits 1 and 3: C2Scene_Mode8 skips its reload
+!C2Scene_Unk7F01F5Bit1 = $02             ; C2Scene_Unk7F01F5 bit 1: likewise
+!C2Scene_Mode6OutFrames = $22            ; frames C2Scene_Mode6 waits for C2Scene_ScrMosaicFadeOut
+!C2Scene_Mode6InFrames = $29             ; and for C2Scene_ScrMosaicFadeIn
+!C2Scene_SoundCmd81 = $81                ; sound commands sent here; meanings not traced ($81 with arguments
+!C2Scene_SoundCmd82 = $82                ; $0C,$00 and later $00,$FF looks like a volume fade out and back)
+!C2Scene_SoundCmd83 = $83
+!C2Scene_SoundArg80 = $80                ; third argument byte of the zone songs' C2Scene_SoundCmd10 (meaning
+                                         ; not traced; script ops $3D/$4A pass $FF there)
+!C2Scene_SoundFadeArg = $0C              ; first argument of the zone task's first C2Scene_SoundCmd81
+!C2Scene_ZoneNone = $FF                  ; C2Scene_SoundZone: no zone looked up
+!C2Scene_ZoneFadeFrames = $3C            ; frames the zone task waits between the two commands (60)
+!C2Scene_ZoneRowBytes = $30              ; bytes per row of the zone map (96 metatiles, 4 bits each)
+!C2Scene_ZoneMask = $0F                  ; a zone number (one nibble)
+!C2Scene_ViewMidCol = 8                  ; metatiles from BG1's left edge to the middle of the view (128 px)
+!C2Scene_ViewMidRow = 7                  ; and from its top (112 px)
 
 ; --- Joypad and play time ---
 !Menu_Dp = $0000                         ; direct page of the pad reader (and of the menu and scene code)

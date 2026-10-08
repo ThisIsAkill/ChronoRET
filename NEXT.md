@@ -145,19 +145,34 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    fade task `C2Scene_TaskPalFade`, the screen fades `C2Scene_TaskUnk20A2`/`2105` (ops
    $28/$29) and the mosaic tasks `C2Scene_TaskUnk2194`/`21F8` (ops $2B/$2A)
    ($C2:1CF5-$C2:2259, without the matched $C2:1DB5), and the sound command queue
-   `C2Scene_QueueSoundCmd` ($C2:2ED9-$C2:2F0E). The six task handlers and their spawn ops
+   `C2Scene_QueueSoundCmd` ($C2:2ED9-$C2:2F0E). Also matched: the layer scrolls
+   `C2Scene_Unk0568`/`C2Scene_Unk066C` with the edge builders `C2Scene_EdgeCol*`/`EdgeRow*` and
+   queuers `C2Scene_QueueEdgeCol/Row` ($C2:0568-$C2:09C4); the scene modes
+   `C2Scene_Mode2`-`Mode8` with `C2Scene_TurnAround` ($C2:2402-$C2:26A7); the mode scripts
+   `C2Scene_ScrFadeOut/FadeIn/MosaicFadeOut/MosaicFadeIn` ($C2:2EC1-$C2:2ED8); the sound
+   zones `C2Scene_ZoneSoundAtEntry/AtView`, the task `C2Scene_TaskZoneSound` with its four
+   states and `C2Scene_ZoneSoundQueue` ($C2:2F0F-$C2:309D), and `C2Scene_GetSoundZone`
+   ($C2:62ED-$C2:631E; the $7E:7200 pack starts with a 4-bit zone map). Stale after that
+   batch (verified headers, fix at their next edit): C2Scene_Main ("unmatched mode
+   handlers"), C2Scene_ModeTable ("The others are unmatched"), C2Scene_LayerMetatiles/
+   LayerMaps/LayerVramMaps ("unmatched code at $C2:0576 ..."), C2Scene_TaskSpawnScript,
+   C2Scene_RestoreFlagTail, C2Scene_SaveState, C2Scene_RestoreState, C2Scene_ReloadScene and
+   C2Scene_QueueSoundCmd (callers now in the modes / zone code listed as unmatched). Once
+   C2Script_ScrollFrames is next edited, `C2Scene_Unk0568`/`066C` can become
+   `C2Scene_ScrollLayerX/Y`. The six task handlers and their spawn ops
    (`C2Script_SpawnUnk1CF5` ... `SpawnUnk2194`) keep their `Unk` names so the spawn ops
    (under review) were not touched; once those are reviewed they can take real names
    (TaskUploadTiles, TaskLoadPalette, TaskFadeOut/FadeIn, TaskMosaicShrink/Grow) and their
    headers can drop "not traced". Also stale after this batch: C2Scene_NegateXVel/YVel,
    C2Scene_TaskSpawn* and C2Scene_DrawBgLayer headers still call their now-matched callers in
-   $C2:17D2-$C2:1C83 "unmatched" (fix at their next edit). Open: the script data at
-   $C2:2EC1-$C2:2ED8 (short scripts: fades and mosaics, ops $00, $28-$2B, $38, $52), the other sound-queue callers ($C2:2F88-$C2:3092,
-   $C2:4395, $C2:4A4C) and the routine at $C2:2F0F; what the list entries' bit 7
-   (C2Script_SetListBit7) and C2Scene_Unk7F01ED mean. Next, in reach order: the layer scrolls
-   `C2Scene_Unk0568` / `C2Scene_Unk066C` that `C2Script_ScrollFrames` calls; the scene modes
-   `C2Scene_Mode2`-`C2Scene_Mode8` ($C2:2402-$C2:26A7; they call C2Scene_SaveState,
-   C2Scene_RestoreState and C2Scene_ReloadScene); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
+   $C2:17D2-$C2:1C83 "unmatched" (fix at their next edit). Open: the other sound-queue callers ($C2:4395, $C2:4A4C); who calls
+   `C2Scene_ZoneSoundAtEntry` and spawns `C2Scene_TaskZoneSound` (no reference found;
+   probably scene data), who fills `C2Scene_ZoneSounds` ($1B9B) and what sound commands
+   $10/$81/$82/$83 do; what the list entries' bit 7 (C2Script_SetListBit7) and
+   C2Scene_Unk7F01ED mean; who sets C2Scene_Mode and C2Scene_Unk1B32 (the code at
+   $C2:309E-$C2:3600, which also calls the layer scrolls at $C2:3702-$C2:371E). Next, in
+   reach order: the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode 7, $C2:631F on) and
+   `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
    `$C2:5798` and the data before `TextWin_Init`); the text decoder states
    `TextWin_State0`-`TextWin_State3` ($C2:58B2 on) and the glyph drawer `$C2:5DC4`; the menu's
    own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and

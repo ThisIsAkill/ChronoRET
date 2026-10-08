@@ -248,7 +248,18 @@ endstruct align 8
 !C2Scene_Unk02AE = $02AE                 ; 8-bit; C2Scene_LoadScene copies the byte at Menu_Config+$1E into it;
                                          ; use unknown
 !C2Scene_Unk02B1 = $02B1                 ; 3 B $02B1-$02B3 zeroed by C2Scene_LoadScene; use unknown
-!C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; the first
+                                         ; is the byte offset of the C2Scene_ListA entry C2Scene_Mode3
+                                         ; acts on (who sets it is not matched)
+!C2Scene_Unk1B43 = $1B43                 ; 8-bit; zeroed by C2Scene_Mode3 before a ListD script; use unknown
+!C2Scene_Unk1B45 = $1B45                 ; 16-bit; the address of the ListD script C2Scene_Mode3 started
+                                         ; (also read by unmatched code); use unknown
+!C2Scene_Unk027E = $027E                 ; 8-bit; non-zero keeps the zone task from changing the song
+                                         ; (C2Scene_ZoneSoundWatch); use unknown
+!C2Scene_ZoneSounds = $1B9B              ; bytes indexed by a sound zone (0-15): the argument sent with
+                                         ; C2Scene_SoundCmd10 for it (probably a song). Who fills it is not found
+!C2Scene_SoundZone = $EB                 ; 8-bit dp: the sound zone C2Scene_ZoneSoundWatch last looked up
+                                         ; (C2Scene_ZoneNone: none)
 !C2Scene_ListACount = $1B38              ; 8-bit entry count of C2Scene_ListA (C2Scene_LoadLists)
 !C2Scene_ListBCount = $1B39              ; 8-bit entry count of C2Scene_ListB
 !C2Scene_ListCCount = $1B3A              ; 8-bit entry count of C2Scene_ListC (ListD's count is not kept)
@@ -286,10 +297,16 @@ endstruct align 8
 !C2Scene_Unk7200 = $7E7200               ; C2Scene_LoadUnk7200's pack; use unknown
 !C2Scene_Unk7F01ED = $7F01ED            ; 8-bit in Menu_FlagBlock7F; non-zero makes script op $3D
                                          ; (C2Script_SoundCmd10IfClear) skip its sound command; meaning not traced
-!C2Scene_ListA = $7E7E00                 ; 7-byte entries (C2Scene_LoadLists); use unknown
+!C2Scene_Unk7F01F4 = $7F01F4            ; 8-bit in Menu_FlagBlock7F; bits 1/3 (or bit 1 of the next byte) make
+                                         ; C2Scene_Mode8 skip its reload and fade-in; meaning not traced
+!C2Scene_Unk7F01F5 = $7F01F5            ; 8-bit, the next byte (see C2Scene_Unk7F01F4)
+!C2Scene_ListA = $7E7E00                 ; 7-byte entries (C2Scene_LoadLists; C2Scene_ListAEntry); probably
+                                         ; the scene's exits: C2Scene_Mode3 leaves for the location of
+                                         ; entry C2Scene_Unk1B32 (byte offset)
 !C2Scene_ListC = $7E8180                 ; 3-byte entries; use unknown
 !C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
-!C2Scene_ListD = $7E8480                 ; 2-byte entries; use unknown
+!C2Scene_ListD = $7E8480                 ; 2-byte entries: addresses of scripts in bank $7F (the scene
+                                         ; script's, C2Scene_ScriptBuf), started by C2Scene_Mode3
 !C2Scene_HdmaArea = $7E8621              ; $800 B $7E:8621-$8E20 zeroed by C2Scene_ClearHdmaArea (holds
                                          ; C2Scene_HdmaValues and C2Scene_HdmaTable)
 !C2Scene_UnkB800 = $7EB800               ; C2Scene_LoadUnkB800's pack; use unknown
@@ -433,6 +450,16 @@ endstruct
 
 ; C2Scene_TaskUnk20A2/2105/2194/21F8 (screen fades and mosaic, started by
 ; script ops $28-$2B): the state and what they read from the spawning op.
+; One C2Scene_ListA entry (7 B). Only the fields C2Scene_Mode3 reads are named.
+struct C2Scene_ListAEntry $7E7E00
+.Flags:     skip 1     ; bit 7: C2Scene_ListEntryBit7 (script ops $44/$45)
+            skip 2
+.Loc:       skip 2     ; bits 0-8: a Loc_Id (C2Scene_ListANoLoc: none); the high byte / 2 is the entry
+                       ; facing (as script op $05's argument)
+.EntryX:    skip 1     ; Loc_EntryX; with no location, the C2Scene_ListD index
+.EntryY:    skip 1     ; Loc_EntryY
+endstruct
+
 struct C2Scene_FxTask $0000
             skip 2     ; +$00 .Handler
 .State:     skip 1     ; +$02 (C2Scene_Task.Unk02, 0 from C2Scene_TaskSpawn)
