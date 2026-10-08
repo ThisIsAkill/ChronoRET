@@ -229,6 +229,11 @@ if !constants_menu_inc == 0
 !C2Scene_WholeMinus1 = $FFFF             ; -1 as the whole-pixel word (C2Script_PanKeepFraction)
 !C2Scene_ListEntryBit7 = $80             ; bit 7 of the first byte of a C2Scene_ListA/B/C entry (set and
                                          ; cleared by script ops $44/$45; meaning not traced)
+!C2Scene_ListTileMask = $3F7F            ; the first word of a ListA/B/C entry AND this: tile X (bits 0-6)
+                                         ; and tile Y (bits 8-13), compared with the party's 16-pixel tile
+                                         ; (C2Scene_FindTrigEntries)
+!C2Scene_NoEntry = $FFFF                 ; C2Scene_FindTrigEntries' offset when a list has no entry at the
+                                         ; tile (the same value as C2Scene_Unk1B32Init)
 !C2Scene_ListAEntrySize = 7              ; bytes per C2Scene_ListA entry (C2Scene_LoadLists)
 !C2Scene_ListBCEntrySize = 3             ; bytes per C2Scene_ListB / ListC entry
 !C2Scene_SoundCmd10 = $10                ; sound command sent by script ops $3D/$4A with one argument
@@ -267,6 +272,7 @@ if !constants_menu_inc == 0
                                          ; (an idle mode: C2Scene_ModeIdle)
 !C2Scene_ModeMenu = 5                    ; the mode that calls BankC2_Entry8000 with C2Scene_MenuArgMenu (9
                                          ; passes ExitMenu_Mode5)
+!C2Scene_ModeHalt = 4                    ; C2Scene_Mode4, which never leaves (set by C2Scene_TrigListC)
 !C2Scene_ModeIdle7 = 7                   ; the third idle mode (C2Scene_ModeIdle)
 !C2Scene_MenuArgMenu = 1                 ; BankC2_Entry8000 argument of mode 5, the value the field passes on
                                          ; a menu request ($C0:1960); probably the main menu
@@ -307,5 +313,62 @@ if !constants_menu_inc == 0
 !TextWin_PenXLeft = 8                    ; pen X at the start of a string and for statuses 5, 7, 9, 11
 !TextWin_PenXIndent = $14                ; pen X for statuses 6, 8, 10, 12 (probably an indented line;
                                          ; inferred only from the larger X)
+
+!TextWin_DictPtrs = $DEFA00              ; 16-bit pointers (in bank $DE) to the dictionary sub-strings: a
+                                         ; length byte, then that many glyph bytes (TextWin_State0)
+!TextWinRom_TechNames = $CC15C4          ; 11-byte names (code $12 $00); entry 1 spells "Cyclone" with $A0 =
+                                         ; "A" (TextWin_HexGlyphs) and $BA = "a": probably the techs
+!TextWinRom_EnemyNames = $CC6500         ; 11-byte names (code $12 $01); entry 1 spells "Reptite": probably
+                                         ; the enemies
+!TextWinRom_ItemNames = $CC0B5E          ; 11-byte names, an icon byte first (code $1F, of
+                                         ; Treasure_ItemId); entry 1 spells "Wood" $FF "Sword"
+!TextWin_FirstGlyph = $A0                ; string bytes from here up are glyphs (TextWin_State0)
+!TextWin_FirstDict = $21                 ; bytes $21-$9F are dictionary entries 0-$7E (TextWin_DictPtrs)
+!TextWin_Code12Dict = 8                  ; after code $12, bytes from 8 up are dictionary entries $1F on
+!TextWin_Code12DictBase = $1F
+!TextWin_StatusStepDone = $10            ; TextWin_Status when TextWin_StepCount runs out
+!TextWin_StateDict = 1                   ; TextWin_State values: 1 = a sub-string of glyphs (State1)
+!TextWin_StateDec = 2                    ; 2 = decimal digits 0-9 (State2)
+!TextWin_StateHex = 3                    ; 3 = glyph codes from TextWin_Digits (State3)
+!TextWin_Wide1 = 1                       ; glyph prefixes: the next byte is the low byte of glyph $01xx
+!TextWin_Wide2 = 2                       ; ... or $02xx
+!TextWin_DigitGlyph0 = $D4               ; glyph of the digit 0 (TextWin_HexGlyphs; 1-9 follow)
+!TextWin_RomNameSize = 11                ; bytes per name in TextWinRom_TechNames / EnemyNames / ItemNames
+!TextWin_NamePad = $EF                   ; the byte that pads the ROM names (TextWin_NameLen10/11 stop at it)
+!TextWin_TechIconByte = $2F              ; a tech name starting with this byte has it skipped (an icon?)
+!TextWin_CharNameMax = 5                 ; TextWin_CharNameLen counts up to this many bytes or a 0
+!TextWin_CharNameSize = 6                ; bytes per name at TextWin_CharNames
+!TextWin_FirstCharName = $13             ; codes $13-$19: TextWin_CharNamePtrs entry (code - $13)
+!TextWin_FirstMemberName = $1B           ; codes $1B-$1D: party position (code - $1B)
+!TextWin_NibbleHi = $00F0                ; TextWin_HexByte: the high digit's bits (then / 16 * 2)
+!TextWin_NibbleLo = $000F                ; the low digit's bits
+!TextWin_WideGlyphMin = $0100            ; a TextWin_HexGlyphs entry this high or more is stored as two bytes
+                                         ; (prefix first); none is
+!TextWin_HexDigitCount8 = 2              ; TextWin_SubLeft for code $0D in hexadecimal
+!TextWin_HexDigitCount16 = 4             ; and for code $0E
+!TextWin_StrNadiaLen = 5                 ; bytes TextWin_CodeNadia draws from TextWin_StrNadia
+
+; --- Scene objects and tile triggers (C2Scene_ObjWatch, C2Scene_TrigWatch) ---
+!C2Scene_ObjActive = $80                 ; C2Scene_Unk0294 / C2Scene_ObjBFlags bit 7: the object is tested
+!C2Scene_ObjBusy = $40                   ; bit 6: C2Scene_ObjWatchBusyA/B wait while it is set
+!C2Scene_ObjCountMask = $03              ; bits 0-1: compared with the number of party members
+                                         ; (C2Scene_ObjWatchFull) and with 0 (C2Scene_ObjWatchEmpty)
+!C2Scene_ObjSelA = 2                     ; C2Scene_ObjSel: object A ($0290-$0294)
+!C2Scene_ObjSelB = 3                     ; C2Scene_ObjSel: object B ($029A-$029E)
+!C2Scene_ObjBLocId = $01F3               ; the Loc_Id word object B is tested at (compared unmasked)
+!C2Scene_Flag0ObjAScript = $D2           ; C2Scene_Flag0Copy value with which object A starts
+                                         ; C2Scene_ScrGoToLoc1D8 instead (meaning not traced)
+!C2Scene_ObjWatchStIdle = 0              ; C2Scene_Unk027E states (C2Scene_ObjWatchStates)
+!C2Scene_ObjWatchStBusyA = 2
+!C2Scene_ObjWatchStBusyB = 3
+!C2Scene_ObjWatchStFull = 4
+!C2Scene_ObjWatchStEmpty = 5
+!C2Scene_TrigStWait = 1                  ; C2Scene_Unk0280 state C2Scene_TrigWatchWait (0: check)
+!C2Scene_TrigRecheck = $01               ; C2Scene_TrigFlags bit 0
+!C2Scene_TrigKeep = $02                  ; C2Scene_TrigFlags bit 1
+!C2Scene_TrigTaskState1 = 1              ; the value C2Scene_TrigListA/C put in the current task's .Unk02
+!C2Scene_TrigFoundA = $01                ; C2Scene_TrigFound bits: a ListA entry at the tile
+!C2Scene_TrigFoundC = $02                ; a ListC entry
+!C2Scene_TrigFoundB = $04                ; a ListB entry
 
 endif

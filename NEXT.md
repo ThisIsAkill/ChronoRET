@@ -199,13 +199,34 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    $C2:17D2-$C2:1C83 "unmatched" (fix at their next edit). Open: the other sound-queue callers ($C2:4395, $C2:4A4C); who calls
    `C2Scene_ZoneSoundAtEntry` and spawns `C2Scene_TaskZoneSound` (no reference found;
    probably scene data), who fills `C2Scene_ZoneSounds` ($1B9B) and what sound commands
-   $10/$81/$82/$83 do; what the list entries' bit 7 (C2Script_SetListBit7) and
-   C2Scene_Unk7F01ED mean; who sets C2Scene_Mode and C2Scene_Unk1B32 (the code at
-   $C2:309E-$C2:3600, which also calls the layer scrolls at $C2:3702-$C2:371E). Next, in
-   reach order: the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode 7, $C2:631F on) and
-   `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
-   `$C2:5798` and the data before `TextWin_Init`); the text decoder states
-   `TextWin_State0`-`TextWin_State3` ($C2:58B2 on) and the glyph drawer `$C2:5DC4`; the menu's
+   $10/$81/$82/$83 do; what C2Scene_Unk7F01ED means. Also matched: the scene helpers `C2Scene_Random` and
+   `C2Scene_BoxesOverlap` ($C2:2336-$C2:23A7); the two watchers `C2Scene_ObjWatch` (objects
+   A/B at $0290-$029F, state C2Scene_Unk027E) and `C2Scene_TrigWatch` (tile triggers in
+   ListA/B/C, state C2Scene_Unk0280; sets C2Scene_Unk1B32 and mode 4) with all their states,
+   tables, boxes and the script `C2Scene_ScrGoToLoc1D8` ($C2:309E-$C2:3403), and the list
+   readers `C2Scene_GetListAUnk02/GetListBScript/GetListCUnk03` ($C2:6263-$C2:6290); the text
+   decoder: `TextWin_State0`-`State3` with their exit tables, `TextWin_CodeTable` and all
+   control codes $00-$20 (numbers, names, dictionary, `TextWin_ExtTable`), `TextWin_HexByte`,
+   `TextWin_HexGlyphs`, the name-length and zero-trim helpers ($C2:58B2-$C2:5DC3). Neither
+   watcher has a reference in the bank (probably started from scene data). Stale after that
+   batch (verified headers, fix at their next edit): C2Scene_TaskSpawnScript (calls
+   $C2:3154, $C2:33B2, $C2:33DF unmatched), C2Scene_ClearUnk1B30 ("use not traced":
+   C2Scene_Random's index), TextWin_StateTable ("unmatched") and the banner in
+   TextWin_Init's header ("the text decoder ... is not matched"). Open from it: who sets
+   C2Scene_TrigFlags (bits 0/1), C2Scene_ObjBusy and the objects' counts (the code at
+   $C2:42FC-$C2:5590 reads $0290-$029F heavily), C2Scene_Unk027E state 1, who reads the task
+   byte C2Scene_TrigListA/C set (probably the third watcher at $C2:3404, unreferenced too: it
+   dispatches on C2Scene_Unk027E through $C2:342D, compares C2Scene_Unk027F/0281, runs
+   C2Anim_Run and has handlers out to $C2:3B00 via the tables $C2:345D, $C2:3493, $C2:34A3);
+   C2Scene_Unk1B47 and why C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex.
+   Next, in reach order: that third watcher ($C2:3404-$C2:3BCx, with $C2:3ACB); the glyph
+   drawer `TextWin_DrawGlyph` ($C2:5DC4-$C2:5E35, its blitters $C2:5E36/$C2:5F07, width table
+   $C2:60E6) and the decimal converters `TextWin_Dec8/16/24` ($C2:614B-$C2:6262, with the data
+   `TextWin_CharNamePtrs` $C2:5FD8 and `TextWin_StrNadia` $C2:6146, now stubs); the layer
+   scroll calls at $C2:3702-$C2:371E; the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode
+   7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
+   `$C2:5798` and the data before `TextWin_Init`; its callers at $C2:5700-$C2:5774 read
+   object A); the menu's
    own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
    `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
