@@ -23042,9 +23042,13 @@ BattleSys_Unk8C09:
 ;     (BattleSys_Unk8C09 then leaves the enemy out).
 ; $C1:8C90 (.restart_from_b273) is not reached from the code above (the
 ; BRA before it jumps over it); BattleAi_Choose04 enters there instead
-; (PLY / JMP $8C90 at $C1:995C), which first sets !Battle_UnkB1D4[enemy]
-; = !Battle_UnkB273 (the action part's start) and then goes on at
-; .resume.
+; (PLY / JMP $8C90 at $C1:995C). Choose04 has first moved
+; !Battle_UnkB273 to the action after its own code and, by chance
+; (Battle_RandRange, thresholds 25/50/75), up to three actions further,
+; so !Battle_UnkB1D4[enemy] becomes the action it picked; .resume then
+; runs the choose handler for that action. The PLY drops the return
+; address of this routine's JSR (BattleAi_ChooseTable,X), so the
+; re-entered copy's RTS returns straight to this routine's caller.
 ; Callers (42 JSR sites): BattleAi_Test00 ($C1:8EA7) and unmatched ($C1:8F0D, $C1:8F7C, $C1:8FCF,
 ;   $C1:9008, $C1:903A, $C1:9077, $C1:90B3, $C1:9125, $C1:9183, $C1:91EE, $C1:9252, $C1:9298,
 ;   $C1:9310, $C1:9389, $C1:93D1, $C1:93DB, $C1:941F, $C1:945B, $C1:9469, $C1:94B2, $C1:94C7,
