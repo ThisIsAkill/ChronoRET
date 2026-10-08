@@ -1,98 +1,98 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
-$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,matched,83385beab003,Mid-game JSL re-entry vector table.
-$C0:000E,$C0:005C,79,GameLoop,$C0,Engine,matched,fadd3d61a031,
-$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,matched,cf13d1c3c85f,
-$C0:0072,$C0:007C,11,GL_ModeOk1,$C0,Engine,matched,b7788f5d1a1e,
-$C0:007D,$C0:0096,26,GL_ModeOk2,$C0,Engine,matched,94766b16acb7,
-$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,matched,44d8b6869dd1,
-$C0:00BF,$C0:00DD,31,VBlankHandler,$C0,Engine,matched,ebef2a5541d2,Performs per-VBlank audio + DMA tasks; tail-jumps to PostVBlank.
-$C0:00DE,$C0:00EA,13,VBlankHandlerShort,$C0,Engine,matched,2a441894bf88,
-$C0:00EB,$C0:00F3,9,Sub_00EB,$C0,Engine (unnamed),matched,32986216a091,
-$C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,matched,eefe2ba6f7a7,One-time location-load called once per scene entry from GameLoop_Main.
-$C0:011B,$C0:01A4,138,Sub_011B,$C0,Engine (unnamed),matched,5312c8bb47c8,Build scene context workspace before a scene transition.
-$C0:01A5,$C0:024B,167,Sub_01A5,$C0,Engine (unnamed),matched,a03952e28b5e,Full location engine init after a scene transition.
-$C0:0905,$C0:0917,19,Sub_0905,$C0,Engine (unnamed),matched,3bd65bcb1757,Block-copy $14E0 bytes from $7F:2000 to $00:0920 (= WRAM $7E:0920).
-$C0:0918,$C0:092A,19,Sub_0918,$C0,Engine (unnamed),matched,3ef765be9c7d,Block-copy $14E0 bytes from $00:0920 (= WRAM $7E:0920) to $7F:2000.
-$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,matched,93db7cb3420a,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA."
-$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,matched,920d1d8a63fc,Writes JML $C0:EA63 (5C 63 EA C0) to WRAM $7E:0500.
-$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,matched,7daed1c1e226,Writes JML $C0:ECCC (5C CC EC C0) to WRAM $7E:0504.
-$C0:0B86,$C0:0C75,240,FrameStateInit,$C0,Engine,matched,7999a2cb4456,Called from GameLoop_Main at the start of each scene iteration.
-$C0:0C76,$C0:0D77,258,Sub_0C76,$C0,Engine (unnamed),matched,95c330c0d11e,"Per-frame state-machine controller, called after FrameStateInit."
-$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,matched,f700e0ed039a,Mode-$E6 scroll-map update.
-$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,matched,c3ecc82604b2,Mode-$EC scroll-map update.
-$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,matched,081f2e209cd5,"Scroll mode $EE handler: updates 4 entries in the $7E:3000 layer table, then computes VRAM word-indices for 16 tilemap corners (4 passes × 4 corners), storing to $09CA–$09E8."
-$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,matched,a364b036227c,"Scroll mode $FA handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
-$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,matched,17421958e1d8,"Scroll mode $FC handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
-$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,matched,e5ba29d92e9a,"The ""all other modes"" arm of Sub_0C76's per-frame dispatch."
-$C0:18D9,$C0:1984,172,Sub_18D9,$C0,Engine (unnamed),matched,bfb75816a344,VBlank-sync wait + mode-transition manager.
-$C0:1985,$C0:19C6,66,Sub_1985,$C0,Engine (unnamed),matched,c79800523357,Mode-5 transition guard + fade.
-$C0:19C7,$C0:1A02,60,Sub_19C7,$C0,Engine (unnamed),matched,473d49718cc2,Mode-5 warm-restart.
-$C0:1A03,$C0:1AAB,169,Sub_1A03,$C0,Engine (unnamed),matched,6fcc3ad25bad,Scene display-state restore: sprite color sync + scene table restore.
-$C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),matched,6636df782a98,Mode-index update dispatcher.
-$C0:1B36,$C0:1B52,29,Sub_1B36,$C0,Engine (unnamed),matched,2f3b7fd3a2f5,VRAM tilemap word-index calculator.
-$C0:1B90,$C0:1B91,2,Sub_1B90,$C0,Engine (unnamed),matched,796715edcafd,SPC audio command dispatcher.
-$C0:1B92,$C0:1BA6,21,Sub_1B90_body,$C0,Engine (unnamed),matched,aae5e9c9cd5e,
-$C0:1BA7,$C0:1BAA,4,Sub_1BA7,$C0,Engine (unnamed),matched,219c6b08235b,Variant entry of Sub_1B90 that loads dp:$FB as the first SPC command argument instead of dp:$FC.
-$C0:1F24,$C0:1F59,54,Sub_1F24,$C0,Engine (unnamed),matched,6c481f71dd57,Scroll-X target tracker: moves dp:$19 (low nibble) toward dp:$1B.
-$C0:1F5A,$C0:1F86,45,Sub_1F5A,$C0,Engine (unnamed),matched,b6889f6cc2f6,Scroll-Y target tracker: moves dp:$21 toward dp:$22.
-$C0:2824,$C0:2847,36,Sub_2824,$C0,Engine (unnamed),matched,208bdd1da02e,Post-transition setup/fade loop.
-$C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,matched,993c0ef58c9e,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
-$C0:595C,$C0:597C,33,Sub_595C,$C0,Engine (unnamed),matched,c45444455f8e,Scene entity-table dispatcher.
-$C0:597D,$C0:59D8,92,Sub_597D,$C0,Engine (unnamed),matched,bdf35628fea1,Sprite-slot entity dispatcher and slot-data reset.
-$C0:B192,$C0:B1B1,32,Sub_B192,$C0,Engine (unnamed),matched,b2f36a927669,"Zero $1Bxx sprite table entries, then BRL-tail to Sub_E935."
-$C0:B271,$C0:B2A7,55,PostVBlank,$C0,Engine,matched,de5dac6c9c5f,OAM buffer culling routine.
-$C0:B2A8,$C0:B2B1,10,PV_SpriteLoop,$C0,Engine,matched,123225369af5,
-$C0:B2B2,$C0:B2BF,14,PV_CheckChain,$C0,Engine,matched,f04488ee91f9,
-$C0:B2C0,$C0:B2C7,8,PV_NextSprite,$C0,Engine,matched,bb136ea4b8bc,
-$C0:B2C8,$C0:B2D7,16,PV_FillRange1,$C0,Engine,matched,d647d4ba6b5d,
-$C0:B2D8,$C0:B2DD,6,PV_EndRange1,$C0,Engine,matched,42a5accff791,
-$C0:B2DE,$C0:B2ED,16,PV_FillRange2,$C0,Engine,matched,c699bcabbeaf,
-$C0:B2EE,$C0:B2F3,6,PV_EndRange2,$C0,Engine,matched,eea8aa5ff57b,
-$C0:B2F4,$C0:B303,16,PV_FillRange3,$C0,Engine,matched,5644e3d4a3e6,
-$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,matched,ea99bb0e1d97,
-$C0:B309,$C0:B700,1016,Sub_B309,$C0,Engine (unnamed),matched,3053dea8bf1f,Sprite descriptor → OAM buffer + WRAM palette copy.
-$C0:B701,$C0:B787,135,Sub_B701,$C0,Engine (unnamed),matched,9f55cd141590,Sprite state gate called from Sub_B309.
-$C0:B788,$C0:B8C9,322,Sub_B788,$C0,Engine (unnamed),matched,ca437e13e944,
-$C0:B8CA,$C0:BA64,411,Sub_B8CA,$C0,Engine (unnamed),matched,ab363db7c373,
-$C0:BA65,$C0:BCDB,631,Sub_BA65,$C0,Engine (unnamed),matched,b5bf92d511aa,
-$C0:BCDC,$C0:BFF1,790,Sub_BCDC,$C0,Engine (unnamed),matched,a1f2b83a89d7,
-$C0:BFF2,$C0:C2BE,717,Sub_BFF2,$C0,Engine (unnamed),matched,8380c8f37f1f,
-$C0:C2BF,$C0:C6E6,1064,Sub_C2BF,$C0,Engine (unnamed),matched,780e68c224d2,
-$C0:C6E7,$C0:C739,83,Sub_C6E7,$C0,Engine (unnamed),matched,3e40d1efc82f,
-$C0:C73A,$C0:C989,592,Sub_C73A,$C0,Engine (unnamed),matched,447441b18ecc,
-$C0:C98A,$C0:CA75,236,Obj_AnimTickAndQueue,$C0,Sprites & objects,matched,1ca5ccc24dd4,Per-frame animation tick and sprite-frame queuer.
-$C0:CA76,$C0:CAD8,99,Field_ProcessAnimQueue,$C0,Engine,matched,563f0fce2e56,VBlank-time sprite animation queue processor.
-$C0:CAD9,$C0:CB09,49,Obj_BuildSpriteFrameStep,$C0,Sprites & objects,matched,6229b5fd35d0,Single sprite-frame build step for the current slot ($6D).
-$C0:CB0A,$C0:CB39,48,Sub_CB0A,$C0,Engine (unnamed),matched,48bdac01bd1e,Top-level sprite-slot init dispatcher.
-$C0:CB3A,$C0:CBDB,162,Sub_CB3A,$C0,Engine (unnamed),matched,240c76a65871,Animation-frame gate for sprite-slot init routines.
-$C0:CBDC,$C0:CDC7,492,Sub_CBDC,$C0,Engine (unnamed),matched,c9b427dc9baf,"Single-slot, animation-gated, 16-tile sprite-slot init."
-$C0:CDC8,$C0:CEF4,301,Sub_CDC8,$C0,Engine (unnamed),matched,b5c4d79ce8e3,"Single-slot, no animation gate, OAM-update for $7F:4BC2+slot."
-$C0:CEF5,$C0:D123,559,Sub_CEF5,$C0,Engine (unnamed),matched,2d9e911c5584,"Complex sprite-slot dispatch with three paths: type==3  ($1780,X==$03): full 32-tile dual-slot init via Sub_E97A + 32-entry loop."
-$C0:D124,$C0:D289,358,Sub_D124,$C0,Engine (unnamed),matched,26d9f9724946,"8-slot OAM buffer init, pass-1 path (sprite type 1)."
-$C0:D28A,$C0:D30C,131,Sub_D28A,$C0,Engine (unnamed),matched,20a2063587a3,"Dual-slot, animation-gated, 16-tile sprite-slot init."
-$C0:D30D,$C0:D4F6,490,Sub_D30D,$C0,Engine (unnamed),matched,d21d46f371f4,Dual-slot second-pass: 16 tiles from Y=$20 into VRAM base+$200.
-$C0:D4F7,$C0:D545,79,Sub_D4F7,$C0,Engine (unnamed),matched,fda7db143e92,Triple-slot sprite-init dispatch; analogous to Sub_CEF5 (dual-slot).
-$C0:D546,$C0:D607,194,Sub_D546,$C0,Engine (unnamed),matched,0035cfbc3880,"Triple-slot first-pass, non-$68 variant."
-$C0:D608,$C0:D68A,131,Sub_D608,$C0,Engine (unnamed),matched,099fb666d153,"Triple-slot first-pass, $68 variant (Obj_BuildFrameSize2_Start)."
-$C0:D68B,$C0:D737,173,Sub_D68B,$C0,Engine (unnamed),matched,1292a180f1f0,"Triple-slot pass-1, non-$68 variant."
-$C0:D738,$C0:D7E4,173,Sub_D738,$C0,Engine (unnamed),matched,5ce79524f1fb,"Triple-slot pass-1, $68 variant."
-$C0:D7E5,$C0:DA68,644,Sub_D7E5,$C0,Engine (unnamed),matched,f830ef6113a0,"Triple-slot pass-2+, non-$68 variant."
-$C0:DA69,$C0:DD27,703,Sub_DA69,$C0,Engine (unnamed),matched,4f24a3443285,"Triple-slot pass-2+, $68 variant."
-$C0:DD28,$C0:E129,1026,Sub_DD28,$C0,Engine (unnamed),matched,0bed8b456a44,"12-slot OAM buffer init, pass-1 path (sprite type 2)."
-$C0:E12A,$C0:E533,1034,Sub_E12A,$C0,Engine (unnamed),matched,924dc2b82aef,"Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene data, DMAs it to VRAM (destination word-addr $0400), then populates the OAM staging buffer at $7F:4BC2+X with palette values, tile in"
-$C0:E534,$C0:E686,339,Sub_E534,$C0,Engine (unnamed),matched,41ae445940f4,"FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA."
-$C0:E687,$C0:E738,178,Sub_E687,$C0,Engine (unnamed),matched,dfef32d3121d,Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM graphics bank into WRAM at the address in dp:$D0.
-$C0:E739,$C0:E7BB,131,Sub_E739,$C0,Engine (unnamed),matched,536d1ada9584,Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
-$C0:E7BC,$C0:E83E,131,Sub_E7BC,$C0,Engine (unnamed),matched,ab67e4af407c,Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
-$C0:E83F,$C0:E8C1,131,Sub_E83F,$C0,Engine (unnamed),matched,5ec0fb4af57e,Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
-$C0:E8C2,$C0:E934,115,Sub_E8C2,$C0,Engine (unnamed),matched,9480e0d49641,Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
-$C0:E935,$C0:E951,29,Sub_E935,$C0,Engine (unnamed),matched,070f595d770e,"Initialize 8 sprite-slot ""uninitialized"" flags at $0BC0-$0BC7 to $80."
-$C0:E952,$C0:E979,40,Sub_E952,$C0,Engine (unnamed),matched,3074830cc667,Sprite slot allocator — single-slot variant.
-$C0:E97A,$C0:E9A9,48,Sub_E97A,$C0,Engine (unnamed),matched,c69dc74f7d12,Sprite slot allocator — dual-slot variant.
-$C0:E9AA,$C0:E9E1,56,Sub_E9AA,$C0,Engine (unnamed),matched,07a879cf6e8b,Sprite slot allocator — triple-slot variant.
-$C0:E9E2,$C0:E9FE,29,Sub_E9E2,$C0,Engine (unnamed),matched,3206d2cfabb8,
-$C0:E9FF,$C0:EA1E,32,Sub_E9FF,$C0,Engine (unnamed),matched,e528f5a70bf5,
-$C0:EA1F,$C0:EA41,35,Sub_EA1F,$C0,Engine (unnamed),matched,9cef01f49169,
+$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,readable,2ab26f722fe4,Mid-game JSL re-entry vector table.
+$C0:000E,$C0:005C,79,GameLoop,$C0,Engine,readable,f5d4b62841d5,
+$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,readable,a2f0ee696731,
+$C0:0072,$C0:007C,11,GL_ModeOk1,$C0,Engine,readable,df6e56164d60,
+$C0:007D,$C0:0096,26,GL_ModeOk2,$C0,Engine,readable,52da8d49b120,
+$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,readable,28fff188e796,
+$C0:00BF,$C0:00DD,31,VBlankHandler,$C0,Engine,readable,15772cdb1d16,"End-of-frame work, called once per frame from GameLoop_FrameBody (not an interrupt handler despite the name): Vblank_* helpers, EngFD_UnkC2C1, FdVec_FFF7 (earlier notes: waits for VBlank), Field_Proce"
+$C0:00DE,$C0:00EA,13,VBlankHandlerShort,$C0,Engine,readable,ff47c56b47a0,VBlankHandlerShort: the EngFD_UnkC2C1 + FdVec_FFF7 part only.
+$C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,readable,536f821d6872,"game logic: Field_FrameUpdate, VBlankHandlerShort, Sub_EC60."
+$C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,readable,9ecd669e3fe1,One-time location-load called once per scene entry from GameLoop_Main.
+$C0:011B,$C0:01A4,138,Field_SaveState,$C0,Engine,readable,f8422d9bd266,"(was Sub_011B.) Saves the field before handing control to bank $C2 (BankC2_Entry8000), so Field_RestoreState can rebuild it after: - if Field_Unk29 is set, force it to 1 and clear Field_Unk26/27; - co"
+$C0:01A5,$C0:024B,167,Field_RestoreState,$C0,Engine,readable,0afe6772b1a8,(was Sub_01A5.) Rebuilds the field after a bank-$C2 round trip: 1.
+$C0:0905,$C0:0917,19,Field_RestoreSaveBlock,$C0,Engine,readable,8c3e526500ae,"(was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over Field_SaveBlock ($7E:0920, $14E0 bytes)."
+$C0:0918,$C0:092A,19,Field_StashSaveBlock,$C0,Engine,readable,ee0ab598e3b8,"(was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to SceneSave_Buffer ($7F:2000)."
+$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,readable,e10cd19454cc,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA."
+$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,readable,912c2eb7e664,Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
+$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,readable,d8d7b944f972,Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
+$C0:0B86,$C0:0C75,240,FrameStateInit,$C0,Engine,readable,61b9780bc6d3,"Called once per location load from GameLoop_Main (not per frame, despite the name)."
+$C0:0C76,$C0:0D77,258,Field_SceneChangeTick,$C0,Engine,readable,8958b75bae68,"Steps the two fades requested in Field_FadeFlags, then acts on Field_SceneFlags: 0           nothing to do."
+$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,readable,35726027687c,"Tile animation for map-tile state $E6: a 1x2 column, the tile at (Field_TileAnimX, Field_TileAnimY) and the one above it."
+$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,readable,968e837a5387,"Tile animation for map-tile state $EC: a 2x2 block, columns col..col+1, rows row-1..row."
+$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,readable,e6ca3709791c,"Tile animation for map-tile state $EE: a 2x2 block, columns col-1..col, rows row-1..row (ModeEC_Handler mirrored)."
+$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,readable,23c6ef3d2514,"Tile animation for map-tile state $FA: a 2-wide, 3-tall block, columns col..col+1, rows row-2..row."
+$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,readable,f4e8de2dfe2a,"Tile animation for map-tile state $FC: a 2-wide, 3-tall block, columns col-1..col, rows row-2..row (ModeFA_Handler mirrored)."
+$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,readable,9c7976e96704,"The rest of Field_SceneChangeTick's request handling: reached by BRL when Field_SceneFlags bit 4 is clear or the tile mode is not one of the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by"
+$C0:18D9,$C0:1984,172,Field_PauseAndMenuInput,$C0,Engine,readable,61e240c6d303,"(was Sub_18D9.) Per-frame pause and menu input, called from GameLoop_FrameBody before Field_SceneChangeTick."
+$C0:1985,$C0:19C6,66,Field_FadeToBankC2Mode5,$C0,Engine,readable,a9fd5c099392,(was Sub_1985.) Called from Field_PauseAndMenuInput when Pad_Unk00F6 bit 0 is set.
+$C0:19C7,$C0:1A02,60,Field_RunBankC2Mode5,$C0,Engine,readable,752a8681dc61,"(was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning of 5 unverified; earlier notes called it ""BG mode 5""), then reloads the field: restore state, re-init changed party members, move a pe"
+$C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,readable,3f01af4128da,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
+$C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),readable,e881a40ca89a,Leaf routine run by Field_PauseAndMenuInput when Field_Unk62 is set (and Pad_Unk00F6 bit 6 is clear); A = Field_Unk62.
+$C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,readable,ae1d4b66bede,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
+$C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,readable,b7a233ce130c,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the party leader's Obj_SfxArg."
+$C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,readable,cc8c4746bdc5,
+$C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,readable,562b84380d13,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
+$C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,readable,f5119270db8e,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
+$C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,readable,fe5c82eb9fdd,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
+$C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,readable,dc359ca1e1c0,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
+$C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,readable,a7d31cdfb739,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
+$C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,readable,f2047768a692,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
+$C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,readable,d4d8f56af68d,"(was Sub_597D.) Runs object Obj_Cur's init function: the first of its 16 function offsets (Evt_Data + Obj_Cur*16, i.e."
+$C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,readable,30448da1dd03,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
+$C0:B271,$C0:B2A7,55,PostVBlank,$C0,Engine,readable,322effc721a3,"Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the frame."
+$C0:B2A8,$C0:B2B1,10,PV_SpriteLoop,$C0,Engine,readable,5b0eeb49e66a,
+$C0:B2B2,$C0:B2BF,14,PV_CheckChain,$C0,Engine,readable,c5f564ab0c6b,
+$C0:B2C0,$C0:B2C7,8,PV_NextSprite,$C0,Engine,readable,8b91176ef1f5,
+$C0:B2C8,$C0:B2D7,16,PV_FillRange1,$C0,Engine,readable,118b4a76b2cb,
+$C0:B2D8,$C0:B2DD,6,PV_EndRange1,$C0,Engine,readable,e7c230e38649,
+$C0:B2DE,$C0:B2ED,16,PV_FillRange2,$C0,Engine,readable,c94cbc3b3769,
+$C0:B2EE,$C0:B2F3,6,PV_EndRange2,$C0,Engine,readable,d0ea676042da,
+$C0:B2F4,$C0:B303,16,PV_FillRange3,$C0,Engine,readable,40c5ee3fe7f6,
+$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,readable,09d036d33e90,
+$C0:B309,$C0:B700,1016,Spr_AppendToOam,$C0,Engine,readable,704d22fa9ee9,(was Sub_B309.) Appends object Obj_Cur's sprite to the OAM shadow.
+$C0:B701,$C0:B787,135,Spr_PrepareTiles,$C0,Engine,readable,854587e7b313,(was Sub_B701.) Brings object Obj_Cur's SprTile records up to date before Spr_AppendToOam copies them.
+$C0:B788,$C0:B8C9,322,Spr_Place4,$C0,Engine,readable,8c66615d624d,"(was Sub_B788.) Re-places a 4-tile (size 0) object: with DB=$7F, each SprTile record's X = Spr_BaseX + OfsX (bit 8 packed into Obj_OamHiA with the large-size bits) and Y = Spr_BaseY + OfsY, clamped to"
+$C0:B8CA,$C0:BA64,411,Spr_Load4,$C0,Engine,readable,8ee8faab8a72,"(was Sub_B8CA.) Builds a 4-tile (size 0) object's SprTile records from SprTileSrc (OfsX, OfsY, Tile/Attr), placing them at the object's position as Spr_Place4 does."
+$C0:BA65,$C0:BCDB,631,Spr_Place8,$C0,Engine,readable,57ca296efb65,(was Sub_BA65.) Re-places an 8-tile (size 1) object from its existing SprTile records (2 high-table bytes).
+$C0:BCDC,$C0:BFF1,790,Spr_Load8,$C0,Engine,readable,5b7fa6817e78,(was Sub_BCDC.) Builds an 8-tile (size 1) object's SprTile records from SprTileSrc and places them.
+$C0:BFF2,$C0:C2BE,717,Spr_Place12,$C0,Engine,readable,3ed5054b8c39,"(was Sub_BFF2.) Re-places a 12-tile (size 2) object from its existing SprTile records (3 high-table bytes: Obj_OamHiA, +1, Obj_OamHiB)."
+$C0:C2BF,$C0:C6E6,1064,Spr_Load12,$C0,Engine,readable,7fe98d7fb9ac,(was Sub_C2BF.) Builds a 12-tile (size 2) object's SprTile records from SprTileSrc and places them.
+$C0:C6E7,$C0:C739,83,Spr_PackHiBits4,$C0,Engine,readable,5925f2aa665d,"(was Sub_C6E7.) For the 4 SprTile records starting at X: X = Spr_BaseX + OfsX, and returns in A the OAM high-table byte for them (X bit 8 of each, large-size bits set)."
+$C0:C73A,$C0:C989,592,Spr_Place24,$C0,Engine,readable,788f53c3bcba,"(was Sub_C73A.) Re-places a 24-tile (size 3) object: six Spr_PackHiBits4 groups fill Obj_OamHiA/B/C, then all 24 Y positions are rebuilt from Spr_BaseY + OfsY with the clamp variant chosen by Spr_Base"
+$C0:C98A,$C0:CA75,236,Obj_AnimTickAndQueue,$C0,Sprites & objects,readable,332ba6466ad1,"Per-object animation tick, called for object Obj_Cur from the object loop ($C0:A832, $C0:A878)."
+$C0:CA76,$C0:CAD8,99,Field_ProcessAnimQueue,$C0,Engine,readable,9acee87c6e33,"Builds queued object frames while there is time left in the frame, called from VBlankHandler."
+$C0:CAD9,$C0:CB09,49,Obj_BuildSpriteFrameStep,$C0,Sprites & objects,readable,965376797d94,"One step of building object Obj_Cur's current frame, graphics included: skips (C=0) unless Obj_Unk1100 bit 7 is clear, Obj_Unk1A81 is 1..$7F and Obj_Unk0F00 is nonzero; then by size class tail-calls O"
+$C0:CB0A,$C0:CB39,48,Obj_BuildFrameLayout,$C0,Sprites & objects,readable,dfed7ba9033b,"(was Sub_CB0A.) Like Obj_BuildSpriteFrameStep, but for objects whose tiles are already in VRAM: tail-calls Obj_FrameLayout4 / 8 / 12, which only rewrite the SprTile records for Obj_LastFrame."
+$C0:CB3A,$C0:CBDB,162,Obj_AnimFrameLookup,$C0,Sprites & objects,readable,78cad7038795,"(was Sub_CB3A.) Returns in A the frame number object X should show: Anim_FramePtr = Obj_AnimFrameTbl + (facing-dependent multiple of Obj_AnimFacingStride: 0 for facing 0, 1 for negative, 2 for 2, 3 fo"
+$C0:CBDC,$C0:CDC7,492,Obj_BuildFrame4,$C0,Sprites & objects,readable,9e0b81cc9c82,"(was Sub_CBDC.) Builds frame A (Obj_FixedFrame in mode 3, else Obj_AnimFrameLookup) of a 4-tile object, in one pass."
+$C0:CDC8,$C0:CEF4,301,Obj_FrameLayout4,$C0,Sprites & objects,readable,38f6c5234ce0,"(was Sub_CDC8.) Rewrites the 4 SprTile records of a 4-tile object for Obj_LastFrame directly (tiles already in VRAM): offsets from the frame record, Tile = Obj_VramTile + 2n, attributes as in Obj_Buil"
+$C0:CEF5,$C0:D123,559,Obj_BuildFrame8,$C0,Sprites & objects,readable,24ea0fd9bee6,(was Sub_CEF5.) Builds the current frame of an 8-tile object.
+$C0:D124,$C0:D289,358,Obj_FrameLayout8,$C0,Sprites & objects,readable,90e647ad4d63,"(was Sub_D124.) As Obj_FrameLayout4 for an 8-tile object (frame record 80 bytes, positions after 32 tile words); the first four tiles take Obj_PrioLow, the last four Obj_PrioHigh."
+$C0:D28A,$C0:D30C,131,Obj_BuildFrame8Pass0,$C0,Sprites & objects,readable,94cb63a929f2,"(was Sub_D28A.) First pass of an 8-tile frame: look the frame up, SprBuf_Alloc2, copy tiles 0-15 into the first chunk, INC Obj_State, return C=1 (more to do)."
+$C0:D30D,$C0:D4F6,490,Obj_BuildFrame8Pass1,$C0,Sprites & objects,readable,e13d8476b05a,"(was Sub_D30D.) Second pass: tiles 16-31 into the second chunk (Obj_TileBuf + $200), queue the VRAM upload, write the 8 SprTileSrc records, INC Obj_State; C=0."
+$C0:D4F7,$C0:D545,79,Obj_BuildFrame12,$C0,Sprites & objects,readable,e053bdc59b44,"Obj_BuildFrame12Pass0 tail that follows it) (was Sub_D4F7.) Builds the current frame of a 12-tile object over three passes chosen by the Obj_State count (0 / 1 / 2+), each with an ""Alt"" variant when O"
+$C0:D546,$C0:D607,194,Obj_BuildFrame12Pass0,$C0,Sprites & objects,readable,5fa0a4e6cc02,"(was Sub_D546.) Pass 0: frame lookup, SprBuf_Alloc3, tiles 0-7 to the buffer start and tiles 8-15 to +$200, INC Obj_State; C=1."
+$C0:D608,$C0:D68A,131,Obj_BuildFrame12Pass0Alt,$C0,Sprites & objects,readable,90643c280b74,"(was Sub_D608.) Pass 0, $68 layout: tiles 0-15 in one run to the buffer start."
+$C0:D68B,$C0:D737,173,Obj_BuildFrame12Pass1,$C0,Sprites & objects,readable,da9588e8fa38,"(was Sub_D68B.) Pass 1: tiles 16-23 to +$100, tiles 24-31 to +$300; INC Obj_State; C=1."
+$C0:D738,$C0:D7E4,173,Obj_BuildFrame12Pass1Alt,$C0,Sprites & objects,readable,d3f855e77cd1,"(was Sub_D738.) Pass 1, $68 layout: tiles 16-23 to +$200, tiles 24-31 to +$400."
+$C0:D7E5,$C0:DA68,644,Obj_BuildFrame12Pass2,$C0,Sprites & objects,readable,7ca5d24cf3a0,"(was Sub_D7E5.) Pass 2: tiles 32-47 to +$400, queue the VRAM upload, write the 12 SprTileSrc records (tiles in rows of 8 then 4), INC Obj_State; C=0."
+$C0:DA69,$C0:DD27,703,Obj_BuildFrame12Pass2Alt,$C0,Sprites & objects,readable,5b2d46da5ad8,"(was Sub_DA69.) Pass 2, $68 layout: tiles 32-39 to +$300 and 40-47 to +$500, queue the upload, write the 12 SprTileSrc records (rows of 4 then 8); C=0."
+$C0:DD28,$C0:E129,1026,Obj_FrameLayout12,$C0,Sprites & objects,readable,063d2742af8d,"(was Sub_DD28.) As Obj_FrameLayout4 for a 12-tile object (frame record 120 bytes, positions after 48 tile words), with the two tile-number layouts of the 12-tile builders (Obj_VramTile = $68 → .dd28_a"
+$C0:E12A,$C0:E533,1034,Spr_LoadLargeObj,$C0,Engine,readable,649ec44a8c64,"(was Sub_E12A.) Loads a 24-tile (""large"", size 3) object in one go."
+$C0:E534,$C0:E686,339,Spr_CopyTileFlipped,$C0,Engine,readable,013b27fc5b0b,"(was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right, from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through WMDATA: each byte goes through BitReverseTable ($C0:FD00), which"
+$C0:E687,$C0:E738,178,Spr_CopyTile,$C0,Engine,readable,f6b105073a90,"(was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr + (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD past it so a following Spr_CopyTileFlipped writes the next tile."
+$C0:E739,$C0:E7BB,131,Spr_CopyTileD4,$C0,Engine,readable,67e2639b8a1b,Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D4).
+$C0:E7BC,$C0:E83E,131,Spr_CopyTileD2,$C0,Engine,readable,808b65c0cc01,Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D2).
+$C0:E83F,$C0:E8C1,131,Spr_CopyTileD3,$C0,Engine,readable,6d41f162d481,Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D3).
+$C0:E8C2,$C0:E934,115,Spr_CopyTile7F,$C0,Engine,readable,90670945851e,"Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when the graphics are already in WRAM); abs,X reads since DB = $7F."
+$C0:E935,$C0:E951,29,SprBuf_FreeAll,$C0,Engine,readable,da9e5da5fff0,"(was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80), with DP pointed at $0B00 so each store is a 2-byte dp store."
+$C0:E952,$C0:E979,40,SprBuf_Alloc1,$C0,Engine,readable,9da2c65f5286,"(was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200."
+$C0:E97A,$C0:E9A9,48,SprBuf_Alloc2,$C0,Engine,readable,b967c2e90f21,(was Sub_E97A.) As SprBuf_Alloc1 for two adjacent free chunks (start entries 0-2).
+$C0:E9AA,$C0:E9E1,56,SprBuf_Alloc3,$C0,Engine,readable,36f58475f979,(was Sub_E9AA.) As SprBuf_Alloc1 for three adjacent free chunks (start entries 0-1).
+$C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,readable,0c6a5697d5e2,
+$C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,readable,7bccff6d4790,
+$C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,readable,b256ab1b7893,
 $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,208b0705c41c,The CPU comes out of reset in emulation mode with I already set.
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,verified,b4be75de9340,Native-mode interrupt stubs ($FF10–$FF17)
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,bd12634e9770,

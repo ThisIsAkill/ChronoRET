@@ -12,28 +12,33 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
-; $C0:B309 — Sub_B309 (1016 bytes, $B309–$B700)
-; Sprite descriptor → OAM buffer + WRAM palette copy.
-; Called from PostVBlank's sprite loop for each active descriptor.
-; Dispatches on sprite type (bits 0-1 of $1201,X):
-;   type 0 = 1 tile  (1 OAM byte,  ADC #$0010, 4  palette iters)
-;   type 1 = 2 tiles (2 OAM bytes, ADC #$0020, 8  palette iters)
-;   type 2 = 3 tiles (3 OAM bytes, ADC #$0030, 12 palette iters)
-;   type 3+ = 6 tiles (6 OAM bytes, ADC #$0060, 24 palette iters)
-; Each type has 3 range paths (flag bits 2-3 of $0F80,X) selecting
-;   OAM write-head ($0181/$0185/$0189) and WRAM dest ($01DB/$01DD/$01DF).
-; On entry: M=1, X=0 (16-bit), DP=$0100, $6D = sprite descriptor index.
-; Sets DP=$2100 internally (PPU register aliasing trick), restores via PLD.
+; $C0:B309 — Spr_AppendToOam (1016 bytes, $B309–$B700)
+; (was Sub_B309.) Appends object Obj_Cur's sprite to the OAM shadow.
+; Called from PostVBlank for every object in the draw buckets.
+; First Spr_PrepareTiles brings the object's SprTile records up to
+; date (C=1: nothing to draw). Then, by size class (Obj_SprSize bits
+; 0-1: 4/8/12/24 tiles = 1/2/3/6 high-table bytes) and by the OAM
+; range in Obj_OamFlags bits 2-3:
+;   - the object's packed high-table bytes (Obj_OamHiA/B/C) go to
+;     the range's high-table pointer (Oam_RangeNHiPtr);
+;   - WMADD is aimed at the range's low-table pointer
+;     (Oam_RangeNLoPtr), which then advances 4 bytes per tile;
+;   - X, Y, Tile, Attr of each SprTile record are written through
+;     WMDATA. (Earlier notes called these 4-byte copies a palette
+;     copy; they are OAM low-table entries.)
+; With DP pointed at $2100, WMADDL/WMDATA are dp operands; the field
+; variables are reached with absolute !DP_Field+ addresses.
+; On entry: M=1, X=0 (16-bit), DP=$0100, Obj_Cur = object.
 ; ============================================================
 org $C0B309
-Sub_B309:
-    JSR Sub_B701            ; sprite state gate; C=0 proceed, C=1 skip
+Spr_AppendToOam:
+    JSR Spr_PrepareTiles            ; C=1: nothing to draw
     BCC .proceed
     RTS
 .proceed:
-    LDX $6D                 ; sprite descriptor index
-    LDA $1201,X             ; sprite type byte
-    AND #$03                ; isolate type 0-3
+    LDX.b !Obj_Cur          ; object slot
+    LDA.w !Obj_SprSize,X    ; size class in bits 0-1
+    AND.b #!ObjSpr_SizeMask
     BEQ .type0              ; type 0 → $B329
     CMP #$01
     BNE .chk_t2
@@ -46,499 +51,511 @@ Sub_B309:
     BRL .type3plus          ; type 3+ → $B5AF
 
 ; ============================================================
-; TYPE 0 — 1 OAM byte per range, ADC #$0010, palette loop ×4
+; Size 0: 4 tiles, 1 high-table byte, 4 low-table entries
 ; ============================================================
 .type0:                     ; $B329
-    LDX $6D
+    LDX.b !Obj_Cur
     PHD
     REP #$20                ; A → 16-bit
-    LDA #$2100
-    TCD                     ; DP = $2100 (PPU register alias base)
+    LDA.w #!DP_PPU
+    TCD                     ; DP = $2100: WMADDL/WMDATA as dp operands
     SEP #$20                ; A → 8-bit
-    LDA $0F80,X             ; sprite flags (abs,X since DP≠$0100)
-    AND #$0C                ; range selection bits 2-3
+    LDA.w !Obj_OamFlags,X   ; OAM range bits
+    AND.b #!ObjOam_RangeMask
     BEQ .t0r1               ; no bits → range 1
-    BIT #$04                ; test bit 2
+    BIT.b #!ObjOam_Range2   ; test bit 2
     BNE .t0r2               ; bit 2 → range 2
     BRA .t0r3               ; bit 3 only → range 3
 
-.t0r1:                      ; $B341 — range 1 ($0181 / $01DB)
-    LDA.l $7F4F00,X
-    LDX $0181
-    STA.w $0000,X           ; .w: abs,X not dp,X
+.t0r1:                      ; $B341 — range 1 (Oam_Range1HiPtr / Oam_Range1LoPtr)
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range1HiPtr
+    STA.w !Eng_PtrBase,X    ; high-table byte → *Oam_Range1HiPtr
     INX
-    STX $0181
-    LDX $01DB
-    STX $81                 ; DP+$81 = $2181 = WMADDL/H (16-bit X write)
-    LDX $016D               ; abs: sprite index (DP=$2100, not $0100)
+    STX.w !DP_Field+!Oam_Range1HiPtr
+    LDX.w !DP_Field+!Oam_Range1LoPtr
+    STX.b WMADDL-!DP_PPU    ; WMADDL/WMADDM = low-table pointer
+    LDX.w !DP_Field+!Obj_Cur ; object slot (absolute: DP is $2100 here)
     REP #$20
-    LDA $01DB
+    LDA.w !DP_Field+!Oam_Range1LoPtr
     CLC
-    ADC #$0010
-    STA $01DB
-.t0_gfx:                    ; $B363 — shared sprite-gfx + palette loop (type 0)
-    LDA $1700,X             ; sprite gfx table index (16-bit, M=0)
+    ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range1LoPtr
+.t0_gfx:                    ; $B363 — shared low-table copy (size 0)
+    LDA.w !Obj_TileRecOfs,X ; object's first SprTile record
     TAX
     SEP #$20
-    LDA #$04
-    STA $01C9               ; palette loop counter
+    LDA.b #!Spr_Size0Tiles
+    STA.w !DP_Field+!Spr_TileCount ; tiles left to copy
 .t0_pal:                    ; $B36E
-    LDA.l $7F4BC0,X
-    STA $80                 ; DP+$80 = $2180 = WMDATA (auto-increments WRAM addr)
-    LDA.l $7F4BC1,X
-    STA $80
-    LDA.l $7F4BC6,X
-    STA $80
-    LDA.l $7F4BC7,X
-    STA $80
+    LDA.l SprTile.X,X
+    STA.b WMDATA-!DP_PPU    ; X, Y, tile, attr → OAM shadow
+    LDA.l SprTile.Y,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Tile,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Attr,X
+    STA.b WMDATA-!DP_PPU
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $01C9
+    DEC.w !DP_Field+!Spr_TileCount
     BNE .t0_pal
     PLD
     RTS
 
-.t0r2:                      ; $B397 — range 2 ($0185 / $01DD)
-    LDA.l $7F4F00,X
-    LDX $0185
-    STA.w $0000,X
+.t0r2:                      ; $B397 — range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range2HiPtr
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0185
-    LDX $01DD
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range2HiPtr
+    LDX.w !DP_Field+!Oam_Range2LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DD
+    LDA.w !DP_Field+!Oam_Range2LoPtr
     CLC
-    ADC #$0010
-    STA $01DD
+    ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range2LoPtr
     BRA .t0_gfx
 
-.t0r3:                      ; $B3BB — range 3 ($0189 / $01DF)
-    LDA.l $7F4F00,X
-    LDX $0189
-    STA.w $0000,X
+.t0r3:                      ; $B3BB — range 3 (Oam_Range3HiPtr / Oam_Range3LoPtr)
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range3HiPtr
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0189
-    LDX $01DF
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range3HiPtr
+    LDX.w !DP_Field+!Oam_Range3LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DF
+    LDA.w !DP_Field+!Oam_Range3LoPtr
     CLC
-    ADC #$0010
-    STA $01DF
+    ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range3LoPtr
     BRA .t0_gfx
 
 ; ============================================================
-; TYPE 1 — 2 OAM bytes per range (PHA/PLA), ADC #$0020, ×8
+; Size 1: 8 tiles, 2 high-table bytes (via PHA/PLA), 8 entries
 ; ============================================================
 .type1:                     ; $B3DF
-    LDX $6D
+    LDX.b !Obj_Cur
     PHD
     REP #$20
-    LDA #$2100
+    LDA.w #!DP_PPU
     TCD
     SEP #$20
-    LDA $0F80,X
-    AND #$0C
+    LDA.w !Obj_OamFlags,X
+    AND.b #!ObjOam_RangeMask
     BEQ .t1r1
-    BIT #$04
+    BIT.b #!ObjOam_Range2
     BNE .t1r2_tramp         ; bit 2: conditional long branch via trampoline
     BRL .t1r3               ; bit 3 only → long branch to range 3
 .t1r2_tramp:
     BRL .t1r2               ; trampoline: range 2
 
-.t1r1:                      ; $B3FB — range 1 ($0181 / $01DB)
-    LDA.l $7F4F01,X
+.t1r1:                      ; $B3FB — range 1 (Oam_Range1HiPtr / Oam_Range1LoPtr)
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0181
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range1HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0181
-    LDX $01DB
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range1HiPtr
+    LDX.w !DP_Field+!Oam_Range1LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DB
+    LDA.w !DP_Field+!Oam_Range1LoPtr
     CLC
-    ADC #$0020
-    STA $01DB
-.t1_gfx:                    ; shared gfx+palette loop (type 1)
-    LDA $1700,X
+    ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range1LoPtr
+.t1_gfx:                    ; shared gfx+OAM entry copy loop (type 1)
+    LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
-    LDA #$08
-    STA $01C9
+    LDA.b #!Spr_Size1Tiles
+    STA.w !DP_Field+!Spr_TileCount
 .t1_pal:
-    LDA.l $7F4BC0,X
-    STA $80
-    LDA.l $7F4BC1,X
-    STA $80
-    LDA.l $7F4BC6,X
-    STA $80
-    LDA.l $7F4BC7,X
-    STA $80
+    LDA.l SprTile.X,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Y,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Tile,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Attr,X
+    STA.b WMDATA-!DP_PPU
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $01C9
+    DEC.w !DP_Field+!Spr_TileCount
     BNE .t1_pal
     PLD
     RTS
 
-.t1r3:                      ; $B45B — range 3 ($0189 / $01DF)
-    LDA.l $7F4F01,X
+.t1r3:                      ; $B45B — range 3 (Oam_Range3HiPtr / Oam_Range3LoPtr)
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0189
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range3HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0189
-    LDX $01DF
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range3HiPtr
+    LDX.w !DP_Field+!Oam_Range3LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DF
+    LDA.w !DP_Field+!Oam_Range3LoPtr
     CLC
-    ADC #$0020
-    STA $01DF
+    ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range3LoPtr
     BRA .t1_gfx             ; within BRA range (-98)
 
-.t1r2:                      ; $B489 — range 2 ($0185 / $01DD)
-    LDA.l $7F4F01,X
+.t1r2:                      ; $B489 — range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0185
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range2HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0185
-    LDX $01DD
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range2HiPtr
+    LDX.w !DP_Field+!Oam_Range2LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DD
+    LDA.w !DP_Field+!Oam_Range2LoPtr
     CLC
-    ADC #$0020
-    STA $01DD
+    ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range2LoPtr
     BRL .t1_gfx             ; too far for BRA (-145)
 
 ; ============================================================
 ; TYPE 2 — 3 OAM bytes per range (2×PHA/PLA), ADC #$0030, ×12
 ; ============================================================
 .type2:                     ; $B4B8
-    LDX $6D
+    LDX.b !Obj_Cur
     PHD
     REP #$20
-    LDA #$2100
+    LDA.w #!DP_PPU
     TCD
     SEP #$20
-    LDA $0F80,X
-    AND #$0C
+    LDA.w !Obj_OamFlags,X
+    AND.b #!ObjOam_RangeMask
     BEQ .t2r1
-    BIT #$04
+    BIT.b #!ObjOam_Range2
     BNE .t2r2_tramp
     BRL .t2r3
 .t2r2_tramp:
     BRL .t2r2
 
-.t2r1:                      ; range 1 ($0181 / $01DB)
-    LDA.l $7F4B40,X
+.t2r1:                      ; range 1 (Oam_Range1HiPtr / Oam_Range1LoPtr)
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0181
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range1HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0181
-    LDX $01DB
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range1HiPtr
+    LDX.w !DP_Field+!Oam_Range1LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DB
+    LDA.w !DP_Field+!Oam_Range1LoPtr
     CLC
-    ADC #$0030
-    STA $01DB
-.t2_gfx:                    ; shared gfx+palette loop (type 2)
-    LDA $1700,X
+    ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range1LoPtr
+.t2_gfx:                    ; shared gfx+OAM entry copy loop (type 2)
+    LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
-    LDA #$0C
-    STA $01C9
+    LDA.b #!Spr_Size2Tiles
+    STA.w !DP_Field+!Spr_TileCount
 .t2_pal:
-    LDA.l $7F4BC0,X
-    STA $80
-    LDA.l $7F4BC1,X
-    STA $80
-    LDA.l $7F4BC6,X
-    STA $80
-    LDA.l $7F4BC7,X
-    STA $80
+    LDA.l SprTile.X,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Y,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Tile,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Attr,X
+    STA.b WMDATA-!DP_PPU
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $01C9
+    DEC.w !DP_Field+!Spr_TileCount
     BNE .t2_pal
     PLD
     RTS
 
-.t2r3:                      ; range 3 ($0189 / $01DF)
-    LDA.l $7F4B40,X
+.t2r3:                      ; range 3 (Oam_Range3HiPtr / Oam_Range3LoPtr)
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0189
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range3HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0189
-    LDX $01DF
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range3HiPtr
+    LDX.w !DP_Field+!Oam_Range3LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DF
+    LDA.w !DP_Field+!Oam_Range3LoPtr
     CLC
-    ADC #$0030
-    STA $01DF
+    ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range3LoPtr
     BRA .t2_gfx             ; within BRA range (-108)
 
-.t2r2:                      ; range 2 ($0185 / $01DD)
-    LDA.l $7F4B40,X
+.t2r2:                      ; range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0185
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range2HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0185
-    LDX $01DD
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range2HiPtr
+    LDX.w !DP_Field+!Oam_Range2LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DD
+    LDA.w !DP_Field+!Oam_Range2LoPtr
     CLC
-    ADC #$0030
-    STA $01DD
+    ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range2LoPtr
     BRL .t2_gfx             ; too far for BRA (-165)
 
 ; ============================================================
-; TYPE 3+ — 6 OAM bytes per range (5×PHA/PLA), ADC #$0060, ×24
+; Size 3: 24 tiles, 6 high-table bytes (Obj_OamHiA/B/C via PHA/PLA), 24 entries
 ; ============================================================
 .type3plus:                 ; $B5AF
-    LDX $6D
+    LDX.b !Obj_Cur
     PHD
     REP #$20
-    LDA #$2100
+    LDA.w #!DP_PPU
     TCD
     SEP #$20
-    LDA $0F80,X
-    AND #$0C
+    LDA.w !Obj_OamFlags,X
+    AND.b #!ObjOam_RangeMask
     BEQ .t3r1
-    BIT #$04
+    BIT.b #!ObjOam_Range2
     BNE .t3r2_tramp
     BRL .t3r3
 .t3r2_tramp:
     BRL .t3r2
 
-.t3r1:                      ; range 1 ($0181 / $01DB)
-    LDA.l $7F4F81,X
+.t3r1:                      ; range 1 (Oam_Range1HiPtr / Oam_Range1LoPtr)
+    LDA.l SprTile[120].Y,X
     PHA
-    LDA.l $7F4F80,X
+    LDA.l !Obj_OamHiC,X
     PHA
-    LDA.l $7F4B41,X
+    LDA.l SprTileSrc[104].Y,X
     PHA
-    LDA.l $7F4B40,X
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0181
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range1HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0181
-    LDX $01DB
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range1HiPtr
+    LDX.w !DP_Field+!Oam_Range1LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DB
+    LDA.w !DP_Field+!Oam_Range1LoPtr
     CLC
-    ADC #$0060
-    STA $01DB
-.t3_gfx:                    ; shared gfx+palette loop (type 3+)
-    LDA $1700,X
+    ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range1LoPtr
+.t3_gfx:                    ; shared low-table copy (size 3)
+    LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
-    LDA #$18
-    STA $01C9
+    LDA.b #!Spr_Size3Tiles
+    STA.w !DP_Field+!Spr_TileCount
 .t3_pal:
-    LDA.l $7F4BC0,X
-    STA $80
-    LDA.l $7F4BC1,X
-    STA $80
-    LDA.l $7F4BC6,X
-    STA $80
-    LDA.l $7F4BC7,X
-    STA $80
+    LDA.l SprTile.X,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Y,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Tile,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l SprTile.Attr,X
+    STA.b WMDATA-!DP_PPU
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $01C9
+    DEC.w !DP_Field+!Spr_TileCount
     BNE .t3_pal
     PLD
     RTS
 
-.t3r3:                      ; range 3 ($0189 / $01DF)
-    LDA.l $7F4F81,X
+.t3r3:                      ; range 3 (Oam_Range3HiPtr / Oam_Range3LoPtr)
+    LDA.l SprTile[120].Y,X
     PHA
-    LDA.l $7F4F80,X
+    LDA.l !Obj_OamHiC,X
     PHA
-    LDA.l $7F4B41,X
+    LDA.l SprTileSrc[104].Y,X
     PHA
-    LDA.l $7F4B40,X
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0189
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range3HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0189
-    LDX $01DF
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range3HiPtr
+    LDX.w !DP_Field+!Oam_Range3LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DF
+    LDA.w !DP_Field+!Oam_Range3LoPtr
     CLC
-    ADC #$0060
-    STA $01DF
+    ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range3LoPtr
     BRL .t3_gfx             ; -226, must use BRL
 
-.t3r2:                      ; range 2 ($0185 / $01DD)
-    LDA.l $7F4F81,X
+.t3r2:                      ; range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
+    LDA.l SprTile[120].Y,X
     PHA
-    LDA.l $7F4F80,X
+    LDA.l !Obj_OamHiC,X
     PHA
-    LDA.l $7F4B41,X
+    LDA.l SprTileSrc[104].Y,X
     PHA
-    LDA.l $7F4B40,X
+    LDA.l !Obj_OamHiB,X
     PHA
-    LDA.l $7F4F01,X
+    LDA.l SprTile[104].Y,X
     PHA
-    LDA.l $7F4F00,X
-    LDX $0185
-    STA.w $0000,X
+    LDA.l !Obj_OamHiA,X
+    LDX.w !DP_Field+!Oam_Range2HiPtr
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
     PLA
-    STA.w $0000,X
+    STA.w !Eng_PtrBase,X
     INX
-    STX $0185
-    LDX $01DD
-    STX $81
-    LDX $016D
+    STX.w !DP_Field+!Oam_Range2HiPtr
+    LDX.w !DP_Field+!Oam_Range2LoPtr
+    STX.b WMADDL-!DP_PPU
+    LDX.w !DP_Field+!Obj_Cur
     REP #$20
-    LDA $01DD
+    LDA.w !DP_Field+!Oam_Range2LoPtr
     CLC
-    ADC #$0060
-    STA $01DD
+    ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
+    STA.w !DP_Field+!Oam_Range2LoPtr
     BRL .t3_gfx             ; -139, must use BRL
 
 
 ; ============================================================
-; $C0:B701 — Sub_B701 (171 bytes, $B701–$B7AB)
-; Sprite state gate called from Sub_B309.
-; Returns C=0 (proceed to render), C=1 (skip).
-; Sub_B788 at $B788 is a secondary entry used by the type 0 negative path.
+; $C0:B701 — Spr_PrepareTiles (135 bytes, $B701–$B787)
+; (was Sub_B701.) Brings object Obj_Cur's SprTile records up to date
+; before Spr_AppendToOam copies them. Returns C=1 when there is
+; nothing to draw. By size class (Obj_SprSize) and Obj_State:
+;   0                        → C=1.
+;   1..$7F, below threshold  → C=1 (threshold: 2 for size 1, 3 for
+;                              size 2, none for size 0).
+;   1..$7F at/above it, or
+;   $81..$FF at/above it     → Spr_LoadN (copy from SprTileSrc and
+;                              place), run the matching SprBuf_Free1/E9FF/
+;                              EA1F, set Obj_State = $80, C=0.
+;   $80, or $81.. below it   → Spr_PlaceN (re-place the existing
+;                              records at the object's position), C=0.
+; Size 3 always goes to Spr_Place24 (BRL; its carry is returned).
+; (The previous header gave the size as 171 bytes, which overlapped
+; Spr_Place4.)
 ; ============================================================
 org $C0B701
-Sub_B701:
-    LDX $6D
-    LDA $1201,X
-    AND #$03
+Spr_PrepareTiles:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_SprSize,X
+    AND.b #!ObjSpr_SizeMask
     BEQ .t0
     CMP #$01
     BNE .chk2
@@ -549,29 +566,29 @@ Sub_B701:
     BRA .t2
 
 .t0:
-    LDA $1B00,X
+    LDA.w !Obj_State,X
     BNE .t0_nz
     SEC
     RTS
 .t0_nz:
     BMI .t0_neg
 .t0_init:
-    JSR Sub_B8CA
-    JSR Sub_E9E2
-    LDX $6D
-    LDA #$80
-    STA $1B00,X
+    JSR Spr_Load4
+    JSR SprBuf_Free1
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     CLC
     RTS
 .t0_neg:
-    AND #$7F
+    AND.b #!ObjState_CountMask
     BNE .t0_init
-    JSR Sub_B788
+    JSR Spr_Place4
     CLC
     RTS
 
 .t1:
-    LDA $1B00,X
+    LDA.w !Obj_State,X
     BNE .t1_nz
 .t1_abort:
     SEC
@@ -581,23 +598,23 @@ Sub_B701:
     CMP #$02
     BCC .t1_abort
 .t1_init:
-    JSR Sub_BCDC
-    JSR Sub_E9FF
-    LDX $6D
-    LDA #$80
-    STA $1B00,X
+    JSR Spr_Load8
+    JSR SprBuf_Free2
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     CLC
     RTS
 .t1_neg:
-    AND #$7F
+    AND.b #!ObjState_CountMask
     CMP #$02
     BCS .t1_init
-    JSR Sub_BA65
+    JSR Spr_Place8
     CLC
     RTS
 
 .t2:
-    LDA $1B00,X
+    LDA.w !Obj_State,X
     BNE .t2_nz
 .t2_abort:
     SEC
@@ -607,783 +624,807 @@ Sub_B701:
     CMP #$03
     BCC .t2_abort
 .t2_init:
-    JSR Sub_C2BF
-    JSR Sub_EA1F
-    LDX $6D
-    LDA #$80
-    STA $1B00,X
+    JSR Spr_Load12
+    JSR SprBuf_Free3
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     CLC
     RTS
 .t2_neg:
-    AND #$7F
+    AND.b #!ObjState_CountMask
     CMP #$03
     BCS .t2_init
-    JSR Sub_BFF2
+    JSR Spr_Place12
     CLC
     RTS
 
 .t3plus:
-    BRL Sub_C73A            ; type 3+ delegates to full renderer at $C73A
+    BRL Spr_Place24         ; size 3: always re-placed
 
+; ============================================================
+; $C0:B788 — Spr_Place4 (322 bytes, $B788–$B8C9)
+; (was Sub_B788.) Re-places a 4-tile (size 0) object: with DB=$7F,
+; each SprTile record's X = Spr_BaseX + OfsX (bit 8 packed into
+; Obj_OamHiA with the large-size bits) and Y = Spr_BaseY + OfsY,
+; clamped to Oam_HiddenY according to the sign of the base and the
+; offset (three clamp variants on Spr_BaseYHi / Spr_BaseY bit 7).
+; On entry: M=1, X/Y 16-bit, X = Obj_Cur.
+; ============================================================
 org $C0B788
-Sub_B788:
+Spr_Place4:
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
-    PLB                     ; DB = $7F — bank $7F staging data now addressable via abs
+    PLB                     ; DB = $7F — bank $7F SprTile data now addressable via abs
     REP #$20                ; M→0 (16-bit A)
-    LDA.l $000A80,X         ; 9-bit X/flip flags (long: DB=$7F doesn't reach bank $00)
-    AND #$01FF
-    STA $C5                 ; dp: C5=lo byte, C6=hi bit (bit 8 of 9-bit value)
-    LDA.l $000A00,X         ; base X coordinate
-    STA $C3                 ; dp: C3=lo, C4=hi
-    STZ $E5
-    LDA.l $001700,X         ; sprite gfx index (16-bit)
-    STA $D9                 ; dp: D9=lo, DA=hi
+    LDA.l !Obj_ScreenY,X    ; long: DB=$7F does not reach bank $00
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY        ; 16-bit: Y bits 0-7 and bit 8
+    LDA.l !Obj_ScreenX,X    ; base X coordinate
+    STA.b !Spr_BaseX        ; 16-bit
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X ; sprite first tile record (16-bit)
+    STA.b !Spr_FirstRec     ; 16-bit
     CLC
-    ADC #$0018              ; start loop at gfx_index + $18 (3 tiles above base)
+    ADC.w #!SprTile_Stride*3 ; start loop at first tile record + $18 (3 tiles above base)
 .b788_loop:
     TAX
-    LDA.w $4BC2,X           ; raw X offset from pre-built table
+    LDA.w SprTile.OfsX,X    ; SprTileSrc X offset from pre-built table
     CLC
-    ADC $C3                 ; add base X
+    ADC.b !Spr_BaseX        ; add base X
     SEP #$20                ; M→1 (8-bit A)
-    STA.w $4BC0,X           ; write X position low byte
+    STA.w SprTile.X,X       ; write X position low byte
     XBA                     ; get high byte (bit 8 of sum = X overflow bit)
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6                 ; pack flip/overflow bits
-    CPX $D9                 ; reached base gfx index?
+    ORA.b !Spr_HiBitTmp     ; pack X bit 8 of this tile
+    CPX.b !Spr_FirstRec     ; reached base first tile record?
     BEQ .b788_post
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20                ; M→0
     TXA
     SEC
-    SBC #$0008              ; step back one tile
+    SBC.w #!SprTile_Stride  ; step back one tile
     BRA .b788_loop
 .b788_post:
-    ORA #$AA                ; set high attribute bits
-    LDX $6D                 ; sprite descriptor index
-    STA.w $4F00,X           ; write to OAM slot
-    LDX $D9                 ; restore gfx base index
-    LDA $C6                 ; check bit 8 of position
-    BEQ .b788_no_c6         ; = 0: dispatch on C5 sign
-    ; C6 != 0: 5-tile Y-clamp (BCC→clamp, BCS→keep)
-    LDA.w $4BC4,X
+    ORA.b #!Oam_HiLarge4    ; set high attribute bits
+    LDX.b !Obj_Cur          ; object slot
+    STA.w !Obj_OamHiA,X     ; packed high-table byte
+    LDX.b !Spr_FirstRec     ; restore gfx base index
+    LDA.b !Spr_BaseYHi      ; check bit 8 of position
+    BEQ .b788_no_c6         ; = 0: dispatch on Spr_BaseY sign
+    ; Spr_BaseYHi != 0: 5-tile Y-clamp (BCC→clamp, BCS→keep)
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_c6_cl1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_c6_st1
 .b788_c6_cl1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_c6_st1:
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_c6_cl2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_c6_st2
 .b788_c6_cl2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_c6_st2:
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_c6_cl3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_c6_st3
 .b788_c6_cl3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_c6_st3:
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_c6_cl4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_c6_st4
 .b788_c6_cl4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_c6_st4:
-    STA.w $4BD9,X
-    LDA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_c6_cl5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_c6_st5
 .b788_c6_cl5:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_c6_st5:
-    STA.w $4BE1,X
+    STA.w SprTile[4].Y,X
     SEP #$20
     PLB
     RTS
 .b788_no_c6:
-    LDA $C5
-    BPL .b788_pos_c5        ; C5 bit 7 = 0: positive path
-    ; negative C5: 4-tile Y-clamp (BCC+BCC→keep, else clamp)
-    LDA.w $4BC4,X
+    LDA.b !Spr_BaseY
+    BPL .b788_pos_c5        ; Spr_BaseY bit 7 = 0: positive path
+    ; negative Spr_BaseY: 4-tile Y-clamp (BCC+BCC→keep, else clamp)
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_n1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b788_n1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_n1:
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_n2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b788_n2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_n2:
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_n3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b788_n3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_n3:
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b788_n4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b788_n4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_n4:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
     SEP #$20
     PLB
     RTS
 .b788_pos_c5:
-    ; positive C5: 4-tile Y-clamp (BPL+BCS→keep, else clamp)
-    LDA.w $4BC4,X
+    ; positive Spr_BaseY: 4-tile Y-clamp (BPL+BCS→keep, else clamp)
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b788_p1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_p1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_p1:
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b788_p2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_p2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_p2:
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b788_p3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_p3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_p3:
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b788_p4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b788_p4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b788_p4:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
     SEP #$20
     PLB
     RTS
 
+; ============================================================
+; $C0:C6E7 — Spr_PackHiBits4 (83 bytes, $C6E7–$C739)
+; (was Sub_C6E7.) For the 4 SprTile records starting at X: X =
+; Spr_BaseX + OfsX, and returns in A the OAM high-table byte for
+; them (X bit 8 of each, large-size bits set). Used 6 times by
+; Spr_Place24. DB = $7F.
+; ============================================================
 org $C0C6E7
-Sub_C6E7:
-    ; Called from Sub_C73A 6 times, X = gfx index for current 4-tile group.
-    ; Computes X positions for 4 sprite tiles from $4BC2/CA/D2/DA into $4BC0/C8/D0/D8,
+Spr_PackHiBits4:
+    ; Called from Spr_Place24 6 times, X = first tile record for current 4-tile group.
+    ; Computes X positions for 4 sprite tiles from SprTile.OfsX/CA/D2/DA into SprTile.X/C8/D0/D8,
     ; packs their X-overflow bits, and returns the OAM high-table byte in A.
-    ; Entry: M=0 (16-bit A), X = gfx index.  Exit: M=1, A = packed OAM attr byte.
-    LDA.w $4BC2,X
+    ; Entry: M=0 (16-bit A), X = first tile record.  Exit: M=1, A = packed OAM attr byte.
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3                 ; add base X (16-bit)
+    ADC.b !Spr_BaseX        ; add base X (16-bit)
     SEP #$20                ; M→1
-    STA.w $4BC0,X           ; store tile 0 X low byte
+    STA.w SprTile.X,X       ; store tile 0 X low byte
     XBA
     AND #$01
-    STA $E5                 ; tile 0 X overflow bit
+    STA.b !Spr_HiBits       ; tile 0 X overflow bit
 
     REP #$20                ; M→0
-    LDA.w $4BCA,X
+    LDA.w SprTile[1].OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC8,X
+    STA.w SprTile[1].X,X
     XBA
     AND #$01
-    STA $E6                 ; tile 1 X overflow bit
+    STA.b !Spr_HiBitTmp     ; tile 1 X overflow bit
 
     REP #$20
-    LDA.w $4BD2,X
+    LDA.w SprTile[2].OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BD0,X
+    STA.w SprTile[2].X,X
     XBA
     AND #$01
-    STA $E7                 ; tile 2 X overflow bit
+    STA.b !Spr_HiBitTmp2    ; tile 2 X overflow bit
 
     REP #$20
-    LDA.w $4BDA,X
+    LDA.w SprTile[3].OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BD8,X
+    STA.w SprTile[3].X,X
     XBA
     AND #$01                ; tile 3 X overflow bit in A[0]
     ASL A
     ASL A
-    ORA $E7                 ; pack: (bit3<<2) | bit2
+    ORA.b !Spr_HiBitTmp2    ; pack: (bit3<<2) | bit2
     ASL A
     ASL A
-    ORA $E6                 ; pack: (bit3<<4) | (bit2<<2) | bit1
+    ORA.b !Spr_HiBitTmp     ; pack: (bit3<<4) | (bit2<<2) | bit1
     ASL A
     ASL A
-    ORA $E5                 ; pack: (bit3<<6) | (bit2<<4) | (bit1<<2) | bit0
-    ORA #$AA                ; set size bits (SNES OAM: bit pairs = [xhi, size])
+    ORA.b !Spr_HiBits       ; pack: (bit3<<6) | (bit2<<4) | (bit1<<2) | bit0
+    ORA.b #!Oam_HiLarge4    ; set size bits (SNES OAM: bit pairs = [xhi, size])
     RTS
 
+; ============================================================
+; $C0:C73A — Spr_Place24 (592 bytes, $C73A–$C989)
+; (was Sub_C73A.) Re-places a 24-tile (size 3) object: six
+; Spr_PackHiBits4 groups fill Obj_OamHiA/B/C, then all 24 Y
+; positions are rebuilt from Spr_BaseY + OfsY with the clamp variant
+; chosen by Spr_BaseYHi / Spr_BaseY bit 7. Reached by BRL from
+; Spr_PrepareTiles.
+; ============================================================
 org $C0C73A
-Sub_C73A:
-    ; 592 bytes ($C73A-$C989). Entry M=1, X=1 (from Sub_B701 type-3+ BRL).
-    ; DB=$7F prologue, 6× JSR Sub_C6E7 for OAM X-bits, then 3-way 24-tile Y-clamp.
+Spr_Place24:
+    ; 592 bytes ($C73A-$C989). Entry M=1, X=1 (from Spr_PrepareTiles type-3+ BRL).
+    ; DB=$7F prologue, 6× JSR Spr_PackHiBits4 for OAM X-bits, then 3-way 24-tile Y-clamp.
 
     ; ── Prologue: DB=$7F ────────────────────────────────────────────────────────
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB                         ; DB=$7F
 
     ; ── Load sprite params ───────────────────────────────────────────────────────
     REP #$20                    ; M→0
-    LDX $6D                     ; sprite/OAM slot index (8-bit X)
-    LDA.l $000A80,X             ; 9-bit Y position value
-    AND #$01FF
-    STA $C5                     ; C5=lo byte, C6=hi bit (bit 8)
-    LDA.l $000A00,X             ; base X coordinate
-    STA $C3
-    LDA.l $001700,X             ; gfx index
-    TAX                         ; X = gfx_index (8-bit capture)
+    LDX.b !Obj_Cur              ; object slot (8-bit X)
+    LDA.l !Obj_ScreenY,X        ; 9-bit Y position value
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY            ; Spr_BaseY=lo byte, Spr_BaseYHi=hi bit (bit 8)
+    LDA.l !Obj_ScreenX,X        ; base X coordinate
+    STA.b !Spr_BaseX
+    LDA.l !Obj_TileRecOfs,X     ; first tile record
+    TAX                         ; X = first tile record (8-bit capture)
 
-    ; ── 6× JSR Sub_C6E7 ─────────────────────────────────────────────────────────
-    ; Each call: entry M=0, X=gfx_index; exit M=1, A=packed OAM byte.
-    ; After each call (except last): save X, load OAM slot, write OAM byte,
-    ;   restore X, REP, TXA+ADC #$20+TAX to advance gfx_index by $20.
-    JSR Sub_C6E7                ; call 1 — gfx_index
-    STX $D9
-    LDX $6D
-    STA.w $4F00,X
-    LDX $D9
+    ; ── 6× JSR Spr_PackHiBits4 ─────────────────────────────────────────────────────────
+    ; Each call: entry M=0, X=first tile record; exit M=1, A=packed OAM byte.
+    ; After each call (except last): save X, load the object slot, store the high-table byte,
+    ;   restore X, REP, TXA+ADC #$20+TAX to advance first tile record by $20.
+    JSR Spr_PackHiBits4                ; call 1 — first tile record
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X
+    LDX.b !Spr_FirstRec
     REP #$20
     TXA
     CLC
-    ADC #$0020
+    ADC.w #!SprTile_Stride*4
     TAX
-    JSR Sub_C6E7                ; call 2 — gfx_index+$20
-    STX $D9
-    LDX $6D
-    STA.w $4F01,X
-    LDX $D9
+    JSR Spr_PackHiBits4                ; call 2 — first record + $20
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w SprTile[104].Y,X
+    LDX.b !Spr_FirstRec
     REP #$20
     TXA
     CLC
-    ADC #$0020
+    ADC.w #!SprTile_Stride*4
     TAX
-    JSR Sub_C6E7                ; call 3 — gfx_index+$40
-    STX $D9
-    LDX $6D
-    STA.w $4B40,X
-    LDX $D9
+    JSR Spr_PackHiBits4                ; call 3 — first record + $40
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiB,X
+    LDX.b !Spr_FirstRec
     REP #$20
     TXA
     CLC
-    ADC #$0020
+    ADC.w #!SprTile_Stride*4
     TAX
-    JSR Sub_C6E7                ; call 4 — gfx_index+$60
-    STX $D9
-    LDX $6D
-    STA.w $4B41,X
-    LDX $D9
+    JSR Spr_PackHiBits4                ; call 4 — first record + $60
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w SprTileSrc[104].Y,X
+    LDX.b !Spr_FirstRec
     REP #$20
     TXA
     CLC
-    ADC #$0020
+    ADC.w #!SprTile_Stride*4
     TAX
-    JSR Sub_C6E7                ; call 5 — gfx_index+$80
-    STX $D9
-    LDX $6D
-    STA.w $4F80,X
-    LDX $D9
+    JSR Spr_PackHiBits4                ; call 5 — first record + $80
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiC,X
+    LDX.b !Spr_FirstRec
     REP #$20
     TXA
     CLC
-    ADC #$0020
+    ADC.w #!SprTile_Stride*4
     TAX
-    JSR Sub_C6E7                ; call 6 — gfx_index+$A0
-    STX $D9
-    LDX $6D
-    STA.w $4F81,X
-    LDX $6D                     ; reload OAM slot (not $D9) for gfx_index lookup
+    JSR Spr_PackHiBits4                ; call 6 — first record + $A0
+    STX.b !Spr_FirstRec
+    LDX.b !Obj_Cur
+    STA.w SprTile[120].Y,X
+    LDX.b !Obj_Cur              ; reload the object slot
     REP #$20
-    LDA.l $001700,X             ; reload original gfx_index for Y-clamp pass
+    LDA.l !Obj_TileRecOfs,X     ; first tile record again for the Y pass
     TAX
     SEP #$20                    ; M→1
 
     ; ── Y-position 3-way dispatch ────────────────────────────────────────────────
-    LDA $C6
-    BEQ .c73a_chk_c5            ; C6=0: check C5 next
-    BRL $0049                   ; C6≠0: → .c73a_c6nz [$C820; offset=$C820-$C7D7=$0049]
+    LDA.b !Spr_BaseYHi
+    BEQ .c73a_chk_c5            ; Spr_BaseYHi=0: check Spr_BaseY next
+    BRL .c73a_c6nz                   ; Spr_BaseYHi≠0: → .c73a_c6nz
 .c73a_chk_c5:
-    LDA $C5
-    BMI .c73a_large_c5          ; C5≥$80: no-clamp path
-    BRL $001D                   ; C5<$80: clamp path → .c73a_small_c5 [$C7FB; offset=$C7FB-$C7DE=$001D]
+    LDA.b !Spr_BaseY
+    BMI .c73a_large_c5          ; Spr_BaseY≥$80: no-clamp path
+    BRL .c73a_small_c5                   ; Spr_BaseY<$80: clamp path → .c73a_small_c5
 
-    ; ── C6=0, C5≥$80: 24-tile add with no clamping ───────────────────────────────
+    ; ── Spr_BaseYHi=0, Spr_BaseY≥$80: 24-tile add with no clamping ───────────────────────────────
 .c73a_large_c5:
-    LDA #$18
-    STA $C9                     ; counter = 24
+    LDA.b #!Spr_Size3Tiles
+    STA.b !Spr_TileCount        ; counter = 24
 .c73a_large_loop:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BC1,X               ; store Y (no clamp; overflow wraps)
+    ADC.b !Spr_BaseY
+    STA.w SprTile.Y,X           ; store Y (no clamp; overflow wraps)
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .c73a_large_loop
     PLB
     RTS
 
-    ; ── C6=0, C5<$80: 24-tile add, clamp $80–$DF to $E0 ─────────────────────────
+    ; ── Spr_BaseYHi=0, Spr_BaseY<$80: 24-tile add, clamp $80–$DF to $E0 ─────────────────────────
 .c73a_small_c5:
-    LDA #$18
-    STA $C9
+    LDA.b #!Spr_Size3Tiles
+    STA.b !Spr_TileCount
 .c73a_small_loop:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c73a_small_store       ; 0–$7F: store as-is
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c73a_small_store       ; $E0–$FF: already off-screen, store as-is
-    LDA #$E0                    ; $80–$DF: clamp to $E0
+    LDA.b #!Oam_HiddenY         ; $80–$DF: clamp to $E0
 .c73a_small_store:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
     REP #$20
     TXA
     CLC
-    ADC #$0008
+    ADC.w #!SprTile_Stride
     TAX
     SEP #$20
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .c73a_small_loop
     PLB
     RTS
 
-    ; ── C6≠0: unrolled 24-tile Y-clamp (BCS→clamp, BMI→clamp, else store) ────────
+    ; ── Spr_BaseYHi≠0: unrolled 24-tile Y-clamp (BCS→clamp, BMI→clamp, else store) ────────
     ; Clamp fires if: sum overflows (BCS) or result is $80–$FF with no overflow (BMI).
     ; Only 0–$7F passes through unclamped.
 .c73a_c6nz:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl00
     BPL .c73a_st00
-.c73a_cl00: LDA #$E0
-.c73a_st00: STA.w $4BC1,X
-    LDA.w $4BCC,X
+.c73a_cl00: LDA.b #!Oam_HiddenY
+.c73a_st00: STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl01
     BPL .c73a_st01
-.c73a_cl01: LDA #$E0
-.c73a_st01: STA.w $4BC9,X
-    LDA.w $4BD4,X
+.c73a_cl01: LDA.b #!Oam_HiddenY
+.c73a_st01: STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl02
     BPL .c73a_st02
-.c73a_cl02: LDA #$E0
-.c73a_st02: STA.w $4BD1,X
-    LDA.w $4BDC,X
+.c73a_cl02: LDA.b #!Oam_HiddenY
+.c73a_st02: STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl03
     BPL .c73a_st03
-.c73a_cl03: LDA #$E0
-.c73a_st03: STA.w $4BD9,X
-    LDA.w $4BE4,X
+.c73a_cl03: LDA.b #!Oam_HiddenY
+.c73a_st03: STA.w SprTile[3].Y,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl04
     BPL .c73a_st04
-.c73a_cl04: LDA #$E0
-.c73a_st04: STA.w $4BE1,X
-    LDA.w $4BEC,X
+.c73a_cl04: LDA.b #!Oam_HiddenY
+.c73a_st04: STA.w SprTile[4].Y,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl05
     BPL .c73a_st05
-.c73a_cl05: LDA #$E0
-.c73a_st05: STA.w $4BE9,X
-    LDA.w $4BF4,X
+.c73a_cl05: LDA.b #!Oam_HiddenY
+.c73a_st05: STA.w SprTile[5].Y,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl06
     BPL .c73a_st06
-.c73a_cl06: LDA #$E0
-.c73a_st06: STA.w $4BF1,X
-    LDA.w $4BFC,X
+.c73a_cl06: LDA.b #!Oam_HiddenY
+.c73a_st06: STA.w SprTile[6].Y,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl07
     BPL .c73a_st07
-.c73a_cl07: LDA #$E0
-.c73a_st07: STA.w $4BF9,X
-    LDA.w $4C04,X
+.c73a_cl07: LDA.b #!Oam_HiddenY
+.c73a_st07: STA.w SprTile[7].Y,X
+    LDA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl08
     BPL .c73a_st08
-.c73a_cl08: LDA #$E0
-.c73a_st08: STA.w $4C01,X
-    LDA.w $4C0C,X
+.c73a_cl08: LDA.b #!Oam_HiddenY
+.c73a_st08: STA.w SprTile[8].Y,X
+    LDA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl09
     BPL .c73a_st09
-.c73a_cl09: LDA #$E0
-.c73a_st09: STA.w $4C09,X
-    LDA.w $4C14,X
+.c73a_cl09: LDA.b #!Oam_HiddenY
+.c73a_st09: STA.w SprTile[9].Y,X
+    LDA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl10
     BPL .c73a_st10
-.c73a_cl10: LDA #$E0
-.c73a_st10: STA.w $4C11,X
-    LDA.w $4C1C,X
+.c73a_cl10: LDA.b #!Oam_HiddenY
+.c73a_st10: STA.w SprTile[10].Y,X
+    LDA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl11
     BPL .c73a_st11
-.c73a_cl11: LDA #$E0
-.c73a_st11: STA.w $4C19,X
-    LDA.w $4C24,X
+.c73a_cl11: LDA.b #!Oam_HiddenY
+.c73a_st11: STA.w SprTile[11].Y,X
+    LDA.w SprTile[12].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl12
     BPL .c73a_st12
-.c73a_cl12: LDA #$E0
-.c73a_st12: STA.w $4C21,X
-    LDA.w $4C2C,X
+.c73a_cl12: LDA.b #!Oam_HiddenY
+.c73a_st12: STA.w SprTile[12].Y,X
+    LDA.w SprTile[13].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl13
     BPL .c73a_st13
-.c73a_cl13: LDA #$E0
-.c73a_st13: STA.w $4C29,X
-    LDA.w $4C34,X
+.c73a_cl13: LDA.b #!Oam_HiddenY
+.c73a_st13: STA.w SprTile[13].Y,X
+    LDA.w SprTile[14].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl14
     BPL .c73a_st14
-.c73a_cl14: LDA #$E0
-.c73a_st14: STA.w $4C31,X
-    LDA.w $4C3C,X
+.c73a_cl14: LDA.b #!Oam_HiddenY
+.c73a_st14: STA.w SprTile[14].Y,X
+    LDA.w SprTile[15].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl15
     BPL .c73a_st15
-.c73a_cl15: LDA #$E0
-.c73a_st15: STA.w $4C39,X
-    LDA.w $4C44,X
+.c73a_cl15: LDA.b #!Oam_HiddenY
+.c73a_st15: STA.w SprTile[15].Y,X
+    LDA.w SprTile[16].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl16
     BPL .c73a_st16
-.c73a_cl16: LDA #$E0
-.c73a_st16: STA.w $4C41,X
-    LDA.w $4C4C,X
+.c73a_cl16: LDA.b #!Oam_HiddenY
+.c73a_st16: STA.w SprTile[16].Y,X
+    LDA.w SprTile[17].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl17
     BPL .c73a_st17
-.c73a_cl17: LDA #$E0
-.c73a_st17: STA.w $4C49,X
-    LDA.w $4C54,X
+.c73a_cl17: LDA.b #!Oam_HiddenY
+.c73a_st17: STA.w SprTile[17].Y,X
+    LDA.w SprTile[18].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl18
     BPL .c73a_st18
-.c73a_cl18: LDA #$E0
-.c73a_st18: STA.w $4C51,X
-    LDA.w $4C5C,X
+.c73a_cl18: LDA.b #!Oam_HiddenY
+.c73a_st18: STA.w SprTile[18].Y,X
+    LDA.w SprTile[19].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl19
     BPL .c73a_st19
-.c73a_cl19: LDA #$E0
-.c73a_st19: STA.w $4C59,X
-    LDA.w $4C64,X
+.c73a_cl19: LDA.b #!Oam_HiddenY
+.c73a_st19: STA.w SprTile[19].Y,X
+    LDA.w SprTile[20].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl20
     BPL .c73a_st20
-.c73a_cl20: LDA #$E0
-.c73a_st20: STA.w $4C61,X
-    LDA.w $4C6C,X
+.c73a_cl20: LDA.b #!Oam_HiddenY
+.c73a_st20: STA.w SprTile[20].Y,X
+    LDA.w SprTile[21].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl21
     BPL .c73a_st21
-.c73a_cl21: LDA #$E0
-.c73a_st21: STA.w $4C69,X
-    LDA.w $4C74,X
+.c73a_cl21: LDA.b #!Oam_HiddenY
+.c73a_st21: STA.w SprTile[21].Y,X
+    LDA.w SprTile[22].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl22
     BPL .c73a_st22
-.c73a_cl22: LDA #$E0
-.c73a_st22: STA.w $4C71,X
-    LDA.w $4C7C,X
+.c73a_cl22: LDA.b #!Oam_HiddenY
+.c73a_st22: STA.w SprTile[22].Y,X
+    LDA.w SprTile[23].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c73a_cl23
     BPL .c73a_st23
-.c73a_cl23: LDA #$E0
-.c73a_st23: STA.w $4C79,X
+.c73a_cl23: LDA.b #!Oam_HiddenY
+.c73a_st23: STA.w SprTile[23].Y,X
     PLB
     RTS
 
 ; ============================================================
 ; $C0:C98A — Obj_AnimTickAndQueue (236 bytes, $C98A–$CA75)
-; Per-frame animation tick and sprite-frame queuer.
-; Called once per slot from the main entity loop ($C0:A832, $C0:A878).
-; Decrements the per-slot animation timer ($1601,X). When it expires,
-; arbitrates which entity slot becomes the primary/secondary "focus"
-; (tracked in $76/$77), computes the animation frame-entry address from
-; $1580,X + row*4 + column, reads the frame-step byte from bank $E4,
-; stores it back as the new timer, and adjusts $1681,X (column counter).
-; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit). $6D = current entity slot.
-; Modifies: $76, $77, $78, $C1, $1081,X, $1601,X, $1681,X.
+; Per-object animation tick, called for object Obj_Cur from the
+; object loop ($C0:A832, $C0:A878). Counts Obj_AnimTimer down; when it
+; runs out the object moves to its next frame:
+;   - it is put in the frame-build queue (ObjQ_Head / ObjQ_Tail, linked
+;     through Obj_QueueNext) unless already there: at the head when
+;     Obj_Unk1100 is 0 (or 1/2 with ObjQ_Unk78 = 2), else at the tail;
+;   - Obj_AnimColumn advances, and the new frame's duration is read
+;     from bank $E4 at Obj_AnimTimeTbl + row*4 + column. A zero
+;     duration ends the row: the row's first entry becomes the timer
+;     and the column restarts (mode 2 counts ObjX_AnimLoops first).
+; Earlier notes described the queue as primary/secondary "focus" slots.
+; Entry: M=1, X/Y 8-bit, Obj_Cur = object.
 ; ============================================================
 org $C0C98A
 Obj_AnimTickAndQueue:
-    LDX $6D               ; current entity slot index
-    LDA $1601,X           ; per-slot animation timer
+    LDX.b !Obj_Cur        ; current entity slot index
+    LDA.w !Obj_AnimTimer,X ; per-slot animation timer
     BEQ .tick_done        ; already zero → execute now
-    DEC $1601,X           ; count down
+    DEC.w !Obj_AnimTimer,X ; count down
     BEQ .tick_done        ; just expired → execute
 .rts:
     RTS                   ; $C996 — timer still running, early exit
 .tick_done:               ; $C997
-    LDA $1100,X           ; sprite state flags
+    LDA.w !Obj_Unk1100,X  ; sprite state flags
     BEQ .no_type          ; 0 → slot has no type/owner
     BMI .rts              ; bit7 set → inactive slot, return
     CMP #$01
     BEQ .type_1_or_2      ; type 1
     CMP #$02
     BEQ .type_1_or_2      ; type 2
-    CPX $77               ; is this slot already the secondary focus?
+    CPX.b !ObjQ_Tail      ; is this slot already the queue tail?
     BEQ .rts              ; yes → no change needed
-    LDA $77               ; load secondary focus slot index
+    LDA.b !ObjQ_Tail      ; load queue tail slot index
     BMI .promote_sec      ; negative ($80) = no secondary → promote
-    LDA $1081,X           ; shadow field of current slot
+    LDA.w !Obj_QueueNext,X ; Obj_QueueNext of current slot
     BPL .rts              ; non-negative → slot occupied, skip
 .promote_sec:             ; $C9B3
     TXA                   ; A = current slot index
-    LDX $77               ; X = current secondary focus slot
-    CPX #$80              ; secondary empty ($80)?
+    LDX.b !ObjQ_Tail      ; X = current queue tail slot
+    CPX.b #!ObjQ_Empty    ; secondary empty ($80)?
     BPL .set_both2        ; yes → A already holds current slot, set both
-    STA.w $1081,X         ; link old secondary's shadow → current slot
-    STA $77               ; secondary focus = current slot (A)
+    STA.w !Obj_QueueNext,X ; link old secondary's shadow → current slot
+    STA.b !ObjQ_Tail      ; queue tail = current slot (A)
     TAX                   ; X = current slot
-    INC $1681,X           ; advance animation column counter
+    INC.w !Obj_AnimColumn,X ; advance animation column counter
     BRA .do_anim
 .set_both1:               ; $C9C5 — from .no_type when primary is negative
     TXA                   ; A = current slot (X = current, A was primary)
 .set_both2:               ; $C9C6 — from .promote_sec / .promote_sec2 when slot empty
-    STA $77               ; secondary focus = current slot
-    STA $76               ; primary focus = current slot
+    STA.b !ObjQ_Tail      ; queue tail = current slot
+    STA.b !ObjQ_Head      ; queue head = current slot
     TAX                   ; X = current slot
-    INC $1681,X
+    INC.w !Obj_AnimColumn,X
     BRA .do_anim
 .no_type:                 ; $C9D0
-    CPX $76               ; is this slot already the primary focus?
+    CPX.b !ObjQ_Head      ; is this slot already the queue head?
     BEQ .rts              ; yes → no change
-    LDA $76               ; load primary focus slot index
+    LDA.b !ObjQ_Head      ; load queue head slot index
     BMI .set_both1        ; negative → no primary, set this as both
-    STA.w $1081,X         ; link primary into current's shadow
-    STX $76               ; primary focus = current slot
-    INC $1681,X
+    STA.w !Obj_QueueNext,X ; link primary into current's shadow
+    STX.b !ObjQ_Head      ; queue head = current slot
+    INC.w !Obj_AnimColumn,X
     BRA .do_anim
 .type_1_or_2:             ; $C9E2
-    LDA $78               ; tertiary mode flag
+    LDA.b !ObjQ_Unk78     ; tertiary mode flag
     CMP #$02
     BNE .type_sec         ; not 2 → check secondary
-    STZ $78               ; reset tertiary mode
+    STZ.b !ObjQ_Unk78     ; reset tertiary mode
     BRA .no_type          ; re-run as type-0 path
 .type_sec:                ; $C9EC
-    CPX $77               ; is this slot already the secondary focus?
+    CPX.b !ObjQ_Tail      ; is this slot already the queue tail?
     BEQ .rts              ; yes → no change
-    LDA $77
+    LDA.b !ObjQ_Tail
     BMI .promote_sec2     ; negative → no secondary, promote
-    LDA $1081,X           ; shadow field
+    LDA.w !Obj_QueueNext,X ; Obj_QueueNext
     BPL .rts              ; occupied → skip
 .promote_sec2:            ; $C9F9
     TXA
-    LDX $77
-    CPX #$80
+    LDX.b !ObjQ_Tail
+    CPX.b #!ObjQ_Empty
     BPL .set_both2        ; empty secondary → set both (skip TXA)
-    STA.w $1081,X
-    STA $77
+    STA.w !Obj_QueueNext,X
+    STA.b !ObjQ_Tail
     TAX
-    INC $1681,X
+    INC.w !Obj_AnimColumn,X
 .do_anim:                 ; $CA09 — fall-through from .promote_sec2 and BRAs above
-    LDX $6D               ; reload entity slot
-    LDA $1780,X           ; animation mode byte
+    LDX.b !Obj_Cur        ; reload entity slot
+    LDA.w !Obj_AnimMode,X ; animation mode byte
     BEQ .use_primary_row  ; mode 0 → use primary row
     DEC                   ; mode - 1
     BEQ .use_primary_row  ; mode 1 → use primary row
-    LDA $1781,X           ; mode >= 2 → use secondary row byte
+    LDA.w !Obj_AnimRowAlt,X ; mode >= 2 → use secondary row byte
     BRA .got_row
 .use_primary_row:         ; $CA18
-    LDA $1680,X           ; primary animation row byte
+    LDA.w !Obj_AnimRow,X  ; primary animation row byte
 .got_row:                 ; $CA1B
     REP #$20              ; A=16-bit
-    AND #$00FF            ; zero high byte
+    AND.w #!Eng_LowByteMask ; zero high byte
     ASL                   ; row × 2
     ASL                   ; row × 4 (frame row offset)
     CLC
-    ADC $1580,X           ; + slot base pointer → frame row address
-    STA $C1               ; save frame row address (16-bit)
-    LDA $1681,X           ; animation column counter (16-bit)
-    AND #$00FF            ; zero high byte
-    ADC $C1               ; + frame row = frame-entry address (carry from ADC above)
+    ADC.w !Obj_AnimTimeTbl,X ; + slot base pointer → frame row address
+    STA.b !Anim_RowAddr   ; save frame row address (16-bit)
+    LDA.w !Obj_AnimColumn,X ; animation column counter (16-bit)
+    AND.w #!Eng_LowByteMask ; zero high byte
+    ADC.b !Anim_RowAddr   ; + frame row = frame-entry address (carry from ADC above)
     REP #$10              ; X=16-bit
     TAX                   ; X = 16-bit frame-entry address
     SEP #$20              ; A=8-bit
-    LDA $E40000,X         ; read frame-step byte from bank $E4 sprite table
+    LDA.l !AnimRom,X      ; read frame-step byte from bank $E4 sprite table
     BNE .got_frame        ; nonzero → use as timer
-    LDX $C1               ; X = frame row base address (16-bit)
-    LDA $E40000,X         ; read row-base frame value from bank $E4
+    LDX.b !Anim_RowAddr   ; X = frame row base address (16-bit)
+    LDA.l !AnimRom,X      ; read row-base frame value from bank $E4
     SEP #$10              ; X=8-bit
-    LDX $6D               ; reload entity slot
-    STA.w $1601,X         ; store row-base byte as new timer
-    LDA $1780,X           ; check animation mode
+    LDX.b !Obj_Cur        ; reload entity slot
+    STA.w !Obj_AnimTimer,X ; store row-base byte as new timer
+    LDA.w !Obj_AnimMode,X ; check animation mode
     CMP #$02
     BNE .mode_simple      ; mode != 2 → simple clear and return
-    LDA $7F0B01,X         ; long: loop-count byte for this slot ($7F:0B01+X)
+    LDA.l !ObjX_AnimLoops,X ; long: loop-count byte for this slot (ObjX_AnimLoops)
     DEC
     BEQ .loop_end         ; hit 0 → decrement column counter
     DEC
     BEQ .loop_one         ; hit 0 (was 2) → bump counter then decrement column
-    STA $7F0B01,X         ; store updated loop count
-    STZ.w $1681,X         ; reset animation column counter
+    STA.l !ObjX_AnimLoops,X ; store updated loop count
+    STZ.w !Obj_AnimColumn,X ; reset animation column counter
     RTS
 .loop_one:                ; $CA61
     INC
-    STA $7F0B01,X
+    STA.l !ObjX_AnimLoops,X
 .loop_end:                ; $CA66
-    DEC $1681,X           ; decrement animation column counter
+    DEC.w !Obj_AnimColumn,X ; decrement animation column counter
     RTS
 .mode_simple:             ; $CA6A
-    STZ.w $1681,X         ; clear animation column counter
+    STZ.w !Obj_AnimColumn,X ; clear animation column counter
     RTS
 .got_frame:               ; $CA6E — A = nonzero frame-step byte, X still 16-bit
     SEP #$10              ; X=8-bit
-    LDX $6D               ; reload entity slot
-    STA.w $1601,X         ; store frame-step byte as new animation timer
+    LDX.b !Obj_Cur        ; reload entity slot
+    STA.w !Obj_AnimTimer,X ; store frame-step byte as new animation timer
     RTS
 
 ; ============================================================
 ; $C0:CA76 — Field_ProcessAnimQueue (99 bytes, $CA76–$CAD8)
-; VBlank-time sprite animation queue processor.
-; Called from VBlankHandler ($C0:00BF). Guards against $09A0 being
-; nonzero (already processing). Latches the H/V scanline counter and
-; checks the current vertical position: exits if too far into the
-; active display ($6B ≤ V < $F0). If within the safe window, iterates
-; through the focus-slot chain ($76/$77), calling Obj_BuildSpriteFrameStep
-; for each slot. When a step completes (carry clear), the slot's
-; shadow ($1081,X) is marked invalid ($80) and focus variables are
-; updated. Loops back to re-latch V and process the next slot.
-; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit).
-; Modifies: $6D, $76, $77, $79, $1081,X. Reads: $09A0, $6B, $213D.
+; Builds queued object frames while there is time left in the frame,
+; called from VBlankHandler. Skips the frame if the previous VRAM
+; upload queue (VramQ_Valid) is still pending. Otherwise, while the
+; V counter is past line 240 or below ObjQ_ScanlineLimit, it takes the
+; queue head into Obj_Cur and runs Obj_BuildSpriteFrameStep; when that
+; returns C=0 (step finished) the head is unlinked (Obj_QueueNext =
+; $80) and the queue advances; C=1 retries the same object.
+; Entry: M=1, X/Y 8-bit.
 ; ============================================================
 org $C0CA76
 Field_ProcessAnimQueue:
-    LDA $09A0             ; animation-queue busy / processed flag
+    LDA.w !VramQ_Valid    ; animation-queue busy / processed flag
     BEQ .proceed          ; zero → proceed
     RTS                   ; nonzero → already done this frame, exit
 .proceed:                 ; $CA7C
     REP #$10              ; X=16-bit (NOP: immediately reset below)
     SEP #$10              ; X=8-bit
-    STZ $79               ; clear scratch byte
-    LDA $213F             ; STAT78: read PPU status (arms latch)
+    STZ.b !VramQ_Pos      ; clear scratch byte
+    LDA.w STAT78          ; STAT78: read PPU status (arms latch)
 .latch:                   ; $CA85 — loop re-entry point for each slot step
-    LDA $2137             ; SLHV:  software-latch H/V counters
-    LDA $213D             ; OPVCT: read vertical counter (low byte)
+    LDA.w SLHV            ; SLHV:  software-latch H/V counters
+    LDA.w OPVCT           ; OPVCT: read vertical counter (low byte)
     XBA                   ; save low byte in B
-    LDA $213D             ; OPVCT: read vertical counter (high bit)
+    LDA.w OPVCT           ; OPVCT: read vertical counter (high bit)
     AND #$01              ; keep only bit 0 (9th bit of V)
     XBA                   ; restore low byte (B = high bit)
     REP #$20              ; A=16-bit: A[7:0]=V_low, A[15:8]=V_high_bit
-    CMP #$00F0            ; compare with scanline 240 (vblank)
+    CMP.w #!Ppu_FirstHiddenLine ; compare with scanline 240 (vblank)
     BPL .in_window        ; V >= 240 → safe window, proceed
-    CMP $6B               ; compare with threshold
+    CMP.b !ObjQ_ScanlineLimit ; compare with threshold
     BCS .exit_sep         ; V >= $6B → too close to display, exit
 .in_window:               ; $CA9D
     LDA #$0000            ; clear A (16-bit zero)
     SEP #$20              ; A=8-bit
-    LDA $76               ; primary focus slot index
+    LDA.b !ObjQ_Head      ; queue head slot index
     BMI .exit_rts         ; negative ($80) = no valid slot, exit
-    STA $6D               ; current slot = primary focus
-    LDA $76
-    CMP $77               ; primary == secondary?
+    STA.b !Obj_Cur        ; current slot = queue head
+    LDA.b !ObjQ_Head
+    CMP.b !ObjQ_Tail      ; primary == secondary?
     BEQ .same_slot        ; yes → single-slot path
     JSR Obj_BuildSpriteFrameStep  ; process primary slot step
     BCS .latch            ; carry set → step not complete, re-latch
-    LDA $76               ; update primary focus via shadow chain
+    LDA.b !ObjQ_Head      ; update queue head via queue links
     TAX
-    LDA $1081,X           ; next slot in shadow chain
-    STA $76               ; advance primary focus
-    LDA #$80
-    STA.w $1081,X         ; mark old primary as invalid ($80)
+    LDA.w !Obj_QueueNext,X ; next slot in queue links
+    STA.b !ObjQ_Head      ; advance queue head
+    LDA.b #!ObjQ_Empty
+    STA.w !Obj_QueueNext,X ; mark old primary as invalid ($80)
     BRA .latch            ; re-latch and continue
 .same_slot:               ; $CAC2 — $76 == $77
     JSR Obj_BuildSpriteFrameStep
     BCS .latch            ; not complete, retry
-    LDA $76
+    LDA.b !ObjQ_Head
     TAX
-    LDA #$80
-    STA.w $1081,X         ; mark slot invalid
-    STA $76               ; primary focus = invalid ($80)
-    STA $77               ; secondary focus = invalid ($80)
+    LDA.b #!ObjQ_Empty
+    STA.w !Obj_QueueNext,X ; mark slot invalid
+    STA.b !ObjQ_Head      ; queue head = invalid ($80)
+    STA.b !ObjQ_Tail      ; queue tail = invalid ($80)
     BRA .latch            ; re-latch
 .exit_rts:                ; $CAD5
     RTS
@@ -1393,34 +1434,30 @@ Field_ProcessAnimQueue:
 
 ; ============================================================
 ; $C0:CAD9 — Obj_BuildSpriteFrameStep (49 bytes, $CAD9–$CB09)
-; Single sprite-frame build step for the current slot ($6D).
-; Validates the slot: skips if $1100,X bit7 set, $1A81,X is zero
-; or negative, or $0F00,X is zero. Then dispatches on bits 0-1 of
-; $1201,X (sprite type/pass index) to the matching frame-builder:
-;   0 → BRL Sub_CBDC (single-slot frame builder)
-;   1 → BRL Sub_CEF5 (8-slot frame builder)
-;   2 → BRL Sub_D4F7 (12-slot frame builder)
-;   3 → CLC + RTS (unrecognised type, no-op)
-; Returns carry set if a frame was produced, carry clear otherwise.
-; Called by: Field_ProcessAnimQueue ($CA76), map-load pass ($C0:B109).
-; Entry: M=1 (A 8-bit), X=1 (X/Y 8-bit). $6D = entity slot.
+; One step of building object Obj_Cur's current frame, graphics
+; included: skips (C=0) unless Obj_Unk1100 bit 7 is clear,
+; Obj_Unk1A81 is 1..$7F and Obj_Unk0F00 is nonzero; then by size class
+; tail-calls Obj_BuildFrame4 / 8 / 12 (size 3: C=0, nothing).
+; C=1 from a builder means "call again" (a multi-pass build).
+; Called by Field_ProcessAnimQueue and the map-load pass ($C0:B109).
+; Entry: M=1, X/Y 8-bit.
 ; ============================================================
 org $C0CAD9
 Obj_BuildSpriteFrameStep:
-    LDX $6D               ; entity slot index
-    LDA $1100,X           ; sprite state flags
+    LDX.b !Obj_Cur        ; entity slot index
+    LDA.w !Obj_Unk1100,X  ; sprite state flags
     BPL .active           ; bit7 clear → slot active
 .no_carry_rts:            ; $CAE0 — shared CLC+RTS exit
     CLC
     RTS
 .active:                  ; $CAE2
-    LDA $1A81,X           ; timer/state byte
+    LDA.w !Obj_Unk1A81,X  ; timer/state byte
     BEQ .no_carry_rts     ; zero → not ready
     BMI .no_carry_rts     ; negative → not ready
-    LDA $0F00,X           ; animation type byte
+    LDA.w !Obj_Unk0F00,X  ; animation type byte
     BEQ .no_carry_rts     ; zero → no animation
-    LDA $1201,X           ; sprite pass/type flags
-    AND #$03              ; isolate bits 0-1
+    LDA.w !Obj_SprSize,X  ; sprite pass/type flags
+    AND.b #!ObjSpr_SizeMask ; isolate bits 0-1
     BEQ .type0            ; 0 → single-slot builder
     CMP #$01
     BNE .check2
@@ -1431,3073 +1468,3075 @@ Obj_BuildSpriteFrameStep:
     CLC
     RTS                   ; 3 → unhandled, no-op
 .type0:
-    BRL $00D8             ; tail-call Sub_CBDC ($CB04 + $00D8 = $CBDC)
+    BRL Obj_BuildFrame4             ; tail-call Obj_BuildFrame4 ($CB04 + $00D8 = $CBDC)
 .type1:
-    BRL $03EE             ; tail-call Sub_CEF5 ($CB07 + $03EE = $CEF5)
+    BRL Obj_BuildFrame8             ; tail-call Obj_BuildFrame8 ($CB07 + $03EE = $CEF5)
 .type2:
-    BRL $09ED             ; tail-call Sub_D4F7 ($CB0A + $09ED = $D4F7)
+    BRL Obj_BuildFrame12             ; tail-call Obj_BuildFrame12 ($CB0A + $09ED = $D4F7)
 
+; ============================================================
+; $C0:B8CA — Spr_Load4 (411 bytes, $B8CA–$BA64)
+; (was Sub_B8CA.) Builds a 4-tile (size 0) object's SprTile records
+; from SprTileSrc (OfsX, OfsY, Tile/Attr), placing them at the
+; object's position as Spr_Place4 does.
+; ============================================================
 org $C0B8CA
-Sub_B8CA:
-    ; 411 bytes ($B8CA-$BA64). Entry M=1, X=1 (X=gfx_index from caller).
-    ; Packs X-overflow bits into OAM attribute byte, copies raw Y-source table
-    ; ($7F:480X) into staging buf ($7F:4BCX), then dispatches Y-clamp on $C6:$C5.
+Spr_Load4:
+    ; 411 bytes ($B8CA-$BA64). Entry M=1, X=1 (X=first tile record from caller).
+    ; Packs X-overflow bits into OAM attribute byte, copies SprTileSrc Y-source table
+    ; ($7F:480X) into SprTile ($7F:4BCX), then dispatches Y-clamp on Spr_BaseYHi:Spr_BaseY.
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB
     REP #$20
-    LDA.l $000A80,X
-    AND #$01FF
-    STA $C5
-    LDA.l $000A00,X
-    STA $C3
-    STZ $E5
-    LDA.l $001700,X
-    STA $D9
+    LDA.l !Obj_ScreenY,X
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY
+    LDA.l !Obj_ScreenX,X
+    STA.b !Spr_BaseX
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X
+    STA.b !Spr_FirstRec
     CLC
-    ADC #$0018              ; A = gfx_index + $18 (first tile is highest)
+    ADC.w #!SprTile_Stride*3 ; A = first tile record + $18 (first tile is highest)
 
-    ; ── X-init loop: copy $7F:4802,X → $7F:4BC2,X; pack 1 overflow bit per tile ─
+    ; ── X-init loop: copy SprTileSrc.OfsX → SprTile.OfsX; pack 1 overflow bit per tile ─
 .b8ca_x_loop:
     TAX                     ; X = decremented tile pointer (or gfx+$18 on first pass)
-    LDA.w $4802,X           ; M=0: 16-bit raw X offset
-    STA.w $4BC2,X           ; copy to staging buf
+    LDA.w SprTileSrc.OfsX,X ; M=0: 16-bit SprTileSrc X offset
+    STA.w SprTile.OfsX,X    ; copy to SprTile
     CLC
-    ADC $C3                 ; add base X coordinate
+    ADC.b !Spr_BaseX        ; add base X coordinate
     SEP #$20                ; M=1
-    STA.w $4BC0,X           ; store X low byte
+    STA.w SprTile.X,X       ; store X low byte
     XBA
     AND #$01                ; extract X bit 8 (overflow)
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $D9
-    BEQ .b8ca_x_done        ; exit when X reaches gfx_index (lowest tile)
-    STA $E5
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_FirstRec
+    BEQ .b8ca_x_done        ; exit when X reaches first tile record (lowest tile)
+    STA.b !Spr_HiBits
     REP #$20                ; M=0
     TXA
     SEC
-    SBC #$0008              ; step to next lower tile
+    SBC.w #!SprTile_Stride  ; step to next lower tile
     BRA .b8ca_x_loop
 
-    ; ── Finalize OAM byte, dispatch on $C6 ────────────────────────────────────
+    ; ── Finalize OAM byte, dispatch on Spr_BaseYHi ────────────────────────────────────
 .b8ca_x_done:
-    ORA #$AA                ; M=1: set OAM size bits; merge last overflow bit
-    LDX $6D
-    STA.w $4F00,X           ; OAM high-table byte for this sprite slot
-    LDX $D9                 ; restore X = gfx_index for Y-clamp pass
-    LDA $C6
+    ORA.b #!Oam_HiLarge4    ; M=1: set OAM size bits; merge last overflow bit
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X     ; OAM high-table byte for this sprite slot
+    LDX.b !Spr_FirstRec     ; restore X = first tile record for Y-clamp pass
+    LDA.b !Spr_BaseYHi
     BEQ .b8ca_c6_zero
 
-    ; ── C6≠0: 5-tile unrolled, BCC→clamp / carry+CMP/BCS→store ─────────────
+    ; ── Spr_BaseYHi≠0: 5-tile unrolled, BCC→clamp / carry+CMP/BCS→store ─────────────
     ; Logic: only carry-set results ≥$E0 pass through; everything else → $E0.
-    LDA.w $4804,X
-    STA.w $4BC4,X           ; copy raw Y-source to staging
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X    ; copy SprTileSrc Y-source to SprTile
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_nz_cl0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_nz_st0
 .b8ca_nz_cl0:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_nz_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_nz_cl1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_nz_st1
 .b8ca_nz_cl1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_nz_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_nz_cl2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_nz_st2
 .b8ca_nz_cl2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_nz_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_nz_cl3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_nz_st3
 .b8ca_nz_cl3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_nz_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
 
-    LDA.w $4BE4,X           ; tile 4: read from staging (no raw-table copy)
+    LDA.w SprTile[4].OfsY,X ; tile 4: read from SprTile (no SprTileSrc-table copy)
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_nz_cl4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_nz_st4
 .b8ca_nz_cl4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_nz_st4:
-    STA.w $4BE1,X
+    STA.w SprTile[4].Y,X
 
-    REP #$20                ; 16-bit epilogue: copy raw 16-bit Y-source → staging
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
+    REP #$20                ; 16-bit epilogue: copy SprTileSrc 16-bit Y-source → SprTile
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
     SEP #$20
     PLB
-    RTS                     ; C6≠0 path exit
+    RTS                     ; Spr_BaseYHi≠0 path exit
 
-    ; ── C6=0 dispatch on C5 bit 7 ─────────────────────────────────────────────
+    ; ── Spr_BaseYHi=0 dispatch on Spr_BaseY bit 7 ─────────────────────────────────────────────
 .b8ca_c6_zero:
-    LDA $C5
+    LDA.b !Spr_BaseY
     BPL .b8ca_pos_c5        ; bit7=0: positive path
 
-    ; ── C6=0 negative path (C5≥$80): 4 tiles, BCC+6/BCC+2 clamp ─────────────
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    ; ── Spr_BaseYHi=0 negative path (Spr_BaseY≥$80): 4 tiles, BCC+6/BCC+2 clamp ─────────────
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_neg_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b8ca_neg_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_neg_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_neg_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b8ca_neg_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_neg_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_neg_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b8ca_neg_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_neg_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b8ca_neg_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCC .b8ca_neg_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_neg_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
     BRA .b8ca_epilogue
 
-    ; ── C6=0 positive path (C5<$80): 4 tiles, BPL+6/BCS+2 clamp ─────────────
+    ; ── Spr_BaseYHi=0 positive path (Spr_BaseY<$80): 4 tiles, BPL+6/BCS+2 clamp ─────────────
 .b8ca_pos_c5:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b8ca_pos_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_pos_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_pos_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b8ca_pos_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_pos_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_pos_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b8ca_pos_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_pos_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_pos_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .b8ca_pos_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b8ca_pos_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b8ca_pos_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
     ; fall through to shared epilogue
 
     ; ── Shared epilogue: 16-bit Y-source copies + PLB + RTS ───────────────────
 .b8ca_epilogue:
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
     SEP #$20
     PLB
     RTS
 
+; ============================================================
+; $C0:BA65 — Spr_Place8 (631 bytes, $BA65–$BCDB)
+; (was Sub_BA65.) Re-places an 8-tile (size 1) object from its
+; existing SprTile records (2 high-table bytes).
+; ============================================================
 org $C0BA65
-Sub_BA65:
-    ; 631 bytes ($BA65-$BCDB). Entry M=1, X=1. Type 1 low-state init.
-    ; Reads X offsets from staging buf ($4BC2,X) — not raw table.
-    ; Two X-loops (gfx_index and gfx_index+$20 slots), then 3-way Y-clamp.
+Spr_Place8:
+    ; 631 bytes ($BA65-$BCDB). Entry M=1, X=1. Size 1 re-place.
+    ; Reads X offsets from SprTile (SprTile.OfsX) — not SprTileSrc.
+    ; Two X-loops (first tile record and first record + $20 slots), then 3-way Y-clamp.
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB
     REP #$20
-    LDX $6D
-    LDA.l $000A80,X
-    AND #$01FF
-    STA $C5
-    LDA.l $000A00,X
-    STA $C3
-    STZ $E5
-    LDA.l $001700,X
-    STA $D9
+    LDX.b !Obj_Cur
+    LDA.l !Obj_ScreenY,X
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY
+    LDA.l !Obj_ScreenX,X
+    STA.b !Spr_BaseX
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X
+    STA.b !Spr_FirstRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 1: staging $4BC2 → $4BC0, ORA#$AA → $4F00 ───────────────────
+    ; ── X-loop 1: SprTile SprTile.OfsX → SprTile.X, ORA#$AA → Obj_OamHiA ───────────────────
 .b65_x1_loop:
     TAX
-    LDA.w $4BC2,X
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $D9
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_FirstRec
     BEQ .b65_x1_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .b65_x1_loop
 .b65_x1_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F00,X
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0020
-    STA $E7
+    ADC.w #!SprTile_Stride*4
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 2: same as loop 1 but compare $E7 → $4F01 ────────────────────
+    ; ── X-loop 2: same as loop 1 but compare Spr_GroupRec → Obj_OamHiA+1 ────────────────────
 .b65_x2_loop:
     TAX
-    LDA.w $4BC2,X
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .b65_x2_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .b65_x2_loop
 .b65_x2_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F01,X
-    LDX $D9
-    LDA $C6
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w SprTile[104].Y,X
+    LDX.b !Spr_FirstRec
+    LDA.b !Spr_BaseYHi
     BEQ .b65_c6_zero
-    BRL $0154               ; C6≠0 → $BC50 (raw signed offset, asar BRL quirk)
+    BRL .b65_c6nz               ; Spr_BaseYHi≠0 → $BC50
 
-    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+    ; ── Spr_BaseYHi=0 dispatch on Spr_BaseY sign ──────────────────────────────────────────────
 .b65_c6_zero:
-    LDA $C5
+    LDA.b !Spr_BaseY
     BPL .b65_pos_c5
 
-    ; ── C6=0 negative (C5≥$80): 8 tiles, CMP#$E0/BCC clamp ─────────────────
-    LDA.w $4BC4,X
+    ; ── Spr_BaseYHi=0 negative (Spr_BaseY≥$80): 8 tiles, CMP#$E0/BCC clamp ─────────────────
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $4BCC,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4BD4,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $4BDC,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
 
-    LDA.w $4BE4,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st4:
-    STA.w $4BE1,X
+    STA.w SprTile[4].Y,X
 
-    LDA.w $4BEC,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st5:
-    STA.w $4BE9,X
+    STA.w SprTile[5].Y,X
 
-    LDA.w $4BF4,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st6:
-    STA.w $4BF1,X
+    STA.w SprTile[6].Y,X
 
-    LDA.w $4BFC,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .b65_neg_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_neg_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6=0 positive (C5<$80): 8 tiles, BMI-split BPL/CMP/BCS clamp ────────
-    ; Source sign check on staging Y-src: <$80 uses CLC/ADC/BCC path;
+    ; ── Spr_BaseYHi=0 positive (Spr_BaseY<$80): 8 tiles, BMI-split BPL/CMP/BCS clamp ────────
+    ; Source sign check on SprTile Y-src: <$80 uses CLC/ADC/BCC path;
     ; ≥$80 uses CLC/ADC/BPL/CMP/BCS path. Both converge at store label.
 .b65_pos_c5:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     BMI .b65_pos_b0
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st0
     BRA .b65_pos_p0
 .b65_pos_b0:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p0:
     BPL .b65_pos_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $4BCC,X
+    LDA.w SprTile[1].OfsY,X
     BMI .b65_pos_b1
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st1
     BRA .b65_pos_p1
 .b65_pos_b1:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p1:
     BPL .b65_pos_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4BD4,X
+    LDA.w SprTile[2].OfsY,X
     BMI .b65_pos_b2
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st2
     BRA .b65_pos_p2
 .b65_pos_b2:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p2:
     BPL .b65_pos_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $4BDC,X
+    LDA.w SprTile[3].OfsY,X
     BMI .b65_pos_b3
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st3
     BRA .b65_pos_p3
 .b65_pos_b3:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p3:
     BPL .b65_pos_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
 
-    LDA.w $4BE4,X
+    LDA.w SprTile[4].OfsY,X
     BMI .b65_pos_b4
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st4
     BRA .b65_pos_p4
 .b65_pos_b4:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p4:
     BPL .b65_pos_st4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st4:
-    STA.w $4BE1,X
+    STA.w SprTile[4].Y,X
 
-    LDA.w $4BEC,X
+    LDA.w SprTile[5].OfsY,X
     BMI .b65_pos_b5
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st5
     BRA .b65_pos_p5
 .b65_pos_b5:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p5:
     BPL .b65_pos_st5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st5:
-    STA.w $4BE9,X
+    STA.w SprTile[5].Y,X
 
-    LDA.w $4BF4,X
+    LDA.w SprTile[6].OfsY,X
     BMI .b65_pos_b6
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st6
     BRA .b65_pos_p6
 .b65_pos_b6:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p6:
     BPL .b65_pos_st6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st6:
-    STA.w $4BF1,X
+    STA.w SprTile[6].Y,X
 
-    LDA.w $4BFC,X
+    LDA.w SprTile[7].OfsY,X
     BMI .b65_pos_b7
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_pos_st7
     BRA .b65_pos_p7
 .b65_pos_b7:
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
 .b65_pos_p7:
     BPL .b65_pos_st7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_pos_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_pos_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6≠0 path: 8 tiles from staging, BCC→$E0, CMP/BCS→store ────────────
-    LDA.w $4BC4,X
+    ; ── Spr_BaseYHi≠0 path: 8 tiles from SprTile, BCC→$E0, CMP/BCS→store ────────────
+.b65_c6nz:
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st0
 .b65_nz_cl0:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st0:
-    STA.w $4BC1,X
+    STA.w SprTile.Y,X
 
-    LDA.w $4BCC,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st1
 .b65_nz_cl1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st1:
-    STA.w $4BC9,X
+    STA.w SprTile[1].Y,X
 
-    LDA.w $4BD4,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st2
 .b65_nz_cl2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st2:
-    STA.w $4BD1,X
+    STA.w SprTile[2].Y,X
 
-    LDA.w $4BDC,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st3
 .b65_nz_cl3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st3:
-    STA.w $4BD9,X
+    STA.w SprTile[3].Y,X
 
-    LDA.w $4BE4,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st4
 .b65_nz_cl4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st4:
-    STA.w $4BE1,X
+    STA.w SprTile[4].Y,X
 
-    LDA.w $4BEC,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st5
 .b65_nz_cl5:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st5:
-    STA.w $4BE9,X
+    STA.w SprTile[5].Y,X
 
-    LDA.w $4BF4,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st6
 .b65_nz_cl6:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st6:
-    STA.w $4BF1,X
+    STA.w SprTile[6].Y,X
 
-    LDA.w $4BFC,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .b65_nz_cl7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .b65_nz_st7
 .b65_nz_cl7:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .b65_nz_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     SEP #$20
     PLB
     RTS
 
+; ============================================================
+; $C0:BCDC — Spr_Load8 (790 bytes, $BCDC–$BFF1)
+; (was Sub_BCDC.) Builds an 8-tile (size 1) object's SprTile records
+; from SprTileSrc and places them.
+; ============================================================
 org $C0BCDC
-Sub_BCDC:
-    ; 790 bytes ($BCDC-$BFF1). Entry M=1, X=1. Type 1 high-state init.
-    ; Reads X offsets from raw table ($4802,X) AND writes to staging ($4BC2,X).
-    ; Two X-loops (gfx_index and gfx_index+$20), then 3-way Y-clamp (8 tiles).
-    ; Positive path uses BPL/CMP/BCS — no BMI-split (unlike Sub_BA65).
+Spr_Load8:
+    ; 790 bytes ($BCDC-$BFF1). Entry M=1, X=1. Size 1 load.
+    ; Reads X offsets from SprTileSrc (SprTileSrc.OfsX) AND writes to SprTile (SprTile.OfsX).
+    ; Two X-loops (first tile record and first record + $20), then 3-way Y-clamp (8 tiles).
+    ; Positive path uses BPL/CMP/BCS — no BMI-split (unlike Spr_Place8).
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB
     REP #$20
-    LDX $6D
-    LDA.l $000A80,X
-    AND #$01FF
-    STA $C5
-    LDA.l $000A00,X
-    STA $C3
-    STZ $E5
-    LDA.l $001700,X
-    STA $D9
+    LDX.b !Obj_Cur
+    LDA.l !Obj_ScreenY,X
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY
+    LDA.l !Obj_ScreenX,X
+    STA.b !Spr_BaseX
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X
+    STA.b !Spr_FirstRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 1: raw $4802 → staging $4BC2 → $4BC0, pack OAM → $4F00 ─────────
+    ; ── X-loop 1: SprTileSrc SprTileSrc.OfsX → SprTile SprTile.OfsX → SprTile.X, pack OAM → Obj_OamHiA ─────────
 .bcdc_x1_loop:
     TAX
-    LDA.w $4802,X
-    STA.w $4BC2,X
+    LDA.w SprTileSrc.OfsX,X
+    STA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $D9
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_FirstRec
     BEQ .bcdc_x1_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .bcdc_x1_loop
 .bcdc_x1_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F00,X
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0020
-    STA $E7
+    ADC.w #!SprTile_Stride*4
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 2: same, compare $E7 → $4F01 ─────────────────────────────────
+    ; ── X-loop 2: same, compare Spr_GroupRec → Obj_OamHiA+1 ─────────────────────────────────
 .bcdc_x2_loop:
     TAX
-    LDA.w $4802,X
-    STA.w $4BC2,X
+    LDA.w SprTileSrc.OfsX,X
+    STA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .bcdc_x2_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .bcdc_x2_loop
 .bcdc_x2_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F01,X
-    LDX $D9
-    LDA $C6
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w SprTile[104].Y,X
+    LDX.b !Spr_FirstRec
+    LDA.b !Spr_BaseYHi
     BEQ .bcdc_c6_zero
-    BRL $01A3               ; C6≠0 → $BF1C (raw signed offset, asar BRL quirk)
+    BRL .bcdc_nz               ; Spr_BaseYHi≠0 → $BF1C
 
-    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+    ; ── Spr_BaseYHi=0 dispatch on Spr_BaseY sign ──────────────────────────────────────────────
 .bcdc_c6_zero:
-    LDA $C5
+    LDA.b !Spr_BaseY
     BMI .bcdc_neg
-    BRL $00C6               ; C5<$80 → $BE46 positive path (raw signed offset)
+    BRL .bcdc_pos               ; Spr_BaseY<$80 → $BE46 positive path
 
-    ; ── C6=0 negative (C5≥$80): CMP#$E0/BCC clamp ────────────────────────────
+    ; ── Spr_BaseYHi=0 negative (Spr_BaseY≥$80): CMP#$E0/BCC clamp ────────────────────────────
 .bcdc_neg:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st0:
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st1:
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st2:
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st3:
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st4:
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st5:
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st6:
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
-    CMP #$E0
+    ADC.b !Spr_BaseY
+    CMP.b #!Oam_HiddenY
     BCC .bcdc_neg_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_neg_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6=0 positive (C5<$80): BPL/CMP/BCS clamp (no BMI-split) ────────────
+    ; ── Spr_BaseYHi=0 positive (Spr_BaseY<$80): BPL/CMP/BCS clamp (no BMI-split) ────────────
 .bcdc_pos:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st0:
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st1:
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st2:
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st3:
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st4:
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st5:
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st6:
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bcdc_pos_st7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_pos_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_pos_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6≠0: BCC→clamp, CMP/BCS→store ──────────────────────────────────────
+    ; ── Spr_BaseYHi≠0: BCC→clamp, CMP/BCS→store ──────────────────────────────────────
 .bcdc_nz:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st0
 .bcdc_nz_cl0:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st0:
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st1
 .bcdc_nz_cl1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st1:
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st2
 .bcdc_nz_cl2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st2:
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st3
 .bcdc_nz_cl3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st3:
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st4
 .bcdc_nz_cl4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st4:
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st5
 .bcdc_nz_cl5:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st5:
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st6
 .bcdc_nz_cl6:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st6:
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCC .bcdc_nz_cl7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bcdc_nz_st7
 .bcdc_nz_cl7:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bcdc_nz_st7:
-    STA.w $4BF9,X
+    STA.w SprTile[7].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
     SEP #$20
     PLB
     RTS
 
+; ============================================================
+; $C0:BFF2 — Spr_Place12 (717 bytes, $BFF2–$C2BE)
+; (was Sub_BFF2.) Re-places a 12-tile (size 2) object from its
+; existing SprTile records (3 high-table bytes: Obj_OamHiA, +1,
+; Obj_OamHiB).
+; ============================================================
 org $C0BFF2
-Sub_BFF2:
-    ; 717 bytes ($BFF2–$C2BE). Entry M=1, X=1. Types 2/3+ low-state init.
-    ; Reads X coords from staging ($4BC2,X) directly (no raw-table copy).
-    ; Three backward X-loops pack OAM high bits → $4F00, $4F01, $4B40.
-    ; Then 3-way Y dispatch: C6≠0 → type-3+ (BCS/BPL clamp, 12 tiles),
-    ;   C6=0 C5<0 → negative (direct add, 12 tiles),
-    ;   C6=0 C5≥0 → positive (BMI-split BPL/CMP/BCS clamp, 12 tiles).
-    ; BMI-split IS present here — not isolated to Sub_BA65.
+Spr_Place12:
+    ; 717 bytes ($BFF2–$C2BE). Entry M=1, X=1. Size 2 re-place.
+    ; Reads X coords from SprTile (SprTile.OfsX) directly (no SprTileSrc-table copy).
+    ; Three backward X-loops pack OAM high bits → Obj_OamHiA, Obj_OamHiA+1, Obj_OamHiB.
+    ; Then 3-way Y dispatch: Spr_BaseYHi≠0 → type-3+ (BCS/BPL clamp, 12 tiles),
+    ;   Spr_BaseYHi=0 Spr_BaseY<0 → negative (direct add, 12 tiles),
+    ;   Spr_BaseYHi=0 Spr_BaseY≥0 → positive (BMI-split BPL/CMP/BCS clamp, 12 tiles).
+    ; BMI-split IS present here — not isolated to Spr_Place8.
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB
     REP #$20
-    LDX $6D
-    LDA.l $000A80,X
-    AND #$01FF
-    STA $C5
-    LDA.l $000A00,X
-    STA $C3
-    STZ $E5
-    LDA.l $001700,X
-    STA $D9
+    LDX.b !Obj_Cur
+    LDA.l !Obj_ScreenY,X
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY
+    LDA.l !Obj_ScreenX,X
+    STA.b !Spr_BaseX
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X
+    STA.b !Spr_FirstRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 1: staging $4BC2 → $4BC0, pack OAM high → $4F00 ─────────────
+    ; ── X-loop 1: SprTile SprTile.OfsX → SprTile.X, pack OAM high → Obj_OamHiA ─────────────
 .bff2_x1_loop:
     TAX
-    LDA.w $4BC2,X
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $D9
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_FirstRec
     BEQ .bff2_x1_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .bff2_x1_loop
 .bff2_x1_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F00,X
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0020
-    STA $E7
+    ADC.w #!SprTile_Stride*4
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 2: same, compare $E7 → $4F01 ─────────────────────────────────
+    ; ── X-loop 2: same, compare Spr_GroupRec → Obj_OamHiA+1 ─────────────────────────────────
 .bff2_x2_loop:
     TAX
-    LDA.w $4BC2,X
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .bff2_x2_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .bff2_x2_loop
 .bff2_x2_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F01,X
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w SprTile[104].Y,X
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0040
-    STA $E7
+    ADC.w #!SprTile_Stride*8
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 3: same, compare $E7 → $4B40 ─────────────────────────────────
+    ; ── X-loop 3: same, compare Spr_GroupRec → Obj_OamHiB ─────────────────────────────────
 .bff2_x3_loop:
     TAX
-    LDA.w $4BC2,X
+    LDA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .bff2_x3_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .bff2_x3_loop
 .bff2_x3_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4B40,X
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiB,X
 
     ; ── Dispatch ──────────────────────────────────────────────────────────────
-    LDX $D9
-    LDA $C6
+    LDX.b !Spr_FirstRec
+    LDA.b !Spr_BaseYHi
     BEQ .bff2_c6_zero
-    BRL $0143               ; C6≠0 → $C209 type-3+ path (raw signed offset)
+    BRL .bff2_t3               ; Spr_BaseYHi≠0 → $C209 type-3+ path
 
 .bff2_c6_zero:
-    LDA $C5
+    LDA.b !Spr_BaseY
     BMI .bff2_neg
-    BRL $006E               ; C5≥0 → $C13B positive path (raw signed offset)
+    BRL .bff2_pos               ; Spr_BaseY≥0 → $C13B positive path
 
-    ; ── Negative (C5<0): direct add, no clamp, 12 tiles ─────────────────────
+    ; ── Negative (Spr_BaseY<0): direct add, no clamp, 12 tiles ─────────────────────
 .bff2_neg:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BD9,X
-    LDA.w $4BE4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[3].Y,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BE1,X
-    LDA.w $4BEC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[4].Y,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BE9,X
-    LDA.w $4BF4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[5].Y,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BF1,X
-    LDA.w $4BFC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[6].Y,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BF9,X
-    LDA.w $4C04,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[7].Y,X
+    LDA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C01,X
-    LDA.w $4C0C,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[8].Y,X
+    LDA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C09,X
-    LDA.w $4C14,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[9].Y,X
+    LDA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C11,X
-    LDA.w $4C1C,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[10].Y,X
+    LDA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C19,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[11].Y,X
     PLB
     RTS
 
-    ; ── Positive (C5≥0): BMI-split BPL/CMP #$E0/BCS clamp, 12 tiles ─────────
-    ; Same 3-instruction clamp as Sub_BA65 positive path.
+    ; ── Positive (Spr_BaseY≥0): BMI-split BPL/CMP #$E0/BCS clamp, 12 tiles ─────────
+    ; Same 3-instruction clamp as Spr_Place8 positive path.
 .bff2_pos:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st0:
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st1:
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st2:
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st3:
-    STA.w $4BD9,X
-    LDA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st4:
-    STA.w $4BE1,X
-    LDA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st5:
-    STA.w $4BE9,X
-    LDA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st6:
-    STA.w $4BF1,X
-    LDA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st7:
-    STA.w $4BF9,X
-    LDA.w $4C04,X
+    STA.w SprTile[7].Y,X
+    LDA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st8
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st8
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st8:
-    STA.w $4C01,X
-    LDA.w $4C0C,X
+    STA.w SprTile[8].Y,X
+    LDA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st9
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st9
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st9:
-    STA.w $4C09,X
-    LDA.w $4C14,X
+    STA.w SprTile[9].Y,X
+    LDA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st10
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st10
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st10:
-    STA.w $4C11,X
-    LDA.w $4C1C,X
+    STA.w SprTile[10].Y,X
+    LDA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .bff2_pos_st11
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .bff2_pos_st11
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_pos_st11:
-    STA.w $4C19,X
+    STA.w SprTile[11].Y,X
     PLB
     RTS
 
-    ; ── Type 3+ (C6≠0): BCS/BPL clamp (carry-overflow → $E0), 12 tiles ──────
+    ; ── Type 3+ (Spr_BaseYHi≠0): BCS/BPL clamp (carry-overflow → $E0), 12 tiles ──────
 .bff2_t3:
-    LDA.w $4BC4,X
+    LDA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st0
     BPL .bff2_t3_skip0
 .bff2_t3_st0:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip0:
-    STA.w $4BC1,X
-    LDA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st1
     BPL .bff2_t3_skip1
 .bff2_t3_st1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip1:
-    STA.w $4BC9,X
-    LDA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st2
     BPL .bff2_t3_skip2
 .bff2_t3_st2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip2:
-    STA.w $4BD1,X
-    LDA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st3
     BPL .bff2_t3_skip3
 .bff2_t3_st3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip3:
-    STA.w $4BD9,X
-    LDA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st4
     BPL .bff2_t3_skip4
 .bff2_t3_st4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip4:
-    STA.w $4BE1,X
-    LDA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st5
     BPL .bff2_t3_skip5
 .bff2_t3_st5:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip5:
-    STA.w $4BE9,X
-    LDA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st6
     BPL .bff2_t3_skip6
 .bff2_t3_st6:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip6:
-    STA.w $4BF1,X
-    LDA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st7
     BPL .bff2_t3_skip7
 .bff2_t3_st7:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip7:
-    STA.w $4BF9,X
-    LDA.w $4C04,X
+    STA.w SprTile[7].Y,X
+    LDA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st8
     BPL .bff2_t3_skip8
 .bff2_t3_st8:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip8:
-    STA.w $4C01,X
-    LDA.w $4C0C,X
+    STA.w SprTile[8].Y,X
+    LDA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st9
     BPL .bff2_t3_skip9
 .bff2_t3_st9:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip9:
-    STA.w $4C09,X
-    LDA.w $4C14,X
+    STA.w SprTile[9].Y,X
+    LDA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st10
     BPL .bff2_t3_skip10
 .bff2_t3_st10:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip10:
-    STA.w $4C11,X
-    LDA.w $4C1C,X
+    STA.w SprTile[10].Y,X
+    LDA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .bff2_t3_st11
     BPL .bff2_t3_skip11
 .bff2_t3_st11:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .bff2_t3_skip11:
-    STA.w $4C19,X
+    STA.w SprTile[11].Y,X
     PLB
     RTS
 
+; ============================================================
+; $C0:C2BF — Spr_Load12 (1064 bytes, $C2BF–$C6E6)
+; (was Sub_C2BF.) Builds a 12-tile (size 2) object's SprTile records
+; from SprTileSrc and places them.
+; ============================================================
 org $C0C2BF
-Sub_C2BF:
-    ; 1064 bytes ($C2BF-$C6E6). Entry M=1, X=1. Types 2/3+ high-state init.
-    ; Reads X offsets from raw table ($4802,X) AND writes to staging ($4BC2,X).
+Spr_Load12:
+    ; 1064 bytes ($C2BF-$C6E6). Entry M=1, X=1. Size 2 load.
+    ; Reads X offsets from SprTileSrc (SprTileSrc.OfsX) AND writes to SprTile (SprTile.OfsX).
     ; Three backward X-loops (D9+$18 down, D9+$20+$18 down, D9+$40+$18 down).
-    ; Then 3-way Y dispatch: C6≠0 → BCS/BPL clamp (12 tiles, raw copy),
-    ;   C6=0 C5≥$80 → negative (raw copy, direct add, no clamp),
-    ;   C6=0 C5<$80 → positive (raw copy, BPL/CMP/BCS clamp, no BMI-split).
-    ; High-state indicator: raw $4802→$4BC2 in X-loops AND $4804→$4BC4 in Y paths.
-    ; Mirrors Sub_BCDC (type 1 high-state) structure, scaled to 12 tiles.
+    ; Then 3-way Y dispatch: Spr_BaseYHi≠0 → BCS/BPL clamp (12 tiles, SprTileSrc copy),
+    ;   Spr_BaseYHi=0 Spr_BaseY≥$80 → negative (SprTileSrc copy, direct add, no clamp),
+    ;   Spr_BaseYHi=0 Spr_BaseY<$80 → positive (SprTileSrc copy, BPL/CMP/BCS clamp, no BMI-split).
+    ; High-state indicator: SprTileSrc SprTileSrc.OfsX→SprTile.OfsX in X-loops AND $4804→$4BC4 in Y paths.
+    ; Mirrors Spr_Load8 (type 1 high-state) structure, scaled to 12 tiles.
     PHB
-    LDA #$7F
+    LDA.b #!Bank7F
     PHA
     PLB
     REP #$20
-    LDX $6D
-    LDA.l $000A80,X
-    AND #$01FF
-    STA $C5
-    LDA.l $000A00,X
-    STA $C3
-    STZ $E5
-    LDA.l $001700,X
-    STA $D9
+    LDX.b !Obj_Cur
+    LDA.l !Obj_ScreenY,X
+    AND.w #!Spr_YMask9
+    STA.b !Spr_BaseY
+    LDA.l !Obj_ScreenX,X
+    STA.b !Spr_BaseX
+    STZ.b !Spr_HiBits
+    LDA.l !Obj_TileRecOfs,X
+    STA.b !Spr_FirstRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 1: raw $4802,X → staging $4BC2,X, pack OAM high → $4F00 ──────
+    ; ── X-loop 1: SprTileSrc SprTileSrc.OfsX → SprTile SprTile.OfsX, pack OAM high → Obj_OamHiA ──────
 .c2bf_x1_loop:
     TAX
-    LDA.w $4802,X
-    STA.w $4BC2,X
+    LDA.w SprTileSrc.OfsX,X
+    STA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $D9
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_FirstRec
     BEQ .c2bf_x1_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .c2bf_x1_loop
 .c2bf_x1_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F00,X
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiA,X
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0020
-    STA $E7
+    ADC.w #!SprTile_Stride*4
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 2: raw $4802,X → staging $4BC2,X, pack OAM high → $4F01 ──────
+    ; ── X-loop 2: SprTileSrc SprTileSrc.OfsX → SprTile SprTile.OfsX, pack OAM high → Obj_OamHiA+1 ──────
 .c2bf_x2_loop:
     TAX
-    LDA.w $4802,X
-    STA.w $4BC2,X
+    LDA.w SprTileSrc.OfsX,X
+    STA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .c2bf_x2_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .c2bf_x2_loop
 .c2bf_x2_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4F01,X
-    LDX $D9                     ; extra LDX vs Sub_BFF2 (dead code quirk)
-    STZ $E5
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w SprTile[104].Y,X
+    LDX.b !Spr_FirstRec         ; extra LDX vs Spr_Place12 (dead code quirk)
+    STZ.b !Spr_HiBits
     REP #$20
-    LDA $D9
+    LDA.b !Spr_FirstRec
     CLC
-    ADC #$0040
-    STA $E7
+    ADC.w #!SprTile_Stride*8
+    STA.b !Spr_GroupRec
     CLC
-    ADC #$0018
+    ADC.w #!SprTile_Stride*3
 
-    ; ── X-loop 3: raw $4802,X → staging $4BC2,X, pack OAM high → $4B40 ──────
+    ; ── X-loop 3: SprTileSrc SprTileSrc.OfsX → SprTile SprTile.OfsX, pack OAM high → Obj_OamHiB ──────
 .c2bf_x3_loop:
     TAX
-    LDA.w $4802,X
-    STA.w $4BC2,X
+    LDA.w SprTileSrc.OfsX,X
+    STA.w SprTile.OfsX,X
     CLC
-    ADC $C3
+    ADC.b !Spr_BaseX
     SEP #$20
-    STA.w $4BC0,X
+    STA.w SprTile.X,X
     XBA
     AND #$01
-    STA $E6
-    LDA $E5
+    STA.b !Spr_HiBitTmp
+    LDA.b !Spr_HiBits
     ASL A
     ASL A
-    ORA $E6
-    CPX $E7
+    ORA.b !Spr_HiBitTmp
+    CPX.b !Spr_GroupRec
     BEQ .c2bf_x3_done
-    STA $E5
+    STA.b !Spr_HiBits
     REP #$20
     TXA
     SEC
-    SBC #$0008
+    SBC.w #!SprTile_Stride
     BRA .c2bf_x3_loop
 .c2bf_x3_done:
-    ORA #$AA
-    LDX $6D
-    STA.w $4B40,X
-    LDX $D9
-    LDA $C6
+    ORA.b #!Oam_HiLarge4
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamHiB,X
+    LDX.b !Spr_FirstRec
+    LDA.b !Spr_BaseYHi
     BEQ .c2bf_c6_zero
-    BRL $0223               ; C6≠0 → $C5C1 (raw signed offset, asar BRL quirk)
+    BRL .c2bf_nz               ; Spr_BaseYHi≠0 → $C5C1
 
-    ; ── C6=0 dispatch on C5 sign ──────────────────────────────────────────────
+    ; ── Spr_BaseYHi=0 dispatch on Spr_BaseY sign ──────────────────────────────────────────────
 .c2bf_c6_zero:
-    LDA $C5
+    LDA.b !Spr_BaseY
     BMI .c2bf_neg
-    BRL $00DE               ; C5<$80 → $C483 positive path (raw signed offset)
+    BRL .c2bf_pos               ; Spr_BaseY<$80 → $C483 positive path
 
-    ; ── C6=0 negative (C5≥$80): raw copy + direct add, no clamp, 12 tiles ────
+    ; ── Spr_BaseYHi=0 negative (Spr_BaseY≥$80): SprTileSrc copy + direct add, no clamp, 12 tiles ────
 .c2bf_neg:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4BF9,X
-    LDA.w $4844,X
-    STA.w $4C04,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[7].Y,X
+    LDA.w SprTileSrc[8].OfsY,X
+    STA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C01,X
-    LDA.w $484C,X
-    STA.w $4C0C,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[8].Y,X
+    LDA.w SprTileSrc[9].OfsY,X
+    STA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C09,X
-    LDA.w $4854,X
-    STA.w $4C14,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[9].Y,X
+    LDA.w SprTileSrc[10].OfsY,X
+    STA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C11,X
-    LDA.w $485C,X
-    STA.w $4C1C,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[10].Y,X
+    LDA.w SprTileSrc[11].OfsY,X
+    STA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
-    STA.w $4C19,X
+    ADC.b !Spr_BaseY
+    STA.w SprTile[11].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
-    LDA.w $4846,X
-    STA.w $4C06,X
-    LDA.w $484E,X
-    STA.w $4C0E,X
-    LDA.w $4856,X
-    STA.w $4C16,X
-    LDA.w $485E,X
-    STA.w $4C1E,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
+    LDA.w SprTileSrc[8].Tile,X
+    STA.w SprTile[8].Tile,X
+    LDA.w SprTileSrc[9].Tile,X
+    STA.w SprTile[9].Tile,X
+    LDA.w SprTileSrc[10].Tile,X
+    STA.w SprTile[10].Tile,X
+    LDA.w SprTileSrc[11].Tile,X
+    STA.w SprTile[11].Tile,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6=0 positive (C5<$80): raw copy + BPL/CMP/BCS clamp, 12 tiles ───────
-    ; Same tile structure as Sub_BCDC positive path — no BMI-split.
-    ; Reads $4804,X → $4BC4,X (raw→staging) before computing Y clamp.
+    ; ── Spr_BaseYHi=0 positive (Spr_BaseY<$80): SprTileSrc copy + BPL/CMP/BCS clamp, 12 tiles ───────
+    ; Same tile structure as Spr_Load8 positive path — no BMI-split.
+    ; Reads $4804,X → $4BC4,X (SprTileSrc→SprTile) before computing Y clamp.
 .c2bf_pos:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st0
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st0
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st0:
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st1
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st1
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st1:
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st2
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st2
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st2:
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st3
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st3
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st3:
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st4
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st4
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st4:
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st5
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st5
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st5:
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st6
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st6
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st6:
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st7
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st7
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st7:
-    STA.w $4BF9,X
-    LDA.w $4844,X
-    STA.w $4C04,X
+    STA.w SprTile[7].Y,X
+    LDA.w SprTileSrc[8].OfsY,X
+    STA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st8
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st8
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st8:
-    STA.w $4C01,X
-    LDA.w $484C,X
-    STA.w $4C0C,X
+    STA.w SprTile[8].Y,X
+    LDA.w SprTileSrc[9].OfsY,X
+    STA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st9
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st9
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st9:
-    STA.w $4C09,X
-    LDA.w $4854,X
-    STA.w $4C14,X
+    STA.w SprTile[9].Y,X
+    LDA.w SprTileSrc[10].OfsY,X
+    STA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st10
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st10
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st10:
-    STA.w $4C11,X
-    LDA.w $485C,X
-    STA.w $4C1C,X
+    STA.w SprTile[10].Y,X
+    LDA.w SprTileSrc[11].OfsY,X
+    STA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BPL .c2bf_pos_st11
-    CMP #$E0
+    CMP.b #!Oam_HiddenY
     BCS .c2bf_pos_st11
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_pos_st11:
-    STA.w $4C19,X
+    STA.w SprTile[11].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
-    LDA.w $4846,X
-    STA.w $4C06,X
-    LDA.w $484E,X
-    STA.w $4C0E,X
-    LDA.w $4856,X
-    STA.w $4C16,X
-    LDA.w $485E,X
-    STA.w $4C1E,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
+    LDA.w SprTileSrc[8].Tile,X
+    STA.w SprTile[8].Tile,X
+    LDA.w SprTileSrc[9].Tile,X
+    STA.w SprTile[9].Tile,X
+    LDA.w SprTileSrc[10].Tile,X
+    STA.w SprTile[10].Tile,X
+    LDA.w SprTileSrc[11].Tile,X
+    STA.w SprTile[11].Tile,X
     SEP #$20
     PLB
     RTS
 
-    ; ── C6≠0: raw copy + BCS/BPL clamp (carry first, sign second), 12 tiles ──
-    ; Same BCS/BPL ordering as Sub_BFF2 C6≠0 path.
+    ; ── Spr_BaseYHi≠0: SprTileSrc copy + BCS/BPL clamp (carry first, sign second), 12 tiles ──
+    ; Same BCS/BPL ordering as Spr_Place12 Spr_BaseYHi≠0 path.
 .c2bf_nz:
-    LDA.w $4804,X
-    STA.w $4BC4,X
+    LDA.w SprTileSrc.OfsY,X
+    STA.w SprTile.OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl0
     BPL .c2bf_nz_st0
 .c2bf_nz_cl0:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st0:
-    STA.w $4BC1,X
-    LDA.w $480C,X
-    STA.w $4BCC,X
+    STA.w SprTile.Y,X
+    LDA.w SprTileSrc[1].OfsY,X
+    STA.w SprTile[1].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl1
     BPL .c2bf_nz_st1
 .c2bf_nz_cl1:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st1:
-    STA.w $4BC9,X
-    LDA.w $4814,X
-    STA.w $4BD4,X
+    STA.w SprTile[1].Y,X
+    LDA.w SprTileSrc[2].OfsY,X
+    STA.w SprTile[2].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl2
     BPL .c2bf_nz_st2
 .c2bf_nz_cl2:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st2:
-    STA.w $4BD1,X
-    LDA.w $481C,X
-    STA.w $4BDC,X
+    STA.w SprTile[2].Y,X
+    LDA.w SprTileSrc[3].OfsY,X
+    STA.w SprTile[3].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl3
     BPL .c2bf_nz_st3
 .c2bf_nz_cl3:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st3:
-    STA.w $4BD9,X
-    LDA.w $4824,X
-    STA.w $4BE4,X
+    STA.w SprTile[3].Y,X
+    LDA.w SprTileSrc[4].OfsY,X
+    STA.w SprTile[4].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl4
     BPL .c2bf_nz_st4
 .c2bf_nz_cl4:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st4:
-    STA.w $4BE1,X
-    LDA.w $482C,X
-    STA.w $4BEC,X
+    STA.w SprTile[4].Y,X
+    LDA.w SprTileSrc[5].OfsY,X
+    STA.w SprTile[5].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl5
     BPL .c2bf_nz_st5
 .c2bf_nz_cl5:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st5:
-    STA.w $4BE9,X
-    LDA.w $4834,X
-    STA.w $4BF4,X
+    STA.w SprTile[5].Y,X
+    LDA.w SprTileSrc[6].OfsY,X
+    STA.w SprTile[6].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl6
     BPL .c2bf_nz_st6
 .c2bf_nz_cl6:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st6:
-    STA.w $4BF1,X
-    LDA.w $483C,X
-    STA.w $4BFC,X
+    STA.w SprTile[6].Y,X
+    LDA.w SprTileSrc[7].OfsY,X
+    STA.w SprTile[7].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl7
     BPL .c2bf_nz_st7
 .c2bf_nz_cl7:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st7:
-    STA.w $4BF9,X
-    LDA.w $4844,X
-    STA.w $4C04,X
+    STA.w SprTile[7].Y,X
+    LDA.w SprTileSrc[8].OfsY,X
+    STA.w SprTile[8].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl8
     BPL .c2bf_nz_st8
 .c2bf_nz_cl8:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st8:
-    STA.w $4C01,X
-    LDA.w $484C,X
-    STA.w $4C0C,X
+    STA.w SprTile[8].Y,X
+    LDA.w SprTileSrc[9].OfsY,X
+    STA.w SprTile[9].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl9
     BPL .c2bf_nz_st9
 .c2bf_nz_cl9:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st9:
-    STA.w $4C09,X
-    LDA.w $4854,X
-    STA.w $4C14,X
+    STA.w SprTile[9].Y,X
+    LDA.w SprTileSrc[10].OfsY,X
+    STA.w SprTile[10].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl10
     BPL .c2bf_nz_st10
 .c2bf_nz_cl10:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st10:
-    STA.w $4C11,X
-    LDA.w $485C,X
-    STA.w $4C1C,X
+    STA.w SprTile[10].Y,X
+    LDA.w SprTileSrc[11].OfsY,X
+    STA.w SprTile[11].OfsY,X
     CLC
-    ADC $C5
+    ADC.b !Spr_BaseY
     BCS .c2bf_nz_cl11
     BPL .c2bf_nz_st11
 .c2bf_nz_cl11:
-    LDA #$E0
+    LDA.b #!Oam_HiddenY
 .c2bf_nz_st11:
-    STA.w $4C19,X
+    STA.w SprTile[11].Y,X
     REP #$20
-    LDA.w $4806,X
-    STA.w $4BC6,X
-    LDA.w $480E,X
-    STA.w $4BCE,X
-    LDA.w $4816,X
-    STA.w $4BD6,X
-    LDA.w $481E,X
-    STA.w $4BDE,X
-    LDA.w $4826,X
-    STA.w $4BE6,X
-    LDA.w $482E,X
-    STA.w $4BEE,X
-    LDA.w $4836,X
-    STA.w $4BF6,X
-    LDA.w $483E,X
-    STA.w $4BFE,X
-    LDA.w $4846,X
-    STA.w $4C06,X
-    LDA.w $484E,X
-    STA.w $4C0E,X
-    LDA.w $4856,X
-    STA.w $4C16,X
-    LDA.w $485E,X
-    STA.w $4C1E,X
+    LDA.w SprTileSrc.Tile,X
+    STA.w SprTile.Tile,X
+    LDA.w SprTileSrc[1].Tile,X
+    STA.w SprTile[1].Tile,X
+    LDA.w SprTileSrc[2].Tile,X
+    STA.w SprTile[2].Tile,X
+    LDA.w SprTileSrc[3].Tile,X
+    STA.w SprTile[3].Tile,X
+    LDA.w SprTileSrc[4].Tile,X
+    STA.w SprTile[4].Tile,X
+    LDA.w SprTileSrc[5].Tile,X
+    STA.w SprTile[5].Tile,X
+    LDA.w SprTileSrc[6].Tile,X
+    STA.w SprTile[6].Tile,X
+    LDA.w SprTileSrc[7].Tile,X
+    STA.w SprTile[7].Tile,X
+    LDA.w SprTileSrc[8].Tile,X
+    STA.w SprTile[8].Tile,X
+    LDA.w SprTileSrc[9].Tile,X
+    STA.w SprTile[9].Tile,X
+    LDA.w SprTileSrc[10].Tile,X
+    STA.w SprTile[10].Tile,X
+    LDA.w SprTileSrc[11].Tile,X
+    STA.w SprTile[11].Tile,X
     SEP #$20
     PLB
     RTS
 
 ; ============================================================
-; $C0:E12A — Sub_E12A (1034 bytes, $E12A–$E533)
-; Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene
-; data, DMAs it to VRAM (destination word-addr $0400), then populates
-; the OAM staging buffer at $7F:4BC2+X with palette values, tile
-; indices, and attribute bytes for 24 sprite sub-slots (stride $08).
-;
-; On entry: X = sprite-slot index (16-bit), M=1 (8-bit A), DP=$0100.
-; Source arrays (indexed by slot):
-;   $1200+slot  → dp:$CF  (sprite type/bank byte)
-;   $1280+slot  → dp:$CD/$CE  (sprite-data ptr offset; bank=$7F via $D2)
-;   $1300+slot  → dp:$D5  (scene-data bank for [$D3] pointer)
-;   $1380+slot  → dp:$D3/$D4  (scene-data ptr offset)
-;   $1700+slot  → X (OAM staging buffer X offset for $7F:4BC2 writes)
-; Calls Sub_E534 (bit 14 of scene word set: multi-tile WRAM fill)
-;   and Sub_E687 (bit 14 clear: single WMDATA write per entry).
+; $C0:E12A — Spr_LoadLargeObj (1034 bytes, $E12A–$E533)
+; (was Sub_E12A.) Loads a 24-tile ("large", size 3) object in one go.
+; 1. Pointers: Spr_GfxPtr = Obj_GfxBank:Obj_GfxOfs, Spr_FramePtr =
+;    Obj_FrameBank:Obj_FrameOfs, Spr_WramPtr = $7F:SprBuf_Base (the
+;    object takes the whole tile buffer: Obj_TileBuf = SprBuf_Base).
+; 2. For each of the 96 tile words at the start of the frame data,
+;    copy that 32-byte 4bpp tile into the buffer: Spr_CopyTileFlipped
+;    when bit 14 (SprFrame_HFlip) is set, else Spr_CopyTile.
+; 3. DMA the $0C00-byte buffer to VRAM word $0400 (channel 7).
+; 4. Fill the object's 24 SprTile records: OfsX = sign-extended byte,
+;    OfsY = byte, from the position pairs after the tile words; Tile =
+;    16x16 tile numbers $40-$4E / $60-$6E / $80-$8E; Attr = $22.
+; Earlier notes read the frame data as "scene data" and the position
+; bytes as palette groups.
+; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100. Called from
+; Field_RestoreState for Field_UnkAEObj.
 ; ============================================================
 org $C0E12A
-Sub_E12A:
-; Phase 1: Load descriptor arrays, set up [$CD] and [$D3] pointers.
-    LDA $1200,X             ; sprite type byte for this slot
-    STA $CF                 ; dp:$CF = sprite type
-    LDA #$7F
-    STA $D2                 ; dp:$D2 = $7F (bank byte for [$CD] pointer)
+Spr_LoadLargeObj:
+    LDA.w !Obj_GfxBank,X
+    STA.b !Spr_GfxPtr+2
+    LDA.b #!Bank7F
+    STA.b !Spr_WramPtr+2
     REP #$20                ; A → 16-bit
-    LDA $1280,X             ; sprite data pointer offset (bank $7F)
-    STA $CD                 ; dp:$CD/$CE; [$CD] → $7F:XXXX
+    LDA.w !Obj_GfxOfs,X
+    STA.b !Spr_GfxPtr
     SEP #$20                ; A → 8-bit
     REP #$20                ; A → 16-bit
-    LDX $6D                 ; X = slot index (re-read; was unchanged)
-    LDA #$3800              ; WRAM staging buffer base
-    STA $0D80,X             ; $0D80+slot = $3800 (chunk base address)
-    STA $D0                 ; dp:$D0 = $3800 (running WMADDL pointer)
+    LDX.b !Obj_Cur
+    LDA.w #!SprBuf_Base
+    STA.w !Obj_TileBuf,X
+    STA.b !Spr_WramPtr      ; next tile goes here
     SEP #$20                ; A → 8-bit
     LDA #$00
-    STA $0F01,X             ; $0F01+slot = 0 (clear sprite-state flag)
-    LDA $1300,X             ; scene-data bank byte for this slot
-    STA $D5                 ; dp:$D5 = bank for [$D3] pointer
+    STA.w !Obj_LastFrame,X
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20                ; A → 16-bit
-    LDA $1380,X             ; scene-data pointer offset
-    STA $D3                 ; dp:$D3/$D4; [$D3] → $D5:XXXX (scene data)
-; Phase 2: Set WRAM address registers, then loop 96× dispatching scene
-; data words.  Bit 14 of each word: 0 → Sub_E687 (WMDATA write),
-;                                    1 → Sub_E534 (multi-tile fill).
-; WRAM address advances by $0020 per iteration.
-    SEP #$30                ; A,X,Y → 8-bit (for 1-byte WMADDH write)
-    LDA #$01
-    STA $2183               ; WMADDH = $01 (WRAM address high byte)
+    LDA.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
+    ; --- Copy the 96 tiles into the WRAM buffer ---
+    SEP #$30                ; A,X,Y → 8-bit (for the 1-byte WMADDH write)
+    LDA.b #!WMADDH_Bank7F
+    STA.w WMADDH
     REP #$30                ; A,X,Y → 16-bit
-    LDA $D0
-    STA $2181               ; WMADDL = $3800 (full WRAM addr: $01:3800)
-    LDA #$0060              ; loop counter = 96 entries
-    STA $C9                 ; dp:$C9 = $60
-    LDY #$0000              ; Y = scene-data word table index
-    BRA .first_iter         ; skip address advance on first iteration
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMDATA writes go to $7F:3800
+    LDA.w #!SprBuf_Tiles    ; 96 tile words
+    STA.b !Spr_TileCount
+    LDY #$0000              ; frame-data index
+    BRA .first_iter
 .next_iter:
-    LDA $D0                 ; advance running WRAM write address
+    LDA.b !Spr_WramPtr      ; next 32-byte tile
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .first_iter:
-    LDA [$D3],Y             ; read 16-bit scene-data word
-    BIT #$4000              ; test bit 14
-    BNE .big_fill           ; set → multi-tile WRAM fill
-    JSR $E687               ; clear → single WMDATA write
+    LDA.b [!Spr_FramePtr],Y ; tile word
+    BIT.w #!SprFrame_HFlip
+    BNE .big_fill
+    JSR Spr_CopyTile
     INY
-    INY                     ; Y += 2 (advance to next 16-bit entry)
-    DEC $C9
+    INY
+    DEC.b !Spr_TileCount
     BNE .next_iter
     BRA .dma
 .big_fill:
-    JSR $E534               ; multi-tile WRAM fill
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .next_iter
-; Phase 3: DMA $0C00 bytes from $7F:3800 → VRAM at word-addr $0400.
+    ; --- DMA the buffer to VRAM ---
 .dma:
     SEP #$20                ; A → 8-bit
-    LDA #$80
-    STA $2115               ; VMAIN = $80 (word-addr, inc after high byte)
-    LDA #$18
-    STA $4371               ; BBAD7 = $18 (VMDATA port)
-    LDA #$01
-    STA $4370               ; DMAP7 = $01 (CPU→PPU, auto-inc, word)
-    LDA #$7F
-    STA $4374               ; A1B7 = $7F (source bank)
-    LDY #$0400
-    STY $2116               ; VMADDL = $0400 (VRAM destination)
-    LDY #$3800
-    STY $4372               ; A1T7L = $3800 (DMA source offset)
-    LDY #$0C00
-    STY $4375               ; DAS7L = $0C00 (transfer byte count)
-    LDA #$80
-    STA $420B               ; MDMAEN = $80 (trigger DMA channel 7)
-; Phase 4: Populate OAM staging buffer $7F:4BC2+X.
-; X is loaded from $1700+slot and used as the long-indexed X offset.
-; 24 groups of 8 bytes (stride $08, bases $4BC2/$4BCA/$4BD2/…/$4C7A).
-; Each group: [+0] = signed value, [+1] = sign-ext, [+2] = raw value.
-; Scene data read from [$D3]+$C0 onward, 2 bytes consumed per group.
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDY.w #!SprBuf_VramWord
+    STY.w VMADDL
+    LDY.w #!SprBuf_Base
+    STY.w A1T7L
+    LDY.w #!SprBuf_Bytes
+    STY.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    ; --- 24 SprTile records: position offsets ---
     REP #$20                ; A → 16-bit
-    LDX $6D                 ; X = slot index
-    LDA $1700,X             ; OAM staging buffer X offset for this slot
-    REP #$10                ; X → 16-bit (ensure width)
-    TAX                     ; X = OAM staging offset
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileRecOfs,X
+    REP #$10                ; X → 16-bit
+    TAX                     ; X = object's first record
     SEP #$20                ; A → 8-bit
-    LDY #$00C0              ; Y = scene-data palette section start
-; 24 palette groups (each: signed+sign-ext at base+0/1, raw at base+2)
-    LDA [$D3],Y             ; group 1 signed value
-    STA.l $7F4BC2,X
+    LDY.w #!LargeObj_LayoutOfs ; position bytes follow the tile words
+    ; per record: X offset byte (sign-extended to 16 bits), Y offset byte
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile.OfsX,X
     BPL .sp01
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se01
 .sp01:
     LDA #$00
 .se01:
-    STA.l $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BC4,X         ; group 1 raw value
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 2 signed value
-    STA.l $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[1].OfsX,X
     BPL .sp02
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se02
 .sp02:
     LDA #$00
 .se02:
-    STA.l $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BCC,X         ; group 2 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 3 signed
-    STA.l $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[2].OfsX,X
     BPL .sp03
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se03
 .sp03:
     LDA #$00
 .se03:
-    STA.l $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BD4,X         ; group 3 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 4 signed
-    STA.l $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[3].OfsX,X
     BPL .sp04
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se04
 .sp04:
     LDA #$00
 .se04:
-    STA.l $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BDC,X         ; group 4 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 5 signed
-    STA.l $7F4BE2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[4].OfsX,X
     BPL .sp05
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se05
 .sp05:
     LDA #$00
 .se05:
-    STA.l $7F4BE3,X
+    STA.l SprTile[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BE4,X         ; group 5 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 6 signed
-    STA.l $7F4BEA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[5].OfsX,X
     BPL .sp06
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se06
 .sp06:
     LDA #$00
 .se06:
-    STA.l $7F4BEB,X
+    STA.l SprTile[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BEC,X         ; group 6 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 7 signed
-    STA.l $7F4BF2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[6].OfsX,X
     BPL .sp07
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se07
 .sp07:
     LDA #$00
 .se07:
-    STA.l $7F4BF3,X
+    STA.l SprTile[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BF4,X         ; group 7 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 8 signed
-    STA.l $7F4BFA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[7].OfsX,X
     BPL .sp08
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se08
 .sp08:
     LDA #$00
 .se08:
-    STA.l $7F4BFB,X
+    STA.l SprTile[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BFC,X         ; group 8 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 9 signed
-    STA.l $7F4C02,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[8].OfsX,X
     BPL .sp09
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se09
 .sp09:
     LDA #$00
 .se09:
-    STA.l $7F4C03,X
+    STA.l SprTile[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C04,X         ; group 9 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 10 signed
-    STA.l $7F4C0A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[9].OfsX,X
     BPL .sp10
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se10
 .sp10:
     LDA #$00
 .se10:
-    STA.l $7F4C0B,X
+    STA.l SprTile[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C0C,X         ; group 10 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 11 signed
-    STA.l $7F4C12,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[10].OfsX,X
     BPL .sp11
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se11
 .sp11:
     LDA #$00
 .se11:
-    STA.l $7F4C13,X
+    STA.l SprTile[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C14,X         ; group 11 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 12 signed
-    STA.l $7F4C1A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[11].OfsX,X
     BPL .sp12
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se12
 .sp12:
     LDA #$00
 .se12:
-    STA.l $7F4C1B,X
+    STA.l SprTile[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C1C,X         ; group 12 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 13 signed
-    STA.l $7F4C22,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[12].OfsX,X
     BPL .sp13
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se13
 .sp13:
     LDA #$00
 .se13:
-    STA.l $7F4C23,X
+    STA.l SprTile[12].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C24,X         ; group 13 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[12].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 14 signed
-    STA.l $7F4C2A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[13].OfsX,X
     BPL .sp14
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se14
 .sp14:
     LDA #$00
 .se14:
-    STA.l $7F4C2B,X
+    STA.l SprTile[13].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C2C,X         ; group 14 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[13].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 15 signed
-    STA.l $7F4C32,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[14].OfsX,X
     BPL .sp15
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se15
 .sp15:
     LDA #$00
 .se15:
-    STA.l $7F4C33,X
+    STA.l SprTile[14].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C34,X         ; group 15 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[14].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 16 signed
-    STA.l $7F4C3A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[15].OfsX,X
     BPL .sp16
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se16
 .sp16:
     LDA #$00
 .se16:
-    STA.l $7F4C3B,X
+    STA.l SprTile[15].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C3C,X         ; group 16 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[15].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 17 signed
-    STA.l $7F4C42,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[16].OfsX,X
     BPL .sp17
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se17
 .sp17:
     LDA #$00
 .se17:
-    STA.l $7F4C43,X
+    STA.l SprTile[16].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C44,X         ; group 17 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[16].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 18 signed
-    STA.l $7F4C4A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[17].OfsX,X
     BPL .sp18
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se18
 .sp18:
     LDA #$00
 .se18:
-    STA.l $7F4C4B,X
+    STA.l SprTile[17].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C4C,X         ; group 18 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[17].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 19 signed
-    STA.l $7F4C52,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[18].OfsX,X
     BPL .sp19
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se19
 .sp19:
     LDA #$00
 .se19:
-    STA.l $7F4C53,X
+    STA.l SprTile[18].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C54,X         ; group 19 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[18].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 20 signed
-    STA.l $7F4C5A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[19].OfsX,X
     BPL .sp20
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se20
 .sp20:
     LDA #$00
 .se20:
-    STA.l $7F4C5B,X
+    STA.l SprTile[19].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C5C,X         ; group 20 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[19].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 21 signed
-    STA.l $7F4C62,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[20].OfsX,X
     BPL .sp21
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se21
 .sp21:
     LDA #$00
 .se21:
-    STA.l $7F4C63,X
+    STA.l SprTile[20].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C64,X         ; group 21 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[20].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 22 signed
-    STA.l $7F4C6A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[21].OfsX,X
     BPL .sp22
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se22
 .sp22:
     LDA #$00
 .se22:
-    STA.l $7F4C6B,X
+    STA.l SprTile[21].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C6C,X         ; group 22 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[21].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 23 signed
-    STA.l $7F4C72,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[22].OfsX,X
     BPL .sp23
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se23
 .sp23:
     LDA #$00
 .se23:
-    STA.l $7F4C73,X
+    STA.l SprTile[22].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C74,X         ; group 23 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[22].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 24 signed (last group)
-    STA.l $7F4C7A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[23].OfsX,X
     BPL .sp24
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se24
 .sp24:
     LDA #$00
 .se24:
-    STA.l $7F4C7B,X
+    STA.l SprTile[23].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C7C,X         ; group 24 raw (no trailing INY)
-; Phase 5: Write tile-index bytes to [+4] of each of the 24 groups.
-; Groups 1-8:  $40,$42,$44,$46,$48,$4A,$4C,$4E
-; Groups 9-16: $60,$62,$64,$66,$68,$6A,$6C,$6E
-; Groups 17-24:$80,$82,$84,$86,$88,$8A,$8C,$8E
-    LDA #$40
-    STA.l $7F4BC6,X
-    LDA #$42
-    STA.l $7F4BCE,X
-    LDA #$44
-    STA.l $7F4BD6,X
-    LDA #$46
-    STA.l $7F4BDE,X
-    LDA #$48
-    STA.l $7F4BE6,X
-    LDA #$4A
-    STA.l $7F4BEE,X
-    LDA #$4C
-    STA.l $7F4BF6,X
-    LDA #$4E
-    STA.l $7F4BFE,X
-    LDA #$60
-    STA.l $7F4C06,X
-    LDA #$62
-    STA.l $7F4C0E,X
-    LDA #$64
-    STA.l $7F4C16,X
-    LDA #$66
-    STA.l $7F4C1E,X
-    LDA #$68
-    STA.l $7F4C26,X
-    LDA #$6A
-    STA.l $7F4C2E,X
-    LDA #$6C
-    STA.l $7F4C36,X
-    LDA #$6E
-    STA.l $7F4C3E,X
-    LDA #$80
-    STA.l $7F4C46,X
-    LDA #$82
-    STA.l $7F4C4E,X
-    LDA #$84
-    STA.l $7F4C56,X
-    LDA #$86
-    STA.l $7F4C5E,X
-    LDA #$88
-    STA.l $7F4C66,X
-    LDA #$8A
-    STA.l $7F4C6E,X
-    LDA #$8C
-    STA.l $7F4C76,X
-    LDA #$8E
-    STA.l $7F4C7E,X
-; Phase 6: Write attribute byte $22 to [+5] of each of the 24 groups.
-    LDA #$22                ; OAM attribute byte
-    STA.l $7F4BC7,X
-    STA.l $7F4BCF,X
-    STA.l $7F4BD7,X
-    STA.l $7F4BDF,X
-    STA.l $7F4BE7,X
-    STA.l $7F4BEF,X
-    STA.l $7F4BF7,X
-    STA.l $7F4BFF,X
-    STA.l $7F4C07,X
-    STA.l $7F4C0F,X
-    STA.l $7F4C17,X
-    STA.l $7F4C1F,X
-    STA.l $7F4C27,X
-    STA.l $7F4C2F,X
-    STA.l $7F4C37,X
-    STA.l $7F4C3F,X
-    STA.l $7F4C47,X
-    STA.l $7F4C4F,X
-    STA.l $7F4C57,X
-    STA.l $7F4C5F,X
-    STA.l $7F4C67,X
-    STA.l $7F4C6F,X
-    STA.l $7F4C77,X
-    STA.l $7F4C7F,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[23].OfsY,X ; Y offset
+    ; --- Tile numbers: three rows of eight 16x16 tiles ---
+    LDA.b #!LargeObj_TileRow0
+    STA.l SprTile.Tile,X
+    LDA.b #!LargeObj_TileRow0+2
+    STA.l SprTile[1].Tile,X
+    LDA.b #!LargeObj_TileRow0+4
+    STA.l SprTile[2].Tile,X
+    LDA.b #!LargeObj_TileRow0+6
+    STA.l SprTile[3].Tile,X
+    LDA.b #!LargeObj_TileRow0+8
+    STA.l SprTile[4].Tile,X
+    LDA.b #!LargeObj_TileRow0+10
+    STA.l SprTile[5].Tile,X
+    LDA.b #!LargeObj_TileRow0+12
+    STA.l SprTile[6].Tile,X
+    LDA.b #!LargeObj_TileRow0+14
+    STA.l SprTile[7].Tile,X
+    LDA.b #!LargeObj_TileRow1
+    STA.l SprTile[8].Tile,X
+    LDA.b #!LargeObj_TileRow1+2
+    STA.l SprTile[9].Tile,X
+    LDA.b #!LargeObj_TileRow1+4
+    STA.l SprTile[10].Tile,X
+    LDA.b #!LargeObj_TileRow1+6
+    STA.l SprTile[11].Tile,X
+    LDA.b #!LargeObj_TileRow1+8
+    STA.l SprTile[12].Tile,X
+    LDA.b #!LargeObj_TileRow1+10
+    STA.l SprTile[13].Tile,X
+    LDA.b #!LargeObj_TileRow1+12
+    STA.l SprTile[14].Tile,X
+    LDA.b #!LargeObj_TileRow1+14
+    STA.l SprTile[15].Tile,X
+    LDA.b #!LargeObj_TileRow2
+    STA.l SprTile[16].Tile,X
+    LDA.b #!LargeObj_TileRow2+2
+    STA.l SprTile[17].Tile,X
+    LDA.b #!LargeObj_TileRow2+4
+    STA.l SprTile[18].Tile,X
+    LDA.b #!LargeObj_TileRow2+6
+    STA.l SprTile[19].Tile,X
+    LDA.b #!LargeObj_TileRow2+8
+    STA.l SprTile[20].Tile,X
+    LDA.b #!LargeObj_TileRow2+10
+    STA.l SprTile[21].Tile,X
+    LDA.b #!LargeObj_TileRow2+12
+    STA.l SprTile[22].Tile,X
+    LDA.b #!LargeObj_TileRow2+14
+    STA.l SprTile[23].Tile,X
+    ; --- Attributes ---
+    LDA.b #!LargeObj_Attr
+    STA.l SprTile.Attr,X
+    STA.l SprTile[1].Attr,X
+    STA.l SprTile[2].Attr,X
+    STA.l SprTile[3].Attr,X
+    STA.l SprTile[4].Attr,X
+    STA.l SprTile[5].Attr,X
+    STA.l SprTile[6].Attr,X
+    STA.l SprTile[7].Attr,X
+    STA.l SprTile[8].Attr,X
+    STA.l SprTile[9].Attr,X
+    STA.l SprTile[10].Attr,X
+    STA.l SprTile[11].Attr,X
+    STA.l SprTile[12].Attr,X
+    STA.l SprTile[13].Attr,X
+    STA.l SprTile[14].Attr,X
+    STA.l SprTile[15].Attr,X
+    STA.l SprTile[16].Attr,X
+    STA.l SprTile[17].Attr,X
+    STA.l SprTile[18].Attr,X
+    STA.l SprTile[19].Attr,X
+    STA.l SprTile[20].Attr,X
+    STA.l SprTile[21].Attr,X
+    STA.l SprTile[22].Attr,X
+    STA.l SprTile[23].Attr,X
     RTS
 
 ; ============================================================
-; $C0:E534 — Sub_E534 (339 bytes, $C0:E534–$E686)
-; FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like
-; lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA.
-;
-; On entry (from Sub_E12A Phase 2, bit 14 of scene word set):
-;   A = 16-bit scene-data word, Y = scene-data table index,
-;   dp:$0A = base offset, dp:$CD/$CE = sprite-data ptr (bank $7F),
-;   WMADDL/WMADDH already set for current WRAM position.
-; Computes byte index = ((A & $FF) | [$0A]) << 4 (M=1 encoding):
-; reads 32 bytes from [$CD]+index, looks each up in $FD00, writes to WMDATA.
-; Note: the header bytes 29 FF 07 0A*4 are a byte-identity shared with
-; Sub_E687 — valid as M=1 "AND #$FF / ORA[$0A] / 4×ASL" or M=0 "AND #$07FF / 5×ASL".
-; Returns with 16-bit A restored, Y restored from dp:$C5.
+; $C0:E534 — Spr_CopyTileFlipped (339 bytes, $C0:E534–$E686)
+; (was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right,
+; from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through
+; WMDATA: each byte goes through BitReverseTable ($C0:FD00), which
+; mirrors a tile row. Earlier notes called it a "palette-like lookup
+; at bank $FD" and gave the entry as AND #$FF / ORA [$0A]; see below.
+; On entry: M=0, A = frame-data tile word (bit 14 set), Y = frame-data
+; index, WMADD already at the destination, DB = $00.
+; Returns with M=0 and Y restored from Spr_SavedY.
 ; ============================================================
 org $C0E534
-Sub_E534:
-    AND #$FF                ; mask low byte (M=1 encoding: 29 FF)
-    ORA [$0A]               ; merge with dp:[$0A] indirect long
+Spr_CopyTileFlipped:
+    AND.w #!SprFrame_TileMask ; tile number (earlier listings split these
+    ASL                     ; bytes as AND #$FF / ORA [$0A] / 4×ASL,
+    ASL                     ; which is how they decode with M=1; the
+    ASL                     ; caller runs with M=0)
     ASL
-    ASL
-    ASL
-    ASL                     ; × 16: sprite-data byte index
-    STY $C5                 ; save Y
-    TAY                     ; Y = sprite-data byte index
+    ASL                     ; × 32: byte offset of the 4bpp tile
+    STY.b !Spr_SavedY
+    TAY                     ; Y = tile's byte offset
     SEP #$20                ; A → 8-bit
-    TDC                     ; A = DP (clears A)
-    XBA                     ; ensure A high byte = 0
-    LDA [$CD],Y
+    TDC                     ; C = D = $0100
+    XBA                     ; B = 0 for the TAX below
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 1)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 1
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 2)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 2
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 3)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 3
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 4)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 4
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 5)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 5
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 6)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 6
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 7)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 7
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 8)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 8
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 9)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 9
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 10)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 10
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 11)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 11
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 12)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 12
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 13)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 13
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 14)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 14
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 15)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 15
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 16)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 16
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 17)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 17
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 18)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 18
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 19)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 19
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 20)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 20
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 21)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 21
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 22)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 22
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 23)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 23
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 24)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 24
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 25)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 25
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 26)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 26
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 27)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 27
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 28)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 28
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 29)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 29
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 30)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 30
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 31)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 31
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 32 — no INY)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; WMDATA (byte 32 — no INY)
     REP #$20                ; A → 16-bit
-    LDY $C5                 ; restore Y
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E687 — Sub_E687 (178 bytes, $C0:E687–$E738)
-; Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM
-; graphics bank into WRAM at the address in dp:$D0.
-;
-; On entry (from Sub_E12A Phase 2, bit 14 of scene word clear):
-;   A = 16-bit scene-data word, Y = scene-data table index,
-;   dp:$0A = base offset, dp:$CD = sprite-data byte base,
-;   dp:$CF = graphics bank selector, dp:$D0 = WRAM write address.
-; Header (M=0 encoding here: AND #$07FF / 5×ASL ≡ same bytes as Sub_E534's header)
-; computes source byte offset X = ((A & $07FF) << 5) + dp:$CD,
-; loads WRAM address Y = dp:$D0, dispatches on dp:$CF:
-;   $7F → Sub_E8C2, $D2 → Sub_E7BC, $D3 → Sub_E83F, $D4 → Sub_E739,
-;   else → inline $D5 copy below.
-; After copy: WMADDL = old_Y + $20, Y restored. Returns 16-bit A.
+; $C0:E687 — Spr_CopyTile (178 bytes, $C0:E687–$E738)
+; (was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr +
+; (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD
+; past it so a following Spr_CopyTileFlipped writes the next tile.
+; The source bank (Spr_GfxPtr+2) picks the copier: $7F → Spr_CopyTile7F,
+; $D2/$D3/$D4 → Spr_CopyTileD2/D3/D4, anything else → bank $D5 below.
+; Each copier is an unrolled 16-word move with DB = $7F, X = source
+; offset and Y = destination address.
+; On entry: M=0, A = frame-data tile word (bit 14 clear), Y = frame-data
+; index. Returns with M=0, Y restored.
 ; ============================================================
 org $C0E687
-Sub_E687:
-    AND #$07FF              ; (M=0: 29 FF 07) same bytes as Sub_E534's AND #$FF/ORA[$0A]
+Spr_CopyTile:
+    AND.w #!SprFrame_TileMask
     ASL
     ASL
     ASL
     ASL
-    ASL                     ; 5×ASL (same byte sequence as 4×ASL in M=1 above)
-    STY $C5                 ; save Y
+    ASL                     ; × 32: byte offset of the tile
+    STY.b !Spr_SavedY
     CLC
-    ADC $CD                 ; X = shifted offset + dp:$CD base
+    ADC.b !Spr_GfxPtr       ; X = source offset in its bank
     TAX
-    LDY $D0                 ; Y = WRAM write address
-    SEP #$20                ; A → 8-bit for bank-selector dispatch
-    LDA $CF                 ; graphics bank selector
-    CMP #$7F
+    LDY.b !Spr_WramPtr      ; Y = destination in bank $7F
+    SEP #$20                ; A → 8-bit
+    LDA.b !Spr_GfxPtr+2     ; source bank
+    CMP.b #!Bank7F
     BNE .not7f
-    BRL $0220               ; → Sub_E8C2 ($E8C2): copy from $7F using abs,X
+    BRL Spr_CopyTile7F
 .not7f:
     SEC
-    SBC #$D2
+    SBC.b #!BankD2
     BNE .notd2
-    BRL $0112               ; → Sub_E7BC ($E7BC): copy from bank $D2
+    BRL Spr_CopyTileD2
 .notd2:
     DEC
     BNE .notd3
-    BRL $018F               ; → Sub_E83F ($E83F): copy from bank $D3
+    BRL Spr_CopyTileD3
 .notd3:
     DEC
-    BNE .d5copy             ; else → inline $D5 copy
-    BRL $0083               ; → Sub_E739 ($E739): copy from bank $D4
-.d5copy:                    ; dp:$CF = $D5 (or unrecognised) → read from bank $D5
+    BNE .d5copy
+    BRL Spr_CopyTileD4
+.d5copy:                    ; $D5 (or any other bank): read bank $D5
     PHB
-    LDA #$7F                ; (M=1 after SEP above)
+    LDA.b #!Bank7F          ; (M=1 after SEP above)
     PHA
     PLB                     ; DB = $7F
     REP #$20                ; A → 16-bit
-    LDA $D50000,X
-    STA.w $0000,Y
-    LDA $D50002,X
-    STA.w $0002,Y
-    LDA $D50004,X
-    STA.w $0004,Y
-    LDA $D50006,X
-    STA.w $0006,Y
-    LDA $D50008,X
-    STA.w $0008,Y
-    LDA $D5000A,X
-    STA.w $000A,Y
-    LDA $D5000C,X
-    STA.w $000C,Y
-    LDA $D5000E,X
-    STA.w $000E,Y
-    LDA $D50010,X
-    STA.w $0010,Y
-    LDA $D50012,X
-    STA.w $0012,Y
-    LDA $D50014,X
-    STA.w $0014,Y
-    LDA $D50016,X
-    STA.w $0016,Y
-    LDA $D50018,X
-    STA.w $0018,Y
-    LDA $D5001A,X
-    STA.w $001A,Y
-    LDA $D5001C,X
-    STA.w $001C,Y
-    LDA $D5001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D5,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D5+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D5+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D5+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D5+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D5+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D5+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D5+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D5+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D5+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D5+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D5+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D5+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D5+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D5+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D5+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181             ; WMADDL = old_Y + $20
-    LDY $C5                 ; restore Y
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL            ; WMADD = just past the copied tile
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E739 — Sub_E739 (131 bytes, $C0:E739–$E7BB)
-; Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D4.
-; X = source byte offset, Y = WRAM write address (both from Sub_E687).
+; $C0:E739 — Spr_CopyTileD4 (131 bytes, $C0:E739–$E7BB)
+; Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D4).
 ; ============================================================
 org $C0E739
-Sub_E739:
+Spr_CopyTileD4:
     PHB
-    db $A9,$7F              ; LDA #$7F (db: M=1 byte encoding in M=0 asar context)
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20                ; A → 16-bit
-    LDA $D40000,X
-    STA.w $0000,Y
-    LDA $D40002,X
-    STA.w $0002,Y
-    LDA $D40004,X
-    STA.w $0004,Y
-    LDA $D40006,X
-    STA.w $0006,Y
-    LDA $D40008,X
-    STA.w $0008,Y
-    LDA $D4000A,X
-    STA.w $000A,Y
-    LDA $D4000C,X
-    STA.w $000C,Y
-    LDA $D4000E,X
-    STA.w $000E,Y
-    LDA $D40010,X
-    STA.w $0010,Y
-    LDA $D40012,X
-    STA.w $0012,Y
-    LDA $D40014,X
-    STA.w $0014,Y
-    LDA $D40016,X
-    STA.w $0016,Y
-    LDA $D40018,X
-    STA.w $0018,Y
-    LDA $D4001A,X
-    STA.w $001A,Y
-    LDA $D4001C,X
-    STA.w $001C,Y
-    LDA $D4001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D4,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D4+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D4+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D4+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D4+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D4+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D4+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D4+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D4+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D4+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D4+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D4+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D4+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D4+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D4+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D4+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181             ; WMADDL = old_Y + $20
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL            ; WMADD = just past the copied tile
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E7BC — Sub_E7BC (131 bytes, $C0:E7BC–$E83E)
-; Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D2.
+; $C0:E7BC — Spr_CopyTileD2 (131 bytes, $C0:E7BC–$E83E)
+; Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D2).
 ; ============================================================
 org $C0E7BC
-Sub_E7BC:
+Spr_CopyTileD2:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA $D20000,X
-    STA.w $0000,Y
-    LDA $D20002,X
-    STA.w $0002,Y
-    LDA $D20004,X
-    STA.w $0004,Y
-    LDA $D20006,X
-    STA.w $0006,Y
-    LDA $D20008,X
-    STA.w $0008,Y
-    LDA $D2000A,X
-    STA.w $000A,Y
-    LDA $D2000C,X
-    STA.w $000C,Y
-    LDA $D2000E,X
-    STA.w $000E,Y
-    LDA $D20010,X
-    STA.w $0010,Y
-    LDA $D20012,X
-    STA.w $0012,Y
-    LDA $D20014,X
-    STA.w $0014,Y
-    LDA $D20016,X
-    STA.w $0016,Y
-    LDA $D20018,X
-    STA.w $0018,Y
-    LDA $D2001A,X
-    STA.w $001A,Y
-    LDA $D2001C,X
-    STA.w $001C,Y
-    LDA $D2001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D2,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D2+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D2+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D2+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D2+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D2+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D2+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D2+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D2+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D2+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D2+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D2+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D2+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D2+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D2+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D2+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E83F — Sub_E83F (131 bytes, $C0:E83F–$E8C1)
-; Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D3.
+; $C0:E83F — Spr_CopyTileD3 (131 bytes, $C0:E83F–$E8C1)
+; Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D3).
 ; ============================================================
 org $C0E83F
-Sub_E83F:
+Spr_CopyTileD3:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA $D30000,X
-    STA.w $0000,Y
-    LDA $D30002,X
-    STA.w $0002,Y
-    LDA $D30004,X
-    STA.w $0004,Y
-    LDA $D30006,X
-    STA.w $0006,Y
-    LDA $D30008,X
-    STA.w $0008,Y
-    LDA $D3000A,X
-    STA.w $000A,Y
-    LDA $D3000C,X
-    STA.w $000C,Y
-    LDA $D3000E,X
-    STA.w $000E,Y
-    LDA $D30010,X
-    STA.w $0010,Y
-    LDA $D30012,X
-    STA.w $0012,Y
-    LDA $D30014,X
-    STA.w $0014,Y
-    LDA $D30016,X
-    STA.w $0016,Y
-    LDA $D30018,X
-    STA.w $0018,Y
-    LDA $D3001A,X
-    STA.w $001A,Y
-    LDA $D3001C,X
-    STA.w $001C,Y
-    LDA $D3001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D3,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D3+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D3+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D3+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D3+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D3+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D3+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D3+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D3+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D3+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D3+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D3+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D3+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D3+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D3+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D3+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E8C2 — Sub_E8C2 (115 bytes, $C0:E8C2–$E934)
-; Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $7F.
-; Uses absolute,X (BD) rather than long,X (BF): DB is already $7F after PLB.
+; $C0:E8C2 — Spr_CopyTile7F (115 bytes, $C0:E8C2–$E934)
+; Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when
+; the graphics are already in WRAM); abs,X reads since DB = $7F.
 ; ============================================================
 org $C0E8C2
-Sub_E8C2:
+Spr_CopyTile7F:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA.w $0000,X           ; BD: abs,X (DB=$7F → reads $7F:0000+X)
-    STA.w $0000,Y
-    LDA.w $0002,X
-    STA.w $0002,Y
-    LDA.w $0004,X
-    STA.w $0004,Y
-    LDA.w $0006,X
-    STA.w $0006,Y
-    LDA.w $0008,X
-    STA.w $0008,Y
-    LDA.w $000A,X
-    STA.w $000A,Y
-    LDA.w $000C,X
-    STA.w $000C,Y
-    LDA.w $000E,X
-    STA.w $000E,Y
-    LDA.w $0010,X
-    STA.w $0010,Y
-    LDA.w $0012,X
-    STA.w $0012,Y
-    LDA.w $0014,X
-    STA.w $0014,Y
-    LDA.w $0016,X
-    STA.w $0016,Y
-    LDA.w $0018,X
-    STA.w $0018,Y
-    LDA.w $001A,X
-    STA.w $001A,Y
-    LDA.w $001C,X
-    STA.w $001C,Y
-    LDA.w $001E,X
-    STA.w $001E,Y
+    LDA.w !Wram7F_PtrBase,X ; DB = $7F
+    STA.w !Wram7F_PtrBase,Y
+    LDA.w !Wram7F_PtrBase+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.w !Wram7F_PtrBase+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.w !Wram7F_PtrBase+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.w !Wram7F_PtrBase+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.w !Wram7F_PtrBase+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.w !Wram7F_PtrBase+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.w !Wram7F_PtrBase+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.w !Wram7F_PtrBase+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.w !Wram7F_PtrBase+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.w !Wram7F_PtrBase+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.w !Wram7F_PtrBase+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.w !Wram7F_PtrBase+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.w !Wram7F_PtrBase+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.w !Wram7F_PtrBase+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.w !Wram7F_PtrBase+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E935 — Sub_E935 (29 bytes, $E935–$E951)
-; Initialize 8 sprite-slot "uninitialized" flags at $0BC0-$0BC7 to $80.
-; Sets DP=$0B00, stores LDA #$80 to dp:$C0-$C7 (= abs $0BC0-$0BC7),
-; then PLD / RTS.
-; Tail-called via BRL from Sub_B192 at end of sprite table clear.
-; $80 in these slots means "no sprite assigned" (tested in Sub_E9E2/E9FF).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP restored by PLD before call.
+; $C0:E935 — SprBuf_FreeAll (29 bytes, $E935–$E951)
+; (was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80),
+; with DP pointed at $0B00 so each store is a 2-byte dp store.
+; Tail of Obj_ResetStates; also called by Scene_PostLoadInit and
+; after a battle (DefaultHandler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y).
 ; ============================================================
 org $C0E935
-Sub_E935:
+SprBuf_FreeAll:
     PHD
     REP #$20                ; A → 16-bit
-    LDA #$0B00
+    LDA.w #!DP_SprBufPage
     TCD                     ; DP = $0B00
     SEP #$20                ; A → 8-bit
-    LDA #$80                ; "uninitialized" sentinel
-    STA $C0                 ; dp:$C0 = $0BC0
-    STA $C1
-    STA $C2
-    STA $C3
-    STA $C4
-    STA $C5
-    STA $C6
-    STA $C7                 ; dp:$C7 = $0BC7
+    LDA.b #!Obj_None        ; free
+    STA.b !SprBuf_Owner-!DP_SprBufPage
+    STA.b !SprBuf_Owner+1-!DP_SprBufPage
+    STA.b !SprBuf_Owner+2-!DP_SprBufPage
+    STA.b !SprBuf_Owner+3-!DP_SprBufPage
+    STA.b !SprBuf_Owner+4-!DP_SprBufPage
+    STA.b !SprBuf_Owner+5-!DP_SprBufPage
+    STA.b !SprBuf_Owner+6-!DP_SprBufPage
+    STA.b !SprBuf_Owner+7-!DP_SprBufPage
     PLD
     RTS
 
 ; ============================================================
-; $C0:E952 — Sub_E952 (40 bytes, $E952–$E979)
-; Sprite slot allocator — single-slot variant.
-; Scans $0BC0[0..3] for the first entry whose value is negative
-; ($80 = free sentinel set by Sub_E935).  Claims the entry by
-; writing dp:$6D there, then computes the WRAM staging-buffer base
-; address for that sprite slot: $3800 + slotIndex×$0200 (so entries
-; 0–3 map to $3800/$3A00/$3C00/$3E00) and stores the result in
-; $0D80+dp:$6D.
-; Returns: SEC on success (slot allocated), CLC if table is full.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $CC0D.
+; $C0:E952 — SprBuf_Alloc1 (40 bytes, $E952–$E979)
+; (was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the
+; WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets
+; Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200.
+; Returns C=1 on success, C=0 when all four are taken.
+; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100. Called from Obj_BuildFrame4.
 ; ============================================================
 org $C0E952
-Sub_E952:
+SprBuf_Alloc1:
     LDX #$00
 .e952_loop:
-    LDA $0BC0,X          ; read slot entry X
-    BPL .e952_next       ; $00–$7F = occupied → skip
-    LDA $6D              ; $80+ = free → claim: store slot id
-    STA $0BC0,X
-    TXA                  ; A.lo = table index (0–3)
-    XBA                  ; A.hi ← index; A.lo ← 0
+    LDA.w !SprBuf_Owner,X
+    BPL .e952_next
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    TXA
+    XBA
     REP #$20             ; A → 16-bit
-    AND #$FF00           ; isolate high byte (= index × $0100)
-    ASL                  ; × 2  → index × $0200
+    AND.w #!Eng_HighByteMask
+    ASL                  ; entry × $200
     CLC
-    ADC #$3800           ; WRAM base: $3800 + index × $0200
-    LDX $6D              ; X = sprite slot id
-    STA $0D80,X          ; $0D80+slot ← staging-buffer base
+    ADC.w #!SprBuf_Base  ; chunk address
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20             ; A → 8-bit
     SEC                  ; success
     RTS
@@ -4505,40 +4544,34 @@ Sub_E952:
     INX
     CPX #$04
     BMI .e952_loop       ; loop for entries 0–3
-    CLC                  ; table full — no slot found
+    CLC                  ; all taken
     RTS
 
 ; ============================================================
-; $C0:E97A — Sub_E97A (48 bytes, $E97A–$E9A9)
-; Sprite slot allocator — dual-slot variant.
-; Like Sub_E952 but requires BOTH $0BC0[X] and $0BC1[X] to be free.
-; Claims both entries with dp:$6D; WRAM base computation is identical.
-; Searches entries 0–2 (CPX #$03) since adjacent pairs overlap:
-; position 0 → ($0BC0,$0BC1), position 1 → ($0BC1,$0BC2), etc.
-; Returns: SEC on success, CLC on failure.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $CF2D, $D299.
+; $C0:E97A — SprBuf_Alloc2 (48 bytes, $E97A–$E9A9)
+; (was Sub_E97A.) As SprBuf_Alloc1 for two adjacent free chunks
+; (start entries 0-2). Called from Obj_BuildFrame8 and Obj_BuildFrame8Pass0.
 ; ============================================================
 org $C0E97A
-Sub_E97A:
+SprBuf_Alloc2:
     LDX #$00
 .e97a_loop:
-    LDA $0BC0,X          ; check first sub-slot
-    BPL .e97a_next       ; occupied → skip
-    LDA $0BC1,X          ; check second sub-slot
-    BPL .e97a_next       ; occupied → skip
-    LDA $6D              ; both free → claim both
-    STA $0BC0,X
-    STA $0BC1,X
+    LDA.w !SprBuf_Owner,X
+    BPL .e97a_next
+    LDA.w !SprBuf_Owner+1,X
+    BPL .e97a_next
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
     TXA
     XBA
     REP #$20
-    AND #$FF00
+    AND.w #!Eng_HighByteMask
     ASL
     CLC
-    ADC #$3800
-    LDX $6D
-    STA $0D80,X
+    ADC.w #!SprBuf_Base
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20
     SEC
     RTS
@@ -4550,38 +4583,33 @@ Sub_E97A:
     RTS
 
 ; ============================================================
-; $C0:E9AA — Sub_E9AA (56 bytes, $E9AA–$E9E1)
-; Sprite slot allocator — triple-slot variant.
-; Requires $0BC0[X], $0BC1[X], and $0BC2[X] all free; searches only
-; entries 0–1 (CPX #$02) since three consecutive sub-slots fit in two
-; starting positions.  Claims all three with dp:$6D; same WRAM base.
-; Returns: SEC on success, CLC on failure.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $D555, $D617.
+; $C0:E9AA — SprBuf_Alloc3 (56 bytes, $E9AA–$E9E1)
+; (was Sub_E9AA.) As SprBuf_Alloc1 for three adjacent free chunks
+; (start entries 0-1). Called from Obj_BuildFrame12Pass0 and Obj_BuildFrame12Pass0Alt.
 ; ============================================================
 org $C0E9AA
-Sub_E9AA:
+SprBuf_Alloc3:
     LDX #$00
 .e9aa_loop:
-    LDA $0BC0,X
+    LDA.w !SprBuf_Owner,X
     BPL .e9aa_next
-    LDA $0BC1,X
+    LDA.w !SprBuf_Owner+1,X
     BPL .e9aa_next
-    LDA $0BC2,X
+    LDA.w !SprBuf_Owner+2,X
     BPL .e9aa_next
-    LDA $6D              ; all three free → claim
-    STA $0BC0,X
-    STA $0BC1,X
-    STA $0BC2,X
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
+    STA.w !SprBuf_Owner+2,X
     TXA
     XBA
     REP #$20
-    AND #$FF00
+    AND.w #!Eng_HighByteMask
     ASL
     CLC
-    ADC #$3800
-    LDX $6D
-    STA $0D80,X
+    ADC.w #!SprBuf_Base
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20
     SEC
     RTS
@@ -4593,16 +4621,17 @@ Sub_E9AA:
     RTS
 
 org $C0E9E2
-Sub_E9E2:
-    ; 29 bytes ($E9E2-$E9FE). Entry M=1, X=1.
-    ; Searches 4-entry table at $0BC0 for the current sprite slot ($6D),
-    ; then marks the matching entry with $80.
+SprBuf_Free1:
+    ; (was Sub_E9E2.) 29 bytes ($E9E2-$E9FE). Releases the SprBuf chunk
+    ; owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries
+    ; and marks it free. Run by Spr_PrepareTiles after Spr_Load4.
+    ; Entry M=1; returns with X/Y 16-bit.
     SEP #$10
-    LDX $6D
+    LDX.b !Obj_Cur
     LDX #$00
 .e9e2_loop:
-    LDA.w $0BC0,X
-    CMP $6D
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .e9e2_found
     INX
     CPX #$04
@@ -4610,22 +4639,22 @@ Sub_E9E2:
     REP #$10
     RTS
 .e9e2_found:
-    LDA #$80
-    STA.w $0BC0,X
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X
     REP #$10
     RTS
 
 org $C0E9FF
-Sub_E9FF:
-    ; 32 bytes ($E9FF-$EA1E). Entry M=1, X=1.
-    ; Searches 3-entry table at $0BC0 for slot $6D; marks match with $80 in
-    ; both $0BC0,X and $0BC1,X (two entries). Loop limit CPX #$03 vs Sub_E9E2's #$04.
+SprBuf_Free2:
+    ; (was Sub_E9FF.) 32 bytes ($E9FF-$EA1E). As SprBuf_Free1 for a
+    ; 2-chunk object: the first of the 3 possible start entries owned by
+    ; Obj_Cur and the one after it are freed. Run after Spr_Load8.
     SEP #$10
-    LDX $6D
+    LDX.b !Obj_Cur
     LDX #$00
 .e9ff_loop:
-    LDA.w $0BC0,X
-    CMP $6D
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .e9ff_found
     INX
     CPX #$03
@@ -4633,34 +4662,33 @@ Sub_E9FF:
     REP #$10
     RTS
 .e9ff_found:
-    LDA #$80
-    STA.w $0BC0,X
-    STA.w $0BC1,X
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
     REP #$10
     RTS
 
 org $C0EA1F
-Sub_EA1F:
-    ; 35 bytes ($EA1F–$EA41). Entry M=1, X=0 (16-bit).
-    ; Types 2/3+ init pass 2: searches 2-entry table at $0BC0 for sprite
-    ; slot $6D; marks $0BC0,X $0BC1,X $0BC2,X with $80 (3 OAM slots).
+SprBuf_Free3:
+    ; (was Sub_EA1F.) 35 bytes ($EA1F–$EA41). As SprBuf_Free1 for a
+    ; 3-chunk object (2 possible start entries). Run after Spr_Load12.
     SEP #$10                ; X → 8-bit
-    LDX $6D                 ; (discarded; immediately overwritten)
-    LDX #$00                ; X = 0 (loop counter)
+    LDX.b !Obj_Cur          ; (discarded; immediately overwritten)
+    LDX #$00
 .ea1f_loop:
-    LDA.w $0BC0,X           ; table entry X
-    CMP $6D                 ; match sprite slot?
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .ea1f_found
     INX
-    CPX #$02                ; 2-entry table (0,1)
+    CPX #$02                ; start entries 0-1
     BNE .ea1f_loop
     REP #$10                ; X → 16-bit (no match)
     RTS
 .ea1f_found:
-    LDA #$80
-    STA.w $0BC0,X           ; mark slot (byte 0)
-    STA.w $0BC1,X           ; mark slot (byte 1)
-    STA.w $0BC2,X           ; mark slot (byte 2)
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X   ; free all three chunks
+    STA.w !SprBuf_Owner+1,X
+    STA.w !SprBuf_Owner+2,X
     REP #$10                ; X → 16-bit
     RTS
 
@@ -4679,10 +4707,10 @@ org $C00000
 
 ReentryVectors:
     BRA GameLoop_Main       ; [0] warm restart — skip init, enter frame loop
-    BRL $2C3C               ; [1] → ScrollStepAccum  ($2C41)
-    BRL $0AF7               ; [2] → AudioDrvSync      ($0AFF)
-    BRL $1BA0               ; [3] → MusicCueDispatch  ($1BAB)
-    BRL $1BD8               ; [4] → AudioFadeDispatch ($1BE6)
+    BRL ScrollStepAccum     ; [1] $C0:2C41
+    BRL AudioDrvSync        ; [2] $C0:0AFF
+    BRL MusicCueDispatch    ; [3] $C0:1BAB
+    BRL AudioFadeDispatch   ; [4] $C0:1BE6
 
 ; ============================================================
 ; $C0:000E — GameLoop: one-time startup init (from MainInit)
@@ -4694,333 +4722,337 @@ GameLoop:
 
     ; Install RAM-resident interrupt handlers first — they live at
     ; $7E:0500/$7E:0504, which are deliberately NOT cleared below.
-    JSR InstallNMI          ; NMI handler: JML $C0:EA63 at $7E:0500
-    JSR InstallIRQ          ; IRQ handler: JML $C0:ECCC at $7E:0504
+    JSR InstallNMI          ; JML NmiHandler at $7E:0500
+    JSR InstallIRQ          ; JML IrqHandler at $7E:0504
 
     REP #$20                ; A → 16-bit for TCD
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                     ; DP = $0100 (WRAM variable page)
     SEP #$20                ; A → 8-bit
 
     JSR InitHW              ; disable hardware (SEI, forced blank, no NMI/DMA)
 
     ; Clear WRAM block 1: $7E:0000-04FF (1280 bytes, stops before handlers)
-    LDX #$0500
-    STX $4E                 ; ($014E-$014F) = byte count
+    LDX.w #!Boot_ClearLowSize
+    STX.b !DmaFill_Size
     LDX #$0000
-    STX $4B                 ; ($014B-$014C) = dest addr
-    LDA #$7E
-    STA $4D                 ; ($014D) = dest bank
+    STX.b !DmaFill_Dest
+    LDA.b #!Bank7E
+    STA.b !DmaFill_Bank
     JSR ClearRAMDMA         ; DMA fill with 0
 
     ; Clear WRAM block 2: $7E:0700-FFFF (59648 bytes)
-    LDX #$E900
-    STX $4E
-    LDX #$0700
-    STX $4B
-    LDA #$7E
-    STA $4D
+    LDX.w #!Boot_ClearMainSize
+    STX.b !DmaFill_Size
+    LDX.w #!Boot_ClearMainStart
+    STX.b !DmaFill_Dest
+    LDA.b #!Bank7E
+    STA.b !DmaFill_Bank
     JSR ClearRAMDMA
 
     ; Clear WRAM block 3: $7F:5080-A0FF (20608 bytes)
-    LDX #$5080
-    STX $4E
-    STX $4B                 ; count == dest addr (both $5080)
-    LDA #$7F
-    STA $4D
+    LDX.w #!Boot_Clear7FStart
+    STX.b !DmaFill_Size
+    STX.b !DmaFill_Dest     ; count == dest addr (both $5080)
+    LDA.b #!Bank7F
+    STA.b !DmaFill_Bank
     JSR ClearRAMDMA
 
-    JSL $C70000             ; engine subsystem init
-    LDA #$09
-    JSL $C28004
+    JSL Audio_DriverInit    ; sound driver init (bank $C7)
+    LDA.b #!BankC2_BootArg
+    JSL BankC2_Entry8004
 
 GameLoop_Main:
     JSR InitHW              ; forced blank, disable NMI/DMA
     JSR InstallNMI          ; reinstall NMI handler
     JSR InstallIRQ          ; reinstall IRQ handler
 
-    ; Dispatch on game mode index at WRAM $0100 (16-bit)
-    LDX $0100
-    CPX #$01F0
+    ; Dispatch on the location index (Loc_Id, WRAM $0100, 16-bit)
+    LDX.w !DP_Field+!Loc_Id
+    CPX.w #!Loc_FirstBankC2
     BMI GL_ModeOk1
-    JML $C20000             ; mode >= $01F0 → alternate handler in bank $C2
+    JML BankC2_Entry0000    ; Loc_Id >= $01F0 → handled in bank $C2
 
 GL_ModeOk1:
-    CPX #$01FF
+    CPX.w #!Loc_LoadSave
     BMI GL_ModeOk2
-    LDX #$7C00
-    BRL $2DA1               ; → LoadSavePath ($2E1E)
+    LDX.w #!LoadSave_EntryX
+    BRL LoadSavePath               ; → LoadSavePath ($2E1E)
 
 GL_ModeOk2:
     REP #$20
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                     ; DP = $0100
     SEP #$20
 
-    JSR FrameStateInit      ; save/reset per-frame state variables
-    JSR LoadLocation        ; one-time location-load (10 JSR + 2 JSL)
-    JSR Sub_B192            ; zero $1Bxx table + init $0BC0-$0BC7
-    JSR $56A6
-    JSR $28AA
-    JSR $2848               ; input polling
+    JSR FrameStateInit      ; reset the field page for this location
+    JSR LoadLocation        ; location-load steps (10 JSR + 2 JSL)
+    JSR Obj_ResetStates     ; clear Obj_State, then SprBuf_FreeAll
+    JSR Scene_PostLoadInit
+    JSR TileAnimList_Clear
+    JSR Scene_SettleFrames  ; run frames until the new scene reports ready
 
 GameLoop_FrameBody:
-    LDA.w $00F0
-    TSB $51                 ; ($0151) |= [$00F0]
-    LDA.w $00F6
-    TSB $50                 ; ($0150) |= [$00F6]
-    JSR $18D9
-    JSR $0C76
-    JSR $881E
-    JSR $1AAC
-    JSL $C01F87
-    JSR $21E1
-    JSR $274D
+    LDA.w !Pad_Pressed
+    TSB.b !Pad_PressedLatch ; accumulate newly pressed buttons
+    LDA.w !Pad_Unk00F6
+    TSB.b !Pad_Unk00F6Latch ; accumulate Pad_Unk00F6
+    JSR Field_PauseAndMenuInput
+    JSR Field_SceneChangeTick
+    JSR Field_FrameUpdate
+    JSR Field_Unk1AAC
+    JSL Field_Unk1F87
+    JSR Field_EventHookDispatch
+    JSR Field_Unk274D
     JSR VBlankHandler       ; sync to VBlank (tail-jumps via BRL to PostVBlank)
-    JSR $EC60
+    JSR Sub_EC60
     BRA GameLoop_FrameBody
 
 ; ============================================================
 ; $C0:00BF — VBlankHandler
-; Performs per-VBlank audio + DMA tasks; tail-jumps to PostVBlank.
-; Caller's return addr stays on stack so PostVBlank's RTS resumes there.
+; End-of-frame work, called once per frame from GameLoop_FrameBody
+; (not an interrupt handler despite the name): Vblank_* helpers,
+; EngFD_UnkC2C1, FdVec_FFF7 (earlier notes: waits for VBlank),
+; Field_ProcessAnimQueue, then tail-jumps to PostVBlank, whose RTS
+; returns to this routine's caller.
 ; ============================================================
 VBlankHandler:
     SEP #$10                ; X/Y → 8-bit
-    JSR $59D9
-    JSR $5A46
-    JSL $FDC2C1
+    JSR Vblank_Unk59D9
+    JSR Vblank_ReadScanlineCounters
+    JSL EngFD_UnkC2C1
     REP #$10                ; X/Y → 16-bit
-    JSL $FDFFF7
+    JSL FdVec_FFF7
     SEP #$10
-    JSR $A810
-    JSR $CA76
+    JSR Vblank_UnkA810
+    JSR Field_ProcessAnimQueue
     REP #$10
-    BRL $B193               ; → PostVBlank ($B271), RTS returns to caller
+    BRL PostVBlank-!BankWrap ; offset wraps around the bank to $B271
 
+; VBlankHandlerShort: the EngFD_UnkC2C1 + FdVec_FFF7 part only.
 VBlankHandlerShort:
     SEP #$10
-    JSL $FDC2C1
+    JSL EngFD_UnkC2C1
     REP #$10
-    JSL $FDFFF7
+    JSL FdVec_FFF7
     RTS
 
-Sub_00EB:
-    JSR $881E
+; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
+; game logic: Field_FrameUpdate, VBlankHandlerShort, Sub_EC60.
+Field_IdleFrame:
+    JSR Field_FrameUpdate
     JSR VBlankHandlerShort
-    BRL $EB6C               ; → Sub_EC60 ($EC60)
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ============================================================
 ; $C0:00F4 — LoadLocation (39 bytes, $00F4–$011A)
 ; One-time location-load called once per scene entry from GameLoop_Main.
-; Calls 10 scene-load helpers (JSR) and 2 cross-bank engine inits (JSL).
+; Calls 10 location-load steps (JSR) and two bank-$FD service vectors.
 ; NOT called per frame — only when entering a new location/map.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 LoadLocation:
-    JSR $092B               ; scene init helper
-    JSR $1B53               ; scene init helper
-    JSR $0960               ; scene init helper
-    JSR $6DCF               ; scene init helper
-    JSR $7084               ; scene init helper
-    JSR $7F7E               ; scene init helper
-    JSR $A33B               ; scene init helper
-    JSR $09DD               ; scene init helper
-    JSR $0A14               ; scene init helper
-    JSR $56D4               ; scene init helper
-    JSL $FDFFFA             ; cross-bank engine init 1
-    JSL $FDFFF4             ; cross-bank engine init 2
+    JSR LocLoad_Unk092B
+    JSR LocLoad_AudioSetup
+    JSR LocLoad_Unk0960
+    JSR LocLoad_Unk6DCF
+    JSR LocLoad_Unk7084
+    JSR LocLoad_ClearPage1D00
+    JSR LocLoad_UnkA33B
+    JSR LocLoad_Unk09DD
+    JSR LocLoad_Unk0A14
+    JSR LocLoad_Unk56D4
+    JSL FdVec_FFFA
+    JSL FdVec_FFF4
     RTS
 
 ; ============================================================
-; $C0:011B — Sub_011B (138 bytes, $011B–$01A4)
-; Build scene context workspace before a scene transition.
-; Optionally gates: if dp:$29≠0 → set dp:$29=1, clear dp:$26/$27.
-; Then: JSR Sub_0918 (MVN $7E:0920→$7F:2000, $14E0 bytes).
-; Load dp:$97-indexed scene table rows ($1801,Y / $1881,Y / $1600,Y)
-;   into dp:$02/$03/$04 and loop over 3 sprite slots:
-;   if slot valid: copy $1800,Y/$1880,Y/$0C00,Y (16-bit) →
-;     $7F1D09,X / $7F1D0F,X / $7F1D15,X (X = 0,2,4).
-; Copy dp:$AB/$AC/$AD → $7F1D1B/$1D1C/$1D1D.
-; Copy $7F3728/$3748/$3768/$3781 (scroll pos) → $7F1D1E/$1D20/$1D22/$1D24.
-; Copy $1DF9 → $7F1D26.
-; Called from Sub_0C76 and Sub_18D9 at start of scene transition.
+; $C0:011B — Field_SaveState (138 bytes, $011B–$01A4)
+; (was Sub_011B.) Saves the field before handing control to bank $C2
+; (BankC2_Entry8000), so Field_RestoreState can rebuild it after:
+;   - if Field_Unk29 is set, force it to 1 and clear Field_Unk26/27;
+;   - copy Field_SaveBlock to SceneSave_Buffer (Field_StashSaveBlock);
+;   - the leader's tile X/Y and facing become the entry point
+;     (Loc_EntryX/Y/Facing);
+;   - each party member's Obj_PosX/PosY/Unk0C00 → SceneSave_Party*;
+;   - Field_UnkAB-AD, Map_ScrollA-D and Field_Unk1DF9 → SceneSave_*.
+; Called from Field_SceneChangeTick, Field_PauseAndMenuInput and
+; Field_FadeToBankC2Mode5.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0011B
-Sub_011B:
-    LDA $29                 ; re-entry gate flag
-    BEQ .call_mvn           ; zero → skip gate
+Field_SaveState:
+    LDA.b !Field_Unk29
+    BEQ .call_mvn
     LDA #$01
-    STA $29                 ; set re-entry flag = 1
+    STA.b !Field_Unk29
     LDA #$00
-    STA $26                 ; clear dp:$26
-    STZ $27                 ; clear dp:$27
+    STA.b !Field_Unk26
+    STZ.b !Field_Unk27
 .call_mvn:
-    JSR Sub_0918            ; MVN $7E:0920 → $7F:2000 ($14E0 bytes)
-    LDY $97                 ; 16-bit Y: loads dp:$97-$98 (sprite slot 0 index)
-    LDA $1801,Y             ; scene table byte
-    STA $02
-    LDA $1881,Y
-    STA $03
-    LDA $1600,Y
-    STA $04
-    LDX #$0000              ; X = 0 (16-bit loop index)
+    JSR Field_StashSaveBlock ; Field_SaveBlock → SceneSave_Buffer
+    LDY.b !Party_ObjSlot    ; leader's object (16-bit)
+    LDA.w !Obj_TileX,Y
+    STA.b !Loc_EntryX
+    LDA.w !Obj_TileY,Y
+    STA.b !Loc_EntryY
+    LDA.w !Obj_Facing,Y
+    STA.b !Loc_EntryFacing
+    LDX #$0000              ; party member x 2
 .slot_loop:
-    TDC                     ; A = DP ($01); XBA clears B
-    XBA
-    LDA $97,X               ; dp:$97+X = sprite slot index (0,2,4 → $97,$99,$9B)
-    BMI .next_slot          ; $80 = no sprite → skip
-    TAY                     ; Y = sprite slot index
+    TDC                     ; C = D = $0100
+    XBA                     ; B = 0 for the TAY below
+    LDA.b !Party_ObjSlot,X
+    BMI .next_slot          ; Obj_None
+    TAY                     ; Y = member's object
     REP #$20                ; A → 16-bit
-    LDA $1800,Y             ; scene table word
-    STA $7F1D09,X           ; → workspace entry X
-    LDA $1880,Y
-    STA $7F1D0F,X
-    LDA $0C00,Y
-    STA $7F1D15,X
+    LDA.w !Obj_PosX,Y
+    STA.l !SceneSave_PartyPosX,X
+    LDA.w !Obj_PosY,Y
+    STA.l !SceneSave_PartyPosY,X
+    LDA.w !Obj_PrioLow,Y
+    STA.l !SceneSave_PartyPrio,X
     SEP #$20                ; A → 8-bit
 .next_slot:
     INX
-    INX                     ; X += 2 (step to next slot)
-    CPX #$0006              ; done after 3 iterations (X = 0,2,4)
+    INX                     ; next member
+    CPX #$0006              ; 3 members
     BNE .slot_loop
-    LDA $AB
-    STA.l $7F1D1B           ; dp:$AB → workspace
-    LDA $AC
-    STA.l $7F1D1C
-    LDA $AD
-    STA.l $7F1D1D
+    LDA.b !Field_UnkAB
+    STA.l !SceneSave_UnkAB
+    LDA.b !Field_UnkAC
+    STA.l !SceneSave_UnkAB+1
+    LDA.b !Field_UnkAD
+    STA.l !SceneSave_UnkAB+2
     REP #$20                ; A → 16-bit
-    LDA.l $7F3728           ; current scroll X0
-    STA.l $7F1D1E           ; → workspace scroll X0
-    LDA.l $7F3748
-    STA.l $7F1D20
-    LDA.l $7F3768
-    STA.l $7F1D22
-    LDA.l $7F3781
-    STA.l $7F1D24
+    LDA.l !Map_ScrollA
+    STA.l !SceneSave_Scroll
+    LDA.l !Map_ScrollB
+    STA.l !SceneSave_Scroll+2
+    LDA.l !Map_ScrollC
+    STA.l !SceneSave_Scroll+4
+    LDA.l !Map_ScrollD
+    STA.l !SceneSave_Scroll+6
     SEP #$20                ; A → 8-bit
-    LDA.w $1DF9             ; abs: scene entry value
-    STA.l $7F1D26
+    LDA.w !Field_Unk1DF9
+    STA.l !SceneSave_Unk1DF9
     RTS
 
 ; ============================================================
-; $C0:01A5 — Sub_01A5 (167 bytes, $01A5–$024B)
-; Full location engine init after a scene transition.
-; 1. JSR Sub_0905 (MVN $7F:2000 → $7E:0920, $14E0 bytes).
-; 2. Audio tick: SEP #$10 / JSL $FDC2C1 / REP #$10 / JSL $FDC1EE.
-; 3. Reset OAM buffer write-head limits: dp:$7D=$0900/$7F=$0770/$7B=$08A0.
-; 4. Call 8 scene-load helpers: $0960/$6DCF/$7084/$7F7E/$A33B/$09DD/$0A14/$56D4.
-; 5. REP #$20: unpack workspace scroll → $7F3728/$3748/$3768/$3781;
-;    restore $1DF9 from $7F1D26.
-; 6. JSR Sub_595C (sprite dispatch from $7F2003 table).
-; 7. TDC/XBA/LDA dp:$AE: if ≥ 0: TAX/STX dp:$6D/JSR $E12A.
-; 8. LDA $7F03FE: if 0 or ≥ 3 skip; else copy 3 sprite slots $1800/$1880,
-;    set dp:$1F=1 / $7F03FE=3.
+; $C0:01A5 — Field_RestoreState (167 bytes, $01A5–$024B)
+; (was Sub_01A5.) Rebuilds the field after a bank-$C2 round trip:
+; 1. Field_RestoreSaveBlock (SceneSave_Buffer → Field_SaveBlock).
+; 2. EngFD_UnkC2C1 (8-bit X), Hdma_InitChannelsFD.
+; 3. Previous-frame OAM range ends = full limits.
+; 4. Re-run eight location-load steps (LoadLocation's list without
+;    LocLoad_Unk092B / LocLoad_AudioSetup).
+; 5. Restore Map_ScrollA-D and Field_Unk1DF9 from SceneSave_*.
+; 6. Evt_RunObj0Func1.
+; 7. If Field_UnkAEObj names an object, run Spr_LoadLargeObj on it.
+; 8. If Field_Unk7F03FE is 1 or 2: put party members 2 and 3 on the
+;    leader's position, enable control, set Field_Unk7F03FE = 3.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C001A5
-Sub_01A5:
-    JSR Sub_0905            ; MVN $7F:2000 → $7E:0920 (unpack workspace)
-    SEP #$10                ; X,Y → 8-bit for audio tick
-    JSL $FDC2C1             ; audio driver tick
+Field_RestoreState:
+    JSR Field_RestoreSaveBlock ; SceneSave_Buffer → Field_SaveBlock
+    SEP #$10                ; X,Y → 8-bit
+    JSL EngFD_UnkC2C1
     REP #$10                ; X,Y → 16-bit
-    JSL $FDC1EE             ; cross-bank FD audio init
-    LDX #$0900
-    STX $7D                 ; OAM range-2 end = $0900
-    LDX #$0770
-    STX $7F                 ; OAM range-3 end = $0770
-    LDX #$08A0
-    STX $7B                 ; OAM range-1 end = $08A0
-    JSR $0960               ; scene-load helper
-    JSR $6DCF               ; scene-load helper
-    JSR $7084               ; scene-load helper
-    JSR $7F7E               ; scene-load helper
-    JSR $A33B               ; scene-load helper
-    JSR $09DD               ; scene-load helper
-    JSR $0A14               ; scene-load helper
-    JSR $56D4               ; scene-load helper
+    JSL Hdma_InitChannelsFD
+    LDX.w #!Oam_Range2Limit
+    STX.b !Oam_Range2PrevEnd
+    LDX.w #!Oam_Range3Limit
+    STX.b !Oam_Range3PrevEnd
+    LDX.w #!Oam_Range1Limit
+    STX.b !Oam_Range1PrevEnd
+    JSR LocLoad_Unk0960
+    JSR LocLoad_Unk6DCF
+    JSR LocLoad_Unk7084
+    JSR LocLoad_ClearPage1D00
+    JSR LocLoad_UnkA33B
+    JSR LocLoad_Unk09DD
+    JSR LocLoad_Unk0A14
+    JSR LocLoad_Unk56D4
     REP #$20                ; A → 16-bit
-    LDA.l $7F1D1E           ; workspace scroll X0
-    STA.l $7F3728           ; → live scroll X0
-    LDA.l $7F1D20
-    STA.l $7F3748
-    LDA.l $7F1D22
-    STA.l $7F3768
-    LDA.l $7F1D24
-    STA.l $7F3781
+    LDA.l !SceneSave_Scroll
+    STA.l !Map_ScrollA
+    LDA.l !SceneSave_Scroll+2
+    STA.l !Map_ScrollB
+    LDA.l !SceneSave_Scroll+4
+    STA.l !Map_ScrollC
+    LDA.l !SceneSave_Scroll+6
+    STA.l !Map_ScrollD
     SEP #$20                ; A → 8-bit
-    LDA.l $7F1D26           ; workspace scene-entry value
-    STA.w $1DF9             ; → abs: scene-entry cache
-    JSR Sub_595C            ; sprite dispatch from $7F2003 table
-    TDC                     ; A = DP low byte; XBA sets B = 0
-    XBA
-    LDA $AE                 ; sprite slot index cache
-    BMI .no_e12a            ; $80 → no valid slot
-    TAX                     ; X = slot index (zero-extended)
-    STX $6D                 ; dp:$6D = slot index (16-bit write)
-    JSR Sub_E12A            ; sprite init pass
+    LDA.l !SceneSave_Unk1DF9
+    STA.w !Field_Unk1DF9
+    JSR Evt_RunObj0Func1
+    TDC                     ; C = D = $0100
+    XBA                     ; B = 0 for the TAX below
+    LDA.b !Field_UnkAEObj
+    BMI .no_e12a            ; Obj_None
+    TAX
+    STX.b !Obj_Cur          ; 16-bit store
+    JSR Spr_LoadLargeObj
 .no_e12a:
-    LDA.l $7F03FE           ; transition counter
+    LDA.l !Field_Unk7F03FE
     BEQ .done               ; 0 → skip
     CMP #$03
     BCS .done               ; ≥ 3 → skip
     REP #$20                ; A → 16-bit
-    LDX $97                 ; sprite slot 0 index (16-bit)
-    LDA $1800,X             ; source sprite table entry
-    LDX $99                 ; slot 1 index
-    STA $1800,X             ; copy to slot 1
-    LDX $9B                 ; slot 2 index
-    STA $1800,X             ; copy to slot 2
-    LDX $97
-    LDA $1880,X             ; source sprite table entry (second table)
-    LDX $99
-    STA $1880,X
-    LDX $9B
-    STA $1880,X
+    LDX.b !Party_ObjSlot    ; leader
+    LDA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot1
+    STA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot2
+    STA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_PosY,X
+    LDX.b !Party_ObjSlot1
+    STA.w !Obj_PosY,X
+    LDX.b !Party_ObjSlot2
+    STA.w !Obj_PosY,X
     SEP #$20                ; A → 8-bit
     LDA #$01
-    STA $1F                 ; set transition-active flag
+    STA.b !Field_ControlEnabled
     LDA #$03
-    STA.l $7F03FE           ; mark transition counter = 3
+    STA.l !Field_Unk7F03FE
 .done:
     RTS
 
 ; ============================================================
-; $C0:0905 — Sub_0905 (19 bytes, $0905–$0917)
-; Block-copy $14E0 bytes from $7F:2000 to $00:0920 (= WRAM $7E:0920).
-; Reverse of Sub_0918: unpacks scene workspace back to main WRAM.
-; Called from Sub_01A5 at start of location init.
+; $C0:0905 — Field_RestoreSaveBlock (19 bytes, $0905–$0917)
+; (was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over
+; Field_SaveBlock ($7E:0920, $14E0 bytes). Reverse of
+; Field_StashSaveBlock; called first thing in Field_RestoreState.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C00905
-Sub_0905:
-    LDY #$0920              ; MVN dst offset (bank $00 = WRAM $7E)
-    LDX #$2000              ; MVN src offset (bank $7F)
+Field_RestoreSaveBlock:
+    LDY.w #!Field_SaveBlock ; destination (bank $00 mirror of $7E)
+    LDX.w #!SceneSave_Buffer ; source (bank $7F)
     REP #$20                ; A → 16-bit
-    LDA #$14DF              ; count = $14E0 bytes (A = count-1)
+    LDA.w #!Field_SaveBlockSize-1 ; MVN count - 1
     PHB
-    MVN $00,$7F             ; copy from $7F:$2000 to $00:$0920
+    MVN !Bank00,!Bank7F     ; $7F:2000 → $00:0920  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     PLB
     SEP #$20                ; A → 8-bit
     RTS
 
 ; ============================================================
-; $C0:0918 — Sub_0918 (19 bytes, $0918–$092A)
-; Block-copy $14E0 bytes from $00:0920 (= WRAM $7E:0920) to $7F:2000.
-; Saves scene workspace into $7F scratch buffer.
-; Called from Sub_011B during scene transition save.
+; $C0:0918 — Field_StashSaveBlock (19 bytes, $0918–$092A)
+; (was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to
+; SceneSave_Buffer ($7F:2000). Called from Field_SaveState.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C00918
-Sub_0918:
-    LDX #$0920              ; MVN src offset (bank $00 = WRAM $7E)
-    LDY #$2000              ; MVN dst offset (bank $7F)
+Field_StashSaveBlock:
+    LDX.w #!Field_SaveBlock ; source (bank $00 mirror of $7E)
+    LDY.w #!SceneSave_Buffer ; destination (bank $7F)
     REP #$20                ; A → 16-bit
-    LDA #$14DF              ; count = $14E0 bytes (A = count-1)
+    LDA.w #!Field_SaveBlockSize-1 ; MVN count - 1
     PHB
-    MVN $7F,$00             ; copy from $00:$0920 to $7F:$2000
+    MVN !Bank7F,!Bank00     ; $00:0920 → $7F:2000  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     PLB
     SEP #$20                ; A → 8-bit
     RTS
@@ -5036,276 +5068,270 @@ InitHW:
     LDA #$00
     PHA
     PLB                     ; DB = $00
-    LDA #$80
-    STA.w INIDISP             ; $2100: forced blank on, brightness 0
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP           ; forced blank on, brightness 0
     LDA #$00
-    STA.w NMITIMEN            ; $4200: disable NMI, IRQ, joypad auto-read
-    STA.w MDMAEN              ; $420B: disable all DMA channels
-    STA.w HDMAEN              ; $420C: disable all HDMA channels
+    STA.w NMITIMEN          ; disable NMI, IRQ, joypad auto-read
+    STA.w MDMAEN            ; disable all DMA channels
+    STA.w HDMAEN            ; disable all HDMA channels
     RTS
 
 ; ============================================================
 ; $C0:0B64 — InstallNMI (17 bytes)
-; Writes JML $C0:EA63 (5C 63 EA C0) to WRAM $7E:0500.
+; Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
 ; Called with M=1 (8-bit A), X=0 (16-bit X).
 ; ============================================================
 InstallNMI:
-    LDA #$5C                ; JML opcode
-    STA $0500
-    LDX #$EA63              ; low 16-bit of $C0:EA63 (little-endian)
-    STX $0501
-    LDA #$C0                ; bank byte
-    STA $0503
+    LDA.b #!Op_JML          ; JML opcode
+    STA.w !NmiTrampoline
+    LDX.w #NmiHandler       ; low 16 bits of the target
+    STX.w !NmiTrampoline+1
+    LDA.b #bank(NmiHandler) ; bank byte
+    STA.w !NmiTrampoline+3
     RTS
 
 ; ============================================================
 ; $C0:0B75 — InstallIRQ (17 bytes)
-; Writes JML $C0:ECCC (5C CC EC C0) to WRAM $7E:0504.
+; Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
 ; ============================================================
 InstallIRQ:
-    LDA #$5C
-    STA $0504
-    LDX #$ECCC
-    STX $0505
-    LDA #$C0
-    STA $0507
+    LDA.b #!Op_JML
+    STA.w !IrqTrampoline
+    LDX.w #IrqHandler
+    STX.w !IrqTrampoline+1
+    LDA.b #bank(IrqHandler)
+    STA.w !IrqTrampoline+3
     RTS
 
 ; ============================================================
 ; $C0:0B86 — FrameStateInit (240 bytes)
-; Called from GameLoop_Main at the start of each scene iteration.
-; Saves active sprite registers, zeros per-frame state, sets defaults.
+; Called once per location load from GameLoop_Main (not per frame,
+; despite the name). Remembers where the location was entered, then
+; resets the field direct page to its load-time defaults.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
 ; ============================================================
 FrameStateInit:
-    ; Save current sprite registers to "previous frame" slots
-    LDX $00                  ; ($0100) active sprite X
-    STX $0A                  ; ($010A) = saved X
-    LDX $02                  ; ($0102) active sprite Y
-    STX $0C                  ; ($010C) = saved Y
-    LDA $04                  ; ($0104) sprite attribute
-    STA $0E                  ; ($010E) = saved attribute
-    ; Zero per-frame flags and counters
-    STZ $10
-    STZ $11
-    STZ $17
-    STZ $18
-    STZ $38
-    STZ $0F
-    ; Default sprite Y = $E0 (off-screen, below NTSC visible area)
-    LDA #$E0
-    STA $21
-    STZ $19
-    STZ $BC
-    ; WRAM scene state
+    ; Remember the location and entry point this load started from
+    LDX.b !Loc_Id
+    STX.b !Loc_PrevId
+    LDX.b !Loc_EntryX        ; 16-bit: entry X and Y
+    STX.b !Loc_PrevX
+    LDA.b !Loc_EntryFacing
+    STA.b !Loc_PrevFacing
+    ; Clear scene/fade request flags
+    STZ.b !Field_Unk10
+    STZ.b !Field_Unk11
+    STZ.b !Field_SceneFlags
+    STZ.b !Field_FadeFlags
+    STZ.b !Field_Unk38
+    STZ.b !Field_Unk0F
+    ; Fixed colour starts at all channels / intensity 0, screen dark
+    LDA.b #!Fade_FixedColorInit
+    STA.b !Fade_FixedColor
+    STZ.b !Fade_Brightness
+    STZ.b !Field_UnkBC
     LDA #$02
-    STA $0BDE               ; WRAM $0BDE = 2
-    ; Reset OAM write-head end pointers to full-buffer limits
-    LDX #$0900
-    STX $7D                 ; ($017D) range-2 end = $0900
-    LDX #$0770
-    STX $7F                 ; ($017F) range-3 end = $0770
-    LDX #$08A0
-    STX $7B                 ; ($017B) range-1 end = $08A0
-    ; Palette/color defaults
-    LDA #$E4
-    STA $B1
-    STA $B4
-    STA $B7
-    STA $BA
-    ; Per-frame mode flags
+    STA.w !Field_Unk0BDE
+    ; Previous-frame OAM range ends = full range limits
+    LDX.w #!Oam_Range2Limit
+    STX.b !Oam_Range2PrevEnd
+    LDX.w #!Oam_Range3Limit
+    STX.b !Oam_Range3PrevEnd
+    LDX.w #!Oam_Range1Limit
+    STX.b !Oam_Range1PrevEnd
+    ; Bank bytes of the four bank-$E4 pointers
+    LDA.b #!BankE4
+    STA.b !Field_E4Ptr0+2
+    STA.b !Field_E4Ptr1+2
+    STA.b !Field_E4Ptr2+2
+    STA.b !Field_E4Ptr3+2
     LDA #$01
-    STA $1F
-    STA $20
+    STA.b !Field_ControlEnabled
+    STA.b !Field_Unk20
     LDA #$05
-    STA $68
-    LDA #$5F
-    STA $28
-    ; Zero remaining per-frame variables
-    STZ $53
-    STZ $26
-    STZ $29
-    STZ $2F
-    STZ $2D
-    STZ $30
-    STZ $44
-    STZ $45
-    STZ $46
-    STZ $5F
-    STZ $78
-    STZ $BB
-    STZ $62
-    LDA #$80
-    STA $63
-    STZ $39
-    STZ $54
-    ; 16-bit section: initialize pointer/address variables
+    STA.b !Field_Unk68
+    LDA.b #!Field_Unk28Init
+    STA.b !Field_Unk28
+    STZ.b !Field_Unk53
+    STZ.b !Field_Unk26
+    STZ.b !Field_Unk29
+    STZ.b !Field_Unk2F
+    STZ.b !Field_Unk2D
+    STZ.b !Field_Unk30
+    STZ.b !Field_Unk44
+    STZ.b !Field_MapRedrawSel
+    STZ.b !Field_MapRedrawDone
+    STZ.b !Field_VramQueueFlags
+    STZ.b !ObjQ_Unk78
+    STZ.b !Field_UnkBB
+    STZ.b !Field_Unk62
+    LDA.b #!Field_Unk63Idle
+    STA.b !Field_Unk63
+    STZ.b !Field_EventHook
+    STZ.b !Field_Unk54
     REP #$20                ; M=0: A -> 16-bit
-    STZ $2B                 ; ($012B-$012C) = 0
-    ; Load 4 × 16-bit seeds from ROM table at $E4:FFE0-FFE7
-    LDA.l $E4FFE0
-    STA $AF                 ; ($01AF-$01B0)
-    LDA.l $E4FFE2
-    STA $B2
-    LDA.l $E4FFE4
-    STA $B5
-    LDA.l $E4FFE6
-    STA $B8
-    STZ.w $0150             ; ($0150-$0151) = 0 (abs mode)
+    STZ.b !Field_Unk2B
+    ; Low words of the four bank-$E4 pointers from the ROM table
+    LDA.l !RomE4_PtrInit
+    STA.b !Field_E4Ptr0
+    LDA.l !RomE4_PtrInit+2
+    STA.b !Field_E4Ptr1
+    LDA.l !RomE4_PtrInit+4
+    STA.b !Field_E4Ptr2
+    LDA.l !RomE4_PtrInit+6
+    STA.b !Field_E4Ptr3
+    STZ.w !DP_Field+!Pad_Unk00F6Latch ; both latches (abs addressing in the original)
     LDA #$0000
-    STA.l $7E2000           ; WRAM $7E:2000-2001 = 0
-    STZ $58                 ; ($0158-$0159) = 0
-    ; Back to 8-bit A
+    STA.l !Field_Unk7E2000
+    STZ.b !Field_Unk58
     SEP #$20                ; M=1: A -> 8-bit
-    LDA #$80
-    STA $97
-    STA $99
-    STA $9B
-    STA $8D
-    STA $8E
-    STA $8F
-    STA $91
-    STA $90
-    STA $92
-    STA $93
-    ; Copy dynamic color vars from WRAM $7E:2980-2982
-    LDA.l $7E2980
-    STA $94
-    LDA.l $7E2981
-    STA $95
-    LDA.l $7E2982
-    STA $96
-    LDA #$80
-    STA $EB
-    STA $AE
+    ; No party/character objects yet
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot
+    STA.b !Party_ObjSlot1
+    STA.b !Party_ObjSlot2
+    STA.b !Chr_ObjSlot
+    STA.b !Chr_ObjSlot+1
+    STA.b !Chr_ObjSlot+2
+    STA.b !Chr_ObjSlot+4
+    STA.b !Chr_ObjSlot+3
+    STA.b !Chr_ObjSlot+5
+    STA.b !Chr_ObjSlot+6
+    ; Snapshot the party so Party_ReinitIfChanged can tell when it changes
+    LDA.l !Party_Members
+    STA.b !Party_MembersCache
+    LDA.l !Party_Members+1
+    STA.b !Party_MembersCache+1
+    LDA.l !Party_Members+2
+    STA.b !Party_MembersCache+2
+    LDA.b #!Field_UnkEBInit
+    STA.b !Field_UnkEB
+    STA.b !Field_UnkAEObj   ; = Obj_None
     LDA #$01
-    STA $55
-    LDA #$53
-    STA $FC
-    LDA #$65
-    STA $FB
-    LDA #$45
-    STA $FA
-    ; Zero WRAM state
+    STA.b !Field_Unk55
+    LDA.b #!Audio_SfxDefaultA
+    STA.b !Audio_SfxTileAnimA
+    LDA.b #!Audio_SfxDefaultB
+    STA.b !Audio_SfxTileAnimB
+    LDA.b #!Audio_SfxDefaultFA
+    STA.b !Audio_SfxUnkFA
     LDA #$00
-    STA.l $7E2989
+    STA.l !Field_Unk7E2989
     LDA #$00
-    STA $0BD9
-    STA $0BDA
-    STA $0BDB
-    STA $0BE9
-    ; Load scene entry value from WRAM $0400
-    LDA $0400
-    STA $F8
+    STA.w !Field_Unk0BD9
+    STA.w !Field_Unk0BDA
+    STA.w !Field_Unk0BDB
+    STA.w !Field_Unk0BE9
+    LDA.w !Eng_Unk0400
+    STA.b !Field_Unk0400Copy
     RTS
 
 ; ============================================================
-; $C0:0C76 — Sub_0C76 (258 bytes, $0C76–$0D77)
-; Per-frame state-machine controller, called after FrameStateInit.
-; Dispatches scroll/scene updates, handles mode transitions.
-;
-; dp:$18 = pending-transition flags (bits 1=$02, 3=$08)
-; dp:$17 = active-transition flags (bit 7=negative; bit 6=$40; bit 4=$10)
-; dp:$19 = countdown timer
-; dp:$25 = scene/mode selector
-; dp:$5B = current game mode value (indexed into $7E3000)
-;
-; Fast path (dp:$17 == 0): just service $18 flags and RTS.
-; Negative-$17 path: decrement $19 or hard-restart GameLoop ($0000).
-; Positive-$17 paths:
-;   bit 6 = fade-in loop (calls $881E + EC60 each VBlank)
-;   bit 4 = mode handler dispatch ($E6/$EC/$EE/$FA/$FC or default)
-;   other = color-transition setup, then restart scene.
+; $C0:0C76 — Field_SceneChangeTick (258 bytes, $0C76–$0D77)
+; (was Field_SceneChangeTick.) Runs every frame from GameLoop_FrameBody.
+; Steps the two fades requested in Field_FadeFlags, then acts on
+; Field_SceneFlags:
+;   0           nothing to do.
+;   bit 7       count Fade_Brightness down to 0, then warp: remember the
+;               current location as the return point, copy Loc_Dest* into
+;               Loc_Id/Loc_Entry*, reset the stack and restart through
+;               ReentryVectors.
+;   bit 6       count Fade_Brightness down (one frame per step, with
+;               Field_FrameUpdate), save the field state and call
+;               BankC2_Entry8000 with an argument chosen by
+;               Field_ExitMenuArg, then restore the field and fade in.
+;   bit 4       run the tile-animation handler for the mode byte at
+;               Map_TileProps[Field_TileAnimX/Y] (ModeE6..ModeFC_Handler);
+;               any other mode goes to DefaultHandler.
+;   otherwise   DefaultHandler.
 ; ============================================================
 org $C00C76
-Sub_0C76:
-    ; --- Check pending scroll/fade flags in dp:$18 ---
-    LDA $18
-    BEQ .chk_transition      ; $18=0 → skip, check $17
-    BIT #$02
-    BEQ .chk_flag8           ; bit 1 not set → skip Sub_1F24
-    JSR $1F24                ; Sub_1F24: advance scroll target (scroll-X direction)
-    LDA $18
+Field_SceneChangeTick:
+    ; --- Step the fades requested in Field_FadeFlags ---
+    LDA.b !Field_FadeFlags
+    BEQ .chk_transition      ; no fade running
+    BIT.b #!FadeFlag_Brightness
+    BEQ .chk_flag8
+    JSR Fade_StepBrightness
+    LDA.b !Field_FadeFlags
 .chk_flag8:
-    BIT #$08
-    BEQ .chk_transition      ; bit 3 not set → skip Sub_1F5A
-    JSR $1F5A                ; Sub_1F5A: advance scroll target (scroll-Y direction)
+    BIT.b #!FadeFlag_FixedColor
+    BEQ .chk_transition
+    JSR Fade_StepFixedColor
 
 .chk_transition:
-    ; --- Check dp:$17 transition flags ---
-    LDA $17
+    LDA.b !Field_SceneFlags
     BNE .has_transition
     RTS                      ; nothing pending — fast exit
 
 .has_transition:
-    BPL .positive_17         ; bit 7 clear → positive flags path
+    BPL .positive_17         ; bit 7 clear → bits 6/4 paths
 
-    ; --- Negative $17 path: countdown timer ---
-    LDA $19
-    BEQ .hard_restart        ; $19=0 → warmboot
-    BMI .hard_restart        ; $19 negative → warmboot
-    DEC $19
+    ; --- Bit 7: fade out, then warp to Loc_Dest* ---
+    LDA.b !Fade_Brightness
+    BEQ .hard_restart        ; dark → warp now
+    BMI .hard_restart
+    DEC.b !Fade_Brightness
     RTS
 
 .hard_restart:
-    ; Full warmboot: disable hw, save dp state, jump back to GameLoop
-    JSR $0B4E                ; InitHW: SEI + forced blank
-    LDX $00
-    STX $05
-    LDY $97
-    LDA $1801,Y
-    STA $07
-    LDA $1881,Y
-    STA $08
-    LDA $1600,Y
+    JSR InitHW                ; SEI + forced blank
+    LDX.b !Loc_Id
+    STX.b !Loc_ReturnId
+    LDY.b !Party_ObjSlot
+    LDA.w !Obj_TileX,Y
+    STA.b !Loc_ReturnX
+    LDA.w !Obj_TileY,Y
+    STA.b !Loc_ReturnY
+    LDA.w !Obj_Facing,Y
     EOR #$01
-    STA $09
-    LDX $12
-    STX $00
-    LDX $14
-    STX $02
-    LDA $16
-    STA $04
-    LDX #$FF
-    ASL $9A
-    BRL $F339                ; → GameLoop ($0000): restart engine
+    STA.b !Loc_ReturnFacing
+    LDX.b !Loc_DestId
+    STX.b !Loc_Id
+    LDX.b !Loc_DestX
+    STX.b !Loc_EntryX
+    LDA.b !Loc_DestFacing
+    STA.b !Loc_EntryFacing
+    LDX.w #!StackTop         ; reset the stack (earlier listings split
+    TXS                      ; these 4 bytes as LDX #$FF / ASL $9A)
+    BRL ReentryVectors       ; → GameLoop_Main (warm restart into the new location)
 
     ; --- Positive $17 path ---
 .positive_17:
-    BIT #$40
-    BNE .run_fade_loop       ; bit 6 set → fade-in loop
-    BRL .chk_bit10           ; bit 6 clear → check bit 4 ($0D3E)
+    BIT.b #!SceneFlag_Reload
+    BNE .run_fade_loop       ; bit 6 set → fade out and reload
+    BRL .chk_bit10           ; bit 6 clear → check bit 4
 
 .run_fade_loop:
-    ; Fade-in loop: decrement $19, call $881E each VBlank until done
-    LDA $19
+    ; Fade out one brightness step per frame, input disabled
+    LDA.b !Fade_Brightness
     BEQ .enter_transition
     BMI .enter_transition
-    DEC $19
-    LDA $1F
+    DEC.b !Fade_Brightness
+    LDA.b !Field_ControlEnabled
     PHA
-    STZ $1F
-    JSR $881E                ; frame update (DMA/controller)
+    STZ.b !Field_ControlEnabled
+    JSR Field_FrameUpdate
     PLA
-    STA $1F
-    JSL $FDFFF7              ; wait for VBlank
-    JSR $EC60                ; post-VBlank work
+    STA.b !Field_ControlEnabled
+    JSL FdVec_FFF7
+    JSR Sub_EC60
     BRA .run_fade_loop
 
 .enter_transition:
-    ; Scene transition: reinit HW + set up new color/mode
-    JSR $0B4E                ; InitHW
-    JSR Sub_011B             ; build scene context workspace
+    ; Dark: save the field and hand over to bank $C2
+    JSR InitHW
+    JSR Field_SaveState
     TDC
     XBA                      ; B = 0 (dp high byte)
-    LDA $25
-    BEQ .mode_5_setup        ; $25=0 → plain mode 5
-    BMI .negative_25         ; $25 negative → extract mode bits
+    LDA.b !Field_ExitMenuArg
+    BEQ .mode_5_setup        ; 0 → argument 5 via Field_RunBankC2Mode5
+    BMI .negative_25         ; bit 7 → argument from bits 7-6
 
     ; $25 positive: choose mode 0 or 6 based on bit 0
     BIT #$01
     BNE .lda_0
-    LDA #$06
+    LDA.b #!ExitMenu_Mode6
     BRA .do_jsl_c28000
 
 .lda_0:
@@ -5313,178 +5339,183 @@ Sub_0C76:
     BRA .do_jsl_c28000
 
 .mode_5_setup:
-    LDA #$05
-    BRL $0CBE                ; → $19C7 (special warm-restart path)
+    LDA.b #!ExitMenu_Mode5
+    BRL Field_RunBankC2Mode5                ; → $19C7 (special warm-restart path)
 
 .negative_25:
     REP #$20                 ; A → 16-bit
-    AND #$003F               ; isolate low 6 bits of $25
+    AND.w #!Field_ExitArgXMask ; bits 5-0 of Field_ExitMenuArg → X
     TAX
     SEP #$20                 ; A → 8-bit
-    LDA $25
+    LDA.b !Field_ExitMenuArg
     ROL
     ROL
     ROL
-    AND #$03                 ; bits 7–6 of $25 → 2-bit mode
+    AND #$03                 ; bits 7-6 of Field_ExitMenuArg → A
 
 .do_jsl_c28000:
-    JSL $C28000              ; set BG mode
-    JSR $0B4E                ; InitHW
-    JSR $0B64                ; InstallNMI
-    JSR $0B75                ; InstallIRQ
+    JSL BankC2_Entry8000     ; A = argument (callers once guessed "set BG mode")
+    JSR InitHW
+    JSR InstallNMI
+    JSR InstallIRQ
     REP #$20
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                      ; DP = $0100
     SEP #$20
-    JSR Sub_01A5             ; full location engine init
-    JSR Sub_B192             ; zero $1Bxx table + init $0BC0-$0BC7
-    LDA #$40
-    TRB $17                  ; clear bit 6 of $17
-    LDA #$40
-    TSB $18                  ; set bit 6 of $18
-    BRL $1AE6                ; → $2824 (post-transition work)
+    JSR Field_RestoreState   ; reload the location around the saved state
+    JSR Obj_ResetStates      ; clear Obj_State, then SprBuf_FreeAll
+    LDA.b #!SceneFlag_Reload
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_Reloaded
+    TSB.b !Field_FadeFlags
+    BRL Field_FadeInAfterReload
 
-    ; --- Bit 4 dispatch ($0D3E) ---
+    ; --- Bit 4: tile-animation mode handlers ---
 .chk_bit10:
-    BIT #$10
+    BIT.b #!SceneFlag_TileAnim
     BNE .handle_bit10
-    BRL $0997                ; bit 4 clear → default handler ($16DC)
+    BRL DefaultHandler
 
 .handle_bit10:
-    LDA #$10
-    TRB $17                  ; clear bit 4
-    JSR $28C0                ; unknown per-mode init
-    LDX $5B
-    LDA $7E3000,X            ; load current mode byte from WRAM
-    CMP #$E6
+    LDA.b #!SceneFlag_TileAnim
+    TRB.b !Field_SceneFlags
+    JSR TileAnimList_AddCurrent ; remember this tile in the $7F:1CC8 list
+    LDX.b !Field_TileAnimX   ; 16-bit: row*256 + column
+    LDA.l !Map_TileProps,X   ; mode byte of the tile
+    CMP.b #!TileAnim_ModeE6
     BNE .chk_ec
-    BRL $001F                ; → mode-E6 handler ($0D78)
+    BRL ModeE6_Handler                ; → mode-E6 handler ($0D78)
 
 .chk_ec:
-    CMP #$EC
+    CMP.b #!TileAnim_ModeEC
     BNE .chk_ee
-    BRL $00FF                ; → mode-EC handler ($0E5F)
+    BRL ModeEC_Handler                ; → mode-EC handler ($0E5F)
 
 .chk_ee:
-    CMP #$EE
+    CMP.b #!TileAnim_ModeEE
     BNE .chk_fa
-    BRL $02AD                ; → mode-EE handler ($1014)
+    BRL ModeEE_Handler                ; → mode-EE handler ($1014)
 
 .chk_fa:
-    CMP #$FA
+    CMP.b #!TileAnim_ModeFA
     BNE .chk_fc
-    BRL $045B                ; → mode-FA handler ($11C9)
+    BRL ModeFA_Handler                ; → mode-FA handler ($11C9)
 
 .chk_fc:
-    CMP #$FC
+    CMP.b #!TileAnim_ModeFC
     BNE .default_mode
-    BRL $06DF                ; → mode-FC handler ($1454)
+    BRL ModeFC_Handler                ; → mode-FC handler ($1454)
 
 .default_mode:
-    BRL $0964                ; → default handler ($16DC)
+    BRL DefaultHandler
 
 ; ============================================================
-; $C0:1F24 — Sub_1F24 (54 bytes, $1F24–$1F59)
-; Scroll-X target tracker: moves dp:$19 (low nibble) toward dp:$1B.
-; Uses dp:$1C as step delay and dp:$1D as delay counter.
-; When dp:$19 reaches dp:$1B, clears bit 1 of dp:$18.
-; Called from Sub_0C76 when dp:$18 bit 1 is set.
+; $C0:1F24 — Fade_StepBrightness (54 bytes, $1F24–$1F59)
+; (was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit
+; toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and
+; clears FadeFlag_Brightness when it gets there (or reaches 0 going down).
+; Called from Field_SceneChangeTick while that flag is set. Earlier notes
+; read this as a scroll tracker; the 0-15 range, the fade-in to 15 in
+; Field_FadeInAfterReload and the pause dimming in
+; Field_PauseAndMenuInput point to screen brightness.
 ; ============================================================
 org $C01F24
-Sub_1F24:
-    LDA $19
-    AND #$0F                 ; low nibble of $19 = current scroll-X
-    CMP $1B                  ; compare to target
+Fade_StepBrightness:
+    LDA.b !Fade_Brightness
+    AND.b #!INIDISP_BrightnessMask ; brightness bits only
+    CMP.b !Fade_BrightnessTarget
     BEQ .x_at_target         ; equal → done
     BCS .x_above             ; above → count down
 
-    ; $19 below target: decrement delay or step up
-    LDA $1D
+    ; below target: wait out the delay, then step up
+    LDA.b !Fade_BrightnessTimer
     BEQ .x_reload_up         ; delay exhausted → reload and step
-    DEC $1D
+    DEC.b !Fade_BrightnessTimer
     RTS
 
 .x_reload_up:
-    LDA $1C
-    STA $1D                  ; reload delay
-    LDA $19
-    AND #$0F
-    INC $19                  ; step up
+    LDA.b !Fade_BrightnessDelay
+    STA.b !Fade_BrightnessTimer ; reload the delay
+    LDA.b !Fade_Brightness
+    AND.b #!INIDISP_BrightnessMask
+    INC.b !Fade_Brightness   ; step up
     RTS
 
 .x_above:
-    ; $19 above target: decrement delay or step down
-    LDA $1D
+    ; above target: wait out the delay, then step down
+    LDA.b !Fade_BrightnessTimer
     BEQ .x_reload_dn
-    DEC $1D
+    DEC.b !Fade_BrightnessTimer
     RTS
 
 .x_reload_dn:
-    LDA $1C
-    STA $1D
-    LDA $19
-    DEC                      ; DEC A ($3A)
+    LDA.b !Fade_BrightnessDelay
+    STA.b !Fade_BrightnessTimer
+    LDA.b !Fade_Brightness
+    DEC
     BEQ .x_at_target_store   ; reached 0 → also done
-    STA $19
+    STA.b !Fade_Brightness
     RTS
 
 .x_at_target_store:
-    STA $19
+    STA.b !Fade_Brightness
 
 .x_at_target:
-    LDA #$02
-    TRB $18                  ; clear bit 1 of $18 (X done)
+    LDA.b #!FadeFlag_Brightness
+    TRB.b !Field_FadeFlags   ; brightness fade done
     RTS
 
 ; ============================================================
-; $C0:1F5A — Sub_1F5A (45 bytes, $1F5A–$1F86)
-; Scroll-Y target tracker: moves dp:$21 toward dp:$22.
-; Uses dp:$23/$24 for step delay. Clears bit 3 of dp:$18 when done.
-; Called from Sub_0C76 when dp:$18 bit 3 is set.
+; $C0:1F5A — Fade_StepFixedColor (45 bytes, $1F5A–$1F86)
+; (was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit
+; toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and
+; clears FadeFlag_FixedColor when it gets there. Called from
+; Field_SceneChangeTick while that flag is set. (Earlier notes read
+; this as a scroll-Y tracker; its load value $E0 is a COLDATA value.)
 ; ============================================================
 org $C01F5A
-Sub_1F5A:
-    LDA $21
-    CMP $22                  ; compare current to target
+Fade_StepFixedColor:
+    LDA.b !Fade_FixedColor
+    CMP.b !Fade_FixedColorTarget
     BEQ .y_at_target         ; equal → done
     BCS .y_above             ; above → count down
 
     ; below target
-    LDA $24
+    LDA.b !Fade_FixedColorTimer
     BEQ .y_reload_up
-    DEC $24
+    DEC.b !Fade_FixedColorTimer
     RTS
 
 .y_reload_up:
-    LDA $23
-    STA $24
-    LDA $21
-    INC $21                  ; step up
+    LDA.b !Fade_FixedColorDelay
+    STA.b !Fade_FixedColorTimer
+    LDA.b !Fade_FixedColor
+    INC.b !Fade_FixedColor   ; step up
     RTS
 
 .y_above:
-    LDA $24
+    LDA.b !Fade_FixedColorTimer
     BEQ .y_reload_dn
-    DEC $24
+    DEC.b !Fade_FixedColorTimer
     RTS
 
 .y_reload_dn:
-    LDA $23
-    STA $24
-    LDA $21
-    DEC $21                  ; step down
+    LDA.b !Fade_FixedColorDelay
+    STA.b !Fade_FixedColorTimer
+    LDA.b !Fade_FixedColor
+    DEC.b !Fade_FixedColor   ; step down
     RTS
 
 .y_at_target:
-    LDA #$08
-    TRB $18                  ; clear bit 3 of $18 (Y done)
+    LDA.b #!FadeFlag_FixedColor
+    TRB.b !Field_FadeFlags   ; fixed-colour fade done
     RTS
 
 ; ============================================================
 ; $C0:2DF1 — ClearRAMDMA (45 bytes)
 ; Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0
-; since M7A=M7B=0). Caller loads $4B/$4C=dest addr, $4D=dest bank,
-; $4E/$4F=byte count before calling.
+; since M7A=M7B=0). Caller sets DmaFill_Dest / DmaFill_Bank /
+; DmaFill_Size first.
 ; ============================================================
 org $C02DF1
 ClearRAMDMA:
@@ -5493,494 +5524,489 @@ ClearRAMDMA:
     STA.w M7A
     STA.w M7B                 ; $211C: clear Mode-7 operand B (write twice)
     STA.w M7B                 ; -> MPYL ($2134) = 0*0 = 0 (DMA source byte)
-    LDA #$80
+    LDA.b #!DMAP_BtoA
     STA.w DMAP7               ; $4370: B->A direction, byte unit, increment A-bus
-    LDA #$34                ; $2100 + $34 = $2134 = MPYL
+    LDA.b #!BBAD_MPYL       ; B-bus $34 = $2134 = MPYL
     STA.w BBAD7               ; $4371: B-bus source = MPYL
-    LDX $4B
-    STX $4372               ; $4372: A-bus (WRAM) destination address
-    LDA $4D
+    LDX.b !DmaFill_Dest
+    STX.w A1T7L             ; $4372: A-bus (WRAM) destination address
+    LDA.b !DmaFill_Bank
     STA.w A1B7                ; $4374: A-bus destination bank
-    LDX $4E
-    STX $4375               ; $4375: byte count
-    LDA #$80
+    LDX.b !DmaFill_Size
+    STX.w DAS7L             ; $4375: byte count
+    LDA.b #!MDMAEN_Ch7
     STA.w MDMAEN              ; $420B: enable DMA channel 7 (auto-clears when done)
     RTS
 
 ; ============================================================
-; $C0:B192 — Sub_B192 (30 bytes, $B192–$B1B1)
-; Zero $1Bxx sprite table entries, then BRL-tail to Sub_E935.
-; Sets DP=$1B00, reads count from $7F:2000, loops zeroing X=0
-; at dp:$00+Y (Y steps by 2) for count iterations.
-; After loop: REP #$10 / PLD / BRL Sub_E935 (which inits $0BC0-$0BC7=$80).
-; Called from Sub_0C76, Sub_19C7, Sub_18D9 at end of scene reinit.
+; $C0:B192 — Obj_ResetStates (30 bytes, $B192–$B1B1)
+; (was Sub_B192.) Clears Obj_State for every object the location
+; defines (count in Evt_ObjCount), pointing DP at the Obj_State table
+; so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll
+; (which sets $0BC0-$0BC7 to $80). Called at the end of every reload.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0B192
-Sub_B192:
+Obj_ResetStates:
     PHD
     REP #$20                ; A → 16-bit
-    LDA #$1B00
-    TCD                     ; DP = $1B00
+    LDA.w #!Obj_State
+    TCD                     ; DP = Obj_State table
     SEP #$20                ; A → 8-bit
     SEP #$10                ; X,Y → 8-bit
-    LDA.l $7F2000           ; sprite table entry count
-    LDX #$00                ; X = $00 (value to store)
-    LDY #$00                ; Y = table offset
+    LDA.l !Evt_ObjCount     ; objects in this location
+    LDX #$00                ; value to store
+    LDY #$00                ; object offset
 .zero_loop:
-    STX $00,Y               ; store $00 at $1B00+Y
+    STX.b !Dp_TableStart,Y  ; Obj_State[Y] = 0
     INY
     INY                     ; Y += 2
     DEC                     ; A-- (count)
     BNE .zero_loop
     REP #$10                ; X,Y → 16-bit
     PLD
-    BRL $3783               ; → Sub_E935 ($E935): init $0BC0-$0BC7=$80
+    BRL SprBuf_FreeAll            ; sets $0BC0-$0BC7 to $80
 
 ; ============================================================
 ; $C0:B271 — PostVBlank (152 bytes)
-; OAM buffer culling routine. Processes sprite descriptors from the frame-
-; built table at $7E:0E00, calls Sub_B309 to push each sprite into the OAM
-; buffer, then pads any unused slots with $E0 (Y=$E0 places sprites below
-; the visible area). Updates write-head pointers in DP so the next frame
-; knows where to start writing.
+; Rebuilds the OAM shadow ($0700 low table, $0900 high table) for
+; the frame. The shadow is split into three ranges, each with a
+; low-table pointer (Oam_RangeNLoPtr) and a high-table pointer
+; (Oam_RangeNHiPtr); Spr_AppendToOam appends each object's tiles to the range
+; chosen by its flags. Objects are visited bucket by bucket from
+; Obj_DrawBucket (last bucket first), following Obj_DrawNext chains.
+; Afterwards, entries between each range's new end and last frame's
+; end (Oam_RangeNPrevEnd) are parked off screen with Y = $E0.
 ;
-; Entered via BRL tail-call from VBlankHandler ($C0:00BF).
+; Entered via BRL tail-call from VBlankHandler ($C0:00BF), DP=$0100.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y).
-; RTS returns to VBlankHandler's caller ($C0:00BA = JSR $EC60).
+; RTS returns to VBlankHandler's caller.
 ; ============================================================
 org $C0B271
 PostVBlank:
-    LDX #$0901
-    STX $89                 ; ($0189): range-A write head
+    LDX.w #!Oam_Range3HiStart
+    STX.b !Oam_Range3HiPtr
     LDX #$0000
-    STX $8B                 ; ($018B): range-A end (empty)
-    LDX #$0907
-    STX $81                 ; ($0181): range-B write head
+    STX.b !Oam_Range3HiUnk
+    LDX.w #!Oam_Range1HiStart
+    STX.b !Oam_Range1HiPtr
     LDX #$0000
-    STX $83                 ; ($0183): range-B end
-    LDX #$091A
-    STX $85                 ; ($0185): range-C write head
+    STX.b !Oam_Range1HiUnk
+    LDX.w #!Oam_Range2HiStart
+    STX.b !Oam_Range2HiPtr
     LDX #$0000
-    STX $87                 ; ($0187): range-C end
-    LDX #$0710
-    STX $DF                 ; ($01DF): OAM lo-buf start, range 3
-    LDX #$0770
-    STX $DB                 ; ($01DB): OAM lo-buf start, range 1
+    STX.b !Oam_Range2HiUnk
+    LDX.w #!Oam_Range3Start
+    STX.b !Oam_Range3LoPtr
+    LDX.w #!Oam_Range1Start
+    STX.b !Oam_Range1LoPtr
     LDA #$00
-    STA.w WMADDH              ; $2183 = $00: WRAM bank 0
-    STA $6E                 ; ($016E) = 0
-    LDX #$08A0
-    STX $DD                 ; ($01DD): OAM lo-buf start, range 2
-    LDY #$007E              ; iterate sprite descriptor table (63 slots * 2)
+    STA.w WMADDH              ; WMDATA writes go to bank $7E
+    STA.b !Obj_CurHi        ; keep Obj_Cur's high byte 0
+    LDX.w #!Oam_Range2Start
+    STX.b !Oam_Range2LoPtr
+    LDY.w #!Obj_DrawBucketLast ; 64 buckets x 2, last first
 PV_SpriteLoop:
-    LDA $0E00,Y
-    BMI PV_NextSprite       ; bit 7: no sprite
-    STA $6D                 ; ($016D): descriptor index
-    JSR Sub_B309
+    LDA.w !Obj_DrawBucket,Y
+    BMI PV_NextSprite       ; bit 7: empty bucket
+    STA.b !Obj_Cur          ; first object in the bucket
+    JSR Spr_AppendToOam
 PV_CheckChain:
-    LDX $6D
-    LDA $0E81,X             ; chained sprite-B descriptor
+    LDX.b !Obj_Cur
+    LDA.w !Obj_DrawNext,X   ; next object in the same bucket
     BMI PV_NextSprite
-    STA $6D
-    JSR Sub_B309
+    STA.b !Obj_Cur
+    JSR Spr_AppendToOam
     BRA PV_CheckChain
 PV_NextSprite:
     DEY
     DEY
     BPL PV_SpriteLoop
-    LDX $DB
-    LDA #$E0                ; Y=$E0 hides sprite below NTSC scanlines
+    LDX.b !Oam_Range1LoPtr
+    LDA.b #!Oam_HiddenY     ; Y=$E0 parks the entry below the screen
 PV_FillRange1:
-    CPX $7B
+    CPX.b !Oam_Range1PrevEnd
     BCS PV_EndRange1
-    STA.w $0001,X             ; Y byte of 4-byte OAM entry
+    STA.w OamEntry.Y,X        ; X = entry address
     INX
     INX
     INX
     INX
-    CPX #$08A0
+    CPX.w #!Oam_Range1Limit
     BCC PV_FillRange1
 PV_EndRange1:
-    LDX $DB
-    STX $7B                 ; ($017B): range-1 write pointer
-    LDX $DD
+    LDX.b !Oam_Range1LoPtr
+    STX.b !Oam_Range1PrevEnd
+    LDX.b !Oam_Range2LoPtr
 PV_FillRange2:
-    CPX $7D
+    CPX.b !Oam_Range2PrevEnd
     BCS PV_EndRange2
-    STA.w $0001,X
+    STA.w OamEntry.Y,X
     INX
     INX
     INX
     INX
-    CPX #$0900
+    CPX.w #!Oam_Range2Limit
     BCC PV_FillRange2
 PV_EndRange2:
-    LDX $DD
-    STX $7D                 ; ($017D): range-2 write pointer
-    LDX $DF
+    LDX.b !Oam_Range2LoPtr
+    STX.b !Oam_Range2PrevEnd
+    LDX.b !Oam_Range3LoPtr
 PV_FillRange3:
-    CPX $7F
+    CPX.b !Oam_Range3PrevEnd
     BCS PV_EndRange3
-    STA.w $0001,X
+    STA.w OamEntry.Y,X
     INX
     INX
     INX
     INX
-    CPX #$0770
+    CPX.w #!Oam_Range3Limit
     BCC PV_FillRange3
 PV_EndRange3:
-    LDX $DF
-    STX $7F                 ; ($017F): range-3 write pointer
+    LDX.b !Oam_Range3LoPtr
+    STX.b !Oam_Range3PrevEnd
     RTS
 
 ; ============================================================
-; $C0:1B90 — Sub_1B90 (23 bytes, $1B90–$1BA6)
-; SPC audio command dispatcher. Called from ModeE6_Handler.
+; $C0:1B90 — Audio_PlayTileSfxA (23 bytes, $1B90–$1BA6)
+; (was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the
+; sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id,
+; Arg1 = the party leader's Obj_SfxArg. Called from the Mode*_Handler
+; tile animations. Audio_PlaySfxAtLeader (was Sub_1B90_body) is the
+; shared tail, entered by Audio_PlayTileSfxB with its own effect id.
 ; On entry: M=1 (A=8-bit), X/Y=16-bit.
-; Sets command args at $1E00–$1E02 then calls SPC driver via JSL $C70004.
-; Command $19 cues a sound effect; arg0=dp:$FC, arg1=$0A00+dp:$97 table.
 ; ============================================================
 org $C01B90
-Sub_1B90:
-    LDA $FC              ; 8-bit arg 0 from dp:$FC
-Sub_1B90_body:           ; ← entry for Sub_1BA7 (uses $FB instead of $FC)
-    STA $1E01
-    LDY $97              ; 16-bit index from dp:$97
-    LDA $0A00,Y          ; arg 1: sound-effect byte from $0A00 table
-    STA $1E02
-    LDA #$19             ; SPC command byte $19
-    STA $1E00
-    JSL $C70004          ; → SPC700 driver entry
+Audio_PlayTileSfxA:
+    LDA.b !Audio_SfxTileAnimA
+Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
+    STA.w !Audio_CmdArg0
+    LDY.b !Party_ObjSlot ; leader's object
+    LDA.w !Obj_ScreenX,Y
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_CmdPlaySfx
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
     RTS
 
 ; ============================================================
-; $C0:2824 — Sub_2824 (36 bytes, $2824–$2847)
-; Post-transition setup/fade loop. BRL target from Sub_0C76 transition
-; path (offset $1AE6) and called from Sub_19C7.
-; Calls $286C (scene-init probe). If non-zero return, exits immediately.
-; Otherwise loops up to 15 VBlanks (dp:$19 counter): calls $881E (frame
-; DMA/controller update), $00DE (VBlankHandlerShort), and $EC60 (post-VBlank).
-; Clears dp:$1E and abs:$0407 on exit.
+; $C0:2824 — Field_FadeInAfterReload (36 bytes, $2824–$2847)
+; (was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep
+; returns nonzero, raises Fade_Brightness one step per frame (input
+; disabled around Field_FrameUpdate) until it reaches full brightness.
+; Clears Field_Unk1E and Field_FadeBusy on exit. Tail of
+; Field_SceneChangeTick's reload path; also called after the
+; bank-$C2 round trips.
 ; On entry: M=1 (A=8-bit), X/Y=16-bit.
 ; ============================================================
 org $C02824
-Sub_2824:
-    JSR $286C            ; scene-init probe; sets Z if not ready
-    BNE .done            ; non-zero (Z=0) → done, skip loop
+Field_FadeInAfterReload:
+    JSR Scene_ReloadStep
+    BNE .done            ; nonzero → skip the fade-in
 .loop:
-    INC $19              ; advance transition counter
-    LDA $1F
-    PHA                  ; save dp:$1F
-    STZ $1F              ; clear $1F during update
-    JSR $881E            ; frame DMA/controller update
+    INC.b !Fade_Brightness
+    LDA.b !Field_ControlEnabled
+    PHA
+    STZ.b !Field_ControlEnabled ; no input during the fade
+    JSR Field_FrameUpdate
     PLA
-    STA $1F              ; restore dp:$1F
-    JSR $00DE            ; VBlankHandlerShort (minimal VBlank)
-    JSR $EC60            ; post-VBlank work
-    LDA $19
-    CMP #$0F
-    BMI .loop            ; loop while dp:$19 < 15
+    STA.b !Field_ControlEnabled
+    JSR VBlankHandlerShort
+    JSR Sub_EC60
+    LDA.b !Fade_Brightness
+    CMP.b #!Fade_BrightnessMax
+    BMI .loop            ; until full brightness
 .done:
-    STZ $1E
-    STZ $0407            ; abs zero: 9C 07 04
+    STZ.b !Field_Unk1E
+    STZ.w !Field_FadeBusy
     RTS
 
 ; ============================================================
-; $C0:18D9 — Sub_18D9 (172 bytes, $18D9–$1984)
-; VBlank-sync wait + mode-transition manager.
-; Called from GameLoop frame body at $C0:00A1, before $0C76 dispatch.
+; $C0:18D9 — Field_PauseAndMenuInput (172 bytes, $18D9–$1984)
+; (was Sub_18D9.) Per-frame pause and menu input, called from
+; GameLoop_FrameBody before Field_SceneChangeTick.
 ; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
 ;
-; Part A — VBlank-sync wait ($18D9–$1915):
-;   If $00F0 bit 0 is SET, AND dp:$11=0, AND dp:$1F≠0:
-;     halve dp:$19 (fade timer), set $0407=$FF, then loop calling JSR $EC60
-;     until $00F0 bit 0 clears (halving $1A each iteration via JSL $FDC2C1).
-;     When bit 0 clears: restore dp:$19 from $1A, clear $0407.
-;
-; Part B — mode-transition dispatch ($1916–$1984):
-;   Check $00F6 bit 0 → if set, call Sub_1985 (mode-5 guard + reinit).
-;   Re-read $00F6, test bit 6:
-;     bit 6 CLEAR: if dp:$62≠0 call Sub_1ADF (mode-index update). RTS.
-;     bit 6 SET:   additional guards (dp:$1F≠0, dp:$62=0, dp:$10=0); then
-;       fade loop (DEC dp:$19, JSR $EC60), full mode-0 reinit:
-;       JSR InitHW/$011B, TDC/XBA/JSL $C28000, JSR InitHW/$0B64/$0B75,
-;       REP #$20/LDA #$0100/TCD/SEP #$20, JSR $01A5/$1A03/$B192/Sub_2824,
-;       STZ $0407, RTS.
+; Pause: when Start is newly pressed (Pad_Pressed bit 0) with
+;   Field_Unk11 = 0 and Field_ControlEnabled set, halve the brightness
+;   and loop (Sub_EC60 + EngFD_UnkC2C1 each frame) until Start is
+;   pressed again, then restore the brightness. (Earlier notes read
+;   this as a VBlank-sync wait and had the exit test inverted.)
+; Then Pad_Unk00F6: bit 0 → Field_FadeToBankC2Mode5; bit 6 (X in the
+;   Pad_Pressed layout) → if control is enabled and Field_Unk62 /
+;   Field_Unk10 are 0, fade out, save the field, call
+;   BankC2_Entry8000 with A = 1 (TDC/XBA leaves DP's high byte in A;
+;   very likely the main menu), and reload; otherwise run Sub_1ADF
+;   when Field_Unk62 is set.
 ; ============================================================
 org $C018D9
-Sub_18D9:
-    LDA.w $00F0          ; VBlank/HW flags
-    BIT #$01             ; test bit 0 (sync flag)
-    BEQ .after_wait      ; bit 0 clear → skip wait loop
-    LDA $11              ; re-entry guard
-    BNE .after_wait      ; non-zero → skip
-    LDA $1F              ; transition-active flag
-    BEQ .after_wait      ; zero → skip
-    ; All three conditions met: run wait loop
-    LDA $19              ; fade timer
-    STA $1A              ; save copy
+Field_PauseAndMenuInput:
+    LDA.w !Pad_Pressed
+    BIT.b #!Pad_Start
+    BEQ .after_wait      ; Start not pressed
+    LDA.b !Field_Unk11
+    BNE .after_wait
+    LDA.b !Field_ControlEnabled
+    BEQ .after_wait
+    ; Pause: dim to half brightness until Start is pressed again
+    LDA.b !Fade_Brightness
+    STA.b !Fade_BrightnessSaved
     LSR                  ; halve
-    STA $19
-    LDA #$FF
-    STA $0407            ; mark transition in progress (abs: 8D 07 04)
+    STA.b !Fade_Brightness
+    LDA.b #!Field_FadeBusyOn
+    STA.w !Field_FadeBusy
 .wait_loop:
-    JSR $EC60
-    LDA.w $00F0
-    BIT #$01
-    BNE .wait_exit       ; bit 0 now clear → exit
-    LDA $1A
+    JSR Sub_EC60
+    LDA.w !Pad_Pressed
+    BIT.b #!Pad_Start
+    BNE .wait_exit       ; Start pressed again → resume
+    LDA.b !Fade_BrightnessSaved
     LSR
-    STA $19
+    STA.b !Fade_Brightness
     SEP #$10
-    JSL $FDC2C1
-    STZ $53
+    JSL EngFD_UnkC2C1
+    STZ.b !Field_Unk53
     REP #$10
     BRA .wait_loop
 .wait_exit:
-    LDA $1A
-    STA $19
-    STZ $0407            ; abs clear: 9C 07 04
+    LDA.b !Fade_BrightnessSaved
+    STA.b !Fade_Brightness
+    STZ.w !Field_FadeBusy
 .after_wait:
-    LDA.w $00F6
-    BIT #$01
+    LDA.w !Pad_Unk00F6
+    BIT.b #!Pad_Unk00F6Mode5
     BEQ .no_mode5
-    JSR Sub_1985
-    LDA.w $00F6
+    JSR Field_FadeToBankC2Mode5
+    LDA.w !Pad_Unk00F6
 .no_mode5:
-    BIT #$40
+    BIT.b #!Pad_Unk00F6Menu
     BNE .bit6_set
-    LDA $62
+    LDA.b !Field_Unk62
     BEQ .done
     JSR Sub_1ADF
 .done:
     RTS
 .bit6_set:
-    LDA $1F
+    LDA.b !Field_ControlEnabled
     BNE .chk_62
     RTS
 .chk_62:
-    LDA $62
+    LDA.b !Field_Unk62
     BEQ .chk_10
     RTS
 .chk_10:
-    LDA $10
+    LDA.b !Field_Unk10
     BEQ .do_reinit
     RTS
 .do_reinit:
 .fade_loop:
-    LDA #$FF
-    STA $0407            ; abs: 8D 07 04 (re-sets flag each iteration)
-    LDA $19
+    LDA.b #!Field_FadeBusyOn
+    STA.w !Field_FadeBusy ; (set again every frame)
+    LDA.b !Fade_Brightness
     BEQ .fade_done
     BMI .fade_done
-    DEC $19
+    DEC.b !Fade_Brightness
     SEP #$10
-    JSL $FDC2C1
+    JSL EngFD_UnkC2C1
     REP #$10
-    JSR $EC60
+    JSR Sub_EC60
     BRA .fade_loop
 .fade_done:
-    JSR $0B4E            ; InitHW
-    JSR Sub_011B         ; build scene context workspace
-    TDC                  ; A = low byte of DP = $00 (DP=$0100)
-    XBA                  ; swap A/B
-    JSL $C28000          ; set BG mode (A in B after XBA)
-    JSR $0B4E            ; InitHW again
-    JSR $0B64            ; InstallNMI
-    JSR $0B75            ; InstallIRQ
+    JSR InitHW
+    JSR Field_SaveState
+    TDC                  ; C = D = $0100
+    XBA                  ; A = $01 (DP high byte), B = $00
+    JSL BankC2_Entry8000
+    JSR InitHW
+    JSR InstallNMI
+    JSR InstallIRQ
     REP #$20             ; A → 16-bit
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                  ; DP = $0100
     SEP #$20             ; A → 8-bit
-    JSR Sub_01A5         ; full location engine init
-    JSR Sub_1A03         ; restore sprite colors + scene tables
-    JSR Sub_B192         ; zero $1Bxx table + init $0BC0-$0BC7
-    JSR Sub_2824         ; post-transition fade loop
-    STZ $0407            ; abs clear: 9C 07 04
+    JSR Field_RestoreState
+    JSR Party_ReinitIfChanged ; party may have changed in the menu
+    JSR Obj_ResetStates
+    JSR Field_FadeInAfterReload
+    STZ.w !Field_FadeBusy
     RTS
 
 ; ============================================================
-; $C0:1985 — Sub_1985 (66 bytes, $1985–$19C6)
-; Mode-5 transition guard + fade.  Falls through to Sub_19C7.
-; Called from Sub_18D9 when $00F6 bit 0 is set.
+; $C0:1985 — Field_FadeToBankC2Mode5 (66 bytes, $1985–$19C6)
+; (was Sub_1985.) Called from Field_PauseAndMenuInput when
+; Pad_Unk00F6 bit 0 is set. If Field_Unk26 is nonzero it only toggles
+; its bits 0-1. Otherwise, if Eng_Unk7F0000 >= $49, control is enabled
+; and Field_Unk62 / Field_Unk10 are 0, it fades out (one step per
+; frame), saves the field and falls through to Field_RunBankC2Mode5.
 ; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
-;
-; Guard chain: if dp:$26≠0 → toggle $26 bits 0-1 and return early.
-;   Otherwise check WRAM[$7F0000] ≥ $49 (version gate),
-;   dp:$1F≠0, dp:$62=0, dp:$10=0.
-; If all pass: set $0407=$FF, decrement dp:$19 each frame calling
-;   JSR $EC60 (per-frame work) until dp:$19 reaches 0 or goes negative.
-;   Then JSR $0B4E (InitHW) + JSR $011B (scene setup).
-; Falls through directly into Sub_19C7 for hardware reinit.
 ; ============================================================
 org $C01985
-Sub_1985:
-    LDA $26
+Field_FadeToBankC2Mode5:
+    LDA.b !Field_Unk26
     BEQ .continue
     EOR #$03             ; toggle bits 0-1
-    STA $26
+    STA.b !Field_Unk26
     RTS
 .continue:
-    LDA.l $7F0000        ; WRAM byte 0 (version/region indicator)
+    LDA.l !Eng_Unk7F0000
     SEC
-    SBC #$49
+    SBC.b #!Eng_Unk7F0000Min
     BCS .chk_1F          ; ≥ $49 → continue
     RTS
 .chk_1F:
-    LDA $1F
+    LDA.b !Field_ControlEnabled
     BNE .chk_62          ; non-zero → continue
     RTS
 .chk_62:
-    LDA $62
+    LDA.b !Field_Unk62
     BEQ .chk_10          ; zero → continue
     RTS
 .chk_10:
-    LDA $10
+    LDA.b !Field_Unk10
     BEQ .do_fade         ; zero → proceed
     RTS
 .do_fade:
 .fade_loop:
-    LDA #$FF
-    STA $0407            ; abs: 8D 07 04 (re-sets flag each iteration)
-    LDA $19
+    LDA.b #!Field_FadeBusyOn
+    STA.w !Field_FadeBusy ; (set again every frame)
+    LDA.b !Fade_Brightness
     BEQ .fade_done
     BMI .fade_done
-    DEC $19
+    DEC.b !Fade_Brightness
     SEP #$10
-    JSL $FDC2C1
+    JSL EngFD_UnkC2C1
     REP #$10
-    JSR $EC60
+    JSR Sub_EC60
     BRA .fade_loop
 .fade_done:
-    JSR $0B4E            ; InitHW
-    JSR Sub_011B         ; build scene context workspace
-    ; fall through to Sub_19C7
+    JSR InitHW
+    JSR Field_SaveState
+    ; fall through to Field_RunBankC2Mode5
 
 ; ============================================================
-; $C0:19C7 — Sub_19C7 (60 bytes, $19C7–$1A02)
-; Mode-5 warm-restart. BRL target from Sub_0C76 mode-5-setup path.
-; On entry: M=1 (A=8-bit), X/Y=16-bit.
-; Reinitialises hardware for BG mode 5, sets DP=$0100, calls two engine
-; helpers, conditionally moves bit 6 from dp:$17 to dp:$18, calls $B192,
-; then calls Sub_2824 for the post-transition fade. Clears $0407, returns.
+; $C0:19C7 — Field_RunBankC2Mode5 (60 bytes, $19C7–$1A02)
+; (was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning
+; of 5 unverified; earlier notes called it "BG mode 5"), then reloads
+; the field: restore state, re-init changed party members, move a
+; pending SceneFlag_Reload over to FadeFlag_Reloaded, reset object
+; states and fade in. Reached from Field_SceneChangeTick (when
+; Field_ExitMenuArg is 0) and by fall-through from
+; Field_FadeToBankC2Mode5. On entry: M=1 (A=8-bit), X/Y=16-bit.
 ; ============================================================
 org $C019C7
-Sub_19C7:
-    LDX #$0000           ; clear X (16-bit: A2 00 00)
-    TDC                  ; A = D register low byte
-    XBA                  ; swap A/B: clears B accumulator
-    LDA #$05             ; BG mode 5
-    JSL $C28000          ; set BG mode
-    JSR $0B4E            ; InitHW: SEI + forced blank + disable NMI/DMA
-    JSR $0B64            ; InstallNMI
-    JSR $0B75            ; InstallIRQ
+Field_RunBankC2Mode5:
+    LDX #$0000
+    TDC                  ; C = D = $0100
+    XBA                  ; B = $00 (A is reloaded next)
+    LDA.b #!ExitMenu_Mode5
+    JSL BankC2_Entry8000
+    JSR InitHW
+    JSR InstallNMI
+    JSR InstallIRQ
     REP #$20             ; A → 16-bit
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                  ; DP = $0100
     SEP #$20             ; A → 8-bit
-    JSR Sub_01A5         ; full location engine init
-    JSR Sub_1A03         ; restore sprite colors + scene tables
+    JSR Field_RestoreState
+    JSR Party_ReinitIfChanged
     REP #$10             ; ensure X/Y 16-bit
-    LDA $17              ; load dp:$17 transition flags
-    BIT #$40             ; test bit 6
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_Reload
     BEQ .no_bit6
-    LDA #$40
-    TRB $17              ; clear bit 6 of dp:$17
-    LDA #$40
-    TSB $18              ; set bit 6 of dp:$18
+    LDA.b #!SceneFlag_Reload
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_Reloaded
+    TSB.b !Field_FadeFlags
 .no_bit6:
-    JSR Sub_B192         ; zero $1Bxx table + init $0BC0-$0BC7
-    JSR Sub_2824         ; post-transition fade loop
-    STZ $0407
+    JSR Obj_ResetStates
+    JSR Field_FadeInAfterReload
+    STZ.w !Field_FadeBusy
     RTS
 
 ; ============================================================
-; $C0:1A03 — Sub_1A03 (169 bytes, $1A03–$1AAB)
-; Scene display-state restore: sprite color sync + scene table restore.
-; First checks if palette colors ($7E2980-$2982) have changed vs dp:$94-$96;
-;   if unchanged → early RTS.
-; If changed: call Sub_597D for each active sprite slot (dp:$8D/$8E/$8F/
-;   $91/$90/$92/$93; skip slot if negative = no sprite).
-; Then update color cache: dp:$94/$95/$96 = new $7E2980/$2981/$2982.
-; Loop (X=0,2,4): if slot dp:$97+X valid (not $80):
-;   LDA $7F1D09,X/$0F,X/$15,X (16-bit) → STA $1800,Y/$1880,Y/$0C00,Y.
-; Finally restore dp:$AB/$AC/$AD from $7F1D1B/$1D1C/$1D1D.
-; Essentially the inverse of Sub_011B's scene-table-save pass.
+; $C0:1A03 — Party_ReinitIfChanged (169 bytes, $1A03–$1AAB)
+; (was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no
+; longer matches the copy taken at load (Party_MembersCache), re-run
+; the init function of every character object that exists
+; (Chr_ObjSlot, order $8D $8E $8F $91 $90 $92 $93) and refresh the
+; copy. Earlier notes read $7E:2980-2982 as palette colours; they are
+; the party's character ids. Either way, then put the party members
+; back where Field_SaveState left them (SceneSave_Party*) and restore
+; Field_UnkAB-AD — the second half of Field_SaveState's work.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C01A03
-Sub_1A03:
-    LDA.l $7E2980           ; current palette color 0
-    CMP $94                 ; vs cached value
+Party_ReinitIfChanged:
+    LDA.l !Party_Members
+    CMP.b !Party_MembersCache
     BNE .colors_changed
-    LDA.l $7E2981
-    CMP $95
+    LDA.l !Party_Members+1
+    CMP.b !Party_MembersCache+1
     BNE .colors_changed
-    LDA.l $7E2982
-    CMP $96
+    LDA.l !Party_Members+2
+    CMP.b !Party_MembersCache+2
     BNE .colors_changed
-    RTS                     ; colors unchanged → nothing to do
+    RTS                     ; party unchanged → nothing to do
 
 .colors_changed:
-    STZ $6E                 ; clear sprite-update flag
-    LDA $8D
-    BMI .chk_8E             ; $80 = no sprite
-    STA $6D
-    JSR Sub_597D            ; sprite slot refresh
+    STZ.b !Obj_CurHi        ; keep Obj_Cur's high byte 0
+    LDA.b !Chr_ObjSlot
+    BMI .chk_8E             ; Obj_None
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_8E:
-    LDA $8E
+    LDA.b !Chr_ObjSlot+1
     BMI .chk_8F
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_8F:
-    LDA $8F
+    LDA.b !Chr_ObjSlot+2
     BMI .chk_91
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_91:
-    LDA $91
+    LDA.b !Chr_ObjSlot+4
     BMI .chk_90
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_90:
-    LDA $90
+    LDA.b !Chr_ObjSlot+3
     BMI .chk_92
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_92:
-    LDA $92
+    LDA.b !Chr_ObjSlot+5
     BMI .chk_93
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 .chk_93:
-    LDA $93
+    LDA.b !Chr_ObjSlot+6
     BMI .update_cache
-    STA $6D
-    JSR $597D
+    STA.b !Obj_Cur
+    JSR Evt_RunObjInit
 
 .update_cache:
-    LDA.l $7E2980           ; update color cache
-    STA $94
-    LDA.l $7E2981
-    STA $95
-    LDA.l $7E2982
-    STA $96
+    LDA.l !Party_Members    ; refresh the copy
+    STA.b !Party_MembersCache
+    LDA.l !Party_Members+1
+    STA.b !Party_MembersCache+1
+    LDA.l !Party_Members+2
+    STA.b !Party_MembersCache+2
 
-    LDX #$0000              ; X = slot loop index (16-bit)
+    LDX #$0000              ; party member x 2
 .restore_loop:
-    TDC                     ; A = DP low; XBA sets B = 0
-    XBA
-    LDA $97,X               ; sprite slot index (dp:$97+X)
-    BMI .next_restore       ; $80 → no sprite
-    TAY                     ; Y = slot index
+    TDC                     ; C = D = $0100
+    XBA                     ; B = 0 for the TAY below
+    LDA.b !Party_ObjSlot,X
+    BMI .next_restore       ; Obj_None
+    TAY                     ; Y = member's object
     REP #$20                ; A → 16-bit
-    LDA.l $7F1D09,X         ; workspace entry 0
-    STA $1800,Y             ; → scene table
-    LDA.l $7F1D0F,X         ; workspace entry 1
-    STA $1880,Y
-    LDA.l $7F1D15,X         ; workspace entry 2
-    STA $0C00,Y
+    LDA.l !SceneSave_PartyPosX,X
+    STA.w !Obj_PosX,Y
+    LDA.l !SceneSave_PartyPosY,X
+    STA.w !Obj_PosY,Y
+    LDA.l !SceneSave_PartyPrio,X
+    STA.w !Obj_PrioLow,Y
     SEP #$20                ; A → 8-bit
 .next_restore:
     INX
@@ -5988,2006 +6014,1918 @@ Sub_1A03:
     CPX #$0006              ; 3 iterations
     BNE .restore_loop
 
-    LDA.l $7F1D1B           ; restore dp:$AB/$AC/$AD
-    STA $AB
-    LDA.l $7F1D1C
-    STA $AC
-    LDA.l $7F1D1D
-    STA $AD
+    LDA.l !SceneSave_UnkAB
+    STA.b !Field_UnkAB
+    LDA.l !SceneSave_UnkAB+1
+    STA.b !Field_UnkAC
+    LDA.l !SceneSave_UnkAB+2
+    STA.b !Field_UnkAD
     RTS
 
 ; ============================================================
-; $C0:595C — Sub_595C (33 bytes, $595C–$597C)
-; Scene entity-table dispatcher.
-; Reads entity-list X base pointer from $7F:2003 (16-bit), zeroes
-; dp:$6D/$6E, then walks entries at $7F:2001,X dispatching each
-; non-zero type byte via the jump table at $5D6E (type × 2 = index).
-; Stops when it reads a zero terminator.
-; Calling convention: callee (via $5D6E) must return with X pointing
-; to the next entity in the list.
-; Called from Sub_01A5 after workspace scroll restore.
+; $C0:595C — Evt_RunObj0Func1 (33 bytes, $595C–$597C)
+; (was Sub_595C.) Runs one event-script function of object 0: the
+; offset stored at Evt_Data+2 (object 0's second function pointer),
+; executing opcodes through Evt_OpcodeTable until opcode $00. Each
+; opcode handler gets Y = the opcode's offset and must return with X
+; at the next opcode. (Earlier notes called the opcodes "entity type
+; bytes".) Called from Field_RestoreState.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0595C
-Sub_595C:
+Evt_RunObj0Func1:
     REP #$20                ; A → 16-bit
-    STZ $6D                 ; sprite-slot index = 0 (clears dp:$6D and $6E)
-    LDA.l $7F2003           ; entity-list X base pointer
-    TAX                     ; X = entity list pointer
+    STZ.b !Obj_Cur          ; object 0 (16-bit store clears Obj_CurHi too)
+    LDA.l !Evt_Data+2       ; object 0, function 1 offset
+    TAX
     SEP #$20                ; A → 8-bit
 .dispatch_loop:
-    LDA.l $7F2001,X         ; entity type byte
-    BEQ .done               ; zero = end of list
-    TXY                     ; Y = entity pointer (callee uses to locate data)
+    LDA.l !Evt_Data,X       ; opcode
+    BEQ .done               ; $00 = return
+    TXY                     ; Y = opcode's offset
     REP #$20                ; A → 16-bit
-    AND #$00FF              ; zero-extend type byte
-    ASL                     ; × 2 = dispatch-table word index
-    TAX                     ; X = dispatch index
+    AND.w #!Eng_LowByteMask
+    ASL                     ; word table index
+    TAX
     SEP #$20                ; A → 8-bit
-    JSR ($5D6E,X)           ; call entity handler from dispatch table
+    JSR (Evt_OpcodeTable,X) ; handler returns X = next opcode
     BRA .dispatch_loop
 .done:
     RTS
 
 ; ============================================================
-; $C0:597D — Sub_597D (92 bytes, $597D–$59D8)
-; Sprite-slot entity dispatcher and slot-data reset.
-; On entry dp:$6D = sprite-slot index (0–6).
-; 1. Computes slot × 16 byte offset into $7F:2001 to find this
-;    slot's entity-list base pointer (16-bit).
-; 2. Inner loop: dispatches each non-zero entity type via $5D6E
-;    until zero terminator.
-; 3. Stores end-of-list pointer + 1 → $1180+slot (16-bit).
-; 4. Zeroes 8 sprite-slot data arrays at $7F:0580/$0600/$0680/
-;    $0700/$0780/$0800/$0880/$0900 (indexed by slot).
-; 5. Sets $1C00+slot = $07.
-; Called from Sub_1A03 for each active sprite slot.
+; $C0:597D — Evt_RunObjInit (92 bytes, $597D–$59D8)
+; (was Sub_597D.) Runs object Obj_Cur's init function: the first of
+; its 16 function offsets (Evt_Data + Obj_Cur*16, i.e. 32 bytes per
+; object) is executed through Evt_OpcodeTable until opcode $00. Then
+; Obj_ScriptPos = the offset after that $00, eight per-object words in
+; bank $7F are cleared and Obj_Unk1C00 = 7.
+; Called from Party_ReinitIfChanged for each character object.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
 org $C0597D
-Sub_597D:
-    LDA $6D                 ; sprite-slot index (8-bit)
+Evt_RunObjInit:
+    LDA.b !Obj_Cur          ; object x 2
     REP #$20                ; A → 16-bit
-    AND #$00FF              ; zero-extend
-    ASL                     ; × 2
-    ASL                     ; × 4
-    ASL                     ; × 8
-    ASL                     ; × 16 — byte offset into entity table
-    TAX                     ; X = slot offset
-    LDA.l $7F2001,X         ; 16-bit entity-list base pointer for this slot
-    TAX                     ; X = entity-list pointer
+    AND.w #!Eng_LowByteMask
+    ASL
+    ASL
+    ASL
+    ASL                     ; x 16 = object x 32: its function table
+    TAX
+    LDA.l !Evt_Data,X       ; function 0 (init) offset
+    TAX
     SEP #$20                ; A → 8-bit
 .inner_loop:
-    LDA.l $7F2001,X         ; entity type byte
-    BEQ .list_done          ; zero = end of sub-list
-    TXY                     ; Y = entity pointer (callee uses to locate data)
+    LDA.l !Evt_Data,X       ; opcode
+    BEQ .list_done          ; $00 = return
+    TXY                     ; Y = opcode's offset
     REP #$20                ; A → 16-bit
-    AND #$00FF              ; zero-extend type
-    ASL                     ; × 2 = dispatch-table word index
-    TAX                     ; X = dispatch index
+    AND.w #!Eng_LowByteMask
+    ASL                     ; word table index
+    TAX
     SEP #$20                ; A → 8-bit
-    JSR ($5D6E,X)           ; call entity handler
+    JSR (Evt_OpcodeTable,X) ; handler returns X = next opcode
     BRA .inner_loop
 .list_done:
     REP #$20                ; A → 16-bit
-    INX                     ; advance past zero terminator
-    TXA                     ; A = end-of-list pointer + 1
-    LDX $6D                 ; restore slot index (16-bit; $6E = 0)
-    STA.w $1180,X           ; end pointer → $1180+slot
-    LDA #$0000              ; A = 0
-    STA.l $7F0580,X         ; zero sprite-slot data arrays (8 × $0080-stride)
-    STA.l $7F0600,X
-    STA.l $7F0680,X
-    STA.l $7F0700,X
-    STA.l $7F0780,X
-    STA.l $7F0800,X
-    STA.l $7F0880,X
-    STA.l $7F0900,X
+    INX                     ; past the $00
+    TXA
+    LDX.b !Obj_Cur          ; 16-bit; Obj_CurHi is 0
+    STA.w !Obj_ScriptPos,X  ; where the object's script continues
+    LDA #$0000
+    STA.l !ObjX_Unk7F0580,X ; clear the object's bank-$7F words
+    STA.l !ObjX_Unk7F0600,X
+    STA.l !ObjX_Unk7F0680,X
+    STA.l !ObjX_Unk7F0700,X
+    STA.l !ObjX_Unk7F0780,X
+    STA.l !ObjX_Unk7F0800,X
+    STA.l !ObjX_Unk7F0880,X
+    STA.l !ObjX_Unk7F0900,X
     SEP #$20                ; A → 8-bit
-    LDA #$07                ; slot property value
-    STA.w $1C00,X           ; $1C00+slot = 7
+    LDA.b #!Obj_Unk1C00Init
+    STA.w !Obj_Unk1C00,X
     RTS
 
 ; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
-; Mode-index update dispatcher.  Pure leaf (no JSR calls).
-; Called from Sub_18D9 when $00F6 bit 6 CLEAR and dp:$62≠0.
-; On entry: M=1 (A 8-bit, holds mode parameter), X/Y 16-bit, DP=$0100.
+; Leaf routine run by Field_PauseAndMenuInput when Field_Unk62 is set
+; (and Pad_Unk00F6 bit 6 is clear); A = Field_Unk62.
+; On entry: M=1, X/Y 16-bit, DP=$0100.
 ;
-; A=1 → .chk_flags: read $00F6 bit 7; if set clear dp:$34 (LDX #0, STX).
-; A=2 → inspect $00F7 bits 2 and 3 for increment/decrement path;
-;        also checks $00F8 bit 7 to set dp:$62=3.
-; A≠1,2 → save dp:$63→dp:$66, force dp:$63=$04, then .chk_flags.
-;
-; .inc_mode63: INC dp:$63; clamp against dp:$65/$64; store dp:$63. RTS.
-; .dec_mode63: DEC dp:$63; clamp against dp:$64/$65; store dp:$63. RTS.
+; A=1    → if Pad_Unk00F6 bit 7 is set, clear Field_Unk34.
+; A=2    → Pad_Unk00F7 bit 2 steps Field_Unk63 up (wrapping from
+;          Field_Unk65 to Field_Unk64), bit 3 steps it down (wrapping
+;          the other way); else Pad_Unk00F8 bit 7 sets Field_Unk62 = 3.
+;          (Bits 2/3 are Down/Up in the Pad_Pressed layout: a list
+;          cursor is likely.)
+; other  → save Field_Unk63 in Field_Unk66 and force it to 4 (unless it
+;          is negative or already 4), then as A=1.
 ; ============================================================
 org $C01ADF
 Sub_1ADF:
     CMP #$01
-    BEQ .chk_flags       ; A=1: go directly to flag check ($1B0C)
+    BEQ .chk_flags       ; A=1
     CMP #$02
-    BNE .update_mode63   ; A≠2: update mode counter ($1AFE)
-    ; A=2 path: check $00F7 buttons
-    LDA.w $00F7
-    BIT #$04
-    BNE .inc_mode63      ; bit 2 set → increment mode ($1B19)
-    BIT #$08
-    BNE .dec_mode63      ; bit 3 set → decrement mode ($1B29)
-    LDA.w $00F8
-    BIT #$80
-    BEQ .rts2            ; bit 7 clear → skip to bare RTS ($1B18)
+    BNE .update_mode63   ; A≠1,2
+    ; A=2
+    LDA.w !Pad_Unk00F7
+    BIT.b #!Pad_HiDown
+    BNE .inc_mode63
+    BIT.b #!Pad_HiUp
+    BNE .dec_mode63
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit7
+    BEQ .rts2
     LDA #$03
-    STA $62
+    STA.b !Field_Unk62
     RTS
-.update_mode63:          ; $1AFE — A≠1,2 path
-    LDA $63
-    BMI .chk_flags       ; negative → skip update
+.update_mode63:          ; A≠1,2
+    LDA.b !Field_Unk63
+    BMI .chk_flags       ; negative → leave it
     CMP #$04
-    BEQ .chk_flags       ; already 4 → skip update
-    STA $66
+    BEQ .chk_flags       ; already 4
+    STA.b !Field_Unk66
     LDA #$04
-    STA $63
-.chk_flags:              ; $1B0C
-    LDA.w $00F6
-    BIT #$80
-    BEQ .rts2            ; bit 7 clear → RTS without clearing $34
+    STA.b !Field_Unk63
+.chk_flags:
+    LDA.w !Pad_Unk00F6
+    BIT.b #!Pad_Unk00F6Bit7
+    BEQ .rts2            ; bit 7 clear → leave Field_Unk34
     LDX #$0000
-    STX $34
+    STX.b !Field_Unk34
 .rts2:                   ; $1B18
     RTS
 .inc_mode63:             ; $1B19
-    LDA $63
+    LDA.b !Field_Unk63
     INC A
-    CMP $65
+    CMP.b !Field_Unk65
     BEQ .store_63
     BCS .use_64_val
 .store_63:               ; $1B22
-    STA $63
+    STA.b !Field_Unk63
     RTS
 .use_64_val:             ; $1B25
-    LDA $64
+    LDA.b !Field_Unk64
     BRA .store_63
 .dec_mode63:             ; $1B29
-    LDA $63
+    LDA.b !Field_Unk63
     BEQ .use_65_val
     DEC A
-    CMP $64
+    CMP.b !Field_Unk64
     BCS .store_63
 .use_65_val:             ; $1B32
-    LDA $65
+    LDA.b !Field_Unk65
     BRA .store_63
-; Mode-$E6 scroll-map update. BRL target from Sub_0C76 bit-4 dispatch
-; (mode $E6 case, raw offset $001F from $0D5C).
-; On entry: A=$E6 (current mode), X=layer index, M=1, X/Y=16-bit.
+
+; ============================================================
+; $C0:0D78 — ModeE6_Handler (231 bytes, $0D78–$0E5E)
+; Tile animation for map-tile state $E6: a 1x2 column, the tile at
+; (Field_TileAnimX, Field_TileAnimY) and the one above it.
+; BRL target from Field_SceneChangeTick (Field_SceneFlags bit 4).
+; On entry: A = $E6, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ;
-; This block increments both the current and previous layer modes in
-; the $7E:3000 mode table (current: $E6→$E7; previous: whatever→+1).
-; Then triggers an SPC audio command via Sub_1B90, loads two 16-bit
-; scroll base registers ($1D0A→dp:$DB, $1D0E→dp:$DD), and falls into
-; the computation block (org $C00DA1 below) to compute 8 VRAM indices.
-;
-; [Split into two org blocks so Sub_1B36 (which needs M=0) can appear
-;  between them in file order, inheriting the REP #$20 state.]
+; The general shape, shared by all five Mode*_Handlers:
+;  1. Advance the state byte of each affected map tile in
+;     Map_TileProps by one ($E6 → $E7 here), set TileAnim_PairCount
+;     and play Audio_SfxTileAnimA.
+;  2. For each affected map tile ("pass"), compute the VRAM word
+;     address of its four 8x8 tiles in the 64x32 BG tilemap
+;     (Bg_TilemapIndex64x32 + Map_TilemapVram) into TileAnim_VramAddrs,
+;     4 words per map tile in TL, TR, BL, BR order.
+;  3. Set VramQueue_TileAnim in Field_VramQueueFlags and continue in
+;     DefaultHandler.
+; Earlier comments here swapped rows and columns: Field_TileAnimX
+; ($5B) is the map column, Field_TileAnimY ($5C) the row.
 ; ============================================================
 org $C00D78
 ModeE6_Handler:
-    INC                  ; A = $E7 (current mode $E6 + 1)
-    STA.l $7E3000,X      ; update current layer: $E6 → $E7
+    INC                  ; tile state $E6 → $E7
+    STA.l !Map_TileProps,X ; tile (col, row)
     REP #$20             ; A → 16-bit
-    TXA                  ; A = current layer index (16-bit)
+    TXA
     SEC
-    SBC #$0100           ; A = previous layer index
-    TAX                  ; X = previous layer
-    LDA.l $7E3000,X      ; load previous layer mode (16-bit)
-    INC                  ; advance previous mode
-    STA.l $7E3000,X      ; write back
-    SEP #$20             ; A → 8-bit
-    STZ $60              ; clear dp:$60 (layer-loop counter)
-    JSR Sub_1B90         ; trigger SPC audio command
-    REP #$20             ; A → 16-bit
-    LDA $1D0A            ; scroll X base (abs 16-bit)
-    STA $DB              ; dp:$DB/$DC = scroll X base
-    LDA $1D0E            ; scroll Y base
-    STA $DD              ; dp:$DD/$DE = scroll Y base
-    ; [M=0 here — Sub_1B36 follows in file order with correct M=0 state]
-
-; ============================================================
-; $C0:1B36 — Sub_1B36 (29 bytes, $1B36–$1B52)
-; VRAM tilemap word-index calculator.
-; On entry (M=0 = 16-bit A): A=tile col (0–31), Y=tile row (0–63).
-; Returns: A = VRAM word index = col*32 + (row<32 ? row : row-32+$0400).
-; Encodes a 32-col × 64-row BG tilemap split across two VRAM pages
-; ($0000 for rows 0–31, $0400 for rows 32–63).
-; Called from ModeE6_Handler computation block to build scroll table.
-; [M=0 (16-bit A) inherited from ModeE6_Handler header above]
-; ============================================================
-org $C01B36
-Sub_1B36:
-    ASL                  ; col × 2
-    ASL                  ; col × 4
-    ASL                  ; col × 8
-    ASL                  ; col × 16
-    ASL                  ; col × 32
-    STA $D9              ; dp:$D9/$DA = col*32 (16-bit store)
-    TYA                  ; A = row
-    CMP #$0020           ; row ≥ 32?
-    BCS .rowhi
-    CLC
-    ADC $D9              ; A = row + col*32
-    RTS
-.rowhi:
-    SEC
-    SBC #$0020           ; row -= 32
-    CLC
-    ADC $D9              ; A = (row-32) + col*32
-    CLC
-    ADC #$0400           ; + $0400 (second tilemap VRAM page)
-    RTS
-    ; [M=0 here — ModeE6_Handler computation block continues below]
-
-; ============================================================
-; $C0:0DA1 — ModeE6_Handler computation block ($0DA1–$0E5E)
-; Computes 8 VRAM scroll-map word indices (2 passes of 4 corners each)
-; and stores to $09CA–$09D8. Pass 1 uses col derived from dp:$5C;
-; pass 2 uses (dp:$5C - 1). Ends by setting bit 4 of dp:$5F and
-; tail-jumping to the default mode handler via BRL $087D (→ $16DC).
-; [M=0 (16-bit A) inherited from Sub_1B36 above]
-; ============================================================
-org $C00DA1
-    ; --- Pass 1: 4-corner VRAM indices at (col, row) + neighbours ---
-    LDA $5B              ; scroll row base (16-bit dp load)
-    ASL
-    SEC
-    SBC $DB              ; subtract scroll X base
-    CLC
-    ADC $1D99            ; add row adjustment
-    AND #$003F           ; wrap to 64 rows
-    TAY                  ; Y = tile row (0–63)
-    LDA $5C              ; scroll col base (16-bit dp load)
-    ASL
-    SEC
-    SBC $DD              ; subtract scroll Y base
-    CLC
-    ADC $1D9A            ; add col adjustment
-    AND #$001F           ; wrap to 32 cols
-    TAX                  ; X = col (A = col too; TAX doesn't modify A)
-    JSR Sub_1B36         ; → A = VRAM index(col, row)
-    CLC
-    ADC $1D7C            ; add VRAM base
-    STA $09CA            ; BG scroll VRAM word 0
-    TYA                  ; A = row
-    PHA                  ; save row on stack
-    INC                  ; row + 1
-    AND #$003F
-    TAY                  ; Y = (row+1) wrapped
-    TXA                  ; A = col (X unchanged by Sub_1B36)
-    JSR Sub_1B36         ; → A = VRAM index(col, row+1)
-    CLC
-    ADC $1D7C
-    STA $09CC            ; BG scroll VRAM word 1
-    PLY                  ; Y = original row
-    TXA                  ; A = col
-    INC                  ; col + 1
-    AND #$001F
-    TAX                  ; X = (col+1) wrapped
-    JSR Sub_1B36         ; → A = VRAM index(col+1, row)
-    CLC
-    ADC $1D7C
-    STA $09CE            ; BG scroll VRAM word 2
-    TYA                  ; A = original row
-    INC                  ; row + 1
-    AND #$003F
-    TAY                  ; Y = (row+1) wrapped
-    TXA                  ; A = col+1
-    JSR Sub_1B36         ; → A = VRAM index(col+1, row+1)
-    CLC
-    ADC $1D7C
-    STA $09D0            ; BG scroll VRAM word 3
-    ; --- Pass 2: same 4-corner pattern, col base decremented by 1 ---
-    LDA $5B
-    ASL
-    SEC
-    SBC $DB
-    CLC
-    ADC $1D99
-    AND #$003F
-    TAY                  ; Y = tile row (same formula)
-    LDA $5C
-    DEC                  ; DEC A (opcode 3A): col base − 1
-    ASL
-    SEC
-    SBC $DD
-    CLC
-    ADC $1D9A
-    AND #$001F
+    SBC.w #!Map_RowStride ; index of (col, row-1)
     TAX
-    JSR Sub_1B36         ; → A = VRAM index(col', row)
+    LDA.l !Map_TileProps,X ; 16-bit: (col, row-1) and its right neighbour
+    INC                  ; +1 lands in (col, row-1)
+    STA.l !Map_TileProps,X
+    SEP #$20             ; A → 8-bit
+    STZ.b !TileAnim_PairCount ; one pair of tiles
+    JSR Audio_PlayTileSfxA
+    REP #$20             ; A → 16-bit
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D7C
-    STA $09D2            ; BG scroll VRAM word 4
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginY
+    CLC
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36         ; → A = VRAM index(col', row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4            ; BG scroll VRAM word 5
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36         ; → A = VRAM index(col'+1, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6            ; BG scroll VRAM word 6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36         ; → A = VRAM index(col'+1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8            ; BG scroll VRAM word 7
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginX
+    CLC
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginY
+    CLC
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
+    TYA
+    PHA
+    INC
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    TXA
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
+    PLY
+    TXA
+    INC
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
+    TYA
+    INC
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    TXA
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
     SEP #$20             ; A → 8-bit
-    LDA #$10
-    TSB $5F              ; set bit 4 of dp:$5F (scroll-update trigger)
-    BRL $087D            ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
+
+; ============================================================
+; $C0:1B36 — Bg_TilemapIndex64x32 (29 bytes, $1B36–$1B52)
+; (was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap
+; made of two 32x32 screens side by side.
+; On entry (M=0): A = tile row (0-31), Y = tile column (0-63).
+; Returns A = row*32 + column for columns 0-31, or
+;             row*32 + (column-32) + $0400 for columns 32-63.
+; (Earlier comments had the row and column inputs swapped.)
+; Called by the Mode*_Handlers and DefaultHandler; uses Eng_Scratch.
+; ============================================================
+org $C01B36
+Bg_TilemapIndex64x32:
+    ASL
+    ASL
+    ASL
+    ASL
+    ASL                  ; row × 32
+    STA.b !Bg_RowWordOfs
+    TYA                  ; A = column
+    CMP.w #!Bg_ScreenWidth
+    BCS .rowhi           ; right-hand screen
+    CLC
+    ADC.b !Bg_RowWordOfs ; row*32 + column
+    RTS
+.rowhi:
+    SEC
+    SBC.w #!Bg_ScreenWidth ; column - 32
+    CLC
+    ADC.b !Bg_RowWordOfs
+    CLC
+    ADC.w #!Bg_ScreenWords ; + the left screen's $400 words
+    RTS
 
 ; ============================================================
 ; $C0:0E5F — ModeEC_Handler (437 bytes, $0E5F–$1013)
-; Mode-$EC scroll-map update. BRL target from Sub_0C76 bit-4 dispatch
-; (mode $EC case, raw offset $00FF from $0D5D).
-; On entry: A=$EC (current mode), X=layer index, M=1, X/Y=16-bit.
-;
-; Prologue: updates 4 entries in the $7E:3000 mode table
-; (current, current+1, current-$100, current-$101), each incremented
-; by 1. Sets dp:$60=$01 (vs STZ in ModeE6_Handler), then calls
-; Sub_1B90 (SPC audio). Confirmed: both Sub_1B36 and Sub_1B90 reused.
-;
-; Computation: 4 passes × 4 VRAM corner indices = 16 JSR Sub_1B36 calls,
-; storing to $09CA–$09E8 (vs 8 calls/$09CA–$09D8 in mode $E6).
-; Pass 1: row=$5B,   col=$5C   (note: uses LDX $5B; TXA anomaly)
-; Pass 2: row=$5B,   col=$5C−1
-; Pass 3: row=$5B+1, col=$5C
-; Pass 4: row=$5B+1, col=$5C−1
-; Ends by setting bit 4 of dp:$5F and BRL to $16DC (default handler).
+; Tile animation for map-tile state $EC: a 2x2 block, columns
+; col..col+1, rows row-1..row. Same shape as ModeE6_Handler; 4 passes.
+; On entry: A = $EC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C00E5F
 ModeEC_Handler:
     INC A                   ; $EC → $ED
-    STA.l $7E3000,X         ; update current layer entry
-    INX                     ; advance to next layer entry
-    LDA.l $7E3000,X         ; load next entry (M=1, byte load)
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    INX                     ; X = tile (col+1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update next entry
+    STA.l !Map_TileProps,X  ; tile (col+1, row)
     REP #$20                ; M → 0 (16-bit A)
-    TXA                     ; A = X (16-bit layer index)
+    TXA
     SEC
-    SBC #$0100              ; A = X − $0100
-    TAX                     ; X = previous block
+    SBC.w #!Map_RowStride   ; A = index of (col+1, row-1)
+    TAX
     SEP #$20                ; M → 1 (8-bit A)
-    LDA.l $7E3000,X         ; load entry at X−$100
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update it
-    DEX                     ; X = X − 1
-    LDA.l $7E3000,X         ; load entry at X−$101
+    STA.l !Map_TileProps,X
+    DEX                     ; (col, row-1)
+    LDA.l !Map_TileProps,X  ; load entry at (col, row-1)
     INC A
-    STA.l $7E3000,X         ; update it
+    STA.l !Map_TileProps,X
     LDA #$01
-    STA $60                 ; dp:$60 = $01 (vs STZ in ModeE6_Handler)
-    JSR Sub_1B90            ; SPC audio command $19
-    ; --- Computation block: 4 passes × 4 VRAM corner indices ---
+    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
+    JSR Audio_PlayTileSfxA
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20                ; M → 0 (16-bit A)
-    LDA $1D0A               ; scroll X base (abs 16-bit)
-    STA $DB                 ; dp:$DB/$DC
-    LDA $1D0E               ; scroll Y base
-    STA $DD                 ; dp:$DD/$DE
-    ; --- Pass 1: row=$5B, col=$5C → $09CA–$09D0 ---
-    ; (anomaly: uses LDX $5B / TXA instead of LDA $5B)
-    LDX $5B                 ; X = dp:$5B (row base, 16-bit X load)
-    TXA                     ; A = row base (16-bit)
-    ASL                     ; A = row*2
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
+    TXA
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB                 ; A = row*2 − $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99               ; + row adjustment
-    AND #$003F              ; wrap to 64 rows
-    TAY                     ; Y = tile row
-    LDA $5C                 ; A = col base
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F              ; wrap to 32 cols
-    TAX                     ; X = tile col
-    JSR Sub_1B36            ; A = VRAM index(col, row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C               ; + VRAM base
-    STA $09CA               ; VRAM word 0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC               ; VRAM word 1
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col+1, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE               ; VRAM word 2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0               ; VRAM word 3
-    ; --- Pass 2: row=$5B, col=$5C−1 → $09D2–$09D8 ---
-    LDA $5B                 ; A = row base (normal LDA this time)
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col − 1 (DEC A = 3A)
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col−1, row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2               ; VRAM word 4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4               ; VRAM word 5
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6               ; VRAM word 6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8               ; VRAM word 7
-    ; --- Pass 3: row=$5B+1, col=$5C → $09DA–$09E0 ---
-    LDA $5B
-    INC                     ; row + 1 (INC A = 1A)
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
+    ; --- Pass 3: map tile (col+1, row) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL                     ; col unchanged (no DEC)
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA               ; VRAM word 8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC               ; VRAM word 9
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE               ; VRAM word 10
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0               ; VRAM word 11
-    ; --- Pass 4: row=$5B+1, col=$5C−1 → $09E2–$09E8 ---
-    LDA $5B
-    INC                     ; row + 1
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
+    ; --- Pass 4: map tile (col+1, row-1) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col − 1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2               ; VRAM word 12
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4               ; VRAM word 13
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6               ; VRAM word 14
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8               ; VRAM word 15
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
     SEP #$20                ; A → 8-bit
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F (scroll-update trigger)
-    BRL $06C8               ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:1014 — ModeEE_Handler (437 bytes, $1014–$11C8)
-;
-; Scroll mode $EE handler: updates 4 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 16 tilemap
-; corners (4 passes × 4 corners), storing to $09CA–$09E8.
-;
-; Row range: $5B−1, $5B  (negative direction vs Mode-EC)
-; Col range: $5C, $5C−1
-;
-; Differences from ModeEC_Handler:
-;   - Step 2 uses DEX (not INX) → updates current−1 (not +1)
-;   - Step 4 uses INX (not DEX) → lands at current−$100
-;   - JSR Sub_1B90 is called BEFORE STA $60 (reversed from EC)
-;   - Pass 1 row: LDX $5B; TXA; DEC; ASL (row−1, LDX anomaly)
-;   - Pass 2 row: LDA $5B; DEC; ASL  (row−1 without LDX)
-;   - Passes 3–4 row: LDA $5B; ASL   (row, no dec/inc)
-;   - Passes 1,3 col: LDA $5C; ASL   (col, no dec)
-;   - Passes 2,4 col: LDA $5C; DEC; ASL (col−1)
-;   - Tail BRL: raw offset $0513 → $16DC
+; Tile animation for map-tile state $EE: a 2x2 block, columns
+; col-1..col, rows row-1..row (ModeEC_Handler mirrored). 4 passes.
+; On entry: A = $EE, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C01014
 ModeEE_Handler:
-    ; --- Prologue: update 4 mode-table entries (51 bytes) ---
-    INC A                   ; mode byte $EE → $EF
-    STA.l $7E3000,X         ; update current entry
-    DEX                     ; X → current−1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 4 tiles ---
+    INC A                   ; tile state $EE → $EF
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    DEX                     ; X = tile (col-1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−1
+    STA.l !Map_TileProps,X  ; tile (col-1, row)
     REP #$20                ; M → 0 (16-bit A)
     TXA
     SEC
-    SBC #$0100              ; A = current−1−$100 = current−$101
+    SBC.w #!Map_RowStride   ; A = index of (col-1, row-1)
     TAX
     SEP #$20                ; M → 1 (8-bit A)
-    LDA.l $7E3000,X         ; load current−$101
+    LDA.l !Map_TileProps,X  ; tile (col-1, row-1)
     INC A
-    STA.l $7E3000,X         ; update current−$101
-    INX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col-1, row-1)
+    INX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
-    JSR Sub_1B90            ; SPC audio command $19 (called BEFORE STA $60)
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
+    JSR Audio_PlayTileSfxA            ; (before setting TileAnim_PairCount here)
     LDA #$01
-    STA $60                 ; dp:$60 = $01
+    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
 
-    ; --- Computation header: load scroll bases (12 bytes) ---
-    REP #$20                ; M → 0 (16-bit A for all computation below)
-    LDA $1D0A               ; scroll X base
-    STA $DB                 ; dp:$DB/$DC
-    LDA $1D0E               ; scroll Y base
-    STA $DD                 ; dp:$DD/$DE
+    ; --- VRAM addresses of the 8x8 tiles ---
+    REP #$20                ; M → 0 (16-bit A)
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly: uses LDX+TXA instead of LDA, same as ModeEC pass 1)
-    LDX $5B                 ; X = dp:$5B (16-bit, row base)
-    TXA                     ; A = row base
-    DEC                     ; A = row−1
-    ASL                     ; A = (row−1)×2
+    ; --- Pass 1: map tile (col-1, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
+    TXA
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C                 ; A = col base (16-bit load from dp:$5C/$5D)
-    ASL                     ; A = col×2
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(row−1, col)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(row, col)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(row−1, col+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(row, col+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 2: map tile (col-1, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = $5B×2, col = $5C×2 → $09DA–$09E0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 3: map tile (col, row) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = $5B×2, col = ($5C−1)×2 → $09E2–$09E8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 4: map tile (col, row-1) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Tail (9 bytes) ---
+
     SEP #$20                ; A → 8-bit
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F
-    BRL $0513               ; raw offset → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:11C9 — ModeFA_Handler (651 bytes, $11C9–$1453)
-;
-; Scroll mode $FA handler: updates 6 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 24 tilemap
-; corners (6 passes × 4 corners), storing to $09CA–$09F8.
-;
-; Row range: $5B, $5B+1  (positive direction, same as EC)
-; Col range: $5C, $5C−1, $5C−2  (3 columns)
-;
-; dp:$60 set to $02 (vs $01 for EC/EE)
-; JSR Sub_1B90 called before STA $60 (same as EE)
-; Pass 1 uses LDX $5B anomaly (no DEC/INC, same as EC/EC)
-; Passes 3,6 use double DEC for col (col−2)
+; Tile animation for map-tile state $FA: a 2-wide, 3-tall block,
+; columns col..col+1, rows row-2..row. 6 passes.
+; On entry: A = $FA, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C011C9
 ModeFA_Handler:
-    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
-    INC A                   ; mode byte $FA → $FB
-    STA.l $7E3000,X         ; update current
-    INX                     ; X → current+1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 6 tiles ---
+    INC A                   ; tile state $FA → $FB
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    INX                     ; X = tile (col+1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current+1
+    STA.l !Map_TileProps,X  ; tile (col+1, row)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current+1−$100 = current−$FF
+    SBC.w #!Map_RowStride   ; A = index of (col+1, row-1)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$FF
-    DEX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col+1, row-1)
+    DEX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−$200
+    SBC.w #!Map_RowStride   ; A = index of (col, row-2)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$200
-    INX                     ; X → current−$1FF
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col, row-2)
+    INX                     ; X = tile (col+1, row-2)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$1FF
-    JSR Sub_1B90            ; SPC audio command $19
+    STA.l !Map_TileProps,X  ; tile (col+1, row-2)
+    JSR Audio_PlayTileSfxA
     LDA #$02
-    STA $60                 ; dp:$60 = $02
+    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
 
-    ; --- Computation header (12 bytes) ---
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
-    LDA $1D0A
-    STA $DB
-    LDA $1D0E
-    STA $DD
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = $5B×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly: no DEC/INC on row)
-    LDX $5B
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
     TXA
-    ASL
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = $5B×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = $5B×2, col = ($5C−2)×2 → $09DA–$09E0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 3: map tile (col, row-2) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = ($5B+1)×2, col = $5C×2 → $09E2–$09E8 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 4: map tile (col+1, row) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Pass 5: row = ($5B+1)×2, col = ($5C−1)×2 → $09EA–$09F0 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 5: map tile (col+1, row-1) → TileAnim_VramAddrs+32..+38 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+32 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+34 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+36 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+38 ; bottom-right 8x8 tile
 
-    ; --- Pass 6: row = ($5B+1)×2, col = ($5C−2)×2 → $09F2–$09F8 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 6: map tile (col+1, row-2) → TileAnim_VramAddrs+40..+46 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+40 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+42 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+44 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+46 ; bottom-right 8x8 tile
 
-    ; --- Tail (9 bytes) ---
+
     SEP #$20
-    LDA #$10
-    TSB $5F
-    BRL $0288               ; raw offset → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:1454 — ModeFC_Handler (648 bytes, $1454–$16DB)
-;
-; Scroll mode $FC handler: updates 6 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 24 tilemap
-; corners (6 passes × 4 corners), storing to $09CA–$09F8.
-;
-; Row range: $5B−1, $5B  (negative direction, like EE)
-; Col range: $5C, $5C−1, $5C−2  (3 columns)
-;
-; dp:$60 set to $02 (same as FA)
-; JSR Sub_1B90 called before STA $60 (same as EE/FA)
-; Pass 1 uses LDX $5B anomaly WITH DEC (like ModeEE pass 1)
-; Passes 3,6 use double DEC for col (col−2)
-; NO tail BRL — falls through directly to $16DC (DefaultModeHandler)
+; Tile animation for map-tile state $FC: a 2-wide, 3-tall block,
+; columns col-1..col, rows row-2..row (ModeFA_Handler mirrored).
+; 6 passes; falls through into DefaultHandler.
+; On entry: A = $FC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C01454
 ModeFC_Handler:
-    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
-    INC A                   ; mode byte $FC → $FD
-    STA.l $7E3000,X         ; update current
-    DEX                     ; X → current−1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 6 tiles ---
+    INC A                   ; tile state $FC → $FD
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    DEX                     ; X = tile (col-1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−1
+    STA.l !Map_TileProps,X  ; tile (col-1, row)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−1−$100 = current−$101
+    SBC.w #!Map_RowStride   ; A = index of (col-1, row-1)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$101
-    INX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col-1, row-1)
+    INX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−$200
+    SBC.w #!Map_RowStride   ; A = index of (col, row-2)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$200
-    DEX                     ; X → current−$201
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col, row-2)
+    DEX                     ; X = tile (col-1, row-2)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$201
-    JSR Sub_1B90            ; SPC audio command $19
+    STA.l !Map_TileProps,X  ; tile (col-1, row-2)
+    JSR Audio_PlayTileSfxA
     LDA #$02
-    STA $60                 ; dp:$60 = $02
+    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
 
-    ; --- Computation header (12 bytes) ---
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
-    LDA $1D0A
-    STA $DB
-    LDA $1D0E
-    STA $DD
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly WITH DEC, same as ModeEE pass 1)
-    LDX $5B
+    ; --- Pass 1: map tile (col-1, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
     TXA
-    DEC                     ; row−1
-    ASL
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 2: map tile (col-1, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = ($5B−1)×2, col = ($5C−2)×2 → $09DA–$09E0 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 3: map tile (col-1, row-2) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = $5B×2, col = $5C×2 → $09E2–$09E8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 4: map tile (col, row) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Pass 5: row = $5B×2, col = ($5C−1)×2 → $09EA–$09F0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 5: map tile (col, row-1) → TileAnim_VramAddrs+32..+38 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+32 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+34 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+36 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+38 ; bottom-right 8x8 tile
 
-    ; --- Pass 6: row = $5B×2, col = ($5C−2)×2 → $09F2–$09F8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 6: map tile (col, row-2) → TileAnim_VramAddrs+40..+46 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+40 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+42 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+44 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+46 ; bottom-right 8x8 tile
 
-    ; --- Tail (6 bytes, no BRL — falls through to $16DC) ---
+
     SEP #$20
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
 
 ; ============================================================
 ; $C0:16DC — DefaultHandler (509 bytes, $16DC–$18D8)
-; The "all other modes" arm of Sub_0C76's per-frame dispatch.
-; Reached by two BRL paths from Sub_0C76 (bit-4 clear at $0D42,
-; and fall-through .default_mode at $0D75) and by fall-through
-; from ModeFC_Handler.
-;
-; Structurally distinct from the named mode handlers (E6/EC/EE/FA/FC):
-;   • Uses dp:$5D/$5E as the layer-state index (vs $5B/$5C)
-;   • VRAM write slots $09B2–$09B8 (vs $09CA–$09FA in named handlers)
-;   • Calls Sub_1BA7 (dp:$FB variant of Sub_1B90) instead of Sub_1B90
-;   • Bit-5 section drives a display-mode transition loop:
-;     loops JSR $885A / JSR $00BF until dp:$38 == 0, then selects
-;     one of four per-mode branches (dp:$45 = 1–4) that call
-;     mode-specific renderers ($75E9/$78EC/$7CB5/$74xx) and
-;     tail-call Sub_EC60 via BRL $Dxxx.
-;   • Bit-0 section handles scene-swap (JSR $024C probe, then
-;     JSL $C02C41 / $C10000 init and reinit of dp:$17/$18).
-;
+; The rest of Field_SceneChangeTick's request handling: reached by BRL
+; when Field_SceneFlags bit 4 is clear or the tile mode is not one of
+; the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by
+; fall-through from ModeFC_Handler. Three independent requests:
+;   bit 1 (SceneFlag_TileStep)  advance the single map tile at
+;         Field_TileStepX/Y if its state is $FE or $E0, play
+;         Audio_SfxTileAnimB and queue its four 8x8-tile VRAM
+;         addresses in TileAnim_StepVramAddrs (VramQueue_TileStep).
+;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + VBlankHandler
+;         frames until Field_Unk38 clears, then redraw map layers
+;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
+;         tail into Sub_EC60.
+;   bit 0 (SceneFlag_Battle)    unless Scene_Unk024C returns carry,
+;         enter the battle engine (JSL EngCall_BattleMain), then
+;         reinstall the interrupt handlers and rebuild the field;
+;         either way set FadeFlag_AfterBattle and finish with
+;         Field_IdleFrame.
+; Earlier notes called bit 5 a "display-mode transition" and bit 0 a
+; "scene swap"; the JSL into bank $C1 identifies bit 0 as the battle.
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100.
-; Exits via RTS (two paths), or BRL tail-calls to Sub_EC60 ($EC60)
-; or to $00EB (JSR $881E + JSR $00DE + BRL $EC60 fragment).
 ; ============================================================
 org $C016DC
 DefaultHandler:
-    ; --- Bit 1 check: VRAM update needed? ---
-    LDA $17                 ; dp:$17 = transition flag byte
-    BIT #$02                ; test bit 1 (VRAM-update-needed flag)
-    BNE .vram_update        ; bit 1 set → do VRAM work
-    BRL $008B               ; bit 1 clear → skip to .bit5_check ($1770)
-                            ; raw signed offset $008B; target $16E5+$8B=$1770
+    ; --- Bit 1: single-tile step ---
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_TileStep
+    BNE .vram_update
+    BRL .bit5_check
 
 .vram_update:
-    ; Clear flag, trigger SPC command, scan layer-state entry
-    STZ $61                 ; dp:$61 = 0 (sub-index for state scan)
-    LDA #$02
-    TRB $17                 ; clear bit 1
-    JSR Sub_1BA7            ; send SPC command using dp:$FB
-    LDX $5D                 ; X = layer-state index (dp:$5D, 16-bit)
-    LDA.l $7E3000,X         ; load current mode byte from layer-state table
-    CMP #$FE                ; terminal state $FE?
-    BEQ .do_advance         ; yes → advance
-    INC $61                 ; no → sub-index = 1
-    CMP #$E0                ; state $E0?
-    BEQ .do_advance         ; yes → advance
-    BRA .bit5_check         ; no → skip computation (BRA off=$70 → $1770)
+    STZ.b !TileAnim_StepKind
+    LDA.b #!SceneFlag_TileStep
+    TRB.b !Field_SceneFlags
+    JSR Audio_PlayTileSfxB
+    LDX.b !Field_TileStepX  ; 16-bit: Map_TileProps index
+    LDA.l !Map_TileProps,X
+    CMP.b #!TileAnim_StateFE
+    BEQ .do_advance
+    INC.b !TileAnim_StepKind ; 1 = the $E0 kind
+    CMP.b #!TileAnim_StateE0
+    BEQ .do_advance
+    BRA .bit5_check         ; any other state: nothing to do
 
 .do_advance:
-    INC A                   ; advance mode byte ($FE→$FF, $E0→$E1)
-    STA.l $7E3000,X         ; write back to layer-state table
+    INC A                   ; $FE → $FF, $E0 → $E1
+    STA.l !Map_TileProps,X
 
-    ; --- VRAM computation (M=0, 16-bit A) ---
-    ; Computes 4 VRAM scroll-map word indices using dp:$5D (col-like)
-    ; and dp:$5E (row-like) via Sub_1B36, writes to $09B2–$09B8.
+    ; --- VRAM addresses of the tile's four 8x8 tiles (as Mode*_Handler) ---
     REP #$20
-    LDA $1D0A               ; scroll param (16-bit abs read)
-    STA $DB                 ; dp:$DB/$DC = col base
-    LDA $1D0E
-    STA $DD                 ; dp:$DD/$DE = row base
-
-    ; Row: (X * 2 - $1D0A + $1D99) & $3F
-    TXA                     ; A = X (layer-state index as col input)
-    ASL                     ; A = X * 2
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+    TXA                     ; index: low byte = column
+    ASL                     ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB                 ; A -= col base
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99               ; A += $1D99
-    AND #$003F              ; mask to 6 bits
-    TAY                     ; Y = row
-
-    ; Col: ($5E * 2 - $1D0E + $1D9A) & $1F
-    LDA $5E                 ; dp:$5E (16-bit)
-    ASL                     ; A = $5E * 2
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                     ; Y = tilemap column (0-63)
+    LDA.b !Field_TileStepY
+    ASL
     SEC
-    SBC $DD                 ; A -= row base
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A               ; A += $1D9A
-    AND #$001F              ; mask to 5 bits
-    TAX                     ; X = col (also in A)
-
-    ; Pass 1: (col, row) → $09B2
-    JSR Sub_1B36            ; A = VRAM tile index (A=col, Y=row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                     ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C               ; + tilemap base
-    STA $09B2               ; VRAM slot 1
-
-    ; Pass 2: (col, row+1) → $09B4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs ; top-left 8x8 tile
     TYA
-    PHA                     ; save row
+    PHA
     INC A
-    AND #$003F
-    TAY                     ; Y = row+1
-    TXA                     ; A = col (X preserved through Sub_1B36)
-    JSR Sub_1B36
+    AND.w #!Bg_ColMask64
+    TAY                     ; column + 1
+    TXA
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B4               ; VRAM slot 2
-
-    ; Pass 3: (col+1, row) → $09B6
-    PLY                     ; Y = original row (restored)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+2 ; top-right
+    PLY                     ; column
     TXA
     INC A
-    AND #$001F
-    TAX                     ; X = col+1 (also in A)
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                     ; row + 1
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B6               ; VRAM slot 3
-
-    ; Pass 4: (col+1, row+1) → $09B8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+4 ; bottom-left
     TYA
     INC A
-    AND #$003F
-    TAY                     ; Y = row+1
-    TXA                     ; A = col+1 (X still = col+1)
-    JSR Sub_1B36
+    AND.w #!Bg_ColMask64
+    TAY                     ; column + 1
+    TXA
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B8               ; VRAM slot 4
-
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+6 ; bottom-right
     SEP #$20                ; M=1 (8-bit A)
-    LDA #$02
-    TSB $5F                 ; set bit 1 of dp:$5F (VRAM-done flag)
-
+    LDA.b #!VramQueue_TileStep
+    TSB.b !Field_VramQueueFlags ; TileAnim_StepVramAddrs ready
 .bit5_check:
-    ; --- Bit 5 check: display-mode transition? ---
-    LDA $17
-    BIT #$20                ; test bit 5
-    BNE .bit5_set           ; bit 5 set → run transition
-    BRL $0113               ; bit 5 clear → .bit0_check ($188C)
-                            ; raw offset $0113; target $1779+$0113=$188C
+    ; --- Bit 5: map layer redraw ---
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_MapRedraw
+    BNE .bit5_set
+    BRL .bit0_check
 
 .bit5_set:
-    LDA #$20
-    TRB $17                 ; clear bit 5
+    LDA.b #!SceneFlag_MapRedraw
+    TRB.b !Field_SceneFlags
 
-    ; Loop: JSR $885A (main frame work) + JSR $00BF (VBlankHandler)
-    ; until dp:$38 == 0, then do post-loop work.
+    ; Run Field_Unk885A + VBlankHandler frames until it clears Field_Unk38
     LDA #$01
-    STA $38                 ; dp:$38 = 1 (loop guard / retry flag)
+    STA.b !Field_Unk38
 
 .loop_885A:
-    JSR $885A               ; frame work (large unmatched routine)
-    JSR $00BF               ; VBlankHandler ($00BF)
-    LDA $38
-    BEQ .loop_done          ; dp:$38 == 0 → exit loop
-    JSR $EC60               ; post-VBlank work (Sub_EC60)
+    JSR Field_Unk885A
+    JSR VBlankHandler
+    LDA.b !Field_Unk38
+    BEQ .loop_done
+    JSR Sub_EC60
     BRA .loop_885A
 
 .loop_done:
-    JSR $AF4E               ; unknown routine
-    JSL $FDFFF7             ; wait/sync (FD bank)
-    JSR $EC60               ; post-VBlank work
+    JSR Field_UnkAF4E
+    JSL FdVec_FFF7
+    JSR Sub_EC60
 
-    ; --- Mode dispatch on dp:$45 (transition sub-mode 1–4) ---
-    LDA $45
+    ; --- Redraw per Field_MapRedrawSel (1-4) ---
+    LDA.b !Field_MapRedrawSel
     CMP #$01
     BNE .not_mode1
 
-    ; dp:$45 == 1
+    ; 1: Field_BuildC800Mode1
     PHD
     REP #$20
-    LDA #$1D00
-    TCD                     ; DP = $1D00
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00 for the builders
     SEP #$20
-    JSR $75E9               ; mode-1 renderer (DP=$1D00 context)
-    PLD                     ; restore DP
-    JSR $74D4
-    JSR $00DE               ; VBlankHandlerShort
+    JSR Field_BuildC800Mode1
+    PLD
+    JSR Field_Unk74D4
+    JSR VBlankHandlerShort
     LDA #$01
-    STA $46                 ; dp:$46 = 1
-    STZ $45                 ; dp:$45 = 0
-    JSR $EC60
-    JSR $00DE
-    JSR $87F1               ; unknown finalizer
-    BRL $D49B               ; tail → Sub_EC60 ($EC60); raw=$D49B
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
+    JSR Sub_EC60
+    JSR VBlankHandlerShort
+    JSR Field_Unk87F1
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode1:
     CMP #$02
     BNE .not_mode2
 
-    ; dp:$45 == 2
+    ; 2: Field_BuildC800Mode2
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR $78EC               ; mode-2 renderer (DP=$1D00 context)
+    JSR Field_BuildC800Mode2
     PLD
-    JSR $74E8
-    JSR $00DE
+    JSR Field_Unk74E8
+    JSR VBlankHandlerShort
     LDA #$02
-    STA $46
-    STZ $45
-    JSR $EC60
-    JSR $00DE
-    JSR $87F1
-    BRL $D472               ; tail → Sub_EC60; raw=$D472
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
+    JSR Sub_EC60
+    JSR VBlankHandlerShort
+    JSR Field_Unk87F1
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode2:
     CMP #$03
     BEQ .mode3
-    BRL $006D               ; not 3 → .chk_mode4 ($1862); raw=$006D
+    BRL .chk_mode4
 
 .mode3:
-    ; dp:$45 == 3 (two-pass renderer with $7C/$82 swap)
+    ; 3: Mode1, then Mode2 and Mode1 again with the two tilemap bases
+    ;    swapped around each (so both tilemaps get drawn)
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR $75E9               ; first pass renderer
+    JSR Field_BuildC800Mode1
     PLD
-    JSR $00DE
+    JSR VBlankHandlerShort
     LDA #$03
-    STA $46
-    STZ $45
-    JSR $EC60
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
+    JSR Sub_EC60
 
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR $78EC               ; second pass renderer
-    LDX $7C                 ; save dp:$7C (16-bit)
+    JSR Field_BuildC800Mode2
+    LDX.b !Map_TilemapVram-!DP_Map ; swap the two tilemap bases (DP=$1D00)
     PHX
-    LDX $82
-    STX $7C
+    LDX.b !Map_TilemapVram2-!DP_Map
+    STX.b !Map_TilemapVram-!DP_Map
     PLX
-    STX $82                 ; swap dp:$7C and dp:$82
+    STX.b !Map_TilemapVram2-!DP_Map
     PLD
-    JSR $74D4
-    JSR $74E8
-    JSR $00DE
+    JSR Field_Unk74D4
+    JSR Field_Unk74E8
+    JSR VBlankHandlerShort
     LDA #$02
-    STA $46
-    JSR $EC60
+    STA.b !Field_MapRedrawDone
+    JSR Sub_EC60
 
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR $75E9               ; third pass renderer
-    LDX $7C                 ; swap dp:$7C and dp:$82 again
+    JSR Field_BuildC800Mode1
+    LDX.b !Map_TilemapVram-!DP_Map ; swap them back
     PHX
-    LDX $82
-    STX $7C
+    LDX.b !Map_TilemapVram2-!DP_Map
+    STX.b !Map_TilemapVram-!DP_Map
     PLX
-    STX $82
+    STX.b !Map_TilemapVram2-!DP_Map
     PLD
-    JSR $74D4
-    JSR $00DE
+    JSR Field_Unk74D4
+    JSR VBlankHandlerShort
     LDA #$01
-    STA $46
-    JSR $EC60
-    JSR $00DE
-    JSR $87F1
-    BRL $D3FE               ; tail → Sub_EC60; raw=$D3FE
+    STA.b !Field_MapRedrawDone
+    JSR Sub_EC60
+    JSR VBlankHandlerShort
+    JSR Field_Unk87F1
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .chk_mode4:
     CMP #$04
-    BNE .exit               ; none of 1–4 → RTS
+    BNE .exit               ; none of 1-4
 
-    ; dp:$45 == 4
+    ; 4: Field_BuildC800Mode4
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR $7CB5               ; mode-4 renderer (DP=$1D00 context)
+    JSR Field_BuildC800Mode4
     PLD
-    JSR $74F7
-    JSR $00DE
+    JSR Field_Unk74F7
+    JSR VBlankHandlerShort
     LDA #$04
-    STA $46
-    STZ $45
-    JSR $EC60
-    JSR $00DE
-    JSR $87F1
-    JSR $EC60
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
+    JSR Sub_EC60
+    JSR VBlankHandlerShort
+    JSR Field_Unk87F1
+    JSR Sub_EC60
 
 .exit:
     RTS
 
-    ; --- Bit 0 check: scene-swap init (reached via BRL $0113 from .bit5_check) ---
+    ; --- Bit 0: battle ---
 .bit0_check:
-    ; A still holds dp:$17 from .bit5_check
-    BIT #$01                ; test bit 0 (scene-swap pending)
-    BEQ .exit2              ; bit 0 clear → RTS
-    JSR $024C               ; scene-state probe; C=1 → quick clear, C=0 → full init
-    BCS .clear_bit0         ; carry set → quick path
+    ; A still holds Field_SceneFlags from .bit5_check
+    BIT.b #!SceneFlag_Battle
+    BEQ .exit2
+    JSR Scene_Unk024C
+    BCS .clear_bit0         ; carry set → no battle after all
 
-    ; Full scene-swap init path
-    JSL $C02C41             ; unknown cross-bank init
-    LDA #$80
-    TSB $53                 ; set bit 7 of dp:$53 (DMA inhibit?)
-    JSR $00DE               ; VBlankHandlerShort
-    LDA #$80
-    TRB $53                 ; clear bit 7
-    JSR $EC60               ; post-VBlank
-    JSL $C10000             ; bank-C1 init
-    JSR $0B64               ; InstallNMI
-    JSR $0B75               ; InstallIRQ
+    JSL ScrollStepAccum
+    LDA.b #!Field_Unk53Bit7
+    TSB.b !Field_Unk53
+    JSR VBlankHandlerShort
+    LDA.b #!Field_Unk53Bit7
+    TRB.b !Field_Unk53
+    JSR Sub_EC60
+    JSL EngCall_BattleMain  ; the battle (bank $C1)
+    JSR InstallNMI          ; back in the field: reinstall our handlers
+    JSR InstallIRQ
     REP #$20
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                     ; DP = $0100
     SEP #$20
-    LDA #$01
-    TRB $17                 ; clear bit 0 of dp:$17
-    LDA #$01
-    TSB $18                 ; set bit 0 of dp:$18
-    JSR $0283               ; unknown scene post-init
-    JSR $28E1               ; unknown scene post-init
-    JSR $E935               ; unknown scene post-init
-    JSR $00EB               ; JSR $881E + JSR $00DE + BRL $EC60 fragment
+    LDA.b #!SceneFlag_Battle
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_AfterBattle
+    TSB.b !Field_FadeFlags
+    JSR Scene_Unk0283       ; rebuild the field
+    JSR TileAnimList_ApplyAll
+    JSR SprBuf_FreeAll
+    JSR Field_IdleFrame
 
 .exit2:
     RTS
 
 .clear_bit0:
-    ; Quick clear path (C=1 from JSR $024C)
-    LDA #$01
-    TRB $17                 ; clear bit 0
-    LDA #$01
-    TSB $18                 ; set bit 0 of dp:$18
-    BRL $E812               ; tail → $00EB fragment; raw=$E812
+    LDA.b #!SceneFlag_Battle
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_AfterBattle
+    TSB.b !Field_FadeFlags
+    BRL Field_IdleFrame
 
 ; ============================================================
-; $C0:1BA7 — Sub_1BA7 (4 bytes, $1BA7–$1BAA)
-; Variant entry of Sub_1B90 that loads dp:$FB as the first
-; SPC command argument instead of dp:$FC.
-; Branches into Sub_1B90_body (STA $1E01 onward) to share the
-; rest of the implementation.
-; Called from DefaultHandler at $16EB.
+; $C0:1BA7 — Audio_PlayTileSfxB (4 bytes, $1BA7–$1BAA)
+; (was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as
+; Audio_PlayTileSfxA with the other effect id, sharing its tail
+; Audio_PlaySfxAtLeader. Called from DefaultHandler.
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit).
 ; ============================================================
 org $C01BA7
-Sub_1BA7:
-    LDA $FB                 ; dp:$FB = SPC arg 0 (vs $FC in Sub_1B90)
-    BRA Sub_1B90_body       ; join Sub_1B90 at STA $1E01
+Audio_PlayTileSfxB:
+    LDA.b !Audio_SfxTileAnimB ; effect id (Audio_PlayTileSfxA uses Audio_SfxTileAnimA)
+    BRA Audio_PlaySfxAtLeader ; shared tail
 
 ; ============================================================
-; $C0:CB0A — Sub_CB0A (48 bytes, $CB0A–$CB39)
-; Top-level sprite-slot init dispatcher.
-; Validates the current entity (slot $6D): skips if $1100,X bit7
-; set, $1A81,X is zero or negative, or $0F00,X is zero.
-; Then reads bits 0-1 of $1201,X (sprite type/pass index) and
-; tail-calls the matching initializer:
-;   0 → BRL Sub_CDC8 (single-slot)
-;   1 → BRL Sub_D124 (8-slot OAM init)
-;   2 → BRL Sub_DD28 (12-slot OAM init)
-;   other → CLC + RTS
-; Entry: M=1 (A 8-bit), X/Y=16-bit.
+; $C0:CB0A — Obj_BuildFrameLayout (48 bytes, $CB0A–$CB39)
+; (was Sub_CB0A.) Like Obj_BuildSpriteFrameStep, but for objects whose
+; tiles are already in VRAM: tail-calls Obj_FrameLayout4 / 8 / 12,
+; which only rewrite the SprTile records for Obj_LastFrame.
+; Entry: M=1, X/Y 16-bit.
 ; ============================================================
 org $C0CB0A
-Sub_CB0A:
-    LDX $6D                  ; entity slot index
-    LDA $1100,X              ; sprite state flag
-    BPL .cb0a_active         ; bit7 clear → entity active
+Obj_BuildFrameLayout:
+    LDX.b !Obj_Cur           ; object
+    LDA.w !Obj_Unk1100,X     ; skip when bit 7 is set
+    BPL .cb0a_active         ; bit 7 clear → build
 .cb0a_exit:
     RTS                      ; shared early-exit RTS at $CB11
 .cb0a_active:                ; $CB12
-    LDA $1A81,X              ; timer/state byte
+    LDA.w !Obj_Unk1A81,X     ; Obj_Unk1A81
     BEQ .cb0a_exit           ; zero → early exit (back to $CB11)
     BMI .cb0a_exit           ; negative → early exit (back to $CB11)
-    LDA $0F00,X              ; animation type
+    LDA.w !Obj_Unk0F00,X     ; Obj_AnimMode
     BEQ .cb0a_exit           ; zero → early exit (back to $CB11)
-    LDA $1201,X              ; sprite pass/type flags
-    AND #$03                 ; isolate bits 0-1
+    LDA.w !Obj_SprSize,X     ; size class
+    AND.b #!ObjSpr_SizeMask  ; isolate bits 0-1
     BEQ .cb0a_type0          ; == 0: single-slot
     CMP #$01
     BNE .cb0a_check2
@@ -7998,3036 +7936,2977 @@ Sub_CB0A:
     CLC
     RTS                      ; other: CLC + RTS
 .cb0a_type0:
-    BRL $0294                ; tail-call Sub_CDC8 ($CDC8)
+    BRL Obj_FrameLayout4                ; tail-call Obj_FrameLayout4 ($CDC8)
 .cb0a_type1:
-    BRL $05ED                ; tail-call Sub_D124 ($D124)
+    BRL Obj_FrameLayout8                ; tail-call Obj_FrameLayout8 ($D124)
 .cb0a_type2:
-    BRL $11EE                ; tail-call Sub_DD28 ($DD28)
+    BRL Obj_FrameLayout12                ; tail-call Obj_FrameLayout12 ($DD28)
 
 ; ============================================================
-; $C0:CB3A — Sub_CB3A (162 bytes, $CB3A–$CBDB)
-; Animation-frame gate for sprite-slot init routines.
-; Computes a frame-data pointer into dp:$D6 from entity animation
-; state ($1600,X), sprite width ($1480,X), and sprite base offset
-; ($1500,X):
-;   state = 0  → $D6 = $1500,X
-;   state = 2  → $D6 = 2×$1480,X + $1500,X
-;   state > 0  → $D6 = 3×$1480,X + $1500,X
-;   state < 0  → $D6 = $1480,X + $1500,X
-; Then adjusts $D6 by (animType×4 + animRowHi) to reach the
-; current frame entry, and reads the frame byte via [$D6]:
-;   • If byte ≠ $FF: SEC + RTS (caller should init this sprite).
-;   • If byte = $FF and anim type = 2: decrement $7F0B01,X timer;
-;     return CLC + RTS (skip until timer hits 0, then CLC + RTS).
-;   • If byte = $FF and other type: wrap $D6 back by animRowHi,
-;     store $FF into $1681,X, re-read wrapped frame byte; SEC + RTS.
-; Entry: M=1 (A 8-bit), X=0 (X/Y 16-bit); X = entity slot.
-; Exit:  SEC = proceed; CLC = skip this frame.
-; Modifies: dp:$D6 (frame ptr, 16-bit), dp:$D9 (scratch, 16-bit), A.
-; Preserves X (entity slot).
-; Called by: Sub_CBDC ($CBFE), Sub_D28A ($D28C), …
+; $C0:CB3A — Obj_AnimFrameLookup (162 bytes, $CB3A–$CBDB)
+; (was Sub_CB3A.) Returns in A the frame number object X should show:
+; Anim_FramePtr = Obj_AnimFrameTbl + (facing-dependent multiple of
+; Obj_AnimFacingStride: 0 for facing 0, 1 for negative, 2 for 2, 3
+; for the others) + row*4 + Obj_AnimColumn, row = Obj_AnimRow (or
+; Obj_AnimRowAlt in mode 2), read from bank $E4.
+;   entry ≠ $FF          → C=1, A = frame number.
+;   $FF in mode 2        → count ObjX_AnimLoops down, C=0 (no frame).
+;   $FF in other modes   → step back to the row start, set
+;                          Obj_AnimColumn = $FF, C=1 with that entry.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur. Preserves X.
 ; ============================================================
 org $C0CB3A
-Sub_CB3A:
-    LDA $1600,X             ; animation state byte
+Obj_AnimFrameLookup:
+    LDA.w !Obj_Facing,X     ; animation state byte
     BEQ .zero               ; state = 0 → base path
     CMP #$02
     BEQ .two                ; state = 2 → double path
     BPL .plus               ; state > 0, != 2 → triple path
 .neg:                       ; state < 0 (bit 7 set) → single-add path
     REP #$20
-    LDA $1480,X             ; sprite width
+    LDA.w !Obj_AnimFacingStride,X ; facing stride
     CLC
-    ADC $1500,X             ; + base offset
-    STA $D6
+    ADC.w !Obj_AnimFrameTbl,X ; + base offset
+    STA.b !Anim_FramePtr
     BRA .common
 .zero:
     REP #$20
-    LDA $1500,X             ; base offset only
-    STA $D6
+    LDA.w !Obj_AnimFrameTbl,X ; base offset only
+    STA.b !Anim_FramePtr
     BRA .common
 .plus:                      ; state > 0, not 2 → triple-add
     REP #$20
-    LDA $1480,X
-    STA $D9                 ; save width
+    LDA.w !Obj_AnimFacingStride,X
+    STA.b !Anim_Column      ; save width
     CLC
-    ADC $D9                 ; 2× width
-    ADC $D9                 ; 3× width
-    ADC $1500,X             ; + base offset
-    STA $D6
+    ADC.b !Anim_Column      ; 2× width
+    ADC.b !Anim_Column      ; 3× width
+    ADC.w !Obj_AnimFrameTbl,X ; + base offset
+    STA.b !Anim_FramePtr
     BRA .common
 .two:                       ; state = 2 → double-add
     REP #$20
-    LDA $1480,X
+    LDA.w !Obj_AnimFacingStride,X
     ASL                     ; 2× width
     CLC
-    ADC $1500,X             ; + base offset
-    STA $D6
+    ADC.w !Obj_AnimFrameTbl,X ; + base offset
+    STA.b !Anim_FramePtr
     ; fall through to .common (M=0)
 .common:
-    LDA $1681,X             ; animation row high byte (zero-extended)
-    AND #$00FF
-    STA $D9                 ; save as animRowHi
-    LDA $1780,X             ; animation type field
-    AND #$00FF
+    LDA.w !Obj_AnimColumn,X ; animation row high byte (zero-extended)
+    AND.w #!Anim_EndMarker
+    STA.b !Anim_Column      ; save as animRowHi
+    LDA.w !Obj_AnimMode,X   ; Obj_AnimMode
+    AND.w #!Anim_EndMarker
     CMP #$0002              ; type == 2?
     BNE .not_two
 .type_two:
-    LDA $1781,X             ; type-2 subfield
-    AND #$00FF
+    LDA.w !Obj_AnimRowAlt,X ; type-2 subfield
+    AND.w #!Anim_EndMarker
     ASL                     ; × 2
     ASL                     ; × 4
     CLC
-    ADC $D9                 ; + animRowHi
-    ADC $D6                 ; + base pointer
-    STA $D6                 ; → adjusted frame pointer
+    ADC.b !Anim_Column      ; + animRowHi
+    ADC.b !Anim_FramePtr    ; + base pointer
+    STA.b !Anim_FramePtr    ; → adjusted frame pointer
     SEP #$20
-    LDA [$D6]               ; read frame data byte
-    CMP #$FF
+    LDA.b [!Anim_FramePtr]  ; read frame data byte
+    CMP.b #!Anim_EndMarker
     BNE .proceed            ; not $FF → sprite is ready
-    LDA $7F0B01,X           ; countdown timer (WRAM)
+    LDA.l !ObjX_AnimLoops,X ; countdown timer (WRAM)
     DEC
     BEQ .skip_store         ; timer hit 0: just clear carry and return
-    STA $7F0B01,X           ; store decremented timer
+    STA.l !ObjX_AnimLoops,X ; store decremented timer
 .skip_store:
     CLC
     RTS                     ; not ready this frame
 .not_two:
-    LDA $1680,X             ; standard anim frame field
-    AND #$00FF
+    LDA.w !Obj_AnimRow,X    ; standard anim frame field
+    AND.w #!Anim_EndMarker
     ASL                     ; × 2
     ASL                     ; × 4
     CLC
-    ADC $D9                 ; + animRowHi
-    ADC $D6                 ; + base pointer
-    STA $D6                 ; → adjusted frame pointer
+    ADC.b !Anim_Column      ; + animRowHi
+    ADC.b !Anim_FramePtr    ; + base pointer
+    STA.b !Anim_FramePtr    ; → adjusted frame pointer
     SEP #$20
-    LDA [$D6]               ; read frame data byte
-    CMP #$FF
+    LDA.b [!Anim_FramePtr]  ; read frame data byte
+    CMP.b #!Anim_EndMarker
     BNE .proceed            ; not $FF → sprite is ready
     REP #$20
-    LDA $D6                 ; current frame pointer
+    LDA.b !Anim_FramePtr    ; current frame pointer
     SEC
-    SBC $D9                 ; subtract animRowHi → row start
-    STA $D6
+    SBC.b !Anim_Column      ; subtract animRowHi → row start
+    STA.b !Anim_FramePtr
     SEP #$20
-    LDA #$FF
-    STA $1681,X             ; mark frame row as exhausted
-    LDA [$D6]               ; re-read wrapped frame byte
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimColumn,X ; mark frame row as exhausted
+    LDA.b [!Anim_FramePtr]  ; re-read wrapped frame byte
 .proceed:
     SEC
     RTS
 
 ; ============================================================
-; $C0:CBDC — Sub_CBDC (492 bytes, $CBDC–$CDC7)
-; Single-slot, animation-gated, 16-tile sprite-slot init.
-; Sets up dp:$CF/$D2 (tile bank ptr) and dp:$CD (table ptr),
-; then either uses $1301,X directly (type-3: $1780,X==$03) or
-; calls Sub_CB3A for the animation gate.  Allocates one VRAM
-; slot via Sub_E952; if same frame as last call (CMP $0F01,X),
-; returns CLC with no work.  On new frame: copies 16 tile
-; entries ($0010 iterations) through Sub_E687/Sub_E534 into
-; WRAM via WMDATA; writes 4-entry (Y/X/attr) OAM staging data
-; to $7F:4802+slot and the DMA descriptor to $09xx; CLC RTS.
-; Entry: M=1, X/Y=16-bit; X = entity slot index.
-; Exit:  CLC always (caller checks separately if needed).
+; $C0:CBDC — Obj_BuildFrame4 (492 bytes, $CBDC–$CDC7)
+; (was Sub_CBDC.) Builds frame A (Obj_FixedFrame in mode 3, else
+; Obj_AnimFrameLookup) of a 4-tile object, in one pass. Nothing to do
+; (C=0) if it is still Obj_LastFrame or no SprBuf chunk is free.
+; Otherwise: SprBuf_Alloc1; copy the frame's 16 8x8 tiles (frame
+; record = Obj_FrameOfs + frame * 40, in Obj_FrameBank) into the
+; chunk with Spr_CopyTile / Spr_CopyTileFlipped; queue the chunk's
+; two halves for VRAM at Obj_VramTile (VramQ_*); write the 4
+; SprTileSrc records (OfsX sign-extended, OfsY, Tile = Obj_VramTile
+; + 2n, Attr = Obj_OamAttr | Obj_VramTileHi | Obj_PrioLow or, for
+; OfsY >= $E8, Obj_PrioHigh); INC Obj_State. Returns C=0.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur.
 ; ============================================================
 org $C0CBDC
-Sub_CBDC:
-    LDA $1200,X             ; tile-data bank byte
-    STA $CF
-    LDA #$7F
-    STA $D2                 ; dp:$D2 = $7F (pointer bank)
+Obj_BuildFrame4:
+    LDA.w !Obj_GfxBank,X    ; Obj_GfxBank
+    STA.b !Spr_GfxPtr+2
+    LDA.b #!Bank7F
+    STA.b !Spr_WramPtr+2    ; dp:$D2 = $7F (pointer bank)
     REP #$20
-    LDA $1280,X             ; 16-bit tile-table base address
-    STA $CD
+    LDA.w !Obj_GfxOfs,X     ; 16-bit tile-table base address
+    STA.b !Spr_GfxPtr
     SEP #$20
-    LDA #$E4
-    STA $D8                 ; palette/attr byte
-    LDA $1780,X             ; animation type field
+    LDA.b #!BankE4
+    STA.b !Anim_FramePtr+2  ; bank $E4 of Anim_FramePtr
+    LDA.w !Obj_AnimMode,X   ; Obj_AnimMode
     CMP #$03
     BNE .run_gate           ; not type-3: use animation gate
-    LDA $1301,X             ; type-3: use $1301,X directly as frame byte
+    LDA.w !Obj_FixedFrame,X ; type-3: use Obj_FixedFrame directly as frame byte
     BRA .frame_check
 .run_gate:
-    JSR $CB3A               ; animation-frame gate (Sub_CB3A)
+    JSR Obj_AnimFrameLookup               ; animation-frame gate (Obj_AnimFrameLookup)
     BCS .frame_check        ; gate passed (SEC) → proceed
     RTS                     ; gate failed (CLC) → skip
 .frame_check:
-    CMP $0F01,X             ; same frame as last?
+    CMP.w !Obj_LastFrame,X  ; same frame as last?
     BNE .new_frame
 .no_work:
     CLC
     RTS                     ; same frame → no work
 .new_frame:
-    STA $EE                 ; save frame byte
-    JSR $E952               ; single-slot allocator
+    STA.b !Spr_NewFrame     ; save frame byte
+    JSR SprBuf_Alloc1               ; single-slot allocator
     BCC .no_work            ; allocation failed → backward branch to CLC+RTS
-    LDA $EE
-    STA $0F01,X             ; record current frame
+    LDA.b !Spr_NewFrame
+    STA.w !Obj_LastFrame,X  ; record current frame
     REP #$20
-    LDX $6D
-    LDA $0D80,X             ; VRAM base for allocated slot
-    STA $D0
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X    ; Obj_TileBuf (bank-$7F chunk address)
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X             ; frame# for multiplier
-    STA $4202               ; WRMPYA
-    LDA #$28
-    STA $4203               ; WRMPYB = 40 (16 tiles × 2.5 bytes)
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X  ; frame# for multiplier
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame4_Bytes
+    STA.w WRMPYB            ; WRMPYB = 40 (16 tiles × 2.5 bytes)
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL = frame# × 40
+    LDA.w RDMPYL            ; RDMPYL = frame# × 40
     CLC
-    ADC $1380,X             ; + tile-row base → tile data pointer
-    STA $D3
+    ADC.w !Obj_FrameOfs,X   ; + tile-row base → tile data pointer
+    STA.b !Spr_FramePtr
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH = bank 1
+    STA.w WMADDH            ; WMADDH = bank 1
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL = VRAM target
-    LDA #$0010              ; loop count = 16 tiles
-    STA $C9
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL = VRAM target
+    LDA.w #!SprBuf_ChunkTiles ; loop count = 16 tiles
+    STA.b !Spr_TileCount
     LDY #$0000
     BRA .check              ; enter loop at condition check
 .next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .fd_path
-    JSR $E687               ; bank-switch tile copy
+    JSR Spr_CopyTile               ; bank-switch tile copy
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .next
     BRA .after_loop
 .fd_path:
-    JSR $E534               ; FD00-table WRAM fill
+    JSR Spr_CopyTileFlipped               ; FD00-table WRAM fill
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .next
 .after_loop:
-    ; --- OAM staging: DMA descriptor into $09xx ---
+    ; --- SprTile/SprTileSrc: DMA descriptor into $09xx ---
     SEP #$10                ; X/Y → 8-bit
-    LDX $6D
-    LDA $0D00,X             ; entity tile VRAM index (16-bit A, 8-bit X)
-    AND #$01FF              ; mask to 9-bit VRAM tile number
+    LDX.b !Obj_Cur
+    LDA.w !Obj_VramTile,X   ; object's first OAM tile number
+    AND.w #!Obj_VramTileMask ; tile number bits
     ASL
     ASL
     ASL
-    ASL                     ; × 16 = VRAM tile slot address
-    LDX $79                 ; OAM buffer write pointer
-    STA $0950,X             ; slot-A tile#
+    ASL                     ; x 16 = VRAM word address
+    LDX.b !VramQ_Pos        ; queue position
+    STA.w !VramQ_DestA,X    ; VRAM word address (tile * 16)
     CLC
-    ADC #$0100
-    STA $0970,X             ; slot-B tile# (+256)
-    LDX $6D
-    LDA $0D80,X             ; VRAM base
-    LDX $79
-    STA $0940,X             ; slot-A VRAM base
+    ADC.w #!Vram_TileRowWords
+    STA.w !VramQ_DestB,X    ; next row of 16 tiles
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X    ; Obj_TileBuf
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_SrcA,X     ; source: the object's chunk
     CLC
-    ADC #$0100
-    STA $0960,X             ; slot-B VRAM base
-    LDA #$0100
-    STA $0980,X             ; slot-A size
-    STA $0990,X             ; slot-B size
-    INC $09A0,X             ; bump slot-A entry count
+    ADC.w #!Gfx_8TilesBytes
+    STA.w !VramQ_SrcB,X     ; second half
+    LDA.w #!Gfx_8TilesBytes
+    STA.w !VramQ_SizeA,X    ; bytes
+    STA.w !VramQ_SizeB,X    ; bytes
+    INC.w !VramQ_Valid,X    ; entry pending
     INX
     INX
-    STZ $09A0,X             ; zero slot-B
-    STX $79                 ; save updated buffer ptr
-    ; --- OAM Y / tile entry writes to $7F:4802+slot ---
+    STZ.w !VramQ_Valid,X    ; ends the queue
+    STX.b !VramQ_Pos        ; next queue entry
+    ; --- Position offsets: OfsX (sign-extended), OfsY ---
     REP #$20
-    LDX $6D
-    LDA $1700,X             ; OAM slot base index (16-bit)
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileRecOfs,X ; object's first tile record
     REP #$10                ; X → 16-bit
-    TAX                     ; X = OAM slot index
+    TAX                     ; X = first tile record
     SEP #$20
-    LDY #$0020              ; offset into tile data for OAM entries
-    ; tile 0 Y-pos
-    LDA [$D3],Y
-    STA $7F4802,X
+    LDY.w #!Frame_TileWordBytes*16 ; position bytes follow the 16 tile words
+    ; tile 0 offsets
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsX,X
     BPL .y0pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y0hi
 .y0pos:
     LDA #$00
 .y0hi:
-    STA $7F4803,X
+    STA.l SprTileSrc.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4804,X
-    ; tile 1 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsY,X
+    ; tile 1 offsets
     INY
-    LDA [$D3],Y
-    STA $7F480A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsX,X
     BPL .y1pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y1hi
 .y1pos:
     LDA #$00
 .y1hi:
-    STA $7F480B,X
+    STA.l SprTileSrc[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F480C,X
-    ; tile 2 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsY,X
+    ; tile 2 offsets
     INY
-    LDA [$D3],Y
-    STA $7F4812,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsX,X
     BPL .y2pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y2hi
 .y2pos:
     LDA #$00
 .y2hi:
-    STA $7F4813,X
+    STA.l SprTileSrc[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4814,X
-    ; tile 3 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsY,X
+    ; tile 3 offsets
     INY
-    LDA [$D3],Y
-    STA $7F481A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsX,X
     BPL .y3pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y3hi
 .y3pos:
     LDA #$00
 .y3hi:
-    STA $7F481B,X
+    STA.l SprTileSrc[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F481C,X
-    ; --- OAM X-positions from entity table ---
-    LDY $6D
-    LDA $0D00,Y             ; entity X base
-    STA $7F4806,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsY,X
+    ; --- Tile numbers: Obj_VramTile + 2 per 16x16 tile ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y   ; object's first OAM tile number
+    STA.l SprTileSrc.Tile,X
     INC
     INC
-    STA $7F480E,X
+    STA.l SprTileSrc[1].Tile,X
     INC
     INC
-    STA $7F4816,X
+    STA.l SprTileSrc[2].Tile,X
     INC
     INC
-    STA $7F481E,X
-    ; --- OAM attribute/high bytes (palette + visibility) ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9                 ; palette + priority composite
+    STA.l SprTileSrc[3].Tile,X
+    ; --- Attributes ---
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase     ; attribute bits before priority
     ; tile 0 attr
-    LDA $7F4804,X
-    CMP #$E8
+    LDA.l SprTileSrc.OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a0within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4807,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc.Attr,X
     BRA .a1test
 .a0within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4807,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc.Attr,X
     ; tile 1 attr
 .a1test:
-    LDA $7F480C,X
-    CMP #$E8
+    LDA.l SprTileSrc[1].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a1within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F480F,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[1].Attr,X
     BRA .a2test
 .a1within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F480F,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc[1].Attr,X
     ; tile 2 attr
 .a2test:
-    LDA $7F4814,X
-    CMP #$E8
+    LDA.l SprTileSrc[2].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a2within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4817,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[2].Attr,X
     BRA .a3test
 .a2within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4817,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc[2].Attr,X
     ; tile 3 attr
 .a3test:
-    LDA $7F481C,X
-    CMP #$E8
+    LDA.l SprTileSrc[3].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a3within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F481F,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[3].Attr,X
     BRA .cbdc_done
 .a3within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F481F,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc[3].Attr,X
 .cbdc_done:
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:CDC8 — Sub_CDC8 (301 bytes, $CDC8–$CEF4)
-; Single-slot, no animation gate, OAM-update for $7F:4BC2+slot.
-; Uses the current frame# from $0F01,X directly (no gate call).
-; Computes tile-data pointer from frame# × $28 + $1380,X, then
-; loads OAM slot index from $1700,X and writes 4 Y-entries
-; (with sign-extension) and 4 X-entries (+2 step) to $7F:4BC2+.
-; Sets $1B00,X = $80 (marks entry as "OAM-only updated").
-; Entry: M=1, X/Y=16-bit; X = entity slot.
+; $C0:CDC8 — Obj_FrameLayout4 (301 bytes, $CDC8–$CEF4)
+; (was Sub_CDC8.) Rewrites the 4 SprTile records of a 4-tile object
+; for Obj_LastFrame directly (tiles already in VRAM): offsets from the
+; frame record, Tile = Obj_VramTile + 2n, attributes as in
+; Obj_BuildFrame4; then Obj_State = $80.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur.
 ; ============================================================
 org $C0CDC8
-Sub_CDC8:
-    LDX $6D
-    LDA $0F01,X             ; current frame# (no gate)
-    STA $4202               ; WRMPYA
-    LDA #$28
-    STA $4203               ; WRMPYB = 40
-    LDA $1300,X
-    STA $D5
+Obj_FrameLayout4:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_LastFrame,X  ; current frame# (no gate)
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame4_Bytes
+    STA.w WRMPYB            ; WRMPYB = 40
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; frame# × 40
+    LDA.w RDMPYL            ; frame# × 40
     CLC
-    ADC $1380,X
-    STA $D3                 ; tile data pointer
-    LDA $1700,X             ; OAM slot index (16-bit)
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr     ; tile data pointer
+    LDA.w !Obj_TileRecOfs,X ; object's first tile record
     REP #$10                ; X → 16-bit
-    TAX                     ; X = OAM slot index
+    TAX                     ; X = first tile record
     SEP #$20
-    LDY #$0020              ; offset to OAM position data in tile table
-    ; tile 0 Y-pos → $7F:4BC2+X
-    LDA [$D3],Y
-    STA $7F4BC2,X
+    LDY.w #!Frame_TileWordBytes*16 ; position bytes follow the 16 tile words
+    ; tile 0 offsets → SprTile
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsX,X
     BPL .y0pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y0hi
 .y0pos:
     LDA #$00
 .y0hi:
-    STA $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BC4,X
-    ; tile 1 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X
+    ; tile 1 offsets
     INY
-    LDA [$D3],Y
-    STA $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsX,X
     BPL .y1pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y1hi
 .y1pos:
     LDA #$00
 .y1hi:
-    STA $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BCC,X
-    ; tile 2 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X
+    ; tile 2 offsets
     INY
-    LDA [$D3],Y
-    STA $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsX,X
     BPL .y2pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y2hi
 .y2pos:
     LDA #$00
 .y2hi:
-    STA $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BD4,X
-    ; tile 3 Y-pos
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X
+    ; tile 3 offsets
     INY
-    LDA [$D3],Y
-    STA $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsX,X
     BPL .y3pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .y3hi
 .y3pos:
     LDA #$00
 .y3hi:
-    STA $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BDC,X
-    ; --- X-positions from entity table (Y still 8-bit from SEP#10 earlier? no) ---
-    LDY $6D                 ; entity slot index (dp LDY)
-    LDA $0D00,Y             ; entity X base
-    STA $7F4BC6,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X
+    ; --- Tile numbers: Obj_VramTile + 2 per 16x16 tile ---
+    LDY.b !Obj_Cur          ; object
+    LDA.w !Obj_VramTile,Y   ; object's first OAM tile number
+    STA.l SprTile.Tile,X
     INC
     INC
-    STA $7F4BCE,X
+    STA.l SprTile[1].Tile,X
     INC
     INC
-    STA $7F4BD6,X
+    STA.l SprTile[2].Tile,X
     INC
     INC
-    STA $7F4BDE,X
-    ; --- OAM attribute/high bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
+    STA.l SprTile[3].Tile,X
+    ; --- Attributes ---
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
     ; tile 0 attr
-    LDA $7F4BC4,X
-    CMP #$E8
+    LDA.l SprTile.OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a0within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BC7,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile.Attr,X
     BRA .a1test
 .a0within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4BC7,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile.Attr,X
     ; tile 1 attr
 .a1test:
-    LDA $7F4BCC,X
-    CMP #$E8
+    LDA.l SprTile[1].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a1within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BCF,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[1].Attr,X
     BRA .a2test
 .a1within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4BCF,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile[1].Attr,X
     ; tile 2 attr
 .a2test:
-    LDA $7F4BD4,X
-    CMP #$E8
+    LDA.l SprTile[2].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a2within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BD7,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[2].Attr,X
     BRA .a3test
 .a2within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4BD7,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile[2].Attr,X
     ; tile 3 attr
 .a3test:
-    LDA $7F4BDC,X
-    CMP #$E8
+    LDA.l SprTile[3].OfsY,X
+    CMP.b #!Spr_UpperOfsY
     BCC .a3within
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BDF,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[3].Attr,X
     BRA .cdc8_done
 .a3within:
-    LDA $D9
-    ORA $0C00,Y
-    STA $7F4BDF,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile[3].Attr,X
 .cdc8_done:
-    LDX $6D
-    LDA #$80
-    STA $1B00,X
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:CEF5 — Sub_CEF5 (559 bytes, $CEF5–$D123)
-; Complex sprite-slot dispatch with three paths:
-;   type==3  ($1780,X==$03): full 32-tile dual-slot init via
-;            Sub_E97A + 32-entry loop.
-;   $1B00,X & $7F == 0: tail-call → Sub_D28A (first-pass,
-;            16 tiles, Y=0).
-;   $1B00,X & $7F != 0: tail-call → Sub_D30D (second-pass,
-;            16 tiles, Y=$20, VRAM base+$200).
-; On type-3 success: INC $1B00,X twice; CLC RTS.
-; On dispatch path: returns whatever Sub_D28A / Sub_D30D returns.
-; Entry: M=1, X/Y=16-bit; X = entity slot.
+; $C0:CEF5 — Obj_BuildFrame8 (559 bytes, $CEF5–$D123)
+; (was Sub_CEF5.) Builds the current frame of an 8-tile object. In
+; mode 3 (fixed frame) all 32 tiles go into two chunks in one pass
+; and Obj_State is incremented twice; otherwise the work is split:
+; Obj_State count 0 → Obj_BuildFrame8Pass0, else Obj_BuildFrame8Pass1.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur.
 ; ============================================================
 org $C0CEF5
-Sub_CEF5:
-    LDA $1200,X
-    STA $CF
-    LDA #$7F
-    STA $D2
+Obj_BuildFrame8:
+    LDA.w !Obj_GfxBank,X
+    STA.b !Spr_GfxPtr+2
+    LDA.b #!Bank7F
+    STA.b !Spr_WramPtr+2
     REP #$20
-    LDA $1280,X
-    STA $CD
+    LDA.w !Obj_GfxOfs,X
+    STA.b !Spr_GfxPtr
     SEP #$20
-    LDA #$E4
-    STA $D8
-    LDA $1780,X             ; animation type
+    LDA.b #!BankE4
+    STA.b !Anim_FramePtr+2
+    LDA.w !Obj_AnimMode,X   ; Obj_AnimMode
     CMP #$03
     BNE .check_pass         ; not type-3 → check pass counter
     BRA .type3_path         ; type-3 → full 32-tile path
 .check_pass:
-    LDA $1B00,X
-    AND #$7F
+    LDA.w !Obj_State,X
+    AND.b #!ObjState_CountMask
     BEQ .first_pass         ; pass counter == 0: first pass
-    BRL $03EF               ; pass counter != 0: tail-call Sub_D30D
+    BRL Obj_BuildFrame8Pass1               ; pass counter != 0: tail-call Obj_BuildFrame8Pass1
 .first_pass:
-    BRL $0369               ; tail-call Sub_D28A
+    BRL Obj_BuildFrame8Pass0               ; tail-call Obj_BuildFrame8Pass0
     ; ---- type-3 full 32-tile path ----
 .type3_path:
-    LDA $1301,X             ; use $1301,X directly as frame byte
-    CMP $0F01,X
+    LDA.w !Obj_FixedFrame,X ; use Obj_FixedFrame directly as frame byte
+    CMP.w !Obj_LastFrame,X
     BNE .t3_new_frame
 .t3_nc_exit:
     CLC
     RTS                     ; same frame → no work
 .t3_new_frame:
-    STA $EE
-    JSR $E97A               ; dual-slot allocator
+    STA.b !Spr_NewFrame
+    JSR SprBuf_Alloc2               ; dual-slot allocator
     BCC .t3_nc_exit         ; allocation failed → backward branch to CLC+RTS
-    LDA $EE
-    STA $0F01,X
+    LDA.b !Spr_NewFrame
+    STA.w !Obj_LastFrame,X
     REP #$20
-    LDX $6D
-    LDA $0D80,X             ; VRAM base
-    STA $D0
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X    ; Obj_TileBuf
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$50
-    STA $4203               ; WRMPYB = 80
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame8_Bytes
+    STA.w WRMPYB            ; WRMPYB = 80
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; frame# × 80
+    LDA.w RDMPYL            ; frame# × 80
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$20
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
-    LDA #$0020              ; 32 tiles
-    STA $C9
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
+    LDA.w #!SprBuf_ChunkTiles*2 ; 32 tiles
+    STA.b !Spr_TileCount
     LDY #$0000
     BRA .t3_check
 .t3_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .t3_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .t3_fd
-    JSR $E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .t3_next
     BRA .t3_after_loop
 .t3_fd:
-    JSR $E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .t3_next
 .t3_after_loop:
-    ; --- OAM staging for 32-tile dual-slot ---
+    ; --- SprTile/SprTileSrc for 32-tile dual-slot ---
     SEP #$10
-    LDX $6D
-    LDA $0D00,X
-    AND #$01FF
+    LDX.b !Obj_Cur
+    LDA.w !Obj_VramTile,X
+    AND.w #!Obj_VramTileMask
     ASL
     ASL
     ASL
     ASL
-    LDX $79
-    STA $0950,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_DestA,X
     CLC
-    ADC #$0100
-    STA $0970,X
-    LDX $6D
-    LDA $0D80,X
-    LDX $79
-    STA $0940,X
+    ADC.w #!Vram_TileRowWords
+    STA.w !VramQ_DestB,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_SrcA,X
     CLC
-    ADC #$0200
-    STA $0960,X
-    LDA #$0200
-    STA $0980,X
-    STA $0990,X
-    INC $09A0,X
+    ADC.w #!Gfx_8TilesBytes*2
+    STA.w !VramQ_SrcB,X
+    LDA.w #!Gfx_8TilesBytes*2
+    STA.w !VramQ_SizeA,X
+    STA.w !VramQ_SizeB,X
+    INC.w !VramQ_Valid,X
     INX
     INX
-    STZ $09A0,X
-    STX $79
-    ; --- OAM Y/tile writes to $7F:4802+slot (Y from $40) ---
+    STZ.w !VramQ_Valid,X
+    STX.b !VramQ_Pos
+    ; --- Position offsets (after 32 tile words) ---
     REP #$20
-    LDX $6D
-    LDA.l $001700,X
+    LDX.b !Obj_Cur
+    LDA.l !Obj_TileRecOfs,X
     REP #$10
     TAX
     SEP #$20
-    LDY #$0040              ; offset = 64 (8 tile-entry pairs × 2 bytes, after 32 tiles)
-    ; entry 0 Y-pos
-    LDA [$D3],Y
-    STA $7F4802,X
+    LDY.w #!Frame_TileWordBytes*32 ; offset = 64 (8 tile-entry pairs × 2 bytes, after 32 tiles)
+    ; record 0 offsets
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsX,X
     BPL .t3y0pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y0hi
 .t3y0pos:
     LDA #$00
 .t3y0hi:
-    STA $7F4803,X
+    STA.l SprTileSrc.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4804,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsY,X
     ; entry 1
     INY
-    LDA [$D3],Y
-    STA $7F480A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsX,X
     BPL .t3y1pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y1hi
 .t3y1pos:
     LDA #$00
 .t3y1hi:
-    STA $7F480B,X
+    STA.l SprTileSrc[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F480C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsY,X
     ; entry 2
     INY
-    LDA [$D3],Y
-    STA $7F4812,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsX,X
     BPL .t3y2pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y2hi
 .t3y2pos:
     LDA #$00
 .t3y2hi:
-    STA $7F4813,X
+    STA.l SprTileSrc[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4814,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsY,X
     ; entry 3
     INY
-    LDA [$D3],Y
-    STA $7F481A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsX,X
     BPL .t3y3pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y3hi
 .t3y3pos:
     LDA #$00
 .t3y3hi:
-    STA $7F481B,X
+    STA.l SprTileSrc[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F481C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsY,X
     ; entry 4
     INY
-    LDA [$D3],Y
-    STA $7F4822,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsX,X
     BPL .t3y4pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y4hi
 .t3y4pos:
     LDA #$00
 .t3y4hi:
-    STA $7F4823,X
+    STA.l SprTileSrc[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4824,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsY,X
     ; entry 5
     INY
-    LDA [$D3],Y
-    STA $7F482A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsX,X
     BPL .t3y5pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y5hi
 .t3y5pos:
     LDA #$00
 .t3y5hi:
-    STA $7F482B,X
+    STA.l SprTileSrc[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F482C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsY,X
     ; entry 6
     INY
-    LDA [$D3],Y
-    STA $7F4832,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsX,X
     BPL .t3y6pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y6hi
 .t3y6pos:
     LDA #$00
 .t3y6hi:
-    STA $7F4833,X
+    STA.l SprTileSrc[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4834,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsY,X
     ; entry 7
     INY
-    LDA [$D3],Y
-    STA $7F483A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsX,X
     BPL .t3y7pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .t3y7hi
 .t3y7pos:
     LDA #$00
 .t3y7hi:
-    STA $7F483B,X
+    STA.l SprTileSrc[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F483C,X
-    ; --- X-positions (entity base + 2-step) ---
-    LDY $6D
-    LDA $0D00,Y
-    STA $7F4806,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsY,X
+    ; --- Tile numbers: Obj_VramTile + 2 per 16x16 tile ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y
+    STA.l SprTileSrc.Tile,X
     INC
     INC
-    STA $7F480E,X
+    STA.l SprTileSrc[1].Tile,X
     INC
     INC
-    STA $7F4816,X
+    STA.l SprTileSrc[2].Tile,X
     INC
     INC
-    STA $7F481E,X
+    STA.l SprTileSrc[3].Tile,X
     INC
     INC
-    STA $7F4826,X
+    STA.l SprTileSrc[4].Tile,X
     INC
     INC
-    STA $7F482E,X
+    STA.l SprTileSrc[5].Tile,X
     INC
     INC
-    STA $7F4836,X
+    STA.l SprTileSrc[6].Tile,X
     INC
     INC
-    STA $7F483E,X
+    STA.l SprTileSrc[7].Tile,X
     ; --- attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9                 ; A still holds the composite value
-    ORA $0C00,Y             ; no LDA $D9 needed: A unchanged since STA $D9
-    STA $7F4807,X
-    STA $7F480F,X
-    STA $7F4817,X
-    STA $7F481F,X
-    LDA $D9                 ; reload for second group (A was modified by ORA $0C00)
-    ORA $0C01,Y
-    STA $7F4827,X
-    STA $7F482F,X
-    STA $7F4837,X
-    STA $7F483F,X
-    LDX $6D
-    INC $1B00,X
-    INC $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase     ; A still holds the composite value
+    ORA.w !Obj_PrioLow,Y    ; no LDA $D9 needed: A unchanged since STA $D9
+    STA.l SprTileSrc.Attr,X
+    STA.l SprTileSrc[1].Attr,X
+    STA.l SprTileSrc[2].Attr,X
+    STA.l SprTileSrc[3].Attr,X
+    LDA.b !Spr_AttrBase     ; reload for second group (A was modified by ORA $0C00)
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[4].Attr,X
+    STA.l SprTileSrc[5].Attr,X
+    STA.l SprTileSrc[6].Attr,X
+    STA.l SprTileSrc[7].Attr,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
+    INC.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:D124 — Sub_D124 (358 bytes, $D124–$D289)
-; 8-slot OAM buffer init, pass-1 path (sprite type 1).
-; Called via BRL from Sub_CB0A when bits 0-1 of $1201,X == 1.
-; Computes animation data pointer: frame# × $50 + $1380,X,
-; using $1300,X as the data bank byte (dp:$D5/$D3).
-; Reads OAM buffer index from WRAM table $001700,X (16-bit).
-; Starting at animation data offset Y=$40, reads 8 tile-index/
-; attribute pairs and writes them into the $7F4Bxx OAM staging
-; buffer (8 groups at stride $08: C2–FC).
-; Sets 8 X-position bytes (C6–FE) and priority/attribute bytes
-; (C7/CF/D7/DF from $0C00; E7/EF/F7/FF from $0C01).
-; On completion: sets $1B00,X = $80, SEP #$10, CLC, RTS.
-; Entry: M=1, X/Y=16-bit; X = entity slot.
+; $C0:D124 — Obj_FrameLayout8 (358 bytes, $D124–$D289)
+; (was Sub_D124.) As Obj_FrameLayout4 for an 8-tile object (frame
+; record 80 bytes, positions after 32 tile words); the first four
+; tiles take Obj_PrioLow, the last four Obj_PrioHigh.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur.
 ; ============================================================
 org $C0D124
-Sub_D124:
-    LDA $0F01,X              ; current animation frame number
-    STA $4202                ; WRMPYA
-    LDA #$50                 ; multiply by $50 = 80 (bytes per frame entry)
-    STA $4203                ; WRMPYB → triggers multiply
-    LDA $1300,X              ; animation data bank byte
-    STA $D5
+Obj_FrameLayout8:
+    LDA.w !Obj_LastFrame,X   ; current animation frame number
+    STA.w WRMPYA             ; WRMPYA
+    LDA.b #!Frame8_Bytes     ; multiply by $50 = 80 (bytes per frame entry)
+    STA.w WRMPYB             ; WRMPYB → triggers multiply
+    LDA.w !Obj_FrameBank,X   ; animation data bank byte
+    STA.b !Spr_FramePtr+2
     REP #$20                 ; A 16-bit
-    LDA $4216                ; RDMPYL: result of frame# × $50
+    LDA.w RDMPYL             ; RDMPYL: result of frame# × $50
     CLC
-    ADC $1380,X              ; add sprite base offset
-    STA $D3                  ; dp:$D3 = animation data ptr (16-bit)
+    ADC.w !Obj_FrameOfs,X    ; add sprite base offset
+    STA.b !Spr_FramePtr      ; dp:$D3 = animation data ptr (16-bit)
     REP #$20                 ; (already 16-bit; ensures A mode explicit)
-    LDA.l $001700,X          ; OAM buffer index from WRAM table (16-bit)
+    LDA.l !Obj_TileRecOfs,X  ; object's first tile record
     REP #$10                 ; X/Y 16-bit
-    TAX                      ; X = OAM buffer index
+    TAX                      ; X = first tile record
     SEP #$20                 ; A 8-bit
-    LDY #$0040               ; start at animation data offset $40
-    ; --- 8 OAM tile-entry groups (stride $08) ---
-    ; entry 0: OAM C2/C3/C4
-    LDA [$D3],Y
-    STA $7F4BC2,X
+    LDY.w #!Frame_TileWordBytes*32 ; start at animation data offset $40
+    ; --- 8 records: OfsX (sign-extended), OfsY ---
+    ; record 0
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsX,X
     BPL .d124_y0p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y0h
 .d124_y0p:
     LDA #$00
 .d124_y0h:
-    STA $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BC4,X
-    ; entry 1: OAM CA/CB/CC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X
+    ; record 1
     INY
-    LDA [$D3],Y
-    STA $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsX,X
     BPL .d124_y1p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y1h
 .d124_y1p:
     LDA #$00
 .d124_y1h:
-    STA $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BCC,X
-    ; entry 2: OAM D2/D3/D4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X
+    ; record 2
     INY
-    LDA [$D3],Y
-    STA $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsX,X
     BPL .d124_y2p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y2h
 .d124_y2p:
     LDA #$00
 .d124_y2h:
-    STA $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BD4,X
-    ; entry 3: OAM DA/DB/DC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X
+    ; record 3
     INY
-    LDA [$D3],Y
-    STA $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsX,X
     BPL .d124_y3p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y3h
 .d124_y3p:
     LDA #$00
 .d124_y3h:
-    STA $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BDC,X
-    ; entry 4: OAM E2/E3/E4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X
+    ; record 4
     INY
-    LDA [$D3],Y
-    STA $7F4BE2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsX,X
     BPL .d124_y4p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y4h
 .d124_y4p:
     LDA #$00
 .d124_y4h:
-    STA $7F4BE3,X
+    STA.l SprTile[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BE4,X
-    ; entry 5: OAM EA/EB/EC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsY,X
+    ; record 5
     INY
-    LDA [$D3],Y
-    STA $7F4BEA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsX,X
     BPL .d124_y5p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y5h
 .d124_y5p:
     LDA #$00
 .d124_y5h:
-    STA $7F4BEB,X
+    STA.l SprTile[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BEC,X
-    ; entry 6: OAM F2/F3/F4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsY,X
+    ; record 6
     INY
-    LDA [$D3],Y
-    STA $7F4BF2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsX,X
     BPL .d124_y6p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y6h
 .d124_y6p:
     LDA #$00
 .d124_y6h:
-    STA $7F4BF3,X
+    STA.l SprTile[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BF4,X
-    ; entry 7: OAM FA/FB/FC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsY,X
+    ; record 7
     INY
-    LDA [$D3],Y
-    STA $7F4BFA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsX,X
     BPL .d124_y7p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d124_y7h
 .d124_y7p:
     LDA #$00
 .d124_y7h:
-    STA $7F4BFB,X
+    STA.l SprTile[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BFC,X
-    ; --- X-positions (8 slots, stride +2 each) ---
-    LDY $6D
-    LDA $0D00,Y              ; base X coordinate
-    STA $7F4BC6,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsY,X
+    ; --- Tile numbers (8 slots, stride +2 each) ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y    ; base X coordinate
+    STA.l SprTile.Tile,X
     INC
     INC
-    STA $7F4BCE,X
+    STA.l SprTile[1].Tile,X
     INC
     INC
-    STA $7F4BD6,X
+    STA.l SprTile[2].Tile,X
     INC
     INC
-    STA $7F4BDE,X
+    STA.l SprTile[3].Tile,X
     INC
     INC
-    STA $7F4BE6,X
+    STA.l SprTile[4].Tile,X
     INC
     INC
-    STA $7F4BEE,X
+    STA.l SprTile[5].Tile,X
     INC
     INC
-    STA $7F4BF6,X
+    STA.l SprTile[6].Tile,X
     INC
     INC
-    STA $7F4BFE,X
+    STA.l SprTile[7].Tile,X
     ; --- priority/attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
-    ORA $0C00,Y
-    STA $7F4BC7,X
-    STA $7F4BCF,X
-    STA $7F4BD7,X
-    STA $7F4BDF,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BE7,X
-    STA $7F4BEF,X
-    STA $7F4BF7,X
-    STA $7F4BFF,X
-    LDX $6D
-    LDA #$80
-    STA.w $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile.Attr,X
+    STA.l SprTile[1].Attr,X
+    STA.l SprTile[2].Attr,X
+    STA.l SprTile[3].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[4].Attr,X
+    STA.l SprTile[5].Attr,X
+    STA.l SprTile[6].Attr,X
+    STA.l SprTile[7].Attr,X
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:D28A — Sub_D28A (131 bytes, $D28A–$D30C)
-; Dual-slot, animation-gated, 16-tile sprite-slot init.
-; Called directly and also as a tail-call target (BRL from
-; Sub_CEF5 at $CF1E) for the first-pass case.
-; Calls Sub_CB3A to check the animation gate; on pass, calls
-; Sub_E97A to allocate two VRAM slots; copies 16 tile entries
-; (frame# × $50 offset, 16 iterations via Sub_E687/E534) into
-; WRAM.  Increments $1B00,X on success; SEC RTS.
-; Entry: M=1, X/Y=16-bit; X = entity slot.
+; $C0:D28A — Obj_BuildFrame8Pass0 (131 bytes, $D28A–$D30C)
+; (was Sub_D28A.) First pass of an 8-tile frame: look the frame up,
+; SprBuf_Alloc2, copy tiles 0-15 into the first chunk, INC Obj_State,
+; return C=1 (more to do). C=0 when nothing changed or no chunks.
 ; ============================================================
 org $C0D28A
-Sub_D28A:
-    JSR $CB3A               ; animation-frame gate
+Obj_BuildFrame8Pass0:
+    JSR Obj_AnimFrameLookup               ; animation-frame gate
     BCS .d28a_proceed
     RTS                     ; gate failed → CLC, skip
 .d28a_proceed:
-    CMP $0F01,X             ; same frame?
+    CMP.w !Obj_LastFrame,X  ; same frame?
     BNE .d28a_new_frame
 .d28a_nc_exit:
     CLC
     RTS
 .d28a_new_frame:
-    STA $EE
-    JSR $E97A               ; dual-slot allocator
+    STA.b !Spr_NewFrame
+    JSR SprBuf_Alloc2               ; dual-slot allocator
     BCC .d28a_nc_exit       ; allocation failed → backward branch to CLC+RTS
-    LDA $EE
-    STA $0F01,X
+    LDA.b !Spr_NewFrame
+    STA.w !Obj_LastFrame,X
     REP #$20
-    LDX $6D
-    LDA $0D80,X
-    STA $D0
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$50
-    STA $4203               ; WRMPYB = 80
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame8_Bytes
+    STA.w WRMPYB            ; WRMPYB = 80
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; frame# × 80
+    LDA.w RDMPYL            ; frame# × 80
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
-    LDA #$0010              ; 16 tiles
-    STA $C9
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
+    LDA.w #!SprBuf_ChunkTiles ; 16 tiles
+    STA.b !Spr_TileCount
     LDY #$0000
     BRA .d28a_check
 .d28a_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d28a_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d28a_fd
-    JSR $E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d28a_next
     BRA .d28a_done
 .d28a_fd:
-    JSR $E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d28a_next
 .d28a_done:
     SEP #$30
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEC
     RTS
 
 ; ============================================================
-; $C0:D30D — Sub_D30D (490 bytes, $D30D–$D4F6)
-; Dual-slot second-pass: 16 tiles from Y=$20 into VRAM base+$200.
-; Tail-call target (BRL from Sub_CEF5 $CF1B) for pass counter != 0.
-; Uses existing slot allocation ($0D80,X + $200 for second slot).
-; Copies 16 tile entries starting at tile-data offset Y=$20 through
-; Sub_E687/Sub_E534; writes 8-entry OAM staging to $7F:4802+slot
-; (Y from $40); CLC RTS on success.
-; Entry: M=1, X/Y=16-bit; X = entity slot (via $6D).
+; $C0:D30D — Obj_BuildFrame8Pass1 (490 bytes, $D30D–$D4F6)
+; (was Sub_D30D.) Second pass: tiles 16-31 into the second chunk
+; (Obj_TileBuf + $200), queue the VRAM upload, write the 8
+; SprTileSrc records, INC Obj_State; C=0.
 ; ============================================================
 org $C0D30D
-Sub_D30D:
+Obj_BuildFrame8Pass1:
     REP #$20
-    LDA $0D80,X
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0200              ; second-slot VRAM base
-    STA $D0
+    ADC.w #!Gfx_8TilesBytes*2 ; second chunk
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$50
-    STA $4203               ; WRMPYB = 80
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame8_Bytes
+    STA.w WRMPYB            ; WRMPYB = 80
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; frame# × 80
+    LDA.w RDMPYL            ; frame# × 80
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$20
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
-    LDA #$0010              ; 16 tiles
-    STA $C9
-    LDY #$0020              ; start at tile-data offset 32 (second half)
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
+    LDA.w #!SprBuf_ChunkTiles ; 16 tiles
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*16 ; start at tile-data offset 32 (second half)
     BRA .d30d_check
 .d30d_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d30d_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d30d_fd
-    JSR $E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d30d_next
     BRA .d30d_after_loop
 .d30d_fd:
-    JSR $E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d30d_next
 .d30d_after_loop:
-    ; --- OAM staging ---
+    ; --- SprTile/SprTileSrc ---
     SEP #$10
-    LDX $6D
-    LDA $0D00,X
-    AND #$01FF
+    LDX.b !Obj_Cur
+    LDA.w !Obj_VramTile,X
+    AND.w #!Obj_VramTileMask
     ASL
     ASL
     ASL
     ASL
-    LDX $79
-    STA $0950,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_DestA,X
     CLC
-    ADC #$0100
-    STA $0970,X
-    LDX $6D
-    LDA $0D80,X
-    LDX $79
-    STA $0940,X
+    ADC.w #!Vram_TileRowWords
+    STA.w !VramQ_DestB,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_SrcA,X
     CLC
-    ADC #$0200
-    STA $0960,X
-    LDA #$0200
-    STA $0980,X
-    STA $0990,X
-    INC $09A0,X
+    ADC.w #!Gfx_8TilesBytes*2
+    STA.w !VramQ_SrcB,X
+    LDA.w #!Gfx_8TilesBytes*2
+    STA.w !VramQ_SizeA,X
+    STA.w !VramQ_SizeB,X
+    INC.w !VramQ_Valid,X
     INX
     INX
-    STZ $09A0,X
-    STX $79
-    ; --- OAM Y/tile writes (Y from $40) ---
-    LDX $6D
-    LDA.l $001700,X
+    STZ.w !VramQ_Valid,X
+    STX.b !VramQ_Pos
+    ; --- Position offsets (after 32 tile words) ---
+    LDX.b !Obj_Cur
+    LDA.l !Obj_TileRecOfs,X
     REP #$10
     TAX
     SEP #$20
-    LDY #$0040
+    LDY.w #!Frame_TileWordBytes*32
     ; entry 0
-    LDA [$D3],Y
-    STA $7F4802,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsX,X
     BPL .d30d_y0pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y0hi
 .d30d_y0pos:
     LDA #$00
 .d30d_y0hi:
-    STA $7F4803,X
+    STA.l SprTileSrc.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4804,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsY,X
     ; entry 1
     INY
-    LDA [$D3],Y
-    STA $7F480A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsX,X
     BPL .d30d_y1pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y1hi
 .d30d_y1pos:
     LDA #$00
 .d30d_y1hi:
-    STA $7F480B,X
+    STA.l SprTileSrc[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F480C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsY,X
     ; entry 2
     INY
-    LDA [$D3],Y
-    STA $7F4812,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsX,X
     BPL .d30d_y2pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y2hi
 .d30d_y2pos:
     LDA #$00
 .d30d_y2hi:
-    STA $7F4813,X
+    STA.l SprTileSrc[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4814,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsY,X
     ; entry 3
     INY
-    LDA [$D3],Y
-    STA $7F481A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsX,X
     BPL .d30d_y3pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y3hi
 .d30d_y3pos:
     LDA #$00
 .d30d_y3hi:
-    STA $7F481B,X
+    STA.l SprTileSrc[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F481C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsY,X
     ; entry 4
     INY
-    LDA [$D3],Y
-    STA $7F4822,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsX,X
     BPL .d30d_y4pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y4hi
 .d30d_y4pos:
     LDA #$00
 .d30d_y4hi:
-    STA $7F4823,X
+    STA.l SprTileSrc[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4824,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsY,X
     ; entry 5
     INY
-    LDA [$D3],Y
-    STA $7F482A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsX,X
     BPL .d30d_y5pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y5hi
 .d30d_y5pos:
     LDA #$00
 .d30d_y5hi:
-    STA $7F482B,X
+    STA.l SprTileSrc[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F482C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsY,X
     ; entry 6
     INY
-    LDA [$D3],Y
-    STA $7F4832,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsX,X
     BPL .d30d_y6pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y6hi
 .d30d_y6pos:
     LDA #$00
 .d30d_y6hi:
-    STA $7F4833,X
+    STA.l SprTileSrc[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4834,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsY,X
     ; entry 7
     INY
-    LDA [$D3],Y
-    STA $7F483A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsX,X
     BPL .d30d_y7pos
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d30d_y7hi
 .d30d_y7pos:
     LDA #$00
 .d30d_y7hi:
-    STA $7F483B,X
+    STA.l SprTileSrc[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F483C,X
-    ; --- X-positions ---
-    LDY $6D
-    LDA $0D00,Y
-    STA $7F4806,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsY,X
+    ; --- Tile numbers ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y
+    STA.l SprTileSrc.Tile,X
     INC
     INC
-    STA $7F480E,X
+    STA.l SprTileSrc[1].Tile,X
     INC
     INC
-    STA $7F4816,X
+    STA.l SprTileSrc[2].Tile,X
     INC
     INC
-    STA $7F481E,X
+    STA.l SprTileSrc[3].Tile,X
     INC
     INC
-    STA $7F4826,X
+    STA.l SprTileSrc[4].Tile,X
     INC
     INC
-    STA $7F482E,X
+    STA.l SprTileSrc[5].Tile,X
     INC
     INC
-    STA $7F4836,X
+    STA.l SprTileSrc[6].Tile,X
     INC
     INC
-    STA $7F483E,X
+    STA.l SprTileSrc[7].Tile,X
     ; --- attribute bytes (lower 4 use $0C00, upper 4 use $0C01) ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9                 ; A still holds composite
-    ORA $0C00,Y             ; no reload needed: A unchanged since STA $D9
-    STA $7F4807,X
-    STA $7F480F,X
-    STA $7F4817,X
-    STA $7F481F,X
-    LDA $D9                 ; reload for upper group
-    ORA $0C01,Y
-    STA $7F4827,X
-    STA $7F482F,X
-    STA $7F4837,X
-    STA $7F483F,X
-    LDX $6D
-    INC $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase     ; A still holds composite
+    ORA.w !Obj_PrioLow,Y    ; no reload needed: A unchanged since STA $D9
+    STA.l SprTileSrc.Attr,X
+    STA.l SprTileSrc[1].Attr,X
+    STA.l SprTileSrc[2].Attr,X
+    STA.l SprTileSrc[3].Attr,X
+    LDA.b !Spr_AttrBase     ; reload for upper group
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[4].Attr,X
+    STA.l SprTileSrc[5].Attr,X
+    STA.l SprTileSrc[6].Attr,X
+    STA.l SprTileSrc[7].Attr,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:D4F7 — Sub_D4F7 (273 bytes, $D4F7–$D607)
-; Triple-slot sprite-init dispatch; analogous to Sub_CEF5 (dual-slot).
-; Sets up tile-bank / graphic-slot params, then dispatches on:
-;   $1B00,X & $7F == 0: pass 0  → $D546 (non-$68) or Sub_D608 ($68)
-;   $1B00,X & $7F == 1: pass 1  → Sub_D68B (non-$68) or Sub_D738 ($68)
-;   $1B00,X & $7F >= 2: pass 2+ → Sub_D7E5 (non-$68) or Sub_DA69 ($68)
-; Type-3 sprites ($1780,X==$03): RTS immediately (no re-init).
-; Body at $D546 (pass 0, non-$68): triple-slot alloc via Sub_E9AA,
-;   8-tile loop to WRAM base, then 8-tile loop to WRAM base+$200; SEC RTS.
-; Called from: sprite-slot entity dispatcher table (entity type dispatch).
+; $C0:D4F7 — Obj_BuildFrame12 (79 bytes, $D4F7–$D545, plus the
+; Obj_BuildFrame12Pass0 tail that follows it)
+; (was Sub_D4F7.) Builds the current frame of a 12-tile object over
+; three passes chosen by the Obj_State count (0 / 1 / 2+), each with
+; an "Alt" variant when Obj_VramTile is $68 (different chunk/VRAM
+; layout). Mode 3 objects return at once.
 ; ============================================================
 org $C0D4F7
-Sub_D4F7:
-    LDA $1200,X             ; sprite graphic-bank id
-    STA $CF
-    LDA #$7F
-    STA $D2
+Obj_BuildFrame12:
+    LDA.w !Obj_GfxBank,X    ; Obj_GfxBank
+    STA.b !Spr_GfxPtr+2
+    LDA.b #!Bank7F
+    STA.b !Spr_WramPtr+2
     REP #$20
-    LDA $1280,X             ; sprite graphic-pointer
-    STA $CD
+    LDA.w !Obj_GfxOfs,X     ; Obj_GfxOfs
+    STA.b !Spr_GfxPtr
     SEP #$20
-    LDA #$E4
-    STA $D8
+    LDA.b #!BankE4
+    STA.b !Anim_FramePtr+2
     ; type-3 sprites bypass all init
-    LDA $1780,X
+    LDA.w !Obj_AnimMode,X
     CMP #$03
     BNE .d4f7_check_pass
     RTS
 .d4f7_check_pass:
-    LDA $1B00,X
-    AND #$7F                ; pass counter (low 7 bits)
+    LDA.w !Obj_State,X
+    AND.b #!ObjState_CountMask ; pass counter (low 7 bits)
     BEQ .d4f7_pass0
     CMP #$01
     BEQ .d4f7_pass1
-    ; pass 2+: further dispatch on $0D00,X
-    LDA $0D00,X
-    CMP #$68
+    ; pass 2+: further dispatch on Obj_VramTile
+    LDA.w !Obj_VramTile,X
+    CMP.b #!ObjTile_AltLayout
     BEQ .d4f7_p2_68
-    BRL Sub_D7E5            ; pass 2+, non-$68
+    BRL Obj_BuildFrame12Pass2            ; pass 2+, non-$68
 .d4f7_p2_68:
-    BRL Sub_DA69            ; pass 2+, $68
+    BRL Obj_BuildFrame12Pass2Alt            ; pass 2+, $68
 .d4f7_pass0:
-    LDA $0D00,X
-    CMP #$68
+    LDA.w !Obj_VramTile,X
+    CMP.b #!ObjTile_AltLayout
     BEQ .d4f7_p0_68
-    BRA Sub_D546            ; pass 0, non-$68 → tile DMA body below
+    BRA Obj_BuildFrame12Pass0            ; pass 0, non-$68 → tile DMA body below
 .d4f7_p0_68:
-    BRL Sub_D608            ; pass 0, $68 → 16-tile single-pass variant
+    BRL Obj_BuildFrame12Pass0Alt            ; pass 0, $68 → 16-tile single-pass variant
 .d4f7_pass1:
-    LDA $0D00,X
-    CMP #$68
+    LDA.w !Obj_VramTile,X
+    CMP.b #!ObjTile_AltLayout
     BEQ .d4f7_p1_68
-    BRL Sub_D68B            ; pass 1, non-$68
+    BRL Obj_BuildFrame12Pass1            ; pass 1, non-$68
 .d4f7_p1_68:
-    BRL Sub_D738            ; pass 1, $68
+    BRL Obj_BuildFrame12Pass1Alt            ; pass 1, $68
 
 ; ============================================================
-; $C0:D546 — Sub_D546 (194 bytes, $D546–$D607)
-; Triple-slot first-pass, non-$68 variant.
-; Reached by BRA from Sub_D4F7 (pass 0, non-$68 path) — shares
-; the same return stack as the caller.  Also the label used as
-; anchor for the cluster tracking table.
-; Algorithm: animation gate (Sub_CB3A) → triple-slot alloc (Sub_E9AA)
-;   → 8 tiles Y=0..7 to WRAM base (bank $7F slot)
-;   → 8 tiles Y=8..15 to WRAM base+$200
-;   → INC $1B00,X; SEC RTS.
+; $C0:D546 — Obj_BuildFrame12Pass0 (194 bytes, $D546–$D607)
+; (was Sub_D546.) Pass 0: frame lookup, SprBuf_Alloc3, tiles 0-7 to
+; the buffer start and tiles 8-15 to +$200, INC Obj_State; C=1.
+; Reached by falling out of Obj_BuildFrame12.
 ; ============================================================
-Sub_D546:
-    JSR Sub_CB3A
+Obj_BuildFrame12Pass0:
+    JSR Obj_AnimFrameLookup
     BCS .d546_proceed
     RTS
 .d546_proceed:
-    CMP $0F01,X             ; same frame already loaded?
+    CMP.w !Obj_LastFrame,X  ; same frame already loaded?
     BNE .d546_new_frame
 .d546_cle_rts:              ; shared exit: CLC + RTS (same-frame skip / alloc fail)
     CLC
     RTS
 .d546_new_frame:
-    STA $EE                 ; save current frame type
-    JSR Sub_E9AA            ; allocate three sprite slots
+    STA.b !Spr_NewFrame     ; save current frame type
+    JSR SprBuf_Alloc3            ; allocate three sprite slots
     BCC .d546_cle_rts       ; alloc failed → CLC RTS
-    LDA $EE
-    STA $0F01,X             ; mark frame type as loaded
+    LDA.b !Spr_NewFrame
+    STA.w !Obj_LastFrame,X  ; mark frame type as loaded
     REP #$20
-    LDX $6D
-    LDA $0D80,X             ; WRAM base for this slot group
-    STA $D0
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X    ; WRAM base for this slot group
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X             ; frame number → multiply by $78 (120 tiles per frame)
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB
-    LDA $1300,X             ; tile bank byte
-    STA $D5
+    LDA.w !Obj_LastFrame,X  ; frame number → multiply by $78 (120 tiles per frame)
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB
+    LDA.w !Obj_FrameBank,X  ; Obj_GfxBank
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL — frame# × 120 product
+    LDA.w RDMPYL            ; RDMPYL — frame# × 120 product
     CLC
-    ADC $1380,X             ; add sprite base offset → frame data pointer
-    STA $D3
-    ; set up WMADDR for WRAM writes (bank $7F = $01)
+    ADC.w !Obj_FrameOfs,X   ; add sprite base offset → frame data pointer
+    STA.b !Spr_FramePtr
+    ; WMADD bank bit = $7F
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     ; first 8-tile loop: Y=0..7 → WRAM base
     LDA #$0008
-    STA $C9
+    STA.b !Spr_TileCount
     LDY #$0000
     BRA .d546_loop1_entry
 .d546_loop1_top:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d546_loop1_entry:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d546_loop1_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d546_loop1_top
     BRA .d546_loop2_init
 .d546_loop1_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d546_loop1_top
 .d546_loop2_init:
     ; second 8-tile loop: Y=8..15 → WRAM base+$200
     REP #$20
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0200
-    STA $D0
-    STA $2181               ; WMADDL — advance WRAM dest to slot+$200
+    ADC.w #!Gfx_8TilesBytes*2
+    STA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL — advance WRAM dest to slot+$200
     REP #$10
     LDA #$0008
-    STA $C9
-    LDY #$0010              ; word 8 in frame data (Y=16 bytes in)
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*8 ; word 8 in frame data (Y=16 bytes in)
     BRA .d546_loop2_entry
 .d546_loop2_top:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d546_loop2_entry:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d546_loop2_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d546_loop2_top
     BRA .d546_done
 .d546_loop2_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d546_loop2_top
 .d546_done:
     SEP #$30
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEC
     RTS
 
 ; ============================================================
-; $C0:D608 — Sub_D608 (131 bytes, $D608–$D68A)
-; Triple-slot first-pass, $68 variant (Obj_BuildFrameSize2_Start).
-; Animation gate → triple-slot alloc → single 16-tile loop to
-; WRAM base; INC $1B00,X; SEC RTS.
-; Reached by BRL from Sub_D4F7 (pass 0, $68 path).
+; $C0:D608 — Obj_BuildFrame12Pass0Alt (131 bytes, $D608–$D68A)
+; (was Sub_D608.) Pass 0, $68 layout: tiles 0-15 in one run to the
+; buffer start. (An older comment here named a label
+; "Obj_BuildFrameSize2_Start" that never existed.)
 ; ============================================================
 org $C0D608
-Sub_D608:
-    JSR Sub_CB3A
+Obj_BuildFrame12Pass0Alt:
+    JSR Obj_AnimFrameLookup
     BCS .d608_proceed
     RTS
 .d608_proceed:
-    CMP $0F01,X             ; same frame already loaded?
+    CMP.w !Obj_LastFrame,X  ; same frame already loaded?
     BNE .d608_new_frame
 .d608_cle_rts:
     CLC
     RTS
 .d608_new_frame:
-    STA $EE
-    JSR Sub_E9AA            ; triple-slot alloc
+    STA.b !Spr_NewFrame
+    JSR SprBuf_Alloc3            ; triple-slot alloc
     BCC .d608_cle_rts
-    LDA $EE
-    STA $0F01,X
+    LDA.b !Spr_NewFrame
+    STA.w !Obj_LastFrame,X
     REP #$20
-    LDX $6D
-    LDA $0D80,X
-    STA $D0
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X             ; frame number
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X  ; frame number
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL
+    LDA.w RDMPYL            ; RDMPYL
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     ; 16-tile loop (single pass): Y=0..15 → WRAM base
-    LDA #$0010
-    STA $C9
+    LDA.w #!SprBuf_ChunkTiles
+    STA.b !Spr_TileCount
     LDY #$0000
     BRA .d608_loop_entry
 .d608_loop_top:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d608_loop_entry:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d608_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d608_loop_top
     BRA .d608_done
 .d608_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d608_loop_top
 .d608_done:
     SEP #$30
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEC
     RTS
 
 ; ============================================================
-; $C0:D68B — Sub_D68B (173 bytes, $D68B–$D737)
-; Triple-slot pass-1, non-$68 variant.
-; Entry from BRL in Sub_D4F7 when $1B00,X&$7F == 1 and $0D00,X != $68.
-; Copies 8 frame tiles at Y=$20–$2F to WRAM at VRAM base+$0100,
-; then 8 tiles at Y=$30–$3F to VRAM base+$0300. INC $1B00,X; SEC RTS.
+; $C0:D68B — Obj_BuildFrame12Pass1 (173 bytes, $D68B–$D737)
+; (was Sub_D68B.) Pass 1: tiles 16-23 to +$100, tiles 24-31 to
+; +$300; INC Obj_State; C=1.
 ; ============================================================
 org $C0D68B
-Sub_D68B:
+Obj_BuildFrame12Pass1:
     REP #$20
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0100
-    STA $D0
+    ADC.w #!Gfx_8TilesBytes
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB = 120
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB = 120
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL (= frame# × 120)
+    LDA.w RDMPYL            ; RDMPYL (= frame# × 120)
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     LDA #$0008
-    STA $C9
-    LDY #$0020
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*16
     BRA .d68b_check
 .d68b_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d68b_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d68b_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d68b_next
     BRA .d68b_loop2
 .d68b_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d68b_next
 .d68b_loop2:
     REP #$20
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0300
-    STA $D0
-    STA $2181               ; WMADDL
+    ADC.w #!Gfx_8TilesBytes*3
+    STA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     REP #$10
     LDA #$0008
-    STA $C9
-    LDY #$0030
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*24
     BRA .d68b_check2
 .d68b_next2:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d68b_check2:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d68b_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d68b_next2
     BRA .d68b_done
 .d68b_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d68b_next2
 .d68b_done:
     SEP #$30
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEC
     RTS
 
 ; ============================================================
-; $C0:D738 — Sub_D738 (173 bytes, $D738–$D7E4)
-; Triple-slot pass-1, $68 variant.
-; Entry from BRL in Sub_D4F7 when $1B00,X&$7F == 1 and $0D00,X == $68.
-; Copies 8 frame tiles at Y=$20–$2F to WRAM at VRAM base+$0200,
-; then 8 tiles at Y=$30–$3F to VRAM base+$0400. INC $1B00,X; SEC RTS.
+; $C0:D738 — Obj_BuildFrame12Pass1Alt (173 bytes, $D738–$D7E4)
+; (was Sub_D738.) Pass 1, $68 layout: tiles 16-23 to +$200, tiles
+; 24-31 to +$400.
 ; ============================================================
 org $C0D738
-Sub_D738:
+Obj_BuildFrame12Pass1Alt:
     REP #$20
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0200
-    STA $D0
+    ADC.w #!Gfx_8TilesBytes*2
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB = 120
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB = 120
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL (= frame# × 120)
+    LDA.w RDMPYL            ; RDMPYL (= frame# × 120)
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$30
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     LDA #$0008
-    STA $C9
-    LDY #$0020
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*16
     BRA .d738_check
 .d738_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d738_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d738_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d738_next
     BRA .d738_loop2
 .d738_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d738_next
 .d738_loop2:
     REP #$20
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0400
-    STA $D0
-    STA $2181               ; WMADDL
+    ADC.w #!Gfx_8TilesBytes*4
+    STA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     REP #$10
     LDA #$0008
-    STA $C9
-    LDY #$0030
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*24
     BRA .d738_check2
 .d738_next2:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d738_check2:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d738_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d738_next2
     BRA .d738_done
 .d738_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d738_next2
 .d738_done:
     SEP #$30
-    LDX $6D
-    INC $1B00,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEC
     RTS
 
 ; ============================================================
-; $C0:D7E5 — Sub_D7E5 (644 bytes, $D7E5–$DA68)
-; Triple-slot pass-2+, non-$68 variant.
-; Entry from BRL in Sub_D4F7 when $1B00,X&$7F >= 2 and $0D00,X != $68.
-; Copies 16 frame tiles at Y=$40–$5F to WRAM at VRAM base+$0400, then
-; stages 12-entry OAM descriptors (three 4-tile rows). CLC RTS.
+; $C0:D7E5 — Obj_BuildFrame12Pass2 (644 bytes, $D7E5–$DA68)
+; (was Sub_D7E5.) Pass 2: tiles 32-47 to +$400, queue the VRAM
+; upload, write the 12 SprTileSrc records (tiles in rows of 8 then
+; 4), INC Obj_State; C=0.
 ; ============================================================
 org $C0D7E5
-Sub_D7E5:
+Obj_BuildFrame12Pass2:
     REP #$20
-    LDA $0D80,X
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0400
-    STA $D0
+    ADC.w #!Gfx_8TilesBytes*4
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB = 120
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB = 120
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL (= frame# × 120)
+    LDA.w RDMPYL            ; RDMPYL (= frame# × 120)
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$20
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
-    LDA #$0010              ; 16 tiles
-    STA $C9
-    LDY #$0040
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
+    LDA.w #!SprBuf_ChunkTiles ; 16 tiles
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*32
     BRA .d7e5_check
 .d7e5_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .d7e5_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .d7e5_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d7e5_next
     BRA .d7e5_oam
 .d7e5_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .d7e5_next
 .d7e5_oam:
-    ; --- OAM slot descriptor setup ---
+    ; --- Queue the VRAM upload ---
     SEP #$10                ; X/Y = 8-bit; A stays 16-bit
-    LDX $6D
-    LDA $0D00,X
-    AND #$01FF
+    LDX.b !Obj_Cur
+    LDA.w !Obj_VramTile,X
+    AND.w #!Obj_VramTileMask
     ASL
     ASL
     ASL
     ASL
-    LDX $79
-    STA $0950,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_DestA,X
     CLC
-    ADC #$0300
-    STA $0970,X
-    LDX $6D
-    LDA $0D80,X
-    LDX $79
-    STA $0940,X
+    ADC.w #!Vram_TileRowWords*3
+    STA.w !VramQ_DestB,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_SrcA,X
     CLC
-    ADC #$0500
-    STA $0960,X
-    LDA #$0500
-    STA $0980,X
-    LDA #$0100
-    STA $0990,X
-    INC $09A0,X
+    ADC.w #!Gfx_8TilesBytes*5
+    STA.w !VramQ_SrcB,X
+    LDA.w #!Gfx_8TilesBytes*5
+    STA.w !VramQ_SizeA,X
+    LDA.w #!Gfx_8TilesBytes
+    STA.w !VramQ_SizeB,X
+    INC.w !VramQ_Valid,X
     INX
     INX
-    STZ $09A0,X
-    STX $79
-    LDX $6D
-    LDA $1700,X
+    STZ.w !VramQ_Valid,X
+    STX.b !VramQ_Pos
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileRecOfs,X
     REP #$10                ; X/Y = 16-bit
     TAX
     SEP #$20                ; A = 8-bit
-    LDY #$0060
-    ; --- 12 OAM Y/tile entries ---
+    LDY.w #!Frame_TileWordBytes*48
+    ; --- Position offsets (after 48 tile words) ---
     ; entry 0
-    LDA [$D3],Y
-    STA $7F4802,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsX,X
     BPL .d7e5_y0p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y0h
 .d7e5_y0p:
     LDA #$00
 .d7e5_y0h:
-    STA $7F4803,X
+    STA.l SprTileSrc.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4804,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsY,X
     ; entry 1
     INY
-    LDA [$D3],Y
-    STA $7F480A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsX,X
     BPL .d7e5_y1p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y1h
 .d7e5_y1p:
     LDA #$00
 .d7e5_y1h:
-    STA $7F480B,X
+    STA.l SprTileSrc[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F480C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsY,X
     ; entry 2
     INY
-    LDA [$D3],Y
-    STA $7F4812,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsX,X
     BPL .d7e5_y2p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y2h
 .d7e5_y2p:
     LDA #$00
 .d7e5_y2h:
-    STA $7F4813,X
+    STA.l SprTileSrc[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4814,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsY,X
     ; entry 3
     INY
-    LDA [$D3],Y
-    STA $7F481A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsX,X
     BPL .d7e5_y3p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y3h
 .d7e5_y3p:
     LDA #$00
 .d7e5_y3h:
-    STA $7F481B,X
+    STA.l SprTileSrc[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F481C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsY,X
     ; entry 4
     INY
-    LDA [$D3],Y
-    STA $7F4822,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsX,X
     BPL .d7e5_y4p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y4h
 .d7e5_y4p:
     LDA #$00
 .d7e5_y4h:
-    STA $7F4823,X
+    STA.l SprTileSrc[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4824,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsY,X
     ; entry 5
     INY
-    LDA [$D3],Y
-    STA $7F482A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsX,X
     BPL .d7e5_y5p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y5h
 .d7e5_y5p:
     LDA #$00
 .d7e5_y5h:
-    STA $7F482B,X
+    STA.l SprTileSrc[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F482C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsY,X
     ; entry 6
     INY
-    LDA [$D3],Y
-    STA $7F4832,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsX,X
     BPL .d7e5_y6p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y6h
 .d7e5_y6p:
     LDA #$00
 .d7e5_y6h:
-    STA $7F4833,X
+    STA.l SprTileSrc[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4834,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsY,X
     ; entry 7
     INY
-    LDA [$D3],Y
-    STA $7F483A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsX,X
     BPL .d7e5_y7p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y7h
 .d7e5_y7p:
     LDA #$00
 .d7e5_y7h:
-    STA $7F483B,X
+    STA.l SprTileSrc[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F483C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsY,X
     ; entry 8
     INY
-    LDA [$D3],Y
-    STA $7F4842,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[8].OfsX,X
     BPL .d7e5_y8p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y8h
 .d7e5_y8p:
     LDA #$00
 .d7e5_y8h:
-    STA $7F4843,X
+    STA.l SprTileSrc[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4844,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[8].OfsY,X
     ; entry 9
     INY
-    LDA [$D3],Y
-    STA $7F484A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[9].OfsX,X
     BPL .d7e5_y9p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y9h
 .d7e5_y9p:
     LDA #$00
 .d7e5_y9h:
-    STA $7F484B,X
+    STA.l SprTileSrc[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F484C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[9].OfsY,X
     ; entry 10
     INY
-    LDA [$D3],Y
-    STA $7F4852,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[10].OfsX,X
     BPL .d7e5_y10p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y10h
 .d7e5_y10p:
     LDA #$00
 .d7e5_y10h:
-    STA $7F4853,X
+    STA.l SprTileSrc[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4854,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[10].OfsY,X
     ; entry 11
     INY
-    LDA [$D3],Y
-    STA $7F485A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[11].OfsX,X
     BPL .d7e5_y11p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .d7e5_y11h
 .d7e5_y11p:
     LDA #$00
 .d7e5_y11h:
-    STA $7F485B,X
+    STA.l SprTileSrc[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F485C,X
-    ; --- X-positions (8 sequential, gap at slot boundary, 4 more) ---
-    LDY $6D
-    LDA $0D00,Y
-    STA $7F4806,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[11].OfsY,X
+    ; --- Tile numbers (8 sequential, gap at slot boundary, 4 more) ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y
+    STA.l SprTileSrc.Tile,X
     INC
     INC
-    STA $7F480E,X
+    STA.l SprTileSrc[1].Tile,X
     INC
     INC
-    STA $7F4816,X
+    STA.l SprTileSrc[2].Tile,X
     INC
     INC
-    STA $7F481E,X
+    STA.l SprTileSrc[3].Tile,X
     INC
     INC
-    STA $7F4826,X
+    STA.l SprTileSrc[4].Tile,X
     INC
     INC
-    STA $7F482E,X
+    STA.l SprTileSrc[5].Tile,X
     INC
     INC
-    STA $7F4836,X
+    STA.l SprTileSrc[6].Tile,X
     INC
     INC
-    STA $7F483E,X
+    STA.l SprTileSrc[7].Tile,X
     INC
     INC
     CLC
-    ADC #$10
-    STA $7F4846,X
+    ADC.b #!Spr_TileRowStep
+    STA.l SprTileSrc[8].Tile,X
     INC
     INC
-    STA $7F484E,X
+    STA.l SprTileSrc[9].Tile,X
     INC
     INC
-    STA $7F4856,X
+    STA.l SprTileSrc[10].Tile,X
     INC
     INC
-    STA $7F485E,X
+    STA.l SprTileSrc[11].Tile,X
     ; --- attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
-    ORA $0C00,Y
-    STA $7F4807,X
-    STA $7F480F,X
-    STA $7F4817,X
-    STA $7F481F,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4827,X
-    STA $7F482F,X
-    STA $7F4837,X
-    STA $7F483F,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4847,X
-    STA $7F484F,X
-    STA $7F4857,X
-    STA $7F485F,X
-    LDX $6D
-    INC $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc.Attr,X
+    STA.l SprTileSrc[1].Attr,X
+    STA.l SprTileSrc[2].Attr,X
+    STA.l SprTileSrc[3].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[4].Attr,X
+    STA.l SprTileSrc[5].Attr,X
+    STA.l SprTileSrc[6].Attr,X
+    STA.l SprTileSrc[7].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[8].Attr,X
+    STA.l SprTileSrc[9].Attr,X
+    STA.l SprTileSrc[10].Attr,X
+    STA.l SprTileSrc[11].Attr,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:DA69 — Sub_DA69 (703 bytes, $DA69–$DD27)
-; Triple-slot pass-2+, $68 variant.
-; Entry from BRL in Sub_D4F7 when $1B00,X&$7F >= 2 and $0D00,X == $68.
-; Two 8-tile loops: Y=$40 → VRAM base+$0300, Y=$50 → base+$0500;
-; then 12-entry OAM staging for two 8-tile slots. CLC RTS.
+; $C0:DA69 — Obj_BuildFrame12Pass2Alt (703 bytes, $DA69–$DD27)
+; (was Sub_DA69.) Pass 2, $68 layout: tiles 32-39 to +$300 and 40-47
+; to +$500, queue the upload, write the 12 SprTileSrc records (rows
+; of 4 then 8); C=0.
 ; ============================================================
 org $C0DA69
-Sub_DA69:
+Obj_BuildFrame12Pass2Alt:
     REP #$20
-    LDA $0D80,X
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0300
-    STA $D0
+    ADC.w #!Gfx_8TilesBytes*3
+    STA.b !Spr_WramPtr
     SEP #$20
-    LDA $0F01,X
-    STA $4202               ; WRMPYA
-    LDA #$78
-    STA $4203               ; WRMPYB = 120
-    LDA $1300,X
-    STA $D5
+    LDA.w !Obj_LastFrame,X
+    STA.w WRMPYA            ; WRMPYA
+    LDA.b #!Frame12_Bytes
+    STA.w WRMPYB            ; WRMPYB = 120
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20
-    LDA $4216               ; RDMPYL (= frame# × 120)
+    LDA.w RDMPYL            ; RDMPYL (= frame# × 120)
     CLC
-    ADC $1380,X
-    STA $D3
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
     SEP #$20
     LDA #$01
-    STA $2183               ; WMADDH
+    STA.w WMADDH            ; WMADDH
     REP #$30
-    LDA $D0
-    STA $2181               ; WMADDL
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     LDA #$0008              ; 8 tiles
-    STA $C9
-    LDY #$0040
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*32
     BRA .da69_check
 .da69_next:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .da69_check:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .da69_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .da69_next
     BRA .da69_loop2
 .da69_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .da69_next
 .da69_loop2:
-    LDX $6D
-    LDA $0D80,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
     CLC
-    ADC #$0500
-    STA $D0
-    STA $2181               ; WMADDL
+    ADC.w #!Gfx_8TilesBytes*5
+    STA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMADDL
     LDA #$0008              ; 8 tiles
-    STA $C9
-    LDY #$0050
+    STA.b !Spr_TileCount
+    LDY.w #!Frame_TileWordBytes*40
     BRA .da69_check2
 .da69_next2:
-    LDA $D0
+    LDA.b !Spr_WramPtr
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .da69_check2:
-    LDA [$D3],Y
-    BIT #$4000
+    LDA.b [!Spr_FramePtr],Y
+    BIT.w #!SprFrame_HFlip
     BNE .da69_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .da69_next2
     BRA .da69_oam
 .da69_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .da69_next2
 .da69_oam:
-    ; --- OAM slot descriptor setup ---
+    ; --- Queue the VRAM upload ---
     SEP #$10                ; X/Y = 8-bit; A stays 16-bit
-    LDX $6D
-    LDA $0D00,X
-    AND #$01FF
+    LDX.b !Obj_Cur
+    LDA.w !Obj_VramTile,X
+    AND.w #!Obj_VramTileMask
     ASL
     ASL
     ASL
     ASL
-    LDX $79
-    STA $0950,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_DestA,X
     CLC
-    ADC #$0100
-    STA $0970,X
-    LDX $6D
-    LDA $0D80,X
-    LDX $79
-    STA $0940,X
+    ADC.w #!Vram_TileRowWords
+    STA.w !VramQ_DestB,X
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileBuf,X
+    LDX.b !VramQ_Pos
+    STA.w !VramQ_SrcA,X
     CLC
-    ADC #$0100
-    STA $0960,X
-    LDA #$0100
-    STA $0980,X
-    LDA #$0500
-    STA $0990,X
-    INC $09A0,X
+    ADC.w #!Gfx_8TilesBytes
+    STA.w !VramQ_SrcB,X
+    LDA.w #!Gfx_8TilesBytes
+    STA.w !VramQ_SizeA,X
+    LDA.w #!Gfx_8TilesBytes*5
+    STA.w !VramQ_SizeB,X
+    INC.w !VramQ_Valid,X
     INX
     INX
-    STZ $09A0,X
-    STX $79
-    LDX $6D
-    LDA $1700,X
+    STZ.w !VramQ_Valid,X
+    STX.b !VramQ_Pos
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileRecOfs,X
     REP #$10                ; X/Y = 16-bit
     TAX
     SEP #$20                ; A = 8-bit
-    LDY #$0060
-    ; --- 12 OAM Y/tile entries ---
+    LDY.w #!Frame_TileWordBytes*48
+    ; --- Position offsets (after 48 tile words) ---
     ; entry 0
-    LDA [$D3],Y
-    STA $7F4802,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsX,X
     BPL .da69_y0p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y0h
 .da69_y0p:
     LDA #$00
 .da69_y0h:
-    STA $7F4803,X
+    STA.l SprTileSrc.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4804,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc.OfsY,X
     ; entry 1
     INY
-    LDA [$D3],Y
-    STA $7F480A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsX,X
     BPL .da69_y1p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y1h
 .da69_y1p:
     LDA #$00
 .da69_y1h:
-    STA $7F480B,X
+    STA.l SprTileSrc[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F480C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[1].OfsY,X
     ; entry 2
     INY
-    LDA [$D3],Y
-    STA $7F4812,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsX,X
     BPL .da69_y2p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y2h
 .da69_y2p:
     LDA #$00
 .da69_y2h:
-    STA $7F4813,X
+    STA.l SprTileSrc[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4814,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[2].OfsY,X
     ; entry 3
     INY
-    LDA [$D3],Y
-    STA $7F481A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsX,X
     BPL .da69_y3p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y3h
 .da69_y3p:
     LDA #$00
 .da69_y3h:
-    STA $7F481B,X
+    STA.l SprTileSrc[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F481C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[3].OfsY,X
     ; entry 4
     INY
-    LDA [$D3],Y
-    STA $7F4822,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsX,X
     BPL .da69_y4p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y4h
 .da69_y4p:
     LDA #$00
 .da69_y4h:
-    STA $7F4823,X
+    STA.l SprTileSrc[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4824,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[4].OfsY,X
     ; entry 5
     INY
-    LDA [$D3],Y
-    STA $7F482A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsX,X
     BPL .da69_y5p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y5h
 .da69_y5p:
     LDA #$00
 .da69_y5h:
-    STA $7F482B,X
+    STA.l SprTileSrc[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F482C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[5].OfsY,X
     ; entry 6
     INY
-    LDA [$D3],Y
-    STA $7F4832,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsX,X
     BPL .da69_y6p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y6h
 .da69_y6p:
     LDA #$00
 .da69_y6h:
-    STA $7F4833,X
+    STA.l SprTileSrc[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4834,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[6].OfsY,X
     ; entry 7
     INY
-    LDA [$D3],Y
-    STA $7F483A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsX,X
     BPL .da69_y7p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y7h
 .da69_y7p:
     LDA #$00
 .da69_y7h:
-    STA $7F483B,X
+    STA.l SprTileSrc[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F483C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[7].OfsY,X
     ; entry 8
     INY
-    LDA [$D3],Y
-    STA $7F4842,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[8].OfsX,X
     BPL .da69_y8p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y8h
 .da69_y8p:
     LDA #$00
 .da69_y8h:
-    STA $7F4843,X
+    STA.l SprTileSrc[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4844,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[8].OfsY,X
     ; entry 9
     INY
-    LDA [$D3],Y
-    STA $7F484A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[9].OfsX,X
     BPL .da69_y9p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y9h
 .da69_y9p:
     LDA #$00
 .da69_y9h:
-    STA $7F484B,X
+    STA.l SprTileSrc[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F484C,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[9].OfsY,X
     ; entry 10
     INY
-    LDA [$D3],Y
-    STA $7F4852,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[10].OfsX,X
     BPL .da69_y10p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y10h
 .da69_y10p:
     LDA #$00
 .da69_y10h:
-    STA $7F4853,X
+    STA.l SprTileSrc[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4854,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[10].OfsY,X
     ; entry 11
     INY
-    LDA [$D3],Y
-    STA $7F485A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[11].OfsX,X
     BPL .da69_y11p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .da69_y11h
 .da69_y11p:
     LDA #$00
 .da69_y11h:
-    STA $7F485B,X
+    STA.l SprTileSrc[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F485C,X
-    ; --- X-positions (4 sequential, gap at slot boundary, 8 more) ---
-    LDY $6D
-    LDA $0D00,Y
-    STA $7F4806,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTileSrc[11].OfsY,X
+    ; --- Tile numbers (4 sequential, gap at slot boundary, 8 more) ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y
+    STA.l SprTileSrc.Tile,X
     INC
     INC
-    STA $7F480E,X
+    STA.l SprTileSrc[1].Tile,X
     INC
     INC
-    STA $7F4816,X
+    STA.l SprTileSrc[2].Tile,X
     INC
     INC
-    STA $7F481E,X
+    STA.l SprTileSrc[3].Tile,X
     INC
     INC
     CLC
-    ADC #$10
-    STA $7F4826,X
+    ADC.b #!Spr_TileRowStep
+    STA.l SprTileSrc[4].Tile,X
     INC
     INC
-    STA $7F482E,X
+    STA.l SprTileSrc[5].Tile,X
     INC
     INC
-    STA $7F4836,X
+    STA.l SprTileSrc[6].Tile,X
     INC
     INC
-    STA $7F483E,X
+    STA.l SprTileSrc[7].Tile,X
     INC
     INC
-    STA $7F4846,X
+    STA.l SprTileSrc[8].Tile,X
     INC
     INC
-    STA $7F484E,X
+    STA.l SprTileSrc[9].Tile,X
     INC
     INC
-    STA $7F4856,X
+    STA.l SprTileSrc[10].Tile,X
     INC
     INC
-    STA $7F485E,X
+    STA.l SprTileSrc[11].Tile,X
     ; --- attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
-    ORA $0C00,Y
-    STA $7F4807,X
-    STA $7F480F,X
-    STA $7F4817,X
-    STA $7F481F,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4827,X
-    STA $7F482F,X
-    STA $7F4837,X
-    STA $7F483F,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4847,X
-    STA $7F484F,X
-    STA $7F4857,X
-    STA $7F485F,X
-    LDX $6D
-    INC $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTileSrc.Attr,X
+    STA.l SprTileSrc[1].Attr,X
+    STA.l SprTileSrc[2].Attr,X
+    STA.l SprTileSrc[3].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[4].Attr,X
+    STA.l SprTileSrc[5].Attr,X
+    STA.l SprTileSrc[6].Attr,X
+    STA.l SprTileSrc[7].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTileSrc[8].Attr,X
+    STA.l SprTileSrc[9].Attr,X
+    STA.l SprTileSrc[10].Attr,X
+    STA.l SprTileSrc[11].Attr,X
+    LDX.b !Obj_Cur
+    INC.w !Obj_State,X
     SEP #$10
     CLC
     RTS
 
 ; ============================================================
-; $C0:DD28 — Sub_DD28 (1026 bytes, $DD28–$E129)
-; 12-slot OAM buffer init, pass-1 path (sprite type 2).
-; Called via BRL from Sub_CB0A when bits 0-1 of $1201,X == 2.
-; Two sub-paths selected by $0D00,X:
-;   $0D00,X == $68 → BRL to alt path at $DF2F
-;   otherwise      → main path at $DD34
-; Both paths: multiply frame# × $78 for animation data offset;
-; read 12 tile-entry pairs (Y starts at $60) into $7F4Bxx/$7F4Cxx
-; OAM staging (groups at stride $08: C2–1C).
-; X-positions differ between paths:
-;   main: 8-slot block (C6–FE), gap +$10, 4-slot block (C06–C1E)
-;   alt:  4-slot block (C6–DE), gap +$10, 8-slot block (E6–C1E)
-; Attribute bytes: $0C00 → C7-DF; $0C01 → E7-FF and C07-C1F.
-; On completion: $1B00,X = $80, SEP #$10, CLC, RTS.
-; Entry: M=1, X/Y=16-bit; X = entity slot.
+; $C0:DD28 — Obj_FrameLayout12 (1026 bytes, $DD28–$E129)
+; (was Sub_DD28.) As Obj_FrameLayout4 for a 12-tile object (frame
+; record 120 bytes, positions after 48 tile words), with the two
+; tile-number layouts of the 12-tile builders (Obj_VramTile = $68 →
+; .dd28_alt); Obj_State = $80.
+; Entry: M=1, X/Y 16-bit, X = Obj_Cur.
 ; ============================================================
 org $C0DD28
-Sub_DD28:
-    LDA $0D00,X              ; sprite type/layout flag
-    CMP #$68
+Obj_FrameLayout12:
+    LDA.w !Obj_VramTile,X    ; Obj_VramTile ($68 = alternate layout)
+    CMP.b #!ObjTile_AltLayout
     BEQ .dd28_alt_branch     ; == $68: use alt path
     BRA .dd28_main           ; else: main path
 .dd28_alt_branch:
-    BRL $01FB                ; tail-call alt path at $DF2F
+    BRL .dd28_alt                ; tail-call alt path at $DF2F
     ; ---- main path ----
 .dd28_main:
-    LDA $0F01,X              ; animation frame number
-    STA $4202                ; WRMPYA
-    LDA #$78                 ; multiply by $78 = 120
-    STA $4203                ; WRMPYB → triggers multiply
-    LDA $1300,X              ; animation data bank byte
-    STA $D5
+    LDA.w !Obj_LastFrame,X   ; animation frame number
+    STA.w WRMPYA             ; WRMPYA
+    LDA.b #!Frame12_Bytes    ; multiply by $78 = 120
+    STA.w WRMPYB             ; WRMPYB → triggers multiply
+    LDA.w !Obj_FrameBank,X   ; animation data bank byte
+    STA.b !Spr_FramePtr+2
     REP #$20                 ; A 16-bit
-    LDA $4216                ; RDMPYL: frame# × $78
+    LDA.w RDMPYL             ; RDMPYL: frame# × $78
     CLC
-    ADC $1380,X              ; add sprite base offset
-    STA $D3                  ; dp:$D3 = animation data ptr
-    LDA $1700,X              ; OAM buffer index from ROM table ($C01700,X)
+    ADC.w !Obj_FrameOfs,X    ; add sprite base offset
+    STA.b !Spr_FramePtr      ; dp:$D3 = animation data ptr
+    LDA.w !Obj_TileRecOfs,X  ; object's first tile record
     REP #$10                 ; X/Y 16-bit
-    TAX                      ; X = OAM buffer index
+    TAX                      ; X = first tile record
     SEP #$20                 ; A 8-bit
-    LDY #$0060               ; animation data start offset
-    ; --- 12 OAM tile-entry groups (stride $08) ---
-    ; entry 0: OAM C2/C3/C4
-    LDA [$D3],Y
-    STA $7F4BC2,X
+    LDY.w #!Frame_TileWordBytes*48 ; animation data start offset
+    ; --- 12 records: OfsX (sign-extended), OfsY ---
+    ; record 0
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsX,X
     BPL .dd28_y0p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y0h
 .dd28_y0p:
     LDA #$00
 .dd28_y0h:
-    STA $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BC4,X
-    ; entry 1: OAM CA/CB/CC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X
+    ; record 1
     INY
-    LDA [$D3],Y
-    STA $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsX,X
     BPL .dd28_y1p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y1h
 .dd28_y1p:
     LDA #$00
 .dd28_y1h:
-    STA $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BCC,X
-    ; entry 2: OAM D2/D3/D4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X
+    ; record 2
     INY
-    LDA [$D3],Y
-    STA $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsX,X
     BPL .dd28_y2p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y2h
 .dd28_y2p:
     LDA #$00
 .dd28_y2h:
-    STA $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BD4,X
-    ; entry 3: OAM DA/DB/DC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X
+    ; record 3
     INY
-    LDA [$D3],Y
-    STA $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsX,X
     BPL .dd28_y3p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y3h
 .dd28_y3p:
     LDA #$00
 .dd28_y3h:
-    STA $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BDC,X
-    ; entry 4: OAM E2/E3/E4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X
+    ; record 4
     INY
-    LDA [$D3],Y
-    STA $7F4BE2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsX,X
     BPL .dd28_y4p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y4h
 .dd28_y4p:
     LDA #$00
 .dd28_y4h:
-    STA $7F4BE3,X
+    STA.l SprTile[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BE4,X
-    ; entry 5: OAM EA/EB/EC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsY,X
+    ; record 5
     INY
-    LDA [$D3],Y
-    STA $7F4BEA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsX,X
     BPL .dd28_y5p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y5h
 .dd28_y5p:
     LDA #$00
 .dd28_y5h:
-    STA $7F4BEB,X
+    STA.l SprTile[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BEC,X
-    ; entry 6: OAM F2/F3/F4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsY,X
+    ; record 6
     INY
-    LDA [$D3],Y
-    STA $7F4BF2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsX,X
     BPL .dd28_y6p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y6h
 .dd28_y6p:
     LDA #$00
 .dd28_y6h:
-    STA $7F4BF3,X
+    STA.l SprTile[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BF4,X
-    ; entry 7: OAM FA/FB/FC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsY,X
+    ; record 7
     INY
-    LDA [$D3],Y
-    STA $7F4BFA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsX,X
     BPL .dd28_y7p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y7h
 .dd28_y7p:
     LDA #$00
 .dd28_y7h:
-    STA $7F4BFB,X
+    STA.l SprTile[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BFC,X
-    ; entry 8: OAM $4C02/03/04
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsY,X
+    ; record 8
     INY
-    LDA [$D3],Y
-    STA $7F4C02,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsX,X
     BPL .dd28_y8p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y8h
 .dd28_y8p:
     LDA #$00
 .dd28_y8h:
-    STA $7F4C03,X
+    STA.l SprTile[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C04,X
-    ; entry 9: OAM $4C0A/0B/0C
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsY,X
+    ; record 9
     INY
-    LDA [$D3],Y
-    STA $7F4C0A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsX,X
     BPL .dd28_y9p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y9h
 .dd28_y9p:
     LDA #$00
 .dd28_y9h:
-    STA $7F4C0B,X
+    STA.l SprTile[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C0C,X
-    ; entry 10: OAM $4C12/13/14
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsY,X
+    ; record 10
     INY
-    LDA [$D3],Y
-    STA $7F4C12,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsX,X
     BPL .dd28_y10p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y10h
 .dd28_y10p:
     LDA #$00
 .dd28_y10h:
-    STA $7F4C13,X
+    STA.l SprTile[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C14,X
-    ; entry 11: OAM $4C1A/1B/1C
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsY,X
+    ; record 11
     INY
-    LDA [$D3],Y
-    STA $7F4C1A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsX,X
     BPL .dd28_y11p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28_y11h
 .dd28_y11p:
     LDA #$00
 .dd28_y11h:
-    STA $7F4C1B,X
+    STA.l SprTile[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C1C,X
-    ; --- X-positions: 8-slot block, gap +$10, 4-slot block ---
-    LDY $6D
-    LDA $0D00,Y              ; base X coordinate
-    STA $7F4BC6,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsY,X
+    ; --- Tile numbers: 8-slot block, gap +$10, 4-slot block ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y    ; base X coordinate
+    STA.l SprTile.Tile,X
     INC
     INC
-    STA $7F4BCE,X
+    STA.l SprTile[1].Tile,X
     INC
     INC
-    STA $7F4BD6,X
+    STA.l SprTile[2].Tile,X
     INC
     INC
-    STA $7F4BDE,X
+    STA.l SprTile[3].Tile,X
     INC
     INC
-    STA $7F4BE6,X
+    STA.l SprTile[4].Tile,X
     INC
     INC
-    STA $7F4BEE,X
+    STA.l SprTile[5].Tile,X
     INC
     INC
-    STA $7F4BF6,X
+    STA.l SprTile[6].Tile,X
     INC
     INC
-    STA $7F4BFE,X
+    STA.l SprTile[7].Tile,X
     INC
     INC
     CLC
-    ADC #$10                 ; gap: skip $10 pixels
-    STA $7F4C06,X
+    ADC.b #!Spr_TileRowStep  ; gap: skip $10 pixels
+    STA.l SprTile[8].Tile,X
     INC
     INC
-    STA $7F4C0E,X
+    STA.l SprTile[9].Tile,X
     INC
     INC
-    STA $7F4C16,X
+    STA.l SprTile[10].Tile,X
     INC
     INC
-    STA $7F4C1E,X
+    STA.l SprTile[11].Tile,X
     ; --- attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
-    ORA $0C00,Y
-    STA $7F4BC7,X
-    STA $7F4BCF,X
-    STA $7F4BD7,X
-    STA $7F4BDF,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BE7,X
-    STA $7F4BEF,X
-    STA $7F4BF7,X
-    STA $7F4BFF,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4C07,X
-    STA $7F4C0F,X
-    STA $7F4C17,X
-    STA $7F4C1F,X
-    LDX $6D
-    LDA #$80
-    STA.w $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile.Attr,X
+    STA.l SprTile[1].Attr,X
+    STA.l SprTile[2].Attr,X
+    STA.l SprTile[3].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[4].Attr,X
+    STA.l SprTile[5].Attr,X
+    STA.l SprTile[6].Attr,X
+    STA.l SprTile[7].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[8].Attr,X
+    STA.l SprTile[9].Attr,X
+    STA.l SprTile[10].Attr,X
+    STA.l SprTile[11].Attr,X
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     SEP #$10
     CLC
     RTS
-    ; ---- alt path ($DF2F): for $0D00,X == $68 ----
+    ; ---- alt path ($DF2F): for Obj_VramTile == $68 ----
 .dd28_alt:
-    LDA $0F01,X              ; animation frame number
-    STA $4202                ; WRMPYA
-    LDA #$78                 ; multiply by $78 = 120
-    STA $4203                ; WRMPYB
-    LDA $1300,X              ; animation data bank byte
-    STA $D5
+    LDA.w !Obj_LastFrame,X   ; animation frame number
+    STA.w WRMPYA             ; WRMPYA
+    LDA.b #!Frame12_Bytes    ; multiply by $78 = 120
+    STA.w WRMPYB             ; WRMPYB
+    LDA.w !Obj_FrameBank,X   ; animation data bank byte
+    STA.b !Spr_FramePtr+2
     REP #$20                 ; A 16-bit
-    LDA $4216                ; RDMPYL: frame# × $78
+    LDA.w RDMPYL             ; RDMPYL: frame# × $78
     CLC
-    ADC $1380,X
-    STA $D3
-    LDA $1700,X              ; OAM buffer index from ROM table
+    ADC.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
+    LDA.w !Obj_TileRecOfs,X  ; OAM buffer index from ROM table
     REP #$10                 ; X/Y 16-bit
     TAX
     SEP #$20                 ; A 8-bit
-    LDY #$0060               ; animation data start offset
+    LDY.w #!Frame_TileWordBytes*48 ; animation data start offset
     ; --- 12 OAM tile-entry groups (stride $08, same as main path) ---
-    ; entry 0: OAM C2/C3/C4
-    LDA [$D3],Y
-    STA $7F4BC2,X
+    ; record 0
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsX,X
     BPL .dd28a_y0p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y0h
 .dd28a_y0p:
     LDA #$00
 .dd28a_y0h:
-    STA $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BC4,X
-    ; entry 1: OAM CA/CB/CC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X
+    ; record 1
     INY
-    LDA [$D3],Y
-    STA $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsX,X
     BPL .dd28a_y1p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y1h
 .dd28a_y1p:
     LDA #$00
 .dd28a_y1h:
-    STA $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BCC,X
-    ; entry 2: OAM D2/D3/D4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X
+    ; record 2
     INY
-    LDA [$D3],Y
-    STA $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsX,X
     BPL .dd28a_y2p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y2h
 .dd28a_y2p:
     LDA #$00
 .dd28a_y2h:
-    STA $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BD4,X
-    ; entry 3: OAM DA/DB/DC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X
+    ; record 3
     INY
-    LDA [$D3],Y
-    STA $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsX,X
     BPL .dd28a_y3p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y3h
 .dd28a_y3p:
     LDA #$00
 .dd28a_y3h:
-    STA $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BDC,X
-    ; entry 4: OAM E2/E3/E4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X
+    ; record 4
     INY
-    LDA [$D3],Y
-    STA $7F4BE2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsX,X
     BPL .dd28a_y4p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y4h
 .dd28a_y4p:
     LDA #$00
 .dd28a_y4h:
-    STA $7F4BE3,X
+    STA.l SprTile[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BE4,X
-    ; entry 5: OAM EA/EB/EC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsY,X
+    ; record 5
     INY
-    LDA [$D3],Y
-    STA $7F4BEA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsX,X
     BPL .dd28a_y5p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y5h
 .dd28a_y5p:
     LDA #$00
 .dd28a_y5h:
-    STA $7F4BEB,X
+    STA.l SprTile[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BEC,X
-    ; entry 6: OAM F2/F3/F4
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsY,X
+    ; record 6
     INY
-    LDA [$D3],Y
-    STA $7F4BF2,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsX,X
     BPL .dd28a_y6p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y6h
 .dd28a_y6p:
     LDA #$00
 .dd28a_y6h:
-    STA $7F4BF3,X
+    STA.l SprTile[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BF4,X
-    ; entry 7: OAM FA/FB/FC
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsY,X
+    ; record 7
     INY
-    LDA [$D3],Y
-    STA $7F4BFA,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsX,X
     BPL .dd28a_y7p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y7h
 .dd28a_y7p:
     LDA #$00
 .dd28a_y7h:
-    STA $7F4BFB,X
+    STA.l SprTile[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4BFC,X
-    ; entry 8: OAM $4C02/03/04
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsY,X
+    ; record 8
     INY
-    LDA [$D3],Y
-    STA $7F4C02,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsX,X
     BPL .dd28a_y8p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y8h
 .dd28a_y8p:
     LDA #$00
 .dd28a_y8h:
-    STA $7F4C03,X
+    STA.l SprTile[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C04,X
-    ; entry 9: OAM $4C0A/0B/0C
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsY,X
+    ; record 9
     INY
-    LDA [$D3],Y
-    STA $7F4C0A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsX,X
     BPL .dd28a_y9p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y9h
 .dd28a_y9p:
     LDA #$00
 .dd28a_y9h:
-    STA $7F4C0B,X
+    STA.l SprTile[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C0C,X
-    ; entry 10: OAM $4C12/13/14
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsY,X
+    ; record 10
     INY
-    LDA [$D3],Y
-    STA $7F4C12,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsX,X
     BPL .dd28a_y10p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y10h
 .dd28a_y10p:
     LDA #$00
 .dd28a_y10h:
-    STA $7F4C13,X
+    STA.l SprTile[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C14,X
-    ; entry 11: OAM $4C1A/1B/1C
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsY,X
+    ; record 11
     INY
-    LDA [$D3],Y
-    STA $7F4C1A,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsX,X
     BPL .dd28a_y11p
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .dd28a_y11h
 .dd28a_y11p:
     LDA #$00
 .dd28a_y11h:
-    STA $7F4C1B,X
+    STA.l SprTile[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA $7F4C1C,X
-    ; --- X-positions: 4-slot block, gap +$10, 8-slot block ---
-    LDY $6D
-    LDA $0D00,Y              ; base X coordinate
-    STA $7F4BC6,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsY,X
+    ; --- Tile numbers: 4-slot block, gap +$10, 8-slot block ---
+    LDY.b !Obj_Cur
+    LDA.w !Obj_VramTile,Y    ; base X coordinate
+    STA.l SprTile.Tile,X
     INC
     INC
-    STA $7F4BCE,X
+    STA.l SprTile[1].Tile,X
     INC
     INC
-    STA $7F4BD6,X
+    STA.l SprTile[2].Tile,X
     INC
     INC
-    STA $7F4BDE,X
+    STA.l SprTile[3].Tile,X
     INC
     INC
     CLC
-    ADC #$10                 ; gap: skip $10 pixels after 4th slot
-    STA $7F4BE6,X
+    ADC.b #!Spr_TileRowStep  ; gap: skip $10 pixels after 4th slot
+    STA.l SprTile[4].Tile,X
     INC
     INC
-    STA $7F4BEE,X
+    STA.l SprTile[5].Tile,X
     INC
     INC
-    STA $7F4BF6,X
+    STA.l SprTile[6].Tile,X
     INC
     INC
-    STA $7F4BFE,X
+    STA.l SprTile[7].Tile,X
     INC
     INC
-    STA $7F4C06,X
+    STA.l SprTile[8].Tile,X
     INC
     INC
-    STA $7F4C0E,X
+    STA.l SprTile[9].Tile,X
     INC
     INC
-    STA $7F4C16,X
+    STA.l SprTile[10].Tile,X
     INC
     INC
-    STA $7F4C1E,X
+    STA.l SprTile[11].Tile,X
     ; --- attribute bytes ---
-    LDA $0F81,Y
-    ORA $0D01,Y
-    STA $D9
-    ORA $0C00,Y
-    STA $7F4BC7,X
-    STA $7F4BCF,X
-    STA $7F4BD7,X
-    STA $7F4BDF,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4BE7,X
-    STA $7F4BEF,X
-    STA $7F4BF7,X
-    STA $7F4BFF,X
-    LDA $D9
-    ORA $0C01,Y
-    STA $7F4C07,X
-    STA $7F4C0F,X
-    STA $7F4C17,X
-    STA $7F4C1F,X
-    LDX $6D
-    LDA #$80
-    STA.w $1B00,X
+    LDA.w !Obj_OamAttr,Y
+    ORA.w !Obj_VramTileHi,Y
+    STA.b !Spr_AttrBase
+    ORA.w !Obj_PrioLow,Y
+    STA.l SprTile.Attr,X
+    STA.l SprTile[1].Attr,X
+    STA.l SprTile[2].Attr,X
+    STA.l SprTile[3].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[4].Attr,X
+    STA.l SprTile[5].Attr,X
+    STA.l SprTile[6].Attr,X
+    STA.l SprTile[7].Attr,X
+    LDA.b !Spr_AttrBase
+    ORA.w !Obj_PrioHigh,Y
+    STA.l SprTile[8].Attr,X
+    STA.l SprTile[9].Attr,X
+    STA.l SprTile[10].Attr,X
+    STA.l SprTile[11].Attr,X
+    LDX.b !Obj_Cur
+    LDA.b #!ObjState_Ready
+    STA.w !Obj_State,X
     SEP #$10
     CLC
     RTS

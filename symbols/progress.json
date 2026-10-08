@@ -8,8 +8,8 @@
       "bytes": 29032
     },
     "readable": {
-      "functions": 162,
-      "bytes": 9703
+      "functions": 256,
+      "bytes": 29032
     },
     "verified": {
       "functions": 23,
@@ -26,8 +26,8 @@
         "bytes": 19585
       },
       "readable": {
-        "functions": 23,
-        "bytes": 256
+        "functions": 117,
+        "bytes": 19585
       },
       "verified": {
         "functions": 23,
@@ -84,17 +84,17 @@
         "GameLoop_FrameBody",
         "VBlankHandler",
         "VBlankHandlerShort",
-        "Sub_00EB",
+        "Field_IdleFrame",
         "LoadLocation",
-        "Sub_011B",
-        "Sub_01A5",
-        "Sub_0905",
-        "Sub_0918",
+        "Field_SaveState",
+        "Field_RestoreState",
+        "Field_RestoreSaveBlock",
+        "Field_StashSaveBlock",
         "InitHW",
         "InstallNMI",
         "InstallIRQ",
         "FrameStateInit",
-        "Sub_0C76",
+        "Field_SceneChangeTick",
         "ModeE6_Handler",
         "ModeEC_Handler"
       ]
@@ -109,17 +109,17 @@
         "ModeFA_Handler",
         "ModeFC_Handler",
         "DefaultHandler",
-        "Sub_18D9",
-        "Sub_1985",
-        "Sub_19C7",
-        "Sub_1A03",
+        "Field_PauseAndMenuInput",
+        "Field_FadeToBankC2Mode5",
+        "Field_RunBankC2Mode5",
+        "Party_ReinitIfChanged",
         "Sub_1ADF",
-        "Sub_1B36",
-        "Sub_1B90",
-        "Sub_1B90_body",
-        "Sub_1BA7",
-        "Sub_1F24",
-        "Sub_1F5A"
+        "Bg_TilemapIndex64x32",
+        "Audio_PlayTileSfxA",
+        "Audio_PlaySfxAtLeader",
+        "Audio_PlayTileSfxB",
+        "Fade_StepBrightness",
+        "Fade_StepFixedColor"
       ]
     },
     {
@@ -128,7 +128,7 @@
       "end": "$C0:2FFF",
       "emitted_bytes": 81,
       "functions": [
-        "Sub_2824",
+        "Field_FadeInAfterReload",
         "ClearRAMDMA"
       ]
     },
@@ -152,8 +152,8 @@
       "end": "$C0:5FFF",
       "emitted_bytes": 125,
       "functions": [
-        "Sub_595C",
-        "Sub_597D"
+        "Evt_RunObj0Func1",
+        "Evt_RunObjInit"
       ]
     },
     {
@@ -197,7 +197,7 @@
       "end": "$C0:BFFF",
       "emitted_bytes": 3503,
       "functions": [
-        "Sub_B192",
+        "Obj_ResetStates",
         "PostVBlank",
         "PV_SpriteLoop",
         "PV_CheckChain",
@@ -208,13 +208,13 @@
         "PV_EndRange2",
         "PV_FillRange3",
         "PV_EndRange3",
-        "Sub_B309",
-        "Sub_B701",
-        "Sub_B788",
-        "Sub_B8CA",
-        "Sub_BA65",
-        "Sub_BCDC",
-        "Sub_BFF2"
+        "Spr_AppendToOam",
+        "Spr_PrepareTiles",
+        "Spr_Place4",
+        "Spr_Load4",
+        "Spr_Place8",
+        "Spr_Load8",
+        "Spr_Place12"
       ]
     },
     {
@@ -223,17 +223,17 @@
       "end": "$C0:CFFF",
       "emitted_bytes": 4096,
       "functions": [
-        "Sub_C2BF",
-        "Sub_C6E7",
-        "Sub_C73A",
+        "Spr_Load12",
+        "Spr_PackHiBits4",
+        "Spr_Place24",
         "Obj_AnimTickAndQueue",
         "Field_ProcessAnimQueue",
         "Obj_BuildSpriteFrameStep",
-        "Sub_CB0A",
-        "Sub_CB3A",
-        "Sub_CBDC",
-        "Sub_CDC8",
-        "Sub_CEF5"
+        "Obj_BuildFrameLayout",
+        "Obj_AnimFrameLookup",
+        "Obj_BuildFrame4",
+        "Obj_FrameLayout4",
+        "Obj_BuildFrame8"
       ]
     },
     {
@@ -242,17 +242,17 @@
       "end": "$C0:DFFF",
       "emitted_bytes": 4096,
       "functions": [
-        "Sub_D124",
-        "Sub_D28A",
-        "Sub_D30D",
-        "Sub_D4F7",
-        "Sub_D546",
-        "Sub_D608",
-        "Sub_D68B",
-        "Sub_D738",
-        "Sub_D7E5",
-        "Sub_DA69",
-        "Sub_DD28"
+        "Obj_FrameLayout8",
+        "Obj_BuildFrame8Pass0",
+        "Obj_BuildFrame8Pass1",
+        "Obj_BuildFrame12",
+        "Obj_BuildFrame12Pass0",
+        "Obj_BuildFrame12Pass0Alt",
+        "Obj_BuildFrame12Pass1",
+        "Obj_BuildFrame12Pass1Alt",
+        "Obj_BuildFrame12Pass2",
+        "Obj_BuildFrame12Pass2Alt",
+        "Obj_FrameLayout12"
       ]
     },
     {
@@ -261,20 +261,20 @@
       "end": "$C0:EFFF",
       "emitted_bytes": 2626,
       "functions": [
-        "Sub_E12A",
-        "Sub_E534",
-        "Sub_E687",
-        "Sub_E739",
-        "Sub_E7BC",
-        "Sub_E83F",
-        "Sub_E8C2",
-        "Sub_E935",
-        "Sub_E952",
-        "Sub_E97A",
-        "Sub_E9AA",
-        "Sub_E9E2",
-        "Sub_E9FF",
-        "Sub_EA1F"
+        "Spr_LoadLargeObj",
+        "Spr_CopyTileFlipped",
+        "Spr_CopyTile",
+        "Spr_CopyTileD4",
+        "Spr_CopyTileD2",
+        "Spr_CopyTileD3",
+        "Spr_CopyTile7F",
+        "SprBuf_FreeAll",
+        "SprBuf_Alloc1",
+        "SprBuf_Alloc2",
+        "SprBuf_Alloc3",
+        "SprBuf_Free1",
+        "SprBuf_Free2",
+        "SprBuf_Free3"
       ]
     },
     {
