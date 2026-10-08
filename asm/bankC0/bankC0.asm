@@ -31,7 +31,10 @@ incsrc "../hardware.inc"
 ; variables are reached with absolute !DP_Field+ addresses.
 ; On entry: M=1, X=0 (16-bit), DP=$0100, DB=$00 (the high-table
 ; stores through Eng_PtrBase are bank $00), Obj_Cur = object.
-; Exit: M=1, X=0, DP=$0100 (PLD), DB=$00; A and X clobbered. Y is
+; Exit: M=1, X=0, DP=$0100 (PLD), DB=$00; A and X clobbered;
+; Spr_TileCount left at 0; Spr_PrepareTiles and its callees write DP
+; Spr_BaseX/BaseY ($C3-$C6), Spr_FirstRec ($D9) and Spr_HiBits/HiBitTmp
+; ($E5-$E7). Y is
 ; preserved (neither this routine nor its callees touch it), which
 ; Oam_BuildShadow relies on: it keeps its bucket index in Y across the call.
 ; ============================================================
@@ -3564,14 +3567,16 @@ Spr_Load12:
 ;    16x16 tile numbers $40-$4E / $60-$6E / $80-$8E; Attr = $22.
 ; Earlier notes read the frame data as "scene data" and the position
 ; bytes as palette groups.
-; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100, DB=$00 (absolute
+; On entry: X = Obj_Cur (8- or 16-bit: the $C0:47E9 caller runs with X
+; 8-bit; the routine widens X/Y itself), M=1, DP=$0100, DB=$00 (absolute
 ; object-table loads and DMA register stores). Callers (both JSR):
 ; Field_RestoreState ($C0:0212) for Field_UnkAEObj, and unmatched object
 ; set-up code at $C0:47E9, which first stores the object in
 ; Field_UnkAEObj.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A, X and Y clobbered;
 ; Obj_LastFrame of the object set to 0; DP Spr_GfxPtr, Spr_WramPtr,
-; Spr_FramePtr and Spr_TileCount written; WMADD, VMADD and DMA channel 7
+; Spr_FramePtr, Spr_TileCount and (in the tile copiers) Spr_SavedY
+; written; WMADD, VMADD and DMA channel 7
 ; registers written.
 ; ============================================================
 org $C0E12A
