@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 49461,
+  "emitted_bytes": 52623,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 480,
-      "bytes": 49461
+      "functions": 501,
+      "bytes": 52623
     },
     "readable": {
-      "functions": 480,
-      "bytes": 49461
+      "functions": 501,
+      "bytes": 52623
     },
     "verified": {
       "functions": 480,
@@ -20,14 +20,14 @@
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 26061,
+      "emitted_bytes": 29223,
       "matched": {
-        "functions": 225,
-        "bytes": 26061
+        "functions": 246,
+        "bytes": 29223
       },
       "readable": {
-        "functions": 225,
-        "bytes": 26061
+        "functions": 246,
+        "bytes": 29223
       },
       "verified": {
         "functions": 225,
@@ -277,17 +277,38 @@
       "bank": "$C0",
       "start": "$C0:7000",
       "end": "$C0:7FFF",
-      "emitted_bytes": 73,
+      "emitted_bytes": 2656,
       "functions": [
-        "Map_ClearBufC800"
+        "Map_ClearBufC800",
+        "Field_BuildC800Mode1",
+        "Map_WriteRow1",
+        "Map_WriteCol1",
+        "Field_BuildC800Mode2",
+        "Map_WriteRow2",
+        "Map_WriteCol2",
+        "Field_BuildC800Mode4",
+        "Map_WriteRow3",
+        "Map_WriteCol3",
+        "Map_UploadBufTo7400",
+        "Map_UploadBufTo7000",
+        "Map_UploadBufToX",
+        "Map_UploadBuf2K",
+        "Map_UploadBuf_Tail",
+        "Map_UploadBuf4K",
+        "LocLoad_ClearPage1D00",
+        "Sub_C07F9A"
       ]
     },
     {
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 1105,
+      "emitted_bytes": 1684,
       "functions": [
+        "Bg_RowSpan64x32",
+        "Bg_RowSpan64x32Addr",
+        "Bg_ColSpan64x32",
+        "Bg_ColSpan64x32Addr",
         "Map_BuildRowYInc1",
         "Map_BuildRowYInc2",
         "Map_BuildRowYInc2Half",

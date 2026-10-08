@@ -282,6 +282,23 @@ if !constants_engine_inc == 0
 !Map_EdgeRowLen = $12                    ; Map_BuildLen of a row builder (18 entries)
 !Map_EdgeColLen = $0F                    ; Map_BuildLen of a column builder (15 entries)
 !Map_FineWrapUpHalf = $20                ; one past Map_FineLastHalf: DEC A then gives $1F
+!Map_HalfTileBit = $01                   ; bit 0 of Map_BuildRow / Map_BuildCol: the bottom / right
+                                         ; 8x8 half of a 16x16 metatile
+!Map_RedrawRows = $20                    ; 8x8 rows Field_BuildC800Mode1/2/4 write from the origin
+!Map_RedrawLen = $10                     ; Map_BuildLen of a redraw row (16 metatiles, 32 words)
+!Map_RedrawLastRow = $1F                 ; last 8x8 row of one 32x32 screen (redraw loops)
+!Map_RedrawLastRow2 = $3F                ; last 8x8 row of a 32x64 build (rows 32-63)
+!Map_ScreenMetatiles = $10               ; metatiles across one 32x32 screen (Map_Unk0BCF-0BD5
+                                         ; compared with it)
+!Bg_ScreenHeight = $20                   ; 8x8 rows in one 32x32 tilemap screen
+!Bg_MapWidth64 = $0040                   ; 8x8 columns across a 64x32 tilemap (two screens)
+!Map_EdgeRowTiles = $0022                ; 8x8 tiles in the edge row Bg_RowSpan64x32 splits (34)
+!Map_RowsUp4 = $001C                     ; added to a tilemap row and masked to 32: 4 rows up
+!Map_PageBytes = $0100                   ; bytes in the $1D00 page LocLoad_ClearPage1D00 clears
+!Map_UploadVramA = $7400                 ; VRAM word address Map_UploadBufTo7400 uses
+!Map_UploadVramB = $7000                 ; VRAM word address Map_UploadBufTo7000 uses
+!Map_UploadSmall = $0800                 ; bytes of Map_BufC800 Map_UploadBuf2K sends (2 KB)
+!Map_UploadLarge = $1000                 ; bytes Map_UploadBuf4K sends (4 KB: into Map_BufD000's space)
 
 ; --- Window effects (Field_EventHook handlers) ---
 !EventHook_WinFixedA1 = $07              ; Field_EventHook value of Field_HookWinFixedA's first frame
