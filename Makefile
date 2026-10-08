@@ -32,8 +32,8 @@ verify: check-rom
 lint:
 	python3 tools/lint_readability.py
 
-# Regenerate every generated number: symbols/ and the README/CONTRIBUTING/
-# STATUS blocks.
+# Write the generated symbols/functions.csv and progress.json (untracked; the
+# tools that read them also regenerate them on demand) and print the numbers.
 progress: check-rom
 	python3 tools/progress.py --update
 

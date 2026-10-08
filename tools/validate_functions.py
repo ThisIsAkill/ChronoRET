@@ -2,7 +2,10 @@
 """
 validate_functions.py — Check symbols/functions.csv and symbols/reviews.csv.
 
-Needs no ROM, so it runs in CI as well as the hook:
+functions.csv is generated and not tracked: with the ROM and asar it is
+regenerated first when stale (tools/generated.py). Without them (the CI
+readability job) only the review log is checked.
+
   - functions.csv: known columns, addresses `$BB:AAAA` strictly ascending,
     status one of matched/readable/verified, notes on one line (<= 200 chars);
   - reviews.csv: known columns, ISO dates, a reviewer, verdict approved or
@@ -17,6 +20,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generated  # noqa: E402
+
 FUNCTIONS = Path('symbols/functions.csv')
 REVIEWS = Path('symbols/reviews.csv')
 F_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'status', 'source_hash', 'notes']
@@ -30,11 +36,17 @@ def addr_key(a: str) -> int:
 
 def main() -> int:
     errors = []
-    with FUNCTIONS.open() as f:
-        reader = csv.DictReader(f)
-        if reader.fieldnames != F_COLS:
-            errors.append(f'{FUNCTIONS}: columns {reader.fieldnames}, expected {F_COLS}')
-        functions = list(reader)
+    functions = []
+    have_functions = generated.ensure() and FUNCTIONS.exists()
+    if have_functions:
+        with FUNCTIONS.open() as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames != F_COLS:
+                errors.append(f'{FUNCTIONS}: columns {reader.fieldnames}, expected {F_COLS}')
+            functions = list(reader)
+    else:
+        print(f'{FUNCTIONS} cannot be generated here (needs the ROM and asar): '
+              f'checking the review log only.')
     last = -1
     for n, row in enumerate(functions, 2):
         where = f'{FUNCTIONS}:{n} {row.get("name")}'
@@ -63,7 +75,7 @@ def main() -> int:
         where = f'{REVIEWS}:{n} {row.get("name")}'
         # A row naming a routine that no longer exists (renamed or removed)
         # stays as history; it just can't make anything verified.
-        if row['name'] not in names:
+        if have_functions and row['name'] not in names:
             historical += 1
         if not re.match(r'^\d{4}-\d{2}-\d{2}$', row['date'] or ''):
             errors.append(f'{where}: date must be YYYY-MM-DD')
@@ -89,6 +101,9 @@ def main() -> int:
     if errors:
         print(f'FAIL: {len(errors)} problem(s) in symbols/.')
         return 1
+    if not have_functions:
+        print(f'symbols/ review log valid: {len(reviews)} review row(s).')
+        return 0
     print(f'symbols/ valid: {len(functions)} functions, {len(reviews)} review row(s)'
           f' ({historical} for routines since renamed or removed).')
     return 0

@@ -4,7 +4,8 @@
 #
 #   - author and committer of every new commit is the maintainer identity
 #   - no session links or blocked words in commit messages
-#   - make gate (byte-exact, full coverage, readability) and symbols/ current
+#   - make gate (byte-exact, full coverage, readability), symbols/ valid, and
+#     no generated file tracked
 set -euo pipefail
 IDENT='Akill <24420588+ThisIsAkill@users.noreply.github.com>'
 fail() { printf '\033[0;31m[pre-push] %s\033[0m\n' "$*" >&2; exit 1; }
@@ -21,5 +22,5 @@ fi
 
 make --no-print-directory -s gate >/dev/null || fail "make gate failed"
 python3 tools/validate_functions.py >/dev/null || fail "symbols/ is invalid (tools/validate_functions.py)"
-python3 tools/progress.py --check >/dev/null || fail "symbols/ is stale: run tools/progress.py --update"
+python3 tools/progress.py --check >/dev/null || fail "generated files tracked or doc blocks back (tools/progress.py --check)"
 echo "[pre-push] gate passed for $range"

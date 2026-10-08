@@ -33,7 +33,7 @@ audit() {
     if make --no-print-directory -s gate >/dev/null 2>&1; then ok "make gate"; else bad "make gate (run it to see why)"; fi
 
     step "Generated numbers and review log"
-    if python3 tools/progress.py --check >/dev/null; then ok "symbols/ and doc blocks current"; else bad "stale: tools/progress.py --update"; fi
+    if python3 tools/progress.py --check >/dev/null; then ok "generated symbols/ untracked and current"; else bad "tools/progress.py --check (run it to see why)"; fi
     if python3 tools/validate_functions.py >/dev/null; then ok "symbols/ valid"; else bad "tools/validate_functions.py"; fi
 
     step "Firewall fires on planted fixtures"

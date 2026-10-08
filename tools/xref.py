@@ -18,7 +18,8 @@ hit is classified:
 
 How the boundary is decided:
 
-  matched code   (the site lies in a row of symbols/functions.csv) the
+  matched code   (the site lies in a row of symbols/functions.csv, which is
+                 regenerated first when stale: tools/generated.py) the
                  source is assembled with asar's address-to-line mapping;
                  a site is a boundary exactly when an instruction line of
                  the source starts there. Authoritative.
@@ -130,12 +131,11 @@ class Xref:
     @staticmethod
     def _read_rows():
         rows = []
-        if FUNCTIONS_CSV.exists():
-            with FUNCTIONS_CSV.open() as f:
-                for row in csv.DictReader(f):
-                    s, e = row['address'], row['end']
-                    rows.append((to_offset(int(s[1:3], 16), int(s[4:], 16)),
-                                 to_offset(int(e[1:3], 16), int(e[4:], 16)), row['name']))
+        import generated        # regenerates symbols/functions.csv when stale
+        for row in generated.function_rows():
+            s, e = row['address'], row['end']
+            rows.append((to_offset(int(s[1:3], 16), int(s[4:], 16)),
+                         to_offset(int(e[1:3], 16), int(e[4:], 16)), row['name']))
         return sorted(rows)
 
     @staticmethod

@@ -216,9 +216,14 @@ _PARENTS = []
 
 def _xref():
     if not _XREF:
+        import generated
+        if generated.can_generate():
+            # Brings symbols/functions.csv up to date first (inside
+            # tools/progress.py this is a no-op: the layout is already known).
+            generated.ensure()
+    if not _XREF:
         xr = None
-        if Path('roms/chrono_trigger.sfc').exists() and shutil.which('asar') \
-                and Path('symbols/functions.csv').exists():
+        if Path('roms/chrono_trigger.sfc').exists() and shutil.which('asar'):
             import xref
             xr = xref.Xref()
         _XREF.append(xr)

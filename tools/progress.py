@@ -10,9 +10,10 @@ the review log, and writes:
   symbols/progress.json         totals, per bank, per 4 KB address-map slice
   symbols/progress_history.csv  one row per working day (--update-history)
 
-and the generated blocks in README.md, CONTRIBUTING.md and STATUS.md
-(<!-- progress:start/end -->, <!-- status:start/end -->). Never type a count
-or percentage by hand.
+functions.csv and progress.json are not tracked: every tool that reads them
+regenerates them when they are stale (tools/generated.py), and the docs
+carry no generated numbers. Run `--update` to have them on disk (the wiki
+sync reads them from here). Never type a count or percentage by hand.
 
 A function's status (each level includes the previous):
   matched    every byte from its label to the next is emitted by source
@@ -23,9 +24,10 @@ A function's status (each level includes the previous):
 
 Usage:
     python3 tools/progress.py                   print the summary
-    python3 tools/progress.py --update          rewrite symbols/ and doc blocks
+    python3 tools/progress.py --update          write symbols/functions.csv, progress.json
     python3 tools/progress.py --update-history  also record today's row
-    python3 tools/progress.py --check           fail if anything is stale
+    python3 tools/progress.py --check           fail if a generated file is tracked or a
+                                                doc carries a generated block
 """
 
 import argparse
@@ -43,17 +45,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asm_source  # noqa: E402
+import generated  # noqa: E402
 import lint_readability  # noqa: E402
 import verify  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
 SYMBOLS = Path('symbols')
-FUNCTIONS_CSV = SYMBOLS / 'functions.csv'
+FUNCTIONS_CSV = generated.FUNCTIONS_CSV
 REVIEWS_CSV = SYMBOLS / 'reviews.csv'
-PROGRESS_JSON = SYMBOLS / 'progress.json'
+PROGRESS_JSON = generated.PROGRESS_JSON
 HISTORY_CSV = SYMBOLS / 'progress_history.csv'
+# Docs that once carried generated blocks; --check keeps them out.
 DOCS = [Path('README.md'), Path('CONTRIBUTING.md'), Path('STATUS.md')]
+GENERATED_BLOCK = re.compile(r'<!-- (progress|status):start -->')
 
 # Code-byte denominators: re-surveyed only when the code/data boundary is.
 CODE_BYTES_TOTAL = 359278
@@ -168,8 +173,6 @@ def analyse() -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         emitted, addrs = build_facts(Path(tmp))
     source = source_functions()
-    lint = lint_readability.by_function(lint_readability.collect())
-    reviews = read_reviews()
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)
     functions = []
@@ -180,18 +183,24 @@ def analyse() -> dict:
         end = start
         while end < nxt and end in emitted:
             end += 1
-        src = source[name]
-        status = 'matched'
-        if f'{src["file"]}:{name}' not in lint:
-            status = 'readable'
-            review = reviews.get(name)
-            if review and review['verdict'] == 'approved' and review['source_hash'] == src['source_hash']:
-                status = 'verified'
         functions.append({
             'address': offset_to_snes(start), 'end': offset_to_snes(end - 1), 'size': end - start,
             'name': name, 'bank': f'${0xC0 + (start >> 16):02X}', 'subsystem': subsystem(name),
-            'status': status, 'source_hash': src['source_hash'], 'notes': src['note'], '_start': start,
+            'status': 'matched', 'source_hash': source[name]['source_hash'],
+            'notes': source[name]['note'], '_start': start,
         })
+
+    # The layout is known now; the lint's caller checks read it from here.
+    with generated.generating([dict(f) for f in functions]):
+        lint = lint_readability.by_function(lint_readability.collect())
+    reviews = read_reviews()
+    for f in functions:
+        src = source[f['name']]
+        if f'{src["file"]}:{f["name"]}' not in lint:
+            f['status'] = 'readable'
+            review = reviews.get(f['name'])
+            if review and review['verdict'] == 'approved' and review['source_hash'] == src['source_hash']:
+                f['status'] = 'verified'
 
     def level_totals(rows):
         out = {}
@@ -242,18 +251,14 @@ def render_progress_json(result) -> str:
     return json.dumps({'schema': 2, **data}, indent=2) + '\n'
 
 
-def render_progress_block(result) -> str:
+def render_summary(result) -> str:
+    """The local numbers, as a plain table for the terminal."""
     t, code = result['totals'], result['code_bytes']
-    lines = [
-        '| | Functions | Bytes | Share of game code |',
-        '|---|---:|---:|---:|',
-        f'| Game code (surveyed) | | {code:,} | |',
-    ]
+    lines = [f'{"":<10}{"Functions":>10}{"Bytes":>10}  Share of game code ({code:,} bytes surveyed)']
     for level in LEVELS:
-        lines.append(f'| {level.capitalize()} | {t[level]["functions"]} | {t[level]["bytes"]:,} '
-                     f'| {pct(t[level]["bytes"], code)} |')
-    lines += ['', 'Each row includes the next: verified functions are also readable and matched.', '',
-              '| Bank | Code bytes | Matched | Readable | Verified |', '|---|---:|---:|---:|---:|']
+        lines.append(f'{level.capitalize():<10}{t[level]["functions"]:>10}{t[level]["bytes"]:>10,}'
+                     f'  {pct(t[level]["bytes"], code)}')
+    lines += ['', f'{"Bank":<6}{"Code bytes":>14}' + ''.join(f'{l.capitalize():>20}' for l in LEVELS)]
     for b in result['banks']:
         code_b = f'{b["code_bytes"]:,}' if b['code_bytes'] else 'not surveyed'
         cells = []
@@ -261,9 +266,8 @@ def render_progress_block(result) -> str:
             cell = f'{b[level]["bytes"]:,}'
             if b['code_bytes']:
                 cell += f' ({pct(b[level]["bytes"], b["code_bytes"])})'
-            cells.append(cell)
-        lines.append(f'| `{b["bank"]}` | {code_b} | ' + ' | '.join(cells) + ' |')
-    lines += ['', 'Generated by `tools/progress.py --update`. Do not edit.']
+            cells.append(f'{cell:>20}')
+        lines.append(f'{b["bank"]:<6}{code_b:>14}' + ''.join(cells))
     return '\n'.join(lines)
 
 
@@ -275,21 +279,30 @@ def render_status_line(result) -> str:
             f'{t["verified"]["functions"]} are verified by independent review.')
 
 
-def replace_block(text: str, tag: str, body: str) -> str:
-    pattern = re.compile(rf'(<!-- {tag}:start -->).*?(<!-- {tag}:end -->)', re.S)
-    return pattern.sub(lambda m: m.group(1) + '\n' + body + '\n' + m.group(2), text)
+def write_generated(result) -> None:
+    """Write symbols/functions.csv and progress.json (tools/generated.py)."""
+    generated.write_outputs({FUNCTIONS_CSV: render_functions_csv(result),
+                             PROGRESS_JSON: render_progress_json(result)})
 
 
-def render_docs(result) -> dict[Path, str]:
-    out = {}
+def check() -> int:
+    """Generated files stay out of git, and the docs carry no generated numbers."""
+    problems = []
+    tracked = subprocess.run(['git', 'ls-files', '--', *map(str, generated.OUTPUTS)],
+                             capture_output=True, text=True).stdout.split()
+    problems += [f'{p} is tracked; it is generated (git rm --cached {p})' for p in tracked]
     for path in DOCS:
-        if not path.exists():
-            continue
-        text = path.read_text()
-        text = replace_block(text, 'progress', render_progress_block(result))
-        text = replace_block(text, 'status', render_status_line(result))
-        out[path] = text
-    return out
+        if path.exists() and GENERATED_BLOCK.search(path.read_text()):
+            problems.append(f'{path} carries a generated progress block; numbers live on the '
+                            f'Kajar site and in `python3 tools/progress.py`')
+    for p in problems:
+        print(p)
+    if problems:
+        return 1
+    if ROM_PATH.exists():
+        generated.ensure()
+    print('Progress files are generated, untracked and current.')
+    return 0
 
 
 def history_rows(result) -> list[dict]:
@@ -323,29 +336,21 @@ def main() -> int:
     ap.add_argument('--check', action='store_true')
     args = ap.parse_args()
 
+    if args.check:
+        return check()
     if not ROM_PATH.exists():
         print(f'No ROM at {ROM_PATH}; progress needs a build. Skipping.')
-        return 0 if args.check else 2
+        return 2
 
     result = analyse()
-    outputs = {FUNCTIONS_CSV: render_functions_csv(result),
-               PROGRESS_JSON: render_progress_json(result), **render_docs(result)}
+    write_generated(result)
     if args.update_history:
-        outputs[HISTORY_CSV] = render_history(history_rows(result))
-
-    if args.check:
-        stale = [str(p) for p, text in outputs.items() if not p.exists() or p.read_text() != text]
-        if stale:
-            print('STALE (run `python3 tools/progress.py --update`): ' + ', '.join(stale))
-            return 1
-        print('Progress files are current.')
-        return 0
-
+        HISTORY_CSV.write_text(render_history(history_rows(result)))
     if args.update or args.update_history:
-        SYMBOLS.mkdir(exist_ok=True)
-        for path, text in outputs.items():
-            path.write_text(text)
-        print('Updated: ' + ', '.join(str(p) for p in outputs))
+        print('Updated: ' + ', '.join(str(p) for p in generated.OUTPUTS)
+              + (f', {HISTORY_CSV}' if args.update_history else ''))
+    print(render_summary(result))
+    print()
     print(render_status_line(result))
     return 0
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # pre-commit / commit-msg hook.
 #   pre-commit:  author/committer identity, blocked-pattern scan, staged
-#                paths, ROM byte-exact match, full-coverage verify,
-#                readability gate, regenerated progress (symbols/),
-#                review-log validation
+#                paths (no ROMs, local notes or generated files), ROM
+#                byte-exact match, full-coverage verify, readability gate,
+#                symbols/ regenerated and validated
 #   commit-msg:  commit message text against the same blocked-pattern scan
 #
 # Install:   make install-hook
@@ -48,6 +48,8 @@ bad=$(printf '%s\n' "$staged" | grep -E '(^|/)(C[L]AUDE\.md|CT_WORKFLOW\.md|KICK
 [ -z "$bad" ] || fail "ignored local file staged:"$'\n'"$bad"
 bad=$(printf '%s\n' "$staged" | grep -iE '\.(sfc|smc)$' || true)
 [ -z "$bad" ] || fail "ROM file staged:"$'\n'"$bad"
+bad=$(printf '%s\n' "$staged" | grep -E '^symbols/(functions\.csv|progress\.json|\.generated)$' || true)
+[ -z "$bad" ] || fail "generated file staged (tools/progress.py writes it on demand; never commit it):"$'\n'"$bad"
 printf '%s\n' "$staged" | scan "staged path"
 
 # Content (added lines only). `|| true` keeps pipefail from aborting
@@ -78,14 +80,13 @@ if [ -f tools/lint_readability.py ]; then
     python3 tools/lint_readability.py || fail "Readability gate failed (see above; rules in tools/lint_readability.py)."
 fi
 
-# ── 2. Generated numbers and the review log (symbols/) ──────────────────────
-# Counts are never typed by hand: regenerate them and stage the result, so
-# symbols/ and the README/CONTRIBUTING/STATUS blocks always match the code.
-# (Guarded: older checkouts sharing this hook may not have these tools yet.)
-if [ -f tools/validate_functions.py ] && [ -d symbols ] && [ -f roms/chrono_trigger.sfc ]; then
-    info "Regenerating symbols/ and progress blocks..."
-    python3 tools/progress.py --update >/dev/null || fail "tools/progress.py --update failed."
-    git add symbols/functions.csv symbols/progress.json README.md CONTRIBUTING.md STATUS.md 2>/dev/null || true
+# ── 2. Generated files and the review log (symbols/) ────────────────────────
+# symbols/functions.csv and progress.json are generated, never committed:
+# --check fails if one is tracked or a doc carries a generated block again,
+# and regenerates them locally (with the ROM) so the validation below reads
+# current statuses. (Guarded: older checkouts may not have these tools yet.)
+if [ -f tools/generated.py ]; then
+    python3 tools/progress.py --check >/dev/null || { python3 tools/progress.py --check; fail "tools/progress.py --check failed."; }
 fi
 if [ -f tools/validate_functions.py ] && [ -d symbols ]; then
     python3 tools/validate_functions.py >/dev/null || { python3 tools/validate_functions.py; fail "symbols/ is invalid."; }
