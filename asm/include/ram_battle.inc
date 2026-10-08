@@ -511,7 +511,8 @@ endstruct
                                  ; flipped when an orbit step is blocked
 !Battle_OrbitRadius      = $A5FC ; 1 B: ring radius of the enemy Battle_MoverOrbit is moving ($20, or $40 for move $0E)
 !Enemy_LoopStarted       = $A5FD ; 1 B per enemy: non-zero = Battle_MoverLoop has set up its loop; cleared by the other
-                                 ; movers except the fixed-direction and centre ones
+                                 ; movers except the fixed-direction and centre ones (Battle_MoverIdle only once a
+                                 ; move has ended)
 !Enemy_LoopCentreX       = $A605 ; 1 B per enemy: x of the centre of Battle_MoverLoop's loop (its x at the start)
 !Enemy_LoopCentreY       = $A60D ; 1 B per enemy: y of that centre (its y at the start + 16)
 !Enemy_LoopPhase         = $A615 ; 1 B per enemy: angle of the loop point it heads for (starts at $C0, straight up)

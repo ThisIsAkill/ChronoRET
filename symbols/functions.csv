@@ -310,6 +310,9 @@ $C1:38BF,$C1:3958,154,Battle_MoverCharge,$C1,Battle engine,readable,81f37ad575ff
 $C1:3959,$C1:3A3C,228,Battle_MoverAxis,$C1,Battle engine,readable,836194094b21,
 $C1:3A3D,$C1:3BC1,389,Battle_MoverKeepRange,$C1,Battle engine,readable,0150640bb50b,
 $C1:3BC2,$C1:3E32,625,Battle_MoverOrbit,$C1,Battle engine,readable,3ce6a676b774,Mover 5 (moves $0D-$0F): circles the target on a ring of radius !Battle_OrbitRadius ($20; move $0E: $40).
+$C1:3E33,$C1:3F59,295,Battle_MoverLoop,$C1,Battle engine,readable,d333f2f75483,
+$C1:3F5A,$C1:4020,199,Battle_MoverFixedDir,$C1,Battle engine,readable,451b0d5729c0,
+$C1:4021,$C1:4057,55,Battle_MoverToCentre,$C1,Battle engine,readable,2810c3762c30,"Mover 8 (move $19): heads from the enemy's position for the middle of the screen (!Battle_ScreenCentreX/Y), faces that way and starts the step, with no probe and no collision test."
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,verified,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,verified,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"

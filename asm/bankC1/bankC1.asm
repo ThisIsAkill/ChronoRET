@@ -9573,6 +9573,344 @@ Battle_MoverOrbit:
     JMP .exit
 
 ; ==================================================================
+; Battle_MoverLoop ($C13E33–$C13F59, 295 bytes)
+; ==================================================================
+; Mover 6 (moves $0A-$0C): flies round a loop near where it started. On
+; the first run (!Enemy_LoopStarted clear) the loop is set up: centre =
+; the enemy's position + 16 pixels down, phase $C0 (straight up),
+; forwards. Each run moves the phase on by $10 (back by $10 when
+; !Enemy_LoopReverse is set) and heads from the enemy's position for the
+; point of an ellipse round the centre at that phase: vertical radius
+; !Battle_LoopRadius = $20 (move $0A: $10), horizontal radius $20 more.
+; If the step is blocked (move $0C passes cell bit 7 and other
+; battlers), the phase jumps back $58 against the direction of travel
+; (move $0A: $30) and the direction reverses, without a step; otherwise
+; the step starts. The move never ends.
+; The other movers clear !Enemy_LoopStarted, except
+; Battle_MoverFixedDir and Battle_MoverToCentre, so after one of those
+; the loop goes on round the old centre.
+; Callers: Battle_EnemyMoverTable entry 6.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $80-$86,
+;        $8C-$8F, $77-$78, $A5-$AE and $D3-$E3 written
+; Callees: Battle_SinLookup, Battle_CalcAngle, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers
+!Battle_LoopBounceBy = !BattleTmp_82      ; 1 B: phase jump when blocked ($58 or $30)
+Battle_MoverLoop:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartY,X
+    LDA.w !Enemy_LoopStarted,X
+    BNE .started
+    INC.w !Enemy_LoopStarted,X
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b #!Battle_LoopDropY
+    STA.w !Enemy_LoopCentreY,X
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_LoopCentreX,X
+    LDA.b #!Battle_AngleThreeQuarter ; up
+    STA.w !Enemy_LoopPhase,X
+    STZ.w !Enemy_LoopReverse,X
+.started:
+    LDA.w !Enemy_LoopReverse,X
+    BNE .backwards
+    LDA.b #!Battle_LoopTurn
+    BRA .turn
+.backwards:
+    LDA.b #!Battle_LoopTurnBack
+.turn:
+    CLC
+    ADC.w !Enemy_LoopPhase,X
+    STA.w !Enemy_LoopPhase,X
+    STA.b !Battle_GeoAngle
+    LDA.b #!Battle_LoopRadiusBig
+    STA.w !Battle_LoopRadius
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveLoopSmall
+    BNE .radius_set
+    LSR.w !Battle_LoopRadius
+.radius_set:
+    LDA.w !Battle_LoopRadius
+    STA.b !Battle_SinScale
+    LDA.b !Battle_GeoAngle
+    JSR Battle_SinLookup
+    LDX.b !Battle_MoverEnemy
+    CLC
+    ADC.w !Enemy_LoopCentreY,X
+    STA.b !Battle_GeoPointY
+    CLC
+    LDA.w !Battle_LoopRadius
+    ADC.b #!Battle_LoopRadiusBig    ; wider than high
+    STA.b !Battle_SinScale
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    LDX.b !Battle_MoverEnemy
+    CLC
+    ADC.w !Enemy_LoopCentreX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginY
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    JSR Battle_CalcAngle            ; enemy -> loop point
+    LDX.b !Battle_MoverEnemy
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveLoopPass
+    BNE .test_cells
+    LDA.b #1
+    STA.w !Battle_PassCellBit7
+.test_cells:
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveLoopPass
+    BEQ .free                       ; move $0C passes other battlers
+    JSR Battle_BoxOverlapsOthers
+    BPL .free
+.blocked:
+    LDA.b #!Battle_LoopBounce
+    STA.b !Battle_LoopBounceBy
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveLoopSmall
+    BNE .bounce
+    LDA.b #!Battle_LoopBounceSmall
+    STA.b !Battle_LoopBounceBy
+.bounce:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_LoopReverse,X
+    BNE .bounce_forwards
+    SEC
+    LDA.w !Enemy_LoopPhase,X
+    SBC.b !Battle_LoopBounceBy
+    BRA .set_phase
+.bounce_forwards:
+    CLC
+    LDA.w !Enemy_LoopPhase,X
+    ADC.b !Battle_LoopBounceBy
+.set_phase:
+    STA.w !Enemy_LoopPhase,X
+    LDA.w !Enemy_LoopReverse,X
+    EOR.b #1
+    STA.w !Enemy_LoopReverse,X
+    BRA .exit
+.free:
+    LDX.b !Battle_MoverEnemy
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+.exit:
+    LDX.b !Battle_MoverEnemy
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Battle_MoverFixedDir ($C13F5A–$C14020, 199 bytes)
+; ==================================================================
+; Mover 7 (moves $11-$18): steps in a fixed direction from the enemy's
+; position: $11 up, $12 down, $13 right, $14 left, $15 down-right, $16
+; down-left, $17 up-left, any other (move $18) up-right. Straight moves
+; face as !BattleRom_FacingByAngle says; the diagonals, exactly on that
+; table's boundaries, are given the facing of the angle just below
+; instead (right, down, left, up). The step starts at once; when it is
+; blocked (a blocking cell or another battler) it is cancelled and
+; !Enemy_MoveDone counted up. Unlike the done path of the other movers,
+; this one saves neither !Enemy_ResumeAnim nor the target's position.
+; Quirk: the last case ends with a BRA to the very next instruction.
+; Callers: Battle_EnemyMoverTable entry 7.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $80-$86,
+;        $8C-$8F, $77-$78 and $A5-$AE written
+; Callees: Battle_SinLookup, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers
+!Battle_MoveFacing = !BattleTmp_80        ; 1 B: facing to force, or !Battle_FacingFromAngle
+Battle_MoverFixedDir:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartY,X
+    LDA.b #!Battle_FacingFromAngle
+    STA.b !Battle_MoveFacing
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveUp
+    BNE .not_up
+    LDA.b #!Battle_AngleThreeQuarter
+    BRA .set_angle
+.not_up:
+    CMP.b #!Enemy_MoveDown
+    BNE .not_down
+    LDA.b #!Battle_AngleQuarter
+    BRA .set_angle
+.not_down:
+    CMP.b #!Enemy_MoveRight
+    BNE .not_right
+    TDC
+    BRA .set_angle
+.not_right:
+    CMP.b #!Enemy_MoveLeft
+    BNE .not_left
+    LDA.b #!Battle_AngleHalfTurn
+    BRA .set_angle
+.not_left:
+    CMP.b #!Enemy_MoveDownRight
+    BNE .not_down_right
+    LDA.b #!Battle_FacingRight
+    STA.b !Battle_MoveFacing
+    LDA.b #!Battle_AngleEighth
+    BRA .set_angle
+.not_down_right:
+    CMP.b #!Enemy_MoveDownLeft
+    BNE .not_down_left
+    LDA.b #!Battle_FacingDown
+    STA.b !Battle_MoveFacing
+    LDA.b #!Battle_AngleQuarter+!Battle_AngleEighth
+    BRA .set_angle
+.not_down_left:
+    CMP.b #!Enemy_MoveUpLeft
+    BNE .up_right
+    LDA.b #!Battle_FacingLeft
+    STA.b !Battle_MoveFacing
+    LDA.b #!Battle_AngleHalfTurn+!Battle_AngleEighth
+    BRA .set_angle
+.up_right:
+    STZ.b !Battle_MoveFacing        ; !Battle_FacingUp
+    LDA.b #!Battle_AngleThreeQuarter+!Battle_AngleEighth
+    BRA .set_angle                  ; quirk: the next instruction
+.set_angle:
+    STA.w !Enemy_MoveAngle,X
+    STA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.b !Battle_MoveFacing
+    BMI .facing_set
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+.facing_set:
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDA.b !Battle_GeoAngle
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDX.b !Battle_MoverEnemy
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    JSR Battle_BoxOverlapsOthers
+    BPL .exit
+.blocked:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_Stepping,X
+    INC.w !Enemy_MoveDone,X
+.exit:
+    LDX.b !Battle_MoverEnemy
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Battle_MoverToCentre ($C14021–$C14057, 55 bytes)
+; ==================================================================
+; Mover 8 (move $19): heads from the enemy's position for the middle of
+; the screen (!Battle_ScreenCentreX/Y), faces that way and starts the
+; step, with no probe and no collision test. The move never ends.
+; Callers: Battle_EnemyMoverTable entry 8.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; Y unchanged; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $D3-$E3
+;        written
+; Callees: Battle_CalcAngle
+Battle_MoverToCentre:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartY,X
+    STA.b !Battle_GeoOriginY
+    LDA.b #!Battle_ScreenCentreX
+    STA.b !Battle_GeoPointX
+    LDA.b #!Battle_ScreenCentreY
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    LDX.b !Battle_MoverEnemy
+    STA.w !Enemy_MoveAngle,X
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
 ; ==================================================================
 ; Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in

@@ -14,13 +14,6 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C13E33
-Battle_MoverLoop:                       ; Battle_EnemyMoverTable entry 6
-org $C13F5A
-Battle_MoverFixedDir:                   ; Battle_EnemyMoverTable entry 7
-org $C14021
-Battle_MoverToCentre:                   ; Battle_EnemyMoverTable entry 8
-
 ; --- Bank $C7 (audio) ---
 
 org $C70004
