@@ -1772,6 +1772,2117 @@ C2Scene_OamHiBitsTable:
     db $00,$40,$80,$C0
 
 ; ============================================================
+; Scene sprite animation scripts and task motion ($C2:0E1D–$C2:0F62)
+; ============================================================
+; A task that shows a sprite runs a small byte-code script of its own,
+; probably its animation: .AnimPtr/.AnimBank point into it (C2Scene_SetAnim
+; starts one from C2SceneRom_AnimTable), and each call of C2Anim_Run carries
+; out ops until one of them ends the frame, usually by adding the current
+; frame to the sprite list. Each op is an opcode byte and its arguments;
+; its handler (C2Anim_OpTable) returns the number of bytes to advance in
+; A, or Z=1 to stop for this frame without advancing.
+
+org $C20E1D
+; $C2:0E1D — C2Anim_Run (45 bytes, $0E1D–$0E49)
+; Runs the running task's animation script (.AnimPtr, .AnimBank) from
+; where it stopped: calls the handler of each op from C2Anim_OpTable with
+; C2Anim_Ptr on the opcode. A handler that returns Z=0 gives in A the
+; bytes to advance, and the next op runs at once; Z=1 ends the call, and
+; only then is the pointer stored back in .AnimPtr. The carry the last
+; handler returned comes back: C=1 from C2Anim_OpEnd, C=0 from the
+; others that stop.
+; Inferred to be the sprite's animation from C2Anim_OpShowFrame, which
+; adds a frame to the sprite list for a number of frames, and from the
+; script ops that start one (C2Scene_SetAnim) before moving the task.
+; Callers (57 JSR sites, all unmatched except those listed): e.g.
+;   C2Script_MoveFrames ($C2:1643), $C2:18AC, $C2:19B6, $C2:1A1F,
+;   $C2:3444, $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
+;   doubtful byte patterns.
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
+;        $0000-$1FFF; C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; A, Y clobbered; C as the last handler
+;        left it; C2Anim_Ptr = where the script stopped; whatever the
+;        handlers change (C2Scene_SprAdd, the VRAM queue)
+; Calls: the C2Anim_OpTable handlers.
+C2Anim_Run:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.AnimBank,X
+    STA.b !C2Anim_Ptr+2
+    REP #$20
+    LDA.w C2Scene_Task.AnimPtr,X
+    STA.b !C2Anim_Ptr
+.op:
+    LDA.b [!C2Anim_Ptr]
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JSR (C2Anim_OpTable,X)
+    BEQ .stop
+    CLC
+    ADC.b !C2Anim_Ptr
+    STA.b !C2Anim_Ptr
+    BRA .op
+.stop:
+    LDX.b !C2Scene_TaskCur
+    LDA.b !C2Anim_Ptr
+    STA.w C2Scene_Task.AnimPtr,X
+    SEP #$20
+    RTS
+
+; $C2:0E4A — C2Anim_OpTable (8 words, $0E4A–$0E59)
+; The handler of each animation opcode 0-7 (C2Anim_Run: JSR (T,X) with
+; X = the opcode * 2). There is no range check: a larger opcode would
+; jump through the code after the table.
+C2Anim_OpTable:
+    dw C2Anim_OpClearByte       ; 0
+    dw C2Anim_OpIncByte         ; 1
+    dw C2Anim_OpDecByte         ; 2
+    dw C2Anim_OpJumpBack        ; 3
+    dw C2Anim_OpShowFrame       ; 4
+    dw C2Anim_OpWait            ; 5
+    dw C2Anim_OpQueueVram       ; 6
+    dw C2Anim_OpEnd             ; 7
+
+; $C2:0E5A — C2Anim_OpClearByte (17 bytes, $0E5A–$0E6A)
+; Animation op 0, 2 bytes: zeroes the task's byte at offset arg 1
+; (any of the 64 record bytes, through C2Scene_TaskCur).
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_Run calls it: M=0, X=0, DP=$0000, DB with low WRAM
+;        at $0000-$1FFF ($00 from the NMI), C2Anim_Ptr on the opcode
+; Exit:  M=0, X=0; A = 2 (advance, Z=0); Y = the offset
+; No calls.
+C2Anim_OpClearByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    TAY
+    TDC                         ; A = DP = 0
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:0E6B — C2Anim_OpIncByte (19 bytes, $0E6B–$0E7D)
+; Animation op 1, 2 bytes: adds 1 to the task's byte at offset arg 1.
+; Callers: none direct (C2Anim_OpTable).
+; Entry/Exit: as C2Anim_OpClearByte
+; No calls.
+C2Anim_OpIncByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    INC A
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:0E7E — C2Anim_OpDecByte (19 bytes, $0E7E–$0E90)
+; Animation op 2, 2 bytes: subtracts 1 from the task's byte at offset
+; arg 1.
+; Callers: none direct (C2Anim_OpTable).
+; Entry/Exit: as C2Anim_OpClearByte
+; No calls.
+C2Anim_OpDecByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    DEC A
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:0E91 — C2Anim_OpJumpBack (18 bytes, $0E91–$0EA2)
+; Animation op 3, 2 bytes: moves the script by the signed byte arg 1,
+; counted from the opcode: A = the offset sign-extended.
+; Quirk, kept: only a negative offset works. For 0-$7F the BIT leaves
+; Z=1 and the ORA that would clear it is skipped, so C2Anim_Run stops
+; for this frame without moving, and the same op stops it again every
+; frame after: the script stays there for good. So it is a loop back
+; (the name says so).
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_OpClearByte
+; Exit:  M=0, X=0; A = the offset; C=0; Z=1 when it is 0-$7F; Y = 1
+; No calls.
+C2Anim_OpJumpBack:
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    AND.w #!Eng_LowByteMask
+    BIT.w #!C2Scene_ByteSignBit
+    BEQ .positive
+    ORA.w #!Eng_HighByteMask
+.positive:
+    CLC
+    RTS
+
+; $C2:0EA3 — C2Anim_OpShowFrame (57 bytes, $0EA3–$0EDB)
+; Animation op 4, 4 bytes: shows the sprite frame at arg 1-2 (an
+; address in the script's bank) for arg 3 frames. Each call adds that
+; frame to the sprite list (C2Scene_SprAdd: the task's position, tile
+; and attributes) and stops for this frame. .AnimTimer counts: 0 on the
+; first call loads it with arg 3; then each call takes 1 off, and when it
+; reaches 0 the op advances (4, C=0) without drawing, so the next op
+; runs in the same call.
+; While .SprAttr has C2Scene_SprAttrHold (bit 6) the timer is neither
+; loaded nor counted: the frame is drawn every call and the script holds.
+; Quirk, kept: arg 3 = 0 is loaded as 0, so the next call loads it again:
+; the frame then stays for good.
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_OpClearByte
+; Exit:  advance: M=0, X=0, A = 4, C=0; X = the task. Drawn: M=0 (as
+;        C2Scene_SprAdd leaves it), X=0, A = 0 (Z=1), C=0; X, Y as
+;        C2Scene_SprAdd leaves them; C2Scene_SprFramePtr = the frame
+; Calls: C2Scene_SprAdd.
+C2Anim_OpShowFrame:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprAttr,X
+    BIT.b #!C2Scene_SprAttrHold
+    BNE .draw
+    LDA.w C2Scene_Task.AnimTimer,X
+    BNE .count
+    LDY.w #3
+    LDA.b [!C2Anim_Ptr],Y
+    STA.w C2Scene_Task.AnimTimer,X
+    BRA .draw
+.count:
+    DEC.w C2Scene_Task.AnimTimer,X
+    BNE .draw
+    REP #$20
+    LDA.w #4
+    CLC
+    RTS
+.draw:
+    LDA.b !C2Anim_Ptr+2
+    STA.b !C2Scene_SprFramePtr+2
+    REP #$20
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    STA.b !C2Scene_SprFramePtr
+    JSR C2Scene_SprAdd
+    TDC                         ; A = 0, Z=1: stop for this frame
+    CLC
+    RTS
+
+; $C2:0EDC — C2Anim_OpWait (36 bytes, $0EDC–$0EFF)
+; Animation op 5, 2 bytes: waits arg 1 calls without drawing, counting
+; in .AnimTimer as C2Anim_OpShowFrame does (0 loads it, then -1 per call;
+; at 0 it advances 2 at once). Arg 1 = 0 waits for good.
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_OpClearByte
+; Exit:  M=0, X=0; X = the task; C=0; A = 2 (advance) or 0 (Z=1, wait)
+; No calls.
+C2Anim_OpWait:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.AnimTimer,X
+    BNE .count
+    LDY.w #1
+    LDA.b [!C2Anim_Ptr],Y
+    STA.w C2Scene_Task.AnimTimer,X
+    BRA .wait
+.count:
+    DEC.w C2Scene_Task.AnimTimer,X
+    BNE .wait
+    REP #$20
+    LDA.w #2
+    CLC
+    RTS
+.wait:
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:0F00 — C2Anim_OpQueueVram (53 bytes, $0F00–$0F34)
+; Animation op 6, 8 bytes: adds a VRAM DMA to the queue the NMI flushes
+; (C2Scene_VramQ at C2Scene_VramQEnd): .Bank = arg 1, .Src = arg 2-3,
+; .Dest = arg 4-5, .Size = arg 6-7, .Vmain = VMAIN_IncAfterHigh; probably
+; the frame's tiles. C2Scene_VramQLock is held while the entry is written,
+; so a flush in between skips it. Script op $33 (C2Script_QueueVram) is
+; the same code for the main script.
+; Quirk, kept: no check that the queue has room.
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_OpClearByte
+; Exit:  M=0, X=0 (REP #$30); A = 8 (advance); X = the entry's offset, Y
+;        = 6; C2Scene_VramQEnd + 8; C2Scene_VramQLock = 0
+; No calls.
+C2Anim_OpQueueVram:
+    SEP #$30
+    LDX.b !C2Scene_VramQEnd
+    INC.b !C2Scene_VramQLock
+    LDY.b #1
+    LDA.b [!C2Anim_Ptr],Y
+    STA.w C2Scene_VramQ.Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.b C2Scene_VramQ.Vmain,X
+    REP #$20
+    LDY.b #2
+    LDA.b [!C2Anim_Ptr],Y
+    STA.b C2Scene_VramQ.Src,X
+    LDY.b #4
+    LDA.b [!C2Anim_Ptr],Y
+    STA.b C2Scene_VramQ.Dest,X
+    LDY.b #6
+    LDA.b [!C2Anim_Ptr],Y
+    STA.b C2Scene_VramQ.Size,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #!C2Scene_VramQEntrySize
+    STA.b !C2Scene_VramQEnd
+    STZ.b !C2Scene_VramQLock
+    REP #$30
+    LDA.w #8
+    RTS
+
+; $C2:0F35 — C2Anim_OpEnd (3 bytes, $0F35–$0F37)
+; Animation op 7: stops (A = 0, Z=1) with C=1 and does not advance, so
+; every later call stops here again. A task handler that returns this
+; carry ends its task (C2Scene_TaskRunAll); C2Script_MoveFrames and the
+; other script ops that call C2Anim_Run drop it.
+; Callers: none direct (C2Anim_OpTable).
+; Entry: as C2Anim_OpClearByte
+; Exit:  M=0, X=0; A = 0, C=1
+; No calls.
+C2Anim_OpEnd:
+    TDC
+    SEC
+    RTS
+
+; $C2:0F38 — C2Scene_TaskMove (43 bytes, $0F38–$0F62)
+; Moves the running task by its velocity, in 16.16 fixed point:
+; .XFrac/.SprX += .XVelFrac/.XVel and .YFrac/.SprY += .YVelFrac/.YVel
+; (inferred from the carry chain: the fraction words are added first and
+; carry into the whole ones). No wrap here; C2Scene_WrapTaskPos does that.
+; Callers (21 JSR sites, all unmatched except those listed): e.g.
+;   C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
+;   C2Script_ScrollLayerFrames ($C2:172B), $C2:36F1 and $C2:7824;
+;   $C2:46FA and $C2:5254 are doubtful byte patterns.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
+;        $0000-$1FFF; C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
+; No calls.
+C2Scene_TaskMove:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_Task.XFrac,X
+    ADC.w C2Scene_Task.XVelFrac,X
+    STA.w C2Scene_Task.XFrac,X
+    LDA.w C2Scene_Task.SprX,X
+    ADC.w C2Scene_Task.XVel,X
+    STA.w C2Scene_Task.SprX,X
+    CLC
+    LDA.w C2Scene_Task.YFrac,X
+    ADC.w C2Scene_Task.YVelFrac,X
+    STA.w C2Scene_Task.YFrac,X
+    LDA.w C2Scene_Task.SprY,X
+    ADC.w C2Scene_Task.YVel,X
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; ============================================================
+; Scene script interpreter ($C2:0F63–$C2:1036)
+; ============================================================
+; A scene's tasks are driven by byte-code scripts: C2Scene_LoadScene
+; starts one on C2Scene_ScriptBuf, and ops start more
+; (C2Script_SpawnScript). Each op is an opcode byte and its arguments;
+; its handler (C2Script_OpTable, named C2Script_*) runs with
+; C2Script_Ptr on the opcode and returns, like the animation ops
+; (C2Anim_Run), Z=0 with the bytes to advance in A, or Z=1 to stop for
+; this frame and run the same op again next frame. That is how the waits
+; work: a timed op counts in .ScriptWait, and a conditional branch whose
+; offset is 0 waits until its condition fails. C=1 from a handler ends
+; the task when C2Scene_TaskRunScript is its handler.
+
+org $C20F63
+; $C2:0F63 — C2Scene_TaskRunScript (46 bytes, $0F63–$0F90)
+; Task handler of the script tasks (C2Scene_TaskSpawnScript and
+; C2Scene_TaskSpawnScriptLow install it); also called by other handlers.
+; Runs the task's script from .ScriptPtr/.ScriptBank: calls the handler
+; of each op from C2Script_OpTable with C2Script_Ptr on the opcode. On
+; Z=0 it adds A to the pointer, stores it back in .ScriptPtr, zeroes
+; .OpState (16-bit, so +$33 too) for the next op and goes on; Z=1 ends
+; the call with the pointer where it is (.ScriptBank is never written).
+; Callers (5 JSR sites, unmatched): $C2:378B, $C2:37A1, $C2:3DBA,
+;   $C2:3DC1 and $C2:4823; as a task handler, C2Scene_TaskRunAll
+;   (C2Scene_TaskCallHandler).
+; Entry: M any (SEP #$20 / REP #$20 here), X=0, DP=$0000, DB with low
+;        WRAM at $0000-$1FFF ($00 from the NMI; the RAM ops read and
+;        write absolute addresses through it); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C as the last handler left it (C=1: the task is done);
+;        A, X, Y clobbered; C2Script_Ptr = the op it stopped on; and
+;        whatever the handlers change
+; Calls: the C2Script_OpTable handlers.
+C2Scene_TaskRunScript:
+    LDX.b !C2Scene_TaskCur
+    SEP #$20
+    LDA.w C2Scene_Task.ScriptBank,X
+    STA.b !C2Script_Ptr+2
+    REP #$20
+    LDA.w C2Scene_Task.ScriptPtr,X
+    STA.b !C2Script_Ptr
+.op:
+    LDA.b [!C2Script_Ptr]
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JSR (C2Script_OpTable,X)
+    BEQ .stop
+    CLC
+    ADC.b !C2Script_Ptr
+    STA.b !C2Script_Ptr
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_Task.ScriptPtr,X
+    STZ.w C2Scene_Task.OpState,X
+    BRA .op
+.stop:
+    SEP #$20
+    RTS
+
+; $C2:0F91 — C2Script_OpTable (83 words, $0F91–$1036)
+; The handler of each script opcode $00-$52 (C2Scene_TaskRunScript: JSR
+; (T,X) with X = the opcode * 2); a larger opcode is not checked for and
+; would jump through the code after the table. Opcodes are listed in table
+; order; the handlers are not in opcode order in the ROM ($4C and $4D sit
+; among the branches, $51 after $32). Operand bytes follow the opcode
+; ("arg 1" is the byte after it).
+C2Script_OpTable:
+    dw C2Script_ResetTask       ; $00
+    dw C2Script_SetSprPalette   ; $01
+    dw C2Script_SetSprPriority  ; $02
+    dw C2Script_SpawnUnk1CF5    ; $03
+    dw C2Script_SpawnUnk1DD4    ; $04
+    dw C2Script_GoToLocation    ; $05
+    dw C2Script_Halt            ; $06
+    dw C2Script_SetMapCell      ; $07
+    dw C2Script_SetMemberWord   ; $08
+    dw C2Script_SpawnScript     ; $09
+    dw C2Script_ClearTaskByte   ; $0A
+    dw C2Script_IncTaskByte     ; $0B
+    dw C2Script_DecTaskByte     ; $0C
+    dw C2Script_SetTaskByte     ; $0D
+    dw C2Script_OrTaskByte      ; $0E
+    dw C2Script_ClearTaskBits   ; $0F
+    dw C2Script_ClearRamByte    ; $10
+    dw C2Script_IncRamByte      ; $11
+    dw C2Script_DecRamByte      ; $12
+    dw C2Script_SetRamByte      ; $13
+    dw C2Script_OrRamByte       ; $14
+    dw C2Script_ClearRamBits    ; $15
+    dw C2Script_TaskByteToRam   ; $16
+    dw C2Script_RamByteToTask   ; $17
+    dw C2Script_CopyTaskByte    ; $18
+    dw C2Script_CopyRamByte     ; $19
+    dw C2Script_Jump            ; $1A
+    dw C2Script_LoopTaskByte    ; $1B
+    dw C2Script_IfTaskByteZero  ; $1C
+    dw C2Script_IfTaskByteNonZero ; $1D
+    dw C2Script_IfTaskByteNe    ; $1E
+    dw C2Script_IfTaskByteEq    ; $1F
+    dw C2Script_IfTaskBitsSet   ; $20
+    dw C2Script_IfTaskBitsClear ; $21
+    dw C2Script_IfRamByteZero   ; $22
+    dw C2Script_IfRamByteNonZero ; $23
+    dw C2Script_IfRamByteNe     ; $24
+    dw C2Script_IfRamByteEq     ; $25
+    dw C2Script_IfRamBitsSet    ; $26
+    dw C2Script_IfRamBitsClear  ; $27
+    dw C2Script_SpawnUnk20A2    ; $28
+    dw C2Script_SpawnUnk2105    ; $29
+    dw C2Script_SpawnUnk21F8    ; $2A
+    dw C2Script_SpawnUnk2194    ; $2B
+    dw C2Script_SetPosition     ; $2C
+    dw C2Script_Skip1           ; $2D
+    dw C2Script_SetXVelocity    ; $2E
+    dw C2Script_SetYVelocity    ; $2F
+    dw C2Script_SetAnim         ; $30
+    dw C2Script_MoveFrames      ; $31
+    dw C2Script_ScrollFrames    ; $32
+    dw C2Script_QueueVram       ; $33
+    dw C2Script_CallNear        ; $34
+    dw C2Script_SpawnTask       ; $35
+    dw C2Script_Call            ; $36
+    dw C2Script_Return          ; $37
+    dw C2Script_Wait            ; $38
+    dw C2Script_WaitAnimating   ; $39
+    dw C2Script_WaitTaskFrames  ; $3A
+    dw C2Script_SoundUnk18C7    ; $3B
+    dw C2Script_SoundUnk18D0    ; $3C
+    dw C2Script_Unk18F1         ; $3D
+    dw C2Script_DrawLayer       ; $3E
+    dw C2Script_MoveToX         ; $3F
+    dw C2Script_MoveToY         ; $40
+    dw C2Script_Halt2           ; $41
+    dw C2Script_SpawnTaskLow    ; $42
+    dw C2Script_SpawnScriptLow  ; $43
+    dw C2Script_SetListBit7     ; $44
+    dw C2Script_ClearListBit7   ; $45
+    dw C2Script_AddTaskByte     ; $46
+    dw C2Script_SubTaskByte     ; $47
+    dw C2Script_AddRamByte      ; $48
+    dw C2Script_SubRamByte      ; $49
+    dw C2Script_SoundUnk18F9    ; $4A
+    dw C2Script_SoundCmd        ; $4B
+    dw C2Script_IfRamByteLess   ; $4C
+    dw C2Script_IfRamByteGe     ; $4D
+    dw C2Script_CallLong        ; $4E
+    dw C2Script_CopyMapBlock    ; $4F
+    dw C2Script_Unk1BE0         ; $50
+    dw C2Script_ScrollLayerFrames ; $51
+    dw C2Script_End             ; $52
+
+; ============================================================
+; Scene script ops $00-$32, $4C, $4D, $51 ($C2:1037–$C2:17D1)
+; ============================================================
+; Every handler is entered from C2Scene_TaskRunScript with M=0, X=0
+; (X = the opcode * 2, which none of them uses), DP=$0000, DB with low
+; WRAM at $0000-$1FFF ($00 from the NMI) and C2Script_Ptr on the opcode,
+; and returns as that routine reads it: Z=0 and A = the bytes to advance,
+; or Z=1 to stop. "Task byte n" is byte n of the running task's record
+; (C2Scene_TaskCur), reached with (dp),Y; "RAM byte a" is the byte at
+; the 16-bit address a through DB, so with DB=$00 low WRAM or an I/O
+; register. The conditional branches move the script by a signed byte
+; counted from the opcode (sign-extended into A); an offset of 0 stops
+; on the op, so it waits until the condition fails.
+
+; $C2:1037 — C2Script_ResetTask (90 bytes, $1037–$1090)
+; Op $00, 1 byte: zeroes the task's record from +$05 on, except the
+; script fields +$07-$0A: .ScriptReturn, the animation, the sprite fields,
+; position and velocity and all words up to +$3F (16-bit STZs at +$05,
+; +$0B, +$0D, +$0E and every even offset $10-$3E, so +$0E is cleared twice).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 1; X = the task
+; No calls.
+C2Script_ResetTask:
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_Task.ScriptReturn,X
+    STZ.w C2Scene_Task.AnimPtr,X
+    STZ.w C2Scene_Task.AnimBank,X
+    STZ.w C2Scene_Task.AnimTimer,X  ; and .SprAttr
+    STZ.w C2Scene_Task.SprTile,X
+    STZ.w C2Scene_Task.XFrac,X
+    STZ.w C2Scene_Task.SprX,X
+    STZ.w C2Scene_Task.YFrac,X
+    STZ.w C2Scene_Task.SprY,X
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.YVel+2,X     ; +$22-$31: no names yet
+    STZ.w C2Scene_Task.YVel+4,X
+    STZ.w C2Scene_Task.YVel+6,X
+    STZ.w C2Scene_Task.YVel+8,X
+    STZ.w C2Scene_Task.YVel+10,X
+    STZ.w C2Scene_Task.YVel+12,X
+    STZ.w C2Scene_Task.YVel+14,X
+    STZ.w C2Scene_Task.YVel+16,X
+    STZ.w C2Scene_Task.OpState,X
+    STZ.w C2Scene_Task.OpTarget,X   ; and .Unk35 low byte
+    STZ.w C2Scene_Task.Unk35+1,X    ; +$36-$37
+    STZ.w C2Scene_Task.Unk37+1,X    ; +$38-$3F
+    STZ.w C2Scene_Task.Unk37+3,X
+    STZ.w C2Scene_Task.Unk37+5,X
+    STZ.w C2Scene_Task.Unk37+7,X
+    LDA.w #1
+    RTS
+
+; $C2:1091 — C2Script_SetSprPalette (23 bytes, $1091–$10A7)
+; Op $01, 2 bytes: .SprAttr = .SprAttr AND $F1 OR arg 1: replaces bits
+; 1-3, which C2Scene_SprDrawNode puts in the OAM palette bits.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
+; No calls.
+C2Script_SetSprPalette:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.w C2Scene_Task.SprAttr,X
+    AND.b #!C2Scene_SprAttrKeepPal
+    ORA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.SprAttr,X
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:10A8 — C2Script_SetSprPriority (23 bytes, $10A8–$10BE)
+; Op $02, 2 bytes: .SprAttr = .SprAttr AND $4F OR arg 1: replaces bits 4
+; and 5 (the OAM priority bits) and bit 7 (C2Scene_SprAttrScroll).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
+; No calls.
+C2Script_SetSprPriority:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.w C2Scene_Task.SprAttr,X
+    AND.b #!C2Scene_SprAttrKeepPrio
+    ORA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.SprAttr,X
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:10BF — C2Script_SpawnUnk1CF5 (14 bytes, $10BF–$10CC)
+; Op $03, 10 bytes: starts a C2Scene_TaskUnk1CF5 task (C2Scene_TaskSpawn,
+; records 4-63), which copies this task's record, and advances 10. The op
+; reads none of its 9 argument bytes itself: probably the new task reads
+; them through the .ScriptPtr it copied, which still points at this op
+; (C2Scene_TaskRunScript stores the pointer only after the op).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 10; X, Y as C2Scene_TaskSpawn leaves them;
+;        C2Tmp_08 changed
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk1CF5:
+    SEP #$20
+    LDX.w #C2Scene_TaskUnk1CF5
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #!C2Script_SpawnUnk1CF5Len
+    RTS
+
+; $C2:10CD — C2Script_SpawnUnk1DD4 (51 bytes, $10CD–$10FF)
+; Op $04, 6 bytes: puts its arguments in this task's record, .Unk35 = arg
+; 1-2, .Unk37 = arg 3, .OpState = arg 4 (high byte 0), .OpTarget = arg 5,
+; and starts a C2Scene_TaskUnk1DD4 task, which copies them (what it does
+; with them is not traced). This task's .OpState is zeroed again when
+; C2Scene_TaskRunScript advances.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 6; X, Y as C2Scene_TaskSpawn leaves them;
+;        C2Tmp_08 changed
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk1DD4:
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.Unk35,X
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.Unk37,X
+    LDY.w #4
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.OpState,X
+    STZ.w C2Scene_Task.OpState+1,X
+    LDY.w #5
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.OpTarget,X
+    LDX.w #C2Scene_TaskUnk1DD4
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #6
+    RTS
+
+; $C2:1100 — C2Script_GoToLocation (105 bytes, $1100–$1168)
+; Op $05, 5 bytes: sets up a location change in the field's location
+; block (DP_Field) and selects scene mode C2Scene_ModeUnk2:
+; - Loc_ReturnId = the current Loc_Id; Loc_ReturnX = BG2's tile X
+;   (C2Scene_BgTileX word 1) + 16, less 192 if that reaches 192;
+;   Loc_ReturnY = BG2's tile Y + 16, AND $7F; Loc_ReturnFacing = the new
+;   entry facing turned around (C2SceneRom_TurnAround). The id, X and Y
+;   are also copied to C2Scene_SavedReturnId/X/Y;
+; - Loc_Id = arg 1-2 AND C2Scene_LocIdMask (bits 0-8), Loc_EntryFacing =
+;   arg 2 / 2 (the word's bits 9-15; the turn-around takes bits 9-10),
+;   Loc_EntryX = arg 3, Loc_EntryY = arg 4.
+; The +16 is half the screen width in tiles for X but not half its height
+; for Y (C2Scene_SetStartScroll uses 14 there): probably the tile under
+; the camera's center, or near it.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner); DB=$00
+;        (absolute DP_Field block and $04FC)
+; Exit:  M=0, X=0; A = 5; X = the facing AND 3, Y = 4
+; No calls.
+C2Script_GoToLocation:
+    LDA.w !DP_Field+!Loc_Id
+    STA.w !DP_Field+!Loc_ReturnId
+    STA.w !C2Scene_SavedReturnId
+    LDA.b !C2Scene_BgTileX+2
+    CLC
+    ADC.w #!C2Scene_ReturnTileOfs
+    CMP.w #!C2Scene_MapTilesX
+    BCC .x_ok
+    SBC.w #!C2Scene_MapTilesX
+.x_ok:
+    STA.w !DP_Field+!Loc_ReturnX    ; 16-bit: Loc_ReturnY is written below
+    STA.w !C2Scene_SavedReturnX
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_ReturnTileOfs
+    AND.w #!C2Scene_MapTilesY-1
+    SEP #$20
+    STA.w !DP_Field+!Loc_ReturnY
+    STA.w !C2Scene_SavedReturnY
+    REP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    AND.w #!C2Scene_LocIdMask
+    STA.w !DP_Field+!Loc_Id
+    SEP #$20
+    INY
+    LDA.b [!C2Script_Ptr],Y         ; arg 2 again: the bits above the location
+    LSR A
+    STA.w !DP_Field+!Loc_EntryFacing
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !DP_Field+!Loc_EntryX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !DP_Field+!Loc_EntryY
+    TDC
+    LDA.w !DP_Field+!Loc_EntryFacing
+    AND.b #3
+    TAX
+    LDA.l !C2SceneRom_TurnAround,X
+    STA.w !DP_Field+!Loc_ReturnFacing
+    LDA.b #!C2Scene_ModeUnk2
+    STA.w !C2Scene_Mode
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:1169 — C2Script_Halt (2 bytes, $1169–$116A)
+; Op $06: stops (A = 0, Z=1) without advancing, every frame: the script
+; ends there but its task stays (C as C2Scene_TaskRunScript left it, 0
+; from its ASL). Op $41 (C2Script_Halt2) is the same code.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 0
+; No calls.
+C2Script_Halt:
+    TDC
+    RTS
+
+; $C2:116B — C2Script_SetMapCell (71 bytes, $116B–$11B1)
+; Op $07, 5 bytes: writes metatile number arg 4 into BG layer arg 1's
+; map (C2Scene_LayerMaps, bank $7E) at column arg 2, row arg 3 (row * 96
+; + column, with the hardware multiplier). It only changes the map: what
+; is on screen is redrawn elsewhere (e.g. C2Script_DrawLayer).
+; Quirk, kept: the layer is not checked; 0 gives index $1FE and reads a
+; word far past C2Scene_LayerMaps.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB=$00
+;        (WRMPYA/WRMPYB/RDMPYL)
+; Exit:  M=0, X=0; A = 5; X = (layer - 1) * 2, Y = 4; C2Tmp_10-$12 = the
+;        cell's address
+; No calls.
+!C2Script_CellPtr = !C2Tmp_10   ; 24-bit: the map cell
+C2Script_SetMapCell:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    DEC A
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l C2Scene_LayerMaps,X
+    STA.b !C2Script_CellPtr
+    SEP #$20
+    LDA.b #!Bank7E
+    STA.b !C2Script_CellPtr+2
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w WRMPYA
+    LDA.b #!C2Scene_MapCols
+    STA.w WRMPYB
+    REP #$20
+    CLC
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    AND.w #!Eng_LowByteMask
+    ADC.w RDMPYL
+    CLC
+    ADC.b !C2Script_CellPtr
+    STA.b !C2Script_CellPtr
+    TDC
+    SEP #$20
+    LDY.w #4
+    LDA.b [!C2Script_Ptr],Y
+    STA.b [!C2Script_CellPtr]
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:11B2 — C2Script_SetMemberWord (68 bytes, $11B2–$11F5)
+; Op $08, 4 bytes: stores the word arg 1-2 for character arg 3: at
+; C2Scene_Unk1B41 for character 7, else at the C2Scene_MemberWords word
+; of the party position (Party_Members) that holds that character;
+; nothing if none does. With C2Scene_Unk1B41 that makes four words at
+; $1B3B-$1B42; what they mean is not traced.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 4; X = the word when one was stored; Y = 3;
+;        C2Tmp_08 = the word
+; No calls.
+!C2Script_MemberWord = !C2Tmp_08
+C2Script_SetMemberWord:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_MemberWord
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    CMP.b #7
+    BNE .member0
+    LDX.b !C2Script_MemberWord
+    STX.w !C2Scene_Unk1B41
+    BRA .done
+.member0:
+    CMP.l !Party_Members
+    BNE .member1
+    LDX.b !C2Script_MemberWord
+    STX.w !C2Scene_MemberWords
+    BRA .done
+.member1:
+    CMP.l !Party_Members+1
+    BNE .member2
+    LDX.b !C2Script_MemberWord
+    STX.w !C2Scene_MemberWords+2
+    BRA .done
+.member2:
+    CMP.l !Party_Members+2
+    BNE .done
+    LDX.b !C2Script_MemberWord
+    STX.w !C2Scene_MemberWords+4
+.done:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:11F6 — C2Script_SpawnScript (22 bytes, $11F6–$120B)
+; Op $09, 4 bytes: starts another script task (C2Scene_TaskSpawnScript,
+; records 4-63) on the script at arg 1-2 in bank arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 4; X = the new record; Y as C2Scene_TaskSpawn
+;        leaves it; C2Tmp_01, C2Tmp_08 and C2Tmp_0A changed
+; Calls: C2Scene_TaskSpawnScript.
+C2Script_SpawnScript:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_TaskSpawnScript
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:120C — C2Script_ClearTaskByte (17 bytes, $120C–$121C)
+; Op $0A, 2 bytes: task byte arg 1 = 0.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 2; Y = arg 1
+; No calls.
+C2Script_ClearTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    TDC                         ; A = DP = 0
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:121D — C2Script_IncTaskByte (19 bytes, $121D–$122F)
+; Op $0B, 2 bytes: task byte arg 1 + 1.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IncTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    INC A
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:1230 — C2Script_DecTaskByte (19 bytes, $1230–$1242)
+; Op $0C, 2 bytes: task byte arg 1 - 1.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_DecTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    DEC A
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:1243 — C2Script_SetTaskByte (20 bytes, $1243–$1256)
+; Op $0D, 3 bytes: task byte arg 1 = arg 2.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 3; X = Y = arg 1
+; No calls.
+C2Script_SetTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1257 — C2Script_OrTaskByte (22 bytes, $1257–$126C)
+; Op $0E, 3 bytes: task byte arg 1 OR= arg 2 (sets those bits).
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_OrTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    ORA.b (!C2Scene_TaskCur),Y
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:126D — C2Script_ClearTaskBits (24 bytes, $126D–$1284)
+; Op $0F, 3 bytes: task byte arg 1 AND= NOT arg 2 (clears those bits).
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_ClearTaskBits:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    EOR.b #!Eng_Invert8
+    TXY
+    AND.b (!C2Scene_TaskCur),Y
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1285 — C2Script_ClearRamByte (17 bytes, $1285–$1295)
+; Op $10, 3 bytes: RAM byte at arg 1-2 = 0.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB = the
+;        bank of the RAM bytes ($00 from the NMI)
+; Exit:  M=0, X=0; A = 3; X = the address, Y = 1
+; No calls.
+C2Script_ClearRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    STZ.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1296 — C2Script_IncRamByte (17 bytes, $1296–$12A6)
+; Op $11, 3 bytes: RAM byte at arg 1-2 + 1.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IncRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    INC.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:12A7 — C2Script_DecRamByte (17 bytes, $12A7–$12B7)
+; Op $12, 3 bytes: RAM byte at arg 1-2 - 1.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_DecRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    DEC.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:12B8 — C2Script_SetRamByte (22 bytes, $12B8–$12CD)
+; Op $13, 4 bytes: RAM byte at arg 1-2 = arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 4; X = the address, Y = 3
+; No calls.
+C2Script_SetRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:12CE — C2Script_OrRamByte (25 bytes, $12CE–$12E6)
+; Op $14, 4 bytes: RAM byte at arg 1-2 OR= arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_OrRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    ORA.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:12E7 — C2Script_ClearRamBits (27 bytes, $12E7–$1301)
+; Op $15, 4 bytes: RAM byte at arg 1-2 AND= NOT arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_ClearRamBits:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    EOR.b #!Eng_Invert8
+    AND.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1302 — C2Script_TaskByteToRam (26 bytes, $1302–$131B)
+; Op $16, 4 bytes: RAM byte at arg 2-3 = task byte arg 1.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 4; X = the address, Y = arg 1
+; No calls.
+C2Script_TaskByteToRam:
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    DEY
+    LDA.b [!C2Script_Ptr],Y
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+    LDA.b (!C2Scene_TaskCur),Y
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:131C — C2Script_RamByteToTask (26 bytes, $131C–$1335)
+; Op $17, 4 bytes: task byte arg 1 = RAM byte at arg 2-3.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_TaskByteToRam; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_RamByteToTask:
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    DEY
+    LDA.b [!C2Script_Ptr],Y
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1336 — C2Script_CopyTaskByte (26 bytes, $1336–$134F)
+; Op $18, 3 bytes: task byte arg 1 = task byte arg 2.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 3; X = the byte, Y = arg 1
+; No calls.
+C2Script_CopyTaskByte:
+    SEP #$20
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    TAX
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    TXA
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1350 — C2Script_CopyRamByte (26 bytes, $1350–$1369)
+; Op $19, 5 bytes: RAM byte at arg 1-2 = RAM byte at arg 3-4.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 5; X = the source, Y = the destination
+; No calls.
+C2Script_CopyRamByte:
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,Y
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:136A — C2Script_Jump (11 bytes, $136A–$1374)
+; Op $1A, 3 bytes: C2Script_Ptr = arg 1-2 (an address in the script's
+; bank), then advance 1, so the script goes on at arg 1-2 + 1. Unlike
+; C2Script_Call, which subtracts 1 before advancing, the target is not
+; arg 1-2 itself: the script's addresses are probably written one less
+; (not traced).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 1; Y = 1
+; No calls.
+C2Script_Jump:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_Ptr
+    LDA.w #1
+    RTS
+
+; $C2:1375 — C2Script_LoopTaskByte (35 bytes, $1375–$1397)
+; Op $1B, 3 bytes: task byte arg 1 - 1; while it is not 0, branch by arg
+; 2; at 0, advance 3 (a counted loop).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 3, or the offset with C=0 (Z=1 for 0); Y = arg 1
+;        or 2
+; No calls.
+C2Script_LoopTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    DEC A
+    STA.b (!C2Scene_TaskCur),Y
+    BEQ .done
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20                    ; high byte 0 (from the opcode * 2)
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.done:
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1398 — C2Script_IfTaskByteZero (32 bytes, $1398–$13B7)
+; Op $1C, 3 bytes: if task byte arg 1 is 0, branch by arg 2; else
+; advance 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 3, or the offset with C=0; Y = arg 1 or 2
+; No calls.
+C2Script_IfTaskByteZero:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    BNE .next
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:13B8 — C2Script_IfTaskByteNonZero (32 bytes, $13B8–$13D7)
+; Op $1D, 3 bytes: if task byte arg 1 is not 0, branch by arg 2; else
+; advance 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfTaskByteZero; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfTaskByteNonZero:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    BEQ .next
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:13D8 — C2Script_IfTaskByteNe (36 bytes, $13D8–$13FB)
+; Op $1E, 4 bytes: if task byte arg 1 is not arg 2, branch by arg 3;
+; else advance 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = arg 1; Y = arg 1
+;        or 3
+; No calls.
+C2Script_IfTaskByteNe:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    CMP.b (!C2Scene_TaskCur),Y
+    BEQ .next
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:13FC — C2Script_IfTaskByteEq (36 bytes, $13FC–$141F)
+; Op $1F, 4 bytes: if task byte arg 1 is arg 2, branch by arg 3; else
+; advance 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfTaskByteEq:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    CMP.b (!C2Scene_TaskCur),Y
+    BNE .next
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1420 — C2Script_IfTaskBitsSet (36 bytes, $1420–$1443)
+; Op $20, 4 bytes: if task byte arg 1 AND arg 2 is not 0, branch by arg
+; 3; else advance 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfTaskBitsSet:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    AND.b (!C2Scene_TaskCur),Y
+    BEQ .next
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1444 — C2Script_IfTaskBitsClear (37 bytes, $1444–$1468)
+; Op $21, 4 bytes: if task byte arg 1 AND arg 2 is 0, branch by arg 3;
+; else advance 4. (Its TDC clears a high byte that is already 0.)
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfTaskBitsClear:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    AND.b (!C2Scene_TaskCur),Y
+    BNE .next
+    TDC
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1469 — C2Script_IfRamByteZero (34 bytes, $1469–$148A)
+; Op $22, 4 bytes: if the RAM byte at arg 1-2 is 0, branch by arg 3; else
+; advance 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = the address; Y = 1
+;        or 3
+; No calls.
+C2Script_IfRamByteZero:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    TDC                         ; clear the high byte for the offset
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    BNE .next
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:148B — C2Script_IfRamByteNonZero (34 bytes, $148B–$14AC)
+; Op $23, 4 bytes: if the RAM byte at arg 1-2 is not 0, branch by arg 3;
+; else advance 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteZero; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamByteNonZero:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    TDC
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    BEQ .next
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:14AD — C2Script_IfRamByteNe (37 bytes, $14AD–$14D1)
+; Op $24, 5 bytes: if the RAM byte at arg 1-2 is not arg 3, branch by
+; arg 4; else advance 5.
+; Callers: none direct (C2Script_OpTable). xref's CONFIRMED JSR at
+;   $C2:FFB4 is not a call: those bytes are the operand of REP #$20 at
+;   $C2:FFB3 and the LDA $1814 after it (unmatched code).
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 5, or the offset with C=0; X = the address; Y = 3
+;        or 4
+; No calls.
+C2Script_IfRamByteNe:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    CMP.w !Eng_PtrBase,X
+    BEQ .next
+    TDC                         ; clear the high byte for the offset
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:14D2 — C2Script_IfRamByteEq (37 bytes, $14D2–$14F6)
+; Op $25, 5 bytes: if the RAM byte at arg 1-2 is arg 3, branch by arg 4;
+; else advance 5.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamByteEq:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    CMP.w !Eng_PtrBase,X
+    BNE .next
+    TDC
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:14F7 — C2Script_IfRamBitsSet (37 bytes, $14F7–$151B)
+; Op $26, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is not 0, branch
+; by arg 4; else advance 5.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamBitsSet:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    AND.w !Eng_PtrBase,X
+    BEQ .next
+    TDC
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:151C — C2Script_IfRamBitsClear (37 bytes, $151C–$1540)
+; Op $27, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is 0, branch by
+; arg 4; else advance 5.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamBitsClear:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    AND.w !Eng_PtrBase,X
+    BNE .next
+    TDC
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:1541 — C2Script_IfRamByteLess (37 bytes, $1541–$1565)
+; Op $4C, 5 bytes: if the RAM byte at arg 1-2 is below arg 3 (unsigned),
+; branch by arg 4; else advance 5. (It reads a word and compares the low
+; byte.)
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamByteLess:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    LDY.w #3
+    LDA.w !Eng_PtrBase,X
+    SEP #$20
+    CMP.b [!C2Script_Ptr],Y
+    BCS .next
+    TDC
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:1566 — C2Script_IfRamByteGe (37 bytes, $1566–$158A)
+; Op $4D, 5 bytes: if the RAM byte at arg 1-2 is arg 3 or more
+; (unsigned), branch by arg 4; else advance 5.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_IfRamByteGe:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    LDY.w #3
+    LDA.w !Eng_PtrBase,X
+    SEP #$20
+    CMP.b [!C2Script_Ptr],Y
+    BCC .next
+    TDC
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    BPL .branch
+    ORA.w #!Eng_HighByteMask
+.branch:
+    CLC
+    RTS
+.next:
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:158B — C2Script_SpawnUnk20A2 (14 bytes, $158B–$1598)
+; Op $28, 2 bytes: starts a C2Scene_TaskUnk20A2 task (C2Scene_TaskSpawn),
+; which copies this record (and so this op's .ScriptPtr: probably it
+; reads arg 1 from there; not traced).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 2; X, Y as C2Scene_TaskSpawn leaves them;
+;        C2Tmp_08 changed
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk20A2:
+    SEP #$20
+    LDX.w #C2Scene_TaskUnk20A2
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:1599 — C2Script_SpawnUnk2105 (14 bytes, $1599–$15A6)
+; Op $29, 2 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk2105.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SpawnUnk20A2
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk2105:
+    SEP #$20
+    LDX.w #C2Scene_TaskUnk2105
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:15A7 — C2Script_SpawnUnk21F8 (14 bytes, $15A7–$15B4)
+; Op $2A, 3 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk21F8.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_SpawnUnk20A2
+; Exit:  as C2Script_SpawnUnk20A2, A = 3
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk21F8:
+    SEP #$20
+    LDX.w #C2Scene_TaskUnk21F8
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:15B5 — C2Script_SpawnUnk2194 (14 bytes, $15B5–$15C2)
+; Op $2B, 3 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk2194.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Script_SpawnUnk20A2
+; Exit:  as C2Script_SpawnUnk20A2, A = 3
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnUnk2194:
+    SEP #$20
+    LDX.w #C2Scene_TaskUnk2194
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:15C3 — C2Script_SetPosition (28 bytes, $15C3–$15DE)
+; Op $2C, 5 bytes: .SprX = arg 1-2 and .SprY = arg 3-4, both fractions
+; 0.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 5; X = the task, Y = 3
+; No calls.
+C2Script_SetPosition:
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.SprX,X
+    STZ.w C2Scene_Task.XFrac,X
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.SprY,X
+    STZ.w C2Scene_Task.YFrac,X
+    LDA.w #5
+    RTS
+
+; $C2:15DF — C2Script_Skip1 (4 bytes, $15DF–$15E2)
+; Op $2D, 2 bytes: does nothing and advances 2 (the byte after the opcode
+; is skipped).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  M=0, X=0; A = 2
+; No calls.
+C2Script_Skip1:
+    LDA.w #2
+    RTS
+
+; $C2:15E3 — C2Script_SetXVelocity (22 bytes, $15E3–$15F8)
+; Op $2E, 5 bytes: .XVelFrac = arg 1-2, .XVel = arg 3-4.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_SetXVelocity:
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.XVelFrac,X
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.XVel,X
+    LDA.w #5
+    RTS
+
+; $C2:15F9 — C2Script_SetYVelocity (22 bytes, $15F9–$160E)
+; Op $2F, 5 bytes: .YVelFrac = arg 1-2, .YVel = arg 3-4.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
+; No calls.
+C2Script_SetYVelocity:
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.YVelFrac,X
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.YVel,X
+    LDA.w #5
+    RTS
+
+; $C2:160F — C2Script_SetAnim (14 bytes, $160F–$161C)
+; Op $30, 2 bytes: starts animation script arg 1 (C2Scene_SetAnim).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
+; Calls: C2Scene_SetAnim.
+C2Script_SetAnim:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_SetAnim
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:161D — C2Script_MoveFrames (46 bytes, $161D–$164A)
+; Op $31, 2 bytes: for arg 1 frames, each frame moves the task by its
+; velocity (C2Scene_TaskMove), wraps the position into the map
+; (C2Scene_WrapTaskPos), runs its animation (C2Anim_Run) and stops for
+; the frame. .ScriptWait counts: 0 loads it with arg 1 (and that frame
+; moves), then -1 per frame; when it reaches 0 the op advances 2 without
+; moving. So arg 1 = n moves n times; 0 never ends.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  advance: M=0, X=0, A = 2, X = the task. Moved: M=0, X=0, A = 0
+;        (Z=1), C=0 (the animation's carry is dropped); X, Y as
+;        C2Anim_Run leaves them
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Anim_Run.
+C2Script_MoveFrames:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptWait,X
+    BNE .count
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.ScriptWait,X
+    BRA .move
+.count:
+    DEC.w C2Scene_Task.ScriptWait,X
+    BNE .move
+    REP #$20
+    LDA.w #2
+    RTS
+.move:
+    REP #$20
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    JSR C2Anim_Run
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:164B — C2Script_ScrollFrames (175 bytes, $164B–$16F9)
+; Op $32, 2 bytes: scrolls BG layers 1 and 2 (and BG3) by the task's
+; velocity for arg 1 frames, counted in .ScriptWait as C2Script_MoveFrames
+; does. The first frame also zeroes the position (.XFrac-.SprY), which
+; then serves as an accumulator: each frame
+; C2Script_PanKeepFraction drops the whole pixels of the last frame,
+; C2Scene_TaskMove adds the velocity, and when that makes at least one
+; whole pixel in X (C2Script_PanTakeX) the layers are moved by that many
+; pixels (C2Tmp_01, signed) with C2Scene_Unk0568 for layer 1 and then
+; 2; likewise in Y (C2Script_PanTakeY, C2Scene_Unk066C; the two are
+; probably the horizontal and vertical layer scrolls, which redraw the
+; edge they uncover: not traced). BG3's scroll shadow takes the same
+; pixels unless any of three flag bits is set in C2Scene_FlagTailCopy
+; (bytes 0, 3 and 8: the copy of $7F:01F0-$01FF; what they stand for is
+; not traced).
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  advance: M=0, X=0, A = 2, X = the task. Scrolled: M=0, X=0, A =
+;        0 (Z=1), C=0; X, Y clobbered; C2Tmp_00/$01 and whatever the
+;        scroll calls change
+; Calls: C2Script_PanKeepFraction, C2Scene_TaskMove, C2Script_PanTakeX,
+;   C2Script_PanTakeY, C2Scene_Unk0568, C2Scene_Unk066C.
+!C2Script_PanLayer = !C2Tmp_00  ; in for C2Scene_Unk0568/066C: the layer (as C2Scene_DrawLayer)
+!C2Script_PanStep = !C2Tmp_01   ; signed pixels to move, from C2Script_PanTakeX/Y
+C2Script_ScrollFrames:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptWait,X
+    BNE .count
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.ScriptWait,X
+    REP #$20
+    STZ.w C2Scene_Task.XFrac,X
+    STZ.w C2Scene_Task.SprX,X
+    STZ.w C2Scene_Task.YFrac,X
+    STZ.w C2Scene_Task.SprY,X
+    BRA .scroll
+.count:
+    DEC.w C2Scene_Task.ScriptWait,X
+    BNE .scroll
+    REP #$20
+    LDA.w #2
+    RTS
+.scroll:
+    REP #$20
+    JSR C2Script_PanKeepFraction
+    JSR C2Scene_TaskMove
+    JSR C2Script_PanTakeX
+    BCC .y
+    SEP #$20
+    LDA.b #1
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk0568
+    LDA.b #2
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk0568
+    LDA.w !C2Scene_FlagTailCopy
+    BIT.b #!C2Scene_NoBg3PanBit0
+    BNE .y
+    LDA.w !C2Scene_FlagTailCopy+3
+    BIT.b #!C2Scene_NoBg3PanBit3
+    BNE .y
+    LDA.w !C2Scene_FlagTailCopy+8
+    BIT.b #!C2Scene_NoBg3PanBit8
+    BNE .y
+    TDC
+    LDA.b !C2Script_PanStep
+    REP #$20
+    BPL .x_add
+    ORA.w #!Eng_HighByteMask
+.x_add:
+    CLC
+    ADC.b !C2Scene_Bg3HScroll
+    STA.b !C2Scene_Bg3HScroll
+.y:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Script_PanTakeY
+    BCC .done
+    SEP #$20
+    LDA.b #1
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk066C
+    LDA.b #2
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk066C
+    LDA.w !C2Scene_FlagTailCopy
+    BIT.b #!C2Scene_NoBg3PanBit0
+    BNE .done
+    LDA.w !C2Scene_FlagTailCopy+3
+    BIT.b #!C2Scene_NoBg3PanBit3
+    BNE .done
+    LDA.w !C2Scene_FlagTailCopy+8
+    BIT.b #!C2Scene_NoBg3PanBit8
+    BNE .done
+    TDC
+    LDA.b !C2Script_PanStep
+    REP #$20
+    BPL .y_add
+    ORA.w #!Eng_HighByteMask
+.y_add:
+    CLC
+    ADC.b !C2Scene_Bg3VScroll
+    STA.b !C2Scene_Bg3VScroll
+.done:
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:16FA — C2Script_ScrollLayerFrames (95 bytes, $16FA–$1758)
+; Op $51, 3 bytes: C2Script_ScrollFrames for one layer, arg 1 (passed to
+; C2Scene_Unk0568/066C as is), for arg 2 frames, and without BG3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Exit:  advance: M=0, X=0, A = 3, X = the task. Scrolled: as
+;        C2Script_ScrollFrames
+; Calls: C2Script_PanKeepFraction, C2Scene_TaskMove, C2Script_PanTakeX,
+;   C2Script_PanTakeY, C2Scene_Unk0568, C2Scene_Unk066C.
+C2Script_ScrollLayerFrames:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptWait,X
+    BNE .count
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.ScriptWait,X
+    REP #$20
+    STZ.w C2Scene_Task.XFrac,X
+    STZ.w C2Scene_Task.SprX,X
+    STZ.w C2Scene_Task.YFrac,X
+    STZ.w C2Scene_Task.SprY,X
+    BRA .scroll
+.count:
+    DEC.w C2Scene_Task.ScriptWait,X
+    BNE .scroll
+    REP #$20
+    LDA.w #3
+    RTS
+.scroll:
+    REP #$20
+    JSR C2Script_PanKeepFraction
+    JSR C2Scene_TaskMove
+    JSR C2Script_PanTakeX
+    BCC .y
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk0568
+.y:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Script_PanTakeY
+    BCC .done
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_PanLayer
+    JSR C2Scene_Unk066C
+.done:
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:1759 — C2Script_PanKeepFraction (43 bytes, $1759–$1783)
+; Drops the whole pixels from the task's position, keeping the fraction
+; as a value in -1..+1: .SprX = -1 if it was negative with a non-zero
+; .XFrac, else 0; the same for .SprY with .YFrac. (The fraction words
+; are left as they are.)
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:1679),
+;   C2Script_ScrollLayerFrames ($C2:1728).
+; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
+;        $0000-$1FFF
+; Exit:  M=0, X=0; A clobbered; X, Y unchanged
+; No calls.
+C2Script_PanKeepFraction:
+    LDA.w C2Scene_Task.SprX,X
+    BPL .x_zero
+    LDA.w C2Scene_Task.XFrac,X
+    BEQ .x_zero
+    LDA.w #!C2Scene_WholeMinus1
+    STA.w C2Scene_Task.SprX,X
+    BRA .y
+.x_zero:
+    STZ.w C2Scene_Task.SprX,X
+.y:
+    LDA.w C2Scene_Task.SprY,X
+    BPL .y_zero
+    LDA.w C2Scene_Task.YFrac,X
+    BEQ .y_zero
+    LDA.w #!C2Scene_WholeMinus1
+    STA.w C2Scene_Task.SprY,X
+    BRA .done
+.y_zero:
+    STZ.w C2Scene_Task.SprY,X
+.done:
+    RTS
+
+; $C2:1784 — C2Script_PanTakeX (39 bytes, $1784–$17AA)
+; Tells whether the X accumulator (.XFrac/.SprX) holds at least one whole
+; pixel either way: C=1 with C2Tmp_01 = the low byte of .SprX (signed
+; pixels), else C=0. A negative value is negated as 32 bits (only the
+; high word is kept, for the test), so -1 plus a fraction counts as less
+; than a pixel.
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:167F),
+;   C2Script_ScrollLayerFrames ($C2:172E).
+; Entry: M=0, X=0 with X = the task, DP=$0000, DB with low WRAM at
+;        $0000-$1FFF
+; Exit:  M=0, X=0; C as above; A clobbered; C2Tmp_01 set when C=1; X, Y
+;        unchanged
+; No calls.
+C2Script_PanTakeX:
+    LDA.w C2Scene_Task.SprX,X
+    BPL .test
+    CLC
+    LDA.w C2Scene_Task.XFrac,X
+    EOR.w #!Eng_Invert16
+    ADC.w #1                    ; only the carry is kept
+    LDA.w C2Scene_Task.SprX,X
+    EOR.w #!Eng_Invert16
+    ADC.w #0
+.test:
+    BEQ .none
+    SEP #$20
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Script_PanStep
+    REP #$20
+    SEC
+    RTS
+.none:
+    CLC
+    RTS
+
+; $C2:17AB — C2Script_PanTakeY (39 bytes, $17AB–$17D1)
+; C2Script_PanTakeX for .YFrac/.SprY.
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:16BC),
+;   C2Script_ScrollLayerFrames ($C2:1743).
+; Entry/Exit: as C2Script_PanTakeX
+; No calls.
+C2Script_PanTakeY:
+    LDA.w C2Scene_Task.SprY,X
+    BPL .test
+    CLC
+    LDA.w C2Scene_Task.YFrac,X
+    EOR.w #!Eng_Invert16
+    ADC.w #1
+    LDA.w C2Scene_Task.SprY,X
+    EOR.w #!Eng_Invert16
+    ADC.w #0
+.test:
+    BEQ .none
+    SEP #$20
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Script_PanStep
+    REP #$20
+    SEC
+    RTS
+.none:
+    CLC
+    RTS
+
+; ============================================================
+; Scene task motion helpers ($C2:1C84–$C2:1CF4)
+; ============================================================
+; Used by the script ops (C2Script_MoveFrames, C2Script_MoveToX/Y) and by
+; other task handlers on the running task's record (C2Scene_TaskCur).
+
+org $C21C84
+; $C2:1C84 — C2Scene_NegateXVel (26 bytes, $1C84–$1C9D)
+; Negates the task's X velocity as one 32-bit value (.XVelFrac/.XVel:
+; invert both words and add 1 with the carry), turning it around.
+; Callers (4 JSR sites): $C2:1979 and $C2:198B (both in C2Script_MoveToX,
+;   unmatched), $C2:52D0 and $C2:5429 (unmatched).
+; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
+;        $0000-$1FFF
+; Exit:  M=0, X=0; A = the new .XVel; X, Y unchanged
+; No calls.
+C2Scene_NegateXVel:
+    LDA.w C2Scene_Task.XVelFrac,X
+    EOR.w #!Eng_Invert16
+    CLC
+    ADC.w #1
+    STA.w C2Scene_Task.XVelFrac,X
+    LDA.w C2Scene_Task.XVel,X
+    EOR.w #!Eng_Invert16
+    ADC.w #0
+    STA.w C2Scene_Task.XVel,X
+    RTS
+
+; $C2:1C9E — C2Scene_NegateYVel (26 bytes, $1C9E–$1CB7)
+; C2Scene_NegateXVel for .YVelFrac/.YVel.
+; Callers (4 JSR sites): $C2:19E2 and $C2:19F4 (both in C2Script_MoveToY,
+;   unmatched), $C2:5319 and $C2:5436 (unmatched).
+; Entry/Exit: as C2Scene_NegateXVel (A = the new .YVel)
+; No calls.
+C2Scene_NegateYVel:
+    LDA.w C2Scene_Task.YVelFrac,X
+    EOR.w #!Eng_Invert16
+    CLC
+    ADC.w #1
+    STA.w C2Scene_Task.YVelFrac,X
+    LDA.w C2Scene_Task.YVel,X
+    EOR.w #!Eng_Invert16
+    ADC.w #0
+    STA.w C2Scene_Task.YVel,X
+    RTS
+
+; $C2:1CB8 — C2Scene_WrapTaskPos (34 bytes, $1CB8–$1CD9)
+; Wraps the task's position into the scene map: .SprX gets
+; C2Scene_MapWidthPx (1536, the 96 metatile columns) added when it is
+; negative or taken off when it is that or more (once, so it assumes the
+; position moved by less than a map width); .SprY is taken AND
+; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
+; Callers (22 call sites, JSR and JMP, all unmatched except those
+;   listed): e.g.
+;   C2Script_MoveFrames ($C2:1640), $C2:19B3, $C2:1A1C, $C2:36F4, JMP at
+;   $C2:48E5, and $C2:55DF; $C2:5257 is a doubtful byte pattern.
+; Entry: M=0, X=0, DP=$0000, DB with low WRAM at $0000-$1FFF;
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
+; No calls.
+C2Scene_WrapTaskPos:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    BPL .not_negative
+    CLC
+    ADC.w #!C2Scene_MapWidthPx
+    BRA .store_x
+.not_negative:
+    CMP.w #!C2Scene_MapWidthPx
+    BCC .store_x
+    SBC.w #!C2Scene_MapWidthPx
+.store_x:
+    STA.w C2Scene_Task.SprX,X
+    LDA.w C2Scene_Task.SprY,X
+    AND.w #!C2Scene_MapHeightMask
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:1CDA — C2Scene_SetAnim (27 bytes, $1CDA–$1CF4)
+; Starts animation script A (low byte) on the running task: .AnimPtr =
+; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
+; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
+; Callers (34 call sites, JSR and JMP, all unmatched except those
+;   listed): e.g.
+;   C2Script_SetAnim ($C2:1614), $C2:1981, $C2:1993, $C2:19EA,
+;   $C2:19FC, JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
+;   also lists doubtful byte patterns at $C2:470F, $C2:48BB, $C2:48C2,
+;   $C2:49B5, $C2:501E and $C2:559F.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
+;        $0000-$1FFF; A = the animation number; C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; A = C2SceneRom_AnimBank; Y unchanged
+; No calls.
+C2Scene_SetAnim:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !C2SceneRom_AnimTable,X
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_Task.AnimPtr,X
+    SEP #$20
+    LDA.b #!C2SceneRom_AnimBank
+    STA.w C2Scene_Task.AnimBank,X
+    STZ.w C2Scene_Task.AnimTimer,X
+    RTS
+
+; ============================================================
 ; Scene boot step ($C2:1DB5–$C2:1DD3)
 ; ============================================================
 
