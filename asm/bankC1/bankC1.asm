@@ -16303,6 +16303,486 @@ BattleAct_OpSetHeading:
     JMP BattleAct_AdvanceScript
 
 ; ==================================================================
+; BattleAct_OpArcToCalc ($C16299–$C16548, 688 bytes, with
+; BattleAct_ArcToCalcDir and BattleAct_ArcToPoint)
+; ==================================================================
+; The arc opcodes: like the move opcodes $10-$12 (BattleAct_OpMoveTo)
+; they move the thread's actor in a straight line to a point and wait
+; for it, but with mover kind !Battle_MoveKindArc ($CF:F087,
+; unmatched), which also makes a height rise and fall back over the
+; move (see !Battle_ActorArcSteps; probably a jump):
+;   - $98 / $9C <mode> <n> (BattleAct_OpArcToCalc): the point left by
+;     BattleAct_RunCalc handler n; length 3; the height subtracted;
+;   - $9A <mode> <n> (BattleAct_OpArcDownToCalc, enters at
+;     BattleAct_ArcToCalcDir with DP $8F = 1): the same with the height
+;     added;
+;   - $99 / $9D, $9B <m> (BattleAct_OpArcToUnkPoint and
+;     BattleAct_OpArcDownToUnkPoint, enter at BattleAct_ArcToPoint): the
+;     point in !Battle_ActUnkPointX/Y; length 2. Quirk: the byte m
+;     (probably meant as the mode) is never read and DP $90 is left as
+;     it is, so the mode is whatever DP $90 held.
+; For opcodes $9C/$9D the point is first moved to a quarter of the way
+; (BattleAct_ArcQuarterPoint) and the step count is multiplied by 4:
+; the actor still covers the whole distance, but the arc is sized for
+; a quarter of it and starts again each time it lands (so probably
+; four hops; inferred from the mover's reload of the start speed).
+; BattleAct_ArcToPoint, the shared part, by thread:
+;   - threads 0-7 other than 4, the thread's battler: when it is not
+;     moving (!Battle_ActorMoving 0) starts the move as
+;     BattleAct_StartBattlerMove does (from, to, facing, step, offset,
+;     timer, done flag), but with the step count in
+;     !Battle_ActorArcSteps, kind !Battle_MoveKindArc, and the arc set
+;     up: !Battle_ActorArcSpeed = !Battle_ActorArcSpeed0 =
+;     !Battle_ArcSpeedHalf for mode !Battle_ArcModeHalf, else
+;     !Battle_ArcSpeedFull; !Battle_ActorArcAccel = that / (major
+;     distance / 2); height and falling 0; the mode in
+;     !Battle_ActorArcMode and DP $8F in !Battle_ActorArcDown. It keeps
+;     the length in the thread's !Battle_ActThreadOpLen and waits
+;     (advance 0) until !Battler_MoveDone, then clears
+;     !Battle_ActorMoving and advances by the kept length;
+;   - thread 4: starts nothing and advances at once by
+;     !Battle_ActThreadOpLen of thread 4, which this opcode never set
+;     (quirk, kept: a length left by an earlier opcode);
+;   - threads 8-15, object j: the same as a battler with the object's
+;     entries of the actor arrays (index 11 + j; the word arrays 22 + 2j,
+;     the 4-byte ones 44 + 4j), from the object's position
+;     (!Battle_ActObjX/Y), keeping the angle in !Battle_ActObjMoveAngle
+;     and the facing in !Battle_ActObjFacing; it waits for
+;     !Battle_ActObjMoveDone. Unlike the straight move it does not set
+;     !Battle_ActObjUnkA5B5 or zero !Battle_ActObjUnkA31C.
+; !Battle_ActorMoveSteps is not set: the arc mover ends on its own
+; count. The mode operand and the direction are DP $90 and $8F.
+; Callers: BattleAct_OpcodeTable entries $98 and $9C; BattleAct_ArcToCalcDir
+;   is reached by JMP from BattleAct_OpArcDownToCalc ($C1:6747),
+;   BattleAct_ArcToPoint by JMP from BattleAct_ArcToUnkPointDir
+;   ($C1:6740; header of BattleAct_OpArcToUnkPoint).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread); BattleAct_ArcToCalcDir: DP $8F set;
+;        BattleAct_ArcToPoint: DP $8E, $8F set and the point in
+;        !Battle_ActCalcOutA/B
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
+;        !Battle_ActCalcOutA/B = the point; DP $8E = the length, $8F the
+;        direction, $90 the mode; when a move starts, DP $80-$81 and the
+;        angle's, BattleAct_CalcMoveStep's, multiply's and divide's DP
+;        scratch
+; Callees: BattleAct_RunCalc, BattleAct_ArcQuarterPoint,
+;          Battle_CalcAngle, BattleAct_CalcMoveStep, Battle_Divide,
+;          Battle_Mul8x16, BattleAct_AdvanceScript (JMP)
+!BattleAct_ArcSlot = !BattleTmp_80      ; 2 B: the battler slot
+!BattleAct_ArcDown = !BattleTmp_8E+1    ; 1 B: 0 = height subtracted, 1 = added
+!BattleAct_ArcMode = !BattleTmp_90      ; 1 B: the mode operand
+BattleAct_OpArcToCalc:
+    STZ.b !BattleAct_ArcDown
+BattleAct_ArcToCalcDir:                 ; header: see BattleAct_OpArcToCalc
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_ArcMode
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.b #3
+    STA.b !BattleAct_MoveLen
+BattleAct_ArcToPoint:                   ; header: see BattleAct_OpArcToCalc
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .object
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .target_set
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battle_ActorMoving,X
+    BEQ .battler_start
+    JMP .battler_moving
+.battler_start:
+    STX.b !BattleAct_ArcSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    STA.w !Battle_ActorFromX,X
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    STA.w !Battle_ActorFromY,X
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoPointY
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpArcQuarter
+    BEQ .battler_quarter
+    CMP.b #!Battle_ActOpArcQuarterUnkPoint
+    BNE .battler_angle
+.battler_quarter:
+    JSR BattleAct_ArcQuarterPoint
+.battler_angle:
+    JSR Battle_CalcAngle
+    JSR BattleAct_CalcMoveStep
+    LDY.b !BattleAct_ArcSlot
+    LDA.b !BattleAct_MoveYMajor
+    BNE .battler_y_major
+    LDA.b !Battle_GeoAbsDeltaX
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+    BRA .battler_steps
+.battler_y_major:
+    LDA.b !Battle_GeoAbsDeltaY
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+.battler_steps:
+    LDA.w !Battle_ActorMoveSpeed,Y
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActorArcSteps,Y
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpArcQuarter
+    BEQ .battler_times4
+    CMP.b #!Battle_ActOpArcQuarterUnkPoint
+    BNE .battler_scale
+.battler_times4:
+    LDA.w !Battle_ActorArcSteps,Y
+    ASL A
+    ASL A
+    STA.w !Battle_ActorArcSteps,Y
+.battler_scale:
+    LDA.b !BattleAct_ArcDown
+    STA.w !Battle_ActorArcDown,Y
+    LDA.w !Battle_ActMoveUnitX
+    STA.b !Battle_MulFactor16
+    LDA.w !Battle_ActMoveUnitX+1
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_ActorMoveSpeed,Y
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.w !Battle_ActMoveUnitX
+    LDA.w !Battle_ActMoveUnitY
+    STA.b !Battle_MulFactor16
+    LDA.w !Battle_ActMoveUnitY+1
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_ActorMoveSpeed,Y
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.w !Battle_ActMoveUnitY
+    LDA.b !BattleAct_ArcSlot
+    ASL A
+    TAX
+    LDA.b !BattleAct_ArcMode
+    STA.w !Battle_ActorArcMode,X
+    STZ.w !Battle_ActorArcMode+1,X
+    CMP.b #!Battle_ArcModeHalf
+    BNE .battler_full
+    LDX.w #!Battle_ArcSpeedHalf
+    BRA .battler_accel
+.battler_full:
+    LDX.w #!Battle_ArcSpeedFull
+.battler_accel:
+    STX.b !Battle_DivDividend
+    LDA.b !BattleAct_MoveHalfMajor
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDY.b !BattleAct_ArcSlot
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActorToX,Y
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActorToY,Y
+    LDA.b #!Battle_MoveKindArc          ; also the timer's 1
+    STA.w !Battle_ActorMoveTimer,Y
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battler_MoveDone,Y
+    PHY
+    TYA
+    ASL A
+    TAY                             ; slot * 2
+    ASL A
+    TAX                             ; slot * 4
+    REP #$20
+    LDA.w !Battle_ActMoveUnitX
+    STA.w !Battle_ActorStepX,Y
+    LDA.w !Battle_ActMoveUnitY
+    STA.w !Battle_ActorStepY,Y
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActorArcAccel,Y
+    LDA.b !Battle_DivDividend           ; the start speed
+    STA.w !Battle_ActorArcSpeed,X
+    STA.w !Battle_ActorArcSpeed0,Y
+    TDC
+    STZ.w !Battle_ActorArcSpeed+2,X
+    STA.w !Battle_ActorOfsX,Y
+    STA.w !Battle_ActorOfsY,Y
+    STZ.w !Battle_ActorArcHeight,X
+    STZ.w !Battle_ActorArcHeight+2,X
+    STA.w !Battle_ActorArcFalling,Y
+    SEP #$20
+    PLY
+    LDX.w !Battle_ActThread
+    LDA.b !BattleAct_MoveLen
+    STA.w !Battle_ActThreadOpLen,X
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    JMP .wait
+.battler_moving:
+    LDA.w !Battler_MoveDone,X
+    BEQ .battler_wait
+    STZ.w !Battle_ActorMoving,X
+    JMP .done
+.battler_wait:
+    JMP .wait
+.target_set:
+    JMP .done                       ; quirk: thread 4's length was not kept here
+.object:
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BEQ .object_start
+    JMP .object_moving
+.object_start:
+    TXA
+    TXY
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.b !Battle_GeoOriginX
+    STA.w !Battle_ActorFromX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjY,X
+    STA.b !Battle_GeoOriginY
+    STA.w !Battle_ActorFromY+!Battle_NumSlots,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoPointY
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpArcQuarter
+    BEQ .object_quarter
+    CMP.b #!Battle_ActOpArcQuarterUnkPoint
+    BNE .object_angle
+.object_quarter:
+    JSR BattleAct_ArcQuarterPoint
+.object_angle:
+    JSR Battle_CalcAngle
+    JSR BattleAct_CalcMoveStep
+    LDY.w !Battle_ActObjThread
+    LDA.b !BattleAct_MoveYMajor
+    BNE .object_y_major
+    LDA.b !Battle_GeoAbsDeltaX
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+    BRA .object_steps
+.object_y_major:
+    LDA.b !Battle_GeoAbsDeltaY
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+.object_steps:
+    LDA.w !Battle_ActorMoveSpeed+!Battle_NumSlots,Y
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActorArcSteps+!Battle_NumSlots,Y
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpArcQuarter
+    BEQ .object_times4
+    CMP.b #!Battle_ActOpArcQuarterUnkPoint
+    BNE .object_scale
+.object_times4:
+    LDA.w !Battle_ActorArcSteps+!Battle_NumSlots,Y
+    ASL A
+    ASL A
+    STA.w !Battle_ActorArcSteps+!Battle_NumSlots,Y
+.object_scale:
+    LDA.b !BattleAct_ArcDown
+    STA.w !Battle_ActorArcDown+!Battle_NumSlots,Y
+    LDA.w !Battle_ActMoveUnitX
+    STA.b !Battle_MulFactor16
+    LDA.w !Battle_ActMoveUnitX+1
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_ActorMoveSpeed+!Battle_NumSlots,Y
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.w !Battle_ActMoveUnitX
+    LDA.w !Battle_ActMoveUnitY
+    STA.b !Battle_MulFactor16
+    LDA.w !Battle_ActMoveUnitY+1
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_ActorMoveSpeed+!Battle_NumSlots,Y
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.w !Battle_ActMoveUnitY
+    LDA.w !Battle_ActObjThread
+    ASL A
+    TAX
+    LDA.b !BattleAct_ArcMode
+    STA.w !Battle_ActorArcMode+(2*!Battle_NumSlots),X
+    STZ.w !Battle_ActorArcMode+(2*!Battle_NumSlots)+1,X
+    CMP.b #!Battle_ArcModeHalf
+    BNE .object_full
+    LDX.w #!Battle_ArcSpeedHalf
+    BRA .object_accel
+.object_full:
+    LDX.w #!Battle_ArcSpeedFull
+.object_accel:
+    STX.b !Battle_DivDividend
+    LDA.b !BattleAct_MoveHalfMajor
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDY.w !Battle_ActObjThread
+    LDA.b !Battle_GeoAngle
+    STA.w !Battle_ActObjMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActObjFacing,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActorToX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActorToY+!Battle_NumSlots,Y
+    LDA.b #!Battle_MoveKindArc          ; also the timer's 1
+    STA.w !Battle_ActorMoveTimer+!Battle_NumSlots,Y
+    STA.w !Battle_ActorMoveKind+!Battle_NumSlots,Y
+    TDC
+    STA.w !Battle_ActObjMoveDone,Y
+    PHY
+    TYA
+    ASL A
+    TAY                             ; j * 2
+    ASL A
+    TAX                             ; j * 4
+    REP #$20
+    LDA.w !Battle_ActMoveUnitX
+    STA.w !Battle_ActorStepX+(2*!Battle_NumSlots),Y
+    LDA.w !Battle_ActMoveUnitY
+    STA.w !Battle_ActorStepY+(2*!Battle_NumSlots),Y
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActorArcAccel+(2*!Battle_NumSlots),Y
+    LDA.b !Battle_DivDividend           ; the start speed
+    STA.w !Battle_ActorArcSpeed+(4*!Battle_NumSlots),X
+    STA.w !Battle_ActorArcSpeed0+(2*!Battle_NumSlots),Y
+    TDC
+    STZ.w !Battle_ActorArcSpeed+(4*!Battle_NumSlots)+2,X
+    STA.w !Battle_ActorOfsX+(2*!Battle_NumSlots),Y
+    STA.w !Battle_ActorOfsY+(2*!Battle_NumSlots),Y
+    STZ.w !Battle_ActorArcHeight+(4*!Battle_NumSlots),X
+    STZ.w !Battle_ActorArcHeight+(4*!Battle_NumSlots)+2,X
+    STA.w !Battle_ActorArcFalling+(2*!Battle_NumSlots),Y
+    SEP #$20
+    PLY
+    LDX.w !Battle_ActThread
+    LDA.b !BattleAct_MoveLen
+    STA.w !Battle_ActThreadOpLen,X
+    LDA.b #1
+    STA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BRA .wait
+.object_moving:
+    LDA.w !Battle_ActObjMoveDone,X
+    BEQ .wait
+    STZ.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BRA .done
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+.done:
+    LDX.w !Battle_ActThread
+    LDA.w !Battle_ActThreadOpLen,X
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_ArcQuarterPoint ($C16549–$C165B9, 113 bytes)
+; ==================================================================
+; Opcodes $9C/$9D: moves !Battle_GeoPointX/Y to a quarter of the way
+; from !Battle_GeoOriginX/Y: Origin + (|Point - Origin| / 4, rounded
+; down) with the delta's sign, per axis (8-bit, no carry out).
+; Its first part is the delta code of BattleAct_CalcMoveStep, which
+; the caller runs next and which recomputes all of it from the new
+; point.
+; Callers (JSR): BattleAct_OpArcToCalc ($C1:62EF, $C1:6430; header of
+;   BattleAct_OpArcToCalc).
+; Entry: M=1, X=0, DP=0, DB any (DP operands only); the two Geo points
+;        set
+; Exit:  M=1, X=0, DP=0; A clobbered; X, Y unchanged; DP $82/$83 = 1
+;        when the x / y delta is negative; !Battle_GeoDeltaX/Y = Point -
+;        Origin (16-bit); !Battle_GeoAbsDeltaX/Y = the quarter
+;        distances; !Battle_GeoPointX/Y moved
+; No calls.
+BattleAct_ArcQuarterPoint:
+    STZ.b !BattleAct_MoveXNeg
+    STZ.b !BattleAct_MoveYNeg
+    SEC
+    LDA.b !Battle_GeoPointX
+    SBC.b !Battle_GeoOriginX
+    STA.b !Battle_GeoDeltaX
+    LDA.b #0
+    SBC.b #0                        ; high byte: $FF when it borrowed
+    STA.b !Battle_GeoDeltaX+1
+    BCS .y
+    INC.b !BattleAct_MoveXNeg
+.y:
+    SEC
+    LDA.b !Battle_GeoPointY
+    SBC.b !Battle_GeoOriginY
+    STA.b !Battle_GeoDeltaY
+    LDA.b #0
+    SBC.b #0
+    STA.b !Battle_GeoDeltaY+1
+    BCS .abs
+    INC.b !BattleAct_MoveYNeg
+.abs:
+    LDA.b !Battle_GeoDeltaX
+    EOR.b !Battle_GeoDeltaX+1
+    SEC
+    SBC.b !Battle_GeoDeltaX+1
+    STA.b !Battle_GeoAbsDeltaX
+    STZ.b !Battle_GeoAbsDeltaX+1
+    LDA.b !Battle_GeoDeltaY
+    EOR.b !Battle_GeoDeltaY+1
+    SEC
+    SBC.b !Battle_GeoDeltaY+1
+    STA.b !Battle_GeoAbsDeltaY
+    STZ.b !Battle_GeoAbsDeltaY+1
+    LDA.b !Battle_GeoAbsDeltaX
+    LSR A
+    LSR A
+    STA.b !Battle_GeoAbsDeltaX
+    LDA.b !Battle_GeoAbsDeltaY
+    LSR A
+    LSR A
+    STA.b !Battle_GeoAbsDeltaY
+    LDA.b !BattleAct_MoveXNeg
+    BNE .x_neg
+    CLC
+    LDA.b !Battle_GeoOriginX
+    ADC.b !Battle_GeoAbsDeltaX
+    STA.b !Battle_GeoPointX
+    BRA .y_point
+.x_neg:
+    SEC
+    LDA.b !Battle_GeoOriginX
+    SBC.b !Battle_GeoAbsDeltaX
+    STA.b !Battle_GeoPointX
+.y_point:
+    LDA.b !BattleAct_MoveYNeg
+    BNE .y_neg
+    CLC
+    LDA.b !Battle_GeoOriginY
+    ADC.b !Battle_GeoAbsDeltaY
+    STA.b !Battle_GeoPointY
+    BRA .exit
+.y_neg:
+    SEC
+    LDA.b !Battle_GeoOriginY
+    SBC.b !Battle_GeoAbsDeltaY
+    STA.b !Battle_GeoPointY
+.exit:
+    RTS
+
+; ==================================================================
 ; BattleAct_CalcMoveStep ($C165BA–$C16670, 183 bytes)
 ; ==================================================================
 ; Unit step of a straight move from !Battle_GeoOriginX/Y to
@@ -16426,6 +16906,1041 @@ BattleAct_CalcMoveStep:
     RTS
 
 ; ==================================================================
+; BattleAct_CalcMidpointSteps ($C16671–$C1672D, 189 bytes)
+; ==================================================================
+; From !Battle_GeoOriginX/Y and !Battle_GeoPointX/Y: sets
+; !Battle_ActMoveUnitX/Y to the delta * 4 with the delta's sign (as
+; signed 8.8, 1/64 of the delta: probably a move of 64 steps),
+; !Battle_ActUnkMidX/Y to the point halfway (Origin +- |delta| / 2,
+; rounded towards Origin), with y then raised by !Battle_ActMidRise
+; (clamped at 0), and !Battle_ActUnkAAFC/AAFD to
+; !Battle_ActUnkAAFCStart and 0. What the callers do with them is not
+; traced (perhaps a thrown arc through the raised midpoint; a guess
+; from the numbers).
+; Callers (JSR): $C1:7095 and $C1:715C (unmatched; opcode $D2's
+;   handler, BattleAct_OpcodeTable entry $D2 at $C1:705A).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; the two Geo points set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered (B = 0); X = 0; Y
+;        unchanged; DP $82/$83 = half |dx| / |dy| when that delta is
+;        negative, else 0; DP $84-$85 = 0;
+;        !Battle_GeoDeltaX/Y and !Battle_GeoAbsDeltaX/Y set
+; No calls.
+!BattleAct_MidXNeg = !BattleTmp_82      ; 1 B: 1 = x delta negative (then reused for half |dx|)
+!BattleAct_MidYNeg = !BattleTmp_83      ; 1 B: the same for y
+BattleAct_CalcMidpointSteps:
+    TDC
+    TAX
+    STX.b !BattleAct_MidXNeg        ; and MidYNeg
+    STX.b !BattleTmp_84             ; zeroed, not used here
+    SEC
+    LDA.b !Battle_GeoPointX
+    SBC.b !Battle_GeoOriginX
+    STA.b !Battle_GeoDeltaX
+    LDA.b #0
+    SBC.b #0                        ; high byte: $FF when it borrowed
+    STA.b !Battle_GeoDeltaX+1
+    BCS .y
+    INC.b !BattleAct_MidXNeg
+.y:
+    SEC
+    LDA.b !Battle_GeoPointY
+    SBC.b !Battle_GeoOriginY
+    STA.b !Battle_GeoDeltaY
+    LDA.b #0
+    SBC.b #0
+    STA.b !Battle_GeoDeltaY+1
+    BCS .abs
+    INC.b !BattleAct_MidYNeg
+.abs:
+    LDA.b !Battle_GeoDeltaX
+    EOR.b !Battle_GeoDeltaX+1
+    SEC
+    SBC.b !Battle_GeoDeltaX+1
+    STA.b !Battle_GeoAbsDeltaX
+    STZ.b !Battle_GeoAbsDeltaX+1
+    LDA.b !Battle_GeoDeltaY
+    EOR.b !Battle_GeoDeltaY+1
+    SEC
+    SBC.b !Battle_GeoDeltaY+1
+    STA.b !Battle_GeoAbsDeltaY
+    STZ.b !Battle_GeoAbsDeltaY+1
+    REP #$20
+    LDA.b !Battle_GeoAbsDeltaX
+    ASL A
+    ASL A
+    STA.w !Battle_ActMoveUnitX
+    LDA.b !Battle_GeoAbsDeltaY
+    ASL A
+    ASL A
+    STA.w !Battle_ActMoveUnitY
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_MidXNeg
+    BEQ .x_pos
+    REP #$20
+    LDA.w !Battle_ActMoveUnitX
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.w !Battle_ActMoveUnitX
+    TDC
+    SEP #$20
+    LDA.b !Battle_GeoAbsDeltaX
+    LSR A
+    STA.b !BattleAct_MidXNeg
+    SEC
+    LDA.b !Battle_GeoOriginX
+    SBC.b !BattleAct_MidXNeg
+    STA.w !Battle_ActUnkMidX
+    BRA .mid_y
+.x_pos:
+    LDA.b !Battle_GeoAbsDeltaX
+    LSR A
+    CLC
+    ADC.b !Battle_GeoOriginX
+    STA.w !Battle_ActUnkMidX
+.mid_y:
+    LDA.b !BattleAct_MidYNeg
+    BEQ .y_pos
+    REP #$20
+    LDA.w !Battle_ActMoveUnitY
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.w !Battle_ActMoveUnitY
+    TDC
+    SEP #$20
+    LDA.b !Battle_GeoAbsDeltaY
+    LSR A
+    STA.b !BattleAct_MidYNeg
+    SEC
+    LDA.b !Battle_GeoOriginY
+    SBC.b !BattleAct_MidYNeg
+    STA.w !Battle_ActUnkMidY
+    BRA .rise
+.y_pos:
+    LDA.b !Battle_GeoAbsDeltaY
+    LSR A
+    CLC
+    ADC.b !Battle_GeoOriginY
+    STA.w !Battle_ActUnkMidY
+.rise:
+    SEC
+    LDA.w !Battle_ActUnkMidY
+    SBC.b #!Battle_ActMidRise
+    BCS .store_y
+    LDA.b #0
+.store_y:
+    STA.w !Battle_ActUnkMidY
+    LDA.b #!Battle_ActUnkAAFCStart
+    STA.w !Battle_ActUnkAAFC
+    STZ.w !Battle_ActUnkAAFD
+    RTS
+
+; ==================================================================
+; BattleAct_OpArcToUnkPoint ($C1672E–$C16742, 21 bytes, with
+; BattleAct_ArcToUnkPointDir)
+; ==================================================================
+; Opcodes $99/$9D <m>: the arc move (BattleAct_OpArcToCalc) to the
+; point in !Battle_ActUnkPointX/Y, height subtracted; length 2. Quirk:
+; m is never read and DP $90 (the mode) is left as it is (see
+; BattleAct_OpArcToCalc).
+; BattleAct_ArcToUnkPointDir is the entry with DP $8F already set
+; (opcode $9B, BattleAct_OpArcDownToUnkPoint).
+; Callers: BattleAct_OpcodeTable entries $99 and $9D;
+;   BattleAct_ArcToUnkPointDir by JMP from BattleAct_OpArcDownToUnkPoint
+;   ($C1:674E).
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  as BattleAct_OpArcToCalc's (DP $8E = 2, $8F = 0 or as set)
+; Callees: BattleAct_ArcToPoint (JMP)
+BattleAct_OpArcToUnkPoint:
+    STZ.b !BattleAct_ArcDown
+BattleAct_ArcToUnkPointDir:             ; header: see BattleAct_OpArcToUnkPoint
+    LDA.w !Battle_ActUnkPointX
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battle_ActUnkPointY
+    STA.w !Battle_ActCalcOutB
+    LDA.b #2                        ; skips a byte it does not read
+    STA.b !BattleAct_MoveLen
+    JMP BattleAct_ArcToPoint
+
+; ==================================================================
+; BattleAct_OpArcDownToCalc ($C16743–$C16749, 7 bytes)
+; ==================================================================
+; Opcode $9A <mode> <n>: opcode $98 (BattleAct_OpArcToCalc) with the
+; height added instead of subtracted (DP $8F = 1).
+; Callers: BattleAct_OpcodeTable entry $9A.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  as BattleAct_OpArcToCalc's (DP $8F = 1)
+; Callees: BattleAct_ArcToCalcDir (JMP)
+BattleAct_OpArcDownToCalc:
+    LDA.b #1
+    STA.b !BattleAct_ArcDown
+    JMP BattleAct_ArcToCalcDir
+
+; ==================================================================
+; BattleAct_OpArcDownToUnkPoint ($C1674A–$C16750, 7 bytes)
+; ==================================================================
+; Opcode $9B <m>: opcode $99 (BattleAct_OpArcToUnkPoint) with the height
+; added instead of subtracted (DP $8F = 1).
+; Callers: BattleAct_OpcodeTable entry $9B.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  as BattleAct_OpArcToCalc's (DP $8E = 2, $8F = 1)
+; Callees: BattleAct_ArcToUnkPointDir (JMP)
+BattleAct_OpArcDownToUnkPoint:
+    LDA.b #1
+    STA.b !BattleAct_ArcDown
+    JMP BattleAct_ArcToUnkPointDir
+
+; ==================================================================
+; BattleAct_OpMoveAlongHeading ($C16751–$C1691A, 458 bytes)
+; ==================================================================
+; Opcode $A2: moves the thread's actor along its heading
+; (!Battle_ActorUnkA5AA; for the objects !Battle_ActObjUnkA5B5) with
+; mover kind !Battle_MoveKindHeading ($CF:F194, unmatched; up to $FF
+; steps, see !Battle_ActorHeadSteps) until the cell
+; !Battle_HeadProbeDist pixels ahead along the angle (sine lookups:
+; sin to y, cos to x) has either blocking bit (!Battle_CellBlocksAny)
+; in !Battle_CellMap, or the mover is done; then advances 1. Starting
+; a move stores the angle in !Battle_ActorMoveAngle, the facing from
+; !BattleRom_FacingByAngle, the position in !Battle_ActorFromX/Y,
+; !Battle_ActorMoveTimer = 1, the kind, and zeroes
+; !Battle_ActorUnkA311 (the mover's distance) and the done flag. By
+; thread:
+;   - threads 0-7 other than 4, the thread's battler: starts the move
+;     when it is not moving, then on the same and every later frame
+;     tests done / the cell ahead: stopped, it clears
+;     !Battle_ActorMoving and advances; else it sets it to 1 and waits;
+;   - thread 4: starts every slot of !Battle_ActTargetSet up to the
+;     first that is already moving, then tests from that slot on,
+;     counting in DP $84 the slots still free to go; it waits while
+;     any is. Quirk, kept: on the frame that starts the whole set the
+;     test loop starts at the set's end, so it advances at once
+;     without testing; the start loop never sets !Battle_ActorMoving
+;     (only the test loop does), and the mover at $CF:EFC4 skips actors
+;     with it 0, so none of the set moves: the opcode only sets angle,
+;     facing and move state;
+;   - threads 8-15, object j: as a battler with the object's entries
+;     (index 11 + j), its position !Battle_ActObjX/Y, and
+;     !Battle_ActObjMoveDone; it also zeroes !Battle_ActObjUnkA31C.
+; Clearing !Battle_ActorMoving stops the mover (it steps only moving
+; actors) wherever the actor is.
+; Callers: BattleAct_OpcodeTable entry $A2.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $82/$83 and
+;        Battle_SinLookup's DP written; thread 4 also DP $80-$81 and $84
+; Callees: Battle_SinLookup, Battle_ShiftRight4,
+;          BattleAct_AdvanceScript (JMP)
+!BattleAct_HeadSetIdx = !BattleTmp_80   ; 2 B: thread 4: position in !Battle_ActTargetSet
+!BattleAct_HeadCellRow = !BattleTmp_82  ; 1 B: sin part, then the probe's row * 16
+!BattleAct_HeadCos = !BattleTmp_83      ; 1 B: cos part of the probe
+!BattleAct_HeadBusy = !BattleTmp_84     ; 1 B: thread 4: slots still moving
+BattleAct_OpMoveAlongHeading:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .object
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .target_set
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .battler_test
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    DEC A                           ; $FF steps
+    STA.w !Battle_ActorHeadSteps,Y
+.battler_test:
+    LDA.w !Battler_MoveDone,Y
+    BNE .battler_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActorMoveAngle,Y
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActorMoveAngle,Y
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BEQ .battler_go
+.battler_stop:
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    JMP .done
+.battler_go:
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    JMP .wait
+.target_set:
+    TDC
+    TAX
+    STX.b !BattleAct_HeadSetIdx
+.start_slot:
+    LDX.b !BattleAct_HeadSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .test_set
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .test_set
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    DEC A                           ; $FF steps
+    STA.w !Battle_ActorHeadSteps,Y
+    INC.b !BattleAct_HeadSetIdx
+    BRA .start_slot
+.test_set:
+    STZ.b !BattleAct_HeadBusy
+.test_slot:
+    LDX.b !BattleAct_HeadSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .set_done
+    TAY
+    LDA.w !Battler_MoveDone,Y
+    BNE .slot_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActorMoveAngle,Y
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActorMoveAngle,Y
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BEQ .slot_go
+.slot_stop:
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    BRA .next_slot
+.slot_go:
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    INC.b !BattleAct_HeadBusy
+.next_slot:
+    INC.b !BattleAct_HeadSetIdx
+    BRA .test_slot
+.set_done:
+    LDA.b !BattleAct_HeadBusy
+    BEQ .set_advance
+    JMP .wait
+.set_advance:
+    JMP .done
+.object:
+    LDY.w !Battle_ActObjThread
+    LDA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BEQ .object_start
+    JMP .object_test
+.object_start:
+    LDA.w !Battle_ActObjUnkA5B5,Y
+    STA.w !Battle_ActObjMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActObjFacing,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer+!Battle_NumSlots,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind+!Battle_NumSlots,Y
+    TDC
+    STA.w !Battle_ActObjUnkA31C,Y
+    STA.w !Battle_ActObjMoveDone,Y
+    DEC A                           ; $FF steps
+    STA.w !Battle_ActorHeadSteps+!Battle_NumSlots,Y
+    TYA
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.w !Battle_ActorFromX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjY,X
+    STA.w !Battle_ActorFromY+!Battle_NumSlots,Y
+.object_test:
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActObjMoveDone,X
+    BNE .object_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActObjMoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    LDX.w !Battle_ActObjThread
+    CLC
+    LDA.w !Battle_ActObjMoveAngle,X
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    TYA
+    ASL A
+    TAY
+    CLC
+    LDA.w !Battle_ActObjY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActObjX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BEQ .object_go
+    LDX.w !Battle_ActObjThread
+.object_stop:
+    STZ.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BRA .done
+.object_go:
+    LDX.w !Battle_ActObjThread
+    LDA.b #1
+    STA.w !Battle_ActorMoving+!Battle_NumSlots,X
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+.done:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStartPosHistory ($C1691B–$C169B9, 159 bytes, with
+; BattleAct_SetPosHistory)
+; ==================================================================
+; Opcode $A4 <delay> <b>: starts the position history of the thread's
+; battler (threads 0-3) or of every slot of !Battle_ActTargetSet
+; (threads 4-7; unlike most opcodes, threads 5-7 take the set too):
+; !Battler_PosHistDelay = delay, !Battler_PosHistUnkAB7D = b,
+; !Battler_PosHistTimer and !Battler_PosHistUnkAB88 = 1, all four
+; records = the battler's !Battler_ScreenX/Y, and !Battler_PosHistOn =
+; 3; advances 3. Object threads only advance.
+; BattleAct_SetPosHistory is the shared part, with DP $8E = the length
+; and $8F = the on value (opcode $A5, BattleAct_OpStopPosHistory, enters
+; there with 1 and 0).
+; Callers: BattleAct_OpcodeTable entry $A4; BattleAct_SetPosHistory by
+;   JMP from BattleAct_OpStopPosHistory ($C1:69C0).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread); BattleAct_SetPosHistory: DP $80, $81,
+;        $8E and $8F set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80/$81 =
+;        the operands, $8E the length, $8F the on value
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_HistDelay = !BattleTmp_80    ; 1 B: the delay operand
+!BattleAct_HistUnk = !BattleTmp_81      ; 1 B: the second operand
+!BattleAct_HistLen = !BattleTmp_8E      ; 1 B: the opcode's length
+!BattleAct_HistOn = !BattleTmp_8E+1     ; 1 B: value for !Battler_PosHistOn
+BattleAct_OpStartPosHistory:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_HistDelay
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_HistUnk
+    LDA.b #3                        ; the length, and the on value
+    STA.b !BattleAct_HistLen
+    STA.b !BattleAct_HistOn
+BattleAct_SetPosHistory:                ; header: see BattleAct_OpStartPosHistory
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .advance
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BCS .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !BattleAct_HistDelay
+    STA.w !Battler_PosHistDelay,X
+    LDA.b !BattleAct_HistUnk
+    STA.w !Battler_PosHistUnkAB7D,X
+    LDA.b #1
+    STA.w !Battler_PosHistTimer,X
+    STA.w !Battler_PosHistUnkAB88,X
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_PosHistX,X
+    STA.w !Battler_PosHistX+(2*!Battle_NumSlots),X
+    STA.w !Battler_PosHistX+(4*!Battle_NumSlots),X
+    STA.w !Battler_PosHistX+(6*!Battle_NumSlots),X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_PosHistY,X
+    STA.w !Battler_PosHistY+(2*!Battle_NumSlots),X
+    STA.w !Battler_PosHistY+(4*!Battle_NumSlots),X
+    STA.w !Battler_PosHistY+(6*!Battle_NumSlots),X
+    LDA.b !BattleAct_HistOn
+    STA.w !Battler_PosHistOn,X
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .advance
+    TAX
+    LDA.b !BattleAct_HistDelay
+    STA.w !Battler_PosHistDelay,X
+    LDA.b !BattleAct_HistUnk
+    STA.w !Battler_PosHistUnkAB7D,X
+    LDA.b #1
+    STA.w !Battler_PosHistTimer,X
+    STA.w !Battler_PosHistUnkAB88,X
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_PosHistX,X
+    STA.w !Battler_PosHistX+(2*!Battle_NumSlots),X
+    STA.w !Battler_PosHistX+(4*!Battle_NumSlots),X
+    STA.w !Battler_PosHistX+(6*!Battle_NumSlots),X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_PosHistY,X
+    STA.w !Battler_PosHistY+(2*!Battle_NumSlots),X
+    STA.w !Battler_PosHistY+(4*!Battle_NumSlots),X
+    STA.w !Battler_PosHistY+(6*!Battle_NumSlots),X
+    LDA.b !BattleAct_HistOn
+    STA.w !Battler_PosHistOn,X
+    INY
+    BRA .set_slot
+.advance:
+    LDA.b !BattleAct_HistLen
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStopPosHistory ($C169BA–$C169C2, 9 bytes)
+; ==================================================================
+; Opcode $A5: !Battler_PosHistOn = 0 for the same battlers as opcode
+; $A4 (BattleAct_OpStartPosHistory); advances 1. Quirk: it goes through
+; the whole of opcode $A4's store, so it also writes the delay, the
+; second operand, the timers and the records, with whatever DP $80/$81
+; hold (it reads no operands).
+; Callers: BattleAct_OpcodeTable entry $A5.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  as BattleAct_OpStartPosHistory's (DP $8E = 1, $8F = 0)
+; Callees: BattleAct_SetPosHistory (JMP)
+BattleAct_OpStopPosHistory:
+    LDA.b #1
+    STA.b !BattleAct_HistLen
+    STZ.b !BattleAct_HistOn
+    JMP BattleAct_SetPosHistory
+
+; ==================================================================
+; BattleAct_OpMoveHeadingSteps ($C169C3–$C16AEF, 301 bytes)
+; ==================================================================
+; Opcode $A8 <n>: moves the thread's actor along its heading
+; (!Battle_ActorUnkA5AA; objects !Battle_ActObjUnkA5B5) with mover kind
+; !Battle_MoveKindHeading for n steps (!Battle_ActorHeadSteps = n, kept
+; in !Battle_ActHeadSteps; the mover also stops it, probably at the
+; screen's edge: see the heading-move notes in ram_battle.inc),
+; and waits for the done flag; then advances 2. Unlike opcode $A2
+; (BattleAct_OpMoveAlongHeading) it does not test the cells ahead. A
+; start stores what opcode $A2's does (and sets !Battle_ActorMoving).
+; By thread:
+;   - threads 0-7 other than 4, the thread's battler: starts it when
+;     not moving; when moving and done, clears !Battle_ActorMoving and
+;     advances; else waits;
+;   - thread 4: starts every slot of !Battle_ActTargetSet up to the
+;     first that is already moving and waits; at such a slot it goes
+;     through the whole set from the start instead, clearing
+;     !Battle_ActorMoving of each done slot and counting the others in
+;     DP $84, and advances when none is left. Quirk, kept (as in
+;     BattleAct_OpCurveTo): a slot cleared while others still move is
+;     started again on the next frame;
+;   - threads 8-15, object j: as a battler with the object's entries
+;     (index 11 + j), its position, and !Battle_ActObjMoveDone; it also
+;     zeroes !Battle_ActObjUnkA31C.
+; Callers: BattleAct_OpcodeTable entry $A8.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; thread 4 also
+;        DP $80-$81 and $84-$85
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_StepsSetIdx = !BattleTmp_80  ; 2 B: thread 4: position in !Battle_ActTargetSet
+!BattleAct_StepsBusy = !BattleTmp_84    ; 2 B: thread 4: slots still moving (zeroed 16-bit)
+BattleAct_OpMoveHeadingSteps:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActHeadSteps
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .object
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .target_set
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .battler_moving
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps,Y
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    BRA .battler_wait
+.battler_moving:
+    LDA.w !Battler_MoveDone,Y
+    BEQ .battler_wait
+    TYX
+    STZ.w !Battle_ActorMoving,X
+    JMP .done
+.battler_wait:
+    JMP .wait
+.target_set:
+    TDC
+    TAX
+    STX.b !BattleAct_StepsSetIdx
+.start_slot:
+    LDX.b !BattleAct_StepsSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .set_started
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .test_set
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps,Y
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    INC.b !BattleAct_StepsSetIdx
+    BRA .start_slot
+.set_started:
+    BRA .set_wait
+.test_set:
+    TDC
+    TAY
+    STY.b !BattleAct_StepsBusy
+.test_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .set_tested
+    TAX
+    LDA.w !Battler_MoveDone,X
+    BEQ .slot_busy
+    STZ.w !Battle_ActorMoving,X
+    BRA .next_slot
+.slot_busy:
+    INC.b !BattleAct_StepsBusy
+.next_slot:
+    INY
+    BRA .test_slot
+.set_tested:
+    LDA.b !BattleAct_StepsBusy
+    BEQ .set_done
+.set_wait:
+    JMP .wait
+.set_done:
+    JMP .done
+.object:
+    LDY.w !Battle_ActObjThread
+    LDA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BNE .object_moving
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjUnkA5B5,Y
+    STA.w !Battle_ActObjMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActObjFacing,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer+!Battle_NumSlots,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind+!Battle_NumSlots,Y
+    TDC
+    STA.w !Battle_ActObjUnkA31C,Y
+    STA.w !Battle_ActObjMoveDone,Y
+    TYA
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.w !Battle_ActorFromX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjY,X
+    STA.w !Battle_ActorFromY+!Battle_NumSlots,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BRA .wait
+.object_moving:
+    LDA.w !Battle_ActObjMoveDone,Y
+    BEQ .wait
+    TYX
+    STZ.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BRA .done
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+.done:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpMoveHeadingChecked ($C16AF0–$C16CF2, 515 bytes)
+; ==================================================================
+; Opcode $A9 <n>: opcode $A8 (BattleAct_OpMoveHeadingSteps) with opcode
+; $A2's test of the cell ahead (BattleAct_OpMoveAlongHeading), and for
+; the battlers also the box test: BattleAct_ProbeBoxOverlap at the
+; battler's position; touching another battler (bit 7 of the result)
+; stops it too. Each frame that none of these stops it, the opcode
+; itself also counts !Battle_ActorHeadSteps down (as does the mover per
+; step) and stops it at 0. Stopped, it clears !Battle_ActorMoving and
+; advances 2; else it waits. A start is opcode $A8's, n from
+; !Battle_ActHeadSteps. By thread:
+;   - threads 0-7 other than 4, the thread's battler: as above;
+;   - thread 4: starts every slot of !Battle_ActTargetSet up to the
+;     first that is already moving, then tests from there with
+;     DP $84 as the count of slots still going. Quirks, kept: the INC
+;     of that count is dead code (after a BRA), so the opcode always
+;     advances once the test loop ends; the loop ends at the first
+;     slot whose countdown is not yet 0; the box test's slot (DP $80)
+;     and then its result overwrite the loop index in DP $80, so the
+;     next slot tested is entry result + 1 of the set; and on the frame
+;     that starts the whole set the test loop starts at the set's end,
+;     so it advances at once without testing;
+;   - threads 8-15, object j: as a battler with the object's entries
+;     (index 11 + j), but without the box test.
+; Callers: BattleAct_OpcodeTable entry $A9.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$83 and
+;        the sine lookups' and box test's DP written; thread 4 also
+;        DP $84
+; Callees: Battle_SinLookup, Battle_ShiftRight4,
+;          BattleAct_ProbeBoxOverlap, BattleAct_AdvanceScript (JMP)
+!BattleAct_CheckSetIdx = !BattleTmp_80  ; 2 B: thread 4: position in !Battle_ActTargetSet (also the box test's slot)
+!BattleAct_CheckBusy = !BattleTmp_84    ; 1 B: thread 4: slots still moving (never raised)
+BattleAct_OpMoveHeadingChecked:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActHeadSteps
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .object
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .target_set
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .battler_test
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps,Y
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+.battler_test:
+    LDA.w !Battler_MoveDone,Y
+    BNE .battler_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActorMoveAngle,Y
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActorMoveAngle,Y
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BNE .battler_stop
+    STY.b !Battle_BoxTestSlot
+    PHY
+    TYX
+    JSR BattleAct_ProbeBoxOverlap
+    STA.b !Battle_BoxTestSlot       ; kept in DP $80 (scratch here)
+    PLY
+    LDA.b !Battle_BoxTestSlot
+    BMI .battler_stop
+    TYX
+    DEC.w !Battle_ActorHeadSteps,X
+    BNE .battler_wait
+.battler_stop:
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    JMP .done
+.battler_wait:
+    JMP .wait
+.target_set:
+    TDC
+    TAX
+    STX.b !BattleAct_CheckSetIdx
+.start_slot:
+    LDX.b !BattleAct_CheckSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .test_set
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .test_set
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps,Y
+    LDA.w !Battle_ActorUnkA5AA,Y
+    STA.w !Battle_ActorMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battler_Facing,Y
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battle_ActorFromX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battle_ActorFromY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    INC.b !BattleAct_CheckSetIdx
+    BRA .start_slot
+.test_set:
+    STZ.b !BattleAct_CheckBusy
+.test_slot:
+    LDX.b !BattleAct_CheckSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .set_tested
+    TAY
+    LDA.w !Battler_MoveDone,Y
+    BNE .slot_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActorMoveAngle,Y
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActorMoveAngle,Y
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BNE .slot_stop
+    STY.b !Battle_BoxTestSlot       ; quirk: overwrites the loop index
+    PHY
+    TYX
+    JSR BattleAct_ProbeBoxOverlap
+    STA.b !Battle_BoxTestSlot       ; and again, with the result
+    PLY
+    LDA.b !Battle_BoxTestSlot
+    BMI .slot_stop
+    TYX
+    DEC.w !Battle_ActorHeadSteps,X
+    BNE .set_tested                 ; quirk: leaves the loop
+.slot_stop:
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    BRA .next_slot
+    INC.b !BattleAct_CheckBusy      ; dead code: no path reaches it
+.next_slot:
+    INC.b !BattleAct_CheckSetIdx
+    BRA .test_slot
+.set_tested:
+    LDA.b !BattleAct_CheckBusy
+    BEQ .set_done
+    JMP .wait
+.set_done:
+    JMP .done
+.object:
+    LDY.w !Battle_ActObjThread
+    LDA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BEQ .object_start
+    JMP .object_test
+.object_start:
+    LDA.w !Battle_ActHeadSteps
+    STA.w !Battle_ActorHeadSteps+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjUnkA5B5,Y
+    STA.w !Battle_ActObjMoveAngle,Y
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActObjFacing,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer+!Battle_NumSlots,Y
+    INC A                           ; !Battle_MoveKindHeading
+    STA.w !Battle_ActorMoveKind+!Battle_NumSlots,Y
+    TDC
+    STA.w !Battle_ActObjUnkA31C,Y
+    STA.w !Battle_ActObjMoveDone,Y
+    TYA
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.w !Battle_ActorFromX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActObjY,X
+    STA.w !Battle_ActorFromY+!Battle_NumSlots,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+.object_test:
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActObjMoveDone,X
+    BNE .object_stop
+    LDA.b #!Battle_HeadProbeDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActObjMoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCellRow
+    LDX.w !Battle_ActObjThread
+    CLC
+    LDA.w !Battle_ActObjMoveAngle,X
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_HeadCos
+    TYA
+    ASL A
+    TAY
+    CLC
+    LDA.w !Battle_ActObjY,Y
+    ADC.b !BattleAct_HeadCellRow
+    AND.b #!Battle_PathRowMask
+    STA.b !BattleAct_HeadCellRow
+    CLC
+    LDA.w !Battle_ActObjX,Y
+    ADC.b !BattleAct_HeadCos
+    JSR Battle_ShiftRight4
+    ORA.b !BattleAct_HeadCellRow
+    TAX
+    LDA.w !Battle_CellMap,X
+    AND.b #!Battle_CellBlocksAny
+    BNE .object_stop
+    LDX.w !Battle_ActObjThread
+    DEC.w !Battle_ActorHeadSteps+!Battle_NumSlots,X
+    BNE .wait
+.object_stop:
+    LDX.w !Battle_ActObjThread
+    STZ.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BRA .done
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+.done:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
 ; BattleAct_AdvanceScript ($C175BB–$C175CB, 17 bytes)
 ; ==================================================================
 ; Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes:
@@ -16452,6 +17967,29 @@ BattleAct_AdvanceScript:
     TDC
     SEP #$20
     RTS
+
+; ==================================================================
+; BattleAct_ProbeBoxOverlap ($C17C2B–$C17C3C, 18 bytes)
+; ==================================================================
+; Puts battler X's probe (!Battler_ProbeX/Y) at its screen position,
+; builds its box (Battle_CalcBattlerBox) and tests it against the
+; other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP). It sits
+; right after BattleAct_OpcodeTable.
+; Callers (JSR): BattleAct_OpMoveHeadingChecked ($C1:6B83, $C1:6C2E).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; X = battler slot, DP
+;        $80-$81 (!Battle_BoxTestSlot) = the same slot
+; Exit:  as Battle_BoxOverlapsOthers': A = $80 / $81 (N set) when the
+;        box touches a PC's / an enemy's, else 0; Y = the slot touched
+;        (11 when none); X = the slot; ProbeX/Y and the box written
+; Callees: Battle_CalcBattlerBox, Battle_BoxOverlapsOthers (JMP)
+org $C17C2B
+BattleAct_ProbeBoxOverlap:
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    JSR Battle_CalcBattlerBox
+    JMP Battle_BoxOverlapsOthers
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)

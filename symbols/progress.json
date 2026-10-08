@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 68721,
+  "emitted_bytes": 71206,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 783,
-      "bytes": 68721
+      "functions": 799,
+      "bytes": 71206
     },
     "readable": {
-      "functions": 783,
-      "bytes": 68721
+      "functions": 799,
+      "bytes": 71206
     },
     "verified": {
-      "functions": 783,
-      "bytes": 68721
+      "functions": 799,
+      "bytes": 71206
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 25315,
+      "emitted_bytes": 27800,
       "matched": {
-        "functions": 317,
-        "bytes": 25315
+        "functions": 333,
+        "bytes": 27800
       },
       "readable": {
-        "functions": 317,
-        "bytes": 25315
+        "functions": 333,
+        "bytes": 27800
       },
       "verified": {
-        "functions": 317,
-        "bytes": 25315
+        "functions": 333,
+        "bytes": 27800
       }
     },
     {
@@ -892,7 +892,7 @@
       "bank": "$C1",
       "start": "$C1:6000",
       "end": "$C1:6FFF",
-      "emitted_bytes": 848,
+      "emitted_bytes": 3315,
       "functions": [
         "BattleAct_OpLinkObjBit7",
         "BattleAct_OpLinkObjBit6",
@@ -908,16 +908,32 @@
         "BattleAct_OpRunVecCD001B",
         "BattleAct_OpSetCalcSel",
         "BattleAct_OpSetHeading",
-        "BattleAct_CalcMoveStep"
+        "BattleAct_OpArcToCalc",
+        "BattleAct_ArcToCalcDir",
+        "BattleAct_ArcToPoint",
+        "BattleAct_ArcQuarterPoint",
+        "BattleAct_CalcMoveStep",
+        "BattleAct_CalcMidpointSteps",
+        "BattleAct_OpArcToUnkPoint",
+        "BattleAct_ArcToUnkPointDir",
+        "BattleAct_OpArcDownToCalc",
+        "BattleAct_OpArcDownToUnkPoint",
+        "BattleAct_OpMoveAlongHeading",
+        "BattleAct_OpStartPosHistory",
+        "BattleAct_SetPosHistory",
+        "BattleAct_OpStopPosHistory",
+        "BattleAct_OpMoveHeadingSteps",
+        "BattleAct_OpMoveHeadingChecked"
       ]
     },
     {
       "bank": "$C1",
       "start": "$C1:7000",
       "end": "$C1:7FFF",
-      "emitted_bytes": 17,
+      "emitted_bytes": 35,
       "functions": [
-        "BattleAct_AdvanceScript"
+        "BattleAct_AdvanceScript",
+        "BattleAct_ProbeBoxOverlap"
       ]
     },
     {
