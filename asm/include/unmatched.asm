@@ -58,9 +58,6 @@ Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (tabl
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C2631F
-C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
-                    ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
 org $C26A34
 C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
 org $C2800E

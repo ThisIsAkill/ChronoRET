@@ -424,7 +424,7 @@ if !constants_menu_inc == 0
 !Pad_Unk00F8Bit2 = $04                   ; bit 2 (Select with the default map): mode C2Scene_ModeMode7
 !Pad_Unk00F8Bit0 = $01                   ; bit 0 (Y with the default map): mode C2Scene_ModeMenu9
 !C2Scene_ModeListA = 3                   ; C2Scene_Mode3: act on the ListA entry at C2Scene_Unk1B32
-!C2Scene_ModeMode7 = 6                   ; C2Scene_Mode6: C2Scene_Unk631F (BG mode 7) between mosaics
+!C2Scene_ModeMode7 = 6                   ; C2Scene_Mode6: C2Scene_MapView (BG mode 7) between mosaics
 !C2Scene_ModeMenu9 = 9                   ; C2Scene_Mode5 with ExitMenu_Mode5
 !C2Scene_Loc1F5 = $01F5                  ; the Loc_Id where the leader gets C2Scene_LeaderAttr1F5
 !C2Scene_LeaderAttr = $A8                ; C2Scene_Task.SprAttr of the leader's sprite (C2Scene_SprAttr*
@@ -467,5 +467,67 @@ if !constants_menu_inc == 0
 !C2Scene_TilePropWallBits = $03          ; C2Scene_TilePropWall's bits in one property nibble
 !C2Scene_AnimIdle1 = $A3                 ; idle animations of the slot 1 and 2 members (as
 !C2Scene_AnimIdle2 = $A4                 ; C2Scene_AnimIdle for the leader)
+
+; --- The map view (C2Scene_MapView, scene mode 6) ---
+!C2Scene_BgMode7 = $07                   ; C2Scene_BgModeShadow: BG mode 7
+!C2Scene_MapObjVram = $6000              ; VRAM word address of the sprite tiles in the map view (OBSEL
+                                         ; OBSEL_Size16And32_Base6000)
+!C2Scene_TileBytes = $0020               ; bytes in one 8x8 4bpp tile
+!C2Scene_TileWords = 16                  ; VRAM words in one 8x8 4bpp tile
+!C2SceneRom_MapMarkerTiles = $C6F500     ; two 4bpp tiles: sprite tiles 0 and 2 of the map view
+!C2SceneRom_MapViewObjPal = $C6F540      ; 16 colours: sprite palette 0 of the map view (33 B copied)
+!C2Scene_ObjPal0Dest = $0A20             ; = C2Scene_PaletteBuf + $100: colour $80 (sprite palette 0)
+!C2Scene_MapViewEndFrames = $11          ; frames C2Scene_MapView waits after the zoom-in ends
+!C2Scene_MapTileCount = $0380            ; tiles in the seven BG packs ($7000 bytes / 32)
+!C2Scene_TileRow2Plane0 = $04            ; byte offsets in a 4bpp tile of row 2's bit planes 0-3
+!C2Scene_TileRow2Plane1 = $05            ; (C2Scene_MapTileColors takes bit 4 of each: column 3)
+!C2Scene_TileRow2Plane2 = $14
+!C2Scene_TileRow2Plane3 = $15
+!C2Scene_TilePalBits = $1C               ; tile word high byte bits 2-4: the palette (* 4)
+!C2Scene_TileNumMask = $03FF             ; tile word bits 0-9: the tile number
+!C2Scene_Mode7RowBytes = 8               ; bytes per pixel row of a mode-7 tile (one per pixel)
+!C2Scene_MapBandBytes = $0300            ; one band of the picture: 12 mode-7 tiles of 64 bytes
+!C2Scene_MapBandWords = $0300            ; the same in VRAM words (the DMA writes VMDATAH only)
+!C2Scene_MapBandRowMask = $0003          ; metatile rows per band - 1 (two pixel rows each)
+!C2Scene_MapTilePxMask = $0007           ; metatile columns per mode-7 tile - 1 (one pixel each)
+!C2Scene_MapNextTile = (64-7)            ; from a tile's 8th pixel to the next tile's first: + 57
+!C2Scene_MapBackToRow = ($300-$10)       ; from past the band's row end back to its first tile,
+                                         ; two pixel rows further down
+!C2Scene_MapFirstTileVram = $0040        ; VRAM word of mode-7 tile 1 (64 words per tile)
+!C2Scene_MapHideColA = $0F               ; C2Scene_MapFilterColor: colours shown as 0 (palette * 16 +
+!C2Scene_MapHideColB = $2F               ; colour): $0F, $2F and $24-$2B; at Loc_Id
+!C2Scene_MapHideFrom = $24               ; C2Scene_MapLoc1F3 $40-$4E instead
+!C2Scene_MapHideTo = $2C
+!C2Scene_MapLoc1F3 = $01F3               ; the Loc_Id with its own hidden colours
+!C2Scene_MapHide1F3From = $40
+!C2Scene_MapHide1F3To = $4F
+!C2Scene_TmBytes = $0400                 ; the 32 x 32 tile block C2Scene_MapBuildTilemap builds
+!C2Scene_TmRowBytes = $20                ; bytes (tiles) per row of it
+!C2Scene_TmRows = $20                    ; its rows
+!C2Scene_Mode7MapWidth = $0080           ; VRAM words per row of the 128 x 128 mode-7 tilemap
+!C2Scene_MapTileCol0 = 2                 ; the picture's first tile column in the mode-7 map
+!C2Scene_MapTileRow0 = 6                 ; and its first tile row
+!C2Scene_MapFirstTile = 1                ; the picture's first mode-7 tile (tile 0 stays blank)
+!C2Scene_MapTilesWide = 12               ; the picture in tiles: 96 metatiles at 8 per tile
+!C2Scene_MapTilesHigh = 16               ; 64 metatile rows at 4 per tile
+!C2Scene_ZoomSteps = 32                  ; entries of C2SceneRom_ZoomDivA/B (word offsets 0-$3E)
+!C2SceneRom_ZoomDivA = $C6F560           ; 32 words $FF, $F0, ... $10: the zoom's M7A/M7B divisors
+!C2SceneRom_ZoomDivB = $C6F5A0           ; 32 words $7F, $78, ... $08: its M7C/M7D divisors
+!C2Scene_MapViewExitBtn = $0008          ; Pad_Unk00F6 bit 3 (read as a word): ends the map view
+!C2Scene_MapMarkerAttr = $30             ; C2Scene_Task.SprAttr of the map markers: OAM attribute bits
+                                         ; 4-5 (priority 3), palette 0
+!C2Scene_LocMarkerY = $00C0              ; C2Scene_TaskLocMarker's screen Y
+!C2Scene_AnimLocLabel = $0047            ; its C2SceneRom_AnimTable entry
+!C2Scene_MapGradLines = $0007            ; lines per step of the map view's gradient
+!C2Scene_MapGradLevels = $10             ; steps per half (blue 0-15, then 16-31)
+!C2Scene_MapGradRun = $F0                ; HDMA line-count byte: repeat (bit 7), 112 lines
+!C2Scene_MapLabelVram = $6200            ; VRAM word of sprite tile $20: where the label goes
+!C2SceneRom_MapLabelStrs = $C6F400       ; 16-bit string addresses (bank $C6), the label's TextWin_StrTable
+!C2Scene_MapLabelA = $6C                 ; label string replaced by C2Scene_MapLabelEarly while
+!C2Scene_MapLabelAFlag = $36             ; C2Scene_Flag0Copy is below this
+!C2Scene_MapLabelB = $6B                 ; label string replaced by it while C2Scene_FlagTailCopy+6
+!C2Scene_MapLabelBBit = $01              ; has this bit clear
+!C2Scene_MapLabelEarly = $6F             ; the replacement string
+!C2Scene_MapLabelGlyphs = $0C            ; TextWin_StepCount for the label's one TextWin_Step
 
 endif

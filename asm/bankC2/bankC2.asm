@@ -620,7 +620,7 @@ C2Scene_HideAllSprites:
 ; C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf
 ; ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF).
 ; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5 ($C2:2560), C2Scene_Mode6
-;   ($C2:25F0), C2Scene_Mode8 ($C2:265B) and unmatched ($C2:6331, $C2:6A37).
+;   ($C2:25F0), C2Scene_Mode8 ($C2:265B), C2Scene_MapView ($C2:6331) and unmatched ($C2:6A37).
 ; Entry: M=1 (8-bit bank store), X=0 (16-bit pointer store and loop
 ;        count), DP=$0000, DB any
 ; Exit:  M=1, X=0; A = bank(C2Scene_VramQBuf), X = $FFFF; Y, DP and DB
@@ -714,7 +714,8 @@ C2Scene_VramQFlush:
 ; with Audio_DriverCommand, the state marked C2Scene_SoundCmdSending
 ; meanwhile and cleared after.
 ; Callers (9 JSR sites): C2Scene_Mode5 ($C2:2532, $C2:2582), C2Scene_Mode6 ($C2:25A1, $C2:2612),
-;   C2Scene_Mode8 ($C2:2631, $C2:269D) and unmatched ($C2:63C7, $C2:6A99, $C2:6AB1).
+;   C2Scene_Mode8 ($C2:2631, $C2:269D), C2Scene_MapView ($C2:63C7) and unmatched ($C2:6A99,
+;   $C2:6AB1).
 ; Entry: M=1 (8-bit flag loads), X=0 with X = the number of frames (0
 ;        waits 65536), DP=$0000, DB with low WRAM at $0000-$1FFF; NMI on
 ; Exit:  M=1, X=0, X = 0; A clobbered; Y, DP and DB as Audio_DriverCommand
@@ -738,9 +739,8 @@ C2Scene_WaitFrames:
 ; $C2:046E — C2Scene_WaitOneFrame (3 bytes, $046E–$0470)
 ; A JMP to C2Scene_WaitFrame: waits for the next NMI without sending a
 ; pending sound command.
-; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF) and unmatched ($C2:63BA, $C2:6A9C).
-; Callers note (3 JSR sites): C2Scene_Main ($C2:23CF, in C2Scene_MainLoop);
-;   unmatched: $C2:63BA and $C2:6A9C.
+; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF), C2Scene_MapView ($C2:63BA) and unmatched
+;   ($C2:6A9C).
 ; Entry/Exit: those of C2Scene_WaitFrame.
 C2Scene_WaitOneFrame:
     JMP C2Scene_WaitFrame
@@ -749,7 +749,8 @@ C2Scene_WaitOneFrame:
 ; Frees all 64 task records (zeroes each .Handler) and points
 ; C2Scene_TaskCur at the first record, so that tasks spawned before any
 ; task runs copy their parameters from record 0.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23B1) and unmatched ($C2:6334, $C2:6A3A).
+; Callers (3 JSR sites): C2Scene_Main ($C2:23B1), C2Scene_MapView ($C2:6334) and unmatched
+;   ($C2:6A3A).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=1, X=0; A = C2Scene_TaskRecordsEnd (16-bit), X = the same, Y =
@@ -782,8 +783,8 @@ C2Scene_TaskClearAll:
 ; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0), C2Script_SpawnUnk1CF5 ($C2:10C4),
 ;   C2Script_SpawnUnk1DD4 ($C2:10F7), C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105
 ;   ($C2:159E), C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
-;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2) and unmatched ($C2:63A6, $C2:7417,
-;   $C2:742D, $C2:7441).
+;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2), C2Scene_MapView ($C2:63A6) and
+;   unmatched ($C2:7417, $C2:742D, $C2:7441).
 ; Entry: M any, X=0 with X = the handler address, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF (the MVN copies in bank $00 and leaves DB
 ;        as it was)
@@ -860,8 +861,9 @@ C2Scene_TaskSpawnLow:
 ;   $C2:242E, JSR $C2:2459), C2Scene_Mode5 (JSR $C2:2527, JSR $C2:256B), C2Scene_Mode6 (JSR
 ;   $C2:2596, JSR $C2:25FB), C2Scene_Mode8 (JSR $C2:2626, JSR $C2:2676), C2Scene_LoadScene (JMP
 ;   $C2:2C90), C2Scene_ObjWatchIdle (JSR $C2:3154), C2Scene_TrigListB (JSR $C2:33B2),
-;   C2Scene_TrigListAB (JSR $C2:33DF) and unmatched (JSR $C2:4479, JSR $C2:452C, JSR $C2:63AE, JSR
-;   $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP $C2:7457).
+;   C2Scene_TrigListAB (JSR $C2:33DF), C2Scene_MapView (JSR $C2:63AE), C2Scene_MapZoomOut (JSR
+;   $C2:66DF), C2Scene_MapZoomWait (JSR $C2:66FF) and unmatched (JSR $C2:4479, JSR $C2:452C, JSR
+;   $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP $C2:7457).
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -2651,12 +2653,13 @@ org $C20E1D
 ;   C2Scene_LeaderInput ($C2:35E0, $C2:36E2), C2Scene_LeaderStep ($C2:3731), C2Scene_LeaderBoardY
 ;   ($C2:38C0), C2Scene_LeaderBoardX ($C2:3915), C2Scene_MemberWalk ($C2:3B3F), C2Scene_MemberFollow
 ;   ($C2:3CD5), C2Scene_MemberMoveX ($C2:3D36), C2Scene_MemberMoveY ($C2:3D97), C2Scene_MemberBoardX
-;   ($C2:3E76), C2Scene_MemberBoardY ($C2:3EDA) and unmatched ($C2:4340, $C2:4382, $C2:43D2,
-;   $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700, $C2:4723, $C2:481E, $C2:4852, $C2:4870,
-;   $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E, $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008,
-;   $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8, $C2:523E, $C2:525D, $C2:5285, $C2:5553,
-;   $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770, $C2:6834, $C2:6883, $C2:68DD, $C2:719A,
-;   $C2:71A9, $C2:71C7, $C2:71D8).
+;   ($C2:3E76), C2Scene_MemberBoardY ($C2:3EDA), C2Scene_TaskLeaderMarker ($C2:6834),
+;   C2Scene_TaskObjAMarker ($C2:6883), C2Scene_TaskLocMarker ($C2:68DD) and unmatched ($C2:4340,
+;   $C2:4382, $C2:43D2, $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700, $C2:4723, $C2:481E,
+;   $C2:4852, $C2:4870, $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E, $C2:4D96, $C2:4F73,
+;   $C2:4FC2, $C2:5008, $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8, $C2:523E, $C2:525D,
+;   $C2:5285, $C2:5553, $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770, $C2:719A, $C2:71A9,
+;   $C2:71C7, $C2:71D8).
 ; Callers note: xref also lists a doubtful byte pattern at $C2:4E1B.
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
@@ -5763,11 +5766,12 @@ C2Scene_WrapTaskPos:
 ; Callers (37 sites: 34 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
 ;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC), C2Scene_LeaderInput (JSR
 ;   $C2:35CD), C2Scene_SetWalkAnim (JMP $C2:397C), C2Scene_SetStandAnim (JMP $C2:39A7),
-;   C2Scene_MemberFollow (JSR $C2:3CA7, JSR $C2:3CC7) and unmatched (JSR $C2:4336, JSR $C2:433D, JSR
-;   $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR $C2:4D11,
-;   JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E, JSR
-;   $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR $C2:550B,
-;   JSR $C2:556A, JSR $C2:559F, JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
+;   C2Scene_MemberFollow (JSR $C2:3CA7, JSR $C2:3CC7), C2Scene_TaskLocMarker (JSR $C2:68D3) and
+;   unmatched (JSR $C2:4336, JSR $C2:433D, JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747,
+;   JSR $C2:483B, JSR $C2:499C, JSR $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR
+;   $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E, JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5,
+;   JMP $C2:5488, JSR $C2:54BC, JSR $C2:550B, JSR $C2:556A, JSR $C2:559F, JSR $C2:7197, JSR
+;   $C2:71C4).
 ; Callers note: xref also lists doubtful byte patterns at $C2:48BB,
 ;   $C2:48C2 and $C2:49B5.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
@@ -6957,9 +6961,10 @@ C2Scene_MosaicInStep:
 ; its AND on, minus the scale multiply: the same index mask, the same
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
-; Callers (5 JSL sites): unmatched ($C2:6752, $C2:6D10, $C2:704F, $C2:711D, $C6:E9FF).
-; Callers of Trig_Sin1024 (9 JSL sites): unmatched ($C2:673B, $C2:6D17, $C2:7062, $C2:712D,
-;   $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
+; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752) and unmatched ($C2:6D10, $C2:704F,
+;   $C2:711D, $C6:E9FF).
+; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B) and unmatched ($C2:6D17,
+;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
 ; Callers note (JSL): Trig_Cos1024 from $C2:6752, $C2:6D10, $C2:704F,
 ;   $C2:711D and $C6:E9FF; Trig_Sin1024 from $C2:673B, $C2:6D17,
 ;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9 and
@@ -7474,13 +7479,13 @@ C2Scene_Mode5:
     JMP C2Scene_MainLoop
 
 ; $C2:258D — C2Scene_Mode6 (144 bytes, $258D–$261C)
-; Mode 6: runs C2Scene_Unk631F (it sets BG mode 7 and runs its own
+; Mode 6: runs C2Scene_MapView (it sets BG mode 7 and runs its own
 ; tasks until the mode changes from 6: probably a mode-7 view) between a
 ; mosaic fade out and in. Starts C2Scene_ScrMosaicFadeOut and waits
 ; C2Scene_Mode6OutFrames frames; interrupts, NMI, DMA and HDMA (and its
 ; shadow) off; copies dp $00-$EF to C2Scene_SaveDp and the 64 task
 ; records to C2Scene_SaveLowRam ($7F:2800: not where C2Scene_SaveState
-; puts them), runs C2Scene_Unk631F, copies both back; then the VRAM
+; puts them), runs C2Scene_MapView, copies both back; then the VRAM
 ; queue and graphics (C2Scene_VramQInit, C2Scene_ReloadScene),
 ; C2Scene_ScrMosaicFadeIn, C2Scene_Unk1B59 + 1 when C2Scene_Unk1B58 is
 ; set, NMI updates and NMI on, C2Scene_Mode6InFrames frames, mode
@@ -7489,7 +7494,7 @@ C2Scene_Mode5:
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0, DB=$00; A, X, Y
 ;        clobbered
-; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, C2Scene_Unk631F,
+; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, C2Scene_MapView,
 ;   C2Scene_VramQInit, C2Scene_ReloadScene.
 C2Scene_Mode6:
     TDC
@@ -7519,7 +7524,7 @@ C2Scene_Mode6:
     MVN bank(!C2Scene_SaveLowRam),!Bank00 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     PLB
     SEP #$20
-    JSR C2Scene_Unk631F
+    JSR C2Scene_MapView
     REP #$20
     PHB
     LDX.w #!C2Scene_SaveDp&$FFFF
@@ -7638,7 +7643,8 @@ org $C226A8
 ; VMDATAL/H from the fixed source C2Scene_ZeroWord, VRAM address 0, a
 ; byte count of 0 (= 65536 bytes). Needs forced blank, which the boot has
 ; set.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23A8) and unmatched ($C2:632E, $C2:6A34).
+; Callers (3 JSR sites): C2Scene_Main ($C2:23A8), C2Scene_MapView ($C2:632E) and unmatched
+;   ($C2:6A34).
 ; Entry: M=1 (8-bit register values), X=0 (16-bit address and count
 ;        stores), DP any, DB=$00 (absolute register stores)
 ; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = 0; Y, DP and DB unchanged
@@ -7901,7 +7907,7 @@ C2Scene_LoadUnkC800:
 ; C2Scene_PackSlotSize bytes apart ($7F:9000-$FFFF; C2Scene_LoadVram DMAs
 ; them to the BG1/BG2 tiles at VRAM $2000). Bit 7 set: slot left as it
 ; was.
-; Callers (2 JSR sites): C2Scene_LoadVram ($C2:2CDF) and unmatched ($C2:63DF).
+; Callers (2 JSR sites): C2Scene_LoadVram ($C2:2CDF) and C2Scene_MapViewBuild ($C2:63DF).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=0, X=0; A = 7, X and Y clobbered; C2Tmp_08 = 7;
 ;        Menu_Decomp* changed
@@ -13004,7 +13010,7 @@ C2Scene_Unk5775:
 ; Zeroes the first C2Scene_Unk8621Bytes bytes of C2Scene_HdmaArea
 ; ($7E:8621-$8A20, up to C2Scene_HdmaValues): a zero word at the start,
 ; then an overlapping MVN.
-; Callers (3 JSR sites): unmatched ($C2:5707, $C2:5719, $C2:6965).
+; Callers (3 JSR sites): C2Scene_MapViewLabel ($C2:6965) and unmatched ($C2:5707, $C2:5719).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (TDC for 0), DB any
 ;        (saved around the MVN)
 ; Exit:  M=1, X=0; DB unchanged; A = $FFFF; X = $8A20, Y = $8A21
@@ -13066,11 +13072,11 @@ org $C257DF
 ; TextWin_Unk3D = $00:0200 (use not traced), and the pen X
 ; (TextWin_PenX) at TextWin_PenXLeft, or 0 when TextWin_Mode is
 ; TextWin_ModeUnk2 or has bit 7 set.
-; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0003 (JMP $C2:0003), BankC2_Entry0006 (JMP $C2:0006)
-;   and unmatched (JSL $C2:5695, JSL $C2:69BB).
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0003 (JMP $C2:0003), BankC2_Entry0006 (JMP $C2:0006),
+;   C2Scene_MapViewLabel (JSL $C2:69BB) and unmatched (JSL $C2:5695).
 ; Callers note: JMP from BankC2_Entry0003 ($C2:0003) and BankC2_Entry0006
-;   ($C2:0006), the cross-bank JSL vectors; JSL (unmatched) from $C2:5695
-;   and $C2:69BB.
+;   ($C2:0006), the cross-bank JSL vectors; JSL from $C2:5695 (unmatched)
+;   and C2Scene_MapViewLabel ($C2:69BB).
 ; Entry: M any, X=0 (16-bit X/Y: the LDX #$0200 and the TAY of the doubled
 ;        string index need it; P saved), DP any (saved; DP=$0200 here), DB any (all
 ;        accesses direct page); the block at $0200 filled as above
@@ -13123,11 +13129,11 @@ TextWin_Init:
 ; TextWin_Status whether to go on (C=0); if so, the handler of
 ; TextWin_State in TextWin_StateTable runs. Returns with the high byte
 ; of A zero.
-; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0009 (JMP $C2:0009), BankC2_Entry000C (JMP $C2:000C)
-;   and unmatched (JSL $C2:569E, JSL $C2:69C4).
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0009 (JMP $C2:0009), BankC2_Entry000C (JMP $C2:000C),
+;   C2Scene_MapViewLabel (JSL $C2:69C4) and unmatched (JSL $C2:569E).
 ; Callers note: JMP from BankC2_Entry0009 ($C2:0009) and BankC2_Entry000C
-;   ($C2:000C), the cross-bank JSL vectors; JSL (unmatched) from $C2:569E
-;   and $C2:69C4.
+;   ($C2:000C), the cross-bank JSL vectors; JSL from $C2:569E (unmatched)
+;   and C2Scene_MapViewLabel ($C2:69C4).
 ; Entry: any M (P saved), X=0 or 1 (kept for the JSR (abs,X); the
 ;        16-bit LDA before the SEP leaves B = 0 for the index), DP any
 ;        (saved; DP=$0200 here), DB as the state handlers need (not
@@ -15192,6 +15198,1289 @@ C2Scene_GetSoundZone:
 .odd:
     AND.b #!C2Scene_ZoneMask
     RTS
+
+; ============================================================
+; Map view: scene mode 6 ($C2:631F–$C2:6A33)
+; ============================================================
+; C2Scene_Mode6 runs C2Scene_MapView in BG mode 7. The mode-7 picture is
+; built from the scene's two BG maps, one pixel per metatile across and
+; two down (C2Scene_MapDrawPixels): a small map of the whole scene, that
+; the task C2Scene_TaskMapZoom zooms out from the leader's position
+; (C2Scene_StartX/Y) and back in when C2Scene_MapViewExitBtn is pressed.
+; Marker sprites (the leader, object A, a label) are shown while it is
+; zoomed out, over a blue fixed-colour gradient (C2Scene_MapViewGradient).
+
+; $C2:631F — C2Scene_MapView (192 bytes, $631F–$63DE)
+; Mode 6's sub-program (inferred from what it builds; see the banner):
+; BG mode 7, sprite tiles at VRAM $6000 (OBSEL), colour math adding the
+; fixed colour on the backdrop only; clears VRAM, the VRAM queue and the
+; tasks; draws the label (C2Scene_MapViewLabel), sets up the gradient
+; and the mode-7 picture (C2Scene_MapViewGradient, C2Scene_MapViewBuild);
+; DMAs the two marker tiles from C2SceneRom_MapMarkerTiles to sprite
+; tiles 0 and 2; colour 0 = black and sprite palette 0 from
+; C2SceneRom_MapViewObjPal (the MVN count C2Scene_PalRowBytes copies 33
+; bytes, one more than the palette, as C2Scene_LoadVram's copy of
+; C2SceneRom_LastPalRow does). Then it starts C2Scene_TaskMapZoom and the
+; script C2Scene_ScrMapViewStart (both copy their parameters from record
+; 0: C2Scene_TaskClearAll points C2Scene_TaskCur there), turns on the NMI
+; update and the NMI, and waits frame by frame until C2Scene_Mode is no
+; longer C2Scene_ModeMode7 (C2Scene_MapZoomIn sets C2Scene_ModeIdle7).
+; Then C2Scene_MapViewEndFrames more frames, BG mode C2Scene_InitBgMode
+; and OBSEL back to the boot values, and NMI, DMA and HDMA off.
+; Callers (1 JSR site): C2Scene_Mode6 ($C2:25CF).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM);
+;        interrupts off (C2Scene_Mode6 has saved dp and the tasks)
+; Exit:  M=1, X=0; A = 0; X, Y clobbered; NMITIMEN, MDMAEN and HDMAEN = 0;
+;        dp, the task records, the VRAM queue, C2Scene_PaletteBuf and
+;        VRAM changed (C2Scene_Mode6 restores dp and the tasks); the
+;        HDMA enable bit C2Scene_MapViewGradient set in
+;        C2Scene_HdmaenShadow is left set
+; Calls: C2Scene_ClearVram, C2Scene_VramQInit, C2Scene_TaskClearAll,
+;   C2Scene_MapViewLabel, C2Scene_MapViewGradient, C2Scene_MapViewBuild,
+;   C2Scene_TaskSpawn, C2Scene_TaskSpawnScript, C2Scene_WaitOneFrame,
+;   C2Scene_WaitFrames.
+C2Scene_MapView:
+    LDA.b #!C2Scene_BgMode7
+    STA.b !C2Scene_BgModeShadow
+    LDA.b #!OBSEL_Size16And32_Base6000
+    STA.w OBSEL
+    STZ.b !C2Scene_CgwselShadow
+    LDA.b #!CGADSUB_AddBackdrop
+    STA.b !C2Scene_CgadsubShadow
+    JSR C2Scene_ClearVram
+    JSR C2Scene_VramQInit
+    JSR C2Scene_TaskClearAll
+    JSR C2Scene_MapViewLabel
+    JSR C2Scene_MapViewGradient
+    JSR C2Scene_MapViewBuild
+    LDX.w #!C2Scene_MapObjVram
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDX.w #!C2SceneRom_MapMarkerTiles&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2SceneRom_MapMarkerTiles)
+    STA.w A1B7
+    LDX.w #!C2Scene_TileBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDX.w #!C2Scene_MapObjVram+(2*!C2Scene_TileWords) ; sprite tile 2
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDX.w #(!C2SceneRom_MapMarkerTiles+!C2Scene_TileBytes)&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2SceneRom_MapMarkerTiles)
+    STA.w A1B7
+    LDX.w #!C2Scene_TileBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    STZ.w !C2Scene_PaletteBuf           ; colour 0 (the backdrop): black
+    PHB
+    LDX.w #!C2SceneRom_MapViewObjPal&$FFFF
+    LDY.w #!C2Scene_ObjPal0Dest
+    LDA.w #!C2Scene_PalRowBytes         ; count - 1 = 32: 33 bytes
+    MVN !Bank00,bank(!C2SceneRom_MapViewObjPal) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDX.w #C2Scene_TaskMapZoom
+    JSR C2Scene_TaskSpawn
+    LDA.b #bank(C2Scene_ScrMapViewStart)
+    LDX.w #C2Scene_ScrMapViewStart
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+.wait:
+    JSR C2Scene_WaitOneFrame
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeMode7
+    BEQ .wait
+    LDX.w #!C2Scene_MapViewEndFrames
+    JSR C2Scene_WaitFrames
+    LDA.b #!C2Scene_InitBgMode
+    STA.b !C2Scene_BgModeShadow
+    LDA.b #!OBSEL_Size16And32_Base0000
+    STA.w OBSEL
+    LDA.b #$00
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    RTS
+
+; $C2:63DF — C2Scene_MapViewBuild (33 bytes, $63DF–$63FF)
+; Builds the mode-7 picture: unpacks the scene's BG graphics
+; (C2Scene_LoadBgGfx) and takes one colour per tile from them
+; (C2Scene_MapTileColors); then draws the pixels from layer 2's map
+; (C2Scene_BgMaps + C2Scene_MapBytes, metatiles at C2Scene_Metatiles +
+; C2Scene_MetatileSetBytes) with layer 1's (C2Scene_BgMaps,
+; C2Scene_Metatiles) over it (C2Scene_MapDrawPixels: the same pairs
+; C2Scene_LayerMaps and C2Scene_LayerMetatiles give for layers 2 and 1),
+; and writes the mode-7 tilemap (C2Scene_MapBuildTilemap).
+; Callers (1 JSR site): C2Scene_MapView ($C2:633D).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (as C2Scene_LoadBgGfx needs);
+;        C2Scene_HeaderPtr set; NMI and DMA off (it DMAs to VRAM)
+; Exit:  M=1, X=0; A, X, Y clobbered; C2Tmp_00-$1B, Menu_Decomp*,
+;        C2Scene_DecompBuf, C2Scene_TileColors, C2Scene_VramQBuf and VRAM
+;        changed
+; Calls: C2Scene_LoadBgGfx, C2Scene_MapTileColors, C2Scene_MapDrawPixels,
+;   C2Scene_MapBuildTilemap.
+!C2Scene_MapPtrA = !C2Tmp_10           ; 16-bit address of map A's row (bank $7E)
+!C2Scene_MapPtrB = !C2Tmp_13           ; and map B's
+!C2Scene_MetaBaseA = !C2Tmp_16         ; 16-bit address of metatile set A (bank $7E)
+!C2Scene_MetaBaseB = !C2Tmp_19         ; and set B
+C2Scene_MapViewBuild:
+    JSR C2Scene_LoadBgGfx
+    JSR C2Scene_MapTileColors
+    LDX.w #(!C2Scene_BgMaps+!C2Scene_MapBytes)&$FFFF
+    STX.b !C2Scene_MapPtrA
+    LDX.w #!C2Scene_BgMaps&$FFFF
+    STX.b !C2Scene_MapPtrB
+    LDX.w #(!C2Scene_Metatiles+!C2Scene_MetatileSetBytes)&$FFFF
+    STX.b !C2Scene_MetaBaseA
+    LDX.w #!C2Scene_Metatiles&$FFFF
+    STX.b !C2Scene_MetaBaseB
+    JSR C2Scene_MapDrawPixels
+    JSR C2Scene_MapBuildTilemap
+    RTS
+
+; $C2:6400 — C2Scene_MapTileColors (83 bytes, $6400–$6452)
+; For each of the C2Scene_MapTileCount 4bpp tiles in C2Scene_DecompBuf
+; (32 bytes each: the seven BG packs), writes one byte to
+; C2Scene_TileColors through WMDATA: the colour number (0-15) of the
+; tile's pixel in column 3 of row 2 (bit 4 of the bytes at +$15, +$14,
+; +$05 and +$04: bit planes 3, 2, 1, 0, from C2Scene_MapTilePixelBit).
+; Probably one pixel standing for the tile's colour (inferred: it is the
+; only colour C2Scene_MapCellPixels takes from a tile).
+; Callers (1 JSR site): C2Scene_MapViewBuild ($C2:63E2).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB any (set to $7F and
+;        restored; WMDATA written long)
+; Exit:  M=1, X=0; A = C2Scene_MapTileCount (B = $03, which
+;        C2Scene_MapDrawPixels' first MVN uses as its count's high
+;        byte); X = C2Scene_TileColors' address, Y = 4; C2Tmp_00,
+;        $08-$09 and $10-$11 changed; WMADD left past the table; DB
+;        restored
+; Calls: C2Scene_MapTilePixelBit.
+!C2Scene_TileColor = !C2Tmp_00         ; 8-bit: the colour being built
+!C2Scene_TileNum = !C2Tmp_08           ; 16-bit tile number
+!C2Scene_TilePtr = !C2Tmp_10           ; 16-bit address of the tile in bank $7F
+C2Scene_MapTileColors:
+    SEP #$20
+    LDX.w #!C2Scene_TileColors&$FFFF
+    STX.w WMADDL
+    LDA.b #bank(!C2Scene_TileColors)
+    STA.w WMADDH
+    PHB
+    LDA.b #bank(!C2Scene_DecompBuf)
+    PHA
+    PLB
+    REP #$20
+    STZ.b !C2Scene_TileNum
+.tile:
+    LDA.b !C2Scene_TileNum
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; * 32 (C=0: the number is below $800)
+    ADC.w #!C2Scene_DecompBuf&$FFFF
+    STA.b !C2Scene_TilePtr
+    SEP #$20
+    STZ.b !C2Scene_TileColor
+    LDY.w #!C2Scene_TileRow2Plane3
+    JSR C2Scene_MapTilePixelBit
+    LDY.w #!C2Scene_TileRow2Plane2
+    JSR C2Scene_MapTilePixelBit
+    LDY.w #!C2Scene_TileRow2Plane1
+    JSR C2Scene_MapTilePixelBit
+    LDY.w #!C2Scene_TileRow2Plane0
+    JSR C2Scene_MapTilePixelBit
+    LDA.b !C2Scene_TileColor
+    STA.l WMDATA
+    REP #$20
+    INC.b !C2Scene_TileNum
+    LDA.b !C2Scene_TileNum
+    CMP.w #!C2Scene_MapTileCount
+    BNE .tile
+    SEP #$20
+    PLB
+    RTS
+
+; $C2:6453 — C2Scene_MapTilePixelBit (9 bytes, $6453–$645B)
+; Shifts bit 4 of the tile byte at C2Scene_TilePtr + Y (bank DB) into
+; C2Scene_TileColor from the right: four ROLs bring bit 4 into the carry.
+; Callers (4 JSR sites): C2Scene_MapTileColors ($C2:6429, $C2:642F, $C2:6435, $C2:643B).
+; Entry: M=1, X=0, DP=$0000, DB = the tile's bank; Y = the byte offset
+; Exit:  M=1; A clobbered; C2Scene_TileColor shifted left, the bit in bit 0;
+;        X, Y unchanged
+; No calls.
+C2Scene_MapTilePixelBit:
+    LDA.b (!C2Scene_TilePtr),Y
+    ROL A
+    ROL A
+    ROL A
+    ROL A
+    ROL.b !C2Scene_TileColor
+    RTS
+
+; $C2:645C — C2Scene_MapDrawPixels (226 bytes, $645C–$653D)
+; Draws the mode-7 picture's tiles, a band of 8 pixel rows (4 metatile
+; rows) at a time, in C2Scene_VramQBuf (C2Scene_VramQBufPtr, bank $7E):
+; mode-7 tiles are 8 x 8 bytes, one byte per pixel, and the band is 12
+; tiles wide ($300 bytes). For each metatile row (0-63) and column (0-95)
+; it draws the cell of map A with metatile set A (C2Scene_MapCellPixels:
+; two pixels, one under the other), then, unless Loc_Id is
+; C2Scene_Loc1F5, the cell of map B with set B over it (only its
+; non-zero pixels are written). After each band the $300 bytes are DMAed
+; to VRAM (VMDATAH: mode-7 tile data) at C2Scene_MapVram, which starts at
+; word $0040 (tile 1), and the buffer is cleared again. 192 tiles (1-192)
+; in all.
+; Quirk, kept: the first clear (MVN count $xxFE) takes its high byte from
+; B, which C2Scene_MapTileColors leaves at $03, so it clears $400 bytes
+; ($F000-$F3FF); the later clears are $300.
+; Callers (1 JSR site): C2Scene_MapViewBuild ($C2:63F9).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB any (set to $7E and
+;        restored; registers written long); B = $03 (see the quirk);
+;        C2Scene_MapPtrA/B, C2Scene_MetaBaseA/B set; DMA free
+; Exit:  M=0, X=0; A = C2Scene_MapRows; X, Y clobbered; C2Tmp_00-$0F
+;        changed, C2Scene_MapPtrA/B advanced past their maps; DB restored
+; Calls: C2Scene_MapCellPixels.
+!C2Scene_MapOut = !C2Tmp_05            ; 16-bit address in the band of the cell's top pixel
+!C2Scene_MapRow = !C2Tmp_08            ; 16-bit metatile row
+!C2Scene_MapCol = !C2Tmp_0A            ; 16-bit metatile column
+!C2Scene_MapVram = !C2Tmp_0C           ; 16-bit VRAM word address of the next band
+!C2Scene_MetaPtr = !C2Tmp_0E           ; 16-bit address of the cell's metatile (bank $7E)
+C2Scene_MapDrawPixels:
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    LDX.b !C2Scene_VramQBufPtr
+    STX.b !C2Scene_MapOut
+    STZ.w !Eng_PtrBase,X
+    TXY
+    INY
+    LDA.b #(!C2Scene_MapBandBytes-2)&$FF ; low byte only: B is the count's high byte
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_MapFirstTileVram
+    STX.b !C2Scene_MapVram
+    REP #$20
+    STZ.b !C2Scene_MapRow
+.row:
+    STZ.b !C2Scene_MapCol
+.cell:
+    LDY.b !C2Scene_MapCol
+    LDA.b (!C2Scene_MapPtrA),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                               ; * 8 bytes per metatile (C=0)
+    ADC.b !C2Scene_MetaBaseA
+    STA.b !C2Scene_MetaPtr
+    SEP #$20
+    JSR C2Scene_MapCellPixels
+    LDY.w !DP_Field+!Loc_Id
+    CPY.w #!C2Scene_Loc1F5
+    BEQ .next
+    REP #$20
+    LDY.b !C2Scene_MapCol
+    LDA.b (!C2Scene_MapPtrB),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Scene_MetaBaseB
+    STA.b !C2Scene_MetaPtr
+    SEP #$20
+    JSR C2Scene_MapCellPixels
+.next:
+    REP #$20
+    INC.b !C2Scene_MapCol
+    LDA.b !C2Scene_MapCol
+    AND.w #!C2Scene_MapTilePxMask
+    BNE .same_tile
+    LDA.b !C2Scene_MapOut
+    CLC
+    ADC.w #!C2Scene_MapNextTile         ; to the next tile's first row
+    STA.b !C2Scene_MapOut
+    BRA .col_done
+.same_tile:
+    INC.b !C2Scene_MapOut
+.col_done:
+    LDA.b !C2Scene_MapCol
+    CMP.w #!C2Scene_MapCols
+    BCC .cell
+    LDA.b !C2Scene_MapPtrA
+    CLC
+    ADC.w #!C2Scene_MapCols
+    STA.b !C2Scene_MapPtrA
+    LDA.b !C2Scene_MapPtrB
+    CLC
+    ADC.w #!C2Scene_MapCols
+    STA.b !C2Scene_MapPtrB
+    LDA.b !C2Scene_MapOut
+    SEC
+    SBC.w #!C2Scene_MapBackToRow        ; back to the first tile, two pixel rows down
+    STA.b !C2Scene_MapOut
+    INC.b !C2Scene_MapRow
+    LDA.b !C2Scene_MapRow
+    AND.w #!C2Scene_MapBandRowMask
+    BNE .band_open
+    LDA.b !C2Scene_MapVram
+    STA.l VMADDL
+    LDA.b !C2Scene_VramQBufPtr
+    STA.l A1T7L
+    LDA.w #!C2Scene_MapBandBytes
+    STA.l DAS7L
+    LDA.w #!BBAD_VMDATAH<<8             ; DMAP7 = 0 (one register), BBAD7 = VMDATAH
+    STA.l DMAP7
+    SEP #$20
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.l VMAIN
+    LDA.b !C2Scene_VramQBufPtr+2
+    STA.l A1B7
+    LDA.b #!MDMAEN_Ch7
+    STA.l MDMAEN
+    LDX.b !C2Scene_VramQBufPtr
+    STX.b !C2Scene_MapOut
+    REP #$20
+    STZ.w !Eng_PtrBase,X
+    TXY
+    INY
+    LDA.w #!C2Scene_MapBandBytes-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !C2Scene_MapVram
+    CLC
+    ADC.w #!C2Scene_MapBandWords
+    STA.b !C2Scene_MapVram
+.band_open:
+    LDA.b !C2Scene_MapRow
+    CMP.w #!C2Scene_MapRows
+    BCS .done
+    JMP .row
+.done:
+    PLB
+    RTS
+
+; $C2:653E — C2Scene_MapCellPixels (80 bytes, $653E–$658D)
+; Draws one metatile cell as two pixels, at C2Scene_MapOut and 8 bytes
+; (one pixel row) below: the colours (C2Scene_TileColors) of the
+; metatile's top-right and bottom-right tiles, each ORed with that
+; tile's palette * 16 (high-byte bits 2-4) and passed through
+; C2Scene_MapFilterColor. A tile whose colour is 0 writes nothing (what
+; is there stays); a colour the filter hides is written as 0. The left
+; tiles are not looked at.
+; Callers (2 JSR sites): C2Scene_MapDrawPixels ($C2:648C, $C2:64A9).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$7E (the metatile and
+;        the band); C2Scene_MetaPtr = the metatile
+; Exit:  M=1, X=0; A, X clobbered; Y = 8; C2Tmp_00/$01 = the two
+;        palettes * 16
+; Calls: C2Scene_MapFilterColor.
+!C2Scene_PalTop = !C2Tmp_00            ; 8-bit: top-right tile's palette * 16
+!C2Scene_PalBottom = !C2Tmp_01         ; 8-bit: bottom-right tile's
+C2Scene_MapCellPixels:
+    SEP #$20
+    LDY.w #C2Scene_Metatile.TopRight+1
+    LDA.b (!C2Scene_MetaPtr),Y
+    AND.b #!C2Scene_TilePalBits
+    ASL A
+    ASL A
+    STA.b !C2Scene_PalTop
+    LDY.w #C2Scene_Metatile.BottomRight+1
+    LDA.b (!C2Scene_MetaPtr),Y
+    AND.b #!C2Scene_TilePalBits
+    ASL A
+    ASL A
+    STA.b !C2Scene_PalBottom
+    REP #$20
+    LDY.w #C2Scene_Metatile.TopRight
+    LDA.b (!C2Scene_MetaPtr),Y
+    AND.w #!C2Scene_TileNumMask
+    TAX
+    SEP #$20
+    LDA.l !C2Scene_TileColors,X
+    BEQ .bottom
+    ORA.b !C2Scene_PalTop
+    JSR C2Scene_MapFilterColor
+    STA.b (!C2Scene_MapOut)
+.bottom:
+    REP #$20
+    LDY.w #C2Scene_Metatile.BottomRight
+    LDA.b (!C2Scene_MetaPtr),Y
+    AND.w #!C2Scene_TileNumMask
+    TAX
+    SEP #$20
+    LDY.w #!C2Scene_Mode7RowBytes
+    LDA.l !C2Scene_TileColors,X
+    BEQ .done
+    ORA.b !C2Scene_PalBottom
+    JSR C2Scene_MapFilterColor
+    STA.b (!C2Scene_MapOut),Y
+.done:
+    RTS
+
+; $C2:658E — C2Scene_MapFilterColor (36 bytes, $658E–$65B1)
+; Turns some pixel colours (palette * 16 + colour) into 0, the
+; transparent colour that shows the gradient: at Loc_Id
+; C2Scene_MapLoc1F3 the colours $40-$4E; at any other location
+; $0F, $2F and $24-$2B. Which tiles these are is not traced (probably
+; ones that should not show on the map).
+; Callers (2 JSR sites): C2Scene_MapCellPixels ($C2:656B, $C2:6588).
+; Entry: M=1, X=0, DP=$0000 (TDC loads 0), DB with low WRAM mirrored
+;        ($7E here: Loc_Id is read absolute); A = the colour
+; Exit:  M=1, X=0; A = the colour or 0 (B = 0 when it is 0); X = Loc_Id;
+;        Y unchanged
+; No calls.
+C2Scene_MapFilterColor:
+    LDX.w !DP_Field+!Loc_Id
+    CPX.w #!C2Scene_MapLoc1F3
+    BEQ .loc1F3
+    CMP.b #!C2Scene_MapHideColA
+    BEQ .hide
+    CMP.b #!C2Scene_MapHideColB
+    BEQ .hide
+    CMP.b #!C2Scene_MapHideFrom
+    BCC .keep
+    CMP.b #!C2Scene_MapHideTo
+    BCS .keep
+.hide:
+    TDC                                 ; A = DP = 0
+.keep:
+    RTS
+.loc1F3:
+    CMP.b #!C2Scene_MapHide1F3From
+    BCC .keep
+    CMP.b #!C2Scene_MapHide1F3To
+    BCS .keep
+    BRA .hide
+
+; $C2:65B2 — C2Scene_MapBuildTilemap (186 bytes, $65B2–$666B)
+; Writes the mode-7 tilemap: a 32 x 32 tile block of bytes at
+; C2Scene_VramQBuf, zeroed (tile 0: blank), with the picture's tiles
+; 1-192 in 16 rows of 12 from column C2Scene_MapTileCol0, row
+; C2Scene_MapTileRow0 (offset row * 32 + column, the row product with
+; the hardware multiplier); then DMAs its 32 rows to the first 32
+; columns of the first 32 rows of the 128 x 128 mode-7 map (VMDATAL,
+; VMAIN 0: one byte per word, the low bytes).
+; Callers (1 JSR site): C2Scene_MapViewBuild ($C2:63FC).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB any for the build (set
+;        to $7E by the MVN and restored), DB=$00 for the DMA (absolute
+;        register stores after the PLB); DMA free
+; Exit:  M=1, X=0; A clobbered; X = $0020, Y clobbered; C2Tmp_00/$01, $08,
+;        $0A-$0D and $10-$11 changed
+; No calls.
+!C2Scene_TmCol = !C2Tmp_00             ; 8-bit first column of the picture
+!C2Scene_TmRow = !C2Tmp_01             ; 8-bit first row
+!C2Scene_TmTile = !C2Tmp_08            ; 8-bit next tile number
+!C2Scene_TmRowCount = !C2Tmp_0A        ; 8-bit rows written
+!C2Scene_TmPtr = !C2Tmp_10             ; 16-bit address of the row being written (bank $7E)
+!C2Scene_TmLeft = !C2Tmp_00            ; 8-bit rows still to DMA
+!C2Scene_TmVram = !C2Tmp_0C            ; 16-bit VRAM word address of the next row
+!C2Scene_TmSrc = !C2Tmp_0A             ; 16-bit source of the next row
+C2Scene_MapBuildTilemap:
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_VramQBuf
+    LDX.w #!C2Scene_VramQBuf&$FFFF
+    LDY.w #(!C2Scene_VramQBuf&$FFFF)+1
+    LDA.w #!C2Scene_TmBytes-2           ; with the zero word: all $400 bytes
+    MVN bank(!C2Scene_VramQBuf),bank(!C2Scene_VramQBuf) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.b #!C2Scene_MapTileCol0
+    STA.b !C2Scene_TmCol
+    LDA.b #!C2Scene_MapTileRow0
+    STA.b !C2Scene_TmRow
+    LDX.w #!C2Scene_VramQBuf&$FFFF
+    STX.b !C2Scene_TmPtr
+    LDA.b !C2Scene_TmRow
+    STA.l WRMPYA
+    LDA.b #!C2Scene_TmRowBytes
+    STA.l WRMPYB
+    REP #$20
+    CLC
+    LDA.b !C2Scene_TmPtr
+    ADC.l RDMPYL
+    STA.b !C2Scene_TmPtr
+    LDA.b !C2Scene_TmCol
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.b !C2Scene_TmPtr
+    STA.b !C2Scene_TmPtr
+    SEP #$20
+    LDA.b #!C2Scene_MapFirstTile
+    STA.b !C2Scene_TmTile
+    STZ.b !C2Scene_TmRowCount
+.row:
+    LDY.w #$0000
+.tile:
+    LDA.b !C2Scene_TmTile
+    STA.b (!C2Scene_TmPtr),Y
+    INC.b !C2Scene_TmTile
+    INY
+    CPY.w #!C2Scene_MapTilesWide
+    BNE .tile
+    REP #$20
+    LDA.b !C2Scene_TmPtr
+    CLC
+    ADC.w #!C2Scene_TmRowBytes
+    STA.b !C2Scene_TmPtr
+    SEP #$20
+    INC.b !C2Scene_TmRowCount
+    LDA.b !C2Scene_TmRowCount
+    CMP.b #!C2Scene_MapTilesHigh
+    BNE .row
+    PLB
+    LDA.b #!C2Scene_TmRows
+    STA.b !C2Scene_TmLeft
+    STZ.b !C2Scene_TmVram
+    STZ.b !C2Scene_TmVram+1
+    LDX.w #!C2Scene_VramQBuf&$FFFF
+    STX.b !C2Scene_TmSrc
+.dma:
+    LDX.b !C2Scene_TmVram
+    STX.w VMADDL
+    TDC                                 ; VMAIN 0: step after the low byte
+    STA.w VMAIN
+    LDX.w #!BBAD_VMDATAL<<8             ; DMAP7 = 0 (one register), BBAD7 = VMDATAL
+    STX.w DMAP7
+    LDX.b !C2Scene_TmSrc
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_VramQBuf)
+    STA.w A1B7
+    LDX.w #!C2Scene_TmRowBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    LDA.b !C2Scene_TmVram
+    CLC
+    ADC.w #!C2Scene_Mode7MapWidth
+    STA.b !C2Scene_TmVram
+    LDA.b !C2Scene_TmSrc
+    CLC
+    ADC.w #!C2Scene_TmRowBytes
+    STA.b !C2Scene_TmSrc
+    SEP #$20
+    DEC.b !C2Scene_TmLeft
+    BNE .dma
+    RTS
+
+; $C2:666C — C2Scene_TaskMapZoom (9 bytes, $666C–$6674)
+; Task handler started by C2Scene_MapView: runs .State through
+; C2Scene_MapZoomStates. 0: set up and fall into 1; 1: zoom out one step
+; per frame (32 steps), then start the markers; 2: wait for
+; C2Scene_MapViewExitBtn; 3: zoom back in, then end the view.
+; Callers note: none direct (C2Scene_MapView spawns it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's
+; Calls: the C2Scene_MapZoomStates handlers (JMP (abs,X)).
+C2Scene_TaskMapZoom:
+    TDC
+    LDA.w C2Scene_ZoomTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_MapZoomStates,X)
+
+; $C2:6675 — C2Scene_MapZoomStates (4 words, $6675–$667C)
+; C2Scene_TaskMapZoom's handler for each .State.
+C2Scene_MapZoomStates:
+    dw C2Scene_MapZoomInit      ; 0
+    dw C2Scene_MapZoomOut       ; 1
+    dw C2Scene_MapZoomWait      ; 2
+    dw C2Scene_MapZoomIn        ; 3
+
+; $C2:667D — C2Scene_MapZoomInit (46 bytes, $667D–$66AA)
+; State 0: .State = 1; the mode-7 centre at the leader's place in the
+; picture: C2Scene_M7X = C2Scene_StartX / 16 + 16 (one pixel per
+; 16-pixel metatile, the picture 2 tiles in) and C2Scene_M7Y =
+; C2Scene_StartY / 8 + 48 (two pixels per metatile, 6 tiles down);
+; BG1's horizontal scroll = -C2Scene_M7X, its vertical scroll 0; .Angle
+; and .Step = 0. Falls into C2Scene_MapZoomOut.
+; Callers note: none direct (C2Scene_MapZoomStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_MapZoomOut
+; No calls (falls into C2Scene_MapZoomOut).
+C2Scene_MapZoomInit:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_ZoomTask.State,X
+    REP #$20
+    LDA.w !C2Scene_StartX
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C2Scene_MapTileCol0*8
+    STA.b !C2Scene_M7X
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_Bg1HScroll
+    LDA.w !C2Scene_StartY
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.w #!C2Scene_MapTileRow0*8
+    STA.b !C2Scene_M7Y
+    STZ.b !C2Scene_Bg1VScroll
+    STZ.w C2Scene_ZoomTask.Angle,X
+    STZ.w C2Scene_ZoomTask.Step,X
+
+; $C2:66AB — C2Scene_MapZoomOut (62 bytes, $66AB–$66E8)
+; State 1, once per frame: .DivA and .DivB = entry .Step of
+; C2SceneRom_ZoomDivA/B ($FF/$7F down to $10/$08: the picture shrinks),
+; .Step + 2; when it reaches $40 (all 32 entries used) .Step = $3E,
+; .State = 2 and the script C2Scene_ScrMapViewMarkers starts. Then the
+; matrix (C2Scene_MapZoomMatrix).
+; Quirk, kept: on the last step the matrix reads its first .Angle with X
+; = the script task C2Scene_TaskSpawnScript returned, not this one; the
+; spawn copied this record's +$05-$3F into it, so the value is the same.
+; Callers note: none direct (C2Scene_MapZoomStates; C2Scene_MapZoomInit
+;   falls in).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM: the
+;        task record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0, C=0 (the task goes on); A, X, Y and C2Tmp_00-$11 as
+;        C2Scene_MapZoomMatrix leaves them; the mode-7 matrix shadows set;
+;        on the last step C2Tmp_01, $08 and $0A changed by the spawn
+; Calls: C2Scene_TaskSpawnScript, C2Scene_MapZoomMatrix.
+C2Scene_MapZoomOut:
+    REP #$20
+    LDY.b !C2Scene_TaskCur
+    LDX.w C2Scene_ZoomTask.Step,Y
+    LDA.l !C2SceneRom_ZoomDivA,X
+    STA.w C2Scene_ZoomTask.DivA,Y
+    LDA.l !C2SceneRom_ZoomDivB,X
+    STA.w C2Scene_ZoomTask.DivB,Y
+    TYX
+    INC.w C2Scene_ZoomTask.Step,X
+    INC.w C2Scene_ZoomTask.Step,X
+    LDA.w C2Scene_ZoomTask.Step,X
+    CMP.w #!C2Scene_ZoomSteps*2
+    BCC .matrix
+    LDA.w #(!C2Scene_ZoomSteps-1)*2
+    STA.w C2Scene_ZoomTask.Step,X
+    SEP #$20
+    INC.w C2Scene_ZoomTask.State,X
+    LDA.b #bank(C2Scene_ScrMapViewMarkers)
+    LDX.w #C2Scene_ScrMapViewMarkers
+    JSR C2Scene_TaskSpawnScript
+    REP #$20
+.matrix:
+    JSR C2Scene_MapZoomMatrix
+    CLC
+    RTS
+
+; $C2:66E9 — C2Scene_MapZoomWait (27 bytes, $66E9–$6703)
+; State 2: when Pad_Unk00F6 has C2Scene_MapViewExitBtn (bit 3), .State =
+; 3 and the script C2Scene_ScrMapViewExit starts.
+; Callers note: none direct (C2Scene_MapZoomStates).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A clobbered; when pressed X = the script task and
+;        C2Tmp_01, $08, $0A changed (C2Scene_TaskSpawnScript), else X
+;        unchanged
+; Calls: C2Scene_TaskSpawnScript.
+C2Scene_MapZoomWait:
+    REP #$20
+    LDA.w !Pad_Unk00F6
+    BIT.w #!C2Scene_MapViewExitBtn
+    SEP #$20
+    BEQ .wait
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_ZoomTask.State,X
+    LDA.b #bank(C2Scene_ScrMapViewExit)
+    LDX.w #C2Scene_ScrMapViewExit
+    JSR C2Scene_TaskSpawnScript
+.wait:
+    CLC
+    RTS
+
+; $C2:6704 — C2Scene_MapZoomIn (50 bytes, $6704–$6735)
+; State 3, once per frame: .DivA/.DivB = entry .Step of the tables, then
+; .Step - 2, and the matrix: the zoom of C2Scene_MapZoomOut backwards
+; (entries 31 down to 1). When .Step reaches 0, C2Scene_Mode =
+; C2Scene_ModeIdle7, which ends C2Scene_MapView's wait, and the task
+; ends (C=1).
+; Callers note: none direct (C2Scene_MapZoomStates).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  going on: M=0, X=0, C=0; done: M=1, X=0, C=1, A =
+;        C2Scene_ModeIdle7; A, X, Y and C2Tmp_00-$11 otherwise as
+;        C2Scene_MapZoomMatrix leaves them
+; Calls: C2Scene_MapZoomMatrix.
+C2Scene_MapZoomIn:
+    REP #$20
+    LDY.b !C2Scene_TaskCur
+    LDX.w C2Scene_ZoomTask.Step,Y
+    LDA.l !C2SceneRom_ZoomDivA,X
+    STA.w C2Scene_ZoomTask.DivA,Y
+    LDA.l !C2SceneRom_ZoomDivB,X
+    STA.w C2Scene_ZoomTask.DivB,Y
+    TYX
+    DEC.w C2Scene_ZoomTask.Step,X
+    DEC.w C2Scene_ZoomTask.Step,X
+    LDA.w C2Scene_ZoomTask.Step,X
+    BNE .going
+    JSR C2Scene_MapZoomMatrix
+    SEP #$20
+    LDA.b #!C2Scene_ModeIdle7
+    STA.w !C2Scene_Mode
+    SEC
+    RTS
+.going:
+    JSR C2Scene_MapZoomMatrix
+    CLC
+    RTS
+
+; $C2:6736 — C2Scene_MapZoomMatrix (125 bytes, $6736–$67B2)
+; Sets the mode-7 matrix shadows from the task's .Angle, .DivA and
+; .DivB: C2Scene_M7A = 8 cos / DivA, C2Scene_M7B = 8 sin / DivA,
+; C2Scene_M7C = -8 sin / DivB, C2Scene_M7D = 8 cos / DivB (sine and
+; cosine from Trig_Sin1024/Cos1024, signed bytes; the divisions are
+; unsigned, C2Scene_MapZoomDivide, on the magnitudes, and the signs put
+; back after). With .Angle 0 (nothing here changes it) that is a pure
+; scale: DivA $10 and DivB $08 give 2040/16 and 2040/8, about 0.5 and
+; 1.0 in the matrix's 8.8 units.
+; Callers (3 JSR sites): C2Scene_MapZoomOut ($C2:66E4) and C2Scene_MapZoomIn ($C2:6725, $C2:6731).
+; Entry: M=0, X=0 with X = the task for the first (sine) .Angle read,
+;        DP=$0000, DB=$00 (low WRAM: the task; WRDIV); C2Scene_TaskCur =
+;        the task
+; Exit:  M=0, X=0; A = C2Scene_M7D's value; X = the cosine's sign flag
+;        (0/1), Y = the last quotient; C2Tmp_00-$0F and C2Tmp_10/$11
+;        (the sign flags) changed
+; Calls: Trig_Sin1024, Trig_Cos1024 (JSL), C2Scene_MapZoomDivide (JSL).
+!C2Scene_ZoomSinNeg = !C2Tmp_10        ; 8-bit: 1 if the sine was negative
+!C2Scene_ZoomCosNeg = !C2Tmp_10+1      ; 8-bit: 1 if the cosine was negative
+!C2Scene_ZoomCos8 = !C2Tmp_08          ; 16-bit 8 |cos|
+!C2Scene_ZoomSin8 = !C2Tmp_0A          ; 16-bit 8 |sin|
+!C2Scene_ZoomDivA = !C2Tmp_0C          ; 8-bit divisor (the low byte of .DivA)
+!C2Scene_ZoomDivB = !C2Tmp_0E          ; 8-bit divisor (the low byte of .DivB)
+!C2Scene_ZoomA = !C2Tmp_00             ; 16-bit results, the matrix in order
+!C2Scene_ZoomB = !C2Tmp_02
+!C2Scene_ZoomC = !C2Tmp_04
+!C2Scene_ZoomD = !C2Tmp_06
+C2Scene_MapZoomMatrix:
+    STZ.b !C2Scene_ZoomSinNeg           ; and C2Scene_ZoomCosNeg (16-bit)
+    LDA.w C2Scene_ZoomTask.Angle,X
+    JSL Trig_Sin1024
+    TAX                                 ; N = the sign
+    BPL .sin_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    INC.b !C2Scene_ZoomSinNeg
+.sin_pos:
+    ASL A
+    ASL A
+    ASL A
+    STA.b !C2Scene_ZoomSin8
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_ZoomTask.Angle,X
+    JSL Trig_Cos1024
+    TAX
+    BPL .cos_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    INC.b !C2Scene_ZoomCosNeg
+.cos_pos:
+    ASL A
+    ASL A
+    ASL A
+    STA.b !C2Scene_ZoomCos8
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_ZoomTask.DivA,X
+    STA.b !C2Scene_ZoomDivA
+    LDA.w C2Scene_ZoomTask.DivB,X
+    STA.b !C2Scene_ZoomDivB
+    SEP #$20
+    JSL C2Scene_MapZoomDivide
+    SEP #$10                            ; M=0 from the divide; 8-bit X for the flags
+    LDX.b !C2Scene_ZoomSinNeg
+    BEQ .b_c_signed
+    LDA.b !C2Scene_ZoomB
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_ZoomB
+    LDA.b !C2Scene_ZoomC
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_ZoomC
+.b_c_signed:
+    LDX.b !C2Scene_ZoomCosNeg
+    BEQ .a_d_signed
+    LDA.b !C2Scene_ZoomA
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_ZoomA
+    LDA.b !C2Scene_ZoomD
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_ZoomD
+.a_d_signed:
+    LDA.b !C2Scene_ZoomA
+    STA.b !C2Scene_M7A
+    LDA.b !C2Scene_ZoomB
+    STA.b !C2Scene_M7B
+    LDA.b !C2Scene_ZoomC
+    STA.b !C2Scene_M7C
+    LDA.b !C2Scene_ZoomD
+    STA.b !C2Scene_M7D
+    REP #$10
+    RTS
+
+; $C2:67B3 — C2Scene_MapZoomDivide (71 bytes, $67B3–$67F9)
+; The four divisions of C2Scene_MapZoomMatrix on the hardware divider,
+; each next dividend and divisor written while the previous division
+; runs (NOPs pad the waits): C2Scene_ZoomA = Cos8 / DivA, ZoomB = Sin8 /
+; DivA, ZoomC = -(Sin8 / DivB), ZoomD = Cos8 / DivB (16-bit quotients).
+; Callers (1 JSL site): C2Scene_MapZoomMatrix ($C2:6772).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (WRDIV/RDDIV absolute)
+; Exit:  M=0, X=0; A = ZoomC, X = Cos8, Y = ZoomD; RTL
+; No calls.
+C2Scene_MapZoomDivide:
+    LDX.b !C2Scene_ZoomCos8
+    STX.w WRDIVL
+    LDA.b !C2Scene_ZoomDivA
+    STA.w WRDIVB                        ; Cos8 / DivA
+    LDX.b !C2Scene_ZoomSin8
+    STX.w WRDIVL
+    LDA.b !C2Scene_ZoomDivA
+    NOP
+    LDY.w RDDIVL
+    STY.b !C2Scene_ZoomA
+    STA.w WRDIVB                        ; Sin8 / DivA
+    STX.w WRDIVL
+    LDA.b !C2Scene_ZoomDivB
+    NOP
+    NOP
+    NOP
+    LDY.w RDDIVL
+    STY.b !C2Scene_ZoomB
+    STA.w WRDIVB                        ; Sin8 / DivB
+    LDX.b !C2Scene_ZoomCos8
+    STX.w WRDIVL
+    LDA.b !C2Scene_ZoomDivB
+    NOP
+    LDY.w RDDIVL
+    STA.w WRDIVB                        ; Cos8 / DivB
+    REP #$20
+    TYA
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_ZoomC
+    LDY.w RDDIVL
+    STY.b !C2Scene_ZoomD
+    RTL
+
+; $C2:67FA — C2Scene_TaskLeaderMarker (65 bytes, $67FA–$683A)
+; Task handler (started by C2Scene_ScrMapViewMarkers): a marker sprite
+; at the leader's place on the zoomed-out picture. First call: .State =
+; 1, .SprAttr = C2Scene_MapMarkerAttr, .SprTile = 0, .SprX/.SprY =
+; C2Scene_StartX/Y through C2Scene_MapMarkerPos, animation
+; C2Scene_AnimLeaderMarker (bank $C2), .AnimTimer = 0. Every call: while
+; C2Scene_MapMarkersOff is 0 it runs the animation (C2Anim_Run, C=0);
+; once it is set the task ends (C=1).
+; Callers note: none direct (C2Scene_ScrMapViewMarkers, op $35).
+; Entry: M any (SEP #$20 here), X any, DP=$0000, DB=$00 (low WRAM: the
+;        task record); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=1: ended, A = C2Scene_MapMarkersOff; C=0: as
+;        C2Anim_Run leaves it (X = the task)
+; Calls: C2Scene_MapMarkerPos, C2Anim_Run.
+C2Scene_TaskLeaderMarker:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.State,X
+    BNE .run
+    INC.w C2Scene_FxTask.State,X
+    LDA.b #!C2Scene_MapMarkerAttr
+    STA.w C2Scene_Task.SprAttr,X
+    REP #$20
+    STZ.w C2Scene_Task.SprTile,X
+    LDA.w !C2Scene_StartX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_StartY
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_MapMarkerPos
+    LDA.w #C2Scene_AnimLeaderMarker
+    STA.w C2Scene_Task.AnimPtr,X
+    SEP #$20
+    LDA.b #bank(C2Scene_AnimLeaderMarker)
+    STA.w C2Scene_Task.AnimBank,X
+    STZ.w C2Scene_Task.AnimTimer,X
+.run:
+    LDA.w !C2Scene_MapMarkersOff
+    BNE .done
+    JSR C2Anim_Run
+    CLC
+    RTS
+.done:
+    SEC
+    RTS
+
+; $C2:683B — C2Scene_TaskObjAMarker (79 bytes, $683B–$6889)
+; Task handler (started by C2Scene_ScrMapViewMarkers): as
+; C2Scene_TaskLeaderMarker for object A (C2Scene_ObjAX/Y), with
+; C2Scene_AnimObjAMarker; but on the first call, unless Loc_Id AND
+; C2Scene_LocIdMask equals C2Scene_ObjALoc, it ends at once (C=1).
+; Quirks, kept: the first-call setup runs with 16-bit A: .State is
+; raised with a 16-bit INC and C2Scene_MapMarkerAttr stored as a word
+; (so .SprTile's low byte is zeroed twice), and the end at another
+; location returns with M=0.
+; Callers note: none direct (C2Scene_ScrMapViewMarkers, op $35).
+; Entry: M any (SEP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_TaskLeaderMarker; ended at another location: M=0,
+;        X=0, C=1, A = the location number
+; Calls: C2Scene_MapMarkerPos, C2Anim_Run.
+C2Scene_TaskObjAMarker:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.State,X
+    BNE .run
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    CMP.w !C2Scene_ObjALoc
+    BNE .done
+    INC.w C2Scene_FxTask.State,X
+    LDA.w #!C2Scene_MapMarkerAttr
+    STA.w C2Scene_Task.SprAttr,X
+    REP #$20
+    STZ.w C2Scene_Task.SprTile,X
+    LDA.w !C2Scene_ObjAX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_ObjAY
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_MapMarkerPos
+    LDA.w #C2Scene_AnimObjAMarker
+    STA.w C2Scene_Task.AnimPtr,X
+    SEP #$20
+    LDA.b #bank(C2Scene_AnimObjAMarker)
+    STA.w C2Scene_Task.AnimBank,X
+    STZ.w C2Scene_Task.AnimTimer,X
+.run:
+    LDA.w !C2Scene_MapMarkersOff
+    BNE .done
+    JSR C2Anim_Run
+    CLC
+    RTS
+.done:
+    SEC
+    RTS
+
+; $C2:688A — C2Scene_MapMarkerPos (25 bytes, $688A–$68A2)
+; Turns the task's .SprX/.SprY (scene pixels) into the screen position
+; on the zoomed-out picture: .SprX = .SprX / 8 + 32, .SprY = .SprY / 8 +
+; 48 (the full zoom shows the picture's 1 x 2 pixels per metatile at 2 x
+; 2 on screen, its corner at the screen's).
+; Quirk, kept: there is no CLC; the carry left by the last LSR (bit 2 of
+; the position) adds 1 more.
+; Callers (2 JSR sites): C2Scene_TaskLeaderMarker ($C2:681C) and C2Scene_TaskObjAMarker ($C2:686B).
+; Entry: M=0, X=0 with X = the task, DP any, DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = the new .SprY; X, Y unchanged
+; No calls.
+C2Scene_MapMarkerPos:
+    LDA.w C2Scene_Task.SprX,X
+    LSR A
+    LSR A
+    LSR A
+    ADC.w #!C2Scene_MapTileCol0*16
+    STA.w C2Scene_Task.SprX,X
+    LDA.w C2Scene_Task.SprY,X
+    LSR A
+    LSR A
+    LSR A
+    ADC.w #!C2Scene_MapTileRow0*8
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:68A3 — C2Scene_TaskLocMarker (65 bytes, $68A3–$68E3)
+; Task handler (started by C2Scene_ScrMapViewMarkers): first call:
+; .State = 1, .SprAttr = C2Scene_MapMarkerAttr, .SprX = the
+; C2Scene_LocMarkerX word of this location (Loc_Id AND
+; C2Scene_LocIdMask, less Loc_FirstBankC2), .SprY =
+; C2Scene_LocMarkerY, .SprTile = 0 and animation C2Scene_AnimLocLabel
+; of C2SceneRom_AnimTable (C2Scene_SetAnim). Then as
+; C2Scene_TaskLeaderMarker: animated until C2Scene_MapMarkersOff is set.
+; Probably the label C2Scene_MapViewLabel drew into sprite tiles $20 on
+; (inferred only from the bottom-centre position; the animation's data
+; in bank $C3 is not traced).
+; Callers note: none direct (C2Scene_ScrMapViewMarkers, op $35).
+; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it),
+;        DP=$0000, DB=$00 (low WRAM); C2Scene_TaskCur = the task
+; Exit:  as C2Scene_TaskLeaderMarker
+; Calls: C2Scene_SetAnim, C2Anim_Run.
+C2Scene_TaskLocMarker:
+    LDA.w C2Scene_FxTask.State,X
+    BNE .run
+    INC.w C2Scene_FxTask.State,X
+    LDA.b #!C2Scene_MapMarkerAttr
+    STA.w C2Scene_Task.SprAttr,X
+    TXY
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    SEC
+    SBC.w #!Loc_FirstBankC2
+    ASL A
+    TAX
+    LDA.l C2Scene_LocMarkerX,X
+    STA.w C2Scene_Task.SprX,Y
+    LDA.w #!C2Scene_LocMarkerY
+    STA.w C2Scene_Task.SprY,Y
+    TYX
+    STZ.w C2Scene_Task.SprTile,X
+    LDA.w #!C2Scene_AnimLocLabel
+    JSR C2Scene_SetAnim
+    SEP #$20
+.run:
+    LDA.w !C2Scene_MapMarkersOff
+    BNE .done
+    JSR C2Anim_Run
+    CLC
+    RTS
+.done:
+    SEC
+    RTS
+
+; $C2:68E4 — C2Scene_LocMarkerX (8 words, $68E4–$68F3)
+; C2Scene_TaskLocMarker's screen X for Loc_Id $1F0-$1F7 (index (location
+; - Loc_FirstBankC2) * 2).
+C2Scene_LocMarkerX:
+    dw $0066,$0068,$0064,$0056,$0062,$0062,$0062,$0000
+
+; $C2:68F4 — C2Scene_MapViewGradient (113 bytes, $68F4–$6964)
+; Sets up a blue gradient behind the picture: HDMA channel 1 in indirect
+; mode writes COLDATA every line from C2Scene_HdmaTable record 0, two
+; runs of 112 lines (C2Scene_MapGradRun: repeat flag and count) whose
+; data C2Scene_HdmaValues points at C2Scene_MapGradTop and
+; C2Scene_MapGradBottom (the NMI copies them into the record). The data,
+; written through WMDATA from C2Scene_MapGradTop on: blue intensity 0-15,
+; each for 7 lines (COLDATA_Blue | n), then 16-31 the same way: the blue
+; rises down the screen. C2Scene_MapView's CGADSUB adds it to the
+; backdrop.
+; Quirk, kept: the second loop stops when its counter, which starts at
+; 16, comes back to 16 (CMP of the first loop's limit), so it writes 256
+; values: 1792 bytes, up to $7E:92C5, past the end of C2Scene_HdmaArea.
+; Only the first 16 are read.
+; Callers (1 JSR site): C2Scene_MapView ($C2:633A).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_00, TDC), DB=$00 (absolute registers);
+;        Y free
+; Exit:  M=1, X=0; A = HDMAEN_Ch1; X = 0, Y =
+;        C2Scene_HdmaTable's address; C2Tmp_00 = $10 (wrapped); WMADD
+;        past the data; HDMA channel 1 set up and enabled in
+;        C2Scene_HdmaenShadow
+; No calls.
+!C2Scene_GradLevel = !C2Tmp_00         ; 8-bit blue intensity being written
+C2Scene_MapViewGradient:
+    LDX.w #!C2Scene_MapGradTop&$FFFF
+    STX.w WMADDL
+    LDA.b #bank(!C2Scene_MapGradTop)
+    STA.w WMADDH
+    STZ.b !C2Scene_GradLevel
+.top:
+    LDX.w #!C2Scene_MapGradLines
+    LDA.b !C2Scene_GradLevel
+    ORA.b #!COLDATA_Blue
+.top_line:
+    STA.w WMDATA
+    DEX
+    BNE .top_line
+    INC.b !C2Scene_GradLevel
+    LDA.b !C2Scene_GradLevel
+    CMP.b #!C2Scene_MapGradLevels
+    BNE .top
+.bottom:
+    LDX.w #!C2Scene_MapGradLines
+    LDA.b !C2Scene_GradLevel
+    ORA.b #!COLDATA_Blue
+.bottom_line:
+    STA.w WMDATA
+    DEX
+    BNE .bottom_line
+    INC.b !C2Scene_GradLevel
+    LDA.b !C2Scene_GradLevel
+    CMP.b #!C2Scene_MapGradLevels       ; quirk: 16 again only after 256 values
+    BNE .bottom
+    LDA.b #!C2Scene_MapGradRun
+    STA.l C2Scene_HdmaTable.Count0
+    STA.l C2Scene_HdmaTable.Count1
+    TDC
+    STA.l C2Scene_HdmaTable.Value1+2    ; the end of the table (count 0)
+    REP #$20
+    LDA.w #!C2Scene_MapGradTop&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #!C2Scene_MapGradBottom&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    LDY.w #(!BBAD_COLDATA<<8)|!DMAP_HdmaIndirect
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable.Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B                         ; the indirect data's bank
+    LDA.b #!HDMAEN_Ch1
+    TSB.b !C2Scene_HdmaenShadow
+    RTS
+
+; $C2:6965 — C2Scene_MapViewLabel (139 bytes, $6965–$69EF)
+; Draws a string into sprite tiles $20-$3F (VRAM C2Scene_MapLabelVram)
+; with the text window code: clears the first $400 bytes of
+; C2Scene_HdmaArea (C2Scene_ClearUnk8621) and uses them as the glyph
+; buffer (TextWin_GfxBuf, TextWin_Mode = TextWin_ModeUnk2: 4bpp, pen
+; from 0); the string is entry C2Scene_MapLabelStr[location] (Loc_Id
+; AND C2Scene_LocIdMask, less Loc_FirstBankC2) of the table at
+; C2SceneRom_MapLabelStrs, except that C2Scene_MapLabelEarly replaces
+; C2Scene_MapLabelA while C2Scene_Flag0Copy is below
+; C2Scene_MapLabelAFlag, and replaces C2Scene_MapLabelB while bit 0 of
+; C2Scene_FlagTailCopy+6 (the copy of $7F:01F6) is clear. One
+; TextWin_Init and one TextWin_Step with TextWin_StepCount
+; C2Scene_MapLabelGlyphs, then the $400 bytes are DMAed to VRAM. What the
+; strings say is not traced (probably the location's name or era).
+; Callers (1 JSR site): C2Scene_MapView ($C2:6337).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (the text block at $0200 and the
+;        registers absolute)
+; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = $0400, Y clobbered; the text block
+;        at TextWin_Dp changed (TextWin_Init/Step); P and DP as before
+; Calls: C2Scene_ClearUnk8621, TextWin_Init (JSL), TextWin_Step (JSL).
+C2Scene_MapViewLabel:
+    JSR C2Scene_ClearUnk8621
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    SEC
+    SBC.w #!Loc_FirstBankC2
+    TAX
+    LDA.l C2Scene_MapLabelStr,X         ; 16-bit: the high byte is the next entry,
+    STA.w !TextWin_Dp+!TextWin_StrIndex ; overwritten by the table pointer below
+    SEP #$20
+    CMP.b #!C2Scene_MapLabelA
+    BNE .check_b
+    LDA.w !C2Scene_Flag0Copy
+    CMP.b #!C2Scene_MapLabelAFlag
+    BCS .set
+    LDA.b #!C2Scene_MapLabelEarly
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    BRA .set
+.check_b:
+    CMP.b #!C2Scene_MapLabelB
+    BNE .set
+    LDA.w !C2Scene_FlagTailCopy+6
+    BIT.b #!C2Scene_MapLabelBBit
+    BNE .set
+    LDA.b #!C2Scene_MapLabelEarly
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+.set:
+    LDX.w #!C2SceneRom_MapLabelStrs&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b #bank(!C2SceneRom_MapLabelStrs)
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDA.b #!TextWin_ModeUnk2
+    STA.w !TextWin_Dp+!TextWin_Mode
+    LDX.w #!C2Scene_HdmaArea&$FFFF
+    STX.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.b #bank(!C2Scene_HdmaArea)
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    JSL TextWin_Init
+    LDA.b #!C2Scene_MapLabelGlyphs
+    STA.w !TextWin_Dp+!TextWin_StepCount
+    JSL TextWin_Step
+    LDX.w #!C2Scene_MapLabelVram
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDX.w #!C2Scene_HdmaArea&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_HdmaArea)
+    STA.w A1B7
+    LDX.w #!C2Scene_Unk8621Bytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; $C2:69F0 — C2Scene_MapLabelStr (8 bytes, $69F0–$69F7)
+; C2Scene_MapViewLabel's string number for Loc_Id $1F0-$1F7 (read as a
+; word; only the low byte is kept).
+C2Scene_MapLabelStr:
+    db $6A,$6B,$6C,$6D,$6E,$6E,$6E,$6A
+
+; $C2:69F8 — C2Scene_ScrMapViewStart (7 bytes, $69F8–$69FE)
+; Started by C2Scene_MapView: clears the task's fields, starts a mosaic
+; shrink on BG1 and BG2 (op $2B, arg 1 = 3) at 2 frames per step and a
+; fade in at 2 frames per step, ends.
+C2Scene_ScrMapViewStart:
+    db $00                      ; C2Script_ResetTask
+    db $2B,$03,$02              ; C2Script_SpawnUnk2194 (mosaic shrink): BG1-2, 2 frames per step
+    db $29,$02                  ; C2Script_SpawnUnk2105 (fade in), 2 frames per step
+    db $52                      ; C2Script_End
+
+; $C2:69FF — C2Scene_ScrMapViewExit (11 bytes, $69FF–$6A09)
+; Started by C2Scene_MapZoomWait: raises C2Scene_MapMarkersOff (the
+; markers end), starts a mosaic grow on BG1 and BG2 at 2 frames per
+; step, waits 8 frames, fades out at 2 frames per step, ends (while
+; C2Scene_MapZoomIn zooms back in).
+C2Scene_ScrMapViewExit:
+    db $11 : dw !C2Scene_MapMarkersOff ; C2Script_IncRamByte
+    db $2A,$03,$02              ; C2Script_SpawnUnk21F8 (mosaic grow): BG1-2, 2 frames per step
+    db $38,$08                  ; C2Script_Wait, 8 frames
+    db $28,$02                  ; C2Script_SpawnUnk20A2 (fade out), 2 frames per step
+    db $52                      ; C2Script_End
+
+; $C2:6A0A — C2Scene_ScrMapViewMarkers (14 bytes, $6A0A–$6A17)
+; Started by C2Scene_MapZoomOut when fully zoomed out: clears the task's
+; fields, C2Scene_MapMarkersOff = 0, and starts the three marker tasks.
+C2Scene_ScrMapViewMarkers:
+    db $00                      ; C2Script_ResetTask
+    db $10 : dw !C2Scene_MapMarkersOff ; C2Script_ClearRamByte
+    db $35 : dw C2Scene_TaskLeaderMarker ; C2Script_SpawnTask
+    db $35 : dw C2Scene_TaskObjAMarker ; C2Script_SpawnTask
+    db $35 : dw C2Scene_TaskLocMarker ; C2Script_SpawnTask
+    db $52                      ; C2Script_End
+
+; $C2:6A18 — C2Scene_AnimLeaderMarker (8 bytes, $6A18–$6A1F)
+; Animation (C2Anim_Run) of C2Scene_TaskLeaderMarker: frame
+; C2Scene_FrameMapMarkerA for 16 frames, nothing for 16, again: a blink.
+C2Scene_AnimLeaderMarker:
+    db $04 : dw C2Scene_FrameMapMarkerA : db $10 ; C2Anim_OpShowFrame, 16 frames
+    db $05,$10                  ; C2Anim_OpWait, 16 frames
+    db $03,$FA                  ; C2Anim_OpJumpBack, -6: to the start
+
+; $C2:6A20 — C2Scene_AnimObjAMarker (10 bytes, $6A20–$6A29)
+; Animation of C2Scene_TaskObjAMarker: 8 frames of nothing, frame
+; C2Scene_FrameMapMarkerB for 16, 8 of nothing, again.
+C2Scene_AnimObjAMarker:
+    db $05,$08                  ; C2Anim_OpWait, 8 frames
+    db $04 : dw C2Scene_FrameMapMarkerB : db $10 ; C2Anim_OpShowFrame, 16 frames
+    db $05,$08                  ; C2Anim_OpWait, 8 frames
+    db $03,$F8                  ; C2Anim_OpJumpBack, -8: to the start
+
+; $C2:6A2A — C2Scene_FrameMapMarkerA (5 bytes, $6A2A–$6A2E)
+; Sprite frame (C2Scene_SprDrawNode): one piece at (-4, -4), tile 0
+; (the first tile C2Scene_MapView loaded from C2SceneRom_MapMarkerTiles).
+C2Scene_FrameMapMarkerA:
+    db $01                      ; pieces
+    db $FC,$FC : dw $0000       ; X -4, Y -4, tile 0
+
+; $C2:6A2F — C2Scene_FrameMapMarkerB (5 bytes, $6A2F–$6A33)
+; The same with tile 2 (the second marker tile).
+C2Scene_FrameMapMarkerB:
+    db $01
+    db $FC,$FC : dw $0002       ; X -4, Y -4, tile 2
 
 ; ============================================================
 ; Scene extra-graphics loaders ($C2:7B5A–$C2:7BC3)

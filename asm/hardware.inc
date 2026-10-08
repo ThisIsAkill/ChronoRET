@@ -97,6 +97,10 @@ if !hardware_inc == 0
 !BG2SC_6000_32x64      = $62  ; BG2 map at VRAM word $6000, 32x64 tiles
 !BG3SC_6800_32x64      = $6A  ; BG3 map at VRAM word $6800, 32x64 tiles
 !BG34NBA_Bg3At7000     = $07  ; BG3 tiles at VRAM word $7000, BG4 at $0000
+!BBAD_VMDATAH          = $19  ; B-bus address of VMDATAH ($2119)
+!BBAD_COLDATA          = $32  ; B-bus address of COLDATA ($2132)
+!HDMAEN_Ch1            = $02  ; bit 1: HDMA channel 1
+!CGADSUB_AddBackdrop   = $20  ; colour math on the backdrop only, add, not halved
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

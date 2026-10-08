@@ -642,4 +642,24 @@ endstruct
 !C2Scene_SprActiveHead = $7EB500         ; 4 B .Prev/.Next: head of the list C2Scene_SprDrawList draws
 !C2Scene_SprFreeHead = $7EB504           ; 4 B .Prev/.Next: head of the free nodes
 
+; --- The map view (C2Scene_MapView, scene mode 6) ---
+!C2Scene_TileColors = $7EAB25            ; $380 B: one colour (0-15) per BG tile, built by
+                                         ; C2Scene_MapTileColors for the mode-7 picture
+!C2Scene_MapMarkersOff = $1B48           ; 8-bit; zeroed by C2Scene_ScrMapViewMarkers, raised by
+                                         ; C2Scene_ScrMapViewExit; non-zero ends the marker tasks
+!C2Scene_MapGradTop = $7E8B56            ; 112 B: COLDATA values of the gradient's top half
+                                         ; (C2Scene_MapViewGradient; inside C2Scene_HdmaArea)
+!C2Scene_MapGradBottom = $7E8BC6         ; and of its bottom half (the first 112 of 1792 written)
+
+struct C2Scene_ZoomTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: C2Scene_MapZoomStates index
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.Angle:     skip 2     ; +$22 rotation (Trig_Sin1024 units); zeroed and never changed here
+.DivA:      skip 2     ; +$24 C2SceneRom_ZoomDivA entry: divisor of M7A/M7B (low byte used)
+.DivB:      skip 2     ; +$26 C2SceneRom_ZoomDivB entry: divisor of M7C/M7D
+.Step:      skip 2     ; +$28 byte offset into both tables (0-$3E)
+            skip $16
+endstruct
+
 endif
