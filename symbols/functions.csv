@@ -93,28 +93,28 @@ $C0:E9AA,$C0:E9E1,56,Sub_E9AA,$C0,Engine (unnamed),matched,07a879cf6e8b,Sprite s
 $C0:E9E2,$C0:E9FE,29,Sub_E9E2,$C0,Engine (unnamed),matched,3206d2cfabb8,
 $C0:E9FF,$C0:EA1E,32,Sub_E9FF,$C0,Engine (unnamed),matched,e528f5a70bf5,
 $C0:EA1F,$C0:EA41,35,Sub_EA1F,$C0,Engine (unnamed),matched,9cef01f49169,
-$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,208b0705c41c,The CPU comes out of reset in emulation mode with I already set.
-$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,b4be75de9340,Native-mode interrupt stubs ($FF10–$FF17)
+$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,208b0705c41c,The CPU comes out of reset in emulation mode with I already set.
+$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,verified,b4be75de9340,Native-mode interrupt stubs ($FF10–$FF17)
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,bd12634e9770,
-$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,5084e9025e2a,"A crash trap: it reads a fixed, recognizable address forever and never returns."
+$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,verified,5084e9025e2a,"A crash trap: it reads a fixed, recognizable address forever and never returns."
 $C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
-$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,readable,012bbbcead94,
+$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,012bbbcead94,
 $C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,c6cbab686ed4,Wave tables ($FF30–$FFAF) Two identical 32-entry signed 16-bit tables: one period of a sine-like wave between -6 and +6.
 $C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,readable,5a72ed739650,
-$C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,readable,1dcc24864b33,"SNES cartridge header ($FFB0–$FFDF), standard layout"
-$C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,readable,4a10f4fbea5d,
-$C0:FFBE,$C0:FFBE,1,RomSpecialVersion,$C0,ROM header,readable,e01cc8c6afac,
-$C0:FFBF,$C0:FFBF,1,RomCartridgeSubtype,$C0,ROM header,readable,6c2cda2586f8,
-$C0:FFC0,$C0:FFD4,21,ROMTitle,$C0,ROM header,readable,dd0883bd0760,
-$C0:FFD5,$C0:FFD5,1,RomMapMode,$C0,ROM header,readable,0f84279bb47f,
-$C0:FFD6,$C0:FFD6,1,RomType,$C0,ROM header,readable,04c3c05561f6,
-$C0:FFD7,$C0:FFD7,1,RomSize,$C0,ROM header,readable,753bbf27c372,
-$C0:FFD8,$C0:FFD8,1,RomSramSize,$C0,ROM header,readable,5da94208e63c,
-$C0:FFD9,$C0:FFD9,1,RomRegion,$C0,ROM header,readable,d4f657cb4395,
-$C0:FFDA,$C0:FFDA,1,RomDeveloperId,$C0,ROM header,readable,e0cc47ba5fa5,
-$C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,readable,310a0a5fa6af,
-$C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,readable,422bc75831ed,
-$C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,readable,b0c39e035e55,
+$C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,verified,1dcc24864b33,"SNES cartridge header ($FFB0–$FFDF), standard layout"
+$C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,verified,4a10f4fbea5d,
+$C0:FFBE,$C0:FFBE,1,RomSpecialVersion,$C0,ROM header,verified,e01cc8c6afac,
+$C0:FFBF,$C0:FFBF,1,RomCartridgeSubtype,$C0,ROM header,verified,6c2cda2586f8,
+$C0:FFC0,$C0:FFD4,21,ROMTitle,$C0,ROM header,verified,dd0883bd0760,
+$C0:FFD5,$C0:FFD5,1,RomMapMode,$C0,ROM header,verified,0f84279bb47f,
+$C0:FFD6,$C0:FFD6,1,RomType,$C0,ROM header,verified,04c3c05561f6,
+$C0:FFD7,$C0:FFD7,1,RomSize,$C0,ROM header,verified,753bbf27c372,
+$C0:FFD8,$C0:FFD8,1,RomSramSize,$C0,ROM header,verified,5da94208e63c,
+$C0:FFD9,$C0:FFD9,1,RomRegion,$C0,ROM header,verified,d4f657cb4395,
+$C0:FFDA,$C0:FFDA,1,RomDeveloperId,$C0,ROM header,verified,e0cc47ba5fa5,
+$C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
+$C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
+$C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
 $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,readable,de5dde7a79b3,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,matched,e6b443f74c5f,8×8→16 HW multiply via $4202/$4203/$4216.
 $C1:00A7,$C1:00D6,48,Battle_MulAccum,$C1,Battle engine,matched,cab6b322dc69,"Multiply-accumulate: $A5 × $A7 via HW mult, 32-bit accumulate into $A9/$AA."
