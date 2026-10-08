@@ -1,1 +1,11 @@
 address,name,date,reviewer,verdict,source_hash,notes
+$C0:FF00,Reset,2026-10-08,independent session,changes,7d1550ba1974,"SEI is not part of the mode switch (I already set by reset); add exit state (E=0,M=X=1,D=0,DB=0); drop per-line narration"
+$C0:FF10,NMI_Stub,2026-10-08,independent session,changes,1964cd813ad3,"Trampoline is not installed by MainInit: C0:0B64 (JSR from GameLoop) writes JML $C0EA63; later code repatches it (RTI at C0:2E4B, bank FD at FD:EAF4). Fix banner+define"
+$C0:FF14,IRQ_Stub,2026-10-08,independent session,changes,2275d2a13258,"Same false claim as NMI_Stub: $0504 is set by C0:0B75 (JML $C0ECCC), not MainInit, and repatched later (RTI, FD:EAF9). Say so in the banner and define"
+$C0:FF18,BRK_Handler,2026-10-08,independent session,changes,44801a10bb74,"$AB:CDEF is ROM (HiROM mirror of file $2BCDEF), not RAM: move CrashMarkerRead out of ram_engine.inc to constants_engine.inc, state it is ROM and value is discarded"
+$C0:FF20,BitSet,2026-10-08,independent session,approved,67df1a0aff8b,Values and label correct (1<<N); many long-indexed refs to $C0FF20/$00FF20 in ROM support the usage note
+$C0:FF28,BitClear,2026-10-08,independent session,approved,acb443291953,Values and label correct (~(1<<N))
+$C0:FF30,ScrollWaveA,2026-10-08,independent session,changes,c6cbab686ed4,Purpose (wave-scroll/shake) and 'independent phases' are unhedged guesses; B may just be a 2nd period for unmasked index overflow. Hedge or cite callers
+$C0:FF70,ScrollWaveB,2026-10-08,independent session,changes,7b557115940e,"Same unhedged purpose claim as A; row end $FFBF (80 B) swallows the extended header $FFB0-$FFBF, which has no label. End should be $FFAF, 64 B"
+$C0:FFC0,ROMTitle,2026-10-08,independent session,changes,77ab30e48f4e,"$FFEC is reserved: no native RESET vector exists; $FFD6 $02 = ROM+RAM+battery; row spans header+vectors under a title label, so label the header and vector table"
+$FD:C000,MainInit,2026-10-08,independent session,changes,8154143b5e4a,"Phases 1/2 ranges wrong (C000-C013,C014-C035); 'four' phases lists 5; '$0700 page'; M7A lo isn't overwritten; COLDATA red unset; dead BANK_MAP ref; no exit state; narration"

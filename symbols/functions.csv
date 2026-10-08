@@ -97,8 +97,8 @@ $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,7d1550ba1974,SNES emulation-mode RE
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,1964cd813ad3,Native-mode interrupt stubs ($FF10–$FF1F) RAM handlers are installed during MainInit; these stubs dispatch there.
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,2275d2a13258,
 $C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,44801a10bb74,"Both native BRK and emulation-mode COP point here (see $FFE6, $FFF4)."
-$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,readable,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N)."
-$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,readable,acb443291953,
+$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N)."
+$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,acb443291953,
 $C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,c6cbab686ed4,Scroll wave tables ($FF30–$FFAF) Two identical 32-entry signed 16-bit tables (64 bytes each).
 $C0:FF70,$C0:FFBF,80,ScrollWaveB,$C0,Engine,readable,7b557115940e,
 $C0:FFC0,$C0:FFFF,64,ROMTitle,$C0,Engine,readable,77ab30e48f4e,
