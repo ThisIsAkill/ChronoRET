@@ -1,8 +1,8 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
 $C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,verified,9e1f38db5616,Mid-game re-entry vector table at the start of the bank.
 $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the interrupt trampolines, clears WRAM, starts the sound driver and bank $C2, then falls into GameLoop_Main."
-$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,81e2479105c1,trampolines and dispatches on Loc_Id.
-$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,readable,4bf31803c73e,Loc_FirstBankC2.
+$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,readable,f56ffa11c897,trampolines and dispatches on Loc_Id.
+$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,readable,b82aa0cbd435,Loc_Id - Loc_FirstBankC2 is set.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
 $C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,4d54bc759a9d,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
@@ -236,7 +236,7 @@ $C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,verified,
 $C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,verified,370009544b72,
 $C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,verified,616df1aa78e7,
 $C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,verified,bb00c7bb01b6,"Shared tail of the area scans: puts !BattleTgt_Anchor at the front of !BattleTgt_Candidates if it belongs to the scanned side (see the AreaCircle header), then falls into BattleTgt_CompactCandidates."
-$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,readable,70ce0aa4bbec,"front slot is empty, shift the list left by one."
+$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,readable,365247000b52,"front slot is empty, shift the list left by one."
 $C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,verified,a8ed04ed0863,"and selection lists (12 entries each, one more than they use)"
 $C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,verified,0302ef7d4f82,target-all and copy the 11 candidates into the selection list
 $C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,verified,461b3e81f768,next non-empty candidate (wrap at 11); no-op on an empty list.

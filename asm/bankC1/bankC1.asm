@@ -5023,15 +5023,17 @@ BattleTgt_AreaAddAnchor:
 
 ; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
 ; front slot is empty, shift the list left by one. The front stays empty
-; when CollectValidTargets' requester was not eligible, always after
+; when CollectValidTargets' requester was not eligible or lay outside the
+; scanned range (every enemy mode, since the requester is a PC), always after
 ; AreaPartyTriangle (its scan appends from entry 1), and after
 ; AreaAddAnchor when the anchor is on the other side. The last step reads
 ; entry 11, one past the 11 used entries (the list has 12 bytes).
 ; Callers (2 sites: 1 JSR, 1 JMP): BattleTgt_CollectValidTargets ($C1:207B)
 ;   and BattleTgt_AreaPartyTriangle ($C1:25A0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (unchanged if the front
-;        entry was filled); Y and DP unchanged
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the front entry if it was filled,
+;        else the last byte moved; X unchanged if the front was filled,
+;        else !Battle_NumSlots; Y unchanged
 org $C127C5
 BattleTgt_CompactCandidates:
     LDA.w !BattleTgt_Candidates

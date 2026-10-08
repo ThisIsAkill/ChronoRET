@@ -45,7 +45,7 @@ if !constants_engine_inc == 0
 ; --- Locations ---
 !Loc_FirstBankC2 = $01F0                 ; Loc_Id at or above this is handled by BankC2_Entry0000
                                          ; (GameLoop_Main)
-!Loc_LoadSave = $01FF                    ; Loc_Id at or above this goes to LoadSavePath
+!Loc_LoadSave = $01FF                    ; GameLoop_NotBankC2's CPX limit: Loc_Id $81F0-$81FE reach LoadSavePath
                                          ; (GameLoop_Main)
 !LoadSave_EntryX = $7C00                 ; X handed to LoadSavePath (meaning unknown)
 

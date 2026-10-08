@@ -4935,12 +4935,17 @@ GameLoop_Main:
     LDX.w !DP_Field+!Loc_Id
     CPX.w #!Loc_FirstBankC2
     BMI GameLoop_NotBankC2
-    JML BankC2_Entry0000    ; Loc_Id >= $01F0 → handled in bank $C2
+    JML BankC2_Entry0000    ; Loc_Id $01F0-$81EF → handled in bank $C2
 
-; GameLoop_NotBankC2 (was GL_ModeOk1): the path for Loc_Id below
-; Loc_FirstBankC2. Both tests here and above are BMI on X minus the
-; limit, i.e. signed compares; Loc_Id >= Loc_LoadSave goes to
-; LoadSavePath with X = LoadSave_EntryX.
+; GameLoop_NotBankC2 (was GL_ModeOk1): reached when bit 15 of
+; Loc_Id - Loc_FirstBankC2 is set. Both tests (here and in GameLoop_Main)
+; are CPX then BMI, which branch on bit 15 of the 16-bit difference, not
+; a signed compare. Taken together:
+;   Loc_Id $0000-$01EF  -> GameLoop_LoadField
+;   Loc_Id $01F0-$81EF  -> bank $C2 (GameLoop_Main's JML)
+;   Loc_Id $81F0-$81FE  -> LoadSavePath, with X = LoadSave_EntryX
+;   Loc_Id $81FF-$FFFF  -> GameLoop_LoadField
+; So LoadSavePath needs bit 15 of Loc_Id set; what sets it is not traced yet.
 ; On entry: M=1, X=0, X = Loc_Id (from GameLoop_Main's BMI), DB=$00.
 ; Exit: never returns; BRL LoadSavePath or into GameLoop_LoadField.
 GameLoop_NotBankC2:
