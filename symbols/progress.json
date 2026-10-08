@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 44805,
+  "emitted_bytes": 47230,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 419,
-      "bytes": 44805
+      "functions": 461,
+      "bytes": 47230
     },
     "readable": {
-      "functions": 419,
-      "bytes": 44805
+      "functions": 461,
+      "bytes": 47230
     },
     "verified": {
-      "functions": 419,
-      "bytes": 44805
+      "functions": 418,
+      "bytes": 44745
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 23636,
+      "emitted_bytes": 26061,
       "matched": {
-        "functions": 183,
-        "bytes": 23636
+        "functions": 225,
+        "bytes": 26061
       },
       "readable": {
-        "functions": 183,
-        "bytes": 23636
+        "functions": 225,
+        "bytes": 26061
       },
       "verified": {
-        "functions": 183,
-        "bytes": 23636
+        "functions": 182,
+        "bytes": 23576
       }
     },
     {
@@ -286,8 +286,24 @@
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 591,
+      "emitted_bytes": 1105,
       "functions": [
+        "Map_BuildRowYInc1",
+        "Map_BuildRowYInc2",
+        "Map_BuildRowYInc2Half",
+        "Map_BuildRowYInc3",
+        "Map_BuildRowYDec1",
+        "Map_BuildRowYDec2",
+        "Map_BuildRowYDec2Half",
+        "Map_BuildRowYDec3",
+        "Map_BuildColXInc1",
+        "Map_BuildColXInc2",
+        "Map_BuildColXInc2Half",
+        "Map_BuildColXInc3",
+        "Map_BuildColXDec1",
+        "Map_BuildColXDec2",
+        "Map_BuildColXDec2Half",
+        "Map_BuildColXDec3",
         "Field_FrameUpdate",
         "Field_Unk885A",
         "Map_ResetUnk1D2E",
@@ -308,9 +324,35 @@
       "bank": "$C0",
       "start": "$C0:9000",
       "end": "$C0:9FFF",
-      "emitted_bytes": 250,
+      "emitted_bytes": 2161,
       "functions": [
         "Map_Unk9175",
+        "Map_Unk91AC",
+        "Map_Unk93E1",
+        "Map_Scroll1XInc",
+        "Map_Scroll1XDec",
+        "Map_Scroll1YInc",
+        "Map_Scroll1YDec",
+        "Map_Scroll2XInc",
+        "Map_Scroll2XDec",
+        "Map_Scroll2YInc",
+        "Map_Scroll2YDec",
+        "Map_Scroll2XIncHalf",
+        "Map_Scroll2XDecHalf",
+        "Map_Scroll2YIncHalf",
+        "Map_Scroll2YDecHalf",
+        "Map_Scroll3XInc",
+        "Map_Scroll3XDec",
+        "Map_Scroll3YInc",
+        "Map_Scroll3YDec",
+        "Map_EdgeColsXInc",
+        "Map_EdgeColsXIncHalf",
+        "Map_EdgeColsXDec",
+        "Map_EdgeColsXDecHalf",
+        "Map_EdgeRowsYInc",
+        "Map_EdgeRowsYIncHalf",
+        "Map_EdgeRowsYDec",
+        "Map_EdgeRowsYDecHalf",
         "Map_Unk99DE",
         "Map_StepStopDown",
         "Map_StepStopUp",

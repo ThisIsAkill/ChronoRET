@@ -254,6 +254,35 @@ if !constants_engine_inc == 0
 !Map_RunStepPos = $20                    ; D-pad step right / down with Pad_Unk00F8 bit 1 held
 !Map_RunStepNeg = $E0                    ; D-pad step left / up with Pad_Unk00F8 bit 1 held (-$20)
 
+; --- Map_Unk91AC / Map_Unk93E1 (layer scroll) ---
+!Map_SubMask = $0F                       ; Map_Acc* bits 0-3: the remainder Map_Unk91AC keeps
+!Map_SubSignExt = $F0                    ; ORed onto a negative Map_Acc* remainder (keeps it negative)
+!Map_TilePixelMask = $0F                 ; Map_Unk1D87/1D89 bits 0-3 (pixel within a 16-pixel cell)
+!ScrollTo_XDone = $01                    ; Map_ScrollToDone bit 0: X has arrived
+!ScrollTo_YDone = $02                    ; Map_ScrollToDone bit 1: Y has arrived
+!ScrollTo_BothDone = $03                 ; Map_ScrollToDone when both have arrived
+!ScrollTo_Arrived = $02                  ; Map_ScrollToMode value once both have arrived
+!Eng0400_Negative = $01                  ; Eng_Unk0400 bit 0: shake amounts negative
+!Eng0400_ShakeY = $02                    ; Eng_Unk0400 bit 1: Y shake ($02 << 3 = $10)
+!Eng0400_ShakeX = $04                    ; Eng_Unk0400 bit 2: X shake ($04 << 2 = $10)
+!Map_OwnStep2 = $02                      ; Map_OwnStepFlags bit 1: set 2 without camera step / shake
+!Map_OwnStep3 = $04                      ; Map_OwnStepFlags bit 2: set 3 without camera step / shake
+!Map_Layer1 = $01                        ; Map_Edge* bit of layer 1
+!Map_Layer2 = $02                        ; Map_Edge* / Map_LayerEdgeOff bit of layer 2
+!Map_Layer3 = $04                        ; Map_Edge* / Map_LayerEdgeOff bit of layer 3
+!Map_FineLast = $0F                      ; last value of a 16-pixel fine counter (Map_Unk1D93-1D98);
+                                         ; also the half-way point of a half-rate (32-step) counter
+!Map_FineMid = $07                       ; fine value below the 8-pixel boundary inside a cell
+!Map_FineMidUp = $08                     ; fine value above it
+!Map_FineWrapUp = $10                    ; one past Map_FineLast: DEC A then gives $0F
+!Map_FineWrapDown = $FF                  ; -1: INC A then gives 0 (a fine counter wrapping upwards)
+!Map_FineLastHalf = $1F                  ; last value of a half-rate fine counter (Map_Unk1D94/1D97)
+!Map_BufColOfs = $0080                   ; column data starts this far into a layer's edge buffer
+                                         ; (Map_BufC800/D000/D800); the row data at the start
+!Map_EdgeRowLen = $12                    ; Map_BuildLen of a row builder (18 entries)
+!Map_EdgeColLen = $0F                    ; Map_BuildLen of a column builder (15 entries)
+!Map_FineWrapUpHalf = $20                ; one past Map_FineLastHalf: DEC A then gives $1F
+
 ; --- Window effects (Field_EventHook handlers) ---
 !EventHook_WinFixedA1 = $07              ; Field_EventHook value of Field_HookWinFixedA's first frame
                                          ; (it moves on to 8 for a second frame)
