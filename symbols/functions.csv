@@ -431,6 +431,25 @@ $C1:475B,$C1:4832,216,BattleAct_LoadKind3,$C1,Battle engine,verified,624c1ab1262
 $C1:4833,$C1:48EB,185,BattleAct_LoadCommon,$C1,Battle engine,verified,6d88546ce9da,
 $C1:48EC,$C1:4942,87,BattleAct_IndexObjLists,$C1,Battle engine,verified,0f4f6c8e8d21,
 $C1:4943,$C1:49FE,188,BattleAct_UnpackFrames,$C1,Battle engine,verified,aa85f71dd6b9,
+$C1:49FF,$C1:4A70,114,BattleAct_CheckReach,$C1,Battle engine,verified,9b4bbb9e91e4,"For a PC caster: sets !Battle_ActNear to 1, then to 0 when the main target (entry 3 of !Battle_ActBattlers) is not within 40 pixels (BattlePos_WithinDist40XY), and turns the caster towards the target "
+$C1:4A71,$C1:4BBD,333,BattleAct_FindPath,$C1,Battle engine,verified,a37e2f7ec312,"Breadth-first search on !Battle_PathMap from the cell of the start point ($80, $81) to the cell of the goal point ($82, $83); the cell of a point is (y & $F0) | (x >> 4)."
+$C1:4BBE,$C1:4C9D,224,BattleAct_RunThreads,$C1,Battle engine,verified,b52ff73bcbc8,"Runs one step of each live thread, in the order 0-4 then 8-15: thread n runs when its !Battle_ActThreadOn byte is non-zero, thread 4 only when !Battle_ActTargetMask is non-zero too, and threads 8-15 o"
+$C1:4C9E,$C1:4CEF,82,BattleAct_RunThread,$C1,Battle engine,verified,487d99d227d8,Runs one thread for this frame.
+$C1:4CF0,$C1:4CF6,7,BattleAct_OpEndThread,$C1,Battle engine,verified,edce4eb63b27,Opcode $00: switches the thread off (!Battle_ActThreadOn = 0).
+$C1:4CF7,$C1:4D03,13,BattleAct_OpEndScript,$C1,Battle engine,verified,603d1c6f8926,"Opcode $01, and the handler of every unused opcode in the table: counts !Battle_ActScriptDone up, which ends the action (service 4 waits for it)."
+$C1:4D04,$C1:4D07,4,BattleAct_OpLoopAnim,$C1,Battle engine,verified,b8facb7d4c73,
+$C1:4D08,$C1:4E21,282,BattleAct_StartAnim,$C1,Battle engine,verified,420a370574ba,
+$C1:4E22,$C1:4EA1,128,BattleAct_OpPlayAnim,$C1,Battle engine,verified,82c64f838b90,"Opcode $03 <n>: plays animation n once and waits for it to end, then advances 2."
+$C1:4EA2,$C1:4F19,120,BattleAct_OpShowAnimFrame,$C1,Battle engine,verified,3cc03f579139,"Opcodes $04-$06 <n> (one handler; the opcode is not looked at): starts animation n with the actor's stop byte set to 1, so that BattleAct_StepBattlerAnims shows its entry 0 and switches it off (presum"
+$C1:4F1A,$C1:4F53,58,BattleAct_OpResetSpeed,$C1,Battle engine,verified,2062c43a8341,"Opcode $07: sets the actor's move delay and speed (!Battle_ActorMoveDelay / !Battle_ActorMoveSpeed) back to the battler's defaults (!Battler_DefMoveDelay / !Battler_DefMoveSpeed, set at battle start b"
+$C1:4F54,$C1:4FBE,107,BattleAct_OpSetSpeed,$C1,Battle engine,verified,ca42f1182d15,
+$C1:4FBF,$C1:4FD0,18,BattleAct_OpMoveTo,$C1,Battle engine,verified,2a056f3ac10b,
+$C1:4FD1,$C1:4FE2,18,BattleAct_OpMoveToUnkPoint,$C1,Battle engine,verified,a2807f1e4e41,
+$C1:4FE3,$C1:4FEC,10,BattleAct_OpMoveToCalc,$C1,Battle engine,verified,6a10ea2d3914,
+$C1:4FED,$C1:5134,328,BattleAct_MoveToPoint,$C1,Battle engine,verified,66c934f037ca,
+$C1:5135,$C1:51ED,185,BattleAct_StartBattlerMove,$C1,Battle engine,verified,278664d51c5a,
+$C1:65BA,$C1:6670,183,BattleAct_CalcMoveStep,$C1,Battle engine,verified,e905d1e222ad,"Unit step of a straight move from !Battle_GeoOriginX/Y to !Battle_GeoPointX/Y, as signed 8.8 pixels: the axis with the larger distance (x on a tie) moves 1.0 ($0100) per step, the other (smaller * 256"
+$C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
 $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
 $C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,

@@ -360,6 +360,24 @@ if !constants_battle_inc == 0
 !Battle_ActFrameRowsMask = $0F   ; frame header: row count
 !Battle_ActFrameCols     = 8     ; columns per row (one mask bit each)
 !Battle_ActFramesPerCall = 4     ; frames BattleAct_UnpackFrames builds per call
+!Battle_ActAnimOnce      = 1     ; !Battler_ActAnimMode: play the list once (the "play" opcodes)
+!Battle_ActTargetSetThread = 4   ; thread that acts for every slot of !Battle_ActTargetSet
+!Battle_ActFirstObjThread = 8    ; threads 8-15 are object threads 0-7
+!Battle_ActNumOpcodes    = $DB   ; opcodes $00-$DA have a handler in BattleAct_OpcodeTable
+!Battle_ActOpSetSpeed    = $08   ; first of the opcodes $08-$0F (BattleAct_OpSetSpeed)
+!Battle_MoveUnitStep     = $0100 ; 1.0 in 8.8: the major axis' step (BattleAct_CalcMoveStep)
+
+; --- Path search (BattleAct_FindPath, on !Battle_PathMap) ---
+!Battle_PathRowMask      = $F0   ; y & this = 16 * cell row (the cell is row * 16 + x / 16)
+!Battle_PathUp           = $F0   ; cell index step to the neighbour above (-16, 8-bit)
+!Battle_PathDown         = $10   ; ... below (+16)
+!Battle_PathLeft         = $FF   ; ... to the left (-1, 8-bit)
+!Battle_PathRight        = $01   ; ... to the right
+!Battle_PathCellStart    = $20   ; start cell while searching (blocks like any non-zero value)
+!Battle_PathCellGoal     = $FF   ; goal cell
+!Battle_PathMark         = $E0   ; ORed into each cell of the found path
+!Battle_PathMaxWave      = $1F   ; waves run 1-30; the search fails when the count reaches this
+!Battle_PathNotFound     = $80   ; result: no path (bit 7); 1-4 = found
 
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)

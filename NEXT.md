@@ -30,15 +30,21 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 from `$C1:49FF`: `BattleAct_CheckReach` (`$C1:49FF`-`$C1:4A70`, sets `!Battle_ActNear`;
-   calls `$C1:4A71`), then onward in address order. (`$C1:007E` and `$C1:283D`-`$C1:49FE` are
-   matched; service 4, `BattleSys_RunAction`, and its loaders end at `$C1:49FE`.) Open from
-   service 4: the script threads (`BattleAct_RunThreads` at `$C1:4BBE`, per thread `$C1:4C9E`;
-   `!Battle_ActScriptDone` is set at `$C1:4D00`), `BattleAct_RunCalc` (`$C1:762E`, table
-   `$C1:79D3`), the 4-word `BattleAct_LoaderTable` at `$C1:7A63` (still original bytes), the bank
-   $CC action helpers `$CC:F06B`-`$CC:F2A9` (`bankCC.asm` so far holds only `Battle_Mul8CC`), and
-   the code at `$C1:ACF0` that fills the action block `$AE91`-`$AE9B`. Open from the movers: the
-   stepper at `$CF:F978` (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
+1. Bank $C1 from `$C1:51EE`: the action script's opcode handlers, in address order (opcode $13
+   `$C1:51EE`, $14 `$C1:5205`, $15 `$C1:521C`, $16 `$C1:5409`, $17 `$C1:541B`, $18 `$C1:542D`,
+   which calls `BattleAct_FindPath` and copies the path map at `$C1:549B`, ...). Matched so far:
+   `$C1:007E`, `$C1:283D`-`$C1:51ED` (service 4, its loaders, the reach check and path search,
+   the thread runner and opcodes $00-$12), `BattleAct_CalcMoveStep` `$C1:65BA` and
+   `BattleAct_AdvanceScript` `$C1:75BB`. The handler table `BattleAct_OpcodeTable` (`$C1:7A6B`,
+   224 words, 115 distinct handlers) is still original bytes: match it once its handlers have
+   names (stubs for the rest), together with the 4-word `BattleAct_LoaderTable` at `$C1:7A63`.
+   Leads: `BattleAct_Op70Body` (`$C1:5FC3`) is used by opcode $03; the movers that step
+   `!Battle_ActorMoving` actors are in bank $CF (`$CF:EFC4`, straight mover `$CF:F040`, kind table
+   `$CF:F01E`), out of this bank. Still open from service 4: `BattleAct_RunCalc` (`$C1:762E`,
+   table `$C1:79D3`), the bank $CC action helpers `$CC:F06B`-`$CC:F2A9` (object lists stepped at
+   `$CC:F278`), and the code at `$C1:ACF0` that fills the action block `$AE91`-`$AE9B`. Open from
+   the movers: the stepper at `$CF:F978` (`!Enemy_Stepping`), and who writes
+   `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
    `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
    `Field_ServiceUnk54` $C0:274D) and the first of their callees: `Field_FindObjInFront` and

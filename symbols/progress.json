@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 47230,
+  "emitted_bytes": 49461,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 461,
-      "bytes": 47230
+      "functions": 480,
+      "bytes": 49461
     },
     "readable": {
-      "functions": 461,
-      "bytes": 47230
+      "functions": 480,
+      "bytes": 49461
     },
     "verified": {
-      "functions": 461,
-      "bytes": 47230
+      "functions": 480,
+      "bytes": 49461
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 18817,
+      "emitted_bytes": 21048,
       "matched": {
-        "functions": 207,
-        "bytes": 18817
+        "functions": 226,
+        "bytes": 21048
       },
       "readable": {
-        "functions": 207,
-        "bytes": 18817
+        "functions": 226,
+        "bytes": 21048
       },
       "verified": {
-        "functions": 207,
-        "bytes": 18817
+        "functions": 226,
+        "bytes": 21048
       }
     },
     {
@@ -717,7 +717,7 @@
       "bank": "$C1",
       "start": "$C1:4000",
       "end": "$C1:4FFF",
-      "emitted_bytes": 2559,
+      "emitted_bytes": 4096,
       "functions": [
         "Battle_MoverToCentre",
         "BattleSys_RunAction",
@@ -731,29 +731,51 @@
         "BattleAct_LoadKind3",
         "BattleAct_LoadCommon",
         "BattleAct_IndexObjLists",
-        "BattleAct_UnpackFrames"
+        "BattleAct_UnpackFrames",
+        "BattleAct_CheckReach",
+        "BattleAct_FindPath",
+        "BattleAct_RunThreads",
+        "BattleAct_RunThread",
+        "BattleAct_OpEndThread",
+        "BattleAct_OpEndScript",
+        "BattleAct_OpLoopAnim",
+        "BattleAct_StartAnim",
+        "BattleAct_OpPlayAnim",
+        "BattleAct_OpShowAnimFrame",
+        "BattleAct_OpResetSpeed",
+        "BattleAct_OpSetSpeed",
+        "BattleAct_OpMoveTo",
+        "BattleAct_OpMoveToUnkPoint",
+        "BattleAct_OpMoveToCalc",
+        "BattleAct_MoveToPoint"
       ]
     },
     {
       "bank": "$C1",
       "start": "$C1:5000",
       "end": "$C1:5FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 494,
+      "functions": [
+        "BattleAct_StartBattlerMove"
+      ]
     },
     {
       "bank": "$C1",
       "start": "$C1:6000",
       "end": "$C1:6FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 183,
+      "functions": [
+        "BattleAct_CalcMoveStep"
+      ]
     },
     {
       "bank": "$C1",
       "start": "$C1:7000",
       "end": "$C1:7FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 17,
+      "functions": [
+        "BattleAct_AdvanceScript"
+      ]
     },
     {
       "bank": "$C1",
