@@ -307,6 +307,9 @@ if !ram_engine_inc == 0
                                          ; a jump)
 !Obj_ArcGravity = $1B81                  ; per object, 8-bit amount added to Obj_VelY per frame in
                                          ; arc mode (an event handler at $C0:4D87 stores it)
+!ObjX_CallWait = $7F0980                 ; 8-bit per object in bank $7F (the table after the eight
+                                         ; ObjX_Unk7F0580 levels): nonzero while opcode $04/$07 of the
+                                         ; object waits for the function it called to end
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
                                          ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
@@ -330,6 +333,18 @@ if !ram_engine_inc == 0
 !EvtFollow_ScrRow = $DD                  ; as EvtFollow_ScrCol: Map_TileOriginY / 2
 !EvtFace_Target = $D9                    ; alias of Eng_Scratch in Evt_OpA8_FaceObj: 16-bit, the
                                          ; target's slot
+!EvtCall_Level = $D9                     ; alias of Eng_Scratch in the call opcodes $02-$07: 8-bit,
+                                         ; the target's Obj_Unk1C00 (its current level)
+!EvtCall_Slot = $DB                      ; alias of Oam_Range1LoPtr's slot: 16-bit, the target's slot
+                                         ; (low byte stored, EvtCall_SlotHi zeroed)
+!EvtCall_SlotHi = $DC                    ; high byte of EvtCall_Slot
+!EvtCall_Arg = $DD                       ; alias of Oam_Range2LoPtr's slot: 8-bit, the level/function
+                                         ; operand (level in the high nibble, function in the low)
+!EvtCall_NewLevel = $DF                  ; 8-bit: EvtCall_Arg >> 4, the level the call runs at
+!EvtCall_SaveIdx = $E1                   ; 16-bit: level x Evt_PrioStride + the target's slot (index
+                                         ; into ObjX_Unk7F0580)
+!EvtCall_FuncTbl = $E3                   ; 16-bit: the target's slot x 16 (its function table in
+                                         ; Evt_Data); Evt_Unk0920Key's slot
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
                                          ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
                                          ; the slot being tried

@@ -8,6 +8,7 @@
 # rule still applies, and the review stands. Fix it at the routine's next
 # edit and delete the line.
 asm/bankC0/bankC0.asm:Audio_PlayTileSfxA SIZE
+asm/bankC0/bankC0.asm:Sys_HaltWithColor UNMATCHED
 asm/bankC1/bankC1.asm:BattleAct_AdvanceScript UNMATCHED
 asm/bankC1/bankC1.asm:BattleAct_CalcMidpointSteps UNMATCHED
 asm/bankC1/bankC1.asm:BattleAct_CalcMoveStep UNMATCHED

@@ -748,3 +748,9 @@ endif
 !ObjAnim_RunKinds = $04                  ; Obj_Unk1100 kinds below this may take ObjAnim_RowRun
 !Obj_AnimModeNormal = $01                ; Obj_AnimMode Obj_SetMoveAnim sets when it leaves
                                          ; Obj_AnimModeFixed (Obj_AnimRow not $FF)
+
+; --- Event call opcodes ($00-$09) ---
+!Halt_ColorBadOpcode = $1639             ; Sys_HaltWithColor colour for an unused event opcode
+                                         ; (Evt_UnusedOpcode)
+!Evt_CallFuncMask = $000F                ; low nibble of a call opcode's level/function operand: the
+                                         ; function number (word index in the 16-word table)

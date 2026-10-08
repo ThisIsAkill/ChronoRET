@@ -39,9 +39,6 @@ org $C028C0
 TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
 org $C028E1
 TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
-org $C05F6E
-Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_OpcodeTable's end);
-                    ; LDX #$1639, BRL LoadSavePath. Also Field_EventHookTable entries 15-16
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
