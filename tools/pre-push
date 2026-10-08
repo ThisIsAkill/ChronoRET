@@ -10,5 +10,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     else
         range="$remote_sha..$local_sha"
     fi
-    tools/pre_push.sh "$range"
+    if [ -x tools/pre_push.sh ]; then
+        tools/pre_push.sh "$range"
+    else
+        # Branch cut from before the gate: byte-exact is the check it has.
+        make --no-print-directory -s diff >/dev/null || { echo "[pre-push] make diff failed" >&2; exit 1; }
+    fi
 done
