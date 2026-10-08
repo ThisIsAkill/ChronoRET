@@ -78,10 +78,12 @@ MainInit:
     LDA.b #FORCED_BLANK
     STA.b INIDISP-!DP_PPU
 
-    ; Step 4 — PPU. Sprite size/base and BG mode get real values; tilemap
-    ; and character bases, scroll, VRAM address and color math start at 0
-    ; and are set per scene later.
-    LDA.b #!OBSEL_Size16x32_Base6000
+    ; Step 4 — PPU. Non-zero values: sprite size/base (OBSEL), BG mode,
+    ; the Mode 7 identity matrix, W34SEL, the layer enables (TM/TS) and
+    ; the fixed color's green/blue. Everything else (tilemap and character
+    ; bases, scroll, VRAM address, color math) starts at 0, presumably to
+    ; be set by each scene later.
+    LDA.b #!OBSEL_Size16And32_Base6000
     STA.b OBSEL-!DP_PPU
     LDA #$00
     STA.b OAMADDL-!DP_PPU

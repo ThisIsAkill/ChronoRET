@@ -73,11 +73,14 @@ BitClear:               ; $FF28 — bit N clear, others set
 
 ; ============================================================
 ; Wave tables ($FF30–$FFAF)
-; Two identical 32-entry signed 16-bit tables: one period of a sine-like
-; wave between -6 and +6. Purpose inferred from the values only; no caller
-; has been traced yet. That B repeats A exactly suggests either a second
-; period (so an index can run to 63 without masking) or two independent
-; users; which one is unknown.
+; One period of a sine-like wave between -6 and +6 (32 signed 16-bit
+; entries), stored twice. Callers $FD:C5F3 and $FD:C743 mask a phase with
+; AND #$3E, then read $C0FF30,X, $C0FF34,X, $C0FF38,X... (a fixed step of
+; 4 per output), add $1D8F and store the results at $1D27, $1D2B, ...
+; Those phase-offset reads run past A into B (up to $FFAB), so B is A's
+; second period: it lets them read ahead without masking each index.
+; What the outputs drive is not traced yet; "Scroll" in the names is a
+; guess.
 ; ============================================================
 ScrollWaveA:            ; $FF30 (32 × sint16)
     dw  $0000,$0001,$0002,$0003,$0004,$0005,$0005,$0006
@@ -85,7 +88,7 @@ ScrollWaveA:            ; $FF30 (32 × sint16)
     dw  $0000,$FFFF,$FFFE,$FFFD,$FFFC,$FFFB,$FFFB,$FFFA
     dw  $FFFA,$FFFA,$FFFB,$FFFB,$FFFC,$FFFD,$FFFE,$FFFF
 
-ScrollWaveB:            ; $FF70 (32 × sint16, same values as A)
+ScrollWaveB:            ; $FF70 (32 × sint16: A's second period)
     dw  $0000,$0001,$0002,$0003,$0004,$0005,$0005,$0006
     dw  $0006,$0006,$0005,$0005,$0004,$0003,$0002,$0001
     dw  $0000,$FFFF,$FFFE,$FFFD,$FFFC,$FFFB,$FFFB,$FFFA
@@ -149,6 +152,7 @@ RomVectors:
     dw BRK_Handler      ; $FFF4 COP    (same crash trap as BRK)
     dw $FFFF            ; $FFF6 reserved
     dw $FFFF            ; $FFF8 ABORT  (unused)
-    dw $FFFF            ; $FFFA NMI    (unused: the game never runs in emulation mode)
+    dw $FFFF            ; $FFFA NMI    (unused: NMI is off after reset, NMITIMEN=0, during
+                        ;               the three instructions Reset runs in emulation mode)
     dw Reset            ; $FFFC RESET  → boot
     dw $FFFF            ; $FFFE IRQ/BRK (unused)

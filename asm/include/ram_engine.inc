@@ -23,9 +23,10 @@ if !ram_engine_inc == 0
 !NmiTrampoline   = $000500   ; 4 B: JML target of the native NMI stub ($00:FF10). Installed by
                              ; InstallNMI ($C0:0B64, from the GameLoop init path) as JML $C0:EA63;
                              ; set to RTI ($40) by $C0:2E4B and repointed into bank $FD by
-                             ; $FD:EAF4 (JML $FD:DE15). Not touched by MainInit.
+                             ; $FD:EAF4 (JML $FD:DE15; called from $FD:DBB8). Not touched by MainInit.
 !IrqTrampoline   = $000504   ; 4 B: JML target of the native IRQ stub ($00:FF14). Installed by
-                             ; $C0:0B75 as JML $C0:ECCC; set to RTI by $C0:2E4B and repointed by
-                             ; $FD:EAF9 (JML $FD:DE87).
+                             ; InstallIRQ ($C0:0B75) as JML $C0:ECCC; set to RTI by $C0:2E4B and
+                             ; repointed by $FD:EAF4 (JML $FD:DE87), the routine that also
+                             ; repoints the NMI trampoline.
 
 endif
