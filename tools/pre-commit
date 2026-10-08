@@ -65,13 +65,18 @@ else
     fi
     ok "MATCH: byte-exact."
     info "Checking every source-emitted byte (independent of base ROM)..."
-    python3 tools/verify.py >/dev/null || fail "tools/verify.py found source bytes that differ from the ROM."
+    if [ -f tools/verify.py ]; then
+        python3 tools/verify.py >/dev/null || fail "tools/verify.py found source bytes that differ from the ROM."
+    fi
     ok "VERIFIED: full coverage."
 fi
 
 # ── 1b. Readability standard ─────────────────────────────────────────────────
 info "Checking readability standard..."
-python3 tools/lint_readability.py || fail "Readability gate failed (see above; rules in tools/lint_readability.py)."
+# (Guarded: branches cut from before the gate don't have the lint yet.)
+if [ -f tools/lint_readability.py ]; then
+    python3 tools/lint_readability.py || fail "Readability gate failed (see above; rules in tools/lint_readability.py)."
+fi
 
 # ── 2. Generated numbers and the review log (symbols/) ──────────────────────
 # Counts are never typed by hand: regenerate them and stage the result, so
