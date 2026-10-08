@@ -12,6 +12,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 
 ## Matching
 
+0. Quick wins from `tools/find_duplicates.py` (byte-identical copies of verified routines):
+   `Battle_Mul8` again at `$CC:F365`; the two wave tables again at `$FF:F759` and `$FF:F799`.
+   A relocation-tolerant mode (masking absolute JSR/JMP/JSL operands) should find more.
 1. `$C1:1C4A–$C1:1F78`: the gap between `BattleMenu_LoadCommandWindowMap` and
    `BattleMenu_BuildTargetList`.
 2. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for

@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate progress test-hooks clean check-rom setup
+.PHONY: all build diff verify lint gate progress test-hooks duplicates clean check-rom setup
 
 all: build diff
 
@@ -36,6 +36,10 @@ lint:
 # STATUS blocks.
 progress: check-rom
 	python3 tools/progress.py --update
+
+# Byte-identical copies of matched routines elsewhere in the ROM.
+duplicates: check-rom
+	python3 tools/find_duplicates.py
 
 # Prove the pre-commit firewall rejects planted ROMs, notes and blocked words.
 test-hooks:
