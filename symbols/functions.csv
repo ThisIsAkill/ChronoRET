@@ -93,15 +93,15 @@ $C0:E9AA,$C0:E9E1,56,SprBuf_Alloc3,$C0,Engine,readable,50b746e5f35a,(was Sub_E9A
 $C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,readable,c51b700e9871,
 $C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,readable,ef33cecb6962,
 $C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,readable,48b6702ba2d7,
-$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,b119b61f6d34,The CPU comes out of reset in emulation mode with I already set.
+$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,b119b61f6d34,The CPU comes out of reset in emulation mode with I already set.
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,9c2774b7207f,Native-mode interrupt stubs ($FF10–$FF17)
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,bd12634e9770,
-$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,8926ad22dcae,"A crash trap: it reads a fixed, recognizable address forever and never returns."
-$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,readable,2fad0af24d5b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
+$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,verified,8926ad22dcae,"A crash trap: it reads a fixed, recognizable address forever and never returns."
+$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,2fad0af24d5b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
 $C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,012bbbcead94,
 $C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,430b677ff873,"Wave tables ($FF30–$FFAF) One period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored twice."
 $C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,verified,4a7da0a8b51b,
-$C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,readable,eac7eb0d4916,"SNES cartridge header ($FFB0–$FFDF), standard layout"
+$C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,verified,eac7eb0d4916,"SNES cartridge header ($FFB0–$FFDF), standard layout"
 $C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,verified,4a10f4fbea5d,
 $C0:FFBE,$C0:FFBE,1,RomSpecialVersion,$C0,ROM header,verified,e01cc8c6afac,
 $C0:FFBF,$C0:FFBF,1,RomCartridgeSubtype,$C0,ROM header,verified,6c2cda2586f8,
@@ -115,40 +115,40 @@ $C0:FFDA,$C0:FFDA,1,RomDeveloperId,$C0,ROM header,verified,e0cc47ba5fa5,
 $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
-$C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,readable,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
+$C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,readable,261e0f394cb6,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
 $C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,readable,52685dbb9b1f,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,readable,0a62561692c4,16÷8 HW divide via $4204/$4205/$4206/$4214.
-$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,readable,00d22ff978da,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
+$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,00d22ff978da,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
 $C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,verified,77e03f9cac8b,
 $C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,verified,fe9eb52af7ca,
-$C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,readable,3536e305ba96,
+$C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,verified,3536e305ba96,
 $C1:0118,$C1:0118,1,Battle_ShiftRight6,$C1,Battle engine,verified,91b05803d8eb,
 $C1:0119,$C1:0119,1,Battle_ShiftRight5,$C1,Battle engine,verified,d4172c45304d,
 $C1:011A,$C1:011A,1,Battle_ShiftRight4,$C1,Battle engine,verified,d022f8f89c7c,
 $C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,verified,26c7786bd957,
-$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,readable,7c18d1437b94,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
-$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,readable,d9f740b4a534,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
-$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,readable,19d0329dc565,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
-$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,readable,04c18cc34873,
-$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,readable,6634aa7cc981,Direction angle between two screen points (256 units per turn).
+$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,verified,7c18d1437b94,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
+$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,verified,d9f740b4a534,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
+$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,verified,19d0329dc565,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
+$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,verified,04c18cc34873,
+$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,verified,6634aa7cc981,Direction angle between two screen points (256 units per turn).
 $C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,readable,ed5aced9485c,
 $C1:0305,$C1:04C4,448,BattleUI_DrawPcNamePanel,$C1,Battle status bar,readable,87f6141ecf12,
-$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,readable,42b9b300367c,
+$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,verified,42b9b300367c,
 $C1:05A7,$C1:06DA,308,BattleUI_UpdateNextPcPanel,$C1,Battle status bar,readable,3e18bcf4eb3e,
-$C1:06DB,$C1:06EE,20,BattleUI_DrawAtbGauges,$C1,Battle status bar,readable,91a948db9df1,
-$C1:06EF,$C1:06EF,1,BattleUI_UpdateNextPcPanel_Exit,$C1,Battle status bar,readable,62d039cd7b3c,
+$C1:06DB,$C1:06EE,20,BattleUI_DrawAtbGauges,$C1,Battle status bar,verified,91a948db9df1,
+$C1:06EF,$C1:06EF,1,BattleUI_UpdateNextPcPanel_Exit,$C1,Battle status bar,verified,62d039cd7b3c,
 $C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,readable,4372c4362aa6,
 $C1:0785,$C1:081D,153,BattleMenu_DrawCommandList,$C1,Battle menu,readable,36468cecf6f9,
 $C1:081E,$C1:0871,84,BattleMenu_DrawCommandWindowFrames,$C1,Battle menu,readable,9f3911c0f8df,
 $C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,readable,75675a692bc1,
 $C1:08E8,$C1:0928,65,BattleUI_HighlightPcName,$C1,Battle status bar,readable,1c51d0213156,Highlight PC slot A's name in the status bar: look up the slot's offset in !BattleRom_NameAttrL1 (layout 1) or !BattleRom_NameAttrL02 (layouts 0 and 2) and set the attribute of a 5-wide × 2-high block
 $C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,readable,fa7f890c830d,
-$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,readable,4a979eb2a0a5,
+$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,verified,4a979eb2a0a5,
 $C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,readable,7796a78799ab,
 $C1:0A87,$C1:0A87,1,CODE_JP_C10A87,$C1,Engine,readable,00edb101698a,
-$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,readable,bb2e85e94eb6,
-$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,readable,72803e4b410d,
+$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,verified,bb2e85e94eb6,
+$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,verified,72803e4b410d,
 $C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,readable,30bd1869058d,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
 $C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,readable,ff3952e45db1,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
 $C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,readable,86add6f07a84,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
@@ -212,7 +212,7 @@ $C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,verif
 $C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,verified,eb342fca8940,
 $C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,readable,de5ad53b6b32,"Scrolls the item list down one row: increments !BattleMenu_ItemScroll (clamped at $FA), then re-renders and invalidates both draw caches."
 $C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,verified,1cb83529e976,
-$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,readable,1ca8550ddb2b,
+$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,verified,1ca8550ddb2b,
 $C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,readable,88788f811983,
 $C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,readable,955d09491346,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
 $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,a4b0c2f4b91c,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
@@ -221,28 +221,28 @@ $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,readable,dd1d4f3f54f4,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
 $C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,7adc88152f5c,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,readable,c1a452fc394e,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
-$C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,readable,9779f4140b1c,
-$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,readable,74c25c3a3aa9,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
+$C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,
+$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,verified,74c25c3a3aa9,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
 $C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,8c6f80faef48,
 $C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,verified,96ac25da6792,
-$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,readable,7e69b526ca0e,
-$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,readable,3af96a43a7ff,cursor may cycle.
-$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,readable,ae599fce70f7,
-$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,readable,a87ffddbacda,
-$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,readable,ab722fbb270e,
-$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,readable,9acd96d41bc0,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
+$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,verified,7e69b526ca0e,
+$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,verified,3af96a43a7ff,cursor may cycle.
+$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,verified,ae599fce70f7,
+$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,verified,a87ffddbacda,
+$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,verified,ab722fbb270e,
+$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,verified,9acd96d41bc0,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
 $C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,readable,60696611caf5,
 $C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,verified,1098ffd7d8a1,
-$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,readable,2b634a3bf388,
-$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,readable,a6b8b561fa43,
+$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,verified,2b634a3bf388,
+$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,verified,a6b8b561fa43,
 $C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,readable,f6d7ffa8cd0d,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
-$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,readable,5a7841bb4268,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
-$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,readable,434f2363d6ec,the caster
-$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,readable,10d92bd91fc4,"chosen enemy; size $19 for mode $1A, else $09"
+$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,verified,5a7841bb4268,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
+$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,verified,434f2363d6ec,the caster
+$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,verified,10d92bd91fc4,"chosen enemy; size $19 for mode $1A, else $09"
 $C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,readable,efe3189ef5b2,"member id 3; size $19 for mode $14, else $10"
 $C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,readable,57369279ad82,party member id 6
-$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,readable,fef35bc71450,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
-$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,readable,7ac5d63ffd11,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
+$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,verified,fef35bc71450,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
+$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,verified,7ac5d63ffd11,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
 $C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,readable,2f5be3bfb838,
 $C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,readable,9d8c9fb7396a,
 $C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,readable,0e7a3db6d2e2,
@@ -254,4 +254,4 @@ $C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,readable
 $C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,readable,e6431a791f12,next non-empty candidate (wrap at 11); no-op on an empty list.
 $C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,readable,1dc13ffd8218,
 $C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,readable,624c00de57ad,"candidate slots are $FF, Z=0 as soon as one isn't"
-$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,readable,18ff8680932e,Called via: JML from Reset ($00:FF03)
+$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,18ff8680932e,Called via: JML from Reset ($00:FF03)
