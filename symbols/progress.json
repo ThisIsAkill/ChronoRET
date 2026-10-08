@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 34444,
+  "emitted_bytes": 36047,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 323,
+      "bytes": 36047
     },
     "readable": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 323,
+      "bytes": 36047
     },
     "verified": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 305,
+      "bytes": 34404
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 20097,
+      "emitted_bytes": 21700,
       "matched": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 136,
+        "bytes": 21700
       },
       "readable": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 136,
+        "bytes": 21700
       },
       "verified": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 118,
+        "bytes": 20057
       }
     },
     {
@@ -160,8 +160,25 @@
       "bank": "$C0",
       "start": "$C0:2000",
       "end": "$C0:2FFF",
-      "emitted_bytes": 81,
+      "emitted_bytes": 1684,
       "functions": [
+        "Field_EventHookDispatch",
+        "Field_EventHookTable",
+        "Field_HookWinGrow0",
+        "Field_HookWinShrink0",
+        "Field_HookWinC3E",
+        "Field_HookIdle",
+        "Field_HookWinGrow1",
+        "Field_HookWinShrink1",
+        "Field_HookWinShrink1_Off",
+        "Field_HookWinQuad",
+        "Field_HookWinFixedA",
+        "Field_HookWinFixedB",
+        "Field_HookLeaveToBankC3",
+        "Field_HookWinPulse",
+        "Field_WinPulseDraw",
+        "Field_ServiceUnk54",
+        "Field_ServiceUnk54_SendLine",
         "Field_FadeInAfterReload",
         "ClearRAMDMA"
       ]
