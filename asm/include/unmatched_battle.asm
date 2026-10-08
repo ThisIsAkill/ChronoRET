@@ -14,14 +14,11 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C13234
-Battle_TickUnkA4Mode:                   ; JMP target of Battle_TickPcSlots while !Battle_UnkA4 is set; not analysed
-org $C134A6
-Battle_UnkReturn34A6:                   ; an RTS, the end of the routine around $C1:3499 (also JMP target from
-                                        ; $C1:324F and Battle_UnkThunk2F1F)
 org $C13714
-Battle_TickStatusEffectVisuals:         ; JSR: per-slot countdown timers, skipped while !Battle_MenuTimeHold is set;
-                                        ; name from the session notes, not checked
+Battle_TickStatusEffectVisuals:         ; JSR: skipped while !Battle_MenuTimeHold is set; counts down per-enemy timers
+                                        ; ($9897) and dispatches on !Enemy_Anim through the table at $C1:3760. The name
+                                        ; is from the session notes and looks wrong (enemy movement, not status visuals;
+                                        ; not checked in detail)
 
 ; --- Bank $C7 (audio) ---
 
