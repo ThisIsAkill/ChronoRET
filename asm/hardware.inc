@@ -16,6 +16,7 @@ if !hardware_inc == 0
 ; ------------------------------------------------------------
 !DP_CPU = $4200   ; CPU I/O registers ($4200-$421F)
 !DP_PPU = $2100   ; PPU registers ($2100-$213F)
+!DP_DMA = $4300   ; DMA / HDMA channel registers ($4300-$437F)
 
 ; ------------------------------------------------------------
 ; Register values (named by the bits they set; single-bit values
@@ -78,6 +79,18 @@ if !hardware_inc == 0
 !COLDATA_Red           = $20  ; bit 5: write the intensity to the red channel
 !COLDATA_Green         = $40  ; bit 6: ... green channel
 !COLDATA_Blue          = $80  ; bit 7: ... blue channel
+!DMAP_HdmaIndirect     = $40  ; bit 6: HDMA indirect mode (the table holds addresses of the data)
+!DMAP_TwoRegsTwice     = $03  ; transfer mode 3: two B-bus registers, each written twice
+!DMAP_FourRegs         = $04  ; transfer mode 4: four consecutive B-bus registers
+!BBAD_BG1SC            = $07  ; B-bus address of BG1SC ($2107)
+!BBAD_BG1HOFS          = $0D  ; B-bus address of BG1HOFS ($210D)
+!BBAD_BG2HOFS          = $0F  ; B-bus address of BG2HOFS ($210F)
+!BBAD_BG3HOFS          = $11  ; B-bus address of BG3HOFS ($2111)
+!BBAD_WH0              = $26  ; B-bus address of WH0 ($2126)
+!BBAD_WH2              = $28  ; B-bus address of WH2 ($2128)
+!BBAD_WH3              = $29  ; B-bus address of WH3 ($2129)
+!BBAD_TM               = $2C  ; B-bus address of TM ($212C)
+!BBAD_CGADSUB          = $31  ; B-bus address of CGADSUB ($2131)
 !NMITIMEN_NmiAutoJoy   = $81  ; NMI on, auto-joypad read on
 !OBSEL_Size8And16_Base4000 = $02 ; size %000 = 8x8 and 16x16 sprites, sprite tiles at VRAM word $4000
 !BG1SC_5800_32x64      = $5A  ; BG1 map at VRAM word $5800, 32x64 tiles

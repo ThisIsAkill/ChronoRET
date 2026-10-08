@@ -244,7 +244,7 @@ struct BattlerStats $5E00
             skip $2D
 .Unk2D:     skip 1      ; +$2D: Battle_SetupBattle sets .Unk56 from .Unk3F for a PC when this is 5; the
                         ; !BattleRom_PcStatBlock addresses point here (PcStatBlk); meaning unknown
-            skip 1
+.Unk2E:     skip 1      ; +$2E: bits 7-4 make BattleFD_UnkB3FE set .Unk6C+0..+3 (the first set bit) to 5; meaning unknown
 .Unk2F:     skip 1      ; +$2F: bit 0 set = Battle_PickStatusAnim picks animation $12 and effect $80 when no status
                         ; record matches; meaning unknown
 .CurHp:     skip 2      ; +$30: current HP
@@ -253,17 +253,34 @@ struct BattlerStats $5E00
 .MaxMp:     skip 2      ; +$36: max MP (inferred: Battle_ApplyHits caps .CurMp at it, as .CurHp at .MaxHp)
             skip 7
 .Unk3F:     skip 1      ; +$3F: Battle_CalcUnk56's input (see .Unk2D); meaning unknown
-            skip $0A
+            skip 6
+.Unk46:     skip 1      ; +$46: an enemy's first of 3 bytes from its BattleRom_EnemyStats record (BattleFD_UnkB438)
+.Unk47:     skip 1      ; +$47: an enemy's bits 0-1 go to !Battle_UnkA020 (BattleFD_UnkB121), bit 1 (inverted) to
+                        ; !Battler_Unk9F29 (BattleFD_UnkB0D5); meaning unknown
+            skip 2
 .Status:    skip 1      ; +$4A: status bits; bit 7 set = KO'd (by context: BattleTgt_SingleKoAlly lists these)
 .Status2:   skip 1      ; +$4B: more status bits; bit 1 set = Battle_UpdatePcFacing leaves the facing alone (meaning unknown)
 .Unk4C:     skip $0A    ; +$4C
 .Unk56:     skip 1      ; +$56: BattleSys_Main stores !Battle_Unk1C48 entry 0/5/10 here for PC 0/1/2 as the
                         ; battle ends; Battle_SetupBattle derives it for a PC whose .Unk2D is 5; meaning unknown
-            skip $0D
+.Unk57:     skip 1      ; +$57: byte $2A of a PC's character record (BattleFD_UnkAE52); BattleFD_UnkAE99 counts
+                        ; the PCs with $A9 here, BattleFD_UnkAEC4 flags those with $AB; meaning unknown
+            skip $0C
 .Unk64:     skip 1      ; +$64: added to turn list 1's timer reload, and (halved, + 8) the divisor of its HP
                         ; amount (BattleSys_ListHandler1); meaning unknown
             skip 1
 .Unk66:     skip 1      ; +$66: x 5 = the HP amount of BattleSys_UpdateKo's revive hit; meaning unknown
+            skip 5
+.Unk6C:     skip 4      ; +$6C: 4 B set to 4 for each PC by BattleFD_UnkB3FE, one of them to 5 by .Unk2E; meaning unknown
+            skip 2
+.Unk72:     skip 1      ; +$72: set to $32 by BattleFD_UnkB3EB; meaning unknown
+            skip 5
+.Unk78:     skip 1      ; +$78: bit 6 set = the slot may act in BattleFD_UnkAC6E (probably a counter-attack)
+.Unk79:     skip 1      ; +$79: bit 7 set = BattleFD_UnkB363 ORs .Unk7B into the status byte at .Status + .Unk7A
+.Unk7A:     skip 1      ; +$7A: BattleFD_UnkAC6E: bit 7 set = act at once, clear = set !Battler_UnkAFAB to 1;
+                        ; BattleFD_UnkB363: an offset from .Status
+.Unk7B:     skip 1      ; +$7B: BattleFD_UnkAC6E's chance (a random 0-99 below this lets the slot act);
+                        ; BattleFD_UnkB363: status bits to set
 endstruct align $80
 
 ; Per-PC command records, 7 bytes each, PC slot 0/1/2 at +0/+7/+14
@@ -1293,15 +1310,20 @@ endstruct
 !Battle_UnkAE4E           = $AE4E ; 1 B: zeroed with !Battle_UnkAE4D
 !Battle_UnkAE55           = $AE55 ; 1 B: bit 3 clear = BattleAi_EnemyTurn sets !Battle_UnkB2C0 (reactions) after an
                                   ; action on an enemy, and then zeroes this; who sets it is not traced
-!Battle_UnkAE85           = $AE85 ; 1 B per enemy: set to 1 by BattleSys_UnkAC5E for each !Battle_UnkAEB3 entry set
+!Battle_UnkAE85           = $AE85 ; 1 B per enemy (8): set to 1 by BattleSys_UnkAC5E for each !Battle_UnkAEB3 entry set;
+                                  ; zeroed when BattleFD_RestoreEnemies puts the enemy back; non-zero sets the enemy's bit in
+                                  ; !Battle_Unk7F01EE (BattleFD_UnkAAB0); meaning unknown
 !Battle_UnkAE90           = $AE90 ; 1 B: the byte before !Battle_ActCaster; zeroed by BattleAi_FillActBlock
 !Battle_UnkAEEB           = $AEEB ; 1 B: set to 4 by BattleAi_SetCmdBits for action code 1; meaning unknown
 !Battle_UnkB18E           = $B18E ; 1 B: BattleAi_SetCmdBits ORs the acting slot into it, plus $80 (action code 1) or
-                                  ; $40 (code 2); a command byte like BattleCmd.Kind, probably
-!Battle_UnkB18F           = $B18F ; 1 B: 0 (action codes 0, 1) or DP $0E (code 2) (BattleAi_SetCmdBits)
-!Battle_UnkB191           = $B191 ; 1 B: zeroed by BattleAi_SetCmdBits
+                                  ; $40 (code 2); a command byte like BattleCmd.Kind, probably; BattleFD_LoadUnkB18E
+                                  ; loads it with byte 0 of the !Battle_UnkB18C record
+!Battle_UnkB18F           = $B18F ; 1 B: 0 (action codes 0, 1) or DP $0E (code 2) (BattleAi_SetCmdBits); the record
+                                  ; number !Battle_UnkB18C itself (BattleFD_LoadUnkB18E)
+!Battle_UnkB191           = $B191 ; 1 B: zeroed by BattleAi_SetCmdBits and by BattleFD_LoadUnkB18E
 !Battle_UnkAD9B           = $AD9B ; 1 B: set number (0-5) of the !Battle_ActPcHitAmount records Battle_HitEntryOffset
-                                  ; indexes; written elsewhere (not traced)
+                                  ; indexes; zeroed by BattleFD_UnkACEE with the hit records after it; other writers
+                                  ; not traced
 !Battle_HitAmount         = $B328 ; 2 B, 4-byte entry per battler slot, 3 sets of 11 ($2C apart, set !Battle_UnkB2C7):
                                   ; amount Battle_ApplyHits takes off the battler's HP or MP (Battle_RecordHit)
 !Battle_HitFlags          = $B32A ; 2 B, same entries: bit 14 = the amount is for MP, bit 13 = cancelled
@@ -1331,7 +1353,8 @@ endstruct
 !Battle_UnkB18B           = $B18B ; 1 B: PC slot argument of $C1:BC60 (BattleSys_Main's debug path); service 4
                                   ; copies it to !Battle_ActCaster
 !Battle_UnkB1BE           = $B1BE ; 1 B per character id (a PC's !Battler_UnkAEFF): + 1 goes into BattleSys_Main's
-                                  ; shuffle pool, so probably the character's battler slot; written elsewhere (not traced)
+                                  ; shuffle pool; BattleFD_UnkB22E sets each of the 7 to $FF, then to the PC slot of
+                                  ; each character taking part: the character's battler slot
 !Battle_EnemyOrder        = $B23A ; 8 B: the enemy entries in a random order (BattleSys_Main), $FF after
 !Battle_UnkB242           = $B242 ; 8 B: set to $FF by BattleSys_Main
 !Battle_UnkB252           = $B252 ; 1 B: zeroed by BattleSys_Main
@@ -1357,7 +1380,8 @@ endstruct
 ; !BattleRom_PcStatBlock (BattlerStats[n].Unk2D), so +n here = BattlerStats + $2D + n.
 ; Only the fields that code touches; what they hold is not traced.
 struct PcStatBlk $0000
-            skip $0B
+            skip $0A
+.Unk0A:     skip 1      ; +$0A: an enemy's bit 0 set = BattleFD_UnkB7EB sets its !Battle_UnkAF15 bit 6 (not counted)
 .Unk0B:     skip 1      ; +$0B-$11: copied to .Unk36-.Unk3C (each + $2B) by BattleSys_UnkCE3A (base values
 .Unk0C:     skip 1      ;   of the stats there, probably)
 .Unk0D:     skip 1
@@ -1376,11 +1400,13 @@ struct PcStatBlk $0000
             skip $0C
 .Unk36:     skip 1      ; +$36: added to the bank-$CC byte for .Unk3D (character ids other than 1 and 2)
 .Unk37:     skip 1      ; +$37: summed into .Unk3E
-.Unk38:     skip 1      ; +$38-$3C: with .Unk36/37, set from .Unk0B-.Unk11 by BattleSys_UnkCE3A
-.Unk39:     skip 1
+.Unk38:     skip 1      ; +$38-$3C: with .Unk36/37, set from .Unk0B-.Unk11 by BattleSys_UnkCE3A.
+                        ; +$38: capped at 16 (BattleFD_UnkB14D, BattleFD_UnkB7EB); picks the PC's or enemy's
+                        ; first !Battler_UnkAFAB (BattleFD_UnkB7EB)
+.Unk39:     skip 1      ; +$39: raised by BattleFD_UnkB14D (capped at 99)
 .Unk3A:     skip 1      ; +$3A: as .Unk36, for character ids 1 and 2
-.Unk3B:     skip 1
-.Unk3C:     skip 1
+.Unk3B:     skip 1      ; +$3B: raised by BattleFD_UnkB14D (capped at $FF)
+.Unk3C:     skip 1      ; +$3C: raised by BattleFD_UnkB14D (capped at 99)
 .Unk3D:     skip 1      ; +$3D: written by Battle_SetupBattle (.Unk36/.Unk3A + a bank-$CC byte)
 .Unk3E:     skip 1      ; +$3E: written by Battle_SetupBattle (.Unk37 + .Unk48 + .Unk70, at most $FF)
 .Unk3F:     skip 1      ; +$3F-$42: BattleSys_UnkCF69 adds a record's bonus to each whose bit is set
@@ -1389,11 +1415,15 @@ struct PcStatBlk $0000
 .Unk42:     skip 1
             skip 5
 .Unk48:     skip 1      ; +$48: summed into .Unk3E
-            skip 3
+.Unk49:     skip 1      ; +$49: record of !BattleRom_UnkCC2A05 BattleFD_UnkB555 applies when .Unk4A is 1
+.Unk4A:     skip 1      ; +$4A
+            skip 1
 .Unk4C:     skip 1      ; +$4C: bit 6 (with .Unk4D non-zero) makes Battle_SetupBattle run $FD:B14D
 .Unk4D:     skip 1      ; +$4D
             skip $22
 .Unk70:     skip 1      ; +$70: summed into .Unk3E (past the block's own $80-byte record)
+.Unk71:     skip 1      ; +$71: a second record of !BattleRom_UnkCC2A05 BattleFD_UnkB555 applies when .Unk72 is 1
+.Unk72:     skip 1      ; +$72
 endstruct
 !BattleRom_PcStatBlock    = $FDA80B ; 2 B per PC slot: address of its stat block (BattlerStats[n].Unk2D; read as
                                     ; $5E2D, $5EAD, $5F2D)
@@ -1436,22 +1466,27 @@ endstruct
                                   ; BattleSys_UnkB575 for each PC of a group BattleFD_UnkA8A5 refused
 !Battle_UnkB3EA           = $B3EA ; 1 B: read after each BattleFD_UnkA8A5 call (A = a taking-part PC); non-zero =
                                   ; BattleSys_UnkB967 drops the command (BattleFD_UnkA93C); written in bank $FD
-!Battle_UnkAE4C           = $AE4C ; 1 B: zeroed by BattleSys_UnkB967 before the command; meaning unknown
-!Battle_UnkB3C9           = $B3C9 ; 1 B: BattleCmd.Kind of the command BattleSys_UnkB967 runs; not read in bank $C1's
-                                  ; matched code
+!Battle_UnkAE4C           = $AE4C ; 1 B: zeroed by BattleSys_UnkB967 before the command, and by BattleFD_UnkAB30
+                                  ; before a PC's turn; meaning unknown
+!Battle_UnkB3C9           = $B3C9 ; 1 B: BattleCmd.Kind of the command BattleSys_UnkB967 runs; set to $80 when
+                                  ; BattleFD_UnkAB30 makes a PC act on its own; not read in bank $C1's matched code
 !Battle_UnkB18C           = $B18C ; 1 B: number of the action being run, the index of the bank-$CC tables here:
-                                  ; the tech id (tech), the item id - $BC (item), !BattleRom_PcAttackNum (attack)
+                                  ; the tech id (tech), the item id - $BC (item), !BattleRom_PcAttackNum (attack);
+                                  ; BattleFD_LoadUnkB18E/2 read its 11-byte record
 !Battle_UnkB1FC           = $B1FC ; 1 B: bit 1 is set while BattleSys_RunPcAttack runs (cleared by the item and tech
-                                  ; paths too); its other bits and readers are not traced
+                                  ; paths too); zeroed by BattleFD_UnkB732; its other bits and readers are not traced
 !Battle_TechUsers         = $B2EA ; 3 B: character ids of the users of the tech !Battle_UnkB18C, $FF = none (from the
                                   ; $CC:249F triples, BattleSys_UnkCB93); !Battle_UnkB1BE turns one into a slot
 !Battle_UnkB3C8           = $B3C8 ; 1 B: non-zero after BattleSys_UnkBF79 = the tech path plays nothing; set elsewhere
 !Battle_UnkB3BF           = $B3BF ; 1 B: after a tech: positive = $CD:0021 with A = 3 and !Pc_UnkA0B5 = 1, $FF =
-                                  ; $CD:0021 with A = $0D; set elsewhere (not traced)
+                                  ; $CD:0021 with A = $0D; bit 1 set when BattleFD_UnkB655 puts an item in
+                                  ; !Battle_PcItem; other writers not traced
 !Battle_Unk7F0200         = $7F0200 ; 1 B (long): BattleSys_UnkB967 stores DP $06's low byte here before $CD:0021
-                                  ; with A = 3 (the field's !Treasure_ItemId bytes); meaning unknown
+                                  ; with A = 3 (the field's !Treasure_ItemId bytes); BattleFD_UnkAD17 puts the item id
+                                  ; of its message 3 here
 !Pc_UnkA0B5               = $A0B5 ; 1 B per PC slot: set to 1 for the commanding PC when !Battle_UnkB3BF is positive
-!Battle_UnkAEE6           = $AEE6 ; 17 B: filled from !BattleRom_UnkCC213F by BattleSys_UnkBF81; meaning unknown
+!Battle_UnkAEE6           = $AEE6 ; 17 B: filled from !BattleRom_UnkCC213F by BattleSys_UnkBF81, zeroed by
+                                  ; BattleFD_UnkB555; meaning unknown
 !Battle_InvIds            = $2400 ; 256 B: inventory item ids, probably (BankC1_AddItem's note; the menu's
                                   ; !Menu_Unk2400); BattleSys_UnkBC60's dead body searches it
 !Battle_InvCounts         = $2500 ; 256 B: the count of each !Battle_InvIds entry, probably
@@ -1498,7 +1533,8 @@ endstruct
 ; --- Battler checks of BattleSys_Main's passes ($C1:B093-$C1:B487) ---
 !Battle_FieldObjFlags     = $29C6 ; FieldBtlObj.Flags (12 B records, 8 objects) as a bank-$7E absolute address
 !Battle_UnkB2D3           = $B2D3 ; 1 B: slot counter of BattleSys_UnkB223 (0-10)
-!Battle_UnkAE7D           = $AE7D ; 8 B per enemy: BattlerStats.Status2 bit 2 as BattleSys_UnkB0B6 last saw it
+!Battle_UnkAE7D           = $AE7D ; 8 B per enemy: BattlerStats.Status2 bit 2 as BattleSys_UnkB0B6 last saw it;
+                                  ; zeroed by BattleFD_UnkB732
 
 ; --- Tech menu builders ($C1:C96A-$C1:CB47, $C1:CCCB-$C1:CDFE) ---
 !BattleRom_TechEntryPtr   = $FDA84F ; 2 B per PC slot: address of its 20 Tech_MenuEntry records ($1A80, $1B0C, $1B98;
@@ -1519,5 +1555,94 @@ endstruct
                                     ; bits 7-4 pick PcStatBlk.Unk3F-.Unk42, bits 3-0 the amount (BattleSys_UnkCF69)
 !Battle_Unk2A03           = $2A03 ; its address is left in DP $0E before each BattleSys_UnkCF69 call (which does not
                                   ; read it); meaning unknown
+
+; ------------------------------------------------------------
+; Bank $FD battle helpers (BattleFD_*, $FD:A982 on)
+; ------------------------------------------------------------
+!Battle_UnkAE6D           = $AE6D ; 11 B: BattleFD_UnkB223 sets entry n to n; BattleFD_RestoreEnemies sets an enemy
+                                  ; entry's (indexed 0-7) to its number when it puts it back; meaning unknown
+!Battle_UnkAECB           = $AECB ; 1 B: number of entries BattleFD_RestoreEnemies put in !Battle_UnkAECC
+!Battle_UnkAECC           = $AECC ; 11 B: slots of the enemies BattleFD_RestoreEnemies put back, in order ($FF-filled by
+                                  ; BattleFD_UnkB732)
+!Battle_UnkB190           = $B190 ; 1 B: byte 1 of the !Battle_UnkB18C record (BattleFD_LoadUnkB18E); meaning unknown
+!Battle_UnkB1F4           = $B1F4 ; 1 B (stored 16-bit): PC loop counter of BattleFD_UnkAD17
+!Battle_UnkB26B           = $B26B ; 8 B per enemy: set to $FF when BattleFD_RestoreEnemies puts it back
+!Battle_UnkB28C           = $B28C ; 2 B: sum of the defeated enemies' BattleRom_EnemyReward.Unk0
+                                  ; (BattleFD_AddEnemyRewards); message 0 of BattleFD_UnkAD17 (probably experience)
+!Battle_UnkB2B0           = $B2B0 ; 1 B per PC (3): bit 7 = BattleFD_UnkAD17 shows message 4 (!Battle_UnkB311 times)
+!Battle_UnkB2B3           = $B2B3 ; 1 B per PC (3): bits 3, 2, 1 = BattleFD_UnkAD17 shows messages 5, 6, 7
+!Battle_UnkB2C3           = $B2C3 ; 2 B: offset of the record BattleFD_LoadUnkB18E/2 read (!Battle_UnkB18C * 11)
+!Battle_UnkB2DB           = $B2DB ; 2 B: low word of the 24-bit sum of BattleRom_EnemyReward.Unk6
+                                  ; (BattleFD_AddEnemyRewards); message 1 of BattleFD_UnkAD17
+!Battle_UnkB2DD           = $B2DD ; 1 B: its high byte
+!Battle_UnkB305           = $B305 ; $FF-ended list of BattleFD_UnkAD17's message 6 arguments (one counter for all PCs)
+!Battle_UnkB30F           = $B30F ; 1 B: BattleFD_UnkAD17's position in !Battle_UnkB305 (zeroed at its start)
+!Battle_UnkB310           = $B310 ; 1 B: argument of BattleFD_UnkAD17's message 7
+!Battle_UnkB311           = $B311 ; 1 B per PC (3): how many times BattleFD_UnkAD17 shows message 4 (counted down)
+!Battle_UnkB3BA           = $B3BA ; 3 B: BattlerStats.Unk57 of PCs 0-2 (BattleFD_UnkAE99)
+!Battle_UnkB3BD           = $B3BD ; 1 B: how many PCs have BattlerStats.Unk57 = $A9 (BattleFD_UnkAE99)
+!Battle_UnkB3CC           = $B3CC ; 1 B: BattleFD_UnkAD17's position in !Battle_UnkB3CE (PC * 8 + entry)
+!Battle_UnkB3CE           = $B3CE ; 8 B per PC: $FF-ended lists of BattleFD_UnkAD17's message 5 arguments
+!Battle_MsgArg0           = $0200 ; 1-2 B: first argument byte(s) of the BattleSys_UnkVecCD0021 messages (BattleFD_UnkAD17)
+!Battle_MsgArg1           = $0201 ; 1 B: second argument byte
+!Battle_MsgArg2           = $0202 ; 1 B: third argument byte
+!Battle_Unk7F01EE         = $7F01EE ; 1 B (long): bit n = enemy entry n's !Battle_UnkAE85 was non-zero (BattleFD_UnkAAB0,
+                                  ; the battle's last step); probably read by the field (not traced)
+!BattleRom_UnkCC6FCB      = $CC6FCB ; 11 B per !Battle_UnkB18C: bytes 0 and 1 go to !Battle_UnkB18E / B190
+!BattleRom_UnkCC88CB      = $CC88CB ; 11 B per !Battle_UnkB18C: the same for BattleFD_LoadUnkB18E2
+!BattleRom_UnkCC06A7      = $CC06A7 ; 6 B per PcStatBlk.Unk29 value: byte 0's highest set bit picks a
+                                    ; !Battle_UnkB1BE entry (BattleFD_UnkAEF2)
+; An enemy's reward record, 7 B per enemy id (the !Battler_UnkAF0A id), read by BattleFD_AddEnemyRewards.
+; Battle_SetupBattle reads .ItemA/.ItemB as !BattleRom_EnemyUnk5E04/5E05.
+struct BattleRom_EnemyReward $CC5E00
+.Unk0:      skip 2      ; +0: added to !Battle_UnkB28C (probably experience)
+.Gold:      skip 2      ; +2: added to !Battle_RewardGold
+.ItemA:     skip 1      ; +4: item id (0 = none) put in the rewards with a 90% chance, or always when = .ItemB
+.ItemB:     skip 1      ; +5: compared with .ItemA (equal = the second list, no chance)
+.Unk6:      skip 1      ; +6: added to the 24-bit !Battle_UnkB2DB (probably tech points)
+endstruct
+
+!BattleTmp_16             = $16   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!BattleTmp_18             = $18   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!BattleTmp_1A             = $1A   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!BattleTmp_1C             = $1C   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!BattleTmp_1E             = $1E   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!BattleTmp_20             = $20   ; 2 B scratch (zeroed by BattleFD_UnkB732)
+!Battle_UnkA020           = $A020 ; 8 B per enemy: bits 0-1 of its BattlerStats.Unk47 (BattleFD_UnkB121); meaning unknown
+!Battle_UnkAED8           = $AED8 ; 11 B: set to $FF by BattleFD_UnkB732; meaning unknown
+!Battle_UnkAF1D           = $AF1D ; 1 B: zeroed by BattleFD_UnkB33F; meaning unknown
+!Battle_UnkB19E           = $B19E ; 32 B: zeroed by BattleFD_UnkB555; meaning unknown
+!Battle_UnkB253           = $B253 ; 1 B: zeroed by BattleFD_UnkB732; meaning unknown
+!Battle_UnkB320           = $B320 ; 8 B per enemy: zeroed by BattleFD_UnkB732; meaning unknown
+; A slot's item record (BattleFD_UnkB655): the fields of an Item_BattleList record, 8 B per battler slot.
+struct Battle_PcItem $A0B8
+.Id:         skip 1     ; +0: item id
+.TargetMode: skip 1     ; +1: from !BattleRom_ItemTargetMode
+.Flags:      skip 1     ; +2: the item's !BattleRom_ItemUseFlags byte without bit 7
+.Quantity:   skip 1     ; +3: 1
+.PcMask:     skip 1     ; +4: only written by BattleFD_UnkB655's dead code
+endstruct
+; The 8 enemy records the battle starts from, 12 B each (BattleFD_UnkB22E; who fills them is not traced).
+struct BattleEnemyInit $29C4
+.Id:         skip 1     ; +0: enemy id for !Battler_UnkAEFF / !Battler_UnkAF0A
+.Unk1:       skip 1     ; +1: negative = no enemy in this entry
+.Unk2:       skip 1     ; +2: negative = the enemy is listed (!Battler_UnkAF0A) but absent at the start
+                        ; (!Battler_UnkAEFF $FF, !Battle_UnkAF15 bit 7)
+             skip 9
+endstruct
+!BattleRom_BankCC         = $CC0000 ; bank $CC base for LDA.l this,X with X an address in bank $CC (item records,
+                                    ; the stat-boost tables)
+!BattleRom_BankFD         = $FD0000 ; bank $FD base, the same for the lists BattleFD_UnkB2DE reads
+!BattleRom_UnkFDB99C      = $FDB99C ; 2 B per !Menu_Config+28 value: address in bank $FD of BattleFD_UnkB2DE's
+                                    ; 8 x 4 words for the character records
+!BattleRom_ItemUseFlags   = $CC0ABC ; 3 B per item id - $BC: byte 0 bit 7 set = the battle item list takes the item;
+                                    ; the other bits become Item_BattleList.Flags
+!BattleRom_ItemTargetMode = $CC1BB5 ; 1 B per item id - $BC: Item_BattleList.TargetMode
+!BattleRom_EnemyStats     = $CC4700 ; 23 B per enemy id: the stat record BattleFD_UnkB438 copies (+0 HP, +2 .Unk3F,
+                                    ; +3 .Unk4C+3.., +8 .Unk64.., +$14 .Unk46..)
+!BattleRom_UnkCC2A05      = $CC2A05 ; 3 B per record: byte 0 = offset in a stat block, byte 1 = bits BattleFD_UnkB555
+                                    ; ORs in there
+!BattleRom_UnkCC2E31      = $CC2E31 ; 16 B per !Menu_Config bits 0-2 value, 1 B per .Unk38 - 1: added to a
+                                    ; battler's first !Battler_UnkAFAB (BattleFD_UnkB7EB)
 
 endif

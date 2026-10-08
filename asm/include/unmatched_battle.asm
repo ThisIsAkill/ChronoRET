@@ -286,8 +286,6 @@ org $C1D7C4
 BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
 org $C1D8D1
 BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
-org $FDABA2
-BattleFD_UnkABA2:                       ; JSL from Battle_ApplyHits with DP $0E = an enemy slot being KO'd; not analysed
 org $C1C1DD
 BattleSys_UnkC1DD:                      ; JSR from BattleSys_UnkB967 (item and tech paths): fills !Battle_UnkAD8D/AD8E
                                         ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
@@ -390,7 +388,7 @@ org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
                                         ; after a tech, A = 3 or $0D; not analysed
 
-; --- Bank $FD (called from BattleSys_Main and Battle_SetupBattle; not analysed) ---
+; --- Bank $FD (called from BattleSys_UnkB575 and BattleSys_UnkB967; not analysed) ---
 
 org $FDA8A5
 BattleFD_UnkA8A5:                       ; JSL from BattleSys_UnkB967, A = a PC slot taking part; leaves !Battle_UnkB3EA
@@ -398,69 +396,7 @@ org $FDA93C
 BattleFD_UnkA93C:                       ; JSL from BattleSys_UnkB967 when !Battle_UnkB3EA is non-zero
 org $FDA95F
 BattleFD_UnkA95F:                       ; JSL from BattleSys_UnkB575 after it set !Battle_CmdPcs
-org $FDAF80
-BattleFD_UnkAF80:                       ; JSL from BattleSys_UnkCDFF, A = an inventory item id, DP $0E = its count
-org $FDB01C
-BattleFD_UnkB01C:                       ; JSL from BattleSys_UnkCDFF for an empty inventory entry
-org $FDB033
-BattleFD_UnkB033:                       ; JSL from BattleSys_UnkCF15, A = an id byte; returns X = a bank-$CC offset
-org $FDB141
-BattleFD_UnkB141:                       ; JSL from BattleSys_UnkCE3A, DP $08 = a record offset, DP $0E = $29D7
-org $FDA982
-BattleFD_UnkA982:                       ; JSL: first call of BattleSys_Main
-org $FDAA98
-BattleFD_UnkAA98:                       ; JSL: BattleSys_Main's !Battle_Unk99CD end
-org $FDAAB0
-BattleFD_UnkAAB0:                       ; JSL: last call of BattleSys_Main before BattleSys_ExitVec
-org $FDACFD
-BattleFD_UnkACFD:                       ; JSL: each BattleSys_Main pass, after the upkeep service
-org $FDAD17
-BattleFD_UnkAD17:                       ; JSL: BattleSys_Main's victory end
-org $FDB201
-BattleFD_UnkB201:                       ; JSL: BattleSys_Main's victory end, before the gold
 
-org $FDB2DE
-BattleFD_UnkB2DE:                       ; JSL from Battle_SetupBattle
-org $FDB22E
-BattleFD_UnkB22E:                       ; JSL from Battle_SetupBattle
-org $FDB438
-BattleFD_UnkB438:                       ; JSL from Battle_SetupBattle
-org $FDB121
-BattleFD_UnkB121:                       ; JSL from Battle_SetupBattle
-org $FDAE52
-BattleFD_UnkAE52:                       ; JSL from Battle_SetupBattle
-org $FDB3FE
-BattleFD_UnkB3FE:                       ; JSL from Battle_SetupBattle
-org $FDAE99
-BattleFD_UnkAE99:                       ; JSL from Battle_SetupBattle
-org $FDAD09
-BattleFD_UnkAD09:                       ; JSL from Battle_SetupBattle
-org $FDAEF2
-BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle (and BattleSys_UnkBC60's dead body)
-org $FDACEE
-BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle, BattleSys_Unk8461 and turn lists 1 / 9
-org $FDAB30
-BattleFD_UnkAB30:                       ; JSL from BattleSys_Unk8461 for a due PC, X = slot * $80, Y = slot
-org $FDAC6E
-BattleFD_UnkAC6E:                       ; JSL from BattleSys_Unk8461 when !Battle_UnkB2C0 is 0
-org $FDB14D
-BattleFD_UnkB14D:                       ; JSL from Battle_SetupBattle
-org $FDB0D5
-BattleFD_UnkB0D5:                       ; JSL from Battle_SetupBattle
-org $FDB4E7
-BattleFD_UnkB4E7:                       ; JSL from Battle_SetupBattle
-org $FDB7EB
-BattleFD_UnkB7EB:                       ; JSL from Battle_SetupBattle
-org $FDB555
-BattleFD_UnkB555:                       ; JSL from Battle_SetupBattle
-org $FDB732
-BattleFD_UnkB732:                       ; JSL from Battle_SetupBattle
-org $FDB363
-BattleFD_UnkB363:                       ; JSL from Battle_SetupBattle
-org $FDB223
-BattleFD_UnkB223:                       ; JSL from Battle_SetupBattle
-org $FDAEC4
-BattleFD_UnkAEC4:                       ; JSL from Battle_SetupBattle
 
 ; --- Bank $CF (battle support) ---
 
