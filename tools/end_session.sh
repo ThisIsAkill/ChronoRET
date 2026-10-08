@@ -36,6 +36,9 @@ audit() {
     if python3 tools/progress.py --check >/dev/null; then ok "symbols/ and doc blocks current"; else bad "stale: tools/progress.py --update"; fi
     if python3 tools/validate_functions.py >/dev/null; then ok "symbols/ valid"; else bad "tools/validate_functions.py"; fi
 
+    step "Firewall fires on planted fixtures"
+    if tools/test_hooks.sh >/dev/null 2>&1; then ok "tools/test_hooks.sh"; else bad "tools/test_hooks.sh (run it to see which check)"; fi
+
     step "Nothing that must never be tracked"
     tracked=$(git ls-files | grep -iE '\.(sfc|smc)$|(^|/)(C[L]AUDE\.md|SESSION[^/]*\.md)$' || true)
     if [ -z "$tracked" ]; then ok "no ROMs or local notes tracked"; else bad "tracked: $tracked"; fi
