@@ -60,6 +60,14 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-08: routine headers are checked mechanically. `HEADER`: an Entry and an Exit line
+  (tables exempt; sub-entries point at their parent with `; header: see <Parent>`). `CALLERS`:
+  every caller site `tools/xref.py` confirms is named in the header (address, containing
+  routine, or a site count). Requested by the maintainer after review rounds kept rejecting
+  routines for missing Entry/Exit lines and incomplete caller lists. The existing headers were
+  brought up to it in a separate commit first; that edit changed 112 routines' source hashes, so
+  their reviews no longer count until they are re-reviewed.
+
 - 2026-10-08: jumps and calls (`JSR`, `JMP`, `JSL`, `JML`, branches) are exempt from the
   explicit-width rule; each has exactly one encoding, so its width can't drift with how a define
   is written. Approved by the maintainer after an independent review flagged that the exemption

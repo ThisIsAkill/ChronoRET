@@ -69,6 +69,41 @@ state on entry and exit (M, X, DP, DB), and anything a reader would not guess. W
 meaning is inferred, say from what ("inferred: only written by the revive path"). Comments inside
 explain the non-obvious; they don't narrate each line or repeat what a name already says.
 
+**Headers are checked.** The header is the comment block between the previous routine's last
+code line and the label (the same span `tools/progress.py` hashes). The lint requires:
+
+- `HEADER`: a comment line starting `Entry:` or `On entry:` and one starting `Exit:` (a
+  parenthesis before the colon is fine, as in `Exit (both entries):`; `Entry/Exit:` counts as
+  both).
+- `CALLERS`: every caller site `tools/xref.py` CONFIRMS (`JSR`/`JSL`/`JMP`/`JML`/`BRL`) is
+  accounted for, by its address (`$C1:2ECF`, `$C12ECF`, `$2ECF` in the routine's own bank, or a
+  `/AAAA` continuation such as `$FD:DA5B/DABA`), by the full name of the matched routine that
+  contains it, or by a count such as `19 JSR sites` or `20 call sites` that is at least the
+  confirmed count. Prefer one `Callers:` line:
+
+  ```asm
+  ; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0),
+  ;   BattleMenu_TechConfirm ($C1:1379), BattleMenu_ItemConfirm ($C1:14C5) and
+  ;   BattleMenu_TargetSelectInput ($C1:1561).
+  ```
+
+  A routine reached only through a table or by falling in needs no list. If xref confirms a site
+  that is not a real call (data that decodes as `JSR`), name its address and say so; that is
+  accounted for too.
+
+Two kinds of label are exempt from `HEADER`:
+
+- **Tables**: a label whose body is only `db`/`dw`/`dl`/`dd` data (no instruction or macro).
+- **Sub-entries** (a fall-through entry, shared tail or loop label that has to be global): mark
+  it `; header: see <Parent>` on or above the label line. `<Parent>` must be a routine in the
+  same file with an Entry/Exit header that names the sub-entry; the sub-entry's callers may be
+  listed there. Sites inside the parent or a sibling sub-entry are internal flow and need no
+  mention.
+
+  ```asm
+  BattleMenu_ItemListScrollUp_RenderTail:     ; header: see BattleMenu_ItemListScrollUp
+  ```
+
 ## Layout
 
 - One file per bank, `asm/bank<NN>/bank<NN>.asm`, in address order, grouped by subsystem with a

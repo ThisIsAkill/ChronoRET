@@ -72,6 +72,10 @@ includes the one before:
   (asar's address-to-line map); unmatched code by decoding forward from the 64 bytes before
   the hit under each M/X start state and voting. The vote is a heuristic: read a CONFIRMED hit
   in unmatched code before you rely on it.
+- `make lint` also checks routine headers (`HEADER`, `CALLERS`, see STYLE.md): Entry and Exit
+  lines, and every CONFIRMED caller from xref accounted for. Write the `Callers:` line from
+  `make xref` output; a reviewer then only judges whether the header is right, not whether it
+  is complete.
 
 **Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
 by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
