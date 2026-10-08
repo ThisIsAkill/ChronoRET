@@ -49,6 +49,13 @@ if !constants_battle_inc == 0
 !Battle_AngleHalfTurn    = $80   ; 180 degrees
 !Battle_AngleThreeQuarter = $C0  ; 270 degrees
 
+; --- Battler boxes (Battle_CalcBattlerBox and the box tests) ---
+!Battle_BoxBottomPad     = 8     ; pixels a box reaches below the probe y, unless !Battle_Unk2989NoBoxPad
+!Battle_Unk2989NoBoxPad  = $04   ; !Battle_Unk2989 bit: set = boxes end at the probe y; meaning unknown
+!Battle_BoxEdgeMax       = $FF   ; right-edge clamp (rightmost pixel)
+!Battle_CellBlocked      = $40   ; !Battle_CellMap bit: always blocks a box
+!Battle_OverlapPc        = $80   ; Battle_BoxOverlapsOthers result: touches a PC's box ($81 = an enemy's)
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
