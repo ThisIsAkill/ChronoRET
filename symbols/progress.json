@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 87664,
+  "emitted_bytes": 89729,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 1007,
-      "bytes": 87664
+      "functions": 1026,
+      "bytes": 89729
     },
     "readable": {
-      "functions": 1007,
-      "bytes": 87664
+      "functions": 1026,
+      "bytes": 89729
     },
     "verified": {
-      "functions": 1007,
-      "bytes": 87664
+      "functions": 1026,
+      "bytes": 89729
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 34751,
+      "emitted_bytes": 36816,
       "matched": {
-        "functions": 391,
-        "bytes": 34751
+        "functions": 410,
+        "bytes": 36816
       },
       "readable": {
-        "functions": 391,
-        "bytes": 34751
+        "functions": 410,
+        "bytes": 36816
       },
       "verified": {
-        "functions": 391,
-        "bytes": 34751
+        "functions": 410,
+        "bytes": 36816
       }
     },
     {
@@ -1041,11 +1041,28 @@
       "bank": "$C1",
       "start": "$C1:8000",
       "end": "$C1:8FFF",
-      "emitted_bytes": 1121,
+      "emitted_bytes": 3134,
       "functions": [
         "BankC1_BattleStartVec",
         "BankC1_Entry8003",
-        "BattleSys_Main"
+        "BattleSys_Main",
+        "BattleSys_Unk8461",
+        "BattleSys_Unk883D",
+        "BattleSys_ClearUnkB192",
+        "BattleSys_ListHandler0",
+        "BattleSys_ListHandler1",
+        "BattleSys_Unk895B",
+        "BattleSys_ListHandler2",
+        "BattleSys_ListHandler3",
+        "BattleSys_ListHandler4",
+        "BattleSys_ListHandler5",
+        "BattleSys_ListHandler6",
+        "BattleSys_ListHandler7",
+        "BattleSys_ListHandler8",
+        "BattleSys_ListHandler9",
+        "BattleSys_ListHandler10",
+        "BattleSys_ListHandler11",
+        "BattleSys_Unk8C09"
       ]
     },
     {
@@ -1068,8 +1085,11 @@
       "bank": "$C1",
       "start": "$C1:B000",
       "end": "$C1:BFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 52,
+      "functions": [
+        "BattleSys_ListHandlerTable",
+        "BattleSys_ListOffsetTable"
+      ]
     },
     {
       "bank": "$C1",

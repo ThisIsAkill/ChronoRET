@@ -711,7 +711,26 @@ $C1:7C3D,$C1:7FFF,963,BankC1_OldBuildLeftovers,$C1,Engine,verified,836b2a9ecbe2,
 $C1:8000,$C1:8002,3,BankC1_BattleStartVec,$C1,Engine,verified,be8958424952,Vector into BattleSys_Main.
 $C1:8003,$C1:8005,3,BankC1_Entry8003,$C1,Engine,verified,84b94346c88a,"Long vector into BankC1_RunService (unmatched, $C1:CFC2), which pushes P, X, DP and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets DB=$7E and DP=0, runs entry A (low byte) of its service table at $C1:"
 $C1:8006,$C1:8460,1115,BattleSys_Main,$C1,Battle system,verified,6025337701cd,
+$C1:8461,$C1:883C,988,BattleSys_Unk8461,$C1,Battle system,verified,12776c5fcdda,
+$C1:883D,$C1:8861,37,BattleSys_Unk883D,$C1,Battle system,verified,34e3401cbc07,"For each PC slot 0-2 whose !Battler_UnkAF0A entry is not $FF: DP $14 (16-bit) = the slot, BattleSys_UnkB575, then BattleSys_UnkB3F9 with X = the slot."
+$C1:8862,$C1:8875,20,BattleSys_ClearUnkB192,$C1,Battle system,verified,d507d92ddb0c,Zeroes the 4-byte !Battle_UnkB192 record of battler slot !Battle_UnkB18B.
+$C1:8876,$C1:88C4,79,BattleSys_ListHandler0,$C1,Battle system,verified,1f689be1bb6a,Turn list 0 (BattleSys_ListHandlerTable entry 0): the usual handler (see the banner); at the end of its runs it clears BattlerStats.Status2 bit 7 of the slot.
+$C1:88C5,$C1:895A,150,BattleSys_ListHandler1,$C1,Battle system,verified,36648ba6479c,"Turn list 1: a repeating hit on the slot (inferred from the amount going to !Battle_ActPcHitAmount with kind 3, which BattleAct_FlagLethalPcHits checks as damage; probably poison)."
+$C1:895B,$C1:8974,26,BattleSys_Unk895B,$C1,Battle system,verified,de6b84810d9e,"Sets up the action block for a kind-2 action (BattleAct_LoaderTable's loader 2; the tech loader, inferred in !Battle_ActId's note) with record A, caster slot 0, no flags and the main-target mask !Batt"
+$C1:8975,$C1:89B8,68,BattleSys_ListHandler2,$C1,Battle system,verified,7e541e2cf3c5,"Turn list 2: the usual handler, but after its last run it only stops the entry: no status bit is cleared."
+$C1:89B9,$C1:8A04,76,BattleSys_ListHandler3,$C1,Battle system,verified,6718636eae7c,Turn list 3: the usual handler; at the end of its runs it clears bit 7 of the slot's BattlerStats.Unk4C+1 (+$4D).
+$C1:8A05,$C1:8A50,76,BattleSys_ListHandler4,$C1,Battle system,verified,875076acf389,Turn list 4: the usual handler; at the end of its runs it clears bit 6 of the slot's BattlerStats.Unk4C+1 (+$4D).
+$C1:8A51,$C1:8A9C,76,BattleSys_ListHandler5,$C1,Battle system,verified,960f13c375ad,Turn list 5: the usual handler; at the end of its runs it clears bit 6 of the slot's BattlerStats.Unk4C+2 (+$4E).
+$C1:8A9D,$C1:8A9D,1,BattleSys_ListHandler6,$C1,Battle system,verified,61539445e44e,Turn list 6: does nothing (RTS).
+$C1:8A9E,$C1:8A9E,1,BattleSys_ListHandler7,$C1,Battle system,verified,8b516e2f5e41,"Turn list 7: does nothing (RTS), like list 6."
+$C1:8A9F,$C1:8B0F,113,BattleSys_ListHandler8,$C1,Battle system,verified,bf17f93d08c2,"Turn list 8: re-arms the entry (flags = 1) with the timer = reload, halved when bit 7 of the slot's BattlerStats.Unk4C+1 or Unk4C+6 (+$4D, +$52) is set, doubled (from the reload, so this wins) when St"
+$C1:8B10,$C1:8BB8,169,BattleSys_ListHandler9,$C1,Battle system,verified,2c72a66946e6,"Turn list 9: re-arms the entry with the timer halved / doubled as list 8 does, clears the list's !Battle_ListDue bit and counts !Battle_ListRuns down; at 0 (set back to 10), unless the slot is KO'd, w"
+$C1:8BB9,$C1:8C07,79,BattleSys_ListHandler10,$C1,Battle system,verified,78cc0f24786c,Turn list 10: the usual handler; at the end of its runs it clears bit 2 of the slot's BattlerStats.Unk4C+2 (+$4E).
+$C1:8C08,$C1:8C08,1,BattleSys_ListHandler11,$C1,Battle system,verified,f3fb78ef6567,"Turn list 11: does nothing (RTS), like lists 6 and 7."
+$C1:8C09,$C1:8C3D,53,BattleSys_Unk8C09,$C1,Battle system,verified,48bbacff4160,Runs BattleSys_UnkAFD2 (probably an enemy's behaviour script: it reads a pointer from the $CC:8B08 table by the id in A) for each enemy entry 0-7 with !Battle_UnkB2B6 0 whose !Battle_UnkAF15 has bit 7
 $C1:AF22,$C1:AF78,87,Battle_RandRange,$C1,Battle engine,verified,87f9d12b2984,"A random number from the low bound X (low byte) up to, but not including, the high bound A: low + (RandomTableFD[!Battle_RandIdx] mod (high - low)), then !Battle_RandIdx + 1."
+$C1:B92D,$C1:B946,26,BattleSys_ListHandlerTable,$C1,Battle system,verified,fd92e1a8214f,"Handler of each turn list, indexed by list number * 2: BattleSys_Main runs entry n (JSR (T,X) at $C1:8333) for each list whose !Battle_ListDue bit is set."
+$C1:B947,$C1:B960,26,BattleSys_ListOffsetTable,$C1,Battle system,verified,128e13a737c0,"Address of each turn list's !Battle_ListFlags bytes (list * 11 past the start), indexed by list number * 2; BattleSys_Main's scan reads it with LDA.l at $C1:82C5."
 $C1:C90B,$C1:C929,31,Battle_Mul16,$C1,Battle engine,verified,6eb417b82d00,16 x 16 -> 32-bit unsigned shift-and-add multiply: !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB.
 $C1:C92A,$C1:C95B,50,Battle_Div32,$C1,Battle engine,verified,98df24afe48c,"32 / 16-bit unsigned restoring divide of !Battle_MathHi:MathA by !Battle_MathB: !Battle_MathRem = the remainder, !Battle_MathLo = the quotient's low word."
 $C1:FA8B,$C1:FDAD,803,Battle_SetupBattle,$C1,Battle engine,verified,0887b3a8f90e,
