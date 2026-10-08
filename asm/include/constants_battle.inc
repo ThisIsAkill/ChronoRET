@@ -135,8 +135,8 @@ if !constants_battle_inc == 0
 !BattleMenu_TechBorderCols = 9   ; columns copied from BattleRom_TechBorder per row
 !BattleMenu_TechBorderSkip = $2E ; rest of a row after those 9 entries ($40 - 9*2)
 !BattleMenu_TechRowCells = 18    ; entries recoloured per tech line by UpdateTechMpAvail
-!BattleMenu_NameLeadCells = 3    ; tech-list cells blanked left of a name (BlankMpCostDigits)
-!BattleMenu_NameTailCells = 4    ; tech-list cells blanked right of a name (CODE_JP_C10C00)
+!BattleMenu_NameLeadCells = 3    ; tech-list cells blanked left of a name (BattleMenu_BlankNameLeadCells)
+!BattleMenu_NameTailCells = 4    ; tech-list cells blanked right of a name (BattleMenu_BlankNameTailCells)
 !BattleMenu_DoubleTechPcs = 2    ; ready PCs a double tech needs
 !BattleMenu_TripleTechPcs = 3    ; ready PCs a triple tech needs
 !BattleMenu_ReadyQueueSize = 3   ; entries scanned in !BattleMenu_ReadyQueue
@@ -156,8 +156,8 @@ if !constants_battle_inc == 0
 !Tech_NameTable          = $15C4 ; tech names in bank $CC (11 B each, by tech id)
 !Tech_CodeBlank          = $FF   ; !Tech_ListCode: empty line
 !Tech_CodeBlank2         = $FE   ; !Tech_ListCode: empty line (second kind)
-!Tech_CodeTripleHeader   = $FD   ; !Tech_ListCode: "[Triple Tech]" header (needs 3 ready PCs)
-!Tech_CodeDoubleHeader   = $FC   ; !Tech_ListCode: "[Double Tech]" header (needs 2 ready PCs)
+!Tech_CodeTripleHeader   = $FD   ; !Tech_ListCode: "Triple Technique" header (ROM text $CC:FB5D) (needs 3 ready PCs)
+!Tech_CodeDoubleHeader   = $FC   ; !Tech_ListCode: "Double Technique" header (ROM text $CC:FB4B) (needs 2 ready PCs)
 !Tech_CodeSkip           = $FB   ; !Tech_ListCode: unselectable line with no text drawn
 !Tech_CodeSpecialMask    = $F0   ; codes $F0-$FF are special lines
 !Tech_DoubleHeaderText   = $0000 ; offset of the "Double Technique" line in BattleRom_TechFixedText

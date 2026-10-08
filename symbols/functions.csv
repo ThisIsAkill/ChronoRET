@@ -116,10 +116,10 @@ $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
 $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
-$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,readable,261e0f394cb6,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
-$C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,readable,52685dbb9b1f,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
-$C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,readable,0a62561692c4,16÷8 HW divide via $4204/$4205/$4206/$4214.
-$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,00d22ff978da,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
+$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,readable,c216e0034961,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
+$C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,readable,8b16093d795f,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
+$C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,readable,fc3693c2a45e,"16÷8 HW divide via WRDIVL/WRDIVH/WRDIVB, quotient from RDDIVL and remainder from RDMPYL."
+$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,readable,2cdb3012745e,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
 $C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,verified,77e03f9cac8b,
 $C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,verified,fe9eb52af7ca,
 $C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,verified,3536e305ba96,
@@ -127,66 +127,54 @@ $C1:0118,$C1:0118,1,Battle_ShiftRight6,$C1,Battle engine,verified,91b05803d8eb,
 $C1:0119,$C1:0119,1,Battle_ShiftRight5,$C1,Battle engine,verified,d4172c45304d,
 $C1:011A,$C1:011A,1,Battle_ShiftRight4,$C1,Battle engine,verified,d022f8f89c7c,
 $C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,verified,26c7786bd957,
-$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,verified,7c18d1437b94,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
-$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,verified,d9f740b4a534,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
-$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,verified,19d0329dc565,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
-$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,verified,04c18cc34873,
-$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,verified,6634aa7cc981,Direction angle between two screen points (256 units per turn).
-$C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,readable,ed5aced9485c,
-$C1:0305,$C1:04C4,448,BattleUI_DrawPcNamePanel,$C1,Battle status bar,readable,87f6141ecf12,
-$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,verified,42b9b300367c,
-$C1:05A7,$C1:06DA,308,BattleUI_UpdateNextPcPanel,$C1,Battle status bar,readable,3e18bcf4eb3e,
+$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,readable,60fd83d03478,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
+$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,readable,b9a472ea6cee,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
+$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,readable,916ca40a3eb9,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
+$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,readable,9a12a5a4566d,
+$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,readable,9d4bb04a4a23,Direction angle between two screen points (256 units per turn).
+$C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,readable,6ae57970b327,
+$C1:0305,$C1:04C4,448,BattleUI_DrawPcNamePanel,$C1,Battle status bar,readable,8857f194bfbc,
+$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,readable,4f12182ead63,
+$C1:05A7,$C1:06DA,308,BattleUI_UpdateNextPcPanel,$C1,Battle status bar,readable,a1b3c2101475,
 $C1:06DB,$C1:06EE,20,BattleUI_DrawAtbGauges,$C1,Battle status bar,verified,91a948db9df1,
 $C1:06EF,$C1:06EF,1,BattleUI_UpdateNextPcPanel_Exit,$C1,Battle status bar,verified,62d039cd7b3c,
-$C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,readable,4372c4362aa6,
-$C1:0785,$C1:081D,153,BattleMenu_DrawCommandList,$C1,Battle menu,readable,36468cecf6f9,
-$C1:081E,$C1:0871,84,BattleMenu_DrawCommandWindowFrames,$C1,Battle menu,readable,9f3911c0f8df,
-$C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,readable,75675a692bc1,
-$C1:08E8,$C1:0928,65,BattleUI_HighlightPcName,$C1,Battle status bar,readable,1c51d0213156,Highlight PC slot A's name in the status bar: look up the slot's offset in !BattleRom_NameAttrL1 (layout 1) or !BattleRom_NameAttrL02 (layouts 0 and 2) and set the attribute of a 5-wide × 2-high block
-$C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,readable,fa7f890c830d,
-$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,verified,4a979eb2a0a5,
-$C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,readable,7796a78799ab,
-$C1:0A87,$C1:0A87,1,CODE_JP_C10A87,$C1,Engine,readable,00edb101698a,
-$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,verified,bb2e85e94eb6,
-$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,verified,72803e4b410d,
-$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,readable,30bd1869058d,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
-$C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,readable,ff3952e45db1,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
-$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,readable,86add6f07a84,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
-$C1:0C00,$C1:0C2C,45,CODE_JP_C10C00,$C1,Engine,readable,b1e8de4480b2,"Tech-name exit path of BattleMenu_RenderTechRow: blanks cols 17-20 (right of the 11-tile name) on both rows of the line (blank tile, palette 3)."
-$C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,readable,c90fd01804f1,Per-frame window upkeep dispatcher.
-$C1:0C46,$C1:0C48,3,CODE_C10C46,$C1,Engine,verified,f100e6f42dbf,
-$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,readable,1ee9e281b1ad,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
-$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,readable,fc68d8e99382,
-$C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,readable,fdd8ba0d1234,
-$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,readable,a08f43ee4422,Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
-$C1:0EE1,$C1:0F27,71,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,readable,8d217e18d7a0,
-$C1:0F28,$C1:0F56,47,CODE_JP_C10F28,$C1,Engine,readable,35b81ecfc264,
-$C1:0F57,$C1:0F61,11,_ump_check_fd,$C1,Engine,verified,4d9653d6d117,
-$C1:0F62,$C1:0F65,4,_ump_set_grey,$C1,Engine,readable,f8ea85fee54d,
-$C1:0F66,$C1:0F68,3,CODE_C10F66_JMP,$C1,Engine,verified,efb036b61102,
-$C1:0F69,$C1:0F8E,38,_ump_check_battler,$C1,Engine,readable,66ce20178bf5,
-$C1:0F8F,$C1:0F9F,17,_ump_pc1_ok,$C1,Engine,readable,b0ffa666dcda,
-$C1:0FA0,$C1:0FB0,17,_ump_pc2_ok,$C1,Engine,readable,588e49be2d74,
-$C1:0FB1,$C1:0FD4,36,_ump_pc3_ok,$C1,Engine,readable,27107d9eb796,
-$C1:0FD5,$C1:0FF0,28,_ump_slot_ready,$C1,Engine,readable,cd3010385c2d,
-$C1:0FF1,$C1:1000,16,_ump_write_bright,$C1,Engine,verified,24aeb1ec2361,
-$C1:1001,$C1:100E,14,_ump_set_unusable,$C1,Engine,readable,2729185d9803,
-$C1:100F,$C1:103C,46,CODE_JP_C1100F,$C1,Engine,readable,2cb4a9406a96,
-$C1:103D,$C1:103D,1,CODE_JP_C1103D,$C1,Engine,verified,c974e5d65b7f,
-$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,readable,c5ce4b1e3843,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.
-$C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,readable,9d618d977926,Leading-zero suppression for the number formatter's digits.
-$C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,readable,6784280a72dd,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
-$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,readable,494a1e2f2e21,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
-$C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,readable,714e998c559e,"Builds OAM sprites 0-3 (BattleOam) for the command cursor over the shown PC: each of the 4 template sprites in BattleRom_CursorSprite is offset by the PC's !Battler_ScreenX/Y, and its palette bits are"
-$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,readable,268495cc6caa,"Battle command-window input handler, called once per frame from the menu dirty-flag gates (RefreshIfDirtyL/AndTick)."
-$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,readable,d41a9c137621,"Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping roster entries that are negative."
-$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,readable,0ef70d7ebbdd,Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx forward (wrap at 3 back to 0) instead; the same sound 0 and the same cursor-memory handling.
-$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,readable,9a88b1a22cf9,Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag the cursor redraw (!BattleUI_PanelRedraw).
-$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,readable,69d8c83965d1,Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
-$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,readable,8068fc2c335c,"Confirm-button dispatch: sets !BattleUI_UnkA0D7 to $FF (compared by BattleUI_BuildStatusBarFrame with the first selected target), calls BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on "
-$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,readable,229b01a2e16f,"Row 0 (Attack) confirm: message call with ""none"", flags the cursor redraw (twice), sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0, builds the target list, then enters target selection."
-$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,readable,9ccca3b6d66e,"Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders the tech list lines, builds !Tech_ListAvail, switches to the tech list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests "
-$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,readable,7a22ed46eafe,"Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the item list at !BattleMenu_ItemScroll, queues the item map upload, copies the item box frame (!BattleRom_ItemBoxMap, ""ItemBoxBattle"
+$C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,readable,3496df1efcc5,
+$C1:0785,$C1:081D,153,BattleMenu_DrawCommandList,$C1,Battle menu,readable,16464af59edc,
+$C1:081E,$C1:0871,84,BattleMenu_DrawCommandWindowFrames,$C1,Battle menu,readable,3d292c7ec4a1,
+$C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,readable,903295a239ce,
+$C1:08E8,$C1:0928,65,BattleUI_HighlightPcName,$C1,Battle status bar,readable,8369fa8bbc86,Highlight PC slot A's name in the status bar: look up the slot's offset in !BattleRom_NameAttrL1 (layout 1) or !BattleRom_NameAttrL02 (layouts 0 and 2) and set the attribute of a 5-wide × 2-high block
+$C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,readable,be2c464c972c,
+$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,readable,469ef4f5e6a5,
+$C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,readable,c33697921c45,
+$C1:0A87,$C1:0A87,1,BattleMenu_RenderItemRow_Exit,$C1,Battle menu,readable,e77cea3e4c42,
+$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,readable,c700ea1555de,
+$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,readable,be0d3d80dea7,
+$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,readable,6a5abe85360e,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
+$C1:0BB6,$C1:0BD2,29,BattleMenu_DrawTechLowerRow,$C1,Battle menu,readable,7da2c3d57d28,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
+$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,readable,8a652baf2c22,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
+$C1:0C00,$C1:0C2C,45,BattleMenu_BlankNameTailCells,$C1,Battle menu,readable,9e3fc8087d4f,"Tech-name exit path of BattleMenu_RenderTechRow (reached by its tail JMP): blanks cols 17-20 (right of the 11-tile name) on both rows of the line (blank tile, palette 3); the mirror of BattleMenu_Blan"
+$C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,readable,f39fb50226f6,"BattleMenu_UpdateWindows_Exit, $C10C46–$C10C48)"
+$C1:0C46,$C1:0C48,3,BattleMenu_UpdateWindows_Exit,$C1,Battle menu,readable,3b94b9699b86,
+$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,readable,b73e2781a948,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
+$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,readable,b30f590a6394,
+$C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,readable,566594d97fdd,
+$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,readable,fb5726f3d2c9,Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
+$C1:0EE1,$C1:103C,348,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,readable,ade255643c34,
+$C1:103D,$C1:103D,1,BattleMenu_Return,$C1,Battle menu,readable,f7fccb3866f6,
+$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,readable,d8ca861ba604,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.
+$C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,readable,d52acb37a2c3,Leading-zero suppression for the number formatter's digits.
+$C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,readable,7b1e36fb6214,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
+$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,readable,ccc20e51c346,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
+$C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,readable,24e55a80fe50,"Builds OAM sprites 0-3 (BattleOam) for the command cursor over the shown PC: each of the 4 template sprites in BattleRom_CursorSprite is offset by the PC's !Battler_ScreenX/Y, and its palette bits are"
+$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,readable,5986d5afa7e2,Battle command-window input handler.
+$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,readable,157d09b44ff8,"Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping roster entries that are negative."
+$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,readable,2102835d9237,Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx forward (wrap at 3 back to 0) instead; the same sound 0 and the same cursor-memory handling.
+$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,readable,f3112b3ff08b,Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag the cursor redraw (!BattleUI_PanelRedraw).
+$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,readable,9e80c473cbc0,Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
+$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,readable,7fc5986a6f38,"Confirm-button dispatch: sets !BattleUI_UnkA0D7 to $FF (compared by BattleUI_BuildStatusBarFrame with the first selected target), calls BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on "
+$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,readable,a03d32c360f0,"Row 0 (Attack) confirm: message call with ""none"", flags the cursor redraw, sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0, builds the target list, sets !BattleMenu_TargetMoved (so UpdateCursor"
+$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,readable,8888ced30b00,"Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders the tech list lines, builds !Tech_ListAvail, switches to the tech list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests "
+$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,readable,befa3636a23d,"Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the item list at !BattleMenu_ItemScroll, queues the item map upload, copies the item box frame (!BattleRom_ItemBoxMap) into !BattleMe"
 $C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,readable,96c15494bdb5,
 $C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,readable,a4247203ff87,Confirms the highlighted tech: aborts unless the rows have been graded (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
 $C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,readable,6260c94fa869,"Closes the tech list: reload the command window, back to the main menu, force a window rebuild, and restore this PC's saved tech-list cursor (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechSc"
@@ -205,7 +193,7 @@ $C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,readable,61650de90
 $C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,readable,a54a224860ac,"Removes PC slot !BattleMenu_PartnerArg from the ready state as part of committing a double/triple tech: if it's in the roster, decrements !BattleMenu_ReadyCount; either way marks its roster entry empt"
 $C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,readable,a387547ade72,"Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at 11), skipping empty candidate entries, and select the battler it lands on (!BattleTgt_Selected)."
 $C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,readable,1447a4a0f030,Left/Up while cycling targets: mirror of TargetNext — steps !BattleTgt_Cursor back (wrap to 10) instead.
-$C1:179C,$C1:17A0,5,Battle_ClearPadEdges,$C1,Battle engine,readable,9cb8ddc4a0d0,Clears both pad-edge bytes and returns.
+$C1:179C,$C1:17A0,5,Battle_ClearPadEdges,$C1,Battle engine,readable,9d639f198e8d,Clears both pad-edge bytes and returns.
 $C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,readable,c6f1ef1c4f51,"Scrolls the item list up one row: decrements !BattleMenu_ItemScroll (min 0), then re-renders and invalidates both draw caches (row cursor, arrows)."
 $C1:17B1,$C1:17B2,2,BattleMenu_ItemListScrollUp_SetScroll,$C1,Battle menu,verified,06672cd2c585,
 $C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,verified,f325bfe623ce,
@@ -214,13 +202,13 @@ $C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,readable,de5a
 $C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,verified,1cb83529e976,
 $C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,verified,1ca8550ddb2b,
 $C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,readable,88788f811983,
-$C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,readable,955d09491346,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
-$C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,a4b0c2f4b91c,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
+$C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,readable,61eb48ba2ba8,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
+$C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,b78418c192a1,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
 $C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,readable,2de0a605f112,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
 $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable,cd6e51899c4d,
-$C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,readable,dd1d4f3f54f4,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
-$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,7adc88152f5c,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
-$C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,readable,c1a452fc394e,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
+$C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,readable,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
+$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,3fb75c63c47f,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
+$C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,readable,449abab74e5d,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
 $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,
 $C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,verified,74c25c3a3aa9,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
 $C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,8c6f80faef48,

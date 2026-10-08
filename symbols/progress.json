@@ -4,16 +4,16 @@
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 256,
+      "functions": 244,
       "bytes": 29032
     },
     "readable": {
-      "functions": 256,
+      "functions": 244,
       "bytes": 29032
     },
     "verified": {
-      "functions": 74,
-      "bytes": 2045
+      "functions": 59,
+      "bytes": 1189
     }
   },
   "banks": [
@@ -39,16 +39,16 @@
       "code_bytes": 63904,
       "emitted_bytes": 9232,
       "matched": {
-        "functions": 138,
+        "functions": 126,
         "bytes": 9232
       },
       "readable": {
-        "functions": 138,
+        "functions": 126,
         "bytes": 9232
       },
       "verified": {
-        "functions": 46,
-        "bytes": 1577
+        "functions": 31,
+        "bytes": 721
       }
     },
     {
@@ -344,30 +344,20 @@
         "BattleMenu_DrawCommandWindowFrame",
         "BattleMenu_RenderItemListRows",
         "BattleMenu_RenderItemRow",
-        "CODE_JP_C10A87",
+        "BattleMenu_RenderItemRow_Exit",
         "BattleMenu_RenderTechListRows",
         "BattleMenu_BuildTechAvailFlags",
         "BattleMenu_RenderTechRow",
-        "CODE_JP_C10BB6",
+        "BattleMenu_DrawTechLowerRow",
         "BattleMenu_BlankNameLeadCells",
-        "CODE_JP_C10C00",
+        "BattleMenu_BlankNameTailCells",
         "BattleMenu_UpdateWindows",
-        "CODE_C10C46",
+        "BattleMenu_UpdateWindows_Exit",
         "BattleMenu_UpdateMainWindow",
         "BattleMenu_UpdateTechWindow",
         "BattleMenu_DrawTechCursorRow",
         "BattleMenu_ClearTechCursorTiles",
-        "BattleMenu_UpdateTechMpAvail",
-        "CODE_JP_C10F28",
-        "_ump_check_fd",
-        "_ump_set_grey",
-        "CODE_C10F66_JMP",
-        "_ump_check_battler",
-        "_ump_pc1_ok",
-        "_ump_pc2_ok",
-        "_ump_pc3_ok",
-        "_ump_slot_ready",
-        "_ump_write_bright"
+        "BattleMenu_UpdateTechMpAvail"
       ]
     },
     {
@@ -376,9 +366,7 @@
       "end": "$C1:1FFF",
       "emitted_bytes": 3164,
       "functions": [
-        "_ump_set_unusable",
-        "CODE_JP_C1100F",
-        "CODE_JP_C1103D",
+        "BattleMenu_Return",
         "BattleSys_SlotMenuReadyPredicate",
         "BattleMsg_BlankLeadingZeros",
         "BattleMenu_RefreshIfDirtyL",
