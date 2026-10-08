@@ -705,7 +705,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; (unmatched); purpose unknown
 !Battler_UnkA4A4         = $A4A4 ; 1 B per battler slot: zeroed by opcode $2B; used by the movers in bank $CF ($CF:F21D and
                                  ; others); purpose unknown
-!Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; also $C1:6FBF, unmatched)
+!Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; also $C1:6FBF, unmatched); the arc
+                                 ; mover writes its height here (see the arc moves below)
 ; The curving move (opcodes $13-$15, mover kind 7 at $CF:F405, unmatched):
 !Battle_ActorHeading     = $AC11 ; 1 B per actor: heading angle of a curving move; the opcode sets the start heading,
                                  ; the mover turns it towards the point by up to !Battle_ActorMoveSpeed per step and
@@ -715,7 +716,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActorOnCourse    = $AC24 ; 1 B per actor: zeroed at the start; the mover counts it up when the heading reaches
                                  ; the angle to the point, and from then on stops turning
 !Battle_ActorUnkA311     = $A311 ; 1 B per actor: zeroed when a curving move starts (the object part is
-                                 ; !Battle_ActObjUnkA31C); read and written at $CF:F1B9; purpose unknown
+                                 ; !Battle_ActObjUnkA31C); read and written at $CF:F1B9: the heading mover's distance
+                                 ; (see the heading moves below); other uses unknown
 !Battle_ActorUnkA5AA     = $A5AA ; 1 B per actor: start heading of a curving move whose operand is $FF; for the objects
                                  ; ($A5B5, !Battle_ActObjUnkA5B5) the straight move stores its angle there, so probably
                                  ; the last heading; written by many unmatched handlers ($C1:60BF and on)
@@ -823,6 +825,53 @@ endstruct
 !Battle_ActHeadToY       = $A5C0 ; 1 B: opcode $76: y of the point it is taken to
 !Battle_ActOp80Args      = $53   ; up to 15 B (DP): bytes opcode $80 copies from its script (from its length byte on)
                                  ; for BattleAct_UnkVecCD001B
+
+; Arc moves (opcodes $98-$9D, mover kind !Battle_MoveKindArc at $CF:F087, unmatched). The mover adds the
+; step to the offset like the straight mover and, !Battle_ActorMoveSpeed times per step, steps a speed and a
+; height: rising, the speed drops by the accel and the height grows by the speed; once the speed would go
+; below 0 it falls: the speed grows back by the accel and the height shrinks by it; once the speed would pass
+; $FFFF it is reset to the start speed and rises again. It writes 0 - the height in pixels (+ it, see
+; !Battle_ActorArcDown) to !Battler_UnkA4AF, doubled when !Battle_ActorArcMode is 0, and ends the move when
+; !Battle_ActorArcSteps runs out. "Arc" is inferred from that rise and fall (probably a jump; how
+; !Battler_UnkA4AF shows on screen is not traced; $CF:ED1D adds it to the y it records).
+!Battle_ActorArcSteps    = $ABFE ; 1 B per actor (11 battler slots, then object threads): steps left of an arc move;
+                                 ; the mover ($CF:F186) sets the done flag at 0
+!Battle_ActorArcDown     = $AA2A ; 1 B per actor: 0 = the height is subtracted (opcodes $98/$99/$9C/$9D), non-zero =
+                                 ; added (opcodes $9A/$9B set 1) ($CF:F149)
+!Battle_ActorArcMode     = $AA04 ; 2 B per actor (index actor * 2): the arc opcode's mode operand (high byte 0);
+                                 ; !Battle_ArcModeHalf = half the start speed; 0 = the mover doubles the height
+!Battle_ActorArcSpeed    = $A920 ; 4 B per actor (index actor * 4): the arc's speed (low word; the high word is
+                                 ; zeroed), 0..$FFFF
+!Battle_ActorArcHeight   = $A96C ; 4 B per actor: 16.16 height, the high word in pixels
+!Battle_ActorArcAccel    = $A9B8 ; 2 B per actor: start speed / (major distance / 2), taken off or added to the speed
+                                 ; per pixel moved
+!Battle_ActorArcFalling  = $A9DE ; 2 B per actor: 0 = rising, 1 = falling
+!Battle_ActorArcSpeed0   = $AA3D ; 2 B per actor: the start speed; the mover reloads it when the falling speed passes
+                                 ; $FFFF
+; Heading moves (opcodes $A2, $A8, $A9, mover kind !Battle_MoveKindHeading at $CF:F194, unmatched): the mover
+; adds !Battle_ActorMoveSpeed to !Battle_ActorUnkA311 each step and puts the actor at its start + that
+; distance along the angle; it ends the move when !Battle_ActorHeadSteps runs out or when $CF:FADD gives 0, $0E (y)
+; or $0F (x) for the position (probably the cell row / column at the screen's edge; not traced).
+!Battle_ActorMoveAngle   = $A34A ; 1 B per actor: angle of a heading move (the objects' part, from index 11, is
+                                 ; !Battle_ActObjMoveAngle); the mover also copies it to !Battle_ActorUnkA5AA
+!Battle_ActorHeadSteps   = $A639 ; 1 B per actor: steps left of a heading move ($FF from opcode $A2, the operand from
+                                 ; $A8/$A9); the mover ($CF:F1B3) counts it down and ends the move at 0
+!Battle_ActHeadSteps     = $A5BD ; 1 B: opcodes $A8/$A9: the step count operand
+; Midpoint helper (BattleAct_CalcMidpointSteps; its callers at $C1:7095/$C1:715C are unmatched):
+!Battle_ActUnkMidX       = $AAF9 ; 1 B: x halfway between the two points; read at $C1:720E
+!Battle_ActUnkMidY       = $AAFA ; 1 B: y halfway, minus !Battle_ActMidRise (0 at least); read at $C1:7214
+!Battle_ActUnkAAFC       = $AAFC ; 1 B: set to !Battle_ActUnkAAFCStart; read and written at $C1:7327-$C1:7357
+!Battle_ActUnkAAFD       = $AAFD ; 1 B: zeroed with it; read at $C1:735A and $C1:B74C
+; Position history (opcodes $A4/$A5; recorded by $CF:ED1D, unmatched): every !Battler_PosHistDelay frames the
+; four records shift one place and record 0 gets !Battler_ScreenX/Y + !Battler_UnkA4A4/A4AF (probably for
+; after-images; who draws them is not traced).
+!Battler_PosHistOn       = $A192 ; 1 B per battler slot: non-zero = record (opcode $A4 sets 3, $A5 0)
+!Battler_PosHistDelay    = $AB67 ; 1 B per battler slot: frames between records (opcode $A4's first operand)
+!Battler_PosHistTimer    = $AB72 ; 1 B per battler slot: frames to the next record (1 on start)
+!Battler_PosHistUnkAB7D  = $AB7D ; 1 B per battler slot: opcode $A4's second operand; no reader found
+!Battler_PosHistUnkAB88  = $AB88 ; 1 B per battler slot: set to 1 with it; no reader found
+!Battler_PosHistX        = $AB93 ; 4 records of 22 B (11 x, then 11 y; record k at + k * 22): x per battler slot
+!Battler_PosHistY        = $AB9E ; the y part of record 0
 
 ; Sprites of the action's frames: 4 bytes per sprite, $C0 bytes (48
 ; sprites) per frame at the offset !BattleRom_ActFrameBase gives

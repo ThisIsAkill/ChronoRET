@@ -30,18 +30,25 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 from `$C1:6299`: the action script's opcode handlers, in address order ($98/$9C
-   `$C1:6299`-`$C1:672D`, 1,173 B in one piece; $99/$9D `$C1:672E`, $9A `$C1:6743`, $9B `$C1:674A`,
-   $A2 `$C1:6751`, $A4 `$C1:691B`, $A5 `$C1:69BA`, $A8 `$C1:69C3`, $A9 `$C1:6AF0`, $C0 `$C1:6CF3`,
-   ...). Matched so far: `$C1:007E`, `$C1:283D`-`$C1:6298` (service 4, its loaders, the reach check
-   and path search, the thread runner and opcodes $00-$85: moves, curving moves, path walks, place,
-   follow, subscripts, waits, battler flags, the script variables `!Battle_ActVars`, the hit
-   numbers, palettes, object counters, facing, object links, headings, sounds and calc selection),
-   `BattleAct_CalcMoveStep` `$C1:65BA` and `BattleAct_AdvanceScript` `$C1:75BB`. The handler table
+1. Bank $C1 from `$C1:6CF3`: the action script's opcode handlers, in address order ($C0 `$C1:6CF3`,
+   $C1 `$C1:6F31`, $C2 `$C1:6F53`, $C3 `$C1:6F75`, $C4 `$C1:6F9A`, $C5 `$C1:6FEF`, $D0 `$C1:6FFC`,
+   $D1 `$C1:702B`, $D2 `$C1:705A` (calls `BattleAct_CalcMidpointSteps`), $D3 `$C1:720E`, $D4
+   `$C1:7349`, $D6 `$C1:7364`, $D5 `$C1:73AD`, $D7 `$C1:740B`, $D8 `$C1:74B4`, $D9 `$C1:753A`, $DA
+   `$C1:7579`). Matched so far: `$C1:007E`, `$C1:283D`-`$C1:6CF2` (service 4, its loaders, the reach
+   check and path search, the thread runner and opcodes $00-$A9: moves, curving moves, path walks,
+   place, follow, subscripts, waits, battler flags, the script variables `!Battle_ActVars`, the hit
+   numbers, palettes, object counters, facing, object links, headings, sounds, calc selection, the
+   arc moves $98-$9D (mover kind 1), the heading moves $A2/$A8/$A9 (mover kind 2) and the position
+   history $A4/$A5), `BattleAct_AdvanceScript` `$C1:75BB` and `BattleAct_ProbeBoxOverlap`
+   `$C1:7C2B` (right after the opcode table). Movers to read for the new opcodes, all in bank $CF:
+   the arc mover `$CF:F087`, the heading mover `$CF:F194` (and its edge test `$CF:FADD`), the
+   position-history recorder `$CF:ED1D` (who draws the history, and the readers of
+   `!Battler_PosHistUnkAB7D/AB88`, are not found). The handler table
    `BattleAct_OpcodeTable` (`$C1:7A6B`, 224 words, 115 distinct handlers) is still original bytes:
    match it once its handlers have names (stubs for the rest), together with the 4-word
    `BattleAct_LoaderTable` at `$C1:7A63`. Some verified headers still call now-matched sites
-   "unmatched" (BattleAct_FindPath: `$C1:5479`/`$C1:549B`, now BattleAct_PathToPoint;
+   "unmatched" (BattleAct_CalcMoveStep: `$C1:62F5`/`$C1:6436`, now BattleAct_OpArcToCalc;
+   BattleAct_FindPath: `$C1:5479`/`$C1:549B`, now BattleAct_PathToPoint;
    BattleAct_OpLoopAnim: `$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now BattleAct_OpShowAnimEntry;
    BattleAct_OpEndThread: `$C1:577A`, now BattleAct_OpEndIfNoTarget): fix them at their next
    edit. Small open helpers next to the handlers: `BattleAct_CalcFacing` (`$C1:75CC`, table

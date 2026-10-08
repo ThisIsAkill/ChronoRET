@@ -437,6 +437,18 @@ if !constants_battle_inc == 0
 !Battle_ActOp80LenMask   = $0F   ; opcode $80: low bits of the length byte = bytes copied, the length byte included
 !Battle_ActOpSetCalcSel  = $81   ; opcodes $81-$84: !Battle_ActCalcSel entry 0-3
 !Battle_ActOpSetCalcSel4 = $47   ; opcodes $47/$48: entries 4 and 5
+; Arc and heading moves (opcodes $98-$A9):
+!Battle_MoveKindArc      = 1     ; !Battle_ActorMoveKind of an arc move ($CF:F087)
+!Battle_MoveKindHeading  = 2     ; ... of a heading move ($CF:F194)
+!Battle_ActOpArcQuarter  = $9C   ; opcodes $9C/$9D: the arc opcodes' quarter form (BattleAct_ArcQuarterPoint)
+!Battle_ActOpArcQuarterUnkPoint = $9D
+!Battle_ArcModeHalf      = 2     ; !Battle_ActorArcMode: start speed !Battle_ArcSpeedHalf instead of !Battle_ArcSpeedFull
+!Battle_ArcSpeedFull     = $FFFF ; arc start speeds
+!Battle_ArcSpeedHalf     = $7FFF
+!Battle_HeadProbeDist    = $10   ; heading moves: distance ahead of the actor whose cell is tested
+!Battle_CellBlocksAny    = $C0   ; !Battle_CellMap bits 6-7: either kind of blocking cell
+!Battle_ActMidRise       = $40   ; BattleAct_CalcMidpointSteps: !Battle_ActUnkMidY is this far above the midpoint
+!Battle_ActUnkAAFCStart  = $24   ; BattleAct_CalcMidpointSteps: start value of !Battle_ActUnkAAFC
 
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)
