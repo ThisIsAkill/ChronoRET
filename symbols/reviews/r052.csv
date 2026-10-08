@@ -1,0 +1,9 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:17D2,C2Script_QueueVram,2026-10-08,rev52a,approved,f3d12b78f2cf,"Fix ok: DB=$00 for STA.w VramQ.Bank,X. Checked arg->field map vs struct, Vmain=$80, End+8, Lock held/cleared, Exit X=old End, Y=6, A=8; matches C2Anim_OpQueueVram."
+$C2:18B4,C2Script_StopIfOlder,2026-10-08,rev52a,approved,09b1bde48498,"Fix ok: TaskRunScript keeps C=0 on Z=1 (SEP only), TaskRunAll INCs 16-bit .Frames, so stop lasts until wrap. CMP/BCC = stop iff .Frames > arg; Exit X/Y/A right."
+$C2:1ACA,C2Script_AddTaskByte,2026-10-08,rev52a,approved,395461aec97b,"Fix ok: (TaskCur),Y via DB=$00; B=0 holds (TaskRunScript dispatch A = (op AND $FF)*2, unchanged by JSR), so TAX/TXY give arg 1. Exit A=3, X=Y=arg 1; 23 bytes."
+$C2:1AE1,C2Script_SubTaskByte,2026-10-08,rev52a,approved,628360ca53ae,"Fix ok: DB=$00 for (TaskCur),Y; B=0 from TaskRunScript's A=op*2 so TAX/TAY = arg 1. SEC/SBC arg 2, stored back via TXY. Exit A=3, X=Y=arg 1; 26 bytes."
+$C2:1BE0,C2Script_DrawMetatile,2026-10-08,rev52a,approved,4e1e09d14486,"Fix ok: DB=$00 for STA.w .Bank,X. Checked layer pick, col/row masks ($3F/$1F), +$400 on bit 5, src +meta*8, 2 entries 4 B (+$20 dest), End+16, Exit X/Y=4/A=5, tmp list."
+$C2:1E47,C2Scene_PalFadeStart,2026-10-08,rev52a,approved,6d6fa9bee46c,"Fix ok: PlanColor's last LDX BluePtr = task+$30+15 = task+$3F; Plan never touches Y, so Y = palette; M=1, C=0. nit: C2Tmp_0E-$1B overstates ($12,$15,$18 untouched)."
+$C2:2194,C2Scene_TaskUnk2194,2026-10-08,rev52a,approved,d48970e155dd,"Fix ok: 15 bytes $2194-$21A2, table at $21A3. Checked op $2B -> C2Script_SpawnUnk2194 installs it, state dispatch, OutStep lowers size (shrink), exits M=1/C=1 done."
+$C2:21F8,C2Scene_TaskUnk21F8,2026-10-08,rev52a,approved,dcb67a3de693,"Fix ok: 13 bytes $21F8-$2204, table at $2205. Op $2A -> SpawnUnk21F8 installs it; uses X from TaskRunAll (= task); InStep grows size; Exit as states (M=1)."

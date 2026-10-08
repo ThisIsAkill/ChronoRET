@@ -1,0 +1,5 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:51EE,BattleAct_OpCurveTo,2026-10-08,rev33a,approved,97a96bcd52d5,"Fix verified: header now documents thread 4's STA DP $82 making h=$FF apply only to the first slot started. Checked table $13-$15, operands, lengths, range 450 B, Entry/Exit."
+$C1:522B,BattleAct_CurveToPoint,2026-10-08,rev33a,approved,0ab30d4bbe70,"Fix verified at .slot_heading. Checked 3 thread paths, restart quirk, object index 11+j (A5B5/A31C), stores, DP $80-$81/$84/$86-$87/$D3-$E3, A=0 exit via AdvanceScript."
+$C1:5409,BattleAct_OpPathTo,2026-10-08,rev33a,approved,39b74d19fd34,"Fix verified: two-ahead goal ends at c; straight kinds sum 16px/8 frames ($CC:F494/F594), cells 16px, so 2 short. Table $16-$18, lengths, 520 B ok. nit: kind 3 dx sums -15, not -16."
+$C1:5437,BattleAct_PathToPoint,2026-10-08,rev33a,approved,19e27349e964,"Fix verified at .look_ahead; $CF:EC78 steps only walking slots. Checked neighbour order, PathAhead/Side tables, kinds +1..+4. nit: Exit omits DP $87 (STY $86) and FindPath's $8E on a start."

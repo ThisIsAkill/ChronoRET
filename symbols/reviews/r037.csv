@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:8A6D,Map_Unk8A6D,2026-10-08,rev37a,approved,74097ed05fd3,"Prior fixes OK (first-two BL/TL, DR BL, $FFF0 carry, 8-bit STZ); all ADC/SBC carries, paths, CPU state, caller checked. nit: no-CLC quirks need LeaderX>=$70"

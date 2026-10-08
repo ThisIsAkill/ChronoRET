@@ -422,6 +422,8 @@ def main() -> int:
     t0 = time.monotonic()
 
     rom = ROM_PATH.read_bytes()
+    import generated
+    generated.ensure()      # symbols/functions.csv is generated, not tracked
     with FUNCTIONS.open() as f:
         rows = list(csv.DictReader(f))
     spans = [(offset(r['address']), offset(r['address']) + int(r['size']), r['name']) for r in rows]

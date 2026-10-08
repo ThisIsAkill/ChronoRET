@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:56A6,Scene_PostLoadInit,2026-10-08,rev51a,approved,82bdb0320cce,"Fix OK: Exit now states DP=$0100/DB=$00 unchanged, hedged on the bank-$C2 call. Verified stores, 8 JSR order, TDC/XBA B=0, $0B arg, sole caller $C0:008E, entry state."
+$C0:70E9,Pal_LoadUnkRow0,2026-10-08,rev51a,approved,843fd5c78f55,"Fix OK: 30 bytes from set+2 = set n colours 1-7 + all 16 of set n+1 as colours 8-15. Verified mask 7, $FF:B210, MVNs, greys 9-11, $200 copy to $7E:2200, DB kept, caller $2887."
+$C0:9DC3,Map_InitEntryTile,2026-10-08,rev51a,approved,1f730e1f43ad,"Callers now Evt_InitObjects BRL $C0:5926 (xref 1 confirmed). Re-checked zeroing, probe $80/$FF low bytes, level min 1, prio stores, X width/exit A,X, DP/DB. nit: callees list 9DEA/9DF5 as unmatched"

@@ -63,6 +63,7 @@ RandomTableFD:
 ; resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and
 ; S=$06FF). The bytes at $FD:851D read as JSR $C000 but sit in a block of
 ; packed data ($FD:8480 onwards does not decode as code), not a caller.
+; Callers (3 sites: 1 JSR, 2 JML): Reset (JML $C0:FF03) and unmatched (JML $C0:418D, JSR $FD:851D).
 ; Entry: native mode; from a hardware reset M=1 X=1, D=$0000, DB=$00;
 ;        from $C0:418D M=1, X=0, DB=$00. Steps 1-3 set M, X, S, DB and DP,
 ;        so nothing else about the entry state matters
@@ -241,7 +242,8 @@ MainInit:
 ; (24 bytes the same as MainInit's scroll clears), BG1, BG2 and OBJ on
 ; the main screen, color math adding the sub screen, and the fixed color
 ; black. What the layout is used for is not traced.
-; Callers: JSL from $C0:0A5D (unmatched; in a routine at $C0:0A50,
+; Callers (1 JSL site): LocLoad_DrawMap ($C0:0A5D).
+; Callers note: JSL from $C0:0A5D (unmatched; in a routine at $C0:0A50,
 ;   called by JSR from $C0:286F, that
 ;   runs a DP=$1D00 step first and more setup after).
 ; Entry: M=1 (8-bit A; the immediates are 8-bit), X either width, DP any

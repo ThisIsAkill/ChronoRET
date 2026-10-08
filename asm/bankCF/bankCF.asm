@@ -27,7 +27,10 @@ hirom
 ; Battle_SinLookup's. !BattleRom_SineTable holds |sin|
 ; for 1024 steps per turn; angle × 4 picks every fourth entry, negated for
 ; the second half turn.
-; Callers (20 JSR sites, all in unmatched bank $CF code, in pairs: e.g.
+; Callers (20 JSR sites): unmatched ($CF:F1CA, $CF:F1D7, $CF:F20E, $CF:F21A, $CF:F36B, $CF:F37C,
+;   $CF:F3F2, $CF:F3FE, $CF:F48B, $CF:F498, $CF:F657, $CF:F664, $CF:F6A3, $CF:F6AE, $CF:F840,
+;   $CF:F850, $CF:F920, $CF:F933, $CF:F9A8, $CF:F9B5).
+; Callers note (20 JSR sites, all in unmatched bank $CF code, in pairs: e.g.
 ;   $CF:F1CA/F1D7, $CF:F20E/F21A, $CF:F36B/F37C, $CF:F3F2/F3FE). In the
 ;   pair at $CF:F1CA the caller stores a per-battler byte to $00, calls
 ;   with an angle and again with angle + $40 (the cosine), and adds the
@@ -98,7 +101,8 @@ Battle_SinLookupCF:
 ; into Digit1000 / Digit100 / Digit10 / Digit1, all four as digit tiles:
 ; nothing is blanked here (the caller counts the leading $90 tiles
 ; itself). NumValue is consumed. Ends in RTL, so bank $C1 can reach it.
-; Callers: JSL from $C1:5BB9 (unmatched; it stores a word from
+; Callers (1 JSL site): BattleAct_OpShowHitNumbers ($C1:5BB9).
+; Callers note: JSL from $C1:5BB9 (unmatched; it stores a word from
 ;   $AD9C,X to NumValue first, then counts the leading $90 tiles in
 ;   Digit1000, Digit100, Digit10 (stopping at the first other tile) and
 ;   indexes a 4-byte table at $CC:F5C4 with that count, which looks like

@@ -29,7 +29,8 @@ hirom
 ;        traced), DB any (the HW registers are reached with STA.l/LDA.l)
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y and DB unchanged; DP $77/$78 and
 ;        $AF/$B0 written
-; Callers: JSR from $CC:F23E, $CC:F25A and $CC:F2C4 (searched: no other
+; Callers (3 JSR sites): unmatched ($CC:F23E, $CC:F25A, $CC:F2C4).
+; Callers note: JSR from $CC:F23E, $CC:F25A and $CC:F2C4 (searched: no other
 ;          JSR/JMP/JSL reaches $F365). No calls.
 org $CCF365
 Battle_Mul8CC:

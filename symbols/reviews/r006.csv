@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:B309,Spr_AppendToOam,2026-10-08,independent session r6-p1,approved,fa79ded62acf,"Verified: callers B2AF/B2BB in Oam_BuildShadow, ranges, sizes, Place24 carry, Y untouched in tree, exit M1 X0 DP$100. Note: Spr_Load8/12,Place8/12 also write $E8 (unused by caller)"
+$C0:E12A,Spr_LoadLargeObj,2026-10-08,independent session r6-p1,approved,0641e7b53dc8,"Verified callers 0212/47E9 (X 8-bit, size==3, stores $AE), DMA $C00 to VRAM $0400 ch7, $C0 layout ofs, tiles/attr, DP clobbers. Note: VMAIN, MDMAEN and $CA (16-bit count) also written"

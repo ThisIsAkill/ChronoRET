@@ -18,7 +18,8 @@ hit is classified:
 
 How the boundary is decided:
 
-  matched code   (the site lies in a row of symbols/functions.csv) the
+  matched code   (the site lies in a row of symbols/functions.csv, which is
+                 regenerated first when stale: tools/generated.py) the
                  source is assembled with asar's address-to-line mapping;
                  a site is a boundary exactly when an instruction line of
                  the source starts there. Authoritative.
@@ -40,11 +41,10 @@ How the boundary is decided:
                  dropped; of the rest, the site is CONFIRMED when more than
                  half land exactly on it. The score printed is that fraction.
 
-The command line judges unmatched code as above. The library (Xref(), what
-the lint's CALLERS rule and draft.py use) still judges it by the sweep alone,
-without the exit widths, until the routine headers list the callers the
-fuller analysis finds; Xref(deep=True) gives the command line's verdicts,
-and --sweep-only gives the library's.
+The command line and the library (Xref(), what tools/callers.py, the lint's
+CALLERS rule and draft.py use) judge unmatched code as above.
+Xref(deep=False) and --sweep-only judge it by the sweep alone, without the
+exit widths.
 
 Each hit names the matched routine that contains it, if any.
 
@@ -144,10 +144,10 @@ class Hit:
 class Xref:
     """ROM, matched rows and source boundaries, loaded once and reused."""
 
-    def __init__(self, rom_path: Path = ROM_PATH, hide=(), deep: bool = False):
+    def __init__(self, rom_path: Path = ROM_PATH, hide=(), deep: bool = True):
         """deep: judge unmatched code by flow() first and give the sweep the
-        exit widths of the routines it calls (the command line's default; the
-        library default stays the plain sweep, see the module docstring).
+        exit widths of the routines it calls (the default; deep=False is the
+        plain sweep, see the module docstring).
         hide: start offsets of matched rows to treat as unmatched (tests use
         it to score the unmatched-code verdicts against the source)."""
         self.deep = deep
@@ -166,12 +166,11 @@ class Xref:
     @staticmethod
     def _read_rows():
         rows = []
-        if FUNCTIONS_CSV.exists():
-            with FUNCTIONS_CSV.open() as f:
-                for row in csv.DictReader(f):
-                    s, e = row['address'], row['end']
-                    rows.append((to_offset(int(s[1:3], 16), int(s[4:], 16)),
-                                 to_offset(int(e[1:3], 16), int(e[4:], 16)), row['name']))
+        import generated        # regenerates symbols/functions.csv when stale
+        for row in generated.function_rows():
+            s, e = row['address'], row['end']
+            rows.append((to_offset(int(s[1:3], 16), int(s[4:], 16)),
+                         to_offset(int(e[1:3], 16), int(e[4:], 16)), row['name']))
         return sorted(rows)
 
     @staticmethod
@@ -621,7 +620,7 @@ def main() -> int:
     ap.add_argument('--confirmed', action='store_true', help='only CONFIRMED hits')
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--sweep-only', action='store_true',
-                    help='judge unmatched code by the sweep alone, as the lint does')
+                    help='judge unmatched code by the sweep alone')
     args = ap.parse_args()
 
     if not ROM_PATH.exists():

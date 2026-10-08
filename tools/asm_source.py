@@ -10,6 +10,13 @@ A routine is a global label in asm/bank*/*.asm. It owns everything after the
 previous routine's last code line (its header comments, org, local defines)
 through its own last code line. The header is the part of that region up to
 and including the label line.
+
+The source hash covers the whole region except the generated Callers block
+of the header (tools/callers.py): the lines in exactly the form that tool
+writes, `; Callers (<count>): ...` or `; Callers of <Sub-entry> (<count>):
+...` and the `;   ...` lines continuing it. The lint fails unless those
+lines are exactly what tools/callers.py generates, so nothing hand-written
+escapes the hash. A `; Callers note: ...` line is hand-written and hashed.
 """
 
 import hashlib
@@ -19,6 +26,30 @@ from pathlib import Path
 
 ASM_GLOB = 'bank*/*.asm'
 GLOBAL = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):')
+
+# Version 1 hashed the whole region; version 2 leaves out the generated
+# Callers block. Review rows carry the hash of the version they were
+# recorded under (rows from version 1 were migrated when it changed).
+HASH_VERSION = 2
+_COUNT = (r'(?:\d+ (?:JSR|JSL|JMP|JML|BRL) sites?'
+          r'|\d+ sites: \d+ (?:JSR|JSL|JMP|JML|BRL)(?:, \d+ (?:JSR|JSL|JMP|JML|BRL))+)')
+CALLERS_START = re.compile(rf'^; Callers(?: of [A-Za-z_][A-Za-z0-9_]*)? \({_COUNT}\): \S')
+CALLERS_CONT = re.compile(r'^;   \S')
+
+
+def callers_block_lines(region) -> list[int]:
+    """Line indices of the generated Callers block(s) in the region's header."""
+    out, i = [], region.start
+    while i < region.label:
+        if CALLERS_START.match(region.lines[i]):
+            out.append(i)
+            i += 1
+            while i < region.label and CALLERS_CONT.match(region.lines[i]):
+                out.append(i)
+                i += 1
+            continue
+        i += 1
+    return out
 
 
 @dataclass
@@ -38,10 +69,14 @@ class Region:
     def body_lines(self) -> list[str]:
         return self.lines[self.label:self.end]
 
-    def header_comments(self) -> list[str]:
-        """Comment text of the header (the part after ';'), one per line."""
+    def header_comments(self, hand_written: bool = False) -> list[str]:
+        """Comment text of the header (the part after ';'), one per line;
+        with hand_written=True, without the generated Callers block."""
         out = []
-        for line in self.header_lines:
+        skip = set(callers_block_lines(self)) if hand_written else set()
+        for n, line in enumerate(self.header_lines, self.start):
+            if n in skip:
+                continue
             idx = line.find(';')
             if idx >= 0:
                 out.append(line[idx + 1:])
@@ -49,8 +84,10 @@ class Region:
 
     @property
     def source_hash(self) -> str:
-        body = '\n'.join(l.rstrip() for l in self.lines[self.start:self.end]).strip()
-        return hashlib.sha256(body.encode()).hexdigest()[:12]
+        skip = set(callers_block_lines(self))
+        body = '\n'.join(l.rstrip() for i, l in enumerate(self.lines[self.start:self.end], self.start)
+                         if i not in skip).strip()
+        return hashlib.sha256(f'v{HASH_VERSION}\n{body}'.encode()).hexdigest()[:12]
 
 
 def _is_code(line: str) -> bool:

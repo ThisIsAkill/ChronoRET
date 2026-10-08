@@ -33,10 +33,11 @@ incsrc "../hardware.inc"
 ; ($0006 and $000C have no callers found; they duplicate the vector
 ; before them.) TextWin_Init and TextWin_Step end in RTL, so the
 ; $0003/$0009 vectors are JSL targets.
-; Callers: BankC2_Entry0000: JML from GameLoop_Main ($C0:006E).
-;   BankC2_Entry0003 (JSL, all unmatched): $C0:2121, $C2:F91F, $C2:F9E4,
-;   $C2:FA3F, $C2:FA99 and $CD:0278. BankC2_Entry0009 (JSL, all
-;   unmatched): $C0:2172, $C2:F928, $C2:FAB2, $CD:0282 and $CD:04E9.
+; Callers (1 JML site): GameLoop_Main ($C0:006E).
+; Callers of BankC2_Entry0003 (6 JSL sites): unmatched ($C0:2121, $C2:F91F, $C2:F9E4, $C2:FA3F,
+;   $C2:FA99, $CD:0278).
+; Callers of BankC2_Entry0009 (5 JSL sites): unmatched ($C0:2172, $C2:F928, $C2:FAB2, $CD:0282,
+;   $CD:04E9).
 ; Entry/Exit: those of the routine each vector jumps to.
 org $C20000
 BankC2_Entry0000:
@@ -60,7 +61,7 @@ BankC2_Entry000C:               ; header: see BankC2_Entry0000
 ; an empty VRAM queue (C2Scene_VramQInit) and a black palette
 ; (C2Scene_ClearPalette), and jumps into C2Scene_Main, which does not
 ; come back here.
-; Callers: JMP from BankC2_Entry0000 ($C2:0000).
+; Callers (1 JMP site): BankC2_Entry0000 ($C2:0000).
 ; Entry: M=1, X=0 (as GameLoop_Main leaves them; set again here), DP any,
 ;        DB=$00 (the first stores, to NMITIMEN and on, are absolute;
 ;        GameLoop_Main's InitHW sets it)
@@ -111,7 +112,8 @@ BankC2_SceneBoot:
 ; clears ($C2:0073–$C2:0092) and the CPU register stores from $C2:00FC
 ; on are the same bytes as MainInit's. INIDISP is not written
 ; (BankC2_SceneBoot has already set forced blank).
-; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0031; it has run SEI,
+; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0031) and C2Scene_Mode5 ($C2:2557).
+; Callers note (2 JSR sites): BankC2_SceneBoot ($C2:0031; it has run SEI,
 ;   NMI/DMA off, forced blank, DB=$00 and DP=$0000 first) and
 ;   C2Scene_Mode5 ($C2:2557).
 ; Entry: M=1 (8-bit A: the register values are 8-bit immediates), X=0
@@ -238,8 +240,7 @@ BankC2_InitHwRegs:
 ; Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM
 ; trampolines that the native NMI and IRQ stubs in bank $00 jump through,
 ; as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the field engine.
-; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and C2Scene_Mode5
-;   ($C2:255A).
+; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and C2Scene_Mode5 ($C2:255A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X), DP any (not used), DB a bank
 ;        that maps low WRAM (absolute stores to $0500-$0507;
 ;        BankC2_SceneBoot has DB=$00)
@@ -318,7 +319,7 @@ C2Scene_ClearDp:
 ; set bit 0 again. C2Scene_SprResetLists returns with M=0, so the STZ of
 ; C2Scene_OamNext is a 16-bit store that zeroes $4E (C2Scene_TaskCur)
 ; as well.
-; Callers: none (an interrupt handler, entered through the trampoline).
+; Callers note: none (an interrupt handler, entered through the trampoline).
 ; Entry: an NMI in native mode, any M/X/DP/DB (A, X, Y saved 16-bit, DP
 ;        and DB saved; then M=0/1 as needed, X=0, DP=$0000, DB=$00)
 ; Exit:  RTI with A, X, Y, DP, DB and P as they were
@@ -527,8 +528,8 @@ C2Scene_IrqHandler:
 
 ; $C2:0346 — C2Scene_WaitFrame (7 bytes, $0346–$034C)
 ; Waits until the next NMI: spins until C2Scene_FrameCounter changes.
-; Callers (3 sites): C2Scene_WaitFrames (JSR at $C2:0455),
-;   C2Scene_WaitOneFrame (JMP at $C2:046E), C2Scene_Mode3 (JSR at $C2:2465).
+; Callers (3 sites: 2 JSR, 1 JMP): C2Scene_WaitFrames (JSR $C2:0455), C2Scene_WaitOneFrame (JMP
+;   $C2:046E) and C2Scene_Mode3 (JSR $C2:2465).
 ; Entry: M=1 (8-bit compare), X any, DP=$0000, DB any; NMI enabled
 ; Exit:  M=1; A = the counter before the change; X, Y unchanged
 ; No calls.
@@ -618,9 +619,8 @@ C2Scene_HideAllSprites:
 ; Empties and unlocks the VRAM upload queue: clears C2Scene_VramQLock and
 ; C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf
 ; ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF).
-; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5
-;   ($C2:2560), C2Scene_Mode6 ($C2:25F0), C2Scene_Mode8 ($C2:265B);
-;   unmatched: $C2:6331 and $C2:6A37.
+; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5 ($C2:2560), C2Scene_Mode6
+;   ($C2:25F0), C2Scene_Mode8 ($C2:265B) and unmatched ($C2:6331, $C2:6A37).
 ; Entry: M=1 (8-bit bank store), X=0 (16-bit pointer store and loop
 ;        count), DP=$0000, DB any
 ; Exit:  M=1, X=0; A = bank(C2Scene_VramQBuf), X = $FFFF; Y, DP and DB
@@ -713,9 +713,8 @@ C2Scene_VramQFlush:
 ; sound command is pending (C2Scene_SoundCmdState non-zero) it is sent
 ; with Audio_DriverCommand, the state marked C2Scene_SoundCmdSending
 ; meanwhile and cleared after.
-; Callers (9 JSR sites): C2Scene_Mode5 ($C2:2532, $C2:2582), C2Scene_Mode6
-;   ($C2:25A1, $C2:2612), C2Scene_Mode8 ($C2:2631, $C2:269D); unmatched:
-;   $C2:63C7, $C2:6A99 and $C2:6AB1.
+; Callers (9 JSR sites): C2Scene_Mode5 ($C2:2532, $C2:2582), C2Scene_Mode6 ($C2:25A1, $C2:2612),
+;   C2Scene_Mode8 ($C2:2631, $C2:269D) and unmatched ($C2:63C7, $C2:6A99, $C2:6AB1).
 ; Entry: M=1 (8-bit flag loads), X=0 with X = the number of frames (0
 ;        waits 65536), DP=$0000, DB with low WRAM at $0000-$1FFF; NMI on
 ; Exit:  M=1, X=0, X = 0; A clobbered; Y, DP and DB as Audio_DriverCommand
@@ -739,7 +738,8 @@ C2Scene_WaitFrames:
 ; $C2:046E — C2Scene_WaitOneFrame (3 bytes, $046E–$0470)
 ; A JMP to C2Scene_WaitFrame: waits for the next NMI without sending a
 ; pending sound command.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23CF, in C2Scene_MainLoop);
+; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF) and unmatched ($C2:63BA, $C2:6A9C).
+; Callers note (3 JSR sites): C2Scene_Main ($C2:23CF, in C2Scene_MainLoop);
 ;   unmatched: $C2:63BA and $C2:6A9C.
 ; Entry/Exit: those of C2Scene_WaitFrame.
 C2Scene_WaitOneFrame:
@@ -749,8 +749,7 @@ C2Scene_WaitOneFrame:
 ; Frees all 64 task records (zeroes each .Handler) and points
 ; C2Scene_TaskCur at the first record, so that tasks spawned before any
 ; task runs copy their parameters from record 0.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23B1); unmatched: $C2:6334 and
-;   $C2:6A3A.
+; Callers (3 JSR sites): C2Scene_Main ($C2:23B1) and unmatched ($C2:6334, $C2:6A3A).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=1, X=0; A = C2Scene_TaskRecordsEnd (16-bit), X = the same, Y =
@@ -780,12 +779,11 @@ C2Scene_TaskClearAll:
 ; (.Params on) are copied from the record C2Scene_TaskCur points at:
 ; the running task, when a task spawns another.
 ; If no record is free nothing is written.
-; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0),
-;   C2Script_SpawnUnk1CF5 ($C2:10C4), C2Script_SpawnUnk1DD4 ($C2:10F7),
-;   C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105 ($C2:159E),
-;   C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
-;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2);
-;   unmatched: $C2:63A6, $C2:7417, $C2:742D and $C2:7441.
+; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0), C2Script_SpawnUnk1CF5 ($C2:10C4),
+;   C2Script_SpawnUnk1DD4 ($C2:10F7), C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105
+;   ($C2:159E), C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
+;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2) and unmatched ($C2:63A6, $C2:7417,
+;   $C2:742D, $C2:7441).
 ; Entry: M any, X=0 with X = the handler address, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF (the MVN copies in bank $00 and leaves DB
 ;        as it was)
@@ -838,8 +836,7 @@ C2Scene_TaskSpawn_Search:       ; header: see C2Scene_TaskSpawn
 ; $C2:04CD — C2Scene_TaskSpawnLow (12 bytes, $04CD–$04D8)
 ; C2Scene_TaskSpawn over records 0-3 only: the same search and setup
 ; (it branches into C2Scene_TaskSpawn_Search).
-; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502) and
-;   C2Script_SpawnTaskLow ($C2:1A49).
+; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502) and C2Script_SpawnTaskLow ($C2:1A49).
 ; Entry: as C2Scene_TaskSpawn
 ; Exit:  as C2Scene_TaskSpawn; when no record is free, X = record 4's
 ;        address (C2Scene_TaskRecords + 4 * C2Scene_TaskSize)
@@ -859,12 +856,12 @@ C2Scene_TaskSpawnLow:
 ; Quirk, kept: there is no check that a record was free. Then X comes
 ; back as C2Scene_TaskRecordsEnd and the three fields are written into
 ; the last record (63), whatever runs there.
-; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90),
-;   C2Script_SpawnScript ($C2:1203), C2Scene_Mode3 ($C2:242E, $C2:2459),
-;   C2Scene_Mode5 ($C2:2527, $C2:256B), C2Scene_Mode6 ($C2:2596,
-;   $C2:25FB), C2Scene_Mode8 ($C2:2626, $C2:2676); unmatched: $C2:3154,
-;   $C2:33B2, $C2:33DF, $C2:4479, $C2:452C, $C2:63AE, $C2:66DF, $C2:66FF,
-;   $C2:6AAB, $C2:741F and $C2:7427.
+; Callers (22 sites: 20 JSR, 2 JMP): C2Script_SpawnScript (JSR $C2:1203), C2Scene_Mode3 (JSR
+;   $C2:242E, JSR $C2:2459), C2Scene_Mode5 (JSR $C2:2527, JSR $C2:256B), C2Scene_Mode6 (JSR
+;   $C2:2596, JSR $C2:25FB), C2Scene_Mode8 (JSR $C2:2626, JSR $C2:2676), C2Scene_LoadScene (JMP
+;   $C2:2C90) and unmatched (JSR $C2:3154, JSR $C2:33B2, JSR $C2:33DF, JSR $C2:4479, JSR $C2:452C,
+;   JSR $C2:63AE, JSR $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP
+;   $C2:7457).
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -1054,7 +1051,10 @@ C2Scene_LayerVramMaps:
 ; use).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
-; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
+; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
+;   ($C2:173C) and unmatched ($C2:3702, $C2:3709, $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93,
+;   $C2:4F9A, $C2:785B).
+; Callers note (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
 ;   C2Script_ScrollLayerFrames ($C2:173C); unmatched: $C2:3702, $C2:3709,
 ;   $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and
 ;   $C2:785B (xref rates $38FB and $3902 doubtful; they are real calls).
@@ -1228,7 +1228,10 @@ C2Scene_Unk0568:
 ; one; then C2Scene_QueueEdgeRow).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) loops for good
 ; (.hang). 0 pixels does nothing.
-; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
+; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE), C2Script_ScrollLayerFrames
+;   ($C2:1751) and unmatched ($C2:3717, $C2:371E, $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8,
+;   $C2:4FAF).
+; Callers note (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
 ;   C2Script_ScrollLayerFrames ($C2:1751); unmatched: $C2:3717, $C2:371E,
 ;   $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF (xref
 ;   rates $385B and $3862 doubtful; they are real calls).
@@ -1524,8 +1527,7 @@ C2Scene_EdgeColRight:
 ; C2Scene_EdgeHalf = 1 when the layer's tile Y is even, else 0; and
 ; C2Scene_EdgeBufPos = ((VScroll - 8) AND $F8) / 4, the buffer word of
 ; the tile row one above the scroll (32 rows of the tilemap).
-; Callers (2 JSR sites): C2Scene_EdgeColLeft ($C2:0773),
-;   C2Scene_EdgeColRight ($C2:07C2).
+; Callers (2 JSR sites): C2Scene_EdgeColLeft ($C2:0773) and C2Scene_EdgeColRight ($C2:07C2).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (C2Scene_VramQBufPtr and
 ;        C2Scene_BgTileY read absolute)
 ; Exit:  M=0, X=0; A = the buffer offset; X = C2Scene_ScrollSlot; Y
@@ -1694,8 +1696,7 @@ C2Scene_EdgeRowBottom:
 ; when the layer's tile X is even, else 0; and C2Scene_EdgeBufPos =
 ; ((HScroll - 8) AND $1F8) / 4, the buffer word of the tile column one
 ; left of the scroll (64 columns of the tilemap).
-; Callers (2 JSR sites): C2Scene_EdgeRowTop ($C2:0843),
-;   C2Scene_EdgeRowBottom ($C2:088F).
+; Callers (2 JSR sites): C2Scene_EdgeRowTop ($C2:0843) and C2Scene_EdgeRowBottom ($C2:088F).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (C2Scene_VramQBufPtr and
 ;        C2Scene_BgTileX read absolute)
 ; Exit:  M=0, X=0; A = the buffer offset; X = C2Scene_ScrollSlot; Y
@@ -1876,9 +1877,8 @@ C2Scene_QueueEdgeRow:
 ; not fit the BG3 layout (see C2Scene_LayerVramMaps); no known caller
 ; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2;
 ; C2Script_DrawLayer passes a script byte).
-; Callers (5 sites): C2Scene_LoadScene ($C2:2C81, $C2:2C88),
-;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE) and C2Script_DrawLayer
-;   ($C2:1950).
+; Callers (5 sites: 4 JSR, 1 JMP): C2Script_DrawLayer (JSR $C2:1950), C2Scene_LoadScene (JSR
+;   $C2:2C81, JSR $C2:2C88) and C2Scene_ReloadScene (JSR $C2:2CB7, JMP $C2:2CBE).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (direct-page work area;
 ;        TDC for 0), DB any (set to $7E for the buffers and restored);
 ;        C2Tmp_00 = the layer; forced blank or vblank (VRAM DMA)
@@ -2648,7 +2648,15 @@ org $C20E1D
 ; Inferred to be the sprite's animation from C2Anim_OpShowFrame, which
 ; adds a frame to the sprite list for a number of frames, and from the
 ; script ops that start one (C2Scene_SetAnim) before moving the task.
-; Callers (57 JSR sites, all unmatched except those named): e.g.
+; Callers (58 JSR sites): C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
+;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F) and unmatched ($C2:3444, $C2:35E0,
+;   $C2:36E2, $C2:3731, $C2:38C0, $C2:3915, $C2:3B3F, $C2:3CD5, $C2:3D36, $C2:3D97, $C2:3E76,
+;   $C2:3EDA, $C2:4340, $C2:4382, $C2:43D2, $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700,
+;   $C2:4723, $C2:481E, $C2:4852, $C2:4870, $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E,
+;   $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008, $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8,
+;   $C2:523E, $C2:525D, $C2:5285, $C2:5553, $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770,
+;   $C2:6834, $C2:6883, $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
+; Callers note (57 JSR sites, all unmatched except those named): e.g.
 ;   C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
 ;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), $C2:3444,
 ;   $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
@@ -2702,7 +2710,7 @@ C2Anim_OpTable:
 ; $C2:0E5A — C2Anim_OpClearByte (17 bytes, $0E5A–$0E6A)
 ; Animation op 0, 2 bytes: zeroes the task's byte at offset arg 1
 ; (any of the 64 record bytes, through C2Scene_TaskCur).
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_Run calls it: M=0, X=0, DP=$0000, DB with low WRAM
 ;        at $0000-$1FFF ($00 from the NMI), C2Anim_Ptr on the opcode
 ; Exit:  M=0, X=0; A = 2 (advance, Z=0); Y = the offset
@@ -2720,7 +2728,7 @@ C2Anim_OpClearByte:
 
 ; $C2:0E6B — C2Anim_OpIncByte (19 bytes, $0E6B–$0E7D)
 ; Animation op 1, 2 bytes: adds 1 to the task's byte at offset arg 1.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry/Exit: as C2Anim_OpClearByte
 ; No calls.
 C2Anim_OpIncByte:
@@ -2738,7 +2746,7 @@ C2Anim_OpIncByte:
 ; $C2:0E7E — C2Anim_OpDecByte (19 bytes, $0E7E–$0E90)
 ; Animation op 2, 2 bytes: subtracts 1 from the task's byte at offset
 ; arg 1.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry/Exit: as C2Anim_OpClearByte
 ; No calls.
 C2Anim_OpDecByte:
@@ -2761,7 +2769,7 @@ C2Anim_OpDecByte:
 ; for this frame without moving, and the same op stops it again every
 ; frame after: the script stays there for good. So it is a loop back
 ; (the name says so).
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_OpClearByte
 ; Exit:  M=0, X=0; A = the offset; C=0; Z=1 when it is 0-$7F; Y = 1
 ; No calls.
@@ -2788,7 +2796,7 @@ C2Anim_OpJumpBack:
 ; loaded nor counted: the frame is drawn every call and the script holds.
 ; Quirk, kept: arg 3 = 0 is loaded as 0, so the next call loads it again:
 ; the frame then stays for good.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_OpClearByte
 ; Exit:  advance: M=0, X=0, A = 4, C=0; X = the task. Drawn: M=0 (as
 ;        C2Scene_SprAdd leaves it), X=0, A = 0 (Z=1), C=0; X, Y as
@@ -2829,7 +2837,7 @@ C2Anim_OpShowFrame:
 ; Animation op 5, 2 bytes: waits arg 1 calls without drawing, counting
 ; in .AnimTimer as C2Anim_OpShowFrame does (0 loads it, then -1 per call;
 ; at 0 it advances 2 at once). Arg 1 = 0 waits for good.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_OpClearByte
 ; Exit:  M=0, X=0; X = the task; C=0; A = 2 (advance) or 0 (Z=1, wait)
 ; No calls.
@@ -2863,7 +2871,7 @@ C2Anim_OpWait:
 ; so a flush in between skips it. Script op $33 (C2Script_QueueVram) is
 ; the same code for the main script.
 ; Quirk, kept: no check that the queue has room.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_OpClearByte
 ; Exit:  M=0, X=0 (REP #$30); A = 8 (advance); X = the entry's offset, Y
 ;        = 6; C2Scene_VramQEnd + 8; C2Scene_VramQLock = 0
@@ -2902,7 +2910,7 @@ C2Anim_OpQueueVram:
 ; every later call stops here again. A task handler that returns this
 ; carry ends its task (C2Scene_TaskRunAll); C2Script_MoveFrames and the
 ; other script ops that call C2Anim_Run drop it.
-; Callers: none direct (C2Anim_OpTable).
+; Callers note: none direct (C2Anim_OpTable).
 ; Entry: as C2Anim_OpClearByte
 ; Exit:  M=0, X=0; A = 0, C=1
 ; No calls.
@@ -2916,7 +2924,11 @@ C2Anim_OpEnd:
 ; .XFrac/.SprX += .XVelFrac/.XVel and .YFrac/.SprY += .YVelFrac/.YVel
 ; (inferred from the carry chain: the fraction words are added first and
 ; carry into the whole ones). No wrap here; C2Scene_WrapTaskPos does that.
-; Callers (21 JSR sites, all unmatched except those listed): e.g.
+; Callers (22 JSR sites): C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
+;   C2Script_ScrollLayerFrames ($C2:172B) and unmatched ($C2:36F1, $C2:383B, $C2:38C9, $C2:3D02,
+;   $C2:3D63, $C2:3E23, $C2:3E87, $C2:4454, $C2:4679, $C2:4D90, $C2:4F82, $C2:5002, $C2:5166,
+;   $C2:5235, $C2:5254, $C2:554D, $C2:55DC, $C2:7734, $C2:7824).
+; Callers note (21 JSR sites, all unmatched except those listed): e.g.
 ;   C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
 ;   C2Script_ScrollLayerFrames ($C2:172B), $C2:36F1 and $C2:7824;
 ;   $C2:46FA and $C2:5254 are doubtful byte patterns.
@@ -2966,7 +2978,8 @@ org $C20F63
 ; Z=0 it adds A to the pointer, stores it back in .ScriptPtr, zeroes
 ; .OpState (16-bit, so +$33 too) for the next op and goes on; Z=1 ends
 ; the call with the pointer where it is (.ScriptBank is never written).
-; Callers (5 JSR sites, unmatched): $C2:378B, $C2:37A1, $C2:3DBA,
+; Callers (5 JSR sites): unmatched ($C2:378B, $C2:37A1, $C2:3DBA, $C2:3DC1, $C2:4823).
+; Callers note (5 JSR sites, unmatched): $C2:378B, $C2:37A1, $C2:3DBA,
 ;   $C2:3DC1 and $C2:4823; as a task handler, C2Scene_TaskRunAll
 ;   (C2Scene_TaskCallHandler).
 ; Entry: M any (SEP #$20 / REP #$20 here), X=0, DP=$0000, DB with low
@@ -3113,7 +3126,7 @@ C2Script_OpTable:
 ; script fields +$07-$0A: .ScriptReturn, the animation, the sprite fields,
 ; position and velocity and all words up to +$3F (16-bit STZs at +$05,
 ; +$0B, +$0D, +$0E and every even offset $10-$3E, so +$0E is cleared twice).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 1; X = the task
 ; No calls.
@@ -3153,7 +3166,7 @@ C2Script_ResetTask:
 ; $C2:1091 — C2Script_SetSprPalette (23 bytes, $1091–$10A7)
 ; Op $01, 2 bytes: .SprAttr = .SprAttr AND $F1 OR arg 1: replaces bits
 ; 1-3, which C2Scene_SprDrawNode puts in the OAM palette bits.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
@@ -3173,7 +3186,7 @@ C2Script_SetSprPalette:
 ; $C2:10A8 — C2Script_SetSprPriority (23 bytes, $10A8–$10BE)
 ; Op $02, 2 bytes: .SprAttr = .SprAttr AND $4F OR arg 1: replaces bits 4
 ; and 5 (the OAM priority bits) and bit 7 (C2Scene_SprAttrScroll).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
@@ -3196,7 +3209,7 @@ C2Script_SetSprPriority:
 ; reads none of its 9 argument bytes itself: probably the new task reads
 ; them through the .ScriptPtr it copied, which still points at this op
 ; (C2Scene_TaskRunScript stores the pointer only after the op).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 10; X, Y as C2Scene_TaskSpawn leaves them;
 ;        C2Tmp_08 changed
@@ -3215,7 +3228,7 @@ C2Script_SpawnUnk1CF5:
 ; and starts a C2Scene_TaskUnk1DD4 task, which copies them (what it does
 ; with them is not traced). This task's .OpState is zeroed again when
 ; C2Scene_TaskRunScript advances.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 6; X, Y as C2Scene_TaskSpawn leaves them;
 ;        C2Tmp_08 changed
@@ -3256,7 +3269,7 @@ C2Script_SpawnUnk1DD4:
 ; The +16 is half the screen width in tiles for X but not half its height
 ; for Y (C2Scene_SetStartScroll uses 14 there): probably the tile under
 ; the camera's center, or near it.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner); DB=$00
 ;        (absolute DP_Field block and $04FC)
 ; Exit:  M=0, X=0; A = 5; X = the facing AND 3, Y = 4
@@ -3313,7 +3326,7 @@ C2Script_GoToLocation:
 ; Op $06: stops (A = 0, Z=1) without advancing, every frame: the script
 ; ends there but its task stays (C as C2Scene_TaskRunScript left it, 0
 ; from its ASL). Op $41 (C2Script_Halt2) is the same code.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 0
 ; No calls.
@@ -3328,7 +3341,7 @@ C2Script_Halt:
 ; is on screen is redrawn elsewhere (e.g. C2Script_DrawLayer).
 ; Quirk, kept: the layer is not checked; 0 gives index $1FE and reads a
 ; word far past C2Scene_LayerMaps.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB=$00
 ;        (WRMPYA/WRMPYB/RDMPYL)
 ; Exit:  M=0, X=0; A = 5; X = (layer - 1) * 2, Y = 4; C2Tmp_10-$12 = the
@@ -3376,7 +3389,7 @@ C2Script_SetMapCell:
 ; of the party position (Party_Members) that holds that character;
 ; nothing if none does. With C2Scene_Unk1B41 that makes four words at
 ; $1B3B-$1B42; what they mean is not traced.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the word when one was stored; Y = 3;
@@ -3420,7 +3433,7 @@ C2Script_SetMemberWord:
 ; $C2:11F6 — C2Script_SpawnScript (22 bytes, $11F6–$120B)
 ; Op $09, 4 bytes: starts another script task (C2Scene_TaskSpawnScript,
 ; records 4-63) on the script at arg 1-2 in bank arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 4; X = the new record; Y as C2Scene_TaskSpawn
 ;        leaves it; C2Tmp_01, C2Tmp_08 and C2Tmp_0A changed
@@ -3439,7 +3452,7 @@ C2Script_SpawnScript:
 
 ; $C2:120C — C2Script_ClearTaskByte (17 bytes, $120C–$121C)
 ; Op $0A, 2 bytes: task byte arg 1 = 0.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; Y = arg 1
@@ -3457,7 +3470,7 @@ C2Script_ClearTaskByte:
 
 ; $C2:121D — C2Script_IncTaskByte (19 bytes, $121D–$122F)
 ; Op $0B, 2 bytes: task byte arg 1 + 1.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IncTaskByte:
@@ -3474,7 +3487,7 @@ C2Script_IncTaskByte:
 
 ; $C2:1230 — C2Script_DecTaskByte (19 bytes, $1230–$1242)
 ; Op $0C, 2 bytes: task byte arg 1 - 1.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_DecTaskByte:
@@ -3491,7 +3504,7 @@ C2Script_DecTaskByte:
 
 ; $C2:1243 — C2Script_SetTaskByte (20 bytes, $1243–$1256)
 ; Op $0D, 3 bytes: task byte arg 1 = arg 2.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3; X = Y = arg 1
@@ -3511,7 +3524,7 @@ C2Script_SetTaskByte:
 
 ; $C2:1257 — C2Script_OrTaskByte (22 bytes, $1257–$126C)
 ; Op $0E, 3 bytes: task byte arg 1 OR= arg 2 (sets those bits).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_OrTaskByte:
@@ -3530,7 +3543,7 @@ C2Script_OrTaskByte:
 
 ; $C2:126D — C2Script_ClearTaskBits (24 bytes, $126D–$1284)
 ; Op $0F, 3 bytes: task byte arg 1 AND= NOT arg 2 (clears those bits).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_ClearTaskBits:
@@ -3550,7 +3563,7 @@ C2Script_ClearTaskBits:
 
 ; $C2:1285 — C2Script_ClearRamByte (17 bytes, $1285–$1295)
 ; Op $10, 3 bytes: RAM byte at arg 1-2 = 0.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB = the
 ;        bank of the RAM bytes ($00 from the NMI)
 ; Exit:  M=0, X=0; A = 3; X = the address, Y = 1
@@ -3567,7 +3580,7 @@ C2Script_ClearRamByte:
 
 ; $C2:1296 — C2Script_IncRamByte (17 bytes, $1296–$12A6)
 ; Op $11, 3 bytes: RAM byte at arg 1-2 + 1.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IncRamByte:
@@ -3582,7 +3595,7 @@ C2Script_IncRamByte:
 
 ; $C2:12A7 — C2Script_DecRamByte (17 bytes, $12A7–$12B7)
 ; Op $12, 3 bytes: RAM byte at arg 1-2 - 1.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_DecRamByte:
@@ -3597,7 +3610,7 @@ C2Script_DecRamByte:
 
 ; $C2:12B8 — C2Script_SetRamByte (22 bytes, $12B8–$12CD)
 ; Op $13, 4 bytes: RAM byte at arg 1-2 = arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the address, Y = 3
 ; No calls.
@@ -3615,7 +3628,7 @@ C2Script_SetRamByte:
 
 ; $C2:12CE — C2Script_OrRamByte (25 bytes, $12CE–$12E6)
 ; Op $14, 4 bytes: RAM byte at arg 1-2 OR= arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_OrRamByte:
@@ -3633,7 +3646,7 @@ C2Script_OrRamByte:
 
 ; $C2:12E7 — C2Script_ClearRamBits (27 bytes, $12E7–$1301)
 ; Op $15, 4 bytes: RAM byte at arg 1-2 AND= NOT arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_ClearRamBits:
@@ -3652,7 +3665,7 @@ C2Script_ClearRamBits:
 
 ; $C2:1302 — C2Script_TaskByteToRam (26 bytes, $1302–$131B)
 ; Op $16, 4 bytes: RAM byte at arg 2-3 = task byte arg 1.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the address, Y = arg 1
 ; No calls.
@@ -3673,7 +3686,7 @@ C2Script_TaskByteToRam:
 
 ; $C2:131C — C2Script_RamByteToTask (26 bytes, $131C–$1335)
 ; Op $17, 4 bytes: task byte arg 1 = RAM byte at arg 2-3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_TaskByteToRam; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_RamByteToTask:
@@ -3693,7 +3706,7 @@ C2Script_RamByteToTask:
 
 ; $C2:1336 — C2Script_CopyTaskByte (26 bytes, $1336–$134F)
 ; Op $18, 3 bytes: task byte arg 1 = task byte arg 2.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3; X = the byte, Y = arg 1
@@ -3716,7 +3729,7 @@ C2Script_CopyTaskByte:
 
 ; $C2:1350 — C2Script_CopyRamByte (26 bytes, $1350–$1369)
 ; Op $19, 5 bytes: RAM byte at arg 1-2 = RAM byte at arg 3-4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5; X = the source, Y = the destination
 ; No calls.
@@ -3740,7 +3753,7 @@ C2Script_CopyRamByte:
 ; C2Script_Call, which subtracts 1 before advancing, the target is not
 ; arg 1-2 itself: the script's addresses are probably written one less
 ; (not traced).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 1; Y = 1
@@ -3755,7 +3768,7 @@ C2Script_Jump:
 ; $C2:1375 — C2Script_LoopTaskByte (35 bytes, $1375–$1397)
 ; Op $1B, 3 bytes: task byte arg 1 - 1; while it is not 0, branch by arg
 ; 2; at 0, advance 3 (a counted loop).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3, or the offset with C=0 (Z=1 for 0); Y = arg 1
@@ -3786,7 +3799,7 @@ C2Script_LoopTaskByte:
 ; $C2:1398 — C2Script_IfTaskByteZero (32 bytes, $1398–$13B7)
 ; Op $1C, 3 bytes: if task byte arg 1 is 0, branch by arg 2; else
 ; advance 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3, or the offset with C=0; Y = arg 1 or 2
@@ -3814,7 +3827,7 @@ C2Script_IfTaskByteZero:
 ; $C2:13B8 — C2Script_IfTaskByteNonZero (32 bytes, $13B8–$13D7)
 ; Op $1D, 3 bytes: if task byte arg 1 is not 0, branch by arg 2; else
 ; advance 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfTaskByteZero; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskByteNonZero:
@@ -3840,7 +3853,7 @@ C2Script_IfTaskByteNonZero:
 ; $C2:13D8 — C2Script_IfTaskByteNe (36 bytes, $13D8–$13FB)
 ; Op $1E, 4 bytes: if task byte arg 1 is not arg 2, branch by arg 3;
 ; else advance 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = arg 1; Y = arg 1
@@ -3872,7 +3885,7 @@ C2Script_IfTaskByteNe:
 ; $C2:13FC — C2Script_IfTaskByteEq (36 bytes, $13FC–$141F)
 ; Op $1F, 4 bytes: if task byte arg 1 is arg 2, branch by arg 3; else
 ; advance 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskByteEq:
@@ -3901,7 +3914,7 @@ C2Script_IfTaskByteEq:
 ; $C2:1420 — C2Script_IfTaskBitsSet (36 bytes, $1420–$1443)
 ; Op $20, 4 bytes: if task byte arg 1 AND arg 2 is not 0, branch by arg
 ; 3; else advance 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskBitsSet:
@@ -3930,7 +3943,7 @@ C2Script_IfTaskBitsSet:
 ; $C2:1444 — C2Script_IfTaskBitsClear (37 bytes, $1444–$1468)
 ; Op $21, 4 bytes: if task byte arg 1 AND arg 2 is 0, branch by arg 3;
 ; else advance 4. (Its TDC clears a high byte that is already 0.)
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskBitsClear:
@@ -3960,7 +3973,7 @@ C2Script_IfTaskBitsClear:
 ; $C2:1469 — C2Script_IfRamByteZero (34 bytes, $1469–$148A)
 ; Op $22, 4 bytes: if the RAM byte at arg 1-2 is 0, branch by arg 3; else
 ; advance 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = the address; Y = 1
 ;        or 3
@@ -3989,7 +4002,7 @@ C2Script_IfRamByteZero:
 ; $C2:148B — C2Script_IfRamByteNonZero (34 bytes, $148B–$14AC)
 ; Op $23, 4 bytes: if the RAM byte at arg 1-2 is not 0, branch by arg 3;
 ; else advance 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteZero; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteNonZero:
@@ -4016,7 +4029,8 @@ C2Script_IfRamByteNonZero:
 ; $C2:14AD — C2Script_IfRamByteNe (37 bytes, $14AD–$14D1)
 ; Op $24, 5 bytes: if the RAM byte at arg 1-2 is not arg 3, branch by
 ; arg 4; else advance 5.
-; Callers: none direct (C2Script_OpTable). xref's CONFIRMED JSR at
+; Callers (1 JSR site): unmatched ($C2:FFB4).
+; Callers note: none direct (C2Script_OpTable). xref's CONFIRMED JSR at
 ;   $C2:FFB4 is not a call: those bytes are the operand of REP #$20 at
 ;   $C2:FFB3 and the LDA $1814 after it (unmatched code).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
@@ -4049,7 +4063,7 @@ C2Script_IfRamByteNe:
 ; $C2:14D2 — C2Script_IfRamByteEq (37 bytes, $14D2–$14F6)
 ; Op $25, 5 bytes: if the RAM byte at arg 1-2 is arg 3, branch by arg 4;
 ; else advance 5.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteEq:
@@ -4078,7 +4092,7 @@ C2Script_IfRamByteEq:
 ; $C2:14F7 — C2Script_IfRamBitsSet (37 bytes, $14F7–$151B)
 ; Op $26, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is not 0, branch
 ; by arg 4; else advance 5.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamBitsSet:
@@ -4107,7 +4121,7 @@ C2Script_IfRamBitsSet:
 ; $C2:151C — C2Script_IfRamBitsClear (37 bytes, $151C–$1540)
 ; Op $27, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is 0, branch by
 ; arg 4; else advance 5.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamBitsClear:
@@ -4137,7 +4151,7 @@ C2Script_IfRamBitsClear:
 ; Op $4C, 5 bytes: if the RAM byte at arg 1-2 is below arg 3 (unsigned),
 ; branch by arg 4; else advance 5. (It reads a word and compares the low
 ; byte.)
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteLess:
@@ -4166,7 +4180,7 @@ C2Script_IfRamByteLess:
 ; $C2:1566 — C2Script_IfRamByteGe (37 bytes, $1566–$158A)
 ; Op $4D, 5 bytes: if the RAM byte at arg 1-2 is arg 3 or more
 ; (unsigned), branch by arg 4; else advance 5.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteGe:
@@ -4196,7 +4210,7 @@ C2Script_IfRamByteGe:
 ; Op $28, 2 bytes: starts a C2Scene_TaskUnk20A2 task (C2Scene_TaskSpawn),
 ; which copies this record (and so this op's .ScriptPtr: probably it
 ; reads arg 1 from there; not traced).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 2; X, Y as C2Scene_TaskSpawn leaves them;
 ;        C2Tmp_08 changed
@@ -4211,7 +4225,7 @@ C2Script_SpawnUnk20A2:
 
 ; $C2:1599 — C2Script_SpawnUnk2105 (14 bytes, $1599–$15A6)
 ; Op $29, 2 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk2105.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SpawnUnk20A2
 ; Calls: C2Scene_TaskSpawn.
 C2Script_SpawnUnk2105:
@@ -4224,7 +4238,7 @@ C2Script_SpawnUnk2105:
 
 ; $C2:15A7 — C2Script_SpawnUnk21F8 (14 bytes, $15A7–$15B4)
 ; Op $2A, 3 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk21F8.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_SpawnUnk20A2
 ; Exit:  as C2Script_SpawnUnk20A2, A = 3
 ; Calls: C2Scene_TaskSpawn.
@@ -4238,7 +4252,7 @@ C2Script_SpawnUnk21F8:
 
 ; $C2:15B5 — C2Script_SpawnUnk2194 (14 bytes, $15B5–$15C2)
 ; Op $2B, 3 bytes: as C2Script_SpawnUnk20A2 with C2Scene_TaskUnk2194.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Script_SpawnUnk20A2
 ; Exit:  as C2Script_SpawnUnk20A2, A = 3
 ; Calls: C2Scene_TaskSpawn.
@@ -4253,7 +4267,7 @@ C2Script_SpawnUnk2194:
 ; $C2:15C3 — C2Script_SetPosition (28 bytes, $15C3–$15DE)
 ; Op $2C, 5 bytes: .SprX = arg 1-2 and .SprY = arg 3-4, both fractions
 ; 0.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5; X = the task, Y = 3
@@ -4274,7 +4288,7 @@ C2Script_SetPosition:
 ; $C2:15DF — C2Script_Skip1 (4 bytes, $15DF–$15E2)
 ; Op $2D, 2 bytes: does nothing and advances 2 (the byte after the opcode
 ; is skipped).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  M=0, X=0; A = 2
 ; No calls.
@@ -4284,7 +4298,7 @@ C2Script_Skip1:
 
 ; $C2:15E3 — C2Script_SetXVelocity (22 bytes, $15E3–$15F8)
 ; Op $2E, 5 bytes: .XVelFrac = arg 1-2, .XVel = arg 3-4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_SetXVelocity:
@@ -4300,7 +4314,7 @@ C2Script_SetXVelocity:
 
 ; $C2:15F9 — C2Script_SetYVelocity (22 bytes, $15F9–$160E)
 ; Op $2F, 5 bytes: .YVelFrac = arg 1-2, .YVel = arg 3-4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_SetYVelocity:
@@ -4316,7 +4330,7 @@ C2Script_SetYVelocity:
 
 ; $C2:160F — C2Script_SetAnim (14 bytes, $160F–$161C)
 ; Op $30, 2 bytes: starts animation script arg 1 (C2Scene_SetAnim).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
 ;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
@@ -4336,7 +4350,7 @@ C2Script_SetAnim:
 ; the frame. .ScriptWait counts: 0 loads it with arg 1 (and that frame
 ; moves), then -1 per frame; when it reaches 0 the op advances 2 without
 ; moving. So arg 1 = n moves n times; 0 never ends.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  advance: M=0, X=0, A = 2, X = the task. Moved: M=0, X=0, A = 0
 ;        (Z=1), C=0 (the animation's carry is dropped); X, Y as
@@ -4382,7 +4396,7 @@ C2Script_MoveFrames:
 ; pixels unless any of three flag bits is set in C2Scene_FlagTailCopy
 ; (bytes 0, 3 and 8: the copy of $7F:01F0-$01FF; what they stand for is
 ; not traced).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  advance: M=0, X=0, A = 2, X = the task. Scrolled: M=0, X=0, A =
 ;        0 (Z=1), C=0; X, Y clobbered; C2Tmp_00/$01 and whatever the
@@ -4481,7 +4495,7 @@ C2Script_ScrollFrames:
 ; $C2:16FA — C2Script_ScrollLayerFrames (95 bytes, $16FA–$1758)
 ; Op $51, 3 bytes: C2Script_ScrollFrames for one layer, arg 1 (passed to
 ; C2Scene_Unk0568/066C as is), for arg 2 frames, and without BG3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
 ; Exit:  advance: M=0, X=0, A = 3, X = the task. Scrolled: as
 ;        C2Script_ScrollFrames
@@ -4539,8 +4553,7 @@ C2Script_ScrollLayerFrames:
 ; as a value in -1..+1: .SprX = -1 if it was negative with a non-zero
 ; .XFrac, else 0; the same for .SprY with .YFrac. (The fraction words
 ; are left as they are.)
-; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:1679),
-;   C2Script_ScrollLayerFrames ($C2:1728).
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:1679) and C2Script_ScrollLayerFrames ($C2:1728).
 ; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=0, X=0; A clobbered; X, Y unchanged
@@ -4574,8 +4587,7 @@ C2Script_PanKeepFraction:
 ; pixels), else C=0. A negative value is negated as 32 bits (only the
 ; high word is kept, for the test), so -1 plus a fraction counts as less
 ; than a pixel.
-; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:167F),
-;   C2Script_ScrollLayerFrames ($C2:172E).
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:167F) and C2Script_ScrollLayerFrames ($C2:172E).
 ; Entry: M=0, X=0 with X = the task, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=0, X=0; C as above; A clobbered; C2Tmp_01 set when C=1; X, Y
@@ -4605,8 +4617,7 @@ C2Script_PanTakeX:
 
 ; $C2:17AB — C2Script_PanTakeY (39 bytes, $17AB–$17D1)
 ; C2Script_PanTakeX for .YFrac/.SprY.
-; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:16BC),
-;   C2Script_ScrollLayerFrames ($C2:1743).
+; Callers (2 JSR sites): C2Script_ScrollFrames ($C2:16BC) and C2Script_ScrollLayerFrames ($C2:1743).
 ; Entry/Exit: as C2Script_PanTakeX
 ; No calls.
 C2Script_PanTakeY:
@@ -4647,7 +4658,7 @@ C2Script_PanTakeY:
 ; .Size = arg 6-7, .Vmain = VMAIN_IncAfterHigh, with C2Scene_VramQLock
 ; held while the entry is written.
 ; Quirk, kept: no check that the queue has room.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$30 here), DP=$0000 (the queue is direct page),
 ;        DB=$00 (low WRAM: the .Bank byte is stored absolute through
 ;        DB); C2Script_Ptr on the opcode
@@ -4687,7 +4698,7 @@ C2Script_QueueVram:
 ; Op $34, 3 bytes: calls the routine at arg 1-2 in bank $C2 (JSR to
 ; .call, a JMP (C2Script_CallVec)) with M=1, then advances 3. The
 ; routine returns with RTS; its carry and registers are dropped.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000 (C2Script_CallVec, C2Script_Ptr), DB any
 ;        for this code (the called routine may need more); C2Script_Ptr
 ;        on the opcode
@@ -4710,7 +4721,7 @@ C2Script_CallNear:
 ; Op $4E, 4 bytes: calls the routine at the long address arg 1-3 (JSL to
 ; .call, a JML [C2Script_CallVec]) with M=1; it returns with RTL. Then
 ; advances 4.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000 (C2Script_CallVec, C2Script_Ptr), DB any
 ;        for this code; C2Script_Ptr on the opcode
 ; Exit:  M=0, X=0; A = 4; X, Y and the rest as the called routine leaves
@@ -4735,7 +4746,7 @@ C2Script_CallLong:
 ; Op $35, 3 bytes: starts a task with handler arg 1-2 (an address in bank
 ; $C2) in records 4-63 (C2Scene_TaskSpawn), which copies this task's
 ; record from +$05 on.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; A = 3; X, Y as C2Scene_TaskSpawn leaves them;
@@ -4755,7 +4766,7 @@ C2Script_SpawnTask:
 ; address of the next op, and the script continues at arg 1-2 (same
 ; bank): C2Script_Ptr = arg - 1 and A = 1, which C2Scene_TaskRunScript
 ; adds. There is one return slot, so calls do not nest.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; A = 1; X = the task, Y = 1; C2Script_Ptr = arg - 1
@@ -4776,7 +4787,7 @@ C2Script_Call:
 ; $C2:185F — C2Script_Return (12 bytes, $185F–$186A)
 ; Op $37, 1 byte: returns from C2Script_Call: the script continues at
 ; .ScriptReturn (C2Script_Ptr = it - 1, A = 1).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; A = 1; X = the task
@@ -4793,7 +4804,7 @@ C2Script_Return:
 ; Op $38, 2 bytes: waits arg 1 frames, counted in .ScriptWait as
 ; C2Script_MoveFrames counts: 0 loads it with arg 1 and stops, then -1
 ; per frame; at 0 it advances 2. Arg 1 = 0 waits for good.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = 2 (advance) or 0 (Z=1, C=0: wait)
@@ -4822,7 +4833,7 @@ C2Script_Wait:
 ; $C2:188E — C2Script_WaitAnimating (38 bytes, $188E–$18B3)
 ; Op $39, 2 bytes: C2Script_Wait, running the task's animation
 ; (C2Anim_Run) on each frame it waits.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  advance: M=0, X=0, A = 2, X = the task. Wait: M=0, X=0, A = 0
@@ -4858,7 +4869,7 @@ C2Script_WaitAnimating:
 ; so C2Scene_TaskRunAll keeps adding 1 to the 16-bit .Frames; it stays
 ; stopped until .Frames wraps to 0, and then advances. Why a script would want this is not
 ; traced.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task, Y = 1; A = 3 (advance) or 0 (Z=1, C=0)
@@ -4880,7 +4891,7 @@ C2Script_StopIfOlder:
 ; Op $3B, 3 bytes: C2Script_PlaySfx with sound command C2Scene_SoundCmd18
 ; instead of Audio_CmdPlaySfx: it sets the command byte and branches to
 ; C2Script_PlaySfx_SetArgs.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_PlaySfx (M=0, X=0, DP=$0000, DB=$00)
 ; Calls: C2Scene_QueueSoundCmd (through C2Script_PlaySfx_SetArgs).
 C2Script_SoundCmd18:
@@ -4896,7 +4907,7 @@ C2Script_SoundCmd18:
 ; one is being sent; the refusal is not checked). C2Script_SoundCmd18
 ; enters at the sub-entry C2Script_PlaySfx_SetArgs with its own command
 ; byte.
-; Callers: none direct (C2Script_OpTable); C2Script_PlaySfx_SetArgs: BRA
+; Callers note: none direct (C2Script_OpTable); C2Script_PlaySfx_SetArgs: BRA
 ;   from C2Script_SoundCmd18 ($C2:18CE).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
 ;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
@@ -4926,7 +4937,7 @@ C2Script_PlaySfx_SetArgs:       ; header: see C2Script_PlaySfx
 ; Op $3D, 2 bytes: C2Script_SoundCmd10 unless C2Scene_Unk7F01ED is
 ; non-zero: then it branches to C2Script_SoundCmd10_Done, which only
 ; advances 2. Otherwise it falls into C2Script_SoundCmd10.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM; the flag
 ;        is read long); C2Script_Ptr on the opcode
 ; Exit:  as C2Script_SoundCmd10 (skipped: M=0, X=0, A = 2)
@@ -4944,7 +4955,7 @@ C2Script_SoundCmd10IfClear:
 ; probably the scene's current music, unverified). The sub-entry
 ; C2Script_SoundCmd10_Done (the advance) is where
 ; C2Script_SoundCmd10IfClear skips to.
-; Callers: none direct (C2Script_OpTable); C2Script_SoundCmd10_Done:
+; Callers note: none direct (C2Script_OpTable); C2Script_SoundCmd10_Done:
 ;   BNE from C2Script_SoundCmd10IfClear ($C2:18F7).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
 ;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
@@ -4973,7 +4984,7 @@ C2Script_SoundCmd10_Done:       ; header: see C2Script_SoundCmd10
 ; $C2:191F — C2Script_SoundCmd (40 bytes, $191F–$1946)
 ; Op $4B, 5 bytes: queues the sound command arg 1 with argument bytes arg
 ; 2-4, at rank 0 (C2Scene_QueueSoundCmd).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
 ;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
 ;        the opcode
@@ -5004,7 +5015,7 @@ C2Script_SoundCmd:
 ; (C2Scene_DrawBgLayer), e.g. after C2Script_SetMapCell. That redraw
 ; DMAs straight to VRAM, so it relies on running in vblank (the script
 ; tasks run from the NMI).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_DrawBgLayer's work
 ;        area), DB=$00 (low WRAM; C2Scene_DrawBgLayer sets and restores
 ;        its own); C2Script_Ptr on the opcode; vblank
@@ -5034,7 +5045,7 @@ C2Script_DrawLayer:
 ; Quirk, kept: only an exact hit ends it. A speed that steps past the
 ; target keeps going, around the wrapped map, until some step lands on
 ; it, and a velocity of 0 never arrives.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM: the task
 ;        record); C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  arrived: M=0, X=0, A = 5, X = the task. Moving: M=0, X=0, A = 0
@@ -5096,7 +5107,7 @@ C2Script_MoveToX:
 ; C2Scene_NegateYVel, animation arg 3 when going up (target above .SprY)
 ; and arg 4 when going down; .YFrac/.SprY += the Y velocity. The same
 ; exact-hit quirk.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM: the task
 ;        record); C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  arrived: M=0, X=0, A = 5, X = the task. Moving: M=0, X=0, A = 0
@@ -5156,7 +5167,7 @@ C2Script_MoveToY:
 ; $C2:1A2B — C2Script_Halt2 (2 bytes, $1A2B–$1A2C)
 ; Op $41, 1 byte: the same code as C2Script_Halt (op $06): stops (A = 0,
 ; Z=1) without advancing, every frame; the task stays.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000 (TDC loads 0), DB any (no data accesses)
 ; Exit:  M=0, X=0; A = 0
 ; No calls.
@@ -5168,7 +5179,7 @@ C2Script_Halt2:
 ; Op $43, 4 bytes: C2Script_SpawnScript in records 0-3: starts a script
 ; task (C2Scene_TaskSpawnScriptLow) on the script at arg 1-2 in bank
 ; arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; A = 4; X = the new record; Y as C2Scene_TaskSpawn
@@ -5189,7 +5200,7 @@ C2Script_SpawnScriptLow:
 ; $C2:1A43 — C2Script_SpawnTaskLow (15 bytes, $1A43–$1A51)
 ; Op $42, 3 bytes: C2Script_SpawnTask in records 0-3
 ; (C2Scene_TaskSpawnLow): handler arg 1-2.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
 ;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; A = 3; X, Y as C2Scene_TaskSpawnLow leaves them;
@@ -5211,7 +5222,7 @@ C2Script_SpawnTaskLow:
 ; C2Tmp_10/$11; this adds bank $7E). What the bit means is not traced.
 ; Quirk, kept: the list number is not checked; 3 or more jumps through
 ; the code after the table.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00, C2Tmp_10-$12),
 ;        DB any (the entry is reached long); C2Script_Ptr on the opcode;
 ;        A's high byte 0 (the helpers use the entry number as 16 bits:
@@ -5250,7 +5261,7 @@ C2Script_ListEntryTable:
 ; $C2:1A76 — C2Script_ListAEntry (20 bytes, $1A76–$1A89)
 ; C2Tmp_10/$11 = the 16-bit address of entry arg 2 of C2Scene_ListA
 ; (entry * 7, as entry * 8 - entry, + the list).
-; Callers: none direct (C2Script_ListEntryTable).
+; Callers note: none direct (C2Script_ListEntryTable).
 ; Entry: M=1, X=0, DP=$0000, DB any; Y = 1 (on arg 1), C2Script_Ptr on
 ;        the opcode; A's high byte 0
 ; Exit:  M=0, X=0; A = the address; Y = 2; C2Tmp_00/$01 = the entry
@@ -5274,7 +5285,7 @@ C2Script_ListAEntry:
 ; $C2:1A8A — C2Script_ListBEntry (17 bytes, $1A8A–$1A9A)
 ; C2Tmp_10/$11 = the address of entry arg 2 of C2Scene_ListB (entry * 3
 ; + the list).
-; Callers: none direct (C2Script_ListEntryTable).
+; Callers note: none direct (C2Script_ListEntryTable).
 ; Entry/Exit: as C2Script_ListAEntry (M=1, X=0, DP=$0000, DB any on
 ;        entry; M=0, X=0 on exit)
 ; No calls.
@@ -5293,7 +5304,7 @@ C2Script_ListBEntry:
 ; $C2:1A9B — C2Script_ListCEntry (17 bytes, $1A9B–$1AAB)
 ; C2Tmp_10/$11 = the address of entry arg 2 of C2Scene_ListC (entry * 3
 ; + the list).
-; Callers: none direct (C2Script_ListEntryTable).
+; Callers note: none direct (C2Script_ListEntryTable).
 ; Entry/Exit: as C2Script_ListAEntry (M=1, X=0, DP=$0000, DB any on
 ;        entry; M=0, X=0 on exit)
 ; No calls.
@@ -5311,7 +5322,7 @@ C2Script_ListCEntry:
 
 ; $C2:1AAC — C2Script_ClearListBit7 (30 bytes, $1AAC–$1AC9)
 ; Op $45, 3 bytes: C2Script_SetListBit7, clearing the bit instead.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00, C2Tmp_10-$12),
 ;        DB any (the entry is reached long); C2Script_Ptr on the opcode;
 ;        A's high byte 0 (as C2Script_SetListBit7)
@@ -5337,7 +5348,7 @@ C2Script_ClearListBit7:
 
 ; $C2:1ACA — C2Script_AddTaskByte (23 bytes, $1ACA–$1AE0)
 ; Op $46, 3 bytes: task byte arg 1 += arg 2 (8-bit, wrapping).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
 ;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
 ;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TXY
@@ -5362,7 +5373,7 @@ C2Script_AddTaskByte:
 
 ; $C2:1AE1 — C2Script_SubTaskByte (26 bytes, $1AE1–$1AFA)
 ; Op $47, 3 bytes: task byte arg 1 -= arg 2 (8-bit, wrapping).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
 ;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
 ;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TAY
@@ -5388,7 +5399,7 @@ C2Script_SubTaskByte:
 
 ; $C2:1AFB — C2Script_AddRamByte (26 bytes, $1AFB–$1B14)
 ; Op $48, 4 bytes: RAM byte at arg 1-2 (through DB) += arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000 (C2Script_Ptr), DB=$00 (the address is
 ;        absolute: low WRAM or I/O); C2Script_Ptr on the opcode
 ; Exit:  M=0, X=0; A = 4; X = arg 1-2, Y = 3
@@ -5409,7 +5420,7 @@ C2Script_AddRamByte:
 
 ; $C2:1B15 — C2Script_SubRamByte (26 bytes, $1B15–$1B2E)
 ; Op $49, 4 bytes: RAM byte at arg 1-2 (through DB) -= arg 3.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry/Exit: as C2Script_AddRamByte (M=0, X=0, DP=$0000, DB=$00 on
 ;        entry; M=0, X=0, A = 4, X = arg 1-2, Y = 3 on exit)
 ; No calls.
@@ -5438,7 +5449,7 @@ C2Script_SubRamByte:
 ; redrawn elsewhere (C2Script_DrawLayer).
 ; Quirk, kept: a width or height of 0 copies 256 (DEC/BNE). No wrap at
 ; the map's edge: a block past column 95 runs into the next row.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00-$15), DB=$00
 ;        (WRMPYA/WRMPYB/RDMPYL, WMADD/WMDATA); C2Script_Ptr on the
 ;        opcode
@@ -5556,7 +5567,7 @@ C2Script_CopyMapBlock:
 ; 32x32 screen). Layer 1 picks the BG1 set, any other value BG2. The map
 ; bytes are not changed (C2Script_SetMapCell does that).
 ; Quirk, kept: no check that the queue has room.
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00-$02, C2Tmp_10-$14,
 ;        the queue), DB=$00 (low WRAM: the entries' .Bank bytes are stored
 ;        absolute through DB); C2Script_Ptr on the opcode
@@ -5659,7 +5670,7 @@ C2Script_DrawMetatile:
 ; $C2:1C81 — C2Script_End (3 bytes, $1C81–$1C83)
 ; Op $52, 1 byte: stops (A = 0, Z=1) with C=1, which ends the task when
 ; C2Scene_TaskRunScript is its handler (C2Scene_TaskRunAll frees it).
-; Callers: none direct (C2Script_OpTable).
+; Callers note: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000 (TDC loads 0), DB any (no data accesses)
 ; Exit:  M=0, X=0; A = 0, C=1
 ; No calls.
@@ -5678,8 +5689,7 @@ org $C21C84
 ; $C2:1C84 — C2Scene_NegateXVel (26 bytes, $1C84–$1C9D)
 ; Negates the task's X velocity as one 32-bit value (.XVelFrac/.XVel:
 ; invert both words and add 1 with the carry), turning it around.
-; Callers (4 JSR sites): C2Script_MoveToX ($C2:1979, $C2:198B);
-;   unmatched: $C2:52D0 and $C2:5429.
+; Callers (4 JSR sites): C2Script_MoveToX ($C2:1979, $C2:198B) and unmatched ($C2:52D0, $C2:5429).
 ; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=0, X=0; A = the new .XVel; X, Y unchanged
@@ -5698,8 +5708,7 @@ C2Scene_NegateXVel:
 
 ; $C2:1C9E — C2Scene_NegateYVel (26 bytes, $1C9E–$1CB7)
 ; C2Scene_NegateXVel for .YVelFrac/.YVel.
-; Callers (4 JSR sites): C2Script_MoveToY ($C2:19E2, $C2:19F4);
-;   unmatched: $C2:5319 and $C2:5436.
+; Callers (4 JSR sites): C2Script_MoveToY ($C2:19E2, $C2:19F4) and unmatched ($C2:5319, $C2:5436).
 ; Entry/Exit: as C2Scene_NegateXVel (A = the new .YVel)
 ; No calls.
 C2Scene_NegateYVel:
@@ -5720,7 +5729,12 @@ C2Scene_NegateYVel:
 ; negative or taken off when it is that or more (once, so it assumes the
 ; position moved by less than a map width); .SprY is taken AND
 ; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
-; Callers (22 call sites, JSR and JMP, all unmatched except those
+; Callers (23 sites: 22 JSR, 1 JMP): C2Script_MoveFrames (JSR $C2:1640), C2Script_MoveToX (JSR
+;   $C2:19B3), C2Script_MoveToY (JSR $C2:1A1C) and unmatched (JSR $C2:36F4, JSR $C2:383E, JSR
+;   $C2:38CC, JSR $C2:3D05, JSR $C2:3D66, JSR $C2:3E26, JSR $C2:3E8A, JSR $C2:4457, JSR $C2:467C,
+;   JSR $C2:46FD, JMP $C2:48E5, JSR $C2:4D93, JSR $C2:4F85, JSR $C2:5005, JSR $C2:5169, JSR
+;   $C2:5238, JSR $C2:5257, JSR $C2:5550, JSR $C2:55C9, JSR $C2:55DF).
+; Callers note (22 call sites, JSR and JMP, all unmatched except those
 ;   named): e.g. C2Script_MoveFrames ($C2:1640), C2Script_MoveToX
 ;   ($C2:19B3), C2Script_MoveToY ($C2:1A1C), $C2:36F4, JMP at $C2:48E5,
 ;   and $C2:55DF; $C2:5257 is a doubtful byte pattern.
@@ -5750,7 +5764,14 @@ C2Scene_WrapTaskPos:
 ; Starts animation script A (low byte) on the running task: .AnimPtr =
 ; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
 ; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
-; Callers (34 call sites, JSR and JMP, all unmatched except those
+; Callers (37 sites: 34 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
+;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC) and unmatched (JSR
+;   $C2:35CD, JMP $C2:397C, JMP $C2:39A7, JSR $C2:3CA7, JSR $C2:3CC7, JSR $C2:4336, JSR $C2:433D,
+;   JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR
+;   $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E,
+;   JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR
+;   $C2:550B, JSR $C2:556A, JSR $C2:559F, JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
+; Callers note (34 call sites, JSR and JMP, all unmatched except those
 ;   named): e.g. C2Script_SetAnim ($C2:1614), C2Script_MoveToX
 ;   ($C2:1981, $C2:1993), C2Script_MoveToY ($C2:19EA, $C2:19FC), JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
 ;   also lists doubtful byte patterns at $C2:470F, $C2:48BB, $C2:48C2,
@@ -5786,7 +5807,7 @@ C2Scene_SetAnim:
 ; Task handler: runs the state in .State (C2Scene_UploadTask; the record's
 ; .Unk02, 0 from C2Scene_TaskSpawn) through C2Scene_UploadTileStates: 0
 ; C2Scene_UploadTilesStart, 1 C2Scene_UploadTilesStep.
-; Callers: none direct; the handler C2Script_SpawnUnk1CF5 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk1CF5 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1 (REP #$20 here), X=0 with X = the task, DP=$0000, DB=$00
 ;        (low WRAM: the task record); C2Scene_TaskCur = the task
@@ -5816,7 +5837,7 @@ C2Scene_UploadTileStates:
 ; units: probably 8x8 4-bit tiles). .PerFrame 0 means all at once
 ; (.PerFrame = .Left). Then falls into C2Scene_UploadTilesStep, so the
 ; first part goes this frame.
-; Callers: none direct (C2Scene_UploadTileStates).
+; Callers note: none direct (C2Scene_UploadTileStates).
 ; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12), DB=$00 (low WRAM: the task
 ;        record); C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_UploadTilesStep; C2Tmp_10-$12 = the op's address
@@ -5861,7 +5882,7 @@ C2Scene_UploadTilesStart:
 ; Quirk, kept: no check that the queue has room; and .Left = 0 from the
 ; op still queues a part, of size 0 (which the DMA hardware takes as
 ; 65536 bytes if the flush passes it on as is), then ends.
-; Callers: none direct (C2Scene_UploadTileStates; C2Scene_UploadTilesStart
+; Callers note: none direct (C2Scene_UploadTileStates; C2Scene_UploadTilesStart
 ;   branches (BNE at $C2:1D44) or falls into it).
 ; Entry: M=0, X=0, DP=$0000 (the queue, C2Tmp_08/$0A), DB=$00 (low WRAM:
 ;        the task record); C2Scene_TaskCur = the task
@@ -5987,7 +6008,7 @@ org $C21DD4
 ; C2Scene_PaletteBuf (WMADD/WMDATA) and asks the NMI to upload the
 ; palettes (C2Scene_NmiPalette); .State = 1. Second frame: takes itself
 ; out of C2Scene_Unk0B20 and ends.
-; Callers: none direct; the handler C2Script_SpawnUnk1DD4 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk1DD4 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0; C2Tmp_10-$12,
 ;        C2Scene_NmiFlags), DB=$00 (low WRAM: the task record,
@@ -6056,7 +6077,7 @@ C2Scene_TaskUnk1DD4:
 ; Task handler (palette fade, started by C2Scene_TaskUnk1DD4): runs
 ; .State through C2Scene_PalFadeStates: 0 C2Scene_PalFadeStart, 1
 ; C2Scene_PalFadeStep, 2 C2Scene_PalFadeEnd.
-; Callers: none direct (C2Scene_TaskRunAll calls the handler).
+; Callers note: none direct (C2Scene_TaskRunAll calls the handler).
 ; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
 ; Exit:  the state's (M=1, X=0; C=1 when the fade is over)
@@ -6081,7 +6102,7 @@ C2Scene_PalFadeStates:
 ; arrays will overwrite them); .Timer = 0, .Steps = 0; .Colors = the
 ; palette's address in C2Scene_PaletteBuf; then plans the fade
 ; (C2Scene_PalFadePlan).
-; Callers: none direct (C2Scene_PalFadeStates).
+; Callers note: none direct (C2Scene_PalFadeStates).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record,
 ;        C2Scene_PaletteBuf, C2Scene_Unk0B20); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; C=0; X = the task + $3F (the last .BlueStep byte,
@@ -6126,7 +6147,7 @@ C2Scene_PalFadeStart:
 ; takes one step (C2Scene_PalFadeApply), zeroes .Timer's low byte, asks
 ; the NMI to upload the palettes, and after the C2Scene_PalFadeSteps-th
 ; step sets .State to 2.
-; Callers: none direct (C2Scene_PalFadeStates).
+; Callers note: none direct (C2Scene_PalFadeStates).
 ; Entry: M=1, X=0, DP=$0000 (C2Scene_NmiFlags), DB=$00 (low WRAM: the
 ;        task record, C2Scene_PaletteBuf, C2Scene_Unk0B20);
 ;        C2Scene_TaskCur = the task
@@ -6159,7 +6180,7 @@ C2Scene_PalFadeStep:
 ; $C2:1EB5 — C2Scene_PalFadeEnd (11 bytes, $1EB5–$1EBF)
 ; State 2 (and C2Scene_PalFadeStep's give-up): takes the task out of
 ; C2Scene_Unk0B20 for its palette and ends it (C=1).
-; Callers: none direct (C2Scene_PalFadeStates; BNE from
+; Callers note: none direct (C2Scene_PalFadeStates; BNE from
 ;   C2Scene_PalFadeStep at $C2:1E90).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record,
 ;        C2Scene_Unk0B20); C2Scene_TaskCur = the task; A's high byte 0
@@ -6500,7 +6521,7 @@ C2Scene_PalFadeStepTable:
 ; $C2:20A2 — C2Scene_TaskUnk20A2 (9 bytes, $20A2–$20AA)
 ; Task handler (fade out, op $28): runs .State through
 ; C2Scene_FadeOutStates: 0 C2Scene_FadeOutStart, 1 C2Scene_FadeOutStep.
-; Callers: none direct; the handler C2Script_SpawnUnk20A2 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk20A2 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
@@ -6527,7 +6548,7 @@ C2Scene_FadeOutStates:
 ; (quirk, kept: no later fade-out runs until something clears it).
 ; Otherwise .Rate = arg 1, .Timer's low byte = 0, and it falls into
 ; C2Scene_FadeOutStep.
-; Callers: none direct (C2Scene_FadeOutStates).
+; Callers note: none direct (C2Scene_FadeOutStates).
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
 ;        WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur = the
 ;        task
@@ -6565,7 +6586,7 @@ C2Scene_FadeOutStart:
 ; byte and takes C2Scene_Brightness down one. At brightness 0 (already,
 ; or after the step) it turns on forced blank, clears
 ; C2Scene_FadeOutBusy and ends (C=1).
-; Callers: none direct (C2Scene_FadeOutStates; C2Scene_FadeOutStart falls
+; Callers note: none direct (C2Scene_FadeOutStates; C2Scene_FadeOutStart falls
 ;   into it).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
 ;        (low WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur =
@@ -6600,7 +6621,7 @@ C2Scene_FadeOutStep:
 ; Task handler (fade in, op $29): runs .State through
 ; C2Scene_FadeInStates: 0 C2Scene_FadeInStart, 1 C2Scene_FadeInUnblank,
 ; 2 C2Scene_FadeInStep, 3 C2Scene_FadeInEnd.
-; Callers: none direct; the handler C2Script_SpawnUnk2105 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk2105 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
@@ -6632,7 +6653,7 @@ C2Scene_FadeInStates:
 ; 0.
 ; Quirk, kept: a second fade-in started while one runs ends through
 ; C2Scene_FadeInEnd and so clears the running one's C2Scene_FadeInBusy.
-; Callers: none direct (C2Scene_FadeInStates).
+; Callers note: none direct (C2Scene_FadeInStates).
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
 ;        WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur = the
 ;        task
@@ -6674,7 +6695,7 @@ C2Scene_FadeInStart:
 ; State 1: ends (C2Scene_FadeInEnd) if a fade-out has started. Once .Timer
 ; reaches .Rate: .State = 2, .Timer's low byte = 0, forced blank off and
 ; C2Scene_Brightness + 1 (the first step).
-; Callers: none direct (C2Scene_FadeInStates).
+; Callers note: none direct (C2Scene_FadeInStates).
 ; Entry: M=1, X=0, DP=$0000 (the PPU shadows), DB=$00 (low WRAM: the task
 ;        record, C2Scene_Unk1BF6); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; C=0 (or as C2Scene_FadeInEnd); X = the task; A
@@ -6703,7 +6724,7 @@ C2Scene_FadeInUnblank:
 ; Quirk, kept: a fade-in started at full brightness steps past it (16,
 ; 17, ...: the NMI ORs the byte into INIDISP, so the high bits spill into
 ; forced blank) and ends only when the byte wraps round to 15 again.
-; Callers: none direct (C2Scene_FadeInStates).
+; Callers note: none direct (C2Scene_FadeInStates).
 ; Entry: M=1, X=0, DP=$0000 (the PPU shadows), DB=$00 (low WRAM: the task
 ;        record, C2Scene_Unk1BF6); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; C=0 (or as C2Scene_FadeInEnd); X = the task; A
@@ -6729,7 +6750,7 @@ C2Scene_FadeInStep:
 ; $C2:218D — C2Scene_FadeInEnd (7 bytes, $218D–$2193)
 ; State 3, and where the other fade-in states end: clears
 ; C2Scene_FadeInBusy and ends the task (C=1).
-; Callers: none direct (C2Scene_FadeInStates; BNE from
+; Callers note: none direct (C2Scene_FadeInStates; BNE from
 ;   C2Scene_FadeInStart ($C2:2119), C2Scene_FadeInUnblank ($C2:2157) and
 ;   C2Scene_FadeInStep ($C2:2174); BEQ from C2Scene_FadeInStep
 ;   ($C2:2189)).
@@ -6746,7 +6767,7 @@ C2Scene_FadeInEnd:
 ; Task handler (mosaic shrink, op $2B): runs .State through
 ; C2Scene_MosaicOutStates: 0 C2Scene_MosaicOutStart, 1
 ; C2Scene_MosaicOutStep.
-; Callers: none direct; the handler C2Script_SpawnUnk2194 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk2194 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1 (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
@@ -6772,7 +6793,7 @@ C2Scene_MosaicOutStates:
 ; BGs to apply it to, bits 0-3); arg 2 is the frames per step: 0 sets
 ; the size to 0 at once (keeping the BG bits) and ends. Otherwise .Rate =
 ; arg 2, .Timer's low byte = 0, and it falls into C2Scene_MosaicOutStep.
-; Callers: none direct (C2Scene_MosaicOutStates).
+; Callers note: none direct (C2Scene_MosaicOutStates).
 ; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
 ; Exit:  ended: M=1, X=0, C=1. Else as C2Scene_MosaicOutStep. Y = 2;
@@ -6806,7 +6827,7 @@ C2Scene_MosaicOutStart:
 ; State 1: once .Timer reaches .Rate, .Timer's low byte = 0 and the
 ; mosaic size (C2Scene_MosaicShadow bits 4-7) goes down one; when it is
 ; already 0 the task ends (C=1) instead.
-; Callers: none direct (C2Scene_MosaicOutStates; C2Scene_MosaicOutStart
+; Callers note: none direct (C2Scene_MosaicOutStates; C2Scene_MosaicOutStart
 ;   falls into it).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
 ;        (low WRAM: the task record); C2Scene_TaskCur = the task
@@ -6838,7 +6859,7 @@ C2Scene_MosaicOutStep:
 ; $C2:21F8 — C2Scene_TaskUnk21F8 (13 bytes, $21F8–$2204)
 ; Task handler (mosaic grow, op $2A): runs .State through
 ; C2Scene_MosaicInStates: 0 C2Scene_MosaicInStart, 1 C2Scene_MosaicInStep.
-; Callers: none direct; the handler C2Script_SpawnUnk21F8 installs
+; Callers note: none direct; the handler C2Script_SpawnUnk21F8 installs
 ;   (C2Scene_TaskRunAll calls it).
 ; Entry: M=1 (REP #$20 here), X=0 with X = the task, DP=$0000, DB=$00
 ;        (low WRAM: the task record); C2Scene_TaskCur = the task
@@ -6862,7 +6883,7 @@ C2Scene_MosaicInStates:
 ; State 0: as C2Scene_MosaicOutStart (op $2A's arg 1 ORed into
 ; C2Scene_MosaicShadow, arg 2 the frames per step), but rate 0 sets the
 ; size to the largest (C2Scene_MosaicSizeMask: 16x16 blocks) at once.
-; Callers: none direct (C2Scene_MosaicInStates).
+; Callers note: none direct (C2Scene_MosaicInStates).
 ; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
 ; Exit:  ended: M=1, X=0, C=1. Else as C2Scene_MosaicInStep. Y = 2;
@@ -6899,7 +6920,7 @@ C2Scene_MosaicInStart:
 ; Quirk, kept: the step is added to the whole byte, so a size already
 ; at the largest overflows into 0 (and the carry is lost) and the
 ; growth goes round again, ending only at the next $F0.
-; Callers: none direct (C2Scene_MosaicInStates; C2Scene_MosaicInStart
+; Callers note: none direct (C2Scene_MosaicInStates; C2Scene_MosaicInStart
 ;   falls into it).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
 ;        (low WRAM: the task record); C2Scene_TaskCur = the task
@@ -6942,7 +6963,10 @@ C2Scene_MosaicInStep:
 ; its AND on, minus the scale multiply: the same index mask, the same
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
-; Callers (JSL): Trig_Cos1024 from $C2:6752, $C2:6D10, $C2:704F,
+; Callers (5 JSL sites): unmatched ($C2:6752, $C2:6D10, $C2:704F, $C2:711D, $C6:E9FF).
+; Callers of Trig_Sin1024 (9 JSL sites): unmatched ($C2:673B, $C2:6D17, $C2:7062, $C2:712D,
+;   $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
+; Callers note (JSL): Trig_Cos1024 from $C2:6752, $C2:6D10, $C2:704F,
 ;   $C2:711D and $C6:E9FF; Trig_Sin1024 from $C2:673B, $C2:6D17,
 ;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9 and
 ;   $C6:EA17 (all unmatched; e.g. $C2:6D10/6D17 take the cosine and the
@@ -7009,7 +7033,10 @@ C2Scene_ClearUnk1B30:
 ; and jumps through C2Scene_ModeTable on C2Scene_Mode. The handlers come
 ; back to C2Scene_MainLoop by JMP or BRA; the per-frame work itself is in
 ; the NMI (C2Scene_NmiHandler).
-; Callers: JMP from BankC2_SceneBoot ($C2:0040). C2Scene_MainLoop: from
+; Callers (1 JMP site): BankC2_SceneBoot ($C2:0040).
+; Callers of C2Scene_MainLoop (4 JMP sites): C2Scene_Mode3 ($C2:244F), C2Scene_Mode5 ($C2:258A),
+;   C2Scene_Mode6 ($C2:261A) and C2Scene_Mode8 ($C2:26A5).
+; Callers note: JMP from BankC2_SceneBoot ($C2:0040). C2Scene_MainLoop: from
 ;   C2Scene_ModeIdle and the mode handlers C2Scene_Mode3 (JMP at
 ;   $C2:244F), C2Scene_Mode5 ($C2:258A), C2Scene_Mode6 ($C2:261A) and
 ;   C2Scene_Mode8 ($C2:26A5).
@@ -7067,7 +7094,7 @@ C2Scene_ModeTable:
 ; C2Scene_Mode 0, 1 and 7: if a sound command is pending
 ; (C2Scene_SoundCmdState), sends it with Audio_DriverCommand as
 ; C2Scene_WaitFrames does; then back to C2Scene_MainLoop.
-; Callers: none direct (C2Scene_ModeTable).
+; Callers note: none direct (C2Scene_ModeTable).
 ; Entry: M=1, X=0, DP=$0000, DB with low WRAM at $0000-$1FFF ($00)
 ; Exit:  continues at C2Scene_MainLoop, M=1, X=0
 ; Calls: Audio_DriverCommand (JSL).
@@ -7110,7 +7137,7 @@ C2Scene_ModeIdle:
 ;   facing turned around (C2Scene_TurnAround[facing AND 3]), as op $05
 ;   does; then falls into C2Scene_Mode2,
 ;   which leaves the scene.
-; Callers: none direct (C2Scene_ModeTable entry 3).
+; Callers note: none direct (C2Scene_ModeTable entry 3).
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers,
 ;        DP_Field and low WRAM); C2Scene_Unk1B32 = the entry's offset
 ; Exit:  a script started: continues at C2Scene_MainLoop with M=1, X=0;
@@ -7211,7 +7238,7 @@ C2Scene_Mode3:
 ; and C2Scene_SoundCmd83 (arguments 0, $FF; not traced) sent straight
 ; to the driver; then JML to ReentryVectors ($C0:0000), which restarts
 ; the field's game loop with the location block DP_Field as set up.
-; Callers: none direct (C2Scene_ModeTable entry 2; C2Scene_Mode3 falls
+; Callers note: none direct (C2Scene_ModeTable entry 2; C2Scene_Mode3 falls
 ;   in).
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers and
 ;        the driver block)
@@ -7249,7 +7276,7 @@ C2Scene_TurnAround:
 ; Mode 4: interrupts, NMI, DMA and HDMA off, the flag tail copied back
 ; (C2Scene_RestoreFlagTail), and again, for good: it never leaves
 ; (probably waits for a reset; who sets mode 4 is not matched).
-; Callers: none direct (C2Scene_ModeTable entry 4); its own JMP at
+; Callers note: none direct (C2Scene_ModeTable entry 4); its own JMP at
 ;   $C2:251B.
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers)
 ; Exit:  never returns
@@ -7277,7 +7304,7 @@ C2Scene_Mode4:
 ; is set, turns the NMI updates and NMI on, waits
 ; C2Scene_FadeWaitFrames frames and goes back to the loop in mode
 ; C2Scene_ModeIdle1.
-; Callers: none direct (C2Scene_ModeTable entries 5 and 9).
+; Callers note: none direct (C2Scene_ModeTable entries 5 and 9).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
 ; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, C2Scene_SaveState,
@@ -7344,7 +7371,7 @@ C2Scene_Mode5:
 ; C2Scene_ScrMosaicFadeIn, C2Scene_Unk1B59 + 1 when C2Scene_Unk1B58 is
 ; set, NMI updates and NMI on, C2Scene_Mode6InFrames frames, mode
 ; C2Scene_ModeIdle1 and back to the loop.
-; Callers: none direct (C2Scene_ModeTable entry 6).
+; Callers note: none direct (C2Scene_ModeTable entry 6).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0, DB=$00; A, X, Y
 ;        clobbered
@@ -7428,7 +7455,7 @@ C2Scene_Mode6:
 ; while C2Scene_Unk6A34 ran (it loops at $C2:6A9C-$C2:6AA4 until
 ; C2Scene_Mode is no longer 8, and C2Scene_RestoreState does not
 ; restore it).
-; Callers: none direct (C2Scene_ModeTable entry 8).
+; Callers note: none direct (C2Scene_ModeTable entry 8).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
 ; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, Audio_DriverCommand
@@ -7497,8 +7524,7 @@ org $C226A8
 ; VMDATAL/H from the fixed source C2Scene_ZeroWord, VRAM address 0, a
 ; byte count of 0 (= 65536 bytes). Needs forced blank, which the boot has
 ; set.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23A8); unmatched: $C2:632E and
-;   $C2:6A34.
+; Callers (3 JSR sites): C2Scene_Main ($C2:23A8) and unmatched ($C2:632E, $C2:6A34).
 ; Entry: M=1 (8-bit register values), X=0 (16-bit address and count
 ;        stores), DP any, DB=$00 (absolute register stores)
 ; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = 0; Y, DP and DB unchanged
@@ -7554,8 +7580,7 @@ C2Scene_SaveFlagTail:
 ; $C2:26F0 — C2Scene_RestoreFlagTail (19 bytes, $26F0–$2702)
 ; Copies C2Scene_FlagTailCopy (16 bytes) back to $7F:01F0-$01FF, the end
 ; of Menu_FlagBlock7F (C2Scene_Flag0Copy is not written back).
-; Callers (2 JSR sites): C2Scene_Mode2 ($C2:24E0) and C2Scene_Mode4
-;   ($C2:2518).
+; Callers (2 JSR sites): C2Scene_Mode2 ($C2:24E0) and C2Scene_Mode4 ($C2:2518).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVN)
 ; Exit:  M=1, X=0; A = $FFFF, X = C2Scene_FlagTailCopy + 16, Y = $0200;
@@ -7737,7 +7762,7 @@ C2Scene_LoadObjGfx:
 ; Unpacks entry C2Scene_UnkC800Pack of C2SceneRom_ObjPacks (the same for
 ; every scene) to C2Scene_UnkC800 ($7E:C800); what it holds is not
 ; traced.
-; Callers: JMP from C2Scene_LoadVram ($C2:2D6D).
+; Callers (1 JMP site): C2Scene_LoadVram ($C2:2D6D).
 ; Entry: M=1, X=0, DP any, DB=$00
 ; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
 ;        Menu_Decomp* changed
@@ -7762,7 +7787,7 @@ C2Scene_LoadUnkC800:
 ; C2Scene_PackSlotSize bytes apart ($7F:9000-$FFFF; C2Scene_LoadVram DMAs
 ; them to the BG1/BG2 tiles at VRAM $2000). Bit 7 set: slot left as it
 ; was.
-; Callers (2 JSR sites): C2Scene_LoadVram ($C2:2CDF); unmatched: $C2:63DF.
+; Callers (2 JSR sites): C2Scene_LoadVram ($C2:2CDF) and unmatched ($C2:63DF).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=0, X=0; A = 7, X and Y clobbered; C2Tmp_08 = 7;
 ;        Menu_Decomp* changed
@@ -7923,7 +7948,8 @@ C2Scene_LoadPalettes:
 ; (C2Scene_PartyPalSrc + 32 * A) to Y in bank $7F.
 ; Quirk, kept: an empty slot ($80, Menu_PartyEmpty) is not skipped; it
 ; copies from C2Scene_PartyPalSrc + $1000, in C2Scene_DecompBuf.
-; Callers (2 JSR sites): C2Scene_LoadPalettes ($C2:28D9, $C2:28E3; it
+; Callers (2 JSR sites): C2Scene_LoadPalettes ($C2:28D9, $C2:28E3).
+; Callers note (2 JSR sites): C2Scene_LoadPalettes ($C2:28D9, $C2:28E3; it
 ;   also falls in for the third member).
 ; Entry: M=0, X=0, DP any, DB any (saved around the MVN); A low byte = the
 ;        character id, Y = the destination address (bank $7F)
@@ -7947,8 +7973,7 @@ C2Scene_CopyPartyPalette:
 ; $C2:2902 — C2Scene_LoadUnkB800 (46 bytes, $2902–$292F)
 ; Unpacks header byte C2Scene_HdrUnkB800's C2SceneRom_BgPacks entry into
 ; C2Scene_UnkB800 ($7E:B800); what it holds is not traced.
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C74), C2Scene_ReloadScene
-;   ($C2:2CAD).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C74) and C2Scene_ReloadScene ($C2:2CAD).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -7978,8 +8003,7 @@ C2Scene_LoadUnkB800:
 ; Unpacks header byte C2Scene_HdrUnkC000's C2SceneRom_PalettePacks entry
 ; into C2Scene_UnkC000 ($7E:C000); what it holds is not traced (probably
 ; more palettes, from the table it uses).
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C77), C2Scene_ReloadScene
-;   ($C2:2CB0).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C77) and C2Scene_ReloadScene ($C2:2CB0).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -8009,8 +8033,7 @@ C2Scene_LoadUnkC000:
 ; Unpacks header byte C2Scene_HdrMetatiles's C2SceneRom_MetatilePacks
 ; entry into C2Scene_Metatiles ($7E:3000), the metatile set of layer 1
 ; (and probably of layer 2 at $7E:3800; see C2Scene_LayerMetatiles).
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C62), C2Scene_ReloadScene
-;   ($C2:2CA7).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C62) and C2Scene_ReloadScene ($C2:2CA7).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -8070,8 +8093,7 @@ C2Scene_LoadBgMaps:
 ; Unpacks header byte C2Scene_HdrUnk7000's C2SceneRom_Unk7000Packs entry
 ; into C2Scene_Unk7000 ($7E:7000), which is where C2Scene_LayerMaps puts
 ; layer 3's map; what it holds is not traced.
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C68), C2Scene_ReloadScene
-;   ($C2:2CAA).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C68) and C2Scene_ReloadScene ($C2:2CAA).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -8349,8 +8371,7 @@ C2Scene_LoadPartyGfx:
 ; (C2Scene_DecompBuf + $400 * A) to Y in bank $7F.
 ; Quirk, kept: an empty slot ($80) is not skipped; its offset wraps
 ; ($80 * $400 = $20000) and the character-0 graphics are copied.
-; Callers (3 JSR sites): C2Scene_LoadPartyGfx ($C2:2B87, $C2:2B9B,
-;   $C2:2BAF).
+; Callers (3 JSR sites): C2Scene_LoadPartyGfx ($C2:2B87, $C2:2B9B, $C2:2BAF).
 ; Entry: M=0, X=0, DP any, DB any (saved around the MVN); A low byte = the
 ;        character id, Y = the destination (bank $7F)
 ; Exit:  M=0, X=0, DB unchanged; A = $FFFF, X and Y past the copy
@@ -8372,8 +8393,7 @@ C2Scene_CopyPartyGfx:
 ; Copies character A's two C2Scene_PartyGfxBSize-byte blocks
 ; (C2Scene_PartyGfxSrcB + $40 * A, and C2Scene_PartyGfxBGap bytes
 ; further) to Y and Y + C2Scene_PartyGfxBGap in bank $7F.
-; Callers (3 sites): C2Scene_LoadPartyGfx ($C2:2B91, $C2:2BA5; JMP at
-;   $C2:2BB9).
+; Callers (3 sites: 2 JSR, 1 JMP): C2Scene_LoadPartyGfx (JSR $C2:2B91, JSR $C2:2BA5, JMP $C2:2BB9).
 ; Entry: M=0, X=0, DP=$0000 (scratch), DB any (saved around the MVNs);
 ;        A low byte = the character id, Y = the destination (bank $7F)
 ; Exit:  M=0, X=0, DB unchanged; A = $FFFF, X and Y past the second
@@ -8412,8 +8432,7 @@ C2Scene_CopyPartyGfxB:
 ; Zeroes C2Scene_HdmaArea ($7E:8621-$8E20, 2048 bytes) through
 ; WMADD/WMDATA, with DP = $2100 for the register stores. The area holds
 ; C2Scene_HdmaValues and C2Scene_HdmaTable.
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C7A), C2Scene_ReloadScene
-;   ($C2:2C96).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C7A) and C2Scene_ReloadScene ($C2:2C96).
 ; Entry: M=1, X=0, DP any (saved; $2100 here), DB any (all register
 ;        stores direct page)
 ; Exit:  M=1, X=0; A = 0 (B = $21), X = 0; Y, DP and DB unchanged; WMADD
@@ -8520,8 +8539,8 @@ C2Scene_LoadScene:
 ; and UnkC000 packs, and BG layers 1 and 2 redrawn. The maps and lists
 ; are not reloaded: C2Scene_SaveState keeps them, and the header pointer
 ; with the direct page.
-; Callers (3 JSR sites): C2Scene_Mode5 ($C2:2563), C2Scene_Mode6
-;   ($C2:25F3) and C2Scene_Mode8 ($C2:266E).
+; Callers (3 JSR sites): C2Scene_Mode5 ($C2:2563), C2Scene_Mode6 ($C2:25F3) and C2Scene_Mode8
+;   ($C2:266E).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set; forced blank
 ; Exit:  as C2Scene_DrawBgLayer: M=1, X=0; A, X, Y clobbered;
 ;        C2Tmp_00-$1B, Menu_Decomp*, DMA channel 7 and WMADD changed
@@ -8564,8 +8583,7 @@ C2Scene_ReloadScene:
 ; Quirk, kept: both MVN counts are the byte count, not the count - 1, so
 ; each copy moves one byte more: $00:0B20 (C2Scene_Unk0B20's first byte)
 ; is written twice, last with byte 33 of C2SceneRom_LastPalRow.
-; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C5F), C2Scene_ReloadScene
-;   ($C2:2CA4).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C5F) and C2Scene_ReloadScene ($C2:2CA4).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute register stores);
 ;        C2Scene_HeaderPtr set; forced blank
 ; Exit:  as C2Scene_LoadUnkC800: M=1, X=0; A, X, Y clobbered; DB
@@ -8640,9 +8658,8 @@ C2Scene_LoadVram:
 ; $C2:2D70 — C2Scene_DmaToVram (33 bytes, $2D70–$2D90)
 ; DMAs A bytes from X in bank $7F to VRAM word address Y on channel 7
 ; (word writes to VMDATAL/H, VMAIN stepping after the high byte).
-; Callers (9 JSR sites): C2Scene_LoadVram ($C2:2CCD, $C2:2CDC, $C2:2CEB,
-;   $C2:2CFC, $C2:2D0D), C2Scene_LoadLocExtraGfx ($C2:2DBF, $C2:2DDB,
-;   $C2:2E01, $C2:2E1D).
+; Callers (9 JSR sites): C2Scene_LoadVram ($C2:2CCD, $C2:2CDC, $C2:2CEB, $C2:2CFC, $C2:2D0D) and
+;   C2Scene_LoadLocExtraGfx ($C2:2DBF, $C2:2DDB, $C2:2E01, $C2:2E1D).
 ; Entry: M=0 (16-bit count store), X=0, DP any, DB=$00 (absolute register
 ;        stores); X = the source, Y = the VRAM address, A = the count;
 ;        forced blank or vblank
@@ -8757,8 +8774,7 @@ C2Scene_LoadLocExtraGfx:
 ; from the callers: scene modes 5 and 8 save, do something
 ; else and restore; mode 5 then reloads, mode 8 only when the flag test
 ; at $C2:265E passes.
-; Callers (2 JSR sites): C2Scene_Mode5 ($C2:2542) and C2Scene_Mode8
-;   ($C2:2652).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:2542) and C2Scene_Mode8 ($C2:2652).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVNs)
 ; Exit:  M=1, X=0; A = $FFFF, X = $8600, Y = C2Scene_SaveLists + $800
@@ -8798,8 +8814,7 @@ C2Scene_SaveState:
 ; $C2:2E72 — C2Scene_RestoreState (79 bytes, $2E72–$2EC0)
 ; The reverse of C2Scene_SaveState: copies the six saved blocks from bank
 ; $7F back where they came from (the direct page $00-$EF included).
-; Callers (2 JSR sites): C2Scene_Mode5 ($C2:255D) and C2Scene_Mode8
-;   ($C2:2658).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:255D) and C2Scene_Mode8 ($C2:2658).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (the copy rewrites dp
 ;        $00-$EF, so it must be the scene's), DB any (saved around the
 ;        MVNs)
@@ -8897,7 +8912,11 @@ org $C22ED9
 ; when one is already queued with a lower pending rank than the new one;
 ; an equal or higher pending rank is replaced (so rank 0, which every
 ; matched caller passes, always replaces a queued command).
-; Callers (10 JSR sites): C2Script_PlaySfx ($C2:18E8),
+; Callers (10 JSR sites): C2Script_PlaySfx_SetArgs ($C2:18E8), C2Script_SoundCmd10 ($C2:1916),
+;   C2Script_SoundCmd ($C2:193E), C2Scene_ZoneSoundAtView ($C2:2F88), C2Scene_ZoneSoundWatch
+;   ($C2:2FCD, $C2:3031), C2Scene_ZoneSoundResume ($C2:306A), C2Scene_ZoneSoundQueue ($C2:3092) and
+;   unmatched ($C2:4395, $C2:4A4C).
+; Callers note (10 JSR sites): C2Script_PlaySfx ($C2:18E8),
 ;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E),
 ;   C2Scene_ZoneSoundAtView ($C2:2F88), C2Scene_ZoneSoundWatch ($C2:2FCD,
 ;   $C2:3031), C2Scene_ZoneSoundResume ($C2:306A), C2Scene_ZoneSoundQueue
@@ -8956,7 +8975,7 @@ C2Scene_QueueSoundCmd:
 ; C2Scene_ZoneSounds), or with Menu_Config1E's byte while
 ; C2Scene_Unk7F01ED is set; argument bytes 2-3 C2Scene_SoundArgUnused
 ; and C2Scene_SoundArg80. The argument is also kept in C2Scene_Unk02AE.
-; Callers: none found by xref (perhaps reached through a pointer; not
+; Callers note: none found by xref (perhaps reached through a pointer; not
 ;   traced).
 ; Entry: M=1 (8-bit loads), X=0, DP=$0000 (C2Tmp_00/$01), DB=$00
 ;        (DP_Field, low WRAM and the driver block, absolute)
@@ -9004,7 +9023,7 @@ C2Scene_ZoneSoundAtEntry:
 ; last queuer left, 0 for every matched one); and the column is not
 ; wrapped at 96, so near the right edge of the map (BgTileX 176 or more)
 ; it reads the next row's first zones.
-; Callers (1 JSR site, unmatched): $C2:45A6.
+; Callers (1 JSR site): unmatched ($C2:45A6).
 ; Entry: M=1 (8-bit loads and adds), X=0, DP=$0000 (C2Scene_BgTileX/Y,
 ;        C2Tmp_00/$01), DB=$00 (low WRAM)
 ; Exit:  M=1, X=0; C as C2Scene_QueueSoundCmd leaves it (0 queued, 1
@@ -9056,7 +9075,7 @@ C2Scene_ZoneSoundAtView:
 ; C2Scene_ZoneFadeFrames frames, sends the new zone's
 ; C2Scene_SoundCmd10 and then C2Scene_SoundCmd81 with $00,$FF (probably
 ; full volume back). It never ends (every state returns C=0).
-; Callers: none found (no spawn of this address is in matched code or
+; Callers note: none found (no spawn of this address is in matched code or
 ;   found by a byte search; probably a script op $35 in scene data).
 ; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
 ;        WRAM: the task record); C2Scene_TaskCur = the task
@@ -9080,7 +9099,7 @@ C2Scene_ZoneSoundStates:
 ; $C2:2FA5 — C2Scene_ZoneSoundInit (9 bytes, $2FA5–$2FAD)
 ; State 0: .State = 1, C2Scene_SoundZone = C2Scene_ZoneNone; falls into
 ; C2Scene_ZoneSoundWatch.
-; Callers: none direct (C2Scene_ZoneSoundStates).
+; Callers note: none direct (C2Scene_ZoneSoundStates).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_ZoneSoundWatch
@@ -9105,7 +9124,7 @@ C2Scene_ZoneSoundInit:
 ;   C2Scene_SoundArgUnused at rank 0;
 ; - in any other mode, or with C2Scene_Unk027E set: C2Scene_SoundZone =
 ;   C2Scene_ZoneNone.
-; Callers: none direct (C2Scene_ZoneSoundStates; C2Scene_ZoneSoundInit
+; Callers note: none direct (C2Scene_ZoneSoundStates; C2Scene_ZoneSoundInit
 ;   falls in).
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_00/$01, C2Scene_SoundZone), DB=$00
 ;        (low WRAM); C2Scene_TaskCur = the task
@@ -9192,7 +9211,7 @@ C2Scene_ZoneSoundWatch:
 ; then one more each frame from C2Scene_TaskRunAll) reaches
 ; C2Scene_ZoneFadeFrames: .State = 3 and the new zone's sound is queued
 ; (C2Scene_ZoneSoundQueue).
-; Callers: none direct (C2Scene_ZoneSoundStates).
+; Callers note: none direct (C2Scene_ZoneSoundStates).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X clobbered; Y unchanged
@@ -9214,7 +9233,7 @@ C2Scene_ZoneSoundWait:
 ; negative), queues C2Scene_SoundCmd81 with 0, C2Scene_SoundArgUnused,
 ; C2Scene_SoundArgUnused at rank 0 and sets .State back to 1 (whether
 ; the queue took the command or not).
-; Callers: none direct (C2Scene_ZoneSoundStates).
+; Callers note: none direct (C2Scene_ZoneSoundStates).
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (low WRAM);
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X clobbered; Y unchanged
@@ -9289,7 +9308,9 @@ org $C257DF
 ; TextWin_Unk3D = $00:0200 (use not traced), and the pen X
 ; (TextWin_PenX) at TextWin_PenXLeft, or 0 when TextWin_Mode is
 ; TextWin_ModeUnk2 or has bit 7 set.
-; Callers: JMP from BankC2_Entry0003 ($C2:0003) and BankC2_Entry0006
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0003 (JMP $C2:0003), BankC2_Entry0006 (JMP $C2:0006)
+;   and unmatched (JSL $C2:5695, JSL $C2:69BB).
+; Callers note: JMP from BankC2_Entry0003 ($C2:0003) and BankC2_Entry0006
 ;   ($C2:0006), the cross-bank JSL vectors; JSL (unmatched) from $C2:5695
 ;   and $C2:69BB.
 ; Entry: M any, X=0 (16-bit X/Y: the LDX #$0200 and the TAY of the doubled
@@ -9344,7 +9365,9 @@ TextWin_Init:
 ; TextWin_Status whether to go on (C=0); if so, the handler of
 ; TextWin_State in TextWin_StateTable runs. Returns with the high byte
 ; of A zero.
-; Callers: JMP from BankC2_Entry0009 ($C2:0009) and BankC2_Entry000C
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0009 (JMP $C2:0009), BankC2_Entry000C (JMP $C2:000C)
+;   and unmatched (JSL $C2:569E, JSL $C2:69C4).
+; Callers note: JMP from BankC2_Entry0009 ($C2:0009) and BankC2_Entry000C
 ;   ($C2:000C), the cross-bank JSL vectors; JSL (unmatched) from $C2:569E
 ;   and $C2:69C4.
 ; Entry: any M (P saved), X=0 or 1 (kept for the JSR (abs,X); the
@@ -9439,7 +9462,7 @@ TextWin_StatusTable:
 
 ; $C2:5893 — TextWin_StatusIdle (2 bytes, $5893–$5894)
 ; Status 0: nothing to do; C=1 so TextWin_Step skips the state handler.
-; Callers: none direct (TextWin_StatusTable).
+; Callers note: none direct (TextWin_StatusTable).
 ; Entry: M=1, DP=$0200 (from TextWin_CheckStatus)
 ; Exit:  C=1; nothing else changed
 TextWin_StatusIdle:
@@ -9455,7 +9478,7 @@ TextWin_StatusIdle:
 ; for TextWin_ModeUnk2) and zero TextWin_Unk17, then return C=0 as well.
 ; What those statuses stand for is not traced (probably new lines, from
 ; the pen going back to the left).
-; Callers: none direct (TextWin_StatusTable).
+; Callers note: none direct (TextWin_StatusTable).
 ; Entry: M=1, DP=$0200 (from TextWin_CheckStatus)
 ; Exit:  C=0; M=1; the sub-entries change A (the pen X, or
 ;        TextWin_Mode AND TextWin_ModeMask), TextWin_PenX and
@@ -9494,9 +9517,8 @@ org $C262ED
 ; its high nibble for an even column, its low nibble for an odd one.
 ; The pointer is built in C2Tmp_10-$12. (That this pack is a zone map is
 ; inferred from these readers: its $C00 bytes are 64 rows of 48.)
-; Callers (3 JSR sites): C2Scene_ZoneSoundAtEntry ($C2:2F21),
-;   C2Scene_ZoneSoundAtView ($C2:2F66), C2Scene_ZoneSoundWatch
-;   ($C2:3001).
+; Callers (3 JSR sites): C2Scene_ZoneSoundAtEntry ($C2:2F21), C2Scene_ZoneSoundAtView ($C2:2F66) and
+;   C2Scene_ZoneSoundWatch ($C2:3001).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00/$01, $10-$12),
 ;        DB=$00 (WRMPYA/B and RDMPYL, absolute)
 ; Exit:  M=1, X=0; A = the zone (0-15), B = 0; Y = column / 2; X
@@ -9543,8 +9565,7 @@ org $C27B5A
 ; $C2:7B5A — C2Scene_LoadExtraObjPack (37 bytes, $7B5A–$7B7E)
 ; Unpacks entry C2Scene_ExtraObjPack of C2SceneRom_ObjPacks into
 ; C2Scene_DecompBuf.
-; Callers (4 JSR sites): C2Scene_LoadLocExtraGfx ($C2:2DB1, $C2:2DCD,
-;   $C2:2DF3, $C2:2E0F).
+; Callers (4 JSR sites): C2Scene_LoadLocExtraGfx ($C2:2DB1, $C2:2DCD, $C2:2DF3, $C2:2E0F).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute stores to Menu_Decomp*)
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -9567,8 +9588,7 @@ C2Scene_LoadExtraObjPack:
 ; Unpacks entry C2Scene_ExtraPalPack of C2SceneRom_PalettePacks to A:X
 ; (C2Scene_LoadLocExtraGfx passes bank $00 and an address inside
 ; C2Scene_PaletteBuf).
-; Callers (3 JSR sites):
-;   C2Scene_LoadLocExtraGfx ($C2:2DC7, $C2:2DED, $C2:2E09).
+; Callers (3 JSR sites): C2Scene_LoadLocExtraGfx ($C2:2DC7, $C2:2DED, $C2:2E09).
 ; Entry: M=1 with A = the destination bank, X=0 with X = the destination,
 ;        DP any, DB=$00
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
@@ -9589,8 +9609,7 @@ C2Scene_LoadExtraPalette:
 ; $C2:7B9F — C2Scene_LoadUnkC600 (37 bytes, $7B9F–$7BC3)
 ; Unpacks entry C2Scene_UnkC600Pack of C2SceneRom_PalettePacks into
 ; C2Scene_UnkC600 ($7E:C600); what it holds is not traced.
-; Callers (JMP, 4 sites): C2Scene_LoadLocExtraGfx ($C2:2DCA, $C2:2DF0,
-;   $C2:2E0C, $C2:2E20).
+; Callers (4 JMP sites): C2Scene_LoadLocExtraGfx ($C2:2DCA, $C2:2DF0, $C2:2E0C, $C2:2E20).
 ; Entry: M=1, X=0, DP any, DB=$00
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
@@ -9622,14 +9641,13 @@ org $C28000
 ;         the caller; the menu side is not matched)
 ;   $8002 BankC2_Entry8002 → BankC2_ReadPadLong: the joypad reader
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
-; Callers: BankC2_Entry8000 (JSL): Field_SceneChangeTick ($C0:0D18),
-;   Field_PauseAndMenuInput ($C0:1960), Field_RunBankC2Mode5 ($C0:19CE)
-;   and C2Scene_Mode5 ($C2:2552). BankC2_Entry8002 (JSL):
-;   C2Scene_NmiHandler ($C2:031B); unmatched: $C0:EC15, $C1:EE27,
-;   $CD:091A and $CD:09C6. BankC2_Entry8004 (15 JSL sites): GameLoop
-;   ($C0:0059), Scene_PostLoadInit ($C0:56CF); unmatched: $C0:3807,
-;   $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
-;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92 and $FF:FB98.
+; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
+;   Field_RunBankC2Mode5 ($C0:19CE) and C2Scene_Mode5 ($C2:2552).
+; Callers of BankC2_Entry8002 (5 JSL sites): C2Scene_NmiHandler ($C2:031B) and unmatched ($C0:EC15,
+;   $C1:EE27, $CD:091A, $CD:09C6).
+; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Scene_PostLoadInit ($C0:56CF) and
+;   unmatched ($C0:3807, $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
+;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92, $FF:FB98).
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry
@@ -9640,7 +9658,7 @@ BankC2_Entry8004:               ; header: see BankC2_Entry8000
 
 ; $C2:8006 — BankC2_ReadPadLong (4 bytes, $8006–$8009)
 ; Menu_ReadPad as a long call (the BankC2_Entry8002 vector).
-; Callers: none direct (BRA from BankC2_Entry8002).
+; Callers note: none direct (BRA from BankC2_Entry8002).
 ; Entry/Exit: as Menu_ReadPad (everything preserved), returning with RTL
 ; Calls: Menu_ReadPad.
 BankC2_ReadPadLong:
@@ -9649,7 +9667,7 @@ BankC2_ReadPadLong:
 
 ; $C2:800A — BankC2_CommandLong (4 bytes, $800A–$800D)
 ; Menu_Unk8C36 as a long call (the BankC2_Entry8004 vector).
-; Callers: none direct (BRA from BankC2_Entry8004).
+; Callers note: none direct (BRA from BankC2_Entry8004).
 ; Entry/Exit: as Menu_Unk8C36 (not matched), returning with RTL
 ; Calls: Menu_Unk8C36.
 BankC2_CommandLong:
@@ -9705,7 +9723,8 @@ Menu_ReadPad:
 ;   down; at 0 the held buttons are added to Menu_PadRepeat and the timer
 ;   reloads from Menu_PadRepeatDelay, as it does whenever nothing is
 ;   held.
-; Callers (2 JSR sites): Menu_ReadPad ($C2:84DB); unmatched: $C2:8487
+; Callers (2 JSR sites): Menu_ReadPad ($C2:84DB) and unmatched ($C2:8487).
+; Callers note (2 JSR sites): Menu_ReadPad ($C2:84DB); unmatched: $C2:8487
 ;   (the menu's own NMI code).
 ; Entry: M any (SEP #$20 here), X=0 (16-bit X for the held word copy),
 ;        DP and DB any (set to $0000 and $00 here, not restored)
@@ -9775,7 +9794,8 @@ Menu_PollPad:
 ;   Menu_PadHeld → Pad_Unk00F8 and Pad_Unk00F9;
 ;   Menu_PadRepeat → Menu_PadRepeatMapped and Menu_PadRepeatDpad.
 ; Menu_MapButtons calls it twice and falls into it for the third.
-; Callers (1 JSR site): Menu_ReadPad ($C2:84DE). Menu_MapButtonsOne: JSR
+; Callers (1 JSR site): Menu_ReadPad ($C2:84DE).
+; Callers note (1 JSR site): Menu_ReadPad ($C2:84DE). Menu_MapButtonsOne: JSR
 ;   from Menu_MapButtons itself ($C2:854F/8552).
 ; Entry: M, X any (SEP #$30 here), DP=$0000 (Menu_PollPad sets it), DB any
 ;        (set to $7E here, not restored: the masks are read absolute)
@@ -9838,7 +9858,8 @@ Menu_MapButtonsOne:             ; header: see Menu_MapButtons
 ; When the last one carries too (99:59:59 and 59 frames, with the
 ; limits as they are) the clock is all zeros again and
 ; Menu_PlayTimeMaxed is set to 1.
-; Callers (2 JSR sites): Menu_ReadPad ($C2:84E1); unmatched: $C2:8490
+; Callers (2 JSR sites): Menu_ReadPad ($C2:84E1) and unmatched ($C2:8490).
+; Callers note (2 JSR sites): Menu_ReadPad ($C2:84E1); unmatched: $C2:8490
 ;   (the menu's own NMI code).
 ; Entry: M, X any (SEP #$30 here), DP any (set to $0400 here, not
 ;        restored), DB any (the limits are read long)
@@ -9899,7 +9920,8 @@ Menu_PlayTimeLimits:
 ; Menu_PartyOrder and Menu_Config).
 ; Quirk: X=0 is also stored to $4216-$4219 (RDMPYL/H and JOY1L/H), which
 ; are read-only; the stores do nothing.
-; Callers (1 JSR site, unmatched): $C2:80F0 in Menu_InitSystems.
+; Callers (1 JSR site): unmatched ($C2:80F0).
+; Callers note (1 JSR site, unmatched): $C2:80F0 in Menu_InitSystems.
 ; Entry: M any, X any (P saved; sets M=1, X=0 itself), DP any and DB any
 ;        (both saved, then DP=$2100/$4200 and DB=$00)
 ; Exit:  P, DP and DB restored; A, X and Y clobbered (X = Menu_DmaZeroWord,
@@ -10046,8 +10068,8 @@ Menu_DmaZeroWord:
 ; Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed
 ; source Menu_DmaZeroWord, one register: WMDATA). HDMA is switched off
 ; first; WMADDH is set to 0, so the block is always in bank $7E.
-; Callers (5 JSR sites): Menu_InitPpuAndRam ($C2:94F7, $C2:9500,
-;   $C2:9509), and $C2:97A1 and $C2:981F (unmatched).
+; Callers (5 JSR sites): Menu_InitPpuAndRam ($C2:94F7, $C2:9500, $C2:9509) and unmatched ($C2:97A1,
+;   $C2:981F).
 ; Entry: M any (P saved; sets M=1), X=0 (16-bit X and Y), DP any (not
 ;        used), DB any (saved, then $00); X = WRAM address, Y = byte count
 ;        (0 = 64 KiB)
@@ -10082,7 +10104,7 @@ Menu_DmaClearWram:
 ; Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank
 ; $7E at address X with DMA channel 0 (stepping source, one register:
 ; WMDATA). Unlike Menu_DmaClearWram it leaves HDMAEN alone.
-; Callers (2 JSR sites, unmatched): $C2:9698 and $C2:96A4.
+; Callers (2 JSR sites): unmatched ($C2:9698, $C2:96A4).
 ; Entry: M any, X any (P saved; sets M=0, X=0, then M=1), DP any (not
 ;        used), DB any (saved, then $00); A (16-bit) = source address in
 ;        bank $FF, X = WRAM address, Y = byte count
@@ -10124,7 +10146,8 @@ Menu_DmaCopyFFToWram:
 ; ($80), sets Menu_Unk29AF to $0080 and zeroes $2C7C-$2C99.
 ; Each zero or $80 fill stores the first word, then an overlapping MVN
 ; (source = destination - 2, or - 1 for the party list) copies it on.
-; Callers (3 JSR sites, unmatched): $C2:8048 in BankC2_MenuEntry, $C2:8D7E
+; Callers (3 JSR sites): unmatched ($C2:8048, $C2:8D7E, $C2:E65D).
+; Callers note (3 JSR sites, unmatched): $C2:8048 in BankC2_MenuEntry, $C2:8D7E
 ;   and $C2:E65D.
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (absolute stores; the MVNs also leave DB=$7E)
@@ -10170,8 +10193,7 @@ Menu_InitNewGameData:
 ; Fills as in Menu_InitNewGameData (first word, then an overlapping MVN).
 ; PHB/PLB keep DB across the bank-$7F fill only; the later MVNs leave
 ; DB=$7E.
-; Callers (2 JSR sites): Menu_InitNewGameData ($C2:9571); unmatched:
-;   $C2:8D85.
+; Callers (2 JSR sites): Menu_InitNewGameData ($C2:9571) and unmatched ($C2:8D85).
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (STZ Menu_PlayTime is absolute, after the PLB)
 ; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the last MVN

@@ -70,34 +70,53 @@ meaning is inferred, say from what ("inferred: only written by the revive path")
 explain the non-obvious; they don't narrate each line or repeat what a name already says.
 
 **Headers are checked.** The header is the comment block between the previous routine's last
-code line and the label (the same span `tools/progress.py` hashes). The lint requires:
+code line and the label (the same span `tools/progress.py` hashes, less the generated Callers
+block). The lint requires:
 
 - `HEADER`: a comment line starting `Entry:` or `On entry:` and one starting `Exit:` (a
   parenthesis before the colon is fine, as in `Exit (both entries):`; `Entry/Exit:` counts as
   both).
-- `CALLERS`: every caller site `tools/xref.py` CONFIRMS (`JSR`/`JSL`/`JMP`/`JML`/`BRL`) is
-  accounted for, by its address (`$C1:2ECF`, `$C12ECF`, `$2ECF` in the routine's own bank, or a
-  `/AAAA` continuation such as `$FD:DA5B/DABA`), by the full name of the matched routine that
-  contains it, or by a count such as `19 JSR sites` or `20 call sites` that is at least the
-  confirmed count. Prefer one `Callers:` line:
+- `CALLERS`: the Callers block is exactly what `tools/callers.py` generates. Never write it by
+  hand: run `python3 tools/callers.py --update` after matching code (and after merging
+  `origin/main`), and it rewrites every block from the call sites `tools/xref.py` CONFIRMS
+  (`JSR`/`JSL`/`JMP`/`JML`/`BRL`), outside the routine and its sub-entries. Each site is named by
+  the matched routine that contains it, or `unmatched`, with its address, and the block keeps the
+  count:
 
   ```asm
-  ; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0),
-  ;   BattleMenu_TechConfirm ($C1:1379), BattleMenu_ItemConfirm ($C1:14C5) and
-  ;   BattleMenu_TargetSelectInput ($C1:1561).
+  ; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0), BattleMenu_TechConfirm ($C1:1379),
+  ;   BattleMenu_ItemConfirm ($C1:14C5) and unmatched ($C1:5561).
   ```
 
-  A routine reached only through a table or by falling in needs no list. If xref confirms a site
-  that is not a real call (data that decodes as `JSR`), name its address and say so; that is
-  accounted for too.
+  Sites of different kinds carry their kind (`Name (JSR $C0:1234, JMP $C0:1240)`, count
+  `5 sites: 4 JSR, 1 JMP`); a sub-entry's sites are listed in its parent's header as
+  `; Callers of <Sub-entry> (...)`; a routine with no confirmed site has no block. The block is
+  left out of the source hash, so new callers never void a review. Anything a person adds about
+  callers goes on its own line, which the tool leaves alone and the reviewer judges:
+
+  ```asm
+  ; Callers note: also reached through BattleAct_OpcodeTable entry $1C; the JSR byte
+  ;   pattern at $C1:8F02 is inside a data table.
+  ```
+
+  Use a note for a site xref confirms that is not a real call (data that decodes as `JSR`), for
+  tables that dispatch to the routine and for fall-ins.
+
+- `SIZE`: a header claim `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout (the
+  routine alone, or with its sub-entries).
+- `UNMATCHED`: no header or banner calls an address `unmatched` (`unmatched code at $C1:0027`,
+  `$C1:3819 (unmatched)`) once that address lies inside matched code; name the routine instead.
+- `DPDB`: the Entry line states DP and DB itself (`DP any` and `DB any` are statements too).
+  "as Field_Unk74D4" or "see the banner" does not count unless the text it points to is in the
+  same header.
 
 Two kinds of label are exempt from `HEADER`:
 
 - **Tables**: a label whose body is only `db`/`dw`/`dl`/`dd` data (no instruction or macro).
 - **Sub-entries** (a fall-through entry, shared tail or loop label that has to be global): mark
   it `; header: see <Parent>` on or above the label line. `<Parent>` must be a routine in the
-  same file with an Entry/Exit header that names the sub-entry; the sub-entry's callers may be
-  listed there. Sites inside the parent or a sibling sub-entry are internal flow and need no
+  same file with an Entry/Exit header that names the sub-entry (outside the generated Callers
+  block); the sub-entry's callers are listed there. Sites inside the parent or a sibling sub-entry are internal flow and need no
   mention.
 
   ```asm

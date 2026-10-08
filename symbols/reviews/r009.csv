@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:FD00,BitReverseTable,2026-10-08,independent session r9-p1,approved,32da65be6db2,"All 256 ROM bytes are bit-reversed N; flip rationale true; 32 LDA.w in Spr_CopyTileFlipped (DB=$00 per its header), 32 LDA.l $C1:1DDE-1F14, $C2:F7EA, $CD:1285+ confirmed."
+$C0:FE00,RandomTable,2026-10-08,independent session r9-p1,changes,23e014b6a262,"Permutation true. Add $C0:6D11 ($F8 reader); CC:C8FB/FD:24EE/FD:8230 hits look like data: hedge/drop; not all step a counter ($C2:8F09 LDX $0D00, word reads): reword."

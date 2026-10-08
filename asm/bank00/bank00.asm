@@ -16,7 +16,8 @@ hirom
 ; The CPU comes out of reset in emulation mode with I already set. Only
 ; CLC+XCE are needed to enter native mode; the SEI first is for the soft
 ; resets below, which arrive in native mode with interrupts possibly on.
-; Callers: besides the RESET vector, three JMLs restart the game through
+; Callers (3 JML sites): Menu_PollPad ($C2:8523) and unmatched ($C3:0AB5, $CF:E702).
+; Callers note: besides the RESET vector, three JMLs restart the game through
 ; here: $C2:8523 (when JOY1 reads $3030, i.e. L+R+Select+Start held),
 ; $C3:0AB5 (JML $00FF00, after forced blank and NMI/HDMA off) and
 ; $CF:E702.
@@ -79,6 +80,7 @@ BRK_Handler:
 ; BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7.
 ; Used for testing/setting/clearing single bits in flag bytes.
 ; ============================================================
+; Callers (1 JSL site): unmatched ($CA:1006).
 BitSet:                 ; $FF20 — bit N set, others clear
     db $01,$02,$04,$08,$10,$20,$40,$80
 

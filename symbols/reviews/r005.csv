@@ -1,0 +1,5 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:000E,GameLoop,2026-10-08,independent session r5-p1,approved,6398e143a7d5,"Verified: JML at $FD:C0D3 (DP=$2100, DB=0) and BRL at $C0:02CA (after InitHW, S=$06FF); clear ranges; C7:0000/C2:8004 restore P/D/B; BootArg $09, 15 JSL sites; stubs true."
+$C0:B309,Spr_AppendToOam,2026-10-08,independent session r5-p1,changes,0319bceb1e9b,"Exit lists only A/X: Spr_TileCount ($C9) is left 0 and Spr_PrepareTiles' callees write DP $C3-$C6, $D9, $E5-$E7 (Spr_BaseX/Y, Spr_HiBits...). Add them. Y kept, ranges, callers OK."
+$C0:D124,Obj_FrameLayout8,2026-10-08,independent session r5-p1,approved,bbf86e90273c,"Verified: frame x $50 + Obj_FrameOfs, Y=$40, 8 OfsX/OfsY pairs, tile +2 each, attrs 0-3 PrioLow / 4-7 PrioHigh, Obj_State=$80, C=0; only BRL from $C0:CB34 after its LDX Obj_Cur."
+$C0:E12A,Spr_LoadLargeObj,2026-10-08,independent session r5-p1,changes,155250f0d2f7,"Entry 'X = Obj_Cur (16-bit)' false: $C0:47E9 calls with X 8-bit (SEP #$10 at $47A4, REP only after at $47F7). Say X/Y either width. Exit DP list omits Spr_SavedY ($C5), written by the copiers."

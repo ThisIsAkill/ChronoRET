@@ -26,7 +26,12 @@ incsrc "../hardware.inc"
 ; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
 ; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
 ; What the $CD0036 callee does meanwhile is not analysed.
-; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; Callers (20 JSR sites): BattleSys_UpkeepTwoFrames ($C1:109D, $C1:10BD), BattleSys_DefeatPose
+;   ($C1:3554), BattleSys_VictoryPose ($C1:358E, $C1:3596, $C1:359E), Battle_RunPcPose ($C1:3686),
+;   BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
+;   $C1:41B7), BattleAct_LoadCommon ($C1:4841, $C1:485B, $C1:4864, $C1:488D) and
+;   BattleAct_UnpackFrames ($C1:4943).
+; Callers note (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
 ; BattleSys_DefeatPose, BattleSys_VictoryPose (three times),
 ; Battle_RunPcPose, BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0,
@@ -62,7 +67,12 @@ BattleSys_PumpFrames:
 ;        with STA.l/LDA.l, so the caller's data bank does not matter)
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y and DB unchanged; DP $77/$78 and
 ;        $AF/$B0 written
-; Callers: 20 JSR sites across bank $C1: BattleMenu_ItemConfirm
+; Callers (20 JSR sites): BattleMenu_ItemConfirm ($C1:14A7), Battle_DrawBattlerFrameAnyLayout
+;   ($C1:1CBE), BattlePos_CheckDist ($C1:2B8D, $C1:2B9A), BattlePos_DistDifference ($C1:2D14,
+;   $C1:2D2A, $C1:2D4B, $C1:2D61), BattleAct_LinkObjBody ($C1:607B), BattleAct_CircleMoveKind
+;   ($C1:6D94, $C1:6E40, $C1:6EF6), BattleAct_CalcLerpToTarget ($C1:7878, $C1:78BD, $C1:78DB,
+;   $C1:78EA) and BattleAct_CalcLerpToObj0 ($C1:7945, $C1:795A, $C1:7978, $C1:7987).
+; Callers note: 20 JSR sites across bank $C1: BattleMenu_ItemConfirm
 ; ($C1:14A7), Battle_DrawBattlerFrameAnyLayout ($C1:1CBE),
 ; BattlePos_CheckDist ($C1:2B8D, $C1:2B9A), BattlePos_DistDifference
 ; ($C1:2D14, $C1:2D2A, $C1:2D4B, $C1:2D61) and 12 in unmatched code
@@ -100,7 +110,13 @@ Battle_Mul8:
 ;        DP=0, DB any
 ; Exit:  M=1, X=0 (P restored); A=0; X = first partial product; Y and DB
 ;        unchanged; DP $77/$78 and $A9-$AB written
-; Callers: 20 JSR sites across bank $C1: Battle_SinLookup ($C1:021C),
+; Callers (20 JSR sites): Battle_SinLookup ($C1:021C), Battle_DrawBattlerFrameAnyLayout ($C1:1C7F),
+;   Battle_TickPcSlots ($C1:2E98), Battle_TickEnemyGroup ($C1:33A5), Battle_RunPcPose ($C1:35FF),
+;   BattleAct_StepBattlerAnims ($C1:429F), BattleAct_MoveToPoint ($C1:509B, $C1:50B2),
+;   BattleAct_StartBattlerMove ($C1:5187, $C1:519E), BattleAct_ArcToPoint ($C1:6340, $C1:6357,
+;   $C1:6482, $C1:6499), BattleAct_OpMoveKind4ToCalc ($C1:70A9, $C1:70C0, $C1:7171, $C1:7188) and
+;   BattleAct_OpMoveToMidpoint ($C1:7295, $C1:72AC).
+; Callers note: 20 JSR sites across bank $C1: Battle_SinLookup ($C1:021C),
 ; Battle_DrawBattlerFrameAnyLayout ($C1:1C7F), Battle_TickPcSlots
 ; ($C1:2E98), Battle_TickEnemyGroup ($C1:33A5), Battle_RunPcPose
 ; ($C1:35FF) and 15 in unmatched code (e.g. $C1:509B). No calls.
@@ -144,7 +160,13 @@ Battle_Mul8x16:
 ;        $A029, outside the low-RAM mirror); HW registers use .l
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y unchanged; DP $79-$7B and $B5-$B8
 ;        written
-; Callers: 19 JSR sites across bank $C1: BattleUI_DrawSlotGaugeBar
+; Callers (19 JSR sites): BattleUI_DrawSlotGaugeBar ($C1:071D), Battle_TickPcSlots ($C1:2ECF),
+;   BattleAct_MoveToPoint ($C1:5084), BattleAct_StartBattlerMove ($C1:5170), BattleAct_ArcToPoint
+;   ($C1:6311, $C1:637D, $C1:6453, $C1:64C0), BattleAct_CalcMoveStep ($C1:6614, $C1:663C),
+;   BattleAct_CircleMoveKind ($C1:6DA0, $C1:6E4C, $C1:6F02), BattleAct_OpMoveKind4ToCalc ($C1:70DB,
+;   $C1:71A4), BattleAct_OpMoveToMidpoint ($C1:727E, $C1:731C) and BattleAct_CalcCentroid ($C1:7731,
+;   $C1:7745).
+; Callers note: 19 JSR sites across bank $C1: BattleUI_DrawSlotGaugeBar
 ; ($C1:071D), Battle_TickPcSlots ($C1:2ECF) and 17 in unmatched code
 ; (e.g. $C1:5084, $C1:6311, $C1:7731). No calls.
 org $C100D7
@@ -187,22 +209,26 @@ Battle_Divide:
 ;   (>>6) → Battle_ShiftRight5 (>>5) → Battle_ShiftRight4 (>>4)
 ;   → Battle_ShiftRight3 (>>3, RTS)
 ; The other seven labels are sub-entries documented here.
-; Callers (all JSR, by entry point):
-;   Battle_ShiftLeft8: BattleUI_DrawSlotGaugeBar ($C1:0715), $C1:660C,
-;     $C1:6634
-;   Battle_ShiftLeft4: Battle_FxReset ($C1:30CF), Battle_FxOverlay2Tint
-;     ($C1:310F)
-;   Battle_ShiftLeft3: Battle_TickEnemyGroup ($C1:3410, $C1:3471),
-;     BattleAct_LoadCommon ($C1:48BA)
-;   Battle_ShiftRight8: BattlePos_DistDifference ($C1:2D73)
-;   Battle_ShiftRight6: $C1:3AB7, $C1:3C41, $C1:53B2, $C1:53B9
-;   Battle_ShiftRight5: $C1:39F6, $C1:39FE, $C1:3A0A, $C1:3A12
-;   Battle_ShiftRight4 (15 sites): BattleMenu_UpdateTechMpAvail,
-;     BattleMenu_CommitAction, BattleMenu_UpdateCursorOverlay,
-;     BattleTgt_AreaCircle (4), and $C1:4A81, $C1:4A9F, $C1:67C6, $C1:685B,
-;     $C1:68F4, $C1:6B72, $C1:6C1D, $C1:6CCC
-;   Battle_ShiftRight3: BattleUI_DrawPcNamePanel, BattleUI_UpdateNextPcPanel,
-;     BattleUI_DrawSlotGaugeBar, $C1:78C6, $C1:78F3, $C1:7963, $C1:7990
+; Callers (3 JSR sites): BattleUI_DrawSlotGaugeBar ($C1:0715) and BattleAct_CalcMoveStep ($C1:660C,
+;   $C1:6634).
+; Callers of Battle_ShiftLeft4 (2 JSR sites): Battle_FxReset ($C1:30CF) and Battle_FxOverlay2Tint
+;   ($C1:310F).
+; Callers of Battle_ShiftLeft3 (3 JSR sites): Battle_TickEnemyGroup ($C1:3410, $C1:3471) and
+;   BattleAct_LoadCommon ($C1:48BA).
+; Callers of Battle_ShiftRight8 (1 JSR site): BattlePos_DistDifference ($C1:2D73).
+; Callers of Battle_ShiftRight6 (4 JSR sites): Battle_MoverKeepRange ($C1:3AB7), Battle_MoverOrbit
+;   ($C1:3C41) and BattleAct_CurveTurnDir ($C1:53B2, $C1:53B9).
+; Callers of Battle_ShiftRight5 (4 JSR sites): Battle_MoverAxis ($C1:39F6, $C1:39FE, $C1:3A0A,
+;   $C1:3A12).
+; Callers of Battle_ShiftRight4 (15 JSR sites): BattleMenu_UpdateTechMpAvail ($C1:0FCB),
+;   BattleMenu_CommitAction ($C1:166D), BattleMenu_UpdateCursorOverlay ($C1:1884),
+;   BattleTgt_AreaCircle ($C1:2708, $C1:2711, $C1:2754, $C1:275E), BattleAct_FindPath ($C1:4A81,
+;   $C1:4A9F), BattleAct_OpMoveAlongHeading ($C1:67C6, $C1:685B, $C1:68F4) and
+;   BattleAct_OpMoveHeadingChecked ($C1:6B72, $C1:6C1D, $C1:6CCC).
+; Callers of Battle_ShiftRight3 (7 JSR sites): BattleUI_DrawPcNamePanel ($C1:0369),
+;   BattleUI_UpdateNextPcPanel ($C1:0616), BattleUI_DrawSlotGaugeBar ($C1:0724),
+;   BattleAct_CalcLerpToTarget ($C1:78C6, $C1:78F3) and BattleAct_CalcLerpToObj0 ($C1:7963,
+;   $C1:7990).
 ; Entry: M either width (A shifted at its current width), X, DP, DB any
 ; Exit:  M, X, DP, DB unchanged; A shifted; C = last bit shifted out;
 ;        X/Y and memory untouched
@@ -242,7 +268,7 @@ Battle_ShiftRight3:         ; A >>= 3; header: see Battle_ShiftLeft8
 ; Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles:
 ;   !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits,
 ;   tiles looked up in !BattleRom_DigitTiles. NumValue is consumed.
-; Callers (JSR): BattleUI_DrawPcNamePanel ($C1:039A, $C1:03EE) and
+; Callers (3 JSR sites): BattleUI_DrawPcNamePanel ($C1:039A, $C1:03EE) and
 ;   BattleUI_UpdateNextPcPanel ($C1:0628).
 ; Entry: M=0 (16-bit A), X=0 (16-bit), DP=0 (TDC / TAX zeroes the digit
 ;        counters only because D=0), DB=$7E (WRAM accessible)
@@ -302,9 +328,9 @@ BattleMsg_FormatNumberDigits:
 ; Two-digit variant of BattleMsg_FormatNumberDigits: formats
 ; !BattleMsg_NumValue as tens+ones only. Digit1000/Digit100 = blank;
 ; Digit10 = tens, Digit1 = ones. Used for two-digit values (0–99).
-; Callers (9 JSR sites): BattleUI_DrawPcNamePanel ($C1:0444),
-;   BattleUI_UpdateNextPcPanel ($C1:0686), BattleMenu_RenderItemRow
-;   ($C1:0A41) and BattleMenu_UpdateTechWindow (6 sites).
+; Callers (9 JSR sites): BattleUI_DrawPcNamePanel ($C1:0444), BattleUI_UpdateNextPcPanel ($C1:0686),
+;   BattleMenu_RenderItemRow ($C1:0A41) and BattleMenu_UpdateTechWindow ($C1:0CD0, $C1:0CFE,
+;   $C1:0D2C, $C1:0DE6, $C1:0E10, $C1:0E3A).
 ; Entry: M=0 (16-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1 (8-bit A), X=0; X and Y unchanged (PHX/PLX); A = blank tile;
 ;        !BattleMsg_NumValue consumed
@@ -353,8 +379,8 @@ BattleMsg_FormatTwoDigits:
 ; has 41 codes and set 2 has 10, the counts of Japanese kana that take a
 ; dakuten and a handakuten, so $71/$72 are probably those marks drawn
 ; above the base character (a leftover of the Japanese text code).
-; Callers (JSR): BattleMenu_RenderItemRow ($C1:09E2) and
-;   BattleMenu_RenderTechRow ($C1:0B7C).
+; Callers (2 JSR sites): BattleMenu_RenderItemRow ($C1:09E2) and BattleMenu_RenderTechRow
+;   ($C1:0B7C).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC / TAX as zero), DB any
 ;        (nothing touches memory before the MVN)
 ; Exit:  M=1, X=0; DB=$7E (set by the MVN); A, X, Y clobbered
@@ -420,9 +446,15 @@ BattleMsg_ReencodeTextBuffer:
 ; $FF at +$100 and +$300); angle × 4 picks every fourth entry, and the
 ; value is negated for the second half turn (table offset $200 and up). The signed sine goes to !Battle_MulFactor16, the scale to
 ; !Battle_MulFactor8, and Battle_Mul8x16 multiplies them.
-; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites), BattlePos_PathClear
-;   ($C1:2C38, $C1:2C42) and 40 in unmatched code (e.g. $C1:37D7,
-;   $C1:37E1).
+; Callers (46 JSR sites): BattleTgt_AreaLine ($C1:25CA, $C1:25D4, $C1:25DE, $C1:25E8),
+;   BattlePos_PathClear ($C1:2C38, $C1:2C42), Battle_MoverApproach ($C1:37D7, $C1:37E1),
+;   Battle_MoverCharge ($C1:38EE, $C1:38F8), Battle_MoverAxis ($C1:399F, $C1:39A9),
+;   Battle_MoverKeepRange ($C1:3A7F, $C1:3A91, $C1:3B02, $C1:3B0C), Battle_MoverOrbit ($C1:3C09,
+;   $C1:3C1B, $C1:3C8C, $C1:3C96, $C1:3D80, $C1:3D90, $C1:3DC6, $C1:3DD0), Battle_MoverLoop
+;   ($C1:3E8A, $C1:3EA2, $C1:3EC3, $C1:3ECD), Battle_MoverFixedDir ($C1:3FD4, $C1:3FDE),
+;   BattleAct_OpMoveAlongHeading ($C1:67A6, $C1:67B1, $C1:683B, $C1:6846, $C1:68CE, $C1:68DC),
+;   BattleAct_OpMoveHeadingChecked ($C1:6B52, $C1:6B5D, $C1:6BFD, $C1:6C08, $C1:6CA6, $C1:6CB4) and
+;   BattleAct_CalcAheadOfActor ($C1:7763, $C1:7774, $C1:779C, $C1:77AF).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB any (table read with .l);
 ;        angle in A
 ; Exit:  M=1, X=0; A = !Battle_MulProduct+1 (product >> 8); X clobbered
@@ -459,11 +491,17 @@ Battle_SinLookup:
 ; 16-bit values, takes |dx| and |dy|, looks up a base angle in
 ; !BattleRom_AngleTable at index (|dy| & ~7) × 4 + (|dx| >> 3), then
 ; places it in the right quadrant from the signs of dx and dy.
-; Callers (37 JSR sites): BattleTgt_AreaPartyTriangle (9 sites),
-;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC), BattlePos_PathClear
-;   ($C1:2C27), Battle_UpdatePcFacing ($C1:2F82),
-;   Battle_FaceAllPcsNearestEnemy ($C1:353B) and 22 in unmatched code
-;   (e.g. $C1:37C9).
+; Callers (37 JSR sites): BattleTgt_AreaPartyTriangle ($C1:2484, $C1:2491, $C1:249E, $C1:24AB,
+;   $C1:24B8, $C1:24C5, $C1:251C, $C1:2545, $C1:256E), BattleTgt_AreaLine ($C1:25C7, $C1:26A3,
+;   $C1:26CC), BattlePos_PathClear ($C1:2C27), Battle_UpdatePcFacing ($C1:2F82),
+;   Battle_FaceAllPcsNearestEnemy ($C1:353B), Battle_MoverApproach ($C1:37C9), Battle_MoverCharge
+;   ($C1:38E6), Battle_MoverKeepRange ($C1:3A7C), Battle_MoverOrbit ($C1:3C06, $C1:3D63, $C1:3DA5),
+;   Battle_MoverLoop ($C1:3EBB), Battle_MoverToCentre ($C1:403B), BattleAct_CheckReach ($C1:4A35),
+;   BattleAct_MoveToPoint ($C1:5064), BattleAct_StartBattlerMove ($C1:5151), BattleAct_CurveToPoint
+;   ($C1:525A, $C1:52CC, $C1:535B), BattleAct_OpHeadingFromCalc ($C1:6118), BattleAct_ArcToPoint
+;   ($C1:62F2, $C1:6433), BattleAct_OpMoveKind4ToCalc ($C1:7092, $C1:7159),
+;   BattleAct_OpMoveToMidpoint ($C1:725E), BattleAct_FaceTowardEntry ($C1:75FE) and
+;   BattleAct_FaceTowardCentre ($C1:7622).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB any (table
 ;        read with .l); !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y
 ; Exit:  M=1, X=0; angle in A and !Battle_GeoAngle; X = table index;
@@ -585,8 +623,7 @@ Battle_CalcAngle:
 ;        otherwise), set !BattleMenu_ActivePc, redraw every roster PC's
 ;        command list (BattleMenu_DrawCommandList) and the command-window
 ;        frames (BattleMenu_DrawCommandWindowFrames).
-; Callers (JSR): BattleMenu_UpdateMainWindow ($C1:0C5C) and unmatched code
-;   at $C1:0027.
+; Callers (2 JSR sites): BattleMenu_UpdateMainWindow ($C1:0C5C) and unmatched ($C1:0027).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87, $8E and
 ;        $A2/$A3 used as temporaries, plus the callees' DP: $79-$7B,
@@ -672,6 +709,7 @@ BattleUI_BuildStatusBarFrame:
     ;        !BattleUI_PanelDest = its name cell
     ; Exit:  continues into BattleUI_NextNamePanel (same state; A/X/Y and
     ;        the DP listed for BuildStatusBarFrame clobbered)
+; Callers (1 JMP site): BattleUI_NextNamePanel ($C1:04D9).
 BattleUI_DrawPcNamePanel:
     LDY.b !BattleUI_PanelDest       ; Y = name cell
     LDX.b !BattleUI_Slot
@@ -899,6 +937,7 @@ BattleUI_DrawPcNamePanel:
     ; .gauge_caps above, and by JMP from BattleUI_DrawPcNamePanel ($C1:030E)
     ; when the slot holds no PC.
     ; Entry/Exit: as BattleUI_BuildStatusBarFrame (M=1, X=0, DP=0, DB=$7E)
+; Callers (1 JMP site): BattleUI_DrawPcNamePanel ($C1:030E).
 BattleUI_NextNamePanel:
     REP #$21                        ; M=0, C=0
     LDA.b !BattleUI_PanelDest
@@ -1054,7 +1093,8 @@ BattleUI_NextNamePanel:
 ;        $AD/$AE and $B1-$B8
 ; Calls: Battle_ShiftRight3, BattleMsg_FormatNumberDigits,
 ;        BattleMsg_BlankLeadingZeros, BattleMsg_FormatTwoDigits, BattleUI_DrawSlotGaugeBar
-; Caller: BattleMenu_UpdateMainWindow (when the shown roster entry has not
+; Callers (1 JSR site): BattleMenu_UpdateMainWindow ($C1:0C61).
+; Callers note: BattleMenu_UpdateMainWindow (when the shown roster entry has not
 ;        changed, so no full BuildStatusBarFrame is needed)
 ; Sub-entry: BattleUI_DrawAtbGauges ($06DB) — X = first PC slot; redraw the
 ;        ATB gauges from there to slot 2 (same entry state; only reached
@@ -1246,7 +1286,7 @@ BattleUI_UpdateNextPcPanel_Exit:    ; header: see BattleUI_UpdateNextPcPanel
 ;        only when units are left over: Y = start + 8 for an empty gauge,
 ;        start for a full one); DP $79–$7B, $82/$83, $86, $AD/$AE and
 ;        $B1–$B8 clobbered ($B7/$B8 is Battle_Divide's 16-bit remainder)
-; Callers: BattleUI_DrawPcNamePanel, BattleUI_DrawAtbGauges
+; Callers (2 JSR sites): BattleUI_DrawPcNamePanel ($C1:04C0) and BattleUI_DrawAtbGauges ($C1:06E4).
 ; Calls: Battle_ShiftLeft8, Battle_Divide, Battle_ShiftRight3
 ; Direct-page roles (!BattleUI_Slot is defined with BuildStatusBarFrame):
 !BattleUI_AtbValue = !BattleTmp_AD        ; 2 B: AtbCur zero-extended
@@ -1351,7 +1391,8 @@ BattleUI_DrawSlotGaugeBar:
 ; Entry: M=1, X=0 (16-bit), DP=0, DB=$7E (.w !Pc_Unk9F25/!BattleUI_UnkA117/
 ;        !BattleMenu_Roster), A = PC slot (0–2)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$83 clobbered
-; Caller: BattleUI_NextNamePanel (once per roster PC). No calls.
+; Callers (1 JSR site): BattleUI_NextNamePanel ($C1:0598).
+; Callers note: BattleUI_NextNamePanel (once per roster PC). No calls.
 ; Direct-page roles (!BattleUI_Slot holds the slot until the drawing loops):
 !BattleUI_RowsLeft = !BattleTmp_80        ; 1 B: command-list rows left to draw
 !BattleUI_ColsLeft = !BattleTmp_81        ; 1 B: columns left in the row
@@ -1462,7 +1503,7 @@ BattleMenu_DrawCommandList:
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$84 clobbered
 ;        ($81 is FrameRowsLeft and the high byte of ColumnOffset);
 ;        !BattleUI_PanelRedraw = 0
-; Caller: BattleUI_NextNamePanel
+; Callers (1 JSR site): BattleUI_NextNamePanel ($C1:05A3).
 ; Calls: BattleMenu_DrawCommandWindowFrame, BattleUI_HighlightPcName
 !BattleUI_FrameJoined = !BattleTmp_84    ; 1 B: 0 = whole frame, else drop its left border column (DrawCommandWindowFrame input)
 org $C1081E
@@ -1519,7 +1560,8 @@ BattleMenu_DrawCommandWindowFrames:
 ; Entry: M=1, X=0 (16-bit), DP=0, DB=$7E (.w !BattleMenu_ActivePc/!Pc_MenuRow)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and DP $80/$81 clobbered;
 ;        !BattleUI_PanelRedraw = 0
-; Callers: falls in from BattleMenu_DrawCommandWindowFrames; JSR from
+; Callers (1 JSR site): BattleMenu_UpdateMainWindow ($C1:0C6E).
+; Callers note: falls in from BattleMenu_DrawCommandWindowFrames; JSR from
 ;        BattleMenu_UpdateMainWindow. No calls.
 !BattleUI_ColumnOffset = !BattleTmp_80   ; 1-2 B: slot * 12, the PC's column offset in the status map
 BattleUI_ClearActivePanelColumn:
@@ -1593,7 +1635,9 @@ BattleUI_ClearActivePanelColumn:
 ;        A = PC slot (0–2)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X = offset; A = !BattleUI_AttrPal2;
 ;        Y and DP unchanged
-; Callers: BattleMenu_DrawCommandWindowFrames (JSR); BattleUI_NextNamePanel
+; Callers (2 sites: 1 JSR, 1 JMP): BattleUI_NextNamePanel (JMP $C1:0561) and
+;   BattleMenu_DrawCommandWindowFrames (JSR $C1:086C).
+; Callers note: BattleMenu_DrawCommandWindowFrames (JSR); BattleUI_NextNamePanel
 ;        (tail JMP). No calls.
 org $C108E8
 BattleUI_HighlightPcName:
@@ -1640,7 +1684,8 @@ BattleUI_HighlightPcName:
 ;        !BattleUI_MapOffset = map offset, !BattleUI_FrameJoined = 0 for
 ;        a whole frame
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and DP $80-$83 clobbered
-; Caller: BattleMenu_DrawCommandWindowFrames (up to 3 times). No calls.
+; Callers (3 JSR sites): BattleMenu_DrawCommandWindowFrames ($C1:082A, $C1:0845, $C1:0862).
+; Callers note: BattleMenu_DrawCommandWindowFrames (up to 3 times). No calls.
 !BattleUI_FrameBytesLeft = !BattleTmp_80      ; 1 B: bytes left to copy in this row
 !BattleUI_FrameRowsLeft = !BattleTmp_81       ; 1 B: rows left
 org $C10929
@@ -1693,8 +1738,9 @@ BattleMenu_DrawCommandWindowFrame:
 ;        !BattleMenu_ListScroll = scroll position
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87, $8E-$8F,
 ;        $96-$98 clobbered (the last three partly by BattleMenu_RenderItemRow)
-; Callers: BattleMenu_OpenItemList, BattleMenu_ItemListRefresh,
-;        BattleMenu_ItemListScrollUp_RenderTail, BattleMenu_ItemListScrollDown_RenderTail
+; Callers (4 JSR sites): BattleMenu_OpenItemList ($C1:12FF), BattleMenu_ItemListRefresh ($C1:1550),
+;   BattleMenu_ItemListScrollUp_RenderTail ($C1:17B3) and BattleMenu_ItemListScrollDown_RenderTail
+;   ($C1:17D1).
 ; Calls: BattleMenu_RenderItemRow
 ; Direct-page roles (shared with RenderItemRow and the list scroll routines):
 !BattleMenu_ListScroll = !BattleTmp_80    ; 1 B in: list scroll position
@@ -1778,7 +1824,7 @@ BattleMenu_RenderItemListRows:
 ;        clobbered; DP $84-$85, $8E-$8F, $98 clobbered;
 ;        !BattleMsg_TextTiles/TextTopTiles/TextSource and the digit cells
 ;        overwritten
-; Caller: BattleMenu_RenderItemListRows (3 times)
+; Callers (1 JSR site): BattleMenu_RenderItemListRows ($C1:098B).
 ; Calls: BattleMsg_ReencodeTextBuffer, BattleMsg_FormatTwoDigits, BattleMsg_BlankLeadingZeros
 !BattleMenu_RowAttr = !BattleTmp_98      ; 1 B: attribute for the whole line (palette 2 or greyed 3)
 org $C109B0
@@ -1897,7 +1943,8 @@ BattleMenu_RenderItemRow_Exit:      ; header: see BattleMenu_RenderItemRow
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$83, $86-$89,
 ;        $8E-$91 and $AF clobbered (with RenderTechRow's)
-; Callers: BattleMenu_UpdateTechWindow, BattleMenu_OpenTechList
+; Callers (2 JSR sites): BattleMenu_UpdateTechWindow ($C1:0C83) and BattleMenu_OpenTechList
+;   ($C1:12D1).
 ; Calls: BattleMenu_RenderTechRow
 ; Direct-page roles (shared with RenderTechRow and its tails):
 !BattleMenu_TechListBase = !BattleTmp_AF  ; 1 B: first line of the PC's tech list
@@ -1950,7 +1997,8 @@ BattleMenu_RenderTechListRows:
 ; anything else → 1. TechListPrev/Next use it to skip those lines.
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and DP $80 clobbered
-; Caller: BattleMenu_OpenTechList. No JSR/JSL calls.
+; Callers (1 JSR site): BattleMenu_OpenTechList ($C1:12D4).
+; Callers note: BattleMenu_OpenTechList. No JSR/JSL calls.
 !BattleMenu_EntriesLeft = !BattleTmp_80  ; 1 B: list lines left to grade
 org $C10AD3
 BattleMenu_BuildTechAvailFlags:
@@ -2005,7 +2053,7 @@ BattleMenu_BuildTechAvailFlags:
 ; Exit:  M=1, X=0, DP=0, DB=$7E (the MVN also sets $7E), through one of
 ;        its tail JMPs; A, X, Y clobbered; DP $88 and $8E-$91 clobbered;
 ;        !BattleMsg_TextTiles/TextTopTiles/TextSource overwritten
-; Caller: BattleMenu_RenderTechListRows (4 times)
+; Callers (2 JSR sites): BattleMenu_RenderTechListRows ($C1:0AAD, $C1:0ABE).
 ; Calls: BattleMsg_ReencodeTextBuffer, BattleMenu_BlankNameLeadCells;
 ;        tail JMPs to BattleMenu_DrawTechLowerRow (header/blank lines) or
 ;        BattleMenu_BlankNameTailCells (tech names)
@@ -2113,6 +2161,7 @@ BattleMenu_RenderTechRow:
 ; !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row
 ; tiles from !BattleMsg_TextTiles into the line from col 3 (palette 3).
 ; Reached only by JMP from BattleMenu_RenderTechRow.
+; Callers (1 JMP site): BattleMenu_RenderTechRow ($C1:0B54).
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC as zero), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $88 advanced
 ; Calls: BattleMenu_BlankNameLeadCells
@@ -2140,6 +2189,8 @@ BattleMenu_DrawTechLowerRow:
 ; col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset
 ; (blank tile, palette 3).
 ; Called from BattleMenu_RenderTechRow and BattleMenu_DrawTechLowerRow.
+; Callers (2 JSR sites): BattleMenu_RenderTechRow ($C1:0B81) and BattleMenu_DrawTechLowerRow
+;   ($C1:0BB8).
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC as zero), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; no DP written
 ; No JSR/JSL calls.
@@ -2177,6 +2228,7 @@ BattleMenu_BlankNameLeadCells:
 ; Tech-name exit path of BattleMenu_RenderTechRow (reached by its tail
 ; JMP): blanks cols 17-20 (right of the 11-tile name) on both rows of the
 ; line (blank tile, palette 3); the mirror of BattleMenu_BlankNameLeadCells.
+; Callers (1 JMP site): BattleMenu_RenderTechRow ($C1:0BB2).
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC as zero), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; no DP written
 ; No JSR/JSL calls.
@@ -2219,7 +2271,9 @@ BattleMenu_BlankNameTailCells:
 ;   0 → BattleMenu_UpdateMainWindow
 ;   1 → BattleMenu_UpdateTechMpAvail + BattleMenu_UpdateTechWindow
 ;   other → BattleMenu_UpdateWindows_Exit → BattleMenu_Return (RTS)
-; Callers (4 JSRs, checked in the ROM): BattleMenu_RefreshIfDirtyL,
+; Callers (4 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10D1), BattleMenu_RefreshIfDirtyL
+;   ($C1:10F0), BattleMenu_RefreshIfDirtyAndTick ($C1:1107) and BattleSys_VictoryPose ($C1:35A6).
+; Callers note (4 JSRs, checked in the ROM): BattleMenu_RefreshIfDirtyL,
 ;   BattleMenu_RefreshIfDirtyAndTick, BattleSys_UpkeepTwoFrames (behind
 ;   the same !BattleMenu_Dirty gate) and BattleSys_VictoryPose.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
@@ -2258,6 +2312,7 @@ BattleMenu_UpdateWindows_Exit:      ; shared exit — branched to from UpdateMai
 ; The opening Submenu != 0 test is redundant: the only way in is the JMP
 ; from BattleMenu_UpdateWindows, taken only when !BattleMenu_Submenu = 0
 ; (no other JSR/JMP to $0C49 in the bank).
+; Callers (1 JMP site): BattleMenu_UpdateWindows ($C1:0C39).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E (through BattleMenu_Return); A, X, Y
 ;        clobbered, plus the callees' DP: BuildStatusBarFrame's or
@@ -2312,6 +2367,7 @@ BattleMenu_UpdateMainWindow:
 ;    row, the tens digit suppressed when zero.
 ; 5. Falls through into BattleMenu_DrawTechCursorRow.
 ; Reached only by the JMP from BattleMenu_UpdateWindows (submenu 1).
+; Callers (1 JMP site): BattleMenu_UpdateWindows ($C1:0C43).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleMenu_ActivePc = PC shown
 ; Exit:  M=1, X=0, DP=0, DB=$7E (via BattleMenu_DrawTechCursorRow →
 ;        BattleMenu_Return); A, X, Y clobbered; DP $80-$83, $86-$89,
@@ -2564,6 +2620,7 @@ BattleMenu_UpdateTechWindow:
 ; once after the list opens (!BattleMenu_TechWindowNew), copies the tech
 ; box frame (!BattleRom_TechBoxMap) into !BattleMenu_WindowMap.
 ; Reached by fall-through or JMP/branch from BattleMenu_UpdateTechWindow only.
+; Callers (1 JMP site): BattleMenu_UpdateTechWindow ($C1:0D84).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E (via BattleMenu_Return); A, X, Y and DP $80
 ;        clobbered, plus whatever the two JSL targets (not matched yet)
@@ -2621,7 +2678,8 @@ BattleMenu_DrawTechCursorRow:
 ; BattleMenu_ClearTechCursorTiles ($C10EBA–$C10EE0, 39 bytes)
 ; ==================================================================
 ; Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
-; Callers: BattleMenu_DrawTechCursorRow, BattleMenu_UpdateCursorOverlay
+; Callers (2 JSR sites): BattleMenu_DrawTechCursorRow ($C1:0E63) and BattleMenu_UpdateCursorOverlay
+;   ($C1:1987).
 ; Entry: M=1, X either width, DP any (no DP access), DB=$7E
 ; Exit:  M, X, DP, DB unchanged; A=$FF; X/Y unchanged
 ; No JSR/JSL calls.
@@ -2660,7 +2718,10 @@ BattleMenu_ClearTechCursorTiles:
 ;   - The attribute goes to 18 cells of both rows of the line, from the
 ;     cell !BattleRom_TechRowMapOffset gives (col 3).
 ;   - After the 3rd line: !BattleMenu_TechAvailDone = 1.
-; Caller: BattleMenu_UpdateWindows (submenu 1), just before UpdateTechWindow.
+; Callers (1 JSR site): BattleMenu_UpdateWindows ($C1:0C40).
+; Callers of BattleMenu_Return (3 JMP sites): BattleMenu_UpdateWindows_Exit ($C1:0C46),
+;   BattleMenu_UpdateMainWindow ($C1:0C80) and BattleMenu_DrawTechCursorRow ($C1:0EB7).
+; Callers note: BattleMenu_UpdateWindows (submenu 1), just before UpdateTechWindow.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleMenu_ActivePc = PC shown
 ; Exit:  M=1, X=0, DP=0, DB=$7E (falls into BattleMenu_Return); A, X, Y
 ;        clobbered; DP $80-$89, $94, $96-$9B and $AF/$B0 clobbered
@@ -2881,7 +2942,7 @@ BattleMenu_Return:
 ; nonzero otherwise. The callers (UpdateTechMpAvail, twice) BNE straight
 ; after the JSR, so the Z flag is the real result: the ready path ends
 ; with TDC, which gives A=0 and Z set only because DP=0.
-; Callers (JSR): BattleMenu_UpdateTechMpAvail ($C1:0FBE, $C1:0FD0).
+; Callers (2 JSR sites): BattleMenu_UpdateTechMpAvail ($C1:0FBE, $C1:0FD0).
 ; Entry: M=1, X=0 (16-bit), DP=0, DB=$7E; !BattleMenu_ReadySlotArg = PC slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Z set iff ready (A = 0), else Z clear and
 ;        A non-zero; X clobbered; Y unchanged
@@ -2907,6 +2968,9 @@ BattleSys_SlotMenuReadyPredicate:
 ; BattleMsg_FormatTwoDigits (hundreds already blank, so only the tens test
 ; matters) and 3 follow BattleMsg_FormatNumberDigits (the HP and MaxHP
 ; digits).
+; Callers (11 JSR sites): BattleUI_DrawPcNamePanel ($C1:039D, $C1:03F1, $C1:044C, $C1:0451),
+;   BattleUI_UpdateNextPcPanel ($C1:062B, $C1:068E, $C1:0693), BattleMenu_RenderItemRow ($C1:0A44)
+;   and BattleMenu_UpdateTechWindow ($C1:0CD3, $C1:0D01, $C1:0D2F).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP any (no DP access), DB=$7E
 ; Exit:  M, X, DP, DB unchanged; A clobbered; X/Y unchanged
 ; No JSR/JSL calls.
@@ -3017,9 +3081,9 @@ BattleSys_UpkeepTwoFrames:
 ; Copies the $180-byte command window map (!BattleRom_CommandWindowMap,
 ; bank $D1) into !BattleMenu_WindowMap. Used whenever the shown PC changes
 ; or a submenu closes.
-; Callers: BattleMenu_UpdateMainWindow (twice), BattleMenu_BuildTargetList,
-;        BattleMenu_RemoveBattlerFromReady, BattleMenu_TechListCancel,
-;        BattleMenu_ItemListCancel
+; Callers (6 JSR sites): BattleMenu_UpdateMainWindow ($C1:0C59, $C1:0C76), BattleMenu_TechListCancel
+;   ($C1:138F), BattleMenu_ItemListCancel ($C1:14DB), BattleMenu_RemoveBattlerFromReady ($C1:1C33)
+;   and BattleMenu_BuildTargetList ($C1:1FB9).
 ; Entry: M=1, X=0 (16-bit), DP=0 (TDC / TAX zeroes X only because D=0),
 ;        DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X=$0180; A = last byte copied; Y and DP
@@ -3062,7 +3126,10 @@ BattleMenu_LoadCommandWindowMap:
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
 ; Exit:  see Battle_DrawBattlerFrameAnyLayout (layout 3: M=1, X=0, DP=0,
 ;        DB=$7E, X = slot, A = 3, nothing written)
-; Callers: JSR from Battle_TickPcSlots, Battle_TickEnemyGroup,
+; Callers (7 JSR sites): Battle_TickPcSlots ($C1:2F10), Battle_TickEnemyGroup ($C1:345D),
+;   Battle_PoseStep ($C1:3702), BattleSys_RunAction ($C1:416A, $C1:418B, $C1:41AC) and
+;   BattleAct_StepBattlerAnims ($C1:4307).
+; Callers note: JSR from Battle_TickPcSlots, Battle_TickEnemyGroup,
 ;          Battle_PoseStep, $C1:416A, $C1:418B, $C1:41AC and $C1:4307
 ;          (searched: every JSR $1C4A in bank $C1; no JMP or JSL
 ;          reaches it)
@@ -3102,7 +3169,8 @@ Battle_DrawBattlerFrame:
 ;        $80-$85, $88-$89, $8C-$8D, $A5, $A7-$B0 (partly the multiply
 ;        helpers') and $BA-$BE written.
 ;        An unchanged frame returns early with X = slot and A = FrameId.
-; Callers: JSR from Battle_DrawAllBattlerFrames (all 11 slots), and the fall-in
+; Callers (1 JSR site): Battle_DrawAllBattlerFrames ($C1:34C0).
+; Callers note: JSR from Battle_DrawAllBattlerFrames (all 11 slots), and the fall-in
 ;          from Battle_DrawBattlerFrame (searched: no other JSR, JMP or JSL
 ;          reaches $1C55)
 ; Callees: Battle_Mul8x16, Battle_Mul8
@@ -3500,6 +3568,7 @@ Battle_DrawBattlerFrameAnyLayout:
 ; input, redraw cursor overlay). Returns with RTL (long return) since
 ; callers reach this via JSL through the $C10012 vector, not a
 ; same-bank JSR.
+; Callers (1 JMP site): unmatched ($C1:0012).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered (see their headers; the JSL targets they reach are not
@@ -3528,9 +3597,8 @@ BattleMenu_RefreshIfDirtyL:
 ; plain RTS. Runs right after each frame wait in service 4
 ; (BattleSys_RunAction) and its loaders BattleAct_LoadCommon and
 ; BattleAct_UnpackFrames.
-; Callers (7 JSR sites): BattleSys_RunAction ($C1:40A3, $C1:40B6,
-;   $C1:40E4), BattleAct_LoadCommon ($C1:485E, $C1:4867, $C1:4890) and
-;   BattleAct_UnpackFrames ($C1:4946).
+; Callers (7 JSR sites): BattleSys_RunAction ($C1:40A3, $C1:40B6, $C1:40E4), BattleAct_LoadCommon
+;   ($C1:485E, $C1:4867, $C1:4890) and BattleAct_UnpackFrames ($C1:4946).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered, plus whatever BattleSys_FrameTickVec (not matched yet)
@@ -3562,6 +3630,8 @@ BattleMenu_RefreshIfDirtyAndTick:
 ; !BattleOam_CursorSizeBits (all 4 large, x bit 8 clear). Called from
 ; BattleMenu_ProcessInput while no target selection runs, and from
 ; BattleMenu_UpdateCursorOverlay (.tech_single_cursor, JSR at $C1:18AA).
+; Callers (2 JSR sites): BattleMenu_ProcessInput ($C1:1167) and BattleMenu_UpdateCursorOverlay
+;   ($C1:18AA).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X=$0010; A/Y clobbered; no DP written
 ; No JSR/JSL calls.
@@ -3613,6 +3683,8 @@ BattleMenu_DrawCursorSprites:
 ;     !BattleMenu_CfgCursorMemory on (row forced to 0, !BattleMenu_KeepRow
 ;     set), go straight to ConfirmCommand; otherwise Left/Right cycle the
 ;     PC, Up/Down move the cursor, confirm confirms
+; Callers (3 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10D4), BattleMenu_RefreshIfDirtyL ($C1:10F3)
+;   and BattleMenu_RefreshIfDirtyAndTick ($C1:110A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, TDC as
 ;        zero), DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
@@ -3709,7 +3781,7 @@ BattleMenu_ProcessInput:
 ; unreachable, but the battle init code at $CC:E39C sets
 ; CfgCursorMemory from config byte $2991 bit 6, so it runs whenever that
 ; setting is on (inferred: the cursor-memory option).
-; Callers (JMP): BattleMenu_ProcessInput ($C1:11AE).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:11AE).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; pad edges ($EE/$EF) cleared
@@ -3750,7 +3822,7 @@ BattleMenu_CycleActivePcPrev:
 ; Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx
 ; forward (wrap at 3 back to 0) instead; the same sound 0 and the same
 ; cursor-memory handling.
-; Callers (JMP): BattleMenu_ProcessInput ($C1:11CF).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:11CF).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; pad edges ($EE/$EF) cleared
@@ -3791,7 +3863,7 @@ BattleMenu_CycleActivePcNext:
 ; ==================================================================
 ; Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag
 ; the cursor redraw (!BattleUI_PanelRedraw).
-; Callers (JMP): BattleMenu_ProcessInput ($C1:11BA).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:11BA).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; pad edges ($EE/$EF) cleared
@@ -3813,7 +3885,7 @@ BattleMenu_CursorUp:
 ; ==================================================================
 ; Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to
 ; 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
-; Callers (JMP): BattleMenu_ProcessInput ($C1:11C6).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:11C6).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; pad edges ($EE/$EF) cleared
@@ -3837,20 +3909,17 @@ BattleMenu_CursorDown:
 ; Clears both pad-edge bytes and returns. Shared tail used by most of the
 ; command-window input handlers above once they've consumed this frame's
 ; input.
-; Callers (25 JMP sites): BattleMenu_ProcessInput ($C1:115C, $C1:11DE),
-;   BattleMenu_CycleActivePcPrev ($C1:1215), BattleMenu_CycleActivePcNext
-;   ($C1:124D), BattleMenu_CursorUp ($C1:1261), BattleMenu_CursorDown
-;   ($C1:1278), BattleMenu_ChooseAttack ($C1:12B9), BattleMenu_OpenTechList
-;   ($C1:12EA), BattleMenu_OpenItemList ($C1:131D), BattleMenu_TechListInput
-;   ($C1:1366), BattleMenu_TechConfirm ($C1:138C), BattleMenu_TechListCancel
-;   ($C1:13AA), BattleMenu_TechListPrev ($C1:13F1), BattleMenu_TechListNext
-;   ($C1:143A), BattleMenu_ItemListInput ($C1:1495), BattleMenu_ItemConfirm
-;   ($C1:14D8), BattleMenu_ItemListCancel ($C1:14E9),
-;   BattleMenu_ItemCursorUp ($C1:14FF), BattleMenu_ItemCursorDown
-;   ($C1:1519), BattleMenu_ItemListPageDown ($C1:1534),
-;   BattleMenu_ItemListPageUp ($C1:1548), BattleMenu_ItemListRefresh
-;   ($C1:155E), BattleMenu_TargetSelectInput ($C1:1617),
-;   BattleMenu_CommitAction ($C1:174B) and BattleMenu_TargetNext ($C1:1783).
+; Callers (25 JMP sites): BattleMenu_ProcessInput ($C1:115C, $C1:11DE), BattleMenu_CycleActivePcPrev
+;   ($C1:1215), BattleMenu_CycleActivePcNext ($C1:124D), BattleMenu_CursorUp ($C1:1261),
+;   BattleMenu_CursorDown ($C1:1278), BattleMenu_ChooseAttack ($C1:12B9), BattleMenu_OpenTechList
+;   ($C1:12EA), BattleMenu_OpenItemList ($C1:131D), BattleMenu_TechListInput ($C1:1366),
+;   BattleMenu_TechConfirm ($C1:138C), BattleMenu_TechListCancel ($C1:13AA), BattleMenu_TechListPrev
+;   ($C1:13F1), BattleMenu_TechListNext ($C1:143A), BattleMenu_ItemListInput ($C1:1495),
+;   BattleMenu_ItemConfirm ($C1:14D8), BattleMenu_ItemListCancel ($C1:14E9), BattleMenu_ItemCursorUp
+;   ($C1:14FF), BattleMenu_ItemCursorDown ($C1:1519), BattleMenu_ItemListPageDown ($C1:1534),
+;   BattleMenu_ItemListPageUp ($C1:1548), BattleMenu_ItemListRefresh ($C1:155E),
+;   BattleMenu_TargetSelectInput ($C1:1617), BattleMenu_CommitAction ($C1:174B) and
+;   BattleMenu_TargetNext ($C1:1783).
 ; Entry: M=1, X either width, DP=0 (STZ.b $EE/$EF), DB any
 ; Exit:  M, X, DP, DB unchanged; A/X/Y unchanged;
 ;        !Battle_PadEdgeButtons = !Battle_PadEdgeDpad = 0
@@ -3927,15 +3996,14 @@ BattleMenu_EnqueueReadyBattler:
 ; Audio_PlayTileSfxA fills) and calls the audio driver entry. Used when
 ; the cursor moves or a command is confirmed; whether sound 0 is a
 ; cursor beep or a stop is not settled, hence the neutral name.
-; Callers (29 JSR sites): BattleMenu_ProcessInput ($C1:11B7, $C1:11C3,
-;   $C1:11D8), BattleMenu_CycleActivePcPrev ($C1:11E7),
-;   BattleMenu_CycleActivePcNext ($C1:121E), BattleMenu_TechListInput
-;   (4 sites), BattleMenu_ItemListInput (6 sites),
-;   BattleMenu_TargetSelectInput (4 sites), BattleTgt_EnemyLineFromCaster
-;   ($C1:217A, $C1:2188), BattleTgt_EnemyLineFromChar3 ($C1:21C0, $C1:21CE),
-;   BattleTgt_EnemyLineFromCaster2 ($C1:2214, $C1:2222),
-;   BattleTgt_EnemyRadius ($C1:226B, $C1:2279) and BattleTgt_EnemyRow
-;   ($C1:2301, $C1:230F).
+; Callers (29 JSR sites): BattleMenu_ProcessInput ($C1:11B7, $C1:11C3, $C1:11D8),
+;   BattleMenu_CycleActivePcPrev ($C1:11E7), BattleMenu_CycleActivePcNext ($C1:121E),
+;   BattleMenu_TechListInput ($C1:1334, $C1:1340, $C1:1350, $C1:1360), BattleMenu_ItemListInput
+;   ($C1:1443, $C1:144F, $C1:145F, $C1:146F, $C1:147B, $C1:1487), BattleMenu_TargetSelectInput
+;   ($C1:1574, $C1:15EE, $C1:1602, $C1:1611), BattleTgt_EnemyLineFromCaster ($C1:217A, $C1:2188),
+;   BattleTgt_EnemyLineFromChar3 ($C1:21C0, $C1:21CE), BattleTgt_EnemyLineFromCaster2 ($C1:2214,
+;   $C1:2222), BattleTgt_EnemyRadius ($C1:226B, $C1:2279) and BattleTgt_EnemyRow ($C1:2301,
+;   $C1:230F).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as at every caller; the routine itself
 ;        only needs M=1 and DB=$7E for the .w stores)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered, plus whatever
@@ -3958,7 +4026,7 @@ Battle_PlaySfx0:
 ; BattleUI_BuildStatusBarFrame with the first selected target), calls
 ; BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on that
 ; PC's !Pc_MenuRow (0/1/2 = Attack/Tech/Item).
-; Callers (JMP): BattleMenu_ProcessInput ($C1:11A5, $C1:11DB).
+; Callers (2 JMP sites): BattleMenu_ProcessInput ($C1:11A5, $C1:11DB).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  tail-jumps to one of three row handlers, does not fall through;
 ;        each ends in Battle_ClearPadEdges with M=1, X=0, DP=0, DB=$7E;
@@ -3997,7 +4065,7 @@ BattleMenu_ConfirmCommand:
 ; !BattleUI_PanelRedraw is incremented twice; the second INC changes
 ; nothing, since every access to it in banks $C0-$CF is an INC, a
 ; zero/non-zero test or the STZ that clears it (ROM scan of $A43F).
-; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1290).
+; Callers (1 JMP site): BattleMenu_ConfirmCommand ($C1:1290).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered, plus BuildTargetList's (see its header) and
@@ -4025,7 +4093,7 @@ BattleMenu_ChooseAttack:
 ; the tech list lines, builds !Tech_ListAvail, switches to the tech list
 ; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests the tech
 ; box frame (!BattleMenu_TechWindowNew).
-; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1296).
+; Callers (1 JMP site): BattleMenu_ConfirmCommand ($C1:1296).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; DP as in RenderTechListRows and BuildTechAvailFlags
@@ -4060,7 +4128,7 @@ BattleMenu_OpenTechList:
 ; item list at !BattleMenu_ItemScroll, queues the item map upload, copies
 ; the item box frame (!BattleRom_ItemBoxMap) into !BattleMenu_WindowMap,
 ; and switches to the item list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 2).
-; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1299).
+; Callers (1 JMP site): BattleMenu_ConfirmCommand ($C1:1299).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll, TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; DP as in RenderItemListRows, plus whatever
@@ -4111,9 +4179,8 @@ BattleMenu_OpenItemList:
 ; selection entries is empty, !BattleTgt_Result gets the $FF just read
 ; (negative = no valid target).
 ;
-; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0),
-;   BattleMenu_TechConfirm ($C1:1379), BattleMenu_ItemConfirm ($C1:14C5) and
-;   BattleMenu_TargetSelectInput ($C1:1561).
+; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0), BattleMenu_TechConfirm ($C1:1379),
+;   BattleMenu_ItemConfirm ($C1:14C5) and BattleMenu_TargetSelectInput ($C1:1561).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
 ;        the mode handler that ran (the BattleTgt_ routines below: within
@@ -4287,6 +4354,8 @@ BattleTgt_ModeTable:
 ; CompactCandidates then closes the hole if the front stayed empty.
 ; Finally the cursor entry is copied to !BattleTgt_Selected, or the
 ; whole list when !BattleTgt_TargetAll says "target all".
+; Callers of BattleTgt_CollectValidTargets (2 JMP sites): BattleTgt_AllEnemies ($C1:20C3) and
+;   BattleTgt_Everyone ($C1:20D3).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; CollectValidTargets also
 ;        takes X = first slot and !BattleTgt_ScanEnd
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80/$81 written
@@ -4357,10 +4426,9 @@ BattleTgt_AllAllies:
 
 ; BattleTgt_SingleEnemy ($C120A9–$C120B5, 13 bytes): one enemy (3-10),
 ; cursor may cycle. Also called as a list builder by the area modes.
-; Callers (5 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:2169),
-;   BattleTgt_EnemyLineFromChar3 ($C1:21AF), BattleTgt_EnemyLineFromCaster2
-;   ($C1:2203), BattleTgt_EnemyRadius ($C1:225F) and BattleTgt_EnemyRow
-;   ($C1:22F5).
+; Callers (5 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:2169), BattleTgt_EnemyLineFromChar3
+;   ($C1:21AF), BattleTgt_EnemyLineFromCaster2 ($C1:2203), BattleTgt_EnemyRadius ($C1:225F) and
+;   BattleTgt_EnemyRow ($C1:22F5).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_SingleEnemy:
     LDX.w #!Battle_NumSlots
@@ -4800,7 +4868,7 @@ BattleTgt_PartyTriangle:
 ; !Battler_Untargetable). The centre battler is skipped in the scan and
 ; then written unconditionally to the front of !BattleTgt_Candidates —
 ; it is not checked for eligibility, and no CompactCandidates pass runs.
-; Callers (JSR): BattleTgt_EnemyRow ($C1:2322).
+; Callers (1 JSR site): BattleTgt_EnemyRow ($C1:2322).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
 ;        !BattleTgt_AreaCentre
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Candidates[0] = centre, [1..] = hits,
@@ -4899,7 +4967,7 @@ BattleTgt_AreaRow:
 ;    corner to the enemy must fall inside that corner's range (with
 ;    wrap handled as an OR instead of an AND). Inside all three wedges
 ;    = inside the triangle.
-; Callers (JSR): BattleTgt_PartyTriangle ($C1:232C).
+; Callers (1 JSR site): BattleTgt_PartyTriangle ($C1:232C).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; tail-jumps to BattleTgt_CompactCandidates
 ;        (the scan only appends from entry 1, so the $FF front entry is
@@ -5233,9 +5301,8 @@ BattleTgt_AreaPartyTriangle:
 ; scan and re-added by the shared tail BattleTgt_AreaAddAnchor if it is
 ; on the scanned side. Scanned side follows !BattleTgt_AreaSide as in
 ; BattleTgt_AreaRow.
-; Callers (JSR): BattleTgt_EnemyLineFromCaster ($C1:21A9),
-;   BattleTgt_EnemyLineFromChar3 ($C1:21FD) and
-;   BattleTgt_EnemyLineFromCaster2 ($C1:2245).
+; Callers (3 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:21A9), BattleTgt_EnemyLineFromChar3
+;   ($C1:21FD) and BattleTgt_EnemyLineFromCaster2 ($C1:2245).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide..
 ;        AreaVariant as above
 ; Exit:  M=1, X=0, DP=0, DB=$7E; via BattleTgt_AreaAddAnchor ->
@@ -5468,9 +5535,8 @@ BattleTgt_AreaLine:
 ; PC — i.e. only if it belongs to the side that was scanned. Otherwise
 ; falls through into BattleTgt_CompactCandidates (which also runs after
 ; the anchor is placed, as a no-op since the front entry is then filled).
-; Callers (4 JSR sites): BattleTgt_CasterRadius ($C1:2259),
-;   BattleTgt_EnemyRadius ($C1:229E), BattleTgt_Char3Radius ($C1:22CD) and
-;   BattleTgt_Char6Radius ($C1:22EF).
+; Callers (4 JSR sites): BattleTgt_CasterRadius ($C1:2259), BattleTgt_EnemyRadius ($C1:229E),
+;   BattleTgt_Char3Radius ($C1:22CD) and BattleTgt_Char6Radius ($C1:22EF).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
 ;        AreaCentre, AreaSize = radius^2
 ; Exit:  M=1, X=0, DP=0, DB=$7E; falls through into BattleTgt_AreaAddAnchor
@@ -5579,6 +5645,7 @@ BattleTgt_AreaCircle:
 ; AreaCircle header), then falls into BattleTgt_CompactCandidates.
 ; Reached by falling in from BattleTgt_AreaCircle and by JMP from
 ; BattleTgt_AreaLine.
+; Callers (1 JMP site): BattleTgt_AreaLine ($C1:26FE).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattleTgt_AreaSide, !BattleTgt_Anchor ($92)
 ; Exit:  M=1, X=0, DP=0, DB=$7E (through CompactCandidates); A, X
 ;        clobbered; no DP written
@@ -5609,8 +5676,8 @@ BattleTgt_AreaAddAnchor:
 ; AreaPartyTriangle (its scan appends from entry 1), and after
 ; AreaAddAnchor when the anchor is on the other side. The last step reads
 ; entry 11, one past the 11 used entries (the list has 12 bytes).
-; Callers (2 sites: 1 JSR, 1 JMP): BattleTgt_CollectValidTargets ($C1:207B)
-;   and BattleTgt_AreaPartyTriangle ($C1:25A0).
+; Callers (2 sites: 1 JSR, 1 JMP): BattleTgt_CollectValidTargets (JSR $C1:207B) and
+;   BattleTgt_AreaPartyTriangle (JMP $C1:25A0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the front entry if it was filled,
 ;        else the last byte moved; X unchanged if the front was filled,
@@ -5632,9 +5699,8 @@ BattleTgt_CompactCandidates:
 
 ; BattleTgt_ClearLists ($C127D9–$C127E7, 15 bytes): blank candidate
 ; and selection lists (12 entries each, one more than they use)
-; Callers (4 JSR sites): BattleTgt_AreaRow ($C1:234F),
-;   BattleTgt_AreaPartyTriangle ($C1:24E2), BattleTgt_AreaLine ($C1:2657)
-;   and BattleTgt_AreaCircle ($C1:2717).
+; Callers (4 JSR sites): BattleTgt_AreaRow ($C1:234F), BattleTgt_AreaPartyTriangle ($C1:24E2),
+;   BattleTgt_AreaLine ($C1:2657) and BattleTgt_AreaCircle ($C1:2717).
 ; Entry/Exit: M=1, X=0 (LDX.w #$0B), DP=0, DB=$7E; A = $FF, X = $FFFF;
 ; Y and DP unchanged
 BattleTgt_ClearLists:
@@ -5649,12 +5715,10 @@ BattleTgt_ClearLists:
 
 ; BattleTgt_SelectAllCandidates ($C127E8–$C127F9, 18 bytes): set
 ; target-all and copy the 11 candidates into the selection list
-; Callers (9 JMP sites): BattleTgt_EnemyLineFromCaster ($C1:21AC),
-;   BattleTgt_EnemyLineFromChar3 ($C1:2200), BattleTgt_EnemyLineFromCaster2
-;   ($C1:2248), BattleTgt_CasterRadius ($C1:225C), BattleTgt_EnemyRadius
-;   ($C1:22A1), BattleTgt_Char3Radius ($C1:22D0), BattleTgt_Char6Radius
-;   ($C1:22F2), BattleTgt_EnemyRow ($C1:2325) and BattleTgt_PartyTriangle
-;   ($C1:232F).
+; Callers (9 JMP sites): BattleTgt_EnemyLineFromCaster ($C1:21AC), BattleTgt_EnemyLineFromChar3
+;   ($C1:2200), BattleTgt_EnemyLineFromCaster2 ($C1:2248), BattleTgt_CasterRadius ($C1:225C),
+;   BattleTgt_EnemyRadius ($C1:22A1), BattleTgt_Char3Radius ($C1:22D0), BattleTgt_Char6Radius
+;   ($C1:22F2), BattleTgt_EnemyRow ($C1:2325) and BattleTgt_PartyTriangle ($C1:232F).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_SelectAllCandidates:
     LDA.b #!BattleTgt_AllFlag
@@ -5673,9 +5737,8 @@ BattleTgt_SelectAllCandidates:
 ; (TargetNext would loop forever on an empty list); unlike TargetNext it
 ; does not write !BattleTgt_Selected.
 ; Callers (8 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:217D, $C1:218B),
-;   BattleTgt_EnemyLineFromChar3 ($C1:21C3, $C1:21D1),
-;   BattleTgt_EnemyLineFromCaster2 ($C1:2217, $C1:2225),
-;   BattleTgt_EnemyRadius ($C1:226E) and BattleTgt_EnemyRow ($C1:2304).
+;   BattleTgt_EnemyLineFromChar3 ($C1:21C3, $C1:21D1), BattleTgt_EnemyLineFromCaster2 ($C1:2217,
+;   $C1:2225), BattleTgt_EnemyRadius ($C1:226E) and BattleTgt_EnemyRow ($C1:2304).
 ; Entry/Exit: M=1, X=0, DP=0 (TDC as zero), DB=$7E; A, X clobbered; Y and
 ; DP unchanged
 BattleTgt_CycleNext:
@@ -5696,8 +5759,7 @@ BattleTgt_CycleNext:
     RTS
 
 ; BattleTgt_CyclePrev ($C12814–$C1282C, 25 bytes): mirror of CycleNext
-; Callers (JSR): BattleTgt_EnemyRadius ($C1:227C) and BattleTgt_EnemyRow
-;   ($C1:2312).
+; Callers (2 JSR sites): BattleTgt_EnemyRadius ($C1:227C) and BattleTgt_EnemyRow ($C1:2312).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_CyclePrev:
     JSR BattleTgt_AnyCandidate
@@ -5717,8 +5779,7 @@ BattleTgt_CyclePrev:
 
 ; BattleTgt_AnyCandidate ($C1282D–$C1283C, 16 bytes): Z=1 if all 11
 ; candidate slots are $FF, Z=0 as soon as one isn't
-; Callers (JSR): BattleTgt_CycleNext ($C1:27FA) and BattleTgt_CyclePrev
-;   ($C1:2814).
+; Callers (2 JSR sites): BattleTgt_CycleNext ($C1:27FA) and BattleTgt_CyclePrev ($C1:2814).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Z as above (callers BEQ on it); A, X
 ;        clobbered; Y unchanged
@@ -5751,7 +5812,9 @@ BattleTgt_AnyCandidate:
 ; ==================================================================
 ; Copies every present battler's screen position into its probe
 ; position and rebuilds its box.
-; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; Callers (4 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10B8, $C1:10DF), BattleSys_RunAction
+;   ($C1:40C8) and unmatched ($C1:002A).
+; Callers note (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded): BattleSys_UpkeepTwoFrames (twice), the
 ; unmatched service 0 at $C1:002A and $C1:40C8.
 ; Entry: M=1, X=0 (16-bit slot counter), DP=0 (TDC as zero), DB=$7E
@@ -5787,7 +5850,12 @@ Battle_CacheBattlerCoordsAll:
 ; needed (left/top only when the coordinate is below $80, right only
 ; when it is $80 or more), which is right as long as the half-width and
 ; height stay below $80. The bottom edge is never clamped.
-; Callers (JSR/JMP, scanned as above): Battle_CacheBattlerCoordsAll,
+; Callers (12 sites: 11 JSR, 1 JMP): Battle_CacheBattlerCoordsAll (JSR $C1:2850),
+;   BattlePos_PathClear (JSR $C1:2C6B, JMP $C1:2CA4), Battle_MoverApproach (JSR $C1:386A),
+;   Battle_MoverCharge (JSR $C1:3925), Battle_MoverAxis (JSR $C1:39D6), Battle_MoverKeepRange (JSR
+;   $C1:3B79), Battle_MoverOrbit (JSR $C1:3CEB, JSR $C1:3DFA), Battle_MoverLoop (JSR $C1:3EF7),
+;   Battle_MoverFixedDir (JSR $C1:4001) and BattleAct_ProbeBoxOverlap (JSR $C1:7C37).
+; Callers note (JSR/JMP, scanned as above): Battle_CacheBattlerCoordsAll,
 ; BattlePos_PathClear (JSR, and JMP as its tail), and the unmatched
 ; movers at $C1:386A, $C1:3925, $C1:39D6, $C1:3B79, $C1:3CEB, $C1:3DFA,
 ; $C1:3EF7, $C1:4001, $C1:7C37.
@@ -5853,7 +5921,12 @@ Battle_CalcBattlerBox:
 ; 0 when it touches none; Y = the slot touched (11 when none).
 ; The horizontal test is written out twice, once for each order of the
 ; two left edges, and each copy repeats the vertical test.
-; Callers (JSR/JMP, scanned as above): BattlePos_PathClear and the
+; Callers (10 sites: 9 JSR, 1 JMP): BattlePos_PathClear (JSR $C1:2C7B), Battle_MoverApproach (JSR
+;   $C1:3888), Battle_MoverCharge (JSR $C1:3930), Battle_MoverAxis (JSR $C1:39E1),
+;   Battle_MoverKeepRange (JSR $C1:3B8B), Battle_MoverOrbit (JSR $C1:3D09, JSR $C1:3E18),
+;   Battle_MoverLoop (JSR $C1:3F15), Battle_MoverFixedDir (JSR $C1:400C) and
+;   BattleAct_ProbeBoxOverlap (JMP $C1:7C3A).
+; Callers note (JSR/JMP, scanned as above): BattlePos_PathClear and the
 ; unmatched movers at $C1:3888, $C1:3930, $C1:39E1, $C1:3B8B, $C1:3D09,
 ; $C1:3E18, $C1:3F15, $C1:400C, plus a JMP (tail call) at $C1:7C3A.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot (16-bit,
@@ -5935,7 +6008,11 @@ Battle_BoxOverlapsOthers:
 ; The cell index row*16 + col is built in 8-bit A and moved with TAY,
 ; which also copies B; the index is right only while B is 0 (as after
 ; the callers' TDC; assumed, not traced for every caller).
-; Callers (JSR, scanned as above): BattlePos_PathClear and the unmatched
+; Callers (9 JSR sites): BattlePos_PathClear ($C1:2C71), Battle_MoverApproach ($C1:387C),
+;   Battle_MoverCharge ($C1:392B), Battle_MoverAxis ($C1:39DC), Battle_MoverKeepRange ($C1:3B7F),
+;   Battle_MoverOrbit ($C1:3CFD, $C1:3E0C), Battle_MoverLoop ($C1:3F09) and Battle_MoverFixedDir
+;   ($C1:4007).
+; Callers note (JSR, scanned as above): BattlePos_PathClear and the unmatched
 ; movers at $C1:387C, $C1:392B, $C1:39DC, $C1:3B7F, $C1:3CFD, $C1:3E0C,
 ; $C1:3F09, $C1:4007.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot
@@ -6084,7 +6161,7 @@ BattlePos_Query:
 ; Only NearestEnemy skips the subject itself; the PC scans include it
 ; when it is a PC (distance 0, so NearestPc then returns the subject).
 ; Found is stored 16-bit from the 16-bit slot counter, so $9874 gets 0.
-; Callers: BattlePos_ModeTable entries 0-3 only (BattlePos_Query).
+; Callers note: BattlePos_ModeTable entries 0-3 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattlePos_Subject
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattlePos_Other =
 ;        last slot examined; DP $77-$78, $80-$87 (and $8A for
@@ -6287,7 +6364,17 @@ BattlePos_FarthestEnemy:            ; header: see BattlePos_NearestPc
 ; bytes differ only in the BRA displacement to CheckDist ($36 vs $2A).
 ; The 16-bit sum of the two squares wraps for points about 256 pixels
 ; or more apart (reproduced as found; on-screen distances keep below).
-; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; Callers (1 JSR site): BattleAct_CheckReach ($C1:4A26).
+; Callers of BattlePos_WithinDist32XY (2 JSR sites): BattlePos_PathClear ($C1:2C5D) and
+;   Battle_MoverApproach ($C1:3819).
+; Callers of BattlePos_WithinDist64XY (1 JSR site): Battle_MoverApproach ($C1:3821).
+; Callers of BattlePos_WithinDist4XY (1 JSR site): Battle_MoverApproach ($C1:3829).
+; Callers of BattlePos_WithinDist4XYTwin (1 JSR site): Battle_MoverKeepRange ($C1:3B38).
+; Callers of BattlePos_WithinDist16XY (1 JSR site): Battle_MoverOrbit ($C1:3CBB).
+; Callers of BattlePos_WithinDist32 (4 JSR sites): BattlePos_NearestPc ($C1:29DB),
+;   BattlePos_FarthestPc ($C1:2A23), BattlePos_NearestEnemy ($C1:2A78) and BattlePos_FarthestEnemy
+;   ($C1:2AC3).
+; Callers note (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded):
 ;   WithinDist40XY      $C1:4A26 (unmatched)
 ;   WithinDist32XY      BattlePos_PathClear ($C1:2C5D), $C1:3819 (unmatched)
@@ -6444,7 +6531,7 @@ BattlePos_CheckDist:                ; X, Y = the two battlers; header: see Battl
 ;                 more folds to its 256-complement)
 ;   SubjectAbove  subject y < other y
 ;   SubjectLeft   subject x < other x
-; Callers: BattlePos_ModeTable entries 5-7 only (BattlePos_Query).
+; Callers note: BattlePos_ModeTable entries 5-7 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject, Y = other
 ; No calls.
@@ -6518,7 +6605,7 @@ BattlePos_SubjectLeft:              ; header: see BattlePos_SameRowBand
 ; Battle_Mul8 squares it), so from the second pass on the radius is
 ; PathStep + the previous check's |dy| (8-bit add), not a running sum.
 ; Reproduced as found.
-; Callers: BattlePos_ModeTable entry 8 only (BattlePos_Query).
+; Callers note: BattlePos_ModeTable entry 8 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$8E, $A5-$B0,
 ;        $D3-$E3 written (also $77-$78 through the multiplies);
@@ -6617,7 +6704,7 @@ BattlePos_PathClear:
 ; !BattlePos_Result (0 -> $FF) when the condition fails:
 ;   LowerHalf  y / 16 >= 8          UpperHalf  y / 16 < 8
 ;   RightPart  x / 16 >= 11         LeftPart   x / 16 < 5
-; Callers: BattlePos_ModeTable entries 9-12 only (BattlePos_Query).
+; Callers note: BattlePos_ModeTable entries 9-12 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject; Y unchanged
 ; No calls.
@@ -6688,7 +6775,7 @@ BattlePos_SubjectLeftPart:          ; header: see BattlePos_SubjectLowerHalf
 ; to its 256-complement), so each is at most $80, each square at most
 ; $4000 and d1, d2 at most $8000: the 16-bit sums do not wrap and
 ; |d2 - d1| is exact.
-; Callers: BattlePos_ModeTable entry 13 only (BattlePos_Query).
+; Callers note: BattlePos_ModeTable entry 13 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = d2's dx*dx; Y = Arg;
 ;        DP $77-$78, $80-$85 and $AD-$B0 written
@@ -6826,7 +6913,8 @@ BattlePos_ModeTable:
 ;     new facing or belongs to the PC whose menu is shown.
 ; Lists, ids and the "facing" reading are inferred from how the values
 ; combine; the animation data itself has not been looked at.
-; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; Callers (1 JSR site): BattleSys_UpkeepTwoFrames ($C1:10A9).
+; Callers note (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded): BattleSys_UpkeepTwoFrames only.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$94 and the
@@ -7056,7 +7144,8 @@ Battle_UnkThunk2F1F:
 ; The turn-passing reading and the meaning of the Status2 bit are inferred
 ; or unknown. The BattlerStats offset in !Battle_PickStatsOffset comes
 ; from Battle_PickStatusAnim, which runs first.
-; Callers (JSR, scanned as above): Battle_TickPcSlots only.
+; Callers (1 JSR site): Battle_TickPcSlots ($C1:2E2B).
+; Callers note (JSR, scanned as above): Battle_TickPcSlots only.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot, and
 ;        !Battle_PickStatsOffset = its BattlerStats offset
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$81 written
@@ -7159,7 +7248,8 @@ Battle_UpdatePcFacing:
 ; enemy slots 8-10 the store lands on !Enemy_AnimTimer+0..2
 ; (Battle_TickEnemyGroup). Only the Unk2F path checks for a PC slot.
 ; Whether that matters in play is not traced.
-; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; Callers (2 JSR sites): Battle_TickPcSlots ($C1:2E28) and Battle_PickNextStatusAnim ($C1:3067).
+; Callers note (JSR; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
 ; inside other instructions discarded): Battle_TickPcSlots,
 ; Battle_PickNextStatusAnim.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot = battler slot
@@ -7286,7 +7376,8 @@ Battle_PickStatusAnim:
 ; Battle_TickPcSlots). Then runs Battle_ApplyPendingEffect for all 11
 ; slots. The animation id the pick leaves in !Battle_AnimId is not used
 ; here.
-; Callers (JSR; scanned as above): BattleSys_RunAction ($C1:4127), which
+; Callers (1 JSR site): BattleSys_RunAction ($C1:4127).
+; Callers note (JSR; scanned as above): BattleSys_RunAction ($C1:4127), which
 ; starts it at slot 0 and calls it until !Battle_StatusAnimWraps is set
 ; (inferred: one full pass over every battler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; TAX of the slot also copies B, assumed 0
@@ -7329,7 +7420,8 @@ Battle_PickNextStatusAnim:
 ; !Battler_KoFlag and runs the effect's entry of Battle_FxHandlerTable.
 ; A negative effect ($FF none, $80 from the Unk2F path) runs entry 0,
 ; Battle_FxReset.
-; Callers (JSR; scanned as above): Battle_TickPcSlots,
+; Callers (2 JSR sites): Battle_TickPcSlots ($C1:2E2E) and Battle_PickNextStatusAnim ($C1:3080).
+; Callers note (JSR; scanned as above): Battle_TickPcSlots,
 ; Battle_PickNextStatusAnim.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot; the TAX of the table
 ;        index also copies B, assumed 0
@@ -7382,7 +7474,10 @@ Battle_ApplyPendingEffect:
 ; copies the saved palette (!Battle_PaletteSaved, 26 bytes from
 ; !Battler_Palette * 16) back over the live one, undoing a tint or
 ; colour cycle.
-; Callers (8 JSR sites): Battle_FxHandlerTable entry 0; the handlers
+; Callers (8 JSR sites): Battle_FxOverlay2Tint ($C1:30E1), Battle_FxOverlay7 ($C1:3141),
+;   Battle_FxOverlay6 ($C1:3163), Battle_FxColourCycle ($C1:3185), Battle_FxOverlay3 ($C1:31B0),
+;   Battle_FxOverlay4 ($C1:31D2), Battle_FxOverlay5 ($C1:31F4) and BattleSys_VictoryPose ($C1:3582).
+; Callers note (8 JSR sites): Battle_FxHandlerTable entry 0; the handlers
 ;   Battle_FxOverlay2Tint ($C1:30E1), Battle_FxOverlay7 ($C1:3141),
 ;   Battle_FxOverlay6 ($C1:3163), Battle_FxColourCycle ($C1:3185),
 ;   Battle_FxOverlay3 ($C1:31B0), Battle_FxOverlay4 ($C1:31D2) and
@@ -7416,7 +7511,7 @@ Battle_FxReset:
 ; byte 2 on (24 bytes) and then writes the 4 bytes at
 ; !BattleRom_FxTintColours into live palette bytes 6-9 (inferred: two
 ; colours).
-; Callers: Battle_FxHandlerTable entry 3.
+; Callers note: Battle_FxHandlerTable entry 3.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; for a PC, Y clobbered
 ;        and DP $80-$81 written (!Battle_FxPalOffset)
@@ -7463,7 +7558,7 @@ Battle_FxOverlay2Tint:
 
 ; Battle_FxOverlay7 ($C13141–$C13162, 34 bytes)
 ; Effect $0E: resets and starts overlay 7.
-; Callers: Battle_FxHandlerTable entry $0E.
+; Callers note: Battle_FxHandlerTable entry $0E.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7484,7 +7579,7 @@ Battle_FxOverlay7:
 
 ; Battle_FxOverlay6 ($C13163–$C13184, 34 bytes)
 ; Effect 9: resets and starts overlay 6.
-; Callers: Battle_FxHandlerTable entry 9.
+; Callers note: Battle_FxHandlerTable entry 9.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7506,7 +7601,7 @@ Battle_FxOverlay6:
 ; Battle_FxColourCycle ($C13185–$C13190, 12 bytes)
 ; Effects 6, 7, $0B, $0C and $0D: resets and starts the colour cycle
 ; from step 0.
-; Callers: Battle_FxHandlerTable entries 6, 7, $0B, $0C, $0D.
+; Callers note: Battle_FxHandlerTable entries 6, 7, $0B, $0C, $0D.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7523,7 +7618,7 @@ Battle_FxColourCycle:
 ; (palette bytes and !Battler_FxTinted) and the Unk A457/A483 flags
 ; stay as they were (kept as found; whether that shows in play is not
 ; traced).
-; Callers: Battle_FxHandlerTable entries 1, 2, $0A.
+; Callers note: Battle_FxHandlerTable entries 1, 2, $0A.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        unchanged
@@ -7543,7 +7638,7 @@ Battle_FxOverlay1:
 
 ; Battle_FxOverlay3 ($C131B0–$C131D1, 34 bytes)
 ; Effect 4: resets and starts overlay 3.
-; Callers: Battle_FxHandlerTable entry 4.
+; Callers note: Battle_FxHandlerTable entry 4.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7564,7 +7659,7 @@ Battle_FxOverlay3:
 
 ; Battle_FxOverlay4 ($C131D2–$C131F3, 34 bytes)
 ; Effect 5: resets and starts overlay 4.
-; Callers: Battle_FxHandlerTable entry 5.
+; Callers note: Battle_FxHandlerTable entry 5.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7585,7 +7680,7 @@ Battle_FxOverlay4:
 
 ; Battle_FxOverlay5 ($C131F4–$C13215, 34 bytes)
 ; Effect 8: resets and starts overlay 5.
-; Callers: Battle_FxHandlerTable entry 8.
+; Callers note: Battle_FxHandlerTable entry 8.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
 ;        clobbered for a PC (by Battle_FxReset)
@@ -7667,7 +7762,8 @@ Battle_FxHandlerTable:
 ; "Group" and the enemy reading come from the index arithmetic
 ; (slot = enemy + 3, 3-byte pointer arrays indexed at +9); the meaning of
 ; the list numbers and of the kind table is not established.
-; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; Callers (1 JMP site): Battle_TickPcSlots ($C1:2DA6).
+; Callers note (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
 ; inside other instructions discarded): Battle_TickPcSlots only. The
 ; final RTS (.exit) is also the target of Battle_UnkThunk2F1F.
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkA4
@@ -8009,7 +8105,8 @@ Battle_TickEnemyGroup:
 ; counts them down).
 ; !Pc_AnimTimer serves as the loop counter (16-bit store, 8-bit count)
 ; before it gets those values.
-; Callers (JSR; scanned as above): the battle set-up of service 0 at
+; Callers (1 JSR site): unmatched ($C1:0031).
+; Callers note (JSR; scanned as above): the battle set-up of service 0 at
 ; $C1:0031 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3; X, Y and the decoder's scratch
@@ -8057,7 +8154,8 @@ Battle_DrawAllBattlerFrames:
 ; targetable PCs (animation 0 on the others) through Battle_RunPcPose,
 ; with !Battle_PoseUnk5DDD set and KO'd PCs left out. That this is the
 ; PCs' entry into battle is inferred from where it runs.
-; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; Callers (1 JMP site): unmatched ($C1:0042).
+; Callers note (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
 ; inside other instructions discarded): service 0 at $C1:0042 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  as Battle_RunPcPose
@@ -8099,7 +8197,8 @@ Battle_StartPose:
 ; !Pc_FacingTarget). The query mode is set once; the value 2 also serves
 ; as the first PC slot of the loop. Assumes the query leaves
 ; !BattlePos_Mode alone (it is not written by BattlePos_Query).
-; Callers (JSR; scanned as above): Battle_StartPose only.
+; Callers (1 JSR site): Battle_StartPose ($C1:34DB).
+; Callers note (JSR; scanned as above): Battle_StartPose only.
 ; Entry: M=1, X=0, DP=0, DB=$7E; the TAX of the found enemy and of the
 ;        angle also copy B, assumed 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_TickSlot =
@@ -8257,7 +8356,8 @@ BattleSys_VictoryPose:
 ; !Battle_UnkE5 and !Battle_UnkA4 are cleared before and after.
 ; Durations are halved here (LSR) where Battle_TickPcSlots divides by 5;
 ; the tick buffer is cleared (24 bytes), the frame buffer is not.
-; Callers: Battle_StartPose (JMP), BattleSys_DefeatPose (BRA),
+; Callers (1 JMP site): Battle_StartPose ($C1:350C).
+; Callers note: Battle_StartPose (JMP), BattleSys_DefeatPose (BRA),
 ; BattleSys_VictoryPose (falls through); scanned as above, no other.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Pc_PoseListOfs, !Battle_PoseUnk5DDD,
 ;        !Battle_PoseIncludeKo
@@ -8384,7 +8484,8 @@ Battle_RunPcPose:
 ; pose, which sets it).
 ; Why !Battle_UnkA4 is set during the step is not known; Battle_TickPcSlots
 ; would tick enemy group 1 if it ran meanwhile.
-; Callers (JSR; scanned as above): Battle_RunPcPose only.
+; Callers (1 JSR site): Battle_RunPcPose ($C1:368D).
+; Callers note (JSR; scanned as above): Battle_RunPcPose only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80 and $A2-$A3
 ;        written, plus the decoder's scratch
@@ -8522,7 +8623,7 @@ Battle_TickEnemyMovers:
 ; entry !BattleRom_EnemyMover[id] of Battle_EnemyMoverTable.
 ; Quirk: the copy is skipped when the two are already equal, which
 ; changes nothing (kept as found).
-; Callers (JSR): Battle_TickEnemyMovers ($C1:372F) only.
+; Callers (1 JSR site): Battle_TickEnemyMovers ($C1:372F).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when a mover ran,
 ;        !Battle_MoverAnim and the mover's scratch (see the movers)
@@ -8572,7 +8673,7 @@ Battle_EnemyMoverTable:
 ; (!Enemy_ResumeAnim -> !Enemy_AnimWanted) and clears !Enemy_MoveDone,
 ; so the enemy follows the target again. Clears !Enemy_LoopStarted only
 ; when MoveDone is set.
-; Callers: Battle_EnemyMoverTable entry 0.
+; Callers note: Battle_EnemyMoverTable entry 0.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X = enemy (0-7)
 Battle_MoverIdle:
@@ -8615,7 +8716,7 @@ Battle_MoverIdle:
 ; Done: !Enemy_MoveDone counted up, !Enemy_AnimWanted saved in
 ; !Enemy_ResumeAnim, the target's position in !Enemy_DoneTargetX/Y,
 ; !Enemy_Stepping cleared.
-; Callers: Battle_EnemyMoverTable entry 1.
+; Callers note: Battle_EnemyMoverTable entry 1.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
@@ -8787,7 +8888,7 @@ Battle_MoverApproach:
 ; Battle_BoxOverlapsOthers returns, so the closing INX x3 leaves X and
 ; !Battle_BoxTestSlot at enemy + 6 instead of the slot; the callers
 ; reload X, so it does no harm (kept as found).
-; Callers: Battle_EnemyMoverTable entry 2.
+; Callers note: Battle_EnemyMoverTable entry 2.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
 ;        !Battle_BoxTestSlot = the enemy's battler slot (enemy + 6 when
@@ -8878,7 +8979,7 @@ Battle_MoverCharge:
 ; when the step is blocked by a cell or a battler, or when the enemy
 ; and the target are in the same 32-pixel band of y (move 8) or x
 ; (move 9), compared on their current positions.
-; Callers: Battle_EnemyMoverTable entry 3.
+; Callers note: Battle_EnemyMoverTable entry 3.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; Y = the target's slot; X
@@ -9020,7 +9121,7 @@ Battle_MoverAxis:
 ; left of the point; and the step test still skips the battler test for
 ; move 3, which never reaches this mover (copied from
 ; Battle_MoverApproach, inferred).
-; Callers: Battle_EnemyMoverTable entry 4.
+; Callers note: Battle_EnemyMoverTable entry 4.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
@@ -9254,7 +9355,7 @@ Battle_MoverKeepRange:
 ; !Enemy_Stepping as it was; a free one starts it. Move $0F passes cell
 ; bit 7 and other battlers here too.
 ; The move never ends; the approach part never sets !Enemy_MoveDone.
-; Callers: Battle_EnemyMoverTable entry 5.
+; Callers note: Battle_EnemyMoverTable entry 5.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
@@ -9595,7 +9696,7 @@ Battle_MoverOrbit:
 ; The other movers clear !Enemy_LoopStarted, except
 ; Battle_MoverFixedDir and Battle_MoverToCentre, so after one of those
 ; the loop goes on round the old centre.
-; Callers: Battle_EnemyMoverTable entry 6.
+; Callers note: Battle_EnemyMoverTable entry 6.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
@@ -9761,7 +9862,7 @@ Battle_MoverLoop:
 ; !Enemy_MoveDone counted up. Unlike the done path of the other movers,
 ; this one saves neither !Enemy_ResumeAnim nor the target's position.
 ; Quirk: the last case ends with a BRA to the very next instruction.
-; Callers: Battle_EnemyMoverTable entry 7.
+; Callers note: Battle_EnemyMoverTable entry 7.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
 ;        !Battle_MoverAnim
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
@@ -9883,7 +9984,7 @@ Battle_MoverFixedDir:
 ; Mover 8 (move $19): heads from the enemy's position for the middle of
 ; the screen (!Battle_ScreenCentreX/Y), faces that way and starts the
 ; step, with no probe and no collision test. The move never ends.
-; Callers: Battle_EnemyMoverTable entry 8.
+; Callers note: Battle_EnemyMoverTable entry 8.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; Y unchanged; X and
 ;        !Battle_BoxTestSlot = the enemy's battler slot; DP $D3-$E3
@@ -10161,7 +10262,7 @@ BattleSys_RunAction:
 ; carry since each is bumped at most once.
 ; Quirk: the kind is tested for 0 before it is compared with 3, which
 ; changes nothing.
-; Callers (JSR): BattleSys_RunAction ($C1:4148) only.
+; Callers (1 JSR site): BattleSys_RunAction ($C1:4148).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = PC 2's flag; X, Y clobbered; DP
 ;        $80-$85 written
@@ -10224,7 +10325,7 @@ BattleAct_FlagLethalPcHits:
 ; and stores the two bytes it leaves in !Battle_ActCalcOutA/B into the
 ; entry's pair at !Battle_ActCalcResult. What the handlers compute is
 ; not analysed (the entries are set by the script code, presumably).
-; Callers (JSR): BattleSys_RunAction ($C1:40C1) only.
+; Callers (1 JSR site): BattleSys_RunAction ($C1:40C1).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y unchanged
 ;        (BattleAct_RunCalc keeps X and Y); DP $90-$91 written
@@ -10282,7 +10383,7 @@ BattleAct_TickCalcs:
 ; threads, presumably); "mode 2 = loop" is read from this routine only.
 ; Quirk: when the facing equals !Battler_ActFacing it is loaded again
 ; from there, the same value.
-; Callers (JSR): BattleSys_RunAction ($C1:40B3) only.
+; Callers (1 JSR site): BattleSys_RunAction ($C1:40B3).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when a frame was
 ;        drawn, DP $80-$83, the multiply's $A5-$AB and
@@ -10414,7 +10515,7 @@ BattleAct_StepBattlerAnims:
 ; for !Battle_ActKind through BattleAct_LoaderTable (kinds 4 and up are
 ; taken as 0, which loads nothing). The loaders fill the parameter
 ; block from the action's records and start the script threads.
-; Callers (JSR): BattleSys_RunAction ($C1:40AD) only.
+; Callers (1 JSR site): BattleSys_RunAction ($C1:40AD).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  as the loader (kind 0: A, X clobbered, nothing else)
 ; Callees: JSR (BattleAct_LoaderTable,X)
@@ -10489,7 +10590,7 @@ BattleAct_LoadScript:
 ; TDC, so it relies on B being 0 there (as BattleAct_CheckReach leaves
 ; it, presumably; see the banner); the "Near" path ends with a BRA to
 ; the next instruction.
-; Callers: BattleAct_LoaderTable entry 1.
+; Callers note: BattleAct_LoaderTable entry 1.
 ; Entry: M=1, X=0, DP=0, DB=$7E; the action block set, the parameter
 ;        block cleared (BattleAct_LoadScript)
 ; Exit:  as BattleAct_LoadCommon
@@ -10789,7 +10890,7 @@ BattleAct_LoadAttack:
 ; !BattleRom_PcTechScripts in bank $CE / !BattleRom_EnemyTechScripts in
 ; bank $CD. Starts the threads (see the banner) and jumps to
 ; BattleAct_LoadCommon.
-; Callers: BattleAct_LoaderTable entry 2.
+; Callers note: BattleAct_LoaderTable entry 2.
 ; Entry: M=1, X=0, DP=0, DB=$7E; as BattleAct_LoadAttack
 ; Exit:  as BattleAct_LoadCommon
 ; Callees: BattleAct_LoadCommon (JMP)
@@ -11008,7 +11109,7 @@ BattleAct_LoadTech:
 ; ==================================================================
 ; Kind 0 (and any kind of 4 and up): loads nothing, so no thread
 ; starts.
-; Callers: BattleAct_LoaderTable entry 0.
+; Callers note: BattleAct_LoaderTable entry 0.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  unchanged
 BattleAct_LoadNone:
@@ -11023,7 +11124,7 @@ BattleAct_LoadNone:
 ; !BattleRom_TechObjs, scripts !BattleRom_Kind3Scripts in bank $CE.
 ; What kind 3 is (ids from $BC up) is not known. Starts the threads (see
 ; the banner) and falls into BattleAct_LoadCommon.
-; Callers: BattleAct_LoaderTable entry 3.
+; Callers note: BattleAct_LoaderTable entry 3.
 ; Entry: M=1, X=0, DP=0, DB=$7E; as BattleAct_LoadAttack
 ; Exit:  as BattleAct_LoadCommon
 BattleAct_LoadKind3:
@@ -11151,7 +11252,9 @@ BattleAct_LoadKind3:
 ;     established.
 ; Each frame wait is BattleSys_PumpFrames followed by
 ; BattleMenu_RefreshIfDirtyAndTick, except the first.
-; Callers: JMP from BattleAct_LoadAttack ($C1:4494, $C1:459D) and
+; Callers (4 JMP sites): BattleAct_LoadAttack ($C1:4494, $C1:459D) and BattleAct_LoadTech ($C1:467F,
+;   $C1:4757).
+; Callers note: JMP from BattleAct_LoadAttack ($C1:4494, $C1:459D) and
 ;   BattleAct_LoadTech ($C1:467F, $C1:4757); BattleAct_LoadKind3 falls
 ;   in.
 ; Entry: M=1, X=0, DP=0, DB=$7E; the parameter block loaded
@@ -11257,7 +11360,7 @@ BattleAct_LoadCommon:
 ; pointer itself; object n: the record after object n-1's end). The
 ; first record of lists 1-15 is never tested and counts as 1. Records
 ; and marks are read here only; what they say is not analysed.
-; Callers (JSR): BattleAct_LoadCommon ($C1:4861) only.
+; Callers (1 JSR site): BattleAct_LoadCommon ($C1:4861).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = $10; X = the record after object 15's
 ;        end; Y clobbered; DP $80-$83 written
@@ -11339,8 +11442,8 @@ BattleAct_IndexObjLists:
 ; zero bytes BattleAct_LoadCommon appends); the frame number then stays.
 ; "Sprite" and "16x16" are inferred from the 4-byte x, y, tile,
 ; attribute layout and the 16-pixel steps.
-; Callers (8 JSR sites): BattleAct_LoadCommon ($C1:489B, $C1:489E,
-;   $C1:48A1, $C1:48A4, $C1:48A7, $C1:48AA, $C1:48AD, $C1:48B0).
+; Callers (8 JSR sites): BattleAct_LoadCommon ($C1:489B, $C1:489E, $C1:48A1, $C1:48A4, $C1:48A7,
+;   $C1:48AA, $C1:48AD, $C1:48B0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87 and $8C
 ;        written, and the callees' scratch
@@ -11486,7 +11589,8 @@ BattleAct_UnpackFrames:
 ; and 2 (byte 0) a far target is "Far" without a search, and for the
 ; others the search alone decides. That characters 1 and 2 are the two
 ; with ranged attacks is a guess from the data, not checked.
-; Callers (JSR): BattleAct_LoadAttack ($C1:433A) only, for a PC caster
+; Callers (1 JSR site): BattleAct_LoadAttack ($C1:433A).
+; Callers note (JSR): BattleAct_LoadAttack ($C1:433A) only, for a PC caster
 ; after Battle_BuildOccupiedCellMap.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (TAX/TAY of 8-bit slots); !Battle_ActCaster a PC slot (0-2; the
 ;        character is read from !Pc_CharId by it)
@@ -11589,7 +11693,8 @@ BattleAct_CheckReach:
 ;     in the order.
 ; The meaning of the result for the caller ("can reach") is from
 ; BattleAct_CheckReach; the movement along the marks is not traced.
-; Callers (JSR): BattleAct_CheckReach ($C1:4A5F) and the script handler
+; Callers (2 JSR sites): BattleAct_CheckReach ($C1:4A5F) and BattleAct_PathToPoint ($C1:5479).
+; Callers note (JSR): BattleAct_CheckReach ($C1:4A5F) and the script handler
 ;   at $C1:542D ($C1:5479, unmatched).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; DP $80-$83 = start x, y
 ;        and goal x, y in pixels; !Battle_PathMap filled
@@ -11821,7 +11926,7 @@ BattleAct_FindPath:
 ; while !Battle_ActUnkA3D1 is 0. For thread 8 + j it first sets
 ; !Battle_ActObjThread to j. Threads 5-7 are never run (their flags are
 ; set by the loaders like any other).
-; Callers (JSR): BattleSys_RunAction ($C1:40CB) only.
+; Callers (1 JSR site): BattleSys_RunAction ($C1:40CB).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B=0 (A = thread * 4 goes to a 16-bit TAX
 ;        in BattleAct_RunThread; the caller's TDC leaves it 0)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; the threads'
@@ -11943,9 +12048,8 @@ BattleAct_RunThreads:
 ; handler left !Battle_ActNextOp non-zero. Then it stores the pointer
 ; back. A byte of $DB or more is not run: the thread stops on it, this
 ; frame and every frame after.
-; Callers (13 JSR sites): BattleAct_RunThreads ($C1:4BC8, $C1:4BD5,
-;   $C1:4BE2, $C1:4BEF, $C1:4C04, $C1:4C1C, $C1:4C2E, $C1:4C40,
-;   $C1:4C52, $C1:4C64, $C1:4C76, $C1:4C88, $C1:4C9A).
+; Callers (13 JSR sites): BattleAct_RunThreads ($C1:4BC8, $C1:4BD5, $C1:4BE2, $C1:4BEF, $C1:4C04,
+;   $C1:4C1C, $C1:4C2E, $C1:4C40, $C1:4C52, $C1:4C64, $C1:4C76, $C1:4C88, $C1:4C9A).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; B=0 (16-bit TAX); A = thread * 4 (its
 ;        !Battle_ActThreadPtr offset), Y = thread number
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered;
@@ -12000,7 +12104,8 @@ BattleAct_RunThread:
 ; ==================================================================
 ; Opcode $00: switches the thread off (!Battle_ActThreadOn = 0). The
 ; pointer stays on the opcode.
-; Callers: BattleAct_OpcodeTable entry $00, and the JMP at $C1:577A
+; Callers (1 JMP site): BattleAct_OpEndIfNoTarget ($C1:577A).
+; Callers note: BattleAct_OpcodeTable entry $00, and the JMP at $C1:577A
 ;   (unmatched handler code).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_ActThread set
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X = thread number; A, Y unchanged
@@ -12018,7 +12123,7 @@ BattleAct_OpEndThread:
 ; stays on the opcode (advance by 0) to try again next frame. The
 ; thread is not switched off, so it runs this again every frame until
 ; service 4 stops calling the threads.
-; Callers: BattleAct_OpcodeTable entries $01, $2F and 68 more of the
+; Callers note: BattleAct_OpcodeTable entries $01, $2F and 68 more of the
 ;   219 opcodes (and the five entries $DB-$DF after them, which
 ;   BattleAct_RunThread never reaches). xref also confirms "JMP" sites
 ;   at $C1:7A6C, $C1:7B02, $C1:7B68, $C1:7BB8, $C1:7BF8 and $C1:7C22,
@@ -12062,7 +12167,10 @@ BattleAct_OpEndScript:
 ;     $CC:F278 (unmatched); that they play like the battlers' lists is
 ;     inferred from the parallel layout.
 ; Quirk: the thread-4 loop has a TAX that is not used.
-; Callers: BattleAct_OpcodeTable entry $02 (BattleAct_OpLoopAnim);
+; Callers of BattleAct_StartAnim (9 sites: 3 JSR, 6 JMP): BattleAct_OpPlayAnim (JMP $C1:4E3E, JMP
+;   $C1:4E5F, JSR $C1:4E87), BattleAct_OpShowAnimFrame (JMP $C1:4EBE, JMP $C1:4EDF, JSR $C1:4F06)
+;   and BattleAct_OpShowAnimEntry (JMP $C1:57A5, JMP $C1:57C8, JSR $C1:57F2).
+; Callers note: BattleAct_OpcodeTable entry $02 (BattleAct_OpLoopAnim);
 ;   BattleAct_StartAnim: BattleAct_OpPlayAnim ($C1:4E3E, $C1:4E5F,
 ;   $C1:4E87), BattleAct_OpShowAnimFrame ($C1:4EBE, $C1:4EDF, $C1:4F06)
 ;   and the unmatched handler code at $C1:57A5, $C1:57C8 and $C1:57F2.
@@ -12243,7 +12351,7 @@ BattleAct_StartAnim:                    ; header: see BattleAct_OpLoopAnim
 ;     animation it also runs BattleAct_Op70Body with DP $8E = 1
 ;     (!Battle_ActObjUnkA1D8 counted up, no advance); done when
 ;     !Battle_ActUnkA1A8 is 0, which also clears !Battle_ActObjUnkA1D8.
-; Callers: BattleAct_OpcodeTable entry $03.
+; Callers note: BattleAct_OpcodeTable entry $03.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when it starts,
@@ -12336,7 +12444,7 @@ BattleAct_OpPlayAnim:
 ;     (same opcode next frame), the wait ends when !Battle_ActUnkA1A8
 ;     is 0.
 ; Quirk: a dead RTS after the JMP at $C1:4EF3 ($C1:4EF6).
-; Callers: BattleAct_OpcodeTable entries $04, $05 and $06.
+; Callers note: BattleAct_OpcodeTable entries $04, $05 and $06.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when it starts,
@@ -12416,7 +12524,7 @@ BattleAct_OpShowAnimFrame:
 ; battler's defaults (!Battler_DefMoveDelay / !Battler_DefMoveSpeed,
 ; set at battle start by $CC:E3E3, unmatched); for thread 4 for every
 ; slot of the target set. Object threads are left alone. Advances 1.
-; Callers: BattleAct_OpcodeTable entry $07.
+; Callers note: BattleAct_OpcodeTable entry $07.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -12461,7 +12569,7 @@ BattleAct_OpResetSpeed:
 ; slowest to fastest: frames per step, then pixels per step (as the
 ; movers at $CF:EFC4 and the move opcodes use them). For thread 4 every
 ; slot of the target set; for object thread j entry 11 + j. Advances 1.
-; Callers: BattleAct_OpcodeTable entries $08-$0F.
+; Callers note: BattleAct_OpcodeTable entries $08-$0F.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread); !Battle_ActOpcode = $08-$0F
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; for thread 4,
@@ -12556,7 +12664,7 @@ BattleAct_OpSetSpeed:
 ; "Move" is inferred from the mover at $CF:EFC4/$CF:F040, which adds the
 ; step to the offset each step and writes start + offset to
 ; !Battler_ScreenX/Y.
-; Callers: BattleAct_OpcodeTable entries $10 (BattleAct_OpMoveTo), $11
+; Callers note: BattleAct_OpcodeTable entries $10 (BattleAct_OpMoveTo), $11
 ;   (BattleAct_OpMoveToUnkPoint) and $12 (BattleAct_OpMoveToCalc);
 ;   BattleAct_MoveToPoint is reached only from these three.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
@@ -12770,7 +12878,9 @@ BattleAct_MoveToPoint:                  ; header: see BattleAct_OpMoveTo
 ;     it through the table at $CF:F01E), !Battler_MoveDone = 0 and
 ;     !Battle_ActorMoving = 1.
 ; Quirk: it also computes slot * 4 into X, which is not used.
-; Callers (JSR): BattleAct_MoveToPoint ($C1:5008, $C1:5030; header of
+; Callers (3 JSR sites): BattleAct_MoveToPoint ($C1:5008, $C1:5030) and BattleAct_OpMoveToMidpoint
+;   ($C1:7231).
+; Callers note (JSR): BattleAct_MoveToPoint ($C1:5008, $C1:5030; header of
 ;   BattleAct_OpMoveTo) and $C1:7231 (unmatched).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0; X = battler slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1; Y = the slot; X clobbered;
@@ -12913,7 +13023,7 @@ BattleAct_StartBattlerMove:
 ; Unlike the straight move it sets no step, offset or step count, and
 ; the length is not kept per thread: each frame the opcode runs again
 ; from the start and sets DP $8E (and the point) again.
-; Callers: BattleAct_OpcodeTable entries $13 (BattleAct_OpCurveTo), $14
+; Callers note: BattleAct_OpcodeTable entries $13 (BattleAct_OpCurveTo), $14
 ;   (BattleAct_OpCurveToUnkPoint) and $15 (BattleAct_OpCurveToCalc);
 ;   BattleAct_CurveToPoint is reached only from these three.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
@@ -13157,7 +13267,8 @@ BattleAct_CurveToPoint:                 ; header: see BattleAct_OpCurveTo
 ; and in opposite quarters by whether heading + $80 (8-bit, so it
 ; wraps) is below the angle. The result is stored in
 ; !Battle_ActorTurnDir, which the mover at $CF:F453 reads.
-; Callers (3 JSR sites): BattleAct_CurveToPoint ($C1:526B, $C1:52DD,
+; Callers (3 JSR sites): BattleAct_CurveToPoint ($C1:526B, $C1:52DD, $C1:536C).
+; Callers note (3 JSR sites): BattleAct_CurveToPoint ($C1:526B, $C1:52DD,
 ;   $C1:536C; header of BattleAct_OpCurveTo).
 ; Entry: M=1, X=0, DP=0, DB=any; DP $82 = heading, !Battle_GeoAngle set
 ; Exit:  M=1, X=0, DP=0; A = 0 or 1 (Z set iff 0); X, Y unchanged; DP
@@ -13281,7 +13392,7 @@ BattleAct_CurveTurnDir:
 ; !Battle_ActThreadPathLen. Quirk: only the battler part above writes
 ; that byte, for threads 0-3, so these threads advance by whatever it
 ; holds (if 0, they stay on this opcode for good).
-; Callers: BattleAct_OpcodeTable entries $16 (BattleAct_OpPathTo), $17
+; Callers note: BattleAct_OpcodeTable entries $16 (BattleAct_OpPathTo), $17
 ;   (BattleAct_OpPathToUnkPoint) and $18 (BattleAct_OpPathToCalc);
 ;   BattleAct_PathToPoint is reached only from these three.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
@@ -13581,7 +13692,7 @@ BattleAct_PathToPoint:                  ; header: see BattleAct_OpPathTo
 ; thread's battler (threads 0-3), of every slot of the target set
 ; (thread 4), or to the object's !Battle_ActObjX/Y with the high bytes
 ; zeroed (threads 8-15); then advances by the length.
-; Callers: BattleAct_OpcodeTable entries $19 (BattleAct_OpSetPos), $1A
+; Callers note: BattleAct_OpcodeTable entries $19 (BattleAct_OpSetPos), $1A
 ;   (BattleAct_OpSetPosUnkPoint) and $1B (BattleAct_OpSetPosCalc);
 ;   BattleAct_SetPosToPoint is reached only from these three (JMP at
 ;   $C1:567A and $C1:5691).
@@ -13676,7 +13787,7 @@ BattleAct_OpSetPosCalc:                 ; header: see BattleAct_OpSetPos
 ; !Battler_ScreenX/Y, or the other object's !Battle_ActObjX/Y, to the
 ; object's position each frame. On other threads it does nothing.
 ; Goes on with the next opcode in the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entry $1C.
+; Callers note: BattleAct_OpcodeTable entry $1C.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; on an object thread X = the
 ;        object thread, Y = 1; !Battle_ActNextOp counted up
@@ -13710,7 +13821,7 @@ BattleAct_OpFollow:
 ; Opcode $1D <j>: object thread j follows nothing any more
 ; (!Battle_ActObjFollow = !Battle_ActFollowNone), whatever thread runs
 ; it. Goes on with the next opcode in the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entry $1D.
+; Callers note: BattleAct_OpcodeTable entry $1D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = j, Y = 1;
@@ -13735,7 +13846,7 @@ BattleAct_OpUnfollow:
 ; entry n of !BattleRom_ActSubscripts, always in bank
 ; !BattleRom_ScriptBankPc, running it in the same frame. One level
 ; only: a call inside a subscript overwrites the return address.
-; Callers: BattleAct_OpcodeTable entry $1E.
+; Callers note: BattleAct_OpcodeTable entry $1E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n * 2; Y = thread * 4;
@@ -13770,7 +13881,7 @@ BattleAct_OpCall:
 ; Opcode $1F: returns from a subscript (BattleAct_OpCall): the script
 ; pointer = the thread's !Battle_ActThreadReturn / ReturnBank, and the
 ; next opcode runs in the same frame.
-; Callers: BattleAct_OpcodeTable entry $1F; BattleAct_OpReturnIfVar1F0
+; Callers note: BattleAct_OpcodeTable entry $1F; BattleAct_OpReturnIfVar1F0
 ;   branches here.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = thread * 4; X unchanged;
@@ -13795,7 +13906,7 @@ BattleAct_OpReturn:
 ; Opcode $20 <n>: ends the thread's turn for this frame and has
 ; BattleAct_RunThread only count !Battle_ActThreadWait = n down on the
 ; next n frames before running the next opcode; advances 2.
-; Callers: BattleAct_OpcodeTable entry $20.
+; Callers note: BattleAct_OpcodeTable entry $20.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = thread; Y = 1
@@ -13815,7 +13926,7 @@ BattleAct_OpPause:
 ; from the subscript like opcode $1F; otherwise advances 1 (and the
 ; thread waits for the next frame). Why the y of the point is the
 ; test is not known.
-; Callers: BattleAct_OpcodeTable entry $21.
+; Callers note: BattleAct_OpcodeTable entry $21.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; as BattleAct_OpReturn when it
 ;        returns; X, Y unchanged otherwise
@@ -13832,7 +13943,7 @@ BattleAct_OpReturnIfVar1F0:
 ; Opcode $22 <n> <v>: waits until variable n (!Battle_ActVars + n) is
 ; v: while it is not, stays on the opcode (advance 0); then goes on
 ; with the next opcode in the same frame, advancing 3.
-; Callers: BattleAct_OpcodeTable entry $22.
+; Callers note: BattleAct_OpcodeTable entry $22.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2; when equal
@@ -13859,7 +13970,7 @@ BattleAct_OpWaitVar:
 ; ==================================================================
 ; Opcode $23 <v>: as opcode $22 for variable $1C (!Battle_ActVar1C);
 ; advances 2 when it is v.
-; Callers: BattleAct_OpcodeTable entry $23.
+; Callers note: BattleAct_OpcodeTable entry $23.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1; when equal
 ;        !Battle_ActNextOp counted up
@@ -13881,7 +13992,7 @@ BattleAct_OpWaitVar1C:
 ; BattleAct_OpWaitVar1D ($C15756–$C15768, 19 bytes)
 ; ==================================================================
 ; Opcode $24 <v>: as opcode $23 for variable $1D (!Battle_ActVar1D).
-; Callers: BattleAct_OpcodeTable entry $24.
+; Callers note: BattleAct_OpcodeTable entry $24.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1; when equal
 ;        !Battle_ActNextOp counted up
@@ -13907,7 +14018,7 @@ BattleAct_OpWaitVar1D:
 ; thread off (BattleAct_OpEndThread); otherwise goes on with the next
 ; opcode in the same frame, advancing 2. No bound check: an i past the
 ; end marker reads whatever follows it.
-; Callers: BattleAct_OpcodeTable entry $25.
+; Callers note: BattleAct_OpcodeTable entry $25.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; as BattleAct_OpEndThread when the
@@ -13947,7 +14058,7 @@ BattleAct_OpEndIfNoTarget:
 ;     advances by 0, so the pointer is left on the f operand, which
 ;     runs as the next opcode in the same frame.
 ; While waiting it returns without calling BattleAct_AdvanceScript.
-; Callers: BattleAct_OpcodeTable entry $26.
+; Callers note: BattleAct_OpcodeTable entry $26.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80 = f and
@@ -14045,7 +14156,7 @@ BattleAct_OpShowAnimEntry:
 ; Battle_BoxOverlapsOthers skips on); object threads change nothing.
 ; The value is in DP $8E. Advances 1. What the low bits mean is not
 ; known.
-; Callers: BattleAct_OpcodeTable entries $27 and $28;
+; Callers note: BattleAct_OpcodeTable entries $27 and $28;
 ;   BattleAct_StoreUnkA5CD is reached from BattleAct_OpClearUnkA5CD.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
@@ -14100,7 +14211,7 @@ BattleAct_OpClearUnkA5CD:               ; header: see BattleAct_OpSetUnkA5CD
 ; !Battler_Unk9FF7 (bit 7: skipped by the target scans). Quirk: for
 ; the thread's battler (threads 0-3) the value is stored as it is, so
 ; bit 7 is cleared; only the target-set path keeps it. Advances 1.
-; Callers: BattleAct_OpcodeTable entries $29 and $2A;
+; Callers note: BattleAct_OpcodeTable entries $29 and $2A;
 ;   BattleAct_StoreUnk9FF7 is reached from BattleAct_OpClearUnk9FF7.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
@@ -14150,7 +14261,7 @@ BattleAct_OpClearUnk9FF7:               ; header: see BattleAct_OpSetUnk9FF7
 ; thread's battler (threads 0-3) or of every slot of the target set
 ; (thread 4); object threads change nothing. Advances 1. Both bytes
 ; are used by the movers in bank $CF; what they mean is not known.
-; Callers: BattleAct_OpcodeTable entry $2B.
+; Callers note: BattleAct_OpcodeTable entry $2B.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered
@@ -14191,7 +14302,7 @@ BattleAct_OpClearUnkA4A4:
 ; opcode in the same frame; advances 1. Probably brings the battler
 ; back into the battle (inferred only from the two names); "up", not
 ; "= 1", so a present battler gets 2.
-; Callers: BattleAct_OpcodeTable entry $2C.
+; Callers note: BattleAct_OpcodeTable entry $2C.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
@@ -14229,7 +14340,7 @@ BattleAct_OpUnkRevive:
 ; BattleAct_OpSetUnkCFFF ($C158DC–$C158E3, 8 bytes)
 ; ==================================================================
 ; Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
-; Callers: BattleAct_OpcodeTable entry $2D.
+; Callers note: BattleAct_OpcodeTable entry $2D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -14242,7 +14353,7 @@ BattleAct_OpSetUnkCFFF:
 ; BattleAct_OpClearUnkCFFF ($C158E4–$C158EB, 8 bytes)
 ; ==================================================================
 ; Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
-; Callers: BattleAct_OpcodeTable entry $2E.
+; Callers note: BattleAct_OpcodeTable entry $2E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -14261,7 +14372,7 @@ BattleAct_OpClearUnkCFFF:
 ; BattleAct_OpSetVar ($C158EC–$C158FD, 18 bytes)
 ; ==================================================================
 ; Opcode $30 <n> <v>: variable n = v; advances 3.
-; Callers: BattleAct_OpcodeTable entry $30.
+; Callers note: BattleAct_OpcodeTable entry $30.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2;
@@ -14282,7 +14393,7 @@ BattleAct_OpSetVar:
 ; BattleAct_OpSetVar1C ($C158FE–$C1590B, 14 bytes)
 ; ==================================================================
 ; Opcode $31 <v>: !Battle_ActVar1C = v; advances 2.
-; Callers: BattleAct_OpcodeTable entry $31.
+; Callers note: BattleAct_OpcodeTable entry $31.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14299,7 +14410,7 @@ BattleAct_OpSetVar1C:
 ; BattleAct_OpSetVar1D ($C1590C–$C15919, 14 bytes)
 ; ==================================================================
 ; Opcode $32 <v>: !Battle_ActVar1D = v; advances 2.
-; Callers: BattleAct_OpcodeTable entry $32.
+; Callers note: BattleAct_OpcodeTable entry $32.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14318,7 +14429,7 @@ BattleAct_OpSetVar1D:
 ; Opcode $33 <n>: runs BattleAct_RunCalc handler n and keeps its point
 ; in !Battle_ActUnkPointX/Y (variables $1E/$1F), for the "UnkPoint"
 ; move opcodes; advances 2, and the thread waits for the next frame.
-; Callers: BattleAct_OpcodeTable entry $33.
+; Callers note: BattleAct_OpcodeTable entry $33.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged, Y = 1 (BattleAct_RunCalc
 ;        keeps them); whatever the handler writes
@@ -14338,7 +14449,7 @@ BattleAct_OpCalcToUnkPoint:
 ; BattleAct_OpIncVar ($C15931–$C1593F, 15 bytes)
 ; ==================================================================
 ; Opcode $34 <n>: variable n + 1; advances 2.
-; Callers: BattleAct_OpcodeTable entry $34.
+; Callers note: BattleAct_OpcodeTable entry $34.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14356,7 +14467,7 @@ BattleAct_OpIncVar:
 ; BattleAct_OpIncVar1C ($C15940–$C1594A, 11 bytes)
 ; ==================================================================
 ; Opcode $35: !Battle_ActVar1C + 1; advances 1.
-; Callers: BattleAct_OpcodeTable entry $35.
+; Callers note: BattleAct_OpcodeTable entry $35.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14371,7 +14482,7 @@ BattleAct_OpIncVar1C:
 ; BattleAct_OpIncVar1D ($C1594B–$C15955, 11 bytes)
 ; ==================================================================
 ; Opcode $36: !Battle_ActVar1D + 1; advances 1.
-; Callers: BattleAct_OpcodeTable entry $36.
+; Callers note: BattleAct_OpcodeTable entry $36.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14386,7 +14497,7 @@ BattleAct_OpIncVar1D:
 ; BattleAct_OpDecVar ($C15956–$C15964, 15 bytes)
 ; ==================================================================
 ; Opcode $37 <n>: variable n - 1; advances 2.
-; Callers: BattleAct_OpcodeTable entry $37.
+; Callers note: BattleAct_OpcodeTable entry $37.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14404,7 +14515,7 @@ BattleAct_OpDecVar:
 ; BattleAct_OpDecVar1C ($C15965–$C1596F, 11 bytes)
 ; ==================================================================
 ; Opcode $38: !Battle_ActVar1C - 1; advances 1.
-; Callers: BattleAct_OpcodeTable entry $38.
+; Callers note: BattleAct_OpcodeTable entry $38.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14419,7 +14530,7 @@ BattleAct_OpDecVar1C:
 ; BattleAct_OpDecVar1D ($C15970–$C1597A, 11 bytes)
 ; ==================================================================
 ; Opcode $39: !Battle_ActVar1D - 1; advances 1.
-; Callers: BattleAct_OpcodeTable entry $39.
+; Callers note: BattleAct_OpcodeTable entry $39.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14434,7 +14545,7 @@ BattleAct_OpDecVar1D:
 ; BattleAct_OpAddVar ($C1597B–$C15990, 22 bytes)
 ; ==================================================================
 ; Opcode $3A <n> <v>: variable n + v (8-bit, wraps); advances 3.
-; Callers: BattleAct_OpcodeTable entry $3A.
+; Callers note: BattleAct_OpcodeTable entry $3A.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2;
 ;        !Battle_ActNextOp counted up
@@ -14456,7 +14567,7 @@ BattleAct_OpAddVar:
 ; BattleAct_OpAddVar1C ($C15991–$C159A2, 18 bytes)
 ; ==================================================================
 ; Opcode $3B <v>: !Battle_ActVar1C + v; advances 2.
-; Callers: BattleAct_OpcodeTable entry $3B.
+; Callers note: BattleAct_OpcodeTable entry $3B.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14475,7 +14586,7 @@ BattleAct_OpAddVar1C:
 ; BattleAct_OpAddVarTo1C ($C159A3–$C159B8, 22 bytes)
 ; ==================================================================
 ; Opcode $3C <n>: !Battle_ActVar1C + variable n; advances 2.
-; Callers: BattleAct_OpcodeTable entry $3C.
+; Callers note: BattleAct_OpcodeTable entry $3C.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14501,7 +14612,7 @@ BattleAct_OpAddVarTo1C:
 ; $41 for $45-$46 (4-5); the same entries BattleAct_TickCalcs fills
 ; every frame for the handlers in !Battle_ActCalcSel. Goes on with the
 ; next opcode in the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entries $3D-$40, $45 and $46.
+; Callers note: BattleAct_OpcodeTable entries $3D-$40, $45 and $46.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread); !Battle_ActOpcode = one of those
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = k * 2; Y = 1;
@@ -14535,7 +14646,7 @@ BattleAct_OpCalcToResult:
 ; BattleAct_OpCopyVar ($C159E4–$C159F9, 22 bytes)
 ; ==================================================================
 ; Opcode $41 <a> <b>: variable b = variable a; advances 3.
-; Callers: BattleAct_OpcodeTable entry $41.
+; Callers note: BattleAct_OpcodeTable entry $41.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = a; Y = b;
@@ -14558,7 +14669,7 @@ BattleAct_OpCopyVar:
 ; BattleAct_OpCopyVar1C ($C159FA–$C15A0B, 18 bytes)
 ; ==================================================================
 ; Opcode $42 <n>: variable n = !Battle_ActVar1C; advances 2.
-; Callers: BattleAct_OpcodeTable entry $42.
+; Callers note: BattleAct_OpcodeTable entry $42.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
 ;        !Battle_ActNextOp counted up
@@ -14579,7 +14690,7 @@ BattleAct_OpCopyVar1C:
 ; Opcode $43 <n> <x> <y>: !Battle_ActUnkPointX/Y = (x, y) plus the point
 ; of BattleAct_RunCalc handler n (each 8-bit, wrapping); advances 4.
 ; The operands are stored before the handler runs.
-; Callers: BattleAct_OpcodeTable entry $43.
+; Callers note: BattleAct_OpcodeTable entry $43.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged, Y = 3
@@ -14619,7 +14730,7 @@ BattleAct_OpOffsetToUnkPoint:
 ; object's !Battle_ActObjX/Y on threads 8-15. Thread 4 has no case of
 ; its own, so it takes entry 4 of the list, the first slot of the
 ; target set. Advances 1; the thread waits for the next frame.
-; Callers: BattleAct_OpcodeTable entry $44.
+; Callers note: BattleAct_OpcodeTable entry $44.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y unchanged; on
 ;        threads 0-4 DP $82-$83 = the slot (not read after)
@@ -14656,7 +14767,7 @@ BattleAct_OpActorPosToUnkPoint:
 ; Opcode $49 <n> <d>: variable n + d, with d signed and the result
 ; clamped to 0-$FF (a carry out of a positive add gives $FF, a negative
 ; add with no carry gives 0); advances 3.
-; Callers: BattleAct_OpcodeTable entry $49.
+; Callers note: BattleAct_OpcodeTable entry $49.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2; DP $80 = d;
@@ -14693,7 +14804,7 @@ BattleAct_OpAddVarClamped:
 ; ==================================================================
 ; Opcodes $4A and $4D: swaps !Battle_ActVar1C and !Battle_ActVar1D;
 ; advances 1.
-; Callers: BattleAct_OpcodeTable entries $4A and $4D.
+; Callers note: BattleAct_OpcodeTable entries $4A and $4D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14714,7 +14825,7 @@ BattleAct_OpSwapVar1C1D:
 ; ==================================================================
 ; Opcode $4E: swaps !Battle_ActVar1C and variable $1E
 ; (!Battle_ActUnkPointX); advances 1.
-; Callers: BattleAct_OpcodeTable entry $4E.
+; Callers note: BattleAct_OpcodeTable entry $4E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14735,7 +14846,7 @@ BattleAct_OpSwapVar1C1E:
 ; ==================================================================
 ; Opcode $4F: swaps !Battle_ActVar1C and variable $1F
 ; (!Battle_ActUnkPointY); advances 1.
-; Callers: BattleAct_OpcodeTable entry $4F.
+; Callers note: BattleAct_OpcodeTable entry $4F.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -14783,7 +14894,7 @@ BattleAct_OpSwapVar1C1F:
 ; ($949B), which nothing here reads; DP $92-$93 are zeroed and never
 ; read; the sprite offset of a slot with no hit is stepped with an
 ; 8-bit add (it never passes $B0).
-; Callers: BattleAct_OpcodeTable entries $50-$55.
+; Callers note: BattleAct_OpcodeTable entries $50-$55.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; in state 1
@@ -15082,7 +15193,7 @@ BattleAct_OpShowHitNumbers:
 ; (the target-set thread included, unlike opcodes $29/$2A) change
 ; nothing. Advances 1. Quirk: the test for the object threads is made
 ; before the test that already covers them.
-; Callers: BattleAct_OpcodeTable entries $5D and $5E;
+; Callers note: BattleAct_OpcodeTable entries $5D and $5E;
 ;   BattleAct_StoreUnk9FF7Bit7 is reached from BattleAct_OpSetUnk9FF7Bit7.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered (the slot for
@@ -15116,7 +15227,7 @@ BattleAct_OpSetUnk9FF7Bit7:             ; header: see BattleAct_OpClearUnk9FF7Bi
 ; BattleAct_OpNop2 ($C15D18–$C15D1C, 5 bytes)
 ; ==================================================================
 ; Opcode $5F <x>: does nothing; advances 2 (over its operand).
-; Callers: BattleAct_OpcodeTable entry $5F.
+; Callers note: BattleAct_OpcodeTable entry $5F.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -15140,7 +15251,7 @@ BattleAct_OpNop2:
 ; !BattleRom_PalSets14. The same copy as one step of
 ; BattleAct_StepPalettes ($CC:F1E7), which places with flags & 3.
 ; Goes on with the next opcode in the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entry $60.
+; Callers note: BattleAct_OpcodeTable entry $60.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$85
@@ -15227,7 +15338,7 @@ BattleAct_OpLoadPalEntry:
 ; the palette-list entries first..last in turn, one every delay frames,
 ; starting with the next frame, and wraps back to first. Goes on with
 ; the next opcode in the same frame; advances 4.
-; Callers: BattleAct_OpcodeTable entries $61-$64.
+; Callers note: BattleAct_OpcodeTable entries $61-$64.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the sequence; Y = 3;
@@ -15262,7 +15373,7 @@ BattleAct_OpStartPalSeq:
 ; Opcodes $65-$68: stops palette sequence opcode - $65 (0-3); the
 ; colours it last loaded stay. Goes on with the next opcode in the same
 ; frame; advances 1.
-; Callers: BattleAct_OpcodeTable entries $65-$68.
+; Callers note: BattleAct_OpcodeTable entries $65-$68.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the sequence; Y unchanged;
 ;        !Battle_ActNextOp counted up
@@ -15295,7 +15406,9 @@ BattleAct_OpStopPalSeq:
 ; set by the caller: BattleAct_OpBlinkPalette ($C1:5F54, $C1:5F85)
 ; jumps there with $8E = 0, so its opcode is run again in the same
 ; frame.
-; Callers: BattleAct_OpcodeTable entry $69; BattleAct_SpecialPaletteBody
+; Callers of BattleAct_SpecialPaletteBody (2 JMP sites): BattleAct_OpBlinkPalette ($C1:5F54,
+;   $C1:5F85).
+; Callers note: BattleAct_OpcodeTable entry $69; BattleAct_SpecialPaletteBody
 ;   from BattleAct_OpBlinkPalette ($C1:5F54, $C1:5F85; JMP).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
@@ -15423,7 +15536,9 @@ BattleAct_SpecialPaletteBody:           ; header: see BattleAct_OpSetSpecialPale
 ; BattleAct_RestorePaletteBody is the same with DP $8E set by the
 ; caller: BattleAct_OpBlinkPalette jumps there with 3 ($C1:5F1C) or 0
 ; ($C1:5F59, $C1:5F8A).
-; Callers: BattleAct_OpcodeTable entry $6A; BattleAct_RestorePaletteBody
+; Callers of BattleAct_RestorePaletteBody (3 JMP sites): BattleAct_OpBlinkPalette ($C1:5F1C,
+;   $C1:5F59, $C1:5F8A).
+; Callers note: BattleAct_OpcodeTable entry $6A; BattleAct_RestorePaletteBody
 ;   from BattleAct_OpBlinkPalette ($C1:5F1C, $C1:5F59, $C1:5F8A; JMP).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
@@ -15492,7 +15607,7 @@ BattleAct_RestorePaletteBody:           ; header: see BattleAct_OpRestorePalette
 ; !Battler_UnkA08C set and the special palette counts
 ; !Battle_PalCycleLo up, so the !Battle_PaletteLiveLo colours turn too.
 ; Advances 2.
-; Callers: BattleAct_OpcodeTable entry $6B.
+; Callers note: BattleAct_OpcodeTable entry $6B.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered (Y = 1 or a
@@ -15546,7 +15661,7 @@ BattleAct_OpStartPalCycle:
 ; already counts the new timer down once.
 ; Quirk: each JMP to the special-palette body is followed by a BRA
 ; that nothing reaches ($C1:5F57, $C1:5F88).
-; Callers: BattleAct_OpcodeTable entry $6C.
+; Callers note: BattleAct_OpcodeTable entry $6C.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80, $8E,
@@ -15635,7 +15750,7 @@ BattleAct_OpBlinkPalette:
 ; Opcode $6D: stops opcode $6B's colour rotation (!Battle_UnkAB4E and
 ; !Battle_PalCycleLo = 0); the colours stay as they were turned.
 ; Advances 1.
-; Callers: BattleAct_OpcodeTable entry $6D.
+; Callers note: BattleAct_OpcodeTable entry $6D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -15655,7 +15770,7 @@ BattleAct_OpStopPalCycle:
 ; ==================================================================
 ; Opcode $6E: counts !Battle_ActObjUnkA1D8 of object threads 0-7 up;
 ; advances 1.
-; Callers: BattleAct_OpcodeTable entry $6E.
+; Callers note: BattleAct_OpcodeTable entry $6E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = $FFFF; Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -15673,7 +15788,7 @@ BattleAct_OpIncAllObjUnkA1D8:
 ; ==================================================================
 ; Opcode $6F: zeroes !Battle_ActObjUnkA1D8 of object threads 0-7;
 ; advances 1.
-; Callers: BattleAct_OpcodeTable entry $6F.
+; Callers note: BattleAct_OpcodeTable entry $6F.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = $FFFF; Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
@@ -15696,7 +15811,8 @@ BattleAct_OpClearAllObjUnkA1D8:
 ; object thread left.
 ; BattleAct_Op70Body is the same without the STZ of DP $8E: with $8E
 ; non-zero it counts up and returns (RTS) without advancing.
-; Callers: BattleAct_OpcodeTable entry $70; BattleAct_Op70Body from
+; Callers of BattleAct_Op70Body (1 JMP site): BattleAct_OpPlayAnim ($C1:4E8E).
+; Callers note: BattleAct_OpcodeTable entry $70; BattleAct_Op70Body from
 ;   BattleAct_OpPlayAnim ($C1:4E8E, JMP, with DP $8E = 1).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread);
 ;        BattleAct_Op70Body: DP $8E set
@@ -15721,7 +15837,7 @@ BattleAct_Op70Body:                     ; header: see BattleAct_OpIncObjUnkA1D8
 ; ==================================================================
 ; Opcode $71: zeroes !Battle_ActObjUnkA1D8 of the running object thread;
 ; advances 1.
-; Callers: BattleAct_OpcodeTable entry $71.
+; Callers note: BattleAct_OpcodeTable entry $71.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the object thread; Y
 ;        unchanged
@@ -15742,7 +15858,7 @@ BattleAct_OpClearObjUnkA1D8:
 ; call DP $80/$81 hold the actor's x/y (!Battler_ScreenX/Y or
 ; !Battle_ActObjX/Y) and X its slot or object thread. Threads 5-7 are
 ; taken as battler threads. Advances 2.
-; Callers: BattleAct_OpcodeTable entry $72.
+; Callers note: BattleAct_OpcodeTable entry $72.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$83 and
@@ -15826,7 +15942,7 @@ BattleAct_OpSetFacing:
 ; does is not traced (read at $CF:EDD4 and $CF:F81D); "link" is
 ; inferred from the two tables only. Meant for object threads.
 ; Advances 2.
-; Callers: BattleAct_OpcodeTable entries $73 and $74;
+; Callers note: BattleAct_OpcodeTable entries $73 and $74;
 ;   BattleAct_LinkObjBody is reached from BattleAct_OpLinkObjBit7 (BRA)
 ;   and by falling in from BattleAct_OpLinkObjBit6.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
@@ -15886,7 +16002,7 @@ BattleAct_LinkObjBody:                  ; header: see BattleAct_OpLinkObjBit7
 ; heading of the thread's battler (threads 0-3 and 5-7), of the list
 ; above (thread 4) or of the object (threads 8-15). Goes on with the
 ; next opcode in the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entry $75.
+; Callers note: BattleAct_OpcodeTable entry $75.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
@@ -15951,7 +16067,7 @@ BattleAct_OpCopyHeading:
 ; Battle_CalcAngle gives from point a (origin) to point b as the
 ; heading, for the same actors as opcode $75. Goes on with the next
 ; opcode in the same frame; advances 3.
-; Callers: BattleAct_OpcodeTable entry $76.
+; Callers note: BattleAct_OpcodeTable entry $76.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 2 or the last
@@ -16021,7 +16137,7 @@ BattleAct_OpHeadingFromCalc:
 ; Opcode $77 <d>: adds d (mod 256, so a turn either way) to the heading
 ; of the same actors as opcode $75. Goes on with the next opcode in
 ; the same frame; advances 2.
-; Callers: BattleAct_OpcodeTable entry $77.
+; Callers note: BattleAct_OpcodeTable entry $77.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
@@ -16083,7 +16199,7 @@ BattleAct_OpAddHeading:
 ; ==================================================================
 ; Opcodes $78/$79 <id>: APU command $18 (opcode $78) or $19 (opcode $79)
 ; with !Sfx_Param1 = id and !Sfx_Param2 = $80; advances 2.
-; Callers: BattleAct_OpcodeTable entries $78 and $79.
+; Callers note: BattleAct_OpcodeTable entries $78 and $79.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as Audio_ProcessEntry
@@ -16113,7 +16229,7 @@ BattleAct_OpSound:
 ; (opcode $7B) with !Sfx_Param1 = id and !Sfx_Param2 = the first result
 ; of BattleAct_RunCalc handler calc (probably an x, as opcodes $7C/$7D
 ; send a screen x there); advances 3.
-; Callers: BattleAct_OpcodeTable entries $7A and $7B.
+; Callers note: BattleAct_OpcodeTable entries $7A and $7B.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as Audio_ProcessEntry
@@ -16151,7 +16267,7 @@ BattleAct_OpSoundCalc:
 ; !BattleRom_PcAttackSfxA or B, and !Sfx_Param2 = !Battler_ScreenX of
 ; entry 0 of !Battle_ActBattlers (the actor of the action); advances 1.
 ; BattleAct_PlayPcAttackSfx is the shared tail, A = the sound.
-; Callers: BattleAct_OpcodeTable entries $7C and $7D;
+; Callers note: BattleAct_OpcodeTable entries $7C and $7D;
 ;   BattleAct_PlayPcAttackSfx is reached from BattleAct_OpPcAttackSfxA
 ;   (BRA) and by falling through BattleAct_OpPcAttackSfxB.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
@@ -16189,7 +16305,7 @@ BattleAct_PlayPcAttackSfx:              ; header: see BattleAct_OpPcAttackSfxA
 ; BattleAct_UnkVecCD001B and advances by that count + 1 (the opcode
 ; and its bytes). Quirk: a count of 0 copies 256 bytes (the DEC counts
 ; through 0) and advances 1.
-; Callers: BattleAct_OpcodeTable entry $80.
+; Callers note: BattleAct_OpcodeTable entry $80.
 ; Entry: M=1, X=0, DP=0 (the copy is DP-relative), DB=$7E, Y = 0,
 ;        B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E as the vector leaves them (the code
@@ -16225,7 +16341,7 @@ BattleAct_OpRunVecCD001B:
 ; Opcodes $81-$84 (entries 0-3) and $47/$48 (entries 4 and 5) <n>:
 ; !Battle_ActCalcSel[entry] = n + 1, so BattleAct_TickCalcs runs
 ; BattleAct_RunCalc handler n for that entry every frame; advances 2.
-; Callers: BattleAct_OpcodeTable entries $47, $48 and $81-$84.
+; Callers note: BattleAct_OpcodeTable entries $47, $48 and $81-$84.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the entry; Y = 1
@@ -16257,7 +16373,7 @@ BattleAct_OpSetCalcSel:
 ; target set (thread 4; the target set here, unlike opcodes $75-$77) or
 ; of the object (threads 8-15) to h; advances 2. Quirk: two of its
 ; branches go through a JMP where a branch would reach.
-; Callers: BattleAct_OpcodeTable entry $85.
+; Callers note: BattleAct_OpcodeTable entry $85.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
@@ -16353,7 +16469,9 @@ BattleAct_OpSetHeading:
 ;     !Battle_ActObjUnkA5B5 or zero !Battle_ActObjUnkA31C.
 ; !Battle_ActorMoveSteps is not set: the arc mover ends on its own
 ; count. The mode operand and the direction are DP $90 and $8F.
-; Callers: BattleAct_OpcodeTable entries $98 and $9C; BattleAct_ArcToCalcDir
+; Callers of BattleAct_ArcToCalcDir (1 JMP site): BattleAct_OpArcDownToCalc ($C1:6747).
+; Callers of BattleAct_ArcToPoint (1 JMP site): BattleAct_ArcToUnkPointDir ($C1:6740).
+; Callers note: BattleAct_OpcodeTable entries $98 and $9C; BattleAct_ArcToCalcDir
 ;   is reached by JMP from BattleAct_OpArcDownToCalc ($C1:6747),
 ;   BattleAct_ArcToPoint by JMP from BattleAct_ArcToUnkPointDir
 ;   ($C1:6740; header of BattleAct_OpArcToUnkPoint).
@@ -16703,7 +16821,8 @@ BattleAct_ArcToPoint:                   ; header: see BattleAct_OpArcToCalc
 ; Its first part is the delta code of BattleAct_CalcMoveStep, which
 ; the caller runs next and which recomputes all of it from the new
 ; point.
-; Callers (JSR): BattleAct_OpArcToCalc ($C1:62EF, $C1:6430; header of
+; Callers (2 JSR sites): BattleAct_ArcToPoint ($C1:62EF, $C1:6430).
+; Callers note (JSR): BattleAct_OpArcToCalc ($C1:62EF, $C1:6430; header of
 ;   BattleAct_OpArcToCalc).
 ; Entry: M=1, X=0, DP=0, DB any (DP operands only); the two Geo points
 ;        set
@@ -16797,7 +16916,10 @@ BattleAct_ArcQuarterPoint:
 ; negative) and $8C (y is the major axis), which the callers test.
 ; Quirk: for two equal points the divide is by 0 (what Battle_Divide
 ; returns then is the hardware's); the move then has 0 steps anyway.
-; Callers (6 JSR sites): BattleAct_MoveToPoint ($C1:5067; header of
+; Callers (6 JSR sites): BattleAct_MoveToPoint ($C1:5067), BattleAct_StartBattlerMove ($C1:5154),
+;   BattleAct_ArcToPoint ($C1:62F5, $C1:6436), BattleAct_OpMoveToMidpoint ($C1:7261) and
+;   BattleAct_OpPointTowardCalc ($C1:7468).
+; Callers note (6 JSR sites): BattleAct_MoveToPoint ($C1:5067; header of
 ;   BattleAct_OpMoveTo), BattleAct_StartBattlerMove ($C1:5154) and
 ;   $C1:62F5, $C1:6436, $C1:7261, $C1:7468 (unmatched).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (the step is stored
@@ -16918,7 +17040,8 @@ BattleAct_CalcMoveStep:
 ; !Battle_ActUnkAAFCStart and 0. What the callers do with them is not
 ; traced (perhaps a thrown arc through the raised midpoint; a guess
 ; from the numbers).
-; Callers (JSR): $C1:7095 and $C1:715C (unmatched; opcode $D2's
+; Callers (2 JSR sites): BattleAct_OpMoveKind4ToCalc ($C1:7095, $C1:715C).
+; Callers note (JSR): $C1:7095 and $C1:715C (unmatched; opcode $D2's
 ;   handler, BattleAct_OpcodeTable entry $D2 at $C1:705A).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; the two Geo points set
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered (B = 0); X = 0; Y
@@ -17046,7 +17169,8 @@ BattleAct_CalcMidpointSteps:
 ; BattleAct_OpArcToCalc).
 ; BattleAct_ArcToUnkPointDir is the entry with DP $8F already set
 ; (opcode $9B, BattleAct_OpArcDownToUnkPoint).
-; Callers: BattleAct_OpcodeTable entries $99 and $9D;
+; Callers of BattleAct_ArcToUnkPointDir (1 JMP site): BattleAct_OpArcDownToUnkPoint ($C1:674E).
+; Callers note: BattleAct_OpcodeTable entries $99 and $9D;
 ;   BattleAct_ArcToUnkPointDir by JMP from BattleAct_OpArcDownToUnkPoint
 ;   ($C1:674E).
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
@@ -17069,7 +17193,7 @@ BattleAct_ArcToUnkPointDir:             ; header: see BattleAct_OpArcToUnkPoint
 ; ==================================================================
 ; Opcode $9A <mode> <n>: opcode $98 (BattleAct_OpArcToCalc) with the
 ; height added instead of subtracted (DP $8F = 1).
-; Callers: BattleAct_OpcodeTable entry $9A.
+; Callers note: BattleAct_OpcodeTable entry $9A.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpArcToCalc's (DP $8F = 1)
@@ -17084,7 +17208,7 @@ BattleAct_OpArcDownToCalc:
 ; ==================================================================
 ; Opcode $9B <m>: opcode $99 (BattleAct_OpArcToUnkPoint) with the height
 ; added instead of subtracted (DP $8F = 1).
-; Callers: BattleAct_OpcodeTable entry $9B.
+; Callers note: BattleAct_OpcodeTable entry $9B.
 ; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpArcToCalc's (DP $8E = 2, $8F = 1)
@@ -17127,7 +17251,7 @@ BattleAct_OpArcDownToUnkPoint:
 ;     !Battle_ActObjMoveDone; it also zeroes !Battle_ActObjUnkA31C.
 ; Clearing !Battle_ActorMoving stops the mover (it steps only moving
 ; actors) wherever the actor is.
-; Callers: BattleAct_OpcodeTable entry $A2.
+; Callers note: BattleAct_OpcodeTable entry $A2.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $82/$83 and
@@ -17375,7 +17499,8 @@ BattleAct_OpMoveAlongHeading:
 ; BattleAct_SetPosHistory is the shared part, with DP $8E = the length
 ; and $8F = the on value (opcode $A5, BattleAct_OpStopPosHistory, enters
 ; there with 1 and 0).
-; Callers: BattleAct_OpcodeTable entry $A4; BattleAct_SetPosHistory by
+; Callers of BattleAct_SetPosHistory (1 JMP site): BattleAct_OpStopPosHistory ($C1:69C0).
+; Callers note: BattleAct_OpcodeTable entry $A4; BattleAct_SetPosHistory by
 ;   JMP from BattleAct_OpStopPosHistory ($C1:69C0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread); BattleAct_SetPosHistory: DP $80, $81,
@@ -17468,7 +17593,7 @@ BattleAct_SetPosHistory:                ; header: see BattleAct_OpStartPosHistor
 ; the whole of opcode $A4's store, so it also writes the delay, the
 ; second operand, the timers and the records, with whatever DP $80/$81
 ; hold (it reads no operands).
-; Callers: BattleAct_OpcodeTable entry $A5.
+; Callers note: BattleAct_OpcodeTable entry $A5.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  as BattleAct_OpStartPosHistory's (DP $8E = 1, $8F = 0)
 ; Callees: BattleAct_SetPosHistory (JMP)
@@ -17503,7 +17628,7 @@ BattleAct_OpStopPosHistory:
 ;   - threads 8-15, object j: as a battler with the object's entries
 ;     (index 11 + j), its position, and !Battle_ActObjMoveDone; it also
 ;     zeroes !Battle_ActObjUnkA31C.
-; Callers: BattleAct_OpcodeTable entry $A8.
+; Callers note: BattleAct_OpcodeTable entry $A8.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; thread 4 also
@@ -17683,7 +17808,7 @@ BattleAct_OpMoveHeadingSteps:
 ;     so it advances at once without testing;
 ;   - threads 8-15, object j: as a battler with the object's entries
 ;     (index 11 + j), but without the box test.
-; Callers: BattleAct_OpcodeTable entry $A9.
+; Callers note: BattleAct_OpcodeTable entry $A9.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$83 and
@@ -17982,7 +18107,10 @@ BattleAct_OpMoveHeadingChecked:
 ;     of the actor arrays (index 11 + j, the word array 22 + 2j) and
 ;     !Battle_ActObjMoveDone, but the object's position
 ;     (!Battle_ActObjX/Y) is not moved to the centre.
-; Callers: BattleAct_OpcodeTable entry $C0; BattleAct_CircleMove by
+; Callers of BattleAct_CircleMove (1 JMP site): BattleAct_OpCircleToUnkPoint ($C1:6F50).
+; Callers of BattleAct_CircleMoveKind (2 JMP sites): BattleAct_OpEllipseToCalc ($C1:6F72) and
+;   BattleAct_OpEllipseToUnkPoint ($C1:6F97).
+; Callers note: BattleAct_OpcodeTable entry $C0; BattleAct_CircleMove by
 ;   JMP from BattleAct_OpCircleToUnkPoint ($C1:6F50),
 ;   BattleAct_CircleMoveKind by JMP from BattleAct_OpEllipseToCalc
 ;   ($C1:6F72) and BattleAct_OpEllipseToUnkPoint ($C1:6F97).
@@ -18298,7 +18426,7 @@ BattleAct_CircleMoveKind:               ; header: see BattleAct_OpCircleToCalc
 ; ==================================================================
 ; Opcode $C1 <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc) round
 ; the point in !Battle_ActUnkPointX/Y; length 4.
-; Callers: BattleAct_OpcodeTable entry $C1.
+; Callers note: BattleAct_OpcodeTable entry $C1.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpCircleToCalc's (DP $86 not set from a script
@@ -18331,7 +18459,7 @@ BattleAct_OpCircleToUnkPoint:
 ; y offset (so probably an ellipse, flattened like a ring on the
 ; ground); length 5. The kind is the same 5 as the length (one store
 ; of A to each).
-; Callers: BattleAct_OpcodeTable entry $C2.
+; Callers note: BattleAct_OpcodeTable entry $C2.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpCircleToCalc's
@@ -18361,7 +18489,7 @@ BattleAct_OpEllipseToCalc:
 ; ==================================================================
 ; Opcode $C3 <r> <a> <q>: opcode $C2 (BattleAct_OpEllipseToCalc) round
 ; the point in !Battle_ActUnkPointX/Y; length 4.
-; Callers: BattleAct_OpcodeTable entry $C3.
+; Callers note: BattleAct_OpcodeTable entry $C3.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpCircleToCalc's (DP $86 not set from a script
@@ -18405,7 +18533,7 @@ BattleAct_OpEllipseToUnkPoint:
 ;   - threads 8-15: nothing; advances at once.
 ; BattleAct_StepUnkA4AF is the entry with DP $80/$81 = t/d and DP $8E
 ; = the length set (opcode $C5, BattleAct_OpStepUnkA4AFTo0).
-; Callers: BattleAct_OpcodeTable entry $C4; BattleAct_StepUnkA4AF by
+; Callers note: BattleAct_OpcodeTable entry $C4; BattleAct_StepUnkA4AF by
 ;   BRA from BattleAct_OpStepUnkA4AFTo0 ($C1:6FFA).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread); !Battle_ActThread read 16-bit by LDX
@@ -18470,7 +18598,7 @@ BattleAct_StepUnkA4AF:                  ; header: see BattleAct_OpStepUnkA4AF
 ; ==================================================================
 ; Opcode $C5 <d>: opcode $C4 (BattleAct_OpStepUnkA4AF) with t = 0:
 ; steps !Battler_UnkA4AF back to 0 by d per frame; length 2.
-; Callers: BattleAct_OpcodeTable entry $C5.
+; Callers note: BattleAct_OpcodeTable entry $C5.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  as BattleAct_OpStepUnkA4AF's (DP $80 = 0, $8E = 2)
@@ -18493,7 +18621,7 @@ BattleAct_OpStepUnkA4AFTo0:
 ; the main target, the target set) up to the first $FF, not for
 ; !Battle_ActTargetSet as the other opcodes do; threads 8-15 do
 ; nothing.
-; Callers: BattleAct_OpcodeTable entry $D0.
+; Callers note: BattleAct_OpcodeTable entry $D0.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread); !Battle_ActThread read 16-bit by LDX
 ;        (BattleAct_RunThread stores it 16-bit)
@@ -18532,7 +18660,7 @@ BattleAct_OpIncUnkA5D8:
 ; ==================================================================
 ; Opcode $D1: zeroes !Battler_UnkA5D8, for the same battlers as opcode
 ; $D0 (BattleAct_OpIncUnkA5D8); length 1.
-; Callers: BattleAct_OpcodeTable entry $D1.
+; Callers note: BattleAct_OpcodeTable entry $D1.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread); !Battle_ActThread read 16-bit by LDX
 ;        (BattleAct_RunThread stores it 16-bit)
@@ -18597,7 +18725,7 @@ BattleAct_OpClearUnkA5D8:
 ;     (Battle_CalcAngle) in !Battle_ActObjMoveAngle and its facing in
 ;     !Battle_ActObjFacing. For a battler the angle is computed but not
 ;     used.
-; Callers: BattleAct_OpcodeTable entry $D2.
+; Callers note: BattleAct_OpcodeTable entry $D2.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
@@ -18822,7 +18950,7 @@ BattleAct_OpMoveKind4ToCalc:
 ;     !Battle_ActorMoving not set. Quirk, kept: the split divides by
 ;     !Battle_ActorMoveSpeed + 11 indexed by 2j (the X left from the
 ;     word stores), not by the object's own speed.
-; Callers: BattleAct_OpcodeTable entry $D3.
+; Callers note: BattleAct_OpcodeTable entry $D3.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
@@ -18995,7 +19123,7 @@ BattleAct_OpMoveToMidpoint:
 ; at the end). BattleAct_OpRunMove_Wait and BattleAct_OpRunMove_Done
 ; are the shared exits (advance 0 / 1), global only because the
 ; opcode $D4 part branches to them.
-; Callers: BattleAct_OpcodeTable entries $D4 and $D6 (BattleAct_OpRunMove).
+; Callers note: BattleAct_OpcodeTable entries $D4 and $D6 (BattleAct_OpRunMove).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered (battlers and
@@ -19064,7 +19192,7 @@ BattleAct_OpRunMove_Done:               ; header: see BattleAct_OpRunMoveAfterUn
 ; its done flag, then clears !Battle_ActorMoving and advances by 1.
 ; Unlike opcode $D6 it leaves the done flag set. Threads as in
 ; BattleAct_OpRunMoveAfterUnkAAFC.
-; Callers: BattleAct_OpcodeTable entry $D5.
+; Callers note: BattleAct_OpcodeTable entry $D5.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered (battlers and
@@ -19134,7 +19262,7 @@ BattleAct_OpRunMoveAfterMajorDist:
 ; so it adds the step 256 times. Length 3. By thread: the battler at
 ; !Battler_ScreenX/Y; thread 4 nothing; object j from
 ; !Battle_ActObjX/Y.
-; Callers: BattleAct_OpcodeTable entry $D7.
+; Callers note: BattleAct_OpcodeTable entry $D7.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
@@ -19255,7 +19383,7 @@ BattleAct_OpPointTowardCalc:
 ; and !Battle_ActorMoving zeroed) after f frames, so probably a shake
 ; or vibration. Thread 4 does this for every slot of
 ; !Battle_ActTargetSet; threads 8-15 do nothing.
-; Callers: BattleAct_OpcodeTable entry $D8.
+; Callers note: BattleAct_OpcodeTable entry $D8.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80, $82,
@@ -19338,7 +19466,7 @@ BattleAct_OpShake:
 ; (!Battler_ActAttr for a battler, every slot of !Battle_ActTargetSet
 ; for thread 4, !Battle_ActObjAttr for object j; probably sprite
 ; attribute bits, see the define); length 2.
-; Callers: BattleAct_OpcodeTable entry $D9.
+; Callers note: BattleAct_OpcodeTable entry $D9.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or (thread
@@ -19393,7 +19521,7 @@ BattleAct_OpSetActAttr:
 ; 4 every slot of !Battle_ActTargetSet, !Battle_ActObjAttrInit into
 ; !Battle_ActObjAttr for object j); length 1. Quirk, kept: it also
 ; reads the byte after the opcode into DP $80 and never uses it.
-; Callers: BattleAct_OpcodeTable entry $DA.
+; Callers note: BattleAct_OpcodeTable entry $DA.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
 ;        BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or (thread
@@ -19447,7 +19575,48 @@ BattleAct_OpResetActAttr:
 ; (added 16-bit, so DP $E9 takes part too). The opcode handlers end
 ; here with A = the length of their opcode, or 0 to run the same opcode
 ; again next frame.
-; Callers (113 JMP sites): the opcode handlers, e.g. BattleAct_OpEndScript
+; Callers (113 JMP sites): BattleAct_OpEndScript ($C1:4CFD), BattleAct_StartAnim ($C1:4E1E),
+;   BattleAct_OpPlayAnim ($C1:4E4B, $C1:4E74, $C1:4E9E), BattleAct_OpShowAnimFrame ($C1:4ECB,
+;   $C1:4EF3, $C1:4F16), BattleAct_OpResetSpeed ($C1:4F51), BattleAct_OpSetSpeed ($C1:4FBC),
+;   BattleAct_MoveToPoint ($C1:5129, $C1:5132), BattleAct_CurveToPoint ($C1:53A8, $C1:53AD),
+;   BattleAct_PathToPoint ($C1:5609, $C1:560E), BattleAct_SetPosToPoint ($C1:5669),
+;   BattleAct_OpFollow ($C1:56B8), BattleAct_OpUnfollow ($C1:56C9), BattleAct_OpCall ($C1:56F8),
+;   BattleAct_OpReturn ($C1:5711), BattleAct_OpPause ($C1:571F), BattleAct_OpReturnIfVar1F0
+;   ($C1:5729), BattleAct_OpWaitVar ($C1:5740), BattleAct_OpWaitVar1C ($C1:5753),
+;   BattleAct_OpWaitVar1D ($C1:5766), BattleAct_OpEndIfNoTarget ($C1:5777),
+;   BattleAct_OpShowAnimEntry ($C1:57B2, $C1:57DD, $C1:5802), BattleAct_StoreUnkA5CD ($C1:583D),
+;   BattleAct_StoreUnk9FF7 ($C1:5876), BattleAct_OpClearUnkA4A4 ($C1:58A8), BattleAct_OpUnkRevive
+;   ($C1:58D9), BattleAct_OpSetUnkCFFF ($C1:58E1), BattleAct_OpClearUnkCFFF ($C1:58E9),
+;   BattleAct_OpSetVar ($C1:58FB), BattleAct_OpSetVar1C ($C1:5909), BattleAct_OpSetVar1D ($C1:5917),
+;   BattleAct_OpCalcToUnkPoint ($C1:592E), BattleAct_OpIncVar ($C1:593D), BattleAct_OpIncVar1C
+;   ($C1:5948), BattleAct_OpIncVar1D ($C1:5953), BattleAct_OpDecVar ($C1:5962), BattleAct_OpDecVar1C
+;   ($C1:596D), BattleAct_OpDecVar1D ($C1:5978), BattleAct_OpAddVar ($C1:598E), BattleAct_OpAddVar1C
+;   ($C1:59A0), BattleAct_OpAddVarTo1C ($C1:59B6), BattleAct_OpCalcToResult ($C1:59E1),
+;   BattleAct_OpCopyVar ($C1:59F7), BattleAct_OpCopyVar1C ($C1:5A09), BattleAct_OpOffsetToUnkPoint
+;   ($C1:5A3B), BattleAct_OpActorPosToUnkPoint ($C1:5A6D), BattleAct_OpAddVarClamped ($C1:5A96),
+;   BattleAct_OpSwapVar1C1D ($C1:5AAC), BattleAct_OpSwapVar1C1E ($C1:5AC2), BattleAct_OpSwapVar1C1F
+;   ($C1:5AD8), BattleAct_OpShowHitNumbers ($C1:5B20, $C1:5CDD, $C1:5CE6, $C1:5CEE),
+;   BattleAct_StoreUnk9FF7Bit7 ($C1:5D0F), BattleAct_OpNop2 ($C1:5D1A), BattleAct_OpLoadPalEntry
+;   ($C1:5D90), BattleAct_OpStartPalSeq ($C1:5DBE), BattleAct_OpStopPalSeq ($C1:5DD0),
+;   BattleAct_SpecialPaletteBody ($C1:5E84), BattleAct_RestorePaletteBody ($C1:5EDC),
+;   BattleAct_OpStartPalCycle ($C1:5F10), BattleAct_OpBlinkPalette ($C1:5F92, $C1:5F97),
+;   BattleAct_OpStopPalCycle ($C1:5FA2), BattleAct_OpIncAllObjUnkA1D8 ($C1:5FB0),
+;   BattleAct_OpClearAllObjUnkA1D8 ($C1:5FBE), BattleAct_Op70Body ($C1:5FCF),
+;   BattleAct_OpClearObjUnkA1D8 ($C1:5FDB), BattleAct_OpSetFacing ($C1:6056), BattleAct_LinkObjBody
+;   ($C1:6090), BattleAct_OpCopyHeading ($C1:60E3), BattleAct_OpHeadingFromCalc ($C1:6151),
+;   BattleAct_OpAddHeading ($C1:619B), BattleAct_OpSound ($C1:61BE), BattleAct_OpSoundCalc
+;   ($C1:61E8), BattleAct_PlayPcAttackSfx ($C1:6218), BattleAct_OpRunVecCD001B ($C1:6239),
+;   BattleAct_OpSetCalcSel ($C1:6255), BattleAct_OpSetHeading ($C1:6296), BattleAct_ArcToPoint
+;   ($C1:653D, $C1:6546), BattleAct_OpMoveAlongHeading ($C1:6913, $C1:6918), BattleAct_SetPosHistory
+;   ($C1:69B7), BattleAct_OpMoveHeadingSteps ($C1:6AE8, $C1:6AED), BattleAct_OpMoveHeadingChecked
+;   ($C1:6CEB, $C1:6CF0), BattleAct_CircleMoveKind ($C1:6F29, $C1:6F2E), BattleAct_StepUnkA4AF
+;   ($C1:6FE7, $C1:6FEC), BattleAct_OpIncUnkA5D8 ($C1:7028), BattleAct_OpClearUnkA5D8 ($C1:7057),
+;   BattleAct_OpMoveKind4ToCalc ($C1:720B), BattleAct_OpMoveToMidpoint ($C1:7310),
+;   BattleAct_OpRunMove_Wait ($C1:73A5), BattleAct_OpRunMove_Done ($C1:73AA),
+;   BattleAct_OpRunMoveAfterMajorDist ($C1:7403, $C1:7408), BattleAct_OpPointTowardCalc ($C1:7465),
+;   BattleAct_OpShake ($C1:7537), BattleAct_OpSetActAttr ($C1:7576) and BattleAct_OpResetActAttr
+;   ($C1:75B8).
+; Callers note (113 JMP sites): the opcode handlers, e.g. BattleAct_OpEndScript
 ;   ($C1:4CFD), BattleAct_OpLoopAnim ($C1:4E1E), BattleAct_OpPlayAnim
 ;   ($C1:4E4B), BattleAct_OpSetSpeed ($C1:4FBC) BattleAct_MoveToPoint ($C1:5129,
 ;   $C1:5132) and many in unmatched code ($C1:53A8 on).
@@ -19488,8 +19657,7 @@ BattleAct_AdvanceScript:
 ; of !Battle_ActBattlers entry A, $0A-$13 face entry A - $0A, $14-$17
 ; give facing A - $14, $18 faces the screen centre. The handler gets
 ; the mode in Y; the caller's X and Y come back.
-; Callers (3 JSR sites): BattleAct_OpSetFacing ($C1:6001, $C1:6024,
-;   $C1:6048).
+; Callers (3 JSR sites): BattleAct_OpSetFacing ($C1:6001, $C1:6024, $C1:6048).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (the 16-bit TAY/TAX take B as the
 ;        mode's high byte); A = mode; DP $80/$81 = the actor's x/y
 ;        (read by modes $0A-$13 and $18)
@@ -19514,7 +19682,7 @@ BattleAct_CalcFacing:
 ; BattleAct_FaceLikeEntry ($C175D7–$C175E2, 12 bytes)
 ; ==================================================================
 ; Facing modes 0-9: the !Battler_Facing of !Battle_ActBattlers entry Y.
-; Callers: BattleAct_FacingModeTable entries 0-9 (BattleAct_CalcFacing).
+; Callers note: BattleAct_FacingModeTable entries 0-9 (BattleAct_CalcFacing).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = mode (0-9)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the facing, also in
 ;        !Battle_ActFacingOut; X = the slot; Y unchanged
@@ -19533,7 +19701,7 @@ BattleAct_FaceLikeEntry:
 ; Facing modes $0A-$13: the facing from the actor's point (DP $80/$81)
 ; toward the screen position of !Battle_ActBattlers entry Y - $0A, from
 ; Battle_CalcAngle and !BattleRom_FacingByAngle.
-; Callers: BattleAct_FacingModeTable entries $0A-$13
+; Callers note: BattleAct_FacingModeTable entries $0A-$13
 ;   (BattleAct_CalcFacing).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = mode ($0A-$13); DP $80/$81 =
 ;        the actor's x/y
@@ -19569,7 +19737,7 @@ BattleAct_FaceTowardEntry:
 ; ==================================================================
 ; Facing modes $14-$17: facing Y - $14 (!Battle_FacingUp, Down, Left,
 ; Right).
-; Callers: BattleAct_FacingModeTable entries $14-$17
+; Callers note: BattleAct_FacingModeTable entries $14-$17
 ;   (BattleAct_CalcFacing).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = mode ($14-$17)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the facing, also in
@@ -19587,7 +19755,7 @@ BattleAct_FaceFixed:
 ; ==================================================================
 ; Facing mode $18: the facing from the actor's point (DP $80/$81)
 ; toward the middle of the screen (!Battle_ScreenCentreX/Y).
-; Callers: BattleAct_FacingModeTable entry $18 (BattleAct_CalcFacing).
+; Callers note: BattleAct_FacingModeTable entry $18 (BattleAct_CalcFacing).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $80/$81 = the actor's x/y
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0 (Battle_CalcAngle leaves it 0); A =
 ;        the facing, also in !Battle_ActFacingOut; X = the angle; Y
@@ -19617,15 +19785,12 @@ BattleAct_FaceTowardCentre:
 ; leaves a point in !Battle_ActCalcOutA (x) and !Battle_ActCalcOutB (y)
 ; (two script variables for handlers $2A-$31; nothing for $12). The
 ; handler gets the number in Y; the caller's X and Y come back.
-; Callers (16 JSR sites): BattleAct_TickCalcs ($C1:421E),
-;   BattleAct_OpMoveToCalc ($C1:4FE6), BattleAct_OpCurveToCalc
-;   ($C1:5224), BattleAct_OpPathToCalc ($C1:5430), BattleAct_OpSetPosCalc
-;   ($C1:5680), BattleAct_OpCalcToUnkPoint ($C1:591D),
-;   BattleAct_OpCalcToResult ($C1:59BC), BattleAct_OpOffsetToUnkPoint
-;   ($C1:5A1F), BattleAct_OpHeadingFromCalc ($C1:60EF, $C1:6101),
-;   BattleAct_OpSoundCalc ($C1:61CA), BattleAct_ArcToCalcDir ($C1:62A3),
-;   BattleAct_OpCircleToCalc ($C1:6D09), BattleAct_OpEllipseToCalc
-;   ($C1:6F69), BattleAct_OpMoveKind4ToCalc ($C1:705D) and
+; Callers (16 JSR sites): BattleAct_TickCalcs ($C1:421E), BattleAct_OpMoveToCalc ($C1:4FE6),
+;   BattleAct_OpCurveToCalc ($C1:5224), BattleAct_OpPathToCalc ($C1:5430), BattleAct_OpSetPosCalc
+;   ($C1:5680), BattleAct_OpCalcToUnkPoint ($C1:591D), BattleAct_OpCalcToResult ($C1:59BC),
+;   BattleAct_OpOffsetToUnkPoint ($C1:5A1F), BattleAct_OpHeadingFromCalc ($C1:60EF, $C1:6101),
+;   BattleAct_OpSoundCalc ($C1:61CA), BattleAct_ArcToCalcDir ($C1:62A3), BattleAct_OpCircleToCalc
+;   ($C1:6D09), BattleAct_OpEllipseToCalc ($C1:6F69), BattleAct_OpMoveKind4ToCalc ($C1:705D) and
 ;   BattleAct_OpPointTowardCalc ($C1:7412).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (the 16-bit TAY/TAX take B as the
 ;        number's high byte); A = handler number
@@ -19652,7 +19817,7 @@ BattleAct_RunCalc:
 ; ==================================================================
 ; Handlers 0-8: the screen position (!Battler_ScreenX/Y) of
 ; !Battle_ActBattlers entry Y.
-; Callers: BattleAct_CalcTable entries 0-8 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries 0-8 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number (0-8)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the slot; Y
 ;        unchanged; !Battle_ActCalcOutA/B written
@@ -19672,7 +19837,7 @@ BattleAct_CalcEntryPos:
 ; Handlers 9-$11: the screen position of !Battle_ActBattlers entry Y - 9
 ; plus its !Battler_ScreenOffsetX/Y. The x sum wraps at 8 bits; the y
 ; offset is taken as signed and the sum is clamped to 0..$FF.
-; Callers: BattleAct_CalcTable entries 9-$11 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries 9-$11 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number (9-$11)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the slot; Y = the
 ;        entry (handler - 9); !Battle_ActCalcOutA/B written
@@ -19711,7 +19876,7 @@ BattleAct_CalcEntryOffsetPos:
 ; ==================================================================
 ; Handler $12: does nothing; !Battle_ActCalcOutA/B keep what the last
 ; handler left.
-; Callers: BattleAct_CalcTable entry $12 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $12 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y unchanged
 org $C1767D
@@ -19724,7 +19889,7 @@ BattleAct_CalcNone:
 ; Handler $13: the midpoint of !Battle_ActBattlers entries 0 and 3 (the
 ; caster and the main target), through BattleAct_CalcMid02's
 ; BattleAct_CalcMidWithEntry0.
-; Callers: BattleAct_CalcTable entry $13 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $13 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0
 ; Exit:  as BattleAct_CalcMid02's: M=1, X=0, DP=0, DB=$7E, B=0; A = the
 ;        y; X, Y clobbered; DP $80-$87 written; !Battle_ActCalcOutA/B
@@ -19741,7 +19906,7 @@ BattleAct_CalcMid03:
 ; ==================================================================
 ; Handler $14: the midpoint of !Battle_ActBattlers entries 0 and 1,
 ; through BattleAct_CalcMid02's BattleAct_CalcMidWithEntry0.
-; Callers: BattleAct_CalcTable entry $14 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $14 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X, Y clobbered; DP
 ;        $80-$87 written; !Battle_ActCalcOutA/B written
@@ -19763,7 +19928,10 @@ BattleAct_CalcMid01:
 ;   DP $84 (BattleAct_CalcMid03 and BattleAct_CalcMid01 jump here).
 ; - BattleAct_CalcMidFromSlot ($C1:7697): slot X and the entry in DP $84
 ;   (BattleAct_CalcMid12 jumps here).
-; Callers: BattleAct_CalcTable entry $15 (BattleAct_RunCalc);
+; Callers of BattleAct_CalcMidWithEntry0 (2 JMP sites): BattleAct_CalcMid03 ($C1:7683) and
+;   BattleAct_CalcMid01 ($C1:768B).
+; Callers of BattleAct_CalcMidFromSlot (1 JMP site): BattleAct_CalcMid12 ($C1:791D).
+; Callers note: BattleAct_CalcTable entry $15 (BattleAct_RunCalc);
 ;   BattleAct_CalcMid03 ($C1:7683) and BattleAct_CalcMid01 ($C1:768B)
 ;   JMP to BattleAct_CalcMidWithEntry0; BattleAct_CalcMid12 ($C1:791D)
 ;   to BattleAct_CalcMidFromSlot.
@@ -19827,7 +19995,7 @@ BattleAct_CalcMidFromSlot:              ; header: see BattleAct_CalcMid02
 ; second division divides the x sum again (DP $80/$81, not the y sum
 ; in $82/$83), so !Battle_ActCalcOutB gets the mean x as well; the y
 ; sum is never used.
-; Callers: BattleAct_CalcTable entry $16 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $16 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the mean x; X = the slot of
 ;        entry 2; Y unchanged; DP $80-$8B, $B1-$B3 written and
@@ -19913,7 +20081,7 @@ BattleAct_CalcCentroid:
 ;   and stored 16-bit. Quirk: the sine bytes are zero-extended, not
 ;   sign-extended, so for a negative one the high bytes written to
 ;   $A2B1/$A2B3 come out one too high (the low bytes are right).
-; Callers: BattleAct_CalcTable entry $17 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $17 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the x (battlers) or 0
 ;        (objects); X = the slot or the object * 2; Y unchanged; DP
@@ -19999,7 +20167,7 @@ BattleAct_CalcAheadOfActor:
 ; Handler $18: the point ($80, $80). The screen centre used elsewhere
 ; is ($80, $70) (!Battle_ScreenCentreX/Y), so what this point is meant
 ; to be is not known.
-; Callers: BattleAct_CalcTable entry $18 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $18 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = $80; X, Y unchanged;
 ;        !Battle_ActCalcOutA/B written
@@ -20015,7 +20183,7 @@ BattleAct_CalcFixedPoint:
 ; ==================================================================
 ; Handlers $19-$1B: the position saved for !Battle_ActBattlers entry
 ; Y - $19 (0-2) in !Battle_ActSavedX/Y.
-; Callers: BattleAct_CalcTable entries $19-$1B (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries $19-$1B (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($19-$1B)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the entry; Y
 ;        unchanged; !Battle_ActCalcOutA/B written
@@ -20036,7 +20204,7 @@ BattleAct_CalcSavedPos:
 ; ==================================================================
 ; Handlers $1C-$23: the position of object Y - $1C (0-7) plus its
 ; !Battle_ActObjOfsX/Y, 16-bit, stored 16-bit.
-; Callers: BattleAct_CalcTable entries $1C-$23 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries $1C-$23 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($1C-$23)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = the object * 2; Y
 ;        unchanged; !Battle_ActCalcOutA/B written ($A2B0-$A2B3)
@@ -20073,7 +20241,7 @@ BattleAct_CalcObjOffset:
 ; - $39-$3F: from entry 0, k = n - $39, with both points moved by their
 ;   !Battler_ScreenOffsetX/Y (x wrapping at 8 bits, y + offset clamped
 ;   to 0..$FF, as in BattleAct_CalcEntryOffsetPos).
-; Callers: BattleAct_CalcTable entries $24-$29 and $32-$3F
+; Callers note: BattleAct_CalcTable entries $24-$29 and $32-$3F
 ;   (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = w1 * y1;
@@ -20217,7 +20385,7 @@ BattleAct_CalcLerpToTarget:
 ; ==================================================================
 ; Handlers $2A-$31: script variables 2k and 2k + 1 of !Battle_ActVars,
 ; k = n - $2A (0-7), as the pair (not necessarily a point).
-; Callers: BattleAct_CalcTable entries $2A-$31 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries $2A-$31 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($2A-$31)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = variable 2k + 1; X = 2k; Y
 ;        unchanged; !Battle_ActCalcOutA/B written
@@ -20240,7 +20408,7 @@ BattleAct_CalcVarPair:
 ; Handler $40: the midpoint of !Battle_ActBattlers entries 1 and 2 (the
 ; two partners), through BattleAct_CalcMid02's
 ; BattleAct_CalcMidFromSlot.
-; Callers: BattleAct_CalcTable entry $40 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entry $40 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X, Y clobbered; DP
 ;        $80-$87 written; !Battle_ActCalcOutA/B written
@@ -20262,7 +20430,7 @@ BattleAct_CalcMid12:
 ; !BattleRom_ActLerpWeights, as in BattleAct_CalcLerpToTarget. It saves
 ; DP $86-$87 on the stack and puts it back at the end, though nothing in
 ; it writes there (probably left over).
-; Callers: BattleAct_CalcTable entries $41-$47 (BattleAct_RunCalc).
+; Callers note: BattleAct_CalcTable entries $41-$47 (BattleAct_RunCalc).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($41-$47)
 ; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = DP $86-$87 (kept);
 ;        Y unchanged; DP $80-$85 and $AD/$AE written, and Battle_Mul8's
@@ -20700,7 +20868,7 @@ BattleAct_OpcodeTable:
 ; builds its box (Battle_CalcBattlerBox) and tests it against the
 ; other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP). It sits
 ; right after BattleAct_OpcodeTable.
-; Callers (JSR): BattleAct_OpMoveHeadingChecked ($C1:6B83, $C1:6C2E).
+; Callers (2 JSR sites): BattleAct_OpMoveHeadingChecked ($C1:6B83, $C1:6C2E).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; X = battler slot, DP
 ;        $80-$81 (!Battle_BoxTestSlot) = the same slot
 ; Exit:  as Battle_BoxOverlapsOthers': A = $80 / $81 (N set) when the
@@ -20842,7 +21010,8 @@ BankC1_OldBuildLeftovers:
 
 ; $C1:8000 — BankC1_BattleStartVec (3 bytes)
 ; Vector into BattleSys_Main.
-; Callers: JML at $CF:FBE1 (the battle entry, unmatched); xref also
+; Callers (2 sites: 1 JSL, 1 JML): unmatched (JML $CF:FBE1, JSL $E2:74F3).
+; Callers note: JML at $CF:FBE1 (the battle entry, unmatched); xref also
 ;   confirms a JSL $C1:8000 decoded at $E2:74F3 (unmatched, not checked
 ;   to be code).
 ; Entry: as BattleSys_Main (M=1, X=0, DP=0, DB=$7E)
@@ -20858,9 +21027,8 @@ BankC1_BattleStartVec:
 ; $C1:D126 with argument Y, pulls them back and returns with RTL; service 1 is
 ; BankC1_AddItem, service 4 BankC1_AddGold (!BankC1Svc_AddItem /
 ; AddGold, as Field_CheckTileInFront uses them).
-; Callers (JSL): Field_CheckTileInFront ($C0:1E72, $C0:1E84) and the
-;   unmatched bank-$C0 code at $C0:378E, $C0:37BF, $C0:37F1, $C0:3838,
-;   $C0:386C and $C0:3885.
+; Callers (8 JSL sites): Field_CheckTileInFront ($C0:1E72, $C0:1E84) and unmatched ($C0:378E,
+;   $C0:37BF, $C0:37F1, $C0:3838, $C0:386C, $C0:3885).
 ; Entry: M and X any (the service sets its own widths), DP and DB any;
 ;        A = service number, Y = argument
 ; Exit:  P, X, DP and DB as on entry; A = the service's result; Y as
@@ -20924,7 +21092,8 @@ BankC1_Entry8003:
 ; known roles (their headers); the turn-list reading (13 lists, each
 ; finding the next due battler in the shuffled order) is inferred from
 ; the loops only: what each list and handler stands for is not traced.
-; Callers: none by call; reached through BankC1_BattleStartVec.
+; Callers (1 JMP site): BankC1_BattleStartVec ($C1:8000).
+; Callers note: none by call; reached through BankC1_BattleStartVec.
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the battle entry leaves them; the
 ;        code uses .b direct page, TDC as zero and .w WRAM operands)
 ; Exit:  never returns: JMP BattleSys_ExitVec with M=1, X=0, DP=0,
@@ -21603,7 +21772,8 @@ BattleSys_Main:
 ;     !Battle_UnkB2C0 = 0.
 ; Quirks: a NOP after the bit-5 test ($C1:864A); in .react the LDX of
 ; !Battle_UnkB1D2 at $C1:87EE is dead (X is reloaded at once).
-; Callers: BattleSys_Main ($C1:822B); also entry 12 of
+; Callers (1 JSR site): BattleSys_Main ($C1:822B).
+; Callers note: BattleSys_Main ($C1:822B); also entry 12 of
 ;   BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E (.b direct page, .w WRAM operands); A
 ;        is set with TDC before use
@@ -22099,7 +22269,8 @@ BattleSys_Unk8461:
 ; (16-bit) = the slot, BattleSys_UnkB575, then BattleSys_UnkB3F9 with
 ; X = the slot. The same loop as BattleSys_Main's wait-mode path; what
 ; the two callees do is not traced.
-; Callers: BattleSys_Unk8461 ($C1:860A). xref also lists a BRL decoded at
+; Callers (1 JSR site): BattleSys_Unk8461 ($C1:860A).
+; Callers note: BattleSys_Unk8461 ($C1:860A). xref also lists a BRL decoded at
 ;   $C1:B78C (unmatched, DOUBTFUL: inside another instruction or data).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
@@ -22131,7 +22302,7 @@ BattleSys_Unk883D:
 ; $C1:8862 — BattleSys_ClearUnkB192 (20 bytes, $8862–$8875)
 ; Zeroes the 4-byte !Battle_UnkB192 record of battler slot
 ; !Battle_UnkB18B.
-; Callers: BattleSys_Unk8461 ($C1:8816, $C1:882F).
+; Callers (2 JSR sites): BattleSys_Unk8461 ($C1:8816, $C1:882F).
 ; Entry: M=1, X=0, DP=0 (not used), DB=$7E; !Battle_UnkB18B = slot
 ;        (0-$3F: the index is slot * 4 in 8 bits)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = slot * 4 + 4; Y = 4
@@ -22155,7 +22326,7 @@ BattleSys_ClearUnkB192:
 ; Turn list 0 (BattleSys_ListHandlerTable entry 0): the usual handler
 ; (see the banner); at the end of its runs it clears BattlerStats.Status2
 ; bit 7 of the slot.
-; Callers: none by call; entry 0 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 0 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22221,7 +22392,7 @@ BattleSys_ListHandler0:
 ; Quirk: only the low byte of the divisor !Battle_MathB is written and
 ; !Battle_MathHi (the dividend's high word) not at all, so the divide
 ; uses what earlier math left there.
-; Callers: none by call; entry 1 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 1 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A = 0;
 ;        X, Y clobbered; DP $10 = slot * $80; on the hit path the math DP
@@ -22306,7 +22477,7 @@ BattleSys_ListHandler1:
 ; record A, caster slot 0, no flags and the main-target mask
 ; !Battle_ActMainMask = $8000 (bit 15: slot 0), then
 ; BattleSys_UnkAC57 (not traced; probably runs it).
-; Callers: BattleSys_Main ($C1:820F), BattleSys_ListHandler1 ($C1:8945),
+; Callers (3 JSR sites): BattleSys_Main ($C1:820F), BattleSys_ListHandler1 ($C1:8945) and
 ;   BattleSys_ListHandler9 ($C1:8BB1).
 ; Entry: M=1, X=0, DP=0 (not used here), DB=$7E; A = the action record
 ; Exit:  M=1, X=0 as assumed after BattleSys_UnkAC57 (not analysed);
@@ -22328,7 +22499,7 @@ BattleSys_Unk895B:
 ; Turn list 2: the usual handler, but after its last run it only stops
 ; the entry: no status bit is cleared.
 ; Quirk: it still computes X = slot * $80 there and does not use it.
-; Callers: none by call; entry 2 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 2 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22376,7 +22547,7 @@ BattleSys_ListHandler2:
 ; $C1:89B9 — BattleSys_ListHandler3 (76 bytes, $89B9–$8A04)
 ; Turn list 3: the usual handler; at the end of its runs it clears bit 7
 ; of the slot's BattlerStats.Unk4C+1 (+$4D).
-; Callers: none by call; entry 3 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 3 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22427,7 +22598,7 @@ BattleSys_ListHandler3:
 ; $C1:8A05 — BattleSys_ListHandler4 (76 bytes, $8A05–$8A50)
 ; Turn list 4: the usual handler; at the end of its runs it clears bit 6
 ; of the slot's BattlerStats.Unk4C+1 (+$4D).
-; Callers: none by call; entry 4 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 4 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22478,7 +22649,7 @@ BattleSys_ListHandler4:
 ; $C1:8A51 — BattleSys_ListHandler5 (76 bytes, $8A51–$8A9C)
 ; Turn list 5: the usual handler; at the end of its runs it clears bit 6
 ; of the slot's BattlerStats.Unk4C+2 (+$4E).
-; Callers: none by call; entry 5 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 5 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22529,7 +22700,7 @@ BattleSys_ListHandler5:
 ; $C1:8A9D — BattleSys_ListHandler6 (1 byte)
 ; Turn list 6: does nothing (RTS). The list's !Battle_ListDue bit is not
 ; cleared and its entries stay due.
-; Callers: none by call; entry 6 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 6 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
 ; Exit:  nothing changed
 BattleSys_ListHandler6:
@@ -22537,7 +22708,7 @@ BattleSys_ListHandler6:
 
 ; $C1:8A9E — BattleSys_ListHandler7 (1 byte)
 ; Turn list 7: does nothing (RTS), like list 6.
-; Callers: none by call; entry 7 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 7 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
 ; Exit:  nothing changed
 BattleSys_ListHandler7:
@@ -22551,7 +22722,7 @@ BattleSys_ListHandler7:
 ; list's !Battle_ListDue bit; then, with Status2 bit 4 set:
 ; !Battle_UnkAD89 = 1, !Battle_UnkB1FD = slot, !Battle_UnkB202 = 0,
 ; BattleSys_UnkEBF8 and BattleSys_UnkEC7F. No run count.
-; Callers: none by call; entry 8 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 8 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
 ;        clobbered; Y = the slot; DP $10 = slot * $80; with bit 4 set
@@ -22626,7 +22797,7 @@ BattleSys_ListHandler8:
 ; a heal over time). The entry is never stopped here.
 ; Quirk: the halving test loads Unk4C+1 and then overwrites it with
 ; Unk4C+6 (list 8 ORs the two), so only Unk4C+6 bit 7 halves the timer.
-; Callers: none by call; entry 9 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 9 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
 ;        clobbered; Y = the slot; DP $10 = slot * $80; on the hit path
@@ -22715,7 +22886,7 @@ BattleSys_ListHandler9:
 ; $C1:8BB9 — BattleSys_ListHandler10 (79 bytes, $8BB9–$8C07)
 ; Turn list 10: the usual handler; at the end of its runs it clears
 ; bit 2 of the slot's BattlerStats.Unk4C+2 (+$4E).
-; Callers: none by call; entry 10 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 10 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
 ;        the last run; X = the list's !Battle_SlotOrder
@@ -22766,7 +22937,7 @@ BattleSys_ListHandler10:
 
 ; $C1:8C08 — BattleSys_ListHandler11 (1 byte)
 ; Turn list 11: does nothing (RTS), like lists 6 and 7.
-; Callers: none by call; entry 11 of BattleSys_ListHandlerTable.
+; Callers note: none by call; entry 11 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
 ; Exit:  nothing changed
 BattleSys_ListHandler11:
@@ -22780,7 +22951,7 @@ BattleSys_ListHandler11:
 ; !Battler_UnkAEFF entry (possibly $FF when bit 7 is set). Before each,
 ; that entry's !Battle_UnkB24A and !Battle_UnkB263 are zeroed and
 ; !Battle_UnkB1CF = 0. !Battle_UnkB252 is the loop's enemy index.
-; Callers: BattleSys_Main ($C1:80E8), BattleSys_Unk8461 ($C1:8826).
+; Callers (2 JSR sites): BattleSys_Main ($C1:80E8) and BattleSys_Unk8461 ($C1:8826).
 ; Entry: M=1, X=0, DP=0 (not used), DB=$7E
 ; Exit:  M=1, X=0 (as assumed after BattleSys_UnkAFD2), DP=0, DB=$7E; A = 8;
 ;        X clobbered; !Battle_UnkB252 = 8, plus whatever
@@ -22832,7 +23003,12 @@ BattleSys_Unk8C09:
 ; routine sets only !Battle_MathA, so whatever !Battle_MathHi holds
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
-; Callers: 37 JSR sites, e.g. BattleSys_Main ($C1:807B, $C1:80B1) and
+; Callers (37 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1) and unmatched ($C1:8DE8, $C1:95E8,
+;   $C1:98D5, $C1:A48A, $C1:AB30, $C1:C486, $C1:C867, $C1:C8D0, $C1:D29E, $C1:D67C, $C1:DA7C,
+;   $C1:DB1A, $C1:DC94, $C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F,
+;   $C1:E4AE, $C1:E508, $C1:E56F, $C1:E774, $C1:E7BB, $C1:E97A, $C1:E9F0, $C1:EED8, $C1:EEFF,
+;   $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDCB, $C1:FDDA).
+; Callers note: 37 JSR sites, e.g. BattleSys_Main ($C1:807B, $C1:80B1) and
 ;   unmatched code from $C1:8DE8 on (xref).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
@@ -22940,7 +23116,20 @@ BattleSys_ListOffsetTable:
 ; !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB. MathB is
 ; shifted out on the way (it ends as garbage; its first shift takes in
 ; the caller's carry).
-; Callers: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
+; Callers (109 JSR sites): Battle_SetupBattle ($C1:FCA6, $C1:FD75) and unmatched ($C1:B329,
+;   $C1:B455, $C1:B4BC, $C1:BC7D, $C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF, $C1:BF05, $C1:BF3C,
+;   $C1:C60B, $C1:CB50, $C1:CB69, $C1:CB82, $C1:CB9B, $C1:CE8F, $C1:CEC1, $C1:CEF3, $C1:D53A,
+;   $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D,
+;   $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73,
+;   $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9,
+;   $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC,
+;   $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484,
+;   $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D,
+;   $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792, $C1:E8B5, $C1:E8D6,
+;   $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EC1D, $C1:EDA8, $C1:EDC5, $C1:EDEE,
+;   $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C,
+;   $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D, $C1:FDBF).
+; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
 ; Exit:  M=1, X=0; A = 0, X = 0, Y unchanged; !Battle_MathLo/Hi = the
@@ -22979,7 +23168,15 @@ Battle_Mul16:
 ; is lost in the carry), and MathHi holds the caller's carry in bit 15
 ; (it is shifted in first), not usable results. The remainder is kept
 ; in 16 bits, so a divisor of $8000 or more can give wrong results.
-; Callers: 59 JSR sites, e.g. $C1:8918, Battle_RandRange ($C1:AF69),
+; Callers (59 JSR sites): BattleSys_ListHandler1 ($C1:8918), Battle_RandRange ($C1:AF69),
+;   Battle_CalcUnk56 ($C1:FDB6) and unmatched ($C1:AFC1, $C1:BE1A, $C1:BE94, $C1:BF11, $C1:D290,
+;   $C1:DA6F, $C1:DB0D, $C1:DC89, $C1:DCD6, $C1:DD2F, $C1:DD5C, $C1:DEBF, $C1:DEE7, $C1:DF58,
+;   $C1:DF7F, $C1:DFA6, $C1:DFCB, $C1:DFED, $C1:DFF7, $C1:E157, $C1:E16D, $C1:E1E0, $C1:E259,
+;   $C1:E2B6, $C1:E30B, $C1:E33C, $C1:E352, $C1:E3B1, $C1:E40C, $C1:E49B, $C1:E4F5, $C1:E560,
+;   $C1:E5A5, $C1:E5C9, $C1:E5F7, $C1:E619, $C1:E62F, $C1:E6A2, $C1:E6CC, $C1:E6F2, $C1:E716,
+;   $C1:E73A, $C1:E79E, $C1:E7B0, $C1:EDD1, $C1:EE36, $C1:EFB3, $C1:F0EC, $C1:F104, $C1:F673,
+;   $C1:F6A8, $C1:F6DD, $C1:F712, $C1:F747, $C1:F77C, $C1:FA39).
+; Callers note: 59 JSR sites, e.g. $C1:8918, Battle_RandRange ($C1:AF69),
 ;   $C1:AFC1 and Battle_SetupBattle (xref; mostly unmatched code).
 ; Entry: M any, X any, DP=0, DB any; the caller's carry goes in as said
 ; Exit:  P restored (PLP: M, X and the flags as on entry); A = 0;
@@ -23063,7 +23260,7 @@ Battle_Div32:
 ; record of the block's own slot (the next slot's +$1D). The +$2D-based
 ; offsets of PcStatBlk are what the code uses; what the fields hold is
 ; not traced.
-; Callers: BattleSys_Main ($C1:8012).
+; Callers (1 JSR site): BattleSys_Main ($C1:8012).
 ; Entry: M any, X any (it sets M=1, X=0 itself), DP=0, DB=$7E
 ; Exit:  M=1, X=0; A, X, Y, DP $00-$13 scratch and !Battle_MathA..MathRem
 ;        clobbered, plus what the unanalysed callees change
@@ -23450,7 +23647,7 @@ Battle_SetupBattle:
 ; a PC whose .Unk2D is 5. What the values mean is not traced.
 ; Quirk: !Battle_MathHi is not set, so its stale value is the dividend's
 ; high word (Battle_Div32), and a .Unk3F of 0 gives $44 (no divide).
-; Callers (JSR): Battle_SetupBattle ($C1:FAD0, $C1:FAE8, $C1:FB00).
+; Callers (3 JSR sites): Battle_SetupBattle ($C1:FAD0, $C1:FAE8, $C1:FB00).
 ; Entry: M=1, X=0, DP=0, DB any; A = the value with B = 0 (the callers
 ;        TDC first, so the 16-bit TAX takes 0 as its high byte)
 ; Exit:  M=1, X=0; A = quotient low byte + $44; X = 0 after a divide, or
@@ -23488,9 +23685,8 @@ Battle_CalcUnk56:
 ; (which checks only the head) would dequeue c again. Whether three PCs
 ; are ever queued at once is not established.
 ;
-; Callers (JSR): BattleMenu_RefreshIfDirtyL ($C1:10ED),
-;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and
-;   BattleSys_UpkeepTwoFrames ($C1:10CE).
+; Callers (3 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10CE), BattleMenu_RefreshIfDirtyL ($C1:10ED)
+;   and BattleMenu_RefreshIfDirtyAndTick ($C1:1104).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (as at every caller; no DP
 ;        access here), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = dequeued slot index (or
@@ -23551,7 +23747,7 @@ BattleMenu_DequeueReadyBattler:
 ; STZ in .clear_targeting overwrites it at once, so it always ends on
 ; the main menu; the first store is dead.
 ;
-; Callers (JSR): BattleSys_VictoryPose ($C1:358B, $C1:3593, $C1:359B).
+; Callers (3 JSR sites): BattleSys_VictoryPose ($C1:358B, $C1:3593, $C1:359B).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot, STA.b $80,
 ;        TDC as zero), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written; Y unchanged
@@ -23656,6 +23852,7 @@ BattleMenu_RemoveBattlerFromReady:
 ; (both preceding paths branch past them via BRA); reproduced exactly
 ; regardless, since matching the ROM means matching orphaned bytes too.
 ;
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:1164).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, TDC as zero),
 ;        DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
@@ -23785,7 +23982,7 @@ BattleMenu_TargetSelectInput:
 ; Finally takes the PC out of the roster and shows the next roster
 ; entry, if any (same shape as BattleMenu_RemoveBattlerFromReady's tail).
 ;
-; Callers (JMP): BattleMenu_TargetSelectInput ($C1:15F1).
+; Callers (1 JMP site): BattleMenu_TargetSelectInput ($C1:15F1).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (STA.b $80-$84, TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; DP $80, $82 and $84 written
@@ -23940,7 +24137,7 @@ BattleMenu_CommitAction:
 ; !BattleMenu_ReadyCount; either way marks its roster entry empty and
 ; clears BattleCmd.State bit 7 ("waiting for a command", set by
 ; BattleMenu_EnqueueReadyBattler) in its command record.
-; Callers (JSR): BattleMenu_CommitAction ($C1:1661, $C1:1672).
+; Callers (2 JSR sites): BattleMenu_CommitAction ($C1:1661, $C1:1672).
 ; Entry: M=1, X=0, DP=0 (reads its argument with LDA.b !BattleMenu_PartnerArg,
 ;        $80), DB=$7E; !BattleMenu_PartnerArg = partner PC slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
@@ -23976,7 +24173,7 @@ BattleMenu_ConsumePartnerSlot:
 ; slot, and every mode handler fills Selected only with values it also
 ; put in Candidates 0-10. (Argued from the handlers, not proven for every
 ; caller of the $C10045 services that also write Candidates.)
-; Callers (JMP): BattleMenu_TargetSelectInput ($C1:1605).
+; Callers (1 JMP site): BattleMenu_TargetSelectInput ($C1:1605).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered
@@ -24003,7 +24200,7 @@ BattleMenu_TargetNext:
 ; !BattleTgt_Cursor back (wrap to 10) instead. Falls straight through
 ; into Battle_ClearPadEdges (no JMP needed; they're adjacent in ROM).
 ; Same unguarded BMI loop as TargetNext, safe for the same reason.
-; Callers (JMP): BattleMenu_TargetSelectInput ($C1:1614).
+; Callers (1 JMP site): BattleMenu_TargetSelectInput ($C1:1614).
 ; Entry: M=1, X=0, DP=0 (the fall-through writes DP $EE/$EF), DB=$7E
 ; Exit:  falls through to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered
@@ -24028,7 +24225,7 @@ BattleMenu_TargetPrev:
 ; Computes the highlighted line of the PC's list into
 ; !BattleMenu_TechListIdx (!Pc_TechScroll + !Pc_TechRow), then polls:
 ; confirm, cancel, Up or Left = previous, Down or Right = next.
-; Callers (JMP): BattleMenu_ProcessInput ($C1:1178).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:1178).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, STX.b), DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
 ;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
@@ -24089,7 +24286,7 @@ BattleMenu_TechListInput:
 ; bit 7, BuildTargetList has already left the tech list before the
 ; missing target is noticed (Submenu = 0, !BattleMenu_ReturnSubmenu
 ; saved, command window reloaded), and nothing here undoes that.
-; Callers (JMP): BattleMenu_TechListInput ($C1:1337).
+; Callers (1 JMP site): BattleMenu_TechListInput ($C1:1337).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered, plus BuildTargetList's (the mode handler's DP, see its header)
@@ -24119,7 +24316,7 @@ BattleMenu_TechConfirm:
 ; Closes the tech list: reload the command window, back to the main menu,
 ; force a window rebuild, and restore this PC's saved tech-list cursor
 ; (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechScroll).
-; Callers (JMP): BattleMenu_TechListInput ($C1:1343).
+; Callers (1 JMP site): BattleMenu_TechListInput ($C1:1343).
 ; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; no DP written besides the pad edges
@@ -24146,7 +24343,7 @@ BattleMenu_TechListCancel:
 ; moves the cursor row (!Pc_TechRow) back the same number of lines,
 ; scrolling the list (!Pc_TechScroll) up a line at a time while the row
 ; would be negative.
-; Callers (JMP): BattleMenu_TechListInput ($C1:1353).
+; Callers (1 JMP site): BattleMenu_TechListInput ($C1:1353).
 ; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
 ;        !BattleMenu_TechListIdx = current line
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -24203,7 +24400,7 @@ BattleMenu_TechListPrev:
 ; instead of backward, bounded by the list length (!Pc_TechCount)
 ; instead of the start of the list, and scrolls down instead of up when
 ; the new row would reach 3.
-; Callers (JMP): BattleMenu_TechListInput ($C1:1363).
+; Callers (1 JMP site): BattleMenu_TechListInput ($C1:1363).
 ; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
 ;        !BattleMenu_TechListIdx = current line
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -24260,7 +24457,7 @@ BattleMenu_TechListNext:
 ; skip during cursor movement — up/down just move the cursor one row
 ; and scroll via ItemListScrollUp/Down at the edges. The page buttons
 ; page the whole list up/down by 3 rows at once.
-; Callers (JMP): BattleMenu_ProcessInput ($C1:1181).
+; Callers (1 JMP site): BattleMenu_ProcessInput ($C1:1181).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges), DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
 ;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
@@ -24331,7 +24528,7 @@ BattleMenu_ItemListInput:
 ; the target list, and enters target selection if a valid target was
 ; found. As in TechConfirm, a TargetMode with bit 7 has already left the
 ; item list (inside BuildTargetList) by the time a missing target shows.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:1446).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:1446).
 ; Entry: M=1, X=0, DP=0 (STA.b Mul8A/ItemListIdx, LDX.b Mul8Product), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; DP $80 written, Battle_Mul8's $77/$78, $AD/$AE and
@@ -24374,7 +24571,7 @@ BattleMenu_ItemConfirm:
 ; ==================================================================
 ; Closes the item list: reload the command window, back to the main
 ; menu, force a window rebuild, and invalidate the scroll-arrow cache.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:1452).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:1452).
 ; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; no DP written besides the pad edges
@@ -24393,7 +24590,7 @@ BattleMenu_ItemListCancel:
 ; ==================================================================
 ; Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the
 ; list up via ItemListScrollUp when already at the top row.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:1462).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:1462).
 ; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24418,7 +24615,7 @@ BattleMenu_ItemCursorUp:
 ; Down/Right in the item list: increment !BattleMenu_ItemRow (max 2),
 ; scrolling the list down via ItemListScrollDown when already at the
 ; bottom row.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:1472).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:1472).
 ; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24448,7 +24645,7 @@ BattleMenu_ItemCursorDown:
 ; ItemListScrollDown's shared render+indicator tail
 ; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
 ; that logic.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:147E).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:147E).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24476,7 +24673,7 @@ BattleMenu_ItemListPageDown:
 ; Page-up button: page the item list up 3 rows at once, clamped at 0.
 ; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
 ; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
-; Callers (JMP): BattleMenu_ItemListInput ($C1:148A).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:148A).
 ; Entry: M=1, X=0, DP=0 (the clamp TDC means A=0 only because D=0, and
 ;        STA.b !BattleMenu_ListScroll is DP), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -24501,7 +24698,7 @@ BattleMenu_ItemListPageUp:
 ; Re-renders the item list rows, invalidates both draw caches and clears
 ; !BattleMenu_ItemRefresh. Called (JMP) by ItemListInput when
 ; !BattleMenu_ItemRefresh is set and no button was pressed.
-; Callers (JMP): BattleMenu_ItemListInput ($C1:1492).
+; Callers (1 JMP site): BattleMenu_ItemListInput ($C1:1492).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24532,7 +24729,9 @@ BattleMenu_ItemListRefresh:
 ; indicator writes) can never actually be reached, since reaching that
 ; second branch at all requires the first BEQ to have found the flag
 ; clear. Reproduced exactly regardless.
-; Callers (JSR): BattleMenu_ItemCursorUp ($C1:14F1).
+; Callers (1 JSR site): BattleMenu_ItemCursorUp ($C1:14F1).
+; Callers of BattleMenu_ItemListScrollUp_RenderTail (1 JSR site): BattleMenu_ItemListPageUp
+;   ($C1:1545).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
 ;        sub-entries take the same state)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24573,7 +24772,9 @@ BattleMenu_ItemListScrollUp_SkipRender:     ; header: see BattleMenu_ItemListScr
 ; at the clamp, skips both the increment AND the render entirely.
 ; BattleMenu_ItemListScrollDown_RenderTail is the external entry point
 ; called directly by BattleMenu_ItemListPageDown.
-; Callers (JSR): BattleMenu_ItemCursorDown ($C1:1509).
+; Callers (1 JSR site): BattleMenu_ItemCursorDown ($C1:1509).
+; Callers of BattleMenu_ItemListScrollDown_RenderTail (1 JSR site): BattleMenu_ItemListPageDown
+;   ($C1:1531).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
 ;        sub-entries take the same state)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -24632,6 +24833,8 @@ BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScr
 ;   offset) − !BattleOam_CursorCentreX on x, written into one of the
 ;   four cursor sprites (BattleOam[0-3]).
 ;
+; Callers (3 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10D7), BattleMenu_RefreshIfDirtyL ($C1:10F6)
+;   and BattleMenu_RefreshIfDirtyAndTick ($C1:110D).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero; STZ.b/STY.b), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; pad-edge bytes cleared (shared tail, same as
 ;        Battle_ClearPadEdges elsewhere); A, X, Y clobbered; DP $80-$83 and

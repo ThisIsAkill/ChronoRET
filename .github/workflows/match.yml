@@ -15,10 +15,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      # Without the ROM the header checks that need it (callers) are skipped
+      # here and run in the match job below.
       - name: Lint (functions outside tools/readability_baseline.txt must be clean)
         run: python3 tools/lint_readability.py
-      - name: Validate symbols/ (statuses and the review log)
+      - name: Validate the review log
         run: python3 tools/validate_functions.py
+      - name: Generated files stay untracked, docs carry no generated numbers
+        run: python3 tools/progress.py --check
 
   match:
     name: Reassemble and diff
@@ -80,7 +84,24 @@ jobs:
         run: |
           python3 tools/verify.py
 
-      - name: Generated numbers are current
+      # symbols/functions.csv and progress.json are not tracked: regenerate
+      # them from the source, then check everything against them.
+      - name: Regenerate symbols/ from the source
+        if: env.SKIP_CHECK != '1'
+        run: |
+          python3 tools/progress.py --update
+
+      - name: Lint with the ROM (header and caller checks)
+        if: env.SKIP_CHECK != '1'
+        run: |
+          python3 tools/lint_readability.py
+
+      - name: Validate symbols/ (statuses and the review log)
+        if: env.SKIP_CHECK != '1'
+        run: |
+          python3 tools/validate_functions.py
+
+      - name: Generated files stay untracked
         if: env.SKIP_CHECK != '1'
         run: |
           python3 tools/progress.py --check

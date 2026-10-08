@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:106E,BattleSys_UpkeepTwoFrames,2026-10-08,independent session r16-p1,approved,02e16c76ae75,"JSR $3714 at $10B5/$10DC is Battle_TickEnemyMovers (per-frame enemy mover tick, 99E0 hold, enemies 0-7); table entry 3, L+R latch via $CF:E706-E732, flow, DP/DB still hold"
+$C1:356D,BattleSys_VictoryPose,2026-10-08,independent session r16-p1,approved,2a65f2771e72,"STZ $98A7,X x8 is !Enemy_Stepping (movers set it, $CF:F978 stepper tests/clears per enemy); entry 8, $C1:8186/$AF02 caller, FxReset, 2989 bit 0, anim $0A ok. nit: early Exit omits DP $94/$A1"

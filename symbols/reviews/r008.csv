@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:005D,GameLoop_Main,2026-10-08,independent session r8-p1,approved,f56ffa11c897,"Bytes, callers ($0301 BRL; ReentryVectors[0] via $C2/$FD JMLs, $0CC4/$3B95), DB from InitHW, absolute Loc_Id read checked. nit: !Loc_FirstBankC2 says >=$01F0 to C2; really $01F0-$81EF"
+$C0:0072,GameLoop_NotBankC2,2026-10-08,independent session r8-p1,approved,b82aa0cbd435,"Range table checked via CPX/BMI bit 15 at $01EF/$01F0/$81EF/$81F0/$81FE/$81FF/$FFFF; X=$7C00, BRL $2E1E. nit: Loc_Id define and LoadSavePath stub still say $01FF+ -> LoadSavePath"
+$C1:27C5,BattleTgt_CompactCandidates,2026-10-08,independent session r8-p1,approved,87aa664f30ca,"Checked bytes, callers $207B/$25A0, empty-front cases (Caster is the active PC, triangle appends from +1, AddAnchor), read of entry 11 of 12, TDC needs DP=0, Exit A/X/Y."
