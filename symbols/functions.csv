@@ -36,7 +36,7 @@ $C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,verified,8af6b4d0cdff,Audi
 $C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,verified,8e1af34745a1,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
 $C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,verified,29587b9b9aa5,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
 $C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,verified,48f2c50391f1,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
-$C0:21E1,$C0:21ED,13,Field_EventHookDispatch,$C0,Engine,readable,c3439b1b1143,Runs the Field_EventHook handler for this frame: entry Field_EventHook - 1 of Field_EventHookTable; nothing when it is 0.
+$C0:21E1,$C0:21ED,13,Field_EventHookDispatch,$C0,Engine,readable,83c7950af601,Runs the Field_EventHook handler for this frame: entry Field_EventHook - 1 of Field_EventHookTable; nothing when it is 0.
 $C0:21EE,$C0:220D,32,Field_EventHookTable,$C0,Engine,readable,9bc0fe249616,"Field_EventHookTable: 16 handler addresses, indexed by (Field_EventHook - 1) x 2."
 $C0:220E,$C0:2268,91,Field_HookWinGrow0,$C0,Engine,verified,ee9fdb77e1af,Hook 1: one frame of a growing window shape.
 $C0:2269,$C0:22D7,111,Field_HookWinShrink0,$C0,Engine,verified,05249e8befb7,Hook 2: the reverse of hook 1.
