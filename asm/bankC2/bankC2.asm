@@ -847,7 +847,8 @@ Menu_DmaClearWram:
 ; Entry: M any, X any (P saved; sets M=0, X=0, then M=1), DP any (not
 ;        used), DB any (saved, then $00); A (16-bit) = source address in
 ;        bank $FF, X = WRAM address, Y = byte count
-; Exit:  P and DB restored; low byte of A = DMA_CH0, X and Y unchanged
+; Exit:  P and DB restored; low byte of A = DMA_CH0; X = $8000
+;        (BBAD_WMDATA<<8, the DMAP0/BBAD0 value); Y unchanged
 ; No calls.
 Menu_DmaCopyFFToWram:
     PHB
@@ -873,8 +874,11 @@ Menu_DmaCopyFFToWram:
     RTS
 
 ; $C2:956E — Menu_InitNewGameData (77 bytes, $956E–$95BA)
-; Sets up the data of a new game (inferred: run once, the first time
-; bank $C2 is entered in mode 0, guarded by Menu_DataInitDone): runs
+; Sets up the data of a new game (inferred from what it fills). The call
+; at $C2:8048 runs only while Menu_DataInitDone is 0 in mode 0; the
+; other two are not guarded by that flag: $C2:8D7E runs it when none of
+; three JSL $FF:F9C4 slot checks returns 0, then clears the flag, and
+; $C2:E65D runs it and then sets the flag to 1. It: runs
 ; Menu_ClearConfigAndFlags, zeroes Menu_Unk2400 ($2400-$25FF), copies the
 ; $280 B of MenuRom_CharRecordInit ($CC:0000) to Menu_CharRecords
 ; ($2600), zeroes $2C53-$2C55, marks all 9 Menu_PartyOrder entries empty

@@ -25,8 +25,9 @@ if !ram_menu_inc == 0
 !Menu_FlagBlock7F = $7F0000              ; 512 B at $7F:0000-$01FF, zeroed for a new game. Its first byte
                                          ; is Eng_Unk7F0000 (gates Field_FadeToBankC2Mode5); probably the
                                          ; story/event flags (unverified)
-!Menu_DataInitDone = $7F0061             ; 8-bit; BankC2_MenuEntry runs Menu_InitNewGameData only while it is
-                                         ; 0 (and the mode is 0), then sets it to 1
+!Menu_DataInitDone = $7F0061             ; 8-bit; the call at $C2:8048 runs Menu_InitNewGameData only while it
+                                         ; is 0 (and the mode is 0), then sets it to 1; $C2:8D7E clears it
+                                         ; and $C2:E65D sets it to 1 after their own unguarded calls
 !Menu_PlayTime = $0400                   ; 6 B: play-time counter, one byte per digit group, lowest first
                                          ; (Menu_TickPlayTime: frames, then up to the limits in
                                          ; Menu_PlayTimeLimits); the field engine calls the first byte

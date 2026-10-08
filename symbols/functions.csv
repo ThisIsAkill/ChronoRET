@@ -340,27 +340,27 @@ $C1:3BC2,$C1:3E32,625,Battle_MoverOrbit,$C1,Battle engine,verified,3ce6a676b774,
 $C1:3E33,$C1:3F59,295,Battle_MoverLoop,$C1,Battle engine,verified,d333f2f75483,
 $C1:3F5A,$C1:4020,199,Battle_MoverFixedDir,$C1,Battle engine,verified,451b0d5729c0,
 $C1:4021,$C1:4057,55,Battle_MoverToCentre,$C1,Battle engine,verified,2810c3762c30,"Mover 8 (move $19): heads from the enemy's position for the middle of the screen (!Battle_ScreenCentreX/Y), faces that way and starts the step, with no probe and no collision test."
-$C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,readable,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
-$C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,readable,3820532e261c,
-$C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,readable,5c579e7a1967,
-$C2:0009,$C2:000B,3,BankC2_Entry0009,$C2,Engine,readable,63f34dceaf41,
-$C2:000C,$C2:000E,3,BankC2_Entry000C,$C2,Engine,readable,3cd62bfe166d,
-$C2:000F,$C2:0042,52,BankC2_SceneBoot,$C2,Engine,readable,682c28b9d14c,Starts the bank's scene mode (inferred name: GameLoop_Main sends Loc_Id $01F0-$81EF here; what those locations show is not traced).
-$C2:0043,$C2:010F,205,BankC2_InitHwRegs,$C2,Engine,readable,d96e085a8e79,"Writes the PPU registers from OBSEL to SETINI (all but INIDISP and the data ports OAMDATA, VMDATAL/H and CGDATA) and the CPU registers WRIO-VTIMEH with fixed values, through DP=$2100 and then DP=$4200"
-$C2:0110,$C2:012E,31,C2Scene_InstallInterrupts,$C2,Engine,readable,f13b4cbdf31e,"Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM trampolines that the native NMI and IRQ stubs in bank $00 jump through, as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the fiel"
-$C2:012F,$C2:015D,47,C2Scene_ClearDp,$C2,Engine,readable,0d6b367fd6c2,"Zeroes the direct page $00-$EF (an STZ of the first word, then an overlapping MVN), then sets the PPU shadows that C2Scene_NmiHandler copies out to their starting values: forced blank, mode 1 with BG3"
-$C2:015E,$C2:0344,487,C2Scene_NmiHandler,$C2,Engine,readable,e5ca264eebdd,"The scene mode's NMI (reached through !NmiTrampoline, installed by C2Scene_InstallInterrupts)."
-$C2:0345,$C2:0345,1,C2Scene_IrqHandler,$C2,Engine,readable,83e137cdf0d9,(installed by C2Scene_InstallInterrupts; nothing here enables IRQs).
-$C2:0346,$C2:034C,7,C2Scene_WaitFrame,$C2,Engine,readable,3a0410c96062,Waits until the next NMI: spins until C2Scene_FrameCounter changes.
-$C2:0405,$C2:0453,79,C2Scene_VramQFlush,$C2,Engine,readable,c82ffcb74e7f,"Runs the queued VRAM uploads: for each 8-byte C2Scene_VramQ entry up to C2Scene_VramQEnd, one DMA on channel 0 (word writes to VMDATAL/H) from .Bank:.Src, .Size bytes, to VRAM word .Dest with VMAIN = "
+$C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
+$C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
+$C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,
+$C2:0009,$C2:000B,3,BankC2_Entry0009,$C2,Engine,verified,63f34dceaf41,
+$C2:000C,$C2:000E,3,BankC2_Entry000C,$C2,Engine,verified,3cd62bfe166d,
+$C2:000F,$C2:0042,52,BankC2_SceneBoot,$C2,Engine,verified,682c28b9d14c,Starts the bank's scene mode (inferred name: GameLoop_Main sends Loc_Id $01F0-$81EF here; what those locations show is not traced).
+$C2:0043,$C2:010F,205,BankC2_InitHwRegs,$C2,Engine,verified,d96e085a8e79,"Writes the PPU registers from OBSEL to SETINI (all but INIDISP and the data ports OAMDATA, VMDATAL/H and CGDATA) and the CPU registers WRIO-VTIMEH with fixed values, through DP=$2100 and then DP=$4200"
+$C2:0110,$C2:012E,31,C2Scene_InstallInterrupts,$C2,Engine,verified,f13b4cbdf31e,"Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM trampolines that the native NMI and IRQ stubs in bank $00 jump through, as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the fiel"
+$C2:012F,$C2:015D,47,C2Scene_ClearDp,$C2,Engine,verified,0d6b367fd6c2,"Zeroes the direct page $00-$EF (an STZ of the first word, then an overlapping MVN), then sets the PPU shadows that C2Scene_NmiHandler copies out to their starting values: forced blank, mode 1 with BG3"
+$C2:015E,$C2:0344,487,C2Scene_NmiHandler,$C2,Engine,verified,e5ca264eebdd,"The scene mode's NMI (reached through !NmiTrampoline, installed by C2Scene_InstallInterrupts)."
+$C2:0345,$C2:0345,1,C2Scene_IrqHandler,$C2,Engine,verified,83e137cdf0d9,(installed by C2Scene_InstallInterrupts; nothing here enables IRQs).
+$C2:0346,$C2:034C,7,C2Scene_WaitFrame,$C2,Engine,verified,3a0410c96062,Waits until the next NMI: spins until C2Scene_FrameCounter changes.
+$C2:0405,$C2:0453,79,C2Scene_VramQFlush,$C2,Engine,verified,c82ffcb74e7f,"Runs the queued VRAM uploads: for each 8-byte C2Scene_VramQ entry up to C2Scene_VramQEnd, one DMA on channel 0 (word writes to VMDATAL/H) from .Bank:.Src, .Size bytes, to VRAM word .Dest with VMAIN = "
 $C2:225A,$C2:225D,4,Trig_Cos1024,$C2,Engine,verified,7080f9fc7e20,"Signed sine or cosine of a 16-bit angle with 1024 steps per turn, read from !Rom_SineTable: A = sin(angle) × 255 (−255..+255; the table holds |sin| as one byte per step, negated for the second half tu"
 $C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
-$C2:940D,$C2:950F,259,Menu_InitPpuAndRam,$C2,Engine,readable,78d1a70fa43b,"Puts the PPU and CPU registers into the menu's starting state, then clears all of VRAM and most of bank $7E with DMA."
-$C2:9510,$C2:9511,2,Menu_DmaZeroWord,$C2,Engine,readable,0b8bae3fc865,Menu_InitPpuAndRam's VRAM clear and of Menu_DmaClearWram.
-$C2:9512,$C2:9541,48,Menu_DmaClearWram,$C2,Engine,readable,060735f6467b,"Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed source Menu_DmaZeroWord, one register: WMDATA)."
-$C2:9542,$C2:956D,44,Menu_DmaCopyFFToWram,$C2,Engine,readable,6e125695af70,"Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank $7E at address X with DMA channel 0 (stepping source, one register: WMDATA)."
-$C2:956E,$C2:95BA,77,Menu_InitNewGameData,$C2,Engine,readable,40aa925efe62,"Sets up the data of a new game (inferred: run once, the first time bank $C2 is entered in mode 0, guarded by Menu_DataInitDone): runs Menu_ClearConfigAndFlags, zeroes Menu_Unk2400 ($2400-$25FF), copie"
-$C2:95BB,$C2:960A,80,Menu_ClearConfigAndFlags,$C2,Engine,readable,cc7ac2655a45,"Zeroes Menu_FlagBlock7F ($7F:0000-$01FF), the page $7E:0400-$04FF (Menu_PlayTime and what follows) and Menu_Config ($2990-$29AF), then copies MenuRom_DefaultConfig (12 B) to Menu_Config and the 9 B fr"
+$C2:940D,$C2:950F,259,Menu_InitPpuAndRam,$C2,Engine,verified,78d1a70fa43b,"Puts the PPU and CPU registers into the menu's starting state, then clears all of VRAM and most of bank $7E with DMA."
+$C2:9510,$C2:9511,2,Menu_DmaZeroWord,$C2,Engine,verified,0b8bae3fc865,Menu_InitPpuAndRam's VRAM clear and of Menu_DmaClearWram.
+$C2:9512,$C2:9541,48,Menu_DmaClearWram,$C2,Engine,verified,060735f6467b,"Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed source Menu_DmaZeroWord, one register: WMDATA)."
+$C2:9542,$C2:956D,44,Menu_DmaCopyFFToWram,$C2,Engine,readable,103e4d2d74ad,"Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank $7E at address X with DMA channel 0 (stepping source, one register: WMDATA)."
+$C2:956E,$C2:95BA,77,Menu_InitNewGameData,$C2,Engine,readable,31545d7027df,Sets up the data of a new game (inferred from what it fills).
+$C2:95BB,$C2:960A,80,Menu_ClearConfigAndFlags,$C2,Engine,verified,cc7ac2655a45,"Zeroes Menu_FlagBlock7F ($7F:0000-$01FF), the page $7E:0400-$04FF (Menu_PlayTime and what follows) and Menu_Config ($2990-$29AF), then copies MenuRom_DefaultConfig (12 B) to Menu_Config and the 9 B fr"
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,verified,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $CF:F9FB,$CF:FA42,72,Battle_SinLookupCF,$CF,Battle engine,verified,754e4d354d3e,Bank $CF's own scaled sine: returns (sin(A) × !BattleCF_SinScale) >> 8 in A.
 $CF:FDAD,$CF:FE1F,115,BattleMsg_FormatNumber4Digits,$CF,Battle text & numbers,verified,8661fa9c82a1,"A four-digit, long-call version of BattleMsg_FormatNumberDigits ($C1:011F): the same subtract-and-count loops with one more for the thousands, and the digits looked up in !BattleRom_DigitTilesB (tiles"
