@@ -112,8 +112,8 @@ BankC2_SceneBoot:
 ; on are the same bytes as MainInit's. INIDISP is not written
 ; (BankC2_SceneBoot has already set forced blank).
 ; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0031; it has run SEI,
-;   NMI/DMA off, forced blank, DB=$00 and DP=$0000 first) and $C2:2557
-;   (unmatched).
+;   NMI/DMA off, forced blank, DB=$00 and DP=$0000 first) and
+;   C2Scene_Mode5 ($C2:2557).
 ; Entry: M=1 (8-bit A: the register values are 8-bit immediates), X=0
 ;        (16-bit X: the LDX.w #$0000 / STX.b pairs clear two registers
 ;        at once), DP any (saved and restored), DB any (all stores are
@@ -238,8 +238,8 @@ BankC2_InitHwRegs:
 ; Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM
 ; trampolines that the native NMI and IRQ stubs in bank $00 jump through,
 ; as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the field engine.
-; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and $C2:255A
-;   (unmatched).
+; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and C2Scene_Mode5
+;   ($C2:255A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X), DP any (not used), DB a bank
 ;        that maps low WRAM (absolute stores to $0500-$0507;
 ;        BankC2_SceneBoot has DB=$00)
@@ -618,8 +618,9 @@ C2Scene_HideAllSprites:
 ; Empties and unlocks the VRAM upload queue: clears C2Scene_VramQLock and
 ; C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf
 ; ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF).
-; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A); unmatched: $C2:2560,
-;   $C2:25F0, $C2:265B, $C2:6331 and $C2:6A37.
+; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5
+;   ($C2:2560), C2Scene_Mode6 ($C2:25F0), C2Scene_Mode8 ($C2:265B);
+;   unmatched: $C2:6331 and $C2:6A37.
 ; Entry: M=1 (8-bit bank store), X=0 (16-bit pointer store and loop
 ;        count), DP=$0000, DB any
 ; Exit:  M=1, X=0; A = bank(C2Scene_VramQBuf), X = $FFFF; Y, DP and DB
@@ -779,9 +780,12 @@ C2Scene_TaskClearAll:
 ; (.Params on) are copied from the record C2Scene_TaskCur points at:
 ; the running task, when a task spawns another.
 ; If no record is free nothing is written.
-; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0); unmatched:
-;   $C2:10C4, $C2:10F7, $C2:1590, $C2:159E, $C2:15AC, $C2:15BA, $C2:183F,
-;   $C2:1DE2, $C2:63A6, $C2:7417, $C2:742D and $C2:7441.
+; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0),
+;   C2Script_SpawnUnk1CF5 ($C2:10C4), C2Script_SpawnUnk1DD4 ($C2:10F7),
+;   C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105 ($C2:159E),
+;   C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
+;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2);
+;   unmatched: $C2:63A6, $C2:7417, $C2:742D and $C2:7441.
 ; Entry: M any, X=0 with X = the handler address, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF (the MVN copies in bank $00 and leaves DB
 ;        as it was)
@@ -834,8 +838,8 @@ C2Scene_TaskSpawn_Search:       ; header: see C2Scene_TaskSpawn
 ; $C2:04CD — C2Scene_TaskSpawnLow (12 bytes, $04CD–$04D8)
 ; C2Scene_TaskSpawn over records 0-3 only: the same search and setup
 ; (it branches into C2Scene_TaskSpawn_Search).
-; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502); unmatched:
-;   $C2:1A49.
+; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502) and
+;   C2Script_SpawnTaskLow ($C2:1A49).
 ; Entry: as C2Scene_TaskSpawn
 ; Exit:  as C2Scene_TaskSpawn; when no record is free, X = record 4's
 ;        address (C2Scene_TaskRecords + 4 * C2Scene_TaskSize)
@@ -855,10 +859,12 @@ C2Scene_TaskSpawnLow:
 ; Quirk, kept: there is no check that a record was free. Then X comes
 ; back as C2Scene_TaskRecordsEnd and the three fields are written into
 ; the last record (63), whatever runs there.
-; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90);
-;   unmatched: $C2:1203, $C2:242E, $C2:2459, $C2:2527, $C2:256B, $C2:2596,
-;   $C2:25FB, $C2:2626, $C2:2676, $C2:3154, $C2:33B2, $C2:33DF, $C2:4479, $C2:452C,
-;   $C2:63AE, $C2:66DF, $C2:66FF, $C2:6AAB, $C2:741F and $C2:7427.
+; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90),
+;   C2Script_SpawnScript ($C2:1203), C2Scene_Mode3 ($C2:242E, $C2:2459),
+;   C2Scene_Mode5 ($C2:2527, $C2:256B), C2Scene_Mode6 ($C2:2596,
+;   $C2:25FB), C2Scene_Mode8 ($C2:2626, $C2:2676); unmatched: $C2:3154,
+;   $C2:33B2, $C2:33DF, $C2:4479, $C2:452C, $C2:63AE, $C2:66DF, $C2:66FF,
+;   $C2:6AAB, $C2:741F and $C2:7427.
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -889,7 +895,7 @@ C2Scene_TaskSpawnScript:
 ; C2Scene_TaskSpawnScript in records 0-3 (C2Scene_TaskSpawnLow).
 ; Quirk, kept: as there, no check that a record was free; then the
 ; fields are written into record 3.
-; Callers (1 JSR site, unmatched): $C2:1A3A.
+; Callers (1 JSR site): C2Script_SpawnScriptLow ($C2:1A3A).
 ; Entry/Exit: as C2Scene_TaskSpawnScript
 ; Calls: C2Scene_TaskSpawnLow.
 C2Scene_TaskSpawnScriptLow:
@@ -965,8 +971,8 @@ C2Scene_TaskCallHandler:
 
 ; $C2:0556 — C2Scene_LayerMetatiles (3 words, $0556–$055B)
 ; Per BG layer 1-3 (index (layer - 1) * 2): where its metatile
-; definitions are in bank $7E. Read by C2Scene_DrawBgLayer and by
-; unmatched code at $C2:0576 and $C2:067A. Layer 1's set is the one
+; definitions are in bank $7E. Read by C2Scene_DrawBgLayer,
+; C2Scene_Unk0568 ($C2:0576) and C2Scene_Unk066C ($C2:067A). Layer 1's set is the one
 ; C2Scene_LoadMetatiles unpacks at C2Scene_Metatiles; layer 2's follows it
 ; $800 bytes on (256 metatiles of 8 bytes), so the same pack probably
 ; holds both. Layer 3's entry, like its other two, is not explained.
@@ -978,8 +984,9 @@ C2Scene_LayerMetatiles:
 ; $C2:055C — C2Scene_LayerMaps (3 words, $055C–$0561)
 ; Per layer: where its map (96 x 64 metatile numbers, C2Scene_MapBytes)
 ; is in bank $7E. Layer 1's is C2Scene_BgMaps (C2Scene_LoadBgMaps); layer
-; 2's follows it at +$1800. Read by C2Scene_DrawBgLayer and unmatched code
-; at $C2:057C, $C2:0680 and $C2:1176.
+; 2's follows it at +$1800. Read by C2Scene_DrawBgLayer, C2Scene_Unk0568
+; ($C2:057C), C2Scene_Unk066C ($C2:0680) and C2Script_SetMapCell
+; ($C2:1176).
 C2Scene_LayerMaps:
     dw $4000                    ; 1: C2Scene_BgMaps
     dw $5800                    ; 2
@@ -989,8 +996,8 @@ C2Scene_LayerMaps:
 ; Per layer: the VRAM word address of its tilemap. 1 and 2 are the BG1SC
 ; and BG2SC bases BankC2_InitHwRegs sets ($6000, $6800); 3's $7000 is
 ; where the BG3 tiles go, not the BG3 map ($7800), so layer 3 is probably
-; not drawn this way. Read by C2Scene_DrawBgLayer and unmatched code at
-; $C2:0582 and $C2:0686.
+; not drawn this way. Read by C2Scene_DrawBgLayer, C2Scene_Unk0568
+; ($C2:0582) and C2Scene_Unk066C ($C2:0686).
 C2Scene_LayerVramMaps:
     dw $6000                    ; 1: BG1 map
     dw $6800                    ; 2: BG2 map
@@ -1846,8 +1853,8 @@ C2Scene_QueueEdgeRow:
 ; metatile (C2Scene_LayerMetatiles) is four tile words. A redraw builds
 ; the tilemap column by column in the buffer at C2Scene_VramQBufPtr and
 ; DMAs each column to VRAM straight away, so it needs forced blank or
-; vblank (its callers are the scene setup, under forced blank, and the
-; unmatched script code at $C2:1950).
+; vblank (its callers are the scene setup, under forced blank, and
+; script op C2Script_DrawLayer at $C2:1950).
 
 ; $C2:09C5 — C2Scene_DrawBgLayer (167 bytes, $09C5–$0A6B)
 ; Redraws the visible part of BG layer C2Scene_DrawLayer (1 or 2; the
@@ -1865,10 +1872,11 @@ C2Scene_QueueEdgeRow:
 ; loop (.hang). Layer 3 would read its X from C2Scene_BgTileY's first word
 ; and its Y from dp $EB, past C2Scene_BgTileY, and its table entries do
 ; not fit the BG3 layout (see C2Scene_LayerVramMaps); no known caller
-; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2; the
-; unmatched caller passes a script byte).
+; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2;
+; C2Script_DrawLayer passes a script byte).
 ; Callers (5 sites): C2Scene_LoadScene ($C2:2C81, $C2:2C88),
-;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE); unmatched: $C2:1950.
+;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE) and C2Script_DrawLayer
+;   ($C2:1950).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (direct-page work area;
 ;        TDC for 0), DB any (set to $7E for the buffers and restored);
 ;        C2Tmp_00 = the layer; forced blank or vblank (VRAM DMA)
@@ -2180,7 +2188,7 @@ org $C20B53
 ;   smaller than its own, so the larger .Y is drawn first (on top).
 ; Quirk, kept: there is no check that the free list is empty; a 65th
 ; node in one frame would unlink the free head itself.
-; Callers (1 JSR site, unmatched): $C2:0ED6.
+; Callers (1 JSR site): C2Anim_OpShowFrame ($C2:0ED6).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB any (set to $7E and
 ;        restored); C2Scene_SprFramePtr = the frame
 ; Exit:  M=0 (16-bit A: the REP #$20 before the insert is never undone),
@@ -2638,9 +2646,10 @@ org $C20E1D
 ; Inferred to be the sprite's animation from C2Anim_OpShowFrame, which
 ; adds a frame to the sprite list for a number of frames, and from the
 ; script ops that start one (C2Scene_SetAnim) before moving the task.
-; Callers (57 JSR sites, all unmatched except those listed): e.g.
-;   C2Script_MoveFrames ($C2:1643), $C2:18AC, $C2:19B6, $C2:1A1F,
-;   $C2:3444, $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
+; Callers (57 JSR sites, all unmatched except those named): e.g.
+;   C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
+;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), $C2:3444,
+;   $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
 ;   doubtful byte patterns.
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
@@ -5667,8 +5676,8 @@ org $C21C84
 ; $C2:1C84 — C2Scene_NegateXVel (26 bytes, $1C84–$1C9D)
 ; Negates the task's X velocity as one 32-bit value (.XVelFrac/.XVel:
 ; invert both words and add 1 with the carry), turning it around.
-; Callers (4 JSR sites): $C2:1979 and $C2:198B (both in C2Script_MoveToX,
-;   unmatched), $C2:52D0 and $C2:5429 (unmatched).
+; Callers (4 JSR sites): C2Script_MoveToX ($C2:1979, $C2:198B);
+;   unmatched: $C2:52D0 and $C2:5429.
 ; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=0, X=0; A = the new .XVel; X, Y unchanged
@@ -5687,8 +5696,8 @@ C2Scene_NegateXVel:
 
 ; $C2:1C9E — C2Scene_NegateYVel (26 bytes, $1C9E–$1CB7)
 ; C2Scene_NegateXVel for .YVelFrac/.YVel.
-; Callers (4 JSR sites): $C2:19E2 and $C2:19F4 (both in C2Script_MoveToY,
-;   unmatched), $C2:5319 and $C2:5436 (unmatched).
+; Callers (4 JSR sites): C2Script_MoveToY ($C2:19E2, $C2:19F4);
+;   unmatched: $C2:5319 and $C2:5436.
 ; Entry/Exit: as C2Scene_NegateXVel (A = the new .YVel)
 ; No calls.
 C2Scene_NegateYVel:
@@ -5710,9 +5719,9 @@ C2Scene_NegateYVel:
 ; position moved by less than a map width); .SprY is taken AND
 ; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
 ; Callers (22 call sites, JSR and JMP, all unmatched except those
-;   listed): e.g.
-;   C2Script_MoveFrames ($C2:1640), $C2:19B3, $C2:1A1C, $C2:36F4, JMP at
-;   $C2:48E5, and $C2:55DF; $C2:5257 is a doubtful byte pattern.
+;   named): e.g. C2Script_MoveFrames ($C2:1640), C2Script_MoveToX
+;   ($C2:19B3), C2Script_MoveToY ($C2:1A1C), $C2:36F4, JMP at $C2:48E5,
+;   and $C2:55DF; $C2:5257 is a doubtful byte pattern.
 ; Entry: M=0, X=0, DP=$0000, DB with low WRAM at $0000-$1FFF;
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -5740,9 +5749,8 @@ C2Scene_WrapTaskPos:
 ; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
 ; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
 ; Callers (34 call sites, JSR and JMP, all unmatched except those
-;   listed): e.g.
-;   C2Script_SetAnim ($C2:1614), $C2:1981, $C2:1993, $C2:19EA,
-;   $C2:19FC, JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
+;   named): e.g. C2Script_SetAnim ($C2:1614), C2Script_MoveToX
+;   ($C2:1981, $C2:1993), C2Script_MoveToY ($C2:19EA, $C2:19FC), JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
 ;   also lists doubtful byte patterns at $C2:470F, $C2:48BB, $C2:48C2,
 ;   $C2:49B5, $C2:501E and $C2:559F.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
@@ -7000,8 +7008,9 @@ C2Scene_ClearUnk1B30:
 ; back to C2Scene_MainLoop by JMP or BRA; the per-frame work itself is in
 ; the NMI (C2Scene_NmiHandler).
 ; Callers: JMP from BankC2_SceneBoot ($C2:0040). C2Scene_MainLoop: from
-;   C2Scene_ModeIdle and the unmatched mode handlers (JMP at $C2:244F,
-;   $C2:258A, $C2:261A and $C2:26A5).
+;   C2Scene_ModeIdle and the mode handlers C2Scene_Mode3 (JMP at
+;   $C2:244F), C2Scene_Mode5 ($C2:258A), C2Scene_Mode6 ($C2:261A) and
+;   C2Scene_Mode8 ($C2:26A5).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (as BankC2_SceneBoot leaves them;
 ;        the dispatch reads C2Scene_Mode absolute and uses TDC for a zero
 ;        high byte)
@@ -7037,8 +7046,9 @@ C2Scene_MainLoop:               ; header: see C2Scene_Main
 ; $C2:23DB — C2Scene_ModeTable (10 words, $23DB–$23EE)
 ; C2Scene_MainLoop's handler for each C2Scene_Mode value 0-9. Modes 0, 1
 ; and 7 only send a pending sound command (C2Scene_ModeIdle). The others
-; are unmatched; what they show is not traced (4, for one, turns the NMI
-; off and loops on C2Scene_RestoreFlagTail for good).
+; have their own handlers, C2Scene_Mode2-C2Scene_Mode6 and
+; C2Scene_Mode8, mode 9 sharing C2Scene_Mode5's (the scene mode handlers
+; below).
 C2Scene_ModeTable:
     dw C2Scene_ModeIdle         ; 0
     dw C2Scene_ModeIdle         ; 1
@@ -7537,8 +7547,8 @@ C2Scene_SaveFlagTail:
 ; $C2:26F0 — C2Scene_RestoreFlagTail (19 bytes, $26F0–$2702)
 ; Copies C2Scene_FlagTailCopy (16 bytes) back to $7F:01F0-$01FF, the end
 ; of Menu_FlagBlock7F (C2Scene_Flag0Copy is not written back).
-; Callers (2 JSR sites, unmatched): $C2:24E0 (C2Scene_Mode2) and $C2:2518
-;   (C2Scene_Mode4).
+; Callers (2 JSR sites): C2Scene_Mode2 ($C2:24E0) and C2Scene_Mode4
+;   ($C2:2518).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVN)
 ; Exit:  M=1, X=0; A = $FFFF, X = C2Scene_FlagTailCopy + 16, Y = $0200;
@@ -8497,14 +8507,14 @@ C2Scene_LoadScene:
 ; Loads the scene's graphics again (scene modes 5 and 8 call it after
 ; C2Scene_RestoreState and C2Scene_VramQInit; mode 8 skips it when
 ; $7F:01F4 AND $0A or $7F:01F5 AND $02 is non-zero ($C2:265E); mode 6
-; calls it too, from the unmatched
-; callers' addresses): C2Scene_Unk5775, the HDMA area cleared and
+; calls it too): C2Scene_Unk5775, the HDMA area cleared and
 ; C2Scene_HdmaValueA916 = C2Scene_HdmaValueA916Init, then the VRAM and
 ; palette loads (C2Scene_LoadVram), the metatiles, the Unk7000, UnkB800
 ; and UnkC000 packs, and BG layers 1 and 2 redrawn. The maps and lists
 ; are not reloaded: C2Scene_SaveState keeps them, and the header pointer
 ; with the direct page.
-; Callers (3 JSR sites, unmatched): $C2:2563, $C2:25F3 and $C2:266E.
+; Callers (3 JSR sites): C2Scene_Mode5 ($C2:2563), C2Scene_Mode6
+;   ($C2:25F3) and C2Scene_Mode8 ($C2:266E).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set; forced blank
 ; Exit:  as C2Scene_DrawBgLayer: M=1, X=0; A, X, Y clobbered;
 ;        C2Tmp_00-$1B, Menu_Decomp*, DMA channel 7 and WMADD changed
@@ -8737,11 +8747,11 @@ C2Scene_LoadLocExtraGfx:
 ; state is not kept for (metatiles, the $7E:7000, $7E:B800, $7E:C000 and
 ; $7E:C800 packs, the $7E:C600 pack of the extra-graphics scenes,
 ; graphics) is what C2Scene_ReloadScene loads again. Inferred
-; from the unmatched callers: scene modes 5 and 8 save, do something
+; from the callers: scene modes 5 and 8 save, do something
 ; else and restore; mode 5 then reloads, mode 8 only when the flag test
 ; at $C2:265E passes.
-; Callers (2 JSR sites, unmatched): $C2:2542 (C2Scene_Mode5) and $C2:2652
-;   (C2Scene_Mode8).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:2542) and C2Scene_Mode8
+;   ($C2:2652).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVNs)
 ; Exit:  M=1, X=0; A = $FFFF, X = $8600, Y = C2Scene_SaveLists + $800
@@ -8781,8 +8791,8 @@ C2Scene_SaveState:
 ; $C2:2E72 — C2Scene_RestoreState (79 bytes, $2E72–$2EC0)
 ; The reverse of C2Scene_SaveState: copies the six saved blocks from bank
 ; $7F back where they came from (the direct page $00-$EF included).
-; Callers (2 JSR sites, unmatched): $C2:255D (C2Scene_Mode5) and $C2:2658
-;   (C2Scene_Mode8).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:255D) and C2Scene_Mode8
+;   ($C2:2658).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (the copy rewrites dp
 ;        $00-$EF, so it must be the scene's), DB any (saved around the
 ;        MVNs)
@@ -8881,9 +8891,10 @@ org $C22ED9
 ; an equal or higher pending rank is replaced (so rank 0, which every
 ; matched caller passes, always replaces a queued command).
 ; Callers (10 JSR sites): C2Script_PlaySfx ($C2:18E8),
-;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E);
-;   unmatched: $C2:2F88, $C2:2FCD, $C2:3031, $C2:306A, $C2:3092, $C2:4395
-;   and $C2:4A4C.
+;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E),
+;   C2Scene_ZoneSoundAtView ($C2:2F88), C2Scene_ZoneSoundWatch ($C2:2FCD,
+;   $C2:3031), C2Scene_ZoneSoundResume ($C2:306A), C2Scene_ZoneSoundQueue
+;   ($C2:3092); unmatched: $C2:4395 and $C2:4A4C.
 ; Entry: M=1, X any (no index use), DP any (no direct page), DB=$00 (low
 ;        WRAM: the buffer, the state and the driver block)
 ; Exit:  M=1, X unchanged; C=0 queued, C=1 refused; A clobbered; X, Y,
@@ -9602,12 +9613,12 @@ org $C28000
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers: BankC2_Entry8000 (JSL): Field_SceneChangeTick ($C0:0D18),
 ;   Field_PauseAndMenuInput ($C0:1960), Field_RunBankC2Mode5 ($C0:19CE)
-;   and $C2:2552 (unmatched). BankC2_Entry8002 (JSL): C2Scene_NmiHandler
-;   ($C2:031B); unmatched: $C0:EC15, $C1:EE27, $CD:091A and $CD:09C6.
-;   BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059); unmatched:
-;   $C0:3807, $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA,
-;   $C0:3A7C, $C0:3E61, $C0:3E67, $C0:56CF, $FF:FB84, $FF:FB92 and
-;   $FF:FB98.
+;   and C2Scene_Mode5 ($C2:2552). BankC2_Entry8002 (JSL):
+;   C2Scene_NmiHandler ($C2:031B); unmatched: $C0:EC15, $C1:EE27,
+;   $CD:091A and $CD:09C6. BankC2_Entry8004 (15 JSL sites): GameLoop
+;   ($C0:0059), Scene_PostLoadInit ($C0:56CF); unmatched: $C0:3807,
+;   $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
+;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92 and $FF:FB98.
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry
@@ -10148,8 +10159,8 @@ Menu_InitNewGameData:
 ; Fills as in Menu_InitNewGameData (first word, then an overlapping MVN).
 ; PHB/PLB keep DB across the bank-$7F fill only; the later MVNs leave
 ; DB=$7E.
-; Callers (2 JSR sites, unmatched): $C2:8D85 and $C2:9571 in
-;   Menu_InitNewGameData.
+; Callers (2 JSR sites): Menu_InitNewGameData ($C2:9571); unmatched:
+;   $C2:8D85.
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (STZ Menu_PlayTime is absolute, after the PLB)
 ; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the last MVN
