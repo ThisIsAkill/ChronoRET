@@ -90,8 +90,6 @@ org $C074F7
 Field_Unk74F7:      ; DP=$1D00; clears dp $9D/$8F/$91 then shares Field_Unk74D4's tail
 org $C087F1
 Field_Unk87F1:      ; DP=$1D00 finalizer after the $C800 builders (DefaultHandler)
-org $C08A6D
-Map_Unk8A6D:        ; Field_FrameUpdate, X/Y 8-bit, when Field_Unk20 is set (DP=$1D00)
 org $C0A33B
 LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810

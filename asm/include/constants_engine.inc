@@ -387,4 +387,56 @@ if !constants_engine_inc == 0
 !TreasureKind_Gold = $01                 ; Field_Unk2A: gold was taken
 !TreasureKind_Opened = $02               ; Field_Unk2A: the treasure was already taken
 
+; --- Map_Unk8A6D and its probes (leader collision) ---
+!Map_BoxHalfW = $0070                    ; Obj_PosX units: from the leader's X to the left / right
+                                         ; edge of the box Map_Unk8A6D tests (7 pixels)
+!Map_BoxHeight = $0070                   ; from the leader's Y up to the top edge of that box
+!Map_BoxMidY = $0040                     ; from the leader's Y up to the point a sideways step
+                                         ; tests for objects
+!Map_StepNeg16 = $FFF0                   ; Map_StepNeg as a 16-bit value (a slide of -$10)
+!Map_StepHiNeg = $FF                     ; Map_Unk1D2EHi / 1D30Hi for a negative step
+!Map_StepSign16 = $0080                  ; bit 7 of Map_Unk1D30 tested with a 16-bit BIT
+!Map_ObjNear = $00E0                     ; an object closer than this in both X and Y to the probe
+                                         ; is touched (Map_ProbeHitsObj; 14 pixels)
+!Obj_Unk1B01Solid = $01                  ; Obj_Unk1B01 bit 0: a touched object blocks (C=1)
+!Map_ShapeMask = $FC                     ; Map_TileHiBits bits 2-7: the tile's shape number
+!Map_ShapeTables = $16                   ; shapes 2-$17 (Map_ProbeShape below this) use the line
+                                         ; tables Map_SlopeShift/Base/Side
+!Map_SlopeShiftMask = $7F                ; Map_SlopeShift bits 0-6: the shift count (bit 7: invert)
+!MapShape_LeftB = $16                    ; Map_ProbeShape values (shape - 2) of the split shapes:
+                                         ; half B is the left half
+!MapShape_TopB = $17                     ; half B is the top half
+!MapShape_BottomLeftB = $18              ; half B is the bottom-left quarter
+!MapShape_BottomRightB = $19             ; half B is the bottom-right quarter
+!MapShape_TopRightB = $1A                ; half B is the top-right quarter
+!MapShape_TopLeftB = $1B                 ; half B is the top-left quarter
+!MapShape_Unk1E = $1C                    ; shape $1E: half A, Map_ProbeShape1E, and a nonzero Y step
+                                         ; cut to Map_StepPos / Map_StepNeg
+!Map_ProbeShape1E = $04                  ; Map_ProbeMoveFlags bit 2: the tile has shape $1E
+!Map_ProbePushing = $08                  ; Map_ProbeMoveFlags bit 3: the tile pushes
+!TileAttrB_LevelA = $03                  ; Map_TileAttrB bits 0-1: half A's level
+!TileAttrB_NoLevelA = $04                ; Map_TileAttrB bit 2: half A's "no level" bit
+!TileAttrB_LevelB = $18                  ; Map_TileAttrB bits 3-4: half B's level
+!TileAttrB_NoLevelB = $20                ; Map_TileAttrB bit 5: half B's "no level" bit
+!TileAttr_PrioBit = $10                  ; Map_TileAttrA/B bit 6 after two LSRs: OAM priority bit 0
+!Oam_Prio2 = $20                         ; OAM attribute bits 4-5 = 2 (priority 2)
+!Map_LevelAny = $03                      ; Map_ProbeLevel / Field_Unk55 value that meets any level
+!SceneFlag_Warp = $80                    ; Field_SceneFlags bit 7: fade out then warp to Loc_Dest*
+!Map_ExitRecSize = $07                   ; bytes per ExitRom record
+!Map_ExitRowRange = $3F                  ; an exit record in the probe's column matches when its row
+                                         ; is less than this far from the probe's
+!Exit_DestHiBit = $01                    ; ExitRom.DestHiFacing bit 0: Loc_DestId bit 8
+!Exit_FacingMask = $0F                   ; ExitRom.DestHiFacing bits 1-4 after one LSR: the facing
+!Exit_FacingBit7 = $80                   ; ExitRom.DestHiFacing bit 7, kept in Loc_DestFacing
+!TileAttrA_AnimNear = $10                ; Map_TileAttrA bit 4: start a tile animation
+!TileAttrA_PushSpeed = $0C               ; Map_TileAttrA bits 2-3: push speed (0 = none)
+!TileAttrA_PushSlow = $04                ; push speed 1: Map_PushSlow
+!TileAttrA_PushMid = $08                 ; push speed 2: Map_PushMid (3: Map_PushFast)
+!TileAttrA_PushDir = $03                 ; Map_TileAttrA bits 0-1: push direction
+!Map_ProbeIsChest = $01                  ; A from Map_Unk8A6D's tile test: C=1 because of a treasure
+!Map_ProbeIsTile = $00                   ; A from that test otherwise (C=1: the half tile blocks)
+!Map_PushSlow = $08                      ; push amounts written to Map_Unk1D2A/1D2B (1/16 pixel)
+!Map_PushMid = $10                       ; push amount for push speed 2
+!Map_PushFast = $20                      ; push amount for push speed 3
+
 endif
