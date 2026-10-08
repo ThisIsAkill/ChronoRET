@@ -21676,6 +21676,1314 @@ BattleSys_Main:
     JMP BattleSys_ExitVec
 
 ; ==================================================================
+; Turn-list handlers ($C1:8461–$C1:8C3D)
+; ==================================================================
+; The 13 per-slot turn lists BattleSys_Main counts and scans (see its
+; header): four 13 x 11-byte arrays, one byte per list and battler slot,
+; list n at +n * 11: !Battle_ListTimers (countdowns), !Battle_ListFlags
+; (bit 7 due, low bits "takes part"), !Battle_ListRuns (runs left) and
+; !Battle_ListReload (timer reload). When list n's scan finds a due slot
+; it steps !Battle_ListCursor past it and sets the list's !Battle_ListDue
+; bit; BattleSys_Main then runs entry n of BattleSys_ListHandlerTable.
+; Every handler finds its slot the same way: the !Battle_SlotOrder entry
+; just before the list's cursor (the last one, at !Battle_BattlerCount
+; - 1, when the cursor is 0).
+; The usual handler (lists 0, 2-5 and 10) re-arms the entry (flags = 1,
+; timer = reload), clears the list's !Battle_ListDue bit, and counts
+; !Battle_ListRuns down; at 0 it sets it back to 10, clears one status
+; bit of the slot's BattlerStats and stops the entry (flags = 0). That
+; shape, and lists 8/9 halving or doubling the timer by status bits,
+; suggest timed statuses; which status each list is was not traced.
+; List 12 (BattleSys_Unk8461) is the turn list proper: it hands ready
+; PCs to the command menu and makes ready enemies act.
+; The handlers run in BattleSys_Main's state (M=1, X=0, DP=0, DB=$7E,
+; A = 0 from its TDC).
+
+; $C1:8461 — BattleSys_Unk8461 (988 bytes, $8461–$883C)
+; Handler of turn list 12, the battlers' turns (inferred: a ready PC is
+; queued for the command menu by service 1, BattleMenu_EnqueueReadyBattler;
+; a ready enemy's !Battler_UnkAFAB, probably its ATB gauge, is reloaded
+; from !Battle_UnkB158). Also run by BattleSys_Main instead of the turn
+; lists while !Battle_UnkAF25 is set. Steps:
+;   - !Battle_UnkB2C0 and !Battle_UnkB3B9 = 0. On an even
+;     !Battle_LoopCount it goes straight to .after_turn.
+;   - Clears !Battle_UnkAEB2 and the 8 !Battle_UnkAEB3 bytes; the slot is
+;     the one list 12 found (also when run through !Battle_UnkAF25), kept
+;     in DP $22.
+;   - Enemy slot (3-10), present (!Battler_UnkAEFF not $FF) and
+;     !Battler_UnkAFAB 0: if its !Enemy_AnimWanted is 0, 4, 6 or
+;     $0A-$10, or !Battler_Unk9826 is set, !Battler_Unk9826 is cleared
+;     and, unless its !Battle_UnkB24A entry is set, !Battle_UnkAEC8 =
+;     enemy, BattleSys_Unk8CF9, !Battler_UnkAFAB = !Battle_UnkB158,
+;     BattleSys_UnkBD6F and list 12's flags = 1 (re-armed, not due).
+;     When any test above fails: if any of !Battle_UnkB188-B18A is negative (a PC waiting),
+;     !Battle_UnkB3BE counts 2, 1, 0, 2, ... into DP $14 (16-bit) and it
+;     goes on at .pending; with none, to .end.
+;   - PC slot with list 12 due: BattleFD_UnkAB30 (X = slot * $80,
+;     Y = slot); then if !Battle_UnkAF23 is set: !Battle_UnkB3F4 and DP
+;     $14 = slot, BattleSys_UnkB575, BattleSys_UnkBCE1. Else, if the
+;     PC's BattleCmd.State is 0: with !Battle_Unk2989 bit 5 set
+;     BattleSys_UnkB70E, else State = 1 and service 1 for the slot
+;     (which adds bit 7, "waiting for a command").
+;   - .pending: each PC whose BattleCmd.State is negative has it copied
+;     to its !Battle_UnkB188-B18A byte; with bit 5 set BattleSys_UnkB725.
+;     Then the head of !Battle_CmdQueue (a PC that committed a command),
+;     if any, is popped into !Battle_UnkB18B; if bit 7 of that PC's
+;     State and of its latched B188-B18A byte differ (the command was
+;     chosen since), BattleSys_UnkB967 runs (probably the command; not
+;     traced) and both bytes are zeroed.
+;   - BattleSys_Unk883D: a popped command of PC 0 or 1 never calls it;
+;     one of PC 2 calls it only after BattleSys_UnkB967 ran (it falls
+;     through into the JSR at $C1:860A; when nothing ran, the BPL at
+;     $C1:85F9 skips it); then, when no PC is latched any more, list 12's
+;     !Battle_ListDue bit is cleared.
+;   - .after_turn: BattleSys_UnkB223, !Battle_UnkB3AC = the 11 bytes of
+;     !Battle_UnkAD8E, !Battle_UnkB3B7 = !Battle_UnkB18B,
+;     BattleSys_UnkB762. With bit 5 set, or !Battle_UnkB2C0 still 0
+;     (then after BattleFD_UnkAC6E), or an enemy !Battle_UnkB3B7 whose
+;     BattlerStats.Status2 has bit 2, it goes to .end.
+;   - .react: for each of the first 8 !Battle_UnkB3AC entries that is an
+;     enemy slot, the second part of that enemy's script (probably its
+;     behaviour script, from bank $CC: BattleSys_UnkB488 looks it up by the id in
+;     !Battler_UnkAEFF, or by !Battler_UnkAF0A when the entry is empty
+;     and the part starts with code $20, which then also puts the id
+;     back) is run block by block through BattleSys_UnkB80DTable, unless
+;     the enemy's Status2 has any of bits 7, 3-0. A block is one or two
+;     4-byte records (two when byte 4 is not $FE), then up to a $FE; $FF
+;     ends the part. When a block's condition records leave
+;     !Battle_UnkAF24 0, the enemy acts on it (BattleSys_Unk8CF9, which
+;     zeroes AF24 and may set it again, then BattleSys_UnkB223), and
+;     AF24 is stored to !Battle_UnkB24A (2 also zeroes !Battle_UnkB2B6).
+;     Then, if AF24 is 0 the part ends; otherwise the rest of the block
+;     is skipped (for a value other than 2, the remaining conditions to
+;     the $FE first) and the next block is tried, unless $FF follows
+;     (!Battle_UnkB263 counts the blocks tried).
+;     !Enemy_AnimWanted is saved over the part and put back.
+;     BattleSys_UnkB575 runs after each entry, BattleSys_ClearUnkB192
+;     between entries. !Battle_UnkB1D4, !Battle_UnkB24A, !Battle_UnkB263
+;     and !Battle_UnkB2B6 are indexed here by the list position
+;     !Battle_UnkB315; BattleSys_Unk8C09 (through BattleSys_UnkAFD2)
+;     indexes B24A, B263 and B2B6 by enemy instead (a bug or not, not
+;     known). The reading as "reactions to the last action"
+;     rests on !Battle_UnkB3AC being copied right after it; not traced.
+;   - .end: BattleSys_UnkAC5E; unless DP !Battle_Unk24 is set,
+;     BattleSys_Unk8C09; !Battle_UnkB18B = !Battle_UnkB3B7,
+;     BattleSys_ClearUnkB192, BattleSys_UnkAC46, BattleFD_UnkACEE;
+;     !Battle_UnkB2C0 = 0.
+; Quirks: a NOP after the bit-5 test ($C1:864A); in .react the LDX of
+; !Battle_UnkB1D2 at $C1:87EE is dead (X is reloaded at once).
+; Callers (1 JSR site): BattleSys_Main ($C1:822B).
+; Callers note: BattleSys_Main ($C1:822B); also entry 12 of
+;   BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E (.b direct page, .w WRAM operands); A
+;        is set with TDC before use
+; Exit:  M=1, X=0 (as the code assumes after its callees, none of which
+;        is analysed), DP=0, DB=$7E; A, X, Y clobbered; DP $14/$15 and
+;        $22/$23 written; the RAM above changed, plus whatever the
+;        callees change
+; Callees: BattleSys_Unk8CF9, BattleSys_UnkBD6F, BattleFD_UnkAB30,
+;          BattleSys_UnkB575, BattleSys_UnkBCE1, BattleSys_UnkB70E,
+;          BattleSys_RunServiceVec (service 1), BattleSys_UnkB725,
+;          BattleSys_UnkB967, BattleSys_Unk883D, BattleSys_UnkB223,
+;          BattleSys_UnkB762, BattleFD_UnkAC6E, BattleSys_UnkB488,
+;          BattleSys_UnkB80DTable entries, BattleSys_ClearUnkB192,
+;          BattleSys_UnkAC5E, BattleSys_Unk8C09, BattleSys_UnkAC46,
+;          BattleFD_UnkACEE
+!BattleTurn_Slot = !BattleTmp_22        ; 2 B: the slot list 12 found
+!BattleTurn_Arg14 = !BattleTmp_14       ; 1-2 B: slot (or !Battle_UnkB3BE) left for the callees (not traced)
+org $C18461
+BattleSys_Unk8461:
+    TDC
+    STA.w !Battle_UnkB2C0
+    STA.w !Battle_UnkB3B9
+    LDA.w !Battle_LoopCount             ; absolute $0027 (DB=$7E: the same byte as the DP one)
+    BIT.b #1
+    BNE .odd_pass
+    JMP .after_turn
+.odd_pass:
+    TDC
+    TAX
+.clear_aeb2:
+    STA.w !Battle_UnkAEB2,X
+    INX
+    CPX.w #!Battle_UnkAEB2Bytes
+    BCC .clear_aeb2
+    TDC
+    LDX.w #!Battle_TurnList
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAX
+    STX.b !BattleTurn_Slot
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .pc
+    ; Enemy slot.
+    LDX.b !BattleTurn_Slot
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .enemy_not_ready
+    LDA.w !Battler_UnkAFAB,X
+    BNE .enemy_not_ready
+    LDA.w !Enemy_AnimWanted-!Battle_FirstEnemySlot,X
+    BEQ .enemy_go
+    CMP.b #4
+    BEQ .enemy_go
+    CMP.b #6
+    BEQ .enemy_go
+    CMP.b #!Battle_TurnAnimLo
+    BCC .enemy_check_9826
+    CMP.b #!Battle_TurnAnimEnd
+    BCC .enemy_go
+.enemy_check_9826:
+    LDA.w !Battler_Unk9826,X
+    BEQ .enemy_not_ready
+.enemy_go:
+    STZ.w !Battler_Unk9826,X
+    LDA.w !Battle_UnkB24A-!Battle_FirstEnemySlot,X
+    BNE .enemy_not_ready
+    LDX.b !BattleTurn_Slot
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .enemy_not_ready
+    LDA.b !BattleTurn_Slot
+    SEC
+    SBC.b #!Battle_FirstEnemySlot
+    STA.w !Battle_UnkAEC8
+    JSR BattleSys_Unk8CF9
+    LDX.b !BattleTurn_Slot
+    LDA.w !Battle_UnkB158,X
+    STA.w !Battler_UnkAFAB,X
+    JSR BattleSys_UnkBD6F
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*!Battle_TurnList),X
+    JMP .held_pcs
+.enemy_not_ready:
+    TDC
+    LDA.w !Battle_UnkB188
+    ORA.w !Battle_UnkB189
+    ORA.w !Battle_UnkB18A
+    BPL .to_end
+    DEC.w !Battle_UnkB3BE
+    LDA.w !Battle_UnkB3BE
+    BPL .b3be_ok
+    LDA.b #2
+    STA.w !Battle_UnkB3BE
+.b3be_ok:
+    LDA.w !Battle_UnkB3BE
+    TAX
+    STX.b !BattleTurn_Arg14
+    JMP .pending
+.to_end:
+    JMP .end
+.pc:
+    LDX.b !BattleTurn_Slot
+    LDA.w !Battle_ListFlags+(!Battle_NumSlots*!Battle_TurnList),X
+    BMI .pc_due
+    JMP .held_pcs
+.pc_due:
+    LDA.b !BattleTurn_Slot
+    TAY
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    JSL BattleFD_UnkAB30
+    LDA.w !Battle_UnkAF23
+    BEQ .pc_cmd
+    LDA.b !BattleTurn_Slot
+    STA.w !Battle_UnkB3F4
+    STA.b !BattleTurn_Arg14
+    STZ.b !BattleTurn_Arg14+1
+    JSR BattleSys_UnkB575
+    JSR BattleSys_UnkBCE1
+    JMP .held_pcs
+.pc_cmd:
+    TDC
+    LDX.b !BattleTurn_Slot
+    STX.b !BattleTurn_Arg14
+    LDA.b !BattleTurn_Arg14
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !BattleTurn_Arg14
+    TAX                                 ; X = slot * 7, its BattleCmd record
+    LDA.w BattleCmd.State,X
+    BNE .pending
+    TDC
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BEQ .pc_enqueue
+    JSR BattleSys_UnkB70E
+    JMP .pending_b725
+.pc_enqueue:
+    LDA.b #1
+    STA.w BattleCmd.State,X
+    LDA.b !BattleTurn_Arg14
+    STA.b !Battle_ArgSlot
+    LDA.b #!BattleSys_ServiceEnqueue
+    JSR BattleSys_RunServiceVec
+.pending:
+    LDA.w BattleCmd.State
+    BPL .pending_pc1
+    STA.w !Battle_UnkB188
+.pending_pc1:
+    LDA.w BattleCmd[1].State
+    BPL .pending_pc2
+    STA.w !Battle_UnkB189
+.pending_pc2:
+    LDA.w BattleCmd[2].State
+    BPL .pending_b725
+    STA.w !Battle_UnkB18A
+.pending_b725:
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BEQ .pop_cmd
+    JSR BattleSys_UnkB725
+.pop_cmd:
+    LDA.w !Battle_CmdQueue
+    BMI .held_pcs
+    LDA.w !Battle_CmdQueue
+    STA.w !Battle_UnkB18B
+    LDA.w !Battle_CmdQueue+1
+    STA.w !Battle_CmdQueue
+    LDA.w !Battle_CmdQueue+2
+    STA.w !Battle_CmdQueue+1
+    LDA.b #!Battle_EntryNone
+    STA.w !Battle_CmdQueue+2
+    DEC.w !Battle_CmdQueueLen
+    LDA.w !Battle_UnkB18B
+    CMP.b #0
+    BEQ .cmd_pc0
+    CMP.b #1
+    BEQ .cmd_pc1
+    CMP.b #2
+    BEQ .cmd_pc2
+    BRA .held_pcs
+.cmd_pc0:
+    LDA.w BattleCmd.State
+    EOR.w !Battle_UnkB188
+    BPL .latched_check
+    TDC
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_UnkB967
+    TDC
+    STA.w !Battle_UnkB188
+    STA.w BattleCmd.State
+    BRA .latched_check
+.cmd_pc1:
+    LDA.w BattleCmd[1].State
+    EOR.w !Battle_UnkB189
+    BPL .latched_check
+    LDA.b #1
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_UnkB967
+    TDC
+    STA.w !Battle_UnkB189
+    STA.w BattleCmd[1].State
+    BRA .latched_check
+.cmd_pc2:
+    LDA.w BattleCmd[2].State
+    EOR.w !Battle_UnkB18A
+    BPL .latched_check
+    LDA.b #2
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_UnkB967
+    TDC
+    STA.w !Battle_UnkB18A
+    STA.w BattleCmd[2].State
+.held_pcs:
+    JSR BattleSys_Unk883D
+.latched_check:
+    LDA.w !Battle_UnkB188
+    ORA.w !Battle_UnkB189
+    ORA.w !Battle_UnkB18A
+    BNE .after_turn
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #$FFFF^(!Battle_ListBit0>>!Battle_TurnList)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+.after_turn:
+    JSR BattleSys_UnkB223
+    TDC
+    TAX
+.copy_ad8e:
+    LDA.w !Battle_UnkAD8E,X
+    STA.w !Battle_UnkB3AC,X
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .copy_ad8e
+    LDA.w !Battle_UnkB18B
+    STA.w !Battle_UnkB3B7
+    JSR BattleSys_UnkB762
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BEQ .bit5_clear
+    JMP .end
+.bit5_clear:
+    NOP                                 ; quirk: no effect
+    LDA.w !Battle_UnkB2C0
+    BNE .check_actor
+    JSL BattleFD_UnkAC6E
+    JMP .end
+.check_actor:
+    TDC
+    LDA.w !Battle_UnkB3B7
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .react_start
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_TurnNoReactBit
+    BEQ .react_start
+    JMP .end
+.react_start:
+    TDC
+    STA.w !Battle_UnkB252
+    STA.w !Battle_UnkB315
+    STA.w !Battle_UnkB1CF
+    STA.w !Battle_UnkAF24
+.react:
+    LDA.w !Battle_UnkB315
+    TAX
+    LDA.w !Battle_UnkB3AC,X
+    CMP.b #!Battle_FirstEnemySlot
+    BCS .react_enemy
+    JMP .react_next
+.react_enemy:
+    CMP.b #!Battle_EntryNone
+    BNE .react_slot
+    JMP .react_next
+.react_slot:
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .react_present
+    TXA
+    SEC
+    SBC.b #!Battle_FirstEnemySlot
+    STA.w !Battle_UnkB252
+    STA.w !Battle_UnkAEC8
+    LDA.w !Battler_UnkAF0A,X
+    JSR BattleSys_UnkB488
+    LDX.w !Battle_UnkB1D2
+    STX.w !Battle_UnkB273
+    STX.w !Battle_UnkB1D0
+    LDA.l !BattleRom_ScriptBank,X
+    CMP.b #!BattleAi_CodeUnk20
+    BNE .react_skip
+    LDA.w !Battle_UnkAEC8
+    TAX
+    LDA.w !Battler_UnkAF0A+!Battle_FirstEnemySlot,X
+    STA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,X
+    BRA .react_script
+.react_skip:
+    JMP .react_next
+.react_present:
+    TXA
+    SEC
+    SBC.b #!Battle_FirstEnemySlot
+    STA.w !Battle_UnkB252
+    STA.w !Battle_UnkAEC8
+    LDA.w !Battler_UnkAEFF,X
+    JSR BattleSys_UnkB488
+    LDX.w !Battle_UnkB1D2
+    STX.w !Battle_UnkB273
+    STX.w !Battle_UnkB1D0
+.react_script:
+    TDC
+    LDA.w !Battle_UnkAEC8
+    TAX
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Battle_UnkB2D5
+    TDC
+    LDA.w !Battle_UnkAEC8
+    REP #$20
+    XBA
+    LSR A
+    CLC
+    ADC.w #!Battle_FirstEnemySlot*!Battle_StatsStride
+    TAX                                 ; X = (enemy + 3) * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_NoReactMask
+    BNE .react_skip
+.react_block:
+    TDC
+    STA.w !Battle_UnkB1CF
+    STA.w !Battle_UnkAF24
+    LDA.w !Battle_UnkB252
+    TAX
+    LDA.w !Battle_UnkB16E,X
+    STA.w !Battle_UnkAEBB
+    LDA.w !Battle_UnkB3B7
+    STA.w !Battle_UnkB16E,X
+    TDC
+    LDX.w !Battle_UnkB1D2
+    LDA.l !BattleRom_ScriptBank,X
+    STA.w !Battle_UnkB239
+    STZ.w !Battle_UnkAF24
+    LDA.l !BattleRom_ScriptBank+4,X
+    CMP.b #!BattleAi_BlockEnd
+    BEQ .react_one_record
+    LDA.b #1
+    STA.w !Battle_UnkB1CF
+.react_one_record:
+    TDC
+    LDA.w !Battle_UnkB315
+    ASL A
+    TAX
+    REP #$20
+    LDA.w !Battle_UnkB1D4,X
+    STA.w !Battle_UnkB3CA
+    TDC
+    SEP #$20
+    LDA.w !Battle_UnkB239
+    ASL A
+    TAX
+    JSR (BattleSys_UnkB80DTable,X)
+    LDA.w !Battle_UnkB1CF
+    BEQ .react_ran
+    LDX.w !Battle_UnkB1D0
+    INX
+    INX
+    INX
+    INX
+    STX.w !Battle_UnkB1D2
+    LDA.l !BattleRom_ScriptBank,X
+    STA.w !Battle_UnkB239
+    ASL A
+    TAX
+    JSR (BattleSys_UnkB80DTable,X)
+.react_ran:
+    LDA.w !Battle_UnkAF24
+    BNE .react_after
+    TDC
+    LDA.w !Battle_UnkB252
+    TAX
+    LDA.w !Battle_UnkB3B7
+    STA.w !Battle_UnkB16E,X
+    LDA.w !Battle_UnkAEC8
+    PHA
+    JSR BattleSys_Unk8CF9
+    PLA
+    STA.w !Battle_UnkAEC8
+    JSR BattleSys_UnkB223
+    TDC
+    LDA.w !Battle_UnkB315
+    ASL A
+    TAX
+    REP #$20
+    LDA.w !Battle_UnkB3CA
+    STA.w !Battle_UnkB1D4,X
+    SEP #$20
+    TDC
+    LDA.w !Battle_UnkB315
+    TAX
+    LDA.w !Battle_UnkAF24
+    STA.w !Battle_UnkB24A,X
+    CMP.b #2
+    BNE .react_after
+    LDA.b #0
+    STA.w !Battle_UnkB2B6,X
+.react_after:
+    LDA.w !Battle_UnkAF24
+    BEQ .react_done
+    LDA.w !Battle_UnkAF24
+    CMP.b #2
+    BEQ .react_skip_actions
+    STZ.w !Battle_UnkB1CF
+    LDX.w !Battle_UnkB1D2
+.react_skip_conds:
+    INX
+    LDA.l !BattleRom_ScriptBank,X
+    CMP.b #!BattleAi_BlockEnd
+    BNE .react_skip_conds
+    STX.w !Battle_UnkB1D2
+.react_skip_actions:
+    LDX.w !Battle_UnkB1D2
+.react_find_end:
+    INX
+    LDA.l !BattleRom_ScriptBank,X
+    CMP.b #!BattleAi_BlockEnd
+    BNE .react_find_end
+    INX
+    STX.w !Battle_UnkB1D2
+    LDA.l !BattleRom_ScriptBank,X
+    CMP.b #!BattleAi_ScriptEnd
+    BEQ .react_done
+    STX.w !Battle_UnkB1D0
+    LDA.w !Battle_UnkB315
+    TAX
+    INC.w !Battle_UnkB263,X
+    LDX.w !Battle_UnkB1D2               ; quirk: dead, X is reloaded below
+    LDA.w !Battle_UnkB252
+    TAX
+    LDA.w !Battle_UnkAEBB
+    STA.w !Battle_UnkB16E,X
+    JMP .react_block
+.react_done:
+    TDC
+    LDA.w !Battle_UnkAEC8
+    TAX
+    LDA.w !Battle_UnkB2D5
+    STA.w !Enemy_AnimWanted,X
+.react_next:
+    JSR BattleSys_UnkB575
+    INC.w !Battle_UnkB315
+    LDA.w !Battle_UnkB315
+    CMP.b #!Battle_NumEnemies
+    BCS .end
+    JSR BattleSys_ClearUnkB192
+    JMP .react
+.end:
+    JSR BattleSys_UnkAC5E
+    STZ.w !Battle_UnkB2C0
+    LDA.b !Battle_Unk24
+    BNE .end_no_8c09
+    JSR BattleSys_Unk8C09
+.end_no_8c09:
+    LDA.w !Battle_UnkB3B7
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_ClearUnkB192
+    JSR BattleSys_UnkAC46
+    JSL BattleFD_UnkACEE
+    STZ.w !Battle_UnkB2C0
+    RTS
+
+; $C1:883D — BattleSys_Unk883D (37 bytes, $883D–$8861)
+; For each PC slot 0-2 whose !Battler_UnkAF0A entry is not $FF: DP $14
+; (16-bit) = the slot, BattleSys_UnkB575, then BattleSys_UnkB3F9 with
+; X = the slot. The same loop as BattleSys_Main's wait-mode path; what
+; the two callees do is not traced.
+; Callers (1 JSR site): BattleSys_Unk8461 ($C1:860A).
+; Callers note: BattleSys_Unk8461 ($C1:860A). xref also lists a BRL decoded at
+;   $C1:B78C (unmatched, DOUBTFUL: inside another instruction or data).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
+;        clobbered (Y as the callees leave it); DP $14/$15 and
+;        !Battle_UnkAE5A (3) written, plus whatever the callees change
+; Callees: BattleSys_UnkB575, BattleSys_UnkB3F9
+BattleSys_Unk883D:
+    TDC
+    STZ.w !Battle_UnkAE5A
+.pc:
+    TAX
+    LDA.w !Battler_UnkAF0A,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    STX.b !BattleTmp_14
+    JSR BattleSys_UnkB575
+    TDC
+    LDA.w !Battle_UnkAE5A
+    TAX
+    JSR BattleSys_UnkB3F9
+.next:
+    TDC
+    INC.w !Battle_UnkAE5A
+    LDA.w !Battle_UnkAE5A
+    CMP.b #!Battle_NumPcSlots
+    BCC .pc
+    RTS
+
+; $C1:8862 — BattleSys_ClearUnkB192 (20 bytes, $8862–$8875)
+; Zeroes the 4-byte !Battle_UnkB192 record of battler slot
+; !Battle_UnkB18B.
+; Callers (2 JSR sites): BattleSys_Unk8461 ($C1:8816, $C1:882F).
+; Entry: M=1, X=0, DP=0 (not used), DB=$7E; !Battle_UnkB18B = slot
+;        (0-$3F: the index is slot * 4 in 8 bits)
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = slot * 4 + 4; Y = 4
+BattleSys_ClearUnkB192:
+    TDC
+    TAY
+    LDA.w !Battle_UnkB18B
+    ASL A
+    ASL A
+    TAX
+    TDC
+.clear:
+    STA.w !Battle_UnkB192,X
+    INX
+    INY
+    CPY.w #!Battle_UnkB192Size
+    BCC .clear
+    RTS
+
+; $C1:8876 — BattleSys_ListHandler0 (79 bytes, $8876–$88C4)
+; Turn list 0 (BattleSys_ListHandlerTable entry 0): the usual handler
+; (see the banner); at the end of its runs it clears BattlerStats.Status2
+; bit 7 of the slot.
+; Callers note: none by call; entry 0 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler0:
+    TDC
+    LDX.w #0
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags,Y
+    LDA.w !Battle_ListReload,Y
+    STA.w !Battle_ListTimers,Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>0)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns,Y
+    DEC A
+    STA.w !Battle_ListRuns,Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns,Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status2,X
+    AND.b #!Battle_List0StatusBit^$FF
+    STA.w BattlerStats.Status2,X
+    TDC
+    STA.w !Battle_ListFlags,Y
+.done:
+    RTS
+
+; $C1:88C5 — BattleSys_ListHandler1 (150 bytes, $88C5–$895A)
+; Turn list 1: a repeating hit on the slot (inferred from the amount
+; going to !Battle_ActPcHitAmount with kind 3, which
+; BattleAct_FlagLethalPcHits checks as damage; probably poison). Skipped
+; while the slot is KO'd (Status bit 7) or its BattlerStats.Status2
+; bit 6 is clear; then the entry stays due and only the list's
+; !Battle_ListDue bit is cleared. Else: flags = 1, timer = reload +
+; BattlerStats.Unk64; amount = MaxHp / (Unk64 / 2 + 8) through
+; Battle_Div32 into !Battle_UnkAD89, slot in !Battle_UnkB1FD,
+; BattleSys_UnkE89F; the amount and kind 3 go into the
+; !Battle_ActPcHit* record at the offset in DP $0E (probably left by
+; BattleSys_UnkE89F); !Battle_UnkB202 = 0, BattleSys_UnkEBF8,
+; BattleSys_Unk895B with A = $7F, BattleFD_UnkACEE. No run count: the
+; entry never ends here.
+; Quirk: only the low byte of the divisor !Battle_MathB is written and
+; !Battle_MathHi (the dividend's high word) not at all, so the divide
+; uses what earlier math left there.
+; Callers note: none by call; entry 1 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A = 0;
+;        X, Y clobbered; DP $10 = slot * $80; on the hit path the math DP
+;        bytes, !Battle_UnkAD89/B1FD/B202 and whatever the callees change
+BattleSys_ListHandler1:
+    TDC
+    LDX.w #1
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    STA.b !BattleTmp_10
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    BIT.b #!Battle_StatusKo
+    BEQ .alive
+    JMP .done
+.alive:
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_List1StatusBit
+    BNE .hit
+    JMP .done
+.hit:
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*1),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*1),Y
+    CLC
+    ADC.w BattlerStats.Unk64,X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*1),Y
+    TDC
+    LDA.w BattlerStats.Unk64,X
+    LSR A
+    CLC
+    ADC.b #!Battle_List1DivBase
+    STA.b !Battle_MathB
+    LDA.w BattlerStats.MaxHp,X
+    STA.b !Battle_MathA
+    LDA.w BattlerStats.MaxHp+1,X
+    STA.b !Battle_MathA+1
+    JSR Battle_Div32
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    TYA
+    STA.w !Battle_UnkB1FD
+    JSR BattleSys_UnkE89F
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    LDX.b !BattleTmp_0E
+    STA.w !Battle_ActPcHitAmount,X
+    TDC
+    SEP #$20
+    LDA.b #!Battle_List1HitKind
+    LDX.b !BattleTmp_0E
+    STA.w !Battle_ActPcHitKind,X
+    LDA.b #0
+    STA.w !Battle_UnkB202
+    JSR BattleSys_UnkEBF8
+    LDA.b #!Battle_ListHitActId
+    JSR BattleSys_Unk895B
+    JSL BattleFD_UnkACEE
+.done:
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>1)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:895B — BattleSys_Unk895B (26 bytes, $895B–$8974)
+; Sets up the action block for a kind-2 action (BattleAct_LoaderTable's
+; loader 2; the tech loader, inferred in !Battle_ActId's note) with
+; record A, caster slot 0, no flags and the main-target mask
+; !Battle_ActMainMask = $8000 (bit 15: slot 0), then
+; BattleSys_UnkAC57 (not traced; probably runs it).
+; Callers (3 JSR sites): BattleSys_Main ($C1:820F), BattleSys_ListHandler1 ($C1:8945) and
+;   BattleSys_ListHandler9 ($C1:8BB1).
+; Entry: M=1, X=0, DP=0 (not used here), DB=$7E; A = the action record
+; Exit:  M=1, X=0 as assumed after BattleSys_UnkAC57 (not analysed);
+;        DP=0, DB=$7E; !Battle_ActId/Caster/Kind/Flags and !Battle_ActMainMask
+;        written, plus whatever BattleSys_UnkAC57 changes
+BattleSys_Unk895B:
+    STA.w !Battle_ActId
+    STZ.w !Battle_ActCaster
+    LDA.b #2
+    STA.w !Battle_ActKind
+    STZ.w !Battle_ActFlags
+    STZ.w !Battle_ActMainMask
+    LDA.b #!Battle_ActMainMaskSlot0Hi
+    STA.w !Battle_ActMainMask+1
+    JSR BattleSys_UnkAC57
+    RTS
+
+; $C1:8975 — BattleSys_ListHandler2 (68 bytes, $8975–$89B8)
+; Turn list 2: the usual handler, but after its last run it only stops
+; the entry: no status bit is cleared.
+; Quirk: it still computes X = slot * $80 there and does not use it.
+; Callers note: none by call; entry 2 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler2:
+    TDC
+    LDA.w !Battle_ListCursor+2
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*2),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*2),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*2),Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>2)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*2),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*2),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*2),Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80, unused (quirk)
+    TDC
+    SEP #$20
+    TDC
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*2),Y
+.done:
+    RTS
+
+; $C1:89B9 — BattleSys_ListHandler3 (76 bytes, $89B9–$8A04)
+; Turn list 3: the usual handler; at the end of its runs it clears bit 7
+; of the slot's BattlerStats.Unk4C+1 (+$4D).
+; Callers note: none by call; entry 3 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler3:
+    TDC
+    LDA.w !Battle_ListCursor+3
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*3),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*3),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*3),Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>3)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*3),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*3),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*3),Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk4C+1,X
+    AND.b #!Battle_List3StatusBit^$FF
+    STA.w BattlerStats.Unk4C+1,X
+    TDC
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*3),Y
+.done:
+    RTS
+
+; $C1:8A05 — BattleSys_ListHandler4 (76 bytes, $8A05–$8A50)
+; Turn list 4: the usual handler; at the end of its runs it clears bit 6
+; of the slot's BattlerStats.Unk4C+1 (+$4D).
+; Callers note: none by call; entry 4 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler4:
+    TDC
+    LDA.w !Battle_ListCursor+4
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*4),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*4),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*4),Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>4)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*4),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*4),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*4),Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk4C+1,X
+    AND.b #!Battle_List4StatusBit^$FF
+    STA.w BattlerStats.Unk4C+1,X
+    TDC
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*4),Y
+.done:
+    RTS
+
+; $C1:8A51 — BattleSys_ListHandler5 (76 bytes, $8A51–$8A9C)
+; Turn list 5: the usual handler; at the end of its runs it clears bit 6
+; of the slot's BattlerStats.Unk4C+2 (+$4E).
+; Callers note: none by call; entry 5 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler5:
+    TDC
+    LDA.w !Battle_ListCursor+5
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*5),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*5),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*5),Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>5)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*5),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*5),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*5),Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk4C+2,X
+    AND.b #!Battle_List5StatusBit^$FF
+    STA.w BattlerStats.Unk4C+2,X
+    TDC
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*5),Y
+.done:
+    RTS
+
+; $C1:8A9D — BattleSys_ListHandler6 (1 byte)
+; Turn list 6: does nothing (RTS). The list's !Battle_ListDue bit is not
+; cleared and its entries stay due.
+; Callers note: none by call; entry 6 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
+; Exit:  nothing changed
+BattleSys_ListHandler6:
+    RTS
+
+; $C1:8A9E — BattleSys_ListHandler7 (1 byte)
+; Turn list 7: does nothing (RTS), like list 6.
+; Callers note: none by call; entry 7 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
+; Exit:  nothing changed
+BattleSys_ListHandler7:
+    RTS
+
+; $C1:8A9F — BattleSys_ListHandler8 (113 bytes, $8A9F–$8B0F)
+; Turn list 8: re-arms the entry (flags = 1) with the timer = reload,
+; halved when bit 7 of the slot's BattlerStats.Unk4C+1 or Unk4C+6
+; (+$4D, +$52) is set, doubled (from the reload, so this wins) when
+; Status2 bit 5 is set (probably haste / slow; not traced); clears the
+; list's !Battle_ListDue bit; then, with Status2 bit 4 set:
+; !Battle_UnkAD89 = 1, !Battle_UnkB1FD = slot, !Battle_UnkB202 = 0,
+; BattleSys_UnkEBF8 and BattleSys_UnkEC7F. No run count.
+; Callers note: none by call; entry 8 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
+;        clobbered; Y = the slot; DP $10 = slot * $80; with bit 4 set
+;        !Battle_UnkAD89/B1FD/B202 and whatever the callees change
+BattleSys_ListHandler8:
+    TDC
+    LDX.w #8
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    STA.b !BattleTmp_10
+    TDC
+    SEP #$20
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*8),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*8),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*8),Y
+    LDA.w BattlerStats.Unk4C+1,X
+    ORA.w BattlerStats.Unk4C+6,X
+    BIT.b #!Battle_ListHalveBit
+    BEQ .not_halved
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*8),Y
+    LSR A
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*8),Y
+.not_halved:
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_ListDoubleBit
+    BEQ .not_doubled
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*8),Y
+    ASL A
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*8),Y
+.not_doubled:
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>8)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_List8StatusBit
+    BEQ .done
+    LDX.w #!Battle_List8Amount
+    STX.w !Battle_UnkAD89
+    TYA
+    STA.w !Battle_UnkB1FD
+    LDA.b #0
+    STA.w !Battle_UnkB202
+    JSR BattleSys_UnkEBF8
+    JSR BattleSys_UnkEC7F
+.done:
+    RTS
+
+; $C1:8B10 — BattleSys_ListHandler9 (169 bytes, $8B10–$8BB8)
+; Turn list 9: re-arms the entry with the timer halved / doubled as list
+; 8 does, clears the list's !Battle_ListDue bit and counts
+; !Battle_ListRuns down; at 0 (set back to 10), unless the slot is KO'd,
+; with bit 5 of its BattlerStats.Unk4C+2 or Unk4C+7 (+$4E, +$53) set:
+; amount 5 in !Battle_UnkAD89, slot in !Battle_UnkB1FD,
+; BattleSys_UnkE89F; !Battle_UnkAD89 and kind 2 go into the
+; !Battle_ActPcHit* record at the offset in DP $0E; !Battle_UnkB202 =
+; $C0, BattleSys_UnkEBF8, BattleSys_Unk895B with A = $7F,
+; BattleFD_UnkACEE (the same tail as list 1's hit, other kind; probably
+; a heal over time). The entry is never stopped here.
+; Quirk: the halving test loads Unk4C+1 and then overwrites it with
+; Unk4C+6 (list 8 ORs the two), so only Unk4C+6 bit 7 halves the timer.
+; Callers note: none by call; entry 9 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
+;        clobbered; Y = the slot; DP $10 = slot * $80; on the hit path
+;        !Battle_UnkAD89/B1FD/B202 and whatever the callees change
+BattleSys_ListHandler9:
+    TDC
+    LDX.w #!Battle_ListIndex9
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    STA.b !BattleTmp_10
+    TDC
+    SEP #$20
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*9),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*9),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*9),Y
+    LDA.w BattlerStats.Unk4C+1,X        ; quirk: overwritten by the next load
+    LDA.w BattlerStats.Unk4C+6,X
+    BIT.b #!Battle_ListHalveBit
+    BEQ .not_halved
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*9),Y
+    LSR A
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*9),Y
+.not_halved:
+    LDA.w BattlerStats.Status2,X
+    BIT.b #!Battle_ListDoubleBit
+    BEQ .not_doubled
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*9),Y
+    ASL A
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*9),Y
+.not_doubled:
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>9)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*9),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*9),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*9),Y
+    LDA.w BattlerStats.Status,X
+    BIT.b #!Battle_StatusKo
+    BEQ .alive
+    JMP .done
+.alive:
+    LDA.w BattlerStats.Unk4C+2,X
+    ORA.w BattlerStats.Unk4C+7,X
+    BIT.b #!Battle_List9StatusBit
+    BEQ .done
+    LDX.w #!Battle_List9Amount
+    STX.w !Battle_UnkAD89
+    TYA
+    STA.w !Battle_UnkB1FD
+    JSR BattleSys_UnkE89F
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    LDX.b !BattleTmp_0E
+    STA.w !Battle_ActPcHitAmount,X
+    TDC
+    SEP #$20
+    LDA.b #!Battle_List9HitKind
+    LDX.b !BattleTmp_0E
+    STA.w !Battle_ActPcHitKind,X
+    LDA.b #!Battle_List9UnkB202
+    STA.w !Battle_UnkB202
+    JSR BattleSys_UnkEBF8
+    LDA.b #!Battle_ListHitActId
+    JSR BattleSys_Unk895B
+    JSL BattleFD_UnkACEE
+.done:
+    RTS
+
+; $C1:8BB9 — BattleSys_ListHandler10 (79 bytes, $8BB9–$8C07)
+; Turn list 10: the usual handler; at the end of its runs it clears
+; bit 2 of the slot's BattlerStats.Unk4C+2 (+$4E).
+; Callers note: none by call; entry 10 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
+;        position, or slot * $80 after the last run; Y = the slot; the list's
+;        !Battle_ListDue bit cleared and its entries for the slot
+;        changed as above
+BattleSys_ListHandler10:
+    TDC
+    LDX.w #!Battle_ListIndex10
+    LDA.w !Battle_ListCursor,X
+    BNE .cursor_ok
+    LDA.w !Battle_BattlerCount
+.cursor_ok:
+    DEC A
+    TAX
+    LDA.w !Battle_SlotOrder,X
+    TAY
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*10),Y
+    LDA.w !Battle_ListReload+(!Battle_NumSlots*10),Y
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*10),Y
+    REP #$20
+    LDA.w !Battle_ListDue
+    AND.w #!Battle_ListDueAll^(!Battle_ListBit0>>10)
+    STA.w !Battle_ListDue
+    TDC
+    SEP #$20
+    LDA.w !Battle_ListRuns+(!Battle_NumSlots*10),Y
+    DEC A
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*10),Y
+    BNE .done
+    LDA.b #!Battle_ListRunsReset
+    STA.w !Battle_ListRuns+(!Battle_NumSlots*10),Y
+    TYA
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk4C+2,X
+    AND.b #!Battle_List10StatusBit^$FF
+    STA.w BattlerStats.Unk4C+2,X
+    TDC
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*10),Y
+.done:
+    RTS
+
+; $C1:8C08 — BattleSys_ListHandler11 (1 byte)
+; Turn list 11: does nothing (RTS), like lists 6 and 7.
+; Callers note: none by call; entry 11 of BattleSys_ListHandlerTable.
+; Entry: M=1, X=0, DP=0, DB=$7E (nothing used)
+; Exit:  nothing changed
+BattleSys_ListHandler11:
+    RTS
+
+; $C1:8C09 — BattleSys_Unk8C09 (53 bytes, $8C09–$8C3D)
+; Runs BattleSys_UnkAFD2 (probably an enemy's behaviour script: it reads a
+; pointer from the $CC:8B08 table by the id in A) for each enemy entry
+; 0-7 with !Battle_UnkB2B6 0 whose !Battle_UnkAF15 has bit 7 set or
+; whose !Battler_UnkAEFF entry is present, with A = that
+; !Battler_UnkAEFF entry (possibly $FF when bit 7 is set). Before each,
+; that entry's !Battle_UnkB24A and !Battle_UnkB263 are zeroed and
+; !Battle_UnkB1CF = 0. !Battle_UnkB252 is the loop's enemy index.
+; Callers (2 JSR sites): BattleSys_Main ($C1:80E8) and BattleSys_Unk8461 ($C1:8826).
+; Entry: M=1, X=0, DP=0 (not used), DB=$7E
+; Exit:  M=1, X=0 (as assumed after BattleSys_UnkAFD2), DP=0, DB=$7E; A = 8;
+;        X clobbered; !Battle_UnkB252 = 8, plus whatever
+;        BattleSys_UnkAFD2 changes
+BattleSys_Unk8C09:
+    STZ.w !Battle_UnkB252
+.enemy:
+    TDC
+    STA.w !Battle_UnkB1CF
+    LDA.w !Battle_UnkB252
+    TAX
+    STZ.w !Battle_UnkB24A,X
+    STZ.w !Battle_UnkB263,X
+    LDA.w !Battle_UnkAF15,X
+    BIT.b #!Battle_AF15Bit7
+    BNE .check_b2b6
+    LDA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+.check_b2b6:
+    LDA.w !Battle_UnkB2B6,X
+    BNE .next
+    LDA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,X
+    JSR BattleSys_UnkAFD2
+.next:
+    INC.w !Battle_UnkB252
+    LDA.w !Battle_UnkB252
+    CMP.b #!Battle_NumEnemies
+    BCC .enemy
+    RTS
+
+; ==================================================================
 ; Random range and 16-bit math ($C1:AF22–$C1:AF78, $C1:C90B–$C1:C95B)
 ; ==================================================================
 ; Direct-page arithmetic on !Battle_MathA ($28) .. !Battle_MathRem ($32),
@@ -21760,6 +23068,49 @@ Battle_RandRange:
     STX.b !Battle_MathLo
     RTS
 
+; ==================================================================
+; Turn-list tables ($C1:B92D–$C1:B960)
+; ==================================================================
+
+; $C1:B92D — BattleSys_ListHandlerTable (13 words, $B92D–$B946)
+; Handler of each turn list, indexed by list number * 2:
+; BattleSys_Main runs entry n (JSR (T,X) at $C1:8333) for each list
+; whose !Battle_ListDue bit is set. Entries 6, 7 and 11 are bare RTSs.
+org $C1B92D
+BattleSys_ListHandlerTable:
+    dw BattleSys_ListHandler0           ; $00
+    dw BattleSys_ListHandler1           ; $01
+    dw BattleSys_ListHandler2           ; $02
+    dw BattleSys_ListHandler3           ; $03
+    dw BattleSys_ListHandler4           ; $04
+    dw BattleSys_ListHandler5           ; $05
+    dw BattleSys_ListHandler6           ; $06
+    dw BattleSys_ListHandler7           ; $07
+    dw BattleSys_ListHandler8           ; $08
+    dw BattleSys_ListHandler9           ; $09
+    dw BattleSys_ListHandler10          ; $0A
+    dw BattleSys_ListHandler11          ; $0B
+    dw BattleSys_Unk8461                ; $0C: the battlers' turns
+
+; $C1:B947 — BattleSys_ListOffsetTable (13 words, $B947–$B960)
+; Address of each turn list's !Battle_ListFlags bytes (list * 11 past
+; the start), indexed by list number * 2; BattleSys_Main's scan reads it
+; with LDA.l at $C1:82C5.
+BattleSys_ListOffsetTable:
+    dw !Battle_ListFlags+(!Battle_NumSlots*0)
+    dw !Battle_ListFlags+(!Battle_NumSlots*1)
+    dw !Battle_ListFlags+(!Battle_NumSlots*2)
+    dw !Battle_ListFlags+(!Battle_NumSlots*3)
+    dw !Battle_ListFlags+(!Battle_NumSlots*4)
+    dw !Battle_ListFlags+(!Battle_NumSlots*5)
+    dw !Battle_ListFlags+(!Battle_NumSlots*6)
+    dw !Battle_ListFlags+(!Battle_NumSlots*7)
+    dw !Battle_ListFlags+(!Battle_NumSlots*8)
+    dw !Battle_ListFlags+(!Battle_NumSlots*9)
+    dw !Battle_ListFlags+(!Battle_NumSlots*10)
+    dw !Battle_ListFlags+(!Battle_NumSlots*11)
+    dw !Battle_ListFlags+(!Battle_NumSlots*12)
+
 ; $C1:C90B — Battle_Mul16 (31 bytes, $C90B–$C929)
 ; 16 x 16 -> 32-bit unsigned shift-and-add multiply:
 ; !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB. MathB is
@@ -21817,14 +23168,14 @@ Battle_Mul16:
 ; is lost in the carry), and MathHi holds the caller's carry in bit 15
 ; (it is shifted in first), not usable results. The remainder is kept
 ; in 16 bits, so a divisor of $8000 or more can give wrong results.
-; Callers (59 JSR sites): Battle_RandRange ($C1:AF69), Battle_CalcUnk56 ($C1:FDB6) and unmatched
-;   ($C1:8918, $C1:AFC1, $C1:BE1A, $C1:BE94, $C1:BF11, $C1:D290, $C1:DA6F, $C1:DB0D, $C1:DC89,
-;   $C1:DCD6, $C1:DD2F, $C1:DD5C, $C1:DEBF, $C1:DEE7, $C1:DF58, $C1:DF7F, $C1:DFA6, $C1:DFCB,
-;   $C1:DFED, $C1:DFF7, $C1:E157, $C1:E16D, $C1:E1E0, $C1:E259, $C1:E2B6, $C1:E30B, $C1:E33C,
-;   $C1:E352, $C1:E3B1, $C1:E40C, $C1:E49B, $C1:E4F5, $C1:E560, $C1:E5A5, $C1:E5C9, $C1:E5F7,
-;   $C1:E619, $C1:E62F, $C1:E6A2, $C1:E6CC, $C1:E6F2, $C1:E716, $C1:E73A, $C1:E79E, $C1:E7B0,
-;   $C1:EDD1, $C1:EE36, $C1:EFB3, $C1:F0EC, $C1:F104, $C1:F673, $C1:F6A8, $C1:F6DD, $C1:F712,
-;   $C1:F747, $C1:F77C, $C1:FA39).
+; Callers (59 JSR sites): BattleSys_ListHandler1 ($C1:8918), Battle_RandRange ($C1:AF69),
+;   Battle_CalcUnk56 ($C1:FDB6) and unmatched ($C1:AFC1, $C1:BE1A, $C1:BE94, $C1:BF11, $C1:D290,
+;   $C1:DA6F, $C1:DB0D, $C1:DC89, $C1:DCD6, $C1:DD2F, $C1:DD5C, $C1:DEBF, $C1:DEE7, $C1:DF58,
+;   $C1:DF7F, $C1:DFA6, $C1:DFCB, $C1:DFED, $C1:DFF7, $C1:E157, $C1:E16D, $C1:E1E0, $C1:E259,
+;   $C1:E2B6, $C1:E30B, $C1:E33C, $C1:E352, $C1:E3B1, $C1:E40C, $C1:E49B, $C1:E4F5, $C1:E560,
+;   $C1:E5A5, $C1:E5C9, $C1:E5F7, $C1:E619, $C1:E62F, $C1:E6A2, $C1:E6CC, $C1:E6F2, $C1:E716,
+;   $C1:E73A, $C1:E79E, $C1:E7B0, $C1:EDD1, $C1:EE36, $C1:EFB3, $C1:F0EC, $C1:F104, $C1:F673,
+;   $C1:F6A8, $C1:F6DD, $C1:F712, $C1:F747, $C1:F77C, $C1:FA39).
 ; Callers note: 59 JSR sites, e.g. $C1:8918, Battle_RandRange ($C1:AF69),
 ;   $C1:AFC1 and Battle_SetupBattle (xref; mostly unmatched code).
 ; Entry: M any, X any, DP=0, DB any; the caller's carry goes in as said

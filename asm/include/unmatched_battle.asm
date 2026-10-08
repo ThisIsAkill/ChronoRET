@@ -18,13 +18,40 @@ org $C10003
 BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
 org $C10006
 BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
-org $C18461
-BattleSys_Unk8461:                      ; JSR from BattleSys_Main while !Battle_UnkAF25 is set; also entry 12 of
-                                        ; BattleSys_ListHandlerTable; not analysed
-org $C1895B
-BattleSys_Unk895B:                      ; JSR from BattleSys_Main (A = !Battle_EndUnk895BArg); not analysed
-org $C18C09
-BattleSys_Unk8C09:                      ; JSR from BattleSys_Main after the shuffles; not analysed
+org $C18CF9
+BattleSys_Unk8CF9:                      ; JSR from BattleSys_Unk8461 with !Battle_UnkAEC8 = enemy: probably the enemy's action; not analysed
+org $C1AC46
+BattleSys_UnkAC46:                      ; JSR from BattleSys_Unk8461's end; not analysed
+org $C1AC57
+BattleSys_UnkAC57:                      ; JSR from BattleSys_Unk895B after it fills the action block; not analysed
+org $C1AC5E
+BattleSys_UnkAC5E:                      ; JSR from BattleSys_Unk8461's end; not analysed
+org $C1AFD2
+BattleSys_UnkAFD2:                      ; JSR from BattleSys_Unk8C09, A = enemy id: reads $CC:8B08 (probably runs its behaviour script); not analysed
+org $C1B488
+BattleSys_UnkB488:                      ; JSR from BattleSys_Unk8461, A = enemy id: leaves a bank-$CC script address in !Battle_UnkB1D2
+org $C1B575
+BattleSys_UnkB575:                      ; JSR from BattleSys_Unk8461 / BattleSys_Unk883D; reads the BattleCmd partner bytes; not analysed
+org $C1B70E
+BattleSys_UnkB70E:                      ; JSR from BattleSys_Unk8461 (a ready PC, !Battle_Unk2989 bit 5 set); not analysed
+org $C1B725
+BattleSys_UnkB725:                      ; JSR from BattleSys_Unk8461 (!Battle_Unk2989 bit 5 set); not analysed
+org $C1B762
+BattleSys_UnkB762:                      ; JSR from BattleSys_Unk8461 each run; not analysed
+org $C1B80D
+BattleSys_UnkB80DTable:                 ; 157 words: JSR (T,X) from BattleSys_Unk8461 by a script code * 2; not analysed
+org $C1B967
+BattleSys_UnkB967:                      ; JSR from BattleSys_Unk8461 with !Battle_UnkB18B = PC: probably runs its command; not analysed
+org $C1BCE1
+BattleSys_UnkBCE1:                      ; JSR from BattleSys_Unk8461 (!Battle_UnkAF23 set); not analysed
+org $C1BD6F
+BattleSys_UnkBD6F:                      ; JSR from BattleSys_Unk8461 after an enemy's turn; not analysed
+org $C1E89F
+BattleSys_UnkE89F:                      ; JSR from turn lists 1 and 9 with !Battle_UnkAD89 / B1FD set; leaves DP $0E (not analysed)
+org $C1EBF8
+BattleSys_UnkEBF8:                      ; JSR from turn lists 1, 8 and 9 with !Battle_UnkB202 set; not analysed
+org $C1EC7F
+BattleSys_UnkEC7F:                      ; JSR from turn list 8; not analysed
 org $C1B093
 BattleSys_UnkB093:                      ; JSR from BattleSys_Main / Battle_SetupBattle with X = PC slot * $80; not analysed
 org $C1B0B6
@@ -43,11 +70,6 @@ org $C1B4E9
 BattleSys_UnkB4E9:                      ; JSR from BattleSys_Main's end paths; not analysed
 org $C1B7F2
 BattleSys_UnkB7F2:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B92D
-BattleSys_ListHandlerTable:             ; 13 words: handler per turn list (BattleSys_Main JSR (T,X)); entry 12 is
-                                        ; BattleSys_Unk8461
-org $C1B947
-BattleSys_ListOffsetTable:              ; 13 words: !Battle_ListFlags + list * 11 (BattleSys_Main)
 org $C1BC60
 BattleSys_UnkBC60:                      ; JSR from BattleSys_Main's debug win with !Battle_UnkB18B = PC slot; not analysed
 org $C1C96A
@@ -186,7 +208,11 @@ BattleFD_UnkAD09:                       ; JSL from Battle_SetupBattle
 org $FDAEF2
 BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle
 org $FDACEE
-BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle
+BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle, BattleSys_Unk8461 and turn lists 1 / 9
+org $FDAB30
+BattleFD_UnkAB30:                       ; JSL from BattleSys_Unk8461 for a due PC, X = slot * $80, Y = slot
+org $FDAC6E
+BattleFD_UnkAC6E:                       ; JSL from BattleSys_Unk8461 when !Battle_UnkB2C0 is 0
 org $FDB14D
 BattleFD_UnkB14D:                       ; JSL from Battle_SetupBattle
 org $FDB0D5

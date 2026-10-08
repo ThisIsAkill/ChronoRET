@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:8461,BattleSys_Unk8461,2026-10-08,rev63a,changes,22abc14cb09f,"PC 2 fix OK ($85F9/$860A). New: 'acts...and the part ends' false: 8CF9 zeroes AF24 ($C1:8CFB), its handlers may set it; AF24 re-read, ->B24A; nonzero tries next block. Say so."

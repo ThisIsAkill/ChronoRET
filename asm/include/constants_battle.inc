@@ -507,6 +507,43 @@ if !constants_battle_inc == 0
 !Battle_Mul16Steps        = 16    ; Battle_Mul16: one step per multiplier bit
 !Battle_Div32Steps        = 32    ; Battle_Div32: one step per dividend bit
 
+; --- Turn lists (BattleSys_ListHandler*, BattleSys_Unk8461) ---
+!Battle_ListDueAll        = $1FFF ; !Battle_ListDue: the bits of lists 0-12
+!Battle_ListIndex9        = 9     ; turn list 9
+!Battle_ListIndex10       = 10    ; turn list 10
+!Battle_TurnList          = 12    ; turn list 12, the battlers' turns (BattleSys_Unk8461)
+!Battle_ListRunsReset     = 10    ; !Battle_ListRuns value set back after the last run
+!Battle_List0StatusBit    = $80   ; BattlerStats.Status2 bit list 0 clears at its end
+!Battle_List1StatusBit    = $40   ; BattlerStats.Status2 bit that makes list 1 hit
+!Battle_List3StatusBit    = $80   ; BattlerStats.Unk4C+1 bit list 3 clears at its end
+!Battle_List4StatusBit    = $40   ; BattlerStats.Unk4C+1 bit list 4 clears at its end
+!Battle_List5StatusBit    = $40   ; BattlerStats.Unk4C+2 bit list 5 clears at its end
+!Battle_List8StatusBit    = $10   ; BattlerStats.Status2 bit that makes list 8 call $C1:EBF8 / $C1:EC7F
+!Battle_List9StatusBit    = $20   ; BattlerStats.Unk4C+2 / Unk4C+7 bit that makes list 9 hit
+!Battle_List10StatusBit   = $04   ; BattlerStats.Unk4C+2 bit list 10 clears at its end
+!Battle_ListHalveBit      = $80   ; BattlerStats.Unk4C+1 / Unk4C+6 bit: lists 8 and 9 halve their timer
+!Battle_ListDoubleBit     = $20   ; BattlerStats.Status2 bit: lists 8 and 9 double their timer
+!Battle_List1DivBase      = 8     ; list 1's divisor: BattlerStats.Unk64 / 2 + this
+!Battle_List1HitKind      = 3     ; !Battle_ActPcHitKind of list 1's hit
+!Battle_List8Amount       = 1     ; !Battle_UnkAD89 of list 8's call
+!Battle_List9Amount       = 5     ; !Battle_UnkAD89 of list 9's hit
+!Battle_List9HitKind      = 2     ; !Battle_ActPcHitKind of list 9's hit
+!Battle_List9UnkB202      = $C0   ; !Battle_UnkB202 of list 9's hit (meaning unknown)
+!Battle_ListHitActId      = $7F   ; A for BattleSys_Unk895B after the hits of lists 1 and 9 (action record)
+!Battle_ActMainMaskSlot0Hi = $80  ; high byte of !Battle_ActMainMask with only slot 0 (bit 15)
+!BattleSys_ServiceEnqueue = 1     ; $C10045 service BattleMenu_EnqueueReadyBattler
+!Battle_TurnAnimLo        = $0A   ; BattleSys_Unk8461: an enemy whose !Enemy_AnimWanted is in
+!Battle_TurnAnimEnd       = $11   ; [this low, this end) (or 0, 4, 6) takes its turn; meaning unknown
+!Battle_TurnNoReactBit    = $04   ; BattlerStats.Status2 bit: no reaction scripts after this enemy's turn
+!Battle_NoReactMask       = $8F   ; BattlerStats.Status2 bits: any set = the enemy's reaction script is skipped
+!Battle_UnkAEB2Bytes      = 9     ; bytes BattleSys_Unk8461 zeroes from !Battle_UnkAEB2
+!Battle_UnkB192Size       = 4     ; bytes per !Battle_UnkB192 record
+!Battle_AF15Bit7          = $80   ; !Battle_UnkAF15 bit 7: BattleSys_Unk8C09 runs the enemy even with no id
+!BattleAi_BlockEnd        = $FE   ; script byte that ends a block (BattleSys_Unk8461)
+!BattleAi_ScriptEnd       = $FF   ; script byte that ends a script part
+!BattleAi_CodeUnk20       = $20   ; first code of a reaction part that lets an empty enemy entry run it (and puts
+                                  ; its id back); meaning unknown
+
 ; --- Battle setup (Battle_SetupBattle) ---
 !Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56
 !Battle_Unk56Divisor      = 24    ; Battle_CalcUnk56: .Unk3F / this ...

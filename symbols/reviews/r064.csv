@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:8461,BattleSys_Unk8461,2026-10-08,rev64a,approved,ab9a8865c868,"Fixed: 8CF9 zeroes AF24 ($8CFB), reads it after its ($B88D) dispatch; 876C-87FE skip/$FE/$FF flow OK. Rest rechecked. nit: B263 counts only blocks after the first"
