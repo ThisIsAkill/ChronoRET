@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # pre-commit / commit-msg hook.
 #   pre-commit:  author/committer identity, blocked-pattern scan, staged
-#                paths, ROM byte-exact match, doc regen, staleness checks
+#                paths, ROM byte-exact match, full-coverage verify,
+#                readability gate, doc regen, staleness checks
 #   commit-msg:  commit message text against the same blocked-pattern scan
 #
 # Install:   make install-hook
@@ -48,9 +49,10 @@ bad=$(printf '%s\n' "$staged" | grep -iE '\.(sfc|smc)$' || true)
 [ -z "$bad" ] || fail "ROM file staged:"$'\n'"$bad"
 printf '%s\n' "$staged" | scan "staged path"
 
-# Content (added lines only)
-git diff --cached -U0 --no-color --diff-filter=ACMR \
-    | grep -E '^\+' | grep -vE '^\+\+\+ ' | scan "staged content"
+# Content (added lines only). `|| true` keeps pipefail from aborting
+# silently when nothing new is staged (e.g. a message-only amend).
+{ git diff --cached -U0 --no-color --diff-filter=ACMR \
+    | grep -E '^\+' | grep -vE '^\+\+\+ ' || true; } | scan "staged content"
 
 # ── 1. ROM byte-exact diff ────────────────────────────────────────────────────
 if [ ! -f roms/chrono_trigger.sfc ]; then
@@ -61,7 +63,14 @@ else
         fail "ROM does not match after reassembly. Run 'make diff' to debug."
     fi
     ok "MATCH: byte-exact."
+    info "Checking every source-emitted byte (independent of base ROM)..."
+    python3 tools/verify.py >/dev/null || fail "tools/verify.py found source bytes that differ from the ROM."
+    ok "VERIFIED: full coverage."
 fi
+
+# ── 1b. Readability standard ─────────────────────────────────────────────────
+info "Checking readability standard..."
+python3 tools/lint_readability.py || fail "Readability gate failed (see above; rules in tools/lint_readability.py)."
 
 # ── 2. Regenerate progress snippet in wiki ───────────────────────────────────
 WIKI_DIR="../chrono-trigger-wiki"

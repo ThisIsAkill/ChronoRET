@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff clean check-rom setup
+.PHONY: all build diff verify lint gate clean check-rom setup
 
 all: build diff
 
@@ -23,6 +23,18 @@ build: check-rom
 diff: build
 	python3 tools/diff_rom.py $(ROM) $(OUT_ROM)
 
+# Every source-emitted byte matches the ROM, independent of the base ROM.
+verify: check-rom
+	python3 tools/verify.py
+
+# Readability standard (functions in tools/readability_baseline.txt are
+# grandfathered and may only shrink).
+lint:
+	python3 tools/lint_readability.py
+
+# What a function needs before it reaches main.
+gate: diff verify lint
+
 clean:
 	rm -rf $(BUILD_DIR)
 
@@ -32,7 +44,8 @@ setup:
 
 # Install pre-commit/commit-msg hooks (requires git repo)
 install-hook:
-	cp tools/pre-commit .git/hooks/pre-commit
-	cp tools/pre-commit .git/hooks/commit-msg
-	chmod +x .git/hooks/pre-commit .git/hooks/commit-msg
-	@echo "pre-commit, commit-msg hooks installed."
+	@hooks=$$(git rev-parse --git-common-dir)/hooks; \
+	cp tools/pre-commit $$hooks/pre-commit; \
+	cp tools/pre-commit $$hooks/commit-msg; \
+	chmod +x $$hooks/pre-commit $$hooks/commit-msg; \
+	echo "pre-commit, commit-msg hooks installed in $$hooks."
