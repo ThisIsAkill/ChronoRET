@@ -1,0 +1,10 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:2ED9,C2Scene_QueueSoundCmd,2026-10-08,rev84a,approved,e003ada1a03a,"Fix verified: WaitFrames/ModeIdle send it. Checked state tests, PendPrio<Prio refusal, copies, C exit. nit: ZoneSoundAtView passes no rank (only effectively 0)."
+$C2:443C,C2Scene_ObjARise,2026-10-08,rev84a,approved,cd7e1b80aa9f,"Fix verified: C2Anim_Run reloads X=TaskCur; spawn temps noted. Checked RiseAttrAt/Prio3, Go1DD path (no Anim_Run off mode 1), +Lift, facing bits, fall-in."
+$C2:44B7,C2Scene_ObjAFly,2026-10-08,rev84a,approved,dee3d49e1a2b,"Fix verified (X = task via .done). Checked button order, spot/land paths, LiftUp, LandFrames, step vel/target, .done=$4509, ObjBOverlap M quirk, fall into ObjAMove."
+$C2:4728,C2Scene_ObjAAfterMode8,2026-10-08,rev84a,approved,9108c2908818,"Fix verified: ObjAWait and ObjAFly zero NextLoc. Checked neg/pos paths, loc/tile constants, 7F00CC/CD, word-store quirk, $0C1C/$0C20 and M=0 STZ quirks."
+$C2:4823,C2Scene_ObjAScript,2026-10-08,rev84a,approved,830f7c696de4,"Fix verified: Arrive/Leave stop only on ops $39/$31/$38, each leaving X = task; $3B/$3D always advance. Checked end paths (flag 5 or not), copy of position."
+$C2:4AAD,C2Scene_ObjAScrLeave,2026-10-08,rev84a,approved,f1937715a7ab,"Fix verified: pal 0 from PalB, 1-7/9-15 from PalA, 8 mid-fade (12 two-frame rounds = 24 frames). Checked both paths, dash 50 = 14+36, .go copies, 8-frame wait."
+$C2:5249,C2Scene_ObjBMateLand,2026-10-08,rev84a,approved,41c6be64ee6c,"Fix verified: Follow's landing returns C=0, so Frames 1-$30 move = $30 = MateGlideFrames. Checked prio 2, fractions/vel 0, SavePos. nit: 'reaches' not 'passes' LandFrames."
+$C2:55D1,C2Scene_ObjBMateMarkLand,2026-10-08,rev84a,approved,8285dd772a5e,"Fix verified: MarkFollow's landing returns C=0, Frames starts at 1, $30 moves; state 1 = MateStWait in MarkStates. nit: 'reaches' not 'passes' LandFrames."
+$C2:5628,C2Scene_LabelTask,2026-10-08,rev84a,changes,8b98616b87e0,"'or above object A' is false: Y = ObjAY + LabelBelowObjA ($40), pieces at -48, so the label is 16 px below A's position (A's rest frame spans -16..+16). Say below."
