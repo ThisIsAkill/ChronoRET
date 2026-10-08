@@ -5344,6 +5344,452 @@ Field_StashSaveBlock:
     RTS
 
 ; ============================================================
+; Location-load steps: the record offset, the layer graphics, the
+; metatile tables and the palette rows ($C0:092B-$C0:0A4F, $C0:6D2F-
+; $C0:6E26, $C0:7084-$C0:70E8). LoadLocation runs them in the order
+; LocLoad_Unk092B, LocLoad_Unk0960, LocLoad_Unk6DCF, LocLoad_Unk7084,
+; ..., LocLoad_Unk09DD, LocLoad_Unk0A14; Field_RestoreState repeats all
+; but the first. Each reads one byte of the location's LocRom record
+; (Tileset12, Tileset3, Palette) and unpacks or copies what it picks.
+; The step names stay Unk because verified callers use them.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:092B — LocLoad_Unk092B (53 bytes, $092B–$095F)
+; First location-load step: Loc_RecOfs = (Loc_Id & $FF) x
+; LocRom_RecSize, plus LocRom_HalfOfs when Loc_Id bit 8 is set, i.e.
+; the offset of record Loc_Id & Loc_IdMask in LocRom. The two paths
+; repeat the whole multiply instead of sharing it; kept as found.
+; Callers: LoadLocation ($C0:00F4), its only call site.
+; On entry: M=1 (8-bit A), X=0, DP=$0100 (Loc_Id, Loc_RecOfs), DB=$00
+; (WRMPYA/WRMPYB/RDMPYL absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A = Loc_RecOfs (16-bit value,
+; B = its high byte); Loc_RecOfs set.
+; ------------------------------------------------------------
+org $C0092B
+LocLoad_Unk092B:
+    LDA.b !Loc_Id+1
+    AND.b #!Loc_IdHiBit8
+    BNE .second_half
+    LDA.b !Loc_Id
+    STA.w WRMPYA
+    LDA.b #!LocRom_RecSize
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP                                 ; multiplier latency
+    REP #$20
+    LDA.w RDMPYL
+    BRA .store
+.second_half:
+    LDA.b !Loc_Id
+    STA.w WRMPYA
+    LDA.b #!LocRom_RecSize
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!LocRom_HalfOfs
+.store:
+    STA.b !Loc_RecOfs
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:0960 — LocLoad_Unk0960 (125 bytes, $0960–$09DC)
+; Loads the graphics of layers 1 and 2. Unless LocRom.Tileset12 is
+; LocRom_SetNone, LocGfx_PackListPtr is pointed at its LocGfx_Lists
+; entry (8 pack numbers) and LocLoad_UploadPack unpacks packs 0-5 one
+; by one to LocGfx_Stage and uploads each to VRAM: $2000, $2800, $3000,
+; $3800, $4000 ($1000 bytes each) and $4800 ($0F80 bytes). The tail jump
+; to LocLoad_UnpackPacks67 then unpacks packs 6 and 7 into bank $7F.
+; "Graphics" rests on the VRAM targets below the tilemaps at $6000
+; (Map_VramTilemap1); the BG character bases are not traced.
+; The pointer is stepped with an 8-bit INC: the entries are 8-byte
+; aligned, so the low byte never carries.
+; Callers: LoadLocation ($C0:00FA) and Field_RestoreState ($C0:01C3).
+; On entry: M=1 (8-bit A), X=0, DP=$0100 (Loc_RecOfs and the
+; VramDma_*/LocGfx_PackListPtr arguments), DB=$00 (multiplier and the
+; Decomp_* block absolute).
+; Exit (all paths): M=1, X=0, DP and DB unchanged; A, X and Y
+; clobbered; Eng_Scratch, LocGfx_PackListPtr, the VramDma_* arguments,
+; the Decomp_* block, LocGfx_Stage, LocGfx_Unk7F6000/7000 and VRAM
+; $2000-$4FBF written.
+; ------------------------------------------------------------
+LocLoad_Unk0960:
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Tileset12,X
+    CMP.b #!LocRom_SetNone
+    BNE .load
+    RTS
+.load:
+    STA.w WRMPYA
+    LDA.b #!LocGfx_ListSize
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP                                 ; multiplier latency
+    REP #$30
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!LocGfx_Lists&$FFFF
+    STA.b !LocGfx_PackListPtr
+    SEP #$20
+    LDA.b #!LocGfx_Lists>>16
+    STA.b !LocGfx_PackListPtr+2
+    LDX.w #!LocGfx_Vram0
+    STX.b !VramDma_Addr
+    LDX.w #!LocGfx_Stage&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7E
+    STA.b !VramDma_SrcBank
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDX.w #!LocGfx_PackBytes
+    STX.b !VramDma_Size
+    JSR LocLoad_UploadPack              ; pack 0
+    LDX.w #!LocGfx_Vram0+(1*!LocGfx_VramStep)
+    STX.b !VramDma_Addr
+    INC.b !LocGfx_PackListPtr
+    JSR LocLoad_UploadPack              ; pack 1
+    INC.b !LocGfx_PackListPtr
+    LDX.w #!LocGfx_Vram0+(2*!LocGfx_VramStep)
+    STX.b !VramDma_Addr
+    JSR LocLoad_UploadPack              ; pack 2
+    INC.b !LocGfx_PackListPtr
+    LDX.w #!LocGfx_Vram0+(3*!LocGfx_VramStep)
+    STX.b !VramDma_Addr
+    JSR LocLoad_UploadPack              ; pack 3
+    INC.b !LocGfx_PackListPtr
+    LDX.w #!LocGfx_Vram0+(4*!LocGfx_VramStep)
+    STX.b !VramDma_Addr
+    JSR LocLoad_UploadPack              ; pack 4
+    INC.b !LocGfx_PackListPtr
+    LDX.w #!LocGfx_Vram0+(5*!LocGfx_VramStep)
+    STX.b !VramDma_Addr
+    LDX.w #!LocGfx_Pack5Bytes
+    STX.b !VramDma_Size
+    JSR LocLoad_UploadPack              ; pack 5
+    INC.b !LocGfx_PackListPtr
+    BRL LocLoad_UnpackPacks67           ; packs 6 and 7
+
+; ------------------------------------------------------------
+; $C0:09DD — LocLoad_Unk09DD (55 bytes, $09DD–$0A13)
+; Unpacks the layer 1/2 metatile table: unless LocRom.Tileset12 is
+; LocRom_SetNone, its LocGfx_Meta12Ptrs entry is unpacked with
+; Decomp_ToWramVec to Map_Meta12TL ($7E:B000), over the MapProps that
+; LocLoad_UnkA33B has already used.
+; Callers: LoadLocation ($C0:0109), Field_RestoreState ($C0:01D2) and
+;   unmatched code at $C0:0324 (Scene_Unk0283).
+; On entry: M=1 (8-bit A), X=0, DP=$0100 (Loc_RecOfs, Eng_Scratch),
+; DB=$00 (the Decomp_* block absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (and what
+; Decomp_ToWramVec changes); Eng_Scratch and the Decomp_* block written.
+; ------------------------------------------------------------
+LocLoad_Unk09DD:
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Tileset12,X
+    CMP.b #!LocRom_SetNone
+    BEQ .done
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    TAX
+    LDA.l !LocGfx_Meta12Ptrs,X
+    STA.w !Decomp_Src
+    LDA.w #!Map_Meta12TL&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_Meta12Ptrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7E
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:0A14 — LocLoad_Unk0A14 (60 bytes, $0A14–$0A4F)
+; Unpacks the layer-3 metatile table: unless Field_UnkBB is set (no
+; layer 3, LocLoad_Unk6DCF) or LocRom.Tileset3 is LocRom_SetNone, its
+; LocGfx_Meta3Ptrs entry is unpacked with Decomp_ToWramVec to
+; Map_Meta3TL ($7E:C000). The two exits are separate RTSs.
+; Callers: LoadLocation ($C0:010C), Field_RestoreState ($C0:01D5) and
+;   unmatched code at $C0:032A (Scene_Unk0283).
+; On entry: M=1 (8-bit A), X=0, DP=$0100 (Field_UnkBB, Loc_RecOfs,
+; Eng_Scratch), DB=$00 (the Decomp_* block absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (and what
+; Decomp_ToWramVec changes); Eng_Scratch and the Decomp_* block written
+; when it loads.
+; ------------------------------------------------------------
+LocLoad_Unk0A14:
+    LDA.b !Field_UnkBB
+    BNE .skip
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Tileset3,X
+    CMP.b #!LocRom_SetNone
+    BEQ .skip
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    TAX
+    LDA.l !LocGfx_Meta3Ptrs,X
+    STA.w !Decomp_Src
+    LDA.w #!Map_Meta3TL&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_Meta3Ptrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7E
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    RTS
+.skip:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6D2F — LocLoad_UploadPack (54 bytes, $6D2F–$6D64)
+; One graphics pack of LocLoad_Unk0960: reads the pack number at
+; [LocGfx_PackListPtr]; unless it is LocRom_SetNone, unpacks its
+; LocGfx_PackPtrs entry with Decomp_ToWramVec to LocGfx_Stage and
+; uploads it with VramDma_Upload, using the VramDma_* arguments the
+; caller set (VRAM address, size; source LocGfx_Stage).
+; Callers (6 JSR sites): LocLoad_Unk0960 ($C0:099E, $C0:09A8, $C0:09B2,
+;   $C0:09BC, $C0:09C6, $C0:09D5).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+; (LocGfx_PackListPtr, Eng_Scratch, VramDma_*), DB=$00 (Decomp_* block).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Eng_Scratch
+; and the Decomp_* block written when a pack is loaded.
+; ------------------------------------------------------------
+org $C06D2F
+LocLoad_UploadPack:
+    LDA.b [!LocGfx_PackListPtr]
+    CMP.b #!LocRom_SetNone
+    BEQ .done
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    TAX
+    LDA.l !LocGfx_PackPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #!LocGfx_Stage&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_PackPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7E
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    JSR VramDma_Upload
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6D65 — LocLoad_UnpackPacks67 (106 bytes, $6D65–$6DCE)
+; The end of LocLoad_Unk0960: with LocGfx_PackListPtr on entry byte 6
+; of the LocGfx_Lists entry, unpacks pack 6 to LocGfx_Unk7F6000, steps
+; the pointer (16-bit INX this time), and unpacks pack 7 to
+; LocGfx_Unk7F7000. Either is skipped when its number is
+; LocRom_SetNone. Nothing here uploads them; who reads them is not
+; traced.
+; Callers: BRL from LocLoad_Unk0960 ($C0:09DA), its only reference.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+; (LocGfx_PackListPtr, Eng_Scratch), DB=$00 (Decomp_* block).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered;
+; LocGfx_PackListPtr advanced by 1, Eng_Scratch and the Decomp_* block
+; written.
+; ------------------------------------------------------------
+LocLoad_UnpackPacks67:
+    LDA.b [!LocGfx_PackListPtr]
+    CMP.b #!LocRom_SetNone
+    BEQ .pack7
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    TAX
+    LDA.l !LocGfx_PackPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #!LocGfx_Unk7F6000&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_PackPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+.pack7:
+    LDX.b !LocGfx_PackListPtr
+    INX
+    STX.b !LocGfx_PackListPtr
+    LDA.b [!LocGfx_PackListPtr]
+    CMP.b #!LocRom_SetNone
+    BEQ .done
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    TAX
+    LDA.l !LocGfx_PackPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #!LocGfx_Unk7F7000&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_PackPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6DCF — LocLoad_Unk6DCF (88 bytes, $6DCF–$6E26)
+; Loads the layer-3 graphics: if LocRom.Tileset3 is LocRom_SetNone it
+; only sets Field_UnkBB = 1 (no layer 3; LocLoad_Unk0A14 and
+; LocLoad_UnkA33B test it). Otherwise its LocGfx_PackPtrs entry is
+; unpacked to LocGfx_StageL3 ($7F:5080) and LocGfx_PackBytes of it are
+; uploaded to VRAM LocGfx_VramL3 ($5000). It does not clear
+; Field_UnkBB itself (Field_InitLoadState zeroes it).
+; Callers: LoadLocation ($C0:00FD) and Field_RestoreState ($C0:01C6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_RecOfs,
+; Eng_Scratch, VramDma_*, Field_UnkBB), DB=$00 (Decomp_* block).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Eng_Scratch
+; (= the entry's offset), the Decomp_* block and the VramDma_* arguments
+; written, or Field_UnkBB = 1.
+; ------------------------------------------------------------
+LocLoad_Unk6DCF:
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Tileset3,X
+    CMP.b #!LocRom_SetNone
+    BEQ .no_layer3
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x LocGfx_PackPtrSize
+    STA.b !Eng_Scratch
+    TAX
+    LDA.l !LocGfx_PackPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #!LocGfx_StageL3&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !LocGfx_PackPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    LDX.w #!LocGfx_VramL3
+    STX.b !VramDma_Addr
+    LDX.w #!LocGfx_StageL3&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7F
+    STA.b !VramDma_SrcBank
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDX.w #!LocGfx_PackBytes
+    STX.b !VramDma_Size
+    JSR VramDma_Upload
+    RTS
+.no_layer3:
+    LDA.b #$01
+    STA.b !Field_UnkBB
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7084 — LocLoad_Unk7084 (101 bytes, $7084–$70E8)
+; Copies the location's palette rows: LocPal_Rom entry LocRom.Palette
+; (LocPal_SetBytes = 7 x 30 bytes, offset by the hardware multiplier)
+; goes with seven MVNs of LocPal_RowBytes each to Pal_LocRows and the
+; six rows after it, LocPal_RowStep apart, so colours 1-15 of Pal_Buf
+; rows 1-7 are replaced and each row's colour 0 is kept. Each MVN
+; leaves X and Y just past what it copied; the INY INY skips colour 0
+; of the next row. "Palette" rests on the 15-of-16 word layout and on
+; Pal_Buf probably being the CGRAM shadow (not traced to the upload).
+; Callers: LoadLocation ($C0:0100) and Field_RestoreState ($C0:01C9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_RecOfs),
+; DB=$00 (multiplier registers absolute).
+; Exit: M=1, X=0, DP unchanged, DB preserved (PHB/PLB around each MVN);
+; A, X and Y clobbered.
+; ------------------------------------------------------------
+org $C07084
+LocLoad_Unk7084:
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Palette,X
+    STA.w WRMPYA
+    LDA.b #!LocPal_SetBytes
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP                                 ; multiplier latency
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!LocPal_Rom&$FFFF
+    TAX                                 ; source in bank $F6
+    LDY.w #!Pal_LocRows&$FFFF           ; row 1, colour 1
+    LDA.w #!LocPal_RowBytes-1           ; MVN count - 1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 1  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY                                 ; skip colour 0 of the next row
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 2  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 3  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 4  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 5  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 6  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    INY
+    INY
+    LDA.w #!LocPal_RowBytes-1
+    PHB
+    MVN !Bank7E,!BankF6                 ; row 7  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; ============================================================
 ; $C0:0B4E — InitHW (22 bytes)
 ; Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and
 ; sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on.
@@ -15800,6 +16246,502 @@ Scene_SettleFrames:
     RTS
 
 ; ============================================================
+; $C0:286C — Scene_ReloadStep (62 bytes, $286C–$28A9)
+; Rebuilds the screen after a location load or a bank-$C2 round trip,
+; before the fade-in: TileAnimList_ApplyAll, LocLoad_DrawMap, the object
+; resets Field_ResetUnk0B88, Field_ResetUnk0B80, SprBuf_FreeAll,
+; Obj_ResetDrawLists and Obj_ResetFrameState, then Field_UnkB0E6, the
+; VRAM uploads and palette setup (Field_UploadUnk1F00, Pal_LoadUnkRow0,
+; Field_Unk29F7, Field_UploadUnk1D00, Field_Unk2B78,
+; Field_UploadUnk1C00, Field_UploadUnk0000), Oam_HideFirst4,
+; Field_UploadUnk57E0, Scene_ResumeNmi (NMI back on) and one Sub_EC60
+; frame wait. Returns Field_Unk1E: its callers skip the fade-in when
+; it is nonzero.
+; Callers: Field_FadeInAfterReload ($C0:2824) and Scene_SettleFrames
+;   ($C0:2848).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (as the
+; callees need; GameLoop_LoadField and the reload paths set them).
+; Exit: M=1, X=0, DP and DB as the callees leave them (unchanged as far
+; as the matched ones go); A = Field_Unk1E with Z set iff it is 0;
+; X, Y, Obj_Cur and what the callees change clobbered; interrupts on.
+; ============================================================
+org $C0286C
+Scene_ReloadStep:
+    JSR TileAnimList_ApplyAll
+    JSR LocLoad_DrawMap
+    JSR Field_ResetUnk0B88
+    JSR Field_ResetUnk0B80
+    JSR SprBuf_FreeAll
+    JSR Obj_ResetDrawLists
+    JSR Obj_ResetFrameState
+    JSR Field_UnkB0E6
+    JSR Field_UploadUnk1F00
+    JSR Pal_LoadUnkRow0
+    JSL Field_Unk29F7
+    JSR Field_UploadUnk1D00
+    JSL Field_Unk2B78
+    JSR Field_UploadUnk1C00
+    JSR Field_UploadUnk0000
+    JSR Oam_HideFirst4
+    JSR Field_UploadUnk57E0
+    JSR Scene_ResumeNmi
+    JSR Sub_EC60
+    LDA.b !Field_Unk1E                  ; Z: 0 = do the fade-in
+    RTS
+
+; ------------------------------------------------------------
+; $C0:0B28 — Scene_ResumeNmi (38 bytes, $0B28–$0B4D)
+; Scene_ReloadStep's last setup: EngFD_UnkC124 (writes HDMA table bytes
+; in bank $7F from the map's tilemap settings; not traced),
+; EngFD_UnkC2C1 (with 8-bit X/Y) and Hdma_InitChannelsFD, then waits
+; for the NMI flag (RDNMI bit 7, the start of a vertical blank) and
+; enables NMI and joypad auto-read (NMITIMEN_NmiJoy), sets VTIMEL =
+; Scene_VIrqLine ($D3; the V-IRQ enable bit is not set here) and clears
+; the interrupt mask.
+; Callers: Scene_ReloadStep ($C0:28A1), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB=$00 (registers
+; absolute), DP=$0100 (as Scene_ReloadStep has it; what the bank-$FD
+; callees need is not traced).
+; Exit: M=1, X=0, DP and DB unchanged as far as is known (the bank-$FD
+; callees are not matched); A clobbered (RDNMI read); interrupts on.
+; ------------------------------------------------------------
+org $C00B28
+Scene_ResumeNmi:
+    JSL EngFD_UnkC124
+    SEP #$10
+    JSL EngFD_UnkC2C1
+    REP #$10
+    JSL Hdma_InitChannelsFD
+.wait_vblank:
+    LDA.w RDNMI
+    BPL .wait_vblank                    ; until the NMI flag is set
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    REP #$20
+    LDA.w #!Scene_VIrqLine
+    STA.w VTIMEL
+    SEP #$20
+    CLI
+    RTS
+; ------------------------------------------------------------
+; $C0:6E5C — Field_UploadUnk1F00 (68 bytes, $6E5C–$6E9F)
+; Uploads one of eight bank-$FF graphics sets picked, like
+; Pal_LoadUnkRow0's colours, by Menu_Config01 bits 0-2: the set's first
+; Field_UploadUnk1F00Bytes ($200) go to VRAM $1F00 and the next
+; Field_UploadUnk4FC0Bytes ($80) to VRAM $4FC0, the 64 words that
+; LocLoad_Unk0960's last pack (LocGfx_Pack5Bytes) leaves free. The set
+; offsets come from Field_UploadUnk1F00Srcs (PHK/PLB around the read,
+; so DB = this bank for it). Using the same setting as the colours
+; suggests a window frame (probably); not traced.
+; Callers: Scene_ReloadStep ($C0:2884) and unmatched code at $C0:EABA
+;   (NMI handler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
+; DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
+; the VramDma_* arguments written.
+; ------------------------------------------------------------
+org $C06E5C
+Field_UploadUnk1F00:
+    LDA.l !Menu_Config01
+    REP #$20
+    AND.w #!Pal_Row0SetMask
+    ASL A                               ; word index
+    PHB
+    PHK
+    PLB                                 ; DB = $C0 for the table
+    TAX
+    LDA.w Field_UploadUnk1F00Srcs,X
+    PLB
+    STA.b !VramDma_Src
+    LDA.w #!Field_UploadVram1F00
+    STA.b !VramDma_Addr
+    LDA.w #!Field_UploadUnk1F00Bytes
+    STA.b !VramDma_Size
+    SEP #$20
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDA.b #!BankFF
+    STA.b !VramDma_SrcBank
+    JSR VramDma_Upload
+    REP #$20
+    LDA.b !VramDma_Src
+    CLC
+    ADC.b !VramDma_Size                 ; the bytes after the first part
+    STA.b !VramDma_Src
+    LDA.w #!Field_UploadVram4FC0
+    STA.b !VramDma_Addr
+    LDA.w #!Field_UploadUnk4FC0Bytes
+    STA.b !VramDma_Size
+    SEP #$20
+    JSR VramDma_Upload
+    RTS
+
+; $C0:6EA0 — Field_UploadUnk1F00Srcs (16 bytes, $6EA0–$6EAF)
+; Field_UploadUnk1F00's eight source offsets in bank $FF, one per
+; Menu_Config01 setting; each set is $280 bytes ($200 + $80).
+Field_UploadUnk1F00Srcs:
+    dw $9E10,$A090,$A310,$A590,$A810,$AA90,$AD10,$AF90
+
+
+; ------------------------------------------------------------
+; $C0:6EB0 — Field_UploadUnk1D00 (27 bytes, $6EB0–$6ECA)
+; Uploads Field_UploadUnk1D00Bytes ($280) from Field_Unk7EF000 to VRAM
+; $1D00 (VramDma_Upload, word writes). What the data is, is not traced.
+; Callers: Scene_ReloadStep ($C0:288E) and unmatched code at $C0:EA9E
+;   (NMI handler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
+; DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (as
+; VramDma_Upload); Y preserved; the VramDma_* arguments written.
+; ------------------------------------------------------------
+org $C06EB0
+Field_UploadUnk1D00:
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7E
+    STA.b !VramDma_SrcBank
+    LDX.w #!Field_UploadVram1D00
+    STX.b !VramDma_Addr
+    LDX.w #!Field_UploadUnk1D00Bytes
+    STX.b !VramDma_Size
+    JSR VramDma_Upload
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6EF1 — Field_UploadUnk1C00 (27 bytes, $6EF1–$6F0B)
+; As Field_UploadUnk1D00 with VRAM $1C00 and Field_UploadUnk1C00Bytes
+; ($200), from the same Field_Unk7EF000.
+; Callers: Scene_ReloadStep ($C0:2895) and unmatched code at $C0:EAAC
+;   (NMI handler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
+; DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
+; the VramDma_* arguments written.
+; ------------------------------------------------------------
+org $C06EF1
+Field_UploadUnk1C00:
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7E
+    STA.b !VramDma_SrcBank
+    LDX.w #!Field_UploadVram1C00
+    STX.b !VramDma_Addr
+    LDX.w #!Field_UploadUnk1C00Bytes
+    STX.b !VramDma_Size
+    JSR VramDma_Upload
+    RTS
+; ------------------------------------------------------------
+; $C0:6F0C — Field_UploadUnk0000 (82 bytes, $6F0C–$6F5D)
+; Four uploads of Field_UploadUnk0000Bytes ($40) from bank $FF to the
+; start of VRAM: FieldRom_Unk9CF0 + 0 / $40 / $80 / $C0 to VRAM $0000,
+; $0100, $0030 and $0130 (two 2-tile pieces in each of two tile rows,
+; if VRAM there holds 4bpp tiles; not traced). The second and fourth
+; uploads reuse the size, mode and bank the first and third set. It
+; ends with a JSR to Pal_UploadCgram_Rts, a lone RTS: a call that does
+; nothing; kept as found.
+; Callers: Scene_ReloadStep ($C0:2898), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
+; DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
+; the VramDma_* arguments written.
+; ------------------------------------------------------------
+org $C06F0C
+Field_UploadUnk0000:
+    LDX.w #!FieldRom_Unk9CF0&$FFFF
+    STX.b !VramDma_Src
+    LDX.w #!Field_UploadVram0000
+    STX.b !VramDma_Addr
+    LDX.w #!Field_UploadUnk0000Bytes
+    STX.b !VramDma_Size
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDA.b #!BankFF
+    STA.b !VramDma_SrcBank
+    JSR VramDma_Upload
+    LDX.w #(!FieldRom_Unk9CF0+(1*!Field_UploadUnk0000Bytes))&$FFFF
+    STX.b !VramDma_Src
+    LDX.w #!Field_UploadVram0100
+    STX.b !VramDma_Addr
+    JSR VramDma_Upload
+    LDX.w #(!FieldRom_Unk9CF0+(2*!Field_UploadUnk0000Bytes))&$FFFF
+    STX.b !VramDma_Src
+    LDX.w #!Field_UploadVram0030
+    STX.b !VramDma_Addr
+    LDX.w #!Field_UploadUnk0000Bytes
+    STX.b !VramDma_Size
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDA.b #!BankFF
+    STA.b !VramDma_SrcBank
+    JSR VramDma_Upload
+    LDX.w #(!FieldRom_Unk9CF0+(3*!Field_UploadUnk0000Bytes))&$FFFF
+    STX.b !VramDma_Src
+    LDX.w #!Field_UploadVram0130
+    STX.b !VramDma_Addr
+    JSR VramDma_Upload
+    JSR Pal_UploadCgram_Rts             ; a lone RTS
+    RTS
+
+
+; ------------------------------------------------------------
+; $C0:6F5E — Field_UploadUnk57E0 (27 bytes, $6F5E–$6F78)
+; Uploads Field_UploadUnk57E0Bytes ($40) from FieldRom_Unk9260
+; ($FF:9260) to VRAM $57E0, the last $20 words of the area
+; LocLoad_Unk6DCF fills from LocGfx_VramL3 ($5000), so it overwrites the
+; end of the layer-3 graphics. What the 64 bytes are is not traced.
+; Callers: Scene_ReloadStep ($C0:289E) and unmatched code at $C0:EAC8
+;   (NMI handler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
+; DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
+; the VramDma_* arguments written.
+; ------------------------------------------------------------
+org $C06F5E
+Field_UploadUnk57E0:
+    LDX.w #!FieldRom_Unk9260&$FFFF
+    STX.b !VramDma_Src
+    LDX.w #!Field_UploadVram57E0
+    STX.b !VramDma_Addr
+    LDX.w #!Field_UploadUnk57E0Bytes
+    STX.b !VramDma_Size
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDA.b #!FieldRom_Unk9260>>16
+    STA.b !VramDma_SrcBank
+    JSR VramDma_Upload
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6F79 — Field_ResetUnk0B88 (33 bytes, $6F79–$6F99)
+; With DP=$2100, writes Field_Unk0B80Empty ($80) to the
+; Field_Unk0B88Bytes (30) bytes of Field_Unk0B88 through the WRAM port.
+; Field_ResetUnk0B80 does the same for the 8 bytes before them; the
+; two run back to back in Scene_PostLoadInit and Scene_ReloadStep.
+; Callers: Scene_ReloadStep ($C0:2872) and Scene_PostLoadInit
+;   ($C0:56B3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP and DB any (DP is set
+; to $2100 here and restored; the register writes go through it).
+; Exit: M=1, X=0, DP restored, DB unchanged; A = Field_Unk0B80Empty,
+; X = 0.
+; ------------------------------------------------------------
+org $C06F79
+Field_ResetUnk0B88:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Field_Unk0B88
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; WRAM bank $7E
+    STA.b WMADDH-!DP_PPU
+    SEP #$10
+    LDX.b #!Field_Unk0B88Bytes
+    LDA.b #!Field_Unk0B80Empty
+.fill:
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .fill
+    REP #$10
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:70E9 — Pal_LoadUnkRow0 (69 bytes, $70E9–$712D)
+; Sets colours 1-15 of Pal_Buf row 0 and then copies all of Pal_Buf
+; (Pal_BufBytes) to Pal_CgramBuf ($7E:2200):
+; - 30 bytes from FieldRom_PalRow0Sets + 2 + n x 16, n = Menu_Config01
+;   (Menu_Config+1) bits 0-2, go to Pal_Buf+2 (MVN). The sets are 16 bytes apart but 30
+;   are copied, so each takes the next set's first 14 bytes along;
+; - colours 9, 10 and 11 are then forced to Pal_Grey9 ($0C63), Pal_Grey10
+;   ($18C6) and Pal_Grey11 ($739C).
+; Menu_Config+1 bits 0-2 picking the colours suggests a player setting
+; (a window colour, probably); not traced on the menu side.
+; Callers: Scene_ReloadStep ($C0:2887), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP not used; any DB
+; (long accesses, DB preserved around the MVNs).
+; Exit: M=1, X=0, DB preserved; A, X and Y clobbered.
+; ------------------------------------------------------------
+org $C070E9
+Pal_LoadUnkRow0:
+    LDA.l !Menu_Config01
+    REP #$20
+    AND.w #!Pal_Row0SetMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; x 16
+    CLC
+    ADC.w #!FieldRom_PalRow0Sets&$FFFF
+    INC A
+    INC A                               ; skip colour 0
+    TAX
+    LDY.w #(!Pal_Buf+2)&$FFFF           ; row 0, colour 1
+    LDA.w #!LocPal_RowBytes-1           ; MVN count - 1
+    PHB
+    MVN !Bank7E,!BankFF                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDA.w #!Pal_Grey9
+    STA.l !Pal_Buf+(9*2)
+    LDA.w #!Pal_Grey10
+    STA.l !Pal_Buf+(10*2)
+    LDA.w #!Pal_Grey11
+    STA.l !Pal_Buf+(11*2)
+    LDX.w #!Pal_Buf&$FFFF
+    LDY.w #!Pal_CgramBuf&$FFFF
+    LDA.w #!Pal_BufBytes-1
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+; ------------------------------------------------------------
+; $C0:712E — Pal_UploadCgram (39 bytes, $712E–$7154)
+; Sends Pal_CgramBuf (Pal_BufBytes from $7E:2200) to CGRAM from colour 0
+; with DMA channel 7 (mode 0, B-bus CGDATA). A second RTS follows the
+; first at $C0:7154: Pal_UploadCgram_Rts, the target of
+; Field_UploadUnk0000's do-nothing JSR.
+; Callers: unmatched code at $C0:EB86 (NMI handler); the sub-entry
+;   Pal_UploadCgram_Rts: Field_UploadUnk0000 ($C0:6F5A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the address and size are word
+; stores), DB=$00 (registers absolute); DP not used. Meant for a
+; vertical blank or forced blank (CGRAM writes).
+; Exit: M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X = Pal_BufBytes.
+; ------------------------------------------------------------
+org $C0712E
+Pal_UploadCgram:
+    LDA.b #$00
+    STA.w CGADD                         ; from colour 0
+    LDA.b #$00                          ; mode 0: one register, A-bus to B-bus
+    STA.w DMAP7
+    LDA.b #!BBAD_CGDATA
+    STA.w BBAD7
+    LDX.w #!Pal_CgramBuf&$FFFF
+    STX.w A1T7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDX.w #!Pal_BufBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+Pal_UploadCgram_Rts:                    ; header: see Pal_UploadCgram
+    RTS
+
+
+; ------------------------------------------------------------
+; $C0:7155 — Field_ResetUnk0B80 (27 bytes, $7155–$716F)
+; Writes Field_Unk0B80Empty ($80) to the 8 bytes of Field_Unk0B80, one
+; STA each (see Field_ResetUnk0B88).
+; Callers: Scene_ReloadStep ($C0:2875) and Scene_PostLoadInit
+;   ($C0:56B6).
+; On entry: M=1 (8-bit A), DB=$00 (absolute stores); X and DP not used.
+; Exit: M, X, DP and DB unchanged; A = Field_Unk0B80Empty.
+; ------------------------------------------------------------
+org $C07155
+Field_ResetUnk0B80:
+    LDA.b #!Field_Unk0B80Empty
+    STA.w !Field_Unk0B80
+    STA.w !Field_Unk0B80+1
+    STA.w !Field_Unk0B80+2
+    STA.w !Field_Unk0B80+3
+    STA.w !Field_Unk0B80+4
+    STA.w !Field_Unk0B80+5
+    STA.w !Field_Unk0B80+6
+    STA.w !Field_Unk0B80+7
+    RTS
+
+; ------------------------------------------------------------
+; $C0:B204 — Obj_ResetDrawLists (94 bytes, $B204–$B261)
+; Empties the draw buckets: with DP=$2100 it writes ObjQ_Empty ($80) to
+; the first 32 bytes at Obj_DrawBucket through the WRAM port, then MVNs
+; spread them over the rest of the page ($0E20-$0EFF: 32, 64 and 128
+; bytes, each copy reading the bytes already filled), so Obj_DrawBucket
+; and Obj_DrawNext are all "none". Then it means to set Obj_LastFrame
+; to Obj_LastFrameNone (with 0 in the byte after) for Evt_ObjCount
+; objects through WMDATA, but X and Y are 16-bit there: each STX/STY
+; also writes its high byte (0) to WMADDL, which sends the address back
+; to $0F00 after every byte. In effect only object 0 is reset
+; (Obj_LastFrame = $FF, Obj_Unk0F00 = 0); kept as found
+; (Obj_ResetFrameState, run right after by both callers, does it
+; properly).
+; Callers: Scene_ReloadStep ($C0:287B) and Scene_PostLoadInit
+;   ($C0:56BF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP any (set to $2100 here
+; and restored); DB any (the MVNs set it to $00 until the PLB; the
+; other accesses are direct page or long).
+; Exit: M=1, X=0, DP and DB unchanged; A = 0, X = $00FF, Y = 0.
+; ------------------------------------------------------------
+org $C0B204
+Obj_ResetDrawLists:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Obj_DrawBucket
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; WRAM bank $7E
+    STA.b WMADDH-!DP_PPU
+    LDX.w #!Obj_DrawFillWords
+    LDA.b #!ObjQ_Empty
+.fill:
+    STA.b WMDATA-!DP_PPU
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .fill
+    LDY.w #!Obj_DrawBucket+(2*!Obj_DrawFillWords)
+    LDX.w #!Obj_DrawBucket
+    REP #$20
+    LDA.w #(2*!Obj_DrawFillWords)-1     ; 32 bytes
+    PHB
+    MVN !Bank00,!Bank00                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #(4*!Obj_DrawFillWords)-1     ; 64 bytes, Y continues
+    LDX.w #!Obj_DrawBucket
+    MVN !Bank00,!Bank00                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #(8*!Obj_DrawFillWords)-1     ; 128 bytes, to $0EFF
+    LDX.w #!Obj_DrawBucket
+    MVN !Bank00,!Bank00                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    PLB
+    LDX.w #!Obj_LastFrame
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; WRAM bank $7E
+    STA.b WMADDH-!DP_PPU
+    LDX.w #!Obj_LastFrameNone
+    LDY.w #$0000
+    LDA.l !Evt_ObjCount
+.frame_loop:
+    STX.b WMDATA-!DP_PPU                ; 16-bit: also WMADDL = 0
+    STY.b WMDATA-!DP_PPU                ; 16-bit: also WMADDL = 0
+    DEC A
+    BNE .frame_loop
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:B262 — Oam_HideFirst4 (15 bytes, $B262–$B270)
+; Parks OAM shadow sprites 0-3 below the screen: their Y bytes in
+; Oam_LowTable = Oam_HiddenY.
+; Callers: Scene_ReloadStep ($C0:289B) and unmatched code at $C0:0283
+;   (Scene_Unk0283's first call).
+; On entry: M=1 (8-bit A), DB=$00 (absolute stores); X and DP not used.
+; Exit: M, X, DP and DB unchanged; A = Oam_HiddenY.
+; ------------------------------------------------------------
+org $C0B262
+Oam_HideFirst4:
+    LDA.b #!Oam_HiddenY
+    STA.w !Oam_LowTable+OamEntry[0].Y
+    STA.w !Oam_LowTable+OamEntry[1].Y
+    STA.w !Oam_LowTable+OamEntry[2].Y
+    STA.w !Oam_LowTable+OamEntry[3].Y
+    RTS
+
+; ============================================================
 ; $C0:18D9 — Field_PauseAndMenuInput (172 bytes, $18D9–$1984)
 ; (was Sub_18D9.) Per-frame pause and menu input, called from
 ; GameLoop_FrameBody before Field_SceneChangeTick.
@@ -16168,6 +17110,435 @@ Field_ActionButton:
     BRL Field_CheckTileInFront
 
 ; ============================================================
+; Location objects and event data at a location load ($C0:56A6-
+; $C0:595B, $C0:5CC7-$C0:5D6D): LocLoad_Unk56D4 unpacks the location's
+; event data to Evt_ObjCount/Evt_Data ($7F:2000), checks it and seeds
+; Map_Unk7F3700; Scene_PostLoadInit later resets the object tables and
+; runs every object's init function (Evt_InitObjects).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:56A6 — Scene_PostLoadInit (46 bytes, $56A6–$56D3)
+; The object side of a location load, run once by GameLoop_LoadField
+; after LoadLocation: ObjQ_Unk69 = $0048, ObjQ_ScanlineLimit = $0078,
+; VramQ_Valid = 0 (empty VRAM queue); then Field_ResetUnk0B88,
+; Field_ResetUnk0B80, SprBuf_FreeAll, Evt_ClearUnk0920,
+; Obj_ResetDrawLists, Obj_ResetFrameState,
+; Evt_InitObjects (object tables and init functions; it ends with
+; Map_InitEntryTile) and Evt_RunObj0Func1 (object 0's function 1); and
+; last BankC2_Entry8004 with A = BankC2_PostLoadArg ($0B; B = 0 from
+; TDC/XBA), a bank-$C2 command that is not traced.
+; Callers: GameLoop_LoadField ($C0:008E), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00
+; (VramQ_Valid absolute; the callees assume the same).
+; Exit: M=1, X=0 as far as is known (the bank-$C2 command is not
+; matched); A, X, Y clobbered, Obj_Cur and what the callees change.
+; ------------------------------------------------------------
+org $C056A6
+Scene_PostLoadInit:
+    LDX.w #!ObjQ_Unk69Init
+    STX.b !ObjQ_Unk69
+    LDX.w #!ObjQ_ScanlineInit
+    STX.b !ObjQ_ScanlineLimit
+    STZ.w !VramQ_Valid
+    JSR Field_ResetUnk0B88
+    JSR Field_ResetUnk0B80
+    JSR SprBuf_FreeAll
+    JSR Evt_ClearUnk0920
+    JSR Obj_ResetDrawLists
+    JSR Obj_ResetFrameState
+    JSR Evt_InitObjects
+    JSR Evt_RunObj0Func1
+    TDC                                 ; C = D = $0100
+    XBA                                 ; B = 0 for the command word
+    LDA.b #!BankC2_PostLoadArg
+    JSL BankC2_Entry8004
+    RTS
+
+; ------------------------------------------------------------
+; $C0:56D4 — LocLoad_Unk56D4 (53 bytes, $56D4–$5708)
+; The last location-load step: unpacks the location's event data. The
+; Evt_PackPtrs entry LocRom.Events is unpacked with Decomp_ToWramVec to
+; $7F:2000 (Evt_ObjCount, then Evt_Data); LocLoad_CheckEvtData stops
+; the game on two bad cases, and the tail jump to LocLoad_InitUnk7F3700
+; seeds Map_Unk7F3700 from ROM. (Called as LocLoad_Unk56D4 by verified
+; code, so the name stays.)
+; Callers: LoadLocation ($C0:010F), Field_RestoreState ($C0:01D8) and
+;   unmatched code at $C0:032D (Scene_Unk0283).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_RecOfs,
+; Eng_Scratch), DB=$00 (the Decomp_* block absolute).
+; Exit (through LocLoad_InitUnk7F3700): M=1, X=0, DP and DB unchanged;
+; A, X and Y clobbered; Eng_Scratch and the Decomp_* block written.
+; ------------------------------------------------------------
+LocLoad_Unk56D4:
+    REP #$20
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Events,X
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x Evt_PackPtrSize
+    TAX
+    LDA.l !Evt_PackPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #!Evt_ObjCount&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !Evt_PackPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    JSR LocLoad_CheckEvtData
+    BRL LocLoad_InitUnk7F3700
+
+; ------------------------------------------------------------
+; $C0:5709 — Evt_InitObjects (544 bytes, $5709–$5928)
+; Resets the object tables for the Evt_ObjCount objects of the new
+; location and runs each one's init function:
+; 1. Clears $7F:0200-$7F:03FF (Evt_Unk7F0200, with ClearRAMDMA; it
+;    starts with Treasure_ItemId).
+; 2. With DP=$2100, fills per-object tables through the WRAM port
+;    (WMADD/WMDATA), one byte pair per object for Evt_ObjCount objects:
+;    Obj_ScriptPos = the object's function 0 (init) offset (word 0 of
+;    each Evt_FuncTableBytes block of Evt_Data); Obj_Unk1C00/1C01 =
+;    Obj_Unk1C00Init/0; Obj_Unk1000/1001 = Obj_Unk1000Init/0;
+;    Obj_Unk1080/Obj_QueueNext = ObjQ_Empty; Obj_Unk1100 = $80/$00 for
+;    63 slots, then Obj_Unk1100Seven/0 for the objects; Obj_PosX and
+;    Obj_PosY = Obj_PosOffMap ($FF00); Obj_Unk1A00/1A01 =
+;    Obj_Unk1A00Init/0; Obj_Unk1A80/1A81 = 0/1; Obj_AnimMode/AnimRowAlt
+;    = 0/0; Obj_Unk1C80/1C81 = Obj_Unk1C80Init/0; Obj_OamFlags/OamAttr
+;    = $80/0; ObjX_Unk7F0B00 / ObjX_AnimLoops = 0/0 and ObjX_Unk7F0B80
+;    = $FF/$FF (both in bank $7F).
+; 3. Clears Obj_Unk1900 (a page) and $7F:0580-$7F:1B3F (ObjX_Unk7F0580
+;    on). That second clear covers $7F:0B00-$7F:0BFF too, so the
+;    ObjX_Unk7F0B00/AnimLoops/7F0B80 fills of step 2 are wiped right
+;    away; kept as found.
+; 4. ObjQ_Unk74/75, ObjQ_Head/Tail = ObjQ_Empty, ObjQ_Unk71 = $8000,
+;    ObjQ_Unk73 = 0, Evt_ObjSlotEnd = Evt_ObjCount x 2.
+; 5. For each object slot: Obj_Unk1B01 = Obj_Unk1B80 = 0; unless
+;    the word at Obj_Unk1100 is negative, runs its opcodes from
+;    Obj_ScriptPos through Evt_OpcodeTable up to opcode $00 (as
+;    Evt_RunObjInit does) with Obj_Cur = the slot, and leaves
+;    Obj_ScriptPos past that $00. A is 16-bit in this loop, so the
+;    skip test reads bit 7 of the byte after Obj_Unk1100, which step 2
+;    zeroed for every object: no object is skipped. The 16-bit STZ of
+;    Obj_Unk1B01 also clears the next slot's Obj_State byte.
+; 6. Tail jump to Map_InitEntryTile.
+; The LDA #$00 before the first loop is overwritten at once; the CLC
+; before it holds for the loop's ADC because the CPX that ends each
+; pass leaves C clear while the loop goes on.
+; Callers: Scene_PostLoadInit ($C0:56C5), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (DmaFill_*,
+; Eng_Scratch, Obj_Cur, the queue bytes), DB=$00 (the per-object tables
+; and Eng_Scratch through DP_Field are absolute).
+; Exit (through Map_InitEntryTile): M=1, X=0, DP and DB unchanged; A, X,
+; Y clobbered; Obj_Cur = the last slot run, and whatever the opcode
+; handlers and Map_InitEntryTile change.
+; ------------------------------------------------------------
+Evt_InitObjects:
+    LDX.w #!Evt_Unk7F0200Bytes
+    STX.b !DmaFill_Size
+    LDX.w #!Evt_Unk7F0200&$FFFF
+    STX.b !DmaFill_Dest
+    LDA.b #!Bank7F
+    STA.b !DmaFill_Bank
+    JSR ClearRAMDMA
+    PHD
+    LDA.l !Evt_ObjCount
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; x Evt_FuncTableBytes
+    STA.b !Eng_Scratch                  ; end of the function tables
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Obj_ScriptPos
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; WRAM bank $7E
+    STA.b WMADDH-!DP_PPU
+    CLC
+    LDA.b #$00                          ; overwritten below
+    LDX.w #$0000                        ; offset of object 0's function table
+.script_loop:
+    LDA.l !Evt_Data,X
+    STA.b WMDATA-!DP_PPU
+    LDA.l !Evt_Data+1,X
+    STA.b WMDATA-!DP_PPU                ; Obj_ScriptPos = function 0
+    REP #$20
+    TXA
+    ADC.w #!Evt_FuncTableBytes
+    TAX
+    SEP #$20
+    CPX.w !DP_Field+!Eng_Scratch
+    BMI .script_loop
+    LDX.w #!Obj_Unk1C00
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_Unk1C00Init
+    LDY.b #$00
+.fill_1c00:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1c00
+    REP #$10
+    LDX.w #!Obj_Unk1000
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+.fill_1000:
+    LDX.b #!Obj_Unk1000Init
+    STX.b WMDATA-!DP_PPU
+    LDX.b #$00
+    STX.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1000
+    REP #$10
+    LDX.w #!Obj_Unk1080
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+.fill_1080:
+    LDX.b #!ObjQ_Empty
+    STX.b WMDATA-!DP_PPU                ; Obj_Unk1080
+    STX.b WMDATA-!DP_PPU                ; Obj_QueueNext
+    DEC A
+    BNE .fill_1080
+    REP #$10
+    LDX.w #!Obj_Unk1100
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.b #!Obj_Unk1100SkipSlots
+    LDX.b #!Obj_Unk1100Skip
+    LDY.b #$00
+.fill_1100_skip:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1100_skip
+    REP #$10
+    LDX.w #!Obj_Unk1100
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_Unk1100Seven
+    LDY.b #$00
+.fill_1100:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1100
+    REP #$10
+    LDX.w #!Obj_PosX
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_PosOffMap&$FF
+    LDY.b #!Obj_PosOffMap>>8
+.fill_posx:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_posx
+    REP #$10
+    LDX.w #!Obj_PosY
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_PosOffMap&$FF
+    LDY.b #!Obj_PosOffMap>>8
+.fill_posy:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_posy
+    REP #$10
+    LDX.w #!Obj_Unk1A00
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_Unk1A00Init
+    LDY.b #$00
+.fill_1a00:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1a00
+    REP #$10
+    LDX.w #!Obj_Unk1A80
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #$00
+    LDY.b #!Obj_Unk1A81Init
+.fill_1a80:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1a80
+    REP #$10
+    LDX.w #!Obj_AnimMode
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #$00
+    LDY.b #$00
+.fill_animmode:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_animmode
+    REP #$10
+    LDX.w #!Obj_Unk1C80
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_Unk1C80Init
+    LDY.b #$00
+.fill_1c80:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_1c80
+    REP #$10
+    LDX.w #!Obj_OamFlags
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!Obj_OamFlagsInit
+    LDY.b #$00
+.fill_oamflags:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_oamflags
+    REP #$10
+    LDX.w #!ObjX_Unk7F0B00&$FFFF
+    STX.b WMADDL-!DP_PPU
+    LDA.b #!WMADDH_Bank7F
+    STA.b WMADDH-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #$00
+    LDY.b #$00
+.fill_7f0b00:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_7f0b00
+    REP #$10
+    LDX.w #!ObjX_Unk7F0B80&$FFFF
+    STX.b WMADDL-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #!ObjX_Unk7F0B80Init
+    LDY.b #!ObjX_Unk7F0B80Init
+.fill_7f0b80:
+    STX.b WMDATA-!DP_PPU
+    STY.b WMDATA-!DP_PPU
+    DEC A
+    BNE .fill_7f0b80
+    REP #$10
+    PLD
+    LDX.w #!Obj_Unk1900Bytes
+    STX.b !DmaFill_Size
+    LDX.w #!Obj_Unk1900
+    STX.b !DmaFill_Dest
+    LDA.b #$00                          ; bank $00: low WRAM
+    STA.b !DmaFill_Bank
+    JSR ClearRAMDMA
+    LDX.w #!ObjX_ClearBytes
+    STX.b !DmaFill_Size
+    LDX.w #!ObjX_Unk7F0580&$FFFF
+    STX.b !DmaFill_Dest
+    LDA.b #!Bank7F
+    STA.b !DmaFill_Bank
+    JSR ClearRAMDMA                     ; also wipes $7F:0B00-$7F:0BFF
+    LDA.b #!ObjQ_Empty
+    STA.b !ObjQ_Unk74
+    STA.b !ObjQ_Unk75
+    STA.b !ObjQ_Head
+    STA.b !ObjQ_Tail
+    LDX.w #!ObjQ_Unk71Init
+    STX.b !ObjQ_Unk71
+    STZ.b !ObjQ_Unk73
+    LDA.l !Evt_ObjCount
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    STA.b !Evt_ObjSlotEnd
+    LDX.w #$0000                        ; object 0
+.object_loop:
+    STZ.w !Obj_Unk1B01,X                ; 16-bit: also the next slot's Obj_State
+    STZ.w !Obj_Unk1B80,X                ; 16-bit: the slot's word
+    LDA.w !Obj_Unk1100,X                ; 16-bit: N = bit 7 of Obj_Unk1100+1
+    BMI .next_object                    ; never taken (step 2 zeroed it)
+    LDA.w !Obj_ScriptPos,X
+    STX.b !Obj_Cur
+    TAX
+    SEP #$20
+.opcode_loop:
+    LDA.l !Evt_Data,X                   ; opcode
+    BEQ .init_done                      ; $00 = return
+    TXY                                 ; Y = opcode's offset
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A                               ; word table index
+    TAX
+    SEP #$20
+    JSR (Evt_OpcodeTable,X)             ; handler returns X = next opcode
+    BRA .opcode_loop
+.init_done:
+    REP #$20
+    INX                                 ; past the $00
+    TXA
+    LDX.b !Obj_Cur
+    STA.w !Obj_ScriptPos,X
+.next_object:
+    INX
+    INX
+    CPX.b !Evt_ObjSlotEnd
+    BNE .object_loop
+    SEP #$20
+    BRL Map_InitEntryTile
+
+; ------------------------------------------------------------
+; $C0:5929 — Evt_ClearUnk0920 (51 bytes, $5929–$595B)
+; Sets the 16 bytes Evt_Unk0920 to Evt_Unk0920Free ($FF), one STA each.
+; The unmatched code at $C0:5C90 searches this list for dp $E3, takes
+; the first $FF entry for a new one and keeps Obj_Cur beside it in
+; Evt_Unk0930; what the entries stand for is not traced.
+; Callers: Scene_PostLoadInit ($C0:56BC), its only call site.
+; On entry: M=1 (8-bit A), DB=$00 (absolute stores); X and DP not used.
+; Exit: M, X, DP and DB unchanged; A = Evt_Unk0920Free.
+; ------------------------------------------------------------
+Evt_ClearUnk0920:
+    LDA.b #!Evt_Unk0920Free
+    STA.w !Evt_Unk0920
+    STA.w !Evt_Unk0920+1
+    STA.w !Evt_Unk0920+2
+    STA.w !Evt_Unk0920+3
+    STA.w !Evt_Unk0920+4
+    STA.w !Evt_Unk0920+5
+    STA.w !Evt_Unk0920+6
+    STA.w !Evt_Unk0920+7
+    STA.w !Evt_Unk0920+8
+    STA.w !Evt_Unk0920+9
+    STA.w !Evt_Unk0920+10
+    STA.w !Evt_Unk0920+11
+    STA.w !Evt_Unk0920+12
+    STA.w !Evt_Unk0920+13
+    STA.w !Evt_Unk0920+14
+    STA.w !Evt_Unk0920+15
+    RTS
+
+; ============================================================
 ; $C0:595C — Evt_RunObj0Func1 (33 bytes, $595C–$597C)
 ; (was Sub_595C.) Runs one event-script function of object 0: the
 ; offset stored at Evt_Data+2 (object 0's second function pointer),
@@ -16389,6 +17760,108 @@ Map_LeaderPastColMin:
     LDA.w !Map_Unk1D1A
     CMP.w !Obj_TileX,X
     RTS
+
+; ------------------------------------------------------------
+; $C0:5CC7 — LocLoad_CheckEvtData (37 bytes, $5CC7–$5CEB)
+; Two checks LocLoad_Unk56D4 makes on the event data it has just
+; unpacked; each failure ends in Sys_HaltWithColor:
+; - Evt_ObjCount = Evt_BadObjCount ($0D) with first Evt_Data byte
+;   Evt_BadFirstByte ($0A): colour Halt_ColorEvtUnk ($01F0). Why this
+;   pair is refused is not known;
+; - Decomp_OutLen above Evt_DataMax ($1700; CPX then BPL, so the test
+;   is the sign of $1700 - Decomp_OutLen): colour Halt_ColorEvtLong
+;   ($000F). $7F:2000 + $1700 is where
+;   Map_Unk7F3700 starts, which LocLoad_InitUnk7F3700 fills right
+;   after, so this looks like an overflow guard.
+; Callers: LocLoad_Unk56D4 ($C0:5703), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the colour), DB=$00
+; (Decomp_OutLen absolute); DP not used.
+; Exit: returns only when both checks pass: M=1, X=0, DP and DB
+; unchanged; A and X clobbered.
+; ------------------------------------------------------------
+org $C05CC7
+LocLoad_CheckEvtData:
+    LDA.l !Evt_ObjCount
+    CMP.b #!Evt_BadObjCount
+    BNE .check_length
+    LDA.l !Evt_Data
+    CMP.b #!Evt_BadFirstByte
+    BNE .check_length
+    LDX.w #!Halt_ColorEvtUnk
+    BRL Sys_HaltWithColor
+.check_length:
+    LDX.w #!Evt_DataMax
+    CPX.w !Decomp_OutLen
+    BPL .ok
+    LDX.w #!Halt_ColorEvtLong
+    BRL Sys_HaltWithColor
+.ok:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5CEC — LocLoad_InitUnk7F3700 (75 bytes, $5CEC–$5D36)
+; Seeds the 134 bytes at Map_Unk7F3700 from LocLoad_Unk7F3700Init with
+; five MVNs: 32 bytes from the table's start to $7F:3700, then three
+; times 32 bytes from LocLoad_Unk7F3700Init_Rec1 to $7F:3720, $7F:3740
+; and $7F:3760, and 6 bytes from LocLoad_Unk7F3700Init_Rec4 to
+; $7F:3780. The 32-byte copies read past the record they start at: the
+; first takes 7 bytes of Rec1 along, those from Rec1 all of Rec4 and
+; the first 2 bytes of Evt_OpcodeTable; kept as found. Map_Unk7F3728/3748/3768 and
+; Map_Unk7F3781 lie inside these blocks.
+; Callers: BRL from LocLoad_Unk56D4 ($C0:5706), its only reference.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP not used; any DB
+; (preserved around each MVN).
+; Exit: M=1, X=0, DB preserved; A, X and Y clobbered.
+; ------------------------------------------------------------
+LocLoad_InitUnk7F3700:
+    REP #$20
+    LDX.w #LocLoad_Unk7F3700Init
+    LDY.w #!Map_Unk7F3700&$FFFF
+    PHB
+    LDA.w #!Map_Unk7F3700RecBytes-1     ; MVN count - 1
+    MVN !Bank7F,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDX.w #LocLoad_Unk7F3700Init_Rec1
+    LDY.w #(!Map_Unk7F3700+(1*!Map_Unk7F3700RecBytes))&$FFFF
+    PHB
+    LDA.w #!Map_Unk7F3700RecBytes-1
+    MVN !Bank7F,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDX.w #LocLoad_Unk7F3700Init_Rec1
+    LDY.w #(!Map_Unk7F3700+(2*!Map_Unk7F3700RecBytes))&$FFFF
+    PHB
+    LDA.w #!Map_Unk7F3700RecBytes-1
+    MVN !Bank7F,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDX.w #LocLoad_Unk7F3700Init_Rec1
+    LDY.w #(!Map_Unk7F3700+(3*!Map_Unk7F3700RecBytes))&$FFFF
+    PHB
+    LDA.w #!Map_Unk7F3700RecBytes-1
+    MVN !Bank7F,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDX.w #LocLoad_Unk7F3700Init_Rec4
+    LDY.w #(!Map_Unk7F3700+(4*!Map_Unk7F3700RecBytes))&$FFFF
+    PHB
+    LDA.w #!Map_Unk7F3700TailBytes-1
+    MVN !Bank7F,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; $C0:5D37 — LocLoad_Unk7F3700Init (55 bytes, $5D37–$5D6D)
+; LocLoad_InitUnk7F3700's source: 25 bytes for $7F:3700, 24 for the
+; three blocks at $7F:3720-$7F:3760 (Rec1; the copies take 32 and so
+; also read Rec4 and the first two bytes of Evt_OpcodeTable) and 6 for
+; $7F:3780 (Rec4). The bytes look like script data (each block starts
+; $E3 and the first two end $11 $09); not decoded.
+LocLoad_Unk7F3700Init:
+    db $E3,$00,$89,$40,$0D,$00,$0E,$02,$AE,$95,$00,$0E,$00,$71,$FF,$12
+    db $FF,$03,$04,$04,$E3,$01,$00,$11,$09
+.Rec1:
+    db $E3,$00,$89,$40,$0D,$00,$AE,$96,$00,$00,$A6,$00,$71,$FE,$12,$FE
+    db $04,$04,$04,$E3,$00,$00,$11,$09
+.Rec4:
+    db $96,$00,$00,$FF,$9D,$00
 
 ; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)

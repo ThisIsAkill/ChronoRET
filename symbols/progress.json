@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 71206,
+  "emitted_bytes": 73333,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 829,
+      "bytes": 73333
     },
     "readable": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 829,
+      "bytes": 73333
     },
     "verified": {
       "functions": 799,
@@ -20,14 +20,14 @@
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 34090,
+      "emitted_bytes": 36217,
       "matched": {
-        "functions": 276,
-        "bytes": 34090
+        "functions": 306,
+        "bytes": 36217
       },
       "readable": {
-        "functions": 276,
-        "bytes": 34090
+        "functions": 306,
+        "bytes": 36217
       },
       "verified": {
         "functions": 276,
@@ -142,7 +142,7 @@
       "bank": "$C0",
       "start": "$C0:0000",
       "end": "$C0:0FFF",
-      "emitted_bytes": 2058,
+      "emitted_bytes": 2389,
       "functions": [
         "ReentryVectors",
         "GameLoop",
@@ -159,7 +159,12 @@
         "Scene_Unk024C",
         "Field_RestoreSaveBlock",
         "Field_StashSaveBlock",
+        "LocLoad_Unk092B",
+        "LocLoad_Unk0960",
+        "LocLoad_Unk09DD",
+        "LocLoad_Unk0A14",
         "LocLoad_DrawMap",
+        "Scene_ResumeNmi",
         "InitHW",
         "InstallNMI",
         "InstallIRQ",
@@ -212,7 +217,7 @@
       "bank": "$C0",
       "start": "$C0:2000",
       "end": "$C0:2FFF",
-      "emitted_bytes": 1834,
+      "emitted_bytes": 1896,
       "functions": [
         "Field_EventHookDispatch",
         "Field_EventHookTable",
@@ -233,6 +238,7 @@
         "Field_ServiceUnk54_SendLine",
         "Field_FadeInAfterReload",
         "Scene_SettleFrames",
+        "Scene_ReloadStep",
         "VramDma_Upload",
         "ClearRAMDMA",
         "Sys_HaltWithColor"
@@ -256,30 +262,53 @@
       "bank": "$C0",
       "start": "$C0:5000",
       "end": "$C0:5FFF",
-      "emitted_bytes": 257,
+      "emitted_bytes": 1118,
       "functions": [
+        "Scene_PostLoadInit",
+        "LocLoad_Unk56D4",
+        "Evt_InitObjects",
+        "Evt_ClearUnk0920",
         "Evt_RunObj0Func1",
         "Evt_RunObjInit",
         "Evt_StartTargetFunc1",
         "Map_LeaderPastRowMax",
         "Map_LeaderPastRowMin",
         "Map_LeaderPastColMax",
-        "Map_LeaderPastColMin"
+        "Map_LeaderPastColMin",
+        "LocLoad_CheckEvtData",
+        "LocLoad_InitUnk7F3700",
+        "LocLoad_Unk7F3700Init"
       ]
     },
     {
       "bank": "$C0",
       "start": "$C0:6000",
       "end": "$C0:6FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 528,
+      "functions": [
+        "LocLoad_UploadPack",
+        "LocLoad_UnpackPacks67",
+        "LocLoad_Unk6DCF",
+        "Field_UploadUnk1F00",
+        "Field_UploadUnk1F00Srcs",
+        "Field_UploadUnk1D00",
+        "Field_UploadUnk1C00",
+        "Field_UploadUnk0000",
+        "Field_UploadUnk57E0",
+        "Field_ResetUnk0B88"
+      ]
     },
     {
       "bank": "$C0",
       "start": "$C0:7000",
       "end": "$C0:7FFF",
-      "emitted_bytes": 3175,
+      "emitted_bytes": 3411,
       "functions": [
+        "LocLoad_Unk7084",
+        "Pal_LoadUnkRow0",
+        "Pal_UploadCgram",
+        "Pal_UploadCgram_Rts",
+        "Field_ResetUnk0B80",
         "Map_InitMasksAndLimits",
         "Map_InitOrigin",
         "Field_Unk74D4",
@@ -423,10 +452,12 @@
       "bank": "$C0",
       "start": "$C0:B000",
       "end": "$C0:BFFF",
-      "emitted_bytes": 3585,
+      "emitted_bytes": 3694,
       "functions": [
         "Obj_ResetStates",
         "VramQ_Flush",
+        "Obj_ResetDrawLists",
+        "Oam_HideFirst4",
         "Oam_BuildShadow",
         "Oam_BucketLoop",
         "Oam_CheckChain",

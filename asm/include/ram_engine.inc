@@ -169,8 +169,12 @@ if !ram_engine_inc == 0
 !Field_E4Ptr1 = $B2                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_E4Ptr2 = $B5                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_E4Ptr3 = $B8                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
-!Field_UnkBB = $BB                       ; 8-bit; zeroed at load; LocLoad_Unk0A14 skips its work when
-                                         ; nonzero
+!Evt_ObjSlotEnd = $BD                    ; 16-bit Evt_ObjCount x 2: end of the object-slot loops
+                                         ; (Evt_InitObjects)
+!Field_UnkBB = $BB                       ; 8-bit; zeroed at load; LocLoad_Unk6DCF sets 1 when the
+                                         ; location has no LocRom.Tileset3; LocLoad_Unk0A14 then skips
+                                         ; the layer-3 metatiles and LocLoad_UnkA33B drops BG3 from
+                                         ; the screens (so probably "no layer 3")
 !Field_UnkBC = $BC                       ; 8-bit; zeroed by Field_InitLoadState; nonzero makes
                                          ; Map_Unk91AC set Map_ShakeX/Y from Eng_Unk0400
 !Field_UnkEB = $EB                       ; 8-bit object slot the action button acts on, $80 = none:
@@ -345,6 +349,13 @@ if !ram_engine_inc == 0
 ; --- Object frame queue and animation (Obj_AnimTickAndQueue, Field_ProcessAnimQueue) (dp) ---
 !ObjQ_ScanlineLimit = $6B                ; 16-bit: Field_ProcessAnimQueue stops building frames once
                                          ; the V counter reaches this (unless past line 240)
+!ObjQ_Unk69 = $69                        ; 16-bit; Scene_PostLoadInit sets ObjQ_Unk69Init; no reader traced
+!ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; no reader traced
+!ObjQ_Unk73 = $73                        ; 8-bit; zeroed by Evt_InitObjects; no reader traced
+!ObjQ_Unk74 = $74                        ; 8-bit; ObjQ_Empty at load (Evt_InitObjects); unmatched code
+                                         ; at $C0:5A66 (Vblank_ReadScanlineCounters) walks a list from
+                                         ; it through Obj_Unk1080: probably a second object list's head
+!ObjQ_Unk75 = $75                        ; 8-bit; as ObjQ_Unk74, probably that list's tail
 !ObjQ_Head = $76                         ; 8-bit: first object waiting for a frame build ($80 = queue
                                          ; empty); objects are linked through Obj_QueueNext
 !ObjQ_Tail = $77                         ; 8-bit: last object in the frame-build queue ($80 = empty)
@@ -471,6 +482,19 @@ if !ram_engine_inc == 0
 !Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
                                          ; Obj_ScreenX in Audio_PlaySfxAtLeader)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
+!Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
+                                         ; colours) that Pal_LoadUnkRow0 copies to Pal_CgramBuf, the
+                                         ; CGRAM upload source; LocLoad_Unk7084 fills rows 1-7
+!Pal_LocRows = $7E2022                   ; Pal_Buf row 1, colour 1: where LocLoad_Unk7084 copies the
+                                         ; location's seven rows (colour 0 of each row is skipped)
+!Pal_CgramBuf = $7E2200                  ; Pal_BufBytes sent to CGRAM by Pal_UploadCgram (NMI side);
+                                         ; Pal_LoadUnkRow0 copies all of Pal_Buf here
+!FieldRom_PalRow0Sets = $FFB210          ; ROM: colour sets 16 bytes apart; Pal_LoadUnkRow0 copies 30
+                                         ; bytes from entry + 2 to Pal_Buf row 0
+!FieldRom_Unk9CF0 = $FF9CF0              ; ROM: four 64-byte pieces Field_UploadUnk0000 sends to VRAM
+!FieldRom_Unk9260 = $FF9260              ; ROM: 64 bytes Field_UploadUnk57E0 sends to VRAM $57E0
+!Field_Unk7EF000 = $7EF000               ; WRAM source of Field_UploadUnk1C00/1D00 (VRAM $1C00/$1D00);
+                                         ; who fills it is not traced
 !Treasure_Gold = $0200                   ; 16-bit gold amount of the last treasure taken
                                          ; (Field_CheckTileInFront, DB=$00; reader not traced)
 !Field_Unk02A1 = $02A1                   ; 8-bit; zeroed by Field_CheckTileInFront as it starts
@@ -490,6 +514,8 @@ if !ram_engine_inc == 0
 !Treasure_ItemId = $7F0200               ; 16-bit item id of the last treasure item taken
                                          ; (Field_CheckTileInFront; reader not traced, probably the
                                          ; message)
+!Evt_Unk7F0200 = $7F0200                 ; alias of Treasure_ItemId: start of the Evt_Unk7F0200Bytes
+                                         ; Evt_InitObjects clears at each location load
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
 !Rom_SineTable = $C0F900                 ; 1024 B in ROM: |sin| for 1024 steps per turn, $00 at +$000/+$200,
@@ -514,6 +540,10 @@ if !ram_engine_inc == 0
                                          ; Field_SaveState, restored by Field_RestoreState
 !SceneSave_Unk1DF9 = $7F1D26             ; 8-bit Field_Unk1DF9 saved by Field_SaveState, restored by
                                          ; Field_RestoreState
+!Map_Unk7F3700 = $7F3700                 ; 4 blocks of Map_Unk7F3700RecBytes and one of 6 bytes,
+                                         ; seeded from ROM at each location load
+                                         ; (LocLoad_InitUnk7F3700); Map_Unk7F3728/3748/3768/3781 lie
+                                         ; inside them
 !Map_Unk7F3728 = $7F3728                 ; 16-bit; saved/restored around bank $C2 (Field_SaveState,
                                          ; Field_RestoreState). An event opcode handler at $C0:3311
                                          ; stores two script bytes AND $7F into its low and high
@@ -542,6 +572,9 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
 
 ; --- OAM shadow ---
+!Field_Unk0B80 = $0B80                   ; 8 bytes set to Field_Unk0B80Empty at each load
+                                         ; (Field_ResetUnk0B80); no reader traced
+!Field_Unk0B88 = $0B88                   ; Field_Unk0B88Bytes bytes, the same (Field_ResetUnk0B88)
 !Oam_LowTable = $0700                    ; 512-byte OAM low-table shadow (4 bytes per sprite: X, Y,
                                          ; tile, attr)
 !Oam_HighTable = $0900                   ; 32-byte OAM high-table shadow (2 bits per sprite)
@@ -582,6 +615,11 @@ if !ram_engine_inc == 0
 !Obj_Unk1000 = $1000                     ; 8-bit per object; bit 7 blocks Evt_StartTargetFunc1
 !Obj_Unk1001 = $1001                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
 !Obj_Unk1A01 = $1A01                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
+!Obj_Unk1A00 = $1A00                     ; 8-bit per object; Obj_Unk1A00Init at load (Evt_InitObjects)
+!Obj_Unk1B80 = $1B80                     ; 16-bit per object; zeroed by Evt_InitObjects
+!Obj_Unk1C80 = $1C80                     ; 8-bit per object; Obj_Unk1C80Init at load (Evt_InitObjects)
+!Obj_Unk1900 = $1900                     ; a page ($100 bytes) cleared by Evt_InitObjects; probably a
+                                         ; per-object table (the object tables lie around it)
 !Obj_Unk1A80 = $1A80                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
 !Obj_ScreenY = $0A80                     ; 16-bit per object: screen Y of the sprite origin; the
                                          ; builders use the low 9 bits
@@ -633,6 +671,8 @@ if !ram_engine_inc == 0
                                          ; (Obj_BuildSpriteFrameStep, Obj_BuildFrameLayout)
 !Obj_OamAttr = $0F81                     ; 8-bit per object: OAM attribute bits (palette/priority)
                                          ; ORed into every tile
+!Obj_Unk1080 = $1080                     ; 8-bit per object; ObjQ_Empty at load (Evt_InitObjects);
+                                         ; probably the link of the ObjQ_Unk74 list
 !Obj_QueueNext = $1081                   ; 8-bit per object: next object in the frame-build queue
                                          ; ($80 = not queued / end)
 !Obj_Unk1100 = $1100                     ; 8-bit per object; bit 7 = skip; 0 = queue at the head; 1/2
@@ -655,6 +695,10 @@ if !ram_engine_inc == 0
                                          ; (ObjX_AnimLoops, row Obj_AnimRowAlt), 3 = fixed frame
 !Obj_AnimRowAlt = $1781                  ; 8-bit per object: animation row used in mode 2
 !Obj_Unk1A81 = $1A81                     ; 8-bit per object; must be 1..$7F for a frame build
+!ObjX_Unk7F0B00 = $7F0B00                ; 8-bit per object in bank $7F; Evt_InitObjects writes 0
+                                         ; (then clears it again with the ObjX_* block)
+!ObjX_Unk7F0B80 = $7F0B80                ; 16-bit per object in bank $7F; Evt_InitObjects writes
+                                         ; ObjX_Unk7F0B80Init twice, then clears it again
 !ObjX_AnimLoops = $7F0B01                ; 8-bit per object in bank $7F: loops left for animation
                                          ; mode 2
 !AnimRom = $E40000                       ; bank $E4: object animation tables (frame numbers and
@@ -665,10 +709,23 @@ if !ram_engine_inc == 0
 !Field_SaveBlock = $0920                 ; start of the $14E0-byte WRAM block Field_StashSaveBlock
                                          ; copies to SceneSave_Buffer before the menu and
                                          ; Field_RestoreSaveBlock copies back
+!Evt_Unk0920 = $0920                     ; 16 bytes at the start of Field_SaveBlock: a list, Evt_Unk0920Free
+                                         ; = free (Evt_ClearUnk0920); unmatched code at $C0:5C90
+                                         ; searches it for dp $E3 and adds entries
+!Evt_Unk0930 = $0930                     ; 16 bytes: the Obj_Cur of each Evt_Unk0920 entry ($C0:5C90)
 !SceneSave_Buffer = $7F2000              ; $7F:2000: destination of the Field_SaveBlock copy (same
                                          ; address as Evt_ObjCount, used at a different time)
 
 ; --- Map ---
+!LocGfx_Stage = $7E3000                  ; alias of Map_TileProps: each layer graphics pack is unpacked
+                                         ; here and uploaded to VRAM (LocLoad_UploadPack), before the
+                                         ; map's planes are unpacked over it
+!LocGfx_Unk7F6000 = $7F6000              ; LocGfx_Lists pack 6 unpacked here; no reader traced
+!LocGfx_Unk7F7000 = $7F7000              ; LocGfx_Lists pack 7 unpacked here; no reader traced
+!LocGfx_StageL3 = $7F5080                ; the LocRom.Tileset3 pack is unpacked here and uploaded to
+                                         ; VRAM LocGfx_VramL3 (LocLoad_Unk6DCF)
+!LocGfx_PackListPtr = $D6                ; alias of Anim_FramePtr (dp, 24-bit): LocLoad_Unk0960 points it
+                                         ; at the location's LocGfx_Lists entry, one pack per step
 !Map_TileProps = $7E3000                 ; one byte per map tile, row stride $100 (index = row*256 +
                                          ; column); values $E6/$EC/$EE/$FA/$FC select tile-animation
                                          ; modes. "Props" is a guess: matched code only uses it for
@@ -1132,8 +1189,25 @@ if !ram_engine_inc == 0
 !Decomp_SrcBank = $0302                  ; 8-bit source bank
 !Decomp_Dest = $0303                     ; 16-bit WRAM destination offset
 !Decomp_DestBank = $0305                 ; 8-bit WRAM destination bank
+!Decomp_OutLen = $0306                   ; 16-bit, read back after Decomp_ToWramVec: the unpacked
+                                         ; length, or end offset (LocLoad_CheckEvtData limits it to
+                                         ; Evt_DataMax; ram_battle.inc reads it as the end offset)
 !Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
                                          ; MapProps; LocRom.MapProps picks the entry
+!LocGfx_Lists = $F61C00                  ; 8 bytes per LocRom.Tileset12: graphics pack numbers ($FF =
+                                         ; none); 0-5 are unpacked to LocGfx_Stage and uploaded to
+                                         ; VRAM $2000-$4800 (LocLoad_Unk0960), 6 / 7 only unpacked to
+                                         ; LocGfx_Unk7F6000 / LocGfx_Unk7F7000 (LocLoad_UnpackPacks67)
+!LocGfx_PackPtrs = $F62220               ; 3 bytes per graphics pack: long pointer to its packed data
+                                         ; (the pack numbers above, and LocRom.Tileset3)
+!LocGfx_Meta12Ptrs = $F62100             ; 3 bytes per LocRom.Tileset12: long pointer to the packed
+                                         ; Map_Meta12TL table (LocLoad_Unk09DD)
+!LocGfx_Meta3Ptrs = $F621C0              ; 3 bytes per LocRom.Tileset3: long pointer to the packed
+                                         ; Map_Meta3TL table (LocLoad_Unk0A14)
+!LocPal_Rom = $F624C0                    ; LocPal_SetBytes per LocRom.Palette: colours 1-15 of seven
+                                         ; palette rows (LocLoad_Unk7084)
+!Evt_PackPtrs = $FCF9F0                  ; 3 bytes per entry: long pointer to a location's packed event
+                                         ; data; LocRom.Events picks the entry (LocLoad_Unk56D4)
 !ExitRom_LocOfs = $E50000                ; one word per location (Loc_Id & Loc_IdMask): ExitRom
                                          ; offset of its first record; the next word ends the list
                                          ; (Map_LoadExitTiles)
@@ -1145,12 +1219,17 @@ if !ram_engine_inc == 0
 ; fields the matched location-load steps read are named.
 struct LocRom $F60000
     .Unk00: skip 1
-    .Unk01: skip 1       ; read by LocLoad_Unk0960 and LocLoad_Unk09DD ($FF = none)
-    .Unk02: skip 1       ; read by LocLoad_Unk0A14 ($FF = none)
-    .Unk03: skip 1
+    .Tileset12: skip 1   ; layers 1/2 graphics: LocGfx_Lists entry (LocLoad_Unk0960) and
+                         ; LocGfx_Meta12Ptrs entry (LocLoad_Unk09DD); $FF = none (both skip).
+                         ; "Tileset" rests on it choosing both the graphics and the metatiles
+    .Tileset3: skip 1    ; layer 3: LocGfx_PackPtrs entry uploaded to VRAM LocGfx_VramL3
+                         ; (LocLoad_Unk6DCF) and LocGfx_Meta3Ptrs entry (LocLoad_Unk0A14);
+                         ; $FF = none (LocLoad_Unk6DCF then sets Field_UnkBB)
+    .Palette: skip 1     ; LocPal_Rom entry copied to Pal_LocRows (LocLoad_Unk7084)
     .MapProps: skip 2    ; 16-bit entry number in Map_PropsPtrs (LocLoad_UnkA33B)
     .Unk06: skip 2
-    .Unk08: skip 2       ; byte 8 read by LocLoad_Unk56D4
+    .Events: skip 2      ; 16-bit entry number in Evt_PackPtrs: the location's event data
+                         ; (LocLoad_Unk56D4)
     .LimitLeft: skip 1   ; Map_Unk1D1A (column); bit 7 set: no limits from the record, the
                          ; four are 0, Map_Unk0BCB - 1, 0, Map_Unk0BCD - 1 instead
     .LimitTop: skip 1    ; Map_Unk1D1C (row)
