@@ -1260,7 +1260,7 @@ Spr_Place24:
 ; object is already queued: it is the head (head path), or it is the
 ; tail or already has an Obj_QueueNext link (tail path).
 ; Earlier notes described the queue as primary/secondary "focus" slots.
-; Callers (2 JSR sites): unmatched ($C0:A832, $C0:A878).
+; Callers (2 JSR sites): Vblank_UnkA810 ($C0:A832, $C0:A878).
 ; On entry: M=1, X/Y 8-bit, DP=$0100 (ObjQ_* and Anim_RowAddr are dp),
 ; DB=$00 (the Obj_* tables are absolute), Obj_Cur = object.
 ; Exit: M=1, X/Y 8-bit, DP and DB unchanged; A clobbered, X = Obj_Cur;
@@ -1475,8 +1475,8 @@ Field_ProcessAnimQueue:
 ; tail-calls Obj_BuildFrame4 / 8 / 12 (size 3: C=0, nothing).
 ; C=1 from a builder means "call again" (a multi-pass build).
 ; Called by Field_ProcessAnimQueue ($C0:CAAE, $C0:CAC2) and the
-; unmatched map-load pass at $C0:B0E6 ($C0:B109).
-; Callers (3 JSR sites): Field_ProcessAnimQueue ($C0:CAAE, $C0:CAC2) and unmatched ($C0:B109).
+; map-load pass Field_UnkB0E6 ($C0:B109).
+; Callers (3 JSR sites): Field_UnkB0E6 ($C0:B109) and Field_ProcessAnimQueue ($C0:CAAE, $C0:CAC2).
 ; On entry: M=1, X/Y 8-bit, DP=$0100 (Obj_Cur is dp), DB=$00 (the
 ; Obj_* tables are absolute), Obj_Cur = object.
 ; Exit: M=1, X/Y 8-bit, DP and DB unchanged (also through the
@@ -4844,6 +4844,44 @@ SprBuf_Free3:
     STA.w !SprBuf_Owner+1,X
     STA.w !SprBuf_Owner+2,X
     REP #$10                ; X → 16-bit
+    RTS
+
+; ============================================================
+; $C0:EA42 — SprBuf_FreeObj (33 bytes, $EA42–$EA62)
+; Releases the SprBuf chunks owned by Obj_Cur whatever its size: finds
+; the first of the SprBuf_UsedEntries SprBuf_Owner entries that holds
+; Obj_Cur, frees it ($80 = Obj_None) and goes on freeing the following
+; entries while they hold Obj_Cur too, stopping at the first that does
+; not or after entry 3 (an object's chunks are adjacent, as
+; SprBuf_Alloc2/3 hand them out). Used when an object leaves the view
+; and after a load builds an object's frame at once.
+; Callers (2 JSR sites): Obj_UpdateInView ($C0:A918) and Field_UnkB0E6 ($C0:B117).
+; On entry: M=1, X=1 (8-bit X/Y: CPX #imm is one byte), DP=$0100
+; (Obj_Cur is dp), DB=$00 (SprBuf_Owner absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered, X = the entry after
+; the last one freed (or 4 when none), Y unchanged.
+; ============================================================
+org $C0EA42
+SprBuf_FreeObj:
+    LDX.b #$00
+.find:
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
+    BEQ .free
+    INX
+    CPX.b #!SprBuf_UsedEntries
+    BNE .find
+.done:
+    RTS
+.free:
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X
+    INX
+    CPX.b #!SprBuf_UsedEntries
+    BEQ .done
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
+    BEQ .free
     RTS
 
 ; ============================================================
@@ -15678,6 +15716,296 @@ Obj_ResetFrameState:
     RTS
 
 ; ============================================================
+; Object motion and view culling, once per frame. Vblank_UnkA810
+; (Field_EndOfFrame) walks the location objects: it moves each one
+; (Obj_MoveStep / Obj_MoveStepFree, $C0:AA07-$C0:AB44), tests it
+; against a window a little larger than the view (Obj_UpdateInView),
+; and for an object in the window ticks its animation, works out its
+; screen position (Obj_CalcScreenPos) and puts it back in the draw
+; bucket for that position. Obj_Unk0F00 bit 7 (Obj_Unk0F00Active)
+; says the object is in the window and set up for drawing. Field_UnkB0E6
+; ($C0:B0E6) is the same pass at a location load, without movement.
+; Positions: Obj_PosX/Y are in 1/16 pixel (the high byte is the 16-pixel
+; map tile); Map_TileOriginX/Y count 8-pixel columns / rows, so the
+; tests double Obj_TileX/Y.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:A810 — Vblank_UnkA810 (125 bytes, $A810–$A88C)
+; The per-frame object pass. Sets Evt_ObjSlotEnd = Evt_ObjCount x 2,
+; then for each slot (Obj_Cur = 0, 2, ...) by Obj_Unk1100:
+; - below Obj_Unk1100FreeMove (0-2): Obj_MoveStepFree;
+; - Obj_Unk1100Eight: nothing;
+; - Obj_Unk1100Seven (the value Evt_InitObjects gives every object):
+;   Obj_FlagInView only (no movement, no drawing set-up);
+; - any other value (3-6 and 9 up, bit 7 included): Obj_MoveStep;
+; then, for the moved ones, Obj_UpdateInView, and when it reports the
+; object in the window (C=1): Obj_AnimTickAndQueue, Obj_DrawUnlink,
+; Obj_CalcScreenPos and Obj_DrawLink (the bucket follows the new
+; screen Y).
+; Afterwards party member 2 (Party_ObjSlot1) and then the leader
+; (Party_ObjSlot), when present and with Obj_Unk0F00 nonzero, are
+; unlinked and linked again, which puts them at the head of their
+; buckets (member 3, Party_ObjSlot2, is not; kept as found).
+; The loop test is CPX / BMI (the N flag of X - Evt_ObjSlotEnd), which
+; ends the loop right for up to 64 objects (Field_UnkB0E6 uses BCC);
+; the two copies of the loop tail are as found.
+; Callers (1 JSR site): Field_EndOfFrame ($C0:00D3).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: STX.b Obj_Cur writes one
+; byte, its high byte stays 0), DP=$0100 (Obj_Cur, Evt_ObjSlotEnd and
+; the callees' scratch are dp), DB=$00 (the Obj_* tables are absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A, X, Y clobbered; Obj_Cur = the
+; last object handled (or a party slot); Evt_ObjSlotEnd written; the
+; callees' dp scratch ($C3-$C6, $D9-$E0) changed.
+; ------------------------------------------------------------
+org $C0A810
+Vblank_UnkA810:
+    LDA.l !Evt_ObjCount
+    ASL A
+    STA.b !Evt_ObjSlotEnd
+    LDX.b #$00
+.object:
+    STX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    CMP.b #!Obj_Unk1100FreeMove
+    BCC .free_move
+    CMP.b #!Obj_Unk1100Eight
+    BEQ .next
+    CMP.b #!Obj_Unk1100Seven
+    BEQ .flag_only
+    JSR Obj_MoveStep
+    JSR Obj_UpdateInView
+    BCC .next                           ; out of the window
+    JSR Obj_AnimTickAndQueue
+    JSR Obj_DrawUnlink
+    JSR Obj_CalcScreenPos
+    JSR Obj_DrawLink
+.next:
+    LDX.b !Obj_Cur
+    INX
+    INX
+    CPX.b !Evt_ObjSlotEnd
+    BMI .object
+    LDA.b !Party_ObjSlot1
+    BMI .leader                         ; no member 2
+    TAX
+    LDA.w !Obj_Unk0F00,X
+    BEQ .leader
+    STX.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    JSR Obj_DrawLink
+.leader:
+    LDA.b !Party_ObjSlot
+    BMI .done
+    TAX
+    LDA.w !Obj_Unk0F00,X
+    BEQ .done
+    STX.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    JSR Obj_DrawLink
+.done:
+    RTS
+.flag_only:
+    JSR Obj_FlagInView
+    BRA .next
+.free_move:
+    JSR Obj_MoveStepFree
+    JSR Obj_UpdateInView
+    BCC .next_free
+    JSR Obj_AnimTickAndQueue
+    JSR Obj_DrawUnlink
+    JSR Obj_CalcScreenPos
+    JSR Obj_DrawLink
+.next_free:
+    LDX.b !Obj_Cur                      ; the loop tail again
+    INX
+    INX
+    CPX.b !Evt_ObjSlotEnd
+    BMI .object
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A88D — Obj_UpdateInView (186 bytes, $A88D–$A946)
+; Tests object Obj_Cur against the view window and sets it up or
+; drops it as it enters or leaves.
+; The window, in 8-pixel columns / rows: from Map_TileOriginX -
+; ObjView_MarginX (0 if that borrows) up to, not including,
+; Map_Unk1D0C + ObjView_MarginX (ObjView_Max if that carries); from
+; Map_TileOriginY - ObjView_MarginTop (0 on a borrow) to Map_Unk1D10 +
+; ObjView_MarginBottom (ObjView_Max on a carry). The object is in it
+; when Obj_TileX x 2 and Obj_TileY x 2 fall inside, Obj_Unk1100 bit 7
+; is clear and Obj_Unk1A81 is 1..$7F.
+; - In it: if Obj_Unk0F00 is already Active, nothing; else it is set
+;   up: Obj_DrawPrev / Obj_DrawNext / Obj_Unk0F00 = $80, Obj_AnimColumn
+;   = 0, Obj_AnimTimer = 0, Obj_State = 0, Obj_LastFrame =
+;   Obj_LastFrameNone, then Obj_Unk7170, Obj_Unk6F9A (both dispatch on
+;   Obj_Unk1100; not traced) and Obj_DrawLink. C=1 either way.
+; - Out of it: if Obj_Unk0F00 is Active, it is dropped: Obj_Unk0F00 =
+;   0, SprBuf_FreeObj, Obj_Unk734C, Obj_Unk7056 (not traced) and
+;   Obj_DrawUnlink; then, when ObjX_LeaveView is nonzero and
+;   Field_Unk30 is 0, Field_Unk29 = Field_Unk29State0D. In every out
+;   case ObjX_AnimLoops, when nonzero, becomes ObjX_AnimLoopsOut. C=0.
+; The 5 bytes after the RTS ($C0:A942: JSR Obj_Unk734C, CLC, RTS) are
+; never reached; nothing branches or calls there (xref finds no site).
+; Callers (2 JSR sites): Vblank_UnkA810 ($C0:A82D, $C0:A873).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur, the
+; ObjView_* scratch and Field_Unk29/30 are dp), DB=$00 (Obj_* and
+; Map_* tables absolute); Obj_Cur = the object.
+; Exit: M=1, X=1 as the callees leave them (Obj_DrawLink /
+; Obj_DrawUnlink return with 8-bit X/Y), DP and DB unchanged; C=1 in
+; the window, C=0 out of it; A and Y clobbered, X = Obj_Cur;
+; ObjView_Left/Right/Top/Bottom ($C3-$C6) written unless Obj_Unk1100
+; bit 7 is set or Obj_Unk1A81 is out of range.
+; ------------------------------------------------------------
+Obj_UpdateInView:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BMI .out
+    LDA.w !Obj_Unk1A81,X
+    BEQ .out
+    BMI .out
+    LDA.w !Map_TileOriginX
+    SEC
+    SBC.b #!ObjView_MarginX
+    BCS .left
+    LDA.b #$00
+.left:
+    STA.b !ObjView_Left
+    LDA.w !Map_Unk1D0C
+    CLC
+    ADC.b #!ObjView_MarginX
+    BCC .right
+    LDA.b #!ObjView_Max
+.right:
+    STA.b !ObjView_Right
+    LDA.w !Map_TileOriginY
+    SEC
+    SBC.b #!ObjView_MarginTop
+    BCS .top
+    LDA.b #$00
+.top:
+    STA.b !ObjView_Top
+    LDA.w !Map_Unk1D10
+    CLC
+    ADC.b #!ObjView_MarginBottom
+    BCC .bottom
+    LDA.b #!ObjView_Max
+.bottom:
+    STA.b !ObjView_Bottom
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    ASL A
+    CMP.b !ObjView_Left
+    BCC .out
+    CMP.b !ObjView_Right
+    BCS .out
+    LDA.w !Obj_TileY,X
+    ASL A
+    CMP.b !ObjView_Top
+    BCC .out
+    CMP.b !ObjView_Bottom
+    BCS .out
+    LDA.w !Obj_Unk0F00,X
+    BMI .in                             ; already set up
+    LDA.b #!Obj_None
+    STA.w !Obj_DrawPrev,X
+    STA.w !Obj_DrawNext,X
+    STA.w !Obj_Unk0F00,X                ; Obj_Unk0F00Active
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    STZ.w !Obj_State,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    JSR Obj_Unk7170
+    JSR Obj_Unk6F9A
+    JSR Obj_DrawLink
+.in:
+    SEC
+    RTS
+.out:
+    LDA.w !Obj_Unk0F00,X
+    BPL .loops                          ; was not set up
+    STZ.w !Obj_Unk0F00,X
+    JSR SprBuf_FreeObj
+    JSR Obj_Unk734C
+    JSR Obj_Unk7056
+    JSR Obj_DrawUnlink
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BEQ .loops
+    LDA.b !Field_Unk30
+    BNE .loops
+    LDA.b #!Field_Unk29State0D
+    STA.b !Field_Unk29
+.loops:
+    LDA.l !ObjX_AnimLoops,X
+    BEQ .out_done
+    LDA.b #!ObjX_AnimLoopsOut
+    STA.l !ObjX_AnimLoops,X
+.out_done:
+    CLC
+    RTS
+.unreached:                             ; dead: no branch or call reaches it
+    JSR Obj_Unk734C
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A947 — Obj_FlagInView (67 bytes, $A947–$A989)
+; The view test for objects whose Obj_Unk1100 is Obj_Unk1100Seven:
+; only sets Obj_Unk0F00 = Obj_Unk0F00Active in the window and 0 out of
+; it, with no set-up, linking or release. Its window differs from
+; Obj_UpdateInView's: the left margin is subtracted and the right and
+; bottom margins added without clamping, there is no top margin
+; (from Map_TileOriginY itself), and the compares branch on N (BMI /
+; BPL) rather than on carry, so they are signed byte compares; the
+; caller ignores the returned carry. All kept as found.
+; Callers (1 JSR site): Vblank_UnkA810 ($C0:A86B).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+; ObjView_* scratch are dp), DB=$00; Obj_Cur = the object.
+; Exit: M=1, X=1, DP and DB unchanged; C=1 in the window, C=0 out;
+; A clobbered, X = Obj_Cur, Y unchanged; ObjView_Left/Right/Top/Bottom
+; ($C3-$C6) written.
+; ------------------------------------------------------------
+Obj_FlagInView:
+    LDA.w !Map_TileOriginX
+    SEC
+    SBC.b #!ObjView_MarginX
+    STA.b !ObjView_Left
+    LDA.w !Map_Unk1D0C
+    CLC
+    ADC.b #!ObjView_MarginX
+    STA.b !ObjView_Right
+    LDA.w !Map_TileOriginY
+    STA.b !ObjView_Top
+    LDA.w !Map_Unk1D10
+    CLC
+    ADC.b #!ObjView_MarginBottom
+    STA.b !ObjView_Bottom
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    ASL A
+    CMP.b !ObjView_Left
+    BMI .out
+    CMP.b !ObjView_Right
+    BPL .out
+    LDA.w !Obj_TileY,X
+    ASL A
+    CMP.b !ObjView_Top
+    BMI .out
+    CMP.b !ObjView_Bottom
+    BPL .out
+    LDA.b #!Obj_Unk0F00Active
+    STA.w !Obj_Unk0F00,X
+    SEC
+    RTS
+.out:
+    STZ.w !Obj_Unk0F00,X
+    CLC
+    RTS
+
+; ============================================================
 ; Draw buckets. Oam_BuildShadow draws objects bucket by bucket
 ; (Obj_DrawBucket, 64 of them, one per 4 lines of Obj_ScreenY's low
 ; byte: offset (ScreenY >> 1) & $FE), each a doubly linked list through
@@ -15704,8 +16032,8 @@ Obj_ResetFrameState:
 ; The bucket is found from the current Obj_ScreenY, so it must not have
 ; changed since Obj_DrawLink.
 ; Callers (16 JSR sites): FieldBtl_RestoreObjs ($C0:0771, $C0:0781, $C0:0791, $C0:07A1, $C0:07B1,
-;   $C0:07C1, $C0:07D1, $C0:07E1), FieldBtl_RestoreParty ($C0:0875, $C0:0885, $C0:0895) and
-;   unmatched ($C0:A835, $C0:A852, $C0:A864, $C0:A87B, $C0:A921).
+;   $C0:07C1, $C0:07D1, $C0:07E1), FieldBtl_RestoreParty ($C0:0875, $C0:0885, $C0:0895),
+;   Vblank_UnkA810 ($C0:A835, $C0:A852, $C0:A864, $C0:A87B) and Obj_UpdateInView ($C0:A921).
 ; On entry: M any, X any (SEP #$30 here), DP=$0100 (Obj_Cur), DB=$00
 ; (the object tables are absolute); Obj_Cur = the object's slot.
 ; Exit: M=1, X=1 (8-bit X/Y), DP and DB unchanged; A, X and Y
@@ -15756,8 +16084,9 @@ Obj_DrawUnlink:
 ; the old head's Obj_DrawPrev = the object and its Obj_DrawNext = the
 ; old head; its own Obj_DrawPrev is not written (it is $80 when the
 ; object was taken out by Obj_DrawUnlink). Obj_DrawOut = 0 either way.
-; Callers (8 JSR sites): FieldBtl_RestoreObj ($C0:086B), FieldBtl_RestorePc ($C0:08FF) and unmatched
-;   ($C0:A83B, $C0:A855, $C0:A867, $C0:A881, $C0:A90B, $C0:B104).
+; Callers (8 JSR sites): FieldBtl_RestoreObj ($C0:086B), FieldBtl_RestorePc ($C0:08FF),
+;   Vblank_UnkA810 ($C0:A83B, $C0:A855, $C0:A867, $C0:A881), Obj_UpdateInView ($C0:A90B) and
+;   Field_UnkB0E6 ($C0:B104).
 ; On entry: M any, X any (SEP #$30 here), DP=$0100 (Obj_Cur,
 ; Obj_DrawBucketOfs), DB=$00; Obj_Cur = the object's slot.
 ; Exit: M=1, X=1 (8-bit X/Y), DP and DB unchanged; A and Y clobbered,
@@ -15794,6 +16123,1370 @@ Obj_DrawLink:
     STA.w !Obj_DrawBucket,Y
     STZ.w !Obj_DrawOut,X
 .done:
+    RTS
+
+; ============================================================
+; Object motion (continued from $C0:A810): the move steps, the screen
+; position, the direction and velocity set-up the event handlers use,
+; then (after the map region copy) the load-time draw pass.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:AA07 — Obj_MoveStep (192 bytes, $AA07–$AAC6)
+; One frame of movement for object Obj_Cur (Obj_Unk1100 3 and up),
+; while Obj_MoveFrames is nonzero (it is decremented first). With
+; Obj_ArcMode nonzero this is the arc step, Obj_MoveStep_Arc.
+; Otherwise the low bytes of Obj_VelX / Obj_VelY are signed steps
+; added to Obj_PosX and then to Obj_PosY:
+; - ObjX_Unk7F0B00 nonzero: the step may cross into the next map tile
+;   (a carry or borrow moves Obj_TileX/Y by one). A value 1..$7F is
+;   cleared first, so it allows this for one frame; bit 7 keeps it.
+; - ObjX_Unk7F0B00 zero: a step that would cross a tile edge is not
+;   made and ends the movement (Obj_MoveFrames = 0). The other axis
+;   still moves this frame.
+; Callers (1 JSR site): Vblank_UnkA810 ($C0:A82A).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and
+; ObjMove_Step are dp), DB=$00 (Obj_* tables absolute); Obj_Cur = the
+; object.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered, X = Obj_Cur, Y
+; unchanged; Obj_PosX/Y (and Obj_TileX/Y), Obj_MoveFrames,
+; ObjX_Unk7F0B00 and ObjMove_Step ($D9) as above.
+; ------------------------------------------------------------
+Obj_MoveStep:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_ArcMode,X
+    BEQ .linear
+    BRL Obj_MoveStep_Arc
+.linear:
+    LDA.w !Obj_MoveFrames,X
+    BNE .moving
+    RTS
+.moving:
+    DEC A
+    STA.w !Obj_MoveFrames,X
+    LDA.l !ObjX_Unk7F0B00,X
+    BEQ .in_tile
+    BMI .x_cross                        ; bit 7: always may cross
+    LDA.b #$00                          ; 1..$7F: this frame only
+    STA.l !ObjX_Unk7F0B00,X
+.x_cross:
+    LDA.w !Obj_VelX,X
+    BPL .x_cross_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjMove_Step
+    LDA.w !Obj_PosX,X
+    SEC
+    SBC.b !ObjMove_Step
+    BCS .x_cross_store
+    STA.w !Obj_PosX,X
+    DEC.w !Obj_TileX,X                  ; into the tile to the left
+    BRA .y_cross
+.x_cross_store:
+    STA.w !Obj_PosX,X
+    BRA .y_cross
+.x_cross_pos:
+    CLC
+    ADC.w !Obj_PosX,X
+    BCC .x_cross_store
+    STA.w !Obj_PosX,X
+    INC.w !Obj_TileX,X                  ; into the tile to the right
+.y_cross:
+    LDA.w !Obj_VelY,X
+    BPL .y_cross_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjMove_Step
+    LDA.w !Obj_PosY,X
+    SEC
+    SBC.b !ObjMove_Step
+    BCS .y_cross_store
+    STA.w !Obj_PosY,X
+    DEC.w !Obj_TileY,X
+    RTS
+.y_cross_store:
+    STA.w !Obj_PosY,X
+    RTS
+.y_cross_pos:
+    CLC
+    ADC.w !Obj_PosY,X
+    BCC .y_cross_store
+    STA.w !Obj_PosY,X
+    INC.w !Obj_TileY,X
+    RTS
+.in_tile:
+    LDA.w !Obj_VelX,X
+    BPL .x_in_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjMove_Step
+    LDA.w !Obj_PosX,X
+    SEC
+    SBC.b !ObjMove_Step
+    BCS .x_in_store
+    STZ.w !Obj_MoveFrames,X             ; would leave the tile: stop
+    BRA .y_in
+.x_in_store:
+    STA.w !Obj_PosX,X
+    BRA .y_in
+.x_in_pos:
+    CLC
+    ADC.w !Obj_PosX,X
+    BCC .x_in_store
+    STZ.w !Obj_MoveFrames,X
+.y_in:
+    LDA.w !Obj_VelY,X
+    BPL .y_in_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjMove_Step
+    LDA.w !Obj_PosY,X
+    SEC
+    SBC.b !ObjMove_Step
+    BCS .y_in_store
+    STZ.w !Obj_MoveFrames,X
+    RTS
+.y_in_store:
+    STA.w !Obj_PosY,X
+    RTS
+.y_in_pos:
+    CLC
+    ADC.w !Obj_PosY,X
+    BCC .y_in_store
+    STZ.w !Obj_MoveFrames,X
+    RTS
+
+; header: see Obj_MoveStep
+; $C0:AAC7 — Obj_MoveStep_Arc (54 bytes, $AAC7–$AAFC)
+; The arc step: while Obj_MoveFrames is nonzero (decremented first),
+; Obj_PosX += Obj_VelX as 16-bit words; Obj_VelY += Obj_ArcGravity (an
+; unsigned byte, carried into Obj_VelYHi); Obj_PosY += Obj_VelY (16-bit).
+; Reached by BRL from Obj_MoveStep ($C0:AA0E) and BRA from
+; Obj_MoveStepFree ($C0:AB04), with X = Obj_Cur.
+; Exit: M=1, X as on entry, DP and DB unchanged; A clobbered.
+Obj_MoveStep_Arc:
+    LDA.w !Obj_MoveFrames,X
+    BNE .moving
+    RTS
+.moving:
+    DEC A
+    STA.w !Obj_MoveFrames,X
+    REP #$20
+    LDA.w !Obj_VelX,X
+    CLC
+    ADC.w !Obj_PosX,X
+    STA.w !Obj_PosX,X
+    SEP #$20
+    LDA.w !Obj_VelY,X
+    CLC
+    ADC.w !Obj_ArcGravity,X
+    BCC .no_carry
+    INC.w !Obj_VelYHi,X
+.no_carry:
+    STA.w !Obj_VelY,X
+    REP #$20
+    LDA.w !Obj_VelY,X
+    CLC
+    ADC.w !Obj_PosY,X
+    STA.w !Obj_PosY,X
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:AAFD — Obj_MoveStepFree (72 bytes, $AAFD–$AB44)
+; Movement for objects with Obj_Unk1100 below Obj_Unk1100FreeMove:
+; with Obj_ArcMode set, the arc step (BRA Obj_MoveStep_Arc); otherwise,
+; while Obj_MoveFrames is nonzero (decremented first), the low bytes of
+; Obj_VelX / Obj_VelY are sign-extended and added to Obj_PosX / Obj_PosY
+; as words, so the object crosses tile edges freely.
+; Callers (2 sites: 1 JSR, 1 JSL): Vblank_UnkA810 (JSR $C0:A870) and unmatched (JSL $C9:3BB0).
+; Callers note: Vblank_UnkA810 ($C0:A870). xref also confirms a JSL at
+; $C9:3BB0 in unmatched code, which this RTS routine could not return
+; from; it is probably data that decodes as JSL, not a call.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y; X = Obj_Cur is loaded here),
+; DP=$0100 (Obj_Cur is dp), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered, X = Obj_Cur, Y
+; unchanged; Obj_PosX/Y and Obj_MoveFrames as above.
+; ------------------------------------------------------------
+Obj_MoveStepFree:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_ArcMode,X
+    BEQ .linear
+    BRA Obj_MoveStep_Arc
+.linear:
+    LDA.w !Obj_MoveFrames,X
+    BNE .moving
+    RTS
+.moving:
+    DEC A
+    STA.w !Obj_MoveFrames,X
+    LDA.w !Obj_VelX,X
+    BPL .x_pos
+    REP #$20
+    ORA.w #!Eng_HighByteMask            ; sign-extend (B held whatever was there)
+    BRA .x_add
+.x_pos:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+.x_add:
+    CLC
+    ADC.w !Obj_PosX,X
+    STA.w !Obj_PosX,X
+    SEP #$20
+    LDA.w !Obj_VelY,X
+    BPL .y_pos
+    REP #$20
+    ORA.w #!Eng_HighByteMask
+    BRA .y_add
+.y_pos:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+.y_add:
+    CLC
+    ADC.w !Obj_PosY,X
+    STA.w !Obj_PosY,X
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:AB45 — Obj_CalcScreenPos (93 bytes, $AB45–$ABA1)
+; Screen position of object Obj_Cur from its map position and the
+; layer-1 view: ObjScr_ViewX = Map_TileOriginX (low byte) x 8 +
+; (Map_Unk1D87 & 7), ObjScr_ViewY likewise from Map_TileOriginY and
+; Map_Unk1D89; Obj_ScreenX = Obj_PosX / 16 - ObjScr_ViewX and
+; Obj_ScreenY = Obj_PosY / 16 - ObjScr_ViewY, each kept to 9 bits, with
+; bit 8 forced on when the difference is negative (left of / above the
+; view). This is why Map_Unk1D87/1D89 are taken as the layer-1 scroll in
+; pixels: their low 3 bits are the pixel within the scrolled column.
+; Callers (3 JSR sites): Vblank_UnkA810 ($C0:A838, $C0:A87E) and Field_UnkB0E6 ($C0:B101).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y; X = Obj_Cur is loaded
+; here), DP=$0100 (Obj_Cur and the ObjScr_* scratch are dp), DB=$00
+; (Map_* and Obj_* absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered, X = Obj_Cur, Y
+; unchanged; Obj_ScreenX/Y written; ObjScr_FineX/FineY/ViewX/ViewY
+; ($D9-$E0) written.
+; ------------------------------------------------------------
+Obj_CalcScreenPos:
+    REP #$20
+    LDX.b !Obj_Cur
+    LDA.w !Map_Unk1D87
+    AND.w #!Map_FineScrollMask
+    STA.b !ObjScr_FineX
+    LDA.w !Map_Unk1D89
+    AND.w #!Map_FineScrollMask
+    STA.b !ObjScr_FineY
+    LDA.w !Map_TileOriginX
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !ObjScr_FineX
+    STA.b !ObjScr_ViewX
+    LDA.w !Map_TileOriginY
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !ObjScr_FineY
+    STA.b !ObjScr_ViewY
+    LDA.w !Obj_PosX,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A                               ; pixels
+    SEC
+    SBC.b !ObjScr_ViewX
+    BCS .x_mask
+    ORA.w #!Obj_ScreenWrap              ; left of the view
+.x_mask:
+    AND.w #!Obj_ScreenXMask
+    STA.w !Obj_ScreenX,X
+    LDA.w !Obj_PosY,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    SEC
+    SBC.b !ObjScr_ViewY
+    BCS .y_mask
+    ORA.w #!Obj_ScreenWrap              ; above the view
+.y_mask:
+    AND.w #!Spr_YMask9
+    STA.w !Obj_ScreenY,X
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:ABA2 — Obj_CalcDirection (199 bytes, $ABA2–$AC68)
+; Direction from point (ObjDir_FromX, ObjDir_FromY) to (ObjDir_ToX,
+; ObjDir_ToY), map tiles, as an angle in Obj_Direction: 256 per turn,
+; $00 = +X (right), $40 = +Y (down), $80 = -X, $C0 = -Y. The quadrant
+; gives a base angle and the two distances (ObjDir_Run along the
+; quadrant's starting axis, ObjDir_Rise along the next):
+;   dy >= 0, dx >= 0: base $00, run dx,  rise dy;
+;   dy >= 0, dx < 0:  base $40, run dy,  rise |dx|;
+;   dy < 0,  dx < 0:  base $80, run |dx|, rise |dy|;
+;   dy < 0,  dx >= 0: base $C0, run |dy|, rise dx.
+; The base plus Rom_AngleTable[rise x 32 + run] is the result. A
+; distance with bit 6 set (in either) scales both by 1/4 (bits 0-6
+; kept), else one with bit 5 set scales both by 1/2 (bits 0-5), so the
+; index stays in the 32 x 32 table. Quirk, kept: bit 7 of a distance
+; (128 tiles or more) is never looked at; such a distance loses it.
+; Both points equal give $40. Obj_DirectionHi is zeroed.
+; Callers (11 JSR sites): unmatched ($C0:4D46, $C0:4FAB, $C0:503D, $C0:50EA, $C0:516D, $C0:51F1,
+;   $C0:5281, $C0:5326, $C0:53CA, $C0:54B6, $C0:55E6).
+; Callers note (11 JSR sites in unmatched code, probably event-opcode
+;   handlers like the one at $C0:4D22): $C0:4D46, $C0:4FAB, $C0:503D, $C0:50EA, $C0:516D, $C0:51F1,
+;   $C0:5281, $C0:5326, $C0:53CA, $C0:54B6 and $C0:55E6. The one at
+;   $C0:4D22 stores Obj_TileX/Y of Obj_Cur as the start and two script
+;   bytes as the target.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: TAX of the 10-bit index),
+; DP=$0100 (the ObjDir_* bytes are dp), DB=$00 or $C0 (Rom_AngleTable
+; read absolute, through the bank $00 mirror).
+; Exit: M=1, X=0, DP and DB unchanged; A = Obj_Direction, X = the table
+; index, Y unchanged; Obj_Direction /
+; Obj_DirectionHi written; ObjDir_Index/Run/Rise ($F4-$F7) written.
+; ------------------------------------------------------------
+Obj_CalcDirection:
+    STZ.b !Obj_DirectionHi
+    LDA.b !ObjDir_ToY
+    SEC
+    SBC.b !ObjDir_FromY
+    BCC .up
+    STA.b !ObjDir_Rise                  ; dy >= 0
+    LDA.b !ObjDir_ToX
+    SEC
+    SBC.b !ObjDir_FromX
+    BCC .down_left
+    STA.b !ObjDir_Run                   ; quadrant 0: run dx, rise dy
+    STZ.b !Obj_Direction
+    BRA .lookup
+.down_left:
+    EOR.b #!Eng_Invert8
+    INC A
+    XBA                                 ; B = |dx|
+    LDA.b !ObjDir_Rise
+    STA.b !ObjDir_Run                   ; run dy
+    XBA
+    STA.b !ObjDir_Rise                  ; rise |dx|
+    LDA.b #!Dir_QuarterTurn
+    STA.b !Obj_Direction
+    BRA .lookup
+.up:
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjDir_Rise                  ; |dy|
+    LDA.b !ObjDir_ToX
+    SEC
+    SBC.b !ObjDir_FromX
+    BCS .up_right
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjDir_Run                   ; quadrant 2: run |dx|, rise |dy|
+    LDA.b #!Dir_HalfTurn
+    STA.b !Obj_Direction
+    BRA .lookup
+.up_right:
+    XBA                                 ; B = dx
+    LDA.b !ObjDir_Rise
+    STA.b !ObjDir_Run                   ; run |dy|
+    XBA
+    STA.b !ObjDir_Rise                  ; rise dx
+    LDA.b #!Dir_ThreeQuarters
+    STA.b !Obj_Direction
+.lookup:
+    LDA.b !ObjDir_Run
+    BIT.b #!Dir_Over63
+    BNE .quarter
+    LDA.b !ObjDir_Rise
+    BIT.b #!Dir_Over63
+    BNE .quarter
+    LDA.b !ObjDir_Run
+    BIT.b #!Dir_Over31
+    BNE .half
+    LDA.b !ObjDir_Rise
+    BIT.b #!Dir_Over31
+    BNE .half
+    LDA.b !ObjDir_Run
+    REP #$20
+    AND.w #!Dir_Low5
+    STA.b !ObjDir_Index
+    LDA.b !ObjDir_Rise                  ; 16-bit: also the byte after
+    AND.w #!Dir_Low5
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; rise x 32
+    ORA.b !ObjDir_Index
+    TAX
+    SEP #$20
+    LDA.w !Rom_AngleTable,X
+    CLC
+    ADC.b !Obj_Direction
+    STA.b !Obj_Direction
+    RTS
+.quarter:
+    LDA.b !ObjDir_Run
+    REP #$20
+    AND.w #!Dir_Low7
+    LSR A
+    LSR A
+    STA.b !ObjDir_Index
+    LDA.b !ObjDir_Rise
+    AND.w #!Dir_Rise7Mask
+    ASL A
+    ASL A
+    ASL A                               ; (rise / 4) x 32
+    ORA.b !ObjDir_Index
+    TAX
+    SEP #$20
+    LDA.w !Rom_AngleTable,X
+    CLC
+    ADC.b !Obj_Direction
+    STA.b !Obj_Direction
+    RTS
+.half:
+    LDA.b !ObjDir_Run
+    REP #$20
+    AND.w #!Dir_Low6
+    LSR A
+    STA.b !ObjDir_Index
+    LDA.b !ObjDir_Rise
+    AND.w #!Dir_Rise6Mask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; (rise / 2) x 32
+    ORA.b !ObjDir_Index
+    TAX
+    SEP #$20
+    LDA.w !Rom_AngleTable,X
+    CLC
+    ADC.b !Obj_Direction
+    STA.b !Obj_Direction
+    RTS
+
+; ------------------------------------------------------------
+; $C0:AC69 — Obj_SetVelocity (148 bytes, $AC69–$ACFC)
+; Sets object X's steps from Obj_Direction and Obj_Speed with the
+; hardware multiplier: Obj_VelY = speed x sin / 256 and Obj_VelX =
+; speed x cos / 256 (Rom_SineTable256 at the direction and at the
+; direction + Dir_QuarterTurn; the multiply is unsigned, so a negative
+; table value is negated first and the product negated back; the sign
+; is taken from the angle, past Dir_HalfTurn, not from the byte). Both
+; are sign-extended into Obj_VelYHi / Obj_VelXHi. ObjVel_Y gets a copy
+; of the Y step. The opening STZs of Obj_VelX / Obj_VelY are
+; overwritten before anything reads them (kept as found).
+; Callers (1 JSR site): unmatched ($C0:4D4B).
+; Callers note: $C0:4D4B in unmatched code (the event handler at $C0:4D22,
+; right after Obj_CalcDirection), its only call site.
+; On entry: M=1 (8-bit A), X any (SEP #$10 here) = Obj_Cur, DP=$0100
+; (Obj_Cur, Obj_Direction and ObjVel_Y are dp), DB=$00 (Obj_*,
+; multiplier registers and the ROM table absolute).
+; Exit: M=1, X=0 (16-bit, REP #$10 at the end), DP and DB unchanged;
+; A clobbered, X = Obj_Cur, Y unchanged; Obj_VelX/VelXHi/VelY/VelYHi
+; and ObjVel_Y ($DB) written.
+; ------------------------------------------------------------
+Obj_SetVelocity:
+    SEP #$10
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    LDA.w !Obj_Speed,X
+    STA.w WRMPYA
+    LDX.b !Obj_Direction
+    LDA.w !Rom_SineTable256,X           ; sin
+    CPX.b #!Dir_HalfTurn
+    BCS .sin_neg
+    STA.w WRMPYB
+    NOP                                 ; multiplier delay
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    STA.b !ObjVel_Y
+    STA.w !Obj_VelY,X
+    BRA .y_sign
+.sin_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjVel_Y
+    STA.w !Obj_VelY,X
+.y_sign:
+    LDA.w !Obj_VelY,X
+    BPL .y_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.w !Obj_VelYHi,X
+    BRA .cos
+.y_pos:
+    STZ.w !Obj_VelYHi,X
+.cos:
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Dir_QuarterTurn
+    TAX
+    LDA.w !Rom_SineTable256,X           ; cos
+    CPX.b #!Dir_HalfTurn
+    BCC .cos_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w !Obj_VelX,X
+    REP #$10
+    BRA .x_sign
+.cos_pos:
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    STA.w !Obj_VelX,X
+    REP #$10
+.x_sign:
+    LDA.w !Obj_VelX,X
+    BPL .x_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.w !Obj_VelXHi,X
+    RTS
+.x_pos:
+    STZ.w !Obj_VelXHi,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:ACFD — Obj_SetVelocityChecked (410 bytes, $ACFD–$AE96)
+; As Obj_SetVelocity (steps from Obj_Direction and Obj_Speed, the sine
+; into ObjVel_Y and the cosine into ObjVel_X, sign-extended into
+; ObjVel_YHi / ObjVel_XHi), but it looks at the map tile the object
+; would reach after one step before storing them, and only the low
+; bytes go to Obj_VelX / Obj_VelY (Obj_VelXHi / Obj_VelYHi are not
+; written). With both steps 0 it stores them and stops.
+; The probe: ObjVel_NewX = Obj_PosX + the X step, and Obj_PosY + the Y
+; step left in 16-bit A; after SEP #$20 the LDA of ObjVel_NewTileX puts
+; the new column in A's low byte while B still holds the new row, so the
+; 16-bit AND with Map_ColMask1 gives the Map_TileAttrA/B index.
+; - When Obj_Unk1C80 bit 0 (Obj_Unk1C80Block) is set and the tile's
+;   Map_TileAttrB has bit 7 set (blocking, inferred from this use), it
+;   picks a random direction (RandomTable at Field_Unk0400Copy + 1,
+;   which it increments), recomputes the steps and probes again in
+;   Obj_SetVelocityChecked_Probe, which no longer tests Obj_Unk1C80 and
+;   stops the object (both steps 0) if that tile blocks too. The BRL
+;   to the very next instruction ($C0:AE34) is as found.
+; - Otherwise the priorities: with Obj_OamFlags bit 7
+;   (Obj_OamFlagsTilePrio) set, Obj_PrioHigh / Obj_PrioLow = Oam_Prio2
+;   plus TileAttr_Prio of Map_TileAttrB / Map_TileAttrA moved to bit 4
+;   (as Map_ProbeTileLevel does for the leader); else they come from
+;   Obj_OamFlags itself: Obj_PrioHigh = its bits 4-5, Obj_PrioLow = its
+;   bits 0-1 moved to bits 4-5.
+; The opening STZs of Obj_VelX / Obj_VelY are overwritten (kept).
+; Callers (12 JSR sites): unmatched ($C0:4EBD, $C0:4F03, $C0:4F5A, $C0:4FE0, $C0:507A, $C0:511F,
+;   $C0:518A, $C0:520E, $C0:52B6, $C0:5343, $C0:5406, $C0:54EB).
+; Callers of Obj_SetVelocityChecked_Probe (2 BRL sites): Obj_SetVelocityAxis ($C0:AF46, $C0:AF4B).
+; Callers note (12 JSR sites in unmatched code, near the Obj_CalcDirection
+;   ones): $C0:4EBD, $C0:4F03, $C0:4F5A, $C0:4FE0, $C0:507A, $C0:511F,
+;   $C0:518A, $C0:520E, $C0:52B6, $C0:5343, $C0:5406 and $C0:54EB.
+; On entry: M=1 (8-bit A), X any (SEP #$10 here) = Obj_Cur, DP=$0100
+; (Obj_Cur, Obj_Direction, the ObjVel_* scratch and Field_Unk0400Copy
+; are dp), DB=$00 (Obj_*, the multiplier and the ROM tables absolute;
+; Map_TileAttrA/B read long).
+; Exit: M=1, X=0 (16-bit), DP and DB unchanged; A clobbered, X =
+; Obj_Cur, Y = Obj_Cur when a tile was probed (else unchanged);
+; Obj_VelX / Obj_VelY, maybe Obj_PrioHigh / Obj_PrioLow, Obj_Direction
+; and Field_Unk0400Copy (after a block) written; ObjVel_* ($D9-$E1,
+; $E5) scratch.
+; ------------------------------------------------------------
+Obj_SetVelocityChecked:
+    SEP #$10
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    LDA.w !Obj_Speed,X
+    STA.w WRMPYA
+    LDX.b !Obj_Direction
+    LDA.w !Rom_SineTable256,X     ; sin
+    CPX.b #!Dir_HalfTurn
+    BCS .sin_neg
+    STA.w WRMPYB
+    NOP                                 ; multiplier delay
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !ObjVel_Y
+    BRA .cos
+.sin_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjVel_Y
+.cos:
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Dir_QuarterTurn
+    TAX
+    LDA.w !Rom_SineTable256,X     ; cos
+    CPX.b #!Dir_HalfTurn
+    BCC .cos_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjVel_X
+    BRA .x_sign
+.cos_pos:
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !ObjVel_X
+.x_sign:
+    LDA.b !ObjVel_X
+    BEQ .x_zero
+    BPL .x_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.b !ObjVel_XHi
+    BRA .y_sign
+.x_pos:
+    STZ.b !ObjVel_XHi
+    BRA .y_sign
+.x_zero:
+    STZ.b !ObjVel_XHi
+    LDA.b !ObjVel_Y
+    BEQ .store                          ; no movement: nothing to probe
+.y_sign:
+    LDA.b !ObjVel_Y
+    BPL .y_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.b !ObjVel_YHi
+    BRA .probe
+.y_pos:
+    STZ.b !ObjVel_YHi
+.probe:
+    LDX.b !Obj_Cur
+    REP #$20
+    LDA.w !Obj_PosX,X
+    CLC
+    ADC.b !ObjVel_X
+    STA.b !ObjVel_NewX
+    LDA.w !Obj_PosY,X
+    CLC
+    ADC.b !ObjVel_Y                     ; B = the new tile row
+    SEP #$20
+    LDA.b !ObjVel_NewTileX              ; A = the new tile column
+    REP #$30
+    AND.w !Map_ColMask1
+    SEP #$20
+    TAX                                 ; the map index (16-bit X)
+    LDY.b !Obj_Cur
+    LDA.w !Obj_Unk1C80,Y
+    BIT.b #!Obj_Unk1C80Block
+    BEQ .no_block_test
+    LDA.l !Map_TileAttrA,X
+    STA.b !ObjVel_AttrA
+    LDA.l !Map_TileAttrB,X
+    STA.b !ObjVel_AttrB
+    BMI .blocked
+    LDA.w !Obj_OamFlags,Y
+    BPL .fixed_prio
+    SEP #$10
+    LDA.b !ObjVel_AttrB
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioHigh,X
+    LDA.b !ObjVel_AttrA
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.w !Obj_PrioLow,X
+    BRA .store
+.fixed_prio:
+    STA.b !ObjVel_Flags
+    LDX.b !Obj_Cur
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioHigh,X
+    LDA.b !ObjVel_Flags
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioLow,X
+.store:
+    LDX.b !Obj_Cur                      ; X is 8- or 16-bit here (paths differ)
+    LDA.b !ObjVel_X
+    STA.w !Obj_VelX,X
+    LDA.b !ObjVel_Y
+    STA.w !Obj_VelY,X
+    REP #$10
+    RTS
+.no_block_test:
+    LDA.l !Map_TileAttrA,X
+    STA.b !ObjVel_AttrA
+    LDA.l !Map_TileAttrB,X
+    STA.b !ObjVel_AttrB
+    LDA.w !Obj_OamFlags,Y
+    BPL .fixed_prio
+    SEP #$10
+    LDA.b !ObjVel_AttrB
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioHigh,X
+    LDA.b !ObjVel_AttrA
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.w !Obj_PrioLow,X
+    BRA .store
+.blocked:
+    SEP #$10
+    INC.b !Field_Unk0400Copy
+    LDX.b !Field_Unk0400Copy
+    LDA.w RandomTable,X
+    STA.b !Obj_Direction
+    LDX.b !Obj_Cur
+    BRL .retry                          ; to the next instruction (as found)
+.retry:
+    SEP #$10
+    LDA.w !Obj_Speed,X
+    STA.w WRMPYA
+    LDX.b !Obj_Direction
+    LDA.w !Rom_SineTable256,X
+    CPX.b #!Dir_HalfTurn
+    BCS .retry_sin_neg
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !ObjVel_Y
+    BRA .retry_cos
+.retry_sin_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjVel_Y
+.retry_cos:
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Dir_QuarterTurn
+    TAX
+    LDA.w !Rom_SineTable256,X
+    CPX.b #!Dir_HalfTurn
+    BCC .retry_cos_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !ObjVel_X
+    BRA Obj_SetVelocityChecked_Probe
+.retry_cos_pos:
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDX.b !Obj_Cur
+    LDA.w RDMPYH
+    STA.b !ObjVel_X
+
+; header: see Obj_SetVelocityChecked
+; $C0:AE97 — Obj_SetVelocityChecked_Probe (153 bytes, $AE97–$AF2F)
+; The second probe, reached by falling in from the retry and by BRL
+; from Obj_SetVelocityAxis ($C0:AF46, $C0:AF4B), with ObjVel_X /
+; ObjVel_Y set, X 8-bit and Y = Obj_Cur. As the first probe without the
+; Obj_Unk1C80 test; a blocking tile sets both steps to 0. Quirk, kept:
+; with the X step 0 it does not clear ObjVel_XHi (the first probe
+; does), so the old byte is used: after the first probe's negative X
+; step ($FF there), the probe adds $FF00 to Obj_PosX and looks one tile
+; column to the left.
+; Exit: as Obj_SetVelocityChecked.
+Obj_SetVelocityChecked_Probe:
+    LDA.b !ObjVel_X
+    BEQ .x_zero
+    BPL .x_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.b !ObjVel_XHi
+    BRA .y_sign
+.x_pos:
+    STZ.b !ObjVel_XHi
+    BRA .y_sign
+.x_zero:
+    LDA.b !ObjVel_Y                     ; (ObjVel_XHi not cleared: quirk above)
+    BEQ .store
+.y_sign:
+    LDA.b !ObjVel_Y
+    BPL .y_pos
+    LDA.b #!Eng_SignExtNeg
+    STA.b !ObjVel_YHi
+    BRA .probe
+.y_pos:
+    STZ.b !ObjVel_YHi
+.probe:
+    LDX.b !Obj_Cur
+    REP #$20
+    LDA.w !Obj_PosX,X
+    CLC
+    ADC.b !ObjVel_X
+    STA.b !ObjVel_NewX
+    LDA.w !Obj_PosY,X
+    CLC
+    ADC.b !ObjVel_Y
+    SEP #$20
+    LDA.b !ObjVel_NewTileX
+    REP #$30
+    AND.w !Map_ColMask1
+    SEP #$20
+    TAX
+    LDA.l !Map_TileAttrA,X
+    STA.b !ObjVel_AttrA
+    LDA.l !Map_TileAttrB,X
+    STA.b !ObjVel_AttrB
+    BMI .stop                           ; blocked again
+    LDA.w !Obj_OamFlags,Y
+    BPL .fixed_prio
+    SEP #$10
+    LDA.b !ObjVel_AttrB
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioHigh,X
+    LDA.b !ObjVel_AttrA
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.w !Obj_PrioLow,X
+    BRA .store
+.fixed_prio:
+    STA.b !ObjVel_Flags
+    LDX.b !Obj_Cur
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioHigh,X
+    LDA.b !ObjVel_Flags
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioLow,X
+.store:
+    LDX.b !Obj_Cur
+    LDA.b !ObjVel_X
+    STA.w !Obj_VelX,X
+    LDA.b !ObjVel_Y
+    STA.w !Obj_VelY,X
+    REP #$10
+    RTS
+.stop:
+    SEP #$10
+    STZ.b !ObjVel_Y
+    STZ.b !ObjVel_X
+    BRL .store
+
+; ------------------------------------------------------------
+; $C0:AF30 — Obj_SetVelocityAxis (30 bytes, $AF30–$AF4D)
+; Zeroes one of the two steps in ObjVel_X / ObjVel_Y, then probes and
+; stores them through Obj_SetVelocityChecked_Probe: when |Y step| >=
+; |X step| the Y step goes, else the X step. So it keeps the smaller
+; step (the X step on a tie), the object moving along one axis only;
+; which axis it is meant to keep is not established, the code is as
+; found.
+; Callers note: none found (xref finds no JSR/JMP/BRL to $C0:AF30); it may be
+; reached through a pointer, or be unused.
+; On entry: M=1 (8-bit A), X 8-bit (the probe loads Obj_Cur into X and
+; relies on the width), Y = Obj_Cur (the probe reads Obj_OamFlags,Y),
+; DP=$0100, DB=$00; ObjVel_X / ObjVel_Y (and ObjVel_XHi, see the probe's
+; quirk) set.
+; Exit: as Obj_SetVelocityChecked_Probe; ObjVel_AbsX ($D9) written.
+; ------------------------------------------------------------
+Obj_SetVelocityAxis:
+    LDA.b !ObjVel_X
+    BPL .abs_x
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_x:
+    STA.b !ObjVel_AbsX
+    LDA.b !ObjVel_Y
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b !ObjVel_AbsX
+    BCS .drop_y                         ; |Y| >= |X|
+    STZ.b !ObjVel_X
+    BRL Obj_SetVelocityChecked_Probe
+.drop_y:
+    STZ.b !ObjVel_Y
+    BRL Obj_SetVelocityChecked_Probe
+
+; ============================================================
+; Map region copy: copies a rectangle of map tiles to another place
+; in the same map planes, plane by plane, as Field_Unk44 selects. The
+; event handler at $C0:3D97 reads the rectangle and the flags from
+; seven script bytes into MapCopy_SrcX-DstY and Field_Unk44 and calls
+; Field_UnkAF4E; DefaultHandler calls it again after its Field_Unk885A
+; loop. The planes all have a $100-byte row stride (Map_RowStride).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:AF4E — Field_UnkAF4E (328 bytes, $AF4E–$B095)
+; Copies the rectangle MapCopy_SrcX..MapCopy_EndX x MapCopy_SrcY..
+; MapCopy_EndY (inclusive) to MapCopy_DstX/DstY, once per Field_Unk44
+; bit: MapCopy_L1/L2/L3/HiBits/AttrA/AttrB copy whole bytes of
+; Map_TileProps, Map_Layer2Tiles, Map_Layer3Tiles, Map_TileHiBits,
+; Map_TileAttrA and Map_TileAttrB with Map_CopyRegionPlane;
+; MapCopy_L1Bit8 / MapCopy_L2Bit8 copy only bit 0 / bit 1 of
+; Map_TileHiBits (the metatile's bit 8 of layer 1 / layer 2), tile by
+; tile with DB=$7E, keeping the destination's other bits. Does nothing
+; when Field_Unk44 is 0; Field_Unk44 is not cleared. The two bit copies
+; are the same code twice. The name is kept because DefaultHandler
+; calls it by name (probably Map_CopyRegion).
+; Callers (2 JSR sites): DefaultHandler ($C0:1790) and unmatched ($C0:3DBD).
+; Callers note: DefaultHandler ($C0:1790) and $C0:3DBD in unmatched code
+; (the event handler at $C0:3D97).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the plane bases and map
+; indexes), DP=$0100 (Field_Unk44, MapCopy_* are dp), DB any (the bit
+; copies set $7E around themselves; Map_CopyRegionPlane's MVN sets it).
+; Exit: M=1, X=0, DP and DB unchanged; A, X, Y clobbered; the planes
+; changed; MapCopy_Plane ($F0) and the MapCopy_* scratch ($D9-$E4)
+; written.
+; ------------------------------------------------------------
+Field_UnkAF4E:
+    LDA.b !Field_Unk44
+    BNE .copy
+    RTS
+.copy:
+    BIT.b #!MapCopy_L1
+    BEQ .l2
+    LDX.w #!Map_TileProps&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.l2:
+    BIT.b #!MapCopy_L2
+    BEQ .l3
+    LDX.w #!Map_Layer2Tiles&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.l3:
+    BIT.b #!MapCopy_L3
+    BEQ .hi_bits
+    LDX.w #!Map_Layer3Tiles&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.hi_bits:
+    BIT.b #!MapCopy_HiBits
+    BEQ .attr_a
+    LDX.w #!Map_TileHiBits&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.attr_a:
+    BIT.b #!MapCopy_AttrA
+    BEQ .attr_b
+    LDX.w #!Map_TileAttrA&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.attr_b:
+    BIT.b #!MapCopy_AttrB
+    BEQ .l1_bit8
+    LDX.w #!Map_TileAttrB&$FFFF
+    STX.b !MapCopy_Plane
+    JSR Map_CopyRegionPlane
+    LDA.b !Field_Unk44
+.l1_bit8:
+    BIT.b #!MapCopy_L1Bit8
+    BEQ .l2_bit8
+    STZ.b !MapCopy_Width+1
+    STZ.b !MapCopy_RowsHi
+    STZ.b !MapCopy_ColsLeftHi
+    LDA.b !MapCopy_EndX
+    SEC
+    SBC.b !MapCopy_SrcX
+    STA.b !MapCopy_Width
+    LDA.b !MapCopy_EndY
+    SEC
+    SBC.b !MapCopy_SrcY
+    STA.b !MapCopy_Rows
+    REP #$20
+    LDA.b !MapCopy_SrcX                 ; 16-bit: row << 8 | column
+    TAX
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_SrcCol
+    LDA.b !MapCopy_DstX
+    TAY
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_DstCol
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+.l1_row:
+    SEP #$20
+    LDA.b !MapCopy_Width
+    STA.b !MapCopy_ColsLeft
+.l1_tile:
+    LDA.w !Map_TileHiBits,X
+    AND.b #!TileHiBits_L1Bit8
+    STA.b !MapCopy_Bit
+    LDA.w !Map_TileHiBits,Y
+    AND.b #!TileHiBits_L1Bit8^$FF
+    ORA.b !MapCopy_Bit
+    STA.w !Map_TileHiBits,Y
+    LDA.b !MapCopy_ColsLeft
+    BEQ .l1_row_done
+    DEC A
+    STA.b !MapCopy_ColsLeft
+    INX
+    INY
+    BRA .l1_tile
+.l1_row_done:
+    LDA.b !MapCopy_Rows
+    BEQ .l1_done
+    DEC.b !MapCopy_Rows
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Map_RowStride               ; next row, back to the first column
+    AND.w #!Eng_HighByteMask
+    ORA.b !MapCopy_SrcCol
+    TAX
+    TYA
+    CLC
+    ADC.w #!Map_RowStride
+    AND.w #!Eng_HighByteMask
+    ORA.b !MapCopy_DstCol
+    TAY
+    BRA .l1_row
+.l1_done:
+    SEP #$20
+    PLB
+.l2_bit8:
+    LDA.b !Field_Unk44
+    BIT.b #!MapCopy_L2Bit8
+    BEQ .done
+    STZ.b !MapCopy_Width+1
+    STZ.b !MapCopy_RowsHi
+    STZ.b !MapCopy_ColsLeftHi
+    LDA.b !MapCopy_EndX
+    SEC
+    SBC.b !MapCopy_SrcX
+    STA.b !MapCopy_Width
+    LDA.b !MapCopy_EndY
+    SEC
+    SBC.b !MapCopy_SrcY
+    STA.b !MapCopy_Rows
+    REP #$20
+    LDA.b !MapCopy_SrcX
+    TAX
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_SrcCol
+    LDA.b !MapCopy_DstX
+    TAY
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_DstCol
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+.l2_row:
+    SEP #$20
+    LDA.b !MapCopy_Width
+    STA.b !MapCopy_ColsLeft
+.l2_tile:
+    LDA.w !Map_TileHiBits,X
+    AND.b #!TileHiBits_L2Bit8
+    STA.b !MapCopy_Bit
+    LDA.w !Map_TileHiBits,Y
+    AND.b #!TileHiBits_L2Bit8^$FF
+    ORA.b !MapCopy_Bit
+    STA.w !Map_TileHiBits,Y
+    LDA.b !MapCopy_ColsLeft
+    BEQ .l2_row_done
+    DEC A
+    STA.b !MapCopy_ColsLeft
+    INX
+    INY
+    BRA .l2_tile
+.l2_row_done:
+    LDA.b !MapCopy_Rows
+    BEQ .l2_done
+    DEC.b !MapCopy_Rows
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Map_RowStride
+    AND.w #!Eng_HighByteMask
+    ORA.b !MapCopy_SrcCol
+    TAX
+    TYA
+    CLC
+    ADC.w #!Map_RowStride
+    AND.w #!Eng_HighByteMask
+    ORA.b !MapCopy_DstCol
+    TAY
+    BRA .l2_row
+.l2_done:
+    SEP #$20
+    PLB
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:B096 — Map_CopyRegionPlane (80 bytes, $B096–$B0E5)
+; Copies the MapCopy_* rectangle within one map plane, the one at
+; $7E:MapCopy_Plane: one MVN per row of MapCopy_Width + 1 bytes, from
+; MapCopy_SrcX/Y + MapCopy_Plane to MapCopy_DstX/Y + MapCopy_Plane,
+; MapCopy_Rows + 1 rows, Map_RowStride apart. Rows are copied top
+; down and left to right, so an overlapping destination below or right
+; of the source would read bytes already overwritten (not guarded).
+; MapCopy_SrcCol / DstCol are written but not read here.
+; Callers (6 JSR sites): Field_UnkAF4E ($C0:AF5C, $C0:AF6A, $C0:AF78, $C0:AF86, $C0:AF94, $C0:AFA2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y for the MVN addresses),
+; DP=$0100 (MapCopy_* are dp), DB any (PHB/PLB around each MVN).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered, X / Y past the last
+; row copied; MapCopy_Width/Rows/SrcCol/DstCol ($DB-$E2) written.
+; ------------------------------------------------------------
+Map_CopyRegionPlane:
+    STZ.b !MapCopy_Width+1
+    STZ.b !MapCopy_RowsHi
+    LDA.b !MapCopy_EndX
+    SEC
+    SBC.b !MapCopy_SrcX
+    STA.b !MapCopy_Width
+    LDA.b !MapCopy_EndY
+    SEC
+    SBC.b !MapCopy_SrcY
+    STA.b !MapCopy_Rows
+    REP #$20
+    LDA.b !MapCopy_SrcX                 ; 16-bit: row << 8 | column
+    CLC
+    ADC.b !MapCopy_Plane
+    TAX
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_SrcCol
+    LDA.b !MapCopy_DstX
+    CLC
+    ADC.b !MapCopy_Plane
+    TAY
+    AND.w #!Eng_LowByteMask
+    STA.b !MapCopy_DstCol
+.row:
+    LDA.b !MapCopy_Width                ; MVN count - 1
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDA.b !MapCopy_Rows
+    BEQ .done
+    DEC.b !MapCopy_Rows
+    TXA                                 ; X is past the row: back to its start,
+    SEC                                 ; then one row down
+    SBC.b !MapCopy_Width
+    DEC A
+    CLC
+    ADC.w #!Map_RowStride
+    TAX
+    TYA
+    SEC
+    SBC.b !MapCopy_Width
+    DEC A
+    CLC
+    ADC.w #!Map_RowStride
+    TAY
+    BRA .row
+.done:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:B0E6 — Field_UnkB0E6 (65 bytes, $B0E6–$B126)
+; The location-load counterpart of Vblank_UnkA810: for every object
+; slot below Evt_ObjCount x 2 (Evt_ObjSlotEnd) whose Obj_Unk1100 has bit
+; 7 clear and is not Obj_Unk1100Seven, Obj_ActivateIfInView; for one it
+; set up (C=1): Obj_CalcScreenPos, Obj_DrawLink, then the whole frame at
+; once: VramQ_Pos = 0 (an empty VRAM queue), Obj_BuildSpriteFrameStep
+; until it returns C=0, VramQ_Flush (inside PHD / PLD with 16-bit
+; X, as it needs) and SprBuf_FreeObj (the tiles are in VRAM now, so the
+; buffer chunks go back). Ends with a BRL tail call to Oam_BuildShadow.
+; No movement and no animation tick; the name is kept because
+; Scene_ReloadStep calls it by name (probably Obj_DrawAllAtLoad).
+; Callers (1 JSR site): Scene_ReloadStep ($C0:2881).
+; On entry: M=1 (8-bit A), X any (SEP #$10 here), DP=$0100 (Obj_Cur,
+; Evt_ObjSlotEnd, VramQ_Pos and the callees' scratch are dp), DB=$00
+; (Obj_* tables absolute, as the callees need).
+; Exit (from Oam_BuildShadow): M=1, X=0, DP and DB unchanged; A, X, Y
+; clobbered; Obj_Cur = the last object drawn; Evt_ObjSlotEnd, VramQ_Pos
+; and the callees' dp scratch written; the drawn objects' graphics
+; uploaded to VRAM.
+; ------------------------------------------------------------
+Field_UnkB0E6:
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    ASL A
+    STA.b !Evt_ObjSlotEnd
+    LDX.b #$00
+.object:
+    STX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BMI .next                           ; skipped slot
+    CMP.b #!Obj_Unk1100Seven
+    BEQ .next
+    JSR Obj_ActivateIfInView
+    BCC .next
+    JSR Obj_CalcScreenPos
+    JSR Obj_DrawLink
+    STZ.b !VramQ_Pos
+.build:
+    JSR Obj_BuildSpriteFrameStep
+    BCS .build                          ; a multi-pass frame
+    PHD                                 ; VramQ_Flush leaves DP at DP_VramQ
+    REP #$10
+    JSR VramQ_Flush
+    SEP #$10
+    PLD
+    JSR SprBuf_FreeObj
+.next:
+    LDX.b !Obj_Cur
+    INX
+    INX
+    CPX.b !Evt_ObjSlotEnd
+    BCC .object
+    REP #$10
+    BRL Oam_BuildShadow
+
+; ------------------------------------------------------------
+; $C0:B127 — Obj_ActivateIfInView (107 bytes, $B127–$B191)
+; Obj_UpdateInView's set-up half for a location load: when Obj_Unk1A81
+; is 1..$7F and the object lies in the view window, sets it up exactly
+; as Obj_UpdateInView does (Obj_DrawPrev / Obj_DrawNext / Obj_Unk0F00 =
+; $80, Obj_AnimColumn / Obj_AnimTimer / Obj_State = 0, Obj_LastFrame =
+; Obj_LastFrameNone, Obj_Unk7170, Obj_Unk6F9A) but does not link it,
+; and returns C=1; otherwise C=0 with nothing changed (Obj_Unk1100 is
+; the caller's test here). Its window differs from Obj_UpdateInView's:
+; the left bound is clamped to 0 with BPL (so Map_TileOriginX - 4 of
+; $80 or more also gives 0), the right and bottom bounds are not
+; clamped (they wrap past $FF), and the top bound is Map_TileOriginY
+; itself (no margin; $80 or more gives 0). Kept as found.
+; Callers (1 JSR site): Field_UnkB0E6 ($C0:B0FC).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y) with X = Obj_Cur, DP=$0100
+; (Obj_Cur and the ObjView_* scratch are dp), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged (as far as Obj_Unk7170 /
+; Obj_Unk6F9A go; not traced); C as above; A clobbered, X = Obj_Cur,
+; Y unchanged on the C=0 paths; ObjView_Left/Right/Top/Bottom ($C3-$C6)
+; written once Obj_Unk1A81 passed.
+; ------------------------------------------------------------
+Obj_ActivateIfInView:
+    LDA.w !Obj_Unk1A81,X
+    BEQ .out
+    BMI .out
+    LDA.w !Map_TileOriginX
+    SEC
+    SBC.b #!ObjView_MarginX
+    BPL .left
+    LDA.b #$00
+.left:
+    STA.b !ObjView_Left
+    LDA.w !Map_Unk1D0C
+    CLC
+    ADC.b #!ObjView_MarginX
+    STA.b !ObjView_Right
+    LDA.w !Map_TileOriginY
+    BPL .top
+    LDA.b #$00
+.top:
+    STA.b !ObjView_Top
+    LDA.w !Map_Unk1D10
+    CLC
+    ADC.b #!ObjView_MarginBottom
+    STA.b !ObjView_Bottom
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    ASL A
+    CMP.b !ObjView_Left
+    BCC .out
+    CMP.b !ObjView_Right
+    BCS .out
+    LDA.w !Obj_TileY,X
+    ASL A
+    CMP.b !ObjView_Top
+    BCC .out
+    CMP.b !ObjView_Bottom
+    BCS .out
+    LDA.b #!Obj_None
+    STA.w !Obj_DrawPrev,X
+    STA.w !Obj_DrawNext,X
+    STA.w !Obj_Unk0F00,X                ; Obj_Unk0F00Active
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    STZ.w !Obj_State,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    JSR Obj_Unk7170
+    JSR Obj_Unk6F9A
+    SEC
+    RTS
+.out:
+    CLC
     RTS
 
 ; ============================================================
@@ -16247,10 +17940,10 @@ Obj_ResetStates:
 ; one). The channel 7 setup before the loop (VMAIN, BBAD7, DMAP7, A1B7)
 ; is the same 22 bytes (counting its SEP #$20) as in Spr_LoadLargeObj; every source is in bank
 ; $7F.
-; Callers (2 JSR sites): unmatched ($C0:B111, $C0:EB8C).
-; Callers note (2 JSR sites, unmatched): $C0:EB8C in NmiHandler (which sets
-;   DP=$1D00 right after) and $C0:B111 (inside PHD/PLD, with REP #$10
-;   before it).
+; Callers (2 JSR sites): Field_UnkB0E6 ($C0:B111) and unmatched ($C0:EB8C).
+; Callers note: $C0:EB8C is in NmiHandler (which sets DP=$1D00 right
+;   after); $C0:B111 is in Field_UnkB0E6, inside PHD/PLD, with REP #$10
+;   before it.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the queue words are
 ; loaded into Y), DP any (set to DP_VramQ here), DB=$00 (absolute PPU
 ; and DMA register stores).
@@ -16315,9 +18008,9 @@ VramQ_Flush:
 ; Oam_HideRange2, Oam_EndRange2, Oam_HideRange3 and Oam_EndRange3.
 ;
 ; Callers (3 sites: 1 JSR, 2 BRL): Field_EndOfFrame (BRL $C0:00DB), FieldBtl_Restore (JSR $C0:072B)
-;   and unmatched (BRL $C0:B124).
+;   and Field_UnkB0E6 (BRL $C0:B124).
 ; Callers note: BRL tail calls from Field_EndOfFrame ($C0:00DB) and from
-; the unmatched routine at $C0:B0E6 ($C0:B124; that routine is called by
+; Field_UnkB0E6 ($C0:B124; that routine is called by
 ; Scene_ReloadStep), and a JSR from FieldBtl_Restore ($C0:072B). On the
 ; tail calls the RTS returns to that routine's caller.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
@@ -24500,10 +26193,11 @@ BitReverseTable:
 ; The game's pseudo-random bytes, probably: a shuffle of 0-255 (every
 ; value appears exactly once; checked against the ROM). The name is
 ; inferred from how its readers use it. Readers are spread over many
-; banks and none is matched yet, so the list below gives verified
+; banks and most are not matched yet, so the list below gives verified
 ; examples, not every reader:
 ;   - step a counter of their own and read the entry at it:
-;     $C0:AE29 (INC $F8 / LDX $F8 / LDA $FE00,X),
+;     $C0:AE29 in Obj_SetVelocityChecked (INC $F8 / LDX $F8 / LDA
+;     $FE00,X),
 ;     $C0:6D0B (LDA $F8 / INC / STA $F8 / TAX / LDA $FE00,X),
 ;     $C2:2338 (LDX $1B30 / LDA.l $C0FE00,X / INC $1B30; bank $C6 has
 ;     more readers sharing the $1B30 counter),

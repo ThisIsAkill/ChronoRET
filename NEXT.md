@@ -152,10 +152,21 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    builders `Field_Unk29F7`/`Field_Unk2B78` ($C0:29F7–$C0:2C40). `Scene_Unk0283`, `Field_Unk034B`/`038F`/`0617` and
    `Field_Unk29F7`/`2B78` keep their names because verified code calls them by name; better
    names once those callers are re-reviewed: `Scene_RebuildAfterBattle`, `FieldBtl_Save`,
-   `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably). Next, in
-   reach order: `Field_UnkB0E6` (Scene_ReloadStep's last unmatched callee; calls
-   `Obj_DrawLink` and $C0:AB45) and the other draw-bucket users at $C0:A810–$C0:A950 (the
-   unmatched `Obj_DrawUnlink`/`Obj_DrawLink` sites); `Obj_Unk72B4`/`Obj_Unk734C` (they work
+   `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably).
+   Also done: the whole $C0:A810–$C0:B191 block (object motion and view culling):
+   `Vblank_UnkA810` (the per-frame object pass), `Obj_UpdateInView`, `Obj_FlagInView`,
+   `Obj_MoveStep` (+ `Obj_MoveStep_Arc`), `Obj_MoveStepFree`, `Obj_CalcScreenPos`,
+   `Obj_CalcDirection`, `Obj_SetVelocity`, `Obj_SetVelocityChecked` (+ `_Probe`),
+   `Obj_SetVelocityAxis` (no caller found), the map region copy `Field_UnkAF4E` /
+   `Map_CopyRegionPlane`, the load-time pass `Field_UnkB0E6` and `Obj_ActivateIfInView`; and
+   `SprBuf_FreeObj` ($C0:EA42). `Vblank_UnkA810`, `Field_UnkAF4E` and `Field_UnkB0E6` keep
+   their names because verified callers use them; better names once those are re-reviewed:
+   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`. Open from it: the stubs
+   `Obj_Unk6F9A` / `Obj_Unk7170` (dispatch on Obj_Unk1100 through tables $C0:6FA7 / $C0:7181)
+   and `Obj_Unk7056` (the $0B88 entry), who writes `ObjX_LeaveView` ($7F:0A00), and the
+   event-opcode handlers that call `Obj_CalcDirection` / `Obj_SetVelocity*` ($C0:4D22-$C0:55E6,
+   they set `Obj_MoveFrames` / `Obj_ArcGravity`) and the region copy ($C0:3D97). Next, in
+   reach order: `Obj_Unk72B4`/`Obj_Unk734C` (they work
    on the $0B00/$0B80 tables, up to $C0:7398); the NMI handler's upload calls
    ($C0:EA9E–$C0:EB86, which also call the Field_Upload* routines and Pal_UploadCgram); the
    `Evt_Unk0920` list code at $C0:5C90 and the halts at $C0:5CB3; `Vblank_ReadScanlineCounters`
@@ -216,13 +227,34 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    $C2:17D2-$C2:1C83 "unmatched" (fix at their next edit). Open: the other sound-queue callers ($C2:4395, $C2:4A4C); who calls
    `C2Scene_ZoneSoundAtEntry` and spawns `C2Scene_TaskZoneSound` (no reference found;
    probably scene data), who fills `C2Scene_ZoneSounds` ($1B9B) and what sound commands
-   $10/$81/$82/$83 do; what the list entries' bit 7 (C2Script_SetListBit7) and
-   C2Scene_Unk7F01ED mean; who sets C2Scene_Mode and C2Scene_Unk1B32 (the code at
-   $C2:309E-$C2:3600, which also calls the layer scrolls at $C2:3702-$C2:371E). Next, in
-   reach order: the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode 7, $C2:631F on) and
-   `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
-   `$C2:5798` and the data before `TextWin_Init`); the text decoder states
-   `TextWin_State0`-`TextWin_State3` ($C2:58B2 on) and the glyph drawer `$C2:5DC4`; the menu's
+   $10/$81/$82/$83 do; what C2Scene_Unk7F01ED means. Also matched: the scene helpers `C2Scene_Random` and
+   `C2Scene_BoxesOverlap` ($C2:2336-$C2:23A7); the two watchers `C2Scene_ObjWatch` (objects
+   A/B at $0290-$029F, state C2Scene_Unk027E) and `C2Scene_TrigWatch` (tile triggers in
+   ListA/B/C, state C2Scene_Unk0280; sets C2Scene_Unk1B32 and mode 4) with all their states,
+   tables, boxes and the script `C2Scene_ScrGoToLoc1D8` ($C2:309E-$C2:3403), and the list
+   readers `C2Scene_GetListAUnk02/GetListBScript/GetListCUnk03` ($C2:6263-$C2:6290); the text
+   decoder: `TextWin_State0`-`State3` with their exit tables, `TextWin_CodeTable` and all
+   control codes $00-$20 (numbers, names, dictionary, `TextWin_ExtTable`), `TextWin_HexByte`,
+   `TextWin_HexGlyphs`, the name-length and zero-trim helpers ($C2:58B2-$C2:5DC3). Neither
+   watcher has a reference in the bank (probably started from scene data). Stale after that
+   batch (verified headers, fix at their next edit): C2Scene_TaskSpawnScript (calls
+   $C2:3154, $C2:33B2, $C2:33DF unmatched), C2Scene_ClearUnk1B30 ("use not traced":
+   C2Scene_Random's index), TextWin_StateTable ("unmatched") and the banner in
+   TextWin_Init's header ("the text decoder ... is not matched"). Open from it: who sets
+   C2Scene_TrigFlags (bits 0/1), C2Scene_ObjBusy and the objects' counts (the code at
+   $C2:42FC-$C2:5590 reads $0290-$029F heavily), C2Scene_Unk027E state 1, who reads the task
+   byte C2Scene_TrigListA/C set (probably the third watcher at $C2:3404, unreferenced too: it
+   dispatches on C2Scene_Unk027E through $C2:342D, compares C2Scene_Unk027F/0281, runs
+   C2Anim_Run and has handlers out to $C2:3B00 via the tables $C2:345D, $C2:3493, $C2:34A3);
+   C2Scene_Unk1B47 and why C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex.
+   Next, in reach order: that third watcher ($C2:3404-$C2:3BCx, with $C2:3ACB); the glyph
+   drawer `TextWin_DrawGlyph` ($C2:5DC4-$C2:5E35, its blitters $C2:5E36/$C2:5F07, width table
+   $C2:60E6) and the decimal converters `TextWin_Dec8/16/24` ($C2:614B-$C2:6262, with the data
+   `TextWin_CharNamePtrs` $C2:5FD8 and `TextWin_StrNadia` $C2:6146, now stubs); the layer
+   scroll calls at $C2:3702-$C2:371E; the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode
+   7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
+   `$C2:5798` and the data before `TextWin_Init`; its callers at $C2:5700-$C2:5774 read
+   object A); the menu's
    own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
    `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
