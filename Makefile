@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate progress test-hooks duplicates xref clean check-rom setup
+.PHONY: all build diff verify lint gate progress test-hooks duplicates xref clean check-rom setup tables-scan
 
 all: build diff
 
@@ -47,6 +47,12 @@ duplicates: check-rom
 xref: check-rom
 	@if [ -z '$(value ADDR)' ]; then echo "Usage: make xref ADDR=C100D7 [XREF_FLAGS='--branches --json']"; exit 1; fi
 	@python3 tools/xref.py '$(value ADDR)' $(XREF_FLAGS)
+
+# Candidate data tables (jump/pointer tables) in a bank's unmatched bytes;
+# `python3 tools/tables.py emit ...` prints one as source.
+BANK ?= C1
+tables-scan: check-rom
+	python3 tools/tables.py scan --bank $(BANK)
 
 # Prove the pre-commit firewall rejects planted ROMs, notes and blocked words.
 test-hooks:
