@@ -3794,7 +3794,8 @@ C2Script_PanTakeY:
 ; Quirk, kept: no check that the queue has room.
 ; Callers: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$30 here), DP=$0000 (the queue is direct page),
-;        DB any (no absolute data accesses); C2Script_Ptr on the opcode
+;        DB=$00 (low WRAM: the .Bank byte is stored absolute through
+;        DB); C2Script_Ptr on the opcode
 ; Exit:  M=0, X=0 (REP #$30); A = 8 (advance); X = the entry's offset, Y
 ;        = 6; C2Scene_VramQEnd + 8; C2Scene_VramQLock = 0
 ; No calls.
@@ -3998,9 +3999,9 @@ C2Script_WaitAnimating:
 ; $C2:18B4 — C2Script_StopIfOlder (19 bytes, $18B4–$18C6)
 ; Op $3A, 3 bytes: compares arg 1-2 with the task's age (.Frames, +1
 ; per frame it has run). While .Frames <= arg it advances 3 at once;
-; once .Frames > arg it stops here (A = 0), and since .Frames only goes
-; up, it stays stopped for good: the script ends there but the task
-; lives on (as C2Script_Halt). Why a script would want this is not
+; once .Frames > arg it stops here (A = 0). The task still returns C=0,
+; so C2Scene_TaskRunAll keeps adding 1 to the 16-bit .Frames; it stays
+; stopped until .Frames wraps to 0, and then advances. Why a script would want this is not
 ; traced.
 ; Callers: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
@@ -4482,9 +4483,11 @@ C2Script_ClearListBit7:
 ; $C2:1ACA — C2Script_AddTaskByte (23 bytes, $1ACA–$1AE0)
 ; Op $46, 3 bytes: task byte arg 1 += arg 2 (8-bit, wrapping).
 ; Callers: none direct (C2Script_OpTable).
-; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB any
-;        (the record is reached through the direct page); C2Script_Ptr
-;        on the opcode, C2Scene_TaskCur = the task
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
+;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TXY
+;        copy all 16 bits); C2Script_Ptr on the opcode, C2Scene_TaskCur =
+;        the task
 ; Exit:  M=0, X=0; A = 3; X = Y = arg 1
 ; No calls.
 C2Script_AddTaskByte:
@@ -4505,8 +4508,12 @@ C2Script_AddTaskByte:
 ; $C2:1AE1 — C2Script_SubTaskByte (26 bytes, $1AE1–$1AFA)
 ; Op $47, 3 bytes: task byte arg 1 -= arg 2 (8-bit, wrapping).
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_AddTaskByte (M=0, X=0, DP=$0000, DB any on
-;        entry; M=0, X=0, A = 3, X = Y = arg 1 on exit)
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
+;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TAY
+;        copy all 16 bits); C2Script_Ptr on the opcode, C2Scene_TaskCur =
+;        the task
+; Exit:  M=0, X=0; A = 3; X = Y = arg 1
 ; No calls.
 C2Script_SubTaskByte:
     SEP #$20
@@ -4696,8 +4703,8 @@ C2Script_CopyMapBlock:
 ; Quirk, kept: no check that the queue has room.
 ; Callers: none direct (C2Script_OpTable).
 ; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00-$02, C2Tmp_10-$14,
-;        the queue), DB any (no absolute data accesses); C2Script_Ptr on
-;        the opcode
+;        the queue), DB=$00 (low WRAM: the entries' .Bank bytes are stored
+;        absolute through DB); C2Script_Ptr on the opcode
 ; Exit:  M=0, X=0 (REP #$30); A = 5; X = the first entry's offset, Y =
 ;        4; C2Scene_VramQEnd + 16; C2Scene_VramQLock = 0; C2Tmp_00-$03,
 ;        C2Tmp_10/$11 and C2Tmp_13/$14 changed
@@ -5223,7 +5230,8 @@ C2Scene_PalFadeStates:
 ; Callers: none direct (C2Scene_PalFadeStates).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record,
 ;        C2Scene_PaletteBuf, C2Scene_Unk0B20); C2Scene_TaskCur = the task
-; Exit:  M=1, X=0; C=0; X = the task, Y = the palette; A clobbered;
+; Exit:  M=1, X=0; C=0; X = the task + $3F (the last .BlueStep byte,
+;        left by C2Scene_PalFadePlanColor), Y = the palette; A clobbered;
 ;        C2Tmp_00, C2Tmp_08-$0C, C2Tmp_0E-$1B changed (C2Scene_PalFadePlan)
 ; Calls: C2Scene_PalFadePlan.
 C2Scene_PalFadeStart:
@@ -5880,7 +5888,7 @@ C2Scene_FadeInEnd:
     SEC
     RTS
 
-; $C2:2194 — C2Scene_TaskUnk2194 (19 bytes, $2194–$21A6)
+; $C2:2194 — C2Scene_TaskUnk2194 (15 bytes, $2194–$21A2)
 ; Task handler (mosaic shrink, op $2B): runs .State through
 ; C2Scene_MosaicOutStates: 0 C2Scene_MosaicOutStart, 1
 ; C2Scene_MosaicOutStep.
@@ -5973,7 +5981,7 @@ C2Scene_MosaicOutStep:
     SEC
     RTS
 
-; $C2:21F8 — C2Scene_TaskUnk21F8 (17 bytes, $21F8–$2208)
+; $C2:21F8 — C2Scene_TaskUnk21F8 (13 bytes, $21F8–$2204)
 ; Task handler (mosaic grow, op $2A): runs .State through
 ; C2Scene_MosaicInStates: 0 C2Scene_MosaicInStart, 1 C2Scene_MosaicInStep.
 ; Callers: none direct; the handler C2Script_SpawnUnk21F8 installs
