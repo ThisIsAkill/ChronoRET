@@ -1,0 +1,665 @@
+{
+  "schema": 2,
+  "emitted_bytes": 29032,
+  "code_bytes": 359278,
+  "totals": {
+    "matched": {
+      "functions": 242,
+      "bytes": 29032
+    },
+    "readable": {
+      "functions": 27,
+      "bytes": 584
+    },
+    "verified": {
+      "functions": 0,
+      "bytes": 0
+    }
+  },
+  "banks": [
+    {
+      "bank": "$C0",
+      "code_bytes": 61779,
+      "emitted_bytes": 19585,
+      "matched": {
+        "functions": 103,
+        "bytes": 19585
+      },
+      "readable": {
+        "functions": 9,
+        "bytes": 256
+      },
+      "verified": {
+        "functions": 0,
+        "bytes": 0
+      }
+    },
+    {
+      "bank": "$C1",
+      "code_bytes": 63904,
+      "emitted_bytes": 9232,
+      "matched": {
+        "functions": 138,
+        "bytes": 9232
+      },
+      "readable": {
+        "functions": 17,
+        "bytes": 113
+      },
+      "verified": {
+        "functions": 0,
+        "bytes": 0
+      }
+    },
+    {
+      "bank": "$FD",
+      "code_bytes": null,
+      "emitted_bytes": 215,
+      "matched": {
+        "functions": 1,
+        "bytes": 215
+      },
+      "readable": {
+        "functions": 1,
+        "bytes": 215
+      },
+      "verified": {
+        "functions": 0,
+        "bytes": 0
+      }
+    }
+  ],
+  "slices": [
+    {
+      "bank": "$C0",
+      "start": "$C0:0000",
+      "end": "$C0:0FFF",
+      "emitted_bytes": 1828,
+      "functions": [
+        "ReentryVectors",
+        "GameLoop",
+        "GameLoop_Main",
+        "GL_ModeOk1",
+        "GL_ModeOk2",
+        "GameLoop_FrameBody",
+        "VBlankHandler",
+        "VBlankHandlerShort",
+        "Sub_00EB",
+        "LoadLocation",
+        "Sub_011B",
+        "Sub_01A5",
+        "Sub_0905",
+        "Sub_0918",
+        "InitHW",
+        "InstallNMI",
+        "InstallIRQ",
+        "FrameStateInit",
+        "Sub_0C76",
+        "ModeE6_Handler",
+        "ModeEC_Handler"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:1000",
+      "end": "$C0:1FFF",
+      "emitted_bytes": 2974,
+      "functions": [
+        "ModeEE_Handler",
+        "ModeFA_Handler",
+        "ModeFC_Handler",
+        "DefaultHandler",
+        "Sub_18D9",
+        "Sub_1985",
+        "Sub_19C7",
+        "Sub_1A03",
+        "Sub_1ADF",
+        "Sub_1B36",
+        "Sub_1B90",
+        "Sub_1B90_body",
+        "Sub_1BA7",
+        "Sub_1F24",
+        "Sub_1F5A"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:2000",
+      "end": "$C0:2FFF",
+      "emitted_bytes": 81,
+      "functions": [
+        "Sub_2824",
+        "ClearRAMDMA"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:3000",
+      "end": "$C0:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:4000",
+      "end": "$C0:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:5000",
+      "end": "$C0:5FFF",
+      "emitted_bytes": 125,
+      "functions": [
+        "Sub_595C",
+        "Sub_597D"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:6000",
+      "end": "$C0:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:7000",
+      "end": "$C0:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:8000",
+      "end": "$C0:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:9000",
+      "end": "$C0:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:A000",
+      "end": "$C0:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:B000",
+      "end": "$C0:BFFF",
+      "emitted_bytes": 3503,
+      "functions": [
+        "Sub_B192",
+        "PostVBlank",
+        "PV_SpriteLoop",
+        "PV_CheckChain",
+        "PV_NextSprite",
+        "PV_FillRange1",
+        "PV_EndRange1",
+        "PV_FillRange2",
+        "PV_EndRange2",
+        "PV_FillRange3",
+        "PV_EndRange3",
+        "Sub_B309",
+        "Sub_B701",
+        "Sub_B788",
+        "Sub_B8CA",
+        "Sub_BA65",
+        "Sub_BCDC",
+        "Sub_BFF2"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:C000",
+      "end": "$C0:CFFF",
+      "emitted_bytes": 4096,
+      "functions": [
+        "Sub_C2BF",
+        "Sub_C6E7",
+        "Sub_C73A",
+        "Obj_AnimTickAndQueue",
+        "Field_ProcessAnimQueue",
+        "Obj_BuildSpriteFrameStep",
+        "Sub_CB0A",
+        "Sub_CB3A",
+        "Sub_CBDC",
+        "Sub_CDC8",
+        "Sub_CEF5"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:D000",
+      "end": "$C0:DFFF",
+      "emitted_bytes": 4096,
+      "functions": [
+        "Sub_D124",
+        "Sub_D28A",
+        "Sub_D30D",
+        "Sub_D4F7",
+        "Sub_D546",
+        "Sub_D608",
+        "Sub_D68B",
+        "Sub_D738",
+        "Sub_D7E5",
+        "Sub_DA69",
+        "Sub_DD28"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:E000",
+      "end": "$C0:EFFF",
+      "emitted_bytes": 2626,
+      "functions": [
+        "Sub_E12A",
+        "Sub_E534",
+        "Sub_E687",
+        "Sub_E739",
+        "Sub_E7BC",
+        "Sub_E83F",
+        "Sub_E8C2",
+        "Sub_E935",
+        "Sub_E952",
+        "Sub_E97A",
+        "Sub_E9AA",
+        "Sub_E9E2",
+        "Sub_E9FF",
+        "Sub_EA1F"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:F000",
+      "end": "$C0:FFFF",
+      "emitted_bytes": 256,
+      "functions": [
+        "Reset",
+        "NMI_Stub",
+        "IRQ_Stub",
+        "BRK_Handler",
+        "BitSet",
+        "BitClear",
+        "ScrollWaveA",
+        "ScrollWaveB",
+        "ROMTitle"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:0000",
+      "end": "$C1:0FFF",
+      "emitted_bytes": 3959,
+      "functions": [
+        "Battle_Mul8",
+        "Battle_MulAccum",
+        "Battle_Divide",
+        "Battle_ShiftLeft7",
+        "Battle_ShiftLeft4",
+        "Battle_ShiftLeft3",
+        "Loc_C10116",
+        "Battle_ShiftRight6",
+        "Battle_ShiftRight5",
+        "Battle_ShiftRight4",
+        "Battle_ShiftRight3",
+        "BattleMsg_FormatNumberDigits",
+        "Battle_DivTen9499",
+        "BattleMsg_ReencodeTextBuffer",
+        "Battle_SinLookup",
+        "Calc_Delta16",
+        "BattleUI_BuildStatusBarFrame",
+        "BattleUI_DrawPcNamePanel",
+        "BattleUI_NextNamePanel",
+        "BattleUI_UpdateNextPcPanel",
+        "Battle_DrawHpBars",
+        "UpdateNpc_exit",
+        "BattleUI_DrawSlotGaugeBar",
+        "BattleSys_SlotPanelRefresh",
+        "BattleMenu_DrawReadyWindowEdges",
+        "BattleUI_ClearActivePanelColumn",
+        "BattleUI_SetPanelAttrColumn",
+        "BattleMenu_DrawWindowEdgeStrip",
+        "BattleMenu_RenderItemListRows",
+        "BattleMenu_RenderItemRow",
+        "CODE_JP_C10A87",
+        "BattleMenu_RenderTechListRows",
+        "BattleMenu_BuildTechAvailFlags",
+        "BattleMenu_RenderTechRow",
+        "CODE_JP_C10BB6",
+        "BattleMenu_BlankMpCostDigits",
+        "CODE_JP_C10C00",
+        "BattleMenu_UpdateWindows",
+        "CODE_C10C46",
+        "BattleMenu_UpdateMainWindow",
+        "BattleMenu_UpdateTechWindow",
+        "BattleMenu_DrawTechCursorRow",
+        "BattleMenu_ClearTechCursorTiles",
+        "BattleMenu_UpdateTechMpAvail",
+        "CODE_JP_C10F28",
+        "_ump_check_fd",
+        "_ump_set_bright",
+        "CODE_C10F66_JMP",
+        "_ump_check_battler",
+        "_ump_pc1_ok",
+        "_ump_pc2_ok",
+        "_ump_pc3_ok",
+        "_ump_slot_ready",
+        "_ump_write_bright"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:1000",
+      "end": "$C1:1FFF",
+      "emitted_bytes": 3164,
+      "functions": [
+        "_L1001",
+        "CODE_JP_C1100F",
+        "CODE_JP_C1103D",
+        "BattleSys_SlotMenuReadyPredicate",
+        "BattleMsg_BlankLeadingZeros",
+        "BattleMenu_RefreshIfDirtyL",
+        "BattleMenu_RefreshIfDirtyAndTick",
+        "BattleMenu_DrawCursorSprites",
+        "BattleMenu_ProcessInput",
+        "BattleMenu_CycleActivePcPrev",
+        "BattleMenu_CycleActivePcNext",
+        "BattleMenu_CursorUp",
+        "BattleMenu_CursorDown",
+        "BattleMenu_ConfirmCommand",
+        "BattleMenu_ChooseAttack",
+        "BattleMenu_OpenTechList",
+        "BattleMenu_OpenItemList",
+        "BattleMenu_TechListInput",
+        "BattleMenu_TechConfirm",
+        "BattleMenu_TechListCancel",
+        "BattleMenu_TechListPrev",
+        "BattleMenu_TechListNext",
+        "BattleMenu_ItemListInput",
+        "BattleMenu_ItemConfirm",
+        "BattleMenu_ItemListCancel",
+        "BattleMenu_ItemCursorUp",
+        "BattleMenu_ItemCursorDown",
+        "BattleMenu_ItemListPageDown",
+        "BattleMenu_ItemListPageUp",
+        "BattleMenu_ItemListRefresh",
+        "BattleMenu_TargetSelectInput",
+        "BattleMenu_CommitAction",
+        "BattleMenu_ConsumePartnerSlot",
+        "BattleMenu_TargetNext",
+        "BattleMenu_TargetPrev",
+        "Battle_ZeroResultEE",
+        "BattleMenu_ItemListScrollUp",
+        "BattleMenu_ItemListScrollUp_SetScroll",
+        "BattleMenu_ItemListScrollUp_RenderTail",
+        "BattleMenu_ItemListScrollUp_SkipRender",
+        "BattleMenu_ItemListScrollDown",
+        "BattleMenu_ItemListScrollDown_RenderTail",
+        "BattleMenu_ItemListScrollDown_SkipRender",
+        "BattleMenu_UpdateCursorOverlay",
+        "BattleMenu_EnqueueReadyBattler",
+        "Battle_StopSfx",
+        "BattleMenu_DequeueReadyBattler",
+        "BattleMenu_RemoveBattlerFromReady",
+        "BattleMenu_LoadCommandWindowMap",
+        "BattleMenu_BuildTargetList",
+        "BattleTgt_RunAreaQuery",
+        "BattleTgt_AreaTable",
+        "BattleTgt_ModeTable"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:2000",
+      "end": "$C1:2FFF",
+      "emitted_bytes": 2109,
+      "functions": [
+        "BattleTgt_SingleAlly",
+        "BattleTgt_CollectValidTargets",
+        "BattleTgt_AllAllies",
+        "BattleTgt_SingleEnemy",
+        "BattleTgt_AllEnemies",
+        "BattleTgt_Everyone",
+        "BattleTgt_Self",
+        "BattleTgt_SingleKoAlly",
+        "BattleTgt_PcByCharId5",
+        "BattleTgt_FindPcByCharId",
+        "BattleTgt_PcByCharId4",
+        "BattleTgt_EnemyLineFromCaster",
+        "BattleTgt_EnemyLineFromChar3",
+        "BattleTgt_EnemyLineFromCaster2",
+        "BattleTgt_CasterRadius",
+        "BattleTgt_EnemyRadius",
+        "BattleTgt_Char3Radius",
+        "BattleTgt_Char6Radius",
+        "BattleTgt_EnemyRow",
+        "BattleTgt_PartyTriangle",
+        "BattleTgt_AreaRow",
+        "BattleTgt_AreaPartyTriangle",
+        "BattleTgt_AreaLine",
+        "BattleTgt_AreaCircle",
+        "BattleTgt_AreaAddAnchor",
+        "BattleTgt_CompactCandidates",
+        "BattleTgt_ClearLists",
+        "BattleTgt_SelectAllCandidates",
+        "BattleTgt_CycleNext",
+        "BattleTgt_CyclePrev",
+        "BattleTgt_AnyCandidate"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:3000",
+      "end": "$C1:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:4000",
+      "end": "$C1:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:5000",
+      "end": "$C1:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:6000",
+      "end": "$C1:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:7000",
+      "end": "$C1:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:8000",
+      "end": "$C1:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:9000",
+      "end": "$C1:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:A000",
+      "end": "$C1:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:B000",
+      "end": "$C1:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:C000",
+      "end": "$C1:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:D000",
+      "end": "$C1:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:E000",
+      "end": "$C1:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:F000",
+      "end": "$C1:FFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:0000",
+      "end": "$FD:0FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:1000",
+      "end": "$FD:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:2000",
+      "end": "$FD:2FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:3000",
+      "end": "$FD:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:4000",
+      "end": "$FD:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:5000",
+      "end": "$FD:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:6000",
+      "end": "$FD:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:7000",
+      "end": "$FD:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:8000",
+      "end": "$FD:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:9000",
+      "end": "$FD:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:A000",
+      "end": "$FD:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:B000",
+      "end": "$FD:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:C000",
+      "end": "$FD:CFFF",
+      "emitted_bytes": 215,
+      "functions": [
+        "MainInit"
+      ]
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:D000",
+      "end": "$FD:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:E000",
+      "end": "$FD:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:F000",
+      "end": "$FD:FFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    }
+  ]
+}

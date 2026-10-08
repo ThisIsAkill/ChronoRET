@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate sync clean check-rom setup
+.PHONY: all build diff verify lint gate progress clean check-rom setup
 
 all: build diff
 
@@ -32,9 +32,10 @@ verify: check-rom
 lint:
 	python3 tools/lint_readability.py
 
-# Regenerate the wiki's progress data (docs/data/) from the code.
-sync: check-rom
-	python3 tools/sync_progress.py
+# Regenerate every generated number: symbols/ and the README/CONTRIBUTING/
+# STATUS blocks.
+progress: check-rom
+	python3 tools/progress.py --update
 
 # What a function needs before it reaches main.
 gate: diff verify lint
@@ -51,5 +52,6 @@ install-hook:
 	@hooks=$$(git rev-parse --git-common-dir)/hooks; \
 	cp tools/pre-commit $$hooks/pre-commit; \
 	cp tools/pre-commit $$hooks/commit-msg; \
-	chmod +x $$hooks/pre-commit $$hooks/commit-msg; \
-	echo "pre-commit, commit-msg hooks installed in $$hooks."
+	cp tools/pre-push $$hooks/pre-push; \
+	chmod +x $$hooks/pre-commit $$hooks/commit-msg $$hooks/pre-push; \
+	echo "pre-commit, commit-msg, pre-push hooks installed in $$hooks."

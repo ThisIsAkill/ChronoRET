@@ -2,7 +2,8 @@
 # pre-commit / commit-msg hook.
 #   pre-commit:  author/committer identity, blocked-pattern scan, staged
 #                paths, ROM byte-exact match, full-coverage verify,
-#                readability gate, doc regen, staleness checks
+#                readability gate, regenerated progress (symbols/),
+#                review-log validation
 #   commit-msg:  commit message text against the same blocked-pattern scan
 #
 # Install:   make install-hook
@@ -72,30 +73,18 @@ fi
 info "Checking readability standard..."
 python3 tools/lint_readability.py || fail "Readability gate failed (see above; rules in tools/lint_readability.py)."
 
-# ── 2. Regenerate progress snippet in wiki ───────────────────────────────────
-WIKI_DIR="../chrono-trigger-wiki"
-info "Regenerating ${WIKI_DIR}/docs/includes/progress_summary.md..."
-python3 tools/progress.py --update-index 2>&1 | grep -E "^Updated|error" || true
-# Note: progress_summary.md lives in the wiki repo — stage it there separately.
-
-# ── 3. Stale PROGRESS.md warning ─────────────────────────────────────────────
-STAGED_ASM=$(printf '%s\n' "$staged" | grep '^asm/' | head -5 || true)
-if [ -n "$STAGED_ASM" ]; then
-    warn "asm/ files staged — remember to update PROGRESS.md and BANK_MAP.md in the wiki repo."
-    warn "(${WIKI_DIR}/docs/PROGRESS.md  and  ${WIKI_DIR}/docs/BANK_MAP.md)"
-    echo ""
+# ── 2. Generated numbers and the review log (symbols/) ──────────────────────
+# Counts are never typed by hand: regenerate them and stage the result, so
+# symbols/ and the README/CONTRIBUTING/STATUS blocks always match the code.
+# (Guarded: older checkouts sharing this hook may not have these tools yet.)
+if [ -f tools/validate_functions.py ] && [ -d symbols ] && [ -f roms/chrono_trigger.sfc ]; then
+    info "Regenerating symbols/ and progress blocks..."
+    python3 tools/progress.py --update >/dev/null || fail "tools/progress.py --update failed."
+    git add symbols/functions.csv symbols/progress.json README.md CONTRIBUTING.md STATUS.md 2>/dev/null || true
 fi
-
-# ── 4. Devlog reminder (wiki-repo posts can't be checked here) ───────────────
-if [ -n "$STAGED_ASM" ]; then
-    TODAY=$(date +%Y-%m-%d)
-    WIKI_POSTS="${WIKI_DIR}/docs/devlog/posts"
-    if ! ls "${WIKI_POSTS}/${TODAY}"*.md 2>/dev/null | grep -q .; then
-        warn "No devlog post for today (${TODAY}) found in wiki."
-        warn "  Expected: ${WIKI_POSTS}/${TODAY}*.md"
-        warn "(Continuing — write a devlog entry in the wiki repo and commit it there.)"
-        echo ""
-    fi
+if [ -f tools/validate_functions.py ] && [ -d symbols ]; then
+    python3 tools/validate_functions.py >/dev/null || { python3 tools/validate_functions.py; fail "symbols/ is invalid."; }
+    ok "symbols/ valid."
 fi
 
 ok "All checks passed."

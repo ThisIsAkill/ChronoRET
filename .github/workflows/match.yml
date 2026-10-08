@@ -17,6 +17,8 @@ jobs:
           python-version: '3.11'
       - name: Lint (functions outside tools/readability_baseline.txt must be clean)
         run: python3 tools/lint_readability.py
+      - name: Validate symbols/ (statuses and the review log)
+        run: python3 tools/validate_functions.py
 
   match:
     name: Reassemble and diff
@@ -77,6 +79,11 @@ jobs:
         if: env.SKIP_CHECK != '1'
         run: |
           python3 tools/verify.py
+
+      - name: Generated numbers are current
+        if: env.SKIP_CHECK != '1'
+        run: |
+          python3 tools/progress.py --check
 
       - name: Fail on mismatch
         if: env.SKIP_CHECK != '1' && env.MATCH_RESULT != 'passed'
