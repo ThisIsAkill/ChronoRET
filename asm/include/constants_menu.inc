@@ -468,4 +468,57 @@ if !constants_menu_inc == 0
 !C2Scene_AnimIdle1 = $A3                 ; idle animations of the slot 1 and 2 members (as
 !C2Scene_AnimIdle2 = $A4                 ; C2Scene_AnimIdle for the leader)
 
+; --- Object A's tasks (C2Scene_ObjATask, C2Scene_ObjAMarkTask, C2Scene_ObjASpotWatch) ---
+!C2Scene_ObjAFlag5 = $20                 ; C2Scene_Unk0294 bit 5: object A goes up and is steered when the
+                                         ; party is in (else it starts mode 8 at once) and uses the other
+                                         ; animations; who sets it is not traced
+!C2Scene_ObjAInMode8 = $10               ; bit 4: set when object A starts scene mode C2Scene_ModeUnk8,
+                                         ; cleared when it goes on afterwards
+!C2Scene_ObjAOnSpot = $08                ; bit 3: object A overlaps the spot at C2Scene_SpotX/Y
+                                         ; (C2Scene_ObjASpotWatch)
+!C2Scene_ObjASpotBits = $0C              ; bits 2-3 (C2Scene_Unk0294Bit2 and C2Scene_ObjAOnSpot)
+!C2Scene_ModeUnk8 = 8                    ; C2Scene_Mode8 (runs C2Scene_Unk6A34), set by object A
+!C2Scene_ObjAStWait = 1                  ; C2Scene_ObjTask.State values of C2Scene_ObjATask
+!C2Scene_ObjAStFly = 3                   ; (C2Scene_ObjAStates)
+!C2Scene_ObjAStLand = 5
+!C2Scene_ObjAStMode8 = 6
+!C2Scene_ObjAStScript = 7
+!C2Scene_ObjAStWaitEmpty = 8
+!C2Scene_ObjAttrPrio2 = $A0              ; C2Scene_Task.SprAttr: C2Scene_SprAttrScroll and OAM priority 2
+!C2Scene_ObjAttrPrio3 = $B0              ; the same with priority 3 (attribute bits 4-5)
+!C2Scene_AnimObjARest = $2D              ; object A's animation at rest
+!C2Scene_AnimObjARest5 = $18             ; and with C2Scene_ObjAFlag5
+!C2Scene_AnimObjARise = $19              ; while it goes up (C2Scene_ObjAWait)
+!C2Scene_AnimObjALand = $1A              ; while it comes down (C2Scene_ObjAFly)
+!C2Scene_AnimObjAMark = $4E              ; C2Scene_ObjAMarkShow's sprite above object A
+!C2Scene_AnimObjAMark5 = $1F             ; and below it while it is up with C2Scene_ObjAFlag5
+!C2Scene_SoundCmd86 = $86                ; sound command C2Scene_ObjAInit sends (arguments 0, 0); meaning not
+                                         ; traced
+!C2Scene_ObjASongArg = $13               ; C2Scene_SoundCmd10 argument of C2Scene_ObjASound (probably a song)
+!C2Scene_Flag0ObjAGo1DD = $D3            ; C2Scene_Flag0Copy value with which object A, once up, starts
+                                         ; C2Scene_ObjAScrGo1DD (meaning not traced)
+!C2Scene_ObjARiseFrames = $30            ; frames C2Scene_ObjARise moves (at -0.5: 24 pixels)
+!C2Scene_ObjALandFrames = $31            ; frames C2Scene_ObjALand moves (at +0.5)
+!C2Scene_ObjARiseAttrAt = 8              ; .Frames at which the rising sprite gets C2Scene_ObjAttrPrio3
+!C2Scene_ObjALandAttrAt = $20            ; and the landing one C2Scene_ObjAttrPrio2
+!C2Scene_ObjALift = $0018                ; 24 pixels: how far object A's sprite goes up
+!C2Scene_ObjALiftUp = $FFE8              ; -24
+!C2Scene_HalfPixel = $8000               ; a velocity fraction word: half a pixel a frame
+!C2Scene_ObjALandMask = $0707            ; property nibble bits 0-2 (two nibbles a word) that keep object A
+                                         ; from coming down
+!C2Scene_ObjAJumpPx = $0200              ; pixels C2Scene_ObjAJump moves the task in X
+!C2Scene_ObjALoc1D9 = $01D9              ; C2Scene_ObjANextLoc values C2Scene_ObjAAfterMode8 treats apart
+!C2Scene_ObjALoc1F7 = $01F7
+!C2Scene_ObjALoc1F2 = $01F2
+!C2Scene_ObjALoc1D8 = $01D8              ; and the ones it puts there instead
+!C2Scene_ObjALoc1B0 = $01B0
+!C2Scene_ObjALoc0F3 = $00F3
+!C2Scene_Tile7x8 = $0807                 ; Loc_EntryX/Y as a word: tile X 7, Y 8
+!C2Scene_Tile7x24 = $1807                ; X 7, Y 24
+!C2Scene_Tile8x12 = $0C08                ; X 8, Y 12
+!C2Scene_Unk7F00CCBit0 = $01             ; the C2Scene_Unk7F00CC bit set for C2Scene_ObjALoc1F2
+!C2Scene_Unk1B58Spot = $4C               ; C2Scene_Unk1B58 while object A is on the spot
+!C2SceneRom_ObjAPalA = $C6F5E0           ; 16 colors object A's scripts fade palettes to (bank $C6)
+!C2SceneRom_ObjAPalB = $C6F600           ; 16 colors C2Scene_ObjAScrLeave sets palette 0 to
+
 endif

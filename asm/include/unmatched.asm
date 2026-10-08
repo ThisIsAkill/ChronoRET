@@ -66,6 +66,9 @@ BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P
                     ; at $0A01, forced blank, then the menu (not matched)
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
+org $C6E797
+BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
+                    ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up
 org $C30000
 BankC3_Entry0000:   ; JML target (Field_HookLeaveToBankC3, A = $85): reinstalls the NMI/IRQ
                     ; trampolines into bank $C3, unpacks code via $C3:0557 from a $FE:0003 pointer

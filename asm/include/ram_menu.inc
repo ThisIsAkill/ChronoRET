@@ -338,6 +338,17 @@ endstruct align 8
 !C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene and by C2Scene_LeaderInput
                                          ; when a step starts; use unknown
+!C2Scene_ObjANextLoc = $02AF            ; 16-bit; zeroed by object A before scene mode C2Scene_ModeUnk8;
+                                         ; C2Scene_ObjAAfterMode8 waits for it: negative = none, else a
+                                         ; Loc_Id the party leaves for (probably set by C2Scene_Unk6A34)
+!C2Scene_ObjAAloft = $1BEF               ; 8-bit; 1 while object A is up (C2Scene_ObjARise to
+                                         ; C2Scene_ObjAFly's landing), 0 otherwise (C2Scene_ObjAMarkShow)
+!C2Scene_SpotX = $02A2                   ; 16-bit centre X of the spot C2Scene_ObjASpotWatch tests
+                                         ; (who sets it is not traced)
+!C2Scene_SpotY = $02A4                   ; 16-bit centre Y
+!C2Scene_Unk7F00CC = $7F00CC             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_ObjAAfterMode8
+                                         ; (C2Scene_ObjALoc1F2); meaning not traced
+!C2Scene_Unk7F00CD = $7F00CD             ; 8-bit; zeroed by C2Scene_ObjAAfterMode8; meaning not traced
 !C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
                                          ; C2Scene_LeaderBoard move (read by unmatched code)
 !C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
@@ -616,6 +627,27 @@ struct C2Scene_WalkTask $0000
 .TargetX:   skip 2     ; +$2A pixel X where the current step or move ends
 .TargetY:   skip 2     ; +$2C pixel Y
             skip $12
+endstruct
+
+; Object A's task (C2Scene_ObjATask) and its mark task: the fields after
+; C2Scene_Task's motion words (+$22-$25 and the targets as C2Scene_WalkTask).
+struct C2Scene_ObjTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state (C2Scene_ObjAStates)
+            skip $1F   ; +$03-$21: as C2Scene_Task (.Frames counts a timed move)
+.PropUL:    skip 1     ; +$22 C2Scene_GetTileProps' nibbles, as C2Scene_WalkTask; the scripts
+.PropUR:    skip 1     ; also use +$22 as a loop count
+.PropDL:    skip 1
+.PropDR:    skip 1
+.Duration:  skip 1     ; +$26 frames C2Scene_ObjARise / C2Scene_ObjALand move
+.PrevFacing: skip 1    ; +$27 .Facing before the last change
+.Facing:    skip 1     ; +$28 0-3 (C2Scene_FacingUp...)
+            skip 1
+.TargetX:   skip 2     ; +$2A where the current step ends (C2Scene_SetStepTarget)
+.TargetY:   skip 2     ; +$2C
+.PropBL:    skip 1     ; +$2E the nibble of the tile below .PropDL (C2Scene_ObjAGetProps)
+.PropB:     skip 1     ; +$2F and of the tile below .PropDR
+            skip $10
 endstruct
 
 ; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),
