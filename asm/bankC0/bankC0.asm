@@ -6496,6 +6496,489 @@ Map_ClearBufC800:
     RTS
 
 ; ============================================================
+; Layer edge builders ($C0:8243–$C0:8444)
+; One small routine per layer, direction and kind (row or column):
+; points WMADD at the layer's edge buffer (Map_BufC800 / D000 / D800,
+; columns at +Map_BufColOfs), passes the first column, the row and a
+; length in Map_BuildCol / Map_BuildRow / Map_BuildLen to the layer's
+; row or column writer (not matched), and sets the layer's bit in the
+; matching Map_Built* byte. Rows start one column left of the layer's
+; left origin; columns start one row above its top origin. Rows for a
+; rising Y go at the bottom bound (Map_Unk1D10 or Map_Unk1D18), for a
+; falling Y at the top origin; columns likewise at the right bound
+; (Map_Unk1D0C or Map_Unk1D14) or the left origin. Normal-rate layers
+; 2 and 3 use layer 1's origin and bounds.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:8243 — Map_BuildRowYInc1 (32 bytes, $8243–$8262)
+; Layer-1 row for a rising Y scroll: WMADD = Map_BufC800, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_Unk1D10; runs Map_WriteRow1 and sets bit 0 in Map_BuiltRowYInc.
+; Callers: Map_EdgeRowsYInc ($C0:9865) and Map_EdgeRowsYIncHalf
+;   ($C0:9896).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer1; X and the rest as
+;   Map_WriteRow1 leaves them (not established).
+; ------------------------------------------------------------
+org $C08243
+Map_BuildRowYInc1:
+    LDX.w #!Map_BufC800&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D10-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow1
+    LDA.b #!Map_Layer1
+    TSB.b !Map_BuiltRowYInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8263 — Map_BuildRowYInc2 (34 bytes, $8263–$8284)
+; Layer-2 row for a rising Y scroll: WMADD = Map_BufD000, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_Unk1D10; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRowYInc.
+; Quirk: a SEP #$20 after the WMADDL write, with M already 1, is kept.
+; Callers: Map_EdgeRowsYInc ($C0:9875), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteRow2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYInc2:
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w WMADDL
+    SEP #$20
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D10-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltRowYInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8285 — Map_BuildRowYInc2Half (32 bytes, $8285–$82A4)
+; Layer-2 row for a rising Y scroll: WMADD = Map_BufD000, Map_BuildCol =
+;   Map_Unk1D12 - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_Unk1D18; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRowYInc.
+; Callers: Map_EdgeRowsYIncHalf ($C0:98A6), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteRow2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYInc2Half:
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D12-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D18-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltRowYInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:82A5 — Map_BuildRowYInc3 (32 bytes, $82A5–$82C4)
+; Layer-3 row for a rising Y scroll: WMADD = Map_BufD800, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_Unk1D10; runs Map_WriteRow3 and sets bit 2 in Map_BuiltRowYInc.
+; Callers: Map_EdgeRowsYInc ($C0:9885) and Map_EdgeRowsYIncHalf
+;   ($C0:98B6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer3; X and the rest as
+;   Map_WriteRow3 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYInc3:
+    LDX.w #!Map_BufD800&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D10-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow3
+    LDA.b #!Map_Layer3
+    TSB.b !Map_BuiltRowYInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:82C5 — Map_BuildRowYDec1 (32 bytes, $82C5–$82E4)
+; Layer-1 row for a falling Y scroll: WMADD = Map_BufC800, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_TileOriginY; runs Map_WriteRow1 and sets bit 0 in Map_BuiltRowYDec.
+; Callers: Map_EdgeRowsYDec ($C0:98C7) and Map_EdgeRowsYDecHalf
+;   ($C0:98F8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer1; X and the rest as
+;   Map_WriteRow1 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYDec1:
+    LDX.w #!Map_BufC800&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow1
+    LDA.b #!Map_Layer1
+    TSB.b !Map_BuiltRowYDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:82E5 — Map_BuildRowYDec2 (32 bytes, $82E5–$8304)
+; Layer-2 row for a falling Y scroll: WMADD = Map_BufD000, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_TileOriginY; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRowYDec.
+; Callers: Map_EdgeRowsYDec ($C0:98D7), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteRow2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYDec2:
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltRowYDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8305 — Map_BuildRowYDec2Half (32 bytes, $8305–$8324)
+; Layer-2 row for a falling Y scroll: WMADD = Map_BufD000, Map_BuildCol =
+;   Map_Unk1D12 - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_Unk1D16; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRowYDec.
+; Callers: Map_EdgeRowsYDecHalf ($C0:9908), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteRow2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYDec2Half:
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D12-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D16-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltRowYDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8325 — Map_BuildRowYDec3 (32 bytes, $8325–$8344)
+; Layer-3 row for a falling Y scroll: WMADD = Map_BufD800, Map_BuildCol =
+;   Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow =
+;   Map_TileOriginY; runs Map_WriteRow3 and sets bit 2 in Map_BuiltRowYDec.
+; Callers: Map_EdgeRowsYDec ($C0:98E7) and Map_EdgeRowsYDecHalf
+;   ($C0:9918).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer3; X and the rest as
+;   Map_WriteRow3 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildRowYDec3:
+    LDX.w #!Map_BufD800&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    DEC A
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeRowLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteRow3
+    LDA.b #!Map_Layer3
+    TSB.b !Map_BuiltRowYDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8345 — Map_BuildColXInc1 (32 bytes, $8345–$8364)
+; Layer-1 column for a rising X scroll: WMADD = Map_BufC800 +
+;   Map_BufColOfs, Map_BuildCol = Map_Unk1D0C, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol1
+;   and sets bit 0 in Map_BuiltColXInc.
+; Callers: Map_EdgeColsXInc ($C0:97A1), Map_EdgeColsXIncHalf ($C0:97D2)
+;   and unmatched code at $C0:87FA.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer1; X and the rest as
+;   Map_WriteCol1 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXInc1:
+    LDX.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D0C-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol1
+    LDA.b #!Map_Layer1
+    TSB.b !Map_BuiltColXInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8365 — Map_BuildColXInc2 (32 bytes, $8365–$8384)
+; Layer-2 column for a rising X scroll: WMADD = Map_BufD000 +
+;   Map_BufColOfs, Map_BuildCol = Map_Unk1D0C, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol2
+;   and sets bit 1 in Map_BuiltColXInc.
+; Callers: Map_EdgeColsXInc ($C0:97B1) and unmatched code at $C0:880D.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteCol2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXInc2:
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D0C-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltColXInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8385 — Map_BuildColXInc2Half (32 bytes, $8385–$83A4)
+; Layer-2 column for a rising X scroll: WMADD = Map_BufD000 +
+;   Map_BufColOfs, Map_BuildCol = Map_Unk1D14, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_Unk1D16 - 1; runs Map_WriteCol2
+;   and sets bit 1 in Map_BuiltColXInc.
+; Callers: Map_EdgeColsXIncHalf ($C0:97E2) and unmatched code at
+;   $C0:8808.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteCol2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXInc2Half:
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D14-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D16-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltColXInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:83A5 — Map_BuildColXInc3 (32 bytes, $83A5–$83C4)
+; Layer-3 column for a rising X scroll: WMADD = Map_BufD800 +
+;   Map_BufColOfs, Map_BuildCol = Map_Unk1D0C, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol3
+;   and sets bit 2 in Map_BuiltColXInc.
+; Callers: Map_EdgeColsXInc ($C0:97C1), Map_EdgeColsXIncHalf ($C0:97F2)
+;   and unmatched code at $C0:8816.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer3; X and the rest as
+;   Map_WriteCol3 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXInc3:
+    LDX.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D0C-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol3
+    LDA.b #!Map_Layer3
+    TSB.b !Map_BuiltColXInc-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:83C5 — Map_BuildColXDec1 (32 bytes, $83C5–$83E4)
+; Layer-1 column for a falling X scroll: WMADD = Map_BufC800 +
+;   Map_BufColOfs, Map_BuildCol = Map_TileOriginX, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol1
+;   and sets bit 0 in Map_BuiltColXDec.
+; Callers: Map_EdgeColsXDec ($C0:9803) and Map_EdgeColsXDecHalf
+;   ($C0:9834).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer1; X and the rest as
+;   Map_WriteCol1 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXDec1:
+    LDX.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol1
+    LDA.b #!Map_Layer1
+    TSB.b !Map_BuiltColXDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:83E5 — Map_BuildColXDec2 (32 bytes, $83E5–$8404)
+; Layer-2 column for a falling X scroll: WMADD = Map_BufD000 +
+;   Map_BufColOfs, Map_BuildCol = Map_TileOriginX, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol2
+;   and sets bit 1 in Map_BuiltColXDec.
+; Callers: Map_EdgeColsXDec ($C0:9813), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteCol2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXDec2:
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltColXDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8405 — Map_BuildColXDec2Half (32 bytes, $8405–$8424)
+; Layer-2 column for a falling X scroll: WMADD = Map_BufD000 +
+;   Map_BufColOfs, Map_BuildCol = Map_Unk1D12, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_Unk1D16 - 1; runs Map_WriteCol2
+;   and sets bit 1 in Map_BuiltColXDec.
+; Callers: Map_EdgeColsXDecHalf ($C0:9844), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
+;   Map_WriteCol2 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXDec2Half:
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_Unk1D12-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_Unk1D16-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol2
+    LDA.b #!Map_Layer2
+    TSB.b !Map_BuiltColXDec-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8425 — Map_BuildColXDec3 (32 bytes, $8425–$8444)
+; Layer-3 column for a falling X scroll: WMADD = Map_BufD800 +
+;   Map_BufColOfs, Map_BuildCol = Map_TileOriginX, Map_BuildLen =
+;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol3
+;   and sets bit 2 in Map_BuiltColXDec.
+; Callers: Map_EdgeColsXDec ($C0:9823) and Map_EdgeColsXDecHalf
+;   ($C0:9854).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
+;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
+; Exit: M=1, DP and DB unchanged; A = Map_Layer3; X and the rest as
+;   Map_WriteCol3 leaves them (not established).
+; ------------------------------------------------------------
+Map_BuildColXDec3:
+    LDX.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH          ; WRAM bank $7E
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_EdgeColLen
+    STA.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    DEC A
+    STA.b !Map_BuildRow-!DP_Map
+    JSR Map_WriteCol3
+    LDA.b #!Map_Layer3
+    TSB.b !Map_BuiltColXDec-!DP_Map
+    RTS
+
+; ============================================================
 ; Field frame update and its first helpers ($C0:881E–$C0:8901)
 ; These run with DP = !DP_Map ($1D00): a dp operand is written as
 ; !Map_Name-!DP_Map, and field-page variables are reached absolute
@@ -6510,19 +6993,19 @@ Map_ClearBufC800:
 ; 1D2D, runs Field_DpadDispatch only when Field_Unk62 is 0 and
 ; Field_ControlEnabled is set (so the fade loops, which clear
 ; Field_ControlEnabled around this call, get no input), Map_Unk8A6D
-; (with 8-bit X) when Field_Unk20 is set, and then Map_Unk9175 (copies
-; the X/Y steps to Map_Unk1D32/1D33 unless the leader is at that limit),
-; Map_Unk99DE (may drop the frame's X/Y steps via Map_StepStop*),
-; Map_Unk91AC and Map_Unk93E1; the last two are not matched yet and
-; what they do (movement, scrolling?) is not traced.
+; (with 8-bit X) when Field_Unk20 is set (not matched yet), and then
+; Map_Unk9175 (copies the X/Y steps to Map_Unk1D32/1D33 unless the
+; leader is at that limit), Map_Unk99DE (may drop the frame's X/Y steps
+; via Map_StepStop*), Map_Unk91AC and Map_Unk93E1 (the layer scroll).
 ; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame
 ;   ($C0:00EB), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload
 ;   ($C0:2830), Scene_SettleFrames ($C0:2854) and unmatched code at
 ;   $C0:02B7, $C0:02DE and $C0:3FC3.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
 ; exit; set to $1D00 inside), DB=$00 (absolute operands are bank $00).
-; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the unmatched
-; callees leave them (not established).
+; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the callees
+; leave them (Map_Unk93E1 ends in the unmatched Sub_C07F9A; not
+; established).
 ; ------------------------------------------------------------
 org $C0881E
 Field_FrameUpdate:
@@ -7060,6 +7543,1564 @@ Map_Unk9175:
     LDA.b !Map_Unk1D30-!DP_Map
     STA.b !Map_Unk1D33-!DP_Map
 .done:
+    RTS
+
+; ============================================================
+; Layer scroll: accumulate and step ($C0:91AC–$C0:9922)
+; Map_Unk91AC adds up the frame's scroll amounts for three sets of
+; scroll words in 1/16 pixel and splits out whole pixels; Map_Unk93E1
+; steps the words a pixel at a time (Map_Scroll*), noting each 8-pixel
+; boundary crossed per layer and direction (Map_Edge*), and then has
+; the edge rows / columns built (Map_EdgeRows*/Cols*). All run with
+; DP = !DP_Map ($1D00).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:91AC — Map_Unk91AC (565 bytes, $91AC–$93E0)
+; Adds up this frame's scroll amounts for three sets of layer scroll
+; words and splits them into whole pixels for Map_Unk93E1, which runs
+; next. In order:
+; 1. Scroll-to: while Map_ScrollToMode is nonzero, sets the camera step
+;    Map_Unk1D2E to +$10 / -$10 while Map_TileOriginX (low byte) is
+;    below / above Map_ScrollToX, and also -$10 when they are equal but
+;    Map_Unk1D87 is not on a 16-pixel boundary; when both hold it sets
+;    ScrollTo_XDone in Map_ScrollToDone and leaves Map_Unk1D2E alone.
+;    The same for Y (Map_ScrollToY, Map_Unk1D30, Map_Unk1D89,
+;    ScrollTo_YDone). Once both bits are set it stores ScrollTo_Arrived
+;    in Map_ScrollToMode and clears Map_ScrollToDone (the mode stays
+;    nonzero, so it keeps holding the target).
+; 2. Shake: while Field_UnkBC is set, Map_ShakeX = $10 if Eng_Unk0400
+;    bit 2 is set, else 0, Map_ShakeY the same from bit 1, both negated
+;    when bit 0 is set; each is then zeroed while the low byte of
+;    Map_TileOriginX / Y is 0. With Field_UnkBC clear the old values are kept.
+; 3. Accumulate, in 1/16 pixel (a walking step of $10 = 1 pixel):
+;    Map_Acc1X += Map_Unk1D2E + Map_Drift1X + Map_ShakeX, Map_Acc1Y the
+;    same with Map_Unk1D30. Set 2 adds Map_OwnStep2X/Y and Map_Drift2X/Y
+;    always, plus the camera step and the shake unless Map_OwnStepFlags
+;    bit 1 is set; set 3 likewise with bit 2. All 8-bit, wrapping.
+; 4. Split each Map_Acc*: the whole pixels (|acc| / 16) go to its
+;    Map_Move*Pos or Map_Move*Neg byte by sign (the other is zeroed),
+;    and the signed remainder stays in the accumulator.
+; 5. Counts Map_DriftTimer down if it is running; when it reaches 0,
+;    Map_Drift1X..Map_Drift3Y are zeroed.
+; Callers: Field_FrameUpdate ($C0:8852), Field_Unk885A ($C0:88B9,
+;   $C0:88DD).
+; On entry: M=1 (8-bit A), DP=$1D00 (!DP_Map), DB=$00 (Eng_Unk0400 and
+;   Field_UnkBC are read absolute). X is not used.
+; Exit: M=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+org $C091AC
+Map_Unk91AC:
+    LDA.b !Map_ScrollToMode-!DP_Map
+    BEQ .shake
+    LDA.b !Map_ScrollToX-!DP_Map
+    CMP.b !Map_TileOriginX-!DP_Map
+    BEQ .x_at_target
+    BCC .x_back
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    BRA .to_y
+.x_back:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2E-!DP_Map
+    BRA .to_y
+.x_at_target:
+    LDA.b !Map_Unk1D87-!DP_Map
+    AND.b #!Map_TilePixelMask
+    BNE .x_back                 ; not on a 16-pixel boundary yet
+    LDA.b #!ScrollTo_XDone
+    TSB.b !Map_ScrollToDone-!DP_Map
+.to_y:
+    LDA.b !Map_ScrollToY-!DP_Map
+    CMP.b !Map_TileOriginY-!DP_Map
+    BEQ .y_at_target
+    BCC .y_back
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    BRA .shake
+.y_back:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D30-!DP_Map
+    BRA .shake
+.y_at_target:
+    LDA.b !Map_Unk1D89-!DP_Map
+    AND.b #!Map_TilePixelMask
+    BNE .y_back
+    LDA.b #!ScrollTo_YDone
+    TSB.b !Map_ScrollToDone-!DP_Map
+    LDA.b !Map_ScrollToDone-!DP_Map
+    CMP.b #!ScrollTo_BothDone
+    BNE .shake
+    LDA.b #!ScrollTo_Arrived
+    STA.b !Map_ScrollToMode-!DP_Map
+    STZ.b !Map_ScrollToDone-!DP_Map
+.shake:
+    LDA.w !DP_Field+!Field_UnkBC
+    BEQ .accumulate
+    LDA.w !Eng_Unk0400
+    BIT.b #!Eng0400_Negative
+    BNE .shake_neg
+    AND.b #!Eng0400_ShakeX
+    ASL A
+    ASL A
+    STA.b !Map_ShakeX-!DP_Map
+    LDA.w !Eng_Unk0400
+    AND.b #!Eng0400_ShakeY
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Map_ShakeY-!DP_Map
+    BRA .shake_edges
+.shake_neg:
+    AND.b #!Eng0400_ShakeX
+    ASL A
+    ASL A
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_ShakeX-!DP_Map
+    LDA.w !Eng_Unk0400
+    AND.b #!Eng0400_ShakeY
+    ASL A
+    ASL A
+    ASL A
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_ShakeY-!DP_Map
+.shake_edges:
+    LDA.b !Map_TileOriginX-!DP_Map
+    BNE .shake_y_edge
+    STZ.b !Map_ShakeX-!DP_Map
+.shake_y_edge:
+    LDA.b !Map_TileOriginY-!DP_Map
+    BNE .accumulate
+    STZ.b !Map_ShakeY-!DP_Map
+.accumulate:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_Acc1X-!DP_Map
+    CLC
+    ADC.b !Map_Drift1X-!DP_Map
+    CLC
+    ADC.b !Map_ShakeX-!DP_Map
+    STA.b !Map_Acc1X-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b !Map_Acc1Y-!DP_Map
+    CLC
+    ADC.b !Map_Drift1Y-!DP_Map
+    CLC
+    ADC.b !Map_ShakeY-!DP_Map
+    STA.b !Map_Acc1Y-!DP_Map
+    LDA.b !Map_OwnStepFlags-!DP_Map
+    BIT.b #!Map_OwnStep2
+    BEQ .set2_follow
+    CLC
+    LDA.b !Map_OwnStep2X-!DP_Map
+    ADC.b !Map_Acc2X-!DP_Map
+    CLC
+    ADC.b !Map_Drift2X-!DP_Map
+    STA.b !Map_Acc2X-!DP_Map
+    CLC
+    LDA.b !Map_OwnStep2Y-!DP_Map
+    ADC.b !Map_Acc2Y-!DP_Map
+    CLC
+    ADC.b !Map_Drift2Y-!DP_Map
+    STA.b !Map_Acc2Y-!DP_Map
+    BRA .set3
+.set2_follow:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_OwnStep2X-!DP_Map
+    CLC
+    ADC.b !Map_Acc2X-!DP_Map
+    CLC
+    ADC.b !Map_Drift2X-!DP_Map
+    CLC
+    ADC.b !Map_ShakeX-!DP_Map
+    STA.b !Map_Acc2X-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b !Map_OwnStep2Y-!DP_Map
+    CLC
+    ADC.b !Map_Acc2Y-!DP_Map
+    CLC
+    ADC.b !Map_Drift2Y-!DP_Map
+    CLC
+    ADC.b !Map_ShakeY-!DP_Map
+    STA.b !Map_Acc2Y-!DP_Map
+.set3:
+    LDA.b !Map_OwnStepFlags-!DP_Map
+    BIT.b #!Map_OwnStep3
+    BEQ .set3_follow
+    CLC
+    LDA.b !Map_OwnStep3X-!DP_Map
+    ADC.b !Map_Acc3X-!DP_Map
+    CLC
+    ADC.b !Map_Drift3X-!DP_Map
+    STA.b !Map_Acc3X-!DP_Map
+    CLC
+    LDA.b !Map_OwnStep3Y-!DP_Map
+    ADC.b !Map_Acc3Y-!DP_Map
+    CLC
+    ADC.b !Map_Drift3Y-!DP_Map
+    STA.b !Map_Acc3Y-!DP_Map
+    BRA .split
+.set3_follow:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_OwnStep3X-!DP_Map
+    CLC
+    ADC.b !Map_Acc3X-!DP_Map
+    CLC
+    ADC.b !Map_Drift3X-!DP_Map
+    CLC
+    ADC.b !Map_ShakeX-!DP_Map
+    STA.b !Map_Acc3X-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b !Map_OwnStep3Y-!DP_Map
+    CLC
+    ADC.b !Map_Acc3Y-!DP_Map
+    CLC
+    ADC.b !Map_Drift3Y-!DP_Map
+    CLC
+    ADC.b !Map_ShakeY-!DP_Map
+    STA.b !Map_Acc3Y-!DP_Map
+.split:                         ; the same split for each of the six accumulators
+    LDA.b !Map_Acc1X-!DP_Map
+    BMI .acc1x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move1XPos-!DP_Map
+    STZ.b !Map_Move1XNeg-!DP_Map
+    BRA .acc1x_rem
+.acc1x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move1XNeg-!DP_Map
+    STZ.b !Map_Move1XPos-!DP_Map
+.acc1x_rem:
+    LDA.b !Map_Acc1X-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc1x_store            ; no remainder: store 0
+    LDA.b !Map_Acc1X-!DP_Map
+    BPL .acc1x_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc1x_store
+.acc1x_pos:
+    AND.b #!Map_SubMask
+.acc1x_store:
+    STA.b !Map_Acc1X-!DP_Map
+    LDA.b !Map_Acc1Y-!DP_Map
+    BMI .acc1y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move1YPos-!DP_Map
+    STZ.b !Map_Move1YNeg-!DP_Map
+    BRA .acc1y_rem
+.acc1y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move1YNeg-!DP_Map
+    STZ.b !Map_Move1YPos-!DP_Map
+.acc1y_rem:
+    LDA.b !Map_Acc1Y-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc1y_store
+    LDA.b !Map_Acc1Y-!DP_Map
+    BPL .acc1y_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc1y_store
+.acc1y_pos:
+    AND.b #!Map_SubMask
+.acc1y_store:
+    STA.b !Map_Acc1Y-!DP_Map
+    LDA.b !Map_Acc2X-!DP_Map
+    BMI .acc2x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move2XPos-!DP_Map
+    STZ.b !Map_Move2XNeg-!DP_Map
+    BRA .acc2x_rem
+.acc2x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move2XNeg-!DP_Map
+    STZ.b !Map_Move2XPos-!DP_Map
+.acc2x_rem:
+    LDA.b !Map_Acc2X-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc2x_store
+    LDA.b !Map_Acc2X-!DP_Map
+    BPL .acc2x_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc2x_store
+.acc2x_pos:
+    AND.b #!Map_SubMask
+.acc2x_store:
+    STA.b !Map_Acc2X-!DP_Map
+    LDA.b !Map_Acc2Y-!DP_Map
+    BMI .acc2y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move2YPos-!DP_Map
+    STZ.b !Map_Move2YNeg-!DP_Map
+    BRA .acc2y_rem
+.acc2y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move2YNeg-!DP_Map
+    STZ.b !Map_Move2YPos-!DP_Map
+.acc2y_rem:
+    LDA.b !Map_Acc2Y-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc2y_store
+    LDA.b !Map_Acc2Y-!DP_Map
+    BPL .acc2y_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc2y_store
+.acc2y_pos:
+    AND.b #!Map_SubMask
+.acc2y_store:
+    STA.b !Map_Acc2Y-!DP_Map
+    LDA.b !Map_Acc3X-!DP_Map
+    BMI .acc3x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move3XPos-!DP_Map
+    STZ.b !Map_Move3XNeg-!DP_Map
+    BRA .acc3x_rem
+.acc3x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move3XNeg-!DP_Map
+    STZ.b !Map_Move3XPos-!DP_Map
+.acc3x_rem:
+    LDA.b !Map_Acc3X-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc3x_store
+    LDA.b !Map_Acc3X-!DP_Map
+    BPL .acc3x_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc3x_store
+.acc3x_pos:
+    AND.b #!Map_SubMask
+.acc3x_store:
+    STA.b !Map_Acc3X-!DP_Map
+    LDA.b !Map_Acc3Y-!DP_Map
+    BMI .acc3y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move3YPos-!DP_Map
+    STZ.b !Map_Move3YNeg-!DP_Map
+    BRA .acc3y_rem
+.acc3y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_Move3YNeg-!DP_Map
+    STZ.b !Map_Move3YPos-!DP_Map
+.acc3y_rem:
+    LDA.b !Map_Acc3Y-!DP_Map
+    AND.b #!Map_SubMask
+    BEQ .acc3y_store
+    LDA.b !Map_Acc3Y-!DP_Map
+    BPL .acc3y_pos
+    ORA.b #!Map_SubSignExt
+    BRA .acc3y_store
+.acc3y_pos:
+    AND.b #!Map_SubMask
+.acc3y_store:
+    STA.b !Map_Acc3Y-!DP_Map
+    LDA.b !Map_DriftTimer-!DP_Map
+    BEQ .done
+    DEC.b !Map_DriftTimer-!DP_Map
+    BNE .done
+    STZ.b !Map_Drift1X-!DP_Map
+    STZ.b !Map_Drift1Y-!DP_Map
+    STZ.b !Map_Drift2X-!DP_Map
+    STZ.b !Map_Drift2Y-!DP_Map
+    STZ.b !Map_Drift3X-!DP_Map
+    STZ.b !Map_Drift3Y-!DP_Map
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:93E1 — Map_Unk93E1 (106 bytes, $93E1–$944A)
+; Applies the pixels Map_Unk91AC split out this frame to the three sets
+; of scroll words, then has the new tilemap edges built:
+; - zeroes Map_EdgeRowYInc/YDec and Map_EdgeColXInc/XDec;
+; - layer 1: Map_Scroll1XInc, XDec, YDec, YInc;
+; - layer 2: Map_Scroll2XInc, XDec, YDec, YInc, or their *Half
+;   versions (moving at half rate) when Map_Unk0BC9 bit 7 is set;
+; - layer 3: Map_Scroll3XInc, XDec, YDec, YInc;
+; - zeroes Map_BuiltRowYInc/YDec and Map_BuiltColXInc/XDec, then runs
+;   Map_EdgeRowsYDec, YInc, Map_EdgeColsXDec, XInc (the *Half versions
+;   with Map_Unk0BC9 bit 7, which use other builders for layer 2), and
+;   ends in a BRL to
+;   Sub_C07F9A (not matched; also called by Field_Unk74D4).
+; Callers: Field_FrameUpdate ($C0:8855), Field_Unk885A ($C0:88BC,
+;   $C0:88E0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll words are stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map), DB=$00 (Map_Unk0BC9 is read
+;   absolute).
+; Exit: as Sub_C07F9A leaves it (not established); A and X clobbered
+;   here, Map_StepCount overwritten, plus what the edge builders change.
+; ------------------------------------------------------------
+Map_Unk93E1:
+    STZ.b !Map_EdgeColXInc-!DP_Map
+    STZ.b !Map_EdgeColXDec-!DP_Map
+    STZ.b !Map_EdgeRowYInc-!DP_Map
+    STZ.b !Map_EdgeRowYDec-!DP_Map
+    JSR Map_Scroll1XInc
+    JSR Map_Scroll1XDec
+    JSR Map_Scroll1YDec
+    JSR Map_Scroll1YInc
+    LDA.w !Map_Unk0BC9
+    BMI .layer2_half
+    JSR Map_Scroll2XInc
+    JSR Map_Scroll2XDec
+    JSR Map_Scroll2YDec
+    JSR Map_Scroll2YInc
+    BRA .layer3
+.layer2_half:
+    JSR Map_Scroll2XIncHalf
+    JSR Map_Scroll2XDecHalf
+    JSR Map_Scroll2YDecHalf
+    JSR Map_Scroll2YIncHalf
+.layer3:
+    JSR Map_Scroll3XInc
+    JSR Map_Scroll3XDec
+    JSR Map_Scroll3YDec
+    JSR Map_Scroll3YInc
+    STZ.b !Map_BuiltRowYInc-!DP_Map
+    STZ.b !Map_BuiltRowYDec-!DP_Map
+    STZ.b !Map_BuiltColXInc-!DP_Map
+    STZ.b !Map_BuiltColXDec-!DP_Map
+    LDA.w !Map_Unk0BC9
+    BMI .edges_half
+    JSR Map_EdgeRowsYDec
+    JSR Map_EdgeRowsYInc
+    JSR Map_EdgeColsXDec
+    JSR Map_EdgeColsXInc
+    BRL Sub_C07F9A
+.edges_half:
+    JSR Map_EdgeRowsYDecHalf
+    JSR Map_EdgeRowsYIncHalf
+    JSR Map_EdgeColsXDecHalf
+    JSR Map_EdgeColsXIncHalf
+    BRL Sub_C07F9A
+
+; ------------------------------------------------------------
+; $C0:944B — Map_Scroll1XInc (50 bytes, $944B–$947C)
+; Layer 1, X rising: once per pixel in Map_Move1XPos, Map_Unk1D87 + 1
+; and the fine counter Map_Unk1D93 + 1 (0-$0F, wrapping). When the
+; counter goes from $07 to $08 or from $0F to 0 (every 8 pixels), the
+; low bytes of Map_TileOriginX and Map_Unk1D0C go up by 1 and
+; Map_EdgeColXInc is set to Map_Layer1 (a STA, not a TSB: this is the
+; first writer after Map_Unk93E1 zeroes it).
+; Callers: Map_Unk93E1 ($C0:93E9), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll1XInc:
+    LDA.b !Map_Move1XPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D87-!DP_Map
+    INX
+    STX.b !Map_Unk1D87-!DP_Map
+    LDA.b !Map_Unk1D93-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    INC.b !Map_TileOriginX-!DP_Map
+    INC.b !Map_Unk1D0C-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeColXInc-!DP_Map
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    INC.b !Map_TileOriginX-!DP_Map
+    INC.b !Map_Unk1D0C-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeColXInc-!DP_Map
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D93-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:947D — Map_Scroll1XDec (48 bytes, $947D–$94AC)
+; Layer 1, X falling: as Map_Scroll1XInc with Map_Move1XNeg, stepping
+; Map_Unk1D87 and Map_Unk1D93 down; the crossings are 0 to $0F and $08
+; to $07, and lower the low bytes of Map_Unk1D0C and Map_TileOriginX
+; (in that order) and store Map_Layer1 in Map_EdgeColXDec.
+; Callers: Map_Unk93E1 ($C0:93EC), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll1XDec:
+    LDA.b !Map_Move1XNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D87-!DP_Map
+    DEX
+    STX.b !Map_Unk1D87-!DP_Map
+    LDA.b !Map_Unk1D93-!DP_Map
+    BNE .not_zero
+    DEC.b !Map_Unk1D0C-!DP_Map
+    DEC.b !Map_TileOriginX-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeColXDec-!DP_Map
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    DEC.b !Map_Unk1D0C-!DP_Map
+    DEC.b !Map_TileOriginX-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeColXDec-!DP_Map
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D93-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:94AD — Map_Scroll1YInc (50 bytes, $94AD–$94DE)
+; Layer 1, Y rising: as Map_Scroll1XInc with Map_Move1YPos, Map_Unk1D89
+; and the fine counter Map_Unk1D96; the crossings raise the low bytes
+; of Map_TileOriginY and Map_Unk1D10 and store Map_Layer1 in
+; Map_EdgeRowYInc.
+; Callers: Map_Unk93E1 ($C0:93F2), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll1YInc:
+    LDA.b !Map_Move1YPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D89-!DP_Map
+    INX
+    STX.b !Map_Unk1D89-!DP_Map
+    LDA.b !Map_Unk1D96-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    INC.b !Map_TileOriginY-!DP_Map
+    INC.b !Map_Unk1D10-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeRowYInc-!DP_Map
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    INC.b !Map_TileOriginY-!DP_Map
+    INC.b !Map_Unk1D10-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeRowYInc-!DP_Map
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D96-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:94DF — Map_Scroll1YDec (48 bytes, $94DF–$950E)
+; Layer 1, Y falling: as Map_Scroll1XDec with Map_Move1YNeg,
+; Map_Unk1D89 and Map_Unk1D96; the crossings lower the low bytes of
+; Map_TileOriginY and Map_Unk1D10 (in this order, unlike the X version)
+; and store Map_Layer1 in Map_EdgeRowYDec.
+; Callers: Map_Unk93E1 ($C0:93EF), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll1YDec:
+    LDA.b !Map_Move1YNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D89-!DP_Map
+    DEX
+    STX.b !Map_Unk1D89-!DP_Map
+    LDA.b !Map_Unk1D96-!DP_Map
+    BNE .not_zero
+    DEC.b !Map_TileOriginY-!DP_Map
+    DEC.b !Map_Unk1D10-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeRowYDec-!DP_Map
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    DEC.b !Map_TileOriginY-!DP_Map
+    DEC.b !Map_Unk1D10-!DP_Map
+    LDA.b #!Map_Layer1
+    STA.b !Map_EdgeRowYDec-!DP_Map
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D96-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:950F — Map_Scroll2XInc (54 bytes, $950F–$9544)
+; Layer 2, X rising: once per pixel in Map_Move2XPos, Map_Unk1D8B + 1
+; and the fine counter Map_Unk1D94 + 1 (0-$0F, wrapping). At the
+; crossings ($07 to $08, $0F to 0) it sets Map_Layer2 in
+; Map_EdgeColXInc unless Map_LayerEdgeOff has that bit. Unlike layer 1
+; there is no tile origin to move.
+; Callers: Map_Unk93E1 ($C0:93FA), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2XInc:
+    LDA.b !Map_Move2XPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8B-!DP_Map
+    INX
+    STX.b !Map_Unk1D8B-!DP_Map
+    LDA.b !Map_Unk1D94-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .wrap_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXInc-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .mid_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXInc-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D94-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9545 — Map_Scroll2XDec (52 bytes, $9545–$9578)
+; Layer 2, X falling: as Map_Scroll2XInc with Map_Move2XNeg, stepping
+; down (crossings 0 to $0F and $08 to $07; Map_EdgeColXDec).
+; Callers: Map_Unk93E1 ($C0:93FD), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2XDec:
+    LDA.b !Map_Move2XNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8B-!DP_Map
+    DEX
+    STX.b !Map_Unk1D8B-!DP_Map
+    LDA.b !Map_Unk1D94-!DP_Map
+    BNE .not_zero
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .wrap_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXDec-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .mid_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXDec-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D94-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9579 — Map_Scroll2YInc (54 bytes, $9579–$95AE)
+; Layer 2, Y rising: as Map_Scroll2XInc with Map_Move2YPos, Map_Unk1D8D
+; and Map_Unk1D97 (Map_EdgeRowYInc).
+; Callers: Map_Unk93E1 ($C0:9403), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2YInc:
+    LDA.b !Map_Move2YPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8D-!DP_Map
+    INX
+    STX.b !Map_Unk1D8D-!DP_Map
+    LDA.b !Map_Unk1D97-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .wrap_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .mid_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D97-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:95AF — Map_Scroll2YDec (52 bytes, $95AF–$95E2)
+; Layer 2, Y falling: as Map_Scroll2XDec with Map_Move2YNeg,
+; Map_Unk1D8D and Map_Unk1D97 (Map_EdgeRowYDec).
+; Callers: Map_Unk93E1 ($C0:9400), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2YDec:
+    LDA.b !Map_Move2YNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8D-!DP_Map
+    DEX
+    STX.b !Map_Unk1D8D-!DP_Map
+    LDA.b !Map_Unk1D97-!DP_Map
+    BNE .not_zero
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .wrap_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .mid_off
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D97-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:95E3 — Map_Scroll2XIncHalf (54 bytes, $95E3–$9618)
+; Layer 2 at half rate, X rising (Map_Unk0BC9 bit 7): once per step in
+; Map_Move2XPos the fine counter Map_Unk1D94 + 1, here 0-$1F
+; (wrapping), and Map_Unk1D8B + 1 only when the new count is even, so
+; the scroll word moves half as far. When the counter goes from $0F to
+; $10 or from $1F to 0 (every 8 pixels of Map_Unk1D8B), Map_Unk1D12
+; and Map_Unk1D14 go up by 1 and Map_Layer2 is set in Map_EdgeColXInc;
+; Map_LayerEdgeOff is not checked here.
+; Callers: Map_Unk93E1 ($C0:9408), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2XIncHalf:
+    LDA.b !Map_Move2XPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDA.b !Map_Unk1D94-!DP_Map
+    CMP.b #!Map_FineLastHalf
+    BNE .not_last
+    INC.b !Map_Unk1D12-!DP_Map
+    INC.b !Map_Unk1D14-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXInc-!DP_Map
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineLast
+    BNE .step
+    INC.b !Map_Unk1D12-!DP_Map
+    INC.b !Map_Unk1D14-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXInc-!DP_Map
+    LDA.b #!Map_FineLast
+.step:
+    INC A
+    STA.b !Map_Unk1D94-!DP_Map
+    AND.b #$01
+    BNE .odd
+    LDX.b !Map_Unk1D8B-!DP_Map
+    INX
+    STX.b !Map_Unk1D8B-!DP_Map
+.odd:
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9619 — Map_Scroll2XDecHalf (52 bytes, $9619–$964C)
+; Layer 2 at half rate, X falling: as Map_Scroll2XIncHalf with
+; Map_Move2XNeg, counting down (crossings 0 to $1F and $10 to $0F,
+; which lower Map_Unk1D14 and Map_Unk1D12 and set Map_Layer2 in
+; Map_EdgeColXDec); Map_Unk1D8B - 1 when the new count is even.
+; Callers: Map_Unk93E1 ($C0:940B), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2XDecHalf:
+    LDA.b !Map_Move2XNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDA.b !Map_Unk1D94-!DP_Map
+    BNE .not_zero
+    DEC.b !Map_Unk1D14-!DP_Map
+    DEC.b !Map_Unk1D12-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXDec-!DP_Map
+    LDA.b #!Map_FineWrapUpHalf ; DEC A below gives $1F
+.not_zero:
+    CMP.b #!Map_FineWrapUp
+    BNE .step
+    DEC.b !Map_Unk1D14-!DP_Map
+    DEC.b !Map_Unk1D12-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeColXDec-!DP_Map
+    LDA.b #!Map_FineWrapUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D94-!DP_Map
+    AND.b #$01
+    BNE .odd
+    LDX.b !Map_Unk1D8B-!DP_Map
+    DEX
+    STX.b !Map_Unk1D8B-!DP_Map
+.odd:
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:964D — Map_Scroll2YIncHalf (54 bytes, $964D–$9682)
+; Layer 2 at half rate, Y rising: as Map_Scroll2XIncHalf with
+; Map_Move2YPos, Map_Unk1D97 and Map_Unk1D8D; the crossings raise
+; Map_Unk1D16 and Map_Unk1D18 (Map_EdgeRowYInc).
+; Callers: Map_Unk93E1 ($C0:9411), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2YIncHalf:
+    LDA.b !Map_Move2YPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDA.b !Map_Unk1D97-!DP_Map
+    CMP.b #!Map_FineLastHalf
+    BNE .not_last
+    INC.b !Map_Unk1D16-!DP_Map
+    INC.b !Map_Unk1D18-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineLast
+    BNE .step
+    INC.b !Map_Unk1D16-!DP_Map
+    INC.b !Map_Unk1D18-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+    LDA.b #!Map_FineLast
+.step:
+    INC A
+    STA.b !Map_Unk1D97-!DP_Map
+    AND.b #$01
+    BNE .odd
+    LDX.b !Map_Unk1D8D-!DP_Map
+    INX
+    STX.b !Map_Unk1D8D-!DP_Map
+.odd:
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9683 — Map_Scroll2YDecHalf (52 bytes, $9683–$96B6)
+; Layer 2 at half rate, Y falling: as Map_Scroll2XDecHalf with
+; Map_Move2YNeg, Map_Unk1D97 and Map_Unk1D8D; the crossings lower
+; Map_Unk1D16 and Map_Unk1D18 (Map_EdgeRowYDec).
+; Callers: Map_Unk93E1 ($C0:940E), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll2YDecHalf:
+    LDA.b !Map_Move2YNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDA.b !Map_Unk1D97-!DP_Map
+    BNE .not_zero
+    DEC.b !Map_Unk1D16-!DP_Map
+    DEC.b !Map_Unk1D18-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+    LDA.b #!Map_FineWrapUpHalf ; DEC A below gives $1F
+.not_zero:
+    CMP.b #!Map_FineWrapUp
+    BNE .step
+    DEC.b !Map_Unk1D16-!DP_Map
+    DEC.b !Map_Unk1D18-!DP_Map
+    LDA.b #!Map_Layer2
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+    LDA.b #!Map_FineWrapUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D97-!DP_Map
+    AND.b #$01
+    BNE .odd
+    LDX.b !Map_Unk1D8D-!DP_Map
+    DEX
+    STX.b !Map_Unk1D8D-!DP_Map
+.odd:
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:96B7 — Map_Scroll3XInc (54 bytes, $96B7–$96EC)
+; Layer 3, X rising: as Map_Scroll2XInc with Map_Move3XPos,
+; Map_Unk1D8F, Map_Unk1D95 and the Map_Layer3 bit.
+; Callers: Map_Unk93E1 ($C0:9414), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll3XInc:
+    LDA.b !Map_Move3XPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8F-!DP_Map
+    INX
+    STX.b !Map_Unk1D8F-!DP_Map
+    LDA.b !Map_Unk1D95-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .wrap_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeColXInc-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .mid_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeColXInc-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D95-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:96ED — Map_Scroll3XDec (52 bytes, $96ED–$9720)
+; Layer 3, X falling: as Map_Scroll2XDec with Map_Move3XNeg,
+; Map_Unk1D8F, Map_Unk1D95 and the Map_Layer3 bit.
+; Callers: Map_Unk93E1 ($C0:9417), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll3XDec:
+    LDA.b !Map_Move3XNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    LDX.b !Map_Unk1D8F-!DP_Map
+    DEX
+    STX.b !Map_Unk1D8F-!DP_Map
+    LDA.b !Map_Unk1D95-!DP_Map
+    BNE .not_zero
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .wrap_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeColXDec-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .mid_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeColXDec-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D95-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9721 — Map_Scroll3YInc (62 bytes, $9721–$975E)
+; Layer 3, Y rising: as Map_Scroll2YInc with Map_Move3YPos,
+; Map_Unk1D91, Map_Unk1D98 and the Map_Layer3 bit; also adds 4 to
+; Map_Unk1DFB per pixel (four INCs; what reads it is not traced).
+; Callers: Map_Unk93E1 ($C0:941D), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll3YInc:
+    LDA.b !Map_Move3YPos-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    INC.b !Map_Unk1DFB-!DP_Map
+    INC.b !Map_Unk1DFB-!DP_Map
+    INC.b !Map_Unk1DFB-!DP_Map
+    INC.b !Map_Unk1DFB-!DP_Map
+    LDX.b !Map_Unk1D91-!DP_Map
+    INX
+    STX.b !Map_Unk1D91-!DP_Map
+    LDA.b !Map_Unk1D98-!DP_Map
+    CMP.b #!Map_FineLast
+    BNE .not_last
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .wrap_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapDown   ; INC A below gives 0
+.not_last:
+    CMP.b #!Map_FineMid
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .mid_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeRowYInc-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMid
+.step:
+    INC A
+    STA.b !Map_Unk1D98-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:975F — Map_Scroll3YDec (60 bytes, $975F–$979A)
+; Layer 3, Y falling: as Map_Scroll2YDec with Map_Move3YNeg,
+; Map_Unk1D91, Map_Unk1D98 and the Map_Layer3 bit; also subtracts 4
+; from Map_Unk1DFB per pixel.
+; Callers: Map_Unk93E1 ($C0:941A), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll word is stepped
+;   with LDX/INX/STX), DP=$1D00 (!DP_Map). DB is not used.
+; Exit: M=1, X=0, DP unchanged; A clobbered, X too when the scroll
+;   word was stepped; Map_StepCount is 0 when there was a step.
+; ------------------------------------------------------------
+Map_Scroll3YDec:
+    LDA.b !Map_Move3YNeg-!DP_Map
+    BNE .start
+    RTS
+.start:
+    STA.b !Map_StepCount-!DP_Map
+.loop:
+    DEC.b !Map_Unk1DFB-!DP_Map
+    DEC.b !Map_Unk1DFB-!DP_Map
+    DEC.b !Map_Unk1DFB-!DP_Map
+    DEC.b !Map_Unk1DFB-!DP_Map
+    LDX.b !Map_Unk1D91-!DP_Map
+    DEX
+    STX.b !Map_Unk1D91-!DP_Map
+    LDA.b !Map_Unk1D98-!DP_Map
+    BNE .not_zero
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .wrap_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+.wrap_off:
+    LDA.b #!Map_FineWrapUp     ; DEC A below gives $0F
+.not_zero:
+    CMP.b #!Map_FineMidUp
+    BNE .step
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .mid_off
+    LDA.b #!Map_Layer3
+    TSB.b !Map_EdgeRowYDec-!DP_Map
+.mid_off:
+    LDA.b #!Map_FineMidUp
+.step:
+    DEC A
+    STA.b !Map_Unk1D98-!DP_Map
+    DEC.b !Map_StepCount-!DP_Map
+    BNE .loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:979B — Map_EdgeColsXInc (49 bytes, $979B–$97CB)
+; For each layer bit set in Map_EdgeColXInc (1, 2, 3 in that order)
+; runs that layer's column builder (Map_BuildColXInc1/2/3)
+; and then adds 1 to the layer's column bias (Map_BgColBias,
+; Map_BgColBias2, Map_BgColBias3), wrapping at 64.
+; Callers: Map_Unk93E1 ($C0:9436), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeColsXInc:
+    LDA.b !Map_EdgeColXInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildColXInc1
+    LDA.b !Map_BgColBias-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias-!DP_Map
+    LDA.b !Map_EdgeColXInc-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildColXInc2
+    LDA.b !Map_BgColBias2-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias2-!DP_Map
+    LDA.b !Map_EdgeColXInc-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildColXInc3
+    LDA.b !Map_BgColBias3-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:97CC — Map_EdgeColsXIncHalf (49 bytes, $97CC–$97FC)
+; As Map_EdgeColsXInc, with Map_BuildColXInc2Half as layer 2's builder
+; (used while Map_Unk0BC9 bit 7 is set).
+; Callers: Map_Unk93E1 ($C0:9445), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeColsXIncHalf:
+    LDA.b !Map_EdgeColXInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildColXInc1
+    LDA.b !Map_BgColBias-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias-!DP_Map
+    LDA.b !Map_EdgeColXInc-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildColXInc2Half
+    LDA.b !Map_BgColBias2-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias2-!DP_Map
+    LDA.b !Map_EdgeColXInc-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildColXInc3
+    LDA.b !Map_BgColBias3-!DP_Map
+    INC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:97FD — Map_EdgeColsXDec (49 bytes, $97FD–$982D)
+; As Map_EdgeColsXInc for Map_EdgeColXDec: builders Map_BuildColXDec1/
+; 2/3, and the column biases go down by 1 (wrapping at 64).
+; Callers: Map_Unk93E1 ($C0:9433), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeColsXDec:
+    LDA.b !Map_EdgeColXDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildColXDec1
+    LDA.b !Map_BgColBias-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias-!DP_Map
+    LDA.b !Map_EdgeColXDec-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildColXDec2
+    LDA.b !Map_BgColBias2-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias2-!DP_Map
+    LDA.b !Map_EdgeColXDec-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildColXDec3
+    LDA.b !Map_BgColBias3-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:982E — Map_EdgeColsXDecHalf (49 bytes, $982E–$985E)
+; As Map_EdgeColsXDec, with Map_BuildColXDec2Half for layer 2.
+; Callers: Map_Unk93E1 ($C0:9442), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeColsXDecHalf:
+    LDA.b !Map_EdgeColXDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildColXDec1
+    LDA.b !Map_BgColBias-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias-!DP_Map
+    LDA.b !Map_EdgeColXDec-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildColXDec2Half
+    LDA.b !Map_BgColBias2-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias2-!DP_Map
+    LDA.b !Map_EdgeColXDec-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildColXDec3
+    LDA.b !Map_BgColBias3-!DP_Map
+    DEC A
+    AND.b #!Bg_ColMask64
+    STA.b !Map_BgColBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:985F — Map_EdgeRowsYInc (49 bytes, $985F–$988F)
+; As Map_EdgeColsXInc for rows: for each layer bit in Map_EdgeRowYInc
+; runs Map_BuildRowYInc1/2/3 and adds 1 to the layer's
+; row bias (Map_BgRowBias, Map_BgRowBias2, Map_BgRowBias3), wrapping
+; at 32.
+; Callers: Map_Unk93E1 ($C0:9430), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeRowsYInc:
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildRowYInc1
+    LDA.b !Map_BgRowBias-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias-!DP_Map
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildRowYInc2
+    LDA.b !Map_BgRowBias2-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias2-!DP_Map
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildRowYInc3
+    LDA.b !Map_BgRowBias3-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9890 — Map_EdgeRowsYIncHalf (49 bytes, $9890–$98C0)
+; As Map_EdgeRowsYInc, with Map_BuildRowYInc2Half for layer 2.
+; Callers: Map_Unk93E1 ($C0:943F), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeRowsYIncHalf:
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildRowYInc1
+    LDA.b !Map_BgRowBias-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias-!DP_Map
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildRowYInc2Half
+    LDA.b !Map_BgRowBias2-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias2-!DP_Map
+    LDA.b !Map_EdgeRowYInc-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildRowYInc3
+    LDA.b !Map_BgRowBias3-!DP_Map
+    INC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:98C1 — Map_EdgeRowsYDec (49 bytes, $98C1–$98F1)
+; As Map_EdgeRowsYInc for Map_EdgeRowYDec: builders Map_BuildRowYDec1/
+; 2/3, and the row biases go down by 1 (wrapping at 32).
+; Callers: Map_Unk93E1 ($C0:942D), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeRowsYDec:
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildRowYDec1
+    LDA.b !Map_BgRowBias-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias-!DP_Map
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildRowYDec2
+    LDA.b !Map_BgRowBias2-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias2-!DP_Map
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildRowYDec3
+    LDA.b !Map_BgRowBias3-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias3-!DP_Map
+.no_layer3:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:98F2 — Map_EdgeRowsYDecHalf (49 bytes, $98F2–$9922)
+; As Map_EdgeRowsYDec, with Map_BuildRowYDec2Half for layer 2.
+; Callers: Map_Unk93E1 ($C0:943C), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X) and DB=$00 as the builders
+;   need them, DP=$1D00 (!DP_Map).
+; Exit: M=1, DP and DB unchanged; A clobbered; Map_Built* bits set,
+;   plus what the row / column writers change (not established).
+; ------------------------------------------------------------
+Map_EdgeRowsYDecHalf:
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .no_layer1
+    JSR Map_BuildRowYDec1
+    LDA.b !Map_BgRowBias-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias-!DP_Map
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+.no_layer1:
+    BIT.b #!Map_Layer2
+    BEQ .no_layer2
+    JSR Map_BuildRowYDec2Half
+    LDA.b !Map_BgRowBias2-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias2-!DP_Map
+    LDA.b !Map_EdgeRowYDec-!DP_Map
+.no_layer2:
+    BIT.b #!Map_Layer3
+    BEQ .no_layer3
+    JSR Map_BuildRowYDec3
+    LDA.b !Map_BgRowBias3-!DP_Map
+    DEC A
+    AND.b #!Bg_RowMask32
+    STA.b !Map_BgRowBias3-!DP_Map
+.no_layer3:
     RTS
 
 ; ------------------------------------------------------------

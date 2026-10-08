@@ -169,7 +169,8 @@ if !ram_engine_inc == 0
 !Field_E4Ptr3 = $B8                      ; 24-bit pointer into bank $E4 (as Field_E4Ptr0)
 !Field_UnkBB = $BB                       ; 8-bit; zeroed at load; LocLoad_Unk0A14 skips its work when
                                          ; nonzero
-!Field_UnkBC = $BC                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_UnkBC = $BC                       ; 8-bit; zeroed by Field_InitLoadState; nonzero makes
+                                         ; Map_Unk91AC set Map_ShakeX/Y from Eng_Unk0400
 !Field_UnkEB = $EB                       ; 8-bit object slot the action button acts on, $80 = none:
                                          ; Field_FindObjInFront stores the object it finds;
                                          ; Field_ActionButton reads it. $80 at load; Field_FrameUpdate
@@ -379,11 +380,16 @@ if !ram_engine_inc == 0
 !Pad_Unk00F8 = $00F8                     ; 8-bit; Sub_1ADF: bit 7 sets Field_Unk62 = 3
 !Pad_Unk00F9 = $00F9                     ; 8-bit; bits 0-3 index Field_DpadDispatch's handler table
                                          ; (Up Down Left Right in the Pad_Pressed high-byte layout?)
-!Eng_Unk0400 = $0400                     ; 8-bit; Field_InitLoadState copies it to Field_Unk0400Copy
+!Eng_Unk0400 = $0400                     ; 8-bit; Field_InitLoadState copies it to Field_Unk0400Copy;
+                                         ; with Field_UnkBC set, Map_Unk91AC reads bit 0 as the sign
+                                         ; and bits 2 / 1 as X / Y shake on (Eng0400_*)
 !Field_FadeBusy = $0407                  ; 8-bit; $FF while a pause/fade loop runs
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5),
                                          ; cleared after (Field_FadeInAfterReload,
                                          ; Field_RunBankC2Mode5)
+!Map_Unk0BC9 = $0BC9                     ; 8-bit; bit 7 set: Map_Unk93E1 moves layer 2 with the
+                                         ; half-rate steppers (Map_Scroll2*Half) and the matching
+                                         ; edge builders; who sets it is not traced
 !Ppu_Unk0BD7 = $0BD7                     ; 8-bit; probably the TM (main screen) value: $C0:0691 copies
                                          ; it, Ppu_Unk0BD8, 0, 0, 2 and Ppu_Unk0BDF to $7E:2C66-6B,
                                          ; the order of TM, TS, TMW, TSW, CGWSEL, CGADSUB (not traced
@@ -709,11 +715,28 @@ if !ram_engine_inc == 0
 !Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
                                          ; AOKI"...): '/' ends a line, a byte >= $80 ends a block
 !Map_BufC800 = $7EC800                   ; 2 KB WRAM buffer ($7E:C800-$CFFF) that Field_BuildC800Mode1/2/4
-                                         ; write through WMDATA; Map_ClearBufC800 zeroes it
+                                         ; write through WMDATA; Map_ClearBufC800 zeroes it. The
+                                         ; layer-1 edge builders write a row at its start and a
+                                         ; column at +Map_BufColOfs (Map_BuildRow*1/Col*1)
+!Map_BufD000 = $7ED000                   ; as Map_BufC800 for the layer-2 edge builders
+                                         ; (Map_BuildRow*2*/Col*2*)
+!Map_BufD800 = $7ED800                   ; as Map_BufC800 for the layer-3 edge builders; the same
+                                         ; address as Credits_LineBuf, used at another time
 !Credits_LineBuf = $7ED800               ; 64 bytes: one tilemap row (32 words) built by
                                          ; Field_ServiceUnk54, DMAed to VRAM by the NMI ($C0:EC77)
 
 ; --- Map page $1D00 (absolute, or dp with DP = !DP_Map) ---
+; Layer numbers 1-3 below follow Map_Unk93E1's three sets of scroll words
+; (Map_Unk1D87/89, 1D8B/8D, 1D8F/91); set 1 follows the camera step
+; Map_Unk1D2E/1D30. That they are BG1-BG3 is likely, not traced.
+!Map_ScrollToMode = $1D00                ; 8-bit; nonzero makes Map_Unk91AC set Map_Unk1D2E/1D30 to
+                                         ; +/-$10 towards Map_ScrollToX/Y; it stores 2 when both
+                                         ; have arrived (inferred: a scroll-to request; who sets it
+                                         ; is not traced)
+!Map_ScrollToDone = $1D01                ; 8-bit; bit 0 / bit 1 set by Map_Unk91AC when X / Y has
+                                         ; arrived; zeroed when both have
+!Map_ScrollToX = $1D02                   ; 8-bit target compared with Map_TileOriginX's low byte
+!Map_ScrollToY = $1D03                   ; 8-bit target compared with Map_TileOriginY's low byte
 !Map_TreasureRec0 = $1D06                ; 16-bit TreasureRom offset that treasure numbers count from:
                                          ; Field_CheckTileInFront numbers a record (offset -
                                          ; this) / 4 for Treasure_Flags. Setter not matched
@@ -723,6 +746,17 @@ if !ram_engine_inc == 0
 !Map_Unk1D0C = $1D0C                     ; 16-bit; its low byte / 2 is the upper column bound of
                                          ; Field_ServiceUnk54's bit-5 box (Map_TileOriginX the lower)
 !Map_Unk1D10 = $1D10                     ; 16-bit; as Map_Unk1D0C for rows (Map_TileOriginY lower)
+!Map_Unk1D12 = $1D12                     ; 8-bit; layer 2 at half rate, as Map_TileOriginX for
+                                         ; layer 1: Map_Scroll2XIncHalf / XDecHalf step it with
+                                         ; Map_Unk1D14 every 16 steps; the half-rate layer-2 builders
+                                         ; take it minus 1 as a row's first column, and as the
+                                         ; column of a left-edge column
+!Map_Unk1D14 = $1D14                     ; 8-bit; as Map_Unk1D0C for half-rate layer 2: the column
+                                         ; Map_BuildColXInc2Half builds
+!Map_Unk1D16 = $1D16                     ; 8-bit; as Map_TileOriginY for half-rate layer 2
+                                         ; (Map_Scroll2Y*Half; the row Map_BuildRowYDec2Half builds)
+!Map_Unk1D18 = $1D18                     ; 8-bit; as Map_Unk1D10 for half-rate layer 2 (the row
+                                         ; Map_BuildRowYInc2Half builds)
 !Map_Unk1D1A = $1D1A                     ; 8-bit column: Map_Unk9175 keeps a leftward Map_Unk1D2E
                                          ; out of Map_Unk1D32 once the leader's Obj_TileX <= it;
                                          ; Map_StepStopLeft compares Map_TileOriginX / 2 with it
@@ -734,6 +768,14 @@ if !ram_engine_inc == 0
                                          ; it + 1; Map_StepStopUp against Map_TileOriginY / 2)
 !Map_Unk1D1D = $1D1D                     ; 8-bit row: as Map_Unk1D1A downwards (leader Obj_TileY >
                                          ; it; Map_StepStopDown against Map_Unk1D10 / 2)
+!Map_Drift1X = $1D24                     ; 8-bit signed amount Map_Unk91AC adds to Map_Acc1X every
+                                         ; frame; Map_Drift1X..Map_Drift3Y are zeroed when
+                                         ; Map_DriftTimer runs out
+!Map_Drift1Y = $1D25                     ; 8-bit; as Map_Drift1X for Map_Acc1Y
+!Map_Drift2X = $1D26                     ; 8-bit; as Map_Drift1X for Map_Acc2X
+!Map_Drift2Y = $1D27                     ; 8-bit; as Map_Drift1X for Map_Acc2Y
+!Map_Drift3X = $1D28                     ; 8-bit; as Map_Drift1X for Map_Acc3X
+!Map_Drift3Y = $1D29                     ; 8-bit; as Map_Drift1X for Map_Acc3Y
 !Map_Unk1D2A = $1D2A                     ; 8-bit; copied to Map_Unk1D2E each frame by
                                          ; Map_ResetUnk1D2E
 !Map_Unk1D2B = $1D2B                     ; 8-bit; copied to Map_Unk1D30 each frame (as above)
@@ -751,24 +793,115 @@ if !ram_engine_inc == 0
                                          ; Map_Unk1D1A/1D1B in that direction
 !Map_Unk1D33 = $1D33                     ; 8-bit; as Map_Unk1D32 for Map_Unk1D30 (rows
                                          ; Map_Unk1D1C/1D1D)
+!Map_LayerEdgeOff = $1D35                ; 8-bit; bit 1 / bit 2: the normal-rate steppers of layer
+                                         ; 2 / 3 don't set Map_Edge* bits for it (the half-rate
+                                         ; layer-2 steppers ignore it)
+!Map_OwnStepFlags = $1D36                ; 8-bit; bit 1 (bit 2): Map_Unk91AC moves set 2 (set 3) by
+                                         ; its Map_OwnStep and drift only, without the camera step
+                                         ; Map_Unk1D2E/1D30 and the shake
+!Map_OwnStep2X = $1D37                   ; 8-bit signed X amount Map_Unk91AC adds to Map_Acc2X every
+                                         ; frame (with or without Map_OwnStepFlags bit 1)
+!Map_OwnStep2Y = $1D38                   ; 8-bit; as Map_OwnStep2X for Y
+!Map_OwnStep3X = $1D39                   ; 8-bit; as Map_OwnStep2X for set 3 (flag bit 2)
+!Map_OwnStep3Y = $1D3A                   ; 8-bit; as Map_OwnStep3X for Y
+!Map_Acc1X = $1D3B                       ; 8-bit signed accumulator of set 1, X, in 1/16 pixel (a
+                                         ; walking camera step of $10 moves 1): Map_Unk91AC adds the
+                                         ; frame's amounts, moves the whole pixels out to
+                                         ; Map_Move1XNeg/Pos and keeps the signed remainder
+!Map_Acc1Y = $1D3C                       ; 8-bit; as Map_Acc1X for Y (Map_Move1YNeg/Pos)
+!Map_Acc2X = $1D3D                       ; 8-bit; as Map_Acc1X for set 2
+!Map_Acc2Y = $1D3E                       ; 8-bit; as Map_Acc1Y for set 2
+!Map_Acc3X = $1D3F                       ; 8-bit; as Map_Acc1X for set 3
+!Map_Acc3Y = $1D40                       ; 8-bit; as Map_Acc1Y for set 3
+!Map_Move1XNeg = $1D41                   ; 8-bit pixels set 1 moves this frame in -X (0 when it
+                                         ; moves in +X); written by Map_Unk91AC, used as the step
+                                         ; count of Map_Scroll1XDec (Map_Unk93E1)
+!Map_Move1XPos = $1D42                   ; 8-bit pixels in +X (0 when moving in -X); Map_Scroll1XInc
+!Map_Move1YNeg = $1D43                   ; 8-bit; as Map_Move1XNeg for -Y (Map_Scroll1YDec)
+!Map_Move1YPos = $1D44                   ; 8-bit; as Map_Move1XPos for +Y (Map_Scroll1YInc)
+!Map_Move2XNeg = $1D45                   ; 8-bit; as Map_Move1XNeg for set 2 (Map_Scroll2XDec*)
+!Map_Move2XPos = $1D46                   ; 8-bit; as Map_Move1XPos for set 2 (Map_Scroll2XInc*)
+!Map_Move2YNeg = $1D47                   ; 8-bit; as Map_Move1YNeg for set 2 (Map_Scroll2YDec*)
+!Map_Move2YPos = $1D48                   ; 8-bit; as Map_Move1YPos for set 2 (Map_Scroll2YInc*)
+!Map_Move3XNeg = $1D49                   ; 8-bit; as Map_Move1XNeg for set 3 (Map_Scroll3XDec)
+!Map_Move3XPos = $1D4A                   ; 8-bit; as Map_Move1XPos for set 3 (Map_Scroll3XInc)
+!Map_Move3YNeg = $1D4B                   ; 8-bit; as Map_Move1YNeg for set 3 (Map_Scroll3YDec)
+!Map_Move3YPos = $1D4C                   ; 8-bit; as Map_Move1YPos for set 3 (Map_Scroll3YInc)
+!Map_DriftTimer = $1D4D                  ; 8-bit frame countdown; when Map_Unk91AC counts it to 0 it
+                                         ; zeroes Map_Drift1X..Map_Drift3Y (0 = not running)
+!Map_ShakeX = $1D4E                      ; 8-bit signed X amount Map_Unk91AC adds to sets 1-3 (not
+                                         ; to a set with its Map_OwnStepFlags bit): +/-$10 from
+                                         ; Eng_Unk0400 while Field_UnkBC is set, 0 while
+                                         ; Map_TileOriginX is 0 (inferred: a screen shake)
+!Map_ShakeY = $1D4F                      ; 8-bit; as Map_ShakeX for Y (Map_TileOriginY)
 !Map_StepTestN = $1D52                   ; 8-bit scratch of the Map_StepStop* tests: the step / 16
                                          ; (Down, Right) or Map_TileOriginY/X / 2 (Up, Left)
 !Map_StepTestN2 = $1D54                  ; 8-bit scratch of Map_StepStopUp/Left: the step / 16
+!Map_BuildCol = $1D58                    ; 8-bit argument of the row / column writers ($C0:7612 ...):
+                                         ; the first column of a row, or the column of a column
+                                         ; (Map_Build*); units as the writers use them, not traced
+!Map_BuildRow = $1D5A                    ; 8-bit; as Map_BuildCol: the row, or the first row of a
+                                         ; column
+!Map_BuildLen = $1D5C                    ; 8-bit; as Map_BuildCol: how many entries to write
+!Map_StepCount = $1D66                   ; 8-bit loop counter of the Map_Scroll* steppers (pixels
+                                         ; left to step); a scratch byte, other unmatched code
+                                         ; uses $1D66 as a 16-bit value
+!Map_EdgeRowYInc = $1D74                 ; 8-bit; bit 0/1/2: layer 1/2/3 crossed an 8-pixel row
+                                         ; boundary with its Y scroll rising this frame (set by the
+                                         ; Map_Scroll*YInc steppers); Map_EdgeRowsYInc then runs that
+                                         ; layer's row builder (inferred: a new row comes into view)
+!Map_EdgeRowYDec = $1D75                 ; 8-bit; as Map_EdgeRowYInc, Y falling (Map_EdgeRowsYDec)
+!Map_EdgeColXInc = $1D76                 ; 8-bit; as Map_EdgeRowYInc for columns, X rising
+                                         ; (Map_EdgeColsXInc)
+!Map_EdgeColXDec = $1D77                 ; 8-bit; as Map_EdgeColXInc, X falling (Map_EdgeColsXDec)
+!Map_BuiltRowYInc = $1D78                ; 8-bit; bit 0/1/2: Map_BuildRowYInc1/2/3 (or 2Half) wrote a
+                                         ; row for layer 1/2/3 into its buffer this frame; zeroed
+                                         ; with the next three by Map_Unk93E1 first (probably for
+                                         ; the NMI to copy; readers not traced)
+!Map_BuiltRowYDec = $1D79                ; 8-bit; as Map_BuiltRowYInc for Map_BuildRowYDec*
+!Map_BuiltColXInc = $1D7A                ; 8-bit; as Map_BuiltRowYInc for Map_BuildColXInc*
+!Map_BuiltColXDec = $1D7B                ; 8-bit; as Map_BuiltRowYInc for Map_BuildColXDec*
 !Map_TilemapVram3 = $1D7E                ; 16-bit tilemap VRAM base the NMI uses for redraw step 2
                                          ; (Field_MapRedrawDone = 2)
 !Map_TilemapVram4 = $1D84                ; 16-bit; its high byte is ORed into Hdma_Unk7F14F1 when
                                          ; hook 12 ends
-!Map_Unk1D8D = $1D8D                     ; 16-bit; one of six words $1D87-$1D91 that $C0:06F1 copies
-                                         ; to $7E:2C5A (BG scroll values? unverified); hooks 7-10
-                                         ; set it to $0100
-!Map_Unk1D8F = $1D8F                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $F01D)
-!Map_Unk1D91 = $1D91                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $01C0)
-!Map_Unk1D93 = $1D93                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D2E; at the
+!Map_Unk1D87 = $1D87                     ; 16-bit; layer 1 X scroll in pixels (probably): first of
+                                         ; the six words $1D87-$1D91 that $C0:06F1 copies to
+                                         ; $7E:2C5A; Map_Scroll1XInc/XDec step it by 1 per pixel of
+                                         ; Map_Move1XPos/Neg. Map_Unk91AC holds a scroll-to on X while
+                                         ; its bits 0-3 are nonzero
+!Map_Unk1D89 = $1D89                     ; 16-bit; as Map_Unk1D87, layer 1 Y (Map_Scroll1Y*)
+!Map_Unk1D8B = $1D8B                     ; 16-bit; as Map_Unk1D87, layer 2 X (Map_Scroll2X*; at
+                                         ; half rate it moves every second step)
+!Map_Unk1D8D = $1D8D                     ; 16-bit; as Map_Unk1D87, layer 2 Y (Map_Scroll2Y*; at
+                                         ; half rate every second step); hooks 7-10 set it to $0100
+!Map_Unk1D8F = $1D8F                     ; 16-bit; as Map_Unk1D87, layer 3 X (Map_Scroll3X*);
+                                         ; hooks 7/8 set $F01D
+!Map_Unk1D91 = $1D91                     ; 16-bit; as Map_Unk1D87, layer 3 Y (Map_Scroll3Y*);
+                                         ; hooks 7/8 set $01C0
+!Map_Unk1D93 = $1D93                     ; 8-bit; layer 1 X scroll within a 16-pixel cell (0-$0F):
+                                         ; Map_Scroll1XInc/XDec step it with Map_Unk1D87 and move
+                                         ; Map_TileOriginX/Map_Unk1D0C when it crosses 7/8 or
+                                         ; $0F/0. Nonzero lets Field_Unk885A set Map_Unk1D2E; at the
                                          ; limit column Map_StepStopRight/Left keep the X step only
                                          ; while it plus / minus the step / 16 stays within 0-$F
-                                         ; (a pixel offset inside a 16-pixel tile?)
-!Map_Unk1D96 = $1D96                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D30; as
-                                         ; Map_Unk1D93 for the Y step (Map_StepStopDown/Up)
+!Map_Unk1D94 = $1D94                     ; 8-bit; as Map_Unk1D93 for layer 2 X (0-$0F; 0-$1F with
+                                         ; the half-rate steppers)
+!Map_Unk1D95 = $1D95                     ; 8-bit; as Map_Unk1D93 for layer 3 X
+!Map_Unk1D96 = $1D96                     ; 8-bit; as Map_Unk1D93 for layer 1 Y (Map_Scroll1Y*,
+                                         ; Map_TileOriginY/Map_Unk1D10); nonzero lets Field_Unk885A
+                                         ; set Map_Unk1D30; Map_StepStopDown/Up as for X
+!Map_Unk1D97 = $1D97                     ; 8-bit; as Map_Unk1D96 for layer 2 Y (0-$0F; 0-$1F with
+                                         ; the half-rate steppers)
+!Map_Unk1D98 = $1D98                     ; 8-bit; as Map_Unk1D96 for layer 3 Y
+!Map_BgColBias2 = $1D9B                  ; 8-bit; as Map_BgColBias for layer 2: Map_EdgeColsX* step
+                                         ; it (wrapping at 64) after a layer-2 column build
+!Map_BgRowBias2 = $1D9C                  ; 8-bit; as Map_BgRowBias for layer 2 (wraps at 32;
+                                         ; Map_EdgeRowsY*)
+!Map_BgColBias3 = $1D9D                  ; 8-bit; as Map_BgColBias2 for layer 3
+!Map_BgRowBias3 = $1D9E                  ; 8-bit; as Map_BgRowBias2 for layer 3
+!Map_Unk1DFB = $1DFB                     ; 8-bit; Map_Scroll3YInc / YDec add / subtract 4 per pixel
+                                         ; of layer-3 Y scroll; readers not traced
 !Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0
 !Map_HookTimer = $1DFF                   ; 8-bit frame countdown for hook 12's loops
 

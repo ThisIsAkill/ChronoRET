@@ -88,6 +88,19 @@ org $C074E8
 Field_Unk74E8:      ; DP=$1D00; clears dp $9B/$8B/$8D then shares Field_Unk74D4's tail
 org $C074F7
 Field_Unk74F7:      ; DP=$1D00; clears dp $9D/$8F/$91 then shares Field_Unk74D4's tail
+org $C07612
+Map_WriteRow1:      ; layer-1 row writer (args Map_BuildCol/Row/Len, output via WMDATA); also
+                    ; called by Field_BuildC800Mode1
+org $C077E4
+Map_WriteCol1:      ; layer-1 column writer (Map_BuildColXInc1/XDec1)
+org $C079CF
+Map_WriteRow2:      ; layer-2 row writer; also called six times from $C0:7925-$C0:79BA
+org $C07BA9
+Map_WriteCol2:      ; layer-2 column writer
+org $C07D66
+Map_WriteRow3:      ; layer-3 row writer; also called five times from $C0:7CDD-$C0:7D51
+org $C07E60
+Map_WriteCol3:      ; layer-3 column writer
 org $C075E9
 Field_BuildC800Mode1: ; writes a buffer at WRAM $7E:C800 through WMDATA (DefaultHandler mode 1/3)
 org $C078EC
@@ -96,14 +109,12 @@ org $C07CB5
 Field_BuildC800Mode4: ; as above, mode 4 variant
 org $C07F7E
 LocLoad_ClearPage1D00: ; ClearRAMDMA of $7E:1D00-$1DFF
+org $C07F9A
+Sub_C07F9A:         ; DP=$1D00; Map_Unk93E1 ends in a BRL here, Field_Unk74D4 calls it; 419 bytes
 org $C087F1
 Field_Unk87F1:      ; DP=$1D00 finalizer after the $C800 builders (DefaultHandler)
 org $C08A6D
 Map_Unk8A6D:        ; Field_FrameUpdate, X/Y 8-bit, when Field_Unk20 is set (DP=$1D00)
-org $C091AC
-Map_Unk91AC:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
-org $C093E1
-Map_Unk93E1:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
 org $C0A33B
 LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810
