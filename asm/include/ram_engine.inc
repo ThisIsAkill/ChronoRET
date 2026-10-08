@@ -241,6 +241,30 @@ if !ram_engine_inc == 0
 !Field_BattleObjList = $9D               ; up to 12 object offsets + $80 end marker, filled by Field_Unk0617
                                          ; (objects of kind 5/6 near the screen); Scene_Unk024C treats a
                                          ; negative first entry as "no battle"
+!FieldBtl_ObjSlots = $A3                ; 8 B: object slot behind each FieldBtlObj record ($FF =
+                                         ; none); FieldBtl_SaveObjs sets all 8 to $FF, then
+                                         ; FieldBtl_SaveObj fills them; FieldBtl_RestoreObjs reads
+                                         ; them back after the battle. Overlaps Field_BattleObjList
+                                         ; entries 6-11 (only entries 0-5 are read by then)
+!FieldBtl_RestOriginX = $F0             ; 8-bit Map_TileOriginX / 2 while FieldBtl_SaveObjs and
+                                         ; FieldBtl_Restore work (the FieldBtl* tile positions are
+                                         ; kept relative to it)
+!FieldBtl_RestOriginY = $F1             ; 8-bit Map_TileOriginY / 2 (as FieldBtl_RestOriginX)
+!FieldBtl_OriginX = $DB                  ; alias of Oam_Range1LoPtr's slot in the battle hand-off
+                                         ; (FieldBtl_SaveTileAttrs, FieldBtl_SavePartyPos,
+                                         ; Field_Unk0617): Map_TileOriginX / 2
+!FieldBtl_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot there: Map_TileOriginY / 2
+!FieldBtl_RowsLeft = $D9                 ; alias of Eng_Scratch in FieldBtl_SaveTileAttrs: 16-bit
+                                         ; rows still to copy after the current one
+!FieldBtl_RecIdx = $D9                   ; alias of Eng_Scratch in FieldBtl_SaveObj: 8-bit, first the
+                                         ; record number - 4 part, then the size class
+!FieldBtl_RecFlags = $EE                 ; alias of Spr_NewFrame's slot in FieldBtl_SaveObj: the
+                                         ; record's Flags byte being built
+!Field_Unk47 = $47                       ; 8-bit; Scene_Unk0283 sets bits 0 and 3 after
+                                         ; Field_Unk29F7 and bit 1 after Field_Unk2B78; no matched
+                                         ; reader
+!Obj_DrawBucketOfs = $C5                 ; alias of Spr_BaseY's slot in Obj_DrawLink: the bucket's
+                                         ; Obj_DrawBucket offset while the links are rewritten
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
 
@@ -382,6 +406,8 @@ if !ram_engine_inc == 0
 ;
 
 ; --- Engine / interrupts ---
+!Eng_Unk0010 = $0010                     ; 8-bit at $00:0010 (not the field page); only Scene_Unk0283's
+                                         ; BIT (probably meant as BIT #$10) reads it; no writer named
 !Pad_Pressed = $00F0                     ; 16-bit newly pressed buttons, remapped: low = A X L R B Y
                                          ; Select Start (bits 7-0), high = Up Down Left Right (bits
                                          ; 3-0). Inferred from the pad reader at $C2:84F0 and Start
@@ -481,7 +507,8 @@ if !ram_engine_inc == 0
                                          ; Audio_PlayTileSfxA)
 !Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
                                          ; Obj_ScreenX in Audio_PlaySfxAtLeader)
-!Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (bank $C2's C2Scene_QueueSoundCmd
+!Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (the last byte of the block
+                                         ; Audio_DriverCommand sends; bank $C2's C2Scene_QueueSoundCmd
                                          ; fills all four bytes $1E00-$1E03)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
@@ -496,7 +523,9 @@ if !ram_engine_inc == 0
 !FieldRom_Unk9CF0 = $FF9CF0              ; ROM: four 64-byte pieces Field_UploadUnk0000 sends to VRAM
 !FieldRom_Unk9260 = $FF9260              ; ROM: 64 bytes Field_UploadUnk57E0 sends to VRAM $57E0
 !Field_Unk7EF000 = $7EF000               ; WRAM source of Field_UploadUnk1C00/1D00 (VRAM $1C00/$1D00);
-                                         ; who fills it is not traced
+                                         ; Field_Unk29F7 / Field_Unk2B78 write the two tilemaps
+!Field_Unk7EF000RunEnd = $D9             ; alias of Eng_Scratch in Field_Unk2B78 (written absolute,
+                                         ; $01D9): last tile of the current run
 !Treasure_Gold = $0200                   ; 16-bit gold amount of the last treasure taken
                                          ; (Field_CheckTileInFront, DB=$00; reader not traced)
 !Field_Unk02A1 = $02A1                   ; 8-bit; zeroed by Field_CheckTileInFront as it starts
@@ -507,7 +536,27 @@ if !ram_engine_inc == 0
 !Party_Members = $7E2980                 ; 3 bytes: character id of each party member
                                          ; (Party_ReinitIfChanged re-inits the character objects when
                                          ; they change)
-!Field_Unk7E2989 = $7E2989               ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk7E2989 = $7E2989               ; 8-bit; zeroed by Field_InitLoadState; FieldBtl_SavePartyPos
+                                         ; ORs its TileAttr_PrioBit with FieldBtl_PcPrio into the
+                                         ; party's Obj_PrioLow/High
+!FieldBtl_Result = $7F01EC               ; 8-bit; read by Scene_Unk0283 and FieldBtl_Restore after a
+                                         ; battle: 0 = rebuild the field, 1 = wait for a button
+                                         ; and restart through GameLoop, 2 = reload Loc_PrevId
+                                         ; (each unless FieldBtl_EvtFlags says not). Bank $C1 stores 1 at
+                                         ; $C1:813C and 0 at $C1:817B/81FA/8358; who stores 2 is not
+                                         ; found. AudioFadeDispatch also reads it
+!FieldBtl_EvtFlags = $7E2A1F             ; 8-bit; an event opcode copies it from the script
+                                         ; ($C0:3A9F). Bit 5 (FieldBtl_EvtNoReset) and bit 7
+                                         ; (FieldBtl_EvtUnk80) are tested by Scene_Unk0283 /
+                                         ; Field_Unk034B, bit 4 probably meant to be (see
+                                         ; Scene_Unk0283); MusicCueDispatch reads bit 6
+!FieldBtl_AttrA = $7E2A23                ; 256 B: the 16 x 16 window of Map_TileAttrA at the screen
+                                         ; origin, rows of 16 (FieldBtl_SaveTileAttrs); read by the
+                                         ; battle code (not traced)
+!FieldBtl_AttrB = $7E2B23                ; 256 B: the same window of Map_TileAttrB
+!Audio_Unk7F01ED = $7F01ED               ; 8-bit; nonzero: LocLoad_AudioSetup sends Menu_Config1E
+                                         ; again instead of the location's LocRom.Music (who sets it
+                                         ; is not traced)
 !Eng_Unk7F0000 = $7F0000                 ; 8-bit; Field_FadeToBankC2Mode5 only proceeds when it is >=
                                          ; $49 (purpose unknown)
 !Treasure_Flags = $7F0001                ; 64 bytes: one bit per treasure number (bit n & 7 of byte
@@ -588,6 +637,12 @@ if !ram_engine_inc == 0
                                          ; Audio_CmdArg1, presumably for panning
 !Obj_DrawBucket = $0E00                  ; 64 words: first object of each draw bucket (low byte; bit
                                          ; 7 = empty); Oam_BuildShadow walks them from the last
+!Obj_DrawPrev = $0E80                    ; 8-bit per object: previous object in its draw bucket (bit
+                                         ; 7 = it is the first); Obj_DrawLink / Obj_DrawUnlink
+!Obj_DrawOut = $0E01                     ; 8-bit per object, index object x 2, so it is the high
+                                         ; byte of Obj_DrawBucket word n for object n: 0 = in a
+                                         ; draw bucket, bit 7 = in none (Obj_DrawLink /
+                                         ; Obj_DrawUnlink)
 !Obj_DrawNext = $0E81                    ; 8-bit per object: next object in the same draw bucket (bit
                                          ; 7 = end)
 !Obj_ScriptPos = $1180                   ; 16-bit per object: Evt_Data offset where the object's
@@ -679,6 +734,8 @@ if !ram_engine_inc == 0
                                          ; ($80 = not queued / end)
 !Obj_Unk1100 = $1100                     ; 8-bit per object; bit 7 = skip; 0 = queue at the head; 1/2
                                          ; = queue at the tail (head when ObjQ_Unk78 = 2)
+!Obj_Unk1101 = $1101                     ; 8-bit per object (odd byte of the $1100 words);
+                                         ; FieldBtl_SaveObj copies it to FieldBtlObj.Unk05
 !Obj_FixedFrame = $1301                  ; 8-bit per object: frame number used when Obj_AnimMode = 3
                                          ; (no animation lookup)
 !Obj_AnimFacingStride = $1480            ; 16-bit per object: bytes per facing in its frame-number
@@ -1220,7 +1277,9 @@ if !ram_engine_inc == 0
 ; One location record in ROM bank $F6 (14 bytes; record Loc_Id at Loc_RecOfs). Only the
 ; fields the matched location-load steps read are named.
 struct LocRom $F60000
-    .Unk00: skip 1
+    .Music: skip 1       ; probably the music track: LocLoad_AudioSetup sends it with sound
+                         ; command Audio_CmdPlayMusic and keeps it in Menu_Config1E; bit 7
+                         ; set = leave the music alone
     .Tileset12: skip 1   ; layers 1/2 graphics: LocGfx_Lists entry (LocLoad_Unk0960) and
                          ; LocGfx_Meta12Ptrs entry (LocLoad_Unk09DD); $FF = none (both skip).
                          ; "Tileset" rests on it choosing both the graphics and the metatiles
@@ -1311,5 +1370,58 @@ struct TreasureRom $F50000
     .Contents: skip 2    ; bit 15 set: gold, amount = bits 0-14 x 2; else bit 14 set
                          ; (Treasure_Empty): nothing given; else item id in bits 0-8
 endstruct align 4
+
+; The field/battle hand-off block in bank $7E. Field_Unk038F fills it before a battle
+; (the battle engine reads it absolute, e.g. $CC:E936 / $CC:EA3B / $CD:0CA2), and
+; FieldBtl_Restore puts the objects back from it afterwards. Tile positions are relative to
+; FieldBtl_OriginX/Y (the screen origin / 2).
+
+; One party member (3 records: leader, member 2, member 3).
+struct FieldBtlPc $7E29B0
+    .TileX: skip 1       ; Obj_TileX - origin
+    .TileY: skip 1       ; Obj_TileY - origin
+    .SubX: skip 1        ; low 4 bits of Obj_ScreenX (the pixel within the tile)
+    .SubY: skip 1        ; low 4 bits of Obj_ScreenY
+    .Frame: skip 1       ; Obj_LastFrame
+endstruct
+
+; One other object on screen (8 records, right after the 3 FieldBtlPc). The record number
+; comes from the object's Obj_VramTile (FieldBtl_SaveObj).
+struct FieldBtlObj $7E29BF
+    .TileX: skip 1       ; as FieldBtlPc
+    .TileY: skip 1
+    .SubX: skip 1
+    .SubY: skip 1
+    .Frame: skip 1       ; Obj_LastFrame, 0 for size class 3
+    .Unk05: skip 1       ; Obj_Unk1101; $FF (with .Unk06) = no object
+    .Unk06: skip 1       ; 0
+    .Flags: skip 1       ; Obj_SprSize & ObjSpr_SizeMask, | FieldBtl_ObjKind6Flag for
+                         ; kind 6, | Obj_Unk1A81 bit 7. 0 after the battle: FieldBtl_RestoreObj
+                         ; removes the object
+    .Attr: skip 1        ; Obj_OamAttr >> 1
+    .GfxOfs: skip 2      ; Obj_GfxOfs
+    .GfxBank: skip 1     ; Obj_GfxBank
+endstruct
+
+; Screen settings saved by FieldBtl_SavePpu. The order follows PPU registers $2107-$210A,
+; $210D-$2112 and $212C-$2133 (probably a register image; the reader is not traced).
+struct FieldBtlPpu $7E2C56
+    .Tilemap1: skip 1    ; Map_TilemapVram high byte | Map_TilemapVram4 (BG1SC-like)
+    .Tilemap2: skip 1    ; Map_TilemapVram3 high byte | Map_TilemapVram4Hi
+    .Tilemap3: skip 1    ; Map_TilemapVramL3 high byte | Map_Unk1D86
+    .Unk59: skip 1       ; 0
+    .Scroll: skip 12     ; Map_Unk1D87-Map_Unk1D91: X/Y of layers 1-3, 16-bit each
+    .MainScreen: skip 1  ; Ppu_Unk0BD7 (TM value)
+    .SubScreen: skip 1   ; Ppu_Unk0BD8 (TS value)
+    .Unk68: skip 1       ; 0
+    .Unk69: skip 1       ; 0
+    .Unk6A: skip 1       ; FieldBtl_PpuUnk6A
+    .ColorMath: skip 1   ; Ppu_Unk0BDF (CGADSUB value)
+    .FixedColor: skip 1  ; Fade_FixedColor
+    .Unk6D: skip 1       ; 0
+    .Unk6E: skip 1       ; FieldBtl_PpuUnk6E
+    .Unk6F: skip 1       ; 0
+    .Scroll2: skip 12    ; the same six words again
+endstruct
 
 endif
