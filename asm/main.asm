@@ -17,6 +17,8 @@ incsrc "include/constants_engine.inc"
 incsrc "include/constants_battle.inc"
 incsrc "include/ram_engine.inc"
 incsrc "include/ram_battle.inc"
+incsrc "include/constants_menu.inc"
+incsrc "include/ram_menu.inc"
 incsrc "include/macros.inc"
 
 ; --- Bank includes ---

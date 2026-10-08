@@ -14,8 +14,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    2. `$C0:2848` 36 B: `Field_FadeInAfterReload` (whole); 1 differs (`JSR Field_EndOfFrameShort`
       -> `JSR Field_EndOfFrame`): the sibling routine right after it
    3. `$C0:58FD` 33 B: `Evt_RunObjInit+$10` (part); 0 differ
-   4. `$C2:0073` 32 B: `MainInit+$60` (part, PPU write-twice register clears); 0 differ
-   5. `$C2:9445` 32 B: `MainInit+$60` (part, same); 0 differ
+   4. `$C2:0073` 32 B: `MainInit+$60` (part, PPU write-twice register clears): matched, inside
+      `BankC2_InitHwRegs`
+   5. `$C2:9445` 32 B: `MainInit+$60` (part, same): matched, inside `Menu_InitPpuAndRam`
    6. `$CC:F365` 30 B: `Battle_Mul8` (whole, byte-identical); 0 differ
    7. `$C1:6699` 26 B: `Battle_CalcAngle+$1A` (part); 0 differ
    8. `$C0:2DD9` 24 B: `ClearRAMDMA+$15` (part, DMA channel 7 setup tail); 0 differ
@@ -49,6 +50,13 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_Unk8A6D`, `Map_Unk91AC`, `Map_Unk93E1`; then the treasure-record setters
    (`Map_TreasureRec0` $1D06, `Map_TreasureLocRecs` $1D08) and who sets the scroll limits
    `Map_Unk1D1A`-`1D1D`.
+3. Bank $C2: the entry vectors, the scene boot (`BankC2_SceneBoot`, `BankC2_InitHwRegs`), the
+   scene interrupts and NMI handler ($C2:0000–$C2:0453 except `$C2:034D`-`$C2:0404`), and
+   `Menu_InitPpuAndRam` with the new-game data init ($C2:940D–$C2:960A) are matched. Next, the
+   scene NMI's unmatched per-frame steps (`C2Scene_Unk034D`, `C2Scene_Unk051D`,
+   `C2Scene_Unk0C4D`, `C2Scene_Unk0CEA`), then the boot steps `C2Scene_Unk03EF` and
+   `C2Scene_Unk1DB5` and `C2Scene_Main` ($C2:23A8); the text-window entries `TextWin_Init`
+   ($C2:57DF) and `TextWin_Step` ($C2:5823) and the joypad entry `BankC2_Entry8002`.
 
 ## Tables
 
