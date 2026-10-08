@@ -146,7 +146,9 @@ if !ram_engine_inc == 0
                                          ; one staff-credits line per frame, bits 2-3 = run
                                          ; Map_ClearBufC800, bit 5 = watch Field_TileStepX/Y against the
                                          ; Map_Unk1D0A-1D10 box; zeroed at load
-!Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
+!Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState; Map_StepTileEffects
+                                         ; stores Map_ProbeLevel here and Map_ProbeLevelBlocked
+                                         ; compares with it (looks like the leader's current level)
 !Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);
                                          ; blocks the pause/menu paths and Field_DpadDispatch when
@@ -535,6 +537,8 @@ if !ram_engine_inc == 0
                                          ; draw; bits 0-6 count finished Obj_BuildFrame* passes (INC
                                          ; per pass); $80 = SprTile records up to date.
                                          ; Obj_ResetStates zeroes it for every location object
+!Obj_Unk1B01 = $1B01                     ; 8-bit per object (the odd byte next to Obj_State); bit 0
+                                         ; set: the object blocks the leader (Map_ProbeHitsObj)
 !Obj_Unk1C00 = $1C00                     ; 8-bit per object; Evt_RunObjInit sets 7 after the init
                                          ; function; Evt_StartTargetFunc1 needs it >= 2, saves
                                          ; Obj_ScriptPos in the ObjX_Unk7F0580 table of that level
@@ -644,6 +648,19 @@ if !ram_engine_inc == 0
 !Map_TileHiBits = $7E30C0               ; per map tile, same index as Map_TileProps: bit 0 is bit 8
                                          ; of the layer-1 metatile number, bit 1 of layer 2's
                                          ; (Map_WriteRow1/2, Map_WriteCol1/2)
+!Map_TileAttrA = $7E7000                 ; one byte per map tile, index as Map_TileProps (masked
+                                         ; with Map_ColMask1/RowMask1): bits 0-1 push direction (0
+                                         ; up, 1 down, 2 left, 3 right), bits 2-3 push speed (0 none),
+                                         ; bit 4 starts a tile animation when it is the tile one row
+                                         ; ahead of the leader's new position, bit 6
+                                         ; OAM priority for Obj_PrioLow (Map_ProbeTileLevel,
+                                         ; Map_StepTileEffects; "push" inferred from Map_Unk1D2A/1D2B
+                                         ; being the per-frame base step)
+!Map_TileAttrB = $7E7040                 ; as Map_TileAttrA: bits 0-1 / 3-4 the level of the tile's
+                                         ; half A / half B, bit 2 / bit 5 their "no level" bits, bit 6
+                                         ; OAM priority for Obj_PrioHigh (Map_ProbeTileLevel)
+!Map_TileExitIdx = $7E7080               ; as Map_TileAttrA: bit 7 clear = the tile is an exit,
+                                         ; record (value) of the location's ExitRom list
 !Map_Meta12TL = $7EB000                 ; metatile table of layers 1 and 2: 8 bytes per 16x16
                                          ; metatile (index = number x 8), four tilemap words;
                                          ; this one the top-left 8x8 tile (inferred from which
@@ -903,6 +920,62 @@ if !ram_engine_inc == 0
 !Map_StepCount = $1D66                   ; 8-bit loop counter of the Map_Scroll* steppers (pixels
                                          ; left to step); a scratch byte, other unmatched code
                                          ; uses $1D66 as a 16-bit value
+; --- Map_Unk8A6D and its tile / object probes ($1D04, $1D2F-$1D34, $1D52-$1D73 as their
+;     scratch; most of these bytes have other names at other times, see above) ---
+!Map_ExitRec0 = $1D04                    ; 16-bit ExitRom offset of the current location's exit
+                                         ; record 0 (Map_TileExitIdx values x 7 are added to it in
+                                         ; Map_StepTileEffects). Setter not matched
+!Map_Unk1D2EHi = $1D2F                   ; 8-bit high byte that makes Map_Unk1D2E a 16-bit signed
+                                         ; step: Map_Unk8A6D sets it to $00 / $FF by the step's sign
+                                         ; before its 16-bit adds (16-bit stores of Map_Unk1D2E also
+                                         ; clear it)
+!Map_Unk1D30Hi = $1D31                   ; 8-bit; as Map_Unk1D2EHi for Map_Unk1D30
+!Map_Unk1D34 = $1D34                     ; 8-bit; Map_StepTileEffects stores Map_ProbeMoveFlags here
+                                         ; for every step it commits (bit 2: a shape-$1E tile, bit 3:
+                                         ; a pushing tile); readers not traced
+!Map_PushSpeed = $1D52                   ; alias of Map_StepTestN: 8-bit scratch of
+                                         ; Map_StepTileEffects, the push amount ($08/$10/$20)
+!Map_ExitScratch = $1D52                 ; alias of Map_StepTestN: 8-bit; Map_StepTileEffects keeps
+                                         ; ExitRom.DestHiFacing here while it splits it
+!Map_SlopeTest = $1D54                   ; alias of Map_StepTestN2: 8-bit scratch of
+                                         ; Map_ProbeTileLevel, the probe's side of a shape's line
+!Map_ProbeFracY4 = $1D56                 ; 8-bit; Map_ProbeTileLevel: the low byte of Map_ProbeY / 4
+                                         ; (the probe's height inside its tile, 0-63)
+!Map_ProbeHiBits = $1D58                 ; alias of Map_BuildCol: 8-bit Map_TileHiBits of the probed
+                                         ; tile (Map_ProbeTileAttrs); bits 2-7 are its shape number
+!Map_ProbeAttrA = $1D5A                  ; alias of Map_BuildRow: 8-bit Map_TileAttrA of the probed
+                                         ; tile
+!Map_ProbeAttrB = $1D5C                  ; alias of Map_BuildLen: 8-bit Map_TileAttrB of the probed
+                                         ; tile
+!Map_ProbeMoveFlags = $1D5E              ; alias of Map_RowsLeft: 8-bit; Map_ProbeTileLevel sets it to
+                                         ; 0, or Map_ProbeShape1E for a shape-$1E tile;
+                                         ; Map_StepTileEffects adds Map_ProbePushing
+!Map_ProbeShape = $1D60                  ; 8-bit; Map_ProbeTileLevel: shape number - 2 (left 0 for
+                                         ; shapes 0 and 1)
+!Map_LeaderX = $1D62                     ; 16-bit; Map_Unk8A6D's copy of the leader's Obj_PosX (the
+                                         ; same bytes as Map_SpanCol at another time)
+!Map_LeaderY = $1D64                     ; 16-bit; as Map_LeaderX for Obj_PosY (Map_SpanRow)
+!Map_ProbeX = $1D66                      ; 16-bit Obj_PosX-style X of the point being tested (an edge
+                                         ; of the leader's box plus the step); Map_StepTileEffects
+                                         ; leaves the leader's new X here (Map_StepCount's bytes)
+!Map_ProbeTileX = $1D67                  ; 8-bit high byte of Map_ProbeX: its map column
+!Map_ProbeY = $1D68                      ; 16-bit; as Map_ProbeX for Y
+!Map_ProbeTileY = $1D69                  ; 8-bit high byte of Map_ProbeY: its map row
+!Map_ProbeLevel = $1D6A                  ; alias of Map_SpanLen3: 8-bit level of the probed half
+                                         ; tile (0-3; Map_ProbeLevelBlocked; inferred from how it is
+                                         ; compared with Field_Unk55)
+!Map_ProbeNoLevel = $1D6C                ; alias of Map_SpanLen1: 8-bit, nonzero when the half tile's
+                                         ; "no level" bit is set (Map_TileAttrB bit 2 / bit 5)
+!Map_ProbePrio = $1D6E                   ; alias of Map_SpanLen2: 8-bit OAM priority bits for the
+                                         ; leader's Obj_PrioLow ($20 or $30, from Map_TileAttrA bit 6)
+!Map_ProbePrioHi = $1D6F                 ; 8-bit; as Map_ProbePrio for Obj_PrioHigh (Map_TileAttrB
+                                         ; bit 6)
+!Map_DestX = $1D70                       ; 16-bit; Map_StepTileEffects: the leader's new X
+                                         ; (Map_LeaderX + the X step)
+!Map_DestTileX = $1D71                   ; 8-bit high byte of Map_DestX: its map column
+!Map_NextRowY = $1D72                    ; 16-bit; Map_StepTileEffects: the leader's new Y one tile
+                                         ; further on (up for a negative Y step, else down)
+!Map_NextRowTileY = $1D73                ; 8-bit high byte of Map_NextRowY: its map row
 !Map_EdgeRowYInc = $1D74                 ; 8-bit; bit 0/1/2: layer 1/2/3 crossed an 8-pixel row
                                          ; boundary with its Y scroll rising this frame (set by the
                                          ; Map_Scroll*YInc steppers); Map_EdgeRowsYInc then runs that
@@ -1014,6 +1087,19 @@ struct SprTileSrc $7F4800
     .Tile: skip 1        ; OAM tile number
     .Attr: skip 1        ; OAM attributes (vhppccct)
 endstruct align 8
+
+; One exit record in ROM bank $E5 (7 bytes; Map_StepTileEffects reaches record n of the
+; location at Map_ExitRec0 + n*7, n from Map_TileExitIdx). "Exit" rests on what the code does:
+; it fills Loc_DestId/DestX/DestFacing and requests SceneFlag_Warp.
+struct ExitRom $E50000
+    .TileX: skip 1       ; map column the record belongs to
+    .TileY: skip 1       ; map row
+    .Unk2: skip 1        ; not read by Map_StepTileEffects
+    .DestLo: skip 1      ; Loc_DestId low byte
+    .DestHiFacing: skip 1 ; bit 0: Loc_DestId bit 8; bits 1-4: facing; bit 7: Loc_DestFacing bit 7
+    .DestX: skip 1       ; Loc_DestX (destination tile X)
+    .DestY: skip 1       ; Loc_DestX+1 (destination tile Y)
+endstruct
 
 ; One treasure record in ROM bank $F5 (4 bytes; Field_CheckTileInFront reaches record n of
 ; the location at Map_TreasureLocRecs + n*4). "Treasure" rests on what the code gives: an item

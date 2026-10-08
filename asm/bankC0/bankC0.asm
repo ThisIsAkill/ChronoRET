@@ -9533,6 +9533,1054 @@ Field_DpadUpLeft:
     STA.b !Map_Unk1D30-!DP_Map
     RTS
 
+; ============================================================
+; Leader collision ($C0:8A6D–$C0:9174 and $C0:9923–$C0:99DD,
+; $C0:9AA1–$C0:9DC2)
+; Map_Unk8A6D tests the frame's step (Map_Unk1D2E X, Map_Unk1D30 Y,
+; in Obj_PosX/Y units, 1/256 tile) against the leader's box: X from
+; -$70 to +$70 around Obj_PosX, Y from -$70 to 0 above Obj_PosY. Its
+; probes are Map_ProbeHitsObj (other objects), Map_ProbeTileAttrs,
+; Map_ProbeTileLevel and Map_ProbeLevelBlocked (the map tile under one
+; point); Map_StepTileEffects commits a step. All run with DP =
+; !DP_Map ($1D00) and DB=$00.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:8A6D — Map_Unk8A6D (1800 bytes, $8A6D–$9174)
+; Probably the leader's collision with the map and with other objects
+; (inferred: it zeroes the parts of the step whose moved box would have
+; a corner on a blocking tile or touch a blocking object, and the steps
+; it keeps are the ones Map_Unk9175 and the layer scroll then use).
+; Picks a path by the signs of the two steps (both zero: nothing). Each
+; path sign-extends the steps into Map_Unk1D2EHi / Map_Unk1D30Hi, copies
+; the leader's Obj_PosX/Y into Map_LeaderX/Y, and first asks
+; Map_ProbeHitsObj about the leading corner (the leading edge's middle
+; for a straight step, at mid-height Y-$40 for a sideways one); a hit
+; zeroes the step(s) and returns. Then it tests the corners of the moved
+; box with .test_probe:
+; - straight step: both corners of the leading edge. Both free: commit.
+;   One blocked, the other free: slide by $10 on the other axis, away
+;   from the blocked corner (written into that step), and test both
+;   corners again with the slide added; by what still blocks it commits
+;   both steps, keeps only the slide (when a corner moved by the slide
+;   alone is free) or stops (see the comments at each block). A
+;   treasure tile under the first corner tested (under either, for a
+;   vertical step) stops the step at once.
+; - diagonal step: see the comment at .up_right.
+; "Commit" is Map_StepTileEffects (JSR or BRL to it), which also writes
+; the frame's push into Map_Unk1D2A/1D2B. Where a step is cut its high
+; byte ends up zero too (16-bit stores, or on the .up/.down object-hit
+; paths 8-bit STZ with Map_Unk1D30Hi cleared or already zero).
+; Callers: Field_FrameUpdate ($C0:8847), its only JSR site.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+; (Obj_PosX/Y and the field page are read absolute).
+; Exit: M=1, X=1 or X=0 (Map_ProbeHitsObj and a treasure probe return
+; 16-bit X; Field_FrameUpdate sets X=0 after the call anyway), DP and DB
+; unchanged; Map_Unk1D2E/1D30 (and their Hi bytes) hold the steps kept;
+; A, X, Y clobbered; Map_LeaderX/Y,
+; Map_ProbeX/Y and the probe scratch ($1D52-$1D6F) overwritten;
+; Field_UnkEB may hold a touched object (Map_ProbeHitsObj); a commit
+; changes what Map_StepTileEffects says.
+; ------------------------------------------------------------
+org $C08A6D
+Map_Unk8A6D:
+    LDA.b !Map_Unk1D30-!DP_Map
+    BEQ .y_zero
+    BMI .y_neg
+    LDA.b !Map_Unk1D2E-!DP_Map
+    BEQ .to_down
+    BMI .to_down_left
+    BRL .down_right
+.to_down_left:
+    BRL .down_left
+.to_down:
+    BRL .down
+.y_zero:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    BEQ .no_step
+    BMI .to_left
+    BRL .right
+.to_left:
+    BRL .left
+.no_step:
+    RTS
+.y_neg:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    BEQ .to_up
+    BMI .to_up_left
+    BRL .up_right
+.to_up_left:
+    BRL .up_left
+.to_up:
+    BRL .up
+; Tile test of the point Map_ProbeX/Y (entered with M=0): A = the
+; probe's map row << 8 | column. C=0: free. C=1 with Z=0 (A =
+; Map_ProbeIsChest): a treasure tile; C=1 with Z=1: the half tile under
+; the probe blocks (Map_ProbeLevelBlocked). Returns M=1.
+.test_probe:
+    LDA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    LDA.b !Map_ProbeTileX-!DP_Map
+    JSR Map_ProbeTileAttrs
+    BCC .probe_level
+    LDA.b #!Map_ProbeIsChest            ; Z=0: a treasure tile
+    RTS
+.probe_level:
+    JSR Map_ProbeTileLevel
+    JSR Map_ProbeLevelBlocked
+    LDA.b #!Map_ProbeIsTile             ; Z=1 (C from Map_ProbeLevelBlocked)
+    RTS
+; X step only, rightwards: objects at the right edge, mid-height; then
+; the tiles under both right corners (.side_tiles, shared with .left).
+.right:
+    STZ.b !Map_Unk1D2EHi-!DP_Map
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxMidY
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .side_tiles
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+; Bottom (foot) corner first, then the top one; both free: commit.
+.side_tiles:
+    REP #$20
+    LDA.b !Map_LeaderY-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .side_foot_blocked
+    REP #$20
+    LDA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .side_slide_down
+    JSR Map_StepTileEffects
+    RTS
+; Foot corner blocked: stop on a treasure; else, if the top corner is
+; free, try sliding up around the corner.
+.side_foot_blocked:
+    BNE .side_stop_x
+    REP #$20
+    LDA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_slide_up
+.side_stop_x:
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+; Y step -$10: test the foot corner moved up.
+.side_slide_up:
+    REP #$20
+    LDA.w #!Map_StepNeg16
+    STA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b !Map_LeaderY-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_up_head
+    BRA .side_up_only
+; Quirk: never taken; .test_probe returns Z=1 with C=0, and this is
+; only reached with C=0. Kept from the original.
+.side_up_head:
+    BNE .side_stop_x
+    REP #$20
+    LDA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_up_commit
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.side_up_commit:
+    BRL Map_StepTileEffects
+; Foot free, top corner blocked (a treasure is not told apart here):
+; Y step +$10, test the foot corner moved down.
+.side_slide_down:
+    REP #$20
+    LDA.w #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b !Map_LeaderY-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_down_head
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.side_down_commit:
+    BRL Map_StepTileEffects
+.side_down_head:
+    REP #$20
+    LDA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_down_commit
+    BRA .side_down_only
+; The moved-up foot is blocked too: drop the X step and test the top
+; corner straight up (at the leader's own right / left edge).
+.side_up_only:
+    REP #$20
+    LDA.b !Map_ProbeX-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_up_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.side_up_only_commit:
+    BRL Map_StepTileEffects
+; The moved-down top is blocked: drop the X step and move straight down
+; if the foot corner allows it.
+.side_down_only:
+    REP #$20
+    LDA.b !Map_ProbeX-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .side_down_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.side_down_only_commit:
+    BRL Map_StepTileEffects
+; X step only, leftwards: as .right with the left edge.
+.left:
+    LDA.b #!Map_StepHiNeg
+    STA.b !Map_Unk1D2EHi-!DP_Map
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxMidY
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .left_tiles
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.left_tiles:
+    BRL .side_tiles
+; Y step only, upwards: objects at the top middle of the box, then the
+; tiles under both top corners (left first). One corner blocked, the
+; other free: slide $10 sideways away from the blocked corner, as in
+; .side_tiles; a treasure under either corner stops the step.
+.up:
+    LDA.b #!Map_StepHiNeg
+    STA.b !Map_Unk1D30Hi-!DP_Map
+    STZ.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .up_tiles
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    RTS
+.up_tiles:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .up_left_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .up_right_blocked
+    BRL Map_StepTileEffects
+.up_left_blocked:
+    BNE .up_stop_y
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_slide_right
+.up_stop_y:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.up_slide_right:
+    REP #$20
+    LDA.w #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_right_edge
+    BRA .up_right_only
+.up_right_edge:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_commit_diag_r
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.up_commit_diag_r:
+    BRL Map_StepTileEffects
+.up_right_blocked:
+    BNE .up_stop_y
+    REP #$20
+    LDA.w #!Map_StepNeg16
+    STA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_LeaderX-!DP_Map
+    ADC.w #!Map_BoxHalfW          ; no CLC: the carry from the add above (set when LeaderX >= $10) lands it 1 unit further right (quirk, kept)
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_left_edge
+    BRA .up_left_only
+.up_left_edge:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_commit_diag_l
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.up_commit_diag_l:
+    BRL Map_StepTileEffects
+; The moved box's left corner is blocked too: drop the Y step and move
+; straight right if the right corner allows it.
+.up_right_only:
+    REP #$20
+    LDA.b !Map_ProbeY-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_right_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.up_right_only_commit:
+    BRL Map_StepTileEffects
+; As .up_right_only, moving straight left.
+.up_left_only:
+    REP #$20
+    LDA.b !Map_ProbeY-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .up_left_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.up_left_only_commit:
+    BRL Map_StepTileEffects
+; Y step only, downwards: as .up with the box's bottom edge (the
+; leader's Y itself); its own copy of the corner tests.
+.down:
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    STZ.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .down_tiles
+    STZ.b !Map_Unk1D30-!DP_Map
+    RTS
+.down_tiles:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dn_left_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dn_right_blocked
+    BRL Map_StepTileEffects
+.dn_left_blocked:
+    BNE .dn_stop_y
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_slide_right
+.dn_stop_y:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.dn_slide_right:
+    REP #$20
+    LDA.w #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_right_edge
+    BRA .dn_right_only
+.dn_right_edge:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_commit_diag_r
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.dn_commit_diag_r:
+    BRL Map_StepTileEffects
+.dn_right_blocked:
+    BNE .dn_stop_y
+    REP #$20
+    LDA.w #!Map_StepNeg16
+    STA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b !Map_LeaderX-!DP_Map
+    ADC.w #!Map_BoxHalfW          ; no CLC: the carry from the add above (set when LeaderX >= $10) lands it 1 unit further right (quirk, kept)
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_left_edge
+    BRA .dn_left_only
+.dn_left_edge:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_commit_diag_l
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.dn_commit_diag_l:
+    BRL Map_StepTileEffects
+.dn_right_only:
+    REP #$20
+    LDA.b !Map_ProbeY-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_right_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dn_right_only_commit:
+    BRL Map_StepTileEffects
+.dn_left_only:
+    REP #$20
+    LDA.b !Map_ProbeY-!DP_Map
+    SEC
+    SBC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCC .dn_left_only_commit
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dn_left_only_commit:
+    BRL Map_StepTileEffects
+; Diagonal steps test three corners of the moved box: the leading one,
+; then the other corner of the leading Y edge, then the other corner of
+; the leading X edge. All free: commit. Second blocked: keep only the
+; X step if the third is free (and redo as the straight step), else stop
+; both. Second free, third blocked: keep only the Y step and redo as
+; the straight step. Leading blocked but both others free: stop both.
+.up_right:
+    LDA.b #!Map_StepHiNeg
+    STA.b !Map_Unk1D30Hi-!DP_Map
+    STZ.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .ur_tiles
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.ur_tiles:
+    REP #$20
+    JSR .test_probe
+    BCS .ur_corner_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .ur_top_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .ur_keep_y
+    BRL Map_StepTileEffects
+.ur_corner_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .ur_top_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .ur_keep_y
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.ur_keep_y:
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    BRL .up
+.ur_top_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .ur_keep_x
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.ur_keep_x:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    BRL .right
+; Quirk: the first two bottom-left probes below add the X step right after
+; SBC with no CLC, so they land 1 unit (1/256 tile) further right (the one
+; in .ul_top_blocked has its CLC); kept.
+.up_left:
+    LDA.b #!Map_StepHiNeg
+    STA.b !Map_Unk1D30Hi-!DP_Map
+    STA.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .ul_tiles
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.ul_tiles:
+    REP #$20
+    JSR .test_probe
+    BCS .ul_corner_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .ul_top_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .ul_keep_y
+    BRL Map_StepTileEffects
+.ul_corner_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .ul_top_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .ul_keep_y
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.ul_keep_y:
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    BRL .up
+.ul_top_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .ul_keep_x
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.ul_keep_x:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    BRL .left
+; Quirk: the first two top-left probes below add the X step with no CLC
+; after SBC (1 unit further right); kept.
+.down_left:
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    LDA.b #!Map_StepHiNeg
+    STA.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .dl_tiles
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dl_tiles:
+    REP #$20
+    JSR .test_probe
+    BCS .dl_corner_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dl_bottom_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .dl_commit
+    BRL .dl_keep_y
+.dl_commit:
+    BRL Map_StepTileEffects
+.dl_corner_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dl_bottom_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .dl_keep_y
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.dl_bottom_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .dl_keep_x
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dl_keep_y:
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    BRL .down
+.dl_keep_x:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    BRL .left
+; Quirk: the bottom-left probes below add the X step with no CLC after
+; SBC (1 unit further right); kept.
+.down_right:
+    STZ.b !Map_Unk1D30Hi-!DP_Map
+    STZ.b !Map_Unk1D2EHi-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.w !Obj_PosY,X
+    STA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    JSR Map_ProbeHitsObj
+    BCC .dr_tiles
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dr_tiles:
+    REP #$20
+    JSR .test_probe
+    BCS .dr_corner_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dr_bottom_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .dr_commit
+    BRL .dr_keep_y
+.dr_commit:
+    BRL Map_StepTileEffects
+.dr_corner_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    JSR .test_probe
+    BCS .dr_bottom_blocked
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCS .dr_keep_y
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.dr_bottom_blocked:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.w #!Map_BoxHalfW
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.w #!Map_BoxHeight
+    STA.b !Map_ProbeY-!DP_Map
+    JSR .test_probe
+    BCC .dr_keep_x
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    RTS
+.dr_keep_y:
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    SEP #$20
+    BRL .down
+.dr_keep_x:
+    REP #$20
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    BRL .right
+
 ; ------------------------------------------------------------
 ; $C0:9175 — Map_Unk9175 (55 bytes, $9175–$91AB)
 ; Field_FrameUpdate's step after the D-pad: zeroes Map_Unk1D32/1D33,
@@ -11143,6 +12191,132 @@ Map_EdgeRowsYDecHalf:
     RTS
 
 ; ------------------------------------------------------------
+; $C0:9923 — Map_ProbeHitsObj (187 bytes, $9923–$99DD)
+; Map_Unk8A6D's object test of the point Map_ProbeX/Y. Walks the object
+; slots from Evt_ObjCount x 2 down to 2 (slot 0 is never tested), as
+; Field_FindObjInFront does, skipping a slot whose Obj_Unk0F00 is 0,
+; whose Obj_Unk1100 has bit 7 set, or that holds one of the three party
+; members. The first one (highest slot) whose Obj_PosX and Obj_PosY are
+; both less than Map_ObjNear ($E0) from the probe is touched: its slot
+; goes to Field_UnkEB, and C=1 when its Obj_Unk1B01 bit 0 is set (it
+; blocks), C=0 when not. No object touched: Field_UnkEB = $80
+; (Field_UnkEBInit), C=0.
+; Quirks (kept): the
+; Y difference is taken with SBC and no SEC (the carry left by the CPX
+; before it), and the X difference with the carry the CMP left (clear),
+; so both can come out 1 smaller. The 16-bit store at the start also
+; zeroes $01EC.
+; Callers (8 JSR sites in Map_Unk8A6D): $C0:8AD8, $C0:8BEA, $C0:8C1B,
+;   $C0:8D2D, $C0:8E49, $C0:8F1A, $C0:8FE6 and $C0:90BF.
+; On entry: M=1 (8-bit A), X=1 or X=0 (set to 8-bit inside), DP=$1D00
+; (!DP_Map), DB=$00 (Field_UnkEB and the object tables are reached
+; absolute).
+; Exit: M=1, X=0 (16-bit), DP and DB unchanged; C as above; X = the
+; touched slot, or 0; A clobbered.
+; ------------------------------------------------------------
+org $C09923
+Map_ProbeHitsObj:
+    REP #$20
+    LDA.w #!Field_UnkEBInit
+    STA.w !DP_Field+!Field_UnkEB    ; 16-bit: $01EC = 0 as well
+    SEP #$30
+    LDA.l !Evt_ObjCount
+    ASL A
+    TAX                             ; last slot (count x 2), 8-bit X
+.next_slot:
+    LDA.w !Obj_Unk0F00,X
+    BNE .candidate
+.skip:
+    DEX
+    DEX
+    BNE .next_slot
+    LDA.b #!Field_UnkEBInit
+    STA.w !DP_Field+!Field_UnkEB    ; nothing touched
+    REP #$10
+    CLC
+    RTS
+.candidate:
+    LDA.w !Obj_Unk1100,X
+    BMI .skip
+    CPX.w !DP_Field+!Party_ObjSlot
+    BEQ .skip
+    CPX.w !DP_Field+!Party_ObjSlot1
+    BEQ .skip
+    CPX.w !DP_Field+!Party_ObjSlot2
+    BEQ .skip
+    LDA.w !Obj_Unk1B01,X
+    BIT.b #!Obj_Unk1B01Solid
+    BEQ .soft
+    STX.w !DP_Field+!Field_UnkEB
+    REP #$20
+    LDA.w !Obj_PosY,X
+    SBC.b !Map_ProbeY-!DP_Map       ; no SEC (quirk)
+    BPL .solid_dy_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    CMP.w #!Map_ObjNear
+    BCS .far
+.solid_dx:
+    LDA.w !Obj_PosX,X
+    SBC.b !Map_ProbeX-!DP_Map       ; C=0 from the CMP: 1 extra (quirk)
+    BPL .solid_dx_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    CMP.w #!Map_ObjNear
+    BCS .far
+    SEP #$20
+    REP #$10
+    SEC                             ; touched and blocking
+    RTS
+.solid_dy_pos:
+    CMP.w #!Map_ObjNear
+    BCS .far
+    BRA .solid_dx
+.solid_dx_pos:
+    CMP.w #!Map_ObjNear
+    BCS .far
+    SEP #$20
+    REP #$10
+    SEC
+    RTS
+.far:
+    SEP #$20
+    BRA .skip
+.soft:
+    STX.w !DP_Field+!Field_UnkEB
+    REP #$20
+    LDA.w !Obj_PosY,X
+    SBC.b !Map_ProbeY-!DP_Map       ; no SEC (quirk)
+    BPL .soft_dy_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    CMP.w #!Map_ObjNear
+    BCS .far
+.soft_dx:
+    LDA.w !Obj_PosX,X
+    SBC.b !Map_ProbeX-!DP_Map
+    BPL .soft_dx_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    CMP.w #!Map_ObjNear
+    BCS .far
+    SEP #$20
+    REP #$10
+    CLC                             ; touched, not blocking
+    RTS
+.soft_dy_pos:
+    CMP.w #!Map_ObjNear
+    BCS .far
+    BRA .soft_dx
+.soft_dx_pos:
+    CMP.w #!Map_ObjNear
+    BCS .far
+    SEP #$20
+    REP #$10
+    CLC
+    RTS
+
+; ------------------------------------------------------------
 ; $C0:99DE — Map_Unk99DE (65 bytes, $99DE–$9A1E)
 ; Field_FrameUpdate's step after Map_Unk9175: may drop the frame's
 ; steps in Map_Unk1D2E (X) and Map_Unk1D30 (Y). For a nonzero step, n =
@@ -11348,6 +12522,549 @@ Map_StepStopLeft:
     RTS
 .keep:
     CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9AA1 — Map_ProbeTileAttrs (39 bytes, $9AA1–$9AC7)
+; Reads the map bytes of one tile for the collision probes. A (16-bit
+; value: B = map row, A = column) is masked with Map_ColMask1 /
+; Map_RowMask1 (one 16-bit AND) into the index X. A tile that holds
+; treasure (Map_TreasureIdx bit 7 clear) blocks: C=1 at once. Otherwise
+; (Map_ProbeTileAttrs_Load, also reached from Map_ProbeTileAttrsAny)
+; Map_TileHiBits, Map_TileAttrA and Map_TileAttrB of the tile go to
+; Map_ProbeHiBits, Map_ProbeAttrA and Map_ProbeAttrB, and C=0.
+; Callers: Map_Unk8A6D ($C0:8AA4, in its .test_probe), its only JSR site.
+; On entry: M=1 (8-bit A), X either (set to 16-bit inside), DP=$1D00
+; (!DP_Map), DB any (long operands); A = row << 8 | column.
+; Exit: M=1, DP and DB unchanged. C=1: X=0 (16-bit X holding the tile
+; index), nothing read. C=0:
+; X=1 (8-bit), X = the index's low byte; A = Map_ProbeAttrB.
+; ------------------------------------------------------------
+org $C09AA1
+Map_ProbeTileAttrs:
+    REP #$10
+    REP #$20
+    AND.b !Map_ColMask1-!DP_Map     ; 16-bit: Map_RowMask1 masks the row
+    SEP #$20
+    TAX
+    LDA.l !Map_TreasureIdx,X
+    BMI Map_ProbeTileAttrs_Load
+    SEC                             ; a treasure tile blocks
+    RTS
+Map_ProbeTileAttrs_Load:            ; header: see Map_ProbeTileAttrs
+    LDA.l !Map_TileHiBits,X
+    STA.b !Map_ProbeHiBits-!DP_Map
+    LDA.l !Map_TileAttrA,X
+    STA.b !Map_ProbeAttrA-!DP_Map
+    LDA.l !Map_TileAttrB,X
+    STA.b !Map_ProbeAttrB-!DP_Map
+    SEP #$10
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9AC8 — Map_ProbeTileAttrsAny (11 bytes, $9AC8–$9AD2)
+; As Map_ProbeTileAttrs without the treasure test: always reads the
+; three bytes (branches into Map_ProbeTileAttrs_Load) and returns C=0.
+; Callers (2 JSR sites): Map_StepTileEffects ($C0:9C8D) and unmatched
+;   code at $C0:9DEA.
+; On entry: M=1 (8-bit A), X either, DP=$1D00 (!DP_Map), DB any; A = row
+; << 8 | column (16-bit value).
+; Exit: M=1, X=1 (8-bit), DP and DB unchanged; X = the index's low byte;
+; A = Map_ProbeAttrB; C=0.
+; ------------------------------------------------------------
+Map_ProbeTileAttrsAny:
+    REP #$10
+    REP #$20
+    AND.b !Map_ColMask1-!DP_Map     ; 16-bit: Map_RowMask1 masks the row
+    SEP #$20
+    TAX
+    BRA Map_ProbeTileAttrs_Load
+
+; ------------------------------------------------------------
+; $C0:9AD3 — Map_ProbeTileLevel (290 bytes, $9AD3–$9BF4; tables to $9C36)
+; Decides which half of the probed tile the point Map_ProbeX/Y is in and
+; loads that half's level. The shape number is Map_ProbeHiBits bits 2-7:
+; - 0: half A; 1: half B (the whole tile either way);
+; - 2-$17: Map_ProbeShape = shape - 2 indexes three 22-byte tables:
+;   t = (Map_ProbeX low byte >> Map_SlopeShift bits 0-6, inverted when
+;   bit 7 is set) + Map_SlopeBase - Map_ProbeFracY4 (the Y fraction / 4);
+;   half A when t has the sign Map_SlopeSide gives ($00 positive, $FF
+;   negative), else half B (inferred: a sloped line through the tile);
+; - $18-$1D: half B in one half or quarter of the tile (MapShape_LeftB ...
+;   MapShape_TopLeftB, by bit 7 of the X / Y fractions), else half A;
+; - $1E: half A; Map_ProbeMoveFlags = Map_ProbeShape1E, and a nonzero
+;   Map_Unk1D30 is cut to Map_StepPos / Map_StepNeg (its sign kept);
+; - $1F-$3F: half A.
+; Half A: Map_ProbeLevel = Map_ProbeAttrB bits 0-1, Map_ProbeNoLevel =
+; bit 2. Half B: Map_ProbeLevel = bits 3-4 (shifted down), Map_ProbeNoLevel
+; = bit 5. Both: Map_ProbePrio / Map_ProbePrioHi = Oam_Prio2 plus $10
+; when bit 6 of Map_ProbeAttrA / Map_ProbeAttrB is set (OAM priority 2
+; or 3, for the leader's Obj_PrioLow / Obj_PrioHigh).
+; Callers (3 JSR sites): Map_Unk8A6D ($C0:8AAC, in its .test_probe),
+;   Map_StepTileEffects ($C0:9C90) and unmatched code at $C0:9DF5.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the table index and shift
+; count), DP=$1D00 (!DP_Map), DB any (tables read long); Map_ProbeHiBits,
+; Map_ProbeAttrA/B and Map_ProbeX/Y set.
+; Exit: M=1, X=1, DP and DB unchanged; A, X, Y clobbered; Map_ProbeMoveFlags,
+; Map_ProbeShape, Map_ProbeFracY4, Map_SlopeTest, Map_ProbeLevel,
+; Map_ProbeNoLevel and Map_ProbePrio/PrioHi written; Map_Unk1D30 may be
+; cut.
+; ------------------------------------------------------------
+Map_ProbeTileLevel:
+    STZ.b !Map_ProbeMoveFlags-!DP_Map
+    STZ.b !Map_ProbeShape-!DP_Map
+    STZ.b !Map_ProbeLevel-!DP_Map
+    STZ.b !Map_ProbeNoLevel-!DP_Map
+    STZ.b !Map_ProbePrio-!DP_Map
+    LDA.b !Map_ProbeY-!DP_Map
+    LSR A
+    LSR A
+    STA.b !Map_ProbeFracY4-!DP_Map
+    LDA.b !Map_ProbeHiBits-!DP_Map
+    AND.b #!Map_ShapeMask
+    LSR A
+    LSR A                           ; shape number
+    BEQ .half_a
+    DEC A
+    BEQ .half_b
+    DEC A
+    STA.b !Map_ProbeShape-!DP_Map
+    CMP.b #!Map_ShapeTables
+    BCC .sloped
+    BRL .split
+.sloped:
+    TAX
+    LDA.l Map_SlopeShift,X
+    BMI .sloped_inverted
+    TAY
+    LDA.b !Map_ProbeX-!DP_Map
+.shift:
+    LSR A
+    DEY
+    BNE .shift
+    STA.b !Map_SlopeTest-!DP_Map
+    LDA.l Map_SlopeBase,X
+    CLC
+    ADC.b !Map_SlopeTest-!DP_Map
+    SEC
+    SBC.b !Map_ProbeFracY4-!DP_Map
+    STA.b !Map_SlopeTest-!DP_Map
+    LDA.l Map_SlopeSide,X
+    EOR.b !Map_SlopeTest-!DP_Map
+    BPL .half_a                     ; same sign as Map_SlopeSide
+    BRA .half_b
+.sloped_inverted:
+    AND.b #!Map_SlopeShiftMask
+    TAY
+    LDA.b !Map_ProbeX-!DP_Map
+.shift_inv:
+    LSR A
+    DEY
+    BNE .shift_inv
+    EOR.b #!Eng_Invert8
+    STA.b !Map_SlopeTest-!DP_Map
+    LDA.l Map_SlopeBase,X
+    CLC
+    ADC.b !Map_SlopeTest-!DP_Map
+    SEC
+    SBC.b !Map_ProbeFracY4-!DP_Map
+    STA.b !Map_SlopeTest-!DP_Map
+    LDA.l Map_SlopeSide,X
+    EOR.b !Map_SlopeTest-!DP_Map
+    BPL .half_a
+    BRA .half_b
+.half_a:
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    AND.b #!TileAttrB_LevelA
+    STA.b !Map_ProbeLevel-!DP_Map
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    AND.b #!TileAttrB_NoLevelA
+    STA.b !Map_ProbeNoLevel-!DP_Map
+    LDA.b !Map_ProbeAttrA-!DP_Map
+    LSR A
+    LSR A
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!Oam_Prio2
+    STA.b !Map_ProbePrio-!DP_Map
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    LSR A
+    LSR A
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!Oam_Prio2
+    STA.b !Map_ProbePrioHi-!DP_Map
+    RTS
+.half_b:
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    AND.b #!TileAttrB_LevelB
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_ProbeLevel-!DP_Map
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    AND.b #!TileAttrB_NoLevelB
+    STA.b !Map_ProbeNoLevel-!DP_Map
+    LDA.b !Map_ProbeAttrA-!DP_Map
+    LSR A
+    LSR A
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!Oam_Prio2
+    STA.b !Map_ProbePrio-!DP_Map
+    LDA.b !Map_ProbeAttrB-!DP_Map
+    LSR A
+    LSR A
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!Oam_Prio2
+    STA.b !Map_ProbePrioHi-!DP_Map
+    RTS
+.split:
+    BEQ .left_b                     ; Z from the CMP: MapShape_LeftB
+    CMP.b #!MapShape_TopB
+    BEQ .top_b
+    CMP.b #!MapShape_BottomLeftB
+    BEQ .bottom_left_b
+    CMP.b #!MapShape_BottomRightB
+    BEQ .bottom_right_b
+    CMP.b #!MapShape_TopRightB
+    BEQ .top_right_b
+    CMP.b #!MapShape_TopLeftB
+    BEQ .top_left_b
+    CMP.b #!MapShape_Unk1E
+    BEQ .shape_1e
+    BRA .half_a
+.left_b:
+    LDA.b !Map_ProbeX-!DP_Map
+    BPL .half_b
+    BRL .half_a
+.top_b:
+    LDA.b !Map_ProbeY-!DP_Map
+    BPL .half_b
+    BRL .half_a
+.top_left_b:
+    LDA.b !Map_ProbeX-!DP_Map
+    BPL .top_test
+    BRL .half_a
+.top_test:
+    LDA.b !Map_ProbeY-!DP_Map
+    BPL .to_half_b
+    BRL .half_a
+.to_half_b:
+    BRL .half_b
+.top_right_b:
+    LDA.b !Map_ProbeX-!DP_Map
+    BMI .top_test
+    BRL .half_a
+.bottom_left_b:
+    LDA.b !Map_ProbeX-!DP_Map
+    BPL .bottom_test
+    BRL .half_a
+.bottom_test:
+    LDA.b !Map_ProbeY-!DP_Map
+    BMI .to_half_b
+    BRL .half_a
+.bottom_right_b:
+    LDA.b !Map_ProbeX-!DP_Map
+    BMI .bottom_test
+    BRL .half_a
+.shape_1e:
+    LDA.b #!Map_ProbeShape1E
+    STA.b !Map_ProbeMoveFlags-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    BEQ .shape_1e_done
+    BMI .shape_1e_up
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    BRL .half_a
+.shape_1e_up:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D30-!DP_Map
+.shape_1e_done:
+    BRL .half_a
+
+; Map_SlopeShift / Map_SlopeBase / Map_SlopeSide: Map_ProbeTileLevel's
+; line for shapes 2-$17, indexed by Map_ProbeShape (shape - 2). Shift:
+; bits 0-6 how far the X fraction is shifted right (1-3), bit 7 set:
+; inverted after the shift. Base: added. Side: the sign that means half A.
+Map_SlopeShift:
+    db $82,$02,$02,$82,$81,$01,$01,$81,$83,$03,$03,$83
+    db $81,$01,$01,$81,$83,$03,$03,$83,$82,$02
+Map_SlopeBase:
+    db $3D,$03,$03,$3D,$7D,$03,$C3,$3D,$3E,$23,$03,$1D
+    db $3D,$C3,$03,$7D,$1E,$03,$23,$3D,$3D,$03
+Map_SlopeSide:
+    db $00,$00,$FF,$FF,$00,$00,$FF,$FF,$00,$00,$FF,$FF
+    db $00,$00,$FF,$FF,$00,$00,$FF,$FF,$00,$00
+
+; ------------------------------------------------------------
+; $C0:9C37 — Map_ProbeLevelBlocked (37 bytes, $9C37–$9C5B)
+; Whether the half tile Map_ProbeTileLevel picked blocks the leader,
+; against Field_Unk55 (looks like the level the leader stands on):
+; - Map_ProbeNoLevel set: blocks only when Field_Unk55 is
+;   Map_LevelAny (3);
+; - else Map_ProbeLevel 0 blocks; level 3, the same level as
+;   Field_Unk55, or Field_Unk55 = 3 lets the leader through; any other
+;   level blocks.
+; Callers (2 JSR sites): Map_Unk8A6D ($C0:8AAF, in its .test_probe) and
+;   Map_StepTileEffects ($C0:9C93).
+; On entry: M=1 (8-bit A), X either, DP=$1D00 (!DP_Map), DB=$00
+; (Field_Unk55 is read absolute).
+; Exit: M=1, X, DP and DB unchanged; C=1: blocked, C=0: free; A
+; clobbered.
+; ------------------------------------------------------------
+Map_ProbeLevelBlocked:
+    LDA.b !Map_ProbeNoLevel-!DP_Map
+    BNE .no_level
+    LDA.b !Map_ProbeLevel-!DP_Map
+    BEQ .blocked
+    CMP.b #!Map_LevelAny
+    BEQ .free
+    CMP.w !DP_Field+!Field_Unk55
+    BEQ .free
+    LDA.w !DP_Field+!Field_Unk55
+    CMP.b #!Map_LevelAny
+    BEQ .free
+.blocked:
+    SEC
+    RTS
+.free:
+    CLC
+    RTS
+.no_level:
+    LDA.w !DP_Field+!Field_Unk55
+    CMP.b #!Map_LevelAny
+    BEQ .blocked
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9C5C — Map_StepTileEffects (359 bytes, $9C5C–$9DC2)
+; Map_Unk8A6D's commit of a step it has kept. The leader's new point
+; is Map_LeaderX/Y plus Map_Unk1D2E/1D30 (to Map_ProbeX/Y, and the X to
+; Map_DestX); Map_NextRowY is that Y one tile further on (minus $100 for
+; an upward step, else plus $100). Then:
+; - the new point's tile (Map_ProbeTileAttrsAny, Map_ProbeTileLevel,
+;   Map_ProbeLevelBlocked) blocks: zero both steps and return;
+; - unless a warp is already requested (Field_SceneFlags bit 7): when
+;   the tile's Map_TileExitIdx has bit 7 clear, ExitRom record (value)
+;   of the location (Map_ExitRec0 + value x 7, multiplied on the CPU's
+;   WRMPYA/WRMPYB) is checked: its TileX is the probe's column and its
+;   TileY less than Map_ExitRowRange from the probe's row, or its TileY
+;   is the probe's row. Then Loc_DestId (DestLo and DestHiFacing bit 0),
+;   Loc_DestX/Y and Loc_DestFacing (DestHiFacing bits 1-4, plus its bit
+;   7) are set and SceneFlag_Warp is requested (inferred: an exit tile);
+; - the tile at Map_DestX's column and Map_NextRowY's row: when its
+;   Map_TileAttrA has bit 4 set, its index goes to Field_TileAnimX/Y and
+;   SceneFlag_TileAnim is requested;
+; - unless Map_ProbeNoLevel: Field_Unk55 = Map_ProbeLevel, and the
+;   leader's Obj_PrioLow / Obj_PrioHigh = Map_ProbePrio / PrioHi;
+; - Map_Unk1D34 = Map_ProbeMoveFlags, plus Map_ProbePushing when the new
+;   tile's Map_ProbeAttrA bits 2-3 are nonzero. Those pick a push of
+;   $08 / $10 / $20 that goes into Map_Unk1D2A or Map_Unk1D2B (copied
+;   into the step every frame by Map_ResetUnk1D2E) by bits 0-1: 0 up,
+;   1 down, 2 left, 3 right; the other one is zeroed. Bits 2-3 zero
+;   zero both.
+; Quirks (kept): with a warp already requested the exit test is skipped
+; with 8-bit X still set, so the TAX for the bit-4 tile keeps only the
+; column (row 0 is read) and STX writes only Field_TileAnimX. The index
+; built at .no_exit is never used: .anim_tile overwrites A at once.
+; Callers (19 sites, all in Map_Unk8A6D: a JSR at $C0:8AFE and 18 BRL
+;   tail jumps such as $C0:8B4A).
+; On entry: M either (set to 16-bit inside), X either, DP=$1D00
+; (!DP_Map), DB=$00 (the field page, Obj_Prio*, WRMPYA/RDMPYL absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A, X, Y clobbered; besides the
+; above, Map_ProbeX/Y, Map_DestX, Map_NextRowY, Map_PushSpeed (or
+; Map_ExitScratch, the same byte) and the
+; probe bytes written.
+; ------------------------------------------------------------
+Map_StepTileEffects:
+    REP #$20
+    LDA.b !Map_LeaderX-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_ProbeX-!DP_Map
+    STA.b !Map_DestX-!DP_Map
+    LDA.b !Map_LeaderY-!DP_Map
+    CLC
+    ADC.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_ProbeY-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    BIT.w #!Map_StepSign16
+    BEQ .next_row_down
+    LDA.b !Map_ProbeY-!DP_Map
+    SEC
+    SBC.w #!Map_RowStride
+    STA.b !Map_NextRowY-!DP_Map
+    BRA .test_tile
+.next_row_down:
+    LDA.b !Map_ProbeY-!DP_Map
+    CLC
+    ADC.w #!Map_RowStride
+    STA.b !Map_NextRowY-!DP_Map
+.test_tile:
+    LDA.b !Map_ProbeY-!DP_Map
+    SEP #$20
+    LDA.b !Map_ProbeTileX-!DP_Map   ; A = row << 8 | column
+    JSR Map_ProbeTileAttrsAny
+    JSR Map_ProbeTileLevel
+    JSR Map_ProbeLevelBlocked
+    BCC .free
+    REP #$20
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    SEP #$20
+    RTS
+.free:
+    LDA.w !DP_Field+!Field_SceneFlags
+    BIT.b #!SceneFlag_Warp
+    BEQ .exit_test
+    BRL .no_exit                    ; X still 8-bit here (quirk)
+.exit_test:
+    LDA.b !Map_ProbeTileY-!DP_Map
+    AND.b !Map_RowMask1-!DP_Map
+    XBA
+    LDA.b !Map_ProbeTileX-!DP_Map
+    AND.b !Map_ColMask1-!DP_Map
+    REP #$10
+    TAX
+    LDA.l !Map_TileExitIdx,X
+    BMI .anim_tile
+    STA.w WRMPYA
+    LDA.b #!Map_ExitRecSize
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP                             ; wait for the product
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.b !Map_ExitRec0-!DP_Map
+    TAX
+    SEP #$20
+    LDA.l ExitRom.TileX,X
+    CMP.b !Map_ProbeTileX-!DP_Map
+    BEQ .same_column
+    LDA.l ExitRom.TileY,X
+    CMP.b !Map_ProbeTileY-!DP_Map
+    BEQ .take_exit
+    BRA .no_exit
+.same_column:
+    LDA.l ExitRom.TileY,X
+    SEC
+    SBC.b !Map_ProbeTileY-!DP_Map
+    BPL .row_distance
+    EOR.b #!Eng_Invert8
+    INC A
+.row_distance:
+    CMP.b #!Map_ExitRowRange
+    BCS .no_exit
+.take_exit:
+    LDA.l ExitRom.DestHiFacing,X
+    STA.b !Map_ExitScratch-!DP_Map
+    LSR A
+    AND.b #!Exit_FacingMask
+    STA.w !DP_Field+!Loc_DestFacing
+    LDA.b !Map_ExitScratch-!DP_Map
+    AND.b #!Exit_FacingBit7
+    TSB.w !DP_Field+!Loc_DestFacing
+    LDA.b !Map_ExitScratch-!DP_Map
+    AND.b #!Exit_DestHiBit
+    STA.w !DP_Field+!Loc_DestId+1
+    LDA.l ExitRom.DestLo,X
+    STA.w !DP_Field+!Loc_DestId
+    LDA.l ExitRom.DestX,X
+    STA.w !DP_Field+!Loc_DestX
+    LDA.l ExitRom.DestY,X
+    STA.w !DP_Field+!Loc_DestX+1
+    LDA.w !DP_Field+!Field_SceneFlags
+    ORA.b #!SceneFlag_Warp
+    STA.w !DP_Field+!Field_SceneFlags
+.no_exit:
+    LDA.b !Map_ProbeTileY-!DP_Map   ; unused: .anim_tile reloads A (quirk)
+    AND.b !Map_RowMask1-!DP_Map
+    XBA
+    LDA.b !Map_ProbeTileX-!DP_Map
+    AND.b !Map_ColMask1-!DP_Map
+.anim_tile:
+    LDA.b !Map_NextRowTileY-!DP_Map
+    AND.b !Map_RowMask1-!DP_Map
+    XBA
+    LDA.b !Map_DestTileX-!DP_Map
+    AND.b !Map_ColMask1-!DP_Map
+    TAX
+    LDA.l !Map_TileAttrA,X
+    BIT.b #!TileAttrA_AnimNear
+    BEQ .level
+    STX.w !DP_Field+!Field_TileAnimX ; 16-bit X: Field_TileAnimY too
+    LDA.w !DP_Field+!Field_SceneFlags
+    ORA.b #!SceneFlag_TileAnim
+    STA.w !DP_Field+!Field_SceneFlags
+.level:
+    SEP #$10
+    LDA.b !Map_ProbeNoLevel-!DP_Map
+    BNE .push
+    LDA.b !Map_ProbeLevel-!DP_Map
+    STA.w !DP_Field+!Field_Unk55
+    LDX.w !DP_Field+!Party_ObjSlot
+    LDA.b !Map_ProbePrio-!DP_Map
+    STA.w !Obj_PrioLow,X
+    LDA.b !Map_ProbePrioHi-!DP_Map
+    STA.w !Obj_PrioHigh,X
+.push:
+    LDA.b !Map_ProbeMoveFlags-!DP_Map
+    STA.b !Map_Unk1D34-!DP_Map
+    LDA.b !Map_ProbeAttrA-!DP_Map
+    AND.b #!TileAttrA_PushSpeed
+    BEQ .no_push
+    CMP.b #!TileAttrA_PushSlow
+    BEQ .slow
+    CMP.b #!TileAttrA_PushMid
+    BEQ .mid
+    LDA.b #!Map_PushFast
+    STA.b !Map_PushSpeed-!DP_Map
+    BRA .direction
+.slow:
+    LDA.b #!Map_PushSlow
+    STA.b !Map_PushSpeed-!DP_Map
+    BRA .direction
+.mid:
+    LDA.b #!Map_PushMid
+    STA.b !Map_PushSpeed-!DP_Map
+.direction:
+    LDA.b #!Map_ProbePushing
+    TSB.b !Map_Unk1D34-!DP_Map
+    LDA.b !Map_ProbeAttrA-!DP_Map
+    AND.b #!TileAttrA_PushDir
+    BEQ .push_up
+    DEC A
+    BEQ .push_down
+    DEC A
+    BEQ .push_left
+    LDA.b !Map_PushSpeed-!DP_Map    ; 3: right
+    STA.b !Map_Unk1D2A-!DP_Map
+    STZ.b !Map_Unk1D2B-!DP_Map
+    RTS
+.push_left:
+    LDA.b #$00
+    SEC
+    SBC.b !Map_PushSpeed-!DP_Map
+    STA.b !Map_Unk1D2A-!DP_Map
+    STZ.b !Map_Unk1D2B-!DP_Map
+    RTS
+.push_down:
+    LDA.b !Map_PushSpeed-!DP_Map
+    STA.b !Map_Unk1D2B-!DP_Map
+    STZ.b !Map_Unk1D2A-!DP_Map
+    RTS
+.push_up:
+    LDA.b #$00
+    SEC
+    SBC.b !Map_PushSpeed-!DP_Map
+    STA.b !Map_Unk1D2B-!DP_Map
+    STZ.b !Map_Unk1D2A-!DP_Map
+    RTS
+.no_push:
+    STZ.b !Map_Unk1D2A-!DP_Map
+    STZ.b !Map_Unk1D2B-!DP_Map
     RTS
 
 ; ============================================================
