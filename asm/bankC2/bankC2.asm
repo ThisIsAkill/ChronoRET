@@ -15280,8 +15280,8 @@ org $C28000
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
 ;   Field_RunBankC2Mode5 ($C0:19CE) and C2Scene_Mode5 ($C2:2552).
-; Callers of BankC2_Entry8002 (5 JSL sites): C2Scene_NmiHandler ($C2:031B) and unmatched ($C0:EC15,
-;   $C1:EE27, $CD:091A, $CD:09C6).
+; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), C2Scene_NmiHandler ($C2:031B)
+;   and unmatched ($C1:EE27, $CD:091A, $CD:09C6).
 ; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Scene_PostLoadInit ($C0:56CF) and
 ;   unmatched ($C0:3807, $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
 ;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92, $FF:FB98).
