@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 56844,
+  "emitted_bytes": 59633,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 607,
-      "bytes": 56844
+      "functions": 618,
+      "bytes": 59633
     },
     "readable": {
-      "functions": 607,
-      "bytes": 56844
+      "functions": 618,
+      "bytes": 59633
     },
     "verified": {
-      "functions": 607,
-      "bytes": 56844
+      "functions": 618,
+      "bytes": 59633
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 29223,
+      "emitted_bytes": 32012,
       "matched": {
-        "functions": 246,
-        "bytes": 29223
+        "functions": 257,
+        "bytes": 32012
       },
       "readable": {
-        "functions": 246,
-        "bytes": 29223
+        "functions": 257,
+        "bytes": 32012
       },
       "verified": {
-        "functions": 246,
-        "bytes": 29223
+        "functions": 257,
+        "bytes": 32012
       }
     },
     {
@@ -303,7 +303,7 @@
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 1684,
+      "emitted_bytes": 3111,
       "functions": [
         "Bg_RowSpan64x32",
         "Bg_RowSpan64x32Addr",
@@ -338,14 +338,15 @@
         "Field_DpadDownRight",
         "Field_DpadDownLeft",
         "Field_DpadUpRight",
-        "Field_DpadUpLeft"
+        "Field_DpadUpLeft",
+        "Map_Unk8A6D"
       ]
     },
     {
       "bank": "$C0",
       "start": "$C0:9000",
       "end": "$C0:9FFF",
-      "emitted_bytes": 2161,
+      "emitted_bytes": 3523,
       "functions": [
         "Map_Unk9175",
         "Map_Unk91AC",
@@ -374,11 +375,21 @@
         "Map_EdgeRowsYIncHalf",
         "Map_EdgeRowsYDec",
         "Map_EdgeRowsYDecHalf",
+        "Map_ProbeHitsObj",
         "Map_Unk99DE",
         "Map_StepStopDown",
         "Map_StepStopUp",
         "Map_StepStopRight",
-        "Map_StepStopLeft"
+        "Map_StepStopLeft",
+        "Map_ProbeTileAttrs",
+        "Map_ProbeTileAttrs_Load",
+        "Map_ProbeTileAttrsAny",
+        "Map_ProbeTileLevel",
+        "Map_SlopeShift",
+        "Map_SlopeBase",
+        "Map_SlopeSide",
+        "Map_ProbeLevelBlocked",
+        "Map_StepTileEffects"
       ]
     },
     {

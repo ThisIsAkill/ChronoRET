@@ -64,12 +64,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_BuildRow*`/`Map_BuildCol*` ($C0:8243–$C0:8444); and the whole block before them,
    $C0:75E9–$C0:8242: the redraws `Field_BuildC800Mode1/2/4`, the six row / column writers
    `Map_WriteRow1/2/3`, `Map_WriteCol1/2/3`, the `Map_UploadBuf*` VRAM uploads ($C0:7F58),
-   `LocLoad_ClearPage1D00`, `Sub_C07F9A` and its four `Bg_*Span64x32` helpers. Next, in reach
-   order: `Map_Unk8A6D`
-   ($C0:8A6D–$C0:9174, 1,800 B in one piece; Field_FrameUpdate runs it when
-   Field_Unk20 is set; it copies the leader's Obj_PosX/Y into $1D62–$1D68, may zero the
-   camera steps Map_Unk1D2E/1D30, and calls `$C0:9923`, `$C0:9AA1`, `$C0:9AD3`, `$C0:9C37`, `$C0:9C5C`, all unmatched; $C0:8A9E–$C0:8AB4
-   is reached only by JSR from inside it); the NMI side that reads `Map_EdgeVram*` /
+   `LocLoad_ClearPage1D00`, `Sub_C07F9A` and its four `Bg_*Span64x32` helpers. Also done: the leader collision `Map_Unk8A6D` ($C0:8A6D–$C0:9174) with its
+   probes `Map_ProbeHitsObj` ($C0:9923), `Map_ProbeTileAttrs`/`Map_ProbeTileAttrsAny`,
+   `Map_ProbeTileLevel` (+ the `Map_Slope*` tables), `Map_ProbeLevelBlocked` and the commit
+   `Map_StepTileEffects` ($C0:9AA1–$C0:9DC2). Field_FrameUpdate's header still says
+   Map_Unk8A6D is unmatched and could name it better once its review is redone. Next, in reach
+   order: the sibling at `$C0:9DC3` (reached by BRL from `$C0:5926`; it calls
+   `Map_ProbeTileAttrsAny` at `$C0:9DEA` and `Map_ProbeTileLevel` at `$C0:9DF5`, probably the
+   same tile effects for another object); who reads `Map_Unk1D34` and who sets
+   `Map_ExitRec0` ($1D04) and the `Map_TileAttrA/B` / `Map_TileExitIdx` planes ($7E:7000-$70BF);
+   the NMI side that reads `Map_EdgeVram*` /
    `Map_EdgeSize*` and the `Map_Built*` bits (then `Sub_C07F9A` can take a real name; it is
    left `Sub_` because Map_Unk93E1 branches to it by that name); the callers of the uploads
    (`$C0:0A80`–`$C0:0AF4`, the NMI at `$C0:EAE1`–`$C0:EB5E`), `Field_Unk74D4/74E8/74F7` and
