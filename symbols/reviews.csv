@@ -38,3 +38,141 @@ $C0:FF30,ScrollWaveA,2026-10-08,independent session 3,approved,c6cbab686ed4,"Rea
 $C0:FF70,ScrollWaveB,2026-10-08,independent session 3,approved,4a7da0a8b51b,"'A's second period' now matches the FD readers: X<=$3E plus offsets <=$3C reach entry 61 of 64; no other C0/FD reader found. Bytes equal A"
 $C0:FFE0,RomVectors,2026-10-08,independent session 3,approved,7411a2f15cbb,"All slots match ROM. $FFFA note correct: NMITIMEN=0 after reset, only SEI/CLC/XCE run in E mode; no SEC;XCE found in C0-C3/FD code"
 $FD:C000,MainInit,2026-10-08,independent session 3,changes,1f7f1e8a0da4,"OBSEL rename right; step-4 register list matches ROM. But 'Non-zero values: ...the fixed color's green/blue' is false: COLDATA=$C0 sets G/B to 0 (as line 179 says). Reword"
+$C1:10E3,BattleMenu_RefreshIfDirtyL,2026-10-08,independent session c1-42ce269,approved,d935d35fdc5f,Names and header match the code; JSL vector entry and RTL explained.
+$C1:10FA,BattleMenu_RefreshIfDirtyAndTick,2026-10-08,independent session c1-42ce269,approved,e03f2ee6ee7e,"Accurate; same gate as the L twin plus BattleSys_FrameTickVec, RTS."
+$C1:1115,BattleMenu_DrawCursorSprites,2026-10-08,independent session c1-42ce269,approved,839d819d206c,"OAM struct use, $F1/$AA constants verified against attr/high-table bit layouts and ROM $CCF604. Nit: also called from UpdateCursorOverlay (tech single cursor)."
+$C1:1153,BattleMenu_ProcessInput,2026-10-08,independent session c1-42ce269,approved,a4531738ad96,"Dispatch and pad constants match; MenuTimeHold/CfgBattleMode copy is described, meaning hedged in ram_battle.inc."
+$C1:11E1,BattleMenu_CycleActivePcPrev,2026-10-08,independent session c1-42ce269,changes,6680fedbdbc5,"""Plays the cursor sound"" asserts what Battle_StopSfx calls unsettled; .default_row restores Pc_SavedMenuRow (rename .restore_saved_row); CfgCursorMemory vs ""unreachable"" unexplained"
+$C1:1218,BattleMenu_CycleActivePcNext,2026-10-08,independent session c1-42ce269,changes,a540f0b5c667,"Same as Prev: .default_row label is wrong (path restores the old PC's Pc_SavedMenuRow), rename e.g. .restore_saved_row."
+$C1:1250,BattleMenu_CursorUp,2026-10-08,independent session c1-42ce269,approved,9cf2b69020ea,Accurate.
+$C1:1264,BattleMenu_CursorDown,2026-10-08,independent session c1-42ce269,approved,b157ea8e58b5,Accurate.
+$C1:179C,Battle_ZeroResultEE,2026-10-08,independent session c1-42ce269,changes,d4da510714e8,"Name is wrong: it clears !Battle_PadEdgeButtons/!Battle_PadEdgeDpad, not a ""result"", and embeds a DP address. Rename e.g. Battle_ClearPadEdges (and the comments citing it)."
+$C1:1B19,BattleMenu_EnqueueReadyBattler,2026-10-08,independent session c1-42ce269,approved,f688eae2b844,"BattleCmd.State bit 7, CmdOffset 0/7/14 (ROM $CCFAF0 checked), queue append and Sfx_TurnReady (hedged) all accurate."
+$C1:1B55,Battle_StopSfx,2026-10-08,independent session c1-42ce269,changes,1303622ecc15,"Name asserts ""Stop"" while its header says beep-vs-stop is not settled and callers call it the cursor sound. Use a neutral name, e.g. Battle_PlaySfx0, until established."
+$C1:127B,BattleMenu_ConfirmCommand,2026-10-08,independent session c1-42ce269,approved,b5a85d167251,"Accurate; UnkA0D7 kept Unk, $FF written as CacheInvalid fits its compare-with-target use in BuildStatusBarFrame."
+$C1:129C,BattleMenu_ChooseAttack,2026-10-08,independent session c1-42ce269,approved,0e67b2d254f7,"Accurate (header omits the TargetMoved INC, minor)."
+$C1:12BC,BattleMenu_OpenTechList,2026-10-08,independent session c1-42ce269,approved,2dd9a037bd9e,"Accurate; Lock bit, SubmenuTech for both Submenu and CmdMenu documented."
+$C1:12ED,BattleMenu_OpenItemList,2026-10-08,independent session c1-42ce269,approved,be86b56a6695,Accurate.
+$C1:1B67,BattleMenu_DequeueReadyBattler,2026-10-08,independent session c1-42ce269,changes,8a5f56d7dbd1,"""harmless in practice"" is unproven: with 3 queued, the shift leaves [c,c,c,c] and after Len hits 0 the head is still c, so c would be dequeued again. Hedge or prove."
+$C1:1BAA,BattleMenu_RemoveBattlerFromReady,2026-10-08,independent session c1-42ce269,changes,000e4498299a,"Unflagged quirk: .removing_active_pc stores ReturnSubmenu-1 into !BattleMenu_Submenu, then .clear_targeting STZs it at once (dead store). Say so in a comment."
+$C1:1561,BattleMenu_TargetSelectInput,2026-10-08,independent session c1-42ce269,changes,c44a89f13631,"Header: ""($115B6-$115C7)"" and ""$15E8"" should be $C115B6-$C115C7 and .poll_input ($C115E8); ""item-graphic copy loop"" should be ""item box frame copy loop""."
+$C1:161A,BattleMenu_CommitAction,2026-10-08,independent session c1-42ce269,approved,773630a71b5b,"Corrected Partners/ActionId sources, 7-byte BattleCmd and State bits verified; DP role aliases are accurate."
+$C1:174E,BattleMenu_ConsumePartnerSlot,2026-10-08,independent session c1-42ce269,approved,0fc7c2b64242,Accurate.
+$C1:176C,BattleMenu_TargetNext,2026-10-08,independent session c1-42ce269,approved,1520bd8f8ca9,Accurate.
+$C1:1786,BattleMenu_TargetPrev,2026-10-08,independent session c1-42ce269,approved,9d1581f02093,Accurate; fall-through into Battle_ZeroResultEE explained.
+$C1:1320,BattleMenu_TechListInput,2026-10-08,independent session c1-42ce269,approved,f4a33d0e4599,Accurate.
+$C1:1369,BattleMenu_TechConfirm,2026-10-08,independent session c1-42ce269,approved,1d1b76620ad4,Accurate.
+$C1:138F,BattleMenu_TechListCancel,2026-10-08,independent session c1-42ce269,approved,0266a40ba395,Accurate.
+$C1:13AD,BattleMenu_TechListPrev,2026-10-08,independent session c1-42ce269,approved,e4b26826ce97,"Accurate (label .no_wrap means ""no scroll""; minor)."
+$C1:13F4,BattleMenu_TechListNext,2026-10-08,independent session c1-42ce269,approved,ad94d6052ff5,Accurate.
+$C1:143D,BattleMenu_ItemListInput,2026-10-08,independent session c1-42ce269,approved,967b71c1b4ca,Accurate.
+$C1:1498,BattleMenu_ItemConfirm,2026-10-08,independent session c1-42ce269,approved,5c7616786862,Item_BattleList fields and *5 record size accurate.
+$C1:14DB,BattleMenu_ItemListCancel,2026-10-08,independent session c1-42ce269,changes,7a64abc98bd9,"Header ""Callees: Battle_ZeroResultEE"" omits BattleMenu_LoadCommandWindowMap, which it JSRs first."
+$C1:14EC,BattleMenu_ItemCursorUp,2026-10-08,independent session c1-42ce269,approved,7376a34687a7,Accurate.
+$C1:1502,BattleMenu_ItemCursorDown,2026-10-08,independent session c1-42ce269,approved,6c5817eb0f1a,Accurate.
+$C1:151C,BattleMenu_ItemListPageDown,2026-10-08,independent session c1-42ce269,changes,dc9e45f83c8c,"""pattern already seen elsewhere in this bank (e.g. Sub_1BA7 in bank $C0)"" contradicts itself; ""Sets the scroll position and index"" - it sets ItemScroll and ListScroll."
+$C1:1537,BattleMenu_ItemListPageUp,2026-10-08,independent session c1-42ce269,approved,095d48289e5a,Accurate.
+$C1:154B,BattleMenu_ItemListRefresh,2026-10-08,independent session c1-42ce269,approved,53a318471704,Accurate.
+$C1:17A1,BattleMenu_ItemListScrollUp,2026-10-08,independent session c1-42ce269,approved,5ffa538a73e4,Accurate; unreachable second BEQ documented.
+$C1:17B1,BattleMenu_ItemListScrollUp_SetScroll,2026-10-08,independent session c1-42ce269,approved,06672cd2c585,Accurate.
+$C1:17B3,BattleMenu_ItemListScrollUp_RenderTail,2026-10-08,independent session c1-42ce269,approved,f325bfe623ce,Accurate.
+$C1:17B6,BattleMenu_ItemListScrollUp_SkipRender,2026-10-08,independent session c1-42ce269,approved,eb342fca8940,Accurate.
+$C1:17BF,BattleMenu_ItemListScrollDown,2026-10-08,independent session c1-42ce269,approved,ae3f94528b01,Accurate.
+$C1:17D1,BattleMenu_ItemListScrollDown_RenderTail,2026-10-08,independent session c1-42ce269,approved,1cb83529e976,Accurate.
+$C1:17D4,BattleMenu_ItemListScrollDown_SkipRender,2026-10-08,independent session c1-42ce269,approved,8fd52349042c,Accurate.
+$C1:17DD,BattleMenu_UpdateCursorOverlay,2026-10-08,independent session c1-42ce269,changes,1509fe91a1cd,"Labels contradict comments: .ally_target ""(despite the label, an enemy)"", rename .panel_with_hp; .*_marker_* is an info-panel message; .blink_* kept though ""blink"" is unconfirmed"
+$C1:0089,Battle_Mul8,2026-10-08,independent session c1-97ed239,approved,491cac6d448f,"Names, widths and CPU notes match the code (RDMPYL product, TDC zeroes A on exit)."
+$C1:00A7,Battle_MulAccum,2026-10-08,independent session c1-97ed239,changes,41219e69bddd,"Header itself says the name is wrong (8x16->24 multiply, nothing accumulated): rename Battle_MulAccum to e.g. Battle_Mul8x16 rather than keep a known-false name."
+$C1:00D7,Battle_Divide,2026-10-08,independent session c1-97ed239,approved,639a2a1b5ac4,"Accurate: RDDIVL quotient, RDMPYL remainder, DivBusy bracket; mirrors named."
+$C1:010D,Battle_ShiftLeft7,2026-10-08,independent session c1-97ed239,changes,bb2d214c96cb,"Shifts by 8 not 7 (4+1+3 ASL; caller says A<<=8): rename Battle_ShiftLeft8, fix ""; A <<= 7"". Banner ""All routines operate on M=1"" is false: callers use M=0."
+$C1:0111,Battle_ShiftLeft4,2026-10-08,independent session c1-97ed239,approved,77e03f9cac8b,"4 ASL, correct. (Shared banner M=1 claim is wrong; fix tracked on ShiftLeft7.)"
+$C1:0112,Battle_ShiftLeft3,2026-10-08,independent session c1-97ed239,approved,fe9eb52af7ca,"3 ASL, correct."
+$C1:0116,Loc_C10116,2026-10-08,independent session c1-97ed239,changes,73e069287465,"Address label for a real entry (A >>= 8, 2+6 LSR): rename Battle_ShiftRight8 to match the chain."
+$C1:0118,Battle_ShiftRight6,2026-10-08,independent session c1-97ed239,approved,91b05803d8eb,"6 LSR, correct."
+$C1:0119,Battle_ShiftRight5,2026-10-08,independent session c1-97ed239,approved,d4172c45304d,"5 LSR, correct."
+$C1:011A,Battle_ShiftRight4,2026-10-08,independent session c1-97ed239,approved,d022f8f89c7c,"4 LSR, correct."
+$C1:011B,Battle_ShiftRight3,2026-10-08,independent session c1-97ed239,approved,26c7786bd957,"3 LSR, correct."
+$C1:011F,BattleMsg_FormatNumberDigits,2026-10-08,independent session c1-97ed239,approved,faffd844d304,Matches code; DigitTiles $CCF903 = $73-$7C and GlyphZero $73 checked in ROM; .w immediates justified.
+$C1:0174,Battle_DivTen9499,2026-10-08,independent session c1-97ed239,changes,66a2809eed34,"Name is an address plus a wrong verb (header: formats two digits, no division by 9499): rename e.g. BattleMsg_FormatTwoDigits."
+$C1:01A9,BattleMsg_ReencodeTextBuffer,2026-10-08,independent session c1-97ed239,changes,a77bd18a0258,"""first/second accent set"" stated as fact; 41 + 10 codes match JP dakuten/handakuten kana counts: hedge as inferred. Exit omits DB=$7E set by MVN."
+$C1:01F9,Battle_SinLookup,2026-10-08,independent session c1-97ed239,changes,c727d310265b,"ROM $C0F900 is a 1024-entry 1-byte |sin| table (peak $FF at +$100), not ""512 entries x 2 B""/""low byte of each 2-byte entry""; same in ram/constants comments. .first_quadrant = first half."
+$C1:0222,Calc_Delta16,2026-10-08,independent session c1-97ed239,changes,9170c794a164,"Name says delta, routine returns an angle: rename e.g. Battle_CalcAngle. Local labels .d8_negative/.da_negative_q1/.da_negative_q3 are DP addresses; .da_negative_q1 is commented Q4."
+$C1:0299,BattleUI_BuildStatusBarFrame,2026-10-08,independent session c1-97ed239,changes,ee10d8f3505f,"No TP: $5D/$5E at cols 25/30 cap the ATB gauge (cols 26-29). Fix ""2 = HP/MP/TP + gauge"", ""Layout 2: HP + MP + TP""; layouts 1/2 differ by name side. LowHp: = MaxHP/8 needs A110."
+$C1:0305,BattleUI_DrawPcNamePanel,2026-10-08,independent session c1-97ed239,changes,752cdd05da8e,"""name + HP/MP/TP"", .tp_gauge, ""no TP / ATB gauge"", !BattleUI_TileTpBarL/R, !BattleUI_TpOffsetL1/L2: these are ATB gauge end caps; rename (GaugeCapL/R). .dest_5A is an offset label."
+$C1:04C5,BattleUI_NextNamePanel,2026-10-08,independent session c1-97ed239,approved,31787cef250a,"Loop tail, enemy lines (11+gap+11 of 24 B) and ready-PC tail match code; callee names it uses are flagged on those rows."
+$C1:05A7,BattleUI_UpdateNextPcPanel,2026-10-08,independent session c1-97ed239,changes,c2c52f54c06b,.tp_gauges should be .atb_gauges (no TP); .check_a110 is an address label; jumps to misnamed UpdateNpc_exit. HpCell/MpCell offsets checked against ROM: correct.
+$C1:06DB,Battle_DrawHpBars,2026-10-08,independent session c1-97ed239,changes,b0e5870dae8f,"Draws the ATB gauges (DrawSlotGaugeBar per present PC), not HP bars: rename e.g. BattleUI_DrawAtbGauges."
+$C1:06EF,UpdateNpc_exit,2026-10-08,independent session c1-97ed239,changes,9ff8c3dea8b6,Nothing NPC here; shared RTS of UpdateNextPcPanel/DrawHpBars: rename e.g. BattleUI_UpdateNextPcPanel_Exit.
+$C1:06F0,BattleUI_DrawSlotGaugeBar,2026-10-08,independent session c1-97ed239,changes,7e6d21636150,"Quotient is 256 when AtbCur=AtbMax: units 0-32, not 0-31 / ""(0-255)"". Drop ""the earlier header called"" history. TileGauge0/8 comments assert graphics header says unchecked. Exit omits $79-$7B."
+$C1:0785,BattleSys_SlotPanelRefresh,2026-10-08,independent session c1-97ed239,changes,d054570c4843,"ROM tables are command lists: $CCFA41 = Attack/Tech/Item, $CCFA6B = Attack/Comb(o)/Item (a0 cd cd e8, b3 be bc c1 vs a2 c8 c6 bb). PanelEmpty/Ready, ""panel"" names wrong."
+$C1:081E,BattleMenu_DrawReadyWindowEdges,2026-10-08,independent session c1-97ed239,changes,619594a2cb56,"Draws whole 7x6 command-window frames ($D159FC: corners f0/f3/f8/fb, borders, fill), right variant drops the left border column: ""edge strip""/EdgeRight/EdgeCol* misnamed."
+$C1:0872,BattleUI_ClearActivePanelColumn,2026-10-08,independent session c1-97ed239,approved,e4c2eea52432,"Matches code: clears cursor columns, draws $60-$63 cursor via MenuCursorCell (0/$80/$100 checked in ROM)."
+$C1:08E8,BattleUI_SetPanelAttrColumn,2026-10-08,independent session c1-97ed239,changes,ee4edbd1d68c,"Offsets ($1B/$9B/$11B, $29/$A9/$129) are each PC name block (2 rows above/at PanelDest): it highlights the PC name in palette 2. Rename routine + AttrColumn tables."
+$C1:0929,BattleMenu_DrawWindowEdgeStrip,2026-10-08,independent session c1-97ed239,changes,dd0809c05dbb,"Copies a full 6-row window frame (top/bottom borders, fill), optionally without its left border column; not an ""edge strip"". Rename routine, EdgeBytesLeft/Right, WindowEdges."
+$C1:104E,BattleMsg_BlankLeadingZeros,2026-10-08,independent session c1-97ed239,approved,35d2cbb0e94c,Matches code; GlyphZero/TileBlank named; ones digit never blanked.
+$C1:1F79,BattleMenu_BuildTargetList,2026-10-08,independent session c1-99969f3,changes,370003c6724c,"Header ""(with the panel refresh held)"" is wrong: UpdateNextPcPanel treats non-zero $A09A as force-digit-refresh (never gauge-only). Rename !BattleUI_PanelHold and fix header."
+$C1:1FDD,BattleTgt_RunAreaQuery,2026-10-08,independent session c1-99969f3,approved,d5414d1313f6,Service 7 at $C1005F -> $1FDD verified in ROM.
+$C1:1FEA,BattleTgt_AreaTable,2026-10-08,independent session c1-99969f3,approved,416781e91cd3,"Names, constants and comments match the code."
+$C1:1FF8,BattleTgt_ModeTable,2026-10-08,independent session c1-99969f3,approved,73c7adf577db,"Table matches header. Nit: !BattleTgt_Result is ""negative"" (BuildTargetList stores $FF), not only $80."
+$C1:203A,BattleTgt_SingleAlly,2026-10-08,independent session c1-99969f3,approved,a80552553b02,Eligibility description correct; KoFlag confirmed by $C1:2FCB (set from BattlerStats.Status bit 7).
+$C1:2045,BattleTgt_CollectValidTargets,2026-10-08,independent session c1-99969f3,approved,96ac25da6792,"Names, constants and comments match the code."
+$C1:209A,BattleTgt_AllAllies,2026-10-08,independent session c1-99969f3,approved,bb0a039a9fb1,"Names, constants and comments match the code."
+$C1:20A9,BattleTgt_SingleEnemy,2026-10-08,independent session c1-99969f3,approved,d7b0832a91ce,"Names, constants and comments match the code."
+$C1:20B6,BattleTgt_AllEnemies,2026-10-08,independent session c1-99969f3,approved,4068114a1e2c,"Names, constants and comments match the code."
+$C1:20C6,BattleTgt_Everyone,2026-10-08,independent session c1-99969f3,approved,325270c7fd4c,"Names, constants and comments match the code."
+$C1:20D6,BattleTgt_Self,2026-10-08,independent session c1-99969f3,approved,1229362f6814,"Names, constants and comments match the code."
+$C1:20E0,BattleTgt_SingleKoAlly,2026-10-08,independent session c1-99969f3,approved,ec3b7929c524,"Names, constants and comments match the code."
+$C1:2136,BattleTgt_PcByCharId5,2026-10-08,independent session c1-99969f3,changes,09b11d823a24,"""used by dual/triple techs that act on a specific partner"" is unbacked: no tech using modes 5/6 is cited. Hedge it (which techs use these modes is not established)."
+$C1:213A,BattleTgt_FindPcByCharId,2026-10-08,independent session c1-99969f3,approved,1098ffd7d8a1,"Names, constants and comments match the code."
+$C1:2163,BattleTgt_PcByCharId4,2026-10-08,independent session c1-99969f3,approved,802ebaf499ef,"Names, constants and comments match the code."
+$C1:2169,BattleTgt_EnemyLineFromCaster,2026-10-08,independent session c1-99969f3,approved,39829f34de8f,"Names, constants and comments match the code."
+$C1:21AF,BattleTgt_EnemyLineFromChar3,2026-10-08,independent session c1-99969f3,changes,b4db906d7b2f,"Header ""(no-op if absent)"" is false: SingleEnemy already ran, so one enemy stays selected with TargetAll=$80. Say so. Also Char3 name vs !Pc_CharRobo mismatch."
+$C1:2203,BattleTgt_EnemyLineFromCaster2,2026-10-08,independent session c1-99969f3,approved,310b8624a3b4,"Names, constants and comments match the code."
+$C1:224B,BattleTgt_CasterRadius,2026-10-08,independent session c1-99969f3,approved,989da4fd5427,"Names, constants and comments match the code."
+$C1:225F,BattleTgt_EnemyRadius,2026-10-08,independent session c1-99969f3,approved,5d522db9a41a,"Names, constants and comments match the code."
+$C1:22A4,BattleTgt_Char3Radius,2026-10-08,independent session c1-99969f3,approved,7ff53938ff08,Sizes $19/$10 by mode $14 verified. Nit: routine name Char3 vs constant !Pc_CharRobo/!BattleTgt_ModeRoboRadiusBig.
+$C1:22D3,BattleTgt_Char6Radius,2026-10-08,independent session c1-99969f3,approved,5cb61420eafe,Nit: Char6 name vs !Pc_CharMagus.
+$C1:22F5,BattleTgt_EnemyRow,2026-10-08,independent session c1-99969f3,approved,d1d322b961be,"Names, constants and comments match the code."
+$C1:2329,BattleTgt_PartyTriangle,2026-10-08,independent session c1-99969f3,approved,ca0564ee6e56,"Names, constants and comments match the code."
+$C1:2332,BattleTgt_AreaRow,2026-10-08,independent session c1-99969f3,approved,a173d9ac5b74,"Names, constants and comments match the code."
+$C1:23A4,BattleTgt_AreaPartyTriangle,2026-10-08,independent session c1-99969f3,approved,521edefc3839,"Sort order, tie-break, arc and wrap logic match code; purpose hedged."
+$C1:25A3,BattleTgt_AreaLine,2026-10-08,independent session c1-99969f3,approved,8d71f509ea53,"Geometry checked against Calc_Delta16 (0=right,$40=down): sideways offsets, strip vs box variant, wrap flags all correct."
+$C1:2701,BattleTgt_AreaCircle,2026-10-08,independent session c1-99969f3,approved,f58809f21956,"Squares table $CCFB6F verified; <= test, ADC wrap and B-high-byte caveat correct."
+$C1:27AD,BattleTgt_AreaAddAnchor,2026-10-08,independent session c1-99969f3,approved,57cb2a500659,"Names, constants and comments match the code."
+$C1:27C5,BattleTgt_CompactCandidates,2026-10-08,independent session c1-99969f3,approved,297f368db483,"Nit: ""one byte past the list"" - entry 11 is inside the 12 B list; say past the 11 used entries."
+$C1:27D9,BattleTgt_ClearLists,2026-10-08,independent session c1-99969f3,approved,0c837bc5a8d0,"Names, constants and comments match the code."
+$C1:27E8,BattleTgt_SelectAllCandidates,2026-10-08,independent session c1-99969f3,approved,517f42723875,"Names, constants and comments match the code."
+$C1:27FA,BattleTgt_CycleNext,2026-10-08,independent session c1-99969f3,changes,4bf390c0b14f,"""Same logic as BattleMenu_TargetNext"" overstates: TargetNext has no empty-list guard and stores !BattleTgt_Selected. Say ""same stepping; adds an empty-list guard""."
+$C1:2814,BattleTgt_CyclePrev,2026-10-08,independent session c1-99969f3,approved,792ad88ca277,"Names, constants and comments match the code."
+$C1:282D,BattleTgt_AnyCandidate,2026-10-08,independent session c1-99969f3,approved,1cdd1a452798,"Names, constants and comments match the code."
+$C1:095D,BattleMenu_RenderItemListRows,2026-10-08,independent session c1-a29bb46,changes,4a4283795f21,"Exit note ""DP $80-$87 clobbered"" is incomplete: it also writes $96-$97 (ListPc) and, via RenderItemRow, $8E-$8F and $98. Say ""DP $80-$87, $8E-$8F, $96-$98 clobbered""."
+$C1:09B0,BattleMenu_RenderItemRow,2026-10-08,independent session c1-a29bb46,approved,12032779cfec,"Checked in ROM: names at $CC0B5E are icon+10 chars, so +1 start and next-icon 11th byte are right; PcBit $80/$40/$20; ""Item"" glyphs, cols 15-16/22-25, B=0 all hold."
+$C1:0A87,CODE_JP_C10A87,2026-10-08,independent session c1-a29bb46,approved,2eaaeaac91fa,Shared RTS of RenderItemRow; fine.
+$C1:0A88,BattleMenu_RenderTechListRows,2026-10-08,independent session c1-a29bb46,approved,6006e8423467,TechListBase 0/$14/$28 verified in ROM; DP roles and 2x2 line loop described correctly.
+$C1:0AD3,BattleMenu_BuildTechAvailFlags,2026-10-08,independent session c1-a29bb46,approved,0ccc2d3e6c87,"$FB-$FF -> 0, else 1, 20 entries; matches code."
+$C1:0B0B,BattleMenu_RenderTechRow,2026-10-08,independent session c1-a29bb46,changes,5450dca7f99b,"ROM $CCFB4B text is ""Double/Triple Technique"", not ""[Double Tech]""/""[Triple Tech]"". ""$FB: nothing drawn, only edge cells blanked"" is wrong: cols 3-20 of both rows are blanked. Rename .unreach_fd"
+$C1:0BB6,CODE_JP_C10BB6,2026-10-08,independent session c1-a29bb46,approved,e3fd77921a91,"Header matches code (INC row, lead cells, 18 lower-row tiles from col 3, palette 3)."
+$C1:0BD3,BattleMenu_BlankMpCostDigits,2026-10-08,independent session c1-a29bb46,changes,87afc17949cd,"Name is known wrong (header says these are not MP cells). STYLE says to rename once the meaning is known, not explain it away: e.g. BattleMenu_BlankNameLeadCells."
+$C1:0C00,CODE_JP_C10C00,2026-10-08,independent session c1-a29bb46,approved,495500541b89,Cols 17-20 tail blank after the 11-tile name at col 6; correct.
+$C1:0C2D,BattleMenu_UpdateWindows,2026-10-08,independent session c1-a29bb46,approved,4510786d3153,Dispatch on !BattleMenu_Submenu 0/1/other matches code.
+$C1:0C46,CODE_C10C46,2026-10-08,independent session c1-a29bb46,approved,f100e6f42dbf,"Shared exit trampoline, commented."
+$C1:0C49,BattleMenu_UpdateMainWindow,2026-10-08,independent session c1-a29bb46,approved,aa1b55475471,Matches code; LoadCommandWindowMap/no-PC reload and upload queue described correctly.
+$C1:0C83,BattleMenu_UpdateTechWindow,2026-10-08,independent session c1-a29bb46,changes,bdb11aedac9a,"""PC 1's cost cells"" (header step 4, .cursor_resolve comment) is ambiguous next to .pc1_* labels meaning slot 0; code writes row 3 = PC slot 1. Say ""PC slot 1's cost cells (row 3)""."
+$C1:0E5A,BattleMenu_DrawTechCursorRow,2026-10-08,independent session c1-a29bb46,approved,2e73276c82a7,"TechCursorCell $CCFAE3 = 2/$82/$102 (col 1) verified; $A0DB = $2990 bit 7 copied at $CC:E3AE, supports CfgInfoPanel."
+$C1:0EBA,BattleMenu_ClearTechCursorTiles,2026-10-08,independent session c1-a29bb46,approved,6b152e20eed0,Cols 1-2 of 6 rows; matches cursor cells in ROM.
+$C1:0EE1,BattleMenu_UpdateTechMpAvail,2026-10-08,independent session c1-a29bb46,changes,80afd91a6a7d,"Header quotes ""[Double Tech]""/""[Triple Tech]""; ROM text is ""Double Technique""/""Triple Technique"". Otherwise verified: RowMapOffset 6/$86/$106 = col 3, EntryBase 0/$8C/$118."
+$C1:0F28,CODE_JP_C10F28,2026-10-08,independent session c1-a29bb46,approved,4bed02b5928a,Loop head; special-line grading comments accurate.
+$C1:0F57,_ump_check_fd,2026-10-08,independent session c1-a29bb46,approved,4d9653d6d117,Triple-header check (>=3 ready) correct.
+$C1:0F62,_ump_set_bright,2026-10-08,independent session c1-a29bb46,changes,da37d9580d02,"Label is known wrong (""despite the label, this greys the line""). Rename (e.g. _ump_set_grey) instead of keeping an apology comment."
+$C1:0F66,CODE_C10F66_JMP,2026-10-08,independent session c1-a29bb46,approved,efb036b61102,Convergence point to the colouring tail; commented.
+$C1:0F69,_ump_check_battler,2026-10-08,independent session c1-a29bb46,approved,96d1139aa71e,Entry offset = EntryOffset[idx]+EntryBase; index*7 table verified in ROM.
+$C1:0F8F,_ump_pc1_ok,2026-10-08,independent session c1-a29bb46,approved,9a79e9261dc1,"MP-vs-cost borrow test correct (label is 1-based, comments 0-based slot; acceptable)."
+$C1:0FA0,_ump_pc2_ok,2026-10-08,independent session c1-a29bb46,approved,418bb4cb5769,Same pattern as _ump_pc1_ok; correct.
+$C1:0FB1,_ump_pc3_ok,2026-10-08,independent session c1-a29bb46,approved,6f03f6e62aa8,"Partner nibbles, $FF single tech, $F0 no second partner; correct."
+$C1:0FD5,_ump_slot_ready,2026-10-08,independent session c1-a29bb46,approved,d6a7c5a52ae6,Lock and tech $74/!Battle_Unk1C48 check hedged as unknown; fine.
+$C1:0FF1,_ump_write_bright,2026-10-08,independent session c1-a29bb46,approved,24aeb1ec2361,"Clears Flags bit 7, palette 2; correct."
+$C1:1001,_L1001,2026-10-08,independent session c1-a29bb46,changes,b0df31582f5b,"Comment ""can't afford / partner not ready / locked"" omits the tech $74 / Unk1C48 failure that also lands here; label is meaningless (e.g. _ump_set_unusable)."
+$C1:100F,CODE_JP_C1100F,2026-10-08,independent session c1-a29bb46,approved,b5af1bff666d,18 cells both rows from RowMapOffset (col 3); correct.
+$C1:103D,CODE_JP_C1103D,2026-10-08,independent session c1-a29bb46,approved,c974e5d65b7f,Shared RTS; TechAvailDone set before it on the fall-through path.
+$C1:103E,BattleSys_SlotMenuReadyPredicate,2026-10-08,independent session c1-a29bb46,approved,d5bebdee8203,Roster entry negative / Pc_LockStatus test matches code.
+$C1:1C3A,BattleMenu_LoadCommandWindowMap,2026-10-08,independent session c1-a29bb46,approved,63e695d2cf70,"Callers confirm: roster change, no PC shown, Tech/ItemListCancel. Exit state correct."
