@@ -149,6 +149,8 @@ if !constants_menu_inc == 0
 !C2Scene_MapCols = $60                   ; 96 metatile columns per layer map (16 px each: 1536 px)
 !C2Scene_MapRows = $40                   ; 64 rows
 !C2Scene_MapBytes = (!C2Scene_MapCols*!C2Scene_MapRows) ; $1800
+!C2Scene_MapWidthPx = (!C2Scene_MapCols*!C2Scene_MetatilePx) ; 1536: C2Scene_WrapTaskPos wraps X here
+!C2Scene_MapHeightMask = ((!C2Scene_MapRows*!C2Scene_MetatilePx)-1) ; $3FF: and Y with this (1024 px)
 !C2Scene_DrawCols = 18                   ; columns drawn per redraw (288 px: the screen and a margin)
 !C2Scene_DrawRows = 16                   ; metatiles per column (256 px of the 32-tile map height)
 !C2Scene_MetatilePx = $10                ; 16 pixels per metatile
@@ -189,6 +191,28 @@ if !constants_menu_inc == 0
 !C2Scene_OamSlotMask = $7F               ; low-table slot = C2Scene_OamNext AND this (128 sprites)
 !C2Scene_OamEntrySize = 4                ; bytes per sprite in the OAM low table
 !C2Scene_HidePassBytes = (8*4)           ; C2Scene_HideAllSprites: 8 sprites per pass, in each quarter
+!C2Scene_SprAttrHold = $40               ; C2Scene_Task.SprAttr bit 6: C2Anim_OpShowFrame holds the frame
+                                         ; (neither loads nor counts .AnimTimer)
+!C2Scene_SprAttrKeepPal = $F1            ; .SprAttr bits kept by C2Script_SetSprPalette (it replaces 1-3)
+!C2Scene_SprAttrKeepPrio = $4F           ; .SprAttr bits kept by C2Script_SetSprPriority (it replaces 4,
+                                         ; 5 and 7)
+!C2SceneRom_AnimTable = $C3E000          ; 16-bit addresses of the animation scripts (C2Scene_SetAnim)
+!C2SceneRom_AnimBank = $C3               ; their bank: the table's own
+; --- Scene scripts (C2Scene_TaskRunScript and the C2Script_* ops) ---
+!C2Script_SpawnUnk1CF5Len = 10           ; bytes C2Script_SpawnUnk1CF5 advances (the opcode and 9 bytes it
+                                         ; does not read itself)
+!C2Scene_ReturnTileOfs = $10             ; tiles C2Script_GoToLocation adds to BG2's tile X and Y for the
+                                         ; return position
+!C2Scene_ModeUnk2 = 2                    ; C2Scene_Mode set by C2Script_GoToLocation (C2Scene_Mode2:
+                                         ; restores the flag tail and turns the NMI off; probably leaves
+                                         ; the scene)
+!C2SceneRom_TurnAround = $C22509         ; 4 B: facing 0-3 -> 1, 0, 3, 2 (the facing EOR 1, as the field's
+                                         ; Loc_ReturnFacing; read by C2Script_GoToLocation)
+!C2Scene_NoBg3PanBit0 = $10              ; C2Scene_FlagTailCopy byte 0 bit 4: C2Script_ScrollFrames leaves
+                                         ; BG3 alone (as do the two below; meaning not traced)
+!C2Scene_NoBg3PanBit3 = $20              ; byte 3 bit 5
+!C2Scene_NoBg3PanBit8 = $02              ; byte 8 bit 1
+!C2Scene_WholeMinus1 = $FFFF             ; -1 as the whole-pixel word (C2Script_PanKeepFraction)
 !C2Scene_SoundCmdSending = $FF           ; C2Scene_SoundCmdState while the command is being sent
 
 ; --- Joypad and play time ---

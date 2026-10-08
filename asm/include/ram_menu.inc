@@ -126,6 +126,10 @@ if !ram_menu_inc == 0
 !C2Scene_SprFramePtr = $55               ; 24-bit pointer to a sprite frame (a count byte, then 4-byte
                                          ; pieces): input of C2Scene_SprAdd, and the walk pointer of
                                          ; C2Scene_SprDrawNode
+!C2Anim_Ptr = $52                        ; 24-bit pointer to the current op of the running task's animation
+                                         ; script (C2Anim_Run; copied from and back to .AnimPtr/.AnimBank)
+!C2Script_Ptr = $58                      ; 24-bit pointer to the current op of the running task's script
+                                         ; (C2Scene_TaskRunScript; .ScriptPtr/.ScriptBank)
 !C2Scene_VramQLock = $5E                 ; 8-bit; non-zero: C2Scene_VramQFlush does nothing
 !C2Scene_VramQEnd = $5F                  ; 8-bit byte offset past the last C2Scene_VramQ entry (0 = empty)
 !C2Scene_BgTileX = $E3                   ; 2 words, X in tiles (C2Scene_SetStartScroll sets both alike);
@@ -234,6 +238,15 @@ endstruct align 8
 !C2Scene_Unk1B58 = $1B58                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_SavedReturnId = $04FC          ; 16-bit; C2Script_GoToLocation copies Loc_ReturnId here; use not
+                                         ; traced
+!C2Scene_SavedReturnX = $04FE           ; 8-bit; its copy of Loc_ReturnX (written as a word, then
+                                         ; C2Scene_SavedReturnY over the high byte)
+!C2Scene_SavedReturnY = $04FF           ; 8-bit; its copy of Loc_ReturnY
+!C2Scene_MemberWords = $1B3B             ; 3 words $1B3B-$1B40, one per party position
+                                         ; (C2Script_SetMemberWord); use not traced
+!C2Scene_Unk1B41 = $1B41                 ; 16-bit, right after them; C2Script_SetMemberWord's word for
+                                         ; character 7; use not traced
 !C2Scene_FlagTailByte1 = $1BA8           ; = C2Scene_FlagTailCopy+1, the copy of $7F:01F1; bit 7 picks the
                                          ; palette C2Scene_LoadLocExtraGfx loads for Loc_Id $01F1
 
@@ -326,18 +339,33 @@ struct C2Scene_Task $0000
 .Handler:    skip 2     ; +$00 handler address in bank $C2 (0 = free slot)
 .Unk02:      skip 1     ; +$02 zeroed by C2Scene_TaskSpawn
 .Frames:     skip 2     ; +$03 +1 after each frame the handler returns C=0
+.ScriptReturn:          ; +$05 = .Params: C2Script_Call keeps the return address here
 .Params:     skip 2     ; +$05 first byte copied from the spawner
 .ScriptPtr:  skip 2     ; +$07 C2Scene_TaskSpawnScript: 16-bit address of the script
 .ScriptBank: skip 1     ; +$09 C2Scene_TaskSpawnScript: its bank
+.ScriptWait:            ; +$0A = .Unk0A: frame countdown of the script's timed ops
 .Unk0A:      skip 1     ; +$0A zeroed by C2Scene_TaskSpawnScript
-             skip 4
+.AnimPtr:    skip 2     ; +$0B 16-bit address of the C2Anim_Run script (C2Scene_SetAnim)
+.AnimBank:   skip 1     ; +$0D its bank (C2Scene_SetAnim: C2SceneRom_AnimBank)
+.AnimTimer:  skip 1     ; +$0E frame countdown of C2Anim_OpShowFrame / C2Anim_OpWait
 .SprAttr:    skip 1     ; +$0F C2Scene_SprAdd: the new node's .Attr
 .SprTile:    skip 2     ; +$10 C2Scene_SprAdd: the new node's .Tile
-             skip 2
+.XFrac:      skip 2     ; +$12 fraction of .SprX (16.16 fixed point, C2Scene_TaskMove)
 .SprX:       skip 2     ; +$14 C2Scene_SprAdd: the new node's .X
-             skip 2
+.YFrac:      skip 2     ; +$16 fraction of .SprY
 .SprY:       skip 2     ; +$18 C2Scene_SprAdd: the new node's .Y
-             skip $26
+.XVelFrac:   skip 2     ; +$1A X velocity per frame, fraction (C2Scene_TaskMove)
+.XVel:       skip 2     ; +$1C X velocity, whole pixels (signed)
+.YVelFrac:   skip 2     ; +$1E Y velocity, fraction
+.YVel:       skip 2     ; +$20 Y velocity, whole pixels (signed)
+             skip $10
+.OpState:    skip 2     ; +$32 zeroed by C2Scene_TaskRunScript before each new op;
+                        ; C2Script_MoveToX/Y set it on their first frame
+.OpTarget:   skip 1     ; +$34 16-bit target of C2Script_MoveToX/Y (overlaps .Unk35);
+                        ; C2Script_SpawnUnk1DD4 passes a byte here
+.Unk35:      skip 2     ; +$35 C2Script_SpawnUnk1DD4 passes a word here
+.Unk37:      skip 1     ; +$37 C2Script_SpawnUnk1DD4 passes a byte here
+             skip 8
 endstruct
 
 ; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),
