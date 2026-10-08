@@ -310,6 +310,9 @@ if !ram_engine_inc == 0
 !ObjX_CallWait = $7F0980                 ; 8-bit per object in bank $7F (the table after the eight
                                          ; ObjX_Unk7F0580 levels): nonzero while opcode $04/$07 of the
                                          ; object waits for the function it called to end
+!ObjX_Unk7F0A80 = $7F0A80                ; 16-bit per object in bank $7F: set from an event word or
+                                         ; a bank-$7F word by opcodes $19 / $1C, its low byte compared
+                                         ; by opcode $1A (meaning not traced)
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
                                          ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
@@ -345,6 +348,18 @@ if !ram_engine_inc == 0
                                          ; into ObjX_Unk7F0580)
 !EvtCall_FuncTbl = $E3                   ; 16-bit: the target's slot x 16 (its function table in
                                          ; Evt_Data); Evt_Unk0920Key's slot
+!EvtIf_OfsPos = $C3                      ; alias of Spr_BaseX in the condition opcodes $12-$16:
+                                         ; 16-bit, the Evt_Data offset of the opcode's jump-distance
+                                         ; byte (its last byte)
+!EvtIf_Left = $D9                        ; alias of Eng_Scratch in the condition opcodes: 8- or 16-bit,
+                                         ; the value tested (Evt_CmpTable8 / Evt_CmpTable16 compare
+                                         ; it with EvtIf_Right)
+!EvtIf_Right = $DB                       ; alias of Oam_Range1LoPtr's slot there: 8- or 16-bit, the
+                                         ; value it is compared with
+!EvtIf_Cmp = $DD                         ; alias of Oam_Range2LoPtr's slot in Evt_Op16_IfMemByte:
+                                         ; 8-bit, the comparison number
+!EvtJump_Dist = $D9                      ; alias of Eng_Scratch in the jump opcodes: 16-bit, the
+                                         ; jump distance (an operand byte, zero-extended)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
                                          ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
                                          ; the slot being tried
@@ -1049,6 +1064,9 @@ if !ram_engine_inc == 0
 !GfxRom_D3 = $D30000                     ; object tile graphics in ROM bank $D3
 !GfxRom_D4 = $D40000                     ; object tile graphics in ROM bank $D4
 !GfxRom_D5 = $D50000                     ; object tile graphics in ROM bank $D5
+!Evt_Mem7F = $7F0000                     ; start of bank $7F as the event opcodes address it: the byte
+                                         ; or word at $7F:0000 + an operand (Eng_Unk7F0000,
+                                         ; Treasure_Flags and Evt_Unk7F0200 lie there)
 !Wram7F_PtrBase = $7F0000                ; base 0 of bank $7F for abs,X / abs,Y accesses whose index
                                          ; holds the full address (DB = $7F)
 

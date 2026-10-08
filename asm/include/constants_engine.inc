@@ -754,3 +754,8 @@ endif
                                          ; (Evt_UnusedOpcode)
 !Evt_CallFuncMask = $000F                ; low nibble of a call opcode's level/function operand: the
                                          ; function number (word index in the 16-word table)
+
+; --- Event jump and condition opcodes ($10-$1C) ---
+!EvtIf_Page1Flag = $80                   ; Evt_Op16_IfMemByte's comparison byte, bit 7: the byte tested
+                                         ; is at $7F:0100 + the operand (else $7F:0000 + it)
+!EvtIf_Page1 = $0100                     ; the offset bit 7 of that byte adds
