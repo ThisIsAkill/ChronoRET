@@ -84,7 +84,7 @@ Documentation (progress, bank map, architecture, devlog) is published as
    `main`.
 4. `make gate`: byte-exact (`make diff`), every emitted byte proven
    (`make verify`), readable (`make lint`).
-5. Independent review, recorded in `symbols/reviews.csv`; then
+5. Independent review, recorded as a new round file in `symbols/reviews/`; then
    `tools/progress.py --update` marks the function `verified`.
 6. Session end: `tools/end_session.sh`.
 

@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:7F9A,Sub_C07F9A,2026-10-08,rev31a,approved,a362aba56788,"Callers fix correct (74D1 BRL tail of prior routine; 74E3 in 74D4, 74E8/74F7 BRA to 74E1); slot layout, biases, bases, M/X/DP/DB, Exit verified. nit: two-piece rows store stale WrapVram at +4"

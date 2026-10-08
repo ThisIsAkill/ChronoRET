@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:0568,C2Scene_Unk0568,2026-10-08,rev55a,approved,de248d03fdd6,"Fix OK: $38FB/$3902 are real JSR $0568 (bytes 20 68 05); 12 sites listed. Wraps 0-$5FF/0-191, edge col/parity, hang on layer 0, M/X/DP/DB, $02-$1A clobbers verified."
+$C2:066C,C2Scene_Unk066C,2026-10-08,rev55a,approved,d0265d976746,"Fix OK: $385B/$3862 are real JSR $066C; 11 sites listed. VScroll wrap 0-$3FF, tile Y 0-127, row +28/+224, top/bottom parity, hang, CPU state and clobbers verified."
+$C2:2402,C2Scene_Mode3,2026-10-08,rev55a,approved,baa5cf43e4e8,"Fix OK: return facing = TurnAround[(.Loc hi>>1) AND 3]. ListD script path, BG2 return X/Y wraps, fade wait, fall into Mode2 verified. nit: NMI is also cut at entry on both paths."
+$C2:261D,C2Scene_Mode8,2026-10-08,rev55a,approved,24cfe8843a5e,"Fix OK: 6A34 loops at $C2:6A9C-6AA4 while Mode=8; SaveState (dp $00-$EF, $0700-$1DFF) does not hold $027C. Fade, sound $82, flag tests, reload/fade-in, exit verified."
+$C2:2F4E,C2Scene_ZoneSoundAtView,2026-10-08,rev55a,approved,838b0f928f17,"Fix OK: Y = column/2 via GetSoundZone TAY on zone path only. Col/row math, unwrapped-column quirk (BgTileX>=176), Prio not set, 02AE on C=0, args $FF/$80 verified."
+$C2:2FAE,C2Scene_ZoneSoundWatch,2026-10-08,rev55a,approved,1d6b5f9bc765,"Fix OK: Y=column/2 and 16-bit row store hits $02. Config path, idle modes 0/1/7 + 027E gate, StartX/16, StartY/16-1, state 2/timer 0, cmd $81 $0C,0,$FF, C=0 exit verified."

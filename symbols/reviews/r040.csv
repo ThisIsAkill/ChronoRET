@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:2E23,C2Scene_SaveState,2026-10-08,rev40a,approved,a1ab6017b7f1,"Six MVN ranges/dests, Exit A=$FFFF X=$8600 Y=SaveLists+$800, DB via PLB, callers, not-kept list (7000/B800/C000/C800/C600), mode-8 skip OK. nit: mode-8 test is $265E+$2666"

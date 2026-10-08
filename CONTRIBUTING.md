@@ -43,7 +43,7 @@ every tool that reads them regenerates them when they are stale, and
 |---|---|
 | `matched` | every byte from its label to the next is emitted by the source and equals the ROM (`make diff`, and `make verify`, which assembles onto blank bases so a routine can't hide behind original bytes) |
 | `readable` | it follows [STYLE.md](STYLE.md): `tools/lint_readability.py` finds nothing in it |
-| `verified` | an independent reviewer approved its current source (a row in `symbols/reviews.csv`) |
+| `verified` | an independent reviewer approved its current source (a row in the review log, `symbols/reviews/`) |
 
 - **Readable:** named RAM, structs, calls and constants; explicit widths; no hand-encoded
   opcodes or test plumbing (STYLE.md). A literal transcription is fine on your work branch; it
@@ -52,11 +52,15 @@ every tool that reads them regenerates them when they are stale, and
   still lists a routine that is already clean.
 - **Reviewed:** before a routine counts as `verified`, someone who did not write it checks that
   the names and comments are right — the bytes are already proven, so review is about whether
-  the code tells the truth. The approval is a row in `symbols/reviews.csv`:
-  `address,name,date,reviewer,verdict,source_hash,notes`, with `verdict` = `approved` or
-  `changes`, and `source_hash` copied from the routine's row in `symbols/functions.csv`. Editing
-  the routine changes its hash, so the approval stops counting until it is reviewed again.
-  `tools/validate_functions.py` checks the file in the hook and in CI.
+  the code tells the truth. The approval is a row in the review log, one CSV file per review
+  round: `symbols/reviews/r047.csv` for round 47 (`legacy.csv` holds the rows from before
+  rounds were numbered). Each file starts with the header line
+  `address,name,date,reviewer,verdict,source_hash,notes`; `verdict` is `approved` or `changes`,
+  and `source_hash` is copied from the routine's row in `symbols/functions.csv`. A new round is
+  always a new file, never an append to an old one, so rounds recorded on different branches
+  never conflict. The files are read in round order; a routine's last row is its verdict.
+  Editing the routine changes its hash, so the approval stops counting until it is reviewed
+  again. `tools/validate_functions.py` checks the files in the hook and in CI.
 - **Generated numbers:** no doc carries counts or percentages; they are published on the
   [Kajar site](https://thisisakill.github.io/Kajar-site/) and printed locally by
   `python3 tools/progress.py`. Never type one by hand, and never commit `symbols/functions.csv`

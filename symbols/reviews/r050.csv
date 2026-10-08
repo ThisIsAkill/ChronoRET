@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:6F9A,BattleAct_OpStepUnkA4AF,2026-10-08,rev50a,approved,dfad6cab951d,"Fix ok: gcd(d,256)|(t-value) is right. Checked thread 4/8+ paths, range, B=0 for TAX, Exit via AdvanceScript. nit: Exit omits DP $E6-$E9; empty target set waits forever"

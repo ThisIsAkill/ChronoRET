@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-validate_functions.py — Check symbols/functions.csv and symbols/reviews.csv.
+validate_functions.py — Check symbols/functions.csv and the review log.
 
 functions.csv is generated and not tracked: with the ROM and asar it is
 regenerated first when stale (tools/generated.py). Without them (the CI
@@ -8,9 +8,12 @@ readability job) only the review log is checked.
 
   - functions.csv: known columns, addresses `$BB:AAAA` strictly ascending,
     status one of matched/readable/verified, notes on one line (<= 200 chars);
-  - reviews.csv: known columns, ISO dates, a reviewer, verdict approved or
-    changes and a 12-hex source_hash; rows naming a routine that has since
-    been renamed or removed are kept as history and count for nothing;
+  - the review log, symbols/reviews/ (tools/review_log.py): files named
+    legacy.csv or rNNN.csv only, each with the known header line; rows with
+    ISO dates, a reviewer, verdict approved or changes and a 12-hex
+    source_hash; rows naming a routine that has since been renamed or
+    removed are kept as history and count for nothing. The old single
+    symbols/reviews.csv must not come back;
   - every `verified` function has an approved review of its current
     source_hash, and no function is `verified` without one.
 """
@@ -22,11 +25,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import generated  # noqa: E402
+import review_log  # noqa: E402
 
 FUNCTIONS = Path('symbols/functions.csv')
-REVIEWS = Path('symbols/reviews.csv')
+OLD_REVIEWS = Path('symbols/reviews.csv')
 F_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'status', 'source_hash', 'notes']
-R_COLS = ['address', 'name', 'date', 'reviewer', 'verdict', 'source_hash', 'notes']
+R_COLS = review_log.R_COLS
 ADDR = re.compile(r'^\$[0-9A-F]{2}:[0-9A-F]{4}$')
 
 
@@ -61,18 +65,22 @@ def main() -> int:
         if '\n' in row['notes'] or len(row['notes']) > 200:
             errors.append(f'{where}: notes must be one line, 200 characters at most')
 
-    reviews = []
-    if REVIEWS.exists():
-        with REVIEWS.open() as f:
-            reader = csv.DictReader(f)
-            if reader.fieldnames != R_COLS:
-                errors.append(f'{REVIEWS}: columns {reader.fieldnames}, expected {R_COLS}')
-            reviews = list(reader)
+    if OLD_REVIEWS.exists():
+        errors.append(f'{OLD_REVIEWS}: the review log is one file per round now; move its rows '
+                      f'to {review_log.REVIEWS_DIR}/rNNN.csv (tools/review_log.py)')
+    for path in review_log.stray_files():
+        errors.append(f'{path}: not a review file name (legacy.csv or rNNN.csv)')
+    for path in review_log.review_files():
+        with path.open(newline='') as f:
+            cols = next(csv.reader(f), None)
+        if cols != R_COLS:
+            errors.append(f'{path}: header {cols}, expected {R_COLS}')
+    reviews = review_log.read_rows()
     names = {row['name']: row for row in functions}
     latest = {}
     historical = 0
-    for n, row in enumerate(reviews, 2):
-        where = f'{REVIEWS}:{n} {row.get("name")}'
+    for path, n, _, row in reviews:
+        where = f'{path}:{n} {row.get("name")}'
         # A row naming a routine that no longer exists (renamed or removed)
         # stays as history; it just can't make anything verified.
         if have_functions and row['name'] not in names:

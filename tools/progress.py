@@ -19,8 +19,9 @@ A function's status (each level includes the previous):
   matched    every byte from its label to the next is emitted by source
              and equals the ROM
   readable   ...and it has no findings from tools/lint_readability.py
-  verified   ...and symbols/reviews.csv holds an independent approval of
-             its current source (the review's source_hash still matches)
+  verified   ...and the review log (symbols/reviews/*.csv, one file per
+             round) holds an independent approval of its current source
+             (the review's source_hash still matches)
 
 Usage:
     python3 tools/progress.py                   print the summary
@@ -47,13 +48,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asm_source  # noqa: E402
 import generated  # noqa: E402
 import lint_readability  # noqa: E402
+import review_log  # noqa: E402
 import verify  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
 SYMBOLS = Path('symbols')
 FUNCTIONS_CSV = generated.FUNCTIONS_CSV
-REVIEWS_CSV = SYMBOLS / 'reviews.csv'
 PROGRESS_JSON = generated.PROGRESS_JSON
 HISTORY_CSV = SYMBOLS / 'progress_history.csv'
 # Docs that once carried generated blocks; --check keeps them out.
@@ -139,11 +140,8 @@ def header_note(lines: list[str], i: int, name: str) -> str:
 
 
 def read_reviews() -> dict[str, dict]:
-    """Latest review row per function name."""
-    if not REVIEWS_CSV.exists():
-        return {}
-    with REVIEWS_CSV.open() as f:
-        return {row['name']: row for row in csv.DictReader(f)}
+    """Latest review row per function name (tools/review_log.py)."""
+    return review_log.latest()
 
 
 # ── Build ────────────────────────────────────────────────────────────────────

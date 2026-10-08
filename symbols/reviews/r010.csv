@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:FE00,RandomTable,2026-10-08,independent session r10-p1,changes,4932e008ddaf,"$C2:B119 reads 1 byte (SEP #$30, X=$0D00, *100 via $4202): drop from word-read claim. Add $CD:2AB6 (LDA/INC $CD3B, TAX). $C3:15FC is LZ-like data (SEP #$00 decode): hedge"
+$C0:FE00,RandomTable,2026-10-08,independent session r10-p2,approved,cd0146de6eca,"ROM $FE00-FEFF is a 0-255 permutation; all 7 cited readers match their bytes; $C6:E103/E696/E6D2 share $1B30; B10E high byte of r*100 = 0-99; none matched yet"

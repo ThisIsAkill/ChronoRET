@@ -89,7 +89,7 @@ review; bank $C0 is next.
   ATB-ready queue and plays the turn-ready cue.
 - The readability gate: `tools/lint_readability.py` per routine, `tools/verify.py` proves every
   emitted byte against blank bases, `tools/progress.py` generates every number, reviews are
-  recorded in `symbols/reviews.csv`.
+  recorded in the review log (now `symbols/reviews/`, one file per round).
 
 ## Known issues
 

@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:A508,LocLoad_EmptyStep,2026-10-08,rev45a,approved,272402e780a0,"Callers fix correct: xref's one confirmed site $C0:0A70 is in LocLoad_DrawMap (JSR after Map_InitOrigin). Lone RTS, Entry/Exit 'nothing changed', hedged 'probably emptied' ok."
+$C0:A509,Ppu_ApplyMapScreens,2026-10-08,rev45a,approved,2ea0beed177d,"Callers fix correct ($C0:0A61 in LocLoad_DrawMap); $5CB9 is the operand of STA $0920,X at $5CB8, not a call. Body TM/TS/CGADSUB/MOSAIC=0, A=0 exit, DB range, A33B sources verified."
+$C0:A712,Map_LoadTreasureTiles,2026-10-08,rev45a,approved,e18f926109ed,"Callers fix correct ($033C unmatched, $0A59 in LocLoad_DrawMap). Fill/MVN, redirect loop, FE/E0 steps, X/DP/DB, exits verified. nit: Exit omits $1D55 (16-bit STZ Map_RecNum)."

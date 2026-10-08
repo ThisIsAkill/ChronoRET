@@ -2,10 +2,10 @@
 
 How a routine goes from **readable** to **verified**. The reviewer is someone
 (or some session) that did not write the routine. They get the source, the ROM,
-STYLE.md and this file, nothing else. A verdict is a row in
-`symbols/reviews.csv`, and it holds only for the exact source it read: the row
-carries the routine's `source_hash`, and any later edit to the routine, header
-included, sends it back for review.
+STYLE.md and this file, nothing else. A verdict is a row in the review log
+(`symbols/reviews/`, one file per round), and it holds only for the exact
+source it read: the row carries the routine's `source_hash`, and any later
+edit to the routine, header included, sends it back for review.
 
 ## What the tools already check
 
@@ -80,6 +80,9 @@ concrete fix.
 Put these in the notes as optional, so the next edit can pick them up.
 
 ## Writing the verdict
+
+Each round is a new file, `symbols/reviews/rNNN.csv` (round 47 is `r047.csv`),
+never an append to an earlier one. It starts with the header line:
 
 ```
 address,name,date,reviewer,verdict,source_hash,notes

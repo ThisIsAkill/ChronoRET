@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:881E,Field_FrameUpdate,2026-10-08,independent session r18-p1,approved,0d1a5763990c,"Checked vs ROM $881E-$8859: EB=$80 reset, DP=$1D00 PHD/PLD, Unk62/ControlEnabled gate, 8-bit X around 8A6D, 4 tail calls; 8 xref callers match incl. Scene_SettleFrames"
+$FD:BA61,RandomTableFD,2026-10-08,independent session r18-p1,approved,3708c898ce55,"Table == $C0:FE00, a 0-255 permutation; readers $C1:AF56/60/AFAE/B8, $26/$B3E6 counters, $FF case, C92A remainder+$25 OK. nit: C92A divides $2E:$28, $2E not cleared"

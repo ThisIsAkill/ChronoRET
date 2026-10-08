@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:9542,Menu_DmaCopyFFToWram,2026-10-08,rev24a,approved,103e4d2d74ad,"Fix OK: Exit X=$8000 (LDX #BBAD_WMDATA<<8 at $9554), Y kept, A lo=$01. DMAP 0 stepping, A1B0=$FF, WMADDH 0, HDMAEN untouched; callers $9698/$96A4 (REP #$30) checked."
+$C2:956E,Menu_InitNewGameData,2026-10-08,rev24a,approved,31545d7027df,"Fix OK: $8048 guarded by $0A00 mode=0 and $7F0061=0 then sets 1; $8D7E after 3 FF:F9C4 checks then 0; $E65D then 1. Fill ranges, MVN counts, DB=$7E, Exit A/X/Y verified."
