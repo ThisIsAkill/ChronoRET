@@ -42,9 +42,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 0. A relocation-tolerant mode for `tools/find_duplicates.py` (masking absolute JSR/JMP/JSL
    operands) should find more copies. (The byte-identical copies, `Battle_Mul8CC` at `$CC:F365`
    and `ScrollWaveFF_A/B` at `$FF:F759`/`$FF:F799`, are matched.)
-1. `$C1:1C4A–$C1:1F78`: the gap between `BattleMenu_LoadCommandWindowMap` and
-   `BattleMenu_BuildTargetList`.
-2. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for
+1. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for
    `BattleSys_PumpFrames`, `Battle_TickPcSlots`, `Battle_TickStatusEffectVisuals`,
    `Battle_CacheBattlerCoordsAll`.
 3. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
@@ -71,3 +69,6 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 5. Bank $C1: `$C1:2D81` (~21 words, `$C1:29AE`, the closest to matched code), `$C1:3216` (15,
    `$C1:30B2`), `$C1:3760` (9, `$C1:375C`), `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).
+
+2. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
+3. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.

@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 29702,
+  "emitted_bytes": 30517,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 249,
-      "bytes": 29702
+      "functions": 251,
+      "bytes": 30517
     },
     "readable": {
-      "functions": 249,
-      "bytes": 29702
+      "functions": 251,
+      "bytes": 30517
     },
     "verified": {
       "functions": 246,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 9232,
+      "emitted_bytes": 10047,
       "matched": {
-        "functions": 126,
-        "bytes": 9232
+        "functions": 128,
+        "bytes": 10047
       },
       "readable": {
-        "functions": 126,
-        "bytes": 9232
+        "functions": 128,
+        "bytes": 10047
       },
       "verified": {
         "functions": 126,
@@ -400,7 +400,7 @@
       "bank": "$C1",
       "start": "$C1:1000",
       "end": "$C1:1FFF",
-      "emitted_bytes": 3164,
+      "emitted_bytes": 3979,
       "functions": [
         "BattleMenu_Return",
         "BattleSys_SlotMenuReadyPredicate",
@@ -449,6 +449,8 @@
         "BattleMenu_DequeueReadyBattler",
         "BattleMenu_RemoveBattlerFromReady",
         "BattleMenu_LoadCommandWindowMap",
+        "Battle_DrawBattlerFrame",
+        "Battle_DrawBattlerFrameAnyLayout",
         "BattleMenu_BuildTargetList",
         "BattleTgt_RunAreaQuery",
         "BattleTgt_AreaTable",

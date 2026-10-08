@@ -2913,6 +2913,458 @@ BattleMenu_LoadCommandWindowMap:
     RTS
 
 ; ==================================================================
+; Battler frame decoder ($C1:1C4A–$C1:1F78)
+; ==================================================================
+!BattleFrame_ColsLeft = !BattleTmp_80     ; 1 B: tiles left in this row; later 2 B: count of extra bytes
+!BattleFrame_Width = !BattleTmp_81        ; 1 B: tiles per row (reloads ColsLeft)
+!BattleFrame_RowPtr = !BattleTmp_82       ; 3 B: long pointer to the next BattleRom_FrameLayout.RowOffset word;
+                                          ; later 2 B: the slot's !Battler_FrameExtra offset
+!BattleFrame_RowsLeft = !BattleTmp_85     ; 1 B: rows left
+!BattleFrame_Slot = !BattleTmp_88         ; 2 B: battler slot, doubled once the layout is read
+!BattleFrame_Entry = !BattleTmp_8C        ; 2 B: current tilemap entry; on the mirrored path, the tile's source address
+!BattleFrame_DestPtr = !BattleTmp_AD      ; 3 B: long pointer to the destination tile (mirrored path; bank $7E in +2)
+!BattleFrame_MapPtr = !BattleTmp_BA       ; 3 B: long pointer into the frame record (tilemap, then the extra bytes)
+!BattleFrame_GfxBase = !BattleTmp_BD      ; 2 B: address of tile 0 in the battler's tile bank (DB while copying)
+
+; $C1:1C4A — Battle_DrawBattlerFrame (11 bytes, $1C4A–$1C54)
+; Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the
+; battler's tile buffer in bank $7E, unless the battler uses frame layout 3
+; (!Battle_FrameLayoutStrip), which this entry leaves alone. The work is
+; done by Battle_DrawBattlerFrameAnyLayout, which it falls into.
+; Names are inferred from what the code does (a per-battler frame number,
+; a cache of the last one shown, tiles copied by number with a mirror
+; bit); what the buffer is shown as has not been traced.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
+; Exit:  see Battle_DrawBattlerFrameAnyLayout (layout 3: M=1, X=0, DP=0,
+;        DB=$7E, X = slot, A = 3, nothing written)
+; Callers: JSR from $C1:2F10, $C1:345D, $C1:3702, $C1:416A, $C1:418B,
+;          $C1:41AC and $C1:4307 (searched: every JSR $1C4A in bank $C1;
+;          no JMP or JSL reaches it)
+org $C11C4A
+Battle_DrawBattlerFrame:
+    LDX.w !Battle_FrameSlot
+    LDA.w !Battler_FrameLayout,X
+    CMP.b #!Battle_FrameLayoutStrip
+    BNE Battle_DrawBattlerFrameAnyLayout
+    RTS
+
+; $C1:1C55 — Battle_DrawBattlerFrameAnyLayout (804 bytes, $1C55–$1F78)
+; Decodes one animation frame of a battler into bank $7E tiles:
+;   1. Clear the slot's !Battler_FrameDeferred; return at once if
+;      !Battle_FrameId is already the slot's !Battler_FrameShown.
+;   2. Frame record = !Battler_FramesPtr + FrameId * BattleRom_FrameBytes
+;      (by layout). It holds Width * Height tilemap words, then
+;      Width * Height / 2 signed bytes.
+;   3. For each row (BattleRom_FrameLayout: Width, Height, and a buffer
+;      offset per row, added to the slot's BattleRom_FrameDestBase) and
+;      each cell: entry & $07FF = 0 writes 32 zero bytes; otherwise tile
+;      (entry & $07FF) is copied from !Battler_TileGfxPtr (32 bytes per
+;      tile), bit-reversing each byte through BitReverseTable ($C0:FD00) when
+;      bit 14 (!Battle_FrameHFlip) is set, which mirrors a 4bpp tile left
+;      to right. Bit 15 (a vertical flip in SNES maps) is not tested.
+;   4. Copy the signed bytes, widened to words, into the slot's
+;      !Battler_FrameExtra block, and count the decode in
+;      !Battle_FramesDecoded.
+; Layout 2 (8 x 6) is read with record 5's row order for every slot but
+; 3; why slot 3 differs is not known.
+; The cell copies are unrolled 16 (words) and 32 (mirrored bytes) times in
+; the original, and kept that way.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
+;        (falls in from Battle_DrawBattlerFrame or is called directly)
+; Exit:  M=1, X=0, DP=0, DB=$7E (pushed and restored around the copy, which
+;        runs with DB = the tile bank); A, X, Y clobbered; DP $77-$78,
+;        $80-$85, $88-$89, $8C-$8D, $A5, $A7-$B0 (partly the multiply
+;        helpers') and $BA-$BE written.
+;        An unchanged frame returns early with X = slot and A = FrameId.
+; Callers: JSR from $C1:34C0 (a loop over all 11 slots), and the fall-in
+;          from Battle_DrawBattlerFrame (searched: no other JSR, JMP or JSL
+;          reaches $1C55)
+; Callees: Battle_Mul8x16, Battle_Mul8
+Battle_DrawBattlerFrameAnyLayout:
+    LDX.w !Battle_FrameSlot
+    STX.b !BattleFrame_Slot
+    STZ.w !Battler_FrameDeferred,X
+    LDA.w !Battle_FrameId
+    CMP.w !Battler_FrameShown,X
+    BNE .new_frame
+    RTS                             ; already showing this frame
+.new_frame:
+    STA.w !Battler_FrameShown,X
+
+    ; Frame record offset = FrameId * bytes per record of this layout.
+    LDA.w !Battler_FrameLayout,X
+    ASL
+    TAX
+    LDA.l !BattleRom_FrameBytes,X
+    STA.b !Battle_MulFactor16
+    LDA.l !BattleRom_FrameBytes+1,X
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_FrameId
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_SlotTimes3,X
+    TAX
+    REP #$21                        ; A 16-bit, carry clear for the ADC
+    LDA.w !Battler_FramesPtr,X
+    ADC.b !Battle_MulProduct
+    STA.b !BattleFrame_MapPtr
+    LDA.w !Battler_TileGfxPtr,X
+    STA.b !BattleFrame_GfxBase
+    TDC
+    SEP #$20
+    PHB                             ; keep the caller's DB ($7E)
+    LDA.w !Battler_FramesPtr+2,X
+    STA.b !BattleFrame_MapPtr+2
+    LDA.w !Battler_TileGfxPtr+2,X
+    PHA                             ; the tile bank becomes DB below
+
+    ; Layout record = BattleRom_FrameLayout + layout * 14.
+    LDX.b !BattleFrame_Slot
+    LDA.w !Battler_FrameLayout,X
+    STA.b !Battle_Mul8A
+    CMP.b #!Battle_FrameLayoutTall
+    BNE .layout_ok
+    LDA.w !Battle_FrameSlot
+    CMP.b #!Battle_FirstEnemySlot
+    BEQ .layout_ok                  ; slot 3 keeps layout 2's row order
+    LDA.b #!Battle_FrameLayoutTallAlt
+    STA.b !Battle_Mul8A
+.layout_ok:
+    LDA.b #!Battle_FrameLayoutBytes
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    LDA.l BattleRom_FrameLayout.Width,X
+    STA.b !BattleFrame_ColsLeft
+    STA.b !BattleFrame_Width
+    LDA.l BattleRom_FrameLayout.Height,X
+    STA.b !BattleFrame_RowsLeft
+    REP #$21
+    TXA
+    ADC.w #BattleRom_FrameLayout&$FFFF
+    STA.b !BattleFrame_RowPtr
+    ASL.b !BattleFrame_Slot         ; slot * 2 from here on
+    TDC
+    SEP #$20
+    LDA.b #BattleRom_FrameLayout>>16
+    STA.b !BattleFrame_RowPtr+2
+    LDA.b #!Battle_WramBank
+    STA.b !BattleFrame_DestPtr+2
+    PLB                             ; DB = tile bank
+
+.row:
+    REP #$21
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_FrameDestBase,X
+    ADC.b [!BattleFrame_RowPtr]     ; + this row's offset
+    TAX                             ; X = destination of the row's first tile
+    INC.b !BattleFrame_RowPtr
+    INC.b !BattleFrame_RowPtr
+.cell:
+    REP #$20
+    LDA.b [!BattleFrame_MapPtr]
+    STA.b !BattleFrame_Entry
+    AND.w #!Battle_FrameTileMask
+    BNE .tile
+
+    ; Tile 0: a blank cell, 32 zero bytes (A = 0 here).
+    STA.l !Battle_WramLong,X
+    STA.l !Battle_WramLong+2,X
+    STA.l !Battle_WramLong+4,X
+    STA.l !Battle_WramLong+6,X
+    STA.l !Battle_WramLong+8,X
+    STA.l !Battle_WramLong+10,X
+    STA.l !Battle_WramLong+12,X
+    STA.l !Battle_WramLong+14,X
+    STA.l !Battle_WramLong+16,X
+    STA.l !Battle_WramLong+18,X
+    STA.l !Battle_WramLong+20,X
+    STA.l !Battle_WramLong+22,X
+    STA.l !Battle_WramLong+24,X
+    STA.l !Battle_WramLong+26,X
+    STA.l !Battle_WramLong+28,X
+    STA.l !Battle_WramLong+30,X
+    TXA
+    CLC
+    ADC.w #!Battle_TileBytes
+    TAX
+    JMP .next_cell
+
+.tile:
+    ASL                             ; tile number * 32
+    ASL
+    ASL
+    ASL
+    ASL
+    CLC
+    ADC.b !BattleFrame_GfxBase
+    TAY                             ; Y = source tile in bank DB
+    LDA.b !BattleFrame_Entry
+    AND.w #!Battle_FrameHFlip
+    BNE .mirrored
+    LDA.w !Battle_DataBankAbs,Y
+    STA.l !Battle_WramLong,X
+    LDA.w !Battle_DataBankAbs+2,Y
+    STA.l !Battle_WramLong+2,X
+    LDA.w !Battle_DataBankAbs+4,Y
+    STA.l !Battle_WramLong+4,X
+    LDA.w !Battle_DataBankAbs+6,Y
+    STA.l !Battle_WramLong+6,X
+    LDA.w !Battle_DataBankAbs+8,Y
+    STA.l !Battle_WramLong+8,X
+    LDA.w !Battle_DataBankAbs+10,Y
+    STA.l !Battle_WramLong+10,X
+    LDA.w !Battle_DataBankAbs+12,Y
+    STA.l !Battle_WramLong+12,X
+    LDA.w !Battle_DataBankAbs+14,Y
+    STA.l !Battle_WramLong+14,X
+    LDA.w !Battle_DataBankAbs+16,Y
+    STA.l !Battle_WramLong+16,X
+    LDA.w !Battle_DataBankAbs+18,Y
+    STA.l !Battle_WramLong+18,X
+    LDA.w !Battle_DataBankAbs+20,Y
+    STA.l !Battle_WramLong+20,X
+    LDA.w !Battle_DataBankAbs+22,Y
+    STA.l !Battle_WramLong+22,X
+    LDA.w !Battle_DataBankAbs+24,Y
+    STA.l !Battle_WramLong+24,X
+    LDA.w !Battle_DataBankAbs+26,Y
+    STA.l !Battle_WramLong+26,X
+    LDA.w !Battle_DataBankAbs+28,Y
+    STA.l !Battle_WramLong+28,X
+    LDA.w !Battle_DataBankAbs+30,Y
+    STA.l !Battle_WramLong+30,X
+    TXA
+    CLC
+    ADC.w #!Battle_TileBytes
+    TAX
+    JMP .next_cell
+
+.mirrored:
+    ; Same 32 bytes, each passed through the bit-reverse table. Both
+    ; pointers go to DP so Y can be a byte index with 8-bit X/Y.
+    STY.b !BattleFrame_Entry        ; now the source address
+    STX.b !BattleFrame_DestPtr
+    SEP #$30
+    LDY.b #0
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    REP #$31                        ; A, X/Y 16-bit, carry clear
+    LDA.b !BattleFrame_DestPtr
+    ADC.w #!Battle_TileBytes
+    TAX
+
+.next_cell:
+    INC.b !BattleFrame_MapPtr
+    INC.b !BattleFrame_MapPtr
+    TDC
+    SEP #$20
+    DEC.b !BattleFrame_ColsLeft
+    BEQ .row_done
+    JMP .cell
+.row_done:
+    DEC.b !BattleFrame_RowsLeft
+    BEQ .tiles_done
+    LDA.b !BattleFrame_Width
+    STA.b !BattleFrame_ColsLeft
+    JMP .row
+
+.tiles_done:
+    PLB                             ; DB = $7E again
+    ; MapPtr now points past the tilemap: copy the signed bytes that
+    ; follow into the slot's !Battler_FrameExtra words.
+    LDA.w !Battle_FrameSlot
+    TAX
+    LDA.w !Battler_FrameLayout,X
+    TAX
+    LDA.l !BattleRom_FrameExtraCount,X
+    TAX
+    STX.b !BattleFrame_ColsLeft     ; 16-bit count
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_SlotTimes16,X
+    STA.b !BattleFrame_RowPtr
+    LDA.l !BattleRom_SlotTimes16+1,X
+    STA.b !BattleFrame_RowPtr+1
+    LDX.b !BattleFrame_RowPtr
+    LDY.w #0
+.extra:
+    LDA.b [!BattleFrame_MapPtr],Y
+    STA.w !Battler_FrameExtra,X
+    BMI .negative
+    TDC
+    BRA .store_high
+.negative:
+    LDA.b #!Battle_SignExtendNeg
+.store_high:
+    STA.w !Battler_FrameExtra+1,X
+    INX
+    INX
+    INY
+    CPY.b !BattleFrame_ColsLeft
+    BNE .extra
+    INC.w !Battle_FramesDecoded
+    RTS
+
+; ==================================================================
 ; BattleMenu_RefreshIfDirtyL ($C110E3–$C110F9, 23 bytes)
 ; ==================================================================
 ; JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the
