@@ -414,8 +414,9 @@ if !ram_engine_inc == 0
                                          ; script continues (Evt_RunObjInit sets it past the init
                                          ; function)
 !Obj_Facing = $1600                      ; 8-bit per object facing; EOR 1 turns it around
-                                         ; (Field_SceneChangeTick); Obj_AnimFrameLookup picks the
-                                         ; facing block from it (0, negative, 2, other)
+                                         ; (Field_SceneChangeTick); Obj_AnimFrameLookup uses facing
+                                         ; 0-3 as the multiple of Obj_AnimFacingStride (its tests
+                                         ; also send $80/$81 to 3 and $82-$FF to 1)
 !Obj_PosX = $1800                        ; 16-bit per object X position; the high byte is the tile
                                          ; column (Field_SaveState copies it to Loc_EntryX)
 !Obj_TileX = $1801                       ; 8-bit high byte of Obj_PosX: tile column
@@ -459,11 +460,15 @@ if !ram_engine_inc == 0
 !Obj_FrameBank = $1300                   ; 8-bit per object: bank of its frame data
 !Obj_FrameOfs = $1380                    ; 16-bit per object: offset of its frame data in
                                          ; Obj_FrameBank
-!Obj_PrioLow = $0C00                     ; 8-bit per object: OAM priority bits for tiles whose OfsY
-                                         ; is below $E8 (the lower body); saved with the party
-                                         ; positions
-!Obj_PrioHigh = $0C01                    ; 8-bit per object: OAM priority bits for tiles with OfsY >=
-                                         ; $E8 (the upper 24 lines)
+!Obj_PrioLow = $0C00                     ; 8-bit per object: attribute bits ORed into some of its
+                                         ; tiles: in the 4-tile builders those with OfsY < $E8
+                                         ; (Spr_UpperOfsY), in the 8/12-tile builders records 0-3.
+                                         ; OAM priority bits by inference; which part of the
+                                         ; sprite they cover is not established. Saved (as a word
+                                         ; with Obj_PrioHigh) with the party positions
+!Obj_PrioHigh = $0C01                    ; 8-bit per object: the same for the other tiles: OfsY >=
+                                         ; $E8 in the 4-tile builders, records 4 and up in the
+                                         ; 8/12-tile builders
 !Obj_VramTile = $0D00                    ; 16-bit per object: first OAM tile number of its graphics
                                          ; (bits 0-8); the high byte also feeds the attributes. $68
                                          ; selects the alternate layout in the 12-tile builders

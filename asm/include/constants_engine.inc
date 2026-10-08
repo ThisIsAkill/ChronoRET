@@ -192,18 +192,27 @@ if !constants_engine_inc == 0
 ; --- Object frame build ---
 !Obj_VramTileMask = $01FF                ; tile-number bits of Obj_VramTile
 !ObjTile_AltLayout = $68                 ; Obj_VramTile value that selects the alternate VRAM layout
-                                         ; in the 12-tile builders
+                                         ; in the 12-tile builders: tile $68 is column 8 of a
+                                         ; 16-tile VRAM row, so its first row of 16x16 tiles holds
+                                         ; only 4, giving rows of 4 then 8 instead of 8 then 4
 !Frame4_Bytes = $28                      ; bytes per frame record of a 4-tile object: 16 tile words +
                                          ; 4 position pairs
-!Frame8_Bytes = $50                      ; bytes per frame record of an 8-tile object
-!Frame12_Bytes = $78                     ; bytes per frame record of a 12-tile object
-!Spr_UpperOfsY = $E8                     ; tiles with OfsY >= this (the upper 24 lines) take
-                                         ; Obj_PrioHigh
+!Frame8_Bytes = $50                      ; bytes per frame record of an 8-tile object: 32 tile words
+                                         ; + 8 position pairs
+!Frame12_Bytes = $78                     ; bytes per frame record of a 12-tile object: 48 tile words
+                                         ; + 12 position pairs
+!Spr_UpperOfsY = $E8                     ; 4-tile builders: tiles with OfsY >= this (unsigned; as a
+                                         ; signed byte -24..-1, the 24 lines just above the
+                                         ; origin) take Obj_PrioHigh. Whether that is the upper or
+                                         ; lower part of the sprite depends on where the origin
+                                         ; is, which is not established
 !Anim_EndMarker = $FF                    ; frame-number table entry that ends an animation row
 !Vram_TileRowWords = $0100               ; VRAM words in one row of sixteen 8x8 tiles (the next row
                                          ; holds the lower halves of 16x16 sprites)
 !Gfx_8TilesBytes = $0100                 ; bytes in eight 4bpp 8x8 tiles
 !SprBuf_ChunkTiles = $0010               ; tiles in one $200-byte SprBuf chunk
+!SprBuf_HalfChunkTiles = $0008           ; tiles in half a SprBuf chunk ($100 bytes): one copy run of
+                                         ; the 12-tile builders
 !Frame_TileWordBytes = $02               ; bytes per tile word in a frame record (offsets are written
                                          ; as this x tile index)
 !Spr_TileRowStep = $10                   ; OAM tile-number step to the next row of 16 tiles
