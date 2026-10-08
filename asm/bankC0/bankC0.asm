@@ -20217,9 +20217,8 @@ Field_ServiceUnk54_SendLine: ; header: see Field_ServiceUnk54
 ;   (JSR $C0:197E) and Field_RunBankC2Mode5 (JSR $C0:19FC).
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
-; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them,
-; as far as is known: Field_WaitFrame and Scene_ReloadStep's Field_UnkB0E6 are
-; unmatched); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave
+; them); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
 ; and Field_WaitFrame).
 ; ============================================================
 org $C02824
