@@ -6202,8 +6202,9 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; ============================================================
 ; Field event hooks: window effects ($C0:21E1–$C0:274C)
 ;
-; Field_EventHook (dp $39) names a per-frame job; 0 = none. Every
-; handler drives a window (masking) effect: it sets the window and
+; Field_EventHook (dp $39) names a per-frame job; 0 = none. Hooks 1-10
+; and 12 drive a window (masking) effect (hook 11 leaves the field for
+; bank $C3; 13-16 are idle or unused): each sets the window and
 ; colour-math shadows the NMI handler copies to the PPU
 ; (Ppu_W12SelShadow .. Ppu_CgwSelShadow), turns on an HDMA channel
 ; (5, or 7 for hook 3) in Field_HdmaEnable, and has a bank-$C3 routine
@@ -6240,7 +6241,7 @@ Field_EventHookDispatch:
 ; Field_EventHookTable: 16 handler addresses, indexed by
 ; (Field_EventHook - 1) x 2. Entries 7/8 and 9/10 share a handler that
 ; runs two frames (the first moves the hook on to the second); 13 is a
-; bare RTS (the tail of Field_HookWinOff3) that hook 12 leaves set; 14
+; bare RTS (the last byte of Field_HookWinC3E, hook 3) that hook 12 leaves set; 14
 ; is the shutdown tail of hook 5. 15 and 16 point at Evt_UnusedOpcode,
 ; the event interpreter's handler for unused opcodes.
 Field_EventHookTable:

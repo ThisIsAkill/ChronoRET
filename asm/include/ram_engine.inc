@@ -116,8 +116,9 @@ if !ram_engine_inc == 0
                                          ; DefaultHandler sets it to 1. Field_DpadDispatch does
                                          ; nothing while it is nonzero
 !Field_EventHook = $39                   ; 8-bit; Field_EventHookDispatch runs table entry (value -
-                                         ; 1) when nonzero; the handlers drive window (masking)
-                                         ; effects and clear it (or move it on) when done
+                                         ; 1) when nonzero; most handlers drive window (masking)
+                                         ; effects and clear it (or move it on) when done; hooks 3
+                                         ; and 11 never clear it themselves
 !WinFx_CenterX = $3A                     ; 8-bit; hooks 1-5 hand it to BankC3_Entry0008 as
                                          ; WinFx_ArgX (inferred: the shape's centre X)
 !WinFx_CenterY = $3B                     ; 8-bit; handed over as WinFx_ArgY (inferred: centre Y)
