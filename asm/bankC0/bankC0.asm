@@ -5301,6 +5301,1021 @@ Scene_Unk024C:
     RTS
 
 ; ============================================================
+; $C0:0283 — Scene_Unk0283 (200 bytes, $0283–$034A)
+; Rebuilds the field after a battle; DefaultHandler calls it right
+; after JSL EngCall_BattleMain. Oam_HideFirst4, then Field_RestoreSaveBlock
+; brings back the field state Scene_Unk024C stashed, and FieldBtl_Result
+; (set by the battle code) picks one of three ways out:
+;   1 (unless FieldBtl_EvtFlags has FieldBtl_EvtNoReset): idle frames
+;     until Pad_Unk00F6 or Pad_Pressed is nonzero, then lower
+;     Fade_Brightness one step a frame to 0 (Field_FrameUpdate, FdVec_FFF7,
+;     Sub_EC60), InitHW, S = StackTop and BRL GameLoop: the cold start
+;     (probably the game-over path; that the battle stores 1 when the
+;     party falls is not traced);
+;   2 (unless the quirky test below passes): the same fade-out without
+;     waiting, InitHW, Loc_PrevX/Y/Facing become Loc_EntryX/Y/Facing and
+;     Loc_PrevId becomes Loc_Id, S = StackTop and BRL GameLoop_Main,
+;     which loads that location again;
+;   0, any other value, or a skipped 1/2: rebuild in place. The OAM
+;     ranges' previous ends are set to their limits (so the next
+;     Oam_BuildShadow parks every entry past the new ends), FieldBtl_Restore puts the objects back, then
+;     the location steps run again with an idle frame between some:
+;     LocLoad_UnkA33B, Field_Unk29F7, Field_Unk47 |= Field_Unk47Bits03,
+;     LocLoad_Unk09DD, LocLoad_Unk0A14, LocLoad_Unk56D4, Evt_RunObj0Func1,
+;     Map_LoadTreasureTiles (DP = DP_Map around it), Field_Unk2B78 and
+;     Field_Unk47 |= 2. It then falls into Field_Unk034B, whose RTS
+;     returns to DefaultHandler.
+; Quirk, kept: the value-2 test is `BIT $0010`, an absolute operand where
+; the value-1 test above it has `BIT #$20`. It ANDs FieldBtl_EvtFlags
+; with the byte at $00:0010 (Eng_Unk0010), not with #$10, so whether
+; the reload is skipped depends on that byte. Probably meant as #$10.
+; Callers: DefaultHandler ($C0:18C1), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (DefaultHandler
+; sets it after the battle), DB=$00 (absolute Pad_*, Eng_Unk0010 and
+; the callees' registers).
+; Exit: the rebuild path ends through Field_Unk034B: M=1, X=0, DP=$0100,
+; DB=$00, A, X and Y clobbered. Paths 1 and 2 never return (the stack
+; is reset).
+; ============================================================
+org $C00283
+Scene_Unk0283:
+    JSR Oam_HideFirst4
+    JSR Field_RestoreSaveBlock
+    LDA.l !FieldBtl_Result
+    BEQ .to_rebuild
+    DEC A
+    BEQ .result1
+    DEC A
+    BEQ .result2
+.to_rebuild:
+    BRL .rebuild
+.result1:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtNoReset
+    BNE .rebuild
+.wait_button:
+    LDA.w !Pad_Unk00F6
+    BNE .fade1
+    LDA.w !Pad_Pressed
+    BNE .fade1
+    JSR Field_IdleFrame
+    BRA .wait_button
+.fade1:
+    LDA.b !Fade_Brightness
+    BEQ .restart
+    BMI .restart
+    DEC.b !Fade_Brightness
+    JSR Field_FrameUpdate
+    JSL FdVec_FFF7
+    JSR Sub_EC60
+    BRA .fade1
+.restart:
+    JSR InitHW
+    LDX.w #!StackTop
+    TXS
+    BRL GameLoop
+.result2:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.w !Eng_Unk0010                  ; quirk: absolute, not #$10 (see the header)
+    BNE .rebuild
+.fade2:
+    LDA.b !Fade_Brightness
+    BEQ .reload
+    BMI .reload
+    DEC.b !Fade_Brightness
+    JSR Field_FrameUpdate
+    JSL FdVec_FFF7
+    JSR Sub_EC60
+    BRA .fade2
+.reload:
+    JSR InitHW
+    LDA.b !Loc_PrevX
+    STA.b !Loc_EntryX
+    LDA.b !Loc_PrevX+1                  ; the Y byte of the 16-bit store
+    STA.b !Loc_EntryY
+    LDA.b !Loc_PrevFacing
+    STA.b !Loc_EntryFacing
+    LDX.b !Loc_PrevId
+    STX.b !Loc_Id
+    LDX.w #!StackTop
+    TXS
+    BRL GameLoop_Main
+.rebuild:
+    LDX.w #!Oam_Range2Limit
+    STX.b !Oam_Range2PrevEnd
+    LDX.w #!Oam_Range3Limit
+    STX.b !Oam_Range3PrevEnd
+    LDX.w #!Oam_Range1Limit
+    STX.b !Oam_Range1PrevEnd
+    JSR FieldBtl_Restore
+    JSR LocLoad_UnkA33B
+    JSR Field_IdleFrame
+    JSL Field_Unk29F7
+    LDA.b #!Field_Unk47Bits03
+    TSB.b !Field_Unk47
+    JSR LocLoad_Unk09DD
+    JSR Field_IdleFrame
+    JSR LocLoad_Unk0A14
+    JSR LocLoad_Unk56D4
+    JSR Evt_RunObj0Func1
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    JSR Map_LoadTreasureTiles
+    PLD
+    JSR Field_IdleFrame
+    JSL Field_Unk2B78
+    LDA.b #$02
+    TSB.b !Field_Unk47                  ; falls into Field_Unk034B
+
+; ============================================================
+; $C0:034B — Field_Unk034B (68 bytes, $034B–$038E)
+; Scene_Unk024C's no-battle path, and the end of Scene_Unk0283's
+; rebuild (fall-through). Sets Field_Unk7F03FE, which Field_RestoreState
+; reads: with FieldBtl_EvtFlags bit 7 (FieldBtl_EvtUnk80) set, or with
+; no party member 2, it is 3 (and the latter also sets
+; Field_ControlEnabled = 1); otherwise members 2 and 3 each get
+; Evt_RedirectObjScript (through Field_UnkEB) and it is 2 when there is
+; no member 3, 1 when there is. On the redirect paths Field_UnkAB is
+; then copied to Field_UnkAC and Field_UnkAD. Ends with Field_IdleFrame
+; (BRL, so its RTS returns to this routine's caller).
+; Both paths into .set3 meet with different X widths (16-bit from the
+; flag test, 8-bit from the member test); nothing there uses X, and
+; REP #$10 follows.
+; Callers: Scene_Unk024C ($C0:027E); Scene_Unk0283 falls in.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot*,
+; Field_* are dp), DB=$00 (Field_IdleFrame's callees).
+; Exit: through Field_IdleFrame: M=1, X=0, DP=$0100, DB=$00; A, X, Y
+; clobbered; Field_UnkEB = the last member redirected (when any).
+; ============================================================
+Field_Unk034B:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtUnk80
+    BNE .set3
+    SEP #$10
+    LDA.b !Party_ObjSlot1
+    BPL .redirect2
+    LDA.b #$01
+    STA.b !Field_ControlEnabled
+.set3:
+    LDA.b #$03
+    STA.l !Field_Unk7F03FE
+    REP #$10
+    BRL Field_IdleFrame
+.redirect2:
+    STA.b !Field_UnkEB
+    JSR Evt_RedirectObjScript
+    LDA.b !Party_ObjSlot2
+    BPL .redirect3
+    LDA.b #$02
+    STA.l !Field_Unk7F03FE
+    BRA .copy_ab
+.redirect3:
+    STA.b !Field_UnkEB
+    JSR Evt_RedirectObjScript
+    LDA.b #$01
+    STA.l !Field_Unk7F03FE
+.copy_ab:
+    LDA.b !Field_UnkAB
+    STA.b !Field_UnkAC
+    STA.b !Field_UnkAD
+    REP #$10
+    BRL Field_IdleFrame
+
+; ============================================================
+; $C0:038F — Field_Unk038F (12 bytes, $038F–$039A)
+; Fills the field/battle hand-off block before a battle (see the
+; FieldBtl* structs in ram_engine.inc): FieldBtl_SaveTileAttrs,
+; FieldBtl_SavePartyPos, FieldBtl_SaveObjs, then FieldBtl_SavePpu as a
+; tail call.
+; Callers: Scene_Unk024C ($C0:0265), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00;
+; Field_BattleObjList filled (Field_Unk0617).
+; Exit: through FieldBtl_SavePpu: M=1, X=0, DP and DB unchanged; A, X,
+; Y clobbered; dp FieldBtl_OriginX/Y, FieldBtl_RestOriginX/Y,
+; FieldBtl_ObjSlots and Eng_Scratch written.
+; ============================================================
+Field_Unk038F:
+    JSR FieldBtl_SaveTileAttrs
+    JSR FieldBtl_SavePartyPos
+    JSR FieldBtl_SaveObjs
+    BRL FieldBtl_SavePpu
+
+; ============================================================
+; $C0:039B — FieldBtl_SaveTileAttrs (127 bytes, $039B–$0419)
+; Copies the 16 x 16-tile window of Map_TileAttrA at the screen origin
+; (Map_TileOriginX/Y / 2, wrapped with Map_ColMask1 / Map_RowMask1) to
+; FieldBtl_AttrA, the same window of Map_TileAttrB to FieldBtl_AttrB
+; (16 MVNs of 16 bytes each, source rows Map_RowStride apart), and the
+; whole palette Pal_Buf to Pal_CgramBuf. The window itself is not
+; wrapped: only its corner is masked.
+; Callers: Field_Unk038F ($C0:038F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (or $7E:
+; the Map_TileOrigin* / Map_*Mask1 reads are absolute).
+; Exit: M=1, X=0, DP unchanged, DB unchanged (PHB/PLB around each MVN);
+; A clobbered, X and Y past the last copy; FieldBtl_OriginX/Y =
+; the masked origin; FieldBtl_RowsLeft (Eng_Scratch) = 0.
+; ============================================================
+FieldBtl_SaveTileAttrs:
+    LDA.w !Map_TileOriginX
+    LSR A
+    AND.w !Map_ColMask1
+    STA.b !FieldBtl_OriginX
+    LDA.w !Map_TileOriginY
+    LSR A
+    AND.w !Map_RowMask1
+    STA.b !FieldBtl_OriginY
+    XBA
+    LDA.b !FieldBtl_OriginX             ; A = row << 8 | column
+    REP #$20
+    CLC
+    ADC.w #!Map_TileAttrA&$FFFF
+    TAX
+    LDY.w #!FieldBtl_AttrA&$FFFF
+    LDA.w #!FieldBtl_AttrSide-1
+    STA.b !FieldBtl_RowsLeft
+.row_a:
+    LDA.w #!FieldBtl_AttrSide-1         ; MVN count - 1: one row
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDA.b !FieldBtl_RowsLeft
+    BEQ .attr_b
+    DEC.b !FieldBtl_RowsLeft
+    TXA
+    SEC
+    SBC.w #!FieldBtl_AttrSide
+    CLC
+    ADC.w #!Map_RowStride               ; same column, next map row
+    TAX
+    BRA .row_a
+.attr_b:
+    SEP #$20
+    LDA.b !FieldBtl_OriginY
+    XBA
+    LDA.b !FieldBtl_OriginX
+    REP #$20
+    CLC
+    ADC.w #!Map_TileAttrB&$FFFF
+    TAX
+    LDY.w #!FieldBtl_AttrB&$FFFF
+    LDA.w #!FieldBtl_AttrSide-1
+    STA.b !FieldBtl_RowsLeft
+.row_b:
+    LDA.w #!FieldBtl_AttrSide-1
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDA.b !FieldBtl_RowsLeft
+    BEQ .palette
+    DEC.b !FieldBtl_RowsLeft
+    TXA
+    SEC
+    SBC.w #!FieldBtl_AttrSide
+    CLC
+    ADC.w #!Map_RowStride
+    TAX
+    BRA .row_b
+.palette:
+    LDX.w #!Pal_Buf&$FFFF
+    LDY.w #!Pal_CgramBuf&$FFFF
+    LDA.w #!Pal_BufBytes-1
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; ============================================================
+; $C0:041A — FieldBtl_SavePartyPos (211 bytes, $041A–$04EC)
+; For each party member present (Party_ObjSlot, Party_ObjSlot1,
+; Party_ObjSlot2; bit 7 = none) fills its FieldBtlPc record: tile X/Y
+; relative to FieldBtl_OriginX/Y (Map_TileOriginX/Y / 2, unmasked
+; here), the pixel within the tile (Obj_ScreenX/Y & FieldBtl_SubMask)
+; and Obj_LastFrame; and sets both of its Obj_PrioLow/High to
+; Field_Unk7E2989's TileAttr_PrioBit | FieldBtl_PcPrio.
+; Callers: Field_Unk038F ($C0:0392).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (TDC/XBA clears B
+; for the 16-bit TAX because DP's low byte is 0), DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y unchanged;
+; FieldBtl_OriginX/Y written.
+; ============================================================
+FieldBtl_SavePartyPos:
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !FieldBtl_OriginX
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !FieldBtl_OriginY
+    TDC
+    XBA                                 ; B = 0 (DP low byte)
+    LDA.b !Party_ObjSlot
+    BMI .member2
+    TAX
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !FieldBtl_OriginX
+    STA.l FieldBtlPc[0].TileX
+    LDA.w !Obj_ScreenX,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[0].SubX
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !FieldBtl_OriginY
+    STA.l FieldBtlPc[0].TileY
+    LDA.w !Obj_ScreenY,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[0].SubY
+    LDA.w !Obj_LastFrame,X
+    STA.l FieldBtlPc[0].Frame
+    LDA.l !Field_Unk7E2989
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!FieldBtl_PcPrio
+    STA.w !Obj_PrioLow,X
+    STA.w !Obj_PrioHigh,X
+.member2:
+    TDC
+    XBA
+    LDA.b !Party_ObjSlot1
+    BMI .member3
+    TAX
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !FieldBtl_OriginX
+    STA.l FieldBtlPc[1].TileX
+    LDA.w !Obj_ScreenX,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[1].SubX
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !FieldBtl_OriginY
+    STA.l FieldBtlPc[1].TileY
+    LDA.w !Obj_ScreenY,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[1].SubY
+    LDA.w !Obj_LastFrame,X
+    STA.l FieldBtlPc[1].Frame
+    LDA.l !Field_Unk7E2989
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!FieldBtl_PcPrio
+    STA.w !Obj_PrioLow,X
+    STA.w !Obj_PrioHigh,X
+.member3:
+    TDC
+    XBA
+    LDA.b !Party_ObjSlot2
+    BMI .done
+    TAX
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !FieldBtl_OriginX
+    STA.l FieldBtlPc[2].TileX
+    LDA.w !Obj_ScreenX,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[2].SubX
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !FieldBtl_OriginY
+    STA.l FieldBtlPc[2].TileY
+    LDA.w !Obj_ScreenY,X
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlPc[2].SubY
+    LDA.w !Obj_LastFrame,X
+    STA.l FieldBtlPc[2].Frame
+    LDA.l !Field_Unk7E2989
+    AND.b #!TileAttr_PrioBit
+    ORA.b #!FieldBtl_PcPrio
+    STA.w !Obj_PrioLow,X
+    STA.w !Obj_PrioHigh,X
+.done:
+    RTS
+
+; ============================================================
+; $C0:04ED — FieldBtl_SaveObjs (106 bytes, $04ED–$0556)
+; Marks all 8 FieldBtlObj records empty (Unk05/Unk06 = FieldBtl_NoObj)
+; and all 8 FieldBtl_ObjSlots $FF, then runs FieldBtl_SaveObj for
+; Field_BattleObjList entries 0-5 until one has bit 7 set. Entries 6-11
+; are never read: the $FF fill has just overwritten them (they share
+; FieldBtl_ObjSlots' bytes). FieldBtl_RestOriginX/Y = Map_TileOriginX/Y
+; / 2 for FieldBtl_SaveObj.
+; Callers: Field_Unk038F ($C0:0395).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0 (REP #$10 at the end), DP and DB unchanged; A, X and Y
+; clobbered (FieldBtl_SaveObj's); Eng_Scratch and Spr_NewFrame's byte
+; written.
+; ============================================================
+FieldBtl_SaveObjs:
+    SEP #$10
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !FieldBtl_RestOriginX
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !FieldBtl_RestOriginY
+    REP #$20
+    LDA.w #!FieldBtl_NoObj
+    STA.l FieldBtlObj[0].Unk05
+    STA.l FieldBtlObj[1].Unk05
+    STA.l FieldBtlObj[2].Unk05
+    STA.l FieldBtlObj[3].Unk05
+    STA.l FieldBtlObj[4].Unk05
+    STA.l FieldBtlObj[5].Unk05
+    STA.l FieldBtlObj[6].Unk05
+    STA.l FieldBtlObj[7].Unk05
+    STA.b !FieldBtl_ObjSlots
+    STA.b !FieldBtl_ObjSlots+2
+    STA.b !FieldBtl_ObjSlots+4
+    STA.b !FieldBtl_ObjSlots+6
+    SEP #$20
+    LDA.b !Field_BattleObjList
+    BMI .done
+    JSR FieldBtl_SaveObj
+    LDA.b !Field_BattleObjList+1
+    BMI .done
+    JSR FieldBtl_SaveObj
+    LDA.b !Field_BattleObjList+2
+    BMI .done
+    JSR FieldBtl_SaveObj
+    LDA.b !Field_BattleObjList+3
+    BMI .done
+    JSR FieldBtl_SaveObj
+    LDA.b !Field_BattleObjList+4
+    BMI .done
+    JSR FieldBtl_SaveObj
+    LDA.b !Field_BattleObjList+5
+    BMI .done
+    JSR FieldBtl_SaveObj
+.done:
+    REP #$10
+    RTS
+
+; ============================================================
+; $C0:0557 — FieldBtl_SaveObj (192 bytes, $0557–$0616)
+; Saves one object (A = its slot) in a FieldBtlObj record, unless its
+; Obj_VramTile low byte is FieldBtl_ObjTileLimit or more (then it does
+; nothing). The record number comes from that byte: with v = tile >> 3,
+; it is (v >> 1) - 4 + (v & 1), so tiles $40, $50, ... $B0 give 0-7 (a
+; tile at an odd multiple of 8 gets the number of the tile 8 above it,
+; and tiles below $40 a negative one; neither is guarded). The slot goes in
+; FieldBtl_ObjSlots at that number, and the record gets the position
+; relative to FieldBtl_RestOriginX/Y as FieldBtlPc does, Obj_LastFrame
+; (0 for size class 3), Obj_Unk1101, 0, the Flags byte (size class,
+; FieldBtl_ObjKind6Flag when Obj_Unk1100 = 6, Obj_Unk1A81 bit 7),
+; Obj_OamAttr >> 1 and Obj_GfxOfs / Obj_GfxBank. When Obj_Unk1A81
+; bit 7 is set it also runs Obj_Unk72B4 for the object (Obj_Cur = slot).
+; The size test is `AND #7 / CMP #3` on a value already masked to 0-3.
+; Callers: FieldBtl_SaveObjs, 6 JSR sites ($C0:052E-$C0:0551).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00;
+; A = the object's slot (object x 2).
+; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered; Y = the slot;
+; FieldBtl_RecIdx (Eng_Scratch) and FieldBtl_RecFlags (Spr_NewFrame's
+; byte) written; Obj_Cur = the slot when Obj_Unk72B4 ran.
+; ============================================================
+FieldBtl_SaveObj:
+    TAY
+    LDA.w !Obj_VramTile,Y
+    CMP.b #!FieldBtl_ObjTileLimit
+    BCC .save
+    RTS
+.save:
+    LSR A
+    LSR A
+    LSR A                               ; v = tile >> 3
+    PHA
+    LSR A
+    SEC
+    SBC.b #$04
+    STA.b !FieldBtl_RecIdx              ; (v >> 1) - 4
+    PLA
+    AND.b #$01
+    CLC
+    ADC.b !FieldBtl_RecIdx              ; + (v & 1): record number
+    STA.w WRMPYA
+    TAX
+    STY.b !FieldBtl_ObjSlots,X
+    LDA.b #!FieldBtl_ObjRecSize
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    LDA.w !Obj_TileX,Y
+    SEC
+    SBC.b !FieldBtl_RestOriginX
+    LDX.w RDMPYL                        ; record offset
+    STA.l FieldBtlObj.TileX,X
+    LDA.w !Obj_ScreenX,Y
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlObj.SubX,X
+    LDA.w !Obj_TileY,Y
+    SEC
+    SBC.b !FieldBtl_RestOriginY
+    STA.l FieldBtlObj.TileY,X
+    LDA.w !Obj_ScreenY,Y
+    AND.b #!FieldBtl_SubMask
+    STA.l FieldBtlObj.SubY,X
+    LDA.w !Obj_Unk1101,Y
+    STA.l FieldBtlObj.Unk05,X
+    LDA.b #$00
+    STA.l FieldBtlObj.Unk06,X
+    LDA.w !Obj_Unk1100,Y
+    CMP.b #$06
+    BNE .other_kind
+    LDA.w !Obj_SprSize,Y
+    AND.b #!ObjSpr_SizeMask
+    STA.b !FieldBtl_RecIdx              ; now the size class
+    ORA.b #!FieldBtl_ObjKind6Flag
+    BRA .flags
+.other_kind:
+    LDA.w !Obj_SprSize,Y
+    AND.b #!ObjSpr_SizeMask
+    STA.b !FieldBtl_RecIdx
+.flags:
+    STA.b !FieldBtl_RecFlags
+    LDA.w !Obj_Unk1A81,Y
+    AND.b #!FieldBtl_ObjUnk1A81Bit
+    ORA.b !FieldBtl_RecFlags
+    STA.l FieldBtlObj.Flags,X
+    LDA.b !FieldBtl_RecIdx
+    AND.b #$07                          ; no-op: already 0-3
+    CMP.b #$03
+    BCC .last_frame
+    LDA.b #$00                          ; size class 3: frame 0
+    BRA .frame
+.last_frame:
+    LDA.w !Obj_LastFrame,Y
+.frame:
+    STA.l FieldBtlObj.Frame,X
+    LDA.w !Obj_Unk1A81,Y
+    BPL .attr
+    STY.b !Obj_Cur
+    PHX
+    PHY
+    JSR Obj_Unk72B4
+    PLY
+    PLX
+.attr:
+    LDA.w !Obj_OamAttr,Y
+    LSR A
+    STA.l FieldBtlObj.Attr,X
+    LDA.w !Obj_GfxBank,Y
+    STA.l FieldBtlObj.GfxBank,X
+    LDA.w !Obj_GfxOfs+1,Y
+    STA.l FieldBtlObj.GfxOfs+1,X
+    LDA.w !Obj_GfxOfs,Y
+    STA.l FieldBtlObj.GfxOfs,X
+    RTS
+
+; ============================================================
+; $C0:0617 — Field_Unk0617 (86 bytes, $0617–$066C)
+; Fills Field_BattleObjList for Scene_Unk024C: walks the object slots
+; from Evt_ObjCount x 2 down to 2 (slot 0 is never looked at) and lists
+; each one that has Obj_Unk1A81 bit 7 set or Obj_Unk0F00 nonzero, is of
+; kind 5 or 6 (Obj_Unk1100) and lies inside the screen: tile X minus
+; FieldBtl_OriginX (Map_TileOriginX / 2) from 1 to
+; FieldBtl_ViewTilesX - 1, tile Y minus FieldBtl_OriginY from 1 to
+; FieldBtl_ViewTilesY - 1. At most Field_BattleObjMax entries, then (or
+; at the end of the walk) Obj_None ends the list.
+; Callers: Scene_Unk024C ($C0:024E), its only JSR site.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y; Scene_Unk024C sets it),
+; DP=$0100 (FieldBtl_OriginX/Y), DB=$00 (the list is written absolute,
+; DP_Field+Field_BattleObjList).
+; Exit: M=1, X=1, DP and DB unchanged; A = Obj_None, X = 0 or the last
+; slot listed, Y = the entries listed; FieldBtl_OriginX/Y written.
+; ============================================================
+Field_Unk0617:
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !FieldBtl_OriginX
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !FieldBtl_OriginY
+    LDY.b #$00
+    LDA.l !Evt_ObjCount
+    ASL A
+    TAX
+.check:
+    LDA.w !Obj_Unk1A81,X
+    BMI .kind
+    LDA.w !Obj_Unk0F00,X
+    BNE .kind
+.next:
+    DEX
+    DEX
+    BNE .check
+.end_list:
+    LDA.b #!Obj_None
+    STA.w !DP_Field+!Field_BattleObjList,Y
+    RTS
+.kind:
+    LDA.w !Obj_Unk1100,X
+    CMP.b #$05
+    BEQ .on_screen
+    CMP.b #$06
+    BNE .next
+.on_screen:
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !FieldBtl_OriginX
+    BEQ .next
+    CMP.b #!FieldBtl_ViewTilesX
+    BCS .next
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !FieldBtl_OriginY
+    BEQ .next
+    CMP.b #!FieldBtl_ViewTilesY
+    BCS .next
+    TXA
+    STA.w !DP_Field+!Field_BattleObjList,Y
+    INY
+    CPY.b #!Field_BattleObjMax
+    BEQ .end_list
+    BRA .next
+
+; ============================================================
+; $C0:066D — FieldBtl_SavePpu (168 bytes, $066D–$0714)
+; Fills FieldBtlPpu from the field's screen settings: the three
+; tilemap bytes (each a Map_TilemapVram* high byte ORed with a size
+; byte), the main/sub screen and colour-math values, Fade_FixedColor,
+; the constants 0, FieldBtl_PpuUnk6A and FieldBtl_PpuUnk6E, and the six
+; layer scroll words Map_Unk1D87-Map_Unk1D91 twice (Scroll and
+; Scroll2).
+; Callers: Field_Unk038F ($C0:0398, BRL tail call).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y; not used), DP=$0100
+; (Fade_FixedColor), DB=$00 (the Map_* / Ppu_* reads are absolute).
+; Exit: M=1, X and Y unchanged, DP and DB unchanged; A clobbered.
+; ============================================================
+FieldBtl_SavePpu:
+    LDA.w !Map_TilemapVram+1
+    ORA.w !Map_TilemapVram4
+    STA.l FieldBtlPpu.Tilemap1
+    LDA.w !Map_TilemapVram3+1
+    ORA.w !Map_TilemapVram4Hi
+    STA.l FieldBtlPpu.Tilemap2
+    LDA.w !Map_TilemapVramL3+1
+    ORA.w !Map_Unk1D86
+    STA.l FieldBtlPpu.Tilemap3
+    LDA.b #$00
+    STA.l FieldBtlPpu.Unk59
+    LDA.w !Ppu_Unk0BD7
+    STA.l FieldBtlPpu.MainScreen
+    LDA.w !Ppu_Unk0BD8
+    STA.l FieldBtlPpu.SubScreen
+    LDA.b #$00
+    STA.l FieldBtlPpu.Unk68
+    STA.l FieldBtlPpu.Unk69
+    LDA.b #!FieldBtl_PpuUnk6A
+    STA.l FieldBtlPpu.Unk6A
+    LDA.w !Ppu_Unk0BDF
+    STA.l FieldBtlPpu.ColorMath
+    LDA.b !Fade_FixedColor
+    STA.l FieldBtlPpu.FixedColor
+    LDA.b #$00
+    STA.l FieldBtlPpu.Unk6D
+    LDA.b #!FieldBtl_PpuUnk6E
+    STA.l FieldBtlPpu.Unk6E
+    LDA.b #$00
+    STA.l FieldBtlPpu.Unk6F
+    REP #$20
+    LDA.w !Map_Unk1D87
+    STA.l FieldBtlPpu.Scroll
+    STA.l FieldBtlPpu.Scroll2
+    LDA.w !Map_Unk1D89
+    STA.l FieldBtlPpu.Scroll+2
+    STA.l FieldBtlPpu.Scroll2+2
+    LDA.w !Map_Unk1D8B
+    STA.l FieldBtlPpu.Scroll+4
+    STA.l FieldBtlPpu.Scroll2+4
+    LDA.w !Map_Unk1D8D
+    STA.l FieldBtlPpu.Scroll+6
+    STA.l FieldBtlPpu.Scroll2+6
+    LDA.w !Map_Unk1D8F
+    STA.l FieldBtlPpu.Scroll+8
+    STA.l FieldBtlPpu.Scroll2+8
+    LDA.w !Map_Unk1D91
+    STA.l FieldBtlPpu.Scroll+10
+    STA.l FieldBtlPpu.Scroll2+10
+    SEP #$20
+    RTS
+
+; ============================================================
+; $C0:0715 — FieldBtl_Restore (86 bytes, $0715–$076A)
+; Scene_Unk0283's object rebuild after a battle: FieldBtl_RestOriginX/Y
+; = Map_TileOriginX/Y / 2, FieldBtl_RestoreObjs, FieldBtl_RestoreParty
+; (both with 8-bit X/Y), then Oam_BuildShadow. When FieldBtl_Result is
+; 1 it also sets each present party member's Obj_AnimMode to
+; Obj_AnimModeFixed with Obj_FixedFrame = Obj_LastFrame, freezing its
+; pose (the path where Scene_Unk0283 then waits for a button).
+; Callers: Scene_Unk0283 ($C0:0313), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; the
+; hand-off block as the battle left it. TDC/XBA clears B for the 16-bit
+; TAY (DP's low byte is 0).
+; Exit: M=1, X=0, DP and DB unchanged; A, X and Y clobbered; Obj_Cur
+; and what the callees change (see Oam_BuildShadow) written.
+; ============================================================
+FieldBtl_Restore:
+    SEP #$10
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !FieldBtl_RestOriginX
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !FieldBtl_RestOriginY
+    JSR FieldBtl_RestoreObjs
+    JSR FieldBtl_RestoreParty
+    REP #$10
+    JSR Oam_BuildShadow
+    LDA.l !FieldBtl_Result
+    BEQ .done
+    DEC A
+    BEQ .freeze_party
+.done:
+    RTS
+.freeze_party:
+    TDC
+    XBA                                 ; B = 0 (DP low byte)
+    LDA.b !Party_ObjSlot
+    BMI .member2
+    TAY
+    LDA.b #!Obj_AnimModeFixed
+    STA.w !Obj_AnimMode,Y
+    LDA.w !Obj_LastFrame,Y
+    STA.w !Obj_FixedFrame,Y
+.member2:
+    LDA.b !Party_ObjSlot1
+    BMI .member3
+    TAY
+    LDA.b #!Obj_AnimModeFixed
+    STA.w !Obj_AnimMode,Y
+    LDA.w !Obj_LastFrame,Y
+    STA.w !Obj_FixedFrame,Y
+.member3:
+    LDA.b !Party_ObjSlot2
+    BMI .end
+    TAY
+    LDA.b #!Obj_AnimModeFixed
+    STA.w !Obj_AnimMode,Y
+    LDA.w !Obj_LastFrame,Y
+    STA.w !Obj_FixedFrame,Y
+.end:
+    RTS
+
+; ============================================================
+; $C0:076B — FieldBtl_RestoreObjs (129 bytes, $076B–$07EB)
+; For each of the 8 FieldBtl_ObjSlots that holds a slot (bit 7 clear):
+; Obj_DrawUnlink the object (Obj_Cur = slot), then FieldBtl_RestoreObj
+; with X = its record offset (n x FieldBtl_ObjRecSize).
+; Callers: FieldBtl_Restore ($C0:0723).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered; Obj_Cur =
+; the last object restored.
+; ============================================================
+FieldBtl_RestoreObjs:
+    LDA.b !FieldBtl_ObjSlots
+    BMI .rec1
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots
+    LDX.b #$00
+    JSR FieldBtl_RestoreObj
+.rec1:
+    LDA.b !FieldBtl_ObjSlots+1
+    BMI .rec2
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+1
+    LDX.b #!FieldBtl_ObjRecSize
+    JSR FieldBtl_RestoreObj
+.rec2:
+    LDA.b !FieldBtl_ObjSlots+2
+    BMI .rec3
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+2
+    LDX.b #!FieldBtl_ObjRecSize*2
+    JSR FieldBtl_RestoreObj
+.rec3:
+    LDA.b !FieldBtl_ObjSlots+3
+    BMI .rec4
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+3
+    LDX.b #!FieldBtl_ObjRecSize*3
+    JSR FieldBtl_RestoreObj
+.rec4:
+    LDA.b !FieldBtl_ObjSlots+4
+    BMI .rec5
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+4
+    LDX.b #!FieldBtl_ObjRecSize*4
+    JSR FieldBtl_RestoreObj
+.rec5:
+    LDA.b !FieldBtl_ObjSlots+5
+    BMI .rec6
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+5
+    LDX.b #!FieldBtl_ObjRecSize*5
+    JSR FieldBtl_RestoreObj
+.rec6:
+    LDA.b !FieldBtl_ObjSlots+6
+    BMI .rec7
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+6
+    LDX.b #!FieldBtl_ObjRecSize*6
+    JSR FieldBtl_RestoreObj
+.rec7:
+    LDA.b !FieldBtl_ObjSlots+7
+    BMI .done
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !FieldBtl_ObjSlots+7
+    LDX.b #!FieldBtl_ObjRecSize*7
+    JSR FieldBtl_RestoreObj
+.done:
+    RTS
+
+; ============================================================
+; $C0:07EC — FieldBtl_RestoreObj (133 bytes, $07EC–$0870)
+; Puts one object (A = slot) back from its FieldBtlObj record (X =
+; record offset). Flags = 0 (as the battle left it): the object is
+; removed instead: Obj_Unk1000 |= Obj_Unk1000Bit7, Obj_Unk734C when
+; Obj_Unk1A81 bit 7 is set, Obj_Unk1A81 = 0; it stays out of the draw
+; buckets. Otherwise Obj_TileX/Y = record + FieldBtl_RestOriginX/Y,
+; the low bytes of Obj_PosX/Y = SubX/Y x 16, Obj_LastFrame = Frame,
+; Obj_ScreenX/Y = TileX/Y x 16 + SubX/Y (8-bit), Obj_AnimTimer = 0;
+; then Obj_DrawLink and a tail call to Obj_BuildFrameLayout.
+; Callers: FieldBtl_RestoreObjs, 8 JSR sites ($C0:0778-$C0:07E8).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00; A = the
+; object's slot, X = its record offset.
+; Exit: M=1, X=1 (Obj_DrawLink sets it), DP and DB unchanged; A, X and
+; Y clobbered; Eng_Scratch written; Obj_Cur = the slot (restore path);
+; flags as Obj_BuildFrameLayout leaves them.
+; ============================================================
+FieldBtl_RestoreObj:
+    TAY
+    LDA.l FieldBtlObj.Flags,X
+    BNE .restore
+    LDA.w !Obj_Unk1000,Y
+    ORA.b #!Obj_Unk1000Bit7
+    STA.w !Obj_Unk1000,Y
+    LDA.w !Obj_Unk1A81,Y
+    BPL .clear_1a81
+    PHX
+    PHY
+    JSR Obj_Unk734C
+    PLY
+    PLX
+.clear_1a81:
+    LDA.b #$00
+    STA.w !Obj_Unk1A81,Y
+    RTS
+.restore:
+    LDA.l FieldBtlObj.TileX,X
+    CLC
+    ADC.b !FieldBtl_RestOriginX
+    STA.w !Obj_TileX,Y
+    LDA.l FieldBtlObj.TileY,X
+    CLC
+    ADC.b !FieldBtl_RestOriginY
+    STA.w !Obj_TileY,Y
+    LDA.l FieldBtlObj.SubX,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_PosX,Y
+    LDA.l FieldBtlObj.SubY,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_PosY,Y
+    LDA.l FieldBtlObj.Frame,X
+    STA.w !Obj_LastFrame,Y
+    LDA.l FieldBtlObj.TileX,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Eng_Scratch
+    LDA.l FieldBtlObj.SubX,X
+    ORA.b !Eng_Scratch
+    STA.w !Obj_ScreenX,Y
+    LDA.l FieldBtlObj.TileY,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Eng_Scratch
+    LDA.l FieldBtlObj.SubY,X
+    ORA.b !Eng_Scratch
+    STA.w !Obj_ScreenY,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    STY.b !Obj_Cur
+    JSR Obj_DrawLink
+    BRL Obj_BuildFrameLayout-!BankWrap  ; offset wraps around the bank
+
+; ============================================================
+; $C0:0871 — FieldBtl_RestoreParty (47 bytes, $0871–$089F)
+; Obj_DrawUnlink then FieldBtl_RestorePc for each party member from its
+; FieldBtlPc record. The leader is not tested for Obj_None (members 2
+; and 3 are).
+; Callers: FieldBtl_Restore ($C0:0726).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered; Obj_Cur =
+; the last member restored.
+; ============================================================
+FieldBtl_RestoreParty:
+    LDA.b !Party_ObjSlot
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !Party_ObjSlot
+    LDX.b #$00
+    JSR FieldBtl_RestorePc
+    LDA.b !Party_ObjSlot1
+    BMI .member3
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !Party_ObjSlot1
+    LDX.b #!FieldBtl_PcRecSize
+    JSR FieldBtl_RestorePc
+.member3:
+    LDA.b !Party_ObjSlot2
+    BMI .done
+    STA.b !Obj_Cur
+    JSR Obj_DrawUnlink
+    LDA.b !Party_ObjSlot2
+    LDX.b #!FieldBtl_PcRecSize*2
+    JSR FieldBtl_RestorePc
+.done:
+    RTS
+
+; ============================================================
+; $C0:08A0 — FieldBtl_RestorePc (101 bytes, $08A0–$0904)
+; FieldBtl_RestoreObj's restore path for a party member (A = slot, X =
+; FieldBtlPc record offset): Obj_TileX/Y, the low bytes of Obj_PosX/Y,
+; Obj_LastFrame, Obj_ScreenX/Y and Obj_AnimTimer = 0 from the record,
+; then Obj_DrawLink and a tail call to Obj_BuildFrameLayout.
+; Callers: FieldBtl_RestoreParty ($C0:087C, $C0:088C, $C0:089C).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00; A = the
+; member's slot, X = its record offset.
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered; Eng_Scratch
+; written; Obj_Cur = the slot; flags as Obj_BuildFrameLayout leaves
+; them.
+; ============================================================
+FieldBtl_RestorePc:
+    TAY
+    LDA.l FieldBtlPc.TileX,X
+    CLC
+    ADC.b !FieldBtl_RestOriginX
+    STA.w !Obj_TileX,Y
+    LDA.l FieldBtlPc.TileY,X
+    CLC
+    ADC.b !FieldBtl_RestOriginY
+    STA.w !Obj_TileY,Y
+    LDA.l FieldBtlPc.SubX,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_PosX,Y
+    LDA.l FieldBtlPc.SubY,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_PosY,Y
+    LDA.l FieldBtlPc.Frame,X
+    STA.w !Obj_LastFrame,Y
+    LDA.l FieldBtlPc.TileX,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Eng_Scratch
+    LDA.l FieldBtlPc.SubX,X
+    ORA.b !Eng_Scratch
+    STA.w !Obj_ScreenX,Y
+    LDA.l FieldBtlPc.TileY,X
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Eng_Scratch
+    LDA.l FieldBtlPc.SubY,X
+    ORA.b !Eng_Scratch
+    STA.w !Obj_ScreenY,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    STY.b !Obj_Cur
+    JSR Obj_DrawLink
+    BRL Obj_BuildFrameLayout-!BankWrap  ; offset wraps around the bank
+
+; ============================================================
 ; $C0:0905 — Field_RestoreSaveBlock (19 bytes, $0905–$0917)
 ; (was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over
 ; Field_SaveBlock ($7E:0920, $14E0 bytes). Reverse of
@@ -14585,6 +15600,125 @@ Obj_ResetFrameState:
     RTS
 
 ; ============================================================
+; Draw buckets. Oam_BuildShadow draws objects bucket by bucket
+; (Obj_DrawBucket, 64 of them, one per 4 lines of Obj_ScreenY's low
+; byte: offset (ScreenY >> 1) & $FE), each a doubly linked list through
+; Obj_DrawPrev / Obj_DrawNext ($80 ends). Obj_DrawOut is the per-object
+; byte that says whether the object is in a bucket; indexed by object x
+; 2, it is the high byte of bucket word n for object n.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:A98A — Obj_DrawUnlink (67 bytes, $A98A–$A9CC)
+; Takes object Obj_Cur out of its draw bucket, if it is in one
+; (Obj_DrawOut bit 7 clear). As the bucket's first object, the
+; bucket starts at its Obj_DrawNext, whose Obj_DrawPrev becomes $80 (if
+; there is one); otherwise the previous object's Obj_DrawNext skips it
+; and the next object's Obj_DrawPrev = its previous. Then its own
+; Obj_DrawPrev / Obj_DrawNext / Obj_DrawOut are set to $80 (when it was
+; the bucket's only object, Obj_DrawNext / Obj_DrawOut get the old
+; Obj_DrawNext instead, which has bit 7 set, and Obj_DrawPrev keeps its
+; bit-7 value).
+; Quirk, kept: the middle path does not test for a next object. For the
+; bucket's last object Y = $80 and the store goes to Obj_DrawPrev+$80,
+; i.e. $0F00 (Obj_Unk0F00 of object 0), which gets the previous slot.
+; The bucket is found from the current Obj_ScreenY, so it must not have
+; changed since Obj_DrawLink.
+; Callers (16 JSR sites): FieldBtl_RestoreObjs ($C0:0771-$C0:07E1),
+;   FieldBtl_RestoreParty ($C0:0875, $C0:0885, $C0:0895) and unmatched
+;   code at $C0:A835, $C0:A852, $C0:A864, $C0:A87B and $C0:A921.
+; On entry: M any, X any (SEP #$30 here), DP=$0100 (Obj_Cur), DB=$00
+; (the object tables are absolute); Obj_Cur = the object's slot.
+; Exit: M=1, X=1 (8-bit X/Y), DP and DB unchanged; A, X and Y
+; clobbered (X = the slot).
+; ------------------------------------------------------------
+org $C0A98A
+Obj_DrawUnlink:
+    SEP #$30
+    LDX.b !Obj_Cur
+    LDA.w !Obj_DrawOut,X
+    BMI .done                           ; not in a bucket
+    LDA.w !Obj_DrawPrev,X
+    BPL .middle
+    LDA.w !Obj_ScreenY,X                ; first in its bucket
+    LSR A
+    AND.b #!Obj_DrawBucketMask
+    TAY                                 ; bucket offset
+    LDA.w !Obj_DrawNext,X
+    STA.w !Obj_DrawBucket,Y
+    BMI .clear                          ; it was the only one
+    TAY
+    LDA.b #!Obj_None
+    STA.w !Obj_DrawPrev,Y
+.clear:
+    STA.w !Obj_DrawNext,X               ; $80 (or the old next, bit 7 set)
+    STA.w !Obj_DrawOut,X
+    RTS
+.middle:
+    TAY                                 ; Y = previous
+    XBA
+    LDA.w !Obj_DrawNext,X
+    STA.w !Obj_DrawNext,Y
+    TAY                                 ; Y = next (quirk: $80 at the end)
+    XBA
+    STA.w !Obj_DrawPrev,Y
+    LDA.b #!Obj_None
+    STA.w !Obj_DrawPrev,X
+    STA.w !Obj_DrawNext,X
+    STA.w !Obj_DrawOut,X
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A9CD — Obj_DrawLink (58 bytes, $A9CD–$AA06)
+; Puts object Obj_Cur at the head of the draw bucket for its
+; Obj_ScreenY, unless it is already in one (Obj_DrawOut bit 7 clear).
+; Into an empty bucket: Obj_DrawPrev / Obj_DrawNext = $80. Otherwise
+; the old head's Obj_DrawPrev = the object and its Obj_DrawNext = the
+; old head; its own Obj_DrawPrev is not written (it is $80 when the
+; object was taken out by Obj_DrawUnlink). Obj_DrawOut = 0 either way.
+; Callers (8 JSR sites): FieldBtl_RestoreObj ($C0:086B),
+;   FieldBtl_RestorePc ($C0:08FF) and unmatched code at $C0:A83B,
+;   $C0:A855, $C0:A867, $C0:A881, $C0:A90B and $C0:B104.
+; On entry: M any, X any (SEP #$30 here), DP=$0100 (Obj_Cur,
+; Obj_DrawBucketOfs), DB=$00; Obj_Cur = the object's slot.
+; Exit: M=1, X=1 (8-bit X/Y), DP and DB unchanged; A and Y clobbered,
+; X = the slot; Obj_DrawBucketOfs ($01C5) written when the bucket was
+; not empty.
+; ------------------------------------------------------------
+Obj_DrawLink:
+    SEP #$30
+    LDX.b !Obj_Cur
+    LDA.w !Obj_DrawOut,X
+    BPL .done                           ; already in a bucket
+    LDA.w !Obj_ScreenY,X
+    LSR A
+    AND.b #!Obj_DrawBucketMask
+    TAY                                 ; bucket offset
+    LDA.w !Obj_DrawBucket,Y
+    BPL .push
+    TXA                                 ; empty bucket
+    STA.w !Obj_DrawBucket,Y
+    STZ.w !Obj_DrawOut,X
+    LDA.b #!Obj_None
+    STA.w !Obj_DrawPrev,X
+    STA.w !Obj_DrawNext,X
+    RTS
+.push:
+    STY.b !Obj_DrawBucketOfs
+    TAY                                 ; Y = old head
+    TXA
+    STA.w !Obj_DrawPrev,Y
+    TYA
+    STA.w !Obj_DrawNext,X
+    LDY.b !Obj_DrawBucketOfs
+    TXA
+    STA.w !Obj_DrawBucket,Y
+    STZ.w !Obj_DrawOut,X
+.done:
+    RTS
+
+; ============================================================
 ; Map drawing after a load: the reload step that puts the treasure
 ; tiles in, sets the screen registers and the scroll origin and builds
 ; and uploads the three layers ($C0:0A50), the origin setup and the
@@ -15195,6 +16329,50 @@ Oam_HideRange3:             ; header: see Oam_BuildShadow
 Oam_EndRange3:              ; header: see Oam_BuildShadow
     LDX.b !Oam_Range3LoPtr
     STX.b !Oam_Range3PrevEnd
+    RTS
+
+; ============================================================
+; $C0:1B53 — LocLoad_AudioSetup (61 bytes, $1B53–$1B8F)
+; LoadLocation's sound step. With Audio_Unk7F01ED nonzero it only sends
+; Audio_CmdPlayMusic with Menu_Config1E. Otherwise it first sends
+; Audio_CmdUnk81 (arguments 0, Audio_Cmd81Arg, Audio_Cmd81Arg; not
+; traced), then reads the location's LocRom.Music: bit 7 set ends here;
+; else it is stored in Menu_Config1E and sent with Audio_CmdPlayMusic.
+; So Menu_Config1E keeps the last track started this way (probably
+; the current music; C2Scene_LoadScene copies it too).
+; Callers: LoadLocation ($C0:00F7), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: Loc_RecOfs), DP=$0100
+; (Loc_RecOfs), DB=$00 (the Audio_Cmd* block is absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered, X = Loc_RecOfs on
+; the LocRom path; the Audio_Cmd* block written, and whatever
+; Audio_DriverCommand (unmatched) changes.
+; ============================================================
+org $C01B53
+LocLoad_AudioSetup:
+    LDA.l !Audio_Unk7F01ED
+    BEQ .from_location
+    LDA.l !Menu_Config1E
+    BRA .play
+.from_location:
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.Music,X
+    BMI .done                           ; bit 7: no music change
+    STA.l !Menu_Config1E
+.play:
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_CmdPlayMusic
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+.done:
     RTS
 
 ; ============================================================
@@ -16287,6 +17465,345 @@ Scene_ReloadStep:
     JSR Scene_ResumeNmi
     JSR Sub_EC60
     LDA.b !Field_Unk1E                  ; Z: 0 = do the fade-in
+    RTS
+
+; ============================================================
+; $C0:29F7 — Field_Unk29F7 (385 bytes, $29F7–$2B77)
+; Writes a 32 x 10 tilemap (Field_UploadUnk1D00Bytes, $280 bytes) to
+; Field_Unk7EF000 through the WRAM data port, DP = DP_PPU; Field_UploadUnk1D00
+; then sends it to VRAM $1D00. Each entry is a tile from
+; Field_Unk7EF000Tile ($F0) to +15 with high byte Field_Unk7EF000Hi
+; ($20) or Field_Unk7EF000HiAlt ($23):
+;   row 0: tile +0, 15 x (+1, +2), +3;
+;   rows 1-8, two bands of four: +4 / +6 / +4 / +6 at the left, +5 / +7
+;   at the right, and between them 2 x 2 blocks of +12 +13 / +14 +15
+;   whose high byte alternates block by block between Hi and HiAlt,
+;   starting with Hi in rows 1-2 and with HiAlt in rows 3-4;
+;   row 9: +8, 15 x (+9, +10), +11.
+; That reads as a bordered panel with a checkered inside (probably a
+; window background; Field_UploadUnk1F00 loads graphics to VRAM $1F00
+; from the same Menu_Config01 setting as the window colours). Not traced
+; on screen.
+; Callers: Scene_ReloadStep ($C0:288A) and Scene_Unk0283 ($C0:031C)
+;   (JSL).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the counts), DP any (saved,
+; set to DP_PPU, restored), DB any (WMADD*/WMDATA through DP).
+; Exit: M=1, X=0, DP restored, DB unchanged; A, X = 0 and Y = 0
+; clobbered; the WRAM port address left past the map.
+; ============================================================
+org $C029F7
+Field_Unk29F7:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; bank $7E
+    STA.b WMADDH-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #!Field_Unk7EF000Pairs
+.top_fill:
+    LDA.b #!Field_Unk7EF000Tile+1
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+2
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .top_fill
+    LDA.b #!Field_Unk7EF000Tile+3
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDY.w #$0002                        ; the four-row band twice
+.band:
+    LDA.b #!Field_Unk7EF000Tile+4       ; row A: left edge
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #$0007
+.row_a:
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .row_a
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+5
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+6
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #$0007
+.row_b:
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .row_b
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+7
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+4
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #$0007
+.row_c:
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .row_c
+    LDA.b #!Field_Unk7EF000Tile+12
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+13
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+5
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+6
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #$0007
+.row_d:
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .row_d
+    LDA.b #!Field_Unk7EF000Tile+14
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+15
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000HiAlt
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+7
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    DEY
+    BEQ .bottom
+    BRL .band
+.bottom:
+    LDA.b #!Field_Unk7EF000Tile+8
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDX.w #!Field_Unk7EF000Pairs
+.bottom_fill:
+    LDA.b #!Field_Unk7EF000Tile+9
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Tile+10
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .bottom_fill
+    LDA.b #!Field_Unk7EF000Tile+11
+    STA.b WMDATA-!DP_PPU
+    LDA.b #!Field_Unk7EF000Hi
+    STA.b WMDATA-!DP_PPU
+    PLD
+    RTL
+
+; ============================================================
+; $C0:2B78 — Field_Unk2B78 (201 bytes, $2B78–$2C40)
+; Writes a 32 x 8 tilemap (Field_UploadUnk1C00Bytes, $200 bytes) to
+; Field_Unk7EF000 through the WRAM data port, DP = DP_PPU, over what
+; Field_Unk29F7 left there; Field_UploadUnk1C00 then sends it to VRAM
+; $1C00. Every entry has high byte Field_Unk7EF000HiGrid ($29); the tile
+; numbers come in 16 runs of Field_Unk7EF000Run (16) consecutive tiles,
+; written by .run (A = first tile, Field_Unk7EF000RunEnd = last; both
+; written). The run order $00, $20, $10, $30, $40, $60, $50, $70, ...,
+; $D0, $F0 puts tiles $00-$FF in map rows so that rows 2j and 2j+1 hold
+; tile rows 4j / 4j+1 (of a 16-tile-wide sheet) on the left and 4j+2 /
+; 4j+3 on the right. Not traced on screen.
+; Callers: Scene_ReloadStep ($C0:2891) and Scene_Unk0283 ($C0:0343)
+;   (JSL).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y; 8-bit inside), DP any
+; (saved, set to DP_PPU, restored), DB=$00 (Field_Unk7EF000RunEnd is
+; written absolute, $01D9).
+; Exit: M=1, X=0, DP restored, DB unchanged; A = $FF, X = 0 (its high
+; byte cleared by the SEP #$10), Y = Field_Unk7EF000HiGrid;
+; Field_Unk7EF000RunEnd ($01D9, Eng_Scratch) = $FF.
+; ============================================================
+org $C02B78
+Field_Unk2B78:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; bank $7E
+    STA.b WMADDH-!DP_PPU
+    SEP #$10
+    LDY.b #!Field_Unk7EF000HiGrid
+    LDA.b #!Field_Unk7EF000Run-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #$00
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*3-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*2
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*2-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*4-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*3
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*5-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*4
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*7-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*6
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*6-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*5
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*8-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*7
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*9-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*8
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*11-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*10
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*10-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*9
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*12-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*11
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*13-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*12
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*15-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*14
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*14-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*13
+    JSR .run
+    LDA.b #!Field_Unk7EF000Run*16-1
+    STA.w !DP_Field+!Field_Unk7EF000RunEnd
+    LDA.b #!Field_Unk7EF000Run*15
+    JSR .run
+    REP #$10
+    PLD
+    RTL
+.run:
+    STA.b WMDATA-!DP_PPU                ; tile
+    STY.b WMDATA-!DP_PPU                ; high byte
+    INC A
+    CMP.w !DP_Field+!Field_Unk7EF000RunEnd
+    BNE .run
+    STA.b WMDATA-!DP_PPU                ; the last tile
+    STY.b WMDATA-!DP_PPU
     RTS
 
 ; ------------------------------------------------------------
@@ -17690,6 +19207,56 @@ Evt_StartTargetFunc1:
     STA.w !Obj_ScriptPos,X
     SEP #$30
     LDA.b #!Obj_Unk1C00Func1
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B1F — Evt_RedirectObjScript (68 bytes, $5B1F–$5B62)
+; Evt_StartTargetFunc1's save without its target: for the object in
+; Field_UnkEB, unless Obj_Unk1100 has bit 7 set or Obj_Unk1C00 is 0,
+; saves Obj_ScriptPos in the ObjX_Unk7F0580 table of level Obj_Unk1C00
+; (level x Evt_PrioStride + slot), then sets Obj_ScriptPos =
+; Evt_RedirectPos, Obj_Unk1C00 = 0 and zeroes Obj_Unk1A80, Obj_Unk1A01
+; and Obj_Unk1001. Unlike Evt_StartTargetFunc1 it does not test
+; Obj_Unk1C01 or Obj_Unk1000, and its lower bound is 1 (CMP #1), not
+; Obj_Unk1C00Min. Field_Unk034B runs it for party members 2 and 3.
+; Callers: Field_Unk034B ($C0:036A, $C0:037B).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00;
+; Field_UnkEB = the object's slot (16-bit loads take $01EC as the high
+; byte).
+; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered (when
+; redirected: A = 0, X = the slot); Eng_Scratch written.
+; ------------------------------------------------------------
+org $C05B1F
+Evt_RedirectObjScript:
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_Unk1C00,X
+    CMP.b #$01
+    BCC .done                           ; level 0: nothing to save
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the object was
+    LDX.b !Field_UnkEB
+    LDA.w #!Evt_RedirectPos
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
     STA.w !Obj_Unk1C00,X
     STZ.w !Obj_Unk1A80,X
     STZ.w !Obj_Unk1A01,X
