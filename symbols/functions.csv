@@ -207,39 +207,39 @@ $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,b78418c192a1,APU
 $C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,readable,2de0a605f112,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
 $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable,cd6e51899c4d,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,readable,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
-$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,3fb75c63c47f,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
+$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,4ef6de9b402e,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,readable,449abab74e5d,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
 $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,
-$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,verified,74c25c3a3aa9,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
-$C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,8c6f80faef48,
+$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,readable,28ab29aaa040,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
+$C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,17786c6051aa,
 $C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,verified,96ac25da6792,
-$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,verified,7e69b526ca0e,
+$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,readable,5fb0711d3fc4,"(this and the three list modes below: state as SingleAlly, DP $80/$81)"
 $C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,verified,3af96a43a7ff,cursor may cycle.
 $C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,verified,ae599fce70f7,
 $C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,verified,a87ffddbacda,
-$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,verified,ab722fbb270e,
-$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,verified,9acd96d41bc0,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
-$C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,readable,60696611caf5,
+$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,readable,5662bce9156e,"(Entry/Exit M=1, DB=$7E; only A changes, no DP written)"
+$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,readable,3db35982000f,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
+$C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,readable,7b7b0ce0ed60,
 $C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,verified,1098ffd7d8a1,
-$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,verified,2b634a3bf388,
-$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,verified,a6b8b561fa43,
-$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,readable,f6d7ffa8cd0d,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
+$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,readable,6e7529bc5bab,
+$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,readable,bfe8552cfddd,
+$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,readable,f2e452424fbb,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
 $C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,verified,5a7841bb4268,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
 $C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,verified,434f2363d6ec,the caster
 $C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,verified,10d92bd91fc4,"chosen enemy; size $19 for mode $1A, else $09"
-$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,readable,efe3189ef5b2,"member id 3; size $19 for mode $14, else $10"
-$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,readable,57369279ad82,party member id 6
+$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,readable,dc20d5ea5bf6,"member id 3; size $19 for mode $14, else $10."
+$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,readable,8c9512d74d5f,party member id 6.
 $C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,verified,fef35bc71450,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
 $C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,verified,7ac5d63ffd11,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
-$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,readable,2f5be3bfb838,
-$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,readable,9d8c9fb7396a,
-$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,readable,0e7a3db6d2e2,
-$C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,readable,15d9b944e742,
-$C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,readable,69e67543addc,
-$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,readable,43ea2471b37b,"front slot is empty (requester wasn't eligible), shift the list left by one."
-$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,readable,9bdf75af4bae,"and selection lists (12 entries each, one more than they use)"
-$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,readable,0bd709a6a40b,target-all and copy the 11 candidates into the selection list
-$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,readable,e6431a791f12,next non-empty candidate (wrap at 11); no-op on an empty list.
-$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,readable,1dc13ffd8218,
-$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,readable,624c00de57ad,"candidate slots are $FF, Z=0 as soon as one isn't"
+$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,readable,48cefc785c11,
+$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,readable,74bccbfea163,
+$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,readable,e4006f5241ab,
+$C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,readable,12bb82845db9,
+$C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,readable,bb00c7bb01b6,"Shared tail of the area scans: puts !BattleTgt_Anchor at the front of !BattleTgt_Candidates if it belongs to the scanned side (see the AreaCircle header), then falls into BattleTgt_CompactCandidates."
+$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,readable,938ca208c7af,"front slot is empty, shift the list left by one."
+$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,readable,54e66d5ecc42,"and selection lists (12 entries each, one more than they use)"
+$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,readable,df1bebdd98f0,target-all and copy the 11 candidates into the selection list
+$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,readable,21050c9638e5,next non-empty candidate (wrap at 11); no-op on an empty list.
+$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,readable,6466475eddeb,
+$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,readable,b1aeff4d067d,"candidate slots are $FF, Z=0 as soon as one isn't"
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,18ff8680932e,Called via: JML from Reset ($00:FF03)

@@ -3450,8 +3450,8 @@ BattleMenu_OpenItemList:
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
-;        the mode handler that ran (the BattleTgt_ routines below: $80-$9A
-;        and the Battle_Geo/Mul bytes for the area modes)
+;        the mode handler that ran (the BattleTgt_ routines below: within
+;        $80-$95, plus $77/$78, $A5-$AB, $AE and $D3-$E3 for the area modes)
 ; Callees: BattleMenu_LoadCommandWindowMap; JSR (BattleTgt_ModeTable,X)
 org $C11F79
 BattleMenu_BuildTargetList:
@@ -3560,6 +3560,11 @@ BattleTgt_AreaTable:
 ;   a chosen enemy (BattleTgt_AreaLine)    $0F,$11,$12,$13,$14,$18,$1A,
 ;   $1B other area shapes (BattleTgt_AreaRow/AreaPartyTriangle/
 ;   AreaCircle)
+;
+; CPU state for every handler below (and the BattleTgt_ helpers): Entry
+; M=1, X=0, DP=0, DB=$7E (they use .b DP scratch and TDC as zero);
+; they return the same, with A, X, Y clobbered. Each header names the DP
+; it writes, including its callees'.
 BattleTgt_ModeTable:
     dw BattleTgt_SingleAlly         ; $00
     dw BattleTgt_AllAllies          ; $01
@@ -3596,7 +3601,8 @@ BattleTgt_ModeTable:
     dw BattleTgt_SingleAlly         ; $20
 
 ; ==================================================================
-; BattleTgt_SingleAlly ($C1203A–$C12099, 96 bytes)
+; BattleTgt_SingleAlly ($C1203A–$C12044, 11 bytes; falls into
+; BattleTgt_CollectValidTargets, $C12045–$C12099, 85 bytes)
 ; ==================================================================
 ; Default mode: one PC (slots 0-2), cursor may cycle. Falls into
 ; BattleTgt_CollectValidTargets, the shared list builder that the
@@ -3606,14 +3612,16 @@ BattleTgt_ModeTable:
 ; CollectValidTargets keeps battler X only if it is present
 ; (!Battler_Present), !Battler_Unk9FF7 bit 7 is clear, it is not
 ; !Battler_Untargetable, and — if !Battler_KoFlag is set — only when the
-; mode is $04. The requesting battler (!BattleTgt_Caster) always goes to
-; the front of !BattleTgt_Candidates; everyone else is appended from
-; entry 1. CompactCandidates then closes the hole if the requester
-; wasn't eligible. Finally the cursor entry is copied to
-; !BattleTgt_Selected, or the whole list when !BattleTgt_TargetAll says
-; "target all".
-; Entry: M=1, X=0, DB=$7E (all BattleTgt_* handlers)
-; Exit:  M=1
+; mode is $04. The requesting battler (!BattleTgt_Caster) goes to the
+; front of !BattleTgt_Candidates if it passes those tests and lies in
+; the scanned range; everyone else is appended from entry 1.
+; CompactCandidates then closes the hole if the front stayed empty.
+; Finally the cursor entry is copied to !BattleTgt_Selected, or the
+; whole list when !BattleTgt_TargetAll says "target all".
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; CollectValidTargets also
+;        takes X = first slot and !BattleTgt_ScanEnd
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80/$81 written
+;        (ScanEnd)
 ; Callees: BattleTgt_CompactCandidates
 !BattleTgt_ScanEnd = !BattleTmp_80       ; 2 B in: slot after the last one CollectValidTargets scans
 org $C1203A
@@ -3669,6 +3677,7 @@ BattleTgt_CollectValidTargets:
     RTS
 
 ; BattleTgt_AllAllies ($C1209A–$C120A8, 15 bytes): every PC
+; (this and the three list modes below: state as SingleAlly, DP $80/$81)
 BattleTgt_AllAllies:
     LDX.w #!Battle_NumPcSlots
     STX.b !BattleTgt_ScanEnd
@@ -3705,6 +3714,7 @@ BattleTgt_Everyone:
     JMP BattleTgt_CollectValidTargets
 
 ; BattleTgt_Self ($C120D6–$C120DF, 10 bytes): the shown PC only
+; (Entry/Exit M=1, DB=$7E; only A changes, no DP written)
 BattleTgt_Self:
     LDA.w !BattleMenu_ActivePc
     STA.w !BattleTgt_Candidates
@@ -3717,6 +3727,8 @@ BattleTgt_Self:
 ; Lists the PCs whose BattlerStats.Status has bit 7 set — by context,
 ; KO'd allies, i.e. a revive target. Unrolled for the three PC slots.
 ; No candidate -> !BattleTgt_Result = $80.
+; Entry/Exit: M=1, X=0, DP=0 (TDC as zero), DB=$7E; A, X clobbered; no DP
+; written
 BattleTgt_SingleKoAlly:
     INC.w !BattleTgt_CanCycle
     TDC
@@ -3761,7 +3773,8 @@ BattleTgt_SingleKoAlly:
     RTS
 
 ; ==================================================================
-; BattleTgt_PcByCharId5 ($C12136–$C12162, 45 bytes)
+; BattleTgt_PcByCharId5 ($C12136–$C12139, 4 bytes; falls into
+; BattleTgt_FindPcByCharId, $C1213A–$C12162)
 ; ==================================================================
 ; Targets the one party member whose !Pc_CharId equals
 ; !BattleTgt_WantedChar (5 for this entry, 4 via BattleTgt_PcByCharId4).
@@ -3769,6 +3782,9 @@ BattleTgt_SingleKoAlly:
 ; so these are "target Ayla"/"target Frog" modes. Which techs use target
 ; modes 5 and 6 is not established. The routine names keep the numeric
 ; ids because the character constants (!Pc_CharAyla etc.) are inferred.
+; Entry: M=1, X=0, DP=0, DB=$7E (FindPcByCharId also takes
+;        !BattleTgt_WantedChar in $80)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written
 !BattleTgt_WantedChar = !BattleTmp_80    ; 1 B in: character id FindPcByCharId looks for
 BattleTgt_PcByCharId5:
     LDA.b #!Pc_CharAyla
@@ -3797,7 +3813,7 @@ BattleTgt_FindPcByCharId:
 .exit:
     RTS
 
-; BattleTgt_PcByCharId4 ($C12163–$C12168, 6 bytes)
+; BattleTgt_PcByCharId4 ($C12163–$C12168, 6 bytes); state as PcByCharId5
 BattleTgt_PcByCharId4:
     LDA.b #!Pc_CharFrog
     STA.b !BattleTgt_WantedChar
@@ -3810,7 +3826,9 @@ BattleTgt_PcByCharId4:
 ; specific party member), fill the area parameter block, run an
 ; area-geometry routine that writes the hit list into
 ; !BattleTgt_Candidates, then select the whole list
-; (BattleTgt_SelectAllCandidates):
+; (BattleTgt_SelectAllCandidates). The exception: EnemyLineFromChar3,
+; Char3Radius and Char6Radius return early, before the area step, when
+; no PC has the character id they look for (see their headers):
 ;   !BattleTgt_AreaCentre = source/centre battler, AreaAim = aimed-at
 ;   battler, AreaSize = shape size, AreaVariant = variant flag,
 ;   AreaSide = 0 (scan the enemies)
@@ -3818,6 +3836,12 @@ BattleTgt_PcByCharId4:
 ; move the aim: D-pad up/right or down/left each play Battle_PlaySfx0 and
 ; step the cursor. Note the three "line" modes step forward for both pad
 ; groups; the radius/row modes step backward for the second group.
+; State for all of them: Entry/Exit M=1, X=0, DP=0, DB=$7E; A, X, Y
+; clobbered; they read the pad edges with LDA.b. DP written: the
+; enemy-anchored ones $80/$81 (SingleEnemy) plus the area routine's DP
+; (AreaLine, AreaCircle, AreaRow, AreaPartyTriangle: see those headers),
+; and whatever Battle_PlaySfx0's Audio_ProcessEntry (not matched yet)
+; changes.
 
 ; BattleTgt_EnemyLineFromCaster ($C12169–$C121AE, 70 bytes)
 BattleTgt_EnemyLineFromCaster:
@@ -3855,8 +3879,9 @@ BattleTgt_EnemyLineFromCaster:
 ; but the source is the party member with character id 3 (!Pc_CharRobo,
 ; inferred: Robo; the name keeps the numeric id). If no PC has that id it
 ; returns before the area step, leaving what BattleTgt_SingleEnemy and
-; the pad step set up: the cursor's enemy in !BattleTgt_Selected, with
-; !BattleTgt_TargetAll = $80 (the cursor may already have moved and
+; the pad step set up: in !BattleTgt_Selected the enemy that was under
+; the cursor before the pad step (CycleNext moves only !BattleTgt_Cursor),
+; with !BattleTgt_TargetAll = $80 (the cursor may already have moved and
 ; played sound 0).
 BattleTgt_EnemyLineFromChar3:
     JSR BattleTgt_SingleEnemy
@@ -3982,7 +4007,9 @@ BattleTgt_EnemyRadius:
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_Char3Radius ($C122A4–$C122D2, 47 bytes): area around party
-; member id 3; size $19 for mode $14, else $10
+; member id 3; size $19 for mode $14, else $10. If no PC has id 3 it
+; returns at once with nothing listed, so BuildTargetList finds every
+; selection entry empty and sets !BattleTgt_Result = $FF (no target).
 BattleTgt_Char3Radius:
     STZ.w !BattleTgt_AreaSide
     TDC
@@ -4012,7 +4039,8 @@ BattleTgt_Char3Radius:
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_Char6Radius ($C122D3–$C122F4, 34 bytes): area $19 around
-; party member id 6
+; party member id 6. If no PC has id 6 it returns at once with nothing
+; listed (BuildTargetList then sets !BattleTgt_Result = $FF).
 BattleTgt_Char6Radius:
     STZ.w !BattleTgt_AreaSide
     TDC
@@ -4085,8 +4113,10 @@ BattleTgt_PartyTriangle:
 ; !Battler_Untargetable). The centre battler is skipped in the scan and
 ; then written unconditionally to the front of !BattleTgt_Candidates —
 ; it is not checked for eligibility, and no CompactCandidates pass runs.
-; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide, !BattleTgt_AreaCentre
-; Exit:  M=1; Candidates[0] = centre, [1..] = hits, rest $FF
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
+;        !BattleTgt_AreaCentre
+; Exit:  M=1, X=0, DP=0, DB=$7E; Candidates[0] = centre, [1..] = hits,
+;        rest $FF; A, X, Y clobbered; DP $85, $87-$89 and $8E-$91 written
 ; Callees: BattleTgt_ClearLists
 ; Direct-page roles (AreaSlot/AreaEnd shared by all area routines):
 !BattleTgt_AreaSlot = !BattleTmp_8E       ; 2 B: battler slot being tested
@@ -4181,9 +4211,11 @@ BattleTgt_AreaRow:
 ;    corner to the enemy must fall inside that corner's range (with
 ;    wrap handled as an OR instead of an AND). Inside all three wedges
 ;    = inside the triangle.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to BattleTgt_CompactCandidates (the scan only
-;        appends from entry 1, so the $FF front entry is always closed up)
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; tail-jumps to BattleTgt_CompactCandidates
+;        (the scan only appends from entry 1, so the $FF front entry is
+;        always closed up); A, X, Y clobbered; DP $80-$8B, $8E-$95 and
+;        Battle_CalcAngle's $D3-$E3 written
 ; Callees: Battle_CalcAngle, BattleTgt_ClearLists, BattleTgt_CompactCandidates
 ; Note: !BattleTgt_AreaSide is ignored here; the scan is always over the enemies.
 ; Direct-page roles:
@@ -4512,14 +4544,18 @@ BattleTgt_AreaPartyTriangle:
 ; scan and re-added by the shared tail BattleTgt_AreaAddAnchor if it is
 ; on the scanned side. Scanned side follows !BattleTgt_AreaSide as in
 ; BattleTgt_AreaRow.
-; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide..AreaVariant as above
-; Exit:  M=1; via BattleTgt_AreaAddAnchor -> CompactCandidates
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide..
+;        AreaVariant as above
+; Exit:  M=1, X=0, DP=0, DB=$7E; via BattleTgt_AreaAddAnchor ->
+;        CompactCandidates; A, X, Y clobbered; DP $80-$93 (scratch and
+;        Anchor), $AE (!Battle_SinScale), Battle_SinLookup's $77/$78 and
+;        $A5-$AB, and Battle_CalcAngle's $D3-$E3 written
 ; Callees: Battle_CalcAngle, Battle_SinLookup, BattleTgt_ClearLists
 ; Direct-page roles (!BattleTgt_Anchor shared with AreaCircle / AreaAddAnchor):
-!BattleTgt_PaX = !BattleTmp_80            ; 1 B: r*sin(a), then corner PA screen x
-!BattleTgt_PaY = !BattleTmp_81            ; 1 B: r*sin(a+$C0), then corner PA screen y
-!BattleTgt_PbX = !BattleTmp_82            ; 1 B: r*sin(a+$80), then corner PB screen x
-!BattleTgt_PbY = !BattleTmp_83            ; 1 B: r*sin(a+$40), then corner PB screen y
+!BattleTgt_PaX = !BattleTmp_80            ; 1 B: r*sin θ, then corner PA screen x
+!BattleTgt_PaY = !BattleTmp_81            ; 1 B: r*sin(θ+$C0), then corner PA screen y
+!BattleTgt_PbX = !BattleTmp_82            ; 1 B: r*sin(θ+$80), then corner PB screen x
+!BattleTgt_PbY = !BattleTmp_83            ; 1 B: r*sin(θ+$40), then corner PB screen y
 !BattleTgt_PaArcFrom = !BattleTmp_84      ; 1 B: PA's accepted angles start
 !BattleTgt_PaArcTo = !BattleTmp_86        ; 1 B: ... end
 !BattleTgt_PbArcFrom = !BattleTmp_88      ; 1 B: PB's accepted angles start
@@ -4716,7 +4752,8 @@ BattleTgt_AreaLine:
     JMP BattleTgt_AreaAddAnchor     ; shared tail in AreaCircle
 
 ; ==================================================================
-; BattleTgt_AreaCircle ($C12701–$C127C4, 196 bytes)
+; BattleTgt_AreaCircle ($C12701–$C127AC, 172 bytes; falls into
+; BattleTgt_AreaAddAnchor, $C127AD–$C127C4)
 ; ==================================================================
 ; "Circle" area around the centre battler (!BattleTgt_AreaCentre).
 ; Positions are reduced to 16-pixel cells (Battle_ShiftRight4) and a
@@ -4739,8 +4776,11 @@ BattleTgt_AreaLine:
 ; PC — i.e. only if it belongs to the side that was scanned. Otherwise
 ; falls through into BattleTgt_CompactCandidates (which also runs after
 ; the anchor is placed, as a no-op since the front entry is then filled).
-; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide, AreaCentre, AreaSize = radius^2
-; Exit:  M=1; falls through into BattleTgt_CompactCandidates
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
+;        AreaCentre, AreaSize = radius^2
+; Exit:  M=1, X=0, DP=0, DB=$7E; falls through into BattleTgt_AreaAddAnchor
+;        and BattleTgt_CompactCandidates; A, X, Y clobbered; DP $80-$87
+;        and $8E-$93 written
 ; Callees: Battle_ShiftRight4, BattleTgt_ClearLists
 ; Direct-page roles:
 !BattleTgt_CentreCellX = !BattleTmp_80    ; 2 B: centre x / 16 (high byte = whatever B held)
@@ -4837,6 +4877,16 @@ BattleTgt_AreaCircle:
     LDA.b !BattleTgt_AreaSlot
     CMP.b !BattleTgt_AreaEnd
     BNE .loop
+
+; BattleTgt_AreaAddAnchor ($C127AD–$C127C4, 24 bytes)
+; Shared tail of the area scans: puts !BattleTgt_Anchor at the front of
+; !BattleTgt_Candidates if it belongs to the scanned side (see the
+; AreaCircle header), then falls into BattleTgt_CompactCandidates.
+; Reached by falling in from BattleTgt_AreaCircle and by JMP from
+; BattleTgt_AreaLine.
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattleTgt_AreaSide, !BattleTgt_Anchor ($92)
+; Exit:  M=1, X=0, DP=0, DB=$7E (through CompactCandidates); A, X
+;        clobbered; no DP written
 BattleTgt_AreaAddAnchor:
     LDA.w !BattleTgt_AreaSide
     BNE .pc_side
@@ -4858,9 +4908,14 @@ BattleTgt_AreaAddAnchor:
 ; ==================================================================
 
 ; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
-; front slot is empty (requester wasn't eligible), shift the list
-; left by one. The last step reads entry 11, one past the 11 used
-; entries (the list has 12 bytes).
+; front slot is empty, shift the list left by one. The front stays empty
+; when CollectValidTargets' requester was not eligible, always after
+; AreaPartyTriangle (its scan appends from entry 1), and after
+; AreaAddAnchor when the anchor is on the other side. The last step reads
+; entry 11, one past the 11 used entries (the list has 12 bytes).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (unchanged if the front
+;        entry was filled); Y and DP unchanged
 org $C127C5
 BattleTgt_CompactCandidates:
     LDA.w !BattleTgt_Candidates
@@ -4878,6 +4933,8 @@ BattleTgt_CompactCandidates:
 
 ; BattleTgt_ClearLists ($C127D9–$C127E7, 15 bytes): blank candidate
 ; and selection lists (12 entries each, one more than they use)
+; Entry/Exit: M=1, X=0 (LDX.w #$0B), DP=0, DB=$7E; A = $FF, X = $FFFF;
+; Y and DP unchanged
 BattleTgt_ClearLists:
     LDX.w #!Battle_NumSlots
     LDA.b #!BattleTgt_Empty
@@ -4890,6 +4947,7 @@ BattleTgt_ClearLists:
 
 ; BattleTgt_SelectAllCandidates ($C127E8–$C127F9, 18 bytes): set
 ; target-all and copy the 11 candidates into the selection list
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_SelectAllCandidates:
     LDA.b #!BattleTgt_AllFlag
     STA.w !BattleTgt_TargetAll
@@ -4906,6 +4964,8 @@ BattleTgt_SelectAllCandidates:
 ; cursor stepping as BattleMenu_TargetNext, plus an empty-list guard
 ; (TargetNext would loop forever on an empty list); unlike TargetNext it
 ; does not write !BattleTgt_Selected.
+; Entry/Exit: M=1, X=0, DP=0 (TDC as zero), DB=$7E; A, X clobbered; Y and
+; DP unchanged
 BattleTgt_CycleNext:
     JSR BattleTgt_AnyCandidate
     BEQ .exit                       ; list empty
@@ -4924,6 +4984,7 @@ BattleTgt_CycleNext:
     RTS
 
 ; BattleTgt_CyclePrev ($C12814–$C1282C, 25 bytes): mirror of CycleNext
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_CyclePrev:
     JSR BattleTgt_AnyCandidate
     BEQ .exit
@@ -4942,6 +5003,9 @@ BattleTgt_CyclePrev:
 
 ; BattleTgt_AnyCandidate ($C1282D–$C1283C, 16 bytes): Z=1 if all 11
 ; candidate slots are $FF, Z=0 as soon as one isn't
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; Z as above (callers BEQ on it); A, X
+;        clobbered; Y unchanged
 BattleTgt_AnyCandidate:
     TDC
     TAX
