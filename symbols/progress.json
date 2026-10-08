@@ -12,8 +12,8 @@
       "bytes": 29032
     },
     "verified": {
-      "functions": 123,
-      "bytes": 5278
+      "functions": 113,
+      "bytes": 3254
     }
   },
   "banks": [
@@ -47,8 +47,8 @@
         "bytes": 9232
       },
       "verified": {
-        "functions": 100,
-        "bytes": 5022
+        "functions": 90,
+        "bytes": 2998
       }
     },
     {
@@ -315,33 +315,33 @@
       "emitted_bytes": 3959,
       "functions": [
         "Battle_Mul8",
-        "Battle_MulAccum",
+        "Battle_Mul8x16",
         "Battle_Divide",
-        "Battle_ShiftLeft7",
+        "Battle_ShiftLeft8",
         "Battle_ShiftLeft4",
         "Battle_ShiftLeft3",
-        "Loc_C10116",
+        "Battle_ShiftRight8",
         "Battle_ShiftRight6",
         "Battle_ShiftRight5",
         "Battle_ShiftRight4",
         "Battle_ShiftRight3",
         "BattleMsg_FormatNumberDigits",
-        "Battle_DivTen9499",
+        "BattleMsg_FormatTwoDigits",
         "BattleMsg_ReencodeTextBuffer",
         "Battle_SinLookup",
-        "Calc_Delta16",
+        "Battle_CalcAngle",
         "BattleUI_BuildStatusBarFrame",
         "BattleUI_DrawPcNamePanel",
         "BattleUI_NextNamePanel",
         "BattleUI_UpdateNextPcPanel",
-        "Battle_DrawHpBars",
-        "UpdateNpc_exit",
+        "BattleUI_DrawAtbGauges",
+        "BattleUI_UpdateNextPcPanel_Exit",
         "BattleUI_DrawSlotGaugeBar",
-        "BattleSys_SlotPanelRefresh",
-        "BattleMenu_DrawReadyWindowEdges",
+        "BattleMenu_DrawCommandList",
+        "BattleMenu_DrawCommandWindowFrames",
         "BattleUI_ClearActivePanelColumn",
-        "BattleUI_SetPanelAttrColumn",
-        "BattleMenu_DrawWindowEdgeStrip",
+        "BattleUI_HighlightPcName",
+        "BattleMenu_DrawCommandWindowFrame",
         "BattleMenu_RenderItemListRows",
         "BattleMenu_RenderItemRow",
         "CODE_JP_C10A87",

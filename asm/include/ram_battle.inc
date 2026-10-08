@@ -24,16 +24,16 @@ if !ram_battle_inc == 0
 !ram_battle_inc = 1
 
 ; ------------------------------------------------------------
-; Direct page: math helpers (Battle_Mul8 / MulAccum / Divide)
+; Direct page: math helpers (Battle_Mul8 / Mul8x16 / Divide)
 ; ------------------------------------------------------------
-!Battle_MulMirrorA       = $77   ; 1 B: copy of the WRMPYA operand (Mul8, MulAccum write it; no reader seen in $C1)
-!Battle_MulMirrorB       = $78   ; 1 B: copy of the WRMPYB operand (Mul8, MulAccum)
+!Battle_MulMirrorA       = $77   ; 1 B: copy of the WRMPYA operand (Mul8, Mul8x16 write it; no reader seen in $C1)
+!Battle_MulMirrorB       = $78   ; 1 B: copy of the WRMPYB operand (Mul8, Mul8x16)
 !Battle_DivMirrorLo      = $79   ; 1 B: copy of the dividend low byte (Battle_Divide)
 !Battle_DivMirrorHi      = $7A   ; 1 B: copy of the dividend high byte (Battle_Divide)
 !Battle_DivMirrorDivisor = $7B   ; 1 B: copy of the divisor (Battle_Divide)
-!Battle_MulFactor8       = $A5   ; 1 B: 8-bit factor of Battle_MulAccum (WRMPYA); Battle_SinLookup also zeroes $A6
-!Battle_MulFactor16      = $A7   ; 2 B: 16-bit factor of Battle_MulAccum ($A7 low, $A8 high, each fed to WRMPYB)
-!Battle_MulProduct       = $A9   ; 3 B: 24-bit product of Battle_MulAccum ($A9 low .. $AB high)
+!Battle_MulFactor8       = $A5   ; 1 B: 8-bit factor of Battle_Mul8x16 (WRMPYA); Battle_SinLookup also zeroes $A6
+!Battle_MulFactor16      = $A7   ; 2 B: 16-bit factor of Battle_Mul8x16 ($A7 low, $A8 high, each fed to WRMPYB)
+!Battle_MulProduct       = $A9   ; 3 B: 24-bit product of Battle_Mul8x16 ($A9 low .. $AB high)
 !Battle_Mul8A            = $AD   ; 1 B: Battle_Mul8 multiplicand (callers zero $AE when they store it 16-bit)
 !Battle_Mul8B            = $AE   ; 1 B: Battle_Mul8 multiplier
 !Battle_Mul8Product      = $AF   ; 2 B: Battle_Mul8 16-bit product (RDMPYL)
@@ -43,7 +43,7 @@ if !ram_battle_inc == 0
 !Battle_DivRemainder     = $B7   ; 2 B: Battle_Divide 16-bit remainder (RDMPYL)
 
 ; ------------------------------------------------------------
-; Direct page: geometry (Calc_Delta16 and its callers)
+; Direct page: geometry (Battle_CalcAngle and its callers)
 ; ------------------------------------------------------------
 !Battle_GeoOriginX       = $D3   ; 1 B: screen x of the point the angle is measured from
 !Battle_GeoOriginY       = $D4   ; 1 B: screen y of that point
@@ -197,7 +197,7 @@ struct BattleCmd $93EE
 endstruct
 
 !Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
-!BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / Battle_DivTen9499)
+!BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / BattleMsg_FormatTwoDigits)
 !BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (always blank, $FF)
 !BattleMsg_Digit100      = $949D ; 1 B: hundreds digit tile
 !BattleMsg_Digit10       = $949E ; 1 B: tens digit tile
@@ -273,9 +273,10 @@ struct Tech_CursorEntry $9EE3
 .MpCost2:    skip 1     ; +6
 endstruct
 
-!BattleUI_GaugeLayout    = $9F20 ; 1-2 B: status-bar layout: 0 = HP/MaxHP/MP, 1 = HP/MP + gauge, 2 = HP/MP/TP + gauge
+!BattleUI_GaugeLayout    = $9F20 ; 1-2 B: status-bar layout: 0 = name, HP/MaxHP, MP; 1 = HP, MP, name, ATB gauge;
+                                 ; 2 = name, HP, MP, ATB gauge (1 and 2 differ in the name's side)
 !Pc_AtbMax               = $9F22 ; 3 B per PC: ATB gauge full value (divisor in DrawSlotGaugeBar)
-!Pc_Unk9F25              = $9F25 ; 3 B per PC: ORed with !Pc_Unk9F28; both zero = empty panel (SlotPanelRefresh)
+!Pc_Unk9F25              = $9F25 ; 3 B per PC: ORed with !Pc_Unk9F28; both zero = never the Combo command list (DrawCommandList)
 !Pc_Unk9F28              = $9F28 ; 3 B per PC: see !Pc_Unk9F25
 !Battler_Unk9F29         = $9F29 ; 1 B per battler slot: non-zero (with !Battle_Unk9F34) = the target info panel also
                                  ; gets the target's HP (UpdateCursorOverlay)
@@ -288,24 +289,27 @@ endstruct
 !Battle_DivBusy          = $A029 ; 1 B: non-zero while Battle_Divide runs
 !Pc_TechCount            = $A02A ; 3 B per PC: number of lines in the PC's tech list
 !BattleMenu_TechAvailDone = $A099 ; 1 B: set once UpdateTechMpAvail has graded the visible rows; TechConfirm needs it
-!BattleUI_PanelHold      = $A09A ; 1 B: non-zero holds the per-frame panel refresh (set while targeting from the menu)
+!BattleUI_ForceDigitRefresh      = $A09A ; 1 B: non-zero = BattleUI_UpdateNextPcPanel always refreshes HP/MP digits (no gauges-only
+                                 ; shortcut); set when targeting starts from a submenu (BuildTargetList), cleared on return
 !Battler_Untargetable    = $A09B ; 1 B per battler slot: non-zero = never offered as a target (inferred: hidden)
 !BattleMenu_Lock         = $A0A7 ; 1 B: non-zero blocks the item list; bit 0 also blocks the tech list
 !Battler_KoFlag          = $A0A8 ; 1 B per battler slot: non-zero = only target mode $04 may pick it (inferred: KO'd)
 !BattleMenu_ItemRefresh  = $A0D0 ; 1 B: non-zero = re-render the item list (ItemListInput)
 !Pc_LockStatus           = $A0D1 ; 1 B per PC: non-zero = PC can't join techs (inferred: Lock status)
-!BattleMenu_CfgCursorMemory = $A0D4 ; 1 B: config: non-zero = keep each PC's command-menu row between turns
-!BattleMenu_CfgListMemory = $A0D5 ; 1 B: config: non-zero = keep tech/item list cursor positions between turns
+!BattleMenu_CfgCursorMemory = $A0D4 ; 1 B: config: non-zero = keep each PC's command-menu row between turns (inferred:
+                                 ; battle init $CC:E39C copies it from config byte $2991 bit 6)
+!BattleMenu_CfgListMemory = $A0D5 ; 1 B: config: non-zero = keep tech/item list cursor positions between turns (inferred:
+                                 ; battle init $CC:E3A4 copies it from config byte $2991 bit 7)
 !BattleUI_UnkA0D7        = $A0D7 ; 1 B: compared with !BattleTgt_Selected by BuildStatusBarFrame; ConfirmCommand
                                  ; sets $FF; purpose unknown
 !Pc_SavedTech            = $A0D8 ; 3 B per PC: tech id under the cursor at commit (with CfgListMemory)
-!BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel
+!BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel (battle init $CC:E3AC copies $2990 bit 7)
 !Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
-!BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is <= MaxHP/8 (or 0)
-!BattleUI_UnkA110        = $A110 ; 1-2 B: when HP is exactly MaxHP/8, non-zero makes it count as low; unknown
+!BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is 0, or 1..MaxHP/8 with !BattleUI_UnkA110 set
+!BattleUI_UnkA110        = $A110 ; 1-2 B: non-zero lets HP 1..MaxHP/8 count as low (HP 0 always does); otherwise unknown
 !BattleMenu_KeepRow      = $A114 ; 1 B: set by alt-confirm; CommitAction then keeps !Pc_SavedMenuRow
-!BattleUI_UnkA115        = $A115 ; 1-2 B: PC slot compared with the panel slot in SlotPanelRefresh; purpose unknown
-!BattleUI_UnkA117        = $A117 ; 1 B: zero forces the "ready" panel in SlotPanelRefresh; purpose unknown
+!BattleUI_UnkA115        = $A115 ; 1-2 B: PC slot compared with the drawn slot in DrawCommandList; purpose unknown
+!BattleUI_UnkA117        = $A117 ; 1 B: zero lets DrawCommandList show the Combo list without the A115 test; purpose unknown
 !BattleUI_PanelRedraw    = $A43F ; 1 B: non-zero = redraw the command cursor column (ClearActivePanelColumn)
 !BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
 !BattleTgt_Selected      = $A62D ; 12 B: selected battler slots ($FF = empty); +0 is the command's target
@@ -337,8 +341,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 ; ------------------------------------------------------------
 !Battle_WramBank           = $7E      ; WRAM bank (MVN destination)
 !BattleRom_TextBank        = $CC      ; bank holding the item/tech name tables (MVN source)
-!BattleRom_AngleTable      = $C0F300  ; direction angle by (|dy| & ~7) * 4 + |dx| >> 3 (Calc_Delta16)
-!BattleRom_SineTable       = $C0F900  ; sine magnitudes, 2 B per entry, 512 entries (Battle_SinLookup)
+!BattleRom_AngleTable      = $C0F300  ; direction angle by (|dy| & ~7) * 4 + |dx| >> 3 (Battle_CalcAngle)
+!BattleRom_SineTable       = $C0F900  ; |sin| table: 1024 entries of 1 B per turn, peak $FF at +$100 (Battle_SinLookup)
 !BattleRom_TechListBase    = $CCF38C  ; 1 B per PC slot: first line of the PC in the 20-line tech lists (0/$14/$28)
 !BattleRom_TechEntryBase   = $CCF395  ; 2 B per PC slot: offset of the PC's Tech_MenuEntry block (0/$8C/$118)
 !BattleRom_TechRowMapOffset = $CCF39B ; 2 B per visible tech row: offset of the row in the tech window map
@@ -353,23 +357,24 @@ endstruct
 !BattleRom_StatsOffset     = $CCF8ED  ; 2 B per battler slot: slot * $80, offset of its BattlerStats record
 !BattleRom_DigitTiles      = $CCF903  ; 10 B: tile for digits 0-9 ($73-$7C)
 !BattleRom_PcBit           = $CCF9FB  ; 1 B per PC slot: $80/$40/$20, the PC's bit in Item_BattleList.PcMask
-!BattleRom_AttrColumnL1    = $CCFA23  ; 2 B per PC slot: map offset of the PC's attribute column, layout 1
-!BattleRom_AttrColumnL02   = $CCFA29  ; 2 B per PC slot: same for layouts 0 and 2
+!BattleRom_NameAttrL1    = $CCFA23  ; 2 B per PC slot: map offset of the PC's name block's first attribute byte, layout 1
+!BattleRom_NameAttrL02   = $CCFA29  ; 2 B per PC slot: same for layouts 0 and 2 (BattleUI_HighlightPcName)
 !BattleRom_HpCellL0        = $CCFA2F  ; 2 B per PC slot: map offset of the HP digits, layout 0
 !BattleRom_HpCellL1        = $CCFA35  ; 2 B per PC slot: same, layout 1 (also the gauge base for every layout)
 !BattleRom_HpCellL2        = $CCFA3B  ; 2 B per PC slot: same, layout 2
-!BattleRom_PanelEmpty      = $CCFA41  ; 42 B: 6x7 tiles of the panel shown when no other PC is waiting
-!BattleRom_PanelReady      = $CCFA6B  ; 42 B: 6x7 tiles of the panel shown when another PC is waiting
+!BattleRom_CmdListTech      = $CCFA41  ; 42 B: 6x7 command-list tiles: Attack / Tech / Item (rows 1, 3, 5)
+!BattleRom_CmdListCombo      = $CCFA6B  ; 42 B: same with Combo in place of Tech (text "Comb")
 !BattleRom_TechBorder      = $CCFA95  ; 54 B: 6x9 tiles of the tech window's right part (row 0 holds "MP")
 !BattleRom_MenuCursorCell  = $CCFADD  ; 2 B per command row: map offset of the command cursor
 !BattleRom_TechCursorCell  = $CCFAE3  ; 2 B per tech row: map offset of the tech cursor
 !BattleRom_ItemCursorCell  = $CCFAE9  ; 2 B per item row: map offset of the item cursor
 !BattleRom_CmdOffset       = $CCFAF0  ; 1 B per battler slot: offset of its BattleCmd record (PCs 0/7/14)
-!BattleRom_TechFixedText   = $CCFB4B  ; 2 x 18 B: "[Double Tech]" and "[Triple Tech]" header lines
+!BattleRom_TechFixedText   = $CCFB4B  ; 2 x 18 B: "Double Technique" and "Triple Technique" header lines, each between
+                                 ; end glyphs $5B and $5C
 !BattleRom_Squares         = $CCFB6F  ; 16 B: n*n for n = 0-15 (BattleTgt_AreaCircle)
 !BattleRom_OamShowMask     = $CCFB8D  ; 4 B: high-table mask clearing x bit 8 of cursor sprite 0-3
 !BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
-!BattleRom_WindowEdges     = $D159FC  ; edge strips for the ready-PC windows (left strip, right strip interleaved)
+!BattleRom_CommandWindowFrame     = $D159FC  ; 84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell
 !BattleRom_TechBoxMap      = $D15A50  ; $180 B: tech window frame tilemap
 !BattleRom_ItemBoxMap      = $D15BD0  ; $180 B: item window frame tilemap
 !BattleRom_UnkE1DE80       = $E1DE80  ; 1 B per !Battler_Unk984D value: non-zero = send $FF instead of the target slot

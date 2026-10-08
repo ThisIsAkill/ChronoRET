@@ -38,9 +38,9 @@ Battle_Mul8:
     SEP #$20                ; A → 8-bit
     RTS
 
-; $C1:00A7 — Battle_MulAccum (48 bytes, $00A7–$00D6)
-; 8×16→24 multiply in two hardware passes (despite the name, nothing is
-; accumulated from the caller: the top byte is zeroed first):
+; $C1:00A7 — Battle_Mul8x16 (48 bytes, $00A7–$00D6)
+; 8×16→24 multiply in two hardware passes (the top byte of the product
+; is zeroed first, so nothing from the caller is accumulated):
 ;   pass 1: Factor8 × low byte of Factor16  -> Product+0/+1
 ;   pass 2: Factor8 × high byte of Factor16 -> added at Product+1/+2
 ; In:  !Battle_MulFactor8 (8-bit), !Battle_MulFactor16 (16-bit)
@@ -48,7 +48,7 @@ Battle_Mul8:
 ;      its middle byte, i.e. product >> 8)
 ; Sets DB=0 itself (PHB/TDC/PHA/PLB) to safely use STA.w for HW regs.
 org $C100A7
-Battle_MulAccum:
+Battle_Mul8x16:
     PHB
     TDC
     PHA
@@ -112,14 +112,16 @@ Battle_Divide:
 
 ; $C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E)
 ; Overlapping fall-through stubs for power-of-2 left/right shifts on A.
-; All routines operate on M=1 (8-bit A); ASL A / LSR A = 1 byte each.
+; They work at either accumulator width: some callers run them with M=1,
+; others with M=0 (BattleUI_DrawSlotGaugeBar and the low-HP test in
+; BattleUI_DrawPcNamePanel shift a 16-bit A). ASL A / LSR A = 1 byte each.
 ;
-; Left-shift chain: ShiftLeft7 (8 ASL → *256) → ShiftLeft4 (4 ASL → *16)
+; Left-shift chain: ShiftLeft8 (8 ASL → *256) → ShiftLeft4 (4 ASL → *16)
 ;   → ShiftLeft3 (3 ASL → *8, RTS)
-; Right-shift chain: Loc_C10116 (8 LSR → >>8) → ShiftRight6 (>>6)
+; Right-shift chain: Battle_ShiftRight8 (8 LSR → >>8) → ShiftRight6 (>>6)
 ;   → ShiftRight5 (>>5) → ShiftRight4 (>>4) → ShiftRight3 (>>3, RTS)
 org $C1010D
-Battle_ShiftLeft7:          ; A <<= 7 (falls through ShiftLeft4 + ShiftLeft3 chain)
+Battle_ShiftLeft8:          ; A <<= 8 (4 here, then falls through ShiftLeft4's 1 + ShiftLeft3's 3)
     ASL A
     ASL A
     ASL A
@@ -131,7 +133,7 @@ Battle_ShiftLeft3:          ; A <<= 3
     ASL A
     ASL A
     RTS
-Loc_C10116:                 ; A >>= 8 (2 extra LSR before ShiftRight6 chain)
+Battle_ShiftRight8:         ; A >>= 8 (2 extra LSR before ShiftRight6 chain)
     LSR A
     LSR A
 Battle_ShiftRight6:         ; A >>= 6
@@ -206,7 +208,7 @@ BattleMsg_FormatNumberDigits:
     PLX
     RTS
 
-; $C1:0174 — Battle_DivTen9499 (53 bytes, $0174–$01A8)
+; $C1:0174 — BattleMsg_FormatTwoDigits (53 bytes, $0174–$01A8)
 ; Two-digit variant of BattleMsg_FormatNumberDigits: formats
 ; !BattleMsg_NumValue as tens+ones only. Digit1000/Digit100 = blank;
 ; Digit10 = tens, Digit1 = ones. Used for two-digit values (0–99).
@@ -215,7 +217,7 @@ BattleMsg_FormatNumberDigits:
 ; Note: same explicit .w immediates as BattleMsg_FormatNumberDigits.
 ; No JSR/JSL calls.
 org $C10174
-Battle_DivTen9499:
+BattleMsg_FormatTwoDigits:
     PHX
     TDC
     TAX
@@ -249,12 +251,16 @@ Battle_DivTen9499:
 ; to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles),
 ; then re-encode each text byte into a lower-row tile (TextTiles,X) and
 ; the tile above it (TextTopTiles,X):
-;   $40–$68 → tile = byte + $40, upper tile = $71
-;   $69–$72 → tile = byte + $17, upper tile = $72
+;   $40–$68 → tile = byte + $40, upper tile = $71 (code set 1)
+;   $69–$72 → tile = byte + $17, upper tile = $72 (code set 2)
 ;   $73+, < $40 → tile = byte unchanged, upper tile = $FF (blank)
 ;   $00     → stop early (the rest is already blank)
+; What the two sets are is inferred, not checked against the font: set 1
+; has 41 codes and set 2 has 10, the counts of Japanese kana that take a
+; dakuten and a handakuten, so $71/$72 are probably those marks drawn
+; above the base character (a leftover of the Japanese text code).
 ; Entry: M=1 (8-bit A), X=0 (16-bit); entry state from caller
-; Exit:  M=1 (8-bit A)
+; Exit:  M=1 (8-bit A); DB=$7E (set by the MVN)
 ; No JSR/JSL calls.
 org $C101A9
 BattleMsg_ReencodeTextBuffer:
@@ -279,17 +285,17 @@ BattleMsg_ReencodeTextBuffer:
     CMP.b #!BattleMsg_CharTileMin
     BCS .passthrough            ; $73+ → already a tile, nothing above
     CMP.b #!BattleMsg_CharSet2Min
-    BCS .range69                ; $69–$72 → second accent set
+    BCS .range69                ; $69–$72 → code set 2
     CMP.b #!BattleMsg_CharSet1Min
     BCC .passthrough            ; < $40 → already a tile
-    ; $40–$68: first accent set
+    ; $40–$68: code set 1
     CLC
     ADC.b #!BattleMsg_CharSet1TileAdd
     STA.w !BattleMsg_TextTiles,X
     LDA.b #!BattleMsg_CharSet1Top
     BRA .store_plane
 .range69:
-    ; $69–$72: second accent set
+    ; $69–$72: code set 2
     CLC
     ADC.b #!BattleMsg_CharSet2TileAdd
     STA.w !BattleMsg_TextTiles,X
@@ -307,467 +313,44 @@ BattleMsg_ReencodeTextBuffer:
     RTS
 
 ; ============================================================
-; Status-Bar UI Callees ($C1:06F0–$C1:095C)
-; Matched session 37; called by BattleUI_BuildStatusBarFrame and peers.
-; ============================================================
-
-; $C1:06F0 — BattleUI_DrawSlotGaugeBar (149 bytes, $06F0–$0784)
-; Draw the 4-tile ATB gauge of PC slot !BattleUI_Slot into the status map
-; at BattleRom_HpCellL1[slot] + !BattleUI_GaugeCellOffset.
-;   fill = (AtbCur * 256 / AtbMax) >> 3, 0-31 units of 32
-;   rest = 32 - fill; rest / 8 tiles get TileGauge8, then one tile gets
-;   TileGauge0 + (rest mod 8); the remaining tiles keep TileGauge0.
-; So the tiles drawn track the part of the gauge still to fill (the
-; earlier header called the $6F tiles "full-fill"; what they show depends
-; on the graphics, which were not checked). Attribute: palette 3 if
-; AtbCur is non-zero, else palette 2.
-; Entry: M=1, X=0 (16-bit), !BattleUI_Slot = PC slot (0–2)
-; Exit:  M=1; Y = last map offset written; DP $82/$83/$86/$AD/$AE/$B1–$B7 clobbered
-; Calls: Battle_ShiftLeft7, Battle_Divide, Battle_ShiftRight3
-; Direct-page roles (status-bar routines share !BattleUI_Slot):
-!BattleUI_Slot = !BattleTmp_80            ; 1-2 B: PC slot (or enemy-name line) being drawn
-!BattleUI_AtbValue = !BattleTmp_AD        ; 2 B: AtbCur zero-extended
-!BattleUI_GaugeRest = !BattleTmp_82       ; 1 B: 32 - filled units, then the units left after whole tiles
-!BattleUI_GaugeRestTiles = !BattleTmp_83  ; 1 B: whole 8-unit tiles in GaugeRest
-!BattleUI_GaugeTmp = !BattleTmp_86        ; 1 B: GaugeRestTiles * 8
-org $C106F0
-BattleUI_DrawSlotGaugeBar:
-    REP #$21                    ; M=0, C=0
-    LDA.b !BattleUI_Slot        ; PC slot (16-bit DP load; high byte = 0)
-    ASL                         ; × 2 (table index)
-    TAX
-    LDA.l !BattleRom_HpCellL1,X ; map offset of the slot's HP cell
-    ADC.w #!BattleUI_GaugeCellOffset ; gauge starts this far after it
-    TAY                         ; Y = map destination
-    TDC
-    SEP #$20                    ; M=1
-    LDX.b !BattleUI_Slot        ; X = slot (16-bit DP load)
-    LDA.w !Pc_AtbCur,X
-    STA.b !BattleUI_AtbValue
-    STZ.b !BattleUI_AtbValue+1
-    LDA.w !Pc_AtbMax,X
-    STA.b !Battle_DivDivisor
-    STZ.b !Battle_DivDivisor+1  ; (high byte not read by Battle_Divide)
-    REP #$20                    ; M=0
-    LDA.b !BattleUI_AtbValue
-    JSR Battle_ShiftLeft7       ; A <<= 8 (× 256) — scale to fixed-point
-    STA.b !Battle_DivDividend
-    TDC
-    SEP #$20                    ; M=1
-    JSR Battle_Divide           ; quotient = AtbCur * 256 / AtbMax (0–255)
-    REP #$20                    ; M=0
-    LDA.b !Battle_DivQuotient   ; (16-bit read)
-    JSR Battle_ShiftRight3      ; >> 3 → 0–31 gauge units
-    STA.b !Battle_DivQuotient
-    TDC
-    SEP #$20                    ; M=1
-    SEC
-    LDA.b #!BattleUI_GaugeUnits
-    SBC.b !Battle_DivQuotient   ; units not yet filled
-    STA.b !BattleUI_GaugeRest
-    LSR
-    LSR
-    LSR                         ; / 8 = whole tiles
-    STA.b !BattleUI_GaugeRestTiles
-    ASL
-    ASL
-    ASL                         ; × 8 = units in those tiles
-    STA.b !BattleUI_GaugeTmp
-    SEC
-    LDA.b !BattleUI_GaugeRest
-    SBC.b !BattleUI_GaugeTmp    ; units left over
-    STA.b !BattleUI_GaugeRest
-    ; Write 4 TileGauge0 tiles at the destination
-    LDA.b #!BattleUI_TileGauge0
-    STA.w BattleUI_StatusTile(0,0),Y
-    STA.w BattleUI_StatusTile(0,1),Y
-    STA.w BattleUI_StatusTile(0,2),Y
-    STA.w BattleUI_StatusTile(0,3),Y
-    LDX.b !BattleUI_Slot
-    LDA.w !Pc_AtbCur,X
-    BNE .has_atb
-    LDA.b #!BattleUI_AttrPal2   ; empty gauge → palette 2
-    BRA .set_attr
-.has_atb:
-    LDA.b #!BattleUI_AttrPal3   ; non-empty gauge → palette 3
-.set_attr:
-    STA.w BattleUI_StatusAttr(0,0),Y
-    STA.w BattleUI_StatusAttr(0,1),Y
-    STA.w BattleUI_StatusAttr(0,2),Y
-    STA.w BattleUI_StatusAttr(0,3),Y
-.full_tile_loop:
-    LDA.b !BattleUI_GaugeRestTiles ; whole tiles left
-    BEQ .partial_tile
-    LDA.b #!BattleUI_TileGauge8
-    STA.w BattleUI_StatusTile(0,0),Y
-    INY
-    INY
-    DEC.b !BattleUI_GaugeRestTiles
-    BRA .full_tile_loop
-.partial_tile:
-    CLC
-    LDA.b !BattleUI_GaugeRest   ; units left over
-    BEQ .done                   ; none → nothing to add
-    ADC.b #!BattleUI_TileGauge0 ; TileGauge0 + units
-    STA.w BattleUI_StatusTile(0,0),Y
-.done:
-    RTS
-
-; $C1:0785 — BattleSys_SlotPanelRefresh (153 bytes, $0785–$081D)
-; Draw the 6-row × 7-column panel of PC slot A into the status map at
-; offset slot × 12, from one of two ROM tile tables:
-;   !BattleRom_PanelEmpty — no other PC waiting / panel not applicable
-;   !BattleRom_PanelReady — another PC is waiting for a command
-; Ready is chosen when !BattleUI_OtherReady and the slot's
-; !Pc_Unk9F25|!Pc_Unk9F28 are non-zero, and then either !BattleUI_UnkA117
-; is zero, all three PCs are in the roster, or !BattleUI_UnkA115 names a
-; different PC whose roster entry is negative. Attribute: palette 2.
-; Entry: M=1, X=0 (16-bit), A = PC slot (0–2)
-; Exit:  M=1; DP $80-$83 clobbered; X/Y clobbered
-; No calls.
-; Direct-page roles (!BattleUI_Slot holds the slot until the drawing loops):
-!BattleUI_RowsLeft = !BattleTmp_80        ; 1 B: panel rows left to draw
-!BattleUI_ColsLeft = !BattleTmp_81        ; 1 B: columns left in the row
-!BattleUI_MapOffset = !BattleTmp_82       ; 2 B: map offset of the current row / edge strip
-org $C10785
-BattleSys_SlotPanelRefresh:
-    STA.b !BattleUI_Slot
-    ASL
-    ASL                         ; × 4
-    STA.b !BattleUI_MapOffset
-    ASL                         ; × 8
-    CLC
-    ADC.b !BattleUI_MapOffset   ; slot × 12
-    TAX
-    STX.b !BattleUI_MapOffset   ; 16-bit map offset of the panel
-    LDA.w !BattleUI_OtherReady
-    BEQ .empty_panel            ; no other PC waiting → empty panel
-    LDA.b !BattleUI_Slot
-    TAX
-    LDA.w !Pc_Unk9F25,X
-    ORA.w !Pc_Unk9F28,X
-    BEQ .empty_panel            ; both zero → empty panel
-    LDA.w !BattleUI_UnkA117
-    BEQ .ready_panel            ; zero → ready panel
-    LDA.w !BattleMenu_ReadyCount
-    CMP.b #!Battle_NumPcSlots
-    BEQ .ready_panel            ; all three PCs waiting → ready panel
-    LDA.b !BattleUI_Slot
-    CMP.w !BattleUI_UnkA115
-    BEQ .empty_panel            ; same slot → empty
-    LDX.w !BattleUI_UnkA115
-    LDA.w !BattleMenu_Roster,X
-    BMI .ready_panel            ; that PC not in the roster → ready panel
-
-.empty_panel:
-    TDC
-    TAX                         ; X = table index (starts at 0)
-    LDA.b #!BattleUI_PanelRows
-    STA.b !BattleUI_RowsLeft
-.empty_row_start:
-    LDA.b #!BattleUI_PanelCols
-    STA.b !BattleUI_ColsLeft
-    LDY.b !BattleUI_MapOffset   ; Y = current row
-.empty_col_loop:
-    LDA.l !BattleRom_PanelEmpty,X
-    STA.w BattleUI_StatusTile(0,0),Y
-    LDA.b #!BattleUI_AttrPal2
-    STA.w BattleUI_StatusAttr(0,0),Y
-    INY
-    INY
-    INX
-    DEC.b !BattleUI_ColsLeft
-    BNE .empty_col_loop
-    REP #$21                    ; M=0, C=0
-    LDA.b !BattleUI_MapOffset
-    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
-    STA.b !BattleUI_MapOffset
-    TDC
-    SEP #$20                    ; M=1
-    DEC.b !BattleUI_RowsLeft
-    BNE .empty_row_start
-    BRA .done
-
-.ready_panel:
-    TDC
-    TAX                         ; X = table index
-    LDA.b #!BattleUI_PanelRows
-    STA.b !BattleUI_RowsLeft
-.ready_row_start:
-    LDA.b #!BattleUI_PanelCols
-    STA.b !BattleUI_ColsLeft
-    LDY.b !BattleUI_MapOffset
-.ready_col_loop:
-    LDA.l !BattleRom_PanelReady,X
-    STA.w BattleUI_StatusTile(0,0),Y
-    LDA.b #!BattleUI_AttrPal2
-    STA.w BattleUI_StatusAttr(0,0),Y
-    INY
-    INY
-    INX
-    DEC.b !BattleUI_ColsLeft
-    BNE .ready_col_loop
-    REP #$21                    ; M=0, C=0
-    LDA.b !BattleUI_MapOffset
-    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
-    STA.b !BattleUI_MapOffset
-    TDC
-    SEP #$20                    ; M=1
-    DEC.b !BattleUI_RowsLeft
-    BNE .ready_row_start
-.done:
-    RTS
-
-; $C1:081E — BattleMenu_DrawReadyWindowEdges (202 bytes, $081E–$08E7)
-; Draw the window edge strip of every PC in the roster, then colour the
-; shown PC's attribute column and fall into BattleUI_ClearActivePanelColumn.
-; Slot 1's / slot 2's strip is a right edge (!BattleUI_EdgeRight = 1) when
-; the slot before it is also in the roster, else a left edge further left.
-; BattleUI_ClearActivePanelColumn ($0872) is also called on its own
-; (BattleMenu_UpdateMainWindow) when only the cursor column needs redrawing.
-; Entry: M=1, X=0 (16-bit)
-; Exit:  M=1; DP $80/$82/$84 clobbered; X/Y clobbered
-; Calls: BattleMenu_DrawWindowEdgeStrip, BattleUI_SetPanelAttrColumn
-!BattleUI_EdgeRight = !BattleTmp_84      ; 1 B: 0 = left edge strip, else right (DrawWindowEdgeStrip input)
-org $C1081E
-BattleMenu_DrawReadyWindowEdges:
-    STZ.b !BattleUI_EdgeRight   ; left edge
-    LDA.w !BattleMenu_Roster    ; PC slot 0 in the roster?
-    BMI .check_slot1            ; no → no strip
-    LDX.w #$0000                ; map offset 0
-    STX.b !BattleUI_MapOffset
-    JSR BattleMenu_DrawWindowEdgeStrip
-.check_slot1:
-    LDA.w !BattleMenu_Roster+1  ; PC slot 1 in the roster?
-    BMI .check_slot2            ; no → no strip
-    LDA.w !BattleMenu_Roster    ; slot 0 too?
-    BMI .slot1_left             ; no → left edge
-    LDA #$01
-    STA.b !BattleUI_EdgeRight   ; yes → right edge
-    LDX.w #!BattleUI_EdgeCol1Right
-    BRA .slot1_draw
-.slot1_left:
-    LDX.w #!BattleUI_EdgeCol1Left
-.slot1_draw:
-    STX.b !BattleUI_MapOffset
-    JSR BattleMenu_DrawWindowEdgeStrip
-    STZ.b !BattleUI_EdgeRight   ; back to left edge
-.check_slot2:
-    LDA.w !BattleMenu_Roster+2  ; PC slot 2 in the roster?
-    BMI .active_pc_section      ; no → no strip
-    LDA.w !BattleMenu_Roster+1  ; slot 1 too?
-    BMI .slot2_left             ; no → left edge
-    LDA #$01
-    STA.b !BattleUI_EdgeRight   ; yes → right edge
-    LDX.w #!BattleUI_EdgeCol2Right
-    BRA .slot2_draw
-.slot2_left:
-    LDX.w #!BattleUI_EdgeCol2Left
-.slot2_draw:
-    STX.b !BattleUI_MapOffset
-    JSR BattleMenu_DrawWindowEdgeStrip
-.active_pc_section:
-    LDA.w !BattleMenu_RosterIdx ; roster entry shown
-    TAX
-    LDA.w !BattleMenu_Roster,X  ; its PC slot
-    JSR BattleUI_SetPanelAttrColumn
-    INC.w !BattleUI_PanelRedraw ; redraw the command cursor below
-
-; $C1:0872 — BattleUI_ClearActivePanelColumn (entry point within above body)
-; Zero the two tile columns of the shown PC's command column (6 rows,
-; offset !BattleMenu_ActivePc × 12) in the status map, then, if
-; !BattleUI_PanelRedraw is set and no target selection is running, draw
-; the 2×2 command cursor (tiles $60-$63) at the PC's !Pc_MenuRow, placed
-; through !BattleRom_MenuCursorCell (the same cursor quad the tech and
-; item lists use).
-; Entry: M=1, X=0 (16-bit)
-; Exit:  M=1; DP $80/$81, X/Y clobbered; !BattleUI_PanelRedraw = 0
-; No calls.
-!BattleUI_ColumnOffset = !BattleTmp_80   ; 1-2 B: slot * 12, the PC's column offset in the status map
-BattleUI_ClearActivePanelColumn:
-    LDA.w !BattleMenu_ActivePc
-    ASL
-    ASL
-    STA.b !BattleUI_ColumnOffset ; slot × 4
-    ASL
-    CLC
-    ADC.b !BattleUI_ColumnOffset ; slot × 12
-    TAX                         ; X = column offset
-    STZ.w BattleUI_StatusTile(0,0),X
-    STZ.w BattleUI_StatusTile(1,0),X
-    STZ.w BattleUI_StatusTile(2,0),X
-    STZ.w BattleUI_StatusTile(3,0),X
-    STZ.w BattleUI_StatusTile(4,0),X
-    STZ.w BattleUI_StatusTile(5,0),X
-    STZ.w BattleUI_StatusTile(0,1),X
-    STZ.w BattleUI_StatusTile(1,1),X
-    STZ.w BattleUI_StatusTile(2,1),X
-    STZ.w BattleUI_StatusTile(3,1),X
-    STZ.w BattleUI_StatusTile(4,1),X
-    STZ.w BattleUI_StatusTile(5,1),X
-    LDA.w !BattleUI_PanelRedraw
-    BEQ .clear_done             ; zero → just clear flag and return
-    LDA.w !BattleMenu_RosterIdx ; roster entry shown
-    TAX
-    ASL
-    ASL
-    STA.b !BattleUI_ColumnOffset ; × 4
-    ASL
-    CLC
-    ADC.b !BattleUI_ColumnOffset ; × 12
-    TAY
-    STY.b !BattleUI_ColumnOffset ; 16-bit column offset
-    LDA.w !BattleMenu_Roster,X  ; its PC slot
-    TAX
-    LDA.w !Pc_MenuRow,X         ; that PC's command row
-    ASL
-    TAX                         ; X = row × 2
-    REP #$21                    ; M=0, C=0
-    LDA.l !BattleRom_MenuCursorCell,X ; cursor offset within the column
-    ADC.b !BattleUI_ColumnOffset ; + column offset
-    TAX                         ; X = map offset of the cursor
-    TDC
-    SEP #$20                    ; M=1
-    LDA.w !BattleMenu_TargetSelect
-    BNE .clear_done             ; selecting a target → no command cursor
-    LDA.b #!BattleMenu_TileCursorTL
-    STA.w BattleUI_StatusTile(0,0),X
-    LDA.b #!BattleMenu_TileCursorTR
-    STA.w BattleUI_StatusTile(0,1),X
-    LDA.b #!BattleMenu_TileCursorBL
-    STA.w BattleUI_StatusTile(1,0),X
-    LDA.b #!BattleMenu_TileCursorBR
-    STA.w BattleUI_StatusTile(1,1),X
-.clear_done:
-    STZ.w !BattleUI_PanelRedraw
-    RTS
-
-; $C1:08E8 — BattleUI_SetPanelAttrColumn (65 bytes, $08E8–$0928)
-; For PC slot A: look up the slot's offset in !BattleRom_AttrColumnL1
-; (layout 1) or !BattleRom_AttrColumnL02 (layouts 0 and 2) and set the
-; attribute of a 5-wide × 2-high block of status-map cells to palette 2.
-; The table offsets are odd, i.e. they point at an attribute byte, so the
-; Tile(r,c),X stores below all land on attribute bytes.
-; Entry: M=1, X=0 (16-bit), A = PC slot (0–2)
-; Exit:  M=1; X = offset; A = !BattleUI_AttrPal2; Y unchanged
-; No calls.
-org $C108E8
-BattleUI_SetPanelAttrColumn:
-    ASL                         ; slot × 2 (table index)
-    TAX
-    REP #$20                    ; M=0
-    LDA.w !BattleUI_GaugeLayout ; (16-bit read; layout 0/1/2)
-    BNE .type_not0
-    LDA.l !BattleRom_AttrColumnL02,X ; layout 0
-    BRA .got_offset
-.type_not0:
-    DEC A                       ; layout − 1
-    BNE .type_not1              ; non-zero → layout 2
-    LDA.l !BattleRom_AttrColumnL1,X ; layout 1
-    BRA .got_offset
-.type_not1:
-    LDA.l !BattleRom_AttrColumnL02,X ; layout 2 (same table as layout 0)
-.got_offset:
-    TAX                         ; X = map offset of an attribute byte
-    TDC
-    SEP #$20                    ; M=1
-    LDA.b #!BattleUI_AttrPal2
-    STA.w BattleUI_StatusTile(0,0),X
-    STA.w BattleUI_StatusTile(0,1),X
-    STA.w BattleUI_StatusTile(0,2),X
-    STA.w BattleUI_StatusTile(0,3),X
-    STA.w BattleUI_StatusTile(0,4),X
-    STA.w BattleUI_StatusTile(1,0),X
-    STA.w BattleUI_StatusTile(1,1),X
-    STA.w BattleUI_StatusTile(1,2),X
-    STA.w BattleUI_StatusTile(1,3),X
-    STA.w BattleUI_StatusTile(1,4),X
-    RTS
-
-; $C1:0929 — BattleMenu_DrawWindowEdgeStrip (52 bytes, $0929–$095C)
-; Copy a 6-row window edge strip from !BattleRom_WindowEdges into
-; !BattleMenu_WindowMap at !BattleUI_MapOffset. Each ROM row is 14 bytes
-; (7 entries): a left edge (!BattleUI_EdgeRight = 0) copies all of it, a
-; right edge skips the row's first entry and copies the other 12 bytes.
-; Entry: M=1, X=0 (16-bit), !BattleUI_MapOffset = map offset,
-;        !BattleUI_EdgeRight = edge kind
-; Exit:  M=1; X/Y and DP $80-$83 clobbered
-; No calls.
-!BattleUI_EdgeBytes = !BattleTmp_80      ; 1 B: bytes left to copy in this row
-!BattleUI_EdgeRows = !BattleTmp_81       ; 1 B: rows left
-org $C10929
-BattleMenu_DrawWindowEdgeStrip:
-    TDC
-    TAX                         ; X = 0 (ROM table index)
-    LDA.b #!BattleUI_PanelRows
-    STA.b !BattleUI_EdgeRows
-.row_loop:
-    LDA.b !BattleUI_EdgeRight
-    BNE .right_edge
-    LDA.b #!BattleUI_EdgeBytesLeft ; left edge: whole 14-byte row
-    BRA .pick_done
-.right_edge:
-    INX                         ; right edge: skip the row's first entry
-    INX
-    LDA.b #!BattleUI_EdgeBytesRight ; and copy the other 12 bytes
-.pick_done:
-    STA.b !BattleUI_EdgeBytes
-    LDY.b !BattleUI_MapOffset   ; Y = current row
-.inner_loop:
-    LDA.l !BattleRom_WindowEdges,X
-    STA.w !BattleMenu_WindowMap,Y
-    INX
-    INY
-    DEC.b !BattleUI_EdgeBytes
-    BNE .inner_loop
-    REP #$21                    ; M=0, C=0
-    LDA.b !BattleUI_MapOffset
-    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
-    STA.b !BattleUI_MapOffset
-    TDC
-    SEP #$20                    ; M=1
-    DEC.b !BattleUI_EdgeRows
-    BNE .row_loop
-    RTS
-
-; ============================================================
 ; Trig / Geometry Cluster ($C1:01F9–$C1:0298)
 ; ============================================================
 
 ; $C1:01F9 — Battle_SinLookup (41 bytes, $01F9–$0221)
 ; Scaled sine: returns (sin(A) × !Battle_SinScale) >> 8 in A.
-; A (8-bit) is an angle, 256 units per turn; !BattleRom_SineTable gives
-; the magnitude (low byte of each 2-byte entry), negated for the second
-; half turn. The signed sine goes to !Battle_MulFactor16, the scale to
-; !Battle_MulFactor8, and Battle_MulAccum multiplies them.
+; A (8-bit) is an angle, 256 units per turn. !BattleRom_SineTable holds
+; |sin| for 1024 steps per turn, one byte each ($00 at +$000 and +$200,
+; $FF at +$100 and +$300); angle × 4 picks every fourth entry, and the
+; value is negated for the second half turn (table offset $200 and up). The signed sine goes to !Battle_MulFactor16, the scale to
+; !Battle_MulFactor8, and Battle_Mul8x16 multiplies them.
 ; Entry: M=1 (8-bit A), X=0 (16-bit); angle in A
 ; Exit:  M=1 (8-bit A); A = !Battle_MulProduct+1 (product >> 8)
-; Calls: Battle_MulAccum
+; Calls: Battle_Mul8x16
 !Battle_SinScale = !Battle_Mul8B          ; 1 B in: scale multiplied into the sine (Mul8's B slot)
 org $C101F9
 Battle_SinLookup:
     REP #$20                    ; A → 16-bit
     ASL A
     ASL A
-    AND.w #!Battle_SineIndexMask ; angle × 4, wrapped to the table (512 entries × 2 B)
+    AND.w #!Battle_SineIndexMask ; angle × 4, wrapped to the 1024-entry table
     TAX                         ; X = table byte index
     LDA.l !BattleRom_SineTable,X
-    AND.w #!Battle_LowByteMask  ; keep low byte (magnitude)
+    AND.w #!Battle_LowByteMask  ; keep this entry (the 16-bit read also took the next)
     CPX.w #!Battle_SineHalfTable ; second half turn → negative
-    BCC .first_quadrant
+    BCC .first_half
     EOR.w #!Battle_Invert16
     INC A                       ; two's complement negate (EOR + INC)
-.first_quadrant:
+.first_half:
     STA.b !Battle_MulFactor16   ; signed sine (16-bit store)
     LDA.b !Battle_SinScale      ; (16-bit read: also the next byte)
     AND.w #!Battle_LowByteMask  ; zero-extend the scale byte
     STA.b !Battle_MulFactor8    ; (16-bit store: also clears $A6)
     SEP #$20                    ; A → 8-bit
-    JSR Battle_MulAccum         ; Factor8 × Factor16 → 24-bit product
+    JSR Battle_Mul8x16         ; Factor8 × Factor16 → 24-bit product
     LDA.b !Battle_MulProduct+1  ; return product >> 8
     RTS
 
-; $C1:0222 — Calc_Delta16 (119 bytes, $0222–$0298)
+; $C1:0222 — Battle_CalcAngle (119 bytes, $0222–$0298)
 ; Direction angle between two screen points (256 units per turn).
 ; Computes dx = OriginX − PointX and dy = OriginY − PointY as signed
 ; 16-bit values, takes |dx| and |dy|, looks up a base angle in
@@ -777,7 +360,7 @@ Battle_SinLookup:
 ; Exit:  M=1 (8-bit A); angle in A and !Battle_GeoAngle
 ; No JSR/JSL calls.
 org $C10222
-Calc_Delta16:
+Battle_CalcAngle:
     ; --- Phase 1: dx = OriginX − PointX, dy = OriginY − PointY (16-bit) ---
     SEC
     LDA.b !Battle_GeoOriginX
@@ -829,30 +412,30 @@ Calc_Delta16:
     STA.b !Battle_GeoAngle
     ; --- Phase 4: quadrant adjustment of angle ---
     LDA.b !Battle_GeoDeltaX+1   ; check sign of ΔX (high byte)
-    BMI .d8_negative            ; ΔX < 0
+    BMI .dx_negative            ; ΔX < 0
     LDA.b !Battle_GeoDeltaY+1   ; check sign of ΔY (high byte)
-    BMI .da_negative_q1         ; ΔX ≥ 0, ΔY < 0 → Q4
-    ; Q1: ΔX ≥ 0, ΔY ≥ 0 → angle = $80 + base
+    BMI .dy_negative            ; ΔX ≥ 0, ΔY < 0
+    ; ΔX ≥ 0, ΔY ≥ 0 → angle = $80 + base
     CLC
     LDA.b #!Battle_AngleHalfTurn
     ADC.b !Battle_GeoAngle
     STA.b !Battle_GeoAngle
     RTS
-.da_negative_q1:                ; Q4: ΔX ≥ 0, ΔY < 0 → angle = $80 − base
+.dy_negative:                   ; ΔX ≥ 0, ΔY < 0 → angle = $80 − base
     SEC
     LDA.b #!Battle_AngleHalfTurn
     SBC.b !Battle_GeoAngle
     STA.b !Battle_GeoAngle
     RTS
-.d8_negative:
+.dx_negative:
     LDA.b !Battle_GeoDeltaY+1   ; check sign of ΔY
-    BMI .da_negative_q3         ; ΔX < 0, ΔY < 0 → Q3
-    ; Q2: ΔX < 0, ΔY ≥ 0 → angle = 0 − base (negate)
+    BMI .both_negative          ; ΔX < 0, ΔY < 0
+    ; ΔX < 0, ΔY ≥ 0 → angle = 0 − base (negate)
     TDC                         ; A = 0
     SEC
     SBC.b !Battle_GeoAngle
     STA.b !Battle_GeoAngle
-.da_negative_q3:                ; Q3: ΔX < 0, ΔY < 0 → angle unchanged
+.both_negative:                 ; ΔX < 0, ΔY < 0 → angle = base, unchanged
     LDA.b !Battle_GeoAngle
     RTS
 
@@ -864,39 +447,43 @@ Calc_Delta16:
 ; Rebuilds the battle status-bar map (BattleUI_StatusTile, $0CC0):
 ;   1. Clears 192 entries (tile 0, palette 2).
 ;   2. Writes the "HP"/"MP" header glyphs where the current layout
-;      (!BattleUI_GaugeLayout: 0 = HP/MaxHP/MP, 1 = HP/MP + gauge,
-;      2 = HP/MP/TP + gauge) puts them.
+;      (!BattleUI_GaugeLayout) puts them: 0 = name, HP/MaxHP, MP;
+;      1 = HP, MP, name, ATB gauge; 2 = name, HP, MP, ATB gauge. Layouts
+;      1 and 2 differ only in which side of HP/MP the name is on.
 ;   3. For each present PC (!Battler_Present, slots 0-2), from the line's
 ;      name cell (!BattleUI_PanelDest):
 ;      - the 10 name tiles from !Pc_NameTiles: 5 on the line, the next 5
 ;        on the tilemap row above it;
-;      - HP digits (BattlerStats.CurHp; palette 3 when HP is 0 or at most
-;        MaxHP/8, see !BattleUI_LowHp);
+;      - HP digits (BattlerStats.CurHp; palette 3 when HP is 0, or when
+;        it is at most MaxHP/8 and !BattleUI_UnkA110 is non-zero, see
+;        !BattleUI_LowHp);
 ;      - layout 0: a separator tile and the MaxHP digits;
-;      - MP digits (two digits); layouts 1/2: the TP gauge ends and the
-;        ATB gauge (BattleUI_DrawSlotGaugeBar).
+;      - MP digits (two digits); layouts 1/2: the end caps (cols 25 and
+;        30) and the ATB gauge between them, cols 26-29
+;        (BattleUI_DrawSlotGaugeBar).
 ;   4. For each used enemy-name line (!Enemy_NameLineUsed, 0-2): the 11
 ;      lower-row and 11 upper-row tiles from !Enemy_NameTiles.
 ;   5. If PCs are waiting for a command (!BattleMenu_ReadyCount):
 ;      - while targeting from a submenu (!BattleMenu_ReturnSubmenu != 0)
 ;        and the first selected target differs from !BattleUI_UnkA0D7:
 ;        force a window rebuild and tail-jump to
-;        BattleUI_SetPanelAttrColumn with that target's slot;
+;        BattleUI_HighlightPcName with that target's slot;
 ;      - else, on the main menu only: latch !BattleUI_OtherReady, make
 ;        sure !BattleMenu_RosterIdx names a roster entry (first valid one
 ;        otherwise), set !BattleMenu_ActivePc, redraw every roster PC's
-;        panel (BattleSys_SlotPanelRefresh) and the window edges
-;        (BattleMenu_DrawReadyWindowEdges).
+;        command list (BattleMenu_DrawCommandList) and the command-window
+;        frames (BattleMenu_DrawCommandWindowFrames).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0, DB=$7E
 ; Exit:  M=1; X, Y clobbered; DP $80/$84/$86/$8E/$A2 used as temporaries
 ; Calls: Battle_ShiftRight3, BattleMsg_FormatNumberDigits, BattleMsg_BlankLeadingZeros,
-;        Battle_DivTen9499, BattleUI_DrawSlotGaugeBar, BattleUI_SetPanelAttrColumn,
-;        BattleSys_SlotPanelRefresh, BattleMenu_DrawReadyWindowEdges
+;        BattleMsg_FormatTwoDigits, BattleUI_DrawSlotGaugeBar, BattleUI_HighlightPcName,
+;        BattleMenu_DrawCommandList, BattleMenu_DrawCommandWindowFrames
 ; Direct-page roles:
+!BattleUI_Slot = !BattleTmp_80            ; 1-2 B: PC slot (or enemy-name line) being drawn; shared by the status-bar routines
 !BattleUI_PanelDest = !BattleTmp_84       ; 2 B: map offset of the current line's name cell
 !BattleUI_CharsLeft = !BattleTmp_8E       ; 1 B: name tiles left to copy
 !BattleUI_StatsOffset = !BattleTmp_A2     ; 2 B: BattlerStats offset of the PC being drawn
-!BattleUI_RefreshSlot = !BattleTmp_86     ; 1-2 B: PC slot of the panel-refresh loop
+!BattleUI_RefreshSlot = !BattleTmp_86     ; 1-2 B: PC slot of the command-list loop
 org $C10299
 BattleUI_BuildStatusBarFrame:
     TDC
@@ -927,7 +514,7 @@ BattleUI_BuildStatusBarFrame:
 .gauge_not0:
     DEC A
     BNE .gauge_type2
-    ; Layout 1: HP + MP + gauge
+    ; Layout 1: HP, MP, name, ATB gauge
     LDA.b #!BattleUI_TileH
     STA.w BattleUI_StatusTile(0,13)
     LDA.b #!BattleUI_TileP
@@ -937,7 +524,7 @@ BattleUI_BuildStatusBarFrame:
     STA.w BattleUI_StatusTile(0,17)
     BRA .gauge_dest_sel
 .gauge_type2:
-    ; Layout 2: HP + MP + TP + gauge
+    ; Layout 2: name, HP, MP, ATB gauge
     LDA.b #!BattleUI_TileH
     STA.w BattleUI_StatusTile(0,19)
     LDA.b #!BattleUI_TileP
@@ -948,12 +535,12 @@ BattleUI_BuildStatusBarFrame:
 .gauge_dest_sel:
     ; First name cell: layout 1 → PanelDestL1, layouts 0/2 → PanelDestL02
     LDA.w !BattleUI_GaugeLayout
-    BEQ .dest_5A
+    BEQ .dest_l02
     DEC A
-    BNE .dest_5A
+    BNE .dest_l02
     LDX.w #!BattleUI_PanelDestL1
     BRA .set_dest_base
-.dest_5A:
+.dest_l02:
     LDX.w #!BattleUI_PanelDestL02
 .set_dest_base:
     STX.b !BattleUI_PanelDest
@@ -961,7 +548,7 @@ BattleUI_BuildStatusBarFrame:
     TAX
     STX.b !BattleUI_Slot            ; PC slot 0
     ; --- BattleUI_DrawPcNamePanel ---
-    ; Writes one PC slot's name + HP/MP/TP into the status map. Loop body:
+    ; Writes one PC slot's name, HP/MP and ATB gauge into the status map. Loop body:
     ; BattleUI_NextNamePanel advances PanelDest/Slot and JMPs back here.
 BattleUI_DrawPcNamePanel:
     LDY.b !BattleUI_PanelDest       ; Y = name cell
@@ -1018,9 +605,9 @@ BattleUI_DrawPcNamePanel:
     LDA.w BattlerStats.MaxHp,X      ; (16-bit)
     JSR Battle_ShiftRight3          ; MaxHP >> 3 (M=0: 16-bit shifts)
     CMP.w !BattleMsg_NumValue       ; MaxHP/8 vs HP
-    BEQ .lhp_equal                  ; equal → !BattleUI_UnkA110 decides
+    BEQ .lhp_at_most_eighth         ; (redundant: equal falls through below anyway)
     BCC .lhp_ok                     ; MaxHP/8 < HP → not low
-.lhp_equal:
+.lhp_at_most_eighth:                ; 0 < HP <= MaxHP/8: !BattleUI_UnkA110 decides
     LDA.w !BattleUI_UnkA110
     BEQ .lhp_ok
 .lhp_set:
@@ -1123,7 +710,7 @@ BattleUI_DrawPcNamePanel:
     ADC.w #!BattleUI_MpOffsetL2     ; layout 2
 .mp_fmt:
     TAY
-    JSR Battle_DivTen9499           ; exits M=1
+    JSR BattleMsg_FormatTwoDigits           ; exits M=1
     LDA.w !BattleUI_GaugeLayout
     BNE .mp_blanking
     JSR BattleMsg_BlankLeadingZeros
@@ -1142,7 +729,7 @@ BattleUI_DrawPcNamePanel:
     TXA
     STA.w BattleUI_StatusAttr(0,0),Y
     STA.w BattleUI_StatusAttr(0,1),Y
-    BRA .tp_gauge
+    BRA .gauge_caps
 .mp_place_0:                        ; layout 0: MP digits one cell further right
     LDA.w !BattleMsg_Digit10
     STA.w BattleUI_StatusTile(0,1),Y
@@ -1156,27 +743,27 @@ BattleUI_DrawPcNamePanel:
     TXA
     STA.w BattleUI_StatusAttr(0,1),Y
     STA.w BattleUI_StatusAttr(0,2),Y
-.tp_gauge:
+.gauge_caps:
     LDA.w !BattleUI_GaugeLayout
-    BEQ BattleUI_NextNamePanel      ; layout 0: no TP / ATB gauge
+    BEQ BattleUI_NextNamePanel      ; layout 0: no ATB gauge
     REP #$20                        ; M=0
     DEC A
-    BNE .tp_yoff_type2
+    BNE .caps_layout2
     CLC
     LDA.b !BattleUI_PanelDest
-    ADC.w #!BattleUI_TpOffsetL1     ; layout 1
-    BRA .tp_fmt
-.tp_yoff_type2:
+    ADC.w #!BattleUI_GaugeCapOffsetL1     ; layout 1
+    BRA .caps_draw
+.caps_layout2:
     CLC
     LDA.b !BattleUI_PanelDest
-    ADC.w #!BattleUI_TpOffsetL2     ; layout 2
-.tp_fmt:
+    ADC.w #!BattleUI_GaugeCapOffsetL2     ; layout 2
+.caps_draw:
     TAY
     TDC
     SEP #$20                        ; M=1
-    LDA.b #!BattleUI_TileTpBarL
+    LDA.b #!BattleUI_TileGaugeCapL
     STA.w BattleUI_StatusTile(0,0),Y
-    LDA.b #!BattleUI_TileTpBarR
+    LDA.b #!BattleUI_TileGaugeCapR
     STA.w BattleUI_StatusTile(0,5),Y
     LDA.b #!BattleUI_AttrPal2
     STA.w BattleUI_StatusAttr(0,0),Y
@@ -1261,7 +848,7 @@ BattleUI_NextNamePanel:
     LDA.b !BattleUI_Slot
     CMP.b #!Enemy_NameLines
     BNE .enemy_loop
-    ; --- Ready-PC panels ---
+    ; --- Command windows of the PCs waiting for a command ---
     LDA.w !BattleMenu_ReadyCount
     BEQ .buildbar_done              ; no PC waiting → done
     LDA.w !BattleMenu_ReturnSubmenu
@@ -1272,11 +859,11 @@ BattleUI_NextNamePanel:
     LDA.b #!BattleMenu_RosterRedraw
     STA.w !BattleMenu_RosterIdxDrawn
     LDA.w !BattleTgt_Selected
-    JMP.w BattleUI_SetPanelAttrColumn
+    JMP.w BattleUI_HighlightPcName
 .check_slot_state:
     LDA.w !BattleMenu_Submenu
     BEQ .do_slot_state
-    RTS                             ; a submenu is open → leave the panels
+    RTS                             ; a submenu is open → leave the windows
 .do_slot_state:
     LDA.w !BattleMenu_ReadyCount
     DEC A
@@ -1306,13 +893,13 @@ BattleUI_NextNamePanel:
     LDX.b !BattleUI_RefreshSlot
     LDA.w !BattleMenu_Roster,X
     BMI .slot_skip
-    JSR BattleSys_SlotPanelRefresh
+    JSR BattleMenu_DrawCommandList
 .slot_skip:
     INC.b !BattleUI_RefreshSlot
     LDA.b !BattleUI_RefreshSlot
     CMP.b #!Battle_NumPcSlots
     BNE .slot_refresh_loop
-    JSR BattleMenu_DrawReadyWindowEdges
+    JSR BattleMenu_DrawCommandWindowFrames
 .buildbar_done:
     RTS
 
@@ -1323,33 +910,33 @@ BattleUI_NextNamePanel:
 ; then redraws every present PC's ATB gauge (layouts 1/2).
 ; Logic:
 ;   1. The digit refresh is skipped (straight to the gauges) only when
-;      PC slot 2 is in the roster, !BattleUI_PanelHold is clear and the
-;      layout is 1; every other case refreshes.
+;      PC slot 2 is in the roster, !BattleUI_ForceDigitRefresh is clear
+;      and the layout is 1; every other case refreshes.
 ;   2. Advance !BattleUI_NextPanelSlot (wrap at 3); stop if no PC there.
 ;   3. HP cell from !BattleRom_HpCellL0/L1/L2 by layout.
 ;   4. HP digits, palette 3 when low (same test as BuildStatusBarFrame);
 ;      layout 0 also recolours the three MaxHP cells after them.
 ;   5. MP digits at HP cell + !BattleUI_MpCellL0 / L12.
-;   6. Layouts 1/2: ATB gauges for all present PCs (Battle_DrawHpBars).
+;   6. Layouts 1/2: ATB gauges for all present PCs (BattleUI_DrawAtbGauges).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1; X, Y clobbered; DP $80/$86/$A2, !BattleUI_LowHp and
 ;        !BattleMsg_NumValue used as temporaries
 ; Calls: Battle_ShiftRight3, BattleMsg_FormatNumberDigits,
-;        BattleMsg_BlankLeadingZeros, Battle_DivTen9499, BattleUI_DrawSlotGaugeBar
-; Sub-entry: Battle_DrawHpBars ($06DB) — X = first PC slot; redraw the
+;        BattleMsg_BlankLeadingZeros, BattleMsg_FormatTwoDigits, BattleUI_DrawSlotGaugeBar
+; Sub-entry: BattleUI_DrawAtbGauges ($06DB) — X = first PC slot; redraw the
 ;        ATB gauges from there to slot 2
 !BattleUI_PanelBase = !BattleTmp_86      ; 2 B: map offset of the PC's HP cell
 org $C105A7
 BattleUI_UpdateNextPcPanel:
     LDA.w !BattleMenu_Roster+2      ; PC slot 2 in the roster?
     BMI .advance_panel              ; no → refresh digits
-    LDA.w !BattleUI_PanelHold
-    BNE .advance_panel              ; held → refresh digits
+    LDA.w !BattleUI_ForceDigitRefresh
+    BNE .advance_panel              ; forced → refresh digits
     LDA.w !BattleUI_GaugeLayout
     BEQ .advance_panel              ; layout 0 → refresh digits
     DEC A                           ; layout 1 → A=0; layout 2 → A=1
     BNE .advance_panel              ; layout 2 → refresh digits
-    JMP .tp_gauges                  ; layout 1 → gauges only
+    JMP .atb_gauges                 ; layout 1 → gauges only
 .advance_panel:
     INC.w !BattleUI_NextPanelSlot   ; round robin 0-2
     LDA.w !BattleUI_NextPanelSlot
@@ -1362,7 +949,7 @@ BattleUI_UpdateNextPcPanel:
     STX.b !BattleUI_Slot            ; (16-bit store)
     LDA.w !Battler_Present,X
     BNE .slot_present
-    JMP UpdateNpc_exit              ; no PC in this slot
+    JMP BattleUI_UpdateNextPcPanel_Exit ; no PC in this slot
 .slot_present:
     REP #$21                        ; M=0, C=0
     LDA.b !BattleUI_Slot            ; (16-bit DP load)
@@ -1398,9 +985,9 @@ BattleUI_UpdateNextPcPanel:
     LDA.w BattlerStats.MaxHp,X      ; (16-bit)
     JSR Battle_ShiftRight3          ; MaxHP >> 3
     CMP.w !BattleMsg_NumValue       ; MaxHP/8 vs HP
-    BEQ .check_a110                 ; equal → !BattleUI_UnkA110 decides
+    BEQ .hp_at_most_eighth          ; (redundant: equal falls through below anyway)
     BCC .hp_ok                      ; MaxHP/8 < HP → not low
-.check_a110:
+.hp_at_most_eighth:                 ; 0 < HP <= MaxHP/8: !BattleUI_UnkA110 decides
     LDA.w !BattleUI_UnkA110
     BEQ .hp_ok
 .set_low_hp:
@@ -1448,7 +1035,7 @@ BattleUI_UpdateNextPcPanel:
     ADC.w #!BattleUI_MpCellL12
 .mp_dest_done:
     TAY
-    JSR Battle_DivTen9499           ; MP digits (exits M=1)
+    JSR BattleMsg_FormatTwoDigits           ; MP digits (exits M=1)
     LDA.w !BattleUI_GaugeLayout
     BNE .mp_not_type0
     JSR BattleMsg_BlankLeadingZeros
@@ -1467,7 +1054,7 @@ BattleUI_UpdateNextPcPanel:
     TXA
     STA.w BattleUI_StatusAttr(0,0),Y
     STA.w BattleUI_StatusAttr(0,1),Y
-    BRA .tp_gauges
+    BRA .atb_gauges
 .gauge0_mp_path:
     LDA.w !BattleMsg_Digit10
     STA.w BattleUI_StatusTile(0,1),Y
@@ -1481,12 +1068,12 @@ BattleUI_UpdateNextPcPanel:
     TXA
     STA.w BattleUI_StatusAttr(0,1),Y
     STA.w BattleUI_StatusAttr(0,2),Y
-.tp_gauges:
+.atb_gauges:
     LDA.w !BattleUI_GaugeLayout
-    BEQ UpdateNpc_exit              ; layout 0 has no ATB gauges
+    BEQ BattleUI_UpdateNextPcPanel_Exit ; layout 0 has no ATB gauges
     TDC
     TAX                             ; X = 0 (first slot)
-Battle_DrawHpBars:
+BattleUI_DrawAtbGauges:
     STX.b !BattleUI_Slot
 .gauge_loop:
     LDX.b !BattleUI_Slot
@@ -1498,7 +1085,442 @@ Battle_DrawHpBars:
     LDA.b !BattleUI_Slot
     CMP.b #!Battle_NumPcSlots
     BNE .gauge_loop
-UpdateNpc_exit:
+BattleUI_UpdateNextPcPanel_Exit:
+    RTS
+
+; ============================================================
+; Status-Bar UI Callees ($C1:06F0–$C1:095C)
+; Called by BattleUI_BuildStatusBarFrame and its peers: the ATB gauge,
+; the per-PC command windows and the name highlight.
+; ============================================================
+
+; $C1:06F0 — BattleUI_DrawSlotGaugeBar (149 bytes, $06F0–$0784)
+; Draw the 4-tile ATB gauge of PC slot !BattleUI_Slot into the status map
+; at BattleRom_HpCellL1[slot] + !BattleUI_GaugeCellOffset.
+;   fill = (AtbCur * 256 / AtbMax) >> 3: 0-32 units of 32 (the quotient
+;   is 256 when AtbCur = AtbMax, so a full gauge gives 32)
+;   rest = 32 - fill; rest / 8 tiles get TileGauge8, then one tile gets
+;   TileGauge0 + (rest mod 8); the remaining tiles keep TileGauge0.
+; So the tiles drawn track the part of the gauge still to fill; what the
+; tiles look like depends on the graphics, which were not checked.
+; Attribute: palette 3 if AtbCur is non-zero, else palette 2.
+; Entry: M=1, X=0 (16-bit), !BattleUI_Slot = PC slot (0–2)
+; Exit:  M=1; Y = last map offset written; DP $79–$7B, $82/$83/$86,
+;        $AD/$AE, $B1–$B7 clobbered
+; Calls: Battle_ShiftLeft8, Battle_Divide, Battle_ShiftRight3
+; Direct-page roles (!BattleUI_Slot is defined with BuildStatusBarFrame):
+!BattleUI_AtbValue = !BattleTmp_AD        ; 2 B: AtbCur zero-extended
+!BattleUI_GaugeRest = !BattleTmp_82       ; 1 B: 32 - filled units, then the units left after whole tiles
+!BattleUI_GaugeRestTiles = !BattleTmp_83  ; 1 B: whole 8-unit tiles in GaugeRest
+!BattleUI_GaugeTmp = !BattleTmp_86        ; 1 B: GaugeRestTiles * 8
+org $C106F0
+BattleUI_DrawSlotGaugeBar:
+    REP #$21                    ; M=0, C=0
+    LDA.b !BattleUI_Slot        ; PC slot (16-bit DP load; high byte = 0)
+    ASL                         ; × 2 (table index)
+    TAX
+    LDA.l !BattleRom_HpCellL1,X ; map offset of the slot's HP cell
+    ADC.w #!BattleUI_GaugeCellOffset ; gauge starts this far after it
+    TAY                         ; Y = map destination
+    TDC
+    SEP #$20                    ; M=1
+    LDX.b !BattleUI_Slot        ; X = slot (16-bit DP load)
+    LDA.w !Pc_AtbCur,X
+    STA.b !BattleUI_AtbValue
+    STZ.b !BattleUI_AtbValue+1
+    LDA.w !Pc_AtbMax,X
+    STA.b !Battle_DivDivisor
+    STZ.b !Battle_DivDivisor+1  ; (high byte not read by Battle_Divide)
+    REP #$20                    ; M=0
+    LDA.b !BattleUI_AtbValue
+    JSR Battle_ShiftLeft8       ; A <<= 8 (× 256) — scale to fixed-point
+    STA.b !Battle_DivDividend
+    TDC
+    SEP #$20                    ; M=1
+    JSR Battle_Divide           ; quotient = AtbCur * 256 / AtbMax (0–256)
+    REP #$20                    ; M=0
+    LDA.b !Battle_DivQuotient   ; (16-bit read)
+    JSR Battle_ShiftRight3      ; >> 3 → 0–32 gauge units
+    STA.b !Battle_DivQuotient
+    TDC
+    SEP #$20                    ; M=1
+    SEC
+    LDA.b #!BattleUI_GaugeUnits
+    SBC.b !Battle_DivQuotient   ; units not yet filled
+    STA.b !BattleUI_GaugeRest
+    LSR
+    LSR
+    LSR                         ; / 8 = whole tiles
+    STA.b !BattleUI_GaugeRestTiles
+    ASL
+    ASL
+    ASL                         ; × 8 = units in those tiles
+    STA.b !BattleUI_GaugeTmp
+    SEC
+    LDA.b !BattleUI_GaugeRest
+    SBC.b !BattleUI_GaugeTmp    ; units left over
+    STA.b !BattleUI_GaugeRest
+    ; Write 4 TileGauge0 tiles at the destination
+    LDA.b #!BattleUI_TileGauge0
+    STA.w BattleUI_StatusTile(0,0),Y
+    STA.w BattleUI_StatusTile(0,1),Y
+    STA.w BattleUI_StatusTile(0,2),Y
+    STA.w BattleUI_StatusTile(0,3),Y
+    LDX.b !BattleUI_Slot
+    LDA.w !Pc_AtbCur,X
+    BNE .has_atb
+    LDA.b #!BattleUI_AttrPal2   ; empty gauge → palette 2
+    BRA .set_attr
+.has_atb:
+    LDA.b #!BattleUI_AttrPal3   ; non-empty gauge → palette 3
+.set_attr:
+    STA.w BattleUI_StatusAttr(0,0),Y
+    STA.w BattleUI_StatusAttr(0,1),Y
+    STA.w BattleUI_StatusAttr(0,2),Y
+    STA.w BattleUI_StatusAttr(0,3),Y
+.full_tile_loop:
+    LDA.b !BattleUI_GaugeRestTiles ; whole tiles left
+    BEQ .partial_tile
+    LDA.b #!BattleUI_TileGauge8
+    STA.w BattleUI_StatusTile(0,0),Y
+    INY
+    INY
+    DEC.b !BattleUI_GaugeRestTiles
+    BRA .full_tile_loop
+.partial_tile:
+    CLC
+    LDA.b !BattleUI_GaugeRest   ; units left over
+    BEQ .done                   ; none → nothing to add
+    ADC.b #!BattleUI_TileGauge0 ; TileGauge0 + units
+    STA.w BattleUI_StatusTile(0,0),Y
+.done:
+    RTS
+
+; $C1:0785 — BattleMenu_DrawCommandList (153 bytes, $0785–$081D)
+; Draw the command list of PC slot A (6 rows × 7 columns) into the status
+; map at offset slot × 12, from one of two ROM tile tables:
+;   !BattleRom_CmdListTech  — "Attack", "Tech", "Item" on rows 1/3/5
+;   !BattleRom_CmdListCombo — the same with "Comb" (Combo) for "Tech"
+; ("Attack" is "Att" plus tile $E8, presumably an "ack" ligature.)
+; The Combo list is chosen when !BattleUI_OtherReady (another PC is in the
+; roster) and the slot's !Pc_Unk9F25|!Pc_Unk9F28 are non-zero, and then
+; either !BattleUI_UnkA117 is zero, all three PCs are in the roster, or
+; !BattleUI_UnkA115 names a different PC whose roster entry is negative.
+; Attribute: palette 2. The window frame around it is drawn into
+; !BattleMenu_WindowMap by BattleMenu_DrawCommandWindowFrames.
+; Entry: M=1, X=0 (16-bit), A = PC slot (0–2)
+; Exit:  M=1; DP $80-$83 clobbered; X/Y clobbered
+; No calls.
+; Direct-page roles (!BattleUI_Slot holds the slot until the drawing loops):
+!BattleUI_RowsLeft = !BattleTmp_80        ; 1 B: command-list rows left to draw
+!BattleUI_ColsLeft = !BattleTmp_81        ; 1 B: columns left in the row
+!BattleUI_MapOffset = !BattleTmp_82       ; 2 B: map offset of the current row / window frame
+org $C10785
+BattleMenu_DrawCommandList:
+    STA.b !BattleUI_Slot
+    ASL
+    ASL                         ; × 4
+    STA.b !BattleUI_MapOffset
+    ASL                         ; × 8
+    CLC
+    ADC.b !BattleUI_MapOffset   ; slot × 12
+    TAX
+    STX.b !BattleUI_MapOffset   ; 16-bit map offset of the list
+    LDA.w !BattleUI_OtherReady
+    BEQ .tech_list              ; no other PC in the roster → Tech
+    LDA.b !BattleUI_Slot
+    TAX
+    LDA.w !Pc_Unk9F25,X
+    ORA.w !Pc_Unk9F28,X
+    BEQ .tech_list              ; both zero → Tech
+    LDA.w !BattleUI_UnkA117
+    BEQ .combo_list             ; zero → Combo
+    LDA.w !BattleMenu_ReadyCount
+    CMP.b #!Battle_NumPcSlots
+    BEQ .combo_list             ; all three PCs in the roster → Combo
+    LDA.b !BattleUI_Slot
+    CMP.w !BattleUI_UnkA115
+    BEQ .tech_list              ; same slot → Tech
+    LDX.w !BattleUI_UnkA115
+    LDA.w !BattleMenu_Roster,X
+    BMI .combo_list             ; that PC not in the roster → Combo
+
+.tech_list:
+    TDC
+    TAX                         ; X = table index (starts at 0)
+    LDA.b #!BattleUI_CmdWindowRows
+    STA.b !BattleUI_RowsLeft
+.tech_row_start:
+    LDA.b #!BattleUI_CmdWindowCols
+    STA.b !BattleUI_ColsLeft
+    LDY.b !BattleUI_MapOffset   ; Y = current row
+.tech_col_loop:
+    LDA.l !BattleRom_CmdListTech,X
+    STA.w BattleUI_StatusTile(0,0),Y
+    LDA.b #!BattleUI_AttrPal2
+    STA.w BattleUI_StatusAttr(0,0),Y
+    INY
+    INY
+    INX
+    DEC.b !BattleUI_ColsLeft
+    BNE .tech_col_loop
+    REP #$21                    ; M=0, C=0
+    LDA.b !BattleUI_MapOffset
+    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
+    STA.b !BattleUI_MapOffset
+    TDC
+    SEP #$20                    ; M=1
+    DEC.b !BattleUI_RowsLeft
+    BNE .tech_row_start
+    BRA .done
+
+.combo_list:
+    TDC
+    TAX                         ; X = table index
+    LDA.b #!BattleUI_CmdWindowRows
+    STA.b !BattleUI_RowsLeft
+.combo_row_start:
+    LDA.b #!BattleUI_CmdWindowCols
+    STA.b !BattleUI_ColsLeft
+    LDY.b !BattleUI_MapOffset
+.combo_col_loop:
+    LDA.l !BattleRom_CmdListCombo,X
+    STA.w BattleUI_StatusTile(0,0),Y
+    LDA.b #!BattleUI_AttrPal2
+    STA.w BattleUI_StatusAttr(0,0),Y
+    INY
+    INY
+    INX
+    DEC.b !BattleUI_ColsLeft
+    BNE .combo_col_loop
+    REP #$21                    ; M=0, C=0
+    LDA.b !BattleUI_MapOffset
+    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
+    STA.b !BattleUI_MapOffset
+    TDC
+    SEP #$20                    ; M=1
+    DEC.b !BattleUI_RowsLeft
+    BNE .combo_row_start
+.done:
+    RTS
+
+; $C1:081E — BattleMenu_DrawCommandWindowFrames (202 bytes, $081E–$08E7)
+; Draw the 7×6 command-window frame of every PC in the roster into
+; !BattleMenu_WindowMap, then highlight the shown PC's name and fall into
+; BattleUI_ClearActivePanelColumn. Slot 1's / slot 2's frame is drawn
+; joined (!BattleUI_FrameJoined = 1: without its left border column, one
+; cell further right) when the slot before it is also in the roster, so
+; it shares that window's right border; else it is drawn whole.
+; BattleUI_ClearActivePanelColumn ($0872) is also called on its own
+; (BattleMenu_UpdateMainWindow) when only the cursor column needs redrawing.
+; Entry: M=1, X=0 (16-bit)
+; Exit:  M=1; DP $80/$82/$84 clobbered; X/Y clobbered
+; Calls: BattleMenu_DrawCommandWindowFrame, BattleUI_HighlightPcName
+!BattleUI_FrameJoined = !BattleTmp_84    ; 1 B: 0 = whole frame, else drop its left border column (DrawCommandWindowFrame input)
+org $C1081E
+BattleMenu_DrawCommandWindowFrames:
+    STZ.b !BattleUI_FrameJoined ; whole frame
+    LDA.w !BattleMenu_Roster    ; PC slot 0 in the roster?
+    BMI .check_slot1            ; no → no window
+    LDX.w #$0000                ; map offset 0
+    STX.b !BattleUI_MapOffset
+    JSR BattleMenu_DrawCommandWindowFrame
+.check_slot1:
+    LDA.w !BattleMenu_Roster+1  ; PC slot 1 in the roster?
+    BMI .check_slot2            ; no → no window
+    LDA.w !BattleMenu_Roster    ; slot 0 too?
+    BMI .slot1_whole            ; no → whole frame
+    LDA #$01
+    STA.b !BattleUI_FrameJoined ; yes → joined to slot 0's window
+    LDX.w #!BattleUI_FrameCol1Joined
+    BRA .slot1_draw
+.slot1_whole:
+    LDX.w #!BattleUI_FrameCol1Full
+.slot1_draw:
+    STX.b !BattleUI_MapOffset
+    JSR BattleMenu_DrawCommandWindowFrame
+    STZ.b !BattleUI_FrameJoined ; back to whole frames
+.check_slot2:
+    LDA.w !BattleMenu_Roster+2  ; PC slot 2 in the roster?
+    BMI .active_pc_section      ; no → no window
+    LDA.w !BattleMenu_Roster+1  ; slot 1 too?
+    BMI .slot2_whole            ; no → whole frame
+    LDA #$01
+    STA.b !BattleUI_FrameJoined ; yes → joined to slot 1's window
+    LDX.w #!BattleUI_FrameCol2Joined
+    BRA .slot2_draw
+.slot2_whole:
+    LDX.w #!BattleUI_FrameCol2Full
+.slot2_draw:
+    STX.b !BattleUI_MapOffset
+    JSR BattleMenu_DrawCommandWindowFrame
+.active_pc_section:
+    LDA.w !BattleMenu_RosterIdx ; roster entry shown
+    TAX
+    LDA.w !BattleMenu_Roster,X  ; its PC slot
+    JSR BattleUI_HighlightPcName
+    INC.w !BattleUI_PanelRedraw ; redraw the command cursor below
+
+; $C1:0872 — BattleUI_ClearActivePanelColumn (entry point within above body)
+; Zero the two tile columns of the shown PC's command column (6 rows,
+; offset !BattleMenu_ActivePc × 12) in the status map, then, if
+; !BattleUI_PanelRedraw is set and no target selection is running, draw
+; the 2×2 command cursor (tiles $60-$63) at the PC's !Pc_MenuRow, placed
+; through !BattleRom_MenuCursorCell (the same cursor quad the tech and
+; item lists use).
+; Entry: M=1, X=0 (16-bit)
+; Exit:  M=1; DP $80/$81, X/Y clobbered; !BattleUI_PanelRedraw = 0
+; No calls.
+!BattleUI_ColumnOffset = !BattleTmp_80   ; 1-2 B: slot * 12, the PC's column offset in the status map
+BattleUI_ClearActivePanelColumn:
+    LDA.w !BattleMenu_ActivePc
+    ASL
+    ASL
+    STA.b !BattleUI_ColumnOffset ; slot × 4
+    ASL
+    CLC
+    ADC.b !BattleUI_ColumnOffset ; slot × 12
+    TAX                         ; X = column offset
+    STZ.w BattleUI_StatusTile(0,0),X
+    STZ.w BattleUI_StatusTile(1,0),X
+    STZ.w BattleUI_StatusTile(2,0),X
+    STZ.w BattleUI_StatusTile(3,0),X
+    STZ.w BattleUI_StatusTile(4,0),X
+    STZ.w BattleUI_StatusTile(5,0),X
+    STZ.w BattleUI_StatusTile(0,1),X
+    STZ.w BattleUI_StatusTile(1,1),X
+    STZ.w BattleUI_StatusTile(2,1),X
+    STZ.w BattleUI_StatusTile(3,1),X
+    STZ.w BattleUI_StatusTile(4,1),X
+    STZ.w BattleUI_StatusTile(5,1),X
+    LDA.w !BattleUI_PanelRedraw
+    BEQ .clear_done             ; zero → just clear flag and return
+    LDA.w !BattleMenu_RosterIdx ; roster entry shown
+    TAX
+    ASL
+    ASL
+    STA.b !BattleUI_ColumnOffset ; × 4
+    ASL
+    CLC
+    ADC.b !BattleUI_ColumnOffset ; × 12
+    TAY
+    STY.b !BattleUI_ColumnOffset ; 16-bit column offset
+    LDA.w !BattleMenu_Roster,X  ; its PC slot
+    TAX
+    LDA.w !Pc_MenuRow,X         ; that PC's command row
+    ASL
+    TAX                         ; X = row × 2
+    REP #$21                    ; M=0, C=0
+    LDA.l !BattleRom_MenuCursorCell,X ; cursor offset within the column
+    ADC.b !BattleUI_ColumnOffset ; + column offset
+    TAX                         ; X = map offset of the cursor
+    TDC
+    SEP #$20                    ; M=1
+    LDA.w !BattleMenu_TargetSelect
+    BNE .clear_done             ; selecting a target → no command cursor
+    LDA.b #!BattleMenu_TileCursorTL
+    STA.w BattleUI_StatusTile(0,0),X
+    LDA.b #!BattleMenu_TileCursorTR
+    STA.w BattleUI_StatusTile(0,1),X
+    LDA.b #!BattleMenu_TileCursorBL
+    STA.w BattleUI_StatusTile(1,0),X
+    LDA.b #!BattleMenu_TileCursorBR
+    STA.w BattleUI_StatusTile(1,1),X
+.clear_done:
+    STZ.w !BattleUI_PanelRedraw
+    RTS
+
+; $C1:08E8 — BattleUI_HighlightPcName (65 bytes, $08E8–$0928)
+; Highlight PC slot A's name in the status bar: look up the slot's offset
+; in !BattleRom_NameAttrL1 (layout 1) or !BattleRom_NameAttrL02 (layouts
+; 0 and 2) and set the attribute of a 5-wide × 2-high block of status-map
+; cells to palette 2. That block is the PC's 10-tile name (the name line
+; and the row above it, see BattleUI_DrawPcNamePanel), which is normally
+; drawn in palette 3. The table offsets are odd, i.e. they point at an
+; attribute byte, so the Tile(r,c),X stores below all land on attribute
+; bytes. BuildStatusBarFrame also calls it with the first selected target.
+; Entry: M=1, X=0 (16-bit), A = PC slot (0–2)
+; Exit:  M=1; X = offset; A = !BattleUI_AttrPal2; Y unchanged
+; No calls.
+org $C108E8
+BattleUI_HighlightPcName:
+    ASL                         ; slot × 2 (table index)
+    TAX
+    REP #$20                    ; M=0
+    LDA.w !BattleUI_GaugeLayout ; (16-bit read; layout 0/1/2)
+    BNE .type_not0
+    LDA.l !BattleRom_NameAttrL02,X ; layout 0
+    BRA .got_offset
+.type_not0:
+    DEC A                       ; layout − 1
+    BNE .type_not1              ; non-zero → layout 2
+    LDA.l !BattleRom_NameAttrL1,X ; layout 1
+    BRA .got_offset
+.type_not1:
+    LDA.l !BattleRom_NameAttrL02,X ; layout 2 (same table as layout 0)
+.got_offset:
+    TAX                         ; X = map offset of an attribute byte
+    TDC
+    SEP #$20                    ; M=1
+    LDA.b #!BattleUI_AttrPal2
+    STA.w BattleUI_StatusTile(0,0),X
+    STA.w BattleUI_StatusTile(0,1),X
+    STA.w BattleUI_StatusTile(0,2),X
+    STA.w BattleUI_StatusTile(0,3),X
+    STA.w BattleUI_StatusTile(0,4),X
+    STA.w BattleUI_StatusTile(1,0),X
+    STA.w BattleUI_StatusTile(1,1),X
+    STA.w BattleUI_StatusTile(1,2),X
+    STA.w BattleUI_StatusTile(1,3),X
+    STA.w BattleUI_StatusTile(1,4),X
+    RTS
+
+; $C1:0929 — BattleMenu_DrawCommandWindowFrame (52 bytes, $0929–$095C)
+; Copy one 7-column × 6-row command-window frame (corners, borders and
+; fill) from !BattleRom_CommandWindowFrame into !BattleMenu_WindowMap at
+; !BattleUI_MapOffset. Each ROM row is 14 bytes (7 tile/attribute
+; entries): a whole frame (!BattleUI_FrameJoined = 0) copies all of it, a
+; joined frame skips the row's first entry (the left border column) and
+; copies the other 12 bytes.
+; Entry: M=1, X=0 (16-bit), !BattleUI_MapOffset = map offset,
+;        !BattleUI_FrameJoined = 0 for a whole frame
+; Exit:  M=1; X/Y and DP $80-$83 clobbered
+; No calls.
+!BattleUI_FrameBytesLeft = !BattleTmp_80      ; 1 B: bytes left to copy in this row
+!BattleUI_FrameRowsLeft = !BattleTmp_81       ; 1 B: rows left
+org $C10929
+BattleMenu_DrawCommandWindowFrame:
+    TDC
+    TAX                         ; X = 0 (ROM table index)
+    LDA.b #!BattleUI_CmdWindowRows
+    STA.b !BattleUI_FrameRowsLeft
+.row_loop:
+    LDA.b !BattleUI_FrameJoined
+    BNE .joined
+    LDA.b #!BattleUI_FrameRowBytesFull ; whole frame: all 14 bytes of the row
+    BRA .pick_done
+.joined:
+    INX                         ; joined: skip the left border entry
+    INX
+    LDA.b #!BattleUI_FrameRowBytesJoined ; and copy the other 12 bytes
+.pick_done:
+    STA.b !BattleUI_FrameBytesLeft
+    LDY.b !BattleUI_MapOffset   ; Y = current row
+.inner_loop:
+    LDA.l !BattleRom_CommandWindowFrame,X
+    STA.w !BattleMenu_WindowMap,Y
+    INX
+    INY
+    DEC.b !BattleUI_FrameBytesLeft
+    BNE .inner_loop
+    REP #$21                    ; M=0, C=0
+    LDA.b !BattleUI_MapOffset
+    ADC.w #!BattleUI_MapRowBytes ; next tilemap row
+    STA.b !BattleUI_MapOffset
+    TDC
+    SEP #$20                    ; M=1
+    DEC.b !BattleUI_FrameRowsLeft
+    BNE .row_loop
     RTS
 
 ; ============================================================
@@ -1593,7 +1615,7 @@ BattleMenu_RenderItemListRows:
 ;     set and .PcMask lacks the active PC's bit, else palette 2.
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ItemRecOffset, !BattleMenu_RowMapOffset
 ; Exit:  M=1; DP $84/$8E/$98 clobbered
-; Calls: BattleMsg_ReencodeTextBuffer, Battle_DivTen9499, BattleMsg_BlankLeadingZeros
+; Calls: BattleMsg_ReencodeTextBuffer, BattleMsg_FormatTwoDigits, BattleMsg_BlankLeadingZeros
 !BattleMenu_RowAttr = !BattleTmp_98      ; 1 B: attribute for the whole line (palette 2 or greyed 3)
 org $C109B0
 BattleMenu_RenderItemRow:
@@ -1673,7 +1695,7 @@ BattleMenu_RenderItemRow:
     LDA.w Item_BattleList.Quantity,X
     REP #$20                        ; M=0 (B is 0: zero-extended)
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; two digits
+    JSR BattleMsg_FormatTwoDigits           ; two digits
     JSR BattleMsg_BlankLeadingZeros
     LDX.b !BattleMenu_RowMapOffset  ; (M=1 again after both calls)
     LDA.w !BattleMsg_Digit10
@@ -2104,7 +2126,7 @@ BattleMenu_UpdateMainWindow:
 ; 5. Falls through into BattleMenu_DrawTechCursorRow.
 ; Entry: M=1, X=0, DB=$7E; !BattleMenu_ActivePc = PC shown
 ; Exit:  M=1 (via BattleMenu_DrawTechCursorRow → CODE_JP_C1103D)
-; Callees: BattleMenu_RenderTechListRows, Battle_DivTen9499,
+; Callees: BattleMenu_RenderTechListRows, BattleMsg_FormatTwoDigits,
 ;          BattleMsg_BlankLeadingZeros, BattleMenu_DrawTechCursorRow (fall-through)
 ; Direct-page roles (!BattleMenu_TechListBase as in RenderTechListRows):
 !BattleMenu_BorderRow = !BattleTmp_80     ; 1-2 B: frame row being copied
@@ -2163,7 +2185,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats.CurMp        ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(1,24)
@@ -2184,7 +2206,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats[1].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(3,24)
@@ -2205,7 +2227,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats[2].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(5,24)
@@ -2288,7 +2310,7 @@ BattleMenu_UpdateTechWindow:
     BMI .check_pc2_digit            ; PC slot 0 not involved
     REP #$20                        ; M=0 (B is 0: zero-extended)
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero     ; tens digit zero?
     BNE .pc1_nonzero
@@ -2307,7 +2329,7 @@ BattleMenu_UpdateTechWindow:
     BMI .check_pc3_digit            ; PC slot 1 not involved
     REP #$20
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
     BNE .pc2_nonzero
@@ -2326,7 +2348,7 @@ BattleMenu_UpdateTechWindow:
     BMI BattleMenu_DrawTechCursorRow ; PC slot 2 not involved
     REP #$20
     STA.w !BattleMsg_NumValue
-    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
     BNE .pc3_nonzero
@@ -2865,7 +2887,7 @@ BattleMenu_ProcessInput:
     STA.w !Battle_MenuTimeHold
     JMP BattleMenu_ItemListInput
 .main_menu:
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
     STZ.w !Battle_MenuTimeHold
     LDA.w !BattleMenu_UnkA862
     BNE .confirm                    ; set -> confirm without polling
@@ -3194,7 +3216,7 @@ BattleMenu_OpenTechList:
     BNE .exit                       ; tech list blocked -> no-op
     LDA.b #!Tech_NoPartners
     STA.w Tech_CursorEntry.Partners ; no cursor entry yet
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
     STZ.w !BattleMenu_TechAvailDone
     INC.w !BattleMenu_UnkA862
     JSR BattleMenu_RenderTechListRows
@@ -3225,7 +3247,7 @@ org $C112ED
 BattleMenu_OpenItemList:
     LDA.w !BattleMenu_Lock
     BNE .exit                       ; item list blocked -> no-op
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
     LDA.b #!BattleMenu_SubmenuItem
     STA.w !BattleMenu_CmdMenu       ; command from the item list
     LDA.w !BattleMenu_ItemScroll
@@ -3292,7 +3314,7 @@ BattleMenu_BuildTargetList:
     STZ.w !BattleMenu_Submenu
     LDA.b #!BattleMenu_RosterRedraw
     STA.w !BattleMenu_RosterIdxDrawn
-    INC.w !BattleUI_PanelHold
+    INC.w !BattleUI_ForceDigitRefresh
     JSR BattleMenu_LoadCommandWindowMap
 .have_mode:
     LDA.w !BattleTgt_Mode
@@ -3976,7 +3998,7 @@ BattleTgt_AreaRow:
 ;    if P0's y is greater than P1's or P2's, P1 and P2 are swapped
 ;    (inferred purpose: a consistent vertex winding so each corner's
 ;    interior angle runs "from" one edge "to" the other).
-; 3. Calc_Delta16 gives the direction angle of each edge as seen from
+; 3. Battle_CalcAngle gives the direction angle of each edge as seen from
 ;    each corner: P0 -> [P0ArcFrom, P0ArcTo], P1 -> [P1ArcFrom, P1ArcTo],
 ;    P2 -> [P2ArcFrom, P2ArcTo]. P0Wraps/P1Wraps/P2Wraps flag corners
 ;    whose range wraps past angle 0.
@@ -3987,7 +4009,7 @@ BattleTgt_AreaRow:
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to BattleTgt_CompactCandidates (the scan only
 ;        appends from entry 1, so the $FF front entry is always closed up)
-; Callees: Calc_Delta16, BattleTgt_ClearLists, BattleTgt_CompactCandidates
+; Callees: Battle_CalcAngle, BattleTgt_ClearLists, BattleTgt_CompactCandidates
 ; Note: !BattleTgt_AreaSide is ignored here; the scan is always over the enemies.
 ; Direct-page roles:
 !BattleTgt_P0X = !BattleTmp_80            ; 1 B: corner P0 screen x
@@ -4140,37 +4162,37 @@ BattleTgt_AreaPartyTriangle:
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoPointY
-    JSR Calc_Delta16                ; P0 vs P1
+    JSR Battle_CalcAngle                ; P0 vs P1
     STA.b !BattleTgt_P0ArcFrom
     LDA.b !BattleTgt_P2X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P2Y
     STA.b !Battle_GeoPointY
-    JSR Calc_Delta16                ; P0 vs P2
+    JSR Battle_CalcAngle                ; P0 vs P2
     STA.b !BattleTgt_P0ArcTo
     LDA.b !BattleTgt_P1X
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16                ; P1 vs P2
+    JSR Battle_CalcAngle                ; P1 vs P2
     STA.b !BattleTgt_P1ArcFrom
     LDA.b !BattleTgt_P0X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P0Y
     STA.b !Battle_GeoPointY
-    JSR Calc_Delta16                ; P1 vs P0
+    JSR Battle_CalcAngle                ; P1 vs P0
     STA.b !BattleTgt_P1ArcTo
     LDA.b !BattleTgt_P2X
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P2Y
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16                ; P2 vs P0
+    JSR Battle_CalcAngle                ; P2 vs P0
     STA.b !BattleTgt_P2ArcFrom
     LDA.b !BattleTgt_P1X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoPointY
-    JSR Calc_Delta16                ; P2 vs P1
+    JSR Battle_CalcAngle                ; P2 vs P1
     STA.b !BattleTgt_P2ArcTo
     LDA.b !BattleTgt_P0ArcTo
     CMP.b !BattleTgt_P0ArcFrom
@@ -4215,7 +4237,7 @@ BattleTgt_AreaPartyTriangle:
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P0Y
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16
+    JSR Battle_CalcAngle
     LDA.b !BattleTgt_P0Wraps
     BNE .p0_wrap
     LDA.b !Battle_GeoAngle
@@ -4237,7 +4259,7 @@ BattleTgt_AreaPartyTriangle:
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16
+    JSR Battle_CalcAngle
     LDA.b !BattleTgt_P1Wraps
     BNE .p1_wrap
     LDA.b !Battle_GeoAngle
@@ -4259,7 +4281,7 @@ BattleTgt_AreaPartyTriangle:
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P2Y
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16
+    JSR Battle_CalcAngle
     LDA.b !BattleTgt_P2Wraps
     BNE .p2_wrap
     LDA.b !Battle_GeoAngle
@@ -4297,7 +4319,7 @@ BattleTgt_AreaPartyTriangle:
 ; (passed to Battle_SinLookup as !Battle_SinScale; AreaSize = 2 from
 ; every caller seen).
 ;
-; θ = Calc_Delta16 angle between source (GeoOrigin) and target (GeoPoint).
+; θ = Battle_CalcAngle angle between source (GeoOrigin) and target (GeoPoint).
 ; Two corner points are offset sideways from the line using
 ; Battle_SinLookup at θ, θ+$C0, θ+$80, θ+$40 (256 units per turn):
 ;   PA (PaX,PaY) = source + r*(sin θ, sin(θ+$C0))
@@ -4317,7 +4339,7 @@ BattleTgt_AreaPartyTriangle:
 ; BattleTgt_AreaRow.
 ; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide..AreaVariant as above
 ; Exit:  M=1; via BattleTgt_AreaAddAnchor -> CompactCandidates
-; Callees: Calc_Delta16, Battle_SinLookup, BattleTgt_ClearLists
+; Callees: Battle_CalcAngle, Battle_SinLookup, BattleTgt_ClearLists
 ; Direct-page roles (!BattleTgt_Anchor shared with AreaCircle / AreaAddAnchor):
 !BattleTgt_PaX = !BattleTmp_80            ; 1 B: r*sin(a), then corner PA screen x
 !BattleTgt_PaY = !BattleTmp_81            ; 1 B: r*sin(a+$C0), then corner PA screen y
@@ -4349,7 +4371,7 @@ BattleTgt_AreaLine:
     STA.b !Battle_GeoPointX
     LDA.w !Battler_ScreenY,Y
     STA.b !Battle_GeoPointY
-    JSR Calc_Delta16                ; A = GeoAngle = θ
+    JSR Battle_CalcAngle                ; A = GeoAngle = θ
     JSR Battle_SinLookup
     STA.b !BattleTgt_PaX            ; r*sin θ
     CLC
@@ -4466,7 +4488,7 @@ BattleTgt_AreaLine:
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_PaY
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16
+    JSR Battle_CalcAngle
     LDA.b !BattleTgt_PaWraps
     BNE .a_wrap
     LDA.b !Battle_GeoAngle
@@ -4488,7 +4510,7 @@ BattleTgt_AreaLine:
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_PbY
     STA.b !Battle_GeoOriginY
-    JSR Calc_Delta16
+    JSR Battle_CalcAngle
     LDA.b !BattleTgt_PbWraps
     BNE .b_wrap
     LDA.b !Battle_GeoAngle
@@ -4873,7 +4895,7 @@ BattleMenu_RemoveBattlerFromReady:
     DEC
     STA.w !BattleMenu_Submenu
     STZ.w !BattleMenu_ReturnSubmenu
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
 .clear_targeting:
     STZ.w !BattleMenu_TargetSelect
     STZ.w !BattleTgt_Unk960E
@@ -4953,7 +4975,7 @@ BattleMenu_TargetSelectInput:
     BEQ .redraw_cursor
     DEC
     STA.w !BattleMenu_Submenu
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
     STZ.w !BattleMenu_ReturnSubmenu
     LDA.w !BattleMenu_Submenu
     DEC
@@ -5145,7 +5167,7 @@ BattleMenu_CommitAction:
     STZ.w !BattleMenu_KeepRow
     STZ.w !BattleTgt_Unk960E
     STZ.w !BattleTgt_Cursor
-    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleUI_ForceDigitRefresh
     LDA.w !Battle_CmdQueueLen
     TAX
     LDA.w !BattleMenu_ActivePc

@@ -42,7 +42,7 @@ if !constants_battle_inc == 0
 ; --- Math and geometry ---
 !Battle_LowByteMask      = $00FF ; keep the low byte of a 16-bit A
 !Battle_Invert16         = $FFFF ; EOR mask; with INC A negates a 16-bit value
-!Battle_SineIndexMask    = $03FF ; angle * 4 wrapped to the 512-entry (2 B each) sine table
+!Battle_SineIndexMask    = $03FF ; angle * 4 wrapped to the 1024-entry (1 B each) sine table
 !Battle_SineHalfTable    = $0200 ; table offset of angle $80: from here the sine is negative
 !Battle_GeoRowMask       = $FFF8 ; |dy| rounded down to a multiple of 8 (angle table row)
 !Battle_AngleQuarter     = $40   ; 90 degrees (256 angle units per turn)
@@ -51,17 +51,17 @@ if !constants_battle_inc == 0
 
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
-!BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / DivTen9499
+!BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
 !BattleMsg_GlyphZero     = $73   ; tile of digit 0 (BattleRom_DigitTiles[0]); leading ones get blanked
 !BattleMsg_TextLen       = 16    ; characters per re-encoded text buffer
 !BattleMsg_TextBufBytes  = 32    ; both 16-byte tile rows ($94A0-$94BF) cleared together
 !BattleMsg_CharTileMin   = $73   ; text bytes from here up are already tiles (digits, symbols)
-!BattleMsg_CharSet2Min   = $69   ; text bytes $69-$72 use the second accent set
-!BattleMsg_CharSet1Min   = $40   ; text bytes $40-$68 use the first accent set; below = tiles
+!BattleMsg_CharSet2Min   = $69   ; text bytes $69-$72: code set 2 (inferred: kana with a handakuten)
+!BattleMsg_CharSet1Min   = $40   ; text bytes $40-$68: code set 1 (inferred: kana with a dakuten); below = tiles
 !BattleMsg_CharSet1TileAdd = $40 ; lower-row tile = text byte + $40 for set 1
-!BattleMsg_CharSet1Top   = $71   ; upper-row tile above a set-1 character (accent mark, inferred)
+!BattleMsg_CharSet1Top   = $71   ; upper-row tile above a set-1 character (inferred: the dakuten mark)
 !BattleMsg_CharSet2TileAdd = $17 ; lower-row tile = text byte + $17 for set 2
-!BattleMsg_CharSet2Top   = $72   ; upper-row tile above a set-2 character
+!BattleMsg_CharSet2Top   = $72   ; upper-row tile above a set-2 character (inferred: the handakuten mark)
 !BattleMsg_ArgNone       = $FF   ; "no battler" argument to the info-panel message calls
 !BattleMsg_Glyph_I       = $A8   ; font: 'I' (A-Z start at $A0, a-z at $BA; checked against the name tables)
 !BattleMsg_Glyph_t       = $CD   ; font: 't'
@@ -70,8 +70,8 @@ if !constants_battle_inc == 0
 
 ; --- Tilemap tiles and attributes (status bar and menu windows) ---
 !BattleUI_MapRowBytes    = $40   ; one tilemap row: 32 entries x 2 bytes
-!BattleUI_AttrPal2       = $29   ; attribute: priority, palette 2 (normal text and frames)
-!BattleUI_AttrPal3       = $2D   ; attribute: priority, palette 3 (greyed menu lines, low-HP digits,
+!BattleUI_AttrPal2       = $29   ; attribute: priority, palette 2, tile-number bit 8 set (normal text and frames)
+!BattleUI_AttrPal3       = $2D   ; attribute: priority, palette 3, tile-number bit 8 set (greyed menu lines, low-HP digits,
                                  ; PC names, a non-empty ATB gauge)
 !BattleUI_AttrPal2VFlip  = $A9   ; palette 2 + vertical flip: the up-arrow tile drawn as a down arrow
 !BattleUI_TileBlank      = $FF   ; empty tile
@@ -81,10 +81,10 @@ if !constants_battle_inc == 0
 !BattleUI_TileH          = $64   ; header glyph 'H' (inferred: pairs with $66 as "HP")
 !BattleUI_TileM          = $65   ; header glyph 'M' (BattleRom_TechBorder spells "MP" with $65 $66)
 !BattleUI_TileP          = $66   ; header glyph 'P'
-!BattleUI_TileTpBarL     = $5D   ; TP gauge left end
-!BattleUI_TileTpBarR     = $5E   ; TP gauge right end
-!BattleUI_TileGauge0     = $67   ; ATB gauge tile showing 0 of 8 units; $67+n shows n units
-!BattleUI_TileGauge8     = $6F   ; ATB gauge tile showing all 8 units
+!BattleUI_TileGaugeCapL  = $5D   ; tile left of the ATB gauge (col 25; inferred: its left end cap)
+!BattleUI_TileGaugeCapR  = $5E   ; tile right of the ATB gauge (col 30; inferred: its right end cap)
+!BattleUI_TileGauge0     = $67   ; ATB gauge tile for 0 units still to fill; $67+n for n (graphics not checked)
+!BattleUI_TileGauge8     = $6F   ; ATB gauge tile for 8 units still to fill (graphics not checked)
 !BattleUI_GaugeUnits     = 32    ; ATB gauge length in units (4 tiles x 8)
 !BattleMenu_TileCursorTL = $60   ; 2x2 row cursor, top-left tile
 !BattleMenu_TileCursorTR = $61   ; top-right
@@ -94,8 +94,8 @@ if !constants_battle_inc == 0
 
 ; --- Status-bar layout (byte offsets into the $0CC0 map) ---
 !BattleUI_StatusEntries  = $00C0 ; 192 entries cleared by BuildStatusBarFrame (6 rows x 32)
-!BattleUI_PanelRows      = 6     ; rows in a PC panel / window edge strip
-!BattleUI_PanelCols      = 7     ; columns in a PC panel
+!BattleUI_CmdWindowRows  = 6     ; rows in a PC's command window (frame and command list)
+!BattleUI_CmdWindowCols  = 7     ; columns in a PC's command list
 !BattleUI_PanelStride    = $80   ; two tilemap rows: next PC or enemy-name line
 !BattleUI_PanelDestL1    = $0068 ; first PC line's name cell, layout 1
 !BattleUI_PanelDestL02   = $005A ; first PC line's name cell, layouts 0 and 2
@@ -107,17 +107,17 @@ if !constants_battle_inc == 0
 !BattleUI_MpOffsetL0     = $1E   ; MP digits after the name cell, layout 0
 !BattleUI_MpBackL1       = 6     ; MP digits before the name cell, layout 1 (subtracted)
 !BattleUI_MpOffsetL2     = $14   ; MP digits after the name cell, layout 2
-!BattleUI_TpOffsetL1     = $0A   ; TP gauge after the name cell, layout 1
-!BattleUI_TpOffsetL2     = $18   ; TP gauge after the name cell, layout 2
+!BattleUI_GaugeCapOffsetL1 = $0A ; ATB gauge's left cap after the name cell, layout 1
+!BattleUI_GaugeCapOffsetL2 = $18 ; ATB gauge's left cap after the name cell, layout 2
 !BattleUI_MpCellL0       = $10   ; MP digits after the HP cell (UpdateNextPcPanel), layout 0
 !BattleUI_MpCellL12      = 8     ; same, layouts 1 and 2
 !BattleUI_GaugeCellOffset = $1A  ; ATB gauge after BattleRom_HpCellL1's cell
-!BattleUI_EdgeCol1Right  = $0E   ; slot-1 window edge, when slot 0 is also waiting
-!BattleUI_EdgeCol1Left   = $0C   ; slot-1 window edge, when slot 0 is not
-!BattleUI_EdgeCol2Right  = $1A   ; slot-2 window edge, when slot 1 is also waiting
-!BattleUI_EdgeCol2Left   = $18   ; slot-2 window edge, when slot 1 is not
-!BattleUI_EdgeBytesLeft  = $0E   ; bytes per row of a left edge strip (7 entries)
-!BattleUI_EdgeBytesRight = $0C   ; bytes per row of a right edge strip (first entry skipped)
+!BattleUI_FrameCol1Joined = $0E  ; slot-1 window frame without its left border (slot 0's window is shown)
+!BattleUI_FrameCol1Full  = $0C   ; slot-1 window frame with its left border (slot 0's is not shown)
+!BattleUI_FrameCol2Joined = $1A  ; slot-2 window frame without its left border (slot 1's window is shown)
+!BattleUI_FrameCol2Full  = $18   ; slot-2 window frame with its left border (slot 1's is not shown)
+!BattleUI_FrameRowBytesFull = $0E ; bytes per frame row with the left border (7 cells)
+!BattleUI_FrameRowBytesJoined = $0C ; bytes per frame row without the left border (6 cells)
 !Pc_NameRowLen           = 5     ; name tiles per row
 !Enemy_NameLen           = 11    ; tiles per enemy-name row
 !Enemy_NameLines         = 3     ; enemy-name lines in the status bar
@@ -160,8 +160,8 @@ if !constants_battle_inc == 0
 !Tech_CodeDoubleHeader   = $FC   ; !Tech_ListCode: "[Double Tech]" header (needs 2 ready PCs)
 !Tech_CodeSkip           = $FB   ; !Tech_ListCode: unselectable line with no text drawn
 !Tech_CodeSpecialMask    = $F0   ; codes $F0-$FF are special lines
-!Tech_DoubleHeaderText   = $0000 ; offset of "[Double Tech]" in BattleRom_TechFixedText
-!Tech_TripleHeaderText   = $0012 ; offset of "[Triple Tech]"
+!Tech_DoubleHeaderText   = $0000 ; offset of the "Double Technique" line in BattleRom_TechFixedText
+!Tech_TripleHeaderText   = $0012 ; offset of the "Triple Technique" line
 !Tech_HeaderTextLen      = 18    ; bytes per header line
 !Tech_NoEntry            = $FF   ; !Tech_ListEntry value: no entry on this line
 !Tech_NoPartners         = $FF   ; Partners value: single tech / no tech data
