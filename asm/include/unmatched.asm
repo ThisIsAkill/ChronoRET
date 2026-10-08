@@ -79,10 +79,6 @@ Field_UnkAF4E:      ; acts on dp $44 bits 0/1 with $F0 = $3000/$3040 ...
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C18003
-BankC1_Entry8003:   ; JSL vector (JMP $CFC2): saves P/X/DP/DB, DB=$7E, DP=0, runs service A (table
-                    ; $C1:D126, 6 entries) with argument Y; 1 = add item Y ($C1:D005), 4 = add Y gold
-                    ; ($C1:D0A2); returns a result in A
 org $C20568
 C2Scene_Unk0568: ; C2Script_ScrollFrames with C2Tmp_00 = a layer, C2Tmp_01 = signed pixels; reads the BG layer tables (probably the horizontal layer scroll)
 org $C2066C

@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 80781,
+  "emitted_bytes": 82890,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 956,
+      "bytes": 82890
     },
     "readable": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 956,
+      "bytes": 82890
     },
     "verified": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 945,
+      "bytes": 79674
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 32642,
+      "emitted_bytes": 34751,
       "matched": {
-        "functions": 383,
-        "bytes": 32642
+        "functions": 391,
+        "bytes": 34751
       },
       "readable": {
-        "functions": 383,
-        "bytes": 32642
+        "functions": 391,
+        "bytes": 34751
       },
       "verified": {
-        "functions": 383,
-        "bytes": 32642
+        "functions": 380,
+        "bytes": 31535
       }
     },
     {
@@ -1021,8 +1021,12 @@
       "bank": "$C1",
       "start": "$C1:8000",
       "end": "$C1:8FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 1121,
+      "functions": [
+        "BankC1_BattleStartVec",
+        "BankC1_Entry8003",
+        "BattleSys_Main"
+      ]
     },
     {
       "bank": "$C1",
@@ -1035,8 +1039,10 @@
       "bank": "$C1",
       "start": "$C1:A000",
       "end": "$C1:AFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 87,
+      "functions": [
+        "Battle_RandRange"
+      ]
     },
     {
       "bank": "$C1",
@@ -1049,8 +1055,11 @@
       "bank": "$C1",
       "start": "$C1:C000",
       "end": "$C1:CFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 81,
+      "functions": [
+        "Battle_Mul16",
+        "Battle_Div32"
+      ]
     },
     {
       "bank": "$C1",
@@ -1070,8 +1079,11 @@
       "bank": "$C1",
       "start": "$C1:F000",
       "end": "$C1:FFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 820,
+      "functions": [
+        "Battle_SetupBattle",
+        "Battle_CalcUnk56"
+      ]
     },
     {
       "bank": "$C2",

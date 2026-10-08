@@ -479,4 +479,53 @@ if !constants_battle_inc == 0
 !Sfx_CmdUnk18            = $18   ; APU command service 4 sends when an action's script has ended; meaning unknown
 !Sfx_Unk18Arg            = $FF   ; !Sfx_Param1 sent with it
 
+; --- Battle main routine (BattleSys_Main) ---
+!BattleSys_ServiceUnk0    = 0     ; $C10045 service run first by BattleSys_Main ($C1:0023; not analysed)
+!BattleSys_ServiceUpkeep  = 3     ; ... BattleSys_UpkeepTwoFrames
+!BattleSys_ServiceUnk6    = 6     ; ... $C1:006D, run by the debug win; not analysed
+!BattleSys_ServiceVictory = 8     ; ... BattleSys_VictoryPose
+!BattleSys_ServiceDefeat  = 9     ; ... BattleSys_DefeatPose
+!Battle_EntryNone         = $FF   ; list / slot entry: empty (the BattleSys_Main lists, !Battler_UnkAEFF)
+!Battle_2989Bit5          = $20   ; !Battle_Unk2989 bit 5: Battle_RandRange returns its low bound; BattleSys_Main
+                                  ; skips the turn lists and ends after one pass (meaning unknown)
+!Battle_NumEnemies        = 8     ; enemy entries (slots 3-10)
+!Battle_NumLists          = 13    ; turn lists in !Battle_ListFlags / !Battle_ListTimers
+!Battle_ListEntries       = !Battle_NumLists*!Battle_NumSlots ; bytes in each of those two arrays ($8F)
+!Battle_ListBit0          = $1000 ; !Battle_ListDue bit of list 0 (list n: this >> n)
+!Battle_ListDueBit        = $80   ; !Battle_ListFlags bit: the slot is due
+!Battle_StatsStride       = $80   ; bytes per BattlerStats record
+!Battle_StatusKo          = $80   ; BattlerStats.Status bit 7: KO'd
+!Battle_UnkB0B6Slots      = 10    ; BattleSys_Main runs $C1:B0B6 for Y = 0 to this - 1 (slot 10 not included)
+!Battle_EndUnk895BArg     = $79   ; A passed to $C1:895B on the !Battle_Unk99CD end (meaning unknown)
+!Battle_EndUnkCD0021Arg   = 8     ; A passed to $CD:0021 on that end (meaning unknown)
+!Battle_RewardBitGold     = $40   ; !Battle_UnkB2AF bit set once the gold is paid
+!Battle_RewardBitItem     = $20   ; !Battle_UnkB2AF bit set once an item is given
+!Battle_NumRewardItems    = 6     ; entries in !Battle_RewardItems
+!Battle_JoySelectHi       = $20   ; JOY2H bit 5: Select
+!Battle_AF15NotCounted    = $40   ; !Battle_UnkAF15 bit 6: the enemy does not count for the victory test
+!Battle_RandFullRange     = $FF   ; Battle_RandRange: high - low of this returns the raw random byte
+!Battle_Mul16Steps        = 16    ; Battle_Mul16: one step per multiplier bit
+!Battle_Div32Steps        = 32    ; Battle_Div32: one step per dividend bit
+
+; --- Battle setup (Battle_SetupBattle) ---
+!Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56
+!Battle_Unk56Divisor      = 24    ; Battle_CalcUnk56: .Unk3F / this ...
+!Battle_Unk56Base         = $44   ; ... + this
+!Battle_CmdBytesCleared   = 18    ; BattleCmd bytes Battle_SetupBattle zeroes (3 records are 21 bytes)
+!Battle_UnkAD8EBytes      = 12    ; bytes of !Battle_UnkAD8E set to $FF
+!Battle_StatByteMax       = $00FF ; clamp of the 8-bit stat sums (16-bit compare)
+!Battle_PcStatUnk4CBit6   = $40   ; PcStatBlk.Unk4C bit tested before $FD:B14D
+!Battle_UnkCC0262Ofs      = $0262 ; added to .Unk29 * 6 for an X that is then overwritten (quirk)
+!Battle_EnemyRecUnk5E04Size = 7   ; bytes per record at !BattleRom_EnemyUnk5E04
+!Battle_AE5DBit7          = $80   ; !Battle_UnkAE5D: the enemy record's byte 1 is non-zero
+!Battle_AE5DBit6          = $40   ; !Battle_UnkAE5D: its byte 0 is non-zero
+!Battle_CF15Call1A        = $29   ; arguments ($06, $08) of Battle_SetupBattle's four $C1:CF15 calls
+!Battle_CF15Call1B        = $43   ; (third argument 6, 3, 3, 4); meaning unknown
+!Battle_CF15Call2A        = $27
+!Battle_CF15Call2B        = $70
+!Battle_CF15Call3A        = $28
+!Battle_CF15Call3B        = $48
+!Battle_CF15Call4A        = $2A
+!Battle_CF15Call4B        = $4B
+
 endif
