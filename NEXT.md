@@ -26,11 +26,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    12. `$C0:0304` 24 B: `Field_RestoreState+$F` (part); 3 differ (call targets)
    13. `$C0:5A46` 23 B: `Field_ProcessAnimQueue+$C` (part); 0 differ
    14. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
-
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
-
-
 1. Bank $C1 from `$C1:4058`: service 4 of the $C10045 API (`$C1:4058`-`$C1:41BD`, 358 B; it calls
    `$C1:41BE`, `$C1:4212`, `$C1:423A`, `$C1:4310`, `$C1:4BBE` and six JSLs into `$CC:F06B`-`$CC:F278`,
    all unmatched), then its callees in bank $C1. (`$C1:007E` and `$C1:283D`-`$C1:4057` are matched;
@@ -43,6 +40,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Field_CheckTileInFront` $C0:1DF4–$C0:1F23 (table at $C0:1E92), `Evt_StartTargetFunc1`
    $C0:5AC5, `Field_DpadHandlerTable` $C0:8902 and the `Map_Unk*` steps of Field_FrameUpdate
    ($8A6D, $9175, $91AC, $93E1, $99DE), `Map_Unk75A0`.
+3. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
+4. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
 
 ## Tables
 

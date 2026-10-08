@@ -159,6 +159,7 @@ if !constants_battle_inc == 0
 !Battle_PoseFrames       = $40   ; frames a pose runs (Battle_RunPcPose)
 
 ; --- Text and number formatting ---
+!BattleMsg_Thousand      = 1000  ; place value subtracted by FormatNumber4Digits
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
 !BattleMsg_GlyphZero     = $73   ; tile of digit 0 (BattleRom_DigitTiles[0]); leading ones get blanked

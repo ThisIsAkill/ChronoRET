@@ -25,9 +25,6 @@ AudioFadeDispatch:  ; JSL re-entry: conditional SPC fade/start via $7F01EC count
 org $C02C41
 ScrollStepAccum:    ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
 
-org $C02E1E
-LoadSavePath:       ; entry for Loc_Id $81F0-$81FE (load/save/transition; meaning unverified)
-
 org $C0EC60
 Sub_EC60:           ; frame wait: INC $0152, then spin until the NMI clears it (after Field_EndOfFrame)
 
@@ -39,8 +36,12 @@ IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline her
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
 
-org $C0024C
-Scene_Unk024C:      ; scene-state probe from DefaultHandler; C=1 quick clear, C=0 full init
+org $C0034B
+Field_Unk034B:      ; Scene_Unk024C's no-battle path: sets Field_Unk7F03FE from the party slots, may BRL Field_IdleFrame
+org $C0038F
+Field_Unk038F:      ; Scene_Unk024C's battle path: JSR $039B/$041A/$04ED, BRL $066D; fills $7E:29xx/$7E:2Cxx
+org $C00617
+Field_Unk0617:      ; 8-bit X/Y: lists objects of kind 5/6 ($1100,X) near the screen tile origin in dp $9D.. (max 12, $80 ends)
 org $C00283
 Scene_Unk0283:      ; scene post-init from DefaultHandler; starts JSR $B262, JSR Field_RestoreSaveBlock
 org $C0092B
@@ -61,9 +62,6 @@ org $C01B53
 LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
 Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
-org $C02848
-Scene_SettleFrames: ; Scene_ReloadStep once; if it returns 0, raises Fade_Brightness (dp $19) one step
-                    ; per frame (frame update, Field_EndOfFrame, frame wait) until it reaches $0F
 org $C0286C
 Scene_ReloadStep:   ; long chain of scene re-init JSRs (TileAnimList_ApplyAll, $0A50, $6F79, ...)
 org $C028AA
