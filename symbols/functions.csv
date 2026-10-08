@@ -207,6 +207,8 @@ $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,verified,b78418c192a1,APU
 $C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,verified,9f455ee2d58c,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
 $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,verified,de544fdf3abf,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,verified,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
+$C1:1C4A,$C1:1C54,11,Battle_DrawBattlerFrame,$C1,Battle engine,readable,2f809e15ad31,"Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the battler's tile buffer in bank $7E, unless the battler uses frame layout 3 (!Battle_FrameLayoutStrip), which this entry leaves alone."
+$C1:1C55,$C1:1F78,804,Battle_DrawBattlerFrameAnyLayout,$C1,Battle engine,readable,e82956d37326,Decodes one animation frame of a battler into bank $7E tiles: 1.
 $C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,verified,4ef6de9b402e,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,verified,2b4add39e679,"Service 7 of the $C10045 service dispatcher (dispatch table at $C10051; reached only by same-bank JSR from bank $C1, see BattleMenu_EnqueueReadyBattler)."
 $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,

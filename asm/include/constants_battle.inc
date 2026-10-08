@@ -203,6 +203,16 @@ if !constants_battle_inc == 0
 !BattleTgt_SweepBatch    = 3     ; multi-target cursor: selection entries drawn per frame
 !BattleTgt_SweepWrap     = 6     ; ... the sweep restarts after this index
 
+; --- Battler frame decoder (Battle_DrawBattlerFrame) ---
+!Battle_FrameLayoutTall  = 2     ; !Battler_FrameLayout: 8 x 6 tiles
+!Battle_FrameLayoutStrip = 3     ; 96 x 1 tiles; the checked entry point never decodes it
+!Battle_FrameLayoutTallAlt = 5   ; row order used instead of layout 2 for every slot but 3 (BattleRom_FrameLayout)
+!Battle_FrameLayoutBytes = 14    ; size of one BattleRom_FrameLayout record
+!Battle_FrameTileMask    = $07FF ; frame tilemap entry: tile number (0 = blank cell, written as zeros)
+!Battle_FrameHFlip       = $4000 ; frame tilemap entry: mirror the tile horizontally (bit 15 is not tested)
+!Battle_TileBytes        = $0020 ; one 8x8 4bpp tile (inferred from the 32-byte cell copy)
+!Battle_SignExtendNeg    = $FF   ; high byte of a sign-extended negative byte
+
 ; --- OAM (cursor sprites) ---
 !BattleOam_CursorSprites = 4     ; cursor sprites 0-3
 !BattleOam_CursorBytes   = $0010 ; their low-table bytes (4 x 4)
