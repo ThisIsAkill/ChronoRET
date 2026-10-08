@@ -3249,62 +3249,57 @@ BattleMenu_OpenItemList:
 ; ==================================================================
 ; BattleMenu_BuildTargetList ($C11F79–$C11FDC, 100 bytes)
 ; ==================================================================
-; Resets the target-selection state ($9613/$960A/$960C/$A64F/$A6D8),
-; blanks the 11-entry candidate list ($99C0-$99CA) and selection list
-; ($A62D-$A637) to $FF, then — unless already in a "return to main
-; menu on cancel" state — snapshots the current submenu type into
-; $A86B and reloads the command window map so cancelling target-select
-; comes back to the right screen.
+; Records the requesting PC (!BattleTgt_Caster), resets the selection
+; state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks
+; !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) to $FF.
+; If !BattleTgt_Mode bit 7 is set and no return target is saved yet,
+; saves submenu + 1 in !BattleMenu_ReturnSubmenu, switches to the main
+; menu (with the panel refresh held) and reloads the command window, so
+; cancelling target selection comes back to the submenu.
 ;
-; The actual target-collection work is fully mode-specific: it clamps
-; $960D (target mode, low 7 bits) to $00-$20, doubles it for a word
-; index, and JSRs indirectly through a jump table at $11FF8 (bank-
-; local target-mode handler table; the individual handlers and the
-; table's contents are a separate, much larger unmatched targeting
-; subsystem — see BANK_MAP.md). After the handler returns, if every
-; slot in the selection list is empty (all $FF), the result byte $9613
-; is set from whatever value fell out of the scan (defensive fallback
-; for "no valid targets").
+; Then runs the mode's handler: mode & $7F (clamped to $20) indexes
+; BattleTgt_ModeTable. If afterwards every one of the first 11
+; selection entries is empty, !BattleTgt_Result gets the $FF just read
+; (negative = no valid target).
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; X/Y clobbered
-; Callees: BattleMenu_LoadCommandWindowMap; JSR ($1FF8,X) into the
-;          (unmatched) target-mode handler table
+; Callees: BattleMenu_LoadCommandWindowMap; JSR (BattleTgt_ModeTable,X)
 org $C11F79
 BattleMenu_BuildTargetList:
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc      ; active PC slot
     TAX
-    STX.w $960F                     ; remember requesting slot
-    STZ.w $9613                     ; result: no target yet
-    STZ.w $960C
-    STZ.w $960A
-    STZ.w $A64F
-    STZ.w $A6D8
-    LDX #$000B
-    LDA #$FF
+    STX.w !BattleTgt_Caster         ; remember requesting slot
+    STZ.w !BattleTgt_Result         ; assume a target will be found
+    STZ.w !BattleTgt_TargetAll
+    STZ.w !BattleTgt_CanCycle
+    STZ.w !BattleTgt_UnkA64F
+    STZ.w !BattleTgt_UnkA6D8
+    LDX.w #!Battle_NumSlots
+    LDA.b #!BattleTgt_Empty
 .clear_loop:
-    STA.w $99C0,X                   ; candidate list slot -> empty
-    STA.w $A62D,X                   ; selection list slot -> empty
+    STA.w !BattleTgt_Candidates,X   ; candidate list slot -> empty
+    STA.w !BattleTgt_Selected,X     ; selection list slot -> empty
     DEX
     BPL .clear_loop
-    LDA.w $960D                     ; target mode
+    LDA.w !BattleTgt_Mode           ; target mode
     BPL .have_mode
-    LDA.w $A86B                     ; saved submenu type (cancel target)
+    LDA.w !BattleMenu_ReturnSubmenu ; saved submenu type (cancel target)
     BNE .have_mode
-    LDA.w $95DB                     ; current submenu type
+    LDA.w !BattleMenu_Submenu       ; current submenu type
     INC
-    STA.w $A86B                     ; save it for cancel-to-return
-    STZ.w $95DB
-    LDA #$FE
-    STA.w $A6DF
-    INC.w $A09A
+    STA.w !BattleMenu_ReturnSubmenu ; save it for cancel-to-return
+    STZ.w !BattleMenu_Submenu
+    LDA.b #!BattleMenu_RosterRedraw
+    STA.w !BattleMenu_RosterIdxDrawn
+    INC.w !BattleUI_PanelHold
     JSR BattleMenu_LoadCommandWindowMap
 .have_mode:
-    LDA.w $960D
-    AND #$7F                        ; strip high bit
-    CMP #$21
+    LDA.w !BattleTgt_Mode
+    AND.b #!BattleTgt_ModeMask      ; strip high bit
+    CMP.b #!BattleTgt_NumModes
     BCC .in_range
-    LDA #$20                        ; clamp to table size
+    LDA.b #!BattleTgt_LastMode      ; clamp to table size
 .in_range:
     ASL                             ; word index
     TAX
@@ -3312,12 +3307,12 @@ BattleMenu_BuildTargetList:
     TDC
     TAX
 .scan_empty:
-    LDA.w $A62D,X                   ; selection list slot
+    LDA.w !BattleTgt_Selected,X     ; selection list slot
     BPL .done                       ; found a real target -> done
     INX
-    CPX #$000B
+    CPX.w #!Battle_NumSlots
     BNE .scan_empty
-    STA.w $9613                     ; all empty -> fallback result
+    STA.w !BattleTgt_Result         ; all empty -> fallback result
 .done:
     RTS
 
@@ -3326,19 +3321,19 @@ BattleMenu_BuildTargetList:
 ; ==================================================================
 ; Service 7 of the cross-bank $C10045 service API (dispatch table at
 ; $C10051). Runs one of the area-target geometry routines, selected by
-; $99CC (0-6) through the 7-entry table just below; out-of-range
+; !BattleTgt_AreaType (0-6) through the 7-entry table just below; out-of-range
 ; selectors are ignored. The same geometry routines back the menu's
 ; area-effect target modes (see BattleTgt_ModeTable), so this is
 ; presumably how non-menu code (enemy scripts, scripted attacks) asks
 ; "which battlers does this area hit?".
-; Entry: M=1, X=0, DB=$7E; $99CC = area type, $9604-$9608 = params
+; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaType, !BattleTgt_AreaSide..AreaVariant
 ; Exit:  M=1
-; Callees: JSR ($1FEA,X) -> BattleTgt_AreaLine/AreaCircle/
+; Callees: JSR (BattleTgt_AreaTable,X) -> BattleTgt_AreaLine/AreaCircle/
 ;          AreaPartyTriangle/AreaRow
 org $C11FDD
 BattleTgt_RunAreaQuery:
-    LDA.w $99CC                     ; area type selector
-    CMP #$07
+    LDA.w !BattleTgt_AreaType
+    CMP.b #!BattleTgt_NumAreaTypes
     BCS .exit                       ; out of range -> no-op
     ASL
     TAX
@@ -3349,23 +3344,23 @@ BattleTgt_RunAreaQuery:
 ; BattleTgt_AreaTable ($C11FEA–$C11FF7, 7 words)
 BattleTgt_AreaTable:
     dw BattleTgt_AreaLine           ; 0
-    dw BattleTgt_AreaCircle           ; 1
-    dw BattleTgt_AreaCircle           ; 2
-    dw BattleTgt_AreaPartyTriangle           ; 3
+    dw BattleTgt_AreaCircle         ; 1
+    dw BattleTgt_AreaCircle         ; 2
+    dw BattleTgt_AreaPartyTriangle  ; 3
     dw BattleTgt_AreaLine           ; 4
-    dw BattleTgt_AreaPartyTriangle           ; 5
-    dw BattleTgt_AreaRow           ; 6
+    dw BattleTgt_AreaPartyTriangle  ; 5
+    dw BattleTgt_AreaRow            ; 6
 
 ; ==================================================================
 ; BattleTgt_ModeTable ($C11FF8–$C12039, 33 words)
 ; ==================================================================
-; Target-mode handler table, indexed by ($960D & $7F) clamped to $20,
-; called from BattleMenu_BuildTargetList. Each handler fills the
-; 11-entry candidate list ($99C0-$99CA, battler slots: 0-2 = PCs,
-; 3-10 = enemies) and seeds the selection list ($A62D...) from the
-; cursor ($9614). $960C = $80 means "target everything in the list";
-; $960A non-zero means the player may cycle the cursor; $9613 = $80
-; means "no valid target".
+; Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped
+; to $20, called from BattleMenu_BuildTargetList. Each handler fills the
+; 11-entry !BattleTgt_Candidates list (battler slots: 0-2 = PCs, 3-10 =
+; enemies) and seeds !BattleTgt_Selected from the cursor
+; (!BattleTgt_Cursor). !BattleTgt_TargetAll = $80 means "target
+; everything in the list"; !BattleTgt_CanCycle non-zero means the player
+; may move the cursor; !BattleTgt_Result = $80 means "no valid target".
 ;
 ; Mode -> handler (unlisted modes use BattleTgt_SingleAlly):
 ;   $01,$04 AllAllies          $02 Self             $03 SingleKoAlly
@@ -3390,7 +3385,7 @@ BattleTgt_ModeTable:
     dw BattleTgt_EnemyLineFromCaster2 ; $0C
     dw BattleTgt_EnemyLineFromChar3 ; $0D
     dw BattleTgt_SingleAlly         ; $0E
-    dw BattleTgt_EnemyRow      ; $0F
+    dw BattleTgt_EnemyRow           ; $0F
     dw BattleTgt_SingleAlly         ; $10
     dw BattleTgt_CasterRadius       ; $11
     dw BattleTgt_EnemyRadius        ; $12
@@ -3399,7 +3394,7 @@ BattleTgt_ModeTable:
     dw BattleTgt_SingleAlly         ; $15
     dw BattleTgt_SingleAlly         ; $16
     dw BattleTgt_SingleAlly         ; $17
-    dw BattleTgt_PartyTriangle       ; $18
+    dw BattleTgt_PartyTriangle      ; $18
     dw BattleTgt_SingleAlly         ; $19
     dw BattleTgt_EnemyRadius        ; $1A
     dw BattleTgt_Char6Radius        ; $1B
@@ -3414,67 +3409,69 @@ BattleTgt_ModeTable:
 ; ==================================================================
 ; Default mode: one PC (slots 0-2), cursor may cycle. Falls into
 ; BattleTgt_CollectValidTargets, the shared list builder that the
-; other list modes enter with their own slot range ($80 = end
-; exclusive, X = start) and flags.
+; other list modes enter with their own slot range (!BattleTgt_ScanEnd
+; = end exclusive, X = start) and flags.
 ;
-; CollectValidTargets keeps battler X only if it is present ($96F5,X),
-; not flagged out ($9FF7,X bit 7 clear), not hidden ($A09B,X zero) and
-; — if $A0A8,X is set (inferred: KO'd) — only when the mode is $04.
-; The requesting battler ($960F) always goes to the front ($99C0);
-; everyone else is appended from $99C1. CompactCandidates then closes
-; the hole if the requester wasn't eligible. Finally the cursor entry
-; is copied to the selection list, or the whole list when $960C says
+; CollectValidTargets keeps battler X only if it is present
+; (!Battler_Present), !Battler_Unk9FF7 bit 7 is clear, it is not
+; !Battler_Untargetable, and — if !Battler_KoFlag is set — only when the
+; mode is $04. The requesting battler (!BattleTgt_Caster) always goes to
+; the front of !BattleTgt_Candidates; everyone else is appended from
+; entry 1. CompactCandidates then closes the hole if the requester
+; wasn't eligible. Finally the cursor entry is copied to
+; !BattleTgt_Selected, or the whole list when !BattleTgt_TargetAll says
 ; "target all".
 ; Entry: M=1, X=0, DB=$7E (all BattleTgt_* handlers)
 ; Exit:  M=1
 ; Callees: BattleTgt_CompactCandidates
+!BattleTgt_ScanEnd = !BattleTmp_80       ; 2 B in: slot after the last one CollectValidTargets scans
 org $C1203A
 BattleTgt_SingleAlly:
-    LDX #$0003
-    STX $80                         ; end slot (exclusive): PCs 0-2
-    LDX #$0000                      ; start slot
-    INC.w $960A                     ; cursor may cycle
+    LDX.w #!Battle_NumPcSlots
+    STX.b !BattleTgt_ScanEnd        ; PCs 0-2
+    LDX #$0000                      ; first slot
+    INC.w !BattleTgt_CanCycle
 BattleTgt_CollectValidTargets:
     TDC
     TAY                             ; Y = append index
 .loop:
-    LDA.w $96F5,X                   ; battler present?
+    LDA.w !Battler_Present,X
     BEQ .next
-    LDA.w $9FF7,X
-    BMI .next                       ; flagged out
-    LDA.w $A0A8,X                   ; KO'd? (inferred)
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next                       ; excluded
+    LDA.w !Battler_KoFlag,X
     BEQ .check_hidden
-    LDA.w $960D
-    AND #$7F
-    CMP #$04                        ; only mode $04 may pick these
+    LDA.w !BattleTgt_Mode
+    AND.b #!BattleTgt_ModeMask
+    CMP.b #!BattleTgt_ModeAllAlliesKo ; only mode $04 may pick these
     BNE .next
 .check_hidden:
-    LDA.w $A09B,X
-    BNE .next                       ; hidden / untargetable
-    CPX.w $960F                     ; requesting battler?
+    LDA.w !Battler_Untargetable,X
+    BNE .next
+    CPX.w !BattleTgt_Caster         ; requesting battler?
     BNE .append
-    LDA.w $960F
-    STA.w $99C0                     ; requester goes first
+    LDA.w !BattleTgt_Caster
+    STA.w !BattleTgt_Candidates     ; requester goes first
     BRA .next
 .append:
     TXA
-    STA.w $99C1,Y
+    STA.w !BattleTgt_Candidates+1,Y
     INY
 .next:
     INX
-    CPX $80
+    CPX.b !BattleTgt_ScanEnd
     BNE .loop
     JSR BattleTgt_CompactCandidates
-    LDA.w $9614                     ; cursor -> selection
+    LDA.w !BattleTgt_Cursor         ; entry under the cursor -> selection
     TAX
-    LDA.w $99C0,X
-    STA.w $A62D
-    LDA.w $960C
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_Selected
+    LDA.w !BattleTgt_TargetAll
     BPL .exit
-    LDX #$000A                      ; target all: copy whole list
+    LDX.w #!Battle_LastSlot         ; target all: copy whole list
 .copy_all:
-    LDA.w $99C0,X
-    STA.w $A62D,X
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_Selected,X
     DEX
     BPL .copy_all
 .exit:
@@ -3482,181 +3479,183 @@ BattleTgt_CollectValidTargets:
 
 ; BattleTgt_AllAllies ($C1209A–$C120A8, 15 bytes): every PC
 BattleTgt_AllAllies:
-    LDX #$0003
-    STX $80
+    LDX.w #!Battle_NumPcSlots
+    STX.b !BattleTgt_ScanEnd
     LDX #$0000
-    LDA #$80
-    STA.w $960C                     ; target all
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll      ; target all
     BRA BattleTgt_CollectValidTargets
 
 ; BattleTgt_SingleEnemy ($C120A9–$C120B5, 13 bytes): one enemy (3-10),
 ; cursor may cycle. Also called as a list builder by the area modes.
 BattleTgt_SingleEnemy:
-    LDX #$000B
-    STX $80
-    LDX #$0003
-    INC.w $960A
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_ScanEnd
+    LDX.w #!Battle_FirstEnemySlot
+    INC.w !BattleTgt_CanCycle
     BRA BattleTgt_CollectValidTargets
 
 ; BattleTgt_AllEnemies ($C120B6–$C120C5, 16 bytes)
 BattleTgt_AllEnemies:
-    LDX #$000B
-    STX $80
-    LDX #$0003
-    LDA #$80
-    STA.w $960C
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_ScanEnd
+    LDX.w #!Battle_FirstEnemySlot
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
     JMP BattleTgt_CollectValidTargets
 
 ; BattleTgt_Everyone ($C120C6–$C120D5, 16 bytes): all battlers 0-10
 BattleTgt_Everyone:
-    LDX #$000B
-    STX $80
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_ScanEnd
     LDX #$0000
-    LDA #$80
-    STA.w $960C
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
     JMP BattleTgt_CollectValidTargets
 
-; BattleTgt_Self ($C120D6–$C120DF, 10 bytes): the active PC only
+; BattleTgt_Self ($C120D6–$C120DF, 10 bytes): the shown PC only
 BattleTgt_Self:
-    LDA.w $95D5                     ; active PC slot
-    STA.w $99C0
-    STA.w $A62D
+    LDA.w !BattleMenu_ActivePc
+    STA.w !BattleTgt_Candidates
+    STA.w !BattleTgt_Selected
     RTS
 
 ; ==================================================================
 ; BattleTgt_SingleKoAlly ($C120E0–$C12135, 86 bytes)
 ; ==================================================================
-; Lists the PCs whose status byte (+$4A in each PC's $80-byte battle
-; record at $5E00) has bit 7 set — by context, KO'd allies, i.e. a
-; revive target. Unrolled for the three PC slots. No candidate ->
-; $9613 = $80.
+; Lists the PCs whose BattlerStats.Status has bit 7 set — by context,
+; KO'd allies, i.e. a revive target. Unrolled for the three PC slots.
+; No candidate -> !BattleTgt_Result = $80.
 BattleTgt_SingleKoAlly:
-    INC.w $960A
+    INC.w !BattleTgt_CanCycle
     TDC
     TAX
-    LDA.w $96F5                     ; PC 0
+    LDA.w !Battler_Present          ; PC 0
     BEQ .pc1
-    LDA.w $A09B
+    LDA.w !Battler_Untargetable
     BNE .pc1
-    LDA.w $5E4A
+    LDA.w BattlerStats.Status
     BPL .pc1
-    STZ.w $99C0
+    STZ.w !BattleTgt_Candidates
     INX
 .pc1:
-    LDA.w $96F6                     ; PC 1
+    LDA.w !Battler_Present+1        ; PC 1
     BEQ .pc2
-    LDA.w $A09C
+    LDA.w !Battler_Untargetable+1
     BNE .pc2
-    LDA.w $5ECA
+    LDA.w BattlerStats[1].Status
     BPL .pc2
     LDA #$01
-    STA.w $99C0,X
+    STA.w !BattleTgt_Candidates,X
     INX
 .pc2:
-    LDA.w $96F7                     ; PC 2
+    LDA.w !Battler_Present+2        ; PC 2
     BEQ .check_any
-    LDA.w $A09D
+    LDA.w !Battler_Untargetable+2
     BNE .check_any
-    LDA.w $5F4A
+    LDA.w BattlerStats[2].Status
     BPL .check_any
     LDA #$02
-    STA.w $99C0,X
+    STA.w !BattleTgt_Candidates,X
 .check_any:
-    LDA.w $99C0
+    LDA.w !BattleTgt_Candidates
     BPL .select
-    LDA #$80
-    STA.w $9613                     ; no valid target
+    LDA.b #!BattleTgt_ResultNone
+    STA.w !BattleTgt_Result         ; no valid target
 .select:
-    LDA.w $9614
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $A62D
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_Selected
     RTS
 
 ; ==================================================================
 ; BattleTgt_PcByCharId5 ($C12136–$C12162, 45 bytes)
 ; ==================================================================
-; Targets the one party member whose $2980,X entry equals $80 (5 for
-; this entry, 4 via BattleTgt_PcByCharId4). In bank $C1, $2980-$2982
-; behaves like the party's character-id list; if so these are
-; "target Ayla"/"target Frog" modes, used by dual/triple techs that
-; act on a specific partner.
+; Targets the one party member whose !Pc_CharId equals
+; !BattleTgt_WantedChar (5 for this entry, 4 via BattleTgt_PcByCharId4).
+; In bank $C1, !Pc_CharId behaves like the party's character-id list; if
+; so these are "target Ayla"/"target Frog" modes, used by dual/triple
+; techs that act on a specific partner.
+!BattleTgt_WantedChar = !BattleTmp_80    ; 1 B in: character id FindPcByCharId looks for
 BattleTgt_PcByCharId5:
-    LDA #$05
-    STA $80
+    LDA.b #!Pc_CharAyla
+    STA.b !BattleTgt_WantedChar
 BattleTgt_FindPcByCharId:
-    INC.w $960A
-    LDX #$0002
+    INC.w !BattleTgt_CanCycle
+    LDX.w #!Battle_LastPcSlot
 .loop:
-    LDA.w $96F5,X
+    LDA.w !Battler_Present,X
     BEQ .next
-    LDA.w $A09B,X
+    LDA.w !Battler_Untargetable,X
     BNE .next
-    LDA.w $2980,X                   ; party member id (inferred)
-    CMP $80
+    LDA.w !Pc_CharId,X
+    CMP.b !BattleTgt_WantedChar
     BEQ .found
 .next:
     DEX
     BPL .loop
-    LDA #$80
-    STA.w $9613                     ; not in party / not targetable
+    LDA.b #!BattleTgt_ResultNone
+    STA.w !BattleTgt_Result         ; not in party / not targetable
     BRA .exit
 .found:
     TXA
-    STA.w $99C0
-    STA.w $A62D
+    STA.w !BattleTgt_Candidates
+    STA.w !BattleTgt_Selected
 .exit:
     RTS
 
 ; BattleTgt_PcByCharId4 ($C12163–$C12168, 6 bytes)
 BattleTgt_PcByCharId4:
-    LDA #$04
-    STA $80
+    LDA.b #!Pc_CharFrog
+    STA.b !BattleTgt_WantedChar
     BRA BattleTgt_FindPcByCharId
 
 ; ==================================================================
 ; Area modes ($C12169–$C12331)
 ; ==================================================================
 ; All of these pick an anchor (the caster, a chosen enemy, or a
-; specific party member), fill the $9604-$9608 parameter block, run an
-; area-geometry routine that writes the hit list into $99C0, then
-; select the whole list (BattleTgt_SelectAllCandidates).
-;   $9605 = source/centre battler, $9606 = aimed-at battler,
-;   $9607 = shape/size code, $9608 = variant flag, $9604 = 0
+; specific party member), fill the area parameter block, run an
+; area-geometry routine that writes the hit list into
+; !BattleTgt_Candidates, then select the whole list
+; (BattleTgt_SelectAllCandidates):
+;   !BattleTgt_AreaCentre = source/centre battler, AreaAim = aimed-at
+;   battler, AreaSize = shape size, AreaVariant = variant flag,
+;   AreaSide = 0 (scan the enemies)
 ; The enemy-anchored ones build the enemy list first and let the pad
-; move the aim: $EF bits $09 / $06 each play Battle_StopSfx and step
-; the cursor. Note the three "line" modes step forward for both pad
+; move the aim: D-pad up/right or down/left each play Battle_StopSfx and
+; step the cursor. Note the three "line" modes step forward for both pad
 ; groups; the radius/row modes step backward for the second group.
 
 ; BattleTgt_EnemyLineFromCaster ($C12169–$C121AE, 70 bytes)
 BattleTgt_EnemyLineFromCaster:
     JSR BattleTgt_SingleEnemy
-    STZ.w $960A
-    LDA #$80
-    STA.w $960C
-    LDA $EF
-    AND #$09
+    STZ.w !BattleTgt_CanCycle
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUpRight
     BEQ .check_other
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
-    LDA $EF
-    AND #$06
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDownLeft
     BEQ .setup
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
 .setup:
-    STZ.w $9604
-    LDA.w $960F
-    STA.w $9605                     ; source: caster
-    LDA.w $9614
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Caster
+    STA.w !BattleTgt_AreaCentre     ; source: caster
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $9606                     ; aimed-at enemy
-    LDA #$02
-    STA.w $9607
-    STZ.w $9608
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_AreaAim        ; aimed-at enemy
+    LDA.b #!BattleTgt_LineWidth
+    STA.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
     JSR BattleTgt_AreaLine
     JMP BattleTgt_SelectAllCandidates
 
@@ -3664,18 +3663,18 @@ BattleTgt_EnemyLineFromCaster:
 ; but the source is the party member with id 3 (no-op if absent)
 BattleTgt_EnemyLineFromChar3:
     JSR BattleTgt_SingleEnemy
-    STZ.w $960A
-    LDA #$80
-    STA.w $960C
-    LDA $EF
-    AND #$09
+    STZ.w !BattleTgt_CanCycle
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUpRight
     BEQ .check_other
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
     BRA .find_source
 .check_other:
-    LDA $EF
-    AND #$06
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDownLeft
     BEQ .find_source
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
@@ -3683,69 +3682,69 @@ BattleTgt_EnemyLineFromChar3:
     TDC
     TAX
 .find_loop:
-    LDA.w $2980,X
-    CMP #$03
+    LDA.w !Pc_CharId,X
+    CMP.b #!Pc_CharRobo
     BEQ .found
     INX
-    CPX #$0003
+    CPX.w #!Battle_NumPcSlots
     BNE .find_loop
     RTS
 .found:
     TXA
-    STA.w $9605                     ; source: party member id 3
-    STZ.w $9604
-    LDA.w $9614
+    STA.w !BattleTgt_AreaCentre     ; source: party member id 3
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $9606
-    LDA #$02
-    STA.w $9607
-    STZ.w $9608
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_AreaAim
+    LDA.b #!BattleTgt_LineWidth
+    STA.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
     JSR BattleTgt_AreaLine
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_EnemyLineFromCaster2 ($C12203–$C1224A, 72 bytes): same as
-; EnemyLineFromCaster with variant flag $9608 = 1
+; EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
 BattleTgt_EnemyLineFromCaster2:
     JSR BattleTgt_SingleEnemy
-    STZ.w $960A
-    LDA #$80
-    STA.w $960C
-    LDA $EF
-    AND #$09
+    STZ.w !BattleTgt_CanCycle
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUpRight
     BEQ .check_other
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
-    LDA $EF
-    AND #$06
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDownLeft
     BEQ .setup
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
 .setup:
-    STZ.w $9604
-    LDA.w $960F
-    STA.w $9605
-    LDA.w $9614
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Caster
+    STA.w !BattleTgt_AreaCentre
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $9606
-    LDA #$02
-    STA.w $9607
-    LDA #$01
-    STA.w $9608
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_AreaAim
+    LDA.b #!BattleTgt_LineWidth
+    STA.w !BattleTgt_AreaSize
+    LDA.b #!BattleTgt_LineVariantAim
+    STA.w !BattleTgt_AreaVariant
     JSR BattleTgt_AreaLine
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_CasterRadius ($C1224B–$C1225E, 20 bytes): area $10 around
 ; the caster
 BattleTgt_CasterRadius:
-    STZ.w $9604
-    LDA.w $960F
-    STA.w $9605
-    LDA #$10
-    STA.w $9607
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Caster
+    STA.w !BattleTgt_AreaCentre
+    LDA.b #!BattleTgt_RadiusSq4
+    STA.w !BattleTgt_AreaSize
     JSR BattleTgt_AreaCircle
     JMP BattleTgt_SelectAllCandidates
 
@@ -3753,114 +3752,114 @@ BattleTgt_CasterRadius:
 ; chosen enemy; size $19 for mode $1A, else $09
 BattleTgt_EnemyRadius:
     JSR BattleTgt_SingleEnemy
-    STZ.w $960A
-    LDA $EF
-    AND #$09
+    STZ.w !BattleTgt_CanCycle
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUpRight
     BEQ .check_other
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
-    LDA $EF
-    AND #$06
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDownLeft
     BEQ .setup
     JSR Battle_StopSfx
     JSR BattleTgt_CyclePrev
 .setup:
-    STZ.w $9604
-    LDA.w $9614
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $9605                     ; centre: chosen enemy
-    LDA.w $960D
-    AND #$7F
-    CMP #$1A
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_AreaCentre     ; centre: chosen enemy
+    LDA.w !BattleTgt_Mode
+    AND.b #!BattleTgt_ModeMask
+    CMP.b #!BattleTgt_ModeEnemyRadiusBig
     BNE .small
-    LDA #$19
+    LDA.b #!BattleTgt_RadiusSq5
     BRA .set_size
 .small:
-    LDA #$09
+    LDA.b #!BattleTgt_RadiusSq3
 .set_size:
-    STA.w $9607
+    STA.w !BattleTgt_AreaSize
     JSR BattleTgt_AreaCircle
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_Char3Radius ($C122A4–$C122D2, 47 bytes): area around party
 ; member id 3; size $19 for mode $14, else $10
 BattleTgt_Char3Radius:
-    STZ.w $9604
+    STZ.w !BattleTgt_AreaSide
     TDC
     TAX
 .find_loop:
-    LDA.w $2980,X
-    CMP #$03
+    LDA.w !Pc_CharId,X
+    CMP.b #!Pc_CharRobo
     BEQ .found
     INX
-    CPX #$0003
+    CPX.w #!Battle_NumPcSlots
     BNE .find_loop
     RTS
 .found:
     TXA
-    STA.w $9605
-    LDA.w $960D
-    AND #$7F
-    CMP #$14
+    STA.w !BattleTgt_AreaCentre
+    LDA.w !BattleTgt_Mode
+    AND.b #!BattleTgt_ModeMask
+    CMP.b #!BattleTgt_ModeRoboRadiusBig
     BNE .small
-    LDA #$19
+    LDA.b #!BattleTgt_RadiusSq5
     BRA .set_size
 .small:
-    LDA #$10
+    LDA.b #!BattleTgt_RadiusSq4
 .set_size:
-    STA.w $9607
+    STA.w !BattleTgt_AreaSize
     JSR BattleTgt_AreaCircle
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_Char6Radius ($C122D3–$C122F4, 34 bytes): area $19 around
 ; party member id 6
 BattleTgt_Char6Radius:
-    STZ.w $9604
+    STZ.w !BattleTgt_AreaSide
     TDC
     TAX
 .find_loop:
-    LDA.w $2980,X
-    CMP #$06
+    LDA.w !Pc_CharId,X
+    CMP.b #!Pc_CharMagus
     BEQ .found
     INX
-    CPX #$0003
+    CPX.w #!Battle_NumPcSlots
     BNE .find_loop
     RTS
 .found:
     TXA
-    STA.w $9605
-    LDA #$19
-    STA.w $9607
+    STA.w !BattleTgt_AreaCentre
+    LDA.b #!BattleTgt_RadiusSq5
+    STA.w !BattleTgt_AreaSize
     JSR BattleTgt_AreaCircle
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_EnemyRow ($C122F5–$C12328, 52 bytes incl. dead RTS):
 ; chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around
-; the anchor's $1D23 screen y)
+; the anchor's !Battler_ScreenY)
 BattleTgt_EnemyRow:
     JSR BattleTgt_SingleEnemy
-    STZ.w $960A
-    LDA $EF
-    AND #$09
+    STZ.w !BattleTgt_CanCycle
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUpRight
     BEQ .check_other
     JSR Battle_StopSfx
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
-    LDA $EF
-    AND #$06
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDownLeft
     BEQ .setup
     JSR Battle_StopSfx
     JSR BattleTgt_CyclePrev
 .setup:
-    STZ.w $9604
-    LDA.w $9614
+    STZ.w !BattleTgt_AreaSide
+    LDA.w !BattleTgt_Cursor
     TAX
-    LDA.w $99C0,X
-    STA.w $9605
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_AreaCentre
     JSR BattleTgt_AreaRow
     JMP BattleTgt_SelectAllCandidates
     RTS                             ; dead byte after the tail JMP, preserved
@@ -3868,7 +3867,7 @@ BattleTgt_EnemyRow:
 ; BattleTgt_PartyTriangle ($C12329–$C12331, 9 bytes): enemies inside
 ; the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
 BattleTgt_PartyTriangle:
-    STZ.w $9604
+    STZ.w !BattleTgt_AreaSide
     JSR BattleTgt_AreaPartyTriangle
     JMP BattleTgt_SelectAllCandidates
 
@@ -3876,94 +3875,101 @@ BattleTgt_PartyTriangle:
 ; BattleTgt_AreaRow ($C12332–$C123A3, 114 bytes)
 ; ==================================================================
 ; "Row" area: every eligible battler on the scanned side whose screen
-; y ($1D23,X) lies within +/-$20 of the centre battler's y. The window
+; y (!Battler_ScreenY) lies within +/-$20 of the centre battler's y. The window
 ; is clamped to $00-$FF (TDC on borrow, $FF on carry) and both ends are
 ; inclusive. Only y is tested, so the shape is a horizontal band across
 ; the whole field (inferred from the arithmetic; the in-game name of
 ; the techs using it is not established here).
 ;
-; Scanned side: $9604 = 0 scans enemies (slots 3-10), non-zero scans
-; PCs (slots 0-2); the same convention as the other area routines.
-; Eligibility is the usual set (present $96F5, not flagged out $9FF7
-; bit 7, $A0A8 clear, not hidden $A09B). The centre battler is skipped
-; in the scan and then written unconditionally to $99C0 — it is not
-; checked for eligibility, and no CompactCandidates pass runs.
-; Entry: M=1, X=0, DB=$7E; $9604 side, $9605 centre slot
-; Exit:  M=1; $99C0 = centre, $99C1.. = hits, rest $FF
+; Scanned side: !BattleTgt_AreaSide = 0 scans enemies (slots 3-10),
+; non-zero scans PCs (slots 0-2); the same convention as the other area
+; routines. Eligibility is the usual set (!Battler_Present,
+; !Battler_Unk9FF7 bit 7 clear, !Battler_KoFlag clear, not
+; !Battler_Untargetable). The centre battler is skipped in the scan and
+; then written unconditionally to the front of !BattleTgt_Candidates —
+; it is not checked for eligibility, and no CompactCandidates pass runs.
+; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide, !BattleTgt_AreaCentre
+; Exit:  M=1; Candidates[0] = centre, [1..] = hits, rest $FF
 ; Callees: BattleTgt_ClearLists
+; Direct-page roles (AreaSlot/AreaEnd shared by all area routines):
+!BattleTgt_AreaSlot = !BattleTmp_8E       ; 2 B: battler slot being tested
+!BattleTgt_AreaEnd = !BattleTmp_90        ; 2 B: slot after the last one scanned
+!BattleTgt_RowCentre = !BattleTmp_88      ; 2 B: centre battler slot
+!BattleTgt_RowTop = !BattleTmp_85         ; 1 B: smallest y inside the band
+!BattleTgt_RowBottom = !BattleTmp_87      ; 1 B: largest y inside the band
 org $C12332
 BattleTgt_AreaRow:
-    LDA.w $9605                     ; centre battler
+    LDA.w !BattleTgt_AreaCentre
     TAX
-    STX $88                         ; $88/$89 = centre slot (16-bit)
+    STX.b !BattleTgt_RowCentre      ; (16-bit)
     SEC
-    LDA.w $1D23,X
-    SBC #$20                        ; low edge = y - $20
+    LDA.w !Battler_ScreenY,X
+    SBC.b #!BattleTgt_RowHalfHeight ; top edge
     BCS .lo_ok
     TDC                             ; clamp at 0
 .lo_ok:
-    STA $85
+    STA.b !BattleTgt_RowTop
     CLC
-    LDA.w $1D23,X
-    ADC #$20                        ; high edge = y + $20
+    LDA.w !Battler_ScreenY,X
+    ADC.b #!BattleTgt_RowHalfHeight ; bottom edge
     BCC .hi_ok
-    LDA #$FF                        ; clamp at $FF
+    LDA.b #!BattleTgt_ScreenMax     ; clamp at $FF
 .hi_ok:
-    STA $87
+    STA.b !BattleTgt_RowBottom
     JSR BattleTgt_ClearLists
-    LDX #$000B
-    STX $90                         ; end (exclusive) = 11
-    LDX #$0003
-    STX $8E                         ; start = 3 (enemies)
-    LDA.w $9604
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_AreaEnd        ; end (exclusive) = 11
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattleTgt_AreaSlot       ; start = 3 (enemies)
+    LDA.w !BattleTgt_AreaSide
     BEQ .scan
-    STX $90                         ; non-zero: end = 3 ...
+    STX.b !BattleTgt_AreaEnd        ; non-zero: end = 3 ...
     TDC
     TAX
-    STX $8E                         ; ... start = 0 (PCs)
+    STX.b !BattleTgt_AreaSlot       ; ... start = 0 (PCs)
 .scan:
     TDC
     TAY                             ; Y = append index
 .loop:
-    LDX $8E
-    CPX $88
+    LDX.b !BattleTgt_AreaSlot
+    CPX.b !BattleTgt_RowCentre
     BEQ .next                       ; skip the centre itself
-    LDA.w $96F5,X
+    LDA.w !Battler_Present,X
     BEQ .next                       ; not present
-    LDA.w $9FF7,X
+    LDA.w !Battler_Unk9FF7,X
     BMI .next                       ; flagged out
-    LDA.w $A0A8,X
+    LDA.w !Battler_KoFlag,X
     BNE .next                       ; KO'd (inferred)
-    LDA.w $A09B,X
+    LDA.w !Battler_Untargetable,X
     BNE .next                       ; hidden / untargetable
-    LDA.w $1D23,X
-    CMP $85
+    LDA.w !Battler_ScreenY,X
+    CMP.b !BattleTgt_RowTop
     BCC .next                       ; above the band
-    CMP $87
+    CMP.b !BattleTgt_RowBottom
     BEQ .hit
     BCS .next                       ; below the band
 .hit:
-    LDA $8E
-    STA.w $99C1,Y
+    LDA.b !BattleTgt_AreaSlot
+    STA.w !BattleTgt_Candidates+1,Y
     INY
 .next:
-    INC $8E
-    LDA $8E
-    CMP $90
+    INC.b !BattleTgt_AreaSlot
+    LDA.b !BattleTgt_AreaSlot
+    CMP.b !BattleTgt_AreaEnd
     BNE .loop
-    LDA $88
-    STA.w $99C0                     ; centre always heads the list
+    LDA.b !BattleTgt_RowCentre
+    STA.w !BattleTgt_Candidates     ; centre always heads the list
     RTS
 
 ; ==================================================================
 ; BattleTgt_AreaPartyTriangle ($C123A4–$C125A2, 511 bytes)
 ; ==================================================================
 ; Enemies inside the triangle whose corners are the screen positions of
-; party slots 0, 1 and 2 ($1D0C/$1D23 for X = 0-2). The slots are read
+; party slots 0, 1 and 2 (!Battler_ScreenX/Y for slots 0-2). The slots are read
 ; unconditionally, so all three PCs are assumed present (by context:
 ; this backs mode $18 and area types 3/5, presumably triple techs).
 ;
-; 1. Copy the corners to P0 ($80,$81), P1 ($82,$83), P2 ($84,$85).
+; 1. Copy the corners to P0, P1, P2 (!BattleTgt_P0X/Y .. P2X/Y).
 ; 2. Three compare-and-swap passes order them by x: P2 = leftmost,
 ;    P1 = rightmost, P0 = middle. Then fix the winding: if P2 and P0
 ;    share an x, or P0 and P1 do, the pair is ordered by y; otherwise
@@ -3971,296 +3977,313 @@ BattleTgt_AreaRow:
 ;    (inferred purpose: a consistent vertex winding so each corner's
 ;    interior angle runs "from" one edge "to" the other).
 ; 3. Calc_Delta16 gives the direction angle of each edge as seen from
-;    each corner: P0 -> [$86,$87], P1 -> [$88,$89], P2 -> [$8A,$8B].
-;    $92/$93/$94 flag corners whose range wraps past angle 0.
+;    each corner: P0 -> [P0ArcFrom, P0ArcTo], P1 -> [P1ArcFrom, P1ArcTo],
+;    P2 -> [P2ArcFrom, P2ArcTo]. P0Wraps/P1Wraps/P2Wraps flag corners
+;    whose range wraps past angle 0.
 ; 4. For each enemy slot 3-10 that is eligible, the angle from every
 ;    corner to the enemy must fall inside that corner's range (with
 ;    wrap handled as an OR instead of an AND). Inside all three wedges
 ;    = inside the triangle.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to BattleTgt_CompactCandidates (the scan only
-;        appends from $99C1, so the $FF front slot is always closed up)
+;        appends from entry 1, so the $FF front entry is always closed up)
 ; Callees: Calc_Delta16, BattleTgt_ClearLists, BattleTgt_CompactCandidates
-; Note: $9604 is ignored here; the scan is always over the enemies.
+; Note: !BattleTgt_AreaSide is ignored here; the scan is always over the enemies.
+; Direct-page roles:
+!BattleTgt_P0X = !BattleTmp_80            ; 1 B: corner P0 screen x
+!BattleTgt_P0Y = !BattleTmp_81            ; 1 B: corner P0 screen y
+!BattleTgt_P1X = !BattleTmp_82            ; 1 B: corner P1 screen x
+!BattleTgt_P1Y = !BattleTmp_83            ; 1 B: corner P1 screen y
+!BattleTgt_P2X = !BattleTmp_84            ; 1 B: corner P2 screen x
+!BattleTgt_P2Y = !BattleTmp_85            ; 1 B: corner P2 screen y
+!BattleTgt_P0ArcFrom = !BattleTmp_86      ; 1 B: P0's accepted angles start (angle to P1)
+!BattleTgt_P0ArcTo = !BattleTmp_87        ; 1 B: ... end (angle to P2)
+!BattleTgt_P1ArcFrom = !BattleTmp_88      ; 1 B: P1's range start (angle to P2)
+!BattleTgt_P1ArcTo = !BattleTmp_89        ; 1 B: ... end (angle to P0)
+!BattleTgt_P2ArcFrom = !BattleTmp_8A      ; 1 B: P2's range start (angle to P0)
+!BattleTgt_P2ArcTo = !BattleTmp_8B        ; 1 B: ... end (angle to P1)
+!BattleTgt_P0Wraps = !BattleTmp_92        ; 1 B: non-zero = P0's range wraps past angle 0
+!BattleTgt_P1Wraps = !BattleTmp_93        ; 1 B: same for P1
+!BattleTgt_P2Wraps = !BattleTmp_94        ; 1 B: same for P2
 org $C123A4
 BattleTgt_AreaPartyTriangle:
     TDC
     TAX
-    STX $92                         ; clear wrap flags $92/$93
-    STX $94                         ; and $94
-    LDA.w $1D0C                     ; P0 = PC slot 0
-    STA $80
-    LDA.w $1D23
-    STA $81
-    LDA.w $1D0D                     ; P1 = PC slot 1
-    STA $82
-    LDA.w $1D24
-    STA $83
-    LDA.w $1D0E                     ; P2 = PC slot 2
-    STA $84
-    LDA.w $1D25
-    STA $85
+    STX.b !BattleTgt_P0Wraps        ; clear P0Wraps and P1Wraps (16-bit)
+    STX.b !BattleTgt_P2Wraps        ; and P2Wraps
+    LDA.w !Battler_ScreenX          ; P0 = PC slot 0
+    STA.b !BattleTgt_P0X
+    LDA.w !Battler_ScreenY
+    STA.b !BattleTgt_P0Y
+    LDA.w !Battler_ScreenX+1        ; P1 = PC slot 1
+    STA.b !BattleTgt_P1X
+    LDA.w !Battler_ScreenY+1
+    STA.b !BattleTgt_P1Y
+    LDA.w !Battler_ScreenX+2        ; P2 = PC slot 2
+    STA.b !BattleTgt_P2X
+    LDA.w !Battler_ScreenY+2
+    STA.b !BattleTgt_P2Y
     ; --- sort by x ---
-    LDA $84
-    CMP $80
+    LDA.b !BattleTgt_P2X
+    CMP.b !BattleTgt_P0X
     BCC .sort2                      ; x2 < x0: keep
     PHA                             ; swap P0 <-> P2
-    LDA $80
-    STA $84
+    LDA.b !BattleTgt_P0X
+    STA.b !BattleTgt_P2X
     PLA
-    STA $80
-    LDA $85
+    STA.b !BattleTgt_P0X
+    LDA.b !BattleTgt_P2Y
     PHA
-    LDA $81
-    STA $85
+    LDA.b !BattleTgt_P0Y
+    STA.b !BattleTgt_P2Y
     PLA
-    STA $81
+    STA.b !BattleTgt_P0Y
 .sort2:
-    LDA $84
-    CMP $82
+    LDA.b !BattleTgt_P2X
+    CMP.b !BattleTgt_P1X
     BCC .sort3                      ; x2 < x1: keep
     PHA                             ; swap P1 <-> P2
-    LDA $82
-    STA $84
+    LDA.b !BattleTgt_P1X
+    STA.b !BattleTgt_P2X
     PLA
-    STA $82
-    LDA $85
+    STA.b !BattleTgt_P1X
+    LDA.b !BattleTgt_P2Y
     PHA
-    LDA $83
-    STA $85
+    LDA.b !BattleTgt_P1Y
+    STA.b !BattleTgt_P2Y
     PLA
-    STA $83
+    STA.b !BattleTgt_P1Y
 .sort3:
-    LDA $80
-    CMP $82
+    LDA.b !BattleTgt_P0X
+    CMP.b !BattleTgt_P1X
     BCC .winding                    ; x0 < x1: keep
     PHA                             ; swap P0 <-> P1
-    LDA $82
-    STA $80
+    LDA.b !BattleTgt_P1X
+    STA.b !BattleTgt_P0X
     PLA
-    STA $82
-    LDA $81
+    STA.b !BattleTgt_P1X
+    LDA.b !BattleTgt_P0Y
     PHA
-    LDA $83
-    STA $81
+    LDA.b !BattleTgt_P1Y
+    STA.b !BattleTgt_P0Y
     PLA
-    STA $83
+    STA.b !BattleTgt_P1Y
     ; --- winding / tie-break ---
 .winding:
-    LDA $84
-    CMP $80
+    LDA.b !BattleTgt_P2X
+    CMP.b !BattleTgt_P0X
     BNE .tie01                      ; x2 != x0
-    LDA $85
-    CMP $81
+    LDA.b !BattleTgt_P2Y
+    CMP.b !BattleTgt_P0Y
     BCS .edges                      ; y2 >= y0: keep
     PHA                             ; swap P0 <-> P2
-    LDA $81
-    STA $85
+    LDA.b !BattleTgt_P0Y
+    STA.b !BattleTgt_P2Y
     PLA
-    STA $81
-    LDA $84
+    STA.b !BattleTgt_P0Y
+    LDA.b !BattleTgt_P2X
     PHA
-    LDA $80
-    STA $84
+    LDA.b !BattleTgt_P0X
+    STA.b !BattleTgt_P2X
     PLA
-    STA $80
+    STA.b !BattleTgt_P0X
     BRA .edges
 .tie01:
-    LDA $80
-    CMP $82
+    LDA.b !BattleTgt_P0X
+    CMP.b !BattleTgt_P1X
     BNE .by_y                       ; x0 != x1
-    LDA $83
-    CMP $81
+    LDA.b !BattleTgt_P1Y
+    CMP.b !BattleTgt_P0Y
     BCS .edges                      ; y1 >= y0: keep
     PHA                             ; swap P0 <-> P1
-    LDA $81
-    STA $83
+    LDA.b !BattleTgt_P0Y
+    STA.b !BattleTgt_P1Y
     PLA
-    STA $81
-    LDA $82
+    STA.b !BattleTgt_P0Y
+    LDA.b !BattleTgt_P1X
     PHA
-    LDA $80
-    STA $82
+    LDA.b !BattleTgt_P0X
+    STA.b !BattleTgt_P1X
     PLA
-    STA $80
+    STA.b !BattleTgt_P0X
     BRA .edges
 .by_y:
-    LDA $81
-    CMP $83
+    LDA.b !BattleTgt_P0Y
+    CMP.b !BattleTgt_P1Y
     BEQ .cmp_y2
     BCS .swap12                     ; y0 > y1
 .cmp_y2:
-    LDA $81
-    CMP $85
+    LDA.b !BattleTgt_P0Y
+    CMP.b !BattleTgt_P2Y
     BEQ .edges
     BCC .edges                      ; y0 <= y2: keep
 .swap12:
-    LDA $84                         ; swap P1 <-> P2
+    LDA.b !BattleTgt_P2X            ; swap P1 <-> P2
     PHA
-    LDA $82
-    STA $84
+    LDA.b !BattleTgt_P1X
+    STA.b !BattleTgt_P2X
     PLA
-    STA $82
-    LDA $85
+    STA.b !BattleTgt_P1X
+    LDA.b !BattleTgt_P2Y
     PHA
-    LDA $83
-    STA $85
+    LDA.b !BattleTgt_P1Y
+    STA.b !BattleTgt_P2Y
     PLA
-    STA $83
+    STA.b !BattleTgt_P1Y
     ; --- per-corner edge angles ---
 .edges:
-    LDA $80
-    STA $D3
-    LDA $81
-    STA $D4
-    LDA $82
-    STA $D5
-    LDA $83
-    STA $D6
+    LDA.b !BattleTgt_P0X
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P0Y
+    STA.b !Battle_GeoOriginY
+    LDA.b !BattleTgt_P1X
+    STA.b !Battle_GeoPointX
+    LDA.b !BattleTgt_P1Y
+    STA.b !Battle_GeoPointY
     JSR Calc_Delta16                ; P0 vs P1
-    STA $86
-    LDA $84
-    STA $D5
-    LDA $85
-    STA $D6
+    STA.b !BattleTgt_P0ArcFrom
+    LDA.b !BattleTgt_P2X
+    STA.b !Battle_GeoPointX
+    LDA.b !BattleTgt_P2Y
+    STA.b !Battle_GeoPointY
     JSR Calc_Delta16                ; P0 vs P2
-    STA $87
-    LDA $82
-    STA $D3
-    LDA $83
-    STA $D4
+    STA.b !BattleTgt_P0ArcTo
+    LDA.b !BattleTgt_P1X
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P1Y
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16                ; P1 vs P2
-    STA $88
-    LDA $80
-    STA $D5
-    LDA $81
-    STA $D6
+    STA.b !BattleTgt_P1ArcFrom
+    LDA.b !BattleTgt_P0X
+    STA.b !Battle_GeoPointX
+    LDA.b !BattleTgt_P0Y
+    STA.b !Battle_GeoPointY
     JSR Calc_Delta16                ; P1 vs P0
-    STA $89
-    LDA $84
-    STA $D3
-    LDA $85
-    STA $D4
+    STA.b !BattleTgt_P1ArcTo
+    LDA.b !BattleTgt_P2X
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P2Y
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16                ; P2 vs P0
-    STA $8A
-    LDA $82
-    STA $D5
-    LDA $83
-    STA $D6
+    STA.b !BattleTgt_P2ArcFrom
+    LDA.b !BattleTgt_P1X
+    STA.b !Battle_GeoPointX
+    LDA.b !BattleTgt_P1Y
+    STA.b !Battle_GeoPointY
     JSR Calc_Delta16                ; P2 vs P1
-    STA $8B
-    LDA $87
-    CMP $86
+    STA.b !BattleTgt_P2ArcTo
+    LDA.b !BattleTgt_P0ArcTo
+    CMP.b !BattleTgt_P0ArcFrom
     BCS .wrap1
-    INC $92                         ; P0 range wraps
+    INC.b !BattleTgt_P0Wraps        ; P0 range wraps
 .wrap1:
-    LDA $89
-    CMP $88
+    LDA.b !BattleTgt_P1ArcTo
+    CMP.b !BattleTgt_P1ArcFrom
     BCS .wrap2
-    INC $93                         ; P1 range wraps
+    INC.b !BattleTgt_P1Wraps        ; P1 range wraps
 .wrap2:
-    LDA $8B
-    CMP $8A
+    LDA.b !BattleTgt_P2ArcTo
+    CMP.b !BattleTgt_P2ArcFrom
     BCS .scan_init
-    INC $94                         ; P2 range wraps
+    INC.b !BattleTgt_P2Wraps        ; P2 range wraps
 .scan_init:
     JSR BattleTgt_ClearLists
-    LDX #$000B
-    STX $90                         ; end (exclusive) = 11
-    LDX #$0003
-    STX $8E                         ; start = 3 (enemies only)
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_AreaEnd        ; end (exclusive) = 11
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattleTgt_AreaSlot       ; start = 3 (enemies only)
     TDC
     TAY                             ; Y = append index
 .loop:
-    LDX $8E
-    LDA.w $96F5,X
+    LDX.b !BattleTgt_AreaSlot
+    LDA.w !Battler_Present,X
     BEQ .skip                       ; not present
-    LDA.w $9FF7,X
+    LDA.w !Battler_Unk9FF7,X
     BMI .skip                       ; flagged out
-    LDA.w $A0A8,X
+    LDA.w !Battler_KoFlag,X
     BNE .skip                       ; KO'd (inferred)
-    LDA.w $A09B,X
+    LDA.w !Battler_Untargetable,X
     BEQ .test                       ; visible -> test it
 .skip:
     JMP .next                       ; (too far for a branch)
 .test:
-    LDA.w $1D0C,X                   ; D5/D6 = candidate
-    STA $D5
-    LDA.w $1D23,X
-    STA $D6
-    LDA $80                         ; seen from P0
-    STA $D3
-    LDA $81
-    STA $D4
+    LDA.w !Battler_ScreenX,X        ; GeoPoint = candidate
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    LDA.b !BattleTgt_P0X            ; seen from P0
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P0Y
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16
-    LDA $92
+    LDA.b !BattleTgt_P0Wraps
     BNE .p0_wrap
-    LDA $DB
-    CMP $86
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P0ArcFrom
     BCC .next                       ; below range
-    LDA $87
-    CMP $DB
+    LDA.b !BattleTgt_P0ArcTo
+    CMP.b !Battle_GeoAngle
     BCC .next                       ; above range
     BRA .p1
 .p0_wrap:
-    LDA $87
-    CMP $DB
+    LDA.b !BattleTgt_P0ArcTo
+    CMP.b !Battle_GeoAngle
     BCS .p1                         ; <= upper: in
-    LDA $DB
-    CMP $86
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P0ArcFrom
     BCC .next                       ; neither side
 .p1:
-    LDA $82                         ; seen from P1
-    STA $D3
-    LDA $83
-    STA $D4
+    LDA.b !BattleTgt_P1X            ; seen from P1
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P1Y
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16
-    LDA $93
+    LDA.b !BattleTgt_P1Wraps
     BNE .p1_wrap
-    LDA $DB
-    CMP $88
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P1ArcFrom
     BCC .next
-    LDA $89
-    CMP $DB
+    LDA.b !BattleTgt_P1ArcTo
+    CMP.b !Battle_GeoAngle
     BCC .next
     BRA .p2
 .p1_wrap:
-    LDA $89
-    CMP $DB
+    LDA.b !BattleTgt_P1ArcTo
+    CMP.b !Battle_GeoAngle
     BCS .p2
-    LDA $DB
-    CMP $88
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P1ArcFrom
     BCC .next
 .p2:
-    LDA $84                         ; seen from P2
-    STA $D3
-    LDA $85
-    STA $D4
+    LDA.b !BattleTgt_P2X            ; seen from P2
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_P2Y
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16
-    LDA $94
+    LDA.b !BattleTgt_P2Wraps
     BNE .p2_wrap
-    LDA $DB
-    CMP $8A
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P2ArcFrom
     BCC .next
-    LDA $8B
-    CMP $DB
+    LDA.b !BattleTgt_P2ArcTo
+    CMP.b !Battle_GeoAngle
     BCC .next
     BRA .hit
 .p2_wrap:
-    LDA $8B
-    CMP $DB
+    LDA.b !BattleTgt_P2ArcTo
+    CMP.b !Battle_GeoAngle
     BCS .hit
-    LDA $DB
-    CMP $8A
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_P2ArcFrom
     BCC .next
 .hit:
-    LDA $8E
-    STA.w $99C1,Y                   ; inside the triangle
+    LDA.b !BattleTgt_AreaSlot
+    STA.w !BattleTgt_Candidates+1,Y ; inside the triangle
     INY
 .next:
-    INC $8E
-    LDA $8E
-    CMP $90
+    INC.b !BattleTgt_AreaSlot
+    LDA.b !BattleTgt_AreaSlot
+    CMP.b !BattleTgt_AreaEnd
     BEQ .done
     JMP .loop
 .done:
@@ -4269,213 +4292,227 @@ BattleTgt_AreaPartyTriangle:
 ; ==================================================================
 ; BattleTgt_AreaLine ($C125A3–$C12700, 350 bytes)
 ; ==================================================================
-; "Line" area from the source battler ($9605) towards the aimed-at
-; battler ($9606), half-width r = $9607 * 8 (scale passed to
-; Battle_SinLookup via $AE; $9607 = $02 from every caller seen).
+; "Line" area from the source battler (!BattleTgt_AreaCentre) towards the
+; aimed-at battler (!BattleTgt_AreaAim), half-width r = AreaSize * 8
+; (passed to Battle_SinLookup as !Battle_SinScale; AreaSize = 2 from
+; every caller seen).
 ;
-; θ = Calc_Delta16 angle between source (D3/D4) and target (D5/D6).
+; θ = Calc_Delta16 angle between source (GeoOrigin) and target (GeoPoint).
 ; Two corner points are offset sideways from the line using
 ; Battle_SinLookup at θ, θ+$C0, θ+$80, θ+$40 (256 units per turn):
-;   PA ($80,$81) = source + r*(sin θ, sin(θ+$C0))
-;   PB ($82,$83) = variant 0: source + r*(sin(θ+$80), sin(θ+$40))
+;   PA (PaX,PaY) = source + r*(sin θ, sin(θ+$C0))
+;   PB (PbX,PbY) = variant 0: source + r*(sin(θ+$80), sin(θ+$40))
 ;                  variant 1: target + the same offset
 ; Each corner gets a 90-degree wedge of accepted angles:
-;   PA: [θ, θ+$40]                          ($84,$86; wrap flag $8C)
-;   PB: variant 0 [θ+$C0, θ], variant 1 [θ+$80, θ+$C0] ($88,$8A; $8D)
+;   PA: [θ, θ+$40]                          (PaArcFrom/To; PaWraps)
+;   PB: variant 0 [θ+$C0, θ], variant 1 [θ+$80, θ+$C0] (PbArcFrom/To; PbWraps)
 ; A battler is hit when its angle from both corners falls inside both
 ; wedges, i.e. it lies in the strip between the two offset edges
-; (inferred geometry; variant 1, $9608 != 0, moves PB to the target
-; end, presumably closing the strip into a box between the two).
+; (inferred geometry; variant 1, AreaVariant != 0, moves PB to the
+; target end, presumably closing the strip into a box between the two).
 ;
-; The aimed-at battler ($9606, kept in $92) is skipped by the scan and
-; re-added by the shared tail BattleTgt_AreaAddAnchor if it is on the
-; scanned side. Scanned side follows $9604 as in BattleTgt_AreaRow.
-; Entry: M=1, X=0, DB=$7E; $9604-$9608 as above
+; The aimed-at battler (kept in !BattleTgt_Anchor) is skipped by the
+; scan and re-added by the shared tail BattleTgt_AreaAddAnchor if it is
+; on the scanned side. Scanned side follows !BattleTgt_AreaSide as in
+; BattleTgt_AreaRow.
+; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide..AreaVariant as above
 ; Exit:  M=1; via BattleTgt_AreaAddAnchor -> CompactCandidates
 ; Callees: Calc_Delta16, Battle_SinLookup, BattleTgt_ClearLists
+; Direct-page roles (!BattleTgt_Anchor shared with AreaCircle / AreaAddAnchor):
+!BattleTgt_PaX = !BattleTmp_80            ; 1 B: r*sin(a), then corner PA screen x
+!BattleTgt_PaY = !BattleTmp_81            ; 1 B: r*sin(a+$C0), then corner PA screen y
+!BattleTgt_PbX = !BattleTmp_82            ; 1 B: r*sin(a+$80), then corner PB screen x
+!BattleTgt_PbY = !BattleTmp_83            ; 1 B: r*sin(a+$40), then corner PB screen y
+!BattleTgt_PaArcFrom = !BattleTmp_84      ; 1 B: PA's accepted angles start
+!BattleTgt_PaArcTo = !BattleTmp_86        ; 1 B: ... end
+!BattleTgt_PbArcFrom = !BattleTmp_88      ; 1 B: PB's accepted angles start
+!BattleTgt_PbArcTo = !BattleTmp_8A        ; 1 B: ... end
+!BattleTgt_PaWraps = !BattleTmp_8C        ; 1 B: non-zero = PA's range wraps past angle 0
+!BattleTgt_PbWraps = !BattleTmp_8D        ; 1 B: same for PB
+!BattleTgt_Anchor = !BattleTmp_92         ; 2 B: battler skipped by the scan and re-added by AreaAddAnchor
 org $C125A3
 BattleTgt_AreaLine:
-    LDA.w $9607
+    LDA.w !BattleTgt_AreaSize
     ASL
     ASL
     ASL
-    STA $AE                         ; radius scale = size * 8
-    LDA.w $9605
+    STA.b !Battle_SinScale          ; radius scale = size * 8
+    LDA.w !BattleTgt_AreaCentre
     TAX                             ; X = source
-    LDA.w $9606
+    LDA.w !BattleTgt_AreaAim
     TAY                             ; Y = aimed-at
-    LDA.w $1D0C,X
-    STA $D3
-    LDA.w $1D23,X
-    STA $D4
-    LDA.w $1D0C,Y
-    STA $D5
-    LDA.w $1D23,Y
-    STA $D6
-    JSR Calc_Delta16                ; A = $DB = θ
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoPointY
+    JSR Calc_Delta16                ; A = GeoAngle = θ
     JSR Battle_SinLookup
-    STA $80                         ; r*sin θ
+    STA.b !BattleTgt_PaX            ; r*sin θ
     CLC
-    LDA $DB
-    ADC #$C0
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleThreeQuarter
     JSR Battle_SinLookup
-    STA $81                         ; r*sin(θ+$C0)
+    STA.b !BattleTgt_PaY            ; r*sin(θ+$C0)
     CLC
-    LDA $DB
-    ADC #$80
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleHalfTurn
     JSR Battle_SinLookup
-    STA $82                         ; r*sin(θ+$80)
+    STA.b !BattleTgt_PbX            ; r*sin(θ+$80)
     CLC
-    LDA $DB
-    ADC #$40
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
     JSR Battle_SinLookup
-    STA $83                         ; r*sin(θ+$40)
+    STA.b !BattleTgt_PbY            ; r*sin(θ+$40)
     CLC
-    LDA $D3
-    ADC $80
-    STA $80                         ; PA = source + offset
+    LDA.b !Battle_GeoOriginX
+    ADC.b !BattleTgt_PaX
+    STA.b !BattleTgt_PaX            ; PA = source + offset
     CLC
-    LDA $D4
-    ADC $81
-    STA $81
-    LDA $DB
-    STA $84                         ; PA wedge low = θ
+    LDA.b !Battle_GeoOriginY
+    ADC.b !BattleTgt_PaY
+    STA.b !BattleTgt_PaY
+    LDA.b !Battle_GeoAngle
+    STA.b !BattleTgt_PaArcFrom      ; PA wedge low = θ
     CLC
-    LDA $DB
-    ADC #$40
-    STA $86                         ; PA wedge high = θ+$40
-    LDA.w $9608
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    STA.b !BattleTgt_PaArcTo        ; PA wedge high = θ+$40
+    LDA.w !BattleTgt_AreaVariant
     BNE .variant1
     CLC
-    LDA $D3
-    ADC $82
-    STA $82                         ; PB = source + opposite offset
+    LDA.b !Battle_GeoOriginX
+    ADC.b !BattleTgt_PbX
+    STA.b !BattleTgt_PbX            ; PB = source + opposite offset
     CLC
-    LDA $D4
-    ADC $83
-    STA $83
+    LDA.b !Battle_GeoOriginY
+    ADC.b !BattleTgt_PbY
+    STA.b !BattleTgt_PbY
     CLC
-    LDA $DB
-    ADC #$C0
-    STA $88                         ; PB wedge low = θ+$C0
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleThreeQuarter
+    STA.b !BattleTgt_PbArcFrom      ; PB wedge low = θ+$C0
     CLC                             ; (unneeded: no add follows)
-    LDA $DB
-    STA $8A                         ; PB wedge high = θ
+    LDA.b !Battle_GeoAngle
+    STA.b !BattleTgt_PbArcTo        ; PB wedge high = θ
     BRA .wrap_flags
 .variant1:
     CLC
-    LDA $D5
-    ADC $82
-    STA $82                         ; PB = target + opposite offset
+    LDA.b !Battle_GeoPointX
+    ADC.b !BattleTgt_PbX
+    STA.b !BattleTgt_PbX            ; PB = target + opposite offset
     CLC
-    LDA $D6
-    ADC $83
-    STA $83
+    LDA.b !Battle_GeoPointY
+    ADC.b !BattleTgt_PbY
+    STA.b !BattleTgt_PbY
     CLC
-    LDA $DB
-    ADC #$80
-    STA $88                         ; PB wedge low = θ+$80
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleHalfTurn
+    STA.b !BattleTgt_PbArcFrom      ; PB wedge low = θ+$80
     CLC
-    LDA $DB
-    ADC #$C0
-    STA $8A                         ; PB wedge high = θ+$C0
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleThreeQuarter
+    STA.b !BattleTgt_PbArcTo        ; PB wedge high = θ+$C0
 .wrap_flags:
-    STZ $8C
-    STZ $8D
-    LDA $84
-    CMP #$C0
+    STZ.b !BattleTgt_PaWraps
+    STZ.b !BattleTgt_PbWraps
+    LDA.b !BattleTgt_PaArcFrom
+    CMP.b #!Battle_AngleThreeQuarter
     BCC .wrap_b
-    INC $8C                         ; PA wedge wraps past 0
+    INC.b !BattleTgt_PaWraps        ; PA wedge wraps past 0
 .wrap_b:
-    LDA $88
-    CMP #$C0
+    LDA.b !BattleTgt_PbArcFrom
+    CMP.b #!Battle_AngleThreeQuarter
     BCC .scan_init
-    INC $8D                         ; PB wedge wraps past 0
+    INC.b !BattleTgt_PbWraps        ; PB wedge wraps past 0
 .scan_init:
     JSR BattleTgt_ClearLists
-    LDX #$000B
-    STX $90                         ; end (exclusive) = 11
-    LDX #$0003
-    STX $8E                         ; start = 3 (enemies)
-    LDA.w $9604
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_AreaEnd        ; end (exclusive) = 11
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattleTgt_AreaSlot       ; start = 3 (enemies)
+    LDA.w !BattleTgt_AreaSide
     BEQ .anchor
-    STX $90                         ; non-zero: PCs 0-2
+    STX.b !BattleTgt_AreaEnd        ; non-zero: PCs 0-2
     TDC
     TAX
-    STX $8E
+    STX.b !BattleTgt_AreaSlot
 .anchor:
-    LDA.w $9606
+    LDA.w !BattleTgt_AreaAim
     TAX
-    STX $92                         ; anchor = aimed-at battler
+    STX.b !BattleTgt_Anchor         ; anchor = aimed-at battler
     TDC
     TAY                             ; Y = append index
 .loop:
-    LDX $8E
-    LDA.w $96F5,X
+    LDX.b !BattleTgt_AreaSlot
+    LDA.w !Battler_Present,X
     BEQ .next                       ; not present
-    LDA.w $9FF7,X
+    LDA.w !Battler_Unk9FF7,X
     BMI .next                       ; flagged out
-    LDA.w $A0A8,X
+    LDA.w !Battler_KoFlag,X
     BNE .next                       ; KO'd (inferred)
-    LDA.w $A09B,X
+    LDA.w !Battler_Untargetable,X
     BNE .next                       ; hidden / untargetable
-    CPX $92
+    CPX.b !BattleTgt_Anchor
     BEQ .next                       ; anchor: added by the tail
-    LDA.w $1D0C,X                   ; D5/D6 = candidate
-    STA $D5
-    LDA.w $1D23,X
-    STA $D6
-    LDA $80                         ; seen from PA
-    STA $D3
-    LDA $81
-    STA $D4
+    LDA.w !Battler_ScreenX,X        ; GeoPoint = candidate
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    LDA.b !BattleTgt_PaX            ; seen from PA
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_PaY
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16
-    LDA $8C
+    LDA.b !BattleTgt_PaWraps
     BNE .a_wrap
-    LDA $DB
-    CMP $84
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_PaArcFrom
     BCC .next
-    LDA $86
-    CMP $DB
+    LDA.b !BattleTgt_PaArcTo
+    CMP.b !Battle_GeoAngle
     BCC .next
     BRA .corner_b
 .a_wrap:
-    LDA $86
-    CMP $DB
+    LDA.b !BattleTgt_PaArcTo
+    CMP.b !Battle_GeoAngle
     BCS .corner_b
-    LDA $DB
-    CMP $84
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_PaArcFrom
     BCC .next
 .corner_b:
-    LDA $82                         ; seen from PB
-    STA $D3
-    LDA $83
-    STA $D4
+    LDA.b !BattleTgt_PbX            ; seen from PB
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTgt_PbY
+    STA.b !Battle_GeoOriginY
     JSR Calc_Delta16
-    LDA $8D
+    LDA.b !BattleTgt_PbWraps
     BNE .b_wrap
-    LDA $DB
-    CMP $88
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_PbArcFrom
     BCC .next
-    LDA $8A
-    CMP $DB
+    LDA.b !BattleTgt_PbArcTo
+    CMP.b !Battle_GeoAngle
     BCC .next
     BRA .hit
 .b_wrap:
-    LDA $8A
-    CMP $DB
+    LDA.b !BattleTgt_PbArcTo
+    CMP.b !Battle_GeoAngle
     BCS .hit
-    LDA $DB
-    CMP $88
+    LDA.b !Battle_GeoAngle
+    CMP.b !BattleTgt_PbArcFrom
     BCC .next
 .hit:
-    LDA $8E
-    STA.w $99C1,Y                   ; inside the line
+    LDA.b !BattleTgt_AreaSlot
+    STA.w !BattleTgt_Candidates+1,Y ; inside the line
     INY
 .next:
-    INC $8E
-    LDA $8E
-    CMP $90
+    INC.b !BattleTgt_AreaSlot
+    LDA.b !BattleTgt_AreaSlot
+    CMP.b !BattleTgt_AreaEnd
     BEQ .done
     JMP .loop
 .done:
@@ -4484,134 +4521,139 @@ BattleTgt_AreaLine:
 ; ==================================================================
 ; BattleTgt_AreaCircle ($C12701–$C127C4, 196 bytes)
 ; ==================================================================
-; "Circle" area around the centre battler ($9605). Positions are
-; reduced to 16-pixel cells (Battle_ShiftRight4) and a battler is hit
-; when dx^2 + dy^2 <= $9607, using the 16-entry squares table at
-; $CC:FB6F (0, 1, 4, 9, ... $E1). The sizes callers pass, $09/$10/$19,
+; "Circle" area around the centre battler (!BattleTgt_AreaCentre).
+; Positions are reduced to 16-pixel cells (Battle_ShiftRight4) and a
+; battler is hit when dx^2 + dy^2 <= !BattleTgt_AreaSize, using the
+; 16-entry !BattleRom_Squares (0, 1, 4, 9, ... $E1). The sizes callers pass, $09/$10/$19,
 ; are 3^2/4^2/5^2, i.e. radii of 3, 4 and 5 cells. The 8-bit ADC of
 ; the two squares can wrap (e.g. 15^2 + 7^2 = $112 -> $12) and admit a
 ; very distant battler; reproduced as found, and probably unreachable
 ; given on-screen distances.
 ;
-; The 16-bit centre cells ($80/$81, $82/$83) are stored with STY after
+; The 16-bit centre cells (CentreCellX/Y) are stored with STY after
 ; TAY, so their high bytes are whatever the B accumulator held; the
 ; M=0 subtraction later assumes those are 0 (callers reach here with
 ; B clear — inferred, not proven).
 ;
 ; The centre is skipped in the scan and re-added by the tail below,
 ; BattleTgt_AreaAddAnchor (also the tail of BattleTgt_AreaLine): with
-; $9604 = 0 the anchor ($92) goes to $99C0 only if it is an enemy
-; (slot >= 3), with $9604 != 0 only if it is a PC — i.e. only if it
-; belongs to the side that was scanned. Otherwise falls through into
-; BattleTgt_CompactCandidates (which also runs after the anchor is
-; placed, as a no-op since $99C0 is then filled).
-; Entry: M=1, X=0, DB=$7E; $9604 side, $9605 centre, $9607 radius^2
+; AreaSide = 0 the anchor (!BattleTgt_Anchor) heads the candidate list
+; only if it is an enemy (slot >= 3), with AreaSide != 0 only if it is a
+; PC — i.e. only if it belongs to the side that was scanned. Otherwise
+; falls through into BattleTgt_CompactCandidates (which also runs after
+; the anchor is placed, as a no-op since the front entry is then filled).
+; Entry: M=1, X=0, DB=$7E; !BattleTgt_AreaSide, AreaCentre, AreaSize = radius^2
 ; Exit:  M=1; falls through into BattleTgt_CompactCandidates
 ; Callees: Battle_ShiftRight4, BattleTgt_ClearLists
+; Direct-page roles:
+!BattleTgt_CentreCellX = !BattleTmp_80    ; 2 B: centre x / 16 (high byte = whatever B held)
+!BattleTgt_CentreCellY = !BattleTmp_82    ; 2 B: centre y / 16 (same caveat)
+!BattleTgt_CellDX = !BattleTmp_84         ; 2 B: candidate x / 16, then |dx|, then dx*dx
+!BattleTgt_CellDY = !BattleTmp_86         ; 2 B: candidate y / 16, then |dy|
 org $C12701
 BattleTgt_AreaCircle:
-    LDA.w $9605
+    LDA.w !BattleTgt_AreaCentre
     TAX                             ; X = centre
-    LDA.w $1D0C,X
+    LDA.w !Battler_ScreenX,X
     JSR Battle_ShiftRight4          ; x / 16
     TAY
-    STY $80                         ; centre cell x (16-bit)
-    LDA.w $1D23,X
+    STY.b !BattleTgt_CentreCellX    ; centre cell x (16-bit)
+    LDA.w !Battler_ScreenY,X
     JSR Battle_ShiftRight4          ; y / 16
     TAY
-    STY $82                         ; centre cell y (16-bit)
+    STY.b !BattleTgt_CentreCellY    ; centre cell y (16-bit)
     JSR BattleTgt_ClearLists
-    LDX #$000B
-    STX $90                         ; end (exclusive) = 11
-    LDX #$0003
-    STX $8E                         ; start = 3 (enemies)
-    LDA.w $9604
+    LDX.w #!Battle_NumSlots
+    STX.b !BattleTgt_AreaEnd        ; end (exclusive) = 11
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattleTgt_AreaSlot       ; start = 3 (enemies)
+    LDA.w !BattleTgt_AreaSide
     BEQ .anchor
-    STX $90                         ; non-zero: PCs 0-2
+    STX.b !BattleTgt_AreaEnd        ; non-zero: PCs 0-2
     TDC
     TAX
-    STX $8E
+    STX.b !BattleTgt_AreaSlot
 .anchor:
-    LDA.w $9605
+    LDA.w !BattleTgt_AreaCentre
     TAX
-    STX $92                         ; anchor = centre battler
+    STX.b !BattleTgt_Anchor         ; anchor = centre battler
     TDC
     TAY                             ; Y = append index
 .loop:
-    LDX $8E
-    LDA.w $96F5,X
+    LDX.b !BattleTgt_AreaSlot
+    LDA.w !Battler_Present,X
     BEQ .next                       ; not present
-    LDA.w $9FF7,X
+    LDA.w !Battler_Unk9FF7,X
     BMI .next                       ; flagged out
-    LDA.w $A0A8,X
+    LDA.w !Battler_KoFlag,X
     BNE .next                       ; KO'd (inferred)
-    LDA.w $A09B,X
+    LDA.w !Battler_Untargetable,X
     BNE .next                       ; hidden / untargetable
-    CPX $92
+    CPX.b !BattleTgt_Anchor
     BEQ .next                       ; anchor: added by the tail
-    LDA.w $1D0C,X
+    LDA.w !Battler_ScreenX,X
     JSR Battle_ShiftRight4
-    STA $84
-    STZ $85                         ; $84/$85 = cell x
-    LDA.w $1D23,X
+    STA.b !BattleTgt_CellDX
+    STZ.b !BattleTgt_CellDX+1       ; cell x (16-bit)
+    LDA.w !Battler_ScreenY,X
     JSR Battle_ShiftRight4
-    STA $86
-    STZ $87                         ; $86/$87 = cell y
+    STA.b !BattleTgt_CellDY
+    STZ.b !BattleTgt_CellDY+1       ; cell y (16-bit)
     REP #$20                        ; A -> 16-bit
     SEC
-    LDA $84
-    SBC $80
+    LDA.b !BattleTgt_CellDX
+    SBC.b !BattleTgt_CentreCellX
     BPL .dx_pos
-    EOR.w #$FFFF
+    EOR.w #!Battle_Invert16
     INC A                           ; |dx|
 .dx_pos:
-    STA $84
+    STA.b !BattleTgt_CellDX
     SEC
-    LDA $86
-    SBC $82
+    LDA.b !BattleTgt_CellDY
+    SBC.b !BattleTgt_CentreCellY
     BPL .dy_pos
-    EOR.w #$FFFF
+    EOR.w #!Battle_Invert16
     INC A                           ; |dy|
 .dy_pos:
-    STA $86
+    STA.b !BattleTgt_CellDY
     TDC                             ; clear B before going 8-bit
     SEP #$20                        ; A -> 8-bit
-    LDA $84
+    LDA.b !BattleTgt_CellDX
     TAX
-    LDA.l $CCFB6F,X                 ; dx^2
-    STA $84
-    LDA $86
+    LDA.l !BattleRom_Squares,X      ; dx^2
+    STA.b !BattleTgt_CellDX
+    LDA.b !BattleTgt_CellDY
     TAX
-    LDA.l $CCFB6F,X                 ; dy^2
+    LDA.l !BattleRom_Squares,X      ; dy^2
     CLC
-    ADC $84
-    CMP.w $9607
+    ADC.b !BattleTgt_CellDX
+    CMP.w !BattleTgt_AreaSize
     BEQ .hit
     BCS .next                       ; outside the radius
 .hit:
     CLC                             ; (unneeded: no add follows)
-    LDA $8E
-    STA.w $99C1,Y
+    LDA.b !BattleTgt_AreaSlot
+    STA.w !BattleTgt_Candidates+1,Y
     INY
 .next:
-    INC $8E
-    LDA $8E
-    CMP $90
+    INC.b !BattleTgt_AreaSlot
+    LDA.b !BattleTgt_AreaSlot
+    CMP.b !BattleTgt_AreaEnd
     BNE .loop
 BattleTgt_AreaAddAnchor:
-    LDA.w $9604
+    LDA.w !BattleTgt_AreaSide
     BNE .pc_side
-    LDA $92
-    CMP #$03
+    LDA.b !BattleTgt_Anchor
+    CMP.b #!Battle_FirstEnemySlot
     BCC BattleTgt_CompactCandidates ; enemy scan, anchor is a PC
     BRA .place
 .pc_side:
-    LDA $92
-    CMP #$03
+    LDA.b !BattleTgt_Anchor
+    CMP.b #!Battle_FirstEnemySlot
     BCS BattleTgt_CompactCandidates ; PC scan, anchor is an enemy
 .place:
-    LDA $92
-    STA.w $99C0                     ; anchor heads the list
+    LDA.b !BattleTgt_Anchor
+    STA.w !BattleTgt_Candidates     ; anchor heads the list
     ; falls through into BattleTgt_CompactCandidates ($C127C5)
 
 ; ==================================================================
@@ -4620,18 +4662,18 @@ BattleTgt_AreaAddAnchor:
 
 ; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
 ; front slot is empty (requester wasn't eligible), shift the list
-; left by one. Reads one byte past the list ($99CB) on the last step.
+; left by one. Reads one byte past the list (entry 11) on the last step.
 org $C127C5
 BattleTgt_CompactCandidates:
-    LDA.w $99C0
+    LDA.w !BattleTgt_Candidates
     BPL .exit
     TDC
     TAX
 .loop:
-    LDA.w $99C1,X
-    STA.w $99C0,X
+    LDA.w !BattleTgt_Candidates+1,X
+    STA.w !BattleTgt_Candidates,X
     INX
-    CPX #$000B
+    CPX.w #!Battle_NumSlots
     BNE .loop
 .exit:
     RTS
@@ -4639,11 +4681,11 @@ BattleTgt_CompactCandidates:
 ; BattleTgt_ClearLists ($C127D9–$C127E7, 15 bytes): blank candidate
 ; and selection lists (12 entries each, one more than they use)
 BattleTgt_ClearLists:
-    LDX #$000B
-    LDA #$FF
+    LDX.w #!Battle_NumSlots
+    LDA.b #!BattleTgt_Empty
 .loop:
-    STA.w $99C0,X
-    STA.w $A62D,X
+    STA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_Selected,X
     DEX
     BPL .loop
     RTS
@@ -4651,32 +4693,32 @@ BattleTgt_ClearLists:
 ; BattleTgt_SelectAllCandidates ($C127E8–$C127F9, 18 bytes): set
 ; target-all and copy the 11 candidates into the selection list
 BattleTgt_SelectAllCandidates:
-    LDA #$80
-    STA.w $960C
-    LDX #$000A
+    LDA.b #!BattleTgt_AllFlag
+    STA.w !BattleTgt_TargetAll
+    LDX.w #!Battle_LastSlot
 .loop:
-    LDA.w $99C0,X
-    STA.w $A62D,X
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !BattleTgt_Selected,X
     DEX
     BPL .loop
     RTS
 
-; BattleTgt_CycleNext ($C127FA–$C12813, 26 bytes): advance $9614 to the
+; BattleTgt_CycleNext ($C127FA–$C12813, 26 bytes): advance !BattleTgt_Cursor to the
 ; next non-empty candidate (wrap at 11); no-op on an empty list. Same
 ; logic as BattleMenu_TargetNext, duplicated rather than shared.
 BattleTgt_CycleNext:
     JSR BattleTgt_AnyCandidate
     BEQ .exit                       ; list empty
 .loop:
-    INC.w $9614
-    LDA.w $9614
-    CMP #$0B
+    INC.w !BattleTgt_Cursor
+    LDA.w !BattleTgt_Cursor
+    CMP.b #!Battle_NumSlots
     BNE .check
     TDC
-    STA.w $9614
+    STA.w !BattleTgt_Cursor
 .check:
     TAX
-    LDA.w $99C0,X
+    LDA.w !BattleTgt_Candidates,X
     BMI .loop
 .exit:
     RTS
@@ -4686,14 +4728,14 @@ BattleTgt_CyclePrev:
     JSR BattleTgt_AnyCandidate
     BEQ .exit
 .loop:
-    DEC.w $9614
-    LDA.w $9614
+    DEC.w !BattleTgt_Cursor
+    LDA.w !BattleTgt_Cursor
     BPL .check
-    LDA #$0A
-    STA.w $9614
+    LDA.b #!Battle_LastSlot
+    STA.w !BattleTgt_Cursor
 .check:
     TAX
-    LDA.w $99C0,X
+    LDA.w !BattleTgt_Candidates,X
     BMI .loop
 .exit:
     RTS
@@ -4704,11 +4746,11 @@ BattleTgt_AnyCandidate:
     TDC
     TAX
 .loop:
-    LDA.w $99C0,X
-    CMP #$FF
+    LDA.w !BattleTgt_Candidates,X
+    CMP.b #!BattleTgt_Empty
     BNE .exit
     INX
-    CPX #$000B
+    CPX.w #!Battle_NumSlots
     BNE .loop
 .exit:
     RTS
