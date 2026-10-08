@@ -313,6 +313,9 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0A80 = $7F0A80                ; 16-bit per object in bank $7F: set from an event word or
                                          ; a bank-$7F word by opcodes $19 / $1C, its low byte compared
                                          ; by opcode $1A (meaning not traced)
+!ObjX_EvtWait = $7F0A01                  ; 8-bit per object in bank $7F (the odd byte beside
+                                         ; ObjX_LeaveView): the script-run counter of the wait
+                                         ; opcodes $AD and $B9-$BD
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
                                          ; Field_Unk29 becomes Field_Unk29State0D. No writer traced

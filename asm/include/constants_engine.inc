@@ -775,3 +775,13 @@ endif
 ; --- Event arithmetic and bit opcodes ($5B-$7F) ---
 !EvtBit_NumMask = $0F                    ; bits of opcode $65/$66's bit operand that index BitSet /
                                          ; BitClear (8 entries each: 8-15 run into the next table)
+
+; --- Event animation and wait opcodes ($AA-$BD) ---
+!Obj_AnimModeLoops = $02                 ; Obj_AnimMode 2: counted passes of Obj_AnimRowAlt
+                                         ; (ObjX_AnimLoops)
+!Evt_AnimLoopsOnce = $02                 ; ObjX_AnimLoops Evt_OpAB_PlayAnimOnce starts with:
+                                         ; Obj_AnimTickAndQueue leaves 1 after a pass of the row
+!Evt_WaitRuns4 = $04                     ; script runs waited by opcode $B9 (Evt_OpB9_Wait4)
+!Evt_WaitRuns8 = $08                     ; ... by opcode $BA
+!Evt_WaitRuns16 = $10                    ; ... by opcode $BC
+!Evt_WaitRuns32 = $20                    ; ... by opcode $BD

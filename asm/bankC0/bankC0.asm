@@ -8412,6 +8412,412 @@ Sys_HaltWithColor:
     BRA .forever
 
 ; ============================================================
+; Event opcodes: animation and waits ($C0:2E67–$C0:2FFC)
+; Handlers in Evt_OpcodeTable (unmatched), entered as the other opcode
+; handlers (see the banner of the call opcodes at $C0:5F6E): Y = the
+; opcode's offset in Evt_Data, X returned = where the script goes on,
+; C=1 to go on in this run, C=0 to stop the object for this run. They
+; set Obj_Cur's animation (Obj_AnimRow in modes 0/1, Obj_AnimRowAlt with
+; ObjX_AnimLoops in mode 2, Obj_FixedFrame in mode 3; see
+; Obj_AnimTickAndQueue and Obj_AnimFrameLookup), or wait a number of
+; the object's script runs (ObjX_EvtWait).
+; ============================================================
+
+org $C02E67
+; ------------------------------------------------------------
+; $C0:2E67 — Evt_OpAA_SetAnimRow (32 bytes, $2E67–$2E86; with the
+;   sub-entries Evt_SetAnimRow at $2E6D and Evt_SetAnimMode at $2E74)
+; Event opcode $AA (2 bytes: $AA, row): Obj_Cur's Obj_AnimRow = row,
+;   Obj_AnimMode = Obj_AnimModeNormal (1), and Obj_AnimTimer,
+;   ObjX_AnimLoops and Obj_AnimColumn = 0 (the row starts over at once);
+;   X = Y + 1, C=1. Evt_SetAnimRow does this with A = the row (Y = the
+;   opcode for the one-byte opcodes $B3/$B4); Evt_SetAnimMode with A =
+;   the mode and X = Obj_Cur (Evt_OpAE_AnimReset).
+; Reached through Evt_OpcodeTable (opcode $AA).
+; Callers note: Evt_SetAnimRow is branched to (BRA) by Evt_OpB3_AnimRow0
+;   and Evt_OpB4_AnimRow1, Evt_SetAnimMode by Evt_OpAE_AnimReset.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the next opcode), C=1;
+;   A = 0; Y = the opcode + 1 here, unchanged through the sub-entries.
+; ------------------------------------------------------------
+Evt_OpAA_SetAnimRow:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+Evt_SetAnimRow:                         ; header: see Evt_OpAA_SetAnimRow
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimRow,X
+    LDA.b #!Obj_AnimModeNormal
+Evt_SetAnimMode:                        ; header: see Evt_OpAA_SetAnimRow
+    STA.w !Obj_AnimMode,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STZ.w !Obj_AnimColumn,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2E87 — Evt_OpB3_AnimRow0 (4 bytes, $2E87–$2E8A)
+; Event opcode $B3 (1 byte): Evt_SetAnimRow with row 0
+;   (ObjAnim_RowStand, the row Obj_SetStandAnim uses); X = Y + 1, C=1.
+; Reached through Evt_OpcodeTable (opcode $B3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB3_AnimRow0:
+    LDA.b #!ObjAnim_RowStand
+    BRA Evt_SetAnimRow
+
+; ------------------------------------------------------------
+; $C0:2E8B — Evt_OpB4_AnimRow1 (4 bytes, $2E8B–$2E8E)
+; Event opcode $B4 (1 byte): Evt_SetAnimRow with row 1
+;   (ObjAnim_RowWalk, the row Obj_SetMoveAnim walks with); X = Y + 1,
+;   C=1.
+; Reached through Evt_OpcodeTable (opcode $B4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB4_AnimRow1:
+    LDA.b #!ObjAnim_RowWalk
+    BRA Evt_SetAnimRow
+
+; ------------------------------------------------------------
+; $C0:2E8F — Evt_OpAE_AnimReset (11 bytes, $2E8F–$2E99)
+; Event opcode $AE (1 byte): Obj_Cur's Obj_AnimRow = 0
+;   (ObjAnim_RowStand) and Obj_AnimMode = 0, then as Evt_SetAnimMode
+;   (timer, loops and column 0); X = Y + 1, C=1.
+; Reached through Evt_OpcodeTable (opcode $AE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpAE_AnimReset:
+    LDX.b !Obj_Cur
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+    BRA Evt_SetAnimMode
+
+; ------------------------------------------------------------
+; $C0:2E9A — Evt_OpAB_PlayAnimOnce (103 bytes, $2E9A–$2F00)
+; Event opcode $AB (2 bytes: $AB, row): plays animation row once in mode
+;   2 and waits for it. With Obj_Cur's ObjX_AnimLoops 0 it starts:
+;   Obj_AnimRowAlt = row, column and timer 0, Obj_AnimRow = $FF
+;   (Anim_EndMarker) when Obj_AnimMode was 0 (a marker for the end),
+;   Obj_AnimMode = Obj_AnimModeLoops, ObjX_AnimLoops = Evt_AnimLoopsOnce;
+;   X = the opcode, C=0. While ObjX_AnimLoops is 2 or more: if
+;   Obj_AnimRowAlt still is row, X = the opcode, C=0; if not (something
+;   changed it), it starts over with row. Once ObjX_AnimLoops is 1 (the
+;   pass is over): loops, timer and column = 0; Obj_AnimMode = 1, or 0
+;   with Obj_AnimRow = 0 when the marker is there; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $AB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpAB_PlayAnimOnce:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_AnimLoops,X
+    BEQ .start
+    DEC A
+    BEQ .done
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+    CMP.w !Obj_AnimRowAlt,X
+    BNE .set_row
+    BRA .wait
+.done:
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STA.w !Obj_AnimTimer,X
+    STZ.w !Obj_AnimColumn,X
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!Anim_EndMarker
+    BEQ .was_mode0
+    LDA.b #!Obj_AnimModeNormal
+    BRA .set_mode
+.was_mode0:
+    STZ.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+.set_mode:
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+.set_row:
+    STA.w !Obj_AnimRowAlt,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .loops
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X                ; mark: return to mode 0
+.loops:
+    LDA.b #!Obj_AnimModeLoops
+    STA.w !Obj_AnimMode,X
+    LDA.b #!Evt_AnimLoopsOnce
+    STA.l !ObjX_AnimLoops,X
+.wait:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F01 — Evt_OpB7_PlayAnimLoops (112 bytes, $2F01–$2F70)
+; Event opcode $B7 (3 bytes: $B7, row, count): as Evt_OpAB_PlayAnimOnce
+;   with ObjX_AnimLoops = count + 1 at the start (Obj_AnimTickAndQueue
+;   takes 2 off per pass of the row and stops at 1); done: X = Y + 3,
+;   C=1.
+; Reached through Evt_OpcodeTable (opcode $B7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in
+;   Evt_OpAB_PlayAnimOnce; A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB7_PlayAnimLoops:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_AnimLoops,X
+    BEQ .start
+    DEC A
+    BEQ .done
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+    CMP.w !Obj_AnimRowAlt,X
+    BNE .set_row
+    BRA .wait
+.done:
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STA.w !Obj_AnimTimer,X
+    STZ.w !Obj_AnimColumn,X
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!Anim_EndMarker
+    BEQ .was_mode0
+    LDA.b #!Obj_AnimModeNormal
+    BRA .set_mode
+.was_mode0:
+    STZ.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+.set_mode:
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+.set_row:
+    STA.w !Obj_AnimRowAlt,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .loops
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X                ; mark: return to mode 0
+.loops:
+    LDA.b #!Obj_AnimModeLoops
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; count
+    INC A
+    LDX.b !Obj_Cur
+    STA.l !ObjX_AnimLoops,X
+.wait:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F71 — Evt_OpAC_ShowFrame (37 bytes, $2F71–$2F95)
+; Event opcode $AC (2 bytes: $AC, frame): Obj_Cur shows a fixed frame:
+;   Obj_FixedFrame = frame, column and timer 0, Obj_AnimRow = $FF when
+;   Obj_AnimMode was 0 (as in Evt_OpAB_PlayAnimOnce), Obj_AnimMode =
+;   Obj_AnimModeFixed; X = Y + 2, C=0 (the object stops for this run).
+; Reached through Evt_OpcodeTable (opcode $AC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 3;
+;   Y unchanged.
+; ------------------------------------------------------------
+Evt_OpAC_ShowFrame:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; frame
+    LDX.b !Obj_Cur
+    STA.w !Obj_FixedFrame,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .fixed
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X
+.fixed:
+    LDA.b #!Obj_AnimModeFixed
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F96 — Evt_OpAD_WaitRuns (48 bytes, $2F96–$2FC5)
+; Event opcode $AD (2 bytes: $AD, n): waits n of the object's script
+;   runs. While Obj_Cur's ObjX_EvtWait is below n it is incremented and
+;   X = the opcode, C=0; once it equals n it is cleared and X = Y + 2,
+;   C=1.
+; Quirk: a counter already above n (left by another wait) is cleared
+;   with X = the opcode and C=1, so the opcode runs again at once and
+;   then counts from 0.
+; Reached through Evt_OpcodeTable (opcode $AD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A = the new
+;   counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpAD_WaitRuns:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; n
+    LDX.b !Obj_Cur
+    CMP.l !ObjX_EvtWait,X
+    BEQ .done
+    BCS .count
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    SEC
+    RTS
+.done:
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.count:
+    LDA.l !ObjX_EvtWait,X
+    INC A
+    STA.l !ObjX_EvtWait,X
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2FC6 — Evt_OpB9_Wait4 (4 bytes, $2FC6–$2FC9)
+; Event opcode $B9 (1 byte): Evt_WaitRuns with n = 4; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $B9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB9_Wait4:
+    LDA.b #!Evt_WaitRuns4
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FCA — Evt_OpBA_Wait8 (4 bytes, $2FCA–$2FCD)
+; Event opcode $BA (1 byte): Evt_WaitRuns with n = 8; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $BA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBA_Wait8:
+    LDA.b #!Evt_WaitRuns8
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FCE — Evt_OpBD_Wait32 (4 bytes, $2FCE–$2FD1)
+; Event opcode $BD (1 byte): Evt_WaitRuns with n = $20; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $BD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBD_Wait32:
+    LDA.b #!Evt_WaitRuns32
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FD2 — Evt_OpBC_Wait16 (2 bytes, $2FD2–$2FD3; then its body
+;   Evt_WaitRuns, 41 bytes, $2FD4–$2FFC)
+; Event opcode $BC (1 byte): Evt_WaitRuns with n = $10.
+;   Evt_WaitRuns (A = n): Evt_OpAD_WaitRuns for the one-byte waits: while
+;   ObjX_EvtWait is below n it is incremented, X = the opcode, C=0; at n
+;   it is cleared, X = Y + 1, C=1; above n (the same quirk as there) it
+;   is cleared with X = the opcode, C=1.
+; Reached through Evt_OpcodeTable (opcode $BC).
+; Callers note: Evt_WaitRuns is branched to (BRA) by Evt_OpB9_Wait4,
+;   Evt_OpBA_Wait8 and Evt_OpBD_Wait32.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A = the new
+;   counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBC_Wait16:
+    LDA.b #!Evt_WaitRuns16
+Evt_WaitRuns:                           ; header: see Evt_OpBC_Wait16
+    LDX.b !Obj_Cur
+    CMP.l !ObjX_EvtWait,X
+    BEQ .done
+    BCS .count
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    SEC
+    RTS
+.done:
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    INX
+    SEC
+    RTS
+.count:
+    LDA.l !ObjX_EvtWait,X
+    INC A
+    STA.l !ObjX_EvtWait,X
+    TYX
+    CLC
+    RTS
+
+; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN
@@ -25970,9 +26376,9 @@ Evt_Op04_WaitSlot:                      ; header: see Evt_Op04_CallObjFuncWait
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
 ;   the EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y =
 ;   the opcode's offset in Evt_Data.
-; Exit: as Evt_Op02_CallObjFunc's: M=1, X=0, DP and DB unchanged; X = Y
-;   = the opcode + 3, C=1; A clobbered; EvtCall_* written as there (none
-;   with no member).
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A
+;   clobbered; EvtCall_* written as in Evt_Op02_CallObjFunc (none with no
+;   member).
 ; ------------------------------------------------------------
 Evt_Op05_CallPcFunc:
     INY
