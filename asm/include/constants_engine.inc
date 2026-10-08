@@ -146,6 +146,11 @@ if !constants_engine_inc == 0
 
 ; --- Audio ---
 !Audio_CmdPlaySfx = $19                  ; Audio_CmdId: play the sound effect in Audio_CmdArg0
+!Audio_CmdPlayMusic = $10                ; Audio_CmdId LocLoad_AudioSetup sends with LocRom.Music in
+                                         ; Audio_CmdArg0 (probably: start that music track)
+!Audio_CmdUnk81 = $81                    ; Audio_CmdId LocLoad_AudioSetup sends first, with
+                                         ; arguments 0, Audio_Cmd81Arg, Audio_Cmd81Arg (not traced)
+!Audio_Cmd81Arg = $FF                    ; Audio_CmdArg1/Arg2 for Audio_CmdUnk81
 
 ; --- Generic ---
 !Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
@@ -582,4 +587,47 @@ if !constants_engine_inc == 0
 !Pal_Grey11 = $739C                      ; BGR555 (28,28,28): colour 11
 !Pal_BufBytes = $0200                    ; bytes of Pal_Buf / Pal_CgramBuf (16 rows x 16 colours x 2)
 !Obj_DrawFillWords = $0010               ; words Obj_ResetDrawLists writes through WMDATA (32 bytes)
+
+; --- Field/battle hand-off (Field_Unk038F, Scene_Unk0283) ---
+!FieldBtl_EvtNoReset = $20               ; FieldBtl_EvtFlags bit 5: Scene_Unk0283 rebuilds the field
+                                         ; instead of the FieldBtl_Result = 1 reset
+!FieldBtl_EvtUnk80 = $80                 ; FieldBtl_EvtFlags bit 7: Field_Unk034B leaves members 2
+                                         ; and 3 alone and sets Field_Unk7F03FE = 3
+!Field_Unk47Bits03 = $09                 ; bits 0 and 3 Scene_Unk0283 sets in Field_Unk47
+!FieldBtl_AttrSide = $0010               ; FieldBtl_AttrA/B window: 16 rows of 16 tiles
+!FieldBtl_SubMask = $0F                  ; low 4 bits of Obj_ScreenX/Y: pixel within the tile
+!FieldBtl_PcPrio = $20                   ; OAM attribute bit 5 (priority bit 1) FieldBtl_SavePartyPos
+                                         ; sets in the party's Obj_PrioLow/High
+!FieldBtl_ViewTilesX = $0F               ; Field_Unk0617 keeps objects whose tile X - origin is
+                                         ; 1 to this - 1
+!FieldBtl_ViewTilesY = $0E               ; ... and tile Y - origin 1 to this - 1
+!Field_BattleObjMax = $0C                ; entries Field_Unk0617 puts in Field_BattleObjList at most
+!FieldBtl_PcRecSize = $05                ; bytes per FieldBtlPc record
+!FieldBtl_ObjRecSize = $0C               ; bytes per FieldBtlObj record
+!FieldBtl_ObjTileLimit = $C0             ; FieldBtl_SaveObj skips objects whose Obj_VramTile low
+                                         ; byte is this or more
+!FieldBtl_NoObj = $FFFF                  ; FieldBtlObj.Unk05/06 word (and two FieldBtl_ObjSlots) for
+                                         ; no object
+!FieldBtl_ObjKind6Flag = $40             ; FieldBtlObj.Flags bit 6: Obj_Unk1100 was 6
+!FieldBtl_ObjUnk1A81Bit = $80            ; Obj_Unk1A81 bit 7, kept in FieldBtlObj.Flags; when set,
+                                         ; FieldBtl_SaveObj calls Obj_Unk72B4 and
+                                         ; FieldBtl_RestoreObj's removal calls Obj_Unk734C
+!Obj_Unk1000Bit7 = $80                   ; Obj_Unk1000 bit 7 (blocks Evt_StartTargetFunc1); set by
+                                         ; FieldBtl_RestoreObj on an object it removes
+!Obj_DrawBucketMask = $FE                ; (Obj_ScreenY >> 1) & this = the Obj_DrawBucket offset
+                                         ; (Obj_DrawLink / Obj_DrawUnlink)
+!Obj_AnimModeFixed = $03                 ; Obj_AnimMode 3: show Obj_FixedFrame
+!FieldBtl_PpuUnk6A = $02                 ; FieldBtlPpu.Unk6A (CGWSEL position)
+!FieldBtl_PpuUnk6E = $09                 ; FieldBtlPpu.Unk6E
+!Evt_RedirectPos = $16FF                 ; Obj_ScriptPos Evt_RedirectObjScript sets (an Evt_Data
+                                         ; offset; what is there is not traced)
+
+; --- Field_Unk7EF000 tilemaps (Field_Unk29F7, Field_Unk2B78) ---
+!Field_Unk7EF000Tile = $F0               ; first tile of Field_Unk29F7's map (it uses this + 0-15)
+!Field_Unk7EF000Hi = $20                 ; tilemap high byte: priority, palette 0, tile bits 8-9 = 0
+!Field_Unk7EF000HiAlt = $23              ; tilemap high byte: priority, palette 0, tile bits 8-9 = 3
+!Field_Unk7EF000Pairs = $000F            ; tile pairs between the corners of Field_Unk29F7's top and
+                                         ; bottom rows (30 tiles)
+!Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
+!Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
 endif

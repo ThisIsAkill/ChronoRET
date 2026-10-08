@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 85158,
+  "emitted_bytes": 87664,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 987,
-      "bytes": 85158
+      "functions": 1007,
+      "bytes": 87664
     },
     "readable": {
-      "functions": 987,
-      "bytes": 85158
+      "functions": 1007,
+      "bytes": 87664
     },
     "verified": {
-      "functions": 987,
-      "bytes": 85158
+      "functions": 1007,
+      "bytes": 87664
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 36217,
+      "emitted_bytes": 38723,
       "matched": {
-        "functions": 306,
-        "bytes": 36217
+        "functions": 326,
+        "bytes": 38723
       },
       "readable": {
-        "functions": 306,
-        "bytes": 36217
+        "functions": 326,
+        "bytes": 38723
       },
       "verified": {
-        "functions": 306,
-        "bytes": 36217
+        "functions": 326,
+        "bytes": 38723
       }
     },
     {
@@ -142,7 +142,7 @@
       "bank": "$C0",
       "start": "$C0:0000",
       "end": "$C0:0FFF",
-      "emitted_bytes": 2389,
+      "emitted_bytes": 4055,
       "functions": [
         "ReentryVectors",
         "GameLoop",
@@ -157,6 +157,20 @@
         "Field_SaveState",
         "Field_RestoreState",
         "Scene_Unk024C",
+        "Scene_Unk0283",
+        "Field_Unk034B",
+        "Field_Unk038F",
+        "FieldBtl_SaveTileAttrs",
+        "FieldBtl_SavePartyPos",
+        "FieldBtl_SaveObjs",
+        "FieldBtl_SaveObj",
+        "Field_Unk0617",
+        "FieldBtl_SavePpu",
+        "FieldBtl_Restore",
+        "FieldBtl_RestoreObjs",
+        "FieldBtl_RestoreObj",
+        "FieldBtl_RestoreParty",
+        "FieldBtl_RestorePc",
         "Field_RestoreSaveBlock",
         "Field_StashSaveBlock",
         "LocLoad_Unk092B",
@@ -178,7 +192,7 @@
       "bank": "$C0",
       "start": "$C0:1000",
       "end": "$C0:1FFF",
-      "emitted_bytes": 3577,
+      "emitted_bytes": 3638,
       "functions": [
         "ModeEE_Handler",
         "ModeFA_Handler",
@@ -191,6 +205,7 @@
         "Field_ActionButton",
         "Sub_1ADF",
         "Bg_TilemapIndex64x32",
+        "LocLoad_AudioSetup",
         "Audio_PlayTileSfxA",
         "Audio_PlaySfxAtLeader",
         "Audio_PlayTileSfxB",
@@ -217,7 +232,7 @@
       "bank": "$C0",
       "start": "$C0:2000",
       "end": "$C0:2FFF",
-      "emitted_bytes": 1896,
+      "emitted_bytes": 2482,
       "functions": [
         "Field_EventHookDispatch",
         "Field_EventHookTable",
@@ -239,6 +254,8 @@
         "Field_FadeInAfterReload",
         "Scene_SettleFrames",
         "Scene_ReloadStep",
+        "Field_Unk29F7",
+        "Field_Unk2B78",
         "VramDma_Upload",
         "ClearRAMDMA",
         "Sys_HaltWithColor"
@@ -262,7 +279,7 @@
       "bank": "$C0",
       "start": "$C0:5000",
       "end": "$C0:5FFF",
-      "emitted_bytes": 1118,
+      "emitted_bytes": 1186,
       "functions": [
         "Scene_PostLoadInit",
         "LocLoad_Unk56D4",
@@ -271,6 +288,7 @@
         "Evt_RunObj0Func1",
         "Evt_RunObjInit",
         "Evt_StartTargetFunc1",
+        "Evt_RedirectObjScript",
         "Map_LeaderPastRowMax",
         "Map_LeaderPastRowMin",
         "Map_LeaderPastColMax",
@@ -436,7 +454,7 @@
       "bank": "$C0",
       "start": "$C0:A000",
       "end": "$C0:AFFF",
-      "emitted_bytes": 1237,
+      "emitted_bytes": 1362,
       "functions": [
         "LocLoad_UnkA33B",
         "LocLoad_EmptyStep",
@@ -445,7 +463,9 @@
         "Map_LoadExitTiles",
         "Map_LoadTreasureTiles",
         "Map_TreasureTaken",
-        "Obj_ResetFrameState"
+        "Obj_ResetFrameState",
+        "Obj_DrawUnlink",
+        "Obj_DrawLink"
       ]
     },
     {
