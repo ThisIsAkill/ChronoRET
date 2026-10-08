@@ -26891,6 +26891,288 @@ Evt_Op1A_IfUnk7F0A80:
     RTS
 
 ; ============================================================
+; Event opcodes: party and object queries ($C0:658F–$C0:66A4)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). The get opcodes copy a byte into the low byte of an event
+; word (Evt_Unk7F0200 + a x 2; the high byte is left as it was); the
+; test opcodes go on with the next opcode when the test holds and else
+; jump n bytes on from their last byte (n), as the condition opcodes do.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:658F — Evt_Op20_GetPartyMember0 (27 bytes, $658F–$65A9)
+; Event opcode $20 (2 bytes: $20, a): event word a's low byte = the first
+;   byte of Party_Members (the character id of party member 1, probably
+;   the leader); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $20).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   the character id.
+; ------------------------------------------------------------
+Evt_Op20_GetPartyMember0:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Party_Members
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:65AA — Evt_Op21_GetObjTile (8 bytes, $65AA–$65B1; then its body
+;   Evt_Op21_Body, 57 bytes, $65B2–$65EA)
+; Event opcode $21 (4 bytes: $21, slot, a, b): event word a's low byte =
+;   the object's Obj_TileX, event word b's = its Obj_TileY; X = Y + 4,
+;   C=1. Evt_Op21_Body is the same after the slot read, with A = the
+;   slot (Evt_Op22_GetPcTile).
+; Reached through Evt_OpcodeTable (opcode $21).
+; Callers note: Evt_Op22_GetPcTile branches to Evt_Op21_Body (BRA at
+;   $C0:65F6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtGet_First /
+;   EvtGet_Second are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data. Evt_Op21_Body: also A = the slot, B = 0
+;   (the 16-bit TAX), Y = the opcode + 1.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the row; EvtGet_First / EvtGet_Second = the column / row.
+; ------------------------------------------------------------
+Evt_Op21_GetObjTile:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op21_Body:                          ; header: see Evt_Op21_GetObjTile
+    TAX
+    LDA.w !Obj_TileX,X
+    STA.b !EvtGet_First
+    LDA.w !Obj_TileY,X
+    STA.b !EvtGet_Second
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_First
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_Second
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:65EB — Evt_Op22_GetPcTile (13 bytes, $65EB–$65F7)
+; Event opcode $22 (4 bytes: $22, p, a, b): Evt_Op21_GetObjTile for party
+;   member p's object (Party_ObjSlot + p); X = Y + 4, C=1.
+; Quirk: no test for a missing member: with none (Obj_None, $80) object
+;   $80's bytes are read (not known to happen).
+; Reached through Evt_OpcodeTable (opcode $22).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   EvtGet_First / EvtGet_Second are dp), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the row; EvtGet_First / EvtGet_Second = the column / row.
+; ------------------------------------------------------------
+Evt_Op22_GetPcTile:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BRA Evt_Op21_Body
+
+; ------------------------------------------------------------
+; $C0:65F8 — Evt_Op23_GetObjFacing (8 bytes, $65F8–$65FF; then its body
+;   Evt_Op23_Body, 31 bytes, $6600–$661E)
+; Event opcode $23 (3 bytes: $23, slot, a): event word a's low byte = the
+;   object's Obj_Facing; X = Y + 3, C=1. Evt_Op23_Body is the same after
+;   the slot read, with A = the slot (Evt_Op24_GetPcFacing).
+; Reached through Evt_OpcodeTable (opcode $23).
+; Callers note: Evt_Op24_GetPcFacing branches to Evt_Op23_Body (BRA at
+;   $C0:662A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtGet_First is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the opcode's offset in
+;   Evt_Data. Evt_Op23_Body: also A = the slot, B = 0 (the 16-bit TAX),
+;   Y = the opcode + 1.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   EvtGet_First = the facing.
+; ------------------------------------------------------------
+Evt_Op23_GetObjFacing:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op23_Body:                          ; header: see Evt_Op23_GetObjFacing
+    TAX
+    LDA.w !Obj_Facing,X
+    STA.b !EvtGet_First
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_First
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:661F — Evt_Op24_GetPcFacing (13 bytes, $661F–$662B)
+; Event opcode $24 (3 bytes: $24, p, a): Evt_Op23_GetObjFacing for party
+;   member p's object; X = Y + 3, C=1.
+; Quirk: no test for a missing member, as in Evt_Op22_GetPcTile.
+; Reached through Evt_OpcodeTable (opcode $24).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   EvtGet_First are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   EvtGet_First = the facing.
+; ------------------------------------------------------------
+Evt_Op24_GetPcFacing:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BRA Evt_Op23_Body
+
+; ------------------------------------------------------------
+; $C0:662C — Evt_Op27_IfObjUnk0F00 (41 bytes, $662C–$6654)
+; Event opcode $27 (3 bytes: $27, slot, n): goes on (X = Y + 3) when the
+;   object's Obj_Unk0F00 is nonzero (it has a frame to build), else jumps
+;   n bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $27).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y =
+;   the opcode + 1; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op27_IfObjUnk0F00:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Obj_Unk0F00,X
+    BEQ .jump
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6655 — Evt_Op28_IfObjInsideScreen (80 bytes, $6655–$66A4)
+; Event opcode $28 (3 bytes: $28, slot, n): goes on (X = Y + 3) when the
+;   object is well inside the screen, by Evt_Op8F_FollowPc's test: its
+;   Obj_TileX minus EvtFollow_ScrCol (Map_TileOriginX / 2) is 2 to
+;   EvtFollow_ColLimit - 1 ($0D) and its Obj_TileY minus EvtFollow_ScrRow
+;   (Map_TileOriginY / 2) is 2 to EvtFollow_RowLimit - 1 ($0C); else it
+;   jumps n bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $28).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_* and
+;   EvtJump_Dist are dp), DB=$00 (Obj_* and Map_TileOrigin* absolute); Y
+;   = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y =
+;   the opcode + 1; EvtFollow_ScrCol / ScrRow written; EvtJump_Dist = n
+;   on a jump.
+; ------------------------------------------------------------
+Evt_Op28_IfObjInsideScreen:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !EvtFollow_ScrCol
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !EvtFollow_ScrRow
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !EvtFollow_ScrCol
+    BEQ .jump
+    CMP.b #$01
+    BEQ .jump
+    CMP.b #!EvtFollow_ColLimit
+    BCS .jump
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !EvtFollow_ScrRow
+    BEQ .jump
+    CMP.b #$01
+    BEQ .jump
+    CMP.b #!EvtFollow_RowLimit
+    BCS .jump
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
 ; Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66,
 ; Pad_Unk00F6-F8) is still unidentified, so it keeps its address name.

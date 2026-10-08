@@ -360,6 +360,9 @@ if !ram_engine_inc == 0
                                          ; 8-bit, the comparison number
 !EvtJump_Dist = $D9                      ; alias of Eng_Scratch in the jump opcodes: 16-bit, the
                                          ; jump distance (an operand byte, zero-extended)
+!EvtGet_First = $D9                      ; alias of Eng_Scratch in the get opcodes $21-$24: 8-bit, the
+                                         ; object's Obj_TileX (or Obj_Facing) on its way to an event word
+!EvtGet_Second = $DB                     ; alias of Oam_Range1LoPtr's slot there: 8-bit, its Obj_TileY
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
                                          ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
                                          ; the slot being tried
