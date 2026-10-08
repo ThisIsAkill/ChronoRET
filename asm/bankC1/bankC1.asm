@@ -24171,11 +24171,12 @@ BattleAi_NoteFirstTest:
 ; routine sets only !Battle_MathA, so whatever !Battle_MathHi holds
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
-; Callers (38 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8) and
-;   unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:C486, $C1:C867, $C1:C8D0,
-;   $C1:D29E, $C1:D67C, $C1:DA7C, $C1:DB1A, $C1:DC94, $C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA,
-;   $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F, $C1:E774, $C1:E7BB, $C1:E97A,
-;   $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDCB, $C1:FDDA).
+; Callers (38 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
+;   Battle_RandRangeLong ($C1:FDCB) and unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6,
+;   $C1:C486, $C1:C867, $C1:C8D0, $C1:D29E, $C1:D67C, $C1:DA7C, $C1:DB1A, $C1:DC94, $C1:E177,
+;   $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F,
+;   $C1:E774, $C1:E7BB, $C1:E97A, $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18, $C1:EFC9, $C1:F0A4,
+;   $C1:F141, $C1:FDDA).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
@@ -25432,7 +25433,7 @@ BattleSys_UnkB575:
 ; command was committed). The byte after the RTS is a second RTS that
 ; nothing reaches.
 ; Callers (6 JSR sites): BattleSys_UnkB3F9 ($C1:B43E), BattleSys_UnkB4E9 ($C1:B4ED, $C1:B4F4,
-;   $C1:B4FB) and unmatched ($C1:FDCF, $C1:FDDE).
+;   $C1:B4FB), BattleSys_RefundItemLong ($C1:FDCF) and unmatched ($C1:FDDE).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $14 = PC slot (0-2)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X preserved (PHX/PLX); A clobbered
 ;        (B = 0); Y = the record number when the item was found, 256
@@ -26921,7 +26922,8 @@ BattleSys_UnkBFA4:
 ; Quirk: !Battle_ActFlags is stored twice, the second time with
 ; BattleAi_SetMainMask's A (0 when the target is a slot, $FF when it is
 ; empty).
-; Callers (3 JSR sites): BattleSys_UnkB967 ($C1:BA7D) and unmatched ($C1:FDC7, $C1:FDD6).
+; Callers (3 JSR sites): BattleSys_UnkB967 ($C1:BA7D), BattleSys_RunPcAttackLong ($C1:FDC7) and
+;   unmatched ($C1:FDD6).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18B = the attacker,
 ;        !Battle_UnkAD8E = the target
 ; Exit:  M=1, X=0 (as assumed after the unanalysed callees), DP=0,
@@ -26991,17 +26993,17 @@ BattleSys_RunPcAttack:
 ;   ($C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF, $C1:BF05, $C1:BF3C), BattleSys_TechMpCost1 ($C1:CB50),
 ;   BattleSys_TechMpCost2 ($C1:CB69), BattleSys_TechMpCost3 ($C1:CB82), BattleSys_LoadTechUsers
 ;   ($C1:CB9B), BattleSys_UnkCE3A ($C1:CE8F, $C1:CEC1, $C1:CEF3), Battle_HitEntryOffset ($C1:E8B5),
-;   Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75) and unmatched ($C1:C60B,
-;   $C1:D53A, $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E, $C1:DAEC,
-;   $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B, $C1:DF4C,
-;   $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A, $C1:E1AF,
-;   $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E, $C1:E2AA,
-;   $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5, $C1:E400,
-;   $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB,
-;   $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792, $C1:E8D6,
-;   $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EDA8, $C1:EDC5, $C1:EDEE, $C1:EE1E,
-;   $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C, $C1:F6D1,
-;   $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D, $C1:FDBF).
+;   Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long
+;   ($C1:FDBF) and unmatched ($C1:C60B, $C1:D53A, $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5,
+;   $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB,
+;   $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140,
+;   $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D,
+;   $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B,
+;   $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554,
+;   $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E,
+;   $C1:E751, $C1:E792, $C1:E8D6, $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EDA8,
+;   $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642,
+;   $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -27898,19 +27900,19 @@ BattleSys_UnkCCCB:
 ; $C1:CDFF — BattleSys_UnkCDFF (55 bytes, $CDFF–$CE35)
 ; Builds the battle's item list: zeroes the 256 Item_BattleList records
 ; ($500 bytes), then walks the inventory from entry DP $00 = 0: an
-; empty entry (!Battle_InvIds 0) goes to BattleFD_UnkB01C, any other to
-; BattleFD_UnkAF80 with A = the id and DP $0E = its count. The walk
-; goes on while DP $08 is non-zero after the call, so the bank-$FD
-; routines advance DP $00 and decide when it ends (not traced; DP $08
-; starts at 0).
+; empty entry (!Battle_InvIds 0) goes to BattleFD_AddItemEntry_Skip, any
+; other to BattleFD_AddItemEntry with A = the id and DP $0E = its count.
+; The walk goes on while DP $08 is non-zero after the call; both bank-$FD
+; entries count DP $00 and $08 up by 1, so it ends when DP $08 (8-bit,
+; starting at 0) wraps after 256 entries.
 ; Callers (1 JSR site): Battle_SetupBattle ($C1:FB81).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  as the last bank-$FD call leaves them (not analysed; the code
-;        assumes M=1, X=0); DP $00, $04, $08, $0A zeroed first, DP $0E
-;        = the last count
+; Exit:  M=1, X=0 (as the bank-$FD entries return), DP=0, DB=$7E; A,
+;        X, Y as the last of them leaves them; DP $00, $04, $08, $0A
+;        zeroed first and stepped by them, DP $0E = the last count
 !ItemList_Inv = !BattleTmp_00           ; 2 B: inventory entry (stepped in bank $FD, presumably)
 !ItemList_More = !BattleTmp_08          ; 1 B: non-zero = go on (set in bank $FD)
-!ItemList_Count = !BattleTmp_0E         ; 1 B: the entry's count, for BattleFD_UnkAF80
+!ItemList_Count = !BattleTmp_0E         ; 1 B: the entry's count, for BattleFD_AddItemEntry
 BattleSys_UnkCDFF:
     TDC
     TAX
@@ -27930,13 +27932,13 @@ BattleSys_UnkCDFF:
     LDX.b !ItemList_Inv
     LDA.w !Battle_InvIds,X
     BNE .item
-    JSL BattleFD_UnkB01C
+    JSL BattleFD_AddItemEntry_Skip
     BRA .next
 .item:
     LDA.w !Battle_InvCounts,X
     STA.b !ItemList_Count
     LDA.w !Battle_InvIds,X
-    JSL BattleFD_UnkAF80
+    JSL BattleFD_AddItemEntry
 .next:
     LDA.b !ItemList_More
     BEQ .done
@@ -27959,7 +27961,7 @@ BattleSys_UnkCE36:
 ; Sets up the stat block (!BattleRom_PcStatBlock) of PC DP $02, if the
 ; slot has an entry: .Unk0B-.Unk11 are copied to .Unk36-.Unk3C, then
 ; for each of three records in bank $CC, 6 bytes each, DP $08 = its
-; offset, DP $0E = !Battle_Unk29D7, BattleFD_UnkB141, DP $0E =
+; offset, DP $0E = !Battle_Unk29D7, BattleFD_ApplyRecBoost, DP $0E =
 ; !Battle_Unk2A03 and BattleSys_UnkCF69 (the record's bonus): record
 ; .Unk29 of !BattleRom_EquipRec1, .Unk28 - $5A of !BattleRom_EquipRec2,
 ; .Unk27 - $7B of !BattleRom_EquipRec3. That these are the PC's
@@ -27969,17 +27971,17 @@ BattleSys_UnkCE36:
 ; Callers note: the BattleSys_UnkBC60 site ($C1:BCB4) is dead code;
 ;   BattleSys_UnkCE36 falls in.
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $02 = PC slot (0-2, high byte 0)
-; Exit:  M=1, X=0 (as assumed after BattleFD_UnkB141, not analysed),
+; Exit:  M=1, X=0 (as BattleFD_ApplyRecBoost returns),
 ;        DP=0, DB=$7E; A = $FF for an empty slot, else as
 ;        BattleSys_UnkCF69 leaves it; B = 0; X, Y clobbered; DP $00 =
 ;        the stat block address, DP $04, $08, $0A, $0E written,
 ;        !Battle_MathA/B/Lo/Hi (Battle_Mul16), plus what
-;        BattleFD_UnkB141 changes
+;        BattleFD_ApplyRecBoost changes
 !PcRec_Blk = !BattleTmp_00              ; 2 B: the PC's stat block address
 !PcRec_Pc = !BattleTmp_02               ; 2 B: the PC slot (input)
 !PcRec_Ofs = !BattleTmp_08              ; 2 B: offset in bank $CC of the record
 !PcRec_Zero0A = !BattleTmp_0A           ; 2 B: zeroed (BattleSys_UnkCF69 uses it)
-!PcRec_Arg0E = !BattleTmp_0E            ; 2 B: address for BattleFD_UnkB141
+!PcRec_Arg0E = !BattleTmp_0E            ; 2 B: address for BattleFD_ApplyRecBoost
 BattleSys_UnkCE3A:
     TDC
     TAX
@@ -28030,7 +28032,7 @@ BattleSys_UnkCE3A:
     SEP #$20
     LDX.w #!Battle_Unk29D7
     STX.b !PcRec_Arg0E
-    JSL BattleFD_UnkB141
+    JSL BattleFD_ApplyRecBoost
     LDX.w #!Battle_Unk2A03
     STX.b !PcRec_Arg0E
     JSR BattleSys_UnkCF69
@@ -28054,7 +28056,7 @@ BattleSys_UnkCE3A:
     SEP #$20
     LDX.w #!Battle_Unk29D7
     STX.b !PcRec_Arg0E
-    JSL BattleFD_UnkB141
+    JSL BattleFD_ApplyRecBoost
     LDX.w #!Battle_Unk2A03
     STX.b !PcRec_Arg0E
     JSR BattleSys_UnkCF69
@@ -28078,7 +28080,7 @@ BattleSys_UnkCE3A:
     SEP #$20
     LDX.w #!Battle_Unk29D7
     STX.b !PcRec_Arg0E
-    JSL BattleFD_UnkB141
+    JSL BattleFD_ApplyRecBoost
     LDX.w #!Battle_Unk2A03
     STX.b !PcRec_Arg0E
     JSR BattleSys_UnkCF69
@@ -28087,7 +28089,7 @@ BattleSys_UnkCE3A:
 
 ; $C1:CF15 — BattleSys_UnkCF15 (61 bytes, $CF15–$CF51)
 ; For each PC slot 0-2 (present or not), with Y = its stat block
-; address (!BattleRom_PcStatBlock): BattleFD_UnkB033 with A = the
+; address (!BattleRom_PcStatBlock): BattleFD_ItemRecOffset with A = the
 ; block's byte at offset DP $06 (LDA (DP $06),Y), then DP $0A bytes
 ; from bank $CC at the X it returns (the record's offset, by its use)
 ; are copied into the block from offset DP $08 on (STA (DP $08),Y).
@@ -28099,7 +28101,7 @@ BattleSys_UnkCE3A:
 ; Callers note: the BattleSys_UnkBC60 site ($C1:BCD5) is dead code.
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $06/$07, $08/$09 = the two block
 ;        offsets (16-bit, used as pointers), DP $0A = the byte count
-; Exit:  M=1, X=0 (as assumed after BattleFD_UnkB033, not analysed),
+; Exit:  M=1, X=0 (as BattleFD_ItemRecOffset returns),
 ;        DP=0, DB=$7E; A = 3, B = 0; X, Y clobbered; DP $00 = the last
 ;        block address, DP $02 = 3, DP $04 = 0
 !CopyRec_Blk = !BattleTmp_00            ; 2 B: the PC's stat block address
@@ -28125,7 +28127,7 @@ BattleSys_UnkCF15:
     SEP #$20
     LDY.b !CopyRec_Blk
     LDA.b (!CopyRec_Src),Y
-    JSL BattleFD_UnkB033
+    JSL BattleFD_ItemRecOffset
     LDY.b !CopyRec_Blk
 .copy:
     LDA.l !BattleRom_UnkCC0000,X
@@ -28388,21 +28390,23 @@ Battle_ClearCancelledHits:
 ;     the result is above 0, .CurHp = it, at most .MaxHp, and on to MP.
 ;     If it is 0 or negative: unless already KO'd or the slot is empty
 ;     (!Battler_UnkAEFF $FF), the slot is KO'd (!Battle_StatusKo), and
-;     for an enemy slot $FD:ABA2 runs first with DP $0E = the slot (not
-;     analysed); .CurHp = 0 and MP is skipped.
+;     for an enemy slot BattleFD_AddEnemyRewards runs first with DP $0E =
+;     the slot; .CurHp = 0 and MP is skipped.
 ;   - MP: .CurMp -= the amount of each set whose flags have
 ;     !Battle_HitMpBit; kept between 0 and .MaxMp.
 ; Then BattleFD_UnkACFD, which zeroes $7E:B328-$B3AB (the three hit
 ; sets) and leaves A = 0, X = $84. A negated amount (see
 ; Battle_RecordHit) raises HP or MP.
 ; Callers (2 JSR sites): BattleSys_ListHandler8 ($C1:8B0C) and BattleSys_UnkAC85 ($C1:AC85).
-; Entry: M=1, X=0, DP=0, DB=$7E
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $0F = 0 if an enemy can be KO'd:
+;        only the low byte of DP $0E is stored (8-bit STA) before the
+;        JSL to BattleFD_AddEnemyRewards, which reads DP $0E 16-bit
 ; Exit:  M=1, X=0 (BattleFD_UnkACFD keeps both), DP=0, DB=$7E;
 ;        A = 0, X = $84 (from BattleFD_UnkACFD), Y = $2C; DP $0E = the
 ;        last enemy slot KO'd here, if any; BattlerStats .CurHp, .CurMp
 ;        and .Status written; !Battle_HitAmount zeroed where cancelled
 ;        (and the rest Battle_ClearCancelledHits writes), plus what
-;        $FD:ABA2 and BattleFD_UnkACFD change
+;        BattleFD_AddEnemyRewards and BattleFD_UnkACFD change
 org $C1EC7F
 Battle_ApplyHits:
     JSR Battle_ClearCancelledHits
@@ -28471,7 +28475,7 @@ Battle_ApplyHits:
     LSR A
     LSR A
     STA.b !BattleTmp_0E
-    JSL BattleFD_UnkABA2
+    JSL BattleFD_AddEnemyRewards
     PLY
     PLX
 .set_ko:
@@ -28995,6 +28999,78 @@ Battle_CalcUnk56:
     CLC
     ADC.b #!Battle_Unk56Base
     RTS
+
+; ==================================================================
+; Long veneers for bank $FD ($C1:FDBF–$C1:FDD2)
+; ==================================================================
+; Each is a JSR to a bank-$C1 routine and an RTL, so that the battle
+; helpers in bank $FD (BattleFD_*) can reach it with JSL. They take and
+; leave what the routine they call takes and leaves; the JSR / RTL pair
+; changes no register or flag of its own.
+
+; $C1:FDBF — Battle_Mul16Long (4 bytes, $FDBF–$FDC2)
+; JSL form of Battle_Mul16.
+; Callers (17 JSL sites): BattleFD_LoadUnkB18E ($FD:AADD), BattleFD_LoadUnkB18E2 ($FD:AB0C),
+;   BattleFD_AddEnemyRewards ($FD:ABC1), BattleFD_UnkAE52 ($FD:AE77), BattleFD_UnkAEF2 ($FD:AF22),
+;   BattleFD_AddItemEntry ($FD:AF98), BattleFD_ItemRecOffset ($FD:B03F, $FD:B061, $FD:B082,
+;   $FD:B0A3, $FD:B0C4), BattleFD_UnkB655 ($FD:B66C, $FD:B68C) and BattleFD_UnkB7EB ($FD:B821,
+;   $FD:B842, $FD:B899, $FD:B8CC).
+; Entry: as Battle_Mul16: M any, X=0, DP=0, DB any
+; Exit:  as Battle_Mul16: M=1, X=0; A = 0, X = 0; !Battle_MathLo/Hi = the
+;        product
+org $C1FDBF
+Battle_Mul16Long:
+    JSR Battle_Mul16
+    RTL
+
+; $C1:FDC3 — BankC1_AddItemLong (4 bytes, $FDC3–$FDC6)
+; JSL form of BankC1_AddItem (not analysed: add one of item Y).
+; Callers (1 JSL site): BattleFD_UnkB655 ($FD:B72A).
+; Entry: as BankC1_AddItem; M=1, X=0, DP=0, DB=$7E at its one caller
+;        (BattleFD_UnkB655), Y = item id
+; Exit:  as BankC1_AddItem (not analysed)
+org $C1FDC3
+BankC1_AddItemLong:
+    JSR BankC1_AddItem
+    RTL
+
+; $C1:FDC7 — BattleSys_RunPcAttackLong (4 bytes, $FDC7–$FDCA)
+; JSL form of BattleSys_RunPcAttack.
+; Callers (3 JSL sites): BattleFD_UnkAB30 ($FD:AB6E, $FD:AB9A) and BattleFD_UnkAC6E ($FD:ACC9).
+; Entry: as BattleSys_RunPcAttack: M=1, X=0, DP=0, DB=$7E;
+;        !Battle_UnkB18B = the attacker, !Battle_UnkAD8E = the target
+; Exit:  as BattleSys_RunPcAttack: M=1, X=0 (as it assumes after its
+;        callees), DP=0, DB=$7E; A, X clobbered; Y as its callees leave it
+org $C1FDC7
+BattleSys_RunPcAttackLong:
+    JSR BattleSys_RunPcAttack
+    RTL
+
+; $C1:FDCB — Battle_RandRangeLong (4 bytes, $FDCB–$FDCE)
+; JSL form of Battle_RandRange.
+; Callers (4 JSL sites): BattleFD_UnkAB30 ($FD:AB55, $FD:AB7D), BattleFD_AddEnemyRewards ($FD:AC23)
+;   and BattleFD_UnkAC6E ($FD:ACA7).
+; Entry: as Battle_RandRange: M=1, X any, DP=0, DB=$7E; A = high bound,
+;        X = low bound
+; Exit:  as Battle_RandRange: M=1, X=0; A = the number
+org $C1FDCB
+Battle_RandRangeLong:
+    JSR Battle_RandRange
+    RTL
+
+; $C1:FDCF — BattleSys_RefundItemLong (4 bytes, $FDCF–$FDD2)
+; JSL form of BattleSys_RefundItem.
+; Callers (2 JSL sites): unmatched ($FD:A8D8, $FD:A910).
+; Entry: as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; DP $14 = PC
+;        slot (0-2)
+; Exit:  as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; X preserved;
+;        A clobbered (B = 0); Y = the record number when the item was
+;        found, 256 when not, unchanged when the command was not an item;
+;        DP $0E = the item id on the item path
+org $C1FDCF
+BattleSys_RefundItemLong:
+    JSR BattleSys_RefundItem
+    RTL
 
 
 ; ==================================================================

@@ -690,6 +690,45 @@ if !constants_engine_inc == 0
                                          ; bottom rows (30 tiles)
 !Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
 !Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
+; --- Field HDMA (Hdma_InitChannelsFD, EngFD_UnkC124, EngFD_UnkD52D, EngFD_UnkC2C1) ---
+!Hdma_TableSetA = $0F80                  ; bank-$7F address of the first set of 8 HDMA tables
+!Hdma_TableSetB = $1238                  ; ... of the second set
+!Hdma_TableBytes = $57                   ; bytes per table in a set
+!Field_Unk53HdmaSetMask = $0F            ; Field_Unk53 bits: all clear = table set A
+!Field_Unk53Phase = $01                  ; Field_Unk53 bit EngFD_UnkC2C1 flips each frame
+!Hdma_ScRecord2Unk = $1C                 ; bytes 0 and 2 of Hdma_Unk7F14F4
+!Hdma_ScrollPair0 = $0037                ; second words of the four Hdma_Unk7F14F8 pairs (the first are 0)
+!Hdma_ScrollPair1 = $FFF1
+!Hdma_ScrollPair2 = $FFBC
+!Hdma_ScrollPair3 = $FF76
+!Hdma_WhWholeLine = $FF00                ; a WH0/WH1 word: WH0 = 0, WH1 = $FF
+!HdmaGrad_Lines = 40                     ; EngFD_UnkD52D: dividend ...
+!HdmaGrad_Steps = 8                      ; ... and divisor of its run length (5)
+!HdmaGrad_AddFirst = $E8                 ; COLDATA of its first step (then down to $E1)
+!HdmaGrad_SubLast = $E9                  ; COLDATA of its last step
+!Hdma_GradAdd = $01                      ; CGADSUB byte of the first half: add, BG1
+!Hdma_GradSub = $81                      ; CGADSUB byte of the second half: subtract, BG1
+!Hdma_GradBytes = $0100                  ; bytes EngFD_UnkD52D copies to Hdma_Unk7F1600
+
+; --- Location animation set-up (FieldFD_LoadAnimSetA/B) ---
+!FieldRom_AnimListAPtrs = $FDF290        ; 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA
+!FieldRom_AnimListA = $FDF310            ; the lists FieldFD_LoadAnimSetA reads
+!FieldRom_AnimListBPtrs = $FDF9C7        ; 2 B per LocRom.Palette: offset of its list from FieldRom_AnimListB
+!FieldRom_AnimListB = $FDFA77            ; the lists FieldFD_LoadAnimSetB reads
+!LocRom_AnimSetMask = $3F                ; LocRom.Tileset12 bits that pick FieldFD_LoadAnimSetA's list
+!FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
+!FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
+!FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
+!FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
+!FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops
+!FieldAnim_Kind4 = 4
+!FieldAnimB_KindMask = $F0               ; FieldFD_LoadAnimSetB: the kind nibble of a list byte
+!FieldAnimB_Kind10 = $10                 ; kinds with 9-byte records
+!FieldAnimB_Kind80 = $80                 ; ... the second also stores FieldAnimB.Ptr
+!FieldAnimB_SkipMask = $0F               ; FieldAnimB.Unk0 bits: list bytes skipped (+ 1) after a kind-$80 record
+!FieldAnimB_Size = 12                    ; bytes per FieldAnimB record
+!FieldAnimB_Filled = 6                   ; records FieldFD_LoadAnimSetB fills (the other 6 get .Unk0 = 0)
+
 endif
 
 ; --- NMI handler (NmiHandler, $C0:EA63) ---
