@@ -581,7 +581,7 @@ $C1:672E,$C1:672F,2,BattleAct_OpArcToUnkPoint,$C1,Battle engine,verified,be5eac6
 $C1:6730,$C1:6742,19,BattleAct_ArcToUnkPointDir,$C1,Battle engine,verified,b0918fd3a41a,
 $C1:6743,$C1:6749,7,BattleAct_OpArcDownToCalc,$C1,Battle engine,verified,f0fbcb0d768a,Opcode $9A <mode> <n>: opcode $98 (BattleAct_OpArcToCalc) with the height added instead of subtracted (DP $8F = 1).
 $C1:674A,$C1:6750,7,BattleAct_OpArcDownToUnkPoint,$C1,Battle engine,verified,1406449c0d9c,Opcode $9B <m>: opcode $99 (BattleAct_OpArcToUnkPoint) with the height added instead of subtracted (DP $8F = 1).
-$C1:6751,$C1:691A,458,BattleAct_OpMoveAlongHeading,$C1,Battle engine,readable,bfa694c47b22,
+$C1:6751,$C1:691A,458,BattleAct_OpMoveAlongHeading,$C1,Battle engine,verified,bfa694c47b22,
 $C1:691B,$C1:692A,16,BattleAct_OpStartPosHistory,$C1,Battle engine,verified,7b080281361b,
 $C1:692B,$C1:69B9,143,BattleAct_SetPosHistory,$C1,Battle engine,verified,0b5f50d5eab0,
 $C1:69BA,$C1:69C2,9,BattleAct_OpStopPosHistory,$C1,Battle engine,verified,62bfb4138f22,Opcode $A5: !Battler_PosHistOn = 0 for the same battlers as opcode $A4 (BattleAct_OpStartPosHistory); advances 1.
