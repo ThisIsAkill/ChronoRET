@@ -258,6 +258,9 @@ struct BattlerStats $5E00
 .Unk4C:     skip $0A    ; +$4C
 .Unk56:     skip 1      ; +$56: BattleSys_Main stores !Battle_Unk1C48 entry 0/5/10 here for PC 0/1/2 as the
                         ; battle ends; Battle_SetupBattle derives it for a PC whose .Unk2D is 5; meaning unknown
+            skip $0D
+.Unk64:     skip 1      ; +$64: added to turn list 1's timer reload, and (halved, + 8) the divisor of its HP
+                        ; amount (BattleSys_ListHandler1); meaning unknown
 endstruct align $80
 
 ; Per-PC command records, 7 bytes each, PC slot 0/1/2 at +0/+7/+14
@@ -1180,6 +1183,8 @@ endstruct
 !BattleTmp_0E             = $0E   ; 1-2 B scratch
 !BattleTmp_10             = $10   ; 1-2 B scratch
 !BattleTmp_12             = $12   ; 1-2 B scratch
+!BattleTmp_14             = $14   ; 1-2 B scratch (BattleSys_Unk8461 leaves a slot here for its callees)
+!BattleTmp_22             = $22   ; 2 B scratch (BattleSys_Unk8461: the slot turn list 12 found)
 
 !Battle_SavedRandIdx      = $29AD ; 1 B: !Battle_RandIdx kept between battles (BattleSys_Main loads and stores it;
                                   ; the menu code calls $2990-$29AF Menu_Config)
@@ -1217,12 +1222,51 @@ endstruct
                                   ; the ATB gauge); 1 for PCs and $FF for enemies when !Battle_Unk2989 bit 5 is set
 !Battle_ListFlags         = $AFB6 ; 13 lists x 11 B, one byte per battler slot (BattleSys_ListOffsetTable): bit 7 set
                                   ; = the slot is due in that list; the low bits non-zero = it takes part
+!Battle_ListRuns          = $B045 ; 13 lists x 11 B: runs left of a list entry; the handlers count it down and at 0
+                                  ; set it back to 10 and (most) stop the entry; who sets it first is not traced
+!Battle_ListReload        = $B0D4 ; 13 lists x 11 B: the value each list handler reloads into !Battle_ListTimers
 !Battle_UnkB158           = $B158 ; 11 B: set to $FF by Battle_SetupBattle
 !Battle_SlotOrder         = $B163 ; 11 B: the present battler slots in a random order (BattleSys_Main), $FF after
 !Battle_UnkB16E           = $B16E ; 11 B: BattleSys_Main's scratch pool for the shuffles
 !Battle_ListCursor        = $B179 ; 13 B: per turn list, the position in !Battle_SlotOrder its scan goes on from
 !Battle_ListDue           = $B186 ; 2 B: bit (12 - n) set = turn list n found a due slot; BattleSys_Main then runs
                                   ; entry n of BattleSys_ListHandlerTable
+!Battle_UnkB192           = $B192 ; 4 B per battler slot: zeroed for slot !Battle_UnkB18B by BattleSys_ClearUnkB192
+!Battle_UnkB1CF           = $B1CF ; 1 B: 1 = the script block being run has a second 4-byte record (byte 4 not $FE)
+                                  ; (BattleSys_Unk8461); zeroed by BattleSys_Unk8C09
+!Battle_UnkB1D0           = $B1D0 ; 2 B: script address of the current block (BattleSys_Unk8461)
+!Battle_UnkB1D2           = $B1D2 ; 2 B: script read address in bank $CC (set by BattleSys_UnkB488; BattleSys_Unk8461)
+!Battle_UnkB1D4           = $B1D4 ; 2 B per entry: saved in !Battle_UnkB3CA around BattleSys_Unk8461's script blocks
+!Battle_UnkB1FD           = $B1FD ; 1 B: battler slot passed with !Battle_UnkAD89 (turn lists 1, 8, 9)
+!Battle_UnkB202           = $B202 ; 1 B: 0 (turn lists 1, 8) or $C0 (list 9) before BattleSys_UnkEBF8; meaning unknown
+!Battle_UnkB239           = $B239 ; 1 B: code of the current script record (BattleSys_UnkB80DTable index)
+!Battle_UnkB24A           = $B24A ; 8 B per enemy (BattleSys_Unk8C09) or reaction entry (BattleSys_Unk8461): set
+                                  ; from !Battle_UnkAF24; non-zero = BattleSys_Unk8461 skips the enemy's turn
+!Battle_UnkB263           = $B263 ; 8 B, indexed as !Battle_UnkB24A: counts the script blocks tried
+!Battle_UnkB273           = $B273 ; 2 B: script address BattleSys_UnkB488 left (BattleSys_Unk8461)
+!Battle_UnkB2B6           = $B2B6 ; 8 B, indexed as !Battle_UnkB24A: zeroed when !Battle_UnkAF24 is 2; non-zero =
+                                  ; BattleSys_Unk8C09 skips the enemy
+!Battle_UnkB2C0           = $B2C0 ; 1 B: zeroed at BattleSys_Unk8461's start and end; 0 after BattleSys_UnkB762
+                                  ; = no reaction scripts (BattleFD_UnkAC6E instead)
+!Battle_UnkB2D5           = $B2D5 ; 1 B: !Enemy_AnimWanted saved over a reaction script (BattleSys_Unk8461)
+!Battle_UnkB315           = $B315 ; 1 B: BattleSys_Unk8461's position in !Battle_UnkB3AC (0-7)
+!Battle_UnkB3AC           = $B3AC ; 11 B: copy of !Battle_UnkAD8E taken after each turn (BattleSys_Unk8461); its
+                                  ; enemy slots get their reaction scripts run
+!Battle_UnkB3B7           = $B3B7 ; 1 B: !Battle_UnkB18B kept by BattleSys_Unk8461 (the slot that last acted, probably)
+!Battle_UnkB3B9           = $B3B9 ; 1 B: zeroed at BattleSys_Unk8461's start; meaning unknown
+!Battle_UnkB3BE           = $B3BE ; 1 B: counts 2, 1, 0, 2, ... while a PC is latched (BattleSys_Unk8461)
+!Battle_UnkB3CA           = $B3CA ; 2 B: !Battle_UnkB1D4 entry saved over a script block (BattleSys_Unk8461)
+!Battle_UnkB3F4           = $B3F4 ; 1 B: PC slot stored when !Battle_UnkAF23 is set (BattleSys_Unk8461)
+!Battle_UnkAD89           = $AD89 ; 2 B: amount of the turn-list hits (lists 1, 8, 9); goes to !Battle_ActPcHitAmount
+!Battle_UnkAEB2           = $AEB2 ; 1 B: zeroed with the 8 !Battle_UnkAEB3 bytes by BattleSys_Unk8461; meaning unknown
+!Battle_UnkAEC8           = $AEC8 ; 1 B: enemy index (slot - 3) BattleSys_Unk8461 works on
+!Battle_UnkAF23           = $AF23 ; 1 B: non-zero = BattleSys_Unk8461 sends a due PC to $C1:B575/$C1:BCE1, not the menu
+!Battle_UnkAF24           = $AF24 ; 1 B: result of a script block (BattleSys_UnkB80DTable handlers): 0 = the enemy
+                                  ; acts on it (BattleSys_Unk8461), 2 = zeroes !Battle_UnkB2B6; else the next block
+!Battler_Unk9826          = $9826 ; 1 B per battler slot: non-zero lets an enemy take its turn whatever its
+                                  ; !Enemy_AnimWanted (BattleSys_Unk8461 clears it then); meaning unknown
+!Battle_ActMainMask       = $AE95 ; 2 B: main-target mask, bit 15 = slot 0 (read at $CC:F186); BattleSys_Unk895B
+                                  ; sets $8000
 !Battle_UnkB188           = $B188 ; 1 B: zeroed by Battle_SetupBattle
 !Battle_UnkB189           = $B189 ; 1 B: zeroed by Battle_SetupBattle
 !Battle_UnkB18A           = $B18A ; 1 B: zeroed by Battle_SetupBattle
@@ -1275,6 +1319,8 @@ endstruct
 !BattleRom_PcStatBlock    = $FDA80B ; 2 B per PC slot: address of its stat block (BattlerStats[n].Unk2D; read as
                                     ; $5E2D, $5EAD, $5F2D)
 !BattleRom_UnkCC0000      = $CC0000 ; base of the LDA.l Battle_SetupBattle indexes with a RAM address (quirk)
+!BattleRom_ScriptBank     = $CC0000 ; bank $CC base: BattleSys_Unk8461 reads script bytes as LDA.l this,X with X = the
+                                    ; address (probably the enemy behaviour scripts, from the $CC:8B08 pointer table)
 !BattleRom_EnemyUnk5E04   = $CC5E04 ; 7 B per enemy id: Battle_SetupBattle tests byte 0 (-> !Battle_UnkAE5D bit 6)
 !BattleRom_EnemyUnk5E05   = $CC5E05 ; ... and byte 1 (-> bit 7); what the records hold is not traced
 !Battle_Unk29D7           = $29D7   ; its address is passed to $FD:B14D (DP $0E) by Battle_SetupBattle; meaning unknown
