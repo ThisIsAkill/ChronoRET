@@ -1507,515 +1507,538 @@ UpdateNpc_exit:
 ; ============================================================
 
 ; $C1:095D — BattleMenu_RenderItemListRows (83 bytes, $095D–$09AF)
-; Renders 3 visible item-list rows:
-;   1. Clears text buffer $0E80 ($180 bytes).
-;   2. Computes first item record index = $80 * 5 (5-byte records).
-;   3. Calls BattleMenu_RenderItemRow for rows 0, 1, 2, advancing
-;      the item index by 5 and the display-column offset by $80 each row.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $80 = item list scroll position
-; Exit:  M=1; $80/$82/$84/$86 clobbered
-; Calls: BattleMenu_RenderItemRow ($09B0)
+; Renders the 3 visible item-list lines:
+;   1. Clears the item list map (BattleMenu_ItemTile, $180 bytes).
+;   2. First record offset = scroll × !Item_RecordSize.
+;   3. Calls BattleMenu_RenderItemRow for lines 0-2, advancing the record
+;      by one and the map offset by !BattleMenu_ListRowStride each time.
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ListScroll = scroll position
+; Exit:  M=1; DP $80-$87 clobbered
+; Calls: BattleMenu_RenderItemRow
+; Direct-page roles (shared with RenderItemRow and the list scroll routines):
+!BattleMenu_ListScroll = !BattleTmp_80    ; 1 B in: list scroll position
+!BattleMenu_ItemRecOffset = !BattleTmp_80 ; 2 B: Item_BattleList offset of the line being drawn
+!BattleMenu_ListPc = !BattleTmp_96        ; 2 B: active PC slot (selects its BattleRom_PcBit)
+!BattleMenu_RowMapOffset = !BattleTmp_82  ; 2 B: map offset of the line being drawn (line * $80)
+!BattleMenu_RowCount = !BattleTmp_86      ; 1-2 B: lines drawn so far
 org $C1095D
 BattleMenu_RenderItemListRows:
-    LDA.w $95D5                     ; active PC slot index
+    LDA.w !BattleMenu_ActivePc
     TAX
-    STX.b $96                       ; save slot (16-bit) to DP $96–$97
-    LDX.w #$0180                    ; $180 bytes to clear
+    STX.b !BattleMenu_ListPc        ; (16-bit store)
+    LDX.w #!BattleMenu_WindowBytes  ; bytes to clear
     REP #$20                        ; M=0
     TDC                             ; A = 0
     TAY                             ; Y = 0 (buffer index)
     SEP #$20                        ; M=1
 .clear_loop:
-    STA.w $0E80,Y                   ; zero one byte of item text buffer
+    STA.w BattleMenu_ItemTile(0,0),Y ; zero one byte
     INY
     DEX
     BNE .clear_loop
-    STZ.b $81                       ; item index high byte = 0
+    STZ.b !BattleMenu_ListScroll+1  ; zero-extend the scroll position
     REP #$20                        ; M=0
     TDC
-    STA.b $82                       ; display-column offset = 0
-    LDA.b $80                       ; scroll position
-    STA.b $84                       ; save
+    STA.b !BattleMenu_RowMapOffset  ; line 0 at map offset 0
+    LDA.b !BattleMenu_ListScroll
+    STA.b !BattleTmp_84
     ASL A                           ; * 2
     ASL A                           ; * 4
     CLC
-    ADC.b $84                       ; * 4 + * 1 = * 5 (5-byte item records)
-    STA.b $80                       ; first item record index
+    ADC.b !BattleTmp_84             ; * 4 + * 1 = * 5
+    STA.b !BattleMenu_ItemRecOffset ; first record
     TAX
     TDC
-    STA.b $86                       ; row counter = 0
+    STA.b !BattleMenu_RowCount      ; lines drawn = 0
     SEP #$20                        ; M=1
 .row_loop:
     JSR BattleMenu_RenderItemRow
     REP #$20                        ; M=0
-    LDA.b $86                       ; row counter
-    INC A                           ; (row + 1) for row-buffer stride calc
+    LDA.b !BattleMenu_RowCount
+    INC A                           ; next line
     ASL A                           ; * 2
     ASL A                           ; * 4
     ASL A                           ; * 8
     ASL A                           ; * 16
     ASL A                           ; * 32
     ASL A                           ; * 64
-    ASL A                           ; * 128 ($80 words per row = line-buffer stride)
-    STA.b $82                       ; column offset for next row
+    ASL A                           ; * 128 (two tilemap rows per line)
+    STA.b !BattleMenu_RowMapOffset
     CLC
-    LDA.b $80
-    db $69,$05,$00                  ; ADC #$0005 — next item record (M=0 3-byte form)
-    STA.b $80
+    LDA.b !BattleMenu_ItemRecOffset
+    ADC.w #!Item_RecordSize         ; next record
+    STA.b !BattleMenu_ItemRecOffset
     TDC
     SEP #$20                        ; M=1
-    INC.b $86                       ; row counter++
-    LDA.b $86
-    CMP #$03
+    INC.b !BattleMenu_RowCount
+    LDA.b !BattleMenu_RowCount
+    CMP.b #!BattleMenu_ListRows
     BNE .row_loop
     RTS
 
 ; $C1:09B0 — BattleMenu_RenderItemRow (215 bytes, $09B0–$0A86) +
 ;             CODE_JP_C10A87 (1 byte, $0A87)
-; Renders one item-list row for item record at $7E:1580+$80.
-;   - If quantity ($1583,X) = 0 or item id ($1580,X) = 0 → exit.
-;   - Copies 11-byte item name from $CC:name_table into $94A0, re-encodes,
-;     then lays tile/attr pairs into display buffers $0EC6 and $0E86.
-;   - Formats item quantity ($1583,X) as 2-digit display at $0EDE/$0EE0.
-;   - Attr tile = $29 (normal) or $2D (greyed) based on party-use flags.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $80 = item record index, $82 = column offset
-; Exit:  M=1; $84/$8E/$98 clobbered
-; Calls: BattleMsg_ReencodeTextBuffer ($01A9), Battle_DivTen9499 ($0174),
-;        BattleMsg_BlankLeadingZeros ($104E)
+; Renders one item-list line for the Item_BattleList record at
+; !BattleMenu_ItemRecOffset into the item map at !BattleMenu_RowMapOffset.
+;   - Quantity 0 or id 0 → nothing drawn.
+;   - Copies 11 bytes from bank $CC at !Item_NameTable + id × 11 + 1 into
+;     !BattleMsg_TextTiles (the +1 is the carry left by the SBC, so the
+;     record's leading icon byte is skipped and the 11th byte copied is
+;     the next record's icon), re-encodes them, then writes 10 lower-row
+;     tiles to row 1 and 11 upper-row tiles to row 0 of the line, from
+;     col 3.
+;   - Quantity as two digits at row 1, cols 15-16, then the glyphs
+;     "Item" at cols 22-25.
+;   - Attribute for the whole line: palette 3 (greyed) when .Flags bit 7 is
+;     set and .PcMask lacks the active PC's bit, else palette 2.
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ItemRecOffset, !BattleMenu_RowMapOffset
+; Exit:  M=1; DP $84/$8E/$98 clobbered
+; Calls: BattleMsg_ReencodeTextBuffer, Battle_DivTen9499, BattleMsg_BlankLeadingZeros
+!BattleMenu_RowAttr = !BattleTmp_98      ; 1 B: attribute for the whole line (palette 2 or greyed 3)
 org $C109B0
 BattleMenu_RenderItemRow:
-    LDX.b $80                       ; item record index (16-bit from DP)
-    LDA.w $1583,X                   ; item quantity
-    BEQ .empty_slot                 ; 0 → empty, skip
-    LDA.w $1580,X                   ; item id
-    BNE .render_item                ; nonzero → render
+    LDX.b !BattleMenu_ItemRecOffset ; (16-bit DP load)
+    LDA.w Item_BattleList.Quantity,X
+    BEQ .empty_slot                 ; none held → skip
+    LDA.w Item_BattleList.Id,X
+    BNE .render_item
 .empty_slot:
-    JMP CODE_JP_C10A87              ; skip this row
+    JMP CODE_JP_C10A87              ; skip this line
 .render_item:
     REP #$20                        ; M=0
-    STA.b $84                       ; save display-flag value (16-bit, B=0)
+    STA.b !BattleTmp_84             ; item id (16-bit, B=0)
     ASL A                           ; * 2
     ASL A                           ; * 4
-    STA.b $8E                       ; save * 4
+    STA.b !BattleTmp_8E             ; save * 4
     ASL A                           ; * 8
     CLC
-    ADC.b $8E                       ; * 8 + * 4 = * 12
+    ADC.b !BattleTmp_8E             ; * 8 + * 4 = * 12
     SEC
-    SBC.b $84                       ; * 12 - * 1 = * 11 (11 bytes/name)
-    db $69,$5E,$0B                  ; ADC #$0B5E — ROM offset of item name table (M=0 3-byte)
-    TAX                             ; X = ROM offset in bank $CC
+    SBC.b !BattleTmp_84             ; * 12 - * 1 = * 11 (bytes per name)
+    ADC.w #!Item_NameTable          ; C is still set from the SBC: +1, past the icon byte
+    TAX                             ; X = name address in bank $CC
     TDC
-    LDY.w #$94A0                    ; Y = destination in $7E
-    LDA.w #$000A                    ; 11 bytes (count-1)
-    MVN $7E,$CC                     ; copy 11-byte item name: $CC:X → $7E:$94A0
+    LDY.w #!BattleMsg_TextTiles     ; Y = destination in bank $7E
+    LDA.w #!Item_NameLen-1          ; count − 1
+    ; copy the item name: $CC:X → $7E:TextTiles
+    MVN !Battle_WramBank,!BattleRom_TextBank ; lint-ok: MVN takes bank bytes and has no width suffix
     TDC
     SEP #$20                        ; M=1
-    STA.w $0000,Y                   ; null-terminate at $7E:$94AB
+    STA.w !Battle_WramAbs,Y         ; terminate the text (Y = end of the copy)
     JSR BattleMsg_ReencodeTextBuffer
-    LDX.b $80                       ; item record index
-    LDA.w $1582,X                   ; item status flags
-    BPL .attr_normal                ; non-negative → selectable
-    LDA.w $1584,X                   ; party-use bitfield
-    LDX.b $96                       ; slot index (16-bit from DP $96–$97)
-    AND.l $CCF9FB,X                 ; mask against per-PC usability table
-    BNE .attr_normal                ; can use → normal attr
-    LDA #$2D                        ; greyed-out attr tile
+    LDX.b !BattleMenu_ItemRecOffset
+    LDA.w Item_BattleList.Flags,X
+    BPL .attr_normal                ; bit 7 clear → normal
+    LDA.w Item_BattleList.PcMask,X
+    LDX.b !BattleMenu_ListPc        ; (16-bit DP load)
+    AND.l !BattleRom_PcBit,X        ; this PC's bit
+    BNE .attr_normal                ; this PC may use it → normal
+    LDA.b #!BattleUI_AttrPal3       ; greyed
     BRA .attr_done
 .attr_normal:
-    LDA #$29                        ; normal attr tile
+    LDA.b #!BattleUI_AttrPal2
 .attr_done:
-    STA.b $98                       ; save attribute tile
+    STA.b !BattleMenu_RowAttr
     TDC
     TAY
-    LDX.b $82                       ; column offset
-.name_copy1:
-    LDA.w $94A0,Y                   ; name tile from re-encoded buffer
-    STA.w $0EC6,X
+    LDX.b !BattleMenu_RowMapOffset
+.name_copy1:                        ; lower-row tiles (X steps over tile, attribute)
+    LDA.w !BattleMsg_TextTiles,Y
+    STA.w BattleMenu_ItemTile(1,3),X
     INX
-    LDA.b $98                       ; attr tile
-    STA.w $0EC6,X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemTile(1,3),X ; (X+1: the attribute byte)
     INX
     INY
-    CPY.w #$000A                    ; 10 tile+attr pairs
+    CPY.w #!Item_NameLen-1          ; 10 tiles on this row
     BNE .name_copy1
-    LDA #$5F                        ; separator tile
-    STA.w $0EC8,X
-    LDA.b $98
-    STA.w $0EC9,X
+    LDA.b #!BattleUI_TileSpacer
+    STA.w BattleMenu_ItemTile(1,4),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,4),X
     TDC
     TAY
-    LDX.b $82
-.name_copy2:
-    LDA.w $94B0,Y
-    STA.w $0E86,X
+    LDX.b !BattleMenu_RowMapOffset
+.name_copy2:                        ; upper-row tiles
+    LDA.w !BattleMsg_TextTopTiles,Y
+    STA.w BattleMenu_ItemTile(0,3),X
     INX
-    LDA.b $98
-    STA.w $0E86,X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemTile(0,3),X ; (X+1: the attribute byte)
     INX
     INY
-    CPY.w #$000B                    ; 11 tile+attr pairs
+    CPY.w #!Item_NameLen            ; 11 tiles on this row
     BNE .name_copy2
-    LDX.b $80                       ; item record index
-    LDA.w $1583,X                   ; item quantity
-    REP #$20                        ; M=0 (zero-extend quantity to 16-bit)
-    STA.w $9499                     ; → digit-format workspace
-    JSR Battle_DivTen9499           ; format quantity as 2-digit decimal
-    JSR BattleMsg_BlankLeadingZeros ; suppress leading zero
-    LDX.b $82                       ; column offset (M=1 on return from both JSRs)
-    LDA.w $949E                     ; tens digit tile
-    STA.w $0EDE,X
-    LDA.b $98
-    STA.w $0EDF,X
-    LDA.w $949F                     ; ones digit tile
-    STA.w $0EE0,X
-    LDA.b $98
-    STA.w $0EE1,X
-    LDA #$A8
-    STA.w $0EEC,X
-    LDA.b $98
-    STA.w $0EED,X
-    LDA #$CD
-    STA.w $0EEE,X
-    LDA.b $98
-    STA.w $0EEF,X
-    LDA #$BE
-    STA.w $0EF0,X
-    LDA.b $98
-    STA.w $0EF1,X
-    LDA #$C6
-    STA.w $0EF2,X
-    LDA.b $98
-    STA.w $0EF3,X
+    LDX.b !BattleMenu_ItemRecOffset
+    LDA.w Item_BattleList.Quantity,X
+    REP #$20                        ; M=0 (B is 0: zero-extended)
+    STA.w !BattleMsg_NumValue
+    JSR Battle_DivTen9499           ; two digits
+    JSR BattleMsg_BlankLeadingZeros
+    LDX.b !BattleMenu_RowMapOffset  ; (M=1 again after both calls)
+    LDA.w !BattleMsg_Digit10
+    STA.w BattleMenu_ItemTile(1,15),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,15),X
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_ItemTile(1,16),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,16),X
+    LDA.b #!BattleMsg_Glyph_I
+    STA.w BattleMenu_ItemTile(1,22),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,22),X
+    LDA.b #!BattleMsg_Glyph_t
+    STA.w BattleMenu_ItemTile(1,23),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,23),X
+    LDA.b #!BattleMsg_Glyph_e
+    STA.w BattleMenu_ItemTile(1,24),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,24),X
+    LDA.b #!BattleMsg_Glyph_m
+    STA.w BattleMenu_ItemTile(1,25),X
+    LDA.b !BattleMenu_RowAttr
+    STA.w BattleMenu_ItemAttr(1,25),X
 CODE_JP_C10A87:
     RTS
 
 ; $C1:0A88 — BattleMenu_RenderTechListRows (75 bytes, $0A88–$0AD2)
-; Renders 4 tech-list rows (2 per outer loop iteration) for the active PC.
-; Loads PC's tech-display base from DATA8_CCF38C[slot], adds scroll position
-; ($95EB,slot), then calls BattleMenu_RenderTechRow four times advancing
-; the destination offset $82 by $80 per row.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $82 = base display-column offset
+; Renders 4 tech-list lines (2 per outer loop pass) for the active PC
+; into the tech text buffer (BattleMenu_TechTextTile). First line =
+; !BattleRom_TechListBase[PC] + !Pc_TechScroll[PC]; each line advances
+; the map offset by !BattleMenu_ListRowStride.
+; Entry: M=1, X=0 (16-bit), DB=$7E
 ; Exit:  M=1
-; Calls: BattleMenu_RenderTechRow ($0B0B)
+; Calls: BattleMenu_RenderTechRow
+; Direct-page roles (shared with RenderTechRow and its tails):
+!BattleMenu_TechListBase = !BattleTmp_AF  ; 1 B: first line of the PC's tech list
+!BattleMenu_TechRowNum = !BattleTmp_88    ; 1-2 B: list line number being drawn
+!BattleMenu_PairsLeft = !BattleTmp_87     ; 1 B: line pairs left
+!BattleMenu_TechCodeIdx = !BattleTmp_80   ; 2 B: !Tech_ListCode index of the line being drawn
 org $C10A88
 BattleMenu_RenderTechListRows:
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.l $CCF38C,X                 ; tech-display base index for this PC
-    STA.b $AF
-    LDA.w $95EB,X                   ; PC tech-list scroll position
-    STA.b $88
-    STA.b $86
-    LDA #$02
-    STA.b $87                       ; outer loop count = 2 (2 passes × 2 rows = 4 rows)
-    STZ.b $89
+    LDA.l !BattleRom_TechListBase,X ; PC's first list line
+    STA.b !BattleMenu_TechListBase
+    LDA.w !Pc_TechScroll,X
+    STA.b !BattleMenu_TechRowNum
+    STA.b !BattleTmp_86             ; (not read again here)
+    LDA.b #!BattleMenu_TechRowPairs
+    STA.b !BattleMenu_PairsLeft     ; 2 passes × 2 lines
+    STZ.b !BattleMenu_TechRowNum+1
     CLC
-    LDA.b $88
-    ADC.b $AF                       ; first display code index = scroll + base
-    STA.b $80
-    STZ.b $81
+    LDA.b !BattleMenu_TechRowNum
+    ADC.b !BattleMenu_TechListBase  ; scroll + base
+    STA.b !BattleMenu_TechCodeIdx
+    STZ.b !BattleMenu_TechCodeIdx+1
     TDC
-    STA.b $82                       ; display-column offset low = 0
-    STA.b $83
+    STA.b !BattleMenu_RowMapOffset  ; first line at map offset 0
+    STA.b !BattleMenu_RowMapOffset+1
 .row_pair_loop:
-    JSR BattleMenu_RenderTechRow    ; render row A
-    INC.b $80                       ; advance display code index
+    JSR BattleMenu_RenderTechRow    ; first line of the pair
+    INC.b !BattleMenu_TechCodeIdx
     REP #$21                        ; M=0, C=0
-    LDA.b $82
-    db $69,$80,$00                  ; ADC #$0080 — advance one row ($80 words, M=0 3-byte)
-    STA.b $82
+    LDA.b !BattleMenu_RowMapOffset
+    ADC.w #!BattleMenu_ListRowStride ; next line
+    STA.b !BattleMenu_RowMapOffset
     TDC
     SEP #$20                        ; M=1
-    JSR BattleMenu_RenderTechRow    ; render row B
+    JSR BattleMenu_RenderTechRow    ; second line of the pair
     REP #$21                        ; M=0, C=0
-    LDA.b $82
-    db $69,$80,$00                  ; ADC #$0080 (M=0 3-byte)
-    STA.b $82
+    LDA.b !BattleMenu_RowMapOffset
+    ADC.w #!BattleMenu_ListRowStride
+    STA.b !BattleMenu_RowMapOffset
     SEP #$20                        ; M=1
-    INC.b $80
-    DEC.b $87
+    INC.b !BattleMenu_TechCodeIdx
+    DEC.b !BattleMenu_PairsLeft
     BNE .row_pair_loop
     RTS
 
 ; $C1:0AD3 — BattleMenu_BuildTechAvailFlags (56 bytes, $0AD3–$0B0A)
-; Builds availability array $7E:1CDB (20 entries, one per display slot) for
-; the active PC's tech list.  For each slot, reads display code from
-; $94D0+base: if $FB–$FF → write 0 (unselectable); else → write 1.
-; Used by cursor-movement logic to skip blank/locked entries.
+; Builds !Tech_ListAvail (20 entries, one per list line) for the active
+; PC's tech list: line code $FB-$FF (blank, header or skip line) → 0,
+; anything else → 1. TechListPrev/Next use it to skip those lines.
 ; Entry: M=1, X=0 (16-bit), DB=$7E
-; Exit:  M=1; $80/X/Y clobbered
+; Exit:  M=1; DP $80, X/Y clobbered
 ; No JSR/JSL calls.
+!BattleMenu_EntriesLeft = !BattleTmp_80  ; 1 B: list lines left to grade
 org $C10AD3
 BattleMenu_BuildTechAvailFlags:
     TDC
-    TAY                             ; Y = output index into $1CDB
-    LDA #$14
-    STA.b $80                       ; 20 entries to process
-    LDA.w $95D5                     ; active PC slot
+    TAY                             ; Y = index into !Tech_ListAvail
+    LDA.b #!Tech_ListLen
+    STA.b !BattleMenu_EntriesLeft
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.l $CCF38C,X                 ; tech-display base index
-    TAX                             ; X = index into $94D0 display table
+    LDA.l !BattleRom_TechListBase,X
+    TAX                             ; X = index into !Tech_ListCode
 .avail_loop:
-    LDA.w $94D0,X                   ; display code
-    CMP #$FF
+    LDA.w !Tech_ListCode,X
+    CMP.b #!Tech_CodeBlank
     BEQ .unavail
-    CMP #$FE
+    CMP.b #!Tech_CodeBlank2
     BEQ .unavail
-    CMP #$FD
+    CMP.b #!Tech_CodeTripleHeader
     BEQ .unavail
-    CMP #$FC
+    CMP.b #!Tech_CodeDoubleHeader
     BEQ .unavail
-    CMP #$FB
+    CMP.b #!Tech_CodeSkip
     BEQ .unavail
     LDA #$01                        ; selectable
-    STA.w $1CDB,Y
+    STA.w !Tech_ListAvail,Y
     BRA .next
 .unavail:
     TDC                             ; 0 = unselectable
-    STA.w $1CDB,Y
+    STA.w !Tech_ListAvail,Y
 .next:
     INY
     INX
-    DEC.b $80
+    DEC.b !BattleMenu_EntriesLeft
     BNE .avail_loop
     RTS
 
 ; $C1:0B0B — BattleMenu_RenderTechRow (171 bytes, $0B0B–$0BB5)
-; Renders one tech-list row into 16-word buffer $94A0 (cleared to $FFFF),
-; then copies tile+attr pairs into window tilemap buffers $9A2F/$99EF.
-; Display code in $94D0+$80:
-;   $FF/$FE → blank (jump to CODE_JP_C10BB6 / exit early)
-;   $FD     → fixed string type 2 at $CCFB4B+$12 (labelled UNREACH in ref)
-;   $FC     → fixed string type 1 at $CCFB4B+$00
-;   $FB     → indexed variant (use $88 as table index, skip name decode)
-;   else    → tech name: id*11+$15C4 in bank $CC, re-encoded via $01A9
-; Entry: M=1, X=0 (16-bit), DB=$7E; $80 = display code index, $82 = col offset
+; Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles /
+; TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx],
+; and copies them into the tech text buffer at !BattleMenu_RowMapOffset:
+;   $FF/$FE → blank line (via CODE_JP_C10BB6)
+;   $FD     → "[Triple Tech]" header (!BattleRom_TechFixedText + $12)
+;   $FC     → "[Double Tech]" header (!BattleRom_TechFixedText + 0)
+;   $FB     → nothing drawn, only the edge cells are blanked
+;   else    → tech name: bank $CC, !Tech_NameTable + code × 11, re-encoded;
+;             upper/lower rows from col 6, palette 3
+; Every path advances !BattleMenu_TechRowNum.
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_TechCodeIdx, !BattleMenu_RowMapOffset
 ; Exit:  M=1
-; Calls: BattleMsg_ReencodeTextBuffer ($01A9), BattleMenu_BlankMpCostDigits ($0BD3),
-;        CODE_JP_C10BB6 ($0BB6), CODE_JP_C10C00 ($0C00)
+; Calls: BattleMsg_ReencodeTextBuffer, BattleMenu_BlankMpCostDigits,
+;        CODE_JP_C10BB6, CODE_JP_C10C00
 org $C10B0B
 BattleMenu_RenderTechRow:
     REP #$20                        ; M=0
-    LDX.w #$001E
-    LDA.w #$FFFF
+    LDX.w #!BattleMsg_TextBufBytes-2
+    LDA.w #!BattleUI_TileBlankPair
 .fill_loop:
-    STA.w $94A0,X                   ; fill $94A0–$94BF with $FFFF
+    STA.w !BattleMsg_TextTiles,X    ; blank both text rows
     DEX
     DEX
     BPL .fill_loop
     TDC
     SEP #$20                        ; M=1
-    LDX.b $80                       ; display code index (16-bit from DP)
-    LDA.w $94D0,X                   ; tech display code
-    CMP #$FF
-    BEQ .fixedstr_skip              ; FF → blank row
-    CMP #$FE
-    BEQ .fixedstr_skip              ; FE → blank row
-    CMP #$FD
-    BEQ .unreach_fd                 ; FD → fixed string variant 2 (unreachable)
-    CMP #$FC
-    BEQ .fixedstr_fc                ; FC → fixed string variant 1
-    CMP #$FB
-    BNE .tech_name                  ; not special → decode tech name
-    LDX.b $88                       ; FB: use scroll index
-    BRA .copy_out                   ; → INC $88 + copy path
+    LDX.b !BattleMenu_TechCodeIdx   ; (16-bit DP load)
+    LDA.w !Tech_ListCode,X
+    CMP.b #!Tech_CodeBlank
+    BEQ .fixedstr_skip              ; blank line
+    CMP.b #!Tech_CodeBlank2
+    BEQ .fixedstr_skip              ; blank line
+    CMP.b #!Tech_CodeTripleHeader
+    BEQ .unreach_fd                 ; "[Triple Tech]"
+    CMP.b #!Tech_CodeDoubleHeader
+    BEQ .fixedstr_fc                ; "[Double Tech]"
+    CMP.b #!Tech_CodeSkip
+    BNE .tech_name                  ; anything else is a tech
+    LDX.b !BattleMenu_TechRowNum    ; skip line (X not used further)
+    BRA .copy_out
 .fixedstr_fc:
-    LDX.w #$0000                    ; string starts at $CCFB4B+0
+    LDX.w #!Tech_DoubleHeaderText
     BRA .into_fixedstr
 .unreach_fd:
-    LDX.w #$0012                    ; string starts at $CCFB4B+$12
+    LDX.w #!Tech_TripleHeaderText
 .into_fixedstr:
     TDC
     TAY
 .fixed_copy:
-    LDA.l $CCFB4B,X                 ; fixed string byte from ROM
-    STA.w $94A0,Y
+    LDA.l !BattleRom_TechFixedText,X
+    STA.w !BattleMsg_TextTiles,Y
     INX
     INY
-    CPY.w #$0012                    ; 18 bytes
+    CPY.w #!Tech_HeaderTextLen
     BNE .fixed_copy
 .fixedstr_skip:
-    LDX.b $88
+    LDX.b !BattleMenu_TechRowNum
     JMP CODE_JP_C10BB6
 .tech_name:
-    LDX.b $88                       ; save scroll index (carried through to .copy_out)
+    LDX.b !BattleMenu_TechRowNum    ; (X not used further)
     REP #$20                        ; M=0
-    STA.b $8E                       ; tech ID (16-bit; B=0 from prior TDC)
+    STA.b !BattleTmp_8E             ; tech id (16-bit; B=0 from the TDC above)
     ASL A                           ; * 2
     ASL A                           ; * 4
-    STA.b $90
+    STA.b !BattleTmp_90
     ASL A                           ; * 8
     CLC
-    ADC.b $90                       ; * 8 + * 4 = * 12
+    ADC.b !BattleTmp_90             ; * 8 + * 4 = * 12
     SEC
-    SBC.b $8E                       ; * 12 - * 1 = * 11
+    SBC.b !BattleTmp_8E             ; * 12 - * 1 = * 11
     CLC
-    db $69,$C4,$15                  ; ADC #$15C4 — tech name table offset (M=0 3-byte)
-    TAX                             ; X = ROM offset in bank $CC
-    LDY.w #$94A0                    ; destination
-    LDA.w #$000A                    ; 11 bytes (count-1)
-    MVN $7E,$CC                     ; copy 11-byte tech name: $CC:X → $7E:$94A0
+    ADC.w #!Tech_NameTable
+    TAX                             ; X = name address in bank $CC
+    LDY.w #!BattleMsg_TextTiles     ; destination in bank $7E
+    LDA.w #!Tech_NameLen-1          ; count − 1
+    ; copy the tech name: $CC:X → $7E:TextTiles
+    MVN !Battle_WramBank,!BattleRom_TextBank ; lint-ok: MVN takes bank bytes and has no width suffix
     TDC
     SEP #$20                        ; M=1
-    STA.w $0000,Y                   ; null-terminate at $7E:$94A0+11
+    STA.w !Battle_WramAbs,Y         ; terminate the text (Y = end of the copy)
     JSR BattleMsg_ReencodeTextBuffer
 .copy_out:
-    INC.b $88                       ; advance scroll tracker
+    INC.b !BattleMenu_TechRowNum
     JSR BattleMenu_BlankMpCostDigits
     TDC
     TAY
-    LDX.b $82
-.tech_copy1:
-    LDA.w $94A0,Y
-    STA.w $9A2F,X
+    LDX.b !BattleMenu_RowMapOffset
+.tech_copy1:                        ; lower row (X steps over tile, attribute)
+    LDA.w !BattleMsg_TextTiles,Y
+    STA.w BattleMenu_TechTextTile(1,6),X
     INX
-    LDA #$2D
-    STA.w $9A2F,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(1,6),X ; (X+1: the attribute byte)
     INX
     INY
-    CPY.w #$000B
+    CPY.w #!Tech_NameLen
     BNE .tech_copy1
     TDC
     TAY
-    LDX.b $82
-.tech_copy2:
-    LDA.w $94B0,Y
-    STA.w $99EF,X
+    LDX.b !BattleMenu_RowMapOffset
+.tech_copy2:                        ; upper row
+    LDA.w !BattleMsg_TextTopTiles,Y
+    STA.w BattleMenu_TechTextTile(0,6),X
     INX
-    LDA #$2D
-    STA.w $99EF,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(0,6),X ; (X+1: the attribute byte)
     INX
     INY
-    CPY.w #$000B
+    CPY.w #!Tech_NameLen
     BNE .tech_copy2
     JMP CODE_JP_C10C00
-    db $60                          ; dead RTS (unreachable, byte-exact pad)
+    RTS                             ; dead: unreachable after the JMP, kept for the byte
 
 ; $C1:0BB6 — CODE_JP_C10BB6 (29 bytes, $0BB6–$0BD2)
-; Blank/fixed-string exit path from BattleMenu_RenderTechRow:
-; increments scroll tracker, blanks MP digit fields, then copies
-; 18 tile+attr pairs from $94A0 into tech-window buffer $9A29.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $82 = column offset
+; Blank-line / header exit path of BattleMenu_RenderTechRow: advances
+; !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row
+; tiles from !BattleMsg_TextTiles into the line from col 3 (palette 3).
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1
-; Calls: BattleMenu_BlankMpCostDigits ($0BD3)
+; Calls: BattleMenu_BlankMpCostDigits
 org $C10BB6
 CODE_JP_C10BB6:
-    INC.b $88
+    INC.b !BattleMenu_TechRowNum
     JSR BattleMenu_BlankMpCostDigits
     TDC
     TAY
-    LDX.b $82
+    LDX.b !BattleMenu_RowMapOffset
 .copy_loop:
-    LDA.w $94A0,Y
-    STA.w $9A29,X
+    LDA.w !BattleMsg_TextTiles,Y
+    STA.w BattleMenu_TechTextTile(1,3),X
     INX
-    LDA #$2D
-    STA.w $9A29,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(1,3),X ; (X+1: the attribute byte)
     INX
     INY
-    CPY.w #$0012                    ; 18 tile+attr pairs
+    CPY.w #!Tech_HeaderTextLen
     BNE .copy_loop
     RTS
 
 ; $C1:0BD3 — BattleMenu_BlankMpCostDigits (45 bytes, $0BD3–$0BFF)
-; Blanks two 3-cell MP-cost digit fields in the tech window:
-;   $9A29+$82 and $99E9+$82 (tile=$FF attr=$2D pairs × 3 each).
+; Blanks cols 3-5 (left of the name) on both rows of the tech-list line
+; at !BattleMenu_RowMapOffset (blank tile, palette 3). Despite the label,
+; these cells are not where MP costs are drawn: the name starts at col 6
+; and costs go to the tech window by UpdateTechWindow.
 ; Called from BattleMenu_RenderTechRow and CODE_JP_C10BB6.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $82 = column offset
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1; X/Y clobbered
 ; No JSR/JSL calls.
 org $C10BD3
 BattleMenu_BlankMpCostDigits:
     TDC
     TAY
-    LDX.b $82
+    LDX.b !BattleMenu_RowMapOffset
 .blank1_loop:
-    LDA #$FF
-    STA.w $9A29,X
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTextTile(1,3),X
     INX
-    LDA #$2D
-    STA.w $9A29,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(1,3),X
     INX
     INY
-    CPY.w #$0003
+    CPY.w #!BattleMenu_NameLeadCells
     BNE .blank1_loop
     TDC
     TAY
-    LDX.b $82
+    LDX.b !BattleMenu_RowMapOffset
 .blank2_loop:
-    LDA #$FF
-    STA.w $99E9,X
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTextTile(0,3),X
     INX
-    LDA #$2D
-    STA.w $99E9,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(0,3),X
     INX
     INY
-    CPY.w #$0003
+    CPY.w #!BattleMenu_NameLeadCells
     BNE .blank2_loop
     RTS
 
 ; $C1:0C00 — CODE_JP_C10C00 (45 bytes, $0C00–$0C2C)
-; Tech-name exit path from BattleMenu_RenderTechRow:
-; blanks two 4-cell tech-window digit fields:
-;   $9A45+$82 (MP cost) and $9A05+$82 (second field), 4 pairs each.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $82 = column offset
+; Tech-name exit path of BattleMenu_RenderTechRow: blanks cols 17-20
+; (right of the 11-tile name) on both rows of the line (blank tile,
+; palette 3).
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1; X/Y clobbered
 ; No JSR/JSL calls.
 org $C10C00
 CODE_JP_C10C00:
     TDC
     TAY
-    LDX.b $82
+    LDX.b !BattleMenu_RowMapOffset
 .blank1_loop:
-    LDA #$FF
-    STA.w $9A45,X
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTextTile(1,17),X
     INX
-    LDA #$2D
-    STA.w $9A45,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(1,17),X
     INX
     INY
-    CPY.w #$0004
+    CPY.w #!BattleMenu_NameTailCells
     BNE .blank1_loop
     TDC
     TAY
-    LDX.b $82
+    LDX.b !BattleMenu_RowMapOffset
 .blank2_loop:
-    LDA #$FF
-    STA.w $9A05,X
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTextTile(0,17),X
     INX
-    LDA #$2D
-    STA.w $9A05,X
+    LDA.b #!BattleUI_AttrPal3
+    STA.w BattleMenu_TechTextTile(0,17),X
     INX
     INY
-    CPY.w #$0004
+    CPY.w #!BattleMenu_NameTailCells
     BNE .blank2_loop
     RTS
 
 ; ==================================================================
 ; BattleMenu_UpdateWindows ($C10C2D–$C10C48, 28 bytes)
 ; ==================================================================
-; Per-frame window upkeep dispatcher. Loads active-slot ptr via JSL
-; $CFFD9E, then dispatches on $95DB (submenu type):
+; Per-frame window upkeep dispatcher. Calls BattleFx_SetPtrA2FromTable
+; with the shown PC, then dispatches on !BattleMenu_Submenu:
 ;   0 → BattleMenu_UpdateMainWindow
 ;   1 → BattleMenu_UpdateTechMpAvail + BattleMenu_UpdateTechWindow
 ;   other → CODE_JP_C1103D (RTS)
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; registers clobbered by callees
-; Callees: JSL $CFFD9E (BattleFx_SetPtrA2FromTable, cross-bank),
-;          BattleMenu_UpdateMainWindow, BattleMenu_UpdateTechMpAvail,
-;          BattleMenu_UpdateTechWindow
+; Callees: BattleFx_SetPtrA2FromTable, BattleMenu_UpdateMainWindow,
+;          BattleMenu_UpdateTechMpAvail, BattleMenu_UpdateTechWindow
 org $C10C2D
 BattleMenu_UpdateWindows:
-    LDA.w $95D5                     ; active PC slot index
-    JSL $CFFD9E                     ; BattleFx_SetPtrA2FromTable (CF bank)
-    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item(→exit)
+    LDA.w !BattleMenu_ActivePc
+    JSL BattleFx_SetPtrA2FromTable
+    LDA.w !BattleMenu_Submenu
     BNE .not_main
-    JMP BattleMenu_UpdateMainWindow ; type 0 → main command window
+    JMP BattleMenu_UpdateMainWindow ; main command window
 .not_main:
-    CMP #$01
-    BNE CODE_C10C46                 ; type != 1 → exit (type 2 = item, just return)
-    JSR BattleMenu_UpdateTechMpAvail ; type 1: refresh tech MP availability first
-    JMP BattleMenu_UpdateTechWindow  ; then update tech window display
+    CMP.b #!BattleMenu_SubmenuTech
+    BNE CODE_C10C46                 ; item list: nothing to do here
+    JSR BattleMenu_UpdateTechMpAvail ; tech list: grade the rows first
+    JMP BattleMenu_UpdateTechWindow  ; then refresh the window
 
 CODE_C10C46:                        ; shared exit — jumped to from UpdateMainWindow too
     JMP CODE_JP_C1103D              ; → shared RTS at $103D
@@ -2023,610 +2046,628 @@ CODE_C10C46:                        ; shared exit — jumped to from UpdateMainW
 ; ==================================================================
 ; BattleMenu_UpdateMainWindow ($C10C49–$C10C82, 58 bytes)
 ; ==================================================================
-; Main command-window upkeep (submenu type 0):
-; - If $A6DD (active-PC index) changed vs. cached $A6DF:
-;     reload command window map ($C11C3A) + rebuild status frame ($C10299).
-; - Else: per-slot panel refresh ($C105A7); if $A43F set and $A6DD >= 0,
-;     redraw active-panel cursor column ($C10872).
-; - If $95D5 < 0: reload command window map again.
-; - Always: JSL $CFFD02 (queue $0CC0 VRAM upload), INC $99E2.
+; Main command-window upkeep (submenu 0):
+; - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn:
+;     reload the command window map and rebuild the status bar.
+; - Else: BattleUI_UpdateNextPcPanel; if !BattleUI_PanelRedraw is set and
+;     a roster entry is shown, redraw the command cursor column.
+; - If no PC is shown (!BattleMenu_ActivePc < 0): reload the window map.
+; - Always: queue the status map ($0CC0) upload, bump
+;   !BattleMenu_WindowMapDirty.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1
 ; Callees: BattleMenu_LoadCommandWindowMap, BattleUI_BuildStatusBarFrame,
 ;          BattleUI_UpdateNextPcPanel, BattleUI_ClearActivePanelColumn,
-;          JSL $CFFD02 (Battle_QueueVramUpload_0CC0, cross-bank)
+;          Battle_QueueVramUpload_0CC0
 BattleMenu_UpdateMainWindow:
-    LDA.w $95DB                     ; must still be type 0
-    BNE CODE_C10C46                 ; if not, bail (offset -8 → $0C46)
-    LDA.w $A6DD                     ; current active-PC index
-    CMP.w $A6DF                     ; == cached value?
+    LDA.w !BattleMenu_Submenu       ; must still be the main menu
+    BNE CODE_C10C46
+    LDA.w !BattleMenu_RosterIdx
+    CMP.w !BattleMenu_RosterIdxDrawn
     BEQ .same_pc
-    STA.w $A6DF                     ; update cache
-    JSR BattleMenu_LoadCommandWindowMap ; reload tilemap ($1C3A)
-    JSR BattleUI_BuildStatusBarFrame  ; rebuild status bar ($0299)
+    STA.w !BattleMenu_RosterIdxDrawn
+    JSR BattleMenu_LoadCommandWindowMap
+    JSR BattleUI_BuildStatusBarFrame
     BRA .do_upload
 .same_pc:
-    JSR BattleUI_UpdateNextPcPanel  ; per-slot panel refresh ($05A7)
-    LDA.w $A43F
+    JSR BattleUI_UpdateNextPcPanel
+    LDA.w !BattleUI_PanelRedraw
     BEQ .do_upload
-    LDA.w $A6DD
+    LDA.w !BattleMenu_RosterIdx
     BMI .do_upload
-    JSR BattleUI_ClearActivePanelColumn ; cursor column redraw ($0872)
+    JSR BattleUI_ClearActivePanelColumn ; command cursor column
 .do_upload:
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     BPL .queue
-    JSR BattleMenu_LoadCommandWindowMap ; reload again if $95D5 negative
+    JSR BattleMenu_LoadCommandWindowMap ; no PC shown → plain window
 .queue:
-    JSL $CFFD02                     ; Battle_QueueVramUpload_0CC0 (CF bank)
-    INC.w $99E2
+    JSL Battle_QueueVramUpload_0CC0
+    INC.w !BattleMenu_WindowMapDirty
     JMP CODE_JP_C1103D              ; → shared RTS at $103D
 
 ; ==================================================================
 ; BattleMenu_UpdateTechWindow ($C10C83–$C10E59, 471 bytes)
 ; ==================================================================
-; Tech-window content refresh (submenu type 1, called after UpdateTechMpAvail):
-; 1. JSR BattleMenu_RenderTechListRows ($0A88) — renders text into $99E3 buffer.
-; 2. Copies $180 bytes from $99E3 into window tilemap $A6E1 (word-stride).
-; 3. Composes 6-row window border/column structure from $CCFA95 template
-;    into $A70B area (9 tiles per row, 6 rows, with Y advancing by $2E stride).
-; 4. For each of 3 PCs, if $96F5/$96F6/$96F7 != 0 (PC has techs to show):
-;    converts $5E34/$5EB4/$5F34 (MP) to digit tiles via DivTen9499 + BlankLeadingZeros,
-;    stores into $A751/$A7D1/$A851 digit cells; else blanks MP cost.
-; 5. Resolves active cursor tech slot; copies battler data into $9EE3-$9EE9;
-;    for each PC present, converts relevant value to tile digits.
-; 6. Falls through into BattleMenu_DrawTechCursorRow ($0E5A).
-; Entry: M=1, X=0, DB=$7E; $95D5 = active PC slot
+; Tech-window refresh (submenu 1, after UpdateTechMpAvail):
+; 1. BattleMenu_RenderTechListRows draws the visible lines into the tech
+;    text buffer; its tile bytes are copied to the window map
+;    (BattleMenu_TechTile; the attributes there come from UpdateTechMpAvail).
+; 2. Columns 21-29 of all 6 rows come from !BattleRom_TechBorder
+;    (frame with the "MP" header).
+; 3. For each present PC slot 0/1/2 (window rows 1/3/5): its current MP
+;    as two digits at cols 24-25 and blank cost cells 29-30; for an
+;    absent PC only col 27 is blanked.
+; 4. Copies the Tech_MenuEntry under the cursor to Tech_CursorEntry
+;    (all $FF, plus PC 1's cost cells, when the line has no entry) and
+;    writes its MP cost for each involved PC at cols 29-30 of that PC's
+;    row, the tens digit suppressed when zero.
+; 5. Falls through into BattleMenu_DrawTechCursorRow.
+; Entry: M=1, X=0, DB=$7E; !BattleMenu_ActivePc = PC shown
 ; Exit:  M=1 (via BattleMenu_DrawTechCursorRow → CODE_JP_C1103D)
 ; Callees: BattleMenu_RenderTechListRows, Battle_DivTen9499,
 ;          BattleMsg_BlankLeadingZeros, BattleMenu_DrawTechCursorRow (fall-through)
+; Direct-page roles (!BattleMenu_TechListBase as in RenderTechListRows):
+!BattleMenu_BorderRow = !BattleTmp_80     ; 1-2 B: frame row being copied
+!BattleMenu_BorderCol = !BattleTmp_81     ; 1 B: frame column being copied
+!BattleMenu_TechEntry = !BattleTmp_80     ; 1 B: menu-entry index under the cursor, then its record offset
+!BattleMenu_TechEntryBase = !BattleTmp_AF ; 2 B: offset of the PC's Tech_MenuEntry block (+ entry offset)
 BattleMenu_UpdateTechWindow:
-    JSR BattleMenu_RenderTechListRows ; render tech list into $99E3 buffer
+    JSR BattleMenu_RenderTechListRows
 
-    ; Copy $180-byte text buffer $99E3 → window tilemap $A6E1 (word stride:
-    ; each tile occupies word pair = 2 bytes tile, 2 bytes attr; read/write by 1)
+    ; Copy the tile bytes of the tech text buffer to the window map
+    ; (both have tile/attribute pairs; X and Y step by 2)
     TDC
     TAY
     TAX
 .copy_loop:
-    LDA.w $99E3,X
-    STA.w $A6E1,Y
+    LDA.w BattleMenu_TechTextTile(0,0),X
+    STA.w BattleMenu_TechTile(0,0),Y
     INX
     INX
     INY
     INY
-    CPY.w #$0180
+    CPY.w #!BattleMenu_WindowBytes
     BNE .copy_loop
 
-    ; Compose window border columns from $CCFA95 template:
-    ; outer loop: 6 rows ($80 = row 0..5)
-    ; inner loop: 9 tiles per row ($81 = col 0..8) → store into $A70B,Y
+    ; Frame columns 21-29 of every row from !BattleRom_TechBorder
     TDC
     TAX
     TAY
-    STX.b $80                       ; row counter = 0
+    STX.b !BattleMenu_BorderRow
 .border_row:
-    STZ.b $81                       ; col counter = 0
+    STZ.b !BattleMenu_BorderCol
 .border_col:
-    LDA.l $CCFA95,X                 ; border template byte
-    STA.w $A70B,Y                   ; store into tech window tilemap
+    LDA.l !BattleRom_TechBorder,X
+    STA.w BattleMenu_TechTile(0,21),Y
     INX
     INY
     INY
-    INC.b $81
-    LDA.b $81
-    CMP #$09
+    INC.b !BattleMenu_BorderCol
+    LDA.b !BattleMenu_BorderCol
+    CMP.b #!BattleMenu_TechBorderCols
     BNE .border_col
     REP #$21                        ; M=0, C=0 for 16-bit add
     TYA
-    db $69,$2E,$00                  ; ADC #$002E — advance Y by row stride
+    ADC.w #!BattleMenu_TechBorderSkip ; rest of the row
     TAY
     TDC
     SEP #$20                        ; M=1
-    INC.b $80
-    LDA.b $80
-    CMP #$06
+    INC.b !BattleMenu_BorderRow
+    LDA.b !BattleMenu_BorderRow
+    CMP.b #!BattleMenu_WindowRows
     BNE .border_row
 
-    ; PC1 MP digits: if $96F5 != 0, convert $5E34 (PC1 MP) → digit tiles
-    LDA.w $96F5
-    BEQ .pc1_mp_absent              ; $96F5=0 → no PC1 tech, blank
-    REP #$20                        ; M=0 for 16-bit PCHP write
-    LDA.w $5E34                     ; PC1 MP low byte
-    STA.w $9499                     ; PCHP = PC1 MP (16-bit)
-    JSR Battle_DivTen9499           ; → M=1; digit tiles in $949C-$949F
-    JSR BattleMsg_BlankLeadingZeros ; suppress leading zeros
-    LDA.w $949E                     ; tens digit
-    STA.w $A751                     ; PC1 tech window tens cell
-    LDA.w $949F                     ; ones digit
-    STA.w $A753                     ; PC1 tech window ones cell
-    LDA #$FF
-    STA.w $A75B                     ; blank PC1 cost hi
-    STA.w $A75D                     ; blank PC1 cost hi+1
+    ; PC slot 0's MP (window row 1)
+    LDA.w !Battler_Present
+    BEQ .pc1_mp_absent
+    REP #$20                        ; M=0
+    LDA.w BattlerStats.CurMp        ; (16-bit)
+    STA.w !BattleMsg_NumValue
+    JSR Battle_DivTen9499           ; → M=1
+    JSR BattleMsg_BlankLeadingZeros
+    LDA.w !BattleMsg_Digit10
+    STA.w BattleMenu_TechTile(1,24)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(1,25)
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(1,29) ; cost cells
+    STA.w BattleMenu_TechTile(1,30)
     BRA .pc2_check
 .pc1_mp_absent:
-    LDA #$FF
-    STA.w $A757                     ; blank PC1 MP field
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(1,27)
 
-    ; PC2 MP digits: if $96F6 != 0
+    ; PC slot 1's MP (window row 3)
 .pc2_check:
-    LDA.w $96F6
+    LDA.w !Battler_Present+1
     BEQ .pc2_mp_absent
     REP #$20                        ; M=0
-    LDA.w $5EB4                     ; PC2 MP low byte
-    STA.w $9499
+    LDA.w BattlerStats[1].CurMp     ; (16-bit)
+    STA.w !BattleMsg_NumValue
     JSR Battle_DivTen9499           ; → M=1
     JSR BattleMsg_BlankLeadingZeros
-    LDA.w $949E
-    STA.w $A7D1
-    LDA.w $949F
-    STA.w $A7D3
-    LDA #$FF
-    STA.w $A7DB
-    STA.w $A7DD
+    LDA.w !BattleMsg_Digit10
+    STA.w BattleMenu_TechTile(3,24)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(3,25)
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(3,29)
+    STA.w BattleMenu_TechTile(3,30)
     BRA .pc3_check
 .pc2_mp_absent:
-    LDA #$FF
-    STA.w $A7D7
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(3,27)
 
-    ; PC3 MP digits: if $96F7 != 0
+    ; PC slot 2's MP (window row 5)
 .pc3_check:
-    LDA.w $96F7
+    LDA.w !Battler_Present+2
     BEQ .pc3_mp_absent
     REP #$20                        ; M=0
-    LDA.w $5F34                     ; PC3 MP low byte
-    STA.w $9499
+    LDA.w BattlerStats[2].CurMp     ; (16-bit)
+    STA.w !BattleMsg_NumValue
     JSR Battle_DivTen9499           ; → M=1
     JSR BattleMsg_BlankLeadingZeros
-    LDA.w $949E
-    STA.w $A851
-    LDA.w $949F
-    STA.w $A853
-    LDA #$FF
-    STA.w $A85B
-    STA.w $A85D
+    LDA.w !BattleMsg_Digit10
+    STA.w BattleMenu_TechTile(5,24)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(5,25)
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(5,29)
+    STA.w BattleMenu_TechTile(5,30)
     BRA .cursor_resolve
 .pc3_mp_absent:
-    LDA #$FF
-    STA.w $A857
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(5,27)
 
-    ; Resolve active cursor tech slot:
-    ; $95D5 → CCF38C table → base offset; add scroll $95EB + cursor $95DF;
-    ; look up in $9551 table → battler slot. If $FF, blank all and jump to cursor draw.
+    ; Menu entry under the cursor: !Tech_ListEntry[list base + scroll + row]
 .cursor_resolve:
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.l $CCF38C,X                 ; PC base offset from table
-    STA.b $AF
+    LDA.l !BattleRom_TechListBase,X
+    STA.b !BattleMenu_TechListBase
     CLC
-    LDA.w $95EB,X                   ; scroll offset (PC1NumberLinesScrolled)
-    ADC.w $95DF,X                   ; + cursor position page
+    LDA.w !Pc_TechScroll,X
+    ADC.w !Pc_TechRow,X
     CLC
-    ADC.b $AF                       ; + base
+    ADC.b !BattleMenu_TechListBase
     TAX
-    LDA.w $9551,X                   ; battler slot at cursor row
-    CMP #$FF
+    LDA.w !Tech_ListEntry,X
+    CMP.b #!Tech_NoEntry
     BNE .slot_present
-    ; slot == $FF: blank relevant tilemap cells and go to cursor draw
-    STA.w $A7DB
-    STA.w $A7DD
-    STA.w $9EE3
-    STA.w $9EE4
-    STA.w $9EE5
-    STA.w $9EE6
-    STA.w $9EE7
-    STA.w $9EE8
-    STA.w $9EE9
-    JMP BattleMenu_DrawTechCursorRow ; → $0E5A
+    ; no entry on this line: A = $FF into PC 1's cost cells and the copy
+    STA.w BattleMenu_TechTile(3,29)
+    STA.w BattleMenu_TechTile(3,30)
+    STA.w Tech_CursorEntry.TechId
+    STA.w Tech_CursorEntry.TargetMode
+    STA.w Tech_CursorEntry.Flags
+    STA.w Tech_CursorEntry.MpCost0
+    STA.w Tech_CursorEntry.Partners
+    STA.w Tech_CursorEntry.MpCost1
+    STA.w Tech_CursorEntry.MpCost2
+    JMP BattleMenu_DrawTechCursorRow
 
 .slot_present:
-    ; slot found — copy battler data from $1A80+slot into $9EE3-$9EE9
-    STA.b $80                       ; save battler slot
-    LDA.w $95D5
+    ; record offset = TechEntryBase[PC] + TechEntryOffset[entry]
+    STA.b !BattleMenu_TechEntry     ; menu-entry index
+    LDA.w !BattleMenu_ActivePc
     ASL A
     TAX
-    LDA.l $CCF395,X                 ; PC tech-table ptr lo
-    STA.b $AF
-    LDA.l $CCF396,X                 ; PC tech-table ptr hi
-    STA.b $B0
-    LDA.b $80
+    LDA.l !BattleRom_TechEntryBase,X
+    STA.b !BattleMenu_TechEntryBase
+    LDA.l !BattleRom_TechEntryBase+1,X
+    STA.b !BattleMenu_TechEntryBase+1
+    LDA.b !BattleMenu_TechEntry
     TAX
-    LDA.l $CCF3A1,X                 ; battler offset from table
-    STA.b $80
+    LDA.l !BattleRom_TechEntryOffset,X ; index × 7
+    STA.b !BattleMenu_TechEntry
     CLC
-    LDA.b $AF
-    ADC.b $80
-    STA.b $AF
-    LDA.b $B0
+    LDA.b !BattleMenu_TechEntryBase
+    ADC.b !BattleMenu_TechEntry
+    STA.b !BattleMenu_TechEntryBase
+    LDA.b !BattleMenu_TechEntryBase+1
     ADC #$00
-    STA.b $B0
-    LDX.b $AF
-    LDA.w $1A80,X                   ; battler fields → $9EE3-$9EE9
-    STA.w $9EE3
-    LDA.w $1A81,X
-    STA.w $9EE4
-    LDA.w $1A82,X
-    STA.w $9EE5
-    LDA.w $1A83,X
-    STA.w $9EE6
-    LDA.w $1A84,X
-    STA.w $9EE7
-    LDA.w $1A85,X
-    STA.w $9EE8
-    LDA.w $1A86,X
-    STA.w $9EE9
+    STA.b !BattleMenu_TechEntryBase+1
+    LDX.b !BattleMenu_TechEntryBase
+    LDA.w Tech_MenuEntry.TechId,X   ; copy the 7-byte entry
+    STA.w Tech_CursorEntry.TechId
+    LDA.w Tech_MenuEntry.TargetMode,X
+    STA.w Tech_CursorEntry.TargetMode
+    LDA.w Tech_MenuEntry.Flags,X
+    STA.w Tech_CursorEntry.Flags
+    LDA.w Tech_MenuEntry.MpCost0,X
+    STA.w Tech_CursorEntry.MpCost0
+    LDA.w Tech_MenuEntry.Partners,X
+    STA.w Tech_CursorEntry.Partners
+    LDA.w Tech_MenuEntry.MpCost1,X
+    STA.w Tech_CursorEntry.MpCost1
+    LDA.w Tech_MenuEntry.MpCost2,X
+    STA.w Tech_CursorEntry.MpCost2
 
-    ; For each PC present ($9EE6/$9EE8/$9EE9 >= 0), convert HP-related
-    ; value to digit tiles and store into tech window digit cells
-    LDA.w $9EE6
-    BMI .check_pc2_digit            ; negative → PC1 absent, skip
-    REP #$20                        ; M=0: write 16-bit to PCHP
-    STA.w $9499
-    JSR Battle_DivTen9499           ; → M=1; digit tiles in $949E/$949F
-    LDA.w $949E
-    CMP #$73                        ; zero digit?
+    ; MP cost for each PC involved (cost byte >= $80 = not involved)
+    LDA.w Tech_CursorEntry.MpCost0
+    BMI .check_pc2_digit            ; PC slot 0 not involved
+    REP #$20                        ; M=0 (B is 0: zero-extended)
+    STA.w !BattleMsg_NumValue
+    JSR Battle_DivTen9499           ; → M=1
+    LDA.w !BattleMsg_Digit10
+    CMP.b #!BattleMsg_GlyphZero     ; tens digit zero?
     BNE .pc1_nonzero
-    LDA #$FF
-    STA.w $A75D                     ; blank hi digit
-    LDA.w $949F
-    STA.w $A75B
+    LDA.b #!BattleUI_TileBlank      ; yes: one digit, left-aligned
+    STA.w BattleMenu_TechTile(1,30)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(1,29)
     BRA .check_pc2_digit
-.pc1_nonzero:                       ; (UNREACH_C10DFD path: digit != $73)
-    STA.w $A75B
-    LDA.w $949F
-    STA.w $A75D
+.pc1_nonzero:                       ; (UNREACH_C10DFD in the reference)
+    STA.w BattleMenu_TechTile(1,29)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(1,30)
 
 .check_pc2_digit:
-    LDA.w $9EE8
-    BMI .check_pc3_digit
+    LDA.w Tech_CursorEntry.MpCost1
+    BMI .check_pc3_digit            ; PC slot 1 not involved
     REP #$20
-    STA.w $9499
+    STA.w !BattleMsg_NumValue
     JSR Battle_DivTen9499           ; → M=1
-    LDA.w $949E
-    CMP #$73
+    LDA.w !BattleMsg_Digit10
+    CMP.b #!BattleMsg_GlyphZero
     BNE .pc2_nonzero
-    LDA #$FF
-    STA.w $A7DD
-    LDA.w $949F
-    STA.w $A7DB
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(3,30)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(3,29)
     BRA .check_pc3_digit
-.pc2_nonzero:                       ; (UNREACH_C10E27 path)
-    STA.w $A7DB
-    LDA.w $949F
-    STA.w $A7DD
+.pc2_nonzero:                       ; (UNREACH_C10E27 in the reference)
+    STA.w BattleMenu_TechTile(3,29)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(3,30)
 
 .check_pc3_digit:
-    LDA.w $9EE9
-    BMI BattleMenu_DrawTechCursorRow ; negative → no PC3, go draw cursor
+    LDA.w Tech_CursorEntry.MpCost2
+    BMI BattleMenu_DrawTechCursorRow ; PC slot 2 not involved
     REP #$20
-    STA.w $9499
+    STA.w !BattleMsg_NumValue
     JSR Battle_DivTen9499           ; → M=1
-    LDA.w $949E
-    CMP #$73
+    LDA.w !BattleMsg_Digit10
+    CMP.b #!BattleMsg_GlyphZero
     BNE .pc3_nonzero
-    LDA #$FF
-    STA.w $A85D
-    LDA.w $949F
-    STA.w $A85B
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(5,30)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(5,29)
     BRA BattleMenu_DrawTechCursorRow
-.pc3_nonzero:                       ; (UNREACH_C10E51 path)
-    STA.w $A85B
-    LDA.w $949F
-    STA.w $A85D
+.pc3_nonzero:                       ; (UNREACH_C10E51 in the reference)
+    STA.w BattleMenu_TechTile(5,29)
+    LDA.w !BattleMsg_Digit1
+    STA.w BattleMenu_TechTile(5,30)
     ; fall through into BattleMenu_DrawTechCursorRow at $0E5A
 
 ; ==================================================================
 ; BattleMenu_DrawTechCursorRow ($C10E5A–$C10EB9, 96 bytes)
 ; ==================================================================
-; Clears old cursor tiles then draws row cursor ($60-$63) at the
-; tech-list row given by $95DF[slot] (indexed via $CCFAE3 offset table)
-; into window buffer $A6E1/$A721. Skipped while targeting ($9609 != 0).
-; Then queues the tech window VRAM upload (JSL $CFFD36) and conditionally
-; copies TechBoxBattles ($D15A50) into $0B40 if $A86A != 0.
+; Clears the cursor columns, then (unless a target is being selected)
+; draws the 2×2 row cursor ($60-$63) at the shown PC's !Pc_TechRow,
+; placed through !BattleRom_TechCursorCell. With the info-panel setting
+; on, shows the tech under the cursor. Queues the tech window upload and,
+; once after the list opens (!BattleMenu_TechWindowNew), copies the tech
+; box frame (!BattleRom_TechBoxMap) into !BattleMenu_WindowMap.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1 (via CODE_JP_C1103D)
-; Callees: BattleMenu_ClearTechCursorTiles, JSL $CD0027, JSL $CFFD36
+; Callees: BattleMenu_ClearTechCursorTiles, BattleMsg_ShowFromTableCC3A09Vec,
+;          Battle_QueueVramUpload_A6E1
+!BattleMenu_TechCursorRow = !BattleTmp_80 ; 1 B: !Pc_TechRow of the active PC
 BattleMenu_DrawTechCursorRow:
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $95DF,X                   ; cursor row position (PC1CursorPositionPage)
-    STA.b $80
-    JSR BattleMenu_ClearTechCursorTiles ; clear all cursor tile columns
-    LDA.w $9609                     ; targeting flag
-    BNE .skip_draw                  ; non-zero = targeting, skip cursor draw
-    LDA.b $80                       ; cursor row
+    LDA.w !Pc_TechRow,X
+    STA.b !BattleMenu_TechCursorRow
+    JSR BattleMenu_ClearTechCursorTiles
+    LDA.w !BattleMenu_TargetSelect
+    BNE .skip_draw                  ; selecting a target → no row cursor
+    LDA.b !BattleMenu_TechCursorRow
     ASL A
     TAX
-    REP #$20                        ; M=0: load 16-bit offset from table
-    LDA.l $CCFAE3,X                 ; cursor row tilemap Y offset
+    REP #$20                        ; M=0: 16-bit table entry
+    LDA.l !BattleRom_TechCursorCell,X ; map offset of the cursor
     TAY
     TDC
     SEP #$20                        ; M=1
-    LDA #$60
-    STA.w $A6E1,Y                   ; cursor top-left
-    LDA #$61
-    STA.w $A6E3,Y                   ; cursor top-right
-    LDA #$62
-    STA.w $A721,Y                   ; cursor bottom-left
-    LDA #$63
-    STA.w $A723,Y                   ; cursor bottom-right
+    LDA.b #!BattleMenu_TileCursorTL
+    STA.w BattleMenu_TechTile(0,0),Y ; cursor top-left
+    LDA.b #!BattleMenu_TileCursorTR
+    STA.w BattleMenu_TechTile(0,1),Y ; cursor top-right
+    LDA.b #!BattleMenu_TileCursorBL
+    STA.w BattleMenu_TechTile(1,0),Y ; cursor bottom-left
+    LDA.b #!BattleMenu_TileCursorBR
+    STA.w BattleMenu_TechTile(1,1),Y ; cursor bottom-right
 .skip_draw:
-    LDA.w $A0DB                     ; SkillItemInfoSetting
-    BPL .queue_upload
-    LDA.w $9EE3                     ; item/skill for info panel
-    JSL $CD0027                     ; BattleMsg_ShowFromTableCC3A09Vec
+    LDA.w !BattleMenu_CfgInfoPanel
+    BPL .queue_upload               ; info panel off
+    LDA.w Tech_CursorEntry.TechId
+    JSL BattleMsg_ShowFromTableCC3A09Vec
 .queue_upload:
-    JSL $CFFD36                     ; Battle_QueueVramUpload_A6E1 (CF bank)
-    LDA.w $A86A
+    JSL Battle_QueueVramUpload_A6E1
+    LDA.w !BattleMenu_TechWindowNew
     BEQ .done
     TDC
     TAX
 .techbox_loop:
-    LDA.l $D15A50,X                 ; TechBoxBattles data
-    STA.w $0B40,X                   ; copy into WRAM $0B40
+    LDA.l !BattleRom_TechBoxMap,X
+    STA.w !BattleMenu_WindowMap,X
     INX
-    CPX.w #$0180
+    CPX.w #!BattleMenu_WindowBytes
     BNE .techbox_loop
-    INC.w $99E2
-    STZ.w $A86A
+    INC.w !BattleMenu_WindowMapDirty
+    STZ.w !BattleMenu_TechWindowNew
 .done:
     JMP CODE_JP_C1103D              ; → shared RTS at $103D
 
 ; ==================================================================
 ; BattleMenu_ClearTechCursorTiles ($C10EBA–$C10EE0, 39 bytes)
 ; ==================================================================
-; Writes $FF over the cursor-column tile slots of all 6 tech-window
-; buffer rows ($A6E3/$A6E5, $A723/$A725, $A763/$A765, $A7A3/$A7A5,
-; $A7E3/$A7E5, $A823/$A825).
+; Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; A=$FF; X/Y unchanged
 ; No JSR/JSL calls.
 BattleMenu_ClearTechCursorTiles:
-    LDA #$FF
-    STA.w $A6E3
-    STA.w $A6E5
-    STA.w $A723
-    STA.w $A725
-    STA.w $A763
-    STA.w $A765
-    STA.w $A7A3
-    STA.w $A7A5
-    STA.w $A7E3
-    STA.w $A7E5
-    STA.w $A823
-    STA.w $A825
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_TechTile(0,1)
+    STA.w BattleMenu_TechTile(0,2)
+    STA.w BattleMenu_TechTile(1,1)
+    STA.w BattleMenu_TechTile(1,2)
+    STA.w BattleMenu_TechTile(2,1)
+    STA.w BattleMenu_TechTile(2,2)
+    STA.w BattleMenu_TechTile(3,1)
+    STA.w BattleMenu_TechTile(3,2)
+    STA.w BattleMenu_TechTile(4,1)
+    STA.w BattleMenu_TechTile(4,2)
+    STA.w BattleMenu_TechTile(5,1)
+    STA.w BattleMenu_TechTile(5,2)
     RTS
 
 ; ==================================================================
 ; BattleMenu_UpdateTechMpAvail ($C10EE1–$C1103D, 349 bytes)
 ; ==================================================================
-; Per-row tech-availability sweep for the tech window (submenu type 1).
-; For each of 3 tech rows (loop on $82 = 0..2):
-;   - Looks up window-column offset ($CCF39B/C), tech-table ptr ($CCF395/6),
-;     base offset ($CCF38C + scroll $95EB), and row palette slot ($A6D9).
-;   - If slot $94D0,X indicates slot type $FC/$FD (special slots), checks
-;     $A6DE party-size; if condition fails → gray the tech cell (attr $2D).
-;   - Else: resolves battler ptr ($9551 → $CCF3A1 + $AF/$B0),
-;     then checks each PC's MP against the tech MP cost ($1A83/$1A85/$1A86).
-;     If all costs affordable and slot is menu-ready: brightens cell (attr $29).
-;     If not affordable or locked: grays cell (attr $2D).
-;   - Sets $A6E2/A722 columns with computed attr byte (18 entries each).
-;   - On $82 reaching 3: sets $A099 = 1 (mark window as updated).
-; Entry: M=1, X=0, DB=$7E; $95D5 = active PC slot
-; Exit:  M=1 (via CODE_JP_C1103D / fall-through)
-; Callees: BattleSys_SlotMenuReadyPredicate ($103E),
-;          Battle_ShiftRight4 ($011A)
+; Grades the 3 visible tech-list lines (submenu 1) and colours each line
+; in the window map: palette 2 = usable, palette 3 = greyed.
+;   - Line code with the high nibble $F (special line): "[Double Tech]" is
+;     greyed with fewer than 2 PCs in the roster, "[Triple Tech]" with
+;     fewer than 3; other special codes keep palette 2.
+;   - Real entry (via !Tech_ListEntry and the PC's Tech_MenuEntry block):
+;     greyed when any involved PC's current MP is below its cost, when a
+;     partner (Partners nibbles) is not menu-ready, when the shown PC has
+;     !Pc_LockStatus set, or for tech id $74 unless !Battle_Unk1C48 says
+;     $42; else usable. The verdict is also kept in the entry's Flags
+;     bit 7 (TechConfirm checks it).
+;   - The attribute goes to 18 cells of both rows of the line, from the
+;     cell !BattleRom_TechRowMapOffset gives (col 3).
+;   - After the 3rd line: !BattleMenu_TechAvailDone = 1.
+; Entry: M=1, X=0, DB=$7E; !BattleMenu_ActivePc = PC shown
+; Exit:  M=1 (falls into the shared RTS CODE_JP_C1103D)
+; Callees: BattleSys_SlotMenuReadyPredicate, Battle_ShiftRight4
+; Direct-page roles (!BattleMenu_TechEntryBase as in UpdateTechWindow):
+!BattleMenu_MpListIdx = !BattleTmp_86     ; 2 B: !Tech_ListCode index of the row being graded
+!BattleMenu_MpPc0 = !BattleTmp_96         ; 2 B: PC slot 0's current MP
+!BattleMenu_MpPc1 = !BattleTmp_98         ; 2 B: PC slot 1's current MP
+!BattleMenu_MpPc2 = !BattleTmp_9A         ; 2 B: PC slot 2's current MP
+!BattleMenu_MpRow = !BattleTmp_82         ; 1-2 B: visible row 0-2
+!BattleMenu_MpRowCell = !BattleTmp_84     ; 2 B: map offset of the row (BattleRom_TechRowMapOffset)
+!BattleMenu_MpRowAttr = !BattleTmp_94     ; 1 B: attribute chosen for the row
+!BattleMenu_MpEntry = !BattleTmp_88       ; 2 B: Tech_MenuEntry offset of the row's entry
+!BattleMenu_MpPartners = !BattleTmp_81    ; 1 B: the entry's Partners byte
+!BattleMenu_ReadySlotArg = !BattleTmp_80  ; 1 B: PC slot tested by BattleSys_SlotMenuReadyPredicate
 BattleMenu_UpdateTechMpAvail:
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     ASL A
     TAX
-    LDA.l $CCF395,X                 ; PC tech-table ptr lo
-    STA.b $AF
-    LDA.l $CCF396,X                 ; PC tech-table ptr hi
-    STA.b $B0
-    LDA.w $95D5
+    LDA.l !BattleRom_TechEntryBase,X ; PC's Tech_MenuEntry block
+    STA.b !BattleMenu_TechEntryBase
+    LDA.l !BattleRom_TechEntryBase+1,X
+    STA.b !BattleMenu_TechEntryBase+1
+    LDA.w !BattleMenu_ActivePc
     TAX
     TAY
-    LDA.l $CCF38C,X                 ; PC base offset from table
-    STA.b $86
-    LDA.w $95EB,Y                   ; scroll offset (PC1NumberLinesScrolled)
+    LDA.l !BattleRom_TechListBase,X ; PC's first list line
+    STA.b !BattleMenu_MpListIdx
+    LDA.w !Pc_TechScroll,Y
     CLC
-    ADC.b $86
+    ADC.b !BattleMenu_MpListIdx
     TAX
-    STX.b $86                       ; $86 = base + scroll (row ptr)
-    LDA.w $5E34                     ; PC1 MP lo
-    STA.b $96
-    LDA.w $5E35                     ; PC1 MP hi
-    STA.b $97
-    LDA.w $5EB4                     ; PC2 MP lo
-    STA.b $98
-    LDA.w $5EB5                     ; PC2 MP hi
-    STA.b $99
-    LDA.w $5F34                     ; PC3 MP lo
-    STA.b $9A
-    LDA.w $5F35                     ; PC3 MP hi
-    STA.b $9B
+    STX.b !BattleMenu_MpListIdx     ; first visible line (16-bit)
+    LDA.w BattlerStats.CurMp        ; copy the three PCs' MP
+    STA.b !BattleMenu_MpPc0
+    LDA.w BattlerStats.CurMp+1
+    STA.b !BattleMenu_MpPc0+1
+    LDA.w BattlerStats[1].CurMp
+    STA.b !BattleMenu_MpPc1
+    LDA.w BattlerStats[1].CurMp+1
+    STA.b !BattleMenu_MpPc1+1
+    LDA.w BattlerStats[2].CurMp
+    STA.b !BattleMenu_MpPc2
+    LDA.w BattlerStats[2].CurMp+1
+    STA.b !BattleMenu_MpPc2+1
     TDC
     TAX
-    STX.b $82                       ; row counter = 0
-    ; outer loop entry point (re-entered via JMP from loop tail):
+    STX.b !BattleMenu_MpRow         ; visible row 0
+    ; per-row loop (re-entered via JMP from the loop tail):
 CODE_JP_C10F28:
-    LDA.b $82
+    LDA.b !BattleMenu_MpRow
     ASL A
     TAX
-    LDA.l $CCF39B,X                 ; window column ptr lo
-    STA.b $84
-    LDA.l $CCF39C,X                 ; window column ptr hi
-    STA.b $85
-    LDA #$29                        ; default attr = bright (affordable)
-    STA.b $94
-    LDX.b $86
-    LDA.w $94D0,X                   ; slot type byte
-    AND #$F0
-    CMP #$F0
-    BNE _ump_check_battler          ; not special → check battler
-    ; special slot type ($Fxx): further checks
-    LDA.w $94D0,X
-    CMP #$FC
+    LDA.l !BattleRom_TechRowMapOffset,X
+    STA.b !BattleMenu_MpRowCell
+    LDA.l !BattleRom_TechRowMapOffset+1,X
+    STA.b !BattleMenu_MpRowCell+1
+    LDA.b #!BattleUI_AttrPal2       ; default: usable
+    STA.b !BattleMenu_MpRowAttr
+    LDX.b !BattleMenu_MpListIdx
+    LDA.w !Tech_ListCode,X
+    AND.b #!Tech_CodeSpecialMask
+    CMP.b #!Tech_CodeSpecialMask
+    BNE _ump_check_battler          ; a real entry
+    ; special line ($Fx): only the two headers are graded
+    LDA.w !Tech_ListCode,X
+    CMP.b #!Tech_CodeDoubleHeader
     BNE _ump_check_fd
-    LDA.w $A6DE                     ; party-size field
-    CMP #$02
-    BCC _ump_set_bright             ; party < 2 → bright (gray the unavail tech)
-    BRA CODE_C10F66_JMP             ; party >= 2 → gray exit
+    LDA.w !BattleMenu_ReadyCount
+    CMP.b #!BattleMenu_DoubleTechPcs
+    BCC _ump_set_bright             ; fewer than 2 PCs ready → grey
+    BRA CODE_C10F66_JMP             ; else keep palette 2
 _ump_check_fd:
-    CMP #$FD
-    BNE CODE_C10F66_JMP             ; not $FC or $FD → gray
-    LDA.w $A6DE
-    CMP #$03
-    BCS CODE_C10F66_JMP             ; party >= 3 → gray
-_ump_set_bright:
-    LDA #$2D                        ; attr = gray (tech unavailable for this party size)
-    STA.b $94
+    CMP.b #!Tech_CodeTripleHeader
+    BNE CODE_C10F66_JMP             ; other special line → keep palette 2
+    LDA.w !BattleMenu_ReadyCount
+    CMP.b #!BattleMenu_TripleTechPcs
+    BCS CODE_C10F66_JMP             ; 3 PCs ready → keep palette 2
+_ump_set_bright:                    ; (despite the label, this greys the line)
+    LDA.b #!BattleUI_AttrPal3
+    STA.b !BattleMenu_MpRowAttr
 CODE_C10F66_JMP:                    ; several branches converge here
-    JMP CODE_JP_C1100F              ; → write column attrs
+    JMP CODE_JP_C1100F              ; → colour the line
 
 _ump_check_battler:
-    ; resolve battler slot and tech offsets
-    LDA.w $9551,X                   ; battler slot from row ptr
+    ; Tech_MenuEntry offset of the line's entry
+    LDA.w !Tech_ListEntry,X         ; menu-entry index
     TAX
-    LDA.l $CCF3A1,X                 ; battler offset
+    LDA.l !BattleRom_TechEntryOffset,X ; index × 7
     CLC
-    ADC.b $AF                       ; + PC tech-table ptr
-    STA.b $88
-    LDA.b $B0
+    ADC.b !BattleMenu_TechEntryBase ; + PC's block
+    STA.b !BattleMenu_MpEntry
+    LDA.b !BattleMenu_TechEntryBase+1
     ADC #$00
-    STA.b $89
-    LDX.b $88
+    STA.b !BattleMenu_MpEntry+1
+    LDX.b !BattleMenu_MpEntry
 
-    ; check PC1 MP vs tech cost at $1A83,X
-    LDA.w $1A83,X
-    BMI _ump_pc1_ok                 ; negative = cost 0 → ok
+    ; PC slot 0's MP vs its cost
+    LDA.w Tech_MenuEntry.MpCost0,X
+    BMI _ump_pc1_ok                 ; $80+ → not involved
     SEC
-    LDA.b $96                       ; PC1 MP lo
-    SBC.w $1A83,X                   ; − tech cost lo
-    LDA.b $97                       ; PC1 MP hi
+    LDA.b !BattleMenu_MpPc0
+    SBC.w Tech_MenuEntry.MpCost0,X
+    LDA.b !BattleMenu_MpPc0+1
     SBC #$00
     BCC _L1001                      ; borrow → can't afford
 
 _ump_pc1_ok:
-    ; check PC2 MP vs tech cost at $1A85,X
-    LDA.w $1A85,X
+    ; PC slot 1's MP vs its cost
+    LDA.w Tech_MenuEntry.MpCost1,X
     BMI _ump_pc2_ok
     SEC
-    LDA.b $98
-    SBC.w $1A85,X
-    LDA.b $99
+    LDA.b !BattleMenu_MpPc1
+    SBC.w Tech_MenuEntry.MpCost1,X
+    LDA.b !BattleMenu_MpPc1+1
     SBC #$00
     BCC _L1001
 
 _ump_pc2_ok:
-    ; check PC3 MP vs tech cost at $1A86,X
-    LDA.w $1A86,X
+    ; PC slot 2's MP vs its cost
+    LDA.w Tech_MenuEntry.MpCost2,X
     BMI _ump_pc3_ok
     SEC
-    LDA.b $9A
-    SBC.w $1A86,X
-    LDA.b $9B
+    LDA.b !BattleMenu_MpPc2
+    SBC.w Tech_MenuEntry.MpCost2,X
+    LDA.b !BattleMenu_MpPc2+1
     SBC #$00
     BCC _L1001
 
 _ump_pc3_ok:
-    ; load tech slot id ($1A84,X); check if valid / single / dual
-    LDA.w $1A84,X
-    STA.b $81
-    CMP #$FF                        ; $FF = no tech
-    BEQ _ump_slot_ready             ; → treat as ready (won't show)
-    AND #$0F                        ; tech slot lo nibble
-    STA.b $80
-    JSR BattleSys_SlotMenuReadyPredicate ; A=0 if slot ready
-    BNE _L1001                      ; not ready → gray
-    LDA.b $81
-    AND #$F0
-    CMP #$F0                        ; dual tech marker?
+    ; partners must be menu-ready
+    LDA.w Tech_MenuEntry.Partners,X
+    STA.b !BattleMenu_MpPartners
+    CMP.b #!Tech_NoPartners
+    BEQ _ump_slot_ready             ; single tech: no partners to check
+    AND.b #!Tech_PartnerLoMask      ; first partner slot
+    STA.b !BattleMenu_ReadySlotArg
+    JSR BattleSys_SlotMenuReadyPredicate ; A=0 if ready
+    BNE _L1001                      ; not ready → grey
+    LDA.b !BattleMenu_MpPartners
+    AND.b #!Tech_PartnerHiMask
+    CMP.b #!Tech_PartnerHiMask      ; no second partner (double tech)?
     BEQ _ump_slot_ready
-    JSR Battle_ShiftRight4          ; shift hi nibble down ($011A)
-    STA.b $80
+    JSR Battle_ShiftRight4          ; second partner slot
+    STA.b !BattleMenu_ReadySlotArg
     JSR BattleSys_SlotMenuReadyPredicate
     BNE _L1001
 
 _ump_slot_ready:
-    ; all checks passed: mark bright, check lock status
-    LDA.w $95D5
+    ; the shown PC must not be locked; tech $74 needs one more check
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $A0D1,X                   ; PC1HasLockStatus
-    BNE _L1001                      ; locked → gray
-    LDX.b $88
-    LDA.w $1A80,X                   ; EventCommand7A7B (battler type)
-    CMP #$74                        ; special type?
+    LDA.w !Pc_LockStatus,X
+    BNE _L1001                      ; locked → grey
+    LDX.b !BattleMenu_MpEntry
+    LDA.w Tech_MenuEntry.TechId,X
+    CMP.b #!Tech_IdUnk74
     BNE _ump_write_bright
-    LDX.w $A0FF
-    LDA.w $1C48,X
-    CMP #$42                        ; status check
-    BNE _L1001                      ; fail → gray
+    LDX.w !Battle_UnkA0FF
+    LDA.w !Battle_Unk1C48,X
+    CMP.b #!Battle_Unk1C48Wanted
+    BNE _L1001                      ; fail → grey
 
 _ump_write_bright:
-    LDX.b $88
-    LDA.w $1A82,X
-    AND #$7F                        ; clear gray bit
-    STA.w $1A82,X
-    LDA #$29                        ; bright attr
-    STA.b $94
-    BRA CODE_JP_C1100F              ; → write column attrs
+    LDX.b !BattleMenu_MpEntry
+    LDA.w Tech_MenuEntry.Flags,X
+    AND.b #!Tech_FlagUsableMask     ; usable
+    STA.w Tech_MenuEntry.Flags,X
+    LDA.b #!BattleUI_AttrPal2
+    STA.b !BattleMenu_MpRowAttr
+    BRA CODE_JP_C1100F              ; → colour the line
 
-_L1001:                             ; not affordable / locked → gray
-    LDX.b $88
-    LDA.w $1A82,X
-    ORA #$80                        ; set gray bit
-    STA.w $1A82,X
-    LDA #$2D                        ; gray attr
-    STA.b $94
+_L1001:                             ; can't afford / partner not ready / locked
+    LDX.b !BattleMenu_MpEntry
+    LDA.w Tech_MenuEntry.Flags,X
+    ORA.b #!Tech_FlagUnusable       ; unusable
+    STA.w Tech_MenuEntry.Flags,X
+    LDA.b #!BattleUI_AttrPal3       ; greyed
+    STA.b !BattleMenu_MpRowAttr
     ; fall through to CODE_JP_C1100F
 
-CODE_JP_C1100F:                     ; write computed attr to column
-    LDX.b $84                       ; window column ptr
-    LDY.w #$0012                    ; 18 entries
-    LDA.b $94                       ; attr byte
+CODE_JP_C1100F:                     ; colour both rows of the line
+    LDX.b !BattleMenu_MpRowCell
+    LDY.w #!BattleMenu_TechRowCells
+    LDA.b !BattleMenu_MpRowAttr
 .col1_loop:
-    STA.w $A6E2,X
+    STA.w BattleMenu_TechAttr(0,0),X
     INX
     INX
     DEY
     BNE .col1_loop
-    LDX.b $84
-    LDY.w #$0012
+    LDX.b !BattleMenu_MpRowCell
+    LDY.w #!BattleMenu_TechRowCells
 .col2_loop:
-    STA.w $A722,X
+    STA.w BattleMenu_TechAttr(1,0),X
     INX
     INX
     DEY
     BNE .col2_loop
-    INC.b $86
-    INC.b $82
-    LDA.b $82
-    CMP #$03
+    INC.b !BattleMenu_MpListIdx
+    INC.b !BattleMenu_MpRow
+    LDA.b !BattleMenu_MpRow
+    CMP.b #!BattleMenu_ListRows
     BEQ .done
     JMP CODE_JP_C10F28              ; next row
 .done:
     LDA #$01
-    STA.w $A099                     ; mark window updated
+    STA.w !BattleMenu_TechAvailDone ; rows graded
 CODE_JP_C1103D:                     ; shared exit RTS (jumped to from multiple routines)
     RTS
 
 ; ==================================================================
 ; BattleSys_SlotMenuReadyPredicate ($C1103E–$C1104D, 16 bytes)
 ; ==================================================================
-; Returns A=0 if battler for slot $80 is menu-ready (slot's $A6D9,X entry
-; is valid / not negative, and $A0D1 lock flag is clear); nonzero otherwise.
-; Entry: M=1, X=0 (16-bit), DB=$7E; $80 = battler slot index
+; Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the
+; roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear;
+; nonzero otherwise.
+; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ReadySlotArg = PC slot
 ; Exit:  M=1; A = 0 (ready) or nonzero (not ready); X clobbered
 ; No JSR/JSL calls.
 BattleSys_SlotMenuReadyPredicate:
-    LDA.b $80
+    LDA.b !BattleMenu_ReadySlotArg
     TAX
-    LDA.w $A6D9,X                   ; slot state
-    BMI .not_ready                  ; negative → slot not active
+    LDA.w !BattleMenu_Roster,X
+    BMI .not_ready                  ; not in the roster
     TAX
-    LDA.w $A0D1,X                   ; PC1HasLockStatus
-    BNE .not_ready                  ; locked → not ready
+    LDA.w !Pc_LockStatus,X
+    BNE .not_ready                  ; locked
     TDC                             ; A = 0 (ready)
 .not_ready:
     RTS
@@ -2662,9 +2703,9 @@ BattleMsg_BlankLeadingZeros:
 ; ==================================================================
 ; BattleMenu_LoadCommandWindowMap ($C11C3A–$C11C49, 16 bytes)
 ; ==================================================================
-; Loads $180 bytes from bank $D1 (TechBoxBattles at $D15800) into
-; WRAM $7E:0B40. Used to reload the command window tilemap whenever
-; the active PC changes or the menu layout needs refreshing.
+; Copies the $180-byte command window map (!BattleRom_CommandWindowMap,
+; bank $D1) into !BattleMenu_WindowMap. Used whenever the shown PC changes
+; or a submenu closes.
 ; Entry: M=1, X=0 (16-bit), DB=$7E
 ; Exit:  M=1; X=$0180; A = last byte copied; Y unchanged
 ; No JSR/JSL calls.
@@ -2673,10 +2714,10 @@ BattleMenu_LoadCommandWindowMap:
     TDC
     TAX
 .load_loop:
-    LDA.l $D15800,X                 ; TechBoxBattles source (bank $D1)
-    STA.w $0B40,X                   ; dest WRAM $0B40
+    LDA.l !BattleRom_CommandWindowMap,X
+    STA.w !BattleMenu_WindowMap,X
     INX
-    CPX.w #$0180
+    CPX.w #!BattleMenu_WindowBytes
     BNE .load_loop
     RTS
 
