@@ -101,23 +101,30 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Field_UploadUnk1F00` (+ table), `Field_UploadUnk1D00`/`1C00`/`0000`/`57E0`,
    `Field_ResetUnk0B88`/`0B80`, `Pal_LoadUnkRow0`, `Pal_UploadCgram` ($C0:6E5C–$C0:6F99,
    $C0:70E9–$C0:716F), `Obj_ResetDrawLists` and `Oam_HideFirst4` ($C0:B204–$C0:B270).
-   Stale now (verified headers, fix on their next review): Field_FrameUpdate's header says
-   Map_Unk8A6D is unmatched; `Map_ProbeTileAttrsAny` / `Map_ProbeTileLevel` list $C0:9DEA /
-   $C0:9DF5 as unmatched (now Map_InitEntryTile); `Sub_C07F9A` lists $C0:74D1 / $C0:74E3 and
-   `Map_BuildColXInc1` $C0:87FA as unmatched; `VramDma_Upload` calls $C0:6D61, $C0:6E1E,
-   $C0:6E84/6E9C/6EC7/6EED/6F08-6F57 "unmatched"; `ClearRAMDMA` ($C0:5717/58B9/58CA),
-   `Sys_HaltWithColor` ($C0:5CDA/5CE8), `Map_InitEntryTile` ($C0:5926) and
-   `Obj_ResetFrameState` ($C0:287E/56C2) name now-matched callers as unmatched; LoadLocation's,
-   Field_RestoreState's and Field_FadeInAfterReload's Exit lines still hedge on "unmatched"
-   steps. Next, in reach order: `Scene_Unk0283` ($C0:0283–$C0:034A, the third caller of the
-   location-load steps) and the rest of Scene_ReloadStep's callees: `Field_UnkB0E6` (calls
-   $C0:A9CD, $C0:AB45), `Field_Unk29F7` and `Field_Unk2B78` (JSL, RTL); `LocLoad_AudioSetup`
-   ($C0:1B53); the NMI handler's upload calls ($C0:EA9E–$C0:EB86, which also call the
-   Field_Upload* routines and Pal_UploadCgram); the `Evt_Unk0920` list code at $C0:5C90 and the
-   halts at $C0:5CB3; `Vblank_ReadScanlineCounters` ($C0:5A46, walks the `ObjQ_Unk74` list
-   through `Obj_Unk1080`). Open questions: who reads `LocGfx_Unk7F6000`/`7F7000`,
-   `Field_Unk7EF000`, `Map_Unk7F3700` (its seed bytes look like scripts), `Field_Unk0B80`/`0B88`,
-   `Map_Unk1D34`, `ObjX_Unk7F0C00`-`7F0D80` and `Field_Unk0BE9`; the NMI side that reads
+   Also done: the field/battle hand-off ($C0:0283–$C0:0904): `Scene_Unk0283` (post-battle
+   rebuild, with the `FieldBtl_Result` exits), `Field_Unk034B`, `Field_Unk038F` with
+   `FieldBtl_SaveTileAttrs`/`SavePartyPos`/`SaveObjs`/`SaveObj`/`SavePpu`, `Field_Unk0617`,
+   `FieldBtl_Restore` with `FieldBtl_RestoreObjs`/`RestoreObj`/`RestoreParty`/`RestorePc` (the
+   block is the `FieldBtlPc`/`FieldBtlObj`/`FieldBtlPpu` structs at $7E:29B0-$7E:2C7B);
+   `Evt_RedirectObjScript` ($C0:5B1F); the draw-bucket links `Obj_DrawUnlink`/`Obj_DrawLink`
+   ($C0:A98A–$C0:AA06); `LocLoad_AudioSetup` ($C0:1B53); and the `Field_Unk7EF000` tilemap
+   builders `Field_Unk29F7`/`Field_Unk2B78` ($C0:29F7–$C0:2C40). `Scene_Unk0283`, `Field_Unk034B`/`038F`/`0617` and
+   `Field_Unk29F7`/`2B78` keep their names because verified code calls them by name; better
+   names once those callers are re-reviewed: `Scene_RebuildAfterBattle`, `FieldBtl_Save`,
+   `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably). Next, in
+   reach order: `Field_UnkB0E6` (Scene_ReloadStep's last unmatched callee; calls
+   `Obj_DrawLink` and $C0:AB45) and the other draw-bucket users at $C0:A810–$C0:A950 (the
+   unmatched `Obj_DrawUnlink`/`Obj_DrawLink` sites); `Obj_Unk72B4`/`Obj_Unk734C` (they work
+   on the $0B00/$0B80 tables, up to $C0:7398); the NMI handler's upload calls
+   ($C0:EA9E–$C0:EB86, which also call the Field_Upload* routines and Pal_UploadCgram); the
+   `Evt_Unk0920` list code at $C0:5C90 and the halts at $C0:5CB3; `Vblank_ReadScanlineCounters`
+   ($C0:5A46, walks the `ObjQ_Unk74` list through `Obj_Unk1080`). Open from the hand-off: who
+   writes `FieldBtl_Result` = 2 and what the battle does with `FieldBtlObj.Flags` (0 removes the
+   object), what `Eng_Unk0010` holds (Scene_Unk0283's `BIT $0010` quirk), the readers of
+   `FieldBtlPpu`, `FieldBtl_AttrA/B` and `Field_Unk47`, and what
+   Audio_CmdUnk81 does. Open questions: who reads `LocGfx_Unk7F6000`/`7F7000`, `Map_Unk7F3700`
+   (its seed bytes look like scripts), `Field_Unk0B80`/`0B88`, `Map_Unk1D34`,
+   `ObjX_Unk7F0C00`-`7F0D80` and `Field_Unk0BE9`; the NMI side that reads
    `Map_EdgeVram*` / `Map_EdgeSize*` and the `Map_Built*` bits (then `Sub_C07F9A` can take a real
    name; it is left `Sub_` because Map_Unk93E1 branches to it by that name); the upload callers
    in the NMI at `$C0:EAE1`–`$C0:EB5E`; who sets `Map_ScrollToMode`, `Map_Drift*`/`Map_DriftTimer`.

@@ -36,16 +36,6 @@ IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline her
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
 
-org $C0034B
-Field_Unk034B:      ; Scene_Unk024C's no-battle path: sets Field_Unk7F03FE from the party slots, may BRL Field_IdleFrame
-org $C0038F
-Field_Unk038F:      ; Scene_Unk024C's battle path: JSR $039B/$041A/$04ED, BRL $066D; fills $7E:29xx/$7E:2Cxx
-org $C00617
-Field_Unk0617:      ; 8-bit X/Y: lists objects of kind 5/6 ($1100,X) near the screen tile origin in dp $9D.. (max 12, $80 ends)
-org $C00283
-Scene_Unk0283:      ; scene post-init from DefaultHandler; starts JSR $B262, JSR Field_RestoreSaveBlock
-org $C01B53
-LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
 Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
 org $C028AA
@@ -64,12 +54,14 @@ Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_Opc
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
-org $C02B78
-Field_Unk2B78:      ; JSL from Scene_ReloadStep; ends RTL (not traced)
-org $C029F7
-Field_Unk29F7:      ; JSL from Scene_ReloadStep; ends RTL (not traced)
 org $C0B0E6
 Field_UnkB0E6:      ; JSR from Scene_ReloadStep; calls $C0:A9CD and $C0:AB45 (not traced)
+org $C072B4
+Obj_Unk72B4:        ; FieldBtl_SaveObj, for an object with Obj_Unk1A81 bit 7 set; writes its
+                    ; $0B00/$0B80 entries and Obj_OamAttr palette bits, copies $E4 colours (not traced)
+org $C0734C
+Obj_Unk734C:        ; FieldBtl_RestoreObj's removal, for Obj_Unk1A81 bit 7 set; undoes Obj_Unk72B4's
+                    ; $0B00/$0B80 links (probably; not traced)
 org $C0A810
 Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
 org $C0AF4E

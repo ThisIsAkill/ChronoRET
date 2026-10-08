@@ -17,22 +17,22 @@ Ship of Harkinian project for Ocarina of Time, but strictly one person learning.
 ## Status
 
 <!-- status:start -->
-83,049 of 359,278 bytes of game code are matched byte-exact (23.12%, 979 functions); 979 of those meet the readability standard and 979 are verified by independent review.
+85,555 of 359,278 bytes of game code are matched byte-exact (23.81%, 999 functions); 999 of those meet the readability standard and 990 are verified by independent review.
 <!-- status:end -->
 
 <!-- progress:start -->
 | | Functions | Bytes | Share of game code |
 |---|---:|---:|---:|
 | Game code (surveyed) | | 359,278 | |
-| Matched | 979 | 83,049 | 23.12% |
-| Readable | 979 | 83,049 | 23.12% |
-| Verified | 979 | 83,049 | 23.12% |
+| Matched | 999 | 85,555 | 23.81% |
+| Readable | 999 | 85,555 | 23.81% |
+| Verified | 990 | 85,123 | 23.69% |
 
 Each row includes the next: verified functions are also readable and matched.
 
 | Bank | Code bytes | Matched | Readable | Verified |
 |---|---:|---:|---:|---:|
-| `$C0` | 61,779 | 36,217 (58.62%) | 36,217 (58.62%) | 36,217 (58.62%) |
+| `$C0` | 61,779 | 38,723 (62.68%) | 38,723 (62.68%) | 38,291 (61.98%) |
 | `$C1` | 63,904 | 32,642 (51.08%) | 32,642 (51.08%) | 32,642 (51.08%) |
 | `$C2` | not surveyed | 13,297 | 13,297 | 13,297 |
 | `$CC` | not surveyed | 30 | 30 | 30 |
