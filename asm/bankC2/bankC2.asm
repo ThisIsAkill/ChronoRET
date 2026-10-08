@@ -1429,8 +1429,8 @@ org $C21DB5
 ; Callers (1 JSR site): BankC2_SceneBoot ($C2:003D).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB with low WRAM at
 ;        $0000-$1FFF ($00 from the boot)
-; Exit:  M=1, X=0; X = C2Scene_Unk0B20Size, A = 0 (16-bit); Y, DP and DB
-;        unchanged
+; Exit:  M=1, X=0; X = C2Scene_Unk0B20Size; A (never written), Y, DP and
+;        DB unchanged
 ; No calls.
 C2Scene_ClearPalette:
     REP #$20
@@ -1768,7 +1768,8 @@ org $C257DF
 ; Callers: JMP from BankC2_Entry0003 ($C2:0003) and BankC2_Entry0006
 ;   ($C2:0006), the cross-bank JSL vectors; JSL (unmatched) from $C2:5695
 ;   and $C2:69BB.
-; Entry: any M, X (P saved), DP any (saved; DP=$0200 here), DB any (all
+; Entry: M any, X=0 (16-bit X/Y: the LDX #$0200 and the TAY of the doubled
+;        string index need it; P saved), DP any (saved; DP=$0200 here), DB any (all
 ;        accesses direct page); the block at $0200 filled as above
 ; Exit:  P and DP restored; A, X (= TextWin_Dp) and Y clobbered; DB
 ;        unchanged
