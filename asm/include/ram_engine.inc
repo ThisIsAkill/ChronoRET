@@ -437,11 +437,13 @@ if !ram_engine_inc == 0
 !Obj_TileRecOfs = $1700                  ; 16-bit per object: offset of its first 8-byte record in
                                          ; SprTile/SprTileSrc
 !Obj_OamHiA = $7F4F00                    ; 2 bytes per object (bank $7F): packed OAM high-table bytes
-                                         ; for tiles 0-7
+                                         ; for tiles 0-3 and 4-7. Lies where SprTile[104] would
+                                         ; be, so the SprTile records stop below it
 !Obj_OamHiB = $7F4B40                    ; 2 bytes per object (bank $7F): high-table bytes for tiles
-                                         ; 8-15 (24-tile objects)
+                                         ; 8-11 and 12-15 (12-tile objects use the first, 24-tile
+                                         ; objects both). Where SprTileSrc[104] would be
 !Obj_OamHiC = $7F4F80                    ; 2 bytes per object (bank $7F): high-table bytes for tiles
-                                         ; 16-23 (24-tile objects)
+                                         ; 16-23 (24-tile objects). Where SprTile[120] would be
 !Eng_PtrBase = $0000                     ; base 0 for abs,X / abs,Y accesses whose index register
                                          ; holds the full address (e.g. Spr_AppendToOam storing at
                                          ; Oam_Range1HiPtr)
@@ -585,8 +587,8 @@ endstruct align 8
 ; Source records with the SprTile layout (bank $7F, same Obj_TileRecOfs index); the
 ; "init" builders copy OfsX/OfsY/Tile/Attr from here into SprTile.
 struct SprTileSrc $7F4800
-    .X: skip 1           ; OAM X (low 8 bits) after adding Spr_BaseX
-    .Y: skip 1           ; OAM Y after adding Spr_BaseY and clamping
+    .X: skip 1           ; not read by the Spr_Load* routines (they set SprTile.X)
+    .Y: skip 1           ; not read by the Spr_Load* routines (they set SprTile.Y)
     .OfsX: skip 2        ; 16-bit X offset of the tile from the object origin
     .OfsY: skip 2        ; Y offset of the tile (low byte used)
     .Tile: skip 1        ; OAM tile number
