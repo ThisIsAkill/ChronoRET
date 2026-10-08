@@ -119,14 +119,24 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    ($C2:84D2-$C2:85D5), and `Menu_InitPpuAndRam` with the new-game data init
    ($C2:940D-$C2:960A), the animation scripts `C2Anim_Run` with their 8 ops and
    `C2Scene_TaskMove` ($C2:0E1D-$C2:0F62), the script interpreter `C2Scene_TaskRunScript`
-   with `C2Script_OpTable` and ops $00-$32, $4C, $4D, $51 ($C2:0F63-$C2:17D1), and the motion
+   with `C2Script_OpTable` and all its ops $00-$52 ($C2:0F63-$C2:1C83), the motion
    helpers `C2Scene_NegateXVel`/`NegateYVel`, `C2Scene_WrapTaskPos`, `C2Scene_SetAnim`
-   ($C2:1C84-$C2:1CF4). Next, in reach order: the rest of the script ops, $C2:17D2-$C2:1C83
-   (stubs `C2Script_QueueVram` ... `C2Script_End` in unmatched.asm; the sound ops call
-   `$C2:2ED9`, and `C2Script_SetListBit7`/`ClearListBit7` have a 3-word table at `$C2:1A70`);
-   the task handlers the ops start (`C2Scene_TaskUnk1CF5`, `C2Scene_TaskUnk1DD4`,
-   `$C2:20A2`, `$C2:2105`, `$C2:2194`, `$C2:21F8`) and the layer scrolls `C2Scene_Unk0568` /
-   `C2Scene_Unk066C` that `C2Script_ScrollFrames` calls; the scene modes
+   ($C2:1C84-$C2:1CF4), the task handlers the spawn ops start: the tile upload
+   `C2Scene_TaskUnk1CF5` (op $03), the palette load `C2Scene_TaskUnk1DD4` (op $04) with its
+   fade task `C2Scene_TaskPalFade`, the screen fades `C2Scene_TaskUnk20A2`/`2105` (ops
+   $28/$29) and the mosaic tasks `C2Scene_TaskUnk2194`/`21F8` (ops $2B/$2A)
+   ($C2:1CF5-$C2:2259, without the matched $C2:1DB5), and the sound command queue
+   `C2Scene_QueueSoundCmd` ($C2:2ED9-$C2:2F0E). The six task handlers and their spawn ops
+   (`C2Script_SpawnUnk1CF5` ... `SpawnUnk2194`) keep their `Unk` names so the spawn ops
+   (under review) were not touched; once those are reviewed they can take real names
+   (TaskUploadTiles, TaskLoadPalette, TaskFadeOut/FadeIn, TaskMosaicShrink/Grow) and their
+   headers can drop "not traced". Also stale after this batch: C2Scene_NegateXVel/YVel,
+   C2Scene_TaskSpawn* and C2Scene_DrawBgLayer headers still call their now-matched callers in
+   $C2:17D2-$C2:1C83 "unmatched" (fix at their next edit). Open: the script data at
+   $C2:2EC1-$C2:2ED8 (short scripts: fades and mosaics, ops $00, $28-$2B, $38, $52), the other sound-queue callers ($C2:2F88-$C2:3092,
+   $C2:4395, $C2:4A4C) and the routine at $C2:2F0F; what the list entries' bit 7
+   (C2Script_SetListBit7) and C2Scene_Unk7F01ED mean. Next, in reach order: the layer scrolls
+   `C2Scene_Unk0568` / `C2Scene_Unk066C` that `C2Script_ScrollFrames` calls; the scene modes
    `C2Scene_Mode2`-`C2Scene_Mode8` ($C2:2402-$C2:26A7; they call C2Scene_SaveState,
    C2Scene_RestoreState and C2Scene_ReloadScene); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
    `$C2:5798` and the data before `TextWin_Init`); the text decoder states

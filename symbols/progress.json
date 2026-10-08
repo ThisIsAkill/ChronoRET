@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 71206,
+  "emitted_bytes": 73812,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 868,
+      "bytes": 73812
     },
     "readable": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 868,
+      "bytes": 73812
     },
     "verified": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 798,
+      "bytes": 71040
     }
   },
   "banks": [
@@ -54,18 +54,18 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 8423,
+      "emitted_bytes": 11029,
       "matched": {
-        "functions": 182,
-        "bytes": 8423
+        "functions": 251,
+        "bytes": 11029
       },
       "readable": {
-        "functions": 182,
-        "bytes": 8423
+        "functions": 251,
+        "bytes": 11029
       },
       "verified": {
-        "functions": 182,
-        "bytes": 8423
+        "functions": 181,
+        "bytes": 8257
       }
     },
     {
@@ -1055,7 +1055,7 @@
       "bank": "$C2",
       "start": "$C2:1000",
       "end": "$C2:1FFF",
-      "emitted_bytes": 2146,
+      "emitted_bytes": 4096,
       "functions": [
         "C2Script_ResetTask",
         "C2Script_SetSprPalette",
@@ -1114,19 +1114,87 @@
         "C2Script_PanKeepFraction",
         "C2Script_PanTakeX",
         "C2Script_PanTakeY",
+        "C2Script_QueueVram",
+        "C2Script_CallNear",
+        "C2Script_CallLong",
+        "C2Script_SpawnTask",
+        "C2Script_Call",
+        "C2Script_Return",
+        "C2Script_Wait",
+        "C2Script_WaitAnimating",
+        "C2Script_StopIfOlder",
+        "C2Script_SoundCmd18",
+        "C2Script_PlaySfx",
+        "C2Script_PlaySfx_SetArgs",
+        "C2Script_SoundCmd10IfClear",
+        "C2Script_SoundCmd10",
+        "C2Script_SoundCmd10_Done",
+        "C2Script_SoundCmd",
+        "C2Script_DrawLayer",
+        "C2Script_MoveToX",
+        "C2Script_MoveToY",
+        "C2Script_Halt2",
+        "C2Script_SpawnScriptLow",
+        "C2Script_SpawnTaskLow",
+        "C2Script_SetListBit7",
+        "C2Script_ListEntryTable",
+        "C2Script_ListAEntry",
+        "C2Script_ListBEntry",
+        "C2Script_ListCEntry",
+        "C2Script_ClearListBit7",
+        "C2Script_AddTaskByte",
+        "C2Script_SubTaskByte",
+        "C2Script_AddRamByte",
+        "C2Script_SubRamByte",
+        "C2Script_CopyMapBlock",
+        "C2Script_DrawMetatile",
+        "C2Script_End",
         "C2Scene_NegateXVel",
         "C2Scene_NegateYVel",
         "C2Scene_WrapTaskPos",
         "C2Scene_SetAnim",
-        "C2Scene_ClearPalette"
+        "C2Scene_TaskUnk1CF5",
+        "C2Scene_UploadTileStates",
+        "C2Scene_UploadTilesStart",
+        "C2Scene_UploadTilesStep",
+        "C2Scene_ClearPalette",
+        "C2Scene_TaskUnk1DD4",
+        "C2Scene_TaskPalFade",
+        "C2Scene_PalFadeStates",
+        "C2Scene_PalFadeStart",
+        "C2Scene_PalFadeStep",
+        "C2Scene_PalFadeEnd",
+        "C2Scene_PalFadePlan",
+        "C2Scene_PalFadePlanColor",
+        "C2Scene_PalFadeApply",
+        "C2Scene_PalFadeStepColor"
       ]
     },
     {
       "bank": "$C2",
       "start": "$C2:2000",
       "end": "$C2:2FFF",
-      "emitted_bytes": 2197,
+      "emitted_bytes": 2853,
       "functions": [
+        "C2Scene_PalFadeStepTable",
+        "C2Scene_TaskUnk20A2",
+        "C2Scene_FadeOutStates",
+        "C2Scene_FadeOutStart",
+        "C2Scene_FadeOutStep",
+        "C2Scene_TaskUnk2105",
+        "C2Scene_FadeInStates",
+        "C2Scene_FadeInStart",
+        "C2Scene_FadeInUnblank",
+        "C2Scene_FadeInStep",
+        "C2Scene_FadeInEnd",
+        "C2Scene_TaskUnk2194",
+        "C2Scene_MosaicOutStates",
+        "C2Scene_MosaicOutStart",
+        "C2Scene_MosaicOutStep",
+        "C2Scene_TaskUnk21F8",
+        "C2Scene_MosaicInStates",
+        "C2Scene_MosaicInStart",
+        "C2Scene_MosaicInStep",
         "Trig_Cos1024",
         "Trig_Sin1024",
         "C2Scene_ClearUnk1B30",
@@ -1166,7 +1234,8 @@
         "C2Scene_DmaToVram",
         "C2Scene_LoadLocExtraGfx",
         "C2Scene_SaveState",
-        "C2Scene_RestoreState"
+        "C2Scene_RestoreState",
+        "C2Scene_QueueSoundCmd"
       ]
     },
     {

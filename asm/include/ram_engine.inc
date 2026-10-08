@@ -470,6 +470,8 @@ if !ram_engine_inc == 0
                                          ; Audio_PlayTileSfxA)
 !Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
                                          ; Obj_ScreenX in Audio_PlaySfxAtLeader)
+!Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (bank $C2's C2Scene_QueueSoundCmd
+                                         ; fills all four bytes $1E00-$1E03)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Treasure_Gold = $0200                   ; 16-bit gold amount of the last treasure taken
                                          ; (Field_CheckTileInFront, DB=$00; reader not traced)

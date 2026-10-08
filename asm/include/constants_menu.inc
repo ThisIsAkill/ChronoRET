@@ -201,6 +201,7 @@ if !constants_menu_inc == 0
 ; --- Scene scripts (C2Scene_TaskRunScript and the C2Script_* ops) ---
 !C2Script_SpawnUnk1CF5Len = 10           ; bytes C2Script_SpawnUnk1CF5 advances (the opcode and 9 bytes it
                                          ; does not read itself)
+!C2Script_CopyMapBlockLen = 9           ; bytes C2Script_CopyMapBlock advances (the opcode and 8 arguments)
 !C2Scene_ReturnTileOfs = $10             ; tiles C2Script_GoToLocation adds to BG2's tile X and Y for the
                                          ; return position
 !C2Scene_ModeUnk2 = 2                    ; C2Scene_Mode set by C2Script_GoToLocation (C2Scene_Mode2:
@@ -213,6 +214,40 @@ if !constants_menu_inc == 0
 !C2Scene_NoBg3PanBit3 = $20              ; byte 3 bit 5
 !C2Scene_NoBg3PanBit8 = $02              ; byte 8 bit 1
 !C2Scene_WholeMinus1 = $FFFF             ; -1 as the whole-pixel word (C2Script_PanKeepFraction)
+!C2Scene_ListEntryBit7 = $80             ; bit 7 of the first byte of a C2Scene_ListA/B/C entry (set and
+                                         ; cleared by script ops $44/$45; meaning not traced)
+!C2Scene_ListAEntrySize = 7              ; bytes per C2Scene_ListA entry (C2Scene_LoadLists)
+!C2Scene_ListBCEntrySize = 3             ; bytes per C2Scene_ListB / ListC entry
+!C2Scene_SoundCmd10 = $10                ; sound command sent by script ops $3D/$4A with one argument
+                                         ; (meaning not traced; the argument also goes to C2Scene_Unk02AE)
+!C2Scene_SoundCmd18 = $18                ; sound command sent by script op $3B (as Audio_CmdPlaySfx's
+                                         ; two arguments; meaning not traced)
+!C2Scene_SoundArgUnused = $FF            ; argument bytes 2 and 3 of C2Scene_SoundCmd10
+!C2Scene_MetatileSetBytes = $0800        ; layer 2's metatiles follow layer 1's (C2Scene_LayerMetatiles)
+!C2Scene_MetatileRowBytes = 4            ; bytes of one row of a metatile: two tile words
+!C2Scene_Bg1MapVram = $6000              ; VRAM word address of the BG1 tilemap (C2Scene_LayerVramMaps)
+!C2Scene_Bg2MapVram = $6800              ; and of the BG2 tilemap
+!C2Scene_TileColMask = $3F               ; tile column within the 64-column tilemap
+!C2Scene_ScreenTileMask = $1F            ; tile column or row within one 32x32 screen
+!C2Scene_TileRowWords = $20              ; VRAM words per tilemap row of one screen
+!C2Scene_PalColors = $10                 ; colors per palette (16; 32 bytes of C2Scene_PaletteBuf)
+!C2Scene_PalFadeSteps = $20              ; steps of a palette fade (C2Scene_TaskPalFade)
+!C2Scene_ColorRedMask = $1F              ; BGR555 color: red, bits 0-4
+!C2Scene_ColorGreenMask = $03E0          ; green, bits 5-9
+!C2Scene_ColorGreenUnit = $0020          ; one step of green
+!C2Scene_ColorBlueHiMask = $7C           ; blue, bits 10-14, as bits 2-6 of the high byte
+!C2Scene_ColorBlueHiUnit = 4             ; one step of blue in the high byte
+!C2Scene_FadeDownFlag = $80              ; fade step byte: counting down (the channel falls)
+!C2Scene_FadeDownBias = $1F              ; a falling channel's count starts at its drop + this
+!C2Scene_FadeCountMask = $3F             ; the count in a step byte (index into C2Scene_PalFadeStepTable)
+!C2Scene_FadeInBusy = $01                ; C2Scene_Unk1BF6 bit 0: a fade-in runs
+!C2Scene_FadeOutBusy = $02               ; C2Scene_Unk1BF6 bit 1: a fade-out runs
+!C2Scene_FadeInStart = 1                 ; C2Scene_TaskUnk2105 .State: first step from forced blank
+!C2Scene_FadeInDone = 3                  ; its .State that ends it (C2Scene_FadeInEnd)
+!C2Scene_MosaicBgMask = $0F              ; MOSAIC bits 0-3: the BGs it applies to
+!C2Scene_MosaicSizeMask = $F0            ; MOSAIC bits 4-7: the block size - 1
+!C2Scene_MosaicSizeStep = $10            ; one step of the size
+!C2Scene_SoundCmdQueued = 1             ; C2Scene_SoundCmdState: a command waits in the driver block
 !C2Scene_SoundCmdSending = $FF           ; C2Scene_SoundCmdState while the command is being sent
 
 ; --- Joypad and play time ---
