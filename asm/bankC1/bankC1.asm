@@ -15,6 +15,17 @@ incsrc "../hardware.inc"
 ; Label stubs — no bytes emitted; used for JSR/JSL targets
 ; ============================================================
 
+; Area-target geometry routines (unmatched; called from the
+; BattleTgt_* area modes and BattleTgt_RunAreaQuery)
+org $C12332
+BattleTgt_Area2332:
+org $C123A4
+BattleTgt_Area23A4:
+org $C125A3
+BattleTgt_Area25A3:
+org $C12701
+BattleTgt_Area2701:
+
 ; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
@@ -3228,7 +3239,7 @@ BattleMenu_BuildTargetList:
 .in_range:
     ASL                             ; word index
     TAX
-    JSR ($1FF8,X)                   ; target-mode handler table (unmatched)
+    JSR (BattleTgt_ModeTable,X)     ; target-mode handler table
     TDC
     TAX
 .scan_empty:
@@ -3239,6 +3250,653 @@ BattleMenu_BuildTargetList:
     BNE .scan_empty
     STA.w $9613                     ; all empty -> fallback result
 .done:
+    RTS
+
+; ==================================================================
+; BattleTgt_RunAreaQuery ($C11FDD–$C11FE9, 13 bytes)
+; ==================================================================
+; Service 7 of the cross-bank $C10045 service API (dispatch table at
+; $C10051). Runs one of the area-target geometry routines, selected by
+; $99CC (0-6) through the 7-entry table just below; out-of-range
+; selectors are ignored. The same geometry routines back the menu's
+; area-effect target modes (see BattleTgt_ModeTable), so this is
+; presumably how non-menu code (enemy scripts, scripted attacks) asks
+; "which battlers does this area hit?".
+; Entry: M=1, X=0, DB=$7E; $99CC = area type, $9604-$9608 = params
+; Exit:  M=1
+; Callees: JSR ($1FEA,X) -> BattleTgt_Area* (unmatched)
+org $C11FDD
+BattleTgt_RunAreaQuery:
+    LDA.w $99CC                     ; area type selector
+    CMP #$07
+    BCS .exit                       ; out of range -> no-op
+    ASL
+    TAX
+    JSR (BattleTgt_AreaTable,X)
+.exit:
+    RTS
+
+; BattleTgt_AreaTable ($C11FEA–$C11FF7, 7 words)
+BattleTgt_AreaTable:
+    dw BattleTgt_Area25A3           ; 0
+    dw BattleTgt_Area2701           ; 1
+    dw BattleTgt_Area2701           ; 2
+    dw BattleTgt_Area23A4           ; 3
+    dw BattleTgt_Area25A3           ; 4
+    dw BattleTgt_Area23A4           ; 5
+    dw BattleTgt_Area2332           ; 6
+
+; ==================================================================
+; BattleTgt_ModeTable ($C11FF8–$C12039, 33 words)
+; ==================================================================
+; Target-mode handler table, indexed by ($960D & $7F) clamped to $20,
+; called from BattleMenu_BuildTargetList. Each handler fills the
+; 11-entry candidate list ($99C0-$99CA, battler slots: 0-2 = PCs,
+; 3-10 = enemies) and seeds the selection list ($A62D...) from the
+; cursor ($9614). $960C = $80 means "target everything in the list";
+; $960A non-zero means the player may cycle the cursor; $9613 = $80
+; means "no valid target".
+;
+; Mode -> handler (unlisted modes use BattleTgt_SingleAlly):
+;   $01,$04 AllAllies          $02 Self             $03 SingleKoAlly
+;   $05,$06 PcByCharId (5/4)   $07 SingleEnemy      $08,$0A AllEnemies
+;   $09 Everyone               $0B,$0C,$0D area between a source PC and
+;   a chosen enemy (BattleTgt_Area25A3)    $0F,$11,$12,$13,$14,$18,$1A,
+;   $1B other area shapes (BattleTgt_Area2332/23A4/2701)
+BattleTgt_ModeTable:
+    dw BattleTgt_SingleAlly         ; $00
+    dw BattleTgt_AllAllies          ; $01
+    dw BattleTgt_Self               ; $02
+    dw BattleTgt_SingleKoAlly       ; $03
+    dw BattleTgt_AllAllies          ; $04
+    dw BattleTgt_PcByCharId5        ; $05
+    dw BattleTgt_PcByCharId4        ; $06
+    dw BattleTgt_SingleEnemy        ; $07
+    dw BattleTgt_AllEnemies         ; $08
+    dw BattleTgt_Everyone           ; $09
+    dw BattleTgt_AllEnemies         ; $0A
+    dw BattleTgt_EnemyLineFromCaster ; $0B
+    dw BattleTgt_EnemyLineFromCaster2 ; $0C
+    dw BattleTgt_EnemyLineFromChar3 ; $0D
+    dw BattleTgt_SingleAlly         ; $0E
+    dw BattleTgt_EnemyArea2332      ; $0F
+    dw BattleTgt_SingleAlly         ; $10
+    dw BattleTgt_CasterRadius       ; $11
+    dw BattleTgt_EnemyRadius        ; $12
+    dw BattleTgt_Char3Radius        ; $13
+    dw BattleTgt_Char3Radius        ; $14
+    dw BattleTgt_SingleAlly         ; $15
+    dw BattleTgt_SingleAlly         ; $16
+    dw BattleTgt_SingleAlly         ; $17
+    dw BattleTgt_Area23A4Mode       ; $18
+    dw BattleTgt_SingleAlly         ; $19
+    dw BattleTgt_EnemyRadius        ; $1A
+    dw BattleTgt_Char6Radius        ; $1B
+    dw BattleTgt_SingleAlly         ; $1C
+    dw BattleTgt_SingleAlly         ; $1D
+    dw BattleTgt_SingleAlly         ; $1E
+    dw BattleTgt_SingleAlly         ; $1F
+    dw BattleTgt_SingleAlly         ; $20
+
+; ==================================================================
+; BattleTgt_SingleAlly ($C1203A–$C12099, 96 bytes)
+; ==================================================================
+; Default mode: one PC (slots 0-2), cursor may cycle. Falls into
+; BattleTgt_CollectValidTargets, the shared list builder that the
+; other list modes enter with their own slot range ($80 = end
+; exclusive, X = start) and flags.
+;
+; CollectValidTargets keeps battler X only if it is present ($96F5,X),
+; not flagged out ($9FF7,X bit 7 clear), not hidden ($A09B,X zero) and
+; — if $A0A8,X is set (inferred: KO'd) — only when the mode is $04.
+; The requesting battler ($960F) always goes to the front ($99C0);
+; everyone else is appended from $99C1. CompactCandidates then closes
+; the hole if the requester wasn't eligible. Finally the cursor entry
+; is copied to the selection list, or the whole list when $960C says
+; "target all".
+; Entry: M=1, X=0, DB=$7E (all BattleTgt_* handlers)
+; Exit:  M=1
+; Callees: BattleTgt_CompactCandidates
+org $C1203A
+BattleTgt_SingleAlly:
+    LDX #$0003
+    STX $80                         ; end slot (exclusive): PCs 0-2
+    LDX #$0000                      ; start slot
+    INC.w $960A                     ; cursor may cycle
+BattleTgt_CollectValidTargets:
+    TDC
+    TAY                             ; Y = append index
+.loop:
+    LDA.w $96F5,X                   ; battler present?
+    BEQ .next
+    LDA.w $9FF7,X
+    BMI .next                       ; flagged out
+    LDA.w $A0A8,X                   ; KO'd? (inferred)
+    BEQ .check_hidden
+    LDA.w $960D
+    AND #$7F
+    CMP #$04                        ; only mode $04 may pick these
+    BNE .next
+.check_hidden:
+    LDA.w $A09B,X
+    BNE .next                       ; hidden / untargetable
+    CPX.w $960F                     ; requesting battler?
+    BNE .append
+    LDA.w $960F
+    STA.w $99C0                     ; requester goes first
+    BRA .next
+.append:
+    TXA
+    STA.w $99C1,Y
+    INY
+.next:
+    INX
+    CPX $80
+    BNE .loop
+    JSR BattleTgt_CompactCandidates
+    LDA.w $9614                     ; cursor -> selection
+    TAX
+    LDA.w $99C0,X
+    STA.w $A62D
+    LDA.w $960C
+    BPL .exit
+    LDX #$000A                      ; target all: copy whole list
+.copy_all:
+    LDA.w $99C0,X
+    STA.w $A62D,X
+    DEX
+    BPL .copy_all
+.exit:
+    RTS
+
+; BattleTgt_AllAllies ($C1209A–$C120A8, 15 bytes): every PC
+BattleTgt_AllAllies:
+    LDX #$0003
+    STX $80
+    LDX #$0000
+    LDA #$80
+    STA.w $960C                     ; target all
+    BRA BattleTgt_CollectValidTargets
+
+; BattleTgt_SingleEnemy ($C120A9–$C120B5, 13 bytes): one enemy (3-10),
+; cursor may cycle. Also called as a list builder by the area modes.
+BattleTgt_SingleEnemy:
+    LDX #$000B
+    STX $80
+    LDX #$0003
+    INC.w $960A
+    BRA BattleTgt_CollectValidTargets
+
+; BattleTgt_AllEnemies ($C120B6–$C120C5, 16 bytes)
+BattleTgt_AllEnemies:
+    LDX #$000B
+    STX $80
+    LDX #$0003
+    LDA #$80
+    STA.w $960C
+    JMP BattleTgt_CollectValidTargets
+
+; BattleTgt_Everyone ($C120C6–$C120D5, 16 bytes): all battlers 0-10
+BattleTgt_Everyone:
+    LDX #$000B
+    STX $80
+    LDX #$0000
+    LDA #$80
+    STA.w $960C
+    JMP BattleTgt_CollectValidTargets
+
+; BattleTgt_Self ($C120D6–$C120DF, 10 bytes): the active PC only
+BattleTgt_Self:
+    LDA.w $95D5                     ; active PC slot
+    STA.w $99C0
+    STA.w $A62D
+    RTS
+
+; ==================================================================
+; BattleTgt_SingleKoAlly ($C120E0–$C12135, 86 bytes)
+; ==================================================================
+; Lists the PCs whose status byte (+$4A in each PC's $80-byte battle
+; record at $5E00) has bit 7 set — by context, KO'd allies, i.e. a
+; revive target. Unrolled for the three PC slots. No candidate ->
+; $9613 = $80.
+BattleTgt_SingleKoAlly:
+    INC.w $960A
+    TDC
+    TAX
+    LDA.w $96F5                     ; PC 0
+    BEQ .pc1
+    LDA.w $A09B
+    BNE .pc1
+    LDA.w $5E4A
+    BPL .pc1
+    STZ.w $99C0
+    INX
+.pc1:
+    LDA.w $96F6                     ; PC 1
+    BEQ .pc2
+    LDA.w $A09C
+    BNE .pc2
+    LDA.w $5ECA
+    BPL .pc2
+    LDA #$01
+    STA.w $99C0,X
+    INX
+.pc2:
+    LDA.w $96F7                     ; PC 2
+    BEQ .check_any
+    LDA.w $A09D
+    BNE .check_any
+    LDA.w $5F4A
+    BPL .check_any
+    LDA #$02
+    STA.w $99C0,X
+.check_any:
+    LDA.w $99C0
+    BPL .select
+    LDA #$80
+    STA.w $9613                     ; no valid target
+.select:
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $A62D
+    RTS
+
+; ==================================================================
+; BattleTgt_PcByCharId5 ($C12136–$C12162, 45 bytes)
+; ==================================================================
+; Targets the one party member whose $2980,X entry equals $80 (5 for
+; this entry, 4 via BattleTgt_PcByCharId4). In bank $C1, $2980-$2982
+; behaves like the party's character-id list; if so these are
+; "target Ayla"/"target Frog" modes, used by dual/triple techs that
+; act on a specific partner.
+BattleTgt_PcByCharId5:
+    LDA #$05
+    STA $80
+BattleTgt_FindPcByCharId:
+    INC.w $960A
+    LDX #$0002
+.loop:
+    LDA.w $96F5,X
+    BEQ .next
+    LDA.w $A09B,X
+    BNE .next
+    LDA.w $2980,X                   ; party member id (inferred)
+    CMP $80
+    BEQ .found
+.next:
+    DEX
+    BPL .loop
+    LDA #$80
+    STA.w $9613                     ; not in party / not targetable
+    BRA .exit
+.found:
+    TXA
+    STA.w $99C0
+    STA.w $A62D
+.exit:
+    RTS
+
+; BattleTgt_PcByCharId4 ($C12163–$C12168, 6 bytes)
+BattleTgt_PcByCharId4:
+    LDA #$04
+    STA $80
+    BRA BattleTgt_FindPcByCharId
+
+; ==================================================================
+; Area modes ($C12169–$C12331)
+; ==================================================================
+; All of these pick an anchor (the caster, a chosen enemy, or a
+; specific party member), fill the $9604-$9608 parameter block, run an
+; area-geometry routine that writes the hit list into $99C0, then
+; select the whole list (BattleTgt_SelectAllCandidates).
+;   $9605 = source/centre battler, $9606 = aimed-at battler,
+;   $9607 = shape/size code, $9608 = variant flag, $9604 = 0
+; The enemy-anchored ones build the enemy list first and let the pad
+; move the aim: $EF bits $09 / $06 each play Battle_StopSfx and step
+; the cursor. Note the three "line" modes step forward for both pad
+; groups; the radius/$2332 modes step backward for the second group.
+
+; BattleTgt_EnemyLineFromCaster ($C12169–$C121AE, 70 bytes)
+BattleTgt_EnemyLineFromCaster:
+    JSR BattleTgt_SingleEnemy
+    STZ.w $960A
+    LDA #$80
+    STA.w $960C
+    LDA $EF
+    AND #$09
+    BEQ .check_other
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+    BRA .setup
+.check_other:
+    LDA $EF
+    AND #$06
+    BEQ .setup
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+.setup:
+    STZ.w $9604
+    LDA.w $960F
+    STA.w $9605                     ; source: caster
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $9606                     ; aimed-at enemy
+    LDA #$02
+    STA.w $9607
+    STZ.w $9608
+    JSR BattleTgt_Area25A3
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_EnemyLineFromChar3 ($C121AF–$C12202, 84 bytes): as above,
+; but the source is the party member with id 3 (no-op if absent)
+BattleTgt_EnemyLineFromChar3:
+    JSR BattleTgt_SingleEnemy
+    STZ.w $960A
+    LDA #$80
+    STA.w $960C
+    LDA $EF
+    AND #$09
+    BEQ .check_other
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+    BRA .find_source
+.check_other:
+    LDA $EF
+    AND #$06
+    BEQ .find_source
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+.find_source:
+    TDC
+    TAX
+.find_loop:
+    LDA.w $2980,X
+    CMP #$03
+    BEQ .found
+    INX
+    CPX #$0003
+    BNE .find_loop
+    RTS
+.found:
+    TXA
+    STA.w $9605                     ; source: party member id 3
+    STZ.w $9604
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $9606
+    LDA #$02
+    STA.w $9607
+    STZ.w $9608
+    JSR BattleTgt_Area25A3
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_EnemyLineFromCaster2 ($C12203–$C1224A, 72 bytes): same as
+; EnemyLineFromCaster with variant flag $9608 = 1
+BattleTgt_EnemyLineFromCaster2:
+    JSR BattleTgt_SingleEnemy
+    STZ.w $960A
+    LDA #$80
+    STA.w $960C
+    LDA $EF
+    AND #$09
+    BEQ .check_other
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+    BRA .setup
+.check_other:
+    LDA $EF
+    AND #$06
+    BEQ .setup
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+.setup:
+    STZ.w $9604
+    LDA.w $960F
+    STA.w $9605
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $9606
+    LDA #$02
+    STA.w $9607
+    LDA #$01
+    STA.w $9608
+    JSR BattleTgt_Area25A3
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_CasterRadius ($C1224B–$C1225E, 20 bytes): area $10 around
+; the caster
+BattleTgt_CasterRadius:
+    STZ.w $9604
+    LDA.w $960F
+    STA.w $9605
+    LDA #$10
+    STA.w $9607
+    JSR BattleTgt_Area2701
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_EnemyRadius ($C1225F–$C122A3, 69 bytes): area around a
+; chosen enemy; size $19 for mode $1A, else $09
+BattleTgt_EnemyRadius:
+    JSR BattleTgt_SingleEnemy
+    STZ.w $960A
+    LDA $EF
+    AND #$09
+    BEQ .check_other
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+    BRA .setup
+.check_other:
+    LDA $EF
+    AND #$06
+    BEQ .setup
+    JSR Battle_StopSfx
+    JSR BattleTgt_CyclePrev
+.setup:
+    STZ.w $9604
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $9605                     ; centre: chosen enemy
+    LDA.w $960D
+    AND #$7F
+    CMP #$1A
+    BNE .small
+    LDA #$19
+    BRA .set_size
+.small:
+    LDA #$09
+.set_size:
+    STA.w $9607
+    JSR BattleTgt_Area2701
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_Char3Radius ($C122A4–$C122D2, 47 bytes): area around party
+; member id 3; size $19 for mode $14, else $10
+BattleTgt_Char3Radius:
+    STZ.w $9604
+    TDC
+    TAX
+.find_loop:
+    LDA.w $2980,X
+    CMP #$03
+    BEQ .found
+    INX
+    CPX #$0003
+    BNE .find_loop
+    RTS
+.found:
+    TXA
+    STA.w $9605
+    LDA.w $960D
+    AND #$7F
+    CMP #$14
+    BNE .small
+    LDA #$19
+    BRA .set_size
+.small:
+    LDA #$10
+.set_size:
+    STA.w $9607
+    JSR BattleTgt_Area2701
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_Char6Radius ($C122D3–$C122F4, 34 bytes): area $19 around
+; party member id 6
+BattleTgt_Char6Radius:
+    STZ.w $9604
+    TDC
+    TAX
+.find_loop:
+    LDA.w $2980,X
+    CMP #$06
+    BEQ .found
+    INX
+    CPX #$0003
+    BNE .find_loop
+    RTS
+.found:
+    TXA
+    STA.w $9605
+    LDA #$19
+    STA.w $9607
+    JSR BattleTgt_Area2701
+    JMP BattleTgt_SelectAllCandidates
+
+; BattleTgt_EnemyArea2332 ($C122F5–$C12328, 52 bytes incl. dead RTS):
+; chosen enemy as anchor for BattleTgt_Area2332 (a +/-$20 band around
+; the anchor's $1D23 screen coordinate)
+BattleTgt_EnemyArea2332:
+    JSR BattleTgt_SingleEnemy
+    STZ.w $960A
+    LDA $EF
+    AND #$09
+    BEQ .check_other
+    JSR Battle_StopSfx
+    JSR BattleTgt_CycleNext
+    BRA .setup
+.check_other:
+    LDA $EF
+    AND #$06
+    BEQ .setup
+    JSR Battle_StopSfx
+    JSR BattleTgt_CyclePrev
+.setup:
+    STZ.w $9604
+    LDA.w $9614
+    TAX
+    LDA.w $99C0,X
+    STA.w $9605
+    JSR BattleTgt_Area2332
+    JMP BattleTgt_SelectAllCandidates
+    RTS                             ; dead byte after the tail JMP, preserved
+
+; BattleTgt_Area23A4Mode ($C12329–$C12331, 9 bytes)
+BattleTgt_Area23A4Mode:
+    STZ.w $9604
+    JSR BattleTgt_Area23A4
+    JMP BattleTgt_SelectAllCandidates
+
+; ==================================================================
+; Candidate-list helpers ($C127C5–$C1283C, 120 bytes)
+; ==================================================================
+
+; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
+; front slot is empty (requester wasn't eligible), shift the list
+; left by one. Reads one byte past the list ($99CB) on the last step.
+org $C127C5
+BattleTgt_CompactCandidates:
+    LDA.w $99C0
+    BPL .exit
+    TDC
+    TAX
+.loop:
+    LDA.w $99C1,X
+    STA.w $99C0,X
+    INX
+    CPX #$000B
+    BNE .loop
+.exit:
+    RTS
+
+; BattleTgt_ClearLists ($C127D9–$C127E7, 15 bytes): blank candidate
+; and selection lists (12 entries each, one more than they use)
+BattleTgt_ClearLists:
+    LDX #$000B
+    LDA #$FF
+.loop:
+    STA.w $99C0,X
+    STA.w $A62D,X
+    DEX
+    BPL .loop
+    RTS
+
+; BattleTgt_SelectAllCandidates ($C127E8–$C127F9, 18 bytes): set
+; target-all and copy the 11 candidates into the selection list
+BattleTgt_SelectAllCandidates:
+    LDA #$80
+    STA.w $960C
+    LDX #$000A
+.loop:
+    LDA.w $99C0,X
+    STA.w $A62D,X
+    DEX
+    BPL .loop
+    RTS
+
+; BattleTgt_CycleNext ($C127FA–$C12813, 26 bytes): advance $9614 to the
+; next non-empty candidate (wrap at 11); no-op on an empty list. Same
+; logic as BattleMenu_TargetNext, duplicated rather than shared.
+BattleTgt_CycleNext:
+    JSR BattleTgt_AnyCandidate
+    BEQ .exit                       ; list empty
+.loop:
+    INC.w $9614
+    LDA.w $9614
+    CMP #$0B
+    BNE .check
+    TDC
+    STA.w $9614
+.check:
+    TAX
+    LDA.w $99C0,X
+    BMI .loop
+.exit:
+    RTS
+
+; BattleTgt_CyclePrev ($C12814–$C1282C, 25 bytes): mirror of CycleNext
+BattleTgt_CyclePrev:
+    JSR BattleTgt_AnyCandidate
+    BEQ .exit
+.loop:
+    DEC.w $9614
+    LDA.w $9614
+    BPL .check
+    LDA #$0A
+    STA.w $9614
+.check:
+    TAX
+    LDA.w $99C0,X
+    BMI .loop
+.exit:
+    RTS
+
+; BattleTgt_AnyCandidate ($C1282D–$C1283C, 16 bytes): Z=1 if all 11
+; candidate slots are $FF, Z=0 as soon as one isn't
+BattleTgt_AnyCandidate:
+    TDC
+    TAX
+.loop:
+    LDA.w $99C0,X
+    CMP #$FF
+    BNE .exit
+    INX
+    CPX #$000B
+    BNE .loop
+.exit:
     RTS
 
 ; ==================================================================
