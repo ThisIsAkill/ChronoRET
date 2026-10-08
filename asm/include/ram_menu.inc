@@ -411,11 +411,13 @@ endstruct align 8
 !C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
 !C2Scene_ListD = $7E8480                 ; 2-byte entries: addresses of scripts in bank $7F (the scene
                                          ; script's, C2Scene_ScriptBuf), started by C2Scene_Mode3
-!C2Scene_Unk8600 = $7E8600               ; 4 B C2Scene_Unk5775 copies from C2Scene_Unk8600Init (use not traced)
-!C2Scene_Unk8604 = $7E8604               ; 25 B C2Scene_Unk5775 copies from C2Scene_Unk8604Init; probably
-                                         ; HDMA tables, as the area after them (unverified)
+!C2Scene_Unk8600 = $7E8600               ; 4 B C2Scene_Unk5775 copies from C2Scene_Unk8600Init: C2Scene_LabelTask's
+                                         ; animation script (shows the frame at C2Scene_Unk8604)
+!C2Scene_Unk8604 = $7E8604               ; 25 B C2Scene_Unk5775 copies from C2Scene_Unk8604Init: the sprite
+                                         ; frame of C2Scene_LabelTask (its first byte set to C2Scene_LabelPieces)
 !C2Scene_HdmaArea = $7E8621              ; $800 B $7E:8621-$8E20 zeroed by C2Scene_ClearHdmaArea (holds
-                                         ; C2Scene_HdmaValues and C2Scene_HdmaTable)
+                                         ; C2Scene_HdmaValues and C2Scene_HdmaTable); C2Scene_LabelTask
+                                         ; draws its text into the start of it
 !C2Scene_UnkB800 = $7EB800               ; C2Scene_LoadUnkB800's pack; use unknown
 !C2Scene_UnkC000 = $7EC000               ; C2Scene_LoadUnkC000's pack; use unknown
 !C2Scene_UnkC600 = $7EC600               ; C2Scene_LoadUnkC600's pack; use unknown

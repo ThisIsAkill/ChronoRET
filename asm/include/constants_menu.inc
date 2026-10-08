@@ -549,4 +549,15 @@ if !constants_menu_inc == 0
 !C2Scene_MateMarkDrop = $0030            ; 48 pixels: a mate's mark below the mate while up
 !C2Scene_MateMarkDropUp = $FFD0          ; -48
 
+; --- The label task (C2Scene_LabelTask) ---
+!C2Scene_LabelStWait = 1                 ; C2Scene_ObjTask.State of C2Scene_LabelWait
+!C2SceneRom_LabelStrings = $C6F400       ; the string table C2Scene_LabelTask draws from (bank $C6)
+!C2Scene_LabelHalfOfs = $0200            ; buffer offset of the text's second half (the lower 8 rows)
+!C2Scene_LabelVramTop = $1E00            ; VRAM word addresses of the two halves
+!C2Scene_LabelVramBottom = $1F00
+!C2Scene_LabelDmaBytes = $0180           ; bytes uploaded per half (12 tiles of 32 bytes)
+!C2Scene_LabelBelowObjA = $0040          ; pixels below object A the label goes while the party is in it
+!C2Scene_LabelPieces = 6                 ; the first byte of the frame at C2Scene_Unk8604 (probably its piece
+                                         ; count)
+
 endif

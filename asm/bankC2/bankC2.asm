@@ -2663,9 +2663,8 @@ org $C20E1D
 ;   C2Scene_ObjBMateInit ($C2:510B), C2Scene_ObjBMateRise ($C2:516F), C2Scene_ObjBMateFollow
 ;   ($C2:51E8), C2Scene_ObjBMateMove ($C2:523E), C2Scene_ObjBMateLand ($C2:525D, $C2:5285),
 ;   C2Scene_ObjBMateMarkRise ($C2:5553), C2Scene_ObjBMateMarkFollow ($C2:55A2, $C2:55CC),
-;   C2Scene_ObjBMateMarkLand ($C2:55E2, $C2:5600) and unmatched ($C2:5770, $C2:6834, $C2:6883,
-;   $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
-; Callers note: xref also lists a doubtful byte pattern at $C2:4E1B.
+;   C2Scene_ObjBMateMarkLand ($C2:55E2, $C2:5600), C2Scene_LabelShow ($C2:5770) and unmatched
+;   ($C2:6834, $C2:6883, $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; X = the task; A, Y clobbered; C as the last handler
@@ -2938,7 +2937,6 @@ C2Anim_OpEnd:
 ;   ($C2:5166), C2Scene_ObjBMateMove ($C2:5235), C2Scene_ObjBMateLand ($C2:5254),
 ;   C2Scene_ObjBMateMarkRise ($C2:554D), C2Scene_ObjBMateMarkLand ($C2:55DC) and unmatched
 ;   ($C2:7734, $C2:7824).
-; Callers note: xref also lists a doubtful byte pattern at $C2:46FA.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -5790,8 +5788,6 @@ C2Scene_WrapTaskPos:
 ;   C2Scene_ObjBMateFaceAnim (JMP $C2:5488), C2Scene_ObjBMateMarkInit (JSR $C2:54BC, JSR $C2:550B),
 ;   C2Scene_ObjBMateMarkRise (JSR $C2:556A), C2Scene_ObjBMateMarkFollow (JSR $C2:559F) and unmatched
 ;   (JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
-; Callers note: xref also lists doubtful byte patterns at $C2:48BB,
-;   $C2:48C2 and $C2:49B5.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; A = the animation number; C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; X = the task; A = C2SceneRom_AnimBank; Y unchanged
@@ -16297,7 +16293,238 @@ C2Scene_ObjBMateSavePos:
 .done:
     RTS
 
-org $C25628
+
+; ============================================================
+; The label task ($C2:5628–$C2:5774)
+; ============================================================
+
+; $C2:5628 — C2Scene_LabelTask (15 bytes, $5628–$5636)
+; Task handler (no reference in the bank's code, as the object tasks):
+; draws string C2Scene_Unk1B58 of C2SceneRom_LabelStrings with the text
+; window code into a buffer, uploads it to VRAM and shows it as a sprite
+; centred under the party (or under object A while the party is in it).
+; C2Scene_Unk1B58 is a ListA entry's byte 2 (C2Scene_GetListAUnk02) or
+; C2Scene_Unk1B58Spot (C2Scene_ObjASpotWatch), so probably the name of
+; the place the party is on; not traced further. Runs the
+; C2Scene_LabelStates handler of .State.
+; Callers note: none found.
+; Entry: M any (REP #$20 / SEP #$20 here), X=0, X = C2Scene_TaskCur = the
+;        task, DP any, DB=$00 (the task record, absolute)
+; Exit:  as the state's handler
+; Calls: a C2Scene_LabelStates handler (JMP (abs,X)).
+C2Scene_LabelTask:
+    REP #$20
+    LDA.w C2Scene_ObjTask.State,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    JMP (C2Scene_LabelStates,X)
+
+; $C2:5637 — C2Scene_LabelStates (4 words, $5637–$563E)
+; C2Scene_LabelTask's handler for each .State 0-3.
+C2Scene_LabelStates:
+    dw C2Scene_LabelInit        ; 0
+    dw C2Scene_LabelWait        ; 1 (C2Scene_LabelStWait)
+    dw C2Scene_LabelDraw        ; 2
+    dw C2Scene_LabelShow        ; 3
+
+; $C2:563F — C2Scene_LabelInit (36 bytes, $563F–$5662)
+; State 0: .State 1, .SprAttr C2Scene_ObjAttrPrio3, .SprTile 0, the
+; animation and frame templates copied to C2Scene_Unk8600/8604
+; (C2Scene_Unk5775), and the animation pointer on C2Scene_Unk8600 (its
+; first op shows the frame at C2Scene_Unk8604: C2Anim_OpShowFrame);
+; falls into C2Scene_LabelWait.
+; Callers note: none direct (C2Scene_LabelStates).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM
+;        absolute); C2Scene_TaskCur = the task
+; Exit:  as C2Scene_LabelWait
+; Calls: C2Scene_Unk5775.
+C2Scene_LabelInit:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_ObjTask.State,X
+    LDA.b #!C2Scene_ObjAttrPrio3
+    STA.w C2Scene_Task.SprAttr,X
+    STZ.w C2Scene_Task.SprTile,X
+    STZ.w C2Scene_Task.SprTile+1,X
+    JSR C2Scene_Unk5775
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w #!C2Scene_Unk8600&$FFFF
+    STA.w C2Scene_Task.AnimPtr,X
+    SEP #$20
+    LDA.b #bank(!C2Scene_Unk8600)
+    STA.w C2Scene_Task.AnimBank,X
+
+; $C2:5663 — C2Scene_LabelWait (54 bytes, $5663–$5698)
+; State 1: nothing (C=0) while C2Scene_Unk1B58 is 0. Then .State 2,
+; .AnimTimer 0, and the text window started (TextWin_Init) on string
+; C2Scene_Unk1B58 of C2SceneRom_LabelStrings, mode TextWin_ModeUnk2,
+; drawing into C2Scene_HdmaArea (the buffer C2Scene_ClearUnk8621
+; clears); falls into C2Scene_LabelDraw.
+; Callers note: none direct (C2Scene_LabelStates); C2Scene_LabelInit falls
+;   in.
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (the text window
+;        block at TextWin_Dp, absolute); C2Scene_TaskCur = the task
+; Exit:  C=0, M=1, A = 0 (waiting); else as C2Scene_LabelDraw
+; Calls: TextWin_Init (JSL).
+C2Scene_LabelWait:
+    LDA.w !C2Scene_Unk1B58
+    BNE .start
+    CLC
+    RTS
+.start:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_ObjTask.State,X
+    STZ.w C2Scene_Task.AnimTimer,X
+    LDA.w !C2Scene_Unk1B58
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    REP #$10
+    LDX.w #!C2SceneRom_LabelStrings&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b #bank(!C2SceneRom_LabelStrings)
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDA.b #!TextWin_ModeUnk2
+    STA.w !TextWin_Dp+!TextWin_Mode
+    LDX.w #!C2Scene_HdmaArea&$FFFF
+    STX.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.b #bank(!C2Scene_HdmaArea)
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    JSL TextWin_Init
+
+; $C2:5699 — C2Scene_LabelDraw (96 bytes, $5699–$56F8)
+; State 2: one TextWin_Step of one character (TextWin_StepCount 1) per
+; frame while TextWin_Status comes back TextWin_StatusStepDone (C=0).
+; When the string is done: .State 3 and two VRAM uploads queued
+; (C2Scene_VramQ, locked while written): C2Scene_LabelDmaBytes from the
+; buffer to VRAM C2Scene_LabelVramTop and as many from
+; C2Scene_LabelHalfOfs further on to C2Scene_LabelVramBottom, bank $7E,
+; VMAIN VMAIN_IncAfterHigh; then it falls into C2Scene_LabelShow. There
+; is no check that the queue has room.
+; Callers note: none direct (C2Scene_LabelStates); C2Scene_LabelWait falls
+;   in.
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (the text window
+;        block and the queue, absolute); C2Scene_TaskCur = the task
+; Exit:  C=0, M=1, X=0 (drawing: TextWin_Step restores P); A, X, Y
+;        clobbered; else as C2Scene_LabelShow
+; Calls: TextWin_Step (JSL).
+C2Scene_LabelDraw:
+    LDA.b #1
+    STA.w !TextWin_Dp+!TextWin_StepCount
+    JSL TextWin_Step
+    LDA.w !TextWin_Dp+!TextWin_Status
+    CMP.b #!TextWin_StatusStepDone
+    BNE .drawn
+    CLC
+    RTS
+.drawn:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_ObjTask.State,X
+    SEP #$30
+    INC.w !C2Scene_VramQLock
+    LDX.w !C2Scene_VramQEnd
+    LDA.b #!Bank7E
+    STA.w C2Scene_VramQ.Bank,X
+    STA.w C2Scene_VramQ[1].Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w C2Scene_VramQ.Vmain,X
+    STA.w C2Scene_VramQ[1].Vmain,X
+    REP #$20
+    LDA.w #!C2Scene_HdmaArea&$FFFF
+    STA.w C2Scene_VramQ.Src,X
+    LDA.w #(!C2Scene_HdmaArea+!C2Scene_LabelHalfOfs)&$FFFF
+    STA.w C2Scene_VramQ[1].Src,X
+    LDA.w #!C2Scene_LabelVramTop
+    STA.w C2Scene_VramQ.Dest,X
+    LDA.w #!C2Scene_LabelVramBottom
+    STA.w C2Scene_VramQ[1].Dest,X
+    LDA.w #!C2Scene_LabelDmaBytes
+    STA.w C2Scene_VramQ.Size,X
+    STA.w C2Scene_VramQ[1].Size,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #2*!C2Scene_VramQEntrySize
+    STA.w !C2Scene_VramQEnd
+    STZ.w !C2Scene_VramQLock
+    REP #$10
+
+; $C2:56F9 — C2Scene_LabelShow (124 bytes, $56F9–$5774)
+; State 3: with C2Scene_Unk1B58 0, .State C2Scene_LabelStWait and the
+; buffer cleared (C2Scene_ClearUnk8621), and the sprite still drawn this
+; frame; with C2Scene_Unk1B59 set (probably "the label changed"),
+; .State C2Scene_LabelStWait, C2Scene_Unk1B59 = 0, the buffer cleared,
+; C=0 at once. Otherwise, unless C2Scene_ObjAInMode8 is set (then
+; nothing): the sprite at C2Scene_StartX/Y (the party), or C2Scene_ObjAX,
+; C2Scene_ObjAY + C2Scene_LabelBelowObjA while C2Scene_ObjWatch is in
+; C2Scene_ObjWatchStBusyA; the frame's first byte (C2Scene_Unk8604) =
+; C2Scene_LabelPieces; .SprX - TextWin_PenX / 2 (the drawn width's half:
+; centred); C2Anim_Run. C=0.
+; Callers note: none direct (C2Scene_LabelStates); C2Scene_LabelDraw falls
+;   in.
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM and the text window block, absolute); C2Scene_TaskCur =
+;        the task
+; Exit:  C=0; M=1, X=0; A, X, Y clobbered
+; Calls: C2Scene_ClearUnk8621, C2Anim_Run.
+C2Scene_LabelShow:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_Unk1B58
+    BNE .label
+    LDA.b #!C2Scene_LabelStWait
+    STA.w C2Scene_ObjTask.State,X
+    JSR C2Scene_ClearUnk8621
+    BRA .show
+.label:
+    LDA.w !C2Scene_Unk1B59
+    BEQ .show
+    LDA.b #!C2Scene_LabelStWait
+    STA.w C2Scene_ObjTask.State,X
+    STZ.w !C2Scene_Unk1B59
+    JSR C2Scene_ClearUnk8621
+    CLC
+    RTS
+.show:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_Unk027E
+    AND.w #!Eng_LowByteMask
+    CMP.w #!C2Scene_ObjWatchStBusyA
+    BEQ .in_obj_a
+    LDA.w !C2Scene_StartX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_StartY
+    STA.w C2Scene_Task.SprY,X
+    BRA .place
+.in_obj_a:
+    LDA.w !C2Scene_ObjAX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_ObjAY
+    CLC
+    ADC.w #!C2Scene_LabelBelowObjA
+    STA.w C2Scene_Task.SprY,X
+.place:
+    SEP #$30
+    LDA.b #!C2Scene_LabelPieces
+    STA.l !C2Scene_Unk8604
+    REP #$30
+    LDA.w !TextWin_Dp+!TextWin_PenX
+    AND.w #!Eng_LowByteMask
+    LSR A
+    EOR.w #!Eng_Invert16
+    INC A
+    LDX.b !C2Scene_TaskCur
+    CLC
+    ADC.w C2Scene_Task.SprX,X
+    STA.w C2Scene_Task.SprX,X
+    JSR C2Anim_Run
+.done:
+    CLC
+    RTS
 
 ; ============================================================
 ; Scene WRAM table setup ($C2:5775–$C2:57DE)
@@ -16307,10 +16534,9 @@ org $C25775
 ; $C2:5775 — C2Scene_Unk5775 (35 bytes, $5775–$5797)
 ; Copies C2Scene_Unk8600Init (4 bytes) to C2Scene_Unk8600 and
 ; C2Scene_Unk8604Init (C2Scene_Unk8604Size bytes, MVN) to
-; C2Scene_Unk8604. What reads them is not traced (they sit just before
-; C2Scene_HdmaArea, so probably HDMA tables).
-; Callers (1 JSR site): C2Scene_ReloadScene ($C2:2C93).
-; Callers note: xref also lists a doubtful byte pattern at $C2:564F.
+; C2Scene_Unk8604: an animation script for C2Scene_LabelTask's sprite
+; (C2Anim_OpShowFrame on the frame at C2Scene_Unk8604) and that frame.
+; Callers (2 JSR sites): C2Scene_ReloadScene ($C2:2C93) and C2Scene_LabelInit ($C2:564F).
 ; Entry: M any (REP #$20 here), X=0 (16-bit MVN counts), DP any, DB any
 ;        (saved around the MVN, which leaves it at $7E)
 ; Exit:  M=1, X=0; DB unchanged; A = $FFFF; X = the end of the source,
@@ -16335,7 +16561,7 @@ C2Scene_Unk5775:
 ; Zeroes the first C2Scene_Unk8621Bytes bytes of C2Scene_HdmaArea
 ; ($7E:8621-$8A20, up to C2Scene_HdmaValues): a zero word at the start,
 ; then an overlapping MVN.
-; Callers (3 JSR sites): unmatched ($C2:5707, $C2:5719, $C2:6965).
+; Callers (3 JSR sites): C2Scene_LabelShow ($C2:5707, $C2:5719) and unmatched ($C2:6965).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (TDC for 0), DB any
 ;        (saved around the MVN)
 ; Exit:  M=1, X=0; DB unchanged; A = $FFFF; X = $8A20, Y = $8A21
@@ -16397,11 +16623,11 @@ org $C257DF
 ; TextWin_Unk3D = $00:0200 (use not traced), and the pen X
 ; (TextWin_PenX) at TextWin_PenXLeft, or 0 when TextWin_Mode is
 ; TextWin_ModeUnk2 or has bit 7 set.
-; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0003 (JMP $C2:0003), BankC2_Entry0006 (JMP $C2:0006)
-;   and unmatched (JSL $C2:5695, JSL $C2:69BB).
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0003 (JMP $C2:0003), BankC2_Entry0006 (JMP $C2:0006),
+;   C2Scene_LabelWait (JSL $C2:5695) and unmatched (JSL $C2:69BB).
 ; Callers note: JMP from BankC2_Entry0003 ($C2:0003) and BankC2_Entry0006
-;   ($C2:0006), the cross-bank JSL vectors; JSL (unmatched) from $C2:5695
-;   and $C2:69BB.
+;   ($C2:0006), the cross-bank JSL vectors; JSL from C2Scene_LabelWait
+;   ($C2:5695) and unmatched code at $C2:69BB.
 ; Entry: M any, X=0 (16-bit X/Y: the LDX #$0200 and the TAY of the doubled
 ;        string index need it; P saved), DP any (saved; DP=$0200 here), DB any (all
 ;        accesses direct page); the block at $0200 filled as above
@@ -16454,11 +16680,11 @@ TextWin_Init:
 ; TextWin_Status whether to go on (C=0); if so, the handler of
 ; TextWin_State in TextWin_StateTable runs. Returns with the high byte
 ; of A zero.
-; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0009 (JMP $C2:0009), BankC2_Entry000C (JMP $C2:000C)
-;   and unmatched (JSL $C2:569E, JSL $C2:69C4).
+; Callers (4 sites: 2 JSL, 2 JMP): BankC2_Entry0009 (JMP $C2:0009), BankC2_Entry000C (JMP $C2:000C),
+;   C2Scene_LabelDraw (JSL $C2:569E) and unmatched (JSL $C2:69C4).
 ; Callers note: JMP from BankC2_Entry0009 ($C2:0009) and BankC2_Entry000C
-;   ($C2:000C), the cross-bank JSL vectors; JSL (unmatched) from $C2:569E
-;   and $C2:69C4.
+;   ($C2:000C), the cross-bank JSL vectors; JSL from C2Scene_LabelDraw
+;   ($C2:569E) and unmatched code at $C2:69C4.
 ; Entry: any M (P saved), X=0 or 1 (kept for the JSR (abs,X); the
 ;        16-bit LDA before the SEP leaves B = 0 for the index), DP any
 ;        (saved; DP=$0200 here), DB as the state handlers need (not
