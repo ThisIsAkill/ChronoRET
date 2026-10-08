@@ -8,8 +8,8 @@
       "bytes": 29032
     },
     "readable": {
-      "functions": 41,
-      "bytes": 584
+      "functions": 162,
+      "bytes": 9703
     },
     "verified": {
       "functions": 23,
@@ -43,8 +43,8 @@
         "bytes": 9232
       },
       "readable": {
-        "functions": 17,
-        "bytes": 113
+        "functions": 138,
+        "bytes": 9232
       },
       "verified": {
         "functions": 0,
