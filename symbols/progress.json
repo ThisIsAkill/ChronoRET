@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 32023,
+  "emitted_bytes": 32527,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 282,
-      "bytes": 32023
+      "functions": 285,
+      "bytes": 32527
     },
     "readable": {
-      "functions": 265,
-      "bytes": 31489
+      "functions": 267,
+      "bytes": 31990
     },
     "verified": {
       "functions": 245,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 11553,
+      "emitted_bytes": 12057,
       "matched": {
-        "functions": 159,
-        "bytes": 11553
+        "functions": 162,
+        "bytes": 12057
       },
       "readable": {
-        "functions": 142,
-        "bytes": 11019
+        "functions": 144,
+        "bytes": 11520
       },
       "verified": {
         "functions": 125,
@@ -463,7 +463,7 @@
       "bank": "$C1",
       "start": "$C1:2000",
       "end": "$C1:2FFF",
-      "emitted_bytes": 3487,
+      "emitted_bytes": 3991,
       "functions": [
         "BattleTgt_SingleAlly",
         "BattleTgt_CollectValidTargets",
@@ -524,7 +524,10 @@
         "BattlePos_SubjectRightPart",
         "BattlePos_SubjectLeftPart",
         "BattlePos_DistDifference",
-        "BattlePos_ModeTable"
+        "BattlePos_ModeTable",
+        "Battle_TickPcSlots",
+        "Battle_UnkThunk2F1F",
+        "Battle_UpdatePcFacing"
       ]
     },
     {

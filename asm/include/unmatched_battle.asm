@@ -10,9 +10,22 @@
 
 ; --- Bank $C1 (battle engine, not matched yet) ---
 
-org $C12D9F
-Battle_TickPcSlots:                     ; JSR: per-PC upkeep; zeroes !Battle_FramesDecoded and runs the PCs'
-                                        ; frame decodes (Battle_DrawBattlerFrame)
+org $C10045
+BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
+                                        ; $C1:0051 (also reached through JMP at $C1:0003)
+
+org $C12F97
+Battle_PickStatusAnim:                  ; JSR: for battler !Battle_TickSlot ($94): sets $A2 = its BattlerStats offset,
+                                        ; picks !Battle_AnimId from its status bits (table at $CC:F77F) and an effect
+                                        ; id into $A441,X; not checked in detail
+org $C1308C
+Battle_ApplyPendingEffect:              ; JSR: for battler !Battle_TickSlot: when $A441,X differs from $A44C,X, copies
+                                        ; it and runs that entry of the handler table at $C1:3216
+org $C13234
+Battle_TickUnkA4Mode:                   ; JMP target of Battle_TickPcSlots while !Battle_UnkA4 is set; not analysed
+org $C134A6
+Battle_UnkReturn34A6:                   ; an RTS, the end of the routine around $C1:3499 (also JMP target from
+                                        ; $C1:324F and Battle_UnkThunk2F1F)
 org $C13714
 Battle_TickStatusEffectVisuals:         ; JSR: per-slot countdown timers, skipped while !Battle_MenuTimeHold is set;
                                         ; name from the session notes, not checked

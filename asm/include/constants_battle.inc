@@ -71,6 +71,17 @@ if !constants_battle_inc == 0
 !BattlePos_LeftColEnd    = 5     ; query 12: cell column where the left part ends (exclusive)
 !Battle_Invert8          = $FF   ; EOR mask; with INC A negates an 8-bit value
 
+; --- PC animation (Battle_TickPcSlots) ---
+!Battle_AnimDefault      = 3     ; !Battle_AnimId when no status picks another (inferred: standing)
+!Battle_AnimUnk2B        = $2B   ; replaces animation 3 while !Battle_Unk99CF/99D0 is set; which animation is unknown
+!Battle_AnimRestart      = $FF   ; !Battler_AnimFrame value: the next step starts the list again
+!Battle_AnimTicksDivisor = 5     ; a list's duration byte / this = frames until the next step
+!Battle_FacingSlotMask   = $7F   ; !Battle_FacingTurn: the PC slot
+!Battle_FacingHandedOn   = $80   ; !Battle_FacingTurn: handed on, not taken yet
+!Battle_StatusUnk4BNoTurn = $02  ; BattlerStats.Status2 bit that stops the facing update; meaning unknown
+!BattlePos_QueryNearestEnemy = 2 ; !BattlePos_Mode of BattlePos_NearestEnemy
+!BattleSys_ServicePosQuery = 5   ; $C10045 service number of BattlePos_Query
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
