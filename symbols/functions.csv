@@ -209,7 +209,7 @@ $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,verified,b78418c192a1,APU
 $C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,verified,9f455ee2d58c,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
 $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,verified,de544fdf3abf,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,verified,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
-$C1:1C4A,$C1:1C54,11,Battle_DrawBattlerFrame,$C1,Battle engine,readable,2f809e15ad31,"Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the battler's tile buffer in bank $7E, unless the battler uses frame layout 3 (!Battle_FrameLayoutStrip), which this entry leaves alone."
+$C1:1C4A,$C1:1C54,11,Battle_DrawBattlerFrame,$C1,Battle engine,readable,51c0c26e2255,"Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the battler's tile buffer in bank $7E, unless the battler uses frame layout 3 (!Battle_FrameLayoutStrip), which this entry leaves alone."
 $C1:1C55,$C1:1F78,804,Battle_DrawBattlerFrameAnyLayout,$C1,Battle engine,readable,e82956d37326,Decodes one animation frame of a battler into bank $7E tiles: 1.
 $C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,verified,4ef6de9b402e,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,verified,2b4add39e679,"Service 7 of the $C10045 service dispatcher (dispatch table at $C10051; reached only by same-bank JSR from bank $C1, see BattleMenu_EnqueueReadyBattler)."
@@ -275,6 +275,9 @@ $C1:2CCD,$C1:2CDF,19,BattlePos_SubjectRightPart,$C1,Battle engine,readable,2bbf0
 $C1:2CE0,$C1:2CF2,19,BattlePos_SubjectLeftPart,$C1,Battle engine,readable,9e8362e6cf76,
 $C1:2CF3,$C1:2D80,142,BattlePos_DistDifference,$C1,Battle engine,readable,f488d7c38e15,
 $C1:2D81,$C1:2D9E,30,BattlePos_ModeTable,$C1,Battle engine,readable,cfcd4e73bb1e,"!BattlePos_Mode, called from BattlePos_Query."
+$C1:2D9F,$C1:2F1E,384,Battle_TickPcSlots,$C1,Battle engine,readable,85320000408a,
+$C1:2F1F,$C1:2F21,3,Battle_UnkThunk2F1F,$C1,Battle engine,readable,e4458ddeebc0,at $C1:34A6.
+$C1:2F22,$C1:2F96,117,Battle_UpdatePcFacing,$C1,Battle engine,readable,c0c04dbde691,
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,readable,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,18ff8680932e,Called via: JML from Reset ($00:FF03)
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,readable,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"
