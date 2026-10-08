@@ -56,22 +56,6 @@ Obj_Unk30B3:        ; as Obj_Unk305D toward the position of the object in ObjFro
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C25775
-C2Scene_Unk5775:    ; JSR from C2Scene_ReloadScene: copies 4 B from $C2:57C2 to $7E:8600 and 25 B from $C2:57C6 to
-                    ; $7E:8604 (probably an HDMA table; not traced)
-org $C25DC4
-TextWin_DrawGlyph:  ; draws glyph TextWin_Glyph at TextWin_PenX into TextWin_GfxBuf and moves the pen
-                    ; on by its width (table $C2:60E6); returns M=1 with A = $0000 (LDA #0 / XBA)
-org $C25FD8
-TextWin_CharNamePtrs: ; data: 7 words, $2C23 + 6 * n (the names at TextWin_CharNames, bank $7E)
-org $C2615E
-TextWin_Dec8:       ; TextWin_NumValue's byte as 3 decimal digits at TextWin_DecDigits (by 100, 10)
-org $C26146
-TextWin_StrNadia:   ; data: 5 glyph bytes $AD,$BA,$BD,$C2,$BA ("Nadia")
-org $C26180
-TextWin_Dec16:      ; TextWin_NumValue's word as 5 decimal digits (by 10000, 1000, 100, 10)
-org $C261BD
-TextWin_Dec24:      ; TextWin_NumValue's 24 bits as 8 decimal digits (by 10000000 ... 10)
 org $C2631F
 C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
                     ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
