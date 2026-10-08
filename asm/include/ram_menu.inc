@@ -27,7 +27,8 @@ if !ram_menu_inc == 0
                                          ; story/event flags (unverified)
 !Menu_DataInitDone = $7F0061             ; 8-bit; the call at $C2:8048 runs Menu_InitNewGameData only while it
                                          ; is 0 (and the mode is 0), then sets it to 1; $C2:8D7E clears it
-                                         ; and $C2:E65D sets it to 1 after their own unguarded calls
+                                         ; and $C2:E65D sets it to 1 after their own unguarded calls;
+                                         ; $C2:8D85 sets it to 2 when a slot check returns 0 (after JSR $C2:95BB)
 !Menu_PlayTime = $0400                   ; 6 B: play-time counter, one byte per digit group, lowest first
                                          ; (Menu_TickPlayTime: frames, then up to the limits in
                                          ; Menu_PlayTimeLimits); the field engine calls the first byte
