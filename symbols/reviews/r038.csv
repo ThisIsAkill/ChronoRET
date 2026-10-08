@@ -1,6 +1,6 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C2:27BC,C2Scene_LoadUnkC800,2026-10-08,rev38a,approved,de4e78305e1b,"Callers fix OK (xref: 1 confirmed JMP $2D6D). Entry 1 at $C6:FDF3 to $7E:C800, DB=$00, Exit verified. nit: Decomp_ToWramVec restores A/X/Y/P/DP/DB, so A,X,Y preserved"
+$C2:27BC,C2Scene_LoadUnkC800,2026-10-08,rev38a,approved,ec1d204ab4e9,"Callers fix OK (xref: 1 confirmed JMP $2D6D). Entry 1 at $C6:FDF3 to $7E:C800, DB=$00, Exit verified. nit: Decomp_ToWramVec restores A/X/Y/P/DP/DB, so A,X,Y preserved"
 $C2:2C93,C2Scene_ReloadScene,2026-10-08,rev38a,approved,2d2a90c75d11,"Fix OK: modes 5/8 call RestoreState, VramQInit, then it; mode 8 skips if $7F:01F4&$0A or 01F5&$02 ($265E). 3 callers, call order, A916 init, Exit verified. nit: mode 9 = Mode5"
-$C2:2D70,C2Scene_DmaToVram,2026-10-08,rev38a,approved,1f30fd00b63d,"Fix OK: 9 JSR sites match xref. Verified DMAP7/BBAD7=$1801, A1B7=$7F, VMAIN=$80, ch7; Entry M=0 X=0 DB=$00; Exit A=$80, X=$1801, Y kept."
-$C2:2D91,C2Scene_LoadLocExtraGfx,2026-10-08,rev38a,approved,a5264986f3c0,"Fix OK: $2D6A confirmed, listed. Verified flag >=$D4, Loc $1F0-$1F2/$1F6 paths, VRAM $0C00/$0000, palettes $90/$B0/$A0 (bit 7 of $1BA8), JMP UnkC600; hedges ok."
-$C2:7B7F,C2Scene_LoadExtraPalette,2026-10-08,rev38a,approved,c1670f46bea1,"Fix OK: 3 JSR sites ($2DC7/$2DED/$2E09) match xref. Verified entry 3 (X=9) of $C6:FEA0 to A:X, DB=$00, Exit. nit: Decomp_ToWramVec preserves A/X/Y."
+$C2:2D70,C2Scene_DmaToVram,2026-10-08,rev38a,approved,18632c05b7ed,"Fix OK: 9 JSR sites match xref. Verified DMAP7/BBAD7=$1801, A1B7=$7F, VMAIN=$80, ch7; Entry M=0 X=0 DB=$00; Exit A=$80, X=$1801, Y kept."
+$C2:2D91,C2Scene_LoadLocExtraGfx,2026-10-08,rev38a,approved,2b23170e6a09,"Fix OK: $2D6A confirmed, listed. Verified flag >=$D4, Loc $1F0-$1F2/$1F6 paths, VRAM $0C00/$0000, palettes $90/$B0/$A0 (bit 7 of $1BA8), JMP UnkC600; hedges ok."
+$C2:7B7F,C2Scene_LoadExtraPalette,2026-10-08,rev38a,approved,3f78f57b4f1d,"Fix OK: 3 JSR sites ($2DC7/$2DED/$2E09) match xref. Verified entry 3 (X=9) of $C6:FEA0 to A:X, DB=$00, Exit. nit: Decomp_ToWramVec preserves A/X/Y."

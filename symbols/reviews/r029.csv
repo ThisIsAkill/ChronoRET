@@ -1,3 +1,3 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C2:1DB5,C2Scene_ClearPalette,2026-10-08,rev29a,approved,e600d79a86ed,"Fix OK: A never written, Exit now 'A unchanged'. Checked ranges $0920-$0B1F/$0B20-$0B2F, word STZ, X=0 entry (3-byte LDX), DB=$00 from boot, X=$10 out, sole caller $C2:003D."
-$C2:57DF,TextWin_Init,2026-10-08,rev29a,approved,755fe9a050b7,"Fix OK: X=0 needed (LDX #$0200, TAY); JSL sites $C2:5695/69BB set X 16-bit. Verified pen/Mode logic, Unk3D=$00:0200, RTL, 4 callers. nit: redundant LDA #$0000 at $57F2 uncommented"
+$C2:1DB5,C2Scene_ClearPalette,2026-10-08,rev29a,approved,b4c79e92e662,"Fix OK: A never written, Exit now 'A unchanged'. Checked ranges $0920-$0B1F/$0B20-$0B2F, word STZ, X=0 entry (3-byte LDX), DB=$00 from boot, X=$10 out, sole caller $C2:003D."
+$C2:57DF,TextWin_Init,2026-10-08,rev29a,approved,2d810df96245,"Fix OK: X=0 needed (LDX #$0200, TAY); JSL sites $C2:5695/69BB set X 16-bit. Verified pen/Mode logic, Unk3D=$00:0200, RTL, 4 callers. nit: redundant LDA #$0000 at $57F2 uncommented"

@@ -1,2 +1,2 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C1:10FA,BattleMenu_RefreshIfDirtyAndTick,2026-10-08,rev23a,approved,a5b4548b1d96,"rev19a fix correct: 7 xref sites all in RunAction (svc 4)/LoadCommon/UnpackFrames after PumpFrames; ops, DP/DB use verified. nit: $C1:40B6 follows StepBattlerAnims"
+$C1:10FA,BattleMenu_RefreshIfDirtyAndTick,2026-10-08,rev23a,approved,d9a4a8c7b5e0,"rev19a fix correct: 7 xref sites all in RunAction (svc 4)/LoadCommon/UnpackFrames after PumpFrames; ops, DP/DB use verified. nit: $C1:40B6 follows StepBattlerAnims"

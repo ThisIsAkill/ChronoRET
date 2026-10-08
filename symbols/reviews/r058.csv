@@ -1,4 +1,4 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C1:356D,BattleSys_VictoryPose,2026-10-08,rev58a,approved,472d34744885,"Fix right: Main $8169-8193 checks 8 AEFF enemy bytes $FF or AF15 bit 6, svc 8 at $8186; table entry 8=$356D; code, poses $28/0, 2989 bit 0 exit, Entry/Exit checked"
-$C1:8006,BattleSys_Main,2026-10-08,rev58a,approved,6025337701cd,"Fix right: INY/JSR/CPY #10 at $81C1-81C8 gives Y=0-10, 11 calls, B0B6 keeps Y; pool count 0 wraps for 256 stores; setup, pass, ends, debug win, Entry/Exit re-checked"
-$C1:AF22,Battle_RandRange,2026-10-08,rev58a,approved,87f9d12b2984,"Fix right: MathLo pushed at $AF28 and put back at $AF76, now out of the changed list; special cases, Div32 MathHi quirk, 37 callers checked. nit: B31E not written when low=$FF"
+$C1:356D,BattleSys_VictoryPose,2026-10-08,rev58a,approved,213a580cc329,"Fix right: Main $8169-8193 checks 8 AEFF enemy bytes $FF or AF15 bit 6, svc 8 at $8186; table entry 8=$356D; code, poses $28/0, 2989 bit 0 exit, Entry/Exit checked"
+$C1:8006,BattleSys_Main,2026-10-08,rev58a,approved,f0b352d126de,"Fix right: INY/JSR/CPY #10 at $81C1-81C8 gives Y=0-10, 11 calls, B0B6 keeps Y; pool count 0 wraps for 256 stores; setup, pass, ends, debug win, Entry/Exit re-checked"
+$C1:AF22,Battle_RandRange,2026-10-08,rev58a,approved,d7962d7850c8,"Fix right: MathLo pushed at $AF28 and put back at $AF76, now out of the changed list; special cases, Div32 MathHi quirk, 37 callers checked. nit: B31E not written when low=$FF"

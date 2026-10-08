@@ -43,9 +43,10 @@ What it does:
     constants used in the same context in the existing source (unambiguous
     only; otherwise the literal stays with a TODO). Unknown targets become
     Sub_<addr> names, listed as stub suggestions at the end.
-  * Header skeleton: entry state, exit widths at each return, callers from
-    tools/xref.py (CONFIRMED sites, in the form the CALLERS lint accepts;
-    unconfirmed byte patterns in unmatched code listed separately), callees,
+  * Header skeleton: entry state, exit widths at each return, the Callers
+    block tools/callers.py generates from tools/xref.py's CONFIRMED sites
+    (unconfirmed byte patterns in unmatched code go on a `Callers note`
+    line with a TODO), callees,
     and the direct-page scratch it uses.
   * --check also runs the readability lint on the drafted routine in the
     temporary tree and prints what is left per rule.
@@ -1108,7 +1109,7 @@ class Renderer:
 # ── Callers ─────────────────────────────────────────────────────────────────
 
 def find_callers(start, end):
-    """Call sites of the routine from tools/xref.py: [(addr, kind, routine, status)].
+    """Call sites of the routine from tools/xref.py: [(addr, kind, routine, status, hit)].
 
     CONFIRMED sites and DOUBTFUL ones in unmatched code (a byte pattern whose
     boundary the sweep could not establish) are kept; a DOUBTFUL site inside
@@ -1123,7 +1124,7 @@ def find_callers(start, end):
         if start <= addr <= end:
             continue
         if h.status == 'CONFIRMED' or not h.routine:
-            out.append((addr, h.kind, h.routine, h.status))
+            out.append((addr, h.kind, h.routine, h.status, h))
     return out
 
 
@@ -1215,22 +1216,20 @@ def generate(rom, kb, args, start, end, st0):
     else:
         hdr.append('; Exit:  TODO (no return: ends in a jump)')
     if callers:
-        sure = [c for c in callers if c[3] == 'CONFIRMED']
+        # The block tools/callers.py generates (rerun it once the routine is
+        # in the tree); what it cannot confirm goes on a hand-written note.
+        import callers as callers_tool
+        hdr += callers_tool.render([c[4] for c in callers if c[3] == 'CONFIRMED'])
         unsure = [c for c in callers if c[3] != 'CONFIRMED']
-        site = lambda c: f'{c[1]} {fmt24(c[0])}' + (f' ({c[2]})' if c[2] else '')  # noqa: E731
-        if len(sure) <= 12:
-            text = ', '.join(site(c) for c in sure) or 'none confirmed'
-        else:
-            text = f'{len(sure)} call sites, e.g. ' + ', '.join(site(c) for c in sure[:8])
         if unsure:
-            text += '; unconfirmed byte patterns (TODO: check): ' + \
+            text = 'TODO check these unconfirmed byte patterns (real calls, or data?): ' + \
                 ', '.join(f'{c[1]} {fmt24(c[0])}' for c in unsure[:8]) + \
                 (f' and {len(unsure) - 8} more' if len(unsure) > 8 else '')
-        wrapped = textwrap.wrap(text, 88)
-        hdr.append('; Callers: ' + wrapped[0])
-        hdr += [';          ' + w for w in wrapped[1:]]
+            wrapped = textwrap.wrap(text, 84)
+            hdr.append('; Callers note: ' + wrapped[0])
+            hdr += [';               ' + w for w in wrapped[1:]]
     elif not args.no_callers:
-        hdr.append('; Callers: none found by the ROM scan (TODO: pointer table / indirect?)')
+        hdr.append('; Callers note: none found by the ROM scan (TODO: pointer table / indirect?)')
     hdr.append('; Callees: ' + (', '.join(r.callees) if r.callees else 'none'))
     if r.scratch:
         hdr.append('; Direct-page roles (TODO: give each an alias here, as the other routines do):')

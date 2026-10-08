@@ -75,7 +75,7 @@ every tool that reads them regenerates them when they are stale, and
   bytes. It disassembles the routine from that address until it ends (every path has returned
   or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),
   tracking M/X, DP and DB, and writes `build/draft_C13714.asm`: asar source with a header
-  skeleton (Entry state, widths at the return, `Callers:` from xref, callees), `.loc_XXXX`
+  skeleton (Entry state, widths at the return, the generated Callers block, callees), `.loc_XXXX`
   labels, and every operand the project already has a name for (RAM and DP defines, struct
   fields, registers, matched labels and stubs, constants used in the same context elsewhere),
   with explicit widths. It then assembles the draft in place of the region in a temporary copy
@@ -95,10 +95,14 @@ every tool that reads them regenerates them when they are stale, and
   (asar's address-to-line map); unmatched code by decoding forward from the 64 bytes before
   the hit under each M/X start state and voting. The vote is a heuristic: read a CONFIRMED hit
   in unmatched code before you rely on it.
+- `python3 tools/callers.py --update` rewrites the `; Callers (...)` block of every header from
+  xref's CONFIRMED sites (`--show NAME` prints one, `--check` lists the ones that differ). Run
+  it after matching code and after merging `origin/main`: new routines change other routines'
+  blocks (a site that was `unmatched` gets its routine's name). The block is generated, not
+  reviewed, and left out of the source hash, so this never voids a review. Hand-written remarks
+  about callers go on a `; Callers note:` line.
 - `make lint` also checks routine headers (`HEADER`, `CALLERS`, see STYLE.md): Entry and Exit
-  lines, and every CONFIRMED caller from xref accounted for. Write the `Callers:` line from
-  `make xref` output; a reviewer then only judges whether the header is right, not whether it
-  is complete.
+  lines, and that every Callers block is exactly what `tools/callers.py` generates.
 
 - Data tables next to matched code (jump tables,
 pointer tables, lookup tables) are the cheapest bytes to match:
@@ -119,10 +123,12 @@ git fetch origin
 git merge origin/main
 ```
 
-Nothing generated is committed, so a merge only conflicts where two branches really edited
-the same lines: `symbols/functions.csv` and `progress.json` are not tracked (the tools
+Then run `python3 tools/callers.py --update` (code matched on `main` changes other headers'
+Callers blocks) and `make gate`. Nothing generated is committed, so a merge only conflicts
+where two branches really edited the same lines: `symbols/functions.csv` and `progress.json` are not tracked (the tools
 regenerate them), the docs carry no generated numbers, and each review round is its own file
-under `symbols/reviews/`. The pre-push hook checks the identity and messages of every commit
+under `symbols/reviews/`. A conflict inside a generated Callers block is resolved by taking
+either side and rerunning `tools/callers.py --update`. The pre-push hook checks the identity and messages of every commit
 the push would publish, and skips commits already on `origin` (such as GitHub's merge commits
 brought in by the merge).
 

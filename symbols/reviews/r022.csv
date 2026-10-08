@@ -1,5 +1,5 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C0:1D5E,Field_ObjInReachUp,2026-10-08,rev22a,approved,7f13956e9044,"Fix verified: Y bound exact with C=0, +1 with C=1; X bound (C=0 from CMP) exact if dx<=0, +1 if dx>0; C=0 makes dy=0 count as above. $1C0/$C0, exits, X=Field_UnkEB checked."
-$C0:5B71,Map_LeaderPastRowMin,2026-10-08,rev22a,approved,59e99458658a,"Fix verified: C=1 iff TileY <= 1D1C+1 (LDA/INC/CMP); RowMax also adds +1, ColMin/ColMax don't, so 'both row tests one row lower' is true. Sole caller $C0:919B, state checked."
-$C0:75A0,Map_ClearBufC800,2026-10-08,rev22a,approved,2728cb0be397,"Fix verified: Y carries on, X=C800, n=32..1024 copies to adjacent bytes; ends X=CC00 Y=D000 A=FFFF. D2:0000 is 32+ zeros; builders set WMADD=C800. DB via PHB/PLB; callers ok."
+$C0:1D5E,Field_ObjInReachUp,2026-10-08,rev22a,approved,6f0d0f9d925c,"Fix verified: Y bound exact with C=0, +1 with C=1; X bound (C=0 from CMP) exact if dx<=0, +1 if dx>0; C=0 makes dy=0 count as above. $1C0/$C0, exits, X=Field_UnkEB checked."
+$C0:5B71,Map_LeaderPastRowMin,2026-10-08,rev22a,approved,fc35303382eb,"Fix verified: C=1 iff TileY <= 1D1C+1 (LDA/INC/CMP); RowMax also adds +1, ColMin/ColMax don't, so 'both row tests one row lower' is true. Sole caller $C0:919B, state checked."
+$C0:75A0,Map_ClearBufC800,2026-10-08,rev22a,approved,a1adeb6248ca,"Fix verified: Y carries on, X=C800, n=32..1024 copies to adjacent bytes; ends X=CC00 Y=D000 A=FFFF. D2:0000 is 32+ zeros; builders set WMADD=C800. DB via PHB/PLB; callers ok."
 $C0:881E,Field_FrameUpdate,2026-10-08,rev22a,approved,41629553031e,"Fix verified: 9175/99DE matched and summarised correctly, only 91AC/93E1 called unmatched. Flow, DP swap, 8 callers, fade claim checked. nit: Map_Unk8A6D is unmatched too."

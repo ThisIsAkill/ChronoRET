@@ -14,28 +14,28 @@ $C0:FF10,NMI_Stub,2026-10-08,independent session 2,approved,b4be75de9340,"Banner
 $C0:FF14,IRQ_Stub,2026-10-08,independent session 2,changes,bd12634e9770,!IrqTrampoline: '$FD:EAF9' is the STA $0504 inside routine $FD:EAF4 (JSR'd from FD:DBB8; EAF9 never called). Say 'by $FD:EAF4'; name InstallIRQ for $C0:0B75
 $C0:FF18,BRK_Handler,2026-10-08,independent session 2,approved,5084e9025e2a,"Moved to constants_engine.inc; $AB:CDEF = file $2BCDEF (HiROM) correct, value discarded, purpose hedged. Vectors FFE6/FFF4 both point here"
 $C0:FF20,BitSet,2026-10-08,independent session 2,approved,67df1a0aff8b,Values 1<<N match ROM; unchanged since approval
-$C0:FF28,BitClear,2026-10-08,independent session 2,approved,012bbbcead94,Values ~(1<<N) match ROM; only the shared banner changed (N=0..7)
+$C0:FF28,BitClear,2026-10-08,independent session 2,approved,857413253db5,Values ~(1<<N) match ROM; only the shared banner changed (N=0..7)
 $C0:FF30,ScrollWaveA,2026-10-08,independent session 2,changes,c6cbab686ed4,"'no caller has been traced yet' is false: FD:C5F3/FD:C743 do AND #$3E,TAX,LDA.l $C0FF30+4k,X (k=0..) reading to $FFAB. Cite them; 'Scroll' in name still unverified"
 $C0:FF70,ScrollWaveB,2026-10-08,independent session 2,changes,5a72ed739650,"Range fixed ($FFAF). But callers at FD:C5F3/C743 read B only as overrun of A (X<=$3E plus +4k offsets), so 'or two independent users' is disproved: say B is A's 2nd period"
 $C0:FFB0,RomExtHeader,2026-10-08,independent session 2,approved,1dcc24864b33,"Maker 'C3', game code 'ACTE', $FFB6-$FFBC reserved, presence via $FFDA=$33: all correct vs ROM and standard layout"
-$C0:FFBD,RomExpansionRam,2026-10-08,independent session 2,approved,4a10f4fbea5d,$00 = no expansion RAM; correct
-$C0:FFBE,RomSpecialVersion,2026-10-08,independent session 2,approved,e01cc8c6afac,$00 = normal; correct
-$C0:FFBF,RomCartridgeSubtype,2026-10-08,independent session 2,approved,6c2cda2586f8,"$00, none (only meaningful with $FFD6 high nibble $F); correct"
-$C0:FFC0,ROMTitle,2026-10-08,independent session 2,approved,dd0883bd0760,"21 bytes, 'CHRONO TRIGGER'+7 spaces; row now title only. Nit: ROMTitle vs Rom* casing (tools/progress.py keys on it)"
-$C0:FFD5,RomMapMode,2026-10-08,independent session 2,approved,0f84279bb47f,$31 = HiROM $21 | FastROM $10; correct
-$C0:FFD6,RomType,2026-10-08,independent session 2,approved,04c3c05561f6,$02 = ROM+RAM+battery; correct
-$C0:FFD7,RomSize,2026-10-08,independent session 2,approved,753bbf27c372,"$0C: 2^12 KiB = 4 MiB, matches 4194304-byte ROM"
-$C0:FFD8,RomSramSize,2026-10-08,independent session 2,approved,5da94208e63c,$03: 2^3 KiB = 8 KiB; correct
-$C0:FFD9,RomRegion,2026-10-08,independent session 2,approved,d4f657cb4395,$01 = North America; correct
-$C0:FFDA,RomDeveloperId,2026-10-08,independent session 2,approved,e0cc47ba5fa5,$33 = extended header valid; correct
-$C0:FFDB,RomVersion,2026-10-08,independent session 2,approved,310a0a5fa6af,$00 = 1.0; correct
-$C0:FFDC,RomChecksumComplement,2026-10-08,independent session 2,approved,422bc75831ed,$8773; $8773+$788C = $FFFF
-$C0:FFDE,RomChecksum,2026-10-08,independent session 2,approved,b0c39e035e55,$788C = 16-bit sum of all ROM bytes (recomputed)
+$C0:FFBD,RomExpansionRam,2026-10-08,independent session 2,approved,96e71d5f3642,$00 = no expansion RAM; correct
+$C0:FFBE,RomSpecialVersion,2026-10-08,independent session 2,approved,4e07980f8a0a,$00 = normal; correct
+$C0:FFBF,RomCartridgeSubtype,2026-10-08,independent session 2,approved,60064a44579f,"$00, none (only meaningful with $FFD6 high nibble $F); correct"
+$C0:FFC0,ROMTitle,2026-10-08,independent session 2,approved,1f5edfe917b1,"21 bytes, 'CHRONO TRIGGER'+7 spaces; row now title only. Nit: ROMTitle vs Rom* casing (tools/progress.py keys on it)"
+$C0:FFD5,RomMapMode,2026-10-08,independent session 2,approved,095a4d18879c,$31 = HiROM $21 | FastROM $10; correct
+$C0:FFD6,RomType,2026-10-08,independent session 2,approved,a3a58ccdea3f,$02 = ROM+RAM+battery; correct
+$C0:FFD7,RomSize,2026-10-08,independent session 2,approved,b89a9a57cfa2,"$0C: 2^12 KiB = 4 MiB, matches 4194304-byte ROM"
+$C0:FFD8,RomSramSize,2026-10-08,independent session 2,approved,3e7f950364c0,$03: 2^3 KiB = 8 KiB; correct
+$C0:FFD9,RomRegion,2026-10-08,independent session 2,approved,e9f1bbfd00a6,$01 = North America; correct
+$C0:FFDA,RomDeveloperId,2026-10-08,independent session 2,approved,61fe2fc203ab,$33 = extended header valid; correct
+$C0:FFDB,RomVersion,2026-10-08,independent session 2,approved,2d229a1a7923,$00 = 1.0; correct
+$C0:FFDC,RomChecksumComplement,2026-10-08,independent session 2,approved,b07f535a74db,$8773; $8773+$788C = $FFFF
+$C0:FFDE,RomChecksum,2026-10-08,independent session 2,approved,ddb955fad616,$788C = 16-bit sum of all ROM bytes (recomputed)
 $C0:FFE0,RomVectors,2026-10-08,independent session 2,changes,de5dde7a79b3,Slots all correct vs ROM. Fix '$FFFA NMI (unused: the game never runs in emulation mode)': Reset runs SEI/CLC/XCE in emulation mode. Say NMI is off then (NMITIMEN=0 at reset)
 $FD:C000,MainInit,2026-10-08,independent session 2,changes,d2e8dff554e2,Steps/bytes/exit state now right. !OBSEL_Size16x32_Base6000 misnames size %011 (16x16+32x32; %110 is 16x32): rename. Step 4 'only sprite+BG mode get real values' omits W34SEL/TM/TS/COLDATA
 $C0:FF14,IRQ_Stub,2026-10-08,independent session 3,approved,bd12634e9770,"ROM-checked: InstallIRQ C0:0B75 JML C0:ECCC; C0:2E4B sets RTI; FD:EAF4 (only JSR at FD:DBB8) repoints $0500/$0504 to FD:DE15/DE87. Fixed"
 $C0:FF30,ScrollWaveA,2026-10-08,independent session 3,approved,c6cbab686ed4,"Reads at FD:C5F3/C743 (in routines FD:C5A7/C6F7) verified: X=phase&$3E, +$30..$6C, max $FFAB. Nit: those are read sites, not callers; ADC has no CLC (carry chains)"
-$C0:FF70,ScrollWaveB,2026-10-08,independent session 3,approved,4a7da0a8b51b,"'A's second period' now matches the FD readers: X<=$3E plus offsets <=$3C reach entry 61 of 64; no other C0/FD reader found. Bytes equal A"
+$C0:FF70,ScrollWaveB,2026-10-08,independent session 3,approved,9a813dae1c5f,"'A's second period' now matches the FD readers: X<=$3E plus offsets <=$3C reach entry 61 of 64; no other C0/FD reader found. Bytes equal A"
 $C0:FFE0,RomVectors,2026-10-08,independent session 3,approved,7411a2f15cbb,"All slots match ROM. $FFFA note correct: NMITIMEN=0 after reset, only SEI/CLC/XCE run in E mode; no SEC;XCE found in C0-C3/FD code"
 $FD:C000,MainInit,2026-10-08,independent session 3,changes,1f7f1e8a0da4,"OBSEL rename right; step-4 register list matches ROM. But 'Non-zero values: ...the fixed color's green/blue' is false: COLDATA=$C0 sets G/B to 0 (as line 179 says). Reword"
 $C1:10E3,BattleMenu_RefreshIfDirtyL,2026-10-08,independent session c1-42ce269,approved,d935d35fdc5f,Names and header match the code; JSL vector entry and RTL explained.

@@ -1,2 +1,2 @@
 address,name,date,reviewer,verdict,source_hash,notes
-$C1:6751,BattleAct_OpMoveAlongHeading,2026-10-08,rev46a,approved,bfa694c47b22,"Fix verified: start loop never sets $A337 and $CF:EFC4 BEQs past 0; thread-4 at-once advance, all 3 paths, B=0 TAX, Y kept by SinLookup, exit A=0. nit: Exit omit $AE (SinScale)"
+$C1:6751,BattleAct_OpMoveAlongHeading,2026-10-08,rev46a,approved,4366669c8bd6,"Fix verified: start loop never sets $A337 and $CF:EFC4 BEQs past 0; thread-4 at-once advance, all 3 paths, B=0 TAX, Y kept by SinLookup, exit A=0. nit: Exit omit $AE (SinScale)"

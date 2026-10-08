@@ -30,21 +30,18 @@ asm/include/ and are exempt):
          sub-entries whose header carries `header: see <Parent>`, where
          <Parent> is a routine in the same file whose header passes this
          rule and names the sub-entry.
-  CALLERS every CONFIRMED JSR/JSL/JMP/JML/BRL site that tools/xref.py finds
-         for the routine is accounted for in its header (for a sub-entry,
-         its own or its parent's): by the site address ($BB:AAAA, $BBAAAA,
-         $AAAA when in the routine's bank, or a `/AAAA` continuation such
-         as `$FD:DA5B/DABA`), by the name of the matched routine that
-         contains it, or by a count such as "20 JSR sites" or "19 call
-         sites" with N at least the confirmed count. Sites inside the
-         routine itself (or its parent and sibling sub-entries) are its own
-         flow and need no mention. A routine with no direct references
-         (reached only through tables) needs no caller list. Needs the ROM
-         and asar; skipped without them.
+  CALLERS the header's generated Callers block (`; Callers (N JSR sites):
+         ...`, see tools/callers.py) is exactly what tools/callers.py
+         generates from tools/xref.py's CONFIRMED call sites: no block when
+         there is none, and nothing hand-written in it. The block is left
+         out of the source hash, so this is what keeps it honest; it cannot
+         be opted out of. Hand-written caller remarks go on a
+         `; Callers note:` line, which is hashed and reviewed. Needs the
+         ROM and asar; skipped without them.
 
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
-mandatory and is what review checks); for HEADER and CALLERS that line is the
-label line.
+mandatory and is what review checks); for HEADER that line is the label
+line. CALLERS cannot be opted out of.
 
 Each finding is attributed to its enclosing global label (the function).
 Functions not yet brought up to the standard are listed in
@@ -205,13 +202,7 @@ def lint_file(path: Path):
 ENTRY_LINE = re.compile(r'^\s*(on\s+entry|entry(/exit)?)\b[^:]{0,60}:', re.I)
 EXIT_LINE = re.compile(r'^\s*(exit|entry/exit)\b[^:]{0,60}:', re.I)
 SEE_PARENT = re.compile(r'\bheader:\s*see\s+([A-Za-z_][A-Za-z0-9_]*)')
-COUNT = re.compile(r'\b(\d+)\s+(?:(?:JSR|JSL|JMP|JML|BRL|call|jump|caller)s?\s+)?'
-                   r'(?:call\s+)?(?:sites?\b|callers\b)', re.I)
-ADDRESS = re.compile(r'\$([0-9A-Fa-f]{2}:[0-9A-Fa-f]{4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{4})'
-                     r'(?![0-9A-Fa-f:])((?:/\s*[0-9A-Fa-f]{4}(?![0-9A-Fa-f]))*)')
-CALL_KINDS = {'JSR', 'JSL', 'JMP', 'JML', 'BRL'}
 _XREF = []      # one tools/xref.py instance per run (or [None] without ROM/asar)
-_PARENTS = []
 
 
 def _xref():
@@ -250,36 +241,8 @@ def _suppressed(region) -> bool:
 
 
 def _has_entry_exit(region) -> bool:
-    comments = region.header_comments()
+    comments = region.header_comments(hand_written=True)
     return any(ENTRY_LINE.match(c) for c in comments) and any(EXIT_LINE.match(c) for c in comments)
-
-
-def _mentioned_offsets(text: str, bank: int, to_offset) -> set[int]:
-    found = set()
-    for m in ADDRESS.finditer(text):
-        tok = m.group(1).replace(':', '')
-        b = int(tok[:2], 16) if len(tok) == 6 else None
-        addr = int(tok[-4:], 16)
-        off = to_offset(b, addr) if b is not None else (bank << 16 | addr)
-        if off is None:
-            continue
-        found.add(off)
-        for cont in m.group(2).split('/')[1:]:
-            found.add(off & ~0xFFFF | int(cont.strip(), 16))
-    return found
-
-
-def _all_parents() -> dict[str, str]:
-    """`header: see <Parent>` declarations across every bank file."""
-    if not _PARENTS:
-        found = {}
-        for path in sorted(Path('.').glob(ASM_GLOB)):
-            for r in asm_source.file_regions(path):
-                m = SEE_PARENT.search('\n'.join(r.header_comments()))
-                if m:
-                    found[r.name] = m.group(1)
-        _PARENTS.append(found)
-    return _PARENTS[0]
 
 
 def header_findings(path: Path):
@@ -309,49 +272,21 @@ def header_findings(path: Path):
         if parent not in ok_header:
             report(by_name[name], 'HEADER', f'{name}: `header: see {parent}` names no routine '
                                             f'in this file with an Entry/Exit header')
-        elif not re.search(rf'\b{name}\b', ' '.join(by_name[parent].header_comments())):
+        elif not re.search(rf'\b{name}\b', ' '.join(by_name[parent].header_comments(hand_written=True))):
             report(by_name[name], 'HEADER', f'{name}: the header of {parent} does not mention '
                                             f'this sub-entry')
 
     xr = _xref()
     if xr is None:
         return findings
-    import xref
-    family = defaultdict(set)
-    for name, parent in parent_of.items():
-        family[parent].add(name)
-    all_parents = _all_parents()
+    import callers
+    want = callers.Generator(xr).expected(regions)
     for r in regions:
-        if is_table(r) or r.name not in xr.labels:
-            continue
-        target = xr.labels[r.name]
-        parent = parent_of.get(r.name)
-        own = {r.name} | ({parent} | family[parent] if parent else family[r.name])
-        sites = [h for h in xr.xref(target)
-                 if h.status == 'CONFIRMED' and h.kind in CALL_KINDS and h.routine not in own]
-        if not sites:
-            continue
-        # Comment lines are joined so a list may wrap (`$FD:DA5B/DABA/` ... `DB19`).
-        text = ' '.join(r.header_comments())
-        if parent in by_name:
-            text += ' ' + ' '.join(by_name[parent].header_comments())
-        offsets = _mentioned_offsets(text, target >> 16, xref.to_offset)
-        words = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', text))
-
-        def named(h):
-            # The routine containing the site, or the parent whose header
-            # documents that routine (`header: see <Parent>`).
-            return h.routine and (h.routine in words or all_parents.get(h.routine) in words)
-        missing = [h for h in sites if h.offset not in offsets and not named(h)]
-        if not missing:
-            continue
-        counts = [int(m.group(1)) for m in COUNT.finditer(text)]
-        if counts and max(counts) >= len(sites):
-            continue
-        listed = ', '.join(f'{h.kind} {h.site}' + (f' ({h.routine})' if h.routine else '')
-                           for h in missing[:6]) + (' ...' if len(missing) > 6 else '')
-        report(r, 'CALLERS', f'{r.name}: {len(missing)} of {len(sites)} confirmed caller site(s) '
-                             f'not in the header: {listed}')
+        # Not suppressible: the block is outside the source hash.
+        if callers.actual(r) != want[r.name]:
+            findings.append((r.name, r.label + 1, 'CALLERS',
+                             f'{r.name}: the Callers block is not what tools/callers.py generates '
+                             f'from the confirmed call sites: run tools/callers.py --update'))
     return findings
 
 
