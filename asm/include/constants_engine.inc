@@ -17,7 +17,8 @@ if !constants_engine_inc == 0
 
 ; --- Banks and direct-page bases ---
 !Bank7E = $7E                            ; WRAM bank $7E (PHA/PLB, DmaFill_Bank)
-!Bank7F = $7F                            ; WRAM bank $7F (PHA/PLB, DmaFill_Bank)
+!Bank7F = $7F                            ; WRAM bank $7F (PHA/PLB, DmaFill_Bank, Obj_GfxBank for
+                                         ; graphics already in WRAM)
 
 ; --- Banks ---
 !Bank00 = $00                            ; bank $00 (MVN bank operand for the low-WRAM mirror)
@@ -161,5 +162,27 @@ if !constants_engine_inc == 0
                                          ; sprites
 !Oam_HiddenY = $E0                       ; sprite Y that parks an entry below the visible screen
                                          ; (also the Y clamp limit)
+
+; --- Object graphics ---
+!DP_SprBufPage = $0B00                   ; direct page SprBuf_FreeAll points at to reach SprBuf_Owner
+                                         ; with dp stores
+!SprBuf_Tiles = $0060                    ; tiles in the WRAM tile buffer (96 x 32 bytes = $0C00)
+!SprBuf_Bytes = $0C00                    ; bytes in the WRAM tile buffer
+!SprBuf_VramWord = $0400                 ; VRAM word address the tile buffer is uploaded to
+!Gfx_Tile4bppBytes = $0020               ; bytes in one 8x8 4bpp tile
+!SprFrame_TileMask = $07FF               ; tile number bits of a frame-data tile word
+!SprFrame_HFlip = $4000                  ; frame-data tile word bit 14: copy the tile mirrored
+                                         ; (Spr_CopyTileFlipped)
+!LargeObj_LayoutOfs = $00C0              ; offset of the 24 position byte pairs in a large object's
+                                         ; frame data (after 96 tile words)
+!Eng_SignExtNeg = $FF                    ; high byte that sign-extends a negative 8-bit value
+!LargeObj_TileRow0 = $40                 ; OAM tile number of the first 16x16 tile in row 0 of a
+                                         ; large object (tiles step by 2)
+!LargeObj_TileRow1 = $60                 ; OAM tile number of the first 16x16 tile in row 1
+!LargeObj_TileRow2 = $80                 ; OAM tile number of the first 16x16 tile in row 2
+!LargeObj_Attr = $22                     ; OAM attributes of every large-object tile: priority 2,
+                                         ; palette 1
+!BankD2 = $D2                            ; ROM bank $D2 (object tile graphics)
+!Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
 
 endif

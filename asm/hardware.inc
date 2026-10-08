@@ -33,6 +33,10 @@ if !hardware_inc == 0
 !DMAP_BtoA             = $80  ; bit 7: transfer direction B-bus -> A-bus
 !BBAD_MPYL             = $34  ; B-bus address of MPYL ($2134), the DMA fill source in ClearRAMDMA
 !MDMAEN_Ch7            = $80  ; bit 7: start DMA channel 7
+!VMAIN_IncAfterHigh    = $80  ; bit 7: increment the VRAM address after the high byte
+!DMAP_TwoRegs          = $01  ; transfer mode 1: alternate two B-bus registers (word writes)
+!BBAD_VMDATAL          = $18  ; B-bus address of VMDATAL ($2118)
+!WMADDH_Bank7F         = $01  ; WMADDH bit 0: WRAM address bit 16, i.e. bank $7F
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

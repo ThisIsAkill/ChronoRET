@@ -543,7 +543,7 @@ Spr_AppendToOam:
 ;                              size 2, none for size 0).
 ;   1..$7F at/above it, or
 ;   $81..$FF at/above it     → Spr_LoadN (copy from SprTileSrc and
-;                              place), run the matching Sub_E9E2/E9FF/
+;                              place), run the matching SprBuf_Free1/E9FF/
 ;                              EA1F, set Obj_State = $80, C=0.
 ;   $80, or $81.. below it   → Spr_PlaceN (re-place the existing
 ;                              records at the object's position), C=0.
@@ -574,7 +574,7 @@ Spr_PrepareTiles:
     BMI .t0_neg
 .t0_init:
     JSR Spr_Load4
-    JSR Sub_E9E2
+    JSR SprBuf_Free1
     LDX.b !Obj_Cur
     LDA.b #!ObjState_Ready
     STA.w !Obj_State,X
@@ -599,7 +599,7 @@ Spr_PrepareTiles:
     BCC .t1_abort
 .t1_init:
     JSR Spr_Load8
-    JSR Sub_E9FF
+    JSR SprBuf_Free2
     LDX.b !Obj_Cur
     LDA.b #!ObjState_Ready
     STA.w !Obj_State,X
@@ -625,7 +625,7 @@ Spr_PrepareTiles:
     BCC .t2_abort
 .t2_init:
     JSR Spr_Load12
-    JSR Sub_EA1F
+    JSR SprBuf_Free3
     LDX.b !Obj_Cur
     LDA.b #!ObjState_Ready
     STA.w !Obj_State,X
@@ -3517,1056 +3517,1030 @@ Spr_Load12:
     RTS
 
 ; ============================================================
-; $C0:E12A — Sub_E12A (1034 bytes, $E12A–$E533)
-; Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene
-; data, DMAs it to VRAM (destination word-addr $0400), then populates
-; the OAM staging buffer at $7F:4BC2+X with palette values, tile
-; indices, and attribute bytes for 24 sprite sub-slots (stride $08).
-;
-; On entry: X = sprite-slot index (16-bit), M=1 (8-bit A), DP=$0100.
-; Source arrays (indexed by slot):
-;   $1200+slot  → dp:$CF  (sprite type/bank byte)
-;   $1280+slot  → dp:$CD/$CE  (sprite-data ptr offset; bank=$7F via $D2)
-;   $1300+slot  → dp:$D5  (scene-data bank for [$D3] pointer)
-;   $1380+slot  → dp:$D3/$D4  (scene-data ptr offset)
-;   $1700+slot  → X (OAM staging buffer X offset for $7F:4BC2 writes)
-; Calls Sub_E534 (bit 14 of scene word set: multi-tile WRAM fill)
-;   and Sub_E687 (bit 14 clear: single WMDATA write per entry).
+; $C0:E12A — Spr_LoadLargeObj (1034 bytes, $E12A–$E533)
+; (was Sub_E12A.) Loads a 24-tile ("large", size 3) object in one go.
+; 1. Pointers: Spr_GfxPtr = Obj_GfxBank:Obj_GfxOfs, Spr_FramePtr =
+;    Obj_FrameBank:Obj_FrameOfs, Spr_WramPtr = $7F:SprBuf_Base (the
+;    object takes the whole tile buffer: Obj_TileBuf = SprBuf_Base).
+; 2. For each of the 96 tile words at the start of the frame data,
+;    copy that 32-byte 4bpp tile into the buffer: Spr_CopyTileFlipped
+;    when bit 14 (SprFrame_HFlip) is set, else Spr_CopyTile.
+; 3. DMA the $0C00-byte buffer to VRAM word $0400 (channel 7).
+; 4. Fill the object's 24 SprTile records: OfsX = sign-extended byte,
+;    OfsY = byte, from the position pairs after the tile words; Tile =
+;    16x16 tile numbers $40-$4E / $60-$6E / $80-$8E; Attr = $22.
+; Earlier notes read the frame data as "scene data" and the position
+; bytes as palette groups.
+; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100. Called from
+; Field_RestoreState for Field_UnkAEObj.
 ; ============================================================
 org $C0E12A
-Sub_E12A:
-; Phase 1: Load descriptor arrays, set up [$CD] and [$D3] pointers.
-    LDA $1200,X             ; sprite type byte for this slot
-    STA $CF                 ; dp:$CF = sprite type
-    LDA #$7F
-    STA $D2                 ; dp:$D2 = $7F (bank byte for [$CD] pointer)
+Spr_LoadLargeObj:
+    LDA.w !Obj_GfxBank,X
+    STA.b !Spr_GfxPtr+2
+    LDA.b #!Bank7F
+    STA.b !Spr_WramPtr+2
     REP #$20                ; A → 16-bit
-    LDA $1280,X             ; sprite data pointer offset (bank $7F)
-    STA $CD                 ; dp:$CD/$CE; [$CD] → $7F:XXXX
+    LDA.w !Obj_GfxOfs,X
+    STA.b !Spr_GfxPtr
     SEP #$20                ; A → 8-bit
     REP #$20                ; A → 16-bit
-    LDX $6D                 ; X = slot index (re-read; was unchanged)
-    LDA #$3800              ; WRAM staging buffer base
-    STA $0D80,X             ; $0D80+slot = $3800 (chunk base address)
-    STA $D0                 ; dp:$D0 = $3800 (running WMADDL pointer)
+    LDX.b !Obj_Cur
+    LDA.w #!SprBuf_Base
+    STA.w !Obj_TileBuf,X
+    STA.b !Spr_WramPtr      ; next tile goes here
     SEP #$20                ; A → 8-bit
     LDA #$00
-    STA $0F01,X             ; $0F01+slot = 0 (clear sprite-state flag)
-    LDA $1300,X             ; scene-data bank byte for this slot
-    STA $D5                 ; dp:$D5 = bank for [$D3] pointer
+    STA.w !Obj_LastFrame,X
+    LDA.w !Obj_FrameBank,X
+    STA.b !Spr_FramePtr+2
     REP #$20                ; A → 16-bit
-    LDA $1380,X             ; scene-data pointer offset
-    STA $D3                 ; dp:$D3/$D4; [$D3] → $D5:XXXX (scene data)
-; Phase 2: Set WRAM address registers, then loop 96× dispatching scene
-; data words.  Bit 14 of each word: 0 → Sub_E687 (WMDATA write),
-;                                    1 → Sub_E534 (multi-tile fill).
-; WRAM address advances by $0020 per iteration.
-    SEP #$30                ; A,X,Y → 8-bit (for 1-byte WMADDH write)
-    LDA #$01
-    STA $2183               ; WMADDH = $01 (WRAM address high byte)
+    LDA.w !Obj_FrameOfs,X
+    STA.b !Spr_FramePtr
+    ; --- Copy the 96 tiles into the WRAM buffer ---
+    SEP #$30                ; A,X,Y → 8-bit (for the 1-byte WMADDH write)
+    LDA.b #!WMADDH_Bank7F
+    STA.w WMADDH
     REP #$30                ; A,X,Y → 16-bit
-    LDA $D0
-    STA $2181               ; WMADDL = $3800 (full WRAM addr: $01:3800)
-    LDA #$0060              ; loop counter = 96 entries
-    STA $C9                 ; dp:$C9 = $60
-    LDY #$0000              ; Y = scene-data word table index
-    BRA .first_iter         ; skip address advance on first iteration
+    LDA.b !Spr_WramPtr
+    STA.w WMADDL            ; WMDATA writes go to $7F:3800
+    LDA.w #!SprBuf_Tiles    ; 96 tile words
+    STA.b !Spr_TileCount
+    LDY #$0000              ; frame-data index
+    BRA .first_iter
 .next_iter:
-    LDA $D0                 ; advance running WRAM write address
+    LDA.b !Spr_WramPtr      ; next 32-byte tile
     CLC
-    ADC #$0020
-    STA $D0
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.b !Spr_WramPtr
 .first_iter:
-    LDA [$D3],Y             ; read 16-bit scene-data word
-    BIT #$4000              ; test bit 14
-    BNE .big_fill           ; set → multi-tile WRAM fill
-    JSR Sub_E687               ; clear → single WMDATA write
+    LDA.b [!Spr_FramePtr],Y ; tile word
+    BIT.w #!SprFrame_HFlip
+    BNE .big_fill
+    JSR Spr_CopyTile
     INY
-    INY                     ; Y += 2 (advance to next 16-bit entry)
-    DEC $C9
+    INY
+    DEC.b !Spr_TileCount
     BNE .next_iter
     BRA .dma
 .big_fill:
-    JSR Sub_E534               ; multi-tile WRAM fill
+    JSR Spr_CopyTileFlipped
     INY
     INY
-    DEC $C9
+    DEC.b !Spr_TileCount
     BNE .next_iter
-; Phase 3: DMA $0C00 bytes from $7F:3800 → VRAM at word-addr $0400.
+    ; --- DMA the buffer to VRAM ---
 .dma:
     SEP #$20                ; A → 8-bit
-    LDA #$80
-    STA $2115               ; VMAIN = $80 (word-addr, inc after high byte)
-    LDA #$18
-    STA $4371               ; BBAD7 = $18 (VMDATA port)
-    LDA #$01
-    STA $4370               ; DMAP7 = $01 (CPU→PPU, auto-inc, word)
-    LDA #$7F
-    STA $4374               ; A1B7 = $7F (source bank)
-    LDY #$0400
-    STY $2116               ; VMADDL = $0400 (VRAM destination)
-    LDY #$3800
-    STY $4372               ; A1T7L = $3800 (DMA source offset)
-    LDY #$0C00
-    STY $4375               ; DAS7L = $0C00 (transfer byte count)
-    LDA #$80
-    STA $420B               ; MDMAEN = $80 (trigger DMA channel 7)
-; Phase 4: Populate OAM staging buffer $7F:4BC2+X.
-; X is loaded from $1700+slot and used as the long-indexed X offset.
-; 24 groups of 8 bytes (stride $08, bases $4BC2/$4BCA/$4BD2/…/$4C7A).
-; Each group: [+0] = signed value, [+1] = sign-ext, [+2] = raw value.
-; Scene data read from [$D3]+$C0 onward, 2 bytes consumed per group.
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDY.w #!SprBuf_VramWord
+    STY.w VMADDL
+    LDY.w #!SprBuf_Base
+    STY.w A1T7L
+    LDY.w #!SprBuf_Bytes
+    STY.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    ; --- 24 SprTile records: position offsets ---
     REP #$20                ; A → 16-bit
-    LDX $6D                 ; X = slot index
-    LDA $1700,X             ; OAM staging buffer X offset for this slot
-    REP #$10                ; X → 16-bit (ensure width)
-    TAX                     ; X = OAM staging offset
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileRecOfs,X
+    REP #$10                ; X → 16-bit
+    TAX                     ; X = object's first record
     SEP #$20                ; A → 8-bit
-    LDY #$00C0              ; Y = scene-data palette section start
-; 24 palette groups (each: signed+sign-ext at base+0/1, raw at base+2)
-    LDA [$D3],Y             ; group 1 signed value
-    STA.l $7F4BC2,X
+    LDY.w #!LargeObj_LayoutOfs ; position bytes follow the tile words
+    ; per record: X offset byte (sign-extended to 16 bits), Y offset byte
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile.OfsX,X
     BPL .sp01
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se01
 .sp01:
     LDA #$00
 .se01:
-    STA.l $7F4BC3,X
+    STA.l SprTile.OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BC4,X         ; group 1 raw value
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile.OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 2 signed value
-    STA.l $7F4BCA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[1].OfsX,X
     BPL .sp02
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se02
 .sp02:
     LDA #$00
 .se02:
-    STA.l $7F4BCB,X
+    STA.l SprTile[1].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BCC,X         ; group 2 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[1].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 3 signed
-    STA.l $7F4BD2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[2].OfsX,X
     BPL .sp03
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se03
 .sp03:
     LDA #$00
 .se03:
-    STA.l $7F4BD3,X
+    STA.l SprTile[2].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BD4,X         ; group 3 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[2].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 4 signed
-    STA.l $7F4BDA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[3].OfsX,X
     BPL .sp04
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se04
 .sp04:
     LDA #$00
 .se04:
-    STA.l $7F4BDB,X
+    STA.l SprTile[3].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BDC,X         ; group 4 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[3].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 5 signed
-    STA.l $7F4BE2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[4].OfsX,X
     BPL .sp05
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se05
 .sp05:
     LDA #$00
 .se05:
-    STA.l $7F4BE3,X
+    STA.l SprTile[4].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BE4,X         ; group 5 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[4].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 6 signed
-    STA.l $7F4BEA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[5].OfsX,X
     BPL .sp06
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se06
 .sp06:
     LDA #$00
 .se06:
-    STA.l $7F4BEB,X
+    STA.l SprTile[5].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BEC,X         ; group 6 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[5].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 7 signed
-    STA.l $7F4BF2,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[6].OfsX,X
     BPL .sp07
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se07
 .sp07:
     LDA #$00
 .se07:
-    STA.l $7F4BF3,X
+    STA.l SprTile[6].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BF4,X         ; group 7 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[6].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 8 signed
-    STA.l $7F4BFA,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[7].OfsX,X
     BPL .sp08
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se08
 .sp08:
     LDA #$00
 .se08:
-    STA.l $7F4BFB,X
+    STA.l SprTile[7].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4BFC,X         ; group 8 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[7].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 9 signed
-    STA.l $7F4C02,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[8].OfsX,X
     BPL .sp09
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se09
 .sp09:
     LDA #$00
 .se09:
-    STA.l $7F4C03,X
+    STA.l SprTile[8].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C04,X         ; group 9 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[8].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 10 signed
-    STA.l $7F4C0A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[9].OfsX,X
     BPL .sp10
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se10
 .sp10:
     LDA #$00
 .se10:
-    STA.l $7F4C0B,X
+    STA.l SprTile[9].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C0C,X         ; group 10 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[9].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 11 signed
-    STA.l $7F4C12,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[10].OfsX,X
     BPL .sp11
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se11
 .sp11:
     LDA #$00
 .se11:
-    STA.l $7F4C13,X
+    STA.l SprTile[10].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C14,X         ; group 11 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[10].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 12 signed
-    STA.l $7F4C1A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[11].OfsX,X
     BPL .sp12
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se12
 .sp12:
     LDA #$00
 .se12:
-    STA.l $7F4C1B,X
+    STA.l SprTile[11].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C1C,X         ; group 12 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[11].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 13 signed
-    STA.l $7F4C22,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[12].OfsX,X
     BPL .sp13
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se13
 .sp13:
     LDA #$00
 .se13:
-    STA.l $7F4C23,X
+    STA.l SprTile[12].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C24,X         ; group 13 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[12].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 14 signed
-    STA.l $7F4C2A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[13].OfsX,X
     BPL .sp14
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se14
 .sp14:
     LDA #$00
 .se14:
-    STA.l $7F4C2B,X
+    STA.l SprTile[13].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C2C,X         ; group 14 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[13].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 15 signed
-    STA.l $7F4C32,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[14].OfsX,X
     BPL .sp15
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se15
 .sp15:
     LDA #$00
 .se15:
-    STA.l $7F4C33,X
+    STA.l SprTile[14].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C34,X         ; group 15 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[14].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 16 signed
-    STA.l $7F4C3A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[15].OfsX,X
     BPL .sp16
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se16
 .sp16:
     LDA #$00
 .se16:
-    STA.l $7F4C3B,X
+    STA.l SprTile[15].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C3C,X         ; group 16 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[15].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 17 signed
-    STA.l $7F4C42,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[16].OfsX,X
     BPL .sp17
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se17
 .sp17:
     LDA #$00
 .se17:
-    STA.l $7F4C43,X
+    STA.l SprTile[16].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C44,X         ; group 17 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[16].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 18 signed
-    STA.l $7F4C4A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[17].OfsX,X
     BPL .sp18
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se18
 .sp18:
     LDA #$00
 .se18:
-    STA.l $7F4C4B,X
+    STA.l SprTile[17].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C4C,X         ; group 18 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[17].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 19 signed
-    STA.l $7F4C52,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[18].OfsX,X
     BPL .sp19
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se19
 .sp19:
     LDA #$00
 .se19:
-    STA.l $7F4C53,X
+    STA.l SprTile[18].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C54,X         ; group 19 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[18].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 20 signed
-    STA.l $7F4C5A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[19].OfsX,X
     BPL .sp20
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se20
 .sp20:
     LDA #$00
 .se20:
-    STA.l $7F4C5B,X
+    STA.l SprTile[19].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C5C,X         ; group 20 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[19].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 21 signed
-    STA.l $7F4C62,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[20].OfsX,X
     BPL .sp21
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se21
 .sp21:
     LDA #$00
 .se21:
-    STA.l $7F4C63,X
+    STA.l SprTile[20].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C64,X         ; group 21 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[20].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 22 signed
-    STA.l $7F4C6A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[21].OfsX,X
     BPL .sp22
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se22
 .sp22:
     LDA #$00
 .se22:
-    STA.l $7F4C6B,X
+    STA.l SprTile[21].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C6C,X         ; group 22 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[21].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 23 signed
-    STA.l $7F4C72,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[22].OfsX,X
     BPL .sp23
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se23
 .sp23:
     LDA #$00
 .se23:
-    STA.l $7F4C73,X
+    STA.l SprTile[22].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C74,X         ; group 23 raw
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[22].OfsY,X ; Y offset
     INY
-    LDA [$D3],Y             ; group 24 signed (last group)
-    STA.l $7F4C7A,X
+    LDA.b [!Spr_FramePtr],Y ; X offset
+    STA.l SprTile[23].OfsX,X
     BPL .sp24
-    LDA #$FF
+    LDA.b #!Eng_SignExtNeg
     BRA .se24
 .sp24:
     LDA #$00
 .se24:
-    STA.l $7F4C7B,X
+    STA.l SprTile[23].OfsX+1,X
     INY
-    LDA [$D3],Y
-    STA.l $7F4C7C,X         ; group 24 raw (no trailing INY)
-; Phase 5: Write tile-index bytes to [+4] of each of the 24 groups.
-; Groups 1-8:  $40,$42,$44,$46,$48,$4A,$4C,$4E
-; Groups 9-16: $60,$62,$64,$66,$68,$6A,$6C,$6E
-; Groups 17-24:$80,$82,$84,$86,$88,$8A,$8C,$8E
-    LDA #$40
-    STA.l $7F4BC6,X
-    LDA #$42
-    STA.l $7F4BCE,X
-    LDA #$44
-    STA.l $7F4BD6,X
-    LDA #$46
-    STA.l $7F4BDE,X
-    LDA #$48
-    STA.l $7F4BE6,X
-    LDA #$4A
-    STA.l $7F4BEE,X
-    LDA #$4C
-    STA.l $7F4BF6,X
-    LDA #$4E
-    STA.l $7F4BFE,X
-    LDA #$60
-    STA.l $7F4C06,X
-    LDA #$62
-    STA.l $7F4C0E,X
-    LDA #$64
-    STA.l $7F4C16,X
-    LDA #$66
-    STA.l $7F4C1E,X
-    LDA #$68
-    STA.l $7F4C26,X
-    LDA #$6A
-    STA.l $7F4C2E,X
-    LDA #$6C
-    STA.l $7F4C36,X
-    LDA #$6E
-    STA.l $7F4C3E,X
-    LDA #$80
-    STA.l $7F4C46,X
-    LDA #$82
-    STA.l $7F4C4E,X
-    LDA #$84
-    STA.l $7F4C56,X
-    LDA #$86
-    STA.l $7F4C5E,X
-    LDA #$88
-    STA.l $7F4C66,X
-    LDA #$8A
-    STA.l $7F4C6E,X
-    LDA #$8C
-    STA.l $7F4C76,X
-    LDA #$8E
-    STA.l $7F4C7E,X
-; Phase 6: Write attribute byte $22 to [+5] of each of the 24 groups.
-    LDA #$22                ; OAM attribute byte
-    STA.l $7F4BC7,X
-    STA.l $7F4BCF,X
-    STA.l $7F4BD7,X
-    STA.l $7F4BDF,X
-    STA.l $7F4BE7,X
-    STA.l $7F4BEF,X
-    STA.l $7F4BF7,X
-    STA.l $7F4BFF,X
-    STA.l $7F4C07,X
-    STA.l $7F4C0F,X
-    STA.l $7F4C17,X
-    STA.l $7F4C1F,X
-    STA.l $7F4C27,X
-    STA.l $7F4C2F,X
-    STA.l $7F4C37,X
-    STA.l $7F4C3F,X
-    STA.l $7F4C47,X
-    STA.l $7F4C4F,X
-    STA.l $7F4C57,X
-    STA.l $7F4C5F,X
-    STA.l $7F4C67,X
-    STA.l $7F4C6F,X
-    STA.l $7F4C77,X
-    STA.l $7F4C7F,X
+    LDA.b [!Spr_FramePtr],Y
+    STA.l SprTile[23].OfsY,X ; Y offset
+    ; --- Tile numbers: three rows of eight 16x16 tiles ---
+    LDA.b #!LargeObj_TileRow0
+    STA.l SprTile.Tile,X
+    LDA.b #!LargeObj_TileRow0+2
+    STA.l SprTile[1].Tile,X
+    LDA.b #!LargeObj_TileRow0+4
+    STA.l SprTile[2].Tile,X
+    LDA.b #!LargeObj_TileRow0+6
+    STA.l SprTile[3].Tile,X
+    LDA.b #!LargeObj_TileRow0+8
+    STA.l SprTile[4].Tile,X
+    LDA.b #!LargeObj_TileRow0+10
+    STA.l SprTile[5].Tile,X
+    LDA.b #!LargeObj_TileRow0+12
+    STA.l SprTile[6].Tile,X
+    LDA.b #!LargeObj_TileRow0+14
+    STA.l SprTile[7].Tile,X
+    LDA.b #!LargeObj_TileRow1
+    STA.l SprTile[8].Tile,X
+    LDA.b #!LargeObj_TileRow1+2
+    STA.l SprTile[9].Tile,X
+    LDA.b #!LargeObj_TileRow1+4
+    STA.l SprTile[10].Tile,X
+    LDA.b #!LargeObj_TileRow1+6
+    STA.l SprTile[11].Tile,X
+    LDA.b #!LargeObj_TileRow1+8
+    STA.l SprTile[12].Tile,X
+    LDA.b #!LargeObj_TileRow1+10
+    STA.l SprTile[13].Tile,X
+    LDA.b #!LargeObj_TileRow1+12
+    STA.l SprTile[14].Tile,X
+    LDA.b #!LargeObj_TileRow1+14
+    STA.l SprTile[15].Tile,X
+    LDA.b #!LargeObj_TileRow2
+    STA.l SprTile[16].Tile,X
+    LDA.b #!LargeObj_TileRow2+2
+    STA.l SprTile[17].Tile,X
+    LDA.b #!LargeObj_TileRow2+4
+    STA.l SprTile[18].Tile,X
+    LDA.b #!LargeObj_TileRow2+6
+    STA.l SprTile[19].Tile,X
+    LDA.b #!LargeObj_TileRow2+8
+    STA.l SprTile[20].Tile,X
+    LDA.b #!LargeObj_TileRow2+10
+    STA.l SprTile[21].Tile,X
+    LDA.b #!LargeObj_TileRow2+12
+    STA.l SprTile[22].Tile,X
+    LDA.b #!LargeObj_TileRow2+14
+    STA.l SprTile[23].Tile,X
+    ; --- Attributes ---
+    LDA.b #!LargeObj_Attr
+    STA.l SprTile.Attr,X
+    STA.l SprTile[1].Attr,X
+    STA.l SprTile[2].Attr,X
+    STA.l SprTile[3].Attr,X
+    STA.l SprTile[4].Attr,X
+    STA.l SprTile[5].Attr,X
+    STA.l SprTile[6].Attr,X
+    STA.l SprTile[7].Attr,X
+    STA.l SprTile[8].Attr,X
+    STA.l SprTile[9].Attr,X
+    STA.l SprTile[10].Attr,X
+    STA.l SprTile[11].Attr,X
+    STA.l SprTile[12].Attr,X
+    STA.l SprTile[13].Attr,X
+    STA.l SprTile[14].Attr,X
+    STA.l SprTile[15].Attr,X
+    STA.l SprTile[16].Attr,X
+    STA.l SprTile[17].Attr,X
+    STA.l SprTile[18].Attr,X
+    STA.l SprTile[19].Attr,X
+    STA.l SprTile[20].Attr,X
+    STA.l SprTile[21].Attr,X
+    STA.l SprTile[22].Attr,X
+    STA.l SprTile[23].Attr,X
     RTS
 
 ; ============================================================
-; $C0:E534 — Sub_E534 (339 bytes, $C0:E534–$E686)
-; FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like
-; lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA.
-;
-; On entry (from Sub_E12A Phase 2, bit 14 of scene word set):
-;   A = 16-bit scene-data word, Y = scene-data table index,
-;   dp:$0A = base offset, dp:$CD/$CE = sprite-data ptr (bank $7F),
-;   WMADDL/WMADDH already set for current WRAM position.
-; Computes byte index = ((A & $FF) | [$0A]) << 4 (M=1 encoding):
-; reads 32 bytes from [$CD]+index, looks each up in $FD00, writes to WMDATA.
-; Note: the header bytes 29 FF 07 0A*4 are a byte-identity shared with
-; Sub_E687 — valid as M=1 "AND #$FF / ORA[$0A] / 4×ASL" or M=0 "AND #$07FF / 5×ASL".
-; Returns with 16-bit A restored, Y restored from dp:$C5.
+; $C0:E534 — Spr_CopyTileFlipped (339 bytes, $C0:E534–$E686)
+; (was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right,
+; from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through
+; WMDATA: each byte goes through BitReverseTable ($C0:FD00), which
+; mirrors a tile row. Earlier notes called it a "palette-like lookup
+; at bank $FD" and gave the entry as AND #$FF / ORA [$0A]; see below.
+; On entry: M=0, A = frame-data tile word (bit 14 set), Y = frame-data
+; index, WMADD already at the destination, DB = $00.
+; Returns with M=0 and Y restored from Spr_SavedY.
 ; ============================================================
 org $C0E534
-Sub_E534:
-    AND #$FF                ; mask low byte (M=1 encoding: 29 FF)
-    ORA [$0A]               ; merge with dp:[$0A] indirect long
+Spr_CopyTileFlipped:
+    AND.w #!SprFrame_TileMask ; tile number (earlier listings split these
+    ASL                     ; bytes as AND #$FF / ORA [$0A] / 4×ASL,
+    ASL                     ; which is how they decode with M=1; the
+    ASL                     ; caller runs with M=0)
     ASL
-    ASL
-    ASL
-    ASL                     ; × 16: sprite-data byte index
-    STY $C5                 ; save Y
-    TAY                     ; Y = sprite-data byte index
+    ASL                     ; × 32: byte offset of the 4bpp tile
+    STY.b !Spr_SavedY
+    TAY                     ; Y = tile's byte offset
     SEP #$20                ; A → 8-bit
-    TDC                     ; A = DP (clears A)
-    XBA                     ; ensure A high byte = 0
-    LDA [$CD],Y
+    TDC                     ; C = D = $0100
+    XBA                     ; B = 0 for the TAX below
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 1)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 1
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 2)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 2
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 3)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 3
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 4)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 4
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 5)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 5
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 6)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 6
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 7)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 7
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 8)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 8
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 9)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 9
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 10)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 10
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 11)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 11
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 12)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 12
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 13)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 13
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 14)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 14
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 15)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 15
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 16)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 16
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 17)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 17
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 18)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 18
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 19)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 19
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 20)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 20
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 21)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 21
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 22)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 22
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 23)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 23
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 24)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 24
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 25)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 25
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 26)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 26
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 27)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 27
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 28)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 28
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 29)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 29
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 30)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 30
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 31)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; byte 31
     INY
-    LDA [$CD],Y
+    LDA.b [!Spr_GfxPtr],Y
     TAX
-    LDA $FD00,X
-    STA $2180               ; WMDATA (byte 32 — no INY)
+    LDA.w BitReverseTable,X
+    STA.w WMDATA            ; WMDATA (byte 32 — no INY)
     REP #$20                ; A → 16-bit
-    LDY $C5                 ; restore Y
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E687 — Sub_E687 (178 bytes, $C0:E687–$E738)
-; Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM
-; graphics bank into WRAM at the address in dp:$D0.
-;
-; On entry (from Sub_E12A Phase 2, bit 14 of scene word clear):
-;   A = 16-bit scene-data word, Y = scene-data table index,
-;   dp:$0A = base offset, dp:$CD = sprite-data byte base,
-;   dp:$CF = graphics bank selector, dp:$D0 = WRAM write address.
-; Header (M=0 encoding here: AND #$07FF / 5×ASL ≡ same bytes as Sub_E534's header)
-; computes source byte offset X = ((A & $07FF) << 5) + dp:$CD,
-; loads WRAM address Y = dp:$D0, dispatches on dp:$CF:
-;   $7F → Sub_E8C2, $D2 → Sub_E7BC, $D3 → Sub_E83F, $D4 → Sub_E739,
-;   else → inline $D5 copy below.
-; After copy: WMADDL = old_Y + $20, Y restored. Returns 16-bit A.
+; $C0:E687 — Spr_CopyTile (178 bytes, $C0:E687–$E738)
+; (was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr +
+; (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD
+; past it so a following Spr_CopyTileFlipped writes the next tile.
+; The source bank (Spr_GfxPtr+2) picks the copier: $7F → Spr_CopyTile7F,
+; $D2/$D3/$D4 → Spr_CopyTileD2/D3/D4, anything else → bank $D5 below.
+; Each copier is an unrolled 16-word move with DB = $7F, X = source
+; offset and Y = destination address.
+; On entry: M=0, A = frame-data tile word (bit 14 clear), Y = frame-data
+; index. Returns with M=0, Y restored.
 ; ============================================================
 org $C0E687
-Sub_E687:
-    AND #$07FF              ; (M=0: 29 FF 07) same bytes as Sub_E534's AND #$FF/ORA[$0A]
+Spr_CopyTile:
+    AND.w #!SprFrame_TileMask
     ASL
     ASL
     ASL
     ASL
-    ASL                     ; 5×ASL (same byte sequence as 4×ASL in M=1 above)
-    STY $C5                 ; save Y
+    ASL                     ; × 32: byte offset of the tile
+    STY.b !Spr_SavedY
     CLC
-    ADC $CD                 ; X = shifted offset + dp:$CD base
+    ADC.b !Spr_GfxPtr       ; X = source offset in its bank
     TAX
-    LDY $D0                 ; Y = WRAM write address
-    SEP #$20                ; A → 8-bit for bank-selector dispatch
-    LDA $CF                 ; graphics bank selector
-    CMP #$7F
+    LDY.b !Spr_WramPtr      ; Y = destination in bank $7F
+    SEP #$20                ; A → 8-bit
+    LDA.b !Spr_GfxPtr+2     ; source bank
+    CMP.b #!Bank7F
     BNE .not7f
-    BRL Sub_E8C2               ; → Sub_E8C2 ($E8C2): copy from $7F using abs,X
+    BRL Spr_CopyTile7F
 .not7f:
     SEC
-    SBC #$D2
+    SBC.b #!BankD2
     BNE .notd2
-    BRL Sub_E7BC               ; → Sub_E7BC ($E7BC): copy from bank $D2
+    BRL Spr_CopyTileD2
 .notd2:
     DEC
     BNE .notd3
-    BRL Sub_E83F               ; → Sub_E83F ($E83F): copy from bank $D3
+    BRL Spr_CopyTileD3
 .notd3:
     DEC
-    BNE .d5copy             ; else → inline $D5 copy
-    BRL Sub_E739               ; → Sub_E739 ($E739): copy from bank $D4
-.d5copy:                    ; dp:$CF = $D5 (or unrecognised) → read from bank $D5
+    BNE .d5copy
+    BRL Spr_CopyTileD4
+.d5copy:                    ; $D5 (or any other bank): read bank $D5
     PHB
-    LDA #$7F                ; (M=1 after SEP above)
+    LDA.b #!Bank7F          ; (M=1 after SEP above)
     PHA
     PLB                     ; DB = $7F
     REP #$20                ; A → 16-bit
-    LDA $D50000,X
-    STA.w $0000,Y
-    LDA $D50002,X
-    STA.w $0002,Y
-    LDA $D50004,X
-    STA.w $0004,Y
-    LDA $D50006,X
-    STA.w $0006,Y
-    LDA $D50008,X
-    STA.w $0008,Y
-    LDA $D5000A,X
-    STA.w $000A,Y
-    LDA $D5000C,X
-    STA.w $000C,Y
-    LDA $D5000E,X
-    STA.w $000E,Y
-    LDA $D50010,X
-    STA.w $0010,Y
-    LDA $D50012,X
-    STA.w $0012,Y
-    LDA $D50014,X
-    STA.w $0014,Y
-    LDA $D50016,X
-    STA.w $0016,Y
-    LDA $D50018,X
-    STA.w $0018,Y
-    LDA $D5001A,X
-    STA.w $001A,Y
-    LDA $D5001C,X
-    STA.w $001C,Y
-    LDA $D5001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D5,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D5+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D5+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D5+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D5+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D5+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D5+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D5+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D5+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D5+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D5+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D5+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D5+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D5+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D5+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D5+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181             ; WMADDL = old_Y + $20
-    LDY $C5                 ; restore Y
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL            ; WMADD = just past the copied tile
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E739 — Sub_E739 (131 bytes, $C0:E739–$E7BB)
-; Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D4.
-; X = source byte offset, Y = WRAM write address (both from Sub_E687).
+; $C0:E739 — Spr_CopyTileD4 (131 bytes, $C0:E739–$E7BB)
+; Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D4).
 ; ============================================================
 org $C0E739
-Sub_E739:
+Spr_CopyTileD4:
     PHB
-    db $A9,$7F              ; LDA #$7F (db: M=1 byte encoding in M=0 asar context)
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20                ; A → 16-bit
-    LDA $D40000,X
-    STA.w $0000,Y
-    LDA $D40002,X
-    STA.w $0002,Y
-    LDA $D40004,X
-    STA.w $0004,Y
-    LDA $D40006,X
-    STA.w $0006,Y
-    LDA $D40008,X
-    STA.w $0008,Y
-    LDA $D4000A,X
-    STA.w $000A,Y
-    LDA $D4000C,X
-    STA.w $000C,Y
-    LDA $D4000E,X
-    STA.w $000E,Y
-    LDA $D40010,X
-    STA.w $0010,Y
-    LDA $D40012,X
-    STA.w $0012,Y
-    LDA $D40014,X
-    STA.w $0014,Y
-    LDA $D40016,X
-    STA.w $0016,Y
-    LDA $D40018,X
-    STA.w $0018,Y
-    LDA $D4001A,X
-    STA.w $001A,Y
-    LDA $D4001C,X
-    STA.w $001C,Y
-    LDA $D4001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D4,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D4+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D4+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D4+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D4+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D4+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D4+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D4+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D4+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D4+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D4+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D4+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D4+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D4+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D4+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D4+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181             ; WMADDL = old_Y + $20
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL            ; WMADD = just past the copied tile
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E7BC — Sub_E7BC (131 bytes, $C0:E7BC–$E83E)
-; Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D2.
+; $C0:E7BC — Spr_CopyTileD2 (131 bytes, $C0:E7BC–$E83E)
+; Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D2).
 ; ============================================================
 org $C0E7BC
-Sub_E7BC:
+Spr_CopyTileD2:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA $D20000,X
-    STA.w $0000,Y
-    LDA $D20002,X
-    STA.w $0002,Y
-    LDA $D20004,X
-    STA.w $0004,Y
-    LDA $D20006,X
-    STA.w $0006,Y
-    LDA $D20008,X
-    STA.w $0008,Y
-    LDA $D2000A,X
-    STA.w $000A,Y
-    LDA $D2000C,X
-    STA.w $000C,Y
-    LDA $D2000E,X
-    STA.w $000E,Y
-    LDA $D20010,X
-    STA.w $0010,Y
-    LDA $D20012,X
-    STA.w $0012,Y
-    LDA $D20014,X
-    STA.w $0014,Y
-    LDA $D20016,X
-    STA.w $0016,Y
-    LDA $D20018,X
-    STA.w $0018,Y
-    LDA $D2001A,X
-    STA.w $001A,Y
-    LDA $D2001C,X
-    STA.w $001C,Y
-    LDA $D2001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D2,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D2+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D2+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D2+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D2+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D2+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D2+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D2+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D2+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D2+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D2+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D2+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D2+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D2+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D2+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D2+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E83F — Sub_E83F (131 bytes, $C0:E83F–$E8C1)
-; Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $D3.
+; $C0:E83F — Spr_CopyTileD3 (131 bytes, $C0:E83F–$E8C1)
+; Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from
+; Spr_CopyTile when the graphics are in bank $D3).
 ; ============================================================
 org $C0E83F
-Sub_E83F:
+Spr_CopyTileD3:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA $D30000,X
-    STA.w $0000,Y
-    LDA $D30002,X
-    STA.w $0002,Y
-    LDA $D30004,X
-    STA.w $0004,Y
-    LDA $D30006,X
-    STA.w $0006,Y
-    LDA $D30008,X
-    STA.w $0008,Y
-    LDA $D3000A,X
-    STA.w $000A,Y
-    LDA $D3000C,X
-    STA.w $000C,Y
-    LDA $D3000E,X
-    STA.w $000E,Y
-    LDA $D30010,X
-    STA.w $0010,Y
-    LDA $D30012,X
-    STA.w $0012,Y
-    LDA $D30014,X
-    STA.w $0014,Y
-    LDA $D30016,X
-    STA.w $0016,Y
-    LDA $D30018,X
-    STA.w $0018,Y
-    LDA $D3001A,X
-    STA.w $001A,Y
-    LDA $D3001C,X
-    STA.w $001C,Y
-    LDA $D3001E,X
-    STA.w $001E,Y
+    LDA.l !GfxRom_D3,X
+    STA.w !Wram7F_PtrBase,Y
+    LDA.l !GfxRom_D3+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.l !GfxRom_D3+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.l !GfxRom_D3+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.l !GfxRom_D3+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.l !GfxRom_D3+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.l !GfxRom_D3+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.l !GfxRom_D3+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.l !GfxRom_D3+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.l !GfxRom_D3+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.l !GfxRom_D3+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.l !GfxRom_D3+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.l !GfxRom_D3+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.l !GfxRom_D3+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.l !GfxRom_D3+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.l !GfxRom_D3+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E8C2 — Sub_E8C2 (115 bytes, $C0:E8C2–$E934)
-; Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
-; Tail-called via BRL from Sub_E687 when dp:$CF = $7F.
-; Uses absolute,X (BD) rather than long,X (BF): DB is already $7F after PLB.
+; $C0:E8C2 — Spr_CopyTile7F (115 bytes, $C0:E8C2–$E934)
+; Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when
+; the graphics are already in WRAM); abs,X reads since DB = $7F.
 ; ============================================================
 org $C0E8C2
-Sub_E8C2:
+Spr_CopyTile7F:
     PHB
-    db $A9,$7F              ; LDA #$7F
+    LDA.b #!Bank7F          ; M=1 here (set before the BRL in Spr_CopyTile)
     PHA
     PLB                     ; DB = $7F
     REP #$20
-    LDA.w $0000,X           ; BD: abs,X (DB=$7F → reads $7F:0000+X)
-    STA.w $0000,Y
-    LDA.w $0002,X
-    STA.w $0002,Y
-    LDA.w $0004,X
-    STA.w $0004,Y
-    LDA.w $0006,X
-    STA.w $0006,Y
-    LDA.w $0008,X
-    STA.w $0008,Y
-    LDA.w $000A,X
-    STA.w $000A,Y
-    LDA.w $000C,X
-    STA.w $000C,Y
-    LDA.w $000E,X
-    STA.w $000E,Y
-    LDA.w $0010,X
-    STA.w $0010,Y
-    LDA.w $0012,X
-    STA.w $0012,Y
-    LDA.w $0014,X
-    STA.w $0014,Y
-    LDA.w $0016,X
-    STA.w $0016,Y
-    LDA.w $0018,X
-    STA.w $0018,Y
-    LDA.w $001A,X
-    STA.w $001A,Y
-    LDA.w $001C,X
-    STA.w $001C,Y
-    LDA.w $001E,X
-    STA.w $001E,Y
+    LDA.w !Wram7F_PtrBase,X ; DB = $7F
+    STA.w !Wram7F_PtrBase,Y
+    LDA.w !Wram7F_PtrBase+2,X
+    STA.w !Wram7F_PtrBase+2,Y
+    LDA.w !Wram7F_PtrBase+4,X
+    STA.w !Wram7F_PtrBase+4,Y
+    LDA.w !Wram7F_PtrBase+6,X
+    STA.w !Wram7F_PtrBase+6,Y
+    LDA.w !Wram7F_PtrBase+8,X
+    STA.w !Wram7F_PtrBase+8,Y
+    LDA.w !Wram7F_PtrBase+10,X
+    STA.w !Wram7F_PtrBase+10,Y
+    LDA.w !Wram7F_PtrBase+12,X
+    STA.w !Wram7F_PtrBase+12,Y
+    LDA.w !Wram7F_PtrBase+14,X
+    STA.w !Wram7F_PtrBase+14,Y
+    LDA.w !Wram7F_PtrBase+16,X
+    STA.w !Wram7F_PtrBase+16,Y
+    LDA.w !Wram7F_PtrBase+18,X
+    STA.w !Wram7F_PtrBase+18,Y
+    LDA.w !Wram7F_PtrBase+20,X
+    STA.w !Wram7F_PtrBase+20,Y
+    LDA.w !Wram7F_PtrBase+22,X
+    STA.w !Wram7F_PtrBase+22,Y
+    LDA.w !Wram7F_PtrBase+24,X
+    STA.w !Wram7F_PtrBase+24,Y
+    LDA.w !Wram7F_PtrBase+26,X
+    STA.w !Wram7F_PtrBase+26,Y
+    LDA.w !Wram7F_PtrBase+28,X
+    STA.w !Wram7F_PtrBase+28,Y
+    LDA.w !Wram7F_PtrBase+30,X
+    STA.w !Wram7F_PtrBase+30,Y
     PLB
     TYA
     CLC
-    ADC #$0020
-    STA.w $2181
-    LDY $C5
+    ADC.w #!Gfx_Tile4bppBytes
+    STA.w WMADDL
+    LDY.b !Spr_SavedY
     RTS
 
 ; ============================================================
-; $C0:E935 — Sub_E935 (29 bytes, $E935–$E951)
-; Initialize 8 sprite-slot "uninitialized" flags at $0BC0-$0BC7 to $80.
-; Sets DP=$0B00, stores LDA #$80 to dp:$C0-$C7 (= abs $0BC0-$0BC7),
-; then PLD / RTS.
-; Tail-called via BRL from Obj_ResetStates at end of sprite table clear.
-; $80 in these slots means "no sprite assigned" (tested in Sub_E9E2/E9FF).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP restored by PLD before call.
+; $C0:E935 — SprBuf_FreeAll (29 bytes, $E935–$E951)
+; (was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80),
+; with DP pointed at $0B00 so each store is a 2-byte dp store.
+; Tail of Obj_ResetStates; also called by Scene_PostLoadInit and
+; after a battle (DefaultHandler).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y).
 ; ============================================================
 org $C0E935
-Sub_E935:
+SprBuf_FreeAll:
     PHD
     REP #$20                ; A → 16-bit
-    LDA #$0B00
+    LDA.w #!DP_SprBufPage
     TCD                     ; DP = $0B00
     SEP #$20                ; A → 8-bit
-    LDA #$80                ; "uninitialized" sentinel
-    STA $C0                 ; dp:$C0 = $0BC0
-    STA $C1
-    STA $C2
-    STA $C3
-    STA $C4
-    STA $C5
-    STA $C6
-    STA $C7                 ; dp:$C7 = $0BC7
+    LDA.b #!Obj_None        ; free
+    STA.b !SprBuf_Owner-!DP_SprBufPage
+    STA.b !SprBuf_Owner+1-!DP_SprBufPage
+    STA.b !SprBuf_Owner+2-!DP_SprBufPage
+    STA.b !SprBuf_Owner+3-!DP_SprBufPage
+    STA.b !SprBuf_Owner+4-!DP_SprBufPage
+    STA.b !SprBuf_Owner+5-!DP_SprBufPage
+    STA.b !SprBuf_Owner+6-!DP_SprBufPage
+    STA.b !SprBuf_Owner+7-!DP_SprBufPage
     PLD
     RTS
 
 ; ============================================================
-; $C0:E952 — Sub_E952 (40 bytes, $E952–$E979)
-; Sprite slot allocator — single-slot variant.
-; Scans $0BC0[0..3] for the first entry whose value is negative
-; ($80 = free sentinel set by Sub_E935).  Claims the entry by
-; writing dp:$6D there, then computes the WRAM staging-buffer base
-; address for that sprite slot: $3800 + slotIndex×$0200 (so entries
-; 0–3 map to $3800/$3A00/$3C00/$3E00) and stores the result in
-; $0D80+dp:$6D.
-; Returns: SEC on success (slot allocated), CLC if table is full.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $CC0D.
+; $C0:E952 — SprBuf_Alloc1 (40 bytes, $E952–$E979)
+; (was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the
+; WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets
+; Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200.
+; Returns C=1 on success, C=0 when all four are taken.
+; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100. Called from Sub_CBDC.
 ; ============================================================
 org $C0E952
-Sub_E952:
+SprBuf_Alloc1:
     LDX #$00
 .e952_loop:
-    LDA $0BC0,X          ; read slot entry X
-    BPL .e952_next       ; $00–$7F = occupied → skip
-    LDA $6D              ; $80+ = free → claim: store slot id
-    STA $0BC0,X
-    TXA                  ; A.lo = table index (0–3)
-    XBA                  ; A.hi ← index; A.lo ← 0
+    LDA.w !SprBuf_Owner,X
+    BPL .e952_next
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    TXA
+    XBA
     REP #$20             ; A → 16-bit
-    AND #$FF00           ; isolate high byte (= index × $0100)
-    ASL                  ; × 2  → index × $0200
+    AND.w #!Eng_HighByteMask
+    ASL                  ; entry × $200
     CLC
-    ADC #$3800           ; WRAM base: $3800 + index × $0200
-    LDX $6D              ; X = sprite slot id
-    STA $0D80,X          ; $0D80+slot ← staging-buffer base
+    ADC.w #!SprBuf_Base  ; chunk address
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20             ; A → 8-bit
     SEC                  ; success
     RTS
@@ -4574,40 +4548,34 @@ Sub_E952:
     INX
     CPX #$04
     BMI .e952_loop       ; loop for entries 0–3
-    CLC                  ; table full — no slot found
+    CLC                  ; all taken
     RTS
 
 ; ============================================================
-; $C0:E97A — Sub_E97A (48 bytes, $E97A–$E9A9)
-; Sprite slot allocator — dual-slot variant.
-; Like Sub_E952 but requires BOTH $0BC0[X] and $0BC1[X] to be free.
-; Claims both entries with dp:$6D; WRAM base computation is identical.
-; Searches entries 0–2 (CPX #$03) since adjacent pairs overlap:
-; position 0 → ($0BC0,$0BC1), position 1 → ($0BC1,$0BC2), etc.
-; Returns: SEC on success, CLC on failure.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $CF2D, $D299.
+; $C0:E97A — SprBuf_Alloc2 (48 bytes, $E97A–$E9A9)
+; (was Sub_E97A.) As SprBuf_Alloc1 for two adjacent free chunks
+; (start entries 0-2). Called from Sub_CEF5 and Sub_D28A.
 ; ============================================================
 org $C0E97A
-Sub_E97A:
+SprBuf_Alloc2:
     LDX #$00
 .e97a_loop:
-    LDA $0BC0,X          ; check first sub-slot
-    BPL .e97a_next       ; occupied → skip
-    LDA $0BC1,X          ; check second sub-slot
-    BPL .e97a_next       ; occupied → skip
-    LDA $6D              ; both free → claim both
-    STA $0BC0,X
-    STA $0BC1,X
+    LDA.w !SprBuf_Owner,X
+    BPL .e97a_next
+    LDA.w !SprBuf_Owner+1,X
+    BPL .e97a_next
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
     TXA
     XBA
     REP #$20
-    AND #$FF00
+    AND.w #!Eng_HighByteMask
     ASL
     CLC
-    ADC #$3800
-    LDX $6D
-    STA $0D80,X
+    ADC.w #!SprBuf_Base
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20
     SEC
     RTS
@@ -4619,38 +4587,33 @@ Sub_E97A:
     RTS
 
 ; ============================================================
-; $C0:E9AA — Sub_E9AA (56 bytes, $E9AA–$E9E1)
-; Sprite slot allocator — triple-slot variant.
-; Requires $0BC0[X], $0BC1[X], and $0BC2[X] all free; searches only
-; entries 0–1 (CPX #$02) since three consecutive sub-slots fit in two
-; starting positions.  Claims all three with dp:$6D; same WRAM base.
-; Returns: SEC on success, CLC on failure.
-; On entry: M=1 (8-bit A), X=0 (8-bit X/Y), DP=$0100.
-; Called from: $D555, $D617.
+; $C0:E9AA — SprBuf_Alloc3 (56 bytes, $E9AA–$E9E1)
+; (was Sub_E9AA.) As SprBuf_Alloc1 for three adjacent free chunks
+; (start entries 0-1). Called from Sub_D546 and Sub_D608.
 ; ============================================================
 org $C0E9AA
-Sub_E9AA:
+SprBuf_Alloc3:
     LDX #$00
 .e9aa_loop:
-    LDA $0BC0,X
+    LDA.w !SprBuf_Owner,X
     BPL .e9aa_next
-    LDA $0BC1,X
+    LDA.w !SprBuf_Owner+1,X
     BPL .e9aa_next
-    LDA $0BC2,X
+    LDA.w !SprBuf_Owner+2,X
     BPL .e9aa_next
-    LDA $6D              ; all three free → claim
-    STA $0BC0,X
-    STA $0BC1,X
-    STA $0BC2,X
+    LDA.b !Obj_Cur
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
+    STA.w !SprBuf_Owner+2,X
     TXA
     XBA
     REP #$20
-    AND #$FF00
+    AND.w #!Eng_HighByteMask
     ASL
     CLC
-    ADC #$3800
-    LDX $6D
-    STA $0D80,X
+    ADC.w #!SprBuf_Base
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileBuf,X
     SEP #$20
     SEC
     RTS
@@ -4662,16 +4625,17 @@ Sub_E9AA:
     RTS
 
 org $C0E9E2
-Sub_E9E2:
-    ; 29 bytes ($E9E2-$E9FE). Entry M=1, X=1.
-    ; Searches 4-entry table at $0BC0 for the current sprite slot ($6D),
-    ; then marks the matching entry with $80.
+SprBuf_Free1:
+    ; (was Sub_E9E2.) 29 bytes ($E9E2-$E9FE). Releases the SprBuf chunk
+    ; owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries
+    ; and marks it free. Run by Spr_PrepareTiles after Spr_Load4.
+    ; Entry M=1; returns with X/Y 16-bit.
     SEP #$10
-    LDX $6D
+    LDX.b !Obj_Cur
     LDX #$00
 .e9e2_loop:
-    LDA.w $0BC0,X
-    CMP $6D
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .e9e2_found
     INX
     CPX #$04
@@ -4679,22 +4643,22 @@ Sub_E9E2:
     REP #$10
     RTS
 .e9e2_found:
-    LDA #$80
-    STA.w $0BC0,X
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X
     REP #$10
     RTS
 
 org $C0E9FF
-Sub_E9FF:
-    ; 32 bytes ($E9FF-$EA1E). Entry M=1, X=1.
-    ; Searches 3-entry table at $0BC0 for slot $6D; marks match with $80 in
-    ; both $0BC0,X and $0BC1,X (two entries). Loop limit CPX #$03 vs Sub_E9E2's #$04.
+SprBuf_Free2:
+    ; (was Sub_E9FF.) 32 bytes ($E9FF-$EA1E). As SprBuf_Free1 for a
+    ; 2-chunk object: the first of the 3 possible start entries owned by
+    ; Obj_Cur and the one after it are freed. Run after Spr_Load8.
     SEP #$10
-    LDX $6D
+    LDX.b !Obj_Cur
     LDX #$00
 .e9ff_loop:
-    LDA.w $0BC0,X
-    CMP $6D
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .e9ff_found
     INX
     CPX #$03
@@ -4702,34 +4666,33 @@ Sub_E9FF:
     REP #$10
     RTS
 .e9ff_found:
-    LDA #$80
-    STA.w $0BC0,X
-    STA.w $0BC1,X
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X
+    STA.w !SprBuf_Owner+1,X
     REP #$10
     RTS
 
 org $C0EA1F
-Sub_EA1F:
-    ; 35 bytes ($EA1F–$EA41). Entry M=1, X=0 (16-bit).
-    ; Types 2/3+ init pass 2: searches 2-entry table at $0BC0 for sprite
-    ; slot $6D; marks $0BC0,X $0BC1,X $0BC2,X with $80 (3 OAM slots).
+SprBuf_Free3:
+    ; (was Sub_EA1F.) 35 bytes ($EA1F–$EA41). As SprBuf_Free1 for a
+    ; 3-chunk object (2 possible start entries). Run after Spr_Load12.
     SEP #$10                ; X → 8-bit
-    LDX $6D                 ; (discarded; immediately overwritten)
-    LDX #$00                ; X = 0 (loop counter)
+    LDX.b !Obj_Cur          ; (discarded; immediately overwritten)
+    LDX #$00
 .ea1f_loop:
-    LDA.w $0BC0,X           ; table entry X
-    CMP $6D                 ; match sprite slot?
+    LDA.w !SprBuf_Owner,X
+    CMP.b !Obj_Cur
     BEQ .ea1f_found
     INX
-    CPX #$02                ; 2-entry table (0,1)
+    CPX #$02                ; start entries 0-1
     BNE .ea1f_loop
     REP #$10                ; X → 16-bit (no match)
     RTS
 .ea1f_found:
-    LDA #$80
-    STA.w $0BC0,X           ; mark slot (byte 0)
-    STA.w $0BC1,X           ; mark slot (byte 1)
-    STA.w $0BC2,X           ; mark slot (byte 2)
+    LDA.b #!Obj_None
+    STA.w !SprBuf_Owner,X   ; free all three chunks
+    STA.w !SprBuf_Owner+1,X
+    STA.w !SprBuf_Owner+2,X
     REP #$10                ; X → 16-bit
     RTS
 
@@ -4828,7 +4791,7 @@ GL_ModeOk2:
 
     JSR FrameStateInit      ; reset the field page for this location
     JSR LoadLocation        ; location-load steps (10 JSR + 2 JSL)
-    JSR Obj_ResetStates     ; clear Obj_State, then Sub_E935
+    JSR Obj_ResetStates     ; clear Obj_State, then SprBuf_FreeAll
     JSR Scene_PostLoadInit
     JSR TileAnimList_Clear
     JSR Scene_SettleFrames  ; run frames until the new scene reports ready
@@ -4989,7 +4952,7 @@ Field_SaveState:
 ;    LocLoad_Unk092B / LocLoad_AudioSetup).
 ; 5. Restore Map_ScrollA-D and Field_Unk1DF9 from SceneSave_*.
 ; 6. Evt_RunObj0Func1.
-; 7. If Field_UnkAEObj names an object, run Sub_E12A on it.
+; 7. If Field_UnkAEObj names an object, run Spr_LoadLargeObj on it.
 ; 8. If Field_Unk7F03FE is 1 or 2: put party members 2 and 3 on the
 ;    leader's position, enable control, set Field_Unk7F03FE = 3.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
@@ -5034,7 +4997,7 @@ Field_RestoreState:
     BMI .no_e12a            ; Obj_None
     TAX
     STX.b !Obj_Cur          ; 16-bit store
-    JSR Sub_E12A
+    JSR Spr_LoadLargeObj
 .no_e12a:
     LDA.l !Field_Unk7F03FE
     BEQ .done               ; 0 → skip
@@ -5404,7 +5367,7 @@ Field_SceneChangeTick:
     TCD                      ; DP = $0100
     SEP #$20
     JSR Field_RestoreState   ; reload the location around the saved state
-    JSR Obj_ResetStates      ; clear Obj_State, then Sub_E935
+    JSR Obj_ResetStates      ; clear Obj_State, then SprBuf_FreeAll
     LDA.b #!SceneFlag_Reload
     TRB.b !Field_SceneFlags
     LDA.b #!FadeFlag_Reloaded
@@ -5583,7 +5546,7 @@ ClearRAMDMA:
 ; $C0:B192 — Obj_ResetStates (30 bytes, $B192–$B1B1)
 ; (was Sub_B192.) Clears Obj_State for every object the location
 ; defines (count in Evt_ObjCount), pointing DP at the Obj_State table
-; so each clear is a 2-byte dp store, then tail-jumps to Sub_E935
+; so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll
 ; (which sets $0BC0-$0BC7 to $80). Called at the end of every reload.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; ============================================================
@@ -5606,7 +5569,7 @@ Obj_ResetStates:
     BNE .zero_loop
     REP #$10                ; X,Y → 16-bit
     PLD
-    BRL Sub_E935            ; sets $0BC0-$0BC7 to $80
+    BRL SprBuf_FreeAll            ; sets $0BC0-$0BC7 to $80
 
 ; ============================================================
 ; $C0:B271 — PostVBlank (152 bytes)
@@ -7920,7 +7883,7 @@ DefaultHandler:
     TSB.b !Field_FadeFlags
     JSR Scene_Unk0283       ; rebuild the field
     JSR TileAnimList_ApplyAll
-    JSR Sub_E935
+    JSR SprBuf_FreeAll
     JSR Field_IdleFrame
 
 .exit2:
@@ -8109,9 +8072,9 @@ Sub_CB3A:
 ; Sets up dp:$CF/$D2 (tile bank ptr) and dp:$CD (table ptr),
 ; then either uses $1301,X directly (type-3: $1780,X==$03) or
 ; calls Sub_CB3A for the animation gate.  Allocates one VRAM
-; slot via Sub_E952; if same frame as last call (CMP $0F01,X),
+; slot via SprBuf_Alloc1; if same frame as last call (CMP $0F01,X),
 ; returns CLC with no work.  On new frame: copies 16 tile
-; entries ($0010 iterations) through Sub_E687/Sub_E534 into
+; entries ($0010 iterations) through Spr_CopyTile/Spr_CopyTileFlipped into
 ; WRAM via WMDATA; writes 4-entry (Y/X/attr) OAM staging data
 ; to $7F:4802+slot and the DMA descriptor to $09xx; CLC RTS.
 ; Entry: M=1, X/Y=16-bit; X = entity slot index.
@@ -8146,7 +8109,7 @@ Sub_CBDC:
     RTS                     ; same frame → no work
 .new_frame:
     STA $EE                 ; save frame byte
-    JSR Sub_E952               ; single-slot allocator
+    JSR SprBuf_Alloc1               ; single-slot allocator
     BCC .no_work            ; allocation failed → backward branch to CLC+RTS
     LDA $EE
     STA $0F01,X             ; record current frame
@@ -8185,14 +8148,14 @@ Sub_CBDC:
     LDA [$D3],Y
     BIT #$4000
     BNE .fd_path
-    JSR Sub_E687               ; bank-switch tile copy
+    JSR Spr_CopyTile               ; bank-switch tile copy
     INY
     INY
     DEC $C9
     BNE .next
     BRA .after_loop
 .fd_path:
-    JSR Sub_E534               ; FD00-table WRAM fill
+    JSR Spr_CopyTileFlipped               ; FD00-table WRAM fill
     INY
     INY
     DEC $C9
@@ -8529,7 +8492,7 @@ Sub_CDC8:
 ; $C0:CEF5 — Sub_CEF5 (559 bytes, $CEF5–$D123)
 ; Complex sprite-slot dispatch with three paths:
 ;   type==3  ($1780,X==$03): full 32-tile dual-slot init via
-;            Sub_E97A + 32-entry loop.
+;            SprBuf_Alloc2 + 32-entry loop.
 ;   $1B00,X & $7F == 0: tail-call → Sub_D28A (first-pass,
 ;            16 tiles, Y=0).
 ;   $1B00,X & $7F != 0: tail-call → Sub_D30D (second-pass,
@@ -8571,7 +8534,7 @@ Sub_CEF5:
     RTS                     ; same frame → no work
 .t3_new_frame:
     STA $EE
-    JSR Sub_E97A               ; dual-slot allocator
+    JSR SprBuf_Alloc2               ; dual-slot allocator
     BCC .t3_nc_exit         ; allocation failed → backward branch to CLC+RTS
     LDA $EE
     STA $0F01,X
@@ -8610,14 +8573,14 @@ Sub_CEF5:
     LDA [$D3],Y
     BIT #$4000
     BNE .t3_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .t3_next
     BRA .t3_after_loop
 .t3_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9017,8 +8980,8 @@ Sub_D124:
 ; Called directly and also as a tail-call target (BRL from
 ; Sub_CEF5 at $CF1E) for the first-pass case.
 ; Calls Sub_CB3A to check the animation gate; on pass, calls
-; Sub_E97A to allocate two VRAM slots; copies 16 tile entries
-; (frame# × $50 offset, 16 iterations via Sub_E687/E534) into
+; SprBuf_Alloc2 to allocate two VRAM slots; copies 16 tile entries
+; (frame# × $50 offset, 16 iterations via Spr_CopyTile/E534) into
 ; WRAM.  Increments $1B00,X on success; SEC RTS.
 ; Entry: M=1, X/Y=16-bit; X = entity slot.
 ; ============================================================
@@ -9035,7 +8998,7 @@ Sub_D28A:
     RTS
 .d28a_new_frame:
     STA $EE
-    JSR Sub_E97A               ; dual-slot allocator
+    JSR SprBuf_Alloc2               ; dual-slot allocator
     BCC .d28a_nc_exit       ; allocation failed → backward branch to CLC+RTS
     LDA $EE
     STA $0F01,X
@@ -9074,14 +9037,14 @@ Sub_D28A:
     LDA [$D3],Y
     BIT #$4000
     BNE .d28a_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d28a_next
     BRA .d28a_done
 .d28a_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9099,7 +9062,7 @@ Sub_D28A:
 ; Tail-call target (BRL from Sub_CEF5 $CF1B) for pass counter != 0.
 ; Uses existing slot allocation ($0D80,X + $200 for second slot).
 ; Copies 16 tile entries starting at tile-data offset Y=$20 through
-; Sub_E687/Sub_E534; writes 8-entry OAM staging to $7F:4802+slot
+; Spr_CopyTile/Spr_CopyTileFlipped; writes 8-entry OAM staging to $7F:4802+slot
 ; (Y from $40); CLC RTS on success.
 ; Entry: M=1, X/Y=16-bit; X = entity slot (via $6D).
 ; ============================================================
@@ -9141,14 +9104,14 @@ Sub_D30D:
     LDA [$D3],Y
     BIT #$4000
     BNE .d30d_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d30d_next
     BRA .d30d_after_loop
 .d30d_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9355,7 +9318,7 @@ Sub_D30D:
 ;   $1B00,X & $7F == 1: pass 1  → Sub_D68B (non-$68) or Sub_D738 ($68)
 ;   $1B00,X & $7F >= 2: pass 2+ → Sub_D7E5 (non-$68) or Sub_DA69 ($68)
 ; Type-3 sprites ($1780,X==$03): RTS immediately (no re-init).
-; Body at $D546 (pass 0, non-$68): triple-slot alloc via Sub_E9AA,
+; Body at $D546 (pass 0, non-$68): triple-slot alloc via SprBuf_Alloc3,
 ;   8-tile loop to WRAM base, then 8-tile loop to WRAM base+$200; SEC RTS.
 ; Called from: sprite-slot entity dispatcher table (entity type dispatch).
 ; ============================================================
@@ -9410,7 +9373,7 @@ Sub_D4F7:
 ; Reached by BRA from Sub_D4F7 (pass 0, non-$68 path) — shares
 ; the same return stack as the caller.  Also the label used as
 ; anchor for the cluster tracking table.
-; Algorithm: animation gate (Sub_CB3A) → triple-slot alloc (Sub_E9AA)
+; Algorithm: animation gate (Sub_CB3A) → triple-slot alloc (SprBuf_Alloc3)
 ;   → 8 tiles Y=0..7 to WRAM base (bank $7F slot)
 ;   → 8 tiles Y=8..15 to WRAM base+$200
 ;   → INC $1B00,X; SEC RTS.
@@ -9427,7 +9390,7 @@ Sub_D546:
     RTS
 .d546_new_frame:
     STA $EE                 ; save current frame type
-    JSR Sub_E9AA            ; allocate three sprite slots
+    JSR SprBuf_Alloc3            ; allocate three sprite slots
     BCC .d546_cle_rts       ; alloc failed → CLC RTS
     LDA $EE
     STA $0F01,X             ; mark frame type as loaded
@@ -9468,14 +9431,14 @@ Sub_D546:
     LDA [$D3],Y
     BIT #$4000
     BNE .d546_loop1_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d546_loop1_top
     BRA .d546_loop2_init
 .d546_loop1_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9503,14 +9466,14 @@ Sub_D546:
     LDA [$D3],Y
     BIT #$4000
     BNE .d546_loop2_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d546_loop2_top
     BRA .d546_done
 .d546_loop2_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9542,7 +9505,7 @@ Sub_D608:
     RTS
 .d608_new_frame:
     STA $EE
-    JSR Sub_E9AA            ; triple-slot alloc
+    JSR SprBuf_Alloc3            ; triple-slot alloc
     BCC .d608_cle_rts
     LDA $EE
     STA $0F01,X
@@ -9582,14 +9545,14 @@ Sub_D608:
     LDA [$D3],Y
     BIT #$4000
     BNE .d608_e534
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d608_loop_top
     BRA .d608_done
 .d608_e534:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9647,14 +9610,14 @@ Sub_D68B:
     LDA [$D3],Y
     BIT #$4000
     BNE .d68b_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d68b_next
     BRA .d68b_loop2
 .d68b_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9681,14 +9644,14 @@ Sub_D68B:
     LDA [$D3],Y
     BIT #$4000
     BNE .d68b_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d68b_next2
     BRA .d68b_done
 .d68b_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9746,14 +9709,14 @@ Sub_D738:
     LDA [$D3],Y
     BIT #$4000
     BNE .d738_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d738_next
     BRA .d738_loop2
 .d738_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9780,14 +9743,14 @@ Sub_D738:
     LDA [$D3],Y
     BIT #$4000
     BNE .d738_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d738_next2
     BRA .d738_done
 .d738_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -9844,14 +9807,14 @@ Sub_D7E5:
     LDA [$D3],Y
     BIT #$4000
     BNE .d7e5_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .d7e5_next
     BRA .d7e5_oam
 .d7e5_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -10172,14 +10135,14 @@ Sub_DA69:
     LDA [$D3],Y
     BIT #$4000
     BNE .da69_fd
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .da69_next
     BRA .da69_loop2
 .da69_fd:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9
@@ -10204,14 +10167,14 @@ Sub_DA69:
     LDA [$D3],Y
     BIT #$4000
     BNE .da69_fd2
-    JSR Sub_E687
+    JSR Spr_CopyTile
     INY
     INY
     DEC $C9
     BNE .da69_next2
     BRA .da69_oam
 .da69_fd2:
-    JSR Sub_E534
+    JSR Spr_CopyTileFlipped
     INY
     INY
     DEC $C9

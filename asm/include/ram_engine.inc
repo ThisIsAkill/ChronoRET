@@ -186,7 +186,7 @@ if !ram_engine_inc == 0
 !Party_ObjSlot1 = $99                    ; 16-bit object slot of party member 2 (= Party_ObjSlot+2)
 !Party_ObjSlot2 = $9B                    ; 16-bit object slot of party member 3 (= Party_ObjSlot+4)
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
-                                         ; runs Sub_E12A on after a reload
+                                         ; runs Spr_LoadLargeObj on after a reload
 !Obj_FocusMode3 = $78                    ; 8-bit tertiary focus mode flag (Obj_AnimTickAndQueue);
                                          ; zeroed at load
 !Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
@@ -273,6 +273,16 @@ if !ram_engine_inc == 0
                                          ; first SprTile record offset (Obj_TileRecOfs)
 !Spr_GroupRec = $E7                      ; alias of Spr_HiBitTmp2 in the 8/12-tile builders: 16-bit
                                          ; record offset where the current group of 4 tiles starts
+
+; --- Object graphics load scratch (Spr_LoadLargeObj, Spr_CopyTile*, the frame builders) (dp) ---
+!Spr_GfxPtr = $CD                        ; 24-bit pointer (bank in byte +2) to the object's tile
+                                         ; graphics: Obj_GfxOfs / Obj_GfxBank
+!Spr_WramPtr = $D0                       ; 24-bit pointer (bank $7F in byte +2) to where the next
+                                         ; tile is written in the WRAM tile buffer
+!Spr_FramePtr = $D3                      ; 24-bit pointer (bank in byte +2) to the object's frame
+                                         ; data: tile words, then position bytes
+!Spr_SavedY = $C5                        ; alias of Spr_BaseY in the tile copiers: the caller's Y
+                                         ; (frame-data index) saved across the copy
 
 ;
 ; Absolute names. Low WRAM ($0000-$1FFF) is given as a 16-bit address
@@ -413,6 +423,18 @@ if !ram_engine_inc == 0
 !Eng_PtrBase = $0000                     ; base 0 for abs,X / abs,Y accesses whose index register
                                          ; holds the full address (e.g. Spr_AppendToOam storing at
                                          ; Oam_Range1HiPtr)
+!Obj_TileBuf = $0D80                     ; 16-bit per object: address in bank $7F of its chunk of the
+                                         ; WRAM tile buffer (SprBuf_Base + n*$200, set by
+                                         ; SprBuf_Alloc*)
+!Obj_LastFrame = $0F01                   ; 8-bit per object: frame number last built (frame builders
+                                         ; skip when unchanged); Spr_LoadLargeObj clears it
+!Obj_GfxBank = $1200                     ; 8-bit per object: bank of its tile graphics ($D2-$D5 ROM,
+                                         ; or $7F WRAM); selects the Spr_CopyTile* variant
+!Obj_GfxOfs = $1280                      ; 16-bit per object: offset of its tile graphics in
+                                         ; Obj_GfxBank
+!Obj_FrameBank = $1300                   ; 8-bit per object: bank of its frame data
+!Obj_FrameOfs = $1380                    ; 16-bit per object: offset of its frame data in
+                                         ; Obj_FrameBank
 
 ; --- Saved field block (menu round trip) ---
 !Field_SaveBlock = $0920                 ; start of the $14E0-byte WRAM block Field_StashSaveBlock
@@ -444,6 +466,22 @@ if !ram_engine_inc == 0
                                          ; DefaultHandler's stepped map tile (TL, TR, BL, BR)
 !TileAnim_VramAddrs = $09CA              ; up to 24 words: VRAM addresses of the 8x8 tiles of each
                                          ; animated map tile, 4 per tile (TL, TR, BL, BR)
+
+; --- Object tile buffer (bank $7F) ---
+!SprBuf_Base = $7F3800                   ; WRAM tile buffer for object graphics, $0C00 bytes in six
+                                         ; $200-byte chunks; uploaded to VRAM word $0400
+!SprBuf_Owner = $0BC0                    ; 8 bytes: object slot owning each $200-byte chunk of
+                                         ; SprBuf_Base ($80 = free); SprBuf_Alloc*/Free* scan the
+                                         ; first 4
+
+; --- ROM tables ---
+!GfxRom_D2 = $D20000                     ; object tile graphics in ROM bank $D2 (Spr_CopyTileD2 reads
+                                         ; 32 bytes at +X)
+!GfxRom_D3 = $D30000                     ; object tile graphics in ROM bank $D3
+!GfxRom_D4 = $D40000                     ; object tile graphics in ROM bank $D4
+!GfxRom_D5 = $D50000                     ; object tile graphics in ROM bank $D5
+!Wram7F_PtrBase = $7F0000                ; base 0 of bank $7F for abs,X / abs,Y accesses whose index
+                                         ; holds the full address (DB = $7F)
 
 ; One OAM low-table entry; used as abs,X with X = the entry's address (PostVBlank)
 struct OamEntry $0000
