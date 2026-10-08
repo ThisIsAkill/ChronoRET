@@ -563,8 +563,10 @@ BattleFD_AddEnemyRewards:
 ; Callers (1 JSL site): BattleSys_Unk8461 ($C1:8650).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $22 = the slot that just acted
 ; Exit:  M=1, X=0; !Battle_UnkB3B9 = 0; A, X, Y clobbered; DP $0C
-;        written; !Battle_UnkB315 = the last entry looked at; Battle_RandRange's
-;        and BattleSys_RunPcAttack's changes
+;        written; !Battle_UnkB315 = 3 after a full pass, the entry (0-2)
+;        whose action left its target KO'd when the loop stops early, and
+;        unchanged when !Battle_UnkB3B9 was 0; Battle_RandRange's and
+;        BattleSys_RunPcAttack's changes
 ; Callees: Battle_RandRangeLong, BattleSys_RunPcAttackLong
 !BattleFDCounter_Ofs = !BattleTmp_0C    ; 2 B: slot * $80
 org $FDAC6E
@@ -659,8 +661,10 @@ BattleFD_UnkACEE:
     RTL
 
 ; $FD:ACFD — BattleFD_UnkACFD (12 bytes, $ACFD–$AD08)
-; Zeroes the $84 bytes of !Battle_UnkB328 ($B328-$B3AB). BattleSys_Main
-; runs it every pass; what the block holds is not traced.
+; Zeroes the $84 bytes from !Battle_HitAmount ($B328-$B3AB): the three
+; $2C-byte hit sets (!Battle_HitAmount/!Battle_HitFlags per battler slot)
+; that Battle_RecordHit fills and Battle_ApplyHits applies, which runs it
+; at its end. BattleSys_Main also runs it every pass.
 ; Callers (6 JSL sites): BattleSys_Main ($C1:812C), Battle_ApplyHits ($C1:ED84), Battle_SetupBattle
 ;   ($C1:FD12) and unmatched ($C1:D523, $C1:D7C4, $C1:D8D1).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
@@ -670,9 +674,9 @@ BattleFD_UnkACFD:
     TDC
     TAX
 .clear:
-    STA.w !Battle_UnkB328,X
+    STA.w !Battle_HitAmount,X
     INX
-    CPX.w #!Battle_UnkB328Bytes
+    CPX.w #!Battle_HitSetsBytes
     BCC .clear
     RTL
 
@@ -1456,8 +1460,9 @@ BattleFD_UnkB121:
 
 ; $FD:B141 — BattleFD_ApplyRecBoost (12 bytes, $B141–$B14C)
 ; Applies the stat boost an item record names: byte 4 of the record at
-; DP $08 (an address in bank $CC; the callers point it at a PC's weapon,
-; armour and helmet records) is a boost number; when it is non-zero this
+; DP $08 (an address in bank $CC; BattleSys_UnkCE3A points it at three
+; equipment records of a PC, probably the weapon, armour and helmet, a
+; guess from the id bases) is a boost number; when it is non-zero this
 ; falls into BattleFD_UnkB14D with it, else returns.
 ; Callers (3 JSL sites): BattleSys_UnkCE3A ($C1:CEA4, $C1:CED6, $C1:CF08).
 ; Entry: M=1, X=0, DP=0, DB=$7E (for BattleFD_UnkB14D's .w stores); DP $08 =
@@ -1611,8 +1616,9 @@ BattleFD_UnkB14D_Done:                  ; header: see BattleFD_UnkB14D
 ; BattlerStats.Unk57 = $A9 (!Battle_UnkB3BD non-zero, BattleFD_UnkAE99),
 ; adds the !Battle_UnkB28C sum to !Battle_RewardGold, zeroes B28C, and in
 ; !Battle_UnkB2AF clears bit 7 (no message 0 in BattleFD_UnkAD17) and
-; sets bit 6 (!Battle_RewardBitGold). So that PC's B28C reward is paid as
-; gold instead (what B28C and the $A9 value are is not traced).
+; sets bit 6 (!Battle_RewardBitGold). So when any PC has $A9 (however
+; many), the battle's whole B28C sum is paid as gold instead; there is no
+; per-PC share (what B28C and the $A9 value are is not traced).
 ; Callers (1 JSL site): BattleSys_Main ($C1:83E0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = !Battle_UnkB2AF, or 0 when !Battle_UnkB3BD is 0;
@@ -1668,7 +1674,10 @@ BattleFD_UnkB223:
 ;     entry's !Battler_UnkAEFF and !Battler_UnkAF0A; when its .Unk2 is
 ;     negative too, !Battler_UnkAEFF is set back to $FF and !Battle_UnkAF15
 ;     bit 7 set (so the enemy is in the battle's list but absent at the
-;     start; BattleFD_RestoreEnemies can bring such entries in).
+;     start). BattleFD_RestoreEnemies skips entries with that bit set,
+;     so it does not bring these in; what does is not traced (in
+;     matched code only BattleAi_UnkAED3, with no caller found, clears
+;     the bit).
 ; !Battle_EnemyCount ends as 8 whatever the records hold: it is counted
 ; for every record, used or not.
 ; Callers (1 JSL site): Battle_SetupBattle ($C1:FA93).

@@ -628,7 +628,7 @@ if !constants_battle_inc == 0
 !Battle_Unk78CounterBit   = $40   ; BattlerStats.Unk78 bit: the slot may act in BattleFD_UnkAC6E
 !Battle_Unk7AActNowBit    = $80   ; BattlerStats.Unk7A bit: BattleFD_UnkAC6E makes the slot act at once
 !Battle_HitRecClearBytes  = $B0   ; bytes BattleFD_UnkACEE zeroes from !Battle_ActPcHitAmount
-!Battle_UnkB328Bytes      = $84   ; bytes BattleFD_UnkACFD zeroes from !Battle_UnkB328
+!Battle_HitSetsBytes      = $84   ; bytes of the three !Battle_HitAmount sets (3 x !Battle_HitSetSize); BattleFD_UnkACFD zeroes them
 !Battle_TechEntryEmpty    = $FF   ; fill of the Tech_MenuEntry blocks (BattleFD_UnkAD09)
 !Battle_TechEntryBlocksBytes = $1A4 ; 3 PCs x $8C B of Tech_MenuEntry records
 !Battle_RewardBitUnk0     = $80   ; !Battle_UnkB2AF bit: BattleFD_UnkAD17 shows message 0 (!Battle_UnkB28C)

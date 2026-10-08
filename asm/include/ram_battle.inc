@@ -1579,7 +1579,6 @@ endstruct
 !Battle_UnkB30F           = $B30F ; 1 B: BattleFD_UnkAD17's position in !Battle_UnkB305 (zeroed at its start)
 !Battle_UnkB310           = $B310 ; 1 B: argument of BattleFD_UnkAD17's message 7
 !Battle_UnkB311           = $B311 ; 1 B per PC (3): how many times BattleFD_UnkAD17 shows message 4 (counted down)
-!Battle_UnkB328           = $B328 ; $84 B: zeroed by BattleFD_UnkACFD every BattleSys_Main pass; meaning unknown
 !Battle_UnkB3BA           = $B3BA ; 3 B: BattlerStats.Unk57 of PCs 0-2 (BattleFD_UnkAE99)
 !Battle_UnkB3BD           = $B3BD ; 1 B: how many PCs have BattlerStats.Unk57 = $A9 (BattleFD_UnkAE99)
 !Battle_UnkB3CC           = $B3CC ; 1 B: BattleFD_UnkAD17's position in !Battle_UnkB3CE (PC * 8 + entry)

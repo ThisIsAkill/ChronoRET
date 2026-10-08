@@ -28398,7 +28398,9 @@ Battle_ClearCancelledHits:
 ; sets) and leaves A = 0, X = $84. A negated amount (see
 ; Battle_RecordHit) raises HP or MP.
 ; Callers (2 JSR sites): BattleSys_ListHandler8 ($C1:8B0C) and BattleSys_UnkAC85 ($C1:AC85).
-; Entry: M=1, X=0, DP=0, DB=$7E
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $0F = 0 if an enemy can be KO'd:
+;        only the low byte of DP $0E is stored (8-bit STA) before the
+;        JSL to BattleFD_AddEnemyRewards, which reads DP $0E 16-bit
 ; Exit:  M=1, X=0 (BattleFD_UnkACFD keeps both), DP=0, DB=$7E;
 ;        A = 0, X = $84 (from BattleFD_UnkACFD), Y = $2C; DP $0E = the
 ;        last enemy slot KO'd here, if any; BattlerStats .CurHp, .CurMp
