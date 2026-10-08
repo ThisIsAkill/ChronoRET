@@ -103,15 +103,29 @@ def source_functions() -> dict[str, dict]:
     for path in sorted(Path('asm').glob('bank*/*.asm')):
         lines = path.read_text().splitlines()
         starts = [i for i, l in enumerate(lines) if GLOBAL.match(l)]
+
+        def is_code(line: str) -> bool:
+            # An instruction or data line (indented, not a comment) or a label.
+            s = line.strip()
+            return bool(s) and not s.startswith(';') and (line[:1].isspace() or s.endswith(':')
+                                                          or GLOBAL.match(line) is not None)
+
+        def last_code(lo: int, hi: int) -> int:
+            for j in range(hi - 1, lo - 1, -1):
+                if is_code(lines[j]) and not lines[j].strip().lower().startswith('org'):
+                    return j
+            return lo
+
+        prev_end = 0
         for n, i in enumerate(starts):
             name = GLOBAL.match(lines[i]).group(1)
-            end = starts[n + 1] if n + 1 < len(starts) else len(lines)
-            # Stop at the routine's last code line: the comment block (and
-            # org) before the next label belongs to the next routine.
-            while end > i + 1 and (not lines[end - 1].strip() or lines[end - 1].startswith(';')
-                                   or lines[end - 1].strip().lower().startswith('org')):
-                end -= 1
-            body = '\n'.join(l.rstrip() for l in lines[i:end]).strip()
+            nxt = starts[n + 1] if n + 1 < len(starts) else len(lines)
+            # A routine owns everything after the previous routine's last code
+            # line (its header comments, org, local defines) through its own
+            # last code line, so editing its header voids its review too.
+            end = last_code(i, nxt) + 1
+            body = '\n'.join(l.rstrip() for l in lines[prev_end:end]).strip()
+            prev_end = end
             found[name] = {
                 'file': str(path), 'note': header_note(lines, i, name),
                 'source_hash': hashlib.sha256(body.encode()).hexdigest()[:12],
