@@ -15609,12 +15609,14 @@ C2Scene_ObjBMateMove:
     JMP C2Scene_ObjBMateFollow
 
 ; $C2:5249 — C2Scene_ObjBMateLand (65 bytes, $5249–$5289)
-; State 5 (C2Scene_MateStLand): moves for C2Scene_LandFrames frames,
-; saving the position; then .State C2Scene_MateStWait, OAM priority 2
+; State 5 (C2Scene_MateStLand): moves until .Frames passes
+; C2Scene_LandFrames, which is $30 frames (C2Scene_TaskRunAll has
+; already counted .Frames to 1 on the frame Follow ended), saving the
+; position; then .State C2Scene_MateStWait, OAM priority 2
 ; (C2Scene_SprAttrPrio2), fractions and velocity 0. C2Anim_Run either
 ; way. (The glide velocity C2Scene_ObjBMateFollow set reaches object
-; B's position after C2Scene_MateGlideFrames frames; this state moves
-; C2Scene_LandFrames frames, one more.)
+; B's position after C2Scene_MateGlideFrames frames, the same $30
+; frames this state moves.)
 ; Callers note: none direct (C2Scene_ObjBMateStates).
 ; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM
 ;        absolute); C2Scene_TaskCur = the task
@@ -16239,7 +16241,8 @@ C2Scene_ObjBMateMarkFollow:
     RTS
 
 ; $C2:55D1 — C2Scene_ObjBMateMarkLand (52 bytes, $55D1–$5604)
-; State 4 (C2Scene_MateMarkStLand): moves for C2Scene_LandFrames frames;
+; State 4 (C2Scene_MateMarkStLand): moves until .Frames passes
+; C2Scene_LandFrames, $30 frames (.Frames is already 1 when it starts);
 ; then .State C2Scene_MateStWait, fractions and velocity 0. C2Anim_Run
 ; either way.
 ; Callers note: none direct (C2Scene_ObjBMateMarkStates).
@@ -16307,7 +16310,8 @@ C2Scene_ObjBMateSavePos:
 ; Task handler (no reference in the bank's code, as the object tasks):
 ; draws string C2Scene_Unk1B58 of C2SceneRom_LabelStrings with the text
 ; window code into a buffer, uploads it to VRAM and shows it as a sprite
-; centred under the party (or under object A while the party is in it).
+; 48 px above the party's position (every piece of its frame at Y
+; offset $D0; or above object A while the party is in it).
 ; C2Scene_Unk1B58 is a ListA entry's byte 2 (C2Scene_GetListAUnk02) or
 ; C2Scene_Unk1B58Spot (C2Scene_ObjASpotWatch), so probably the name of
 ; the place the party is on; not traced further. Runs the
