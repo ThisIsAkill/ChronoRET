@@ -4,7 +4,7 @@ $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the int
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,f56ffa11c897,trampolines and dispatches on Loc_Id.
 $C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,b82aa0cbd435,Loc_Id - Loc_FirstBankC2 is set.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
-$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,readable,28f5bbe014b2,GameLoop_FrameBody: the per-frame field loop.
+$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,readable,e67d24414ed7,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
 $C0:00DE,$C0:00EA,13,Field_EndOfFrameShort,$C0,Engine,verified,2e5dc85b9727,"FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops."
 $C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,verified,c23486c85fdf,"game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail jump, whose RTS returns to this routine's caller)."
@@ -28,6 +28,7 @@ $C0:18D9,$C0:1984,172,Field_PauseAndMenuInput,$C0,Engine,verified,81a5d1737539,"
 $C0:1985,$C0:19C6,66,Field_FadeToBankC2Mode5,$C0,Engine,verified,7a60ad43b399,(was Sub_1985.) Called from Field_PauseAndMenuInput when Pad_Unk00F6 bit 0 is set.
 $C0:19C7,$C0:1A02,60,Field_RunBankC2Mode5,$C0,Engine,verified,7af99c86cc5a,"(was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning of 5 unverified; earlier notes called it ""BG mode 5""), then reloads the field: restore state, re-init changed party members, move a pe"
 $C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,verified,add4c2baa065,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
+$C0:1AAC,$C0:1ADE,51,Field_ActionButton,$C0,Engine,readable,1cd27431bb2f,"(was Field_Unk1AAC.) Per-frame check of the action button: does nothing unless Pad_Unk00F6 bit 7 (A, if Pad_Unk00F6 has the Pad_Pressed layout) is set."
 $C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),verified,c63ce00d7b6b,"Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66, Pad_Unk00F6-F8) is still unidentified, so it keeps its address name."
 $C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,verified,e94e5beac473,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
 $C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,verified,dd25ac14dfe8,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for"
@@ -56,6 +57,10 @@ $C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,verified,8a44e97cd7a2,"(
 $C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,verified,2a8062ed2e09,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
 $C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,verified,698bb554b9b5,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
 $C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,verified,84c4d964684c,"(was Sub_597D.) Runs object Obj_Cur's init function: the first of its 16 function offsets (Evt_Data + Obj_Cur*16, i.e."
+$C0:881E,$C0:8859,60,Field_FrameUpdate,$C0,Engine,readable,fa16bf4176c8,"Field work done every frame, before input-driven checks such as Field_ActionButton: resets Field_UnkEB (the action-button target) to none, then with DP=$1D00 runs Map_ResetUnk1D2E, clears Map_Unk1D2C/"
+$C0:885A,$C0:88E4,139,Field_Unk885A,$C0,Engine,readable,e57d3e91ea71,"A two-step job driven by Field_Unk38, run frame after frame by DefaultHandler's map-redraw path until it clears Field_Unk38: - Field_Unk38 = 1: zero Map_Unk1D2E/1D30/1D32/1D33."
+$C0:88E5,$C0:88ED,9,Map_ResetUnk1D2E,$C0,Engine,readable,8480009531b9,Copies Map_Unk1D2A to Map_Unk1D2E and Map_Unk1D2B to Map_Unk1D30 at the start of every Field_FrameUpdate (so those two hold per-frame values derived from a standing pair; meaning unknown).
+$C0:88EE,$C0:8901,20,Field_DpadDispatch,$C0,Engine,readable,e2d7dae72c17,"Unless Field_Unk38 is busy, runs the Field_DpadHandlerTable entry picked by Pad_Unk00F9 bits 0-3 (16 entries; the D-pad bits, if Pad_Unk00F9 is laid out like Pad_Pressed's high byte), with 8-bit X/Y."
 $C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,verified,fcb380055d6f,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
 $C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,verified,a00b0a1208df,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."
 $C0:B2A8,$C0:B2B1,10,Oam_BucketLoop,$C0,Engine,verified,d57272f16594,

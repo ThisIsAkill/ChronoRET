@@ -116,13 +116,17 @@ if !constants_engine_inc == 0
 !Pad_Start = $01                         ; Pad_Pressed bit 0: Start
 !Pad_HiDown = $04                        ; high byte of Pad_Pressed, bit 2: Down
 !Pad_HiUp = $08                          ; high byte of Pad_Pressed, bit 3: Up
+!Pad_DpadMask = $0F                      ; bits 0-3 of Pad_Unk00F9: Field_DpadDispatch's table index
 !Pad_Unk00F8Bit7 = $80                   ; Pad_Unk00F8 bit 7 (Sub_1ADF sets Field_Unk62 = 3 on it)
 !Pad_Unk00F6Mode5 = $01                  ; Pad_Unk00F6 bit 0: run Field_FadeToBankC2Mode5
                                          ; (Field_PauseAndMenuInput)
 !Pad_Unk00F6Menu = $40                   ; Pad_Unk00F6 bit 6: fade out and call BankC2_Entry8000 with
                                          ; 1 (Field_PauseAndMenuInput); X in the Pad_Pressed layout
-!Pad_Unk00F6Bit7 = $80                   ; Pad_Unk00F6 bit 7: Sub_1ADF clears Field_Unk34 on it (A in
+!Pad_Unk00F6Bit7 = $80                   ; Pad_Unk00F6 bit 7: Field_ActionButton acts on it; Sub_1ADF
+                                         ; clears Field_Unk34 on it (A in
                                          ; the Pad_Pressed layout)
+!Field_Unk34Swallow = $FFFF              ; Field_Unk34 value that makes Field_ActionButton ignore
+                                         ; one press (it then resets Field_Unk34 to 0)
 
 ; --- Audio ---
 !Audio_CmdPlaySfx = $19                  ; Audio_CmdId: play the sound effect in Audio_CmdArg0
@@ -217,6 +221,12 @@ if !constants_engine_inc == 0
                                          ; as this x tile index)
 !Spr_TileRowStep = $10                   ; OAM tile-number step to the next row of 16 tiles
 !Ppu_FirstHiddenLine = $00F0             ; V counter of the first line below the visible screen (240)
+
+; --- Field_Unk885A ---
+!Screen_HalfX = $80                      ; leader Obj_ScreenX low byte at or past this: right half
+!Screen_SplitY = $88                     ; leader Obj_ScreenY low byte at or past this: lower part
+!Map_StepPos = $10                       ; Map_Unk1D2E/1D30 value towards the right / bottom
+!Map_StepNeg = $F0                       ; Map_Unk1D2E/1D30 value towards the left / top (-$10)
 
 ; --- Window effects (Field_EventHook handlers) ---
 !EventHook_WinFixedA1 = $07              ; Field_EventHook value of Field_HookWinFixedA's first frame
