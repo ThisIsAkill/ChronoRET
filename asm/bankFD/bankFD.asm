@@ -28,8 +28,8 @@ incsrc "../hardware.inc"
 ;
 ; Every register write goes through a relocated direct page so each
 ; store is two bytes: first DP=$4200 for the CPU I/O block, then
-; DP=$2100 for the PPU. Most registers are simply zeroed; the few
-; non-zero values are named in hardware.inc.
+; DP=$2100 for the PPU. Most registers are simply zeroed; the non-zero
+; register values are named in hardware.inc (the Mode 7 1.0 is a literal).
 ; ============================================================
 org $FDC000
 
@@ -78,9 +78,10 @@ MainInit:
     LDA.b #FORCED_BLANK
     STA.b INIDISP-!DP_PPU
 
-    ; Step 4 — PPU. Non-zero values: sprite size/base (OBSEL), BG mode,
-    ; the Mode 7 identity matrix, W34SEL, the layer enables (TM/TS) and
-    ; the fixed color's green/blue. Everything else (tilemap and character
+    ; Step 4 — PPU. Non-zero writes: sprite size/base (OBSEL), BG mode,
+    ; the Mode 7 identity matrix (#$01 = 1.0 in the high bytes of A and D),
+    ; W34SEL, the layer enables (TM/TS), and COLDATA (written $C0, which
+    ; sets green and blue to 0). Everything else (tilemap and character
     ; bases, scroll, VRAM address, color math) starts at 0, presumably to
     ; be set by each scene later.
     LDA.b #!OBSEL_Size16And32_Base6000
