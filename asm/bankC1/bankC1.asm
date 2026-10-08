@@ -2887,6 +2887,85 @@ BattleMsg_BlankLeadingZeros:
     RTS
 
 ; ==================================================================
+; BattleSys_UpkeepTwoFrames ($C1106E–$C110E2, 117 bytes)
+; ==================================================================
+; Service 3 of the cross-bank $C10045 service API (dispatch table at
+; $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $106E
+; directly). Runs the battle's per-frame upkeep across two waits:
+;   1. Unless !Battle_UnkA10E is set: clear !Battle_UnkA0FD, and if
+;      !Battle_Unk99CF or !Battle_Unk99D0 is set while !Battle_Unk2989
+;      bit 7 is set, clear both and, the first time only
+;      (!Battle_Unk99D1 latch), send info message $FF then $75.
+;   2. Wait (BattleSys_PumpFrames), service tick, PC upkeep
+;      (Battle_TickPcSlots, with !Battle_UnkA4 saved in !Battle_Unk993B
+;      and taken back from it if that changed), the slot timers and the
+;      battler coordinate cache.
+;   3. Wait and tick again with !Battle_UnkE5 cleared, then set; rebuild
+;      the menu if !BattleMenu_Dirty (the same chain as
+;      BattleMenu_RefreshIfDirtyL, plus clearing !Battle_PadEdgeButtons);
+;      then the slot timers and the coordinate cache once more.
+; What the two message ids show, and what the Unk flags stand for, has
+; not been traced; the "wait" reading of BattleSys_PumpFrames is inferred
+; from its loop (it spins on JSL $CD0036 until $9E is cleared).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher at $C10045,
+;        which saves A, X and Y around the call)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
+;        clobbered, plus whatever the unmatched callees change
+; Callees: BattleMsg_ShowFromTableCC3A09Vec, BattleSys_PumpFrames,
+;          BattleSys_FrameTickVec, Battle_TickPcSlots,
+;          Battle_TickStatusEffectVisuals, Battle_CacheBattlerCoordsAll,
+;          BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
+;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay
+org $C1106E
+BattleSys_UpkeepTwoFrames:
+    LDA.w !Battle_UnkA10E
+    BNE .upkeep
+    STZ.w !Battle_UnkA0FD
+    LDA.w !Battle_Unk99CF
+    ORA.w !Battle_Unk99D0
+    BEQ .upkeep
+    LDA.w !Battle_Unk2989
+    BPL .upkeep
+    STZ.w !Battle_Unk99CF
+    STZ.w !Battle_Unk99D0
+    LDA.w !Battle_Unk99D1
+    BNE .upkeep                     ; message already shown
+    INC.w !Battle_Unk99D1
+    LDA.b #!BattleMsg_InfoNone
+    JSL BattleMsg_ShowFromTableCC3A09Vec
+    LDA.b #!BattleMsg_Info75
+    JSL BattleMsg_ShowFromTableCC3A09Vec
+.upkeep:
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    LDA.b !Battle_UnkA4
+    STA.w !Battle_Unk993B
+    JSR Battle_TickPcSlots
+    LDA.w !Battle_Unk993B
+    CMP.b !Battle_UnkA4
+    BEQ .a4_kept
+    STA.b !Battle_UnkA4             ; take the copy back
+.a4_kept:
+    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_CacheBattlerCoordsAll
+    STZ.b !Battle_UnkE5
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    INC.b !Battle_UnkE5
+    LDA.w !BattleMenu_Dirty
+    BEQ .menu_clean
+    STZ.w !BattleMenu_Dirty
+    JSR BattleMenu_DequeueReadyBattler
+    JSR BattleMenu_UpdateWindows
+    JSR BattleMenu_ProcessInput
+    JSR BattleMenu_UpdateCursorOverlay
+    STZ.b !Battle_PadEdgeButtons
+.menu_clean:
+    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_CacheBattlerCoordsAll
+    RTS
+
+; ==================================================================
 ; BattleMenu_LoadCommandWindowMap ($C11C3A–$C11C49, 16 bytes)
 ; ==================================================================
 ; Copies the $180-byte command window map (!BattleRom_CommandWindowMap,

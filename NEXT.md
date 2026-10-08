@@ -72,3 +72,6 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 
 2. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
 3. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
+
+1. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
+2. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
