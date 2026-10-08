@@ -7,6 +7,7 @@ name the project knows, so the matcher's work is understanding and naming.
 Usage:
     python3 tools/draft.py C1:3714 [C1:3800] [options]
     make draft ADDR=C1:3714 [END=C1:3800] [DRAFT_ARGS="--m 1 --x 0"]
+        (writes build/draft_C13714.asm and runs --check)
 
 Addresses may be written C1:3714, $C1:3714, C13714 or 0xC13714.
 
@@ -42,14 +43,15 @@ What it does:
     constants used in the same context in the existing source (unambiguous
     only; otherwise the literal stays with a TODO). Unknown targets become
     Sub_<addr> names, listed as stub suggestions at the end.
-  * Header skeleton: entry state, exit widths at each return, callers found
-    by a ROM scan (JSR/JMP/BRL in the bank, JSL/JML anywhere; hits inside
-    matched routines are confirmed against their source, others are checked
-    for instruction-boundary alignment), callees.
+  * Header skeleton: entry state, exit widths at each return, callers from
+    tools/xref.py (CONFIRMED sites, in the form the CALLERS lint accepts;
+    unconfirmed byte patterns in unmatched code listed separately), callees,
+    and the direct-page scratch it uses.
+  * --check also runs the readability lint on the drafted routine in the
+    temporary tree and prints what is left per rule.
 """
 
 import argparse
-import csv
 import difflib
 import textwrap
 import os
@@ -67,7 +69,6 @@ from disasm import _OPCODES  # noqa: E402
 ROM_PATH = ROOT / 'roms' / 'chrono_trigger.sfc'
 INCLUDE = ROOT / 'asm' / 'include'
 HARDWARE = ROOT / 'asm' / 'hardware.inc'
-FUNCTIONS_CSV = ROOT / 'symbols' / 'functions.csv'
 
 BRANCHES = {'BPL', 'BMI', 'BVC', 'BVS', 'BCC', 'BCS', 'BNE', 'BEQ'}
 FLOW = BRANCHES | {'BRA', 'BRL', 'JMP', 'JML', 'JSR', 'JSL', 'PER'}
@@ -1106,73 +1107,23 @@ class Renderer:
 
 # ── Callers ─────────────────────────────────────────────────────────────────
 
-def load_functions():
-    rows = []
-    if FUNCTIONS_CSV.exists():
-        with FUNCTIONS_CSV.open() as f:
-            for r in csv.DictReader(f):
-                rows.append((parse_addr(r['address']), parse_addr(r['end']), r['name']))
-    return rows
+def find_callers(start, end):
+    """Call sites of the routine from tools/xref.py: [(addr, kind, routine, status)].
 
-
-def boundary_score(rom, off):
-    """Fraction of nearby decode starts (all four M/X widths) that land on off."""
-    hits = total = 0
-    for back in range(1, 17):
-        s = off - back
-        if s < 0:
-            continue
-        for m in (0, 1):
-            for x in (0, 1):
-                st = State(m, x, 0, 0)
-                p = s
-                while p < off:
-                    mn, mode = _OPCODES[rom[p]]
-                    n = operand_size(mode, st)
-                    p += 1 + n
-                total += 1
-                hits += p == off
-    return hits / total if total else 0
-
-
-def find_callers(rom, kb, target, funcs):
-    tb, tlo = target >> 16, target & 0xFFFF
-    off_t = rom_offset(target)
-    bank_off = off_t & 0xFF0000
-    hits = []
-    lo, hi = tlo & 0xFF, tlo >> 8
-    for p in range(bank_off, bank_off + 0x10000 - 2):
-        b = rom[p]
-        if b in (0x20, 0x4C) and rom[p + 1] == lo and rom[p + 2] == hi:
-            hits.append((p, 'JSR' if b == 0x20 else 'JMP'))
-        elif b == 0x82:
-            rel = rom[p + 1] | rom[p + 2] << 8
-            rel = rel - 65536 if rel >= 32768 else rel
-            if ((p + 3 + rel) & 0xFFFF) == tlo:
-                hits.append((p, 'BRL'))
-    banks = {tb}
-    if tlo >= 0x8000:
-        banks |= {tb & 0x3F, (tb & 0x3F) | 0x80}
-    for p in range(0, len(rom) - 3):
-        b = rom[p]
-        if b in (0x22, 0x5C) and rom[p + 1] == lo and rom[p + 2] == hi and rom[p + 3] in banks:
-            hits.append((p, 'JSL' if b == 0x22 else 'JML'))
+    CONFIRMED sites and DOUBTFUL ones in unmatched code (a byte pattern whose
+    boundary the sweep could not establish) are kept; a DOUBTFUL site inside
+    matched code is proven not to be an instruction and is dropped, and so
+    are sites inside the region itself.
+    """
+    import xref
+    xr = xref.Xref()
     out = []
-    target_name = kb.label_at(target)
-    for p, mn in sorted(hits):
-        addr = 0xC00000 + p
-        owner = None
-        for s, e, name in funcs:
-            if s <= addr <= e:
-                owner = name
-        if owner:
-            text = '\n'.join(kb.source_lines.get(owner, []))
-            ok = target_name is not None and re.search(rf'\b{mn}\s+{re.escape(target_name)}\b', text)
-            if ok:
-                out.append((addr, mn, owner, 'matched'))
-            continue      # inside matched code but not this call: operand bytes
-        score = boundary_score(rom, p)
-        out.append((addr, mn, None, 'aligned' if score >= 0.5 else 'unsure'))
+    for h in xr.xref(rom_offset(start)):
+        addr = 0xC00000 + h.offset
+        if start <= addr <= end:
+            continue
+        if h.status == 'CONFIRMED' or not h.routine:
+            out.append((addr, h.kind, h.routine, h.status))
     return out
 
 
@@ -1248,8 +1199,7 @@ def generate(rom, kb, args, start, end, st0):
     stopped = any('stopped' in m for m in d.flag_at.values())
 
     size = region_end - start + 1
-    funcs = load_functions()
-    callers = [] if args.no_callers else find_callers(rom, kb, start, funcs)
+    callers = [] if args.no_callers else find_callers(start, region_end)
     hdr = [
         f'; {fmt24(start)} — {name} ({size} bytes, ${start & 0xFFFF:04X}–${region_end & 0xFFFF:04X})',
         '; TODO: what it is for (one paragraph), and what each name below means.',
@@ -1265,17 +1215,20 @@ def generate(rom, kb, args, start, end, st0):
     else:
         hdr.append('; Exit:  TODO (no return: ends in a jump)')
     if callers:
-        parts = []
-        for addr, mn, owner, how in callers[:12]:
-            parts.append(f'{mn} {fmt24(addr)}' + (f' ({owner})' if owner else
-                                                   ' (?)' if how == 'unsure' else ''))
-        more = f' and {len(callers) - 12} more' if len(callers) > 12 else ''
-
-        wrapped = textwrap.wrap(', '.join(parts) + more, 88)
+        sure = [c for c in callers if c[3] == 'CONFIRMED']
+        unsure = [c for c in callers if c[3] != 'CONFIRMED']
+        site = lambda c: f'{c[1]} {fmt24(c[0])}' + (f' ({c[2]})' if c[2] else '')  # noqa: E731
+        if len(sure) <= 12:
+            text = ', '.join(site(c) for c in sure) or 'none confirmed'
+        else:
+            text = f'{len(sure)} call sites, e.g. ' + ', '.join(site(c) for c in sure[:8])
+        if unsure:
+            text += '; unconfirmed byte patterns (TODO: check): ' + \
+                ', '.join(f'{c[1]} {fmt24(c[0])}' for c in unsure[:8]) + \
+                (f' and {len(unsure) - 8} more' if len(unsure) > 8 else '')
+        wrapped = textwrap.wrap(text, 88)
         hdr.append('; Callers: ' + wrapped[0])
         hdr += [';          ' + w for w in wrapped[1:]]
-        if any(c[3] == 'unsure' for c in callers):
-            hdr.append(';          ((?) = byte pattern only, instruction boundary not confirmed)')
     elif not args.no_callers:
         hdr.append('; Callers: none found by the ROM scan (TODO: pointer table / indirect?)')
     hdr.append('; Callees: ' + (', '.join(r.callees) if r.callees else 'none'))
@@ -1306,25 +1259,11 @@ def generate(rom, kb, args, start, end, st0):
 # ── Check: assemble the draft in place of the region ────────────────────────
 
 def source_chunks(path: Path):
-    """[(label, first line, end line)] chunks as tools/progress.py cuts them."""
-    lines = path.read_text().splitlines()
-    starts = [i for i, l in enumerate(lines) if GLOBAL.match(l)]
-
-    def is_code(line):
-        s = line.strip()
-        return bool(s) and not s.startswith(';') and (line[:1].isspace() or s.endswith(':')
-                                                      or GLOBAL.match(line) is not None)
-    out, prev_end = [], 0
-    for n, i in enumerate(starts):
-        nxt = starts[n + 1] if n + 1 < len(starts) else len(lines)
-        end = i
-        for j in range(nxt - 1, i - 1, -1):
-            if is_code(lines[j]) and not lines[j].strip().lower().startswith('org'):
-                end = j
-                break
-        out.append((GLOBAL.match(lines[i]).group(1), prev_end, end + 1))
-        prev_end = end + 1
-    return lines, out
+    """[(label, first line, end line)]: each routine's lines as tools/asm_source.py cuts them."""
+    import asm_source
+    regions = asm_source.file_regions(path)
+    lines = regions[0].lines if regions else path.read_text().splitlines()
+    return lines, [(r.name, r.start, r.end) for r in regions]
 
 
 def assemble(tree: Path, fill: int | None, rom: bytes, out: Path):
@@ -1431,8 +1370,21 @@ def check(text, info, kb, rom):
                 return False, f'byte at {fmt24(0xC00000 + off)} is not emitted by the draft'
             if lo_b[off] != rom[off]:
                 return False, f'first mismatch at {fmt24(0xC00000 + off)} (blank base)'
-        return True, f'make diff: {report.splitlines()[-1]}; all {e - s + 1} bytes of ' \
-                     f'{fmt24(start)}–{fmt24(end)} emitted by the draft'
+        msg = f'make diff: {report.splitlines()[-1]}; all {e - s + 1} bytes of ' \
+              f'{fmt24(start)}–{fmt24(end)} emitted by the draft'
+        found = []
+        for n in sorted(defined):
+            lint = subprocess.run([sys.executable, 'tools/lint_readability.py', '--show', n],
+                                  cwd=tree, capture_output=True, text=True)
+            found += [l for l in lint.stdout.splitlines() if l.strip()]
+        rules = {}
+        for l in found:
+            m = re.search(r'\b(ADDR|CALL|CONST|WIDTH|OPCODE|PLUMB|HEADER|CALLERS)\b', l)
+            if m:
+                rules[m.group(1)] = rules.get(m.group(1), 0) + 1
+        msg += '\nlint (what is left for the readability standard): ' + \
+            (', '.join(f'{k} {v}' for k, v in sorted(rules.items())) if rules else 'clean')
+        return True, msg
 
 
 # ── Compare with hand-written source ────────────────────────────────────────

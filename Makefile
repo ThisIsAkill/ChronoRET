@@ -67,10 +67,10 @@ test-hooks:
 # Draft source for an unmatched routine, checked byte-exact, in build/:
 #   make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS="--x 1 --dp 0100 --db 00"]
 draft: check-rom
-	@if [ -z "$(ADDR)" ]; then echo "usage: make draft ADDR=C1:3714 [END=...] [DRAFT_ARGS=...]"; exit 1; fi
+	@if [ -z '$(value ADDR)' ]; then echo "Usage: make draft ADDR=C1:3714 [END=C1:373A] [DRAFT_ARGS='--m 1 --x 0 --dp 0 --db 7E']"; exit 1; fi
 	@mkdir -p $(BUILD_DIR)
-	python3 tools/draft.py $(ADDR) $(END) $(DRAFT_ARGS) --check \
-		-o $(BUILD_DIR)/draft_$(subst :,,$(subst $$,,$(ADDR))).asm
+	@a='$(value ADDR)'; a=$${a#\$$}; out=$(BUILD_DIR)/draft_$$(echo "$$a" | tr -d ':').asm; \
+	python3 tools/draft.py "$$a" $(if $(value END),'$(value END)') $(DRAFT_ARGS) --check -o "$$out"
 
 # What a function needs before it reaches main.
 gate: diff verify lint

@@ -12,7 +12,7 @@ now are structural, not just function-matching:
 - **Bank mapping** — identifying what lives where in ROM, even roughly,
   before anything is matched
 - **Function matching** — the core loop: disassemble → label → verify
-  byte-exact reassembly (see "Workflow" below)
+  byte-exact reassembly (see README "Workflow")
 - **Tooling** — better diffing, automated progress tracking, CI
 - **Data/graphics cataloging** — identifying compressed blobs, tile data,
   and their formats (separate from code matching, but needed eventually)
@@ -64,6 +64,22 @@ includes the one before:
 
 ## Workflow tools
 
+- `make draft ADDR=C1:3714` (`tools/draft.py`) starts a match from source instead of raw
+  bytes. It disassembles the routine from that address until it ends (every path has returned
+  or jumped away and no branch of its own reaches further; `END=C1:373A` fixes the end),
+  tracking M/X, DP and DB, and writes `build/draft_C13714.asm`: asar source with a header
+  skeleton (Entry state, widths at the return, `Callers:` from xref, callees), `.loc_XXXX`
+  labels, and every operand the project already has a name for (RAM and DP defines, struct
+  fields, registers, matched labels and stubs, constants used in the same context elsewhere),
+  with explicit widths. It then assembles the draft in place of the region in a temporary copy
+  of the tree, confirms `make diff` and that every byte of the region is emitted, and prints
+  what the lint still finds. The default entry state is M=1, X=0, DP=0, DB=$7E; pass another
+  with `DRAFT_ARGS="--x 1 --dp 0100 --db 00"`. What is left is the matcher's: every `TODO`
+  (purpose, literals with no name yet, constants it would not guess, the stubs it lists for
+  unknown targets, direct-page aliases), and a check of every name it chose — it names by
+  address and by use elsewhere, not by meaning. Where M/X becomes unknown (a `PLP` without a
+  matching `PHP`, paths that disagree) it stops and says so. `python3 tools/draft.py ADDR
+  --compare` drafts an already matched routine and compares it with the hand-written source.
 - `make xref ADDR=C100D7` (also `$C1:00D7` quoted, or a label; `tools/xref.py`) lists every
   `JSR`/`JMP` (same bank), `JSL`/`JML` (any mirror) and `BRL` to an address, plus 8-bit branches
   with `XREF_FLAGS=--branches` and machine output with `--json`. Each hit is CONFIRMED (on an
@@ -90,31 +106,6 @@ pointer tables, lookup tables) are the cheapest bytes to match:
 **Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
 by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
 revision, so no routine is ever judged by a rule its own author just wrote.
-
-## Workflow
-
-1. Take the first item in [NEXT.md](NEXT.md).
-2. Draft it: `make draft ADDR=C1:3714` (add `END=C1:373A` to fix the end, and
-   `DRAFT_ARGS="--m 1 --x 1 --dp 0100 --db 00"` when the routine is entered in another CPU
-   state; the default is M=1, X=0, DP=0, DB=$7E). `tools/draft.py` disassembles the routine,
-   tracking M/X, DP and DB, and writes `build/draft_<addr>.asm`: asar source with a header
-   skeleton (entry state, widths at the return, callers from a ROM scan, callees), local
-   labels, and every operand the project already has a name for (RAM, structs, registers,
-   labels and stubs, constants used in the same context) written with its explicit width.
-   `make draft` also assembles the draft in place of the region in a temporary copy of the tree
-   and confirms `make diff` and full coverage of the region, so you start from source that is
-   already byte-exact.
-3. Work through the TODOs: what the routine is for, names for the operands left as literals,
-   constants the draft could not pick unambiguously, the stubs it lists for unknown call
-   targets (into `asm/include/unmatched*.asm`), and the direct-page aliases. Check every name
-   it chose: it names by address and by usage elsewhere, not by meaning. A width the draft
-   could not track (a `PLP` without a matching `PHP`, two paths that disagree) is flagged
-   where it stopped; rerun with the right state or an `END`.
-4. Move the result into the bank file, then `make gate` and review (see "Definition of done").
-
-`python3 tools/draft.py ADDR [END] --compare` drafts a routine that is already matched and
-compares its operands with the hand-written source: a quick way to see what the draft gets
-right and where it guesses.
 
 ## Getting started
 
