@@ -82,6 +82,27 @@ $C0:5B71,$C0:5B78,8,Map_LeaderPastRowMin,$C0,Engine,verified,59e99458658a,Map_Un
 $C0:5B79,$C0:5B85,13,Map_LeaderPastColMax,$C0,Engine,verified,cf5293197ab6,Map_Unk9175's test for a rightward step: C=1 when the leader's Obj_TileX >= Map_Unk1D1B.
 $C0:5B86,$C0:5B8C,7,Map_LeaderPastColMin,$C0,Engine,verified,6425a3892d59,Map_Unk9175's test for a leftward step: C=1 when the leader's Obj_TileX <= Map_Unk1D1A.
 $C0:75A0,$C0:75E8,73,Map_ClearBufC800,$C0,Engine,verified,2728cb0be397,"(was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800 ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN copies the 32 zero bytes at GfxRom_D2 to its start, and each later MVN "
+$C0:75E9,$C0:7611,41,Field_BuildC800Mode1,$C0,Engine,verified,c7ebcbbda807,"Map layer redraws, row / column writers and edge VRAM addresses ($C0:75E9–$C0:8242) The map sits in WRAM as metatile numbers."
+$C0:7612,$C0:77E3,466,Map_WriteRow1,$C0,Engine,verified,a189f7820a44,Writes one row of layer-1 tilemap words to WMDATA (WRAM at WMADD).
+$C0:77E4,$C0:78EB,264,Map_WriteCol1,$C0,Engine,verified,aefc8baf84e6,"Writes one column of layer-1 tilemap words to WMDATA, top to bottom."
+$C0:78EC,$C0:79CE,227,Field_BuildC800Mode2,$C0,Engine,verified,93def3629ef4,"Redraws layer 2 into Map_BufC800 (WMADD = $7E:C800) with Map_WriteRow2, 16 metatiles (Map_RedrawLen) per row, one of three ways: - Map_LayerEdgeOff bit 1 clear, Map_Unk0BC9 bit 7 clear: as Field_Build"
+$C0:79CF,$C0:7BA8,474,Map_WriteRow2,$C0,Engine,verified,315002fd102e,"As Map_WriteRow1 for layer 2: masks Map_RowMask2 / Map_ColMask2, the number's low byte from Map_Layer2Tiles and bit 8 from Map_TileHiBits bit 1, Map_Meta12* words."
+$C0:7BA9,$C0:7CB4,268,Map_WriteCol2,$C0,Engine,verified,29641e1805c6,"As Map_WriteCol1 for layer 2 (Map_RowMask2 / Map_ColMask2, Map_Layer2Tiles, Map_TileHiBits bit 1, Map_Meta12*); an odd first row also gives 2 x Map_BuildLen + 1 words."
+$C0:7CB5,$C0:7D65,177,Field_BuildC800Mode4,$C0,Engine,verified,5295bbdce70e,"As Field_BuildC800Mode2 for layer 3 with Map_WriteRow3, without the half-rate path: Map_LayerEdgeOff bit 2 clear redraws 32 rows from Map_TileOriginY / Map_TileOriginX; set builds the fixed map, the s"
+$C0:7D66,$C0:7E5F,250,Map_WriteRow3,$C0,Engine,verified,7681d4d3c12b,"As Map_WriteRow1 for layer 3: masks Map_RowMask3 / Map_ColMask3, an 8-bit metatile number from Map_Layer3Tiles (zero-extended), words from Map_Meta3*."
+$C0:7E60,$C0:7F57,248,Map_WriteCol3,$C0,Engine,verified,745926caad41,"As Map_WriteCol1 for layer 3 (Map_RowMask3 / Map_ColMask3, Map_Layer3Tiles zero-extended, Map_Meta3*); an odd first row gives 2 x Map_BuildLen + 1 words."
+$C0:7F58,$C0:7F5C,5,Map_UploadBufTo7400,$C0,Engine,verified,f112c7872e59,"Sends Map_BufC800 to VRAM through VramDma_Upload (VramDma_Mode 1, source $7E:C800): Map_UploadBufTo7400 ($7F58)  2 KB to VRAM word $7400; Map_UploadBufTo7000 ($7F5D)  2 KB to VRAM word $7000; Map_Uplo"
+$C0:7F5D,$C0:7F5F,3,Map_UploadBufTo7000,$C0,Engine,verified,bc29931b13b6,
+$C0:7F60,$C0:7F61,2,Map_UploadBufToX,$C0,Engine,verified,2acd676a2626,
+$C0:7F62,$C0:7F66,5,Map_UploadBuf2K,$C0,Engine,verified,2dd523865927,
+$C0:7F67,$C0:7F76,16,Map_UploadBuf_Tail,$C0,Engine,verified,c4007976d364,
+$C0:7F77,$C0:7F7D,7,Map_UploadBuf4K,$C0,Engine,verified,edc676ea22bc,
+$C0:7F7E,$C0:7F99,28,LocLoad_ClearPage1D00,$C0,Engine,verified,314c9d23a014,"Zeroes the 256 bytes at $00:1D00-$1DFF (the map page !DP_Map, low WRAM) with ClearRAMDMA: DmaFill_Size = $0100, DmaFill_Dest = $1D00, DmaFill_Bank = $00."
+$C0:7F9A,$C0:813C,419,Sub_C07F9A,$C0,Engine (unnamed),verified,a362aba56788,Purpose not established (no reader of its results traced).
+$C0:813D,$C0:81A0,100,Bg_RowSpan64x32,$C0,Engine,verified,cbe74e63228c,"Splits a run of 34 tilemap words (Map_EdgeRowTiles) along row Y from column A of a 64x32 tilemap (two 32x32 screens, the right one Bg_ScreenWords further on) into pieces contiguous in VRAM."
+$C0:81A1,$C0:81D5,53,Bg_RowSpan64x32Addr,$C0,Engine,verified,c90adb3bcefa,"The addresses of Bg_RowSpan64x32 without the sizes, in other registers: X = word offset of (A, Y), A = offset of the start of row Y in the other screen, Y = X - 31 (the third piece's address; the star"
+$C0:81D6,$C0:8217,66,Bg_ColSpan64x32,$C0,Engine,verified,02b8350daa4d,"Splits a 32-word column of the 64x32 tilemap, column A from row Y and wrapping at the screen's bottom, into two pieces: X = word offset of (A, Y), Y = offset of (A, row 0) in the same screen; Map_Span"
+$C0:8218,$C0:8242,43,Bg_ColSpan64x32Addr,$C0,Engine,verified,a1cd961e46e9,"The addresses of Bg_ColSpan64x32 without the sizes: X = word offset of (A, Y), A = offset of (A, row 0) in the same screen."
 $C0:8243,$C0:8262,32,Map_BuildRowYInc1,$C0,Engine,verified,f34cad52ae85,"Layer-1 row for a rising Y scroll: WMADD = Map_BufC800, Map_BuildCol = Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow = Map_Unk1D10; runs Map_WriteRow1 and sets bit 0 in Map_BuiltRow"
 $C0:8263,$C0:8284,34,Map_BuildRowYInc2,$C0,Engine,verified,2886bc6e442e,"Layer-2 row for a rising Y scroll: WMADD = Map_BufD000, Map_BuildCol = Map_TileOriginX - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow = Map_Unk1D10; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRow"
 $C0:8285,$C0:82A4,32,Map_BuildRowYInc2Half,$C0,Engine,verified,5a394232a07a,"Layer-2 row for a rising Y scroll: WMADD = Map_BufD000, Map_BuildCol = Map_Unk1D12 - 1, Map_BuildLen = Map_EdgeRowLen, Map_BuildRow = Map_Unk1D18; runs Map_WriteRow2 and sets bit 1 in Map_BuiltRowYInc"

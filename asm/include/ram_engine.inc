@@ -390,6 +390,13 @@ if !ram_engine_inc == 0
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5),
                                          ; cleared after (Field_FadeInAfterReload,
                                          ; Field_RunBankC2Mode5)
+!Map_Unk0BCF = $0BCF                     ; 8-bit; Field_BuildC800Mode2 (layer edges off) compares it
+                                         ; with 16: unequal builds the right-hand 32 columns
+                                         ; (probably layer 2's width in metatiles; setter not traced)
+!Map_Unk0BD1 = $0BD1                     ; 8-bit; as Map_Unk0BCF: unequal builds rows 32-63 (probably
+                                         ; layer 2's height in metatiles)
+!Map_Unk0BD3 = $0BD3                     ; 8-bit; as Map_Unk0BCF for layer 3 (Field_BuildC800Mode4)
+!Map_Unk0BD5 = $0BD5                     ; 8-bit; as Map_Unk0BD1 for layer 3 (Field_BuildC800Mode4)
 !Map_Unk0BC9 = $0BC9                     ; 8-bit; bit 7 set: Map_Unk93E1 moves layer 2 with the
                                          ; half-rate steppers (Map_Scroll2*Half) and the matching
                                          ; edge builders; who sets it is not traced
@@ -628,6 +635,26 @@ if !ram_engine_inc == 0
                                          ; column); values $E6/$EC/$EE/$FA/$FC select tile-animation
                                          ; modes. "Props" is a guess: matched code only uses it for
                                          ; tile-animation states
+!Map_Layer2Tiles = $7E3040              ; as Map_TileProps for layer 2: the low 8 bits of each
+                                         ; tile's metatile number, row stride $100 (read by
+                                         ; Map_WriteRow2/Col2; inferred: the three layers sit side by
+                                         ; side in each 256-byte map row, layer 1 at +$00)
+!Map_Layer3Tiles = $7E3080              ; as Map_Layer2Tiles for layer 3 (Map_WriteRow3/Col3); the
+                                         ; full metatile number, 0-255
+!Map_TileHiBits = $7E30C0               ; per map tile, same index as Map_TileProps: bit 0 is bit 8
+                                         ; of the layer-1 metatile number, bit 1 of layer 2's
+                                         ; (Map_WriteRow1/2, Map_WriteCol1/2)
+!Map_Meta12TL = $7EB000                 ; metatile table of layers 1 and 2: 8 bytes per 16x16
+                                         ; metatile (index = number x 8), four tilemap words;
+                                         ; this one the top-left 8x8 tile (inferred from which
+                                         ; words a top / bottom half and a left / right half write)
+!Map_Meta12TR = $7EB002                 ; top-right word of a Map_Meta12TL entry
+!Map_Meta12BL = $7EB004                 ; bottom-left word
+!Map_Meta12BR = $7EB006                 ; bottom-right word
+!Map_Meta3TL = $7EC000                  ; as Map_Meta12TL for layer 3 (256 metatiles)
+!Map_Meta3TR = $7EC002                  ; as Map_Meta12TR for layer 3
+!Map_Meta3BL = $7EC004                  ; as Map_Meta12BL for layer 3
+!Map_Meta3BR = $7EC006                  ; as Map_Meta12BR for layer 3
 
 ; --- Map / BG (page $1D00, also used as a direct page) ---
 !Map_TileOriginX = $1D0A                 ; 16-bit; subtracted from (map column x 2) before wrapping
@@ -771,6 +798,14 @@ if !ram_engine_inc == 0
                                          ; it + 1; Map_StepStopUp against Map_TileOriginY / 2)
 !Map_Unk1D1D = $1D1D                     ; 8-bit row: as Map_Unk1D1A downwards (leader Obj_TileY >
                                          ; it; Map_StepStopDown against Map_Unk1D10 / 2)
+!Map_ColMask1 = $1D1E                    ; 8-bit AND mask on layer 1's metatile column in
+                                         ; Map_WriteRow1/Col1 (wraps the column; probably the
+                                         ; layer's width - 1; setter not traced)
+!Map_RowMask1 = $1D1F                    ; 8-bit; as Map_ColMask1 for layer 1's metatile row
+!Map_ColMask2 = $1D20                    ; 8-bit; as Map_ColMask1 for layer 2 (Map_WriteRow2/Col2)
+!Map_RowMask2 = $1D21                    ; 8-bit; as Map_RowMask1 for layer 2
+!Map_ColMask3 = $1D22                    ; 8-bit; as Map_ColMask1 for layer 3 (Map_WriteRow3/Col3)
+!Map_RowMask3 = $1D23                    ; 8-bit; as Map_RowMask1 for layer 3
 !Map_Drift1X = $1D24                     ; 8-bit signed amount Map_Unk91AC adds to Map_Acc1X every
                                          ; frame; Map_Drift1X..Map_Drift3Y are zeroed when
                                          ; Map_DriftTimer runs out
@@ -840,12 +875,31 @@ if !ram_engine_inc == 0
 !Map_StepTestN = $1D52                   ; 8-bit scratch of the Map_StepStop* tests: the step / 16
                                          ; (Down, Right) or Map_TileOriginY/X / 2 (Up, Left)
 !Map_StepTestN2 = $1D54                  ; 8-bit scratch of Map_StepStopUp/Left: the step / 16
+!Map_WrCol = $1D52                       ; alias of Map_StepTestN: 8-bit scratch of the row / column
+                                         ; writers (Map_WriteRow*/Col*): the metatile column
+                                         ; (Map_BuildCol / 2, masked with the layer's column mask)
+!Map_WrRow = $1D54                       ; alias of Map_StepTestN2: the writers' metatile row
+!Map_SpanRowOfs = $1D52                  ; alias of Map_StepTestN, 16-bit: row x 32, the tilemap
+                                         ; offset of a row, in the Bg_*Span64x32 helpers
 !Map_BuildCol = $1D58                    ; 8-bit argument of the row / column writers ($C0:7612 ...):
                                          ; the first column of a row, or the column of a column
                                          ; (Map_Build*); units as the writers use them, not traced
 !Map_BuildRow = $1D5A                    ; 8-bit; as Map_BuildCol: the row, or the first row of a
                                          ; column
 !Map_BuildLen = $1D5C                    ; 8-bit; as Map_BuildCol: how many entries to write
+                                         ; (in metatiles, two 8x8 tilemap words each; see the writers)
+!Map_RowsLeft = $1D5E                    ; 8-bit row counter of Field_BuildC800Mode1/2/4
+!Map_SpanWrapVram = $1D5E                ; 16-bit, the same bytes as Map_RowsLeft at another time:
+                                         ; Bg_RowSpan64x32's third piece (row start of the first
+                                         ; piece's screen), read by Sub_C07F9A
+!Map_SpanCol = $1D62                     ; 16-bit argument copy of the Bg_*Span64x32 helpers: the
+                                         ; tilemap column (0-63); scratch (Map_Unk8A6D uses
+                                         ; $1D62-$1D68 for other things)
+!Map_SpanRow = $1D64                     ; 16-bit; Bg_ColSpan64x32's row (0-31)
+!Map_SpanLen3 = $1D6A                    ; 16-bit; Bg_RowSpan64x32: bytes in the third piece (2 or 0)
+!Map_SpanLen1 = $1D6C                    ; 16-bit; Bg_RowSpan64x32 / Bg_ColSpan64x32: bytes in the
+                                         ; first piece (to the end of the screen's row / column)
+!Map_SpanLen2 = $1D6E                    ; 16-bit; as Map_SpanLen1 for the second piece
 !Map_StepCount = $1D66                   ; 8-bit loop counter of the Map_Scroll* steppers (pixels
                                          ; left to step); a scratch byte, other unmatched code
                                          ; uses $1D66 as a 16-bit value
@@ -866,8 +920,15 @@ if !ram_engine_inc == 0
 !Map_BuiltColXDec = $1D7B                ; 8-bit; as Map_BuiltRowYInc for Map_BuildColXDec*
 !Map_TilemapVram3 = $1D7E                ; 16-bit tilemap VRAM base the NMI uses for redraw step 2
                                          ; (Field_MapRedrawDone = 2)
+!Map_TilemapVramL3 = $1D80               ; 16-bit tilemap VRAM base of layer 3 (Sub_C07F9A adds it
+                                         ; as Map_TilemapVram for layer 1; $C0:0AD5 uploads the
+                                         ; Field_BuildC800Mode4 buffer there)
 !Map_TilemapVram4 = $1D84                ; 16-bit; its high byte is ORed into Hdma_Unk7F14F1 when
                                          ; hook 12 ends
+!Map_Unk1D86 = $1D86                     ; 8-bit; 1 from $C0:0A8B (with $1D84 and $1D85);
+                                         ; Field_BuildC800Mode4 stores 2 when it builds rows 32-63
+                                         ; (probably layer 3's BGnSC size bits, 2 = 32x64, as the
+                                         ; high byte of Map_TilemapVram4 is for layer 2)
 !Map_Unk1D87 = $1D87                     ; 16-bit; layer 1 X scroll in pixels (probably): first of
                                          ; the six words $1D87-$1D91 that $C0:06F1 copies to
                                          ; $7E:2C5A; Map_Scroll1XInc/XDec step it by 1 per pixel of
@@ -903,6 +964,22 @@ if !ram_engine_inc == 0
                                          ; Map_EdgeRowsY*)
 !Map_BgColBias3 = $1D9D                  ; 8-bit; as Map_BgColBias2 for layer 3
 !Map_BgRowBias3 = $1D9E                  ; 8-bit; as Map_BgRowBias2 for layer 3
+!Map_EdgeVram1 = $1D9F                   ; 10 words: tilemap VRAM word addresses Sub_C07F9A computes
+                                         ; for layer 1 (Map_TilemapVram + the Bg_*Span64x32
+                                         ; results): +0/+2/+4 the row at Map_BgRowBias from column
+                                         ; Map_BgColBias - 1 (three pieces), +6/+8/+10 the row
+                                         ; 28 further down (mod 32), +12/+14 the column Map_BgColBias from row
+                                         ; Map_BgRowBias - 1, +16/+18 the column 32 to the right.
+                                         ; Probably the NMI's edge DMA targets; reader not traced
+!Map_EdgeVram2 = $1DB3                   ; 10 words; as Map_EdgeVram1 for layer 2
+                                         ; (Map_BgColBias2/RowBias2, Map_TilemapVram3)
+!Map_EdgeVram3 = $1DC7                   ; 10 words; as Map_EdgeVram1 for layer 3
+                                         ; (Map_BgColBias3/RowBias3, Map_TilemapVramL3)
+!Map_EdgeSize1 = $1DDB                   ; 5 words: byte counts Sub_C07F9A stores with
+                                         ; Map_EdgeVram1: +0/+2/+4 the row's three pieces, +6/+8
+                                         ; the column's two (Map_SpanLen1/2/3)
+!Map_EdgeSize2 = $1DE5                   ; 5 words; as Map_EdgeSize1 for layer 2
+!Map_EdgeSize3 = $1DEF                   ; 5 words; as Map_EdgeSize1 for layer 3
 !Map_Unk1DFB = $1DFB                     ; 8-bit; Map_Scroll3YInc / YDec add / subtract 4 per pixel
                                          ; of layer-3 Y scroll; readers not traced
 !Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0

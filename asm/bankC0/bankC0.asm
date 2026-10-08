@@ -6496,6 +6496,2045 @@ Map_ClearBufC800:
     RTS
 
 ; ============================================================
+; Map layer redraws, row / column writers and edge VRAM addresses
+; ($C0:75E9–$C0:8242)
+; The map sits in WRAM as metatile numbers. Each 256-byte row of
+; $7E:3000 holds layer 1 at +$00 (Map_TileProps), layer 2 at +$40
+; (Map_Layer2Tiles), layer 3 at +$80 (Map_Layer3Tiles) and at +$C0 the
+; high bits (Map_TileHiBits: bit 0 / bit 1 = bit 8 of the layer-1 /
+; layer-2 number), inferred from the writers' reads. A 16x16 metatile is
+; 8 bytes in Map_Meta12* (layers 1 and 2) or Map_Meta3* (layer 3): four
+; tilemap words, top-left, top-right, bottom-left, bottom-right
+; (inferred from which words a top / bottom and left / right half
+; write). The six writers turn a run of the map into tilemap words and
+; send them to WMDATA. The redraws Field_BuildC800Mode1/2/4 write a
+; whole screen into Map_BufC800; the edge builders (Map_Build*, after
+; this block) write one row or column into a layer's edge buffer.
+; Map_UploadBuf* send Map_BufC800 to VRAM, and Sub_C07F9A with the
+; Bg_*Span64x32 helpers computes the tilemap VRAM addresses of the
+; edges. Layers 1-3 as in ram_engine.inc's map page notes.
+; ============================================================
+org $C075E9
+; ------------------------------------------------------------
+; $C0:75E9 — Field_BuildC800Mode1 (41 bytes, $75E9–$7611)
+; Redraws layer 1 into Map_BufC800: points WMADD at $7E:C800 and writes
+;   32 rows (Map_RedrawRows) of 16 metatiles (Map_RedrawLen: 32 tilemap
+;   words, 64 bytes) with Map_WriteRow1, from row Map_TileOriginY and
+;   column Map_TileOriginX: 2,048 bytes, the whole buffer.
+; Callers: DefaultHandler ($C0:17A9, $C0:17FE, $C0:183E),
+;   Field_HookLeaveToBankC3 ($C0:2617), Field_HookWinPulse ($C0:2658)
+;   and unmatched code at $C0:0A96.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+;   (WMADDL/H here and WMDATA in Map_WriteRow1 are written absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_RowsLeft = 0, Map_BuildRow
+;   advanced by 32, Map_BuildLen = 0; A, X, Map_WrCol and Map_WrRow
+;   clobbered by Map_WriteRow1; Y unchanged.
+; ------------------------------------------------------------
+Field_BuildC800Mode1:
+    REP #$20
+    LDA.w #!Map_BufC800&$FFFF
+    STA.w WMADDL
+    SEP #$20
+    LDA.b #$00
+    STA.w WMADDH
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawRows
+    STA.b !Map_RowsLeft-!DP_Map
+.row_loop:
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow1
+    INC.b !Map_BuildRow-!DP_Map
+    DEC.b !Map_RowsLeft-!DP_Map
+    BNE .row_loop
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7612 — Map_WriteRow1 (466 bytes, $7612–$77E3)
+; Writes one row of layer-1 tilemap words to WMDATA (WRAM at WMADD).
+;   Arguments in 8x8-tile units: Map_BuildRow (bit 0, Map_HalfTileBit,
+;   picks the top or bottom half of metatile row Map_BuildRow / 2),
+;   Map_BuildCol (bit 0 set: start with a right half) and Map_BuildLen in
+;   metatiles. The metatile row and column are ANDed with Map_RowMask1 /
+;   Map_ColMask1, the column again at every step (so it wraps). Each
+;   metatile's 9-bit number (Map_TileProps, bit 8 from Map_TileHiBits
+;   bit 0) times 8 indexes Map_Meta12*; a top half writes its TL and TR
+;   words, a bottom half BL and BR.
+;   An even start writes Map_BuildLen whole metatiles. An odd start
+;   writes the right word of the first metatile, Map_BuildLen - 1 whole
+;   ones, and then one more word, again a right word (TR / BR) of the
+;   next metatile where a left one would continue the row. Kept as is:
+;   both give 2 x Map_BuildLen words, and the edge rows start one column
+;   left of the screen, so that word probably lands off-screen (not
+;   traced).
+; Quirk: on an odd start the count is decremented once before the loop
+;   tests it, so Map_BuildLen = 1 would run 256 more metatiles; callers
+;   pass Map_RedrawLen or Map_EdgeRowLen.
+; Callers: Field_BuildC800Mode1 ($C0:7608), Map_BuildRowYInc1 ($C0:825B)
+;   and Map_BuildRowYDec1 ($C0:82DD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the map index row << 8 |
+;   column, then the Map_Meta12* offset), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildLen = 0; Map_WrRow =
+;   the masked metatile row, Map_WrCol = the last or next metatile
+;   column; A and X clobbered; Y unchanged; WMADD advanced past the
+;   words written.
+; ------------------------------------------------------------
+Map_WriteRow1:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .top_half
+    BRL .bottom_half
+.top_half:
+    LSR A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .top_odd
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.top_even_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .top_done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .top_even_loop
+.top_done:
+    RTS
+.top_odd:
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    DEC.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.top_odd_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .top_odd_last
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .top_odd_loop
+.top_odd_last:
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+.done:
+    RTS
+.bottom_half:
+    LSR A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .bottom_odd
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.bottom_even_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .bottom_even_loop
+.bottom_odd:
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    DEC.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.bottom_odd_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .bottom_odd_last
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .bottom_odd_loop
+.bottom_odd_last:
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    RTS
+
+; ------------------------------------------------------------
+; $C0:77E4 — Map_WriteCol1 (264 bytes, $77E4–$78EB)
+; Writes one column of layer-1 tilemap words to WMDATA, top to bottom.
+;   Map_BuildCol bit 0 picks the left words (TL, BL) or the right ones
+;   (TR, BR) of metatile column Map_BuildCol / 2; Map_BuildRow is the
+;   first 8x8 row and Map_BuildLen counts metatiles. Each step writes a
+;   metatile's top and bottom word and moves one metatile row down (ANDed
+;   with Map_RowMask1, so it wraps). An odd first row writes the bottom
+;   word of the first metatile alone and then Map_BuildLen whole ones:
+;   2 x Map_BuildLen + 1 words, against 2 x Map_BuildLen for an even
+;   start. Lookup as Map_WriteRow1 (Map_TileProps, Map_TileHiBits bit 0,
+;   Map_Meta12*).
+; Callers: Map_BuildColXInc1 ($C0:835D) and Map_BuildColXDec1 ($C0:83DD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildLen = 0; Map_WrCol =
+;   the masked metatile column, Map_WrRow = the last metatile row; A and
+;   X clobbered; Y unchanged; WMADD advanced past the words written.
+; ------------------------------------------------------------
+Map_WriteCol1:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .even_row
+    BRL .odd_row
+.even_row:
+    LSR A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .right_start
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.left_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BL,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BL+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .left_loop
+.right_start:
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.right_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .right_loop
+.done:
+    RTS
+.odd_row:
+    LSR A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .odd_row_right
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .left_loop
+.odd_row_right:
+    LSR A
+    AND.b !Map_ColMask1-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    AND.b #$01
+    XBA
+    LDA.l !Map_TileProps,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask1-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .right_loop
+
+; ------------------------------------------------------------
+; $C0:78EC — Field_BuildC800Mode2 (227 bytes, $78EC–$79CE)
+; Redraws layer 2 into Map_BufC800 (WMADD = $7E:C800) with
+;   Map_WriteRow2, 16 metatiles (Map_RedrawLen) per row, one of three ways:
+;   - Map_LayerEdgeOff bit 1 clear, Map_Unk0BC9 bit 7 clear: as
+;     Field_BuildC800Mode1 (32 rows from Map_TileOriginY, column
+;     Map_TileOriginX: layer 1's origin, as the normal-rate builders).
+;   - bit 1 clear, Map_Unk0BC9 bit 7 set (half-rate layer 2): rows
+;     Map_Unk1D16 through Map_Unk1D18 from column Map_Unk1D12.
+;   - Map_LayerEdgeOff bit 1 set (no edge builds for the layer): a fixed
+;     map from row 0, column 0. Rows 0-31 (2 KB), then a second 2 KB:
+;     columns 32-63 when Map_Unk0BCF is not 16 (Map_ScreenMetatiles),
+;     else rows 32-63 when Map_Unk0BD1 is not 16 (and the high byte of
+;     Map_TilemapVram4 set to 2), else rows 0-31 again. The second block
+;     runs past $7E:CFFF into Map_BufD000's space; $C0:0ABB then uploads
+;     4 KB (Map_UploadBuf4K) when the bit is set.
+; Quirk: the two layer-2-moving paths start with a REP #$20 that the
+;   SEP #$20 after the branch undoes at once; kept.
+; Callers: DefaultHandler ($C0:17D2, $C0:1817) and unmatched code at
+;   $C0:0AAB.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+;   (Map_LayerEdgeOff, Map_Unk0BC9, Map_Unk0BCF/0BD1, WMADD and WMDATA
+;   are absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildCol/Row/Len, A, X,
+;   Map_WrCol and Map_WrRow clobbered (Map_RowsLeft = 0 on the first
+;   path); Y unchanged.
+; ------------------------------------------------------------
+Field_BuildC800Mode2:
+    REP #$20
+    LDA.w #!Map_BufC800&$FFFF
+    STA.w WMADDL
+    SEP #$20
+    LDA.b #$00
+    STA.w WMADDH
+    LDA.w !Map_LayerEdgeOff
+    BIT.b #!Map_Layer2
+    BEQ .not_edge_off
+    BRL .edge_off
+.not_edge_off:
+    LDA.w !Map_Unk0BC9
+    BMI .half_rate
+    REP #$20
+    BRA .normal_rate
+.half_rate:
+    REP #$20
+    BRL .half_rate_rows
+.normal_rate:
+    SEP #$20
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawRows
+    STA.b !Map_RowsLeft-!DP_Map
+.normal_row_loop:
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    INC.b !Map_BuildRow-!DP_Map
+    DEC.b !Map_RowsLeft-!DP_Map
+    BNE .normal_row_loop
+    RTS
+.half_rate_rows:
+    SEP #$20
+    LDA.b !Map_Unk1D12-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_Unk1D16-!DP_Map
+.half_row_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b !Map_Unk1D12-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b !Map_Unk1D18-!DP_Map
+    BCC .half_row_loop
+    BEQ .half_row_loop
+    RTS
+.edge_off:
+    SEP #$20
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.screen0_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .screen0_loop
+    BEQ .screen0_loop
+    LDA.w !Map_Unk0BCF
+    CMP.b #!Map_ScreenMetatiles
+    BNE .right_screen
+    LDA.w !Map_Unk0BD1
+    CMP.b #!Map_ScreenMetatiles
+    BNE .lower_screen
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.repeat_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .repeat_loop
+    BEQ .repeat_loop
+    RTS
+.right_screen:
+    LDA.b #!Bg_ScreenWidth
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.right_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #!Bg_ScreenWidth
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .right_loop
+    BEQ .right_loop
+    RTS
+.lower_screen:
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Bg_ScreenHeight
+.lower_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow2
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow2
+    BCC .lower_loop
+    BEQ .lower_loop
+    LDA.b #$02
+    STA.b !Map_TilemapVram4+1-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:79CF — Map_WriteRow2 (474 bytes, $79CF–$7BA8)
+; As Map_WriteRow1 for layer 2: masks Map_RowMask2 / Map_ColMask2, the
+;   number's low byte from Map_Layer2Tiles and bit 8 from Map_TileHiBits
+;   bit 1, Map_Meta12* words. The same odd-start ending (a second right
+;   word) and the same Map_BuildLen = 1 quirk.
+; Callers: Field_BuildC800Mode2 ($C0:7925, $C0:793D, $C0:795A,
+;   $C0:7982, $C0:799D, $C0:79BA), Map_BuildRowYInc2 ($C0:827D),
+;   Map_BuildRowYInc2Half ($C0:829D), Map_BuildRowYDec2 ($C0:82FD) and
+;   Map_BuildRowYDec2Half ($C0:831D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: as Map_WriteRow1: M=1, X=0, DP and DB unchanged; Map_BuildLen =
+;   0; Map_WrRow / Map_WrCol changed; A and X clobbered; Y unchanged.
+; ------------------------------------------------------------
+Map_WriteRow2:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .top_half
+    BRL .bottom_half
+.top_half:
+    LSR A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .top_odd
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.top_even_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .top_done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .top_even_loop
+.top_done:
+    RTS
+.top_odd:
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    DEC.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.top_odd_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12TR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .top_odd_last
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .top_odd_loop
+.top_odd_last:
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+.done:
+    RTS
+.bottom_half:
+    LSR A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .bottom_odd
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.bottom_even_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .bottom_even_loop
+.bottom_odd:
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    DEC.b !Map_BuildLen-!DP_Map
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.bottom_odd_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .bottom_odd_last
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .bottom_odd_loop
+.bottom_odd_last:
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7BA9 — Map_WriteCol2 (268 bytes, $7BA9–$7CB4)
+; As Map_WriteCol1 for layer 2 (Map_RowMask2 / Map_ColMask2,
+;   Map_Layer2Tiles, Map_TileHiBits bit 1, Map_Meta12*); an odd first
+;   row also gives 2 x Map_BuildLen + 1 words.
+; Callers: Map_BuildColXInc2 ($C0:837D), Map_BuildColXInc2Half
+;   ($C0:839D), Map_BuildColXDec2 ($C0:83FD) and Map_BuildColXDec2Half
+;   ($C0:841D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: as Map_WriteCol1: M=1, X=0, DP and DB unchanged; Map_BuildLen =
+;   0; Map_WrCol / Map_WrRow changed; A and X clobbered; Y unchanged.
+; ------------------------------------------------------------
+Map_WriteCol2:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .even_row
+    BRL .odd_row
+.even_row:
+    LSR A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .right_start
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.left_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BL,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BL+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .left_loop
+.right_start:
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.right_loop:
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta12BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .right_loop
+.done:
+    RTS
+.odd_row:
+    LSR A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .odd_row_right
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .left_loop
+.odd_row_right:
+    LSR A
+    AND.b !Map_ColMask2-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_TileHiBits,X
+    LSR A
+    AND.b #$01
+    XBA
+    LDA.l !Map_Layer2Tiles,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta12BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask2-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .right_loop
+
+; ------------------------------------------------------------
+; $C0:7CB5 — Field_BuildC800Mode4 (177 bytes, $7CB5–$7D65)
+; As Field_BuildC800Mode2 for layer 3 with Map_WriteRow3, without the
+;   half-rate path: Map_LayerEdgeOff bit 2 clear redraws 32 rows from
+;   Map_TileOriginY / Map_TileOriginX; set builds the fixed map, the
+;   second 2 KB chosen by Map_Unk0BD3 / Map_Unk0BD5 (not 16: columns
+;   32-63 / rows 32-63, the latter storing 2 in Map_Unk1D86; else rows
+;   0-31 again).
+; Callers: DefaultHandler ($C0:186F) and unmatched code at $C0:0AD8.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+;   (Map_LayerEdgeOff, Map_Unk0BD3/0BD5, WMADD and WMDATA are absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildCol/Row/Len, A, X,
+;   Map_WrCol and Map_WrRow clobbered (Map_RowsLeft = 0 on the first
+;   path); Y unchanged.
+; ------------------------------------------------------------
+Field_BuildC800Mode4:
+    REP #$20
+    LDA.w #!Map_BufC800&$FFFF
+    STA.w WMADDL
+    SEP #$20
+    LDA.b #$00
+    STA.w WMADDH
+    LDA.w !Map_LayerEdgeOff
+    BIT.b #!Map_Layer3
+    BEQ .normal
+    BRA .edge_off
+.normal:
+    LDA.b !Map_TileOriginY-!DP_Map
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawRows
+    STA.b !Map_RowsLeft-!DP_Map
+.row_loop:
+    LDA.b !Map_TileOriginX-!DP_Map
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow3
+    INC.b !Map_BuildRow-!DP_Map
+    DEC.b !Map_RowsLeft-!DP_Map
+    BNE .row_loop
+    RTS
+.edge_off:
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.screen0_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow3
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .screen0_loop
+    BEQ .screen0_loop
+    LDA.w !Map_Unk0BD3
+    CMP.b #!Map_ScreenMetatiles
+    BNE .right_screen
+    LDA.w !Map_Unk0BD5
+    CMP.b #!Map_ScreenMetatiles
+    BNE .lower_screen
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.repeat_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow3
+    STZ.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .repeat_loop
+    BEQ .repeat_loop
+    RTS
+.right_screen:
+    LDA.b #!Bg_ScreenWidth
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #$00
+.right_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow3
+    LDA.b #!Bg_ScreenWidth
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow
+    BCC .right_loop
+    BEQ .right_loop
+    RTS
+.lower_screen:
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b #!Bg_ScreenHeight
+.lower_loop:
+    STA.b !Map_BuildRow-!DP_Map
+    LDA.b #!Map_RedrawLen
+    STA.b !Map_BuildLen-!DP_Map
+    JSR Map_WriteRow3
+    LDA.b #$00
+    STA.b !Map_BuildCol-!DP_Map
+    LDA.b !Map_BuildRow-!DP_Map
+    INC A
+    CMP.b #!Map_RedrawLastRow2
+    BCC .lower_loop
+    BEQ .lower_loop
+    LDA.b #$02
+    STA.b !Map_Unk1D86-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7D66 — Map_WriteRow3 (250 bytes, $7D66–$7E5F)
+; As Map_WriteRow1 for layer 3: masks Map_RowMask3 / Map_ColMask3, an
+;   8-bit metatile number from Map_Layer3Tiles (zero-extended), words
+;   from Map_Meta3*. Unlike layers 1 and 2, an odd start writes the
+;   first right word and then Map_BuildLen whole metatiles (2 x
+;   Map_BuildLen + 1 words), with no extra word at the end and no early
+;   decrement.
+; Callers: Field_BuildC800Mode4 ($C0:7CDD, $C0:7CF1, $C0:7D19, $C0:7D34,
+;   $C0:7D51), Map_BuildRowYInc3 ($C0:82BD) and Map_BuildRowYDec3
+;   ($C0:833D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildLen = 0; Map_WrRow /
+;   Map_WrCol changed; A and X clobbered; Y unchanged.
+; ------------------------------------------------------------
+Map_WriteRow3:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .top_half
+    BRL .bottom_half
+.top_half:
+    LSR A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .top_odd
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.top_pair_loop:
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta3TR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta3TR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .top_pair_loop
+.top_odd:
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    BRA .top_pair_loop
+.done:
+    RTS
+.bottom_half:
+    LSR A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .bottom_odd
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.bottom_pair_loop:
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta3BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta3BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .bottom_pair_loop
+.bottom_odd:
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    INC A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    BRA .bottom_pair_loop
+
+; ------------------------------------------------------------
+; $C0:7E60 — Map_WriteCol3 (248 bytes, $7E60–$7F57)
+; As Map_WriteCol1 for layer 3 (Map_RowMask3 / Map_ColMask3,
+;   Map_Layer3Tiles zero-extended, Map_Meta3*); an odd first row gives
+;   2 x Map_BuildLen + 1 words.
+; Callers: Map_BuildColXInc3 ($C0:83BD) and Map_BuildColXDec3 ($C0:843D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$1D00 (!DP_Map), DB=$00
+;   (WMDATA written absolute).
+; Exit: M=1, X=0, DP and DB unchanged; Map_BuildLen = 0; Map_WrCol /
+;   Map_WrRow changed; A and X clobbered; Y unchanged.
+; ------------------------------------------------------------
+Map_WriteCol3:
+    LDA.b !Map_BuildRow-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BEQ .even_row
+    BRL .odd_row
+.even_row:
+    LSR A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .right_start
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.left_loop:
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3TL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta3BL,X
+    STA.w WMDATA
+    LDA.l !Map_Meta3BL+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .left_loop
+.right_start:
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+.right_loop:
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3TR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.l !Map_Meta3BR,X
+    STA.w WMDATA
+    LDA.l !Map_Meta3BR+1,X
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    DEC.b !Map_BuildLen-!DP_Map
+    BEQ .done
+    INC A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRA .right_loop
+.done:
+    RTS
+.odd_row:
+    LSR A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_BuildCol-!DP_Map
+    BIT.b #!Map_HalfTileBit
+    BNE .odd_row_right
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3BL,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .left_loop
+.odd_row_right:
+    LSR A
+    AND.b !Map_ColMask3-!DP_Map
+    STA.b !Map_WrCol-!DP_Map
+    TAX
+    LDA.l !Map_Layer3Tiles,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !Map_Meta3BR,X
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b !Map_WrRow-!DP_Map
+    INC A
+    AND.b !Map_RowMask3-!DP_Map
+    STA.b !Map_WrRow-!DP_Map
+    XBA
+    LDA.b !Map_WrCol-!DP_Map
+    BRL .right_loop
+
+; ------------------------------------------------------------
+; $C0:7F58 — Map_UploadBufTo7400 (38 bytes, $7F58–$7F7D, four entries)
+; Sends Map_BufC800 to VRAM through VramDma_Upload (VramDma_Mode 1,
+;   source $7E:C800):
+;   Map_UploadBufTo7400 ($7F58)  2 KB to VRAM word $7400;
+;   Map_UploadBufTo7000 ($7F5D)  2 KB to VRAM word $7000;
+;   Map_UploadBuf2K     ($7F62)  2 KB to the caller's VramDma_Addr;
+;   Map_UploadBuf4K     ($7F77)  4 KB ($7E:C800-$D7FF, what the
+;                                redraws build with the edge bit set) to
+;                                the caller's VramDma_Addr.
+;   The 4 KB entry sits after the BRL and branches back into the shared
+;   tail Map_UploadBuf_Tail; Map_UploadBufToX is the shared store of X
+;   into VramDma_Addr (global labels because the entries are global).
+; Callers (all unmatched): Map_UploadBufTo7400 from $C0:EB5E;
+;   Map_UploadBufTo7000 from $C0:EB4A; Map_UploadBuf2K from $C0:0A9F,
+;   $C0:0AC0, $C0:0AED, $C0:EAE1, $C0:EB01, $C0:EB21 and $C0:EB38;
+;   Map_UploadBuf4K from $C0:0ABB and $C0:0AE8 (e.g. $C0:0AAF loads
+;   VramDma_Addr from Map_TilemapVram3 after Field_BuildC800Mode2).
+;   xref also confirms a JML to Map_UploadBufToX at $D5:677B, inside the
+;   object graphics of bank $D5 (GfxRom_D5), so data, not a call.
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$0100 (!DP_Field: the
+;   VramDma_* bytes are dp), DB=$00 (VramDma_Upload writes registers
+;   absolute); Map_UploadBuf2K / 4K: VramDma_Addr set.
+; Exit: through BRL VramDma_Upload, whose RTS returns to the caller:
+;   M=1, X=0, DP and DB unchanged; A and X clobbered; VramDma_Addr,
+;   Mode, Src, SrcBank and Size as above; Y preserved.
+; ------------------------------------------------------------
+Map_UploadBufTo7400:
+    LDX.w #!Map_UploadVramA
+    BRA Map_UploadBufToX
+Map_UploadBufTo7000:                    ; header: see Map_UploadBufTo7400
+    LDX.w #!Map_UploadVramB
+Map_UploadBufToX:                       ; header: see Map_UploadBufTo7400
+    STX.b !VramDma_Addr
+Map_UploadBuf2K:                        ; header: see Map_UploadBufTo7400
+    LDX.w #!Map_UploadSmall
+    STX.b !VramDma_Size
+Map_UploadBuf_Tail:                     ; header: see Map_UploadBufTo7400
+    LDA.b #$01                          ; VramDma_Mode 1: word writes
+    STA.b !VramDma_Mode
+    LDX.w #!Map_BufC800&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7E
+    STA.b !VramDma_SrcBank
+    BRL VramDma_Upload
+Map_UploadBuf4K:                        ; header: see Map_UploadBufTo7400
+    LDX.w #!Map_UploadLarge
+    STX.b !VramDma_Size
+    BRA Map_UploadBuf_Tail
+
+; ------------------------------------------------------------
+; $C0:7F7E — LocLoad_ClearPage1D00 (28 bytes, $7F7E–$7F99)
+; Zeroes the 256 bytes at $00:1D00-$1DFF (the map page !DP_Map, low
+;   WRAM) with ClearRAMDMA: DmaFill_Size = $0100, DmaFill_Dest = $1D00,
+;   DmaFill_Bank = $00.
+; Callers: LoadLocation ($C0:0103) and Field_RestoreState ($C0:01CC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for the word arguments); DP
+;   any (saved, set to $0100 for the DmaFill_* bytes, restored); DB=$00
+;   (ClearRAMDMA writes registers absolute).
+; Exit: M=1, X=0, DP restored, DB unchanged; A and X clobbered (as
+;   ClearRAMDMA leaves them); DmaFill_* at $0100 set as above; Y
+;   preserved.
+; ------------------------------------------------------------
+LocLoad_ClearPage1D00:
+    PHD
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDX.w #!Map_PageBytes
+    STX.b !DmaFill_Size
+    LDX.w #!DP_Map
+    STX.b !DmaFill_Dest
+    LDA.b #$00
+    STA.b !DmaFill_Bank
+    JSR ClearRAMDMA
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7F9A — Sub_C07F9A (419 bytes, $7F9A–$813C)
+; Purpose not established (no reader of its results traced). For each
+;   layer it stores tilemap VRAM word addresses in Map_EdgeVram1/2/3 and
+;   byte counts in Map_EdgeSize1/2/3, probably the destinations of the
+;   NMI's edge DMAs. Per layer, with c / r its column / row bias
+;   (Map_BgColBias / RowBias, ...2, ...3) and its tilemap base
+;   (Map_TilemapVram, Map_TilemapVram3, Map_TilemapVramL3) added to
+;   each address:
+;   - the row r from column c - 1 (Bg_RowSpan64x32): its three pieces
+;     at Map_EdgeVram +0/+2/+4, sizes at Map_EdgeSize +0/+2/+4;
+;   - the row r + 28 (mod 32) from the same column (Bg_RowSpan64x32Addr,
+;     the same sizes): +6/+8/+10;
+;   - the column c from row r - 1 (Bg_ColSpan64x32): two pieces at
+;     +12/+14, sizes at Map_EdgeSize +6/+8;
+;   - the column c + 32 (mod 64) from row r - 1 (Bg_ColSpan64x32Addr):
+;     +16/+18.
+;   Rows from column c - 1 and columns from row r - 1 match where the
+;   edge builders start (one column left, one row above the origin).
+; Callers: Map_Unk93E1 (BRL at $C0:9439 and $C0:9448) and unmatched
+;   code: BRL at $C0:74D1 (the last instruction of the routine before
+;   Field_Unk74D4), JSR at $C0:74E3 (in Field_Unk74D4, also reached by
+;   Field_Unk74E8 and Field_Unk74F7 through its shared tail) and JSR at
+;   $C0:8819.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map); DB not
+;   used (all direct page).
+; Exit: M=1, X=0, DP unchanged; A, X and Y clobbered; the Map_Span*
+;   scratch (Map_SpanCol/Row/RowOfs/Len1-3, Map_SpanWrapVram) changed.
+; ------------------------------------------------------------
+Sub_C07F9A:
+    REP #$20
+    LDA.b !Map_BgRowBias-!DP_Map
+    AND.w #!Bg_RowMask32
+    TAY
+    LDA.b !Map_BgColBias-!DP_Map
+    DEC A
+    AND.w #!Bg_ColMask64
+    PHA
+    JSR Bg_RowSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+2-!DP_Map
+    LDA.b !Map_SpanWrapVram-!DP_Map
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+4-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize1-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize1+2-!DP_Map
+    LDA.b !Map_SpanLen3-!DP_Map
+    STA.b !Map_EdgeSize1+4-!DP_Map
+    LDA.b !Map_BgRowBias-!DP_Map
+    CLC
+    ADC.w #!Map_RowsUp4
+    AND.w #!Bg_RowMask32
+    TAY
+    PLA
+    JSR Bg_RowSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+8-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+6-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+10-!DP_Map
+    LDA.b !Map_BgRowBias-!DP_Map
+    DEC A
+    AND.w #!Bg_RowMask32
+    PHA
+    TAY
+    LDA.b !Map_BgColBias-!DP_Map
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+12-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+14-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize1+6-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize1+8-!DP_Map
+    PLY
+    LDA.b !Map_BgColBias-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWidth
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+18-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram-!DP_Map
+    STA.b !Map_EdgeVram1+16-!DP_Map
+    LDA.b !Map_BgRowBias2-!DP_Map
+    AND.w #!Bg_RowMask32
+    TAY
+    LDA.b !Map_BgColBias2-!DP_Map
+    DEC A
+    AND.w #!Bg_ColMask64
+    PHA
+    JSR Bg_RowSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+2-!DP_Map
+    LDA.b !Map_SpanWrapVram-!DP_Map
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+4-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize2-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize2+2-!DP_Map
+    LDA.b !Map_SpanLen3-!DP_Map
+    STA.b !Map_EdgeSize2+4-!DP_Map
+    LDA.b !Map_BgRowBias2-!DP_Map
+    CLC
+    ADC.w #!Map_RowsUp4
+    AND.w #!Bg_RowMask32
+    TAY
+    PLA
+    JSR Bg_RowSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+8-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+6-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+10-!DP_Map
+    LDA.b !Map_BgRowBias2-!DP_Map
+    DEC A
+    AND.w #!Bg_RowMask32
+    PHA
+    TAY
+    LDA.b !Map_BgColBias2-!DP_Map
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+12-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+14-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize2+6-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize2+8-!DP_Map
+    PLY
+    LDA.b !Map_BgColBias2-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWidth
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+18-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVram3-!DP_Map
+    STA.b !Map_EdgeVram2+16-!DP_Map
+    LDA.b !Map_BgRowBias3-!DP_Map
+    AND.w #!Bg_RowMask32
+    TAY
+    LDA.b !Map_BgColBias3-!DP_Map
+    DEC A
+    AND.w #!Bg_ColMask64
+    PHA
+    JSR Bg_RowSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+2-!DP_Map
+    LDA.b !Map_SpanWrapVram-!DP_Map
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+4-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize3-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize3+2-!DP_Map
+    LDA.b !Map_SpanLen3-!DP_Map
+    STA.b !Map_EdgeSize3+4-!DP_Map
+    LDA.b !Map_BgRowBias3-!DP_Map
+    CLC
+    ADC.w #!Map_RowsUp4
+    AND.w #!Bg_RowMask32
+    TAY
+    PLA
+    JSR Bg_RowSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+8-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+6-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+10-!DP_Map
+    LDA.b !Map_BgRowBias3-!DP_Map
+    DEC A
+    AND.w #!Bg_RowMask32
+    PHA
+    TAY
+    LDA.b !Map_BgColBias3-!DP_Map
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32
+    TXA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+12-!DP_Map
+    TYA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+14-!DP_Map
+    LDA.b !Map_SpanLen1-!DP_Map
+    STA.b !Map_EdgeSize3+6-!DP_Map
+    LDA.b !Map_SpanLen2-!DP_Map
+    STA.b !Map_EdgeSize3+8-!DP_Map
+    PLY
+    LDA.b !Map_BgColBias3-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWidth
+    AND.w #!Bg_ColMask64
+    JSR Bg_ColSpan64x32Addr
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+18-!DP_Map
+    TXA
+    CLC
+    ADC.b !Map_TilemapVramL3-!DP_Map
+    STA.b !Map_EdgeVram3+16-!DP_Map
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:813D — Bg_RowSpan64x32 (100 bytes, $813D–$81A0)
+; Splits a run of 34 tilemap words (Map_EdgeRowTiles) along row Y from
+;   column A of a 64x32 tilemap (two 32x32 screens, the right one
+;   Bg_ScreenWords further on) into pieces contiguous in VRAM. Returns
+;   X = word offset of (A, Y); Y = offset of the start of row Y in the
+;   other screen; Map_SpanLen1 = bytes to the end of the row in A's
+;   screen ((32 - column within the screen) x 2); Map_SpanLen2 = (34 -
+;   that) x 2 bytes; Map_SpanLen3 = 0. When the first piece is one word
+;   (column 31 or 63) the second is a whole row (64 bytes) and a third
+;   piece of 2 bytes starts at Map_SpanWrapVram = X - 31, the start of
+;   A's own row.
+; Callers: Sub_C07F9A ($C0:7FA9, $C0:8033, $C0:80BD).
+; On entry: M=0 (16-bit A = column 0-63), X=0 (Y = row 0-31), DP=$1D00
+;   (!DP_Map); DB not used.
+; Exit: M=0, X=0, DP unchanged; X, Y, Map_SpanLen1-3 as above (and
+;   Map_SpanWrapVram on the three-piece path); A clobbered;
+;   Map_SpanCol = column, Map_SpanRowOfs = row x 32.
+; ------------------------------------------------------------
+Bg_RowSpan64x32:
+    STA.b !Map_SpanCol-!DP_Map
+    TYA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Map_SpanRowOfs-!DP_Map
+    LDA.b !Map_SpanCol-!DP_Map
+    CMP.w #!Bg_ScreenWidth
+    BCS .right_screen
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    TAX
+    LDA.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    TAY
+    LDA.w #!Bg_ScreenWidth
+    SEC
+    SBC.b !Map_SpanCol-!DP_Map
+    STA.b !Map_SpanLen1-!DP_Map
+    BRA .check_wrap
+.right_screen:
+    SEC
+    SBC.w #!Bg_ScreenWidth
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    TAX
+    LDY.b !Map_SpanRowOfs-!DP_Map
+    LDA.w #!Bg_MapWidth64
+    SEC
+    SBC.b !Map_SpanCol-!DP_Map
+    STA.b !Map_SpanLen1-!DP_Map
+.check_wrap:
+    LDA.w #!Map_EdgeRowTiles
+    SEC
+    SBC.b !Map_SpanLen1-!DP_Map
+    CMP.w #!Map_EdgeRowTiles-1
+    BCC .two_pieces
+    LDA.w #!Bg_ScreenWidth
+    ASL A
+    STA.b !Map_SpanLen2-!DP_Map
+    ASL.b !Map_SpanLen1-!DP_Map
+    LDA.w #$0002
+    STA.b !Map_SpanLen3-!DP_Map
+    TXA
+    SEC
+    SBC.w #!Bg_ScreenWidth-1
+    STA.b !Map_SpanWrapVram-!DP_Map
+    RTS
+.two_pieces:
+    ASL A
+    STA.b !Map_SpanLen2-!DP_Map
+    ASL.b !Map_SpanLen1-!DP_Map
+    STZ.b !Map_SpanLen3-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:81A1 — Bg_RowSpan64x32Addr (53 bytes, $81A1–$81D5)
+; The addresses of Bg_RowSpan64x32 without the sizes, in other
+;   registers: X = word offset of (A, Y), A = offset of the start of row
+;   Y in the other screen, Y = X - 31 (the third piece's address; the
+;   start of A's own row only for column 31 or 63).
+; Callers: Sub_C07F9A ($C0:7FD6, $C0:8060, $C0:80EA).
+; On entry: M=0 (16-bit A = column 0-63), X=0 (Y = row 0-31), DP=$1D00
+;   (!DP_Map); DB not used.
+; Exit: M=0, X=0, DP unchanged; A, X, Y as above; Map_SpanCol and
+;   Map_SpanRowOfs changed.
+; ------------------------------------------------------------
+Bg_RowSpan64x32Addr:
+    STA.b !Map_SpanCol-!DP_Map
+    TYA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Map_SpanRowOfs-!DP_Map
+    LDA.b !Map_SpanCol-!DP_Map
+    CMP.w #!Bg_ScreenWidth
+    BCS .right_screen
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    TAX
+    SEC
+    SBC.w #!Bg_ScreenWidth-1
+    TAY
+    LDA.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    RTS
+.right_screen:
+    SEC
+    SBC.w #!Bg_ScreenWidth
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    TAX
+    SEC
+    SBC.w #!Bg_ScreenWidth-1
+    TAY
+    LDA.b !Map_SpanRowOfs-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:81D6 — Bg_ColSpan64x32 (66 bytes, $81D6–$8217)
+; Splits a 32-word column of the 64x32 tilemap, column A from row Y and
+;   wrapping at the screen's bottom, into two pieces: X = word offset of
+;   (A, Y), Y = offset of (A, row 0) in the same screen; Map_SpanLen1 =
+;   (32 - row) x 2 bytes, Map_SpanLen2 = row x 2 bytes.
+; Callers: Sub_C07F9A ($C0:7FF7, $C0:8081, $C0:810B).
+; On entry: M=0 (16-bit A = column 0-63), X=0 (Y = row 0-31), DP=$1D00
+;   (!DP_Map); DB not used.
+; Exit: M=0, X=0, DP unchanged; X, Y, Map_SpanLen1/2 as above; A
+;   clobbered; Map_SpanCol, Map_SpanRow and Map_SpanRowOfs changed.
+; ------------------------------------------------------------
+Bg_ColSpan64x32:
+    STA.b !Map_SpanCol-!DP_Map
+    TYA
+    STA.b !Map_SpanRow-!DP_Map
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Map_SpanRowOfs-!DP_Map
+    LDA.b !Map_SpanCol-!DP_Map
+    CMP.w #!Bg_ScreenWidth
+    BCS .right_screen
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    TAX
+    LDY.b !Map_SpanCol-!DP_Map
+    BRA .sizes
+.right_screen:
+    SEC
+    SBC.w #!Bg_ScreenWidth
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    TAX
+    LDA.b !Map_SpanCol-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords-!Bg_ScreenWidth
+    TAY
+.sizes:
+    LDA.w #!Bg_ScreenWidth
+    SEC
+    SBC.b !Map_SpanRow-!DP_Map
+    STA.b !Map_SpanLen1-!DP_Map
+    LDA.w #!Bg_ScreenWidth
+    SEC
+    SBC.b !Map_SpanLen1-!DP_Map
+    ASL A
+    STA.b !Map_SpanLen2-!DP_Map
+    ASL.b !Map_SpanLen1-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8218 — Bg_ColSpan64x32Addr (43 bytes, $8218–$8242)
+; The addresses of Bg_ColSpan64x32 without the sizes: X = word offset
+;   of (A, Y), A = offset of (A, row 0) in the same screen.
+; Callers: Sub_C07F9A ($C0:8018, $C0:80A2, $C0:812C).
+; On entry: M=0 (16-bit A = column 0-63), X=0 (Y = row 0-31), DP=$1D00
+;   (!DP_Map); DB not used.
+; Exit: M=0, X=0, DP unchanged; A and X as above; Y unchanged;
+;   Map_SpanCol and Map_SpanRowOfs changed.
+; ------------------------------------------------------------
+Bg_ColSpan64x32Addr:
+    STA.b !Map_SpanCol-!DP_Map
+    TYA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Map_SpanRowOfs-!DP_Map
+    LDA.b !Map_SpanCol-!DP_Map
+    CMP.w #!Bg_ScreenWidth
+    BCS .right_screen
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    TAX
+    LDA.b !Map_SpanCol-!DP_Map
+    RTS
+.right_screen:
+    SEC
+    SBC.w #!Bg_ScreenWidth
+    CLC
+    ADC.b !Map_SpanRowOfs-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords
+    TAX
+    LDA.b !Map_SpanCol-!DP_Map
+    CLC
+    ADC.w #!Bg_ScreenWords-!Bg_ScreenWidth
+    RTS
+
+; ============================================================
 ; Layer edge builders ($C0:8243–$C0:8444)
 ; One small routine per layer, direction and kind (row or column):
 ; points WMADD at the layer's edge buffer (Map_BufC800 / D000 / D800,
