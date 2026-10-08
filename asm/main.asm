@@ -9,6 +9,14 @@
 ; reassembled source below.
 ; ============================================================
 
+; --- Shared names (no bytes emitted) ---
+; Defines must be visible before any bank uses them.
+
+incsrc "include/constants.inc"
+incsrc "include/ram_engine.inc"
+incsrc "include/ram_battle.inc"
+incsrc "include/macros.inc"
+
 ; --- Bank includes ---
 ; As banks get mapped and functions get matched, include their
 ; .asm files here. Until a bank has ANY matched content, leave
@@ -22,7 +30,5 @@ incsrc "bankC1/bankC1.asm"
 ; incsrc "bank02/bank02.asm"
 incsrc "bankFD/bankFD.asm"
 
-; --- Status ---
-; No banks included yet. This file currently produces a
-; byte-identical copy of the base ROM when built, which is the
-; correct starting state (verify with `make diff`).
+; --- Names for not-yet-matched routines (label-only, no bytes) ---
+incsrc "include/unmatched.asm"

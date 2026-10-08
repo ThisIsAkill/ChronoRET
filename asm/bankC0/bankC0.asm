@@ -12,32 +12,6 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
-; Label stubs — no bytes emitted; used for JSR/JSL/BRL targets
-; ============================================================
-
-; BRL targets (raw hex won't compute relative — must use labels)
-org $C00AFF
-AudioDrvSync:     ; JSL re-entry: force 2 audio driver ticks, restore DB/DP; RTL
-
-org $C01BAB
-MusicCueDispatch: ; JSL re-entry: SPC start ($14) or fade ($70) per $7E2A1F bit 6; RTL
-
-org $C01BE6
-AudioFadeDispatch: ; JSL re-entry: conditional SPC fade/start via $7F01EC counter; RTL
-
-org $C02C41
-ScrollStepAccum:  ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
-
-org $C02E1E
-LoadSavePath:   ; entry for mode >= $01FF (load/save/transition)
-
-org $C0EC60
-Sub_EC60:       ; called from main frame loop after VBlankHandler
-
-; Unmatched routines called from matched code
-
-
-; ============================================================
 ; $C0:B309 — Sub_B309 (1016 bytes, $B309–$B700)
 ; Sprite descriptor → OAM buffer + WRAM palette copy.
 ; Called from PostVBlank's sprite loop for each active descriptor.
