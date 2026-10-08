@@ -249,7 +249,9 @@ if !ram_engine_inc == 0
                                          ; DefaultHandler (inferred: picked up by the tilemap
                                          ; uploader)
 !TileAnim_PairCount = $60                ; 8-bit tiles changed / 2, minus 1: 0 for ModeE6 (2 tiles),
-                                         ; 1 for ModeEC/EE (4), 2 for ModeFA/FC (6)
+                                         ; 1 for ModeEC/EE (4), 2 for ModeFA/FC (6). Inferred from
+                                         ; the setters and the VRAM uploader at $C0:ED24, which
+                                         ; sends 8/16/24 VRAM words for 0/1/2 (not converted yet)
 !TileAnim_StepKind = $61                 ; 8-bit; DefaultHandler sets 0 when the stepped tile was
                                          ; $FE, 1 when it was $E0
 
@@ -507,7 +509,8 @@ if !ram_engine_inc == 0
 ; --- Map ---
 !Map_TileProps = $7E3000                 ; one byte per map tile, row stride $100 (index = row*256 +
                                          ; column); values $E6/$EC/$EE/$FA/$FC select tile-animation
-                                         ; modes
+                                         ; modes. "Props" is a guess: matched code only uses it for
+                                         ; tile-animation states
 
 ; --- Map / BG (page $1D00, also used as a direct page) ---
 !Map_TileOriginX = $1D0A                 ; 16-bit; subtracted from (map column x 2) before wrapping

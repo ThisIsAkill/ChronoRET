@@ -6238,7 +6238,10 @@ Sub_1ADF:
 ; Tile animation for map-tile state $E6: a 1x2 column, the tile at
 ; (Field_TileAnimX, Field_TileAnimY) and the one above it.
 ; BRL target from Field_SceneChangeTick (Field_SceneFlags bit 4).
-; On entry: A = $E6, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
+; On entry: A = $E6, X = Map_TileProps index of (col, row), M=1, X/Y
+; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
+; TileAnim_VramAddrs stores).
+; Exit: BRL DefaultHandler with M=1, X/Y 16-bit; X and Y clobbered.
 ;
 ; The general shape, shared by all five Mode*_Handlers:
 ;  1. Advance the state byte of each affected map tile in
@@ -6386,7 +6389,10 @@ ModeE6_Handler:
 ; Returns A = row*32 + column for columns 0-31, or
 ;             row*32 + (column-32) + $0400 for columns 32-63.
 ; (Earlier comments had the row and column inputs swapped.)
-; Called by the Mode*_Handlers and DefaultHandler; uses Eng_Scratch.
+; Called by the Mode*_Handlers and DefaultHandler; keeps row*32 in
+; Bg_RowWordOfs.
+; On entry: M=0, X/Y 16-bit, DP=$0100 (Bg_RowWordOfs is dp).
+; Exit: M=0; X and Y unchanged (the callers rely on it).
 ; ============================================================
 org $C01B36
 Bg_TilemapIndex64x32:
@@ -6398,11 +6404,11 @@ Bg_TilemapIndex64x32:
     STA.b !Bg_RowWordOfs
     TYA                  ; A = column
     CMP.w #!Bg_ScreenWidth
-    BCS .rowhi           ; right-hand screen
+    BCS .right_screen    ; columns 32-63
     CLC
     ADC.b !Bg_RowWordOfs ; row*32 + column
     RTS
-.rowhi:
+.right_screen:
     SEC
     SBC.w #!Bg_ScreenWidth ; column - 32
     CLC
@@ -6415,7 +6421,10 @@ Bg_TilemapIndex64x32:
 ; $C0:0E5F — ModeEC_Handler (437 bytes, $0E5F–$1013)
 ; Tile animation for map-tile state $EC: a 2x2 block, columns
 ; col..col+1, rows row-1..row. Same shape as ModeE6_Handler; 4 passes.
-; On entry: A = $EC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
+; On entry: A = $EC, X = Map_TileProps index of (col, row), M=1, X/Y
+; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
+; TileAnim_VramAddrs stores).
+; Exit: BRL DefaultHandler with M=1, X/Y 16-bit; X and Y clobbered.
 ; ============================================================
 org $C00E5F
 ModeEC_Handler:
@@ -6439,7 +6448,7 @@ ModeEC_Handler:
     INC A
     STA.l !Map_TileProps,X
     LDA #$01
-    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
+    STA.b !TileAnim_PairCount ; 2 pairs of tiles (stored minus 1)
     JSR Audio_PlayTileSfxA
     ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20                ; M → 0 (16-bit A)
@@ -6657,7 +6666,10 @@ ModeEC_Handler:
 ; $C0:1014 — ModeEE_Handler (437 bytes, $1014–$11C8)
 ; Tile animation for map-tile state $EE: a 2x2 block, columns
 ; col-1..col, rows row-1..row (ModeEC_Handler mirrored). 4 passes.
-; On entry: A = $EE, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
+; On entry: A = $EE, X = Map_TileProps index of (col, row), M=1, X/Y
+; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
+; TileAnim_VramAddrs stores).
+; Exit: BRL DefaultHandler with M=1, X/Y 16-bit; X and Y clobbered.
 ; ============================================================
 org $C01014
 ModeEE_Handler:
@@ -6683,7 +6695,7 @@ ModeEE_Handler:
     STA.l !Map_TileProps,X  ; tile (col, row-1)
     JSR Audio_PlayTileSfxA            ; (before setting TileAnim_PairCount here)
     LDA #$01
-    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
+    STA.b !TileAnim_PairCount ; 2 pairs of tiles (stored minus 1)
 
     ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20                ; M → 0 (16-bit A)
@@ -6907,7 +6919,10 @@ ModeEE_Handler:
 ; $C0:11C9 — ModeFA_Handler (651 bytes, $11C9–$1453)
 ; Tile animation for map-tile state $FA: a 2-wide, 3-tall block,
 ; columns col..col+1, rows row-2..row. 6 passes.
-; On entry: A = $FA, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
+; On entry: A = $FA, X = Map_TileProps index of (col, row), M=1, X/Y
+; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
+; TileAnim_VramAddrs stores).
+; Exit: BRL DefaultHandler with M=1, X/Y 16-bit; X and Y clobbered.
 ; ============================================================
 org $C011C9
 ModeFA_Handler:
@@ -6946,7 +6961,7 @@ ModeFA_Handler:
     STA.l !Map_TileProps,X  ; tile (col+1, row-2)
     JSR Audio_PlayTileSfxA
     LDA #$02
-    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
+    STA.b !TileAnim_PairCount ; 3 pairs of tiles (stored minus 1)
 
     ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
@@ -7265,7 +7280,6 @@ ModeFA_Handler:
     ADC.w !Map_TilemapVram
     STA.w !TileAnim_VramAddrs+46 ; bottom-right 8x8 tile
 
-
     SEP #$20
     LDA.b #!VramQueue_TileAnim
     TSB.b !Field_VramQueueFlags
@@ -7276,7 +7290,11 @@ ModeFA_Handler:
 ; Tile animation for map-tile state $FC: a 2-wide, 3-tall block,
 ; columns col-1..col, rows row-2..row (ModeFA_Handler mirrored).
 ; 6 passes; falls through into DefaultHandler.
-; On entry: A = $FC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
+; On entry: A = $FC, X = Map_TileProps index of (col, row), M=1, X/Y
+; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
+; TileAnim_VramAddrs stores).
+; Exit: falls into DefaultHandler with M=1, X/Y 16-bit; X and Y
+; clobbered.
 ; ============================================================
 org $C01454
 ModeFC_Handler:
@@ -7315,7 +7333,7 @@ ModeFC_Handler:
     STA.l !Map_TileProps,X  ; tile (col-1, row-2)
     JSR Audio_PlayTileSfxA
     LDA #$02
-    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
+    STA.b !TileAnim_PairCount ; 3 pairs of tiles (stored minus 1)
 
     ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
@@ -7660,7 +7678,9 @@ ModeFC_Handler:
 ;         Field_IdleFrame.
 ; Earlier notes called bit 5 a "display-mode transition" and bit 0 a
 ; "scene swap"; the JSL into bank $C1 identifies bit 0 as the battle.
-; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100.
+; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100, DB=$00.
+; Exit: M=1, X/Y 16-bit, DP=$0100 on every path (each builder call
+; restores DP with PLD; the battle path sets it again).
 ; ============================================================
 org $C016DC
 DefaultHandler:
@@ -7824,8 +7844,10 @@ DefaultHandler:
     BRL .chk_mode4
 
 .mode3:
-    ; 3: Mode1, then Mode2 and Mode1 again with the two tilemap bases
-    ;    swapped around each (so both tilemaps get drawn)
+    ; 3: Mode1, then Mode2, both on the normal tilemap bases. After
+    ;    Mode2 the two bases are swapped; the swap holds for
+    ;    Field_Unk74D4/74E8 and a second Mode1 build, and is undone
+    ;    after that (presumably so both tilemaps get drawn)
     PHD
     REP #$20
     LDA.w #!DP_Map

@@ -18,18 +18,18 @@ $C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,readable,06b44e2abb93,Writes JML NmiH
 $C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,readable,fc31d155501b,Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
 $C0:0B86,$C0:0C75,240,Field_InitLoadState,$C0,Engine,readable,d4cb5f03e428,"(was FrameStateInit.) Called once per location load from GameLoop_LoadField, not per frame."
 $C0:0C76,$C0:0D77,258,Field_SceneChangeTick,$C0,Engine,readable,bd086c63875f,(was Sub_0C76.) Runs every frame from GameLoop_FrameBody.
-$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,readable,a5a7be1522e5,"Tile animation for map-tile state $E6: a 1x2 column, the tile at (Field_TileAnimX, Field_TileAnimY) and the one above it."
-$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,readable,6774a02f5764,"Tile animation for map-tile state $EC: a 2x2 block, columns col..col+1, rows row-1..row."
-$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,readable,993c40c1eedc,"Tile animation for map-tile state $EE: a 2x2 block, columns col-1..col, rows row-1..row (ModeEC_Handler mirrored)."
-$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,readable,3642b132511e,"Tile animation for map-tile state $FA: a 2-wide, 3-tall block, columns col..col+1, rows row-2..row."
-$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,readable,812176f16cfd,"Tile animation for map-tile state $FC: a 2-wide, 3-tall block, columns col-1..col, rows row-2..row (ModeFA_Handler mirrored)."
-$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,readable,66b3a5a8c55e,"The rest of Field_SceneChangeTick's request handling: reached by BRL when Field_SceneFlags bit 4 is clear or the tile mode is not one of the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by"
+$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,readable,abcfd6c57b3c,"Tile animation for map-tile state $E6: a 1x2 column, the tile at (Field_TileAnimX, Field_TileAnimY) and the one above it."
+$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,readable,6c8b0575576f,"Tile animation for map-tile state $EC: a 2x2 block, columns col..col+1, rows row-1..row."
+$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,readable,02b6c8c0fb43,"Tile animation for map-tile state $EE: a 2x2 block, columns col-1..col, rows row-1..row (ModeEC_Handler mirrored)."
+$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,readable,9c8582a3b7e9,"Tile animation for map-tile state $FA: a 2-wide, 3-tall block, columns col..col+1, rows row-2..row."
+$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,readable,8b74fb1a93e5,"Tile animation for map-tile state $FC: a 2-wide, 3-tall block, columns col-1..col, rows row-2..row (ModeFA_Handler mirrored)."
+$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,readable,9b3076e4be26,"The rest of Field_SceneChangeTick's request handling: reached by BRL when Field_SceneFlags bit 4 is clear or the tile mode is not one of the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by"
 $C0:18D9,$C0:1984,172,Field_PauseAndMenuInput,$C0,Engine,readable,52cae99c0c45,"(was Sub_18D9.) Per-frame pause and menu input, called from GameLoop_FrameBody before Field_SceneChangeTick."
 $C0:1985,$C0:19C6,66,Field_FadeToBankC2Mode5,$C0,Engine,readable,7a60ad43b399,(was Sub_1985.) Called from Field_PauseAndMenuInput when Pad_Unk00F6 bit 0 is set.
 $C0:19C7,$C0:1A02,60,Field_RunBankC2Mode5,$C0,Engine,readable,5f8548796a04,"(was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning of 5 unverified; earlier notes called it ""BG mode 5""), then reloads the field: restore state, re-init changed party members, move a pe"
 $C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,readable,1d04099ff1b2,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
 $C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),readable,8954f0ebb6af,Leaf routine run by Field_PauseAndMenuInput when Field_Unk62 is set (and Pad_Unk00F6 bit 6 is clear); A = Field_Unk62.
-$C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,readable,77ae33e6299d,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
+$C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,readable,81726cfd1986,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
 $C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,readable,205620e6b1b0,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for"
 $C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,readable,cc8c4746bdc5,
 $C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,readable,08f0221febee,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
