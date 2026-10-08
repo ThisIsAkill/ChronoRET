@@ -17,10 +17,15 @@ incsrc "../hardware.inc"
 
 ; $C1:007E — BattleSys_PumpFrames (11 bytes, $007E–$0088)
 ; Waits for the next frame: sets !Battle_FramePending, then calls
-; BattleSys_IdleVecCD0036 again and again until the interrupt handler at
-; $CF:FB65 has cleared the flag. The "wait for the frame" reading is
-; inferred from that handler (it saves every register and zeroes $9E
-; first); what the $CD0036 callee does meanwhile is not analysed.
+; BattleSys_IdleVecCD0036 again and again until something else clears
+; the flag. The likely clearer is the STZ $9E at $CF:E77B, just before
+; the RTL of a bank-$CF routine that reads JOY1 ($CF:E6E0, $CF:E70B) and
+; bumps a 32-bit counter at $96F1, which reads as per-frame work; its
+; entry and who calls it are not traced, so "wait for the frame" is
+; inferred, not proven. ($CF:FB65 also zeroes $9E, but it is the battle
+; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
+; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
+; What the $CD0036 callee does meanwhile is not analysed.
 ; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
 ; BattleSys_DefeatPose, BattleSys_VictoryPose (three times),
@@ -38,7 +43,7 @@ BattleSys_PumpFrames:
 .wait:
     JSL BattleSys_IdleVecCD0036
     LDA.b !Battle_FramePending
-    BNE .wait                   ; the interrupt handler clears it
+    BNE .wait                   ; cleared elsewhere (likely $CF:E77B)
     RTS
 
 ; ============================================================
@@ -2925,7 +2930,8 @@ BattleMsg_BlankLeadingZeros:
 ; ==================================================================
 ; BattleSys_UpkeepTwoFrames ($C1106E–$C110E2, 117 bytes)
 ; ==================================================================
-; Service 3 of the cross-bank $C10045 service API (dispatch table at
+; Service 3 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
 ; $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $106E
 ; directly). Runs the battle's per-frame upkeep across two waits:
 ;   1. Unless !Battle_UnkA10E is set: clear !Battle_UnkA0FD, and if
@@ -6013,9 +6019,9 @@ Battle_BoxHitsBlockedCell:
 ; Results: !BattlePos_Result (0 = holds, $FF = not) and, for 0-3 and 13,
 ; !BattlePos_Found. Callers set !BattlePos_Mode, Subject, Other (and
 ; Arg) and run service 5 (LDA #5, JSR to $C1:0003 or $C1:0045), e.g. the
-; battle-script code at $C1:9270-$C1:A74A tests Result after it, and
-; $C1:2F54 turns the angle to query 2's Found into $96DB (inferred: the
-; battler's facing). What the script commands that use the queries
+; battle-script code at $C1:9270-$C1:A74A tests Result or Found after
+; it, and Battle_UpdatePcFacing turns the angle to query 2's Found into
+; !Battler_Facing. What the script commands that use the queries
 ; stand for is not traced.
 ; The distance checks also have entries of their own, used by movers
 ; that pass the two slots in X and Y.
@@ -6023,7 +6029,8 @@ Battle_BoxHitsBlockedCell:
 ; ==================================================================
 ; BattlePos_Query ($C12986–$C129B1, 44 bytes)
 ; ==================================================================
-; Service 5 of the cross-bank $C10045 service API (dispatch table at
+; Service 5 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
 ; $C10051, entry 5 = $2986; searched: no JSR, JMP or JSL reaches $2986
 ; directly). Copies the screen positions of !BattlePos_Subject and
 ; !BattlePos_Other into their probe positions, clears
@@ -6268,8 +6275,9 @@ BattlePos_FarthestEnemy:            ; header: see BattlePos_NearestPc
 ; BattlePos_WithinDist4XY, BattlePos_WithinDist4XYTwin,
 ; BattlePos_WithinDist16XY, BattlePos_WithinDist48 and
 ; BattlePos_WithinDist32 (which falls into BattlePos_CheckPairDist, and
-; that into BattlePos_CheckDist). WithinDist4XY and WithinDist4XYTwin are
-; byte-identical (two copies in the ROM, one caller each).
+; that into BattlePos_CheckDist). WithinDist4XY and WithinDist4XYTwin run
+; the same code (same limit, two copies in the ROM, one caller each); the
+; bytes differ only in the BRA displacement to CheckDist ($36 vs $2A).
 ; The 16-bit sum of the two squares wraps for points about 256 pixels
 ; or more apart (reproduced as found; on-screen distances keep below).
 ; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
@@ -6291,8 +6299,10 @@ BattlePos_FarthestEnemy:            ; header: see BattlePos_NearestPc
 ;        Y = the two battler slots (CheckPairDist and CheckDist also take
 ;        !BattlePos_DistLimit as set by the entry)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 or $FF; X = dx*dx (from
-;        Battle_Mul8's product); Y unchanged; DP $77-$78, $80-$83 and
-;        $AD-$B0 written; !BattlePos_DistLimit set
+;        Battle_Mul8's product); Y unchanged for the XY entries and
+;        CheckDist, = the slot from !BattlePos_Other for WithinDist32,
+;        WithinDist48 and CheckPairDist; DP $77-$78, $80-$83 and $AD-$B0
+;        written; !BattlePos_DistLimit set
 ; Callee: Battle_Mul8 (twice)
 !BattlePos_CoordA = !BattleTmp_80         ; 2 B: first battler's coordinate (zero-extended), then |dy|
 !BattlePos_CoordB = !BattleTmp_82         ; 2 B: second battler's coordinate, then dx*dx
@@ -6477,28 +6487,36 @@ BattlePos_SubjectLeft:              ; header: see BattlePos_SameRowBand
 ; ==================================================================
 ; BattlePos_PathClear ($C12C02–$C12CA6, 165 bytes; query 8)
 ; ==================================================================
-; Walks the subject's probe position out from its screen position in
+; Places the subject's probe position out from its screen position in
 ; the direction Battle_CalcAngle gives from the subject to the other
-; battler, one step further each pass (the radius grows by the
-; subject's !Battler_PathStep), and after each step:
+; battler, at a radius of !Battle_SinScale (see the quirk below), and
+; after each placement:
 ;   - checks the probe with BattlePos_WithinDist32XY; within -> done,
 ;     Result 0;
-;   - otherwise rebuilds the subject's box: a blocked cell, or (with
-;     !BattlePos_Arg non-zero) another battler's box -> Result $FF.
+;   - otherwise clears !Battle_PassCellBit7 and rebuilds the subject's
+;     box: a blocked cell, or (with !BattlePos_Arg non-zero) another
+;     battler's box -> Result $FF; else another pass.
 ; At the end the subject's screen position is written back from the
 ; copy taken at the start (it was never changed here) and its box is
-; rebuilt (tail JMP to Battle_CalcBattlerBox).
+; rebuilt (tail JMP to Battle_CalcBattlerBox). That box comes from the
+; probe position, so it is the box at the last probe, not at home.
 ; Quirk: at the distance check Y is the subject but X still holds what
 ; Battle_SinLookup left (Battle_Mul8x16's first partial product), not
 ; the other battler's slot, so the probe is compared with an arbitrary
 ; ProbeX/ProbeY,X byte pair. Reproduced as found; the other battler was
-; probably meant. With a step of 0 nothing moves and the loop only ends
-; through that check.
+; probably meant.
+; Quirk: the radius does not grow by !Battler_PathStep each pass.
+; !Battle_SinScale is the same byte as !Battle_Mul8B ($AE), and the
+; distance check leaves |dy| of its comparison there (its second
+; Battle_Mul8 squares it), so from the second pass on the radius is
+; PathStep + the previous check's |dy| (8-bit add), not a running sum.
+; Reproduced as found.
 ; Callers: BattlePos_ModeTable entry 8 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$8E, $A5-$B0,
 ;        $D3-$E3 written (also $77-$78 through the multiplies);
-;        !Battle_PassCellBit7 = 0
+;        !Battle_PassCellBit7 = 0 if any check failed (unchanged when the
+;        first check is within)
 ; Callees: Battle_CalcAngle, Battle_SinLookup, BattlePos_WithinDist32XY,
 ;          Battle_CalcBattlerBox, Battle_BoxHitsBlockedCell,
 ;          Battle_BoxOverlapsOthers
@@ -6530,7 +6548,7 @@ BattlePos_PathClear:
     CLC
     LDA.w !Battler_PathStep,X
     ADC.b !Battle_SinScale
-    STA.b !Battle_SinScale          ; radius += step
+    STA.b !Battle_SinScale          ; radius = step + $AE (|dy| after pass 1, see header)
     LDA.b !Battle_GeoAngle
     JSR Battle_SinLookup
     STA.b !BattlePos_StepY
@@ -6660,8 +6678,9 @@ BattlePos_SubjectLeftPart:          ; header: see BattlePos_SubjectLowerHalf
 ; (d2), and stores |d2 - d1| / 256 (low byte) in !BattlePos_Found.
 ; Result is left at 0. What the scripts use the value for is not traced.
 ; The per-axis differences are 8-bit (a difference of $80 or more folds
-; to its 256-complement) and the 16-bit sums can wrap, as in
-; BattlePos_CheckDist.
+; to its 256-complement), so each is at most $80, each square at most
+; $4000 and d1, d2 at most $8000: the 16-bit sums do not wrap and
+; |d2 - d1| is exact.
 ; Callers: BattlePos_ModeTable entry 13 only (BattlePos_Query).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = d2's dx*dx; Y = Arg;
@@ -8113,7 +8132,8 @@ Battle_FaceAllPcsNearestEnemy:
 ; ==================================================================
 ; BattleSys_DefeatPose ($C1354D–$C1356C, 32 bytes)
 ; ==================================================================
-; Service 9 of the cross-bank $C10045 service API (dispatch table at
+; Service 9 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
 ; $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D directly).
 ; Ticks the frame service, counts !Battle_UnkA0FE up, waits a frame and
 ; plays animation 8 on all three PCs, KO'd ones included
@@ -8142,7 +8162,8 @@ BattleSys_DefeatPose:
 ; ==================================================================
 ; BattleSys_VictoryPose ($C1356D–$C135DC, 112 bytes)
 ; ==================================================================
-; Service 8 of the cross-bank $C10045 service API (dispatch table at
+; Service 8 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
 ; $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D directly).
 ; Ticks the frame service, counts !Battle_UnkA0FE up, clears
 ; !Enemy_Unk98A7, stops the PCs' status effects (Battle_FxReset), takes

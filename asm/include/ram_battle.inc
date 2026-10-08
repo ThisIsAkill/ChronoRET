@@ -70,8 +70,9 @@ if !ram_battle_inc == 0
                                  ; the PCs; copied to !Battle_Unk993B around the tick and copied back if that changed it
                                  ; (BattleSys_UpkeepTwoFrames); set to 1 during each Battle_PoseStep; who sets it otherwise
                                  ; is not traced
-!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames, cleared by the interrupt handler at $CF:FB65 (reached
-                                 ; through $C1:0000/$C1:001B; it saves every register, inferred: the battle NMI)
+!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames, which waits for it to clear; likely cleared once a frame by
+                                 ; the STZ $9E at $CF:E77B, before the RTL of a bank-$CF routine that reads JOY1 and bumps the
+                                 ; 32-bit counter at $96F1 (entry not traced); also zeroed once by the battle entry $CF:FB65
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
                                  ; Battle_PoseStep, which steps only when it finds 1 (every second frame); purpose unknown
@@ -313,8 +314,9 @@ endstruct
 !Battler_HalfWidth       = $971E ; 11 B per battler slot: box half-width; the box spans probe x +/- this
                                  ; (Battle_CalcBattlerBox); who sets it is not traced
 !Battler_Height          = $9729 ; 11 B per battler slot: box height above the probe y (top = y - this)
-!Battler_PathStep        = $9734 ; 11 B per battler slot: pixels BattlePos_PathClear advances the probe per step (its
-                                 ; radius grows by this each pass); inferred: movement step; who sets it is not traced
+!Battler_PathStep        = $9734 ; 11 B per battler slot: added to the probe radius on each BattlePos_PathClear pass
+                                 ; (to |dy| of the last check, not a running sum: see its header); inferred: movement
+                                 ; step; who sets it is not traced
 !Battler_BoxLeft         = $975A ; 11 B per battler slot: box left edge, clamped at 0 (Battle_CalcBattlerBox)
 !Battler_BoxTop          = $9765 ; 11 B per battler slot: box top edge, clamped at 0
 !Battler_BoxRight        = $9770 ; 11 B per battler slot: box right edge, clamped at $FF
