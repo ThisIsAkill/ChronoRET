@@ -438,5 +438,69 @@ if !constants_engine_inc == 0
 !Map_PushSlow = $08                      ; push amounts written to Map_Unk1D2A/1D2B (1/16 pixel)
 !Map_PushMid = $10                       ; push amount for push speed 2
 !Map_PushFast = $20                      ; push amount for push speed 3
+; --- Location map setup (LocLoad_UnkA33B, Map_InitMasksAndLimits, Map_UnpackTilePlanes,
+;     Map_LoadExitTiles, Map_LoadTreasureTiles) ---
+!Loc_IdMask = $01FF                      ; Loc_Id bits 0-8: the location number (indexes
+                                         ; ExitRom_LocOfs / TreasureRom_LocOfs by word)
+!Map_PropsPtrSize = $03                  ; bytes per Map_PropsPtrs entry (a long pointer)
+!MapProps_WidthBits = $03                ; MapProps.Size1 / Size3 bits 0-1: (n + 1) x 16
+!MapProps_HeightBits = $0C               ; bits 2-3: (n + 4) x 4, i.e. (n / 4 + 1) x 16
+!MapProps_HeightAdd = $04                ; added to the height bits before the two ASLs
+!MapProps_L2WidthBits = $30              ; MapProps.Size1 bits 4-5: n + $10
+!MapProps_L2HeightBits = $C0             ; MapProps.Size1 bits 6-7: n / 4 + $10
+!MapProps_OwnStep2 = $10                 ; MapProps.Size3 bit 4: Map_OwnStep2 in Map_OwnStepFlags
+!MapProps_OwnStep3 = $20                 ; MapProps.Size3 bit 5: Map_OwnStep3
+!MapProps_HalfRate2 = $40                ; MapProps.Size3 bit 6: Map_Unk0BC9 = Map_Unk0BC9Set
+!Map_Unk0BC9Set = $80                    ; Map_Unk0BC9 with bit 7 set (half-rate layer 2)
+!Map_Unk0BCAOn = $01                     ; Map_Unk0BCA value for MapProps.Size3 bit 7
+!MapMove_XBits = $07                     ; MapProps.Move2/3 bits 0-2: X step 1 << (n - 1)
+!MapMove_XNeg = $08                      ; bit 3: the X step is negative
+!MapMove_YBits = $70                     ; bits 4-6: as MapMove_XBits for Y
+!MapMove_YNeg = $80                      ; bit 7: the Y step is negative
+!MapScreens_MainBgs = $07                ; MapProps.Screens bits 0-2: BG1-3 on the main screen
+!MapScreens_MainObj = $08                ; bit 3: OBJ on the main screen (moved to TM bit 4)
+!MapScreens_SubBgs = $70                 ; bits 4-6: BG1-3 on the sub screen
+!MapScreens_SubObj = $80                 ; bit 7: OBJ on the sub screen (moved to TS bit 4)
+!Map_Metatiles32 = $20                   ; a layer size of two screens (Map_Unk0BCB ...)
+!Map_Metatiles48 = $30                   ; three screens
+!Map_Metatiles64 = $40                   ; four screens
+!Map_WrapMask16 = $0F                    ; Map_ColMask*/RowMask* for a 16-metatile layer
+!Map_WrapMask32 = $1F                    ; for a 32-metatile layer
+!Map_WrapMask64 = $3F                    ; for a 48- or 64-metatile layer
+!Map_PlaneBytes = $0040                  ; bytes of one plane in each 256-byte map row (64
+                                         ; columns; layer 1, 2, 3 and Map_TileHiBits side by side)
+!Map_PlaneCopyLen = $003F                ; MVN count for one plane row (Map_PlaneBytes - 1)
+!Map_PlaneRows = $40                     ; map rows a plane spans
+!Map_RunFlagMask = $7F                   ; Map_TileHiBits byte with bit 7 set: bits 0-6 are the
+                                         ; value of a run (Map_UnpackTilePlanes)
+!Map_RunLen256 = $0100                   ; a run count byte of 0 means 256
+!Map_ExitNone = $80                      ; Map_TileExitIdx value of a tile that is no exit
+!Map_TreasureNone = $80                  ; Map_TreasureIdx value of a tile with no treasure
+!Exit_SpanLenMask = $7F                  ; ExitRom.Span bits 0-6: tiles after the first
+!Map_TreasureRecSize = $0004             ; bytes per TreasureRom record
+!TileHiBits_L1Bit8 = $01                 ; Map_TileHiBits bit 0: bit 8 of the layer-1 metatile
+!TileAnim_StateE1 = $E1                  ; Map_TileProps value TileAnim_StateE0 steps to
+!TileAnim_StateFF = $FF                  ; Map_TileProps value TileAnim_StateFE steps to
+
+!Obj_LastFrameNone = $FF                 ; Obj_LastFrame after Obj_ResetFrameState (no frame built)
+!Map_VramTilemap1 = $6000                ; Map_TilemapVram set by LocLoad_DrawMap (layer 1's tilemap)
+!Map_VramTilemap2 = $6800                ; Map_TilemapVram3 set there (layer 2's tilemap)
+!Map_VramTilemap3 = $7000                ; Map_TilemapVramL3 set there (layer 3's tilemap)
+!Map_VramTilemapAlt = $7800              ; Map_TilemapVram2 set there
+!Map_ScSizeInit = $01                    ; Map_TilemapVram4, its high byte and Map_Unk1D86 at a
+                                         ; load (LocLoad_DrawMap; probably BGnSC size 1, 64x32)
+!Map_EvenMask = $FE                      ; clears bit 0 (Map_InitOrigin's half-rate column)
+!Map_ScreenTileRows = $1C                ; 8x8 rows the screen shows (28: 224 lines); bottom bound =
+                                         ; top origin + this
+!Map_OriginLeadX = $08                   ; metatiles from the screen's left edge to the entry column
+                                         ; (Map_InitOriginX)
+!Map_OriginLeadY = $08                   ; metatiles from the top edge to the entry row
+!Map_OriginLeadYBelow = $06              ; metatile rows Map_InitOriginY keeps below the entry row
+
+!Map_ProbeMidX = $80                     ; Map_ProbeX low byte Map_InitEntryTile probes: the middle
+                                         ; of the tile across
+!Map_ProbeBottomY = $FF                  ; Map_ProbeY low byte it probes: the bottom pixel row
+!Map_EntryLevelMin = $01                 ; Field_Unk55 Map_InitEntryTile sets when the entry tile's
+                                         ; level is 0
 
 endif

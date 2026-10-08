@@ -82,16 +82,6 @@ org $C06DCF
 LocLoad_Unk6DCF:    ; location-load step; reads byte 2 of the location record, table $F6:2220
 org $C07084
 LocLoad_Unk7084:    ; location-load step; reads byte 3 of the location record (x $D2 records)
-org $C074D4
-Field_Unk74D4:      ; DP=$1D00; clears dp $99/$87/$89 then JSR $7F9A
-org $C074E8
-Field_Unk74E8:      ; DP=$1D00; clears dp $9B/$8B/$8D then shares Field_Unk74D4's tail
-org $C074F7
-Field_Unk74F7:      ; DP=$1D00; clears dp $9D/$8F/$91 then shares Field_Unk74D4's tail
-org $C087F1
-Field_Unk87F1:      ; DP=$1D00 finalizer after the $C800 builders (DefaultHandler)
-org $C0A33B
-LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810
 Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
 org $C0AF4E

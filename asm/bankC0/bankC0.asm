@@ -13067,6 +13067,1481 @@ Map_StepTileEffects:
     STZ.b !Map_Unk1D2B-!DP_Map
     RTS
 
+; ------------------------------------------------------------
+; $C0:9DC3 — Map_InitEntryTile (102 bytes, $9DC3–$9E28)
+; The sibling of Map_StepTileEffects for a location load: it reads the
+; entry tile (Loc_EntryX/Y) with Map_ProbeTileAttrsAny and
+; Map_ProbeTileLevel at the bottom middle of the tile (Map_ProbeX low
+; byte Map_ProbeMidX, Map_ProbeY low byte Map_ProbeBottomY; the high
+; bytes are left as they are, Map_ProbeTileLevel reads only the low
+; ones), then:
+; - Field_Unk55 = Map_ProbeLevel, or Map_EntryLevelMin when that is 0
+;   (so a level-0 tile starts the leader at level 1);
+; - the leader (Party_ObjSlot) gets Obj_PrioLow = Map_ProbePrio and
+;   Obj_PrioHigh = Map_ProbePrioHi; the other two party slots get
+;   Map_ProbePrioHi in both bytes (A is not reloaded; kept as found);
+; - Map_Unk1D34 = Map_ProbeMoveFlags.
+; Before that it zeroes Field_UnkAB-AD and byte 0 of ObjX_Unk7F0C00,
+; 7F0C80, 7F0D00 and 7F0D80 (object 0's entry, if those are per-object
+; tables like the ObjX_* ones; not established).
+; Callers: BRL from unmatched location-load code at $C0:5926 (its
+;   only call site; it returns to that code's caller).
+; On entry: M=1 (8-bit A), X either (8-bit inside), DP any (saved, set
+; to $1D00 = !DP_Map, restored), DB=$00 or $7E (Field_*, Obj_Prio*
+; and Map_Unk1D34 written absolute in low RAM).
+; Exit: M=1, X=0 (16-bit), DP and DB unchanged; A = Map_ProbeMoveFlags,
+; X = Party_ObjSlot2 (low byte), Y clobbered; the probe bytes and
+; Map_ProbeTileLevel's outputs written.
+; ------------------------------------------------------------
+Map_InitEntryTile:
+    STZ.w !DP_Field+!Field_UnkAB
+    STZ.w !DP_Field+!Field_UnkAC
+    STZ.w !DP_Field+!Field_UnkAD
+    LDA.b #$00
+    STA.l !ObjX_Unk7F0C00
+    STA.l !ObjX_Unk7F0C80
+    STA.l !ObjX_Unk7F0D00
+    STA.l !ObjX_Unk7F0D80
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    LDA.w !DP_Field+!Loc_EntryX         ; 16-bit: Loc_EntryY << 8 | Loc_EntryX
+    SEP #$20
+    JSR Map_ProbeTileAttrsAny
+    LDA.b #!Map_ProbeMidX
+    STA.b !Map_ProbeX-!DP_Map
+    LDA.b #!Map_ProbeBottomY
+    STA.b !Map_ProbeY-!DP_Map
+    JSR Map_ProbeTileLevel
+    LDA.b !Map_ProbeLevel-!DP_Map
+    BNE .set_level
+    LDA.b #!Map_EntryLevelMin
+.set_level:
+    STA.w !DP_Field+!Field_Unk55
+    LDA.b !Map_ProbePrio-!DP_Map
+    LDX.w !DP_Field+!Party_ObjSlot      ; 8-bit X: the slot's low byte
+    STA.w !Obj_PrioLow,X
+    LDA.b !Map_ProbePrioHi-!DP_Map
+    STA.w !Obj_PrioHigh,X
+    LDX.w !DP_Field+!Party_ObjSlot1
+    STA.w !Obj_PrioLow,X                ; Map_ProbePrioHi in both bytes
+    STA.w !Obj_PrioHigh,X
+    LDX.w !DP_Field+!Party_ObjSlot2
+    STA.w !Obj_PrioLow,X
+    STA.w !Obj_PrioHigh,X
+    LDA.b !Map_ProbeMoveFlags-!DP_Map
+    STA.w !Map_Unk1D34
+    PLD
+    REP #$10
+    RTS
+
+; ============================================================
+; Location map setup: the map-properties step of a location load
+; (LocLoad_UnkA33B) with its three callees, which fill the layer sizes,
+; wrap masks, scroll limits, own-step amounts, screen layers and the
+; per-tile planes, and the exit and treasure tile planes
+; ($C0:7399–$C0:74A5, $C0:A33B–$C0:A7E8).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:7399 — Map_InitMasksAndLimits (269 bytes, $7399–$74A5)
+; Turns the six layer sizes LocLoad_UnkA33B just set into the wrap
+; masks the row / column writers use: Map_ColMask1 from Map_Unk0BCB,
+; Map_RowMask1 from Map_Unk0BCD, Map_ColMask2 / RowMask2 from
+; Map_Unk0BCF / 0BD1, Map_ColMask3 / RowMask3 from Map_Unk0BD3 / 0BD5:
+; $40 and $30 give $3F, $20 gives $1F, anything else $0F (a 48-metatile
+; layer wraps at 64; the $40 and $30 cases are separate branches with
+; the same store, kept as found). Then the four limits Map_Unk1D1A /
+; 1D1C / 1D1B / 1D1D come from the location's LocRom.LimitLeft / Top /
+; Right / Bottom, or, when LimitLeft has bit 7 set, are 0, 0,
+; Map_Unk0BCB - 1 and Map_Unk0BCD - 1 (the edges of layer 1).
+; Callers: LocLoad_UnkA33B ($C0:A4FD), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: Loc_RecOfs), DP=$1D00
+; (!DP_Map), DB=$00 or $7E (Map_Unk0BCB-0BD5 and Loc_RecOfs read
+; absolute in low RAM).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X = Loc_RecOfs;
+; Map_ColMask1-Map_RowMask3 and Map_Unk1D1A-1D1D written.
+; ------------------------------------------------------------
+org $C07399
+Map_InitMasksAndLimits:
+    LDA.w !Map_Unk0BCB
+    CMP.b #!Map_Metatiles64
+    BEQ .col1_64
+    CMP.b #!Map_Metatiles32
+    BEQ .col1_32
+    CMP.b #!Map_Metatiles48
+    BEQ .col1_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_ColMask1-!DP_Map
+    BRA .row1
+.col1_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_ColMask1-!DP_Map
+    BRA .row1
+.col1_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask1-!DP_Map
+    BRA .row1
+.col1_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask1-!DP_Map
+.row1:
+    LDA.w !Map_Unk0BCD
+    CMP.b #!Map_Metatiles64
+    BEQ .row1_64
+    CMP.b #!Map_Metatiles32
+    BEQ .row1_32
+    CMP.b #!Map_Metatiles48
+    BEQ .row1_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_RowMask1-!DP_Map
+    BRA .col2
+.row1_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_RowMask1-!DP_Map
+    BRA .col2
+.row1_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask1-!DP_Map
+    BRA .col2
+.row1_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask1-!DP_Map
+.col2:
+    LDA.w !Map_Unk0BCF
+    CMP.b #!Map_Metatiles64
+    BEQ .col2_64
+    CMP.b #!Map_Metatiles32
+    BEQ .col2_32
+    CMP.b #!Map_Metatiles48
+    BEQ .col2_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_ColMask2-!DP_Map
+    BRA .row2
+.col2_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_ColMask2-!DP_Map
+    BRA .row2
+.col2_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask2-!DP_Map
+    BRA .row2
+.col2_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask2-!DP_Map
+.row2:
+    LDA.w !Map_Unk0BD1
+    CMP.b #!Map_Metatiles64
+    BEQ .row2_64
+    CMP.b #!Map_Metatiles32
+    BEQ .row2_32
+    CMP.b #!Map_Metatiles48
+    BEQ .row2_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_RowMask2-!DP_Map
+    BRA .col3
+.row2_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_RowMask2-!DP_Map
+    BRA .col3
+.row2_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask2-!DP_Map
+    BRA .col3
+.row2_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask2-!DP_Map
+.col3:
+    LDA.w !Map_Unk0BD3
+    CMP.b #!Map_Metatiles64
+    BEQ .col3_64
+    CMP.b #!Map_Metatiles32
+    BEQ .col3_32
+    CMP.b #!Map_Metatiles48
+    BEQ .col3_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_ColMask3-!DP_Map
+    BRA .row3
+.col3_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_ColMask3-!DP_Map
+    BRA .row3
+.col3_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask3-!DP_Map
+    BRA .row3
+.col3_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_ColMask3-!DP_Map
+.row3:
+    LDA.w !Map_Unk0BD5
+    CMP.b #!Map_Metatiles64
+    BEQ .row3_64
+    CMP.b #!Map_Metatiles32
+    BEQ .row3_32
+    CMP.b #!Map_Metatiles48
+    BEQ .row3_48
+    LDA.b #!Map_WrapMask16
+    STA.b !Map_RowMask3-!DP_Map
+    BRA .limits
+.row3_32:
+    LDA.b #!Map_WrapMask32
+    STA.b !Map_RowMask3-!DP_Map
+    BRA .limits
+.row3_48:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask3-!DP_Map
+    BRA .limits
+.row3_64:
+    LDA.b #!Map_WrapMask64
+    STA.b !Map_RowMask3-!DP_Map
+.limits:
+    LDX.w !DP_Field+!Loc_RecOfs
+    LDA.l LocRom.LimitLeft,X
+    BMI .map_edges
+    STA.b !Map_Unk1D1A-!DP_Map
+    LDA.l LocRom.LimitTop,X
+    STA.b !Map_Unk1D1C-!DP_Map
+    LDA.l LocRom.LimitRight,X
+    STA.b !Map_Unk1D1B-!DP_Map
+    LDA.l LocRom.LimitBottom,X
+    STA.b !Map_Unk1D1D-!DP_Map
+    RTS
+.map_edges:
+    STZ.b !Map_Unk1D1A-!DP_Map
+    STZ.b !Map_Unk1D1C-!DP_Map
+    LDA.w !Map_Unk0BCB
+    DEC A
+    STA.b !Map_Unk1D1B-!DP_Map
+    LDA.w !Map_Unk0BCD
+    DEC A
+    STA.b !Map_Unk1D1D-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A33B — LocLoad_UnkA33B (461 bytes, $A33B–$A507)
+; The map-properties step of a location load (name kept: LoadLocation
+; and Field_RestoreState call it by it). It unpacks the location's
+; MapProps (Map_PropsPtrs entry LocRom.MapProps) to $7E:B500 with
+; Decomp_ToWramVec, then with DP=$1D00 splits it:
+; - zeroes the high bytes Map_Unk0BCBHi-0BD5Hi;
+; - from MapProps.Size3: Map_Unk0BCA = Map_Unk0BCAOn or 0 (bit 7),
+;   Map_Unk0BC9 = Map_Unk0BC9Set or 0 (bit 6), Map_OwnStepFlags =
+;   Map_OwnStep3 (bit 5) | Map_OwnStep2 (bit 4), Map_Unk0BD3 = (bits 0-1
+;   + 1) x 16 and Map_Unk0BD5 = (bits 2-3 + 4) x 4 (layer 3's sizes);
+; - from MapProps.Size1 the same for layer 1 (Map_Unk0BCB, Map_Unk0BCD)
+;   and layer 2: Map_Unk0BCF = bits 4-5 + $10, Map_Unk0BD1 = bits 6-7
+;   / 4 + $10 (all four sizes come out $10, $20, $30 or $40);
+; - Ppu_Unk0BDF = Ppu_Unk0BE0 = MapProps.ColorMath;
+; - Ppu_Unk0BD7 (TM) = MapProps.Screens bits 0-2, with bit 3 moved to
+;   bit 4 (OBJ); Ppu_Unk0BD8 (TS) = bits 4-6 >> 4, bit 7 to bit 4; with
+;   Field_UnkBB nonzero both are cut to Layer_Bg12Obj (no BG3);
+; - Map_LayerEdgeOff = Map_OwnStepFlags, then for MapProps.Move2 (if
+;   nonzero) Map_OwnStep2X / 2Y = 1 << (n - 1) for the 3-bit fields n,
+;   negated by their sign bits (a field of 0 leaves its byte as it
+;   was), and Map_Layer2 set in Map_LayerEdgeOff; the same for Move3
+;   (Map_OwnStep3X/Y, Map_Layer3);
+; - and calls Map_InitMasksAndLimits, Map_UnpackTilePlanes (which reads
+;   the rest of MapProps from MapProps.Planes) and Map_LoadExitTiles.
+; Callers: LoadLocation ($C0:0106), Field_RestoreState ($C0:01CF) and
+;   unmatched code at $C0:0316.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (!DP_Field:
+; Loc_RecOfs read as dp), DB=$00 (Map_Unk0BC9-0BE0 and Field_UnkBB
+; absolute; Map_UnpackTilePlanes needs the WRAM port registers).
+; Exit: M=1, X=0, DP restored, DB unchanged; A, X, Y clobbered;
+; Eng_Scratch, the Decomp_* block, MapProps and the callees' outputs
+; written (Map_ColMask1-RowMask3, Map_Unk1D1A-1D1D, the tile planes,
+; Map_TileExitIdx, Map_ExitRec0 and their scratch bytes).
+; ------------------------------------------------------------
+org $C0A33B
+LocLoad_UnkA33B:
+    REP #$20
+    LDX.b !Loc_RecOfs
+    LDA.l LocRom.MapProps,X
+    STA.b !Eng_Scratch
+    CLC
+    ADC.b !Eng_Scratch
+    ADC.b !Eng_Scratch                  ; x Map_PropsPtrSize
+    TAX
+    LDA.l !Map_PropsPtrs,X
+    STA.w !Decomp_Src
+    LDA.w #MapProps&$FFFF
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.l !Map_PropsPtrs+2,X
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7E
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    STZ.w !Map_Unk0BCBHi
+    STZ.w !Map_Unk0BCDHi
+    STZ.w !Map_Unk0BCFHi
+    STZ.w !Map_Unk0BD1Hi
+    STZ.w !Map_Unk0BD3Hi
+    STZ.w !Map_Unk0BD5Hi
+    LDA.l MapProps.Size3
+    STA.b !Map_LoadScratch-!DP_Map
+    BPL .no_layer3_plane
+    LDA.b #!Map_Unk0BCAOn
+    STA.w !Map_Unk0BCA
+    BRA .half_rate
+.no_layer3_plane:
+    STZ.w !Map_Unk0BCA
+.half_rate:
+    LDA.b !Map_LoadScratch-!DP_Map
+    BIT.b #!MapProps_HalfRate2
+    BNE .half_rate_on
+    STZ.w !Map_Unk0BC9
+    BRA .own_step3
+.half_rate_on:
+    LDA.b #!Map_Unk0BC9Set
+    STA.w !Map_Unk0BC9
+.own_step3:
+    LDA.b !Map_LoadScratch-!DP_Map
+    BIT.b #!MapProps_OwnStep3
+    BNE .own_step3_on
+    STZ.b !Map_OwnStepFlags-!DP_Map
+    BRA .own_step2
+.own_step3_on:
+    LDA.b #!Map_OwnStep3
+    STA.b !Map_OwnStepFlags-!DP_Map
+.own_step2:
+    LDA.b !Map_LoadScratch-!DP_Map
+    BIT.b #!MapProps_OwnStep2
+    BEQ .layer3_size
+    LDA.b !Map_OwnStepFlags-!DP_Map
+    ORA.b #!Map_OwnStep2
+    STA.b !Map_OwnStepFlags-!DP_Map
+.layer3_size:
+    LDA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapProps_WidthBits
+    INC A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Map_Unk0BD3
+    LDA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapProps_HeightBits
+    CLC
+    ADC.b #!MapProps_HeightAdd
+    ASL A
+    ASL A
+    STA.w !Map_Unk0BD5
+    LDA.l MapProps.Size1
+    STA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapProps_WidthBits
+    INC A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Map_Unk0BCB
+    LDA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapProps_HeightBits
+    CLC
+    ADC.b #!MapProps_HeightAdd
+    ASL A
+    ASL A
+    STA.w !Map_Unk0BCD
+    LDA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapProps_L2WidthBits
+    CLC
+    ADC.b #!Map_ScreenMetatiles
+    STA.w !Map_Unk0BCF
+    LDA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapProps_L2HeightBits
+    LSR A
+    LSR A
+    CLC
+    ADC.b #!Map_ScreenMetatiles
+    STA.w !Map_Unk0BD1
+    LDA.l MapProps.ColorMath
+    STA.w !Ppu_Unk0BDF
+    STA.w !Ppu_Unk0BE0
+    LDA.l MapProps.Screens
+    STA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapScreens_MainBgs
+    STA.b !Map_PropsPart-!DP_Map
+    LDA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapScreens_MainObj
+    ASL A                               ; OBJ: bit 3 -> bit 4
+    ORA.b !Map_PropsPart-!DP_Map
+    STA.w !Ppu_Unk0BD7
+    LDA.w !DP_Field+!Field_UnkBB
+    BEQ .sub_screen
+    LDA.w !Ppu_Unk0BD7
+    AND.b #!Layer_Bg12Obj
+    STA.w !Ppu_Unk0BD7
+.sub_screen:
+    LDA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapScreens_SubBgs
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Map_PropsPart-!DP_Map
+    LDA.b !Map_LoadScratch-!DP_Map
+    AND.b #!MapScreens_SubObj
+    LSR A
+    LSR A
+    LSR A                               ; OBJ: bit 7 -> bit 4
+    ORA.b !Map_PropsPart-!DP_Map
+    STA.w !Ppu_Unk0BD8
+    LDA.w !DP_Field+!Field_UnkBB
+    BEQ .own_steps
+    LDA.w !Ppu_Unk0BD8
+    AND.b #!Layer_Bg12Obj
+    STA.w !Ppu_Unk0BD8
+.own_steps:
+    LDA.b !Map_OwnStepFlags-!DP_Map
+    STA.b !Map_LayerEdgeOff-!DP_Map
+    LDA.l MapProps.Move2
+    BEQ .move3
+    STA.b !Map_PropsPart-!DP_Map
+    SEP #$10
+    AND.b #!MapMove_XBits
+    BEQ .move2_y
+    TAY
+    LDA.b #$01
+.move2_x_shift:
+    DEY
+    BEQ .move2_x_set
+    ASL A
+    BRA .move2_x_shift
+.move2_x_set:
+    STA.b !Map_OwnStep2X-!DP_Map
+    LDA.b !Map_PropsPart-!DP_Map
+    BIT.b #!MapMove_XNeg
+    BEQ .move2_y
+    LDA.b !Map_OwnStep2X-!DP_Map
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_OwnStep2X-!DP_Map
+.move2_y:
+    LDA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapMove_YBits
+    BEQ .move2_done
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    TAY
+    LDA.b #$01
+.move2_y_shift:
+    DEY
+    BEQ .move2_y_set
+    ASL A
+    BRA .move2_y_shift
+.move2_y_set:
+    STA.b !Map_OwnStep2Y-!DP_Map
+    LDA.b !Map_PropsPart-!DP_Map
+    BIT.b #!MapMove_YNeg
+    BEQ .move2_done
+    LDA.b !Map_OwnStep2Y-!DP_Map
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_OwnStep2Y-!DP_Map
+.move2_done:
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    ORA.b #!Map_Layer2
+    STA.b !Map_LayerEdgeOff-!DP_Map
+    REP #$10
+.move3:
+    LDA.l MapProps.Move3
+    BEQ .finish
+    STA.b !Map_PropsPart-!DP_Map
+    SEP #$10
+    AND.b #!MapMove_XBits
+    BEQ .move3_y
+    TAY
+    LDA.b #$01
+.move3_x_shift:
+    DEY
+    BEQ .move3_x_set
+    ASL A
+    BRA .move3_x_shift
+.move3_x_set:
+    STA.b !Map_OwnStep3X-!DP_Map
+    LDA.b !Map_PropsPart-!DP_Map
+    BIT.b #!MapMove_XNeg
+    BEQ .move3_y
+    LDA.b !Map_OwnStep3X-!DP_Map
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_OwnStep3X-!DP_Map
+.move3_y:
+    LDA.b !Map_PropsPart-!DP_Map
+    AND.b #!MapMove_YBits
+    BEQ .move3_done
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    TAY
+    LDA.b #$01
+.move3_y_shift:
+    DEY
+    BEQ .move3_y_set
+    ASL A
+    BRA .move3_y_shift
+.move3_y_set:
+    STA.b !Map_OwnStep3Y-!DP_Map
+    LDA.b !Map_PropsPart-!DP_Map
+    BIT.b #!MapMove_YNeg
+    BEQ .move3_done
+    LDA.b !Map_OwnStep3Y-!DP_Map
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !Map_OwnStep3Y-!DP_Map
+.move3_done:
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    ORA.b #!Map_Layer3
+    STA.b !Map_LayerEdgeOff-!DP_Map
+    REP #$10
+.finish:
+    JSR Map_InitMasksAndLimits
+    JSR Map_UnpackTilePlanes
+    JSR Map_LoadExitTiles
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A508 — LocLoad_EmptyStep (1 byte, $A508)
+; A lone RTS: does nothing. Its one caller calls it between two steps
+; of the reload sequence (probably a step that was emptied out).
+; Callers: LocLoad_DrawMap ($C0:0A70).
+; Entry/Exit: any state; nothing changed.
+; ------------------------------------------------------------
+LocLoad_EmptyStep:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A509 — Ppu_ApplyMapScreens (24 bytes, $A509–$A520)
+; Writes the screen settings LocLoad_UnkA33B took from MapProps to the
+; PPU: Ppu_Unk0BD7 to TM, Ppu_Unk0BD8 to TS, Ppu_Unk0BDF to CGADSUB,
+; and 0 to MOSAIC (mosaic off).
+; Callers: LocLoad_DrawMap ($C0:0A61) (xref also lists a doubtful
+;   JSR at $C0:5CB9, inside other code's operands, not a call).
+; On entry: M=1 (8-bit A), X any, DP any, DB=$00-$3F or $80-$BF (the
+; PPU registers and Ppu_Unk0BD7-0BDF absolute; $00 from its caller).
+; Exit: M=1, X, DP and DB unchanged; A = 0.
+; ------------------------------------------------------------
+Ppu_ApplyMapScreens:
+    LDA.w !Ppu_Unk0BD7
+    STA.w TM
+    LDA.w !Ppu_Unk0BD8
+    STA.w TS
+    LDA.w !Ppu_Unk0BDF
+    STA.w CGADSUB
+    LDA.b #$00
+    STA.w MOSAIC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A521 — Map_UnpackTilePlanes (330 bytes, $A521–$A66A)
+; Reads the rest of the unpacked MapProps (from MapProps.Planes, through
+; the WRAM data port) into the map's per-tile planes. Each plane is
+; filled row by row, index row << 8 | column, Map_RowEnd ending a row
+; and Map_PlaneEnd the plane:
+; - Map_TileProps (layer 1's tiles): Map_Unk0BCD rows of Map_Unk0BCB
+;   bytes;
+; - Map_Layer2Tiles: Map_Unk0BD1 rows of Map_Unk0BCF bytes;
+; - Map_Layer3Tiles: Map_Unk0BD5 rows of Map_Unk0BD3 bytes, only when
+;   Map_Unk0BCA bit 0 is set;
+; - Map_TileHiBits, Map_TileAttrA and Map_TileAttrB together, over layer
+;   1's size, as entries of three bytes (HiBits, AttrA, AttrB) for one
+;   tile, or, when the first byte has bit 7 set, a run: HiBits = that
+;   byte & Map_RunFlagMask, AttrA, AttrB, then a count (0 = 256) of
+;   tiles that all get the three values, carried across row ends.
+; It returns when the last plane is full (in the middle of a run if the
+; run is longer).
+; Callers: LocLoad_UnkA33B ($C0:A500), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+; (WMADDL/WMADDH/WMDATA and Map_Unk0BC9-0BD5 absolute); MapProps
+; unpacked at $7E:B500.
+; Exit: M=1, X=0, DP and DB unchanged; A, X, Y clobbered; Map_PlaneEnd,
+; Map_RowEnd and the Map_Run* bytes written; the WRAM port address left
+; past the data read.
+; ------------------------------------------------------------
+Map_UnpackTilePlanes:
+    LDX.w #MapProps.Planes&$FFFF
+    STX.w WMADDL
+    LDA.b #$00                          ; WRAM bank $7E (WMADDH bit 0 clear)
+    STA.w WMADDH
+    LDA.w !Map_Unk0BCD
+    REP #$20
+    XBA
+    AND.w #!Eng_HighByteMask
+    STA.b !Map_PlaneEnd-!DP_Map         ; rows << 8
+    SEP #$20
+    LDA.w !Map_Unk0BCB
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Map_RowEnd-!DP_Map           ; row 0, width
+    SEP #$20
+    LDX.w #$0000
+.layer1:
+    LDA.w WMDATA
+    STA.l !Map_TileProps,X
+    INX
+    CPX.b !Map_RowEnd-!DP_Map
+    BCC .layer1
+    LDA.b !Map_RowEndRow-!DP_Map
+    INC A
+    STA.b !Map_RowEndRow-!DP_Map
+    XBA
+    LDA.b #$00
+    TAX                                 ; X = next row << 8
+    CPX.b !Map_PlaneEnd-!DP_Map
+    BCC .layer1
+    LDA.w !Map_Unk0BD1
+    REP #$20
+    XBA
+    AND.w #!Eng_HighByteMask
+    STA.b !Map_PlaneEnd-!DP_Map
+    SEP #$20
+    LDA.w !Map_Unk0BCF
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Map_RowEnd-!DP_Map
+    SEP #$20
+    LDX.w #$0000
+.layer2:
+    LDA.w WMDATA
+    STA.l !Map_Layer2Tiles,X
+    INX
+    CPX.b !Map_RowEnd-!DP_Map
+    BCC .layer2
+    LDA.b !Map_RowEndRow-!DP_Map
+    INC A
+    STA.b !Map_RowEndRow-!DP_Map
+    XBA
+    LDA.b #$00
+    TAX
+    CPX.b !Map_PlaneEnd-!DP_Map
+    BCC .layer2
+    LDA.w !Map_Unk0BCA
+    AND.b #!Map_Unk0BCAOn
+    BEQ .attrs
+    LDA.w !Map_Unk0BD5
+    REP #$20
+    XBA
+    AND.w #!Eng_HighByteMask
+    STA.b !Map_PlaneEnd-!DP_Map
+    SEP #$20
+    LDA.w !Map_Unk0BD3
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Map_RowEnd-!DP_Map
+    SEP #$20
+    LDX.w #$0000
+.layer3:
+    LDA.w WMDATA
+    STA.l !Map_Layer3Tiles,X
+    INX
+    CPX.b !Map_RowEnd-!DP_Map
+    BCC .layer3
+    LDA.b !Map_RowEndRow-!DP_Map
+    INC A
+    STA.b !Map_RowEndRow-!DP_Map
+    XBA
+    LDA.b #$00
+    TAX
+    CPX.b !Map_PlaneEnd-!DP_Map
+    BCC .layer3
+.attrs:
+    LDA.w !Map_Unk0BCD
+    REP #$20
+    XBA
+    AND.w #!Eng_HighByteMask
+    STA.b !Map_PlaneEnd-!DP_Map
+    SEP #$20
+    LDA.w !Map_Unk0BCB
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Map_RowEnd-!DP_Map
+    SEP #$20
+    LDX.w #$0000
+    TDC
+    XBA                                 ; B = 0 (the low byte of DP $1D00)
+.attr_entry:
+    LDA.w WMDATA
+    BMI .run
+    STA.l !Map_TileHiBits,X
+    LDA.w WMDATA
+    STA.l !Map_TileAttrA,X
+    LDA.w WMDATA
+    STA.l !Map_TileAttrB,X
+.attr_next:
+    INX
+    CPX.b !Map_RowEnd-!DP_Map
+    BCC .attr_entry
+    LDA.b !Map_RowEndRow-!DP_Map
+    INC A
+    STA.b !Map_RowEndRow-!DP_Map
+    XBA
+    LDA.b #$00
+    TAX
+    CPX.b !Map_PlaneEnd-!DP_Map
+    BCC .attr_entry
+    RTS
+.run:
+    AND.b #!Map_RunFlagMask
+    STA.b !Map_RunHiBits-!DP_Map
+    STA.l !Map_TileHiBits,X
+    LDA.w WMDATA
+    STA.b !Map_RunAttrA-!DP_Map
+    STA.l !Map_TileAttrA,X
+    LDA.w WMDATA
+    STA.b !Map_RunAttrB-!DP_Map
+    STA.l !Map_TileAttrB,X
+    TDC
+    XBA                                 ; B = 0: Y = the count byte
+    LDA.w WMDATA
+    BNE .run_count
+    LDY.w #!Map_RunLen256
+    BRA .run_step
+.run_count:
+    TAY
+.run_step:
+    DEY
+    BEQ .attr_next
+    INX
+    CPX.b !Map_RowEnd-!DP_Map
+    BCC .run_tile
+    LDA.b !Map_RowEndRow-!DP_Map
+    INC A
+    STA.b !Map_RowEndRow-!DP_Map
+    XBA
+    LDA.b #$00
+    TAX
+    CPX.b !Map_PlaneEnd-!DP_Map
+    BCC .run_tile
+    RTS
+.run_tile:
+    LDA.b !Map_RunHiBits-!DP_Map
+    STA.l !Map_TileHiBits,X
+    LDA.b !Map_RunAttrA-!DP_Map
+    STA.l !Map_TileAttrA,X
+    LDA.b !Map_RunAttrB-!DP_Map
+    STA.l !Map_TileAttrB,X
+    BRA .run_step
+
+; ------------------------------------------------------------
+; $C0:A66B — Map_LoadExitTiles (167 bytes, $A66B–$A711)
+; Builds Map_TileExitIdx for the location: first every tile of all 64
+; rows gets Map_ExitNone (row 0 filled, then copied to rows 63 down to
+; 1 with MVN, one Map_PlaneBytes row at a time), then
+; Map_ExitRec0 = ExitRom_LocOfs[Loc_Id & Loc_IdMask], and for each
+; ExitRom record n from there up to the next location's first
+; (Map_RecEnd) the tile at TileX / TileY (masked with Map_ColMask1 /
+; Map_RowMask1) and the ExitRom.Span tiles after it get n: along the
+; row when Span bit 7 is clear (only the column is masked again, so
+; the run wraps within the row), down the column when it is set.
+; Quirk (kept): the row loop comes back to its AND with 8-bit A (from
+; a TXA after SEP #$20), so only the column byte is masked while B
+; still holds the row; the column loop does the AND 16-bit.
+; Callers: LocLoad_UnkA33B ($C0:A503), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+; or $7E (Loc_Id read absolute; DB is saved around each MVN);
+; Map_ColMask1/RowMask1 set.
+; Exit: M=1, X=0, DP and DB unchanged; A, X, Y clobbered;
+; Map_TileExitIdx, Map_ExitRec0, Map_RecOfs, Map_RecNum and Map_RecEnd
+; written.
+; ------------------------------------------------------------
+Map_LoadExitTiles:
+    LDA.b #!Map_ExitNone
+    LDX.w #$0000
+.clear_row0:
+    STA.l !Map_TileExitIdx,X
+    INX
+    CPX.w #!Map_PlaneBytes
+    BCC .clear_row0
+    REP #$20
+    LDY.w #(!Map_TileExitIdx+((!Map_PlaneRows-1)*!Map_RowStride))&$FFFF
+.copy_row:
+    LDX.w #!Map_TileExitIdx&$FFFF
+    LDA.w #!Map_PlaneCopyLen
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TYA
+    SEC
+    SBC.w #!Map_RowStride+!Map_PlaneBytes ; back to the start of the row above
+    TAY
+    CPY.w #!Map_TileExitIdx&$FFFF
+    BNE .copy_row
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!Loc_IdMask
+    ASL A
+    TAX
+    LDA.l !ExitRom_LocOfs,X
+    STA.b !Map_ExitRec0-!DP_Map
+    INX
+    INX
+    LDA.l !ExitRom_LocOfs,X
+    STA.b !Map_RecEnd-!DP_Map
+    LDX.b !Map_ExitRec0-!DP_Map
+    STZ.b !Map_RecNum-!DP_Map           ; 16-bit: also clears the byte after it
+.next_record:
+    CPX.b !Map_RecEnd-!DP_Map
+    BCS .done
+    LDA.w #$0000
+    SEP #$20
+    LDA.l ExitRom.Span,X
+    BMI .column
+    TAY
+    REP #$20
+    LDA.l ExitRom.TileX,X               ; 16-bit: TileY << 8 | TileX
+    STX.b !Map_RecOfs-!DP_Map
+.row_tile:
+    AND.b !Map_ColMask1-!DP_Map         ; 16-bit the first time, 8-bit after (see above)
+    TAX
+    SEP #$20
+    LDA.b !Map_RecNum-!DP_Map
+    STA.l !Map_TileExitIdx,X
+    CPY.w #$0000
+    BEQ .record_done
+    DEY
+    INX
+    TXA
+    BRA .row_tile
+.column:
+    AND.b #!Exit_SpanLenMask
+    TAY
+    REP #$20
+    LDA.l ExitRom.TileX,X
+    STX.b !Map_RecOfs-!DP_Map
+.column_tile:
+    AND.b !Map_ColMask1-!DP_Map         ; 16-bit: Map_RowMask1 masks the row
+    TAX
+    SEP #$20
+    LDA.b !Map_RecNum-!DP_Map
+    STA.l !Map_TileExitIdx,X
+    CPY.w #$0000
+    BEQ .record_done
+    DEY
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Map_RowStride
+    BRA .column_tile
+.record_done:
+    INC A
+    STA.b !Map_RecNum-!DP_Map
+    REP #$20
+    LDA.b !Map_RecOfs-!DP_Map
+    CLC
+    ADC.w #!Map_ExitRecSize
+    TAX
+    BRA .next_record
+.done:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A712 — Map_LoadTreasureTiles (170 bytes, $A712–$A7BB)
+; As Map_LoadExitTiles for treasure: Map_TreasureIdx gets
+; Map_TreasureNone on every tile (row 0, then MVN copies), then
+; Map_TreasureRec0 = the first word of TreasureRom_LocOfs and the
+; location's records run from TreasureRom_LocOfs[Loc_Id & Loc_IdMask]
+; to the next word. When that list is not empty but its first record
+; has a Tile word of 0, its Contents word is taken as another location
+; number and that location's list is used instead (repeated while it
+; holds; inferred from the indexing, which is the same). Each record n then marks its tile (Tile masked with
+; Map_ColMask1/RowMask1) in Map_TreasureIdx with n, and when the
+; treasure is already taken (Map_TreasureTaken, C=1) and the tile's
+; layer-1 metatile has bit 8 set (Map_TileHiBits bit 0), a low byte
+; of TileAnim_StateFE becomes TileAnim_StateFF and TileAnim_StateE0
+; becomes TileAnim_StateE1 in Map_TileProps: the state the tile is
+; stepped to when the treasure is taken (probably the opened chest).
+; Map_TreasureLocRecs is left at the first record (of the list used).
+; The STX to Map_LoadScratch is never read (kept as found).
+; Callers (2 JSR sites): unmatched code at $C0:033C and LocLoad_DrawMap
+;   ($C0:0A59).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+; (Loc_Id read absolute, and Map_TreasureTaken reads BitSet at $FF20);
+; Map_ColMask1/RowMask1, Map_TileHiBits and Map_TileProps set.
+; Exit: M=1, X=0, DP and DB unchanged; A, X, Y clobbered;
+; Map_TreasureIdx, Map_TreasureRec0, Map_TreasureLocRecs, Map_RecOfs,
+; Map_RecNum, Map_RecEnd and Map_TreasureNum written.
+; ------------------------------------------------------------
+Map_LoadTreasureTiles:
+    LDA.b #!Map_TreasureNone
+    LDX.w #$0000
+.clear_row0:
+    STA.l !Map_TreasureIdx,X
+    INX
+    CPX.w #!Map_PlaneBytes
+    BCC .clear_row0
+    REP #$20
+    LDY.w #(!Map_TreasureIdx+((!Map_PlaneRows-1)*!Map_RowStride))&$FFFF
+.copy_row:
+    LDX.w #!Map_TreasureIdx&$FFFF
+    LDA.w #!Map_PlaneCopyLen
+    PHB
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TYA
+    SEC
+    SBC.w #!Map_RowStride+!Map_PlaneBytes
+    TAY
+    CPY.w #!Map_TreasureIdx&$FFFF
+    BNE .copy_row
+    LDA.l !TreasureRom_LocOfs
+    STA.b !Map_TreasureRec0-!DP_Map
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!Loc_IdMask
+.find_list:
+    ASL A
+    TAX
+    LDA.l !TreasureRom_LocOfs+2,X
+    STA.b !Map_RecEnd-!DP_Map
+    LDA.l !TreasureRom_LocOfs,X
+    CMP.b !Map_RecEnd-!DP_Map
+    BEQ .done                           ; no treasure here
+    STA.b !Map_TreasureLocRecs-!DP_Map
+    STX.b !Map_LoadScratch-!DP_Map      ; never read
+    TAX
+    LDA.l TreasureRom.Tile,X
+    BNE .records
+    LDA.l TreasureRom.Contents,X        ; tile 0: use this location's list
+    BRA .find_list
+.records:
+    LDX.b !Map_TreasureLocRecs-!DP_Map
+    STZ.b !Map_RecNum-!DP_Map           ; 16-bit: also clears the byte after it
+.next_record:
+    CPX.b !Map_RecEnd-!DP_Map
+    BCS .done
+    LDA.l TreasureRom.Tile,X
+    STX.b !Map_RecOfs-!DP_Map
+    AND.b !Map_ColMask1-!DP_Map         ; 16-bit: Map_RowMask1 masks the row
+    TAX
+    SEP #$20
+    LDA.b !Map_RecNum-!DP_Map
+    STA.l !Map_TreasureIdx,X
+    JSR Map_TreasureTaken
+    BCC .record_done
+    LDA.l !Map_TileHiBits,X
+    BIT.b #!TileHiBits_L1Bit8
+    BEQ .record_done
+    LDA.l !Map_TileProps,X
+    CMP.b #!TileAnim_StateFE
+    BEQ .taken_fe
+    CMP.b #!TileAnim_StateE0
+    BNE .record_done
+    LDA.b #!TileAnim_StateE1
+    STA.l !Map_TileProps,X
+    BRA .record_done
+.taken_fe:
+    LDA.b #!TileAnim_StateFF
+    STA.l !Map_TileProps,X
+.record_done:
+    LDA.b !Map_RecNum-!DP_Map
+    INC A
+    STA.b !Map_RecNum-!DP_Map
+    REP #$20
+    LDA.b !Map_RecOfs-!DP_Map
+    CLC
+    ADC.w #!Map_TreasureRecSize
+    TAX
+    BRA .next_record
+.done:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A7BC — Map_TreasureTaken (45 bytes, $A7BC–$A7E8)
+; Tests the Treasure_Flags bit of the record at Map_RecOfs: its number
+; is (Map_RecOfs - Map_TreasureRec0) / 4, as in Field_CheckTileInFront.
+; Returns C=1 when the bit is set (the treasure was taken), C=0 if not.
+; Callers: Map_LoadTreasureTiles ($C0:A782), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
+; (BitSet read absolute at $FF20); Map_RecOfs set.
+; Exit: M=1, X=0, DP and DB unchanged; X preserved (PHX/PLX); A = the
+; flag byte; Y = the bit number; Map_TreasureNum = the flag bit;
+; C = taken.
+; ------------------------------------------------------------
+Map_TreasureTaken:
+    PHX
+    REP #$20
+    LDA.b !Map_RecOfs-!DP_Map
+    SEC
+    SBC.b !Map_TreasureRec0-!DP_Map
+    LSR A
+    LSR A
+    STA.b !Map_TreasureNum-!DP_Map     ; treasure number
+    LSR A
+    LSR A
+    LSR A
+    AND.w #!Treasure_FlagByteMask
+    TAX                                 ; flag byte
+    SEP #$20
+    LDA.b !Map_TreasureNum-!DP_Map
+    AND.b #!Treasure_FlagBitMask
+    TAY
+    LDA.w BitSet,Y
+    STA.b !Map_TreasureNum-!DP_Map     ; flag bit
+    LDA.l !Treasure_Flags,X
+    BIT.b !Map_TreasureNum-!DP_Map
+    BNE .taken
+    PLX
+    CLC
+    RTS
+.taken:
+    PLX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A7E9 — Obj_ResetFrameState (39 bytes, $A7E9–$A80F)
+; For each location object (Evt_ObjCount of them) writes 0 to its
+; Obj_Unk0F00 (no frame to build) and Obj_LastFrameNone to its
+; Obj_LastFrame (so the next frame is always rebuilt), through the WRAM
+; data port from Obj_Unk0F00 on: two bytes per object, the objects'
+; 2-byte slot stride. The DEC/BNE count assumes Evt_ObjCount >= 1 (0
+; would write 256 pairs; kept as found).
+; Callers (2 JSR sites): unmatched code at $C0:287E (in Scene_ReloadStep)
+;   and $C0:56C2.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (saved, set to $2100
+; = !DP_PPU, restored), DB any (Evt_ObjCount read long).
+; Exit: M=1, X=0, DP restored, DB unchanged; A = 0, X = 0, Y =
+; Obj_LastFrameNone; the WRAM port address left past the last pair.
+; ------------------------------------------------------------
+Obj_ResetFrameState:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDX.w #!Obj_Unk0F00
+    STX.b WMADDL-!DP_PPU
+    LDA.b #$00                          ; bank $7E: the low-RAM object tables
+    STA.b WMADDH-!DP_PPU
+    SEP #$10
+    LDA.l !Evt_ObjCount
+    LDX.b #$00
+    LDY.b #!Obj_LastFrameNone
+.object:
+    STX.b WMDATA-!DP_PPU                ; Obj_Unk0F00
+    STY.b WMDATA-!DP_PPU                ; Obj_LastFrame
+    DEC A
+    BNE .object
+    REP #$10
+    PLD
+    RTS
+
+; ============================================================
+; Map drawing after a load: the reload step that puts the treasure
+; tiles in, sets the screen registers and the scroll origin and builds
+; and uploads the three layers ($C0:0A50), the origin setup and the
+; per-layer scroll resets ($C0:74A6–$C0:759F), and the right-edge
+; column build Field_Unk87F1 ($C0:87F1).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:0A50 — LocLoad_DrawMap (175 bytes, $0A50–$0AFE)
+; Draws the freshly loaded map:
+; - Map_LoadTreasureTiles (DP=$1D00), Ppu_SetBgLayout and
+;   Ppu_ApplyMapScreens;
+; - with DP=$1D00: Map_InitOrigin, LocLoad_EmptyStep, the tilemap VRAM
+;   bases Map_TilemapVram = Map_VramTilemap1, Map_TilemapVram3 =
+;   Map_VramTilemap2, Map_TilemapVramL3 = Map_VramTilemap3,
+;   Map_TilemapVram2 = Map_VramTilemapAlt, and Map_TilemapVram4,
+;   Map_TilemapVram4Hi and Map_Unk1D86 = Map_ScSizeInit;
+; - layer 1: Field_BuildC800Mode1, then Map_UploadBuf2K to
+;   Map_TilemapVram; layer 2: Field_BuildC800Mode2, uploaded to
+;   Map_TilemapVram3 with Map_UploadBuf4K when Map_LayerEdgeOff has
+;   Map_Layer2 set (the layer moves on its own), else Map_UploadBuf2K;
+;   layer 3 the same (Field_BuildC800Mode4, Map_TilemapVramL3,
+;   Map_Layer3), only when Map_Unk0BCA bit 0 is set and Field_UnkBB is 0;
+; - Field_Unk87F1 (the right-edge columns), then Map_Unk1D86 =
+;   Field_Unk0BE9 when that is nonzero.
+; Callers: Scene_ReloadStep ($C0:286F), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (!DP_Field:
+; VramDma_Addr written as dp), DB=$00 (the callees write PPU and WRAM
+; port registers absolute).
+; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X, Y clobbered; besides the
+; above, everything the callees write (the map planes and edge
+; buffers, the origin and bounds, Map_EdgeVram*/EdgeSize*, VRAM).
+; ------------------------------------------------------------
+org $C00A50
+LocLoad_DrawMap:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    JSR Map_LoadTreasureTiles
+    PLD
+    JSL Ppu_SetBgLayout
+    JSR Ppu_ApplyMapScreens
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    JSR Map_InitOrigin
+    JSR LocLoad_EmptyStep
+    LDX.w #!Map_VramTilemap1
+    STX.w !Map_TilemapVram
+    LDX.w #!Map_VramTilemap2
+    STX.w !Map_TilemapVram3
+    LDX.w #!Map_VramTilemap3
+    STX.w !Map_TilemapVramL3
+    LDX.w #!Map_VramTilemapAlt
+    STX.w !Map_TilemapVram2
+    LDA.b #!Map_ScSizeInit
+    STA.w !Map_TilemapVram4
+    STA.w !Map_TilemapVram4Hi
+    STA.w !Map_Unk1D86
+    JSR Field_BuildC800Mode1
+    PLD
+    LDX.w !Map_TilemapVram
+    STX.b !VramDma_Addr
+    JSR Map_UploadBuf2K
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    JSR Field_BuildC800Mode2
+    PLD
+    LDX.w !Map_TilemapVram3
+    STX.b !VramDma_Addr
+    LDA.w !Map_LayerEdgeOff
+    BIT.b #!Map_Layer2
+    BEQ .layer2_2k
+    JSR Map_UploadBuf4K
+    BRA .layer3
+.layer2_2k:
+    JSR Map_UploadBuf2K
+.layer3:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    LDA.w !Map_Unk0BCA
+    AND.b #!Map_Unk0BCAOn
+    BEQ .no_layer3
+    LDA.w !DP_Field+!Field_UnkBB
+    BNE .no_layer3
+    JSR Field_BuildC800Mode4
+    PLD
+    LDX.w !Map_TilemapVramL3
+    STX.b !VramDma_Addr
+    LDA.w !Map_LayerEdgeOff
+    BIT.b #!Map_Layer3
+    BEQ .layer3_2k
+    JSR Map_UploadBuf4K
+    BRA .edges
+.layer3_2k:
+    JSR Map_UploadBuf2K
+    BRA .edges
+.no_layer3:
+    PLD
+.edges:
+    JSR Field_Unk87F1
+    LDA.w !Field_Unk0BE9
+    BEQ .done
+    STA.w !Map_Unk1D86
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:74A6 — Map_InitOrigin (46 bytes, $74A6–$74D3)
+; Sets the scroll origin for the leader's entry point: Map_InitOriginX
+; and Map_InitOriginY, then, when Map_Unk0BC9 has bit 7 set (layer 2 at
+; half rate), layer 2's half-rate origin and bounds: Map_Unk1D12 =
+; Map_TileOriginX / 2 made even, Map_Unk1D14 = that + Bg_ScreenWidth,
+; Map_Unk1D16 = Map_TileOriginY / 2, Map_Unk1D18 = that +
+; Map_ScreenTileRows. Then it zeroes the six tilemap biases
+; Map_BgColBias-Map_BgRowBias3 and tail-jumps to Sub_C07F9A.
+; Callers: LocLoad_DrawMap ($C0:0A6D), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y, for Sub_C07F9A), DP=$1D00
+; (!DP_Map), DB=$00 or $7E (Map_Unk0BC9 and Loc_EntryX/Y absolute in
+; low RAM).
+; Exit (from Sub_C07F9A, BRL tail call): M=1, X=0, DP and DB unchanged;
+; A, X, Y clobbered; Map_TileOriginX/Y, Map_Unk1D0C, Map_Unk1D10 (low
+; bytes), Map_Unk1D12-1D18, the biases, Map_OriginTest and
+; Sub_C07F9A's outputs written.
+; ------------------------------------------------------------
+org $C074A6
+Map_InitOrigin:
+    JSR Map_InitOriginX
+    JSR Map_InitOriginY
+    LDA.w !Map_Unk0BC9
+    BPL .biases
+    LDA.b !Map_TileOriginX-!DP_Map
+    LSR A
+    AND.b #!Map_EvenMask
+    STA.b !Map_Unk1D12-!DP_Map
+    CLC
+    ADC.b #!Bg_ScreenWidth
+    STA.b !Map_Unk1D14-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    LSR A
+    STA.b !Map_Unk1D16-!DP_Map
+    CLC
+    ADC.b #!Map_ScreenTileRows
+    STA.b !Map_Unk1D18-!DP_Map
+.biases:
+    REP #$20
+    STZ.b !Map_BgColBias-!DP_Map        ; 16-bit: with Map_BgRowBias
+    STZ.b !Map_BgColBias2-!DP_Map       ; with Map_BgRowBias2
+    STZ.b !Map_BgColBias3-!DP_Map       ; with Map_BgRowBias3
+    SEP #$20
+    BRL Sub_C07F9A
+
+; ------------------------------------------------------------
+; $C0:74D4 — Field_Unk74D4 (20 bytes, $74D4–$74E7)
+; Resets layer 1's scroll: zeroes Map_BgColBias / Map_BgRowBias and the
+; scroll words Map_Unk1D87 / Map_Unk1D89, then runs Sub_C07F9A for the
+; new edge addresses. Field_Unk74E8 (layer 2) and Field_Unk74F7 (layer
+; 3) do the same for their layer and branch into the shared tail
+; Field_Unk74D4_Tail (SEP, the call, PLD, RTS).
+; Callers: DefaultHandler ($C0:17AD, $C0:1825, $C0:184C) and
+;   Field_HookLeaveToBankC3 ($C0:261B).
+; On entry: M either (set to 16-bit inside), X=0 (16-bit X/Y, for
+; Sub_C07F9A), DP any (saved, set to $1D00 = !DP_Map, restored), DB any
+; (all direct page).
+; Exit: M=1, X=0, DP restored, DB unchanged; A, X, Y clobbered;
+; Sub_C07F9A's outputs written.
+; ------------------------------------------------------------
+org $C074D4
+Field_Unk74D4:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    STZ.b !Map_BgColBias-!DP_Map        ; with Map_BgRowBias
+    STZ.b !Map_Unk1D87-!DP_Map
+    STZ.b !Map_Unk1D89-!DP_Map
+Field_Unk74D4_Tail:                     ; header: see Field_Unk74D4
+    SEP #$20
+    JSR Sub_C07F9A
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:74E8 — Field_Unk74E8 (15 bytes, $74E8–$74F6)
+; As Field_Unk74D4 for layer 2: zeroes Map_BgColBias2 / Map_BgRowBias2,
+; Map_Unk1D8B and Map_Unk1D8D, then Field_Unk74D4_Tail.
+; Callers: DefaultHandler ($C0:17D6, $C0:1828) and Field_HookWinPulse
+;   ($C0:265C).
+; Entry/Exit: as Field_Unk74D4.
+; ------------------------------------------------------------
+Field_Unk74E8:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    STZ.b !Map_BgColBias2-!DP_Map       ; with Map_BgRowBias2
+    STZ.b !Map_Unk1D8B-!DP_Map
+    STZ.b !Map_Unk1D8D-!DP_Map
+    BRA Field_Unk74D4_Tail
+
+; ------------------------------------------------------------
+; $C0:74F7 — Field_Unk74F7 (15 bytes, $74F7–$7505)
+; As Field_Unk74D4 for layer 3: zeroes Map_BgColBias3 / Map_BgRowBias3,
+; Map_Unk1D8F and Map_Unk1D91, then Field_Unk74D4_Tail.
+; Callers: DefaultHandler ($C0:1873) and Field_HookWinPulse ($C0:265F).
+; Entry/Exit: as Field_Unk74D4.
+; ------------------------------------------------------------
+Field_Unk74F7:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    STZ.b !Map_BgColBias3-!DP_Map       ; with Map_BgRowBias3
+    STZ.b !Map_Unk1D8F-!DP_Map
+    STZ.b !Map_Unk1D91-!DP_Map
+    BRA Field_Unk74D4_Tail
+
+; ------------------------------------------------------------
+; $C0:7506 — Map_InitOriginX (77 bytes, $7506–$7552)
+; Puts layer 1's left origin (Map_TileOriginX, in 8x8 tiles: metatile
+; column x 2) so that the entry column Loc_EntryX is Map_OriginLeadX
+; metatiles from the screen's left edge, kept inside the limits
+; Map_Unk1D1A-1D1B:
+; - Loc_EntryX <= Map_Unk1D1A + Map_OriginLeadX: origin = Map_Unk1D1A x 2
+;   (the equal and the lower case are separate branches with the same
+;   code; kept as found);
+; - else origin = (Loc_EntryX - Map_OriginLeadX) x 2, unless
+;   Map_Unk1D1B - Map_OriginLeadX < Loc_EntryX: then the right bound is
+;   (Map_Unk1D1B + 1) x 2 and the origin one screen (Bg_ScreenWidth)
+;   left of it.
+; Map_Unk1D0C (the right bound) = origin + Bg_ScreenWidth. Only the low
+; bytes of Map_TileOriginX and Map_Unk1D0C are written.
+; Callers: Map_InitOrigin ($C0:74A6), its only call site.
+; On entry: M=1 (8-bit A), X any, DP=$1D00 (!DP_Map), DB=$00 or $7E
+; (Loc_EntryX absolute).
+; Exit: M=1, X, DP and DB unchanged; A clobbered; Map_OriginTest
+; written.
+; ------------------------------------------------------------
+Map_InitOriginX:
+    LDA.b !Map_Unk1D1A-!DP_Map
+    CLC
+    ADC.b #!Map_OriginLeadX
+    STA.b !Map_OriginTest-!DP_Map
+    LDA.w !DP_Field+!Loc_EntryX
+    CMP.b !Map_OriginTest-!DP_Map
+    BEQ .at_left
+    BCS .past_left
+    LDA.b !Map_Unk1D1A-!DP_Map
+    ASL A
+    STA.b !Map_TileOriginX-!DP_Map
+    CLC
+    ADC.b #!Bg_ScreenWidth
+    STA.b !Map_Unk1D0C-!DP_Map
+    BRA .done
+.at_left:
+    LDA.b !Map_Unk1D1A-!DP_Map
+    ASL A
+    STA.b !Map_TileOriginX-!DP_Map
+    CLC
+    ADC.b #!Bg_ScreenWidth
+    STA.b !Map_Unk1D0C-!DP_Map
+    BRA .done
+.past_left:
+    SEC
+    SBC.b #!Map_OriginLeadX
+    ASL A
+    STA.b !Map_TileOriginX-!DP_Map
+    LDA.b !Map_Unk1D1B-!DP_Map
+    SEC
+    SBC.b #!Map_OriginLeadX
+    CMP.w !DP_Field+!Loc_EntryX
+    BCS .bound_from_origin
+    LDA.b !Map_Unk1D1B-!DP_Map
+    INC A
+    ASL A
+    STA.b !Map_Unk1D0C-!DP_Map
+    SEC
+    SBC.b #!Bg_ScreenWidth
+    STA.b !Map_TileOriginX-!DP_Map
+    BRA .done
+.bound_from_origin:
+    LDA.b !Map_TileOriginX-!DP_Map
+    CLC
+    ADC.b #!Bg_ScreenWidth
+    STA.b !Map_Unk1D0C-!DP_Map
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7553 — Map_InitOriginY (77 bytes, $7553–$759F)
+; As Map_InitOriginX for rows: Map_TileOriginY from Loc_EntryY and the
+; limits Map_Unk1D1C-1D1D, the leader Map_OriginLeadY metatiles below
+; the top edge; the bottom bound Map_Unk1D10 = origin +
+; Map_ScreenTileRows, and the bottom test is Map_Unk1D1D -
+; Map_OriginLeadYBelow < Loc_EntryY (a 14-metatile screen: 8 rows above
+; the leader, 6 below). Same duplicate equal / lower branches.
+; Callers: Map_InitOrigin ($C0:74A9), its only call site.
+; On entry: M=1 (8-bit A), X any, DP=$1D00 (!DP_Map), DB=$00 or $7E
+; (Loc_EntryY absolute).
+; Exit: M=1, X, DP and DB unchanged; A clobbered; Map_OriginTest
+; written.
+; ------------------------------------------------------------
+Map_InitOriginY:
+    LDA.b !Map_Unk1D1C-!DP_Map
+    CLC
+    ADC.b #!Map_OriginLeadY
+    STA.b !Map_OriginTest-!DP_Map
+    LDA.w !DP_Field+!Loc_EntryY
+    CMP.b !Map_OriginTest-!DP_Map
+    BEQ .at_top
+    BCS .past_top
+    LDA.b !Map_Unk1D1C-!DP_Map
+    ASL A
+    STA.b !Map_TileOriginY-!DP_Map
+    CLC
+    ADC.b #!Map_ScreenTileRows
+    STA.b !Map_Unk1D10-!DP_Map
+    BRA .done
+.at_top:
+    LDA.b !Map_Unk1D1C-!DP_Map
+    ASL A
+    STA.b !Map_TileOriginY-!DP_Map
+    CLC
+    ADC.b #!Map_ScreenTileRows
+    STA.b !Map_Unk1D10-!DP_Map
+    BRA .done
+.past_top:
+    SEC
+    SBC.b #!Map_OriginLeadY
+    ASL A
+    STA.b !Map_TileOriginY-!DP_Map
+    LDA.b !Map_Unk1D1D-!DP_Map
+    SEC
+    SBC.b #!Map_OriginLeadYBelow
+    CMP.w !DP_Field+!Loc_EntryY
+    BCS .bound_from_origin
+    LDA.b !Map_Unk1D1D-!DP_Map
+    INC A
+    ASL A
+    STA.b !Map_Unk1D10-!DP_Map
+    SEC
+    SBC.b #!Map_ScreenTileRows
+    STA.b !Map_TileOriginY-!DP_Map
+    BRA .done
+.bound_from_origin:
+    LDA.b !Map_TileOriginY-!DP_Map
+    CLC
+    ADC.b #!Map_ScreenTileRows
+    STA.b !Map_Unk1D10-!DP_Map
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:87F1 — Field_Unk87F1 (45 bytes, $87F1–$881D)
+; Builds the right-hand edge column of each layer after a full redraw
+; and recomputes the edge addresses: Map_BuildColXInc1; for layer 2,
+; unless Map_LayerEdgeOff has Map_Layer2 set, Map_BuildColXInc2Half
+; (Map_Unk0BC9 bit 7 set) or Map_BuildColXInc2; for layer 3, unless
+; Map_Layer3 is set there, Map_BuildColXInc3; then Sub_C07F9A.
+; Callers: LocLoad_DrawMap ($C0:0AF3) and DefaultHandler ($C0:17BF,
+;   $C0:17E8, $C0:185C, $C0:1885).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (saved, set to
+; $1D00 = !DP_Map, restored), DB=$00 (the builders write WMADDL/H).
+; Exit: M=1, X=0, DP restored, DB unchanged; A, X, Y clobbered; the
+; Map_BuiltColXInc bits, edge buffers and Sub_C07F9A's outputs written.
+; ------------------------------------------------------------
+org $C087F1
+Field_Unk87F1:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    JSR Map_BuildColXInc1
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer2
+    BNE .layer3
+    LDA.w !Map_Unk0BC9
+    BPL .layer2_full
+    JSR Map_BuildColXInc2Half
+    BRA .layer3
+.layer2_full:
+    JSR Map_BuildColXInc2
+.layer3:
+    LDA.b !Map_LayerEdgeOff-!DP_Map
+    BIT.b #!Map_Layer3
+    BNE .finish
+    JSR Map_BuildColXInc3
+.finish:
+    JSR Sub_C07F9A
+    PLD
+    RTS
+
 ; ============================================================
 ; $C0:B192 — Obj_ResetStates (32 bytes, $B192–$B1B1)
 ; (was Sub_B192.) Clears Obj_State for every object the location
