@@ -19,7 +19,7 @@ info() { printf '[pre-commit] %s\n' "$*"; }
 
 # Bracketed so this file does not match itself.
 PATTERN='c[l]aude|a[n]thropic|co-authored-b[y]|generated wit[h]|\bll[m]\b|\ba[i]\b'
-IDENT='Akill <goudakhil29@gmail.com>'
+IDENT='Akill <24420588+ThisIsAkill@users.noreply.github.com>'
 
 scan() {
     # stdin: text to check; $1: label
