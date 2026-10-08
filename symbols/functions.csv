@@ -571,8 +571,24 @@ $C1:61FD,$C1:621A,30,BattleAct_PlayPcAttackSfx,$C1,Battle engine,verified,61b7d3
 $C1:621B,$C1:623B,33,BattleAct_OpRunVecCD001B,$C1,Battle engine,verified,c4f4fe12777a,
 $C1:623C,$C1:6257,28,BattleAct_OpSetCalcSel,$C1,Battle engine,verified,5257776eeb40,"Opcodes $81-$84 (entries 0-3) and $47/$48 (entries 4 and 5) <n>: !Battle_ActCalcSel[entry] = n + 1, so BattleAct_TickCalcs runs BattleAct_RunCalc handler n for that entry every frame; advances 2."
 $C1:6258,$C1:6298,65,BattleAct_OpSetHeading,$C1,Battle engine,verified,2b24e5de760f,"Opcode $85 <h>: sets the heading (see the heading opcodes above) of the thread's battler (threads 0-3 and 5-7), of every slot of the target set (thread 4; the target set here, unlike opcodes $75-$77) "
+$C1:6299,$C1:629A,2,BattleAct_OpArcToCalc,$C1,Battle engine,readable,e4c8df08cefb,
+$C1:629B,$C1:62A9,15,BattleAct_ArcToCalcDir,$C1,Battle engine,readable,055f4511068b,
+$C1:62AA,$C1:6548,671,BattleAct_ArcToPoint,$C1,Battle engine,readable,d9a2071a1610,
+$C1:6549,$C1:65B9,113,BattleAct_ArcQuarterPoint,$C1,Battle engine,readable,fffa0c23444a,"Opcodes $9C/$9D: moves !Battle_GeoPointX/Y to a quarter of the way from !Battle_GeoOriginX/Y: Origin + (|Point - Origin| / 4, rounded down) with the delta's sign, per axis (8-bit, no carry out)."
 $C1:65BA,$C1:6670,183,BattleAct_CalcMoveStep,$C1,Battle engine,verified,e905d1e222ad,"Unit step of a straight move from !Battle_GeoOriginX/Y to !Battle_GeoPointX/Y, as signed 8.8 pixels: the axis with the larger distance (x on a tie) moves 1.0 ($0100) per step, the other (smaller * 256"
+$C1:6671,$C1:672D,189,BattleAct_CalcMidpointSteps,$C1,Battle engine,readable,d002d574356e,
+$C1:672E,$C1:672F,2,BattleAct_OpArcToUnkPoint,$C1,Battle engine,readable,be5eac668c03,BattleAct_ArcToUnkPointDir)
+$C1:6730,$C1:6742,19,BattleAct_ArcToUnkPointDir,$C1,Battle engine,readable,b0918fd3a41a,
+$C1:6743,$C1:6749,7,BattleAct_OpArcDownToCalc,$C1,Battle engine,readable,f0fbcb0d768a,Opcode $9A <mode> <n>: opcode $98 (BattleAct_OpArcToCalc) with the height added instead of subtracted (DP $8F = 1).
+$C1:674A,$C1:6750,7,BattleAct_OpArcDownToUnkPoint,$C1,Battle engine,readable,1406449c0d9c,Opcode $9B <m>: opcode $99 (BattleAct_OpArcToUnkPoint) with the height added instead of subtracted (DP $8F = 1).
+$C1:6751,$C1:691A,458,BattleAct_OpMoveAlongHeading,$C1,Battle engine,readable,dadc4a654f17,
+$C1:691B,$C1:692A,16,BattleAct_OpStartPosHistory,$C1,Battle engine,readable,7b080281361b,
+$C1:692B,$C1:69B9,143,BattleAct_SetPosHistory,$C1,Battle engine,readable,0b5f50d5eab0,
+$C1:69BA,$C1:69C2,9,BattleAct_OpStopPosHistory,$C1,Battle engine,readable,62bfb4138f22,Opcode $A5: !Battler_PosHistOn = 0 for the same battlers as opcode $A4 (BattleAct_OpStartPosHistory); advances 1.
+$C1:69C3,$C1:6AEF,301,BattleAct_OpMoveHeadingSteps,$C1,Battle engine,readable,768fe4773763,
+$C1:6AF0,$C1:6CF2,515,BattleAct_OpMoveHeadingChecked,$C1,Battle engine,readable,73c4ada71ec6,
 $C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
+$C1:7C2B,$C1:7C3C,18,BattleAct_ProbeBoxOverlap,$C1,Battle engine,readable,fc44558e5d3f,"Puts battler X's probe (!Battler_ProbeX/Y) at its screen position, builds its box (Battle_CalcBattlerBox) and tests it against the other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP)."
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
 $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
 $C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,
