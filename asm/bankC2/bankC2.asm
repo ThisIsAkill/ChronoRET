@@ -15282,9 +15282,11 @@ org $C28000
 ;   Field_RunBankC2Mode5 ($C0:19CE) and C2Scene_Mode5 ($C2:2552).
 ; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), C2Scene_NmiHandler ($C2:031B)
 ;   and unmatched ($C1:EE27, $CD:091A, $CD:09C6).
-; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Scene_PostLoadInit ($C0:56CF) and
-;   unmatched ($C0:3807, $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
-;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92, $FF:FB98).
+; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Evt_OpD7_GetItemCount ($C0:3807),
+;   Evt_OpCF_IfCharListed ($C0:389B), Evt_OpD0_AddCharToReserve ($C0:38CC), Evt_OpD1_UnlistChar
+;   ($C0:38E1), Evt_OpD2_IfCharInParty ($C0:38F6), Evt_OpD3_AddCharToParty ($C0:392B),
+;   Evt_OpD4_MoveCharToReserve ($C0:39DA), Evt_OpD5_BankC2Cmd0A ($C0:3A7C), Scene_PostLoadInit
+;   ($C0:56CF) and unmatched ($C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92, $FF:FB98).
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry

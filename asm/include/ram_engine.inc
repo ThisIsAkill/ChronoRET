@@ -383,6 +383,12 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
+!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33 and
+                                         ; $C7-$D7: 16-bit, an Evt_Data offset kept across a call
+!EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6: the character
+                                         ; operand (16-bit in $D3, low byte in $D4/$D6)
+!EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
+                                         ; character's object (Chr_ObjSlot)
 !EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
                                          ; 16-bit, the opcode's offset (Y)
 !EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
@@ -751,8 +757,8 @@ if !ram_engine_inc == 0
                                          ; (each unless FieldBtl_EvtFlags says not). Bank $C1 stores 1 at
                                          ; $C1:813C and 0 at $C1:817B/81FA/8358; who stores 2 is not
                                          ; found. AudioFadeDispatch also reads it
-!FieldBtl_EvtFlags = $7E2A1F             ; 8-bit; an event opcode copies it from the script
-                                         ; ($C0:3A9F). Bit 5 (FieldBtl_EvtNoReset) and bit 7
+!FieldBtl_EvtFlags = $7E2A1F             ; 8-bit; Evt_OpD8_StartBattle copies it from the script
+                                         ; (its second operand). Bit 5 (FieldBtl_EvtNoReset) and bit 7
                                          ; (FieldBtl_EvtUnk80) are tested by Scene_Unk0283 /
                                          ; Field_Unk034B, bit 4 probably meant to be (see
                                          ; Scene_Unk0283); MusicCueDispatch reads bit 6

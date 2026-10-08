@@ -10178,6 +10178,908 @@ Evt_OpC4_MsgChoiceUnk30_2:
     RTS
 
 ; ============================================================
+; Event opcodes: palette, items, gold, characters, battle
+; ($C0:3711–$C0:3AB6)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E). The dispatchers enter every handler with C=0
+; (their ASL of a zero-extended opcode), so a handler that never sets C
+; returns C=0 and ends the object's run. The item and gold opcodes use
+; the bank $C1 services behind BankC1_Entry8003 (the service table at
+; $C1:D126, unmatched; read from the ROM): 0 looks item Y up in the
+; inventory ids at $7E:2400 (A = the id when found, else 0), 1 adds one
+; of item Y (BankC1_AddItem), 2 takes one away (A = 0 when it is not
+; held), 3 tests the 24-bit gold sum at $7E:2C53 against Y (A = $FF
+; when it is at least Y, or Y is 0; else 0), 4 adds Y to it
+; (BankC1_AddGold), 5 takes Y off when there is that much. The
+; character opcodes use BankC2_Entry8004 (Menu_Unk8C36, unmatched; its
+; command table is at $C2:8C5B; read from the ROM), with the 9-byte
+; list Menu_PartyOrder (three party places, then six reserve places;
+; bit 7 = empty): 0 / 3 give A = 0 when character Y is in the party /
+; anywhere in the list, else $FF; 1 puts it in the party (first empty
+; place, else in place of the third member, who goes to the front of
+; the reserve); 2 moves it from the party to the front of the reserve;
+; 4 adds it to the first empty reserve place unless it is listed; 5
+; empties its place; $0C gives A = the count of item X held. The
+; Menu_Unk8C36 path saves and restores P, so C comes back unchanged.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:3711 — Evt_Op33_SetPalette (70 bytes, $3711–$3756)
+; Event opcode $33 (2 bytes: $33, slot): Obj_Cur's Obj_OamAttr = slot x 2
+;   & ObjPal_AttrMask (the palette bits; the other attribute bits are
+;   cleared), and its 12 colours (Obj_PalSrc in bank $E4) are copied to
+;   that sprite palette's row in Pal_Buf and in Pal_CgramBuf, as
+;   Obj_PalSlotFixed copies them, without claiming the slot
+;   (Obj_PalSlot is left alone). Sets Field_Unk54 bit 7 (Field54_Unk80;
+;   no reader traced). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $33).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk54,
+;   Obj_Cur and EvtOp_SavedPos are dp), DB=$00 (Obj_* tables absolute;
+;   saved around the MVNs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2 (also in
+;   EvtOp_SavedPos), C=1; A ($FFFF from the last MVN) and Y clobbered.
+; ------------------------------------------------------------
+Evt_Op33_SetPalette:
+    LDA.b #!Field54_Unk80
+    TSB.b !Field_Unk54
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    ASL A
+    AND.b #!ObjPal_AttrMask
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x $20: its Pal_Buf row
+    INC A
+    INC A                               ; colour 1
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf       ; the same colours in Pal_CgramBuf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3757 — Evt_OpC8_EnterBankC2 (41 bytes, $3757–$377F)
+; Event opcode $C8 (2 bytes: $C8, arg): hands over to bank $C2 the way
+;   Field_SceneChangeTick's SceneFlag_Reload path does, with
+;   Field_BankC2Arg = arg, and goes on once the field is back:
+;   - SceneFlag_Reload set in Field_SceneFlags (the hand-off still
+;     pending): X = the opcode, C=0;
+;   - else FadeFlag_Reloaded set in Field_FadeFlags (back): it is
+;     cleared; X = Y + 2, C=1;
+;   - else (start): Field_BankC2Arg = arg, SceneFlag_Reload set,
+;     FadeFlag_Reloaded cleared; X = the opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $C8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the Field_*
+;   bytes are dp), DB any (operand read long); Y = the opcode's offset
+;   in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpC8_EnterBankC2:
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_Reload
+    BNE .pending
+    LDA.b !Field_FadeFlags
+    BIT.b #!FadeFlag_Reloaded
+    BNE .back
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_BankC2Arg
+    LDA.b #!SceneFlag_Reload            ; the same bit 6 as FadeFlag_Reloaded
+    TSB.b !Field_SceneFlags
+    TRB.b !Field_FadeFlags
+    TYX
+    CLC
+    RTS
+.back:
+    LDA.b #!FadeFlag_Reloaded
+    TRB.b !Field_FadeFlags
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.pending:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3780 — Evt_OpC9_IfHasItem (49 bytes, $3780–$37B0)
+; Event opcode $C9 (3 bytes: $C9, item, n): BankC1_Entry8003 service 0
+;   (BankC1Svc_FindItem) with Y = item. Found (A nonzero): X = Y + 3,
+;   the next opcode. Else X = the n byte's offset + n (a jump forward).
+;   C=1 either way. Item 0 counts as not held (the service returns 0).
+; Reached through Evt_OpcodeTable (opcode $C9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   and Eng_Scratch are dp; its low byte must be 0: TDC/XBA sets B from
+;   it), DB any (operands read long; the service sets its own);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = item (the service leaves it); EvtOp_SavedPos = Y + 2; Eng_Scratch
+;   = n on a jump.
+; ------------------------------------------------------------
+Evt_OpC9_IfHasItem:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC1Svc_FindItem
+    JSL BankC1_Entry8003
+    CMP.b #$00
+    BEQ .jump
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+.jump:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    TXA
+    CLC
+    ADC.b !Eng_Scratch
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:37B1 — Evt_OpCA_AddItem (22 bytes, $37B1–$37C6; the tail from
+;   $37BC is the sub-entry Evt_AddItemTail)
+; Event opcode $CA (2 bytes: $CA, item): BankC1_Entry8003 service 1
+;   (BankC1Svc_AddItem, one more of item Y = item); X = Y + 2, C=1.
+;   Evt_AddItemTail (A = the item, B = 0, EvtOp_SavedPos = the next
+;   opcode) does the call and the return; Evt_OpC7_AddItemVar BRAs to
+;   it.
+; Reached through Evt_OpcodeTable (opcode $CA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any
+;   (operand read long; the service sets its own); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2, C=1;
+;   A clobbered; Y = the item, or as the service leaves it.
+; ------------------------------------------------------------
+Evt_OpCA_AddItem:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+Evt_AddItemTail:                        ; header: see Evt_OpCA_AddItem
+    TAY
+    LDA.b #!BankC1Svc_AddItem
+    JSL BankC1_Entry8003
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:37C7 — Evt_OpC7_AddItemVar (28 bytes, $37C7–$37E2)
+; Event opcode $C7 (2 bytes: $C7, a): as Evt_OpCA_AddItem with the item
+;   taken from the low byte of event word a (Evt_Unk7F0200 + a x 2):
+;   BRA to Evt_AddItemTail; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $C7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any (all
+;   reads long); Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_OpCA_AddItem: M=1, X=0, DP and DB unchanged; X =
+;   EvtOp_SavedPos = Y + 2, C=1; A clobbered; Y = the item, or as the
+;   service leaves it.
+; ------------------------------------------------------------
+Evt_OpC7_AddItemVar:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Unk7F0200,X
+    BRA Evt_AddItemTail
+
+; ------------------------------------------------------------
+; $C0:37E3 — Evt_OpCB_RemoveItem (22 bytes, $37E3–$37F8)
+; Event opcode $CB (2 bytes: $CB, item): BankC1_Entry8003 service 2
+;   (BankC1Svc_RemoveItem: one fewer of item Y = item, the entry emptied
+;   at 0; nothing when it is not held); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $CB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any
+;   (operand read long; the service sets its own); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2, C=1;
+;   A clobbered; Y = the item, or as the service leaves it.
+; ------------------------------------------------------------
+Evt_OpCB_RemoveItem:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC1Svc_RemoveItem
+    JSL BankC1_Entry8003
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:37F9 — Evt_OpD7_GetItemCount (46 bytes, $37F9–$3826)
+; Event opcode $D7 (3 bytes: $D7, item, a): BankC2_Entry8004 command $0C
+;   (BankC2Cmd_ItemCount) with X = item gives the count held (0 when
+;   none); it goes to the low byte of event word a (Evt_Unk7F0200 +
+;   a x 2). X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $D7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   and Eng_Scratch are dp; its low byte must be 0: TDC/XBA sets B from
+;   it), DB any (all reads and writes long; the command sets its own);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=1; A = the count; Y
+;   unchanged; EvtOp_SavedPos = Y + 2; Eng_Scratch low byte = the count.
+; ------------------------------------------------------------
+Evt_OpD7_GetItemCount:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAX
+    LDA.b #!BankC2Cmd_ItemCount
+    JSL BankC2_Entry8004
+    STA.b !Eng_Scratch
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !Eng_Scratch
+    STA.l !Evt_Unk7F0200,X
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3827 — Evt_OpCC_IfHasGold (52 bytes, $3827–$385A)
+; Event opcode $CC (4 bytes: $CC, amount (word), n): BankC1_Entry8003
+;   service 3 (BankC1Svc_HasGold) with Y = amount. At least that much
+;   gold (A nonzero): X = Y + 4, the next opcode. Else X = the n byte's
+;   offset + n. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $CC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   and Eng_Scratch are dp), DB any (operands read long; the service
+;   sets its own); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = amount (the service leaves it); EvtOp_SavedPos = Y + 3;
+;   Eng_Scratch = n on a jump.
+; ------------------------------------------------------------
+Evt_OpCC_IfHasGold:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    INX
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    SEP #$20
+    LDA.b #!BankC1Svc_HasGold
+    JSL BankC1_Entry8003
+    CMP.b #$00
+    BEQ .jump
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+.jump:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    TXA
+    CLC
+    ADC.b !Eng_Scratch
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:385B — Evt_OpCD_AddGold (25 bytes, $385B–$3873)
+; Event opcode $CD (3 bytes: $CD, amount (word)): BankC1_Entry8003
+;   service 4 (BankC1Svc_AddGold) with Y = amount; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $CD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any (operand read long; the service sets its own); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 3, C=1;
+;   A clobbered; Y = amount, or as the service leaves it.
+; ------------------------------------------------------------
+Evt_OpCD_AddGold:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    INX
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    SEP #$20
+    LDA.b #!BankC1Svc_AddGold
+    JSL BankC1_Entry8003
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3874 — Evt_OpCE_RemoveGold (25 bytes, $3874–$388C)
+; Event opcode $CE (3 bytes: $CE, amount (word)): BankC1_Entry8003
+;   service 5 (BankC1Svc_RemoveGold: takes amount off the gold when
+;   there is that much); X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $CE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any (operand read long; the service sets its own); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 3, C=1;
+;   A clobbered; Y = amount, or as the service leaves it.
+; ------------------------------------------------------------
+Evt_OpCE_RemoveGold:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    INX
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    SEP #$20
+    LDA.b #!BankC1Svc_RemoveGold
+    JSL BankC1_Entry8003
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:388D — Evt_OpCF_IfCharListed (49 bytes, $388D–$38BD)
+; Event opcode $CF (3 bytes: $CF, char, n): BankC2_Entry8004 command 3
+;   (BankC2Cmd_FindListed) with Y = char. Listed (A = 0, in the party or
+;   the reserve): X = Y + 3, the next opcode. Else X = the n byte's
+;   offset + n. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $CF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   and Eng_Scratch are dp; its low byte must be 0: TDC/XBA sets B from
+;   it), DB any (operands read long; the command sets its own); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = char (the command saves and restores it); EvtOp_SavedPos = Y + 2;
+;   Eng_Scratch = n on a jump.
+; ------------------------------------------------------------
+Evt_OpCF_IfCharListed:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC2Cmd_FindListed
+    JSL BankC2_Entry8004
+    CMP.b #$00
+    BNE .jump
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+.jump:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    TXA
+    CLC
+    ADC.b !Eng_Scratch
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:38BE — Evt_OpD0_AddCharToReserve (21 bytes, $38BE–$38D2)
+; Event opcode $D0 (2 bytes: $D0, char): BankC2_Entry8004 command 4
+;   (BankC2Cmd_AddToReserve) with Y = char; X = Y + 2.
+; There is no SEC: C stays as the dispatcher entered with it (0), so
+;   the object's run ends after this opcode.
+; Reached through Evt_OpcodeTable (opcode $D0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any
+;   (operand read long; the command sets its own); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
+;   on entry; A clobbered; Y = char.
+; ------------------------------------------------------------
+Evt_OpD0_AddCharToReserve:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC2Cmd_AddToReserve
+    JSL BankC2_Entry8004
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:38D3 — Evt_OpD1_UnlistChar (21 bytes, $38D3–$38E7)
+; Event opcode $D1 (2 bytes: $D1, char): BankC2_Entry8004 command 5
+;   (BankC2Cmd_Unlist: the character's place in Menu_PartyOrder is
+;   marked empty); X = Y + 2.
+; There is no SEC: C stays as the dispatcher entered with it (0), so
+;   the object's run ends after this opcode.
+; Reached through Evt_OpcodeTable (opcode $D1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any
+;   (operand read long; the command sets its own); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
+;   on entry; A clobbered; Y = char.
+; ------------------------------------------------------------
+Evt_OpD1_UnlistChar:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC2Cmd_Unlist
+    JSL BankC2_Entry8004
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:38E8 — Evt_OpD2_IfCharInParty (49 bytes, $38E8–$3918)
+; Event opcode $D2 (3 bytes: $D2, char, n): BankC2_Entry8004 command 0
+;   (BankC2Cmd_FindInParty) with Y = char. In the party (A = 0): X = Y +
+;   3, the next opcode. Else X = the n byte's offset + n. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $D2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   and Eng_Scratch are dp; its low byte must be 0: TDC/XBA sets B from
+;   it), DB any (operands read long; the command sets its own); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = char; EvtOp_SavedPos = Y + 2; Eng_Scratch = n on a jump.
+; ------------------------------------------------------------
+Evt_OpD2_IfCharInParty:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    LDA.b #!BankC2Cmd_FindInParty
+    JSL BankC2_Entry8004
+    CMP.b #$00
+    BNE .jump
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+.jump:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Eng_Scratch
+    TXA
+    CLC
+    ADC.b !Eng_Scratch
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3919 — Evt_OpD3_AddCharToParty (53 bytes, $3919–$394D)
+; Event opcode $D3 (2 bytes: $D3, char): BankC2_Entry8004 command 1
+;   (BankC2Cmd_AddToParty) with Y = char, then ObjQ_Unk78 =
+;   ObjQ_Unk78Set1. When the character has an object (Chr_ObjSlot[char]
+;   bit 7 clear) it becomes party member 2 (Party_ObjSlot1) if that place
+;   is empty, else member 3 (Party_ObjSlot2): low byte stored only, and
+;   whatever object was there is not touched. X = Y + 2.
+; There is no SEC: C stays as the dispatcher entered with it (0), so
+;   the object's run ends after this opcode.
+; Reached through Evt_OpcodeTable (opcode $D3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Chr_ObjSlot,
+;   Party_ObjSlot*, ObjQ_Unk78 and the scratch are dp; its low byte must
+;   be 0: TDC/XBA sets B from it), DB any (operand read long; the
+;   command sets its own); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
+;   on entry; A clobbered; Y = char; EvtChar_Id = char (16-bit), and
+;   EvtChar_Obj = its object when it has one.
+; ------------------------------------------------------------
+Evt_OpD3_AddCharToParty:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAY
+    STA.b !EvtChar_Id
+    STZ.b !EvtChar_Id+1
+    LDA.b #!BankC2Cmd_AddToParty
+    JSL BankC2_Entry8004
+    LDA.b #!ObjQ_Unk78Set1
+    STA.b !ObjQ_Unk78
+    LDX.b !EvtChar_Id
+    TDC
+    XBA
+    LDA.b !Chr_ObjSlot,X
+    BMI .done
+    STA.b !EvtChar_Obj
+    LDA.b !Party_ObjSlot1
+    BPL .as_member3
+    LDA.b !EvtChar_Obj
+    STA.b !Party_ObjSlot1
+    BRA .done
+.as_member3:
+    LDA.b !EvtChar_Obj
+    STA.b !Party_ObjSlot2
+.done:
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:394E — Evt_OpD4_MoveCharToReserve (185 bytes, $394E–$3A06)
+; Event opcode $D4 (2 bytes: $D4, char): takes the character's object
+;   out of the party, by the first of Party_ObjSlot / 1 / 2 (present)
+;   whose Obj_Unk1101 is char (read as the object's character number:
+;   inferred from this test), and then runs BankC2_Entry8004 command 2
+;   (BankC2Cmd_PartyToReserve) with Y = char in every case:
+;   - the leader: its Obj_Unk1100 = 3 (Obj_Unk1100Out); when member 2 is
+;     present its Obj_Unk1100 = 0 and, when member 3 is too, member 3's
+;     = 1; the slots move up (Party_ObjSlot = member 2, Party_ObjSlot1 =
+;     member 3, Party_ObjSlot2 = Obj_None), and the sprite palette rows
+;     of party palette slots 6 and 7 move up to 5 and 6 (.pal_6_to_5,
+;     .pal_7_to_6; Obj_PalSlotFixed gives kinds 0-2 slots 5-7);
+;   - member 2: its Obj_Unk1100 = 3, member 3's (when present) = 1,
+;     Party_ObjSlot1 = member 3, Party_ObjSlot2 = Obj_None, palette row
+;     7 to 6;
+;   - member 3: its Obj_Unk1100 = 3, Obj_None's bit set in
+;     Party_ObjSlot2.
+;   Obj_Unk1100 0 / 1 / 2 read as leader / member 2 / member 3 rests on
+;   Evt_OpB0_PartyControl's use. X = Y + 2.
+; Quirk: when the leader does not match and there is no member 2, the
+;   member-2 path's move-up runs anyway (Party_ObjSlot1 = Party_ObjSlot2,
+;   Party_ObjSlot2 = Obj_None, palette row 7 to 6) and member 3 is not
+;   tested.
+; There is no SEC/CLC: C is left by the last CMP of an Obj_Unk1101
+;   (C=1 after a match, so the run goes on; with no match, that of the
+;   last present member's test, or the dispatcher's C=0 with none).
+; Reached through Evt_OpcodeTable (opcode $D4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot*,
+;   EvtOp_SavedPos and EvtChar_Id are dp; its low byte must be 0:
+;   TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute; saved
+;   around the MVNs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
+;   above; A clobbered; Y = char; EvtChar_Id (low byte) = char.
+; ------------------------------------------------------------
+Evt_OpD4_MoveCharToReserve:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    STA.b !EvtChar_Id
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot
+    BMI .test_member2
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .test_member2
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b !Party_ObjSlot1
+    BMI .leader_shift
+    TAX
+    LDA.b #!Obj_Unk1100Leader
+    STA.w !Obj_Unk1100,X
+    LDA.b !Party_ObjSlot2
+    BMI .leader_shift
+    TAX
+    LDA.b #!Obj_Unk1100Member2
+    STA.w !Obj_Unk1100,X
+.leader_shift:
+    LDA.b !Party_ObjSlot1
+    STA.b !Party_ObjSlot
+    LDA.b !Party_ObjSlot2
+    STA.b !Party_ObjSlot1
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot2
+    JSR .pal_6_to_5
+    JSR .pal_7_to_6
+    BRA .command
+.test_member2:
+    TDC
+    XBA
+    LDA.b !Party_ObjSlot1
+    BMI .member2_shift
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .test_member3
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b !Party_ObjSlot2
+    BMI .member2_shift
+    TAX
+    LDA.b #!Obj_Unk1100Member2
+    STA.w !Obj_Unk1100,X
+.member2_shift:
+    LDA.b !Party_ObjSlot2               ; also reached with no member 2: Party_ObjSlot1 = member 3
+    STA.b !Party_ObjSlot1
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot2
+    JSR .pal_7_to_6
+    BRA .command
+.test_member3:
+    LDA.b !Party_ObjSlot2
+    BMI .command
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .command
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b #!Obj_None
+    TSB.b !Party_ObjSlot2
+.command:
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY
+    LDA.b !EvtChar_Id
+    TAY
+    LDA.b #!BankC2Cmd_PartyToReserve
+    JSL BankC2_Entry8004
+    LDX.b !EvtOp_SavedPos
+    RTS
+.pal_6_to_5:
+    PHB
+    LDX.w #!Pal_PartyRow1&$FFFF
+    LDY.w #!Pal_PartyRow0&$FFFF
+    REP #$20
+    LDA.w #!Pal_RowCopyCount
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    PLB
+    RTS
+.pal_7_to_6:
+    PHB
+    LDX.w #!Pal_PartyRow2&$FFFF
+    LDY.w #!Pal_PartyRow1&$FFFF
+    REP #$20
+    LDA.w #!Pal_RowCopyCount
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    PLB
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3A07 — Evt_OpD6_DropCharObj (97 bytes, $3A07–$3A67)
+; Event opcode $D6 (2 bytes: $D6, char): the first present party member
+;   (Party_ObjSlot, then 1, then 2) whose Obj_Unk1101 is char gets
+;   Obj_Unk1100 = 3 (Obj_Unk1100Out), and its place in Party_ObjSlot*
+;   and in Party_Members is set to Obj_None. Unlike
+;   Evt_OpD4_MoveCharToReserve nothing moves up, no palette moves and
+;   Menu_PartyOrder is not touched. X = Y + 2.
+; There is no SEC/CLC: C is left by the last CMP (C=1 after a match;
+;   else that of the last present member's test, or the dispatcher's
+;   C=0 with none present).
+; Reached through Evt_OpcodeTable (opcode $D6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot*,
+;   EvtOp_SavedPos and EvtChar_Id are dp; its low byte must be 0:
+;   TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
+;   above; A clobbered; Y unchanged; EvtChar_Id (low byte) = char.
+; ------------------------------------------------------------
+Evt_OpD6_DropCharObj:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    STA.b !EvtChar_Id
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot
+    BMI .test_member2
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .test_member2
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot
+    STA.l !Party_Members
+    BRA .done
+.test_member2:
+    TDC
+    XBA
+    LDA.b !Party_ObjSlot1
+    BMI .test_member3
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .test_member3
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot1
+    STA.l !Party_Members+1
+    BRA .done
+.test_member3:
+    LDA.b !Party_ObjSlot2
+    BMI .done
+    TAX
+    LDA.w !Obj_Unk1101,X
+    CMP.b !EvtChar_Id
+    BNE .done
+    LDA.b #!Obj_Unk1100Out
+    STA.w !Obj_Unk1100,X
+    LDA.b #!Obj_None
+    STA.b !Party_ObjSlot2
+    STA.l !Party_Members+2
+.done:
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3A68 — Evt_OpD5_BankC2Cmd0A (27 bytes, $3A68–$3A82)
+; Event opcode $D5 (3 bytes: $D5, a, b): BankC2_Entry8004 command $0A
+;   (BankC2Cmd_Unk0A) with Y = a and X = b; X = Y + 3. The command
+;   indexes $50-byte records at $7E:2600 by a (one per character,
+;   probably) and branches on b being 0; what it does is not traced.
+; There is no SEC: C stays as the dispatcher entered with it (0), so
+;   the object's run ends after this opcode.
+; Reached through Evt_OpcodeTable (opcode $D5).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp; its low byte must be 0: TDC/XBA sets B from it), DB any
+;   (operands read long; the command sets its own); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 3; C as
+;   on entry; A clobbered; Y = a.
+; ------------------------------------------------------------
+Evt_OpD5_BankC2Cmd0A:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAY / TAX
+    LDA.l !Evt_Data,X
+    INX
+    TAY
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    TAX
+    LDA.b #!BankC2Cmd_Unk0A
+    JSL BankC2_Entry8004
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3A83 — Evt_OpD8_StartBattle (52 bytes, $3A83–$3AB6)
+; Event opcode $D8 (3 bytes: $D8, a, b): starts a battle and goes on
+;   after it:
+;   - SceneFlag_Battle set in Field_SceneFlags (not started yet): X =
+;     the opcode, C=0;
+;   - else FadeFlag_AfterBattle set in Field_FadeFlags (DefaultHandler
+;     has run the battle): it is cleared; X = Y + 3, C=0;
+;   - else (start): Field_Unk7E2989 = a (the byte the battle code reads
+;     as Battle_Unk2989), FieldBtl_EvtFlags = b, Field_SceneFlags |=
+;     SceneFlag_Battle and SceneFlag_MapRedraw (what bit 5 does next to
+;     the battle is not traced), Field_ControlEnabled = 0; X = the
+;     opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $D8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the Field_*
+;   bytes are dp), DB any (all other accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpD8_StartBattle:
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_Battle
+    BNE .pending
+    LDA.b !Field_FadeFlags
+    BIT.b #!FadeFlag_AfterBattle
+    BNE .after
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.l !Field_Unk7E2989
+    INX
+    LDA.l !Evt_Data,X
+    STA.l !FieldBtl_EvtFlags
+    LDA.b !Field_SceneFlags
+    ORA.b #!SceneFlag_Battle|!SceneFlag_MapRedraw
+    STA.b !Field_SceneFlags
+    STZ.b !Field_ControlEnabled
+.pending:
+    CLC
+    TYX
+    RTS
+.after:
+    LDA.b #!FadeFlag_AfterBattle
+    TRB.b !Field_FadeFlags
+    CLC
+    TYX
+    INX
+    INX
+    INX
+    RTS
+
+; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN

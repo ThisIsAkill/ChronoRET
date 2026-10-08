@@ -872,3 +872,32 @@ endif
 !EvtDA_AllThere = $03                    ; Field_Unk7F03FE once every member sent has arrived
 !EvtDA_Count2Sent = $01                  ; Field_Unk7F03FE after sending members 2 and 3
 !EvtDA_Count1Sent = $02                  ; ... member 2 alone
+
+; --- Event item, gold, character and battle opcodes ($33, $C7-$D8) ---
+!Field54_Unk80 = $80                     ; Field_Unk54 bit 7: set by Evt_Op33_SetPalette (no reader
+                                         ; traced)
+!BankC1Svc_FindItem = $00                ; BankC1_Entry8003 service: A = item Y's id when it is in the
+                                         ; inventory ids at $7E:2400, else 0 ($C1:CFE9)
+!BankC1Svc_RemoveItem = $02              ; ... one fewer of item Y ($C1:D056)
+!BankC1Svc_HasGold = $03                 ; ... A nonzero when the gold is at least Y ($C1:D086)
+!BankC1Svc_RemoveGold = $05              ; ... takes Y off the gold when there is that much ($C1:D0ED)
+!BankC2Cmd_FindInParty = $00             ; BankC2_Entry8004 commands (Menu_Unk8C36's table at
+                                         ; $C2:8C5B, Y = a character): A = 0 when it is in the party
+!BankC2Cmd_AddToParty = $01              ; ... put it in the party
+!BankC2Cmd_PartyToReserve = $02          ; ... move it from the party to the reserve
+!BankC2Cmd_FindListed = $03              ; ... A = 0 when it is anywhere in Menu_PartyOrder
+!BankC2Cmd_AddToReserve = $04            ; ... add it to the reserve unless listed
+!BankC2Cmd_Unlist = $05                  ; ... empty its place in Menu_PartyOrder
+!BankC2Cmd_Unk0A = $0A                   ; ... not traced (Y = a character, probably; X = an argument)
+!BankC2Cmd_ItemCount = $0C               ; ... A = the count of item X held (X, not Y)
+!ObjQ_Unk78Set1 = $01                    ; ObjQ_Unk78 value Evt_OpD3_AddCharToParty stores (only 2 is
+                                         ; tested by Obj_AnimTickAndQueue)
+!Obj_Unk1100Leader = $00                 ; Obj_Unk1100 of the leader's object (Evt_OpB0_PartyControl's
+                                         ; kind 0)
+!Obj_Unk1100Member2 = $01                ; ... of party member 2 (kind 1); member 3 is kind 2
+!Obj_Unk1100Out = $03                    ; Obj_Unk1100 Evt_OpD4 / Evt_OpD6 give an object leaving
+                                         ; the party
+!Pal_PartyRow0 = $7E21A0                 ; Pal_Buf row of sprite palette slot 5 (party kind 0)
+!Pal_PartyRow1 = $7E21C0                 ; ... slot 6 (kind 1)
+!Pal_PartyRow2 = $7E21E0                 ; ... slot 7 (kind 2)
+!Pal_RowCopyCount = $001F                ; MVN count - 1: one 16-colour palette row (32 bytes)
