@@ -340,9 +340,32 @@ if !constants_battle_inc == 0
 !BattleOam_AttrKeepMask  = $F1   ; keeps flip/priority/name bit, clears the palette
 !BattleOam_CursorCentreX = $10   ; cursor x = battler x - this
 
+; --- Actions (BattleSys_RunAction, service 4) ---
+!Battle_ActFlagSecond    = $40   ; !Battle_ActFlags bit 6: start the second thread group
+!Battle_ActAltFlag       = $80   ; !Battle_ActUnkAE9B bit 7: PC attacks use the "Alt" record set
+!Battle_ActNumKinds      = 4     ; entries of BattleAct_LoaderTable
+!Battle_ActParamsLen     = $10   ; bytes of the parameter block from !Battle_ActScriptId
+!Battle_ActArgNone       = $FF   ; !Battle_ActUnkArg987C: no BattleAnim_UnkVecCD0018 call
+!Battle_ActUnkA1A8Cleared = $28  ; bytes of !Battle_ActUnkA1A8 service 4 clears (5 lists of 8)
+!Battle_ActHitKind3      = 3     ; the only !Battle_ActPcHitKind BattleAct_FlagLethalPcHits checks
+!Battle_ActAnimLoop      = 2     ; !Battler_ActAnimMode: start the list again at its end
+!Battle_ActCalcEntries   = 6     ; entries of !Battle_ActCalcSel
+
+!Battle_ActKind3FirstId  = $BC   ; BattleAct_LoadKind3: record = !Battle_ActId - this
+!Battle_ActIdUnk37       = $37   ; the id that calls BattleAnim_UnkVecCD0018 even with !Battle_ActFlags set; unknown
+!Battle_ActThreads       = $10   ; script threads 0-15
+!Battle_ActObjects       = $10   ; action objects (BattleActObj, object lists)
+!Battle_ActObjRecTypeMask = $E0  ; top three bits of an object record's first byte
+!Battle_ActObjRecMark    = $40   ; type 010: a mark (BattleAct_IndexObjLists)
+!Battle_ActFrameRowsMask = $0F   ; frame header: row count
+!Battle_ActFrameCols     = 8     ; columns per row (one mask bit each)
+!Battle_ActFramesPerCall = 4     ; frames BattleAct_UnpackFrames builds per call
+
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)
 !Sfx_Param2Default       = $80   ; !Sfx_Param2 value sent with it (meaning not established)
 !Sfx_TurnReady           = $42   ; sound id played when a PC's turn comes up (inferred)
+!Sfx_CmdUnk18            = $18   ; APU command service 4 sends when an action's script has ended; meaning unknown
+!Sfx_Unk18Arg            = $FF   ; !Sfx_Param1 sent with it
 
 endif

@@ -29,11 +29,15 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 from `$C1:4058`: service 4 of the $C10045 API (`$C1:4058`-`$C1:41BD`, 358 B; it calls
-   `$C1:41BE`, `$C1:4212`, `$C1:423A`, `$C1:4310`, `$C1:4BBE` and six JSLs into `$CC:F06B`-`$CC:F278`,
-   all unmatched), then its callees in bank $C1. (`$C1:007E` and `$C1:283D`-`$C1:4057` are matched;
-   the enemy movers end at `$C1:4057`.) Open from the movers: the stepper at `$CF:F978` that moves
-   the enemies (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
+1. Bank $C1 from `$C1:49FF`: `BattleAct_CheckReach` (`$C1:49FF`-`$C1:4A70`, sets `!Battle_ActNear`;
+   calls `$C1:4A71`), then onward in address order. (`$C1:007E` and `$C1:283D`-`$C1:49FE` are
+   matched; service 4, `BattleSys_RunAction`, and its loaders end at `$C1:49FE`.) Open from
+   service 4: the script threads (`BattleAct_RunThreads` at `$C1:4BBE`, per thread `$C1:4C9E`;
+   `!Battle_ActScriptDone` is set at `$C1:4D00`), `BattleAct_RunCalc` (`$C1:762E`, table
+   `$C1:79D3`), the 4-word `BattleAct_LoaderTable` at `$C1:7A63` (still original bytes), the bank
+   $CC action helpers `$CC:F06B`-`$CC:F2A9` (`bankCC.asm` so far holds only `Battle_Mul8CC`), and
+   the code at `$C1:ACF0` that fills the action block `$AE91`-`$AE9B`. Open from the movers: the
+   stepper at `$CF:F978` (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
    `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
    `Field_ServiceUnk54` $C0:274D) and the first of their callees: `Field_FindObjInFront` and
