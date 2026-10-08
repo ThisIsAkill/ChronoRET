@@ -536,6 +536,41 @@ $C1:5A70,$C1:5A98,41,BattleAct_OpAddVarClamped,$C1,Battle engine,verified,c41885
 $C1:5A99,$C1:5AAE,22,BattleAct_OpSwapVar1C1D,$C1,Battle engine,verified,29d4e8e8e84f,Opcodes $4A and $4D: swaps !Battle_ActVar1C and !Battle_ActVar1D; advances 1.
 $C1:5AAF,$C1:5AC4,22,BattleAct_OpSwapVar1C1E,$C1,Battle engine,verified,886fc030e816,Opcode $4E: swaps !Battle_ActVar1C and variable $1E (!Battle_ActUnkPointX); advances 1.
 $C1:5AC5,$C1:5ADA,22,BattleAct_OpSwapVar1C1F,$C1,Battle engine,verified,dbd36308d581,Opcode $4F: swaps !Battle_ActVar1C and variable $1F (!Battle_ActUnkPointY); advances 1.
+$C1:5ADB,$C1:5CF0,534,BattleAct_OpShowHitNumbers,$C1,Battle engine,verified,3de65a91596c,
+$C1:5CF1,$C1:5CF2,2,BattleAct_OpClearUnk9FF7Bit7,$C1,Battle engine,verified,62b2126bebeb,BattleAct_StoreUnk9FF7Bit7 and BattleAct_OpSetUnk9FF7Bit7)
+$C1:5CF3,$C1:5D11,31,BattleAct_StoreUnk9FF7Bit7,$C1,Battle engine,verified,0b14253fee00,
+$C1:5D12,$C1:5D17,6,BattleAct_OpSetUnk9FF7Bit7,$C1,Battle engine,verified,ed65d945c59d,
+$C1:5D18,$C1:5D1C,5,BattleAct_OpNop2,$C1,Battle engine,verified,78727b646386,Opcode $5F <x>: does nothing; advances 2 (over its operand).
+$C1:5D1D,$C1:5D92,118,BattleAct_OpLoadPalEntry,$C1,Battle engine,verified,e4cc759aacbe,
+$C1:5D93,$C1:5DC0,46,BattleAct_OpStartPalSeq,$C1,Battle engine,verified,b7b5922ee4a3,"Opcodes $61-$64 <delay> <first> <last>: starts palette sequence opcode - $61 (0-3) for BattleAct_StepPalettes ($CC:F1E7): it loads the palette-list entries first..last in turn, one every delay frames,"
+$C1:5DC1,$C1:5DD2,18,BattleAct_OpStopPalSeq,$C1,Battle engine,verified,cddc06d02a46,Opcodes $65-$68: stops palette sequence opcode - $65 (0-3); the colours it last loaded stay.
+$C1:5DD3,$C1:5DDB,9,BattleAct_OpSetSpecialPalette,$C1,Battle engine,verified,492adb81e4dc,
+$C1:5DDC,$C1:5E86,171,BattleAct_SpecialPaletteBody,$C1,Battle engine,verified,33e0a237981c,
+$C1:5E87,$C1:5E8A,4,BattleAct_OpRestorePalette,$C1,Battle engine,verified,a01b3103fabb,BattleAct_RestorePaletteBody)
+$C1:5E8B,$C1:5EDE,84,BattleAct_RestorePaletteBody,$C1,Battle engine,verified,394b9be04f50,
+$C1:5EDF,$C1:5F12,52,BattleAct_OpStartPalCycle,$C1,Battle engine,verified,51e2abb12c3e,Opcode $6B <delay>: starts the colour rotation at $CF:E600 (unmatched): every delay frames it turns the colours of !Battle_PaletteLive+$82-$99 (the special palette's 12 colours) on by one.
+$C1:5F13,$C1:5F99,135,BattleAct_OpBlinkPalette,$C1,Battle engine,verified,182ea4b10b58,
+$C1:5F9A,$C1:5FA4,11,BattleAct_OpStopPalCycle,$C1,Battle engine,verified,9cc07645e5dd,Opcode $6D: stops opcode $6B's colour rotation (!Battle_UnkAB4E and !Battle_PalCycleLo = 0); the colours stay as they were turned.
+$C1:5FA5,$C1:5FB2,14,BattleAct_OpIncAllObjUnkA1D8,$C1,Battle engine,verified,c7e8baf8b6a1,"The object counter opcodes ($C15FA5–$C15FDD): count !Battle_ActObjUnkA1D8 up or clear it, for all eight object threads or for the running one."
+$C1:5FB3,$C1:5FC0,14,BattleAct_OpClearAllObjUnkA1D8,$C1,Battle engine,verified,578e4ae7da92,Opcode $6F: zeroes !Battle_ActObjUnkA1D8 of object threads 0-7; advances 1.
+$C1:5FC1,$C1:5FC2,2,BattleAct_OpIncObjUnkA1D8,$C1,Battle engine,verified,28271bf31c2d,
+$C1:5FC3,$C1:5FD2,16,BattleAct_Op70Body,$C1,Battle engine,verified,97815bd2b19b,
+$C1:5FD3,$C1:5FDD,11,BattleAct_OpClearObjUnkA1D8,$C1,Battle engine,verified,910d6827658a,Opcode $71: zeroes !Battle_ActObjUnkA1D8 of the running object thread; advances 1.
+$C1:5FDE,$C1:6058,123,BattleAct_OpSetFacing,$C1,Battle engine,verified,82582b9c2bd9,
+$C1:6059,$C1:605E,6,BattleAct_OpLinkObjBit7,$C1,Battle engine,verified,ce7c95e9060f,
+$C1:605F,$C1:6062,4,BattleAct_OpLinkObjBit6,$C1,Battle engine,verified,3a6f1ddd5a2b,
+$C1:6063,$C1:6092,48,BattleAct_LinkObjBody,$C1,Battle engine,verified,020f790211e2,
+$C1:6093,$C1:60E5,83,BattleAct_OpCopyHeading,$C1,Battle engine,verified,6278d80563ba,
+$C1:60E6,$C1:6153,110,BattleAct_OpHeadingFromCalc,$C1,Battle engine,verified,24d8988ca1e0,"Opcode $76 <a> <b>: runs BattleAct_RunCalc handler b and then a, takes each one's two results as a point's x/y, and stores the angle Battle_CalcAngle gives from point a (origin) to point b as the head"
+$C1:6154,$C1:619D,74,BattleAct_OpAddHeading,$C1,Battle engine,verified,702837d3557f,
+$C1:619E,$C1:61C0,35,BattleAct_OpSound,$C1,Battle engine,verified,8c09eb7b3a92,"The sound opcodes ($C1619E–$C1621A): fill the APU command block (!Sfx_Command, !Sfx_Param1/2) and run Audio_ProcessEntry."
+$C1:61C1,$C1:61EA,42,BattleAct_OpSoundCalc,$C1,Battle engine,verified,0e8dcbafe5d7,"Opcodes $7A/$7B <id> <calc>: APU command $18 (opcode $7A) or $19 (opcode $7B) with !Sfx_Param1 = id and !Sfx_Param2 = the first result of BattleAct_RunCalc handler calc (probably an x, as opcodes $7C/"
+$C1:61EB,$C1:61F4,10,BattleAct_OpPcAttackSfxA,$C1,Battle engine,verified,6ca73ec89716,BattleAct_OpPcAttackSfxB and BattleAct_PlayPcAttackSfx)
+$C1:61F5,$C1:61FC,8,BattleAct_OpPcAttackSfxB,$C1,Battle engine,verified,83b3225e381b,
+$C1:61FD,$C1:621A,30,BattleAct_PlayPcAttackSfx,$C1,Battle engine,verified,61b7d38a31f5,
+$C1:621B,$C1:623B,33,BattleAct_OpRunVecCD001B,$C1,Battle engine,verified,c4f4fe12777a,
+$C1:623C,$C1:6257,28,BattleAct_OpSetCalcSel,$C1,Battle engine,verified,5257776eeb40,"Opcodes $81-$84 (entries 0-3) and $47/$48 (entries 4 and 5) <n>: !Battle_ActCalcSel[entry] = n + 1, so BattleAct_TickCalcs runs BattleAct_RunCalc handler n for that entry every frame; advances 2."
+$C1:6258,$C1:6298,65,BattleAct_OpSetHeading,$C1,Battle engine,verified,2b24e5de760f,"Opcode $85 <h>: sets the heading (see the heading opcodes above) of the thread's battler (threads 0-3 and 5-7), of every slot of the target set (thread 4; the target set here, unlike opcodes $75-$77) "
 $C1:65BA,$C1:6670,183,BattleAct_CalcMoveStep,$C1,Battle engine,verified,e905d1e222ad,"Unit step of a straight move from !Battle_GeoOriginX/Y to !Battle_GeoPointX/Y, as signed 8.8 pixels: the axis with the larger distance (x on a tie) moves 1.0 ($0100) per step, the other (smaller * 256"
 $C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"

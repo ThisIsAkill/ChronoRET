@@ -14751,6 +14751,1558 @@ BattleAct_OpSwapVar1C1F:
     JMP BattleAct_AdvanceScript
 
 ; ==================================================================
+; BattleAct_OpShowHitNumbers ($C15ADB–$C15CF0, 534 bytes)
+; ==================================================================
+; Opcodes $50-$55: shows the hit numbers of record set (opcode & 7) as
+; digit sprites over the battlers and waits until they have bounced.
+; It runs in three states of !Battle_ActUnkA3D1 (which also holds the
+; object threads and BattleAct_OpEndScript while it is non-zero):
+;  0: parks all $B0 bytes of Battle_HitNumSprite at $F0 (x and y off
+;     screen), clears !Battle_HitNumHigh and the four
+;     !Battle_ActPalSeqOn flags, copies !Battle_HitNumColoursA/B to
+;     !Battle_PaletteLive and !Battle_PaletteLive+$80 (the palettes of
+;     attributes !Battle_HitNumAttr and !Battle_HitNumAttrAlt if the
+;     buffer is the sprite half of CGRAM, as their palette numbers 0 and
+;     4 suggest) and stays on the opcode (advances 0); state 1.
+;  1: for each battler slot 0-10, reads its 4-byte record at
+;     !BattleRom_HitSetOffset[set] + slot * 4 in !Battle_ActPcHitAmount/
+;     Kind. Kind 0: nothing drawn. Kind 5: the tiles
+;     !Battle_HitNumTileK5A/B in the two right-hand places. Any other
+;     kind: the amount through BattleMsg_FormatNumber4Digits, leading
+;     zeros not drawn; kinds 1 and 2 get the palette-4 attribute, kinds
+;     other than 1, 3 and 5 set !Battler_HitNumAltBounce. The digits go
+;     at the battler's screen x (plus !Battler_ScreenOffsetX/Y when
+;     !Battler_UnkA003 is set) + !BattleRom_HitNumDigitX[zeros], which
+;     centres them; each drawn sprite clears its x bit 8 in the slot's
+;     high-table byte. Then !Battle_HitNumActive = 1; advances 0;
+;     state 2.
+;  2: advances 0 while !Battle_HitNumActive is set ($CF:E781 clears it
+;     when the bounce ends); then state 0 and advances 1.
+; Quirks: kind 5 also writes $90 to the byte before !BattleMsg_Digit1000
+; ($949B), which nothing here reads; DP $92-$93 are zeroed and never
+; read; the sprite offset of a slot with no hit is stepped with an
+; 8-bit add (it never passes $B0).
+; Callers: BattleAct_OpcodeTable entries $50-$55.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; in state 1
+;        DP $80-$85, $8C, $8E-$95 and BattleMsg_FormatNumber4Digits'
+;        !BattleMsg_NumValue and digit bytes written
+; Callees: BattleMsg_FormatNumber4Digits, BattleAct_AdvanceScript (JMP)
+!BattleAct_HitRecOfs = !BattleTmp_80    ; 2 B: offset of the slot's record in !Battle_ActPcHitAmount
+!BattleAct_HitSprOfs = !BattleTmp_82    ; 2 B: offset of the slot's sprites in Battle_HitNumSprite
+!BattleAct_HitHigh = !BattleTmp_84      ; 1 B: the slot's high-table byte being built
+!BattleAct_HitAttr = !BattleTmp_8C      ; 1 B: attribute of the slot's sprites
+!BattleAct_HitZeros = !BattleTmp_8E     ; 1 B: leading zeros (0-3); HitDigitX then overwrites it
+!BattleAct_HitDigitX = !BattleTmp_8E    ; 4 B ($8E-$91): x offset of each digit place
+!BattleAct_HitUnk92 = !BattleTmp_92     ; 2 B: zeroed, not read
+!BattleAct_HitX = !BattleTmp_94         ; 1 B: the battler's screen x
+!BattleAct_HitY = !BattleTmp_94+1       ; 1 B: its screen y
+BattleAct_OpShowHitNumbers:
+    LDA.w !Battle_ActUnkA3D1
+    BNE .state_1_or_2
+    INC.w !Battle_ActUnkA3D1        ; state 0 -> 1
+    LDX.w #!Battle_HitNumSpriteBytes-1
+    LDA.b #!BattleOam_OffscreenY
+.park:
+    STA.w Battle_HitNumSprite.X,X   ; every byte, so x and y are both $F0
+    DEX
+    BPL .park
+    LDX.w #!Battle_LastSlot
+.clear_high:
+    STZ.w !Battle_HitNumHigh,X
+    DEX
+    BPL .clear_high
+    STZ.w !Battle_ActPalSeqOn
+    STZ.w !Battle_ActPalSeqOn+1
+    STZ.w !Battle_ActPalSeqOn+2
+    STZ.w !Battle_ActPalSeqOn+3
+    TDC
+    TAY
+.colours_a:
+    LDA.w !Battle_HitNumColoursA,Y
+    STA.w !Battle_PaletteLive,Y
+    INY
+    CPY.w #!Battle_HitNumColourBytes
+    BNE .colours_a
+    TDC
+    TAY
+.colours_b:
+    LDA.w !Battle_HitNumColoursB,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16),Y ; +$80, the bytes opcode $69 also fills
+    INY
+    CPY.w #!Battle_HitNumColourBytes
+    BNE .colours_b
+    TDC
+    JMP BattleAct_AdvanceScript     ; 0: the same opcode next frame
+
+.state_1_or_2:
+    LDA.w !Battle_ActUnkA3D1
+    CMP.b #1
+    BEQ .build
+    JMP .wait
+.build:
+    STZ.w !Battle_HitNumStep
+    INC.w !Battle_ActUnkA3D1        ; state 1 -> 2
+    LDA.w !Battle_ActOpcode
+    AND.b #!Battle_HitNumSetMask
+    STA.w !Battle_HitNumSet
+    TAX
+    LDA.l !BattleRom_HitSetOffset,X
+    TAX
+    STX.b !BattleAct_HitRecOfs
+    TDC
+    TAY                             ; Y = battler slot
+    STY.b !BattleAct_HitSprOfs
+    STY.b !BattleAct_HitUnk92
+.slot:
+    LDA.b #!Battle_HitNumAttr
+    STA.b !BattleAct_HitAttr
+    LDA.w !Battler_UnkA003,Y
+    BNE .offset_position
+    LDA.w !Battler_ScreenX,Y
+    STA.b !BattleAct_HitX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !BattleAct_HitY
+    BRA .kind
+.offset_position:
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.w !Battler_ScreenOffsetX,Y
+    STA.b !BattleAct_HitX
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.w !Battler_ScreenOffsetY,Y
+    STA.b !BattleAct_HitY
+.kind:
+    LDX.b !BattleAct_HitRecOfs
+    LDA.w !Battle_ActPcHitKind,X
+    BNE .has_hit
+    JMP .no_hit
+.has_hit:
+    CMP.b #!Battle_ActHitKind5
+    BNE .not_kind5
+    LDA.b #!Battle_HitNumTileZero
+    STA.w !BattleMsg_Digit1000-1    ; quirk: $949B, not read here
+    STA.w !BattleMsg_Digit1000
+    STA.w !BattleMsg_Digit100
+    LDA.b #!Battle_HitNumTileK5A
+    STA.w !BattleMsg_Digit10
+    LDA.b #!Battle_HitNumTileK5B
+    STA.w !BattleMsg_Digit1
+    LDA.b #2                        ; placed as a number with two leading zeros
+    STA.b !BattleAct_HitZeros
+    BRA .place
+.not_kind5:
+    CMP.b #!Battle_ActHitKind3
+    BEQ .format
+    CMP.b #!Battle_ActHitKind1
+    BEQ .alt_attr
+    LDA.b #1
+    STA.w !Battler_HitNumAltBounce,Y
+    LDA.w !Battle_ActPcHitKind,X
+    CMP.b #!Battle_ActHitKind2
+    BNE .format
+.alt_attr:
+    LDA.b #!Battle_HitNumAttrAlt
+    STA.b !BattleAct_HitAttr
+.format:
+    REP #$20
+    LDA.w !Battle_ActPcHitAmount,X
+    STA.w !BattleMsg_NumValue
+    JSL BattleMsg_FormatNumber4Digits
+    SEP #$20
+    STZ.b !BattleAct_HitZeros
+    LDA.w !BattleMsg_Digit1000
+    CMP.b #!Battle_HitNumTileZero
+    BNE .place
+    INC.b !BattleAct_HitZeros
+    LDA.w !BattleMsg_Digit100
+    CMP.b #!Battle_HitNumTileZero
+    BNE .place
+    INC.b !BattleAct_HitZeros
+    LDA.w !BattleMsg_Digit10
+    CMP.b #!Battle_HitNumTileZero
+    BNE .place
+    INC.b !BattleAct_HitZeros
+.place:
+    LDA.b !BattleAct_HitZeros
+    ASL A
+    ASL A
+    TAX
+    LDA.l !BattleRom_HitNumDigitX,X
+    STA.b !BattleAct_HitDigitX
+    LDA.l !BattleRom_HitNumDigitX+1,X
+    STA.b !BattleAct_HitDigitX+1
+    LDA.l !BattleRom_HitNumDigitX+2,X
+    STA.b !BattleAct_HitDigitX+2
+    LDA.l !BattleRom_HitNumDigitX+3,X
+    STA.b !BattleAct_HitDigitX+3
+    LDA.b #!Battle_HitNumHighHidden
+    STA.b !BattleAct_HitHigh
+    LDX.b !BattleAct_HitSprOfs
+    LDA.w !BattleMsg_Digit1000      ; thousands: drawn unless a zero
+    CMP.b #!Battle_HitNumTileZero
+    BEQ .hundreds
+    LDA.w !BattleMsg_Digit1000
+    STA.w Battle_HitNumSprite.Tile,X
+    CLC
+    LDA.b !BattleAct_HitX
+    ADC.b !BattleAct_HitDigitX
+    STA.w Battle_HitNumSprite.X,X
+    LDA.b !BattleAct_HitY
+    STA.w Battle_HitNumSprite.Y,X
+    LDA.b !BattleAct_HitAttr
+    STA.w Battle_HitNumSprite.Attr,X
+    LDA.b !BattleAct_HitHigh
+    AND.b #!Battle_HitNumShow0
+    STA.b !BattleAct_HitHigh
+.hundreds:
+    INX
+    INX
+    INX
+    INX
+    LDA.w !BattleMsg_Digit100       ; drawn unless a leading zero
+    CMP.b #!Battle_HitNumTileZero
+    BNE .draw_hundreds
+    LDA.w !BattleMsg_Digit1000
+    CMP.b #!Battle_HitNumTileZero
+    BEQ .tens
+.draw_hundreds:
+    LDA.w !BattleMsg_Digit100
+    STA.w Battle_HitNumSprite.Tile,X
+    CLC
+    LDA.b !BattleAct_HitX
+    ADC.b !BattleAct_HitDigitX+1
+    STA.w Battle_HitNumSprite.X,X
+    LDA.b !BattleAct_HitY
+    STA.w Battle_HitNumSprite.Y,X
+    LDA.b !BattleAct_HitAttr
+    STA.w Battle_HitNumSprite.Attr,X
+    LDA.b !BattleAct_HitHigh
+    AND.b #!Battle_HitNumShow1
+    STA.b !BattleAct_HitHigh
+.tens:
+    INX
+    INX
+    INX
+    INX
+    LDA.w !BattleMsg_Digit10        ; drawn unless a leading zero
+    CMP.b #!Battle_HitNumTileZero
+    BNE .draw_tens
+    LDA.w !BattleMsg_Digit100
+    CMP.b #!Battle_HitNumTileZero
+    BNE .draw_tens
+    LDA.w !BattleMsg_Digit1000
+    CMP.b #!Battle_HitNumTileZero
+    BEQ .ones
+.draw_tens:
+    LDA.w !BattleMsg_Digit10
+    STA.w Battle_HitNumSprite.Tile,X
+    CLC
+    LDA.b !BattleAct_HitX
+    ADC.b !BattleAct_HitDigitX+2
+    STA.w Battle_HitNumSprite.X,X
+    LDA.b !BattleAct_HitY
+    STA.w Battle_HitNumSprite.Y,X
+    LDA.b !BattleAct_HitAttr
+    STA.w Battle_HitNumSprite.Attr,X
+    LDA.b !BattleAct_HitHigh
+    AND.b #!Battle_HitNumShow2
+    STA.b !BattleAct_HitHigh
+.ones:
+    INX
+    INX
+    INX
+    INX
+    LDA.w !BattleMsg_Digit1         ; always drawn
+    STA.w Battle_HitNumSprite.Tile,X
+    CLC
+    LDA.b !BattleAct_HitX
+    ADC.b !BattleAct_HitDigitX+3
+    STA.w Battle_HitNumSprite.X,X
+    LDA.b !BattleAct_HitY
+    STA.w Battle_HitNumSprite.Y,X
+    LDA.b !BattleAct_HitAttr
+    STA.w Battle_HitNumSprite.Attr,X
+    LDA.b !BattleAct_HitHigh
+    AND.b #!Battle_HitNumShow3
+    STA.b !BattleAct_HitHigh
+    INX
+    INX
+    INX
+    INX
+    STX.b !BattleAct_HitSprOfs
+    LDA.b !BattleAct_HitHigh
+    STA.w !Battle_HitNumHigh,Y
+    LDA.b #1
+    STA.w !Battler_HitNumShown,Y
+    BRA .next_slot
+.no_hit:
+    CLC
+    LDA.b !BattleAct_HitSprOfs
+    ADC.b #!Battle_HitNumSlotBytes
+    STA.b !BattleAct_HitSprOfs
+.next_slot:
+    LDX.b !BattleAct_HitRecOfs
+    INX
+    INX
+    INX
+    INX
+    STX.b !BattleAct_HitRecOfs
+    INY
+    CPY.w #!Battle_NumSlots
+    BEQ .built
+    JMP .slot
+.built:
+    LDA.b #1
+    STA.w !Battle_HitNumActive
+    TDC
+    JMP BattleAct_AdvanceScript     ; 0: wait from next frame on
+
+.wait:
+    LDA.w !Battle_HitNumActive
+    BEQ .done
+    TDC
+    JMP BattleAct_AdvanceScript     ; 0: still bouncing
+.done:
+    STZ.w !Battle_ActUnkA3D1
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpClearUnk9FF7Bit7 ($C15CF1–$C15D17, 39 bytes, with
+; BattleAct_StoreUnk9FF7Bit7 and BattleAct_OpSetUnk9FF7Bit7)
+; ==================================================================
+; Opcodes $5D (BattleAct_OpClearUnk9FF7Bit7, DP $8E = 0) and $5E
+; (BattleAct_OpSetUnk9FF7Bit7, DP $8E = $80): sets bit 7 of the
+; thread's battler's !Battler_Unk9FF7 (the target scans' skip bit) to
+; that value, keeping bits 0-6. Only threads 0-3 act; threads 4-15
+; (the target-set thread included, unlike opcodes $29/$2A) change
+; nothing. Advances 1. Quirk: the test for the object threads is made
+; before the test that already covers them.
+; Callers: BattleAct_OpcodeTable entries $5D and $5E;
+;   BattleAct_StoreUnk9FF7Bit7 is reached from BattleAct_OpSetUnk9FF7Bit7.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered (the slot for
+;        threads 0-3); Y unchanged; DP $8E = the bit value
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpClearUnk9FF7Bit7:
+    STZ.b !BattleAct_FlagValue
+BattleAct_StoreUnk9FF7Bit7:             ; header: see BattleAct_OpClearUnk9FF7Bit7
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .advance
+    CMP.b #!Battle_ActTargetSetThread
+    BCS .advance                    ; threads 4-7 too
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_Unk9FF7,X
+    AND.b #!Battle_ActClearBit7
+    ORA.b !BattleAct_FlagValue
+    STA.w !Battler_Unk9FF7,X
+.advance:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+BattleAct_OpSetUnk9FF7Bit7:             ; header: see BattleAct_OpClearUnk9FF7Bit7
+    LDA.b #!Battle_Unk9FF7Skip
+    STA.b !BattleAct_FlagValue
+    BRA BattleAct_StoreUnk9FF7Bit7
+
+; ==================================================================
+; BattleAct_OpNop2 ($C15D18–$C15D1C, 5 bytes)
+; ==================================================================
+; Opcode $5F <x>: does nothing; advances 2 (over its operand).
+; Callers: BattleAct_OpcodeTable entry $5F.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpNop2:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; The palette opcodes ($C15D1D–$C15FA4): colour sets from the
+; action's palette list (!Battle_ActPalPtr) and its four palette
+; sequences, opcode $69's special palette and its blink, and the
+; colour rotation run at $CF:E600. Each is reached only through
+; BattleAct_OpcodeTable, at the entries its header names.
+; ==================================================================
+; BattleAct_OpLoadPalEntry ($C15D1D–$C15D92, 118 bytes)
+; ==================================================================
+; Opcode $60 <n>: copies the colour set of entry n of the action's
+; palette list (bank $CD, !Battle_ActPalPtr + n * 2) into
+; !Battle_PaletteLive+2 + (flags & 7) * 8: 6 bytes of
+; !BattleRom_PalSets6 or, with flags bit 7, 14 bytes of
+; !BattleRom_PalSets14. The same copy as one step of
+; BattleAct_StepPalettes ($CC:F1E7), which places with flags & 3.
+; Goes on with the next opcode in the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entry $60.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$85
+;        written; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_PalSet2 = !BattleTmp_80      ; 2 B: set * 2
+!BattleAct_PalLeft = !BattleTmp_82      ; 1 B: the flags, then bytes left to copy (set * 4 on the 14-byte path)
+!BattleAct_PalSet6 = !BattleTmp_84      ; 2 B: set * 6 (14-byte path)
+BattleAct_OpLoadPalEntry:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    REP #$20
+    ASL A
+    CLC
+    ADC.w !Battle_ActPalPtr
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_PalListFlags,X
+    STA.b !BattleAct_PalLeft
+    AND.b #!Battle_PalListPosMask
+    ASL A
+    ASL A
+    ASL A
+    TAY                             ; Y = (flags & 7) * 8
+    LDA.b !BattleAct_PalLeft
+    BMI .set14
+    LDA.l !BattleRom_PalListSet,X
+    REP #$20
+    ASL A
+    STA.b !BattleAct_PalSet2
+    ASL A
+    CLC
+    ADC.b !BattleAct_PalSet2
+    TAX                             ; set * 6
+    TDC
+    SEP #$20
+    LDA.b #!Battle_PalSet6Len
+    STA.b !BattleAct_PalLeft
+.copy6:
+    LDA.l !BattleRom_PalSets6,X
+    STA.w !Battle_PaletteLive+2,Y
+    INX
+    INY
+    DEC.b !BattleAct_PalLeft
+    BNE .copy6
+    BRA .next
+.set14:
+    LDA.l !BattleRom_PalListSet,X
+    REP #$20
+    ASL A
+    STA.b !BattleAct_PalSet2
+    ASL A
+    STA.b !BattleAct_PalLeft        ; set * 4
+    CLC
+    ADC.b !BattleAct_PalSet2
+    STA.b !BattleAct_PalSet6
+    LDA.b !BattleAct_PalLeft
+    ASL A
+    CLC
+    ADC.b !BattleAct_PalSet6
+    TAX                             ; set * 8 + set * 6 = set * 14
+    TDC
+    SEP #$20
+    LDA.b #!Battle_PalSet14Len
+    STA.b !BattleAct_PalLeft
+.copy14:
+    LDA.l !BattleRom_PalSets14,X
+    STA.w !Battle_PaletteLive+2,Y
+    INX
+    INY
+    DEC.b !BattleAct_PalLeft
+    BNE .copy14
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStartPalSeq ($C15D93–$C15DC0, 46 bytes)
+; ==================================================================
+; Opcodes $61-$64 <delay> <first> <last>: starts palette sequence
+; opcode - $61 (0-3) for BattleAct_StepPalettes ($CC:F1E7): it loads
+; the palette-list entries first..last in turn, one every delay frames,
+; starting with the next frame, and wraps back to first. Goes on with
+; the next opcode in the same frame; advances 4.
+; Callers: BattleAct_OpcodeTable entries $61-$64.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the sequence; Y = 3;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpStartPalSeq:
+    SEC
+    LDA.w !Battle_ActOpcode
+    SBC.b #!Battle_ActOpStartPalSeq
+    TAX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActPalSeqDelay,X
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActPalSeqFirst,X
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActPalSeqLast,X
+    LDA.b #1
+    STA.w !Battle_ActPalSeqTimer,X
+    STA.w !Battle_ActPalSeqOn,X
+    LDA.b #!Battle_PalSeqStepStart
+    STA.w !Battle_ActPalSeqStep,X
+    INC.w !Battle_ActNextOp
+    LDA.b #4
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStopPalSeq ($C15DC1–$C15DD2, 18 bytes)
+; ==================================================================
+; Opcodes $65-$68: stops palette sequence opcode - $65 (0-3); the
+; colours it last loaded stay. Goes on with the next opcode in the same
+; frame; advances 1.
+; Callers: BattleAct_OpcodeTable entries $65-$68.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the sequence; Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpStopPalSeq:
+    SEC
+    LDA.w !Battle_ActOpcode
+    SBC.b #!Battle_ActOpStopPalSeq
+    TAX
+    STZ.w !Battle_ActPalSeqOn,X
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetSpecialPalette ($C15DD3–$C15E86, 180 bytes, with
+; BattleAct_SpecialPaletteBody)
+; ==================================================================
+; Opcode $69 <n>: gives the thread's battler (threads 0-3) or every
+; slot of the target set (threads 4-15, the object threads included)
+; !Battler_Palette = !Battle_SpecialPalette, and fills that palette
+; (!Battle_PaletteLive+$82, from its second colour on) with the 24
+; bytes of entry n of !BattleRom_SpecialPals and six bytes of $FF.
+; When !Battle_Unk99D2 is set and one of those battlers has
+; !Battler_UnkA08C set (for threads 0-3 only an enemy, slot 3 on), it
+; also fills !Battle_PaletteLiveLo from colour !Battle_Unk99D3 to its
+; end with the entry's 12 colours over and over. Goes on with the next
+; opcode in the same frame; advances by DP $8E: 2 here.
+; BattleAct_SpecialPaletteBody is the same with DP $80 = n and DP $8E
+; set by the caller: BattleAct_OpBlinkPalette ($C1:5F54, $C1:5F85)
+; jumps there with $8E = 0, so its opcode is run again in the same
+; frame.
+; Callers: BattleAct_OpcodeTable entry $69; BattleAct_SpecialPaletteBody
+;   from BattleAct_OpBlinkPalette ($C1:5F54, $C1:5F85; JMP).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$87 and
+;        $8E written; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_PalEntry = !BattleTmp_80     ; 2 B: n, then n * 8
+!BattleAct_PalLo = !BattleTmp_82        ; 1 B: non-zero = fill !Battle_PaletteLiveLo too
+!BattleAct_PalSrc = !BattleTmp_84       ; 2 B: n * 24, the entry's offset
+!BattleAct_PalWords = !BattleTmp_86     ; 2 B: colours left of one pass
+!BattleAct_PalAdvance = !BattleTmp_8E   ; 1 B: bytes to advance by
+BattleAct_OpSetSpecialPalette:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_PalEntry
+    LDA.b #2
+    STA.b !BattleAct_PalAdvance
+BattleAct_SpecialPaletteBody:           ; header: see BattleAct_OpSetSpecialPalette
+    STZ.b !BattleAct_PalLo
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActTargetSetThread
+    BCS .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .set_one
+    LDA.w !Battle_Unk99D2
+    BEQ .set_one
+    LDA.w !Battler_UnkA08C,X
+    BEQ .set_one
+    INC.b !BattleAct_PalLo
+.set_one:
+    LDA.b #!Battle_SpecialPalette
+    STA.w !Battler_Palette,X
+    BRA .copy
+.target_set:
+    TDC
+    TAX
+.set_slot:
+    LDA.w !Battle_ActTargetSet,X
+    BMI .copy
+    TAY
+    LDA.w !Battle_Unk99D2
+    BEQ .set_palette
+    LDA.w !Battler_UnkA08C,Y
+    BEQ .set_palette
+    INC.b !BattleAct_PalLo
+.set_palette:
+    LDA.b #!Battle_SpecialPalette
+    STA.w !Battler_Palette,Y
+    INX
+    BRA .set_slot
+.copy:
+    LDA.b !BattleAct_PalEntry
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleAct_PalEntry
+    ASL A
+    CLC
+    ADC.b !BattleAct_PalEntry
+    TAX                             ; n * 24
+    STX.b !BattleAct_PalSrc
+    TDC
+    SEP #$20
+    TDC
+    TAY
+.copy_byte:
+    LDA.l !BattleRom_SpecialPals,X
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+2,Y
+    INX
+    INY
+    CPY.w #!Battle_SpecialPalLen
+    BNE .copy_byte
+    LDA.b #!Battle_SpecialPalFill
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+2,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+3,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+4,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+5,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+6,Y
+    STA.w !Battle_PaletteLive+(!Battle_SpecialPalette*16)+7,Y
+    LDA.b !BattleAct_PalLo
+    BEQ .next
+    LDA.w !Battle_Unk99D3
+    REP #$20
+    ASL A
+    TAY
+.pass:
+    LDX.b !BattleAct_PalSrc
+    LDA.w #!Battle_SpecialPalLen/2
+    STA.b !BattleAct_PalWords
+.copy_colour:
+    LDA.l !BattleRom_SpecialPals,X
+    STA.w !Battle_PaletteLiveLo,Y
+    INX
+    INX
+    INY
+    INY
+    CPY.w #!Battle_PaletteLoBytes
+    BEQ .lo_done
+    DEC.b !BattleAct_PalWords
+    BNE .copy_colour
+    BRA .pass
+.lo_done:
+    TDC
+    SEP #$20
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b !BattleAct_PalAdvance
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpRestorePalette ($C15E87–$C15EDE, 88 bytes, with
+; BattleAct_RestorePaletteBody)
+; ==================================================================
+; Opcode $6A: undoes opcode $69: gives the thread's battler (threads
+; 0-3) or every slot of the target set (threads 4-15) its
+; !Battler_BasePalette back. For an enemy of threads 0-3 (slot 3 on)
+; while !Battle_Unk99D2 is set it also copies !Battle_PaletteSavedLo
+; back over !Battle_PaletteLiveLo from colour !Battle_Unk99D3 on
+; (without testing !Battler_UnkA08C); the target-set path never does,
+; although opcode $69's does fill it. Advances by DP $8E: 1 here.
+; BattleAct_RestorePaletteBody is the same with DP $8E set by the
+; caller: BattleAct_OpBlinkPalette jumps there with 3 ($C1:5F1C) or 0
+; ($C1:5F59, $C1:5F8A).
+; Callers: BattleAct_OpcodeTable entry $6A; BattleAct_RestorePaletteBody
+;   from BattleAct_OpBlinkPalette ($C1:5F1C, $C1:5F59, $C1:5F8A; JMP).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $8E written
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpRestorePalette:
+    LDA.b #1
+    STA.b !BattleAct_PalAdvance
+BattleAct_RestorePaletteBody:           ; header: see BattleAct_OpRestorePalette
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActTargetSetThread
+    BCS .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .restore_one
+    LDA.w !Battle_Unk99D2
+    BEQ .restore_one
+    LDA.w !Battler_BasePalette,X
+    STA.w !Battler_Palette,X
+    BRA .restore_lo
+.restore_one:
+    LDA.w !Battler_BasePalette,X
+    STA.w !Battler_Palette,X
+    BRA .advance
+.restore_lo:
+    LDA.w !Battle_Unk99D3
+    REP #$20
+    ASL A
+    TAX
+.copy_colour:
+    LDA.w !Battle_PaletteSavedLo,X
+    STA.w !Battle_PaletteLiveLo,X
+    INX
+    INX
+    CPX.w #!Battle_PaletteLoBytes
+    BNE .copy_colour
+    TDC
+    SEP #$20
+    BRA .advance
+.target_set:
+    TDC
+    TAX
+.restore_slot:
+    LDA.w !Battle_ActTargetSet,X
+    BMI .advance
+    TAY
+    LDA.w !Battler_BasePalette,Y
+    STA.w !Battler_Palette,Y
+    INX
+    BRA .restore_slot
+.advance:
+    LDA.b !BattleAct_PalAdvance
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStartPalCycle ($C15EDF–$C15F12, 52 bytes)
+; ==================================================================
+; Opcode $6B <delay>: starts the colour rotation at $CF:E600
+; (unmatched): every delay frames it turns the colours of
+; !Battle_PaletteLive+$82-$99 (the special palette's 12 colours) on by
+; one. !Battle_PalCycleTimer = 1, !Battle_UnkAB4E (its on flag) = 1.
+; When !Battle_Unk99D2 is set, the first battler from the main target
+; on (!Battle_ActMainTarget, then the target set) that has
+; !Battler_UnkA08C set and the special palette counts
+; !Battle_PalCycleLo up, so the !Battle_PaletteLiveLo colours turn too.
+; Advances 2.
+; Callers: BattleAct_OpcodeTable entry $6B.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered (Y = 1 or a
+;        slot)
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpStartPalCycle:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_PalCycleDelay
+    LDA.b #1
+    STA.w !Battle_PalCycleTimer
+    STA.w !Battle_UnkAB4E
+    LDA.w !Battle_Unk99D2
+    BEQ .advance
+    TDC
+    TAX
+.check_slot:
+    LDA.w !Battle_ActMainTarget,X
+    BMI .advance
+    TAY
+    LDA.w !Battler_UnkA08C,Y
+    BEQ .next_slot
+    LDA.w !Battler_Palette,Y
+    CMP.b #!Battle_SpecialPalette
+    BNE .next_slot
+    INC.w !Battle_PalCycleLo
+    BRA .advance
+.next_slot:
+    INX
+    BRA .check_slot
+.advance:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpBlinkPalette ($C15F13–$C15F99, 135 bytes)
+; ==================================================================
+; Opcode $6C <n> <frames>: blinks between opcode $69's special palette
+; n and the battler's own palette. While script variable 0
+; (!Battle_ActVars) is 0 it runs BattleAct_RestorePaletteBody and
+; advances 3; otherwise it stays on the opcode. Object threads only
+; advance 3. For the thread's battler (threads 0-3 and 5-7) or each
+; slot of the target set (thread 4): while its !Battler_BlinkTimer is
+; non-zero it is counted down; at 0 it is reloaded with frames and
+; !Battler_BlinkOn toggles, and the handler leaves through
+; BattleAct_SpecialPaletteBody (on) or BattleAct_RestorePaletteBody
+; (off), with DP $8E = 0 (advance 0), which act for the whole thread
+; as their opcodes do; on thread 4 the first slot whose timer ran out
+; switches the whole target set. The special-palette body counts
+; !Battle_ActNextOp up, so the opcode runs again in the same frame and
+; already counts the new timer down once.
+; Quirk: each JMP to the special-palette body is followed by a BRA
+; that nothing reaches ($C1:5F57, $C1:5F88).
+; Callers: BattleAct_OpcodeTable entry $6C.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80, $8E,
+;        $90-$92 written (and what the bodies write)
+; Callees: BattleAct_SpecialPaletteBody, BattleAct_RestorePaletteBody
+;   (JMP), BattleAct_AdvanceScript (JMP)
+!BattleAct_BlinkSetIdx = !BattleTmp_90  ; 2 B: entry of !Battle_ActTargetSet (thread 4)
+!BattleAct_BlinkFrames = !BattleTmp_92  ; 1 B: frames between toggles
+BattleAct_OpBlinkPalette:
+    LDA.b #3
+    STA.b !BattleAct_PalAdvance
+    LDA.w !Battle_ActVars
+    BNE .blink
+    JMP BattleAct_RestorePaletteBody  ; variable 0 is 0: end, advance 3
+.blink:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_PalEntry
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_BlinkFrames
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_BlinkTimer,X
+    BEQ .toggle
+    DEC.w !Battler_BlinkTimer,X
+    BRA .stay_one
+.toggle:
+    LDA.b !BattleAct_BlinkFrames
+    STA.w !Battler_BlinkTimer,X
+    STZ.b !BattleAct_PalAdvance
+    LDA.w !Battler_BlinkOn,X
+    EOR.b #1
+    STA.w !Battler_BlinkOn,X
+    BEQ .off
+    JMP BattleAct_SpecialPaletteBody
+    BRA .stay_one                   ; quirk: not reached
+.off:
+    JMP BattleAct_RestorePaletteBody
+.stay_one:
+    BRA .stay
+.target_set:
+    TDC
+    TAX
+    STX.b !BattleAct_BlinkSetIdx
+.blink_slot:
+    LDX.b !BattleAct_BlinkSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .stay
+    TAX
+    LDA.w !Battler_BlinkTimer,X
+    BEQ .toggle_slot
+    DEC.w !Battler_BlinkTimer,X
+    BRA .next_slot
+.toggle_slot:
+    LDA.b !BattleAct_BlinkFrames
+    STA.w !Battler_BlinkTimer,X
+    STZ.b !BattleAct_PalAdvance
+    LDA.w !Battler_BlinkOn,X
+    EOR.b #1
+    STA.w !Battler_BlinkOn,X
+    BEQ .off_slot
+    JMP BattleAct_SpecialPaletteBody
+    BRA .stay                       ; quirk: not reached
+.off_slot:
+    JMP BattleAct_RestorePaletteBody
+.next_slot:
+    INC.b !BattleAct_BlinkSetIdx
+    BRA .blink_slot
+.stay:
+    TDC
+    JMP BattleAct_AdvanceScript     ; 0: blink on next frame
+.object:
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpStopPalCycle ($C15F9A–$C15FA4, 11 bytes)
+; ==================================================================
+; Opcode $6D: stops opcode $6B's colour rotation (!Battle_UnkAB4E and
+; !Battle_PalCycleLo = 0); the colours stay as they were turned.
+; Advances 1.
+; Callers: BattleAct_OpcodeTable entry $6D.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpStopPalCycle:
+    STZ.w !Battle_UnkAB4E
+    STZ.w !Battle_PalCycleLo
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; The object counter opcodes ($C15FA5–$C15FDD): count
+; !Battle_ActObjUnkA1D8 up or clear it, for all eight object threads
+; or for the running one. Each is reached only through
+; BattleAct_OpcodeTable, at the entry its header names.
+; ==================================================================
+; BattleAct_OpIncAllObjUnkA1D8 ($C15FA5–$C15FB2, 14 bytes)
+; ==================================================================
+; Opcode $6E: counts !Battle_ActObjUnkA1D8 of object threads 0-7 up;
+; advances 1.
+; Callers: BattleAct_OpcodeTable entry $6E.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = $FFFF; Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpIncAllObjUnkA1D8:
+    LDX.w #!Battle_ActNumObjThreads-1
+.object:
+    INC.w !Battle_ActObjUnkA1D8,X
+    DEX
+    BPL .object
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpClearAllObjUnkA1D8 ($C15FB3–$C15FC0, 14 bytes)
+; ==================================================================
+; Opcode $6F: zeroes !Battle_ActObjUnkA1D8 of object threads 0-7;
+; advances 1.
+; Callers: BattleAct_OpcodeTable entry $6F.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = $FFFF; Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpClearAllObjUnkA1D8:
+    LDX.w #!Battle_ActNumObjThreads-1
+.object:
+    STZ.w !Battle_ActObjUnkA1D8,X
+    DEX
+    BPL .object
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpIncObjUnkA1D8 ($C15FC1–$C15FD2, 18 bytes, with
+; BattleAct_Op70Body)
+; ==================================================================
+; Opcode $70: counts !Battle_ActObjUnkA1D8 of the running object
+; thread (!Battle_ActObjThread) up; advances 1. Meant for object
+; threads: on another thread !Battle_ActObjThread is whatever the last
+; object thread left.
+; BattleAct_Op70Body is the same without the STZ of DP $8E: with $8E
+; non-zero it counts up and returns (RTS) without advancing.
+; Callers: BattleAct_OpcodeTable entry $70; BattleAct_Op70Body from
+;   BattleAct_OpPlayAnim ($C1:4E8E, JMP, with DP $8E = 1).
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread);
+;        BattleAct_Op70Body: DP $8E set
+; Exit:  M=1, X=0, DP=0, DB=$7E; X = the object thread; Y unchanged;
+;        advanced: A = 0; returned: A = DP $8E
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_Op70Return = !BattleTmp_8E   ; 1 B: non-zero = return without advancing
+BattleAct_OpIncObjUnkA1D8:
+    STZ.b !BattleAct_Op70Return
+BattleAct_Op70Body:                     ; header: see BattleAct_OpIncObjUnkA1D8
+    LDX.w !Battle_ActObjThread
+    INC.w !Battle_ActObjUnkA1D8,X
+    LDA.b !BattleAct_Op70Return
+    BNE .return
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+.return:
+    RTS
+
+; ==================================================================
+; BattleAct_OpClearObjUnkA1D8 ($C15FD3–$C15FDD, 11 bytes)
+; ==================================================================
+; Opcode $71: zeroes !Battle_ActObjUnkA1D8 of the running object thread;
+; advances 1.
+; Callers: BattleAct_OpcodeTable entry $71.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the object thread; Y
+;        unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpClearObjUnkA1D8:
+    LDX.w !Battle_ActObjThread
+    STZ.w !Battle_ActObjUnkA1D8,X
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetFacing ($C15FDE–$C16058, 123 bytes)
+; ==================================================================
+; Opcode $72 <mode>: sets the facing of the thread's actor from
+; BattleAct_CalcFacing with A = mode: !Battler_Facing of the thread's
+; battler (threads 0-3) or of every slot of the target set (thread
+; 4), or !Battle_ActObjFacing of the object (threads 8-15). Before each
+; call DP $80/$81 hold the actor's x/y (!Battler_ScreenX/Y or
+; !Battle_ActObjX/Y) and X its slot or object thread. Threads 5-7 are
+; taken as battler threads. Advances 2.
+; Callers: BattleAct_OpcodeTable entry $72.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$83 and
+;        $8E written, and what the BattleAct_CalcFacing handler writes
+; Callees: BattleAct_CalcFacing, BattleAct_AdvanceScript (JMP)
+!BattleAct_FaceX = !BattleTmp_80        ; 1 B: the actor's x, for BattleAct_CalcFacing
+!BattleAct_FaceY = !BattleTmp_81        ; 1 B: its y
+!BattleAct_FaceSlot = !BattleTmp_82     ; 2 B: the battler slot
+!BattleAct_FaceMode = !BattleTmp_8E     ; 1 B: the operand
+BattleAct_OpSetFacing:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_FaceMode
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STX.b !BattleAct_FaceSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_FaceX
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_FaceY
+    LDA.b !BattleAct_FaceMode
+    JSR BattleAct_CalcFacing
+    LDX.b !BattleAct_FaceSlot
+    LDA.w !Battle_ActFacingOut
+    STA.w !Battler_Facing,X
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .set_done
+    TAX
+    STX.b !BattleAct_FaceSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_FaceX
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_FaceY
+    LDA.b !BattleAct_FaceMode
+    JSR BattleAct_CalcFacing
+    LDX.b !BattleAct_FaceSlot
+    LDA.w !Battle_ActFacingOut
+    STA.w !Battler_Facing,X
+    INY
+    BRA .set_slot
+.set_done:
+    BRA .advance
+.object:
+    LDA.w !Battle_ActObjThread
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.b !BattleAct_FaceX
+    LDA.w !Battle_ActObjY,X
+    STA.b !BattleAct_FaceY
+    LDX.w !Battle_ActObjThread
+    LDA.b !BattleAct_FaceMode
+    JSR BattleAct_CalcFacing
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActFacingOut
+    STA.w !Battle_ActObjFacing,X
+.advance:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpLinkObjBit7 ($C16059–$C16092, 58 bytes, with
+; BattleAct_OpLinkObjBit6 and BattleAct_LinkObjBody)
+; ==================================================================
+; Opcodes $73 (BattleAct_OpLinkObjBit7, DP $8E = $80) and $74
+; (BattleAct_OpLinkObjBit6, DP $8E = $40) <n>: links the running object
+; thread j (!Battle_ActObjThread) to the battler s in entry n of
+; !Battle_ActBattlers: !Battle_ActObjLinkSlot[j] = s and
+; !Battle_ActObjLinks[j * 11 + s] = (j & $3F) | DP $8E. What the link
+; does is not traced (read at $CF:EDD4 and $CF:F81D); "link" is
+; inferred from the two tables only. Meant for object threads.
+; Advances 2.
+; Callers: BattleAct_OpcodeTable entries $73 and $74;
+;   BattleAct_LinkObjBody is reached from BattleAct_OpLinkObjBit7 (BRA)
+;   and by falling in from BattleAct_OpLinkObjBit6.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = j * 11 + s; Y = 1; DP $80,
+;        $8E and Battle_Mul8's $AD-$B0 and $77/$78 written
+; Callees: Battle_Mul8, BattleAct_AdvanceScript (JMP)
+!BattleAct_LinkSlot = !BattleTmp_80     ; 1 B: the battler slot s
+!BattleAct_LinkFlag = !BattleTmp_8E     ; 1 B: $80 or $40
+BattleAct_OpLinkObjBit7:
+    LDA.b #!Battle_ActObjLinkBit7
+    STA.b !BattleAct_LinkFlag
+    BRA BattleAct_LinkObjBody
+
+BattleAct_OpLinkObjBit6:                ; header: see BattleAct_OpLinkObjBit7
+    LDA.b #!Battle_ActObjLinkBit6
+    STA.b !BattleAct_LinkFlag
+BattleAct_LinkObjBody:                  ; header: see BattleAct_OpLinkObjBit7
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    STA.b !BattleAct_LinkSlot
+    LDA.w !Battle_ActObjThread
+    STA.b !Battle_Mul8A
+    TAX
+    LDA.b !BattleAct_LinkSlot
+    STA.w !Battle_ActObjLinkSlot,X
+    LDA.b #!Battle_NumSlots
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    CLC
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattleAct_LinkSlot
+    TAX                             ; j * 11 + s (B = 0 from Battle_Mul8)
+    LDA.w !Battle_ActObjThread
+    AND.b #!Battle_ActObjLinkThreadMask
+    ORA.b !BattleAct_LinkFlag
+    STA.w !Battle_ActObjLinks,X
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; The heading opcodes ($C16093–$C1619D and $C16258): set
+; !Battle_ActorUnkA5AA (the battlers) or !Battle_ActObjUnkA5B5 (the
+; object threads), the heading a curving move with operand $FF starts
+; from. On thread 4 opcodes $75-$77 walk !Battle_ActBattlers from
+; entry 1 on (entries 1-2 are the two slots of the action block, 3 the
+; main target, then the target set, $FF-ended), not the target set the
+; other handlers use. Each is reached only through BattleAct_OpcodeTable.
+; ==================================================================
+; BattleAct_OpCopyHeading ($C16093–$C160E5, 83 bytes)
+; ==================================================================
+; Opcode $75 <a>: takes the heading of actor a (0-9: the battler in
+; entry a of !Battle_ActBattlers, its !Battle_ActorUnkA5AA; 10 on:
+; object thread a - 10, its !Battle_ActObjUnkA5B5) and stores it as the
+; heading of the thread's battler (threads 0-3 and 5-7), of the list
+; above (thread 4) or of the object (threads 8-15). Goes on with the
+; next opcode in the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entry $75.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
+;        slot; DP $80 = the heading; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_Heading = !BattleTmp_80      ; 1 B: the heading stored
+BattleAct_OpCopyHeading:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    CMP.b #!Battle_ActRefFirstObj
+    BCS .from_object
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battle_ActorUnkA5AA,X
+    BRA .store
+.from_object:
+    SEC
+    SBC.b #!Battle_ActRefFirstObj
+    TAX
+    LDA.w !Battle_ActObjUnkA5B5,X
+.store:
+    STA.b !BattleAct_Heading
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .list
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActorUnkA5AA,X
+    BRA .next
+.list:
+    TDC
+    TAX
+.list_slot:
+    LDA.w !Battle_ActBattlers+1,X   ; entries 1 on
+    BMI .list_done
+    TAY
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActorUnkA5AA,Y
+    INX
+    BRA .list_slot
+.list_done:
+    BRA .next
+.object:
+    LDX.w !Battle_ActObjThread
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActObjUnkA5B5,X
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpHeadingFromCalc ($C160E6–$C16153, 110 bytes)
+; ==================================================================
+; Opcode $76 <a> <b>: runs BattleAct_RunCalc handler b and then a,
+; takes each one's two results as a point's x/y, and stores the angle
+; Battle_CalcAngle gives from point a (origin) to point b as the
+; heading, for the same actors as opcode $75. Goes on with the next
+; opcode in the same frame; advances 3.
+; Callers: BattleAct_OpcodeTable entry $76.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 2 or the last
+;        slot; !Battle_ActHeadToX/Y, !Battle_ActHeadFromCalc,
+;        !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y and Battle_CalcAngle's
+;        DP $D7-$E3 written; !Battle_ActNextOp counted up
+; Callees: BattleAct_RunCalc, Battle_CalcAngle, BattleAct_AdvanceScript
+;   (JMP)
+BattleAct_OpHeadingFromCalc:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActHeadFromCalc
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc           ; point b
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActHeadToX
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActHeadToY
+    LDA.w !Battle_ActHeadFromCalc
+    JSR BattleAct_RunCalc           ; point a
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battle_ActHeadToX
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActHeadToY
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .list
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !Battle_GeoAngle
+    STA.w !Battle_ActorUnkA5AA,X
+    BRA .next
+.list:
+    TDC
+    TAX
+.list_slot:
+    LDA.w !Battle_ActBattlers+1,X   ; entries 1 on
+    BMI .list_done
+    TAY
+    LDA.b !Battle_GeoAngle
+    STA.w !Battle_ActorUnkA5AA,Y
+    INX
+    BRA .list_slot
+.list_done:
+    BRA .next
+.object:
+    LDX.w !Battle_ActObjThread
+    LDA.b !Battle_GeoAngle
+    STA.w !Battle_ActObjUnkA5B5,X
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpAddHeading ($C16154–$C1619D, 74 bytes)
+; ==================================================================
+; Opcode $77 <d>: adds d (mod 256, so a turn either way) to the heading
+; of the same actors as opcode $75. Goes on with the next opcode in
+; the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entry $77.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
+;        slot; DP $80 = d; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_HeadingDelta = !BattleTmp_80 ; 1 B: d
+BattleAct_OpAddHeading:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_HeadingDelta
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .list
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    CLC
+    LDA.w !Battle_ActorUnkA5AA,X
+    ADC.b !BattleAct_HeadingDelta
+    STA.w !Battle_ActorUnkA5AA,X
+    BRA .next
+.list:
+    TDC
+    TAX
+.list_slot:
+    LDA.w !Battle_ActBattlers+1,X   ; entries 1 on
+    BMI .list_done
+    TAY
+    CLC
+    LDA.w !Battle_ActorUnkA5AA,Y
+    ADC.b !BattleAct_HeadingDelta
+    STA.w !Battle_ActorUnkA5AA,Y
+    INX
+    BRA .list_slot
+.list_done:
+    BRA .next
+.object:
+    LDX.w !Battle_ActObjThread
+    CLC
+    LDA.w !Battle_ActObjUnkA5B5,X
+    ADC.b !BattleAct_HeadingDelta
+    STA.w !Battle_ActObjUnkA5B5,X
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; The sound opcodes ($C1619E–$C1621A): fill the APU command block
+; (!Sfx_Command, !Sfx_Param1/2) and run Audio_ProcessEntry. Command
+; $19 is the one the menus play sounds with (!Sfx_CmdPlay); $18
+; (!Sfx_CmdUnk18) is not established. Each goes on with the next
+; opcode in the same frame and is reached only through
+; BattleAct_OpcodeTable.
+; ==================================================================
+; BattleAct_OpSound ($C1619E–$C161C0, 35 bytes)
+; ==================================================================
+; Opcodes $78/$79 <id>: APU command $18 (opcode $78) or $19 (opcode $79)
+; with !Sfx_Param1 = id and !Sfx_Param2 = $80; advances 2.
+; Callers: BattleAct_OpcodeTable entries $78 and $79.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as Audio_ProcessEntry
+;        leaves them (not analysed); !Battle_ActNextOp counted up
+; Callees: Audio_ProcessEntry, BattleAct_AdvanceScript (JMP)
+BattleAct_OpSound:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Sfx_Param1
+    SEC
+    LDA.w !Battle_ActOpcode
+    SBC.b #!Battle_ActOpSound
+    CLC
+    ADC.b #!Sfx_CmdUnk18
+    STA.w !Sfx_Command
+    LDA.b #!Sfx_Param2Default
+    STA.w !Sfx_Param2
+    JSL Audio_ProcessEntry
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSoundCalc ($C161C1–$C161EA, 42 bytes)
+; ==================================================================
+; Opcodes $7A/$7B <id> <calc>: APU command $18 (opcode $7A) or $19
+; (opcode $7B) with !Sfx_Param1 = id and !Sfx_Param2 = the first result
+; of BattleAct_RunCalc handler calc (probably an x, as opcodes $7C/$7D
+; send a screen x there); advances 3.
+; Callers: BattleAct_OpcodeTable entries $7A and $7B.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as Audio_ProcessEntry
+;        leaves them; what the calc handler writes;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_RunCalc, Audio_ProcessEntry,
+;   BattleAct_AdvanceScript (JMP)
+BattleAct_OpSoundCalc:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Sfx_Param1
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Sfx_Param2
+    SEC
+    LDA.w !Battle_ActOpcode
+    SBC.b #!Battle_ActOpSoundCalc
+    CLC
+    ADC.b #!Sfx_CmdUnk18
+    STA.w !Sfx_Command
+    JSL Audio_ProcessEntry
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpPcAttackSfxA ($C161EB–$C1621A, 48 bytes, with
+; BattleAct_OpPcAttackSfxB and BattleAct_PlayPcAttackSfx)
+; ==================================================================
+; Opcodes $7C (BattleAct_OpPcAttackSfxA) and $7D
+; (BattleAct_OpPcAttackSfxB): APU command $18 with !Sfx_Param1 = the
+; sound of the PC attack record (!Battle_ActPcAttackRec) in
+; !BattleRom_PcAttackSfxA or B, and !Sfx_Param2 = !Battler_ScreenX of
+; entry 0 of !Battle_ActBattlers (the actor of the action); advances 1.
+; BattleAct_PlayPcAttackSfx is the shared tail, A = the sound.
+; Callers: BattleAct_OpcodeTable entries $7C and $7D;
+;   BattleAct_PlayPcAttackSfx is reached from BattleAct_OpPcAttackSfxA
+;   (BRA) and by falling through BattleAct_OpPcAttackSfxB.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y as Audio_ProcessEntry
+;        leaves them; !Battle_ActNextOp counted up
+; Callees: Audio_ProcessEntry, BattleAct_AdvanceScript (JMP)
+BattleAct_OpPcAttackSfxA:
+    LDA.w !Battle_ActPcAttackRec
+    TAX
+    LDA.l !BattleRom_PcAttackSfxA,X
+    BRA BattleAct_PlayPcAttackSfx
+
+BattleAct_OpPcAttackSfxB:               ; header: see BattleAct_OpPcAttackSfxA
+    LDA.w !Battle_ActPcAttackRec
+    TAX
+    LDA.l !BattleRom_PcAttackSfxB,X
+BattleAct_PlayPcAttackSfx:              ; header: see BattleAct_OpPcAttackSfxA
+    STA.w !Sfx_Param1
+    LDA.b #!Sfx_CmdUnk18
+    STA.w !Sfx_Command
+    LDA.w !Battle_ActBattlers
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.w !Sfx_Param2
+    JSL Audio_ProcessEntry
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpRunVecCD001B ($C1621B–$C1623B, 33 bytes)
+; ==================================================================
+; Opcode $80 <len> ...: copies len & $0F bytes of the script, from the
+; length byte on, to !Battle_ActOp80Args (DP $53 on), runs
+; BattleAct_UnkVecCD001B and advances by that count + 1 (the opcode
+; and its bytes). Quirk: a count of 0 copies 256 bytes (the DEC counts
+; through 0) and advances 1.
+; Callers: BattleAct_OpcodeTable entry $80.
+; Entry: M=1, X=0, DP=0 (the copy is DP-relative), DB=$7E, Y = 0,
+;        B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E as the vector leaves them (the code
+;        after the JSL assumes so); A = 0; DP $80, $81 and $53 on
+;        written
+; Callees: BattleAct_UnkVecCD001B, BattleAct_AdvanceScript (JMP)
+!BattleAct_Op80Left = !BattleTmp_80     ; 1 B: bytes left to copy
+!BattleAct_Op80Len = !BattleTmp_81      ; 1 B: the count
+BattleAct_OpRunVecCD001B:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    AND.b #!Battle_ActOp80LenMask
+    STA.b !BattleAct_Op80Left
+    STA.b !BattleAct_Op80Len
+    TDC
+    TAX
+.copy:
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !Battle_ActOp80Args,X
+    INY
+    INX
+    DEC.b !BattleAct_Op80Left
+    BNE .copy
+    JSL BattleAct_UnkVecCD001B
+    CLC
+    LDA.b !BattleAct_Op80Len
+    ADC.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetCalcSel ($C1623C–$C16257, 28 bytes)
+; ==================================================================
+; Opcodes $81-$84 (entries 0-3) and $47/$48 (entries 4 and 5) <n>:
+; !Battle_ActCalcSel[entry] = n + 1, so BattleAct_TickCalcs runs
+; BattleAct_RunCalc handler n for that entry every frame; advances 2.
+; Callers: BattleAct_OpcodeTable entries $47, $48 and $81-$84.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the entry; Y = 1
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetCalcSel:
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpSetCalcSel
+    BCS .entry_0_3
+    SEC
+    SBC.b #!Battle_ActOpSetCalcSel4-4
+    BRA .store
+.entry_0_3:
+    SEC
+    SBC.b #!Battle_ActOpSetCalcSel
+.store:
+    TAX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    INC A
+    STA.w !Battle_ActCalcSel,X
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetHeading ($C16258–$C16298, 65 bytes)
+; ==================================================================
+; Opcode $85 <h>: sets the heading (see the heading opcodes above) of
+; the thread's battler (threads 0-3 and 5-7), of every slot of the
+; target set (thread 4; the target set here, unlike opcodes $75-$77) or
+; of the object (threads 8-15) to h; advances 2. Quirk: two of its
+; branches go through a JMP where a branch would reach.
+; Callers: BattleAct_OpcodeTable entry $85.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y = 1 or the last
+;        slot; DP $80 = h
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetHeading:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_Heading
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .not_object
+    JMP .object
+.not_object:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one
+    JMP .target_set
+.one:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActorUnkA5AA,X
+    BRA .advance
+.target_set:
+    TDC
+    TAX
+.set_slot:
+    LDA.w !Battle_ActTargetSet,X
+    BMI .set_done
+    TAY
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActorUnkA5AA,Y
+    INX
+    BRA .set_slot
+.set_done:
+    BRA .advance
+.object:
+    LDX.w !Battle_ActObjThread
+    LDA.b !BattleAct_Heading
+    STA.w !Battle_ActObjUnkA5B5,X
+.advance:
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
 ; BattleAct_CalcMoveStep ($C165BA–$C16670, 183 bytes)
 ; ==================================================================
 ; Unit step of a straight move from !Battle_GeoOriginX/Y to

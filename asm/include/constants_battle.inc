@@ -394,6 +394,49 @@ if !constants_battle_inc == 0
 !Battle_PathMapBytes     = $100  ; bytes of a path map (16 x 16 cells)
 !Battle_CurveKeepHeading = $FF   ; curving move operand: start from !Battle_ActorUnkA5AA
 !Battle_MoveKindCurve    = 7     ; !Battle_ActorMoveKind of a curving move ($CF:F405)
+!Battle_ActClearBit7     = $7F   ; opcodes $5D/$5E: keep bits 0-6 of !Battler_Unk9FF7
+!Battle_Unk9FF7Skip      = $80   ; !Battler_Unk9FF7 bit 7: skipped by the target scans (set by opcode $5E)
+!Battle_ActNumObjThreads = 8     ; object threads 0-7
+!Battle_PalSeqStepStart  = $FF   ; !Battle_ActPalSeqStep on start: the first step makes it 0
+; Hit numbers (BattleAct_OpShowHitNumbers):
+!Battle_HitNumSpriteBytes = $B0  ; bytes of Battle_HitNumSprite (11 slots x 4 sprites x 4 B)
+!Battle_HitNumSlotBytes  = $10   ; bytes per battler slot (4 sprites)
+!Battle_HitNumColourBytes = 8    ; bytes of !Battle_HitNumColoursA/B copied
+!Battle_HitNumSetMask    = 7     ; opcode & this = record set (0-5 for $50-$55)
+!Battle_HitNumAttr       = $31   ; attribute: priority 3, palette 0, name-table bit set
+!Battle_HitNumAttrAlt    = $39   ; the same with palette 4: hit kinds 1 and 2
+!Battle_ActHitKind1      = 1     ; hit kinds (!Battle_ActPcHitKind) opcodes $50-$55 tell apart; 0 = none
+!Battle_ActHitKind2      = 2
+!Battle_ActHitKind5      = 5     ; drawn as tiles !Battle_HitNumTileK5A/B instead of a number
+!Battle_HitNumTileZero   = $90   ; digit tile 0 (!BattleRom_DigitTilesB): a leading one is not drawn
+!Battle_HitNumTileK5A    = $9A   ; the two tiles drawn for hit kind 5 (probably a word such as "miss"; not checked)
+!Battle_HitNumTileK5B    = $9B
+!Battle_HitNumHighHidden = $55   ; high-table byte: x bit 8 set for all four sprites (off screen)
+!Battle_HitNumShow0      = $FC   ; masks that clear the x bit 8 of sprite 0, 1, 2 or 3 in the high-table byte
+!Battle_HitNumShow1      = $F3
+!Battle_HitNumShow2      = $CF
+!Battle_HitNumShow3      = $3F
+; Palettes:
+!Battle_ActOpLoadPal     = $60   ; opcode $60 (BattleAct_OpLoadPalEntry)
+!Battle_ActOpStartPalSeq = $61   ; opcodes $61-$64: start palette sequence 0-3
+!Battle_ActOpStopPalSeq  = $65   ; opcodes $65-$68: stop sequence 0-3
+!Battle_PalListPosMask   = 7     ; !BattleRom_PalListFlags bits that place the colours
+!Battle_PalSet6Len       = 6     ; bytes of a !BattleRom_PalSets6 set
+!Battle_PalSet14Len      = $0E   ; bytes of a !BattleRom_PalSets14 set
+!Battle_SpecialPalette   = 8     ; !Battler_Palette: the unit at !Battle_PaletteLive+$80 that opcode $69 fills
+!Battle_SpecialPalLen    = $18   ; bytes opcode $69 copies from !BattleRom_SpecialPals (then 6 bytes of $FF)
+!Battle_SpecialPalFill   = $FF   ; byte for the last six colour bytes of that palette
+!Battle_PaletteLoBytes   = $100  ; bytes of !Battle_PaletteLiveLo (end of the copies into it)
+; Links, headings, sound, calls:
+!Battle_ActObjLinkBit7   = $80   ; opcode $73's flag in !Battle_ActObjLinks
+!Battle_ActObjLinkBit6   = $40   ; opcode $74's flag
+!Battle_ActObjLinkThreadMask = $3F ; bits of the object thread kept below the flag
+!Battle_ActRefFirstObj   = $0A   ; opcode $75 operand: 0-9 = entry of !Battle_ActBattlers, 10 on = object thread n - 10
+!Battle_ActOpSound       = $78   ; opcodes $78/$79: APU command !Sfx_CmdUnk18 + (opcode - this)
+!Battle_ActOpSoundCalc   = $7A   ; opcodes $7A/$7B: the same with a calculated !Sfx_Param2
+!Battle_ActOp80LenMask   = $0F   ; opcode $80: low bits of the length byte = bytes copied, the length byte included
+!Battle_ActOpSetCalcSel  = $81   ; opcodes $81-$84: !Battle_ActCalcSel entry 0-3
+!Battle_ActOpSetCalcSel4 = $47   ; opcodes $47/$48: entries 4 and 5
 
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)
