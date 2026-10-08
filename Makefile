@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate progress test-hooks duplicates xref clean check-rom setup
+.PHONY: all build diff verify lint gate progress test-hooks duplicates duplicates-reloc xref clean check-rom setup
 
 all: build diff
 
@@ -47,6 +47,12 @@ duplicates: check-rom
 xref: check-rom
 	@if [ -z '$(value ADDR)' ]; then echo "Usage: make xref ADDR=C100D7 [XREF_FLAGS='--branches --json']"; exit 1; fi
 	@python3 tools/xref.py '$(value ADDR)' $(XREF_FLAGS)
+
+# Copies that differ only in absolute/long operands (call targets, data
+# addresses), whole routines and fragments, outside matched code.
+RELOC_FLAGS ?= --fragments 6 --unmatched-only --max-differing 3
+duplicates-reloc: check-rom
+	python3 tools/find_duplicates.py --relocatable $(RELOC_FLAGS)
 
 # Prove the pre-commit firewall rejects planted ROMs, notes and blocked words.
 test-hooks:
