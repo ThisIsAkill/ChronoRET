@@ -21563,9 +21563,10 @@ BattleSys_Main:
 ;     State and of its latched B188-B18A byte differ (the command was
 ;     chosen since), BattleSys_UnkB967 runs (probably the command; not
 ;     traced) and both bytes are zeroed.
-;   - BattleSys_Unk883D, which a popped command of PC 0 or 1 skips, and
-;     one of PC 2 only when it ran nothing (its path falls into the
-;     call); then, when no PC is latched any more, list 12's
+;   - BattleSys_Unk883D: a popped command of PC 0 or 1 never calls it;
+;     one of PC 2 calls it only after BattleSys_UnkB967 ran (it falls
+;     through into the JSR at $C1:860A; when nothing ran, the BPL at
+;     $C1:85F9 skips it); then, when no PC is latched any more, list 12's
 ;     !Battle_ListDue bit is cleared.
 ;   - .after_turn: BattleSys_UnkB223, !Battle_UnkB3AC = the 11 bytes of
 ;     !Battle_UnkAD8E, !Battle_UnkB3B7 = !Battle_UnkB18B,
