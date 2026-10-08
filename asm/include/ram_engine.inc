@@ -1080,7 +1080,9 @@ if !ram_engine_inc == 0
 !WinFx_QuadPos = $7F1CE9                 ; 4 x (16-bit X, 16-bit Y), 8.8 fixed point: hook 6's points
 !WinFx_QuadVel = $7F1CF9                 ; 4 x (16-bit X, 16-bit Y): added to WinFx_QuadPos per frame
 !Hdma_Unk7F14F0 = $7F14F0                ; 8-bit; NmiHandler stores Map_TilemapVram's high byte | 1
-                                         ; here after redraw steps 1 and 2 (see Hdma_Unk7F14F1)
+                                         ; here after redraw steps 1 and 2 (see Hdma_Unk7F14F1). The first
+                                         ; of 4 B, probably BG1SC-BG4SC data for HDMA channel 0
+                                         ; (EngFD_UnkC124 fills them from the tilemap bases)
 !Hdma_Unk7F14F1 = $7F14F1                ; 8-bit; the NMI handler stores a tilemap base | 1 at
                                          ; $7F:14F0 (inferred: BG1SC data for HDMA channel 0, which
                                          ; Hdma_InitChannelsFD points at BG1SC-BG4SC); hook 12
@@ -1092,8 +1094,6 @@ if !ram_engine_inc == 0
 !Hdma_Unk7F1522 = $7F1522                ; 8-bit; $17 (BG1-3 + OBJ bits) while a window effect runs,
                                          ; 0 after; probably the TMW byte of HDMA data
 !Hdma_Unk7F1523 = $7F1523                ; 8-bit; as Hdma_Unk7F1522 (probably TSW)
-!Hdma_Unk7F14F0 = $7F14F0                ; 4 B: probably BG1SC-BG4SC data for HDMA channel 0 (EngFD_UnkC124 fills
-                                         ; it from the tilemap bases; Hdma_Unk7F14F1 is its second byte)
 !Hdma_Unk7F14F4 = $7F14F4                ; 4 B: a second such record ($1C, Map_TilemapVram3 high | 1, $1C, 0)
 !Hdma_Unk7F14F8 = $7F14F8                ; 16 B: four 16-bit pairs EngFD_UnkC124 sets (probably H/V scroll data
                                          ; for HDMA channels 1-3)

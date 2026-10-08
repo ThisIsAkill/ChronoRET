@@ -60,28 +60,56 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    tables `BattleAi_TestTable` / `ChooseTable` / `RunTable` / `TargetTable` (`$C1:B80D`-`$C1:B92C`:
    41 + 23 + 23 + 57 words), and the hit records `Battle_HitEntryOffset` (`$C1:E89F`) and
    `Battle_RecordHit` / `Battle_ClearCancelledHits` / `Battle_ApplyHits` (`$C1:EBF8`-`$C1:ED88`).
-   Next, in reach order: the script handlers themselves (stubs `BattleAi_TestNN` `$C1:8EAB`-`$C1:980F`,
-   `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN` `$C1:99B8`-`$C1:A3F5`,
-   `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`; their shared helpers `$C1:B279` and the like),
-   `BattleSys_UnkB967` (a PC's command, `$C1:B967`-`$C1:BD6E`, with `BC60`/`BCE1` inside it;
-   it reads per-PC records through `$FD:A849` as `LDA $0001,X`, needs a struct), the action
-   callees `BattleSys_UnkBFA4` (service 4 request), `BattleSys_UnkD7C4`/`D8D1`, `BattleFD_UnkABA2`,
-   `$C1:AF79` (a second Battle_RandRange on `!Battle_UnkB3E6`, called from `$C1:ED95`), the other
-   callees of Unk8461 (`B575`, `B70E`, `B725`, `B762`, `BD6F`) and the small
-   per-pass / end callees `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/
-   `BC60`/`EA9D`/`EAE8`/`F93E`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
-   (its bank-$FD callees are matched, see item 4); the vectors
-   `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`) and service 0
+   Also matched (this batch): the PC command runner `$C1:B961`-`$C1:C029`
+   (`BattleSys_RemoveReadyLong`; `BattleSys_UnkB967`, which runs a committed attack / item / tech
+   from the PC's BattleCmd record, reached through `!BattleRom_CmdPtr` `$FD:A849` as the
+   `BattleCmdRec` struct; `BattleSys_UnkBC60`, which returns at its first instruction;
+   `BattleSys_UnkBCE1` with `_ClearRecords` / `_Done`; `BattleSys_UnkBD6F`;
+   `BattleSys_ResetTechUsers`; `BattleSys_UnkBF46`/`BF79`/`BF81`/`BFA4`; `BattleSys_RunPcAttack`),
+   the turn helpers `$C1:B4E9`-`$C1:B80C` (`BattleSys_UnkB4E9` item list back to the inventory,
+   `BattleSys_UnkB575` command groups, `BattleSys_RefundItem`, `BattleSys_UnkB70E`/`B725` the
+   bit-5 battle's fixed commands, `BattleSys_UnkB762`, `BattleSys_UnkB7F2`), the battler checks
+   `$C1:B093`-`$C1:B487` (`BattleSys_UnkB093` low HP, `BattleSys_UnkB0B6` turn-list take-part
+   bits, `BattleSys_UnkB223` / `BattleSys_UpdateKo` the KO check and one-time revive,
+   `BattleSys_UnkB3BB`/`B3D2` FieldBtlObj flags, `BattleSys_UnkB3F9`, `BattleSys_UnkB442`), the
+   tech menu builders and MP costs `$C1:C96A`-`$C1:CB47` / `$C1:CB48`-`$C1:CCCA` /
+   `$C1:CCCB`-`$C1:CDFE` (`BattleSys_UnkC96A`/`CA1A`/`CCCB`, `BattleSys_TechMpCost1-3`,
+   `BattleSys_LoadTechUsers`, `BattleSys_StoreMpCost`/`10`/`18`, `BattleSys_AdjustMpCost`,
+   `BattleSys_PayTechMp`) and the setup helpers `$C1:CDFF`-`$C1:CFBD` (`BattleSys_UnkCDFF`,
+   `BattleSys_UnkCE36`/`CE3A`, `BattleSys_UnkCF15`, `BattleSys_UnkCF52`, `BattleSys_UnkCF69`).
+   Next, in reach order: `BattleSys_UnkC1DD` (`$C1:C1DD`-`$C1:C8F6`, 1,818 B: the item / tech
+   target resolution B967 calls; fills `!Battle_UnkAD8D`/`AD8E`, sets `!Battle_UnkAF23`; part of
+   it, `$C1:C731`-`$C1:C82C`, is reached only through the 7-word table at `$C1:C95C` with
+   `JSR ($C95C,X)` at `$C1:C732`) with `$C1:C8F7`; `BattleSys_UnkD523` (`$C1:D523`-`$C1:D74E`,
+   after `BattleSys_UnkBF79`) and `BattleSys_UnkD490`/`D4AD`/`D4D6` (the item effect dispatch of
+   `BattleSys_UnkBF46`); the script handlers themselves (stubs `BattleAi_TestNN`
+   `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
+   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callees
+   `BattleSys_UnkD7C4`/`D8D1`, `$C1:AF79` (a second Battle_RandRange on
+   `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
+   `$C1:C02A` (math, from `$C1:E2C0`); the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
+   (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
+   `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
+   and service 0
    (`$C1:0023`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
    (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
-   `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits), who sets
-   `!BattleAi_ChosenBlock` to $FF, and the hang in BattleAi_PickPcTarget's marked scan (a quirk, or
-   never reached). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
+   `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits;
+   BattleSys_UnkB0B6 sets `!BattleAi_ChosenBlock` to $FF when Status2 bit 2 changes), and the
+   hang in BattleAi_PickPcTarget's marked scan (a quirk, or never reached). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
    statuses; 6, 7 and 11 are empty), who fills `!Battle_ListRuns`/`!Battle_ListReload` and sets a
    list's flags, what `!Battle_UnkAF24`'s script results and the `!Battle_UnkB24A`/`B263`/`B2B6`
    indexing in Unk8461 (by list position, by enemy in Unk8C09) mean; what `!Battle_Unk24`, `!Battle_Unk99CD`,
-   `!Battle_Unk2989` bit 5 and `PcStatBlk`'s fields mean; the `$CC:0262` table the
-   setup's dead X looks meant for. Stale after this batch (verified headers, fix at their next
+   `!Battle_Unk2989` bit 5 (a battle with fixed commands, BattleSys_UnkB725; a demo, probably)
+   and `PcStatBlk`'s fields mean; the `$CC:0262` table the setup's dead X looks meant for. From
+   this batch: what `!Battle_UnkB18C` indexes for an attack (`!BattleRom_PcAttackNum`), the
+   `!Battle_UnkB1FC` bit 1 readers, `!Battle_UnkB3BF`/`B3C8` (set in unmatched code), what
+   service 6 does with `!Battle_UnkAEB3` (the defeated enemies' exit, probably), whether
+   BattleAct_LoadKind3 is the item loader (B967's item path uses kind 3 with id - $BC; its
+   verified header still says unknown), and why BattleSys_ResetTechUsers' first user divides
+   by a stale `!Battle_MathB`. Stale from the PC-command batch (verified headers, fix at their
+   next edit): Battle_SetupBattle's header calls the `$C1:C96A`-`$C1:CF15` group "not analysed"
+   (now matched); Battle_Mul16's example sites `$C1:B329`/`$C1:B455`/`$C1:B4BC` are now in
+   BattleSys_UpdateKo / BattleSys_UnkB442 / BattleAi_PickScript. Stale after an earlier batch (verified headers, fix at their next
    edit): BattleSys_DefeatPose / BattleSys_VictoryPose call their caller "the unmatched code at
    $C1:815F / $C1:8186" (now BattleSys_Main); BankC1_OldBuildLeftovers calls $C1:8000
    unmatched. Verified headers that
@@ -305,8 +333,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleFD_RestoreEnemies`, `BattleFD_LoadUnkB18E/2`, `BattleFD_AddEnemyRewards`,
    `BattleFD_AddItemEntry`, `BattleFD_ItemRecOffset`, `BattleFD_ApplyRecBoost`, `BattleFD_UnkB33F`,
    `BattleFD_UnkB3EB`, `BattleFD_ZeroStatBlock`, `BattleFD_UnkB655`) with the JSR/RTL veneers
-   `$C1:FDBF`-`$C1:FDD2` (`Battle_Mul16Long`, `BankC1_AddItemLong`, `BattleSys_UnkBFAALong`,
-   `Battle_RandRangeLong`, `BattleSys_UnkB6D1Long`); the field HDMA set-up `EngFD_UnkC124`,
+   `$C1:FDBF`-`$C1:FDD2` (`Battle_Mul16Long`, `BankC1_AddItemLong`, `BattleSys_RunPcAttackLong`,
+   `Battle_RandRangeLong`, `BattleSys_RefundItemLong`); the field HDMA set-up `EngFD_UnkC124`,
    `Hdma_InitChannelsFD`, `EngFD_UnkC2C1` with its two handler tables (`$FD:C124`-`$FD:C2EA`) and
    `EngFD_UnkD52D`; the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
    `FieldFD_LoadAnimSetB` (`$FD:E292`) and the vectors `FdVec_FFF4`/`FFF7`/`FFFA`. The `BattleFD_Unk*`
@@ -325,7 +353,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    (`$FD:C2EB`, `$C847`, `$C995`, `$CD0C`, `$CFCF`, `$D27E`, about $1240 bytes in all, up to
    `$FD:D52C`); `EngFD_UnkE39C` (FdVec_FFF7, every frame, with its subroutines `$FD:E437`-`$E82C`);
    the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
-   BattleSys_UnkB6D1Long at `$FD:A8D8`/`$A910`) and the data at `$FD:B957` (pointer table and
+   BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
    records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
    sums, the end messages 4-7 and their bits (`!Battle_UnkB2B0`/`B2B3`), the `BattlerStats.Unk57`
    values ($A0/$A1/$A9/$AB/$B3) and the PcStatBlk stats mean; who fills BattleEnemyInit ($29C4) and

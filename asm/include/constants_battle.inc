@@ -646,12 +646,10 @@ if !constants_battle_inc == 0
 !Battle_B2B3Msg6Bit       = $04
 !Battle_B2B3Msg7Bit       = $02
 !Battle_UnkB3CEListMask   = 7     ; entries per PC list of !Battle_UnkB3CE - 1 (8 entries)
-!Battle_CharRecordSize    = $50   ; bytes per character record (!Menu_CharRecords), copied by BattleFD_UnkAE52
 !Battle_Unk57CountId      = $A9   ; BattlerStats.Unk57 value BattleFD_UnkAE99 counts
 !Battle_Unk57FlagId       = $AB   ; BattlerStats.Unk57 value BattleFD_UnkAEC4 flags
 !Battle_Unk50Bit2         = $04   ; BattlerStats.Unk4C+4 (+$50) bit BattleFD_UnkAEC4 sets
 !Battle_Unk1C48Bytes      = 15    ; bytes of !Battle_Unk1C48 BattleFD_UnkAEF2 fills (3 records)
-!Battle_Unk1C48Stride     = 5     ; bytes per PC record of !Battle_Unk1C48
 !Battle_Unk1C4AInit       = $80   ; value BattleFD_UnkAEF2 puts in record byte 2
 !BattleRom_UnkCC06A7Size  = 6     ; bytes per record of !BattleRom_UnkCC06A7
 !Battle_HighBit           = $80   ; bit 7: the top of a bit scan or shift
@@ -720,9 +718,83 @@ if !constants_battle_inc == 0
 !Battle_List9Time         = 25
 !Battle_List10Time        = 60
 !Battle_List11Time        = 120
-!Battle_UnkAEE6Bytes      = 17    ; bytes BattleFD_UnkB555 zeroes from !Battle_UnkAEE6
 !Battle_UnkB19EBytes      = 32    ; ... from !Battle_UnkB19E and from !Enemy_AnimWanted
 !Battle_UnkB18EBytes      = $30   ; bytes BattleFD_UnkB732 zeroes from !Battle_UnkB18E
 !Battle_UnkB3BEInit       = 3     ; !Battle_UnkB3BE as BattleFD_UnkB732 sets it
+; --- PC command runner (BattleSys_UnkB967) ---
+!BattleCmd_ClearQueued    = $FF^!BattleCmd_StateQueued ; mask clearing .State bit 6
+!BattleCmd_KindUnk10      = $10   ; .Kind bit 4 (from !Battle_Unk9F38, probably): calls BattleSys_UnkBC60
+!BattleCmd_MenuTech       = 1     ; .Menu: the tech menu (BattleSys_UnkB967 runs a tech only from menu 1 or 3)
+!BattleCmd_MenuUnk3       = 3     ; .Menu value 3, also accepted for a tech; what sets it is not traced
+!BattleCmd_RecSize        = 7     ; bytes per BattleCmd record
+!Tech_PartnerNone         = $0F   ; a Partners nibble: no partner
+!Battle_ActKindAttack     = 1     ; !Battle_ActKind: BattleAct_LoadAttack
+!Battle_ActKindTech       = 2     ; !Battle_ActKind: BattleAct_LoadTech
+!Battle_ActKindItem       = 3     ; !Battle_ActKind: BattleAct_LoadKind3, which BattleSys_UnkB967's item path uses
+                                  ; (id = item id, record = id - !Battle_ActKind3FirstId)
+!Battle_B1FCAttackBit     = $02   ; !Battle_UnkB1FC bit 1: set over BattleSys_RunPcAttack
+!Battle_GaugeCap          = $FF   ; !Battler_UnkAFAB: the largest value (doubling and the tech wait saturate here)
+!Battle_GaugeTenths       = 10    ; BattleSys_ResetTechUsers: the tech wait is in tenths of the reload value
+!BattleSys_ServiceRemoveReady = 2 ; $C10045 service BattleMenu_RemoveBattlerFromReady
+!BattleSys_ServiceRunAction = 4   ; $C10045 service BattleSys_RunAction
+!Battle_CD0021Unk3        = 3     ; A for $CD:0021 after a tech with !Battle_UnkB3BF positive; meaning unknown
+!Battle_CD0021Unk0D       = $0D   ; A for it with !Battle_UnkB3BF = $FF
+!Battle_UnkB3BFUnkFF      = $FF   ; the negative !Battle_UnkB3BF value that is acted on
+!Battle_UnkAEE6Bytes      = 17    ; bytes of !Battle_UnkAEE6: BattleSys_UnkBF81 copies them, BattleFD_UnkB555 zeroes them
+!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_UnkD490
+!Battle_Rec05CCBit2       = $04   ; ... BattleSys_UnkD4AD
+!Battle_Rec05CCBit6       = $40   ; ... BattleSys_UnkD4D6
+!Battle_Unk1C48Stride     = 5     ; bytes per PC in !Battle_Unk1C48 (entries 0, 5, 10; BattleFD_UnkAEF2 fills 3)
+!Battle_InvSlots          = $0100 ; entries in !Battle_InvIds
+!Battle_InvKeepCount      = 2     ; BattleSys_UnkBC60: an inventory entry with this many or more is left alone
+!Battle_BC60CF15Arg3      = 5     ; third and fourth arguments of BattleSys_UnkBC60's $C1:CF15 call
+!Battle_BC60CF15Arg4      = 4     ; (its first two are !Battle_CF15Call1A/B)
+
+; --- Tech MP costs ---
+!Battle_TechRecSize       = 11    ; bytes per BattleRom_TechRec record
+!Battle_TechRecNumMask    = $7F   ; the bits of a BattleRom_TechRec byte used as an index (bit 7 masked off)
+!Battle_MpCostHalfId      = $A2   ; !Pc_UnkB3BA value: the cost is halved (rounded up)
+!Battle_MpCostQuarterId   = $A3   ; !Pc_UnkB3BA value: the cost is quartered (rounded up twice)
+
+; --- Turn helpers ($C1:B4E9-$C1:B80C) ---
+!BattleCmd_StateArmed     = 1     ; .State 1: set by BattleSys_Unk8461 before service 1 adds bit 7
+!Battle_CmdGroupBytes     = 9     ; bytes of !Battle_CmdGroups
+!Battle_ItemListBytes     = !Item_RecordSize*$100 ; the 256 Item_BattleList records ($500 bytes)
+!Battle_ItemListEntries   = $0100 ; records in Item_BattleList (BattleSys_RefundItem's scan)
+!Battle_FixedAtbMax       = $30   ; !Pc_AtbMax of each PC in the !Battle_Unk2989 bit-5 battle (BattleSys_UnkB725)
+!BattleCmd_AllBytes       = 3*!BattleCmd_RecSize ; the three BattleCmd records (21 bytes)
+
+; --- Battler checks ($C1:B093-$C1:B487) ---
+!Battle_LowHpShift        = 3     ; BattleSys_UnkB093: HP at most MaxHp >> this sets BattlerStats.Unk2F bit 0
+!Battle_ListPartBit       = $01   ; !Battle_ListFlags bit 0: the slot takes part in the list (BattleSys_UnkB0B6)
+!Battle_List2StatusBit    = $20   ; BattlerStats.Status2 bit for list 2 (the same bit as !Battle_ListDoubleBit)
+!Battle_List11StatusBit   = $02   ; BattlerStats.Unk4C+1 / Unk4C+6 bit for list 11
+!Battle_Status2LockBit    = $08   ; BattlerStats.Status2 bit 3: sets the PC's !Pc_LockStatus (BattleSys_UnkB0B6)
+!Battle_EnemyAnimStatus7  = 4     ; !Enemy_AnimWanted BattleSys_UnkB0B6 sets while Status2 bit 7 is on
+!Battle_NoActMask2        = $86   ; BattlerStats.Status2 bits 7, 2, 1: BattleSys_UnkB3F9 drops the PC's command
+!Battle_Unk4C3ReviveBit   = $80   ; BattlerStats.Unk4C+3 bit 7: BattleSys_UpdateKo revives the KO'd PC once
+!Battle_ReviveHpMul       = 5     ; BattlerStats.Unk66 times this = the revive's HP amount
+!Battle_ActIdRevive       = $7A   ; !Battle_ActId (kind 2) of the revive's action (by context)
+!Battle_CD0021Unk09       = 9     ; A for $CD:0021 after the revive (BattleMsg_InfoArgs.Id = the character)
+!Battle_CharRecordSize    = $50   ; bytes per !Menu_CharRecords record (BattleFD_UnkAE52 copies a PC's record in,
+                                  ; BattleSys_UnkB442 copies a PC's block back)
+
+; --- Tech menu builders ---
+!Tech_FirstTripleId       = $66   ; tech ids from here up are triple techs (the doubles end here)
+!Tech_TripleEnd           = $75   ; one past the last triple tech
+!Battle_TechInfoFlagsMask = $3F   ; the bits of !BattleRom_TechInfo byte 1 copied to TechMenuRec.Flags
+!Battle_TechBitFirst      = $80   ; the !Battle_TechBits* bit of the tech being looked at (shifted in from bit 0 up)
+!Battle_DoubleBitsPerByte = 3     ; double techs per !Battle_TechBits2 byte
+!Battle_TripleBitsPerByte = 1     ; triple techs per !Battle_TechBits3 byte
+!Battle_MaxDoubleEntries  = 6     ; BattleSys_UnkCA1A stops after this many double-tech entries
+!Battle_CA1AUnk0AStep     = 12    ; BattleSys_UnkCA1A adds this to DP $0A per tech (never read there)
+!Tech_EntrySize           = 7     ; bytes per Tech_MenuEntry record
+!Tech_MpCostNone          = $FF   ; a Tech_MenuEntry .MpCost value: that slot does not take part
+
+; --- Setup: item list and the PCs' records ---
+!Battle_EquipRecSize      = 6     ; bytes per !BattleRom_EquipRec* record
+!Battle_EquipBase2        = $5A   ; first .Unk28 id (subtracted before indexing !BattleRom_EquipRec2)
+!Battle_EquipBase3        = $7B   ; first .Unk27 id (subtracted before indexing !BattleRom_EquipRec3)
+!Battle_EquipBonusMask    = $0F   ; !BattleRom_EquipBonus bits 3-0: the amount added
 
 endif

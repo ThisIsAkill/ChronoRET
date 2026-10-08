@@ -273,8 +273,8 @@ BattleFD_UnkAAB0:
 ; !Battle_UnkB18C of !BattleRom_UnkCC6FCB: B18E = record byte 0, B18F =
 ; the record number, B190 = record byte 1, B191 = 0; !Battle_UnkB2C3 =
 ; the record's offset. BattleFD_LoadUnkB18E2 is the same for the table at
-; !BattleRom_UnkCC88CB. What the records hold is not traced (the bytes
-; are read by $C1:AC89, unmatched, which ORs a slot + 3 into B18E).
+; !BattleRom_UnkCC88CB. What the records hold is not traced
+; (BattleAi_SetCmdBits, $C1:AC89, ORs a slot + 3 into B18E).
 ; Callers (3 JSL sites): unmatched ($C1:9B1C, $C1:A128, $C1:A370).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B (A's high byte) = 0, presumably: both
 ;        TAX copy it into the Mul16 factors (not traced at the callers)
@@ -337,7 +337,7 @@ BattleFD_LoadUnkB18E2:
 ;     a random slot 3-10 is drawn until one with an id in
 ;     !Battler_UnkAEFF comes up; it becomes the target (!Battle_UnkAD8E),
 ;     !Battle_UnkB3C9 = $80, !Battle_UnkB18B = the PC, and
-;     BattleSys_UnkBFAA runs (through BattleSys_UnkBFAALong). Then (also
+;     BattleSys_RunPcAttack runs (through BattleSys_RunPcAttackLong). Then (also
 ;     for Y >= 3) !Battle_UnkAF23 = 1.
 ;   - else Status2 bit 2 set: the same with a random slot 0-10 other than
 ;     the PC itself, so allies too.
@@ -349,10 +349,10 @@ BattleFD_LoadUnkB18E2:
 ; Callers (1 JSL site): BattleSys_Unk8461 ($C1:8526).
 ; Entry: M=1, X=0, DP=0, DB=$7E; X = slot * $80, Y = slot
 ; Exit:  M=1, X=0; !Battle_UnkAF23 = 1 if the PC acted on its own, else 0;
-;        !Battle_UnkAE4C = 0; A, X clobbered; Y unchanged (this code;
-;        BattleSys_UnkBFAA not analysed); DP $12 = the slot on the
-;        Status2 path; what BattleSys_UnkBFAA changes
-; Callees: Battle_RandRangeLong, BattleSys_UnkBFAALong
+;        !Battle_UnkAE4C = 0; A, X clobbered; Y unchanged when no attack
+;        runs, else as BattleSys_RunPcAttack's callees leave it; DP $12 =
+;        the slot on the Status2 path; what BattleSys_RunPcAttack changes
+; Callees: Battle_RandRangeLong, BattleSys_RunPcAttackLong
 !BattleFDAuto_Slot = !BattleTmp_12      ; 2 B: the PC's slot (the Status2 path)
 org $FDAB30
 BattleFD_UnkAB30:
@@ -384,7 +384,7 @@ BattleFD_UnkAB30:
     STA.w !Battle_UnkB3C9
     TYA
     STA.w !Battle_UnkB18B
-    JSL BattleSys_UnkBFAALong
+    JSL BattleSys_RunPcAttackLong
 .acted:
     INC.w !Battle_UnkAF23
     BRA .done
@@ -407,7 +407,7 @@ BattleFD_UnkAB30:
     STA.w !Battle_UnkB3C9
     TYA
     STA.w !Battle_UnkB18B
-    JSL BattleSys_UnkBFAALong
+    JSL BattleSys_RunPcAttackLong
     INC.w !Battle_UnkAF23
 .done:
     RTL
@@ -557,15 +557,15 @@ BattleFD_AddEnemyRewards:
 ;   - else, with BattlerStats.Unk7A bit 7 clear, its !Battler_UnkAFAB
 ;     is set to 1; with it set, the slot acts at once: !Battle_UnkB18B =
 ;     the slot, !Battle_UnkAD8E = DP $22 (the slot whose turn it was,
-;     left by BattleSys_Unk8461), BattleSys_UnkBFAA (through
-;     BattleSys_UnkBFAALong); if that target is then KO'd the loop stops.
+;     left by BattleSys_Unk8461), BattleSys_RunPcAttack (through
+;     BattleSys_RunPcAttackLong); if that target is then KO'd the loop stops.
 ; Then !Battle_UnkB3B9 = 0.
 ; Callers (1 JSL site): BattleSys_Unk8461 ($C1:8650).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $22 = the slot that just acted
 ; Exit:  M=1, X=0; !Battle_UnkB3B9 = 0; A, X, Y clobbered; DP $0C
 ;        written; !Battle_UnkB315 = the last entry looked at; Battle_RandRange's
-;        and BattleSys_UnkBFAA's changes
-; Callees: Battle_RandRangeLong, BattleSys_UnkBFAALong
+;        and BattleSys_RunPcAttack's changes
+; Callees: Battle_RandRangeLong, BattleSys_RunPcAttackLong
 !BattleFDCounter_Ofs = !BattleTmp_0C    ; 2 B: slot * $80
 org $FDAC6E
 BattleFD_UnkAC6E:
@@ -615,7 +615,7 @@ BattleFD_UnkAC6E:
     STA.w !Battle_UnkB18B
     LDA.b !BattleTmp_22
     STA.w !Battle_UnkAD8E
-    JSL BattleSys_UnkBFAALong
+    JSL BattleSys_RunPcAttackLong
     TDC
     LDA.w !Battle_UnkAD8E
     REP #$20
@@ -641,8 +641,9 @@ BattleFD_UnkAC6E:
 ; ($AD9C-$AE4B: the first four of the $2C-byte record sets the hit
 ; opcodes read).
 ; Callers (9 JSL sites): BattleSys_Unk8461 ($C1:8835), BattleSys_ListHandler1 ($C1:8948),
-;   BattleSys_ListHandler9 ($C1:8BB4), BattleAi_EnemyTurn ($C1:8E88), Battle_SetupBattle ($C1:FBAC)
-;   and unmatched ($C1:B38A, $C1:BB29, $C1:BC56, $C1:C01D).
+;   BattleSys_ListHandler9 ($C1:8BB4), BattleAi_EnemyTurn ($C1:8E88), BattleSys_UpdateKo ($C1:B38A),
+;   BattleSys_UnkB967 ($C1:BB29, $C1:BC56), BattleSys_RunPcAttack ($C1:C01D) and Battle_SetupBattle
+;   ($C1:FBAC).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 0 (B too); X = $B0; Y unchanged
 org $FDACEE
@@ -1017,7 +1018,8 @@ BattleFD_UnkAEC4:
 ; record and the bytes mean is not traced.
 ; Quirk: an LDX of DP $02 before the $80 store is overwritten by the
 ; next LDX and has no effect.
-; Callers (3 JSL sites): Battle_SetupBattle ($C1:FB84) and unmatched ($C1:BCD8, $C1:CE36).
+; Callers (3 JSL sites): BattleSys_UnkBC60 ($C1:BCD8), BattleSys_UnkCE36 ($C1:CE36) and
+;   Battle_SetupBattle ($C1:FB84).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0; A = 3 (B = 0); X, Y clobbered; DP $02 = 3, $04, $06
 ;        and $0A written; !Battle_MathA..MathHi as Battle_Mul16 leaves them
@@ -1132,12 +1134,21 @@ BattleFD_UnkAEF2:
 ; BCS and BRA to one label), so the code for them at $AF8B-$AFD6 is
 ; never run; it would fill .Id, .Flags ($80) and .PcMask from the
 ; record of !BattleRom_UnkCC06A7 the way BattleFD_UnkAEF2 does.
-; Callers (2 JSL sites): unmatched ($C1:CE2A, $C1:F012).
+; BattleFD_AddItemEntry_Skip ($FD:B01C, the step that moves DP $04 on)
+; is a second entry: BattleSys_UnkCDFF calls it for an empty inventory
+; entry, so the list keeps an entry there with whatever it held; DP $04
+; moves on 5 bytes and DP $00 and $08 are counted up, nothing else is
+; written.
+; Callers (2 JSL sites): BattleSys_UnkCDFF ($C1:CE2A) and unmatched ($C1:F012).
+; Callers of BattleFD_AddItemEntry_Skip (1 JSL site): BattleSys_UnkCDFF ($C1:CE1C).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = item id; DP $04 = list offset,
-;        DP $0E = quantity
+;        DP $0E = quantity (BattleFD_AddItemEntry_Skip: M any, X=0, DP=0,
+;        DB=$7E; DP $04 = list offset)
 ; Exit:  M=1, X=0; A, X, Y clobbered;
 ;        DP $00 and $08 + 1, $04 + 5 when added; DP $02, $06, $0A
 ;        written; !Battle_UnkAF23 = 0 added, 1 not
+;        (BattleFD_AddItemEntry_Skip: M=1, X=0; A = 0 with B = 0; X, Y
+;        unchanged; DP $04 + 5, DP $00 and $08 + 1)
 ; Callee: Battle_Mul16Long (only in the dead code)
 !BattleFDItem_Rec  = !BattleTmp_02      ; 2 B: offset of the item's record (id - $BC) * 3
 !BattleFDItem_Ofs  = !BattleTmp_04      ; 2 B: the list offset (argument)
@@ -1176,7 +1187,7 @@ BattleFD_AddItemEntry:
     TDC
     LDX.b !BattleFDItem_Ofs
     STA.w Item_BattleList.Id,X
-    BRA .advance
+    BRA BattleFD_AddItemEntry_Skip
 .dead_found:
     LDA.w !Battle_UnkB1BE,Y
     BMI .dead_flags
@@ -1198,7 +1209,7 @@ BattleFD_AddItemEntry:
 .battle_item:
     LDA.b !BattleFDItem_Id
     CMP.b #!Battle_ItemClass4First
-    BCC .not_added
+    BCC BattleFD_AddItemEntry_Skip_not_added
     LDA.b !BattleFDItem_Id
     SEC
     SBC.b #!Battle_ItemClass4First
@@ -1212,7 +1223,7 @@ BattleFD_AddItemEntry:
     LDX.b !BattleFDItem_Rec
     LDA.l !BattleRom_ItemUseFlags,X
     BIT.b #!Battle_ItemListBit
-    BEQ .not_added
+    BEQ BattleFD_AddItemEntry_Skip_not_added
     LDA.b !BattleFDItem_Id
     LDX.b !BattleFDItem_Ofs
     STA.w Item_BattleList.Id,X
@@ -1229,7 +1240,7 @@ BattleFD_AddItemEntry:
     LDA.b !BattleFDItem_Qty
     LDX.b !BattleFDItem_Ofs
     STA.w Item_BattleList.Quantity,X
-.advance:
+BattleFD_AddItemEntry_Skip:             ; header: see BattleFD_AddItemEntry
     REP #$20
     LDA.b !BattleFDItem_Ofs
     CLC
@@ -1251,9 +1262,9 @@ BattleFD_AddItemEntry:
 ;   $7B-$93: (id - $7B) * 3 + $04E1; $94-$BB: (id - $94) * 4 + $052C;
 ;   $BC-$F1: (id - $BC) * 4 + $05CC; $F2 and up: X as it came.
 ; Five tables of records, one per id range (probably the item classes;
-; what the records hold is not traced). Its caller ($C1:CF2F) reads
+; what the records hold is not traced). Its caller, BattleSys_UnkCF15 ($C1:CF2F), reads
 ; LDA.l $CC0000,X with the result.
-; Callers (1 JSL site): unmatched ($C1:CF2F).
+; Callers (1 JSL site): BattleSys_UnkCF15 ($C1:CF2F).
 ; Entry: M=1, X=0, DP=0, DB any; A = item id with B = 0 (TAX takes it into
 ;        the Mul16 factor)
 ; Exit:  M=1, X=0; X = the offset (unchanged for $F2 and up); A = 0 (B
@@ -1448,7 +1459,7 @@ BattleFD_UnkB121:
 ; DP $08 (an address in bank $CC; the callers point it at a PC's weapon,
 ; armour and helmet records) is a boost number; when it is non-zero this
 ; falls into BattleFD_UnkB14D with it, else returns.
-; Callers (3 JSL sites): unmatched ($C1:CEA4, $C1:CED6, $C1:CF08).
+; Callers (3 JSL sites): BattleSys_UnkCE3A ($C1:CEA4, $C1:CED6, $C1:CF08).
 ; Entry: M=1, X=0, DP=0, DB=$7E (for BattleFD_UnkB14D's .w stores); DP $08 =
 ;        the record's address in bank $CC,
 ;        DP $0E = the boost table, DP $00 = the stat block (as
@@ -1475,8 +1486,8 @@ BattleFD_ApplyRecBoost:
 ; BattleFD_ApplyRecBoost an item record's byte 4.
 ; BattleFD_UnkB14D_Done ($FD:B200, the RTL) is BattleFD_ApplyRecBoost's
 ; exit when there is no boost.
-; The 7 bytes are the ones $C1:CE3A (unmatched) copies from the block's
-; +$0B..+$11. The caps of 99 and 16 look like stat limits; which stats they are is
+; The 7 bytes are the ones BattleSys_UnkCE3A copies from the block's
+; +$0B..+$11 (PcStatBlk.Unk0B-.Unk11). The caps of 99 and 16 look like stat limits; which stats they are is
 ; not traced.
 ; Callers (1 JSL site): Battle_SetupBattle ($C1:FC92).
 ; Callers note: also entered by BattleFD_ApplyRecBoost's BNE at $FD:B148,
