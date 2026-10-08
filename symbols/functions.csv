@@ -448,62 +448,62 @@ $C1:4FD1,$C1:4FE2,18,BattleAct_OpMoveToUnkPoint,$C1,Battle engine,verified,a2807
 $C1:4FE3,$C1:4FEC,10,BattleAct_OpMoveToCalc,$C1,Battle engine,verified,6a10ea2d3914,
 $C1:4FED,$C1:5134,328,BattleAct_MoveToPoint,$C1,Battle engine,verified,66c934f037ca,
 $C1:5135,$C1:51ED,185,BattleAct_StartBattlerMove,$C1,Battle engine,verified,278664d51c5a,
-$C1:51EE,$C1:5204,23,BattleAct_OpCurveTo,$C1,Battle engine,readable,fb36c09eb053,
-$C1:5205,$C1:521B,23,BattleAct_OpCurveToUnkPoint,$C1,Battle engine,readable,4b4fdfb33ef9,
-$C1:521C,$C1:522A,15,BattleAct_OpCurveToCalc,$C1,Battle engine,readable,7ef01ada6bbf,
-$C1:522B,$C1:53AF,389,BattleAct_CurveToPoint,$C1,Battle engine,readable,486a541a62be,
-$C1:53B0,$C1:5408,89,BattleAct_CurveTurnDir,$C1,Battle engine,readable,64add2f9e51d,
-$C1:5409,$C1:541A,18,BattleAct_OpPathTo,$C1,Battle engine,readable,df3d02172559,
-$C1:541B,$C1:542C,18,BattleAct_OpPathToUnkPoint,$C1,Battle engine,readable,48348386db42,
-$C1:542D,$C1:5436,10,BattleAct_OpPathToCalc,$C1,Battle engine,readable,41b8891f9356,
-$C1:5437,$C1:5610,474,BattleAct_PathToPoint,$C1,Battle engine,readable,12ca9972268f,
-$C1:5611,$C1:561E,14,BattleAct_OpSetPos,$C1,Battle engine,readable,2348a22f2661,
-$C1:561F,$C1:566B,77,BattleAct_SetPosToPoint,$C1,Battle engine,readable,1ed92c02a88a,
-$C1:566C,$C1:567C,17,BattleAct_OpSetPosUnkPoint,$C1,Battle engine,readable,6156e525b1b5,
-$C1:567D,$C1:5693,23,BattleAct_OpSetPosCalc,$C1,Battle engine,readable,0dd065161865,
-$C1:5694,$C1:56BA,39,BattleAct_OpFollow,$C1,Battle engine,readable,a4ad0ade9511,"Opcode $1C <n>: on an object thread, makes the object follow something: !Battle_ActObjFollow of the object = entry n of !Battle_ActBattlers (a battler slot) for n below !Battle_ActFollowFirstObj, else"
-$C1:56BB,$C1:56CB,17,BattleAct_OpUnfollow,$C1,Battle engine,readable,04d3b9218437,"Opcode $1D <j>: object thread j follows nothing any more (!Battle_ActObjFollow = !Battle_ActFollowNone), whatever thread runs it."
-$C1:56CC,$C1:56FA,47,BattleAct_OpCall,$C1,Battle engine,readable,844ec248f16f,"Opcode $1E <n>: calls subscript n: keeps the address after the opcode (pointer + 2, the carry going into the bank) in the thread's !Battle_ActThreadReturn / !Battle_ActThreadReturnBank and goes to ent"
-$C1:56FB,$C1:5713,25,BattleAct_OpReturn,$C1,Battle engine,readable,191e739fef6a,"Opcode $1F: returns from a subscript (BattleAct_OpCall): the script pointer = the thread's !Battle_ActThreadReturn / ReturnBank, and the next opcode runs in the same frame."
-$C1:5714,$C1:5721,14,BattleAct_OpPause,$C1,Battle engine,readable,4acf7ba9f64e,Opcode $20 <n>: ends the thread's turn for this frame and has BattleAct_RunThread only count !Battle_ActThreadWait = n down on the next n frames before running the next opcode; advances 2.
-$C1:5722,$C1:572B,10,BattleAct_OpReturnIfVar1F0,$C1,Battle engine,readable,d3bcdcf2e5a6,"Opcode $21: when variable $1F (!Battle_ActUnkPointY) is 0, returns from the subscript like opcode $1F; otherwise advances 1 (and the thread waits for the next frame)."
-$C1:572C,$C1:5742,23,BattleAct_OpWaitVar,$C1,Battle engine,readable,bfa21b0aef8a,"Opcode $22 <n> <v>: waits until variable n (!Battle_ActVars + n) is v: while it is not, stays on the opcode (advance 0); then goes on with the next opcode in the same frame, advancing 3."
-$C1:5743,$C1:5755,19,BattleAct_OpWaitVar1C,$C1,Battle engine,readable,03d1c5378300,Opcode $23 <v>: as opcode $22 for variable $1C (!Battle_ActVar1C); advances 2 when it is v.
-$C1:5756,$C1:5768,19,BattleAct_OpWaitVar1D,$C1,Battle engine,readable,59fa2ab488ce,Opcode $24 <v>: as opcode $23 for variable $1D (!Battle_ActVar1D).
-$C1:5769,$C1:577C,20,BattleAct_OpEndIfNoTarget,$C1,Battle engine,readable,7649b5478e61,"Opcode $25 <i>: when entry i of !Battle_ActTargetSet is the end marker (bit 7 set: the set has fewer than i + 1 slots), switches the thread off (BattleAct_OpEndThread); otherwise goes on with the next"
-$C1:577D,$C1:5805,137,BattleAct_OpShowAnimEntry,$C1,Battle engine,readable,910b57498614,
-$C1:5806,$C1:5809,4,BattleAct_OpSetUnkA5CD,$C1,Battle engine,readable,a41a96728f20,
-$C1:580A,$C1:583F,54,BattleAct_StoreUnkA5CD,$C1,Battle engine,readable,2a38872b3e02,
-$C1:5840,$C1:5843,4,BattleAct_OpClearUnkA5CD,$C1,Battle engine,readable,d4f386c4d6fa,
-$C1:5844,$C1:5847,4,BattleAct_OpSetUnk9FF7,$C1,Battle engine,readable,4fa2beb20e7d,BattleAct_StoreUnk9FF7 and BattleAct_OpClearUnk9FF7)
-$C1:5848,$C1:5878,49,BattleAct_StoreUnk9FF7,$C1,Battle engine,readable,6a71fc386aeb,
-$C1:5879,$C1:587C,4,BattleAct_OpClearUnk9FF7,$C1,Battle engine,readable,25389502680e,
-$C1:587D,$C1:58AA,46,BattleAct_OpClearUnkA4A4,$C1,Battle engine,readable,30d2b168ba59,Opcode $2B: zeroes !Battler_UnkA4A4 and !Battler_UnkA4AF of the thread's battler (threads 0-3) or of every slot of the target set (thread 4); object threads change nothing.
-$C1:58AB,$C1:58DB,49,BattleAct_OpUnkRevive,$C1,Battle engine,readable,08f7f5ccd16a,Opcode $2C: for the thread's battler (threads 0-3) or every slot of the target set (thread 4): counts !Battler_Present up and zeroes !Battler_KoFlag; object threads change nothing.
-$C1:58DC,$C1:58E3,8,BattleAct_OpSetUnkCFFF,$C1,Battle engine,readable,bba233c7f9eb,Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
-$C1:58E4,$C1:58EB,8,BattleAct_OpClearUnkCFFF,$C1,Battle engine,readable,d4e5a5c2be19,Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
-$C1:58EC,$C1:58FD,18,BattleAct_OpSetVar,$C1,Battle engine,readable,ca838a52aec8,"The script variable opcodes ($C158EC–$C159B8): set, count and add to the bytes of !Battle_ActVars; variables $1C and $1D have opcodes of their own."
-$C1:58FE,$C1:590B,14,BattleAct_OpSetVar1C,$C1,Battle engine,readable,6a0cff099104,Opcode $31 <v>: !Battle_ActVar1C = v; advances 2.
-$C1:590C,$C1:5919,14,BattleAct_OpSetVar1D,$C1,Battle engine,readable,4f105b750c12,Opcode $32 <v>: !Battle_ActVar1D = v; advances 2.
-$C1:591A,$C1:5930,23,BattleAct_OpCalcToUnkPoint,$C1,Battle engine,readable,22f85c2ab4f1,"Opcode $33 <n>: runs BattleAct_RunCalc handler n and keeps its point in !Battle_ActUnkPointX/Y (variables $1E/$1F), for the ""UnkPoint"" move opcodes; advances 2, and the thread waits for the next frame"
-$C1:5931,$C1:593F,15,BattleAct_OpIncVar,$C1,Battle engine,readable,69dcbdeae518,Opcode $34 <n>: variable n + 1; advances 2.
-$C1:5940,$C1:594A,11,BattleAct_OpIncVar1C,$C1,Battle engine,readable,389e2e04fcde,Opcode $35: !Battle_ActVar1C + 1; advances 1.
-$C1:594B,$C1:5955,11,BattleAct_OpIncVar1D,$C1,Battle engine,readable,b5a2f31665f0,Opcode $36: !Battle_ActVar1D + 1; advances 1.
-$C1:5956,$C1:5964,15,BattleAct_OpDecVar,$C1,Battle engine,readable,d03682326378,Opcode $37 <n>: variable n - 1; advances 2.
-$C1:5965,$C1:596F,11,BattleAct_OpDecVar1C,$C1,Battle engine,readable,21c25fba6773,Opcode $38: !Battle_ActVar1C - 1; advances 1.
-$C1:5970,$C1:597A,11,BattleAct_OpDecVar1D,$C1,Battle engine,readable,a9a4bb9d3e34,Opcode $39: !Battle_ActVar1D - 1; advances 1.
-$C1:597B,$C1:5990,22,BattleAct_OpAddVar,$C1,Battle engine,readable,48f7b75372ef,"Opcode $3A <n> <v>: variable n + v (8-bit, wraps); advances 3."
-$C1:5991,$C1:59A2,18,BattleAct_OpAddVar1C,$C1,Battle engine,readable,8f5a6fc6d3b0,Opcode $3B <v>: !Battle_ActVar1C + v; advances 2.
-$C1:59A3,$C1:59B8,22,BattleAct_OpAddVarTo1C,$C1,Battle engine,readable,6e647756d8f7,Opcode $3C <n>: !Battle_ActVar1C + variable n; advances 2.
-$C1:59B9,$C1:59E3,43,BattleAct_OpCalcToResult,$C1,Battle engine,readable,7c4944e0dd55,"Opcodes $3D-$40 and $45-$46 <n> (one handler): runs BattleAct_RunCalc handler n once and stores its two results in entry k of !Battle_ActCalcResult: k = opcode - $3D for $3D-$40 (0-3), opcode - $41 fo"
-$C1:59E4,$C1:59F9,22,BattleAct_OpCopyVar,$C1,Battle engine,readable,f6b4e21189ce,Opcode $41 <a> <b>: variable b = variable a; advances 3.
-$C1:59FA,$C1:5A0B,18,BattleAct_OpCopyVar1C,$C1,Battle engine,readable,00c273983aa7,Opcode $42 <n>: variable n = !Battle_ActVar1C; advances 2.
-$C1:5A0C,$C1:5A3D,50,BattleAct_OpOffsetToUnkPoint,$C1,Battle engine,readable,e405b7294b6a,
-$C1:5A3E,$C1:5A6F,50,BattleAct_OpActorPosToUnkPoint,$C1,Battle engine,readable,84fe25dc107c,
-$C1:5A70,$C1:5A98,41,BattleAct_OpAddVarClamped,$C1,Battle engine,readable,c41885e2b476,
-$C1:5A99,$C1:5AAE,22,BattleAct_OpSwapVar1C1D,$C1,Battle engine,readable,29d4e8e8e84f,Opcodes $4A and $4D: swaps !Battle_ActVar1C and !Battle_ActVar1D; advances 1.
-$C1:5AAF,$C1:5AC4,22,BattleAct_OpSwapVar1C1E,$C1,Battle engine,readable,886fc030e816,Opcode $4E: swaps !Battle_ActVar1C and variable $1E (!Battle_ActUnkPointX); advances 1.
-$C1:5AC5,$C1:5ADA,22,BattleAct_OpSwapVar1C1F,$C1,Battle engine,readable,dbd36308d581,Opcode $4F: swaps !Battle_ActVar1C and variable $1F (!Battle_ActUnkPointY); advances 1.
+$C1:51EE,$C1:5204,23,BattleAct_OpCurveTo,$C1,Battle engine,readable,851dc0f0e9f1,
+$C1:5205,$C1:521B,23,BattleAct_OpCurveToUnkPoint,$C1,Battle engine,verified,4b4fdfb33ef9,
+$C1:521C,$C1:522A,15,BattleAct_OpCurveToCalc,$C1,Battle engine,verified,7ef01ada6bbf,
+$C1:522B,$C1:53AF,389,BattleAct_CurveToPoint,$C1,Battle engine,readable,ff1b60701811,
+$C1:53B0,$C1:5408,89,BattleAct_CurveTurnDir,$C1,Battle engine,verified,64add2f9e51d,
+$C1:5409,$C1:541A,18,BattleAct_OpPathTo,$C1,Battle engine,readable,c8ff213cb755,
+$C1:541B,$C1:542C,18,BattleAct_OpPathToUnkPoint,$C1,Battle engine,verified,48348386db42,
+$C1:542D,$C1:5436,10,BattleAct_OpPathToCalc,$C1,Battle engine,verified,41b8891f9356,
+$C1:5437,$C1:5610,474,BattleAct_PathToPoint,$C1,Battle engine,readable,e90b202c964c,
+$C1:5611,$C1:561E,14,BattleAct_OpSetPos,$C1,Battle engine,verified,2348a22f2661,
+$C1:561F,$C1:566B,77,BattleAct_SetPosToPoint,$C1,Battle engine,verified,1ed92c02a88a,
+$C1:566C,$C1:567C,17,BattleAct_OpSetPosUnkPoint,$C1,Battle engine,verified,6156e525b1b5,
+$C1:567D,$C1:5693,23,BattleAct_OpSetPosCalc,$C1,Battle engine,verified,0dd065161865,
+$C1:5694,$C1:56BA,39,BattleAct_OpFollow,$C1,Battle engine,verified,a4ad0ade9511,"Opcode $1C <n>: on an object thread, makes the object follow something: !Battle_ActObjFollow of the object = entry n of !Battle_ActBattlers (a battler slot) for n below !Battle_ActFollowFirstObj, else"
+$C1:56BB,$C1:56CB,17,BattleAct_OpUnfollow,$C1,Battle engine,verified,04d3b9218437,"Opcode $1D <j>: object thread j follows nothing any more (!Battle_ActObjFollow = !Battle_ActFollowNone), whatever thread runs it."
+$C1:56CC,$C1:56FA,47,BattleAct_OpCall,$C1,Battle engine,verified,844ec248f16f,"Opcode $1E <n>: calls subscript n: keeps the address after the opcode (pointer + 2, the carry going into the bank) in the thread's !Battle_ActThreadReturn / !Battle_ActThreadReturnBank and goes to ent"
+$C1:56FB,$C1:5713,25,BattleAct_OpReturn,$C1,Battle engine,verified,191e739fef6a,"Opcode $1F: returns from a subscript (BattleAct_OpCall): the script pointer = the thread's !Battle_ActThreadReturn / ReturnBank, and the next opcode runs in the same frame."
+$C1:5714,$C1:5721,14,BattleAct_OpPause,$C1,Battle engine,verified,4acf7ba9f64e,Opcode $20 <n>: ends the thread's turn for this frame and has BattleAct_RunThread only count !Battle_ActThreadWait = n down on the next n frames before running the next opcode; advances 2.
+$C1:5722,$C1:572B,10,BattleAct_OpReturnIfVar1F0,$C1,Battle engine,verified,d3bcdcf2e5a6,"Opcode $21: when variable $1F (!Battle_ActUnkPointY) is 0, returns from the subscript like opcode $1F; otherwise advances 1 (and the thread waits for the next frame)."
+$C1:572C,$C1:5742,23,BattleAct_OpWaitVar,$C1,Battle engine,verified,bfa21b0aef8a,"Opcode $22 <n> <v>: waits until variable n (!Battle_ActVars + n) is v: while it is not, stays on the opcode (advance 0); then goes on with the next opcode in the same frame, advancing 3."
+$C1:5743,$C1:5755,19,BattleAct_OpWaitVar1C,$C1,Battle engine,verified,03d1c5378300,Opcode $23 <v>: as opcode $22 for variable $1C (!Battle_ActVar1C); advances 2 when it is v.
+$C1:5756,$C1:5768,19,BattleAct_OpWaitVar1D,$C1,Battle engine,verified,59fa2ab488ce,Opcode $24 <v>: as opcode $23 for variable $1D (!Battle_ActVar1D).
+$C1:5769,$C1:577C,20,BattleAct_OpEndIfNoTarget,$C1,Battle engine,verified,7649b5478e61,"Opcode $25 <i>: when entry i of !Battle_ActTargetSet is the end marker (bit 7 set: the set has fewer than i + 1 slots), switches the thread off (BattleAct_OpEndThread); otherwise goes on with the next"
+$C1:577D,$C1:5805,137,BattleAct_OpShowAnimEntry,$C1,Battle engine,verified,910b57498614,
+$C1:5806,$C1:5809,4,BattleAct_OpSetUnkA5CD,$C1,Battle engine,verified,a41a96728f20,
+$C1:580A,$C1:583F,54,BattleAct_StoreUnkA5CD,$C1,Battle engine,verified,2a38872b3e02,
+$C1:5840,$C1:5843,4,BattleAct_OpClearUnkA5CD,$C1,Battle engine,verified,d4f386c4d6fa,
+$C1:5844,$C1:5847,4,BattleAct_OpSetUnk9FF7,$C1,Battle engine,verified,4fa2beb20e7d,BattleAct_StoreUnk9FF7 and BattleAct_OpClearUnk9FF7)
+$C1:5848,$C1:5878,49,BattleAct_StoreUnk9FF7,$C1,Battle engine,verified,6a71fc386aeb,
+$C1:5879,$C1:587C,4,BattleAct_OpClearUnk9FF7,$C1,Battle engine,verified,25389502680e,
+$C1:587D,$C1:58AA,46,BattleAct_OpClearUnkA4A4,$C1,Battle engine,verified,30d2b168ba59,Opcode $2B: zeroes !Battler_UnkA4A4 and !Battler_UnkA4AF of the thread's battler (threads 0-3) or of every slot of the target set (thread 4); object threads change nothing.
+$C1:58AB,$C1:58DB,49,BattleAct_OpUnkRevive,$C1,Battle engine,verified,08f7f5ccd16a,Opcode $2C: for the thread's battler (threads 0-3) or every slot of the target set (thread 4): counts !Battler_Present up and zeroes !Battler_KoFlag; object threads change nothing.
+$C1:58DC,$C1:58E3,8,BattleAct_OpSetUnkCFFF,$C1,Battle engine,verified,bba233c7f9eb,Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
+$C1:58E4,$C1:58EB,8,BattleAct_OpClearUnkCFFF,$C1,Battle engine,verified,d4e5a5c2be19,Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
+$C1:58EC,$C1:58FD,18,BattleAct_OpSetVar,$C1,Battle engine,verified,ca838a52aec8,"The script variable opcodes ($C158EC–$C159B8): set, count and add to the bytes of !Battle_ActVars; variables $1C and $1D have opcodes of their own."
+$C1:58FE,$C1:590B,14,BattleAct_OpSetVar1C,$C1,Battle engine,verified,6a0cff099104,Opcode $31 <v>: !Battle_ActVar1C = v; advances 2.
+$C1:590C,$C1:5919,14,BattleAct_OpSetVar1D,$C1,Battle engine,verified,4f105b750c12,Opcode $32 <v>: !Battle_ActVar1D = v; advances 2.
+$C1:591A,$C1:5930,23,BattleAct_OpCalcToUnkPoint,$C1,Battle engine,verified,22f85c2ab4f1,"Opcode $33 <n>: runs BattleAct_RunCalc handler n and keeps its point in !Battle_ActUnkPointX/Y (variables $1E/$1F), for the ""UnkPoint"" move opcodes; advances 2, and the thread waits for the next frame"
+$C1:5931,$C1:593F,15,BattleAct_OpIncVar,$C1,Battle engine,verified,69dcbdeae518,Opcode $34 <n>: variable n + 1; advances 2.
+$C1:5940,$C1:594A,11,BattleAct_OpIncVar1C,$C1,Battle engine,verified,389e2e04fcde,Opcode $35: !Battle_ActVar1C + 1; advances 1.
+$C1:594B,$C1:5955,11,BattleAct_OpIncVar1D,$C1,Battle engine,verified,b5a2f31665f0,Opcode $36: !Battle_ActVar1D + 1; advances 1.
+$C1:5956,$C1:5964,15,BattleAct_OpDecVar,$C1,Battle engine,verified,d03682326378,Opcode $37 <n>: variable n - 1; advances 2.
+$C1:5965,$C1:596F,11,BattleAct_OpDecVar1C,$C1,Battle engine,verified,21c25fba6773,Opcode $38: !Battle_ActVar1C - 1; advances 1.
+$C1:5970,$C1:597A,11,BattleAct_OpDecVar1D,$C1,Battle engine,verified,a9a4bb9d3e34,Opcode $39: !Battle_ActVar1D - 1; advances 1.
+$C1:597B,$C1:5990,22,BattleAct_OpAddVar,$C1,Battle engine,verified,48f7b75372ef,"Opcode $3A <n> <v>: variable n + v (8-bit, wraps); advances 3."
+$C1:5991,$C1:59A2,18,BattleAct_OpAddVar1C,$C1,Battle engine,verified,8f5a6fc6d3b0,Opcode $3B <v>: !Battle_ActVar1C + v; advances 2.
+$C1:59A3,$C1:59B8,22,BattleAct_OpAddVarTo1C,$C1,Battle engine,verified,6e647756d8f7,Opcode $3C <n>: !Battle_ActVar1C + variable n; advances 2.
+$C1:59B9,$C1:59E3,43,BattleAct_OpCalcToResult,$C1,Battle engine,verified,7c4944e0dd55,"Opcodes $3D-$40 and $45-$46 <n> (one handler): runs BattleAct_RunCalc handler n once and stores its two results in entry k of !Battle_ActCalcResult: k = opcode - $3D for $3D-$40 (0-3), opcode - $41 fo"
+$C1:59E4,$C1:59F9,22,BattleAct_OpCopyVar,$C1,Battle engine,verified,f6b4e21189ce,Opcode $41 <a> <b>: variable b = variable a; advances 3.
+$C1:59FA,$C1:5A0B,18,BattleAct_OpCopyVar1C,$C1,Battle engine,verified,00c273983aa7,Opcode $42 <n>: variable n = !Battle_ActVar1C; advances 2.
+$C1:5A0C,$C1:5A3D,50,BattleAct_OpOffsetToUnkPoint,$C1,Battle engine,verified,e405b7294b6a,
+$C1:5A3E,$C1:5A6F,50,BattleAct_OpActorPosToUnkPoint,$C1,Battle engine,verified,84fe25dc107c,
+$C1:5A70,$C1:5A98,41,BattleAct_OpAddVarClamped,$C1,Battle engine,verified,c41885e2b476,
+$C1:5A99,$C1:5AAE,22,BattleAct_OpSwapVar1C1D,$C1,Battle engine,verified,29d4e8e8e84f,Opcodes $4A and $4D: swaps !Battle_ActVar1C and !Battle_ActVar1D; advances 1.
+$C1:5AAF,$C1:5AC4,22,BattleAct_OpSwapVar1C1E,$C1,Battle engine,verified,886fc030e816,Opcode $4E: swaps !Battle_ActVar1C and variable $1E (!Battle_ActUnkPointX); advances 1.
+$C1:5AC5,$C1:5ADA,22,BattleAct_OpSwapVar1C1F,$C1,Battle engine,verified,dbd36308d581,Opcode $4F: swaps !Battle_ActVar1C and variable $1F (!Battle_ActUnkPointY); advances 1.
 $C1:65BA,$C1:6670,183,BattleAct_CalcMoveStep,$C1,Battle engine,verified,e905d1e222ad,"Unit step of a straight move from !Battle_GeoOriginX/Y to !Battle_GeoPointX/Y, as signed 8.8 pixels: the axis with the larger distance (x on a tie) moves 1.0 ($0100) per step, the other (smaller * 256"
 $C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"

@@ -683,14 +683,14 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjUnkA31C    = $A31C ; 1 B per object thread: zeroed when an object's move starts; purpose unknown
 !Battle_ActThreadOpLen   = $A3A9 ; 1 B per thread: length of the move opcode it waits on, advanced by when it ends
 !Battle_ActUnkPointX     = $5D9E ; 1 B: x of the point opcodes $11, $14, $17 and $1A use (variable $1E of
-                                 ; !Battle_ActVars); set by opcode $33 (BattleAct_OpCalcToUnkPoint) and at $C1:5A14 and
-                                 ; others (unmatched); purpose otherwise unknown
+                                 ; !Battle_ActVars); set by opcodes $33 (BattleAct_OpCalcToUnkPoint),
+                                 ; BattleAct_OpOffsetToUnkPoint and BattleAct_OpActorPosToUnkPoint; purpose otherwise unknown
 !Battle_ActUnkPointY     = $5D9F ; 1 B: its y (variable $1F); opcode $21 also tests it for 0
 !Battle_ActVars          = $5D80 ; script variables, 1 B each, index n from the operand (opcodes $22, $30, $34, $37,
-                                 ; $3A, $3C); just after the 16 BattleActObj records, cleared by BattleAct_ResetState
+                                 ; $3A, $3C, $41, $42, $49); just after the 16 BattleActObj records, cleared by BattleAct_ResetState
                                  ; ($5D80-$5E0C); entries $1C-$1F have opcodes of their own
-!Battle_ActVar1C         = $5D9C ; 1 B: variable $1C (opcodes $23, $31, $35, $38, $3B, $3C; also read or written at $C1:59FE
-                                 ; and on, unmatched)
+!Battle_ActVar1C         = $5D9C ; 1 B: variable $1C (opcodes $23, $31, $35, $38, $3B, $3C; also BattleAct_OpCopyVar1C and
+                                 ; the swap opcodes)
 !Battle_ActVar1D         = $5D9D ; 1 B: variable $1D (opcodes $24, $32, $36, $39)
 !Battle_ActThreadReturn  = $A569 ; 2 B per thread (index thread * 4): offset to return to from a subscript (opcode $1E)
 !Battle_ActThreadReturnBank = $A56B ; 2 B per thread (same records): its bank byte, then 0

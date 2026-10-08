@@ -12877,7 +12877,10 @@ BattleAct_StartBattlerMove:
 ; turning. That the move ends near the point is from the mover's call
 ; of $CF:F957 with $10 before it sets the done flag (not traced).
 ; The first operand h is the start heading ($FF: the actor's
-; !Battle_ActorUnkA5AA); the point is put in !Battle_ActCalcOutA/B
+; !Battle_ActorUnkA5AA; quirk, kept: on thread 4 the start loop stores
+; each slot's heading back into DP $82, so only the first slot of the
+; pass sees $FF and later slots start from the first slot's heading);
+; the point is put in !Battle_ActCalcOutA/B
 ; (x, y) and DP $8E holds the opcode's length:
 ;   - $13 <h> <x> <y> (BattleAct_OpCurveTo): the point from the
 ;     operands; length 4;
@@ -13039,7 +13042,7 @@ BattleAct_CurveToPoint:                 ; header: see BattleAct_OpCurveTo
     LDA.w !Battle_ActorUnkA5AA,Y
 .slot_heading:
     STA.w !Battle_ActorHeading,Y
-    STA.b !BattleAct_CurveHeading
+    STA.b !BattleAct_CurveHeading ; overwrites the $FF: later slots reuse this heading
     JSR BattleAct_CurveTurnDir
     STA.w !Battle_ActorTurnDir,Y
     LDA.b #1
@@ -13267,7 +13270,9 @@ BattleAct_CurveTurnDir:
 ;     cell (+2) set. The kind's !BattleRom_PathFromDir and
 ;     !BattleRom_PathFacing entries go to !Battler_PathFromDir and
 ;     !Battler_Facing, and the new cell to !Battler_PathCell. So the
-;     walk ends one cell short of the goal cell. That kinds 3 and 4
+;     walk ends when the goal is the neighbour cell, two cells straight
+;     ahead (a straight step moves one cell, so a straight approach stops
+;     two cells short) or diagonally ahead. That kinds 3 and 4
 ;     are curved diagonals is from the $CC:F494/$CC:F594 entries.
 ;     When the walk ends, !Battler_PathWalking is cleared and the
 ;     thread advances by its !Battle_ActThreadPathLen.
@@ -13464,7 +13469,7 @@ BattleAct_PathToPoint:                  ; header: see BattleAct_OpPathTo
     CMP.b #!Battle_PathCellGoal
     BNE .look_ahead
     JMP .walk_done
-.look_ahead:
+.look_ahead:                    ; the goal two cells ahead also ends the walk
     CLC
     LDA.b !BattleAct_WalkCell
     ADC.l !BattleRom_PathAhead,X
