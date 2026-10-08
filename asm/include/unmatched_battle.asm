@@ -1,12 +1,24 @@
 ; ============================================================
-; unmatched_battle.asm — Names for routines outside bank $C1 that the
-; matched battle code calls but that are not matched yet.
+; unmatched_battle.asm — Names for routines that the matched battle
+; code calls but that are not matched yet (in bank $C1 or elsewhere).
 ;
 ; Same format as unmatched.asm: label-only `org` stubs, no bytes. When a
 ; routine gets matched, delete its stub here; the real label takes over.
 ; Names come from the reference disassembly / earlier session notes;
 ; the comment says what the call site expects.
 ; ============================================================
+
+; --- Bank $C1 (battle engine, not matched yet) ---
+
+org $C10045
+BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
+                                        ; $C1:0051 (also reached through JMP at $C1:0003)
+
+org $C13714
+Battle_TickStatusEffectVisuals:         ; JSR: skipped while !Battle_MenuTimeHold is set; counts down per-enemy timers
+                                        ; ($9897) and dispatches on !Enemy_Anim through the table at $C1:3760. The name
+                                        ; is from the session notes and looks wrong (enemy movement, not status visuals;
+                                        ; not checked in detail)
 
 ; --- Bank $C7 (audio) ---
 
@@ -17,6 +29,10 @@ Audio_ProcessEntry:                     ; JSL: run the APU command block !Sfx_Co
 
 org $CD0009
 BattleSys_FrameTickVec:                 ; JSL vector: per-frame service tick (BattleMenu_RefreshIfDirtyAndTick)
+
+org $CD0036
+BattleSys_IdleVecCD0036:                ; JSL vector (JMP $CD:04A6 -> JSR $CD:3E44): called over and over while
+                                        ; BattleSys_PumpFrames waits; not analysed
 
 org $CD0027
 BattleMsg_ShowFromTableCC3A09Vec:       ; JSL vector: info panel for the tech under the cursor (A = tech id)

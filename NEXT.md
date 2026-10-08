@@ -3,18 +3,10 @@
 The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 "Definition of done").
 
-## Readability burn-down (first)
-
-1. Bank $C1: every routine in `tools/readability_baseline.txt` up to STYLE.md, re-verified
-   (`make gate`), then independently reviewed (`symbols/reviews.csv`).
-2. Bank $C0: the same, cluster by cluster.
-3. Reviews for the routines that are already readable (banks $00, $FD and the clean $C1 ones).
-
 ## Matching
 
-0. Quick wins from `tools/find_duplicates.py`. Byte-identical (`make duplicates`):
-   `Battle_Mul8` again at `$CC:F365`; the two wave tables again at `$FF:F759` and `$FF:F799`.
-   Relocation-tolerant (`make duplicates-reloc`: absolute/long operands masked, fragments of
+0. Quick wins from `tools/find_duplicates.py`. The byte-identical copies (`Battle_Mul8CC`,
+   `ScrollWaveFF_A/B`) are matched. Relocation-tolerant (`make duplicates-reloc`: absolute/long operands masked, fragments of
    6+ instructions, at most 3 operands differing, outside matched code), ranked by size; all
    checked by disassembly to be code. "part" = a run inside the source routine, not all of it.
    1. `$CF:FDC8` 78 B: `BattleMsg_FormatNumberDigits` (part, routine 85 B); 3 differ (digit
@@ -38,13 +30,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
-1. `$C1:1C4A–$C1:1F78`: the gap between `BattleMenu_LoadCommandWindowMap` and
-   `BattleMenu_BuildTargetList`.
-2. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for
-   `BattleSys_PumpFrames`, `Battle_TickPcSlots`, `Battle_TickStatusEffectVisuals`,
-   `Battle_CacheBattlerCoordsAll`.
-3. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
-4. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
+
+
+1. Bank $C1 past `$C1:3714`: the routine at `$C1:3714` (stub `Battle_TickStatusEffectVisuals`; the name
+   looks wrong: it counts down per-enemy timers at `$9897` and dispatches on `!Enemy_Anim` through the
+   9-entry table at `$C1:3760`), then its handlers, the enemy movers at `$C1:3772`-`$C1:4057` that use
+   the box tests and the distance checks, and service 4 (`$C1:4058`). (`$C1:007E` and
+   `$C1:283D`-`$C1:3713` are matched.)
+2. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
 
 ## Tables
 
@@ -64,6 +57,6 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
    `$C0:4009`), `$C0:21EE` (~16, `$C0:21EA`), `$C0:7181` (12, `$C0:717D`), `$C0:6477` (8,
    `$C0:633D`), `$C0:9FF7` (65, `$C0:9ECD`).
-5. Bank $C1: `$C1:2D81` (~21 words, `$C1:29AE`, the closest to matched code), `$C1:3216` (15,
-   `$C1:30B2`), `$C1:3760` (9, `$C1:375C`), `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
+5. Bank $C1 (`$C1:2D81` and `$C1:3216` are matched as BattlePos_ModeTable and
+   Battle_FxHandlerTable): `$C1:3760` (9, `$C1:375C`), `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

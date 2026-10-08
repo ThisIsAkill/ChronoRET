@@ -49,6 +49,70 @@ if !constants_battle_inc == 0
 !Battle_AngleHalfTurn    = $80   ; 180 degrees
 !Battle_AngleThreeQuarter = $C0  ; 270 degrees
 
+; --- Battler boxes (Battle_CalcBattlerBox and the box tests) ---
+!Battle_BoxBottomPad     = 8     ; pixels a box reaches below the probe y, unless !Battle_Unk2989NoBoxPad
+!Battle_Unk2989NoBoxPad  = $04   ; !Battle_Unk2989 bit: set = boxes end at the probe y; meaning unknown
+!Battle_BoxEdgeMax       = $FF   ; right-edge clamp (rightmost pixel)
+!Battle_CellBlocked      = $40   ; !Battle_CellMap bit: always blocks a box
+!Battle_OverlapPc        = $80   ; Battle_BoxOverlapsOthers result: touches a PC's box ($81 = an enemy's)
+
+; --- Position queries (BattlePos_Query) ---
+!BattlePos_Fail          = $FF   ; !BattlePos_Result: the condition does not hold
+!BattlePos_NoBest        = $FFFF ; nearest-battler scans: starting best distance (anything is nearer)
+!BattlePos_DistSq4       = $0010 ; squared distance limits: 4 pixels ...
+!BattlePos_DistSq16      = $0100 ; ... 16 pixels
+!BattlePos_DistSq32      = $0400 ; ... 32 pixels
+!BattlePos_DistSq40      = $0640 ; ... 40 pixels
+!BattlePos_DistSq48      = $0900 ; ... 48 pixels
+!BattlePos_DistSq64      = $1000 ; ... 64 pixels
+!BattlePos_RowBand       = $20   ; query 5: largest |dy| that still counts as the same row
+!BattlePos_MidRow        = 8     ; queries 9/10: cell row (y / 16) where the lower half of the screen starts
+!BattlePos_RightCol      = $0B   ; query 11: cell column (x / 16) where the right part starts
+!BattlePos_LeftColEnd    = 5     ; query 12: cell column where the left part ends (exclusive)
+!Battle_Invert8          = $FF   ; EOR mask; with INC A negates an 8-bit value
+
+; --- PC animation (Battle_TickPcSlots) ---
+!Battle_AnimDefault      = 3     ; !Battle_AnimId when no status picks another (inferred: standing)
+!Battle_AnimUnk2B        = $2B   ; replaces animation 3 while !Battle_Unk99CF/99D0 is set; which animation is unknown
+!Battle_AnimRestart      = $FF   ; !Battler_AnimFrame value: the next step starts the list again
+!Battle_AnimTicksDivisor = 5     ; a list's duration byte / this = frames until the next step
+!Battle_FacingSlotMask   = $7F   ; !Battle_FacingTurn: the PC slot
+!Battle_FacingHandedOn   = $80   ; !Battle_FacingTurn: handed on, not taken yet
+!Battle_StatusUnk4BNoTurn = $02  ; BattlerStats.Status2 bit that stops the facing update; meaning unknown
+!BattlePos_QueryNearestEnemy = 2 ; !BattlePos_Mode of BattlePos_NearestEnemy
+!BattleSys_ServicePosQuery = 5   ; $C10045 service number of BattlePos_Query
+
+; --- Status animations and effects (Battle_PickStatusAnim, Battle_FxHandlerTable) ---
+!Battle_AnimUntargetable = 0     ; !Battle_AnimId default for an !Battler_Untargetable battler; what animation 0 shows is unknown
+!Battle_AnimUnk12        = $12   ; animation for BattlerStats.Unk2F bit 0 when no status record matches; unknown
+!Battle_StatusAnimNone   = $FF   ; BattleRom_StatusAnim.Anim: no animation of its own
+!Battle_StatsUnk2FBit    = $01   ; BattlerStats.Unk2F bit tested by Battle_PickStatusAnim; meaning unknown
+!Battle_FxNone           = $FF   ; !Battler_FxWanted: no effect (runs Battle_FxReset)
+!Battle_FxUnk2F          = $80   ; !Battler_FxWanted from the Unk2F path (also runs Battle_FxReset)
+!Battle_PaletteCopyLen   = $1A   ; bytes Battle_FxReset copies from !Battle_PaletteSaved
+!Battle_PaletteTintCopyLen = $18 ; bytes Battle_FxOverlay2Tint copies, from byte 2 on
+!Battle_FxOverlayStride  = $10   ; !Battler_FxOverlayBase per overlay block (4 frames x 4 B at $CC:F6D4)
+!Battle_FxOverlayFrameStart = $FF ; !Battler_FxOverlayFrame before the first frame (the first tick makes it 0)
+
+; --- Enemy animation (Battle_TickEnemyGroup) ---
+!Battle_TickOrderNone    = $FF   ; !Battle_TickOrder entry: nobody (third entry of enemy group 3)
+!Battle_EnemyListKind1   = 1     ; list block loaded for !BattleRom_EnemyAnimKind 1 (kind 0 loads list 3); meaning unknown
+!Battle_EnemyListOther   = 6     ; list block loaded for every other kind; meaning unknown
+!Battle_EnemyAnimListLen = 8     ; entries copied per list into !Enemy_AnimTicks/Frames
+!Battle_EnemyAnimFrames  = 4     ; !Enemy_AnimFrame wraps here (entries 4-7 are never shown)
+!Battle_EnemyGroupSize   = 3     ; !Battle_TickOrder entries visited per group
+!Battle_EnemyGroupLast   = 3     ; highest !Battle_UnkA4 group
+
+; --- PC poses (Battle_RunPcPose and the services that start it) ---
+!Battle_AnimDown         = 8     ; BattleRom_StatusAnim's animation for KO (Status bit 7); service 9's pose
+!Battle_AnimUnk0A        = $0A   ; service 8's pose (inferred: victory); not looked at
+!Battle_AnimUnk0C        = $0C   ; the battle-start pose (Battle_StartPose); not looked at
+!Battle_Unk2989NoEndPose = $01   ; !Battle_Unk2989 bit: set = service 8 returns before its pose; meaning unknown
+!Battle_PoseTicksLast    = $17   ; last byte of !Pc_PoseTicks cleared by Battle_RunPcPose (3 x 8 B)
+!Battle_PoseListLen      = 8     ; entries per PC pose list
+!Battle_PoseEntryStart   = $FF   ; !Pc_PoseEntry before the first step
+!Battle_PoseFrames       = $40   ; frames a pose runs (Battle_RunPcPose)
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
@@ -202,6 +266,20 @@ if !constants_battle_inc == 0
 !BattleTgt_ScreenMax     = $FF   ; clamp for the row area's lower edge
 !BattleTgt_SweepBatch    = 3     ; multi-target cursor: selection entries drawn per frame
 !BattleTgt_SweepWrap     = 6     ; ... the sweep restarts after this index
+
+; --- Battler frame decoder (Battle_DrawBattlerFrame) ---
+!Battle_FrameLayoutTall  = 2     ; !Battler_FrameLayout: 8 x 6 tiles
+!Battle_FrameLayoutStrip = 3     ; 96 x 1 tiles; the checked entry point never decodes it
+!Battle_FrameLayoutTallAlt = 5   ; row order used instead of layout 2 for every slot but 3 (BattleRom_FrameLayout)
+!Battle_FrameLayoutBytes = 14    ; size of one BattleRom_FrameLayout record
+!Battle_FrameTileMask    = $07FF ; frame tilemap entry: tile number (0 = blank cell, written as zeros)
+!Battle_FrameHFlip       = $4000 ; frame tilemap entry: mirror the tile horizontally (bit 15 is not tested)
+!Battle_TileBytes        = $0020 ; one 8x8 4bpp tile (inferred from the 32-byte cell copy)
+!Battle_SignExtendNeg    = $FF   ; high byte of a sign-extended negative byte
+
+; --- Info messages (BattleMsg_ShowFromTableCC3A09Vec, A = id) ---
+!BattleMsg_InfoNone      = $FF   ; sent before message $75 (inferred: clear the panel, as $FF means none for $CD002D)
+!BattleMsg_Info75        = $75   ; shown once by BattleSys_UpkeepTwoFrames; text not traced
 
 ; --- OAM (cursor sprites) ---
 !BattleOam_CursorSprites = 4     ; cursor sprites 0-3

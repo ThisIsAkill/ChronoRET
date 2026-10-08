@@ -12,6 +12,41 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
+; Frame Wait ($C1:007E–$C1:0088)
+; ============================================================
+
+; $C1:007E — BattleSys_PumpFrames (11 bytes, $007E–$0088)
+; Waits for the next frame: sets !Battle_FramePending, then calls
+; BattleSys_IdleVecCD0036 again and again until something else clears
+; the flag. The likely clearer is the STZ $9E at $CF:E77B, just before
+; the RTL of a bank-$CF routine that reads JOY1 ($CF:E6E0, $CF:E70B) and
+; bumps a 32-bit counter at $96F1, which reads as per-frame work; its
+; entry and who calls it are not traced, so "wait for the frame" is
+; inferred, not proven. ($CF:FB65 also zeroes $9E, but it is the battle
+; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
+; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
+; What the $CD0036 callee does meanwhile is not analysed.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
+; BattleSys_DefeatPose, BattleSys_VictoryPose (three times),
+; Battle_RunPcPose, and the unmatched code at $C1:405F, $C1:40A0,
+; $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4, $C1:41B7, $C1:4841,
+; $C1:485B, $C1:4864, $C1:488D, $C1:4943.
+; Entry: M=1 (8-bit INC/LDA of the flag), X any, DP=0, DB=$7E (as at
+;        every caller; the routine itself only touches direct page)
+; Exit:  M=1, DP=0; A = 0; X, Y, DB as the $CD0036 callee leaves them
+;        (not analysed)
+; Callee: BattleSys_IdleVecCD0036
+org $C1007E
+BattleSys_PumpFrames:
+    INC.b !Battle_FramePending
+.wait:
+    JSL BattleSys_IdleVecCD0036
+    LDA.b !Battle_FramePending
+    BNE .wait                   ; cleared elsewhere (likely $CF:E77B)
+    RTS
+
+; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
 
@@ -26,9 +61,11 @@ incsrc "../hardware.inc"
 ;        with STA.l/LDA.l, so the caller's data bank does not matter)
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y and DB unchanged; DP $77/$78 and
 ;        $AF/$B0 written
-; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1CBE, $C1:2B8D,
-; $C1:607B, $C1:7878); the only matched one is BattleMenu_ItemConfirm
-; ($C1:14A7). No calls.
+; Callers: 20 JSR sites across bank $C1: BattleMenu_ItemConfirm
+; ($C1:14A7), Battle_DrawBattlerFrameAnyLayout ($C1:1CBE),
+; BattlePos_CheckDist ($C1:2B8D, $C1:2B9A), BattlePos_DistDifference
+; ($C1:2D14, $C1:2D2A, $C1:2D4B, $C1:2D61) and 12 in unmatched code
+; (e.g. $C1:607B, $C1:7878). No calls.
 org $C10089
 Battle_Mul8:
     LDA.b !Battle_Mul8A
@@ -62,9 +99,10 @@ Battle_Mul8:
 ;        DP=0, DB any
 ; Exit:  M=1, X=0 (P restored); A=0; X = first partial product; Y and DB
 ;        unchanged; DP $77/$78 and $A9-$AB written
-; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1C7F, $C1:2E98,
-; $C1:33A5, $C1:509B); the only matched one is Battle_SinLookup
-; ($C1:021C). No calls.
+; Callers: 20 JSR sites across bank $C1: Battle_SinLookup ($C1:021C),
+; Battle_DrawBattlerFrameAnyLayout ($C1:1C7F), Battle_TickPcSlots
+; ($C1:2E98), Battle_TickEnemyGroup ($C1:33A5), Battle_RunPcPose
+; ($C1:35FF) and 15 in unmatched code (e.g. $C1:509B). No calls.
 org $C100A7
 Battle_Mul8x16:
     PHB
@@ -105,9 +143,9 @@ Battle_Mul8x16:
 ;        $A029, outside the low-RAM mirror); HW registers use .l
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y unchanged; DP $79-$7B and $B5-$B8
 ;        written
-; Callers: 19 JSR sites across bank $C1 (e.g. $C1:2ECF, $C1:5084,
-; $C1:6311, $C1:7731); the only matched one is BattleUI_DrawSlotGaugeBar
-; ($C1:071D). No calls.
+; Callers: 19 JSR sites across bank $C1: BattleUI_DrawSlotGaugeBar
+; ($C1:071D), Battle_TickPcSlots ($C1:2ECF) and 17 in unmatched code
+; (e.g. $C1:5084, $C1:6311, $C1:7731). No calls.
 org $C100D7
 Battle_Divide:
     INC.w !Battle_DivBusy   ; mark divider busy
@@ -151,9 +189,10 @@ Battle_Divide:
 ; Callers (all JSR, by entry point):
 ;   Battle_ShiftLeft8: BattleUI_DrawSlotGaugeBar ($C1:0715), $C1:660C,
 ;     $C1:6634
-;   Battle_ShiftLeft4: $C1:30CF, $C1:310F
-;   Battle_ShiftLeft3: $C1:3410, $C1:3471, $C1:48BA
-;   Battle_ShiftRight8: $C1:2D73
+;   Battle_ShiftLeft4: Battle_FxReset ($C1:30CF), Battle_FxOverlay2Tint
+;     ($C1:310F)
+;   Battle_ShiftLeft3: Battle_TickEnemyGroup ($C1:3410, $C1:3471), $C1:48BA
+;   Battle_ShiftRight8: BattlePos_DistDifference ($C1:2D73)
 ;   Battle_ShiftRight6: $C1:3AB7, $C1:3C41, $C1:53B2, $C1:53B9
 ;   Battle_ShiftRight5: $C1:39F6, $C1:39FE, $C1:3A0A, $C1:3A12
 ;   Battle_ShiftRight4 (15 sites): BattleMenu_UpdateTechMpAvail,
@@ -379,8 +418,9 @@ BattleMsg_ReencodeTextBuffer:
 ; $FF at +$100 and +$300); angle × 4 picks every fourth entry, and the
 ; value is negated for the second half turn (table offset $200 and up). The signed sine goes to !Battle_MulFactor16, the scale to
 ; !Battle_MulFactor8, and Battle_Mul8x16 multiplies them.
-; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites) and 42 in unmatched
-;   code (e.g. $C1:2C38, $C1:2C42, $C1:37D7, $C1:37E1).
+; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites), BattlePos_PathClear
+;   ($C1:2C38, $C1:2C42) and 40 in unmatched code (e.g. $C1:37D7,
+;   $C1:37E1).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB any (table read with .l);
 ;        angle in A
 ; Exit:  M=1, X=0; A = !Battle_MulProduct+1 (product >> 8); X clobbered
@@ -418,8 +458,10 @@ Battle_SinLookup:
 ; !BattleRom_AngleTable at index (|dy| & ~7) × 4 + (|dx| >> 3), then
 ; places it in the right quadrant from the signs of dx and dy.
 ; Callers (37 JSR sites): BattleTgt_AreaPartyTriangle (9 sites),
-;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC) and 25 in unmatched
-;   code (e.g. $C1:2C27, $C1:2F82, $C1:353B, $C1:37C9).
+;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC), BattlePos_PathClear
+;   ($C1:2C27), Battle_UpdatePcFacing ($C1:2F82),
+;   Battle_FaceAllPcsNearestEnemy ($C1:353B) and 22 in unmatched code
+;   (e.g. $C1:37C9).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB any (table
 ;        read with .l); !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y
 ; Exit:  M=1, X=0; angle in A and !Battle_GeoAngle; X = table index;
@@ -2176,9 +2218,8 @@ BattleMenu_BlankNameTailCells:
 ;   1 → BattleMenu_UpdateTechMpAvail + BattleMenu_UpdateTechWindow
 ;   other → BattleMenu_UpdateWindows_Exit → BattleMenu_Return (RTS)
 ; Callers (4 JSRs, checked in the ROM): BattleMenu_RefreshIfDirtyL,
-;   BattleMenu_RefreshIfDirtyAndTick, $C1:10D1 (the not yet matched routine
-;   at $C1:106E, behind the same !BattleMenu_Dirty gate) and $C1:35A6 (not
-;   yet matched).
+;   BattleMenu_RefreshIfDirtyAndTick, BattleSys_UpkeepTwoFrames (behind
+;   the same !BattleMenu_Dirty gate) and BattleSys_VictoryPose.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
 ;        whichever window routine ran (see their headers) and whatever
@@ -2887,6 +2928,88 @@ BattleMsg_BlankLeadingZeros:
     RTS
 
 ; ==================================================================
+; BattleSys_UpkeepTwoFrames ($C1106E–$C110E2, 117 bytes)
+; ==================================================================
+; Service 3 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
+; $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $106E
+; directly). Runs the battle's per-frame upkeep across two waits:
+;   1. Unless !Battle_UnkA10E is set: clear !Battle_UnkA0FD, and if
+;      !Battle_Unk99CF or !Battle_Unk99D0 is set while !Battle_Unk2989
+;      bit 7 is set, clear both and, once per L+R hold (!Battle_Unk99D1
+;      latch, cleared again by the bank-$CF frame routine at $CF:E732
+;      whenever L and R are not both held and $A013 is 0), send info
+;      message $FF then $75.
+;   2. Wait (BattleSys_PumpFrames), service tick, PC upkeep
+;      (Battle_TickPcSlots, with !Battle_UnkA4 saved in !Battle_Unk993B
+;      and taken back from it if that changed), the slot timers and the
+;      battler coordinate cache.
+;   3. Wait and tick again with !Battle_UnkE5 cleared, then set; rebuild
+;      the menu if !BattleMenu_Dirty (the same chain as
+;      BattleMenu_RefreshIfDirtyL, plus clearing !Battle_PadEdgeButtons);
+;      then the slot timers and the coordinate cache once more.
+; What the two message ids show, and what the Unk flags stand for, has
+; not been traced; the "wait" reading of BattleSys_PumpFrames is inferred
+; from its loop (it spins on JSL $CD0036 until $9E is cleared).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher at $C10045,
+;        which saves A, X and Y around the call)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
+;        clobbered, plus whatever the unmatched callees change
+; Callees: BattleMsg_ShowFromTableCC3A09Vec, BattleSys_PumpFrames,
+;          BattleSys_FrameTickVec, Battle_TickPcSlots,
+;          Battle_TickStatusEffectVisuals, Battle_CacheBattlerCoordsAll,
+;          BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
+;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay
+org $C1106E
+BattleSys_UpkeepTwoFrames:
+    LDA.w !Battle_UnkA10E
+    BNE .upkeep
+    STZ.w !Battle_UnkA0FD
+    LDA.w !Battle_Unk99CF
+    ORA.w !Battle_Unk99D0
+    BEQ .upkeep
+    LDA.w !Battle_Unk2989
+    BPL .upkeep
+    STZ.w !Battle_Unk99CF
+    STZ.w !Battle_Unk99D0
+    LDA.w !Battle_Unk99D1
+    BNE .upkeep                     ; message already shown
+    INC.w !Battle_Unk99D1
+    LDA.b #!BattleMsg_InfoNone
+    JSL BattleMsg_ShowFromTableCC3A09Vec
+    LDA.b #!BattleMsg_Info75
+    JSL BattleMsg_ShowFromTableCC3A09Vec
+.upkeep:
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    LDA.b !Battle_UnkA4
+    STA.w !Battle_Unk993B
+    JSR Battle_TickPcSlots
+    LDA.w !Battle_Unk993B
+    CMP.b !Battle_UnkA4
+    BEQ .a4_kept
+    STA.b !Battle_UnkA4             ; take the copy back
+.a4_kept:
+    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_CacheBattlerCoordsAll
+    STZ.b !Battle_UnkE5
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    INC.b !Battle_UnkE5
+    LDA.w !BattleMenu_Dirty
+    BEQ .menu_clean
+    STZ.w !BattleMenu_Dirty
+    JSR BattleMenu_DequeueReadyBattler
+    JSR BattleMenu_UpdateWindows
+    JSR BattleMenu_ProcessInput
+    JSR BattleMenu_UpdateCursorOverlay
+    STZ.b !Battle_PadEdgeButtons
+.menu_clean:
+    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_CacheBattlerCoordsAll
+    RTS
+
+; ==================================================================
 ; BattleMenu_LoadCommandWindowMap ($C11C3A–$C11C49, 16 bytes)
 ; ==================================================================
 ; Copies the $180-byte command window map (!BattleRom_CommandWindowMap,
@@ -2910,6 +3033,459 @@ BattleMenu_LoadCommandWindowMap:
     INX
     CPX.w #!BattleMenu_WindowBytes
     BNE .load_loop
+    RTS
+
+; ==================================================================
+; Battler frame decoder ($C1:1C4A–$C1:1F78)
+; ==================================================================
+!BattleFrame_ColsLeft = !BattleTmp_80     ; 1 B: tiles left in this row; later 2 B: count of extra bytes
+!BattleFrame_Width = !BattleTmp_81        ; 1 B: tiles per row (reloads ColsLeft)
+!BattleFrame_RowPtr = !BattleTmp_82       ; 3 B: long pointer to the next BattleRom_FrameLayout.RowOffset word;
+                                          ; later 2 B: the slot's !Battler_FrameExtra offset
+!BattleFrame_RowsLeft = !BattleTmp_85     ; 1 B: rows left
+!BattleFrame_Slot = !BattleTmp_88         ; 2 B: battler slot, doubled once the layout is read
+!BattleFrame_Entry = !BattleTmp_8C        ; 2 B: current tilemap entry; on the mirrored path, the tile's source address
+!BattleFrame_DestPtr = !BattleTmp_AD      ; 3 B: long pointer to the destination tile (mirrored path; bank $7E in +2)
+!BattleFrame_MapPtr = !BattleTmp_BA       ; 3 B: long pointer into the frame record (tilemap, then the extra bytes)
+!BattleFrame_GfxBase = !BattleTmp_BD      ; 2 B: address of tile 0 in the battler's tile bank (DB while copying)
+
+; $C1:1C4A — Battle_DrawBattlerFrame (11 bytes, $1C4A–$1C54)
+; Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the
+; battler's tile buffer in bank $7E, unless the battler uses frame layout 3
+; (!Battle_FrameLayoutStrip), which this entry leaves alone. The work is
+; done by Battle_DrawBattlerFrameAnyLayout, which it falls into.
+; Names are inferred from what the code does (a per-battler frame number,
+; a cache of the last one shown, tiles copied by number with a mirror
+; bit); what the buffer is shown as has not been traced.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
+; Exit:  see Battle_DrawBattlerFrameAnyLayout (layout 3: M=1, X=0, DP=0,
+;        DB=$7E, X = slot, A = 3, nothing written)
+; Callers: JSR from Battle_TickPcSlots, Battle_TickEnemyGroup,
+;          Battle_PoseStep, $C1:416A, $C1:418B, $C1:41AC and $C1:4307
+;          (searched: every JSR $1C4A in bank $C1; no JMP or JSL
+;          reaches it)
+org $C11C4A
+Battle_DrawBattlerFrame:
+    LDX.w !Battle_FrameSlot
+    LDA.w !Battler_FrameLayout,X
+    CMP.b #!Battle_FrameLayoutStrip
+    BNE Battle_DrawBattlerFrameAnyLayout
+    RTS
+
+; $C1:1C55 — Battle_DrawBattlerFrameAnyLayout (804 bytes, $1C55–$1F78)
+; Decodes one animation frame of a battler into bank $7E tiles:
+;   1. Clear the slot's !Battler_FrameDeferred; return at once if
+;      !Battle_FrameId is already the slot's !Battler_FrameShown.
+;   2. Frame record = !Battler_FramesPtr + FrameId * BattleRom_FrameBytes
+;      (by layout). It holds Width * Height tilemap words, then
+;      Width * Height / 2 signed bytes.
+;   3. For each row (BattleRom_FrameLayout: Width, Height, and a buffer
+;      offset per row, added to the slot's BattleRom_FrameDestBase) and
+;      each cell: entry & $07FF = 0 writes 32 zero bytes; otherwise tile
+;      (entry & $07FF) is copied from !Battler_TileGfxPtr (32 bytes per
+;      tile), bit-reversing each byte through BitReverseTable ($C0:FD00) when
+;      bit 14 (!Battle_FrameHFlip) is set, which mirrors a 4bpp tile left
+;      to right. Bit 15 (a vertical flip in SNES maps) is not tested.
+;   4. Copy the signed bytes, widened to words, into the slot's
+;      !Battler_FrameExtra block, and count the decode in
+;      !Battle_FramesDecoded.
+; Layout 2 (8 x 6) is read with record 5's row order for every slot but
+; 3; why slot 3 differs is not known.
+; The cell copies are unrolled 16 (words) and 32 (mirrored bytes) times in
+; the original, and kept that way.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
+;        (falls in from Battle_DrawBattlerFrame or is called directly)
+; Exit:  M=1, X=0, DP=0, DB=$7E (pushed and restored around the copy, which
+;        runs with DB = the tile bank); A, X, Y clobbered; DP $77-$78,
+;        $80-$85, $88-$89, $8C-$8D, $A5, $A7-$B0 (partly the multiply
+;        helpers') and $BA-$BE written.
+;        An unchanged frame returns early with X = slot and A = FrameId.
+; Callers: JSR from Battle_DrawAllBattlerFrames (all 11 slots), and the fall-in
+;          from Battle_DrawBattlerFrame (searched: no other JSR, JMP or JSL
+;          reaches $1C55)
+; Callees: Battle_Mul8x16, Battle_Mul8
+Battle_DrawBattlerFrameAnyLayout:
+    LDX.w !Battle_FrameSlot
+    STX.b !BattleFrame_Slot
+    STZ.w !Battler_FrameDeferred,X
+    LDA.w !Battle_FrameId
+    CMP.w !Battler_FrameShown,X
+    BNE .new_frame
+    RTS                             ; already showing this frame
+.new_frame:
+    STA.w !Battler_FrameShown,X
+
+    ; Frame record offset = FrameId * bytes per record of this layout.
+    LDA.w !Battler_FrameLayout,X
+    ASL
+    TAX
+    LDA.l !BattleRom_FrameBytes,X
+    STA.b !Battle_MulFactor16
+    LDA.l !BattleRom_FrameBytes+1,X
+    STA.b !Battle_MulFactor16+1
+    LDA.w !Battle_FrameId
+    STA.b !Battle_MulFactor8
+    JSR Battle_Mul8x16
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_SlotTimes3,X
+    TAX
+    REP #$21                        ; A 16-bit, carry clear for the ADC
+    LDA.w !Battler_FramesPtr,X
+    ADC.b !Battle_MulProduct
+    STA.b !BattleFrame_MapPtr
+    LDA.w !Battler_TileGfxPtr,X
+    STA.b !BattleFrame_GfxBase
+    TDC
+    SEP #$20
+    PHB                             ; keep the caller's DB ($7E)
+    LDA.w !Battler_FramesPtr+2,X
+    STA.b !BattleFrame_MapPtr+2
+    LDA.w !Battler_TileGfxPtr+2,X
+    PHA                             ; the tile bank becomes DB below
+
+    ; Layout record = BattleRom_FrameLayout + layout * 14.
+    LDX.b !BattleFrame_Slot
+    LDA.w !Battler_FrameLayout,X
+    STA.b !Battle_Mul8A
+    CMP.b #!Battle_FrameLayoutTall
+    BNE .layout_ok
+    LDA.w !Battle_FrameSlot
+    CMP.b #!Battle_FirstEnemySlot
+    BEQ .layout_ok                  ; slot 3 keeps layout 2's row order
+    LDA.b #!Battle_FrameLayoutTallAlt
+    STA.b !Battle_Mul8A
+.layout_ok:
+    LDA.b #!Battle_FrameLayoutBytes
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    LDA.l BattleRom_FrameLayout.Width,X
+    STA.b !BattleFrame_ColsLeft
+    STA.b !BattleFrame_Width
+    LDA.l BattleRom_FrameLayout.Height,X
+    STA.b !BattleFrame_RowsLeft
+    REP #$21
+    TXA
+    ADC.w #BattleRom_FrameLayout&$FFFF
+    STA.b !BattleFrame_RowPtr
+    ASL.b !BattleFrame_Slot         ; slot * 2 from here on
+    TDC
+    SEP #$20
+    LDA.b #BattleRom_FrameLayout>>16
+    STA.b !BattleFrame_RowPtr+2
+    LDA.b #!Battle_WramBank
+    STA.b !BattleFrame_DestPtr+2
+    PLB                             ; DB = tile bank
+
+.row:
+    REP #$21
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_FrameDestBase,X
+    ADC.b [!BattleFrame_RowPtr]     ; + this row's offset
+    TAX                             ; X = destination of the row's first tile
+    INC.b !BattleFrame_RowPtr
+    INC.b !BattleFrame_RowPtr
+.cell:
+    REP #$20
+    LDA.b [!BattleFrame_MapPtr]
+    STA.b !BattleFrame_Entry
+    AND.w #!Battle_FrameTileMask
+    BNE .tile
+
+    ; Tile 0: a blank cell, 32 zero bytes (A = 0 here).
+    STA.l !Battle_WramLong,X
+    STA.l !Battle_WramLong+2,X
+    STA.l !Battle_WramLong+4,X
+    STA.l !Battle_WramLong+6,X
+    STA.l !Battle_WramLong+8,X
+    STA.l !Battle_WramLong+10,X
+    STA.l !Battle_WramLong+12,X
+    STA.l !Battle_WramLong+14,X
+    STA.l !Battle_WramLong+16,X
+    STA.l !Battle_WramLong+18,X
+    STA.l !Battle_WramLong+20,X
+    STA.l !Battle_WramLong+22,X
+    STA.l !Battle_WramLong+24,X
+    STA.l !Battle_WramLong+26,X
+    STA.l !Battle_WramLong+28,X
+    STA.l !Battle_WramLong+30,X
+    TXA
+    CLC
+    ADC.w #!Battle_TileBytes
+    TAX
+    JMP .next_cell
+
+.tile:
+    ASL                             ; tile number * 32
+    ASL
+    ASL
+    ASL
+    ASL
+    CLC
+    ADC.b !BattleFrame_GfxBase
+    TAY                             ; Y = source tile in bank DB
+    LDA.b !BattleFrame_Entry
+    AND.w #!Battle_FrameHFlip
+    BNE .mirrored
+    LDA.w !Battle_DataBankAbs,Y
+    STA.l !Battle_WramLong,X
+    LDA.w !Battle_DataBankAbs+2,Y
+    STA.l !Battle_WramLong+2,X
+    LDA.w !Battle_DataBankAbs+4,Y
+    STA.l !Battle_WramLong+4,X
+    LDA.w !Battle_DataBankAbs+6,Y
+    STA.l !Battle_WramLong+6,X
+    LDA.w !Battle_DataBankAbs+8,Y
+    STA.l !Battle_WramLong+8,X
+    LDA.w !Battle_DataBankAbs+10,Y
+    STA.l !Battle_WramLong+10,X
+    LDA.w !Battle_DataBankAbs+12,Y
+    STA.l !Battle_WramLong+12,X
+    LDA.w !Battle_DataBankAbs+14,Y
+    STA.l !Battle_WramLong+14,X
+    LDA.w !Battle_DataBankAbs+16,Y
+    STA.l !Battle_WramLong+16,X
+    LDA.w !Battle_DataBankAbs+18,Y
+    STA.l !Battle_WramLong+18,X
+    LDA.w !Battle_DataBankAbs+20,Y
+    STA.l !Battle_WramLong+20,X
+    LDA.w !Battle_DataBankAbs+22,Y
+    STA.l !Battle_WramLong+22,X
+    LDA.w !Battle_DataBankAbs+24,Y
+    STA.l !Battle_WramLong+24,X
+    LDA.w !Battle_DataBankAbs+26,Y
+    STA.l !Battle_WramLong+26,X
+    LDA.w !Battle_DataBankAbs+28,Y
+    STA.l !Battle_WramLong+28,X
+    LDA.w !Battle_DataBankAbs+30,Y
+    STA.l !Battle_WramLong+30,X
+    TXA
+    CLC
+    ADC.w #!Battle_TileBytes
+    TAX
+    JMP .next_cell
+
+.mirrored:
+    ; Same 32 bytes, each passed through the bit-reverse table. Both
+    ; pointers go to DP so Y can be a byte index with 8-bit X/Y.
+    STY.b !BattleFrame_Entry        ; now the source address
+    STX.b !BattleFrame_DestPtr
+    SEP #$30
+    LDY.b #0
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    LDA.b (!BattleFrame_Entry),Y
+    TAX
+    LDA.l BitReverseTable,X
+    STA.b [!BattleFrame_DestPtr],Y
+    INY
+    REP #$31                        ; A, X/Y 16-bit, carry clear
+    LDA.b !BattleFrame_DestPtr
+    ADC.w #!Battle_TileBytes
+    TAX
+
+.next_cell:
+    INC.b !BattleFrame_MapPtr
+    INC.b !BattleFrame_MapPtr
+    TDC
+    SEP #$20
+    DEC.b !BattleFrame_ColsLeft
+    BEQ .row_done
+    JMP .cell
+.row_done:
+    DEC.b !BattleFrame_RowsLeft
+    BEQ .tiles_done
+    LDA.b !BattleFrame_Width
+    STA.b !BattleFrame_ColsLeft
+    JMP .row
+
+.tiles_done:
+    PLB                             ; DB = $7E again
+    ; MapPtr now points past the tilemap: copy the signed bytes that
+    ; follow into the slot's !Battler_FrameExtra words.
+    LDA.w !Battle_FrameSlot
+    TAX
+    LDA.w !Battler_FrameLayout,X
+    TAX
+    LDA.l !BattleRom_FrameExtraCount,X
+    TAX
+    STX.b !BattleFrame_ColsLeft     ; 16-bit count
+    LDX.b !BattleFrame_Slot
+    LDA.l !BattleRom_SlotTimes16,X
+    STA.b !BattleFrame_RowPtr
+    LDA.l !BattleRom_SlotTimes16+1,X
+    STA.b !BattleFrame_RowPtr+1
+    LDX.b !BattleFrame_RowPtr
+    LDY.w #0
+.extra:
+    LDA.b [!BattleFrame_MapPtr],Y
+    STA.w !Battler_FrameExtra,X
+    BMI .negative
+    TDC
+    BRA .store_high
+.negative:
+    LDA.b #!Battle_SignExtendNeg
+.store_high:
+    STA.w !Battler_FrameExtra+1,X
+    INX
+    INX
+    INY
+    CPY.b !BattleFrame_ColsLeft
+    BNE .extra
+    INC.w !Battle_FramesDecoded
     RTS
 
 ; ==================================================================
@@ -3019,11 +3595,11 @@ BattleMenu_DrawCursorSprites:
 ; BattleMenu_ProcessInput ($C11153–$C111E0, 142 bytes)
 ; ==================================================================
 ; Battle command-window input handler. Its three callers (JSR from
-; BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick and the not
-; yet matched routine at $C1:106E, at $C1:10D4) each call it only on frames where !BattleMenu_Dirty is set
-; (they clear the flag and run the menu chain). Reads the pad-edge
-; bytes (!Battle_PadEdgeButtons / !Battle_PadEdgeDpad, pressed this
-; frame) and dispatches:
+; BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick and
+; BattleSys_UpkeepTwoFrames at $C1:10D4) each call it only on frames
+; where !BattleMenu_Dirty is set (they clear the flag and run the menu
+; chain). Reads the pad-edge bytes (!Battle_PadEdgeButtons /
+; !Battle_PadEdgeDpad, pressed this frame) and dispatches:
 ;   - no PC shown (!BattleMenu_ActivePc < 0) → Battle_ClearPadEdges;
 ;     target selection running → BattleMenu_TargetSelectInput
 ;   - !BattleMenu_Submenu 1 / 2 → tech / item list input (with
@@ -5155,6 +5731,2724 @@ BattleTgt_AnyCandidate:
     RTS
 
 ; ==================================================================
+; Battler boxes and collision tests ($C1:283D–$C1:2985)
+; ==================================================================
+; Each battler has a probe position (!Battler_ProbeX/Y, a copy of its
+; screen position) and a box around it: probe x +/- !Battler_HalfWidth,
+; from probe y - !Battler_Height down to probe y (+ 8). Movers write a
+; tentative position into the probe, rebuild the box and test it
+; against the screen cell map and against the other battlers' boxes
+; before committing the move (inferred from the callers at $C1:3851 and
+; following, and from BattlePos_PathClear).
+
+; ==================================================================
+; Battle_CacheBattlerCoordsAll ($C1283D–$C12859, 29 bytes)
+; ==================================================================
+; Copies every present battler's screen position into its probe
+; position and rebuilds its box.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice), the
+; unmatched service 0 at $C1:002A and $C1:40C8.
+; Entry: M=1, X=0 (16-bit slot counter), DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; X = 11; A clobbered; Y unchanged
+; Callee: Battle_CalcBattlerBox
+org $C1283D
+Battle_CacheBattlerCoordsAll:
+    TDC
+    TAX                             ; slot 0
+.loop:
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    JSR Battle_CalcBattlerBox
+.next:
+    INX
+    CPX.w #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+; ==================================================================
+; Battle_CalcBattlerBox ($C1285A–$C128AF, 86 bytes)
+; ==================================================================
+; Builds battler X's box from its probe position:
+;   left   = ProbeX - HalfWidth, clamped at 0
+;   right  = ProbeX + HalfWidth, clamped at $FF
+;   top    = ProbeY - Height, clamped at 0
+;   bottom = ProbeY + 8, or ProbeY when !Battle_Unk2989 bit 2 is set
+; A clamp is only tried on the half of the screen where it can be
+; needed (left/top only when the coordinate is below $80, right only
+; when it is $80 or more), which is right as long as the half-width and
+; height stay below $80. The bottom edge is never clamped.
+; Callers (JSR/JMP, scanned as above): Battle_CacheBattlerCoordsAll,
+; BattlePos_PathClear (JSR, and JMP as its tail), and the unmatched
+; movers at $C1:386A, $C1:3925, $C1:39D6, $C1:3B79, $C1:3CEB, $C1:3DFA,
+; $C1:3EF7, $C1:4001, $C1:7C37.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; X = battler slot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X, Y unchanged
+; No calls.
+Battle_CalcBattlerBox:
+    SEC
+    LDA.w !Battler_ProbeX,X
+    BMI .left_right_half
+    SBC.w !Battler_HalfWidth,X
+    BPL .store_left
+    TDC                             ; went below 0: clamp
+    BRA .store_left
+.left_right_half:
+    SBC.w !Battler_HalfWidth,X
+.store_left:
+    STA.w !Battler_BoxLeft,X
+    CLC
+    LDA.w !Battler_ProbeX,X
+    BPL .right_left_half
+    ADC.w !Battler_HalfWidth,X
+    BMI .store_right
+    LDA.b #!Battle_BoxEdgeMax       ; went past $FF: clamp
+    BRA .store_right
+.right_left_half:
+    ADC.w !Battler_HalfWidth,X
+.store_right:
+    STA.w !Battler_BoxRight,X
+    SEC
+    LDA.w !Battler_ProbeY,X
+    BMI .top_lower_half
+    SBC.w !Battler_Height,X
+    BPL .store_top
+    TDC                             ; went below 0: clamp
+    BRA .store_top
+.top_lower_half:
+    SBC.w !Battler_Height,X
+.store_top:
+    STA.w !Battler_BoxTop,X
+    LDA.w !Battle_Unk2989
+    AND.b #!Battle_Unk2989NoBoxPad
+    BEQ .padded_bottom
+    LDA.w !Battler_ProbeY,X
+    STA.w !Battler_BoxBottom,X
+    BRA .exit
+.padded_bottom:
+    CLC
+    LDA.w !Battler_ProbeY,X
+    ADC.b #!Battle_BoxBottomPad
+    STA.w !Battler_BoxBottom,X
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_BoxOverlapsOthers ($C128B0–$C12925, 118 bytes)
+; ==================================================================
+; Tests the box of battler !Battle_BoxTestSlot against the box of every
+; other present battler, skipping those with !Battler_Unk9FF7 or
+; !Battler_UnkA5CD bit 7 set. Edges count as touching (the tests are
+; <= / >=). Stops at the first overlap.
+; Returns A = $80 (N set) when it touches a PC's box, $81 an enemy's,
+; 0 when it touches none; Y = the slot touched (11 when none).
+; The horizontal test is written out twice, once for each order of the
+; two left edges, and each copy repeats the vertical test.
+; Callers (JSR/JMP, scanned as above): BattlePos_PathClear and the
+; unmatched movers at $C1:3888, $C1:3930, $C1:39E1, $C1:3B8B, $C1:3D09,
+; $C1:3E18, $C1:3F15, $C1:400C, plus a JMP (tail call) at $C1:7C3A.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot (16-bit,
+;        CPY compares both bytes) = the battler to test
+; Exit:  M=1, X=0, DP=0, DB=$7E; A and Y as above; X = the tested slot
+; No calls.
+!Battle_BoxTestSlot = !BattleTmp_80       ; 2 B in: battler whose box is tested (also Battle_BoxHitsBlockedCell)
+Battle_BoxOverlapsOthers:
+    TDC
+    TAY                             ; other battler, from slot 0
+    LDX.b !Battle_BoxTestSlot
+.loop:
+    CPY.b !Battle_BoxTestSlot
+    BEQ .next                       ; itself
+    LDA.w !Battler_Present,Y
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,Y
+    BMI .next
+    LDA.w !Battler_UnkA5CD,Y
+    BMI .next
+    LDA.w !Battler_BoxLeft,X
+    CMP.w !Battler_BoxLeft,Y
+    BCC .starts_left_of_it
+    CMP.w !Battler_BoxRight,Y
+    BEQ .x_overlap
+    BCS .next                       ; starts right of its box
+.x_overlap:
+    LDA.w !Battler_BoxTop,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .starts_above_it
+    CMP.w !Battler_BoxBottom,Y
+    BEQ .hit
+    BCC .hit
+    BCS .next                       ; starts below its box
+.starts_above_it:
+    LDA.w !Battler_BoxBottom,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .next                       ; ends above its box
+    BCS .hit
+.starts_left_of_it:
+    LDA.w !Battler_BoxRight,X
+    CMP.w !Battler_BoxLeft,Y
+    BCC .next                       ; ends left of its box
+    LDA.w !Battler_BoxTop,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .starts_above_it_2
+    CMP.w !Battler_BoxBottom,Y
+    BEQ .hit
+    BCC .hit
+    BCS .next
+.starts_above_it_2:
+    LDA.w !Battler_BoxBottom,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .next
+    BCS .hit
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .loop
+    TDC                             ; no overlap
+    BRA .exit
+.hit:
+    LDA.b #!Battle_OverlapPc
+    CPY.w #!Battle_FirstEnemySlot
+    BCC .exit
+    INC A                           ; $81: an enemy
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_BoxHitsBlockedCell ($C12926–$C12985, 96 bytes)
+; ==================================================================
+; Tests whether the box of battler !Battle_BoxTestSlot covers a blocked
+; cell of !Battle_CellMap (16x16-pixel cells, 16 per row). Every cell
+; from (top/16, left/16) to (bottom/16, right/16) is checked; one with
+; bit 6 set blocks, and one with bit 7 set blocks unless
+; !Battle_PassCellBit7 is non-zero.
+; Returns A = $FF (N set) when blocked, 0 when not.
+; The cell index row*16 + col is built in 8-bit A and moved with TAY,
+; which also copies B; the index is right only while B is 0 (as after
+; the callers' TDC; assumed, not traced for every caller).
+; Callers (JSR, scanned as above): BattlePos_PathClear and the unmatched
+; movers at $C1:387C, $C1:392B, $C1:39DC, $C1:3B7F, $C1:3CFD, $C1:3E0C,
+; $C1:3F09, $C1:4007.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as above; X = the tested slot; Y =
+;        last cell index; DP $82-$86 written
+; No calls.
+!Battle_CellRow = !BattleTmp_82           ; 1 B: cell row being scanned (from top / 16)
+!Battle_CellFirstCol = !BattleTmp_83      ; 1 B: left / 16
+!Battle_CellRowEnd = !BattleTmp_84        ; 1 B: bottom / 16 + 1 (exclusive)
+!Battle_CellColEnd = !BattleTmp_85        ; 1 B: right / 16 + 1 (exclusive)
+!Battle_CellColOffset = !BattleTmp_86     ; 1 B: column, counted from FirstCol
+Battle_BoxHitsBlockedCell:
+    LDX.b !Battle_BoxTestSlot
+    LDA.w !Battler_BoxTop,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Battle_CellRow
+    LDA.w !Battler_BoxLeft,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Battle_CellFirstCol
+    LDA.w !Battler_BoxBottom,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    INC A
+    STA.b !Battle_CellRowEnd
+    LDA.w !Battler_BoxRight,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    INC A
+    STA.b !Battle_CellColEnd
+.row:
+    STZ.b !Battle_CellColOffset
+.cell:
+    LDA.b !Battle_CellRow
+    ASL A
+    ASL A
+    ASL A
+    ASL A                           ; row * 16
+    CLC
+    ADC.b !Battle_CellColOffset
+    ADC.b !Battle_CellFirstCol
+    TAY
+    LDA.w !Battle_CellMap,Y
+    AND.b #!Battle_CellBlocked
+    BNE .blocked
+    LDA.w !Battle_PassCellBit7
+    BNE .next_cell
+    LDA.w !Battle_CellMap,Y
+    BMI .blocked                    ; bit 7 blocks too
+.next_cell:
+    INC.b !Battle_CellColOffset
+    CLC
+    LDA.b !Battle_CellColOffset
+    ADC.b !Battle_CellFirstCol
+    CMP.b !Battle_CellColEnd
+    BCC .cell
+    INC.b !Battle_CellRow
+    LDA.b !Battle_CellRow
+    CMP.b !Battle_CellRowEnd
+    BCC .row
+    TDC                             ; nothing blocks
+    BRA .exit
+.blocked:
+    TDC
+    DEC A                           ; $FF
+.exit:
+    RTS
+
+; ==================================================================
+; Position queries: service 5 of the $C10045 API ($C1:2986–$C1:2D9E)
+; ==================================================================
+; BattlePos_Query answers one question about two battlers' positions,
+; chosen by !BattlePos_Mode (table at $C1:2D81):
+;   0/1  nearest / farthest PC          2/3  nearest / farthest enemy
+;   4    within 32 pixels               14   within 48 pixels
+;   5    |dy| <= 32                     6/7  subject above / left of other
+;   8    path to the other is clear     9-12 subject in the lower /
+;   13   distance difference                 upper half, right / left part
+; Results: !BattlePos_Result (0 = holds, $FF = not) and, for 0-3 and 13,
+; !BattlePos_Found. Callers set !BattlePos_Mode, Subject, Other (and
+; Arg) and run service 5 (LDA #5, JSR to $C1:0003 or $C1:0045), e.g. the
+; battle-script code at $C1:9270-$C1:A74A tests Result or Found after
+; it, and Battle_UpdatePcFacing turns the angle to query 2's Found into
+; !Battler_Facing. What the script commands that use the queries
+; stand for is not traced.
+; The distance checks also have entries of their own, used by movers
+; that pass the two slots in X and Y.
+
+; ==================================================================
+; BattlePos_Query ($C12986–$C129B1, 44 bytes)
+; ==================================================================
+; Service 5 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
+; $C10051, entry 5 = $2986; searched: no JSR, JMP or JSL reaches $2986
+; directly). Copies the screen positions of !BattlePos_Subject and
+; !BattlePos_Other into their probe positions, clears
+; !BattlePos_Result and runs the query handler for !BattlePos_Mode.
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher, which saves A,
+;        X and Y around the call); TAX/TAY of the slots also copy B,
+;        assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the handler's DP scratch
+;        clobbered
+; Callees: JSR (BattlePos_ModeTable,X)
+org $C12986
+BattlePos_Query:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battler_ProbeX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battler_ProbeY,Y
+    STZ.w !BattlePos_Result
+    LDA.w !BattlePos_Mode
+    ASL A
+    TAX
+    JSR (BattlePos_ModeTable,X)
+    RTS
+
+; ==================================================================
+; BattlePos_NearestPc / BattlePos_FarthestPc / BattlePos_NearestEnemy /
+; BattlePos_FarthestEnemy ($C129B2–$C12AE2, 305 bytes; queries 0-3)
+; ==================================================================
+; Each scans one side, skipping battlers that are not present, have
+; !Battler_Unk9FF7 bit 7 set or are KO'd (BattlerStats.Status bit 7),
+; measures the squared distance from the subject with
+; BattlePos_WithinDist32 (its Result side effect is left in place: the
+; last battler examined decides !BattlePos_Result) and keeps the best
+; slot in !BattlePos_Found. Ties go to the later slot (the compares keep
+; a new battler when it is at least as near / far). With no candidate,
+; Found is left as it was.
+; Only NearestEnemy skips the subject itself; the PC scans include it
+; when it is a PC (distance 0, so NearestPc then returns the subject).
+; Found is stored 16-bit from the 16-bit slot counter, so $9874 gets 0.
+; Callers: BattlePos_ModeTable entries 0-3 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattlePos_Subject
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattlePos_Other =
+;        last slot examined; DP $77-$78, $80-$87 (and $8A for
+;        NearestEnemy) and $AD-$B0 written
+; Callee: BattlePos_WithinDist32
+!BattlePos_ScanSlot = !BattleTmp_84       ; 2 B: slot being examined (initialised 16-bit, counted 8-bit)
+!BattlePos_BestDist = !BattleTmp_86       ; 2 B: squared distance of the best battler so far
+!BattlePos_SubjectCopy = !BattleTmp_8A    ; 1 B: subject slot (NearestEnemy skips it)
+!BattlePos_DistSq = !BattleTmp_AF         ; 2 B: squared distance left by BattlePos_CheckDist
+BattlePos_NearestPc:
+    TDC
+    TAX
+    STX.b !BattlePos_ScanSlot       ; slot 0
+    DEX
+    STX.b !BattlePos_BestDist       ; $FFFF
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_BestDist
+    CMP.b !BattlePos_DistSq
+    BCC .keep                       ; best is nearer
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .loop
+    RTS
+
+BattlePos_FarthestPc:               ; header: see BattlePos_NearestPc
+    TDC
+    TAX
+    STX.b !BattlePos_ScanSlot       ; slot 0
+    STX.b !BattlePos_BestDist       ; 0
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_DistSq
+    CMP.b !BattlePos_BestDist
+    BCC .keep                       ; best is farther
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .loop
+    RTS
+
+BattlePos_NearestEnemy:             ; header: see BattlePos_NearestPc
+    LDX.w #!BattlePos_NoBest
+    STX.b !BattlePos_BestDist
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattlePos_ScanSlot
+    LDA.w !BattlePos_Subject
+    STA.b !BattlePos_SubjectCopy
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    CMP.b !BattlePos_SubjectCopy
+    BEQ .next                       ; the subject itself
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_BestDist
+    CMP.b !BattlePos_DistSq
+    BCC .keep                       ; best is nearer
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+BattlePos_FarthestEnemy:            ; header: see BattlePos_NearestPc
+    TDC
+    TAX
+    STX.b !BattlePos_BestDist       ; 0
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattlePos_ScanSlot
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_DistSq
+    CMP.b !BattlePos_BestDist
+    BCC .keep                       ; best is farther
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+; ==================================================================
+; BattlePos_WithinDist* ($C12AE3–$C12BBB, 217 bytes; queries 4 and 14)
+; ==================================================================
+; Squared-distance checks between two battlers' probe positions:
+; Result = 0 when dx*dx + dy*dy <= the entry's limit, else $FF; the
+; squared distance is left in !BattlePos_DistSq. Each entry sets
+; !BattlePos_DistLimit and joins BattlePos_CheckDist; the "XY" entries
+; take the two slots in X and Y from the caller, the others load them
+; from !BattlePos_Subject (X) and !BattlePos_Other (Y) in
+; BattlePos_CheckPairDist. The entries: BattlePos_WithinDist40XY,
+; BattlePos_WithinDist32XY, BattlePos_WithinDist64XY,
+; BattlePos_WithinDist4XY, BattlePos_WithinDist4XYTwin,
+; BattlePos_WithinDist16XY, BattlePos_WithinDist48 and
+; BattlePos_WithinDist32 (which falls into BattlePos_CheckPairDist, and
+; that into BattlePos_CheckDist). WithinDist4XY and WithinDist4XYTwin run
+; the same code (same limit, two copies in the ROM, one caller each); the
+; bytes differ only in the BRA displacement to CheckDist ($36 vs $2A).
+; The 16-bit sum of the two squares wraps for points about 256 pixels
+; or more apart (reproduced as found; on-screen distances keep below).
+; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded):
+;   WithinDist40XY      $C1:4A26 (unmatched)
+;   WithinDist32XY      BattlePos_PathClear ($C1:2C5D), $C1:3819 (unmatched)
+;   WithinDist64XY      $C1:3821 (unmatched)
+;   WithinDist4XY       $C1:3829 (unmatched)
+;   WithinDist4XYTwin   $C1:3B38 (unmatched)
+;   WithinDist16XY      $C1:3CBB (unmatched)
+;   WithinDist48        BattlePos_ModeTable entry 14 only
+;   WithinDist32        BattlePos_ModeTable entry 4, and the scans of
+;                       queries 0-3: BattlePos_NearestPc ($C1:29DB),
+;                       BattlePos_FarthestPc ($C1:2A23),
+;                       BattlePos_NearestEnemy ($C1:2A78) and
+;                       BattlePos_FarthestEnemy ($C1:2AC3)
+;   CheckPairDist, CheckDist  only by falling in or BRA from the entries
+; Entry: M=1, X=0, DP=0, DB=$7E; for the XY entries and CheckDist X and
+;        Y = the two battler slots (CheckPairDist and CheckDist also take
+;        !BattlePos_DistLimit as set by the entry)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 or $FF; X = dx*dx (from
+;        Battle_Mul8's product); Y unchanged for the XY entries and
+;        CheckDist, = the slot from !BattlePos_Other for WithinDist32,
+;        WithinDist48 and CheckPairDist; DP $77-$78, $80-$83 and $AD-$B0
+;        written; !BattlePos_DistLimit set
+; Callee: Battle_Mul8 (twice)
+!BattlePos_CoordA = !BattleTmp_80         ; 2 B: first battler's coordinate (zero-extended), then |dy|
+!BattlePos_CoordB = !BattleTmp_82         ; 2 B: second battler's coordinate, then dx*dx
+BattlePos_WithinDist40XY:
+    LDA.b #!BattlePos_DistSq40&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq40>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist32XY:           ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq32&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq32>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist64XY:           ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq64&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq64>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist4XY:            ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq4&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq4>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist4XYTwin:        ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq4&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq4>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist16XY:           ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq16&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq16>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist48:             ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq48&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq48>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckPairDist
+
+BattlePos_WithinDist32:             ; header: see BattlePos_WithinDist40XY
+    LDA.b #!BattlePos_DistSq32&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq32>>8
+    STA.w !BattlePos_DistLimit+1
+BattlePos_CheckPairDist:            ; X = subject, Y = other; header: see BattlePos_WithinDist40XY
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+BattlePos_CheckDist:                ; X, Y = the two battlers; header: see BattlePos_WithinDist40XY
+    LDA.w !Battler_ProbeX,X
+    STA.b !BattlePos_CoordA
+    STZ.b !BattlePos_CoordA+1
+    LDA.w !Battler_ProbeX,Y
+    STA.b !BattlePos_CoordB
+    STZ.b !BattlePos_CoordB+1
+    REP #$20                        ; A -> 16-bit
+    SEC
+    LDA.b !BattlePos_CoordA
+    SBC.b !BattlePos_CoordB
+    BPL .dx_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.dx_positive:
+    STA.b !Battle_Mul8A             ; 16-bit: |dx| to Mul8A, its high byte (0) to Mul8B
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B             ; |dx| * |dx|
+    LDA.w !Battler_ProbeY,X
+    STA.b !BattlePos_CoordA
+    STZ.b !BattlePos_CoordA+1
+    LDA.w !Battler_ProbeY,Y
+    STA.b !BattlePos_CoordB
+    STZ.b !BattlePos_CoordB+1
+    REP #$20                        ; A -> 16-bit
+    SEC
+    LDA.b !BattlePos_CoordA
+    SBC.b !BattlePos_CoordB
+    BPL .dy_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.dy_positive:
+    STA.b !BattlePos_CoordA         ; |dy|
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    JSR Battle_Mul8                 ; dx * dx
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_CoordB
+    LDA.b !BattlePos_CoordA
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                 ; dy * dy
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !BattlePos_CoordB
+    ADC.b !Battle_Mul8Product
+    STA.b !BattlePos_DistSq
+    CMP.w !BattlePos_DistLimit
+    BEQ .within
+    BCC .within
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b #!BattlePos_Fail
+    STA.w !BattlePos_Result
+    RTS
+.within:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    STA.w !BattlePos_Result         ; 0
+    RTS
+
+; ==================================================================
+; BattlePos_SameRowBand / BattlePos_SubjectAbove / BattlePos_SubjectLeft
+; ($C12BBC–$C12C01, 70 bytes; queries 5-7)
+; ==================================================================
+; Compare the subject's and the other battler's screen positions and
+; DEC !BattlePos_Result (0 -> $FF) when the condition fails:
+;   SameRowBand   |y difference| <= $20 (8-bit: a difference of $80 or
+;                 more folds to its 256-complement)
+;   SubjectAbove  subject y < other y
+;   SubjectLeft   subject x < other x
+; Callers: BattlePos_ModeTable entries 5-7 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject, Y = other
+; No calls.
+BattlePos_SameRowBand:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    SEC
+    LDA.w !Battler_ScreenY,X
+    SBC.w !Battler_ScreenY,Y
+    BPL .positive
+    EOR.b #!Battle_Invert8
+    INC A                           ; |dy|
+.positive:
+    CMP.b #!BattlePos_RowBand
+    BEQ .exit
+    BCC .exit
+    DEC.w !BattlePos_Result         ; too far apart
+.exit:
+    RTS
+
+BattlePos_SubjectAbove:             ; header: see BattlePos_SameRowBand
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenY,X
+    CMP.w !Battler_ScreenY,Y
+    BCC .exit
+    DEC.w !BattlePos_Result         ; not above
+.exit:
+    RTS
+
+BattlePos_SubjectLeft:              ; header: see BattlePos_SameRowBand
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenX,X
+    CMP.w !Battler_ScreenX,Y
+    BCC .exit
+    DEC.w !BattlePos_Result         ; not left of it
+.exit:
+    RTS
+
+; ==================================================================
+; BattlePos_PathClear ($C12C02–$C12CA6, 165 bytes; query 8)
+; ==================================================================
+; Places the subject's probe position out from its screen position in
+; the direction Battle_CalcAngle gives from the subject to the other
+; battler, at a radius of !Battle_SinScale (see the quirk below), and
+; after each placement:
+;   - checks the probe with BattlePos_WithinDist32XY; within -> done,
+;     Result 0;
+;   - otherwise clears !Battle_PassCellBit7 and rebuilds the subject's
+;     box: a blocked cell, or (with !BattlePos_Arg non-zero) another
+;     battler's box -> Result $FF; else another pass.
+; At the end the subject's screen position is written back from the
+; copy taken at the start (it was never changed here) and its box is
+; rebuilt (tail JMP to Battle_CalcBattlerBox). That box comes from the
+; probe position, so it is the box at the last probe, not at home.
+; Quirk: at the distance check Y is the subject but X still holds what
+; Battle_SinLookup left (Battle_Mul8x16's first partial product), not
+; the other battler's slot, so the probe is compared with an arbitrary
+; ProbeX/ProbeY,X byte pair. Reproduced as found; the other battler was
+; probably meant.
+; Quirk: the radius does not grow by !Battler_PathStep each pass.
+; !Battle_SinScale is the same byte as !Battle_Mul8B ($AE), and the
+; distance check leaves |dy| of its comparison there (its second
+; Battle_Mul8 squares it), so from the second pass on the radius is
+; PathStep + the previous check's |dy| (8-bit add), not a running sum.
+; Reproduced as found.
+; Callers: BattlePos_ModeTable entry 8 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$8E, $A5-$B0,
+;        $D3-$E3 written (also $77-$78 through the multiplies);
+;        !Battle_PassCellBit7 = 0 if any check failed (unchanged when the
+;        first check is within)
+; Callees: Battle_CalcAngle, Battle_SinLookup, BattlePos_WithinDist32XY,
+;          Battle_CalcBattlerBox, Battle_BoxHitsBlockedCell,
+;          Battle_BoxOverlapsOthers
+!BattlePos_HomeX = !BattleTmp_8A          ; 1 B: subject screen x at the start
+!BattlePos_HomeY = !BattleTmp_8B          ; 1 B: subject screen y at the start
+!BattlePos_StepY = !BattleTmp_8C          ; 1 B: y offset of the probe this pass (sine * radius / 256)
+!BattlePos_StepX = !BattleTmp_8E          ; 1 B: x offset (cosine * radius / 256)
+BattlePos_PathClear:
+    STZ.w !BattlePos_Result
+    STZ.b !Battle_SinScale          ; radius 0
+    LDA.w !BattlePos_Subject
+    TAY
+    LDA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_ScreenX,Y
+    STA.b !BattlePos_HomeX
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !BattlePos_HomeY
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+.step:
+    LDA.w !BattlePos_Subject
+    TAX
+    CLC
+    LDA.w !Battler_PathStep,X
+    ADC.b !Battle_SinScale
+    STA.b !Battle_SinScale          ; radius = step + $AE (|dy| after pass 1, see header)
+    LDA.b !Battle_GeoAngle
+    JSR Battle_SinLookup
+    STA.b !BattlePos_StepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !BattlePos_StepX
+    LDA.w !BattlePos_Subject
+    TAY
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattlePos_StepY
+    STA.w !Battler_ProbeY,Y
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattlePos_StepX
+    STA.w !Battler_ProbeX,Y
+    JSR BattlePos_WithinDist32XY    ; X is stale here (see header)
+    LDA.w !BattlePos_Result
+    BPL .done                       ; within: path clear
+    LDA.w !BattlePos_Subject
+    TAX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !BattlePos_Arg
+    BEQ .free
+    JSR Battle_BoxOverlapsOthers
+    BMI .blocked
+.free:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.b !BattlePos_HomeX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattlePos_HomeY
+    STA.w !Battler_ScreenY,X
+    JMP .step
+.blocked:
+    LDA.b #!BattlePos_Fail
+    STA.w !BattlePos_Result
+.done:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.b !BattlePos_HomeX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattlePos_HomeY
+    STA.w !Battler_ScreenY,X
+    JMP Battle_CalcBattlerBox
+
+; ==================================================================
+; BattlePos_SubjectLowerHalf / BattlePos_SubjectUpperHalf /
+; BattlePos_SubjectRightPart / BattlePos_SubjectLeftPart
+; ($C12CA7–$C12CF2, 76 bytes; queries 9-12)
+; ==================================================================
+; Test the subject's 16-pixel cell (screen position / 16) and DEC
+; !BattlePos_Result (0 -> $FF) when the condition fails:
+;   LowerHalf  y / 16 >= 8          UpperHalf  y / 16 < 8
+;   RightPart  x / 16 >= 11         LeftPart   x / 16 < 5
+; Callers: BattlePos_ModeTable entries 9-12 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject; Y unchanged
+; No calls.
+BattlePos_SubjectLowerHalf:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenY,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_MidRow
+    BCS .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectUpperHalf:         ; header: see BattlePos_SubjectLowerHalf
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenY,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_MidRow
+    BCC .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectRightPart:         ; header: see BattlePos_SubjectLowerHalf
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenX,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_RightCol
+    BCS .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectLeftPart:          ; header: see BattlePos_SubjectLowerHalf
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenX,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_LeftColEnd
+    BCC .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+; ==================================================================
+; BattlePos_DistDifference ($C12CF3–$C12D80, 142 bytes; query 13)
+; ==================================================================
+; Measures, from the other battler's screen position, the squared
+; distance to the subject (d1) and to the battler in !BattlePos_Arg
+; (d2), and stores |d2 - d1| / 256 (low byte) in !BattlePos_Found.
+; Result is left at 0. What the scripts use the value for is not traced.
+; The per-axis differences are 8-bit (a difference of $80 or more folds
+; to its 256-complement), so each is at most $80, each square at most
+; $4000 and d1, d2 at most $8000: the 16-bit sums do not wrap and
+; |d2 - d1| is exact.
+; Callers: BattlePos_ModeTable entry 13 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = d2's dx*dx; Y = Arg;
+;        DP $77-$78, $80-$85 and $AD-$B0 written
+; Callees: Battle_Mul8 (four times), Battle_ShiftRight8 (16-bit)
+!BattlePos_PointX = !BattleTmp_80         ; 1 B: other battler's x; at the end the 16-bit result
+!BattlePos_PointY = !BattleTmp_81         ; 1 B: other battler's y
+!BattlePos_DistSq1 = !BattleTmp_82        ; 2 B: d1 (dx*dx first)
+!BattlePos_DistSq2 = !BattleTmp_84        ; 2 B: dx*dx of d2
+BattlePos_DistDifference:
+    LDA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattlePos_PointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattlePos_PointY
+    LDA.w !BattlePos_Subject
+    TAY
+    SEC
+    LDA.b !BattlePos_PointX
+    SBC.w !Battler_ScreenX,Y
+    BPL .dx1_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dx1_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_DistSq1
+    SEC
+    LDA.b !BattlePos_PointY
+    SBC.w !Battler_ScreenY,Y
+    BPL .dy1_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dy1_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattlePos_DistSq1
+    STA.b !BattlePos_DistSq1        ; d1
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w !BattlePos_Arg
+    TAY
+    SEC
+    LDA.b !BattlePos_PointX
+    SBC.w !Battler_ScreenX,Y
+    BPL .dx2_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dx2_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_DistSq2
+    SEC
+    LDA.b !BattlePos_PointY
+    SBC.w !Battler_ScreenY,Y
+    BPL .dy2_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dy2_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattlePos_DistSq2        ; d2
+    SEC
+    SBC.b !BattlePos_DistSq1
+    BPL .diff_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.diff_positive:
+    JSR Battle_ShiftRight8          ; / 256
+    STA.b !BattlePos_PointX         ; (16-bit)
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b !BattlePos_PointX
+    STA.w !BattlePos_Found
+    RTS
+
+; BattlePos_ModeTable ($C12D81–$C12D9E, 30 bytes): query handlers by
+; !BattlePos_Mode, called from BattlePos_Query.
+BattlePos_ModeTable:
+    dw BattlePos_NearestPc          ; $00
+    dw BattlePos_FarthestPc         ; $01
+    dw BattlePos_NearestEnemy       ; $02
+    dw BattlePos_FarthestEnemy      ; $03
+    dw BattlePos_WithinDist32       ; $04
+    dw BattlePos_SameRowBand        ; $05
+    dw BattlePos_SubjectAbove       ; $06
+    dw BattlePos_SubjectLeft        ; $07
+    dw BattlePos_PathClear          ; $08
+    dw BattlePos_SubjectLowerHalf   ; $09
+    dw BattlePos_SubjectUpperHalf   ; $0A
+    dw BattlePos_SubjectRightPart   ; $0B
+    dw BattlePos_SubjectLeftPart    ; $0C
+    dw BattlePos_DistDifference     ; $0D
+    dw BattlePos_WithinDist48       ; $0E
+
+; ==================================================================
+; PC animation tick ($C1:2D9F–$C1:2F96)
+; ==================================================================
+
+; ==================================================================
+; Battle_TickPcSlots ($C12D9F–$C12F1E, 384 bytes)
+; ==================================================================
+; Per-frame animation step for the three PCs. With !Battle_UnkA4 set it
+; jumps to Battle_TickEnemyGroup instead. Otherwise it
+; visits the PCs in !Battle_TickOrder, starting with the first PC whose
+; frame decode was put off (!Battler_FrameDeferred; 0,1,2 / 1,2,0 /
+; 2,0,1), and for each present PC:
+;   - once a frame has been decoded this pass (!Battle_FramesDecoded =
+;     1), only marks the PC deferred, so it goes first next time
+;     (inferred: one decode per frame);
+;   - counts down !Pc_AnimTimer; at 0 it picks the animation
+;     (Battle_PickStatusAnim, into !Battle_AnimId), updates the facing
+;     (Battle_UpdatePcFacing) and the status effect
+;     (Battle_ApplyPendingEffect). Animation 3 becomes $2B while
+;     !Battle_Unk99CF or !Battle_Unk99D0 is set, restarting the list;
+;   - steps !Battler_AnimFrame through the animation's lists in bank $E4
+;     (!BattleRom_AnimData): the duration list (!Battler_AnimDurBase +
+;     AnimId * 4) and the frame-id list (!Battler_AnimFrameBase +
+;     AnimId * 4 + Facing * FacingStride). A duration of 0 ends the list
+;     and the index goes back to 0 (a list whose first entry is 0 would
+;     loop for ever). The timer is reloaded with duration / 5 (at
+;     least 1);
+;   - decodes the frame (Battle_DrawBattlerFrame) when the animation
+;     changed, or when it is not animation 3, or when animation 3 has a
+;     new facing or belongs to the PC whose menu is shown.
+; Lists, ids and the "facing" reading are inferred from how the values
+; combine; the animation data itself has not been looked at.
+; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$94 and the
+;        callees' scratch written
+; Callees: Battle_TickEnemyGroup (JMP), Battle_PickStatusAnim,
+;          Battle_UpdatePcFacing, Battle_ApplyPendingEffect,
+;          Battle_Mul8x16, Battle_Divide, Battle_DrawBattlerFrame
+!Battle_TickOrderIdx = !BattleTmp_92      ; 2 B: index into !Battle_TickOrder (zeroed 16-bit, counted 8-bit)
+!Battle_TickSlot = !BattleTmp_94          ; 2 B: battler slot being ticked (16-bit; also read by the callees)
+!Battle_TickFacingOffset = !BattleTmp_82  ; 2 B: AnimId * 4, then Facing * FacingStride
+!Battle_FacingChanged = !BattleTmp_80     ; 1 B: set by Battle_UpdatePcFacing when the facing changed
+!Battle_TickUnk84 = !BattleTmp_84         ; 1 B: set to 3 here; Battle_PickStatusAnim sets it again before use
+Battle_TickPcSlots:
+    STZ.w !Battle_FramesDecoded
+    LDA.b !Battle_UnkA4
+    BEQ .order
+    JMP Battle_TickEnemyGroup
+.order:
+    LDA.b #!Battle_AnimDefault
+    STA.b !Battle_TickUnk84         ; (overwritten before it is read)
+    LDA.w !Battler_FrameDeferred
+    BEQ .pc1_deferred
+    STZ.w !Battler_FrameDeferred
+    TDC
+    STA.w !Battle_TickOrder             ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .tick
+.pc1_deferred:
+    LDA.w !Battler_FrameDeferred+1
+    BEQ .pc2_deferred
+    STZ.w !Battler_FrameDeferred+1
+    LDA.b #1
+    STA.w !Battle_TickOrder             ; 1, 2, 0
+    INC A
+    STA.w !Battle_TickOrder+1
+    TDC
+    STA.w !Battle_TickOrder+2
+    BRA .tick
+.pc2_deferred:
+    LDA.w !Battler_FrameDeferred+2
+    BEQ .none_deferred
+    STZ.w !Battler_FrameDeferred+2
+    LDA.b #2
+    STA.w !Battle_TickOrder             ; 2, 0, 1
+    TDC
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .tick
+.none_deferred:
+    TDC
+    STA.w !Battle_TickOrder             ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+.tick:
+    TDC
+    TAX
+    STX.b !Battle_TickOrderIdx
+.loop:
+    LDX.b !Battle_TickOrderIdx
+    LDA.w !Battle_TickOrder,X
+    TAX
+    STX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BNE .present
+    JMP .next
+.present:
+    LDA.w !Battle_FramesDecoded
+    CMP.b #1
+    BNE .count_down
+    INC.w !Battler_FrameDeferred,X  ; a frame was decoded already: go first next time
+    JMP .next
+.count_down:
+    LDX.b !Battle_TickSlot
+    DEC.w !Pc_AnimTimer,X
+    BEQ .step
+    JMP .next
+.step:
+    JSR Battle_PickStatusAnim
+    JSR Battle_UpdatePcFacing
+    JSR Battle_ApplyPendingEffect
+    LDA.w !Battle_AnimId
+    CMP.b #!Battle_AnimDefault
+    BNE .lists
+    LDA.w !Battle_Unk99CF
+    ORA.w !Battle_Unk99D0
+    BEQ .lists
+    LDA.b #!Battle_AnimUnk2B
+    STA.w !Battle_AnimId
+    LDX.b !Battle_TickSlot
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,X
+.lists:
+    LDA.b !Battle_TickSlot
+    ASL A
+    CLC
+    ADC.b !Battle_TickSlot
+    TAX                             ; slot * 3
+    LDA.w !Battler_AnimFrameBase,X
+    STA.w !Battle_AnimFrameList
+    LDA.w !Battler_AnimFrameBase+1,X
+    STA.w !Battle_AnimFrameList+1
+    LDA.w !Battler_AnimDurBase,X
+    STA.w !Battle_AnimDurList
+    LDA.w !Battler_AnimDurBase+1,X
+    STA.w !Battle_AnimDurList+1
+    LDA.w !Battle_AnimId
+    REP #$20                        ; A -> 16-bit
+    ASL A
+    ASL A
+    STA.b !Battle_TickFacingOffset  ; AnimId * 4
+    CLC
+    ADC.w !Battle_AnimDurList
+    STA.w !Battle_AnimDurList
+    CLC
+    LDA.b !Battle_TickFacingOffset
+    ADC.w !Battle_AnimFrameList
+    STA.w !Battle_AnimFrameList
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Facing,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.b !Battle_TickFacingOffset  ; Facing * FacingStride
+    LDA.b !Battle_TickSlot
+    STA.w !Battle_FrameSlot
+    ASL A
+    TAY                             ; (Y is not used below)
+    LDX.b !Battle_TickSlot
+    CLC
+    LDA.w !Battler_AnimFrame,X
+    ADC.b #1
+.set_frame:
+    STA.w !Battler_AnimFrame,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.w !Battle_AnimDurList
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.l !BattleRom_AnimData,X     ; this frame's duration
+    BNE .duration
+    TDC                             ; end of the list: back to frame 0
+    LDX.b !Battle_TickSlot
+    BRA .set_frame
+.duration:
+    LDX.b !Battle_TickSlot
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+    LDA.b #!Battle_AnimTicksDivisor
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    BNE .timer
+    INC A                           ; at least 1
+.timer:
+    STA.w !Pc_AnimTimer,X
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_AnimFrame,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_TickFacingOffset
+    CLC
+    ADC.w !Battle_AnimFrameList
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.l !BattleRom_AnimData,X     ; frame id
+    STA.w !Battle_FrameId
+    LDX.b !Battle_TickSlot
+    LDA.w !Battle_AnimId
+    CMP.w !Battler_AnimShown,X
+    BEQ .same_anim
+    STA.w !Battler_AnimShown,X
+    BRA .draw
+.same_anim:
+    CMP.b #!Battle_AnimDefault
+    BNE .draw
+    LDA.b !Battle_FacingChanged
+    BNE .draw
+    LDA.w !BattleMenu_ActivePc
+    CMP.b !Battle_TickSlot
+    BNE .next                       ; idle, same facing, menu not shown: skip
+.draw:
+    JSR Battle_DrawBattlerFrame
+.next:
+    INC.b !Battle_TickOrderIdx
+    LDA.b !Battle_TickOrderIdx
+    CMP.b #!Battle_NumPcSlots
+    BEQ .exit
+    JMP .loop
+.exit:
+    RTS
+
+; Battle_UnkThunk2F1F ($C12F1F–$C12F21, 3 bytes): a lone JMP to the RTS
+; that ends Battle_TickEnemyGroup ($C1:34A6). Nothing reaches it (searched: no JSR, JMP, JSL, JML or
+; BRL targets $2F1F, and no word table holds it); kept as found.
+; Entry: none (unreached); as written it needs only a return address on
+;        the stack, like the RTS it jumps to
+; Exit:  as Battle_TickEnemyGroup's RTS: no register, flag or memory
+;        changed
+Battle_UnkThunk2F1F:
+    JMP Battle_TickEnemyGroup_exit
+
+; ==================================================================
+; Battle_UpdatePcFacing ($C12F22–$C12F96, 117 bytes)
+; ==================================================================
+; Turns PC !Battle_TickSlot toward its nearest enemy, one PC at a time:
+; !Battle_FacingTurn holds the PC whose turn it is (bit 7 = the turn was
+; handed on and has not been taken yet). A PC that is not the one named
+; hands the turn to itself (sets FacingTurn = slot | $80) if bit 7 is
+; clear, and returns. The PC named clears bit 7 and, unless it is KO'd
+; (BattlerStats.Status bit 7) or BattlerStats.Status2 bit 1 is set, runs
+; position query 2 (nearest enemy, BattlePos_NearestEnemy) through
+; service 5, keeps the enemy in !Pc_FacingTarget, and sets
+; !Battler_Facing from !BattleRom_FacingByAngle[angle to the enemy].
+; Returns !Battle_FacingChanged = 1 when the facing changed, else 0.
+; The turn-passing reading and the meaning of the Status2 bit are inferred
+; or unknown. The BattlerStats offset in !Battle_PickStatsOffset comes
+; from Battle_PickStatusAnim, which runs first.
+; Callers (JSR, scanned as above): Battle_TickPcSlots only.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot, and
+;        !Battle_PickStatsOffset = its BattlerStats offset
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$81 written
+;        (and the query's and Battle_CalcAngle's scratch when it runs)
+; Callees: BattleSys_RunService (service 5), Battle_CalcAngle
+!Battle_FacingTurnSlot = !BattleTmp_81    ; 1 B: !Battle_FacingTurn without bit 7
+!Battle_PickStatsOffset = !BattleTmp_A2   ; 2 B: BattlerStats offset of !Battle_TickSlot (set by Battle_PickStatusAnim)
+Battle_UpdatePcFacing:
+    STZ.b !Battle_FacingChanged
+    LDA.w !Battle_FacingTurn
+    AND.b #!Battle_FacingSlotMask
+    STA.b !Battle_FacingTurnSlot
+    LDA.b !Battle_TickSlot
+    CMP.b !Battle_FacingTurnSlot
+    BEQ .my_turn
+    LDA.w !Battle_FacingTurn
+    BMI .exit                       ; already handed on
+    LDA.b !Battle_TickSlot
+    ORA.b #!Battle_FacingHandedOn
+    STA.w !Battle_FacingTurn
+    BRA .exit
+.my_turn:
+    LDA.b !Battle_FacingTurnSlot
+    STA.w !Battle_FacingTurn        ; take it (bit 7 clear)
+    LDY.b !Battle_PickStatsOffset
+    LDA.w BattlerStats.Status,Y
+    BPL .alive
+    BRA .exit                       ; KO'd
+.alive:
+    LDA.w BattlerStats.Status2,Y
+    AND.b #!Battle_StatusUnk4BNoTurn
+    BNE .exit
+    LDA.b #!BattlePos_QueryNearestEnemy
+    STA.w !BattlePos_Mode
+    LDA.b !Battle_TickSlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunService
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    LDA.w !BattlePos_Found
+    STA.w !Pc_FacingTarget,X
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    STZ.b !Battle_FacingChanged
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_TickSlot
+    CMP.w !Battler_Facing,X
+    BEQ .exit
+    STA.w !Battler_Facing,X
+    INC.b !Battle_FacingChanged
+.exit:
+    RTS
+
+; ==================================================================
+; Status animations and status effects ($C1:2F97–$C1:3233)
+; ==================================================================
+
+; ==================================================================
+; Battle_PickStatusAnim ($C12F97–$C1305B, 197 bytes)
+; ==================================================================
+; Picks the animation and the status effect for battler !Battle_TickSlot
+; from its status bytes:
+;   - default animation 3 (!Battle_AnimDefault), or 0 for an
+;     untargetable battler; effect !Battle_FxNone;
+;   - keeps the battler's BattlerStats offset in !Battle_PickStatsOffset
+;     (Battle_UpdatePcFacing uses it next) and clears DP $80-$81;
+;   - a KO'd battler (Status bit 7), or one with !Battler_UnkA119 set,
+;     gets !Battler_KoFlag = 1 and its animation list restarted;
+;   - walks BattleRom_StatusAnim, 4-byte records (status byte, mask,
+;     effect, animation) ended by a negative status byte. The first
+;     record whose bits are set in the battler's stats wins; the first
+;     record (KO) also wins when !Battler_UnkA119 is set. A record
+;     without an animation of its own ($FF) is skipped while
+;     !BattleMenu_Lock is set, otherwise it gives animation 3. A
+;     non-negative effect goes to !Battler_FxWanted, and a new one
+;     restarts the animation list;
+;   - when no record matches and BattlerStats.Unk2F bit 0 is set (and the
+;     battler is targetable): effect !Battle_FxUnk2F and animation $12.
+; The result goes to !Battle_AnimId. The record table (read from the ROM)
+; maps Status bit 7 to animation 8 and Status2 / the bytes at +$4D, +$4E,
+; +$52, +$53 to effects 2-$0E; what those status bits mean in the game is
+; not established here.
+; Quirk: on the Unk2F path the restart test compares
+; !Battler_FxApplied with $12, the animation id, not the effect $80 just
+; stored. The effects written to FxApplied in bank $C1 are 0-$0E, $80 and
+; $FF, so as far as traced the test never matches and a PC's list restarts
+; on every pick (kept as found; the battle-init writers in bank $CC were
+; not checked).
+; Quirk: the restarts at the top and after a record match store into
+; !Battler_AnimFrame,X for any slot, while the array is 3 bytes long; for
+; enemy slots 8-10 the store lands on !Enemy_AnimTimer+0..2
+; (Battle_TickEnemyGroup). Only the Unk2F path checks for a PC slot.
+; Whether that matters in play is not traced.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): Battle_TickPcSlots,
+; Battle_PickNextStatusAnim.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot = battler slot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$81, $84 and
+;        $A2-$A3 written
+; No calls.
+!Battle_PickAnim = !BattleTmp_84          ; 1 B: animation picked so far
+Battle_PickStatusAnim:
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable
+    BRA .set_default
+.targetable:
+    LDA.b #!Battle_AnimDefault
+.set_default:
+    STA.b !Battle_PickAnim
+    LDA.b #!Battle_FxNone
+    STA.w !Battler_FxWanted,X
+    LDA.b !Battle_TickSlot
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAY
+    STY.b !Battle_PickStatsOffset
+    TDC
+    STA.b !Battle_FacingChanged     ; (16-bit: clears $80 and $81)
+    SEP #$20                        ; A -> 8-bit
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_UnkA119,X
+    BNE .down
+    LDA.w BattlerStats.Status,Y
+    BPL .scan
+.down:
+    LDA.b #1
+    STA.w !Battler_KoFlag,X
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,X      ; (an enemy slot writes past the PC array)
+.scan:
+    TDC
+    TAX                             ; X = record offset
+.record:
+    LDA.l BattleRom_StatusAnim.StatusByte,X
+    BMI .table_end
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_PickStatsOffset
+    TAY
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,Y     ; the record's status byte
+    AND.l BattleRom_StatusAnim.Mask,X
+    BNE .match
+    TXA
+    BNE .next_record
+    LDX.b !Battle_TickSlot          ; first record (KO): Unk A119 forces it
+    LDA.w !Battler_UnkA119,X
+    BEQ .not_forced
+    TDC
+    TAX
+    BRA .match
+.not_forced:
+    TDC
+    TAX
+    BRA .next_record
+.match:
+    LDA.l BattleRom_StatusAnim.Anim,X
+    CMP.b #!Battle_StatusAnimNone
+    BNE .set_anim
+    LDA.w !BattleMenu_Lock
+    BNE .next_record                ; no animation of its own: look further while locked
+    LDA.b #!Battle_AnimDefault
+.set_anim:
+    STA.b !Battle_PickAnim
+    LDY.b !Battle_TickSlot
+    LDA.l BattleRom_StatusAnim.Effect,X
+    BMI .effect_done
+    STA.w !Battler_FxWanted,Y
+    CMP.w !Battler_FxApplied,Y
+    BEQ .effect_done
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,Y      ; (an enemy slot writes past the PC array)
+.effect_done:
+    BRA .use_pick
+.next_record:
+    INX
+    INX
+    INX
+    INX
+    BRA .record
+.table_end:
+    LDY.b !Battle_PickStatsOffset
+    LDA.w BattlerStats.Unk2F,Y
+    AND.b #!Battle_StatsUnk2FBit
+    BEQ .use_pick
+    LDY.b !Battle_TickSlot
+    LDA.w !Battler_Untargetable,Y
+    BNE .use_pick
+    LDA.b #!Battle_FxUnk2F
+    STA.w !Battler_FxWanted,Y
+    LDA.b #!Battle_AnimUnk12
+    CMP.w !Battler_FxApplied,Y      ; quirk: the animation id, not the effect (see header)
+    BEQ .anim_unk12
+    CPY.w #!Battle_NumPcSlots
+    BCS .anim_unk12
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,Y
+.anim_unk12:
+    LDA.b #!Battle_AnimUnk12
+    BRA .store
+.use_pick:
+    LDA.b !Battle_PickAnim
+.store:
+    STA.w !Battle_AnimId
+    RTS
+
+; ==================================================================
+; Battle_PickNextStatusAnim ($C1305C–$C1308B, 48 bytes)
+; ==================================================================
+; Runs Battle_PickStatusAnim for one battler per call, the slot in
+; !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it
+; counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3, so
+; after the first pass only enemies are visited (the PCs are picked by
+; Battle_TickPcSlots). Then runs Battle_ApplyPendingEffect for all 11
+; slots. The animation id the pick leaves in !Battle_AnimId is not used
+; here.
+; Callers (JSR; scanned as above): the unmatched code at $C1:4127, which
+; starts it at slot 0 and calls it until !Battle_StatusAnimWraps is set
+; (inferred: one full pass over every battler).
+; Entry: M=1, X=0, DP=0, DB=$7E; TAX of the slot also copies B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_TickSlot = 11
+;        and the callees' DP scratch written
+; Callees: Battle_PickStatusAnim, Battle_ApplyPendingEffect
+Battle_PickNextStatusAnim:
+    LDA.w !Battle_StatusAnimNext
+    TAX
+    STX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BEQ .advance
+    JSR Battle_PickStatusAnim
+.advance:
+    INC.w !Battle_StatusAnimNext
+    LDA.w !Battle_StatusAnimNext
+    CMP.b #!Battle_NumSlots
+    BNE .apply
+    INC.w !Battle_StatusAnimWraps
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !Battle_StatusAnimNext
+.apply:
+    TDC
+    TAX
+    STX.b !Battle_TickSlot
+.apply_loop:
+    JSR Battle_ApplyPendingEffect
+    INC.b !Battle_TickSlot
+    LDA.b !Battle_TickSlot
+    CMP.b #!Battle_NumSlots
+    BNE .apply_loop
+    RTS
+
+; ==================================================================
+; Battle_ApplyPendingEffect ($C1308C–$C130B5, 42 bytes)
+; ==================================================================
+; For battler !Battle_TickSlot, if present: when the effect picked
+; (!Battler_FxWanted) differs from the one running (!Battler_FxApplied),
+; records it, stops the overlay and the colour cycle, clears
+; !Battler_KoFlag and runs the effect's entry of Battle_FxHandlerTable.
+; A negative effect ($FF none, $80 from the Unk2F path) runs entry 0,
+; Battle_FxReset.
+; Callers (JSR; scanned as above): Battle_TickPcSlots,
+; Battle_PickNextStatusAnim.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot; the TAX of the table
+;        index also copies B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered (and DP $80 by
+;        Battle_FxOverlay2Tint)
+; Callees: JSR (Battle_FxHandlerTable,X)
+Battle_ApplyPendingEffect:
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BEQ .exit
+    LDA.w !Battler_FxWanted,X
+    CMP.w !Battler_FxApplied,X
+    BEQ .exit
+    STA.w !Battler_FxApplied,X
+    STZ.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    STZ.w !Battler_KoFlag,X
+    STZ.w !Battler_FxCycleOn,X
+    LDA.w !Battler_FxWanted,X
+    BPL .run
+    TDC                             ; none / Unk2F: entry 0
+.run:
+    ASL A
+    TAX
+    JSR (Battle_FxHandlerTable,X)
+.exit:
+    RTS
+
+; ==================================================================
+; Status effect handlers ($C1:30B6–$C1:3233)
+; ==================================================================
+; Each handler sets up the visuals of one effect for battler
+; !Battle_TickSlot. Two mechanisms are started here and run elsewhere:
+;   - an overlay (!Battler_FxOverlayOn): frame !Battler_FxOverlayFrame
+;     (0-3, $FF = before the first) steps every !Battler_FxOverlayPeriod
+;     frames (counted in !Battler_FxOverlayTimer), from frame block
+;     !Battler_FxOverlayBase of the table at $CC:F6D4 (code at $CF:EE38);
+;   - a colour cycle (!Battler_FxCycleOn): colours from $CE:0100 by
+;     !Battler_FxCycleStep, written into the battler's live palette
+;     (code at $CF:E7E0).
+; Overlay block n ($10 * n) has its period in !BattleRom_FxOverlayPeriod
+; entry n-1. The "overlay" and "colour cycle" readings come from that
+; code in bank $CF, which is not matched; what each overlay looks like
+; has not been checked.
+; Entry (all): M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot
+; Exit (all):  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered
+
+; Battle_FxReset ($C130B6–$C130E0, 43 bytes)
+; Effect 0 (none): clears the battler's effect flags; for a PC also
+; copies the saved palette (!Battle_PaletteSaved, 26 bytes from
+; !Battler_Palette * 16) back over the live one, undoing a tint or
+; colour cycle.
+; Callers (8 JSR sites): Battle_FxHandlerTable entry 0; the handlers
+;   Battle_FxOverlay2Tint ($C1:30E1), Battle_FxOverlay7 ($C1:3141),
+;   Battle_FxOverlay6 ($C1:3163), Battle_FxColourCycle ($C1:3185),
+;   Battle_FxOverlay3 ($C1:31B0), Battle_FxOverlay4 ($C1:31D2) and
+;   Battle_FxOverlay5 ($C1:31F4); and BattleSys_VictoryPose ($C1:3582).
+; The ×16 shift runs on an 8-bit A; the TAY also copies B, assumed 0.
+Battle_FxReset:
+    LDX.b !Battle_TickSlot
+    STZ.w !Battler_UnkA483,X
+    STZ.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_UnkA457,X
+    STZ.w !Battler_FxCycleOn,X
+    STZ.w !Battler_FxTinted,X
+    CPX.w #!Battle_NumPcSlots
+    BCS .exit
+    LDA.w !Battler_Palette,X
+    JSR Battle_ShiftLeft4
+    TAY
+    LDX.w #!Battle_PaletteCopyLen
+.copy:
+    LDA.w !Battle_PaletteSaved,Y
+    STA.w !Battle_PaletteLive,Y
+    INY
+    DEX
+    BNE .copy
+.exit:
+    RTS
+
+; Battle_FxOverlay2Tint ($C130E1–$C13140, 96 bytes)
+; Effect 3: resets, starts overlay 2 and marks the battler tinted
+; (!Battler_FxTinted); for a PC also restores the saved palette from
+; byte 2 on (24 bytes) and then writes the 4 bytes at
+; !BattleRom_FxTintColours into live palette bytes 6-9 (inferred: two
+; colours).
+; Callers: Battle_FxHandlerTable entry 3.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; for a PC, Y clobbered
+;        and DP $80-$81 written (!Battle_FxPalOffset)
+!Battle_FxPalOffset = !BattleTmp_80       ; 2 B: !Battler_Palette * 16
+Battle_FxOverlay2Tint:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*2
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+1
+    STA.w !Battler_FxOverlayPeriod,X
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxTinted,X
+    CPX.w #!Battle_NumPcSlots
+    BCS .exit
+    LDA.w !Battler_Palette,X
+    JSR Battle_ShiftLeft4
+    TAY
+    STY.b !Battle_FxPalOffset
+    LDX.w #!Battle_PaletteTintCopyLen
+.copy:
+    LDA.w !Battle_PaletteSaved+2,Y
+    STA.w !Battle_PaletteLive+2,Y
+    INY
+    DEX
+    BNE .copy
+    LDY.b !Battle_FxPalOffset
+    LDA.l !BattleRom_FxTintColours
+    STA.w !Battle_PaletteLive+6,Y
+    LDA.l !BattleRom_FxTintColours+1
+    STA.w !Battle_PaletteLive+7,Y
+    LDA.l !BattleRom_FxTintColours+2
+    STA.w !Battle_PaletteLive+8,Y
+    LDA.l !BattleRom_FxTintColours+3
+    STA.w !Battle_PaletteLive+9,Y
+.exit:
+    RTS
+
+; Battle_FxOverlay7 ($C13141–$C13162, 34 bytes)
+; Effect $0E: resets and starts overlay 7.
+; Callers: Battle_FxHandlerTable entry $0E.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxOverlay7:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*7
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+6
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay6 ($C13163–$C13184, 34 bytes)
+; Effect 9: resets and starts overlay 6.
+; Callers: Battle_FxHandlerTable entry 9.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxOverlay6:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*6
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+5
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxColourCycle ($C13185–$C13190, 12 bytes)
+; Effects 6, 7, $0B, $0C and $0D: resets and starts the colour cycle
+; from step 0.
+; Callers: Battle_FxHandlerTable entries 6, 7, $0B, $0C, $0D.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxColourCycle:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxCycleOn,X
+    STZ.w !Battler_FxCycleStep,X
+    RTS
+
+; Battle_FxOverlay1 ($C13191–$C131AF, 31 bytes)
+; Effects 1, 2 and $0A: starts overlay 1. Unlike every other handler
+; it does not run Battle_FxReset first, so the previous effect's tint
+; (palette bytes and !Battler_FxTinted) and the Unk A457/A483 flags
+; stay as they were (kept as found; whether that shows in play is not
+; traced).
+; Callers: Battle_FxHandlerTable entries 1, 2, $0A.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        unchanged
+Battle_FxOverlay1:
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*1
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay3 ($C131B0–$C131D1, 34 bytes)
+; Effect 4: resets and starts overlay 3.
+; Callers: Battle_FxHandlerTable entry 4.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxOverlay3:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*3
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+2
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay4 ($C131D2–$C131F3, 34 bytes)
+; Effect 5: resets and starts overlay 4.
+; Callers: Battle_FxHandlerTable entry 5.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxOverlay4:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*4
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+3
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay5 ($C131F4–$C13215, 34 bytes)
+; Effect 8: resets and starts overlay 5.
+; Callers: Battle_FxHandlerTable entry 8.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
+Battle_FxOverlay5:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*5
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+4
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxHandlerTable ($C13216–$C13233, 30 bytes)
+; One handler per status effect id 0-$0E, called from
+; Battle_ApplyPendingEffect.
+Battle_FxHandlerTable:
+    dw Battle_FxReset               ; $00 none
+    dw Battle_FxOverlay1            ; $01
+    dw Battle_FxOverlay1            ; $02
+    dw Battle_FxOverlay2Tint        ; $03
+    dw Battle_FxOverlay3            ; $04
+    dw Battle_FxOverlay4            ; $05
+    dw Battle_FxColourCycle         ; $06
+    dw Battle_FxColourCycle         ; $07
+    dw Battle_FxOverlay5            ; $08
+    dw Battle_FxOverlay6            ; $09
+    dw Battle_FxOverlay1            ; $0A
+    dw Battle_FxColourCycle         ; $0B
+    dw Battle_FxColourCycle         ; $0C
+    dw Battle_FxColourCycle         ; $0D
+    dw Battle_FxOverlay7            ; $0E
+
+; ==================================================================
+; Enemy animation tick ($C1:3234–$C1:34DA)
+; ==================================================================
+
+; ==================================================================
+; Battle_TickEnemyGroup ($C13234–$C134A6, 627 bytes)
+; ==================================================================
+; The enemy counterpart of Battle_TickPcSlots, which jumps here instead
+; of ticking the PCs while !Battle_UnkA4 is 1-3 (A = that value). Value
+; n picks a group of enemies: 1 = enemies 0-2, 2 = enemies 3-5, 3 =
+; enemies 6-7. The group's members go into !Battle_TickOrder, starting
+; with the first whose frame decode was put off (!Battler_FrameDeferred
+; of slot 3 + enemy; $FF fills the unused third entry of group 3). For
+; each present enemy:
+;   - when !Enemy_AnimWanted or the facing (!Battler_Facing) changed,
+;     reloads its lists: from the battler's long pointers
+;     !Battler_AnimDurBase / !Battler_AnimFrameBase it copies 8 frame
+;     ids (offset list * 4 + Facing * FacingStride) into
+;     !Enemy_AnimFrames and 8 durations (offset list * 4), each turned
+;     into frames by !BattleRom_Div5, into !Enemy_AnimTicks. The list is
+;     picked by !BattleRom_EnemyAnimKind[animation]: kind 0 = list 3,
+;     kind 1 = list 1 (and clears !Enemy_Unk9829), other kinds = list 6;
+;   - counts down !Enemy_AnimTimer; at 0 it shows the current frame
+;     (Battle_DrawBattlerFrame, layouts 0-2 only), moves
+;     !Enemy_AnimFrame on (wrapping at 4, or to 0 at a 0 tick count) and
+;     reloads the timer from the new entry's ticks. When a frame was
+;     already decoded this pass (!Battle_FramesDecoded) the step is put
+;     off instead: the enemy is marked deferred and its timer set back
+;     to 1. With exactly one decode done and frame layout 0, slots 4
+;     and 6-10 still draw and slots 3 and 5 wait; why is not known.
+; Finally !Battle_UnkA4, decremented on the way in, is incremented again
+; when it differs from !Battle_Unk993B (the copy
+; BattleSys_UpkeepTwoFrames took before the tick) and is below 3; as the
+; code stands the two cancel, so the group is not advanced here (what
+; else writes $A4 is not traced).
+; Quirks, kept as found: the lists are copied 8 entries long, but the
+; frame index wraps at 4, so entries 4-7 are never shown by this
+; routine; durations 0-4 become 0 ticks through the /5 table, which here
+; ends the list (the PC tick only ends at a 0 byte and keeps 1 as the
+; minimum); group 3 ends with a JMP to the very next instruction.
+; "Group" and the enemy reading come from the index arithmetic
+; (slot = enemy + 3, 3-byte pointer arrays indexed at +9); the meaning of
+; the list numbers and of the kind table is not established.
+; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): Battle_TickPcSlots only. The
+; final RTS (.exit) is also the target of Battle_UnkThunk2F1F.
+; Entry: M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkA4
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$86, $9C and
+;        $C0-$C5 written, plus the callees' scratch
+; Callees: Battle_Mul8x16, Battle_ShiftLeft3, Battle_DrawBattlerFrame
+!Battle_EnemyIdx = !BattleTmp_9C          ; 2 B: enemy being ticked (0-7; slot = enemy + 3)
+!Battle_EnemyFrameSrc = !BattleTmp_C0     ; 3 B: long pointer to the enemy's frame-id lists
+!Battle_EnemyTicksSrc = !BattleTmp_C3     ; 3 B: long pointer to its duration lists
+!Battle_EnemyListOfs = !BattleTmp_86      ; 1 B: list number * 4 (offset of the duration list)
+!Battle_EnemyFrameOfs = !BattleTmp_82     ; 2 B: list number * 4 + Facing * FacingStride
+!Battle_EnemyCopyLeft = !BattleTmp_80     ; 1 B: entries left to copy
+!Battle_EnemyListBase = !BattleTmp_80     ; 1 B: enemy * 8, its block in !Enemy_AnimTicks/Frames
+!Battle_EnemyCopyDest = !BattleTmp_84     ; 2 B: index into !Enemy_AnimTicks being written
+Battle_TickEnemyGroup:
+    STZ.w !Battle_EnemyTickIdx
+    DEC A
+    BNE .not_group1
+    DEC.b !Battle_UnkA4
+    JMP .group1
+.not_group1:
+    DEC A
+    BNE .not_group2
+    DEC.b !Battle_UnkA4
+    JMP .group2
+.not_group2:
+    DEC A
+    BNE .no_group
+    DEC.b !Battle_UnkA4
+    JMP .group3
+.no_group:
+    JMP .exit
+.group1:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot
+    BEQ .g1_enemy1
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot
+    TDC
+    STA.w !Battle_TickOrder         ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_enemy1:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+1
+    BEQ .g1_enemy2
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+1
+    LDA.b #1
+    STA.w !Battle_TickOrder         ; 1, 2, 0
+    INC A
+    STA.w !Battle_TickOrder+1
+    TDC
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_enemy2:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+2
+    BEQ .g1_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+2
+    LDA.b #2
+    STA.w !Battle_TickOrder         ; 2, 0, 1
+    TDC
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_none:
+    TDC
+    STA.w !Battle_TickOrder         ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+.g1_done:
+    JMP .tick
+.group2:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+3
+    BEQ .g2_enemy4
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+3
+    LDA.b #3
+    STA.w !Battle_TickOrder         ; 3, 4, 5
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_enemy4:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+4
+    BEQ .g2_enemy5
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+4
+    LDA.b #4
+    STA.w !Battle_TickOrder         ; 4, 5, 3
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #3
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_enemy5:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+5
+    BEQ .g2_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+5
+    LDA.b #5
+    STA.w !Battle_TickOrder         ; 5, 3, 4
+    LDA.b #3
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_none:
+    LDA.b #3
+    STA.w !Battle_TickOrder         ; 3, 4, 5
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+.g2_done:
+    JMP .tick
+.group3:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+6
+    BEQ .g3_enemy7
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+6
+    LDA.b #6
+    STA.w !Battle_TickOrder         ; 6, 7, none
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+    BRA .g3_done
+.g3_enemy7:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+7
+    BEQ .g3_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+7
+    LDA.b #7
+    STA.w !Battle_TickOrder         ; 7, 6, none
+    DEC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+    BRA .g3_done
+.g3_none:
+    LDA.b #6
+    STA.w !Battle_TickOrder         ; 6, 7, none
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+.g3_done:
+    JMP .tick                       ; quirk: the next instruction
+.tick:
+    LDA.w !Battle_EnemyTickIdx
+    TAX
+    LDA.w !Battle_TickOrder,X
+    BMI .skip
+    TAX
+    STX.b !Battle_EnemyIdx
+    LDA.w !Battler_Present+!Battle_FirstEnemySlot,X
+    BNE .present
+.skip:
+    JMP .next
+.present:
+    LDA.w !Enemy_Anim,X
+    CMP.w !Enemy_AnimWanted,X
+    BNE .reload
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    CMP.w !Enemy_FacingShown,X
+    BNE .reload
+    JMP .count_down
+.reload:
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_Anim,X
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_FacingShown,X
+    TXA
+    ASL A
+    CLC
+    ADC.b !Battle_EnemyIdx
+    TAX                             ; enemy * 3 (+9 below: its slot's pointers)
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3),X
+    STA.b !Battle_EnemyTicksSrc
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3)+1,X
+    STA.b !Battle_EnemyTicksSrc+1
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3)+2,X
+    STA.b !Battle_EnemyTicksSrc+2
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3),X
+    STA.b !Battle_EnemyFrameSrc
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3)+1,X
+    STA.b !Battle_EnemyFrameSrc+1
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3)+2,X
+    STA.b !Battle_EnemyFrameSrc+2
+    LDX.b !Battle_EnemyIdx
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    LDX.b !Battle_EnemyIdx
+    LDA.w !Enemy_Anim,X
+    TAX
+    LDA.l !BattleRom_EnemyAnimKind,X
+    BNE .kind_not0
+    LDA.b #!Battle_AnimDefault*4    ; kind 0: list 3
+    BRA .set_list
+.kind_not0:
+    DEC A
+    BNE .kind_other
+    LDX.b !Battle_EnemyIdx
+    STZ.w !Enemy_Unk9829,X
+    LDA.b #!Battle_EnemyListKind1*4 ; kind 1: list 1
+    BRA .set_list
+.kind_other:
+    LDA.b #!Battle_EnemyListOther*4 ; other kinds: list 6
+.set_list:
+    STA.b !Battle_EnemyListOfs
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_MulProduct
+    STA.b !Battle_EnemyFrameOfs
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b #!Battle_EnemyAnimListLen
+    STA.b !Battle_EnemyCopyLeft
+    LDX.b !Battle_EnemyIdx
+    LDA.l !BattleRom_EnemyListOffset,X
+    TAX
+    PHX
+    LDY.b !Battle_EnemyFrameOfs
+.copy_frames:
+    LDA.b [!Battle_EnemyFrameSrc],Y
+    STA.w !Enemy_AnimFrames,X
+    INY
+    INX
+    DEC.b !Battle_EnemyCopyLeft
+    BNE .copy_frames
+    LDA.b #!Battle_EnemyAnimListLen
+    STA.b !Battle_EnemyCopyLeft
+    PLX
+    STX.b !Battle_EnemyCopyDest
+    LDA.b !Battle_EnemyListOfs
+    TAY
+.copy_ticks:
+    LDA.b [!Battle_EnemyTicksSrc],Y
+    TAX
+    LDA.l !BattleRom_Div5,X         ; duration byte -> frames
+    LDX.b !Battle_EnemyCopyDest
+    STA.w !Enemy_AnimTicks,X
+    INY
+    INC.b !Battle_EnemyCopyDest
+    DEC.b !Battle_EnemyCopyLeft
+    BNE .copy_ticks
+.count_down:
+    LDX.b !Battle_EnemyIdx
+    DEC.w !Enemy_AnimTimer,X
+    BNE .next
+    LDA.b !Battle_EnemyIdx
+    JSR Battle_ShiftLeft3
+    STA.b !Battle_EnemyListBase
+    CLC
+    ADC.w !Enemy_AnimFrame,X
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+    BNE .frame
+    STZ.w !Enemy_AnimFrame,X        ; end of the list: back to entry 0
+    LDA.b !Battle_EnemyListBase
+    TAY
+.frame:
+    LDA.w !Enemy_AnimFrames,Y
+    STA.w !Battle_FrameId
+    CLC
+    LDA.b !Battle_EnemyIdx
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !Battle_FrameSlot
+    TAX                             ; X = battler slot
+    LDA.w !Battle_FramesDecoded
+    BEQ .draw
+    DEC A
+    BNE .defer
+    LDA.w !Battler_FrameLayout,X
+    BNE .defer
+    LDA.w !Battle_FrameSlot
+    CMP.b #!Battle_FirstEnemySlot+1
+    BEQ .draw                       ; slot 4
+    CMP.b #!Battle_FirstEnemySlot+3
+    BCS .draw                       ; slots 6-10
+.defer:
+    INC.w !Battler_FrameDeferred,X
+    LDX.b !Battle_EnemyIdx
+    INC.w !Enemy_AnimTimer,X        ; try again next time
+    BRA .next
+.draw:
+    LDA.w !Battler_FrameLayout,X
+    CMP.b #!Battle_FrameLayoutStrip
+    BCS .advance
+    JSR Battle_DrawBattlerFrame
+.advance:
+    LDX.b !Battle_EnemyIdx
+    INC.w !Enemy_AnimFrame,X
+    LDA.w !Enemy_AnimFrame,X
+    CMP.b #!Battle_EnemyAnimFrames
+    BNE .in_range
+    STZ.w !Enemy_AnimFrame,X
+.in_range:
+    LDA.b !Battle_EnemyIdx
+    JSR Battle_ShiftLeft3
+    STA.b !Battle_EnemyListBase
+    CLC
+    ADC.w !Enemy_AnimFrame,X
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+    BNE .set_timer
+    STZ.w !Enemy_AnimFrame,X
+    LDA.b !Battle_EnemyListBase
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+.set_timer:
+    STA.w !Enemy_AnimTimer,X
+.next:
+    INC.w !Battle_EnemyTickIdx
+    LDA.w !Battle_EnemyTickIdx
+    CMP.b #!Battle_EnemyGroupSize
+    BEQ .group_done
+    JMP .tick
+.group_done:
+    LDA.b !Battle_UnkA4
+    CMP.w !Battle_Unk993B
+    BEQ .exit
+    CMP.b #!Battle_EnemyGroupLast
+    BCS .exit
+    INC.b !Battle_UnkA4             ; (undoes the DEC above; see header)
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_DrawAllBattlerFrames ($C134A7–$C134DA, 52 bytes)
+; ==================================================================
+; Draws the starting frame (!Battler_StartFrame) of every present
+; battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets
+; the three PC animation timers to 1, 2 and 3 so the PCs take their first
+; steps on different frames (inferred from Battle_TickPcSlots, which
+; counts them down).
+; !Pc_AnimTimer serves as the loop counter (16-bit store, 8-bit count)
+; before it gets those values.
+; Callers (JSR; scanned as above): the battle set-up of service 0 at
+; $C1:0031 only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3; X, Y and the decoder's scratch
+;        clobbered
+; Callees: Battle_DrawBattlerFrameAnyLayout
+Battle_DrawAllBattlerFrames:
+    TDC
+    TAX
+    STX.w !Pc_AnimTimer             ; loop counter (slot)
+.loop:
+    LDX.w !Pc_AnimTimer
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Pc_AnimTimer
+    STA.w !Battle_FrameSlot
+    LDA.w !Battler_StartFrame,X
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrameAnyLayout
+.next:
+    INC.w !Pc_AnimTimer
+    LDA.w !Pc_AnimTimer
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    LDA.b #1
+    STA.w !Pc_AnimTimer             ; PC timers 1, 2, 3
+    INC A
+    STA.w !Pc_AnimTimer+1
+    INC A
+    STA.w !Pc_AnimTimer+2
+    RTS
+
+; ==================================================================
+; PC poses: battle start, services 8 and 9 ($C1:34DB–$C1:3713)
+; ==================================================================
+; A pose plays one animation list on all three PCs for 64 frames
+; (Battle_RunPcPose). Each PC's list is chosen by !Pc_PoseListOfs, an
+; offset (animation * 4) into its lists in bank $E4, the same layout
+; Battle_TickPcSlots steps through.
+
+; ==================================================================
+; Battle_StartPose ($C134DB–$C1350E, 52 bytes)
+; ==================================================================
+; The last step of the battle set-up (service 0, which JMPs here): turns
+; every PC toward its nearest enemy, then plays animation $0C on the
+; targetable PCs (animation 0 on the others) through Battle_RunPcPose,
+; with !Battle_PoseUnk5DDD set and KO'd PCs left out. That this is the
+; PCs' entry into battle is inferred from where it runs.
+; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): service 0 at $C1:0042 only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  as Battle_RunPcPose
+; Callees: Battle_FaceAllPcsNearestEnemy, Battle_RunPcPose (JMP)
+Battle_StartPose:
+    JSR Battle_FaceAllPcsNearestEnemy
+    LDX.w #!Battle_LastPcSlot
+    LDY.w #!Battle_LastPcSlot*2
+.slot:
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+    BRA .next
+.targetable:
+    LDA.b #!Battle_AnimUnk0C*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+.next:
+    DEY
+    DEY
+    DEX
+    BPL .slot
+    LDA.b #1
+    STA.w !Battle_PoseUnk5DDD
+    STZ.w !Battle_PoseIncludeKo
+    JMP Battle_RunPcPose
+
+; ==================================================================
+; Battle_FaceAllPcsNearestEnemy ($C1350F–$C1354C, 62 bytes)
+; ==================================================================
+; Sets !Battler_Facing of PCs 2, 1, 0 from the angle to each one's
+; nearest enemy (position query 2 through service 5, as in
+; Battle_UpdatePcFacing, but for every PC at once and without the
+; presence, KO, Status2 and turn checks, and without updating
+; !Pc_FacingTarget). The query mode is set once; the value 2 also serves
+; as the first PC slot of the loop. Assumes the query leaves
+; !BattlePos_Mode alone (it is not written by BattlePos_Query).
+; Callers (JSR; scanned as above): Battle_StartPose only.
+; Entry: M=1, X=0, DP=0, DB=$7E; the TAX of the found enemy and of the
+;        angle also copy B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_TickSlot =
+;        low byte $FF, and the query's and Battle_CalcAngle's
+;        scratch written
+; Callees: BattleSys_RunService (service 5), Battle_CalcAngle
+Battle_FaceAllPcsNearestEnemy:
+    LDA.b #!BattlePos_QueryNearestEnemy
+    STA.w !BattlePos_Mode
+    TAX                             ; 2: also the last PC slot
+    STX.b !Battle_TickSlot
+.slot:
+    LDA.b !Battle_TickSlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunService
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    LDA.w !BattlePos_Found
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_TickSlot
+    STA.w !Battler_Facing,X
+    DEC.b !Battle_TickSlot
+    BPL .slot
+    RTS
+
+; ==================================================================
+; BattleSys_DefeatPose ($C1354D–$C1356C, 32 bytes)
+; ==================================================================
+; Service 9 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
+; $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D directly).
+; Ticks the frame service, counts !Battle_UnkA0FE up, waits a frame and
+; plays animation 8 on all three PCs, KO'd ones included
+; (!Battle_PoseIncludeKo). Animation 8 is the one BattleRom_StatusAnim
+; gives a KO'd battler; the "defeat" reading is inferred from that and
+; from the caller (the unmatched code at $C1:815F, which first runs
+; service 3 eight times with !Battle_UnkA10E set).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher, which saves A,
+;        X and Y around the call)
+; Exit:  as Battle_RunPcPose
+; Callees: BattleSys_FrameTickVec, BattleSys_PumpFrames,
+;          Battle_RunPcPose (BRA)
+BattleSys_DefeatPose:
+    JSL BattleSys_FrameTickVec
+    INC.w !Battle_UnkA0FE
+    JSR BattleSys_PumpFrames
+    LDX.w #!Battle_AnimDown*4
+    STX.w !Pc_PoseListOfs           ; all three PCs
+    STX.w !Pc_PoseListOfs+2
+    STX.w !Pc_PoseListOfs+4
+    STZ.w !Battle_PoseUnk5DDD
+    LDA.b #1
+    STA.w !Battle_PoseIncludeKo
+    BRA Battle_RunPcPose
+
+; ==================================================================
+; BattleSys_VictoryPose ($C1356D–$C135DC, 112 bytes)
+; ==================================================================
+; Service 8 of the same-bank $C10045 service dispatcher (reached only
+; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
+; $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D directly).
+; Ticks the frame service, counts !Battle_UnkA0FE up, clears
+; !Enemy_Unk98A7, stops the PCs' status effects (Battle_FxReset), takes
+; the three PCs out of the ready queue one per frame, closes the menu
+; (!BattleMenu_ActivePc = none, BattleMenu_UpdateWindows), and then,
+; unless !Battle_Unk2989 bit 0 is set, plays animation $0A on the
+; targetable PCs (0 on the others; KO'd PCs left out), falling into
+; Battle_RunPcPose. The "victory" reading is inferred from the caller
+; (the unmatched code at $C1:8186 runs it when all 8 bytes at $AF02 are
+; $FF, presumably no enemy left).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher)
+; Exit:  as Battle_RunPcPose, or after the menu update when bit 0 of
+;        !Battle_Unk2989 is set
+; Callees: BattleSys_FrameTickVec, Battle_FxReset,
+;          BattleMenu_RemoveBattlerFromReady, BattleSys_PumpFrames,
+;          BattleMenu_UpdateWindows, Battle_RunPcPose (falls through)
+BattleSys_VictoryPose:
+    JSL BattleSys_FrameTickVec
+    INC.w !Battle_UnkA0FE
+    LDX.w #!Battle_LastSlot-!Battle_FirstEnemySlot
+.clear:
+    STZ.w !Enemy_Unk98A7,X
+    DEX
+    BPL .clear
+    LDX.w #!Battle_LastPcSlot
+    STX.b !Battle_TickSlot
+.reset_fx:
+    JSR Battle_FxReset
+    DEC.b !Battle_TickSlot
+    BPL .reset_fx
+    STZ.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    INC.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    INC.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_ActivePc
+    JSR BattleMenu_UpdateWindows
+    LDA.w !Battle_Unk2989
+    AND.b #!Battle_Unk2989NoEndPose
+    BEQ .pose
+    RTS
+.pose:
+    LDX.w #!Battle_LastPcSlot
+    LDY.w #!Battle_LastPcSlot*2
+.slot:
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+    BRA .next
+.targetable:
+    LDA.b #!Battle_AnimUnk0A*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+.next:
+    DEY
+    DEY
+    DEX
+    BPL .slot
+    STZ.w !Battle_PoseUnk5DDD
+    STZ.w !Battle_PoseIncludeKo
+    ; falls through into Battle_RunPcPose
+
+; ==================================================================
+; Battle_RunPcPose ($C135DD–$C13699, 189 bytes)
+; ==================================================================
+; Copies, for each present PC, the first 8 entries of its pose list into
+; !Pc_PoseTicks (durations, halved) and !Pc_PoseFrames (frame ids, for
+; its current facing): the lists come from bank $E4 at
+; !Battler_AnimDurBase / !Battler_AnimFrameBase + !Pc_PoseListOfs (+
+; Facing * FacingStride for the frame ids), as in Battle_TickPcSlots.
+; Then starts the PCs on entry 0 with timers 1, 2 and 3 and runs 64
+; frames: wait (BattleSys_PumpFrames), frame service tick, and
+; Battle_PoseStep, which advances the poses every second call.
+; !Battle_UnkE5 and !Battle_UnkA4 are cleared before and after.
+; Durations are halved here (LSR) where Battle_TickPcSlots divides by 5;
+; the tick buffer is cleared (24 bytes), the frame buffer is not.
+; Callers: Battle_StartPose (JMP), BattleSys_DefeatPose (BRA),
+; BattleSys_VictoryPose (falls through); scanned as above, no other.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Pc_PoseListOfs, !Battle_PoseUnk5DDD,
+;        !Battle_PoseIncludeKo
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$85 and the
+;        callees' scratch written
+; Callees: Battle_Mul8x16, BattleSys_PumpFrames, BattleSys_FrameTickVec,
+;          Battle_PoseStep
+!Battle_PoseSetupSlot = !BattleTmp_80     ; 2 B: PC slot whose lists are copied (zeroed 16-bit, counted 8-bit)
+!Battle_PoseCopyLeft = !BattleTmp_82      ; 1 B: entries left to copy
+!Battle_PoseDest = !BattleTmp_84          ; 2 B: slot * 8, its block in !Pc_PoseTicks/Frames
+Battle_RunPcPose:
+    LDX.w #!Battle_PoseTicksLast
+.clear:
+    STZ.w !Pc_PoseTicks,X
+    DEX
+    BPL .clear
+    INX
+    STX.b !Battle_PoseSetupSlot
+.slot:
+    LDX.b !Battle_PoseSetupSlot
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Facing,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    REP #$20                        ; A -> 16-bit
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Battle_PoseDest          ; slot * 8
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    CLC
+    ADC.b !Battle_PoseSetupSlot
+    TAX                             ; slot * 3
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    TAY                             ; slot * 2
+    CLC
+    LDA.w !Pc_PoseListOfs,Y
+    ADC.w !Battler_AnimDurBase,X
+    STA.w !Battle_AnimDurList
+    CLC
+    LDA.w !Pc_PoseListOfs,Y
+    ADC.w !Battler_AnimFrameBase,X
+    CLC
+    ADC.b !Battle_MulProduct        ; + Facing * FacingStride
+    STA.w !Battle_AnimFrameList
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDY.b !Battle_PoseDest
+    LDX.w !Battle_AnimDurList
+    LDA.b #!Battle_PoseListLen
+    STA.b !Battle_PoseCopyLeft
+.copy_ticks:
+    LDA.l !BattleRom_AnimData,X
+    LSR A                           ; duration / 2
+    STA.w !Pc_PoseTicks,Y
+    INY
+    INX
+    DEC.b !Battle_PoseCopyLeft
+    BNE .copy_ticks
+    LDA.b #!Battle_PoseListLen
+    STA.b !Battle_PoseCopyLeft
+    LDX.w !Battle_AnimFrameList
+    LDY.b !Battle_PoseDest
+.copy_frames:
+    LDA.l !BattleRom_AnimData,X
+    STA.w !Pc_PoseFrames,Y
+    INY
+    INX
+    DEC.b !Battle_PoseCopyLeft
+    BNE .copy_frames
+.next:
+    INC.b !Battle_PoseSetupSlot
+    LDA.b !Battle_PoseSetupSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .slot
+    LDA.b #1
+    STA.w !Pc_PoseTimer             ; timers 1, 2, 3
+    INC A
+    STA.w !Pc_PoseTimer+1
+    INC A
+    STA.w !Pc_PoseTimer+2
+    LDA.b #!Battle_PoseEntryStart
+    STA.w !Pc_PoseEntry             ; the first step makes it 0
+    STA.w !Pc_PoseEntry+1
+    STA.w !Pc_PoseEntry+2
+    STZ.b !Battle_UnkE5
+    STZ.b !Battle_UnkA4
+    LDA.b #!Battle_PoseFrames
+    STA.w !Battle_PoseFramesLeft
+.frame:
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    JSR Battle_PoseStep
+    DEC.w !Battle_PoseFramesLeft
+    BNE .frame
+    STZ.b !Battle_UnkE5
+    STZ.b !Battle_UnkA4
+    RTS
+
+; ==================================================================
+; Battle_PoseStep ($C1369A–$C13713, 122 bytes)
+; ==================================================================
+; One pose step, run on every second call: !Battle_UnkE5 flips between
+; 0 (set it, return) and 1 (clear it, step). A step sets !Battle_UnkA4
+; to 1 for its duration and, for PCs 0-2: skips a KO'd PC unless
+; !Battle_PoseIncludeKo is set (the BattlerStats offset comes from
+; BattleFx_SetPtrA2FromTable), skips an absent one, counts down
+; !Pc_PoseTimer, and at 0 moves !Pc_PoseEntry on and reloads the timer
+; from !Pc_PoseTicks; a non-zero tick count draws the entry's frame
+; (Battle_DrawBattlerFrame). Entry 8 or a 0 tick count ends the pose:
+; the timer stays 0, so the next count-down wraps it to 255 steps, longer
+; than the 64-frame run.
+; Quirk: at a 0 tick count it tests !Battle_PoseUnk5DDD, but both
+; outcomes go to the next PC, so the flag has no effect here (kept as
+; found; the code may once have done something for the battle-start
+; pose, which sets it).
+; Why !Battle_UnkA4 is set during the step is not known; Battle_TickPcSlots
+; would tick enemy group 1 if it ran meanwhile.
+; Callers (JSR; scanned as above): Battle_RunPcPose only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80 and $A2-$A3
+;        written, plus the decoder's scratch
+; Callees: BattleFx_SetPtrA2FromTable, Battle_DrawBattlerFrame
+!Battle_PoseStatsOffset = !BattleTmp_A2   ; 2 B: BattlerStats offset left by BattleFx_SetPtrA2FromTable (inferred)
+!Battle_PoseEntryIdx = !BattleTmp_80      ; 1 B: the PC's new !Pc_PoseEntry
+Battle_PoseStep:
+    LDA.b !Battle_UnkE5
+    BNE .step
+    INC.b !Battle_UnkE5
+    RTS
+.step:
+    STZ.b !Battle_UnkE5
+    LDA.b #1
+    STA.b !Battle_UnkA4
+    TDC
+    TAX
+    STX.w !Battle_PoseSlot
+.slot:
+    LDA.w !Battle_PoseIncludeKo
+    BNE .alive
+    LDA.w !Battle_PoseSlot
+    JSL BattleFx_SetPtrA2FromTable
+    LDX.b !Battle_PoseStatsOffset
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+.alive:
+    LDX.w !Battle_PoseSlot
+    LDA.w !Battler_Present,X
+    BEQ .next
+    DEC.w !Pc_PoseTimer,X
+    BNE .next
+    INC.w !Pc_PoseEntry,X
+    LDA.w !Pc_PoseEntry,X
+    CMP.b #!Battle_PoseListLen
+    BNE .entry
+.stop:
+    BRA .next                       ; past the last entry
+.entry:
+    LDA.w !Pc_PoseEntry,X
+    STA.b !Battle_PoseEntryIdx
+    LDA.w !Battle_PoseSlot
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !Battle_PoseEntryIdx
+    TAY                             ; slot * 8 + entry
+    LDA.w !Pc_PoseTicks,Y
+    STA.w !Pc_PoseTimer,X
+    BNE .draw
+    LDA.w !Battle_PoseUnk5DDD
+    BEQ .stop                       ; quirk: both ways lead to .next
+    BRA .next
+.draw:
+    LDA.w !Battle_PoseSlot
+    STA.w !Battle_FrameSlot
+    LDA.w !Pc_PoseFrames,Y
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+.next:
+    INC.w !Battle_PoseSlot
+    LDA.w !Battle_PoseSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .slot
+    STZ.b !Battle_UnkA4
+    STZ.b !Battle_UnkE5
+    RTS
+
+; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
 ; ==================================================================
 ; Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in
@@ -5174,8 +8468,8 @@ BattleTgt_AnyCandidate:
 ; are ever queued at once is not established.
 ;
 ; Callers (JSR): BattleMenu_RefreshIfDirtyL ($C1:10ED),
-;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and unmatched code at
-;   $C1:10CE.
+;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and
+;   BattleSys_UpkeepTwoFrames ($C1:10CE).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (as at every caller; no DP
 ;        access here), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = dequeued slot index (or
@@ -5236,7 +8530,7 @@ BattleMenu_DequeueReadyBattler:
 ; STZ in .clear_targeting overwrites it at once, so it always ends on
 ; the main menu; the first store is dead.
 ;
-; Callers (JSR): unmatched code at $C1:358B, $C1:3593, $C1:359B.
+; Callers (JSR): BattleSys_VictoryPose ($C1:358B, $C1:3593, $C1:359B).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot, STA.b $80,
 ;        TDC as zero), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written; Y unchanged
@@ -6288,7 +9582,7 @@ BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScr
 ; Cursor/overlay refresh at the end of the menu rebuild chain (after
 ; ProcessInput), so like it only on frames with !BattleMenu_Dirty set:
 ; JSR from BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick
-; and $C1:10D7 (the not yet matched routine at $C1:106E). Draws whatever cursor
+; and BattleSys_UpkeepTwoFrames ($C1:10D7). Draws whatever cursor
 ; graphic belongs on screen right now, dispatching on menu state:
 ;
 ;   no PC shown (!BattleMenu_ActivePc < 0) -> hide the 4 cursor sprites

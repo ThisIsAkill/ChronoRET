@@ -58,10 +58,24 @@ if !ram_battle_inc == 0
 !Battle_GeoAngleIndex    = $E2   ; 2 B: index into BattleRom_AngleTable: (|dy| & ~7) * 4 + (|dx| >> 3)
 
 ; ------------------------------------------------------------
+; Direct page: battler frame decoder (Battle_DrawBattlerFrame)
+; ------------------------------------------------------------
+!BattleTmp_BA            = $BA   ; 3 B scratch: long pointer ($BA low .. $BC bank)
+!BattleTmp_BD            = $BD   ; 2 B scratch
+
+; ------------------------------------------------------------
 ; Direct page: other fixed roles
 ; ------------------------------------------------------------
+!Battle_UnkA4            = $A4   ; 1 B: 1-3 = Battle_TickPcSlots ticks enemy group n (Battle_TickEnemyGroup) instead of
+                                 ; the PCs; copied to !Battle_Unk993B around the tick and copied back if that changed it
+                                 ; (BattleSys_UpkeepTwoFrames); set to 1 during each Battle_PoseStep; who sets it otherwise
+                                 ; is not traced
+!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames, which waits for it to clear; likely cleared once a frame by
+                                 ; the STZ $9E at $CF:E77B, before the RTL of a bank-$CF routine that reads JOY1 and bumps the
+                                 ; 32-bit counter at $96F1 (entry not traced); also zeroed once by the battle entry $CF:FB65
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
+                                 ; Battle_PoseStep, which steps only when it finds 1 (every second frame); purpose unknown
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
                                  ;      (UpdateCursorOverlay, only right after the target moved); purpose unknown
 !Battle_PadEdgeButtons   = $EE   ; 1 B: buttons pressed this frame (bit 7 confirm, 6 alt-confirm, 5/4 page, 3 cancel);
@@ -93,7 +107,10 @@ if !ram_battle_inc == 0
 !BattleTmp_96            = $96   ; 2 B scratch
 !BattleTmp_98            = $98   ; 2 B scratch
 !BattleTmp_9A            = $9A   ; 2 B scratch
+!BattleTmp_9C            = $9C   ; 2 B scratch
 !BattleTmp_A2            = $A2   ; 2 B scratch
+!BattleTmp_C0            = $C0   ; 3 B scratch (a long pointer in Battle_TickEnemyGroup)
+!BattleTmp_C3            = $C3   ; 3 B scratch (a long pointer in Battle_TickEnemyGroup)
 !BattleTmp_AD            = $AD   ; 2 B scratch outside Battle_Mul8 (same bytes as !Battle_Mul8A/B)
 !BattleTmp_AF            = $AF   ; 2 B scratch outside Battle_Mul8 (same byte as !Battle_Mul8Product)
 
@@ -101,6 +118,8 @@ if !ram_battle_inc == 0
 ; Absolute WRAM (bank $7E; DB=$7E in all bank $C1 code)
 ; ------------------------------------------------------------
 !Battle_WramAbs          = $0000 ; base 0 for "STA abs,Y" where Y already holds the full address (left by MVN)
+!Battle_DataBankAbs      = $0000 ; base 0 for "LDA abs,Y" in whatever bank DB holds, where Y is the full address
+!Battle_WramLong         = $7E0000 ; base 0 of bank $7E for "STA long,X" where X is the full address
 
 ; Argument block for the info-panel message calls (UpdateCursorOverlay
 ; fills it before JSL BattleMsg_ShowMsg0BIfKeyChangedVec).
@@ -162,6 +181,13 @@ endstruct
 
 !Battle_Unk1C48          = $1C48 ; 1 B array indexed by !Battle_UnkA0FF; must equal $42 for tech id $74 to be usable
                                  ; (UpdateTechMpAvail); purpose unknown
+!Battler_TileGfxPtr      = $1C57 ; 3 B per battler slot (index slot*3): long pointer to the battler's 32-byte tiles,
+                                 ; which Battle_DrawBattlerFrame copies by tile number; who fills it is not traced
+!Battler_FramesPtr       = $1C78 ; 3 B per battler slot (index slot*3): long pointer to the battler's frame records
+                                 ; (BattleRom_FrameBytes bytes each); who fills it is not traced
+!Battler_AnimFrameBase   = $1C99 ; 3 B per battler slot (index slot*3; low word used): offset in !BattleRom_AnimData of
+                                 ; the battler's frame-id lists (Battle_TickPcSlots); who fills it is not traced
+!Battler_AnimDurBase     = $1CBA ; 3 B per battler slot (same layout): offset of its frame-duration lists
 !Tech_ListAvail          = $1CDB ; 20 B: per tech-list entry of the active PC, 1 = selectable, 0 = blank/header
                                  ; (BuildTechAvailFlags; TechListPrev/Next skip zeros)
 !Battler_ScreenX         = $1D0C ; 11 B per battler slot: base screen x (cursor and area-target geometry)
@@ -169,19 +195,45 @@ endstruct
 !Sfx_Command             = $1E00 ; 1 B: APU command byte for Audio_ProcessEntry (same block bank $C0's Audio_PlayTileSfxA uses)
 !Sfx_Param1              = $1E01 ; 1 B: first APU command parameter (sound id for command $19)
 !Sfx_Param2              = $1E02 ; 1 B: second APU command parameter
+!Battle_Unk2989          = $2989 ; 1 B: bit 7 set lets BattleSys_UpkeepTwoFrames act on !Battle_Unk99CF/99D0;
+                                 ; purpose unknown (near the config bytes $2990/$2991)
 !Pc_CharId               = $2980 ; 3 B per PC slot: character id (0-6) of the PC in that slot; inferred from the
                                  ; target modes that search it for ids 3-6. (The field engine uses $2980 for other
                                  ; data; see the wiki's RAM table.)
 
+!Battle_PaletteSaved     = $2100 ; 16 B per !Battler_Palette unit: saved palette bytes that Battle_FxReset copies back over
+                                 ; !Battle_PaletteLive (inferred: a palette buffer; 26 B are copied per PC)
+!Battle_PaletteLive      = $2300 ; 16 B per !Battler_Palette unit: live palette bytes; the colour cycle at $CF:E80F and
+                                 ; Battle_FxOverlay2Tint write colours here (inferred: what is shown)
+!Battle_CellMap          = $7BFD ; 256 B: one byte per 16x16-pixel screen cell, 16 cells per row (index row*16 + col);
+                                 ; bit 6 = blocks a battler box, bit 7 = blocks it unless !Battle_PassCellBit7 is
+                                 ; set (Battle_BoxHitsBlockedCell). Who fills it is not traced
+
+!Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); also written by the
+                                 ; unmatched code at $C1:4471, $C1:457A and others
+!Pc_PoseEntry            = $5DC1 ; 1 B per PC: current entry 0-7 of its pose list ($FF = before the first)
+!Battle_PoseSlot         = $5DC5 ; 2 B: PC slot Battle_PoseStep is on (zeroed 16-bit, counted 8-bit)
+!Battle_PoseFramesLeft   = $5DC9 ; 1 B: frames left in Battle_RunPcPose's loop
+!Battle_PoseUnk5DDD      = $5DDD ; 1 B: 1 for the battle-start pose, 0 for services 8/9; Battle_PoseStep tests it with no
+                                 ; effect (both branches meet)
+!Battle_PoseIncludeKo    = $5DDE ; 1 B: non-zero = Battle_PoseStep also animates KO'd PCs (service 9 only)
+!Pc_PoseListOfs          = $5DF1 ; 2 B per PC: animation * 4, offset of the PC's pose list in its bank $E4 lists
+!Enemy_AnimWanted        = $5E0D ; 1 B per enemy (0-7): animation it should show; Battle_TickEnemyGroup reloads the lists
+                                 ; when it differs from !Enemy_Anim. Lies in the first $30 bytes of BattlerStats[0],
+                                 ; which the struct leaves unnamed; written by unmatched code ($C1:3793, $C1:8806, ...)
+
 ; Battle stat records, $80 bytes per battler slot (BattleRom_StatsOffset
 ; lists slot*$80 for all 11 slots).
 struct BattlerStats $5E00
-            skip $30
+            skip $2F
+.Unk2F:     skip 1      ; +$2F: bit 0 set = Battle_PickStatusAnim picks animation $12 and effect $80 when no status
+                        ; record matches; meaning unknown
 .CurHp:     skip 2      ; +$30: current HP
 .MaxHp:     skip 2      ; +$32: max HP
 .CurMp:     skip 2      ; +$34: current MP
             skip $14
 .Status:    skip 1      ; +$4A: status bits; bit 7 set = KO'd (by context: BattleTgt_SingleKoAlly lists these)
+.Status2:   skip 1      ; +$4B: more status bits; bit 1 set = Battle_UpdatePcFacing leaves the facing alone (meaning unknown)
 endstruct align $80
 
 ; Per-PC command records, 7 bytes each, PC slot 0/1/2 at +0/+7/+14
@@ -196,6 +248,9 @@ struct BattleCmd $93EE
 .ActionId:  skip 1      ; +6: tech id or item id (left stale for attack)
 endstruct
 
+!Pc_PoseTicks            = $922D ; 8 B per PC (24 B): pose steps per entry, halved durations (Battle_RunPcPose); the
+                                 ; unmatched code at $C1:5AE8-$C1:5C9A and $CF:EEC3 also use $922D, purpose there unknown
+!Pc_PoseFrames           = $9245 ; 8 B per PC: frame id per pose entry (Battle_RunPcPose)
 !Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
 !BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / BattleMsg_FormatTwoDigits)
 !BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (always blank, $FF)
@@ -236,20 +291,88 @@ endstruct
 !BattleTgt_Result        = $9613 ; 1 B: 0 = a target exists, negative = no valid target ($80 from the handlers, $FF from BuildTargetList)
 !BattleTgt_Cursor        = $9614 ; 1 B: cursor index into !BattleTgt_Candidates
 !BattleMenu_CmdMenu      = $9615 ; 1 B: menu the pending command comes from (0 attack, 1 tech, 2 item)
+!Pc_AnimTimer            = $9689 ; 3 B per PC: frames left before the next animation step (Battle_TickPcSlots;
+                                 ; reloaded with duration / 5)
+!Battler_AnimFrame       = $968C ; 1 B per PC slot (3 B; enemies use !Enemy_AnimFrame): index of the current entry in
+                                 ; its animation lists; $FF = start again at 0 on the next step
+!Battler_FacingStrideLo  = $966E ; 1 B per battler slot: low byte of the size of one facing's frame-id list block
+                                 ; (multiplied by !Battler_Facing); high byte in !Battler_FacingStrideHi
+!Battle_FrameSlot        = $9679 ; 1 B: argument of Battle_DrawBattlerFrame: battler slot whose frame to decode
+!Battle_FrameId          = $967B ; 1 B: argument of Battle_DrawBattlerFrame: frame number (record index in
+                                 ; !Battler_FramesPtr); callers read it from tables such as $E4:0000 and $D1:5F42
+!Battler_FrameLayout     = $967C ; 1 B per battler slot: frame layout 0-4 (shape of the frame in tiles; indexes
+                                 ; BattleRom_FrameBytes / BattleRom_FrameLayout / BattleRom_FrameExtraCount)
+!Battler_Facing          = $96DB ; 1 B per battler slot: facing, from !BattleRom_FacingByAngle (Battle_UpdatePcFacing);
+                                 ; picks the frame-id list block. "Facing" is inferred from the angle lookup
+!Enemy_AnimTimer         = $9694 ; 1 B per enemy (0-7): frames left before its next animation step (Battle_TickEnemyGroup;
+                                 ; battle init at $CC:E2ED also writes it)
+!Enemy_AnimFrame         = $969C ; 1 B per enemy: entry 0-3 of its lists in !Enemy_AnimTicks/Frames
+!Enemy_FacingShown       = $96E9 ; 1 B per enemy: facing its lists were loaded for (Battle_TickEnemyGroup; read at $CF:E845)
 !Battler_Present         = $96F5 ; 11 B per battler slot: non-zero = battler exists
 !Battler_ScreenOffsetX   = $9708 ; 11 B per battler slot: added to !Battler_ScreenX for the live cursor x
 !Battler_ScreenOffsetY   = $9713 ; 11 B per battler slot: added to !Battler_ScreenY for the live cursor y
+!Battler_HalfWidth       = $971E ; 11 B per battler slot: box half-width; the box spans probe x +/- this
+                                 ; (Battle_CalcBattlerBox); who sets it is not traced
+!Battler_Height          = $9729 ; 11 B per battler slot: box height above the probe y (top = y - this)
+!Battler_PathStep        = $9734 ; 11 B per battler slot: added to the probe radius on each BattlePos_PathClear pass
+                                 ; (to |dy| of the last check, not a running sum: see its header); inferred: movement
+                                 ; step; who sets it is not traced
+!Battler_BoxLeft         = $975A ; 11 B per battler slot: box left edge, clamped at 0 (Battle_CalcBattlerBox)
+!Battler_BoxTop          = $9765 ; 11 B per battler slot: box top edge, clamped at 0
+!Battler_BoxRight        = $9770 ; 11 B per battler slot: box right edge, clamped at $FF
+!Battler_BoxBottom       = $977B ; 11 B per battler slot: box bottom edge: probe y, + 8 unless !Battle_Unk2989 bit 2
+!Enemy_Anim              = $974A ; 1 B per enemy: animation its lists were loaded for (Battle_TickEnemyGroup; battle init
+                                 ; $CC:E34E writes it); also selects the handler at $C1:375C
+!Enemy_AnimTicks         = $9799 ; 8 B per enemy (index enemy * 8): frames per list entry, 0 = end of the list
+!Enemy_AnimFrames        = $97D9 ; 8 B per enemy: frame id per list entry (!Battle_FrameId)
+!Enemy_Unk9829           = $9829 ; 1 B per enemy: cleared when a kind-1 list is loaded (and at $C1:3796); also
+                                 ; incremented by the unmatched code from $C1:3833 on; meaning unknown
+!Battle_EnemyTickIdx     = $9841 ; 1 B: index into !Battle_TickOrder in Battle_TickEnemyGroup
 !Battler_Unk984D         = $984D ; 2 B per battler slot (index slot*2): sent as the info-panel message id and used to
                                  ; index BattleRom_UnkE1DE80; inferred: per-battler type id. Unconfirmed.
+; Position queries (service 5 of the $C10045 API, BattlePos_Query)
+!BattlePos_Mode          = $986E ; 1 B in: query, 0-14 (index into BattlePos_ModeTable)
+!BattlePos_Subject       = $986F ; 1 B in: battler slot the query is about
+!BattlePos_Other         = $9870 ; 1 B in: second battler slot; the nearest/farthest scans overwrite it with each
+                                 ; battler they examine
+!BattlePos_Arg           = $9871 ; 1 B in: query 8: non-zero = also test other battlers' boxes; query 13: a third
+                                 ; battler slot
+!BattlePos_Result        = $9872 ; 1 B out: 0 = the condition holds, $FF = it does not (cleared by BattlePos_Query)
+!BattlePos_Found         = $9873 ; 1 B out: slot found by queries 0-3 (they store 16-bit, so $9874 gets 0 too);
+                                 ; query 13 stores a distance difference here
+!Battle_PassCellBit7     = $9875 ; 1 B: non-zero = !Battle_CellMap bit 7 does not block (Battle_BoxHitsBlockedCell);
+                                 ; zeroed before each check, set to 1 by the mover at $C1:3877 when $A2B5 is 3
+!BattlePos_DistLimit     = $9893 ; 2 B: squared-distance limit of the BattlePos_WithinDist* checks (set by each entry)
+!Enemy_Unk98A7           = $98A7 ; 1 B per enemy: cleared by BattleSys_VictoryPose; written by the unmatched enemy code
+                                 ; from $C1:384C on and read at $CF:F97F; meaning unknown
 !Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
+!Battler_FrameShown      = $9907 ; 1 B per battler slot: frame number last decoded (Battle_DrawBattlerFrame skips a repeat)
+!Battle_FramesDecoded    = $9912 ; 1 B: frames decoded this pass; zeroed by Battle_TickPcSlots, and callers defer a battler
+                                 ; (!Battler_FrameDeferred) once it is 1 (inferred: one decode per frame)
 !Pc_SavedMenuRow         = $9916 ; 3 B per PC: command-menu row to restore when the PC's turn comes back
+!Battler_FrameDeferred   = $9922 ; 1 B per battler slot: non-zero = its frame decode was put off; cleared when a decode
+                                 ; starts (inferred: Battle_TickPcSlots starts with a deferred PC)
 !BattleMenu_ItemRowDrawn = $991F ; 1 B: item cursor row last drawn ($FF = redraw)
 !BattleMenu_ItemScrollDrawn = $9920 ; 1 B: item scroll position the arrows were last drawn for ($FF = redraw)
+!Battle_TickOrder        = $992D ; 3 B: PC slots (Battle_TickPcSlots) or enemies (Battle_TickEnemyGroup; $FF = none)
+                                 ; in the order this pass visits them
 !BattleMenu_Dirty        = $993A ; 1 B: non-zero = rebuild the menu this frame (RefreshIfDirty gates)
+!Battler_Palette         = $993C ; 1 B per battler slot: palette number; * 16 = offset in !Battle_PaletteSaved/Live
+                                 ; (Battle_FxReset); 8 = none to the colour cycle at $CF:E802
+!Battle_Unk993B          = $993B ; 1 B: copy of !Battle_UnkA4 (see there); also compared with it by Battle_TickEnemyGroup
 !BattleTgt_Candidates    = $99C0 ; 12 B: candidate battler slots ($FF = empty); 11 used, cleared through index 11
 !BattleTgt_AreaType      = $99CC ; 1 B: area shape for service 7 (index into BattleTgt_AreaTable, 0-6)
+!Battle_Unk99CF          = $99CF ; 2 B (with $99D0): count of frames L+R are held, kept by the bank-$CF frame
+                                 ; routine ($CF:E715 INC, compared with $78 at $CF:E71D); non-zero with
+                                 ; !Battle_Unk2989 bit 7 makes BattleSys_UpkeepTwoFrames show message $75
+!Battle_Unk99D0          = $99D0 ; high byte of the !Battle_Unk99CF count
+!Battle_Unk99D1          = $99D1 ; 1 B: latch: set when that message is shown; $CF:E732 clears it (and the count)
+                                 ; whenever L+R are not both held and $A013 is 0, so once per hold
 !Battle_CmdQueue         = $99D4 ; 4 B: PC slots with a committed command, in commit order
 !Battle_CmdQueueLen      = $99D8 ; 1 B: entries in !Battle_CmdQueue
+!Battle_StatusAnimNext   = $99D9 ; 1 B: battler slot Battle_PickNextStatusAnim picks next (3-10 after the first pass;
+                                 ; battle init at $CC:E384 also writes it)
+!Pc_FacingTarget         = $99DA ; 3 B per PC: enemy slot the PC last turned toward (Battle_UpdatePcFacing)
 !Pc_AtbCur               = $99DD ; 3 B per PC: ATB gauge value
 !Battle_MenuTimeHold     = $99E0 ; 1 B: = !Battle_CfgBattleMode while a tech/item list is open, 0 on the main menu;
                                  ; inferred: holds the battle clock in Wait mode
@@ -285,9 +408,18 @@ endstruct
 !BattleMenu_ItemRecord   = $9F36 ; 2 B: Item_BattleList record offset of the chosen item
 !Battle_Unk9F38          = $9F38 ; 1 B per PC: ORed into BattleCmd.Kind; cleared when the PC's menu opens
 !BattleMenu_CursorPalette = $9F46 ; 1 B: palette bits merged into the cursor sprite attribute (flash cycle, inferred)
+!Battler_FrameExtra      = $9F47 ; 16 B per battler slot (offset BattleRom_SlotTimes16): the signed bytes after the
+                                 ; frame's tilemap, sign-extended to words; meaning not traced. Layouts 1-4 write
+                                 ; more than 16 B, running into the next slots' blocks (as found)
 !Battler_Unk9FF7         = $9FF7 ; 1 B per battler slot: bit 7 set = skipped by every target scan; meaning unknown
 !Battle_DivBusy          = $A029 ; 1 B: non-zero while Battle_Divide runs
 !Pc_TechCount            = $A02A ; 3 B per PC: number of lines in the PC's tech list
+!Battler_ProbeX          = $A039 ; 11 B per battler slot: x the box and distance checks use; a copy of !Battler_ScreenX
+                                 ; (Battle_CacheBattlerCoordsAll), moved ahead by path checks before the real move
+                                 ; (inferred from the movers at $C1:3851 and BattlePos_PathClear)
+!Battler_ProbeY          = $A050 ; 11 B per battler slot: y counterpart of !Battler_ProbeX
+!Battle_FacingTurn       = $A098 ; 1 B: PC slot whose facing Battle_UpdatePcFacing updates next; bit 7 = handed on,
+                                 ; not taken yet (inferred from the code; who else writes it is not traced)
 !BattleMenu_TechAvailDone = $A099 ; 1 B: set once UpdateTechMpAvail has graded the visible rows; TechConfirm needs it
 !BattleUI_ForceDigitRefresh      = $A09A ; 1 B: non-zero = BattleUI_UpdateNextPcPanel always refreshes HP/MP digits (no gauges-only
                                  ; shortcut); set when targeting starts from a submenu (BuildTargetList), cleared on return
@@ -304,14 +436,49 @@ endstruct
                                  ; sets $FF; purpose unknown
 !Pc_SavedTech            = $A0D8 ; 3 B per PC: tech id under the cursor at commit (with CfgListMemory)
 !BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel (battle init $CC:E3AC copies $2990 bit 7)
+!Battle_UnkA0FD          = $A0FD ; 1 B: zeroed by BattleSys_UpkeepTwoFrames unless !Battle_UnkA10E is set; purpose unknown
+!Battle_UnkA0FE          = $A0FE ; 1 B: incremented by services 8 and 9 (the end-of-battle poses); read at $CF:EDC5;
+                                 ; meaning unknown
 !Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
+!Battle_StatusAnimWraps  = $A102 ; 1 B: counts Battle_PickNextStatusAnim's wraps past slot 10 ($C1:4124 zeroes it and
+                                 ; waits for 1)
+!Battler_AnimShown       = $A103 ; 1 B per battler slot: animation id last drawn (Battle_TickPcSlots)
+!Battle_UnkA10E          = $A10E ; 1 B: non-zero skips the message check in BattleSys_UpkeepTwoFrames; purpose unknown
 !BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is 0, or 1..MaxHP/8 with !BattleUI_UnkA110 set
 !BattleUI_UnkA110        = $A110 ; 1-2 B: non-zero lets HP 1..MaxHP/8 count as low (HP 0 always does); otherwise unknown
 !BattleMenu_KeepRow      = $A114 ; 1 B: set by alt-confirm; CommitAction then keeps !Pc_SavedMenuRow
 !BattleUI_UnkA115        = $A115 ; 1-2 B: PC slot compared with the drawn slot in DrawCommandList; purpose unknown
 !BattleUI_UnkA117        = $A117 ; 1 B: zero lets DrawCommandList show the Combo list without the A115 test; purpose unknown
+!Battler_UnkA119         = $A119 ; 1 B per battler slot: non-zero = Battle_PickStatusAnim treats the battler as KO'd
+                                 ; (first record forced, !Battler_KoFlag set); written at $C1:4153/$C1:4204; meaning unknown
+!Battle_AnimFrameList    = $A1E8 ; 2 B: offset in !BattleRom_AnimData of the frame-id list being stepped
+!Battle_AnimDurList      = $A1FE ; 2 B: offset of the frame-duration list being stepped
+!Battler_FacingStrideHi  = $A2C8 ; 1 B per battler slot: high byte for !Battler_FacingStrideLo
 !BattleUI_PanelRedraw    = $A43F ; 1 B: non-zero = redraw the command cursor column (ClearActivePanelColumn)
+!Battle_AnimId           = $A440 ; 1 B: animation picked for the battler being ticked (Battle_PickStatusAnim; 3 =
+                                 ; default, $2B replaces it while !Battle_Unk99CF/99D0 is set)
+!Battler_FxWanted        = $A441 ; 1 B per battler slot: status effect picked by Battle_PickStatusAnim (0-$0E, index
+                                 ; into Battle_FxHandlerTable; $FF none, $80 the Unk2F path); also indexes the colour table
+                                 ; at $CC:F754 for the cycle at $CF:E7EC
+!Battler_FxApplied       = $A44C ; 1 B per battler slot: effect Battle_ApplyPendingEffect last started; battle init
+                                 ; ($CC:E369) and $CC:F106 also write it
+!Battler_UnkA457         = $A457 ; 1 B per battler slot: cleared by Battle_FxReset; no other access found in banks
+                                 ; $C1/$CC/$CD/$CF
+!Battler_FxCycleOn       = $A46D ; 1 B per battler slot: non-zero = run the colour cycle ($CF:E7E0; Battle_FxColourCycle)
+!Battler_FxTinted        = $A478 ; 1 B per battler slot: set by Battle_FxOverlay2Tint, cleared by Battle_FxReset; no
+                                 ; reader found
+!Battler_UnkA483         = $A483 ; 1 B per battler slot: cleared by Battle_FxReset; no other access found
+!Battler_FxOverlayOn     = $A48E ; 1 B per battler slot: non-zero = draw the status overlay ($CF:EE38)
+!Battler_FxCycleStep     = $A499 ; 1 B per battler slot: colour-cycle position; $CF:E821 adds 2 and wraps at $7C
+!Battler_FxOverlayTimer  = $A4BA ; 1 B per battler slot: frames until the overlay's next frame ($CF:EE47)
+!Battler_FxOverlayPeriod = $A4C5 ; 1 B per battler slot: reload value of !Battler_FxOverlayTimer
+!Battler_FxOverlayBase   = $A4D0 ; 1 B per battler slot: overlay block * $10, added to frame * 4 to index $CC:F6D4
+!Battler_FxOverlayFrame  = $A4DB ; 1 B per battler slot: overlay frame 0-3 ($FF = before the first; $CF:EE52 counts it)
+!Battler_StartFrame      = $A4DC ; 1 B per battler slot: frame drawn by Battle_DrawAllBattlerFrames (battle init writes it
+                                 ; at $CC:E968/$CC:EAA1). Lies inside !Battler_FxOverlayFrame, one slot up; the overlay
+                                 ; handlers run only after the start frames are drawn (inferred)
 !BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
+!Battler_UnkA5CD         = $A5CD ; 1 B per battler slot: bit 7 set = ignored by Battle_BoxOverlapsOthers; meaning unknown
 !BattleTgt_Selected      = $A62D ; 12 B: selected battler slots ($FF = empty); +0 is the command's target
 !BattleTgt_Highlight     = $A64E ; 1 B: battler slot under the single-target cursor
 !BattleTgt_UnkA64F       = $A64F ; 1 B: cleared by BuildTargetList; no reader in bank $C1 yet
@@ -343,18 +510,39 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !BattleRom_TextBank        = $CC      ; bank holding the item/tech name tables (MVN source)
 !BattleRom_AngleTable      = $C0F300  ; direction angle by (|dy| & ~7) * 4 + |dx| >> 3 (Battle_CalcAngle)
 !BattleRom_SineTable       = $C0F900  ; |sin| table: 1024 entries of 1 B per turn, peak $FF at +$100 (Battle_SinLookup)
+!BattleRom_FacingByAngle  = $C0F700  ; 1 B per angle (256 per turn): facing for that direction (Battle_UpdatePcFacing)
 !BattleRom_TechListBase    = $CCF38C  ; 1 B per PC slot: first line of the PC in the 20-line tech lists (0/$14/$28)
 !BattleRom_TechEntryBase   = $CCF395  ; 2 B per PC slot: offset of the PC's Tech_MenuEntry block (0/$8C/$118)
 !BattleRom_TechRowMapOffset = $CCF39B ; 2 B per visible tech row: offset of the row in the tech window map
 !BattleRom_TechEntryOffset = $CCF3A1  ; 1 B per menu-entry index: index * 7
+struct BattleRom_FrameLayout $CCF3B6 ; 14 B per frame layout (0-5), index layout * 14 (Battle_DrawBattlerFrame)
+.RowOffset: skip 12     ; +0: 6 words: offset of each tile row in the battler's tile buffer (only Height used)
+.Width:     skip 1      ; +12: tiles per row
+.Height:    skip 1      ; +13: rows
+endstruct
+!BattleRom_FrameBytes      = $CCF40A  ; 2 B per frame layout 0-4: bytes per frame record (2 B per tile cell + 1 B per two cells)
+!BattleRom_FrameExtraCount = $CCF4FC  ; 1 B per frame layout 0-4: signed bytes after the frame's tilemap (cells / 2)
+!BattleRom_FxOverlayPeriod = $CCF5FD ; 1 B per overlay block 1-7 (entry n-1): frames per overlay frame
 struct BattleRom_CursorSprite $CCF604 ; command cursor, 4 sprites x 4 B
 .X:         skip 1      ; +0: x offset from !Battler_ScreenX
 .Y:         skip 1      ; +1: y offset from !Battler_ScreenY
 .Tile:      skip 1      ; +2: tile
 .Attr:      skip 1      ; +3: attribute (palette replaced by !BattleMenu_CursorPalette)
 endstruct
+!BattleRom_FxTintColours  = $CCF77B  ; 4 B: written into live palette bytes 6-9 by Battle_FxOverlay2Tint (inferred: two colours)
+struct BattleRom_StatusAnim $CCF77F ; 4 B per record, ended by a negative .StatusByte (Battle_PickStatusAnim)
+.StatusByte: skip 1    ; +0: byte to test, as an offset from BattlerStats.Status; negative = end of table
+.Mask:     skip 1      ; +1: bits to test
+.Effect:   skip 1      ; +2: status effect id (Battle_FxHandlerTable index); negative = none
+.Anim:     skip 1      ; +3: animation id; $FF = none of its own
+endstruct
+!BattleRom_EnemyListOffset = $CCF82F ; 1 B per enemy: enemy * 8, its block in !Enemy_AnimTicks/Frames
 !BattleRom_PcNameOffset    = $CCF837  ; 1 B per PC slot: offset of the PC in !Pc_NameTiles (0/10/20)
 !BattleRom_StatsOffset     = $CCF8ED  ; 2 B per battler slot: slot * $80, offset of its BattlerStats record
+!BattleRom_SlotTimes16     = $CCF917  ; 2 B per battler slot: slot * $10, offset of its !Battler_FrameExtra block
+!BattleRom_SlotTimes3      = $CCF92D  ; 1 B per battler slot: slot * 3, offset into the 3-byte pointer arrays
+!BattleRom_FrameDestBase   = $CCF941  ; 2 B per battler slot: bank $7E address its decoded frame tiles go to
+                                      ; ($64AD, $67AD, $68AD, ...); what reads that buffer is not traced
 !BattleRom_DigitTiles      = $CCF903  ; 10 B: tile for digits 0-9 ($73-$7C)
 !BattleRom_PcBit           = $CCF9FB  ; 1 B per PC slot: $80/$40/$20, the PC's bit in Item_BattleList.PcMask
 !BattleRom_NameAttrL1    = $CCFA23  ; 2 B per PC slot: map offset of the PC's name block's first attribute byte, layout 1
@@ -373,10 +561,15 @@ endstruct
                                  ; end glyphs $5B and $5C
 !BattleRom_Squares         = $CCFB6F  ; 16 B: n*n for n = 0-15 (BattleTgt_AreaCircle)
 !BattleRom_OamShowMask     = $CCFB8D  ; 4 B: high-table mask clearing x bit 8 of cursor sprite 0-3
+!BattleRom_EnemyAnimKind  = $CCFB91  ; 1 B per enemy animation id (0-8 seen): which list block Battle_TickEnemyGroup loads
+                                      ; (0 = list 3, 1 = list 1, else list 6); meaning unknown
+!BattleRom_Div5           = $CCFBCE  ; 1 B per n: n / 5 (checked for the first 32 bytes); duration byte -> frames
 !BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
 !BattleRom_CommandWindowFrame     = $D159FC  ; 84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell
 !BattleRom_TechBoxMap      = $D15A50  ; $180 B: tech window frame tilemap
 !BattleRom_ItemBoxMap      = $D15BD0  ; $180 B: item window frame tilemap
+!BattleRom_AnimData       = $E40000  ; bank $E4 (the engine's !AnimRom): battler frame-id and frame-duration lists;
+                                      ; a duration of 0 ends a list
 !BattleRom_UnkE1DE80       = $E1DE80  ; 1 B per !Battler_Unk984D value: non-zero = send $FF instead of the target slot
                                       ; to the info-panel message call; purpose unknown
 
