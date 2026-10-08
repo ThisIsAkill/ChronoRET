@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 29032,
+  "emitted_bytes": 29544,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 244,
-      "bytes": 29032
+      "functions": 246,
+      "bytes": 29544
     },
     "readable": {
-      "functions": 244,
-      "bytes": 29032
+      "functions": 246,
+      "bytes": 29544
     },
     "verified": {
-      "functions": 244,
-      "bytes": 29032
+      "functions": 246,
+      "bytes": 29544
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 19585,
+      "emitted_bytes": 20097,
       "matched": {
-        "functions": 117,
-        "bytes": 19585
+        "functions": 119,
+        "bytes": 20097
       },
       "readable": {
-        "functions": 117,
-        "bytes": 19585
+        "functions": 119,
+        "bytes": 20097
       },
       "verified": {
-        "functions": 117,
-        "bytes": 19585
+        "functions": 119,
+        "bytes": 20097
       }
     },
     {
@@ -281,8 +281,10 @@
       "bank": "$C0",
       "start": "$C0:F000",
       "end": "$C0:FFFF",
-      "emitted_bytes": 256,
+      "emitted_bytes": 768,
       "functions": [
+        "BitReverseTable",
+        "RandomTable",
         "Reset",
         "NMI_Stub",
         "IRQ_Stub",

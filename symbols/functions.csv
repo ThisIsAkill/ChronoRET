@@ -93,6 +93,8 @@ $C0:E9AA,$C0:E9E1,56,SprBuf_Alloc3,$C0,Engine,verified,a11012e8c2af,(was Sub_E9A
 $C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,verified,36bcd6233c5c,(was Sub_E9E2.) Releases the SprBuf chunk owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries and marks it free.
 $C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,verified,ecc6fcf33bcf,(was Sub_E9FF.) As SprBuf_Free1 for a 2-chunk object: the first of the 3 possible start entries owned by Obj_Cur and the one after it are freed.
 $C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,verified,b2719a992e30,(was Sub_EA1F.) As SprBuf_Free1 for a 3-chunk object (2 possible start entries).
+$C0:FD00,$C0:FDFF,256,BitReverseTable,$C0,Engine,verified,32da65be6db2,"Byte N is N with its 8 bits in reverse order (bit 0 ↔ bit 7, 1 ↔ 6, ...): $01 → $80, $02 → $40, $03 → $C0."
+$C0:FE00,$C0:FEFF,256,RandomTable,$C0,Engine,verified,cd0146de6eca,"The game's pseudo-random bytes, probably: a shuffle of 0-255 (every value appears exactly once; checked against the ROM)."
 $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,7569072366ee,The CPU comes out of reset in emulation mode with I already set.
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,verified,986b08119561,Native-mode interrupt stubs ($FF10–$FF17)
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,5ab7fb85aa4d,

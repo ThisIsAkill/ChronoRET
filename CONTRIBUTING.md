@@ -1,7 +1,7 @@
 # Contributing
 
 <!-- status:start -->
-29,032 of 359,278 bytes of game code are matched byte-exact (8.08%, 244 functions); 244 of those meet the readability standard and 244 are verified by independent review.
+29,544 of 359,278 bytes of game code are matched byte-exact (8.22%, 246 functions); 246 of those meet the readability standard and 246 are verified by independent review.
 <!-- status:end -->
 
 This project is early enough that the most valuable contributions right
@@ -76,6 +76,16 @@ includes the one before:
   lines, and every CONFIRMED caller from xref accounted for. Write the `Callers:` line from
   `make xref` output; a reviewer then only judges whether the header is right, not whether it
   is complete.
+
+- Data tables next to matched code (jump tables,
+pointer tables, lookup tables) are the cheapest bytes to match:
+  - `make tables-scan BANK=C1` ranks candidate tables in the bank's unmatched bytes, with the
+  instruction that reads each one (`JSR (T,X)` at ...) and a confidence.
+- `python3 tools/tables.py emit '$C1:1FF8' --count 33 --kind words` prints a table as source:
+  header, then `dw`/`dl`/`db` lines whose pointers use existing label names (`; TODO name` where
+  the target has none). `--kind bytes` and `--kind records:SIZE` give aligned hex rows.
+- The draft still needs what any routine needs: a real header (what it holds, how it is
+  indexed), names for its targets, and `make gate`.
 
 **Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
 by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
