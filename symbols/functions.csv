@@ -248,10 +248,35 @@ $C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,verified
 $C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,verified,461b3e81f768,next non-empty candidate (wrap at 11); no-op on an empty list.
 $C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,verified,24e2ed95f299,
 $C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,verified,87a8926f3aab,"candidate slots are $FF, Z=0 as soon as one isn't"
-$C1:283D,$C1:2859,29,Battle_CacheBattlerCoordsAll,$C1,Battle engine,readable,5aed779e4bc4,Copies every present battler's screen position into its probe position and rebuilds its box.
-$C1:285A,$C1:28AF,86,Battle_CalcBattlerBox,$C1,Battle engine,matched,935215865f98,"Builds battler X's box from its probe position: left   = ProbeX - HalfWidth, clamped at 0 right  = ProbeX + HalfWidth, clamped at $FF top    = ProbeY - Height, clamped at 0 bottom = ProbeY + 8, or Pro"
-$C1:28B0,$C1:2925,118,Battle_BoxOverlapsOthers,$C1,Battle engine,matched,d89e2809c0bf,
-$C1:2926,$C1:2985,96,Battle_BoxHitsBlockedCell,$C1,Battle engine,matched,d30cd03f8a49,
+$C1:283D,$C1:2859,29,Battle_CacheBattlerCoordsAll,$C1,Battle engine,readable,51afec48a09f,Copies every present battler's screen position into its probe position and rebuilds its box.
+$C1:285A,$C1:28AF,86,Battle_CalcBattlerBox,$C1,Battle engine,readable,4bff0abec424,"Builds battler X's box from its probe position: left   = ProbeX - HalfWidth, clamped at 0 right  = ProbeX + HalfWidth, clamped at $FF top    = ProbeY - Height, clamped at 0 bottom = ProbeY + 8, or Pro"
+$C1:28B0,$C1:2925,118,Battle_BoxOverlapsOthers,$C1,Battle engine,readable,c77a502d707c,
+$C1:2926,$C1:2985,96,Battle_BoxHitsBlockedCell,$C1,Battle engine,readable,a15b51438de8,
+$C1:2986,$C1:29B1,44,BattlePos_Query,$C1,Battle engine,readable,c125b106841d,"Service 5 of the cross-bank $C10045 service API (dispatch table at $C10051, entry 5 = $2986; searched: no JSR, JMP or JSL reaches $2986 directly)."
+$C1:29B2,$C1:29FA,73,BattlePos_NearestPc,$C1,Battle engine,readable,9a5c5e882579,
+$C1:29FB,$C1:2A42,72,BattlePos_FarthestPc,$C1,Battle engine,matched,ef7bd0bd298b,
+$C1:2A43,$C1:2A97,85,BattlePos_NearestEnemy,$C1,Battle engine,matched,d668edd9a41e,
+$C1:2A98,$C1:2AE2,75,BattlePos_FarthestEnemy,$C1,Battle engine,matched,5c979907d241,
+$C1:2AE3,$C1:2AEE,12,BattlePos_WithinDist40XY,$C1,Battle engine,readable,71a27740b8fa,
+$C1:2AEF,$C1:2AFA,12,BattlePos_WithinDist32XY,$C1,Battle engine,matched,69d59ca0d9e5,
+$C1:2AFB,$C1:2B06,12,BattlePos_WithinDist64XY,$C1,Battle engine,matched,9746da445e95,
+$C1:2B07,$C1:2B12,12,BattlePos_WithinDist4XY,$C1,Battle engine,matched,4fc3dffc0c4a,
+$C1:2B13,$C1:2B1E,12,BattlePos_WithinDist4XYTwin,$C1,Battle engine,matched,d3b2f4a75ef6,
+$C1:2B1F,$C1:2B2A,12,BattlePos_WithinDist16XY,$C1,Battle engine,matched,b9180b970e79,
+$C1:2B2B,$C1:2B36,12,BattlePos_WithinDist48,$C1,Battle engine,matched,8cd867d5dd0d,
+$C1:2B37,$C1:2B40,10,BattlePos_WithinDist32,$C1,Battle engine,matched,2e490b16a646,
+$C1:2B41,$C1:2B48,8,BattlePos_CheckPairDist,$C1,Battle engine,matched,70a2e1a9c0af,
+$C1:2B49,$C1:2BBB,115,BattlePos_CheckDist,$C1,Battle engine,matched,6b936c683296,
+$C1:2BBC,$C1:2BD9,30,BattlePos_SameRowBand,$C1,Battle engine,readable,3c19a45d4c3d,"BattlePos_SameRowBand / SubjectAbove / SubjectLeft ($C12BBC–$C12C01, 70 bytes; queries 5-7)"
+$C1:2BDA,$C1:2BED,20,BattlePos_SubjectAbove,$C1,Battle engine,matched,2b6b22554cab,
+$C1:2BEE,$C1:2C01,20,BattlePos_SubjectLeft,$C1,Battle engine,matched,9febb342b1ce,
+$C1:2C02,$C1:2CA6,165,BattlePos_PathClear,$C1,Battle engine,readable,6a40fa6d47cf,
+$C1:2CA7,$C1:2CB9,19,BattlePos_SubjectLowerHalf,$C1,Battle engine,readable,21100bb45d54,"BattlePos_SubjectLowerHalf / UpperHalf / RightPart / LeftPart ($C12CA7–$C12CF2, 76 bytes; queries 9-12)"
+$C1:2CBA,$C1:2CCC,19,BattlePos_SubjectUpperHalf,$C1,Battle engine,matched,a9937ccb0c8e,
+$C1:2CCD,$C1:2CDF,19,BattlePos_SubjectRightPart,$C1,Battle engine,matched,2bbf06bd65e2,
+$C1:2CE0,$C1:2CF2,19,BattlePos_SubjectLeftPart,$C1,Battle engine,matched,9e8362e6cf76,
+$C1:2CF3,$C1:2D80,142,BattlePos_DistDifference,$C1,Battle engine,readable,f488d7c38e15,
+$C1:2D81,$C1:2D9E,30,BattlePos_ModeTable,$C1,Battle engine,readable,cfcd4e73bb1e,"!BattlePos_Mode, called from BattlePos_Query."
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,readable,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,readable,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"

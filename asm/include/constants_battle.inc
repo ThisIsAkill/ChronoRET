@@ -56,6 +56,21 @@ if !constants_battle_inc == 0
 !Battle_CellBlocked      = $40   ; !Battle_CellMap bit: always blocks a box
 !Battle_OverlapPc        = $80   ; Battle_BoxOverlapsOthers result: touches a PC's box ($81 = an enemy's)
 
+; --- Position queries (BattlePos_Query) ---
+!BattlePos_Fail          = $FF   ; !BattlePos_Result: the condition does not hold
+!BattlePos_NoBest        = $FFFF ; nearest-battler scans: starting best distance (anything is nearer)
+!BattlePos_DistSq4       = $0010 ; squared distance limits: 4 pixels ...
+!BattlePos_DistSq16      = $0100 ; ... 16 pixels
+!BattlePos_DistSq32      = $0400 ; ... 32 pixels
+!BattlePos_DistSq40      = $0640 ; ... 40 pixels
+!BattlePos_DistSq48      = $0900 ; ... 48 pixels
+!BattlePos_DistSq64      = $1000 ; ... 64 pixels
+!BattlePos_RowBand       = $20   ; query 5: largest |dy| that still counts as the same row
+!BattlePos_MidRow        = 8     ; queries 9/10: cell row (y / 16) where the lower half of the screen starts
+!BattlePos_RightCol      = $0B   ; query 11: cell column (x / 16) where the right part starts
+!BattlePos_LeftColEnd    = 5     ; query 12: cell column where the left part ends (exclusive)
+!Battle_Invert8          = $FF   ; EOR mask; with INC A negates an 8-bit value
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits

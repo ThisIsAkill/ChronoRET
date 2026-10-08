@@ -5723,7 +5723,7 @@ BattleTgt_AnyCandidate:
 ; tentative position into the probe, rebuild the box and test it
 ; against the screen cell map and against the other battlers' boxes
 ; before committing the move (inferred from the callers at $C1:3851 and
-; following, and from the path check at $C1:2C02).
+; following, and from BattlePos_PathClear).
 
 ; ==================================================================
 ; Battle_CacheBattlerCoordsAll ($C1283D–$C12859, 29 bytes)
@@ -5767,7 +5767,7 @@ Battle_CacheBattlerCoordsAll:
 ; when it is $80 or more), which is right as long as the half-width and
 ; height stay below $80. The bottom edge is never clamped.
 ; Callers (JSR/JMP, scanned as above): Battle_CacheBattlerCoordsAll,
-; the path check at $C1:2C02 (JSR, and JMP as its tail), and the unmatched
+; BattlePos_PathClear (JSR, and JMP as its tail), and the unmatched
 ; movers at $C1:386A, $C1:3925, $C1:39D6, $C1:3B79, $C1:3CEB, $C1:3DFA,
 ; $C1:3EF7, $C1:4001, $C1:7C37.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; X = battler slot
@@ -5832,7 +5832,7 @@ Battle_CalcBattlerBox:
 ; 0 when it touches none; Y = the slot touched (11 when none).
 ; The horizontal test is written out twice, once for each order of the
 ; two left edges, and each copy repeats the vertical test.
-; Callers (JSR/JMP, scanned as above): the path check at $C1:2C02 and the
+; Callers (JSR/JMP, scanned as above): BattlePos_PathClear and the
 ; unmatched movers at $C1:3888, $C1:3930, $C1:39E1, $C1:3B8B, $C1:3D09,
 ; $C1:3E18, $C1:3F15, $C1:400C, plus a JMP (tail call) at $C1:7C3A.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot (16-bit,
@@ -5914,7 +5914,7 @@ Battle_BoxOverlapsOthers:
 ; The cell index row*16 + col is built in 8-bit A and moved with TAY,
 ; which also copies B; the index is right only while B is 0 (as after
 ; the callers' TDC; assumed, not traced for every caller).
-; Callers (JSR, scanned as above): the path check at $C1:2C02 and the unmatched
+; Callers (JSR, scanned as above): BattlePos_PathClear and the unmatched
 ; movers at $C1:387C, $C1:392B, $C1:39DC, $C1:3B7F, $C1:3CFD, $C1:3E0C,
 ; $C1:3F09, $C1:4007.
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot
@@ -5991,6 +5991,762 @@ Battle_BoxHitsBlockedCell:
     DEC A                           ; $FF
 .exit:
     RTS
+
+; ==================================================================
+; Position queries: service 5 of the $C10045 API ($C1:2986–$C1:2D9E)
+; ==================================================================
+; BattlePos_Query answers one question about two battlers' positions,
+; chosen by !BattlePos_Mode (table at $C1:2D81):
+;   0/1  nearest / farthest PC          2/3  nearest / farthest enemy
+;   4    within 32 pixels               14   within 48 pixels
+;   5    |dy| <= 32                     6/7  subject above / left of other
+;   8    path to the other is clear     9-12 subject in the lower /
+;   13   distance difference                 upper half, right / left part
+; Results: !BattlePos_Result (0 = holds, $FF = not) and, for 0-3 and 13,
+; !BattlePos_Found. Callers set !BattlePos_Mode, Subject, Other (and
+; Arg) and run service 5 (LDA #5, JSR to $C1:0003 or $C1:0045), e.g. the
+; battle-script code at $C1:9270-$C1:A74A tests Result after it, and
+; $C1:2F54 turns the angle to query 2's Found into $96DB (inferred: the
+; battler's facing). What the script commands that use the queries
+; stand for is not traced.
+; The distance checks also have entries of their own, used by movers
+; that pass the two slots in X and Y.
+
+; ==================================================================
+; BattlePos_Query ($C12986–$C129B1, 44 bytes)
+; ==================================================================
+; Service 5 of the cross-bank $C10045 service API (dispatch table at
+; $C10051, entry 5 = $2986; searched: no JSR, JMP or JSL reaches $2986
+; directly). Copies the screen positions of !BattlePos_Subject and
+; !BattlePos_Other into their probe positions, clears
+; !BattlePos_Result and runs the query handler for !BattlePos_Mode.
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher, which saves A,
+;        X and Y around the call); TAX/TAY of the slots also copy B,
+;        assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the handler's DP scratch
+;        clobbered
+; Callees: JSR (BattlePos_ModeTable,X)
+org $C12986
+BattlePos_Query:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battler_ProbeX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battler_ProbeY,Y
+    STZ.w !BattlePos_Result
+    LDA.w !BattlePos_Mode
+    ASL A
+    TAX
+    JSR (BattlePos_ModeTable,X)
+    RTS
+
+; ==================================================================
+; BattlePos_NearestPc / FarthestPc / NearestEnemy / FarthestEnemy
+; ($C129B2–$C12AE2, 305 bytes; queries 0-3)
+; ==================================================================
+; Each scans one side, skipping battlers that are not present, have
+; !Battler_Unk9FF7 bit 7 set or are KO'd (BattlerStats.Status bit 7),
+; measures the squared distance from the subject with
+; BattlePos_WithinDist32 (its Result side effect is left in place: the
+; last battler examined decides !BattlePos_Result) and keeps the best
+; slot in !BattlePos_Found. Ties go to the later slot (the compares keep
+; a new battler when it is at least as near / far). With no candidate,
+; Found is left as it was.
+; Only NearestEnemy skips the subject itself; the PC scans include it
+; when it is a PC (distance 0, so NearestPc then returns the subject).
+; Found is stored 16-bit from the 16-bit slot counter, so $9874 gets 0.
+; Callers: BattlePos_ModeTable entries 0-3 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattlePos_Subject
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattlePos_Other =
+;        last slot examined; DP $77-$78, $80-$87 (and $8A for
+;        NearestEnemy) and $AD-$B0 written
+; Callee: BattlePos_WithinDist32
+!BattlePos_ScanSlot = !BattleTmp_84       ; 2 B: slot being examined (initialised 16-bit, counted 8-bit)
+!BattlePos_BestDist = !BattleTmp_86       ; 2 B: squared distance of the best battler so far
+!BattlePos_SubjectCopy = !BattleTmp_8A    ; 1 B: subject slot (NearestEnemy skips it)
+!BattlePos_DistSq = !BattleTmp_AF         ; 2 B: squared distance left by BattlePos_CheckDist
+BattlePos_NearestPc:
+    TDC
+    TAX
+    STX.b !BattlePos_ScanSlot       ; slot 0
+    DEX
+    STX.b !BattlePos_BestDist       ; $FFFF
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_BestDist
+    CMP.b !BattlePos_DistSq
+    BCC .keep                       ; best is nearer
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .loop
+    RTS
+
+BattlePos_FarthestPc:
+    TDC
+    TAX
+    STX.b !BattlePos_ScanSlot       ; slot 0
+    STX.b !BattlePos_BestDist       ; 0
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_DistSq
+    CMP.b !BattlePos_BestDist
+    BCC .keep                       ; best is farther
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .loop
+    RTS
+
+BattlePos_NearestEnemy:
+    LDX.w #!BattlePos_NoBest
+    STX.b !BattlePos_BestDist
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattlePos_ScanSlot
+    LDA.w !BattlePos_Subject
+    STA.b !BattlePos_SubjectCopy
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    CMP.b !BattlePos_SubjectCopy
+    BEQ .next                       ; the subject itself
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_BestDist
+    CMP.b !BattlePos_DistSq
+    BCC .keep                       ; best is nearer
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+BattlePos_FarthestEnemy:
+    TDC
+    TAX
+    STX.b !BattlePos_BestDist       ; 0
+    LDX.w #!Battle_FirstEnemySlot
+    STX.b !BattlePos_ScanSlot
+.loop:
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,X
+    BMI .next
+    TXA
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+    JSR BattlePos_WithinDist32
+    REP #$20                        ; A -> 16-bit
+    LDA.b !BattlePos_DistSq
+    CMP.b !BattlePos_BestDist
+    BCC .keep                       ; best is farther
+    LDA.b !BattlePos_DistSq
+    STA.b !BattlePos_BestDist
+    LDA.b !BattlePos_ScanSlot
+    STA.w !BattlePos_Found          ; (16-bit)
+.keep:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+.next:
+    INC.b !BattlePos_ScanSlot
+    LDA.b !BattlePos_ScanSlot
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+; ==================================================================
+; BattlePos_WithinDist* ($C12AE3–$C12BBB, 217 bytes; queries 4 and 14)
+; ==================================================================
+; Squared-distance checks between two battlers' probe positions:
+; Result = 0 when dx*dx + dy*dy <= the entry's limit, else $FF; the
+; squared distance is left in !BattlePos_DistSq. Each entry sets
+; !BattlePos_DistLimit and joins BattlePos_CheckDist; the "XY" entries
+; take the two slots in X and Y from the caller, the others load them
+; from !BattlePos_Subject (X) and !BattlePos_Other (Y) in
+; BattlePos_CheckPairDist. WithinDist4XY and WithinDist4XYTwin are
+; byte-identical (two copies in the ROM, one caller each).
+; The 16-bit sum of the two squares wraps for points about 256 pixels
+; or more apart (reproduced as found; on-screen distances keep below).
+; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded):
+;   WithinDist40XY      $C1:4A26 (unmatched)
+;   WithinDist32XY      BattlePos_PathClear, $C1:3819 (unmatched)
+;   WithinDist64XY      $C1:3821 (unmatched)
+;   WithinDist4XY       $C1:3829 (unmatched)
+;   WithinDist4XYTwin   $C1:3B38 (unmatched)
+;   WithinDist16XY      $C1:3CBB (unmatched)
+;   WithinDist48        BattlePos_ModeTable entry 14 only
+;   WithinDist32        BattlePos_ModeTable entry 4, and queries 0-3
+; Entry: M=1, X=0, DP=0, DB=$7E; for the XY entries X and Y = the two
+;        battler slots
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 or $FF; X = dx*dx (from
+;        Battle_Mul8's product); Y unchanged; DP $77-$78, $80-$83 and
+;        $AD-$B0 written; !BattlePos_DistLimit set
+; Callee: Battle_Mul8 (twice)
+!BattlePos_CoordA = !BattleTmp_80         ; 2 B: first battler's coordinate (zero-extended), then |dy|
+!BattlePos_CoordB = !BattleTmp_82         ; 2 B: second battler's coordinate, then dx*dx
+BattlePos_WithinDist40XY:
+    LDA.b #!BattlePos_DistSq40&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq40>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist32XY:
+    LDA.b #!BattlePos_DistSq32&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq32>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist64XY:
+    LDA.b #!BattlePos_DistSq64&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq64>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist4XY:
+    LDA.b #!BattlePos_DistSq4&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq4>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist4XYTwin:
+    LDA.b #!BattlePos_DistSq4&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq4>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist16XY:
+    LDA.b #!BattlePos_DistSq16&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq16>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckDist
+
+BattlePos_WithinDist48:
+    LDA.b #!BattlePos_DistSq48&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq48>>8
+    STA.w !BattlePos_DistLimit+1
+    BRA BattlePos_CheckPairDist
+
+BattlePos_WithinDist32:
+    LDA.b #!BattlePos_DistSq32&$FF
+    STA.w !BattlePos_DistLimit
+    LDA.b #!BattlePos_DistSq32>>8
+    STA.w !BattlePos_DistLimit+1
+BattlePos_CheckPairDist:            ; X = subject, Y = other
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+BattlePos_CheckDist:                ; X, Y = the two battlers
+    LDA.w !Battler_ProbeX,X
+    STA.b !BattlePos_CoordA
+    STZ.b !BattlePos_CoordA+1
+    LDA.w !Battler_ProbeX,Y
+    STA.b !BattlePos_CoordB
+    STZ.b !BattlePos_CoordB+1
+    REP #$20                        ; A -> 16-bit
+    SEC
+    LDA.b !BattlePos_CoordA
+    SBC.b !BattlePos_CoordB
+    BPL .dx_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.dx_positive:
+    STA.b !Battle_Mul8A             ; 16-bit: |dx| to Mul8A, its high byte (0) to Mul8B
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B             ; |dx| * |dx|
+    LDA.w !Battler_ProbeY,X
+    STA.b !BattlePos_CoordA
+    STZ.b !BattlePos_CoordA+1
+    LDA.w !Battler_ProbeY,Y
+    STA.b !BattlePos_CoordB
+    STZ.b !BattlePos_CoordB+1
+    REP #$20                        ; A -> 16-bit
+    SEC
+    LDA.b !BattlePos_CoordA
+    SBC.b !BattlePos_CoordB
+    BPL .dy_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.dy_positive:
+    STA.b !BattlePos_CoordA         ; |dy|
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    JSR Battle_Mul8                 ; dx * dx
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_CoordB
+    LDA.b !BattlePos_CoordA
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                 ; dy * dy
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !BattlePos_CoordB
+    ADC.b !Battle_Mul8Product
+    STA.b !BattlePos_DistSq
+    CMP.w !BattlePos_DistLimit
+    BEQ .within
+    BCC .within
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b #!BattlePos_Fail
+    STA.w !BattlePos_Result
+    RTS
+.within:
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    STA.w !BattlePos_Result         ; 0
+    RTS
+
+; ==================================================================
+; BattlePos_SameRowBand / SubjectAbove / SubjectLeft
+; ($C12BBC–$C12C01, 70 bytes; queries 5-7)
+; ==================================================================
+; Compare the subject's and the other battler's screen positions and
+; DEC !BattlePos_Result (0 -> $FF) when the condition fails:
+;   SameRowBand   |y difference| <= $20 (8-bit: a difference of $80 or
+;                 more folds to its 256-complement)
+;   SubjectAbove  subject y < other y
+;   SubjectLeft   subject x < other x
+; Callers: BattlePos_ModeTable entries 5-7 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject, Y = other
+; No calls.
+BattlePos_SameRowBand:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    SEC
+    LDA.w !Battler_ScreenY,X
+    SBC.w !Battler_ScreenY,Y
+    BPL .positive
+    EOR.b #!Battle_Invert8
+    INC A                           ; |dy|
+.positive:
+    CMP.b #!BattlePos_RowBand
+    BEQ .exit
+    BCC .exit
+    DEC.w !BattlePos_Result         ; too far apart
+.exit:
+    RTS
+
+BattlePos_SubjectAbove:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenY,X
+    CMP.w !Battler_ScreenY,Y
+    BCC .exit
+    DEC.w !BattlePos_Result         ; not above
+.exit:
+    RTS
+
+BattlePos_SubjectLeft:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !BattlePos_Other
+    TAY
+    LDA.w !Battler_ScreenX,X
+    CMP.w !Battler_ScreenX,Y
+    BCC .exit
+    DEC.w !BattlePos_Result         ; not left of it
+.exit:
+    RTS
+
+; ==================================================================
+; BattlePos_PathClear ($C12C02–$C12CA6, 165 bytes; query 8)
+; ==================================================================
+; Walks the subject's probe position out from its screen position in
+; the direction Battle_CalcAngle gives from the subject to the other
+; battler, one step further each pass (the radius grows by the
+; subject's !Battler_PathStep), and after each step:
+;   - checks the probe with BattlePos_WithinDist32XY; within -> done,
+;     Result 0;
+;   - otherwise rebuilds the subject's box: a blocked cell, or (with
+;     !BattlePos_Arg non-zero) another battler's box -> Result $FF.
+; At the end the subject's screen position is written back from the
+; copy taken at the start (it was never changed here) and its box is
+; rebuilt (tail JMP to Battle_CalcBattlerBox).
+; Quirk: at the distance check Y is the subject but X still holds what
+; Battle_SinLookup left (Battle_Mul8x16's first partial product), not
+; the other battler's slot, so the probe is compared with an arbitrary
+; ProbeX/ProbeY,X byte pair. Reproduced as found; the other battler was
+; probably meant. With a step of 0 nothing moves and the loop only ends
+; through that check.
+; Callers: BattlePos_ModeTable entry 8 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$8E, $A5-$B0,
+;        $D3-$E3 written (also $77-$78 through the multiplies);
+;        !Battle_PassCellBit7 = 0
+; Callees: Battle_CalcAngle, Battle_SinLookup, BattlePos_WithinDist32XY,
+;          Battle_CalcBattlerBox, Battle_BoxHitsBlockedCell,
+;          Battle_BoxOverlapsOthers
+!BattlePos_HomeX = !BattleTmp_8A          ; 1 B: subject screen x at the start
+!BattlePos_HomeY = !BattleTmp_8B          ; 1 B: subject screen y at the start
+!BattlePos_StepY = !BattleTmp_8C          ; 1 B: y offset of the probe this pass (sine * radius / 256)
+!BattlePos_StepX = !BattleTmp_8E          ; 1 B: x offset (cosine * radius / 256)
+BattlePos_PathClear:
+    STZ.w !BattlePos_Result
+    STZ.b !Battle_SinScale          ; radius 0
+    LDA.w !BattlePos_Subject
+    TAY
+    LDA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_ScreenX,Y
+    STA.b !BattlePos_HomeX
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !BattlePos_HomeY
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+.step:
+    LDA.w !BattlePos_Subject
+    TAX
+    CLC
+    LDA.w !Battler_PathStep,X
+    ADC.b !Battle_SinScale
+    STA.b !Battle_SinScale          ; radius += step
+    LDA.b !Battle_GeoAngle
+    JSR Battle_SinLookup
+    STA.b !BattlePos_StepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !BattlePos_StepX
+    LDA.w !BattlePos_Subject
+    TAY
+    CLC
+    LDA.w !Battler_ScreenY,Y
+    ADC.b !BattlePos_StepY
+    STA.w !Battler_ProbeY,Y
+    CLC
+    LDA.w !Battler_ScreenX,Y
+    ADC.b !BattlePos_StepX
+    STA.w !Battler_ProbeX,Y
+    JSR BattlePos_WithinDist32XY    ; X is stale here (see header)
+    LDA.w !BattlePos_Result
+    BPL .done                       ; within: path clear
+    LDA.w !BattlePos_Subject
+    TAX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !BattlePos_Arg
+    BEQ .free
+    JSR Battle_BoxOverlapsOthers
+    BMI .blocked
+.free:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.b !BattlePos_HomeX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattlePos_HomeY
+    STA.w !Battler_ScreenY,X
+    JMP .step
+.blocked:
+    LDA.b #!BattlePos_Fail
+    STA.w !BattlePos_Result
+.done:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.b !BattlePos_HomeX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattlePos_HomeY
+    STA.w !Battler_ScreenY,X
+    JMP Battle_CalcBattlerBox
+
+; ==================================================================
+; BattlePos_SubjectLowerHalf / UpperHalf / RightPart / LeftPart
+; ($C12CA7–$C12CF2, 76 bytes; queries 9-12)
+; ==================================================================
+; Test the subject's 16-pixel cell (screen position / 16) and DEC
+; !BattlePos_Result (0 -> $FF) when the condition fails:
+;   LowerHalf  y / 16 >= 8          UpperHalf  y / 16 < 8
+;   RightPart  x / 16 >= 11         LeftPart   x / 16 < 5
+; Callers: BattlePos_ModeTable entries 9-12 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Result = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = subject; Y unchanged
+; No calls.
+BattlePos_SubjectLowerHalf:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenY,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_MidRow
+    BCS .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectUpperHalf:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenY,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_MidRow
+    BCC .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectRightPart:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenX,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_RightCol
+    BCS .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+BattlePos_SubjectLeftPart:
+    LDA.w !BattlePos_Subject
+    TAX
+    LDA.w !Battler_ScreenX,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CMP.b #!BattlePos_LeftColEnd
+    BCC .exit
+    DEC.w !BattlePos_Result
+.exit:
+    RTS
+
+; ==================================================================
+; BattlePos_DistDifference ($C12CF3–$C12D80, 142 bytes; query 13)
+; ==================================================================
+; Measures, from the other battler's screen position, the squared
+; distance to the subject (d1) and to the battler in !BattlePos_Arg
+; (d2), and stores |d2 - d1| / 256 (low byte) in !BattlePos_Found.
+; Result is left at 0. What the scripts use the value for is not traced.
+; The per-axis differences are 8-bit (a difference of $80 or more folds
+; to its 256-complement) and the 16-bit sums can wrap, as in
+; BattlePos_CheckDist.
+; Callers: BattlePos_ModeTable entry 13 only (BattlePos_Query).
+; Entry: M=1, X=0, DP=0, DB=$7E; !BattlePos_Subject, Other, Arg
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = d2's dx*dx; Y = Arg;
+;        DP $77-$78, $80-$85 and $AD-$B0 written
+; Callees: Battle_Mul8 (four times), Battle_ShiftRight8 (16-bit)
+!BattlePos_PointX = !BattleTmp_80         ; 1 B: other battler's x; at the end the 16-bit result
+!BattlePos_PointY = !BattleTmp_81         ; 1 B: other battler's y
+!BattlePos_DistSq1 = !BattleTmp_82        ; 2 B: d1 (dx*dx first)
+!BattlePos_DistSq2 = !BattleTmp_84        ; 2 B: dx*dx of d2
+BattlePos_DistDifference:
+    LDA.w !BattlePos_Other
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattlePos_PointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattlePos_PointY
+    LDA.w !BattlePos_Subject
+    TAY
+    SEC
+    LDA.b !BattlePos_PointX
+    SBC.w !Battler_ScreenX,Y
+    BPL .dx1_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dx1_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_DistSq1
+    SEC
+    LDA.b !BattlePos_PointY
+    SBC.w !Battler_ScreenY,Y
+    BPL .dy1_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dy1_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattlePos_DistSq1
+    STA.b !BattlePos_DistSq1        ; d1
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w !BattlePos_Arg
+    TAY
+    SEC
+    LDA.b !BattlePos_PointX
+    SBC.w !Battler_ScreenX,Y
+    BPL .dx2_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dx2_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    LDX.b !Battle_Mul8Product
+    STX.b !BattlePos_DistSq2
+    SEC
+    LDA.b !BattlePos_PointY
+    SBC.w !Battler_ScreenY,Y
+    BPL .dy2_positive
+    EOR.b #!Battle_Invert8
+    INC A
+.dy2_positive:
+    STA.b !Battle_Mul8A
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8
+    REP #$21                        ; A -> 16-bit, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattlePos_DistSq2        ; d2
+    SEC
+    SBC.b !BattlePos_DistSq1
+    BPL .diff_positive
+    EOR.w #!Battle_Invert16
+    INC A
+.diff_positive:
+    JSR Battle_ShiftRight8          ; / 256
+    STA.b !BattlePos_PointX         ; (16-bit)
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b !BattlePos_PointX
+    STA.w !BattlePos_Found
+    RTS
+
+; BattlePos_ModeTable ($C12D81–$C12D9E, 30 bytes): query handlers by
+; !BattlePos_Mode, called from BattlePos_Query.
+BattlePos_ModeTable:
+    dw BattlePos_NearestPc          ; $00
+    dw BattlePos_FarthestPc         ; $01
+    dw BattlePos_NearestEnemy       ; $02
+    dw BattlePos_FarthestEnemy      ; $03
+    dw BattlePos_WithinDist32       ; $04
+    dw BattlePos_SameRowBand        ; $05
+    dw BattlePos_SubjectAbove       ; $06
+    dw BattlePos_SubjectLeft        ; $07
+    dw BattlePos_PathClear          ; $08
+    dw BattlePos_SubjectLowerHalf   ; $09
+    dw BattlePos_SubjectUpperHalf   ; $0A
+    dw BattlePos_SubjectRightPart   ; $0B
+    dw BattlePos_SubjectLeftPart    ; $0C
+    dw BattlePos_DistDifference     ; $0D
+    dw BattlePos_WithinDist48       ; $0E
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
