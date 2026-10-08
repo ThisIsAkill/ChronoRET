@@ -12863,6 +12863,1894 @@ BattleAct_StartBattlerMove:
     RTS
 
 ; ==================================================================
+; BattleAct_OpCurveTo ($C151EE–$C153AF, 450 bytes, with
+; BattleAct_OpCurveToUnkPoint, BattleAct_OpCurveToCalc and
+; BattleAct_CurveToPoint)
+; ==================================================================
+; The curving move opcodes: like the move opcodes $10-$12
+; (BattleAct_OpMoveTo) they move the thread's actor to a point and wait
+; for it, but with mover kind !Battle_MoveKindCurve: the mover at
+; $CF:F405 (unmatched) keeps a heading (!Battle_ActorHeading), turns it
+; towards the angle to the point by up to !Battle_ActorMoveSpeed per
+; step, the way !Battle_ActorTurnDir says, and moves along it; once the
+; heading has reached that angle (!Battle_ActorOnCourse) it stops
+; turning. That the move ends near the point is from the mover's call
+; of $CF:F957 with $10 before it sets the done flag (not traced).
+; The first operand h is the start heading ($FF: the actor's
+; !Battle_ActorUnkA5AA; quirk, kept: on thread 4 the start loop stores
+; each slot's heading back into DP $82, so only the first slot of the
+; pass sees $FF and later slots start from the first slot's heading);
+; the point is put in !Battle_ActCalcOutA/B
+; (x, y) and DP $8E holds the opcode's length:
+;   - $13 <h> <x> <y> (BattleAct_OpCurveTo): the point from the
+;     operands; length 4;
+;   - $14 <h> (BattleAct_OpCurveToUnkPoint): the point in
+;     !Battle_ActUnkPointX/Y; length 2;
+;   - $15 <h> <n> (BattleAct_OpCurveToCalc): the point left by
+;     BattleAct_RunCalc handler n; length 3.
+; BattleAct_CurveToPoint, the shared part, starts a move by taking the
+; angle from the actor to the point (Battle_CalcAngle), storing the
+; start heading and the turn direction (BattleAct_CurveTurnDir), the
+; point in !Battle_ActorToX/Y, !Battle_ActorMoveTimer = 1, the kind,
+; and zeroing !Battle_ActorUnkA311, the done flag and
+; !Battle_ActorOnCourse; then !Battle_ActorMoving = 1. By thread:
+;   - threads 0-3, the thread's battler: starts the move when it is not
+;     moving; when it is and !Battler_MoveDone is set, clears
+;     !Battle_ActorMoving and advances by the length; else it stays on
+;     the opcode (advance 0);
+;   - thread 4: goes through the target set starting each slot that is
+;     not moving, then waits. On a later frame, at the first slot that
+;     is moving it switches to counting: each slot from there that is
+;     done gets !Battle_ActorMoving cleared, and it advances only when
+;     none is left undone. Quirk: a slot cleared this way while others
+;     still move is not moving on the next frame, so the start loop
+;     starts its move again (from where it ended);
+;   - threads 8-15, object j: the same as a battler with the object's
+;     entries of the actor arrays (index 11 + j), from the object's
+;     position (!Battle_ActObjX/Y, whose high bytes it zeroes) and
+;     waiting for !Battle_ActObjMoveDone.
+; Unlike the straight move it sets no step, offset or step count, and
+; the length is not kept per thread: each frame the opcode runs again
+; from the start and sets DP $8E (and the point) again.
+; Callers: BattleAct_OpcodeTable entries $13 (BattleAct_OpCurveTo), $14
+;   (BattleAct_OpCurveToUnkPoint) and $15 (BattleAct_OpCurveToCalc);
+;   BattleAct_CurveToPoint is reached only from these three.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
+;        !Battle_ActCalcOutA/B = the point; DP $82 = the start heading,
+;        $8E = the length; when a move starts, Battle_CalcAngle's DP
+;        ($D3-$E3) and $86-$87; thread 4 also DP $80-$81 and $84
+; Callees: BattleAct_RunCalc, Battle_CalcAngle, BattleAct_CurveTurnDir,
+;          BattleAct_AdvanceScript (JMP)
+!BattleAct_CurveHeading = !BattleTmp_82 ; 1 B: the start heading operand, then the one used
+!BattleAct_CurveBusy = !BattleTmp_84    ; 1 B: thread 4: slots of the set still moving
+BattleAct_OpCurveTo:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_CurveHeading
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActCalcOutA
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActCalcOutB
+    LDA.b #4
+    STA.b !BattleAct_MoveLen
+    BRA BattleAct_CurveToPoint
+
+BattleAct_OpCurveToUnkPoint:            ; header: see BattleAct_OpCurveTo
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_CurveHeading
+    LDA.w !Battle_ActUnkPointX
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battle_ActUnkPointY
+    STA.w !Battle_ActCalcOutB
+    LDA.b #2
+    STA.b !BattleAct_MoveLen
+    BRA BattleAct_CurveToPoint
+
+BattleAct_OpCurveToCalc:                ; header: see BattleAct_OpCurveTo
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_CurveHeading
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.b #3
+    STA.b !BattleAct_MoveLen
+BattleAct_CurveToPoint:                 ; header: see BattleAct_OpCurveTo
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .object
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .target_set
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .battler_moving
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    LDA.b !BattleAct_CurveHeading
+    CMP.b #!Battle_CurveKeepHeading
+    BNE .battler_heading
+    LDA.w !Battle_ActorUnkA5AA,Y
+.battler_heading:
+    STA.w !Battle_ActorHeading,Y
+    STA.b !BattleAct_CurveHeading
+    JSR BattleAct_CurveTurnDir
+    STA.w !Battle_ActorTurnDir,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    LDA.b #!Battle_MoveKindCurve
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    STA.w !Battle_ActorOnCourse,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActorToX,Y
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActorToY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    BRA .battler_wait
+.battler_moving:
+    LDA.w !Battler_MoveDone,Y
+    BEQ .battler_wait
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    JMP .done
+.battler_wait:
+    JMP .wait
+.target_set:
+    TDC
+    TAX
+    STX.b !BattleAct_MoveSetIdx
+.start_slot:
+    LDX.b !BattleAct_MoveSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .set_started
+    TAY
+    LDA.w !Battle_ActorMoving,Y
+    BNE .count_busy
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    LDA.b !BattleAct_CurveHeading
+    CMP.b #!Battle_CurveKeepHeading
+    BNE .slot_heading
+    LDA.w !Battle_ActorUnkA5AA,Y
+.slot_heading:
+    STA.w !Battle_ActorHeading,Y
+    STA.b !BattleAct_CurveHeading ; overwrites the $FF: later slots reuse this heading
+    JSR BattleAct_CurveTurnDir
+    STA.w !Battle_ActorTurnDir,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer,Y
+    LDA.b #!Battle_MoveKindCurve
+    STA.w !Battle_ActorMoveKind,Y
+    TDC
+    STA.w !Battle_ActorUnkA311,Y
+    STA.w !Battler_MoveDone,Y
+    STA.w !Battle_ActorOnCourse,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActorToX,Y
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActorToY,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving,Y
+    INC.b !BattleAct_MoveSetIdx
+    BRA .start_slot
+.set_started:
+    BRA .set_wait
+.count_busy:
+    STZ.b !BattleAct_CurveBusy
+.count_slot:
+    LDX.b !BattleAct_MoveSetIdx
+    LDA.w !Battle_ActTargetSet,X
+    BMI .counted
+    TAY
+    LDA.w !Battler_MoveDone,Y
+    BEQ .slot_busy
+    TDC
+    STA.w !Battle_ActorMoving,Y
+    BRA .next_count
+.slot_busy:
+    INC.b !BattleAct_CurveBusy
+.next_count:
+    INC.b !BattleAct_MoveSetIdx
+    BRA .count_slot
+.counted:
+    LDA.b !BattleAct_CurveBusy
+    BEQ .set_done
+.set_wait:
+    JMP .wait
+.set_done:
+    JMP .done
+.object:
+    LDY.w !Battle_ActObjThread
+    LDA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BEQ .object_start
+    JMP .object_moving
+.object_start:
+    TYA
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battle_ActObjY,X
+    STA.b !Battle_GeoOriginY
+    STZ.w !Battle_ActObjX+1,X
+    STZ.w !Battle_ActObjY+1,X
+    LDA.w !Battle_ActCalcOutA
+    STA.b !Battle_GeoPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    LDA.b !BattleAct_CurveHeading
+    CMP.b #!Battle_CurveKeepHeading
+    BNE .object_heading
+    LDA.w !Battle_ActObjUnkA5B5,Y
+.object_heading:
+    STA.w !Battle_ActorHeading+!Battle_NumSlots,Y
+    STA.b !BattleAct_CurveHeading
+    JSR BattleAct_CurveTurnDir
+    STA.w !Battle_ActorTurnDir+!Battle_NumSlots,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoveTimer+!Battle_NumSlots,Y
+    LDA.b #!Battle_MoveKindCurve
+    STA.w !Battle_ActorMoveKind+!Battle_NumSlots,Y
+    TDC
+    STA.w !Battle_ActObjUnkA31C,Y
+    STA.w !Battle_ActObjMoveDone,Y
+    STA.w !Battle_ActorOnCourse+!Battle_NumSlots,Y
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActorToX+!Battle_NumSlots,Y
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActorToY+!Battle_NumSlots,Y
+    LDA.b #1
+    STA.w !Battle_ActorMoving+!Battle_NumSlots,Y
+    BRA .wait
+.object_moving:
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActObjMoveDone,X
+    BEQ .wait
+    STZ.w !Battle_ActorMoving+!Battle_NumSlots,X
+    BRA .done
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+.done:
+    LDA.b !BattleAct_MoveLen
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_CurveTurnDir ($C153B0–$C15408, 89 bytes)
+; ==================================================================
+; Which way a curving move turns from heading DP $82 to the angle
+; !Battle_GeoAngle (Battle_CalcAngle's, to the point): A = 0 (increase
+; the angle) or 1 (decrease it), the shorter way. It compares the
+; quarters of the two angles (angle >> 6, DP $86 for the angle and $87
+; for the heading): in the same quarter by the angles themselves (equal
+; gives 1), in neighbouring quarters by their order round the circle,
+; and in opposite quarters by whether heading + $80 (8-bit, so it
+; wraps) is below the angle. The result is stored in
+; !Battle_ActorTurnDir, which the mover at $CF:F453 reads.
+; Callers (3 JSR sites): BattleAct_CurveToPoint ($C1:526B, $C1:52DD,
+;   $C1:536C; header of BattleAct_OpCurveTo).
+; Entry: M=1, X=0, DP=0, DB=any; DP $82 = heading, !Battle_GeoAngle set
+; Exit:  M=1, X=0, DP=0; A = 0 or 1 (Z set iff 0); X, Y unchanged; DP
+;        $86-$87 written
+; Callees: Battle_ShiftRight6
+!BattleAct_TurnAngleQ = !BattleTmp_86   ; 1 B: quarter of the angle to the point
+!BattleAct_TurnHeadQ = !BattleTmp_87    ; 1 B: quarter of the heading
+BattleAct_CurveTurnDir:
+    LDA.b !Battle_GeoAngle
+    JSR Battle_ShiftRight6
+    STA.b !BattleAct_TurnAngleQ
+    LDA.b !BattleAct_CurveHeading
+    JSR Battle_ShiftRight6
+    STA.b !BattleAct_TurnHeadQ
+    CMP.b !BattleAct_TurnAngleQ
+    BNE .other_quarter
+    LDA.b !BattleAct_CurveHeading
+    CMP.b !Battle_GeoAngle
+    BCS .decrease
+    BRA .increase
+.other_quarter:
+    LDA.b !BattleAct_TurnHeadQ
+    BNE .head_q1
+    LDA.b !BattleAct_TurnAngleQ     ; heading in quarter 0
+    DEC A
+    BEQ .increase
+    DEC A
+    BNE .decrease
+    BRA .opposite
+.head_q1:
+    DEC A
+    BNE .head_q2
+    LDA.b !BattleAct_TurnAngleQ
+    BEQ .decrease
+    DEC A
+    DEC A
+    BEQ .increase
+    BRA .opposite
+.head_q2:
+    DEC A
+    BNE .head_q3
+    LDA.b !BattleAct_TurnAngleQ
+    BEQ .opposite
+    DEC A
+    BEQ .decrease
+    BRA .increase
+.head_q3:
+    LDA.b !BattleAct_TurnAngleQ
+    BEQ .increase
+    DEC A
+    BEQ .opposite
+    BRA .decrease
+.opposite:
+    CLC
+    LDA.b !BattleAct_CurveHeading
+    ADC.b #!Battle_AngleHalfTurn
+    CMP.b !Battle_GeoAngle
+    BCC .decrease
+.increase:
+    TDC
+    BRA .exit
+.decrease:
+    LDA.b #1
+.exit:
+    RTS
+
+; ==================================================================
+; BattleAct_OpPathTo ($C15409–$C15610, 520 bytes, with
+; BattleAct_OpPathToUnkPoint, BattleAct_OpPathToCalc and
+; BattleAct_PathToPoint)
+; ==================================================================
+; The path-walk opcodes: a battler of threads 0-3 walks to a point cell
+; by cell round what stands in the way, then the thread goes on. The
+; point is put in !Battle_ActCalcOutA/B (x, y) and DP $8E holds the
+; opcode's length:
+;   - $16 <x> <y> (BattleAct_OpPathTo): the point from the operands;
+;     length 3;
+;   - $17 (BattleAct_OpPathToUnkPoint): the point in
+;     !Battle_ActUnkPointX/Y; length 1;
+;   - $18 <n> (BattleAct_OpPathToCalc): the point left by
+;     BattleAct_RunCalc handler n; length 2.
+; BattleAct_PathToPoint, the shared part, for the thread's battler:
+;   - when it is not walking (!Battler_PathWalking 0): keeps its x, y
+;     in !Battler_PathStartX/Y, counts !Battler_UnkA166 up, keeps the
+;     length in the thread's !Battle_ActThreadPathLen and searches a
+;     path from its position to the point (BattleAct_FindPath, on the
+;     !Battle_PathMap that is there; whether it was found is not
+;     looked at). It keeps the start cell in !Battler_PathCell and
+;     copies the marked map into its !Battler_PathMaps block, sets
+;     !Battler_PathStepKind and !Battler_UnkA522 to 0,
+;     !Battler_PathFromDir to !Battle_PathDirNone, the step frame to $FF
+;     (no step under way) and !Battler_PathWalking to 1;
+;   - while a step is under way (!Battler_PathStepFrame 0-7) it waits;
+;     $CF:EC78 (unmatched) moves the battler by the step's table
+;     entries each frame and counts the frame down;
+;   - when the step is done: the step frame = !Battle_PathStepFrames,
+;     the battler's map is copied to !Battle_PathWalkMap and the next
+;     step is chosen from its cell c. The neighbours of c are tried in
+;     the order up, down, left, right, leaving out the direction it
+;     came from; the first one with all !Battle_PathMark bits set (a
+;     marked cell, or the goal $FF) gives the direction d (right is
+;     taken without that test, as in BattleAct_FindPath's trace). If
+;     the neighbour is the goal, the walk ends. Else, if the cell two
+;     ahead (!BattleRom_PathAhead +0) is the goal the walk ends, and if
+;     it is marked the step is straight (kind d * 8). Otherwise the
+;     first diagonal ahead (+1) is looked at: the goal ends the walk,
+;     marked makes it the step, kind d * 8 + 1, or + 3 when the side
+;     cell next to it (!BattleRom_PathSide +1) has any of the mark bits
+;     set; if it is not marked, the other diagonal (+2) is the step
+;     (the goal still ends the walk), kind + 2, or + 4 with its side
+;     cell (+2) set. The kind's !BattleRom_PathFromDir and
+;     !BattleRom_PathFacing entries go to !Battler_PathFromDir and
+;     !Battler_Facing, and the new cell to !Battler_PathCell. So the
+;     walk ends when the goal is the neighbour cell, two cells straight
+;     ahead (a straight step moves one cell, so a straight approach stops
+;     two cells short) or diagonally ahead. That kinds 3 and 4
+;     are curved diagonals is from the $CC:F494/$CC:F594 entries.
+;     When the walk ends, !Battler_PathWalking is cleared and the
+;     thread advances by its !Battle_ActThreadPathLen.
+; Threads 4 and 8-15 do nothing but advance by their
+; !Battle_ActThreadPathLen. Quirk: only the battler part above writes
+; that byte, for threads 0-3, so these threads advance by whatever it
+; holds (if 0, they stay on this opcode for good).
+; Callers: BattleAct_OpcodeTable entries $16 (BattleAct_OpPathTo), $17
+;   (BattleAct_OpPathToUnkPoint) and $18 (BattleAct_OpPathToCalc);
+;   BattleAct_PathToPoint is reached only from these three.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
+;        !Battle_ActCalcOutA/B = the point; DP $80 = the slot (threads
+;        0-3), $8E = the length; a start also leaves
+;        BattleAct_FindPath's state and DP; a step DP $82 and $84-$86
+; Callees: BattleAct_RunCalc, BattleAct_FindPath,
+;          BattleAct_AdvanceScript (JMP)
+!BattleAct_WalkSlot = !BattleTmp_80     ; 2 B: the walking battler's slot (X; 1 B as Y)
+!BattleAct_WalkCell = !BattleTmp_82     ; 1 B: the cell it walks from
+!BattleAct_WalkNext = !BattleTmp_84     ; 2 B: the cell of the step (the neighbour, or the diagonal)
+!BattleAct_WalkKind = !BattleTmp_85     ; 1 B: the step kind, direction * 8 + 0-4
+!BattleAct_WalkDiag = !BattleTmp_86     ; 2 B: the diagonal cell while its side cell is tested
+BattleAct_OpPathTo:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActCalcOutA
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActCalcOutB
+    LDA.b #3
+    STA.b !BattleAct_MoveLen
+    BRA BattleAct_PathToPoint
+
+BattleAct_OpPathToUnkPoint:             ; header: see BattleAct_OpPathTo
+    LDA.w !Battle_ActUnkPointX
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battle_ActUnkPointY
+    STA.w !Battle_ActCalcOutB
+    LDA.b #1
+    STA.b !BattleAct_MoveLen
+    BRA BattleAct_PathToPoint
+
+BattleAct_OpPathToCalc:                 ; header: see BattleAct_OpPathTo
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.b #2
+    STA.b !BattleAct_MoveLen
+BattleAct_PathToPoint:                  ; header: see BattleAct_OpPathTo
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .battler
+    JMP .advance_kept
+.battler:
+    CMP.b #!Battle_ActTargetSetThread
+    BNE .one_battler
+    JMP .advance_kept
+.one_battler:
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STX.b !BattleAct_WalkSlot
+    LDA.w !Battler_PathWalking,X
+    BNE .walking
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_PathFromX
+    STA.w !Battler_PathStartX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_PathStartY,X
+    STA.b !BattleAct_PathFromY
+    LDA.w !Battle_ActCalcOutA
+    STA.b !BattleAct_PathToX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !BattleAct_PathToY
+    INC.w !Battler_UnkA166,X
+    LDX.w !Battle_ActThread
+    LDA.b !BattleAct_MoveLen
+    STA.w !Battle_ActThreadPathLen,X
+    JSR BattleAct_FindPath
+    LDA.w !Battle_ActThread
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STX.b !BattleAct_WalkSlot
+    LDA.w !Battle_PathStartCell
+    STA.w !Battler_PathCell,X
+    LDA.b !BattleAct_WalkSlot
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !BattleRom_SlotTimes256,X
+    TAY
+    TDC
+    TAX
+    SEP #$20
+.copy_map:
+    LDA.w !Battle_PathMap,X
+    STA.w !Battler_PathMaps,Y
+    INY
+    INX
+    CPX.w #!Battle_PathMapBytes
+    BNE .copy_map
+    LDY.b !BattleAct_WalkSlot
+    TDC
+    STA.w !Battler_PathStepKind,Y
+    STA.w !Battler_UnkA522,Y
+    LDA.b #!Battle_PathDirNone
+    STA.w !Battler_PathFromDir,Y
+    STA.w !Battler_PathStepFrame,Y
+    LDA.b #1
+    STA.w !Battler_PathWalking,Y
+    JMP .wait
+.walking:
+    LDX.b !BattleAct_WalkSlot
+    LDA.w !Battler_PathStepFrame,X
+    BMI .next_step
+    JMP .stepping
+.next_step:
+    LDA.b #!Battle_PathStepFrames
+    STA.w !Battler_PathStepFrame,X
+    LDA.b !BattleAct_WalkSlot
+    ASL A
+    TAX
+    REP #$21
+    LDA.l !BattleRom_SlotTimes256,X
+    ADC.w #!Battler_PathMaps
+    TAX
+    LDY.w #!Battle_PathWalkMap
+    LDA.w #!Battle_PathMapBytes-1
+    MVN !Battle_WramBank,!Battle_WramBank ; lint-ok: MVN takes bank bytes and has no width suffix
+    TDC
+    SEP #$20
+    LDX.b !BattleAct_WalkSlot
+    LDA.w !Battler_PathCell,X
+    STA.b !BattleAct_WalkCell
+    LDA.w !Battler_PathFromDir,X
+    BEQ .try_down                   ; came from above
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.b #!Battle_PathUp
+    TAY
+    STY.b !BattleAct_WalkNext
+    LDA.w !Battle_PathWalkMap,Y
+    AND.b #!Battle_PathMark
+    CMP.b #!Battle_PathMark
+    BNE .try_down
+    TDC                             ; !Battle_PathDirUp
+    BRA .direction
+.try_down:
+    LDA.w !Battler_PathFromDir,X
+    CMP.b #!Battle_PathDirDown
+    BEQ .try_left
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.b #!Battle_PathDown
+    TAY
+    STY.b !BattleAct_WalkNext
+    LDA.w !Battle_PathWalkMap,Y
+    AND.b #!Battle_PathMark
+    CMP.b #!Battle_PathMark
+    BNE .try_left
+    LDA.b #!Battle_PathDirDown
+    BRA .direction
+.try_left:
+    LDA.w !Battler_PathFromDir,X
+    CMP.b #!Battle_PathDirLeft
+    BEQ .take_right
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.b #!Battle_PathLeft
+    TAY
+    STY.b !BattleAct_WalkNext
+    LDA.w !Battle_PathWalkMap,Y
+    AND.b #!Battle_PathMark
+    CMP.b #!Battle_PathMark
+    BNE .take_right
+    LDA.b #!Battle_PathDirLeft
+    BRA .direction
+.take_right:
+    CLC                             ; not tested (see the header)
+    LDA.b !BattleAct_WalkCell
+    ADC.b #!Battle_PathRight
+    TAY
+    STY.b !BattleAct_WalkNext
+    LDA.b #!Battle_PathDirRight
+.direction:
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleAct_WalkKind
+    TAX
+    LDA.w !Battle_PathWalkMap,Y
+    CMP.b #!Battle_PathCellGoal
+    BNE .look_ahead
+    JMP .walk_done
+.look_ahead:                    ; the goal two cells ahead also ends the walk
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.l !BattleRom_PathAhead,X
+    TAY
+    LDA.w !Battle_PathWalkMap,Y
+    CMP.b #!Battle_PathCellGoal
+    BNE .ahead_not_goal
+    JMP .walk_done
+.ahead_not_goal:
+    AND.b #!Battle_PathMark
+    CMP.b #!Battle_PathMark
+    BEQ .set_step                   ; straight on
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.l !BattleRom_PathAhead+1,X
+    TAY
+    LDA.w !Battle_PathWalkMap,Y
+    CMP.b #!Battle_PathCellGoal
+    BEQ .walk_done
+    AND.b #!Battle_PathMark
+    CMP.b #!Battle_PathMark
+    BNE .other_diagonal
+    STY.b !BattleAct_WalkDiag
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.l !BattleRom_PathSide+1,X
+    TAY
+    LDA.w !Battle_PathWalkMap,Y
+    AND.b #!Battle_PathMark
+    BEQ .diagonal1
+    LDY.b !BattleAct_WalkDiag
+    INC.b !BattleAct_WalkKind       ; + 3: curved
+    INC.b !BattleAct_WalkKind
+    INC.b !BattleAct_WalkKind
+    BRA .take_diagonal
+.diagonal1:
+    LDY.b !BattleAct_WalkDiag
+    INC.b !BattleAct_WalkKind       ; + 1
+    BRA .take_diagonal
+.other_diagonal:
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.l !BattleRom_PathAhead+2,X
+    TAY
+    LDA.w !Battle_PathWalkMap,Y
+    CMP.b #!Battle_PathCellGoal
+    BEQ .walk_done
+    STY.b !BattleAct_WalkDiag
+    CLC
+    LDA.b !BattleAct_WalkCell
+    ADC.l !BattleRom_PathSide+2,X
+    TAY
+    LDA.w !Battle_PathWalkMap,Y
+    AND.b #!Battle_PathMark
+    BEQ .diagonal2
+    LDY.b !BattleAct_WalkDiag
+    INC.b !BattleAct_WalkKind       ; + 4: curved
+    INC.b !BattleAct_WalkKind
+    INC.b !BattleAct_WalkKind
+    INC.b !BattleAct_WalkKind
+    BRA .take_diagonal
+.diagonal2:
+    LDY.b !BattleAct_WalkDiag
+    INC.b !BattleAct_WalkKind       ; + 2
+    INC.b !BattleAct_WalkKind
+.take_diagonal:
+    TYA
+    STA.b !BattleAct_WalkNext
+.set_step:
+    LDA.b !BattleAct_WalkKind
+    TAX
+    LDY.b !BattleAct_WalkSlot
+    LDA.b !BattleAct_WalkKind
+    STA.w !Battler_PathStepKind,Y
+    LDA.l !BattleRom_PathFromDir,X
+    STA.w !Battler_PathFromDir,Y
+    LDA.l !BattleRom_PathFacing,X
+    STA.w !Battler_Facing,Y
+    LDA.b !BattleAct_WalkNext
+    STA.w !Battler_PathCell,Y
+.stepping:
+    BRA .wait
+.walk_done:
+    LDX.b !BattleAct_WalkSlot
+    STZ.w !Battler_PathWalking,X
+.advance_kept:
+    LDX.w !Battle_ActThread
+    LDA.w !Battle_ActThreadPathLen,X
+    JMP BattleAct_AdvanceScript
+.wait:
+    LDA.b #0
+    JMP BattleAct_AdvanceScript     ; by 0: same opcode next frame
+
+; ==================================================================
+; BattleAct_OpSetPos ($C15611–$C15693, 131 bytes, with
+; BattleAct_SetPosToPoint, BattleAct_OpSetPosUnkPoint and
+; BattleAct_OpSetPosCalc)
+; ==================================================================
+; The place opcodes: put the thread's actor at a point at once (no
+; move). The point is put in DP $80/$81 (x, y) and DP $8E holds the
+; opcode's length:
+;   - $19 <x> <y> (BattleAct_OpSetPos): the point from the operands;
+;     length 3;
+;   - $1A (BattleAct_OpSetPosUnkPoint): !Battle_ActUnkPointX/Y; length 1;
+;   - $1B <n> (BattleAct_OpSetPosCalc): the point left by
+;     BattleAct_RunCalc handler n; length 2.
+; BattleAct_SetPosToPoint writes it to !Battler_ScreenX/Y of the
+; thread's battler (threads 0-3), of every slot of the target set
+; (thread 4), or to the object's !Battle_ActObjX/Y with the high bytes
+; zeroed (threads 8-15); then advances by the length.
+; Callers: BattleAct_OpcodeTable entries $19 (BattleAct_OpSetPos), $1A
+;   (BattleAct_OpSetPosUnkPoint) and $1B (BattleAct_OpSetPosCalc);
+;   BattleAct_SetPosToPoint is reached only from these three (JMP at
+;   $C1:567A and $C1:5691).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $80-$81 =
+;        the point, $8E = the length
+; Callees: BattleAct_RunCalc, BattleAct_AdvanceScript (JMP)
+!BattleAct_PosX = !BattleTmp_80         ; 1 B: x of the point
+!BattleAct_PosY = !BattleTmp_81         ; 1 B: y of the point
+BattleAct_OpSetPos:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_PosX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_PosY
+    LDA.b #3
+    STA.b !BattleAct_MoveLen
+BattleAct_SetPosToPoint:                ; header: see BattleAct_OpSetPos
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !BattleAct_PosX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattleAct_PosY
+    STA.w !Battler_ScreenY,X
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .set_done
+    TAX
+    LDA.b !BattleAct_PosX
+    STA.w !Battler_ScreenX,X
+    LDA.b !BattleAct_PosY
+    STA.w !Battler_ScreenY,X
+    INY
+    BRA .set_slot
+.set_done:
+    BRA .advance
+.object:
+    LDA.w !Battle_ActObjThread
+    ASL A
+    TAX
+    LDA.b !BattleAct_PosX
+    STA.w !Battle_ActObjX,X
+    STZ.w !Battle_ActObjX+1,X
+    LDA.b !BattleAct_PosY
+    STA.w !Battle_ActObjY,X
+    STZ.w !Battle_ActObjY+1,X
+.advance:
+    LDA.b !BattleAct_MoveLen
+    JMP BattleAct_AdvanceScript
+
+BattleAct_OpSetPosUnkPoint:             ; header: see BattleAct_OpSetPos
+    LDA.b #1
+    STA.b !BattleAct_MoveLen
+    LDA.w !Battle_ActUnkPointX
+    STA.b !BattleAct_PosX
+    LDA.w !Battle_ActUnkPointY
+    STA.b !BattleAct_PosY
+    JMP BattleAct_SetPosToPoint
+
+BattleAct_OpSetPosCalc:                 ; header: see BattleAct_OpSetPos
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.w !Battle_ActCalcOutA
+    STA.b !BattleAct_PosX
+    LDA.w !Battle_ActCalcOutB
+    STA.b !BattleAct_PosY
+    LDA.b #2
+    STA.b !BattleAct_MoveLen
+    JMP BattleAct_SetPosToPoint
+
+; ==================================================================
+; BattleAct_OpFollow ($C15694–$C156BA, 39 bytes)
+; ==================================================================
+; Opcode $1C <n>: on an object thread, makes the object follow
+; something: !Battle_ActObjFollow of the object = entry n of
+; !Battle_ActBattlers (a battler slot) for n below
+; !Battle_ActFollowFirstObj, else !Battle_ActFollowObj + (n - 9) (object
+; thread n - 9). $CF:ECC2 (unmatched) then copies the slot's
+; !Battler_ScreenX/Y, or the other object's !Battle_ActObjX/Y, to the
+; object's position each frame. On other threads it does nothing.
+; Goes on with the next opcode in the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entry $1C.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; on an object thread X = the
+;        object thread, Y = 1; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpFollow:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCC .next
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    CMP.b #!Battle_ActFollowFirstObj
+    BCS .object
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    BRA .store
+.object:
+    SEC
+    SBC.b #!Battle_ActFollowFirstObj
+    ORA.b #!Battle_ActFollowObj
+.store:
+    LDX.w !Battle_ActObjThread
+    STA.w !Battle_ActObjFollow,X
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpUnfollow ($C156BB–$C156CB, 17 bytes)
+; ==================================================================
+; Opcode $1D <j>: object thread j follows nothing any more
+; (!Battle_ActObjFollow = !Battle_ActFollowNone), whatever thread runs
+; it. Goes on with the next opcode in the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entry $1D.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = j, Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpUnfollow:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    LDA.b #!Battle_ActFollowNone
+    STA.w !Battle_ActObjFollow,X
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpCall ($C156CC–$C156FA, 47 bytes)
+; ==================================================================
+; Opcode $1E <n>: calls subscript n: keeps the address after the
+; opcode (pointer + 2, the carry going into the bank) in the thread's
+; !Battle_ActThreadReturn / !Battle_ActThreadReturnBank and goes to
+; entry n of !BattleRom_ActSubscripts, always in bank
+; !BattleRom_ScriptBankPc, running it in the same frame. One level
+; only: a call inside a subscript overwrites the return address.
+; Callers: BattleAct_OpcodeTable entry $1E.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n * 2; Y = thread * 4;
+;        !Battle_ActScriptPtr (and $E9) set; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP, by 0)
+BattleAct_OpCall:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    ASL A
+    TAX
+    LDA.w !Battle_ActThreadOfs
+    TAY
+    REP #$21
+    LDA.w #2
+    ADC.b !Battle_ActScriptPtr
+    STA.w !Battle_ActThreadReturn,Y
+    LDA.b !Battle_ActScriptPtr+2
+    ADC.w #0
+    STA.w !Battle_ActThreadReturnBank,Y
+    LDA.l !BattleRom_ActSubscripts,X
+    STA.b !Battle_ActScriptPtr
+    LDA.w #!BattleRom_ScriptBankPc
+    STA.b !Battle_ActScriptPtr+2
+    TDC
+    SEP #$20
+    INC.w !Battle_ActNextOp
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpReturn ($C156FB–$C15713, 25 bytes)
+; ==================================================================
+; Opcode $1F: returns from a subscript (BattleAct_OpCall): the script
+; pointer = the thread's !Battle_ActThreadReturn / ReturnBank, and the
+; next opcode runs in the same frame.
+; Callers: BattleAct_OpcodeTable entry $1F; BattleAct_OpReturnIfVar1F0
+;   branches here.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = thread * 4; X unchanged;
+;        !Battle_ActScriptPtr (and $E9) set; !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP, by 0)
+BattleAct_OpReturn:
+    LDA.w !Battle_ActThreadOfs
+    TAY
+    REP #$20
+    LDA.w !Battle_ActThreadReturn,Y
+    STA.b !Battle_ActScriptPtr
+    LDA.w !Battle_ActThreadReturnBank,Y
+    STA.b !Battle_ActScriptPtr+2
+    TDC
+    SEP #$20
+    INC.w !Battle_ActNextOp
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpPause ($C15714–$C15721, 14 bytes)
+; ==================================================================
+; Opcode $20 <n>: ends the thread's turn for this frame and has
+; BattleAct_RunThread only count !Battle_ActThreadWait = n down on the
+; next n frames before running the next opcode; advances 2.
+; Callers: BattleAct_OpcodeTable entry $20.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = thread; Y = 1
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpPause:
+    INY
+    LDX.w !Battle_ActThread
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActThreadWait,X
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpReturnIfVar1F0 ($C15722–$C1572B, 10 bytes)
+; ==================================================================
+; Opcode $21: when variable $1F (!Battle_ActUnkPointY) is 0, returns
+; from the subscript like opcode $1F; otherwise advances 1 (and the
+; thread waits for the next frame). Why the y of the point is the
+; test is not known.
+; Callers: BattleAct_OpcodeTable entry $21.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; as BattleAct_OpReturn when it
+;        returns; X, Y unchanged otherwise
+; Callees: BattleAct_OpReturn (BEQ), BattleAct_AdvanceScript (JMP)
+BattleAct_OpReturnIfVar1F0:
+    LDA.w !Battle_ActUnkPointY
+    BEQ BattleAct_OpReturn
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpWaitVar ($C1572C–$C15742, 23 bytes)
+; ==================================================================
+; Opcode $22 <n> <v>: waits until variable n (!Battle_ActVars + n) is
+; v: while it is not, stays on the opcode (advance 0); then goes on
+; with the next opcode in the same frame, advancing 3.
+; Callers: BattleAct_OpcodeTable entry $22.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2; when equal
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpWaitVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INY
+    LDA.w !Battle_ActVars,X
+    CMP.b [!Battle_ActScriptPtr],Y
+    BEQ .equal
+    TDC
+    BRA .advance
+.equal:
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+.advance:
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpWaitVar1C ($C15743–$C15755, 19 bytes)
+; ==================================================================
+; Opcode $23 <v>: as opcode $22 for variable $1C (!Battle_ActVar1C);
+; advances 2 when it is v.
+; Callers: BattleAct_OpcodeTable entry $23.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1; when equal
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpWaitVar1C:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    CMP.w !Battle_ActVar1C
+    BEQ .equal
+    TDC
+    BRA .advance
+.equal:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+.advance:
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpWaitVar1D ($C15756–$C15768, 19 bytes)
+; ==================================================================
+; Opcode $24 <v>: as opcode $23 for variable $1D (!Battle_ActVar1D).
+; Callers: BattleAct_OpcodeTable entry $24.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1; when equal
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpWaitVar1D:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    CMP.w !Battle_ActVar1D
+    BEQ .equal
+    TDC
+    BRA .advance
+.equal:
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+.advance:
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpEndIfNoTarget ($C15769–$C1577C, 20 bytes)
+; ==================================================================
+; Opcode $25 <i>: when entry i of !Battle_ActTargetSet is the end
+; marker (bit 7 set: the set has fewer than i + 1 slots), switches the
+; thread off (BattleAct_OpEndThread); otherwise goes on with the next
+; opcode in the same frame, advancing 2. No bound check: an i past the
+; end marker reads whatever follows it.
+; Callers: BattleAct_OpcodeTable entry $25.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; as BattleAct_OpEndThread when the
+;        thread ends (X = thread); else A = 0, X = i, Y = 1 and
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript, BattleAct_OpEndThread (JMP)
+BattleAct_OpEndIfNoTarget:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    LDA.w !Battle_ActTargetSet,X
+    BMI .end
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+.end:
+    JMP BattleAct_OpEndThread
+
+; ==================================================================
+; BattleAct_OpShowAnimEntry ($C1577D–$C15805, 137 bytes)
+; ==================================================================
+; Opcode $26 <n> <f>: like opcodes $04-$06 (BattleAct_OpShowAnimFrame)
+; with the stop byte f from the operand: starts animation n with the
+; actor's stop byte = f, so that BattleAct_StepBattlerAnims shows its
+; entry f - 1 and switches it off; then waits for the animation to be
+; off and advances 3. The stop byte is also the "started" flag:
+;   - threads 0-3: !Battler_ActAnimStop of the battler, started in mode
+;     1 (BattleAct_StartAnim stays on the opcode); cleared when its
+;     !Battler_ActAnimMode is 0;
+;   - thread 4: the stop byte of the first slot of the target set only;
+;     done when every slot's mode is 0. Quirk: that stop byte is not
+;     cleared, as in BattleAct_OpPlayAnim;
+;   - threads 8-15: !Battle_ActObjAnimStop; done when
+;     !Battle_ActUnkA1A8 is 0. Quirk: the start uses mode 2
+;     (!Battle_ActAnimLoop), for which BattleAct_StartAnim itself
+;     advances 2 and counts !Battle_ActNextOp up; this handler then
+;     advances by 0, so the pointer is left on the f operand, which
+;     runs as the next opcode in the same frame.
+; While waiting it returns without calling BattleAct_AdvanceScript.
+; Callers: BattleAct_OpcodeTable entry $26.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80 = f and
+;        $82-$83 = 0 written; when it starts, BattleAct_StartAnim's DP
+;        scratch ($80 then = n) and $8E
+; Callees: BattleAct_StartAnim (JMP or JSR), BattleAct_AdvanceScript
+;          (JMP)
+!BattleAct_ShowStop = !BattleTmp_80     ; 1 B: the stop byte f (BattleAct_StartAnim then reuses $80)
+!BattleAct_ShowOpY = !BattleTmp_82      ; 2 B: Y on entry (0), for BattleAct_StartAnim's operand read
+BattleAct_OpShowAnimEntry:
+    STY.b !BattleAct_ShowOpY
+    INY
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_ShowStop
+    LDY.b !BattleAct_ShowOpY
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_ActAnimStop,X
+    BNE .battler_wait
+    LDA.b !BattleAct_ShowStop
+    STA.w !Battler_ActAnimStop,X
+    LDA.b #!Battle_ActAnimOnce
+    STA.b !BattleAct_AnimMode
+    JMP BattleAct_StartAnim
+.battler_wait:
+    LDA.w !Battler_ActAnimMode,X
+    BNE .battler_exit
+    STZ.w !Battler_ActAnimStop,X
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+.battler_exit:
+    RTS
+.target_set:
+    LDA.w !Battle_ActTargetSet
+    TAX
+    LDA.w !Battler_ActAnimStop,X
+    BNE .set_wait
+    LDA.b !BattleAct_ShowStop
+    STA.w !Battler_ActAnimStop,X
+    LDA.b #!Battle_ActAnimOnce
+    STA.b !BattleAct_AnimMode
+    JMP BattleAct_StartAnim
+.set_wait:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .set_done
+    TAX
+    LDA.w !Battler_ActAnimMode,X
+    BNE .set_exit
+    INY
+    BRA .set_slot
+.set_done:
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+.set_exit:
+    RTS
+.object:
+    LDX.w !Battle_ActObjThread
+    LDA.w !Battle_ActObjAnimStop,X
+    BNE .object_wait
+    LDA.b !BattleAct_ShowStop
+    STA.w !Battle_ActObjAnimStop,X
+    LDA.b #!Battle_ActAnimLoop
+    STA.b !BattleAct_AnimMode
+    JSR BattleAct_StartAnim
+    TDC
+    BRA .advance
+.object_wait:
+    LDA.w !Battle_ActUnkA1A8,X
+    BNE .object_exit
+    STZ.w !Battle_ActObjAnimStop,X
+    LDA.b #3
+.advance:
+    JMP BattleAct_AdvanceScript
+.object_exit:
+    RTS
+
+; ==================================================================
+; BattleAct_OpSetUnkA5CD ($C15806–$C15843, 62 bytes, with
+; BattleAct_StoreUnkA5CD and BattleAct_OpClearUnkA5CD)
+; ==================================================================
+; Opcodes $27 (BattleAct_OpSetUnkA5CD, value 1) and $28
+; (BattleAct_OpClearUnkA5CD, value 0): set !Battler_UnkA5CD of the
+; thread's battler (threads 0-3) or of every slot of the target set
+; (thread 4) to the value, keeping its bit 7 (the bit
+; Battle_BoxOverlapsOthers skips on); object threads change nothing.
+; The value is in DP $8E. Advances 1. What the low bits mean is not
+; known.
+; Callers: BattleAct_OpcodeTable entries $27 and $28;
+;   BattleAct_StoreUnkA5CD is reached from BattleAct_OpClearUnkA5CD.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $8E = the
+;        value
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_FlagValue = !BattleTmp_8E    ; 1 B: the value stored
+BattleAct_OpSetUnkA5CD:
+    LDA.b #1
+    STA.b !BattleAct_FlagValue
+BattleAct_StoreUnkA5CD:                 ; header: see BattleAct_OpSetUnkA5CD
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .advance
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_UnkA5CD,X
+    AND.b #!Battle_ActKeepBit7
+    ORA.b !BattleAct_FlagValue
+    STA.w !Battler_UnkA5CD,X
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .advance
+    TAX
+    LDA.w !Battler_UnkA5CD,X
+    AND.b #!Battle_ActKeepBit7
+    ORA.b !BattleAct_FlagValue
+    STA.w !Battler_UnkA5CD,X
+    INY
+    BRA .set_slot
+.advance:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+BattleAct_OpClearUnkA5CD:               ; header: see BattleAct_OpSetUnkA5CD
+    STZ.b !BattleAct_FlagValue
+    BRA BattleAct_StoreUnkA5CD
+
+; ==================================================================
+; BattleAct_OpSetUnk9FF7 ($C15844–$C1587C, 57 bytes, with
+; BattleAct_StoreUnk9FF7 and BattleAct_OpClearUnk9FF7)
+; ==================================================================
+; Opcodes $29 (BattleAct_OpSetUnk9FF7, value 1) and $2A
+; (BattleAct_OpClearUnk9FF7, value 0): as opcodes $27/$28 for
+; !Battler_Unk9FF7 (bit 7: skipped by the target scans). Quirk: for
+; the thread's battler (threads 0-3) the value is stored as it is, so
+; bit 7 is cleared; only the target-set path keeps it. Advances 1.
+; Callers: BattleAct_OpcodeTable entries $29 and $2A;
+;   BattleAct_StoreUnk9FF7 is reached from BattleAct_OpClearUnk9FF7.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered; DP $8E = the
+;        value
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetUnk9FF7:
+    LDA.b #1
+    STA.b !BattleAct_FlagValue
+BattleAct_StoreUnk9FF7:                 ; header: see BattleAct_OpSetUnk9FF7
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .advance
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.b !BattleAct_FlagValue
+    STA.w !Battler_Unk9FF7,X        ; quirk: bit 7 not kept
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .advance
+    TAX
+    LDA.w !Battler_Unk9FF7,X
+    AND.b #!Battle_ActKeepBit7
+    ORA.b !BattleAct_FlagValue
+    STA.w !Battler_Unk9FF7,X
+    INY
+    BRA .set_slot
+.advance:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+BattleAct_OpClearUnk9FF7:               ; header: see BattleAct_OpSetUnk9FF7
+    STZ.b !BattleAct_FlagValue
+    BRA BattleAct_StoreUnk9FF7
+
+; ==================================================================
+; BattleAct_OpClearUnkA4A4 ($C1587D–$C158AA, 46 bytes)
+; ==================================================================
+; Opcode $2B: zeroes !Battler_UnkA4A4 and !Battler_UnkA4AF of the
+; thread's battler (threads 0-3) or of every slot of the target set
+; (thread 4); object threads change nothing. Advances 1. Both bytes
+; are used by the movers in bank $CF; what they mean is not known.
+; Callers: BattleAct_OpcodeTable entry $2B.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpClearUnkA4A4:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .advance
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STZ.w !Battler_UnkA4A4,X
+    STZ.w !Battler_UnkA4AF,X
+    BRA .advance
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .advance
+    TAX
+    STZ.w !Battler_UnkA4A4,X
+    STZ.w !Battler_UnkA4AF,X
+    INY
+    BRA .set_slot
+.advance:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpUnkRevive ($C158AB–$C158DB, 49 bytes)
+; ==================================================================
+; Opcode $2C: for the thread's battler (threads 0-3) or every slot of
+; the target set (thread 4): counts !Battler_Present up and zeroes
+; !Battler_KoFlag; object threads change nothing. Goes on with the next
+; opcode in the same frame; advances 1. Probably brings the battler
+; back into the battle (inferred only from the two names); "up", not
+; "= 1", so a present battler gets 2.
+; Callers: BattleAct_OpcodeTable entry $2C.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y clobbered;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpUnkRevive:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .next
+    CMP.b #!Battle_ActTargetSetThread
+    BEQ .target_set
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    INC.w !Battler_Present,X
+    STZ.w !Battler_KoFlag,X
+    BRA .next
+.target_set:
+    TDC
+    TAY
+.set_slot:
+    LDA.w !Battle_ActTargetSet,Y
+    BMI .next
+    TAX
+    INC.w !Battler_Present,X
+    STZ.w !Battler_KoFlag,X
+    INY
+    BRA .set_slot
+.next:
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetUnkCFFF ($C158DC–$C158E3, 8 bytes)
+; ==================================================================
+; Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
+; Callers: BattleAct_OpcodeTable entry $2D.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetUnkCFFF:
+    LDA.b #1
+    STA.w !Battle_ActUnkCFFF
+    JMP BattleAct_AdvanceScript     ; by the 1 just stored
+
+; ==================================================================
+; BattleAct_OpClearUnkCFFF ($C158E4–$C158EB, 8 bytes)
+; ==================================================================
+; Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
+; Callers: BattleAct_OpcodeTable entry $2E.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpClearUnkCFFF:
+    STZ.w !Battle_ActUnkCFFF
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; The script variable opcodes ($C158EC–$C159B8): set, count and add
+; to the bytes of !Battle_ActVars; variables $1C and $1D have opcodes
+; of their own. All but $33 go on with the next opcode in the same
+; frame (!Battle_ActNextOp counted up). Each is reached only through
+; BattleAct_OpcodeTable, at the entry its header names.
+; ==================================================================
+; BattleAct_OpSetVar ($C158EC–$C158FD, 18 bytes)
+; ==================================================================
+; Opcode $30 <n> <v>: variable n = v; advances 3.
+; Callers: BattleAct_OpcodeTable entry $30.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetVar1C ($C158FE–$C1590B, 14 bytes)
+; ==================================================================
+; Opcode $31 <v>: !Battle_ActVar1C = v; advances 2.
+; Callers: BattleAct_OpcodeTable entry $31.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetVar1C:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActVar1C
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSetVar1D ($C1590C–$C15919, 14 bytes)
+; ==================================================================
+; Opcode $32 <v>: !Battle_ActVar1D = v; advances 2.
+; Callers: BattleAct_OpcodeTable entry $32.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSetVar1D:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActVar1D
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpCalcToUnkPoint ($C1591A–$C15930, 23 bytes)
+; ==================================================================
+; Opcode $33 <n>: runs BattleAct_RunCalc handler n and keeps its point
+; in !Battle_ActUnkPointX/Y (variables $1E/$1F), for the "UnkPoint"
+; move opcodes; advances 2, and the thread waits for the next frame.
+; Callers: BattleAct_OpcodeTable entry $33.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged, Y = 1 (BattleAct_RunCalc
+;        keeps them); whatever the handler writes
+; Callees: BattleAct_RunCalc, BattleAct_AdvanceScript (JMP)
+BattleAct_OpCalcToUnkPoint:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActUnkPointX
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActUnkPointY
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpIncVar ($C15931–$C1593F, 15 bytes)
+; ==================================================================
+; Opcode $34 <n>: variable n + 1; advances 2.
+; Callers: BattleAct_OpcodeTable entry $34.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpIncVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INC.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpIncVar1C ($C15940–$C1594A, 11 bytes)
+; ==================================================================
+; Opcode $35: !Battle_ActVar1C + 1; advances 1.
+; Callers: BattleAct_OpcodeTable entry $35.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpIncVar1C:
+    INC.w !Battle_ActVar1C
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpIncVar1D ($C1594B–$C15955, 11 bytes)
+; ==================================================================
+; Opcode $36: !Battle_ActVar1D + 1; advances 1.
+; Callers: BattleAct_OpcodeTable entry $36.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpIncVar1D:
+    INC.w !Battle_ActVar1D
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpDecVar ($C15956–$C15964, 15 bytes)
+; ==================================================================
+; Opcode $37 <n>: variable n - 1; advances 2.
+; Callers: BattleAct_OpcodeTable entry $37.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpDecVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    DEC.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpDecVar1C ($C15965–$C1596F, 11 bytes)
+; ==================================================================
+; Opcode $38: !Battle_ActVar1C - 1; advances 1.
+; Callers: BattleAct_OpcodeTable entry $38.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpDecVar1C:
+    DEC.w !Battle_ActVar1C
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpDecVar1D ($C15970–$C1597A, 11 bytes)
+; ==================================================================
+; Opcode $39: !Battle_ActVar1D - 1; advances 1.
+; Callers: BattleAct_OpcodeTable entry $39.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpDecVar1D:
+    DEC.w !Battle_ActVar1D
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpAddVar ($C1597B–$C15990, 22 bytes)
+; ==================================================================
+; Opcode $3A <n> <v>: variable n + v (8-bit, wraps); advances 3.
+; Callers: BattleAct_OpcodeTable entry $3A.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpAddVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INY
+    CLC
+    LDA.b [!Battle_ActScriptPtr],Y
+    ADC.w !Battle_ActVars,X
+    STA.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpAddVar1C ($C15991–$C159A2, 18 bytes)
+; ==================================================================
+; Opcode $3B <v>: !Battle_ActVar1C + v; advances 2.
+; Callers: BattleAct_OpcodeTable entry $3B.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpAddVar1C:
+    INY
+    CLC
+    LDA.b [!Battle_ActScriptPtr],Y
+    ADC.w !Battle_ActVar1C
+    STA.w !Battle_ActVar1C
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpAddVarTo1C ($C159A3–$C159B8, 22 bytes)
+; ==================================================================
+; Opcode $3C <n>: !Battle_ActVar1C + variable n; advances 2.
+; Callers: BattleAct_OpcodeTable entry $3C.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpAddVarTo1C:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    CLC
+    LDA.w !Battle_ActVars,X
+    ADC.w !Battle_ActVar1C
+    STA.w !Battle_ActVar1C
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpCalcToResult ($C159B9–$C159E3, 43 bytes)
+; ==================================================================
+; Opcodes $3D-$40 and $45-$46 <n> (one handler): runs BattleAct_RunCalc
+; handler n once and stores its two results in entry k of
+; !Battle_ActCalcResult: k = opcode - $3D for $3D-$40 (0-3), opcode -
+; $41 for $45-$46 (4-5); the same entries BattleAct_TickCalcs fills
+; every frame for the handlers in !Battle_ActCalcSel. Goes on with the
+; next opcode in the same frame; advances 2.
+; Callers: BattleAct_OpcodeTable entries $3D-$40, $45 and $46.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread); !Battle_ActOpcode = one of those
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = k * 2; Y = 1;
+;        !Battle_ActNextOp counted up; whatever the handler writes
+; Callees: BattleAct_RunCalc, BattleAct_AdvanceScript (JMP)
+BattleAct_OpCalcToResult:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    JSR BattleAct_RunCalc
+    LDA.w !Battle_ActOpcode
+    CMP.b #!Battle_ActOpCalcToResult4
+    BCC .first_four
+    SEC
+    SBC.b #!Battle_ActOpCalcToResult4-4
+    BRA .store
+.first_four:
+    SEC
+    SBC.b #!Battle_ActOpCalcToResult
+.store:
+    ASL A
+    TAX
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActCalcResult,X
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActCalcResult+1,X
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpCopyVar ($C159E4–$C159F9, 22 bytes)
+; ==================================================================
+; Opcode $41 <a> <b>: variable b = variable a; advances 3.
+; Callers: BattleAct_OpcodeTable entry $41.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = a; Y = b;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpCopyVar:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAY
+    LDA.w !Battle_ActVars,X
+    STA.w !Battle_ActVars,Y
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpCopyVar1C ($C159FA–$C15A0B, 18 bytes)
+; ==================================================================
+; Opcode $42 <n>: variable n = !Battle_ActVar1C; advances 2.
+; Callers: BattleAct_OpcodeTable entry $42.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 1;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpCopyVar1C:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    LDA.w !Battle_ActVar1C
+    STA.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #2
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpOffsetToUnkPoint ($C15A0C–$C15A3D, 50 bytes)
+; ==================================================================
+; Opcode $43 <n> <x> <y>: !Battle_ActUnkPointX/Y = (x, y) plus the point
+; of BattleAct_RunCalc handler n (each 8-bit, wrapping); advances 4.
+; The operands are stored before the handler runs.
+; Callers: BattleAct_OpcodeTable entry $43.
+; Entry: M=1, X=0, DP=0, DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X unchanged, Y = 3
+;        (BattleAct_RunCalc keeps them); DP $80 = n;
+;        !Battle_ActNextOp counted up; whatever the handler writes
+; Callees: BattleAct_RunCalc, BattleAct_AdvanceScript (JMP)
+!BattleAct_OffsetCalc = !BattleTmp_80   ; 1 B: the handler number n
+BattleAct_OpOffsetToUnkPoint:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_OffsetCalc
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActUnkPointX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.w !Battle_ActUnkPointY
+    LDA.b !BattleAct_OffsetCalc
+    JSR BattleAct_RunCalc
+    CLC
+    LDA.w !Battle_ActCalcOutA
+    ADC.w !Battle_ActUnkPointX
+    STA.w !Battle_ActUnkPointX
+    CLC
+    LDA.w !Battle_ActCalcOutB
+    ADC.w !Battle_ActUnkPointY
+    STA.w !Battle_ActUnkPointY
+    INC.w !Battle_ActNextOp
+    LDA.b #4
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpActorPosToUnkPoint ($C15A3E–$C15A6F, 50 bytes)
+; ==================================================================
+; Opcode $44: !Battle_ActUnkPointX/Y = the position of the thread's
+; actor: !Battler_ScreenX/Y of its !Battle_ActBattlers entry, or the
+; object's !Battle_ActObjX/Y on threads 8-15. Thread 4 has no case of
+; its own, so it takes entry 4 of the list, the first slot of the
+; target set. Advances 1; the thread waits for the next frame.
+; Callers: BattleAct_OpcodeTable entry $44.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y unchanged; on
+;        threads 0-4 DP $82-$83 = the slot (not read after)
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_PosSlot = !BattleTmp_82      ; 2 B: the battler slot (written, not read)
+BattleAct_OpActorPosToUnkPoint:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STX.b !BattleAct_PosSlot
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battle_ActUnkPointX
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battle_ActUnkPointY
+    BRA .advance
+.object:
+    LDA.w !Battle_ActObjThread
+    ASL A
+    TAX
+    LDA.w !Battle_ActObjX,X
+    STA.w !Battle_ActUnkPointX
+    LDA.w !Battle_ActObjY,X
+    STA.w !Battle_ActUnkPointY
+.advance:
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpAddVarClamped ($C15A70–$C15A98, 41 bytes)
+; ==================================================================
+; Opcode $49 <n> <d>: variable n + d, with d signed and the result
+; clamped to 0-$FF (a carry out of a positive add gives $FF, a negative
+; add with no carry gives 0); advances 3.
+; Callers: BattleAct_OpcodeTable entry $49.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0 (as from
+;        BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = n; Y = 2; DP $80 = d;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+!BattleAct_VarDelta = !BattleTmp_80     ; 1 B: d
+BattleAct_OpAddVarClamped:
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    TAX
+    INY
+    LDA.b [!Battle_ActScriptPtr],Y
+    STA.b !BattleAct_VarDelta
+    BMI .subtract
+    CLC
+    ADC.w !Battle_ActVars,X
+    BCC .store
+    LDA.b #!Battle_ActVarMax         ; clamp at the top
+    BRA .store
+.subtract:
+    CLC
+    LDA.b !BattleAct_VarDelta
+    ADC.w !Battle_ActVars,X
+    BCS .store
+    TDC                             ; clamp at 0
+.store:
+    STA.w !Battle_ActVars,X
+    INC.w !Battle_ActNextOp
+    LDA.b #3
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSwapVar1C1D ($C15A99–$C15AAE, 22 bytes)
+; ==================================================================
+; Opcodes $4A and $4D: swaps !Battle_ActVar1C and !Battle_ActVar1D;
+; advances 1.
+; Callers: BattleAct_OpcodeTable entries $4A and $4D.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSwapVar1C1D:
+    LDA.w !Battle_ActVar1C
+    PHA
+    LDA.w !Battle_ActVar1D
+    STA.w !Battle_ActVar1C
+    PLA
+    STA.w !Battle_ActVar1D
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSwapVar1C1E ($C15AAF–$C15AC4, 22 bytes)
+; ==================================================================
+; Opcode $4E: swaps !Battle_ActVar1C and variable $1E
+; (!Battle_ActUnkPointX); advances 1.
+; Callers: BattleAct_OpcodeTable entry $4E.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSwapVar1C1E:
+    LDA.w !Battle_ActVar1C
+    PHA
+    LDA.w !Battle_ActUnkPointX
+    STA.w !Battle_ActVar1C
+    PLA
+    STA.w !Battle_ActUnkPointX
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
+; BattleAct_OpSwapVar1C1F ($C15AC5–$C15ADA, 22 bytes)
+; ==================================================================
+; Opcode $4F: swaps !Battle_ActVar1C and variable $1F
+; (!Battle_ActUnkPointY); advances 1.
+; Callers: BattleAct_OpcodeTable entry $4F.
+; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged;
+;        !Battle_ActNextOp counted up
+; Callees: BattleAct_AdvanceScript (JMP)
+BattleAct_OpSwapVar1C1F:
+    LDA.w !Battle_ActVar1C
+    PHA
+    LDA.w !Battle_ActUnkPointY
+    STA.w !Battle_ActVar1C
+    PLA
+    STA.w !Battle_ActUnkPointY
+    INC.w !Battle_ActNextOp
+    LDA.b #1
+    JMP BattleAct_AdvanceScript
+
+; ==================================================================
 ; BattleAct_CalcMoveStep ($C165BA–$C16670, 183 bytes)
 ; ==================================================================
 ; Unit step of a straight move from !Battle_GeoOriginX/Y to
