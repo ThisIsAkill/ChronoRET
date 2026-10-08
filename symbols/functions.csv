@@ -133,7 +133,7 @@ $C0:89A1,$C0:89D1,49,Field_DpadDownRight,$C0,Engine,verified,66903c81d03d,"Down+
 $C0:89D2,$C0:8A06,53,Field_DpadDownLeft,$C0,Engine,verified,026d25177df3,"Down+Left: X step -$10 (sum down), Y step +$10 (sum up); $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set."
 $C0:8A07,$C0:8A3B,53,Field_DpadUpRight,$C0,Engine,verified,60f41876ecc0,"Up+Right: X step +$10 (sum up), Y step -$10 (sum down); $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set."
 $C0:8A3C,$C0:8A6C,49,Field_DpadUpLeft,$C0,Engine,verified,8a718bf06a16,"Up+Left: both steps -$10, both sums down by $10; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set."
-$C0:8A6D,$C0:9174,1800,Map_Unk8A6D,$C0,Engine,readable,b3feec59ea8d,"Probably the leader's collision with the map and with other objects (inferred: it zeroes the parts of the step whose moved box would have a corner on a blocking tile or touch a blocking object, and th"
+$C0:8A6D,$C0:9174,1800,Map_Unk8A6D,$C0,Engine,readable,89eec07d99f0,"Probably the leader's collision with the map and with other objects (inferred: it zeroes the parts of the step whose moved box would have a corner on a blocking tile or touch a blocking object, and th"
 $C0:9175,$C0:91AB,55,Map_Unk9175,$C0,Engine,verified,f5a5f8cfebf5,"Field_FrameUpdate's step after the D-pad: zeroes Map_Unk1D32/1D33, then copies Map_Unk1D2E (signed X step) into Map_Unk1D32 unless the leader is already at the limit in that direction (Map_LeaderPastC"
 $C0:91AC,$C0:93E0,565,Map_Unk91AC,$C0,Engine,verified,3b930c3021f6,"Adds up this frame's scroll amounts for three sets of layer scroll words and splits them into whole pixels for Map_Unk93E1, which runs next."
 $C0:93E1,$C0:944A,106,Map_Unk93E1,$C0,Engine,verified,ebfb866dcebe,"Applies the pixels Map_Unk91AC split out this frame to the three sets of scroll words, then has the new tilemap edges built: - zeroes Map_EdgeRowYInc/YDec and Map_EdgeColXInc/XDec; - layer 1: Map_Scro"
@@ -161,21 +161,21 @@ $C0:985F,$C0:988F,49,Map_EdgeRowsYInc,$C0,Engine,verified,5fb5b14f17fd,"As Map_E
 $C0:9890,$C0:98C0,49,Map_EdgeRowsYIncHalf,$C0,Engine,verified,c75bc0451b69,"As Map_EdgeRowsYInc, with Map_BuildRowYInc2Half for layer 2."
 $C0:98C1,$C0:98F1,49,Map_EdgeRowsYDec,$C0,Engine,verified,3b84242b4c63,"As Map_EdgeRowsYInc for Map_EdgeRowYDec: builders Map_BuildRowYDec1/ 2/3, and the row biases go down by 1 (wrapping at 32)."
 $C0:98F2,$C0:9922,49,Map_EdgeRowsYDecHalf,$C0,Engine,verified,03df95527a61,"As Map_EdgeRowsYDec, with Map_BuildRowYDec2Half for layer 2."
-$C0:9923,$C0:99DD,187,Map_ProbeHitsObj,$C0,Engine,readable,61e0a4cb73f4,Map_Unk8A6D's object test of the point Map_ProbeX/Y.
+$C0:9923,$C0:99DD,187,Map_ProbeHitsObj,$C0,Engine,verified,61e0a4cb73f4,Map_Unk8A6D's object test of the point Map_ProbeX/Y.
 $C0:99DE,$C0:9A1E,65,Map_Unk99DE,$C0,Engine,verified,d998510b2f98,Field_FrameUpdate's step after Map_Unk9175: may drop the frame's steps in Map_Unk1D2E (X) and Map_Unk1D30 (Y).
 $C0:9A1F,$C0:9A3C,30,Map_StepStopDown,$C0,Engine,verified,9cb56fccdfe5,"Map_Unk99DE's test for a downward step, A = n (step / 16)."
 $C0:9A3D,$C0:9A5F,35,Map_StepStopUp,$C0,Engine,verified,f80d17f05281,"Map_Unk99DE's test for an upward step, A = n."
 $C0:9A60,$C0:9A7D,30,Map_StepStopRight,$C0,Engine,verified,76055abce24e,"As Map_StepStopDown for a rightward step: L = Map_Unk1D0C / 2 against Map_Unk1D1B, the leader's Obj_ScreenX against Screen_HalfX (C=1 when it is in the left half or at $80), Map_Unk1D93 + n against Ma"
 $C0:9A7E,$C0:9AA0,35,Map_StepStopLeft,$C0,Engine,verified,d178ed3f8dc5,"As Map_StepStopUp for a leftward step: Map_Unk1D1A against T = Map_TileOriginX / 2, the leader's Obj_ScreenX against Screen_HalfX (C=1 when it is in the right half), Map_Unk1D93 - n."
-$C0:9AA1,$C0:9AB1,17,Map_ProbeTileAttrs,$C0,Engine,readable,a9dbbd9ec308,Reads the map bytes of one tile for the collision probes.
-$C0:9AB2,$C0:9AC7,22,Map_ProbeTileAttrs_Load,$C0,Engine,readable,c2c56a0d1779,
-$C0:9AC8,$C0:9AD2,11,Map_ProbeTileAttrsAny,$C0,Engine,readable,66cf8623d4d2,As Map_ProbeTileAttrs without the treasure test: always reads the three bytes (branches into Map_ProbeTileAttrs_Load) and returns C=0.
-$C0:9AD3,$C0:9BF4,290,Map_ProbeTileLevel,$C0,Engine,readable,a6f854494cdd,Decides which half of the probed tile the point Map_ProbeX/Y is in and loads that half's level.
-$C0:9BF5,$C0:9C0A,22,Map_SlopeShift,$C0,Engine,readable,c89fe38c7e31,"Map_SlopeShift / Map_SlopeBase / Map_SlopeSide: Map_ProbeTileLevel's line for shapes 2-$17, indexed by Map_ProbeShape (shape - 2)."
-$C0:9C0B,$C0:9C20,22,Map_SlopeBase,$C0,Engine,readable,a6081482c92c,
-$C0:9C21,$C0:9C36,22,Map_SlopeSide,$C0,Engine,readable,b3ade57d14fa,
-$C0:9C37,$C0:9C5B,37,Map_ProbeLevelBlocked,$C0,Engine,readable,2019741a42f8,"Whether the half tile Map_ProbeTileLevel picked blocks the leader, against Field_Unk55 (looks like the level the leader stands on): - Map_ProbeNoLevel set: blocks only when Field_Unk55 is Map_LevelAny"
-$C0:9C5C,$C0:9DC2,359,Map_StepTileEffects,$C0,Engine,readable,933c1e51514b,Map_Unk8A6D's commit of a step it has kept.
+$C0:9AA1,$C0:9AB1,17,Map_ProbeTileAttrs,$C0,Engine,verified,a9dbbd9ec308,Reads the map bytes of one tile for the collision probes.
+$C0:9AB2,$C0:9AC7,22,Map_ProbeTileAttrs_Load,$C0,Engine,verified,c2c56a0d1779,
+$C0:9AC8,$C0:9AD2,11,Map_ProbeTileAttrsAny,$C0,Engine,verified,66cf8623d4d2,As Map_ProbeTileAttrs without the treasure test: always reads the three bytes (branches into Map_ProbeTileAttrs_Load) and returns C=0.
+$C0:9AD3,$C0:9BF4,290,Map_ProbeTileLevel,$C0,Engine,verified,a6f854494cdd,Decides which half of the probed tile the point Map_ProbeX/Y is in and loads that half's level.
+$C0:9BF5,$C0:9C0A,22,Map_SlopeShift,$C0,Engine,verified,c89fe38c7e31,"Map_SlopeShift / Map_SlopeBase / Map_SlopeSide: Map_ProbeTileLevel's line for shapes 2-$17, indexed by Map_ProbeShape (shape - 2)."
+$C0:9C0B,$C0:9C20,22,Map_SlopeBase,$C0,Engine,verified,a6081482c92c,
+$C0:9C21,$C0:9C36,22,Map_SlopeSide,$C0,Engine,verified,b3ade57d14fa,
+$C0:9C37,$C0:9C5B,37,Map_ProbeLevelBlocked,$C0,Engine,verified,2019741a42f8,"Whether the half tile Map_ProbeTileLevel picked blocks the leader, against Field_Unk55 (looks like the level the leader stands on): - Map_ProbeNoLevel set: blocks only when Field_Unk55 is Map_LevelAny"
+$C0:9C5C,$C0:9DC2,359,Map_StepTileEffects,$C0,Engine,verified,933c1e51514b,Map_Unk8A6D's commit of a step it has kept.
 $C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,verified,fcb380055d6f,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
 $C0:B1B2,$C0:B203,82,VramQ_Flush,$C0,Engine,verified,c55fc68b8365,"Uploads every pending entry of the VRAM upload queue (VramQ_*, filled by Obj_BuildFrame4, Obj_BuildFrame8, Obj_BuildFrame8Pass1, Obj_BuildFrame12Pass2 and Obj_BuildFrame12Pass2Alt) with DMA channel 7,"
 $C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,verified,a00b0a1208df,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."

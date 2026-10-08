@@ -9568,8 +9568,9 @@ Field_DpadUpLeft:
 ;   vertical step) stops the step at once.
 ; - diagonal step: see the comment at .up_right.
 ; "Commit" is Map_StepTileEffects (JSR or BRL to it), which also writes
-; the frame's push into Map_Unk1D2A/1D2B. Where a step is cut the code
-; stores 16-bit zeroes, so Map_Unk1D2EHi / 1D30Hi are cleared with it.
+; the frame's push into Map_Unk1D2A/1D2B. Where a step is cut its high
+; byte ends up zero too (16-bit stores, or on the .up/.down object-hit
+; paths 8-bit STZ with Map_Unk1D30Hi cleared or already zero).
 ; Callers: Field_FrameUpdate ($C0:8847), its only JSR site.
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ; (Obj_PosX/Y and the field page are read absolute).
@@ -10237,8 +10238,9 @@ Map_Unk8A6D:
     STZ.b !Map_Unk1D30-!DP_Map
     SEP #$20
     BRL .right
-; Quirk: the bottom-left probes below add the X step right after SBC with
-; no CLC, so they land 1 unit (1/256 tile) further right; kept.
+; Quirk: the first two bottom-left probes below add the X step right after
+; SBC with no CLC, so they land 1 unit (1/256 tile) further right (the one
+; in .ul_top_blocked has its CLC); kept.
 .up_left:
     LDA.b #!Map_StepHiNeg
     STA.b !Map_Unk1D30Hi-!DP_Map
