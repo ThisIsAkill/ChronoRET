@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:2345,C2Scene_BoxesOverlap,2026-10-08,rev67a,approved,96e4271e530f,"Fixed: BMI=overlap C=1, >=0 C=0; Y 2 or 4. Extents/sides, equal/touch, SEC quirk, M/X/DP/DB checked. nit: equal Y centres exit with Y=2 though .test_y decided"
+$C2:5B70,TextWin_CodeMemberName,2026-10-08,rev67a,approved,3ba4e1a9262f,"Fixed: 8-bit ASL maps $80 to entry 0 ($2C23, first name); 7-word table at $C2:5FD8 checked. Codes $1B-$1D in TextWin_CodeTable, code-$1B, B=0 for TAX, DP/DB ok"
+$C2:5D56,TextWin_TrimZeros8,2026-10-08,rev67a,approved,df195fcbb93e,"Fixed: each 8/16-bit move set copies only the remaining digits, old last byte stale. Traced 8/5/3 paths, keeps >=1 digit, A=Y count, X last word, DP $0200 only"
