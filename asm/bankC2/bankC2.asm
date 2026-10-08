@@ -11661,7 +11661,8 @@ C2Scene_MemberLeaveNone:
 ; $C2:3B8E — C2Scene_MemberLeaveA (26 bytes, $3B8E–$3BA7)
 ; Leaving object A: .State = 0, the sprite at C2Scene_ObjAX/Y, one off
 ; C2Scene_Unk0294 (the object's count), every frame of the state, as
-; C2Scene_LeaderLeaveA (without the facing and entry tile).
+; C2Scene_LeaderLeaveA but without C2Scene_StartX/Y, .Unk26, the facing
+; and the entry tile.
 ; Callers note: none direct (C2Scene_MemberLeaveTable).
 ; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM absolute)
 ; Exit:  C=0; M=1, X=0; X = the task; A = C2Scene_ObjAY
