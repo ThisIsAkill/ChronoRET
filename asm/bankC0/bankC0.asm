@@ -2153,9 +2153,10 @@ Spr_Place8:
 ; $C0:BCDC — Spr_Load8 (790 bytes, $BCDC–$BFF1)
 ; (was Sub_BCDC.) Builds an 8-tile (size 1) object's SprTile records
 ; from SprTileSrc and places them: OfsX, OfsY and Tile/Attr are copied
-; from SprTileSrc, then X, the two high-table bytes and Y are set as in
-; Spr_Place8. The Spr_BaseY bit 7 clear clamp is the plain one ($80-$DF
-; → Oam_HiddenY for every record), without Spr_Place8's exception.
+; from SprTileSrc, then X, the two high-table bytes and Y are set. Y
+; clamps: Spr_BaseYHi != 0 keeps only a carried result of $E0-$FF;
+; Spr_BaseY bit 7 set turns $E0-$FF into Oam_HiddenY; bit 7 clear turns
+; $80-$DF into Oam_HiddenY for every record.
 ; Called from Spr_PrepareTiles.
 ; On entry: M=1, X/Y 16-bit, DP=$0100 (Spr_* scratch); loads X =
 ; Obj_Cur itself.
@@ -2574,8 +2575,7 @@ Spr_Load8:
 ;   Spr_BaseYHi != 0      keep only $00-$7F without a carry, else
 ;                         Oam_HiddenY;
 ;   bit 7 set ("negative") plain add, no clamp;
-;   bit 7 clear           $80-$DF → Oam_HiddenY (the plain clamp:
-;                         unlike Spr_Place8, no OfsY sign test).
+;   bit 7 clear           $80-$DF → Oam_HiddenY.
 ; Called from Spr_PrepareTiles.
 ; On entry: M=1, X/Y 16-bit, DP=$0100 (Spr_* scratch); loads X =
 ; Obj_Cur itself.
