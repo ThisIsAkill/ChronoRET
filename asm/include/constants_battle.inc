@@ -94,6 +94,15 @@ if !constants_battle_inc == 0
 !Battle_FxOverlayStride  = $10   ; !Battler_FxOverlayBase per overlay block (4 frames x 4 B at $CC:F6D4)
 !Battle_FxOverlayFrameStart = $FF ; !Battler_FxOverlayFrame before the first frame (the first tick makes it 0)
 
+; --- Enemy animation (Battle_TickEnemyGroup) ---
+!Battle_TickOrderNone    = $FF   ; !Battle_TickOrder entry: nobody (third entry of enemy group 3)
+!Battle_EnemyListKind1   = 1     ; list block loaded for !BattleRom_EnemyAnimKind 1 (kind 0 loads list 3); meaning unknown
+!Battle_EnemyListOther   = 6     ; list block loaded for every other kind; meaning unknown
+!Battle_EnemyAnimListLen = 8     ; entries copied per list into !Enemy_AnimTicks/Frames
+!Battle_EnemyAnimFrames  = 4     ; !Enemy_AnimFrame wraps here (entries 4-7 are never shown)
+!Battle_EnemyGroupSize   = 3     ; !Battle_TickOrder entries visited per group
+!Battle_EnemyGroupLast   = 3     ; highest !Battle_UnkA4 group
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits

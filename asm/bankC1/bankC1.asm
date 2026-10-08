@@ -6756,8 +6756,8 @@ BattlePos_ModeTable:
 ; Battle_TickPcSlots ($C12D9F–$C12F1E, 384 bytes)
 ; ==================================================================
 ; Per-frame animation step for the three PCs. With !Battle_UnkA4 set it
-; jumps to Battle_TickUnkA4Mode instead (not matched). Otherwise it
-; visits the PCs in !Pc_TickOrder, starting with the first PC whose
+; jumps to Battle_TickEnemyGroup instead. Otherwise it
+; visits the PCs in !Battle_TickOrder, starting with the first PC whose
 ; frame decode was put off (!Battler_FrameDeferred; 0,1,2 / 1,2,0 /
 ; 2,0,1), and for each present PC:
 ;   - once a frame has been decoded this pass (!Battle_FramesDecoded =
@@ -6785,10 +6785,10 @@ BattlePos_ModeTable:
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$94 and the
 ;        callees' scratch written
-; Callees: Battle_TickUnkA4Mode (JMP), Battle_PickStatusAnim,
+; Callees: Battle_TickEnemyGroup (JMP), Battle_PickStatusAnim,
 ;          Battle_UpdatePcFacing, Battle_ApplyPendingEffect,
 ;          Battle_Mul8x16, Battle_Divide, Battle_DrawBattlerFrame
-!Battle_TickOrderIdx = !BattleTmp_92      ; 2 B: index into !Pc_TickOrder (zeroed 16-bit, counted 8-bit)
+!Battle_TickOrderIdx = !BattleTmp_92      ; 2 B: index into !Battle_TickOrder (zeroed 16-bit, counted 8-bit)
 !Battle_TickSlot = !BattleTmp_94          ; 2 B: battler slot being ticked (16-bit; also read by the callees)
 !Battle_TickFacingOffset = !BattleTmp_82  ; 2 B: AnimId * 4, then Facing * FacingStride
 !Battle_FacingChanged = !BattleTmp_80     ; 1 B: set by Battle_UpdatePcFacing when the facing changed
@@ -6797,7 +6797,7 @@ Battle_TickPcSlots:
     STZ.w !Battle_FramesDecoded
     LDA.b !Battle_UnkA4
     BEQ .order
-    JMP Battle_TickUnkA4Mode
+    JMP Battle_TickEnemyGroup
 .order:
     LDA.b #!Battle_AnimDefault
     STA.b !Battle_TickUnk84         ; (overwritten before it is read)
@@ -6805,48 +6805,48 @@ Battle_TickPcSlots:
     BEQ .pc1_deferred
     STZ.w !Battler_FrameDeferred
     TDC
-    STA.w !Pc_TickOrder             ; 0, 1, 2
+    STA.w !Battle_TickOrder             ; 0, 1, 2
     INC A
-    STA.w !Pc_TickOrder+1
+    STA.w !Battle_TickOrder+1
     INC A
-    STA.w !Pc_TickOrder+2
+    STA.w !Battle_TickOrder+2
     BRA .tick
 .pc1_deferred:
     LDA.w !Battler_FrameDeferred+1
     BEQ .pc2_deferred
     STZ.w !Battler_FrameDeferred+1
     LDA.b #1
-    STA.w !Pc_TickOrder             ; 1, 2, 0
+    STA.w !Battle_TickOrder             ; 1, 2, 0
     INC A
-    STA.w !Pc_TickOrder+1
+    STA.w !Battle_TickOrder+1
     TDC
-    STA.w !Pc_TickOrder+2
+    STA.w !Battle_TickOrder+2
     BRA .tick
 .pc2_deferred:
     LDA.w !Battler_FrameDeferred+2
     BEQ .none_deferred
     STZ.w !Battler_FrameDeferred+2
     LDA.b #2
-    STA.w !Pc_TickOrder             ; 2, 0, 1
+    STA.w !Battle_TickOrder             ; 2, 0, 1
     TDC
-    STA.w !Pc_TickOrder+1
+    STA.w !Battle_TickOrder+1
     INC A
-    STA.w !Pc_TickOrder+2
+    STA.w !Battle_TickOrder+2
     BRA .tick
 .none_deferred:
     TDC
-    STA.w !Pc_TickOrder             ; 0, 1, 2
+    STA.w !Battle_TickOrder             ; 0, 1, 2
     INC A
-    STA.w !Pc_TickOrder+1
+    STA.w !Battle_TickOrder+1
     INC A
-    STA.w !Pc_TickOrder+2
+    STA.w !Battle_TickOrder+2
 .tick:
     TDC
     TAX
     STX.b !Battle_TickOrderIdx
 .loop:
     LDX.b !Battle_TickOrderIdx
-    LDA.w !Pc_TickOrder,X
+    LDA.w !Battle_TickOrder,X
     TAX
     STX.b !Battle_TickSlot
     LDA.w !Battler_Present,X
@@ -6985,10 +6985,10 @@ Battle_TickPcSlots:
     RTS
 
 ; Battle_UnkThunk2F1F ($C12F1F–$C12F21, 3 bytes): a lone JMP to the RTS
-; at $C1:34A6. Nothing reaches it (searched: no JSR, JMP, JSL, JML or
+; that ends Battle_TickEnemyGroup ($C1:34A6). Nothing reaches it (searched: no JSR, JMP, JSL, JML or
 ; BRL targets $2F1F, and no word table holds it); kept as found.
 Battle_UnkThunk2F1F:
-    JMP Battle_UnkReturn34A6
+    JMP Battle_TickEnemyGroup_exit
 
 ; ==================================================================
 ; Battle_UpdatePcFacing ($C12F22–$C12F96, 117 bytes)
@@ -7547,6 +7547,423 @@ Battle_FxHandlerTable:
     dw Battle_FxColourCycle         ; $0C
     dw Battle_FxColourCycle         ; $0D
     dw Battle_FxOverlay7            ; $0E
+
+; ==================================================================
+; Enemy animation tick ($C1:3234–$C1:34DA)
+; ==================================================================
+
+; ==================================================================
+; Battle_TickEnemyGroup ($C13234–$C134A6, 627 bytes)
+; ==================================================================
+; The enemy counterpart of Battle_TickPcSlots, which jumps here instead
+; of ticking the PCs while !Battle_UnkA4 is 1-3 (A = that value). Value
+; n picks a group of enemies: 1 = enemies 0-2, 2 = enemies 3-5, 3 =
+; enemies 6-7. The group's members go into !Battle_TickOrder, starting
+; with the first whose frame decode was put off (!Battler_FrameDeferred
+; of slot 3 + enemy; $FF fills the unused third entry of group 3). For
+; each present enemy:
+;   - when !Enemy_AnimWanted or the facing (!Battler_Facing) changed,
+;     reloads its lists: from the battler's long pointers
+;     !Battler_AnimDurBase / !Battler_AnimFrameBase it copies 8 frame
+;     ids (offset list * 4 + Facing * FacingStride) into
+;     !Enemy_AnimFrames and 8 durations (offset list * 4), each turned
+;     into frames by !BattleRom_Div5, into !Enemy_AnimTicks. The list is
+;     picked by !BattleRom_EnemyAnimKind[animation]: kind 0 = list 3,
+;     kind 1 = list 1 (and clears !Enemy_Unk9829), other kinds = list 6;
+;   - counts down !Enemy_AnimTimer; at 0 it shows the current frame
+;     (Battle_DrawBattlerFrame, layouts 0-2 only), moves
+;     !Enemy_AnimFrame on (wrapping at 4, or to 0 at a 0 tick count) and
+;     reloads the timer from the new entry's ticks. When a frame was
+;     already decoded this pass (!Battle_FramesDecoded) the step is put
+;     off instead: the enemy is marked deferred and its timer set back
+;     to 1. With exactly one decode done and frame layout 0, slots 4
+;     and 6-10 still draw and slots 3 and 5 wait; why is not known.
+; Finally !Battle_UnkA4, decremented on the way in, is incremented again
+; when it differs from !Battle_Unk993B (the copy
+; BattleSys_UpkeepTwoFrames took before the tick) and is below 3; as the
+; code stands the two cancel, so the group is not advanced here (what
+; else writes $A4 is not traced).
+; Quirks, kept as found: the lists are copied 8 entries long, but the
+; frame index wraps at 4, so entries 4-7 are never shown by this
+; routine; durations 0-4 become 0 ticks through the /5 table, which here
+; ends the list (the PC tick only ends at a 0 byte and keeps 1 as the
+; minimum); group 3 ends with a JMP to the very next instruction.
+; "Group" and the enemy reading come from the index arithmetic
+; (slot = enemy + 3, 3-byte pointer arrays indexed at +9); the meaning of
+; the list numbers and of the kind table is not established.
+; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): Battle_TickPcSlots only. The
+; final RTS (.exit) is also the target of Battle_UnkThunk2F1F.
+; Entry: M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkA4
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$86, $9C and
+;        $C0-$C5 written, plus the callees' scratch
+; Callees: Battle_Mul8x16, Battle_ShiftLeft3, Battle_DrawBattlerFrame
+!Battle_EnemyIdx = !BattleTmp_9C          ; 2 B: enemy being ticked (0-7; slot = enemy + 3)
+!Battle_EnemyFrameSrc = !BattleTmp_C0     ; 3 B: long pointer to the enemy's frame-id lists
+!Battle_EnemyTicksSrc = !BattleTmp_C3     ; 3 B: long pointer to its duration lists
+!Battle_EnemyListOfs = !BattleTmp_86      ; 1 B: list number * 4 (offset of the duration list)
+!Battle_EnemyFrameOfs = !BattleTmp_82     ; 2 B: list number * 4 + Facing * FacingStride
+!Battle_EnemyCopyLeft = !BattleTmp_80     ; 1 B: entries left to copy
+!Battle_EnemyListBase = !BattleTmp_80     ; 1 B: enemy * 8, its block in !Enemy_AnimTicks/Frames
+!Battle_EnemyCopyDest = !BattleTmp_84     ; 2 B: index into !Enemy_AnimTicks being written
+Battle_TickEnemyGroup:
+    STZ.w !Battle_EnemyTickIdx
+    DEC A
+    BNE .not_group1
+    DEC.b !Battle_UnkA4
+    JMP .group1
+.not_group1:
+    DEC A
+    BNE .not_group2
+    DEC.b !Battle_UnkA4
+    JMP .group2
+.not_group2:
+    DEC A
+    BNE .no_group
+    DEC.b !Battle_UnkA4
+    JMP .group3
+.no_group:
+    JMP .exit
+.group1:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot
+    BEQ .g1_enemy1
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot
+    TDC
+    STA.w !Battle_TickOrder         ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_enemy1:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+1
+    BEQ .g1_enemy2
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+1
+    LDA.b #1
+    STA.w !Battle_TickOrder         ; 1, 2, 0
+    INC A
+    STA.w !Battle_TickOrder+1
+    TDC
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_enemy2:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+2
+    BEQ .g1_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+2
+    LDA.b #2
+    STA.w !Battle_TickOrder         ; 2, 0, 1
+    TDC
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g1_done
+.g1_none:
+    TDC
+    STA.w !Battle_TickOrder         ; 0, 1, 2
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+.g1_done:
+    JMP .tick
+.group2:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+3
+    BEQ .g2_enemy4
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+3
+    LDA.b #3
+    STA.w !Battle_TickOrder         ; 3, 4, 5
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_enemy4:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+4
+    BEQ .g2_enemy5
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+4
+    LDA.b #4
+    STA.w !Battle_TickOrder         ; 4, 5, 3
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #3
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_enemy5:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+5
+    BEQ .g2_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+5
+    LDA.b #5
+    STA.w !Battle_TickOrder         ; 5, 3, 4
+    LDA.b #3
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+    BRA .g2_done
+.g2_none:
+    LDA.b #3
+    STA.w !Battle_TickOrder         ; 3, 4, 5
+    INC A
+    STA.w !Battle_TickOrder+1
+    INC A
+    STA.w !Battle_TickOrder+2
+.g2_done:
+    JMP .tick
+.group3:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+6
+    BEQ .g3_enemy7
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+6
+    LDA.b #6
+    STA.w !Battle_TickOrder         ; 6, 7, none
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+    BRA .g3_done
+.g3_enemy7:
+    LDA.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+7
+    BEQ .g3_none
+    STZ.w !Battler_FrameDeferred+!Battle_FirstEnemySlot+7
+    LDA.b #7
+    STA.w !Battle_TickOrder         ; 7, 6, none
+    DEC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+    BRA .g3_done
+.g3_none:
+    LDA.b #6
+    STA.w !Battle_TickOrder         ; 6, 7, none
+    INC A
+    STA.w !Battle_TickOrder+1
+    LDA.b #!Battle_TickOrderNone
+    STA.w !Battle_TickOrder+2
+.g3_done:
+    JMP .tick                       ; quirk: the next instruction
+.tick:
+    LDA.w !Battle_EnemyTickIdx
+    TAX
+    LDA.w !Battle_TickOrder,X
+    BMI .skip
+    TAX
+    STX.b !Battle_EnemyIdx
+    LDA.w !Battler_Present+!Battle_FirstEnemySlot,X
+    BNE .present
+.skip:
+    JMP .next
+.present:
+    LDA.w !Enemy_Anim,X
+    CMP.w !Enemy_AnimWanted,X
+    BNE .reload
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    CMP.w !Enemy_FacingShown,X
+    BNE .reload
+    JMP .count_down
+.reload:
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_Anim,X
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_FacingShown,X
+    TXA
+    ASL A
+    CLC
+    ADC.b !Battle_EnemyIdx
+    TAX                             ; enemy * 3 (+9 below: its slot's pointers)
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3),X
+    STA.b !Battle_EnemyTicksSrc
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3)+1,X
+    STA.b !Battle_EnemyTicksSrc+1
+    LDA.w !Battler_AnimDurBase+(!Battle_FirstEnemySlot*3)+2,X
+    STA.b !Battle_EnemyTicksSrc+2
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3),X
+    STA.b !Battle_EnemyFrameSrc
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3)+1,X
+    STA.b !Battle_EnemyFrameSrc+1
+    LDA.w !Battler_AnimFrameBase+(!Battle_FirstEnemySlot*3)+2,X
+    STA.b !Battle_EnemyFrameSrc+2
+    LDX.b !Battle_EnemyIdx
+    LDA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi+!Battle_FirstEnemySlot,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    LDX.b !Battle_EnemyIdx
+    LDA.w !Enemy_Anim,X
+    TAX
+    LDA.l !BattleRom_EnemyAnimKind,X
+    BNE .kind_not0
+    LDA.b #!Battle_AnimDefault*4    ; kind 0: list 3
+    BRA .set_list
+.kind_not0:
+    DEC A
+    BNE .kind_other
+    LDX.b !Battle_EnemyIdx
+    STZ.w !Enemy_Unk9829,X
+    LDA.b #!Battle_EnemyListKind1*4 ; kind 1: list 1
+    BRA .set_list
+.kind_other:
+    LDA.b #!Battle_EnemyListOther*4 ; other kinds: list 6
+.set_list:
+    STA.b !Battle_EnemyListOfs
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_MulProduct
+    STA.b !Battle_EnemyFrameOfs
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.b #!Battle_EnemyAnimListLen
+    STA.b !Battle_EnemyCopyLeft
+    LDX.b !Battle_EnemyIdx
+    LDA.l !BattleRom_EnemyListOffset,X
+    TAX
+    PHX
+    LDY.b !Battle_EnemyFrameOfs
+.copy_frames:
+    LDA.b [!Battle_EnemyFrameSrc],Y
+    STA.w !Enemy_AnimFrames,X
+    INY
+    INX
+    DEC.b !Battle_EnemyCopyLeft
+    BNE .copy_frames
+    LDA.b #!Battle_EnemyAnimListLen
+    STA.b !Battle_EnemyCopyLeft
+    PLX
+    STX.b !Battle_EnemyCopyDest
+    LDA.b !Battle_EnemyListOfs
+    TAY
+.copy_ticks:
+    LDA.b [!Battle_EnemyTicksSrc],Y
+    TAX
+    LDA.l !BattleRom_Div5,X         ; duration byte -> frames
+    LDX.b !Battle_EnemyCopyDest
+    STA.w !Enemy_AnimTicks,X
+    INY
+    INC.b !Battle_EnemyCopyDest
+    DEC.b !Battle_EnemyCopyLeft
+    BNE .copy_ticks
+.count_down:
+    LDX.b !Battle_EnemyIdx
+    DEC.w !Enemy_AnimTimer,X
+    BNE .next
+    LDA.b !Battle_EnemyIdx
+    JSR Battle_ShiftLeft3
+    STA.b !Battle_EnemyListBase
+    CLC
+    ADC.w !Enemy_AnimFrame,X
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+    BNE .frame
+    STZ.w !Enemy_AnimFrame,X        ; end of the list: back to entry 0
+    LDA.b !Battle_EnemyListBase
+    TAY
+.frame:
+    LDA.w !Enemy_AnimFrames,Y
+    STA.w !Battle_FrameId
+    CLC
+    LDA.b !Battle_EnemyIdx
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !Battle_FrameSlot
+    TAX                             ; X = battler slot
+    LDA.w !Battle_FramesDecoded
+    BEQ .draw
+    DEC A
+    BNE .defer
+    LDA.w !Battler_FrameLayout,X
+    BNE .defer
+    LDA.w !Battle_FrameSlot
+    CMP.b #!Battle_FirstEnemySlot+1
+    BEQ .draw                       ; slot 4
+    CMP.b #!Battle_FirstEnemySlot+3
+    BCS .draw                       ; slots 6-10
+.defer:
+    INC.w !Battler_FrameDeferred,X
+    LDX.b !Battle_EnemyIdx
+    INC.w !Enemy_AnimTimer,X        ; try again next time
+    BRA .next
+.draw:
+    LDA.w !Battler_FrameLayout,X
+    CMP.b #!Battle_FrameLayoutStrip
+    BCS .advance
+    JSR Battle_DrawBattlerFrame
+.advance:
+    LDX.b !Battle_EnemyIdx
+    INC.w !Enemy_AnimFrame,X
+    LDA.w !Enemy_AnimFrame,X
+    CMP.b #!Battle_EnemyAnimFrames
+    BNE .in_range
+    STZ.w !Enemy_AnimFrame,X
+.in_range:
+    LDA.b !Battle_EnemyIdx
+    JSR Battle_ShiftLeft3
+    STA.b !Battle_EnemyListBase
+    CLC
+    ADC.w !Enemy_AnimFrame,X
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+    BNE .set_timer
+    STZ.w !Enemy_AnimFrame,X
+    LDA.b !Battle_EnemyListBase
+    TAY
+    LDA.w !Enemy_AnimTicks,Y
+.set_timer:
+    STA.w !Enemy_AnimTimer,X
+.next:
+    INC.w !Battle_EnemyTickIdx
+    LDA.w !Battle_EnemyTickIdx
+    CMP.b #!Battle_EnemyGroupSize
+    BEQ .group_done
+    JMP .tick
+.group_done:
+    LDA.b !Battle_UnkA4
+    CMP.w !Battle_Unk993B
+    BEQ .exit
+    CMP.b #!Battle_EnemyGroupLast
+    BCS .exit
+    INC.b !Battle_UnkA4             ; (undoes the DEC above; see header)
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_DrawAllBattlerFrames ($C134A7–$C134DA, 52 bytes)
+; ==================================================================
+; Draws the starting frame (!Battler_StartFrame) of every present
+; battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets
+; the three PC animation timers to 1, 2 and 3 so the PCs take their first
+; steps on different frames (inferred from Battle_TickPcSlots, which
+; counts them down).
+; !Pc_AnimTimer serves as the loop counter (16-bit store, 8-bit count)
+; before it gets those values.
+; Callers (JSR; scanned as above): the battle set-up of service 0 at
+; $C1:0031 only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3; X, Y and the decoder's scratch
+;        clobbered
+; Callees: Battle_DrawBattlerFrameAnyLayout
+Battle_DrawAllBattlerFrames:
+    TDC
+    TAX
+    STX.w !Pc_AnimTimer             ; loop counter (slot)
+.loop:
+    LDX.w !Pc_AnimTimer
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Pc_AnimTimer
+    STA.w !Battle_FrameSlot
+    LDA.w !Battler_StartFrame,X
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrameAnyLayout
+.next:
+    INC.w !Pc_AnimTimer
+    LDA.w !Pc_AnimTimer
+    CMP.b #!Battle_NumSlots
+    BNE .loop
+    LDA.b #1
+    STA.w !Pc_AnimTimer             ; PC timers 1, 2, 3
+    INC A
+    STA.w !Pc_AnimTimer+1
+    INC A
+    STA.w !Pc_AnimTimer+2
+    RTS
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)

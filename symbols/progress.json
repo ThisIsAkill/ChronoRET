@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 33196,
+  "emitted_bytes": 33875,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 298,
-      "bytes": 33196
+      "functions": 300,
+      "bytes": 33875
     },
     "readable": {
-      "functions": 271,
-      "bytes": 32307
+      "functions": 273,
+      "bytes": 32986
     },
     "verified": {
       "functions": 245,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 12726,
+      "emitted_bytes": 13405,
       "matched": {
-        "functions": 175,
-        "bytes": 12726
+        "functions": 177,
+        "bytes": 13405
       },
       "readable": {
-        "functions": 148,
-        "bytes": 11837
+        "functions": 150,
+        "bytes": 12516
       },
       "verified": {
         "functions": 125,
@@ -535,7 +535,7 @@
       "bank": "$C1",
       "start": "$C1:3000",
       "end": "$C1:3FFF",
-      "emitted_bytes": 564,
+      "emitted_bytes": 1243,
       "functions": [
         "Battle_PickNextStatusAnim",
         "Battle_ApplyPendingEffect",
@@ -548,7 +548,9 @@
         "Battle_FxOverlay3",
         "Battle_FxOverlay4",
         "Battle_FxOverlay5",
-        "Battle_FxHandlerTable"
+        "Battle_FxHandlerTable",
+        "Battle_TickEnemyGroup",
+        "Battle_DrawAllBattlerFrames"
       ]
     },
     {

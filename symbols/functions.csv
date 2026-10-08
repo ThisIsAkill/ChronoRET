@@ -277,8 +277,8 @@ $C1:2CCD,$C1:2CDF,19,BattlePos_SubjectRightPart,$C1,Battle engine,matched,2bbf06
 $C1:2CE0,$C1:2CF2,19,BattlePos_SubjectLeftPart,$C1,Battle engine,matched,9e8362e6cf76,
 $C1:2CF3,$C1:2D80,142,BattlePos_DistDifference,$C1,Battle engine,readable,f488d7c38e15,
 $C1:2D81,$C1:2D9E,30,BattlePos_ModeTable,$C1,Battle engine,readable,cfcd4e73bb1e,"!BattlePos_Mode, called from BattlePos_Query."
-$C1:2D9F,$C1:2F1E,384,Battle_TickPcSlots,$C1,Battle engine,readable,0dc5c28dae06,
-$C1:2F1F,$C1:2F21,3,Battle_UnkThunk2F1F,$C1,Battle engine,matched,e4458ddeebc0,at $C1:34A6.
+$C1:2D9F,$C1:2F1E,384,Battle_TickPcSlots,$C1,Battle engine,readable,4d0f152d462e,
+$C1:2F1F,$C1:2F21,3,Battle_UnkThunk2F1F,$C1,Battle engine,matched,41a2c60afeaa,that ends Battle_TickEnemyGroup ($C1:34A6).
 $C1:2F22,$C1:2F96,117,Battle_UpdatePcFacing,$C1,Battle engine,readable,c0c04dbde691,
 $C1:2F97,$C1:305B,197,Battle_PickStatusAnim,$C1,Battle engine,readable,f2816325d71f,
 $C1:305C,$C1:308B,48,Battle_PickNextStatusAnim,$C1,Battle engine,readable,22b6fd672ec6,"Runs Battle_PickStatusAnim for one battler per call, the slot in !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3,"
@@ -293,6 +293,8 @@ $C1:31B0,$C1:31D1,34,Battle_FxOverlay3,$C1,Battle engine,matched,80002077ac67,Ef
 $C1:31D2,$C1:31F3,34,Battle_FxOverlay4,$C1,Battle engine,matched,1eddc6dee22b,Effect 5: resets and starts overlay 4.
 $C1:31F4,$C1:3215,34,Battle_FxOverlay5,$C1,Battle engine,matched,c18ba7b2ceb7,Effect 8: resets and starts overlay 5.
 $C1:3216,$C1:3233,30,Battle_FxHandlerTable,$C1,Battle engine,readable,11c9da760b29,"One handler per status effect id 0-$0E, called from Battle_ApplyPendingEffect."
+$C1:3234,$C1:34A6,627,Battle_TickEnemyGroup,$C1,Battle engine,readable,eae55bebf8de,
+$C1:34A7,$C1:34DA,52,Battle_DrawAllBattlerFrames,$C1,Battle engine,readable,c3e1b8987a7c,"Draws the starting frame (!Battler_StartFrame) of every present battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets the three PC animation timers to 1, 2 and 3 so the PCs take thei"
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,readable,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,readable,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"
