@@ -853,9 +853,9 @@ C2Scene_TaskSpawnLow:
 ; Quirk, kept: there is no check that a record was free. Then X comes
 ; back as C2Scene_TaskRecordsEnd and the three fields are written into
 ; the last record (63), whatever runs there.
-; Callers (21 JSR/JMP sites, all unmatched), e.g. $C2:1203, $C2:242E,
-;   $C2:2459, $C2:2527, $C2:256B, $C2:2596, $C2:25FB, $C2:2626, $C2:2676,
-;   $C2:2C90 (JMP), $C2:3154, $C2:33B2, $C2:33DF, $C2:4479, $C2:452C,
+; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90);
+;   unmatched: $C2:1203, $C2:242E, $C2:2459, $C2:2527, $C2:256B, $C2:2596,
+;   $C2:25FB, $C2:2626, $C2:2676, $C2:3154, $C2:33B2, $C2:33DF, $C2:4479, $C2:452C,
 ;   $C2:63AE, $C2:66DF, $C2:66FF, $C2:6AAB, $C2:741F and $C2:7427.
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
@@ -960,6 +960,359 @@ C2Scene_TaskRunAll:
 ; Exit:  the handler's; C=1 frees the task
 C2Scene_TaskCallHandler:
     JMP (!C2Scene_TaskHandler)
+
+; $C2:0556 — C2Scene_LayerMetatiles (3 words, $0556–$055B)
+; Per BG layer 1-3 (index (layer - 1) * 2): where its metatile
+; definitions are in bank $7E. Read by C2Scene_DrawBgLayer and by
+; unmatched code at $C2:0576 and $C2:067A. Layer 1's set is the one
+; C2Scene_LoadMetatiles unpacks at C2Scene_Metatiles; layer 2's follows it
+; $800 bytes on (256 metatiles of 8 bytes), so the same pack probably
+; holds both. Layer 3's entry, like its other two, is not explained.
+C2Scene_LayerMetatiles:
+    dw $3000                    ; 1: C2Scene_Metatiles
+    dw $3800                    ; 2
+    dw $4000                    ; 3
+
+; $C2:055C — C2Scene_LayerMaps (3 words, $055C–$0561)
+; Per layer: where its map (96 x 64 metatile numbers, C2Scene_MapBytes)
+; is in bank $7E. Layer 1's is C2Scene_BgMaps (C2Scene_LoadBgMaps); layer
+; 2's follows it at +$1800. Read by C2Scene_DrawBgLayer and unmatched code
+; at $C2:057C, $C2:0680 and $C2:1176.
+C2Scene_LayerMaps:
+    dw $4000                    ; 1: C2Scene_BgMaps
+    dw $5800                    ; 2
+    dw $7000                    ; 3
+
+; $C2:0562 — C2Scene_LayerVramMaps (3 words, $0562–$0567)
+; Per layer: the VRAM word address of its tilemap. 1 and 2 are the BG1SC
+; and BG2SC bases BankC2_InitHwRegs sets ($6000, $6800); 3's $7000 is
+; where the BG3 tiles go, not the BG3 map ($7800), so layer 3 is probably
+; not drawn this way. Read by C2Scene_DrawBgLayer and unmatched code at
+; $C2:0582 and $C2:0686.
+C2Scene_LayerVramMaps:
+    dw $6000                    ; 1: BG1 map
+    dw $6800                    ; 2: BG2 map
+    dw $7000                    ; 3
+
+; ============================================================
+; Scene BG layer redraw ($C2:09C5–$C2:0B52)
+; ============================================================
+; A BG layer's tilemap is built from 16x16 metatiles: the layer's map
+; (C2Scene_LayerMaps) holds a metatile number per cell, and each
+; metatile (C2Scene_LayerMetatiles) is four tile words. A redraw builds
+; the tilemap column by column in the buffer at C2Scene_VramQBufPtr and
+; DMAs each column to VRAM straight away, so it needs forced blank or
+; vblank (its callers are the scene setup, under forced blank, and the
+; unmatched script code at $C2:1950).
+
+; $C2:09C5 — C2Scene_DrawBgLayer (167 bytes, $09C5–$0A6B)
+; Redraws the visible part of BG layer C2Scene_DrawLayer (1 or 2; the
+; value is taken AND C2Scene_LayerMask) from the layer's tile position
+; C2Scene_BgTileX/Y (word (layer - 1)):
+; - the layer's scroll shadows (C2Scene_Bg1HScroll/VScroll + 2 * (layer -
+;   1)) = the tile position * 8;
+; - starting at the metatile that holds the left edge of the screen, or
+;   the one before it when the edge is on a metatile boundary (the X
+;   tile is even), and likewise for the top edge, it draws
+;   C2Scene_DrawCols columns of C2Scene_DrawRows metatiles
+;   (C2Scene_BuildBgColumn, C2Scene_UploadBgColumn), wrapping at the
+;   map's 96 columns and 64 rows and at the tilemap's 64 x 32 tiles.
+; Quirks, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
+; loop (.hang). Layer 3 would read its X from C2Scene_BgTileY's first word
+; and its Y from dp $EB, past C2Scene_BgTileY, and its table entries do
+; not fit the BG3 layout (see C2Scene_LayerVramMaps); no known caller
+; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2; the
+; unmatched caller passes a script byte).
+; Callers (5 sites): C2Scene_LoadScene ($C2:2C81, $C2:2C88),
+;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE); unmatched: $C2:1950.
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (direct-page work area;
+;        TDC for 0), DB any (set to $7E for the buffers and restored);
+;        C2Tmp_00 = the layer; forced blank or vblank (VRAM DMA)
+; Exit:  M=1, X=0, DB restored; A, X, Y clobbered; C2Tmp_00-$1B changed
+;        (C2Tmp_00 = 0); the layer's scroll shadows set; DMA channel 7
+;        registers changed
+; Calls: C2Scene_BuildBgColumn, C2Scene_UploadBgColumn.
+!C2Scene_DrawLayer = !C2Tmp_00          ; in: the layer, 1-3 (C2Scene_BuildBgColumn reuses it)
+!C2Scene_DrawColsLeft = !C2Tmp_02       ; 16-bit columns still to draw
+!C2Scene_DrawMapRowOfs = !C2Tmp_04      ; 16-bit map byte offset of the current row (row * 96)
+!C2Scene_DrawBufPos = !C2Tmp_06         ; 16-bit byte offset in the column buffer
+!C2Scene_DrawMapCol = !C2Tmp_08         ; 16-bit map column 0-95
+!C2Scene_DrawMapRow = !C2Tmp_0A         ; 16-bit map row 0-63 of the top metatile
+!C2Scene_DrawColX = !C2Tmp_0C           ; 16-bit BG pixel X of the column (wraps at 512)
+!C2Scene_DrawColY = !C2Tmp_0E           ; 16-bit BG pixel Y of the top metatile (wraps at 256)
+!C2Scene_DrawVramMap = !C2Tmp_10        ; 16-bit VRAM word address of the layer's tilemap
+!C2Scene_DrawVramCol = !C2Tmp_12        ; 16-bit VRAM word address of the column
+!C2Scene_DrawMetatiles = !C2Tmp_14      ; 16-bit address (bank $7E) of the layer's metatiles
+!C2Scene_DrawMap = !C2Tmp_16            ; 16-bit address (bank $7E) of the layer's map
+!C2Scene_DrawMapColPtr = !C2Tmp_18      ; 16-bit: the map + the column (row 0)
+!C2Scene_DrawRow64 = !C2Tmp_1A          ; 16-bit: row * 64, on the way to row * 96
+org $C209C5
+C2Scene_DrawBgLayer:
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.b !C2Scene_DrawLayer
+    AND.w #!C2Scene_LayerMask
+    BNE .layer
+    JMP .hang
+.layer:
+    DEC A
+    ASL A
+    TAX                         ; X = (layer - 1) * 2
+    LDA.b !C2Scene_BgTileX,X
+    ASL A
+    ASL A
+    ASL A
+    STA.b !C2Scene_Bg1HScroll,X
+    LDA.b !C2Scene_BgTileY,X
+    ASL A
+    ASL A
+    ASL A
+    STA.b !C2Scene_Bg1VScroll,X
+    LDA.l C2Scene_LayerMetatiles,X
+    STA.b !C2Scene_DrawMetatiles
+    LDA.l C2Scene_LayerMaps,X
+    STA.b !C2Scene_DrawMap
+    LDA.l C2Scene_LayerVramMaps,X
+    STA.b !C2Scene_DrawVramMap
+    LDA.b !C2Scene_BgTileX,X    ; first column: the metatile under the edge,
+    LSR A                       ; or the one before when the tile X is even
+    BCS .col_set
+    DEC A
+    BPL .col_set
+    LDA.w #!C2Scene_MapCols-1
+.col_set:
+    STA.b !C2Scene_DrawMapCol
+    LDA.b !C2Scene_BgTileY,X
+    LSR A
+    BCS .row_set
+    DEC A
+    BPL .row_set
+    LDA.w #!C2Scene_MapRows-1
+.row_set:
+    STA.b !C2Scene_DrawMapRow
+    LDA.b !C2Scene_Bg1HScroll,X ; the same columns in pixels
+    BIT.w #!C2Scene_TilePx
+    BEQ .x_even
+    SEC
+    SBC.w #!C2Scene_TilePx
+    BRA .x_set
+.x_even:
+    SEC
+    SBC.w #!C2Scene_MetatilePx
+.x_set:
+    AND.w #!C2Scene_BgXMask
+    STA.b !C2Scene_DrawColX
+    LDA.b !C2Scene_Bg1VScroll,X
+    BIT.w #!C2Scene_TilePx
+    BEQ .y_even
+    SEC
+    SBC.w #!C2Scene_TilePx
+    BRA .y_set
+.y_even:
+    SEC
+    SBC.w #!C2Scene_MetatilePx
+.y_set:
+    AND.w #!C2Scene_BgYMask
+    STA.b !C2Scene_DrawColY
+    LDA.w #!C2Scene_DrawCols
+    STA.b !C2Scene_DrawColsLeft
+.column:
+    JSR C2Scene_BuildBgColumn
+    JSR C2Scene_UploadBgColumn
+    LDA.b !C2Scene_DrawMapCol
+    INC A
+    CMP.w #!C2Scene_MapCols
+    BCC .next_col
+    TDC                         ; A = DP = 0: wrap to column 0
+.next_col:
+    STA.b !C2Scene_DrawMapCol
+    LDA.b !C2Scene_DrawColX
+    CLC
+    ADC.w #!C2Scene_MetatilePx
+    AND.w #!C2Scene_BgXMask
+    STA.b !C2Scene_DrawColX
+    DEC.b !C2Scene_DrawColsLeft
+    BNE .column
+    SEP #$20
+    PLB
+    RTS
+.hang:
+    BRA .hang
+
+; $C2:0A6C — C2Scene_BuildBgColumn (66 bytes, $0A6C–$0AAD)
+; Builds one tilemap column pair (two tile columns of 32 words) in the
+; buffer at C2Scene_VramQBufPtr: C2Scene_DrawRows metatiles of map column
+; C2Scene_DrawMapCol from row C2Scene_DrawMapRow down (wrapping at 64
+; rows), each put by C2Scene_DrawMetatile at the buffer row that its
+; screen Y (C2Scene_DrawColY) falls on, wrapping at 32 tiles.
+; Callers (1 JSR site): C2Scene_DrawBgLayer ($C2:0A46).
+; Entry: M=0, X=0, DP=$0000 (TDC for 0), DB=$7E; C2Scene_DrawMapCol,
+;        C2Scene_DrawMapRow, C2Scene_DrawColY, C2Scene_DrawMap and
+;        C2Scene_DrawMetatiles set (C2Scene_DrawBgLayer)
+; Exit:  M=0, X=0; A, X, Y clobbered; C2Tmp_00 (the row count, here
+;        C2Scene_DrawLayer's slot) = 0; C2Tmp_04, $06, $18 and $1A changed
+; Calls: C2Scene_DrawMetatile.
+!C2Scene_DrawRowsLeft = !C2Tmp_00       ; 16-bit metatiles still to draw in the column
+C2Scene_BuildBgColumn:
+    LDA.w #!C2Scene_DrawRows
+    STA.b !C2Scene_DrawRowsLeft
+    LDA.b !C2Scene_DrawMapCol
+    CLC
+    ADC.b !C2Scene_DrawMap
+    STA.b !C2Scene_DrawMapColPtr
+    LDA.b !C2Scene_DrawMapRow
+    XBA                         ; row * 256
+    LSR A
+    LSR A
+    STA.b !C2Scene_DrawRow64    ; row * 64
+    LSR A                       ; row * 32 (C = 0: bit 0 of row * 64)
+    ADC.b !C2Scene_DrawRow64
+    STA.b !C2Scene_DrawMapRowOfs ; row * 96: C2Scene_MapCols bytes per row
+    LDA.b !C2Scene_DrawColY
+    AND.w #!C2Scene_PxMetaRowMask
+    LSR A
+    LSR A                       ; metatile row on the tilemap * 4
+    STA.b !C2Scene_DrawBufPos
+.row:
+    JSR C2Scene_DrawMetatile
+    LDA.b !C2Scene_DrawMapRowOfs
+    CLC
+    ADC.w #!C2Scene_MapCols
+    CMP.w #!C2Scene_MapBytes
+    BCC .next_row
+    TDC                         ; A = DP = 0: wrap to row 0
+.next_row:
+    STA.b !C2Scene_DrawMapRowOfs
+    LDA.b !C2Scene_DrawBufPos
+    CLC
+    ADC.w #!C2Scene_ColRowStep
+    AND.w #!C2Scene_ColBufMask
+    STA.b !C2Scene_DrawBufPos
+    DEC.b !C2Scene_DrawRowsLeft
+    BNE .row
+    RTS
+
+; $C2:0AAE — C2Scene_DrawMetatile (46 bytes, $0AAE–$0ADB)
+; Puts one metatile into the column buffer: the map byte at
+; C2Scene_DrawMapColPtr + C2Scene_DrawMapRowOfs selects an 8-byte
+; C2Scene_Metatile record; its .TopLeft and .BottomLeft go to the left
+; tile column (buffer + C2Scene_DrawBufPos, + 2) and .TopRight and
+; .BottomRight to the right one (+ C2Scene_ColBufHalf, + 2). The
+; pointers are 16-bit, so both the map and the buffer are read in bank
+; DB ($7E).
+; Callers (1 JSR site): C2Scene_BuildBgColumn ($C2:0A8D).
+; Entry: M=0, X=0, DP=$0000, DB=$7E; set up as C2Scene_BuildBgColumn
+;        leaves it
+; Exit:  M=0, X=0; A = .BottomRight; X = the metatile's address; Y =
+;        C2Scene_DrawBufPos + C2Scene_ColBufHalf + 2
+; No calls.
+C2Scene_DrawMetatile:
+    LDY.b !C2Scene_DrawMapRowOfs
+    LDA.b (!C2Scene_DrawMapColPtr),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                       ; * 8 bytes per metatile (C = 0)
+    ADC.b !C2Scene_DrawMetatiles
+    TAX
+    LDY.b !C2Scene_DrawBufPos
+    LDA.w C2Scene_Metatile.TopLeft,X
+    STA.b (!C2Scene_VramQBufPtr),Y
+    INY
+    INY
+    LDA.w C2Scene_Metatile.BottomLeft,X
+    STA.b (!C2Scene_VramQBufPtr),Y
+    TYA
+    CLC
+    ADC.w #!C2Scene_ColBufHalf-2
+    TAY
+    LDA.w C2Scene_Metatile.TopRight,X
+    STA.b (!C2Scene_VramQBufPtr),Y
+    INY
+    INY
+    LDA.w C2Scene_Metatile.BottomRight,X
+    STA.b (!C2Scene_VramQBufPtr),Y
+    RTS
+
+; $C2:0ADC — C2Scene_UploadBgColumn (119 bytes, $0ADC–$0B52)
+; DMAs the two tile columns built by C2Scene_BuildBgColumn to VRAM on
+; channel 7, with VMAIN stepping 32 words (one tilemap row) per word: the
+; left column to tile column C2Scene_DrawColX / 8 of the layer's tilemap
+; (C2Scene_DrawVramMap; columns 32-63 are in the second 32x32 screen,
+; $400 words on) and the right column to the next word address.
+; Quirk, kept: the second column's bank is stored with 16-bit A, so the
+; byte after the pointer (dp $E3, C2Scene_BgTileX's low byte) also goes to
+; DAS7L; the count is written again right after.
+; Callers (1 JSR site): C2Scene_DrawBgLayer ($C2:0A49).
+; Entry: M=0, X=0, DP=$0000 (TDC for 0), DB any (saved; $00 for the
+;        registers); forced blank or vblank
+; Exit:  M=0, X=0, DB unchanged; A clobbered, X = C2Scene_ColBufHalf; Y
+;        unchanged; C2Scene_DrawVramCol set; DMA channel 7 registers
+;        changed
+; No calls.
+C2Scene_UploadBgColumn:
+    LDA.b !C2Scene_DrawColX
+    LSR A
+    LSR A
+    LSR A                       ; tile column 0-63
+    CMP.w #!C2Scene_MapScreenCols
+    BCC .left_screen
+    CLC
+    ADC.w #!C2Scene_MapScreen2Skip
+.left_screen:
+    CLC
+    ADC.b !C2Scene_DrawVramMap
+    STA.b !C2Scene_DrawVramCol
+    TAX
+    SEP #$20
+    PHB
+    TDC                         ; A = DP = 0
+    PHA
+    PLB
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh|VRAM_INC_32
+    STA.w VMAIN
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.b !C2Scene_VramQBufPtr
+    STX.w A1T7L
+    LDA.b !C2Scene_VramQBufPtr+2
+    STA.w A1B7
+    LDX.w #!C2Scene_ColBufHalf
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    LDA.b !C2Scene_DrawVramCol
+    INC A
+    STA.w VMADDL
+    LDA.b !C2Scene_VramQBufPtr
+    CLC
+    ADC.w #!C2Scene_ColBufHalf
+    STA.w A1T7L
+    LDA.b !C2Scene_VramQBufPtr+2
+    STA.w A1B7                  ; 16-bit: DAS7L's low byte too (rewritten below)
+    SEP #$20
+    LDA.b #!VMAIN_IncAfterHigh|VRAM_INC_32
+    STA.w VMAIN
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.w #!C2Scene_ColBufHalf
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    PLB
+    RTS
+
 
 ; ============================================================
 ; Scene sprite list ($C2:0B53–$C2:0E1C)
@@ -1525,7 +1878,8 @@ C2Scene_ClearUnk1B30:
 ; (C2Scene_SoundCmdState), C2Scene_Unk1BF6 = 0, a copy of the end of the
 ; flag block (C2Scene_SaveFlagTail), the start position and scroll from
 ; the field's entry tile (C2Scene_SetStartPos, C2Scene_SetStartScroll),
-; and C2Scene_Unk2C1D (unmatched; it spawns a task); then both NMI flags
+; and C2Scene_LoadScene (it loads the scene and spawns its script task);
+; then both NMI flags
 ; (update and palette upload) and NMI with auto-joypad on.
 ; C2Scene_MainLoop then waits for the next frame (C2Scene_WaitOneFrame)
 ; and jumps through C2Scene_ModeTable on C2Scene_Mode. The handlers come
@@ -1541,7 +1895,7 @@ C2Scene_ClearUnk1B30:
 ;        mode * 2, X = the same)
 ; Calls: C2Scene_ClearVram, C2Scene_ClearUnk1B30, C2Scene_SprInitLinks,
 ;   C2Scene_TaskClearAll, C2Scene_SaveFlagTail, C2Scene_SetStartPos,
-;   C2Scene_SetStartScroll, C2Scene_Unk2C1D, C2Scene_WaitOneFrame.
+;   C2Scene_SetStartScroll, C2Scene_LoadScene, C2Scene_WaitOneFrame.
 org $C223A8
 C2Scene_Main:
     JSR C2Scene_ClearVram
@@ -1553,7 +1907,7 @@ C2Scene_Main:
     JSR C2Scene_SaveFlagTail
     JSR C2Scene_SetStartPos
     JSR C2Scene_SetStartScroll
-    JSR C2Scene_Unk2C1D
+    JSR C2Scene_LoadScene
     LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
     TSB.b !C2Scene_NmiFlags
     LDA.b #!NMITIMEN_NmiJoy
@@ -1712,9 +2066,9 @@ C2Scene_SetStartPos:
 ; Puts the entry tile (Loc_EntryX/Y) in the middle of the screen:
 ; C2Scene_BgTileX (both words) = Loc_EntryX - 16, plus 192 if that is
 ; negative; C2Scene_BgTileY (both words) = Loc_EntryY - 14, plus 128 if
-; negative. (Inferred: unmatched code at $C2:09DB multiplies these by 8
-; into the BG1/BG2 scroll shadows; 16 and 14 tiles are half of 256 x 224;
-; 192 x 128 tiles would be the map size.)
+; negative. (C2Scene_DrawBgLayer multiplies these by 8 into the BG1/BG2
+; scroll shadows; 16 and 14 tiles are half of 256 x 224; 192 x 128 tiles
+; are the 96 x 64 metatile maps it draws from.)
 ; Callers (1 JSR site): C2Scene_Main ($C2:23C0).
 ; Entry: M any (REP #$20 here), X any, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF ($00 from the boot)
@@ -1743,6 +2097,1203 @@ C2Scene_SetStartScroll:
 .y_done:
     STA.b !C2Scene_BgTileY
     STA.b !C2Scene_BgTileY+2
+    SEP #$20
+    RTS
+
+; ============================================================
+; Scene loading ($C2:274D–$C2:2EC0)
+; ============================================================
+; Each scene (Loc_Id $01F0 on) has a header in bank $C6
+; (C2SceneRom_HeaderTable, pointer in C2Scene_HeaderPtr) whose bytes pick
+; packed data from pack tables in bank $C6 (C2SceneRom_*Packs, 3-byte long
+; pointers); Decomp_ToWramVec unpacks each into WRAM. Graphics are staged
+; at C2Scene_DecompBuf and DMAed to VRAM (C2Scene_LoadVram); the rest
+; stays in WRAM. A header byte with bit 7 set loads nothing. What the
+; packs contain is inferred from where they go (VRAM tile and map bases
+; from BankC2_InitHwRegs; the metatile maps from C2Scene_DrawBgLayer).
+;
+; All of these run with DP=$0000 and DB=$00 (the scene's state) unless a
+; header says otherwise: the header pointer is direct page, and
+; Decomp_ToWramVec's parameters (Menu_DecompSrc..) are absolute stores.
+
+; $C2:274D — C2Scene_GetHeaderPtr (27 bytes, $274D–$2767)
+; C2Scene_HeaderPtr = $C6:(the word of C2SceneRom_HeaderTable for scene
+; (Loc_Id AND C2Scene_LocIdMask) - Loc_FirstBankC2).
+; Quirk, kept: there is no range check; Loc_Id bits 9-15 are dropped.
+; Callers (1 JSR site): C2Scene_LoadScene ($C2:2C5C).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM ($00)
+;        (absolute read of the field's Loc_Id at $0100)
+; Exit:  M=1, X=0; A = C2SceneRom_HeaderBank (B = the address's high
+;        byte), X = the scene * 2; Y, DP and DB unchanged
+; No calls.
+C2Scene_GetHeaderPtr:
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    SEC
+    SBC.w #!Loc_FirstBankC2
+    ASL A
+    TAX
+    LDA.l !C2SceneRom_HeaderTable,X
+    STA.b !C2Scene_HeaderPtr
+    SEP #$20
+    LDA.b #!C2SceneRom_HeaderBank
+    STA.b !C2Scene_HeaderPtr+2
+    RTS
+
+; $C2:2768 — C2Scene_LoadObjGfx (84 bytes, $2768–$27BB)
+; Unpacks the scene's C2Scene_ObjPackCount sprite graphics packs (header
+; bytes C2Scene_HdrObjGfx..+3, C2SceneRom_ObjPacks) into C2Scene_DecompBuf,
+; C2Scene_PackSlotSize bytes apart (C2Scene_LoadVram DMAs all four to
+; the sprite tiles at VRAM $0000). A pack number with bit 7 set leaves
+; its slot as it was.
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2CC1).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=0 (the loop ends 16-bit), X=0; A = 4, X and Y clobbered;
+;        C2Tmp_08 = 4, C2Tmp_10-$12 = the header + C2Scene_HdrObjGfx;
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+!C2Scene_PackIdx = !C2Tmp_08            ; 16-bit loop count / header byte index
+!C2Scene_PackList = !C2Tmp_10           ; 24-bit pointer to the header bytes being read
+C2Scene_LoadObjGfx:
+    LDA.b !C2Scene_HeaderPtr+2
+    STA.b !C2Scene_PackList+2
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    REP #$20
+    CLC
+    LDA.b !C2Scene_HeaderPtr
+    ADC.w #!C2Scene_HdrObjGfx
+    STA.b !C2Scene_PackList
+    LDA.w #!C2Scene_DecompBuf&$FFFF
+    STA.w !Menu_DecompDest
+    STZ.b !C2Scene_PackIdx
+.pack:
+    SEP #$20
+    LDY.b !C2Scene_PackIdx
+    TDC                         ; A = DP = 0: B = 0 for the TAX
+    LDA.b [!C2Scene_PackList],Y
+    BMI .next
+    ASL A
+    ADC.b [!C2Scene_PackList],Y ; * C2Scene_PackEntrySize
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_ObjPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_ObjPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.next:
+    REP #$20
+    CLC
+    LDA.w !Menu_DecompDest
+    ADC.w #!C2Scene_PackSlotSize
+    STA.w !Menu_DecompDest
+    INC.b !C2Scene_PackIdx
+    LDA.b !C2Scene_PackIdx
+    CMP.w #!C2Scene_ObjPackCount
+    BNE .pack
+    RTS
+
+; $C2:27BC — C2Scene_LoadUnkC800 (34 bytes, $27BC–$27DD)
+; Unpacks entry C2Scene_UnkC800Pack of C2SceneRom_ObjPacks (the same for
+; every scene) to C2Scene_UnkC800 ($7E:C800); what it holds is not
+; traced.
+; Callers: JMP from C2Scene_LoadVram ($C2:2D6D; xref rates the site
+;   doubtful, but it is on an instruction boundary there).
+; Entry: M=1, X=0, DP any, DB=$00
+; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnkC800:
+    LDX.w #!C2Scene_UnkC800&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_UnkC800)
+    STA.w !Menu_DecompDestBank
+    REP #$20
+    LDA.l !C2SceneRom_ObjPacks+(!C2Scene_UnkC800Pack*!C2Scene_PackEntrySize)
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_ObjPacks+(!C2Scene_UnkC800Pack*!C2Scene_PackEntrySize)+2
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:27DE — C2Scene_LoadBgGfx (72 bytes, $27DE–$2825)
+; Unpacks the scene's C2Scene_BgPackCount BG graphics packs (header bytes
+; C2Scene_HdrBgGfx..+6, C2SceneRom_BgPacks) into C2Scene_DecompBuf,
+; C2Scene_PackSlotSize bytes apart ($7F:9000-$FFFF; C2Scene_LoadVram DMAs
+; them to the BG1/BG2 tiles at VRAM $2000). Bit 7 set: slot left as it
+; was.
+; Callers (2 JSR sites): C2Scene_LoadVram ($C2:2CDF); unmatched: $C2:63DF.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=0, X=0; A = 7, X and Y clobbered; C2Tmp_08 = 7;
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadBgGfx:
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    STZ.b !C2Scene_PackIdx
+    STZ.b !C2Scene_PackIdx+1
+.pack:
+    SEP #$20
+    LDY.b !C2Scene_PackIdx
+    TDC                         ; A = DP = 0: B = 0 for the TAX
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .next
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_BgPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_BgPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.next:
+    REP #$20
+    CLC
+    LDA.w !Menu_DecompDest
+    ADC.w #!C2Scene_PackSlotSize
+    STA.w !Menu_DecompDest
+    INC.b !C2Scene_PackIdx
+    LDA.b !C2Scene_PackIdx
+    CMP.w #!C2Scene_BgPackCount
+    BNE .pack
+    RTS
+
+; $C2:2826 — C2Scene_LoadBg3Gfx (46 bytes, $2826–$2853)
+; Unpacks header byte C2Scene_HdrBg3Gfx's C2SceneRom_BgPacks entry into
+; C2Scene_DecompBuf (C2Scene_LoadVram DMAs it to the BG3 tiles at VRAM
+; $7000).
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2CEE).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadBg3Gfx:
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrBg3Gfx
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_BgPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_BgPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:2854 — C2Scene_LoadBg3Map (46 bytes, $2854–$2881)
+; Unpacks header byte C2Scene_HdrBg3Map's C2SceneRom_Bg3MapPacks entry
+; into C2Scene_DecompBuf (C2Scene_LoadVram DMAs it to the BG3 tilemap at
+; VRAM $7800).
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2CFF).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadBg3Map:
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDY.w #!C2Scene_HdrBg3Map
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:2882 — C2Scene_LoadPalettes (107 bytes, $2882–$28EC)
+; Unpacks the scene's palettes (header byte C2Scene_HdrPalettes,
+; C2SceneRom_PalettePacks) into C2Scene_PaletteStage, then the party
+; palettes (entry C2Scene_PartyPalPack) into C2Scene_PartyPalSrc, and
+; copies the palette of each party member (Party_Members, the
+; first C2Scene_PartyPalSize bytes of its 32) to C2Scene_PartyPalDest +
+; 32 * the member's position: sprite palettes 4, 5 and 6 of the staged
+; CGRAM image. Inferred: C2Scene_LoadVram uploads that image to CGRAM.
+; The third copy is C2Scene_CopyPartyPalette entered by falling in.
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2D10).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=0, X=0; DB unchanged; A = $FFFF, X and Y past the third copy
+;        (MVN); Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL), C2Scene_CopyPartyPalette.
+C2Scene_LoadPalettes:
+    LDX.w #!C2Scene_PaletteStage&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_PaletteStage)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrPalettes
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .party
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_PalettePacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_PalettePacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.party:
+    REP #$20
+    LDA.l !C2SceneRom_PalettePacks+(!C2Scene_PartyPalPack*!C2Scene_PackEntrySize)
+    STA.w !Menu_DecompSrc
+    LDA.w #!C2Scene_PartyPalSrc&$FFFF
+    STA.w !Menu_DecompDest
+    SEP #$20
+    LDA.l !C2SceneRom_PalettePacks+(!C2Scene_PartyPalPack*!C2Scene_PackEntrySize)+2
+    STA.w !Menu_DecompSrcBank
+    LDA.b #bank(!C2Scene_PartyPalSrc)
+    STA.w !Menu_DecompDestBank
+    JSL Decomp_ToWramVec
+    REP #$20
+    LDA.l !Party_Members
+    LDY.w #!C2Scene_PartyPalDest&$FFFF
+    JSR C2Scene_CopyPartyPalette
+    LDA.l !Party_Members+1
+    LDY.w #(!C2Scene_PartyPalDest&$FFFF)+!C2Scene_PartyPalStride
+    JSR C2Scene_CopyPartyPalette
+    LDA.l !Party_Members+2
+    LDY.w #(!C2Scene_PartyPalDest&$FFFF)+(2*!C2Scene_PartyPalStride)
+    ; falls into C2Scene_CopyPartyPalette
+
+; $C2:28ED — C2Scene_CopyPartyPalette (21 bytes, $28ED–$2901)
+; Copies C2Scene_PartyPalSize bytes of character A's palette
+; (C2Scene_PartyPalSrc + 32 * A) to Y in bank $7F.
+; Quirk, kept: an empty slot ($80, Menu_PartyEmpty) is not skipped; it
+; copies from C2Scene_PartyPalSrc + $1000, in C2Scene_DecompBuf.
+; Callers (2 JSR sites): C2Scene_LoadPalettes ($C2:28D9, $C2:28E3; it
+;   also falls in for the third member).
+; Entry: M=0, X=0, DP any, DB any (saved around the MVN); A low byte = the
+;        character id, Y = the destination address (bank $7F)
+; Exit:  M=0, X=0, DB unchanged; A = $FFFF, X and Y past the copied bytes
+; No calls.
+C2Scene_CopyPartyPalette:
+    PHB
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                       ; * C2Scene_PartyPalStride (C = 0)
+    ADC.w #!C2Scene_PartyPalSrc&$FFFF
+    TAX
+    LDA.w #!C2Scene_PartyPalSize-1
+    MVN !Bank7F,!Bank7F         ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:2902 — C2Scene_LoadUnkB800 (46 bytes, $2902–$292F)
+; Unpacks header byte C2Scene_HdrUnkB800's C2SceneRom_BgPacks entry into
+; C2Scene_UnkB800 ($7E:B800); what it holds is not traced.
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C74), C2Scene_ReloadScene
+;   ($C2:2CAD).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnkB800:
+    LDX.w #!C2Scene_UnkB800&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_UnkB800)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrUnkB800
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_BgPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_BgPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:2930 — C2Scene_LoadUnkC000 (46 bytes, $2930–$295D)
+; Unpacks header byte C2Scene_HdrUnkC000's C2SceneRom_PalettePacks entry
+; into C2Scene_UnkC000 ($7E:C000); what it holds is not traced (probably
+; more palettes, from the table it uses).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C77), C2Scene_ReloadScene
+;   ($C2:2CB0).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnkC000:
+    LDX.w #!C2Scene_UnkC000&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_UnkC000)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrUnkC000
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_PalettePacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_PalettePacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:295E — C2Scene_LoadMetatiles (46 bytes, $295E–$298B)
+; Unpacks header byte C2Scene_HdrMetatiles's C2SceneRom_MetatilePacks
+; entry into C2Scene_Metatiles ($7E:3000), the metatile set of layer 1
+; (and probably of layer 2 at $7E:3800; see C2Scene_LayerMetatiles).
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C62), C2Scene_ReloadScene
+;   ($C2:2CA7).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadMetatiles:
+    LDX.w #!C2Scene_Metatiles&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_Metatiles)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrMetatiles
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_MetatilePacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_MetatilePacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:298C — C2Scene_LoadBgMaps (46 bytes, $298C–$29B9)
+; Unpacks header byte C2Scene_HdrMaps's C2SceneRom_MapPacks entry into
+; C2Scene_BgMaps ($7E:4000), layer 1's metatile map (and probably layer
+; 2's at $7E:5800; see C2Scene_LayerMaps).
+; Callers (1 JSR site): C2Scene_LoadScene ($C2:2C65).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadBgMaps:
+    LDX.w #!C2Scene_BgMaps&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_BgMaps)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrMaps
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_MapPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_MapPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:29BA — C2Scene_LoadUnk7000 (46 bytes, $29BA–$29E7)
+; Unpacks header byte C2Scene_HdrUnk7000's C2SceneRom_Unk7000Packs entry
+; into C2Scene_Unk7000 ($7E:7000), which is where C2Scene_LayerMaps puts
+; layer 3's map; what it holds is not traced.
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C68), C2Scene_ReloadScene
+;   ($C2:2CAA).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnk7000:
+    LDX.w #!C2Scene_Unk7000&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_Unk7000)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrUnk7000
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_Unk7000Packs,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_Unk7000Packs+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:29E8 — C2Scene_LoadUnk7200 (46 bytes, $29E8–$2A15)
+; Unpacks header byte C2Scene_HdrUnk7200's C2SceneRom_Unk7200Packs entry
+; into C2Scene_Unk7200 ($7E:7200); what it holds is not traced.
+; Callers (1 JSR site): C2Scene_LoadScene ($C2:2C6B).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnk7200:
+    LDX.w #!C2Scene_Unk7200&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_Unk7200)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrUnk7200
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_Unk7200Packs,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_Unk7200Packs+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:2A16 — C2Scene_LoadScript (46 bytes, $2A16–$2A43)
+; Unpacks header byte C2Scene_HdrScript's C2SceneRom_ScriptPacks entry
+; into C2Scene_ScriptBuf ($7F:0400), over the list data
+; C2Scene_LoadLists has already split up. Inferred to be the scene's
+; script: C2Scene_LoadScene starts a C2Scene_TaskRunScript task at that
+; address right after.
+; Callers (1 JSR site): C2Scene_LoadScene ($C2:2C71).
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadScript:
+    LDX.w #!C2Scene_ScriptBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrScript
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .done
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_ScriptPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_ScriptPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.done:
+    RTS
+
+; $C2:2A44 — C2Scene_LoadLists (285 bytes, $2A44–$2B60)
+; Unpacks header byte C2Scene_HdrLists's C2SceneRom_ListPacks entry into
+; C2Scene_ListPack ($7F:0400), then splits it into four lists through
+; WMADD/WMDATA (bank $7E): a count byte, then that many 7-byte entries
+; to C2Scene_ListA; a count, 3-byte entries to C2Scene_ListB; a count,
+; 3-byte entries to C2Scene_ListC; a count, 2-byte entries to
+; C2Scene_ListD. The first three counts are kept (C2Scene_ListACount,
+; ListBCount, ListCCount). What the entries mean is not traced. With bit
+; 7 set in the header byte nothing is unpacked, but the split still runs
+; on whatever is at $7F:0400.
+; Quirk, kept: a count of 0 is not special-cased: the DEY/BNE loops then
+; copy 65536 entries.
+; Callers (1 JSR site): C2Scene_LoadScene ($C2:2C6E).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute stores to Menu_Decomp*, the
+;        counts and WMADD/WMDATA); C2Scene_HeaderPtr set
+; Exit:  M=1, X=0; A = the last byte copied, X = the offset past the
+;        data, Y = 0; Menu_Decomp* and WMADD changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadLists:
+    LDX.w #!C2Scene_ListPack&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_ListPack)
+    STA.w !Menu_DecompDestBank
+    LDY.w #!C2Scene_HdrLists
+    TDC
+    LDA.b [!C2Scene_HeaderPtr],Y
+    BMI .split
+    ASL A
+    ADC.b [!C2Scene_HeaderPtr],Y
+    TAX
+    REP #$20
+    LDA.l !C2SceneRom_ListPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_ListPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+.split:
+    LDX.w #!C2Scene_ListA&$FFFF
+    STX.w WMADDL
+    LDA.b #bank(!C2Scene_ListA) ; bit 0 clear: bank $7E
+    STA.w WMADDH
+    REP #$20
+    LDA.l !C2Scene_ListPack
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+    STA.w !C2Scene_ListACount
+    LDX.w #1
+.list_a:
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    DEY
+    BNE .list_a
+    LDY.w #!C2Scene_ListB&$FFFF
+    STY.w WMADDL
+    LDA.b #bank(!C2Scene_ListB)
+    STA.w WMADDH
+    REP #$20
+    LDA.l !C2Scene_ListPack,X
+    INX
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+    STA.w !C2Scene_ListBCount
+.list_b:
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    DEY
+    BNE .list_b
+    LDY.w #!C2Scene_ListC&$FFFF
+    STY.w WMADDL
+    LDA.b #bank(!C2Scene_ListC)
+    STA.w WMADDH
+    REP #$20
+    LDA.l !C2Scene_ListPack,X
+    INX
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+    STA.w !C2Scene_ListCCount
+.list_c:
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    DEY
+    BNE .list_c
+    LDY.w #!C2Scene_ListD&$FFFF
+    STY.w WMADDL
+    LDA.b #bank(!C2Scene_ListD)
+    STA.w WMADDH
+    REP #$20
+    LDA.l !C2Scene_ListPack,X
+    INX
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+.list_d:
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    LDA.l !C2Scene_ListPack,X
+    STA.w WMDATA
+    INX
+    DEY
+    BNE .list_d
+    RTS
+
+; $C2:2B61 — C2Scene_LoadPartyGfx (91 bytes, $2B61–$2BBB)
+; Unpacks the party graphics (C2SceneRom_ObjPacks entry
+; C2Scene_PartyObjPack, the same for every scene) into C2Scene_DecompBuf,
+; then builds C2Scene_PartyGfx from it: for each party member
+; (Party_Members, position n), C2Scene_CopyPartyGfx copies the
+; character's C2Scene_PartyGfxSize bytes to C2Scene_PartyGfx + $400 * n
+; and C2Scene_CopyPartyGfxB its two $40-byte blocks to C2Scene_PartyGfxB
+; + $40 * n (and $200 further). C2Scene_LoadVram DMAs the result to VRAM
+; $1000, in the sprite tiles; probably the party's sprites (inferred from
+; the per-member copies only).
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2CD0).
+; Entry: M=1, X=0, DP=$0000, DB=$00
+; Exit:  M=0, X=0; DB unchanged; A = $FFFF, X and Y past the last copy;
+;        C2Tmp_08-$0B changed; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL), C2Scene_CopyPartyGfx,
+;   C2Scene_CopyPartyGfxB.
+C2Scene_LoadPartyGfx:
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.l !C2SceneRom_ObjPacks+(!C2Scene_PartyObjPack*!C2Scene_PackEntrySize)+2
+    STA.w !Menu_DecompSrcBank
+    REP #$20
+    LDA.l !C2SceneRom_ObjPacks+(!C2Scene_PartyObjPack*!C2Scene_PackEntrySize)
+    STA.w !Menu_DecompSrc
+    JSL Decomp_ToWramVec
+    LDA.l !Party_Members
+    LDY.w #!C2Scene_PartyGfx&$FFFF
+    JSR C2Scene_CopyPartyGfx
+    LDA.l !Party_Members
+    LDY.w #!C2Scene_PartyGfxB&$FFFF
+    JSR C2Scene_CopyPartyGfxB
+    LDA.l !Party_Members+1
+    LDY.w #(!C2Scene_PartyGfx&$FFFF)+!C2Scene_PartyGfxSize
+    JSR C2Scene_CopyPartyGfx
+    LDA.l !Party_Members+1
+    LDY.w #(!C2Scene_PartyGfxB&$FFFF)+!C2Scene_PartyGfxBSize
+    JSR C2Scene_CopyPartyGfxB
+    LDA.l !Party_Members+2
+    LDY.w #(!C2Scene_PartyGfx&$FFFF)+(2*!C2Scene_PartyGfxSize)
+    JSR C2Scene_CopyPartyGfx
+    LDA.l !Party_Members+2
+    LDY.w #(!C2Scene_PartyGfxB&$FFFF)+(2*!C2Scene_PartyGfxBSize)
+    JMP C2Scene_CopyPartyGfxB
+
+; $C2:2BBC — C2Scene_CopyPartyGfx (19 bytes, $2BBC–$2BCE)
+; Copies C2Scene_PartyGfxSize bytes of character A's graphics
+; (C2Scene_DecompBuf + $400 * A) to Y in bank $7F.
+; Quirk, kept: an empty slot ($80) is not skipped; its offset wraps
+; ($80 * $400 = $20000) and the character-0 graphics are copied.
+; Callers (3 JSR sites): C2Scene_LoadPartyGfx ($C2:2B87, $C2:2B9B,
+;   $C2:2BAF).
+; Entry: M=0, X=0, DP any, DB any (saved around the MVN); A low byte = the
+;        character id, Y = the destination (bank $7F)
+; Exit:  M=0, X=0, DB unchanged; A = $FFFF, X and Y past the copy
+; No calls.
+C2Scene_CopyPartyGfx:
+    PHB
+    AND.w #!Eng_LowByteMask
+    XBA
+    ASL A
+    ASL A                       ; * C2Scene_PartyGfxSize ($400; C = 0 for ids below $40)
+    ADC.w #!C2Scene_DecompBuf&$FFFF
+    TAX
+    LDA.w #!C2Scene_PartyGfxSize-1
+    MVN !Bank7F,!Bank7F         ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:2BCF — C2Scene_CopyPartyGfxB (44 bytes, $2BCF–$2BFA)
+; Copies character A's two C2Scene_PartyGfxBSize-byte blocks
+; (C2Scene_PartyGfxSrcB + $40 * A, and C2Scene_PartyGfxBGap bytes
+; further) to Y and Y + C2Scene_PartyGfxBGap in bank $7F.
+; Callers (3 sites): C2Scene_LoadPartyGfx ($C2:2B91, $C2:2BA5; JMP at
+;   $C2:2BB9).
+; Entry: M=0, X=0, DP=$0000 (scratch), DB any (saved around the MVNs);
+;        A low byte = the character id, Y = the destination (bank $7F)
+; Exit:  M=0, X=0, DB unchanged; A = $FFFF, X and Y past the second
+;        block; C2Tmp_08 = the first source, C2Tmp_0A = the first
+;        destination
+; No calls.
+!C2Scene_PartyBSrc = !C2Tmp_08          ; 16-bit first source block
+!C2Scene_PartyBDest = !C2Tmp_0A         ; 16-bit first destination block
+C2Scene_CopyPartyGfxB:
+    PHB
+    AND.w #!Eng_LowByteMask
+    XBA
+    LSR A
+    LSR A                       ; * C2Scene_PartyGfxBSize ($40)
+    CLC
+    ADC.w #!C2Scene_PartyGfxSrcB&$FFFF
+    STA.b !C2Scene_PartyBSrc
+    STY.b !C2Scene_PartyBDest
+    TAX
+    LDA.w #!C2Scene_PartyGfxBSize-1
+    MVN !Bank7F,!Bank7F         ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    CLC
+    LDA.b !C2Scene_PartyBSrc
+    ADC.w #!C2Scene_PartyGfxBGap
+    TAX
+    CLC
+    LDA.b !C2Scene_PartyBDest
+    ADC.w #!C2Scene_PartyGfxBGap
+    TAY
+    LDA.w #!C2Scene_PartyGfxBSize-1
+    MVN !Bank7F,!Bank7F         ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:2BFB — C2Scene_ClearHdmaArea (34 bytes, $2BFB–$2C1C)
+; Zeroes C2Scene_HdmaArea ($7E:8621-$8E20, 2048 bytes) through
+; WMADD/WMDATA, with DP = $2100 for the register stores. The area holds
+; C2Scene_HdmaValues and C2Scene_HdmaTable.
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C7A), C2Scene_ReloadScene
+;   ($C2:2C96).
+; Entry: M=1, X=0, DP any (saved; $2100 here), DB any (all register
+;        stores direct page)
+; Exit:  M=1, X=0; A = 0 (B = $21), X = 0; Y, DP and DB unchanged; WMADD
+;        changed
+; No calls.
+C2Scene_ClearHdmaArea:
+    PHD
+    LDA.b #!DP_PPU>>8
+    XBA
+    LDA.b #0
+    TCD                         ; DP = $2100
+    LDX.w #!C2Scene_HdmaArea&$FFFF
+    STX.b WMADDL-!DP_PPU
+    LDA.b #bank(!C2Scene_HdmaArea)
+    STA.b WMADDH-!DP_PPU
+    LDX.w #!C2Scene_HdmaAreaPasses
+    LDA.b #0
+.clear:
+    STA.b WMDATA-!DP_PPU
+    STA.b WMDATA-!DP_PPU
+    STA.b WMDATA-!DP_PPU
+    STA.b WMDATA-!DP_PPU
+    DEX
+    BNE .clear
+    PLD
+    RTS
+
+; $C2:2C1D — C2Scene_LoadScene (118 bytes, $2C1D–$2C92)
+; The last setup step of C2Scene_Main: loads the scene and starts its
+; script. Zeroes C2Scene_Mode, C2Scene_Unk027D, the fixed color
+; (C2Scene_FixedBlue/Red/Green), C2Scene_Unk0280 (3 bytes),
+; C2Scene_Unk1B58/1B59, C2Scene_Unk1BF7 and C2Scene_Unk02B1 (3 bytes);
+; sets the three C2Scene_Unk1B32 words to $FFFF; copies Menu_Config1E to
+; C2Scene_Unk02AE and clears bit 2 of C2Scene_Unk0294. Then: the header
+; pointer (C2Scene_GetHeaderPtr), the VRAM and palette loads
+; (C2Scene_LoadVram), the WRAM loads (metatiles, maps, the Unk7000/7200
+; packs, the lists, the script, the UnkB800/C000 packs), the HDMA area
+; cleared, BG layers 1 and 2 drawn (C2Scene_DrawBgLayer), and a
+; C2Scene_TaskRunScript task spawned on C2Scene_ScriptBuf
+; (C2Scene_TaskSpawnScript, which returns for it).
+; Callers (1 JSR site): C2Scene_Main ($C2:23C3).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (as C2Scene_Main runs); forced blank
+;        (VRAM and CGRAM DMA)
+; Exit:  as C2Scene_TaskSpawnScript: M=1, X=0; X = the new task record, A
+;        = bank(C2Scene_ScriptBuf); Y clobbered; C2Tmp_00-$1B,
+;        Menu_Decomp*, DMA channel 7 and WMADD changed; DP and DB
+;        unchanged
+; Calls: C2Scene_GetHeaderPtr, C2Scene_LoadVram, C2Scene_LoadMetatiles,
+;   C2Scene_LoadBgMaps, C2Scene_LoadUnk7000, C2Scene_LoadUnk7200,
+;   C2Scene_LoadLists, C2Scene_LoadScript, C2Scene_LoadUnkB800,
+;   C2Scene_LoadUnkC000, C2Scene_ClearHdmaArea, C2Scene_DrawBgLayer,
+;   C2Scene_TaskSpawnScript (JMP).
+C2Scene_LoadScene:
+    STZ.w !C2Scene_Mode
+    STZ.w !C2Scene_Unk027D
+    STZ.b !C2Scene_FixedBlue
+    STZ.b !C2Scene_FixedRed
+    STZ.b !C2Scene_FixedGreen
+    STZ.w !C2Scene_Unk0280
+    STZ.w !C2Scene_Unk0280+1
+    STZ.w !C2Scene_Unk0280+2
+    STZ.w !C2Scene_Unk1B58
+    STZ.w !C2Scene_Unk1B59
+    STZ.w !C2Scene_Unk1BF7
+    STZ.w !C2Scene_Unk02B1
+    STZ.w !C2Scene_Unk02B1+1
+    STZ.w !C2Scene_Unk02B1+2
+    LDX.w #!C2Scene_Unk1B32Init
+    STX.w !C2Scene_Unk1B32
+    STX.w !C2Scene_Unk1B32+2
+    STX.w !C2Scene_Unk1B32+4
+    LDA.l !Menu_Config1E
+    STA.w !C2Scene_Unk02AE
+    LDA.b #!C2Scene_Unk0294Bit2
+    TRB.w !C2Scene_Unk0294
+    JSR C2Scene_GetHeaderPtr
+    JSR C2Scene_LoadVram
+    JSR C2Scene_LoadMetatiles
+    JSR C2Scene_LoadBgMaps
+    JSR C2Scene_LoadUnk7000
+    JSR C2Scene_LoadUnk7200
+    JSR C2Scene_LoadLists
+    JSR C2Scene_LoadScript
+    JSR C2Scene_LoadUnkB800
+    JSR C2Scene_LoadUnkC000
+    JSR C2Scene_ClearHdmaArea
+    LDA.b #1
+    STA.b !C2Scene_DrawLayer
+    JSR C2Scene_DrawBgLayer
+    LDA.b #2
+    STA.b !C2Scene_DrawLayer
+    JSR C2Scene_DrawBgLayer
+    LDX.w #!C2Scene_ScriptBuf&$FFFF
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    JMP C2Scene_TaskSpawnScript
+
+; $C2:2C93 — C2Scene_ReloadScene (46 bytes, $2C93–$2CC0)
+; Loads the scene's graphics again (scene modes 5 and 8 call it right
+; after C2Scene_RestoreState; mode 6 calls it too, from the unmatched
+; callers' addresses): C2Scene_Unk5775, the HDMA area cleared and
+; C2Scene_HdmaValueA916 = C2Scene_HdmaValueA916Init, then the VRAM and
+; palette loads (C2Scene_LoadVram), the metatiles, the Unk7000, UnkB800
+; and UnkC000 packs, and BG layers 1 and 2 redrawn. The maps and lists
+; are not reloaded: C2Scene_SaveState keeps them, and the header pointer
+; with the direct page.
+; Callers (3 JSR sites, unmatched): $C2:2563, $C2:25F3 and $C2:266E.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set; forced blank
+; Exit:  as C2Scene_DrawBgLayer: M=1, X=0; A, X, Y clobbered;
+;        C2Tmp_00-$1B, Menu_Decomp*, DMA channel 7 and WMADD changed
+; Calls: C2Scene_Unk5775, C2Scene_ClearHdmaArea, C2Scene_LoadVram,
+;   C2Scene_LoadMetatiles, C2Scene_LoadUnk7000, C2Scene_LoadUnkB800,
+;   C2Scene_LoadUnkC000, C2Scene_DrawBgLayer (the second by JMP).
+C2Scene_ReloadScene:
+    JSR C2Scene_Unk5775
+    JSR C2Scene_ClearHdmaArea
+    REP #$20
+    LDA.w #!C2Scene_HdmaValueA916Init
+    STA.l !C2Scene_HdmaValueA916
+    SEP #$20
+    JSR C2Scene_LoadVram
+    JSR C2Scene_LoadMetatiles
+    JSR C2Scene_LoadUnk7000
+    JSR C2Scene_LoadUnkB800
+    JSR C2Scene_LoadUnkC000
+    LDA.b #1
+    STA.b !C2Scene_DrawLayer
+    JSR C2Scene_DrawBgLayer
+    LDA.b #2
+    STA.b !C2Scene_DrawLayer
+    JMP C2Scene_DrawBgLayer
+
+; $C2:2CC1 — C2Scene_LoadVram (175 bytes, $2CC1–$2D6F)
+; Fills VRAM and CGRAM for the scene, each pack staged at
+; C2Scene_DecompBuf and DMAed with C2Scene_DmaToVram:
+; - the four sprite packs (C2Scene_LoadObjGfx) to VRAM $0000 ($4000 B);
+; - the party graphics (C2Scene_LoadPartyGfx) to VRAM $1000 ($1000 B);
+; - the seven BG packs (C2Scene_LoadBgGfx) to VRAM $2000 ($7000 B);
+; - the BG3 tiles (C2Scene_LoadBg3Gfx) to VRAM $7000 and the BG3 map
+;   (C2Scene_LoadBg3Map) to VRAM $7800 ($1000 B each);
+; - the palettes (C2Scene_LoadPalettes) into C2Scene_PaletteStage, whose
+;   first four sprite colors become black and three grays
+;   (C2Scene_ObjPal0); the stage is copied to C2Scene_PaletteBuf and
+;   C2SceneRom_LastPalRow over its colors $F0-$FF, and the stage itself
+;   (without that row) DMAed to CGRAM on channel 7;
+; then C2Scene_LoadLocExtraGfx and C2Scene_LoadUnkC800 (JMP).
+; Quirk, kept: both MVN counts are the byte count, not the count - 1, so
+; each copy moves one byte more: $00:0B20 (C2Scene_Unk0B20's first byte)
+; is written twice, last with byte 33 of C2SceneRom_LastPalRow.
+; Callers (2 JSR sites): C2Scene_LoadScene ($C2:2C5F), C2Scene_ReloadScene
+;   ($C2:2CA4).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute register stores);
+;        C2Scene_HeaderPtr set; forced blank
+; Exit:  as C2Scene_LoadUnkC800: M=1, X=0; A, X, Y clobbered; DB
+;        unchanged; C2Tmp_08-$12, Menu_Decomp* and DMA channel 7 changed
+; Calls: C2Scene_LoadObjGfx, C2Scene_DmaToVram, C2Scene_LoadPartyGfx,
+;   C2Scene_LoadBgGfx, C2Scene_LoadBg3Gfx, C2Scene_LoadBg3Map,
+;   C2Scene_LoadPalettes, C2Scene_LoadLocExtraGfx, C2Scene_LoadUnkC800
+;   (JMP).
+C2Scene_LoadVram:
+    JSR C2Scene_LoadObjGfx      ; returns M=0
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramObj
+    LDA.w #!C2Scene_ObjGfxBytes
+    JSR C2Scene_DmaToVram       ; returns M=1
+    JSR C2Scene_LoadPartyGfx    ; returns M=0
+    LDX.w #!C2Scene_PartyGfx&$FFFF
+    LDY.w #!C2Scene_VramPartyGfx
+    LDA.w #!C2Scene_PartyGfxBytes
+    JSR C2Scene_DmaToVram
+    JSR C2Scene_LoadBgGfx       ; returns M=0
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramBgGfx
+    LDA.w #!C2Scene_BgGfxBytes
+    JSR C2Scene_DmaToVram
+    JSR C2Scene_LoadBg3Gfx
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramBg3Gfx
+    LDA.w #!C2Scene_PackBytes
+    JSR C2Scene_DmaToVram
+    JSR C2Scene_LoadBg3Map
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramBg3Map
+    LDA.w #!C2Scene_PackBytes
+    JSR C2Scene_DmaToVram
+    JSR C2Scene_LoadPalettes    ; returns M=0
+    TDC                         ; A = DP = 0: black
+    STA.l !C2Scene_ObjPal0
+    LDA.w #!C2Scene_Gray1
+    STA.l !C2Scene_ObjPal0+2
+    LDA.w #!C2Scene_Gray2
+    STA.l !C2Scene_ObjPal0+4
+    LDA.w #!C2Scene_Gray3
+    STA.l !C2Scene_ObjPal0+6
+    PHB
+    LDX.w #!C2Scene_PaletteStage&$FFFF
+    LDY.w #!C2Scene_PaletteBuf
+    LDA.w #!C2Scene_PaletteBytes ; MVN moves this + 1
+    MVN !Bank00,bank(!C2Scene_PaletteStage) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2SceneRom_LastPalRow&$FFFF
+    LDY.w #!C2Scene_LastPalRowDest
+    LDA.w #!C2Scene_PalRowBytes ; MVN moves this + 1
+    MVN !Bank00,bank(!C2SceneRom_LastPalRow) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDA.b #0
+    STA.w CGADD
+    LDX.w #!BBAD_CGDATA<<8      ; DMAP7 = 0 (one register), BBAD7 = CGDATA
+    STX.w DMAP7
+    LDX.w #!C2Scene_PaletteStage&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_PaletteStage)
+    STA.w A1B7
+    LDX.w #!C2Scene_PaletteBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    JSR C2Scene_LoadLocExtraGfx
+    JMP C2Scene_LoadUnkC800
+
+; $C2:2D70 — C2Scene_DmaToVram (33 bytes, $2D70–$2D90)
+; DMAs A bytes from X in bank $7F to VRAM word address Y on channel 7
+; (word writes to VMDATAL/H, VMAIN stepping after the high byte).
+; Callers (7 JSR sites): C2Scene_LoadVram ($C2:2CCD, $C2:2CDC, $C2:2CEB,
+;   $C2:2CFC, $C2:2D0D), C2Scene_LoadLocExtraGfx ($C2:2DBF, $C2:2DDB,
+;   $C2:2E01, $C2:2E1D).
+; Entry: M=0 (16-bit count store), X=0, DP any, DB=$00 (absolute register
+;        stores); X = the source, Y = the VRAM address, A = the count;
+;        forced blank or vblank
+; Exit:  M=1, X=0; A = MDMAEN_Ch7 (B = the count's high byte), X =
+;        $1801 (the DMAP7/BBAD7 word); Y, DP and DB unchanged
+; No calls.
+C2Scene_DmaToVram:
+    STX.w A1T7L
+    STY.w VMADDL
+    STA.w DAS7L
+    SEP #$20
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDA.b #!Bank7F
+    STA.w A1B7
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; $C2:2D91 — C2Scene_LoadLocExtraGfx (146 bytes, $2D91–$2E22)
+; Once Eng_Unk7F0000 has reached C2Scene_ExtraGfxFlagMin, four scenes get
+; extra graphics: C2Scene_LoadExtraObjPack, then C2Scene_ExtraObjBytes of
+; it DMAed to VRAM $0C00 (Loc_Id $01F0-$01F2) or $0000 (Loc_Id $01F6),
+; and for $01F0-$01F2 a palette (C2Scene_LoadExtraPalette) into
+; C2Scene_PaletteBuf: colors $90-$9F (C2Scene_ExtraPalA) for $01F0 and
+; $01F2; for $01F1 colors $B0-$BF (C2Scene_ExtraPalB), or $A0-$AF
+; (C2Scene_ExtraPalC) when bit 7 of C2Scene_FlagTailByte1 is set; then
+; C2Scene_LoadUnkC600 (JMP). Other scenes, or a lower flag byte: nothing.
+; (Eng_Unk7F0000 is probably a story-progress byte; unverified.)
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2D6A; xref rates it
+;   doubtful, but it is on an instruction boundary there).
+; Entry: M=1, X=0, DP any, DB=$00 (absolute Loc_Id and register stores);
+;        forced blank
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* and DMA channel 7
+;        changed when anything is loaded
+; Calls: C2Scene_LoadExtraObjPack, C2Scene_DmaToVram,
+;   C2Scene_LoadExtraPalette, C2Scene_LoadUnkC600 (JMP).
+C2Scene_LoadLocExtraGfx:
+    LDA.l !Eng_Unk7F0000
+    CMP.b #!C2Scene_ExtraGfxFlagMin
+    BCC .done
+    LDX.w !DP_Field+!Loc_Id
+    CPX.w #!Loc_FirstBankC2
+    BEQ .loc_1F0
+    CPX.w #!Loc_FirstBankC2+1
+    BEQ .loc_1F1
+    CPX.w #!Loc_FirstBankC2+2
+    BEQ .loc_1F2
+    CPX.w #!Loc_FirstBankC2+6
+    BEQ .loc_1F6
+.done:
+    RTS
+.loc_1F0:
+    JSR C2Scene_LoadExtraObjPack
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramExtraObj
+    LDA.w #!C2Scene_ExtraObjBytes
+    JSR C2Scene_DmaToVram
+    LDA.b #!Bank00
+    LDX.w #!C2Scene_ExtraPalA
+    JSR C2Scene_LoadExtraPalette
+    JMP C2Scene_LoadUnkC600
+.loc_1F1:
+    JSR C2Scene_LoadExtraObjPack
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramExtraObj
+    LDA.w #!C2Scene_ExtraObjBytes
+    JSR C2Scene_DmaToVram
+    LDX.w #!C2Scene_ExtraPalB
+    LDA.w !C2Scene_FlagTailByte1
+    BIT.b #!C2Scene_FlagTailBit7
+    BEQ .pal_1F1
+    LDX.w #!C2Scene_ExtraPalC
+.pal_1F1:
+    LDA.b #!Bank00
+    JSR C2Scene_LoadExtraPalette
+    JMP C2Scene_LoadUnkC600
+.loc_1F2:
+    JSR C2Scene_LoadExtraObjPack
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramExtraObj
+    LDA.w #!C2Scene_ExtraObjBytes
+    JSR C2Scene_DmaToVram
+    LDA.b #!Bank00
+    LDX.w #!C2Scene_ExtraPalA
+    JSR C2Scene_LoadExtraPalette
+    JMP C2Scene_LoadUnkC600
+.loc_1F6:
+    JSR C2Scene_LoadExtraObjPack
+    REP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    LDY.w #!C2Scene_VramObj
+    LDA.w #!C2Scene_ExtraObjBytes
+    JSR C2Scene_DmaToVram
+    JMP C2Scene_LoadUnkC600
+
+; $C2:2E23 — C2Scene_SaveState (79 bytes, $2E23–$2E71)
+; Copies the scene's state to bank $7F with MVN: dp $00-$EF to
+; C2Scene_SaveDp; $0700-$1DFF (with C2Scene_PaletteBuf and the task
+; records) to C2Scene_SaveLowRam; the sprite nodes, link table and list
+; heads ($7E:B000-$B507) to C2Scene_SaveSprNodes; the two BG maps
+; ($7E:4000-$6FFF) to C2Scene_SaveBgMaps; $7E:7200-$7DFF to
+; C2Scene_SaveUnk7200; the four lists ($7E:7E00-$85FF) to
+; C2Scene_SaveLists. C2Scene_RestoreState copies them back; what the
+; state is not kept for (metatiles, the $7E:7000 pack, graphics) is what
+; C2Scene_ReloadScene loads again. Inferred from the unmatched callers:
+; scene modes 5 and 8 save, do something else, restore and reload.
+; Callers (2 JSR sites, unmatched): $C2:2542 (C2Scene_Mode5) and $C2:2652
+;   (C2Scene_Mode8).
+; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
+;        MVNs)
+; Exit:  M=1, X=0; A = $FFFF, X = $8600, Y = C2Scene_SaveLists + $800
+;        (16-bit); DP and DB unchanged
+; No calls.
+C2Scene_SaveState:
+    REP #$20
+    PHB
+    LDX.w #!C2Scene_DpClearStart
+    LDY.w #!C2Scene_SaveDp&$FFFF
+    LDA.w #!C2Scene_SaveDpBytes-1
+    MVN bank(!C2Scene_SaveDp),!Bank00 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveLowStart
+    LDY.w #!C2Scene_SaveLowRam&$FFFF
+    LDA.w #!C2Scene_SaveLowBytes-1
+    MVN bank(!C2Scene_SaveLowRam),!Bank00 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SprNodes&$FFFF
+    LDY.w #!C2Scene_SaveSprNodes&$FFFF
+    LDA.w #!C2Scene_SaveSprBytes-1
+    MVN bank(!C2Scene_SaveSprNodes),bank(!C2Scene_SprNodes) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_BgMaps&$FFFF
+    LDY.w #!C2Scene_SaveBgMaps&$FFFF
+    LDA.w #!C2Scene_SaveMapBytes-1
+    MVN bank(!C2Scene_SaveBgMaps),bank(!C2Scene_BgMaps) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_Unk7200&$FFFF
+    LDY.w #!C2Scene_SaveUnk7200&$FFFF
+    LDA.w #!C2Scene_SaveUnk7200Bytes-1
+    MVN bank(!C2Scene_SaveUnk7200),bank(!C2Scene_Unk7200) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_ListA&$FFFF
+    LDY.w #!C2Scene_SaveLists&$FFFF
+    LDA.w #!C2Scene_SaveListBytes-1
+    MVN bank(!C2Scene_SaveLists),bank(!C2Scene_ListA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; $C2:2E72 — C2Scene_RestoreState (79 bytes, $2E72–$2EC0)
+; The reverse of C2Scene_SaveState: copies the six saved blocks from bank
+; $7F back where they came from (the direct page $00-$EF included).
+; Callers (2 JSR sites, unmatched): $C2:255D (C2Scene_Mode5) and $C2:2658
+;   (C2Scene_Mode8).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (the copy rewrites dp
+;        $00-$EF, so it must be the scene's), DB any (saved around the
+;        MVNs)
+; Exit:  M=1, X=0; A = $FFFF, X = C2Scene_SaveLists + $800, Y = $8600
+;        (16-bit); DP and DB unchanged; dp $00-$EF as saved
+; No calls.
+C2Scene_RestoreState:
+    REP #$20
+    PHB
+    LDX.w #!C2Scene_SaveDp&$FFFF
+    LDY.w #!C2Scene_DpClearStart
+    LDA.w #!C2Scene_SaveDpBytes-1
+    MVN !Bank00,bank(!C2Scene_SaveDp) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveLowRam&$FFFF
+    LDY.w #!C2Scene_SaveLowStart
+    LDA.w #!C2Scene_SaveLowBytes-1
+    MVN !Bank00,bank(!C2Scene_SaveLowRam) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveSprNodes&$FFFF
+    LDY.w #!C2Scene_SprNodes&$FFFF
+    LDA.w #!C2Scene_SaveSprBytes-1
+    MVN bank(!C2Scene_SprNodes),bank(!C2Scene_SaveSprNodes) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveBgMaps&$FFFF
+    LDY.w #!C2Scene_BgMaps&$FFFF
+    LDA.w #!C2Scene_SaveMapBytes-1
+    MVN bank(!C2Scene_BgMaps),bank(!C2Scene_SaveBgMaps) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveUnk7200&$FFFF
+    LDY.w #!C2Scene_Unk7200&$FFFF
+    LDA.w #!C2Scene_SaveUnk7200Bytes-1
+    MVN bank(!C2Scene_Unk7200),bank(!C2Scene_SaveUnk7200) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveLists&$FFFF
+    LDY.w #!C2Scene_ListA&$FFFF
+    LDA.w #!C2Scene_SaveListBytes-1
+    MVN bank(!C2Scene_ListA),bank(!C2Scene_SaveLists) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
     SEP #$20
     RTS
 
@@ -1956,6 +3507,81 @@ TextWin_StatusPenIndent:        ; header: see TextWin_StatusRun
     STA.b !TextWin_PenX
 .run:
     CLC
+    RTS
+
+; ============================================================
+; Scene extra-graphics loaders ($C2:7B5A–$C2:7BC3)
+; ============================================================
+; Three fixed-entry pack loaders used only by C2Scene_LoadLocExtraGfx.
+
+org $C27B5A
+; $C2:7B5A — C2Scene_LoadExtraObjPack (37 bytes, $7B5A–$7B7E)
+; Unpacks entry C2Scene_ExtraObjPack of C2SceneRom_ObjPacks into
+; C2Scene_DecompBuf.
+; Callers (4 JSR sites): C2Scene_LoadLocExtraGfx ($C2:2DB1, $C2:2DCD,
+;   $C2:2DF3, $C2:2E0F).
+; Entry: M=1, X=0, DP any, DB=$00 (absolute stores to Menu_Decomp*)
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadExtraObjPack:
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_ExtraObjPack*!C2Scene_PackEntrySize
+    REP #$20
+    LDA.l !C2SceneRom_ObjPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_ObjPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B7F — C2Scene_LoadExtraPalette (32 bytes, $7B7F–$7B9E)
+; Unpacks entry C2Scene_ExtraPalPack of C2SceneRom_PalettePacks to A:X
+; (C2Scene_LoadLocExtraGfx passes bank $00 and an address inside
+; C2Scene_PaletteBuf).
+; Callers (2 JSR sites, and one more xref rates doubtful):
+;   C2Scene_LoadLocExtraGfx ($C2:2DC7, $C2:2DED, $C2:2E09).
+; Entry: M=1 with A = the destination bank, X=0 with X = the destination,
+;        DP any, DB=$00
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadExtraPalette:
+    STX.w !Menu_DecompDest
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_ExtraPalPack*!C2Scene_PackEntrySize
+    REP #$20
+    LDA.l !C2SceneRom_PalettePacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_PalettePacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B9F — C2Scene_LoadUnkC600 (37 bytes, $7B9F–$7BC3)
+; Unpacks entry C2Scene_UnkC600Pack of C2SceneRom_PalettePacks into
+; C2Scene_UnkC600 ($7E:C600); what it holds is not traced.
+; Callers (JMP, 4 sites): C2Scene_LoadLocExtraGfx ($C2:2DCA, $C2:2DF0,
+;   $C2:2E0C, $C2:2E20).
+; Entry: M=1, X=0, DP any, DB=$00
+; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_LoadUnkC600:
+    LDA.b #bank(!C2Scene_UnkC600)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_UnkC600&$FFFF
+    STX.w !Menu_DecompDest
+    LDX.w #!C2Scene_UnkC600Pack*!C2Scene_PackEntrySize
+    REP #$20
+    LDA.l !C2SceneRom_PalettePacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_PalettePacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
     RTS
 
 ; ============================================================

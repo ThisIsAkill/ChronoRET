@@ -492,10 +492,17 @@ $C2:0471,$C2:0489,25,C2Scene_TaskClearAll,$C2,Engine,verified,27ae59bd54a3,"Free
 $C2:048A,$C2:0493,10,C2Scene_TaskSpawn,$C2,Engine,verified,a32619435854,
 $C2:0494,$C2:04CC,57,C2Scene_TaskSpawn_Search,$C2,Engine,verified,5225bf840030,
 $C2:04CD,$C2:04D8,12,C2Scene_TaskSpawnLow,$C2,Engine,verified,6a8c354d177e,C2Scene_TaskSpawn over records 0-3 only: the same search and setup (it branches into C2Scene_TaskSpawn_Search).
-$C2:04D9,$C2:04FA,34,C2Scene_TaskSpawnScript,$C2,Engine,verified,311a8138d75e,
+$C2:04D9,$C2:04FA,34,C2Scene_TaskSpawnScript,$C2,Engine,readable,6968e84b8391,
 $C2:04FB,$C2:051C,34,C2Scene_TaskSpawnScriptLow,$C2,Engine,verified,58557068a39e,C2Scene_TaskSpawnScript in records 0-3 (C2Scene_TaskSpawnLow).
 $C2:051D,$C2:0552,54,C2Scene_TaskRunAll,$C2,Engine,verified,8469509ac0d7,"Runs every live task once (from the NMI, each frame): for each record of C2Scene_TaskRecords with a non-zero .Handler, sets C2Scene_TaskCur to it and calls the handler (C2Scene_TaskCallHandler) with X"
 $C2:0553,$C2:0555,3,C2Scene_TaskCallHandler,$C2,Engine,verified,40d7bad46760,"JMP (C2Scene_TaskHandler): a JSR here calls the task's handler, which returns to C2Scene_TaskRunAll."
+$C2:0556,$C2:055B,6,C2Scene_LayerMetatiles,$C2,Engine,readable,7ec365c31f03,Per BG layer 1-3 (index (layer - 1) * 2): where its metatile definitions are in bank $7E.
+$C2:055C,$C2:0561,6,C2Scene_LayerMaps,$C2,Engine,readable,22a7a9be2348,"Per layer: where its map (96 x 64 metatile numbers, C2Scene_MapBytes) is in bank $7E."
+$C2:0562,$C2:0567,6,C2Scene_LayerVramMaps,$C2,Engine,readable,b89197d7967c,Per layer: the VRAM word address of its tilemap.
+$C2:09C5,$C2:0A6B,167,C2Scene_DrawBgLayer,$C2,Engine,readable,f8b9dc64be3e,
+$C2:0A6C,$C2:0AAD,66,C2Scene_BuildBgColumn,$C2,Engine,readable,04b6ba3fcbeb,
+$C2:0AAE,$C2:0ADB,46,C2Scene_DrawMetatile,$C2,Engine,readable,8605b7473983,Puts one metatile into the column buffer: the map byte at C2Scene_DrawMapColPtr + C2Scene_DrawMapRowOfs selects an 8-byte C2Scene_Metatile record; its .TopLeft and .BottomLeft go to the left tile colu
+$C2:0ADC,$C2:0B52,119,C2Scene_UploadBgColumn,$C2,Engine,readable,919ea8715014,"DMAs the two tile columns built by C2Scene_BuildBgColumn to VRAM on channel 7, with VMAIN stepping 32 words (one tilemap row) per word: the left column to tile column C2Scene_DrawColX / 8 of the layer"
 $C2:0B53,$C2:0BF5,163,C2Scene_SprAdd,$C2,Engine,verified,2707be8b2be7,"Takes the first node off the free list and fills it from the running task (C2Scene_TaskCur): .X = .SprX, .Y = .SprY, .Tile = .SprTile, .Attr = .SprAttr, .Frame = C2Scene_SprFramePtr."
 $C2:0BF6,$C2:0C4C,87,C2Scene_SprInitLinks,$C2,Engine,verified,c5855593b677,
 $C2:0C4D,$C2:0CE9,157,C2Scene_SprResetLists,$C2,Engine,verified,d3fd77aa427c,
@@ -506,7 +513,7 @@ $C2:1DB5,$C2:1DD3,31,C2Scene_ClearPalette,$C2,Engine,verified,e600d79a86ed,"Zero
 $C2:225A,$C2:225D,4,Trig_Cos1024,$C2,Engine,verified,7080f9fc7e20,"Signed sine or cosine of a 16-bit angle with 1024 steps per turn, read from !Rom_SineTable: A = sin(angle) × 255 (−255..+255; the table holds |sin| as one byte per step, negated for the second half tu"
 $C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
 $C2:232D,$C2:2335,9,C2Scene_ClearUnk1B30,$C2,Engine,verified,a0a52cbf84c0,"Zeroes the two bytes right after the task records, C2Scene_Unk1B30 and C2Scene_Unk1B31 (their use is not traced)."
-$C2:23A8,$C2:23CE,39,C2Scene_Main,$C2,Engine,verified,792aacd9401d,"C2Scene_MainLoop at $C2:23CF) The scene mode's main program, entered once from BankC2_SceneBoot."
+$C2:23A8,$C2:23CE,39,C2Scene_Main,$C2,Engine,readable,e6d4450c12a1,"C2Scene_MainLoop at $C2:23CF) The scene mode's main program, entered once from BankC2_SceneBoot."
 $C2:23CF,$C2:23DA,12,C2Scene_MainLoop,$C2,Engine,verified,c318a513a179,
 $C2:23DB,$C2:23EE,20,C2Scene_ModeTable,$C2,Engine,verified,66dfcc1b4965,C2Scene_MainLoop's handler for each C2Scene_Mode value 0-9.
 $C2:23EF,$C2:2401,19,C2Scene_ModeIdle,$C2,Engine,verified,1d838647aa12,"C2Scene_Mode 0, 1 and 7: if a sound command is pending (C2Scene_SoundCmdState), sends it with Audio_DriverCommand as C2Scene_WaitFrames does; then back to C2Scene_MainLoop."
@@ -515,7 +522,34 @@ $C2:26D4,$C2:26D5,2,C2Scene_ZeroWord,$C2,Engine,verified,74f2b3e91aa1,The fixed 
 $C2:26D6,$C2:26EF,26,C2Scene_SaveFlagTail,$C2,Engine,verified,d6c92edf10d7,Copies the last 16 bytes of Menu_FlagBlock7F ($7F:01F0-$01FF) to C2Scene_FlagTailCopy and its first byte (Eng_Unk7F0000) to C2Scene_Flag0Copy.
 $C2:26F0,$C2:2702,19,C2Scene_RestoreFlagTail,$C2,Engine,verified,ed14471e3a93,"Copies C2Scene_FlagTailCopy (16 bytes) back to $7F:01F0-$01FF, the end of Menu_FlagBlock7F (C2Scene_Flag0Copy is not written back)."
 $C2:2703,$C2:271F,29,C2Scene_SetStartPos,$C2,Engine,verified,fbdcd397ac8f,"C2Scene_StartX/Y = the field's entry tile (Loc_EntryX/Y, in the field's direct page at $0100) times 8: probably the start position in pixels (inferred only from the scaling)."
-$C2:2720,$C2:274C,45,C2Scene_SetStartScroll,$C2,Engine,verified,ecc38b1d4a6e,"Puts the entry tile (Loc_EntryX/Y) in the middle of the screen: C2Scene_BgTileX (both words) = Loc_EntryX - 16, plus 192 if that is negative; C2Scene_BgTileY (both words) = Loc_EntryY - 14, plus 128 i"
+$C2:2720,$C2:274C,45,C2Scene_SetStartScroll,$C2,Engine,readable,e5e132aa9d2d,"Puts the entry tile (Loc_EntryX/Y) in the middle of the screen: C2Scene_BgTileX (both words) = Loc_EntryX - 16, plus 192 if that is negative; C2Scene_BgTileY (both words) = Loc_EntryY - 14, plus 128 i"
+$C2:274D,$C2:2767,27,C2Scene_GetHeaderPtr,$C2,Engine,readable,258ae168deb2,C2Scene_HeaderPtr = $C6:(the word of C2SceneRom_HeaderTable for scene (Loc_Id AND C2Scene_LocIdMask) - Loc_FirstBankC2).
+$C2:2768,$C2:27BB,84,C2Scene_LoadObjGfx,$C2,Engine,readable,124af20163e0,
+$C2:27BC,$C2:27DD,34,C2Scene_LoadUnkC800,$C2,Engine,readable,5acb9f8afc84,Unpacks entry C2Scene_UnkC800Pack of C2SceneRom_ObjPacks (the same for every scene) to C2Scene_UnkC800 ($7E:C800); what it holds is not traced.
+$C2:27DE,$C2:2825,72,C2Scene_LoadBgGfx,$C2,Engine,readable,ed81725b6705,"Unpacks the scene's C2Scene_BgPackCount BG graphics packs (header bytes C2Scene_HdrBgGfx..+6, C2SceneRom_BgPacks) into C2Scene_DecompBuf, C2Scene_PackSlotSize bytes apart ($7F:9000-$FFFF; C2Scene_Load"
+$C2:2826,$C2:2853,46,C2Scene_LoadBg3Gfx,$C2,Engine,readable,03e4a29c8dd9,Unpacks header byte C2Scene_HdrBg3Gfx's C2SceneRom_BgPacks entry into C2Scene_DecompBuf (C2Scene_LoadVram DMAs it to the BG3 tiles at VRAM $7000).
+$C2:2854,$C2:2881,46,C2Scene_LoadBg3Map,$C2,Engine,readable,ca1fff52ee03,Unpacks header byte C2Scene_HdrBg3Map's C2SceneRom_Bg3MapPacks entry into C2Scene_DecompBuf (C2Scene_LoadVram DMAs it to the BG3 tilemap at VRAM $7800).
+$C2:2882,$C2:28EC,107,C2Scene_LoadPalettes,$C2,Engine,readable,f25947b1a738,"Unpacks the scene's palettes (header byte C2Scene_HdrPalettes, C2SceneRom_PalettePacks) into C2Scene_PaletteStage, then the party palettes (entry C2Scene_PartyPalPack) into C2Scene_PartyPalSrc, and co"
+$C2:28ED,$C2:2901,21,C2Scene_CopyPartyPalette,$C2,Engine,readable,71c403e5e31b,Copies C2Scene_PartyPalSize bytes of character A's palette (C2Scene_PartyPalSrc + 32 * A) to Y in bank $7F.
+$C2:2902,$C2:292F,46,C2Scene_LoadUnkB800,$C2,Engine,readable,ff48473e6750,Unpacks header byte C2Scene_HdrUnkB800's C2SceneRom_BgPacks entry into C2Scene_UnkB800 ($7E:B800); what it holds is not traced.
+$C2:2930,$C2:295D,46,C2Scene_LoadUnkC000,$C2,Engine,readable,21d66fc25a45,"Unpacks header byte C2Scene_HdrUnkC000's C2SceneRom_PalettePacks entry into C2Scene_UnkC000 ($7E:C000); what it holds is not traced (probably more palettes, from the table it uses)."
+$C2:295E,$C2:298B,46,C2Scene_LoadMetatiles,$C2,Engine,readable,27b25b53bca8,"Unpacks header byte C2Scene_HdrMetatiles's C2SceneRom_MetatilePacks entry into C2Scene_Metatiles ($7E:3000), the metatile set of layer 1 (and probably of layer 2 at $7E:3800; see C2Scene_LayerMetatile"
+$C2:298C,$C2:29B9,46,C2Scene_LoadBgMaps,$C2,Engine,readable,f9afc439cbfb,"Unpacks header byte C2Scene_HdrMaps's C2SceneRom_MapPacks entry into C2Scene_BgMaps ($7E:4000), layer 1's metatile map (and probably layer 2's at $7E:5800; see C2Scene_LayerMaps)."
+$C2:29BA,$C2:29E7,46,C2Scene_LoadUnk7000,$C2,Engine,readable,4b63edf18650,"Unpacks header byte C2Scene_HdrUnk7000's C2SceneRom_Unk7000Packs entry into C2Scene_Unk7000 ($7E:7000), which is where C2Scene_LayerMaps puts layer 3's map; what it holds is not traced."
+$C2:29E8,$C2:2A15,46,C2Scene_LoadUnk7200,$C2,Engine,readable,3ef2d0b5e52a,Unpacks header byte C2Scene_HdrUnk7200's C2SceneRom_Unk7200Packs entry into C2Scene_Unk7200 ($7E:7200); what it holds is not traced.
+$C2:2A16,$C2:2A43,46,C2Scene_LoadScript,$C2,Engine,readable,4566be770d50,"Unpacks header byte C2Scene_HdrScript's C2SceneRom_ScriptPacks entry into C2Scene_ScriptBuf ($7F:0400), over the list data C2Scene_LoadLists has already split up."
+$C2:2A44,$C2:2B60,285,C2Scene_LoadLists,$C2,Engine,readable,5acba29b6740,"Unpacks header byte C2Scene_HdrLists's C2SceneRom_ListPacks entry into C2Scene_ListPack ($7F:0400), then splits it into four lists through WMADD/WMDATA (bank $7E): a count byte, then that many 7-byte "
+$C2:2B61,$C2:2BBB,91,C2Scene_LoadPartyGfx,$C2,Engine,readable,08ba3d2954eb,"Unpacks the party graphics (C2SceneRom_ObjPacks entry C2Scene_PartyObjPack, the same for every scene) into C2Scene_DecompBuf, then builds C2Scene_PartyGfx from it: for each party member (Party_Members"
+$C2:2BBC,$C2:2BCE,19,C2Scene_CopyPartyGfx,$C2,Engine,readable,32843d7da34c,Copies C2Scene_PartyGfxSize bytes of character A's graphics (C2Scene_DecompBuf + $400 * A) to Y in bank $7F.
+$C2:2BCF,$C2:2BFA,44,C2Scene_CopyPartyGfxB,$C2,Engine,readable,469a47271fe8,
+$C2:2BFB,$C2:2C1C,34,C2Scene_ClearHdmaArea,$C2,Engine,readable,98810bc5db33,"Zeroes C2Scene_HdmaArea ($7E:8621-$8E20, 2048 bytes) through WMADD/WMDATA, with DP = $2100 for the register stores."
+$C2:2C1D,$C2:2C92,118,C2Scene_LoadScene,$C2,Engine,readable,90b5bfc02847,The last setup step of C2Scene_Main: loads the scene and starts its script.
+$C2:2C93,$C2:2CC0,46,C2Scene_ReloadScene,$C2,Engine,readable,944eafbe89fe,"Loads the scene's graphics again (scene modes 5 and 8 call it right after C2Scene_RestoreState; mode 6 calls it too, from the unmatched callers' addresses): C2Scene_Unk5775, the HDMA area cleared and "
+$C2:2CC1,$C2:2D6F,175,C2Scene_LoadVram,$C2,Engine,readable,fefa5c1ac9ff,"Fills VRAM and CGRAM for the scene, each pack staged at C2Scene_DecompBuf and DMAed with C2Scene_DmaToVram: - the four sprite packs (C2Scene_LoadObjGfx) to VRAM $0000 ($4000 B); - the party graphics ("
+$C2:2D70,$C2:2D90,33,C2Scene_DmaToVram,$C2,Engine,readable,e96746db346c,"DMAs A bytes from X in bank $7F to VRAM word address Y on channel 7 (word writes to VMDATAL/H, VMAIN stepping after the high byte)."
+$C2:2D91,$C2:2E22,146,C2Scene_LoadLocExtraGfx,$C2,Engine,readable,c59493c7290f,"Once Eng_Unk7F0000 has reached C2Scene_ExtraGfxFlagMin, four scenes get extra graphics: C2Scene_LoadExtraObjPack, then C2Scene_ExtraObjBytes of it DMAed to VRAM $0C00 (Loc_Id $01F0-$01F2) or $0000 (Lo"
+$C2:2E23,$C2:2E71,79,C2Scene_SaveState,$C2,Engine,readable,37def32447a9,"Copies the scene's state to bank $7F with MVN: dp $00-$EF to C2Scene_SaveDp; $0700-$1DFF (with C2Scene_PaletteBuf and the task records) to C2Scene_SaveLowRam; the sprite nodes, link table and list hea"
+$C2:2E72,$C2:2EC0,79,C2Scene_RestoreState,$C2,Engine,readable,3f6a46bfeeff,The reverse of C2Scene_SaveState: copies the six saved blocks from bank $7F back where they came from (the direct page $00-$EF included).
 $C2:57DF,$C2:5822,68,TextWin_Init,$C2,Engine,verified,755fe9a050b7,"Starts string TextWin_StrIndex: TextWin_TextPtr = the 16-bit entry TextWin_StrIndex of the table at TextWin_StrTable, in the table's bank; state 0 (TextWin_State), status TextWin_StatusStart, TextWin_"
 $C2:5823,$C2:5841,31,TextWin_Step,$C2,Engine,verified,9e8279594b18,"One step of the text box: TextWin_CheckStatus decides from TextWin_Status whether to go on (C=0); if so, the handler of TextWin_State in TextWin_StateTable runs."
 $C2:5842,$C2:5849,8,TextWin_StateTable,$C2,Engine,verified,5cf3e69044c4,TextWin_Step's handler for each TextWin_State (unmatched).
@@ -525,6 +559,9 @@ $C2:5893,$C2:5894,2,TextWin_StatusIdle,$C2,Engine,verified,cb8191ca96ea,Status 0
 $C2:5895,$C2:5896,2,TextWin_StatusRun,$C2,Engine,verified,90c17750f3f5,"sub-entries TextWin_StatusPenLeft $C2:5897 and TextWin_StatusPenIndent $C2:589B) TextWin_StatusRun: C=0, run the state handler."
 $C2:5897,$C2:589A,4,TextWin_StatusPenLeft,$C2,Engine,verified,cccda450c1f7,
 $C2:589B,$C2:58B1,23,TextWin_StatusPenIndent,$C2,Engine,verified,47b764f0d2e2,
+$C2:7B5A,$C2:7B7E,37,C2Scene_LoadExtraObjPack,$C2,Engine,readable,6c1a2d751646,Unpacks entry C2Scene_ExtraObjPack of C2SceneRom_ObjPacks into C2Scene_DecompBuf.
+$C2:7B7F,$C2:7B9E,32,C2Scene_LoadExtraPalette,$C2,Engine,readable,ada640a3577e,Unpacks entry C2Scene_ExtraPalPack of C2SceneRom_PalettePacks to A:X (C2Scene_LoadLocExtraGfx passes bank $00 and an address inside C2Scene_PaletteBuf).
+$C2:7B9F,$C2:7BC3,37,C2Scene_LoadUnkC600,$C2,Engine,readable,77c969fb482c,Unpacks entry C2Scene_UnkC600Pack of C2SceneRom_PalettePacks into C2Scene_UnkC600 ($7E:C600); what it holds is not traced.
 $C2:8000,$C2:8001,2,BankC2_Entry8000,$C2,Engine,verified,f9cf58c7e936,"BankC2_Entry8004, $8000–$8005) Three BRAs, the bank's second set of fixed entry points, each reached by JSL from other banks: $8000 BankC2_Entry8000 → BankC2_MenuEntry (A = an argument chosen by the c"
 $C2:8002,$C2:8003,2,BankC2_Entry8002,$C2,Engine,verified,1883bd9c0530,
 $C2:8004,$C2:8005,2,BankC2_Entry8004,$C2,Engine,verified,53cd6a095362,

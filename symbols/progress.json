@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 54559,
+  "emitted_bytes": 56989,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 551,
-      "bytes": 54559
+      "functions": 588,
+      "bytes": 56989
     },
     "readable": {
-      "functions": 551,
-      "bytes": 54559
+      "functions": 588,
+      "bytes": 56989
     },
     "verified": {
-      "functions": 551,
-      "bytes": 54559
+      "functions": 548,
+      "bytes": 54441
     }
   },
   "banks": [
@@ -54,18 +54,18 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 3395,
+      "emitted_bytes": 5825,
       "matched": {
-        "functions": 71,
-        "bytes": 3395
+        "functions": 108,
+        "bytes": 5825
       },
       "readable": {
-        "functions": 71,
-        "bytes": 3395
+        "functions": 108,
+        "bytes": 5825
       },
       "verified": {
-        "functions": 71,
-        "bytes": 3395
+        "functions": 68,
+        "bytes": 3277
       }
     },
     {
@@ -858,7 +858,7 @@
       "bank": "$C2",
       "start": "$C2:0000",
       "end": "$C2:0FFF",
-      "emitted_bytes": 2080,
+      "emitted_bytes": 2496,
       "functions": [
         "BankC2_Entry0000",
         "BankC2_Entry0003",
@@ -885,6 +885,13 @@
         "C2Scene_TaskSpawnScriptLow",
         "C2Scene_TaskRunAll",
         "C2Scene_TaskCallHandler",
+        "C2Scene_LayerMetatiles",
+        "C2Scene_LayerMaps",
+        "C2Scene_LayerVramMaps",
+        "C2Scene_DrawBgLayer",
+        "C2Scene_BuildBgColumn",
+        "C2Scene_DrawMetatile",
+        "C2Scene_UploadBgColumn",
         "C2Scene_SprAdd",
         "C2Scene_SprInitLinks",
         "C2Scene_SprResetLists",
@@ -906,7 +913,7 @@
       "bank": "$C2",
       "start": "$C2:2000",
       "end": "$C2:2FFF",
-      "emitted_bytes": 289,
+      "emitted_bytes": 2197,
       "functions": [
         "Trig_Cos1024",
         "Trig_Sin1024",
@@ -920,7 +927,34 @@
         "C2Scene_SaveFlagTail",
         "C2Scene_RestoreFlagTail",
         "C2Scene_SetStartPos",
-        "C2Scene_SetStartScroll"
+        "C2Scene_SetStartScroll",
+        "C2Scene_GetHeaderPtr",
+        "C2Scene_LoadObjGfx",
+        "C2Scene_LoadUnkC800",
+        "C2Scene_LoadBgGfx",
+        "C2Scene_LoadBg3Gfx",
+        "C2Scene_LoadBg3Map",
+        "C2Scene_LoadPalettes",
+        "C2Scene_CopyPartyPalette",
+        "C2Scene_LoadUnkB800",
+        "C2Scene_LoadUnkC000",
+        "C2Scene_LoadMetatiles",
+        "C2Scene_LoadBgMaps",
+        "C2Scene_LoadUnk7000",
+        "C2Scene_LoadUnk7200",
+        "C2Scene_LoadScript",
+        "C2Scene_LoadLists",
+        "C2Scene_LoadPartyGfx",
+        "C2Scene_CopyPartyGfx",
+        "C2Scene_CopyPartyGfxB",
+        "C2Scene_ClearHdmaArea",
+        "C2Scene_LoadScene",
+        "C2Scene_ReloadScene",
+        "C2Scene_LoadVram",
+        "C2Scene_DmaToVram",
+        "C2Scene_LoadLocExtraGfx",
+        "C2Scene_SaveState",
+        "C2Scene_RestoreState"
       ]
     },
     {
@@ -965,8 +999,12 @@
       "bank": "$C2",
       "start": "$C2:7000",
       "end": "$C2:7FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 106,
+      "functions": [
+        "C2Scene_LoadExtraObjPack",
+        "C2Scene_LoadExtraPalette",
+        "C2Scene_LoadUnkC600"
+      ]
     },
     {
       "bank": "$C2",
