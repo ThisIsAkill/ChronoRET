@@ -1,78 +1,70 @@
 #!/usr/bin/env bash
-# tools/end_session.sh — close out a matching session in one command.
+# tools/end_session.sh — open or close a working session.
 #
-# Usage: ./tools/end_session.sh "session N: matched FooBar (N bytes)"
+#   tools/end_session.sh --audit        session START: everything must be green
+#                                       before any new work; if not, fixing it
+#                                       is the work.
+#   tools/end_session.sh "message"      session END: regenerate every number
+#                                       (with today's history row), run the
+#                                       gate, commit.
 #
-# What it does (in order):
-#   1. Regenerate docs/includes/progress_summary.md from PROGRESS.md
-#   2. Check for a devlog post dated today; prompt if missing
-#   3. Remind about BANK_MAP.md / PROGRESS.md if asm/ changed
-#   4. git add -A && git commit with your message (pre-commit hook runs automatically)
-
+# Documentation (devlog, systems pages) is written afterwards from the wiki's
+# side, which pulls symbols/ from here; this repository never writes into it.
 set -euo pipefail
 
-MSG="${1:-}"
-if [ -z "$MSG" ]; then
-    echo "Usage: $0 \"commit message\""
-    exit 1
-fi
-
-YELLOW='\033[1;33m'; GREEN='\033[0;32m'; BOLD='\033[1m'; RESET='\033[0m'
-step() { printf "\n${BOLD}==> [%s/4] %s${RESET}\n" "$1" "$2"; }
-warn() { printf "${YELLOW}  ! %s${RESET}\n" "$*"; }
+GREEN='\033[0;32m'; RED='\033[0;31m'; BOLD='\033[1m'; RESET='\033[0m'
+step() { printf "\n${BOLD}==> %s${RESET}\n" "$*"; }
 ok()   { printf "${GREEN}  ✓ %s${RESET}\n" "$*"; }
+bad()  { printf "${RED}  ✗ %s${RESET}\n" "$*"; FAILED=1; }
+FAILED=0
 
-echo ""
-printf "${BOLD}=== End-of-session checklist ===${RESET}\n"
+audit() {
+    step "Hooks installed"
+    hooks=$(git rev-parse --git-common-dir)/hooks
+    for h in pre-commit commit-msg pre-push; do
+        if [ -x "$hooks/$h" ] && cmp -s "$hooks/$h" "tools/$( [ "$h" = commit-msg ] && echo pre-commit || echo "$h")"; then
+            ok "$h is current"
+        else
+            bad "$h missing or stale: run make install-hook"
+        fi
+    done
 
-WIKI_DIR="../chrono-trigger-wiki"
-WIKI_DOCS="${WIKI_DIR}/docs"
+    step "Byte-exact, full coverage, readability"
+    if make --no-print-directory -s gate >/dev/null 2>&1; then ok "make gate"; else bad "make gate (run it to see why)"; fi
 
-# ── 1. Regenerate progress snippet ───────────────────────────────────────────
-step 1 "Regenerate progress snippet"
-python3 tools/progress.py --update-index
+    step "Generated numbers and review log"
+    if python3 tools/progress.py --check >/dev/null; then ok "symbols/ and doc blocks current"; else bad "stale: tools/progress.py --update"; fi
+    if python3 tools/validate_functions.py >/dev/null; then ok "symbols/ valid"; else bad "tools/validate_functions.py"; fi
 
-# ── 2. Devlog check ──────────────────────────────────────────────────────────
-step 2 "Check devlog"
-TODAY=$(date +%Y-%m-%d)
-POSTS_DIR="${WIKI_DOCS}/devlog/posts"
-FOUND=$(ls "${POSTS_DIR}/${TODAY}"*.md 2>/dev/null || true)
+    step "Firewall fires on planted fixtures"
+    if tools/test_hooks.sh >/dev/null 2>&1; then ok "tools/test_hooks.sh"; else bad "tools/test_hooks.sh (run it to see which check)"; fi
 
-if [ -n "$FOUND" ]; then
-    ok "Found: $FOUND"
-else
-    warn "No devlog post for today ($TODAY)."
-    warn "Expected a file matching: ${POSTS_DIR}/${TODAY}*.md"
-    echo ""
-    read -r -p "  Continue without a devlog entry? [y/N] " reply
-    if [[ "${reply:-n}" != [Yy]* ]]; then
-        echo "  Aborted. Write a devlog entry in the wiki repo and re-run."
-        exit 1
-    fi
+    step "Nothing that must never be tracked"
+    tracked=$(git ls-files | grep -iE '\.(sfc|smc)$|(^|/)(C[L]AUDE\.md|SESSION[^/]*\.md)$' || true)
+    if [ -z "$tracked" ]; then ok "no ROMs or local notes tracked"; else bad "tracked: $tracked"; fi
+
+    remaining=$(grep -cv '^#' tools/readability_baseline.txt || true)
+    step "Readability burn-down"
+    ok "$remaining routine(s) still in tools/readability_baseline.txt"
+}
+
+if [ "${1:-}" = "--audit" ]; then
+    audit
+    [ "$FAILED" = 0 ] && printf "\n${GREEN}Audit clean.${RESET}\n" || { printf "\n${RED}Audit failed: fix this first.${RESET}\n"; exit 1; }
+    exit 0
 fi
 
-# ── 3. Manual-update reminders ───────────────────────────────────────────────
-step 3 "Reminders"
-# Check both unstaged and staged asm/ changes relative to HEAD
-CHANGED_ASM=$(
-    { git diff --name-only HEAD -- asm/ 2>/dev/null; \
-      git diff --cached --name-only -- asm/ 2>/dev/null; } | sort -u || true
-)
-if [ -n "$CHANGED_ASM" ]; then
-    warn "asm/ has changes — verify before committing:"
-    warn "  ${WIKI_DOCS}/PROGRESS.md  — byte counts + matched function table"
-    warn "  ${WIKI_DOCS}/BANK_MAP.md  — region status (Identified → Matched, end addresses)"
-    warn "(commit wiki repo separately after updating those files)"
-else
-    ok "No asm/ changes detected — reminders skipped."
-fi
+MSG="${1:-}"
+[ -n "$MSG" ] || { echo "Usage: $0 --audit | \"commit message\""; exit 1; }
 
-# ── 4. Stage all and commit (pre-commit hook fires here) ─────────────────────
-step 4 "Stage all and commit"
+step "Regenerate numbers (with today's history row)"
+python3 tools/progress.py --update-history
+
+audit
+[ "$FAILED" = 0 ] || { printf "\n${RED}Not committing: fix the failures above.${RESET}\n"; exit 1; }
+
+step "Commit"
 git add -A
-echo ""
 git status --short
-echo ""
 git commit -m "$MSG"
-
-printf "\n${GREEN}Session closed.${RESET}\n"
+printf "\n${GREEN}Session closed.${RESET} Update STATUS.md / NEXT.md if the target moved.\n"

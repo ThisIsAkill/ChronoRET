@@ -1,0 +1,3 @@
+# Functions not yet at the readability standard (see
+# tools/lint_readability.py). This list may only shrink; main is
+# fully gated when it is empty.

@@ -10,6 +10,34 @@ if !hardware_inc == 0
 !hardware_inc = 1
 
 ; ------------------------------------------------------------
+; Direct-page bases. Init and VBlank code points DP at a register
+; block so every register write is a 2-byte dp store; such code names
+; the register relative to its base: STA.b INIDISP-!DP_PPU.
+; ------------------------------------------------------------
+!DP_CPU = $4200   ; CPU I/O registers ($4200-$421F)
+!DP_PPU = $2100   ; PPU registers ($2100-$213F)
+
+; ------------------------------------------------------------
+; Register values (named by the bits they set; single-bit values
+; use the bit names further down, e.g. FORCED_BLANK)
+; ------------------------------------------------------------
+!MEMSEL_FastRom        = $01  ; bit 0: 3.58 MHz access for banks $80-$FF
+!WRIO_AllHigh          = $FF  ; all programmable I/O pins high (latch idle)
+!OBSEL_Size16And32_Base6000 = $63 ; size %011 = 16x16 and 32x32 sprites, name select 0,
+                                  ; base %011 = sprite tiles at VRAM word $6000
+!W34SEL_Bg3Win1Inv     = $03  ; BG3 window 1 enable + invert
+!TM_AllLayers          = $1F  ; BG1-4 + OBJ enabled
+!COLDATA_GreenBlueZero = $C0  ; write green+blue channels, intensity 0
+!INIDISP_BrightnessMask = $0F ; bits 0-3: screen brightness (0-15)
+!DMAP_BtoA             = $80  ; bit 7: transfer direction B-bus -> A-bus
+!BBAD_MPYL             = $34  ; B-bus address of MPYL ($2134), the DMA fill source in ClearRAMDMA
+!MDMAEN_Ch7            = $80  ; bit 7: start DMA channel 7
+!VMAIN_IncAfterHigh    = $80  ; bit 7: increment the VRAM address after the high byte
+!DMAP_TwoRegs          = $01  ; transfer mode 1: alternate two B-bus registers (word writes)
+!BBAD_VMDATAL          = $18  ; B-bus address of VMDATAL ($2118)
+!WMADDH_Bank7F         = $01  ; WMADDH bit 0: WRAM address bit 16, i.e. bank $7F
+
+; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)
 ; ------------------------------------------------------------
 INIDISP  = $2100   ; Screen display (brightness + forced blank)

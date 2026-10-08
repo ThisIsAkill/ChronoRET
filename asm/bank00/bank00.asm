@@ -3,7 +3,7 @@
 ;
 ; The entire last 256 bytes of bank $00 (file offset $00FF00–$00FFFF).
 ; Contains: reset entry, native-mode interrupt stubs, BRK crash handler,
-; bitmask LUTs, scroll-wave tables, SNES internal ROM header, and the
+; bitmask LUTs, wave tables, SNES internal ROM header, and the
 ; native/emulation interrupt vector table.
 ; ============================================================
 
@@ -11,42 +11,62 @@ arch snes.cpu
 hirom
 
 ; ============================================================
-; Reset entry point — $00:FF00 (file 0x00FF00)
-; SNES emulation-mode RESET vector ($FFFC/$FFFD) = $FF00.
-; CPU starts in emulation (6502-compat) mode; first three instructions
-; switch it to native 65816 mode, then long-jump to the real init.
+; Reset ($00:FF00) — target of the emulation-mode RESET vector ($FFFC)
+;
+; The CPU comes out of reset in emulation mode with I already set. Only
+; CLC+XCE are needed to enter native mode; the SEI first is defensive
+; (redundant after a hardware reset, but harmless if this is ever jumped to).
+; Entry: emulation mode, I=1 (hardware reset state)
+; Exit:  native mode, M=1 X=1, D=$0000, DB=$00 — continues in MainInit
 ; ============================================================
 org $C0FF00
 
 Reset:
-    SEI                 ; disable IRQs while changing CPU mode
-    CLC                 ; carry=0 → XCE switches to native mode
-    XCE                 ; exchange carry ↔ emulation bit
-    JML MainInit        ; long jump to hardware init ($FD:C000)
+    SEI                 ; defensive: reset already set I
+    CLC
+    XCE                 ; carry 0 → leave emulation mode
+    JML MainInit        ; bank $FD hardware init
 
-    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF  ; padding $FF07–$FF0F
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF  ; unused fill $FF07–$FF0F
 
 ; ============================================================
-; Native-mode interrupt stubs ($FF10–$FF1F)
-; RAM handlers are installed during MainInit; these stubs dispatch there.
+; Native-mode interrupt stubs ($FF10–$FF17)
+;
+; The native NMI and IRQ vectors can only point into bank $00, so they
+; land here and jump on through 4-byte trampolines in WRAM ($0500, $0504)
+; that the game rewrites as it changes mode. The trampolines are not set
+; by MainInit; see !NmiTrampoline / !IrqTrampoline in ram_engine.inc for
+; who installs and repoints them.
+; Entry: native mode, interrupt taken (M, X, D, DB as the interrupted code
+;        left them; the CPU has pushed PB, PC and P)
+; Exit:  nothing changed; control continues at the trampoline, whose
+;        handler ends in RTI
 ; ============================================================
 NMI_Stub:               ; native NMI vector target (see $FFEA)
-    JML $000500         ; → RAM-resident NMI handler
+    JML !NmiTrampoline
 
 IRQ_Stub:               ; native IRQ vector target (see $FFEE)
-    JML $000504         ; → RAM-resident IRQ handler
+    JML !IrqTrampoline
 
-; Both native BRK and emulation-mode COP point here (see $FFE6, $FFF4).
-; Reads a magic SRAM cookie then loops forever — crash trap.
+; ============================================================
+; BRK_Handler ($FF18) — native BRK and emulation-mode COP both land here
+;
+; A crash trap: it reads a fixed, recognizable address forever and never
+; returns. The value read is discarded; the read itself is what an
+; external bus trace or debugger can see (inferred, see
+; !CrashMarkerRead).
+; Entry: any (an unexpected BRK/COP)
+; Exit:  never returns
+; ============================================================
 BRK_Handler:
-    LDA.l $ABCDEF       ; read SRAM sanity cookie
-    BRA BRK_Handler     ; infinite loop — no recovery
+    LDA.l !CrashMarkerRead
+    BRA BRK_Handler
 
-    db $FF,$FF          ; padding $FF1E–$FF1F
+    db $FF,$FF          ; unused fill $FF1E–$FF1F
 
 ; ============================================================
 ; Bitmask lookup tables ($FF20–$FF2F)
-; BitSet[N] = (1 << N), BitClear[N] = ~(1 << N).
+; BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7.
 ; Used for testing/setting/clearing single bits in flag bytes.
 ; ============================================================
 BitSet:                 ; $FF20 — bit N set, others clear
@@ -56,10 +76,19 @@ BitClear:               ; $FF28 — bit N clear, others set
     db $FE,$FD,$FB,$F7,$EF,$DF,$BF,$7F
 
 ; ============================================================
-; Scroll wave tables ($FF30–$FFAF)
-; Two identical 32-entry signed 16-bit tables (64 bytes each).
-; Values oscillate 0→+6→0→-6, used for wave-scroll / shake effects.
-; Table A and B are separate so two effects can have independent phases.
+; Wave tables ($FF30–$FFAF)
+; One period of a sine-like wave between -6 and +6 (32 signed 16-bit
+; entries), stored twice. Two routines read it, at $FD:C5A7 and $FD:C6F7
+; (the table reads start at $FD:C5F3 / $FD:C743). Each masks a phase with
+; AND #$3E, then makes 16 reads, $C0FF30,X, $C0FF34,X, ... $C0FF6C,X (a
+; step of 4 per output), adds the word at $1D8F with ADC.l $001D8F and
+; stores to $1D27, $1D2B, ... (first routine) or $1DA7 ... $1DE3 (second).
+; There is no CLC between outputs, so a carry from one sum passes into the
+; next; reproduced as found, effect not traced.
+; The reads run past A into B (up to $FFAB), so B is A's second period:
+; it lets them read ahead without masking each index.
+; What the outputs drive is not traced yet; "Scroll" in the names is a
+; guess.
 ; ============================================================
 ScrollWaveA:            ; $FF30 (32 × sint16)
     dw  $0000,$0001,$0002,$0003,$0004,$0005,$0005,$0006
@@ -67,56 +96,71 @@ ScrollWaveA:            ; $FF30 (32 × sint16)
     dw  $0000,$FFFF,$FFFE,$FFFD,$FFFC,$FFFB,$FFFB,$FFFA
     dw  $FFFA,$FFFA,$FFFB,$FFFB,$FFFC,$FFFD,$FFFE,$FFFF
 
-ScrollWaveB:            ; $FF70 (32 × sint16, same values as A)
+ScrollWaveB:            ; $FF70 (32 × sint16: A's second period)
     dw  $0000,$0001,$0002,$0003,$0004,$0005,$0005,$0006
     dw  $0006,$0006,$0005,$0005,$0004,$0003,$0002,$0001
     dw  $0000,$FFFF,$FFFE,$FFFD,$FFFC,$FFFB,$FFFB,$FFFA
     dw  $FFFA,$FFFA,$FFFB,$FFFB,$FFFC,$FFFD,$FFFE,$FFFF
 
 ; ============================================================
-; SNES internal ROM header ($FFB0–$FFDF)
-; Standard SFC/SNES format.  $FFB0–$FFBF is the extended header area;
-; the official header begins at $FFC0.
+; SNES cartridge header ($FFB0–$FFDF), standard layout
 ; ============================================================
-                        ; $FFB0 — extended header: maker+game code
-    db "C3"             ; maker code (Square)
-    db "ACTE"           ; game code (Chrono Trigger)
-    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00  ; reserved
+RomExtHeader:           ; $FFB0 — extended header (present: $FFDA = $33)
+    db "C3"             ; maker code
+    db "ACTE"           ; game code
+    db $00,$00,$00,$00,$00,$00,$00  ; $FFB6–$FFBC reserved
+RomExpansionRam:        ; $FFBD — no expansion RAM
+    db $00
+RomSpecialVersion:      ; $FFBE — normal release
+    db $00
+RomCartridgeSubtype:    ; $FFBF — none
+    db $00
 
-ROMTitle:               ; $FFC0 — ROM title (21 bytes, space-padded)
+ROMTitle:               ; $FFC0 — 21 bytes, space-padded
     db "CHRONO TRIGGER       "
-
-    db $31              ; $FFD5 — map mode: HiROM ($21) + FastROM ($10)
-    db $02              ; $FFD6 — ROM type: ROM + SRAM
-    db $0C              ; $FFD7 — ROM size: 2^12 KiB = 4 MiB
-    db $03              ; $FFD8 — SRAM size: 2^3 KiB = 8 KiB
-    db $01              ; $FFD9 — country: USA
-    db $33              ; $FFDA — developer ID ($33 = extended header present)
-    db $00              ; $FFDB — ROM version: 1.0
-    dw $8773            ; $FFDC–$FFDD — checksum complement
-    dw $788C            ; $FFDE–$FFDF — checksum ($8773+$788C=$FFFF ✓)
+RomMapMode:             ; $FFD5 — HiROM ($21) + FastROM ($10)
+    db $31
+RomType:                ; $FFD6 — ROM + RAM + battery (the save SRAM)
+    db $02
+RomSize:                ; $FFD7 — 2^12 KiB = 4 MiB
+    db $0C
+RomSramSize:            ; $FFD8 — 2^3 KiB = 8 KiB
+    db $03
+RomRegion:              ; $FFD9 — North America
+    db $01
+RomDeveloperId:         ; $FFDA — $33: the extended header at $FFB0 is valid
+    db $33
+RomVersion:             ; $FFDB — 1.0
+    db $00
+RomChecksumComplement:  ; $FFDC
+    dw $8773
+RomChecksum:            ; $FFDE — sum of all ROM bytes; complement + checksum = $FFFF
+    dw $788C
 
 ; ============================================================
 ; Interrupt vector table ($FFE0–$FFFF)
-; Native-mode vectors: $FFE4–$FFEF
-; Emulation-mode vectors: $FFF4–$FFFF
+; Native mode: $FFE4–$FFEF. Emulation mode: $FFF4–$FFFF. $FFFF entries
+; are slots the game never uses; $FFEC and $FFF6 are reserved by the CPU
+; (there is no native RESET vector: reset always starts in emulation mode).
 ; ============================================================
-    db $FF,$FF,$FF,$FF  ; $FFE0–$FFE3 — pre-vector padding (unused)
+RomVectors:
+    db $FF,$FF,$FF,$FF  ; $FFE0–$FFE3 unused
 
-    ; Native mode vectors
-    dw $FFFF            ; $FFE4 — native COP     (unused — $FF fill)
-    dw BRK_Handler      ; $FFE6 — native BRK     → crash handler
-    dw $FFFF            ; $FFE8 — native ABORT    (unused)
-    dw NMI_Stub         ; $FFEA — native NMI      → $FF10
-    dw $FFFF            ; $FFEC — native RESET     (unused; emulation RESET is used)
-    dw IRQ_Stub         ; $FFEE — native IRQ      → $FF14
+    ; Native mode
+    dw $FFFF            ; $FFE4 COP    (unused)
+    dw BRK_Handler      ; $FFE6 BRK
+    dw $FFFF            ; $FFE8 ABORT  (unused)
+    dw NMI_Stub         ; $FFEA NMI
+    dw $FFFF            ; $FFEC reserved
+    dw IRQ_Stub         ; $FFEE IRQ
 
-    db $FF,$FF,$FF,$FF  ; $FFF0–$FFF3 — pre-emulation padding
+    db $FF,$FF,$FF,$FF  ; $FFF0–$FFF3 unused
 
-    ; Emulation mode vectors
-    dw BRK_Handler      ; $FFF4 — emulation COP  → crash handler (same as BRK)
-    dw $FFFF            ; $FFF6 — (unused)
-    dw $FFFF            ; $FFF8 — emulation ABORT (unused)
-    dw $FFFF            ; $FFFA — emulation NMI   (unused in emulation mode)
-    dw Reset            ; $FFFC — emulation RESET → $FF00 ← boot vector
-    dw $FFFF            ; $FFFE — emulation IRQBRK (unused)
+    ; Emulation mode
+    dw BRK_Handler      ; $FFF4 COP    (same crash trap as BRK)
+    dw $FFFF            ; $FFF6 reserved
+    dw $FFFF            ; $FFF8 ABORT  (unused)
+    dw $FFFF            ; $FFFA NMI    (unused: NMI is off after reset, NMITIMEN=0, during
+                        ;               the three instructions Reset runs in emulation mode)
+    dw Reset            ; $FFFC RESET  → boot
+    dw $FFFF            ; $FFFE IRQ/BRK (unused)

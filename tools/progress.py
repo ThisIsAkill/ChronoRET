@@ -1,446 +1,379 @@
 #!/usr/bin/env python3
 """
-progress.py — Matched-byte stats and homepage snippet generation.
+progress.py — The single source of every number about this project.
 
-Scans asm/bank*/*.asm for explicit data definitions (db/dw/dl) to count
-data bytes. Instruction bytes are verified only by `make diff`, not counted
-here — see docs/PROGRESS.md (hand-maintained) for the authoritative total.
+Builds the source, proves which bytes it emits (tools/verify.py's two-base
+method), reads label addresses from asar, applies the readability lint and
+the review log, and writes:
+
+  symbols/functions.csv         one row per function: where, how big, status
+  symbols/progress.json         totals, per bank, per 4 KB address-map slice
+  symbols/progress_history.csv  one row per working day (--update-history)
+
+and the generated blocks in README.md, CONTRIBUTING.md and STATUS.md
+(<!-- progress:start/end -->, <!-- status:start/end -->). Never type a count
+or percentage by hand.
+
+A function's status (each level includes the previous):
+  matched    every byte from its label to the next is emitted by source
+             and equals the ROM
+  readable   ...and it has no findings from tools/lint_readability.py
+  verified   ...and symbols/reviews.csv holds an independent approval of
+             its current source (the review's source_hash still matches)
 
 Usage:
-    python3 tools/progress.py             dry-run: print data-byte stats
-    python3 tools/progress.py --update-index
-        Read docs/PROGRESS.md, regenerate docs/includes/progress_summary.md
-        (the snippet included in docs/index.md), and print data-byte stats.
-
-NOTE: --update no longer overwrites docs/PROGRESS.md.  That file is
-hand-maintained because progress.py only counts data bytes, not instructions.
-Run --update-index instead to sync the homepage table from PROGRESS.md.
+    python3 tools/progress.py                   print the summary
+    python3 tools/progress.py --update          rewrite symbols/ and doc blocks
+    python3 tools/progress.py --update-history  also record today's row
+    python3 tools/progress.py --check           fail if anything is stale
 """
 
+import argparse
+import csv
+import datetime as dt
+import hashlib
+import io
+import json
+import os
 import re
+import shutil
+import subprocess
 import sys
-import struct
+import tempfile
 from pathlib import Path
 
-ROM_PATH        = Path('roms/chrono_trigger.sfc')
-ASM_DIR         = Path('asm')
-WIKI_DIR        = Path('../chrono-trigger-wiki')
-PROGRESS_MD     = WIKI_DIR / 'docs/PROGRESS.md'
-SUMMARY_SNIPPET = WIKI_DIR / 'docs/includes/progress_summary.md'
-MKDOCS_YML      = WIKI_DIR / 'mkdocs.yml'
-INDEX_MD        = WIKI_DIR / 'docs/index.md'
-ROM_SIZE        = 0x400000   # 4 MB unheadered
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lint_readability  # noqa: E402
+import verify  # noqa: E402
 
-# Denominators for the "% of code" stats. These change only if the code/data
-# boundary is re-surveyed (see BANK_MAP.md) -- not on every session.
-TOTAL_CODE_BYTES    = 359278
-BANK_C0_CODE_BYTES  = 61779
-BANK_C1_CODE_BYTES  = 63904
+ROM_PATH = Path('roms/chrono_trigger.sfc')
+MAIN_ASM = Path('asm/main.asm')
+SYMBOLS = Path('symbols')
+FUNCTIONS_CSV = SYMBOLS / 'functions.csv'
+REVIEWS_CSV = SYMBOLS / 'reviews.csv'
+PROGRESS_JSON = SYMBOLS / 'progress.json'
+HISTORY_CSV = SYMBOLS / 'progress_history.csv'
+DOCS = [Path('README.md'), Path('CONTRIBUTING.md'), Path('STATUS.md')]
+
+# Code-byte denominators: re-surveyed only when the code/data boundary is.
+CODE_BYTES_TOTAL = 359278
+CODE_BYTES = {'$C0': 61779, '$C1': 63904}
+SLICE = 0x1000
+LEVELS = ('matched', 'readable', 'verified')
+
+SUBSYSTEMS = [
+    ('BattleTgt', 'Battle targeting'), ('BattleMenu', 'Battle menu'),
+    ('BattleUI', 'Battle status bar'), ('BattleMsg', 'Battle text & numbers'),
+    ('BattleSys', 'Battle system'), ('Battle', 'Battle engine'),
+    ('Obj_', 'Sprites & objects'), ('Sprite', 'Sprites & objects'),
+    ('Sub_', 'Engine (unnamed)'), ('MainInit', 'Boot'), ('Reset', 'Boot'),
+    ('NMI', 'Boot'), ('IRQ', 'Boot'), ('BRK', 'Boot'),
+    ('Rom', 'ROM header'), ('ROMTitle', 'ROM header'),
+]
 
 
-def load_rom() -> bytes:
-    data = ROM_PATH.read_bytes()
-    if len(data) % 1024 == 512 and len(data) > 512:
-        rem = len(data) - 512
-        if rem in (0x80000, 0x100000, 0x200000, 0x300000, 0x400000):
-            data = data[512:]
-    return data
+def subsystem(name: str) -> str:
+    return next((label for prefix, label in SUBSYSTEMS if name.startswith(prefix)), 'Engine')
 
 
-def hirom_to_offset(pc: int) -> int | None:
-    """Convert a 24-bit asar PC (HiROM) to a file offset."""
-    bank = (pc >> 16) & 0xFF
-    addr = pc & 0xFFFF
+def snes_to_offset(bank: int, addr: int):
     if bank >= 0xC0:
         return (bank - 0xC0) * 0x10000 + addr
-    if 0x00 <= bank <= 0x3F:
-        if addr < 0x8000:
-            return None
+    if bank < 0x40 and addr >= 0x8000:
         return bank * 0x10000 + addr
-    if 0x80 <= bank <= 0xBF:
-        if addr < 0x8000:
-            return None
-        return (bank - 0x80) * 0x10000 + addr
     return None
 
 
-# Patterns we recognise in .asm source
-_ORG_RE    = re.compile(r'^\s*org\s+\$([0-9A-Fa-f]{2,6})', re.IGNORECASE)
-_DB_RE     = re.compile(r'^\s*db\b',  re.IGNORECASE)
-_DW_RE     = re.compile(r'^\s*dw\b',  re.IGNORECASE)
-_DL_RE     = re.compile(r'^\s*dl\b',  re.IGNORECASE)
-_SKIP_RE   = re.compile(r'^\s*skip\s+(\d+)', re.IGNORECASE)
-_COMMENT   = re.compile(r';.*$')
-_DIRECTIVE = re.compile(r'^\s*(arch|hirom|lorom|incsrc|incbin|namespace|pushns|pullns)\b', re.IGNORECASE)
+def offset_to_snes(off: int) -> str:
+    return f'${0xC0 + (off >> 16):02X}:{off & 0xFFFF:04X}'
 
 
-def count_db_bytes(line: str) -> int:
-    """Count how many bytes a 'db ...' line emits."""
-    line = _COMMENT.sub('', line)
-    after = re.sub(r'^[^,]*db\s*', '', line, flags=re.IGNORECASE)
-    total = 0
-    # quoted strings contribute their character count, not 1
-    for part in re.split(r'(?<=["\'])\s*,\s*|,\s*(?=["\'])|(?<=["\'])\s*$|^\s*(?=["\'])', after):
-        part = part.strip().strip(',').strip()
-        if not part:
+def pct(n: int, d: int) -> str:
+    return f'{100 * n / d:.2f}%'
+
+
+# ── Source ───────────────────────────────────────────────────────────────────
+
+GLOBAL = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):')
+
+
+def source_functions() -> dict[str, dict]:
+    """Global labels in bank files: file, header note, hash of their source."""
+    found = {}
+    for path in sorted(Path('asm').glob('bank*/*.asm')):
+        lines = path.read_text().splitlines()
+        starts = [i for i, l in enumerate(lines) if GLOBAL.match(l)]
+
+        def is_code(line: str) -> bool:
+            # An instruction or data line (indented, not a comment) or a label.
+            s = line.strip()
+            return bool(s) and not s.startswith(';') and (line[:1].isspace() or s.endswith(':')
+                                                          or GLOBAL.match(line) is not None)
+
+        def last_code(lo: int, hi: int) -> int:
+            for j in range(hi - 1, lo - 1, -1):
+                if is_code(lines[j]) and not lines[j].strip().lower().startswith('org'):
+                    return j
+            return lo
+
+        prev_end = 0
+        for n, i in enumerate(starts):
+            name = GLOBAL.match(lines[i]).group(1)
+            nxt = starts[n + 1] if n + 1 < len(starts) else len(lines)
+            # A routine owns everything after the previous routine's last code
+            # line (its header comments, org, local defines) through its own
+            # last code line, so editing its header voids its review too.
+            end = last_code(i, nxt) + 1
+            body = '\n'.join(l.rstrip() for l in lines[prev_end:end]).strip()
+            prev_end = end
+            found[name] = {
+                'file': str(path), 'note': header_note(lines, i, name),
+                'source_hash': hashlib.sha256(body.encode()).hexdigest()[:12],
+            }
+    return found
+
+
+def header_note(lines: list[str], i: int, name: str) -> str:
+    """First descriptive sentence of the comment block above a label."""
+    block, j = [], i - 1
+    while j >= 0 and (lines[j].startswith(';') or lines[j].strip().lower().startswith('org')
+                      or not lines[j].strip()):
+        if lines[j].startswith(';'):
+            block.append(lines[j][1:].strip())
+        elif not lines[j].strip() and block:
+            break
+        j -= 1
+    text = []
+    for line in reversed(block):
+        if not line or set(line) <= set('=-~ '):
+            if text:
+                break
             continue
-        if part.startswith('"') or part.startswith("'"):
-            # count string chars (ignoring quotes and escape sequences for now)
-            inner = part.strip('"\'')
-            total += len(inner)
-        else:
-            # comma-separated non-string items
-            items = [p.strip() for p in part.split(',') if p.strip()]
-            total += len(items)
-    return total
+        if name in line and '(' in line and not text:
+            continue
+        if re.match(r'^(On entry|Entry|Exit|Callees|In|Out)\b', line):
+            break
+        line = re.sub(r'^\$[0-9A-F]{2}:[0-9A-F]{4}\s*[—-]\s*' + re.escape(name) + r'\b[^A-Za-z]*', '', line)
+        if line:
+            text.append(line)
+    note = re.split(r'(?<=[.!?])\s', ' '.join(text), maxsplit=1)[0]
+    return note[:200]
 
 
-def count_dw_bytes(line: str) -> int:
-    line = _COMMENT.sub('', line)
-    after = re.sub(r'^[^,]*dw\s*', '', line, flags=re.IGNORECASE)
-    parts = [p.strip() for p in after.split(',') if p.strip()]
-    return len(parts) * 2
+def read_reviews() -> dict[str, dict]:
+    """Latest review row per function name."""
+    if not REVIEWS_CSV.exists():
+        return {}
+    with REVIEWS_CSV.open() as f:
+        return {row['name']: row for row in csv.DictReader(f)}
 
 
-def count_dl_bytes(line: str) -> int:
-    line = _COMMENT.sub('', line)
-    after = re.sub(r'^[^,]*dl\s*', '', line, flags=re.IGNORECASE)
-    parts = [p.strip() for p in after.split(',') if p.strip()]
-    return len(parts) * 3
+# ── Build ────────────────────────────────────────────────────────────────────
+
+def build_facts(work: Path) -> tuple[set[int], dict[str, int]]:
+    rom = ROM_PATH.read_bytes()
+    lo = verify.assemble_onto(0x00, work)
+    hi = verify.assemble_onto(0xFF, work)
+    emitted = {i for i in range(len(lo)) if lo[i] == hi[i] and lo[i] == rom[i]}
+
+    rom_copy, sym = work / 'sym.sfc', work / 'out.sym'
+    shutil.copy(ROM_PATH, rom_copy)
+    subprocess.run(['asar', '--no-title-check', '--fix-checksum=off', '--symbols=wla',
+                    f'--symbols-path={sym}', str(MAIN_ASM), str(rom_copy)],
+                   check=True, capture_output=True)
+    addrs = {}
+    for line in sym.read_text().splitlines():
+        m = re.match(r'^([0-9A-F]{2}):([0-9A-F]{4}) (\S+)$', line)
+        if m:
+            off = snes_to_offset(int(m.group(1), 16), int(m.group(2), 16))
+            if off is not None:
+                addrs[m.group(3)] = off
+    return emitted, addrs
 
 
-def scan_asm_file(path: Path) -> set[int]:
-    """
-    Return a set of ROM file offsets that this .asm file explicitly defines.
-    Tracks org position and advances it for each instruction-like line.
-    This is a conservative approximation — it counts lines that look like
-    they emit bytes, not a full assembler pass.
-    """
-    covered: set[int] = set()
-    cur_pc: int | None = None
+def analyse() -> dict:
+    with tempfile.TemporaryDirectory() as tmp:
+        emitted, addrs = build_facts(Path(tmp))
+    source = source_functions()
+    lint = lint_readability.by_function(lint_readability.collect())
+    reviews = read_reviews()
 
-    with open(path) as f:
-        for raw_line in f:
-            line = raw_line.rstrip()
+    starts = sorted((off, name) for name, off in addrs.items() if name in source)
+    functions = []
+    for idx, (start, name) in enumerate(starts):
+        if start not in emitted:
+            continue
+        nxt = starts[idx + 1][0] if idx + 1 < len(starts) else start + 0x10000
+        end = start
+        while end < nxt and end in emitted:
+            end += 1
+        src = source[name]
+        status = 'matched'
+        if f'{src["file"]}:{name}' not in lint:
+            status = 'readable'
+            review = reviews.get(name)
+            if review and review['verdict'] == 'approved' and review['source_hash'] == src['source_hash']:
+                status = 'verified'
+        functions.append({
+            'address': offset_to_snes(start), 'end': offset_to_snes(end - 1), 'size': end - start,
+            'name': name, 'bank': f'${0xC0 + (start >> 16):02X}', 'subsystem': subsystem(name),
+            'status': status, 'source_hash': src['source_hash'], 'notes': src['note'], '_start': start,
+        })
 
-            # org directive — update current PC
-            m = _ORG_RE.match(line)
-            if m:
-                cur_pc = int(m.group(1), 16)
-                # Expand short forms: if < 6 hex chars, it's fine as a PC
-                if cur_pc < 0x8000:
-                    cur_pc = None  # address in system area, not ROM
-                continue
+    def level_totals(rows):
+        out = {}
+        for level in LEVELS:
+            reached = [f for f in rows if LEVELS.index(f['status']) >= LEVELS.index(level)]
+            out[level] = {'functions': len(reached), 'bytes': sum(f['size'] for f in reached)}
+        return out
 
-            if cur_pc is None:
-                continue
+    banks = sorted({f'${0xC0 + (o >> 16):02X}' for o in emitted} | set(CODE_BYTES))
+    bank_rows = []
+    for b in banks:
+        rows = [f for f in functions if f['bank'] == b]
+        bank_rows.append({'bank': b, 'code_bytes': CODE_BYTES.get(b),
+                          'emitted_bytes': sum(1 for o in emitted if f'${0xC0 + (o >> 16):02X}' == b),
+                          **level_totals(rows)})
 
-            # skip directive
-            m = _SKIP_RE.match(line)
-            if m:
-                cur_pc = (cur_pc + int(m.group(1))) & 0xFFFFFF
-                continue
-
-            # Directives that don't emit bytes
-            if _DIRECTIVE.match(line):
-                continue
-
-            # Comments and blank lines
-            stripped = _COMMENT.sub('', line).strip()
-            if not stripped:
-                continue
-
-            # Data directives
-            if _DB_RE.match(line):
-                n = count_db_bytes(line)
-                off = hirom_to_offset(cur_pc)
-                if off is not None:
-                    for i in range(n):
-                        covered.add(off + i)
-                cur_pc = (cur_pc + n) & 0xFFFFFF
-                continue
-            if _DW_RE.match(line):
-                n = count_dw_bytes(line)
-                off = hirom_to_offset(cur_pc)
-                if off is not None:
-                    for i in range(n):
-                        covered.add(off + i)
-                cur_pc = (cur_pc + n) & 0xFFFFFF
-                continue
-            if _DL_RE.match(line):
-                n = count_dl_bytes(line)
-                off = hirom_to_offset(cur_pc)
-                if off is not None:
-                    for i in range(n):
-                        covered.add(off + i)
-                cur_pc = (cur_pc + n) & 0xFFFFFF
-                continue
-
-            # Anything else that looks like an instruction (starts with a mnemonic)
-            # We can't know byte length without a full assembler, so we skip counting
-            # those here — only data/org directives are tracked for now.
-
-    return covered
+    slices = []
+    for b in banks:
+        base = (int(b[1:], 16) - 0xC0) << 16
+        for s in range(base, base + 0x10000, SLICE):
+            slices.append({
+                'bank': b, 'start': offset_to_snes(s), 'end': offset_to_snes(s + SLICE - 1),
+                'emitted_bytes': sum(1 for i in range(s, s + SLICE) if i in emitted),
+                'functions': [f['name'] for f in functions if s <= f['_start'] < s + SLICE],
+            })
+    for f in functions:
+        del f['_start']
+    return {'emitted_bytes': len(emitted), 'code_bytes': CODE_BYTES_TOTAL,
+            'totals': level_totals(functions), 'banks': bank_rows,
+            'slices': slices, 'functions': functions}
 
 
-def scan_all_asm() -> tuple[set[int], dict[str, set[int]]]:
-    """Scan all bank asm files; return (all_covered, per_bank_covered)."""
-    all_covered: set[int] = set()
-    per_bank: dict[str, set[int]] = {}
+# ── Outputs ──────────────────────────────────────────────────────────────────
 
-    for bank_dir in sorted(ASM_DIR.glob('bank*/')):
-        bank_name = bank_dir.name  # e.g. 'bank00'
-        bank_covered: set[int] = set()
-        for asm_file in bank_dir.glob('*.asm'):
-            covered = scan_asm_file(asm_file)
-            bank_covered.update(covered)
-        per_bank[bank_name] = bank_covered
-        all_covered.update(bank_covered)
-
-    return all_covered, per_bank
+CSV_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'status', 'source_hash', 'notes']
 
 
-def format_stats(total_covered: set[int], per_bank: dict[str, set[int]]) -> str:
-    total_bytes = ROM_SIZE
-    matched = len(total_covered)
-    pct = 100.0 * matched / total_bytes
+def render_functions_csv(result) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=CSV_COLS, lineterminator='\n')
+    w.writeheader()
+    w.writerows(result['functions'])
+    return buf.getvalue()
 
+
+def render_progress_json(result) -> str:
+    data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'totals', 'banks', 'slices')}
+    return json.dumps({'schema': 2, **data}, indent=2) + '\n'
+
+
+def render_progress_block(result) -> str:
+    t, code = result['totals'], result['code_bytes']
     lines = [
-        '# Matching Progress',
-        '',
-        f'Overall: **{matched:,} / {total_bytes:,} bytes matched ({pct:.4f}%)**',
-        '(data bytes counted by script; instruction bytes verified via `make diff`)',
-        '',
-        '| Bank | Description | Status | Notes |',
-        '|------|-------------|--------|-------|',
+        '| | Functions | Bytes | Share of game code |',
+        '|---|---:|---:|---:|',
+        f'| Game code (surveyed) | | {code:,} | |',
     ]
-
-    # Known bank descriptions
-    desc = {
-        'bank00': 'Boot / core engine',
-        'bank01': 'TBD',
-        'bank02': 'TBD',
-        'bankFD': 'Main init + engine core',
-    }
-
-    # Banks that have source with instructions (not just data bytes).
-    # progress.py counts explicit db/dw/dl only; instruction-only banks
-    # still count as Partial if they have any org-bearing .asm files.
-    def has_asm_content(bank_dir: Path) -> bool:
-        for f in bank_dir.glob('*.asm'):
-            if re.search(r'^\s*org\b', f.read_text(), re.IGNORECASE | re.MULTILINE):
-                return True
-        return False
-
-    all_banks = sorted(set(list(per_bank.keys()) + list(desc.keys())))
-    for b in all_banks:
-        n = len(per_bank.get(b, set()))
-        bnum = b.replace('bank', '$').upper()
-        bdesc = desc.get(b, 'TBD')
-        bank_dir = ASM_DIR / b
-        if n > 0:
-            status = 'Partial'
-            note = f'{n} data bytes'
-        elif bank_dir.exists() and has_asm_content(bank_dir):
-            status = 'Partial'
-            note = 'instructions only (see asm/)'
-        else:
-            status = 'Unmapped'
-            note = ''
-        lines.append(f'| {bnum} | {bdesc} | {status} | {note} |')
-
-    lines += [
-        '',
-        '## Legend',
-        '',
-        '- **Unmapped** — haven\'t identified what lives here yet',
-        '- **Partial** — some functions matched, bank not complete',
-        '- **Matched** — entire bank reassembles byte-identical',
-        '',
-        '## Next steps',
-        '',
-        '1. Trace `MainInit` at `$FD:C000` — real hardware init',
-        '2. Map RAM-resident NMI/IRQ handlers (loaded to $000500/$000504)',
-        '3. Label data tables at `$00:FF20–$00:FF2F` (bit-mask LUT)',
-        '4. Sweep bank $FD once `MainInit` is matched',
-    ]
-
-    return '\n'.join(lines) + '\n'
+    for level in LEVELS:
+        lines.append(f'| {level.capitalize()} | {t[level]["functions"]} | {t[level]["bytes"]:,} '
+                     f'| {pct(t[level]["bytes"], code)} |')
+    lines += ['', 'Each row includes the next: verified functions are also readable and matched.', '',
+              '| Bank | Code bytes | Matched | Readable | Verified |', '|---|---:|---:|---:|---:|']
+    for b in result['banks']:
+        code_b = f'{b["code_bytes"]:,}' if b['code_bytes'] else 'not surveyed'
+        cells = []
+        for level in LEVELS:
+            cell = f'{b[level]["bytes"]:,}'
+            if b['code_bytes']:
+                cell += f' ({pct(b[level]["bytes"], b["code_bytes"])})'
+            cells.append(cell)
+        lines.append(f'| `{b["bank"]}` | {code_b} | ' + ' | '.join(cells) + ' |')
+    lines += ['', 'Generated by `tools/progress.py --update`. Do not edit.']
+    return '\n'.join(lines)
 
 
-def parse_progress_md() -> tuple[int, dict[str, tuple[str, int]]]:
-    """
-    Parse docs/PROGRESS.md (hand-maintained) to extract:
-      - overall total (from the '~XXXX bytes matched' headline)
-      - per-bank byte counts and descriptions (from '### Bank $XX — ... (NNN bytes)' headings)
-
-    Returns (total_bytes, {bank_id: (description, bytes)})
-    """
-    if not PROGRESS_MD.exists():
-        return 0, {}
-
-    text = PROGRESS_MD.read_text()
-
-    # Overall total: "Overall: **~2569 bytes matched**" or "~2,569 bytes"
-    total = 0
-    m = re.search(r'Overall:.*?~?([\d,]+)\s+bytes', text)
-    if m:
-        total = int(m.group(1).replace(',', ''))
-
-    # Bank sections: "### Bank $C0 — `...` (2098 bytes)"
-    bank_re = re.compile(
-        r'^#{2,3}\s+Bank\s+(\$[0-9A-Fa-f]+)\s+[—–-]\s+`[^`]+`\s+\(([\d,]+)\s+bytes',
-        re.MULTILINE,
-    )
-    banks: dict[str, tuple[str, int]] = {}
-    for m in bank_re.finditer(text):
-        bank_id = m.group(1).upper()
-        byte_count = int(m.group(2).replace(',', ''))
-        banks[bank_id] = byte_count
-
-    return total, banks
+def render_status_line(result) -> str:
+    t, code = result['totals'], result['code_bytes']
+    return (f'{t["matched"]["bytes"]:,} of {code:,} bytes of game code are matched byte-exact '
+            f'({pct(t["matched"]["bytes"], code)}, {t["matched"]["functions"]} functions); '
+            f'{t["readable"]["functions"]} of those meet the readability standard and '
+            f'{t["verified"]["functions"]} are verified by independent review.')
 
 
-def write_summary_snippet(total: int, banks: dict[str, int]) -> None:
-    """Write docs/includes/progress_summary.md from parsed PROGRESS.md data."""
-    bank_descriptions = {
-        '$00': 'Boot vectors, wave tables, ROM header',
-        '$C0': 'Engine core — GameLoop, VBlank, OAM, sprite render',
-        '$C1': 'Battle engine — math utilities, status-bar UI, menu rendering',
-        '$FD': 'MainInit (CPU/PPU init sequence)',
-    }
+def replace_block(text: str, tag: str, body: str) -> str:
+    pattern = re.compile(rf'(<!-- {tag}:start -->).*?(<!-- {tag}:end -->)', re.S)
+    return pattern.sub(lambda m: m.group(1) + '\n' + body + '\n' + m.group(2), text)
 
+
+def render_docs(result) -> dict[Path, str]:
+    out = {}
+    for path in DOCS:
+        if not path.exists():
+            continue
+        text = path.read_text()
+        text = replace_block(text, 'progress', render_progress_block(result))
+        text = replace_block(text, 'status', render_status_line(result))
+        out[path] = text
+    return out
+
+
+def history_rows(result) -> list[dict]:
     rows = []
-    grand = 0
-    for bank_id in sorted(banks):
-        desc = bank_descriptions.get(bank_id, '—')
-        n = banks[bank_id]
-        grand += n
-        rows.append(f'| `{bank_id}` | {desc} | Partial | {n:,} |')
-    rows.append('| Everything else | — | Unmapped | 0 |')
-
-    display_total = total if total else grand
-    pct = 100.0 * display_total / ROM_SIZE
-
-    lines = [
-        '| Bank | Region | Status | Bytes |',
-        '|------|--------|--------|-------|',
-    ] + rows + [
-        '',
-        f'**Total matched: ~{display_total:,} bytes out of {ROM_SIZE:,} ({pct:.3f}%)**',
-        '',
-        '*Run `python3 tools/progress.py --update-index` after updating `docs/PROGRESS.md` to regenerate this table.*',
-    ]
-
-    SUMMARY_SNIPPET.write_text('\n'.join(lines) + '\n')
-    print(f'Updated {SUMMARY_SNIPPET}')
+    if HISTORY_CSV.exists():
+        with HISTORY_CSV.open() as f:
+            rows = list(csv.DictReader(f))
+    today = dt.date.today().isoformat()
+    t = result['totals']
+    row = {'date': today, 'matched_bytes': t['matched']['bytes'],
+           'matched_functions': t['matched']['functions'],
+           'readable_functions': t['readable']['functions'],
+           'verified_functions': t['verified']['functions']}
+    rows = [r for r in rows if r['date'] != today] + [row]
+    return sorted(rows, key=lambda r: r['date'])
 
 
-def fmt_pct(numerator: int, denominator: int) -> str:
-    """'31.56' style: up to 2 decimals, trailing zeros trimmed."""
-    pct = 100.0 * numerator / denominator
-    s = f'{pct:.2f}'.rstrip('0').rstrip('.')
-    return s if '.' in s else s + '.0'
-
-
-def sync_mkdocs_yml(total: int, banks: dict[str, int]) -> None:
-    """
-    Patch the extra.progress numeric fields in mkdocs.yml from parsed
-    PROGRESS.md data. Only touches keys that already exist in the file
-    (bytes_matched, bank_XX_bytes for banks present) -- never adds new keys,
-    never touches functions_matched (not derivable from PROGRESS.md's table
-    structure alone; stays hand-maintained).
-    """
-    if not MKDOCS_YML.exists():
-        return
-    text = MKDOCS_YML.read_text()
-    original = text
-
-    text = re.sub(r'(bytes_matched:\s*)\d+', rf'\g<1>{total}', text)
-    for bank_id, n in banks.items():
-        key = 'bank_' + bank_id.lstrip('$').lower() + '_bytes'
-        text = re.sub(rf'({key}:\s*)\d+', rf'\g<1>{n}', text)
-
-    if text != original:
-        MKDOCS_YML.write_text(text)
-        print(f'Updated {MKDOCS_YML}')
-
-
-def sync_index_md(total: int, banks: dict[str, int]) -> None:
-    """
-    Patch the numeric byte counts in docs/index.md's "Matched regions" table
-    and its bold overall-summary line from parsed PROGRESS.md data. Leaves
-    the prose region descriptions alone -- those are session-written content,
-    not derivable numbers.
-    """
-    if not INDEX_MD.exists():
-        return
-    text = INDEX_MD.read_text()
-    original = text
-
-    # Table rows: | `$XX` | <description> | <bytes> |
-    def replace_row(m: re.Match) -> str:
-        bank_id = m.group(1)
-        n = banks.get(bank_id)
-        if n is None:
-            return m.group(0)
-        return f'| `{bank_id}` |{m.group(2)}| {n:,} |'
-
-    text = re.sub(
-        r'\| `(\$[0-9A-Fa-f]+)` \|(.*)\|\s*[\d,]+\s*\|',
-        replace_row,
-        text,
-    )
-
-    # Bold summary line, e.g.:
-    # **Overall: 24,166 bytes matched — ~6.73% of all game code (359,278 bytes),
-    # ~31.6% of Bank $C0 (61,779 bytes), ~6.57% of Bank $C1 (63,904 bytes).**
-    overall_pct = fmt_pct(total, TOTAL_CODE_BYTES)
-    c0_pct = fmt_pct(banks.get('$C0', 0), BANK_C0_CODE_BYTES)
-    c1_pct = fmt_pct(banks.get('$C1', 0), BANK_C1_CODE_BYTES)
-    new_summary = (
-        f'**Overall: {total:,} bytes matched — ~{overall_pct}% of all game code '
-        f'({TOTAL_CODE_BYTES:,} bytes), ~{c0_pct}% of Bank $C0 '
-        f'({BANK_C0_CODE_BYTES:,} bytes), ~{c1_pct}% of Bank $C1 '
-        f'({BANK_C1_CODE_BYTES:,} bytes).**'
-    )
-    text = re.sub(
-        r'\*\*Overall:.*?bytes\)\.\*\*',
-        lambda _m: new_summary,
-        text,
-        count=1,
-        flags=re.DOTALL,
-    )
-
-    if text != original:
-        INDEX_MD.write_text(text)
-        print(f'Updated {INDEX_MD}')
+def render_history(rows) -> str:
+    buf = io.StringIO()
+    cols = ['date', 'matched_bytes', 'matched_functions', 'readable_functions', 'verified_functions']
+    w = csv.DictWriter(buf, fieldnames=cols, lineterminator='\n')
+    w.writeheader()
+    w.writerows({c: r.get(c, '') for c in cols} for r in rows)
+    return buf.getvalue()
 
 
 def main() -> int:
-    update_index = '--update-index' in sys.argv
-    legacy_update = '--update' in sys.argv
+    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    ap.add_argument('--update', action='store_true')
+    ap.add_argument('--update-history', action='store_true')
+    ap.add_argument('--check', action='store_true')
+    args = ap.parse_args()
 
-    if legacy_update:
-        print(
-            'NOTE: --update no longer writes to docs/PROGRESS.md (that file is\n'
-            'hand-maintained). Use --update-index to regenerate the homepage\n'
-            'snippet from PROGRESS.md instead.\n'
-        )
+    if not ROM_PATH.exists():
+        print(f'No ROM at {ROM_PATH}; progress needs a build. Skipping.')
+        return 0 if args.check else 2
 
-    all_covered, per_bank = scan_all_asm()
+    result = analyse()
+    outputs = {FUNCTIONS_CSV: render_functions_csv(result),
+               PROGRESS_JSON: render_progress_json(result), **render_docs(result)}
+    if args.update_history:
+        outputs[HISTORY_CSV] = render_history(history_rows(result))
 
-    matched = len(all_covered)
-    pct = 100.0 * matched / ROM_SIZE
-    print(f'Data bytes matched: {matched:,} / {ROM_SIZE:,} ({pct:.4f}%)')
-    print(f'(instruction bytes verified via make diff — see {PROGRESS_MD} for totals)\n')
+    if args.check:
+        stale = [str(p) for p, text in outputs.items() if not p.exists() or p.read_text() != text]
+        if stale:
+            print('STALE (run `python3 tools/progress.py --update`): ' + ', '.join(stale))
+            return 1
+        print('Progress files are current.')
+        return 0
 
-    if update_index:
-        total, banks = parse_progress_md()
-        write_summary_snippet(total, banks)
-        sync_mkdocs_yml(total, banks)
-        sync_index_md(total, banks)
-
+    if args.update or args.update_history:
+        SYMBOLS.mkdir(exist_ok=True)
+        for path, text in outputs.items():
+            path.write_text(text)
+        print('Updated: ' + ', '.join(str(p) for p in outputs))
+    print(render_status_line(result))
     return 0
 
 

@@ -1,0 +1,679 @@
+{
+  "schema": 2,
+  "emitted_bytes": 29032,
+  "code_bytes": 359278,
+  "totals": {
+    "matched": {
+      "functions": 256,
+      "bytes": 29032
+    },
+    "readable": {
+      "functions": 256,
+      "bytes": 29032
+    },
+    "verified": {
+      "functions": 68,
+      "bytes": 1980
+    }
+  },
+  "banks": [
+    {
+      "bank": "$C0",
+      "code_bytes": 61779,
+      "emitted_bytes": 19585,
+      "matched": {
+        "functions": 117,
+        "bytes": 19585
+      },
+      "readable": {
+        "functions": 117,
+        "bytes": 19585
+      },
+      "verified": {
+        "functions": 21,
+        "bytes": 188
+      }
+    },
+    {
+      "bank": "$C1",
+      "code_bytes": 63904,
+      "emitted_bytes": 9232,
+      "matched": {
+        "functions": 138,
+        "bytes": 9232
+      },
+      "readable": {
+        "functions": 138,
+        "bytes": 9232
+      },
+      "verified": {
+        "functions": 46,
+        "bytes": 1577
+      }
+    },
+    {
+      "bank": "$FD",
+      "code_bytes": null,
+      "emitted_bytes": 215,
+      "matched": {
+        "functions": 1,
+        "bytes": 215
+      },
+      "readable": {
+        "functions": 1,
+        "bytes": 215
+      },
+      "verified": {
+        "functions": 1,
+        "bytes": 215
+      }
+    }
+  ],
+  "slices": [
+    {
+      "bank": "$C0",
+      "start": "$C0:0000",
+      "end": "$C0:0FFF",
+      "emitted_bytes": 1828,
+      "functions": [
+        "ReentryVectors",
+        "GameLoop",
+        "GameLoop_Main",
+        "GL_ModeOk1",
+        "GL_ModeOk2",
+        "GameLoop_FrameBody",
+        "VBlankHandler",
+        "VBlankHandlerShort",
+        "Field_IdleFrame",
+        "LoadLocation",
+        "Field_SaveState",
+        "Field_RestoreState",
+        "Field_RestoreSaveBlock",
+        "Field_StashSaveBlock",
+        "InitHW",
+        "InstallNMI",
+        "InstallIRQ",
+        "FrameStateInit",
+        "Field_SceneChangeTick",
+        "ModeE6_Handler",
+        "ModeEC_Handler"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:1000",
+      "end": "$C0:1FFF",
+      "emitted_bytes": 2974,
+      "functions": [
+        "ModeEE_Handler",
+        "ModeFA_Handler",
+        "ModeFC_Handler",
+        "DefaultHandler",
+        "Field_PauseAndMenuInput",
+        "Field_FadeToBankC2Mode5",
+        "Field_RunBankC2Mode5",
+        "Party_ReinitIfChanged",
+        "Sub_1ADF",
+        "Bg_TilemapIndex64x32",
+        "Audio_PlayTileSfxA",
+        "Audio_PlaySfxAtLeader",
+        "Audio_PlayTileSfxB",
+        "Fade_StepBrightness",
+        "Fade_StepFixedColor"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:2000",
+      "end": "$C0:2FFF",
+      "emitted_bytes": 81,
+      "functions": [
+        "Field_FadeInAfterReload",
+        "ClearRAMDMA"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:3000",
+      "end": "$C0:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:4000",
+      "end": "$C0:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:5000",
+      "end": "$C0:5FFF",
+      "emitted_bytes": 125,
+      "functions": [
+        "Evt_RunObj0Func1",
+        "Evt_RunObjInit"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:6000",
+      "end": "$C0:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:7000",
+      "end": "$C0:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:8000",
+      "end": "$C0:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:9000",
+      "end": "$C0:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:A000",
+      "end": "$C0:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:B000",
+      "end": "$C0:BFFF",
+      "emitted_bytes": 3503,
+      "functions": [
+        "Obj_ResetStates",
+        "PostVBlank",
+        "PV_SpriteLoop",
+        "PV_CheckChain",
+        "PV_NextSprite",
+        "PV_FillRange1",
+        "PV_EndRange1",
+        "PV_FillRange2",
+        "PV_EndRange2",
+        "PV_FillRange3",
+        "PV_EndRange3",
+        "Spr_AppendToOam",
+        "Spr_PrepareTiles",
+        "Spr_Place4",
+        "Spr_Load4",
+        "Spr_Place8",
+        "Spr_Load8",
+        "Spr_Place12"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:C000",
+      "end": "$C0:CFFF",
+      "emitted_bytes": 4096,
+      "functions": [
+        "Spr_Load12",
+        "Spr_PackHiBits4",
+        "Spr_Place24",
+        "Obj_AnimTickAndQueue",
+        "Field_ProcessAnimQueue",
+        "Obj_BuildSpriteFrameStep",
+        "Obj_BuildFrameLayout",
+        "Obj_AnimFrameLookup",
+        "Obj_BuildFrame4",
+        "Obj_FrameLayout4",
+        "Obj_BuildFrame8"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:D000",
+      "end": "$C0:DFFF",
+      "emitted_bytes": 4096,
+      "functions": [
+        "Obj_FrameLayout8",
+        "Obj_BuildFrame8Pass0",
+        "Obj_BuildFrame8Pass1",
+        "Obj_BuildFrame12",
+        "Obj_BuildFrame12Pass0",
+        "Obj_BuildFrame12Pass0Alt",
+        "Obj_BuildFrame12Pass1",
+        "Obj_BuildFrame12Pass1Alt",
+        "Obj_BuildFrame12Pass2",
+        "Obj_BuildFrame12Pass2Alt",
+        "Obj_FrameLayout12"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:E000",
+      "end": "$C0:EFFF",
+      "emitted_bytes": 2626,
+      "functions": [
+        "Spr_LoadLargeObj",
+        "Spr_CopyTileFlipped",
+        "Spr_CopyTile",
+        "Spr_CopyTileD4",
+        "Spr_CopyTileD2",
+        "Spr_CopyTileD3",
+        "Spr_CopyTile7F",
+        "SprBuf_FreeAll",
+        "SprBuf_Alloc1",
+        "SprBuf_Alloc2",
+        "SprBuf_Alloc3",
+        "SprBuf_Free1",
+        "SprBuf_Free2",
+        "SprBuf_Free3"
+      ]
+    },
+    {
+      "bank": "$C0",
+      "start": "$C0:F000",
+      "end": "$C0:FFFF",
+      "emitted_bytes": 256,
+      "functions": [
+        "Reset",
+        "NMI_Stub",
+        "IRQ_Stub",
+        "BRK_Handler",
+        "BitSet",
+        "BitClear",
+        "ScrollWaveA",
+        "ScrollWaveB",
+        "RomExtHeader",
+        "RomExpansionRam",
+        "RomSpecialVersion",
+        "RomCartridgeSubtype",
+        "ROMTitle",
+        "RomMapMode",
+        "RomType",
+        "RomSize",
+        "RomSramSize",
+        "RomRegion",
+        "RomDeveloperId",
+        "RomVersion",
+        "RomChecksumComplement",
+        "RomChecksum",
+        "RomVectors"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:0000",
+      "end": "$C1:0FFF",
+      "emitted_bytes": 3959,
+      "functions": [
+        "Battle_Mul8",
+        "Battle_Mul8x16",
+        "Battle_Divide",
+        "Battle_ShiftLeft8",
+        "Battle_ShiftLeft4",
+        "Battle_ShiftLeft3",
+        "Battle_ShiftRight8",
+        "Battle_ShiftRight6",
+        "Battle_ShiftRight5",
+        "Battle_ShiftRight4",
+        "Battle_ShiftRight3",
+        "BattleMsg_FormatNumberDigits",
+        "BattleMsg_FormatTwoDigits",
+        "BattleMsg_ReencodeTextBuffer",
+        "Battle_SinLookup",
+        "Battle_CalcAngle",
+        "BattleUI_BuildStatusBarFrame",
+        "BattleUI_DrawPcNamePanel",
+        "BattleUI_NextNamePanel",
+        "BattleUI_UpdateNextPcPanel",
+        "BattleUI_DrawAtbGauges",
+        "BattleUI_UpdateNextPcPanel_Exit",
+        "BattleUI_DrawSlotGaugeBar",
+        "BattleMenu_DrawCommandList",
+        "BattleMenu_DrawCommandWindowFrames",
+        "BattleUI_ClearActivePanelColumn",
+        "BattleUI_HighlightPcName",
+        "BattleMenu_DrawCommandWindowFrame",
+        "BattleMenu_RenderItemListRows",
+        "BattleMenu_RenderItemRow",
+        "CODE_JP_C10A87",
+        "BattleMenu_RenderTechListRows",
+        "BattleMenu_BuildTechAvailFlags",
+        "BattleMenu_RenderTechRow",
+        "CODE_JP_C10BB6",
+        "BattleMenu_BlankNameLeadCells",
+        "CODE_JP_C10C00",
+        "BattleMenu_UpdateWindows",
+        "CODE_C10C46",
+        "BattleMenu_UpdateMainWindow",
+        "BattleMenu_UpdateTechWindow",
+        "BattleMenu_DrawTechCursorRow",
+        "BattleMenu_ClearTechCursorTiles",
+        "BattleMenu_UpdateTechMpAvail",
+        "CODE_JP_C10F28",
+        "_ump_check_fd",
+        "_ump_set_grey",
+        "CODE_C10F66_JMP",
+        "_ump_check_battler",
+        "_ump_pc1_ok",
+        "_ump_pc2_ok",
+        "_ump_pc3_ok",
+        "_ump_slot_ready",
+        "_ump_write_bright"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:1000",
+      "end": "$C1:1FFF",
+      "emitted_bytes": 3164,
+      "functions": [
+        "_ump_set_unusable",
+        "CODE_JP_C1100F",
+        "CODE_JP_C1103D",
+        "BattleSys_SlotMenuReadyPredicate",
+        "BattleMsg_BlankLeadingZeros",
+        "BattleMenu_RefreshIfDirtyL",
+        "BattleMenu_RefreshIfDirtyAndTick",
+        "BattleMenu_DrawCursorSprites",
+        "BattleMenu_ProcessInput",
+        "BattleMenu_CycleActivePcPrev",
+        "BattleMenu_CycleActivePcNext",
+        "BattleMenu_CursorUp",
+        "BattleMenu_CursorDown",
+        "BattleMenu_ConfirmCommand",
+        "BattleMenu_ChooseAttack",
+        "BattleMenu_OpenTechList",
+        "BattleMenu_OpenItemList",
+        "BattleMenu_TechListInput",
+        "BattleMenu_TechConfirm",
+        "BattleMenu_TechListCancel",
+        "BattleMenu_TechListPrev",
+        "BattleMenu_TechListNext",
+        "BattleMenu_ItemListInput",
+        "BattleMenu_ItemConfirm",
+        "BattleMenu_ItemListCancel",
+        "BattleMenu_ItemCursorUp",
+        "BattleMenu_ItemCursorDown",
+        "BattleMenu_ItemListPageDown",
+        "BattleMenu_ItemListPageUp",
+        "BattleMenu_ItemListRefresh",
+        "BattleMenu_TargetSelectInput",
+        "BattleMenu_CommitAction",
+        "BattleMenu_ConsumePartnerSlot",
+        "BattleMenu_TargetNext",
+        "BattleMenu_TargetPrev",
+        "Battle_ClearPadEdges",
+        "BattleMenu_ItemListScrollUp",
+        "BattleMenu_ItemListScrollUp_SetScroll",
+        "BattleMenu_ItemListScrollUp_RenderTail",
+        "BattleMenu_ItemListScrollUp_SkipRender",
+        "BattleMenu_ItemListScrollDown",
+        "BattleMenu_ItemListScrollDown_RenderTail",
+        "BattleMenu_ItemListScrollDown_SkipRender",
+        "BattleMenu_UpdateCursorOverlay",
+        "BattleMenu_EnqueueReadyBattler",
+        "Battle_PlaySfx0",
+        "BattleMenu_DequeueReadyBattler",
+        "BattleMenu_RemoveBattlerFromReady",
+        "BattleMenu_LoadCommandWindowMap",
+        "BattleMenu_BuildTargetList",
+        "BattleTgt_RunAreaQuery",
+        "BattleTgt_AreaTable",
+        "BattleTgt_ModeTable"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:2000",
+      "end": "$C1:2FFF",
+      "emitted_bytes": 2109,
+      "functions": [
+        "BattleTgt_SingleAlly",
+        "BattleTgt_CollectValidTargets",
+        "BattleTgt_AllAllies",
+        "BattleTgt_SingleEnemy",
+        "BattleTgt_AllEnemies",
+        "BattleTgt_Everyone",
+        "BattleTgt_Self",
+        "BattleTgt_SingleKoAlly",
+        "BattleTgt_PcByCharId5",
+        "BattleTgt_FindPcByCharId",
+        "BattleTgt_PcByCharId4",
+        "BattleTgt_EnemyLineFromCaster",
+        "BattleTgt_EnemyLineFromChar3",
+        "BattleTgt_EnemyLineFromCaster2",
+        "BattleTgt_CasterRadius",
+        "BattleTgt_EnemyRadius",
+        "BattleTgt_Char3Radius",
+        "BattleTgt_Char6Radius",
+        "BattleTgt_EnemyRow",
+        "BattleTgt_PartyTriangle",
+        "BattleTgt_AreaRow",
+        "BattleTgt_AreaPartyTriangle",
+        "BattleTgt_AreaLine",
+        "BattleTgt_AreaCircle",
+        "BattleTgt_AreaAddAnchor",
+        "BattleTgt_CompactCandidates",
+        "BattleTgt_ClearLists",
+        "BattleTgt_SelectAllCandidates",
+        "BattleTgt_CycleNext",
+        "BattleTgt_CyclePrev",
+        "BattleTgt_AnyCandidate"
+      ]
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:3000",
+      "end": "$C1:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:4000",
+      "end": "$C1:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:5000",
+      "end": "$C1:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:6000",
+      "end": "$C1:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:7000",
+      "end": "$C1:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:8000",
+      "end": "$C1:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:9000",
+      "end": "$C1:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:A000",
+      "end": "$C1:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:B000",
+      "end": "$C1:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:C000",
+      "end": "$C1:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:D000",
+      "end": "$C1:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:E000",
+      "end": "$C1:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C1",
+      "start": "$C1:F000",
+      "end": "$C1:FFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:0000",
+      "end": "$FD:0FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:1000",
+      "end": "$FD:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:2000",
+      "end": "$FD:2FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:3000",
+      "end": "$FD:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:4000",
+      "end": "$FD:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:5000",
+      "end": "$FD:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:6000",
+      "end": "$FD:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:7000",
+      "end": "$FD:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:8000",
+      "end": "$FD:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:9000",
+      "end": "$FD:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:A000",
+      "end": "$FD:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:B000",
+      "end": "$FD:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:C000",
+      "end": "$FD:CFFF",
+      "emitted_bytes": 215,
+      "functions": [
+        "MainInit"
+      ]
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:D000",
+      "end": "$FD:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:E000",
+      "end": "$FD:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FD",
+      "start": "$FD:F000",
+      "end": "$FD:FFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    }
+  ]
+}
