@@ -85,9 +85,13 @@ includes the one before:
   with `XREF_FLAGS=--branches` and machine output with `--json`. Each hit is CONFIRMED (on an
   instruction boundary) or DOUBTFUL (inside another instruction's operand, or in data), and
   names the matched routine that contains it. Matched code is judged from the assembled source
-  (asar's address-to-line map); unmatched code by decoding forward from the 64 bytes before
-  the hit under each M/X start state and voting. The vote is a heuristic: read a CONFIRMED hit
-  in unmatched code before you rely on it.
+  (asar's address-to-line map). Unmatched code is judged first by decoding onward from matched
+  code (`flow`: branches, jumps, calls and matched jump tables, with M/X tracked through
+  REP/SEP, PHP/PLP and the exit widths of each routine called), and where that does not reach,
+  by decoding forward from the 64 bytes before the hit under each M/X start state and voting
+  (`sweep`). Both are heuristics: read a CONFIRMED hit in unmatched code before you rely on
+  it. The lint's CALLERS rule still uses the sweep alone (`--sweep-only` shows its verdicts);
+  `python3 tools/test_xref.py` checks the verdicts against known sites and the source.
 - `make lint` also checks routine headers (`HEADER`, `CALLERS`, see STYLE.md): Entry and Exit
   lines, and every CONFIRMED caller from xref accounted for. Write the `Callers:` line from
   `make xref` output; a reviewer then only judges whether the header is right, not whether it
