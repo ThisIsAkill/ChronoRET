@@ -2213,10 +2213,10 @@ C2Script_OpTable:
     dw C2Script_Return          ; $37
     dw C2Script_Wait            ; $38
     dw C2Script_WaitAnimating   ; $39
-    dw C2Script_WaitTaskFrames  ; $3A
-    dw C2Script_SoundUnk18C7    ; $3B
-    dw C2Script_SoundUnk18D0    ; $3C
-    dw C2Script_Unk18F1         ; $3D
+    dw C2Script_StopIfOlder     ; $3A
+    dw C2Script_SoundCmd18      ; $3B
+    dw C2Script_PlaySfx         ; $3C
+    dw C2Script_SoundCmd10IfClear ; $3D
     dw C2Script_DrawLayer       ; $3E
     dw C2Script_MoveToX         ; $3F
     dw C2Script_MoveToY         ; $40
@@ -2229,13 +2229,13 @@ C2Script_OpTable:
     dw C2Script_SubTaskByte     ; $47
     dw C2Script_AddRamByte      ; $48
     dw C2Script_SubRamByte      ; $49
-    dw C2Script_SoundUnk18F9    ; $4A
+    dw C2Script_SoundCmd10      ; $4A
     dw C2Script_SoundCmd        ; $4B
     dw C2Script_IfRamByteLess   ; $4C
     dw C2Script_IfRamByteGe     ; $4D
     dw C2Script_CallLong        ; $4E
     dw C2Script_CopyMapBlock    ; $4F
-    dw C2Script_Unk1BE0         ; $50
+    dw C2Script_DrawMetatile    ; $50
     dw C2Script_ScrollLayerFrames ; $51
     dw C2Script_End             ; $52
 
@@ -3777,6 +3777,1043 @@ C2Script_PanTakeY:
     RTS
 
 ; ============================================================
+; Scene script ops $33-$50, $52 ($C2:17D2–$C2:1C83)
+; ============================================================
+; The rest of the C2Script_OpTable handlers, in ROM order: VRAM queue,
+; calls, spawns, waits, sound commands, the layer redraw, moves to a
+; point, the list flags, byte arithmetic and the map block copy. They
+; are entered and return as the ops before them (see the banner at
+; C2Script_ResetTask); each header states its own entry state.
+
+; $C2:17D2 — C2Script_QueueVram (53 bytes, $17D2–$1806)
+; Op $33, 8 bytes: C2Anim_OpQueueVram's code on the script pointer: adds
+; a VRAM DMA to the queue the NMI flushes (C2Scene_VramQ at
+; C2Scene_VramQEnd): .Bank = arg 1, .Src = arg 2-3, .Dest = arg 4-5,
+; .Size = arg 6-7, .Vmain = VMAIN_IncAfterHigh, with C2Scene_VramQLock
+; held while the entry is written.
+; Quirk, kept: no check that the queue has room.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$30 here), DP=$0000 (the queue is direct page),
+;        DB=$00 (low WRAM: the .Bank byte is stored absolute through
+;        DB); C2Script_Ptr on the opcode
+; Exit:  M=0, X=0 (REP #$30); A = 8 (advance); X = the entry's offset, Y
+;        = 6; C2Scene_VramQEnd + 8; C2Scene_VramQLock = 0
+; No calls.
+C2Script_QueueVram:
+    SEP #$30
+    LDX.b !C2Scene_VramQEnd
+    INC.b !C2Scene_VramQLock
+    LDY.b #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_VramQ.Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.b C2Scene_VramQ.Vmain,X
+    REP #$20
+    LDY.b #2
+    LDA.b [!C2Script_Ptr],Y
+    STA.b C2Scene_VramQ.Src,X
+    LDY.b #4
+    LDA.b [!C2Script_Ptr],Y
+    STA.b C2Scene_VramQ.Dest,X
+    LDY.b #6
+    LDA.b [!C2Script_Ptr],Y
+    STA.b C2Scene_VramQ.Size,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #!C2Scene_VramQEntrySize
+    STA.b !C2Scene_VramQEnd
+    STZ.b !C2Scene_VramQLock
+    REP #$30
+    LDA.w #8
+    RTS
+
+; $C2:1807 — C2Script_CallNear (21 bytes, $1807–$181B)
+; Op $34, 3 bytes: calls the routine at arg 1-2 in bank $C2 (JSR to
+; .call, a JMP (C2Script_CallVec)) with M=1, then advances 3. The
+; routine returns with RTS; its carry and registers are dropped.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000 (C2Script_CallVec, C2Script_Ptr), DB any
+;        for this code (the called routine may need more); C2Script_Ptr
+;        on the opcode
+; Exit:  M=0, X=0; A = 3; X, Y and the rest as the called routine leaves
+;        them; C2Script_CallVec = arg 1-2
+; Calls: the routine at arg 1-2 (JMP (abs)).
+C2Script_CallNear:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_CallVec
+    SEP #$20
+    JSR .call
+    REP #$20
+    LDA.w #3
+    RTS
+.call:
+    JMP (!C2Script_CallVec)
+
+; $C2:181C — C2Script_CallLong (29 bytes, $181C–$1838)
+; Op $4E, 4 bytes: calls the routine at the long address arg 1-3 (JSL to
+; .call, a JML [C2Script_CallVec]) with M=1; it returns with RTL. Then
+; advances 4.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000 (C2Script_CallVec, C2Script_Ptr), DB any
+;        for this code; C2Script_Ptr on the opcode
+; Exit:  M=0, X=0; A = 4; X, Y and the rest as the called routine leaves
+;        them; C2Script_CallVec = arg 1-3
+; Calls: the routine at arg 1-3 (JML [abs]).
+C2Script_CallLong:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_CallVec
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_CallVec+2
+    JSL .call
+    REP #$20
+    LDA.w #4
+    RTS
+.call:
+    JML [!C2Script_CallVec]
+
+; $C2:1839 — C2Script_SpawnTask (15 bytes, $1839–$1847)
+; Op $35, 3 bytes: starts a task with handler arg 1-2 (an address in bank
+; $C2) in records 4-63 (C2Scene_TaskSpawn), which copies this task's
+; record from +$05 on.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = 3; X, Y as C2Scene_TaskSpawn leaves them;
+;        C2Tmp_08 = the handler
+; Calls: C2Scene_TaskSpawn.
+C2Script_SpawnTask:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    JSR C2Scene_TaskSpawn
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1848 — C2Script_Call (23 bytes, $1848–$185E)
+; Op $36, 3 bytes: a subroutine call in the script: .ScriptReturn = the
+; address of the next op, and the script continues at arg 1-2 (same
+; bank): C2Script_Ptr = arg - 1 and A = 1, which C2Scene_TaskRunScript
+; adds. There is one return slot, so calls do not nest.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = 1; X = the task, Y = 1; C2Script_Ptr = arg - 1
+; No calls.
+C2Script_Call:
+    LDX.b !C2Scene_TaskCur
+    LDA.b !C2Script_Ptr
+    CLC
+    ADC.w #3
+    STA.w C2Scene_Task.ScriptReturn,X
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    DEC A
+    STA.b !C2Script_Ptr
+    LDA.w #1
+    RTS
+
+; $C2:185F — C2Script_Return (12 bytes, $185F–$186A)
+; Op $37, 1 byte: returns from C2Script_Call: the script continues at
+; .ScriptReturn (C2Script_Ptr = it - 1, A = 1).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = 1; X = the task
+; No calls.
+C2Script_Return:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptReturn,X
+    DEC A
+    STA.b !C2Script_Ptr
+    LDA.w #1
+    RTS
+
+; $C2:186B — C2Script_Wait (35 bytes, $186B–$188D)
+; Op $38, 2 bytes: waits arg 1 frames, counted in .ScriptWait as
+; C2Script_MoveFrames counts: 0 loads it with arg 1 and stops, then -1
+; per frame; at 0 it advances 2. Arg 1 = 0 waits for good.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = 2 (advance) or 0 (Z=1, C=0: wait)
+; No calls.
+C2Script_Wait:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptWait,X
+    BNE .count
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.ScriptWait,X
+    BRA .wait
+.count:
+    DEC.w C2Scene_Task.ScriptWait,X
+    BNE .wait
+    REP #$20
+    LDA.w #2
+    RTS
+.wait:
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:188E — C2Script_WaitAnimating (38 bytes, $188E–$18B3)
+; Op $39, 2 bytes: C2Script_Wait, running the task's animation
+; (C2Anim_Run) on each frame it waits.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  advance: M=0, X=0, A = 2, X = the task. Wait: M=0, X=0, A = 0
+;        (Z=1), C=0 (the animation's carry is dropped); X, Y as
+;        C2Anim_Run leaves them
+; Calls: C2Anim_Run.
+C2Script_WaitAnimating:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.ScriptWait,X
+    BNE .count
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.ScriptWait,X
+    BRA .wait
+.count:
+    DEC.w C2Scene_Task.ScriptWait,X
+    BNE .wait
+    REP #$20
+    LDA.w #2
+    RTS
+.wait:
+    JSR C2Anim_Run
+    REP #$20
+    TDC
+    CLC
+    RTS
+
+; $C2:18B4 — C2Script_StopIfOlder (19 bytes, $18B4–$18C6)
+; Op $3A, 3 bytes: compares arg 1-2 with the task's age (.Frames, +1
+; per frame it has run). While .Frames <= arg it advances 3 at once;
+; once .Frames > arg it stops here (A = 0). The task still returns C=0,
+; so C2Scene_TaskRunAll keeps adding 1 to the 16-bit .Frames; it stays
+; stopped until .Frames wraps to 0, and then advances. Why a script would want this is not
+; traced.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task, Y = 1; A = 3 (advance) or 0 (Z=1, C=0)
+; No calls.
+C2Script_StopIfOlder:
+    LDX.b !C2Scene_TaskCur
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    CMP.w C2Scene_Task.Frames,X
+    BCC .stop
+    LDA.w #3
+    RTS
+.stop:
+    TDC
+    CLC
+    RTS
+
+; $C2:18C7 — C2Script_SoundCmd18 (9 bytes, $18C7–$18CF)
+; Op $3B, 3 bytes: C2Script_PlaySfx with sound command C2Scene_SoundCmd18
+; instead of Audio_CmdPlaySfx: it sets the command byte and branches to
+; C2Script_PlaySfx_SetArgs.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_PlaySfx (M=0, X=0, DP=$0000, DB=$00)
+; Calls: C2Scene_QueueSoundCmd (through C2Script_PlaySfx_SetArgs).
+C2Script_SoundCmd18:
+    SEP #$20
+    LDA.b #!C2Scene_SoundCmd18
+    STA.w !C2Scene_SoundCmdBuf
+    BRA C2Script_PlaySfx_SetArgs
+
+; $C2:18D0 — C2Script_PlaySfx (33 bytes, $18D0–$18F0)
+; Op $3C, 3 bytes: queues sound command Audio_CmdPlaySfx with arg 1 and
+; arg 2 as its first two argument bytes (the third is left as it was) at
+; rank 0 (C2Scene_QueueSoundCmd: it replaces any queued command unless
+; one is being sent; the refusal is not checked). C2Script_SoundCmd18
+; enters at the sub-entry C2Script_PlaySfx_SetArgs with its own command
+; byte.
+; Callers: none direct (C2Script_OpTable); C2Script_PlaySfx_SetArgs: BRA
+;   from C2Script_SoundCmd18 ($C2:18CE).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
+;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
+;        the opcode. C2Script_PlaySfx_SetArgs: the same with M=1 and the
+;        command byte stored
+; Exit:  M=0, X=0; A = 3; Y = 2; C as C2Scene_QueueSoundCmd leaves it;
+;        C2Scene_SoundCmdBuf bytes 0-2 and C2Scene_SoundCmdPrio = 0 set
+; Calls: C2Scene_QueueSoundCmd.
+C2Script_PlaySfx:
+    SEP #$20
+    LDA.b #!Audio_CmdPlaySfx
+    STA.w !C2Scene_SoundCmdBuf
+C2Script_PlaySfx_SetArgs:       ; header: see C2Script_PlaySfx
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+1
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+2
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:18F1 — C2Script_SoundCmd10IfClear (8 bytes, $18F1–$18F8)
+; Op $3D, 2 bytes: C2Script_SoundCmd10 unless C2Scene_Unk7F01ED is
+; non-zero: then it branches to C2Script_SoundCmd10_Done, which only
+; advances 2. Otherwise it falls into C2Script_SoundCmd10.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM; the flag
+;        is read long); C2Script_Ptr on the opcode
+; Exit:  as C2Script_SoundCmd10 (skipped: M=0, X=0, A = 2)
+; Calls: C2Scene_QueueSoundCmd (through C2Script_SoundCmd10).
+C2Script_SoundCmd10IfClear:
+    SEP #$20
+    LDA.l !C2Scene_Unk7F01ED
+    BNE C2Script_SoundCmd10_Done
+
+; $C2:18F9 — C2Script_SoundCmd10 (38 bytes, $18F9–$191E)
+; Op $4A, 2 bytes: queues sound command C2Scene_SoundCmd10 with arg 1
+; and C2Scene_SoundArgUnused ($FF) as its other two argument bytes, at
+; rank 0 (C2Scene_QueueSoundCmd), and also stores arg 1 in
+; C2Scene_Unk02AE (which C2Scene_LoadScene fills from Menu_Config+$1E:
+; probably the scene's current music, unverified). The sub-entry
+; C2Script_SoundCmd10_Done (the advance) is where
+; C2Script_SoundCmd10IfClear skips to.
+; Callers: none direct (C2Script_OpTable); C2Script_SoundCmd10_Done:
+;   BNE from C2Script_SoundCmd10IfClear ($C2:18F7).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
+;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
+;        the opcode. C2Script_SoundCmd10_Done: M=1
+; Exit:  M=0, X=0; A = 2; Y = 1 (not when skipped); C as
+;        C2Scene_QueueSoundCmd leaves it
+; Calls: C2Scene_QueueSoundCmd.
+C2Script_SoundCmd10:
+    SEP #$20
+    LDA.b #!C2Scene_SoundCmd10
+    STA.w !C2Scene_SoundCmdBuf
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+1
+    STA.w !C2Scene_Unk02AE
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+2
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+C2Script_SoundCmd10_Done:       ; header: see C2Script_SoundCmd10
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:191F — C2Script_SoundCmd (40 bytes, $191F–$1946)
+; Op $4B, 5 bytes: queues the sound command arg 1 with argument bytes arg
+; 2-4, at rank 0 (C2Scene_QueueSoundCmd).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Script_Ptr), DB=$00 (low
+;        WRAM: the sound buffer and the driver block); C2Script_Ptr on
+;        the opcode
+; Exit:  M=0, X=0; A = 5; Y = 4; C as C2Scene_QueueSoundCmd leaves it
+; Calls: C2Scene_QueueSoundCmd.
+C2Script_SoundCmd:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+1
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+2
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+    REP #$20
+    LDA.w #5
+    RTS
+
+; $C2:1947 — C2Script_DrawLayer (18 bytes, $1947–$1958)
+; Op $3E, 2 bytes: redraws BG layer arg 1 from its map
+; (C2Scene_DrawBgLayer), e.g. after C2Script_SetMapCell. That redraw
+; DMAs straight to VRAM, so it relies on running in vblank (the script
+; tasks run from the NMI).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_DrawBgLayer's work
+;        area), DB=$00 (low WRAM; C2Scene_DrawBgLayer sets and restores
+;        its own); C2Script_Ptr on the opcode; vblank
+; Exit:  M=0, X=0; A = 2; X, Y clobbered; C2Tmp_00-$1B changed, the
+;        layer's scroll shadows set, DMA channel 7 registers changed
+;        (C2Scene_DrawBgLayer)
+; Calls: C2Scene_DrawBgLayer.
+C2Script_DrawLayer:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Scene_DrawLayer
+    JSR C2Scene_DrawBgLayer
+    REP #$20
+    LDA.w #2
+    RTS
+
+; $C2:1959 — C2Script_MoveToX (105 bytes, $1959–$19C1)
+; Op $3F, 5 bytes: moves the task along X until .SprX = arg 1-2, at the
+; speed of its X velocity. The first frame (.OpState 0, then 1) stores
+; the target in .OpTarget, turns the velocity toward it (C2Scene_NegateXVel
+; when its sign points away: negative for a target left of .SprX,
+; positive otherwise) and starts animation arg 3 (going left) or arg 4
+; (going right) (C2Scene_SetAnim). Each frame, the first included: if
+; .SprX equals the target it advances 5; else .XFrac/.SprX += the
+; velocity, C2Scene_WrapTaskPos, C2Anim_Run, and it stops for the frame.
+; Quirk, kept: only an exact hit ends it. A speed that steps past the
+; target keeps going, around the wrapped map, until some step lands on
+; it, and a velocity of 0 never arrives.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM: the task
+;        record); C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  arrived: M=0, X=0, A = 5, X = the task. Moving: M=0, X=0, A = 0
+;        (Z=1), C=0; X, Y as C2Anim_Run leaves them
+; Calls: C2Scene_NegateXVel, C2Scene_SetAnim, C2Scene_WrapTaskPos,
+;   C2Anim_Run.
+C2Script_MoveToX:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.OpState,X
+    BNE .step
+    INC.w C2Scene_Task.OpState,X
+    REP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.OpTarget,X
+    CMP.w C2Scene_Task.SprX,X
+    BCS .right
+    LDA.w C2Scene_Task.XVel,X
+    BMI .anim_left
+    JSR C2Scene_NegateXVel
+.anim_left:
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_SetAnim
+    BRA .step
+.right:
+    LDA.w C2Scene_Task.XVel,X
+    BPL .anim_right
+    JSR C2Scene_NegateXVel
+.anim_right:
+    LDY.w #4
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_SetAnim
+.step:
+    REP #$20
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w C2Scene_Task.OpTarget,X
+    BEQ .arrived
+    CLC
+    LDA.w C2Scene_Task.XFrac,X
+    ADC.w C2Scene_Task.XVelFrac,X
+    STA.w C2Scene_Task.XFrac,X
+    LDA.w C2Scene_Task.SprX,X
+    ADC.w C2Scene_Task.XVel,X
+    STA.w C2Scene_Task.SprX,X
+    JSR C2Scene_WrapTaskPos
+    JSR C2Anim_Run
+    REP #$20
+    TDC
+    CLC
+    RTS
+.arrived:
+    LDA.w #5
+    RTS
+
+; $C2:19C2 — C2Script_MoveToY (105 bytes, $19C2–$1A2A)
+; Op $40, 5 bytes: C2Script_MoveToX along Y: target .SprY = arg 1-2,
+; C2Scene_NegateYVel, animation arg 3 when going up (target above .SprY)
+; and arg 4 when going down; .YFrac/.SprY += the Y velocity. The same
+; exact-hit quirk.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000, DB=$00 (low WRAM: the task
+;        record); C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  arrived: M=0, X=0, A = 5, X = the task. Moving: M=0, X=0, A = 0
+;        (Z=1), C=0; X, Y as C2Anim_Run leaves them
+; Calls: C2Scene_NegateYVel, C2Scene_SetAnim, C2Scene_WrapTaskPos,
+;   C2Anim_Run.
+C2Script_MoveToY:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.OpState,X
+    BNE .step
+    INC.w C2Scene_Task.OpState,X
+    REP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    STA.w C2Scene_Task.OpTarget,X
+    CMP.w C2Scene_Task.SprY,X
+    BCS .down
+    LDA.w C2Scene_Task.YVel,X
+    BMI .anim_up
+    JSR C2Scene_NegateYVel
+.anim_up:
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_SetAnim
+    BRA .step
+.down:
+    LDA.w C2Scene_Task.YVel,X
+    BPL .anim_down
+    JSR C2Scene_NegateYVel
+.anim_down:
+    LDY.w #4
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_SetAnim
+.step:
+    REP #$20
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w C2Scene_Task.OpTarget,X
+    BEQ .arrived
+    CLC
+    LDA.w C2Scene_Task.YFrac,X
+    ADC.w C2Scene_Task.YVelFrac,X
+    STA.w C2Scene_Task.YFrac,X
+    LDA.w C2Scene_Task.SprY,X
+    ADC.w C2Scene_Task.YVel,X
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_WrapTaskPos
+    JSR C2Anim_Run
+    REP #$20
+    TDC
+    CLC
+    RTS
+.arrived:
+    LDA.w #5
+    RTS
+
+; $C2:1A2B — C2Script_Halt2 (2 bytes, $1A2B–$1A2C)
+; Op $41, 1 byte: the same code as C2Script_Halt (op $06): stops (A = 0,
+; Z=1) without advancing, every frame; the task stays.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000 (TDC loads 0), DB any (no data accesses)
+; Exit:  M=0, X=0; A = 0
+; No calls.
+C2Script_Halt2:
+    TDC
+    RTS
+
+; $C2:1A2D — C2Script_SpawnScriptLow (22 bytes, $1A2D–$1A42)
+; Op $43, 4 bytes: C2Script_SpawnScript in records 0-3: starts a script
+; task (C2Scene_TaskSpawnScriptLow) on the script at arg 1-2 in bank
+; arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = 4; X = the new record; Y as C2Scene_TaskSpawn
+;        leaves it; C2Tmp_01, C2Tmp_08 and C2Tmp_0A changed
+; Calls: C2Scene_TaskSpawnScriptLow.
+C2Script_SpawnScriptLow:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    JSR C2Scene_TaskSpawnScriptLow
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1A43 — C2Script_SpawnTaskLow (15 bytes, $1A43–$1A51)
+; Op $42, 3 bytes: C2Script_SpawnTask in records 0-3
+; (C2Scene_TaskSpawnLow): handler arg 1-2.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (low WRAM: the task records);
+;        C2Script_Ptr on the opcode, C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = 3; X, Y as C2Scene_TaskSpawnLow leaves them;
+;        C2Tmp_08 = the handler
+; Calls: C2Scene_TaskSpawnLow.
+C2Script_SpawnTaskLow:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    JSR C2Scene_TaskSpawnLow
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1A52 — C2Script_SetListBit7 (30 bytes, $1A52–$1A6F)
+; Op $44, 3 bytes: sets C2Scene_ListEntryBit7 in the first byte of entry
+; arg 2 of list arg 1 (0 = C2Scene_ListA, 1 = ListB, 2 = ListC: the
+; helper in C2Script_ListEntryTable leaves the entry's address in
+; C2Tmp_10/$11; this adds bank $7E). What the bit means is not traced.
+; Quirk, kept: the list number is not checked; 3 or more jumps through
+; the code after the table.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00, C2Tmp_10-$12),
+;        DB any (the entry is reached long); C2Script_Ptr on the opcode;
+;        A's high byte 0 (the helpers use the entry number as 16 bits:
+;        true from C2Scene_TaskRunScript, whose A is the opcode * 2)
+; Exit:  M=0, X=0; A = 3; X = list * 2, Y = 2; C2Tmp_00/$01 = the entry
+;        number, C2Tmp_10-$12 = the entry's address
+; Calls: C2Script_ListAEntry, C2Script_ListBEntry or C2Script_ListCEntry
+;   (JSR (C2Script_ListEntryTable,X)).
+!C2Script_ListIndex = !C2Tmp_00         ; 16-bit entry number (the helpers' scratch)
+!C2Script_ListEntry = !C2Tmp_10         ; 24-bit address of the entry
+C2Script_SetListBit7:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    ASL A
+    TAX
+    JSR (C2Script_ListEntryTable,X)
+    SEP #$20
+    LDA.b #!Bank7E
+    STA.b !C2Script_ListEntry+2
+    LDA.b [!C2Script_ListEntry]
+    ORA.b #!C2Scene_ListEntryBit7
+    STA.b [!C2Script_ListEntry]
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1A70 — C2Script_ListEntryTable (3 words, $1A70–$1A75)
+; The helper per list number (C2Script_SetListBit7 and
+; C2Script_ClearListBit7: JSR (T,X) with X = the list * 2).
+C2Script_ListEntryTable:
+    dw C2Script_ListAEntry      ; 0: C2Scene_ListA
+    dw C2Script_ListBEntry      ; 1: C2Scene_ListB
+    dw C2Script_ListCEntry      ; 2: C2Scene_ListC
+
+; $C2:1A76 — C2Script_ListAEntry (20 bytes, $1A76–$1A89)
+; C2Tmp_10/$11 = the 16-bit address of entry arg 2 of C2Scene_ListA
+; (entry * 7, as entry * 8 - entry, + the list).
+; Callers: none direct (C2Script_ListEntryTable).
+; Entry: M=1, X=0, DP=$0000, DB any; Y = 1 (on arg 1), C2Script_Ptr on
+;        the opcode; A's high byte 0
+; Exit:  M=0, X=0; A = the address; Y = 2; C2Tmp_00/$01 = the entry
+;        number; X unchanged
+; No calls.
+C2Script_ListAEntry:
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    STA.b !C2Script_ListIndex
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !C2Script_ListIndex
+    CLC
+    ADC.w #!C2Scene_ListA&$FFFF
+    STA.b !C2Script_ListEntry
+    RTS
+
+; $C2:1A8A — C2Script_ListBEntry (17 bytes, $1A8A–$1A9A)
+; C2Tmp_10/$11 = the address of entry arg 2 of C2Scene_ListB (entry * 3
+; + the list).
+; Callers: none direct (C2Script_ListEntryTable).
+; Entry/Exit: as C2Script_ListAEntry (M=1, X=0, DP=$0000, DB any on
+;        entry; M=0, X=0 on exit)
+; No calls.
+C2Script_ListBEntry:
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    STA.b !C2Script_ListIndex
+    ASL A
+    ADC.b !C2Script_ListIndex
+    CLC
+    ADC.w #!C2Scene_ListB&$FFFF
+    STA.b !C2Script_ListEntry
+    RTS
+
+; $C2:1A9B — C2Script_ListCEntry (17 bytes, $1A9B–$1AAB)
+; C2Tmp_10/$11 = the address of entry arg 2 of C2Scene_ListC (entry * 3
+; + the list).
+; Callers: none direct (C2Script_ListEntryTable).
+; Entry/Exit: as C2Script_ListAEntry (M=1, X=0, DP=$0000, DB any on
+;        entry; M=0, X=0 on exit)
+; No calls.
+C2Script_ListCEntry:
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    STA.b !C2Script_ListIndex
+    ASL A
+    ADC.b !C2Script_ListIndex
+    CLC
+    ADC.w #!C2Scene_ListC&$FFFF
+    STA.b !C2Script_ListEntry
+    RTS
+
+; $C2:1AAC — C2Script_ClearListBit7 (30 bytes, $1AAC–$1AC9)
+; Op $45, 3 bytes: C2Script_SetListBit7, clearing the bit instead.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00, C2Tmp_10-$12),
+;        DB any (the entry is reached long); C2Script_Ptr on the opcode;
+;        A's high byte 0 (as C2Script_SetListBit7)
+; Exit:  as C2Script_SetListBit7
+; Calls: C2Script_ListAEntry, C2Script_ListBEntry or C2Script_ListCEntry
+;   (JSR (C2Script_ListEntryTable,X)).
+C2Script_ClearListBit7:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    ASL A
+    TAX
+    JSR (C2Script_ListEntryTable,X)
+    SEP #$20
+    LDA.b #!Bank7E
+    STA.b !C2Script_ListEntry+2
+    LDA.b [!C2Script_ListEntry]
+    AND.b #!C2Scene_ListEntryBit7^$FF
+    STA.b [!C2Script_ListEntry]
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1ACA — C2Script_AddTaskByte (23 bytes, $1ACA–$1AE0)
+; Op $46, 3 bytes: task byte arg 1 += arg 2 (8-bit, wrapping).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
+;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TXY
+;        copy all 16 bits); C2Script_Ptr on the opcode, C2Scene_TaskCur =
+;        the task
+; Exit:  M=0, X=0; A = 3; X = Y = arg 1
+; No calls.
+C2Script_AddTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    TXY
+    CLC
+    ADC.b (!C2Scene_TaskCur),Y
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1AE1 — C2Script_SubTaskByte (26 bytes, $1AE1–$1AFA)
+; Op $47, 3 bytes: task byte arg 1 -= arg 2 (8-bit, wrapping).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM: (C2Scene_TaskCur),Y reaches the record through DB);
+;        B=0 (A = the opcode x 2 from C2Scene_TaskRunScript; the TAX/TAY
+;        copy all 16 bits); C2Script_Ptr on the opcode, C2Scene_TaskCur =
+;        the task
+; Exit:  M=0, X=0; A = 3; X = Y = arg 1
+; No calls.
+C2Script_SubTaskByte:
+    SEP #$20
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    TAY
+    LDA.b (!C2Scene_TaskCur),Y
+    LDY.w #2
+    SEC
+    SBC.b [!C2Script_Ptr],Y
+    TXY
+    STA.b (!C2Scene_TaskCur),Y
+    REP #$20
+    LDA.w #3
+    RTS
+
+; $C2:1AFB — C2Script_AddRamByte (26 bytes, $1AFB–$1B14)
+; Op $48, 4 bytes: RAM byte at arg 1-2 (through DB) += arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000 (C2Script_Ptr), DB=$00 (the address is
+;        absolute: low WRAM or I/O); C2Script_Ptr on the opcode
+; Exit:  M=0, X=0; A = 4; X = arg 1-2, Y = 3
+; No calls.
+C2Script_AddRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    SEP #$20
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    CLC
+    ADC.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1B15 — C2Script_SubRamByte (26 bytes, $1B15–$1B2E)
+; Op $49, 4 bytes: RAM byte at arg 1-2 (through DB) -= arg 3.
+; Callers: none direct (C2Script_OpTable).
+; Entry/Exit: as C2Script_AddRamByte (M=0, X=0, DP=$0000, DB=$00 on
+;        entry; M=0, X=0, A = 4, X = arg 1-2, Y = 3 on exit)
+; No calls.
+C2Script_SubRamByte:
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    TAX
+    LDY.w #3
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    SEC
+    SBC.b [!C2Script_Ptr],Y
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.w #4
+    RTS
+
+; $C2:1B2F — C2Script_CopyMapBlock (177 bytes, $1B2F–$1BDF)
+; Op $4F, 9 bytes: copies a block of metatile numbers from one BG layer
+; map to another place (C2Scene_BgMaps, bank $7E; 96 bytes per row):
+; source layer arg 1 at column arg 2, row arg 3; destination layer arg 4
+; at column arg 5, row arg 6; arg 7 bytes wide, arg 8 rows high. Layer 1
+; is C2Scene_BgMaps, any other value layer 2's map after it (it does not
+; use C2Scene_LayerMaps). Rows are read through C2Tmp_10 (long) and
+; written through WMADD/WMDATA. Only the maps change; the screen is
+; redrawn elsewhere (C2Script_DrawLayer).
+; Quirk, kept: a width or height of 0 copies 256 (DEC/BNE). No wrap at
+; the map's edge: a block past column 95 runs into the next row.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00-$15), DB=$00
+;        (WRMPYA/WRMPYB/RDMPYL, WMADD/WMDATA); C2Script_Ptr on the
+;        opcode
+; Exit:  M=0, X=0; A = 9; X = the last row's destination, Y = the width;
+;        C2Tmp_00-$02 and C2Tmp_10-$15 changed; WMADD changed
+; No calls.
+!C2Script_BlockWidth = !C2Tmp_00        ; bytes per row (arg 7)
+!C2Script_BlockRows = !C2Tmp_01         ; rows left (arg 8)
+!C2Script_BlockCount = !C2Tmp_02        ; bytes left in this row
+!C2Script_BlockSrc = !C2Tmp_10          ; 24-bit source row (bank $7E)
+!C2Script_BlockDest = !C2Tmp_13         ; 16-bit destination row (bank $7E, by WMADD; +2 is set to $7E but unused)
+C2Script_CopyMapBlock:
+    SEP #$20
+    TDC
+    LDA.b #!Bank7E
+    STA.b !C2Script_BlockSrc+2
+    STA.b !C2Script_BlockDest+2
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    CMP.b #1
+    BNE .src_layer2
+    LDX.w #!C2Scene_BgMaps&$FFFF
+    BRA .src
+.src_layer2:
+    LDX.w #(!C2Scene_BgMaps&$FFFF)+!C2Scene_MapBytes
+.src:
+    STX.b !C2Script_BlockSrc
+    LDY.w #3
+    LDA.b [!C2Script_Ptr],Y
+    STA.w WRMPYA
+    LDA.b #!C2Scene_MapCols
+    STA.w WRMPYB
+    DEY
+    CLC
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    ADC.w RDMPYL
+    CLC
+    ADC.b !C2Script_BlockSrc
+    STA.b !C2Script_BlockSrc
+    SEP #$20
+    TDC
+    LDY.w #4
+    LDA.b [!C2Script_Ptr],Y
+    CMP.b #1
+    BNE .dest_layer2
+    LDX.w #!C2Scene_BgMaps&$FFFF
+    BRA .dest
+.dest_layer2:
+    LDX.w #(!C2Scene_BgMaps&$FFFF)+!C2Scene_MapBytes
+.dest:
+    STX.b !C2Script_BlockDest
+    LDY.w #6
+    LDA.b [!C2Script_Ptr],Y
+    STA.w WRMPYA
+    LDA.b #!C2Scene_MapCols
+    STA.w WRMPYB
+    DEY
+    CLC
+    LDA.b [!C2Script_Ptr],Y
+    REP #$20
+    ADC.w RDMPYL
+    CLC
+    ADC.b !C2Script_BlockDest
+    STA.b !C2Script_BlockDest
+    SEP #$20
+    TDC
+    LDY.w #7
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_BlockWidth
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    STA.b !C2Script_BlockRows
+.row:
+    LDA.b !C2Script_BlockWidth
+    STA.b !C2Script_BlockCount
+    LDX.b !C2Script_BlockDest
+    STX.w WMADDL
+    LDA.b #!Bank7E
+    STA.w WMADDH
+    LDY.w #0
+.byte:
+    LDA.b [!C2Script_BlockSrc],Y
+    STA.w WMDATA
+    INY
+    DEC.b !C2Script_BlockCount
+    BNE .byte
+    REP #$20
+    CLC
+    LDA.b !C2Script_BlockSrc
+    ADC.w #!C2Scene_MapCols
+    STA.b !C2Script_BlockSrc
+    CLC
+    LDA.b !C2Script_BlockDest
+    ADC.w #!C2Scene_MapCols
+    STA.b !C2Script_BlockDest
+    TDC
+    SEP #$20
+    DEC.b !C2Script_BlockRows
+    BNE .row
+    REP #$20
+    LDA.w #!C2Script_CopyMapBlockLen
+    RTS
+
+; $C2:1BE0 — C2Script_DrawMetatile (161 bytes, $1BE0–$1C80)
+; Op $50, 5 bytes: draws metatile arg 4 at cell (column arg 2, row arg
+; 3) of BG layer arg 1's tilemap in VRAM, by queuing two VRAM DMAs of
+; C2Scene_MetatileRowBytes each (C2Scene_VramQ): the metatile's top row
+; (two tile words) to the cell's tilemap address and its bottom row to
+; the tilemap row below. The source is the layer's metatile set in bank
+; $7E (C2Scene_Metatiles, + C2Scene_MetatileSetBytes for layer 2) + the
+; metatile * 8; the destination is the BG1 or BG2 map
+; (C2Scene_Bg1MapVram / Bg2MapVram) + (row * 2 AND $1F) * 32 + (column *
+; 2 AND $1F), + Bg_ScreenWords when column * 2 has bit 5 set (the right
+; 32x32 screen). Layer 1 picks the BG1 set, any other value BG2. The map
+; bytes are not changed (C2Script_SetMapCell does that).
+; Quirk, kept: no check that the queue has room.
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0 (SEP #$20 here), DP=$0000 (C2Tmp_00-$02, C2Tmp_10-$14,
+;        the queue), DB=$00 (low WRAM: the entries' .Bank bytes are stored
+;        absolute through DB); C2Script_Ptr on the opcode
+; Exit:  M=0, X=0 (REP #$30); A = 5; X = the first entry's offset, Y =
+;        4; C2Scene_VramQEnd + 16; C2Scene_VramQLock = 0; C2Tmp_00-$03,
+;        C2Tmp_10/$11 and C2Tmp_13/$14 changed
+; No calls.
+!C2Script_TileCol = !C2Tmp_00           ; 16-bit tile column 0-63 (column * 2 AND $3F)
+!C2Script_ScreenCol = !C2Tmp_02         ; 16-bit tile column within the screen
+!C2Script_TileSrc = !C2Tmp_10           ; 16-bit address of the metatile (bank $7E)
+!C2Script_TileVram = !C2Tmp_13          ; 16-bit VRAM word address of the cell
+C2Script_DrawMetatile:
+    SEP #$20
+    TDC
+    LDY.w #1
+    LDA.b [!C2Script_Ptr],Y
+    CMP.b #1
+    BNE .layer2
+    LDX.w #!C2Scene_Metatiles&$FFFF
+    LDY.w #!C2Scene_Bg1MapVram
+    BRA .cell
+.layer2:
+    LDX.w #(!C2Scene_Metatiles&$FFFF)+!C2Scene_MetatileSetBytes
+    LDY.w #!C2Scene_Bg2MapVram
+.cell:
+    STX.b !C2Script_TileSrc
+    STY.b !C2Script_TileVram
+    LDY.w #2
+    LDA.b [!C2Script_Ptr],Y
+    ASL A
+    AND.b #!C2Scene_TileColMask
+    STA.b !C2Script_TileCol
+    STZ.b !C2Script_TileCol+1
+    AND.b #!C2Scene_ScreenTileMask
+    STA.b !C2Script_ScreenCol
+    STZ.b !C2Script_ScreenCol+1
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    ASL A
+    AND.b #!C2Scene_ScreenTileMask
+    REP #$20
+    ASL A                       ; row * 32 (C=0 after: the value is < $400)
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Script_TileVram
+    CLC
+    ADC.b !C2Script_ScreenCol
+    STA.b !C2Script_TileVram
+    LDA.b !C2Script_TileCol
+    BIT.w #!C2Scene_MapScreenCols
+    BEQ .left_screen
+    CLC
+    LDA.b !C2Script_TileVram
+    ADC.w #!Bg_ScreenWords
+    STA.b !C2Script_TileVram
+.left_screen:
+    INY
+    LDA.b [!C2Script_Ptr],Y
+    AND.w #!Eng_LowByteMask
+    ASL A                       ; metatile * 8 (C=0 after)
+    ASL A
+    ASL A
+    ADC.b !C2Script_TileSrc
+    STA.b !C2Script_TileSrc
+    SEP #$30
+    LDX.b !C2Scene_VramQEnd
+    INC.b !C2Scene_VramQLock
+    LDA.b #!Bank7E
+    STA.w C2Scene_VramQ.Bank,X
+    STA.w C2Scene_VramQ[1].Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.b C2Scene_VramQ.Vmain,X
+    STA.b C2Scene_VramQ[1].Vmain,X
+    REP #$20
+    LDA.b !C2Script_TileSrc
+    STA.b C2Scene_VramQ.Src,X
+    CLC
+    ADC.w #!C2Scene_MetatileRowBytes
+    STA.b C2Scene_VramQ[1].Src,X
+    LDA.b !C2Script_TileVram
+    STA.b C2Scene_VramQ.Dest,X
+    CLC
+    ADC.w #!C2Scene_TileRowWords
+    STA.b C2Scene_VramQ[1].Dest,X
+    LDA.w #!C2Scene_MetatileRowBytes
+    STA.b C2Scene_VramQ.Size,X
+    STA.b C2Scene_VramQ[1].Size,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #(2*!C2Scene_VramQEntrySize)
+    STA.b !C2Scene_VramQEnd
+    STZ.b !C2Scene_VramQLock
+    REP #$30
+    LDA.w #5
+    RTS
+
+; $C2:1C81 — C2Script_End (3 bytes, $1C81–$1C83)
+; Op $52, 1 byte: stops (A = 0, Z=1) with C=1, which ends the task when
+; C2Scene_TaskRunScript is its handler (C2Scene_TaskRunAll frees it).
+; Callers: none direct (C2Script_OpTable).
+; Entry: M=0, X=0, DP=$0000 (TDC loads 0), DB any (no data accesses)
+; Exit:  M=0, X=0; A = 0, C=1
+; No calls.
+C2Script_End:
+    TDC
+    SEC
+    RTS
+
+; ============================================================
 ; Scene task motion helpers ($C2:1C84–$C2:1CF4)
 ; ============================================================
 ; Used by the script ops (C2Script_MoveFrames, C2Script_MoveToX/Y) and by
@@ -3883,6 +4920,163 @@ C2Scene_SetAnim:
     RTS
 
 ; ============================================================
+; Scene tile upload task ($C2:1CF5–$C2:1DB4)
+; ============================================================
+; Started by script op $03 (C2Script_SpawnUnk1CF5). It reads the op's 9
+; argument bytes through the script pointer it copied from the spawner
+; (the pointer still on the op) and uploads a block to VRAM through the
+; queue (C2Scene_VramQ), a part per frame. Its record is laid out as
+; C2Scene_UploadTask.
+
+; $C2:1CF5 — C2Scene_TaskUnk1CF5 (13 bytes, $1CF5–$1D01)
+; Task handler: runs the state in .State (C2Scene_UploadTask; the record's
+; .Unk02, 0 from C2Scene_TaskSpawn) through C2Scene_UploadTileStates: 0
+; C2Scene_UploadTilesStart, 1 C2Scene_UploadTilesStep.
+; Callers: none direct; the handler C2Script_SpawnUnk1CF5 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1 (REP #$20 here), X=0 with X = the task, DP=$0000, DB=$00
+;        (low WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=0, X=0; C=1 when the upload is done, which ends
+;        the task)
+; Calls: C2Scene_UploadTilesStart or C2Scene_UploadTilesStep (JMP
+;   (C2Scene_UploadTileStates,X)).
+C2Scene_TaskUnk1CF5:
+    REP #$20
+    LDA.w C2Scene_UploadTask.State,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JMP (C2Scene_UploadTileStates,X)
+
+; $C2:1D02 — C2Scene_UploadTileStates (2 words, $1D02–$1D05)
+; The state handlers of C2Scene_TaskUnk1CF5 (JMP (T,X) with X = .State * 2).
+C2Scene_UploadTileStates:
+    dw C2Scene_UploadTilesStart     ; 0
+    dw C2Scene_UploadTilesStep      ; 1
+
+; $C2:1D06 — C2Scene_UploadTilesStart (70 bytes, $1D06–$1D4B)
+; State 0: sets .State to 1 (a 16-bit INC, so +$03 would take a carry; it
+; never does), then copies op $03's arguments from the spawning op
+; (.OpPtr): .Src = arg 1-2, .SrcBank = arg 3, .Dest = arg 4-5 (a VRAM
+; word address), .PerFrame = arg 6-7 and .Left = arg 8-9 (both in 32-byte
+; units: probably 8x8 4-bit tiles). .PerFrame 0 means all at once
+; (.PerFrame = .Left). Then falls into C2Scene_UploadTilesStep, so the
+; first part goes this frame.
+; Callers: none direct (C2Scene_UploadTileStates).
+; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12), DB=$00 (low WRAM: the task
+;        record); C2Scene_TaskCur = the task
+; Exit:  as C2Scene_UploadTilesStep; C2Tmp_10-$12 = the op's address
+; Calls: none (falls into C2Scene_UploadTilesStep).
+!C2Scene_UploadOp = !C2Tmp_10           ; 24-bit address of the spawning op $03
+C2Scene_UploadTilesStart:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_UploadTask.State,X
+    LDA.w C2Scene_UploadTask.OpPtr,X
+    STA.b !C2Scene_UploadOp
+    SEP #$20
+    LDA.w C2Scene_UploadTask.OpPtr+2,X
+    STA.b !C2Scene_UploadOp+2
+    LDY.w #3
+    LDA.b [!C2Scene_UploadOp],Y
+    STA.w C2Scene_UploadTask.SrcBank,X
+    REP #$20
+    LDY.w #1
+    LDA.b [!C2Scene_UploadOp],Y
+    STA.w C2Scene_UploadTask.Src,X
+    LDY.w #4
+    LDA.b [!C2Scene_UploadOp],Y
+    STA.w C2Scene_UploadTask.Dest,X
+    LDY.w #6
+    LDA.b [!C2Scene_UploadOp],Y
+    STA.w C2Scene_UploadTask.PerFrame,X
+    LDY.w #8
+    LDA.b [!C2Scene_UploadOp],Y
+    STA.w C2Scene_UploadTask.Left,X
+    LDA.w C2Scene_UploadTask.PerFrame,X
+    BNE C2Scene_UploadTilesStep
+    LDA.w C2Scene_UploadTask.Left,X
+    STA.w C2Scene_UploadTask.PerFrame,X
+
+; $C2:1D4C — C2Scene_UploadTilesStep (105 bytes, $1D4C–$1DB4)
+; State 1, each frame: queues the next part, min(.PerFrame, .Left) units
+; of 32 bytes, as one VRAM DMA (C2Scene_VramQ: .Bank = .SrcBank, .Src =
+; .Src, .Dest = .Dest, .Size = units * 32, VMAIN_IncAfterHigh), with
+; C2Scene_VramQLock held. Then .Left -= the units; at 0 it returns C=1
+; (the task ends); else .Src += the bytes, .Dest += the bytes / 2 (VRAM
+; words) and C=0.
+; Quirk, kept: no check that the queue has room; and .Left = 0 from the
+; op still queues a part, of size 0 (which the DMA hardware takes as
+; 65536 bytes if the flush passes it on as is), then ends.
+; Callers: none direct (C2Scene_UploadTileStates; C2Scene_UploadTilesStart
+;   branches (BNE at $C2:1D44) or falls into it).
+; Entry: M=0, X=0, DP=$0000 (the queue, C2Tmp_08/$0A), DB=$00 (low WRAM:
+;        the task record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task, Y = the task; C=1 done, C=0 more to go;
+;        A clobbered; C2Tmp_08 = the units, C2Tmp_0A = the bytes;
+;        C2Scene_VramQEnd + 8, C2Scene_VramQLock = 0
+; No calls.
+!C2Scene_UploadUnits = !C2Tmp_08        ; 16-bit units in this part
+!C2Scene_UploadBytes = !C2Tmp_0A        ; 16-bit bytes in this part
+C2Scene_UploadTilesStep:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_UploadTask.PerFrame,X
+    CMP.w C2Scene_UploadTask.Left,X
+    BCC .units
+    LDA.w C2Scene_UploadTask.Left,X
+.units:
+    STA.b !C2Scene_UploadUnits
+    TXY
+    LDA.b !C2Scene_VramQEnd
+    AND.w #!Eng_LowByteMask
+    TAX
+    SEP #$20
+    INC.b !C2Scene_VramQLock
+    LDA.w C2Scene_UploadTask.SrcBank,Y
+    STA.b C2Scene_VramQ.Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.b C2Scene_VramQ.Vmain,X
+    REP #$20
+    LDA.w C2Scene_UploadTask.Src,Y
+    STA.b C2Scene_VramQ.Src,X
+    LDA.w C2Scene_UploadTask.Dest,Y
+    STA.b C2Scene_VramQ.Dest,X
+    LDA.b !C2Scene_UploadUnits
+    ASL A                       ; units * 32 bytes
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b C2Scene_VramQ.Size,X
+    STA.b !C2Scene_UploadBytes
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #!C2Scene_VramQEntrySize
+    STA.b !C2Scene_VramQEnd
+    STZ.b !C2Scene_VramQLock
+    TYX
+    REP #$20
+    LDA.w C2Scene_UploadTask.Left,X
+    SEC
+    SBC.b !C2Scene_UploadUnits
+    BEQ .done
+    STA.w C2Scene_UploadTask.Left,X
+    LDA.b !C2Scene_UploadBytes
+    CLC
+    ADC.w C2Scene_UploadTask.Src,X
+    STA.w C2Scene_UploadTask.Src,X
+    LDA.b !C2Scene_UploadBytes
+    LSR A
+    CLC
+    ADC.w C2Scene_UploadTask.Dest,X
+    STA.w C2Scene_UploadTask.Dest,X
+    CLC
+    RTS
+.done:
+    SEC
+    RTS
+
+; ============================================================
 ; Scene boot step ($C2:1DB5–$C2:1DD3)
 ; ============================================================
 
@@ -3913,6 +5107,971 @@ C2Scene_ClearPalette:
     CPX.w #!C2Scene_Unk0B20Size
     BNE .unk0B20
     SEP #$20
+    RTS
+
+org $C21DD4
+; ============================================================
+; Scene palette load and fade tasks ($C2:1DD4–$C2:20A1)
+; ============================================================
+; Script op $04 (C2Script_SpawnUnk1DD4) leaves its arguments in the
+; spawner's record (.ArgPalette, .ArgRate, .ArgSrc, .ArgBank of
+; C2Scene_PalTask) and starts C2Scene_TaskUnk1DD4, which copies the 16 new
+; colors into the palette at once or starts C2Scene_TaskPalFade to fade
+; them in. Both count themselves in C2Scene_Unk0B20 (one byte per
+; palette) while they work, and a fade gives up when another task works
+; on its palette. A fade takes C2Scene_PalFadeSteps steps: per color and
+; channel (red, green, blue: BGR555) the difference to the new color is
+; spread over the 32 steps by a count byte per channel
+; (C2Scene_PalFadePlanColor), stepped by C2Scene_PalFadeStepColor.
+
+; $C2:1DD4 — C2Scene_TaskUnk1DD4 (100 bytes, $1DD4–$1E37)
+; Task handler (palette load). First frame (.State 0): with .ArgRate
+; non-zero it starts a C2Scene_TaskPalFade task (C2Scene_TaskSpawn, which
+; copies this record and so the arguments) and ends (C=1). With .ArgRate
+; 0 it counts itself in C2Scene_Unk0B20 for palette .ArgPalette, copies
+; the 16 colors at .ArgSrc/.ArgBank into that palette of
+; C2Scene_PaletteBuf (WMADD/WMDATA) and asks the NMI to upload the
+; palettes (C2Scene_NmiPalette); .State = 1. Second frame: takes itself
+; out of C2Scene_Unk0B20 and ends.
+; Callers: none direct; the handler C2Script_SpawnUnk1DD4 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0; C2Tmp_10-$12,
+;        C2Scene_NmiFlags), DB=$00 (low WRAM: the task record,
+;        C2Scene_Unk0B20; WMADD/WMDATA); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=1 the task ends (fade started, or second frame), C=0
+;        colors copied; A, X, Y clobbered; spawning: C2Tmp_08 changed;
+;        copy: C2Tmp_10-$12 = the source, WMADD changed
+; Calls: C2Scene_TaskSpawn.
+!C2Scene_PalSrc = !C2Tmp_10             ; 24-bit address of the new colors
+C2Scene_TaskUnk1DD4:
+    TDC
+    LDA.w C2Scene_PalTask.State,X
+    BNE .finish
+    LDA.w C2Scene_PalTask.ArgRate,X
+    BEQ .copy
+    LDX.w #C2Scene_TaskPalFade
+    JSR C2Scene_TaskSpawn
+    SEC
+    RTS
+.copy:
+    TXY
+    INC.w C2Scene_PalTask.State,X
+    LDX.w C2Scene_PalTask.ArgPalette,Y
+    INC.w !C2Scene_Unk0B20,X
+    TYX
+    LDA.w C2Scene_PalTask.ArgPalette,X
+    REP #$20
+    ASL A                       ; palette * 32 bytes (C=0 after)
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!C2Scene_PaletteBuf
+    STA.w WMADDL
+    LDA.w C2Scene_PalTask.ArgSrc,X
+    STA.b !C2Scene_PalSrc
+    TDC
+    SEP #$20
+    LDA.b #0                    ; WRAM bank $7E
+    STA.w WMADDH
+    LDA.w C2Scene_PalTask.ArgBank,X
+    STA.b !C2Scene_PalSrc+2
+    LDY.w #0
+    LDX.w #!C2Scene_PalColors
+.color:
+    LDA.b [!C2Scene_PalSrc],Y
+    STA.w WMDATA
+    INY
+    LDA.b [!C2Scene_PalSrc],Y
+    STA.w WMDATA
+    INY
+    DEX
+    BNE .color
+    LDA.b #!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    CLC
+    RTS
+.finish:
+    LDA.w C2Scene_PalTask.ArgPalette,X
+    TAX
+    DEC.w !C2Scene_Unk0B20,X
+    SEC
+    RTS
+
+; $C2:1E38 — C2Scene_TaskPalFade (9 bytes, $1E38–$1E40)
+; Task handler (palette fade, started by C2Scene_TaskUnk1DD4): runs
+; .State through C2Scene_PalFadeStates: 0 C2Scene_PalFadeStart, 1
+; C2Scene_PalFadeStep, 2 C2Scene_PalFadeEnd.
+; Callers: none direct (C2Scene_TaskRunAll calls the handler).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=1 when the fade is over)
+; Calls: the C2Scene_PalFadeStates handlers (JMP (abs,X)).
+C2Scene_TaskPalFade:
+    TDC
+    LDA.w C2Scene_PalTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_PalFadeStates,X)
+
+; $C2:1E41 — C2Scene_PalFadeStates (3 words, $1E41–$1E46)
+; The state handlers of C2Scene_TaskPalFade (X = .State * 2).
+C2Scene_PalFadeStates:
+    dw C2Scene_PalFadeStart     ; 0
+    dw C2Scene_PalFadeStep      ; 1
+    dw C2Scene_PalFadeEnd       ; 2
+
+; $C2:1E47 — C2Scene_PalFadeStart (63 bytes, $1E47–$1E85)
+; State 0: .State = 1; counts itself in C2Scene_Unk0B20 for .ArgPalette;
+; copies the arguments to .Palette, .Rate, .Src and .SrcBank (the step
+; arrays will overwrite them); .Timer = 0, .Steps = 0; .Colors = the
+; palette's address in C2Scene_PaletteBuf; then plans the fade
+; (C2Scene_PalFadePlan).
+; Callers: none direct (C2Scene_PalFadeStates).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record,
+;        C2Scene_PaletteBuf, C2Scene_Unk0B20); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=0; X = the task + $3F (the last .BlueStep byte,
+;        left by C2Scene_PalFadePlanColor), Y = the palette; A clobbered;
+;        C2Tmp_00, C2Tmp_08-$0C, C2Tmp_0E-$1B changed (C2Scene_PalFadePlan)
+; Calls: C2Scene_PalFadePlan.
+C2Scene_PalFadeStart:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_PalTask.State,X
+    LDY.w C2Scene_PalTask.ArgPalette,X
+    TYX
+    INC.w !C2Scene_Unk0B20,X
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_PalTask.ArgRate,X
+    STA.w C2Scene_PalTask.Rate,X
+    LDA.w C2Scene_PalTask.ArgBank,X
+    STA.w C2Scene_PalTask.SrcBank,X
+    REP #$20
+    TYA
+    STA.w C2Scene_PalTask.Palette,X
+    LDA.w C2Scene_PalTask.ArgSrc,X
+    STA.w C2Scene_PalTask.Src,X
+    STZ.w C2Scene_PalTask.Timer,X
+    STZ.w C2Scene_PalTask.Steps,X
+    LDA.w C2Scene_PalTask.Palette,X
+    ASL A                       ; palette * 32 bytes (C=0 after)
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!C2Scene_PaletteBuf
+    STA.w C2Scene_PalTask.Colors,X
+    JSR C2Scene_PalFadePlan
+    CLC
+    RTS
+
+; $C2:1E86 — C2Scene_PalFadeStep (47 bytes, $1E86–$1EB4)
+; State 1, each frame: if C2Scene_Unk0B20 for the palette is not 1
+; (another palette task has started on it) it goes to C2Scene_PalFadeEnd
+; (BNE into it) and the fade stops where it is. Else once .Timer (the
+; record's .Frames, which C2Scene_TaskRunAll counts up) reaches .Rate it
+; takes one step (C2Scene_PalFadeApply), zeroes .Timer's low byte, asks
+; the NMI to upload the palettes, and after the C2Scene_PalFadeSteps-th
+; step sets .State to 2.
+; Callers: none direct (C2Scene_PalFadeStates).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_NmiFlags), DB=$00 (low WRAM: the
+;        task record, C2Scene_PaletteBuf, C2Scene_Unk0B20);
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=0 (or as C2Scene_PalFadeEnd); X = the task; A, Y
+;        clobbered; after a step as C2Scene_PalFadeApply
+; Calls: C2Scene_PalFadeApply.
+C2Scene_PalFadeStep:
+    LDX.b !C2Scene_TaskCur
+    LDY.w C2Scene_PalTask.Palette,X
+    LDA.w !C2Scene_Unk0B20,Y
+    CMP.b #1
+    BNE C2Scene_PalFadeEnd
+    LDA.w C2Scene_PalTask.Timer,X
+    CMP.w C2Scene_PalTask.Rate,X
+    BCC .wait
+    JSR C2Scene_PalFadeApply
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_PalTask.Timer,X
+    LDA.b #!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    INC.w C2Scene_PalTask.Steps,X
+    LDA.w C2Scene_PalTask.Steps,X
+    CMP.b #!C2Scene_PalFadeSteps
+    BNE .wait
+    INC.w C2Scene_PalTask.State,X
+.wait:
+    CLC
+    RTS
+
+; $C2:1EB5 — C2Scene_PalFadeEnd (11 bytes, $1EB5–$1EBF)
+; State 2 (and C2Scene_PalFadeStep's give-up): takes the task out of
+; C2Scene_Unk0B20 for its palette and ends it (C=1).
+; Callers: none direct (C2Scene_PalFadeStates; BNE from
+;   C2Scene_PalFadeStep at $C2:1E90).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record,
+;        C2Scene_Unk0B20); C2Scene_TaskCur = the task; A's high byte 0
+;        (TAX takes 16 bits: true on both ways in)
+; Exit:  M=1, X=0; C=1; X = the palette; A clobbered
+; No calls.
+C2Scene_PalFadeEnd:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_PalTask.Palette,X
+    TAX
+    DEC.w !C2Scene_Unk0B20,X
+    SEC
+    RTS
+
+; $C2:1EC0 — C2Scene_PalFadePlan (81 bytes, $1EC0–$1F10)
+; Plans a fade: for each of the 16 colors, from the palette's current
+; color (.Colors, through DB) to the new one (.Src/.SrcBank, long), sets
+; the color's red, green and blue count bytes in .RedStep, .GreenStep and
+; .BlueStep (C2Scene_PalFadePlanColor).
+; Callers (1 JSR site): C2Scene_PalFadeStart ($C2:1E81).
+; Entry: M any (REP #$20 here), X=0 with X = the task, DP=$0000
+;        (C2Tmp_00-$1B), DB=$00 (low WRAM: the task record and
+;        C2Scene_PaletteBuf); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; A, X, Y clobbered; C2Tmp_00 = 0, C2Tmp_08-$0C,
+;        C2Tmp_0E-$1B changed
+; Calls: C2Scene_PalFadePlanColor.
+!C2Scene_FadeLeft = !C2Tmp_00           ; colors left
+!C2Scene_FadeCur = !C2Tmp_08            ; 16-bit current color
+!C2Scene_FadeNew = !C2Tmp_0A            ; 16-bit new color
+!C2Scene_FadeTmp = !C2Tmp_0C            ; the current color's channel
+!C2Scene_FadeColorPtr = !C2Tmp_0E       ; 16-bit address of the current color
+!C2Scene_FadeRedPtr = !C2Tmp_10         ; 16-bit address of the color's .RedStep byte
+!C2Scene_FadeGreenPtr = !C2Tmp_13       ; 16-bit address of its .GreenStep byte
+!C2Scene_FadeBluePtr = !C2Tmp_16        ; 16-bit address of its .BlueStep byte
+!C2Scene_FadeSrcPtr = !C2Tmp_19         ; 24-bit: the new color (plan), the current color (apply)
+C2Scene_PalFadePlan:
+    REP #$20
+    LDA.b !C2Scene_TaskCur
+    CLC
+    ADC.w #C2Scene_PalTask.RedStep
+    STA.b !C2Scene_FadeRedPtr
+    CLC
+    ADC.w #!C2Scene_PalColors
+    STA.b !C2Scene_FadeGreenPtr
+    CLC
+    ADC.w #!C2Scene_PalColors
+    STA.b !C2Scene_FadeBluePtr
+    LDA.w C2Scene_PalTask.Colors,X
+    STA.b !C2Scene_FadeColorPtr
+    LDA.w C2Scene_PalTask.Src,X
+    STA.b !C2Scene_FadeSrcPtr
+    SEP #$20
+    LDA.w C2Scene_PalTask.SrcBank,X
+    STA.b !C2Scene_FadeSrcPtr+2
+    LDA.b #!C2Scene_PalColors
+    STA.b !C2Scene_FadeLeft
+.color:
+    REP #$20
+    LDA.b (!C2Scene_FadeColorPtr)
+    STA.b !C2Scene_FadeCur
+    LDA.b [!C2Scene_FadeSrcPtr]
+    STA.b !C2Scene_FadeNew
+    SEP #$20
+    JSR C2Scene_PalFadePlanColor
+    REP #$20
+    INC.b !C2Scene_FadeRedPtr
+    INC.b !C2Scene_FadeGreenPtr
+    INC.b !C2Scene_FadeBluePtr
+    INC.b !C2Scene_FadeColorPtr
+    INC.b !C2Scene_FadeColorPtr
+    INC.b !C2Scene_FadeSrcPtr
+    INC.b !C2Scene_FadeSrcPtr
+    SEP #$20
+    DEC.b !C2Scene_FadeLeft
+    BNE .color
+    RTS
+
+; $C2:1F11 — C2Scene_PalFadePlanColor (116 bytes, $1F11–$1F84)
+; For one color: per channel (red: bits 0-4, green: bits 5-9, blue: bits
+; 10-14), d = new - current (-31..31) gives the count byte: 0 when equal,
+; d when rising, or C2Scene_FadeDownFlag OR (-d + C2Scene_FadeDownBias)
+; when falling; stored at the channel's pointer (through DB). See
+; C2Scene_PalFadeStepColor for how the count spreads the steps.
+; Callers (1 JSR site): C2Scene_PalFadePlan ($C2:1EF7).
+; Entry: M=1, X=0, DP=$0000 (TDC loads 0; C2Tmp_08-$0C, C2Tmp_10-$17),
+;        DB=$00 (low WRAM: the task record); C2Scene_FadeCur/New = the
+;        two colors, the three channel pointers set
+; Exit:  M=1, X=0; X = C2Scene_FadeBluePtr; A = the blue count;
+;        C2Tmp_0C changed; Y unchanged
+; No calls.
+C2Scene_PalFadePlanColor:
+    LDA.b !C2Scene_FadeCur
+    AND.b #!C2Scene_ColorRedMask
+    STA.b !C2Scene_FadeTmp
+    LDA.b !C2Scene_FadeNew
+    AND.b #!C2Scene_ColorRedMask
+    SEC
+    SBC.b !C2Scene_FadeTmp
+    BEQ .red_same
+    BCS .red_store
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.b #!C2Scene_FadeDownBias
+    ORA.b #!C2Scene_FadeDownFlag
+    BRA .red_store
+.red_same:
+    TDC
+.red_store:
+    LDX.b !C2Scene_FadeRedPtr
+    STA.w !Eng_PtrBase,X
+    REP #$20
+    LDA.b !C2Scene_FadeCur
+    AND.w #!C2Scene_ColorGreenMask
+    STA.b !C2Scene_FadeTmp
+    LDA.b !C2Scene_FadeNew
+    AND.w #!C2Scene_ColorGreenMask
+    SEC
+    SBC.b !C2Scene_FadeTmp
+    PHP                         ; keep Z and C of the difference
+    ASL A                       ; high byte = the difference / 32
+    ASL A
+    ASL A
+    XBA
+    PLP
+    SEP #$20
+    BEQ .green_same
+    BCS .green_store
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.b #!C2Scene_FadeDownBias
+    ORA.b #!C2Scene_FadeDownFlag
+    BRA .green_store
+.green_same:
+    TDC
+.green_store:
+    LDX.b !C2Scene_FadeGreenPtr
+    STA.w !Eng_PtrBase,X
+    LDA.b !C2Scene_FadeCur+1
+    AND.b #!C2Scene_ColorBlueHiMask
+    LSR A
+    LSR A
+    STA.b !C2Scene_FadeTmp
+    LDA.b !C2Scene_FadeNew+1
+    AND.b #!C2Scene_ColorBlueHiMask
+    LSR A
+    LSR A
+    SEC
+    SBC.b !C2Scene_FadeTmp
+    BEQ .blue_same
+    BCS .blue_store
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.b #!C2Scene_FadeDownBias
+    ORA.b #!C2Scene_FadeDownFlag
+    BRA .blue_store
+.blue_same:
+    TDC
+.blue_store:
+    LDX.b !C2Scene_FadeBluePtr
+    STA.w !Eng_PtrBase,X
+    RTS
+
+; $C2:1F85 — C2Scene_PalFadeApply (71 bytes, $1F85–$1FCB)
+; Takes one fade step on all 16 colors of the palette at .Colors: each
+; color is read, stepped (C2Scene_PalFadeStepColor) and written back
+; (through DB).
+; Callers (1 JSR site): C2Scene_PalFadeStep ($C2:1E9A).
+; Entry: M any (REP #$20 here), X=0 with X = the task, DP=$0000
+;        (C2Tmp_00, C2Tmp_08/$09, C2Tmp_10-$1A), DB=$00 (low WRAM: the
+;        task record and C2Scene_PaletteBuf); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; A, X, Y clobbered; C2Tmp_00 = 0, C2Tmp_08/$09,
+;        C2Tmp_10-$1A changed
+; Calls: C2Scene_PalFadeStepColor.
+C2Scene_PalFadeApply:
+    REP #$20
+    LDA.b !C2Scene_TaskCur
+    CLC
+    ADC.w #C2Scene_PalTask.RedStep
+    STA.b !C2Scene_FadeRedPtr
+    CLC
+    ADC.w #!C2Scene_PalColors
+    STA.b !C2Scene_FadeGreenPtr
+    CLC
+    ADC.w #!C2Scene_PalColors
+    STA.b !C2Scene_FadeBluePtr
+    LDA.w C2Scene_PalTask.Colors,X
+    STA.b !C2Scene_FadeSrcPtr
+    SEP #$20
+    LDA.b #!C2Scene_PalColors
+    STA.b !C2Scene_FadeLeft
+.color:
+    REP #$20
+    LDA.b (!C2Scene_FadeSrcPtr)
+    STA.b !C2Scene_FadeCur
+    TDC
+    SEP #$20
+    JSR C2Scene_PalFadeStepColor
+    REP #$20
+    LDX.b !C2Scene_FadeSrcPtr
+    LDA.b !C2Scene_FadeCur
+    STA.w !Eng_PtrBase,X
+    INC.b !C2Scene_FadeRedPtr
+    INC.b !C2Scene_FadeGreenPtr
+    INC.b !C2Scene_FadeBluePtr
+    INC.b !C2Scene_FadeSrcPtr
+    INC.b !C2Scene_FadeSrcPtr
+    SEP #$20
+    DEC.b !C2Scene_FadeLeft
+    BNE .color
+    RTS
+
+; $C2:1FCC — C2Scene_PalFadeStepColor (150 bytes, $1FCC–$2061)
+; One fade step of one color (C2Scene_FadeCur): for each channel's count
+; byte c (red, green, blue): 0 leaves the channel; a rising count moves
+; the channel up one when C2Scene_PalFadeStepTable[c] is 1 (c >= 32) and
+; then counts c up; a falling one (C2Scene_FadeDownFlag) moves it down
+; one when the table entry for c AND C2Scene_FadeCountMask is 1, then
+; counts c down. So over the 32 steps a rise of d comes in the last d
+; steps (c runs d..d+31) and a drop of d in the first d steps (c runs
+; d+31 down to d), and each channel ends on the new color.
+; Callers (1 JSR site): C2Scene_PalFadeApply ($C2:1FAF).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_08/$09, the channel pointers), DB=$00
+;        (low WRAM: the task record); A's high byte 0 (TAX takes 16
+;        bits); C2Scene_FadeCur = the color
+; Exit:  M=1, X=0; C2Scene_FadeCur stepped; the count bytes moved; A, X,
+;        Y clobbered
+; No calls.
+C2Scene_PalFadeStepColor:
+    LDY.b !C2Scene_FadeRedPtr
+    LDA.w !Eng_PtrBase,Y
+    BEQ .green
+    BMI .red_down
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .red_up_count
+    INC.b !C2Scene_FadeCur
+.red_up_count:
+    TYX
+    INC.w !Eng_PtrBase,X
+    BRA .green
+.red_down:
+    AND.b #!C2Scene_FadeCountMask
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .red_down_count
+    DEC.b !C2Scene_FadeCur
+.red_down_count:
+    TYX
+    DEC.w !Eng_PtrBase,X
+.green:
+    LDY.b !C2Scene_FadeGreenPtr
+    LDA.w !Eng_PtrBase,Y
+    BEQ .blue
+    BMI .green_down
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .green_up_count
+    REP #$20
+    LDA.b !C2Scene_FadeCur
+    CLC
+    ADC.w #!C2Scene_ColorGreenUnit
+    STA.b !C2Scene_FadeCur
+    TDC
+    SEP #$20
+.green_up_count:
+    TYX
+    INC.w !Eng_PtrBase,X
+    BRA .blue
+.green_down:
+    AND.b #!C2Scene_FadeCountMask
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .green_down_count
+    REP #$20
+    LDA.b !C2Scene_FadeCur
+    SEC
+    SBC.w #!C2Scene_ColorGreenUnit
+    STA.b !C2Scene_FadeCur
+    TDC
+    SEP #$20
+.green_down_count:
+    TYX
+    DEC.w !Eng_PtrBase,X
+.blue:
+    LDY.b !C2Scene_FadeBluePtr
+    LDA.w !Eng_PtrBase,Y
+    BEQ .done
+    BMI .blue_down
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .blue_up_count
+    LDA.b !C2Scene_FadeCur+1
+    CLC
+    ADC.b #!C2Scene_ColorBlueHiUnit
+    STA.b !C2Scene_FadeCur+1
+.blue_up_count:
+    TYX
+    INC.w !Eng_PtrBase,X
+    BRA .done
+.blue_down:
+    AND.b #!C2Scene_FadeCountMask
+    TAX
+    LDA.l C2Scene_PalFadeStepTable,X
+    BEQ .blue_down_count
+    LDA.b !C2Scene_FadeCur+1
+    SEC
+    SBC.b #!C2Scene_ColorBlueHiUnit
+    STA.b !C2Scene_FadeCur+1
+.blue_down_count:
+    TYX
+    DEC.w !Eng_PtrBase,X
+.done:
+    RTS
+
+; $C2:2062 — C2Scene_PalFadeStepTable (64 bytes, $2062–$20A1)
+; Indexed by a fade count 0-63 (C2Scene_PalFadeStepColor): 1 = move the
+; channel this step (counts 32-63), 0 = not yet (0-31).
+C2Scene_PalFadeStepTable:
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01
+
+; ============================================================
+; Scene screen fade and mosaic tasks ($C2:20A2–$C2:2259)
+; ============================================================
+; Started by script ops $28-$2B (C2Script_SpawnUnk20A2 ... 2194), each
+; reads its op's arguments through the script pointer it copied from the
+; spawner (still on the op; C2Scene_FxTask.OpPtr) and steps once every
+; .Rate frames, timed by its own .Frames (.Timer), which
+; C2Scene_TaskRunAll counts up after each frame the task lives. Rate 0
+; does the whole effect at once. The two fades mark themselves in
+; C2Scene_Unk1BF6 (C2Scene_FadeInBusy / C2Scene_FadeOutBusy).
+
+; $C2:20A2 — C2Scene_TaskUnk20A2 (9 bytes, $20A2–$20AA)
+; Task handler (fade out, op $28): runs .State through
+; C2Scene_FadeOutStates: 0 C2Scene_FadeOutStart, 1 C2Scene_FadeOutStep.
+; Callers: none direct; the handler C2Script_SpawnUnk20A2 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=1 when done)
+; Calls: the C2Scene_FadeOutStates handlers (JMP (abs,X)).
+C2Scene_TaskUnk20A2:
+    TDC
+    LDA.w C2Scene_FxTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_FadeOutStates,X)
+
+; $C2:20AB — C2Scene_FadeOutStates (2 words, $20AB–$20AE)
+; The state handlers of C2Scene_TaskUnk20A2 (X = .State * 2).
+C2Scene_FadeOutStates:
+    dw C2Scene_FadeOutStart     ; 0
+    dw C2Scene_FadeOutStep      ; 1
+
+; $C2:20AF — C2Scene_FadeOutStart (48 bytes, $20AF–$20DE)
+; State 0: if a fade-out already runs (C2Scene_FadeOutBusy) the task just
+; ends. Else it marks one, sets .State = 1 and reads op $28's arg 1, the
+; frames per brightness step: 0 blanks the screen at once (forced blank,
+; C2Scene_Brightness = 0) and ends, leaving C2Scene_FadeOutBusy set
+; (quirk, kept: no later fade-out runs until something clears it).
+; Otherwise .Rate = arg 1, .Timer's low byte = 0, and it falls into
+; C2Scene_FadeOutStep.
+; Callers: none direct (C2Scene_FadeOutStates).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
+;        WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur = the
+;        task
+; Exit:  ended: M=1, X=0, C=1. Else as C2Scene_FadeOutStep. C2Tmp_10-$12
+;        = the op's address; Y = 1
+; No calls (falls into C2Scene_FadeOutStep).
+!C2Scene_FxOp = !C2Tmp_10               ; 24-bit address of the spawning op
+C2Scene_FadeOutStart:
+    LDA.w !C2Scene_Unk1BF6
+    BIT.b #!C2Scene_FadeOutBusy
+    BNE .end
+    LDA.b #!C2Scene_FadeOutBusy
+    TSB.w !C2Scene_Unk1BF6
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_FxTask.State,X
+    LDY.w C2Scene_FxTask.OpPtr,X
+    STY.b !C2Scene_FxOp
+    LDA.w C2Scene_FxTask.OpPtr+2,X
+    STA.b !C2Scene_FxOp+2
+    LDY.w #1
+    LDA.b [!C2Scene_FxOp],Y
+    BNE .timed
+    LDA.b #FORCED_BLANK
+    STA.b !C2Scene_InidispShadow
+    STZ.b !C2Scene_Brightness
+.end:
+    SEC
+    RTS
+.timed:
+    STA.w C2Scene_FxTask.Rate,X
+    STZ.w C2Scene_FxTask.Timer,X
+
+; $C2:20DF — C2Scene_FadeOutStep (38 bytes, $20DF–$2104)
+; State 1, each frame: once .Timer reaches .Rate it zeroes .Timer's low
+; byte and takes C2Scene_Brightness down one. At brightness 0 (already,
+; or after the step) it turns on forced blank, clears
+; C2Scene_FadeOutBusy and ends (C=1).
+; Callers: none direct (C2Scene_FadeOutStates; C2Scene_FadeOutStart falls
+;   into it).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
+;        (low WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur =
+;        the task
+; Exit:  M=1, X=0; X = the task; C=1 done, C=0 not yet; A clobbered
+; No calls.
+C2Scene_FadeOutStep:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.w C2Scene_FxTask.Rate,X
+    BCS .step
+    CLC
+    RTS
+.step:
+    STZ.w C2Scene_FxTask.Timer,X
+    LDA.b !C2Scene_Brightness
+    BEQ .blank
+    DEC.b !C2Scene_Brightness
+    BEQ .blank
+    CLC
+    RTS
+.blank:
+    LDA.b #FORCED_BLANK
+    STA.b !C2Scene_InidispShadow
+    LDA.b #!C2Scene_FadeOutBusy
+    TRB.w !C2Scene_Unk1BF6
+    SEC
+    RTS
+
+; $C2:2105 — C2Scene_TaskUnk2105 (9 bytes, $2105–$210D)
+; Task handler (fade in, op $29): runs .State through
+; C2Scene_FadeInStates: 0 C2Scene_FadeInStart, 1 C2Scene_FadeInUnblank,
+; 2 C2Scene_FadeInStep, 3 C2Scene_FadeInEnd.
+; Callers: none direct; the handler C2Script_SpawnUnk2105 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=1 when done)
+; Calls: the C2Scene_FadeInStates handlers (JMP (abs,X)).
+C2Scene_TaskUnk2105:
+    TDC
+    LDA.w C2Scene_FxTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_FadeInStates,X)
+
+; $C2:210E — C2Scene_FadeInStates (4 words, $210E–$2115)
+; The state handlers of C2Scene_TaskUnk2105 (X = .State * 2).
+C2Scene_FadeInStates:
+    dw C2Scene_FadeInStart      ; 0
+    dw C2Scene_FadeInUnblank    ; 1
+    dw C2Scene_FadeInStep       ; 2
+    dw C2Scene_FadeInEnd        ; 3
+
+; $C2:2116 — C2Scene_FadeInStart (60 bytes, $2116–$2151)
+; State 0: if any fade runs (C2Scene_Unk1BF6 non-zero) it ends through
+; C2Scene_FadeInEnd. Else it marks C2Scene_FadeInBusy and reads op $29's
+; arg 1, the frames per step: 0 turns forced blank off at full
+; brightness (Fade_BrightnessMax) at once and sets .State to
+; C2Scene_FadeInDone (it ends next frame). Otherwise .Rate = arg 1 and
+; .State = 1 (C2Scene_FadeInUnblank) when C2Scene_Brightness is 0, else
+; 2 (C2Scene_FadeInStep, from the brightness it has); .Timer's low byte =
+; 0.
+; Quirk, kept: a second fade-in started while one runs ends through
+; C2Scene_FadeInEnd and so clears the running one's C2Scene_FadeInBusy.
+; Callers: none direct (C2Scene_FadeInStates).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
+;        WRAM: the task record, C2Scene_Unk1BF6); C2Scene_TaskCur = the
+;        task
+; Exit:  M=1, X=0; C=0 (or as C2Scene_FadeInEnd); X = the task, Y = 1;
+;        C2Tmp_10-$12 = the op's address
+; No calls.
+C2Scene_FadeInStart:
+    LDA.w !C2Scene_Unk1BF6
+    BNE C2Scene_FadeInEnd
+    LDA.b #!C2Scene_FadeInBusy
+    TSB.w !C2Scene_Unk1BF6
+    LDX.b !C2Scene_TaskCur
+    LDY.w C2Scene_FxTask.OpPtr,X
+    STY.b !C2Scene_FxOp
+    LDA.w C2Scene_FxTask.OpPtr+2,X
+    STA.b !C2Scene_FxOp+2
+    LDY.w #1
+    LDA.b [!C2Scene_FxOp],Y
+    BNE .timed
+    STZ.b !C2Scene_InidispShadow
+    LDA.b #!Fade_BrightnessMax
+    STA.b !C2Scene_Brightness
+    LDA.b #!C2Scene_FadeInDone
+    STA.w C2Scene_FxTask.State,X
+    CLC
+    RTS
+.timed:
+    STA.w C2Scene_FxTask.Rate,X
+    INC.w C2Scene_FxTask.State,X
+    LDA.b !C2Scene_Brightness
+    BEQ .from_blank
+    INC.w C2Scene_FxTask.State,X
+.from_blank:
+    STZ.w C2Scene_FxTask.Timer,X
+    CLC
+    RTS
+
+; $C2:2152 — C2Scene_FadeInUnblank (29 bytes, $2152–$216E)
+; State 1: ends (C2Scene_FadeInEnd) if a fade-out has started. Once .Timer
+; reaches .Rate: .State = 2, .Timer's low byte = 0, forced blank off and
+; C2Scene_Brightness + 1 (the first step).
+; Callers: none direct (C2Scene_FadeInStates).
+; Entry: M=1, X=0, DP=$0000 (the PPU shadows), DB=$00 (low WRAM: the task
+;        record, C2Scene_Unk1BF6); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=0 (or as C2Scene_FadeInEnd); X = the task; A
+;        clobbered
+; No calls.
+C2Scene_FadeInUnblank:
+    LDA.w !C2Scene_Unk1BF6
+    BIT.b #!C2Scene_FadeOutBusy
+    BNE C2Scene_FadeInEnd
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.w C2Scene_FxTask.Rate,X
+    BCC .wait
+    INC.w C2Scene_FxTask.State,X
+    STZ.w C2Scene_FxTask.Timer,X
+    STZ.b !C2Scene_InidispShadow
+    INC.b !C2Scene_Brightness
+.wait:
+    CLC
+    RTS
+
+; $C2:216F — C2Scene_FadeInStep (30 bytes, $216F–$218C)
+; State 2: ends (C2Scene_FadeInEnd) if a fade-out has started. Once .Timer
+; reaches .Rate: .Timer's low byte = 0 and C2Scene_Brightness + 1; at
+; Fade_BrightnessMax it ends (C2Scene_FadeInEnd).
+; Quirk, kept: a fade-in started at full brightness steps past it (16,
+; 17, ...: the NMI ORs the byte into INIDISP, so the high bits spill into
+; forced blank) and ends only when the byte wraps round to 15 again.
+; Callers: none direct (C2Scene_FadeInStates).
+; Entry: M=1, X=0, DP=$0000 (the PPU shadows), DB=$00 (low WRAM: the task
+;        record, C2Scene_Unk1BF6); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C=0 (or as C2Scene_FadeInEnd); X = the task; A
+;        clobbered
+; No calls.
+C2Scene_FadeInStep:
+    LDA.w !C2Scene_Unk1BF6
+    BIT.b #!C2Scene_FadeOutBusy
+    BNE C2Scene_FadeInEnd
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.w C2Scene_FxTask.Rate,X
+    BCC .wait
+    STZ.w C2Scene_FxTask.Timer,X
+    INC.b !C2Scene_Brightness
+    LDA.b !C2Scene_Brightness
+    CMP.b #!Fade_BrightnessMax
+    BEQ C2Scene_FadeInEnd
+.wait:
+    CLC
+    RTS
+
+; $C2:218D — C2Scene_FadeInEnd (7 bytes, $218D–$2193)
+; State 3, and where the other fade-in states end: clears
+; C2Scene_FadeInBusy and ends the task (C=1).
+; Callers: none direct (C2Scene_FadeInStates; BNE from
+;   C2Scene_FadeInStart ($C2:2119), C2Scene_FadeInUnblank ($C2:2157) and
+;   C2Scene_FadeInStep ($C2:2174); BEQ from C2Scene_FadeInStep
+;   ($C2:2189)).
+; Entry: M=1, X any, DP any, DB=$00 (low WRAM: C2Scene_Unk1BF6)
+; Exit:  M=1; C=1; A = C2Scene_FadeInBusy; X, Y unchanged
+; No calls.
+C2Scene_FadeInEnd:
+    LDA.b #!C2Scene_FadeInBusy
+    TRB.w !C2Scene_Unk1BF6
+    SEC
+    RTS
+
+; $C2:2194 — C2Scene_TaskUnk2194 (15 bytes, $2194–$21A2)
+; Task handler (mosaic shrink, op $2B): runs .State through
+; C2Scene_MosaicOutStates: 0 C2Scene_MosaicOutStart, 1
+; C2Scene_MosaicOutStep.
+; Callers: none direct; the handler C2Script_SpawnUnk2194 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1 (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=1 when done)
+; Calls: the C2Scene_MosaicOutStates handlers (JMP (abs,X)).
+C2Scene_TaskUnk2194:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.State,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JMP (C2Scene_MosaicOutStates,X)
+
+; $C2:21A3 — C2Scene_MosaicOutStates (2 words, $21A3–$21A6)
+; The state handlers of C2Scene_TaskUnk2194 (X = .State * 2).
+C2Scene_MosaicOutStates:
+    dw C2Scene_MosaicOutStart   ; 0
+    dw C2Scene_MosaicOutStep    ; 1
+
+; $C2:21A7 — C2Scene_MosaicOutStart (47 bytes, $21A7–$21D5)
+; State 0: .State = 1; ORs op $2B's arg 1 into C2Scene_MosaicShadow (the
+; BGs to apply it to, bits 0-3); arg 2 is the frames per step: 0 sets
+; the size to 0 at once (keeping the BG bits) and ends. Otherwise .Rate =
+; arg 2, .Timer's low byte = 0, and it falls into C2Scene_MosaicOutStep.
+; Callers: none direct (C2Scene_MosaicOutStates).
+; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  ended: M=1, X=0, C=1. Else as C2Scene_MosaicOutStep. Y = 2;
+;        C2Tmp_10-$12 = the op's address
+; No calls (falls into C2Scene_MosaicOutStep).
+C2Scene_MosaicOutStart:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.OpPtr,X
+    STA.b !C2Scene_FxOp
+    SEP #$20
+    LDA.w C2Scene_FxTask.OpPtr+2,X
+    STA.b !C2Scene_FxOp+2
+    INC.w C2Scene_FxTask.State,X
+    LDY.w #1
+    LDA.b !C2Scene_MosaicShadow
+    ORA.b [!C2Scene_FxOp],Y
+    STA.b !C2Scene_MosaicShadow
+    LDY.w #2
+    LDA.b [!C2Scene_FxOp],Y
+    BNE .timed
+    LDA.b !C2Scene_MosaicShadow
+    AND.b #!C2Scene_MosaicBgMask
+    STA.b !C2Scene_MosaicShadow
+    SEC
+    RTS
+.timed:
+    STA.w C2Scene_FxTask.Rate,X
+    STZ.w C2Scene_FxTask.Timer,X
+
+; $C2:21D6 — C2Scene_MosaicOutStep (34 bytes, $21D6–$21F7)
+; State 1: once .Timer reaches .Rate, .Timer's low byte = 0 and the
+; mosaic size (C2Scene_MosaicShadow bits 4-7) goes down one; when it is
+; already 0 the task ends (C=1) instead.
+; Callers: none direct (C2Scene_MosaicOutStates; C2Scene_MosaicOutStart
+;   falls into it).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
+;        (low WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; C=1 done, C=0 not yet; A clobbered
+; No calls.
+C2Scene_MosaicOutStep:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.w C2Scene_FxTask.Rate,X
+    BCS .step
+    CLC
+    RTS
+.step:
+    STZ.w C2Scene_FxTask.Timer,X
+    LDA.b !C2Scene_MosaicShadow
+    AND.b #!C2Scene_MosaicSizeMask
+    BEQ .done
+    LDA.b !C2Scene_MosaicShadow
+    SEC
+    SBC.b #!C2Scene_MosaicSizeStep
+    STA.b !C2Scene_MosaicShadow
+    CLC
+    RTS
+.done:
+    SEC
+    RTS
+
+; $C2:21F8 — C2Scene_TaskUnk21F8 (13 bytes, $21F8–$2204)
+; Task handler (mosaic grow, op $2A): runs .State through
+; C2Scene_MosaicInStates: 0 C2Scene_MosaicInStart, 1 C2Scene_MosaicInStep.
+; Callers: none direct; the handler C2Script_SpawnUnk21F8 installs
+;   (C2Scene_TaskRunAll calls it).
+; Entry: M=1 (REP #$20 here), X=0 with X = the task, DP=$0000, DB=$00
+;        (low WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=1 when done)
+; Calls: the C2Scene_MosaicInStates handlers (JMP (abs,X)).
+C2Scene_TaskUnk21F8:
+    REP #$20
+    LDA.w C2Scene_FxTask.State,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JMP (C2Scene_MosaicInStates,X)
+
+; $C2:2205 — C2Scene_MosaicInStates (2 words, $2205–$2208)
+; The state handlers of C2Scene_TaskUnk21F8 (X = .State * 2).
+C2Scene_MosaicInStates:
+    dw C2Scene_MosaicInStart    ; 0
+    dw C2Scene_MosaicInStep     ; 1
+
+; $C2:2209 — C2Scene_MosaicInStart (47 bytes, $2209–$2237)
+; State 0: as C2Scene_MosaicOutStart (op $2A's arg 1 ORed into
+; C2Scene_MosaicShadow, arg 2 the frames per step), but rate 0 sets the
+; size to the largest (C2Scene_MosaicSizeMask: 16x16 blocks) at once.
+; Callers: none direct (C2Scene_MosaicInStates).
+; Entry: M=0, X=0, DP=$0000 (C2Tmp_10-$12, the PPU shadows), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  ended: M=1, X=0, C=1. Else as C2Scene_MosaicInStep. Y = 2;
+;        C2Tmp_10-$12 = the op's address
+; No calls (falls into C2Scene_MosaicInStep).
+C2Scene_MosaicInStart:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.OpPtr,X
+    STA.b !C2Scene_FxOp
+    SEP #$20
+    LDA.w C2Scene_FxTask.OpPtr+2,X
+    STA.b !C2Scene_FxOp+2
+    INC.w C2Scene_FxTask.State,X
+    LDY.w #1
+    LDA.b !C2Scene_MosaicShadow
+    ORA.b [!C2Scene_FxOp],Y
+    STA.b !C2Scene_MosaicShadow
+    LDY.w #2
+    LDA.b [!C2Scene_FxOp],Y
+    BNE .timed
+    LDA.b !C2Scene_MosaicShadow
+    ORA.b #!C2Scene_MosaicSizeMask
+    STA.b !C2Scene_MosaicShadow
+    SEC
+    RTS
+.timed:
+    STA.w C2Scene_FxTask.Rate,X
+    STZ.w C2Scene_FxTask.Timer,X
+
+; $C2:2238 — C2Scene_MosaicInStep (34 bytes, $2238–$2259)
+; State 1: once .Timer reaches .Rate, .Timer's low byte = 0 and the
+; mosaic size goes up one; when that makes it the largest ($F0) the task
+; ends (C=1).
+; Quirk, kept: the step is added to the whole byte, so a size already
+; at the largest overflows into 0 (and the carry is lost) and the
+; growth goes round again, ending only at the next $F0.
+; Callers: none direct (C2Scene_MosaicInStates; C2Scene_MosaicInStart
+;   falls into it).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (the PPU shadows), DB=$00
+;        (low WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; C=1 done, C=0 not yet; A clobbered
+; No calls.
+C2Scene_MosaicInStep:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.w C2Scene_FxTask.Rate,X
+    BCS .step
+    CLC
+    RTS
+.step:
+    STZ.w C2Scene_FxTask.Timer,X
+    LDA.b !C2Scene_MosaicShadow
+    CLC
+    ADC.b #!C2Scene_MosaicSizeStep
+    STA.b !C2Scene_MosaicShadow
+    AND.b #!C2Scene_MosaicSizeMask
+    CMP.b #!C2Scene_MosaicSizeMask
+    BEQ .done
+    CLC
+    RTS
+.done:
+    SEC
     RTS
 
 ; ============================================================
@@ -5409,6 +7568,57 @@ C2Scene_RestoreState:
     MVN bank(!C2Scene_ListA),bank(!C2Scene_SaveLists) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     PLB
     SEP #$20
+    RTS
+
+; ============================================================
+; Scene sound command queue ($C2:2ED9–$C2:2F0E)
+; ============================================================
+
+org $C22ED9
+; $C2:2ED9 — C2Scene_QueueSoundCmd (54 bytes, $2ED9–$2F0E)
+; Queues the sound command in C2Scene_SoundCmdBuf (command byte and three
+; argument bytes) for the frame loop to send: copies it to the driver
+; block Audio_CmdId-Audio_CmdArg2, keeps its rank C2Scene_SoundCmdPrio in
+; C2Scene_SoundCmdPendPrio and sets C2Scene_SoundCmdState to 1
+; (C2Scene_WaitFrames and C2Scene_MainLoop then send it with
+; Audio_DriverCommand). Refused (C=1, nothing written) while a command
+; is being sent (state C2Scene_SoundCmdSending, tested as negative), or
+; when one is already queued with a lower pending rank than the new one;
+; an equal or higher pending rank is replaced (so rank 0, which every
+; matched caller passes, always replaces a queued command).
+; Callers (10 JSR sites): C2Script_PlaySfx ($C2:18E8),
+;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E);
+;   unmatched: $C2:2F88, $C2:2FCD, $C2:3031, $C2:306A, $C2:3092, $C2:4395
+;   and $C2:4A4C.
+; Entry: M=1, X any (no index use), DP any (no direct page), DB=$00 (low
+;        WRAM: the buffer, the state and the driver block)
+; Exit:  M=1, X unchanged; C=0 queued, C=1 refused; A clobbered; X, Y,
+;        DP and DB unchanged
+; No calls.
+C2Scene_QueueSoundCmd:
+    LDA.w !C2Scene_SoundCmdState
+    BEQ .queue
+    BMI .refuse
+    LDA.w !C2Scene_SoundCmdPendPrio
+    CMP.w !C2Scene_SoundCmdPrio
+    BCC .refuse
+.queue:
+    LDA.w !C2Scene_SoundCmdBuf
+    STA.w !Audio_CmdId
+    LDA.w !C2Scene_SoundCmdBuf+1
+    STA.w !Audio_CmdArg0
+    LDA.w !C2Scene_SoundCmdBuf+2
+    STA.w !Audio_CmdArg1
+    LDA.w !C2Scene_SoundCmdBuf+3
+    STA.w !Audio_CmdArg2
+    LDA.w !C2Scene_SoundCmdPrio
+    STA.w !C2Scene_SoundCmdPendPrio
+    LDA.b #!C2Scene_SoundCmdQueued
+    STA.w !C2Scene_SoundCmdState
+    CLC
+    RTS
+.refuse:
+    SEC
     RTS
 
 ; ============================================================

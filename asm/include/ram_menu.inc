@@ -132,6 +132,8 @@ if !ram_menu_inc == 0
                                          ; script (C2Anim_Run; copied from and back to .AnimPtr/.AnimBank)
 !C2Script_Ptr = $58                      ; 24-bit pointer to the current op of the running task's script
                                          ; (C2Scene_TaskRunScript; .ScriptPtr/.ScriptBank)
+!C2Script_CallVec = $5B                  ; 24-bit target of script ops $34 (C2Script_CallNear: JMP (abs),
+                                         ; bank $C2) and $4E (C2Script_CallLong: JML [abs])
 !C2Scene_VramQLock = $5E                 ; 8-bit; non-zero: C2Scene_VramQFlush does nothing
 !C2Scene_VramQEnd = $5F                  ; 8-bit byte offset past the last C2Scene_VramQ entry (0 = empty)
 !C2Scene_BgTileX = $E3                   ; 2 words, X in tiles (C2Scene_SetStartScroll sets both alike);
@@ -176,6 +178,7 @@ endstruct align 8
 !C2Tmp_14 = $14                          ; 1-2 B scratch
 !C2Tmp_16 = $16                          ; 1 B scratch
 !C2Tmp_18 = $18                          ; 1-2 B scratch
+!C2Tmp_19 = $19                          ; 1-3 B scratch
 !C2Tmp_1A = $1A                          ; 1-2 B scratch
 
 ; ==== Text window (TextWin_Init / TextWin_Step) ====
@@ -207,7 +210,10 @@ endstruct align 8
 
 ; --- Scene mode absolute RAM ---
 !C2Scene_Unk0B20 = $0B20                 ; 16 B $0B20-$0B2F zeroed by C2Scene_ClearPalette (right after
-                                         ; C2Scene_PaletteBuf); use unknown
+                                         ; C2Scene_PaletteBuf): one byte per 16-color palette, the
+                                         ; number of palette tasks working on it (C2Scene_TaskUnk1DD4
+                                         ; and C2Scene_TaskPalFade +1 at the start, -1 at the end; a
+                                         ; fade stops when it is not 1)
 !C2Scene_TaskRecords = $0B30             ; 64 C2Scene_Task records, $0B30-$1B2F (C2Scene_TaskRunAll walks
                                          ; them all; C2Scene_TaskClearAll frees them all)
 !C2Scene_TaskRecordsEnd = $1B30          ; first address past the records
@@ -219,11 +225,20 @@ endstruct align 8
 !C2Scene_StartX = $0283                  ; 16-bit; Loc_EntryX * 8 (C2Scene_SetStartPos): probably pixels
 !C2Scene_StartY = $0285                  ; 16-bit; Loc_EntryY * 8
 !C2Scene_SoundCmdState = $1BEC           ; 8-bit: 0 = nothing to send; 1 = a command waits in the
-                                         ; driver block $1E00-$1E03 (set by the unmatched code at
-                                         ; $C2:2ED9, which copies it from $1BE8-$1BEB);
+                                         ; driver block $1E00-$1E03 (set by C2Scene_QueueSoundCmd,
+                                         ; which copies it from C2Scene_SoundCmdBuf);
                                          ; C2Scene_SoundCmdSending while Audio_DriverCommand runs.
                                          ; C2Scene_WaitFrames and C2Scene_MainLoop send it, once per frame
-!C2Scene_Unk1BF6 = $1BF6                 ; 8-bit; zeroed by C2Scene_Main; use unknown
+!C2Scene_SoundCmdBuf = $1BE8            ; 4 B: the next sound command and its 3 argument bytes, copied to
+                                         ; Audio_CmdId-Audio_CmdArg2 by C2Scene_QueueSoundCmd
+!C2Scene_SoundCmdPrio = $1BED            ; 8-bit; the caller's rank for C2Scene_SoundCmdBuf (every matched
+                                         ; caller passes 0); a command is queued only when this is <=
+                                         ; C2Scene_SoundCmdPendPrio (probably lower = more important)
+!C2Scene_SoundCmdPendPrio = $1BEE        ; 8-bit C2Scene_SoundCmdPrio of the command that is queued
+!C2Scene_Unk1BF6 = $1BF6                 ; 8-bit; zeroed by C2Scene_Main. Bit 0 (C2Scene_FadeInBusy): a
+                                         ; fade-in task runs (C2Scene_TaskUnk2105); bit 1
+                                         ; (C2Scene_FadeOutBusy): a fade-out task runs
+                                         ; (C2Scene_TaskUnk20A2)
 !C2Scene_Mode = $027C                    ; 8-bit; selects C2Scene_MainLoop's handler (index into
                                          ; C2Scene_ModeTable); who sets it is not traced
 !C2Scene_Unk027D = $027D                 ; 8-bit; zeroed by C2Scene_LoadScene (next to C2Scene_Mode); use unknown
@@ -269,6 +284,8 @@ endstruct align 8
                                          ; (C2Scene_LayerMaps)
 !C2Scene_Unk7000 = $7E7000               ; C2Scene_LoadUnk7000's pack; use unknown
 !C2Scene_Unk7200 = $7E7200               ; C2Scene_LoadUnk7200's pack; use unknown
+!C2Scene_Unk7F01ED = $7F01ED            ; 8-bit in Menu_FlagBlock7F; non-zero makes script op $3D
+                                         ; (C2Script_SoundCmd10IfClear) skip its sound command; meaning not traced
 !C2Scene_ListA = $7E7E00                 ; 7-byte entries (C2Scene_LoadLists); use unknown
 !C2Scene_ListC = $7E8180                 ; 3-byte entries; use unknown
 !C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
@@ -368,6 +385,63 @@ struct C2Scene_Task $0000
 .Unk35:      skip 2     ; +$35 C2Script_SpawnUnk1DD4 passes a word here
 .Unk37:      skip 1     ; +$37 C2Script_SpawnUnk1DD4 passes a byte here
              skip 8
+endstruct
+
+; Other views of a C2Scene_Task record, for task handlers that use the
+; record their own way (the fields after .Handler and .Unk02 differ).
+; C2Scene_TaskUnk1CF5 (tile upload, started by script op $03): its state
+; and what it reads from the spawning op.
+struct C2Scene_UploadTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 (C2Scene_Task.Unk02, zeroed by C2Scene_TaskSpawn): 0 = start, 1 = upload
+            skip 4
+.OpPtr:     skip 3     ; +$07 = .ScriptPtr/.ScriptBank copied from the spawner: its op $03
+            skip 1
+.Src:       skip 2     ; +$0B source address of the next part
+.SrcBank:   skip 1     ; +$0D its bank
+.Dest:      skip 2     ; +$0E VRAM word address of the next part
+            skip 2
+.PerFrame:  skip 2     ; +$12 32-byte units uploaded per frame (0 in the op: all at once)
+.Left:      skip 2     ; +$14 32-byte units still to upload
+endstruct
+
+; C2Scene_TaskUnk1DD4 (palette load, started by script op $04) and the
+; palette fade task it starts: the op's arguments (left in the spawner's
+; record, copied by C2Scene_TaskSpawn) and the fade's own fields. The
+; fade's step arrays .RedStep-.BlueStep (+$10-$3F) overwrite the arguments at
+; +$32-$37, so it copies them to +$07-$0D first.
+struct C2Scene_PalTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 (C2Scene_Task.Unk02): the fade's state, 0-2
+.Timer:     skip 2     ; +$03 = C2Scene_Task.Frames: frames since the last step (C2Scene_TaskRunAll counts)
+.Steps:     skip 2     ; +$05 fade steps done (C2Scene_PalFadeSteps in all)
+.Palette:   skip 2     ; +$07 the fade's copy of .ArgPalette
+.Rate:      skip 1     ; +$09 the fade's copy of .ArgRate: frames per step
+            skip 1
+.Src:       skip 2     ; +$0B the fade's copy of .ArgSrc
+.SrcBank:   skip 1     ; +$0D the fade's copy of .ArgBank
+.Colors:    skip 2     ; +$0E address of the palette's 16 colors in C2Scene_PaletteBuf
+.RedStep:   skip 16    ; +$10 per color: the red steps still to take (C2Scene_PalFadePlan)
+.GreenStep: skip 16    ; +$20 the same for green
+.BlueStep:  skip 2     ; +$30 the same for blue, 16 B (+$30-$3F, over the arguments below)
+.ArgPalette: skip 2    ; +$32 palette number 0-15 (op $04 arg 4; high byte 0) = C2Scene_Task.OpState
+.ArgRate:   skip 1     ; +$34 0: copy at once; else fade, one step per this many frames (arg 5)
+.ArgSrc:    skip 2     ; +$35 address of the 16 new colors (args 1-2)
+.ArgBank:   skip 1     ; +$37 their bank (arg 3)
+            skip 8
+endstruct
+
+; C2Scene_TaskUnk20A2/2105/2194/21F8 (screen fades and mosaic, started by
+; script ops $28-$2B): the state and what they read from the spawning op.
+struct C2Scene_FxTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 (C2Scene_Task.Unk02, 0 from C2Scene_TaskSpawn)
+.Timer:     skip 2     ; +$03 = C2Scene_Task.Frames: frames since the last step (only the
+                       ; low byte is reset)
+            skip 2
+.OpPtr:     skip 3     ; +$07 = .ScriptPtr/.ScriptBank copied from the spawner: its op
+.Rate:      skip 1     ; +$0A frames per step (op arg 1, or arg 2 for the mosaic)
+            skip $35
 endstruct
 
 ; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),
