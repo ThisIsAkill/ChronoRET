@@ -109,8 +109,6 @@ if !ram_engine_inc == 0
 !Field_EventHook = $39                   ; 8-bit; Field_EventHookDispatch runs table entry (value -
                                          ; 1) when nonzero
 !Field_Unk44 = $44                       ; 8-bit flags; Field_UnkAF4E acts on bits 0/1
-!Field_Unk45 = $45                       ; 8-bit; DefaultHandler mode-swap bookkeeping
-!Field_Unk46 = $46                       ; 8-bit; DefaultHandler mode-swap bookkeeping
 !Pad_Unk00F6Latch = $50                  ; 8-bit; GameLoop_FrameBody ORs Pad_Unk00F6 into it every
                                          ; frame
 !Pad_PressedLatch = $51                  ; 8-bit; GameLoop_FrameBody ORs the low byte of Pad_Pressed
@@ -191,6 +189,11 @@ if !ram_engine_inc == 0
                                          ; runs Sub_E12A on after a reload
 !Obj_FocusMode3 = $78                    ; 8-bit tertiary focus mode flag (Obj_AnimTickAndQueue);
                                          ; zeroed at load
+!Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
+                                         ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
+                                         ; (swapping the two tilemap bases) for 3, then clears it
+!Field_MapRedrawDone = $46               ; 8-bit; DefaultHandler stores the redraw step just done
+                                         ; (1-4)
 
 ; --- OAM shadow build (PostVBlank / Sub_B309) (dp) ---
 !Oam_Range1PrevEnd = $7B                 ; 16-bit OAM shadow address where range 1 ended last frame;
@@ -223,19 +226,36 @@ if !ram_engine_inc == 0
 !Audio_SfxTileAnimA = $FC                ; 8-bit sound-effect id passed by Audio_PlayTileSfxA (Mode*
                                          ; tile-animation handlers); $53 at load
 
-; --- Tile animation (door/switch tile modes) (dp) ---
-!Field_TileAnimX = $5B                   ; 8-bit map column of the tile being animated; 16-bit loads
-                                         ; take Field_TileAnimY as the high byte, giving the
-                                         ; Map_TileProps index
-!Field_TileAnimY = $5C                   ; 8-bit map row of the tile being animated (high byte of the
-                                         ; Map_TileProps index)
-!Field_Unk5F = $5F                       ; 8-bit flags; the tile-animation handlers set bit 4 when
-                                         ; they queue tilemap updates
-
 ; --- Generic (dp) ---
 !Dp_TableStart = $00                     ; offset 0 from DP, for loops that point DP at a table
                                          ; (Obj_ResetStates points it at Obj_State); not a field-page
                                          ; variable
+
+; --- Tile animation (door/switch tiles; Field_SceneChangeTick bit 4, DefaultHandler bit 1) (dp) ---
+!Field_TileAnimX = $5B                   ; 8-bit map column of the tile that started the animation; a
+                                         ; 16-bit load takes Field_TileAnimY as the high byte, giving
+                                         ; the Map_TileProps index
+!Field_TileAnimY = $5C                   ; 8-bit map row of that tile (high byte of the Map_TileProps
+                                         ; index). Earlier comments swapped row and column
+!Field_TileStepX = $5D                   ; 8-bit map column for DefaultHandler's single-tile step;
+                                         ; 16-bit load = Map_TileProps index
+!Field_TileStepY = $5E                   ; 8-bit map row for DefaultHandler's single-tile step
+!Field_VramQueueFlags = $5F              ; 8-bit; bit 4 = TileAnim_VramAddrs filled by a
+                                         ; Mode*_Handler, bit 1 = TileAnim_StepVramAddrs filled by
+                                         ; DefaultHandler (inferred: picked up by the tilemap
+                                         ; uploader)
+!TileAnim_PairCount = $60                ; 8-bit tiles changed / 2, minus 1: 0 for ModeE6 (2 tiles),
+                                         ; 1 for ModeEC/EE (4), 2 for ModeFA/FC (6)
+!TileAnim_StepKind = $61                 ; 8-bit; DefaultHandler sets 0 when the stepped tile was
+                                         ; $FE, 1 when it was $E0
+
+; --- Scratch (dp) ---
+!Eng_Scratch = $D9                       ; 16-bit general scratch, reused by many routines
+!TileAnim_OriginX = $DB                  ; alias of Oam_Range1LoPtr's slot used as scratch by the
+                                         ; tile-animation handlers: copy of Map_TileOriginX
+!TileAnim_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot used as scratch by the
+                                         ; tile-animation handlers: copy of Map_TileOriginY
+!Bg_RowWordOfs = $D9                     ; $D9 in Bg_TilemapIndex64x32: row * 32
 
 ;
 ; Absolute names. Low WRAM ($0000-$1FFF) is given as a 16-bit address
@@ -368,6 +388,25 @@ if !ram_engine_inc == 0
 !Map_TileProps = $7E3000                 ; one byte per map tile, row stride $100 (index = row*256 +
                                          ; column); values $E6/$EC/$EE/$FA/$FC select tile-animation
                                          ; modes
+
+; --- Map / BG (page $1D00, also used as a direct page) ---
+!Map_TileOriginX = $1D0A                 ; 16-bit; subtracted from (map column x 2) before wrapping
+                                         ; into the 64x32 tilemap (inferred: BG scroll origin in 8x8
+                                         ; tiles)
+!Map_TileOriginY = $1D0E                 ; 16-bit; as Map_TileOriginX for rows
+!Map_TilemapVram = $1D7C                 ; 16-bit VRAM word address of the tilemap the tile
+                                         ; animations write to; DefaultHandler swaps it with
+                                         ; Map_TilemapVram2 for redraw mode 3
+!Map_TilemapVram2 = $1D82                ; 16-bit second tilemap base (swapped with Map_TilemapVram
+                                         ; by DefaultHandler)
+!Map_BgColBias = $1D99                   ; 8-bit (read through a 16-bit ADC, high byte masked off)
+                                         ; added to the tilemap column
+!Map_BgRowBias = $1D9A                   ; 8-bit (read through a 16-bit ADC, high byte masked off)
+                                         ; added to the tilemap row
+!TileAnim_StepVramAddrs = $09B2          ; 4 words: VRAM addresses of the four 8x8 tiles of
+                                         ; DefaultHandler's stepped map tile (TL, TR, BL, BR)
+!TileAnim_VramAddrs = $09CA              ; up to 24 words: VRAM addresses of the 8x8 tiles of each
+                                         ; animated map tile, 4 per tile (TL, TR, BL, BR)
 
 ; One OAM low-table entry; used as abs,X with X = the entry's address (PostVBlank)
 struct OamEntry $0000

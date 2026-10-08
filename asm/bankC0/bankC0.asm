@@ -5132,9 +5132,9 @@ FrameStateInit:
     STZ.b !Field_Unk2D
     STZ.b !Field_Unk30
     STZ.b !Field_Unk44
-    STZ.b !Field_Unk45
-    STZ.b !Field_Unk46
-    STZ.b !Field_Unk5F
+    STZ.b !Field_MapRedrawSel
+    STZ.b !Field_MapRedrawDone
+    STZ.b !Field_VramQueueFlags
     STZ.b !Obj_FocusMode3
     STZ.b !Field_UnkBB
     STZ.b !Field_Unk62
@@ -6150,1742 +6150,1672 @@ Sub_1ADF:
 .use_65_val:             ; $1B32
     LDA.b !Field_Unk65
     BRA .store_63
-; Mode-$E6 tile animation. BRL target from Field_SceneChangeTick bit-4 dispatch
-; (mode $E6 case).
-; On entry: A=$E6 (current mode), X=layer index, M=1, X/Y=16-bit.
+
+; ============================================================
+; $C0:0D78 — ModeE6_Handler (231 bytes, $0D78–$0E5E)
+; Tile animation for map-tile state $E6: a 1x2 column, the tile at
+; (Field_TileAnimX, Field_TileAnimY) and the one above it.
+; BRL target from Field_SceneChangeTick (Field_SceneFlags bit 4).
+; On entry: A = $E6, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ;
-; This block increments both the current and previous layer modes in
-; the $7E:3000 mode table (current: $E6→$E7; previous: whatever→+1).
-; Then triggers an SPC audio command via Audio_PlayTileSfxA, loads two 16-bit
-; scroll base registers ($1D0A→dp:$DB, $1D0E→dp:$DD), and falls into
-; the computation block (org $C00DA1 below) to compute 8 VRAM indices.
-;
-; [Split into two org blocks so Sub_1B36 (which needs M=0) can appear
-;  between them in file order, inheriting the REP #$20 state.]
+; The general shape, shared by all five Mode*_Handlers:
+;  1. Advance the state byte of each affected map tile in
+;     Map_TileProps by one ($E6 → $E7 here), set TileAnim_PairCount
+;     and play Audio_SfxTileAnimA.
+;  2. For each affected map tile ("pass"), compute the VRAM word
+;     address of its four 8x8 tiles in the 64x32 BG tilemap
+;     (Bg_TilemapIndex64x32 + Map_TilemapVram) into TileAnim_VramAddrs,
+;     4 words per map tile in TL, TR, BL, BR order.
+;  3. Set VramQueue_TileAnim in Field_VramQueueFlags and continue in
+;     DefaultHandler.
+; Earlier comments here swapped rows and columns: Field_TileAnimX
+; ($5B) is the map column, Field_TileAnimY ($5C) the row.
 ; ============================================================
 org $C00D78
 ModeE6_Handler:
-    INC                  ; A = $E7 (current mode $E6 + 1)
-    STA.l $7E3000,X      ; update current layer: $E6 → $E7
+    INC                  ; tile state $E6 → $E7
+    STA.l !Map_TileProps,X ; tile (col, row)
     REP #$20             ; A → 16-bit
-    TXA                  ; A = current layer index (16-bit)
+    TXA
     SEC
-    SBC #$0100           ; A = previous layer index
-    TAX                  ; X = previous layer
-    LDA.l $7E3000,X      ; load previous layer mode (16-bit)
-    INC                  ; advance previous mode
-    STA.l $7E3000,X      ; write back
-    SEP #$20             ; A → 8-bit
-    STZ $60              ; clear dp:$60 (layer-loop counter)
-    JSR Audio_PlayTileSfxA         ; trigger SPC audio command
-    REP #$20             ; A → 16-bit
-    LDA $1D0A            ; scroll X base (abs 16-bit)
-    STA $DB              ; dp:$DB/$DC = scroll X base
-    LDA $1D0E            ; scroll Y base
-    STA $DD              ; dp:$DD/$DE = scroll Y base
-    ; [M=0 here — Sub_1B36 follows in file order with correct M=0 state]
-
-; ============================================================
-; $C0:1B36 — Sub_1B36 (29 bytes, $1B36–$1B52)
-; VRAM tilemap word-index calculator.
-; On entry (M=0 = 16-bit A): A=tile col (0–31), Y=tile row (0–63).
-; Returns: A = VRAM word index = col*32 + (row<32 ? row : row-32+$0400).
-; Encodes a 32-col × 64-row BG tilemap split across two VRAM pages
-; ($0000 for rows 0–31, $0400 for rows 32–63).
-; Called from ModeE6_Handler computation block to build scroll table.
-; [M=0 (16-bit A) inherited from ModeE6_Handler header above]
-; ============================================================
-org $C01B36
-Sub_1B36:
-    ASL                  ; col × 2
-    ASL                  ; col × 4
-    ASL                  ; col × 8
-    ASL                  ; col × 16
-    ASL                  ; col × 32
-    STA $D9              ; dp:$D9/$DA = col*32 (16-bit store)
-    TYA                  ; A = row
-    CMP #$0020           ; row ≥ 32?
-    BCS .rowhi
-    CLC
-    ADC $D9              ; A = row + col*32
-    RTS
-.rowhi:
-    SEC
-    SBC #$0020           ; row -= 32
-    CLC
-    ADC $D9              ; A = (row-32) + col*32
-    CLC
-    ADC #$0400           ; + $0400 (second tilemap VRAM page)
-    RTS
-    ; [M=0 here — ModeE6_Handler computation block continues below]
-
-; ============================================================
-; $C0:0DA1 — ModeE6_Handler computation block ($0DA1–$0E5E)
-; Computes 8 VRAM scroll-map word indices (2 passes of 4 corners each)
-; and stores to $09CA–$09D8. Pass 1 uses col derived from dp:$5C;
-; pass 2 uses (dp:$5C - 1). Ends by setting bit 4 of dp:$5F and
-; tail-jumping to the default mode handler via BRL DefaultHandler ($16DC).
-; [M=0 (16-bit A) inherited from Sub_1B36 above]
-; ============================================================
-org $C00DA1
-    ; --- Pass 1: 4-corner VRAM indices at (col, row) + neighbours ---
-    LDA $5B              ; scroll row base (16-bit dp load)
-    ASL
-    SEC
-    SBC $DB              ; subtract scroll X base
-    CLC
-    ADC $1D99            ; add row adjustment
-    AND #$003F           ; wrap to 64 rows
-    TAY                  ; Y = tile row (0–63)
-    LDA $5C              ; scroll col base (16-bit dp load)
-    ASL
-    SEC
-    SBC $DD              ; subtract scroll Y base
-    CLC
-    ADC $1D9A            ; add col adjustment
-    AND #$001F           ; wrap to 32 cols
-    TAX                  ; X = col (A = col too; TAX doesn't modify A)
-    JSR Sub_1B36         ; → A = VRAM index(col, row)
-    CLC
-    ADC $1D7C            ; add VRAM base
-    STA $09CA            ; BG scroll VRAM word 0
-    TYA                  ; A = row
-    PHA                  ; save row on stack
-    INC                  ; row + 1
-    AND #$003F
-    TAY                  ; Y = (row+1) wrapped
-    TXA                  ; A = col (X unchanged by Sub_1B36)
-    JSR Sub_1B36         ; → A = VRAM index(col, row+1)
-    CLC
-    ADC $1D7C
-    STA $09CC            ; BG scroll VRAM word 1
-    PLY                  ; Y = original row
-    TXA                  ; A = col
-    INC                  ; col + 1
-    AND #$001F
-    TAX                  ; X = (col+1) wrapped
-    JSR Sub_1B36         ; → A = VRAM index(col+1, row)
-    CLC
-    ADC $1D7C
-    STA $09CE            ; BG scroll VRAM word 2
-    TYA                  ; A = original row
-    INC                  ; row + 1
-    AND #$003F
-    TAY                  ; Y = (row+1) wrapped
-    TXA                  ; A = col+1
-    JSR Sub_1B36         ; → A = VRAM index(col+1, row+1)
-    CLC
-    ADC $1D7C
-    STA $09D0            ; BG scroll VRAM word 3
-    ; --- Pass 2: same 4-corner pattern, col base decremented by 1 ---
-    LDA $5B
-    ASL
-    SEC
-    SBC $DB
-    CLC
-    ADC $1D99
-    AND #$003F
-    TAY                  ; Y = tile row (same formula)
-    LDA $5C
-    DEC                  ; DEC A (opcode 3A): col base − 1
-    ASL
-    SEC
-    SBC $DD
-    CLC
-    ADC $1D9A
-    AND #$001F
+    SBC.w #!Map_RowStride ; index of (col, row-1)
     TAX
-    JSR Sub_1B36         ; → A = VRAM index(col', row)
+    LDA.l !Map_TileProps,X ; 16-bit: (col, row-1) and its right neighbour
+    INC                  ; +1 lands in (col, row-1)
+    STA.l !Map_TileProps,X
+    SEP #$20             ; A → 8-bit
+    STZ.b !TileAnim_PairCount ; one pair of tiles
+    JSR Audio_PlayTileSfxA
+    REP #$20             ; A → 16-bit
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D7C
-    STA $09D2            ; BG scroll VRAM word 4
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginY
+    CLC
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36         ; → A = VRAM index(col', row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4            ; BG scroll VRAM word 5
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36         ; → A = VRAM index(col'+1, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6            ; BG scroll VRAM word 6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36         ; → A = VRAM index(col'+1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8            ; BG scroll VRAM word 7
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginX
+    CLC
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
+    SEC
+    SBC.b !TileAnim_OriginY
+    CLC
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
+    TYA
+    PHA
+    INC
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    TXA
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
+    PLY
+    TXA
+    INC
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
+    TYA
+    INC
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    TXA
+    JSR Bg_TilemapIndex64x32
+    CLC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
     SEP #$20             ; A → 8-bit
-    LDA #$10
-    TSB $5F              ; set bit 4 of dp:$5F (scroll-update trigger)
-    BRL DefaultHandler            ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
+
+; ============================================================
+; $C0:1B36 — Bg_TilemapIndex64x32 (29 bytes, $1B36–$1B52)
+; (was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap
+; made of two 32x32 screens side by side.
+; On entry (M=0): A = tile row (0-31), Y = tile column (0-63).
+; Returns A = row*32 + column for columns 0-31, or
+;             row*32 + (column-32) + $0400 for columns 32-63.
+; (Earlier comments had the row and column inputs swapped.)
+; Called by the Mode*_Handlers and DefaultHandler; uses Eng_Scratch.
+; ============================================================
+org $C01B36
+Bg_TilemapIndex64x32:
+    ASL
+    ASL
+    ASL
+    ASL
+    ASL                  ; row × 32
+    STA.b !Bg_RowWordOfs
+    TYA                  ; A = column
+    CMP.w #!Bg_ScreenWidth
+    BCS .rowhi           ; right-hand screen
+    CLC
+    ADC.b !Bg_RowWordOfs ; row*32 + column
+    RTS
+.rowhi:
+    SEC
+    SBC.w #!Bg_ScreenWidth ; column - 32
+    CLC
+    ADC.b !Bg_RowWordOfs
+    CLC
+    ADC.w #!Bg_ScreenWords ; + the left screen's $400 words
+    RTS
 
 ; ============================================================
 ; $C0:0E5F — ModeEC_Handler (437 bytes, $0E5F–$1013)
-; Mode-$EC scroll-map update. BRL target from Field_SceneChangeTick bit-4 dispatch
-; (mode $EC case).
-; On entry: A=$EC (current mode), X=layer index, M=1, X/Y=16-bit.
-;
-; Prologue: updates 4 entries in the $7E:3000 mode table
-; (current, current+1, current-$100, current-$101), each incremented
-; by 1. Sets dp:$60=$01 (vs STZ in ModeE6_Handler), then calls
-; Audio_PlayTileSfxA (SPC audio). Confirmed: both Sub_1B36 and Audio_PlayTileSfxA reused.
-;
-; Computation: 4 passes × 4 VRAM corner indices = 16 JSR Sub_1B36 calls,
-; storing to $09CA–$09E8 (vs 8 calls/$09CA–$09D8 in mode $E6).
-; Pass 1: row=$5B,   col=$5C   (note: uses LDX $5B; TXA anomaly)
-; Pass 2: row=$5B,   col=$5C−1
-; Pass 3: row=$5B+1, col=$5C
-; Pass 4: row=$5B+1, col=$5C−1
-; Ends by setting bit 4 of dp:$5F and BRL to $16DC (default handler).
+; Tile animation for map-tile state $EC: a 2x2 block, columns
+; col..col+1, rows row-1..row. Same shape as ModeE6_Handler; 4 passes.
+; On entry: A = $EC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C00E5F
 ModeEC_Handler:
     INC A                   ; $EC → $ED
-    STA.l $7E3000,X         ; update current layer entry
-    INX                     ; advance to next layer entry
-    LDA.l $7E3000,X         ; load next entry (M=1, byte load)
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    INX                     ; X = tile (col+1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update next entry
+    STA.l !Map_TileProps,X  ; tile (col+1, row)
     REP #$20                ; M → 0 (16-bit A)
-    TXA                     ; A = X (16-bit layer index)
+    TXA
     SEC
-    SBC #$0100              ; A = X − $0100
-    TAX                     ; X = previous block
+    SBC.w #!Map_RowStride   ; A = index of (col+1, row-1)
+    TAX
     SEP #$20                ; M → 1 (8-bit A)
-    LDA.l $7E3000,X         ; load entry at X−$100
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update it
-    DEX                     ; X = X − 1
-    LDA.l $7E3000,X         ; load entry at X−$101
+    STA.l !Map_TileProps,X
+    DEX                     ; (col, row-1)
+    LDA.l !Map_TileProps,X  ; load entry at (col, row-1)
     INC A
-    STA.l $7E3000,X         ; update it
+    STA.l !Map_TileProps,X
     LDA #$01
-    STA $60                 ; dp:$60 = $01 (vs STZ in ModeE6_Handler)
-    JSR Audio_PlayTileSfxA            ; SPC audio command $19
-    ; --- Computation block: 4 passes × 4 VRAM corner indices ---
+    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
+    JSR Audio_PlayTileSfxA
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20                ; M → 0 (16-bit A)
-    LDA $1D0A               ; scroll X base (abs 16-bit)
-    STA $DB                 ; dp:$DB/$DC
-    LDA $1D0E               ; scroll Y base
-    STA $DD                 ; dp:$DD/$DE
-    ; --- Pass 1: row=$5B, col=$5C → $09CA–$09D0 ---
-    ; (anomaly: uses LDX $5B / TXA instead of LDA $5B)
-    LDX $5B                 ; X = dp:$5B (row base, 16-bit X load)
-    TXA                     ; A = row base (16-bit)
-    ASL                     ; A = row*2
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
+    TXA
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB                 ; A = row*2 − $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99               ; + row adjustment
-    AND #$003F              ; wrap to 64 rows
-    TAY                     ; Y = tile row
-    LDA $5C                 ; A = col base
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F              ; wrap to 32 cols
-    TAX                     ; X = tile col
-    JSR Sub_1B36            ; A = VRAM index(col, row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C               ; + VRAM base
-    STA $09CA               ; VRAM word 0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC               ; VRAM word 1
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col+1, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE               ; VRAM word 2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0               ; VRAM word 3
-    ; --- Pass 2: row=$5B, col=$5C−1 → $09D2–$09D8 ---
-    LDA $5B                 ; A = row base (normal LDA this time)
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col − 1 (DEC A = 3A)
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col−1, row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2               ; VRAM word 4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4               ; VRAM word 5
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6               ; VRAM word 6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8               ; VRAM word 7
-    ; --- Pass 3: row=$5B+1, col=$5C → $09DA–$09E0 ---
-    LDA $5B
-    INC                     ; row + 1 (INC A = 1A)
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
+    ; --- Pass 3: map tile (col+1, row) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL                     ; col unchanged (no DEC)
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA               ; VRAM word 8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC               ; VRAM word 9
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE               ; VRAM word 10
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col+1, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0               ; VRAM word 11
-    ; --- Pass 4: row=$5B+1, col=$5C−1 → $09E2–$09E8 ---
-    LDA $5B
-    INC                     ; row + 1
-    ASL
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
+    ; --- Pass 4: map tile (col+1, row-1) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col − 1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+1)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2               ; VRAM word 12
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col−1, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4               ; VRAM word 13
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(col, row+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6               ; VRAM word 14
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(col, row+2)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8               ; VRAM word 15
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
     SEP #$20                ; A → 8-bit
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F (scroll-update trigger)
-    BRL DefaultHandler               ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:1014 — ModeEE_Handler (437 bytes, $1014–$11C8)
-;
-; Scroll mode $EE handler: updates 4 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 16 tilemap
-; corners (4 passes × 4 corners), storing to $09CA–$09E8.
-;
-; Row range: $5B−1, $5B  (negative direction vs Mode-EC)
-; Col range: $5C, $5C−1
-;
-; Differences from ModeEC_Handler:
-;   - Step 2 uses DEX (not INX) → updates current−1 (not +1)
-;   - Step 4 uses INX (not DEX) → lands at current−$100
-;   - JSR Audio_PlayTileSfxA is called BEFORE STA $60 (reversed from EC)
-;   - Pass 1 row: LDX $5B; TXA; DEC; ASL (row−1, LDX anomaly)
-;   - Pass 2 row: LDA $5B; DEC; ASL  (row−1 without LDX)
-;   - Passes 3–4 row: LDA $5B; ASL   (row, no dec/inc)
-;   - Passes 1,3 col: LDA $5C; ASL   (col, no dec)
-;   - Passes 2,4 col: LDA $5C; DEC; ASL (col−1)
-;   - Tail BRL → DefaultHandler ($16DC)
+; Tile animation for map-tile state $EE: a 2x2 block, columns
+; col-1..col, rows row-1..row (ModeEC_Handler mirrored). 4 passes.
+; On entry: A = $EE, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C01014
 ModeEE_Handler:
-    ; --- Prologue: update 4 mode-table entries (51 bytes) ---
-    INC A                   ; mode byte $EE → $EF
-    STA.l $7E3000,X         ; update current entry
-    DEX                     ; X → current−1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 4 tiles ---
+    INC A                   ; tile state $EE → $EF
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    DEX                     ; X = tile (col-1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−1
+    STA.l !Map_TileProps,X  ; tile (col-1, row)
     REP #$20                ; M → 0 (16-bit A)
     TXA
     SEC
-    SBC #$0100              ; A = current−1−$100 = current−$101
+    SBC.w #!Map_RowStride   ; A = index of (col-1, row-1)
     TAX
     SEP #$20                ; M → 1 (8-bit A)
-    LDA.l $7E3000,X         ; load current−$101
+    LDA.l !Map_TileProps,X  ; tile (col-1, row-1)
     INC A
-    STA.l $7E3000,X         ; update current−$101
-    INX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col-1, row-1)
+    INX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
-    JSR Audio_PlayTileSfxA            ; SPC audio command $19 (called BEFORE STA $60)
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
+    JSR Audio_PlayTileSfxA            ; (before setting TileAnim_PairCount here)
     LDA #$01
-    STA $60                 ; dp:$60 = $01
+    STA.b !TileAnim_PairCount ; 1 + 1 pairs of tiles
 
-    ; --- Computation header: load scroll bases (12 bytes) ---
-    REP #$20                ; M → 0 (16-bit A for all computation below)
-    LDA $1D0A               ; scroll X base
-    STA $DB                 ; dp:$DB/$DC
-    LDA $1D0E               ; scroll Y base
-    STA $DD                 ; dp:$DD/$DE
+    ; --- VRAM addresses of the 8x8 tiles ---
+    REP #$20                ; M → 0 (16-bit A)
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly: uses LDX+TXA instead of LDA, same as ModeEC pass 1)
-    LDX $5B                 ; X = dp:$5B (16-bit, row base)
-    TXA                     ; A = row base
-    DEC                     ; A = row−1
-    ASL                     ; A = (row−1)×2
+    ; --- Pass 1: map tile (col-1, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
+    TXA
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C                 ; A = col base (16-bit load from dp:$5C/$5D)
-    ASL                     ; A = col×2
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(row−1, col)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(row, col)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36            ; A = VRAM index(row−1, col+1)
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36            ; A = VRAM index(row, col+1)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 2: map tile (col-1, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = $5B×2, col = $5C×2 → $09DA–$09E0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 3: map tile (col, row) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = $5B×2, col = ($5C−1)×2 → $09E2–$09E8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 4: map tile (col, row-1) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2               ; corner (0,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4               ; corner (1,0)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6               ; corner (0,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8               ; corner (1,1)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Tail (9 bytes) ---
+
     SEP #$20                ; A → 8-bit
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F
-    BRL DefaultHandler               ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:11C9 — ModeFA_Handler (651 bytes, $11C9–$1453)
-;
-; Scroll mode $FA handler: updates 6 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 24 tilemap
-; corners (6 passes × 4 corners), storing to $09CA–$09F8.
-;
-; Row range: $5B, $5B+1  (positive direction, same as EC)
-; Col range: $5C, $5C−1, $5C−2  (3 columns)
-;
-; dp:$60 set to $02 (vs $01 for EC/EE)
-; JSR Audio_PlayTileSfxA called before STA $60 (same as EE)
-; Pass 1 uses LDX $5B anomaly (no DEC/INC, same as EC/EC)
-; Passes 3,6 use double DEC for col (col−2)
+; Tile animation for map-tile state $FA: a 2-wide, 3-tall block,
+; columns col..col+1, rows row-2..row. 6 passes.
+; On entry: A = $FA, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C011C9
 ModeFA_Handler:
-    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
-    INC A                   ; mode byte $FA → $FB
-    STA.l $7E3000,X         ; update current
-    INX                     ; X → current+1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 6 tiles ---
+    INC A                   ; tile state $FA → $FB
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    INX                     ; X = tile (col+1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current+1
+    STA.l !Map_TileProps,X  ; tile (col+1, row)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current+1−$100 = current−$FF
+    SBC.w #!Map_RowStride   ; A = index of (col+1, row-1)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$FF
-    DEX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col+1, row-1)
+    DEX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−$200
+    SBC.w #!Map_RowStride   ; A = index of (col, row-2)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$200
-    INX                     ; X → current−$1FF
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col, row-2)
+    INX                     ; X = tile (col+1, row-2)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$1FF
-    JSR Audio_PlayTileSfxA            ; SPC audio command $19
+    STA.l !Map_TileProps,X  ; tile (col+1, row-2)
+    JSR Audio_PlayTileSfxA
     LDA #$02
-    STA $60                 ; dp:$60 = $02
+    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
 
-    ; --- Computation header (12 bytes) ---
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
-    LDA $1D0A
-    STA $DB
-    LDA $1D0E
-    STA $DD
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = $5B×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly: no DEC/INC on row)
-    LDX $5B
+    ; --- Pass 1: map tile (col, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
     TXA
-    ASL
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = $5B×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 2: map tile (col, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = $5B×2, col = ($5C−2)×2 → $09DA–$09E0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 3: map tile (col, row-2) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = ($5B+1)×2, col = $5C×2 → $09E2–$09E8 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 4: map tile (col+1, row) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Pass 5: row = ($5B+1)×2, col = ($5C−1)×2 → $09EA–$09F0 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 5: map tile (col+1, row-1) → TileAnim_VramAddrs+32..+38 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+32 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+34 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+36 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+38 ; bottom-right 8x8 tile
 
-    ; --- Pass 6: row = ($5B+1)×2, col = ($5C−2)×2 → $09F2–$09F8 ---
-    LDA $5B
-    INC                     ; row+1
-    ASL
+    ; --- Pass 6: map tile (col+1, row-2) → TileAnim_VramAddrs+40..+46 ---
+    LDA.b !Field_TileAnimX
+    INC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+40 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+42 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+44 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+46 ; bottom-right 8x8 tile
 
-    ; --- Tail (9 bytes) ---
+
     SEP #$20
-    LDA #$10
-    TSB $5F
-    BRL DefaultHandler               ; → $16DC (default mode handler)
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags
+    BRL DefaultHandler
 
 ; ============================================================
 ; $C0:1454 — ModeFC_Handler (648 bytes, $1454–$16DB)
-;
-; Scroll mode $FC handler: updates 6 entries in the $7E:3000
-; layer table, then computes VRAM word-indices for 24 tilemap
-; corners (6 passes × 4 corners), storing to $09CA–$09F8.
-;
-; Row range: $5B−1, $5B  (negative direction, like EE)
-; Col range: $5C, $5C−1, $5C−2  (3 columns)
-;
-; dp:$60 set to $02 (same as FA)
-; JSR Audio_PlayTileSfxA called before STA $60 (same as EE/FA)
-; Pass 1 uses LDX $5B anomaly WITH DEC (like ModeEE pass 1)
-; Passes 3,6 use double DEC for col (col−2)
-; NO tail BRL — falls through directly to $16DC (DefaultModeHandler)
+; Tile animation for map-tile state $FC: a 2-wide, 3-tall block,
+; columns col-1..col, rows row-2..row (ModeFA_Handler mirrored).
+; 6 passes; falls through into DefaultHandler.
+; On entry: A = $FC, X = Map_TileProps index of (col, row), M=1, X/Y 16-bit.
 ; ============================================================
 org $C01454
 ModeFC_Handler:
-    ; --- Prologue: update 6 mode-table entries (80 bytes) ---
-    INC A                   ; mode byte $FC → $FD
-    STA.l $7E3000,X         ; update current
-    DEX                     ; X → current−1
-    LDA.l $7E3000,X
+    ; --- Advance the state of the 6 tiles ---
+    INC A                   ; tile state $FC → $FD
+    STA.l !Map_TileProps,X  ; tile (col, row)
+    DEX                     ; X = tile (col-1, row)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−1
+    STA.l !Map_TileProps,X  ; tile (col-1, row)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−1−$100 = current−$101
+    SBC.w #!Map_RowStride   ; A = index of (col-1, row-1)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$101
-    INX                     ; X → current−$100
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col-1, row-1)
+    INX                     ; X = tile (col, row-1)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$100
+    STA.l !Map_TileProps,X  ; tile (col, row-1)
     REP #$20
     TXA
     SEC
-    SBC #$0100              ; A = current−$200
+    SBC.w #!Map_RowStride   ; A = index of (col, row-2)
     TAX
     SEP #$20
-    LDA.l $7E3000,X
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$200
-    DEX                     ; X → current−$201
-    LDA.l $7E3000,X
+    STA.l !Map_TileProps,X  ; tile (col, row-2)
+    DEX                     ; X = tile (col-1, row-2)
+    LDA.l !Map_TileProps,X
     INC A
-    STA.l $7E3000,X         ; update current−$201
-    JSR Audio_PlayTileSfxA            ; SPC audio command $19
+    STA.l !Map_TileProps,X  ; tile (col-1, row-2)
+    JSR Audio_PlayTileSfxA
     LDA #$02
-    STA $60                 ; dp:$60 = $02
+    STA.b !TileAnim_PairCount ; 2 + 1 pairs of tiles
 
-    ; --- Computation header (12 bytes) ---
+    ; --- VRAM addresses of the 8x8 tiles ---
     REP #$20
-    LDA $1D0A
-    STA $DB
-    LDA $1D0E
-    STA $DD
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
 
-    ; --- Pass 1: row = ($5B−1)×2, col = $5C×2 → $09CA–$09D0 ---
-    ; (LDX $5B anomaly WITH DEC, same as ModeEE pass 1)
-    LDX $5B
+    ; --- Pass 1: map tile (col-1, row) → TileAnim_VramAddrs+0..+6 ---
+    LDX.b !Field_TileAnimX      ; LDX+TXA here, LDA in the other passes
     TXA
-    DEC                     ; row−1
-    ASL
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs   ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+2 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09CE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+4 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+6 ; bottom-right 8x8 tile
 
-    ; --- Pass 2: row = ($5B−1)×2, col = ($5C−1)×2 → $09D2–$09D8 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 2: map tile (col-1, row-1) → TileAnim_VramAddrs+8..+14 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+8 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+10 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+12 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09D8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+14 ; bottom-right 8x8 tile
 
-    ; --- Pass 3: row = ($5B−1)×2, col = ($5C−2)×2 → $09DA–$09E0 ---
-    LDA $5B
-    DEC                     ; row−1
-    ASL
+    ; --- Pass 3: map tile (col-1, row-2) → TileAnim_VramAddrs+16..+22 ---
+    LDA.b !Field_TileAnimX
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+16 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+18 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09DE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+20 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+22 ; bottom-right 8x8 tile
 
-    ; --- Pass 4: row = $5B×2, col = $5C×2 → $09E2–$09E8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 4: map tile (col, row) → TileAnim_VramAddrs+24..+30 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+24 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+26 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+28 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09E8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+30 ; bottom-right 8x8 tile
 
-    ; --- Pass 5: row = $5B×2, col = ($5C−1)×2 → $09EA–$09F0 ---
-    LDA $5B
-    ASL
+    ; --- Pass 5: map tile (col, row-1) → TileAnim_VramAddrs+32..+38 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EA
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+32 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EC
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+34 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09EE
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+36 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F0
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+38 ; bottom-right 8x8 tile
 
-    ; --- Pass 6: row = $5B×2, col = ($5C−2)×2 → $09F2–$09F8 ---
-    LDA $5B
-    ASL
+    ; --- Pass 6: map tile (col, row-2) → TileAnim_VramAddrs+40..+46 ---
+    LDA.b !Field_TileAnimX
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99
-    AND #$003F
-    TAY
-    LDA $5C
-    DEC                     ; col−1
-    DEC                     ; col−2
-    ASL
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
+    LDA.b !Field_TileAnimY
+    DEC
+    DEC
+    ASL                         ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DD
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F2
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+40 ; top-left 8x8 tile
     TYA
     PHA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+42 ; top-right 8x8 tile
     PLY
     TXA
     INC
-    AND #$001F
-    TAX
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                         ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F6
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+44 ; bottom-left 8x8 tile
     TYA
     INC
-    AND #$003F
-    TAY
+    AND.w #!Bg_ColMask64
+    TAY                         ; Y = tilemap column (0-63)
     TXA
-    JSR Sub_1B36
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09F8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_VramAddrs+46 ; bottom-right 8x8 tile
 
-    ; --- Tail (6 bytes, no BRL — falls through to $16DC) ---
+
     SEP #$20
-    LDA #$10
-    TSB $5F                 ; set bit 4 of dp:$5F
+    LDA.b #!VramQueue_TileAnim
+    TSB.b !Field_VramQueueFlags ; TileAnim_VramAddrs ready
 
 ; ============================================================
 ; $C0:16DC — DefaultHandler (509 bytes, $16DC–$18D8)
-; The "all other modes" arm of Field_SceneChangeTick's per-frame dispatch.
-; Reached by two BRL paths from Field_SceneChangeTick (bit-4 clear at $0D42,
-; and fall-through .default_mode at $0D75) and by fall-through
-; from ModeFC_Handler.
-;
-; Structurally distinct from the named mode handlers (E6/EC/EE/FA/FC):
-;   • Uses dp:$5D/$5E as the layer-state index (vs $5B/$5C)
-;   • VRAM write slots $09B2–$09B8 (vs $09CA–$09FA in named handlers)
-;   • Calls Audio_PlayTileSfxB (dp:$FB variant of Audio_PlayTileSfxA) instead of Audio_PlayTileSfxA
-;   • Bit-5 section drives a display-mode transition loop:
-;     loops JSR $885A / JSR $00BF until dp:$38 == 0, then selects
-;     one of four per-mode branches (dp:$45 = 1–4) that call
-;     mode-specific renderers ($75E9/$78EC/$7CB5/$74xx) and
-;     tail-call Sub_EC60 by BRL.
-;   • Bit-0 section handles scene-swap (JSR $024C probe, then
-;     JSL $C02C41 / $C10000 init and reinit of dp:$17/$18).
-;
+; The rest of Field_SceneChangeTick's request handling: reached by BRL
+; when Field_SceneFlags bit 4 is clear or the tile mode is not one of
+; the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by
+; fall-through from ModeFC_Handler. Three independent requests:
+;   bit 1 (SceneFlag_TileStep)  advance the single map tile at
+;         Field_TileStepX/Y if its state is $FE or $E0, play
+;         Audio_SfxTileAnimB and queue its four 8x8-tile VRAM
+;         addresses in TileAnim_StepVramAddrs (VramQueue_TileStep).
+;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + VBlankHandler
+;         frames until Field_Unk38 clears, then redraw map layers
+;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
+;         tail into Sub_EC60.
+;   bit 0 (SceneFlag_Battle)    unless Scene_Unk024C returns carry,
+;         enter the battle engine (JSL EngCall_BattleMain), then
+;         reinstall the interrupt handlers and rebuild the field;
+;         either way set FadeFlag_AfterBattle and finish with
+;         Field_IdleFrame.
+; Earlier notes called bit 5 a "display-mode transition" and bit 0 a
+; "scene swap"; the JSL into bank $C1 identifies bit 0 as the battle.
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100.
-; Exits via RTS (two paths), or BRL tail-calls to Sub_EC60 ($EC60)
-; or to $00EB (Field_FrameUpdate + VBlankHandlerShort + Sub_EC60).
 ; ============================================================
 org $C016DC
 DefaultHandler:
-    ; --- Bit 1 check: VRAM update needed? ---
-    LDA $17                 ; dp:$17 = transition flag byte
-    BIT #$02                ; test bit 1 (VRAM-update-needed flag)
-    BNE .vram_update        ; bit 1 set → do VRAM work
-    BRL .bit5_check               ; bit 1 clear → skip to .bit5_check ($1770)
+    ; --- Bit 1: single-tile step ---
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_TileStep
+    BNE .vram_update
+    BRL .bit5_check
 
 .vram_update:
-    ; Clear flag, trigger SPC command, scan layer-state entry
-    STZ $61                 ; dp:$61 = 0 (sub-index for state scan)
-    LDA #$02
-    TRB $17                 ; clear bit 1
-    JSR Audio_PlayTileSfxB            ; send SPC command using dp:$FB
-    LDX $5D                 ; X = layer-state index (dp:$5D, 16-bit)
-    LDA.l $7E3000,X         ; load current mode byte from layer-state table
-    CMP #$FE                ; terminal state $FE?
-    BEQ .do_advance         ; yes → advance
-    INC $61                 ; no → sub-index = 1
-    CMP #$E0                ; state $E0?
-    BEQ .do_advance         ; yes → advance
-    BRA .bit5_check         ; no → skip computation (BRA off=$70 → $1770)
+    STZ.b !TileAnim_StepKind
+    LDA.b #!SceneFlag_TileStep
+    TRB.b !Field_SceneFlags
+    JSR Audio_PlayTileSfxB
+    LDX.b !Field_TileStepX  ; 16-bit: Map_TileProps index
+    LDA.l !Map_TileProps,X
+    CMP.b #!TileAnim_StateFE
+    BEQ .do_advance
+    INC.b !TileAnim_StepKind ; 1 = the $E0 kind
+    CMP.b #!TileAnim_StateE0
+    BEQ .do_advance
+    BRA .bit5_check         ; any other state: nothing to do
 
 .do_advance:
-    INC A                   ; advance mode byte ($FE→$FF, $E0→$E1)
-    STA.l $7E3000,X         ; write back to layer-state table
+    INC A                   ; $FE → $FF, $E0 → $E1
+    STA.l !Map_TileProps,X
 
-    ; --- VRAM computation (M=0, 16-bit A) ---
-    ; Computes 4 VRAM scroll-map word indices using dp:$5D (col-like)
-    ; and dp:$5E (row-like) via Sub_1B36, writes to $09B2–$09B8.
+    ; --- VRAM addresses of the tile's four 8x8 tiles (as Mode*_Handler) ---
     REP #$20
-    LDA $1D0A               ; scroll param (16-bit abs read)
-    STA $DB                 ; dp:$DB/$DC = col base
-    LDA $1D0E
-    STA $DD                 ; dp:$DD/$DE = row base
-
-    ; Row: (X * 2 - $1D0A + $1D99) & $3F
-    TXA                     ; A = X (layer-state index as col input)
-    ASL                     ; A = X * 2
+    LDA.w !Map_TileOriginX
+    STA.b !TileAnim_OriginX
+    LDA.w !Map_TileOriginY
+    STA.b !TileAnim_OriginY
+    TXA                     ; index: low byte = column
+    ASL                     ; map tiles are 2x2 8x8 tiles
     SEC
-    SBC $DB                 ; A -= col base
+    SBC.b !TileAnim_OriginX
     CLC
-    ADC $1D99               ; A += $1D99
-    AND #$003F              ; mask to 6 bits
-    TAY                     ; Y = row
-
-    ; Col: ($5E * 2 - $1D0E + $1D9A) & $1F
-    LDA $5E                 ; dp:$5E (16-bit)
-    ASL                     ; A = $5E * 2
+    ADC.w !Map_BgColBias
+    AND.w #!Bg_ColMask64
+    TAY                     ; Y = tilemap column (0-63)
+    LDA.b !Field_TileStepY
+    ASL
     SEC
-    SBC $DD                 ; A -= row base
+    SBC.b !TileAnim_OriginY
     CLC
-    ADC $1D9A               ; A += $1D9A
-    AND #$001F              ; mask to 5 bits
-    TAX                     ; X = col (also in A)
-
-    ; Pass 1: (col, row) → $09B2
-    JSR Sub_1B36            ; A = VRAM tile index (A=col, Y=row)
+    ADC.w !Map_BgRowBias
+    AND.w #!Bg_RowMask32
+    TAX                     ; X = tilemap row (0-31)
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C               ; + tilemap base
-    STA $09B2               ; VRAM slot 1
-
-    ; Pass 2: (col, row+1) → $09B4
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs ; top-left 8x8 tile
     TYA
-    PHA                     ; save row
+    PHA
     INC A
-    AND #$003F
-    TAY                     ; Y = row+1
-    TXA                     ; A = col (X preserved through Sub_1B36)
-    JSR Sub_1B36
+    AND.w #!Bg_ColMask64
+    TAY                     ; column + 1
+    TXA
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B4               ; VRAM slot 2
-
-    ; Pass 3: (col+1, row) → $09B6
-    PLY                     ; Y = original row (restored)
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+2 ; top-right
+    PLY                     ; column
     TXA
     INC A
-    AND #$001F
-    TAX                     ; X = col+1 (also in A)
-    JSR Sub_1B36
+    AND.w #!Bg_RowMask32
+    TAX                     ; row + 1
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B6               ; VRAM slot 3
-
-    ; Pass 4: (col+1, row+1) → $09B8
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+4 ; bottom-left
     TYA
     INC A
-    AND #$003F
-    TAY                     ; Y = row+1
-    TXA                     ; A = col+1 (X still = col+1)
-    JSR Sub_1B36
+    AND.w #!Bg_ColMask64
+    TAY                     ; column + 1
+    TXA
+    JSR Bg_TilemapIndex64x32
     CLC
-    ADC $1D7C
-    STA $09B8               ; VRAM slot 4
-
+    ADC.w !Map_TilemapVram
+    STA.w !TileAnim_StepVramAddrs+6 ; bottom-right
     SEP #$20                ; M=1 (8-bit A)
-    LDA #$02
-    TSB $5F                 ; set bit 1 of dp:$5F (VRAM-done flag)
-
+    LDA.b #!VramQueue_TileStep
+    TSB.b !Field_VramQueueFlags ; TileAnim_StepVramAddrs ready
 .bit5_check:
-    ; --- Bit 5 check: display-mode transition? ---
-    LDA $17
-    BIT #$20                ; test bit 5
-    BNE .bit5_set           ; bit 5 set → run transition
-    BRL .bit0_check               ; bit 5 clear → .bit0_check ($188C)
+    ; --- Bit 5: map layer redraw ---
+    LDA.b !Field_SceneFlags
+    BIT.b #!SceneFlag_MapRedraw
+    BNE .bit5_set
+    BRL .bit0_check
 
 .bit5_set:
-    LDA #$20
-    TRB $17                 ; clear bit 5
+    LDA.b #!SceneFlag_MapRedraw
+    TRB.b !Field_SceneFlags
 
-    ; Loop: JSR $885A (main frame work) + JSR $00BF (VBlankHandler)
-    ; until dp:$38 == 0, then do post-loop work.
+    ; Run Field_Unk885A + VBlankHandler frames until it clears Field_Unk38
     LDA #$01
-    STA $38                 ; dp:$38 = 1 (loop guard / retry flag)
+    STA.b !Field_Unk38
 
 .loop_885A:
-    JSR Field_Unk885A               ; frame work (large unmatched routine)
-    JSR VBlankHandler               ; VBlankHandler ($00BF)
-    LDA $38
-    BEQ .loop_done          ; dp:$38 == 0 → exit loop
-    JSR Sub_EC60               ; post-VBlank work (Sub_EC60)
+    JSR Field_Unk885A
+    JSR VBlankHandler
+    LDA.b !Field_Unk38
+    BEQ .loop_done
+    JSR Sub_EC60
     BRA .loop_885A
 
 .loop_done:
-    JSR Field_UnkAF4E               ; unknown routine
-    JSL FdVec_FFF7             ; wait/sync (FD bank)
-    JSR Sub_EC60               ; post-VBlank work
+    JSR Field_UnkAF4E
+    JSL FdVec_FFF7
+    JSR Sub_EC60
 
-    ; --- Mode dispatch on dp:$45 (transition sub-mode 1–4) ---
-    LDA $45
+    ; --- Redraw per Field_MapRedrawSel (1-4) ---
+    LDA.b !Field_MapRedrawSel
     CMP #$01
     BNE .not_mode1
 
-    ; dp:$45 == 1
+    ; 1: Field_BuildC800Mode1
     PHD
     REP #$20
-    LDA #$1D00
-    TCD                     ; DP = $1D00
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00 for the builders
     SEP #$20
-    JSR Field_BuildC800Mode1               ; mode-1 renderer (DP=$1D00 context)
-    PLD                     ; restore DP
+    JSR Field_BuildC800Mode1
+    PLD
     JSR Field_Unk74D4
-    JSR VBlankHandlerShort               ; VBlankHandlerShort
+    JSR VBlankHandlerShort
     LDA #$01
-    STA $46                 ; dp:$46 = 1
-    STZ $45                 ; dp:$45 = 0
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
     JSR VBlankHandlerShort
-    JSR Field_Unk87F1               ; unknown finalizer
-    BRL Sub_EC60-!BankWrap               ; tail → Sub_EC60 ($EC60)
+    JSR Field_Unk87F1
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode1:
     CMP #$02
     BNE .not_mode2
 
-    ; dp:$45 == 2
+    ; 2: Field_BuildC800Mode2
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR Field_BuildC800Mode2               ; mode-2 renderer (DP=$1D00 context)
+    JSR Field_BuildC800Mode2
     PLD
     JSR Field_Unk74E8
     JSR VBlankHandlerShort
     LDA #$02
-    STA $46
-    STZ $45
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
     JSR VBlankHandlerShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap            ; tail → Sub_EC60
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode2:
     CMP #$03
     BEQ .mode3
-    BRL .chk_mode4               ; not 3 → .chk_mode4 ($1862)
+    BRL .chk_mode4
 
 .mode3:
-    ; dp:$45 == 3 (two-pass renderer with $7C/$82 swap)
+    ; 3: Mode1, then Mode2 and Mode1 again with the two tilemap bases
+    ;    swapped around each (so both tilemaps get drawn)
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR Field_BuildC800Mode1               ; first pass renderer
+    JSR Field_BuildC800Mode1
     PLD
     JSR VBlankHandlerShort
     LDA #$03
-    STA $46
-    STZ $45
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
 
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR Field_BuildC800Mode2               ; second pass renderer
-    LDX $7C                 ; save dp:$7C (16-bit)
+    JSR Field_BuildC800Mode2
+    LDX.b !Map_TilemapVram-!DP_Map ; swap the two tilemap bases (DP=$1D00)
     PHX
-    LDX $82
-    STX $7C
+    LDX.b !Map_TilemapVram2-!DP_Map
+    STX.b !Map_TilemapVram-!DP_Map
     PLX
-    STX $82                 ; swap dp:$7C and dp:$82
+    STX.b !Map_TilemapVram2-!DP_Map
     PLD
     JSR Field_Unk74D4
     JSR Field_Unk74E8
     JSR VBlankHandlerShort
     LDA #$02
-    STA $46
+    STA.b !Field_MapRedrawDone
     JSR Sub_EC60
 
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR Field_BuildC800Mode1               ; third pass renderer
-    LDX $7C                 ; swap dp:$7C and dp:$82 again
+    JSR Field_BuildC800Mode1
+    LDX.b !Map_TilemapVram-!DP_Map ; swap them back
     PHX
-    LDX $82
-    STX $7C
+    LDX.b !Map_TilemapVram2-!DP_Map
+    STX.b !Map_TilemapVram-!DP_Map
     PLX
-    STX $82
+    STX.b !Map_TilemapVram2-!DP_Map
     PLD
     JSR Field_Unk74D4
     JSR VBlankHandlerShort
     LDA #$01
-    STA $46
+    STA.b !Field_MapRedrawDone
     JSR Sub_EC60
     JSR VBlankHandlerShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap            ; tail → Sub_EC60
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
 
 .chk_mode4:
     CMP #$04
-    BNE .exit               ; none of 1–4 → RTS
+    BNE .exit               ; none of 1-4
 
-    ; dp:$45 == 4
+    ; 4: Field_BuildC800Mode4
     PHD
     REP #$20
-    LDA #$1D00
+    LDA.w #!DP_Map
     TCD
     SEP #$20
-    JSR Field_BuildC800Mode4               ; mode-4 renderer (DP=$1D00 context)
+    JSR Field_BuildC800Mode4
     PLD
     JSR Field_Unk74F7
     JSR VBlankHandlerShort
     LDA #$04
-    STA $46
-    STZ $45
+    STA.b !Field_MapRedrawDone
+    STZ.b !Field_MapRedrawSel
     JSR Sub_EC60
     JSR VBlankHandlerShort
     JSR Field_Unk87F1
@@ -7894,48 +7824,46 @@ DefaultHandler:
 .exit:
     RTS
 
-    ; --- Bit 0 check: scene-swap init (reached via BRL from .bit5_check) ---
+    ; --- Bit 0: battle ---
 .bit0_check:
-    ; A still holds dp:$17 from .bit5_check
-    BIT #$01                ; test bit 0 (scene-swap pending)
-    BEQ .exit2              ; bit 0 clear → RTS
-    JSR Scene_Unk024C               ; scene-state probe; C=1 → quick clear, C=0 → full init
-    BCS .clear_bit0         ; carry set → quick path
+    ; A still holds Field_SceneFlags from .bit5_check
+    BIT.b #!SceneFlag_Battle
+    BEQ .exit2
+    JSR Scene_Unk024C
+    BCS .clear_bit0         ; carry set → no battle after all
 
-    ; Full scene-swap init path
-    JSL ScrollStepAccum             ; unknown cross-bank init
-    LDA #$80
-    TSB $53                 ; set bit 7 of dp:$53 (DMA inhibit?)
-    JSR VBlankHandlerShort               ; VBlankHandlerShort
-    LDA #$80
-    TRB $53                 ; clear bit 7
-    JSR Sub_EC60               ; post-VBlank
-    JSL EngCall_BattleMain             ; bank-C1 init
-    JSR InstallNMI               ; InstallNMI
-    JSR InstallIRQ               ; InstallIRQ
+    JSL ScrollStepAccum
+    LDA.b #!Field_Unk53Bit7
+    TSB.b !Field_Unk53
+    JSR VBlankHandlerShort
+    LDA.b #!Field_Unk53Bit7
+    TRB.b !Field_Unk53
+    JSR Sub_EC60
+    JSL EngCall_BattleMain  ; the battle (bank $C1)
+    JSR InstallNMI          ; back in the field: reinstall our handlers
+    JSR InstallIRQ
     REP #$20
-    LDA #$0100
+    LDA.w #!DP_Field
     TCD                     ; DP = $0100
     SEP #$20
-    LDA #$01
-    TRB $17                 ; clear bit 0 of dp:$17
-    LDA #$01
-    TSB $18                 ; set bit 0 of dp:$18
-    JSR Scene_Unk0283               ; unknown scene post-init
-    JSR TileAnimList_ApplyAll               ; unknown scene post-init
-    JSR Sub_E935               ; unknown scene post-init
-    JSR Field_IdleFrame               ; Field_FrameUpdate + VBlankHandlerShort + Sub_EC60
+    LDA.b #!SceneFlag_Battle
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_AfterBattle
+    TSB.b !Field_FadeFlags
+    JSR Scene_Unk0283       ; rebuild the field
+    JSR TileAnimList_ApplyAll
+    JSR Sub_E935
+    JSR Field_IdleFrame
 
 .exit2:
     RTS
 
 .clear_bit0:
-    ; Quick clear path (C=1 from JSR $024C)
-    LDA #$01
-    TRB $17                 ; clear bit 0
-    LDA #$01
-    TSB $18                 ; set bit 0 of dp:$18
-    BRL Field_IdleFrame               ; tail → $00EB fragment
+    LDA.b #!SceneFlag_Battle
+    TRB.b !Field_SceneFlags
+    LDA.b #!FadeFlag_AfterBattle
+    TSB.b !Field_FadeFlags
+    BRL Field_IdleFrame
 
 ; ============================================================
 ; $C0:1BA7 — Audio_PlayTileSfxB (4 bytes, $1BA7–$1BAA)

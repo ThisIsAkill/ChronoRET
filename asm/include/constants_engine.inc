@@ -117,4 +117,30 @@ if !constants_engine_inc == 0
 !Pad_Unk00F6Bit7 = $80                   ; Pad_Unk00F6 bit 7: Sub_1ADF clears Field_Unk34 on it (A in
                                          ; the Pad_Pressed layout)
 
+; --- Map / BG ---
+!Map_RowStride = $0100                   ; Map_TileProps bytes per map row (index - $100 = the tile
+                                         ; above)
+!Bg_ColMask64 = $003F                    ; wraps an 8x8 tile column into a 64-wide tilemap
+!Bg_RowMask32 = $001F                    ; wraps an 8x8 tile row into a 32-tall tilemap
+!Bg_ScreenWidth = $0020                  ; tiles per row of one 32x32 tilemap screen
+!Bg_ScreenWords = $0400                  ; words in one 32x32 tilemap screen (offset of the right-
+                                         ; hand screen)
+!TileAnim_StateFE = $FE                  ; Map_TileProps value DefaultHandler steps to $FF
+                                         ; (TileAnim_StepKind 0)
+!TileAnim_StateE0 = $E0                  ; Map_TileProps value DefaultHandler steps to $E1
+                                         ; (TileAnim_StepKind 1)
+!SceneFlag_Battle = $01                  ; Field_SceneFlags bit 0: start a battle (DefaultHandler
+                                         ; JSLs EngCall_BattleMain)
+!SceneFlag_TileStep = $02                ; Field_SceneFlags bit 1: step one tile (DefaultHandler)
+!SceneFlag_MapRedraw = $20               ; Field_SceneFlags bit 5: redraw map layers per
+                                         ; Field_MapRedrawSel (DefaultHandler)
+!FadeFlag_AfterBattle = $01              ; Field_FadeFlags bit 0: set when DefaultHandler finishes
+                                         ; the battle path
+!VramQueue_TileStep = $02                ; Field_VramQueueFlags bit 1: TileAnim_StepVramAddrs ready
+!VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
+!Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one VBlankHandlerShort
+                                         ; before the battle (DefaultHandler)
+!DP_Map = $1D00                          ; direct page of the map/BG routines (Field_BuildC800*,
+                                         ; Field_FrameUpdate)
+
 endif
