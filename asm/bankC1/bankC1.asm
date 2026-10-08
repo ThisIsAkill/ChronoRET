@@ -24674,10 +24674,12 @@ BattleSys_UnkB223:
 ;   - a PC: if its BattleCmd.Kind has bit 4, !Battle_UnkB18B = the
 ;     slot, BattleSys_UnkBC60 (which does nothing) and the bit is
 ;     cleared. If BattlerStats.Unk4C+3 has
-;     bit 7, it is cleared and the PC is revived (probably): a hit of
-;     -(Unk66 * 5) (kind 1, !Battle_HitNegate) is recorded for it
-;     (Battle_HitEntryOffset, Battle_RecordHit), the action kind 2 /
-;     id $7A is played on it (caster 0, BattleSys_UnkAC57),
+;     bit 7, it is cleared and the PC is revived (probably): its
+;     !Battle_ActPcHitAmount entry (Battle_HitEntryOffset) = +(Unk66 *
+;     5) with kind 1, and Battle_RecordHit (!Battle_UnkB202 =
+;     !Battle_HitNegate) records -(Unk66 * 5) in its !Battle_HitAmount
+;     set-0 entry (a negated amount, so a heal; !Battle_UnkAD89 is left
+;     negated); then the action kind 2 / id $7A is played on it (caster 0, BattleSys_UnkAC57),
 ;     BattleMsg_InfoArgs.Id = its !Battler_UnkAF0A and $CD:0021 with
 ;     A = 9, BattleFD_UnkACEE, !Battle_Unk24 = 0 again. Else its gauge
 ;     restarts: !Pc_AtbMax, !Pc_AtbCur and !Battler_UnkAFAB =
