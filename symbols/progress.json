@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 78643,
+  "emitted_bytes": 80781,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 922,
-      "bytes": 78643
+      "functions": 948,
+      "bytes": 80781
     },
     "readable": {
-      "functions": 922,
-      "bytes": 78643
+      "functions": 948,
+      "bytes": 80781
     },
     "verified": {
-      "functions": 922,
-      "bytes": 78643
+      "functions": 948,
+      "bytes": 80781
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 30504,
+      "emitted_bytes": 32642,
       "matched": {
-        "functions": 357,
-        "bytes": 30504
+        "functions": 383,
+        "bytes": 32642
       },
       "readable": {
-        "functions": 357,
-        "bytes": 30504
+        "functions": 383,
+        "bytes": 32642
       },
       "verified": {
-        "functions": 357,
-        "bytes": 30504
+        "functions": 383,
+        "bytes": 32642
       }
     },
     {
@@ -971,7 +971,7 @@
       "bank": "$C1",
       "start": "$C1:7000",
       "end": "$C1:7FFF",
-      "emitted_bytes": 1958,
+      "emitted_bytes": 4096,
       "functions": [
         "BattleAct_OpClearUnkA5D8",
         "BattleAct_OpMoveKind4ToCalc",
@@ -986,9 +986,35 @@
         "BattleAct_OpSetActAttr",
         "BattleAct_OpResetActAttr",
         "BattleAct_AdvanceScript",
+        "BattleAct_CalcFacing",
+        "BattleAct_FaceLikeEntry",
+        "BattleAct_FaceTowardEntry",
+        "BattleAct_FaceFixed",
+        "BattleAct_FaceTowardCentre",
+        "BattleAct_RunCalc",
+        "BattleAct_CalcEntryPos",
+        "BattleAct_CalcEntryOffsetPos",
+        "BattleAct_CalcNone",
+        "BattleAct_CalcMid03",
+        "BattleAct_CalcMid01",
+        "BattleAct_CalcMid02",
+        "BattleAct_CalcMidWithEntry0",
+        "BattleAct_CalcMidFromSlot",
+        "BattleAct_CalcCentroid",
+        "BattleAct_CalcAheadOfActor",
+        "BattleAct_CalcFixedPoint",
+        "BattleAct_CalcSavedPos",
+        "BattleAct_CalcObjOffset",
+        "BattleAct_CalcLerpToTarget",
+        "BattleAct_CalcVarPair",
+        "BattleAct_CalcMid12",
+        "BattleAct_CalcLerpToObj0",
+        "BattleAct_FacingModeTable",
+        "BattleAct_CalcTable",
         "BattleAct_LoaderTable",
         "BattleAct_OpcodeTable",
-        "BattleAct_ProbeBoxOverlap"
+        "BattleAct_ProbeBoxOverlap",
+        "BankC1_OldBuildLeftovers"
       ]
     },
     {

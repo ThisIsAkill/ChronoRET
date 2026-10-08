@@ -457,6 +457,21 @@ if !constants_battle_inc == 0
 !Battle_CircleRadiusMask = $7F   ; circle opcodes: low 7 bits of the first operand = radius (bit 7 = direction)
 !Battle_Kind4AccelDiv    = $80   ; opcode $D2: !Battle_ArcSpeedHalf / this = the accel ($FF)
 
+; Facing modes (BattleAct_CalcFacing, opcode $72) and calc handlers (BattleAct_RunCalc):
+!BattleAct_FaceModeToward = $0A  ; modes $0A-$13: face entry (mode - this) of !Battle_ActBattlers (0-9 copy its facing)
+!BattleAct_FaceModeFixed = $14   ; modes $14-$17: facing = mode - this (!Battle_FacingUp..Right); $18 = face the centre
+!BattleAct_CalcOffsetPos = $09   ; handlers $09-$11: entry (n - this) of !Battle_ActBattlers, with its screen offsets
+!BattleAct_CalcYMax      = $FF   ; those handlers clamp y + offset to 0..this
+!BattleAct_CalcAheadDist = $18   ; handler $17: pixels ahead of the actor along its move angle (Battle_SinLookup scale)
+!BattleAct_CalcFixedXY   = $80   ; handler $18: the point it gives, in both x and y (meaning unknown)
+!BattleAct_CalcSavedPos  = $19   ; handlers $19-$1B: !Battle_ActSavedX/Y entry (n - this)
+!BattleAct_CalcObjOffset = $1C   ; handlers $1C-$23: object (n - this) position plus !Battle_ActObjOfsX/Y
+!BattleAct_CalcLerpCaster = $24  ; handlers $24-$29: point between entry 0 and the main target, weight pair n - this
+!BattleAct_CalcVarPair   = $2A   ; handlers $2A-$31: !Battle_ActVars pair (n - this)
+!BattleAct_CalcLerpEntry1 = $32  ; handlers $32-$38: the same from entry 1
+!BattleAct_CalcLerpOffset = $39  ; handlers $39-$3F: the same from entry 0, both points with their screen offsets
+!BattleAct_CalcLerpObj0  = $41   ; handlers $41-$47: point between entry 0 and object 0, weight pair n - this
+
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)
 !Sfx_Param2Default       = $80   ; !Sfx_Param2 value sent with it (meaning not established)

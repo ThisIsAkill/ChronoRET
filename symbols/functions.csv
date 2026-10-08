@@ -659,9 +659,35 @@ $C1:74B4,$C1:7539,134,BattleAct_OpShake,$C1,Battle engine,verified,9717a284ef5c,
 $C1:753A,$C1:7578,63,BattleAct_OpSetActAttr,$C1,Battle engine,verified,bdf3dc8e16cb,
 $C1:7579,$C1:75BA,66,BattleAct_OpResetActAttr,$C1,Battle engine,verified,cfbcbea541b0,"Opcode $DA: puts the thread's actor's attribute value back to its initial one (!Battler_ActAttrInit into !Battler_ActAttr, for thread 4 every slot of !Battle_ActTargetSet, !Battle_ActObjAttrInit into "
 $C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
+$C1:75CC,$C1:75D6,11,BattleAct_CalcFacing,$C1,Battle engine,verified,abde3c13f8d2,"Runs the BattleAct_FacingModeTable handler for mode A (0-$18), which leaves the facing in !Battle_ActFacingOut: modes 0-9 copy the facing of !Battle_ActBattlers entry A, $0A-$13 face entry A - $0A, $1"
+$C1:75D7,$C1:75E2,12,BattleAct_FaceLikeEntry,$C1,Battle engine,verified,26782b1ddd9c,Facing modes 0-9: the !Battler_Facing of !Battle_ActBattlers entry Y.
+$C1:75E3,$C1:7609,39,BattleAct_FaceTowardEntry,$C1,Battle engine,verified,96b367ee4b6f,"Facing modes $0A-$13: the facing from the actor's point (DP $80/$81) toward the screen position of !Battle_ActBattlers entry Y - $0A, from Battle_CalcAngle and !BattleRom_FacingByAngle."
+$C1:760A,$C1:7611,8,BattleAct_FaceFixed,$C1,Battle engine,verified,7b035b6b2cc0,"Facing modes $14-$17: facing Y - $14 (!Battle_FacingUp, Down, Left, Right)."
+$C1:7612,$C1:762D,28,BattleAct_FaceTowardCentre,$C1,Battle engine,verified,eda4634bfe68,Facing mode $18: the facing from the actor's point (DP $80/$81) toward the middle of the screen (!Battle_ScreenCentreX/Y).
+$C1:762E,$C1:7638,11,BattleAct_RunCalc,$C1,Battle engine,verified,8d99b176ee09,"Runs the BattleAct_CalcTable handler for number A (0-$47), which leaves a point in !Battle_ActCalcOutA (x) and !Battle_ActCalcOutB (y) (two script variables for handlers $2A-$31; nothing for $12)."
+$C1:7639,$C1:7649,17,BattleAct_CalcEntryPos,$C1,Battle engine,verified,50d306d91b55,Handlers 0-8: the screen position (!Battler_ScreenX/Y) of !Battle_ActBattlers entry Y.
+$C1:764A,$C1:767C,51,BattleAct_CalcEntryOffsetPos,$C1,Battle engine,verified,578586f7d445,Handlers 9-$11: the screen position of !Battle_ActBattlers entry Y - 9 plus its !Battler_ScreenOffsetX/Y.
+$C1:767D,$C1:767D,1,BattleAct_CalcNone,$C1,Battle engine,verified,85871c449f9a,Handler $12: does nothing; !Battle_ActCalcOutA/B keep what the last handler left.
+$C1:767E,$C1:7685,8,BattleAct_CalcMid03,$C1,Battle engine,verified,52382340f7a3,"Handler $13: the midpoint of !Battle_ActBattlers entries 0 and 3 (the caster and the main target), through BattleAct_CalcMid02's BattleAct_CalcMidWithEntry0."
+$C1:7686,$C1:768D,8,BattleAct_CalcMid01,$C1,Battle engine,verified,14aa76030b43,"Handler $14: the midpoint of !Battle_ActBattlers entries 0 and 1, through BattleAct_CalcMid02's BattleAct_CalcMidWithEntry0."
+$C1:768E,$C1:7692,5,BattleAct_CalcMid02,$C1,Battle engine,verified,fe6f92648b49,
+$C1:7693,$C1:7696,4,BattleAct_CalcMidWithEntry0,$C1,Battle engine,verified,dc1bc66753dc,
+$C1:7697,$C1:76D7,65,BattleAct_CalcMidFromSlot,$C1,Battle engine,verified,d1e149558023,
+$C1:76D8,$C1:774D,118,BattleAct_CalcCentroid,$C1,Battle engine,verified,6f0f455e8151,
+$C1:774E,$C1:77D0,131,BattleAct_CalcAheadOfActor,$C1,Battle engine,verified,72953d2cc407,
+$C1:77D1,$C1:77D9,9,BattleAct_CalcFixedPoint,$C1,Battle engine,verified,efc2908471cd,"Handler $18: the point ($80, $80)."
+$C1:77DA,$C1:77EB,18,BattleAct_CalcSavedPos,$C1,Battle engine,verified,f60f65987627,Handlers $19-$1B: the position saved for !Battle_ActBattlers entry Y - $19 (0-2) in !Battle_ActSavedX/Y.
+$C1:77EC,$C1:780A,31,BattleAct_CalcObjOffset,$C1,Battle engine,verified,b13023f24a25,"Handlers $1C-$23: the position of object Y - $1C (0-7) plus its !Battle_ActObjOfsX/Y, 16-bit, stored 16-bit."
+$C1:780B,$C1:7900,246,BattleAct_CalcLerpToTarget,$C1,Battle engine,verified,ba0992a46c84,
+$C1:7901,$C1:7913,19,BattleAct_CalcVarPair,$C1,Battle engine,verified,40f6fee8fb61,"Handlers $2A-$31: script variables 2k and 2k + 1 of !Battle_ActVars, k = n - $2A (0-7), as the pair (not necessarily a point)."
+$C1:7914,$C1:791F,12,BattleAct_CalcMid12,$C1,Battle engine,verified,34f2eddf5145,"Handler $40: the midpoint of !Battle_ActBattlers entries 1 and 2 (the two partners), through BattleAct_CalcMid02's BattleAct_CalcMidFromSlot."
+$C1:7920,$C1:79A0,129,BattleAct_CalcLerpToObj0,$C1,Battle engine,verified,1b90656dcb73,"Handlers $41-$47: a point on the line from !Battle_ActBattlers entry 0 (the caster) to object 0 (the low bytes of !Battle_ActObjX/Y), (w1 * P + w2 * O) >> 3 with weight pair n - $41 of !BattleRom_ActL"
+$C1:79A1,$C1:79D2,50,BattleAct_FacingModeTable,$C1,Battle engine,verified,d9a48df79b17,"BattleAct_CalcFacing's handler per facing mode 0-$18, called through JSR (BattleAct_FacingModeTable,X) with X = mode * 2."
+$C1:79D3,$C1:7A62,144,BattleAct_CalcTable,$C1,Battle engine,verified,b95917df9867,"BattleAct_RunCalc's handler per number 0-$47, called through JSR (BattleAct_CalcTable,X) with X = number * 2."
 $C1:7A63,$C1:7A6A,8,BattleAct_LoaderTable,$C1,Battle engine,verified,53e77eaf08fc,"Action loader per !Battle_ActKind 0-3, called by BattleAct_LoadScript through JSR (BattleAct_LoaderTable,X) with X = kind * 2 (kinds 4 and up are taken as 0)."
 $C1:7A6B,$C1:7C2A,448,BattleAct_OpcodeTable,$C1,Battle engine,verified,ca94c9dc6822,"Handler per action-script opcode, called by BattleAct_RunThread through JSR (BattleAct_OpcodeTable,X) with X = opcode * 2."
 $C1:7C2B,$C1:7C3C,18,BattleAct_ProbeBoxOverlap,$C1,Battle engine,verified,fc44558e5d3f,"Puts battler X's probe (!Battler_ProbeX/Y) at its screen position, builds its box (Battle_CalcBattlerBox) and tests it against the other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP)."
+$C1:7C3D,$C1:7FFF,963,BankC1_OldBuildLeftovers,$C1,Engine,verified,69b9cc9bfe6d,"Not code and, as far as found, never read: xref finds no call or jump to $C1:7C3D or to any of the segment starts below, and the absolute $7C3D-$7FFF operands in bank $C1 code are WRAM reads (DB = $7E"
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
 $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,
 $C2:0006,$C2:0008,3,BankC2_Entry0006,$C2,Engine,verified,5c579e7a1967,

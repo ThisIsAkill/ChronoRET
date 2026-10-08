@@ -19467,6 +19467,984 @@ BattleAct_AdvanceScript:
     RTS
 
 ; ==================================================================
+; Facing and point calculations ($C1:75CC–$C1:7A62)
+; ==================================================================
+; Two dispatchers with their handlers and tables. BattleAct_CalcFacing
+; gives opcode $72 a facing (0-3, the !Battler_Facing values) for a
+; mode; BattleAct_RunCalc gives the move, heading, sound and result
+; opcodes and BattleAct_TickCalcs a point (x in !Battle_ActCalcOutA,
+; y in !Battle_ActCalcOutB) for a handler number, mostly worked out
+; from the screen positions of the entries of !Battle_ActBattlers
+; (0 = caster, 1-2 = the two partners, 3 = the main target, 4 on = the
+; target set). Neither dispatcher nor any handler checks an entry for
+; the $FF end marker.
+
+; ==================================================================
+; BattleAct_CalcFacing ($C175CC–$C175D6, 11 bytes)
+; ==================================================================
+; Runs the BattleAct_FacingModeTable handler for mode A (0-$18), which
+; leaves the facing in !Battle_ActFacingOut: modes 0-9 copy the facing
+; of !Battle_ActBattlers entry A, $0A-$13 face entry A - $0A, $14-$17
+; give facing A - $14, $18 faces the screen centre. The handler gets
+; the mode in Y; the caller's X and Y come back.
+; Callers (3 JSR sites): BattleAct_OpSetFacing ($C1:6001, $C1:6024,
+;   $C1:6048).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (the 16-bit TAY/TAX take B as the
+;        mode's high byte); A = mode; DP $80/$81 = the actor's x/y
+;        (read by modes $0A-$13 and $18)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; X, Y unchanged; A = the facing;
+;        !Battle_ActFacingOut written; modes $0A-$13 and $18 also write
+;        !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y and Battle_CalcAngle's
+;        DP $D7-$E3
+; Callees: the BattleAct_FacingModeTable handlers (JSR (table,X))
+org $C175CC
+BattleAct_CalcFacing:
+    PHY
+    PHX
+    TAY
+    ASL A
+    TAX
+    JSR (BattleAct_FacingModeTable,X)
+    PLX
+    PLY
+    RTS
+
+; ==================================================================
+; BattleAct_FaceLikeEntry ($C175D7–$C175E2, 12 bytes)
+; ==================================================================
+; Facing modes 0-9: the !Battler_Facing of !Battle_ActBattlers entry Y.
+; Callers: BattleAct_FacingModeTable entries 0-9 (BattleAct_CalcFacing).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = mode (0-9)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the facing, also in
+;        !Battle_ActFacingOut; X = the slot; Y unchanged
+org $C175D7
+BattleAct_FaceLikeEntry:
+    TYX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_Facing,X
+    STA.w !Battle_ActFacingOut
+    RTS
+
+; ==================================================================
+; BattleAct_FaceTowardEntry ($C175E3–$C17609, 39 bytes)
+; ==================================================================
+; Facing modes $0A-$13: the facing from the actor's point (DP $80/$81)
+; toward the screen position of !Battle_ActBattlers entry Y - $0A, from
+; Battle_CalcAngle and !BattleRom_FacingByAngle.
+; Callers: BattleAct_FacingModeTable entries $0A-$13
+;   (BattleAct_CalcFacing).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = mode ($0A-$13); DP $80/$81 =
+;        the actor's x/y
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0 (Battle_CalcAngle leaves it 0); A =
+;        the facing, also in !Battle_ActFacingOut; X = the angle; Y
+;        unchanged; !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y and DP
+;        $D7-$E3 written
+; Callees: Battle_CalcAngle
+org $C175E3
+BattleAct_FaceTowardEntry:
+    LDA.b !BattleTmp_80
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTmp_81
+    STA.b !Battle_GeoOriginY
+    TYA
+    SEC
+    SBC.b #!BattleAct_FaceModeToward
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActFacingOut
+    RTS
+
+; ==================================================================
+; BattleAct_FaceFixed ($C1760A–$C17611, 8 bytes)
+; ==================================================================
+; Facing modes $14-$17: facing Y - $14 (!Battle_FacingUp, Down, Left,
+; Right).
+; Callers: BattleAct_FacingModeTable entries $14-$17
+;   (BattleAct_CalcFacing).
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = mode ($14-$17)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the facing, also in
+;        !Battle_ActFacingOut; X, Y unchanged
+org $C1760A
+BattleAct_FaceFixed:
+    TYA
+    SEC
+    SBC.b #!BattleAct_FaceModeFixed
+    STA.w !Battle_ActFacingOut
+    RTS
+
+; ==================================================================
+; BattleAct_FaceTowardCentre ($C17612–$C1762D, 28 bytes)
+; ==================================================================
+; Facing mode $18: the facing from the actor's point (DP $80/$81)
+; toward the middle of the screen (!Battle_ScreenCentreX/Y).
+; Callers: BattleAct_FacingModeTable entry $18 (BattleAct_CalcFacing).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $80/$81 = the actor's x/y
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0 (Battle_CalcAngle leaves it 0); A =
+;        the facing, also in !Battle_ActFacingOut; X = the angle; Y
+;        unchanged; !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y and DP
+;        $D7-$E3 written
+; Callees: Battle_CalcAngle
+org $C17612
+BattleAct_FaceTowardCentre:
+    LDA.b !BattleTmp_80
+    STA.b !Battle_GeoOriginX
+    LDA.b !BattleTmp_81
+    STA.b !Battle_GeoOriginY
+    LDA.b #!Battle_ScreenCentreX
+    STA.b !Battle_GeoPointX
+    LDA.b #!Battle_ScreenCentreY
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    STA.w !Battle_ActFacingOut
+    RTS
+
+; ==================================================================
+; BattleAct_RunCalc ($C1762E–$C17638, 11 bytes)
+; ==================================================================
+; Runs the BattleAct_CalcTable handler for number A (0-$47), which
+; leaves a point in !Battle_ActCalcOutA (x) and !Battle_ActCalcOutB (y)
+; (two script variables for handlers $2A-$31; nothing for $12). The
+; handler gets the number in Y; the caller's X and Y come back.
+; Callers (16 JSR sites): BattleAct_TickCalcs ($C1:421E),
+;   BattleAct_OpMoveToCalc ($C1:4FE6), BattleAct_OpCurveToCalc
+;   ($C1:5224), BattleAct_OpPathToCalc ($C1:5430), BattleAct_OpSetPosCalc
+;   ($C1:5680), BattleAct_OpCalcToUnkPoint ($C1:591D),
+;   BattleAct_OpCalcToResult ($C1:59BC), BattleAct_OpOffsetToUnkPoint
+;   ($C1:5A1F), BattleAct_OpHeadingFromCalc ($C1:60EF, $C1:6101),
+;   BattleAct_OpSoundCalc ($C1:61CA), BattleAct_ArcToCalcDir ($C1:62A3),
+;   BattleAct_OpCircleToCalc ($C1:6D09), BattleAct_OpEllipseToCalc
+;   ($C1:6F69), BattleAct_OpMoveKind4ToCalc ($C1:705D) and
+;   BattleAct_OpPointTowardCalc ($C1:7412).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (the 16-bit TAY/TAX take B as the
+;        number's high byte); A = handler number
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0 (every handler leaves it 0); X, Y
+;        unchanged; A clobbered; !Battle_ActCalcOutA/B written (16-bit,
+;        $A2B0-$A2B3, by handler $17 for an object and by $1C-$23); DP
+;        bytes the handler uses: at most $77/$78, $79-$7B, $80-$8B and
+;        $A5-$B8 (see each handler)
+; Callees: the BattleAct_CalcTable handlers (JSR (table,X))
+org $C1762E
+BattleAct_RunCalc:
+    PHY
+    PHX
+    TAY
+    ASL A
+    TAX
+    JSR (BattleAct_CalcTable,X)
+    PLX
+    PLY
+    RTS
+
+; ==================================================================
+; BattleAct_CalcEntryPos ($C17639–$C17649, 17 bytes)
+; ==================================================================
+; Handlers 0-8: the screen position (!Battler_ScreenX/Y) of
+; !Battle_ActBattlers entry Y.
+; Callers: BattleAct_CalcTable entries 0-8 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number (0-8)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the slot; Y
+;        unchanged; !Battle_ActCalcOutA/B written
+org $C17639
+BattleAct_CalcEntryPos:
+    LDA.w !Battle_ActBattlers,Y
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcEntryOffsetPos ($C1764A–$C1767C, 51 bytes)
+; ==================================================================
+; Handlers 9-$11: the screen position of !Battle_ActBattlers entry Y - 9
+; plus its !Battler_ScreenOffsetX/Y. The x sum wraps at 8 bits; the y
+; offset is taken as signed and the sum is clamped to 0..$FF.
+; Callers: BattleAct_CalcTable entries 9-$11 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number (9-$11)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the slot; Y = the
+;        entry (handler - 9); !Battle_ActCalcOutA/B written
+org $C1764A
+BattleAct_CalcEntryOffsetPos:
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcOffsetPos
+    TAY
+    LDA.w !Battle_ActBattlers,Y
+    TAX
+    CLC
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battler_ScreenOffsetY,X
+    BPL .offset_down
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCS .store_y                        ; adding a negative byte: carry = no wrap below 0
+    TDC
+    BRA .store_y
+.offset_down:
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCC .store_y
+    LDA.b #!BattleAct_CalcYMax
+.store_y:
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcNone ($C1767D, 1 byte)
+; ==================================================================
+; Handler $12: does nothing; !Battle_ActCalcOutA/B keep what the last
+; handler left.
+; Callers: BattleAct_CalcTable entry $12 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y unchanged
+org $C1767D
+BattleAct_CalcNone:
+    RTS
+
+; ==================================================================
+; BattleAct_CalcMid03 ($C1767E–$C17685, 8 bytes)
+; ==================================================================
+; Handler $13: the midpoint of !Battle_ActBattlers entries 0 and 3 (the
+; caster and the main target), through BattleAct_CalcMid02's
+; BattleAct_CalcMidWithEntry0.
+; Callers: BattleAct_CalcTable entry $13 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0
+; Exit:  as BattleAct_CalcMid02's: M=1, X=0, DP=0, DB=$7E, B=0; A = the
+;        y; X, Y clobbered; DP $80-$87 written; !Battle_ActCalcOutA/B
+;        written
+; Callees: BattleAct_CalcMidWithEntry0 (JMP)
+org $C1767E
+BattleAct_CalcMid03:
+    LDY.w #3
+    STY.b !BattleTmp_84
+    JMP BattleAct_CalcMidWithEntry0
+
+; ==================================================================
+; BattleAct_CalcMid01 ($C17686–$C1768D, 8 bytes)
+; ==================================================================
+; Handler $14: the midpoint of !Battle_ActBattlers entries 0 and 1,
+; through BattleAct_CalcMid02's BattleAct_CalcMidWithEntry0.
+; Callers: BattleAct_CalcTable entry $14 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X, Y clobbered; DP
+;        $80-$87 written; !Battle_ActCalcOutA/B written
+; Callees: BattleAct_CalcMidWithEntry0 (JMP)
+org $C17686
+BattleAct_CalcMid01:
+    LDY.w #1
+    STY.b !BattleTmp_84
+    JMP BattleAct_CalcMidWithEntry0
+
+; ==================================================================
+; BattleAct_CalcMid02 ($C1768E–$C176D7, 74 bytes)
+; ==================================================================
+; Handler $15: the midpoint of the screen positions of two battler
+; slots, (x1 + x2) / 2 and (y1 + y2) / 2 worked out 16-bit. Three
+; entries:
+; - BattleAct_CalcMid02 (table entry $15): entries 0 and 2.
+; - BattleAct_CalcMidWithEntry0 ($C1:7693): entry 0 and the entry in
+;   DP $84 (BattleAct_CalcMid03 and BattleAct_CalcMid01 jump here).
+; - BattleAct_CalcMidFromSlot ($C1:7697): slot X and the entry in DP $84
+;   (BattleAct_CalcMid12 jumps here).
+; Callers: BattleAct_CalcTable entry $15 (BattleAct_RunCalc);
+;   BattleAct_CalcMid03 ($C1:7683) and BattleAct_CalcMid01 ($C1:768B)
+;   JMP to BattleAct_CalcMidWithEntry0; BattleAct_CalcMid12 ($C1:791D)
+;   to BattleAct_CalcMidFromSlot.
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; BattleAct_CalcMidWithEntry0: DP
+;        $84-$85 = the second entry; BattleAct_CalcMidFromSlot: also X =
+;        the first battler slot
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the second slot; Y =
+;        the second entry; DP $80-$87 written; !Battle_ActCalcOutA/B
+;        written
+!BattleAct_MidX1 = !BattleTmp_80        ; 2 B: first x, then the mean x
+!BattleAct_MidY1 = !BattleTmp_82        ; 2 B: first y, then the mean y
+!BattleAct_MidX2 = !BattleTmp_84        ; 2 B: on entry the second entry; then the second x
+!BattleAct_MidY2 = !BattleTmp_86        ; 2 B: second y
+org $C1768E
+BattleAct_CalcMid02:
+    LDY.w #2
+    STY.b !BattleAct_MidX2
+BattleAct_CalcMidWithEntry0:            ; header: see BattleAct_CalcMid02
+    LDA.w !Battle_ActBattlers
+    TAX
+BattleAct_CalcMidFromSlot:              ; header: see BattleAct_CalcMid02
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_MidX1
+    STZ.b !BattleAct_MidX1+1
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_MidY1
+    STZ.b !BattleAct_MidY1+1
+    LDY.b !BattleAct_MidX2
+    LDA.w !Battle_ActBattlers,Y
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_MidX2
+    STZ.b !BattleAct_MidX2+1
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_MidY2
+    STZ.b !BattleAct_MidY2+1
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !BattleAct_MidX1
+    ADC.b !BattleAct_MidX2
+    LSR A
+    STA.b !BattleAct_MidX1
+    CLC
+    LDA.b !BattleAct_MidY1
+    ADC.b !BattleAct_MidY2
+    LSR A
+    STA.b !BattleAct_MidY1
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_MidX1
+    STA.w !Battle_ActCalcOutA
+    LDA.b !BattleAct_MidY1
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcCentroid ($C176D8–$C1774D, 118 bytes)
+; ==================================================================
+; Handler $16: meant as the centre of !Battle_ActBattlers entries 0-2
+; (the caster and its two partners): sums the three screen x and the
+; three screen y 16-bit and divides by 3 with Battle_Divide. Quirk: the
+; second division divides the x sum again (DP $80/$81, not the y sum
+; in $82/$83), so !Battle_ActCalcOutB gets the mean x as well; the y
+; sum is never used.
+; Callers: BattleAct_CalcTable entry $16 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the mean x; X = the slot of
+;        entry 2; Y unchanged; DP $80-$8B, $B1-$B3 written and
+;        Battle_Divide's $79-$7B and $B5-$B8; !Battle_ActCalcOutA/B
+;        written
+; Callees: Battle_Divide
+!BattleAct_SumX = !BattleTmp_80         ; 2 B: x of entry 0, then the sum of the three
+!BattleAct_SumY = !BattleTmp_82         ; 2 B: y of entry 0, then the sum
+!BattleAct_X1 = !BattleTmp_84           ; 2 B: x of entry 1
+!BattleAct_Y1 = !BattleTmp_86           ; 2 B: y of entry 1
+!BattleAct_X2 = !BattleTmp_88           ; 2 B: x of entry 2
+!BattleAct_Y2 = !BattleTmp_8A           ; 2 B: y of entry 2
+org $C176D8
+BattleAct_CalcCentroid:
+    LDA.w !Battle_ActBattlers
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_SumX
+    STZ.b !BattleAct_SumX+1
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_SumY
+    STZ.b !BattleAct_SumY+1
+    LDA.w !Battle_ActBattlers+1
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_X1
+    STZ.b !BattleAct_X1+1
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_Y1
+    STZ.b !BattleAct_Y1+1
+    LDA.w !Battle_ActBattlers+2
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !BattleAct_X2
+    STZ.b !BattleAct_X2+1
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_Y2
+    STZ.b !BattleAct_Y2+1
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !BattleAct_SumX
+    ADC.b !BattleAct_X1
+    CLC
+    ADC.b !BattleAct_X2
+    STA.b !BattleAct_SumX
+    LDA.b !BattleAct_SumY               ; no CLC: the x sum (at most $2FD) left carry clear
+    ADC.b !BattleAct_Y1
+    CLC
+    ADC.b !BattleAct_Y2
+    STA.b !BattleAct_SumY
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_SumX
+    STA.b !Battle_DivDividend
+    LDA.b !BattleAct_SumX+1
+    STA.b !Battle_DivDividend+1
+    LDA.b #3
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActCalcOutA
+    LDA.b !BattleAct_SumX               ; quirk: the x sum again, not !BattleAct_SumY
+    STA.b !Battle_DivDividend
+    LDA.b !BattleAct_SumX+1
+    STA.b !Battle_DivDividend+1
+    LDA.b #3
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcAheadOfActor ($C1774E–$C177D0, 131 bytes)
+; ==================================================================
+; Handler $17: the point $18 pixels from the thread's actor along its
+; move angle: y + the sine of the angle and x + the sine of the angle
+; + $40, each from Battle_SinLookup with scale $18 (a signed byte).
+; - Battler threads (0-7): the actor is the slot of !Battle_ActBattlers
+;   entry (thread) (thread 4 gives the first slot of the target set),
+;   its angle !Battle_ActorMoveAngle; the sums are 8-bit and wrap.
+; - Object threads (8-15): object thread - 8, its angle
+;   !Battle_ActObjMoveAngle; the sums are 16-bit with !Battle_ActObjX/Y
+;   and stored 16-bit. Quirk: the sine bytes are zero-extended, not
+;   sign-extended, so for a negative one the high bytes written to
+;   $A2B1/$A2B3 come out one too high (the low bytes are right).
+; Callers: BattleAct_CalcTable entry $17 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the x (battlers) or 0
+;        (objects); X = the slot or the object * 2; Y unchanged; DP
+;        $80-$83 (objects: $80-$85) and $AE written, and
+;        Battle_SinLookup's $77/$78 and $A5-$AB; !Battle_ActCalcOutA/B
+;        written (objects: $A2B0-$A2B3)
+; Callees: Battle_SinLookup
+!BattleAct_AheadActor = !BattleTmp_80   ; 2 B: the battler slot or object
+!BattleAct_AheadDy = !BattleTmp_82      ; 1 B (objects: 2 B, high byte 0): the sine of the angle
+!BattleAct_AheadDx = !BattleTmp_83      ; 1 B (battlers): the sine of the angle + $40
+!BattleAct_AheadObjDx = !BattleTmp_84   ; 2 B (objects, high byte 0): the same
+org $C1774E
+BattleAct_CalcAheadOfActor:
+    LDA.w !Battle_ActThread
+    CMP.b #!Battle_ActFirstObjThread
+    BCS .object
+    TAX
+    LDA.w !Battle_ActBattlers,X
+    TAX
+    STX.b !BattleAct_AheadActor
+    LDA.b #!BattleAct_CalcAheadDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActorMoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !BattleAct_AheadDy
+    LDX.b !BattleAct_AheadActor
+    LDA.b #!BattleAct_CalcAheadDist
+    STA.b !Battle_SinScale
+    CLC
+    LDA.w !Battle_ActorMoveAngle,X
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_AheadDx
+    LDX.b !BattleAct_AheadActor
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.b !BattleAct_AheadDy
+    STA.w !Battle_ActCalcOutB
+    CLC
+    LDA.w !Battler_ScreenX,X
+    ADC.b !BattleAct_AheadDx
+    STA.w !Battle_ActCalcOutA
+    BRA .done
+.object:
+    SEC
+    SBC.b #!Battle_ActFirstObjThread
+    TAX
+    STX.b !BattleAct_AheadActor
+    LDA.b #!BattleAct_CalcAheadDist
+    STA.b !Battle_SinScale
+    LDA.w !Battle_ActObjMoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !BattleAct_AheadDy
+    STZ.b !BattleAct_AheadDy+1          ; quirk: zero-extended
+    LDX.b !BattleAct_AheadActor
+    LDA.b #!BattleAct_CalcAheadDist
+    STA.b !Battle_SinScale
+    CLC
+    LDA.w !Battle_ActObjMoveAngle,X
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup
+    STA.b !BattleAct_AheadObjDx
+    STZ.b !BattleAct_AheadObjDx+1       ; quirk: zero-extended
+    LDA.b !BattleAct_AheadActor
+    ASL A
+    TAX
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.w !Battle_ActObjY,X
+    ADC.b !BattleAct_AheadDy
+    STA.w !Battle_ActCalcOutB
+    CLC
+    LDA.w !Battle_ActObjX,X
+    ADC.b !BattleAct_AheadObjDx
+    STA.w !Battle_ActCalcOutA
+    TDC
+    SEP #$20
+.done:
+    RTS
+
+; ==================================================================
+; BattleAct_CalcFixedPoint ($C177D1–$C177D9, 9 bytes)
+; ==================================================================
+; Handler $18: the point ($80, $80). The screen centre used elsewhere
+; is ($80, $70) (!Battle_ScreenCentreX/Y), so what this point is meant
+; to be is not known.
+; Callers: BattleAct_CalcTable entry $18 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $80; X, Y unchanged;
+;        !Battle_ActCalcOutA/B written
+org $C177D1
+BattleAct_CalcFixedPoint:
+    LDA.b #!BattleAct_CalcFixedXY
+    STA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcSavedPos ($C177DA–$C177EB, 18 bytes)
+; ==================================================================
+; Handlers $19-$1B: the position saved for !Battle_ActBattlers entry
+; Y - $19 (0-2) in !Battle_ActSavedX/Y.
+; Callers: BattleAct_CalcTable entries $19-$1B (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($19-$1B)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = the entry; Y
+;        unchanged; !Battle_ActCalcOutA/B written
+org $C177DA
+BattleAct_CalcSavedPos:
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcSavedPos
+    TAX
+    LDA.w !Battle_ActSavedX,X
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battle_ActSavedY,X
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcObjOffset ($C177EC–$C1780A, 31 bytes)
+; ==================================================================
+; Handlers $1C-$23: the position of object Y - $1C (0-7) plus its
+; !Battle_ActObjOfsX/Y, 16-bit, stored 16-bit.
+; Callers: BattleAct_CalcTable entries $1C-$23 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($1C-$23)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = the object * 2; Y
+;        unchanged; !Battle_ActCalcOutA/B written ($A2B0-$A2B3)
+org $C177EC
+BattleAct_CalcObjOffset:
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcObjOffset
+    ASL A
+    TAX
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.w !Battle_ActObjOfsX,X
+    ADC.w !Battle_ActObjX,X
+    STA.w !Battle_ActCalcOutA
+    CLC
+    LDA.w !Battle_ActObjOfsY,X
+    ADC.w !Battle_ActObjY,X
+    STA.w !Battle_ActCalcOutB
+    TDC
+    SEP #$20
+    RTS
+
+; ==================================================================
+; BattleAct_CalcLerpToTarget ($C1780B–$C17900, 246 bytes)
+; ==================================================================
+; Handlers $24-$29 and $32-$3F: a point on the line from one battler to
+; the main target (!Battle_ActMainTarget): (w1 * P + w2 * T) >> 3 per
+; coordinate, with the weight pair (w1, w2) k of
+; !BattleRom_ActLerpWeights (the pairs add up to 8, so k = 0-5 give 1/8,
+; 2/8, 3/8, 5/8, 6/8, 7/8 of the way and k = 6 the midpoint). The
+; products are 16-bit from Battle_Mul8; the result keeps the low byte.
+; - $24-$29: from !Battle_ActBattlers entry 0 (the caster), k = n - $24.
+; - $32-$38: from entry 1, k = n - $32.
+; - $39-$3F: from entry 0, k = n - $39, with both points moved by their
+;   !Battler_ScreenOffsetX/Y (x wrapping at 8 bits, y + offset clamped
+;   to 0..$FF, as in BattleAct_CalcEntryOffsetPos).
+; Callers: BattleAct_CalcTable entries $24-$29 and $32-$3F
+;   (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = w1 * y1;
+;        Y unchanged; DP $80-$85 and $AD/$AE written, and Battle_Mul8's
+;        $77/$78 and $AF/$B0; !Battle_ActCalcOutA/B written
+; Callees: Battle_Mul8, Battle_ShiftRight3
+!BattleAct_LerpW1 = !BattleTmp_80       ; 1 B: weight of the first point
+!BattleAct_LerpW2 = !BattleTmp_81       ; 1 B: weight of the target
+!BattleAct_LerpSum = !BattleTmp_82      ; 2 B: on entry the first slot; then w1 * coordinate, then the result
+!BattleAct_LerpY1 = !BattleTmp_84       ; 1 B: y of the first point
+!BattleAct_LerpY2 = !BattleTmp_85       ; 1 B: y of the target
+org $C1780B
+BattleAct_CalcLerpToTarget:
+    LDA.w !Battle_ActBattlers
+    STA.b !BattleAct_LerpSum
+    CPY.w #!BattleAct_CalcLerpEntry1
+    BCC .from_caster
+    CPY.w #!BattleAct_CalcLerpOffset
+    BCC .from_entry1
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcLerpOffset
+    BRA .weights
+.from_entry1:
+    LDA.w !Battle_ActBattlers+1
+    STA.b !BattleAct_LerpSum
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcLerpEntry1
+    BRA .weights
+.from_caster:
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcLerpCaster
+.weights:
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActLerpWeights,X
+    STA.b !BattleAct_LerpW1
+    STA.b !Battle_Mul8B
+    LDA.l !BattleRom_ActLerpWeights+1,X
+    STA.b !BattleAct_LerpW2
+    LDA.b !BattleAct_LerpSum
+    TAX
+    CPY.w #!BattleAct_CalcLerpOffset
+    BCC .first_plain
+    CLC
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
+    STA.b !Battle_Mul8A
+    LDA.w !Battler_ScreenOffsetY,X
+    BPL .first_down
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCS .first_y
+    TDC
+    BRA .first_y
+.first_down:
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCC .first_y
+    LDA.b #!BattleAct_CalcYMax
+    BRA .first_y
+.first_plain:
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_Mul8A
+    LDA.w !Battler_ScreenY,X
+.first_y:
+    STA.b !BattleAct_LerpY1
+    JSR Battle_Mul8                     ; w1 * x1
+    LDX.b !Battle_Mul8Product
+    STX.b !BattleAct_LerpSum
+    LDA.w !Battle_ActMainTarget
+    TAX
+    CPY.w #!BattleAct_CalcLerpOffset
+    BCC .target_plain
+    CLC
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
+    STA.b !Battle_Mul8A
+    LDA.w !Battler_ScreenOffsetY,X
+    BPL .target_down
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCS .target_y
+    TDC
+    BRA .target_y
+.target_down:
+    CLC
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    BCC .target_y
+    LDA.b #!BattleAct_CalcYMax
+    BRA .target_y
+.target_plain:
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_Mul8A
+    LDA.w !Battler_ScreenY,X
+.target_y:
+    STA.b !BattleAct_LerpY2
+    LDA.b !BattleAct_LerpW2
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w2 * x2
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattleAct_LerpSum
+    JSR Battle_ShiftRight3
+    STA.b !BattleAct_LerpSum
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_LerpSum
+    STA.w !Battle_ActCalcOutA
+    LDA.b !BattleAct_LerpY1
+    STA.b !Battle_Mul8A
+    LDA.b !BattleAct_LerpW1
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w1 * y1
+    LDX.b !Battle_Mul8Product
+    STX.b !BattleAct_LerpSum
+    LDA.b !BattleAct_LerpY2
+    STA.b !Battle_Mul8A
+    LDA.b !BattleAct_LerpW2
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w2 * y2
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattleAct_LerpSum
+    JSR Battle_ShiftRight3
+    STA.b !BattleAct_LerpSum
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_LerpSum
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcVarPair ($C17901–$C17913, 19 bytes)
+; ==================================================================
+; Handlers $2A-$31: script variables 2k and 2k + 1 of !Battle_ActVars,
+; k = n - $2A (0-7), as the pair (not necessarily a point).
+; Callers: BattleAct_CalcTable entries $2A-$31 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($2A-$31)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = variable 2k + 1; X = 2k; Y
+;        unchanged; !Battle_ActCalcOutA/B written
+org $C17901
+BattleAct_CalcVarPair:
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcVarPair
+    ASL A
+    TAX
+    LDA.w !Battle_ActVars,X
+    STA.w !Battle_ActCalcOutA
+    LDA.w !Battle_ActVars+1,X
+    STA.w !Battle_ActCalcOutB
+    RTS
+
+; ==================================================================
+; BattleAct_CalcMid12 ($C17914–$C1791F, 12 bytes)
+; ==================================================================
+; Handler $40: the midpoint of !Battle_ActBattlers entries 1 and 2 (the
+; two partners), through BattleAct_CalcMid02's
+; BattleAct_CalcMidFromSlot.
+; Callers: BattleAct_CalcTable entry $40 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X, Y clobbered; DP
+;        $80-$87 written; !Battle_ActCalcOutA/B written
+; Callees: BattleAct_CalcMidFromSlot (JMP)
+org $C17914
+BattleAct_CalcMid12:
+    LDY.w #2
+    STY.b !BattleTmp_84
+    LDA.w !Battle_ActBattlers+1
+    TAX
+    JMP BattleAct_CalcMidFromSlot
+
+; ==================================================================
+; BattleAct_CalcLerpToObj0 ($C17920–$C179A0, 129 bytes)
+; ==================================================================
+; Handlers $41-$47: a point on the line from !Battle_ActBattlers entry
+; 0 (the caster) to object 0 (the low bytes of !Battle_ActObjX/Y),
+; (w1 * P + w2 * O) >> 3 with weight pair n - $41 of
+; !BattleRom_ActLerpWeights, as in BattleAct_CalcLerpToTarget. It saves
+; DP $86-$87 on the stack and puts it back at the end, though nothing in
+; it writes there (probably left over).
+; Callers: BattleAct_CalcTable entries $41-$47 (BattleAct_RunCalc).
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0; Y = handler number ($41-$47)
+; Exit:  M=1, X=0, DP=0, DB=$7E, B=0; A = the y; X = DP $86-$87 (kept);
+;        Y unchanged; DP $80-$85 and $AD/$AE written, and Battle_Mul8's
+;        $77/$78 and $AF/$B0; !Battle_ActCalcOutA/B written
+; Callees: Battle_Mul8, Battle_ShiftRight3
+org $C17920
+BattleAct_CalcLerpToObj0:
+    LDX.b !BattleTmp_86
+    PHX
+    TYA
+    SEC
+    SBC.b #!BattleAct_CalcLerpObj0
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActLerpWeights,X
+    STA.b !BattleAct_LerpW1
+    STA.b !Battle_Mul8B
+    LDA.l !BattleRom_ActLerpWeights+1,X
+    STA.b !BattleAct_LerpW2
+    LDA.w !Battle_ActBattlers
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_Mul8A
+    LDA.w !Battler_ScreenY,X
+    STA.b !BattleAct_LerpY1
+    JSR Battle_Mul8                     ; w1 * x1
+    LDX.b !Battle_Mul8Product
+    STX.b !BattleAct_LerpSum
+    LDA.w !Battle_ActObjX
+    STA.b !Battle_Mul8A
+    LDA.w !Battle_ActObjY
+    STA.b !BattleAct_LerpY2
+    LDA.b !BattleAct_LerpW2
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w2 * x2
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattleAct_LerpSum
+    JSR Battle_ShiftRight3
+    STA.b !BattleAct_LerpSum
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_LerpSum
+    STA.w !Battle_ActCalcOutA
+    LDA.b !BattleAct_LerpY1
+    STA.b !Battle_Mul8A
+    LDA.b !BattleAct_LerpW1
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w1 * y1
+    LDX.b !Battle_Mul8Product
+    STX.b !BattleAct_LerpSum
+    LDA.b !BattleAct_LerpY2
+    STA.b !Battle_Mul8A
+    LDA.b !BattleAct_LerpW2
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                     ; w2 * y2
+    REP #$21                            ; 16-bit A, carry clear
+    LDA.b !Battle_Mul8Product
+    ADC.b !BattleAct_LerpSum
+    JSR Battle_ShiftRight3
+    STA.b !BattleAct_LerpSum
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_LerpSum
+    STA.w !Battle_ActCalcOutB
+    PLX
+    STX.b !BattleTmp_86
+    RTS
+
+; ==================================================================
+; BattleAct_FacingModeTable ($C179A1–$C179D2, 25 words)
+; ==================================================================
+; BattleAct_CalcFacing's handler per facing mode 0-$18, called through
+; JSR (BattleAct_FacingModeTable,X) with X = mode * 2.
+org $C179A1
+BattleAct_FacingModeTable:
+    dw BattleAct_FaceLikeEntry          ; $00-$09: the facing of entry n
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceLikeEntry
+    dw BattleAct_FaceTowardEntry        ; $0A-$13: toward entry n - $0A
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceTowardEntry
+    dw BattleAct_FaceFixed              ; $14-$17: facing n - $14
+    dw BattleAct_FaceFixed
+    dw BattleAct_FaceFixed
+    dw BattleAct_FaceFixed
+    dw BattleAct_FaceTowardCentre       ; $18
+
+; ==================================================================
+; BattleAct_CalcTable ($C179D3–$C17A62, 72 words)
+; ==================================================================
+; BattleAct_RunCalc's handler per number 0-$47, called through
+; JSR (BattleAct_CalcTable,X) with X = number * 2.
+org $C179D3
+BattleAct_CalcTable:
+    dw BattleAct_CalcEntryPos           ; $00-$08: entry n
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryPos
+    dw BattleAct_CalcEntryOffsetPos     ; $09-$11: entry n - 9 with its screen offsets
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcEntryOffsetPos
+    dw BattleAct_CalcNone               ; $12
+    dw BattleAct_CalcMid03              ; $13
+    dw BattleAct_CalcMid01              ; $14
+    dw BattleAct_CalcMid02              ; $15
+    dw BattleAct_CalcCentroid           ; $16
+    dw BattleAct_CalcAheadOfActor       ; $17
+    dw BattleAct_CalcFixedPoint         ; $18
+    dw BattleAct_CalcSavedPos           ; $19-$1B
+    dw BattleAct_CalcSavedPos
+    dw BattleAct_CalcSavedPos
+    dw BattleAct_CalcObjOffset          ; $1C-$23: object n - $1C
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcObjOffset
+    dw BattleAct_CalcLerpToTarget       ; $24-$29: caster to target
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcVarPair            ; $2A-$31: variable pair n - $2A
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcVarPair
+    dw BattleAct_CalcLerpToTarget       ; $32-$38: entry 1 to target
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget       ; $39-$3F: caster to target, with screen offsets
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcLerpToTarget
+    dw BattleAct_CalcMid12              ; $40
+    dw BattleAct_CalcLerpToObj0         ; $41-$47: caster to object 0
+    dw BattleAct_CalcLerpToObj0
+    dw BattleAct_CalcLerpToObj0
+    dw BattleAct_CalcLerpToObj0
+    dw BattleAct_CalcLerpToObj0
+    dw BattleAct_CalcLerpToObj0
+    dw BattleAct_CalcLerpToObj0
+
+; ==================================================================
 ; BattleAct_LoaderTable ($C17A63–$C17A6A, 4 words)
 ; ==================================================================
 ; Action loader per !Battle_ActKind 0-3, called by BattleAct_LoadScript
@@ -19736,6 +20714,122 @@ BattleAct_ProbeBoxOverlap:
     STA.w !Battler_ProbeY,X
     JSR Battle_CalcBattlerBox
     JMP Battle_BoxOverlapsOthers
+
+; ==================================================================
+; BankC1_OldBuildLeftovers ($C17C3D–$C17FFF, 963 bytes)
+; ==================================================================
+; Not code and, as far as found, never read: xref finds no call or
+; jump to $C1:7C3D or to any of the segment starts below, and the
+; absolute $7C3D-$7FFF operands in bank $C1 code are WRAM reads (DB =
+; $7E). The bytes are what earlier, longer assemblies of the
+; end of this part of the bank left behind: the tables and
+; BattleAct_ProbeBoxOverlap from BattleAct_FacingModeTable on, laid out
+; as today but at higher addresses and with every pointer moved to
+; match. Each later (shorter) build wrote over the start of the one
+; before, so the copies are cut off at the front; the order newest to
+; oldest is probably the order below. Kept as bytes; the code copies
+; are given as db since they never run. $C1:8000 starts the next part
+; of the bank (unmatched).
+; - $7C3D-$7CC1: the current $7BB8-$7C3C (the last 57 entries and a
+;   half of BattleAct_OpcodeTable, then BattleAct_ProbeBoxOverlap)
+;   assembled $85 higher: every table word and both call operands
+;   are the current value + $85.
+; - $7CC2-$7F49: a build $30D higher, whole from its facing table on:
+;   a 15-entry facing-mode table (modes 0-9 hold
+;   BattleAct_FaceTowardEntry + $30D, $0A-$0D BattleAct_FaceFixed +
+;   $30D, $0E BattleAct_FaceTowardCentre + $30D; there is no
+;   BattleAct_FaceLikeEntry entry), then BattleAct_CalcTable,
+;   BattleAct_LoaderTable and BattleAct_OpcodeTable entry for entry
+;   + $30D, then BattleAct_ProbeBoxOverlap calling $2C59 / $2CAF (the
+;   current targets + $3FF).
+; - $7F4A-$7FE2: the high byte of entry $93 and entries $94-$DF of an
+;   opcode table $3B8 higher (handlers + $3B8, the BattleAct_OpEndScript
+;   entries + $3C4); $7FE3-$7FF4: its BattleAct_ProbeBoxOverlap,
+;   calling $2BC4 / $2C1A (current + $36A).
+; - $7FF5-$7FFC: the last 8 bytes of one more ProbeBoxOverlap copy
+;   with the same two targets, 8 bytes higher.
+; - $7FFD-$7FFF: $FF fill up to $C1:8000.
+; Entry/Exit: not code (data; never executed).
+org $C17C3D
+BankC1_OldBuildLeftovers:
+.copy85:                                ; $C1:7C3D-$C1:7CC1: the current $C1:7BB8-$C1:7C3C, $85 higher
+    db $4D
+                                        ; (the high byte of an unused-opcode entry, $4CF7 + $85)
+    dw $4D7C,$6A48,$6B75,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C
+    dw $4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C
+    dw $4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C
+    dw $4D7C,$6D78,$6FB6,$6FD8,$6FFA,$701F,$7074,$4D7C
+    dw $4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C,$4D7C
+    dw $4D7C,$7081,$70B0,$70DF,$7293,$73CE,$7432,$73E9
+    dw $7490,$7539,$75BF,$75FE,$4D7C,$4D7C,$4D7C,$4D7C
+    dw $4D7C
+    db $BD,$0C,$1D,$9D,$39,$A0,$BD,$23,$1D,$9D,$50,$A0,$20,$DF,$28,$4C,$35,$29
+                                        ; (BattleAct_ProbeBoxOverlap calling $28DF / $2935)
+.facing30D:                             ; $C1:7CC2: 15-entry facing-mode table
+    dw $78F0,$78F0,$78F0,$78F0,$78F0,$78F0,$78F0,$78F0,$78F0,$78F0
+    dw $7917,$7917,$7917,$7917,$791F
+.calc30D:                               ; $C1:7CE0: 72-entry calc table
+    dw $7946,$7946,$7946,$7946,$7946,$7946,$7946,$7946
+    dw $7946,$7957,$7957,$7957,$7957,$7957,$7957,$7957
+    dw $7957,$7957,$798A,$798B,$7993,$799B,$79E5,$7A5B
+    dw $7ADE,$7AE7,$7AE7,$7AE7,$7AF9,$7AF9,$7AF9,$7AF9
+    dw $7AF9,$7AF9,$7AF9,$7AF9,$7B18,$7B18,$7B18,$7B18
+    dw $7B18,$7B18,$7C0E,$7C0E,$7C0E,$7C0E,$7C0E,$7C0E
+    dw $7C0E,$7C0E,$7B18,$7B18,$7B18,$7B18,$7B18,$7B18
+    dw $7B18,$7B18,$7B18,$7B18,$7B18,$7B18,$7B18,$7B18
+    dw $7C21,$7C2D,$7C2D,$7C2D,$7C2D,$7C2D,$7C2D,$7C2D
+.loader30D:                             ; $C1:7D70: 4-entry loader table
+    dw $4A67,$4639,$48AD,$4A68
+.opcode30D:                             ; $C1:7D78: 224-entry opcode table
+    dw $4FFD,$5004,$5011,$512F,$51AF,$51AF,$51AF,$5227
+    dw $5261,$5261,$5261,$5261,$5261,$5261,$5261,$5261
+    dw $52CC,$52DE,$52F0,$54FB,$5512,$5529,$5716,$5728
+    dw $573A,$591E,$5979,$598A,$59A1,$59C8,$59D9,$5A08
+    dw $5A21,$5A2F,$5A39,$5A50,$5A63,$5A76,$5A8A,$5B13
+    dw $5B4D,$5B51,$5B86,$5B8A,$5BB8,$5BE9,$5BF1,$5004
+    dw $5BF9,$5C0B,$5C19,$5C27,$5C3E,$5C4D,$5C58,$5C63
+    dw $5C72,$5C7D,$5C88,$5C9E,$5CB0,$5CC6,$5CC6,$5CC6
+    dw $5CC6,$5CF1,$5D07,$5D19,$5D4B,$5CC6,$5CC6,$6549
+    dw $6549,$5D7D,$5DA6,$5004,$5004,$5DA6,$5DBC,$5DD2
+    dw $5DE8,$5DE8,$5DE8,$5DE8,$5DE8,$5DE8,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5FFE,$601F,$6025
+    dw $602A,$60A0,$60A0,$60A0,$60A0,$60CE,$60CE,$60CE
+    dw $60CE,$60E0,$6194,$61EC,$6220,$62A7,$62B2,$62C0
+    dw $62CE,$62E0,$62EB,$6366,$636C,$63A0,$63F3,$6461
+    dw $64AB,$64AB,$64CE,$64CE,$64F8,$6502,$5004,$5004
+    dw $6528,$6549,$6549,$6549,$6549,$6565,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $65A6,$6A3B,$6A50,$6A57,$65A6,$6A3B,$5004,$5004
+    dw $5004,$5004,$6A5E,$5004,$6C28,$6CC7,$5004,$5004
+    dw $6CD0,$6DFD,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $7000,$723E,$7260,$7282,$72A7,$72FC,$5004,$5004
+    dw $5004,$5004,$5004,$5004,$5004,$5004,$5004,$5004
+    dw $7309,$7338,$7367,$751B,$7656,$76BA,$7671,$7718
+    dw $77C1,$7847,$7886,$5004,$5004,$5004,$5004,$5004
+.probe3FF:                              ; $C1:7F38: BattleAct_ProbeBoxOverlap calling $2C59 / $2CAF
+    db $BD,$0C,$1D,$9D,$39,$A0,$BD,$23,$1D,$9D,$50,$A0,$20,$59,$2C,$4C,$AF,$2C
+.opcode3B8:                             ; $C1:7F4A: the last 76 entries and a half of an opcode table
+    db $50
+    dw $50BB,$50BB,$50BB,$50BB,$6651,$6AE6,$6AFB,$6B02
+    dw $6651,$6AE6,$50BB,$50BB,$50BB,$50BB,$6B09,$50BB
+    dw $6CD3,$6D72,$50BB,$50BB,$6D7B,$6EA8,$50BB,$50BB
+    dw $50BB,$50BB,$50BB,$50BB,$50BB,$50BB,$50BB,$50BB
+    dw $50BB,$50BB,$50BB,$50BB,$50BB,$50BB,$50BB,$50BB
+    dw $50BB,$50BB,$50BB,$50BB,$70AB,$72E9,$730B,$732D
+    dw $7352,$73A7,$50BB,$50BB,$50BB,$50BB,$50BB,$50BB
+    dw $50BB,$50BB,$50BB,$50BB,$73B4,$73E3,$7412,$75C6
+    dw $7701,$7765,$771C,$77C3,$786C,$78F2,$7931,$50BB
+    dw $50BB,$50BB,$50BB,$50BB
+.probe36A:                              ; $C1:7FE3: BattleAct_ProbeBoxOverlap calling $2BC4 / $2C1A
+    db $BD,$0C,$1D,$9D,$39,$A0,$BD,$23,$1D,$9D,$50,$A0,$20,$C4,$2B,$4C,$1A,$2C
+.probe36A_tail:                         ; $C1:7FF5: the last 8 bytes of one more such copy
+    db $50,$A0,$20,$C4,$2B,$4C,$1A,$2C
+.fill:
+    db $FF,$FF,$FF
+
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
