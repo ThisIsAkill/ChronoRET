@@ -286,8 +286,6 @@ org $C1D7C4
 BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
 org $C1D8D1
 BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
-org $C1C1DD
-BattleSys_UnkC1DD:                      ; JSR from BattleSys_UnkB967 (item and tech paths): fills !Battle_UnkAD8D/AD8E
                                         ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
 org $C1D490
 BattleSys_UnkD490:                      ; JSR from BattleSys_UnkBF46; not analysed

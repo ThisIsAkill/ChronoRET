@@ -797,4 +797,46 @@ if !constants_battle_inc == 0
 !Battle_EquipBase3        = $7B   ; first .Unk27 id (subtracted before indexing !BattleRom_EquipRec3)
 !Battle_EquipBonusMask    = $0F   ; !BattleRom_EquipBonus bits 3-0: the amount added
 
+
+; --- Action target resolution (BattleSys_UnkC1DD) ---
+; Target modes as BattleSys_UnkC1DD tests them; the names follow the
+; BattleTgt_ModeTable handler of the same number (the menu's meaning).
+!BattleTgt_ModeSingleAlly = 0     ; mode 0: one target
+!BattleTgt_ModeAllAllies = 1      ; mode 1: the caster's side
+!BattleTgt_ModeSingleKoAlly = 3   ; mode 3: one KO'd target
+!BattleTgt_ModePcByCharId5 = 5    ; mode 5: one target
+!BattleTgt_ModePcByCharId4 = 6    ; mode 6: one target
+!BattleTgt_ModeAllEnemies = 8     ; mode 8: the other side
+!BattleTgt_ModeEveryone  = 9      ; mode 9: BattleSys_UnkC1DD picks one of four ways (see there)
+!BattleTgt_ModeAllEnemies2 = $0A  ; mode $0A: AllEnemies in the menu; BattleSys_UnkC1DD fills no list for it
+!BattleTgt_ModeEnemyLineFromCaster = $0B ; mode $0B
+!BattleTgt_ModeEnemyLineFromCaster2 = $0C ; mode $0C
+!BattleTgt_ModeEnemyLineFromChar3 = $0D ; mode $0D
+!BattleTgt_ModeUnk0E     = $0E    ; mode $0E: SingleAlly in the menu; BattleSys_UnkC1DD picks an enemy target
+!BattleTgt_ModeEnemyRow  = $0F    ; mode $0F
+!BattleTgt_ModeUnk10     = $10    ; mode $10: SingleAlly in the menu; an area mode for BattleSys_UnkC1DD
+!BattleTgt_ModeCasterRadius = $11 ; mode $11
+!BattleTgt_ModeEnemyRadius = $12  ; mode $12
+!BattleTgt_ModeChar3Radius = $13  ; mode $13
+!BattleTgt_ModeUnk15     = $15    ; mode $15: SingleAlly in the menu; an area mode for BattleSys_UnkC1DD
+!BattleTgt_ModeChar6Radius = $1B  ; mode $1B
+!BattleTgt_ModeUnk32     = $32    ; mode $32: past BattleTgt_ModeTable; BattleSys_UnkC1DD adds the chosen target to the area's list
+!BattleSys_ServiceAreaQuery = 7   ; $C10045 service number of BattleTgt_RunAreaQuery
+!Battle_Unk4CNoActMask   = $18    ; BattlerStats.Unk4C bits 4-3: either set = BattleSys_UnkC1DD drops the action
+!Battle_RandWayPick1     = 8      ; mode 9: under this (of 100) = pick an enemy target
+!Battle_RandWayOwnSide1  = 12     ; ... under this = the caster's side
+!Battle_RandWayPick2     = 18     ; ... under this = pick an enemy target
+!Battle_RandWayOtherSide = 20     ; ... under this = the other side; else the action is dropped
+!Battle_AreaEntryBytes   = 3      ; bytes per area record entry (!BattleRom_AreaRecPtr)
+!Battle_AreaQueryBit     = $80    ; entry byte 1 bit 7: a position query (service 5), not an area
+!Battle_AreaParamMask    = $7F    ; entry byte 1 bits 6-0: BattleSys_AreaParamTable index
+!Battle_AreaSizeMask     = $7F    ; entry byte 2 bits 6-0: !BattleTgt_AreaSize
+!Battle_AreaVariantBit   = $80    ; entry byte 2 bit 7: !BattleTgt_AreaVariant = 1
+!Battle_TwoEmptyEntries  = $FFFF  ; two $FF list entries read as one word
+!Battle_AD8EShiftEnd     = 10     ; BattleSys_UnkC1DD shifts !Battle_UnkAD8E entries 0-9 down (entry 10 stays)
+!Battle_NoTargetMaskHi   = $10    ; !Battle_ActMainMask high byte of the no-target action (bit 12; meaning unknown)
+!Battle_NoTargetTech1    = $7B    ; !Battle_ActId of the action a PC's area tech plays when the area finds no one:
+!Battle_NoTargetTech2    = $7C    ;   one user, two users, three users (probably a "nothing happens" display; not
+!Battle_NoTargetTech3    = $7D    ;   traced)
+
 endif

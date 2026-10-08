@@ -23525,7 +23525,7 @@ BattleAi_ClearTargets:
 ; plays the action block), then BattleSys_UnkAC85.
 ; Callers (7 JSR sites): BattleSys_Unk895B ($C1:8971), BattleAi_EnemyTurn ($C1:8E47),
 ;   BattleSys_UpdateKo ($C1:B376), BattleSys_UnkB967 ($C1:BB26, $C1:BC1E), BattleSys_RunPcAttack
-;   ($C1:C00E) and unmatched ($C1:C6A3).
+;   ($C1:C00E) and BattleSys_UnkC1DD ($C1:C6A3).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ;        (the service dispatcher is not matched; the code assumes it
 ;        keeps these)
@@ -24172,11 +24172,11 @@ BattleAi_NoteFirstTest:
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
 ; Callers (38 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
-;   Battle_RandRangeLong ($C1:FDCB) and unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6,
-;   $C1:C486, $C1:C867, $C1:C8D0, $C1:D29E, $C1:D67C, $C1:DA7C, $C1:DB1A, $C1:DC94, $C1:E177,
-;   $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F,
-;   $C1:E774, $C1:E7BB, $C1:E97A, $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18, $C1:EFC9, $C1:F0A4,
-;   $C1:F141, $C1:FDDA).
+;   BattleSys_UnkC1DD ($C1:C486, $C1:C867, $C1:C8D0), Battle_RandRangeLong ($C1:FDCB) and unmatched
+;   ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:D29E, $C1:D67C, $C1:DA7C, $C1:DB1A,
+;   $C1:DC94, $C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE,
+;   $C1:E508, $C1:E56F, $C1:E774, $C1:E7BB, $C1:E97A, $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18,
+;   $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDDA).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
@@ -26983,6 +26983,1132 @@ BattleSys_RunPcAttack:
     STA.w !Battle_UnkB1FC
     RTS
 
+; ==================================================================
+; Action target resolution ($C1:C1DD–$C1:C90A, table $C1:C95C)
+; ==================================================================
+
+; $C1:C1DD — BattleSys_UnkC1DD (1818 bytes, $C1DD–$C8F6)
+; Checks that the users of the action !Battle_UnkB18C (a tech, an item,
+; or an enemy's action) can act and resolves its targets into
+; !Battle_UnkAD8E (slots, $FF-ended) and !Battle_UnkAD8D (their count).
+; !Battle_UnkAF23 = 1 means the action is dropped, 0 that it goes ahead.
+; The name is kept as it was: renaming would void the review of
+; BattleSys_UnkB967, which calls it.
+;   1. The caster !Battle_UnkB18B and then each partner must be able
+;      to act: not KO'd (BattlerStats.Status bit 7; an enemy caster
+;      with its !Battle_UnkAEB3 entry set skips this test), no
+;      !Battle_NoActMask2 bit
+;      in .Status2, no bit 4-3 in .Unk4C (!Battle_Unk4CNoActMask), no
+;      !Battle_AutoEnemyBit in .Unk4C+2 or +7. Else the action fails.
+;      A PC's partners are the slots of !Battle_TechUsers[1] and [2]
+;      (through !Battle_UnkB1BE; a $FF id or slot ends the checks); an
+;      enemy's is !Battle_ActUnkAE97, checked twice (quirk: the second
+;      check reads !Battle_ActUnkAE97 again, so !Battle_ActUnkAE98 is
+;      never checked).
+;   2. The target mode (DP $00) and area number (DP $0C): for a PC's
+;      tech !BattleRom_TechInfo bytes 0 (& $7F) and 1; for a PC's item
+;      (BattleCmdRec.Kind of the record at DP $06 has
+;      !BattleCmd_KindItem) !BattleRom_ItemTargetMode & $7F and no area
+;      number (DP $0C is left as BattleSys_UnkB967 zeroed it); for an
+;      enemy !BattleRom_EnemyTechTarget bytes 0 and 1. DP $0A, the side
+;      the areas scan, starts at 0 for a PC and 1 for an enemy.
+;   3. By the mode (the modes share their numbers with
+;      BattleTgt_ModeTable; the result kind in DP $3A says how the list
+;      is finished in step 5):
+;      - 0, 5, 6: one target, BattleSys_MapEmptyTarget(!Battle_UnkB2AE);
+;        fails if it is KO'd. Kind 0.
+;      - 1: every present battler of the caster's side (PC slots below
+;        DP $04 = 3, or enemy slots 3 up to DP $10 = 11); fails if
+;        none. Kind 1. 8: the same for the other side.
+;      - 4: PC slots 0-2, present or not. Kind 5.
+;      - 3: one target, BattleSys_MapEmptyTarget(!Battle_UnkB2AE); it
+;        must be KO'd. For an enemy target the action fails when its
+;        !Battle_UnkAF15 bit 7 is set (quirk: read at !Battle_UnkAF15 +
+;        slot, three entries past the enemy's own; the area copy below
+;        uses slot - 3). Kind 5.
+;      - 7: .pick_enemy_target. Kind 0. $0B-$0F, $12, $1A: the same,
+;        kind 2. $10, $11, $13, $14, $15, $1B: kind 3. $0A: kind 1.
+;      - 9: a percentage roll picks one of four ways (DP $04 = the byte
+;        at !Battle_UnkLong00FA or 00FB, DP $06/$08 dead stores): under
+;        8 .pick_enemy_target, under 12 the mode-1 scan, under 18
+;        .pick_enemy_target, under 20 the mode-8 scan, else the action
+;        fails. Quirk: the roll is compared through !Battle_MathLo,
+;        which Battle_RandRange puts back as it was, not the number it
+;        returns in A; so the outcome is what was in !Battle_MathLo
+;        (BattleSys_LoadTechUsers' set number, by its header). The
+;        .pick_enemy_target ways are JMPs, so they return straight to
+;        the caller with !Battle_UnkAF23 as that path leaves it.
+;      - $32: one target, BattleSys_MapEmptyTarget(!Battle_UnkB2AE),
+;        DP $0A = 1. Kind 4.
+;      - any other mode: kind 0.
+;   4. Kinds 0 and 2: !Battle_UnkAD8E[0] = BattleSys_MapEmptyTarget(
+;      !Battle_UnkB2AE). !Battle_UnkAF23 = 0. With no area number the
+;      routine returns here. Else the area record (!BattleRom_AreaRecPtr
+;      [area], a count byte then 3-byte entries) is run after
+;      .load_user_slots: per entry, byte 0 is the shape (DP $3D), byte
+;      1 the parameter set (bits 6-0, one of the 7 .area_paramsN
+;      routines through BattleSys_AreaParamTable) with bit 7 meaning a
+;      position query instead of an area, byte 2 the size (bits 6-0,
+;      DP $08) and the variant (bit 7, DP $0E). A position query runs
+;      service 5 with !BattlePos_Mode = byte 0 (its subject and other
+;      are not set here and its result is not read here). An area runs
+;      service 7 (BattleTgt_RunAreaQuery) with !BattleTgt_AreaType =
+;      byte 0, then copies !BattleTgt_Candidates into !Battle_UnkAD8E
+;      and !BattleAi_Targets, skipping enemies with !Battle_UnkAF15 bit
+;      7 (their entries are left as they were), and sets
+;      !Battle_UnkAD8D and !BattleAi_TargetCount to the non-$FF entries
+;      copied. Quirk: the copy starts at entry n * 11 for the record's
+;      entry n, so from the second entry on it copies a single byte at
+;      index 11, 22, ... (past the 11 slots).
+;   5. With an area record: unless kind 4, when !BattleTgt_Candidates[0]
+;      and [1] are both $FF the action fails; a PC caster first plays a
+;      tech action (caster = the PC, !Battle_ActKindTech, id
+;      !Battle_NoTargetTech1/2/3 by the number of users, main mask
+;      high byte !Battle_NoTargetMaskHi) through BattleSys_UnkAC57.
+;      Kind 4 puts !Battle_UnkB2AE in the first $FF entry and counts it.
+;      Unless kind 5, entries whose slot is empty (!Battler_UnkAEFF
+;      $FF) are taken out of !Battle_UnkAD8E (quirk: a $FF entry takes
+;      out the entry after it instead). Last, !Battle_UnkAD8D = the
+;      index of the first $FF entry; with none in 11 the action fails.
+; Quirks also: two dead compares ($C1:C573 after step 4's store, and
+; the kind 2 / kind 3 tests at $C1:C6A9-$C1:C6BB, whose branches go to
+; the next instruction either way), and a second RTS at $C1:C731 that
+; nothing reaches.
+; Sub-entries (local labels; reached by JSR / JMP from inside only):
+;   .load_user_slots ($C1:C74C): for a PC caster BattleSys_LoadTechUsers
+;   (!Battle_UnkB18C) and DP $00/$02/$04 = the slots of
+;   !Battle_TechUsers[0]/[1]/[2] (via !Battle_UnkB1BE; $FF for none),
+;   !Battle_ActUnkAE97/AE98 = DP $02/$04; for both, DP $06 =
+;   !Battle_UnkB2AE and DP $0C = the caster.
+;   .pick_enemy_target ($C1:C82D-$C1:C8F6): a target on the side
+;   opposite the caster. Fails (!Battle_UnkAF23 = 1) when that side has
+;   no present battler; keeps !Battle_UnkB2AE when it is present; else
+;   picks one (Battle_RandRange 3-10 for an enemy target, 0-2 for a PC;
+;   with !Battle_Unk2989 bit 5 the PC caster's pick is the first
+;   present enemy, as Battle_RandRange would return the low bound and
+;   loop on an empty slot): !Battle_UnkB2AE = !Battle_UnkAD8E[0] = it,
+;   !Battle_UnkAD8D = 1, DP $0A = 0 (enemies) or 1 (PCs).
+; Callers note: the area parameter routines are reached only through
+;   BattleSys_AreaParamTable (JSR (BattleSys_AreaParamTable,X) at
+;   $C1:C732).
+; Callers (5 JSR sites): BattleSys_UnkB967 ($C1:BABE, $C1:BB88) and unmatched ($C1:9AEB, $C1:A0F2,
+;   $C1:A33A).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18B = the caster,
+;        !Battle_UnkB18C = the action, !Battle_UnkB2AE = the chosen
+;        target, !Battle_TechUsers as the caller set it for an enemy;
+;        for a PC, DP $06 = its BattleCmdRec address and (item) DP $0C
+;        = 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; !Battle_UnkAF23 = 0 (go) or 1
+;        (dropped); A, X, Y clobbered; !Battle_UnkAD8E/AD8D, and on the
+;        paths above !Battle_UnkB2AE, !BattleAi_Targets/TargetCount,
+;        !Battle_TechUsers, !Battle_ActUnkAE97/AE98, the action block;
+;        DP $00-$15 and $3A-$3D written, plus what the callees change
+;        (the math DP bytes, the area or position query's DP scratch and
+;        outputs, BattleSys_UnkAC57's)
+!C1DD_Mode = !BattleTmp_00              ; 1 B: target mode, then user 0's slot (.load_user_slots)
+!C1DD_User1 = !BattleTmp_02             ; 1 B: user 1's slot (.load_user_slots)
+!C1DD_ScanEnd = !BattleTmp_04           ; 1-2 B: end of the PC scan; user 2's slot; an entry's byte 1
+!C1DD_Rec = !BattleTmp_06               ; 2 B: in: the PC's BattleCmdRec address; then !Battle_UnkB2AE
+!C1DD_Size = !BattleTmp_08              ; 1 B: area size (entry byte 2 & $7F)
+!C1DD_Side = !BattleTmp_0A              ; 1 B: !BattleTgt_AreaSide for the areas (0 = enemies, 1 = PCs)
+!C1DD_Area = !BattleTmp_0C              ; 1 B: area number (0 = none); then the caster (.load_user_slots)
+!C1DD_Variant = !BattleTmp_0E           ; 1 B: !BattleTgt_AreaVariant (entry byte 2 bit 7)
+!C1DD_EnemyEnd = !BattleTmp_10          ; 1 B: end of the enemy scan (11); then the entry's record offset
+!C1DD_EntryNum = !BattleTmp_12          ; 1 B: entry number in the area record
+!C1DD_Left = !BattleTmp_14              ; 1 B: entries left
+!C1DD_Kind = $3A                        ; 1 B: result kind (see the header)
+!C1DD_RecAddr = $3B                     ; 2 B: the area record's address in bank $CC
+!C1DD_IsQuery = $3C                     ; 1 B: 1 = the entry is a position query
+!C1DD_Shape = !BattleTmp_3D             ; 1 B: entry byte 0: area type or position query
+!C1DD_KindSingle = 0                    ; result kinds (DP $3A)
+!C1DD_KindList = 1
+!C1DD_KindEnemyPick = 2
+!C1DD_KindArea = 3
+!C1DD_KindAddChosen = 4
+!C1DD_KindKeepEmpty = 5
+org $C1C1DD
+BattleSys_UnkC1DD:
+    TDC
+    STA.w !Battle_UnkAF23
+    LDA.w !Battle_UnkB18C
+    JSR BattleSys_LoadTechUsers
+    LDA.w !Battle_UnkB18B
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = caster * $80 (B = 0 from LoadTechUsers)
+    TDC
+    SEP #$20
+    LDA.w !Battle_UnkB18B
+    TAY
+    CPY.w #!Battle_FirstEnemySlot
+    BCC .caster_ko
+    LDA.w !Battle_UnkAEB3Base,Y
+    BNE .caster_status2
+.caster_ko:
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .caster_status2
+    JMP .fail
+.caster_status2:
+    LDA.w BattlerStats.Status2,X
+    AND.b #!Battle_NoActMask2
+    BEQ .caster_unk4c
+    JMP .fail
+.caster_unk4c:
+    LDA.w BattlerStats.Unk4C,X
+    AND.b #!Battle_Unk4CNoActMask
+    BEQ .caster_auto
+    JMP .fail
+.caster_auto:
+    LDA.w BattlerStats.Unk4C+2,X
+    ORA.w BattlerStats.Unk4C+7,X
+    AND.b #!Battle_AutoEnemyBit
+    BEQ .read_mode
+    JMP .fail
+.read_mode:
+    TDC
+    LDA.w !Battle_UnkB18C
+    REP #$20
+    ASL A
+    TAX                                 ; X = action * 2
+    TDC
+    SEP #$20
+    TDC
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCS .enemy_mode
+    LDY.w #!Battle_NumPcSlots
+    STY.b !C1DD_ScanEnd
+    LDY.w #!Battle_NumSlots
+    STY.b !C1DD_EnemyEnd
+    STZ.b !C1DD_Side
+    LDY.b !C1DD_Rec
+    LDA.w BattleCmdRec.Kind,Y
+    BIT.b #!BattleCmd_KindItem
+    BNE .item_mode
+    LDA.l !BattleRom_TechInfo+1,X
+    STA.b !C1DD_Area
+    LDA.l !BattleRom_TechInfo,X
+    AND.b #!BattleTgt_ModeMask
+    BRA .tech_partner1
+.item_mode:
+    TXA
+    LSR A
+    TAX
+    LDA.l !BattleRom_ItemTargetMode,X
+    AND.b #!BattleTgt_ModeMask
+    STA.b !C1DD_Mode
+    JMP .by_mode
+.enemy_mode:
+    LDY.w #!Battle_NumPcSlots
+    STY.b !C1DD_ScanEnd
+    LDY.w #!Battle_NumSlots
+    STY.b !C1DD_EnemyEnd
+    LDA.b #1
+    STA.b !C1DD_Side
+    LDA.l !BattleRom_EnemyTechTarget+1,X
+    STA.b !C1DD_Area
+    LDA.l !BattleRom_EnemyTechTarget,X
+    STA.b !C1DD_Mode
+    LDA.w !Battle_ActUnkAE97
+    CMP.b #!Battle_EntryNone
+    BNE .partner1_ko
+    JMP .by_mode
+.tech_partner1:
+    STA.b !C1DD_Mode
+    TDC
+    LDA.w !Battle_TechUsers+1
+    CMP.b #!Battle_EntryNone
+    BNE .partner1_slot
+    JMP .by_mode
+.partner1_slot:
+    TAX
+    LDA.w !Battle_UnkB1BE,X
+    CMP.b #!Battle_EntryNone
+    BNE .partner1_ko
+    JMP .by_mode
+.partner1_ko:
+    REP #$20
+    XBA
+    LSR A
+    TAX                                 ; X = partner * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .partner1_status2
+    JMP .fail
+.partner1_status2:
+    LDA.w BattlerStats.Status2,X
+    AND.b #!Battle_NoActMask2
+    BEQ .partner1_unk4c
+    JMP .fail
+.partner1_unk4c:
+    LDA.w BattlerStats.Unk4C,X
+    AND.b #!Battle_Unk4CNoActMask
+    BEQ .partner1_auto
+    JMP .fail
+.partner1_auto:
+    LDA.w BattlerStats.Unk4C+2,X
+    ORA.w BattlerStats.Unk4C+7,X
+    AND.b #!Battle_AutoEnemyBit
+    BEQ .partner2
+    JMP .fail
+.partner2:
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .tech_partner2
+    LDA.w !Battle_ActUnkAE97            ; quirk: AE97 again, not AE98
+    CMP.b #!Battle_EntryNone
+    BNE .partner2_ko
+    JMP .by_mode
+.tech_partner2:
+    TDC
+    LDA.w !Battle_TechUsers+2
+    CMP.b #!Battle_EntryNone
+    BEQ .by_mode
+    TAX
+    LDA.w !Battle_UnkB1BE,X
+    CMP.b #!Battle_EntryNone
+    BNE .partner2_ko
+    JMP .by_mode
+.partner2_ko:
+    REP #$20
+    XBA
+    LSR A
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .partner2_status2
+    JMP .fail
+.partner2_status2:
+    LDA.w BattlerStats.Status2,X
+    AND.b #!Battle_NoActMask2
+    BEQ .partner2_unk4c
+    JMP .fail
+.partner2_unk4c:
+    LDA.w BattlerStats.Unk4C,X
+    AND.b #!Battle_Unk4CNoActMask
+    BEQ .partner2_auto
+    JMP .fail
+.partner2_auto:
+    LDA.w BattlerStats.Unk4C+2,X
+    ORA.w BattlerStats.Unk4C+7,X
+    AND.b #!Battle_AutoEnemyBit
+    BEQ .by_mode
+    JMP .fail
+.by_mode:
+    STZ.b !C1DD_Kind
+    LDA.b !C1DD_Mode
+    CMP.b #!BattleTgt_ModeSingleAlly
+    BEQ .single
+    CMP.b #!BattleTgt_ModePcByCharId5
+    BEQ .single
+    CMP.b #!BattleTgt_ModePcByCharId4
+    BEQ .single
+    JMP .mode_all_allies
+.single:
+    LDA.b #1
+    STA.b !C1DD_Side
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .single_map
+    STZ.b !C1DD_Side
+.single_map:
+    TDC
+    LDA.w !Battle_UnkB2AE
+    JSR BattleSys_MapEmptyTarget
+    STA.w !Battle_UnkAD8E
+    REP #$20
+    XBA
+    LSR A
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    BIT.b #!Battle_StatusKo
+    BEQ .single_ok
+    JMP .fail
+.single_ok:
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    STZ.b !C1DD_Kind
+    JMP .finish_kind
+.mode_all_allies:
+    CMP.b #!BattleTgt_ModeAllAllies
+    BNE .mode_all_allies_ko
+.own_side:
+    LDA.b #1
+    STA.b !C1DD_Side
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .scan_pcs
+    STZ.b !C1DD_Side
+    JMP .scan_enemies
+.scan_pcs:
+    TDC
+    TAX
+    TAY
+.scan_pcs_loop:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .scan_pcs_next
+    TXA
+    STA.w !Battle_UnkAD8E,Y
+    INY
+.scan_pcs_next:
+    INX
+    CPX.b !C1DD_ScanEnd
+    BCS .scan_pcs_done
+    BRA .scan_pcs_loop
+.scan_pcs_done:
+    CPY.w #0
+    BNE .scan_pcs_some
+    JMP .fail
+.scan_pcs_some:
+    TYA
+    STA.w !Battle_UnkAD8D
+    LDA.b #!C1DD_KindList
+    STA.b !C1DD_Kind
+    JMP .finish_kind
+.mode_all_allies_ko:
+    CMP.b #!BattleTgt_ModeAllAlliesKo
+    BNE .mode_ko_ally
+    TDC
+    TAX
+    TAY
+.all_pcs_loop:
+    LDA.w !Battler_UnkAEFF,X            ; dead load: every PC slot is taken
+    TXA
+    STA.w !Battle_UnkAD8E,Y
+    INY
+    INX
+    CPX.w #!Battle_NumPcSlots
+    BCC .all_pcs_loop
+    TYA
+    STA.w !Battle_UnkAD8D
+    BNE .all_pcs_some
+    JMP .fail
+.all_pcs_some:
+    LDA.b #!C1DD_KindKeepEmpty
+    STA.b !C1DD_Kind
+    JMP .finish_kind
+.mode_ko_ally:
+    CMP.b #!BattleTgt_ModeSingleKoAlly
+    BNE .mode_attack
+    TDC
+    LDA.w !Battle_UnkB2AE
+    JSR BattleSys_MapEmptyTarget
+    STA.w !Battle_UnkAD8E
+    REP #$20
+    XBA
+    LSR A
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    BIT.b #!Battle_StatusKo
+    BNE .ko_ally_ok
+    JMP .fail
+.ko_ally_ok:
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    LDA.w !Battle_UnkAD8E
+    CMP.b #!Battle_FirstEnemySlot
+    BCS .ko_ally_enemy
+    LDA.b #1
+    STA.b !C1DD_Side
+    BRA .ko_ally_kind
+.ko_ally_enemy:
+    TAX
+    LDA.w !Battle_UnkAF15,X             ; quirk: indexed by the slot, not slot - 3
+    BIT.b #!Battle_AF15Bit7
+    BEQ .ko_ally_enemy_ok
+    JMP .fail
+.ko_ally_enemy_ok:
+    STZ.b !C1DD_Side
+.ko_ally_kind:
+    LDA.b #!C1DD_KindKeepEmpty
+    STA.b !C1DD_Kind
+    JMP .finish_kind
+.mode_attack:
+    CMP.b #!BattleTgt_ModeAttack
+    BNE .mode_all_enemies
+    JSR .pick_enemy_target
+    LDA.w !Battle_UnkAF23
+    BEQ .attack_ok
+    JMP .fail
+.attack_ok:
+    STZ.b !C1DD_Kind
+    JMP .finish_kind
+.mode_all_enemies:
+    CMP.b #!BattleTgt_ModeAllEnemies
+    BNE .mode_everyone
+.other_side:
+    LDA.b #1
+    STA.b !C1DD_Side
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .scan_enemies
+    STZ.b !C1DD_Side
+    JMP .scan_pcs
+.scan_enemies:
+    TDC
+    TAX
+    TAY
+    LDX.w #!Battle_FirstEnemySlot
+.scan_enemies_loop:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .scan_enemies_next
+    TXA
+    STA.w !Battle_UnkAD8E,Y
+    INY
+.scan_enemies_next:
+    INX
+    CPX.b !C1DD_EnemyEnd
+    BCS .scan_enemies_done
+    BRA .scan_enemies_loop
+.scan_enemies_done:
+    CPY.w #0
+    BNE .scan_enemies_some
+    JMP .fail
+.scan_enemies_some:
+    TYA
+    STA.w !Battle_UnkAD8D
+    LDA.b #!C1DD_KindList
+    STA.b !C1DD_Kind
+    JMP .finish_kind
+.mode_everyone:
+    CMP.b #!BattleTgt_ModeEveryone
+    BEQ .random_way
+    JMP .mode_enemy_pick
+.random_way:
+    TDC
+    TAX
+    LDA.b #!C1DD_KindList
+    STA.b !C1DD_Kind
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    LDA.b !Battle_MathLo                ; quirk: not the roll (see the header)
+    CMP.b #!Battle_RandWayPick1
+    BCS .random_way2
+    LDA.l !Battle_UnkLong00FA
+    STA.b !C1DD_ScanEnd
+    LDA.b #!Battle_EntryNone
+    STA.b !C1DD_Rec
+    LDA.b #1
+    STA.b !C1DD_Size
+    JMP .pick_enemy_target
+.random_way2:
+    LDA.b !Battle_MathLo
+    CMP.b #!Battle_RandWayOwnSide1
+    BCS .random_way3
+    LDA.l !Battle_UnkLong00FA
+    STA.b !C1DD_ScanEnd
+    LDA.b #0
+    STA.b !C1DD_Rec
+    LDA.b #2
+    STA.b !C1DD_Size
+    JMP .own_side
+.random_way3:
+    LDA.b !Battle_MathLo
+    CMP.b #!Battle_RandWayPick2
+    BCS .random_way4
+    LDA.l !Battle_UnkLong00FB
+    STA.b !C1DD_ScanEnd
+    LDA.b #!Battle_EntryNone
+    STA.b !C1DD_Rec
+    LDA.b #3
+    STA.b !C1DD_Size
+    JMP .pick_enemy_target
+.random_way4:
+    LDA.b !Battle_MathLo
+    CMP.b #!Battle_RandWayOtherSide
+    BCS .random_none
+    LDA.l !Battle_UnkLong00FB
+    STA.b !C1DD_ScanEnd
+    LDA.b #0
+    STA.b !C1DD_Rec
+    LDA.b #4
+    STA.b !C1DD_Size
+    JMP .other_side
+.random_none:
+    JMP .fail
+.mode_enemy_pick:
+    CMP.b #!BattleTgt_ModeEnemyLineFromCaster
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeEnemyLineFromCaster2
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeEnemyLineFromChar3
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeUnk0E
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeEnemyRow
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeEnemyRadius
+    BEQ .enemy_pick
+    CMP.b #!BattleTgt_ModeEnemyRadiusBig
+    BEQ .enemy_pick
+    BRA .mode_area
+.enemy_pick:
+    JSR .pick_enemy_target
+    LDA.w !Battle_UnkAF23
+    BEQ .enemy_pick_ok
+    JMP .fail
+.enemy_pick_ok:
+    LDA.b #!C1DD_KindEnemyPick
+    STA.b !C1DD_Kind
+    JMP .finish_kind
+.mode_area:
+    CMP.b #!BattleTgt_ModeUnk10
+    BEQ .area
+    CMP.b #!BattleTgt_ModeUnk15
+    BEQ .area
+    CMP.b #!BattleTgt_ModeCasterRadius
+    BEQ .area
+    CMP.b #!BattleTgt_ModeChar3Radius
+    BEQ .area
+    CMP.b #!BattleTgt_ModeRoboRadiusBig
+    BEQ .area
+    CMP.b #!BattleTgt_ModeChar6Radius
+    BEQ .area
+    BRA .mode_all_enemies2
+.area:
+    LDA.b #!C1DD_KindArea
+    STA.b !C1DD_Kind
+    BRA .finish_kind
+.mode_all_enemies2:
+    CMP.b #!BattleTgt_ModeAllEnemies2
+    BNE .mode_unk32
+    LDA.b #!C1DD_KindList
+    STA.b !C1DD_Kind
+    BRA .finish_kind
+.mode_unk32:
+    CMP.b #!BattleTgt_ModeUnk32
+    BNE .finish_kind
+    TDC
+    LDA.w !Battle_UnkB2AE
+    JSR BattleSys_MapEmptyTarget
+    STA.w !Battle_UnkAD8E
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    LDA.b #!C1DD_KindAddChosen
+    STA.b !C1DD_Kind
+    LDA.b #1
+    STA.b !C1DD_Side
+    BRA .finish_kind
+.finish_kind:
+    LDA.b !C1DD_Kind
+    BEQ .set_first
+    CMP.b #!C1DD_KindEnemyPick
+    BEQ .set_first
+    BRA .dead_compare
+.set_first:
+    TDC
+    LDA.w !Battle_UnkB2AE
+    JSR BattleSys_MapEmptyTarget
+    STA.w !Battle_UnkAD8E
+.dead_compare:
+    CMP.b #1                            ; quirk: both ways go to .areas
+    BEQ .areas
+    BRA .areas
+.areas:
+    TDC
+    STZ.b !C1DD_EntryNum
+    STZ.w !Battle_UnkAF23
+    LDA.b !C1DD_Area
+    BNE .area_record
+    JMP .done
+.area_record:
+    REP #$20
+    ASL A
+    TAX
+    LDA.l !BattleRom_AreaRecPtr,X
+    STA.b !C1DD_RecAddr
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_AreaRec,X        ; the record's count byte
+    STA.b !C1DD_Left
+    JSR .load_user_slots
+    LDA.b #1
+    STA.b !C1DD_EnemyEnd                ; offset of the first entry
+    STZ.b !C1DD_EntryNum
+.entry:
+    LDA.b !C1DD_Left
+    BNE .entry_read
+    JMP .check_found
+.entry_read:
+    TDC
+    LDA.b !C1DD_EnemyEnd
+    REP #$20
+    CLC
+    ADC.b !C1DD_RecAddr
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_AreaRec,X
+    STA.b !C1DD_Shape
+    LDA.l !BattleRom_AreaRec+1,X
+    STA.b !C1DD_ScanEnd
+    LDA.l !BattleRom_AreaRec+2,X
+    AND.b #!Battle_AreaSizeMask
+    STA.b !C1DD_Size
+    LDA.l !BattleRom_AreaRec+2,X
+    AND.b #!Battle_AreaVariantBit
+    BEQ .variant0
+    LDA.b #1
+    BRA .variant_set
+.variant0:
+    LDA.b #0
+.variant_set:
+    STA.b !C1DD_Variant
+    STZ.b !C1DD_IsQuery
+    LDA.b !C1DD_ScanEnd
+    AND.b #!Battle_AreaQueryBit
+    BEQ .params
+    LDA.b #1
+    STA.b !C1DD_IsQuery
+.params:
+    TDC
+    LDA.b !C1DD_ScanEnd
+    AND.b #!Battle_AreaParamMask
+    ASL A
+    TAX
+    JSR .set_params
+    LDA.b !C1DD_IsQuery
+    CMP.b #1
+    BNE .run_area
+    JSR .run_pos_query
+    BRA .entry_next
+.run_area:
+    JSR .run_area_query
+    TDC
+    LDA.b !C1DD_EntryNum
+    TAX
+    STX.w !Battle_MathA
+    LDX.w #!Battle_NumSlots
+    STX.w !Battle_MathB
+    JSR Battle_Mul16
+    TDC
+    TAY
+    LDX.b !Battle_MathLo
+.copy:
+    LDA.w !BattleTgt_Candidates,X
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .copy_store
+    TAX
+    LDA.w !Battle_UnkAF15-!Battle_FirstEnemySlot,X
+    BIT.b #!Battle_AF15Bit7
+    BNE .copy_next
+.copy_store:
+    LDX.b !Battle_MathLo
+    LDA.w !BattleTgt_Candidates,X
+    STA.w !Battle_UnkAD8E,X
+    STA.w !BattleAi_Targets,X
+    CMP.b #!Battle_EntryNone
+    BEQ .copy_next
+    INY
+.copy_next:
+    INC.b !Battle_MathLo
+    LDX.b !Battle_MathLo
+    CPX.w #!Battle_NumSlots
+    BCC .copy
+    TYA
+    STA.w !BattleAi_TargetCount
+    STA.w !Battle_UnkAD8D
+    TDC
+    TAX
+    TAY
+    LDA.w !Battle_UnkAD8E,X             ; dead load
+.entry_next:
+    LDA.b !C1DD_EnemyEnd
+    CLC
+    ADC.b #!Battle_AreaEntryBytes
+    STA.b !C1DD_EnemyEnd
+    INC.b !C1DD_EntryNum
+    DEC.b !C1DD_Left
+    LDA.b !C1DD_Left
+    BEQ .check_found
+    JMP .entry
+.check_found:
+    LDA.b !C1DD_Kind
+    CMP.b #!C1DD_KindAddChosen
+    BEQ .kind2
+    TDC
+    TAX
+    TAY
+    LDY.w !BattleTgt_Candidates
+    CPY.w #!Battle_TwoEmptyEntries
+    BNE .kind2
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCS .no_target_fail
+    STA.w !Battle_ActCaster
+    LDA.b #!Battle_ActKindTech
+    STA.w !Battle_ActKind
+    STZ.w !Battle_ActFlags
+    STZ.w !Battle_ActMainMask
+    LDA.b #!Battle_NoTargetMaskHi
+    STA.w !Battle_ActMainMask+1
+    LDA.w !Battle_TechUsers+2
+    BMI .no_target_two
+    LDA.b #!Battle_NoTargetTech3
+    STA.w !Battle_ActId
+    BRA .no_target_play
+.no_target_two:
+    LDA.w !Battle_TechUsers+1
+    CMP.b #!Battle_EntryNone
+    BEQ .no_target_one
+    LDA.b #!Battle_NoTargetTech2
+    STA.w !Battle_ActId
+    BRA .no_target_play
+.no_target_one:
+    LDA.b #!Battle_NoTargetTech1
+    STA.w !Battle_ActId
+.no_target_play:
+    JSR BattleSys_UnkAC57
+.no_target_fail:
+    JMP .fail
+.kind2:
+    LDA.b !C1DD_Kind
+    CMP.b #!C1DD_KindEnemyPick
+    BNE .kind3                          ; quirk: goes to .kind3 either way
+.kind3:
+    LDA.b !C1DD_Kind
+    CMP.b #!C1DD_KindArea
+    BNE .kind4
+    LDA.w !Battle_UnkAD8E
+    CMP.b #!Battle_EntryNone
+    BEQ .kind4                          ; quirk: goes to .kind4 either way
+.kind4:
+    LDA.b !C1DD_Kind
+    CMP.b #!C1DD_KindAddChosen
+    BNE .kind5
+    TDC
+    TAX
+.add_chosen:
+    LDA.w !Battle_UnkAD8E,X
+    CMP.b #!Battle_EntryNone
+    BEQ .add_chosen_here
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .add_chosen
+    BRA .kind5
+.add_chosen_here:
+    LDA.w !Battle_UnkB2AE
+    STA.w !Battle_UnkAD8E,X
+    INC.w !Battle_UnkAD8D
+.kind5:
+    LDA.b !C1DD_Kind
+    CMP.b #!C1DD_KindKeepEmpty
+    BEQ .count
+    TDC
+    TAX
+    TAY
+.drop_empty:
+    LDA.w !Battle_UnkAD8E,X
+    CMP.b #!Battle_EntryNone
+    BEQ .drop_after_ff
+    TAY
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .drop_entry
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .drop_empty
+    BRA .count
+.drop_after_ff:
+    INX                                 ; quirk: drops the entry after the $FF
+.drop_entry:
+    TXY
+    CPY.w #!Battle_AD8EShiftEnd
+    BCS .count
+.drop_shift:
+    LDA.w !Battle_UnkAD8E+1,Y
+    STA.w !Battle_UnkAD8E,Y
+    INY
+    CPY.w #!Battle_AD8EShiftEnd
+    BCC .drop_shift
+    BRA .drop_empty
+.count:
+    STZ.w !Battle_UnkAD8D
+    TDC
+    TAX
+.count_loop:
+    LDA.w !Battle_UnkAD8E,X
+    CMP.b #!Battle_EntryNone
+    BEQ .count_done
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .count_loop
+    BRA .fail
+.count_done:
+    TXA
+    STA.w !Battle_UnkAD8D
+    BRA .done
+.fail:
+    LDA.b #1
+    STA.w !Battle_UnkAF23
+.done:
+    RTS
+    RTS                                 ; quirk: never reached
+.set_params:
+    JSR (BattleSys_AreaParamTable,X)
+    RTS
+.run_pos_query:
+    LDA.b !C1DD_Shape
+    STA.w !BattlePos_Mode
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunServiceVec
+    RTS
+.run_area_query:
+    LDA.b !C1DD_Shape
+    STA.w !BattleTgt_AreaType
+    LDA.b #!BattleSys_ServiceAreaQuery
+    JSR BattleSys_RunServiceVec
+    RTS
+.load_user_slots:
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCS .load_target
+    LDA.w !Battle_UnkB18C
+    JSR BattleSys_LoadTechUsers
+    LDA.w !Battle_TechUsers
+    TAX
+    LDA.w !Battle_UnkB1BE,X
+    STA.b !C1DD_Mode
+    LDA.w !Battle_TechUsers+1
+    CMP.b #!Battle_EntryNone
+    BEQ .load_user1
+    TAX
+    LDA.w !Battle_UnkB1BE,X
+.load_user1:
+    STA.b !C1DD_User1
+    STA.w !Battle_ActUnkAE97
+    LDA.w !Battle_TechUsers+2
+    CMP.b #!Battle_EntryNone
+    BEQ .load_user2
+    TAX
+    LDA.w !Battle_UnkB1BE,X
+.load_user2:
+    STA.b !C1DD_ScanEnd
+    STA.w !Battle_ActUnkAE98
+.load_target:
+    LDA.w !Battle_UnkB2AE
+    STA.b !C1DD_Rec
+    LDA.w !Battle_UnkB18B
+    STA.b !C1DD_Area
+    RTS
+.area_params0:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Mode
+    STA.w !BattleTgt_AreaCentre
+    LDA.b !C1DD_Rec
+    STA.w !BattleTgt_AreaAim
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaSize
+    LDA.b !C1DD_Variant
+    STA.w !BattleTgt_AreaVariant
+    RTS
+.area_params1:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Rec
+    STA.w !BattleTgt_AreaCentre
+    STZ.w !BattleTgt_AreaAim
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
+    RTS
+.area_params2:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaCentre
+    STZ.w !BattleTgt_AreaAim
+    STZ.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
+    RTS
+.area_params3:
+    LDA.b !C1DD_Mode
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Rec
+    STA.w !BattleTgt_AreaCentre
+    LDA.b !C1DD_User1
+    STA.w !BattleTgt_AreaAim
+    STZ.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
+    RTS
+.area_params4:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_User1
+    STA.w !BattleTgt_AreaCentre
+    STZ.w !BattleTgt_AreaAim
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
+    RTS
+.area_params5:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Area
+    STA.w !BattleTgt_AreaCentre
+    STZ.w !BattleTgt_AreaAim
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaSize
+    STZ.w !BattleTgt_AreaVariant
+    RTS
+.area_params6:
+    LDA.b !C1DD_Side
+    STA.w !BattleTgt_AreaSide
+    LDA.b !C1DD_Area
+    STA.w !BattleTgt_AreaCentre
+    LDA.b !C1DD_Rec
+    STA.w !BattleTgt_AreaAim
+    LDA.b !C1DD_Size
+    STA.w !BattleTgt_AreaSize
+    LDA.b !C1DD_Variant
+    STA.w !BattleTgt_AreaVariant
+    RTS
+.pick_enemy_target:
+    TDC
+    STZ.w !Battle_UnkAF23
+    LDA.w !Battle_UnkB18B
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .pick_pc_caster
+    JMP .pick_enemy_caster
+.pick_pc_caster:
+    LDX.w #!Battle_FirstEnemySlot
+.pick_any_enemy:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .pick_have_enemy
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .pick_any_enemy
+    JMP .pick_fail
+.pick_have_enemy:
+    TDC
+    LDA.w !Battle_UnkB2AE
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .pick_enemy_kept
+.pick_roll_enemy:
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BNE .pick_first_enemy
+    TDC
+    LDX.w #!Battle_FirstEnemySlot
+    LDA.b #!Battle_NumSlots
+    JSR Battle_RandRange
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .pick_roll_enemy
+    TXA
+    STA.w !Battle_UnkB2AE
+    STA.w !Battle_UnkAD8E
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    STZ.b !C1DD_Side
+.pick_enemy_kept:
+    JMP .pick_ok
+.pick_first_enemy:
+    TDC
+    STA.w !Battle_UnkAD8D
+    LDX.w #!Battle_FirstEnemySlot-1
+.pick_first_enemy_loop:
+    INX
+    CPX.w #!Battle_NumSlots
+    BEQ .pick_first_enemy_done
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .pick_first_enemy_loop
+    TXA
+    STA.w !Battle_UnkB2AE
+    STA.w !Battle_UnkAD8E
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    STZ.b !C1DD_Side
+.pick_first_enemy_done:
+    JMP .pick_ok
+.pick_enemy_caster:
+    LDA.w !Battler_UnkAEFF
+    CMP.b #!Battle_EntryNone
+    BNE .pick_have_pc
+    LDA.w !Battler_UnkAEFF+1
+    CMP.b #!Battle_EntryNone
+    BNE .pick_have_pc
+    LDA.w !Battler_UnkAEFF+2
+    CMP.b #!Battle_EntryNone
+    BNE .pick_have_pc
+    JMP .pick_fail
+.pick_have_pc:
+    TDC
+    LDA.w !Battle_UnkB2AE
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .pick_ok
+.pick_roll_pc:
+    TDC
+    TAX
+    LDA.b #!Battle_NumPcSlots
+    JSR Battle_RandRange
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .pick_roll_pc
+    TXA
+    STA.w !Battle_UnkB2AE
+    STA.w !Battle_UnkAD8E
+    LDA.b #1
+    STA.w !Battle_UnkAD8D
+    STA.b !C1DD_Side
+    JMP .pick_ok
+.pick_ok:
+    STZ.w !Battle_UnkAF23
+    BRA .pick_done
+.pick_fail:
+    LDA.b #1
+    STA.w !Battle_UnkAF23
+.pick_done:
+    RTS
+
+; $C1:C8F7 — BattleSys_MapEmptyTarget (20 bytes, $C8F7–$C90A)
+; A battler slot for a target: $FF stays $FF; a slot whose
+; !Battler_UnkAEFF entry is present comes back as it is; an empty one
+; comes back as its !Battle_UnkAE6D entry (BattleFD_UnkB223 fills that
+; with n for slot n; what else writes there, and so what the
+; replacement stands for, is not traced). Name from that use.
+; Callers (4 JSR sites): BattleSys_UnkC1DD ($C1:C359, $C1:C3E5, $C1:C54A, $C1:C56D).
+; Entry: M=1, X=0, DP any, DB=$7E; A = the slot, B = 0 (16-bit TAX)
+; Exit:  M=1, X=0, DP and DB unchanged; A = the slot to use; X = the
+;        slot as given (present slot) or the replacement (empty slot),
+;        unchanged for $FF; Y unchanged
+BattleSys_MapEmptyTarget:
+    CMP.b #!Battle_EntryNone
+    BEQ .done
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .present
+    LDA.w !Battle_UnkAE6D,X
+    TAX
+    BRA .done
+.present:
+    TXA
+.done:
+    RTS
+
 ; $C1:C90B — Battle_Mul16 (31 bytes, $C90B–$C929)
 ; 16 x 16 -> 32-bit unsigned shift-and-add multiply:
 ; !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB. MathB is
@@ -26990,20 +28116,21 @@ BattleSys_RunPcAttack:
 ; the caller's carry).
 ; Callers (109 JSR sites): BattleSys_UpdateKo ($C1:B329), BattleSys_UnkB442 ($C1:B455),
 ;   BattleAi_PickScript ($C1:B4BC), BattleSys_UnkBC60 ($C1:BC7D), BattleSys_ResetTechUsers
-;   ($C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF, $C1:BF05, $C1:BF3C), BattleSys_TechMpCost1 ($C1:CB50),
-;   BattleSys_TechMpCost2 ($C1:CB69), BattleSys_TechMpCost3 ($C1:CB82), BattleSys_LoadTechUsers
-;   ($C1:CB9B), BattleSys_UnkCE3A ($C1:CE8F, $C1:CEC1, $C1:CEF3), Battle_HitEntryOffset ($C1:E8B5),
-;   Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long
-;   ($C1:FDBF) and unmatched ($C1:C60B, $C1:D53A, $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5,
-;   $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB,
-;   $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140,
-;   $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D,
-;   $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B,
-;   $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554,
-;   $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E,
-;   $C1:E751, $C1:E792, $C1:E8D6, $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EDA8,
-;   $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642,
-;   $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D).
+;   ($C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF, $C1:BF05, $C1:BF3C), BattleSys_UnkC1DD ($C1:C60B),
+;   BattleSys_TechMpCost1 ($C1:CB50), BattleSys_TechMpCost2 ($C1:CB69), BattleSys_TechMpCost3
+;   ($C1:CB82), BattleSys_LoadTechUsers ($C1:CB9B), BattleSys_UnkCE3A ($C1:CE8F, $C1:CEC1,
+;   $C1:CEF3), Battle_HitEntryOffset ($C1:E8B5), Battle_RecordHit ($C1:EC1D), Battle_SetupBattle
+;   ($C1:FCA6, $C1:FD75), Battle_Mul16Long ($C1:FDBF) and unmatched ($C1:D53A, $C1:D5E5, $C1:D772,
+;   $C1:D7D8, $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B,
+;   $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF,
+;   $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212,
+;   $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325,
+;   $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE,
+;   $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0,
+;   $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792, $C1:E8D6, $C1:E9AF, $C1:E9CC, $C1:EA14,
+;   $C1:EB28, $C1:EB81, $C1:EDA8, $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE,
+;   $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770,
+;   $C1:FA11, $C1:FA2D).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -27090,6 +28217,23 @@ Battle_Div32:
     SEP #$20
     PLP
     RTS
+
+; BattleSys_AreaParamTable ($C1C95C–$C1C969, 7 words)
+; The area parameter routines of BattleSys_UnkC1DD, by bits 6-0 of an
+; area record entry's byte 1 (JSR (BattleSys_AreaParamTable,X) at
+; $C1:C732). Each sets !BattleTgt_AreaSide .. AreaVariant from
+; BattleSys_UnkC1DD's DP values: side DP $0A (entry 3: DP $00), centre
+; and aim as listed, size DP $08 (entries 0, 1, 4-6), variant DP $0E
+; (entries 0 and 6); the rest 0.
+org $C1C95C
+BattleSys_AreaParamTable:
+    dw BattleSys_UnkC1DD_area_params0   ; 0: centre user 0 (DP $00), aim the target (DP $06)
+    dw BattleSys_UnkC1DD_area_params1   ; 1: centre the target
+    dw BattleSys_UnkC1DD_area_params2   ; 2: centre DP $08 (the size byte), size 0
+    dw BattleSys_UnkC1DD_area_params3   ; 3: side DP $00, centre the target, aim user 1 (DP $02)
+    dw BattleSys_UnkC1DD_area_params4   ; 4: centre user 1
+    dw BattleSys_UnkC1DD_area_params5   ; 5: centre the caster (DP $0C)
+    dw BattleSys_UnkC1DD_area_params6   ; 6: centre the caster, aim the target
 
 ; ==================================================================
 ; Tech menu builders ($C1:C96A–$C1:CB47, $C1:CCCB–$C1:CDFE)
@@ -27472,11 +28616,11 @@ BattleSys_TechMpCost3:
 ; !Battle_TechUsers = the three character ids of the user set of tech
 ; A (BattleRom_TechRec[A].UserSet & $7F, 3 bytes each in
 ; !BattleRom_TechUserSets; $FF = no user).
-; Callers (5 JSR sites): BattleSys_UnkC96A ($C1:C9B6), BattleSys_UnkCA1A ($C1:CA63),
-;   BattleSys_UnkCCCB ($C1:CD18) and unmatched ($C1:C1E4, $C1:C756).
-; Callers note: $C1:C1E4 is in BattleSys_UnkC1DD and $C1:C756 in a
-;   subroutine at $C1:C74C (RTS at $C1:C78C) that C1DD calls from
-;   $C1:C59A; neither is matched.
+; Callers (5 JSR sites): BattleSys_UnkC1DD ($C1:C1E4, $C1:C756), BattleSys_UnkC96A ($C1:C9B6),
+;   BattleSys_UnkCA1A ($C1:CA63) and BattleSys_UnkCCCB ($C1:CD18).
+; Callers note: both sites are in BattleSys_UnkC1DD: $C1:C1E4 at its
+;   start and $C1:C756 in its .load_user_slots ($C1:C74C), which it
+;   calls from $C1:C59A.
 ; Entry: M=1, X=0, DP=0, DB=$7E (.w stores); A = tech, B = 0 (16-bit
 ;        TAX)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the third id, B = 0; X = set * 3;

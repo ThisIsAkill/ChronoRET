@@ -1645,4 +1645,16 @@ endstruct
 !BattleRom_UnkCC2E31      = $CC2E31 ; 16 B per !Menu_Config bits 0-2 value, 1 B per .Unk38 - 1: added to a
                                     ; battler's first !Battler_UnkAFAB (BattleFD_UnkB7EB)
 
+
+; Action target resolution (BattleSys_UnkC1DD)
+!BattleRom_AreaRecPtr     = $CC2AB0 ; 2 B per area number (!BattleRom_TechInfo byte 1, !BattleRom_EnemyTechTarget byte
+                                    ; 1): bank-$CC address of an area record: a count byte, then 3-byte entries
+!BattleRom_AreaRec        = $CC0000 ; base the area records are read from (indexed by the !BattleRom_AreaRecPtr address)
+!BattleRom_EnemyTechTarget = $CC86C9 ; 2 B per !Battle_UnkB18C when an enemy acts: target mode, area number (the
+                                    ; enemy side's counterpart of !BattleRom_TechInfo, probably)
+!Battle_UnkLong00FA       = $0000FA ; 1 B read long ($00:00FA): DP $04 on mode 9's first two ways (the PC scan end on the
+                                    ; second, BattleSys_UnkC1DD); meaning unknown
+!Battle_UnkLong00FB       = $0000FB ; 1 B read long ($00:00FB): the same on the last two ways (the PC scan end on the fourth
+                                    ; when an enemy acts); meaning unknown
+
 endif
