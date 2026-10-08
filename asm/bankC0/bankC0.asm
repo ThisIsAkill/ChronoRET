@@ -5815,10 +5815,13 @@ Field_ObjInReachTable:
 ; Facing 0: the object in Field_UnkEB is in reach when it is above the
 ; leader (Obj_PosY - Field_FindLeaderY negative) by less than
 ; Field_ReachAhead and off the leader's column by less than
-; Field_ReachSide. The distances are ones' complements (EOR with
-; Eng_Invert16, no INC) and the SBCs have no SEC, so each bound is off
-; by a unit or two; the first SBC uses the carry the caller left, the
-; second the C=0 of the passed CMP.
+; Field_ReachSide. The SBCs have no SEC (the first uses the carry the
+; caller left, the second the C=0 of the passed CMP) and negative
+; differences are negated by EOR with Eng_Invert16 and no INC. The two
+; slips cancel for a negative difference, so that bound is exact; a
+; positive difference, or a caller's C=1, leaves the bound 1 unit
+; generous. Never off by 2. With C=0 an object on the leader's own Y
+; counts as above. Kept as found.
 ; Reached only through Field_ObjInReachTable (entry 0).
 ; On entry: M=1, X=1 (8-bit X/Y), DP=$0100, DB=$00; Field_UnkEB = the
 ; object's slot; Field_FindLeaderX/Y set; C as the caller left it.
@@ -5835,7 +5838,7 @@ Field_ObjInReachUp:
     CMP.w #!Field_ReachAhead
     BCS Field_ObjInReach_No
     LDA.w !Obj_PosX,X
-    SBC.b !Field_FindLeaderX    ; C=0 here: one more off
+    SBC.b !Field_FindLeaderX    ; C=0 here (no SEC, see above)
     BPL .dx_abs
     EOR.w #!Eng_Invert16
 .dx_abs:
@@ -6450,9 +6453,10 @@ Sys_HaltWithColor:
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN
 ; copies the 32 zero bytes at GfxRom_D2 to its start, and each later
-; MVN copies the zeroed part onto the bytes right after it (an
-; overlapping forward copy with X restarting at the buffer start), so
-; the cleared size doubles from 64 up to 2,048 bytes.
+; MVN copies the zeroed part ($C800..$C800+n-1) to the n bytes right
+; after it (adjacent, not overlapping; X restarts at the buffer start
+; each time, n = 32 up to 1,024), so the cleared size doubles from 64
+; up to 2,048 bytes.
 ; Callers: Field_ServiceUnk54 ($C0:2787) and unmatched code at
 ; $C0:3E96.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB any (saved); DP not
@@ -6506,8 +6510,10 @@ Map_ClearBufC800:
 ; 1D2D, runs Field_DpadDispatch only when Field_Unk62 is 0 and
 ; Field_ControlEnabled is set (so the fade loops, which clear
 ; Field_ControlEnabled around this call, get no input), Map_Unk8A6D
-; (with 8-bit X) when Field_Unk20 is set, and then Map_Unk9175,
-; Map_Unk99DE, Map_Unk91AC and Map_Unk93E1, which are not matched yet;
+; (with 8-bit X) when Field_Unk20 is set, and then Map_Unk9175 (copies
+; the X/Y steps to Map_Unk1D32/1D33 unless the leader is at that limit),
+; Map_Unk99DE (may drop the frame's X/Y steps via Map_StepStop*),
+; Map_Unk91AC and Map_Unk93E1; the last two are not matched yet and
 ; what they do (movement, scrolling?) is not traced.
 ; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame
 ;   ($C0:00EB), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload
@@ -9068,8 +9074,8 @@ Map_LeaderPastRowMax:
 ; ------------------------------------------------------------
 ; $C0:5B71 — Map_LeaderPastRowMin (8 bytes, $5B71–$5B78)
 ; Map_Unk9175's test for an upward step: C=1 when the leader's
-; Obj_TileY <= Map_Unk1D1C + 1 (one row lower than the other three
-; tests would suggest; kept as found).
+; Obj_TileY <= Map_Unk1D1C + 1. Both row tests take their bound one
+; row lower (+1) than the column tests do; kept as found.
 ; Callers: Map_Unk9175 ($C0:919B), its only JSR site.
 ; On entry: M=1 (8-bit A), X = the leader's slot (either width), DB=$00;
 ; absolute operands only, DP not used.
