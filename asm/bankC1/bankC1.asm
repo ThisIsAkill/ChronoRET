@@ -24691,9 +24691,10 @@ BattleSys_UnkB223:
 ; Callers note: the unmatched sites are probably all in one script
 ;   handler (xref reaches them by decoding on from BattleAi_ReadTargets_Code).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = slot (0-10), X = slot * $80
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = the slot; X = slot * $80,
-;        but clobbered by the revive path; DP $06/$07 = the PC's
-;        BattleCmd record address (PC KO path); !Battle_UnkB18B = the
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = the slot and X = slot *
+;        $80, except after the revive path, which clobbers X, Y and
+;        DP $06/$07 (no caller uses them); DP $06/$07 = the PC's
+;        BattleCmd record address (PC KO path without revive); !Battle_UnkB18B = the
 ;        slot when its .Kind had bit 4 (BattleSys_Unk8461 reads it
 ;        after BattleSys_UnkB223); the revive path also
 ;        writes !Battle_UnkAD89, !Battle_UnkB1FD, !Battle_UnkB2C7,
