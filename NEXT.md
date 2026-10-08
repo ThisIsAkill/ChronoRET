@@ -57,7 +57,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Unk8461 (`$C1:AC46`/`AC57`/`AC5E`, `B575`, `B70E`, `B725`, `B762`, `BCE1`, `BD6F`) and the small
    per-pass / end callees `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/
    `BC60`/`EA9D`/`EAE8`/`F93E`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
-   and its many bank-$FD callees (`BattleFD_Unk*`, stubs in unmatched_battle.asm); the vectors
+   (its bank-$FD callees are matched, see item 4); the vectors
    `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`) and service 0
    (`$C1:0023`). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
    statuses; 6, 7 and 11 are empty), who fills `!Battle_ListRuns`/`!Battle_ListReload` and sets a
@@ -243,6 +243,37 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
    $7E:C000, $7E:C600, $7E:C800) and the four lists `C2Scene_ListA`-`D` hold; the code at
    `$C2:0568` (also reads the BG layer tables).
+
+4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
+   BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
+   `BattleFD_RestoreEnemies`, `BattleFD_LoadUnkB18E/2`, `BattleFD_AddEnemyRewards`,
+   `BattleFD_AddItemEntry`, `BattleFD_ItemRecOffset`, `BattleFD_ApplyRecBoost`, `BattleFD_UnkB33F`,
+   `BattleFD_UnkB3EB`, `BattleFD_ZeroStatBlock`, `BattleFD_UnkB655`) with the JSR/RTL veneers
+   `$C1:FDBF`-`$C1:FDD2` (`Battle_Mul16Long`, `BankC1_AddItemLong`, `BattleSys_UnkBFAALong`,
+   `Battle_RandRangeLong`, `BattleSys_UnkB6D1Long`); the field HDMA set-up `EngFD_UnkC124`,
+   `Hdma_InitChannelsFD`, `EngFD_UnkC2C1` with its two handler tables (`$FD:C124`-`$FD:C2EA`) and
+   `EngFD_UnkD52D`; the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
+   `FieldFD_LoadAnimSetB` (`$FD:E292`) and the vectors `FdVec_FFF4`/`FFF7`/`FFFA`. The `BattleFD_Unk*`
+   and `EngFD_Unk*` routines keep their names because verified code calls them by name; better names
+   once those callers are re-reviewed: `BattleFD_UnkA982` ClearWorkRam, `UnkAA98` KoAllEnemies,
+   `UnkACFD` ClearUnkB328, `UnkAD09` ClearTechEntries, `UnkAD17` ShowEndMessages, `UnkAE52`
+   CopyCharRecord, `UnkB0D5` InitListFlags, `UnkB22E` InitBattlerIds, `UnkB438` InitEnemyStats,
+   `UnkB4E7` InitListTimers, `UnkB732` ClearBattleState, `UnkB7EB` InitFirstTurns. Found on the way:
+   `!Battle_UnkB1BE` is the character id -> PC slot map (BattleFD_UnkB22E), `!Battle_ListRuns` are
+   first set (to 10) by BattleFD_UnkB0D5, `!Battle_UnkB158` is list 12's `!Battle_ListReload`
+   entry, and `!Battle_EnemyCount` is always 8 after BattleFD_UnkB22E. Stale after this batch
+   (verified headers, fix at their next edit): Battle_SetupBattle ("callees that are not analysed
+   (bank $FD ...)"), LoadLocation ("the two bank-$FD vectors are unmatched"), Scene_ResumeNmi
+   ("the bank-$FD callees are not matched"), and RandomTableFD needs a new review (its region changed with the
+   code matched before it). Next, in reach order: the HDMA builders behind EngFD_UnkC2C1's tables
+   (`$FD:C2EB`, `$C847`, `$C995`, `$CD0C`, `$CFCF`, `$D27E`, about $1240 bytes in all, up to
+   `$FD:D52C`); `EngFD_UnkE39C` (FdVec_FFF7, every frame, with its subroutines `$FD:E437`-`$E82C`);
+   the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
+   BattleSys_UnkB6D1Long at `$FD:A8D8`/`$A910`) and the data at `$FD:B957` (pointer table and
+   records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
+   sums, the end messages 4-7 and their bits (`!Battle_UnkB2B0`/`B2B3`), the `BattlerStats.Unk57`
+   values ($A0/$A1/$A9/$AB/$B3) and the PcStatBlk stats mean; who fills BattleEnemyInit ($29C4) and
+   reads `!Battle_Unk7F01EE`; which records of the $7F:14F0 block the HDMA tables use.
 
 ## Tables
 
