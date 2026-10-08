@@ -759,3 +759,15 @@ endif
 !EvtIf_Page1Flag = $80                   ; Evt_Op16_IfMemByte's comparison byte, bit 7: the byte tested
                                          ; is at $7F:0100 + the operand (else $7F:0000 + it)
 !EvtIf_Page1 = $0100                     ; the offset bit 7 of that byte adds
+
+; --- Event button opcodes ($2D-$44) ---
+; Bits of Menu_PadHeld / Pad_PressedLatch, by Pad_Pressed's low-byte layout (A X L R B Y Select
+; Start, bits 7-0; that layout is inferred from the pad reader at $C2:84F0)
+!Pad_A = $80                             ; bit 7: A
+!Pad_X = $40                             ; bit 6: X
+!Pad_L = $20                             ; bit 5: L
+!Pad_R = $10                             ; bit 4: R
+!Pad_B = $08                             ; bit 3: B
+!Pad_Y = $04                             ; bit 2: Y
+!Pad_Unk00F6Bit1 = $02                   ; Pad_Unk00F6 (and Pad_Unk00F6Latch) bit 1, tested by event
+                                         ; opcode $3B (which button the map puts there not traced)

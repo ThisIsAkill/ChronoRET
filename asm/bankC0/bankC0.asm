@@ -27173,6 +27173,408 @@ Evt_Op28_IfObjInsideScreen:
     RTS
 
 ; ============================================================
+; Event opcodes: button tests ($C0:66A5–$C0:6791)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). Each test takes 2 bytes ($op, n): when the button is held
+; (or was pressed) the script goes on with the next opcode (X = Y + 2,
+; through Evt_PadGoOn / Evt_PadGoOn2), else it jumps n bytes on from
+; the n byte (Evt_PadJump). C=1 either way. The held tests read
+; Menu_PadHeld, or Pad_Unk00F8 / Pad_Unk00F9 (the held buttons through
+; the configured button map); the pressed tests read the latches
+; Pad_PressedLatch / Pad_Unk00F6Latch (GameLoop_FrameBody ORs the new
+; presses in every frame) and clear the bit they found set. Button
+; names follow Pad_Pressed's layout note.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:66A5 — Evt_Op2D_IfAnyHeld (13 bytes, $66A5–$66B1)
+; Event opcode $2D (2 bytes: $2D, n): goes on when Pad_Unk00F8 or
+;   Pad_Unk00F9 is nonzero (any button or D-pad direction held, through
+;   the button map), else jumps.
+; Reached through Evt_OpcodeTable (opcode $2D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op2D_IfAnyHeld:
+    INY
+    LDA.w !Pad_Unk00F8
+    BNE Evt_PadGoOn
+    LDA.w !Pad_Unk00F9
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66B2 — Evt_Op30_IfMapHeldBit1 (10 bytes, $66B2–$66BB)
+; Event opcode $30 (2 bytes: $30, n): goes on when Pad_Unk00F8 bit 1
+;   (Pad_Unk00F8Bit1, the button the D-pad handlers run with) is held,
+;   else jumps.
+; Reached through Evt_OpcodeTable (opcode $30).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op30_IfMapHeldBit1:
+    INY
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66BC — Evt_Op31_IfMapHeldBit7 (10 bytes, $66BC–$66C5)
+; Event opcode $31 (2 bytes: $31, n): goes on when Pad_Unk00F8 bit 7
+;   (Pad_Unk00F8Bit7) is held, else jumps.
+; Reached through Evt_OpcodeTable (opcode $31).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op31_IfMapHeldBit7:
+    INY
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit7
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66C6 — Evt_Op34_IfHeldA (10 bytes, $66C6–$66CF; then the shared tail Evt_PadJump, 21 bytes, $66D0–$66E4)
+; Event opcode $34 (2 bytes: $34, n): goes on when A (Pad_A) is held in
+;   Menu_PadHeld, else jumps.
+;   Evt_PadJump, the jump of all the button tests, follows: X = Y + the
+;   byte at Y (Y = the n byte), C=1.
+; Reached through Evt_OpcodeTable (opcode $34).
+; Callers note: Evt_PadJump is also branched to (BEQ) by every held test
+;   ($2D-$39) and by Evt_Op3B_IfMapPressedBit1.
+; Callers of Evt_PadJump (7 BRL sites): Evt_Op3C_IfMapPressedBit7 ($C0:672B), Evt_Op3F_IfPressedA
+;   ($C0:6739), Evt_Op40_IfPressedB ($C0:6747), Evt_Op41_IfPressedX ($C0:6755), Evt_Op42_IfPressedY
+;   ($C0:6763), Evt_Op43_IfPressedL ($C0:6771) and Evt_Op44_IfPressedR ($C0:677F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op34_IfHeldA:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_A
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+Evt_PadJump:                            ; header: see Evt_Op34_IfHeldA
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:66E5 — Evt_Op35_IfHeldB (10 bytes, $66E5–$66EE)
+; Event opcode $35 (2 bytes: $35, n): goes on when B (Pad_B) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $35).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op35_IfHeldB:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_B
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66EF — Evt_Op36_IfHeldX (10 bytes, $66EF–$66F8)
+; Event opcode $36 (2 bytes: $36, n): goes on when X (Pad_X) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $36).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op36_IfHeldX:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_X
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66F9 — Evt_Op37_IfHeldY (8 bytes, $66F9–$6700; then the shared tail Evt_PadGoOn, 4 bytes, $6701–$6704)
+; Event opcode $37 (2 bytes: $37, n): goes on when Y (Pad_Y) is held in
+;   Menu_PadHeld, else jumps.
+;   Evt_PadGoOn, the go-on of the tests, follows: Y + 1, X = Y, C=1.
+; Reached through Evt_OpcodeTable (opcode $37).
+; Callers note: Evt_PadGoOn is branched to (BNE / BRA) by
+;   Evt_Op2D_IfAnyHeld, the other held tests $30-$39 (this one falls
+;   in), Evt_Op3B_IfMapPressedBit1, Evt_Op3C_IfMapPressedBit7 and
+;   Evt_Op3F_IfPressedA.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op37_IfHeldY:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_Y
+    BEQ Evt_PadJump
+Evt_PadGoOn:                            ; header: see Evt_Op37_IfHeldY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6705 — Evt_Op38_IfHeldL (10 bytes, $6705–$670E)
+; Event opcode $38 (2 bytes: $38, n): goes on when L (Pad_L) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $38).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op38_IfHeldL:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_L
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:670F — Evt_Op39_IfHeldR (10 bytes, $670F–$6718)
+; Event opcode $39 (2 bytes: $39, n): goes on when R (Pad_R) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $39).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is dp), DB=$00 (the pad bytes read absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op39_IfHeldR:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_R
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6719 — Evt_Op3B_IfMapPressedBit1 (11 bytes, $6719–$6723)
+; Event opcode $3B (2 bytes: $3B, n): when Pad_Unk00F6Latch bit 1
+;   (Pad_Unk00F6Bit1) is set it is cleared and the script goes on, else
+;   it jumps.
+; Reached through Evt_OpcodeTable (opcode $3B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3B_IfMapPressedBit1:
+    INY
+    LDA.b !Pad_Unk00F6Latch
+    AND.b #!Pad_Unk00F6Bit1
+    BEQ Evt_PadJump
+    TRB.b !Pad_Unk00F6Latch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6724 — Evt_Op3C_IfMapPressedBit7 (14 bytes, $6724–$6731)
+; Event opcode $3C (2 bytes: $3C, n): as Evt_Op3B_IfMapPressedBit1 with
+;   bit 7 (Pad_Unk00F6Bit7, the button Field_ActionButton acts on).
+; Reached through Evt_OpcodeTable (opcode $3C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3C_IfMapPressedBit7:
+    INY
+    LDA.b !Pad_Unk00F6Latch
+    AND.b #!Pad_Unk00F6Bit7
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_Unk00F6Latch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6732 — Evt_Op3F_IfPressedA (14 bytes, $6732–$673F)
+; Event opcode $3F (2 bytes: $3F, n): when A (Pad_A) is set in
+;   Pad_PressedLatch it is cleared and the script goes on, else it
+;   jumps.
+; Reached through Evt_OpcodeTable (opcode $3F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3F_IfPressedA:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_A
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6740 — Evt_Op40_IfPressedB (14 bytes, $6740–$674D)
+; Event opcode $40 (2 bytes: $40, n): as Evt_Op3F_IfPressedA with B
+;   (Pad_B); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $40).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op40_IfPressedB:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_B
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:674E — Evt_Op41_IfPressedX (14 bytes, $674E–$675B)
+; Event opcode $41 (2 bytes: $41, n): as Evt_Op3F_IfPressedA with X
+;   (Pad_X); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $41).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op41_IfPressedX:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_X
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:675C — Evt_Op42_IfPressedY (14 bytes, $675C–$6769)
+; Event opcode $42 (2 bytes: $42, n): as Evt_Op3F_IfPressedA with Y
+;   (Pad_Y); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $42).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op42_IfPressedY:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_Y
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:676A — Evt_Op43_IfPressedL (14 bytes, $676A–$6777)
+; Event opcode $43 (2 bytes: $43, n): as Evt_Op3F_IfPressedA with L
+;   (Pad_L); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $43).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op43_IfPressedL:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_L
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:6778 — Evt_Op44_IfPressedR (12 bytes, $6778–$6783; then the shared tail Evt_PadGoOn2, 4 bytes, $6784–$6787)
+; Event opcode $44 (2 bytes: $44, n): as Evt_Op3F_IfPressedA with R
+;   (Pad_R). Evt_PadGoOn2 follows: the same code as Evt_PadGoOn (Y + 1,
+;   X = Y, C=1).
+; Reached through Evt_OpcodeTable (opcode $44).
+; Callers note: Evt_PadGoOn2 is branched to (BRA) by Evt_Op40_IfPressedB,
+;   Evt_Op41_IfPressedX, Evt_Op42_IfPressedY, Evt_Op43_IfPressedL and
+;   Evt_Op47_SetScanlineLimit.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and EvtJump_Dist are dp), DB any (no absolute operand);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op44_IfPressedR:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_R
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+Evt_PadGoOn2:                           ; header: see Evt_Op44_IfPressedR
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6788 — Evt_Op47_SetScanlineLimit (10 bytes, $6788–$6791)
+; Event opcode $47 (2 bytes: $47, v): the low byte of ObjQ_ScanlineLimit
+;   = v (Field_ProcessAnimQueue stops building frames once the V counter
+;   reaches it); X = Y + 2, C=1 through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $47).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (ObjQ_ScanlineLimit is dp), DB any (operand read long);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   v.
+; ------------------------------------------------------------
+Evt_Op47_SetScanlineLimit:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !ObjQ_ScanlineLimit
+    BRA Evt_PadGoOn2
+
+; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
 ; Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66,
 ; Pad_Unk00F6-F8) is still unidentified, so it keeps its address name.
