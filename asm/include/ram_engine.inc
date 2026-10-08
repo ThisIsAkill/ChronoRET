@@ -371,6 +371,8 @@ if !ram_engine_inc == 0
                                          ; Evt_Data offset of the opcode's last byte
 !EvtMem_Value = $D9                      ; alias of Eng_Scratch in opcodes $4F-$5B: 8- or 16-bit, the
                                          ; value on its way
+!EvtBit_Arg = $DB                        ; alias of Oam_Range1LoPtr's slot in opcodes $65/$66: 8-bit,
+                                         ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
                                          ; (bytes - 1)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers

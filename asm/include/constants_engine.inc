@@ -771,3 +771,7 @@ endif
 !Pad_Y = $04                             ; bit 2: Y
 !Pad_Unk00F6Bit1 = $02                   ; Pad_Unk00F6 (and Pad_Unk00F6Latch) bit 1, tested by event
                                          ; opcode $3B (which button the map puts there not traced)
+
+; --- Event arithmetic and bit opcodes ($5B-$7F) ---
+!EvtBit_NumMask = $0F                    ; bits of opcode $65/$66's bit operand that index BitSet /
+                                         ; BitClear (8 entries each: 8-15 run into the next table)
