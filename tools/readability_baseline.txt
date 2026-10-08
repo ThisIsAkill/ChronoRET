@@ -8,3 +8,18 @@
 # rule still applies, and the review stands. Fix it at the routine's next
 # edit and delete the line.
 asm/bankC0/bankC0.asm:Audio_PlayTileSfxA SIZE
+asm/bankC1/bankC1.asm:BattleAct_AdvanceScript UNMATCHED
+asm/bankC1/bankC1.asm:BattleAct_CalcMidpointSteps UNMATCHED
+asm/bankC1/bankC1.asm:BattleAct_CalcMoveStep UNMATCHED
+asm/bankC1/bankC1.asm:BattleAct_OpEndThread UNMATCHED
+asm/bankC1/bankC1.asm:BattleAct_OpLoopAnim UNMATCHED
+asm/bankC1/bankC1.asm:BattleAct_StartBattlerMove UNMATCHED
+asm/bankC1/bankC1.asm:BattlePos_WithinDist40XY UNMATCHED
+asm/bankC1/bankC1.asm:Battle_BoxHitsBlockedCell UNMATCHED
+asm/bankC1/bankC1.asm:Battle_BoxOverlapsOthers UNMATCHED
+asm/bankC1/bankC1.asm:Battle_CacheBattlerCoordsAll UNMATCHED
+asm/bankC1/bankC1.asm:Battle_CalcBattlerBox UNMATCHED
+asm/bankCC/bankCC.asm:Battle_Mul8CC UNMATCHED
+asm/bankCF/bankCF.asm:BattleMsg_FormatNumber4Digits UNMATCHED
+asm/bankFD/bankFD.asm:Ppu_SetBgLayout UNMATCHED
+asm/bankFD/bankFD.asm:RandomTableFD UNMATCHED

@@ -104,6 +104,8 @@ block). The lint requires:
 
 - `SIZE`: a header claim `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout (the
   routine alone, or with its sub-entries).
+- `UNMATCHED`: no header or banner calls an address `unmatched` (`unmatched code at $C1:0027`,
+  `$C1:3819 (unmatched)`) once that address lies inside matched code; name the routine instead.
 
 Two kinds of label are exempt from `HEADER`:
 

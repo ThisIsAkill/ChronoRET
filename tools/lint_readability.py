@@ -44,6 +44,11 @@ asm/include/ and are exempt):
          layout (symbols/functions.csv): the routine's start, end and size,
          or those of the routine with its `header: see` sub-entries. Needs
          the ROM and asar; skipped without them.
+  UNMATCHED no header or banner text calls an address unmatched when it lies
+         inside matched code: a bank-qualified address ($BB:AAAA, $BBAAAA,
+         `/AAAA` continuations) in the clause after the word "unmatched", or
+         in the list of addresses right before "(unmatched". The finding
+         names the routine that now contains it. Needs the ROM and asar.
 
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
@@ -474,7 +479,7 @@ def by_function(findings):
 # applies to it in full. A whole-function entry (`path:Function`) exempts it
 # from every rule but keeps it at `matched` (tools/progress.py).
 PER_RULE = ('SIZE', 'UNMATCHED', 'DPDB')
-CLAIM_RULES = {'SIZE'}
+CLAIM_RULES = {'SIZE', 'UNMATCHED'}
 EVALUATED = set()       # the per-rule checks this run could make (no ROM: no SIZE/UNMATCHED)
 
 

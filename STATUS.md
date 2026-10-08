@@ -106,6 +106,11 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-08: lint rule `UNMATCHED`: header or banner text may not call an address unmatched
+  once it lies inside matched code. Requested by the maintainer. 53 findings, all in verified
+  routines (15 routines, most of them listed as stale in NEXT.md), are grandfathered for this
+  rule alone in `tools/readability_baseline.txt`; fix each at the routine's next edit.
+
 - 2026-10-08: lint rule `SIZE`: a header's `Name (N bytes, $XXXX–$YYYY)` must agree with the
   assembled layout. Requested by the maintainer. One finding in a verified routine
   (Audio_PlayTileSfxA, whose claim covers the shared tail Audio_PlaySfxAtLeader it falls into) is
