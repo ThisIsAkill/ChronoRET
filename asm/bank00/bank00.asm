@@ -37,6 +37,10 @@ Reset:
 ; that the game rewrites as it changes mode. The trampolines are not set
 ; by MainInit; see !NmiTrampoline / !IrqTrampoline in ram_engine.inc for
 ; who installs and repoints them.
+; Entry: native mode, interrupt taken (M, X, D, DB as the interrupted code
+;        left them; the CPU has pushed PB, PC and P)
+; Exit:  nothing changed; control continues at the trampoline, whose
+;        handler ends in RTI
 ; ============================================================
 NMI_Stub:               ; native NMI vector target (see $FFEA)
     JML !NmiTrampoline
@@ -74,11 +78,15 @@ BitClear:               ; $FF28 — bit N clear, others set
 ; ============================================================
 ; Wave tables ($FF30–$FFAF)
 ; One period of a sine-like wave between -6 and +6 (32 signed 16-bit
-; entries), stored twice. Callers $FD:C5F3 and $FD:C743 mask a phase with
-; AND #$3E, then read $C0FF30,X, $C0FF34,X, $C0FF38,X... (a fixed step of
-; 4 per output), add $1D8F and store the results at $1D27, $1D2B, ...
-; Those phase-offset reads run past A into B (up to $FFAB), so B is A's
-; second period: it lets them read ahead without masking each index.
+; entries), stored twice. Two routines read it, at $FD:C5A7 and $FD:C6F7
+; (the table reads start at $FD:C5F3 / $FD:C743). Each masks a phase with
+; AND #$3E, then makes 16 reads, $C0FF30,X, $C0FF34,X, ... $C0FF6C,X (a
+; step of 4 per output), adds the word at $1D8F with ADC.l $001D8F and
+; stores to $1D27, $1D2B, ... (first routine) or $1DA7 ... $1DE3 (second).
+; There is no CLC between outputs, so a carry from one sum passes into the
+; next; reproduced as found, effect not traced.
+; The reads run past A into B (up to $FFAB), so B is A's second period:
+; it lets them read ahead without masking each index.
 ; What the outputs drive is not traced yet; "Scroll" in the names is a
 ; guess.
 ; ============================================================

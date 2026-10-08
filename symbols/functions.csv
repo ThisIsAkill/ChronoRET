@@ -94,12 +94,12 @@ $C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,readable,c51b700e9871,
 $C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,readable,ef33cecb6962,
 $C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,readable,48b6702ba2d7,
 $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,b119b61f6d34,The CPU comes out of reset in emulation mode with I already set.
-$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,2ce6b3650fc3,Native-mode interrupt stubs ($FF10–$FF17)
+$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,9c2774b7207f,Native-mode interrupt stubs ($FF10–$FF17)
 $C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,bd12634e9770,
 $C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,8926ad22dcae,"A crash trap: it reads a fixed, recognizable address forever and never returns."
 $C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,readable,2fad0af24d5b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
 $C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,012bbbcead94,
-$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,b7a1c764b919,"Wave tables ($FF30–$FFAF) One period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored twice."
+$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,430b677ff873,"Wave tables ($FF30–$FFAF) One period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored twice."
 $C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,verified,4a7da0a8b51b,
 $C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,readable,eac7eb0d4916,"SNES cartridge header ($FFB0–$FFDF), standard layout"
 $C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,verified,4a10f4fbea5d,
