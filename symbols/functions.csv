@@ -182,11 +182,11 @@ $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
 $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
-$C1:007E,$C1:0088,11,BattleSys_PumpFrames,$C1,Battle system,verified,c9c6ff22755b,"Waits for the next frame: sets !Battle_FramePending, then calls BattleSys_IdleVecCD0036 again and again until something else clears the flag."
+$C1:007E,$C1:0088,11,BattleSys_PumpFrames,$C1,Battle system,verified,735e37e66c90,"Waits for the next frame: sets !Battle_FramePending, then calls BattleSys_IdleVecCD0036 again and again until something else clears the flag."
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,verified,b3076b22c6da,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
 $C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,verified,1ea2f124f667,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,verified,b3f458646506,"16÷8 HW divide via WRDIVL/WRDIVH/WRDIVB, quotient from RDDIVL and remainder from RDMPYL."
-$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,37bf1bdd7a04,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
+$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,b45234853564,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
 $C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,verified,b4fcb5476caf,
 $C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,verified,c2643f949d52,
 $C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,verified,b28bf7e8cb4c,
@@ -232,7 +232,7 @@ $C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,verified
 $C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,verified,d52acb37a2c3,Leading-zero suppression for the number formatter's digits.
 $C1:106E,$C1:10E2,117,BattleSys_UpkeepTwoFrames,$C1,Battle system,verified,e2b9ad105ea5,"Service 3 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $1"
 $C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,verified,7b1e36fb6214,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
-$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,verified,a8d65967b090,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
+$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,verified,a5b4548b1d96,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
 $C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,verified,24e55a80fe50,"Builds OAM sprites 0-3 (BattleOam) for the command cursor over the shown PC: each of the 4 template sprites in BattleRom_CursorSprite is offset by the PC's !Battler_ScreenX/Y, and its palette bits are"
 $C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,verified,56eb95b7535f,Battle command-window input handler.
 $C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,verified,cd65b158dfaa,"Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping roster entries that are negative."
@@ -345,7 +345,7 @@ $C1:2D9F,$C1:2F1E,384,Battle_TickPcSlots,$C1,Battle engine,verified,4d0f152d462e
 $C1:2F1F,$C1:2F21,3,Battle_UnkThunk2F1F,$C1,Battle engine,verified,30f8da6da52f,that ends Battle_TickEnemyGroup ($C1:34A6).
 $C1:2F22,$C1:2F96,117,Battle_UpdatePcFacing,$C1,Battle engine,verified,c0c04dbde691,
 $C1:2F97,$C1:305B,197,Battle_PickStatusAnim,$C1,Battle engine,verified,f2816325d71f,
-$C1:305C,$C1:308B,48,Battle_PickNextStatusAnim,$C1,Battle engine,verified,22b6fd672ec6,"Runs Battle_PickStatusAnim for one battler per call, the slot in !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3,"
+$C1:305C,$C1:308B,48,Battle_PickNextStatusAnim,$C1,Battle engine,verified,963a6e1fd4cd,"Runs Battle_PickStatusAnim for one battler per call, the slot in !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3,"
 $C1:308C,$C1:30B5,42,Battle_ApplyPendingEffect,$C1,Battle engine,verified,aa1f51070c40,"For battler !Battle_TickSlot, if present: when the effect picked (!Battler_FxWanted) differs from the one running (!Battler_FxApplied), records it, stops the overlay and the colour cycle, clears !Batt"
 $C1:30B6,$C1:30E0,43,Battle_FxReset,$C1,Battle engine,verified,9940ba3342cc,"Effect 0 (none): clears the battler's effect flags; for a PC also copies the saved palette (!Battle_PaletteSaved, 26 bytes from !Battler_Palette * 16) back over the live one, undoing a tint or colour "
 $C1:30E1,$C1:3140,96,Battle_FxOverlay2Tint,$C1,Battle engine,verified,0ef0383723f8,
@@ -377,6 +377,18 @@ $C1:3BC2,$C1:3E32,625,Battle_MoverOrbit,$C1,Battle engine,verified,3ce6a676b774,
 $C1:3E33,$C1:3F59,295,Battle_MoverLoop,$C1,Battle engine,verified,d333f2f75483,
 $C1:3F5A,$C1:4020,199,Battle_MoverFixedDir,$C1,Battle engine,verified,451b0d5729c0,
 $C1:4021,$C1:4057,55,Battle_MoverToCentre,$C1,Battle engine,verified,2810c3762c30,"Mover 8 (move $19): heads from the enemy's position for the middle of the screen (!Battle_ScreenCentreX/Y), faces that way and starts the step, with no probe and no collision test."
+$C1:4058,$C1:41BD,358,BattleSys_RunAction,$C1,Battle system,verified,cb5987ae9bbe,"Service 4 of the cross-bank $C10045 service API (dispatch table at $C10051, entry 4 = $4058; no JSR, JMP or JSL reaches $4058 directly; the one request found is LDA #4 / JSR $C1:0003 at $C1:BFA4, call"
+$C1:41BE,$C1:4211,84,BattleAct_FlagLethalPcHits,$C1,Battle engine,verified,3bfda2fbc889,
+$C1:4212,$C1:4239,40,BattleAct_TickCalcs,$C1,Battle engine,verified,b0f507359309,
+$C1:423A,$C1:430F,214,BattleAct_StepBattlerAnims,$C1,Battle engine,verified,cd0f2c1e17ee,
+$C1:4310,$C1:432B,28,BattleAct_LoadScript,$C1,Battle engine,verified,50cffec05f73,Clears the 16-byte action parameter block (!Battle_ActScriptId ..
+$C1:432C,$C1:459F,628,BattleAct_LoadAttack,$C1,Battle engine,verified,f8f7edfa2965,
+$C1:45A0,$C1:4759,442,BattleAct_LoadTech,$C1,Battle engine,verified,e576da99aef5,"Kind 2: reads the 7-byte record !Battle_ActId of BattleRom_PcTechAct (PC caster) or BattleRom_EnemyTechAct (enemy caster), including !Battle_ActUnkArg987C, then: frames !BattleRom_ActFrames for both; "
+$C1:475A,$C1:475A,1,BattleAct_LoadNone,$C1,Battle engine,verified,99399c4d5461,"Kind 0 (and any kind of 4 and up): loads nothing, so no thread starts."
+$C1:475B,$C1:4832,216,BattleAct_LoadKind3,$C1,Battle engine,verified,624c1ab12625,"Kind 3: like the PC branch of BattleAct_LoadTech, for any caster, with record !Battle_ActId - $BC of BattleRom_Kind3Act; frames !BattleRom_ActFrames, palettes !BattleRom_Kind3Pals, objects !BattleRom_"
+$C1:4833,$C1:48EB,185,BattleAct_LoadCommon,$C1,Battle engine,verified,6d88546ce9da,
+$C1:48EC,$C1:4942,87,BattleAct_IndexObjLists,$C1,Battle engine,verified,0f4f6c8e8d21,
+$C1:4943,$C1:49FE,188,BattleAct_UnpackFrames,$C1,Battle engine,verified,aa85f71dd6b9,
 $C2:0043,$C2:010F,205,BankC2_InitHwRegs,$C2,Engine,verified,2da8e81a840c,"Writes the PPU registers from OBSEL to SETINI (all but INIDISP and the data ports OAMDATA, VMDATAL/H and CGDATA) and the CPU registers WRIO-VTIMEH with fixed values, through DP=$2100 and then DP=$4200"
 $C2:225A,$C2:225D,4,Trig_Cos1024,$C2,Engine,verified,7080f9fc7e20,"Signed sine or cosine of a 16-bit angle with 1024 steps per turn, read from !Rom_SineTable: A = sin(angle) × 255 (−255..+255; the table holds |sin| as one byte per step, negated for the second half tu"
 $C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
