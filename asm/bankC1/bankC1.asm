@@ -12,6 +12,35 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
+; Frame Wait ($C1:007E–$C1:0088)
+; ============================================================
+
+; $C1:007E — BattleSys_PumpFrames (11 bytes, $007E–$0088)
+; Waits for the next frame: sets !Battle_FramePending, then calls
+; BattleSys_IdleVecCD0036 again and again until the interrupt handler at
+; $CF:FB65 has cleared the flag. The "wait for the frame" reading is
+; inferred from that handler (it saves every register and zeroes $9E
+; first); what the $CD0036 callee does meanwhile is not analysed.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice) and the
+; unmatched code at $C1:3554, $C1:358E, $C1:3596, $C1:359E, $C1:3686,
+; $C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
+; $C1:41B7, $C1:4841, $C1:485B, $C1:4864, $C1:488D, $C1:4943.
+; Entry: M=1 (8-bit INC/LDA of the flag), X any, DP=0, DB=$7E (as at
+;        every caller; the routine itself only touches direct page)
+; Exit:  M=1, DP=0; A = 0; X, Y, DB as the $CD0036 callee leaves them
+;        (not analysed)
+; Callee: BattleSys_IdleVecCD0036
+org $C1007E
+BattleSys_PumpFrames:
+    INC.b !Battle_FramePending
+.wait:
+    JSL BattleSys_IdleVecCD0036
+    LDA.b !Battle_FramePending
+    BNE .wait                   ; the interrupt handler clears it
+    RTS
+
+; ============================================================
 ; Math Utility Cluster ($C1:0089–$C1:011E)
 ; ============================================================
 
