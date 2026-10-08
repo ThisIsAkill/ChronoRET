@@ -1848,8 +1848,8 @@ C2Anim_OpTable:
 ; Animation op 0, 2 bytes: zeroes the task's byte at offset arg 1
 ; (any of the 64 record bytes, through C2Scene_TaskCur).
 ; Callers: none direct (C2Anim_OpTable).
-; Entry: as C2Anim_Run calls it: M=0, X=0, DP=$0000, C2Anim_Ptr on the
-;        opcode
+; Entry: as C2Anim_Run calls it: M=0, X=0, DP=$0000, DB with low WRAM
+;        at $0000-$1FFF ($00 from the NMI), C2Anim_Ptr on the opcode
 ; Exit:  M=0, X=0; A = 2 (advance, Z=0); Y = the offset
 ; No calls.
 C2Anim_OpClearByte:
@@ -2299,7 +2299,8 @@ C2Script_ResetTask:
 ; Op $01, 2 bytes: .SprAttr = .SprAttr AND $F1 OR arg 1: replaces bits
 ; 1-3, which C2Scene_SprDrawNode puts in the OAM palette bits.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
 ; No calls.
 C2Script_SetSprPalette:
@@ -2318,7 +2319,8 @@ C2Script_SetSprPalette:
 ; Op $02, 2 bytes: .SprAttr = .SprAttr AND $4F OR arg 1: replaces bits 4
 ; and 5 (the OAM priority bits) and bit 7 (C2Scene_SprAttrScroll).
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
 ; No calls.
 C2Script_SetSprPriority:
@@ -2472,7 +2474,7 @@ C2Script_Halt:
 ; Quirk, kept: the layer is not checked; 0 gives index $1FE and reads a
 ; word far past C2Scene_LayerMaps.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner); DB=$00
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB=$00
 ;        (WRMPYA/WRMPYB/RDMPYL)
 ; Exit:  M=0, X=0; A = 5; X = (layer - 1) * 2, Y = 4; C2Tmp_10-$12 = the
 ;        cell's address
@@ -2520,7 +2522,8 @@ C2Script_SetMapCell:
 ; nothing if none does. With C2Scene_Unk1B41 that makes four words at
 ; $1B3B-$1B42; what they mean is not traced.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the word when one was stored; Y = 3;
 ;        C2Tmp_08 = the word
 ; No calls.
@@ -2582,7 +2585,8 @@ C2Script_SpawnScript:
 ; $C2:120C — C2Script_ClearTaskByte (17 bytes, $120C–$121C)
 ; Op $0A, 2 bytes: task byte arg 1 = 0.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; Y = arg 1
 ; No calls.
 C2Script_ClearTaskByte:
@@ -2599,7 +2603,7 @@ C2Script_ClearTaskByte:
 ; $C2:121D — C2Script_IncTaskByte (19 bytes, $121D–$122F)
 ; Op $0B, 2 bytes: task byte arg 1 + 1.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_ClearTaskByte
+; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IncTaskByte:
     SEP #$20
@@ -2616,7 +2620,7 @@ C2Script_IncTaskByte:
 ; $C2:1230 — C2Script_DecTaskByte (19 bytes, $1230–$1242)
 ; Op $0C, 2 bytes: task byte arg 1 - 1.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_ClearTaskByte
+; Entry/Exit: as C2Script_ClearTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_DecTaskByte:
     SEP #$20
@@ -2633,7 +2637,8 @@ C2Script_DecTaskByte:
 ; $C2:1243 — C2Script_SetTaskByte (20 bytes, $1243–$1256)
 ; Op $0D, 3 bytes: task byte arg 1 = arg 2.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3; X = Y = arg 1
 ; No calls.
 C2Script_SetTaskByte:
@@ -2652,7 +2657,7 @@ C2Script_SetTaskByte:
 ; $C2:1257 — C2Script_OrTaskByte (22 bytes, $1257–$126C)
 ; Op $0E, 3 bytes: task byte arg 1 OR= arg 2 (sets those bits).
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetTaskByte
+; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_OrTaskByte:
     SEP #$20
@@ -2671,7 +2676,7 @@ C2Script_OrTaskByte:
 ; $C2:126D — C2Script_ClearTaskBits (24 bytes, $126D–$1284)
 ; Op $0F, 3 bytes: task byte arg 1 AND= NOT arg 2 (clears those bits).
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetTaskByte
+; Entry/Exit: as C2Script_SetTaskByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_ClearTaskBits:
     SEP #$20
@@ -2691,7 +2696,7 @@ C2Script_ClearTaskBits:
 ; $C2:1285 — C2Script_ClearRamByte (17 bytes, $1285–$1295)
 ; Op $10, 3 bytes: RAM byte at arg 1-2 = 0.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner); DB = the
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner): DP=$0000; DB = the
 ;        bank of the RAM bytes ($00 from the NMI)
 ; Exit:  M=0, X=0; A = 3; X = the address, Y = 1
 ; No calls.
@@ -2708,7 +2713,7 @@ C2Script_ClearRamByte:
 ; $C2:1296 — C2Script_IncRamByte (17 bytes, $1296–$12A6)
 ; Op $11, 3 bytes: RAM byte at arg 1-2 + 1.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_ClearRamByte
+; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IncRamByte:
     LDY.w #1
@@ -2723,7 +2728,7 @@ C2Script_IncRamByte:
 ; $C2:12A7 — C2Script_DecRamByte (17 bytes, $12A7–$12B7)
 ; Op $12, 3 bytes: RAM byte at arg 1-2 - 1.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_ClearRamByte
+; Entry/Exit: as C2Script_ClearRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_DecRamByte:
     LDY.w #1
@@ -2738,7 +2743,7 @@ C2Script_DecRamByte:
 ; $C2:12B8 — C2Script_SetRamByte (22 bytes, $12B8–$12CD)
 ; Op $13, 4 bytes: RAM byte at arg 1-2 = arg 3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Script_ClearRamByte
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the address, Y = 3
 ; No calls.
 C2Script_SetRamByte:
@@ -2756,7 +2761,7 @@ C2Script_SetRamByte:
 ; $C2:12CE — C2Script_OrRamByte (25 bytes, $12CE–$12E6)
 ; Op $14, 4 bytes: RAM byte at arg 1-2 OR= arg 3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetRamByte
+; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_OrRamByte:
     LDY.w #1
@@ -2774,7 +2779,7 @@ C2Script_OrRamByte:
 ; $C2:12E7 — C2Script_ClearRamBits (27 bytes, $12E7–$1301)
 ; Op $15, 4 bytes: RAM byte at arg 1-2 AND= NOT arg 3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetRamByte
+; Entry/Exit: as C2Script_SetRamByte; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_ClearRamBits:
     LDY.w #1
@@ -2793,7 +2798,7 @@ C2Script_ClearRamBits:
 ; $C2:1302 — C2Script_TaskByteToRam (26 bytes, $1302–$131B)
 ; Op $16, 4 bytes: RAM byte at arg 2-3 = task byte arg 1.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Script_ClearRamByte
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4; X = the address, Y = arg 1
 ; No calls.
 C2Script_TaskByteToRam:
@@ -2814,7 +2819,7 @@ C2Script_TaskByteToRam:
 ; $C2:131C — C2Script_RamByteToTask (26 bytes, $131C–$1335)
 ; Op $17, 4 bytes: task byte arg 1 = RAM byte at arg 2-3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_TaskByteToRam
+; Entry/Exit: as C2Script_TaskByteToRam; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_RamByteToTask:
     LDY.w #2
@@ -2834,7 +2839,8 @@ C2Script_RamByteToTask:
 ; $C2:1336 — C2Script_CopyTaskByte (26 bytes, $1336–$134F)
 ; Op $18, 3 bytes: task byte arg 1 = task byte arg 2.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3; X = the byte, Y = arg 1
 ; No calls.
 C2Script_CopyTaskByte:
@@ -2856,7 +2862,7 @@ C2Script_CopyTaskByte:
 ; $C2:1350 — C2Script_CopyRamByte (26 bytes, $1350–$1369)
 ; Op $19, 5 bytes: RAM byte at arg 1-2 = RAM byte at arg 3-4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Script_ClearRamByte
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5; X = the source, Y = the destination
 ; No calls.
 C2Script_CopyRamByte:
@@ -2880,7 +2886,8 @@ C2Script_CopyRamByte:
 ; arg 1-2 itself: the script's addresses are probably written one less
 ; (not traced).
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 1; Y = 1
 ; No calls.
 C2Script_Jump:
@@ -2894,7 +2901,8 @@ C2Script_Jump:
 ; Op $1B, 3 bytes: task byte arg 1 - 1; while it is not 0, branch by arg
 ; 2; at 0, advance 3 (a counted loop).
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3, or the offset with C=0 (Z=1 for 0); Y = arg 1
 ;        or 2
 ; No calls.
@@ -2924,7 +2932,8 @@ C2Script_LoopTaskByte:
 ; Op $1C, 3 bytes: if task byte arg 1 is 0, branch by arg 2; else
 ; advance 3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 3, or the offset with C=0; Y = arg 1 or 2
 ; No calls.
 C2Script_IfTaskByteZero:
@@ -2951,7 +2960,7 @@ C2Script_IfTaskByteZero:
 ; Op $1D, 3 bytes: if task byte arg 1 is not 0, branch by arg 2; else
 ; advance 3.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfTaskByteZero
+; Entry/Exit: as C2Script_IfTaskByteZero; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskByteNonZero:
     SEP #$20
@@ -2977,7 +2986,8 @@ C2Script_IfTaskByteNonZero:
 ; Op $1E, 4 bytes: if task byte arg 1 is not arg 2, branch by arg 3;
 ; else advance 4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = arg 1; Y = arg 1
 ;        or 3
 ; No calls.
@@ -3008,7 +3018,7 @@ C2Script_IfTaskByteNe:
 ; Op $1F, 4 bytes: if task byte arg 1 is arg 2, branch by arg 3; else
 ; advance 4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfTaskByteNe
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskByteEq:
     SEP #$20
@@ -3037,7 +3047,7 @@ C2Script_IfTaskByteEq:
 ; Op $20, 4 bytes: if task byte arg 1 AND arg 2 is not 0, branch by arg
 ; 3; else advance 4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfTaskByteNe
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskBitsSet:
     SEP #$20
@@ -3066,7 +3076,7 @@ C2Script_IfTaskBitsSet:
 ; Op $21, 4 bytes: if task byte arg 1 AND arg 2 is 0, branch by arg 3;
 ; else advance 4. (Its TDC clears a high byte that is already 0.)
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfTaskByteNe
+; Entry/Exit: as C2Script_IfTaskByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfTaskBitsClear:
     SEP #$20
@@ -3096,7 +3106,7 @@ C2Script_IfTaskBitsClear:
 ; Op $22, 4 bytes: if the RAM byte at arg 1-2 is 0, branch by arg 3; else
 ; advance 4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Script_ClearRamByte
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 4, or the offset with C=0; X = the address; Y = 1
 ;        or 3
 ; No calls.
@@ -3125,7 +3135,7 @@ C2Script_IfRamByteZero:
 ; Op $23, 4 bytes: if the RAM byte at arg 1-2 is not 0, branch by arg 3;
 ; else advance 4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteZero
+; Entry/Exit: as C2Script_IfRamByteZero; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteNonZero:
     LDY.w #1
@@ -3154,7 +3164,7 @@ C2Script_IfRamByteNonZero:
 ; Callers: none direct (C2Script_OpTable). xref's CONFIRMED JSR at
 ;   $C2:FFB4 is not a call: those bytes are the operand of REP #$20 at
 ;   $C2:FFB3 and the LDA $1814 after it (unmatched code).
-; Entry: as C2Script_ClearRamByte
+; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5, or the offset with C=0; X = the address; Y = 3
 ;        or 4
 ; No calls.
@@ -3185,7 +3195,7 @@ C2Script_IfRamByteNe:
 ; Op $25, 5 bytes: if the RAM byte at arg 1-2 is arg 3, branch by arg 4;
 ; else advance 5.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteNe
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteEq:
     LDY.w #1
@@ -3214,7 +3224,7 @@ C2Script_IfRamByteEq:
 ; Op $26, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is not 0, branch
 ; by arg 4; else advance 5.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteNe
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamBitsSet:
     LDY.w #1
@@ -3243,7 +3253,7 @@ C2Script_IfRamBitsSet:
 ; Op $27, 5 bytes: if the RAM byte at arg 1-2 AND arg 3 is 0, branch by
 ; arg 4; else advance 5.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteNe
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamBitsClear:
     LDY.w #1
@@ -3273,7 +3283,7 @@ C2Script_IfRamBitsClear:
 ; branch by arg 4; else advance 5. (It reads a word and compares the low
 ; byte.)
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteNe
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteLess:
     LDY.w #1
@@ -3302,7 +3312,7 @@ C2Script_IfRamByteLess:
 ; Op $4D, 5 bytes: if the RAM byte at arg 1-2 is arg 3 or more
 ; (unsigned), branch by arg 4; else advance 5.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_IfRamByteNe
+; Entry/Exit: as C2Script_IfRamByteNe; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_IfRamByteGe:
     LDY.w #1
@@ -3389,7 +3399,8 @@ C2Script_SpawnUnk2194:
 ; Op $2C, 5 bytes: .SprX = arg 1-2 and .SprY = arg 3-4, both fractions
 ; 0.
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5; X = the task, Y = 3
 ; No calls.
 C2Script_SetPosition:
@@ -3419,7 +3430,7 @@ C2Script_Skip1:
 ; $C2:15E3 — C2Script_SetXVelocity (22 bytes, $15E3–$15F8)
 ; Op $2E, 5 bytes: .XVelFrac = arg 1-2, .XVel = arg 3-4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetPosition
+; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_SetXVelocity:
     LDX.b !C2Scene_TaskCur
@@ -3435,7 +3446,7 @@ C2Script_SetXVelocity:
 ; $C2:15F9 — C2Script_SetYVelocity (22 bytes, $15F9–$160E)
 ; Op $2F, 5 bytes: .YVelFrac = arg 1-2, .YVel = arg 3-4.
 ; Callers: none direct (C2Script_OpTable).
-; Entry/Exit: as C2Script_SetPosition
+; Entry/Exit: as C2Script_SetPosition; on entry DP=$0000, DB=$00 (low WRAM)
 ; No calls.
 C2Script_SetYVelocity:
     LDX.b !C2Scene_TaskCur
@@ -3451,7 +3462,8 @@ C2Script_SetYVelocity:
 ; $C2:160F — C2Script_SetAnim (14 bytes, $160F–$161C)
 ; Op $30, 2 bytes: starts animation script arg 1 (C2Scene_SetAnim).
 ; Callers: none direct (C2Script_OpTable).
-; Entry: as C2Scene_TaskRunScript calls the ops (see the banner)
+; Entry: as C2Scene_TaskRunScript calls the ops (see the banner):
+;        DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 2; X = the task, Y = 1
 ; Calls: C2Scene_SetAnim.
 C2Script_SetAnim:
