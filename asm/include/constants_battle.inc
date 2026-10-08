@@ -518,7 +518,7 @@ if !constants_battle_inc == 0
 !Battle_List3StatusBit    = $80   ; BattlerStats.Unk4C+1 bit list 3 clears at its end
 !Battle_List4StatusBit    = $40   ; BattlerStats.Unk4C+1 bit list 4 clears at its end
 !Battle_List5StatusBit    = $40   ; BattlerStats.Unk4C+2 bit list 5 clears at its end
-!Battle_List8StatusBit    = $10   ; BattlerStats.Status2 bit that makes list 8 call $C1:EBF8 / $C1:EC7F
+!Battle_List8StatusBit    = $10   ; BattlerStats.Status2 bit that makes list 8 call Battle_RecordHit / Battle_ApplyHits
 !Battle_List9StatusBit    = $20   ; BattlerStats.Unk4C+2 / Unk4C+7 bit that makes list 9 hit
 !Battle_List10StatusBit   = $04   ; BattlerStats.Unk4C+2 bit list 10 clears at its end
 !Battle_ListHalveBit      = $80   ; BattlerStats.Unk4C+1 / Unk4C+6 bit: lists 8 and 9 halve their timer
@@ -539,10 +539,58 @@ if !constants_battle_inc == 0
 !Battle_UnkAEB2Bytes      = 9     ; bytes BattleSys_Unk8461 zeroes from !Battle_UnkAEB2
 !Battle_UnkB192Size       = 4     ; bytes per !Battle_UnkB192 record
 !Battle_AF15Bit7          = $80   ; !Battle_UnkAF15 bit 7: BattleSys_Unk8C09 runs the enemy even with no id
-!BattleAi_BlockEnd        = $FE   ; script byte that ends a block (BattleSys_Unk8461)
+!BattleAi_BlockEnd        = $FE   ; script byte that ends a block's test part and its action part
 !BattleAi_ScriptEnd       = $FF   ; script byte that ends a script part
 !BattleAi_CodeUnk20       = $20   ; first code of a reaction part that lets an empty enemy entry run it (and puts
                                   ; its id back); meaning unknown
+!BattleAi_RecordSize      = 4     ; bytes per test record in a script block
+!BattleAi_SecondTest      = $01   ; !Battle_UnkB1CF: the block has a second test (set before the first runs)
+!BattleAi_FirstPassed     = $80   ; !Battle_UnkB1CF: the first of two tests passed (BattleAi_NoteFirstTest)
+!BattleAi_TestFailed      = 1     ; !Battle_UnkAF24 left by a test that fails (it counts up)
+!BattleAi_NoTarget        = 2     ; !Battle_UnkAF24 left by a choose handler that found no target (BattleAi_RunMainPart
+                                  ; then zeroes !Battle_UnkB2B6 and skips only the action part)
+!BattleAi_ActRestart      = $04   ; action code: a chosen block whose action part starts with it is begun from its
+                                  ; first action again (BattleAi_TestPassed); meaning of the action not traced
+!BattleAi_ActCode1        = 1     ; action code 1: BattleAi_SetCmdBits adds $80 and !Battle_UnkAEEB = 4
+!BattleAi_ActCode2        = 2     ; action code 2: BattleAi_EnemyTurn goes to $C1:D7C4 (others: $C1:D8D1);
+                                  ; BattleAi_SetCmdBits adds $40
+!BattleAi_CmdBitCode1     = $80   ; !Battle_UnkB18E bit for action code 1
+!BattleAi_CmdBitCode2     = $40   ; !Battle_UnkB18E bit for action code 2
+!BattleAi_UnkAEEBCode1    = 4     ; !Battle_UnkAEEB for action code 1
+!BattleAi_RunBuild        = 0     ; !BattleAi_RunMode: build the action block, then play
+!BattleAi_RunPlay         = 1     ; !BattleAi_RunMode: play the block as it is
+!BattleAi_AnimNoTarget    = 4     ; !Enemy_AnimWanted set when the chosen target is an enemy that is gone (one of the
+                                  ; values that let BattleSys_Unk8461 run the enemy's turn)
+!BattleAi_RandPcBound     = $30   ; Battle_RandRange high bound for a random PC: the result / 16 is 0-2
+!BattleAi_NoPlayMask      = $82   ; acting battler's BattlerStats.Status2 bits that stop the play (meaning unknown)
+!BattleAi_AE55Bit3        = $08   ; !Battle_UnkAE55 bit that stops BattleAi_EnemyTurn's reaction flag
+!BattleAi_MaskSlot0       = $8000 ; !Battle_ActMainMask bit of slot 0 (slot n: this >> n)
+!BattleAi_ArgUnk1         = 1     ; BattleAi_ArgToDp0E: !BattleAi_ActArg 1 and 2 give 4,
+!BattleAi_ArgUnk2         = 2
+!BattleAi_ArgUnk3         = 3     ; ... 3 and 4 give $0D (meaning unknown)
+!BattleAi_ArgUnk4         = 4
+!BattleAi_ArgOut12        = 4
+!BattleAi_ArgOut34        = $0D
+!Battle_HitEntrySize      = 4     ; bytes per battler slot in a !Battle_HitAmount / !Battle_ActPcHitAmount set
+!Battle_HitSetSize        = (!Battle_NumSlots*!Battle_HitEntrySize) ; bytes per set ($2C)
+!Battle_HitNegate         = $80   ; !Battle_UnkB202 bit: Battle_RecordHit negates !Battle_UnkAD89 first
+!Battle_HitMpBit          = $4000 ; !Battle_HitFlags bit: the amount is taken off MP, not HP
+!Battle_HitMpBitHi        = $40   ; the same bit in !Battle_HitFlagsHi
+!Battle_HitCancelBitHi    = $20   ; !Battle_HitFlagsHi bit: Battle_ClearCancelledHits zeroes the slot's amounts
+!Battle_StatsEnd          = (!Battle_NumSlots*!Battle_StatsStride) ; offset past the last BattlerStats record ($580)
+!BattleAi_TargetMarked40  = $40   ; !BattleAi_Targets bit set by BattleAi_AddPcByByte (PcStatBlk.Unk20 bit 5)
+!BattleAi_PcUnk20Bit5     = $20   ; PcStatBlk.Unk20 bits BattleAi_AddPcByByte copies into the entry's marks
+!BattleAi_PcUnk20Bit4     = $10
+!BattleAi_PcMaskAny       = $FF   ; !BattleAi_PcByteMask: any bit (BattleAi_TargetsByPcByte)
+!BattleAi_TargetMarked    = $80   ; !BattleAi_Targets bit: a test accepted the entry
+!BattleAi_TargetSlotMask  = $0F   ; !BattleAi_Targets bits that hold the slot
+!BattleAi_TargetUseFirst  = $80   ; target code bit: use !BattleAi_FirstTarget instead of a target handler
+!BattleAi_ScriptUnk8D08   = $8D08 ; bank-$CC script BattleAi_PickScript uses instead of the enemy's own when
+                                  ; BattlerStats.Unk4C+2 or +7 has bit 7 (one test-0 block, action 1; meaning unknown)
+!BattleAi_ScriptUnk8D1E   = $8D1E ; ... and when BattlerStats.Status2 has bit 2 that .Unk4C+4 lacks (action 4 list)
+!BattleAi_Unk4CBit7       = $80   ; the BattlerStats.Unk4C+2 / +7 bit for !BattleAi_ScriptUnk8D08
+!BattleAi_Status2Bit2     = $04   ; the BattlerStats.Status2 bit for !BattleAi_ScriptUnk8D1E (the same bit as
+                                  ; !Battle_TurnNoReactBit)
 
 ; --- Battle setup (Battle_SetupBattle) ---
 !Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56

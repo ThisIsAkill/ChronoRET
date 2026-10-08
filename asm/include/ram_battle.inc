@@ -250,7 +250,8 @@ struct BattlerStats $5E00
 .CurHp:     skip 2      ; +$30: current HP
 .MaxHp:     skip 2      ; +$32: max HP
 .CurMp:     skip 2      ; +$34: current MP
-            skip 9
+.MaxMp:     skip 2      ; +$36: max MP (inferred: Battle_ApplyHits caps .CurMp at it, as .CurHp at .MaxHp)
+            skip 7
 .Unk3F:     skip 1      ; +$3F: Battle_CalcUnk56's input (see .Unk2D); meaning unknown
             skip $0A
 .Status:    skip 1      ; +$4A: status bits; bit 7 set = KO'd (by context: BattleTgt_SingleKoAlly lists these)
@@ -1180,6 +1181,7 @@ endstruct
 !BattleTmp_06             = $06   ; 1-2 B scratch
 !BattleTmp_08             = $08   ; 1-2 B scratch
 !BattleTmp_0A             = $0A   ; 1-2 B scratch
+!BattleTmp_0C             = $0C   ; 1-2 B scratch
 !BattleTmp_0E             = $0E   ; 1-2 B scratch
 !BattleTmp_10             = $10   ; 1-2 B scratch
 !BattleTmp_12             = $12   ; 1-2 B scratch
@@ -1235,15 +1237,20 @@ endstruct
 !Battle_UnkB1CF           = $B1CF ; 1 B: 1 = the script block being run has a second 4-byte record (byte 4 not $FE)
                                   ; (BattleSys_Unk8461); zeroed by BattleSys_Unk8C09
 !Battle_UnkB1D0           = $B1D0 ; 2 B: script address of the current block (BattleSys_Unk8461)
-!Battle_UnkB1D2           = $B1D2 ; 2 B: script read address in bank $CC (set by BattleSys_UnkB488; BattleSys_Unk8461)
-!Battle_UnkB1D4           = $B1D4 ; 2 B per entry: saved in !Battle_UnkB3CA around BattleSys_Unk8461's script blocks
+!Battle_UnkB1D2           = $B1D2 ; 2 B: script read address in bank $CC (BattleAi_RunMainPart, BattleAi_FindReactPart,
+                                  ; BattleSys_Unk8461; the script handlers step it on)
+!Battle_UnkB1D4           = $B1D4 ; 2 B per entry: script address of the action an enemy runs next in its chosen block
+                                  ; (BattleAi_TestPassed; BattleAi_EnemyTurn steps it on by the action's length); saved
+                                  ; in !Battle_UnkB3CA around BattleSys_Unk8461's script blocks
 !Battle_UnkB1FD           = $B1FD ; 1 B: battler slot passed with !Battle_UnkAD89 (turn lists 1, 8, 9)
-!Battle_UnkB202           = $B202 ; 1 B: 0 (turn lists 1, 8) or $C0 (list 9) before BattleSys_UnkEBF8; meaning unknown
-!Battle_UnkB239           = $B239 ; 1 B: code of the current script record (BattleSys_UnkB80DTable index)
+!Battle_UnkB202           = $B202 ; 1 B: 0 (turn lists 1, 8) or $C0 (list 9) before Battle_RecordHit: the high byte of
+                                  ; the hit's !Battle_HitFlags; bit 7 = the amount is negated first
+!Battle_UnkB239           = $B239 ; 1 B: code of the current script record (BattleAi_TestTable index)
 !Battle_UnkB24A           = $B24A ; 8 B per enemy (BattleSys_Unk8C09) or reaction entry (BattleSys_Unk8461): set
                                   ; from !Battle_UnkAF24; non-zero = BattleSys_Unk8461 skips the enemy's turn
 !Battle_UnkB263           = $B263 ; 8 B, indexed as !Battle_UnkB24A: counts the script blocks tried
-!Battle_UnkB273           = $B273 ; 2 B: script address BattleSys_UnkB488 left (BattleSys_Unk8461)
+!Battle_UnkB273           = $B273 ; 2 B: script address: the start of the reaction part (BattleSys_Unk8461) or of the
+                                  ; action part (BattleAi_TestPassed, BattleAi_EnemyTurn)
 !Battle_UnkB2B6           = $B2B6 ; 8 B, indexed as !Battle_UnkB24A: zeroed when !Battle_UnkAF24 is 2; non-zero =
                                   ; BattleSys_Unk8C09 skips the enemy
 !Battle_UnkB2C0           = $B2C0 ; 1 B: zeroed at BattleSys_Unk8461's start and end; 0 after BattleSys_UnkB762
@@ -1258,10 +1265,57 @@ endstruct
 !Battle_UnkB3CA           = $B3CA ; 2 B: !Battle_UnkB1D4 entry saved over a script block (BattleSys_Unk8461)
 !Battle_UnkB3F4           = $B3F4 ; 1 B: PC slot stored when !Battle_UnkAF23 is set (BattleSys_Unk8461)
 !Battle_UnkAD89           = $AD89 ; 2 B: amount of the turn-list hits (lists 1, 8, 9); goes to !Battle_ActPcHitAmount
+!BattleAi_TargetCount     = $AECB ; 1 B: entries in !BattleAi_Targets (written by the target-code handlers; 1 after
+                                  ; BattleAi_PickMarkedTarget picks one; not cleared by BattleAi_ClearTargets)
+!BattleAi_Targets         = $AECC ; 11 B: battler slots a script target code chose ($FF = empty, BattleAi_ClearTargets);
+                                  ; the tests set bit 7 of the entries they accept (BattleAi_PickMarkedTarget)
+!BattleAi_FirstTarget     = $AED8 ; 1 B: low nibble of !BattleAi_Targets[0] kept when the first of a block's two tests
+                                  ; passes (BattleAi_NoteFirstTest); target codes $80 and up reuse it (BattleAi_ReadTargets)
+!BattleAi_ActCode         = $AEE3 ; 1 B: action code read from the script's action part (BattleAi_TestPassed /
+                                  ; BattleAi_EnemyTurn); its handler is BattleAi_ChooseTable / BattleAi_RunTable entry n
+!BattleAi_ScriptPos       = $B1E4 ; 2 B per enemy: !Battle_UnkB1D4 entry as BattleAi_TestPassed last chose it;
+                                  ; BattleAi_EnemyTurn runs the action only while the two are still equal
+!BattleAi_ChosenBlock     = $B26B ; 1 B per enemy: !Battle_UnkB263 (block number) of the block whose tests last passed
+                                  ; (BattleAi_TestPassed); $FF = BattleAi_EnemyTurn does nothing (who sets $FF: not traced)
+!Battle_UnkB2AE           = $B2AE ; 1 B: !BattleAi_Targets[0] as BattleAi_ReadTargets left it; not read in matched code
+!BattleAi_ActId           = $AEE4 ; 1 B: action id a run handler read from the script (BattleAi_RunTable $01);
+                                  ; BattleAi_FillActBlock copies it to !Battle_ActId
+!BattleAi_ActArg          = $AEE5 ; 1 B: a parameter byte of the action record (choose handler $00: the value for
+                                  ; !Enemy_AnimWanted; mapped by BattleAi_ArgToDp0E)
+!BattleAi_RunMode         = $B3B8 ; 1 B: left by a BattleAi_RunTable handler: 0 = BattleAi_EnemyTurn builds the action
+                                  ; block and plays it, 1 = plays it as it is, else (2) plays nothing
+!Battle_ActUnkAE97        = $AE97 ; 1 B: action-block slot (see !Battle_ActBattlers); $FF from BattleAi_EnemyTurn
+!Battle_ActUnkAE98        = $AE98 ; 1 B: the same, second slot
+!Battle_UnkAE4D           = $AE4D ; 1 B: zeroed by BattleAi_EnemyTurn before $C1:D7C4 / $C1:D8D1; meaning unknown
+!Battle_UnkAE4E           = $AE4E ; 1 B: zeroed with !Battle_UnkAE4D
+!Battle_UnkAE55           = $AE55 ; 1 B: bit 3 clear = BattleAi_EnemyTurn sets !Battle_UnkB2C0 (reactions) after an
+                                  ; action on an enemy, and then zeroes this; who sets it is not traced
+!Battle_UnkAE85           = $AE85 ; 1 B per enemy: set to 1 by BattleSys_UnkAC5E for each !Battle_UnkAEB3 entry set
+!Battle_UnkAE90           = $AE90 ; 1 B: the byte before !Battle_ActCaster; zeroed by BattleAi_FillActBlock
+!Battle_UnkAEEB           = $AEEB ; 1 B: set to 4 by BattleAi_SetCmdBits for action code 1; meaning unknown
+!Battle_UnkB18E           = $B18E ; 1 B: BattleAi_SetCmdBits ORs the acting slot into it, plus $80 (action code 1) or
+                                  ; $40 (code 2); a command byte like BattleCmd.Kind, probably
+!Battle_UnkB18F           = $B18F ; 1 B: 0 (action codes 0, 1) or DP $0E (code 2) (BattleAi_SetCmdBits)
+!Battle_UnkB191           = $B191 ; 1 B: zeroed by BattleAi_SetCmdBits
+!Battle_UnkAD9B           = $AD9B ; 1 B: set number (0-5) of the !Battle_ActPcHitAmount records Battle_HitEntryOffset
+                                  ; indexes; written elsewhere (not traced)
+!Battle_HitAmount         = $B328 ; 2 B, 4-byte entry per battler slot, 3 sets of 11 ($2C apart, set !Battle_UnkB2C7):
+                                  ; amount Battle_ApplyHits takes off the battler's HP or MP (Battle_RecordHit)
+!Battle_HitFlags          = $B32A ; 2 B, same entries: bit 14 = the amount is for MP, bit 13 = cancelled
+                                  ; (Battle_ClearCancelledHits); the high byte is !Battle_UnkB202 (Battle_RecordHit)
+!Battle_HitFlagsHi        = !Battle_HitFlags+1 ; 1 B: high byte of !Battle_HitFlags
+!Battle_UnkB203           = $B203 ; 1 B: !Battle_UnkB202 as Battle_RecordHit last stored it
+!Battle_UnkAE85Base       = !Battle_UnkAE85-!Battle_FirstEnemySlot ; !Battle_UnkAE85 indexed by battler slot
+!Battle_UnkAEB3Base       = !Battle_UnkAEB3-!Battle_FirstEnemySlot ; !Battle_UnkAEB3 indexed by battler slot
+!Battle_UnkAEC9           = $AEC9 ; 2 B: zeroed by BattleAi_TargetsByPcByte; the loop index of test $01
+!BattleAi_PcSlot          = $AF1E ; 1 B: PC slot BattleAi_AddPcByByte looks at
+!BattleAi_PcByteMask      = $AF1F ; 1 B: bits BattleAi_AddPcByByte wants in the PC's stat-block byte ($FF = any)
+!BattleAi_Marked40Count   = $AF20 ; 1 B: entries BattleAi_AddPcByByte marked $40 (PcStatBlk.Unk20 bit 5)
+!BattleAi_Marked80Count   = $AF21 ; 1 B: entries it marked $80 (PcStatBlk.Unk20 bit 4)
 !Battle_UnkAEB2           = $AEB2 ; 1 B: zeroed with the 8 !Battle_UnkAEB3 bytes by BattleSys_Unk8461; meaning unknown
 !Battle_UnkAEC8           = $AEC8 ; 1 B: enemy index (slot - 3) BattleSys_Unk8461 works on
 !Battle_UnkAF23           = $AF23 ; 1 B: non-zero = BattleSys_Unk8461 sends a due PC to $C1:B575/$C1:BCE1, not the menu
-!Battle_UnkAF24           = $AF24 ; 1 B: result of a script block (BattleSys_UnkB80DTable handlers): 0 = the enemy
+!Battle_UnkAF24           = $AF24 ; 1 B: result of a script block (BattleAi_TestTable handlers): 0 = the enemy
                                   ; acts on it (BattleSys_Unk8461), 2 = zeroes !Battle_UnkB2B6; else the next block
 !Battler_Unk9826          = $9826 ; 1 B per battler slot: non-zero lets an enemy take its turn whatever its
                                   ; !Enemy_AnimWanted (BattleSys_Unk8461 clears it then); meaning unknown
@@ -1280,7 +1334,8 @@ endstruct
 !Battle_RewardGold        = $B2A5 ; 2 B: gold BattleSys_Main's victory path adds (BankC1_AddGold)
 !Battle_RewardItems       = $B2A7 ; 6 B: item ids BattleSys_Main's victory path adds one each of (BankC1_AddItem); 0 = none
 !Battle_UnkB2AF           = $B2AF ; 1 B: bit 6 set after the gold is paid, bit 5 after an item is given
-!Battle_UnkB2C7           = $B2C7 ; 1 B: zeroed at the top of each BattleSys_Main pass
+!Battle_UnkB2C7           = $B2C7 ; 1 B: zeroed at the top of each BattleSys_Main pass; the !Battle_HitAmount set
+                                  ; Battle_RecordHit writes
 !Battle_SavedMaxHp        = $B316 ; 2 B per PC (3): BattlerStats.MaxHp saved by Battle_SetupBattle, put back at the end
 !Battle_UnkB31E           = $B31E ; 1 B: Battle_RandRange's high bound (scratch)
 !Battle_Saved2989Bit5     = $B31F ; 1 B: !Battle_Unk2989 bit 5 as the battle started; BattleSys_Main clears the bit
@@ -1298,7 +1353,11 @@ endstruct
 ; !BattleRom_PcStatBlock (BattlerStats[n].Unk2D), so +n here = BattlerStats + $2D + n.
 ; Only the fields that code touches; what they hold is not traced.
 struct PcStatBlk $0000
-            skip $29
+            skip $1D
+.Status:    skip 1      ; +$1D (= BattlerStats.Status): bit 7 = KO'd (BattleAi_AddPcByByte skips the PC)
+            skip 2
+.Unk20:     skip 1      ; +$20 (= BattlerStats.Unk4C+1): bits 5 and 4 make BattleAi_AddPcByByte mark the entry
+            skip 8
 .Unk29:     skip 1      ; +$29 (= BattlerStats.Unk56)
             skip $0C
 .Unk36:     skip 1      ; +$36: added to the bank-$CC byte for .Unk3D (character ids other than 1 and 2)
@@ -1321,6 +1380,10 @@ endstruct
 !BattleRom_UnkCC0000      = $CC0000 ; base of the LDA.l Battle_SetupBattle indexes with a RAM address (quirk)
 !BattleRom_ScriptBank     = $CC0000 ; bank $CC base: BattleSys_Unk8461 reads script bytes as LDA.l this,X with X = the
                                     ; address (probably the enemy behaviour scripts, from the $CC:8B08 pointer table)
+!BattleRom_AiScriptPtrs   = $CC8B08 ; 2 B per enemy id: address in bank $CC of its script (BattleAi_RunMainPart,
+                                    ; BattleAi_FindReactPart)
+!BattleRom_AiActLength    = $FDBA4A ; 1 B per action code $00-$16: bytes in its record (BattleAi_EnemyTurn steps
+                                    ; !Battle_UnkB1D4 on by it); codes 4 and 5 hold $FF, code 3 holds 0
 !BattleRom_EnemyUnk5E04   = $CC5E04 ; 7 B per enemy id: Battle_SetupBattle tests byte 0 (-> !Battle_UnkAE5D bit 6)
 !BattleRom_EnemyUnk5E05   = $CC5E05 ; ... and byte 1 (-> bit 7); what the records hold is not traced
 !Battle_Unk29D7           = $29D7   ; its address is passed to $FD:B14D (DP $0E) by Battle_SetupBattle; meaning unknown

@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:8C3E,BattleAi_TestPassed,2026-10-08,rev74a,approved,0d234ab4a709,"Choose04 note fixed: ROM $98C5-$995E sets B273=B1D2+1 then +0-3 actions (RNG 25/50/75), PLY eats $8CE9; all steps/Entry/Exit match. nit: callees use DP; $80+ pick runs nothing"
