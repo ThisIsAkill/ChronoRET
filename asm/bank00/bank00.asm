@@ -14,10 +14,18 @@ hirom
 ; Reset ($00:FF00) — target of the emulation-mode RESET vector ($FFFC)
 ;
 ; The CPU comes out of reset in emulation mode with I already set. Only
-; CLC+XCE are needed to enter native mode; the SEI first is defensive
-; (redundant after a hardware reset, but harmless if this is ever jumped to).
-; Entry: emulation mode, I=1 (hardware reset state)
-; Exit:  native mode, M=1 X=1, D=$0000, DB=$00 — continues in MainInit
+; CLC+XCE are needed to enter native mode; the SEI first is for the soft
+; resets below, which arrive in native mode with interrupts possibly on.
+; Callers: besides the RESET vector, three JMLs restart the game through
+; here: $C2:8523 (when JOY1 reads $3030, i.e. L+R+Select+Start held),
+; $C3:0AB5 (JML $00FF00, after forced blank and NMI/HDMA off) and
+; $CF:E702.
+; Entry: emulation mode, I=1 (hardware reset state); or native mode with
+;        the soft-reset caller's M/X/D/DB
+; Exit:  native mode, I=1 — continues in MainInit, which sets M, X, S, DB
+;        and DP itself. After a hardware reset M=1 X=1, D=$0000, DB=$00;
+;        after a soft reset (XCE with C=0 in native mode changes nothing)
+;        M, X, D and DB are still the caller's
 ; ============================================================
 org $C0FF00
 
@@ -34,7 +42,8 @@ Reset:
 ;
 ; The native NMI and IRQ vectors can only point into bank $00, so they
 ; land here and jump on through 4-byte trampolines in WRAM ($0500, $0504)
-; that the game rewrites as it changes mode. The trampolines are not set
+; that the game rewrites as it changes mode: NMI_Stub and IRQ_Stub (the
+; same shape) are covered by this header. The trampolines are not set
 ; by MainInit; see !NmiTrampoline / !IrqTrampoline in ram_engine.inc for
 ; who installs and repoints them.
 ; Entry: native mode, interrupt taken (M, X, D, DB as the interrupted code
@@ -45,6 +54,7 @@ Reset:
 NMI_Stub:               ; native NMI vector target (see $FFEA)
     JML !NmiTrampoline
 
+; header: see NMI_Stub
 IRQ_Stub:               ; native IRQ vector target (see $FFEE)
     JML !IrqTrampoline
 

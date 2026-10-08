@@ -21,8 +21,13 @@ incsrc "../hardware.inc"
 
 ; ============================================================
 ; MainInit ($FD:C000)
-; Called via: JML from Reset ($00:FF03)
-; Entry: native mode, M=1 X=1, D=$0000, DB=$00
+; Called via: JML from Reset ($00:FF03), which also carries the soft
+; resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and
+; S=$06FF). The bytes at $FD:851D read as JSR $C000 but sit in a block of
+; packed data ($FD:8480 onwards does not decode as code), not a caller.
+; Entry: native mode; from a hardware reset M=1 X=1, D=$0000, DB=$00;
+;        from $C0:418D M=1, X=0, DB=$00. Steps 1-3 set M, X, S, DB and DP,
+;        so nothing else about the entry state matters
 ; Exit:  (jumps, never returns) M=1 X=0, D=$2100, DB=$00, S=$06FF,
 ;        screen in forced blank, NMI/IRQ/DMA/HDMA off
 ;

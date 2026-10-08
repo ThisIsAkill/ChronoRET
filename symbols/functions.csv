@@ -1,55 +1,55 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
-$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,verified,b1c0704c4cd5,Mid-game re-entry vector table at the start of the bank.
+$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,readable,9e1f38db5616,Mid-game re-entry vector table at the start of the bank.
 $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the interrupt trampolines, clears WRAM, starts the sound driver and bank $C2, then falls into GameLoop_Main."
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,81e2479105c1,trampolines and dispatches on Loc_Id.
-$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,1e6af7746290,Loc_FirstBankC2.
+$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,readable,4bf31803c73e,Loc_FirstBankC2.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
 $C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,4d54bc759a9d,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
 $C0:00DE,$C0:00EA,13,Field_EndOfFrameShort,$C0,Engine,verified,2e5dc85b9727,"FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops."
-$C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,verified,d1f629db5022,"game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail jump, whose RTS returns to this routine's caller)."
+$C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,readable,c23486c85fdf,"game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail jump, whose RTS returns to this routine's caller)."
 $C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,verified,833278a42a72,"One-time location-load called once per scene entry from GameLoop_LoadField (its only caller, JSR at $C0:0088)."
 $C0:011B,$C0:01A4,138,Field_SaveState,$C0,Engine,verified,8590322c73c3,"(was Sub_011B.) Saves the field before handing control to bank $C2 (BankC2_Entry8000), so Field_RestoreState can rebuild it after: - if Field_Unk29 is set, force it to 1 and clear Field_Unk26/27; - co"
-$C0:01A5,$C0:024B,167,Field_RestoreState,$C0,Engine,verified,4e91e063024e,(was Sub_01A5.) Rebuilds the field after a bank-$C2 round trip: 1.
+$C0:01A5,$C0:024B,167,Field_RestoreState,$C0,Engine,readable,d05450e0d6c3,(was Sub_01A5.) Rebuilds the field after a bank-$C2 round trip: 1.
 $C0:0905,$C0:0917,19,Field_RestoreSaveBlock,$C0,Engine,verified,26317c37e94f,"(was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over Field_SaveBlock ($7E:0920, $14E0 bytes)."
 $C0:0918,$C0:092A,19,Field_StashSaveBlock,$C0,Engine,verified,854a2d54b96a,"(was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to SceneSave_Buffer ($7F:2000)."
-$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,verified,c2e5d19c7f2c,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on."
-$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,verified,154f334211cf,Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
-$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,verified,2a9eabe6073f,Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
+$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,readable,76b6af143b0d,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on."
+$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,readable,71930af9051c,Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
+$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,readable,be2aa5769805,Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
 $C0:0B86,$C0:0C75,240,Field_InitLoadState,$C0,Engine,verified,d4cb5f03e428,"(was FrameStateInit.) Called once per location load from GameLoop_LoadField, not per frame."
-$C0:0C76,$C0:0D77,258,Field_SceneChangeTick,$C0,Engine,verified,bd086c63875f,(was Sub_0C76.) Runs every frame from GameLoop_FrameBody.
+$C0:0C76,$C0:0D77,258,Field_SceneChangeTick,$C0,Engine,readable,ffd5b64e627c,(was Sub_0C76.) Runs every frame from GameLoop_FrameBody.
 $C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,verified,abcfd6c57b3c,"Tile animation for map-tile state $E6: a 1x2 column, the tile at (Field_TileAnimX, Field_TileAnimY) and the one above it."
-$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,verified,6c8b0575576f,"Tile animation for map-tile state $EC: a 2x2 block, columns col..col+1, rows row-1..row."
-$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,verified,02b6c8c0fb43,"Tile animation for map-tile state $EE: a 2x2 block, columns col-1..col, rows row-1..row (ModeEC_Handler mirrored)."
-$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,verified,9c8582a3b7e9,"Tile animation for map-tile state $FA: a 2-wide, 3-tall block, columns col..col+1, rows row-2..row."
-$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,verified,8b74fb1a93e5,"Tile animation for map-tile state $FC: a 2-wide, 3-tall block, columns col-1..col, rows row-2..row (ModeFA_Handler mirrored)."
-$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,verified,7817d07b4731,"The rest of Field_SceneChangeTick's request handling: reached by BRL when Field_SceneFlags bit 4 is clear or the tile mode is not one of the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by"
+$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,readable,4e21d1d7057b,"Tile animation for map-tile state $EC: a 2x2 block, columns col..col+1, rows row-1..row."
+$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,readable,5fb53b36b310,"Tile animation for map-tile state $EE: a 2x2 block, columns col-1..col, rows row-1..row (ModeEC_Handler mirrored)."
+$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,readable,9b4a58d4f702,"Tile animation for map-tile state $FA: a 2-wide, 3-tall block, columns col..col+1, rows row-2..row."
+$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,readable,650b5a4a1de3,"Tile animation for map-tile state $FC: a 2-wide, 3-tall block, columns col-1..col, rows row-2..row (ModeFA_Handler mirrored)."
+$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,readable,30c2be48691c,"The rest of Field_SceneChangeTick's request handling: reached by BRL when Field_SceneFlags bit 4 is clear or the tile mode is not one of the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by"
 $C0:18D9,$C0:1984,172,Field_PauseAndMenuInput,$C0,Engine,verified,81a5d1737539,"(was Sub_18D9.) Per-frame pause and menu input, called from GameLoop_FrameBody before Field_SceneChangeTick."
 $C0:1985,$C0:19C6,66,Field_FadeToBankC2Mode5,$C0,Engine,verified,7a60ad43b399,(was Sub_1985.) Called from Field_PauseAndMenuInput when Pad_Unk00F6 bit 0 is set.
 $C0:19C7,$C0:1A02,60,Field_RunBankC2Mode5,$C0,Engine,verified,7af99c86cc5a,"(was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning of 5 unverified; earlier notes called it ""BG mode 5""), then reloads the field: restore state, re-init changed party members, move a pe"
-$C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,verified,5e1e9e613837,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
+$C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,readable,add4c2baa065,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
 $C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),verified,c63ce00d7b6b,"Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66, Pad_Unk00F6-F8) is still unidentified, so it keeps its address name."
-$C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,verified,81726cfd1986,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
-$C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,verified,6cb5aa9bca17,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for"
+$C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,readable,e94e5beac473,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
+$C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,readable,dd25ac14dfe8,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for"
 $C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,verified,8af6b4d0cdff,Audio_PlaySfxAtLeader: shared tail; Audio_PlayTileSfxA falls in here and Audio_PlayTileSfxB branches here (BRA at $C0:1BA9).
 $C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,verified,8e1af34745a1,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
-$C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,verified,1c278769a73e,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
-$C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,verified,f8ff6f940670,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
-$C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,verified,961ec35727cf,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
+$C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,readable,29587b9b9aa5,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
+$C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,readable,48f2c50391f1,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
+$C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,readable,8a44e97cd7a2,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
 $C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,verified,2a8062ed2e09,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
 $C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,verified,698bb554b9b5,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
 $C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,verified,84c4d964684c,"(was Sub_597D.) Runs object Obj_Cur's init function: the first of its 16 function offsets (Evt_Data + Obj_Cur*16, i.e."
-$C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,verified,2994226d6999,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
-$C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,verified,bac2c5a553fe,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."
-$C0:B2A8,$C0:B2B1,10,Oam_BucketLoop,$C0,Engine,verified,93769887bcf3,
-$C0:B2B2,$C0:B2BF,14,Oam_CheckChain,$C0,Engine,verified,533f49244bf1,
-$C0:B2C0,$C0:B2C7,8,Oam_NextBucket,$C0,Engine,verified,c5e5669903da,
-$C0:B2C8,$C0:B2D7,16,Oam_HideRange1,$C0,Engine,verified,80bdf9367b2f,
-$C0:B2D8,$C0:B2DD,6,Oam_EndRange1,$C0,Engine,verified,00944963d076,
-$C0:B2DE,$C0:B2ED,16,Oam_HideRange2,$C0,Engine,verified,5df6febaf35a,
-$C0:B2EE,$C0:B2F3,6,Oam_EndRange2,$C0,Engine,verified,69bff4c22d1a,
-$C0:B2F4,$C0:B303,16,Oam_HideRange3,$C0,Engine,verified,4671472a585a,
-$C0:B304,$C0:B308,5,Oam_EndRange3,$C0,Engine,verified,29035771116c,
+$C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,readable,fcb380055d6f,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
+$C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,readable,a00b0a1208df,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."
+$C0:B2A8,$C0:B2B1,10,Oam_BucketLoop,$C0,Engine,readable,d57272f16594,
+$C0:B2B2,$C0:B2BF,14,Oam_CheckChain,$C0,Engine,readable,c8de6d8de641,
+$C0:B2C0,$C0:B2C7,8,Oam_NextBucket,$C0,Engine,readable,08506d9cee07,
+$C0:B2C8,$C0:B2D7,16,Oam_HideRange1,$C0,Engine,readable,5a90edeb4aa3,
+$C0:B2D8,$C0:B2DD,6,Oam_EndRange1,$C0,Engine,readable,0bad136a75e1,
+$C0:B2DE,$C0:B2ED,16,Oam_HideRange2,$C0,Engine,readable,a4db7b6f71f8,
+$C0:B2EE,$C0:B2F3,6,Oam_EndRange2,$C0,Engine,readable,65b0dbb6ee8c,
+$C0:B2F4,$C0:B303,16,Oam_HideRange3,$C0,Engine,readable,1bc050c8aba5,
+$C0:B304,$C0:B308,5,Oam_EndRange3,$C0,Engine,readable,6b02550ae159,
 $C0:B309,$C0:B700,1016,Spr_AppendToOam,$C0,Engine,verified,ed0347b886d4,(was Sub_B309.) Appends object Obj_Cur's sprite to the OAM shadow.
 $C0:B701,$C0:B787,135,Spr_PrepareTiles,$C0,Engine,verified,e24f53f22fd1,(was Sub_B701.) Brings object Obj_Cur's SprTile records up to date before Spr_AppendToOam copies them.
 $C0:B788,$C0:B8C9,322,Spr_Place4,$C0,Engine,verified,2cd659c71db5,"(was Sub_B788.) Re-places a 4-tile (size 0) object: with DB=$7F, each SprTile record's X = Spr_BaseX + OfsX (bit 8 packed into Obj_OamHiA with the large-size bits) and Y = Spr_BaseY + OfsY, clamped to"
@@ -80,8 +80,8 @@ $C0:D7E5,$C0:DA68,644,Obj_BuildFrame12Pass2,$C0,Sprites & objects,verified,21f48
 $C0:DA69,$C0:DD27,703,Obj_BuildFrame12Pass2Alt,$C0,Sprites & objects,verified,3e2b38b4a4d9,"(was Sub_DA69.) Pass 2 for the ObjTile_AltLayout ($68) layout: tiles 32-39 to +$300 and 40-47 to +$500, queue the upload ($100 bytes to Obj_VramTile*16, then $500 bytes from +$100 to the next tile row"
 $C0:DD28,$C0:E129,1026,Obj_FrameLayout12,$C0,Sprites & objects,verified,abc59c418f9a,"(was Sub_DD28.) Rewrites the 12 SprTile records of a 12-tile object for Obj_LastFrame (tiles already in VRAM): offsets from the frame record (120 bytes, positions after 48 tile words), tile numbers in"
 $C0:E12A,$C0:E533,1034,Spr_LoadLargeObj,$C0,Engine,verified,57cecdd4d679,"(was Sub_E12A.) Loads a 24-tile (""large"") object in one go."
-$C0:E534,$C0:E686,339,Spr_CopyTileFlipped,$C0,Engine,verified,327fc418c825,"(was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right, from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through WMDATA: each byte goes through BitReverseTable ($C0:FD00), which"
-$C0:E687,$C0:E738,178,Spr_CopyTile,$C0,Engine,verified,1cd89dead30d,"(was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr + (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD past it so a following Spr_CopyTileFlipped writes the next tile."
+$C0:E534,$C0:E686,339,Spr_CopyTileFlipped,$C0,Engine,readable,09ba4499ec52,"(was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right, from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through WMDATA: each byte goes through BitReverseTable ($C0:FD00), which"
+$C0:E687,$C0:E738,178,Spr_CopyTile,$C0,Engine,readable,87bd20f93af4,"(was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr + (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD past it so a following Spr_CopyTileFlipped writes the next tile."
 $C0:E739,$C0:E7BB,131,Spr_CopyTileD4,$C0,Engine,verified,0df1034c1834,Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D4).
 $C0:E7BC,$C0:E83E,131,Spr_CopyTileD2,$C0,Engine,verified,4471c03a3784,Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D2).
 $C0:E83F,$C0:E8C1,131,Spr_CopyTileD3,$C0,Engine,verified,6718fafe277d,Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D3).
@@ -93,9 +93,9 @@ $C0:E9AA,$C0:E9E1,56,SprBuf_Alloc3,$C0,Engine,verified,a11012e8c2af,(was Sub_E9A
 $C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,verified,36bcd6233c5c,(was Sub_E9E2.) Releases the SprBuf chunk owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries and marks it free.
 $C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,verified,ecc6fcf33bcf,(was Sub_E9FF.) As SprBuf_Free1 for a 2-chunk object: the first of the 3 possible start entries owned by Obj_Cur and the one after it are freed.
 $C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,verified,b2719a992e30,(was Sub_EA1F.) As SprBuf_Free1 for a 3-chunk object (2 possible start entries).
-$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,b119b61f6d34,The CPU comes out of reset in emulation mode with I already set.
-$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,verified,9c2774b7207f,Native-mode interrupt stubs ($FF10–$FF17)
-$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,bd12634e9770,
+$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,7569072366ee,The CPU comes out of reset in emulation mode with I already set.
+$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,986b08119561,Native-mode interrupt stubs ($FF10–$FF17)
+$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,5ab7fb85aa4d,
 $C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,verified,8926ad22dcae,"A crash trap: it reads a fixed, recognizable address forever and never returns."
 $C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,2fad0af24d5b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
 $C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,012bbbcead94,
@@ -119,25 +119,25 @@ $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt v
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,verified,b407f9a2aa74,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
 $C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,verified,28c4f8ee0134,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,verified,a88ce7d844a5,"16÷8 HW divide via WRDIVL/WRDIVH/WRDIVB, quotient from RDDIVL and remainder from RDMPYL."
-$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,2cdb3012745e,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
-$C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,verified,77e03f9cac8b,
-$C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,verified,fe9eb52af7ca,
-$C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,verified,3536e305ba96,
-$C1:0118,$C1:0118,1,Battle_ShiftRight6,$C1,Battle engine,verified,91b05803d8eb,
-$C1:0119,$C1:0119,1,Battle_ShiftRight5,$C1,Battle engine,verified,d4172c45304d,
-$C1:011A,$C1:011A,1,Battle_ShiftRight4,$C1,Battle engine,verified,d022f8f89c7c,
-$C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,verified,26c7786bd957,
-$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,verified,60fd83d03478,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
-$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,verified,b9a472ea6cee,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
-$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,verified,916ca40a3eb9,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
-$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,verified,9a12a5a4566d,
-$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,verified,9d4bb04a4a23,Direction angle between two screen points (256 units per turn).
-$C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,verified,6ae57970b327,
+$C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,readable,3e303b840b03,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
+$C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,readable,b4fcb5476caf,
+$C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,readable,c2643f949d52,
+$C1:0116,$C1:0117,2,Battle_ShiftRight8,$C1,Battle engine,readable,b28bf7e8cb4c,
+$C1:0118,$C1:0118,1,Battle_ShiftRight6,$C1,Battle engine,readable,7038dc7a6550,
+$C1:0119,$C1:0119,1,Battle_ShiftRight5,$C1,Battle engine,readable,d77b89a57485,
+$C1:011A,$C1:011A,1,Battle_ShiftRight4,$C1,Battle engine,readable,63fde593cbfc,
+$C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,readable,6d4e6a5dfdcb,
+$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,readable,59e2a0a6e26b,"Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles: !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits, tiles looked up in !BattleRom_DigitTiles."
+$C1:0174,$C1:01A8,53,BattleMsg_FormatTwoDigits,$C1,Battle text & numbers,readable,1d5ecedb56ff,Two-digit variant of BattleMsg_FormatNumberDigits: formats !BattleMsg_NumValue as tens+ones only.
+$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,readable,bb439b6db024,"Back up the 16 raw text bytes the caller left in !BattleMsg_TextTiles to !BattleMsg_TextSource, blank both tile rows (TextTiles/TextTopTiles), then re-encode each text byte into a lower-row tile (Text"
+$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,readable,646ec772ee80,
+$C1:0222,$C1:0298,119,Battle_CalcAngle,$C1,Battle engine,readable,54e8e0354c01,Direction angle between two screen points (256 units per turn).
+$C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,readable,3d9587d1504f,
 $C1:0305,$C1:04C4,448,BattleUI_DrawPcNamePanel,$C1,Battle status bar,verified,8857f194bfbc,
-$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,verified,4f12182ead63,
+$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,readable,dc4f922dfe5e,
 $C1:05A7,$C1:06DA,308,BattleUI_UpdateNextPcPanel,$C1,Battle status bar,verified,a1b3c2101475,
-$C1:06DB,$C1:06EE,20,BattleUI_DrawAtbGauges,$C1,Battle status bar,verified,91a948db9df1,
-$C1:06EF,$C1:06EF,1,BattleUI_UpdateNextPcPanel_Exit,$C1,Battle status bar,verified,62d039cd7b3c,
+$C1:06DB,$C1:06EE,20,BattleUI_DrawAtbGauges,$C1,Battle status bar,readable,1d652ecd8df2,
+$C1:06EF,$C1:06EF,1,BattleUI_UpdateNextPcPanel_Exit,$C1,Battle status bar,readable,2d6e06aff995,
 $C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,verified,2a2f8b607e51,
 $C1:0785,$C1:081D,153,BattleMenu_DrawCommandList,$C1,Battle menu,verified,16464af59edc,
 $C1:081E,$C1:0871,84,BattleMenu_DrawCommandWindowFrames,$C1,Battle menu,verified,3d292c7ec4a1,
@@ -146,7 +146,7 @@ $C1:08E8,$C1:0928,65,BattleUI_HighlightPcName,$C1,Battle status bar,verified,836
 $C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,verified,be2c464c972c,
 $C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,verified,469ef4f5e6a5,
 $C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,verified,c33697921c45,
-$C1:0A87,$C1:0A87,1,BattleMenu_RenderItemRow_Exit,$C1,Battle menu,verified,e77cea3e4c42,
+$C1:0A87,$C1:0A87,1,BattleMenu_RenderItemRow_Exit,$C1,Battle menu,readable,5861f3aeb1f1,
 $C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,verified,c700ea1555de,
 $C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,verified,be0d3d80dea7,
 $C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,verified,6a5abe85360e,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
@@ -154,74 +154,74 @@ $C1:0BB6,$C1:0BD2,29,BattleMenu_DrawTechLowerRow,$C1,Battle menu,verified,7da2c3
 $C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,verified,8a652baf2c22,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
 $C1:0C00,$C1:0C2C,45,BattleMenu_BlankNameTailCells,$C1,Battle menu,verified,9e3fc8087d4f,"Tech-name exit path of BattleMenu_RenderTechRow (reached by its tail JMP): blanks cols 17-20 (right of the 11-tile name) on both rows of the line (blank tile, palette 3); the mirror of BattleMenu_Blan"
 $C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,verified,f39fb50226f6,"BattleMenu_UpdateWindows_Exit, $C10C46–$C10C48)"
-$C1:0C46,$C1:0C48,3,BattleMenu_UpdateWindows_Exit,$C1,Battle menu,verified,3b94b9699b86,
+$C1:0C46,$C1:0C48,3,BattleMenu_UpdateWindows_Exit,$C1,Battle menu,readable,64f680f6dc01,
 $C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,verified,b73e2781a948,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
 $C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,verified,b30f590a6394,
 $C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,verified,566594d97fdd,
 $C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,verified,fb5726f3d2c9,Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
 $C1:0EE1,$C1:103C,348,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,verified,ade255643c34,
-$C1:103D,$C1:103D,1,BattleMenu_Return,$C1,Battle menu,verified,f7fccb3866f6,
-$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,verified,d8ca861ba604,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.
+$C1:103D,$C1:103D,1,BattleMenu_Return,$C1,Battle menu,readable,4724a106a5ca,"Shared RTS, also the JMP target of BattleMenu_UpdateMainWindow, BattleMenu_DrawTechCursorRow and BattleMenu_UpdateWindows_Exit."
+$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,readable,9da3dea2639c,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.
 $C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,verified,d52acb37a2c3,Leading-zero suppression for the number formatter's digits.
 $C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,verified,7b1e36fb6214,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
-$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,verified,ccc20e51c346,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
+$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,readable,a8d65967b090,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
 $C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,verified,24e55a80fe50,"Builds OAM sprites 0-3 (BattleOam) for the command cursor over the shown PC: each of the 4 template sprites in BattleRom_CursorSprite is offset by the PC's !Battler_ScreenX/Y, and its palette bits are"
-$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,verified,5986d5afa7e2,Battle command-window input handler.
-$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,verified,157d09b44ff8,"Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping roster entries that are negative."
-$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,verified,2102835d9237,Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx forward (wrap at 3 back to 0) instead; the same sound 0 and the same cursor-memory handling.
-$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,verified,f3112b3ff08b,Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag the cursor redraw (!BattleUI_PanelRedraw).
-$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,verified,9e80c473cbc0,Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
-$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,verified,ca1dcce3f4c6,"Confirm-button dispatch: sets !BattleUI_UnkA0D7 to $FF (compared by BattleUI_BuildStatusBarFrame with the first selected target), calls BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on "
-$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,verified,a03d32c360f0,"Row 0 (Attack) confirm: message call with ""none"", flags the cursor redraw, sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0, builds the target list, sets !BattleMenu_TargetMoved (so UpdateCursor"
-$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,verified,8888ced30b00,"Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders the tech list lines, builds !Tech_ListAvail, switches to the tech list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests "
-$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,verified,befa3636a23d,"Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the item list at !BattleMenu_ItemScroll, queues the item map upload, copies the item box frame (!BattleRom_ItemBoxMap) into !BattleMe"
-$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,verified,64843a1c92ff,
-$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,verified,05e719df35de,Confirms the highlighted tech: aborts unless the rows have been graded (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
-$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,verified,4ce2a00a6ff4,"Closes the tech list: reload the command window, back to the main menu, force a window rebuild, and restore this PC's saved tech-list cursor (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechSc"
-$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,verified,3dd1be495fe3,
-$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,verified,b534ba7d26ea,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length (!Pc_TechCount) instead of the start of the list, and scrolls down instead of up whe"
-$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,verified,fdf86cb283fe,Per-frame input handler while the item list is open (submenu 2).
-$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,verified,2112ab8dcafb,
-$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,verified,b5829a880a7b,"Closes the item list: reload the command window, back to the main menu, force a window rebuild, and invalidate the scroll-arrow cache."
-$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,verified,c7659d5e1c38,"Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the list up via ItemListScrollUp when already at the top row."
-$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,verified,5c11149b7093,"Down/Right in the item list: increment !BattleMenu_ItemRow (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
-$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,verified,e645f3943f11,"Page-down button: page the item list down 3 rows at once, clamped at scroll position $FA."
-$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,verified,8602a021e014,"Page-up button: page the item list up 3 rows at once, clamped at 0."
-$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,verified,147b16d05658,"Re-renders the item list rows, invalidates both draw caches and clears !BattleMenu_ItemRefresh."
+$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,readable,ef95e455c239,Battle command-window input handler.
+$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,readable,cd65b158dfaa,"Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping roster entries that are negative."
+$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,readable,87e5f8c7878d,Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx forward (wrap at 3 back to 0) instead; the same sound 0 and the same cursor-memory handling.
+$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,readable,d48f21edfa64,Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag the cursor redraw (!BattleUI_PanelRedraw).
+$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,readable,73019f6fbe02,Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
+$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,readable,f35a1c84ceff,"Confirm-button dispatch: sets !BattleUI_UnkA0D7 to $FF (compared by BattleUI_BuildStatusBarFrame with the first selected target), calls BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on "
+$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,readable,7049ee39b557,"Row 0 (Attack) confirm: message call with ""none"", flags the cursor redraw, sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0, builds the target list, sets !BattleMenu_TargetMoved (so UpdateCursor"
+$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,readable,a7449a2ba448,"Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders the tech list lines, builds !Tech_ListAvail, switches to the tech list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests "
+$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,readable,bd04f5066d3d,"Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the item list at !BattleMenu_ItemScroll, queues the item map upload, copies the item box frame (!BattleRom_ItemBoxMap) into !BattleMe"
+$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,readable,e019eb3dff6c,
+$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,readable,a6add27c2de2,Confirms the highlighted tech: aborts unless the rows have been graded (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
+$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,readable,b63a4cb9f4bc,"Closes the tech list: reload the command window, back to the main menu, force a window rebuild, and restore this PC's saved tech-list cursor (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechSc"
+$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,readable,25a3fadf09bd,
+$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,readable,04f8d966dc87,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length (!Pc_TechCount) instead of the start of the list, and scrolls down instead of up whe"
+$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,readable,300ebb83a27e,Per-frame input handler while the item list is open (submenu 2).
+$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,readable,b62ddab0c29f,
+$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,readable,783e4584dbbe,"Closes the item list: reload the command window, back to the main menu, force a window rebuild, and invalidate the scroll-arrow cache."
+$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,readable,20216556c99b,"Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the list up via ItemListScrollUp when already at the top row."
+$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,readable,c9e9540e19b5,"Down/Right in the item list: increment !BattleMenu_ItemRow (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
+$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,readable,ff2642c7d2a1,"Page-down button: page the item list down 3 rows at once, clamped at scroll position $FA."
+$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,readable,8412e29ba515,"Page-up button: page the item list up 3 rows at once, clamped at 0."
+$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,readable,75cab15ac6f1,"Re-renders the item list rows, invalidates both draw caches and clears !BattleMenu_ItemRefresh."
 $C1:1561,$C1:1619,185,BattleMenu_TargetSelectInput,$C1,Battle menu,verified,7a62dfa56c0b,Per-frame input handler while target selection runs (entered from BattleMenu_ProcessInput when !BattleMenu_TargetSelect != 0).
-$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,verified,20b7a458f610,
-$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,verified,806e312bea26,"Removes PC slot !BattleMenu_PartnerArg from the ready state as part of committing a double/triple tech: if it's in the roster, decrements !BattleMenu_ReadyCount; either way marks its roster entry empt"
-$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,verified,3ac7035510cc,"Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at 11), skipping empty candidate entries, and select the battler it lands on (!BattleTgt_Selected)."
-$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,verified,6296d11b2829,Left/Up while cycling targets: mirror of TargetNext — steps !BattleTgt_Cursor back (wrap to 10) instead.
-$C1:179C,$C1:17A0,5,Battle_ClearPadEdges,$C1,Battle engine,verified,9d639f198e8d,Clears both pad-edge bytes and returns.
-$C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,verified,c54c644578c7,"_SetScroll $C117B1, _RenderTail $C117B3 and _SkipRender $C117B6–$C117BE)"
-$C1:17B1,$C1:17B2,2,BattleMenu_ItemListScrollUp_SetScroll,$C1,Battle menu,verified,06672cd2c585,
-$C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,verified,f325bfe623ce,
-$C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,verified,eb342fca8940,
-$C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,verified,6ca7ee98e745,_RenderTail $C117D1 and _SkipRender $C117D4–$C117DC)
-$C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,verified,1cb83529e976,
-$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,verified,1ca8550ddb2b,
-$C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,verified,9c632e110522,
+$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,readable,96f122ede2b6,
+$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,readable,b681b5ec1b5f,"Removes PC slot !BattleMenu_PartnerArg from the ready state as part of committing a double/triple tech: if it's in the roster, decrements !BattleMenu_ReadyCount; either way marks its roster entry empt"
+$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,readable,5f174135699b,"Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at 11), skipping empty candidate entries, and select the battler it lands on (!BattleTgt_Selected)."
+$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,readable,515e08dd04f1,Left/Up while cycling targets: mirror of TargetNext — steps !BattleTgt_Cursor back (wrap to 10) instead.
+$C1:179C,$C1:17A0,5,Battle_ClearPadEdges,$C1,Battle engine,readable,9557ca32ab17,Clears both pad-edge bytes and returns.
+$C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,readable,5268b17557ae,"BattleMenu_ItemListScrollUp_SetScroll $C117B1, BattleMenu_ItemListScrollUp_RenderTail $C117B3 and BattleMenu_ItemListScrollUp_SkipRender $C117B6–$C117BE)"
+$C1:17B1,$C1:17B2,2,BattleMenu_ItemListScrollUp_SetScroll,$C1,Battle menu,readable,344ed6536494,
+$C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,readable,d5df41ffb40a,
+$C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,readable,1c78a85edf56,
+$C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,readable,887ae633b1ce,BattleMenu_ItemListScrollDown_RenderTail $C117D1 and BattleMenu_ItemListScrollDown_SkipRender $C117D4–$C117DC)
+$C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,readable,feee6e7566cd,
+$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,readable,ddee2b711650,
+$C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,readable,48b06d27245e,
 $C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,verified,7ed74e848655,"Service 1 of the $C10045 service dispatcher (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
-$C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,verified,b78418c192a1,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
-$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,verified,9f455ee2d58c,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
-$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,verified,de544fdf3abf,
+$C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,ab8a8de9040c,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
+$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,readable,4a1a477b3788,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
+$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable,1aad1e24cf4b,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,verified,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
-$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,verified,4ef6de9b402e,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
+$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,0cf0840e4d85,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,verified,2b4add39e679,"Service 7 of the $C10045 service dispatcher (dispatch table at $C10051; reached only by same-bank JSR from bank $C1, see BattleMenu_EnqueueReadyBattler)."
 $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,
 $C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,verified,28ab29aaa040,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
-$C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,verified,17786c6051aa,
-$C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,verified,96ac25da6792,
+$C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,f7ce24b0518b,
+$C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,readable,12eafe949913,
 $C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,verified,749b85d97385,
-$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,verified,b5c3825ec1e5,cursor may cycle.
+$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,readable,8c9e6d95faf2,cursor may cycle.
 $C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,verified,885a269d392b,
 $C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,verified,acf939b69bdd,
 $C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,verified,376d14cb032e,
 $C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,verified,3db35982000f,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
 $C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,verified,7b7b0ce0ed60,
-$C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,verified,1098ffd7d8a1,
-$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,verified,6e7529bc5bab,
+$C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,readable,b2bf802bc989,
+$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,readable,5b5a5d6e6349,
 $C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,verified,7e1b39434c7c,
 $C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,verified,fbaa16e3a412,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
 $C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,verified,b182691fe6ce,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
@@ -231,15 +231,15 @@ $C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,verified,14c6620
 $C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,verified,2a93487926f5,party member id 6.
 $C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,verified,6c940e52b5ca,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
 $C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,verified,13176077efea,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
-$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,verified,48cefc785c11,
-$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,verified,74bccbfea163,
-$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,verified,e4006f5241ab,
-$C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,verified,12bb82845db9,
+$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,readable,cedaa631f54d,
+$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,readable,e2452074efa9,
+$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,readable,370009544b72,
+$C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,readable,616df1aa78e7,
 $C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,verified,bb00c7bb01b6,"Shared tail of the area scans: puts !BattleTgt_Anchor at the front of !BattleTgt_Candidates if it belongs to the scanned side (see the AreaCircle header), then falls into BattleTgt_CompactCandidates."
-$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,verified,938ca208c7af,"front slot is empty, shift the list left by one."
-$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,verified,54e66d5ecc42,"and selection lists (12 entries each, one more than they use)"
-$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,verified,df1bebdd98f0,target-all and copy the 11 candidates into the selection list
-$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,verified,21050c9638e5,next non-empty candidate (wrap at 11); no-op on an empty list.
-$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,verified,6466475eddeb,
-$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,verified,b1aeff4d067d,"candidate slots are $FF, Z=0 as soon as one isn't"
-$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,18ff8680932e,Called via: JML from Reset ($00:FF03)
+$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,readable,70ce0aa4bbec,"front slot is empty, shift the list left by one."
+$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,readable,a8ed04ed0863,"and selection lists (12 entries each, one more than they use)"
+$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,readable,0302ef7d4f82,target-all and copy the 11 candidates into the selection list
+$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,readable,461b3e81f768,next non-empty candidate (wrap at 11); no-op on an empty list.
+$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,readable,24e2ed95f299,
+$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,readable,87a8926f3aab,"candidate slots are $FF, Z=0 as soon as one isn't"
+$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,readable,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."

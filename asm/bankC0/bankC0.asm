@@ -4058,10 +4058,17 @@ Spr_LoadLargeObj:
 ; mirrors a tile row. (Earlier notes called it a "palette-like lookup
 ; at bank $FD" and decoded the entry with M=1 as AND #$FF / ORA [$0A];
 ; the callers run it with M=0, giving AND #$07FF and five ASLs.)
+; Callers (15 JSR sites): Obj_BuildFrame4 ($C0:CC6F), Obj_BuildFrame8
+;   ($C0:CF8F), Obj_BuildFrame8Pass0 ($C0:D2FB), Obj_BuildFrame8Pass1
+;   ($C0:D367), Obj_BuildFrame12Pass0 ($C0:D5B7, $C0:D5F6),
+;   Obj_BuildFrame12Pass0Alt ($C0:D679), Obj_BuildFrame12Pass1 ($C0:D6E7,
+;   $C0:D726), Obj_BuildFrame12Pass1Alt ($C0:D794, $C0:D7D3),
+;   Obj_BuildFrame12Pass2 ($C0:D83F), Obj_BuildFrame12Pass2Alt ($C0:DAC3,
+;   $C0:DAFE) and Spr_LoadLargeObj ($C0:E18D).
 ; On entry: M=0, X/Y 16-bit (TAY of tile*32), A = frame-data tile word
 ; (bit 14 set), Y = frame-data index, WMADD already at the destination,
 ; DP=$0100 (Spr_GfxPtr, Spr_SavedY are dp), DB=$00.
-; Returns with M=0 and Y restored from Spr_SavedY; X clobbered.
+; Exit: M=0, Y restored from Spr_SavedY; X clobbered.
 ; ============================================================
 org $C0E534
 Spr_CopyTileFlipped:
@@ -4248,12 +4255,19 @@ Spr_CopyTileFlipped:
 ; $D2/$D3/$D4 → Spr_CopyTileD2/D3/D4, anything else → bank $D5 below.
 ; Each copier is an unrolled 16-word move with DB = $7F, X = source
 ; offset and Y = destination address.
+; Callers (15 JSR sites): Obj_BuildFrame4 ($C0:CC64), Obj_BuildFrame8
+;   ($C0:CF84), Obj_BuildFrame8Pass0 ($C0:D2F0), Obj_BuildFrame8Pass1
+;   ($C0:D35C), Obj_BuildFrame12Pass0 ($C0:D5AC, $C0:D5EB),
+;   Obj_BuildFrame12Pass0Alt ($C0:D66E), Obj_BuildFrame12Pass1 ($C0:D6DC,
+;   $C0:D71B), Obj_BuildFrame12Pass1Alt ($C0:D789, $C0:D7C8),
+;   Obj_BuildFrame12Pass2 ($C0:D834), Obj_BuildFrame12Pass2Alt ($C0:DAB8,
+;   $C0:DAF3) and Spr_LoadLargeObj ($C0:E182).
 ; On entry: M=0, X/Y 16-bit (TAX of the source offset, LDY of the
 ; destination), A = frame-data tile word (bit 14 clear), Y = frame-data
 ; index, DP=$0100 (Spr_GfxPtr, Spr_WramPtr, Spr_SavedY are dp), DB=$00
 ; (the WMADDL store after the PLB).
-; Returns with M=0, Y restored from Spr_SavedY, X clobbered, WMADD just
-; past the copied tile; the four bank copiers below end the same way.
+; Exit: M=0, Y restored from Spr_SavedY, X clobbered, WMADD just past
+; the copied tile; the four bank copiers below end the same way.
 ; ============================================================
 org $C0E687
 Spr_CopyTile:
@@ -4823,6 +4837,11 @@ SprBuf_Free3:
 ;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
+; Entry: each entry only branches, so the state is the target's: [0] as
+;        GameLoop_Main expects (it sets DB itself); [1]-[4] the JSL
+;        caller's state, passed through unchanged.
+; Exit: [0] never returns; [1]-[4] the target's RTL returns to the JSL
+;       caller with whatever state the target leaves.
 ; ============================================================
 org $C00000
 
@@ -4922,6 +4941,8 @@ GameLoop_Main:
 ; Loc_FirstBankC2. Both tests here and above are BMI on X minus the
 ; limit, i.e. signed compares; Loc_Id >= Loc_LoadSave goes to
 ; LoadSavePath with X = LoadSave_EntryX.
+; On entry: M=1, X=0, X = Loc_Id (from GameLoop_Main's BMI), DB=$00.
+; Exit: never returns; BRL LoadSavePath or into GameLoop_LoadField.
 GameLoop_NotBankC2:
     CPX.w #!Loc_LoadSave
     BMI GameLoop_LoadField
@@ -5016,6 +5037,9 @@ Field_EndOfFrameShort:
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
 ; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail
 ; jump, whose RTS returns to this routine's caller).
+; Callers (8 sites: 5 JSR, 3 BRL): DefaultHandler ($C0:18CA, $C0:18D6) and
+;   unmatched code at $C0:02AA, $C0:0319, $C0:0327, $C0:0340, $C0:0365,
+;   $C0:038C.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (needed by
 ; Field_EndOfFrameShort), DB=$00.
 ; Exit: via Sub_EC60: M=1, X=0, DP=$0100; A = 0 (Sub_EC60's wait);
@@ -5142,6 +5166,8 @@ Field_SaveState:
 ; 7. If Field_UnkAEObj names an object, run Spr_LoadLargeObj on it.
 ; 8. If Field_Unk7F03FE is 1 or 2: put party members 2 and 3 on the
 ;    leader's position, enable control, set Field_Unk7F03FE = 3.
+; Callers (JSR): Field_SceneChangeTick ($C0:0D2D), Field_PauseAndMenuInput
+;   ($C0:1975) and Field_RunBankC2Mode5 ($C0:19E3).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
 ; Obj_* tables and Field_Unk1DF9 are written absolute).
 ; Exit: M=1, X=0, DP=$0100 (as the unmatched load steps leave it);
@@ -5261,6 +5287,11 @@ Field_StashSaveBlock:
 ; $C0:0B4E — InitHW (22 bytes)
 ; Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and
 ; sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on.
+; Callers (14 JSR sites): GameLoop ($C0:0020), GameLoop_Main ($C0:005D),
+;   Field_SceneChangeTick ($C0:0C9A, $C0:0CEA, $C0:0D1C),
+;   Field_PauseAndMenuInput ($C0:1958, $C0:1964), Field_FadeToBankC2Mode5
+;   ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2) and unmatched code at
+;   $C0:02C3, $C0:02EA, $C0:3B76, $C0:3FD3, $C0:4186.
 ; On entry: M=1 (LDA #$00 is the 8-bit form), X either width; DP is not
 ; used. Any DB (the PLB comes before the absolute stores).
 ; Exit: M=1, X/Y unchanged, DB=$00, A=0, interrupts disabled (SEI).
@@ -5282,6 +5313,9 @@ InitHW:
 ; ============================================================
 ; $C0:0B64 — InstallNMI (17 bytes)
 ; Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
+; Callers (6 JSR sites): GameLoop ($C0:0012), GameLoop_Main ($C0:0060),
+;   Field_SceneChangeTick ($C0:0D1F), DefaultHandler ($C0:18AB),
+;   Field_PauseAndMenuInput ($C0:1967) and Field_RunBankC2Mode5 ($C0:19D5).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X); DB=$00 (or another bank that
 ; maps $0500 to WRAM: the stores are absolute); DP is not used.
 ; Exit: M=1, X=0, DB unchanged; A and X clobbered.
@@ -5298,7 +5332,10 @@ InstallNMI:
 ; ============================================================
 ; $C0:0B75 — InstallIRQ (17 bytes)
 ; Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
-; Called with M=1 (8-bit A), X=0 (16-bit X); absolute stores, so DP
+; Callers (6 JSR sites): GameLoop ($C0:0015), GameLoop_Main ($C0:0063),
+;   Field_SceneChangeTick ($C0:0D22), DefaultHandler ($C0:18AE),
+;   Field_PauseAndMenuInput ($C0:196A) and Field_RunBankC2Mode5 ($C0:19D8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X); absolute stores, so DP
 ; does not matter (DB=$00 from InitHW or reset).
 ; Exit: M=1, X=0, DB unchanged; A and X clobbered.
 ; ============================================================
@@ -5454,9 +5491,9 @@ Field_InitLoadState:
 ;               Map_TileProps[Field_TileAnimX/Y] (ModeE6..ModeFC_Handler);
 ;               any other mode goes to DefaultHandler.
 ;   otherwise   DefaultHandler.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00. The
-; warp path never returns; the others return (or tail-jump) with M=1,
-; X=0 and DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: the warp path never returns; the others return (or tail-jump)
+; with M=1, X=0 and DP=$0100.
 ; ============================================================
 org $C00C76
 Field_SceneChangeTick:
@@ -5631,7 +5668,8 @@ Field_SceneChangeTick:
 ; handler writes Fade_Brightness to INIDISP ($C0:EC4E; 0 becomes forced
 ; blank), which fixes the name; earlier notes read this as a scroll
 ; tracker.
-; On entry: M=1 (8-bit A), X/Y not used, DP=$0100. Exit: M=1.
+; On entry: M=1 (8-bit A), X/Y not used, DP=$0100.
+; Exit: M=1; A clobbered; X, Y, DP and DB untouched.
 ;
 ; Quirk: the step-up path loads Fade_Brightness and masks it before the
 ; INC, which works on memory, so A is dead there (kept from the original).
@@ -5690,7 +5728,8 @@ Fade_StepBrightness:
 ; Field_SceneChangeTick while that flag is set. The NMI handler writes
 ; Fade_FixedColor to COLDATA ($C0:EC42), which fixes the name; earlier
 ; notes read this as a scroll-Y tracker.
-; On entry: M=1 (8-bit A), X/Y not used, DP=$0100. Exit: M=1.
+; On entry: M=1 (8-bit A), X/Y not used, DP=$0100.
+; Exit: M=1; A clobbered; X, Y, DP and DB untouched.
 ;
 ; Quirk: both step paths load Fade_FixedColor before an INC/DEC that
 ; works on memory, so that A is dead (kept from the original).
@@ -5776,6 +5815,9 @@ ClearRAMDMA:
 ; (which marks every SprBuf_Owner entry free). Called at the end of
 ; every reload. The DEC/BNE count assumes Evt_ObjCount >= 1: a count of
 ; 0 would run 256 times, with the 8-bit Y wrapping round the page.
+; Callers (4 JSR sites): GameLoop_LoadField ($C0:008B),
+;   Field_SceneChangeTick ($C0:0D30), Field_PauseAndMenuInput ($C0:197B) and
+;   Field_RunBankC2Mode5 ($C0:19F9).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
 ; Exit (from SprBuf_FreeAll, BRL tail call): M=1, X=0, DP restored to
 ; $0100 (PLD), DB unchanged; A = Obj_None, X = 0, Y = 2 x count (low
@@ -5813,6 +5855,10 @@ Obj_ResetStates:
 ; Obj_DrawBucket (last bucket first), following Obj_DrawNext chains.
 ; Afterwards, entries between each range's new end and last frame's
 ; end (Oam_RangeNPrevEnd) are parked off screen with Y = $E0.
+; The global labels inside are this routine's loop points, not separate
+; entries (nothing outside branches to them): Oam_BucketLoop,
+; Oam_CheckChain, Oam_NextBucket, Oam_HideRange1, Oam_EndRange1,
+; Oam_HideRange2, Oam_EndRange2, Oam_HideRange3 and Oam_EndRange3.
 ;
 ; Callers: BRL tail calls from Field_EndOfFrame ($C0:00DB) and from
 ; the unmatched routine at $C0:B0E6 ($C0:B124; that routine is called by
@@ -5847,25 +5893,25 @@ Oam_BuildShadow:
     LDX.w #!Oam_Range2Start
     STX.b !Oam_Range2LoPtr
     LDY.w #!Obj_DrawBucketLast ; 64 buckets x 2, last first
-Oam_BucketLoop:             ; one Obj_DrawBucket entry
+Oam_BucketLoop:             ; one Obj_DrawBucket entry; header: see Oam_BuildShadow
     LDA.w !Obj_DrawBucket,Y
     BMI Oam_NextBucket       ; bit 7: empty bucket
     STA.b !Obj_Cur          ; first object in the bucket
     JSR Spr_AppendToOam
-Oam_CheckChain:
+Oam_CheckChain:             ; header: see Oam_BuildShadow
     LDX.b !Obj_Cur
     LDA.w !Obj_DrawNext,X   ; next object in the same bucket
     BMI Oam_NextBucket
     STA.b !Obj_Cur
     JSR Spr_AppendToOam
     BRA Oam_CheckChain
-Oam_NextBucket:
+Oam_NextBucket:             ; header: see Oam_BuildShadow
     DEY
     DEY
     BPL Oam_BucketLoop
     LDX.b !Oam_Range1LoPtr
     LDA.b #!Oam_HiddenY     ; Y=$E0 parks the entry below the screen
-Oam_HideRange1:
+Oam_HideRange1:             ; header: see Oam_BuildShadow
     CPX.b !Oam_Range1PrevEnd
     BCS Oam_EndRange1
     STA.w OamEntry.Y,X        ; X = entry address
@@ -5875,11 +5921,11 @@ Oam_HideRange1:
     INX
     CPX.w #!Oam_Range1Limit
     BCC Oam_HideRange1
-Oam_EndRange1:
+Oam_EndRange1:              ; header: see Oam_BuildShadow
     LDX.b !Oam_Range1LoPtr
     STX.b !Oam_Range1PrevEnd
     LDX.b !Oam_Range2LoPtr
-Oam_HideRange2:
+Oam_HideRange2:             ; header: see Oam_BuildShadow
     CPX.b !Oam_Range2PrevEnd
     BCS Oam_EndRange2
     STA.w OamEntry.Y,X
@@ -5889,11 +5935,11 @@ Oam_HideRange2:
     INX
     CPX.w #!Oam_Range2Limit
     BCC Oam_HideRange2
-Oam_EndRange2:
+Oam_EndRange2:              ; header: see Oam_BuildShadow
     LDX.b !Oam_Range2LoPtr
     STX.b !Oam_Range2PrevEnd
     LDX.b !Oam_Range3LoPtr
-Oam_HideRange3:
+Oam_HideRange3:             ; header: see Oam_BuildShadow
     CPX.b !Oam_Range3PrevEnd
     BCS Oam_EndRange3
     STA.w OamEntry.Y,X
@@ -5903,7 +5949,7 @@ Oam_HideRange3:
     INX
     CPX.w #!Oam_Range3Limit
     BCC Oam_HideRange3
-Oam_EndRange3:
+Oam_EndRange3:              ; header: see Oam_BuildShadow
     LDX.b !Oam_Range3LoPtr
     STX.b !Oam_Range3PrevEnd
     RTS
@@ -5916,6 +5962,9 @@ Oam_EndRange3:
 ; panning). Called from the Mode*_Handler tile animations.
 ; Audio_PlaySfxAtLeader (was Sub_1B90_body) is the shared tail, entered
 ; by Audio_PlayTileSfxB with its own effect id in A.
+; Callers (5 JSR sites): ModeE6_Handler ($C0:0D92), ModeEC_Handler
+;   ($C0:0E8F), ModeEE_Handler ($C0:1040), ModeFA_Handler ($C0:1212) and
+;   ModeFC_Handler ($C0:149D).
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Audio_SfxTileAnimA
 ; and Party_ObjSlot are dp), DB=$00; at Audio_PlaySfxAtLeader, A =
 ; effect id.
@@ -5949,6 +5998,8 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; Clears Field_Unk1E and Field_FadeBusy on exit. Tail of
 ; Field_SceneChangeTick's reload path; also called after the
 ; bank-$C2 round trips.
+; Callers (3 sites: 1 BRL, 2 JSR): Field_SceneChangeTick ($C0:0D3B),
+;   Field_PauseAndMenuInput ($C0:197E) and Field_RunBankC2Mode5 ($C0:19FC).
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the unmatched callees
@@ -6198,6 +6249,8 @@ Field_RunBankC2Mode5:
 ; and restore Field_UnkAB-AD — the second half of Field_SaveState's
 ; work. When the party is unchanged it returns at once and restores
 ; neither.
+; Callers (JSR): Field_PauseAndMenuInput ($C0:1978) and Field_RunBankC2Mode5
+;   ($C0:19E6).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
 ; Exit: M=1, X=0, DP and DB unchanged; A clobbered; on the changed path
 ; X, Y and Obj_Cur clobbered too.
@@ -6608,12 +6661,14 @@ ModeE6_Handler:
 ; $C0:1B36 — Bg_TilemapIndex64x32 (29 bytes, $1B36–$1B52)
 ; (was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap
 ; made of two 32x32 screens side by side.
+; Callers (92 JSR sites): ModeE6_Handler (8 sites), ModeEC_Handler
+;   (16 sites), ModeEE_Handler (16 sites), ModeFA_Handler (24 sites),
+;   ModeFC_Handler (24 sites) and DefaultHandler (4 sites).
 ; On entry (M=0): A = tile row (0-31), Y = tile column (0-63).
 ; Returns A = row*32 + column for columns 0-31, or
 ;             row*32 + (column-32) + $0400 for columns 32-63.
 ; (Earlier comments had the row and column inputs swapped.)
-; Called by the Mode*_Handlers and DefaultHandler; keeps row*32 in
-; Bg_RowWordOfs.
+; Keeps row*32 in Bg_RowWordOfs.
 ; On entry: M=0, X/Y 16-bit, DP=$0100 (Bg_RowWordOfs is dp).
 ; Exit: M=0; X and Y unchanged (the callers rely on it).
 ; ============================================================
@@ -6644,6 +6699,7 @@ Bg_TilemapIndex64x32:
 ; $C0:0E5F — ModeEC_Handler (437 bytes, $0E5F–$1013)
 ; Tile animation for map-tile state $EC: a 2x2 block, columns
 ; col..col+1, rows row-1..row. Same shape as ModeE6_Handler; 4 passes.
+; Callers (BRL): Field_SceneChangeTick ($C0:0D5D).
 ; On entry: A = $EC, X = Map_TileProps index of (col, row), M=1, X/Y
 ; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
 ; TileAnim_VramAddrs stores).
@@ -6889,6 +6945,7 @@ ModeEC_Handler:
 ; $C0:1014 — ModeEE_Handler (437 bytes, $1014–$11C8)
 ; Tile animation for map-tile state $EE: a 2x2 block, columns
 ; col-1..col, rows row-1..row (ModeEC_Handler mirrored). 4 passes.
+; Callers (BRL): Field_SceneChangeTick ($C0:0D64).
 ; On entry: A = $EE, X = Map_TileProps index of (col, row), M=1, X/Y
 ; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
 ; TileAnim_VramAddrs stores).
@@ -7142,6 +7199,7 @@ ModeEE_Handler:
 ; $C0:11C9 — ModeFA_Handler (651 bytes, $11C9–$1453)
 ; Tile animation for map-tile state $FA: a 2-wide, 3-tall block,
 ; columns col..col+1, rows row-2..row. 6 passes.
+; Callers (BRL): Field_SceneChangeTick ($C0:0D6B).
 ; On entry: A = $FA, X = Map_TileProps index of (col, row), M=1, X/Y
 ; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
 ; TileAnim_VramAddrs stores).
@@ -7513,6 +7571,7 @@ ModeFA_Handler:
 ; Tile animation for map-tile state $FC: a 2-wide, 3-tall block,
 ; columns col-1..col, rows row-2..row (ModeFA_Handler mirrored).
 ; 6 passes; falls through into DefaultHandler.
+; Callers (BRL): Field_SceneChangeTick ($C0:0D72).
 ; On entry: A = $FC, X = Map_TileProps index of (col, row), M=1, X/Y
 ; 16-bit, DP=$0100 (TileAnim_* are dp), DB=$00 (absolute Map_* and
 ; TileAnim_VramAddrs stores).
@@ -7905,6 +7964,9 @@ ModeFC_Handler:
 ;         Field_IdleFrame.
 ; Earlier notes called bit 5 a "display-mode transition" and bit 0 a
 ; "scene swap"; the JSL into bank $C1 identifies bit 0 as the battle.
+; Callers (6 BRL sites): Field_SceneChangeTick ($C0:0D42, $C0:0D75),
+;   ModeE6_Handler ($C0:0E5C), ModeEC_Handler ($C0:1011), ModeEE_Handler
+;   ($C0:11C6) and ModeFA_Handler ($C0:1451).
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100, DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP=$0100 on every path (each builder call
 ; restores DP with PLD; the battle path sets it again); A, X and Y
