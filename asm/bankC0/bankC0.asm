@@ -13616,7 +13616,7 @@ LocLoad_UnkA33B:
 ; $C0:A508 — LocLoad_EmptyStep (1 byte, $A508)
 ; A lone RTS: does nothing. Its one caller calls it between two steps
 ; of the reload sequence (probably a step that was emptied out).
-; Callers: unmatched code at $C0:0A70.
+; Callers: LocLoad_DrawMap ($C0:0A70).
 ; Entry/Exit: any state; nothing changed.
 ; ------------------------------------------------------------
 LocLoad_EmptyStep:
@@ -13627,7 +13627,7 @@ LocLoad_EmptyStep:
 ; Writes the screen settings LocLoad_UnkA33B took from MapProps to the
 ; PPU: Ppu_Unk0BD7 to TM, Ppu_Unk0BD8 to TS, Ppu_Unk0BDF to CGADSUB,
 ; and 0 to MOSAIC (mosaic off).
-; Callers: unmatched code at $C0:0A61 (xref also lists a doubtful
+; Callers: LocLoad_DrawMap ($C0:0A61) (xref also lists a doubtful
 ;   JSR at $C0:5CB9, inside other code's operands, not a call).
 ; On entry: M=1 (8-bit A), X any, DP any, DB=$00-$3F or $80-$BF (the
 ; PPU registers and Ppu_Unk0BD7-0BDF absolute; $00 from its caller).
@@ -13964,7 +13964,8 @@ Map_LoadExitTiles:
 ; stepped to when the treasure is taken (probably the opened chest).
 ; Map_TreasureLocRecs is left at the first record (of the list used).
 ; The STX to Map_LoadScratch is never read (kept as found).
-; Callers (2 JSR sites): unmatched code at $C0:033C and $C0:0A59.
+; Callers (2 JSR sites): unmatched code at $C0:033C and LocLoad_DrawMap
+;   ($C0:0A59).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ; (Loc_Id read absolute, and Map_TreasureTaken reads BitSet at $FF20);
 ; Map_ColMask1/RowMask1, Map_TileHiBits and Map_TileProps set.
