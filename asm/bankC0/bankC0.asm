@@ -27575,6 +27575,632 @@ Evt_Op47_SetScanlineLimit:
     BRA Evt_PadGoOn2
 
 ; ============================================================
+; Event opcodes: loads, stores and copies ($C0:6792–$C0:6A1E)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). They move bytes or words between the event words
+; (Evt_Unk7F0200 + a x 2: "a" / "b" operands), bank $7F (Evt_Mem7F + m,
+; "m" a word operand), any long address ("ptr", 3 bytes, low first) and
+; the script's own bytes. A byte stored into an event word goes to its
+; low byte only.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:6792 — Evt_Op48_GetLongByte (16 bytes, $6792–$67A1)
+; Event opcode $48 (5 bytes: $48, ptr, a): event word a's low byte = the
+;   byte at ptr; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $48).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   byte; Y unchanged; EvtMem_Src = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op48_GetLongByte:
+    JSR Evt_ReadSrcPtrAndVar
+    SEP #$20
+    LDA.b [!EvtMem_Src]
+    STA.l !Evt_Unk7F0200,X
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67A2 — Evt_ReadSrcPtrAndVar (37 bytes, $67A2–$67C6)
+; Reads the operands of opcodes $48 / $49: EvtMem_Src = the 3 bytes at
+;   Y + 1 (ptr), then X = the event word index (the byte at Y + 4) x 2,
+;   with EvtMem_Pos = Y + 4. Returns with 16-bit A.
+; Callers (2 JSR sites): Evt_Op48_GetLongByte ($C0:6792) and Evt_Op49_GetLongWord ($C0:67C7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=0 (16-bit A), X=0, DP and DB unchanged; X = A = a x 2; Y
+;   unchanged; EvtMem_Src and EvtMem_Pos written.
+; ------------------------------------------------------------
+Evt_ReadSrcPtrAndVar:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src+2
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67C7 — Evt_Op49_GetLongWord (16 bytes, $67C7–$67D6)
+; Event opcode $49 (5 bytes: $49, ptr, a): event word a = the word at
+;   ptr; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $49).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   word's low byte (B its high byte); Y unchanged; EvtMem_Src = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op49_GetLongWord:
+    JSR Evt_ReadSrcPtrAndVar
+    LDA.b [!EvtMem_Src]
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67D7 — Evt_Op4A_SetLongByte (12 bytes, $67D7–$67E2)
+; Event opcode $4A (5 bytes: $4A, ptr, value): the byte at ptr = value;
+;   X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A =
+;   value; Y unchanged; EvtMem_Dst = ptr.
+; ------------------------------------------------------------
+Evt_Op4A_SetLongByte:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X
+    STA.b [!EvtMem_Dst]
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67E3 — Evt_ReadDstPtr (24 bytes, $67E3–$67FA)
+; Reads the pointer operand of opcodes $4A-$4D: EvtMem_Dst = the 3
+;   bytes at Y + 1; X = Y + 4 (the next operand).
+; Callers (4 JSR sites): Evt_Op4A_SetLongByte ($C0:67D7), Evt_Op4B_SetLongWord ($C0:67FB),
+;   Evt_Op4C_SetLongVarByte ($C0:680C) and Evt_Op4D_SetLongVarWord ($C0:6829).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (operands read long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 4; A = the pointer's bank
+;   byte; Y unchanged; EvtMem_Dst written.
+; ------------------------------------------------------------
+Evt_ReadDstPtr:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst+2
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67FB — Evt_Op4B_SetLongWord (17 bytes, $67FB–$680B)
+; Event opcode $4B (6 bytes: $4B, ptr, value (word)): the word at ptr =
+;   value; X = Y + 6, C=1.
+; Reached through Evt_OpcodeTable (opcode $4B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 6, C=1; A =
+;   value's low byte (B its high byte); Y unchanged; EvtMem_Dst = ptr.
+; ------------------------------------------------------------
+Evt_Op4B_SetLongWord:
+    JSR Evt_ReadDstPtr
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b [!EvtMem_Dst]
+    SEP #$20
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:680C — Evt_Op4C_SetLongVarByte (29 bytes, $680C–$6828)
+; Event opcode $4C (5 bytes: $4C, ptr, a): the byte at ptr = event word
+;   a's low byte; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   byte; Y unchanged; EvtMem_Dst = ptr, EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op4C_SetLongVarByte:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b [!EvtMem_Dst]
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6829 — Evt_Op4D_SetLongVarWord (29 bytes, $6829–$6845)
+; Event opcode $4D (5 bytes: $4D, ptr, a): the word at ptr = event word
+;   a; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   word's low byte (B its high byte); Y unchanged; EvtMem_Dst = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op4D_SetLongVarWord:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b [!EvtMem_Dst]
+    SEP #$20
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6846 — Evt_Op4E_CopyData (95 bytes, $6846–$68A4)
+; Event opcode $4E (variable: $4E, dst (word), bank, len (word), then len
+;   - 2 data bytes): copies the data bytes with MVN to dst in bank $7E
+;   when bank is $7E, else in bank $7F (any other bank byte); len counts
+;   itself and the data. The script goes on after the data: X = Y + 4 +
+;   len, C=1 (taken from the MVN's end source address less
+;   Evt_DataAddr). DB is saved around the MVN (which sets it to the
+;   destination bank).
+; Reached through Evt_OpcodeTable (opcode $4E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtCopy_Count is
+;   dp), DB any (restored after the MVN); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A = $FF (B
+;   $FF: the MVN's count ran out); Y = dst + len - 2 (where the MVN
+;   stopped); EvtCopy_Count = len - 3.
+; ------------------------------------------------------------
+Evt_Op4E_CopyData:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; dst
+    TAY
+    SEP #$20
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; bank
+    CMP.b #!Bank7E
+    BEQ .to_7e
+    REP #$20
+    INX
+    LDA.l !Evt_Data,X                   ; len
+    DEC A
+    DEC A
+    DEC A
+    STA.b !EvtCopy_Count                ; data bytes - 1
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr                ; the data's address in bank $7F
+    TAX
+    LDA.b !EvtCopy_Count
+    PHB
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA
+    SEC
+    SBC.w #!Evt_DataAddr                ; back to an Evt_Data offset: after the data
+    TAX
+    SEP #$20
+    SEC
+    RTS
+.to_7e:
+    REP #$20
+    INX
+    LDA.l !Evt_Data,X                   ; len
+    DEC A
+    DEC A
+    DEC A
+    STA.b !EvtCopy_Count                ; data bytes - 1
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr                ; the data's address in bank $7F
+    TAX
+    LDA.b !EvtCopy_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes (destination $7E, source $7F); asar rejects a width suffix
+    PLB
+    TXA
+    SEC
+    SBC.w #!Evt_DataAddr                ; back to an Evt_Data offset: after the data
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68A5 — Evt_Op4F_SetVarByte (33 bytes, $68A5–$68C5)
+; Event opcode $4F (3 bytes: $4F, value, a): event word a's low byte =
+;   value; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $4F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A =
+;   EvtMem_Value = value; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op4F_SetVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68C6 — Evt_Op50_SetVarWord (35 bytes, $68C6–$68E8)
+; Event opcode $50 (4 bytes: $50, value (word), a): event word a = value;
+;   X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $50).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A =
+;   value's low byte (B its high byte), EvtMem_Value = value; Y = the
+;   opcode + 1.
+; ------------------------------------------------------------
+Evt_Op50_SetVarWord:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68E9 — Evt_Op51_CopyVarByte (42 bytes, $68E9–$6912)
+; Event opcode $51 (3 bytes: $51, a, b): event word b's low byte = event
+;   word a's low byte (a is read as a word, only its low byte stored);
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $51).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A = the
+;   byte; EvtMem_Value = event word a; Y = the opcode + 2.
+; ------------------------------------------------------------
+Evt_Op51_CopyVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6913 — Evt_Op52_CopyVarWord (42 bytes, $6913–$693C)
+; Event opcode $52 (3 bytes: $52, a, b): event word b = event word a;
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $52).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A = the
+;   word's low byte (B its high byte), EvtMem_Value = the word; Y = the
+;   opcode + 2.
+; ------------------------------------------------------------
+Evt_Op52_CopyVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:693D — Evt_Op53_GetMemByte (39 bytes, $693D–$6963)
+; Event opcode $53 (4 bytes: $53, m (word), a): event word a's low byte =
+;   the byte at Evt_Mem7F + m (read as a word, its low byte stored);
+;   X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $53).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   byte; EvtMem_Value = the word at m; Y = the opcode + 3.
+; ------------------------------------------------------------
+Evt_Op53_GetMemByte:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtMem_Value
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6964 — Evt_Op54_GetMemWord (39 bytes, $6964–$698A)
+; Event opcode $54 (4 bytes: $54, m (word), a): event word a = the word
+;   at Evt_Mem7F + m; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $54).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   word's low byte (B its high byte), EvtMem_Value = the word; Y = the
+;   opcode + 3.
+; ------------------------------------------------------------
+Evt_Op54_GetMemWord:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtMem_Value
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:698B — Evt_Op55_GetUnk7F0000 (27 bytes, $698B–$69A5)
+; Event opcode $55 (2 bytes: $55, a): event word a's low byte =
+;   Eng_Unk7F0000; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $55).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   byte; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op55_GetUnk7F0000:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Eng_Unk7F0000
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69A6 — Evt_Op56_SetMemByte (30 bytes, $69A6–$69C3)
+; Event opcode $56 (4 bytes: $56, value, m (word)): the byte at
+;   Evt_Mem7F + m = value; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $56).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   EvtMem_Value = value (B = m's high byte).
+; ------------------------------------------------------------
+Evt_Op56_SetMemByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69C4 — Evt_Op58_SetMemVarByte (39 bytes, $69C4–$69EA)
+; Event opcode $58 (4 bytes: $58, a, m (word)): the byte at Evt_Mem7F +
+;   m = event word a's low byte; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $58).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the byte (B = m's high byte); EvtMem_Value = event word a.
+; ------------------------------------------------------------
+Evt_Op58_SetMemVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69EB — Evt_Op59_SetMemVarWord (39 bytes, $69EB–$6A11)
+; Event opcode $59 (4 bytes: $59, a, m (word)): the word at Evt_Mem7F +
+;   m = event word a; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $59).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the word's low byte (B its high byte); EvtMem_Value = the word.
+; ------------------------------------------------------------
+Evt_Op59_SetMemVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    SEP #$20
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6A12 — Evt_Op5A_SetUnk7F0000 (13 bytes, $6A12–$6A1E)
+; Event opcode $5A (2 bytes: $5A, value): Eng_Unk7F0000 = value; X = Y +
+;   2, C=1.
+; Reached through Evt_OpcodeTable (opcode $5A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A =
+;   value; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op5A_SetUnk7F0000:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.l !Eng_Unk7F0000
+    INX
+    SEC
+    RTS
+
+; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
 ; Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66,
 ; Pad_Unk00F6-F8) is still unidentified, so it keeps its address name.

@@ -363,6 +363,16 @@ if !ram_engine_inc == 0
 !EvtGet_First = $D9                      ; alias of Eng_Scratch in the get opcodes $21-$24: 8-bit, the
                                          ; object's Obj_TileX (or Obj_Facing) on its way to an event word
 !EvtGet_Second = $DB                     ; alias of Oam_Range1LoPtr's slot there: 8-bit, its Obj_TileY
+!EvtMem_Src = $CD                        ; alias of Spr_GfxPtr in opcodes $48/$49: 24-bit pointer read
+                                         ; from the operands (the byte or word to load)
+!EvtMem_Dst = $D0                        ; alias of Spr_WramPtr in opcodes $4A-$4D: 24-bit pointer read
+                                         ; from the operands (where to store)
+!EvtMem_Pos = $D9                        ; alias of Eng_Scratch in opcodes $48/$49/$4C/$4D: 16-bit, the
+                                         ; Evt_Data offset of the opcode's last byte
+!EvtMem_Value = $D9                      ; alias of Eng_Scratch in opcodes $4F-$5B: 8- or 16-bit, the
+                                         ; value on its way
+!EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
+                                         ; (bytes - 1)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
                                          ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
                                          ; the slot being tried
@@ -757,6 +767,8 @@ if !ram_engine_inc == 0
 ; --- Location event data / saved field state ---
 !Evt_ObjCount = $7F2000                  ; 8-bit count of location objects; Obj_ResetStates clears
                                          ; that many Obj_State entries
+!Evt_DataAddr = $2001                    ; Evt_Data's address within bank $7F (Evt_Op4E_CopyData
+                                         ; turns offsets into MVN source addresses with it)
 !Evt_Data = $7F2001                      ; location event data; begins with 16 word function offsets
                                          ; per object (32 bytes, index Obj_Cur*16), and all offsets
                                          ; are relative to it; opcode streams end at opcode $00
