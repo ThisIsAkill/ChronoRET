@@ -2957,7 +2957,7 @@ BattleMsg_BlankLeadingZeros:
 ;        clobbered, plus whatever the unmatched callees change
 ; Callees: BattleMsg_ShowFromTableCC3A09Vec, BattleSys_PumpFrames,
 ;          BattleSys_FrameTickVec, Battle_TickPcSlots,
-;          Battle_TickStatusEffectVisuals, Battle_CacheBattlerCoordsAll,
+;          Battle_TickEnemyMovers, Battle_CacheBattlerCoordsAll,
 ;          BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
 ;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay
 org $C1106E
@@ -2990,7 +2990,7 @@ BattleSys_UpkeepTwoFrames:
     BEQ .a4_kept
     STA.b !Battle_UnkA4             ; take the copy back
 .a4_kept:
-    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_TickEnemyMovers
     JSR Battle_CacheBattlerCoordsAll
     STZ.b !Battle_UnkE5
     JSR BattleSys_PumpFrames
@@ -3005,7 +3005,7 @@ BattleSys_UpkeepTwoFrames:
     JSR BattleMenu_UpdateCursorOverlay
     STZ.b !Battle_PadEdgeButtons
 .menu_clean:
-    JSR Battle_TickStatusEffectVisuals
+    JSR Battle_TickEnemyMovers
     JSR Battle_CacheBattlerCoordsAll
     RTS
 
@@ -7640,7 +7640,7 @@ Battle_FxHandlerTable:
 ;     !Enemy_AnimFrames and 8 durations (offset list * 4), each turned
 ;     into frames by !BattleRom_Div5, into !Enemy_AnimTicks. The list is
 ;     picked by !BattleRom_EnemyAnimKind[animation]: kind 0 = list 3,
-;     kind 1 = list 1 (and clears !Enemy_Unk9829), other kinds = list 6;
+;     kind 1 = list 1 (and clears !Enemy_MoveDone), other kinds = list 6;
 ;   - counts down !Enemy_AnimTimer; at 0 it shows the current frame
 ;     (Battle_DrawBattlerFrame, layouts 0-2 only), moves
 ;     !Enemy_AnimFrame on (wrapping at 4, or to 0 at a 0 tick count) and
@@ -7870,7 +7870,7 @@ Battle_TickEnemyGroup:
     DEC A
     BNE .kind_other
     LDX.b !Battle_EnemyIdx
-    STZ.w !Enemy_Unk9829,X
+    STZ.w !Enemy_MoveDone,X
     LDA.b #!Battle_EnemyListKind1*4 ; kind 1: list 1
     BRA .set_list
 .kind_other:
@@ -8168,7 +8168,7 @@ BattleSys_DefeatPose:
 ; by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at
 ; $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D directly).
 ; Ticks the frame service, counts !Battle_UnkA0FE up, clears
-; !Enemy_Unk98A7, stops the PCs' status effects (Battle_FxReset), takes
+; !Enemy_Stepping, stops the PCs' status effects (Battle_FxReset), takes
 ; the three PCs out of the ready queue one per frame, closes the menu
 ; (!BattleMenu_ActivePc = none, BattleMenu_UpdateWindows), and then,
 ; unless !Battle_Unk2989 bit 0 is set, plays animation $0A on the
@@ -8187,7 +8187,7 @@ BattleSys_VictoryPose:
     INC.w !Battle_UnkA0FE
     LDX.w #!Battle_LastSlot-!Battle_FirstEnemySlot
 .clear:
-    STZ.w !Enemy_Unk98A7,X
+    STZ.w !Enemy_Stepping,X
     DEX
     BPL .clear
     LDX.w #!Battle_LastPcSlot
@@ -8446,6 +8446,548 @@ Battle_PoseStep:
     BNE .slot
     STZ.b !Battle_UnkA4
     STZ.b !Battle_UnkE5
+    RTS
+
+; ==================================================================
+; Enemy movers ($C1:3714–$C1:4057)
+; ==================================================================
+; Enemies move in 8-pixel steps. A mover, picked by the enemy's
+; !Enemy_Anim through !BattleRom_EnemyMover and Battle_EnemyMoverTable,
+; chooses the heading of the next step (!Enemy_MoveAngle) and its start
+; (!Enemy_StepStartX/Y), puts the enemy's probe (!Battler_ProbeX/Y) one
+; step ahead and tests the box there against the cell map and the other
+; battlers. If the way is free it sets !Enemy_Stepping, and the
+; unmatched stepper at $CF:F978 moves the enemy along the heading over
+; the next frames. When the move's goal is reached (or, for some movers,
+; when a step is blocked) the mover sets !Enemy_MoveDone and saves
+; !Enemy_AnimWanted in !Enemy_ResumeAnim. "Target" below is the battler
+; in !Enemy_MoveTarget. Angles are 256 units per turn, measured from the
+; first point towards the second (as Battle_FaceAllPcsNearestEnemy uses
+; Battle_CalcAngle); 0 = right, $40 = down, $80 = left, $C0 = up, with y
+; growing downwards.
+
+; ==================================================================
+; Battle_TickEnemyMovers ($C13714–$C1373A, 39 bytes)
+; ==================================================================
+; Per-frame enemy movement. Does nothing while !Battle_MenuTimeHold is
+; set (a list is open in the waiting battle mode, inferred from that
+; define). Otherwise, for each enemy 0-7 whose !Enemy_Anim is non-zero,
+; counts !Enemy_MoveTimer down and, at 0, reloads it from
+; !Enemy_MoveInterval and runs the enemy's mover (Battle_RunEnemyMover).
+; Presence is checked only there, so an absent enemy's timer still runs.
+; This routine was stubbed as Battle_TickStatusEffectVisuals, a name
+; the code does not bear out.
+; Callers (2 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10B5, $C1:10DC).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_MoverEnemy =
+;        8 unless held; when a mover ran, its scratch too (DP $80-$86,
+;        $8C-$8F, $77-$78, $A5-$B0, $D3-$E3, !Battle_MoverAnim)
+; Callees: Battle_RunEnemyMover
+!Battle_MoverEnemy = !BattleTmp_9C        ; 2 B: enemy being moved (0-7; slot = enemy + 3), zeroed 16-bit, counted 8-bit
+Battle_TickEnemyMovers:
+    LDA.w !Battle_MenuTimeHold
+    BNE .exit
+    TDC
+    TAX
+    STX.b !Battle_MoverEnemy
+.enemy:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_Anim,X
+    BEQ .next
+    DEC.w !Enemy_MoveTimer,X
+    BNE .next
+    LDA.w !Enemy_MoveInterval,X
+    STA.w !Enemy_MoveTimer,X
+    JSR Battle_RunEnemyMover
+.next:
+    INC.b !Battle_MoverEnemy
+    LDA.b !Battle_MoverEnemy
+    CMP.b #8                        ; enemies 0-7
+    BNE .enemy
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_RunEnemyMover ($C1373B–$C1375F, 37 bytes)
+; ==================================================================
+; Runs the mover of enemy !Battle_MoverEnemy, if that enemy is present:
+; copies !Enemy_TargetWanted into !Enemy_MoveTarget, then, unless
+; !Enemy_Anim is negative, stores the id in !Battle_MoverAnim and calls
+; entry !BattleRom_EnemyMover[id] of Battle_EnemyMoverTable.
+; Quirk: the copy is skipped when the two are already equal, which
+; changes nothing (kept as found).
+; Callers (JSR): Battle_TickEnemyMovers ($C1:372F) only.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when a mover ran,
+;        !Battle_MoverAnim and the mover's scratch (see the movers)
+; Callees: JSR (Battle_EnemyMoverTable,X)
+Battle_RunEnemyMover:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Battler_Present+!Battle_FirstEnemySlot,X
+    BEQ .exit
+    LDA.w !Enemy_TargetWanted,X
+    CMP.w !Enemy_MoveTarget,X
+    BEQ .target_set                 ; quirk: storing it anyway would do the same
+    STA.w !Enemy_MoveTarget,X
+.target_set:
+    LDA.w !Enemy_Anim,X
+    BMI .exit
+    STA.w !Battle_MoverAnim
+    TAX
+    LDA.l !BattleRom_EnemyMover,X
+    ASL A
+    TAX
+    JSR (Battle_EnemyMoverTable,X)
+.exit:
+    RTS
+
+; Battle_EnemyMoverTable ($C13760–$C13771, 18 bytes)
+; One mover per !BattleRom_EnemyMover entry, called from
+; Battle_RunEnemyMover. The comments give the move ids that pick each
+; entry ($CC:FBAB-$CC:FBC4, ids $00-$19); id 0 maps to entry 0 but never
+; gets there, since Battle_TickEnemyMovers skips enemies whose id is 0.
+Battle_EnemyMoverTable:
+    dw Battle_MoverIdle             ; 0: ids $00, $04
+    dw Battle_MoverApproach         ; 1: ids $01-$03, $05
+    dw Battle_MoverCharge           ; 2: id $07
+    dw Battle_MoverAxis             ; 3: ids $08, $09
+    dw Battle_MoverKeepRange        ; 4: ids $06, $10
+    dw Battle_MoverOrbit            ; 5: ids $0D-$0F
+    dw Battle_MoverLoop             ; 6: ids $0A-$0C
+    dw Battle_MoverFixedDir         ; 7: ids $11-$18
+    dw Battle_MoverToCentre         ; 8: id $19
+
+; ==================================================================
+; Battle_MoverIdle ($C13772–$C13799, 40 bytes)
+; ==================================================================
+; Mover 0 (move 4): stays put. Once the enemy's last move has ended
+; (!Enemy_MoveDone), watches the target: when it is no longer where it
+; was at the end (!Enemy_DoneTargetX/Y), restores the move that ended
+; (!Enemy_ResumeAnim -> !Enemy_AnimWanted) and clears !Enemy_MoveDone,
+; so the enemy follows the target again. Clears !Enemy_LoopStarted only
+; when MoveDone is set.
+; Callers: Battle_EnemyMoverTable entry 0.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X = enemy (0-7)
+Battle_MoverIdle:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_MoveDone,X
+    BEQ .exit
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    CMP.w !Enemy_DoneTargetX,X
+    BNE .resume
+    LDA.w !Battler_ScreenY,Y
+    CMP.w !Enemy_DoneTargetY,X
+    BEQ .exit
+.resume:
+    LDA.w !Enemy_ResumeAnim,X
+    STA.w !Enemy_AnimWanted,X
+    STZ.w !Enemy_MoveDone,X
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_MoverApproach ($C1379A–$C138BE, 293 bytes)
+; ==================================================================
+; Mover 1: walks towards the target until within reach. Unless a detour
+; is pending (!Enemy_Detour), the step starts at the enemy's position and
+; heads straight for the target; with a detour it keeps the turned
+; heading (the blocked step never moved the enemy, so the old start
+; still holds). Facing follows the heading. Then, by !Battle_MoverAnim:
+;   1, 2, 3  ends the move (done path below) once within 32, 64 or 4
+;            pixels (BattlePos_WithinDist32XY/64XY/4XY, measured on the
+;            probes, which are first set to both battlers' positions);
+;   other    (move 5) ends the move at once, without a step.
+; Otherwise it probes one step ahead: if the box hits a blocking cell
+; (move 3 passes cell bit 7) or, except for move 3, another battler, the
+; heading is turned a quarter turn on and rounded down to a multiple of
+; a quarter (right, down, left, up), !Enemy_Detour set and no step made;
+; else the step starts (!Enemy_Stepping) and the detour is cleared.
+; Done: !Enemy_MoveDone counted up, !Enemy_AnimWanted saved in
+; !Enemy_ResumeAnim, the target's position in !Enemy_DoneTargetX/Y,
+; !Enemy_Stepping cleared.
+; Callers: Battle_EnemyMoverTable entry 1.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $8C-$8F,
+;        $77-$78, $A5-$AE, $D3-$E3 and the callees' $80-$86 written
+; Callees: Battle_CalcAngle, Battle_SinLookup, BattlePos_WithinDist32XY,
+;          BattlePos_WithinDist64XY, BattlePos_WithinDist4XY,
+;          Battle_CalcBattlerBox, Battle_BoxHitsBlockedCell,
+;          Battle_BoxOverlapsOthers
+!Battle_MoveStepY = !BattleTmp_8C         ; 1 B: y part of the step (sin * 8), signed
+!Battle_MoveStepX = !BattleTmp_8E         ; 1 B: x part of the step (cos * 8), signed
+Battle_MoverApproach:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Enemy_Detour,X
+    BEQ .aim
+    LDA.w !Enemy_MoveAngle,X
+    STA.b !Battle_GeoAngle
+    BRA .heading
+.aim:
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginX
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginY
+    STA.w !Enemy_StepStartY,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+.heading:
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDX.b !Battle_MoverEnemy
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Battler_ProbeX,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Battler_ProbeY,Y
+    TXA
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    TAX                             ; X = the enemy's battler slot
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    LDA.w !Battle_MoverAnim
+    DEC A
+    BNE .not_near32
+    JSR BattlePos_WithinDist32XY
+    BRA .check_reach
+.not_near32:
+    DEC A
+    BNE .not_near64
+    JSR BattlePos_WithinDist64XY
+    BRA .check_reach
+.not_near64:
+    DEC A
+    BNE .done                       ; move 5: ends at once
+    JSR BattlePos_WithinDist4XY
+.check_reach:
+    LDA.w !BattlePos_Result
+    BMI .step
+.done:
+    LDX.b !Battle_MoverEnemy
+    INC.w !Enemy_MoveDone,X
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_ResumeAnim,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Enemy_DoneTargetX,X
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Enemy_DoneTargetY,X
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.step:
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveNear4
+    BNE .test_cells
+    LDA.b #1
+    STA.w !Battle_PassCellBit7
+.test_cells:
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveNear4
+    BEQ .free                       ; move 3 passes other battlers
+    JSR Battle_BoxOverlapsOthers
+    BPL .free
+.blocked:
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    LSR A                           ; round down to a quarter turn
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Battle_GeoAngle
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    INC.w !Enemy_Detour,X
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.free:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_Detour,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+.exit:
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Battle_MoverCharge ($C138BF–$C13958, 154 bytes)
+; ==================================================================
+; Mover 2 (move 7): heads straight for the target from the enemy's
+; position every time and starts the step, until a step is blocked by a
+; blocking cell or another battler (the target included): then the step
+; is cancelled and the move ends (the done path of
+; Battle_MoverApproach). No detours.
+; Quirk: when the step is free, X still holds the battler slot that
+; Battle_BoxOverlapsOthers returns, so the closing INX x3 leaves X and
+; !Battle_BoxTestSlot at enemy + 6 instead of the slot; the callers
+; reload X, so it does no harm (kept as found).
+; Callers: Battle_EnemyMoverTable entry 2.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot (enemy + 6 when
+;        the step is free, see above); DP $8C-$8F,
+;        $77-$78, $A5-$AE, $D3-$E3 and the callees' $80-$86 written
+; Callees: Battle_CalcAngle, Battle_SinLookup, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers
+Battle_MoverCharge:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginX
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginY
+    STA.w !Enemy_StepStartY,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoPointY
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    JSR Battle_CalcAngle
+    LDX.b !Battle_MoverEnemy
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .done
+    JSR Battle_BoxOverlapsOthers
+    BPL .exit
+.done:
+    LDX.b !Battle_MoverEnemy
+    INC.w !Enemy_MoveDone,X
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_ResumeAnim,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Enemy_DoneTargetX,X
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Enemy_DoneTargetY,X
+    STZ.w !Enemy_Stepping,X
+.exit:
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Battle_MoverAxis ($C13959–$C13A3C, 228 bytes)
+; ==================================================================
+; Mover 3: lines the enemy up with the target along one axis. Move 8
+; steps straight up or down towards the target's y (up when the target
+; is higher, otherwise down); move 9 steps left or right towards its x
+; (left when the target is further left, otherwise right). The step
+; starts from the enemy's position each time. The move ends (done path
+; of Battle_MoverApproach, which also cancels the step just started)
+; when the step is blocked by a cell or a battler, or when the enemy
+; and the target are in the same 32-pixel band of y (move 8) or x
+; (move 9), compared on their current positions.
+; Callers: Battle_EnemyMoverTable entry 3.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; Y = the target's slot; X
+;        and !Battle_BoxTestSlot = the enemy's battler slot; DP $8C-$8F,
+;        $77-$78, $A5-$AE and the callees' $80-$86 written
+; Callees: Battle_SinLookup, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers,
+;          Battle_ShiftRight5
+!Battle_MoveTargetBand = !BattleTmp_80    ; 1 B: the target's 32-pixel band (coordinate >> 5)
+Battle_MoverAxis:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.w !Enemy_StepStartY,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveAxisY
+    BNE .horizontal
+    LDA.w !Battler_ScreenY,Y
+    CMP.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    BCS .down
+    LDA.b #!Battle_AngleThreeQuarter ; up
+    BRA .heading
+.down:
+    LDA.b #!Battle_AngleQuarter
+    BRA .heading
+.horizontal:
+    LDA.w !Battler_ScreenX,Y
+    CMP.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    BCS .right
+    LDA.b #!Battle_AngleHalfTurn    ; left
+    BRA .heading
+.right:
+    TDC
+.heading:
+    STA.b !Battle_GeoAngle
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDX.b !Battle_MoverEnemy
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .done
+    JSR Battle_BoxOverlapsOthers
+    BMI .done
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveAxisY
+    BNE .band_x
+    LDA.w !Battler_ScreenY,Y
+    JSR Battle_ShiftRight5
+    STA.b !Battle_MoveTargetBand
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    JSR Battle_ShiftRight5
+    CMP.b !Battle_MoveTargetBand
+    BEQ .done
+    BRA .exit
+.band_x:
+    LDA.w !Battler_ScreenX,Y
+    JSR Battle_ShiftRight5
+    STA.b !Battle_MoveTargetBand
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    JSR Battle_ShiftRight5
+    CMP.b !Battle_MoveTargetBand
+    BNE .exit
+.done:
+    LDX.b !Battle_MoverEnemy
+    INC.w !Enemy_MoveDone,X
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_ResumeAnim,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Enemy_DoneTargetX,X
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Enemy_DoneTargetY,X
+    STZ.w !Enemy_Stepping,X
+.exit:
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
     RTS
 
 ; ==================================================================

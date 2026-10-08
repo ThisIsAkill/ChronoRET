@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 34444,
+  "emitted_bytes": 35253,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 313,
+      "bytes": 35253
     },
     "readable": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 313,
+      "bytes": 35253
     },
     "verified": {
-      "functions": 306,
-      "bytes": 34444
+      "functions": 303,
+      "bytes": 33588
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 13974,
+      "emitted_bytes": 14783,
       "matched": {
-        "functions": 183,
-        "bytes": 13974
+        "functions": 190,
+        "bytes": 14783
       },
       "readable": {
-        "functions": 183,
-        "bytes": 13974
+        "functions": 190,
+        "bytes": 14783
       },
       "verified": {
-        "functions": 183,
-        "bytes": 13974
+        "functions": 180,
+        "bytes": 13118
       }
     },
     {
@@ -535,7 +535,7 @@
       "bank": "$C1",
       "start": "$C1:3000",
       "end": "$C1:3FFF",
-      "emitted_bytes": 1812,
+      "emitted_bytes": 2621,
       "functions": [
         "Battle_PickNextStatusAnim",
         "Battle_ApplyPendingEffect",
@@ -556,7 +556,14 @@
         "BattleSys_DefeatPose",
         "BattleSys_VictoryPose",
         "Battle_RunPcPose",
-        "Battle_PoseStep"
+        "Battle_PoseStep",
+        "Battle_TickEnemyMovers",
+        "Battle_RunEnemyMover",
+        "Battle_EnemyMoverTable",
+        "Battle_MoverIdle",
+        "Battle_MoverApproach",
+        "Battle_MoverCharge",
+        "Battle_MoverAxis"
       ]
     },
     {

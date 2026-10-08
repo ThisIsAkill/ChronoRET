@@ -103,6 +103,51 @@ if !constants_battle_inc == 0
 !Battle_EnemyGroupSize   = 3     ; !Battle_TickOrder entries visited per group
 !Battle_EnemyGroupLast   = 3     ; highest !Battle_UnkA4 group
 
+; --- Enemy movers (Battle_TickEnemyMovers, Battle_EnemyMoverTable) ---
+; Move ids are !Enemy_Anim values; the names say what the mover does with
+; them, read from the handlers (what the enemies look like doing it is not
+; checked).
+!Enemy_MoveNear32        = $01   ; Battle_MoverApproach: stop within 32 pixels of the target
+!Enemy_MoveNear64        = $02   ; Battle_MoverApproach: stop within 64 pixels
+!Enemy_MoveNear4         = $03   ; Battle_MoverApproach: stop within 4 pixels; passes cell bit 7 and other battlers
+!Enemy_MoveAxisY         = $08   ; Battle_MoverAxis: line up with the target's row (move $09: its column)
+!Enemy_MoveLoopSmall     = $0A   ; Battle_MoverLoop: half-height loop, shorter turn-back when blocked
+!Enemy_MoveLoopPass      = $0C   ; Battle_MoverLoop: passes cell bit 7 and other battlers
+!Enemy_MoveOrbitHold     = $0D   ; Battle_MoverOrbit: does not approach the ring, only circles when already on it
+!Enemy_MoveOrbitWide     = $0E   ; Battle_MoverOrbit: ring radius $40 instead of $20
+!Enemy_MoveOrbitPass     = $0F   ; Battle_MoverOrbit: passes cell bit 7 and other battlers
+!Enemy_MoveRingFar       = $10   ; Battle_MoverKeepRange: ring radius $80 and no arrival
+!Enemy_MoveUp            = $11   ; Battle_MoverFixedDir: straight up
+!Enemy_MoveDown          = $12   ; straight down
+!Enemy_MoveRight         = $13   ; right
+!Enemy_MoveLeft          = $14   ; left
+!Enemy_MoveDownRight     = $15   ; down-right (any other id that reaches this mover: up-right)
+!Enemy_MoveDownLeft      = $16   ; down-left
+!Enemy_MoveUpLeft        = $17   ; up-left
+!Battle_MoveStepLen      = 8     ; pixels per step: the sine scale of every probe; the stepper at $CF:F978 ends at 8
+!Battle_GoalSlot         = !Battle_NumSlots ; probe entry 11, just past the battlers: the ring goal point
+!Battle_AngleEighth      = $20   ; 45 degrees
+!Battle_AngleAxisShift   = 6     ; LSR/ASL count that rounds an angle down to a quarter turn
+!Battle_RingRadius       = $40   ; Battle_MoverKeepRange's ring radius (!Enemy_MoveRingFar: $80)
+!Battle_RingRadiusFar    = $80
+!Battle_OrbitRadiusSmall = $20   ; Battle_MoverOrbit's ring radius (!Enemy_MoveOrbitWide: doubled)
+!Battle_OrbitTurn        = $10   ; angle the orbit point moves on per step
+!Battle_OrbitTurnBack    = $F0   ; the same, backwards (-$10)
+!Battle_LoopDropY        = $10   ; the loop centre lies this far below the enemy's start
+!Battle_LoopRadiusBig    = $20   ; Battle_MoverLoop's vertical radius (!Enemy_MoveLoopSmall: halved); also the
+                                 ; extra horizontal radius
+!Battle_LoopTurn         = $10   ; phase step per loop step
+!Battle_LoopTurnBack     = $F0   ; the same, backwards (-$10)
+!Battle_LoopBounce       = $58   ; phase jump back when a loop step is blocked
+!Battle_LoopBounceSmall  = $30   ; the same for !Enemy_MoveLoopSmall
+!Battle_ScreenCentreX    = $80   ; Battle_MoverToCentre's goal: the middle of the 256x224 screen
+!Battle_ScreenCentreY    = $70
+!Battle_FacingUp         = 0     ; !Battler_Facing values, from !BattleRom_FacingByAngle (0 for angles $A0-$DF,
+!Battle_FacingDown       = 1     ; 1 for $20-$5F, 2 for $60-$9F, 3 for $E0-$1F) with y growing downwards; the
+!Battle_FacingLeft       = 2     ; directions are inferred from that, not from the graphics
+!Battle_FacingRight      = 3
+!Battle_FacingFromAngle  = $FF   ; Battle_MoverFixedDir: keep the facing the table gave
+
 ; --- PC poses (Battle_RunPcPose and the services that start it) ---
 !Battle_AnimDown         = 8     ; BattleRom_StatusAnim's animation for KO (Status bit 7); service 9's pose
 !Battle_AnimUnk0A        = $0A   ; service 8's pose (inferred: victory); not looked at

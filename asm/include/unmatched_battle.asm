@@ -14,11 +14,16 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C13714
-Battle_TickStatusEffectVisuals:         ; JSR: skipped while !Battle_MenuTimeHold is set; counts down per-enemy timers
-                                        ; ($9897) and dispatches on !Enemy_Anim through the table at $C1:3760. The name
-                                        ; is from the session notes and looks wrong (enemy movement, not status visuals;
-                                        ; not checked in detail)
+org $C13A3D
+Battle_MoverKeepRange:                  ; Battle_EnemyMoverTable entry 4
+org $C13BC2
+Battle_MoverOrbit:                      ; Battle_EnemyMoverTable entry 5
+org $C13E33
+Battle_MoverLoop:                       ; Battle_EnemyMoverTable entry 6
+org $C13F5A
+Battle_MoverFixedDir:                   ; Battle_EnemyMoverTable entry 7
+org $C14021
+Battle_MoverToCentre:                   ; Battle_EnemyMoverTable entry 8
 
 ; --- Bank $C7 (audio) ---
 
