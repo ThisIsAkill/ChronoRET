@@ -17117,7 +17117,10 @@ BattleAct_OpArcDownToUnkPoint:
 ;     counting in DP $84 the slots still free to go; it waits while
 ;     any is. Quirk, kept: on the frame that starts the whole set the
 ;     test loop starts at the set's end, so it advances at once
-;     without testing (the movers keep going on their own);
+;     without testing; the start loop never sets !Battle_ActorMoving
+;     (only the test loop does), and the mover at $CF:EFC4 skips actors
+;     with it 0, so none of the set moves: the opcode only sets angle,
+;     facing and move state;
 ;   - threads 8-15, object j: as a battler with the object's entries
 ;     (index 11 + j), its position !Battle_ActObjX/Y, and
 ;     !Battle_ActObjMoveDone; it also zeroes !Battle_ActObjUnkA31C.
