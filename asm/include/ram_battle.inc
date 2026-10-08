@@ -5,9 +5,374 @@
 ; Battler slots: 0-2 = party (PCs), 3-10 = enemies. Arrays indexed by
 ; battler slot are named !Battler_<Field>; arrays indexed by PC slot
 ; only are named !Pc_<Field>.
+;
+; Every name carries width, meaning and how it was inferred. "Unk"
+; names mark locations whose purpose is not established; their comment
+; says what the code was seen doing with them.
+;
+; Direct page $80-$A2 is per-routine scratch in this bank. It is named
+; !BattleTmp_xx here; bank $C1 gives each slot a routine-specific alias
+; next to the routine header (e.g. !BattleTgt_P0X = !BattleTmp_80).
+;
+; Tilemap buffers are named by cell: BattleUI_StatusTile(row, col) is
+; the tile byte of the 2-byte entry at (row, col), ...Attr(row, col) its
+; attribute byte. A row is $40 bytes (32 entries). Used with ,X/,Y the
+; cell is relative to the index (Tile(0,1),Y = the entry after Y).
 ; ============================================================
 !ram_battle_inc ?= 0
 if !ram_battle_inc == 0
 !ram_battle_inc = 1
+
+; ------------------------------------------------------------
+; Direct page: math helpers (Battle_Mul8 / MulAccum / Divide)
+; ------------------------------------------------------------
+!Battle_MulMirrorA       = $77   ; 1 B: copy of the WRMPYA operand (Mul8, MulAccum write it; no reader seen in $C1)
+!Battle_MulMirrorB       = $78   ; 1 B: copy of the WRMPYB operand (Mul8, MulAccum)
+!Battle_DivMirrorLo      = $79   ; 1 B: copy of the dividend low byte (Battle_Divide)
+!Battle_DivMirrorHi      = $7A   ; 1 B: copy of the dividend high byte (Battle_Divide)
+!Battle_DivMirrorDivisor = $7B   ; 1 B: copy of the divisor (Battle_Divide)
+!Battle_MulFactor8       = $A5   ; 1 B: 8-bit factor of Battle_MulAccum (WRMPYA); Battle_SinLookup also zeroes $A6
+!Battle_MulFactor16      = $A7   ; 2 B: 16-bit factor of Battle_MulAccum ($A7 low, $A8 high, each fed to WRMPYB)
+!Battle_MulProduct       = $A9   ; 3 B: 24-bit product of Battle_MulAccum ($A9 low .. $AB high)
+!Battle_Mul8A            = $AD   ; 1 B: Battle_Mul8 multiplicand (callers zero $AE when they store it 16-bit)
+!Battle_Mul8B            = $AE   ; 1 B: Battle_Mul8 multiplier
+!Battle_Mul8Product      = $AF   ; 2 B: Battle_Mul8 16-bit product (RDMPYL)
+!Battle_DivDividend      = $B1   ; 2 B: Battle_Divide 16-bit dividend
+!Battle_DivDivisor       = $B3   ; 1 B: Battle_Divide 8-bit divisor ($B4 is zeroed by DrawSlotGaugeBar, unused by Divide)
+!Battle_DivQuotient      = $B5   ; 2 B: Battle_Divide 16-bit quotient (RDDIVL)
+!Battle_DivRemainder     = $B7   ; 2 B: Battle_Divide 16-bit remainder (RDMPYL)
+
+; ------------------------------------------------------------
+; Direct page: geometry (Calc_Delta16 and its callers)
+; ------------------------------------------------------------
+!Battle_GeoOriginX       = $D3   ; 1 B: screen x of the point the angle is measured from
+!Battle_GeoOriginY       = $D4   ; 1 B: screen y of that point
+!Battle_GeoPointX        = $D5   ; 1 B: screen x of the point the angle is measured to
+!Battle_GeoPointY        = $D6   ; 1 B: screen y of that point
+!Battle_GeoDeltaX        = $D7   ; 2 B: signed OriginX - PointX (high byte = sign)
+!Battle_GeoDeltaY        = $D9   ; 2 B: signed OriginY - PointY (high byte = sign)
+!Battle_GeoAngle         = $DB   ; 1 B: result angle, 256 units per turn (also returned in A)
+!Battle_GeoTmp           = $DC   ; 2 B: |dx| >> 3 while building the table index
+!Battle_GeoAbsDeltaX     = $DE   ; 2 B: |dx| (high byte zeroed)
+!Battle_GeoAbsDeltaY     = $E0   ; 2 B: |dy| (high byte zeroed)
+!Battle_GeoAngleIndex    = $E2   ; 2 B: index into BattleRom_AngleTable: (|dy| & ~7) * 4 + (|dx| >> 3)
+
+; ------------------------------------------------------------
+; Direct page: other fixed roles
+; ------------------------------------------------------------
+!Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady)
+!Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
+!Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
+                                 ;      (UpdateCursorOverlay, only right after the target moved); purpose unknown
+!Battle_PadEdgeButtons   = $EE   ; 1 B: buttons pressed this frame (bit 7 confirm, 6 alt-confirm, 5/4 page, 3 cancel);
+                                 ;      cleared by Battle_ZeroResultEE once consumed
+!Battle_PadEdgeDpad      = $EF   ; 1 B: D-pad pressed this frame (bit 3 up, 2 down, 1 left, 0 right)
+
+; ------------------------------------------------------------
+; Direct page: per-routine scratch (aliased per routine in bankC1.asm)
+; ------------------------------------------------------------
+!BattleTmp_80            = $80   ; 1-2 B scratch
+!BattleTmp_81            = $81   ; 1 B scratch
+!BattleTmp_82            = $82   ; 1-2 B scratch
+!BattleTmp_83            = $83   ; 1 B scratch
+!BattleTmp_84            = $84   ; 1-2 B scratch
+!BattleTmp_85            = $85   ; 1 B scratch
+!BattleTmp_86            = $86   ; 1-2 B scratch
+!BattleTmp_87            = $87   ; 1 B scratch
+!BattleTmp_88            = $88   ; 1-2 B scratch
+!BattleTmp_89            = $89   ; 1 B scratch
+!BattleTmp_8A            = $8A   ; 1 B scratch
+!BattleTmp_8B            = $8B   ; 1 B scratch
+!BattleTmp_8C            = $8C   ; 1 B scratch
+!BattleTmp_8D            = $8D   ; 1 B scratch
+!BattleTmp_8E            = $8E   ; 1-2 B scratch
+!BattleTmp_90            = $90   ; 1-2 B scratch
+!BattleTmp_92            = $92   ; 1-2 B scratch
+!BattleTmp_93            = $93   ; 1 B scratch
+!BattleTmp_94            = $94   ; 1 B scratch
+!BattleTmp_96            = $96   ; 2 B scratch
+!BattleTmp_98            = $98   ; 2 B scratch
+!BattleTmp_9A            = $9A   ; 2 B scratch
+!BattleTmp_A2            = $A2   ; 2 B scratch
+!BattleTmp_AD            = $AD   ; 2 B scratch outside Battle_Mul8 (same bytes as !Battle_Mul8A/B)
+!BattleTmp_AF            = $AF   ; 2 B scratch outside Battle_Mul8 (same byte as !Battle_Mul8Product)
+
+; ------------------------------------------------------------
+; Absolute WRAM (bank $7E; DB=$7E in all bank $C1 code)
+; ------------------------------------------------------------
+!Battle_WramAbs          = $0000 ; base 0 for "STA abs,Y" where Y already holds the full address (left by MVN)
+
+; Argument block for the info-panel message calls (UpdateCursorOverlay
+; fills it before JSL BattleMsg_ShowMsg0BIfKeyChangedVec).
+struct BattleMsg_InfoArgs $0200
+.Id:        skip 1      ; +0: !Battler_Unk984D value of the highlighted target
+.CurHp:     skip 2      ; +1: target's BattlerStats.CurHp
+.MaxHp:     skip 2      ; +3: target's BattlerStats.MaxHp
+endstruct
+
+; OAM shadow, low table: 4 bytes per sprite. Sprites 0-3 are the menu
+; and target cursors (DrawCursorSprites, UpdateCursorOverlay).
+struct BattleOam $0700
+.X:         skip 1      ; +0: x position (bit 8 lives in the high table)
+.Y:         skip 1      ; +1: y position ($F0 = parked below the screen)
+.Tile:      skip 1      ; +2: tile number
+.Attr:      skip 1      ; +3: vhoopppN attribute byte
+endstruct
+!BattleOam_HighTable     = $0900 ; 1 B: OAM high-table byte for sprites 0-3 (2 bits each: x bit 8, size)
+
+!BattleMenu_WindowMap    = $0B40 ; $180 B: command-window tilemap buffer, 6 rows x $40 (copied from ROM maps)
+
+; Status-bar tilemap buffer at $0CC0 (6 rows x 32 entries, uploaded by
+; Battle_QueueVramUpload_0CC0).
+function BattleUI_StatusTile(row, col) = $0CC0+(row*$40)+(col*2)
+function BattleUI_StatusAttr(row, col) = $0CC1+(row*$40)+(col*2)
+
+; Item-list tilemap buffer at $0E80 (6 rows x 32 entries, uploaded by
+; Battle_QueueVramUpload_0E80).
+function BattleMenu_ItemTile(row, col) = $0E80+(row*$40)+(col*2)
+function BattleMenu_ItemAttr(row, col) = $0E81+(row*$40)+(col*2)
+!BattleMenu_UpArrowTile   = $0EFC ; 1 B: item-list scroll-up arrow tile (row 1, col 30); $FF = hidden
+!BattleMenu_UpArrowAttr   = $0EFD ; 1 B: its attribute
+!BattleMenu_DownArrowTile = $0FFC ; 1 B: item-list scroll-down arrow tile (row 5, col 30); $FF = hidden
+!BattleMenu_DownArrowAttr = $0FFD ; 1 B: its attribute (vertically flipped up-arrow tile)
+
+; Item list shown in the battle item menu: 5-byte records, record
+; offset = list index * 5 (ItemConfirm, RenderItemRow).
+struct Item_BattleList $1580
+.Id:         skip 1     ; +0: item id (0 = empty)
+.TargetMode: skip 1     ; +1: target mode copied to !BattleTgt_Mode on confirm
+.Flags:      skip 1     ; +2: bit 7 set = cannot be used here (ItemConfirm aborts; drawn grey
+                        ;     unless .PcMask has the active PC's bit)
+.Quantity:   skip 1     ; +3: count held (0 = empty); decremented by CommitAction
+.PcMask:     skip 1     ; +4: bit 7/6/5 = PC slot 0/1/2 may use it (tested with BattleRom_PcBit)
+endstruct
+
+; Tech menu entries: 7-byte records, 20 per PC (PC base from
+; BattleRom_TechEntryBase = 0/$8C/$118, entry offset i*7 from
+; BattleRom_TechEntryOffset). Read by UpdateTechWindow / UpdateTechMpAvail.
+struct Tech_MenuEntry $1A80
+.TechId:     skip 1     ; +0: tech id; $39 and up are double/triple techs (UpdateCursorOverlay)
+.TargetMode: skip 1     ; +1: target mode copied to !BattleTgt_Mode on confirm (TechConfirm)
+.Flags:      skip 1     ; +2: bit 7 = unusable now (set/cleared by UpdateTechMpAvail; TechConfirm aborts)
+.MpCost0:    skip 1     ; +3: MP cost for PC slot 0 ($80+ = slot 0 not involved)
+.Partners:   skip 1     ; +4: partner PC slots, low nibble first, high nibble second ($F = none; $FF = no partners)
+.MpCost1:    skip 1     ; +5: MP cost for PC slot 1 ($80+ = not involved)
+.MpCost2:    skip 1     ; +6: MP cost for PC slot 2 ($80+ = not involved)
+endstruct
+
+!Battle_Unk1C48          = $1C48 ; 1 B array indexed by !Battle_UnkA0FF; must equal $42 for tech id $74 to be usable
+                                 ; (UpdateTechMpAvail); purpose unknown
+!Tech_ListAvail          = $1CDB ; 20 B: per tech-list entry of the active PC, 1 = selectable, 0 = blank/header
+                                 ; (BuildTechAvailFlags; TechListPrev/Next skip zeros)
+!Battler_ScreenX         = $1D0C ; 11 B per battler slot: base screen x (cursor and area-target geometry)
+!Battler_ScreenY         = $1D23 ; 11 B per battler slot: base screen y
+!Sfx_Command             = $1E00 ; 1 B: APU command byte for Audio_ProcessEntry (same block bank $C0's Sub_1B90 uses)
+!Sfx_Param1              = $1E01 ; 1 B: first APU command parameter (sound id for command $19)
+!Sfx_Param2              = $1E02 ; 1 B: second APU command parameter
+!Pc_CharId               = $2980 ; 3 B per PC slot: character id (0-6) of the PC in that slot; inferred from the
+                                 ; target modes that search it for ids 3-6. (The field engine uses $2980 for other
+                                 ; data; see the wiki's RAM table.)
+
+; Battle stat records, $80 bytes per battler slot (BattleRom_StatsOffset
+; lists slot*$80 for all 11 slots).
+struct BattlerStats $5E00
+            skip $30
+.CurHp:     skip 2      ; +$30: current HP
+.MaxHp:     skip 2      ; +$32: max HP
+.CurMp:     skip 2      ; +$34: current MP
+            skip $14
+.Status:    skip 1      ; +$4A: status bits; bit 7 set = KO'd (by context: BattleTgt_SingleKoAlly lists these)
+endstruct align $80
+
+; Per-PC command records, 7 bytes each, PC slot 0/1/2 at +0/+7/+14
+; (offsets from BattleRom_CmdOffset).
+struct BattleCmd $93EE
+.State:     skip 1      ; +0: bit 7 = waiting for a command (EnqueueReadyBattler), bit 6 = command queued (CommitAction)
+.Kind:      skip 1      ; +1: command kind ($80 attack, $40 item, $20 tech) ORed with !Battle_Unk9F38
+.Menu:      skip 1      ; +2: menu it came from (0 attack, 1 tech, 2 item; from !BattleMenu_CmdMenu)
+.Target:    skip 1      ; +3: first selected target slot
+.Unk4:      skip 1      ; +4: not written by bank $C1 code seen so far
+.Partners:  skip 1      ; +5: tech partner nibbles ($FF for attack/item)
+.ActionId:  skip 1      ; +6: tech id or item id (left stale for attack)
+endstruct
+
+!Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
+!BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / Battle_DivTen9499)
+!BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (always blank, $FF)
+!BattleMsg_Digit100      = $949D ; 1 B: hundreds digit tile
+!BattleMsg_Digit10       = $949E ; 1 B: tens digit tile
+!BattleMsg_Digit1        = $949F ; 1 B: ones digit tile
+!BattleMsg_TextTiles     = $94A0 ; 16 B: re-encoded text, lower-row tiles (BattleMsg_ReencodeTextBuffer)
+!BattleMsg_TextTopTiles  = $94B0 ; 16 B: re-encoded text, upper-row tiles ($71/$72 marks, $FF blank)
+!BattleMsg_TextSource    = $94C0 ; 16 B: copy of the raw text taken before re-encoding
+!Tech_ListCode           = $94D0 ; 20 B per PC (base BattleRom_TechListBase): tech-list line codes; $FB-$FF are
+                                 ; special lines (see constants), anything else is a real entry
+!Tech_ListEntry          = $9551 ; 20 B per PC: menu-entry index (into the PC's Tech_MenuEntry records) of each line
+!BattleMenu_ActivePc     = $95D5 ; 1 B: PC slot whose command menu is shown; negative = none
+!BattleMenu_ReadyQueue   = $95D6 ; 4 B: PC slots waiting for the menu, head first ($FF/negative = empty)
+!BattleMenu_ReadyQueueLen = $95DA ; 1 B: entries in !BattleMenu_ReadyQueue
+!BattleMenu_Submenu      = $95DB ; 1 B: open submenu: 0 main, 1 tech list, 2 item list
+!Pc_MenuRow              = $95DC ; 3 B per PC: command-menu cursor row (0 attack, 1 tech, 2 item)
+!Pc_TechRow              = $95DF ; 3 B per PC: tech-list cursor row on screen (0-2)
+!BattleMenu_ItemRow      = $95E5 ; 1 B: item-list cursor row on screen (0-2)
+!BattleMenu_ItemScroll   = $95E6 ; 1 B: item-list scroll position (first visible line, max $FA)
+!Pc_TechScroll           = $95EB ; 3 B per PC: tech-list scroll position (first visible line)
+!BattleUI_OtherReady     = $95F1 ; 1 B: !BattleMenu_ReadyCount - 1, latched by BuildStatusBarFrame (0 = only one PC ready)
+
+; Target selection (BattleMenu_BuildTargetList, BattleTgt_*)
+!BattleTgt_AreaSide      = $9604 ; 1 B: area scan side: 0 = enemies (slots 3-10), else PCs (0-2)
+!BattleTgt_AreaCentre    = $9605 ; 1 B: area source / centre battler slot
+!BattleTgt_AreaAim       = $9606 ; 1 B: aimed-at battler slot (line areas)
+!BattleTgt_AreaSize      = $9607 ; 1 B: area size: line half-width / 8, or circle radius squared in 16-px cells
+!BattleTgt_AreaVariant   = $9608 ; 1 B: line variant: 0 = band from the source, else box ending at the aimed-at battler
+!BattleMenu_TargetSelect = $9609 ; 1 B: non-zero while target selection is running
+!BattleTgt_CanCycle      = $960A ; 1 B: non-zero = the player may move the target cursor
+!BattleTgt_SweepResume   = $960B ; 1 B: selection-list index the multi-target cursor sweep resumes from next frame
+!BattleTgt_TargetAll     = $960C ; 1 B: bit 7 set = every listed candidate is selected
+!BattleTgt_Mode          = $960D ; 1 B: target mode: low 7 bits index BattleTgt_ModeTable; bit 7 set = leave the
+                                 ; submenu while targeting and return to it on cancel (BuildTargetList)
+!BattleTgt_Unk960E       = $960E ; 1 B: cleared on target cancel/commit and battler removal; no reader in bank $C1 yet
+!BattleTgt_Caster        = $960F ; 2 B: battler slot that requested the target list (the active PC)
+!BattleTgt_Result        = $9613 ; 1 B: 0 = a target exists, $80 (negative) = no valid target
+!BattleTgt_Cursor        = $9614 ; 1 B: cursor index into !BattleTgt_Candidates
+!BattleMenu_CmdMenu      = $9615 ; 1 B: menu the pending command comes from (0 attack, 1 tech, 2 item)
+!Battler_Present         = $96F5 ; 11 B per battler slot: non-zero = battler exists
+!Battler_ScreenOffsetX   = $9708 ; 11 B per battler slot: added to !Battler_ScreenX for the live cursor x
+!Battler_ScreenOffsetY   = $9713 ; 11 B per battler slot: added to !Battler_ScreenY for the live cursor y
+!Battler_Unk984D         = $984D ; 2 B per battler slot (index slot*2): sent as the info-panel message id and used to
+                                 ; index BattleRom_UnkE1DE80; inferred: per-battler type id. Unconfirmed.
+!Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
+!Pc_SavedMenuRow         = $9916 ; 3 B per PC: command-menu row to restore when the PC's turn comes back
+!BattleMenu_ItemRowDrawn = $991F ; 1 B: item cursor row last drawn ($FF = redraw)
+!BattleMenu_ItemScrollDrawn = $9920 ; 1 B: item scroll position the arrows were last drawn for ($FF = redraw)
+!BattleMenu_Dirty        = $993A ; 1 B: non-zero = rebuild the menu this frame (RefreshIfDirty gates)
+!BattleTgt_Candidates    = $99C0 ; 12 B: candidate battler slots ($FF = empty); 11 used, cleared through index 11
+!BattleTgt_AreaType      = $99CC ; 1 B: area shape for service 7 (index into BattleTgt_AreaTable, 0-6)
+!Battle_CmdQueue         = $99D4 ; 4 B: PC slots with a committed command, in commit order
+!Battle_CmdQueueLen      = $99D8 ; 1 B: entries in !Battle_CmdQueue
+!Pc_AtbCur               = $99DD ; 3 B per PC: ATB gauge value
+!Battle_MenuTimeHold     = $99E0 ; 1 B: = !Battle_CfgBattleMode while a tech/item list is open, 0 on the main menu;
+                                 ; inferred: holds the battle clock in Wait mode
+!Battle_CfgBattleMode    = $99E1 ; 1 B: battle-mode setting copied into !Battle_MenuTimeHold (inferred Active/Wait)
+!BattleMenu_WindowMapDirty = $99E2 ; 1 B: incremented after !BattleMenu_WindowMap changes (upload request, inferred)
+
+; Tech-list text buffer at $99E3 (same layout as the tech window map,
+; tile/attr pairs; BattleMenu_RenderTechRow writes it, UpdateTechWindow
+; copies its tile bytes to the window).
+function BattleMenu_TechTextTile(row, col) = $99E3+(row*$40)+(col*2)
+function BattleMenu_TechTextAttr(row, col) = $99E4+(row*$40)+(col*2)
+
+; Copy of the Tech_MenuEntry under the tech cursor (UpdateTechWindow).
+struct Tech_CursorEntry $9EE3
+.TechId:     skip 1     ; +0
+.TargetMode: skip 1     ; +1
+.Flags:      skip 1     ; +2
+.MpCost0:    skip 1     ; +3
+.Partners:   skip 1     ; +4 ($FF also written when no entry is under the cursor)
+.MpCost1:    skip 1     ; +5
+.MpCost2:    skip 1     ; +6
+endstruct
+
+!BattleUI_GaugeLayout    = $9F20 ; 1-2 B: status-bar layout: 0 = HP/MaxHP/MP, 1 = HP/MP + gauge, 2 = HP/MP/TP + gauge
+!Pc_AtbMax               = $9F22 ; 3 B per PC: ATB gauge full value (divisor in DrawSlotGaugeBar)
+!Pc_Unk9F25              = $9F25 ; 3 B per PC: ORed with !Pc_Unk9F28; both zero = empty panel (SlotPanelRefresh)
+!Pc_Unk9F28              = $9F28 ; 3 B per PC: see !Pc_Unk9F25
+!Battler_Unk9F29         = $9F29 ; 1 B per battler slot: non-zero (with !Battle_Unk9F34) = the target info panel also
+                                 ; gets the target's HP (UpdateCursorOverlay)
+!Battle_Unk9F34          = $9F34 ; 1 B: enables the !Battler_Unk9F29 check above
+!BattleMenu_ItemId       = $9F35 ; 1 B: item id chosen in the item list
+!BattleMenu_ItemRecord   = $9F36 ; 2 B: Item_BattleList record offset of the chosen item
+!Battle_Unk9F38          = $9F38 ; 1 B per PC: ORed into BattleCmd.Kind; cleared when the PC's menu opens
+!BattleMenu_CursorPalette = $9F46 ; 1 B: palette bits merged into the cursor sprite attribute (flash cycle, inferred)
+!Battler_Unk9FF7         = $9FF7 ; 1 B per battler slot: bit 7 set = skipped by every target scan; meaning unknown
+!Battle_DivBusy          = $A029 ; 1 B: non-zero while Battle_Divide runs
+!Pc_TechCount            = $A02A ; 3 B per PC: number of lines in the PC's tech list
+!BattleMenu_TechAvailDone = $A099 ; 1 B: set once UpdateTechMpAvail has graded the visible rows; TechConfirm needs it
+!BattleUI_PanelHold      = $A09A ; 1 B: non-zero holds the per-frame panel refresh (set while targeting from the menu)
+!Battler_Untargetable    = $A09B ; 1 B per battler slot: non-zero = never offered as a target (inferred: hidden)
+!BattleMenu_Lock         = $A0A7 ; 1 B: non-zero blocks the item list; bit 0 also blocks the tech list
+!Battler_KoFlag          = $A0A8 ; 1 B per battler slot: non-zero = only target mode $04 may pick it (inferred: KO'd)
+!BattleMenu_ItemRefresh  = $A0D0 ; 1 B: non-zero = re-render the item list (ItemListInput)
+!Pc_LockStatus           = $A0D1 ; 1 B per PC: non-zero = PC can't join techs (inferred: Lock status)
+!BattleMenu_CfgCursorMemory = $A0D4 ; 1 B: config: non-zero = keep each PC's command-menu row between turns
+!BattleMenu_CfgListMemory = $A0D5 ; 1 B: config: non-zero = keep tech/item list cursor positions between turns
+!BattleUI_UnkA0D7        = $A0D7 ; 1 B: compared with !BattleTgt_Selected by BuildStatusBarFrame; ConfirmCommand
+                                 ; sets $FF; purpose unknown
+!Pc_SavedTech            = $A0D8 ; 3 B per PC: tech id under the cursor at commit (with CfgListMemory)
+!BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel
+!Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
+!BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is <= MaxHP/8 (or 0)
+!BattleUI_UnkA110        = $A110 ; 1-2 B: when HP is exactly MaxHP/8, non-zero makes it count as low; unknown
+!BattleMenu_KeepRow      = $A114 ; 1 B: set by alt-confirm; CommitAction then keeps !Pc_SavedMenuRow
+!BattleUI_UnkA115        = $A115 ; 1-2 B: PC slot compared with the panel slot in SlotPanelRefresh; purpose unknown
+!BattleUI_UnkA117        = $A117 ; 1 B: zero forces the "ready" panel in SlotPanelRefresh; purpose unknown
+!BattleUI_PanelRedraw    = $A43F ; 1 B: non-zero = redraw the command cursor column (ClearActivePanelColumn)
+!BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
+!BattleTgt_Selected      = $A62D ; 12 B: selected battler slots ($FF = empty); +0 is the command's target
+!BattleTgt_Highlight     = $A64E ; 1 B: battler slot under the single-target cursor
+!BattleTgt_UnkA64F       = $A64F ; 1 B: cleared by BuildTargetList; no reader in bank $C1 yet
+!BattleTgt_UnkA6D8       = $A6D8 ; 1 B: cleared by BuildTargetList; no reader in bank $C1 yet
+!BattleMenu_Roster       = $A6D9 ; 3 B: ready PCs; entry i = slot i when PC i waits for a command, negative = not
+!BattleMenu_RosterIdx    = $A6DD ; 1 B: roster entry whose menu is shown (negative = none)
+!BattleMenu_ReadyCount   = $A6DE ; 1 B: PCs in the roster
+!BattleMenu_RosterIdxDrawn = $A6DF ; 1 B: !BattleMenu_RosterIdx the window was last built for ($FE/$FF = rebuild)
+!BattleUI_NextPanelSlot  = $A6E0 ; 1 B: PC slot UpdateNextPcPanel refreshes this frame (round robin 0-2)
+
+; Tech window tilemap buffer at $A6E1 (6 rows x 32 entries, uploaded by
+; Battle_QueueVramUpload_A6E1).
+function BattleMenu_TechTile(row, col) = $A6E1+(row*$40)+(col*2)
+function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
+
+!BattleMenu_UnkA862      = $A862 ; 1 B: non-zero makes ProcessInput confirm at once; OpenTechList sets it only around
+                                 ; its list rendering; purpose unknown
+!Pc_SavedTechRow         = $A863 ; 3 B per PC: !Pc_TechRow to restore when the tech list reopens
+!Pc_SavedTechScroll      = $A866 ; 3 B per PC: !Pc_TechScroll to restore
+!BattleMenu_UnkA869      = $A869 ; 1 B: cleared whenever the tech list (re)opens; no reader in bank $C1 yet
+!BattleMenu_TechWindowNew = $A86A ; 1 B: non-zero = copy the tech box frame into !BattleMenu_WindowMap once
+!BattleMenu_ReturnSubmenu = $A86B ; 1 B: submenu + 1 to return to when targeting is cancelled (0 = main menu)
+!Enemy_NameTiles         = $ACBC ; 24 B per enemy-name line: 11 lower-row tiles, 1 gap byte, 11 upper-row tiles
+
+; ------------------------------------------------------------
+; Banks and ROM data read by bank $C1
+; ------------------------------------------------------------
+!Battle_WramBank           = $7E      ; WRAM bank (MVN destination)
+!BattleRom_TextBank        = $CC      ; bank holding the item/tech name tables (MVN source)
+!BattleRom_AngleTable      = $C0F300  ; direction angle by (|dy| & ~7) * 4 + |dx| >> 3 (Calc_Delta16)
+!BattleRom_SineTable       = $C0F900  ; sine magnitudes, 2 B per entry, 512 entries (Battle_SinLookup)
+!BattleRom_TechListBase    = $CCF38C  ; 1 B per PC slot: first line of the PC in the 20-line tech lists (0/$14/$28)
+!BattleRom_TechEntryBase   = $CCF395  ; 2 B per PC slot: offset of the PC's Tech_MenuEntry block (0/$8C/$118)
+!BattleRom_TechRowMapOffset = $CCF39B ; 2 B per visible tech row: offset of the row in the tech window map
+!BattleRom_TechEntryOffset = $CCF3A1  ; 1 B per menu-entry index: index * 7
+struct BattleRom_CursorSprite $CCF604 ; command cursor, 4 sprites x 4 B
+.X:         skip 1      ; +0: x offset from !Battler_ScreenX
+.Y:         skip 1      ; +1: y offset from !Battler_ScreenY
+.Tile:      skip 1      ; +2: tile
+.Attr:      skip 1      ; +3: attribute (palette replaced by !BattleMenu_CursorPalette)
+endstruct
+!BattleRom_PcNameOffset    = $CCF837  ; 1 B per PC slot: offset of the PC in !Pc_NameTiles (0/10/20)
+!BattleRom_StatsOffset     = $CCF8ED  ; 2 B per battler slot: slot * $80, offset of its BattlerStats record
+!BattleRom_DigitTiles      = $CCF903  ; 10 B: tile for digits 0-9 ($73-$7C)
+!BattleRom_PcBit           = $CCF9FB  ; 1 B per PC slot: $80/$40/$20, the PC's bit in Item_BattleList.PcMask
+!BattleRom_AttrColumnL1    = $CCFA23  ; 2 B per PC slot: map offset of the PC's attribute column, layout 1
+!BattleRom_AttrColumnL02   = $CCFA29  ; 2 B per PC slot: same for layouts 0 and 2
+!BattleRom_HpCellL0        = $CCFA2F  ; 2 B per PC slot: map offset of the HP digits, layout 0
+!BattleRom_HpCellL1        = $CCFA35  ; 2 B per PC slot: same, layout 1 (also the gauge base for every layout)
+!BattleRom_HpCellL2        = $CCFA3B  ; 2 B per PC slot: same, layout 2
+!BattleRom_PanelEmpty      = $CCFA41  ; 42 B: 6x7 tiles of the panel shown when no other PC is waiting
+!BattleRom_PanelReady      = $CCFA6B  ; 42 B: 6x7 tiles of the panel shown when another PC is waiting
+!BattleRom_TechBorder      = $CCFA95  ; 54 B: 6x9 tiles of the tech window's right part (row 0 holds "MP")
+!BattleRom_MenuCursorCell  = $CCFADD  ; 2 B per command row: map offset of the command cursor
+!BattleRom_TechCursorCell  = $CCFAE3  ; 2 B per tech row: map offset of the tech cursor
+!BattleRom_ItemCursorCell  = $CCFAE9  ; 2 B per item row: map offset of the item cursor
+!BattleRom_CmdOffset       = $CCFAF0  ; 1 B per battler slot: offset of its BattleCmd record (PCs 0/7/14)
+!BattleRom_TechFixedText   = $CCFB4B  ; 2 x 18 B: "[Double Tech]" and "[Triple Tech]" header lines
+!BattleRom_Squares         = $CCFB6F  ; 16 B: n*n for n = 0-15 (BattleTgt_AreaCircle)
+!BattleRom_OamShowMask     = $CCFB8D  ; 4 B: high-table mask clearing x bit 8 of cursor sprite 0-3
+!BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
+!BattleRom_WindowEdges     = $D159FC  ; edge strips for the ready-PC windows (left strip, right strip interleaved)
+!BattleRom_TechBoxMap      = $D15A50  ; $180 B: tech window frame tilemap
+!BattleRom_ItemBoxMap      = $D15BD0  ; $180 B: item window frame tilemap
+!BattleRom_UnkE1DE80       = $E1DE80  ; 1 B per !Battler_Unk984D value: non-zero = send $FF instead of the target slot
+                                      ; to the info-panel message call; purpose unknown
 
 endif
