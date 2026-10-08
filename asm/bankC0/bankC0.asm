@@ -27432,7 +27432,8 @@ Evt_Op09_AllowCalls:
 ;   the call opcodes skip it) and Obj_Unk1A81 = 0 (no frame build), so it
 ;   probably leaves the scene; X = Y + 2, C=1.
 ; Reached through Evt_OpcodeTable (opcode $0A).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB=$00
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00
 ;   (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = 0;
 ;   Y = the opcode + 1; B = 0 (TDC/XBA).
@@ -27486,7 +27487,8 @@ Evt_Op0B_StopObjScript:
 ;   Obj_Unk1000 (undoes Evt_Op0B_StopObjScript); X = Y + 2, C=1 through
 ;   Evt_Op0E_Next.
 ; Reached through Evt_OpcodeTable (opcode $0C).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB=$00
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00
 ;   (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
 ;   new Obj_Unk1000; Y = the opcode + 1; B = 0 (TDC/XBA).
@@ -27569,7 +27571,7 @@ Evt_Op0E_Next:                          ; header: see Evt_Op0E_SetUnk1C81
 ; ------------------------------------------------------------
 ; $C0:62B5 — Evt_Op10_JumpFwd (22 bytes, $62B5–$62CA)
 ; Event opcode $10 (2 bytes: $10, n): the script goes on n bytes after
-;   the operand byte: X = Y + 1 + n, C=1. Its last four bytes (.store)
+;   the operand byte: X = Y + 1 + n, C=1. Its last five bytes (.store)
 ;   are also Evt_Op11_JumpBack's tail (BRA Evt_Op10_JumpFwd_store).
 ; Reached through Evt_OpcodeTable (opcode $10).
 ; Callers note: Evt_Op11_JumpBack branches to .store (BRA at $C0:62DC).
