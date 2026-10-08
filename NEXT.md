@@ -79,4 +79,10 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
    `$CC:F77F`), `Battle_ApplyPendingEffect` ($C1:308C) and its handler table at `$C1:3216`, then
    `Battle_TickUnkA4Mode` ($C1:3234) and the movers at `$C1:3800`-`$C1:4010` that use the box tests
    and the distance checks. (`$C1:007E` and `$C1:283D`-`$C1:2F96` are matched.)
+
+1. Bank $C1 past `$C1:3714`: the routine at `$C1:3714` (stub `Battle_TickStatusEffectVisuals`; the name
+   looks wrong: it counts down per-enemy timers at `$9897` and dispatches on `!Enemy_Anim` through the
+   9-entry table at `$C1:3760`), then its handlers, the enemy movers at `$C1:3772`-`$C1:4057` that use
+   the box tests and the distance checks, and service 4 (`$C1:4058`). (`$C1:007E` and
+   `$C1:283D`-`$C1:3713` are matched.)
 2. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.

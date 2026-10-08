@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 33875,
+  "emitted_bytes": 34444,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 300,
-      "bytes": 33875
+      "functions": 306,
+      "bytes": 34444
     },
     "readable": {
-      "functions": 273,
-      "bytes": 32986
+      "functions": 279,
+      "bytes": 33555
     },
     "verified": {
-      "functions": 245,
-      "bytes": 29514
+      "functions": 244,
+      "bytes": 29489
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 13405,
+      "emitted_bytes": 13974,
       "matched": {
-        "functions": 177,
-        "bytes": 13405
+        "functions": 183,
+        "bytes": 13974
       },
       "readable": {
-        "functions": 150,
-        "bytes": 12516
+        "functions": 156,
+        "bytes": 13085
       },
       "verified": {
-        "functions": 125,
-        "bytes": 9202
+        "functions": 124,
+        "bytes": 9177
       }
     },
     {
@@ -535,7 +535,7 @@
       "bank": "$C1",
       "start": "$C1:3000",
       "end": "$C1:3FFF",
-      "emitted_bytes": 1243,
+      "emitted_bytes": 1812,
       "functions": [
         "Battle_PickNextStatusAnim",
         "Battle_ApplyPendingEffect",
@@ -550,7 +550,13 @@
         "Battle_FxOverlay5",
         "Battle_FxHandlerTable",
         "Battle_TickEnemyGroup",
-        "Battle_DrawAllBattlerFrames"
+        "Battle_DrawAllBattlerFrames",
+        "Battle_StartPose",
+        "Battle_FaceAllPcsNearestEnemy",
+        "BattleSys_DefeatPose",
+        "BattleSys_VictoryPose",
+        "Battle_RunPcPose",
+        "Battle_PoseStep"
       ]
     },
     {

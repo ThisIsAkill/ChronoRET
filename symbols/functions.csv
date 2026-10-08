@@ -118,7 +118,7 @@ $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
 $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
-$C1:007E,$C1:0088,11,BattleSys_PumpFrames,$C1,Battle system,readable,b39b10bd06b9,"Waits for the next frame: sets !Battle_FramePending, then calls BattleSys_IdleVecCD0036 again and again until the interrupt handler at $CF:FB65 has cleared the flag."
+$C1:007E,$C1:0088,11,BattleSys_PumpFrames,$C1,Battle system,readable,90234c8d65ac,"Waits for the next frame: sets !Battle_FramePending, then calls BattleSys_IdleVecCD0036 again and again until the interrupt handler at $CF:FB65 has cleared the flag."
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,readable,9b9e4ebaed79,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
 $C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,verified,28c4f8ee0134,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,verified,a88ce7d844a5,"16÷8 HW divide via WRDIVL/WRDIVH/WRDIVB, quotient from RDDIVL and remainder from RDMPYL."
@@ -156,7 +156,7 @@ $C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,verified,6a5abe85
 $C1:0BB6,$C1:0BD2,29,BattleMenu_DrawTechLowerRow,$C1,Battle menu,verified,7da2c3d57d28,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
 $C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,verified,8a652baf2c22,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
 $C1:0C00,$C1:0C2C,45,BattleMenu_BlankNameTailCells,$C1,Battle menu,verified,9e3fc8087d4f,"Tech-name exit path of BattleMenu_RenderTechRow (reached by its tail JMP): blanks cols 17-20 (right of the 11-tile name) on both rows of the line (blank tile, palette 3); the mirror of BattleMenu_Blan"
-$C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,verified,f39fb50226f6,"BattleMenu_UpdateWindows_Exit, $C10C46–$C10C48)"
+$C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,readable,debc392beb10,"BattleMenu_UpdateWindows_Exit, $C10C46–$C10C48)"
 $C1:0C46,$C1:0C48,3,BattleMenu_UpdateWindows_Exit,$C1,Battle menu,verified,64f680f6dc01,
 $C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,verified,b73e2781a948,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
 $C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,verified,b30f590a6394,
@@ -211,8 +211,8 @@ $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,verified,ab8a8de9040c,APU
 $C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,verified,4a1a477b3788,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
 $C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,verified,1aad1e24cf4b,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,verified,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
-$C1:1C4A,$C1:1C54,11,Battle_DrawBattlerFrame,$C1,Battle engine,readable,51c0c26e2255,"Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the battler's tile buffer in bank $7E, unless the battler uses frame layout 3 (!Battle_FrameLayoutStrip), which this entry leaves alone."
-$C1:1C55,$C1:1F78,804,Battle_DrawBattlerFrameAnyLayout,$C1,Battle engine,readable,e82956d37326,Decodes one animation frame of a battler into bank $7E tiles: 1.
+$C1:1C4A,$C1:1C54,11,Battle_DrawBattlerFrame,$C1,Battle engine,readable,6934b6523ba1,"Decodes frame !Battle_FrameId of battler !Battle_FrameSlot into the battler's tile buffer in bank $7E, unless the battler uses frame layout 3 (!Battle_FrameLayoutStrip), which this entry leaves alone."
+$C1:1C55,$C1:1F78,804,Battle_DrawBattlerFrameAnyLayout,$C1,Battle engine,readable,eea4d2dc837c,Decodes one animation frame of a battler into bank $7E tiles: 1.
 $C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,verified,0cf0840e4d85,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,verified,2b4add39e679,"Service 7 of the $C10045 service dispatcher (dispatch table at $C10051; reached only by same-bank JSR from bank $C1, see BattleMenu_EnqueueReadyBattler)."
 $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140b1c,
@@ -283,7 +283,7 @@ $C1:2F22,$C1:2F96,117,Battle_UpdatePcFacing,$C1,Battle engine,readable,c0c04dbde
 $C1:2F97,$C1:305B,197,Battle_PickStatusAnim,$C1,Battle engine,readable,f2816325d71f,
 $C1:305C,$C1:308B,48,Battle_PickNextStatusAnim,$C1,Battle engine,readable,22b6fd672ec6,"Runs Battle_PickStatusAnim for one battler per call, the slot in !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3,"
 $C1:308C,$C1:30B5,42,Battle_ApplyPendingEffect,$C1,Battle engine,readable,aa1f51070c40,"For battler !Battle_TickSlot, if present: when the effect picked (!Battler_FxWanted) differs from the one running (!Battler_FxApplied), records it, stops the overlay and the colour cycle, clears !Batt"
-$C1:30B6,$C1:30E0,43,Battle_FxReset,$C1,Battle engine,matched,98028d56f5d9,"Effect 0 (none): clears the battler's effect flags; for a PC also copies the saved palette (!Battle_PaletteSaved, 26 bytes from !Battler_Palette * 16) back over the live one, undoing a tint or colour "
+$C1:30B6,$C1:30E0,43,Battle_FxReset,$C1,Battle engine,matched,a768ccd526c3,"Effect 0 (none): clears the battler's effect flags; for a PC also copies the saved palette (!Battle_PaletteSaved, 26 bytes from !Battler_Palette * 16) back over the live one, undoing a tint or colour "
 $C1:30E1,$C1:3140,96,Battle_FxOverlay2Tint,$C1,Battle engine,matched,f2938f2481da,
 $C1:3141,$C1:3162,34,Battle_FxOverlay7,$C1,Battle engine,matched,26f1b6d6952c,Effect $0E: resets and starts overlay 7.
 $C1:3163,$C1:3184,34,Battle_FxOverlay6,$C1,Battle engine,matched,7f6ca199a630,Effect 9: resets and starts overlay 6.
@@ -295,6 +295,12 @@ $C1:31F4,$C1:3215,34,Battle_FxOverlay5,$C1,Battle engine,matched,c18ba7b2ceb7,Ef
 $C1:3216,$C1:3233,30,Battle_FxHandlerTable,$C1,Battle engine,readable,11c9da760b29,"One handler per status effect id 0-$0E, called from Battle_ApplyPendingEffect."
 $C1:3234,$C1:34A6,627,Battle_TickEnemyGroup,$C1,Battle engine,readable,eae55bebf8de,
 $C1:34A7,$C1:34DA,52,Battle_DrawAllBattlerFrames,$C1,Battle engine,readable,c3e1b8987a7c,"Draws the starting frame (!Battler_StartFrame) of every present battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets the three PC animation timers to 1, 2 and 3 so the PCs take thei"
+$C1:34DB,$C1:350E,52,Battle_StartPose,$C1,Battle engine,readable,80c585ad73b1,"The last step of the battle set-up (service 0, which JMPs here): turns every PC toward its nearest enemy, then plays animation $0C on the targetable PCs (animation 0 on the others) through Battle_RunP"
+$C1:350F,$C1:354C,62,Battle_FaceAllPcsNearestEnemy,$C1,Battle engine,readable,508575ebb51c,"Sets !Battler_Facing of PCs 2, 1, 0 from the angle to each one's nearest enemy (position query 2 through service 5, as in Battle_UpdatePcFacing, but for every PC at once and without the presence, KO, "
+$C1:354D,$C1:356C,32,BattleSys_DefeatPose,$C1,Battle system,readable,cea7de0cb18a,"Service 9 of the cross-bank $C10045 service API (dispatch table at $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D directly)."
+$C1:356D,$C1:35DC,112,BattleSys_VictoryPose,$C1,Battle system,readable,ee1f3bbde81e,"Service 8 of the cross-bank $C10045 service API (dispatch table at $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D directly)."
+$C1:35DD,$C1:3699,189,Battle_RunPcPose,$C1,Battle engine,readable,1ac43637b622,
+$C1:369A,$C1:3713,122,Battle_PoseStep,$C1,Battle engine,readable,b34241c31cd9,
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,readable,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,readable,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"

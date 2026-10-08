@@ -103,6 +103,16 @@ if !constants_battle_inc == 0
 !Battle_EnemyGroupSize   = 3     ; !Battle_TickOrder entries visited per group
 !Battle_EnemyGroupLast   = 3     ; highest !Battle_UnkA4 group
 
+; --- PC poses (Battle_RunPcPose and the services that start it) ---
+!Battle_AnimDown         = 8     ; BattleRom_StatusAnim's animation for KO (Status bit 7); service 9's pose
+!Battle_AnimUnk0A        = $0A   ; service 8's pose (inferred: victory); not looked at
+!Battle_AnimUnk0C        = $0C   ; the battle-start pose (Battle_StartPose); not looked at
+!Battle_Unk2989NoEndPose = $01   ; !Battle_Unk2989 bit: set = service 8 returns before its pose; meaning unknown
+!Battle_PoseTicksLast    = $17   ; last byte of !Pc_PoseTicks cleared by Battle_RunPcPose (3 x 8 B)
+!Battle_PoseListLen      = 8     ; entries per PC pose list
+!Battle_PoseEntryStart   = $FF   ; !Pc_PoseEntry before the first step
+!Battle_PoseFrames       = $40   ; frames a pose runs (Battle_RunPcPose)
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits
