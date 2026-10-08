@@ -142,10 +142,26 @@ Battle_Divide:
 ; others with M=0 (BattleUI_DrawSlotGaugeBar and the low-HP test in
 ; BattleUI_DrawPcNamePanel shift a 16-bit A). ASL A / LSR A = 1 byte each.
 ;
-; Left-shift chain: ShiftLeft8 (8 ASL → *256) → ShiftLeft4 (4 ASL → *16)
-;   → ShiftLeft3 (3 ASL → *8, RTS)
-; Right-shift chain: Battle_ShiftRight8 (8 LSR → >>8) → ShiftRight6 (>>6)
-;   → ShiftRight5 (>>5) → ShiftRight4 (>>4) → ShiftRight3 (>>3, RTS)
+; Left-shift chain: Battle_ShiftLeft8 (8 ASL → *256) → Battle_ShiftLeft4
+;   (4 ASL → *16) → Battle_ShiftLeft3 (3 ASL → *8, RTS)
+; Right-shift chain: Battle_ShiftRight8 (8 LSR → >>8) → Battle_ShiftRight6
+;   (>>6) → Battle_ShiftRight5 (>>5) → Battle_ShiftRight4 (>>4)
+;   → Battle_ShiftRight3 (>>3, RTS)
+; The other seven labels are sub-entries documented here.
+; Callers (all JSR, by entry point):
+;   Battle_ShiftLeft8: BattleUI_DrawSlotGaugeBar ($C1:0715), $C1:660C,
+;     $C1:6634
+;   Battle_ShiftLeft4: $C1:30CF, $C1:310F
+;   Battle_ShiftLeft3: $C1:3410, $C1:3471, $C1:48BA
+;   Battle_ShiftRight8: $C1:2D73
+;   Battle_ShiftRight6: $C1:3AB7, $C1:3C41, $C1:53B2, $C1:53B9
+;   Battle_ShiftRight5: $C1:39F6, $C1:39FE, $C1:3A0A, $C1:3A12
+;   Battle_ShiftRight4 (15 sites): BattleMenu_UpdateTechMpAvail,
+;     BattleMenu_CommitAction, BattleMenu_UpdateCursorOverlay,
+;     BattleTgt_AreaCircle (4), and $C1:4A81, $C1:4A9F, $C1:67C6, $C1:685B,
+;     $C1:68F4, $C1:6B72, $C1:6C1D, $C1:6CCC
+;   Battle_ShiftRight3: BattleUI_DrawPcNamePanel, BattleUI_UpdateNextPcPanel,
+;     BattleUI_DrawSlotGaugeBar, $C1:78C6, $C1:78F3, $C1:7963, $C1:7990
 ; Entry: M either width (A shifted at its current width), X, DP, DB any
 ; Exit:  M, X, DP, DB unchanged; A shifted; C = last bit shifted out;
 ;        X/Y and memory untouched
@@ -155,23 +171,23 @@ Battle_ShiftLeft8:          ; A <<= 8 (4 here, then falls through ShiftLeft4's 1
     ASL A
     ASL A
     ASL A
-Battle_ShiftLeft4:          ; A <<= 4 (falls through ShiftLeft3 chain)
+Battle_ShiftLeft4:          ; A <<= 4 (falls through ShiftLeft3 chain); header: see Battle_ShiftLeft8
     ASL A
-Battle_ShiftLeft3:          ; A <<= 3
+Battle_ShiftLeft3:          ; A <<= 3; header: see Battle_ShiftLeft8
     ASL A
     ASL A
     ASL A
     RTS
-Battle_ShiftRight8:         ; A >>= 8 (2 extra LSR before ShiftRight6 chain)
+Battle_ShiftRight8:         ; A >>= 8 (2 extra LSR before ShiftRight6 chain); header: see Battle_ShiftLeft8
     LSR A
     LSR A
-Battle_ShiftRight6:         ; A >>= 6
+Battle_ShiftRight6:         ; A >>= 6; header: see Battle_ShiftLeft8
     LSR A
-Battle_ShiftRight5:         ; A >>= 5
+Battle_ShiftRight5:         ; A >>= 5; header: see Battle_ShiftLeft8
     LSR A
-Battle_ShiftRight4:         ; A >>= 4
+Battle_ShiftRight4:         ; A >>= 4; header: see Battle_ShiftLeft8
     LSR A
-Battle_ShiftRight3:         ; A >>= 3
+Battle_ShiftRight3:         ; A >>= 3; header: see Battle_ShiftLeft8
     LSR A
     LSR A
     LSR A
@@ -185,6 +201,8 @@ Battle_ShiftRight3:         ; A >>= 3
 ; Format the 16-bit value in !BattleMsg_NumValue (0-999) into digit tiles:
 ;   !BattleMsg_Digit1000 = blank, Digit100 / Digit10 / Digit1 = digits,
 ;   tiles looked up in !BattleRom_DigitTiles. NumValue is consumed.
+; Callers (JSR): BattleUI_DrawPcNamePanel ($C1:039A, $C1:03EE) and
+;   BattleUI_UpdateNextPcPanel ($C1:0628).
 ; Entry: M=0 (16-bit A), X=0 (16-bit), DP=0 (TDC / TAX zeroes the digit
 ;        counters only because D=0), DB=$7E (WRAM accessible)
 ; Exit:  M=1 (8-bit A), X=0; X and Y unchanged (PHX/PLX); A = blank tile;
@@ -243,6 +261,9 @@ BattleMsg_FormatNumberDigits:
 ; Two-digit variant of BattleMsg_FormatNumberDigits: formats
 ; !BattleMsg_NumValue as tens+ones only. Digit1000/Digit100 = blank;
 ; Digit10 = tens, Digit1 = ones. Used for two-digit values (0–99).
+; Callers (9 JSR sites): BattleUI_DrawPcNamePanel ($C1:0444),
+;   BattleUI_UpdateNextPcPanel ($C1:0686), BattleMenu_RenderItemRow
+;   ($C1:0A41) and BattleMenu_UpdateTechWindow (6 sites).
 ; Entry: M=0 (16-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1 (8-bit A), X=0; X and Y unchanged (PHX/PLX); A = blank tile;
 ;        !BattleMsg_NumValue consumed
@@ -291,6 +312,8 @@ BattleMsg_FormatTwoDigits:
 ; has 41 codes and set 2 has 10, the counts of Japanese kana that take a
 ; dakuten and a handakuten, so $71/$72 are probably those marks drawn
 ; above the base character (a leftover of the Japanese text code).
+; Callers (JSR): BattleMenu_RenderItemRow ($C1:09E2) and
+;   BattleMenu_RenderTechRow ($C1:0B7C).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC / TAX as zero), DB any
 ;        (nothing touches memory before the MVN)
 ; Exit:  M=1, X=0; DB=$7E (set by the MVN); A, X, Y clobbered
@@ -356,6 +379,8 @@ BattleMsg_ReencodeTextBuffer:
 ; $FF at +$100 and +$300); angle × 4 picks every fourth entry, and the
 ; value is negated for the second half turn (table offset $200 and up). The signed sine goes to !Battle_MulFactor16, the scale to
 ; !Battle_MulFactor8, and Battle_Mul8x16 multiplies them.
+; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites) and 42 in unmatched
+;   code (e.g. $C1:2C38, $C1:2C42, $C1:37D7, $C1:37E1).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB any (table read with .l);
 ;        angle in A
 ; Exit:  M=1, X=0; A = !Battle_MulProduct+1 (product >> 8); X clobbered
@@ -392,6 +417,9 @@ Battle_SinLookup:
 ; 16-bit values, takes |dx| and |dy|, looks up a base angle in
 ; !BattleRom_AngleTable at index (|dy| & ~7) × 4 + (|dx| >> 3), then
 ; places it in the right quadrant from the signs of dx and dy.
+; Callers (37 JSR sites): BattleTgt_AreaPartyTriangle (9 sites),
+;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC) and 25 in unmatched
+;   code (e.g. $C1:2C27, $C1:2F82, $C1:353B, $C1:37C9).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB any (table
 ;        read with .l); !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y
 ; Exit:  M=1, X=0; angle in A and !Battle_GeoAngle; X = table index;
@@ -513,6 +541,8 @@ Battle_CalcAngle:
 ;        otherwise), set !BattleMenu_ActivePc, redraw every roster PC's
 ;        command list (BattleMenu_DrawCommandList) and the command-window
 ;        frames (BattleMenu_DrawCommandWindowFrames).
+; Callers (JSR): BattleMenu_UpdateMainWindow ($C1:0C5C) and unmatched code
+;   at $C1:0027.
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87, $8E and
 ;        $A2/$A3 used as temporaries, plus the callees' DP: $79-$7B,
@@ -821,7 +851,9 @@ BattleUI_DrawPcNamePanel:
     ; --- BattleUI_NextNamePanel ($C1:04C5): loop tail ---
     ; Next PC slot (JMP back to DrawPcNamePanel), then the enemy-name lines
     ; and the command windows; ends BuildStatusBarFrame (RTS or tail JMP to
-    ; BattleUI_HighlightPcName).
+    ; BattleUI_HighlightPcName). Reached by falling in, by BEQ/BRA from
+    ; .gauge_caps above, and by JMP from BattleUI_DrawPcNamePanel ($C1:030E)
+    ; when the slot holds no PC.
     ; Entry/Exit: as BattleUI_BuildStatusBarFrame (M=1, X=0, DP=0, DB=$7E)
 BattleUI_NextNamePanel:
     REP #$21                        ; M=0, C=0
@@ -1132,7 +1164,7 @@ BattleUI_UpdateNextPcPanel:
     BEQ BattleUI_UpdateNextPcPanel_Exit ; layout 0 has no ATB gauges
     TDC
     TAX                             ; X = 0 (first slot)
-BattleUI_DrawAtbGauges:
+BattleUI_DrawAtbGauges:             ; header: see BattleUI_UpdateNextPcPanel
     STX.b !BattleUI_Slot
 .gauge_loop:
     LDX.b !BattleUI_Slot
@@ -1144,7 +1176,7 @@ BattleUI_DrawAtbGauges:
     LDA.b !BattleUI_Slot
     CMP.b #!Battle_NumPcSlots
     BNE .gauge_loop
-BattleUI_UpdateNextPcPanel_Exit:
+BattleUI_UpdateNextPcPanel_Exit:    ; header: see BattleUI_UpdateNextPcPanel
     RTS
 
 ; ============================================================
@@ -1810,7 +1842,7 @@ BattleMenu_RenderItemRow:
     STA.w BattleMenu_ItemTile(1,25),X
     LDA.b !BattleMenu_RowAttr
     STA.w BattleMenu_ItemAttr(1,25),X
-BattleMenu_RenderItemRow_Exit:
+BattleMenu_RenderItemRow_Exit:      ; header: see BattleMenu_RenderItemRow
     RTS
 
 ; $C1:0A88 — BattleMenu_RenderTechListRows (75 bytes, $0A88–$0AD2)
@@ -2166,7 +2198,7 @@ BattleMenu_UpdateWindows:
     JSR BattleMenu_UpdateTechMpAvail ; tech list: grade the rows first
     JMP BattleMenu_UpdateTechWindow  ; then refresh the window
 
-BattleMenu_UpdateWindows_Exit:      ; shared exit — branched to from UpdateMainWindow too
+BattleMenu_UpdateWindows_Exit:      ; shared exit — branched to from UpdateMainWindow too; header: see BattleMenu_UpdateWindows
     JMP BattleMenu_Return           ; → shared RTS at $103D
 
 ; ==================================================================
@@ -2792,8 +2824,10 @@ BattleMenu_UpdateTechMpAvail:
 .done:
     LDA #$01
     STA.w !BattleMenu_TechAvailDone ; rows graded
-BattleMenu_Return:                  ; shared RTS: also the JMP target of UpdateMainWindow,
-                                    ; DrawTechCursorRow and UpdateWindows_Exit
+; Shared RTS, also the JMP target of BattleMenu_UpdateMainWindow,
+; BattleMenu_DrawTechCursorRow and BattleMenu_UpdateWindows_Exit.
+; header: see BattleMenu_UpdateTechMpAvail
+BattleMenu_Return:
     RTS
 
 ; ==================================================================
@@ -2804,6 +2838,7 @@ BattleMenu_Return:                  ; shared RTS: also the JMP target of UpdateM
 ; nonzero otherwise. The callers (UpdateTechMpAvail, twice) BNE straight
 ; after the JSR, so the Z flag is the real result: the ready path ends
 ; with TDC, which gives A=0 and Z set only because DP=0.
+; Callers (JSR): BattleMenu_UpdateTechMpAvail ($C1:0FBE, $C1:0FD0).
 ; Entry: M=1, X=0 (16-bit), DP=0, DB=$7E; !BattleMenu_ReadySlotArg = PC slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Z set iff ready (A = 0), else Z clear and
 ;        A non-zero; X clobbered; Y unchanged
@@ -2912,8 +2947,9 @@ BattleMenu_RefreshIfDirtyL:
 ; Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty-
 ; flag gate and menu rebuild chain, but always follows up with a
 ; cross-bank per-frame service tick (BattleSys_FrameTickVec) before returning via
-; plain RTS. Called from several places in the battle-phase state
-; machine ($C140A3 and others) once per frame.
+; plain RTS. Called once per frame from the battle-phase state machine.
+; Callers (7 JSR sites): unmatched code at $C1:40A3, $C1:40B6, $C1:40E4,
+;   $C1:485E, $C1:4867, $C1:4890, $C1:4946.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered, plus whatever BattleSys_FrameTickVec (not matched yet)
@@ -2982,9 +3018,9 @@ BattleMenu_DrawCursorSprites:
 ; ==================================================================
 ; BattleMenu_ProcessInput ($C11153–$C111E0, 142 bytes)
 ; ==================================================================
-; Battle command-window input handler. Its three callers (RefreshIfDirtyL,
-; RefreshIfDirtyAndTick and the not yet matched routine at $C1:106E, JSR
-; at $C1:10D4) each call it only on frames where !BattleMenu_Dirty is set
+; Battle command-window input handler. Its three callers (JSR from
+; BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick and the not
+; yet matched routine at $C1:106E, at $C1:10D4) each call it only on frames where !BattleMenu_Dirty is set
 ; (they clear the flag and run the menu chain). Reads the pad-edge
 ; bytes (!Battle_PadEdgeButtons / !Battle_PadEdgeDpad, pressed this
 ; frame) and dispatches:
@@ -3092,6 +3128,7 @@ BattleMenu_ProcessInput:
 ; unreachable, but the battle init code at $CC:E39C sets
 ; CfgCursorMemory from config byte $2991 bit 6, so it runs whenever that
 ; setting is on (inferred: the cursor-memory option).
+; Callers (JMP): BattleMenu_ProcessInput ($C1:11AE).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; pad edges ($EE/$EF) cleared
@@ -3132,6 +3169,7 @@ BattleMenu_CycleActivePcPrev:
 ; Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx
 ; forward (wrap at 3 back to 0) instead; the same sound 0 and the same
 ; cursor-memory handling.
+; Callers (JMP): BattleMenu_ProcessInput ($C1:11CF).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; pad edges ($EE/$EF) cleared
@@ -3172,6 +3210,7 @@ BattleMenu_CycleActivePcNext:
 ; ==================================================================
 ; Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag
 ; the cursor redraw (!BattleUI_PanelRedraw).
+; Callers (JMP): BattleMenu_ProcessInput ($C1:11BA).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; pad edges ($EE/$EF) cleared
@@ -3193,6 +3232,7 @@ BattleMenu_CursorUp:
 ; ==================================================================
 ; Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to
 ; 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
+; Callers (JMP): BattleMenu_ProcessInput ($C1:11C6).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; pad edges ($EE/$EF) cleared
@@ -3216,6 +3256,20 @@ BattleMenu_CursorDown:
 ; Clears both pad-edge bytes and returns. Shared tail used by most of the
 ; command-window input handlers above once they've consumed this frame's
 ; input.
+; Callers (25 JMP sites): BattleMenu_ProcessInput ($C1:115C, $C1:11DE),
+;   BattleMenu_CycleActivePcPrev ($C1:1215), BattleMenu_CycleActivePcNext
+;   ($C1:124D), BattleMenu_CursorUp ($C1:1261), BattleMenu_CursorDown
+;   ($C1:1278), BattleMenu_ChooseAttack ($C1:12B9), BattleMenu_OpenTechList
+;   ($C1:12EA), BattleMenu_OpenItemList ($C1:131D), BattleMenu_TechListInput
+;   ($C1:1366), BattleMenu_TechConfirm ($C1:138C), BattleMenu_TechListCancel
+;   ($C1:13AA), BattleMenu_TechListPrev ($C1:13F1), BattleMenu_TechListNext
+;   ($C1:143A), BattleMenu_ItemListInput ($C1:1495), BattleMenu_ItemConfirm
+;   ($C1:14D8), BattleMenu_ItemListCancel ($C1:14E9),
+;   BattleMenu_ItemCursorUp ($C1:14FF), BattleMenu_ItemCursorDown
+;   ($C1:1519), BattleMenu_ItemListPageDown ($C1:1534),
+;   BattleMenu_ItemListPageUp ($C1:1548), BattleMenu_ItemListRefresh
+;   ($C1:155E), BattleMenu_TargetSelectInput ($C1:1617),
+;   BattleMenu_CommitAction ($C1:174B) and BattleMenu_TargetNext ($C1:1783).
 ; Entry: M=1, X either width, DP=0 (STZ.b $EE/$EF), DB any
 ; Exit:  M, X, DP, DB unchanged; A/X/Y unchanged;
 ;        !Battle_PadEdgeButtons = !Battle_PadEdgeDpad = 0
@@ -3292,6 +3346,15 @@ BattleMenu_EnqueueReadyBattler:
 ; Audio_PlayTileSfxA fills) and calls the audio driver entry. Used when
 ; the cursor moves or a command is confirmed; whether sound 0 is a
 ; cursor beep or a stop is not settled, hence the neutral name.
+; Callers (29 JSR sites): BattleMenu_ProcessInput ($C1:11B7, $C1:11C3,
+;   $C1:11D8), BattleMenu_CycleActivePcPrev ($C1:11E7),
+;   BattleMenu_CycleActivePcNext ($C1:121E), BattleMenu_TechListInput
+;   (4 sites), BattleMenu_ItemListInput (6 sites),
+;   BattleMenu_TargetSelectInput (4 sites), BattleTgt_EnemyLineFromCaster
+;   ($C1:217A, $C1:2188), BattleTgt_EnemyLineFromChar3 ($C1:21C0, $C1:21CE),
+;   BattleTgt_EnemyLineFromCaster2 ($C1:2214, $C1:2222),
+;   BattleTgt_EnemyRadius ($C1:226B, $C1:2279) and BattleTgt_EnemyRow
+;   ($C1:2301, $C1:230F).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as at every caller; the routine itself
 ;        only needs M=1 and DB=$7E for the .w stores)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered, plus whatever
@@ -3314,6 +3377,7 @@ Battle_PlaySfx0:
 ; BattleUI_BuildStatusBarFrame with the first selected target), calls
 ; BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on that
 ; PC's !Pc_MenuRow (0/1/2 = Attack/Tech/Item).
+; Callers (JMP): BattleMenu_ProcessInput ($C1:11A5, $C1:11DB).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  tail-jumps to one of three row handlers, does not fall through;
 ;        each ends in Battle_ClearPadEdges with M=1, X=0, DP=0, DB=$7E;
@@ -3352,6 +3416,7 @@ BattleMenu_ConfirmCommand:
 ; !BattleUI_PanelRedraw is incremented twice; the second INC changes
 ; nothing, since every access to it in banks $C0-$CF is an INC, a
 ; zero/non-zero test or the STZ that clears it (ROM scan of $A43F).
+; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1290).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered, plus BuildTargetList's (see its header) and
@@ -3379,6 +3444,7 @@ BattleMenu_ChooseAttack:
 ; the tech list lines, builds !Tech_ListAvail, switches to the tech list
 ; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests the tech
 ; box frame (!BattleMenu_TechWindowNew).
+; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1296).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; DP as in RenderTechListRows and BuildTechAvailFlags
@@ -3413,6 +3479,7 @@ BattleMenu_OpenTechList:
 ; item list at !BattleMenu_ItemScroll, queues the item map upload, copies
 ; the item box frame (!BattleRom_ItemBoxMap) into !BattleMenu_WindowMap,
 ; and switches to the item list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 2).
+; Callers (JMP): BattleMenu_ConfirmCommand ($C1:1299).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll, TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered; DP as in RenderItemListRows, plus whatever
@@ -3463,6 +3530,9 @@ BattleMenu_OpenItemList:
 ; selection entries is empty, !BattleTgt_Result gets the $FF just read
 ; (negative = no valid target).
 ;
+; Callers (4 JSR sites): BattleMenu_ChooseAttack ($C1:12B0),
+;   BattleMenu_TechConfirm ($C1:1379), BattleMenu_ItemConfirm ($C1:14C5) and
+;   BattleMenu_TargetSelectInput ($C1:1561).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
 ;        the mode handler that ran (the BattleTgt_ routines below: within
@@ -3623,7 +3693,9 @@ BattleTgt_ModeTable:
 ; Default mode: one PC (slots 0-2), cursor may cycle. Falls into
 ; BattleTgt_CollectValidTargets, the shared list builder that the
 ; other list modes enter with their own slot range (!BattleTgt_ScanEnd
-; = end exclusive, X = start) and flags.
+; = end exclusive, X = start) and flags: BRA from BattleTgt_AllAllies and
+; BattleTgt_SingleEnemy, JMP from BattleTgt_AllEnemies ($C1:20C3) and
+; BattleTgt_Everyone ($C1:20D3).
 ;
 ; CollectValidTargets keeps battler X only if it is present
 ; (!Battler_Present), !Battler_Unk9FF7 bit 7 is clear, it is not
@@ -3646,7 +3718,7 @@ BattleTgt_SingleAlly:
     STX.b !BattleTgt_ScanEnd        ; PCs 0-2
     LDX #$0000                      ; first slot
     INC.w !BattleTgt_CanCycle
-BattleTgt_CollectValidTargets:
+BattleTgt_CollectValidTargets:      ; header: see BattleTgt_SingleAlly
     TDC
     TAY                             ; Y = append index
 .loop:
@@ -3704,6 +3776,10 @@ BattleTgt_AllAllies:
 
 ; BattleTgt_SingleEnemy ($C120A9–$C120B5, 13 bytes): one enemy (3-10),
 ; cursor may cycle. Also called as a list builder by the area modes.
+; Callers (5 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:2169),
+;   BattleTgt_EnemyLineFromChar3 ($C1:21AF), BattleTgt_EnemyLineFromCaster2
+;   ($C1:2203), BattleTgt_EnemyRadius ($C1:225F) and BattleTgt_EnemyRow
+;   ($C1:22F5).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_SingleEnemy:
     LDX.w #!Battle_NumSlots
@@ -3809,7 +3885,7 @@ BattleTgt_SingleKoAlly:
 BattleTgt_PcByCharId5:
     LDA.b #!Pc_CharAyla
     STA.b !BattleTgt_WantedChar
-BattleTgt_FindPcByCharId:
+BattleTgt_FindPcByCharId:           ; header: see BattleTgt_PcByCharId5
     INC.w !BattleTgt_CanCycle
     LDX.w #!Battle_LastPcSlot
 .loop:
@@ -3834,6 +3910,7 @@ BattleTgt_FindPcByCharId:
     RTS
 
 ; BattleTgt_PcByCharId4 ($C12163–$C12168, 6 bytes); state as PcByCharId5
+; header: see BattleTgt_PcByCharId5
 BattleTgt_PcByCharId4:
     LDA.b #!Pc_CharFrog
     STA.b !BattleTgt_WantedChar
@@ -4142,6 +4219,7 @@ BattleTgt_PartyTriangle:
 ; !Battler_Untargetable). The centre battler is skipped in the scan and
 ; then written unconditionally to the front of !BattleTgt_Candidates —
 ; it is not checked for eligibility, and no CompactCandidates pass runs.
+; Callers (JSR): BattleTgt_EnemyRow ($C1:2322).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
 ;        !BattleTgt_AreaCentre
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Candidates[0] = centre, [1..] = hits,
@@ -4240,6 +4318,7 @@ BattleTgt_AreaRow:
 ;    corner to the enemy must fall inside that corner's range (with
 ;    wrap handled as an OR instead of an AND). Inside all three wedges
 ;    = inside the triangle.
+; Callers (JSR): BattleTgt_PartyTriangle ($C1:232C).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; tail-jumps to BattleTgt_CompactCandidates
 ;        (the scan only appends from entry 1, so the $FF front entry is
@@ -4573,6 +4652,9 @@ BattleTgt_AreaPartyTriangle:
 ; scan and re-added by the shared tail BattleTgt_AreaAddAnchor if it is
 ; on the scanned side. Scanned side follows !BattleTgt_AreaSide as in
 ; BattleTgt_AreaRow.
+; Callers (JSR): BattleTgt_EnemyLineFromCaster ($C1:21A9),
+;   BattleTgt_EnemyLineFromChar3 ($C1:21FD) and
+;   BattleTgt_EnemyLineFromCaster2 ($C1:2245).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide..
 ;        AreaVariant as above
 ; Exit:  M=1, X=0, DP=0, DB=$7E; via BattleTgt_AreaAddAnchor ->
@@ -4805,6 +4887,9 @@ BattleTgt_AreaLine:
 ; PC — i.e. only if it belongs to the side that was scanned. Otherwise
 ; falls through into BattleTgt_CompactCandidates (which also runs after
 ; the anchor is placed, as a no-op since the front entry is then filled).
+; Callers (4 JSR sites): BattleTgt_CasterRadius ($C1:2259),
+;   BattleTgt_EnemyRadius ($C1:229E), BattleTgt_Char3Radius ($C1:22CD) and
+;   BattleTgt_Char6Radius ($C1:22EF).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !BattleTgt_AreaSide,
 ;        AreaCentre, AreaSize = radius^2
 ; Exit:  M=1, X=0, DP=0, DB=$7E; falls through into BattleTgt_AreaAddAnchor
@@ -4938,13 +5023,17 @@ BattleTgt_AreaAddAnchor:
 
 ; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
 ; front slot is empty, shift the list left by one. The front stays empty
-; when CollectValidTargets' requester was not eligible, always after
+; when CollectValidTargets' requester was not eligible or lay outside the
+; scanned range (every enemy mode, since the requester is a PC), always after
 ; AreaPartyTriangle (its scan appends from entry 1), and after
 ; AreaAddAnchor when the anchor is on the other side. The last step reads
 ; entry 11, one past the 11 used entries (the list has 12 bytes).
+; Callers (2 sites: 1 JSR, 1 JMP): BattleTgt_CollectValidTargets ($C1:207B)
+;   and BattleTgt_AreaPartyTriangle ($C1:25A0).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (unchanged if the front
-;        entry was filled); Y and DP unchanged
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the front entry if it was filled,
+;        else the last byte moved; X unchanged if the front was filled,
+;        else !Battle_NumSlots; Y unchanged
 org $C127C5
 BattleTgt_CompactCandidates:
     LDA.w !BattleTgt_Candidates
@@ -4962,6 +5051,9 @@ BattleTgt_CompactCandidates:
 
 ; BattleTgt_ClearLists ($C127D9–$C127E7, 15 bytes): blank candidate
 ; and selection lists (12 entries each, one more than they use)
+; Callers (4 JSR sites): BattleTgt_AreaRow ($C1:234F),
+;   BattleTgt_AreaPartyTriangle ($C1:24E2), BattleTgt_AreaLine ($C1:2657)
+;   and BattleTgt_AreaCircle ($C1:2717).
 ; Entry/Exit: M=1, X=0 (LDX.w #$0B), DP=0, DB=$7E; A = $FF, X = $FFFF;
 ; Y and DP unchanged
 BattleTgt_ClearLists:
@@ -4976,6 +5068,12 @@ BattleTgt_ClearLists:
 
 ; BattleTgt_SelectAllCandidates ($C127E8–$C127F9, 18 bytes): set
 ; target-all and copy the 11 candidates into the selection list
+; Callers (9 JMP sites): BattleTgt_EnemyLineFromCaster ($C1:21AC),
+;   BattleTgt_EnemyLineFromChar3 ($C1:2200), BattleTgt_EnemyLineFromCaster2
+;   ($C1:2248), BattleTgt_CasterRadius ($C1:225C), BattleTgt_EnemyRadius
+;   ($C1:22A1), BattleTgt_Char3Radius ($C1:22D0), BattleTgt_Char6Radius
+;   ($C1:22F2), BattleTgt_EnemyRow ($C1:2325) and BattleTgt_PartyTriangle
+;   ($C1:232F).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_SelectAllCandidates:
     LDA.b #!BattleTgt_AllFlag
@@ -4993,6 +5091,10 @@ BattleTgt_SelectAllCandidates:
 ; cursor stepping as BattleMenu_TargetNext, plus an empty-list guard
 ; (TargetNext would loop forever on an empty list); unlike TargetNext it
 ; does not write !BattleTgt_Selected.
+; Callers (8 JSR sites): BattleTgt_EnemyLineFromCaster ($C1:217D, $C1:218B),
+;   BattleTgt_EnemyLineFromChar3 ($C1:21C3, $C1:21D1),
+;   BattleTgt_EnemyLineFromCaster2 ($C1:2217, $C1:2225),
+;   BattleTgt_EnemyRadius ($C1:226E) and BattleTgt_EnemyRow ($C1:2304).
 ; Entry/Exit: M=1, X=0, DP=0 (TDC as zero), DB=$7E; A, X clobbered; Y and
 ; DP unchanged
 BattleTgt_CycleNext:
@@ -5013,6 +5115,8 @@ BattleTgt_CycleNext:
     RTS
 
 ; BattleTgt_CyclePrev ($C12814–$C1282C, 25 bytes): mirror of CycleNext
+; Callers (JSR): BattleTgt_EnemyRadius ($C1:227C) and BattleTgt_EnemyRow
+;   ($C1:2312).
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 BattleTgt_CyclePrev:
     JSR BattleTgt_AnyCandidate
@@ -5032,6 +5136,8 @@ BattleTgt_CyclePrev:
 
 ; BattleTgt_AnyCandidate ($C1282D–$C1283C, 16 bytes): Z=1 if all 11
 ; candidate slots are $FF, Z=0 as soon as one isn't
+; Callers (JSR): BattleTgt_CycleNext ($C1:27FA) and BattleTgt_CyclePrev
+;   ($C1:2814).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; Z as above (callers BEQ on it); A, X
 ;        clobbered; Y unchanged
@@ -5067,6 +5173,9 @@ BattleTgt_AnyCandidate:
 ; (which checks only the head) would dequeue c again. Whether three PCs
 ; are ever queued at once is not established.
 ;
+; Callers (JSR): BattleMenu_RefreshIfDirtyL ($C1:10ED),
+;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and unmatched code at
+;   $C1:10CE.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (as at every caller; no DP
 ;        access here), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = dequeued slot index (or
@@ -5127,6 +5236,7 @@ BattleMenu_DequeueReadyBattler:
 ; STZ in .clear_targeting overwrites it at once, so it always ends on
 ; the main menu; the first store is dead.
 ;
+; Callers (JSR): unmatched code at $C1:358B, $C1:3593, $C1:359B.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot, STA.b $80,
 ;        TDC as zero), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written; Y unchanged
@@ -5360,6 +5470,7 @@ BattleMenu_TargetSelectInput:
 ; Finally takes the PC out of the roster and shows the next roster
 ; entry, if any (same shape as BattleMenu_RemoveBattlerFromReady's tail).
 ;
+; Callers (JMP): BattleMenu_TargetSelectInput ($C1:15F1).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (STA.b $80-$84, TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; DP $80, $82 and $84 written
@@ -5514,6 +5625,7 @@ BattleMenu_CommitAction:
 ; !BattleMenu_ReadyCount; either way marks its roster entry empty and
 ; clears BattleCmd.State bit 7 ("waiting for a command", set by
 ; BattleMenu_EnqueueReadyBattler) in its command record.
+; Callers (JSR): BattleMenu_CommitAction ($C1:1661, $C1:1672).
 ; Entry: M=1, X=0, DP=0 (reads its argument with LDA.b !BattleMenu_PartnerArg,
 ;        $80), DB=$7E; !BattleMenu_PartnerArg = partner PC slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
@@ -5549,6 +5661,7 @@ BattleMenu_ConsumePartnerSlot:
 ; slot, and every mode handler fills Selected only with values it also
 ; put in Candidates 0-10. (Argued from the handlers, not proven for every
 ; caller of the $C10045 services that also write Candidates.)
+; Callers (JMP): BattleMenu_TargetSelectInput ($C1:1605).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered
@@ -5575,6 +5688,7 @@ BattleMenu_TargetNext:
 ; !BattleTgt_Cursor back (wrap to 10) instead. Falls straight through
 ; into Battle_ClearPadEdges (no JMP needed; they're adjacent in ROM).
 ; Same unguarded BMI loop as TargetNext, safe for the same reason.
+; Callers (JMP): BattleMenu_TargetSelectInput ($C1:1614).
 ; Entry: M=1, X=0, DP=0 (the fall-through writes DP $EE/$EF), DB=$7E
 ; Exit:  falls through to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered
@@ -5599,6 +5713,7 @@ BattleMenu_TargetPrev:
 ; Computes the highlighted line of the PC's list into
 ; !BattleMenu_TechListIdx (!Pc_TechScroll + !Pc_TechRow), then polls:
 ; confirm, cancel, Up or Left = previous, Down or Right = next.
+; Callers (JMP): BattleMenu_ProcessInput ($C1:1178).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, STX.b), DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
 ;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
@@ -5659,6 +5774,7 @@ BattleMenu_TechListInput:
 ; bit 7, BuildTargetList has already left the tech list before the
 ; missing target is noticed (Submenu = 0, !BattleMenu_ReturnSubmenu
 ; saved, command window reloaded), and nothing here undoes that.
+; Callers (JMP): BattleMenu_TechListInput ($C1:1337).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered, plus BuildTargetList's (the mode handler's DP, see its header)
@@ -5688,6 +5804,7 @@ BattleMenu_TechConfirm:
 ; Closes the tech list: reload the command window, back to the main menu,
 ; force a window rebuild, and restore this PC's saved tech-list cursor
 ; (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechScroll).
+; Callers (JMP): BattleMenu_TechListInput ($C1:1343).
 ; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; no DP written besides the pad edges
@@ -5714,6 +5831,7 @@ BattleMenu_TechListCancel:
 ; moves the cursor row (!Pc_TechRow) back the same number of lines,
 ; scrolling the list (!Pc_TechScroll) up a line at a time while the row
 ; would be negative.
+; Callers (JMP): BattleMenu_TechListInput ($C1:1353).
 ; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
 ;        !BattleMenu_TechListIdx = current line
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -5770,6 +5888,7 @@ BattleMenu_TechListPrev:
 ; instead of backward, bounded by the list length (!Pc_TechCount)
 ; instead of the start of the list, and scrolls down instead of up when
 ; the new row would reach 3.
+; Callers (JMP): BattleMenu_TechListInput ($C1:1363).
 ; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
 ;        !BattleMenu_TechListIdx = current line
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -5826,6 +5945,7 @@ BattleMenu_TechListNext:
 ; skip during cursor movement — up/down just move the cursor one row
 ; and scroll via ItemListScrollUp/Down at the edges. The page buttons
 ; page the whole list up/down by 3 rows at once.
+; Callers (JMP): BattleMenu_ProcessInput ($C1:1181).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges), DB=$7E
 ; Exit:  tail-jumps to one of several handlers, does not fall through;
 ;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
@@ -5896,6 +6016,7 @@ BattleMenu_ItemListInput:
 ; the target list, and enters target selection if a valid target was
 ; found. As in TechConfirm, a TargetMode with bit 7 has already left the
 ; item list (inside BuildTargetList) by the time a missing target shows.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:1446).
 ; Entry: M=1, X=0, DP=0 (STA.b Mul8A/ItemListIdx, LDX.b Mul8Product), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; DP $80 written, Battle_Mul8's $77/$78, $AD/$AE and
@@ -5938,6 +6059,7 @@ BattleMenu_ItemConfirm:
 ; ==================================================================
 ; Closes the item list: reload the command window, back to the main
 ; menu, force a window rebuild, and invalidate the scroll-arrow cache.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:1452).
 ; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
 ;        clobbered; no DP written besides the pad edges
@@ -5956,6 +6078,7 @@ BattleMenu_ItemListCancel:
 ; ==================================================================
 ; Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the
 ; list up via ItemListScrollUp when already at the top row.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:1462).
 ; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -5980,6 +6103,7 @@ BattleMenu_ItemCursorUp:
 ; Down/Right in the item list: increment !BattleMenu_ItemRow (max 2),
 ; scrolling the list down via ItemListScrollDown when already at the
 ; bottom row.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:1472).
 ; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -6009,6 +6133,7 @@ BattleMenu_ItemCursorDown:
 ; ItemListScrollDown's shared render+indicator tail
 ; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
 ; that logic.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:147E).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -6036,6 +6161,7 @@ BattleMenu_ItemListPageDown:
 ; Page-up button: page the item list up 3 rows at once, clamped at 0.
 ; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
 ; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
+; Callers (JMP): BattleMenu_ItemListInput ($C1:148A).
 ; Entry: M=1, X=0, DP=0 (the clamp TDC means A=0 only because D=0, and
 ;        STA.b !BattleMenu_ListScroll is DP), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
@@ -6060,6 +6186,7 @@ BattleMenu_ItemListPageUp:
 ; Re-renders the item list rows, invalidates both draw caches and clears
 ; !BattleMenu_ItemRefresh. Called (JMP) by ItemListInput when
 ; !BattleMenu_ItemRefresh is set and no button was pressed.
+; Callers (JMP): BattleMenu_ItemListInput ($C1:1492).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
 ;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -6077,7 +6204,9 @@ BattleMenu_ItemListRefresh:
 
 ; ==================================================================
 ; BattleMenu_ItemListScrollUp ($C117A1–$C117B0, 16 bytes; sub-entries
-; _SetScroll $C117B1, _RenderTail $C117B3 and _SkipRender $C117B6–$C117BE)
+; BattleMenu_ItemListScrollUp_SetScroll $C117B1,
+; BattleMenu_ItemListScrollUp_RenderTail $C117B3 and
+; BattleMenu_ItemListScrollUp_SkipRender $C117B6–$C117BE)
 ; ==================================================================
 ; Scrolls the item list up one row: decrements !BattleMenu_ItemScroll (min 0), then
 ; re-renders and invalidates both draw caches (row cursor, arrows).
@@ -6088,6 +6217,7 @@ BattleMenu_ItemListRefresh:
 ; indicator writes) can never actually be reached, since reaching that
 ; second branch at all requires the first BEQ to have found the flag
 ; clear. Reproduced exactly regardless.
+; Callers (JSR): BattleMenu_ItemCursorUp ($C1:14F1).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
 ;        sub-entries take the same state)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -6106,11 +6236,11 @@ BattleMenu_ItemListScrollUp:
     LDA.w !BattleMenu_ItemScroll
     SBC #$01
     STA.w !BattleMenu_ItemScroll
-BattleMenu_ItemListScrollUp_SetScroll:
+BattleMenu_ItemListScrollUp_SetScroll:      ; header: see BattleMenu_ItemListScrollUp
     STA.b !BattleMenu_ListScroll
-BattleMenu_ItemListScrollUp_RenderTail:
+BattleMenu_ItemListScrollUp_RenderTail:     ; header: see BattleMenu_ItemListScrollUp
     JSR BattleMenu_RenderItemListRows
-BattleMenu_ItemListScrollUp_SkipRender:
+BattleMenu_ItemListScrollUp_SkipRender:     ; header: see BattleMenu_ItemListScrollUp
     LDA.b #!BattleMenu_CacheInvalid
     STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
     STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
@@ -6118,7 +6248,8 @@ BattleMenu_ItemListScrollUp_SkipRender:
 
 ; ==================================================================
 ; BattleMenu_ItemListScrollDown ($C117BF–$C117D0, 18 bytes; sub-entries
-; _RenderTail $C117D1 and _SkipRender $C117D4–$C117DC)
+; BattleMenu_ItemListScrollDown_RenderTail $C117D1 and
+; BattleMenu_ItemListScrollDown_SkipRender $C117D4–$C117DC)
 ; ==================================================================
 ; Scrolls the item list down one row: increments !BattleMenu_ItemScroll (clamped at
 ; $FA), then re-renders and invalidates both draw caches.
@@ -6127,6 +6258,7 @@ BattleMenu_ItemListScrollUp_SkipRender:
 ; at the clamp, skips both the increment AND the render entirely.
 ; BattleMenu_ItemListScrollDown_RenderTail is the external entry point
 ; called directly by BattleMenu_ItemListPageDown.
+; Callers (JSR): BattleMenu_ItemCursorDown ($C1:1509).
 ; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
 ;        sub-entries take the same state)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
@@ -6142,9 +6274,9 @@ BattleMenu_ItemListScrollDown:
     ADC #$01
     STA.w !BattleMenu_ItemScroll
     STA.b !BattleMenu_ListScroll
-BattleMenu_ItemListScrollDown_RenderTail:
+BattleMenu_ItemListScrollDown_RenderTail:   ; header: see BattleMenu_ItemListScrollDown
     JSR BattleMenu_RenderItemListRows
-BattleMenu_ItemListScrollDown_SkipRender:
+BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScrollDown
     LDA.b #!BattleMenu_CacheInvalid
     STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
     STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
@@ -6155,8 +6287,8 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ; ==================================================================
 ; Cursor/overlay refresh at the end of the menu rebuild chain (after
 ; ProcessInput), so like it only on frames with !BattleMenu_Dirty set:
-; JSR from RefreshIfDirtyL, RefreshIfDirtyAndTick and $C1:10D7 (the not
-; yet matched routine at $C1:106E). Draws whatever cursor
+; JSR from BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick
+; and $C1:10D7 (the not yet matched routine at $C1:106E). Draws whatever cursor
 ; graphic belongs on screen right now, dispatching on menu state:
 ;
 ;   no PC shown (!BattleMenu_ActivePc < 0) -> hide the 4 cursor sprites

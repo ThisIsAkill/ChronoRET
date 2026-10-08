@@ -43,9 +43,9 @@ if !constants_engine_inc == 0
 !BankC2_BootArg = $09                    ; A for the BankC2_Entry8004 call in GameLoop (boot, and again on the $C0:02CA re-entry)
 
 ; --- Locations ---
-!Loc_FirstBankC2 = $01F0                 ; Loc_Id at or above this is handled by BankC2_Entry0000
+!Loc_FirstBankC2 = $01F0                 ; GameLoop_Main CPX limit: Loc_Id $01F0-$81EF goes to BankC2_Entry0000
                                          ; (GameLoop_Main)
-!Loc_LoadSave = $01FF                    ; Loc_Id at or above this goes to LoadSavePath
+!Loc_LoadSave = $01FF                    ; GameLoop_NotBankC2's CPX limit: Loc_Id $81F0-$81FE reach LoadSavePath
                                          ; (GameLoop_Main)
 !LoadSave_EntryX = $7C00                 ; X handed to LoadSavePath (meaning unknown)
 

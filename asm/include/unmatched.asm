@@ -26,7 +26,7 @@ org $C02C41
 ScrollStepAccum:    ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
 
 org $C02E1E
-LoadSavePath:       ; entry for mode >= $01FF (load/save/transition)
+LoadSavePath:       ; entry for Loc_Id $81F0-$81FE (load/save/transition; meaning unverified)
 
 org $C0EC60
 Sub_EC60:           ; frame wait: INC $0152, then spin until the NMI clears it (after Field_EndOfFrame)
