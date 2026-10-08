@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 80781,
+  "emitted_bytes": 83049,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 979,
+      "bytes": 83049
     },
     "readable": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 979,
+      "bytes": 83049
     },
     "verified": {
-      "functions": 948,
-      "bytes": 80781
+      "functions": 979,
+      "bytes": 83049
     }
   },
   "banks": [
@@ -54,18 +54,18 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 11029,
+      "emitted_bytes": 13297,
       "matched": {
-        "functions": 251,
-        "bytes": 11029
+        "functions": 282,
+        "bytes": 13297
       },
       "readable": {
-        "functions": 251,
-        "bytes": 11029
+        "functions": 282,
+        "bytes": 13297
       },
       "verified": {
-        "functions": 251,
-        "bytes": 11029
+        "functions": 282,
+        "bytes": 13297
       }
     },
     {
@@ -1077,7 +1077,7 @@
       "bank": "$C2",
       "start": "$C2:0000",
       "end": "$C2:0FFF",
-      "emitted_bytes": 2979,
+      "emitted_bytes": 4096,
       "functions": [
         "BankC2_Entry0000",
         "BankC2_Entry0003",
@@ -1107,6 +1107,16 @@
         "C2Scene_LayerMetatiles",
         "C2Scene_LayerMaps",
         "C2Scene_LayerVramMaps",
+        "C2Scene_Unk0568",
+        "C2Scene_Unk066C",
+        "C2Scene_EdgeColLeft",
+        "C2Scene_EdgeColRight",
+        "C2Scene_EdgeColSetup",
+        "C2Scene_EdgeRowTop",
+        "C2Scene_EdgeRowBottom",
+        "C2Scene_EdgeRowSetup",
+        "C2Scene_QueueEdgeCol",
+        "C2Scene_QueueEdgeRow",
         "C2Scene_DrawBgLayer",
         "C2Scene_BuildBgColumn",
         "C2Scene_DrawMetatile",
@@ -1255,7 +1265,7 @@
       "bank": "$C2",
       "start": "$C2:2000",
       "end": "$C2:2FFF",
-      "emitted_bytes": 2853,
+      "emitted_bytes": 3796,
       "functions": [
         "C2Scene_PalFadeStepTable",
         "C2Scene_TaskUnk20A2",
@@ -1283,6 +1293,13 @@
         "C2Scene_MainLoop",
         "C2Scene_ModeTable",
         "C2Scene_ModeIdle",
+        "C2Scene_Mode3",
+        "C2Scene_Mode2",
+        "C2Scene_TurnAround",
+        "C2Scene_Mode4",
+        "C2Scene_Mode5",
+        "C2Scene_Mode6",
+        "C2Scene_Mode8",
         "C2Scene_ClearVram",
         "C2Scene_ZeroWord",
         "C2Scene_SaveFlagTail",
@@ -1316,15 +1333,29 @@
         "C2Scene_LoadLocExtraGfx",
         "C2Scene_SaveState",
         "C2Scene_RestoreState",
-        "C2Scene_QueueSoundCmd"
+        "C2Scene_ScrFadeOut",
+        "C2Scene_ScrFadeIn",
+        "C2Scene_ScrMosaicFadeOut",
+        "C2Scene_ScrMosaicFadeIn",
+        "C2Scene_QueueSoundCmd",
+        "C2Scene_ZoneSoundAtEntry",
+        "C2Scene_ZoneSoundAtView",
+        "C2Scene_TaskZoneSound",
+        "C2Scene_ZoneSoundStates",
+        "C2Scene_ZoneSoundInit",
+        "C2Scene_ZoneSoundWatch"
       ]
     },
     {
       "bank": "$C2",
       "start": "$C2:3000",
       "end": "$C2:3FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 158,
+      "functions": [
+        "C2Scene_ZoneSoundWait",
+        "C2Scene_ZoneSoundResume",
+        "C2Scene_ZoneSoundQueue"
+      ]
     },
     {
       "bank": "$C2",
@@ -1354,8 +1385,10 @@
       "bank": "$C2",
       "start": "$C2:6000",
       "end": "$C2:6FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 50,
+      "functions": [
+        "C2Scene_GetSoundZone"
+      ]
     },
     {
       "bank": "$C2",

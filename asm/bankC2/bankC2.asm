@@ -112,8 +112,8 @@ BankC2_SceneBoot:
 ; on are the same bytes as MainInit's. INIDISP is not written
 ; (BankC2_SceneBoot has already set forced blank).
 ; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0031; it has run SEI,
-;   NMI/DMA off, forced blank, DB=$00 and DP=$0000 first) and $C2:2557
-;   (unmatched).
+;   NMI/DMA off, forced blank, DB=$00 and DP=$0000 first) and
+;   C2Scene_Mode5 ($C2:2557).
 ; Entry: M=1 (8-bit A: the register values are 8-bit immediates), X=0
 ;        (16-bit X: the LDX.w #$0000 / STX.b pairs clear two registers
 ;        at once), DP any (saved and restored), DB any (all stores are
@@ -238,8 +238,8 @@ BankC2_InitHwRegs:
 ; Writes JML C2Scene_NmiHandler and JML C2Scene_IrqHandler into the WRAM
 ; trampolines that the native NMI and IRQ stubs in bank $00 jump through,
 ; as InstallNMI/InstallIRQ ($C0:0B64/$0B75) do for the field engine.
-; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and $C2:255A
-;   (unmatched).
+; Callers (2 JSR sites): BankC2_SceneBoot ($C2:0037) and C2Scene_Mode5
+;   ($C2:255A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X), DP any (not used), DB a bank
 ;        that maps low WRAM (absolute stores to $0500-$0507;
 ;        BankC2_SceneBoot has DB=$00)
@@ -527,7 +527,8 @@ C2Scene_IrqHandler:
 
 ; $C2:0346 — C2Scene_WaitFrame (7 bytes, $0346–$034C)
 ; Waits until the next NMI: spins until C2Scene_FrameCounter changes.
-; Callers (2 sites, unmatched): JSR at $C2:0455 and JMP at $C2:046E.
+; Callers (3 sites): C2Scene_WaitFrames (JSR at $C2:0455),
+;   C2Scene_WaitOneFrame (JMP at $C2:046E), C2Scene_Mode3 (JSR at $C2:2465).
 ; Entry: M=1 (8-bit compare), X any, DP=$0000, DB any; NMI enabled
 ; Exit:  M=1; A = the counter before the change; X, Y unchanged
 ; No calls.
@@ -617,8 +618,9 @@ C2Scene_HideAllSprites:
 ; Empties and unlocks the VRAM upload queue: clears C2Scene_VramQLock and
 ; C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf
 ; ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF).
-; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A); unmatched: $C2:2560,
-;   $C2:25F0, $C2:265B, $C2:6331 and $C2:6A37.
+; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5
+;   ($C2:2560), C2Scene_Mode6 ($C2:25F0), C2Scene_Mode8 ($C2:265B);
+;   unmatched: $C2:6331 and $C2:6A37.
 ; Entry: M=1 (8-bit bank store), X=0 (16-bit pointer store and loop
 ;        count), DP=$0000, DB any
 ; Exit:  M=1, X=0; A = bank(C2Scene_VramQBuf), X = $FFFF; Y, DP and DB
@@ -711,7 +713,8 @@ C2Scene_VramQFlush:
 ; sound command is pending (C2Scene_SoundCmdState non-zero) it is sent
 ; with Audio_DriverCommand, the state marked C2Scene_SoundCmdSending
 ; meanwhile and cleared after.
-; Callers (6 JSR sites, unmatched): $C2:2582, $C2:2612, $C2:269D,
+; Callers (9 JSR sites): C2Scene_Mode5 ($C2:2532, $C2:2582), C2Scene_Mode6
+;   ($C2:25A1, $C2:2612), C2Scene_Mode8 ($C2:2631, $C2:269D); unmatched:
 ;   $C2:63C7, $C2:6A99 and $C2:6AB1.
 ; Entry: M=1 (8-bit flag loads), X=0 with X = the number of frames (0
 ;        waits 65536), DP=$0000, DB with low WRAM at $0000-$1FFF; NMI on
@@ -777,9 +780,12 @@ C2Scene_TaskClearAll:
 ; (.Params on) are copied from the record C2Scene_TaskCur points at:
 ; the running task, when a task spawns another.
 ; If no record is free nothing is written.
-; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0); unmatched:
-;   $C2:10C4, $C2:10F7, $C2:1590, $C2:159E, $C2:15AC, $C2:15BA, $C2:183F,
-;   $C2:1DE2, $C2:63A6, $C2:7417, $C2:742D and $C2:7441.
+; Callers (13 JSR sites): C2Scene_TaskSpawnScript ($C2:04E0),
+;   C2Script_SpawnUnk1CF5 ($C2:10C4), C2Script_SpawnUnk1DD4 ($C2:10F7),
+;   C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105 ($C2:159E),
+;   C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
+;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2);
+;   unmatched: $C2:63A6, $C2:7417, $C2:742D and $C2:7441.
 ; Entry: M any, X=0 with X = the handler address, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF (the MVN copies in bank $00 and leaves DB
 ;        as it was)
@@ -832,8 +838,8 @@ C2Scene_TaskSpawn_Search:       ; header: see C2Scene_TaskSpawn
 ; $C2:04CD — C2Scene_TaskSpawnLow (12 bytes, $04CD–$04D8)
 ; C2Scene_TaskSpawn over records 0-3 only: the same search and setup
 ; (it branches into C2Scene_TaskSpawn_Search).
-; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502); unmatched:
-;   $C2:1A49.
+; Callers (2 JSR sites): C2Scene_TaskSpawnScriptLow ($C2:0502) and
+;   C2Script_SpawnTaskLow ($C2:1A49).
 ; Entry: as C2Scene_TaskSpawn
 ; Exit:  as C2Scene_TaskSpawn; when no record is free, X = record 4's
 ;        address (C2Scene_TaskRecords + 4 * C2Scene_TaskSize)
@@ -853,10 +859,12 @@ C2Scene_TaskSpawnLow:
 ; Quirk, kept: there is no check that a record was free. Then X comes
 ; back as C2Scene_TaskRecordsEnd and the three fields are written into
 ; the last record (63), whatever runs there.
-; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90);
-;   unmatched: $C2:1203, $C2:242E, $C2:2459, $C2:2527, $C2:256B, $C2:2596,
-;   $C2:25FB, $C2:2626, $C2:2676, $C2:3154, $C2:33B2, $C2:33DF, $C2:4479, $C2:452C,
-;   $C2:63AE, $C2:66DF, $C2:66FF, $C2:6AAB, $C2:741F and $C2:7427.
+; Callers (21 JSR/JMP sites): C2Scene_LoadScene (JMP at $C2:2C90),
+;   C2Script_SpawnScript ($C2:1203), C2Scene_Mode3 ($C2:242E, $C2:2459),
+;   C2Scene_Mode5 ($C2:2527, $C2:256B), C2Scene_Mode6 ($C2:2596,
+;   $C2:25FB), C2Scene_Mode8 ($C2:2626, $C2:2676); unmatched: $C2:3154,
+;   $C2:33B2, $C2:33DF, $C2:4479, $C2:452C, $C2:63AE, $C2:66DF, $C2:66FF,
+;   $C2:6AAB, $C2:741F and $C2:7427.
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -887,7 +895,7 @@ C2Scene_TaskSpawnScript:
 ; C2Scene_TaskSpawnScript in records 0-3 (C2Scene_TaskSpawnLow).
 ; Quirk, kept: as there, no check that a record was free; then the
 ; fields are written into record 3.
-; Callers (1 JSR site, unmatched): $C2:1A3A.
+; Callers (1 JSR site): C2Script_SpawnScriptLow ($C2:1A3A).
 ; Entry/Exit: as C2Scene_TaskSpawnScript
 ; Calls: C2Scene_TaskSpawnLow.
 C2Scene_TaskSpawnScriptLow:
@@ -963,8 +971,8 @@ C2Scene_TaskCallHandler:
 
 ; $C2:0556 — C2Scene_LayerMetatiles (3 words, $0556–$055B)
 ; Per BG layer 1-3 (index (layer - 1) * 2): where its metatile
-; definitions are in bank $7E. Read by C2Scene_DrawBgLayer and by
-; unmatched code at $C2:0576 and $C2:067A. Layer 1's set is the one
+; definitions are in bank $7E. Read by C2Scene_DrawBgLayer,
+; C2Scene_Unk0568 ($C2:0576) and C2Scene_Unk066C ($C2:067A). Layer 1's set is the one
 ; C2Scene_LoadMetatiles unpacks at C2Scene_Metatiles; layer 2's follows it
 ; $800 bytes on (256 metatiles of 8 bytes), so the same pack probably
 ; holds both. Layer 3's entry, like its other two, is not explained.
@@ -976,8 +984,9 @@ C2Scene_LayerMetatiles:
 ; $C2:055C — C2Scene_LayerMaps (3 words, $055C–$0561)
 ; Per layer: where its map (96 x 64 metatile numbers, C2Scene_MapBytes)
 ; is in bank $7E. Layer 1's is C2Scene_BgMaps (C2Scene_LoadBgMaps); layer
-; 2's follows it at +$1800. Read by C2Scene_DrawBgLayer and unmatched code
-; at $C2:057C, $C2:0680 and $C2:1176.
+; 2's follows it at +$1800. Read by C2Scene_DrawBgLayer, C2Scene_Unk0568
+; ($C2:057C), C2Scene_Unk066C ($C2:0680) and C2Script_SetMapCell
+; ($C2:1176).
 C2Scene_LayerMaps:
     dw $4000                    ; 1: C2Scene_BgMaps
     dw $5800                    ; 2
@@ -987,12 +996,856 @@ C2Scene_LayerMaps:
 ; Per layer: the VRAM word address of its tilemap. 1 and 2 are the BG1SC
 ; and BG2SC bases BankC2_InitHwRegs sets ($6000, $6800); 3's $7000 is
 ; where the BG3 tiles go, not the BG3 map ($7800), so layer 3 is probably
-; not drawn this way. Read by C2Scene_DrawBgLayer and unmatched code at
-; $C2:0582 and $C2:0686.
+; not drawn this way. Read by C2Scene_DrawBgLayer, C2Scene_Unk0568
+; ($C2:0582) and C2Scene_Unk066C ($C2:0686).
 C2Scene_LayerVramMaps:
     dw $6000                    ; 1: BG1 map
     dw $6800                    ; 2: BG2 map
     dw $7000                    ; 3
+
+; ============================================================
+; Scene BG layer scroll ($C2:0568–$C2:09C4)
+; ============================================================
+; C2Scene_Unk0568 and C2Scene_Unk066C move one BG layer's scroll a pixel
+; at a time and keep its tile position C2Scene_BgTileX/Y in step. Each
+; time the scroll crosses a tile boundary, the tile column (X) or row
+; (Y) that has just come into reach is built from the layer's map and
+; metatiles into the buffer at C2Scene_VramQBufPtr and queued for VRAM
+; (C2Scene_VramQ, sent by the NMI): the edge builders below. A layer's
+; scroll wraps at the map's 1536 x 1024 pixels and its tile position at
+; 192 x 128 tiles; the hardware tilemap is 64 x 32 tiles, so the edges
+; are written where they wrap into it.
+;
+; Direct-page work area of the cluster (DP=$0000):
+!C2Scene_ScrollLayer = !C2Tmp_00        ; in: the layer, 1-3 (16-bit read, AND C2Scene_LayerMask)
+!C2Scene_ScrollPx = !C2Tmp_01           ; in: signed pixels to move (8-bit)
+!C2Scene_EdgeMapPtr = !C2Tmp_02         ; 16-bit: the map + the column (column) or + row * 96 (row)
+!C2Scene_EdgeMapOfs = !C2Tmp_04         ; 16-bit: map byte offset added to it, stepped per metatile
+!C2Scene_EdgeBuf = !C2Tmp_06            ; 16-bit: C2Scene_VramQBufPtr's address (bank $7E)
+!C2Scene_EdgeCol = !C2Tmp_08            ; 16-bit; in to a builder: the metatile column; in to a
+                                        ; queuer: the edge's BG pixel X; out: its VRAM address
+!C2Scene_EdgeHalf = !C2Tmp_08           ; 16-bit, in a builder: bit 0 picks the metatile half
+!C2Scene_EdgeRow = !C2Tmp_0A            ; 16-bit; in to a builder: the metatile row; in to a row
+                                        ; queuer: the edge's BG pixel Y; out: the right screen's VRAM address
+!C2Scene_EdgeBufPos = !C2Tmp_0A         ; 16-bit, in a builder: byte offset in the buffer
+!C2Scene_ScrollLeft = !C2Tmp_0C         ; 16-bit pixels still to move
+!C2Scene_ScrollSlot = !C2Tmp_0E         ; 16-bit (layer - 1) * 2: word index of the layer's variables
+!C2Scene_ScrollMetatiles = !C2Tmp_10    ; 16-bit address (bank $7E) of the layer's metatiles
+!C2Scene_ScrollMap = !C2Tmp_13          ; 16-bit address (bank $7E) of the layer's map
+!C2Scene_ScrollVramMap = !C2Tmp_16      ; 16-bit VRAM word address of the layer's tilemap
+!C2Scene_EdgeTilesLeft = !C2Tmp_19      ; 16-bit tiles still to build (also row * 64 in the setups)
+
+; $C2:0568 — C2Scene_Unk0568 (260 bytes, $0568–$066B)
+; Scrolls BG layer C2Scene_ScrollLayer horizontally by C2Scene_ScrollPx
+; pixels (signed: negative moves the view left), one pixel per pass.
+; Each pass moves the scroll shadow (C2Scene_Bg1HScroll + slot) by one,
+; wrapping in 0-$5FF, and the tile X (C2Scene_BgTileX + slot) whenever
+; the scroll leaves a tile boundary to the left or reaches one to the
+; right, wrapping in 0-191. When the new scroll is on a tile boundary,
+; the tile column that has come into reach is built and queued:
+; - left: tile BgTileX - 1, at pixel X scroll - 8 (just off the left
+;   edge);
+; - right: tile BgTileX + 32, at pixel X scroll + 256 (just off the
+;   right edge);
+; from the metatile column tile / 2, starting at tile row BgTileY - 1
+; (C2Scene_EdgeColLeft for an even tile, C2Scene_EdgeColRight for an
+; odd one; then C2Scene_QueueEdgeCol). The name stays Unk until its
+; callers are next edited (C2Script_ScrollFrames' header guesses this
+; use).
+; Quirk, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
+; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
+; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
+;   C2Script_ScrollLayerFrames ($C2:173C); unmatched: $C2:3702, $C2:3709,
+;   $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and
+;   $C2:785B (xref rates $38FB and $3902 doubtful; they are real calls).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
+;        DB=$00 (absolute C2Scene_BgTileX and the VRAM queue);
+;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
+; Exit:  M=1, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$1A changed
+;        (C2Tmp_0C = 0 after a move); the layer's scroll and tile X,
+;        C2Scene_VramQ entries, C2Scene_VramQEnd/Lock and
+;        C2Scene_VramQBufPtr changed when a column is queued
+; Calls: C2Scene_EdgeColLeft, C2Scene_EdgeColRight, C2Scene_QueueEdgeCol.
+C2Scene_Unk0568:
+    REP #$20
+    LDA.b !C2Scene_ScrollLayer
+    AND.w #!C2Scene_LayerMask
+    BEQ .hang
+    DEC A
+    ASL A
+    STA.b !C2Scene_ScrollSlot
+    TAX
+    LDA.l C2Scene_LayerMetatiles,X
+    STA.b !C2Scene_ScrollMetatiles
+    LDA.l C2Scene_LayerMaps,X
+    STA.b !C2Scene_ScrollMap
+    LDA.l C2Scene_LayerVramMaps,X
+    STA.b !C2Scene_ScrollVramMap
+    SEP #$20
+    LDA.b !C2Scene_ScrollPx
+    BEQ .done
+    BPL .right
+    JSR .left
+    BRA .moved
+.right:
+    JSR .go_right
+.moved:
+    SEP #$20
+.done:
+    RTS
+.hang:
+    BRA .hang
+.left:
+    REP #$20
+    ORA.w #!Eng_HighByteMask
+    EOR.w #!Eng_Invert16
+    INC A                       ; pixels = -C2Scene_ScrollPx
+    STA.b !C2Scene_ScrollLeft
+.left_px:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1HScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BNE .left_scroll            ; leaving a tile boundary: one tile left
+    LDA.w !C2Scene_BgTileX,X
+    DEC A
+    BPL .left_tile
+    LDA.w #!C2Scene_MapTilesX-1
+.left_tile:
+    STA.w !C2Scene_BgTileX,X
+.left_scroll:
+    LDA.b !C2Scene_Bg1HScroll,X
+    DEC A
+    BPL .left_set
+    LDA.w #!C2Scene_MapWidthPx-1
+.left_set:
+    STA.b !C2Scene_Bg1HScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BEQ .left_edge
+.left_next:
+    DEC.b !C2Scene_ScrollLeft
+    BNE .left_px
+    RTS
+.left_edge:
+    LDA.w !C2Scene_BgTileX,X    ; the column one tile left of BgTileX
+    DEC A
+    BPL .left_col
+    LDA.w #!C2Scene_MapTilesX-1
+.left_col:
+    LSR A
+    STA.b !C2Scene_EdgeCol
+    LDA.w !C2Scene_BgTileY,X    ; from one tile above BgTileY
+    DEC A
+    BPL .left_row
+    LDA.w #!C2Scene_MapTilesY-1
+.left_row:
+    LSR A
+    STA.b !C2Scene_EdgeRow
+    LDA.b !C2Scene_Bg1HScroll,X
+    AND.w #!C2Scene_TilePx
+    BNE .left_odd               ; tile X odd: column X - 1 is even (left halves)
+    JSR C2Scene_EdgeColRight
+    BRA .left_queue
+.left_odd:
+    JSR C2Scene_EdgeColLeft
+.left_queue:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1HScroll,X
+    SEC
+    SBC.w #!C2Scene_TilePx
+    STA.b !C2Scene_EdgeCol
+    JSR C2Scene_QueueEdgeCol
+    BRA .left_next
+.go_right:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !C2Scene_ScrollLeft
+.right_px:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1HScroll,X
+    INC A
+    CMP.w #!C2Scene_MapWidthPx
+    BCC .right_set
+    TDC                         ; A = DP = 0: wrap to 0
+.right_set:
+    STA.b !C2Scene_Bg1HScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BEQ .right_edge
+.right_next:
+    DEC.b !C2Scene_ScrollLeft
+    BNE .right_px
+    RTS
+.right_edge:
+    LDA.w !C2Scene_BgTileX,X    ; reached a tile boundary: one tile right
+    INC A
+    CMP.w #!C2Scene_MapTilesX
+    BCC .right_tile
+    TDC
+.right_tile:
+    STA.w !C2Scene_BgTileX,X
+    CLC                         ; the column 32 tiles right of BgTileX
+    ADC.w #!C2Scene_EdgeAheadCols
+    CMP.w #!C2Scene_MapTilesX
+    BCC .right_col
+    SEC
+    SBC.w #!C2Scene_MapTilesX
+.right_col:
+    LSR A
+    STA.b !C2Scene_EdgeCol
+    LDA.w !C2Scene_BgTileY,X
+    DEC A
+    BPL .right_row
+    LDA.w #!C2Scene_MapTilesY-1
+.right_row:
+    LSR A
+    STA.b !C2Scene_EdgeRow
+    LDA.b !C2Scene_Bg1HScroll,X
+    AND.w #!C2Scene_TilePx
+    BNE .right_odd              ; tile X odd: column X + 32 is odd (right halves)
+    JSR C2Scene_EdgeColLeft
+    BRA .right_queue
+.right_odd:
+    JSR C2Scene_EdgeColRight
+.right_queue:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1HScroll,X
+    CLC
+    ADC.w #!C2Scene_EdgeRightPx
+    STA.b !C2Scene_EdgeCol
+    JSR C2Scene_QueueEdgeCol
+    BRA .right_next
+
+; $C2:066C — C2Scene_Unk066C (263 bytes, $066C–$0772)
+; C2Scene_Unk0568 for the vertical: scrolls the layer's
+; C2Scene_Bg1VScroll + slot by C2Scene_ScrollPx pixels (negative: up),
+; wrapping in 0-$3FF, with its tile Y (C2Scene_BgTileY + slot) in
+; 0-127. On a tile boundary it builds and queues the tile row that has
+; come into reach:
+; - up: tile row BgTileY - 1, at pixel Y scroll - 8;
+; - down: tile row BgTileY + 28, at pixel Y scroll + 224 (just below
+;   the 224-line screen);
+; from the metatile row tile / 2, starting at tile column BgTileX - 1
+; (C2Scene_EdgeRowTop for an even row, C2Scene_EdgeRowBottom for an odd
+; one; then C2Scene_QueueEdgeRow).
+; Quirk, kept: a layer number of 0 (or 4, 8, ...) loops for good
+; (.hang). 0 pixels does nothing.
+; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
+;   C2Script_ScrollLayerFrames ($C2:1751); unmatched: $C2:3717, $C2:371E,
+;   $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF (xref
+;   rates $385B and $3862 doubtful; they are real calls).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
+;        DB=$00 (absolute C2Scene_BgTileY and the VRAM queue);
+;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
+; Exit:  M=1, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$1A changed
+;        (C2Tmp_0C = 0 after a move); the layer's VScroll and tile Y,
+;        C2Scene_VramQ entries, C2Scene_VramQEnd/Lock and
+;        C2Scene_VramQBufPtr changed when a row is queued
+; Calls: C2Scene_EdgeRowTop, C2Scene_EdgeRowBottom, C2Scene_QueueEdgeRow.
+C2Scene_Unk066C:
+    REP #$20
+    LDA.b !C2Scene_ScrollLayer
+    AND.w #!C2Scene_LayerMask
+    BEQ .hang
+    DEC A
+    ASL A
+    STA.b !C2Scene_ScrollSlot
+    TAX
+    LDA.l C2Scene_LayerMetatiles,X
+    STA.b !C2Scene_ScrollMetatiles
+    LDA.l C2Scene_LayerMaps,X
+    STA.b !C2Scene_ScrollMap
+    LDA.l C2Scene_LayerVramMaps,X
+    STA.b !C2Scene_ScrollVramMap
+    SEP #$20
+    LDA.b !C2Scene_ScrollPx
+    BEQ .done
+    BPL .down
+    JSR .up
+    BRA .moved
+.down:
+    JSR .go_down
+.moved:
+    SEP #$20
+.done:
+    RTS
+.hang:
+    BRA .hang
+.up:
+    REP #$20
+    ORA.w #!Eng_HighByteMask
+    EOR.w #!Eng_Invert16
+    INC A                       ; pixels = -C2Scene_ScrollPx
+    STA.b !C2Scene_ScrollLeft
+.up_px:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1VScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BNE .up_scroll              ; leaving a tile boundary: one tile up
+    LDA.w !C2Scene_BgTileY,X
+    DEC A
+    BPL .up_tile
+    LDA.w #!C2Scene_MapTilesY-1
+.up_tile:
+    STA.w !C2Scene_BgTileY,X
+.up_scroll:
+    LDA.b !C2Scene_Bg1VScroll,X
+    DEC A
+    BPL .up_set
+    LDA.w #!C2Scene_MapHeightMask
+.up_set:
+    STA.b !C2Scene_Bg1VScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BEQ .up_edge
+.up_next:
+    DEC.b !C2Scene_ScrollLeft
+    BNE .up_px
+    RTS
+.up_edge:
+    LDA.w !C2Scene_BgTileX,X    ; from one tile left of BgTileX
+    DEC A
+    BPL .up_col
+    LDA.w #!C2Scene_MapTilesX-1
+.up_col:
+    LSR A
+    STA.b !C2Scene_EdgeCol
+    LDA.w !C2Scene_BgTileY,X    ; the row one tile above BgTileY
+    DEC A
+    BPL .up_row
+    LDA.w #!C2Scene_MapTilesY-1
+.up_row:
+    LSR A
+    STA.b !C2Scene_EdgeRow
+    LDA.b !C2Scene_Bg1VScroll,X
+    AND.w #!C2Scene_TilePx
+    BNE .up_odd                 ; tile Y odd: row Y - 1 is even (top halves)
+    JSR C2Scene_EdgeRowBottom
+    BRA .up_queue
+.up_odd:
+    JSR C2Scene_EdgeRowTop
+.up_queue:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1VScroll,X
+    SEC
+    SBC.w #!C2Scene_TilePx
+    STA.b !C2Scene_EdgeRow
+    JSR C2Scene_QueueEdgeRow
+    BRA .up_next
+.go_down:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !C2Scene_ScrollLeft
+.down_px:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1VScroll,X
+    INC A
+    CMP.w #!C2Scene_MapHeightPx
+    BCC .down_set
+    TDC                         ; A = DP = 0: wrap to 0
+.down_set:
+    STA.b !C2Scene_Bg1VScroll,X
+    AND.w #!C2Scene_PxInTileMask
+    BEQ .down_edge
+.down_next:
+    DEC.b !C2Scene_ScrollLeft
+    BNE .down_px
+    RTS
+.down_edge:
+    LDA.w !C2Scene_BgTileY,X    ; reached a tile boundary: one tile down
+    INC A
+    CMP.w #!C2Scene_MapTilesY
+    BCC .down_tile
+    TDC
+.down_tile:
+    STA.w !C2Scene_BgTileY,X
+    LDA.w !C2Scene_BgTileX,X
+    DEC A
+    BPL .down_col
+    LDA.w #!C2Scene_MapTilesX-1
+.down_col:
+    LSR A
+    STA.b !C2Scene_EdgeCol
+    LDA.w !C2Scene_BgTileY,X    ; the row 28 tiles below BgTileY
+    CLC
+    ADC.w #!C2Scene_EdgeAheadRows
+    CMP.w #!C2Scene_MapTilesY
+    BCC .down_row
+    SEC
+    SBC.w #!C2Scene_MapTilesY
+.down_row:
+    LSR A
+    STA.b !C2Scene_EdgeRow
+    LDA.b !C2Scene_Bg1VScroll,X
+    AND.w #!C2Scene_TilePx
+    BNE .down_odd               ; tile Y odd: row Y + 28 is odd (bottom halves)
+    JSR C2Scene_EdgeRowTop
+    BRA .down_queue
+.down_odd:
+    JSR C2Scene_EdgeRowBottom
+.down_queue:
+    LDX.b !C2Scene_ScrollSlot
+    LDA.b !C2Scene_Bg1VScroll,X
+    CLC
+    ADC.w #!C2Scene_EdgeBottomPx
+    STA.b !C2Scene_EdgeRow
+    JSR C2Scene_QueueEdgeRow
+    BRA .down_next
+
+; $C2:0773 — C2Scene_EdgeColLeft (79 bytes, $0773–$07C1)
+; Builds one tile column of a layer edge into the buffer at
+; C2Scene_VramQBufPtr: C2Scene_EdgeColTiles (30) tiles from the left
+; half of metatile column C2Scene_EdgeCol, starting at metatile row
+; C2Scene_EdgeRow (C2Scene_EdgeColSetup). Each metatile gives two tiles,
+; .TopLeft then .BottomLeft; the first is skipped when the layer's tile Y
+; is even (the column starts at tile row BgTileY - 1, an odd row). The
+; map row steps down by 96 bytes, wrapping at the map's end, and the
+; buffer offset by one word, wrapping within the 32 words.
+; Note: 30 of the 32 buffer words are written; the two others
+; keep what the buffer held and are sent to VRAM with them
+; (C2Scene_QueueEdgeCol sends 32), which falls in the two rows not on
+; screen.
+; Callers (2 JSR sites): C2Scene_Unk0568 ($C2:05F5, $C2:0655).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (set to $7E for the map and buffer
+;        and restored); C2Scene_EdgeCol/Row, C2Scene_ScrollSlot,
+;        C2Scene_ScrollMap and C2Scene_ScrollMetatiles set
+; Exit:  M=0, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$0A and $19
+;        changed
+; Calls: C2Scene_EdgeColSetup.
+C2Scene_EdgeColLeft:
+    JSR C2Scene_EdgeColSetup
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w #!C2Scene_EdgeColTiles
+    STA.b !C2Scene_EdgeTilesLeft
+.tile:
+    LDY.b !C2Scene_EdgeMapOfs
+    LDA.b (!C2Scene_EdgeMapPtr),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                       ; * 8 bytes per metatile (C = 0)
+    ADC.b !C2Scene_ScrollMetatiles
+    TAX
+    LDY.b !C2Scene_EdgeBufPos
+    LDA.b !C2Scene_EdgeHalf
+    LSR A
+    BCS .bottom
+    LDA.w C2Scene_Metatile.TopLeft,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    BRA .next
+.bottom:
+    LDA.w C2Scene_Metatile.BottomLeft,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    CLC
+    LDA.b !C2Scene_EdgeMapOfs
+    ADC.w #!C2Scene_MapCols
+    CMP.w #!C2Scene_MapBytes
+    BCC .row_set
+    TDC                         ; A = DP = 0: wrap to row 0
+.row_set:
+    STA.b !C2Scene_EdgeMapOfs
+.next:
+    TYA
+    INC A
+    INC A
+    AND.w #!C2Scene_ColBufMask
+    STA.b !C2Scene_EdgeBufPos
+    INC.b !C2Scene_EdgeHalf
+    DEC.b !C2Scene_EdgeTilesLeft
+    BNE .tile
+    PLB
+    RTS
+
+; $C2:07C2 — C2Scene_EdgeColRight (79 bytes, $07C2–$0810)
+; C2Scene_EdgeColLeft for the right half of the metatiles: .TopRight
+; and .BottomRight.
+; Callers (2 JSR sites): C2Scene_Unk0568 ($C2:05F0, $C2:065A).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (set to $7E for the map and buffer
+;        and restored); C2Scene_EdgeCol/Row, C2Scene_ScrollSlot,
+;        C2Scene_ScrollMap and C2Scene_ScrollMetatiles set
+; Exit:  M=0, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$0A and $19
+;        changed
+; Calls: C2Scene_EdgeColSetup.
+C2Scene_EdgeColRight:
+    JSR C2Scene_EdgeColSetup
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w #!C2Scene_EdgeColTiles
+    STA.b !C2Scene_EdgeTilesLeft
+.tile:
+    LDY.b !C2Scene_EdgeMapOfs
+    LDA.b (!C2Scene_EdgeMapPtr),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                       ; * 8 bytes per metatile (C = 0)
+    ADC.b !C2Scene_ScrollMetatiles
+    TAX
+    LDY.b !C2Scene_EdgeBufPos
+    LDA.b !C2Scene_EdgeHalf
+    LSR A
+    BCS .bottom
+    LDA.w C2Scene_Metatile.TopRight,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    BRA .next
+.bottom:
+    LDA.w C2Scene_Metatile.BottomRight,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    CLC
+    LDA.b !C2Scene_EdgeMapOfs
+    ADC.w #!C2Scene_MapCols
+    CMP.w #!C2Scene_MapBytes
+    BCC .row_set
+    TDC                         ; A = DP = 0: wrap to row 0
+.row_set:
+    STA.b !C2Scene_EdgeMapOfs
+.next:
+    TYA
+    INC A
+    INC A
+    AND.w #!C2Scene_ColBufMask
+    STA.b !C2Scene_EdgeBufPos
+    INC.b !C2Scene_EdgeHalf
+    DEC.b !C2Scene_EdgeTilesLeft
+    BNE .tile
+    PLB
+    RTS
+
+; $C2:0811 — C2Scene_EdgeColSetup (50 bytes, $0811–$0842)
+; Sets up a column build: C2Scene_EdgeMapOfs = C2Scene_EdgeRow * 96 (the
+; row's offset in the map), C2Scene_EdgeMapPtr = the layer's map +
+; C2Scene_EdgeCol, C2Scene_EdgeBuf = C2Scene_VramQBufPtr's address;
+; C2Scene_EdgeHalf = 1 when the layer's tile Y is even, else 0; and
+; C2Scene_EdgeBufPos = ((VScroll - 8) AND $F8) / 4, the buffer word of
+; the tile row one above the scroll (32 rows of the tilemap).
+; Callers (2 JSR sites): C2Scene_EdgeColLeft ($C2:0773),
+;   C2Scene_EdgeColRight ($C2:07C2).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (C2Scene_VramQBufPtr and
+;        C2Scene_BgTileY read absolute)
+; Exit:  M=0, X=0; A = the buffer offset; X = C2Scene_ScrollSlot; Y
+;        unchanged; C2Tmp_02-$0A and $19 changed
+; No calls.
+C2Scene_EdgeColSetup:
+    LDA.b !C2Scene_EdgeRow
+    XBA
+    LSR A
+    LSR A
+    STA.b !C2Scene_EdgeTilesLeft ; row * 64
+    LSR A                       ; row * 32 (C = 0)
+    ADC.b !C2Scene_EdgeTilesLeft
+    STA.b !C2Scene_EdgeMapOfs   ; row * 96
+    LDA.b !C2Scene_ScrollMap
+    CLC
+    ADC.b !C2Scene_EdgeCol
+    STA.b !C2Scene_EdgeMapPtr
+    LDA.w !C2Scene_VramQBufPtr
+    STA.b !C2Scene_EdgeBuf
+    LDX.b !C2Scene_ScrollSlot
+    STZ.b !C2Scene_EdgeHalf
+    LDA.w !C2Scene_BgTileY,X
+    LSR A
+    BCS .odd
+    INC.b !C2Scene_EdgeHalf     ; tile Y even: start on a bottom half
+.odd:
+    LDA.b !C2Scene_Bg1VScroll,X
+    SEC
+    SBC.w #!C2Scene_TilePx
+    AND.w #!C2Scene_PxTileRowMask
+    LSR A
+    LSR A
+    STA.b !C2Scene_EdgeBufPos
+    RTS
+
+; $C2:0843 — C2Scene_EdgeRowTop (76 bytes, $0843–$088E)
+; Builds one tile row of a layer edge into the buffer at
+; C2Scene_VramQBufPtr: C2Scene_EdgeRowTiles (34) tiles from the top half
+; of metatile row C2Scene_EdgeRow, starting at metatile column
+; C2Scene_EdgeCol (C2Scene_EdgeRowSetup). Each metatile gives .TopLeft
+; then .TopRight; the first is skipped when the layer's tile X is even
+; (the row starts at tile column BgTileX - 1, an odd column). The map
+; column steps right, wrapping at 96, and the buffer offset by one word,
+; wrapping within the 64 words of the row.
+; Note: 34 of the 64 buffer words are written; the other 30 keep
+; what the buffer held and C2Scene_QueueEdgeRow sends all 64 (they fall
+; off screen).
+; Callers (2 JSR sites): C2Scene_Unk066C ($C2:06F9, $C2:075C).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (set to $7E for the map and buffer
+;        and restored); C2Scene_EdgeCol/Row, C2Scene_ScrollSlot,
+;        C2Scene_ScrollMap and C2Scene_ScrollMetatiles set
+; Exit:  M=0, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$0A and $19
+;        changed
+; Calls: C2Scene_EdgeRowSetup.
+C2Scene_EdgeRowTop:
+    JSR C2Scene_EdgeRowSetup
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w #!C2Scene_EdgeRowTiles
+    STA.b !C2Scene_EdgeTilesLeft
+.tile:
+    LDY.b !C2Scene_EdgeMapOfs
+    LDA.b (!C2Scene_EdgeMapPtr),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                       ; * 8 bytes per metatile (C = 0)
+    ADC.b !C2Scene_ScrollMetatiles
+    TAX
+    LDY.b !C2Scene_EdgeBufPos
+    LDA.b !C2Scene_EdgeHalf
+    LSR A
+    BCS .right
+    LDA.w C2Scene_Metatile.TopLeft,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    BRA .next
+.right:
+    LDA.w C2Scene_Metatile.TopRight,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    LDA.b !C2Scene_EdgeMapOfs
+    INC A
+    CMP.w #!C2Scene_MapCols
+    BCC .col_set
+    TDC                         ; A = DP = 0: wrap to column 0
+.col_set:
+    STA.b !C2Scene_EdgeMapOfs
+.next:
+    TYA
+    INC A
+    INC A
+    AND.w #!C2Scene_RowBufMask
+    STA.b !C2Scene_EdgeBufPos
+    INC.b !C2Scene_EdgeHalf
+    DEC.b !C2Scene_EdgeTilesLeft
+    BNE .tile
+    PLB
+    RTS
+
+; $C2:088F — C2Scene_EdgeRowBottom (76 bytes, $088F–$08DA)
+; C2Scene_EdgeRowTop for the bottom half of the metatiles: .BottomLeft
+; and .BottomRight.
+; Callers (2 JSR sites): C2Scene_Unk066C ($C2:06F4, $C2:0761).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (set to $7E for the map and buffer
+;        and restored); C2Scene_EdgeCol/Row, C2Scene_ScrollSlot,
+;        C2Scene_ScrollMap and C2Scene_ScrollMetatiles set
+; Exit:  M=0, X=0, DB unchanged; A, X, Y clobbered; C2Tmp_02-$0A and $19
+;        changed
+; Calls: C2Scene_EdgeRowSetup.
+C2Scene_EdgeRowBottom:
+    JSR C2Scene_EdgeRowSetup
+    SEP #$20
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w #!C2Scene_EdgeRowTiles
+    STA.b !C2Scene_EdgeTilesLeft
+.tile:
+    LDY.b !C2Scene_EdgeMapOfs
+    LDA.b (!C2Scene_EdgeMapPtr),Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A                       ; * 8 bytes per metatile (C = 0)
+    ADC.b !C2Scene_ScrollMetatiles
+    TAX
+    LDY.b !C2Scene_EdgeBufPos
+    LDA.b !C2Scene_EdgeHalf
+    LSR A
+    BCS .right
+    LDA.w C2Scene_Metatile.BottomLeft,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    BRA .next
+.right:
+    LDA.w C2Scene_Metatile.BottomRight,X
+    STA.b (!C2Scene_EdgeBuf),Y
+    LDA.b !C2Scene_EdgeMapOfs
+    INC A
+    CMP.w #!C2Scene_MapCols
+    BCC .col_set
+    TDC                         ; A = DP = 0: wrap to column 0
+.col_set:
+    STA.b !C2Scene_EdgeMapOfs
+.next:
+    TYA
+    INC A
+    INC A
+    AND.w #!C2Scene_RowBufMask
+    STA.b !C2Scene_EdgeBufPos
+    INC.b !C2Scene_EdgeHalf
+    DEC.b !C2Scene_EdgeTilesLeft
+    BNE .tile
+    PLB
+    RTS
+
+; $C2:08DB — C2Scene_EdgeRowSetup (50 bytes, $08DB–$090C)
+; Sets up a row build: C2Scene_EdgeMapOfs = C2Scene_EdgeCol (the column),
+; C2Scene_EdgeMapPtr = the layer's map + C2Scene_EdgeRow * 96,
+; C2Scene_EdgeBuf = C2Scene_VramQBufPtr's address; C2Scene_EdgeHalf = 1
+; when the layer's tile X is even, else 0; and C2Scene_EdgeBufPos =
+; ((HScroll - 8) AND $1F8) / 4, the buffer word of the tile column one
+; left of the scroll (64 columns of the tilemap).
+; Callers (2 JSR sites): C2Scene_EdgeRowTop ($C2:0843),
+;   C2Scene_EdgeRowBottom ($C2:088F).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (C2Scene_VramQBufPtr and
+;        C2Scene_BgTileX read absolute)
+; Exit:  M=0, X=0; A = the buffer offset; X = C2Scene_ScrollSlot; Y
+;        unchanged; C2Tmp_02-$0A and $19 changed
+; No calls.
+C2Scene_EdgeRowSetup:
+    LDA.b !C2Scene_EdgeCol
+    STA.b !C2Scene_EdgeMapOfs
+    LDA.b !C2Scene_EdgeRow
+    XBA
+    LSR A
+    LSR A
+    STA.b !C2Scene_EdgeTilesLeft ; row * 64
+    LSR A                       ; row * 32 (C = 0)
+    ADC.b !C2Scene_EdgeTilesLeft ; row * 96
+    CLC
+    ADC.b !C2Scene_ScrollMap
+    STA.b !C2Scene_EdgeMapPtr
+    LDA.w !C2Scene_VramQBufPtr
+    STA.b !C2Scene_EdgeBuf
+    LDX.b !C2Scene_ScrollSlot
+    STZ.b !C2Scene_EdgeHalf
+    LDA.w !C2Scene_BgTileX,X
+    LSR A
+    BCS .odd
+    INC.b !C2Scene_EdgeHalf     ; tile X even: start on a right half
+.odd:
+    LDA.b !C2Scene_Bg1HScroll,X
+    SEC
+    SBC.w #!C2Scene_TilePx
+    AND.w #!C2Scene_PxTileColMask
+    LSR A
+    LSR A
+    STA.b !C2Scene_EdgeBufPos
+    RTS
+
+; $C2:090D — C2Scene_QueueEdgeCol (84 bytes, $090D–$0960)
+; Queues the column built at C2Scene_VramQBufPtr for VRAM: one
+; C2Scene_VramQ entry of C2Scene_ColBufHalf bytes from bank $7E, VMAIN
+; stepping 32 words, to tile column (C2Scene_EdgeCol / 8) AND 63 of the
+; layer's tilemap (columns 32-63 in the second screen, as
+; C2Scene_UploadBgColumn). The queue is locked (C2Scene_VramQLock) while
+; the entry is written; C2Scene_VramQBufPtr then moves past the column.
+; There is no check that the queue has room.
+; Callers (2 JSR sites): C2Scene_Unk0568 ($C2:0602, $C2:0667).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
+;        C2Scene_EdgeCol = the column's BG pixel X, C2Scene_ScrollVramMap
+;        set
+; Exit:  M=0, X=0; A = the new buffer pointer; X = the entry's offset; Y
+;        unchanged; C2Scene_EdgeCol = the VRAM address
+; No calls.
+C2Scene_QueueEdgeCol:
+    LDA.b !C2Scene_EdgeCol
+    LSR A
+    LSR A
+    LSR A
+    AND.w #!C2Scene_TileColMask
+    CMP.w #!C2Scene_MapScreenCols
+    BCC .left_screen
+    CLC
+    ADC.w #!C2Scene_MapScreen2Skip
+.left_screen:
+    CLC
+    ADC.b !C2Scene_ScrollVramMap
+    STA.b !C2Scene_EdgeCol
+    SEP #$30
+    INC.w !C2Scene_VramQLock
+    LDX.w !C2Scene_VramQEnd
+    LDA.b #!Bank7E
+    STA.w C2Scene_VramQ.Bank,X
+    LDA.b #!VMAIN_IncAfterHigh|VRAM_INC_32
+    STA.w C2Scene_VramQ.Vmain,X
+    REP #$20
+    LDA.w !C2Scene_VramQBufPtr
+    STA.w C2Scene_VramQ.Src,X
+    LDA.b !C2Scene_EdgeCol
+    STA.w C2Scene_VramQ.Dest,X
+    LDA.w #!C2Scene_ColBufHalf
+    STA.w C2Scene_VramQ.Size,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #!C2Scene_VramQEntrySize
+    STA.w !C2Scene_VramQEnd
+    STZ.w !C2Scene_VramQLock
+    REP #$30
+    CLC
+    LDA.w !C2Scene_VramQBufPtr
+    ADC.w #!C2Scene_ColBufHalf
+    STA.w !C2Scene_VramQBufPtr
+    RTS
+
+; $C2:0961 — C2Scene_QueueEdgeRow (100 bytes, $0961–$09C4)
+; Queues the row built at C2Scene_VramQBufPtr for VRAM as two
+; C2Scene_VramQ entries of C2Scene_RowBufHalf bytes from bank $7E, VMAIN
+; stepping one word: the buffer's first half to tile row
+; (C2Scene_EdgeRow AND $F8) / 8 of the layer's left screen, its second
+; half to the same row of the right screen ($400 words on). Locked and
+; advanced as in C2Scene_QueueEdgeCol (by both halves).
+; Callers (2 JSR sites): C2Scene_Unk066C ($C2:0706, $C2:076E).
+; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
+;        C2Scene_EdgeRow = the row's BG pixel Y, C2Scene_ScrollVramMap set
+; Exit:  M=0, X=0; A = the new buffer pointer; X = the first entry's
+;        offset; Y unchanged; C2Scene_EdgeCol / C2Scene_EdgeRow = the two
+;        VRAM addresses
+; No calls.
+C2Scene_QueueEdgeRow:
+    LDA.b !C2Scene_EdgeRow
+    AND.w #!C2Scene_PxTileRowMask
+    ASL A
+    ASL A                       ; tile row * 32 words
+    ADC.b !C2Scene_ScrollVramMap
+    STA.b !C2Scene_EdgeCol
+    CLC
+    ADC.w #!Bg_ScreenWords
+    STA.b !C2Scene_EdgeRow
+    SEP #$30
+    INC.w !C2Scene_VramQLock
+    LDX.w !C2Scene_VramQEnd
+    LDA.b #!Bank7E
+    STA.w C2Scene_VramQ.Bank,X
+    STA.w C2Scene_VramQ[1].Bank,X
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w C2Scene_VramQ.Vmain,X
+    STA.w C2Scene_VramQ[1].Vmain,X
+    REP #$20
+    LDA.w #!C2Scene_RowBufHalf
+    STA.w C2Scene_VramQ.Size,X
+    STA.w C2Scene_VramQ[1].Size,X
+    LDA.w !C2Scene_VramQBufPtr
+    STA.w C2Scene_VramQ.Src,X
+    CLC
+    ADC.w #!C2Scene_RowBufHalf
+    STA.w C2Scene_VramQ[1].Src,X
+    LDA.b !C2Scene_EdgeCol
+    STA.w C2Scene_VramQ.Dest,X
+    LDA.b !C2Scene_EdgeRow
+    STA.w C2Scene_VramQ[1].Dest,X
+    SEP #$20
+    TXA
+    CLC
+    ADC.b #(2*!C2Scene_VramQEntrySize)
+    STA.w !C2Scene_VramQEnd
+    STZ.w !C2Scene_VramQLock
+    REP #$30
+    CLC
+    LDA.w !C2Scene_VramQBufPtr
+    ADC.w #2*!C2Scene_RowBufHalf
+    STA.w !C2Scene_VramQBufPtr
+    RTS
 
 ; ============================================================
 ; Scene BG layer redraw ($C2:09C5–$C2:0B52)
@@ -1002,8 +1855,8 @@ C2Scene_LayerVramMaps:
 ; metatile (C2Scene_LayerMetatiles) is four tile words. A redraw builds
 ; the tilemap column by column in the buffer at C2Scene_VramQBufPtr and
 ; DMAs each column to VRAM straight away, so it needs forced blank or
-; vblank (its callers are the scene setup, under forced blank, and the
-; unmatched script code at $C2:1950).
+; vblank (its callers are the scene setup, under forced blank, and
+; script op C2Script_DrawLayer at $C2:1950).
 
 ; $C2:09C5 — C2Scene_DrawBgLayer (167 bytes, $09C5–$0A6B)
 ; Redraws the visible part of BG layer C2Scene_DrawLayer (1 or 2; the
@@ -1021,10 +1874,11 @@ C2Scene_LayerVramMaps:
 ; loop (.hang). Layer 3 would read its X from C2Scene_BgTileY's first word
 ; and its Y from dp $EB, past C2Scene_BgTileY, and its table entries do
 ; not fit the BG3 layout (see C2Scene_LayerVramMaps); no known caller
-; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2; the
-; unmatched caller passes a script byte).
+; passes 3 (C2Scene_LoadScene and C2Scene_ReloadScene pass 1 and 2;
+; C2Script_DrawLayer passes a script byte).
 ; Callers (5 sites): C2Scene_LoadScene ($C2:2C81, $C2:2C88),
-;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE); unmatched: $C2:1950.
+;   C2Scene_ReloadScene ($C2:2CB7, JMP at $C2:2CBE) and C2Script_DrawLayer
+;   ($C2:1950).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000 (direct-page work area;
 ;        TDC for 0), DB any (set to $7E for the buffers and restored);
 ;        C2Tmp_00 = the layer; forced blank or vblank (VRAM DMA)
@@ -1336,7 +2190,7 @@ org $C20B53
 ;   smaller than its own, so the larger .Y is drawn first (on top).
 ; Quirk, kept: there is no check that the free list is empty; a 65th
 ; node in one frame would unlink the free head itself.
-; Callers (1 JSR site, unmatched): $C2:0ED6.
+; Callers (1 JSR site): C2Anim_OpShowFrame ($C2:0ED6).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB any (set to $7E and
 ;        restored); C2Scene_SprFramePtr = the frame
 ; Exit:  M=0 (16-bit A: the REP #$20 before the insert is never undone),
@@ -1794,9 +2648,10 @@ org $C20E1D
 ; Inferred to be the sprite's animation from C2Anim_OpShowFrame, which
 ; adds a frame to the sprite list for a number of frames, and from the
 ; script ops that start one (C2Scene_SetAnim) before moving the task.
-; Callers (57 JSR sites, all unmatched except those listed): e.g.
-;   C2Script_MoveFrames ($C2:1643), $C2:18AC, $C2:19B6, $C2:1A1F,
-;   $C2:3444, $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
+; Callers (57 JSR sites, all unmatched except those named): e.g.
+;   C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
+;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), $C2:3444,
+;   $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
 ;   doubtful byte patterns.
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
@@ -4823,8 +5678,8 @@ org $C21C84
 ; $C2:1C84 — C2Scene_NegateXVel (26 bytes, $1C84–$1C9D)
 ; Negates the task's X velocity as one 32-bit value (.XVelFrac/.XVel:
 ; invert both words and add 1 with the carry), turning it around.
-; Callers (4 JSR sites): $C2:1979 and $C2:198B (both in C2Script_MoveToX,
-;   unmatched), $C2:52D0 and $C2:5429 (unmatched).
+; Callers (4 JSR sites): C2Script_MoveToX ($C2:1979, $C2:198B);
+;   unmatched: $C2:52D0 and $C2:5429.
 ; Entry: M=0, X=0 with X = the task, DP any, DB with low WRAM at
 ;        $0000-$1FFF
 ; Exit:  M=0, X=0; A = the new .XVel; X, Y unchanged
@@ -4843,8 +5698,8 @@ C2Scene_NegateXVel:
 
 ; $C2:1C9E — C2Scene_NegateYVel (26 bytes, $1C9E–$1CB7)
 ; C2Scene_NegateXVel for .YVelFrac/.YVel.
-; Callers (4 JSR sites): $C2:19E2 and $C2:19F4 (both in C2Script_MoveToY,
-;   unmatched), $C2:5319 and $C2:5436 (unmatched).
+; Callers (4 JSR sites): C2Script_MoveToY ($C2:19E2, $C2:19F4);
+;   unmatched: $C2:5319 and $C2:5436.
 ; Entry/Exit: as C2Scene_NegateXVel (A = the new .YVel)
 ; No calls.
 C2Scene_NegateYVel:
@@ -4866,9 +5721,9 @@ C2Scene_NegateYVel:
 ; position moved by less than a map width); .SprY is taken AND
 ; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
 ; Callers (22 call sites, JSR and JMP, all unmatched except those
-;   listed): e.g.
-;   C2Script_MoveFrames ($C2:1640), $C2:19B3, $C2:1A1C, $C2:36F4, JMP at
-;   $C2:48E5, and $C2:55DF; $C2:5257 is a doubtful byte pattern.
+;   named): e.g. C2Script_MoveFrames ($C2:1640), C2Script_MoveToX
+;   ($C2:19B3), C2Script_MoveToY ($C2:1A1C), $C2:36F4, JMP at $C2:48E5,
+;   and $C2:55DF; $C2:5257 is a doubtful byte pattern.
 ; Entry: M=0, X=0, DP=$0000, DB with low WRAM at $0000-$1FFF;
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -4896,9 +5751,8 @@ C2Scene_WrapTaskPos:
 ; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
 ; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
 ; Callers (34 call sites, JSR and JMP, all unmatched except those
-;   listed): e.g.
-;   C2Script_SetAnim ($C2:1614), $C2:1981, $C2:1993, $C2:19EA,
-;   $C2:19FC, JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
+;   named): e.g. C2Script_SetAnim ($C2:1614), C2Script_MoveToX
+;   ($C2:1981, $C2:1993), C2Script_MoveToY ($C2:19EA, $C2:19FC), JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
 ;   also lists doubtful byte patterns at $C2:470F, $C2:48BB, $C2:48C2,
 ;   $C2:49B5, $C2:501E and $C2:559F.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
@@ -6156,8 +7010,9 @@ C2Scene_ClearUnk1B30:
 ; back to C2Scene_MainLoop by JMP or BRA; the per-frame work itself is in
 ; the NMI (C2Scene_NmiHandler).
 ; Callers: JMP from BankC2_SceneBoot ($C2:0040). C2Scene_MainLoop: from
-;   C2Scene_ModeIdle and the unmatched mode handlers (JMP at $C2:244F,
-;   $C2:258A, $C2:261A and $C2:26A5).
+;   C2Scene_ModeIdle and the mode handlers C2Scene_Mode3 (JMP at
+;   $C2:244F), C2Scene_Mode5 ($C2:258A), C2Scene_Mode6 ($C2:261A) and
+;   C2Scene_Mode8 ($C2:26A5).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (as BankC2_SceneBoot leaves them;
 ;        the dispatch reads C2Scene_Mode absolute and uses TDC for a zero
 ;        high byte)
@@ -6193,8 +7048,9 @@ C2Scene_MainLoop:               ; header: see C2Scene_Main
 ; $C2:23DB — C2Scene_ModeTable (10 words, $23DB–$23EE)
 ; C2Scene_MainLoop's handler for each C2Scene_Mode value 0-9. Modes 0, 1
 ; and 7 only send a pending sound command (C2Scene_ModeIdle). The others
-; are unmatched; what they show is not traced (4, for one, turns the NMI
-; off and loops on C2Scene_RestoreFlagTail for good).
+; have their own handlers, C2Scene_Mode2-C2Scene_Mode6 and
+; C2Scene_Mode8, mode 9 sharing C2Scene_Mode5's (the scene mode handlers
+; below).
 C2Scene_ModeTable:
     dw C2Scene_ModeIdle         ; 0
     dw C2Scene_ModeIdle         ; 1
@@ -6223,6 +7079,417 @@ C2Scene_ModeIdle:
     JSL Audio_DriverCommand
     STZ.w !C2Scene_SoundCmdState
     BRA C2Scene_MainLoop
+
+; ============================================================
+; Scene mode handlers ($C2:2402–$C2:26A7)
+; ============================================================
+; C2Scene_MainLoop jumps to one of these through C2Scene_ModeTable when
+; C2Scene_Mode is 2-6, 8 or 9 (who sets the mode is mostly unmatched;
+; script op $05 sets 2). Each runs to its end inside one pass of the
+; loop: the ones that come back set C2Scene_ModeIdle1 and JMP to
+; C2Scene_MainLoop; modes 2 and 4 never come back. All are entered with
+; M=1, X=0, DP=$0000, DB=$00 (C2Scene_Main's state), A = X = the mode *
+; 2, and need DB=$00 for their absolute register and low-WRAM accesses.
+
+; $C2:2402 — C2Scene_Mode3 (211 bytes, $2402–$24D4)
+; Mode 3: acts on the C2Scene_ListA entry at byte offset
+; C2Scene_Unk1B32 (probably an exit the player has reached):
+; - its .Loc is C2Scene_ListANoLoc: starts the script whose address is
+;   word .EntryX of C2Scene_ListD (bank $7F, the scene script's bank),
+;   keeps that address in C2Scene_Unk1B45, zeroes C2Scene_MemberWords
+;   and C2Scene_Unk1B43, sets C2Scene_Unk0280 = 1 and goes back to the
+;   loop in mode C2Scene_ModeIdle1;
+; - otherwise it fades out (C2Scene_ScrFadeOut; it waits
+;   C2Scene_FadeOutWaitFrames frames with C2Scene_WaitFrame, so no queued
+;   sound is sent meanwhile), turns NMI off and sets up the location
+;   change as script op $05 does (C2Script_GoToLocation: the return
+;   location, X and Y from the current location and BG2's tile
+;   position, also copied to C2Scene_SavedReturnId/X/Y), here with the
+;   entry's .Loc, .EntryX and .EntryY. The entry facing is .Loc's high
+;   byte shifted right once (bits 9-15), and the return facing is that
+;   facing turned around (C2Scene_TurnAround[facing AND 3]), as op $05
+;   does; then falls into C2Scene_Mode2,
+;   which leaves the scene.
+; Callers: none direct (C2Scene_ModeTable entry 3).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers,
+;        DP_Field and low WRAM); C2Scene_Unk1B32 = the entry's offset
+; Exit:  a script started: continues at C2Scene_MainLoop with M=1, X=0;
+;        A, X, Y clobbered. Leaving: never returns (C2Scene_Mode2)
+; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrame; falls into
+;   C2Scene_Mode2.
+C2Scene_Mode3:
+    TDC                         ; A = DP = 0
+    STA.w NMITIMEN
+    REP #$20
+    LDX.w !C2Scene_Unk1B32
+    LDA.l C2Scene_ListAEntry.Loc,X
+    AND.w #!C2Scene_LocIdMask
+    CMP.w #!C2Scene_ListANoLoc
+    BNE .leave
+    LDA.l C2Scene_ListAEntry.EntryX,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !C2Scene_ListD,X
+    STA.w !C2Scene_Unk1B45
+    SEP #$20
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    LDX.w !C2Scene_Unk1B45
+    JSR C2Scene_TaskSpawnScript
+    LDX.w #$0000
+    STX.w !C2Scene_MemberWords
+    STX.w !C2Scene_MemberWords+2
+    STX.w !C2Scene_MemberWords+4
+    STZ.w !C2Scene_Unk1B43
+    LDA.b #1
+    STA.w !C2Scene_Unk0280
+    LDA.b #!C2Scene_ModeIdle1
+    STA.w !C2Scene_Mode
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    JMP C2Scene_MainLoop
+.leave:
+    SEP #$20
+    LDA.b #bank(C2Scene_ScrFadeOut)
+    LDX.w #C2Scene_ScrFadeOut
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_FadeOutWaitFrames
+.wait:
+    PHX
+    JSR C2Scene_WaitFrame
+    PLX
+    DEX
+    BNE .wait
+    TDC
+    STA.w NMITIMEN
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    STA.w !DP_Field+!Loc_ReturnId
+    STA.w !C2Scene_SavedReturnId
+    LDA.b !C2Scene_BgTileX+2
+    CLC
+    ADC.w #!C2Scene_ReturnTileOfs
+    CMP.w #!C2Scene_MapTilesX
+    BCC .x_ok
+    SBC.w #!C2Scene_MapTilesX
+.x_ok:
+    STA.w !DP_Field+!Loc_ReturnX ; 16-bit: Loc_ReturnY is written below
+    STA.w !C2Scene_SavedReturnX
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_ReturnTileOfs
+    AND.w #!C2Scene_MapTilesY-1
+    SEP #$20
+    STA.w !DP_Field+!Loc_ReturnY
+    STA.w !C2Scene_SavedReturnY
+    LDX.w !C2Scene_Unk1B32
+    REP #$20
+    LDA.l C2Scene_ListAEntry.Loc,X
+    AND.w #!C2Scene_LocIdMask
+    STA.w !DP_Field+!Loc_Id
+    SEP #$20
+    LDA.l C2Scene_ListAEntry.Loc+1,X ; the bits above the location
+    LSR A
+    STA.w !DP_Field+!Loc_EntryFacing
+    LDA.l C2Scene_ListAEntry.EntryX,X
+    STA.w !DP_Field+!Loc_EntryX
+    LDA.l C2Scene_ListAEntry.EntryY,X
+    STA.w !DP_Field+!Loc_EntryY
+    TDC
+    LDA.w !DP_Field+!Loc_EntryFacing
+    AND.b #3
+    TAX
+    LDA.l C2Scene_TurnAround,X
+    STA.w !DP_Field+!Loc_ReturnFacing
+
+; $C2:24D5 — C2Scene_Mode2 (52 bytes, $24D5–$2508)
+; Mode 2 (set by script op $05) and the end of C2Scene_Mode3: leaves the
+; scene. Interrupts, NMI, DMA and HDMA off; the flag tail copied back to
+; $7F:01F0 (C2Scene_RestoreFlagTail); sound commands C2Scene_SoundCmd82
+; and C2Scene_SoundCmd83 (arguments 0, $FF; not traced) sent straight
+; to the driver; then JML to ReentryVectors ($C0:0000), which restarts
+; the field's game loop with the location block DP_Field as set up.
+; Callers: none direct (C2Scene_ModeTable entry 2; C2Scene_Mode3 falls
+;   in).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers and
+;        the driver block)
+; Exit:  never returns
+; Calls: C2Scene_RestoreFlagTail, Audio_DriverCommand (JSL), JML
+;   ReentryVectors.
+C2Scene_Mode2:
+    SEI
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    JSR C2Scene_RestoreFlagTail
+    LDA.b #!C2Scene_SoundCmd82
+    STA.w !Audio_CmdId
+    STZ.w !Audio_CmdArg0
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    LDA.b #!C2Scene_SoundCmd83
+    STA.w !Audio_CmdId
+    STZ.w !Audio_CmdArg0
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    JML ReentryVectors
+
+; $C2:2509 — C2Scene_TurnAround (4 bytes, $2509–$250C)
+; Facing 0-3 -> the opposite facing (the facing EOR 1). Read by
+; C2Script_GoToLocation (as C2SceneRom_TurnAround) and C2Scene_Mode3.
+C2Scene_TurnAround:
+    db $01,$00,$03,$02
+
+; $C2:250D — C2Scene_Mode4 (17 bytes, $250D–$251D)
+; Mode 4: interrupts, NMI, DMA and HDMA off, the flag tail copied back
+; (C2Scene_RestoreFlagTail), and again, for good: it never leaves
+; (probably waits for a reset; who sets mode 4 is not matched).
+; Callers: none direct (C2Scene_ModeTable entry 4); its own JMP at
+;   $C2:251B.
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers)
+; Exit:  never returns
+; Calls: C2Scene_RestoreFlagTail.
+C2Scene_Mode4:
+    SEI
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    JSR C2Scene_RestoreFlagTail
+    JMP C2Scene_Mode4
+
+; $C2:251E — C2Scene_Mode5 (111 bytes, $251E–$258C)
+; Modes 5 (C2Scene_ModeMenu) and 9: run the menu over the scene. Fades
+; out (C2Scene_ScrFadeOut, C2Scene_FadeWaitFrames frames), turns
+; interrupts, NMI, DMA and HDMA (and its shadow) off, saves the scene
+; (C2Scene_SaveState) and calls BankC2_Entry8000 with A =
+; C2Scene_MenuArgMenu for mode 5 or ExitMenu_Mode5 for mode 9 (the
+; values the field passes at $C0:1960 and $C0:19CE). Then it sets the
+; scene back up: registers (BankC2_InitHwRegs), interrupt vectors
+; (C2Scene_InstallInterrupts), C2Scene_RestoreState, the VRAM queue
+; (C2Scene_VramQInit) and the graphics (C2Scene_ReloadScene); fades in
+; (C2Scene_ScrFadeIn), adds one to C2Scene_Unk1B59 when C2Scene_Unk1B58
+; is set, turns the NMI updates and NMI on, waits
+; C2Scene_FadeWaitFrames frames and goes back to the loop in mode
+; C2Scene_ModeIdle1.
+; Callers: none direct (C2Scene_ModeTable entries 5 and 9).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
+; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
+; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, C2Scene_SaveState,
+;   BankC2_Entry8000 (JSL), BankC2_InitHwRegs, C2Scene_InstallInterrupts,
+;   C2Scene_RestoreState, C2Scene_VramQInit, C2Scene_ReloadScene.
+C2Scene_Mode5:
+    TDC
+    STA.w NMITIMEN
+    LDA.b #bank(C2Scene_ScrFadeOut)
+    LDX.w #C2Scene_ScrFadeOut
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_FadeWaitFrames
+    JSR C2Scene_WaitFrames
+    SEI
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    STA.b !C2Scene_HdmaenShadow
+    JSR C2Scene_SaveState
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeMenu
+    BNE .mode9
+    LDA.b #!C2Scene_MenuArgMenu
+    BRA .call
+.mode9:
+    LDA.b #!ExitMenu_Mode5
+.call:
+    JSL BankC2_Entry8000
+    SEI
+    JSR BankC2_InitHwRegs
+    JSR C2Scene_InstallInterrupts
+    JSR C2Scene_RestoreState
+    JSR C2Scene_VramQInit
+    JSR C2Scene_ReloadScene
+    LDA.b #bank(C2Scene_ScrFadeIn)
+    LDX.w #C2Scene_ScrFadeIn
+    JSR C2Scene_TaskSpawnScript
+    LDA.w !C2Scene_Unk1B58
+    BEQ .resume
+    INC.w !C2Scene_Unk1B59
+.resume:
+    LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_FadeWaitFrames
+    JSR C2Scene_WaitFrames
+    LDA.b #!C2Scene_ModeIdle1
+    STA.w !C2Scene_Mode
+    JMP C2Scene_MainLoop
+
+; $C2:258D — C2Scene_Mode6 (144 bytes, $258D–$261C)
+; Mode 6: runs C2Scene_Unk631F (it sets BG mode 7 and runs its own
+; tasks until the mode changes from 6: probably a mode-7 view) between a
+; mosaic fade out and in. Starts C2Scene_ScrMosaicFadeOut and waits
+; C2Scene_Mode6OutFrames frames; interrupts, NMI, DMA and HDMA (and its
+; shadow) off; copies dp $00-$EF to C2Scene_SaveDp and the 64 task
+; records to C2Scene_SaveLowRam ($7F:2800: not where C2Scene_SaveState
+; puts them), runs C2Scene_Unk631F, copies both back; then the VRAM
+; queue and graphics (C2Scene_VramQInit, C2Scene_ReloadScene),
+; C2Scene_ScrMosaicFadeIn, C2Scene_Unk1B59 + 1 when C2Scene_Unk1B58 is
+; set, NMI updates and NMI on, C2Scene_Mode6InFrames frames, mode
+; C2Scene_ModeIdle1 and back to the loop.
+; Callers: none direct (C2Scene_ModeTable entry 6).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
+; Exit:  continues at C2Scene_MainLoop with M=1, X=0, DB=$00; A, X, Y
+;        clobbered
+; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, C2Scene_Unk631F,
+;   C2Scene_VramQInit, C2Scene_ReloadScene.
+C2Scene_Mode6:
+    TDC
+    STA.w NMITIMEN
+    LDA.b #bank(C2Scene_ScrMosaicFadeOut)
+    LDX.w #C2Scene_ScrMosaicFadeOut
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_Mode6OutFrames
+    JSR C2Scene_WaitFrames
+    SEI
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    STA.b !C2Scene_HdmaenShadow
+    REP #$20
+    PHB
+    LDX.w #!C2Scene_DpClearStart
+    LDY.w #!C2Scene_SaveDp&$FFFF
+    LDA.w #!C2Scene_SaveDpBytes-1
+    MVN bank(!C2Scene_SaveDp),!Bank00 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_TaskRecords
+    LDY.w #!C2Scene_SaveLowRam&$FFFF
+    LDA.w #!C2Scene_TaskRecordsEnd-!C2Scene_TaskRecords-1
+    MVN bank(!C2Scene_SaveLowRam),!Bank00 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    JSR C2Scene_Unk631F
+    REP #$20
+    PHB
+    LDX.w #!C2Scene_SaveDp&$FFFF
+    LDY.w #!C2Scene_DpClearStart
+    LDA.w #!C2Scene_SaveDpBytes-1
+    MVN !Bank00,bank(!C2Scene_SaveDp) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SaveLowRam&$FFFF
+    LDY.w #!C2Scene_TaskRecords
+    LDA.w #!C2Scene_TaskRecordsEnd-!C2Scene_TaskRecords-1
+    MVN !Bank00,bank(!C2Scene_SaveLowRam) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    JSR C2Scene_VramQInit
+    JSR C2Scene_ReloadScene
+    LDA.b #bank(C2Scene_ScrMosaicFadeIn)
+    LDX.w #C2Scene_ScrMosaicFadeIn
+    JSR C2Scene_TaskSpawnScript
+    LDA.w !C2Scene_Unk1B58
+    BEQ .resume
+    INC.w !C2Scene_Unk1B59
+.resume:
+    LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_Mode6InFrames
+    JSR C2Scene_WaitFrames
+    LDA.b #!C2Scene_ModeIdle1
+    STA.w !C2Scene_Mode
+    JMP C2Scene_MainLoop
+
+; $C2:261D — C2Scene_Mode8 (139 bytes, $261D–$26A7)
+; Mode 8: runs C2Scene_Unk6A34 (not matched; it clears VRAM and the
+; tasks itself) over a saved scene. Fades out (C2Scene_ScrFadeOut,
+; C2Scene_FadeOutWaitFrames frames), turns interrupts, NMI, DMA and HDMA
+; (and its shadow) off,
+; sends C2Scene_SoundCmd82 (arguments 0, $FF) straight to the driver,
+; saves the scene (C2Scene_SaveState), runs C2Scene_Unk6A34, restores
+; (C2Scene_RestoreState) and resets the VRAM queue. Then, unless
+; $7F:01F4 AND $0A or $7F:01F5 AND $02 is non-zero (two flag bytes of
+; Menu_FlagBlock7F; who sets them is not traced), it
+; reloads the graphics (C2Scene_ReloadScene) and fades in
+; (C2Scene_ScrFadeIn, C2Scene_Unk1B59 + 1 when C2Scene_Unk1B58 is set).
+; NMI updates and NMI on either way; with the flags clear it waits
+; C2Scene_FadeWaitFrames frames and sets mode C2Scene_ModeIdle1, with
+; them set it goes back to the loop at once, in whatever mode was set
+; while C2Scene_Unk6A34 ran (it loops at $C2:6A9C-$C2:6AA4 until
+; C2Scene_Mode is no longer 8, and C2Scene_RestoreState does not
+; restore it).
+; Callers: none direct (C2Scene_ModeTable entry 8).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
+; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
+; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, Audio_DriverCommand
+;   (JSL), C2Scene_SaveState, C2Scene_Unk6A34, C2Scene_RestoreState,
+;   C2Scene_VramQInit, C2Scene_ReloadScene.
+C2Scene_Mode8:
+    TDC
+    STA.w NMITIMEN
+    LDA.b #bank(C2Scene_ScrFadeOut)
+    LDX.w #C2Scene_ScrFadeOut
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_FadeOutWaitFrames
+    JSR C2Scene_WaitFrames
+    SEI
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    STA.b !C2Scene_HdmaenShadow
+    LDA.b #!C2Scene_SoundCmd82
+    STA.w !Audio_CmdId
+    STZ.w !Audio_CmdArg0
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    JSR C2Scene_SaveState
+    JSR C2Scene_Unk6A34
+    JSR C2Scene_RestoreState
+    JSR C2Scene_VramQInit
+    LDA.l !C2Scene_Unk7F01F4
+    BIT.b #!C2Scene_Unk7F01F4Bits
+    BNE .resume
+    LDA.l !C2Scene_Unk7F01F5
+    BIT.b #!C2Scene_Unk7F01F5Bit1
+    BNE .resume
+    JSR C2Scene_ReloadScene
+    LDA.b #bank(C2Scene_ScrFadeIn)
+    LDX.w #C2Scene_ScrFadeIn
+    JSR C2Scene_TaskSpawnScript
+    LDA.w !C2Scene_Unk1B58
+    BEQ .resume
+    INC.w !C2Scene_Unk1B59
+.resume:
+    LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDA.l !C2Scene_Unk7F01F4
+    BIT.b #!C2Scene_Unk7F01F4Bits
+    BNE .back
+    LDA.l !C2Scene_Unk7F01F5
+    BIT.b #!C2Scene_Unk7F01F5Bit1
+    BNE .back
+    LDX.w #!C2Scene_FadeWaitFrames
+    JSR C2Scene_WaitFrames
+    LDA.b #!C2Scene_ModeIdle1
+    STA.w !C2Scene_Mode
+.back:
+    JMP C2Scene_MainLoop
 
 org $C226A8
 ; $C2:26A8 — C2Scene_ClearVram (44 bytes, $26A8–$26D3)
@@ -6287,8 +7554,8 @@ C2Scene_SaveFlagTail:
 ; $C2:26F0 — C2Scene_RestoreFlagTail (19 bytes, $26F0–$2702)
 ; Copies C2Scene_FlagTailCopy (16 bytes) back to $7F:01F0-$01FF, the end
 ; of Menu_FlagBlock7F (C2Scene_Flag0Copy is not written back).
-; Callers (2 JSR sites, unmatched): $C2:24E0 (C2Scene_Mode2) and $C2:2518
-;   (C2Scene_Mode4).
+; Callers (2 JSR sites): C2Scene_Mode2 ($C2:24E0) and C2Scene_Mode4
+;   ($C2:2518).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVN)
 ; Exit:  M=1, X=0; A = $FFFF, X = C2Scene_FlagTailCopy + 16, Y = $0200;
@@ -7247,14 +8514,14 @@ C2Scene_LoadScene:
 ; Loads the scene's graphics again (scene modes 5 and 8 call it after
 ; C2Scene_RestoreState and C2Scene_VramQInit; mode 8 skips it when
 ; $7F:01F4 AND $0A or $7F:01F5 AND $02 is non-zero ($C2:265E); mode 6
-; calls it too, from the unmatched
-; callers' addresses): C2Scene_Unk5775, the HDMA area cleared and
+; calls it too): C2Scene_Unk5775, the HDMA area cleared and
 ; C2Scene_HdmaValueA916 = C2Scene_HdmaValueA916Init, then the VRAM and
 ; palette loads (C2Scene_LoadVram), the metatiles, the Unk7000, UnkB800
 ; and UnkC000 packs, and BG layers 1 and 2 redrawn. The maps and lists
 ; are not reloaded: C2Scene_SaveState keeps them, and the header pointer
 ; with the direct page.
-; Callers (3 JSR sites, unmatched): $C2:2563, $C2:25F3 and $C2:266E.
+; Callers (3 JSR sites): C2Scene_Mode5 ($C2:2563), C2Scene_Mode6
+;   ($C2:25F3) and C2Scene_Mode8 ($C2:266E).
 ; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_HeaderPtr set; forced blank
 ; Exit:  as C2Scene_DrawBgLayer: M=1, X=0; A, X, Y clobbered;
 ;        C2Tmp_00-$1B, Menu_Decomp*, DMA channel 7 and WMADD changed
@@ -7487,11 +8754,11 @@ C2Scene_LoadLocExtraGfx:
 ; state is not kept for (metatiles, the $7E:7000, $7E:B800, $7E:C000 and
 ; $7E:C800 packs, the $7E:C600 pack of the extra-graphics scenes,
 ; graphics) is what C2Scene_ReloadScene loads again. Inferred
-; from the unmatched callers: scene modes 5 and 8 save, do something
+; from the callers: scene modes 5 and 8 save, do something
 ; else and restore; mode 5 then reloads, mode 8 only when the flag test
 ; at $C2:265E passes.
-; Callers (2 JSR sites, unmatched): $C2:2542 (C2Scene_Mode5) and $C2:2652
-;   (C2Scene_Mode8).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:2542) and C2Scene_Mode8
+;   ($C2:2652).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
 ;        MVNs)
 ; Exit:  M=1, X=0; A = $FFFF, X = $8600, Y = C2Scene_SaveLists + $800
@@ -7531,8 +8798,8 @@ C2Scene_SaveState:
 ; $C2:2E72 — C2Scene_RestoreState (79 bytes, $2E72–$2EC0)
 ; The reverse of C2Scene_SaveState: copies the six saved blocks from bank
 ; $7F back where they came from (the direct page $00-$EF included).
-; Callers (2 JSR sites, unmatched): $C2:255D (C2Scene_Mode5) and $C2:2658
-;   (C2Scene_Mode8).
+; Callers (2 JSR sites): C2Scene_Mode5 ($C2:255D) and C2Scene_Mode8
+;   ($C2:2658).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (the copy rewrites dp
 ;        $00-$EF, so it must be the scene's), DB any (saved around the
 ;        MVNs)
@@ -7571,6 +8838,50 @@ C2Scene_RestoreState:
     RTS
 
 ; ============================================================
+; Mode scripts ($C2:2EC1–$C2:2ED8)
+; ============================================================
+; Short scene scripts (C2Scene_TaskRunScript, ops C2Script_OpTable) that
+; the mode handlers start with C2Scene_TaskSpawnScript. Each op is its
+; byte and its arguments; the effect tasks read their arguments from
+; the op (C2Scene_FxTask.OpPtr).
+
+; $C2:2EC1 — C2Scene_ScrFadeOut (3 bytes, $2EC1–$2EC3)
+; Fade out at 1 frame per step (op $28, C2Scene_TaskUnk20A2), then end.
+; Started by C2Scene_Mode3, C2Scene_Mode5 and C2Scene_Mode8.
+C2Scene_ScrFadeOut:
+    db $28,$01                  ; C2Script_SpawnUnk20A2 (fade out), 1 frame per step
+    db $52                      ; C2Script_End
+
+; $C2:2EC4 — C2Scene_ScrFadeIn (3 bytes, $2EC4–$2EC6)
+; Fade in at 1 frame per step (op $29, C2Scene_TaskUnk2105), then end.
+; Started by C2Scene_Mode5 and C2Scene_Mode8.
+C2Scene_ScrFadeIn:
+    db $29,$01                  ; C2Script_SpawnUnk2105 (fade in), 1 frame per step
+    db $52                      ; C2Script_End
+
+; $C2:2EC7 — C2Scene_ScrMosaicFadeOut (9 bytes, $2EC7–$2ECF)
+; Started by C2Scene_Mode6: clears the task's fields (op $00), starts a
+; mosaic grow (op $2A) on BG1-3 (arg 1 = 7) at 2 frames per step, waits
+; 16 frames, fades out at 1 frame per step, ends.
+C2Scene_ScrMosaicFadeOut:
+    db $00                      ; C2Script_ResetTask
+    db $2A,$07,$02              ; C2Script_SpawnUnk21F8 (mosaic grow): BG1-3, 2 frames per step
+    db $38,$10                  ; C2Script_Wait, 16 frames
+    db $28,$01                  ; C2Script_SpawnUnk20A2 (fade out), 1 frame per step
+    db $52                      ; C2Script_End
+
+; $C2:2ED0 — C2Scene_ScrMosaicFadeIn (9 bytes, $2ED0–$2ED8)
+; Started by C2Scene_Mode6 on the way back: clears the task's fields,
+; fades in at 1 frame per step, waits 8 frames, starts a mosaic shrink
+; (op $2B) on BG1-3 at 2 frames per step, ends.
+C2Scene_ScrMosaicFadeIn:
+    db $00                      ; C2Script_ResetTask
+    db $29,$01                  ; C2Script_SpawnUnk2105 (fade in), 1 frame per step
+    db $38,$08                  ; C2Script_Wait, 8 frames
+    db $2B,$07,$02              ; C2Script_SpawnUnk2194 (mosaic shrink): BG1-3, 2 frames per step
+    db $52                      ; C2Script_End
+
+; ============================================================
 ; Scene sound command queue ($C2:2ED9–$C2:2F0E)
 ; ============================================================
 
@@ -7587,9 +8898,10 @@ org $C22ED9
 ; an equal or higher pending rank is replaced (so rank 0, which every
 ; matched caller passes, always replaces a queued command).
 ; Callers (10 JSR sites): C2Script_PlaySfx ($C2:18E8),
-;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E);
-;   unmatched: $C2:2F88, $C2:2FCD, $C2:3031, $C2:306A, $C2:3092, $C2:4395
-;   and $C2:4A4C.
+;   C2Script_SoundCmd10 ($C2:1916), C2Script_SoundCmd ($C2:193E),
+;   C2Scene_ZoneSoundAtView ($C2:2F88), C2Scene_ZoneSoundWatch ($C2:2FCD,
+;   $C2:3031), C2Scene_ZoneSoundResume ($C2:306A), C2Scene_ZoneSoundQueue
+;   ($C2:3092); unmatched: $C2:4395 and $C2:4A4C.
 ; Entry: M=1, X any (no index use), DP any (no direct page), DB=$00 (low
 ;        WRAM: the buffer, the state and the driver block)
 ; Exit:  M=1, X unchanged; C=0 queued, C=1 refused; A clobbered; X, Y,
@@ -7619,6 +8931,343 @@ C2Scene_QueueSoundCmd:
     RTS
 .refuse:
     SEC
+    RTS
+
+; ============================================================
+; Scene sound zones ($C2:2F0F–$C2:309D)
+; ============================================================
+; The scene's $7E:7200 pack (C2Scene_Unk7200) starts with a map of 4-bit
+; zone numbers, one per metatile of the 96 x 64 layer map (48 bytes per
+; row, the even column in the high nibble; C2Scene_GetSoundZone).
+; C2Scene_ZoneSounds gives each zone the argument of sound command
+; C2Scene_SoundCmd10, which these routines send when the zone changes,
+; keeping the last one in C2Scene_Unk02AE as script ops $3D/$4A do. The
+; command is probably "play song" and the zones the music areas of the
+; scene (not traced into the sound driver). While C2Scene_Unk7F01ED is
+; set they send Menu_Config1E's byte instead (as op $3D skips its
+; command then).
+!C2Scene_ZoneCol = !C2Tmp_00            ; in for C2Scene_GetSoundZone: the metatile column (0-95)
+!C2Scene_ZoneRow = !C2Tmp_01            ; and row (0-63)
+
+; $C2:2F0F — C2Scene_ZoneSoundAtEntry (63 bytes, $2F0F–$2F4D)
+; Sends C2Scene_SoundCmd10 straight to the driver (Audio_DriverCommand)
+; with the zone sound of the field's entry tile: metatile column
+; Loc_EntryX / 2, row Loc_EntryY / 2 (C2Scene_GetSoundZone,
+; C2Scene_ZoneSounds), or with Menu_Config1E's byte while
+; C2Scene_Unk7F01ED is set; argument bytes 2-3 C2Scene_SoundArgUnused
+; and C2Scene_SoundArg80. The argument is also kept in C2Scene_Unk02AE.
+; Callers: none found by xref (perhaps reached through a pointer; not
+;   traced).
+; Entry: M=1 (8-bit loads), X=0, DP=$0000 (C2Tmp_00/$01), DB=$00
+;        (DP_Field, low WRAM and the driver block, absolute)
+; Exit:  M=1, X=0; A, X, Y as Audio_DriverCommand leaves them (not
+;        traced); C2Tmp_00/$01 and $10-$12 changed when the zone is
+;        looked up
+; Calls: C2Scene_GetSoundZone, Audio_DriverCommand (JSL).
+C2Scene_ZoneSoundAtEntry:
+    LDA.l !C2Scene_Unk7F01ED
+    BNE .config
+    LDA.w !DP_Field+!Loc_EntryX
+    LSR A
+    STA.b !C2Scene_ZoneCol
+    LDA.w !DP_Field+!Loc_EntryY
+    LSR A
+    STA.b !C2Scene_ZoneRow
+    JSR C2Scene_GetSoundZone
+    TAX                         ; B = 0
+    LDA.w !C2Scene_ZoneSounds,X
+    STA.w !Audio_CmdArg0
+    STA.w !C2Scene_Unk02AE
+    BRA .send
+.config:
+    LDA.l !Menu_Config1E
+    STA.w !Audio_CmdArg0
+    STA.w !C2Scene_Unk02AE
+.send:
+    LDA.b #!C2Scene_SoundCmd10
+    STA.w !Audio_CmdId
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !Audio_CmdArg1
+    LDA.b #!C2Scene_SoundArg80
+    STA.w !Audio_CmdArg2
+    JSL Audio_DriverCommand
+    RTS
+
+; $C2:2F4E — C2Scene_ZoneSoundAtView (70 bytes, $2F4E–$2F93)
+; Queues (C2Scene_QueueSoundCmd) C2Scene_SoundCmd10 with the zone sound
+; of the metatile at the middle of BG1's view: column BgTileX / 2 + 8,
+; row (BgTileY / 2 + 7) AND 63; or with Menu_Config1E's byte while
+; C2Scene_Unk7F01ED is set. Argument bytes 2-3 as
+; C2Scene_ZoneSoundAtEntry. When it is queued (C=0) the argument goes to
+; C2Scene_Unk02AE.
+; Quirks, kept: the rank C2Scene_SoundCmdPrio is not set (whatever the
+; last queuer left, 0 for every matched one); and the column is not
+; wrapped at 96, so near the right edge of the map (BgTileX 176 or more)
+; it reads the next row's first zones.
+; Callers (1 JSR site, unmatched): $C2:45A6.
+; Entry: M=1 (8-bit loads and adds), X=0, DP=$0000 (C2Scene_BgTileX/Y,
+;        C2Tmp_00/$01), DB=$00 (low WRAM)
+; Exit:  M=1, X=0; C as C2Scene_QueueSoundCmd leaves it (0 queued, 1
+;        refused); A, X clobbered; Y = the column / 2 (C2Scene_GetSoundZone's
+;        TAY) when the zone is looked up, else unchanged; C2Tmp_00/$01
+;        and $10-$12 changed when the zone is looked up
+; Calls: C2Scene_GetSoundZone, C2Scene_QueueSoundCmd.
+C2Scene_ZoneSoundAtView:
+    LDA.l !C2Scene_Unk7F01ED
+    BNE .config
+    LDA.b !C2Scene_BgTileX
+    LSR A
+    CLC
+    ADC.b #!C2Scene_ViewMidCol
+    STA.b !C2Scene_ZoneCol
+    LDA.b !C2Scene_BgTileY
+    LSR A
+    CLC
+    ADC.b #!C2Scene_ViewMidRow
+    AND.b #!C2Scene_MapRows-1
+    STA.b !C2Scene_ZoneRow
+    JSR C2Scene_GetSoundZone
+    TAX                         ; B = 0
+    LDA.w !C2Scene_ZoneSounds,X
+    STA.w !C2Scene_SoundCmdBuf+1
+    BRA .queue
+.config:
+    LDA.l !Menu_Config1E
+    STA.w !C2Scene_SoundCmdBuf+1
+.queue:
+    LDA.b #!C2Scene_SoundCmd10
+    STA.w !C2Scene_SoundCmdBuf
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+2
+    LDA.b #!C2Scene_SoundArg80
+    STA.w !C2Scene_SoundCmdBuf+3
+    JSR C2Scene_QueueSoundCmd
+    BCS .done
+    LDA.w !C2Scene_SoundCmdBuf+1
+    STA.w !C2Scene_Unk02AE
+.done:
+    RTS
+
+; $C2:2F94 — C2Scene_TaskZoneSound (9 bytes, $2F94–$2F9C)
+; Task handler: runs .State through C2Scene_ZoneSoundStates. It follows
+; the zone under C2Scene_StartX/Y (probably the player's position) and,
+; when the zone's sound differs from the last one sent, sends
+; C2Scene_SoundCmd81 with $0C,$00 (probably a fade out), waits
+; C2Scene_ZoneFadeFrames frames, sends the new zone's
+; C2Scene_SoundCmd10 and then C2Scene_SoundCmd81 with $00,$FF (probably
+; full volume back). It never ends (every state returns C=0).
+; Callers: none found (no spawn of this address is in matched code or
+;   found by a byte search; probably a script op $35 in scene data).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's (M=1, X=0; C=0)
+; Calls: the C2Scene_ZoneSoundStates handlers (JMP (abs,X)).
+C2Scene_TaskZoneSound:
+    TDC
+    LDA.w C2Scene_FxTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_ZoneSoundStates,X)
+
+; $C2:2F9D — C2Scene_ZoneSoundStates (4 words, $2F9D–$2FA4)
+; C2Scene_TaskZoneSound's handler for each .State.
+C2Scene_ZoneSoundStates:
+    dw C2Scene_ZoneSoundInit    ; 0
+    dw C2Scene_ZoneSoundWatch   ; 1
+    dw C2Scene_ZoneSoundWait    ; 2
+    dw C2Scene_ZoneSoundResume  ; 3
+
+; $C2:2FA5 — C2Scene_ZoneSoundInit (9 bytes, $2FA5–$2FAD)
+; State 0: .State = 1, C2Scene_SoundZone = C2Scene_ZoneNone; falls into
+; C2Scene_ZoneSoundWatch.
+; Callers: none direct (C2Scene_ZoneSoundStates).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_ZoneSoundWatch
+; No calls (falls into C2Scene_ZoneSoundWatch).
+C2Scene_ZoneSoundInit:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_FxTask.State,X
+    LDA.b #!C2Scene_ZoneNone
+    STA.b !C2Scene_SoundZone
+
+; $C2:2FAE — C2Scene_ZoneSoundWatch (142 bytes, $2FAE–$303B)
+; State 1, every frame:
+; - while C2Scene_Unk7F01ED is set: queues C2Scene_SoundCmd10 with
+;   Menu_Config1E's byte at rank 0 (again each frame; C2Scene_Unk02AE
+;   takes it when queued);
+; - else, only in an idle mode (C2Scene_Mode 0, C2Scene_ModeIdle1 or
+;   C2Scene_ModeIdle7) and with C2Scene_Unk027E clear: looks up the zone
+;   at metatile column StartX / 16, row StartY / 16 - 1
+;   (C2Scene_GetSoundZone) into C2Scene_SoundZone; if its sound
+;   (C2Scene_ZoneSounds) is not C2Scene_Unk02AE, .State = 2, .Timer =
+;   0 and C2Scene_SoundCmd81 is queued with C2Scene_SoundFadeArg, 0 and
+;   C2Scene_SoundArgUnused at rank 0;
+; - in any other mode, or with C2Scene_Unk027E set: C2Scene_SoundZone =
+;   C2Scene_ZoneNone.
+; Callers: none direct (C2Scene_ZoneSoundStates; C2Scene_ZoneSoundInit
+;   falls in).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_00/$01, C2Scene_SoundZone), DB=$00
+;        (low WRAM); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0 (the task goes on); A, X clobbered; Y = the
+;        column / 2 (C2Scene_GetSoundZone's TAY) when the zone is looked
+;        up, else unchanged; C2Tmp_00-$02 (the 16-bit store to
+;        C2Scene_ZoneRow writes $02 too) and $10-$12 changed when the
+;        zone is looked up
+; Calls: C2Scene_QueueSoundCmd, C2Scene_GetSoundZone.
+C2Scene_ZoneSoundWatch:
+    LDA.l !C2Scene_Unk7F01ED
+    BEQ .zone
+    LDA.l !Menu_Config1E
+    STA.w !C2Scene_SoundCmdBuf+1
+    LDA.b #!C2Scene_SoundCmd10
+    STA.w !C2Scene_SoundCmdBuf
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+2
+    LDA.b #!C2Scene_SoundArg80
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+    BCS .config_done
+    LDA.w !C2Scene_SoundCmdBuf+1
+    STA.w !C2Scene_Unk02AE
+.config_done:
+    CLC
+    RTS
+.zone:
+    LDA.w !C2Scene_Mode
+    BEQ .idle
+    CMP.b #!C2Scene_ModeIdle1
+    BEQ .idle
+    CMP.b #!C2Scene_ModeIdle7
+    BNE .none
+.idle:
+    LDA.w !C2Scene_Unk027E
+    BNE .none
+    REP #$20
+    LDA.w !C2Scene_StartX
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_ZoneCol      ; 16-bit: C2Scene_ZoneRow is written next
+    LDA.w !C2Scene_StartY
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    DEC A
+    STA.b !C2Scene_ZoneRow
+    JSR C2Scene_GetSoundZone    ; returns M=1
+    STA.b !C2Scene_SoundZone
+    AND.b #!Eng_LowByteMask     ; no effect with 8-bit A (B = 0 already)
+    TAX
+    LDA.w !C2Scene_ZoneSounds,X
+    CMP.w !C2Scene_Unk02AE
+    BEQ .same
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_FxTask.State,X
+    STZ.w C2Scene_FxTask.Timer,X
+    STZ.w C2Scene_FxTask.Timer+1,X
+    LDA.b #!C2Scene_SoundCmd81
+    STA.w !C2Scene_SoundCmdBuf
+    LDA.b #!C2Scene_SoundFadeArg
+    STA.w !C2Scene_SoundCmdBuf+1
+    STZ.w !C2Scene_SoundCmdBuf+2
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+.same:
+    CLC
+    RTS
+.none:
+    LDA.b #!C2Scene_ZoneNone
+    STA.b !C2Scene_SoundZone
+    CLC
+    RTS
+
+; $C2:303C — C2Scene_ZoneSoundWait (19 bytes, $303C–$304E)
+; State 2: once .Timer's low byte (zeroed by C2Scene_ZoneSoundWatch,
+; then one more each frame from C2Scene_TaskRunAll) reaches
+; C2Scene_ZoneFadeFrames: .State = 3 and the new zone's sound is queued
+; (C2Scene_ZoneSoundQueue).
+; Callers: none direct (C2Scene_ZoneSoundStates).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM: the task record);
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A, X clobbered; Y unchanged
+; Calls: C2Scene_ZoneSoundQueue.
+C2Scene_ZoneSoundWait:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FxTask.Timer,X
+    CMP.b #!C2Scene_ZoneFadeFrames
+    BCC .wait
+    LDA.b #3
+    STA.w C2Scene_FxTask.State,X
+    JSR C2Scene_ZoneSoundQueue
+.wait:
+    CLC
+    RTS
+
+; $C2:304F — C2Scene_ZoneSoundResume (39 bytes, $304F–$3075)
+; State 3: unless a command is being sent (C2Scene_SoundCmdState
+; negative), queues C2Scene_SoundCmd81 with 0, C2Scene_SoundArgUnused,
+; C2Scene_SoundArgUnused at rank 0 and sets .State back to 1 (whether
+; the queue took the command or not).
+; Callers: none direct (C2Scene_ZoneSoundStates).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A, X clobbered; Y unchanged
+; Calls: C2Scene_QueueSoundCmd.
+C2Scene_ZoneSoundResume:
+    LDA.w !C2Scene_SoundCmdState
+    BMI .busy
+    LDA.b #!C2Scene_SoundCmd81
+    STA.w !C2Scene_SoundCmdBuf
+    TDC                         ; A = DP = 0
+    STA.w !C2Scene_SoundCmdBuf+1
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+2
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+    LDX.b !C2Scene_TaskCur
+    LDA.b #1
+    STA.w C2Scene_FxTask.State,X
+.busy:
+    CLC
+    RTS
+
+; $C2:3076 — C2Scene_ZoneSoundQueue (40 bytes, $3076–$309D)
+; Queues C2Scene_SoundCmd10 with the sound of zone C2Scene_SoundZone
+; (C2Scene_ZoneSounds), argument bytes 2-3 C2Scene_SoundArgUnused and
+; C2Scene_SoundArg80, at rank 0; when queued, the sound goes to
+; C2Scene_Unk02AE.
+; Callers (1 JSR site): C2Scene_ZoneSoundWait ($C2:304A).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0, C2Scene_SoundZone), DB=$00 (low
+;        WRAM)
+; Exit:  M=1, X=0; C as C2Scene_QueueSoundCmd leaves it; A, X clobbered;
+;        Y unchanged
+; Calls: C2Scene_QueueSoundCmd.
+C2Scene_ZoneSoundQueue:
+    TDC                         ; A = DP = 0: clears the high byte
+    LDA.b !C2Scene_SoundZone
+    TAX
+    LDA.w !C2Scene_ZoneSounds,X
+    STA.w !C2Scene_SoundCmdBuf+1
+    LDA.b #!C2Scene_SoundCmd10
+    STA.w !C2Scene_SoundCmdBuf
+    LDA.b #!C2Scene_SoundArgUnused
+    STA.w !C2Scene_SoundCmdBuf+2
+    LDA.b #!C2Scene_SoundArg80
+    STA.w !C2Scene_SoundCmdBuf+3
+    STZ.w !C2Scene_SoundCmdPrio
+    JSR C2Scene_QueueSoundCmd
+    BCS .done
+    LDA.w !C2Scene_SoundCmdBuf+1
+    STA.w !C2Scene_Unk02AE
+.done:
     RTS
 
 ; ============================================================
@@ -7834,6 +9483,58 @@ TextWin_StatusPenIndent:        ; header: see TextWin_StatusRun
     RTS
 
 ; ============================================================
+; Scene sound zone lookup ($C2:62ED–$C2:631E)
+; ============================================================
+
+org $C262ED
+; $C2:62ED — C2Scene_GetSoundZone (50 bytes, $62ED–$631E)
+; Returns the 4-bit zone of metatile C2Scene_ZoneCol, C2Scene_ZoneRow
+; from the zone map at the start of C2Scene_Unk7200 (bank $7E): byte
+; row * 48 + column / 2 (the row product with the hardware multiplier),
+; its high nibble for an even column, its low nibble for an odd one.
+; The pointer is built in C2Tmp_10-$12. (That this pack is a zone map is
+; inferred from these readers: its $C00 bytes are 64 rows of 48.)
+; Callers (3 JSR sites): C2Scene_ZoneSoundAtEntry ($C2:2F21),
+;   C2Scene_ZoneSoundAtView ($C2:2F66), C2Scene_ZoneSoundWatch
+;   ($C2:3001).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00/$01, $10-$12),
+;        DB=$00 (WRMPYA/B and RDMPYL, absolute)
+; Exit:  M=1, X=0; A = the zone (0-15), B = 0; Y = column / 2; X
+;        unchanged; C2Tmp_00 = column / 2 (shifted); C2Tmp_10-$12 = the
+;        byte's row pointer
+; No calls.
+!C2Scene_ZonePtr = !C2Tmp_10            ; 24-bit: the row in the zone map
+C2Scene_GetSoundZone:
+    SEP #$20
+    LDA.b #bank(!C2Scene_Unk7200)
+    STA.b !C2Scene_ZonePtr+2
+    LDA.b !C2Scene_ZoneRow
+    STA.w WRMPYA
+    LDA.b #!C2Scene_ZoneRowBytes
+    STA.w WRMPYB
+    REP #$20
+    CLC
+    LDA.w #!C2Scene_Unk7200&$FFFF
+    ADC.w RDMPYL
+    STA.b !C2Scene_ZonePtr
+    LDA.b !C2Scene_ZoneCol
+    AND.w #!Eng_LowByteMask
+    LSR A
+    TAY
+    SEP #$20
+    LDA.b [!C2Scene_ZonePtr],Y
+    LSR.b !C2Scene_ZoneCol
+    BCS .odd
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    RTS
+.odd:
+    AND.b #!C2Scene_ZoneMask
+    RTS
+
+; ============================================================
 ; Scene extra-graphics loaders ($C2:7B5A–$C2:7BC3)
 ; ============================================================
 ; Three fixed-entry pack loaders used only by C2Scene_LoadLocExtraGfx.
@@ -7923,12 +9624,12 @@ org $C28000
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers: BankC2_Entry8000 (JSL): Field_SceneChangeTick ($C0:0D18),
 ;   Field_PauseAndMenuInput ($C0:1960), Field_RunBankC2Mode5 ($C0:19CE)
-;   and $C2:2552 (unmatched). BankC2_Entry8002 (JSL): C2Scene_NmiHandler
-;   ($C2:031B); unmatched: $C0:EC15, $C1:EE27, $CD:091A and $CD:09C6.
-;   BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059); unmatched:
-;   $C0:3807, $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA,
-;   $C0:3A7C, $C0:3E61, $C0:3E67, $C0:56CF, $FF:FB84, $FF:FB92 and
-;   $FF:FB98.
+;   and C2Scene_Mode5 ($C2:2552). BankC2_Entry8002 (JSL):
+;   C2Scene_NmiHandler ($C2:031B); unmatched: $C0:EC15, $C1:EE27,
+;   $CD:091A and $CD:09C6. BankC2_Entry8004 (15 JSL sites): GameLoop
+;   ($C0:0059), Scene_PostLoadInit ($C0:56CF); unmatched: $C0:3807,
+;   $C0:389B, $C0:38CC, $C0:38E1, $C0:38F6, $C0:392B, $C0:39DA, $C0:3A7C,
+;   $C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92 and $FF:FB98.
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry
@@ -8469,8 +10170,8 @@ Menu_InitNewGameData:
 ; Fills as in Menu_InitNewGameData (first word, then an overlapping MVN).
 ; PHB/PLB keep DB across the bank-$7F fill only; the later MVNs leave
 ; DB=$7E.
-; Callers (2 JSR sites, unmatched): $C2:8D85 and $C2:9571 in
-;   Menu_InitNewGameData.
+; Callers (2 JSR sites): Menu_InitNewGameData ($C2:9571); unmatched:
+;   $C2:8D85.
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (STZ Menu_PlayTime is absolute, after the PLB)
 ; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the last MVN

@@ -83,23 +83,6 @@ org $C18003
 BankC1_Entry8003:   ; JSL vector (JMP $CFC2): saves P/X/DP/DB, DB=$7E, DP=0, runs service A (table
                     ; $C1:D126, 6 entries) with argument Y; 1 = add item Y ($C1:D005), 4 = add Y gold
                     ; ($C1:D0A2); returns a result in A
-org $C20568
-C2Scene_Unk0568: ; C2Script_ScrollFrames with C2Tmp_00 = a layer, C2Tmp_01 = signed pixels; reads the BG layer tables (probably the horizontal layer scroll)
-org $C2066C
-C2Scene_Unk066C: ; as C2Scene_Unk0568, probably the vertical layer scroll
-org $C22402
-C2Scene_Mode3:      ; C2Scene_ModeTable entry 3 (unmatched; not traced)
-org $C224D5
-C2Scene_Mode2:      ; C2Scene_ModeTable entry 2: SEI, NMI/DMA/HDMA off, JSR C2Scene_RestoreFlagTail, then writes $82 to the
-                    ; audio command block $1E00 (not traced further)
-org $C2250D
-C2Scene_Mode4:      ; C2Scene_ModeTable entry 4: SEI, NMI/DMA/HDMA off, then JSR C2Scene_RestoreFlagTail in an endless loop
-org $C2251E
-C2Scene_Mode5:      ; C2Scene_ModeTable entries 5 and 9 (unmatched; not traced)
-org $C2258D
-C2Scene_Mode6:      ; C2Scene_ModeTable entry 6 (unmatched; not traced)
-org $C2261D
-C2Scene_Mode8:      ; C2Scene_ModeTable entry 8 (unmatched; not traced)
 org $C25775
 C2Scene_Unk5775:    ; JSR from C2Scene_ReloadScene: copies 4 B from $C2:57C2 to $7E:8600 and 25 B from $C2:57C6 to
                     ; $7E:8604 (probably an HDMA table; not traced)
@@ -112,6 +95,11 @@ org $C25C3E
 TextWin_State2:     ; TextWin_StateTable 2 (not traced)
 org $C25C77
 TextWin_State3:     ; TextWin_StateTable 3 (not traced)
+org $C2631F
+C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
+                    ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
+org $C26A34
+C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
 org $C2800E
 BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
                     ; at $0A01, forced blank, then the menu (not matched)
