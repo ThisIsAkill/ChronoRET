@@ -1,5 +1,7 @@
 # ChronoRET — Chrono Trigger (SNES) Matching Decompilation
 
+**[Documentation: Kajar](https://thisisakill.github.io/Kajar-site/)**
+
 A personal side project for learning 65816 assembly and SNES reverse engineering.
 I started this to understand how the game actually works at the machine level —
 it's just me working through the code as I go, not a professional or team effort.
@@ -30,8 +32,8 @@ Sub_E12A tile-streaming cluster, the sprite slot allocators, the sprite-slot
 init cluster, and — in the battle engine (Bank $C1) — math utilities, the
 status-bar UI, item/tech menu rendering, and the per-frame menu upkeep layer.
 
-Progress notes and function-level breakdown live in a companion wiki
-(not yet public).
+Progress notes, the address map, the devlog and a function-level breakdown
+live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.
 
 ## You need your own ROM
 
@@ -65,8 +67,8 @@ tools/      Build scripts, diff tools, disassembler, session helpers
 build/      Build output (gitignored)
 ```
 
-The wiki (PROGRESS.md, BANK_MAP.md, ARCHITECTURE.md, devlog) lives in a
-separate repository at `../chrono-trigger-wiki/` and is not bundled here.
+Documentation (progress, bank map, architecture, devlog) is published as
+[Kajar](https://thisisakill.github.io/Kajar-site/) and is not bundled here.
 
 ## Workflow
 
