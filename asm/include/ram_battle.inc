@@ -60,7 +60,7 @@ if !ram_battle_inc == 0
 ; ------------------------------------------------------------
 ; Direct page: other fixed roles
 ; ------------------------------------------------------------
-!Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady)
+!Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
                                  ;      (UpdateCursorOverlay, only right after the target moved); purpose unknown

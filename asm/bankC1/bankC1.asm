@@ -26,7 +26,9 @@ incsrc "../hardware.inc"
 ;        with STA.l/LDA.l, so the caller's data bank does not matter)
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y and DB unchanged; DP $77/$78 and
 ;        $AF/$B0 written
-; Caller: BattleMenu_ItemConfirm. No calls.
+; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1CBE, $C1:2B8D,
+; $C1:607B, $C1:7878); the only matched one is BattleMenu_ItemConfirm
+; ($C1:14A7). No calls.
 org $C10089
 Battle_Mul8:
     LDA.b !Battle_Mul8A
@@ -60,7 +62,9 @@ Battle_Mul8:
 ;        DP=0, DB any
 ; Exit:  M=1, X=0 (P restored); A=0; X = first partial product; Y and DB
 ;        unchanged; DP $77/$78 and $A9-$AB written
-; Caller: Battle_SinLookup. No calls.
+; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1C7F, $C1:2E98,
+; $C1:33A5, $C1:509B); the only matched one is Battle_SinLookup
+; ($C1:021C). No calls.
 org $C100A7
 Battle_Mul8x16:
     PHB
@@ -101,7 +105,9 @@ Battle_Mul8x16:
 ;        $A029, outside the low-RAM mirror); HW registers use .l
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y unchanged; DP $79-$7B and $B5-$B8
 ;        written
-; Caller: BattleUI_DrawSlotGaugeBar. No calls.
+; Callers: 19 JSR sites across bank $C1 (e.g. $C1:2ECF, $C1:5084,
+; $C1:6311, $C1:7731); the only matched one is BattleUI_DrawSlotGaugeBar
+; ($C1:071D). No calls.
 org $C100D7
 Battle_Divide:
     INC.w !Battle_DivBusy   ; mark divider busy
@@ -1159,9 +1165,11 @@ BattleUI_UpdateNextPcPanel_Exit:
 ; Attribute: palette 3 if AtbCur is non-zero, else palette 2.
 ; Entry: M=1, X=0 (16-bit), DP=0, DB=$7E (.w !Pc_AtbCur/!Pc_AtbMax, and
 ;        Battle_Divide's !Battle_DivBusy); !BattleUI_Slot = PC slot (0–2)
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y = last map offset
-;        written; DP $79–$7B, $82/$83, $86, $AD/$AE and $B1–$B8 clobbered
-;        ($B7/$B8 is Battle_Divide's 16-bit remainder)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y = gauge start + 2 x
+;        the whole TileGauge8 tiles (the partial tile's offset, written
+;        only when units are left over: Y = start + 8 for an empty gauge,
+;        start for a full one); DP $79–$7B, $82/$83, $86, $AD/$AE and
+;        $B1–$B8 clobbered ($B7/$B8 is Battle_Divide's 16-bit remainder)
 ; Callers: BattleUI_DrawPcNamePanel, BattleUI_DrawAtbGauges
 ; Calls: Battle_ShiftLeft8, Battle_Divide, Battle_ShiftRight3
 ; Direct-page roles (!BattleUI_Slot is defined with BuildStatusBarFrame):
@@ -3221,8 +3229,11 @@ Battle_ClearPadEdges:
 ; ==================================================================
 ; BattleMenu_EnqueueReadyBattler ($C11B19–$C11B54, 60 bytes)
 ; ==================================================================
-; Service 1 of the cross-bank $C10045 service API (dispatch table at
+; Service 1 of the $C10045 service dispatcher (dispatch table at
 ; $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady).
+; The dispatcher is a same-bank API: it is reached only by JSR $0003
+; (the vector JMP $0045) or JSR $0045 from bank $C1, never by JSL/JML,
+; and returns with RTS.
 ; Called when battler slot !Battle_ArgSlot becomes ready for a command
 ; (presumably its ATB gauge filled): appends it to the ready queue that
 ; BattleMenu_DequeueReadyBattler later pops from.
@@ -3305,7 +3316,11 @@ Battle_PlaySfx0:
 ; PC's !Pc_MenuRow (0/1/2 = Attack/Tech/Item).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  tail-jumps to one of three row handlers, does not fall through;
-;        each ends in Battle_ClearPadEdges with M=1, X=0, DP=0, DB=$7E
+;        each ends in Battle_ClearPadEdges with M=1, X=0, DP=0, DB=$7E;
+;        A, X, Y clobbered, plus the chosen handler's DP scratch and
+;        callee effects (see BattleMenu_ChooseAttack / OpenTechList /
+;        OpenItemList) and whatever BattleFx_SetPtrA2FromTable (not
+;        matched yet) changes
 ; Callees: BattleFx_SetPtrA2FromTable,
 ;          BattleMenu_ChooseAttack, BattleMenu_OpenTechList,
 ;          BattleMenu_OpenItemList
@@ -3507,10 +3522,11 @@ BattleMenu_BuildTargetList:
 ; ==================================================================
 ; BattleTgt_RunAreaQuery ($C11FDD–$C11FE9, 13 bytes)
 ; ==================================================================
-; Service 7 of the cross-bank $C10045 service API (dispatch table at
-; $C10051). Runs one of the area-target geometry routines, selected by
-; !BattleTgt_AreaType (0-6) through the 7-entry table just below; out-of-range
-; selectors are ignored. The same geometry routines back the menu's
+; Service 7 of the $C10045 service dispatcher (dispatch table at
+; $C10051; reached only by same-bank JSR from bank $C1, see
+; BattleMenu_EnqueueReadyBattler). Runs one of the area-target geometry
+; routines, selected by !BattleTgt_AreaType (0-6) through the 7-entry
+; table just below; out-of-range selectors are ignored. The same geometry routines back the menu's
 ; area-effect target modes (see BattleTgt_ModeTable), so this is
 ; presumably how non-menu code (enemy scripts, scripted attacks) asks
 ; "which battlers does this area hit?".
@@ -5089,8 +5105,9 @@ BattleMenu_DequeueReadyBattler:
 ; ==================================================================
 ; BattleMenu_RemoveBattlerFromReady ($C11BAA–$C11C39, 144 bytes)
 ; ==================================================================
-; Service 2 of the cross-bank $C10045 service API (see the entry-vector
-; table near the top of this bank). Removes battler slot !Battle_ArgSlot
+; Service 2 of the $C10045 service dispatcher (dispatch table at
+; $C10051; reached only by same-bank JSR from bank $C1, see
+; BattleMenu_EnqueueReadyBattler). Removes battler slot !Battle_ArgSlot
 ; from the menu-ready state, whether it's currently queued (in
 ; !BattleMenu_ReadyQueue) or already in the roster.
 ;
@@ -6202,7 +6219,7 @@ BattleMenu_UpdateCursorOverlay:
     JMP .tail
 
 ; ------------------------------------------------------------------
-; Tech-list cursor ($17FE-$18A9)
+; Tech-list cursor ($17FE-$18AF)
 ; ------------------------------------------------------------------
 ; Tech_CursorEntry.TechId (copied by UpdateTechWindow) below $39 means
 ; a single-character tech — those never need partner highlighting, so go
