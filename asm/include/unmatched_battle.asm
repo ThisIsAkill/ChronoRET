@@ -14,16 +14,6 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C175CC
-BattleAct_CalcFacing:                   ; JSR: A = mode; calls entry A of the word table at $C1:79A1, keeping X and
-                                        ; Y; the handler leaves a facing in !Battle_ActFacingOut (modes 0-9: the
-                                        ; !Battler_Facing of !Battle_ActBattlers entry A); the callers set DP $80/$81
-                                        ; to the actor's x/y first (presumably read by the other modes; not analysed)
-
-org $C1762E
-BattleAct_RunCalc:                      ; JSR: A = handler number; calls entry A of the word table at $C1:79D3, keeping
-                                        ; X and Y; the handlers leave results in !Battle_ActCalcOutA/B (not analysed)
-
 ; --- Bank $C3 ---
 
 org $C30002

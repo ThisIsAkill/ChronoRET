@@ -30,16 +30,20 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
-1. Bank $C1 after the opcode handlers: all of `$C1:283D`-`$C1:75CB` is matched (service 4, its
+1. Bank $C1 after the opcode handlers: all of `$C1:283D`-`$C1:7FFF` is matched (service 4, its
    loaders, the reach check and path search, the thread runner and every opcode handler $00-$DA,
    the last ones being the circle / ellipse moves $C0-$C3 (mover kinds 3 and 5), the
    `!Battler_UnkA4AF` steppers $C4/$C5, `!Battler_UnkA5D8` $D0/$D1, the kind-4 move $D2 and the
    midpoint move $D3 with their starters $D4-$D6, the point-along $D7, the shake $D8 (kind 6) and
-   the attribute values $D9/$DA), plus `$C1:007E`, `BattleAct_LoaderTable` and
-   `BattleAct_OpcodeTable` (`$C1:7A63`-`$C1:7C2A`) and `BattleAct_ProbeBoxOverlap` `$C1:7C2B`.
-   Next, in order: `BattleAct_CalcFacing` (`$C1:75CC`, table `$C1:79A1`, handlers `$C1:75D7` on,
-   result `!Battle_ActFacingOut`) and `BattleAct_RunCalc` (`$C1:762E`, table `$C1:79D3`) with their
-   handlers, which fill the gap `$C1:75CC`-`$C1:7A62`; then `$C1:7C3D` on. Verified headers that
+   the attribute values $D9/$DA), plus `$C1:007E`, the facing and point calculations
+   `BattleAct_CalcFacing` / `BattleAct_RunCalc` with their handlers and tables
+   (`$C1:75CC`-`$C1:7A62`), `BattleAct_LoaderTable` and `BattleAct_OpcodeTable`
+   (`$C1:7A63`-`$C1:7C2A`), `BattleAct_ProbeBoxOverlap` `$C1:7C2B`, and
+   `BankC1_OldBuildLeftovers` (`$C1:7C3D`-`$C1:7FFF`: no code, the cut-off remains of older
+   assemblies of those tables and ProbeBoxOverlap, then $FF fill). Next: `$C1:8000` on, a new
+   part of the bank (`JMP $8006`, then `BankC1_Entry8003`'s `JMP $CFC2`; `$C1:8006` starts with
+   `JSL $FD:A982` and fills `$B163`/`$B16E`/`$B23A` lists from `$AEFF`/`$AF0D`, calling
+   `$C1:AF22` and `$C1:FA8B`). Verified headers that
    still call now-matched sites "unmatched" (fix them at their next edit): BattleAct_CalcMoveStep
    (`$C1:62F5`/`$C1:6436`, now BattleAct_OpArcToCalc; `$C1:7261`, now BattleAct_OpMoveToMidpoint;
    `$C1:7468`, now BattleAct_OpPointTowardCalc); BattleAct_StartBattlerMove (`$C1:7231`, now

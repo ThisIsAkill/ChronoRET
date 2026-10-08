@@ -608,8 +608,9 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battler_ActFacing       = $A214 ; 1 B per battler slot: facing its action animation was last stepped with
 !Battle_ActAnimNextSlot  = $A21F ; 1 B: slot BattleAct_StepBattlerAnims starts its search at (round robin)
 !Battle_ActCalcSel       = $A4E8 ; 6 B: per entry, 0 = off, n = run BattleAct_RunCalc handler n - 1 every frame
-!Battle_ActCalcOutA      = $A2B0 ; 1 B: first result a BattleAct_RunCalc handler leaves (not analysed)
-!Battle_ActCalcOutB      = $A2B2 ; 1 B: second result
+!Battle_ActCalcOutA      = $A2B0 ; 1 B: first result a BattleAct_RunCalc handler leaves: the x of a point for most
+                                 ; handlers (a script variable for $2A-$31); handlers $17 (objects) and $1C-$23 store 16 bits
+!Battle_ActCalcOutB      = $A2B2 ; 1 B: second result: the point's y (the next variable for $2A-$31; also x for $16, a quirk)
 !Battle_ActCalcResult    = $5DA0 ; 2 B per !Battle_ActCalcSel entry: the two results copied by BattleAct_TickCalcs
 !Battle_ActScriptOfs     = $9878 ; 2 B: offset of the script in its bank ($CE or $CD; see the loaders); zeroed first,
                                  ; so the 16-bit read of !Battle_ActScriptId sees 0 above it
@@ -681,6 +682,9 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjMoveDone   = $A1E0 ; 1 B per object thread: the same for the objects (written at $CF:F4FF and others)
 !Battle_ActObjX          = $A240 ; 2 B per object thread (index j * 2): the object's x (low byte read as a screen x)
 !Battle_ActObjY          = $A250 ; 2 B per object thread: its y
+!Battle_ActObjOfsX       = $A260 ; 2 B per object thread: signed x offset, sign-extended from a script header byte
+                                 ; at $CC:F30F; BattleAct_CalcObjOffset adds it to !Battle_ActObjX (otherwise unknown)
+!Battle_ActObjOfsY       = $A270 ; 2 B per object thread: the same for y ($CC:F320)
 !Battle_ActObjMoveAngle  = $A355 ; 1 B per object thread: angle of its last move (Battle_CalcAngle)
 !Battle_ActObjUnkA5B5    = $A5B5 ; 1 B per object thread: also set to that angle; purpose unknown
 !Battle_ActObjFacing     = $A230 ; 1 B per object thread: !BattleRom_FacingByAngle of that angle
@@ -889,6 +893,9 @@ endstruct
 ; Per-actor attribute bits (opcodes $D9/$DA). Battle init ($CC:E3FC) fills both copies with
 ; !Battle_ActAttrBits, so probably sprite attribute bits; $CF:EEF8 loads the objects' current value into DP $A1
 ; while building their sprites and $CF:FE36 tests the battlers' for non-zero (neither traced further).
+!Battle_ActSavedX        = $99AF ; 3 B: !Battler_ScreenX of !Battle_ActBattlers entries 0-2, copied at $CC:F1CE (when
+                                 ; that runs is not traced; probably the action's start); read by BattleAct_CalcSavedPos
+!Battle_ActSavedY        = $99B2 ; 3 B: their !Battler_ScreenY, copied there too
 !Battler_ActAttr         = $99B5 ; 1 B per battler slot: current value (opcode $D9 sets it)
 !Battler_ActAttrInit     = $9F3B ; 1 B per battler slot: initial value (opcode $DA copies it back)
 !Battle_ActObjAttrInit   = $AB57 ; 1 B per object thread: initial value
@@ -931,6 +938,8 @@ endstruct
 !BattleRom_TextBank        = $CC      ; bank holding the item/tech name tables (MVN source)
 !BattleRom_AngleTable      = $C0F300  ; direction angle by (|dy| & ~7) * 4 + |dx| >> 3 (Battle_CalcAngle)
 !BattleRom_SineTable       = $C0F900  ; |sin| table: 1024 entries of 1 B per turn, peak $FF at +$100 (Battle_SinLookup)
+!BattleRom_ActLerpWeights = $CCFB7F ; 7 pairs of 1 B weights (7,1) (6,2) (5,3) (3,5) (2,6) (1,7) (4,4), each adding
+                                    ; up to 8: the lerp handlers of BattleAct_RunCalc, index pair * 2
 !BattleRom_FacingByAngle  = $C0F700  ; 1 B per angle (256 per turn): facing for that direction (Battle_UpdatePcFacing)
 !BattleRom_TechListBase    = $CCF38C  ; 1 B per PC slot: first line of the PC in the 20-line tech lists (0/$14/$28)
 !BattleRom_TechEntryBase   = $CCF395  ; 2 B per PC slot: offset of the PC's Tech_MenuEntry block (0/$8C/$118)
