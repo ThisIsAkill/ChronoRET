@@ -102,6 +102,9 @@ block). The lint requires:
   Use a note for a site xref confirms that is not a real call (data that decodes as `JSR`), for
   tables that dispatch to the routine and for fall-ins.
 
+- `SIZE`: a header claim `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout (the
+  routine alone, or with its sub-entries).
+
 Two kinds of label are exempt from `HEADER`:
 
 - **Tables**: a label whose body is only `db`/`dw`/`dl`/`dd` data (no instruction or macro).

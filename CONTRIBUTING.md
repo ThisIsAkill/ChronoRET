@@ -49,7 +49,9 @@ every tool that reads them regenerates them when they are stale, and
   opcodes or test plumbing (STYLE.md). A literal transcription is fine on your work branch; it
   never goes to `main`. Routines matched before this rule are listed in
   `tools/readability_baseline.txt`; that list may only shrink, and the hook fails if it grows or
-  still lists a routine that is already clean.
+  still lists a routine that is already clean. A header check added after routines were verified
+  grandfathers their findings one rule at a time (`path:Function RULE`), so they stay verified
+  and every other rule still applies; fix them at the routine's next edit.
 - **Reviewed:** before a routine counts as `verified`, someone who did not write it checks that
   the names and comments are right — the bytes are already proven, so review is about whether
   the code tells the truth. The approval is a row in the review log, one CSV file per review

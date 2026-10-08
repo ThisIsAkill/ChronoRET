@@ -39,13 +39,22 @@ asm/include/ and are exempt):
          `; Callers note:` line, which is hashed and reviewed. Needs the
          ROM and asar; skipped without them.
 
+  SIZE   a header claim `Name (N bytes, $XXXX–$YYYY)` (or `(N bytes, $XXXX–
+         $YYYY)` about the routine itself) agrees with the assembled
+         layout (symbols/functions.csv): the routine's start, end and size,
+         or those of the routine with its `header: see` sub-entries. Needs
+         the ROM and asar; skipped without them.
+
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
 line. CALLERS cannot be opted out of.
 
 Each finding is attributed to its enclosing global label (the function).
 Functions not yet brought up to the standard are listed in
-tools/readability_baseline.txt; that list may only shrink.
+tools/readability_baseline.txt; that list may only shrink. A finding of a
+rule added after its routine was verified (SIZE, UNMATCHED, DPDB) can be
+grandfathered alone with a `path:Function RULE` line: every other rule
+still applies, and tools/progress.py keeps the routine readable.
 
 Usage:
     python3 tools/lint_readability.py                  check vs baseline
@@ -245,6 +254,137 @@ def _has_entry_exit(region) -> bool:
     return any(ENTRY_LINE.match(c) for c in comments) and any(EXIT_LINE.match(c) for c in comments)
 
 
+# ── Header claims checked against the layout (SIZE, UNMATCHED, DPDB) ─────────
+
+SIZE_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes?, '
+                        r'\$(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})'
+                        r'(?:\s*[–-]\s*\$?(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4}))?')
+LONG_ADDR = re.compile(r'\$([0-9A-Fa-f]{2}):?([0-9A-Fa-f]{4})(?![0-9A-Fa-f])((?:/[0-9A-Fa-f]{4}(?![0-9A-Fa-f]))*)')
+UNMATCHED_WORD = re.compile(r'\bunmatched\b', re.I)
+BEFORE_LIST = re.compile(r'((?:\$[0-9A-Fa-f]{2}:[0-9A-Fa-f]{4}(?:/[0-9A-Fa-f]{4})*'
+                         r'(?:,\s*|\s+and\s+|\s+or\s+)?)+)\s*\(\s*$')
+STATE_DP = re.compile(r'\bDP\b|\bD\s*=|direct page', re.I)
+STATE_DB = re.compile(r'\bDB\b|data bank', re.I)
+STRICT_ENTRY = re.compile(r'^\s?(On entry|Entry(/Exit)?)\b[^:]{0,60}:\s')
+KEY_LINE = re.compile(r'^\s?(?:[A-Z][\w /()-]{0,30}:\s|[-=~]{3})')
+REFERS = re.compile(r'\bas\b|\bsee\b|\bsame\b|banner|above|below', re.I)
+
+
+class Layout:
+    """Matched routines from symbols/functions.csv (tools/generated.py)."""
+
+    def __init__(self, rows):
+        def off(a):
+            return (int(a[1:3], 16) - 0xC0) << 16 | int(a[4:], 16)
+        self.spans = sorted((off(r['address']), off(r['end']), r['name']) for r in rows)
+        self.by_name = {n: (s, e) for s, e, n in self.spans}
+        self.starts = [s for s, _, _ in self.spans]
+
+    def owner(self, o):
+        import bisect
+        i = bisect.bisect_right(self.starts, o) - 1
+        if i >= 0 and self.spans[i][0] <= o <= self.spans[i][1]:
+            return self.spans[i][2]
+        return None
+
+
+_LAYOUT = []
+
+
+def _layout():
+    if not _LAYOUT:
+        rows = []
+        import generated
+        if generated.can_generate():
+            rows = generated.function_rows()
+        _LAYOUT.append(Layout(rows) if rows else None)
+    return _LAYOUT[0]
+
+
+def _fmt(o: int) -> str:
+    return f'${0xC0 + (o >> 16):02X}:{o & 0xFFFF:04X}'
+
+
+def size_findings(r, lay, family_end):
+    """SIZE: `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout."""
+    out = []
+    for m in SIZE_CLAIM.finditer(' '.join(r.header_comments(hand_written=True))):
+        name = m.group(1) if m.group(1) in lay.by_name else r.name
+        if name not in lay.by_name:
+            continue
+        start, end = lay.by_name[name]
+        size = int(m.group(2).replace(',', ''))
+        bank = start >> 16
+        cs = (int(m.group(3), 16) - 0xC0 if m.group(3) else bank) << 16 | int(m.group(4), 16)
+        ce = None
+        if m.group(6):
+            ce = (int(m.group(5), 16) - 0xC0 if m.group(5) else cs >> 16) << 16 | int(m.group(6), 16)
+        real = [(start, end)]
+        if family_end.get(name, end) != end:
+            real.append((start, family_end[name]))       # the routine with its sub-entries
+        if any(cs == s and size == e - s + 1 and ce in (None, e) for s, e in real):
+            continue
+        claim = f'({m.group(2)} bytes, ${m.group(4).upper()}' + \
+            (f'–${m.group(6).upper()})' if ce is not None else ')')
+        out.append(f'{r.name}: header says {name} {claim}, but the layout has '
+                   f'{end - start + 1} bytes, {_fmt(start)}–{_fmt(end)}')
+    return out
+
+
+def unmatched_findings(r, lay):
+    """UNMATCHED: no header text calls an address inside matched code unmatched."""
+    text = ' '.join(c.strip() for c in r.header_comments(hand_written=True))
+    out, seen = [], set()
+    for m in UNMATCHED_WORD.finditer(text):
+        # The clause after the word (to the next ';' or sentence end), and the
+        # list of addresses right before "(unmatched".
+        # In "(unmatched...)" the clause ends at the parenthesis.
+        inside = text[:m.start()].rstrip().endswith('(')
+        after = re.split(r';|\.\s|\.$' + (r'|\)' if inside else ''),
+                         text[m.end():m.end() + 160])[0]
+        before = BEFORE_LIST.search(text[max(0, m.start() - 200):m.start()])
+        spans = [after] + ([before.group(1)] if before else [])
+        for chunk in spans:
+            for a in LONG_ADDR.finditer(chunk):
+                bank = int(a.group(1), 16)
+                if bank < 0xC0:
+                    continue
+                offs = [(bank - 0xC0) << 16 | int(a.group(2), 16)]
+                offs += [offs[0] & ~0xFFFF | int(c, 16) for c in a.group(3).split('/')[1:]]
+                for o in offs:
+                    who = lay.owner(o)
+                    if who and o not in seen:
+                        seen.add(o)
+                        out.append(f'{r.name}: header calls {_fmt(o)} unmatched, but it is inside '
+                                   f'matched {who}')
+    return out
+
+
+def dpdb_findings(r):
+    """DPDB: every Entry line states DP and DB (or points to text in this
+    header that does)."""
+    comments = r.header_comments(hand_written=True)
+    out = []
+    strict = [i for i, c in enumerate(comments) if STRICT_ENTRY.match(c)]
+    for i in strict or [i for i, c in enumerate(comments) if ENTRY_LINE.match(c)]:
+        c = comments[i]
+        block = [c]          # the Entry line and the lines continuing it
+        for d in comments[i + 1:]:
+            if not d.strip() or ENTRY_LINE.match(d) or EXIT_LINE.match(d) or KEY_LINE.match(d):
+                break
+            block.append(d)
+        text = ' '.join(block)
+        missing = [n for n, rx in (('DP', STATE_DP), ('DB', STATE_DB)) if not rx.search(text)]
+        if missing and REFERS.search(text):
+            rest = [d for d in comments if d not in block]
+            if any(STATE_DP.search(d) and STATE_DB.search(d) for d in rest):
+                missing = []
+        if missing:
+            out.append(f'{r.name}: the Entry line does not state {" or ".join(missing)} '
+                       f'({c.strip()[:60]!r})')
+    return out
+
+
 def header_findings(path: Path):
     findings = []
     regions = asm_source.file_regions(path)
@@ -276,6 +416,29 @@ def header_findings(path: Path):
             report(by_name[name], 'HEADER', f'{name}: the header of {parent} does not mention '
                                             f'this sub-entry')
 
+    if 'DPDB' in CLAIM_RULES:
+        EVALUATED.add('DPDB')
+        for r in regions:
+            if not is_table(r) and r.name not in parent_of:
+                for text in dpdb_findings(r):
+                    report(r, 'DPDB', text)
+    lay = _layout()
+    if lay is not None:
+        EVALUATED.update(CLAIM_RULES & {'SIZE', 'UNMATCHED'})
+        family_end = {}
+        for r in regions:
+            top = parent_of.get(r.name, r.name)
+            if r.name in lay.by_name and top in lay.by_name:
+                family_end[top] = max(family_end.get(top, lay.by_name[top][1]),
+                                      lay.by_name[r.name][1])
+        for r in regions:
+            if 'SIZE' in CLAIM_RULES:
+                for text in size_findings(r, lay, family_end):
+                    report(r, 'SIZE', text)
+            if 'UNMATCHED' in CLAIM_RULES:
+                for text in unmatched_findings(r, lay):
+                    report(r, 'UNMATCHED', text)
+
     xr = _xref()
     if xr is None:
         return findings
@@ -305,11 +468,44 @@ def by_function(findings):
     return grouped
 
 
-def read_baseline() -> set[str]:
-    if not BASELINE.exists():
-        return set()
-    return {l.strip() for l in BASELINE.read_text().splitlines()
-            if l.strip() and not l.startswith('#')}
+# Rules added after routines were already verified. A routine can be
+# grandfathered for one of them alone (`path:Function RULE` in the baseline),
+# so an old finding does not void its review, while every other rule still
+# applies to it in full. A whole-function entry (`path:Function`) exempts it
+# from every rule but keeps it at `matched` (tools/progress.py).
+PER_RULE = ('SIZE', 'UNMATCHED', 'DPDB')
+CLAIM_RULES = {'SIZE'}
+EVALUATED = set()       # the per-rule checks this run could make (no ROM: no SIZE/UNMATCHED)
+
+
+def read_baseline():
+    """(whole-function entries, {function: rules grandfathered one by one},
+    malformed lines)."""
+    whole, by_rule, bad = set(), defaultdict(set), []
+    if BASELINE.exists():
+        for line in BASELINE.read_text().splitlines():
+            parts = line.split()
+            if not parts or line.startswith('#'):
+                continue
+            if len(parts) == 1:
+                whole.add(parts[0])
+            elif len(parts) == 2 and parts[1] in PER_RULE:
+                by_rule[parts[0]].add(parts[1])
+            else:
+                bad.append(line)
+    return whole, by_rule, bad
+
+
+def blocking(grouped, by_rule=None):
+    """The findings that count, without the per-rule grandfathered ones."""
+    if by_rule is None:
+        by_rule = read_baseline()[1]
+    out = {}
+    for key, items in grouped.items():
+        left = [f for f in items if f[1] not in by_rule.get(key, ())]
+        if left:
+            out[key] = left
+    return out
 
 
 def main() -> int:
@@ -348,25 +544,33 @@ def main() -> int:
               + ', '.join(f'{r}={n}' for r, n in sorted(rules.items())))
         return 0
 
-    baseline = set() if args.strict else read_baseline()
-    failing = sorted(k for k in grouped if k not in baseline)
-    stale = sorted(k for k in baseline if k not in grouped)
+    whole, by_rule, bad = (set(), {}, []) if args.strict else read_baseline()
+    counted = blocking(grouped, by_rule)
+    failing = sorted(k for k in counted if k not in whole)
+    stale = sorted(k for k in whole if k not in grouped)
+    # A rule this run could not check (no ROM) cannot show an entry stale.
+    stale += sorted(f'{k} {r}' for k, rules in by_rule.items() for r in rules
+                    if r in EVALUATED and not any(f[1] == r for f in grouped.get(k, ())))
 
     for key in failing:
-        for no, rule, text in grouped[key][:10]:
+        for no, rule, text in counted[key][:10]:
             print(f'{key.split(":")[0]}:{no}: {rule}: {text}')
-        if len(grouped[key]) > 10:
-            print(f'  ... {len(grouped[key]) - 10} more in {key}')
+        if len(counted[key]) > 10:
+            print(f'  ... {len(counted[key]) - 10} more in {key}')
     if failing:
         print(f'FAIL: {len(failing)} function(s) not at the readability standard '
               f'(and not in {BASELINE}).')
     if stale:
         print('FAIL: these baseline entries are now clean or gone; remove them from '
               f'{BASELINE}:\n  ' + '\n  '.join(stale))
-    if failing or stale:
+    if bad:
+        print(f'FAIL: malformed lines in {BASELINE} (`path:Function`, or `path:Function RULE` '
+              f'with RULE one of {", ".join(PER_RULE)}):\n  ' + '\n  '.join(bad))
+    if failing or stale or bad:
         return 1
-    remaining = len(baseline)
-    print(f'READABLE: no new findings ({remaining} grandfathered function(s) left in baseline).')
+    n_rule = sum(len(r) for r in by_rule.values())
+    print(f'READABLE: no new findings ({len(whole)} grandfathered function(s) and {n_rule} '
+          f'grandfathered single-rule finding(s) left in baseline).')
     return 0
 
 

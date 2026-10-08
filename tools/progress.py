@@ -19,6 +19,8 @@ A function's status (each level includes the previous):
   matched    every byte from its label to the next is emitted by source
              and equals the ROM
   readable   ...and it has no findings from tools/lint_readability.py
+             (a finding grandfathered for its rule alone in
+             tools/readability_baseline.txt does not count)
   verified   ...and the review log (symbols/reviews/*.csv, one file per
              round) holds an independent approval of its current source
              (the review's source_hash still matches)
@@ -190,7 +192,7 @@ def analyse() -> dict:
 
     # The layout is known now; the lint's caller checks read it from here.
     with generated.generating([dict(f) for f in functions]):
-        lint = lint_readability.by_function(lint_readability.collect())
+        lint = lint_readability.blocking(lint_readability.by_function(lint_readability.collect()))
     reviews = read_reviews()
     for f in functions:
         src = source[f['name']]
