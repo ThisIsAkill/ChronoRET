@@ -31,15 +31,15 @@ Reset:
 ; RAM handlers are installed during MainInit; these stubs dispatch there.
 ; ============================================================
 NMI_Stub:               ; native NMI vector target (see $FFEA)
-    JML $000500         ; → RAM-resident NMI handler
+    JML !NmiTrampoline  ; → RAM-resident NMI handler
 
 IRQ_Stub:               ; native IRQ vector target (see $FFEE)
-    JML $000504         ; → RAM-resident IRQ handler
+    JML !IrqTrampoline  ; → RAM-resident IRQ handler
 
 ; Both native BRK and emulation-mode COP point here (see $FFE6, $FFF4).
-; Reads a magic SRAM cookie then loops forever — crash trap.
+; Reads a recognizable marker address in a loop forever — crash trap.
 BRK_Handler:
-    LDA.l $ABCDEF       ; read SRAM sanity cookie
+    LDA.l !CrashMarkerRead ; recognizable marker read (see ram_engine.inc)
     BRA BRK_Handler     ; infinite loop — no recovery
 
     db $FF,$FF          ; padding $FF1E–$FF1F

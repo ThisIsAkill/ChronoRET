@@ -10,6 +10,27 @@ if !hardware_inc == 0
 !hardware_inc = 1
 
 ; ------------------------------------------------------------
+; Direct-page bases. Init and VBlank code points DP at a register
+; block so every register write is a 2-byte dp store; such code names
+; the register relative to its base: STA.b INIDISP-!DP_PPU.
+; ------------------------------------------------------------
+!DP_CPU = $4200   ; CPU I/O registers ($4200-$421F)
+!DP_PPU = $2100   ; PPU registers ($2100-$213F)
+
+; ------------------------------------------------------------
+; Register values (named by the bits they set)
+; ------------------------------------------------------------
+!INIDISP_ForcedBlank   = $80  ; bit 7: screen off, VRAM/CGRAM/OAM writable
+!MEMSEL_FastRom        = $01  ; bit 0: 3.58 MHz access for banks $80-$FF
+!WRIO_AllHigh          = $FF  ; all programmable I/O pins high (latch idle)
+!OBSEL_Init            = $63  ; size %011 = 16x16/32x32 sprites, name select 0,
+                              ; base %011 = sprite tiles at VRAM word $6000
+!BGMODE_Mode1Bg3Prio   = $09  ; mode 1 (%001) + bit 3: BG3 high priority
+!W34SEL_Bg3Win1Inv     = $03  ; BG3 window 1 enable + invert
+!TM_AllLayers          = $1F  ; BG1-4 + OBJ enabled
+!COLDATA_GreenBlueZero = $C0  ; write green+blue channels, intensity 0
+
+; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)
 ; ------------------------------------------------------------
 INIDISP  = $2100   ; Screen display (brightness + forced blank)

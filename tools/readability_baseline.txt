@@ -1,9 +1,6 @@
 # Functions not yet at the readability standard (see
 # tools/lint_readability.py). This list may only shrink; main is
 # fully gated when it is empty.
-asm/bank00/bank00.asm:BRK_Handler
-asm/bank00/bank00.asm:IRQ_Stub
-asm/bank00/bank00.asm:NMI_Stub
 asm/bankC0/bankC0.asm:ClearRAMDMA
 asm/bankC0/bankC0.asm:DefaultHandler
 asm/bankC0/bankC0.asm:Field_ProcessAnimQueue
@@ -219,4 +216,3 @@ asm/bankC1/bankC1.asm:_ump_pc3_ok
 asm/bankC1/bankC1.asm:_ump_set_bright
 asm/bankC1/bankC1.asm:_ump_slot_ready
 asm/bankC1/bankC1.asm:_ump_write_bright
-asm/bankFD/bankFD.asm:MainInit

@@ -18,4 +18,11 @@
 if !ram_engine_inc == 0
 !ram_engine_inc = 1
 
+; --- Stack / fixed RAM ---
+!StackTop        = $06FF     ; initial S (MainInit); stack grows down from $06FF
+!NmiTrampoline   = $000500   ; 4 B: JML to the NMI handler, installed at boot (bank $00 NMI_Stub jumps here)
+!IrqTrampoline   = $000504   ; 4 B: JML to the IRQ handler, installed at boot
+!CrashMarkerRead = $ABCDEF   ; BRK/COP trap reads this recognizable address in a loop;
+                             ; inferred: a marker for bus traces/debuggers, not real data
+
 endif
