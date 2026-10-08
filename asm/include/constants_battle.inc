@@ -365,6 +365,8 @@ if !constants_battle_inc == 0
 !Battle_ActFirstObjThread = 8    ; threads 8-15 are object threads 0-7
 !Battle_ActNumOpcodes    = $DB   ; opcodes $00-$DA have a handler in BattleAct_OpcodeTable
 !Battle_ActOpSetSpeed    = $08   ; first of the opcodes $08-$0F (BattleAct_OpSetSpeed)
+!Battle_ActOpCalcToResult = $3D  ; opcodes $3D-$40: results entry 0-3 (BattleAct_OpCalcToResult)
+!Battle_ActOpCalcToResult4 = $45 ; opcodes $45-$46: results entry 4-5
 !Battle_MoveUnitStep     = $0100 ; 1.0 in 8.8: the major axis' step (BattleAct_CalcMoveStep)
 
 ; --- Path search (BattleAct_FindPath, on !Battle_PathMap) ---
@@ -378,6 +380,20 @@ if !constants_battle_inc == 0
 !Battle_PathMark         = $E0   ; ORed into each cell of the found path
 !Battle_PathMaxWave      = $1F   ; waves run 1-30; the search fails when the count reaches this
 !Battle_PathNotFound     = $80   ; result: no path (bit 7); 1-4 = found
+!Battle_ActVarMax        = $FF   ; top of a script variable (opcode $49 clamps to 0-this)
+!Battle_ActFollowFirstObj = 9    ; opcode $1C operand: 0-8 = entry of !Battle_ActBattlers, 9 on = object thread n - 9
+!Battle_ActFollowObj     = $40   ; !Battle_ActObjFollow: bit 6 set = an object thread (bits 0-2) rather than a slot
+!Battle_ActFollowNone    = $FF   ; !Battle_ActObjFollow: follows nothing
+!Battle_ActKeepBit7      = $80   ; opcodes $27-$2A keep bit 7 of !Battler_UnkA5CD / !Battler_Unk9FF7 (the scans' skip bit)
+!Battle_PathDirUp        = 0     ; path walk directions (!Battler_PathFromDir; * 8 = step kind base)
+!Battle_PathDirDown      = 1
+!Battle_PathDirLeft      = 2
+!Battle_PathDirRight     = 3
+!Battle_PathDirNone      = $FF   ; !Battler_PathFromDir at the start: no direction left out
+!Battle_PathStepFrames   = 7     ; !Battler_PathStepFrame of a new step: 8 frames per cell
+!Battle_PathMapBytes     = $100  ; bytes of a path map (16 x 16 cells)
+!Battle_CurveKeepHeading = $FF   ; curving move operand: start from !Battle_ActorUnkA5AA
+!Battle_MoveKindCurve    = 7     ; !Battle_ActorMoveKind of a curving move ($CF:F405)
 
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)

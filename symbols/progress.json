@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 51397,
+  "emitted_bytes": 53682,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 530,
-      "bytes": 51397
+      "functions": 586,
+      "bytes": 53682
     },
     "readable": {
-      "functions": 530,
-      "bytes": 51397
+      "functions": 586,
+      "bytes": 53682
     },
     "verified": {
       "functions": 530,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 21048,
+      "emitted_bytes": 23333,
       "matched": {
-        "functions": 226,
-        "bytes": 21048
+        "functions": 282,
+        "bytes": 23333
       },
       "readable": {
-        "functions": 226,
-        "bytes": 21048
+        "functions": 282,
+        "bytes": 23333
       },
       "verified": {
         "functions": 226,
@@ -754,9 +754,65 @@
       "bank": "$C1",
       "start": "$C1:5000",
       "end": "$C1:5FFF",
-      "emitted_bytes": 494,
+      "emitted_bytes": 2779,
       "functions": [
-        "BattleAct_StartBattlerMove"
+        "BattleAct_StartBattlerMove",
+        "BattleAct_OpCurveTo",
+        "BattleAct_OpCurveToUnkPoint",
+        "BattleAct_OpCurveToCalc",
+        "BattleAct_CurveToPoint",
+        "BattleAct_CurveTurnDir",
+        "BattleAct_OpPathTo",
+        "BattleAct_OpPathToUnkPoint",
+        "BattleAct_OpPathToCalc",
+        "BattleAct_PathToPoint",
+        "BattleAct_OpSetPos",
+        "BattleAct_SetPosToPoint",
+        "BattleAct_OpSetPosUnkPoint",
+        "BattleAct_OpSetPosCalc",
+        "BattleAct_OpFollow",
+        "BattleAct_OpUnfollow",
+        "BattleAct_OpCall",
+        "BattleAct_OpReturn",
+        "BattleAct_OpPause",
+        "BattleAct_OpReturnIfVar1F0",
+        "BattleAct_OpWaitVar",
+        "BattleAct_OpWaitVar1C",
+        "BattleAct_OpWaitVar1D",
+        "BattleAct_OpEndIfNoTarget",
+        "BattleAct_OpShowAnimEntry",
+        "BattleAct_OpSetUnkA5CD",
+        "BattleAct_StoreUnkA5CD",
+        "BattleAct_OpClearUnkA5CD",
+        "BattleAct_OpSetUnk9FF7",
+        "BattleAct_StoreUnk9FF7",
+        "BattleAct_OpClearUnk9FF7",
+        "BattleAct_OpClearUnkA4A4",
+        "BattleAct_OpUnkRevive",
+        "BattleAct_OpSetUnkCFFF",
+        "BattleAct_OpClearUnkCFFF",
+        "BattleAct_OpSetVar",
+        "BattleAct_OpSetVar1C",
+        "BattleAct_OpSetVar1D",
+        "BattleAct_OpCalcToUnkPoint",
+        "BattleAct_OpIncVar",
+        "BattleAct_OpIncVar1C",
+        "BattleAct_OpIncVar1D",
+        "BattleAct_OpDecVar",
+        "BattleAct_OpDecVar1C",
+        "BattleAct_OpDecVar1D",
+        "BattleAct_OpAddVar",
+        "BattleAct_OpAddVar1C",
+        "BattleAct_OpAddVarTo1C",
+        "BattleAct_OpCalcToResult",
+        "BattleAct_OpCopyVar",
+        "BattleAct_OpCopyVar1C",
+        "BattleAct_OpOffsetToUnkPoint",
+        "BattleAct_OpActorPosToUnkPoint",
+        "BattleAct_OpAddVarClamped",
+        "BattleAct_OpSwapVar1C1D",
+        "BattleAct_OpSwapVar1C1E",
+        "BattleAct_OpSwapVar1C1F"
       ]
     },
     {
