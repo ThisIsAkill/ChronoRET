@@ -948,3 +948,5 @@ $C2:940D,Menu_InitPpuAndRam,2026-10-08,rev21a,approved,78d1a70fa43b,"Decoded OBS
 $C2:9510,Menu_DmaZeroWord,2026-10-08,rev21a,approved,0b8bae3fc865,"$0000 at $C2:9510; A1T0L=$9510/A1B0=$C2 at $C2:94E1 and $C2:952F, both fixed-source DMAs."
 $C2:9512,Menu_DmaClearWram,2026-10-08,rev21a,approved,060735f6467b,"HDMAEN 0, WMADD X/$00, DAS=Y, DMAP/BBAD $8008, src $C2:9510; 5 callers match xref; Exit X=$9510, A low=1, Y kept; X=0 needed as stated."
 $C2:95BB,Menu_ClearConfigAndFlags,2026-10-08,rev21a,approved,cc7ac2655a45,"Fills $7F:0000-01FF, $0400-04FF, $2990-29AF vs MVN counts; copies $C2:FCA6 x12 to $2990 and $FCA9 x9 to $0408 (=Config+3); PHB/PLB only round $7F MVN; callers $8D85/$9571."
+$C2:9542,Menu_DmaCopyFFToWram,2026-10-08,rev24a,approved,103e4d2d74ad,"Fix OK: Exit X=$8000 (LDX #BBAD_WMDATA<<8 at $9554), Y kept, A lo=$01. DMAP 0 stepping, A1B0=$FF, WMADDH 0, HDMAEN untouched; callers $9698/$96A4 (REP #$30) checked."
+$C2:956E,Menu_InitNewGameData,2026-10-08,rev24a,approved,31545d7027df,"Fix OK: $8048 guarded by $0A00 mode=0 and $7F0061=0 then sets 1; $8D7E after 3 FF:F9C4 checks then 0; $E65D then 1. Fill ranges, MVN counts, DB=$7E, Exit A/X/Y verified."

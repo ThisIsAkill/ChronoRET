@@ -358,8 +358,8 @@ $C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
 $C2:940D,$C2:950F,259,Menu_InitPpuAndRam,$C2,Engine,verified,78d1a70fa43b,"Puts the PPU and CPU registers into the menu's starting state, then clears all of VRAM and most of bank $7E with DMA."
 $C2:9510,$C2:9511,2,Menu_DmaZeroWord,$C2,Engine,verified,0b8bae3fc865,Menu_InitPpuAndRam's VRAM clear and of Menu_DmaClearWram.
 $C2:9512,$C2:9541,48,Menu_DmaClearWram,$C2,Engine,verified,060735f6467b,"Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed source Menu_DmaZeroWord, one register: WMDATA)."
-$C2:9542,$C2:956D,44,Menu_DmaCopyFFToWram,$C2,Engine,readable,103e4d2d74ad,"Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank $7E at address X with DMA channel 0 (stepping source, one register: WMDATA)."
-$C2:956E,$C2:95BA,77,Menu_InitNewGameData,$C2,Engine,readable,31545d7027df,Sets up the data of a new game (inferred from what it fills).
+$C2:9542,$C2:956D,44,Menu_DmaCopyFFToWram,$C2,Engine,verified,103e4d2d74ad,"Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank $7E at address X with DMA channel 0 (stepping source, one register: WMDATA)."
+$C2:956E,$C2:95BA,77,Menu_InitNewGameData,$C2,Engine,verified,31545d7027df,Sets up the data of a new game (inferred from what it fills).
 $C2:95BB,$C2:960A,80,Menu_ClearConfigAndFlags,$C2,Engine,verified,cc7ac2655a45,"Zeroes Menu_FlagBlock7F ($7F:0000-$01FF), the page $7E:0400-$04FF (Menu_PlayTime and what follows) and Menu_Config ($2990-$29AF), then copies MenuRom_DefaultConfig (12 B) to Menu_Config and the 9 B fr"
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,verified,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $CF:F9FB,$CF:FA42,72,Battle_SinLookupCF,$CF,Battle engine,verified,754e4d354d3e,Bank $CF's own scaled sine: returns (sin(A) × !BattleCF_SinScale) >> 8 in A.
