@@ -3,7 +3,7 @@ BUILD_DIR   := build
 OUT_ROM     := $(BUILD_DIR)/chrono_trigger.built.sfc
 MAIN_ASM    := asm/main.asm
 
-.PHONY: all build diff verify lint gate clean check-rom setup
+.PHONY: all build diff verify lint gate sync clean check-rom setup
 
 all: build diff
 
@@ -31,6 +31,10 @@ verify: check-rom
 # grandfathered and may only shrink).
 lint:
 	python3 tools/lint_readability.py
+
+# Regenerate the wiki's progress data (docs/data/) from the code.
+sync: check-rom
+	python3 tools/sync_progress.py
 
 # What a function needs before it reaches main.
 gate: diff verify lint
