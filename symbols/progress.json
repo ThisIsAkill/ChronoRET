@@ -8,12 +8,12 @@
       "bytes": 34444
     },
     "readable": {
-      "functions": 279,
-      "bytes": 33555
+      "functions": 306,
+      "bytes": 34444
     },
     "verified": {
-      "functions": 244,
-      "bytes": 29489
+      "functions": 235,
+      "bytes": 28042
     }
   },
   "banks": [
@@ -43,12 +43,12 @@
         "bytes": 13974
       },
       "readable": {
-        "functions": 156,
-        "bytes": 13085
+        "functions": 183,
+        "bytes": 13974
       },
       "verified": {
-        "functions": 124,
-        "bytes": 9177
+        "functions": 115,
+        "bytes": 7730
       }
     },
     {

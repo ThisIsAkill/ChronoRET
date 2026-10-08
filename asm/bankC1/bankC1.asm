@@ -56,9 +56,11 @@ BattleSys_PumpFrames:
 ;        with STA.l/LDA.l, so the caller's data bank does not matter)
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y and DB unchanged; DP $77/$78 and
 ;        $AF/$B0 written
-; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1CBE, $C1:2B8D,
-; $C1:607B, $C1:7878); the only matched one is BattleMenu_ItemConfirm
-; ($C1:14A7). No calls.
+; Callers: 20 JSR sites across bank $C1: BattleMenu_ItemConfirm
+; ($C1:14A7), Battle_DrawBattlerFrameAnyLayout ($C1:1CBE),
+; BattlePos_CheckDist ($C1:2B8D, $C1:2B9A), BattlePos_DistDifference
+; ($C1:2D14, $C1:2D2A, $C1:2D4B, $C1:2D61) and 12 in unmatched code
+; (e.g. $C1:607B, $C1:7878). No calls.
 org $C10089
 Battle_Mul8:
     LDA.b !Battle_Mul8A
@@ -92,9 +94,10 @@ Battle_Mul8:
 ;        DP=0, DB any
 ; Exit:  M=1, X=0 (P restored); A=0; X = first partial product; Y and DB
 ;        unchanged; DP $77/$78 and $A9-$AB written
-; Callers: 20 JSR sites across bank $C1 (e.g. $C1:1C7F, $C1:2E98,
-; $C1:33A5, $C1:509B); the only matched one is Battle_SinLookup
-; ($C1:021C). No calls.
+; Callers: 20 JSR sites across bank $C1: Battle_SinLookup ($C1:021C),
+; Battle_DrawBattlerFrameAnyLayout ($C1:1C7F), Battle_TickPcSlots
+; ($C1:2E98), Battle_TickEnemyGroup ($C1:33A5), Battle_RunPcPose
+; ($C1:35FF) and 15 in unmatched code (e.g. $C1:509B). No calls.
 org $C100A7
 Battle_Mul8x16:
     PHB
@@ -135,9 +138,9 @@ Battle_Mul8x16:
 ;        $A029, outside the low-RAM mirror); HW registers use .l
 ; Exit:  M=1; A=0 (TDC with DP=0); X/Y unchanged; DP $79-$7B and $B5-$B8
 ;        written
-; Callers: 19 JSR sites across bank $C1 (e.g. $C1:2ECF, $C1:5084,
-; $C1:6311, $C1:7731); the only matched one is BattleUI_DrawSlotGaugeBar
-; ($C1:071D). No calls.
+; Callers: 19 JSR sites across bank $C1: BattleUI_DrawSlotGaugeBar
+; ($C1:071D), Battle_TickPcSlots ($C1:2ECF) and 17 in unmatched code
+; (e.g. $C1:5084, $C1:6311, $C1:7731). No calls.
 org $C100D7
 Battle_Divide:
     INC.w !Battle_DivBusy   ; mark divider busy
@@ -181,9 +184,10 @@ Battle_Divide:
 ; Callers (all JSR, by entry point):
 ;   Battle_ShiftLeft8: BattleUI_DrawSlotGaugeBar ($C1:0715), $C1:660C,
 ;     $C1:6634
-;   Battle_ShiftLeft4: $C1:30CF, $C1:310F
-;   Battle_ShiftLeft3: $C1:3410, $C1:3471, $C1:48BA
-;   Battle_ShiftRight8: $C1:2D73
+;   Battle_ShiftLeft4: Battle_FxReset ($C1:30CF), Battle_FxOverlay2Tint
+;     ($C1:310F)
+;   Battle_ShiftLeft3: Battle_TickEnemyGroup ($C1:3410, $C1:3471), $C1:48BA
+;   Battle_ShiftRight8: BattlePos_DistDifference ($C1:2D73)
 ;   Battle_ShiftRight6: $C1:3AB7, $C1:3C41, $C1:53B2, $C1:53B9
 ;   Battle_ShiftRight5: $C1:39F6, $C1:39FE, $C1:3A0A, $C1:3A12
 ;   Battle_ShiftRight4 (15 sites): BattleMenu_UpdateTechMpAvail,
@@ -409,8 +413,9 @@ BattleMsg_ReencodeTextBuffer:
 ; $FF at +$100 and +$300); angle × 4 picks every fourth entry, and the
 ; value is negated for the second half turn (table offset $200 and up). The signed sine goes to !Battle_MulFactor16, the scale to
 ; !Battle_MulFactor8, and Battle_Mul8x16 multiplies them.
-; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites) and 42 in unmatched
-;   code (e.g. $C1:2C38, $C1:2C42, $C1:37D7, $C1:37E1).
+; Callers (46 JSR sites): BattleTgt_AreaLine (4 sites), BattlePos_PathClear
+;   ($C1:2C38, $C1:2C42) and 40 in unmatched code (e.g. $C1:37D7,
+;   $C1:37E1).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB any (table read with .l);
 ;        angle in A
 ; Exit:  M=1, X=0; A = !Battle_MulProduct+1 (product >> 8); X clobbered
@@ -448,8 +453,10 @@ Battle_SinLookup:
 ; !BattleRom_AngleTable at index (|dy| & ~7) × 4 + (|dx| >> 3), then
 ; places it in the right quadrant from the signs of dx and dy.
 ; Callers (37 JSR sites): BattleTgt_AreaPartyTriangle (9 sites),
-;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC) and 25 in unmatched
-;   code (e.g. $C1:2C27, $C1:2F82, $C1:353B, $C1:37C9).
+;   BattleTgt_AreaLine ($C1:25C7, $C1:26A3, $C1:26CC), BattlePos_PathClear
+;   ($C1:2C27), Battle_UpdatePcFacing ($C1:2F82),
+;   Battle_FaceAllPcsNearestEnemy ($C1:353B) and 22 in unmatched code
+;   (e.g. $C1:37C9).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero), DB any (table
 ;        read with .l); !Battle_GeoOriginX/Y, !Battle_GeoPointX/Y
 ; Exit:  M=1, X=0; angle in A and !Battle_GeoAngle; X = table index;
@@ -3580,11 +3587,11 @@ BattleMenu_DrawCursorSprites:
 ; BattleMenu_ProcessInput ($C11153–$C111E0, 142 bytes)
 ; ==================================================================
 ; Battle command-window input handler. Its three callers (JSR from
-; BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick and the not
-; yet matched routine at $C1:106E, at $C1:10D4) each call it only on frames where !BattleMenu_Dirty is set
-; (they clear the flag and run the menu chain). Reads the pad-edge
-; bytes (!Battle_PadEdgeButtons / !Battle_PadEdgeDpad, pressed this
-; frame) and dispatches:
+; BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick and
+; BattleSys_UpkeepTwoFrames at $C1:10D4) each call it only on frames
+; where !BattleMenu_Dirty is set (they clear the flag and run the menu
+; chain). Reads the pad-edge bytes (!Battle_PadEdgeButtons /
+; !Battle_PadEdgeDpad, pressed this frame) and dispatches:
 ;   - no PC shown (!BattleMenu_ActivePc < 0) → Battle_ClearPadEdges;
 ;     target selection running → BattleMenu_TargetSelectInput
 ;   - !BattleMenu_Submenu 1 / 2 → tech / item list input (with
@@ -6049,8 +6056,8 @@ BattlePos_Query:
     RTS
 
 ; ==================================================================
-; BattlePos_NearestPc / FarthestPc / NearestEnemy / FarthestEnemy
-; ($C129B2–$C12AE2, 305 bytes; queries 0-3)
+; BattlePos_NearestPc / BattlePos_FarthestPc / BattlePos_NearestEnemy /
+; BattlePos_FarthestEnemy ($C129B2–$C12AE2, 305 bytes; queries 0-3)
 ; ==================================================================
 ; Each scans one side, skipping battlers that are not present, have
 ; !Battler_Unk9FF7 bit 7 set or are KO'd (BattlerStats.Status bit 7),
@@ -6116,7 +6123,7 @@ BattlePos_NearestPc:
     BNE .loop
     RTS
 
-BattlePos_FarthestPc:
+BattlePos_FarthestPc:               ; header: see BattlePos_NearestPc
     TDC
     TAX
     STX.b !BattlePos_ScanSlot       ; slot 0
@@ -6158,7 +6165,7 @@ BattlePos_FarthestPc:
     BNE .loop
     RTS
 
-BattlePos_NearestEnemy:
+BattlePos_NearestEnemy:             ; header: see BattlePos_NearestPc
     LDX.w #!BattlePos_NoBest
     STX.b !BattlePos_BestDist
     LDX.w #!Battle_FirstEnemySlot
@@ -6204,7 +6211,7 @@ BattlePos_NearestEnemy:
     BNE .loop
     RTS
 
-BattlePos_FarthestEnemy:
+BattlePos_FarthestEnemy:            ; header: see BattlePos_NearestPc
     TDC
     TAX
     STX.b !BattlePos_BestDist       ; 0
@@ -6256,22 +6263,33 @@ BattlePos_FarthestEnemy:
 ; !BattlePos_DistLimit and joins BattlePos_CheckDist; the "XY" entries
 ; take the two slots in X and Y from the caller, the others load them
 ; from !BattlePos_Subject (X) and !BattlePos_Other (Y) in
-; BattlePos_CheckPairDist. WithinDist4XY and WithinDist4XYTwin are
+; BattlePos_CheckPairDist. The entries: BattlePos_WithinDist40XY,
+; BattlePos_WithinDist32XY, BattlePos_WithinDist64XY,
+; BattlePos_WithinDist4XY, BattlePos_WithinDist4XYTwin,
+; BattlePos_WithinDist16XY, BattlePos_WithinDist48 and
+; BattlePos_WithinDist32 (which falls into BattlePos_CheckPairDist, and
+; that into BattlePos_CheckDist). WithinDist4XY and WithinDist4XYTwin are
 ; byte-identical (two copies in the ROM, one caller each).
 ; The 16-bit sum of the two squares wraps for points about 256 pixels
 ; or more apart (reproduced as found; on-screen distances keep below).
 ; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded):
 ;   WithinDist40XY      $C1:4A26 (unmatched)
-;   WithinDist32XY      BattlePos_PathClear, $C1:3819 (unmatched)
+;   WithinDist32XY      BattlePos_PathClear ($C1:2C5D), $C1:3819 (unmatched)
 ;   WithinDist64XY      $C1:3821 (unmatched)
 ;   WithinDist4XY       $C1:3829 (unmatched)
 ;   WithinDist4XYTwin   $C1:3B38 (unmatched)
 ;   WithinDist16XY      $C1:3CBB (unmatched)
 ;   WithinDist48        BattlePos_ModeTable entry 14 only
-;   WithinDist32        BattlePos_ModeTable entry 4, and queries 0-3
-; Entry: M=1, X=0, DP=0, DB=$7E; for the XY entries X and Y = the two
-;        battler slots
+;   WithinDist32        BattlePos_ModeTable entry 4, and the scans of
+;                       queries 0-3: BattlePos_NearestPc ($C1:29DB),
+;                       BattlePos_FarthestPc ($C1:2A23),
+;                       BattlePos_NearestEnemy ($C1:2A78) and
+;                       BattlePos_FarthestEnemy ($C1:2AC3)
+;   CheckPairDist, CheckDist  only by falling in or BRA from the entries
+; Entry: M=1, X=0, DP=0, DB=$7E; for the XY entries and CheckDist X and
+;        Y = the two battler slots (CheckPairDist and CheckDist also take
+;        !BattlePos_DistLimit as set by the entry)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 or $FF; X = dx*dx (from
 ;        Battle_Mul8's product); Y unchanged; DP $77-$78, $80-$83 and
 ;        $AD-$B0 written; !BattlePos_DistLimit set
@@ -6285,59 +6303,59 @@ BattlePos_WithinDist40XY:
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist32XY:
+BattlePos_WithinDist32XY:           ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq32&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq32>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist64XY:
+BattlePos_WithinDist64XY:           ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq64&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq64>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist4XY:
+BattlePos_WithinDist4XY:            ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq4&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq4>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist4XYTwin:
+BattlePos_WithinDist4XYTwin:        ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq4&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq4>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist16XY:
+BattlePos_WithinDist16XY:           ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq16&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq16>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckDist
 
-BattlePos_WithinDist48:
+BattlePos_WithinDist48:             ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq48&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq48>>8
     STA.w !BattlePos_DistLimit+1
     BRA BattlePos_CheckPairDist
 
-BattlePos_WithinDist32:
+BattlePos_WithinDist32:             ; header: see BattlePos_WithinDist40XY
     LDA.b #!BattlePos_DistSq32&$FF
     STA.w !BattlePos_DistLimit
     LDA.b #!BattlePos_DistSq32>>8
     STA.w !BattlePos_DistLimit+1
-BattlePos_CheckPairDist:            ; X = subject, Y = other
+BattlePos_CheckPairDist:            ; X = subject, Y = other; header: see BattlePos_WithinDist40XY
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !BattlePos_Other
     TAY
-BattlePos_CheckDist:                ; X, Y = the two battlers
+BattlePos_CheckDist:                ; X, Y = the two battlers; header: see BattlePos_WithinDist40XY
     LDA.w !Battler_ProbeX,X
     STA.b !BattlePos_CoordA
     STZ.b !BattlePos_CoordA+1
@@ -6400,7 +6418,7 @@ BattlePos_CheckDist:                ; X, Y = the two battlers
     RTS
 
 ; ==================================================================
-; BattlePos_SameRowBand / SubjectAbove / SubjectLeft
+; BattlePos_SameRowBand / BattlePos_SubjectAbove / BattlePos_SubjectLeft
 ; ($C12BBC–$C12C01, 70 bytes; queries 5-7)
 ; ==================================================================
 ; Compare the subject's and the other battler's screen positions and
@@ -6432,7 +6450,7 @@ BattlePos_SameRowBand:
 .exit:
     RTS
 
-BattlePos_SubjectAbove:
+BattlePos_SubjectAbove:             ; header: see BattlePos_SameRowBand
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !BattlePos_Other
@@ -6444,7 +6462,7 @@ BattlePos_SubjectAbove:
 .exit:
     RTS
 
-BattlePos_SubjectLeft:
+BattlePos_SubjectLeft:              ; header: see BattlePos_SameRowBand
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !BattlePos_Other
@@ -6566,7 +6584,8 @@ BattlePos_PathClear:
     JMP Battle_CalcBattlerBox
 
 ; ==================================================================
-; BattlePos_SubjectLowerHalf / UpperHalf / RightPart / LeftPart
+; BattlePos_SubjectLowerHalf / BattlePos_SubjectUpperHalf /
+; BattlePos_SubjectRightPart / BattlePos_SubjectLeftPart
 ; ($C12CA7–$C12CF2, 76 bytes; queries 9-12)
 ; ==================================================================
 ; Test the subject's 16-pixel cell (screen position / 16) and DEC
@@ -6591,7 +6610,7 @@ BattlePos_SubjectLowerHalf:
 .exit:
     RTS
 
-BattlePos_SubjectUpperHalf:
+BattlePos_SubjectUpperHalf:         ; header: see BattlePos_SubjectLowerHalf
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !Battler_ScreenY,X
@@ -6605,7 +6624,7 @@ BattlePos_SubjectUpperHalf:
 .exit:
     RTS
 
-BattlePos_SubjectRightPart:
+BattlePos_SubjectRightPart:         ; header: see BattlePos_SubjectLowerHalf
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !Battler_ScreenX,X
@@ -6619,7 +6638,7 @@ BattlePos_SubjectRightPart:
 .exit:
     RTS
 
-BattlePos_SubjectLeftPart:
+BattlePos_SubjectLeftPart:          ; header: see BattlePos_SubjectLowerHalf
     LDA.w !BattlePos_Subject
     TAX
     LDA.w !Battler_ScreenX,X
@@ -6988,6 +7007,10 @@ Battle_TickPcSlots:
 ; Battle_UnkThunk2F1F ($C12F1F–$C12F21, 3 bytes): a lone JMP to the RTS
 ; that ends Battle_TickEnemyGroup ($C1:34A6). Nothing reaches it (searched: no JSR, JMP, JSL, JML or
 ; BRL targets $2F1F, and no word table holds it); kept as found.
+; Entry: none (unreached); as written it needs only a return address on
+;        the stack, like the RTS it jumps to
+; Exit:  as Battle_TickEnemyGroup's RTS: no register, flag or memory
+;        changed
 Battle_UnkThunk2F1F:
     JMP Battle_TickEnemyGroup_exit
 
@@ -7333,9 +7356,11 @@ Battle_ApplyPendingEffect:
 ; copies the saved palette (!Battle_PaletteSaved, 26 bytes from
 ; !Battler_Palette * 16) back over the live one, undoing a tint or
 ; colour cycle.
-; Callers (JSR; scanned as above): Battle_FxHandlerTable entry 0, the
-; handlers Battle_FxOverlay2Tint/3/4/5/6/7 and Battle_FxColourCycle, and
-; BattleSys_VictoryPose.
+; Callers (8 JSR sites): Battle_FxHandlerTable entry 0; the handlers
+;   Battle_FxOverlay2Tint ($C1:30E1), Battle_FxOverlay7 ($C1:3141),
+;   Battle_FxOverlay6 ($C1:3163), Battle_FxColourCycle ($C1:3185),
+;   Battle_FxOverlay3 ($C1:31B0), Battle_FxOverlay4 ($C1:31D2) and
+;   Battle_FxOverlay5 ($C1:31F4); and BattleSys_VictoryPose ($C1:3582).
 ; The ×16 shift runs on an 8-bit A; the TAY also copies B, assumed 0.
 Battle_FxReset:
     LDX.b !Battle_TickSlot
@@ -7366,6 +7391,9 @@ Battle_FxReset:
 ; !BattleRom_FxTintColours into live palette bytes 6-9 (inferred: two
 ; colours).
 ; Callers: Battle_FxHandlerTable entry 3.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; for a PC, Y clobbered
+;        and DP $80-$81 written (!Battle_FxPalOffset)
 !Battle_FxPalOffset = !BattleTmp_80       ; 2 B: !Battler_Palette * 16
 Battle_FxOverlay2Tint:
     JSR Battle_FxReset
@@ -7410,6 +7438,9 @@ Battle_FxOverlay2Tint:
 ; Battle_FxOverlay7 ($C13141–$C13162, 34 bytes)
 ; Effect $0E: resets and starts overlay 7.
 ; Callers: Battle_FxHandlerTable entry $0E.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxOverlay7:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -7428,6 +7459,9 @@ Battle_FxOverlay7:
 ; Battle_FxOverlay6 ($C13163–$C13184, 34 bytes)
 ; Effect 9: resets and starts overlay 6.
 ; Callers: Battle_FxHandlerTable entry 9.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxOverlay6:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -7447,6 +7481,9 @@ Battle_FxOverlay6:
 ; Effects 6, 7, $0B, $0C and $0D: resets and starts the colour cycle
 ; from step 0.
 ; Callers: Battle_FxHandlerTable entries 6, 7, $0B, $0C, $0D.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxColourCycle:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -7461,6 +7498,9 @@ Battle_FxColourCycle:
 ; stay as they were (kept as found; whether that shows in play is not
 ; traced).
 ; Callers: Battle_FxHandlerTable entries 1, 2, $0A.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        unchanged
 Battle_FxOverlay1:
     LDX.b !Battle_TickSlot
     INC.w !Battler_FxOverlayOn,X
@@ -7478,6 +7518,9 @@ Battle_FxOverlay1:
 ; Battle_FxOverlay3 ($C131B0–$C131D1, 34 bytes)
 ; Effect 4: resets and starts overlay 3.
 ; Callers: Battle_FxHandlerTable entry 4.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxOverlay3:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -7496,6 +7539,9 @@ Battle_FxOverlay3:
 ; Battle_FxOverlay4 ($C131D2–$C131F3, 34 bytes)
 ; Effect 5: resets and starts overlay 4.
 ; Callers: Battle_FxHandlerTable entry 5.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxOverlay4:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -7514,6 +7560,9 @@ Battle_FxOverlay4:
 ; Battle_FxOverlay5 ($C131F4–$C13215, 34 bytes)
 ; Effect 8: resets and starts overlay 5.
 ; Callers: Battle_FxHandlerTable entry 8.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot (read 16-bit)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_TickSlot; Y
+;        clobbered for a PC (by Battle_FxReset)
 Battle_FxOverlay5:
     JSR Battle_FxReset
     LDX.b !Battle_TickSlot
@@ -8396,8 +8445,8 @@ Battle_PoseStep:
 ; are ever queued at once is not established.
 ;
 ; Callers (JSR): BattleMenu_RefreshIfDirtyL ($C1:10ED),
-;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and unmatched code at
-;   $C1:10CE.
+;   BattleMenu_RefreshIfDirtyAndTick ($C1:1104) and
+;   BattleSys_UpkeepTwoFrames ($C1:10CE).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (as at every caller; no DP
 ;        access here), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = dequeued slot index (or
@@ -8458,7 +8507,7 @@ BattleMenu_DequeueReadyBattler:
 ; STZ in .clear_targeting overwrites it at once, so it always ends on
 ; the main menu; the first store is dead.
 ;
-; Callers (JSR): unmatched code at $C1:358B, $C1:3593, $C1:359B.
+; Callers (JSR): BattleSys_VictoryPose ($C1:358B, $C1:3593, $C1:359B).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot, STA.b $80,
 ;        TDC as zero), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written; Y unchanged
@@ -9510,7 +9559,7 @@ BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScr
 ; Cursor/overlay refresh at the end of the menu rebuild chain (after
 ; ProcessInput), so like it only on frames with !BattleMenu_Dirty set:
 ; JSR from BattleMenu_RefreshIfDirtyL, BattleMenu_RefreshIfDirtyAndTick
-; and $C1:10D7 (the not yet matched routine at $C1:106E). Draws whatever cursor
+; and BattleSys_UpkeepTwoFrames ($C1:10D7). Draws whatever cursor
 ; graphic belongs on screen right now, dispatching on menu state:
 ;
 ;   no PC shown (!BattleMenu_ActivePc < 0) -> hide the 4 cursor sprites
