@@ -216,7 +216,7 @@ def _xref():
         xr = None
         if Path('roms/chrono_trigger.sfc').exists() and shutil.which('asar'):
             import xref
-            xr = xref.Xref()
+            xr = xref.Xref(deep=True)     # the same verdicts tools/callers.py uses
         _XREF.append(xr)
     return _XREF[0]
 

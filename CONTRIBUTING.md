@@ -97,8 +97,9 @@ every tool that reads them regenerates them when they are stale, and
   REP/SEP, PHP/PLP and the exit widths of each routine called), and where that does not reach,
   by decoding forward from the 64 bytes before the hit under each M/X start state and voting
   (`sweep`). Both are heuristics: read a CONFIRMED hit in unmatched code before you rely on
-  it. The lint's CALLERS rule still uses the sweep alone (`--sweep-only` shows its verdicts);
-  `python3 tools/test_xref.py` checks the verdicts against known sites and the source.
+  it. `tools/callers.py`, the lint and the library default (`Xref()`) use both (`--sweep-only`
+  shows the sweep's verdicts alone); `python3 tools/test_xref.py` checks the verdicts against
+  known sites and the source.
 - `python3 tools/callers.py --update` rewrites the `; Callers (...)` block of every header from
   xref's CONFIRMED sites (`--show NAME` prints one, `--check` lists the ones that differ). Run
   it after matching code and after merging `origin/main`: new routines change other routines'

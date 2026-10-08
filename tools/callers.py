@@ -116,7 +116,7 @@ class Generator:
     def __init__(self, xr=None):
         if xr is None:
             import xref
-            xr = xref.Xref()
+            xr = xref.Xref(deep=True)
         self.xr = xr
 
     def family(self, regions):

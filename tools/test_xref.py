@@ -8,7 +8,7 @@ Needs the ROM in roms/ and asar on PATH; skips otherwise.
 
 What it pins:
   * call sites in unmatched code that the sweep alone rejected and the
-    deeper analysis (Xref(deep=True), the command line's default) confirms,
+    deeper analysis (Xref(), deep by default) confirms,
     and a byte pattern it correctly keeps DOUBTFUL;
   * matched code: every verdict comes from the source, so the deeper
     analysis changes none of them, and no site in a matched data table is
@@ -28,7 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import xref  # noqa: E402
 
-READY = xref.ROM_PATH.exists() and shutil.which('asar') and xref.FUNCTIONS_CSV.exists()
+# symbols/functions.csv is generated (not tracked); Xref regenerates it.
+READY = bool(xref.ROM_PATH.exists() and shutil.which('asar'))
 
 # (site, kind, target): real calls in unmatched code.
 REAL_CALLS = [
@@ -53,13 +54,14 @@ def hit(xr, site, kind, target):
     return hits[0]
 
 
-@unittest.skipUnless(READY, 'needs roms/chrono_trigger.sfc, asar and symbols/functions.csv')
+@unittest.skipUnless(READY, 'needs roms/chrono_trigger.sfc and asar')
 class XrefTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.deep = xref.Xref(deep=True)
-        cls.plain = xref.Xref()
+        cls.plain = xref.Xref(deep=False)
+        cls.default = xref.Xref()
 
     def test_real_calls_confirmed(self):
         for site, kind, target in REAL_CALLS:
@@ -75,9 +77,12 @@ class XrefTest(unittest.TestCase):
                 self.assertEqual(h.status, 'DOUBTFUL', h.note)
                 self.assertIn(f'operand of the instruction at {insn}', h.note)
 
-    def test_library_default_is_the_sweep(self):
-        # The lint's CALLERS rule uses Xref(); it keeps the sweep alone until
-        # the headers list what the deeper analysis finds.
+    def test_library_default_is_deep(self):
+        # tools/callers.py and the lint's CALLERS rule use Xref(): the deeper
+        # analysis, which confirms this call the sweep alone keeps DOUBTFUL.
+        self.assertTrue(self.default.deep)
+        h = hit(self.default, '$C2:38FB', 'JSR', '$C2:0568')
+        self.assertEqual(h.status, 'CONFIRMED', h.note)
         h = hit(self.plain, '$C2:38FB', 'JSR', '$C2:0568')
         self.assertEqual((h.status, h.basis), ('DOUBTFUL', 'sweep'))
 

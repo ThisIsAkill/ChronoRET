@@ -856,11 +856,12 @@ C2Scene_TaskSpawnLow:
 ; Quirk, kept: there is no check that a record was free. Then X comes
 ; back as C2Scene_TaskRecordsEnd and the three fields are written into
 ; the last record (63), whatever runs there.
-; Callers (21 sites: 20 JSR, 1 JMP): C2Script_SpawnScript (JSR $C2:1203), C2Scene_Mode3 (JSR
+; Callers (22 sites: 20 JSR, 2 JMP): C2Script_SpawnScript (JSR $C2:1203), C2Scene_Mode3 (JSR
 ;   $C2:242E, JSR $C2:2459), C2Scene_Mode5 (JSR $C2:2527, JSR $C2:256B), C2Scene_Mode6 (JSR
 ;   $C2:2596, JSR $C2:25FB), C2Scene_Mode8 (JSR $C2:2626, JSR $C2:2676), C2Scene_LoadScene (JMP
 ;   $C2:2C90) and unmatched (JSR $C2:3154, JSR $C2:33B2, JSR $C2:33DF, JSR $C2:4479, JSR $C2:452C,
-;   JSR $C2:63AE, JSR $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427).
+;   JSR $C2:63AE, JSR $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP
+;   $C2:7457).
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -1050,8 +1051,9 @@ C2Scene_LayerVramMaps:
 ; use).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
-; Callers (10 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
-;   ($C2:173C) and unmatched ($C2:3702, $C2:3709, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A, $C2:785B).
+; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
+;   ($C2:173C) and unmatched ($C2:3702, $C2:3709, $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93,
+;   $C2:4F9A, $C2:785B).
 ; Callers note (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
 ;   C2Script_ScrollLayerFrames ($C2:173C); unmatched: $C2:3702, $C2:3709,
 ;   $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and
@@ -1226,8 +1228,9 @@ C2Scene_Unk0568:
 ; one; then C2Scene_QueueEdgeRow).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) loops for good
 ; (.hang). 0 pixels does nothing.
-; Callers (9 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE), C2Script_ScrollLayerFrames
-;   ($C2:1751) and unmatched ($C2:3717, $C2:371E, $C2:469F, $C2:46A6, $C2:4FA8, $C2:4FAF).
+; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE), C2Script_ScrollLayerFrames
+;   ($C2:1751) and unmatched ($C2:3717, $C2:371E, $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8,
+;   $C2:4FAF).
 ; Callers note (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
 ;   C2Script_ScrollLayerFrames ($C2:1751); unmatched: $C2:3717, $C2:371E,
 ;   $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF (xref
@@ -2645,14 +2648,14 @@ org $C20E1D
 ; Inferred to be the sprite's animation from C2Anim_OpShowFrame, which
 ; adds a frame to the sprite list for a number of frames, and from the
 ; script ops that start one (C2Scene_SetAnim) before moving the task.
-; Callers (57 JSR sites): C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
+; Callers (58 JSR sites): C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
 ;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F) and unmatched ($C2:3444, $C2:35E0,
 ;   $C2:36E2, $C2:3731, $C2:38C0, $C2:3915, $C2:3B3F, $C2:3CD5, $C2:3D36, $C2:3D97, $C2:3E76,
 ;   $C2:3EDA, $C2:4340, $C2:4382, $C2:43D2, $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700,
 ;   $C2:4723, $C2:481E, $C2:4852, $C2:4870, $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E,
 ;   $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008, $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8,
-;   $C2:523E, $C2:525D, $C2:5285, $C2:5553, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770, $C2:6834,
-;   $C2:6883, $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
+;   $C2:523E, $C2:525D, $C2:5285, $C2:5553, $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770,
+;   $C2:6834, $C2:6883, $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
 ; Callers note (57 JSR sites, all unmatched except those named): e.g.
 ;   C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
 ;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), $C2:3444,
@@ -2921,10 +2924,10 @@ C2Anim_OpEnd:
 ; .XFrac/.SprX += .XVelFrac/.XVel and .YFrac/.SprY += .YVelFrac/.YVel
 ; (inferred from the carry chain: the fraction words are added first and
 ; carry into the whole ones). No wrap here; C2Scene_WrapTaskPos does that.
-; Callers (21 JSR sites): C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
+; Callers (22 JSR sites): C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
 ;   C2Script_ScrollLayerFrames ($C2:172B) and unmatched ($C2:36F1, $C2:383B, $C2:38C9, $C2:3D02,
 ;   $C2:3D63, $C2:3E23, $C2:3E87, $C2:4454, $C2:4679, $C2:4D90, $C2:4F82, $C2:5002, $C2:5166,
-;   $C2:5235, $C2:554D, $C2:55DC, $C2:7734, $C2:7824).
+;   $C2:5235, $C2:5254, $C2:554D, $C2:55DC, $C2:7734, $C2:7824).
 ; Callers note (21 JSR sites, all unmatched except those listed): e.g.
 ;   C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
 ;   C2Script_ScrollLayerFrames ($C2:172B), $C2:36F1 and $C2:7824;
@@ -5726,11 +5729,11 @@ C2Scene_NegateYVel:
 ; negative or taken off when it is that or more (once, so it assumes the
 ; position moved by less than a map width); .SprY is taken AND
 ; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
-; Callers (22 sites: 21 JSR, 1 JMP): C2Script_MoveFrames (JSR $C2:1640), C2Script_MoveToX (JSR
+; Callers (23 sites: 22 JSR, 1 JMP): C2Script_MoveFrames (JSR $C2:1640), C2Script_MoveToX (JSR
 ;   $C2:19B3), C2Script_MoveToY (JSR $C2:1A1C) and unmatched (JSR $C2:36F4, JSR $C2:383E, JSR
 ;   $C2:38CC, JSR $C2:3D05, JSR $C2:3D66, JSR $C2:3E26, JSR $C2:3E8A, JSR $C2:4457, JSR $C2:467C,
 ;   JSR $C2:46FD, JMP $C2:48E5, JSR $C2:4D93, JSR $C2:4F85, JSR $C2:5005, JSR $C2:5169, JSR
-;   $C2:5238, JSR $C2:5550, JSR $C2:55C9, JSR $C2:55DF).
+;   $C2:5238, JSR $C2:5257, JSR $C2:5550, JSR $C2:55C9, JSR $C2:55DF).
 ; Callers note (22 call sites, JSR and JMP, all unmatched except those
 ;   named): e.g. C2Script_MoveFrames ($C2:1640), C2Script_MoveToX
 ;   ($C2:19B3), C2Script_MoveToY ($C2:1A1C), $C2:36F4, JMP at $C2:48E5,
@@ -5761,13 +5764,13 @@ C2Scene_WrapTaskPos:
 ; Starts animation script A (low byte) on the running task: .AnimPtr =
 ; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
 ; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
-; Callers (34 sites: 31 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
+; Callers (37 sites: 34 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
 ;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC) and unmatched (JSR
 ;   $C2:35CD, JMP $C2:397C, JMP $C2:39A7, JSR $C2:3CA7, JSR $C2:3CC7, JSR $C2:4336, JSR $C2:433D,
-;   JSR $C2:4439, JSR $C2:45A0, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR $C2:4D11, JSR
-;   $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:5087, JSR $C2:50EB,
-;   JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR $C2:550B, JSR $C2:556A, JSR
-;   $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
+;   JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR
+;   $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E,
+;   JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR
+;   $C2:550B, JSR $C2:556A, JSR $C2:559F, JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
 ; Callers note (34 call sites, JSR and JMP, all unmatched except those
 ;   named): e.g. C2Script_SetAnim ($C2:1614), C2Script_MoveToX
 ;   ($C2:1981, $C2:1993), C2Script_MoveToY ($C2:19EA, $C2:19FC), JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
