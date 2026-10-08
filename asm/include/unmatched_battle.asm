@@ -14,13 +14,6 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C12F97
-Battle_PickStatusAnim:                  ; JSR: for battler !Battle_TickSlot ($94): sets $A2 = its BattlerStats offset,
-                                        ; picks !Battle_AnimId from its status bits (table at $CC:F77F) and an effect
-                                        ; id into $A441,X; not checked in detail
-org $C1308C
-Battle_ApplyPendingEffect:              ; JSR: for battler !Battle_TickSlot: when $A441,X differs from $A44C,X, copies
-                                        ; it and runs that entry of the handler table at $C1:3216
 org $C13234
 Battle_TickUnkA4Mode:                   ; JMP target of Battle_TickPcSlots while !Battle_UnkA4 is set; not analysed
 org $C134A6
