@@ -14,6 +14,68 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
+org $C10003
+BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
+org $C10006
+BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
+org $C18461
+BattleSys_Unk8461:                      ; JSR from BattleSys_Main while !Battle_UnkAF25 is set; also entry 12 of
+                                        ; BattleSys_ListHandlerTable; not analysed
+org $C1895B
+BattleSys_Unk895B:                      ; JSR from BattleSys_Main (A = !Battle_EndUnk895BArg); not analysed
+org $C18C09
+BattleSys_Unk8C09:                      ; JSR from BattleSys_Main after the shuffles; not analysed
+org $C1B093
+BattleSys_UnkB093:                      ; JSR from BattleSys_Main / Battle_SetupBattle with X = PC slot * $80; not analysed
+org $C1B0B6
+BattleSys_UnkB0B6:                      ; JSR from BattleSys_Main with X = Y * $80, Y = 0-10; not analysed
+org $C1B223
+BattleSys_UnkB223:                      ; JSR from each BattleSys_Main pass; not analysed
+org $C1B3BB
+BattleSys_UnkB3BB:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1B3D2
+BattleSys_UnkB3D2:                      ; JSR from BattleSys_Main's !Battle_Unk2989 bit 5 end; not analysed
+org $C1B3F9
+BattleSys_UnkB3F9:                      ; JSR from BattleSys_Main's wait-mode path, X = PC slot, A = its !Battler_UnkAF0A; not analysed
+org $C1B442
+BattleSys_UnkB442:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1B4E9
+BattleSys_UnkB4E9:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1B7F2
+BattleSys_UnkB7F2:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1B92D
+BattleSys_ListHandlerTable:             ; 13 words: handler per turn list (BattleSys_Main JSR (T,X)); entry 12 is
+                                        ; BattleSys_Unk8461
+org $C1B947
+BattleSys_ListOffsetTable:              ; 13 words: !Battle_ListFlags + list * 11 (BattleSys_Main)
+org $C1BC60
+BattleSys_UnkBC60:                      ; JSR from BattleSys_Main's debug win with !Battle_UnkB18B = PC slot; not analysed
+org $C1C96A
+BattleSys_UnkC96A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
+org $C1CA1A
+BattleSys_UnkCA1A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
+org $C1CCCB
+BattleSys_UnkCCCB:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
+org $C1CDFF
+BattleSys_UnkCDFF:                      ; JSR from Battle_SetupBattle; not analysed
+org $C1CE3A
+BattleSys_UnkCE3A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $02); not analysed
+org $C1CF15
+BattleSys_UnkCF15:                      ; JSR from Battle_SetupBattle with arguments in DP $06, $08, $0A; not analysed
+org $C1CFC2
+BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
+                                        ; table at $C1:D126 (6 entries) with argument Y; returns a result in A
+org $C1D005
+BankC1_AddItem:                         ; BankC1_RunService service 1: add one of item Y to the inventory
+org $C1D0A2
+BankC1_AddGold:                         ; BankC1_RunService service 4: add Y to the gold sum
+org $C1EA9D
+BattleSys_UnkEA9D:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1EAE8
+BattleSys_UnkEAE8:                      ; JSR from BattleSys_Main's end paths; not analysed
+org $C1F93E
+BattleSys_UnkF93E:                      ; JSR from BattleSys_Main's victory path after the gold; not analysed
+
 ; --- Bank $C3 ---
 
 org $C30002
@@ -86,6 +148,63 @@ BattleMsg_ShowMsg0BIfKeyChangedVec:     ; JSL vector: battle message / info pane
 
 org $CD0030
 BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
+
+org $CD0021
+BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; not analysed
+
+; --- Bank $FD (called from BattleSys_Main and Battle_SetupBattle; not analysed) ---
+
+org $FDA982
+BattleFD_UnkA982:                       ; JSL: first call of BattleSys_Main
+org $FDAA98
+BattleFD_UnkAA98:                       ; JSL: BattleSys_Main's !Battle_Unk99CD end
+org $FDAAB0
+BattleFD_UnkAAB0:                       ; JSL: last call of BattleSys_Main before BattleSys_ExitVec
+org $FDACFD
+BattleFD_UnkACFD:                       ; JSL: each BattleSys_Main pass, after the upkeep service
+org $FDAD17
+BattleFD_UnkAD17:                       ; JSL: BattleSys_Main's victory end
+org $FDB201
+BattleFD_UnkB201:                       ; JSL: BattleSys_Main's victory end, before the gold
+
+org $FDB2DE
+BattleFD_UnkB2DE:                       ; JSL from Battle_SetupBattle
+org $FDB22E
+BattleFD_UnkB22E:                       ; JSL from Battle_SetupBattle
+org $FDB438
+BattleFD_UnkB438:                       ; JSL from Battle_SetupBattle
+org $FDB121
+BattleFD_UnkB121:                       ; JSL from Battle_SetupBattle
+org $FDAE52
+BattleFD_UnkAE52:                       ; JSL from Battle_SetupBattle
+org $FDB3FE
+BattleFD_UnkB3FE:                       ; JSL from Battle_SetupBattle
+org $FDAE99
+BattleFD_UnkAE99:                       ; JSL from Battle_SetupBattle
+org $FDAD09
+BattleFD_UnkAD09:                       ; JSL from Battle_SetupBattle
+org $FDAEF2
+BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle
+org $FDACEE
+BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle
+org $FDB14D
+BattleFD_UnkB14D:                       ; JSL from Battle_SetupBattle
+org $FDB0D5
+BattleFD_UnkB0D5:                       ; JSL from Battle_SetupBattle
+org $FDB4E7
+BattleFD_UnkB4E7:                       ; JSL from Battle_SetupBattle
+org $FDB7EB
+BattleFD_UnkB7EB:                       ; JSL from Battle_SetupBattle
+org $FDB555
+BattleFD_UnkB555:                       ; JSL from Battle_SetupBattle
+org $FDB732
+BattleFD_UnkB732:                       ; JSL from Battle_SetupBattle
+org $FDB363
+BattleFD_UnkB363:                       ; JSL from Battle_SetupBattle
+org $FDB223
+BattleFD_UnkB223:                       ; JSL from Battle_SetupBattle
+org $FDAEC4
+BattleFD_UnkAEC4:                       ; JSL from Battle_SetupBattle
 
 ; --- Bank $CF (battle support) ---
 
