@@ -40,7 +40,7 @@ if !ram_engine_inc == 0
 
 ; --- Location (current / return / destination) (dp) ---
 !Loc_Id = $00                            ; 16-bit current location index; GameLoop_Main dispatches on
-                                         ; it ($01F0+ -> bank $C2, $01FF+ -> LoadSavePath)
+                                         ; it ($01F0-$81EF -> bank $C2, $81F0-$81FE -> LoadSavePath)
 !Loc_EntryX = $02                        ; 8-bit entry tile X (Field_SaveState stores the leader's
                                          ; $1801 here); 16-bit loads also take Loc_EntryY
 !Loc_EntryY = $03                        ; 8-bit entry tile Y (Field_SaveState stores the leader's
