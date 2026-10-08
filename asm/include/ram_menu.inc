@@ -164,12 +164,15 @@ endstruct align 8
 !C2Tmp_00 = $00                          ; 1-2 B scratch
 !C2Tmp_01 = $01                          ; 1 B scratch
 !C2Tmp_02 = $02                          ; 1-2 B scratch
+!C2Tmp_03 = $03                          ; 1-2 B scratch
 !C2Tmp_04 = $04                          ; 1-2 B scratch
 !C2Tmp_05 = $05                          ; 1 B scratch
 !C2Tmp_06 = $06                          ; 1-2 B scratch
+!C2Tmp_07 = $07                          ; 1 B scratch
 !C2Tmp_08 = $08                          ; 1-2 B scratch
 !C2Tmp_09 = $09                          ; 1-2 B scratch
 !C2Tmp_0A = $0A                          ; 1-2 B scratch
+!C2Tmp_0B = $0B                          ; 1 B scratch
 !C2Tmp_0C = $0C                          ; 1-2 B scratch
 !C2Tmp_0E = $0E                          ; 1-2 B scratch
 !C2Tmp_10 = $10                          ; 1-2 B scratch
@@ -180,6 +183,7 @@ endstruct align 8
 !C2Tmp_18 = $18                          ; 1-2 B scratch
 !C2Tmp_19 = $19                          ; 1-3 B scratch
 !C2Tmp_1A = $1A                          ; 1-2 B scratch
+!C2Tmp_1B = $1B                          ; 1 B scratch
 
 ; ==== Text window (TextWin_Init / TextWin_Step) ====
 ; A block at $0200 that both run on as their direct page; names are dp
@@ -189,22 +193,22 @@ endstruct align 8
 !TextWin_StrIndex = $0C                  ; 8-bit string number: index into TextWin_StrTable
 !TextWin_StrTable = $0D                  ; 24-bit pointer to a table of 16-bit string addresses (in the
                                          ; table's bank)
-!TextWin_GfxBuf = $10                    ; 24-bit output buffer (the field passes $7E:F000); probably the
-                                         ; glyph pixels ($C2:5DC4 reads it, unmatched)
+!TextWin_GfxBuf = $10                    ; 24-bit output buffer (the field passes $7E:F000): the glyph
+                                         ; pixels TextWin_DrawGlyph ORs in (TextWin_TileOfs2bpp/4bpp layout)
 !TextWin_StepCount = $13                 ; 8-bit; the field sets 1 before each TextWin_Step; state 0
                                          ; decrements it per glyph and sets status $10 at 0 (probably
                                          ; characters per step)
 !TextWin_Mode = $14                      ; 8-bit; the field passes 0. Bit 7 or the value TextWin_ModeUnk2:
-                                         ; pen X starts at 0; low nibble 0 or not picks the glyph
-                                         ; routine at $C2:5E10 (unmatched)
+                                         ; pen X starts at 0; low nibble 0 or not picks TextWin_Blit2bpp
+                                         ; or TextWin_Blit4bpp (TextWin_DrawGlyph)
 !TextWin_Status = $15                    ; 8-bit; TextWin_CheckStatus dispatches on it ($00-$20): 0
                                          ; = idle; TextWin_Init sets TextWin_StatusStart; the field
                                          ; reads it after each step
-!TextWin_Unk17 = $17                     ; 8-bit; zeroed with each pen reset; +1 per glyph ($C2:5E30)
+!TextWin_Unk17 = $17                     ; 8-bit; zeroed with each pen reset; +1 per glyph (TextWin_DrawGlyph)
 !TextWin_State = $30                     ; 8-bit index into TextWin_StateTable
 !TextWin_TextPtr = $31                   ; 24-bit pointer to the next byte of the string
-!TextWin_PenX = $34                      ; 8-bit pen X in pixels (inferred: $C2:5DC4 uses bits 0-2 as the
-                                         ; shift within a tile and bits 3-7 as the tile)
+!TextWin_PenX = $34                      ; 8-bit pen X in pixels (TextWin_DrawGlyph uses bits 0-2 as the
+                                         ; shift within a tile and bits 3-7 as the tile, and adds the width)
 !TextWin_Unk3D = $3D                     ; 24-bit; TextWin_Init sets it to $00:0200 (= TextWin_Dp). Control
                                          ; codes $0D-$0F and $11-$12 read their value from here and step it
                                          ; on (the argument pointer)
@@ -222,6 +226,25 @@ endstruct align 8
 !TextWin_HexIn = $60                     ; 8-bit the byte TextWin_HexByte prints (written as a word)
 !TextWin_NumValue = $68                  ; 24-bit the value codes $0D-$0F read (1, 2 or 3 bytes)
 !TextWin_HexPos = $6A                    ; 16-bit TextWin_HexByte's write offset into TextWin_Digits
+; TextWin_DrawGlyph's work bytes (they overlap the number buffers above,
+; which no glyph draw needs at the same time):
+!TextWin_GlyphRow = $60                  ; 16-bit glyph byte 0-23 being drawn (index into both font tables)
+!TextWin_GlyphLow = $62                  ; 8-bit copy of TextWin_Glyph's low byte: bit 0 picks the nibble
+!TextWin_GlyphSpill = $63                ; 8-bit (written as a word): the bits shifted out on the left at
+                                         ; pen shifts 5-7
+!TextWin_RowCount = $68                  ; 8-bit byte pairs still to draw in the current part
+!TextWin_PenShift = $6A                  ; 8-bit (written as a word) TextWin_PenX AND 7: pixels into the tile
+!TextWin_GlyphX8 = $6C                   ; 16-bit glyph * 8 (on the way to * 24)
+!TextWin_PenTile2 = $6E                  ; 16-bit (TextWin_PenX AND $F8) / 4: the tile * 2, index into the
+                                         ; tile offset tables
+!TextWin_OutPtr = $73                    ; 24-bit: TextWin_GfxBuf + 8, then + 1 per glyph byte
+!TextWin_FontPtr = $76                   ; 24-bit: the glyph's 24 bytes in TextWinRom_Font
+!TextWin_FontNibPtr = $79                ; 24-bit: its pair's 24 bytes in TextWinRom_FontRight
+; The decimal converters' work bytes:
+!TextWin_DivQuot = $65                   ; TextWin_DivBits: the quotient digit (8- or 16-bit)
+!TextWin_DivSub = $6A                    ; TextWin_DivBits: the shifted divisor (8- or 16-bit)
+!TextWin_Div24Quot = $6B                 ; 8-bit TextWin_Div24Bits quotient digit
+!TextWin_Div24Sub = $6C                  ; 24-bit TextWin_Div24Bits shifted divisor
 !TextWin_NumHex = $A1                    ; 8-bit; non-zero: codes $0D/$0E print in hexadecimal (2 or 4
                                          ; digits); who sets it is not traced
 !TextWin_CharNames = $7E2C23             ; 6-byte character names (TextWin_CharNamePtrs points at the first 7;
@@ -313,14 +336,30 @@ endstruct align 8
 !C2Scene_Unk1B58 = $1B58                 ; 8-bit; zeroed by C2Scene_LoadScene; C2Scene_GetListAUnk02 copies
                                          ; byte 2 of a ListA entry here; use unknown
 !C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
-!C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene and by C2Scene_LeaderInput
+                                         ; when a step starts; use unknown
+!C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
+                                         ; C2Scene_LeaderBoard move (read by unmatched code)
+!C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
+!C2Scene_IdleFrames = $02B1              ; 3 B, C2Scene_Unk02B1, one per party slot: frames the leader
+                                         ; (C2Scene_LeaderInput) or member (C2Scene_MemberFollow) has
+                                         ; stood still (see C2Scene_IdleAnimAt)
+!C2Scene_TrailPos = $1B5A                ; 8-bit byte offset of the next word of C2Scene_TrailX/Y
+                                         ; (C2Scene_TrailPush; 0-$1E)
+!C2Scene_TrailX = $1B5B                  ; 16 words: the leader's pixel X at the end of each of its
+                                         ; last 16 steps (C2Scene_TrailFill, C2Scene_TrailPush); the other
+                                         ; members walk to them (C2Scene_MemberTrailTarget,
+                                         ; C2Scene_MemberRouteTrail)
+!C2Scene_TrailY = $1B7B                  ; 16 words: the matching pixel Y
 !C2Scene_SavedReturnId = $04FC          ; 16-bit; C2Script_GoToLocation copies Loc_ReturnId here; use not
                                          ; traced
 !C2Scene_SavedReturnX = $04FE           ; 8-bit; its copy of Loc_ReturnX (written as a word, then
                                          ; C2Scene_SavedReturnY over the high byte)
 !C2Scene_SavedReturnY = $04FF           ; 8-bit; its copy of Loc_ReturnY
 !C2Scene_MemberWords = $1B3B             ; 3 words $1B3B-$1B40, one per party position
-                                         ; (C2Script_SetMemberWord); use not traced
+                                         ; (C2Script_SetMemberWord): non-zero, the address (bank $7F) of a
+                                         ; script that position's task runs while C2Scene_TrigWatch waits
+                                         ; (C2Scene_LeaderScriptStart, C2Scene_MemberScriptStart)
 !C2Scene_Unk1B41 = $1B41                 ; 16-bit, right after them; C2Script_SetMemberWord's word for
                                          ; character 7; use not traced
 !C2Scene_FlagTailByte1 = $1BA8           ; = C2Scene_FlagTailCopy+1, the copy of $7F:01F1; bit 7 picks the
@@ -355,6 +394,9 @@ endstruct align 8
 !C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
 !C2Scene_ListD = $7E8480                 ; 2-byte entries: addresses of scripts in bank $7F (the scene
                                          ; script's, C2Scene_ScriptBuf), started by C2Scene_Mode3
+!C2Scene_Unk8600 = $7E8600               ; 4 B C2Scene_Unk5775 copies from C2Scene_Unk8600Init (use not traced)
+!C2Scene_Unk8604 = $7E8604               ; 25 B C2Scene_Unk5775 copies from C2Scene_Unk8604Init; probably
+                                         ; HDMA tables, as the area after them (unverified)
 !C2Scene_HdmaArea = $7E8621              ; $800 B $7E:8621-$8E20 zeroed by C2Scene_ClearHdmaArea (holds
                                          ; C2Scene_HdmaValues and C2Scene_HdmaTable)
 !C2Scene_UnkB800 = $7EB800               ; C2Scene_LoadUnkB800's pack; use unknown
@@ -527,6 +569,53 @@ struct C2Scene_FxTask $0000
 .OpPtr:     skip 3     ; +$07 = .ScriptPtr/.ScriptBank copied from the spawner: its op
 .Rate:      skip 1     ; +$0A frames per step (op arg 1, or arg 2 for the mosaic)
             skip $35
+endstruct
+
+; The other party members' task (C2Scene_MemberTask; this view is
+; C2Scene_FollowTask): +$22 and the fields
+; from +$24 on differ from C2Scene_WalkTask's.
+struct C2Scene_FollowTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the step within the current state
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.ScanProp:  skip 1     ; +$22 C2Scene_ScanCol: the left tile's property nibble (scratch)
+            skip 1
+.Slot:      skip 1     ; +$24 the party position (C2Scene_Slot1/2) whose member this is, set by
+                       ; whoever starts the task (not traced); read as a word in two places
+            skip 1
+.Unk26:     skip 1     ; +$26 as C2Scene_WalkTask.Unk26 (zeroed by C2Scene_MemberInit)
+.PrevFacing: skip 1    ; +$27 .Facing (bits 0-1) before C2Scene_FaceVelocity's last change
+.Facing:    skip 1     ; +$28 as C2Scene_WalkTask.Facing
+.Route:     skip 1     ; +$29 C2Scene_RouteXFirst / C2Scene_RouteYFirst and the legs left
+.TargetX:   skip 2     ; +$2A pixel X the member walks to
+.TargetY:   skip 2     ; +$2C pixel Y
+.DeltaX:    skip 2     ; +$2E .TargetX - .SprX (C2Scene_MemberDelta)
+.DeltaY:    skip 2     ; +$30 .TargetY - .SprY
+            skip $0E
+endstruct
+
+; The party leader's task (C2Scene_LeaderTask) and the walk helpers it
+; calls: the fields after C2Scene_Task's motion words. The position
+; (.SprX/.SprY) and velocity words are C2Scene_Task's own.
+struct C2Scene_WalkTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the step within the current state; zeroed
+                       ; by C2Scene_LeaderTask when either watcher's state has changed
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.PropUL:    skip 1     ; +$22 C2Scene_GetTileProps: the property nibble of the 8x8 tile up
+                       ; and left of the point (column - 1, row - 1)
+.PropUR:    skip 1     ; +$23 up and right (column, row - 1)
+.PropDL:    skip 1     ; +$24 down and left (column - 1, row)
+.PropDR:    skip 1     ; +$25 down and right (column, row)
+.Unk26:     skip 1     ; +$26 bit 0 picks the second walk animation of a facing
+                       ; (C2Scene_SetWalkAnim); the leader's code only zeroes it
+            skip 1
+.Facing:    skip 1     ; +$28 bits 0-1: C2Scene_FacingUp/Down/Left/Right; bit 7:
+                       ; C2Scene_WalkMoving
+            skip 1
+.TargetX:   skip 2     ; +$2A pixel X where the current step or move ends
+.TargetY:   skip 2     ; +$2C pixel Y
+            skip $12
 endstruct
 
 ; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),

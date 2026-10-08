@@ -1052,12 +1052,11 @@ C2Scene_LayerVramMaps:
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
 ; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
-;   ($C2:173C) and unmatched ($C2:3702, $C2:3709, $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93,
-;   $C2:4F9A, $C2:785B).
-; Callers note (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
-;   C2Script_ScrollLayerFrames ($C2:173C); unmatched: $C2:3702, $C2:3709,
-;   $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and
-;   $C2:785B (xref rates $38FB and $3902 doubtful; they are real calls).
+;   ($C2:173C), C2Scene_LeaderStep ($C2:3702, $C2:3709), C2Scene_LeaderBoardX ($C2:38FB, $C2:3902)
+;   and unmatched ($C2:468A, $C2:4691, $C2:4F93, $C2:4F9A, $C2:785B).
+; Callers note: C2Scene_LeaderStep and C2Scene_LeaderBoardX call it for
+;   layers 1 and 2 with the leader's X velocity, so the view follows the
+;   walking leader.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
 ;        DB=$00 (absolute C2Scene_BgTileX and the VRAM queue);
 ;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
@@ -1229,12 +1228,11 @@ C2Scene_Unk0568:
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) loops for good
 ; (.hang). 0 pixels does nothing.
 ; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE), C2Script_ScrollLayerFrames
-;   ($C2:1751) and unmatched ($C2:3717, $C2:371E, $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8,
-;   $C2:4FAF).
-; Callers note (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
-;   C2Script_ScrollLayerFrames ($C2:1751); unmatched: $C2:3717, $C2:371E,
-;   $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF (xref
-;   rates $385B and $3862 doubtful; they are real calls).
+;   ($C2:1751), C2Scene_LeaderStep ($C2:3717, $C2:371E), C2Scene_LeaderBoardY ($C2:385B, $C2:3862)
+;   and unmatched ($C2:469F, $C2:46A6, $C2:4FA8, $C2:4FAF).
+; Callers note: C2Scene_LeaderStep and C2Scene_LeaderBoardY call it for
+;   layers 1 and 2 with the leader's Y velocity, so the view follows the
+;   walking leader.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
 ;        DB=$00 (absolute C2Scene_BgTileY and the VRAM queue);
 ;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
@@ -2649,18 +2647,17 @@ org $C20E1D
 ; adds a frame to the sprite list for a number of frames, and from the
 ; script ops that start one (C2Scene_SetAnim) before moving the task.
 ; Callers (58 JSR sites): C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
-;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F) and unmatched ($C2:3444, $C2:35E0,
-;   $C2:36E2, $C2:3731, $C2:38C0, $C2:3915, $C2:3B3F, $C2:3CD5, $C2:3D36, $C2:3D97, $C2:3E76,
-;   $C2:3EDA, $C2:4340, $C2:4382, $C2:43D2, $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700,
-;   $C2:4723, $C2:481E, $C2:4852, $C2:4870, $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E,
-;   $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008, $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8,
-;   $C2:523E, $C2:525D, $C2:5285, $C2:5553, $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770,
-;   $C2:6834, $C2:6883, $C2:68DD, $C2:719A, $C2:71A9, $C2:71C7, $C2:71D8).
-; Callers note (57 JSR sites, all unmatched except those named): e.g.
-;   C2Script_MoveFrames ($C2:1643), C2Script_WaitAnimating ($C2:18AC),
-;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), $C2:3444,
-;   $C2:35E0 and $C2:6834; $C2:4E1B and $C2:55A2 are
-;   doubtful byte patterns.
+;   C2Script_MoveToX ($C2:19B6), C2Script_MoveToY ($C2:1A1F), C2Scene_LeaderWalk ($C2:3444),
+;   C2Scene_LeaderInput ($C2:35E0, $C2:36E2), C2Scene_LeaderStep ($C2:3731), C2Scene_LeaderBoardY
+;   ($C2:38C0), C2Scene_LeaderBoardX ($C2:3915), C2Scene_MemberWalk ($C2:3B3F), C2Scene_MemberFollow
+;   ($C2:3CD5), C2Scene_MemberMoveX ($C2:3D36), C2Scene_MemberMoveY ($C2:3D97), C2Scene_MemberBoardX
+;   ($C2:3E76), C2Scene_MemberBoardY ($C2:3EDA) and unmatched ($C2:4340, $C2:4382, $C2:43D2,
+;   $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700, $C2:4723, $C2:481E, $C2:4852, $C2:4870,
+;   $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E, $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008,
+;   $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8, $C2:523E, $C2:525D, $C2:5285, $C2:5553,
+;   $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770, $C2:6834, $C2:6883, $C2:68DD, $C2:719A,
+;   $C2:71A9, $C2:71C7, $C2:71D8).
+; Callers note: xref also lists a doubtful byte pattern at $C2:4E1B.
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; X = the task; A, Y clobbered; C as the last handler
@@ -2925,13 +2922,12 @@ C2Anim_OpEnd:
 ; (inferred from the carry chain: the fraction words are added first and
 ; carry into the whole ones). No wrap here; C2Scene_WrapTaskPos does that.
 ; Callers (22 JSR sites): C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
-;   C2Script_ScrollLayerFrames ($C2:172B) and unmatched ($C2:36F1, $C2:383B, $C2:38C9, $C2:3D02,
-;   $C2:3D63, $C2:3E23, $C2:3E87, $C2:4454, $C2:4679, $C2:4D90, $C2:4F82, $C2:5002, $C2:5166,
-;   $C2:5235, $C2:5254, $C2:554D, $C2:55DC, $C2:7734, $C2:7824).
-; Callers note (21 JSR sites, all unmatched except those listed): e.g.
-;   C2Script_MoveFrames ($C2:163D), C2Script_ScrollFrames ($C2:167C),
-;   C2Script_ScrollLayerFrames ($C2:172B), $C2:36F1 and $C2:7824;
-;   $C2:46FA and $C2:5254 are doubtful byte patterns.
+;   C2Script_ScrollLayerFrames ($C2:172B), C2Scene_LeaderStep ($C2:36F1), C2Scene_LeaderBoardY
+;   ($C2:383B), C2Scene_LeaderBoardX ($C2:38C9), C2Scene_MemberMoveX ($C2:3D02), C2Scene_MemberMoveY
+;   ($C2:3D63), C2Scene_MemberBoardX ($C2:3E23), C2Scene_MemberBoardY ($C2:3E87) and unmatched
+;   ($C2:4454, $C2:4679, $C2:4D90, $C2:4F82, $C2:5002, $C2:5166, $C2:5235, $C2:5254, $C2:554D,
+;   $C2:55DC, $C2:7734, $C2:7824).
+; Callers note: xref also lists a doubtful byte pattern at $C2:46FA.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -2972,15 +2968,17 @@ C2Scene_TaskMove:
 org $C20F63
 ; $C2:0F63 — C2Scene_TaskRunScript (46 bytes, $0F63–$0F90)
 ; Task handler of the script tasks (C2Scene_TaskSpawnScript and
-; C2Scene_TaskSpawnScriptLow install it); also called by other handlers.
+; C2Scene_TaskSpawnScriptLow install it); also called by other handlers
+; (the party leader's and members' script states).
 ; Runs the task's script from .ScriptPtr/.ScriptBank: calls the handler
 ; of each op from C2Script_OpTable with C2Script_Ptr on the opcode. On
 ; Z=0 it adds A to the pointer, stores it back in .ScriptPtr, zeroes
 ; .OpState (16-bit, so +$33 too) for the next op and goes on; Z=1 ends
 ; the call with the pointer where it is (.ScriptBank is never written).
-; Callers (5 JSR sites): unmatched ($C2:378B, $C2:37A1, $C2:3DBA, $C2:3DC1, $C2:4823).
-; Callers note (5 JSR sites, unmatched): $C2:378B, $C2:37A1, $C2:3DBA,
-;   $C2:3DC1 and $C2:4823; as a task handler, C2Scene_TaskRunAll
+; Callers (5 JSR sites): C2Scene_LeaderScriptStart ($C2:378B), C2Scene_LeaderScriptRun ($C2:37A1),
+;   C2Scene_MemberScriptStart ($C2:3DBA), C2Scene_MemberScriptRun ($C2:3DC1) and unmatched
+;   ($C2:4823).
+; Callers note: as a task handler, also C2Scene_TaskRunAll
 ;   (C2Scene_TaskCallHandler).
 ; Entry: M any (SEP #$20 / REP #$20 here), X=0, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF ($00 from the NMI; the RAM ops read and
@@ -5730,14 +5728,12 @@ C2Scene_NegateYVel:
 ; position moved by less than a map width); .SprY is taken AND
 ; C2Scene_MapHeightMask (the 64 rows: 1024 pixels).
 ; Callers (23 sites: 22 JSR, 1 JMP): C2Script_MoveFrames (JSR $C2:1640), C2Script_MoveToX (JSR
-;   $C2:19B3), C2Script_MoveToY (JSR $C2:1A1C) and unmatched (JSR $C2:36F4, JSR $C2:383E, JSR
-;   $C2:38CC, JSR $C2:3D05, JSR $C2:3D66, JSR $C2:3E26, JSR $C2:3E8A, JSR $C2:4457, JSR $C2:467C,
-;   JSR $C2:46FD, JMP $C2:48E5, JSR $C2:4D93, JSR $C2:4F85, JSR $C2:5005, JSR $C2:5169, JSR
-;   $C2:5238, JSR $C2:5257, JSR $C2:5550, JSR $C2:55C9, JSR $C2:55DF).
-; Callers note (22 call sites, JSR and JMP, all unmatched except those
-;   named): e.g. C2Script_MoveFrames ($C2:1640), C2Script_MoveToX
-;   ($C2:19B3), C2Script_MoveToY ($C2:1A1C), $C2:36F4, JMP at $C2:48E5,
-;   and $C2:55DF; $C2:5257 is a doubtful byte pattern.
+;   $C2:19B3), C2Script_MoveToY (JSR $C2:1A1C), C2Scene_LeaderStep (JSR $C2:36F4),
+;   C2Scene_LeaderBoardY (JSR $C2:383E), C2Scene_LeaderBoardX (JSR $C2:38CC), C2Scene_MemberMoveX
+;   (JSR $C2:3D05), C2Scene_MemberMoveY (JSR $C2:3D66), C2Scene_MemberBoardX (JSR $C2:3E26),
+;   C2Scene_MemberBoardY (JSR $C2:3E8A) and unmatched (JSR $C2:4457, JSR $C2:467C, JSR $C2:46FD, JMP
+;   $C2:48E5, JSR $C2:4D93, JSR $C2:4F85, JSR $C2:5005, JSR $C2:5169, JSR $C2:5238, JSR $C2:5257,
+;   JSR $C2:5550, JSR $C2:55C9, JSR $C2:55DF).
 ; Entry: M=0, X=0, DP=$0000, DB with low WRAM at $0000-$1FFF;
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -5765,17 +5761,15 @@ C2Scene_WrapTaskPos:
 ; entry A of C2SceneRom_AnimTable, .AnimBank = C2SceneRom_AnimBank (the
 ; table's own bank), .AnimTimer = 0. The next C2Anim_Run starts it.
 ; Callers (37 sites: 34 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
-;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC) and unmatched (JSR
-;   $C2:35CD, JMP $C2:397C, JMP $C2:39A7, JSR $C2:3CA7, JSR $C2:3CC7, JSR $C2:4336, JSR $C2:433D,
-;   JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR
-;   $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E,
-;   JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR
-;   $C2:550B, JSR $C2:556A, JSR $C2:559F, JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
-; Callers note (34 call sites, JSR and JMP, all unmatched except those
-;   named): e.g. C2Script_SetAnim ($C2:1614), C2Script_MoveToX
-;   ($C2:1981, $C2:1993), C2Script_MoveToY ($C2:19EA, $C2:19FC), JMP at $C2:397C and $C2:39A7, $C2:7197 and $C2:71C4; xref
-;   also lists doubtful byte patterns at $C2:470F, $C2:48BB, $C2:48C2,
-;   $C2:49B5, $C2:501E and $C2:559F.
+;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC), C2Scene_LeaderInput (JSR
+;   $C2:35CD), C2Scene_SetWalkAnim (JMP $C2:397C), C2Scene_SetStandAnim (JMP $C2:39A7),
+;   C2Scene_MemberFollow (JSR $C2:3CA7, JSR $C2:3CC7) and unmatched (JSR $C2:4336, JSR $C2:433D, JSR
+;   $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B, JSR $C2:499C, JSR $C2:4D11,
+;   JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E, JSR
+;   $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488, JSR $C2:54BC, JSR $C2:550B,
+;   JSR $C2:556A, JSR $C2:559F, JSR $C2:68D3, JSR $C2:7197, JSR $C2:71C4).
+; Callers note: xref also lists doubtful byte patterns at $C2:48BB,
+;   $C2:48C2 and $C2:49B5.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; A = the animation number; C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; X = the task; A = C2SceneRom_AnimBank; Y unchanged
@@ -10141,6 +10135,2919 @@ C2Scene_TrigListAB:
     RTS
 
 ; ============================================================
+; The party leader's task and the walk helpers ($C2:3404–$C2:3AE1)
+; ============================================================
+; C2Scene_LeaderTask is a task handler (C2Scene_TaskRunAll) for the
+; sprite of the first party member: no reference to it is in the bank's
+; code, so like the two watchers above it is probably started from scene
+; data. It follows both watchers' states: while C2Scene_ObjWatch is idle
+; it walks the sprite with the D-pad and keeps the party's position
+; (C2Scene_StartX/Y, and Loc_EntryX/Y in tiles) on it, or, while
+; C2Scene_TrigWatch waits, runs the script C2Scene_MemberWords[0]
+; names. When C2Scene_ObjWatch selects an object it walks the sprite
+; onto it and counts itself in, keeps the party's position on the object
+; while the object is busy, and on leaving puts the sprite at the
+; object's position and counts itself out.
+;
+; Positions are pixels in the 1536 x 1024 scene map (C2Scene_WrapTaskPos).
+; A step is 8 pixels: C2Scene_LeaderInput sets a velocity of one pixel a
+; frame, C2Scene_LeaderStep moves the sprite and scrolls BG1 and BG2 by
+; the same amount (C2Scene_Unk0568 / C2Scene_Unk066C: the view follows
+; the leader) until it reaches C2Scene_WalkTask.TargetX/Y. Before a step
+; C2Scene_GetTileProps reads the property nibbles of the four 8x8 tiles
+; around the target from C2Scene_Unk7000 (one byte per metatile row of
+; two 8x8 tiles, a nibble each, indexed by BG2's metatile numbers): bits
+; 0-1 above the point block the step, and bit 2 in both tiles above it
+; sets C2Scene_TrigFlags bits 0 and 1 (C2Scene_TrigWatch then looks the
+; tile up in the trigger lists).
+;
+; Direct page work bytes of the helpers:
+!C2Scene_AnimChar = !C2Tmp_00          ; in: the leader's character (Party_Members byte)
+!C2Scene_AnimNum = !C2Tmp_01           ; the animation number being built
+!C2Scene_PropX = !C2Tmp_08             ; 16-bit; in: pixel X; then the 8x8 tile column
+!C2Scene_PropY = !C2Tmp_0A             ; 16-bit; in: pixel Y; then the 8x8 tile row
+!C2Scene_PropCol = !C2Tmp_00           ; in to C2Scene_GetTileProp: 8x8 tile column (0-191)
+!C2Scene_PropRow = !C2Tmp_01           ; and row (0-127)
+!C2Scene_PropColBit = !C2Tmp_02        ; column bit 0 (which nibble)
+!C2Scene_PropRowBit = !C2Tmp_03        ; 16-bit: row bit 0 (which byte of the pair; high byte $04 = 0)
+!C2Scene_PropMap = !C2Tmp_10           ; 24-bit: the metatile map
+!C2Scene_PropTable = !C2Tmp_13         ; 24-bit: the property table
+
+; $C2:3404 — C2Scene_LeaderTask (41 bytes, $3404–$342C)
+; Task handler. Does nothing while Party_Members[0] has
+; C2Scene_PartySlotEmpty set. Otherwise zeroes the task's .State when
+; C2Scene_Unk027E differs from C2Scene_Unk027F or C2Scene_Unk0280 from
+; C2Scene_Unk0281 (a watcher has changed state since its last step), and
+; runs the C2Scene_LeaderStates handler of C2Scene_Unk027E (the
+; C2Scene_ObjWatch state).
+; Callers note: none found (see the banner).
+; Entry: M=1, X=0, X = C2Scene_TaskCur = the task (C2Scene_TaskRunAll),
+;        DP=$0000 (TDC for 0), DB=$00 (low WRAM absolute)
+; Exit:  C=0 (the task never ends); otherwise as the state's handler
+; Calls: a C2Scene_LeaderStates handler (JMP (abs,X)).
+C2Scene_LeaderTask:
+    LDA.l !Party_Members
+    BPL .present                ; not C2Scene_PartySlotEmpty
+    CLC
+    RTS
+.present:
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_Unk027E
+    CMP.w !C2Scene_Unk027F
+    BEQ .obj_same
+    STZ.w C2Scene_WalkTask.State,X
+.obj_same:
+    LDA.w !C2Scene_Unk0280
+    CMP.w !C2Scene_Unk0281
+    BEQ .trig_same
+    STZ.w C2Scene_WalkTask.State,X
+.trig_same:
+    TDC                         ; A = DP = 0: B = 0 for the TAX here and in the handlers
+    LDA.w !C2Scene_Unk027E
+    ASL A
+    TAX
+    JMP (C2Scene_LeaderStates,X)
+
+; $C2:342D — C2Scene_LeaderStates (6 words, $342D–$3438)
+; C2Scene_LeaderTask's handler for each C2Scene_Unk027E state 0-5.
+C2Scene_LeaderStates:
+    dw C2Scene_LeaderWalk       ; 0 (C2Scene_ObjWatchStIdle)
+    dw C2Scene_LeaderNone       ; 1
+    dw C2Scene_LeaderOnObjA     ; 2 (C2Scene_ObjWatchStBusyA)
+    dw C2Scene_LeaderOnObjB     ; 3 (C2Scene_ObjWatchStBusyB)
+    dw C2Scene_LeaderBoard      ; 4 (C2Scene_ObjWatchStFull)
+    dw C2Scene_LeaderLeave      ; 5 (C2Scene_ObjWatchStEmpty)
+
+; $C2:3439 — C2Scene_LeaderWalk (36 bytes, $3439–$345C)
+; ObjWatch state 0. Unless C2Scene_Mode is 0 or C2Scene_ModeIdle1 it only
+; runs the animation (C2Anim_Run). Otherwise it runs entry
+; C2Scene_Unk0280 * 4 + .State of C2Scene_LeaderWalkSteps.
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_LeaderTask's TDC),
+;        DP=$0000 (C2Tmp_00), DB=$00 (low WRAM absolute)
+; Exit:  C=0 and C2Anim_Run's state (other modes), or as the step's
+;        handler; C2Tmp_00 = C2Scene_Unk0280 * 8 when a step runs
+; Calls: C2Anim_Run, a C2Scene_LeaderWalkSteps handler (JMP (abs,X)).
+C2Scene_LeaderWalk:
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeIdle1
+    BEQ .walk
+    CMP.b #0
+    BEQ .walk
+    JSR C2Anim_Run
+    CLC
+    RTS
+.walk:
+    LDA.w !C2Scene_Unk0280
+    ASL A                       ; * C2Scene_StepsPerTrigState
+    ASL A
+    ASL A
+    STA.b !C2Tmp_00
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_WalkTask.State,X
+    ASL A
+    ADC.b !C2Tmp_00             ; no CLC: C = .State bit 7, 0 for steps 0-3
+    TAX
+    JMP (C2Scene_LeaderWalkSteps,X)
+
+; $C2:345D — C2Scene_LeaderWalkSteps (8 words, $345D–$346C)
+; C2Scene_LeaderWalk's handler per C2Scene_Unk0280 state (4 words each)
+; and .State. Entries 3 and 7 are 0 (they would jump to $C2:0000); no
+; handler sets .State 3 in either state.
+C2Scene_LeaderWalkSteps:
+    dw C2Scene_LeaderInit       ; state 0 (check), step 0
+    dw C2Scene_LeaderInput      ; step 1 (C2Scene_StepInput)
+    dw C2Scene_LeaderStep       ; step 2
+    dw $0000                    ; step 3: none
+    dw C2Scene_LeaderScriptStart ; state C2Scene_TrigStWait, step 0
+    dw C2Scene_LeaderScriptRun  ; step 1
+    dw C2Scene_LeaderScriptDone ; step 2
+    dw $0000                    ; step 3: none
+
+; $C2:346D — C2Scene_LeaderOnObjA (12 bytes, $346D–$3478)
+; ObjWatch state 2 (C2Scene_ObjWatchStBusyA): the party's position
+; C2Scene_StartX/Y = object A's (C2Scene_ObjAX/Y), every frame; then
+; falls into C2Scene_LeaderNone. The sprite itself is not moved.
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M=1, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  C=0; X = C2Scene_ObjAY; A unchanged
+; No calls.
+C2Scene_LeaderOnObjA:
+    LDX.w !C2Scene_ObjAX
+    STX.w !C2Scene_StartX
+    LDX.w !C2Scene_ObjAY
+    STX.w !C2Scene_StartY
+
+; $C2:3479 — C2Scene_LeaderNone (2 bytes, $3479–$347A)
+; ObjWatch state 1, and the end of C2Scene_LeaderOnObjA: nothing; C=0.
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_LeaderNone:
+    CLC
+    RTS
+
+; $C2:347B — C2Scene_LeaderOnObjB (14 bytes, $347B–$3488)
+; ObjWatch state 3 (C2Scene_ObjWatchStBusyB): as C2Scene_LeaderOnObjA
+; with object B (C2Scene_ObjBX/Y).
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M=1, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  C=0; X = C2Scene_ObjBY; A unchanged
+; No calls.
+C2Scene_LeaderOnObjB:
+    LDX.w !C2Scene_ObjBX
+    STX.w !C2Scene_StartX
+    LDX.w !C2Scene_ObjBY
+    STX.w !C2Scene_StartY
+    CLC
+    RTS
+
+; $C2:3489 — C2Scene_LeaderBoard (10 bytes, $3489–$3492)
+; ObjWatch state 4 (C2Scene_ObjWatchStFull): runs entry .State of
+; C2Scene_LeaderBoardSteps (walk to the selected object, then count in).
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_LeaderTask's TDC),
+;        DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM absolute)
+; Exit:  as the step's handler
+; Calls: a C2Scene_LeaderBoardSteps handler (JMP (abs,X)).
+C2Scene_LeaderBoard:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_WalkTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_LeaderBoardSteps,X)
+
+; $C2:3493 — C2Scene_LeaderBoardSteps (4 words, $3493–$349A)
+; C2Scene_LeaderBoard's handler for .State 0-3.
+C2Scene_LeaderBoardSteps:
+    dw C2Scene_LeaderBoardStart ; 0: aim at the object, start the Y move
+    dw C2Scene_LeaderBoardY     ; 1: move in Y
+    dw C2Scene_LeaderBoardX     ; 2: move in X, then count in
+    dw C2Scene_LeaderBoardDone  ; 3: nothing
+
+; $C2:349B — C2Scene_LeaderLeave (8 bytes, $349B–$34A2)
+; ObjWatch state 5 (C2Scene_ObjWatchStEmpty): runs entry C2Scene_ObjSel
+; of C2Scene_LeaderLeaveTable.
+; Callers note: none direct (C2Scene_LeaderStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_LeaderTask's TDC),
+;        DP any, DB=$00 (low WRAM absolute)
+; Exit:  as the handler
+; Calls: a C2Scene_LeaderLeaveTable handler (JMP (abs,X)).
+C2Scene_LeaderLeave:
+    LDA.w !C2Scene_ObjSel
+    ASL A
+    TAX
+    JMP (C2Scene_LeaderLeaveTable,X)
+
+; $C2:34A3 — C2Scene_LeaderLeaveTable (4 words, $34A3–$34AA)
+; C2Scene_LeaderLeave's handler for C2Scene_ObjSel 0-3.
+C2Scene_LeaderLeaveTable:
+    dw C2Scene_LeaderLeaveNone  ; 0
+    dw C2Scene_LeaderLeaveNone  ; 1
+    dw C2Scene_LeaderLeaveA     ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_LeaderLeaveB     ; 3 (C2Scene_ObjSelB)
+
+; $C2:34AB — C2Scene_LeaderLeaveNone (2 bytes, $34AB–$34AC)
+; No object selected: nothing; C=0.
+; Callers note: none direct (C2Scene_LeaderLeaveTable).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_LeaderLeaveNone:
+    CLC
+    RTS
+
+; $C2:34AD — C2Scene_LeaderLeaveA (32 bytes, $34AD–$34CC, with
+; C2Scene_LeaderLeaveB at $C2:34CD, 43 bytes to $34F7)
+; Leaving object A (B): .State = 0, the sprite and C2Scene_StartX/Y at
+; the object's position (C2Scene_ObjAX/Y, C2Scene_ObjBX/Y), one off the
+; object's flags byte (C2Scene_Unk0294, C2Scene_ObjBFlags: its count,
+; C2Scene_ObjCountMask), .Unk26 = 0, Loc_EntryFacing =
+; C2Scene_FacingDown and Loc_EntryX/Y from the position
+; (C2Scene_SetEntryTile). This runs on every frame of the state, so the
+; count drops by one a frame until C2Scene_ObjWatchEmpty sees it at 0.
+; Callers note: none direct (C2Scene_LeaderLeaveTable).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (DP_Field and
+;        low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A = Loc_EntryY
+; Calls: C2Scene_SetEntryTile.
+C2Scene_LeaderLeaveA:
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_WalkTask.State,X
+    REP #$20
+    LDA.w !C2Scene_ObjAX
+    STA.w C2Scene_Task.SprX,X
+    STA.w !C2Scene_StartX
+    LDA.w !C2Scene_ObjAY
+    STA.w C2Scene_Task.SprY,X
+    STA.w !C2Scene_StartY
+    SEP #$20
+    DEC.w !C2Scene_Unk0294
+    BRA C2Scene_LeaderLeaveB_tail
+
+C2Scene_LeaderLeaveB:           ; header: see C2Scene_LeaderLeaveA
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_WalkTask.State,X
+    REP #$20
+    LDA.w !C2Scene_ObjBX
+    STA.w C2Scene_Task.SprX,X
+    STA.w !C2Scene_StartX
+    LDA.w !C2Scene_ObjBY
+    STA.w C2Scene_Task.SprY,X
+    STA.w !C2Scene_StartY
+    SEP #$20
+    DEC.w !C2Scene_ObjBFlags
+.tail:
+    STZ.w C2Scene_WalkTask.Unk26,X
+    LDA.b #!C2Scene_FacingDown
+    STA.w !DP_Field+!Loc_EntryFacing
+    JSR C2Scene_SetEntryTile
+    CLC
+    RTS
+
+; $C2:34F8 — C2Scene_LeaderInit (111 bytes, $34F8–$3566)
+; Step 0 of TrigWatch state 0: sets the sprite up and falls into
+; C2Scene_LeaderInput. .State = 1; .SprAttr = C2Scene_LeaderAttr1F5 at
+; Loc_Id C2Scene_Loc1F5, else C2Scene_LeaderAttr; .SprTile = 0; the
+; position from C2Scene_StartX/Y; the four velocity words 0;
+; Loc_EntryX/Y from the position (C2Scene_SetEntryTile); .Unk26 = 0;
+; .Facing = Loc_EntryFacing AND C2Scene_FacingMask (not moving); the
+; trail emptied (C2Scene_TrailPos = 0, every entry the start position:
+; C2Scene_TrailFill); the stand animation; the tile properties at the
+; position (C2Scene_GetTileProps), and C2Scene_TrigRecheck and
+; C2Scene_TrigKeep set in C2Scene_TrigFlags when C2Scene_OnTrigTiles
+; says so.
+; Callers note: none direct (C2Scene_LeaderWalkSteps).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$00 (DP_Field and low
+;        WRAM absolute)
+; Exit:  as C2Scene_LeaderInput
+; Calls: C2Scene_SetEntryTile, C2Scene_TrailFill, C2Scene_SetStandAnim,
+;   C2Scene_GetTileProps, C2Scene_OnTrigTiles; then falls into
+;   C2Scene_LeaderInput.
+C2Scene_LeaderInit:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_WalkTask.State,X
+    LDY.w !DP_Field+!Loc_Id
+    CPY.w #!C2Scene_Loc1F5
+    BNE .attr_normal
+    LDA.b #!C2Scene_LeaderAttr1F5
+    BRA .attr_set
+.attr_normal:
+    LDA.b #!C2Scene_LeaderAttr
+.attr_set:
+    STA.w C2Scene_Task.SprAttr,X
+    REP #$20
+    STZ.w C2Scene_Task.SprTile,X
+    LDA.w !C2Scene_StartX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_StartY
+    STA.w C2Scene_Task.SprY,X
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    JSR C2Scene_SetEntryTile    ; M=1
+    STZ.w C2Scene_WalkTask.Unk26,X
+    LDA.w !DP_Field+!Loc_EntryFacing
+    AND.b #!C2Scene_FacingMask
+    STA.w C2Scene_WalkTask.Facing,X
+    STZ.w !C2Scene_TrailPos
+    REP #$20
+    JSR C2Scene_TrailFill
+    LDA.l !Party_Members        ; 16-bit: C2Tmp_01 gets member 2 (unused)
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetStandAnim
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_PropX
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_PropY
+    JSR C2Scene_GetTileProps
+    JSR C2Scene_OnTrigTiles
+    BCC C2Scene_LeaderInput
+    LDA.b #!C2Scene_TrigRecheck|!C2Scene_TrigKeep
+    TSB.w !C2Scene_TrigFlags
+
+; $C2:3567 — C2Scene_LeaderInput (390 bytes, $3567–$36EC)
+; Step 1 of TrigWatch state 0: reads the held buttons (Pad_Unk00F8 and
+; the D-pad in Pad_Unk00F9) in scene mode C2Scene_ModeIdle1 only (in
+; mode 0 it only animates). In this order:
+; - nothing held: idle (below);
+; - bit 7 (Pad_Unk00F8Bit7) with a ListA entry found
+;   (C2Scene_Unk1B32 not negative): mode C2Scene_ModeListA; without one
+;   the button is ignored;
+; - bit 6: mode C2Scene_ModeMenu;
+; - bit 0, once Eng_Unk7F0000 >= Eng_Unk7F0000Min (the test
+;   Field_FadeToBankC2Mode5 makes too): mode C2Scene_ModeMenu9; below
+;   it the button is ignored;
+; - bit 2: mode C2Scene_ModeMode7;
+; - Up, Down, Left, Right (first one held wins): a step (below);
+; - anything else: idle.
+; A new mode is set and the frame then ends as an idle one.
+; Idle: .Facing loses C2Scene_WalkMoving; C2Scene_IdleFrames + 1; below
+; C2Scene_IdleAnimAt the stand animation is set again, at it the
+; C2Scene_AnimIdle animation once (the count then stays at
+; C2Scene_IdleHold/C2Scene_IdleSet); C2Anim_Run.
+; Step: the whole-pixel velocity is set to 1 pixel a frame in the
+; direction (the other axis 0; the fraction words are left as they are)
+; and the walk animation (C2Scene_SetWalkAnim) is started unless it
+; already runs for that facing; C2Scene_IdleFrames = 0. The target is the
+; position 8 pixels on (C2Scene_SetStepTarget, C2Scene_WrapStepTarget)
+; and its tile properties are read (C2Scene_GetTileProps). When
+; C2Scene_TileBlocked says so, the step is dropped: not moving, the four
+; velocity words 0, the properties read again at the position, the
+; stand animation, C2Anim_Run. Otherwise C2Scene_Unk1BF7 = 0, .State = 2
+; and it falls into C2Scene_LeaderStep.
+; Callers note: none direct (C2Scene_LeaderWalkSteps); C2Scene_LeaderInit
+;   falls into it.
+; Entry: M=1, X=0, DP=$0000, DB=$00 (Pad_Unk00F8 and low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y and C2Tmp_00-$03, $08-$15
+;        clobbered (the helpers); or as C2Scene_LeaderStep
+; Calls: C2Scene_SetAnim, C2Scene_SetStandAnim, C2Scene_SetWalkAnim,
+;   C2Scene_SetStepTarget, C2Scene_WrapStepTarget, C2Scene_GetTileProps,
+;   C2Scene_TileBlocked, C2Anim_Run.
+C2Scene_LeaderInput:
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeIdle1
+    BNE .animate
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !Pad_Unk00F8
+    BEQ .idle
+    BIT.w #!Pad_Unk00F8Bit7
+    BNE .button7
+.test_bit6:
+    LDA.w !Pad_Unk00F8
+    BIT.w #!Pad_Unk00F8Bit6
+    BNE .button6
+    BIT.w #!Pad_Unk00F8Bit0
+    BNE .button0
+.test_bit2:
+    REP #$20
+    LDA.w !Pad_Unk00F8
+    BIT.w #!Pad_Unk00F8Bit2
+    BNE .button2
+    BIT.w #!C2Scene_PadUp
+    BEQ .not_up
+    JMP .up
+.not_up:
+    BIT.w #!C2Scene_PadDown
+    BEQ .not_down
+    JMP .down
+.not_down:
+    BIT.w #!C2Scene_PadLeft
+    BEQ .not_left
+    JMP .left
+.not_left:
+    BIT.w #!C2Scene_PadRight
+    BEQ .idle
+    JMP .right
+.idle:
+    SEP #$20
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    STA.w C2Scene_WalkTask.Facing,X
+    INC.w !C2Scene_IdleFrames
+    LDA.w !C2Scene_IdleFrames
+    CMP.b #!C2Scene_IdleAnimAt
+    BCC .stand
+    CMP.b #!C2Scene_IdleSet
+    BEQ .idle_hold
+    LDA.b #!C2Scene_AnimIdle
+    JSR C2Scene_SetAnim
+.idle_hold:
+    LDA.b #!C2Scene_IdleHold
+    STA.w !C2Scene_IdleFrames
+    BRA .animate
+.stand:
+    LDA.l !Party_Members
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetStandAnim
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+.button7:
+    LDA.w !C2Scene_Unk1B32
+    BMI .test_bit6              ; no ListA entry: as if not pressed
+    SEP #$20
+    LDA.b #!C2Scene_ModeListA
+    STA.w !C2Scene_Mode
+    BRA .idle
+.button6:
+    SEP #$20
+    LDA.b #!C2Scene_ModeMenu
+    STA.w !C2Scene_Mode
+    BRA .idle
+.button2:
+    SEP #$20
+    LDA.b #!C2Scene_ModeMode7
+    STA.w !C2Scene_Mode
+    BRA .idle
+.button0:
+    SEP #$20
+    LDA.l !Eng_Unk7F0000
+    CMP.b #!Eng_Unk7F0000Min
+    BCS .menu9
+    JMP .test_bit2
+.menu9:
+    LDA.b #!C2Scene_ModeMenu9
+    STA.w !C2Scene_Mode
+    BRA .idle
+.up:
+    LDA.w #!C2Scene_WholeMinus1
+    STA.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.XVel,X
+    SEP #$20
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    CMP.b #!C2Scene_FacingUp
+    BNE .face_up
+    LDA.w C2Scene_WalkTask.Facing,X
+    BMI .start                  ; already walking up
+.face_up:
+    LDA.b #!C2Scene_WalkMoving|!C2Scene_FacingUp
+    BRA .set_walk
+.down:
+    LDA.w #1
+    STA.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.XVel,X
+    SEP #$20
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    CMP.b #!C2Scene_FacingDown
+    BNE .face_down
+    LDA.w C2Scene_WalkTask.Facing,X
+    BMI .start
+.face_down:
+    LDA.b #!C2Scene_WalkMoving|!C2Scene_FacingDown
+    BRA .set_walk
+.left:
+    LDA.w #!C2Scene_WholeMinus1
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVel,X
+    SEP #$20
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    CMP.b #!C2Scene_FacingLeft
+    BNE .face_left
+    LDA.w C2Scene_WalkTask.Facing,X
+    BMI .start
+.face_left:
+    LDA.b #!C2Scene_WalkMoving|!C2Scene_FacingLeft
+    BRA .set_walk
+.right:
+    LDA.w #1
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVel,X
+    SEP #$20
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    CMP.b #!C2Scene_FacingRight
+    BNE .face_right
+    LDA.w C2Scene_WalkTask.Facing,X
+    BMI .start
+.face_right:
+    LDA.b #!C2Scene_WalkMoving|!C2Scene_FacingRight
+.set_walk:
+    STA.w C2Scene_WalkTask.Facing,X
+    LDA.l !Party_Members
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetWalkAnim
+.start:
+    STZ.w !C2Scene_IdleFrames
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_SetStepTarget
+    JSR C2Scene_WrapStepTarget
+    LDA.w C2Scene_WalkTask.TargetX,X
+    STA.b !C2Scene_PropX
+    LDA.w C2Scene_WalkTask.TargetY,X
+    STA.b !C2Scene_PropY
+    JSR C2Scene_GetTileProps
+    JSR C2Scene_TileBlocked
+    BCC .go
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    STA.w C2Scene_WalkTask.Facing,X
+    REP #$20
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_PropX
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_PropY
+    JSR C2Scene_GetTileProps
+    LDA.l !Party_Members
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetStandAnim
+    JSR C2Anim_Run
+    CLC
+    RTS
+.go:
+    STZ.w !C2Scene_Unk1BF7
+    INC.w C2Scene_WalkTask.State,X
+
+; $C2:36ED — C2Scene_LeaderStep (133 bytes, $36ED–$3771)
+; Step 2 of TrigWatch state 0, one frame of a step: moves the sprite
+; (C2Scene_TaskMove, C2Scene_WrapTaskPos); scrolls BG layers 1 and 2 by
+; .XVel pixels across (C2Scene_Unk0568) and by .YVel pixels down
+; (C2Scene_Unk066C); C2Scene_Unk1BF1/1BF3 = .XVel/.YVel; C2Anim_Run;
+; C2Scene_StartX/Y = the position and Loc_EntryX/Y from it
+; (C2Scene_SetEntryTile). At the target (.TargetX/Y) the position goes
+; into the trail (C2Scene_TrailPush), .State = C2Scene_StepInput, and
+; C2Scene_TrigFlags gets C2Scene_TrigRecheck and C2Scene_TrigKeep set
+; when C2Scene_OnTrigTiles says so (the properties C2Scene_LeaderInput
+; read for the target), else C2Scene_TrigKeep cleared.
+; Callers note: none direct (C2Scene_LeaderWalkSteps); C2Scene_LeaderInput
+;   falls into it.
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (the scroll arguments),
+;        DB=$00 (low WRAM absolute)
+; Exit:  C=0; X = the task; still moving: M=0, A = .SprX or .SprY (the
+;        word that differs); at the target: M=1, A = the TSB or TRB mask;
+;        Y, C2Tmp_00-$1A as the scroll routines leave them
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_Unk0568,
+;   C2Scene_Unk066C, C2Anim_Run, C2Scene_SetEntryTile, C2Scene_TrailPush,
+;   C2Scene_OnTrigTiles.
+C2Scene_LeaderStep:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    SEP #$20
+    LDA.w C2Scene_Task.XVel,X
+    STA.b !C2Scene_ScrollPx
+    LDA.b #1
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk0568
+    LDA.b #2
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk0568
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.YVel,X
+    STA.b !C2Scene_ScrollPx
+    LDA.b #1
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk066C
+    LDA.b #2
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk066C
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.XVel,X
+    STA.w !C2Scene_Unk1BF1
+    LDA.w C2Scene_Task.YVel,X
+    STA.w !C2Scene_Unk1BF3
+    JSR C2Anim_Run
+    REP #$20
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !C2Scene_StartX
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !C2Scene_StartY
+    JSR C2Scene_SetEntryTile
+    REP #$20
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w C2Scene_WalkTask.TargetX,X
+    BNE .done
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w C2Scene_WalkTask.TargetY,X
+    BNE .done
+    JSR C2Scene_TrailPush
+    LDA.b #!C2Scene_StepInput
+    STA.w C2Scene_WalkTask.State,X
+    JSR C2Scene_OnTrigTiles
+    BCC .off
+    LDA.b #!C2Scene_TrigRecheck|!C2Scene_TrigKeep
+    TSB.w !C2Scene_TrigFlags
+    BRA .done
+.off:
+    LDA.b #!C2Scene_TrigKeep
+    TRB.w !C2Scene_TrigFlags
+.done:
+    CLC
+    RTS
+
+; $C2:3772 — C2Scene_LeaderScriptStart (47 bytes, $3772–$37A0)
+; Step 0 of TrigWatch state C2Scene_TrigStWait: while the first
+; C2Scene_MemberWords word is 0, nothing. Then it becomes the task's
+; script (.ScriptPtr; .ScriptBank = the scene script's bank $7F,
+; .ScriptWait = 0), .State = 1, the script runs for this frame
+; (C2Scene_TaskRunScript; its carry is not used) and the tile properties
+; at the position are read (C2Scene_GetTileProps). So the first member
+; word is probably the address of a script for the leader (set by
+; C2Script_SetMemberWord, which the ListD script runs).
+; Callers note: none direct (C2Scene_LeaderWalkSteps).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=0 and A = 0 (no word yet), or M=1 with A, X, Y and
+;        C2Tmp_00-$03, $08-$15 clobbered (the script and the lookup)
+; Calls: C2Scene_TaskRunScript, C2Scene_GetTileProps.
+C2Scene_LeaderScriptStart:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_MemberWords
+    BEQ .done
+    STA.w C2Scene_Task.ScriptPtr,X
+    SEP #$20
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    STA.w C2Scene_Task.ScriptBank,X
+    STZ.w C2Scene_Task.ScriptWait,X
+    INC.w C2Scene_WalkTask.State,X
+    JSR C2Scene_TaskRunScript
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_PropX
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_PropY
+    JSR C2Scene_GetTileProps
+.done:
+    CLC
+    RTS
+
+; $C2:37A1 — C2Scene_LeaderScriptRun (26 bytes, $37A1–$37BA)
+; Step 1 of TrigWatch state C2Scene_TrigStWait: runs the script
+; (C2Scene_TaskRunScript); when it ends (C=1) .State = 2 instead of the
+; task ending. Every frame C2Scene_StartX/Y = the sprite's position.
+; Callers note: none direct (C2Scene_LeaderWalkSteps).
+; Entry: M any, X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task, Y = .SprY; A and the rest as the
+;        script leaves them
+; Calls: C2Scene_TaskRunScript.
+C2Scene_LeaderScriptRun:
+    JSR C2Scene_TaskRunScript
+    BCC .running
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_WalkTask.State,X
+.running:
+    LDX.b !C2Scene_TaskCur
+    LDY.w C2Scene_Task.SprX,X
+    STY.w !C2Scene_StartX
+    LDY.w C2Scene_Task.SprY,X
+    STY.w !C2Scene_StartY
+    CLC
+    RTS
+
+; $C2:37BB — C2Scene_LeaderScriptDone (2 bytes, $37BB–$37BC)
+; Step 2 of TrigWatch state C2Scene_TrigStWait (the script has ended):
+; nothing until a watcher's state changes; C=0.
+; Callers note: none direct (C2Scene_LeaderWalkSteps).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_LeaderScriptDone:
+    CLC
+    RTS
+
+; $C2:37BD — C2Scene_LeaderBoardStart (13 bytes, $37BD–$37C9, with the
+; sub-entries C2Scene_LeaderBoardSel0 $C2:37D2, C2Scene_LeaderBoardSel1
+; $C2:37D6, C2Scene_LeaderBoardObjA $C2:37D8 and C2Scene_LeaderBoardObjB
+; $C2:37E8 to $3836, after the table C2Scene_LeaderBoardTargets)
+; Step 0 of ObjWatch state 4: the target (.TargetX/Y) = the selected
+; object's position (C2Scene_ObjAX/Y or C2Scene_ObjBX/Y, by
+; C2Scene_ObjSel through C2Scene_LeaderBoardTargets); the four velocity
+; words 0; .YVel = -1 and .Facing = C2Scene_FacingUp when the target is
+; above, +1 and C2Scene_FacingDown when below (on the same row both are
+; left as they are); .State = 1; the walk animation
+; (C2Scene_SetWalkAnim); then it falls into C2Scene_LeaderBoardY.
+; Quirks, kept: with C2Scene_ObjSel 0 the target is not set (the last
+; one is used); with 1 (never set by the matched code) the LDX of the
+; task is skipped too, so X = 2 and the stores and the INC go to
+; $00:001C-$002A and $00:0004 instead of the task.
+; Callers note: none direct (C2Scene_LeaderBoardSteps).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  as C2Scene_LeaderBoardY
+; Calls: C2Scene_SetWalkAnim; then falls into C2Scene_LeaderBoardY.
+C2Scene_LeaderBoardStart:
+    REP #$20
+    LDA.w !C2Scene_ObjSel
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    JMP (C2Scene_LeaderBoardTargets,X)
+
+; $C2:37CA — C2Scene_LeaderBoardTargets (4 words, $37CA–$37D1)
+; C2Scene_LeaderBoardStart's code for C2Scene_ObjSel 0-3.
+C2Scene_LeaderBoardTargets:
+    dw C2Scene_LeaderBoardSel0  ; 0
+    dw C2Scene_LeaderBoardSel1  ; 1
+    dw C2Scene_LeaderBoardObjA  ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_LeaderBoardObjB  ; 3 (C2Scene_ObjSelB)
+
+C2Scene_LeaderBoardSel0:        ; header: see C2Scene_LeaderBoardStart
+    LDX.b !C2Scene_TaskCur
+    BRA C2Scene_LeaderBoardObjB_aim
+
+C2Scene_LeaderBoardSel1:        ; header: see C2Scene_LeaderBoardStart
+    BRA C2Scene_LeaderBoardObjB_aim ; quirk: X = 2 (see the header)
+
+C2Scene_LeaderBoardObjA:        ; header: see C2Scene_LeaderBoardStart
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_ObjAX
+    STA.w C2Scene_WalkTask.TargetX,X
+    LDA.w !C2Scene_ObjAY
+    STA.w C2Scene_WalkTask.TargetY,X
+    BRA C2Scene_LeaderBoardObjB_aim
+
+C2Scene_LeaderBoardObjB:        ; header: see C2Scene_LeaderBoardStart
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_ObjBX
+    STA.w C2Scene_WalkTask.TargetX,X
+    LDA.w !C2Scene_ObjBY
+    STA.w C2Scene_WalkTask.TargetY,X
+.aim:
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    SEC
+    LDA.w C2Scene_WalkTask.TargetY,X
+    SBC.w C2Scene_Task.SprY,X
+    SEP #$20
+    BEQ .aimed                  ; flags of the 16-bit difference
+    BPL .down
+    LDA.b #!C2Scene_WholeMinus1&$FF
+    STA.w C2Scene_Task.YVel,X
+    STA.w C2Scene_Task.YVel+1,X
+    LDA.b #!C2Scene_FacingUp
+    STA.w C2Scene_WalkTask.Facing,X
+    BRA .aimed
+.down:
+    LDA.b #1
+    STA.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.YVel+1,X
+    LDA.b #!C2Scene_FacingDown
+    STA.w C2Scene_WalkTask.Facing,X
+.aimed:
+    INC.w C2Scene_WalkTask.State,X
+    LDA.l !Party_Members
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetWalkAnim
+
+; $C2:3837 — C2Scene_LeaderBoardY (142 bytes, $3837–$38C4)
+; Step 1 of ObjWatch state 4: moves the sprite (C2Scene_TaskMove,
+; C2Scene_WrapTaskPos); C2Scene_StartX/Y and Loc_EntryX/Y from the
+; position (C2Scene_SetEntryTile); BG layers 1 and 2 scrolled by .YVel
+; (C2Scene_Unk066C); C2Scene_Unk1BF1/1BF3 = .XVel/.YVel. On the target's
+; row: the velocity words 0, .XVel = -1 and .Facing = C2Scene_FacingLeft
+; when the target is left, +1 and C2Scene_FacingRight when right (in the
+; same column both are left as they are), .State = 2 and the walk
+; animation (C2Scene_SetWalkAnim). Then C2Anim_Run.
+; Callers note: none direct (C2Scene_LeaderBoardSteps);
+;   C2Scene_LeaderBoardStart falls into it.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y and C2Tmp_00-$1A clobbered
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_SetEntryTile,
+;   C2Scene_Unk066C, C2Scene_SetWalkAnim, C2Anim_Run.
+C2Scene_LeaderBoardY:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    LDX.b !C2Scene_TaskCur
+    LDY.w C2Scene_Task.SprX,X
+    STY.w !C2Scene_StartX
+    LDY.w C2Scene_Task.SprY,X
+    STY.w !C2Scene_StartY
+    JSR C2Scene_SetEntryTile
+    LDA.w C2Scene_Task.YVel,X
+    STA.b !C2Scene_ScrollPx
+    LDA.b #1
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk066C
+    LDA.b #2
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk066C
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.XVel,X
+    STA.w !C2Scene_Unk1BF1
+    LDA.w C2Scene_Task.YVel,X
+    STA.w !C2Scene_Unk1BF3
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w C2Scene_WalkTask.TargetY,X
+    BNE .animate
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    SEC
+    LDA.w C2Scene_WalkTask.TargetX,X
+    SBC.w C2Scene_Task.SprX,X
+    SEP #$20
+    BEQ .aimed                  ; flags of the 16-bit difference
+    BPL .right
+    LDA.b #!C2Scene_WholeMinus1&$FF
+    STA.w C2Scene_Task.XVel,X
+    STA.w C2Scene_Task.XVel+1,X
+    LDA.b #!C2Scene_FacingLeft
+    STA.w C2Scene_WalkTask.Facing,X
+    BRA .aimed
+.right:
+    LDA.b #1
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.XVel+1,X
+    LDA.b #!C2Scene_FacingRight
+    STA.w C2Scene_WalkTask.Facing,X
+.aimed:
+    INC.w C2Scene_WalkTask.State,X
+    LDA.l !Party_Members
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetWalkAnim
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:38C5 — C2Scene_LeaderBoardX (85 bytes, $38C5–$3919)
+; Step 2 of ObjWatch state 4: moves the sprite (C2Scene_TaskMove,
+; C2Scene_WrapTaskPos); at the target's X, .State = 3 and the object's
+; count goes up by one (C2Scene_ObjCountUp). C2Scene_StartX/Y and
+; Loc_EntryX/Y from the position (C2Scene_SetEntryTile); BG layers 1 and
+; 2 scrolled by .XVel (C2Scene_Unk0568); C2Scene_Unk1BF1/1BF3 =
+; .XVel/.YVel; C2Anim_Run.
+; Callers note: none direct (C2Scene_LeaderBoardSteps).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y and C2Tmp_00-$1A clobbered
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_ObjCountUp,
+;   C2Scene_SetEntryTile, C2Scene_Unk0568, C2Anim_Run.
+C2Scene_LeaderBoardX:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w C2Scene_WalkTask.TargetX,X
+    BNE .move
+    SEP #$20
+    INC.w C2Scene_WalkTask.State,X
+    JSR C2Scene_ObjCountUp
+.move:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDY.w C2Scene_Task.SprX,X
+    STY.w !C2Scene_StartX
+    LDY.w C2Scene_Task.SprY,X
+    STY.w !C2Scene_StartY
+    JSR C2Scene_SetEntryTile
+    LDA.w C2Scene_Task.XVel,X
+    STA.b !C2Scene_ScrollPx
+    LDA.b #1
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk0568
+    LDA.b #2
+    STA.b !C2Scene_ScrollLayer
+    JSR C2Scene_Unk0568
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.XVel,X
+    STA.w !C2Scene_Unk1BF1
+    LDA.w C2Scene_Task.YVel,X
+    STA.w !C2Scene_Unk1BF3
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:391A — C2Scene_LeaderBoardDone (2 bytes, $391A–$391B)
+; Step 3 of ObjWatch state 4 (counted in): nothing; C=0.
+; Callers note: none direct (C2Scene_LeaderBoardSteps).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_LeaderBoardDone:
+    CLC
+    RTS
+
+; $C2:391C — C2Scene_TrailFill (24 bytes, $391C–$3933)
+; Fills all C2Scene_TrailLen entries of C2Scene_TrailX/Y with
+; C2Scene_StartX/Y.
+; Callers (1 JSR site): C2Scene_LeaderInit ($C2:3540).
+; Entry: M=0, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = C2Scene_StartY, X = 2 * C2Scene_TrailLen, Y = 0
+; No calls.
+C2Scene_TrailFill:
+    LDY.w #!C2Scene_TrailLen
+    LDX.w #0
+.next:
+    LDA.w !C2Scene_StartX
+    STA.w !C2Scene_TrailX,X
+    LDA.w !C2Scene_StartY
+    STA.w !C2Scene_TrailY,X
+    INX
+    INX
+    DEY
+    BNE .next
+    RTS
+
+; $C2:3934 — C2Scene_TrailPush (31 bytes, $3934–$3952)
+; Stores the task's .SprX/.SprY at C2Scene_TrailPos in C2Scene_TrailX/Y
+; and moves C2Scene_TrailPos one word on (wrapping after 16).
+; Callers (1 JSR site): C2Scene_LeaderStep ($C2:3757).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=1, X=0; A = the new C2Scene_TrailPos (B = 0), Y = the old one
+;        + 2; X unchanged
+; No calls.
+C2Scene_TrailPush:
+    LDA.w !C2Scene_TrailPos
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !C2Scene_TrailX,Y
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !C2Scene_TrailY,Y
+    INY
+    INY
+    TYA
+    AND.w #!C2Scene_TrailMask
+    SEP #$20
+    STA.w !C2Scene_TrailPos
+    RTS
+
+; $C2:3953 — C2Scene_SetWalkAnim (44 bytes, $3953–$397E)
+; Starts the walk animation of the task's facing: entry .Facing * 2 (bit
+; 7 shifted out) + .Unk26 bit 0 of C2Scene_WalkAnims, C2Scene_AltAnimOfs
+; further on when C2Scene_AnimChar is C2Scene_AltAnimChar
+; (C2Scene_SetAnim, tail call).
+; Callers (4 JSR sites): C2Scene_LeaderInput ($C2:3694), C2Scene_LeaderBoardObjB ($C2:3834),
+;   C2Scene_LeaderBoardY ($C2:38BD) and C2Scene_MemberWalkAnim ($C2:41B1).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00/$01; TDC for
+;        0), DB=$00 (low WRAM absolute); C2Scene_AnimChar set;
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_SetAnim: M=1, X=0; X = the task; Y unchanged;
+;        C2Scene_AnimNum = the animation
+; Calls: C2Scene_SetAnim (JMP).
+C2Scene_SetWalkAnim:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    TDC                         ; B = 0 for the TAX
+    LDA.w C2Scene_WalkTask.Facing,X
+    ASL A
+    STA.b !C2Scene_AnimNum
+    LDA.w C2Scene_WalkTask.Unk26,X
+    AND.b #1
+    CLC
+    ADC.b !C2Scene_AnimNum
+    TAX
+    LDA.l C2Scene_WalkAnims,X
+    STA.b !C2Scene_AnimNum
+    LDA.b !C2Scene_AnimChar
+    CMP.b #!C2Scene_AltAnimChar
+    BNE .set
+    CLC
+    LDA.b !C2Scene_AnimNum
+    ADC.b #!C2Scene_AltAnimOfs
+    STA.b !C2Scene_AnimNum
+.set:
+    LDA.b !C2Scene_AnimNum
+    JMP C2Scene_SetAnim
+
+; $C2:397F — C2Scene_WalkAnims (8 bytes, $397F–$3986)
+; Walk animation numbers (C2Scene_SetAnim), two per facing: up, down,
+; left, right. Each sits next to the facing's stand animation in
+; C2Scene_StandAnims (stand n, walk n+1 and n+2).
+C2Scene_WalkAnims:
+    db $04,$05                  ; C2Scene_FacingUp
+    db $01,$02                  ; C2Scene_FacingDown
+    db $07,$08                  ; C2Scene_FacingLeft
+    db $0A,$0B                  ; C2Scene_FacingRight
+
+; $C2:3987 — C2Scene_SetStandAnim (35 bytes, $3987–$39A9)
+; Starts the stand animation of the task's facing: entry .Facing AND
+; C2Scene_FacingMask of C2Scene_StandAnims, C2Scene_AltAnimOfs further
+; on for C2Scene_AltAnimChar, as C2Scene_SetWalkAnim.
+; Callers (5 sites: 4 JSR, 1 JMP): C2Scene_LeaderInit (JSR $C2:3549), C2Scene_LeaderInput (JSR
+;   $C2:35DD, JSR $C2:36DF), C2Scene_MemberWalk (JSR $C2:3B3C) and C2Scene_MemberStand (JMP
+;   $C2:4181).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00/$01; TDC for
+;        0), DB=$00 (low WRAM absolute); C2Scene_AnimChar set;
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_SetAnim: M=1, X=0; X = the task; Y unchanged;
+;        C2Scene_AnimNum = the animation
+; Calls: C2Scene_SetAnim (JMP).
+C2Scene_SetStandAnim:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    TDC                         ; B = 0 for the TAX
+    LDA.w C2Scene_WalkTask.Facing,X
+    AND.b #!C2Scene_FacingMask
+    TAX
+    LDA.l C2Scene_StandAnims,X
+    STA.b !C2Scene_AnimNum
+    LDA.b !C2Scene_AnimChar
+    CMP.b #!C2Scene_AltAnimChar
+    BNE .set
+    CLC
+    LDA.b !C2Scene_AnimNum
+    ADC.b #!C2Scene_AltAnimOfs
+    STA.b !C2Scene_AnimNum
+.set:
+    LDA.b !C2Scene_AnimNum
+    JMP C2Scene_SetAnim
+
+; $C2:39AA — C2Scene_StandAnims (4 bytes, $39AA–$39AD)
+; Stand animation numbers per facing: up, down, left, right.
+C2Scene_StandAnims:
+    db $03,$00,$06,$09
+
+; $C2:39AE — C2Scene_OnTrigTiles (21 bytes, $39AE–$39C2)
+; C=1 when both upper property nibbles (.PropUL, .PropUR) have bit 2
+; set (C2Scene_TilePropTrig); its callers then set C2Scene_TrigRecheck
+; and C2Scene_TrigKeep.
+; Callers (2 JSR sites): C2Scene_LeaderInit ($C2:355D) and C2Scene_LeaderStep ($C2:375F).
+; Callers note: xref also lists a doubtful byte pattern at $C2:4E2E.
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM absolute); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C as above; X = the task; A = the masked word
+; No calls.
+C2Scene_OnTrigTiles:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_WalkTask.PropUL,X
+    AND.w #!C2Scene_TilePropTrig
+    CMP.w #!C2Scene_TilePropTrig
+    SEP #$20
+    BNE .no
+    SEC
+    RTS
+.no:
+    CLC
+    RTS
+
+; $C2:39C3 — C2Scene_TileBlocked (18 bytes, $39C3–$39D4)
+; C=1 when either upper property nibble (.PropUL, .PropUR) has bit 0 or
+; 1 set (C2Scene_TilePropWall): the step is not taken.
+; Callers (1 JSR site): C2Scene_LeaderInput ($C2:36B1).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (low WRAM absolute); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C as above; X = the task; A = the masked word
+; No calls.
+C2Scene_TileBlocked:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_WalkTask.PropUL,X
+    AND.w #!C2Scene_TilePropWall
+    SEP #$20
+    BEQ .free
+    SEC
+    RTS
+.free:
+    CLC
+    RTS
+
+; $C2:39D5 — C2Scene_GetTileProps (129 bytes, $39D5–$3A55)
+; Reads the property nibbles of the four 8x8 tiles around the pixel point
+; (C2Scene_PropX, C2Scene_PropY) into the task's .PropUL-.PropDR
+; (C2Scene_GetTileProp, with BG2's metatile map at $7E:5800 and the
+; property table C2Scene_Unk7000). The point's 8x8 column and row are
+; X / 8 and Y / 8; the tiles are (column - 1, row - 1), (column, row -
+; 1), (column - 1, row) and (column, row), with column - 1 wrapping to
+; C2Scene_MapTilesX - 1 and row - 1 kept in 0-127.
+; Callers (11 JSR sites): C2Scene_LeaderInit ($C2:355A), C2Scene_LeaderInput ($C2:36AE, $C2:36D6),
+;   C2Scene_LeaderScriptStart ($C2:379C) and unmatched ($C2:437C, $C2:4413, $C2:4669, $C2:486A,
+;   $C2:4D59, $C2:4F31, $C2:4F70).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Tmp_00-$04, $08-$15),
+;        DB=$00 (WRMPYA/B and RDMPYL absolute, for the lookups);
+;        C2Scene_PropX/Y set; C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; A = .PropDR; Y as C2Scene_GetTileProp
+;        leaves it; C2Scene_PropX/Y = the column and row;
+;        C2Scene_PropMap/PropTable set; C2Tmp_00-$04 changed
+; Calls: C2Scene_GetTileProp.
+C2Scene_GetTileProps:
+    REP #$20
+    LDA.b !C2Scene_PropX
+    LSR A                       ; / C2Scene_TilePx
+    LSR A
+    LSR A
+    STA.b !C2Scene_PropX
+    LDA.b !C2Scene_PropY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_PropY
+    SEP #$20
+    LDY.w #(!C2Scene_BgMaps+!C2Scene_MapBytes)&$FFFF ; layer 2's map
+    STY.b !C2Scene_PropMap
+    LDA.b #bank(!C2Scene_BgMaps)
+    STA.b !C2Scene_PropMap+2
+    LDY.w #!C2Scene_Unk7000&$FFFF
+    STY.b !C2Scene_PropTable
+    LDA.b #bank(!C2Scene_Unk7000)
+    STA.b !C2Scene_PropTable+2
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.b !C2Scene_PropX
+    DEC A
+    BPL .ul_col
+    LDA.w #!C2Scene_MapTilesX-1
+.ul_col:
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_PropY
+    DEC A
+    AND.w #!C2Scene_MapTilesY-1
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_WalkTask.PropUL,X
+    LDA.b !C2Scene_PropX
+    STA.b !C2Scene_PropCol
+    REP #$20
+    LDA.b !C2Scene_PropY
+    DEC A
+    AND.w #!C2Scene_MapTilesY-1
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_WalkTask.PropUR,X
+    REP #$20
+    LDA.b !C2Scene_PropX
+    DEC A
+    BPL .dl_col
+    LDA.w #!C2Scene_MapTilesX-1
+.dl_col:
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_PropY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_WalkTask.PropDL,X
+    LDA.b !C2Scene_PropX
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_PropY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_WalkTask.PropDR,X
+    RTS
+
+; $C2:3A56 — C2Scene_SetStepTarget (57 bytes, $3A56–$3A8E)
+; .TargetX/Y = the task's position, moved C2Scene_TilePx (8) pixels in
+; the direction of each non-zero whole-pixel velocity (.XVel, .YVel;
+; minus for a negative one).
+; Callers (3 JSR sites): C2Scene_LeaderInput ($C2:369E) and unmatched ($C2:4659, $C2:4F21).
+; Entry: M=0, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM
+;        absolute); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; Y = .YVel; A = the Y step or the new
+;        .TargetY
+; No calls.
+C2Scene_SetStepTarget:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    STA.w C2Scene_WalkTask.TargetX,X
+    LDA.w C2Scene_Task.SprY,X
+    STA.w C2Scene_WalkTask.TargetY,X
+    LDA.w #!C2Scene_TilePx
+    LDY.w C2Scene_Task.XVel,X
+    BEQ .y
+    BPL .add_x
+    LDA.w #-!C2Scene_TilePx
+.add_x:
+    CLC
+    ADC.w C2Scene_WalkTask.TargetX,X
+    STA.w C2Scene_WalkTask.TargetX,X
+.y:
+    LDA.w #!C2Scene_TilePx
+    LDY.w C2Scene_Task.YVel,X
+    BEQ .done
+    BPL .add_y
+    LDA.w #-!C2Scene_TilePx
+.add_y:
+    CLC
+    ADC.w C2Scene_WalkTask.TargetY,X
+    STA.w C2Scene_WalkTask.TargetY,X
+.done:
+    RTS
+
+; $C2:3A8F — C2Scene_WrapStepTarget (34 bytes, $3A8F–$3AB0)
+; Wraps .TargetX/Y into the scene map as C2Scene_WrapTaskPos does the
+; position: X + or - C2Scene_MapWidthPx (once), Y AND
+; C2Scene_MapHeightMask.
+; Callers (3 JSR sites): C2Scene_LeaderInput ($C2:36A1) and unmatched ($C2:465C, $C2:4F24).
+; Entry: M=0, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM
+;        absolute); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .TargetY; Y unchanged
+; No calls.
+C2Scene_WrapStepTarget:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_WalkTask.TargetX,X
+    BPL .not_negative
+    CLC
+    ADC.w #!C2Scene_MapWidthPx
+    BRA .store_x
+.not_negative:
+    CMP.w #!C2Scene_MapWidthPx
+    BCC .store_x
+    SBC.w #!C2Scene_MapWidthPx
+.store_x:
+    STA.w C2Scene_WalkTask.TargetX,X
+    LDA.w C2Scene_WalkTask.TargetY,X
+    AND.w #!C2Scene_MapHeightMask
+    STA.w C2Scene_WalkTask.TargetY,X
+    RTS
+
+; $C2:3AB1 — C2Scene_ObjCountUp (9 bytes, $3AB1–$3AB9, with the handlers
+; C2Scene_ObjCountUpNone $C2:3AC2, C2Scene_ObjCountUpA $C2:3AC3 and
+; C2Scene_ObjCountUpB $C2:3AC7 to $3ACA after the table)
+; Adds one to the selected object's flags byte (its count,
+; C2Scene_ObjCountMask): C2Scene_Unk0294 for C2Scene_ObjSelA,
+; C2Scene_ObjBFlags for C2Scene_ObjSelB, nothing for 0 and 1. A party
+; member has got on (C2Scene_ObjWatchFull compares the count with the
+; party's).
+; Callers (3 JSR sites): C2Scene_LeaderBoardX ($C2:38DC), C2Scene_MemberBoardX ($C2:3E5E) and
+;   C2Scene_MemberBoardY ($C2:3EC2).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (low WRAM absolute)
+; Exit:  M=1, X=0; A = C2Scene_ObjSel * 2 (B = 0), X the same
+; No calls.
+C2Scene_ObjCountUp:
+    TDC                         ; B = 0 for the TAX
+    LDA.w !C2Scene_ObjSel
+    ASL A
+    TAX
+    JMP (C2Scene_ObjCountUpTable,X)
+
+; $C2:3ABA — C2Scene_ObjCountUpTable (4 words, $3ABA–$3AC1)
+; C2Scene_ObjCountUp's handler for C2Scene_ObjSel 0-3.
+C2Scene_ObjCountUpTable:
+    dw C2Scene_ObjCountUpNone   ; 0
+    dw C2Scene_ObjCountUpNone   ; 1
+    dw C2Scene_ObjCountUpA      ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_ObjCountUpB      ; 3 (C2Scene_ObjSelB)
+
+C2Scene_ObjCountUpNone:         ; header: see C2Scene_ObjCountUp
+    RTS
+
+C2Scene_ObjCountUpA:            ; header: see C2Scene_ObjCountUp
+    INC.w !C2Scene_Unk0294
+    RTS
+
+C2Scene_ObjCountUpB:            ; header: see C2Scene_ObjCountUp
+    INC.w !C2Scene_ObjBFlags
+    RTS
+
+; $C2:3ACB — C2Scene_SetEntryTile (23 bytes, $3ACB–$3AE1)
+; Loc_EntryX/Y = C2Scene_StartX/Y / 8 (the party's 8x8 tile; the inverse
+; of C2Scene_SetStartPos). The X store is a word, so it writes
+; Loc_EntryY too before the Y store replaces it.
+; Callers (5 JSR sites): C2Scene_LeaderLeaveB ($C2:34F3), C2Scene_LeaderInit ($C2:352D),
+;   C2Scene_LeaderStep ($C2:3742), C2Scene_LeaderBoardY ($C2:384F) and C2Scene_LeaderBoardX
+;   ($C2:38EF).
+; Callers note: the C2Scene_LeaderLeaveB site is the tail that C2Scene_LeaderLeaveA
+;   branches into, so it serves both.
+; Entry: M any (REP #$20 here), X=0, DP any, DB=$00 (DP_Field and low
+;        WRAM absolute)
+; Exit:  M=1, X=0; A = C2Scene_StartY / 8 (B its high byte); X, Y
+;        unchanged
+; No calls.
+C2Scene_SetEntryTile:
+    REP #$20
+    LDA.w !C2Scene_StartX
+    LSR A
+    LSR A
+    LSR A
+    STA.w !DP_Field+!Loc_EntryX
+    LDA.w !C2Scene_StartY
+    LSR A
+    LSR A
+    LSR A
+    SEP #$20
+    STA.w !DP_Field+!Loc_EntryY
+    RTS
+
+; ============================================================
+; The other party members' task ($C2:3AE2–$C2:42DC)
+; ============================================================
+; C2Scene_MemberTask is the task handler of the sprites of party slots 1
+; and 2 (C2Scene_FollowTask.Slot); like C2Scene_LeaderTask it has no
+; reference in the bank's code. While C2Scene_ObjWatch is idle the
+; member follows the leader: every C2Scene_FollowWait frames (when not
+; already within 16 or 32 pixels of the party's position) it picks a
+; point of the leader's trail (C2Scene_TrailX/Y: the last step for slot
+; 1, the one before for slot 2) and walks there in at most two legs, one
+; per axis, first trying the order whose straight lines cross no wall
+; tile (C2Scene_PathBlocked). While C2Scene_TrigWatch waits it runs its
+; C2Scene_MemberWords script; when an object is selected it walks to the
+; leader's position and counts itself in, and on leaving it is put at
+; the object's position.
+;
+; Direct page work bytes:
+!C2Scene_NearTop = !C2Tmp_00           ; 16-bit: the box C2Scene_LeaderNear16/32 test
+!C2Scene_NearBottom = !C2Tmp_02
+!C2Scene_NearLeft = !C2Tmp_04
+!C2Scene_NearRight = !C2Tmp_06
+!C2Scene_NearX = !C2Tmp_08             ; 16-bit: the party's position
+!C2Scene_NearY = !C2Tmp_0A
+!C2Scene_RouteFromX = !C2Tmp_08        ; 8x8 tile column of the member (C2Scene_PathBlocked's input)
+!C2Scene_RouteToX = !C2Tmp_09          ; and of the point it goes to
+!C2Scene_RouteFromY = !C2Tmp_0A        ; tile rows
+!C2Scene_RouteToY = !C2Tmp_0B
+!C2Scene_RouteAbsDX = !C2Tmp_08        ; 16-bit |.DeltaX| (C2Scene_MemberRouteOpen)
+!C2Scene_ScanX = !C2Tmp_05             ; C2Scene_ScanRow/ScanCol: the column and row walked along
+!C2Scene_ScanY = !C2Tmp_06
+!C2Scene_ScanEnd = !C2Tmp_07           ; the column (row) the scan ends at
+!C2Scene_PathResult = !C2Tmp_0E        ; C2Scene_PathXYBlocked / C2Scene_PathYXBlocked
+!C2Scene_TrailLeft = !C2Tmp_16         ; C2Scene_MemberRouteTrail: trail entries still to try
+!C2Scene_TrailIdx = !C2Tmp_19          ; 16-bit byte offset of the trail entry tried
+!C2Scene_TrailResult = !C2Tmp_1B       ; its C2Scene_PathBlocked result
+
+; $C2:3AE2 — C2Scene_MemberTask (45 bytes, $3AE2–$3B0E)
+; Task handler. Does nothing while the Party_Members byte of .Slot has
+; C2Scene_PartySlotEmpty set. Otherwise zeroes .State when a watcher's
+; state has changed (as C2Scene_LeaderTask) and runs the
+; C2Scene_MemberStates handler of C2Scene_Unk027E.
+; Callers note: none found (see the banner).
+; Entry: M=1, X=0, X = C2Scene_TaskCur = the task (C2Scene_TaskRunAll),
+;        DP=$0000 (TDC for 0), DB=$00 (low WRAM absolute)
+; Exit:  C=0 (the task never ends); otherwise as the state's handler
+; Calls: a C2Scene_MemberStates handler (JMP (abs,X)).
+C2Scene_MemberTask:
+    TDC                         ; A = DP = 0: B = 0 for the TAX here and in the handlers
+    LDA.w C2Scene_FollowTask.Slot,X
+    TAX
+    LDA.l !Party_Members,X
+    BPL .present                ; not C2Scene_PartySlotEmpty
+    CLC
+    RTS
+.present:
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_Unk027E
+    CMP.w !C2Scene_Unk027F
+    BEQ .obj_same
+    STZ.w C2Scene_FollowTask.State,X
+.obj_same:
+    LDA.w !C2Scene_Unk0280
+    CMP.w !C2Scene_Unk0281
+    BEQ .trig_same
+    STZ.w C2Scene_FollowTask.State,X
+.trig_same:
+    LDA.w !C2Scene_Unk027E
+    ASL A
+    TAX
+    JMP (C2Scene_MemberStates,X)
+
+; $C2:3B0F — C2Scene_MemberStates (6 words, $3B0F–$3B1A)
+; C2Scene_MemberTask's handler for each C2Scene_Unk027E state 0-5.
+C2Scene_MemberStates:
+    dw C2Scene_MemberWalk       ; 0 (C2Scene_ObjWatchStIdle)
+    dw C2Scene_MemberNone       ; 1
+    dw C2Scene_MemberNone       ; 2 (C2Scene_ObjWatchStBusyA)
+    dw C2Scene_MemberNone       ; 3 (C2Scene_ObjWatchStBusyB)
+    dw C2Scene_MemberBoard      ; 4 (C2Scene_ObjWatchStFull)
+    dw C2Scene_MemberLeave      ; 5 (C2Scene_ObjWatchStEmpty)
+
+; $C2:3B1B — C2Scene_MemberWalk (61 bytes, $3B1B–$3B57)
+; ObjWatch state 0. Unless C2Scene_Mode is 0 or C2Scene_ModeIdle1: not
+; moving (.Facing loses C2Scene_WalkMoving), the member's stand animation
+; (C2Scene_SetStandAnim) and C2Anim_Run. Otherwise it runs entry
+; C2Scene_Unk0280 * 4 + .State of C2Scene_MemberWalkSteps.
+; Callers note: none direct (C2Scene_MemberStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_MemberTask's TDC),
+;        DP=$0000 (C2Tmp_00), DB=$00 (low WRAM absolute)
+; Exit:  C=0, M=1, X = the task, A, Y clobbered (other modes); or as the
+;        step's handler, C2Tmp_00 = C2Scene_Unk0280 * 8
+; Calls: C2Scene_SetStandAnim, C2Anim_Run, a C2Scene_MemberWalkSteps
+;   handler (JMP (abs,X)).
+C2Scene_MemberWalk:
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeIdle1
+    BEQ .walk
+    CMP.b #0
+    BEQ .walk
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    STA.w C2Scene_FollowTask.Facing,X
+    LDA.w C2Scene_FollowTask.Slot,X
+    TAX
+    LDA.l !Party_Members,X
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetStandAnim
+    JSR C2Anim_Run
+    CLC
+    RTS
+.walk:
+    LDA.w !C2Scene_Unk0280
+    ASL A                       ; * C2Scene_StepsPerTrigState
+    ASL A
+    ASL A
+    STA.b !C2Tmp_00
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.State,X
+    ASL A
+    ADC.b !C2Tmp_00             ; no CLC: C = .State bit 7, 0 for steps 0-3
+    TAX
+    JMP (C2Scene_MemberWalkSteps,X)
+
+; $C2:3B58 — C2Scene_MemberWalkSteps (8 words, $3B58–$3B67)
+; C2Scene_MemberWalk's handler per C2Scene_Unk0280 state (4 words each)
+; and .State. Entry 7 is 0 (it would jump to $C2:0000); no handler sets
+; .State 3 in state C2Scene_TrigStWait.
+C2Scene_MemberWalkSteps:
+    dw C2Scene_MemberInit       ; state 0 (check), step 0
+    dw C2Scene_MemberFollow     ; step 1
+    dw C2Scene_MemberMoveX      ; step 2
+    dw C2Scene_MemberMoveY      ; step 3
+    dw C2Scene_MemberScriptStart ; state C2Scene_TrigStWait, step 0
+    dw C2Scene_MemberScriptRun  ; step 1
+    dw C2Scene_MemberScriptDone ; step 2
+    dw $0000                    ; step 3: none
+
+; $C2:3B68 — C2Scene_MemberNone (2 bytes, $3B68–$3B69)
+; ObjWatch states 1-3: nothing (the member stays where it is while the
+; object is busy); C=0.
+; Callers note: none direct (C2Scene_MemberStates).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_MemberNone:
+    CLC
+    RTS
+
+; $C2:3B6A — C2Scene_MemberBoard (10 bytes, $3B6A–$3B73)
+; ObjWatch state 4 (C2Scene_ObjWatchStFull): runs entry .State of
+; C2Scene_MemberBoardSteps.
+; Callers note: none direct (C2Scene_MemberStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_MemberTask's TDC),
+;        DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM absolute)
+; Exit:  as the step's handler
+; Calls: a C2Scene_MemberBoardSteps handler (JMP (abs,X)).
+C2Scene_MemberBoard:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_MemberBoardSteps,X)
+
+; $C2:3B74 — C2Scene_MemberBoardSteps (4 words, $3B74–$3B7B)
+; C2Scene_MemberBoard's handler for .State 0-3.
+C2Scene_MemberBoardSteps:
+    dw C2Scene_MemberBoardStart ; 0: aim at the leader
+    dw C2Scene_MemberBoardX     ; 1: a leg in X
+    dw C2Scene_MemberBoardY     ; 2: a leg in Y
+    dw C2Scene_MemberBoardDone  ; 3: counted in
+
+; $C2:3B7C — C2Scene_MemberLeave (8 bytes, $3B7C–$3B83)
+; ObjWatch state 5 (C2Scene_ObjWatchStEmpty): runs entry C2Scene_ObjSel
+; of C2Scene_MemberLeaveTable.
+; Callers note: none direct (C2Scene_MemberStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_MemberTask's TDC),
+;        DP any, DB=$00 (low WRAM absolute)
+; Exit:  as the handler
+; Calls: a C2Scene_MemberLeaveTable handler (JMP (abs,X)).
+C2Scene_MemberLeave:
+    LDA.w !C2Scene_ObjSel
+    ASL A
+    TAX
+    JMP (C2Scene_MemberLeaveTable,X)
+
+; $C2:3B84 — C2Scene_MemberLeaveTable (4 words, $3B84–$3B8B)
+; C2Scene_MemberLeave's handler for C2Scene_ObjSel 0-3. Unlike the
+; leader's table, selector 1 is treated as object A.
+C2Scene_MemberLeaveTable:
+    dw C2Scene_MemberLeaveNone  ; 0
+    dw C2Scene_MemberLeaveA     ; 1
+    dw C2Scene_MemberLeaveA     ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_MemberLeaveB     ; 3 (C2Scene_ObjSelB)
+
+; $C2:3B8C — C2Scene_MemberLeaveNone (2 bytes, $3B8C–$3B8D)
+; No object selected: nothing; C=0.
+; Callers note: none direct (C2Scene_MemberLeaveTable).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_MemberLeaveNone:
+    CLC
+    RTS
+
+; $C2:3B8E — C2Scene_MemberLeaveA (26 bytes, $3B8E–$3BA7)
+; Leaving object A: .State = 0, the sprite at C2Scene_ObjAX/Y, one off
+; C2Scene_Unk0294 (the object's count), every frame of the state, as
+; C2Scene_LeaderLeaveA but without C2Scene_StartX/Y, .Unk26, the facing
+; and the entry tile.
+; Callers note: none direct (C2Scene_MemberLeaveTable).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A = C2Scene_ObjAY
+; No calls.
+C2Scene_MemberLeaveA:
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_FollowTask.State,X
+    REP #$20
+    LDA.w !C2Scene_ObjAX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_ObjAY
+    STA.w C2Scene_Task.SprY,X
+    SEP #$20
+    DEC.w !C2Scene_Unk0294
+    CLC
+    RTS
+
+; $C2:3BA8 — C2Scene_MemberLeaveB (26 bytes, $3BA8–$3BC1)
+; C2Scene_MemberLeaveA for object B (C2Scene_ObjBX/Y,
+; C2Scene_ObjBFlags).
+; Callers note: none direct (C2Scene_MemberLeaveTable).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A = C2Scene_ObjBY
+; No calls.
+C2Scene_MemberLeaveB:
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_FollowTask.State,X
+    REP #$20
+    LDA.w !C2Scene_ObjBX
+    STA.w C2Scene_Task.SprX,X
+    LDA.w !C2Scene_ObjBY
+    STA.w C2Scene_Task.SprY,X
+    SEP #$20
+    DEC.w !C2Scene_ObjBFlags
+    CLC
+    RTS
+
+; $C2:3BC2 — C2Scene_MemberInit (119 bytes, $3BC2–$3C38)
+; Step 0 of TrigWatch state 0: sets the sprite up and falls into
+; C2Scene_MemberFollow. .State = 1; .SprAttr = C2Scene_MemberAttr1F5 at
+; Loc_Id C2Scene_Loc1F5, else C2Scene_MemberAttr, ORed with
+; C2Scene_Member1Pal and .SprTile = C2Scene_Member1Tile for slot 1, else
+; C2Scene_Member2Pal and C2Scene_Member2Tile; the position at
+; C2Scene_StartX/Y with both fractions 0; the four velocity words 0;
+; .Frames = 0; .Facing and .PrevFacing = Loc_EntryFacing AND
+; C2Scene_FacingMask; .Unk26 = 0; the stand animation
+; (C2Scene_MemberStand).
+; Callers note: none direct (C2Scene_MemberWalkSteps).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$00 (DP_Field and low
+;        WRAM absolute)
+; Exit:  as C2Scene_MemberFollow
+; Calls: C2Scene_MemberStand; then falls into C2Scene_MemberFollow.
+C2Scene_MemberInit:
+    SEP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_FollowTask.State,X
+    LDY.w !DP_Field+!Loc_Id
+    CPY.w #!C2Scene_Loc1F5
+    BNE .attr_normal
+    LDA.b #!C2Scene_MemberAttr1F5
+    BRA .attr_set
+.attr_normal:
+    LDA.b #!C2Scene_MemberAttr
+.attr_set:
+    STA.w C2Scene_Task.SprAttr,X
+    LDA.w C2Scene_FollowTask.Slot,X
+    CMP.b #!C2Scene_Slot1
+    BNE .slot2
+    LDA.b #!C2Scene_Member1Pal
+    ORA.w C2Scene_Task.SprAttr,X
+    STA.w C2Scene_Task.SprAttr,X
+    LDA.b #!C2Scene_Member1Tile
+    STA.w C2Scene_Task.SprTile,X
+    STZ.w C2Scene_Task.SprTile+1,X
+    BRA .place
+.slot2:
+    LDA.b #!C2Scene_Member2Pal
+    ORA.w C2Scene_Task.SprAttr,X
+    STA.w C2Scene_Task.SprAttr,X
+    LDA.b #!C2Scene_Member2Tile
+    STA.w C2Scene_Task.SprTile,X
+    STZ.w C2Scene_Task.SprTile+1,X
+.place:
+    REP #$20
+    LDA.w !C2Scene_StartX
+    STA.w C2Scene_Task.SprX,X
+    STZ.w C2Scene_Task.XFrac,X
+    LDA.w !C2Scene_StartY
+    STA.w C2Scene_Task.SprY,X
+    STZ.w C2Scene_Task.YFrac,X
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.Frames,X
+    SEP #$20
+    LDA.w !DP_Field+!Loc_EntryFacing
+    AND.b #!C2Scene_FacingMask
+    STA.w C2Scene_FollowTask.PrevFacing,X
+    STA.w C2Scene_FollowTask.Facing,X
+    STZ.w C2Scene_FollowTask.Unk26,X
+    JSR C2Scene_MemberStand
+
+; $C2:3C39 — C2Scene_MemberFollow (161 bytes, $3C39–$3CD9)
+; Step 1 of TrigWatch state 0: decides the next move.
+; - Fewer than C2Scene_FollowWait .Frames since the last move started,
+;   or the party's position within 16 (slot 1, C2Scene_LeaderNear16) or
+;   32 pixels (slot 2, C2Scene_LeaderNear32; .Frames is then zeroed):
+;   it stands. Its idle count (C2Scene_IdleFrames + slot) goes up; below
+;   C2Scene_IdleAnimAt the stand animation is set again
+;   (C2Scene_MemberStand), at it C2Scene_AnimIdle1 (slot 2:
+;   C2Scene_AnimIdle2) once, as the leader's; C2Anim_Run.
+; - Otherwise: the target is a trail point (C2Scene_MemberTrailTarget),
+;   the route is planned (C2Scene_MemberDelta, C2Scene_MemberRoute), the
+;   first leg's velocity, facing and walk animation are set
+;   (C2Scene_MemberFirstLeg, C2Scene_FaceVelocity,
+;   C2Scene_MemberWalkAnim), .Frames = 0, and it goes on in
+;   C2Scene_MemberMoveX (.State 2) for a C2Scene_RouteXFirst route, else
+;   C2Scene_MemberMoveY (.State 3), this frame.
+; Callers (2 JMP sites): C2Scene_MemberMoveX ($C2:3CF7) and C2Scene_MemberMoveY ($C2:3D58).
+; Callers note: also reached through C2Scene_MemberWalkSteps, and C2Scene_MemberInit
+;   falls into it; the two JMPs are C2Scene_MemberMoveX and C2Scene_MemberMoveY
+;   jumping back to it.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y and C2Tmp_00-$1B clobbered;
+;        or as C2Scene_MemberMoveX/MoveY
+; Calls: C2Scene_LeaderNear16, C2Scene_LeaderNear32,
+;   C2Scene_MemberTrailTarget, C2Scene_MemberDelta, C2Scene_MemberRoute,
+;   C2Scene_MemberFirstLeg, C2Scene_FaceVelocity, C2Scene_MemberWalkAnim,
+;   C2Scene_SetAnim, C2Scene_MemberStand, C2Anim_Run.
+C2Scene_MemberFollow:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.Frames,X
+    CMP.w #!C2Scene_FollowWait
+    BCC .stand
+    LDA.w C2Scene_FollowTask.Slot,X
+    BIT.w #!C2Scene_Slot1
+    BEQ .far_box
+    JSR C2Scene_LeaderNear16
+    BCS .near
+    BRA .plan
+.far_box:
+    JSR C2Scene_LeaderNear32
+    BCS .near
+.plan:
+    JSR C2Scene_MemberTrailTarget
+    JSR C2Scene_MemberDelta
+    JSR C2Scene_MemberRoute
+    JSR C2Scene_MemberFirstLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    STZ.w C2Scene_Task.Frames,X
+    STZ.w C2Scene_Task.Frames+1,X
+    LDA.w C2Scene_FollowTask.Route,X
+    BIT.b #!C2Scene_RouteXFirst
+    BEQ .y_first
+    LDA.b #2
+    STA.w C2Scene_FollowTask.State,X
+    BRA C2Scene_MemberMoveX
+.y_first:
+    LDA.b #3
+    STA.w C2Scene_FollowTask.State,X
+    JMP C2Scene_MemberMoveY
+.near:
+    REP #$20
+    STZ.w C2Scene_Task.Frames,X
+.stand:
+    SEP #$20
+    TDC                         ; B = 0 for the TAX/TYX index
+    TXY
+    LDA.w C2Scene_FollowTask.Slot,Y
+    CMP.b #!C2Scene_Slot2
+    BEQ .idle2
+    INC.w !C2Scene_IdleFrames+1
+    LDA.w !C2Scene_IdleFrames+1
+    CMP.b #!C2Scene_IdleAnimAt
+    BCC .stand1
+    CMP.b #!C2Scene_IdleSet
+    BEQ .hold1
+    LDA.b #!C2Scene_AnimIdle1
+    JSR C2Scene_SetAnim
+.hold1:
+    LDA.b #!C2Scene_IdleHold
+    STA.w !C2Scene_IdleFrames+1
+    BRA .animate
+.stand1:
+    TYX
+    JSR C2Scene_MemberStand
+    BRA .animate
+.idle2:
+    INC.w !C2Scene_IdleFrames+2
+    LDA.w !C2Scene_IdleFrames+2
+    CMP.b #!C2Scene_IdleAnimAt
+    BCC .stand2
+    CMP.b #!C2Scene_IdleSet
+    BEQ .hold2
+    LDA.b #!C2Scene_AnimIdle2
+    JSR C2Scene_SetAnim
+.hold2:
+    LDA.b #!C2Scene_IdleHold
+    STA.w !C2Scene_IdleFrames+2
+    BRA .animate
+.stand2:
+    TYX
+    JSR C2Scene_MemberStand
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:3CDA — C2Scene_MemberMoveX (97 bytes, $3CDA–$3D3A)
+; Step 2 of TrigWatch state 0, a leg in X. Once C2Scene_FollowWait frames
+; have passed and .SprX is on an 8-pixel boundary, .State = 1 and it
+; plans again (JMP C2Scene_MemberFollow). Until .SprX = .TargetX it
+; moves (C2Scene_TaskMove, C2Scene_WrapTaskPos). There, with another leg
+; left (.Route's count - 1, stored over the whole .Route byte) it turns to
+; Y: .State 3, C2Scene_MemberYLeg, C2Scene_FaceVelocity,
+; C2Scene_MemberWalkAnim; with none, .State 1 and the stand animation.
+; Then C2Anim_Run.
+; Callers note: none direct (C2Scene_MemberWalkSteps); C2Scene_MemberFollow
+;   branches to it.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y clobbered; or as
+;        C2Scene_MemberFollow
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_MemberYLeg,
+;   C2Scene_FaceVelocity, C2Scene_MemberWalkAnim, C2Scene_MemberStand,
+;   C2Anim_Run.
+C2Scene_MemberMoveX:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.Frames,X
+    CMP.w #!C2Scene_FollowWait
+    BCC .move
+    LDA.w C2Scene_Task.SprX,X
+    AND.w #!C2Scene_PxInTileMask
+    BNE .move
+    SEP #$20
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JMP C2Scene_MemberFollow
+.move:
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w C2Scene_FollowTask.TargetX,X
+    BEQ .arrived
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    BRA .animate
+.arrived:
+    LDA.w C2Scene_FollowTask.Route,X
+    AND.w #!C2Scene_RouteLegs
+    DEC A
+    BEQ .done
+    SEP #$20
+    STA.w C2Scene_FollowTask.Route,X
+    LDA.b #3
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JSR C2Scene_MemberYLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    BRA .animate
+.done:
+    SEP #$20
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    JSR C2Scene_MemberStand
+    REP #$20
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:3D3B — C2Scene_MemberMoveY (97 bytes, $3D3B–$3D9B)
+; Step 3 of TrigWatch state 0: C2Scene_MemberMoveX with the axes swapped
+; (.SprY, .TargetY; the next leg is in X: .State 2,
+; C2Scene_MemberXLeg).
+; Callers (1 JMP site): C2Scene_MemberFollow ($C2:3C84).
+; Callers note: also reached through C2Scene_MemberWalkSteps.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y clobbered; or as
+;        C2Scene_MemberFollow
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_MemberXLeg,
+;   C2Scene_FaceVelocity, C2Scene_MemberWalkAnim, C2Scene_MemberStand,
+;   C2Anim_Run.
+C2Scene_MemberMoveY:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.Frames,X
+    CMP.w #!C2Scene_FollowWait
+    BCC .move
+    LDA.w C2Scene_Task.SprY,X
+    AND.w #!C2Scene_PxInTileMask
+    BNE .move
+    SEP #$20
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JMP C2Scene_MemberFollow
+.move:
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w C2Scene_FollowTask.TargetY,X
+    BEQ .arrived
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    BRA .animate
+.arrived:
+    LDA.w C2Scene_FollowTask.Route,X
+    AND.w #!C2Scene_RouteLegs
+    DEC A
+    BEQ .done
+    SEP #$20
+    STA.w C2Scene_FollowTask.Route,X
+    LDA.b #2
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JSR C2Scene_MemberXLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    BRA .animate
+.done:
+    SEP #$20
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    JSR C2Scene_MemberStand
+    REP #$20
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:3D9C — C2Scene_MemberScriptStart (37 bytes, $3D9C–$3DC0)
+; Step 0 of TrigWatch state C2Scene_TrigStWait: as
+; C2Scene_LeaderScriptStart with the member's own word,
+; C2Scene_MemberWords + .Slot * 2 (no tile property read here).
+; Callers note: none direct (C2Scene_MemberWalkSteps).
+; Entry: M=1, X=0, B=0 (the 16-bit TAY; from C2Scene_MemberTask's TDC),
+;        DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=0; A = 0 (no word yet), or A, X, Y as the script leaves
+;        them
+; Calls: C2Scene_TaskRunScript.
+C2Scene_MemberScriptStart:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.Slot,X
+    ASL A
+    TAY
+    REP #$20
+    LDA.w !C2Scene_MemberWords,Y
+    BEQ .done
+    STA.w C2Scene_Task.ScriptPtr,X
+    SEP #$20
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    STA.w C2Scene_Task.ScriptBank,X
+    STZ.w C2Scene_Task.ScriptWait,X
+    INC.w C2Scene_FollowTask.State,X
+    JSR C2Scene_TaskRunScript
+    REP #$20
+.done:
+    CLC
+    RTS
+
+; $C2:3DC1 — C2Scene_MemberScriptRun (34 bytes, $3DC1–$3DE2)
+; Step 1 of TrigWatch state C2Scene_TrigStWait: runs the script; when it
+; ends, .State = 2. Every frame the sprite's position goes to the words
+; at C2Scene_StartX/Y + the .Slot word * 4 ($0287-$028E for slots 1 and
+; 2: probably the members' positions, as C2Scene_StartX/Y is the
+; leader's).
+; Callers note: none direct (C2Scene_MemberWalkSteps).
+; Entry: M any, X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=0, X=0; X = the task; Y = .Slot * 4; A = .SprY
+; Calls: C2Scene_TaskRunScript.
+C2Scene_MemberScriptRun:
+    JSR C2Scene_TaskRunScript
+    BCC .running
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_FollowTask.State,X
+.running:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.Slot,X
+    ASL A
+    ASL A
+    TAY
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !C2Scene_StartX,Y
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !C2Scene_StartY,Y
+    CLC
+    RTS
+
+; $C2:3DE3 — C2Scene_MemberScriptDone (2 bytes, $3DE3–$3DE4)
+; Step 2 of TrigWatch state C2Scene_TrigStWait: nothing; C=0.
+; Callers note: none direct (C2Scene_MemberWalkSteps).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_MemberScriptDone:
+    CLC
+    RTS
+
+; $C2:3DE5 — C2Scene_MemberBoardStart (50 bytes, $3DE5–$3E16)
+; Step 0 of ObjWatch state 4: the target is the party's position on its
+; 8x8 tile (C2Scene_MemberLeaderTarget); route, first leg, facing and
+; walk animation as C2Scene_MemberFollow plans them; .Frames = 0; then
+; C2Scene_MemberBoardX (.State 1) for a C2Scene_RouteXFirst route, else
+; C2Scene_MemberBoardY (.State 2), this frame.
+; Callers note: none direct (C2Scene_MemberBoardSteps).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  as C2Scene_MemberBoardX / C2Scene_MemberBoardY
+; Calls: C2Scene_MemberLeaderTarget, C2Scene_MemberDelta,
+;   C2Scene_MemberRoute, C2Scene_MemberFirstLeg, C2Scene_FaceVelocity,
+;   C2Scene_MemberWalkAnim.
+C2Scene_MemberBoardStart:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_MemberLeaderTarget
+    JSR C2Scene_MemberDelta
+    JSR C2Scene_MemberRoute
+    JSR C2Scene_MemberFirstLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    STZ.w C2Scene_Task.Frames,X
+    STZ.w C2Scene_Task.Frames+1,X
+    LDA.w C2Scene_FollowTask.Route,X
+    BIT.b #!C2Scene_RouteXFirst
+    BEQ .y_first
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    BRA C2Scene_MemberBoardX
+.y_first:
+    LDA.b #2
+    STA.w C2Scene_FollowTask.State,X
+    JMP C2Scene_MemberBoardY
+
+; $C2:3E17 — C2Scene_MemberBoardX (100 bytes, $3E17–$3E7A)
+; Step 1 of ObjWatch state 4, a leg in X: moves until .SprX = .TargetX.
+; There, with another leg left it turns to Y (.State 2,
+; C2Scene_MemberYLeg, C2Scene_FaceVelocity, C2Scene_MemberWalkAnim);
+; with none, at the party's position (C2Scene_StartX/Y) the object's
+; count goes up (C2Scene_ObjCountUp) and .State = 3; elsewhere .State = 0
+; (aim again) and the stand animation. Then C2Anim_Run.
+; Callers note: none direct (C2Scene_MemberBoardSteps);
+;   C2Scene_MemberBoardStart branches to it.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y clobbered
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_MemberYLeg,
+;   C2Scene_FaceVelocity, C2Scene_MemberWalkAnim, C2Scene_ObjCountUp,
+;   C2Scene_MemberStand, C2Anim_Run.
+C2Scene_MemberBoardX:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w C2Scene_FollowTask.TargetX,X
+    BEQ .arrived
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    JMP .animate
+.arrived:
+    LDA.w C2Scene_FollowTask.Route,X
+    AND.w #!C2Scene_RouteLegs
+    DEC A
+    BEQ .last
+    SEP #$20
+    STA.w C2Scene_FollowTask.Route,X
+    LDA.b #2
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JSR C2Scene_MemberYLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    BRA .animate
+.last:
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w !C2Scene_StartX
+    BNE .again
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w !C2Scene_StartY
+    BNE .again
+    SEP #$20
+    JSR C2Scene_ObjCountUp
+    LDX.b !C2Scene_TaskCur
+    LDA.b #3
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    BRA .animate
+.again:
+    SEP #$20
+    STZ.w C2Scene_FollowTask.State,X
+    JSR C2Scene_MemberStand
+    REP #$20
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:3E7B — C2Scene_MemberBoardY (100 bytes, $3E7B–$3EDE)
+; Step 2 of ObjWatch state 4: C2Scene_MemberBoardX with the axes swapped
+; (.SprY, .TargetY; the next leg is in X: .State 1,
+; C2Scene_MemberXLeg).
+; Callers (1 JMP site): C2Scene_MemberBoardStart ($C2:3E14).
+; Callers note: also reached through C2Scene_MemberBoardSteps.
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = the task; A, Y clobbered
+; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_MemberXLeg,
+;   C2Scene_FaceVelocity, C2Scene_MemberWalkAnim, C2Scene_ObjCountUp,
+;   C2Scene_MemberStand, C2Anim_Run.
+C2Scene_MemberBoardY:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w C2Scene_FollowTask.TargetY,X
+    BEQ .arrived
+    JSR C2Scene_TaskMove
+    JSR C2Scene_WrapTaskPos
+    JMP .animate
+.arrived:
+    LDA.w C2Scene_FollowTask.Route,X
+    AND.w #!C2Scene_RouteLegs
+    DEC A
+    BEQ .last
+    SEP #$20
+    STA.w C2Scene_FollowTask.Route,X
+    LDA.b #1
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    JSR C2Scene_MemberXLeg
+    JSR C2Scene_FaceVelocity
+    JSR C2Scene_MemberWalkAnim
+    BRA .animate
+.last:
+    LDA.w C2Scene_Task.SprX,X
+    CMP.w !C2Scene_StartX
+    BNE .again
+    LDA.w C2Scene_Task.SprY,X
+    CMP.w !C2Scene_StartY
+    BNE .again
+    SEP #$20
+    JSR C2Scene_ObjCountUp
+    LDX.b !C2Scene_TaskCur
+    LDA.b #3
+    STA.w C2Scene_FollowTask.State,X
+    REP #$20
+    BRA .animate
+.again:
+    SEP #$20
+    STZ.w C2Scene_FollowTask.State,X
+    JSR C2Scene_MemberStand
+    REP #$20
+.animate:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:3EDF — C2Scene_MemberBoardDone (2 bytes, $3EDF–$3EE0)
+; Step 3 of ObjWatch state 4 (counted in): nothing; C=0.
+; Callers note: none direct (C2Scene_MemberBoardSteps).
+; Entry: M, X, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_MemberBoardDone:
+    CLC
+    RTS
+
+; $C2:3EE1 — C2Scene_LeaderNear16 (70 bytes, $3EE1–$3F26)
+; C=1 when the party's position (C2Scene_StartX/Y) is within
+; C2Scene_NearLo16 pixels before and C2Scene_NearHi16 - 1 after the
+; member's .SprX/.SprY on both axes (unsigned compares, so the box does
+; not wrap at the map's edges).
+; Callers (1 JSR site): C2Scene_MemberFollow ($C2:3C4D).
+; Entry: M=0, X=0, X = the task, DP=$0000 (C2Tmp_00-$0B), DB=$00 (low
+;        WRAM absolute)
+; Exit:  M=0, X=0; C as above; A clobbered; C2Scene_NearTop-NearY set;
+;        X, Y unchanged
+; No calls.
+C2Scene_LeaderNear16:
+    LDA.w C2Scene_Task.SprY,X
+    SEC
+    SBC.w #!C2Scene_NearLo16
+    STA.b !C2Scene_NearTop
+    LDA.w C2Scene_Task.SprY,X
+    CLC
+    ADC.w #!C2Scene_NearHi16
+    STA.b !C2Scene_NearBottom
+    LDA.w C2Scene_Task.SprX,X
+    SEC
+    SBC.w #!C2Scene_NearLo16
+    STA.b !C2Scene_NearLeft
+    LDA.w C2Scene_Task.SprX,X
+    CLC
+    ADC.w #!C2Scene_NearHi16
+    STA.b !C2Scene_NearRight
+    LDA.w !C2Scene_StartX
+    STA.b !C2Scene_NearX
+    LDA.w !C2Scene_StartY
+    STA.b !C2Scene_NearY
+    LDA.b !C2Scene_NearY
+    CMP.b !C2Scene_NearTop
+    BCC .far
+    CMP.b !C2Scene_NearBottom
+    BCS .far
+    LDA.b !C2Scene_NearX
+    CMP.b !C2Scene_NearLeft
+    BCC .far
+    CMP.b !C2Scene_NearRight
+    BCS .far
+    SEC
+    RTS
+.far:
+    CLC
+    RTS
+
+; $C2:3F27 — C2Scene_LeaderNear32 (70 bytes, $3F27–$3F6C)
+; C2Scene_LeaderNear16 with C2Scene_NearLo32 / C2Scene_NearHi32 (32
+; pixels).
+; Callers (1 JSR site): C2Scene_MemberFollow ($C2:3C54).
+; Entry: M=0, X=0, X = the task, DP=$0000 (C2Tmp_00-$0B), DB=$00 (low
+;        WRAM absolute)
+; Exit:  M=0, X=0; C as above; A clobbered; C2Scene_NearTop-NearY set;
+;        X, Y unchanged
+; No calls.
+C2Scene_LeaderNear32:
+    LDA.w C2Scene_Task.SprY,X
+    SEC
+    SBC.w #!C2Scene_NearLo32
+    STA.b !C2Scene_NearTop
+    LDA.w C2Scene_Task.SprY,X
+    CLC
+    ADC.w #!C2Scene_NearHi32
+    STA.b !C2Scene_NearBottom
+    LDA.w C2Scene_Task.SprX,X
+    SEC
+    SBC.w #!C2Scene_NearLo32
+    STA.b !C2Scene_NearLeft
+    LDA.w C2Scene_Task.SprX,X
+    CLC
+    ADC.w #!C2Scene_NearHi32
+    STA.b !C2Scene_NearRight
+    LDA.w !C2Scene_StartX
+    STA.b !C2Scene_NearX
+    LDA.w !C2Scene_StartY
+    STA.b !C2Scene_NearY
+    LDA.b !C2Scene_NearY
+    CMP.b !C2Scene_NearTop
+    BCC .far
+    CMP.b !C2Scene_NearBottom
+    BCS .far
+    LDA.b !C2Scene_NearX
+    CMP.b !C2Scene_NearLeft
+    BCC .far
+    CMP.b !C2Scene_NearRight
+    BCS .far
+    SEC
+    RTS
+.far:
+    CLC
+    RTS
+
+; $C2:3F6D — C2Scene_MemberTrailTarget (39 bytes, $3F6D–$3F93)
+; .TargetX/Y = a trail entry: the last one C2Scene_TrailPush wrote
+; (C2Scene_TrailPos - 2) for slot 1 (.Slot bit 0), the one before it
+; (- 4) otherwise.
+; Callers (2 JSR sites): C2Scene_MemberFollow ($C2:3C59) and C2Scene_MemberRouteTrail ($C2:40B3).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = the target Y; Y = the entry's offset; X unchanged
+; No calls.
+C2Scene_MemberTrailTarget:
+    LDA.w C2Scene_FollowTask.Slot,X
+    BIT.w #!C2Scene_Slot1
+    BEQ .slot2
+    LDA.w !C2Scene_TrailPos
+    DEC A
+    DEC A
+    BRA .entry
+.slot2:
+    LDA.w !C2Scene_TrailPos
+    SEC
+    SBC.w #4
+.entry:
+    AND.w #!C2Scene_TrailMask
+    TAY
+    LDA.w !C2Scene_TrailX,Y
+    STA.w C2Scene_FollowTask.TargetX,X
+    LDA.w !C2Scene_TrailY,Y
+    STA.w C2Scene_FollowTask.TargetY,X
+    RTS
+
+; $C2:3F94 — C2Scene_MemberLeaderTarget (19 bytes, $3F94–$3FA6)
+; .TargetX/Y = C2Scene_StartX/Y AND C2Scene_TileSnapMask (the start of
+; the party's 8x8 tile).
+; Callers (1 JSR site): C2Scene_MemberBoardStart ($C2:3DE9).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = the target Y; X, Y unchanged
+; No calls.
+C2Scene_MemberLeaderTarget:
+    LDA.w !C2Scene_StartX
+    AND.w #!C2Scene_TileSnapMask
+    STA.w C2Scene_FollowTask.TargetX,X
+    LDA.w !C2Scene_StartY
+    AND.w #!C2Scene_TileSnapMask
+    STA.w C2Scene_FollowTask.TargetY,X
+    RTS
+
+; $C2:3FA7 — C2Scene_MemberDelta (21 bytes, $3FA7–$3FBB)
+; .DeltaX/Y = .TargetX/Y - .SprX/Y.
+; Callers (4 JSR sites): C2Scene_MemberFollow ($C2:3C5C), C2Scene_MemberBoardStart ($C2:3DEC) and
+;   C2Scene_MemberRouteTrail ($C2:40B6, $C2:40D9).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = .DeltaY; X, Y unchanged
+; No calls.
+C2Scene_MemberDelta:
+    LDA.w C2Scene_FollowTask.TargetX,X
+    SEC
+    SBC.w C2Scene_Task.SprX,X
+    STA.w C2Scene_FollowTask.DeltaX,X
+    LDA.w C2Scene_FollowTask.TargetY,X
+    SEC
+    SBC.w C2Scene_Task.SprY,X
+    STA.w C2Scene_FollowTask.DeltaY,X
+    RTS
+
+; $C2:3FBC — C2Scene_MemberRoute (44 bytes, $3FBC–$3FE7, with the table
+; C2Scene_MemberRouteTable and the handlers C2Scene_MemberRouteOpen
+; $C2:3FF0 (to $404B, with dead code at $4012-$4031),
+; C2Scene_MemberRouteYFirst $C2:404C, C2Scene_MemberRouteXFirst $C2:4056
+; and C2Scene_MemberRouteTrail $C2:4060 to $40E3)
+; Plans .Route from the member's position to its target. The 8x8 tiles of
+; both go to C2Scene_PathBlocked (the target is taken as C2Scene_StartX/Y
+; here, not .TargetX/Y), and its result picks the handler:
+; - 0 (both paths open), C2Scene_MemberRouteOpen: one leg when .DeltaX
+;   (Y only: C2Scene_RouteYFirst + 1) or .DeltaY (X only) is 0, else two,
+;   along the longer axis first (Y on a tie);
+; - C2Scene_PathXYBlocked: Y first, two legs;
+; - C2Scene_PathYXBlocked: X first, two legs;
+; - both blocked, C2Scene_MemberRouteTrail: walks back through up to
+;   C2Scene_TrailLen trail entries from the last one, newest first, for
+;   one with a path open from the member; the first found becomes the
+;   target (on its 8x8 tile, .DeltaX/Y again) and its result picks the
+;   handler (C2Scene_MemberRoute_dispatch). With none, the target is the
+;   member's trail point again (C2Scene_MemberTrailTarget,
+;   C2Scene_MemberDelta) with result 0.
+; Quirk, kept: after C2Scene_MemberRouteOpen's BRA, $4012-$4031 is a
+; second copy of its tests with the two-leg results swapped (X first when
+; |.DeltaY| >= |.DeltaX|); nothing jumps there.
+; Callers (2 JSR sites): C2Scene_MemberFollow ($C2:3C5F) and C2Scene_MemberBoardStart ($C2:3DEF).
+; Entry: M=0, X=0, DP=$0000 (C2Tmp_00-$1B), DB=$00 (WRMPYA/B, RDMPYL and
+;        low WRAM absolute); C2Scene_TaskCur = the task; .DeltaX/Y set
+; Exit:  M=0, X=0; X = the task; A = the handler's last value; Y
+;        clobbered; .Route set; C2Tmp_00-$1B as the helpers leave them
+; Calls: C2Scene_PathBlocked, C2Scene_MemberTrailTarget,
+;   C2Scene_MemberDelta.
+C2Scene_MemberRoute:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.SprX,X
+    LSR A                       ; / C2Scene_TilePx
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteFromX   ; each store is a word; the next one
+    LDA.w !C2Scene_StartX       ; replaces its high byte
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteToX
+    LDA.w C2Scene_Task.SprY,X
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteFromY
+    LDA.w !C2Scene_StartY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteToY
+    SEP #$20
+    JSR C2Scene_PathBlocked     ; B = 0 for the TAX
+.dispatch:
+    ASL A
+    TAX
+    JMP (C2Scene_MemberRouteTable,X)
+
+; $C2:3FE8 — C2Scene_MemberRouteTable (4 words, $3FE8–$3FEF)
+; C2Scene_MemberRoute's handler for each C2Scene_PathBlocked result 0-3.
+C2Scene_MemberRouteTable:
+    dw C2Scene_MemberRouteOpen  ; 0
+    dw C2Scene_MemberRouteYFirst ; C2Scene_PathXYBlocked
+    dw C2Scene_MemberRouteXFirst ; C2Scene_PathYXBlocked
+    dw C2Scene_MemberRouteTrail ; C2Scene_PathBothBlocked
+
+C2Scene_MemberRouteOpen:        ; header: see C2Scene_MemberRoute
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.DeltaX,X
+    BEQ .y_only
+    BPL .abs_x
+    EOR.w #!Eng_Invert16
+    INC A
+.abs_x:
+    STA.b !C2Scene_RouteAbsDX
+    LDA.w C2Scene_FollowTask.DeltaY,X
+    BEQ .x_only
+    BPL .abs_y
+    EOR.w #!Eng_Invert16
+    INC A
+.abs_y:
+    CMP.b !C2Scene_RouteAbsDX
+    BCS .y_first
+    BRA .x_first
+.dead:                          ; quirk: never reached (see the header)
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_FollowTask.DeltaX,X
+    BEQ .y_only
+    BPL .dead_abs_x
+    EOR.w #!Eng_Invert16
+    INC A
+.dead_abs_x:
+    STA.b !C2Scene_RouteAbsDX
+    LDA.w C2Scene_FollowTask.DeltaY,X
+    BEQ .x_only
+    BPL .dead_abs_y
+    EOR.w #!Eng_Invert16
+    INC A
+.dead_abs_y:
+    CMP.b !C2Scene_RouteAbsDX
+    BCS .x_first
+    BRA .y_first
+.y_only:
+    LDA.w #!C2Scene_RouteYFirst|1
+    BRA .store
+.x_only:
+    LDA.w #!C2Scene_RouteXFirst|1
+    BRA .store
+.y_first:
+    LDA.w #!C2Scene_RouteYFirst|2
+    BRA .store
+.x_first:
+    LDA.w #!C2Scene_RouteXFirst|2
+.store:
+    SEP #$20
+    STA.w C2Scene_FollowTask.Route,X
+    REP #$20
+    RTS
+
+C2Scene_MemberRouteYFirst:      ; header: see C2Scene_MemberRoute
+    LDX.b !C2Scene_TaskCur
+    LDA.b #!C2Scene_RouteYFirst|2
+    STA.w C2Scene_FollowTask.Route,X
+    REP #$20
+    RTS
+
+C2Scene_MemberRouteXFirst:      ; header: see C2Scene_MemberRoute
+    LDX.b !C2Scene_TaskCur
+    LDA.b #!C2Scene_RouteXFirst|2
+    STA.w C2Scene_FollowTask.Route,X
+    REP #$20
+    RTS
+
+C2Scene_MemberRouteTrail:       ; header: see C2Scene_MemberRoute
+    LDA.b #!C2Scene_TrailLen
+    STA.b !C2Scene_TrailLeft
+    LDA.w !C2Scene_TrailPos
+    DEC A
+    DEC A
+    AND.b #!C2Scene_TrailMask
+    STA.b !C2Scene_TrailIdx
+    STZ.b !C2Scene_TrailIdx+1
+.try:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDY.b !C2Scene_TrailIdx
+    LDA.w C2Scene_Task.SprX,X
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteFromX
+    LDA.w !C2Scene_TrailX,Y
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteToX
+    LDA.w C2Scene_Task.SprY,X
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteFromY
+    LDA.w !C2Scene_TrailY,Y
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_RouteToY
+    SEP #$20
+    JSR C2Scene_PathBlocked
+    CMP.b #!C2Scene_PathBothBlocked
+    BNE .found
+    REP #$20
+    LDA.b !C2Scene_TrailIdx
+    DEC A
+    DEC A
+    AND.w #!C2Scene_TrailMask
+    STA.b !C2Scene_TrailIdx
+    SEP #$20
+    DEC.b !C2Scene_TrailLeft
+    BNE .try
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    JSR C2Scene_MemberTrailTarget
+    JSR C2Scene_MemberDelta
+    TDC                         ; result 0
+    SEP #$20
+    JMP C2Scene_MemberRoute_dispatch
+.found:
+    STA.b !C2Scene_TrailResult
+    REP #$20
+    LDY.b !C2Scene_TrailIdx
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_TrailX,Y
+    AND.w #!C2Scene_TileSnapMask
+    STA.w C2Scene_FollowTask.TargetX,X
+    LDA.w !C2Scene_TrailY,Y
+    AND.w #!C2Scene_TileSnapMask
+    STA.w C2Scene_FollowTask.TargetY,X
+    JSR C2Scene_MemberDelta
+    TDC                         ; B = 0 for the dispatch's TAX
+    SEP #$20
+    LDA.b !C2Scene_TrailResult
+    JMP C2Scene_MemberRoute_dispatch
+
+; $C2:40E4 — C2Scene_FaceVelocity (65 bytes, $40E4–$4124)
+; .PrevFacing = .Facing's direction; .Facing keeps only
+; C2Scene_WalkMoving and gets the direction of the whole-pixel velocity:
+; left / right for a negative / positive .XVel, else up / down for .YVel.
+; Quirk, kept: with both velocities 0 it loops forever (.hang).
+; Callers (6 JSR sites): C2Scene_MemberFollow ($C2:3C65), C2Scene_MemberMoveX ($C2:3D22),
+;   C2Scene_MemberMoveY ($C2:3D83), C2Scene_MemberBoardStart ($C2:3DF5), C2Scene_MemberBoardX
+;   ($C2:3E44) and C2Scene_MemberBoardY ($C2:3EA8).
+; Entry: M any (SEP #$20 here), X=0, X = the task, DP any, DB=$00 (low
+;        WRAM absolute)
+; Exit:  M=0, X=0; A = the new .Facing (B = 0); X, Y unchanged
+; No calls.
+C2Scene_FaceVelocity:
+    SEP #$20
+    LDA.w C2Scene_FollowTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    STA.w C2Scene_FollowTask.PrevFacing,X
+    LDA.w C2Scene_FollowTask.Facing,X
+    AND.b #!C2Scene_WalkMoving
+    STA.w C2Scene_FollowTask.Facing,X
+    REP #$20
+    LDA.w C2Scene_Task.XVel,X
+    BEQ .vertical
+    BPL .right
+    LDA.w #!C2Scene_FacingLeft
+    BRA .set
+.right:
+    LDA.w #!C2Scene_FacingRight
+    BRA .set
+.vertical:
+    LDA.w C2Scene_Task.YVel,X
+    BEQ .hang
+    BPL .down
+    LDA.w #!C2Scene_FacingUp
+    BRA .set
+.down:
+    LDA.w #!C2Scene_FacingDown
+.set:
+    SEP #$20
+    ORA.w C2Scene_FollowTask.Facing,X
+    STA.w C2Scene_FollowTask.Facing,X
+    REP #$20
+    RTS
+.hang:
+    BRA .hang
+
+; $C2:4125 — C2Scene_MemberFirstLeg (19 bytes, $4125–$4137)
+; Sets the velocity of the route's first leg: C2Scene_MemberYLeg for a
+; C2Scene_RouteYFirst route, else C2Scene_MemberXLeg.
+; Callers (2 JSR sites): C2Scene_MemberFollow ($C2:3C62) and C2Scene_MemberBoardStart ($C2:3DF2).
+; Entry: M any (SEP #$20 here), X=0, X = the task, DP any, DB=$00 (low
+;        WRAM absolute)
+; Exit:  M=0, X=0; as C2Scene_MemberXLeg / C2Scene_MemberYLeg
+; Calls: C2Scene_MemberXLeg or C2Scene_MemberYLeg.
+C2Scene_MemberFirstLeg:
+    SEP #$20
+    LDA.w C2Scene_FollowTask.Route,X
+    BIT.b #!C2Scene_RouteYFirst
+    REP #$20
+    BNE .y_leg
+    JSR C2Scene_MemberXLeg
+    RTS
+.y_leg:
+    JSR C2Scene_MemberYLeg
+    RTS
+
+; $C2:4138 — C2Scene_MemberXLeg (26 bytes, $4138–$4151)
+; A leg in X: .XVel = -1 for a negative .DeltaX, else +1; .XVelFrac,
+; .YVel and .YVelFrac 0.
+; Callers (3 JSR sites): C2Scene_MemberMoveY ($C2:3D80), C2Scene_MemberBoardY ($C2:3EA5) and
+;   C2Scene_MemberFirstLeg ($C2:4130).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = the new .XVel; X, Y unchanged
+; No calls.
+C2Scene_MemberXLeg:
+    LDA.w C2Scene_FollowTask.DeltaX,X
+    BPL .plus
+    LDA.w #!C2Scene_WholeMinus1
+    BRA .set
+.plus:
+    LDA.w #1
+.set:
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.XVelFrac,X
+    STZ.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    RTS
+
+; $C2:4152 — C2Scene_MemberYLeg (26 bytes, $4152–$416B)
+; C2Scene_MemberXLeg for Y: .YVel = -1 / +1 by .DeltaY, the other three
+; velocity words 0.
+; Callers (3 JSR sites): C2Scene_MemberMoveX ($C2:3D1F), C2Scene_MemberBoardX ($C2:3E41) and
+;   C2Scene_MemberFirstLeg ($C2:4134).
+; Entry: M=0, X=0, X = the task, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=0, X=0; A = the new .YVel; X, Y unchanged
+; No calls.
+C2Scene_MemberYLeg:
+    LDA.w C2Scene_FollowTask.DeltaY,X
+    BPL .plus
+    LDA.w #!C2Scene_WholeMinus1
+    BRA .set
+.plus:
+    LDA.w #1
+.set:
+    STA.w C2Scene_Task.YVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    STZ.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.XVelFrac,X
+    RTS
+
+; $C2:416C — C2Scene_MemberStand (24 bytes, $416C–$4183)
+; Not moving (.Facing loses C2Scene_WalkMoving) and the stand animation
+; of the member's character (the Party_Members byte of .Slot;
+; C2Scene_SetStandAnim, tail call).
+; Callers (7 JSR sites): C2Scene_MemberInit ($C2:3C36), C2Scene_MemberFollow ($C2:3CB2, $C2:3CD2),
+;   C2Scene_MemberMoveX ($C2:3D31), C2Scene_MemberMoveY ($C2:3D92), C2Scene_MemberBoardX ($C2:3E71)
+;   and C2Scene_MemberBoardY ($C2:3ED5).
+; Entry: M any (SEP #$20 here), X=0, X = the task, DP=$0000 (TDC for 0;
+;        C2Scene_AnimChar), DB=$00 (low WRAM absolute)
+; Exit:  as C2Scene_SetStandAnim: M=1, X=0; X = the task
+; Calls: C2Scene_SetStandAnim (JMP).
+C2Scene_MemberStand:
+    SEP #$20
+    LDA.w C2Scene_FollowTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    STA.w C2Scene_FollowTask.Facing,X
+    TDC                         ; B = 0 for the TAX
+    LDA.w C2Scene_FollowTask.Slot,X
+    TAX
+    LDA.l !Party_Members,X
+    STA.b !C2Scene_AnimChar
+    JMP C2Scene_SetStandAnim
+
+; $C2:4184 — C2Scene_MemberWalkAnim (49 bytes, $4184–$41B4)
+; Zeroes the member's idle count (C2Scene_IdleFrames + .Slot) and starts
+; the walk animation (C2Scene_SetWalkAnim) unless it already runs for an
+; unchanged direction (.Facing = .PrevFacing with C2Scene_WalkMoving
+; set); .Facing gets C2Scene_WalkMoving.
+; Callers (6 JSR sites): C2Scene_MemberFollow ($C2:3C68), C2Scene_MemberMoveX ($C2:3D25),
+;   C2Scene_MemberMoveY ($C2:3D86), C2Scene_MemberBoardStart ($C2:3DF8), C2Scene_MemberBoardX
+;   ($C2:3E47) and C2Scene_MemberBoardY ($C2:3EAB).
+; Entry: M any (SEP #$20 here), X=0, X = the task, B=0 (the TAX of .Slot;
+;        C2Scene_FaceVelocity leaves it so), DP=$0000 (TDC for 0),
+;        DB=$00 (low WRAM absolute)
+; Exit:  M=1, X=0; X = the task; Y = the task (no new animation) or as
+;        C2Scene_SetWalkAnim leaves it
+; Calls: C2Scene_SetWalkAnim.
+C2Scene_MemberWalkAnim:
+    SEP #$20
+    TXY
+    LDA.w C2Scene_FollowTask.Slot,Y
+    TAX
+    STZ.w !C2Scene_IdleFrames,X
+    TYX
+    LDA.w C2Scene_FollowTask.Facing,X
+    AND.b #!C2Scene_WalkMoving^$FF
+    CMP.w C2Scene_FollowTask.PrevFacing,X
+    BNE .start
+    LDA.w C2Scene_FollowTask.Facing,X
+    BMI .done                   ; already walking that way
+.start:
+    LDA.w C2Scene_FollowTask.Facing,X
+    ORA.b #!C2Scene_WalkMoving
+    STA.w C2Scene_FollowTask.Facing,X
+    TDC                         ; B = 0 for the TAX
+    LDA.w C2Scene_FollowTask.Slot,X
+    TAX
+    LDA.l !Party_Members,X
+    STA.b !C2Scene_AnimChar
+    JSR C2Scene_SetWalkAnim
+.done:
+    RTS
+
+; $C2:41B5 — C2Scene_PathBlocked (80 bytes, $41B5–$4204)
+; Tests the two one-turn paths between 8x8 tiles (C2Scene_RouteFromX,
+; C2Scene_RouteFromY) and (C2Scene_RouteToX, C2Scene_RouteToY) for wall
+; tiles: C2Scene_PathXYBlocked when the path along the row to the target
+; column (C2Scene_ScanRow) and then down that column (C2Scene_ScanCol)
+; has one, C2Scene_PathYXBlocked when the path along the column and then
+; the target row has one.
+; Callers (2 JSR sites): C2Scene_MemberRoute ($C2:3FE0) and C2Scene_MemberRouteTrail ($C2:4097).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00-$15), DB=$00
+;        (WRMPYA/B and RDMPYL absolute); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; A = C2Scene_PathResult (0-3, B = 0); X as the last
+;        scan leaves it (the task or $7000), Y clobbered; C2Tmp_00-$07,
+;        $0E and $10-$15 changed
+; Calls: C2Scene_ScanRow, C2Scene_ScanCol.
+C2Scene_PathBlocked:
+    SEP #$20
+    STZ.b !C2Scene_PathResult
+    LDA.b !C2Scene_RouteFromX
+    STA.b !C2Scene_ScanX
+    LDA.b !C2Scene_RouteFromY
+    STA.b !C2Scene_ScanY
+    LDA.b !C2Scene_RouteToX
+    STA.b !C2Scene_ScanEnd
+    JSR C2Scene_ScanRow
+    BCC .xy_col
+    LDA.b #!C2Scene_PathXYBlocked
+    TSB.b !C2Scene_PathResult
+    BRA .yx
+.xy_col:
+    LDA.b !C2Scene_RouteToY
+    STA.b !C2Scene_ScanEnd
+    JSR C2Scene_ScanCol
+    BCC .yx
+    LDA.b #!C2Scene_PathXYBlocked
+    TSB.b !C2Scene_PathResult
+.yx:
+    LDA.b !C2Scene_RouteFromX
+    STA.b !C2Scene_ScanX
+    LDA.b !C2Scene_RouteFromY
+    STA.b !C2Scene_ScanY
+    LDA.b !C2Scene_RouteToY
+    STA.b !C2Scene_ScanEnd
+    JSR C2Scene_ScanCol
+    BCC .yx_row
+    LDA.b #!C2Scene_PathYXBlocked
+    TSB.b !C2Scene_PathResult
+    BRA .done
+.yx_row:
+    LDA.b !C2Scene_RouteToX
+    STA.b !C2Scene_ScanEnd
+    JSR C2Scene_ScanRow
+    BCC .done
+    LDA.b #!C2Scene_PathYXBlocked
+    TSB.b !C2Scene_PathResult
+.done:
+    TDC                         ; B = 0
+    LDA.b !C2Scene_PathResult
+    RTS
+
+; $C2:4205 — C2Scene_ScanRow (85 bytes, $4205–$4259)
+; Walks C2Scene_ScanX one column at a time to C2Scene_ScanEnd along tile
+; row C2Scene_ScanY - 1 (the row above the point, as the leader's
+; .PropUL/UR), testing each new column's property nibble
+; (C2Scene_GetTileProp, BG2's map and C2Scene_Unk7000) for
+; C2Scene_TilePropWallBits. C=1 at the first wall (C2Scene_ScanX is left
+; on it), C=0 when C2Scene_ScanEnd is reached (or was the start).
+; Callers (2 JSR sites): C2Scene_PathBlocked ($C2:41C5, $C2:41F8).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_00-$07, $10-$15), DB=$00 (WRMPYA/B
+;        and RDMPYL absolute)
+; Exit:  M=1, X=0; C as above; C2Scene_ScanY unchanged, C2Scene_ScanX at
+;        the stop; X = $7000 (C2Scene_Unk7000's address), A, Y
+;        clobbered; C2Scene_PropMap
+;        and C2Scene_PropTable set
+; Calls: C2Scene_GetTileProp.
+C2Scene_ScanRow:
+    LDX.w #(!C2Scene_BgMaps+!C2Scene_MapBytes)&$FFFF ; layer 2's map
+    STX.b !C2Scene_PropMap
+    LDA.b #bank(!C2Scene_BgMaps)
+    STA.b !C2Scene_PropMap+2
+    LDX.w #!C2Scene_Unk7000&$FFFF
+    STX.b !C2Scene_PropTable
+    LDA.b #bank(!C2Scene_Unk7000)
+    STA.b !C2Scene_PropTable+2
+    DEC.b !C2Scene_ScanY
+    SEC
+    LDA.b !C2Scene_ScanEnd
+    SBC.b !C2Scene_ScanX
+    BEQ .open
+    BMI .left
+.right:
+    INC.b !C2Scene_ScanX
+    LDA.b !C2Scene_ScanX
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    AND.b #!C2Scene_TilePropWallBits
+    BNE .wall
+    LDA.b !C2Scene_ScanX
+    CMP.b !C2Scene_ScanEnd
+    BNE .right
+    BRA .open
+.left:
+    DEC.b !C2Scene_ScanX
+    LDA.b !C2Scene_ScanX
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    AND.b #!C2Scene_TilePropWallBits
+    BNE .wall
+    LDA.b !C2Scene_ScanX
+    CMP.b !C2Scene_ScanEnd
+    BNE .left
+.open:
+    INC.b !C2Scene_ScanY
+    CLC
+    RTS
+.wall:
+    INC.b !C2Scene_ScanY
+    SEC
+    RTS
+
+; $C2:425A — C2Scene_ScanCol (131 bytes, $425A–$42DC)
+; C2Scene_ScanRow down or up a column: C2Scene_ScanY (and C2Scene_ScanEnd)
+; are taken one row up, then C2Scene_ScanY walks to C2Scene_ScanEnd
+; testing the two tiles of each new row at columns C2Scene_ScanX - 1 and
+; C2Scene_ScanX (the first kept in the task's .ScanProp) for
+; C2Scene_TilePropWallBits. C=1 at the first wall.
+; Quirk, kept: C2Scene_ScanY is put back afterwards but C2Scene_ScanEnd
+; is left one less (both callers set it again before using it).
+; Callers (2 JSR sites): C2Scene_PathBlocked ($C2:41D4, $C2:41E9).
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_00-$07, $10-$15), DB=$00 (WRMPYA/B
+;        and RDMPYL absolute); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; C as above; X = the task (after a test) or $7000
+;        (C2Scene_Unk7000's address); A, Y clobbered;
+;        C2Scene_PropMap/PropTable set
+; Calls: C2Scene_GetTileProp.
+C2Scene_ScanCol:
+    LDX.w #(!C2Scene_BgMaps+!C2Scene_MapBytes)&$FFFF ; layer 2's map
+    STX.b !C2Scene_PropMap
+    LDA.b #bank(!C2Scene_BgMaps)
+    STA.b !C2Scene_PropMap+2
+    LDX.w #!C2Scene_Unk7000&$FFFF
+    STX.b !C2Scene_PropTable
+    LDA.b #bank(!C2Scene_Unk7000)
+    STA.b !C2Scene_PropTable+2
+    DEC.b !C2Scene_ScanY
+    DEC.b !C2Scene_ScanEnd
+    SEC
+    LDA.b !C2Scene_ScanEnd
+    SBC.b !C2Scene_ScanY
+    BEQ .open
+    BMI .up
+.down:
+    INC.b !C2Scene_ScanY
+    LDA.b !C2Scene_ScanX
+    DEC A
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_FollowTask.ScanProp,X
+    LDA.b !C2Scene_ScanX
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    ORA.w C2Scene_FollowTask.ScanProp,X
+    AND.b #!C2Scene_TilePropWallBits
+    BNE .wall
+    LDA.b !C2Scene_ScanY
+    CMP.b !C2Scene_ScanEnd
+    BNE .down
+    BRA .open
+.up:
+    DEC.b !C2Scene_ScanY
+    LDA.b !C2Scene_ScanX
+    DEC A
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_FollowTask.ScanProp,X
+    LDA.b !C2Scene_ScanX
+    STA.b !C2Scene_PropCol
+    LDA.b !C2Scene_ScanY
+    STA.b !C2Scene_PropRow
+    JSR C2Scene_GetTileProp
+    LDX.b !C2Scene_TaskCur
+    ORA.w C2Scene_FollowTask.ScanProp,X
+    AND.b #!C2Scene_TilePropWallBits
+    BNE .wall
+    LDA.b !C2Scene_ScanY
+    CMP.b !C2Scene_ScanEnd
+    BNE .up
+.open:
+    INC.b !C2Scene_ScanY
+    CLC
+    RTS
+.wall:
+    INC.b !C2Scene_ScanY
+    SEC
+    RTS
+
+; ============================================================
+; Scene WRAM table setup ($C2:5775–$C2:57DE)
+; ============================================================
+
+org $C25775
+; $C2:5775 — C2Scene_Unk5775 (35 bytes, $5775–$5797)
+; Copies C2Scene_Unk8600Init (4 bytes) to C2Scene_Unk8600 and
+; C2Scene_Unk8604Init (C2Scene_Unk8604Size bytes, MVN) to
+; C2Scene_Unk8604. What reads them is not traced (they sit just before
+; C2Scene_HdmaArea, so probably HDMA tables).
+; Callers (1 JSR site): C2Scene_ReloadScene ($C2:2C93).
+; Callers note: xref also lists a doubtful byte pattern at $C2:564F.
+; Entry: M any (REP #$20 here), X=0 (16-bit MVN counts), DP any, DB any
+;        (saved around the MVN, which leaves it at $7E)
+; Exit:  M=1, X=0; DB unchanged; A = $FFFF; X = the end of the source,
+;        Y = the end of the copy
+; No calls.
+C2Scene_Unk5775:
+    REP #$20
+    LDA.l C2Scene_Unk8600Init
+    STA.l !C2Scene_Unk8600
+    LDA.l C2Scene_Unk8600Init+2
+    STA.l !C2Scene_Unk8600+2
+    PHB
+    LDX.w #C2Scene_Unk8604Init
+    LDY.w #!C2Scene_Unk8604&$FFFF
+    LDA.w #!C2Scene_Unk8604Size-1
+    MVN bank(!C2Scene_Unk8604),bank(C2Scene_Unk8604Init) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; $C2:5798 — C2Scene_ClearUnk8621 (24 bytes, $5798–$57AF)
+; Zeroes the first C2Scene_Unk8621Bytes bytes of C2Scene_HdmaArea
+; ($7E:8621-$8A20, up to C2Scene_HdmaValues): a zero word at the start,
+; then an overlapping MVN.
+; Callers (3 JSR sites): unmatched ($C2:5707, $C2:5719, $C2:6965).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (TDC for 0), DB any
+;        (saved around the MVN)
+; Exit:  M=1, X=0; DB unchanged; A = $FFFF; X = $8A20, Y = $8A21
+; No calls.
+C2Scene_ClearUnk8621:
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_HdmaArea
+    LDX.w #!C2Scene_HdmaArea&$FFFF
+    LDY.w #(!C2Scene_HdmaArea+1)&$FFFF
+    LDA.w #!C2Scene_Unk8621Bytes-2
+    MVN !Bank7E,!Bank7E         ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; $C2:57B0 — C2Scene_Unk57B0 (18 bytes, $57B0–$57C1)
+; Data with no reference found in the bank (no pointer to any of its
+; bytes): 0, 1, 2, 3, 3, 4, 5, 6, 6, two zeros, then $F4 down to $D0 in
+; steps of 6. Use unknown.
+C2Scene_Unk57B0:
+    db $00,$01,$02,$03,$03,$04,$05,$06,$06,$00
+    db $00,$F4,$EE,$E8,$E2,$DC,$D6,$D0
+
+; $C2:57C2 — C2Scene_Unk8600Init (4 bytes, $57C2–$57C5)
+; C2Scene_Unk5775's source for C2Scene_Unk8600.
+C2Scene_Unk8600Init:
+    db $04,$04,$86,$00
+
+; $C2:57C6 — C2Scene_Unk8604Init (25 bytes, $57C6–$57DE)
+; C2Scene_Unk5775's source for C2Scene_Unk8604: a 0 word, $D0, then
+; five groups $E0+2n,$01,$10+16n,$D0 (n = 0-4), and $EA,$01.
+C2Scene_Unk8604Init:
+    db $00,$00,$D0
+    db $E0,$01,$10,$D0
+    db $E2,$01,$20,$D0
+    db $E4,$01,$30,$D0
+    db $E6,$01,$40,$D0
+    db $E8,$01,$50,$D0
+    db $EA,$01
+
+; ============================================================
 ; Text window entries ($C2:57DF–$C2:58B1)
 ; ============================================================
 ; A text box drawn into a buffer one step at a time, called from other
@@ -10149,7 +13056,7 @@ C2Scene_TrigListAB:
 ; caller fills first: the field ($C0:20F4-$C0:2121) sets the string
 ; number, the string table, the output buffer ($7E:F000) and the mode,
 ; and before each step the character count. The text decoder itself
-; (TextWin_StateTable's handlers) is not matched.
+; is TextWin_StateTable's handlers, TextWin_State0-3 (below).
 
 org $C257DF
 ; $C2:57DF — TextWin_Init (68 bytes, $57DF–$5822)
@@ -10362,7 +13269,7 @@ TextWin_StatusPenIndent:        ; header: see TextWin_StatusRun
 ; TextWin_Step's state handlers (TextWin_StateTable) and the routines
 ; they use, all on the $0200 block (DP=TextWin_Dp). A string is a run of
 ; bytes at TextWin_TextPtr:
-; - $A0-$FF: a glyph, drawn by TextWin_DrawGlyph (not matched). The
+; - $A0-$FF: a glyph, drawn by TextWin_DrawGlyph. The
 ;   digit table TextWin_HexGlyphs gives "0"-"9" as $D4-$DD and "A"-"F"
 ;   as $A0-$A5, so $A0-$B9 are probably "A"-"Z" and $BA-$D3 "a"-"z"
 ;   (the ROM names below read as words that way);
@@ -10397,9 +13304,7 @@ TextWin_StatusPenIndent:        ; header: see TextWin_StatusRun
 ; Callers (3 JMP sites): TextWin_State1Resume ($C2:5C39), TextWin_State2Resume ($C2:5C72) and
 ;   TextWin_State3Resume ($C2:5CBB).
 ; Callers of TextWin_State0_Draw (1 JMP site): TextWin_CodeWide ($C2:5B11).
-; Callers note: none direct (TextWin_StateTable entry 0); TextWin_State0_Draw:
-;   JMP from TextWin_CodeWide; TextWin_State0: JMP from
-;   TextWin_State1Resume, TextWin_State2Resume and TextWin_State3Resume.
+; Callers note: also TextWin_StateTable entry 0, through TextWin_Step.
 ; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner)
 ; Exit:  M=1, X=0; A, X, Y as the path leaves them; TextWin_TextPtr
 ;        advanced
@@ -11402,6 +14307,699 @@ TextWin_TrimZeros3:             ; header: see TextWin_TrimZeros8
     RTS
 
 ; ============================================================
+; Text window glyph drawing and decimal digits ($C2:5DC4–$C2:6262)
+; ============================================================
+; The text decoder's back end: TextWin_DrawGlyph puts one glyph into the
+; output buffer and moves the pen; TextWin_Dec8/16/24 turn the number
+; codes' values into decimal digits. Data: the character name pointers,
+; the buffer tile offsets, the glyph widths and the "Nadia" string.
+
+; $C2:5DC4 — TextWin_DrawGlyph (114 bytes, $5DC4–$5E35)
+; Draws glyph TextWin_Glyph at TextWin_PenX into TextWin_GfxBuf and
+; moves the pen on by the glyph's width:
+; - TextWin_FontPtr = TextWinRom_Font + glyph * 24, TextWin_FontNibPtr =
+;   TextWinRom_FontRight + glyph / 2 * 24 (16-bit glyph, bank $FF);
+;   TextWin_OutPtr = TextWin_GfxBuf + TextWin_GlyphTopSkip;
+;   TextWin_PenShift = pen AND 7, TextWin_PenTile2 = the pen's tile * 2;
+;   TextWin_GlyphLow = the glyph's low byte;
+; - TextWin_Blit2bpp when TextWin_Mode AND TextWin_ModeBlitMask is 0,
+;   else TextWin_Blit4bpp;
+; - TextWin_PenX + entry (glyph low byte - TextWin_FirstGlyph) of
+;   TextWin_GlyphWidths; TextWin_Unk17 + 1.
+; Quirk, kept: the width index is the low byte only, so a glyph $01xx or
+; $02xx (TextWin_Wide1/2) with a low byte under $A0 reads past the
+; 96-byte table (into TextWin_StrNadia and the code after it).
+; Callers (4 JSR sites): TextWin_State0_Draw ($C2:58C4), TextWin_State1 ($C2:5C12), TextWin_State2
+;   ($C2:5C4B) and TextWin_State3 ($C2:5C94).
+; Entry: M any (REP #$20 here), X=0, DP=$0200 (TextWin_Dp), DB any (the
+;        blitters set their own)
+; Exit:  M=1, X=0; A = $0000 (B = 0); X = the width index; Y as the
+;        blitter leaves it; TextWin_PenX and TextWin_Unk17 moved on;
+;        dp $60-$64, $68, $6A-$6F and $73-$7B (the work bytes) changed
+; Calls: TextWin_Blit2bpp or TextWin_Blit4bpp.
+TextWin_DrawGlyph:
+    REP #$20
+    LDA.b !TextWin_Glyph
+    ASL A
+    ASL A
+    ASL A
+    STA.b !TextWin_GlyphX8
+    ASL A
+    ADC.b !TextWin_GlyphX8      ; glyph * 24 (C = 0 from the ASL of a small code)
+    CLC
+    ADC.w #!TextWinRom_Font&$FFFF
+    STA.b !TextWin_FontPtr
+    LDA.b !TextWin_Glyph
+    LSR A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !TextWin_GlyphX8
+    ASL A
+    ADC.b !TextWin_GlyphX8
+    CLC
+    ADC.w #!TextWinRom_FontRight&$FFFF
+    STA.b !TextWin_FontNibPtr
+    LDA.b !TextWin_PenX
+    AND.w #!TextWin_PenShiftMask
+    STA.b !TextWin_PenShift
+    LDA.b !TextWin_GfxBuf
+    CLC
+    ADC.w #!TextWin_GlyphTopSkip
+    STA.b !TextWin_OutPtr
+    SEP #$20
+    LDA.b !TextWin_GfxBuf+2
+    STA.b !TextWin_OutPtr+2
+    LDA.b #bank(!TextWinRom_Font)
+    STA.b !TextWin_FontPtr+2
+    STA.b !TextWin_FontNibPtr+2
+    LDA.b !TextWin_PenX
+    AND.b #!TextWin_PenTileMask
+    LSR A
+    LSR A
+    STA.b !TextWin_PenTile2
+    STZ.b !TextWin_PenTile2+1
+    LDA.b !TextWin_Glyph
+    STA.b !TextWin_GlyphLow
+    LDA.b !TextWin_Mode
+    AND.b #!TextWin_ModeBlitMask
+    BNE .blit4bpp
+    JSR TextWin_Blit2bpp
+    BRA .advance
+.blit4bpp:
+    JSR TextWin_Blit4bpp
+.advance:
+    LDA.b #0
+    XBA                         ; B = 0 for the TAX
+    SEC
+    LDA.b !TextWin_Glyph
+    SBC.b #!TextWin_FirstGlyph
+    TAX
+    CLC
+    LDA.l TextWin_GlyphWidths,X
+    ADC.b !TextWin_PenX
+    STA.b !TextWin_PenX
+    INC.b !TextWin_Unk17
+    LDA.b #0
+    XBA
+    RTS
+
+; $C2:5E36 — TextWin_Blit2bpp (83 bytes, $5E36–$5E88)
+; Draws the glyph's 24 bytes with TextWin_Blit2bppRow, one per
+; TextWin_GlyphRow: the first 8 (TextWin_GlyphTopPairs pairs) at
+; TextWin_OutPtr on, then TextWin_OutPtr + TextWin_NextRow2bpp and the
+; other 16, TextWin_OutPtr + 1 after each byte. So the glyph starts 8
+; bytes into its tile row and goes on $100 bytes further: the buffer is
+; probably 2bpp tiles, rows of 16 tiles $100 bytes apart (see
+; TextWin_TileOfs2bpp).
+; Callers (1 JSR site): TextWin_DrawGlyph ($C2:5E16).
+; Entry: M=1, X=0, DP=$0200, DB any (set to $C2 for the offset table and
+;        restored); TextWin_DrawGlyph's work bytes set
+; Exit:  M=1, X=0; DB unchanged; A, X, Y clobbered; TextWin_RowCount 0,
+;        TextWin_GlyphRow 24, TextWin_OutPtr moved on
+; Calls: TextWin_Blit2bppRow.
+TextWin_Blit2bpp:
+    PHB
+    LDA.b #bank(TextWin_TileOfs2bpp)
+    PHA
+    PLB
+    LDA.b #!TextWin_GlyphTopPairs
+    STA.b !TextWin_RowCount
+    STZ.b !TextWin_GlyphRow
+    STZ.b !TextWin_GlyphRow+1
+.top:
+    JSR TextWin_Blit2bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    JSR TextWin_Blit2bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    DEC.b !TextWin_RowCount
+    BNE .top
+    REP #$20
+    LDA.b !TextWin_OutPtr
+    CLC
+    ADC.w #!TextWin_NextRow2bpp
+    STA.b !TextWin_OutPtr
+    SEP #$20
+    LDA.b #!TextWin_GlyphLowPairs
+    STA.b !TextWin_RowCount
+.low:
+    JSR TextWin_Blit2bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    JSR TextWin_Blit2bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    DEC.b !TextWin_RowCount
+    BNE .low
+    PLB
+    RTS
+
+; $C2:5E89 — TextWin_Blit2bppRow (38 bytes, $5E89–$5EAE, with the table
+; TextWin_Blit2bppShifts and the shift entries TextWin_Blit2bppShr0
+; $C2:5EBF, TextWin_Blit2bppShr4, TextWin_Blit2bppShr3,
+; TextWin_Blit2bppShr2, TextWin_Blit2bppShr1 $C2:5ECF-$5ED2,
+; TextWin_Blit2bppShl3, TextWin_Blit2bppShl2 and TextWin_Blit2bppShl1
+; $C2:5EE5/$5EE8/$5EEB, to $5F06)
+; One glyph byte: A = byte TextWin_GlyphRow of TextWin_FontPtr in the
+; high byte and of TextWin_FontNibPtr in the low (its high nibble for an
+; even TextWin_GlyphLow, its low nibble moved up for an odd one): 12
+; pixels in bits 15-4. Then, by TextWin_PenShift through
+; TextWin_Blit2bppShifts:
+; - 0: high byte stored in the pen's tile, low byte in the next;
+; - 1-4: shifted right that many times; the high byte ORed into the
+;   pen's tile, the low stored in the next;
+; - 5-7: shifted left 3/2/1 times into TextWin_GlyphSpill (a right shift
+;   by 5-7 across three tiles): the spill ORed into the pen's tile, the
+;   high byte stored in the next, the low byte in the one after.
+; Each tile's byte is at TextWin_OutPtr + its TextWin_TileOfs2bpp word
+; (entry TextWin_PenTile2 / 2, + 1, + 2).
+; Callers (4 JSR sites): TextWin_Blit2bpp ($C2:5E43, $C2:5E4E, $C2:5E6D, $C2:5E78).
+; Entry: M=1, X=0, DP=$0200, DB=$C2 (the offset table; TextWin_Blit2bpp
+;        sets it)
+; Exit:  M=1, X=0; X = TextWin_PenTile2; Y = the last offset; A = the
+;        last byte stored; TextWin_GlyphSpill set
+; No calls.
+TextWin_Blit2bppRow:
+    LDY.b !TextWin_GlyphRow
+    LDA.b [!TextWin_FontPtr],Y
+    XBA
+    LDA.b !TextWin_GlyphLow
+    LSR A
+    BCC .even
+    LDA.b [!TextWin_FontNibPtr],Y
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    BRA .row
+.even:
+    LDA.b [!TextWin_FontNibPtr],Y
+    AND.b #!TextWin_RightNibble
+.row:
+    REP #$20
+    TAY
+    STZ.b !TextWin_GlyphSpill
+    LDA.b !TextWin_PenShift
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    TYA
+    JMP (TextWin_Blit2bppShifts,X)
+
+; $C2:5EAF — TextWin_Blit2bppShifts (8 words, $5EAF–$5EBE)
+; TextWin_Blit2bppRow's entry for each pen shift 0-7.
+TextWin_Blit2bppShifts:
+    dw TextWin_Blit2bppShr0     ; 0
+    dw TextWin_Blit2bppShr1     ; 1
+    dw TextWin_Blit2bppShr2     ; 2
+    dw TextWin_Blit2bppShr3     ; 3
+    dw TextWin_Blit2bppShr4     ; 4
+    dw TextWin_Blit2bppShl3     ; 5
+    dw TextWin_Blit2bppShl2     ; 6
+    dw TextWin_Blit2bppShl1     ; 7
+
+TextWin_Blit2bppShr0:           ; header: see TextWin_Blit2bppRow
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs2bpp+2,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs2bpp,X
+    XBA
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+TextWin_Blit2bppShr4:           ; header: see TextWin_Blit2bppRow
+    LSR A
+TextWin_Blit2bppShr3:           ; header: see TextWin_Blit2bppRow
+    LSR A
+TextWin_Blit2bppShr2:           ; header: see TextWin_Blit2bppRow
+    LSR A
+TextWin_Blit2bppShr1:           ; header: see TextWin_Blit2bppRow
+    LSR A
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs2bpp+2,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs2bpp,X
+    XBA
+    ORA.b [!TextWin_OutPtr],Y
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+TextWin_Blit2bppShl3:           ; header: see TextWin_Blit2bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+TextWin_Blit2bppShl2:           ; header: see TextWin_Blit2bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+TextWin_Blit2bppShl1:           ; header: see TextWin_Blit2bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs2bpp+4,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs2bpp+2,X
+    XBA
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs2bpp,X
+    LDA.b !TextWin_GlyphSpill
+    ORA.b [!TextWin_OutPtr],Y
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+; $C2:5F07 — TextWin_Blit4bpp (83 bytes, $5F07–$5F59)
+; As TextWin_Blit2bpp with TextWin_Blit4bppRow and
+; TextWin_NextRow4bpp: the second part goes $200 bytes on, and the tiles
+; are TextWin_TileOfs4bpp's, $20 bytes apart (probably 4bpp tiles, the
+; glyph in their first two planes).
+; Callers (1 JSR site): TextWin_DrawGlyph ($C2:5E1B).
+; Entry: M=1, X=0, DP=$0200, DB any (set to $C2 for the offset table and
+;        restored); TextWin_DrawGlyph's work bytes set
+; Exit:  M=1, X=0; DB unchanged; A, X, Y clobbered; TextWin_RowCount 0,
+;        TextWin_GlyphRow 24, TextWin_OutPtr moved on
+; Calls: TextWin_Blit4bppRow.
+TextWin_Blit4bpp:
+    PHB
+    LDA.b #bank(TextWin_TileOfs4bpp)
+    PHA
+    PLB
+    LDA.b #!TextWin_GlyphTopPairs
+    STA.b !TextWin_RowCount
+    STZ.b !TextWin_GlyphRow
+    STZ.b !TextWin_GlyphRow+1
+.top:
+    JSR TextWin_Blit4bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    JSR TextWin_Blit4bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    DEC.b !TextWin_RowCount
+    BNE .top
+    REP #$20
+    CLC
+    LDA.b !TextWin_OutPtr
+    ADC.w #!TextWin_NextRow4bpp
+    STA.b !TextWin_OutPtr
+    SEP #$20
+    LDA.b #!TextWin_GlyphLowPairs
+    STA.b !TextWin_RowCount
+.low:
+    JSR TextWin_Blit4bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    JSR TextWin_Blit4bppRow
+    REP #$20
+    INC.b !TextWin_GlyphRow
+    INC.b !TextWin_OutPtr
+    SEP #$20
+    DEC.b !TextWin_RowCount
+    BNE .low
+    PLB
+    RTS
+
+; $C2:5F5A — TextWin_Blit4bppRow (38 bytes, $5F5A–$5F7F, with the table
+; TextWin_Blit4bppShifts and the shift entries TextWin_Blit4bppShr0
+; $C2:5F90, TextWin_Blit4bppShr4, TextWin_Blit4bppShr3,
+; TextWin_Blit4bppShr2, TextWin_Blit4bppShr1 $C2:5FA0-$5FA3,
+; TextWin_Blit4bppShl3, TextWin_Blit4bppShl2 and TextWin_Blit4bppShl1
+; $C2:5FB6/$5FB9/$5FBC, to $5FD7)
+; TextWin_Blit2bppRow with the tile offsets of TextWin_TileOfs4bpp.
+; Callers (4 JSR sites): TextWin_Blit4bpp ($C2:5F14, $C2:5F1F, $C2:5F3E, $C2:5F49).
+; Entry: M=1, X=0, DP=$0200, DB=$C2 (the offset table; TextWin_Blit4bpp
+;        sets it)
+; Exit:  M=1, X=0; X = TextWin_PenTile2; Y = the last offset; A = the
+;        last byte stored; TextWin_GlyphSpill set
+; No calls.
+TextWin_Blit4bppRow:
+    LDY.b !TextWin_GlyphRow
+    LDA.b [!TextWin_FontPtr],Y
+    XBA
+    LDA.b !TextWin_GlyphLow
+    LSR A
+    BCC .even
+    LDA.b [!TextWin_FontNibPtr],Y
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    BRA .row
+.even:
+    LDA.b [!TextWin_FontNibPtr],Y
+    AND.b #!TextWin_RightNibble
+.row:
+    REP #$20
+    TAY
+    STZ.b !TextWin_GlyphSpill
+    LDA.b !TextWin_PenShift
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    TYA
+    JMP (TextWin_Blit4bppShifts,X)
+
+; $C2:5F80 — TextWin_Blit4bppShifts (8 words, $5F80–$5F8F)
+; TextWin_Blit4bppRow's entry for each pen shift 0-7.
+TextWin_Blit4bppShifts:
+    dw TextWin_Blit4bppShr0     ; 0
+    dw TextWin_Blit4bppShr1     ; 1
+    dw TextWin_Blit4bppShr2     ; 2
+    dw TextWin_Blit4bppShr3     ; 3
+    dw TextWin_Blit4bppShr4     ; 4
+    dw TextWin_Blit4bppShl3     ; 5
+    dw TextWin_Blit4bppShl2     ; 6
+    dw TextWin_Blit4bppShl1     ; 7
+
+TextWin_Blit4bppShr0:           ; header: see TextWin_Blit4bppRow
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs4bpp+2,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs4bpp,X
+    XBA
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+TextWin_Blit4bppShr4:           ; header: see TextWin_Blit4bppRow
+    LSR A
+TextWin_Blit4bppShr3:           ; header: see TextWin_Blit4bppRow
+    LSR A
+TextWin_Blit4bppShr2:           ; header: see TextWin_Blit4bppRow
+    LSR A
+TextWin_Blit4bppShr1:           ; header: see TextWin_Blit4bppRow
+    LSR A
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs4bpp+2,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs4bpp,X
+    XBA
+    ORA.b [!TextWin_OutPtr],Y
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+TextWin_Blit4bppShl3:           ; header: see TextWin_Blit4bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+TextWin_Blit4bppShl2:           ; header: see TextWin_Blit4bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+TextWin_Blit4bppShl1:           ; header: see TextWin_Blit4bppRow
+    ASL A
+    ROL.b !TextWin_GlyphSpill
+    SEP #$20
+    LDX.b !TextWin_PenTile2
+    LDY.w TextWin_TileOfs4bpp+4,X
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs4bpp+2,X
+    XBA
+    STA.b [!TextWin_OutPtr],Y
+    LDY.w TextWin_TileOfs4bpp,X
+    LDA.b !TextWin_GlyphSpill
+    ORA.b [!TextWin_OutPtr],Y
+    STA.b [!TextWin_OutPtr],Y
+    RTS
+
+; $C2:5FD8 — TextWin_CharNamePtrs (7 words, $5FD8–$5FE5)
+; The 16-bit addresses (bank $7E) of the first 7 names at
+; TextWin_CharNames, TextWin_CharNameSize bytes apart (codes $11 and
+; $13-$19).
+TextWin_CharNamePtrs:
+    dw (!TextWin_CharNames+(0*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(1*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(2*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(3*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(4*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(5*!TextWin_CharNameSize))&$FFFF
+    dw (!TextWin_CharNames+(6*!TextWin_CharNameSize))&$FFFF
+
+; $C2:5FE6 — TextWin_TileOfs2bpp (64 words, $5FE6–$6065)
+; TextWin_Blit2bppRow: the TextWin_GfxBuf offset of each 8-pixel tile
+; column of the pen (index pen / 8; the glyph spans up to three, + 1 and
+; + 2). Columns 0-15 are $10 bytes apart from $000, 16-31 from $200; 32-47
+; ($100 on) and 48-63 ($300 on) are only reached past column 31 (the
+; tile row below the first two blocks).
+TextWin_TileOfs2bpp:
+    dw $0000,$0010,$0020,$0030,$0040,$0050,$0060,$0070
+    dw $0080,$0090,$00A0,$00B0,$00C0,$00D0,$00E0,$00F0
+    dw $0200,$0210,$0220,$0230,$0240,$0250,$0260,$0270
+    dw $0280,$0290,$02A0,$02B0,$02C0,$02D0,$02E0,$02F0
+    dw $0100,$0110,$0120,$0130,$0140,$0150,$0160,$0170
+    dw $0180,$0190,$01A0,$01B0,$01C0,$01D0,$01E0,$01F0
+    dw $0300,$0310,$0320,$0330,$0340,$0350,$0360,$0370
+    dw $0380,$0390,$03A0,$03B0,$03C0,$03D0,$03E0,$03F0
+
+; $C2:6066 — TextWin_TileOfs4bpp (64 words, $6066–$60E5)
+; As TextWin_TileOfs2bpp for TextWin_Blit4bppRow, $20 bytes per tile:
+; columns 0-15 from $000, 16-31 from $400, then $200 and $600.
+TextWin_TileOfs4bpp:
+    dw $0000,$0020,$0040,$0060,$0080,$00A0,$00C0,$00E0
+    dw $0100,$0120,$0140,$0160,$0180,$01A0,$01C0,$01E0
+    dw $0400,$0420,$0440,$0460,$0480,$04A0,$04C0,$04E0
+    dw $0500,$0520,$0540,$0560,$0580,$05A0,$05C0,$05E0
+    dw $0200,$0220,$0240,$0260,$0280,$02A0,$02C0,$02E0
+    dw $0300,$0320,$0340,$0360,$0380,$03A0,$03C0,$03E0
+    dw $0600,$0620,$0640,$0660,$0680,$06A0,$06C0,$06E0
+    dw $0700,$0720,$0740,$0760,$0780,$07A0,$07C0,$07E0
+
+; $C2:60E6 — TextWin_GlyphWidths (96 bytes, $60E6–$6145)
+; The pen advance in pixels of each glyph $A0-$FF (TextWin_DrawGlyph;
+; index glyph - TextWin_FirstGlyph). $A0-$B9 are the capitals and
+; $BA-$D3 the small letters ("A" $A0, "a" $BA; TextWin_HexGlyphs,
+; TextWin_StrNadia; probably), $D4-$DD the digits; glyphs $F2 and
+; $F4-$FE have width 0.
+TextWin_GlyphWidths:
+    db $07,$07,$07,$07,$06,$06,$07,$07,$05,$07,$08,$06,$09,$08,$07,$07 ; $A0
+    db $07,$07,$06,$07,$07,$07,$0B,$07,$07,$07,$07,$07,$06,$07,$07,$06 ; $B0
+    db $07,$07,$03,$06,$07,$03,$0B,$07,$07,$07,$07,$06,$06,$05,$07,$07 ; $C0
+    db $0B,$07,$07,$07,$07,$04,$07,$07,$08,$07,$07,$07,$07,$07,$03,$07 ; $D0
+    db $05,$08,$06,$03,$09,$04,$04,$03,$03,$03,$08,$08,$08,$09,$0B,$04 ; $E0
+    db $0B,$09,$00,$09,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$04 ; $F0
+
+; $C2:6146 — TextWin_StrNadia (5 bytes, $6146–$614A)
+; Glyphs "Nadia" (TextWin_CodeNadia, code $1E).
+TextWin_StrNadia:
+    db $AD,$BA,$BD,$C2,$BA
+
+; $C2:614B — TextWin_DivBits (19 bytes, $614B–$615D)
+; One decimal digit by shift and subtract: TextWin_DivQuot = A /
+; divisor, A = the remainder, for a divisor that the caller put in
+; TextWin_DivSub shifted left by Y - 1 (Y = the quotient bits). Each
+; pass: if A >= TextWin_DivSub, A - TextWin_DivSub and a 1 bit, else a
+; 0, into TextWin_DivQuot; TextWin_DivSub / 2. Works in the caller's
+; width: 8-bit for TextWin_Dec8, 16-bit for TextWin_Dec16 (then
+; TextWin_DivQuot's second byte is zeroed too).
+; Callers (6 JSR sites): TextWin_Dec8 ($C2:616A, $C2:6176) and TextWin_Dec16 ($C2:618C, $C2:6198,
+;   $C2:61A4, $C2:61B0).
+; Entry: M=1 or 0 (the operand width), X=0, DP=$0200, DB any; A = the
+;        value; TextWin_DivSub = the shifted divisor; Y = the bit count
+; Exit:  M, X unchanged; A = the remainder; TextWin_DivQuot = the digit;
+;        TextWin_DivSub shifted right Y times; Y = 4 (the next digit's
+;        bit count for the callers); X unchanged
+; No calls.
+TextWin_DivBits:
+    STZ.b !TextWin_DivQuot
+.next:
+    CMP.b !TextWin_DivSub
+    BCC .bit
+    SBC.b !TextWin_DivSub
+.bit:
+    ROL.b !TextWin_DivQuot
+    LSR.b !TextWin_DivSub
+    DEY
+    BNE .next
+    LDY.w #4
+    RTS
+
+; $C2:615E — TextWin_Dec8 (34 bytes, $615E–$617F)
+; TextWin_NumValue's first byte as 3 decimal digits (0-9 each) at
+; TextWin_DecDigits, most significant first (TextWin_DivBits by 100 and
+; 10; the remainder is the last digit). Each digit is stored as a word,
+; the next store replacing its second byte.
+; Callers (1 JSR site): TextWin_CodeNum8 ($C2:5961).
+; Entry: M any (SEP #$20 here), X=0, DP=$0200, DB any
+; Exit:  M=1, X=0; A = the last digit; X = the word at TextWin_DivQuot
+;        (the tens digit, high byte not cleared); Y = 4; TextWin_DivSub
+;        changed
+; Calls: TextWin_DivBits.
+TextWin_Dec8:
+    SEP #$20
+    LDA.b !TextWin_NumValue
+    LDY.w #2
+    LDX.w #!TextWin_Dec8First
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits
+    LDX.w #!TextWin_DecTens
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits+1
+    STA.b !TextWin_DecDigits+2
+    RTS
+
+; $C2:6180 — TextWin_Dec16 (61 bytes, $6180–$61BC)
+; TextWin_NumValue's first word as 5 decimal digits at TextWin_DecDigits
+; (TextWin_DivBits in 16 bits by 10000, 1000, 100 and 10; the remainder
+; is the last digit, stored as a word: TextWin_DecDigits+5 = 0).
+; Callers (1 JSR site): TextWin_CodeNum16 ($C2:5998).
+; Entry: M any (REP #$20 here), X=0, DP=$0200 (TDC at the end), DB any
+; Exit:  M=1, X=0; A = $0200 (TDC: A = $00, B = $02); X = the tens digit;
+;        Y = 4; TextWin_DivSub, TextWin_DivQuot changed
+; Calls: TextWin_DivBits.
+TextWin_Dec16:
+    REP #$20
+    LDA.b !TextWin_NumValue
+    LDY.w #3
+    LDX.w #!TextWin_Dec16First
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits
+    LDX.w #!TextWin_DecThousands
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits+1
+    LDX.w #!TextWin_DecHundreds
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits+2
+    LDX.w #!TextWin_DecTens
+    STX.b !TextWin_DivSub
+    JSR TextWin_DivBits
+    LDX.b !TextWin_DivQuot
+    STX.b !TextWin_DecDigits+3
+    STA.b !TextWin_DecDigits+4
+    TDC
+    SEP #$20
+    RTS
+
+; $C2:61BD — TextWin_Dec24 (116 bytes, $61BD–$6230)
+; TextWin_NumValue's 24 bits as 8 decimal digits at TextWin_DecDigits
+; (TextWin_Div24Bits by 10000000 ... 10; the last digit is what is left
+; of TextWin_NumValue's first byte). TextWin_NumValue is used up (left as
+; the last digit).
+; Callers (1 JSR site): TextWin_CodeNum24 ($C2:59E6).
+; Entry: M any (SEP #$20 here), X=0, DP=$0200, DB any
+; Exit:  M=1, X=0; A = the last digit; X = the tens digit and the
+;        divisor's next byte; Y = 4; TextWin_NumValue,
+;        TextWin_Div24Quot/Sub changed
+; Calls: TextWin_Div24Bits.
+TextWin_Dec24:
+    SEP #$20
+    LDY.w #1
+    LDX.w #!TextWin_Dec24First&$FFFF
+    STX.b !TextWin_Div24Sub
+    LDA.b #!TextWin_Dec24First>>16
+    STA.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits
+    LDX.w #!TextWin_DecMillions&$FFFF
+    STX.b !TextWin_Div24Sub
+    LDA.b #!TextWin_DecMillions>>16
+    STA.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+1
+    LDX.w #!TextWin_DecHundredK&$FFFF
+    STX.b !TextWin_Div24Sub
+    LDA.b #!TextWin_DecHundredK>>16
+    STA.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+2
+    LDX.w #!TextWin_DecTenK&$FFFF
+    STX.b !TextWin_Div24Sub
+    LDA.b #!TextWin_DecTenK>>16
+    STA.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+3
+    LDX.w #!TextWin_DecThousands
+    STX.b !TextWin_Div24Sub
+    STZ.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+4
+    LDX.w #!TextWin_DecHundreds
+    STX.b !TextWin_Div24Sub
+    STZ.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+5
+    LDX.w #!TextWin_DecTens
+    STX.b !TextWin_Div24Sub
+    STZ.b !TextWin_Div24Sub+2
+    JSR TextWin_Div24Bits
+    LDX.b !TextWin_Div24Quot
+    STX.b !TextWin_DecDigits+6
+    LDA.b !TextWin_NumValue
+    STA.b !TextWin_DecDigits+7
+    RTS
+
+; $C2:6231 — TextWin_Div24Bits (50 bytes, $6231–$6262)
+; TextWin_DivBits for 24 bits, in place: TextWin_NumValue (3 bytes) is
+; the value and becomes the remainder; TextWin_Div24Sub (3 bytes, shifted
+; left by Y - 1) the divisor; TextWin_Div24Quot gets Y quotient bits.
+; Each pass subtracts only when the trial subtraction does not borrow.
+; Callers (7 JSR sites): TextWin_Dec24 ($C2:61CB, $C2:61DB, $C2:61EB, $C2:61FB, $C2:6209, $C2:6217,
+;   $C2:6225).
+; Entry: M=1, X=0, DP=$0200, DB any; Y = the bit count
+; Exit:  M=1, X=0; Y = 4; A clobbered; TextWin_NumValue, TextWin_Div24Quot and
+;        TextWin_Div24Sub changed; X unchanged
+; No calls.
+TextWin_Div24Bits:
+    STZ.b !TextWin_Div24Quot
+.next:
+    SEC
+    LDA.b !TextWin_NumValue
+    SBC.b !TextWin_Div24Sub
+    LDA.b !TextWin_NumValue+1
+    SBC.b !TextWin_Div24Sub+1
+    LDA.b !TextWin_NumValue+2
+    SBC.b !TextWin_Div24Sub+2
+    BCC .bit
+    LDA.b !TextWin_NumValue
+    SBC.b !TextWin_Div24Sub
+    STA.b !TextWin_NumValue
+    LDA.b !TextWin_NumValue+1
+    SBC.b !TextWin_Div24Sub+1
+    STA.b !TextWin_NumValue+1
+    LDA.b !TextWin_NumValue+2
+    SBC.b !TextWin_Div24Sub+2
+    STA.b !TextWin_NumValue+2
+.bit:
+    ROL.b !TextWin_Div24Quot
+    LSR.b !TextWin_Div24Sub+2
+    ROR.b !TextWin_Div24Sub+1
+    ROR.b !TextWin_Div24Sub
+    DEY
+    BNE .next
+    LDY.w #4
+    RTS
+
+; ============================================================
 ; Tile trigger list readers ($C2:6263–$C2:6290)
 ; ============================================================
 ; Read the entries C2Scene_FindTrigEntries found (offsets in the three
@@ -11454,6 +15052,94 @@ C2Scene_GetListCUnk03:
     LDX.w !C2Scene_Unk1B32+4
     LDA.l !C2Scene_ListC+!C2Scene_ListBCEntrySize,X
     STA.w !C2Scene_Unk1B47
+    RTS
+
+; ============================================================
+; Metatile map and tile property lookups ($C2:6291–$C2:62EC)
+; ============================================================
+; Both index a 96-column metatile map (C2Scene_MapCols, through the
+; hardware multiplier) at C2Scene_PropMap; C2Scene_GetTileProp then
+; reads C2Scene_PropTable, two bytes per metatile number (top and
+; bottom row of 8x8 tiles), a nibble per 8x8 tile (high: left).
+
+; $C2:6291 — C2Scene_GetMapCell (29 bytes, $6291–$62AD)
+; A = the metatile number at column C2Scene_PropCol (0-95), row
+; C2Scene_PropRow of the map at C2Scene_PropMap (byte row * 96 +
+; column).
+; Callers note: none found (no reference in the bank, and no byte pattern).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00/$01, $10-$12),
+;        DB=$00 (WRMPYA/B and RDMPYL absolute); C2Scene_PropMap set
+; Exit:  M=1, X=0; A = the metatile (B = the next map byte); Y = the
+;        offset; X unchanged
+; No calls.
+C2Scene_GetMapCell:
+    SEP #$20
+    LDA.b !C2Scene_PropRow
+    STA.w WRMPYA
+    LDA.b #!C2Scene_MapCols
+    STA.w WRMPYB
+    REP #$20
+    CLC
+    LDA.b !C2Scene_PropCol
+    AND.w #!Eng_LowByteMask
+    ADC.w RDMPYL
+    TAY
+    LDA.b [!C2Scene_PropMap],Y
+    SEP #$20
+    RTS
+
+; $C2:62AE — C2Scene_GetTileProp (63 bytes, $62AE–$62EC)
+; A = the property nibble of 8x8 tile C2Scene_PropCol (0-191),
+; C2Scene_PropRow (0-127): the metatile at column / 2, row / 2 of the
+; map at C2Scene_PropMap; its byte row bit 0 (byte metatile * 2 + row
+; bit 0) of C2Scene_PropTable; the high nibble for an even column, the
+; low one for an odd column. C2Scene_PropCol/Row are halved in place.
+; Callers (12 JSR sites): C2Scene_GetTileProps ($C2:3A0F, $C2:3A25, $C2:3A3D, $C2:3A4D),
+;   C2Scene_ScanRow ($C2:422C, $C2:4245), C2Scene_ScanCol ($C2:4284, $C2:4294, $C2:42B3, $C2:42C3)
+;   and unmatched ($C2:4A82, $C2:4A92).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Tmp_00-$04, $10-$15),
+;        DB=$00 (WRMPYA/B and RDMPYL absolute); C2Scene_PropMap and
+;        C2Scene_PropTable set
+; Exit:  M=1, X=0; A = the nibble (0-15; B = the high byte of the
+;        table offset); Y = the table offset; X unchanged;
+;        C2Scene_PropCol/Row halved, C2Scene_PropColBit 0,
+;        C2Scene_PropRowBit = row bit 0
+; No calls.
+C2Scene_GetTileProp:
+    SEP #$20
+    STZ.b !C2Scene_PropColBit
+    STZ.b !C2Scene_PropRowBit
+    STZ.b !C2Scene_PropRowBit+1 ; the high byte of the 16-bit add below
+    LSR.b !C2Scene_PropCol
+    ROL.b !C2Scene_PropColBit
+    LSR.b !C2Scene_PropRow
+    ROL.b !C2Scene_PropRowBit
+    LDA.b !C2Scene_PropRow
+    STA.w WRMPYA
+    LDA.b #!C2Scene_MapCols
+    STA.w WRMPYB
+    REP #$20
+    CLC
+    LDA.b !C2Scene_PropCol
+    AND.w #!Eng_LowByteMask
+    ADC.w RDMPYL
+    TAY
+    LDA.b [!C2Scene_PropMap],Y
+    AND.w #!Eng_LowByteMask
+    ASL A                       ; 2 bytes per metatile; C = 0 for the ADC
+    ADC.b !C2Scene_PropRowBit
+    TAY
+    SEP #$20
+    LDA.b [!C2Scene_PropTable],Y
+    LSR.b !C2Scene_PropColBit
+    BCS .odd
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    RTS
+.odd:
+    AND.b #!C2Scene_TilePropLowNibble
     RTS
 
 ; ============================================================

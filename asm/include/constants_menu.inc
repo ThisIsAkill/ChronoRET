@@ -347,6 +347,33 @@ if !constants_menu_inc == 0
 !TextWin_HexDigitCount8 = 2              ; TextWin_SubLeft for code $0D in hexadecimal
 !TextWin_HexDigitCount16 = 4             ; and for code $0E
 !TextWin_StrNadiaLen = 5                 ; bytes TextWin_CodeNadia draws from TextWin_StrNadia
+; --- Glyph drawing (TextWin_DrawGlyph) ---
+!TextWinRom_Font = $FF2060               ; 24 bytes per glyph code (code * 24): the left 8 pixels of each of
+                                         ; 24 rows (probably 12 lines of two 2bpp planes, as they are stored)
+!TextWinRom_FontRight = $FF3860          ; 24 bytes per two glyph codes (code / 2 * 24): the right 4 pixels
+                                         ; of each row, high nibble for an even code, low for an odd one
+!TextWin_GlyphTopSkip = 8                ; TextWin_GfxBuf bytes skipped before the first glyph byte (the
+                                         ; top 4 lines of the tile row, 2 bytes each)
+!TextWin_GlyphTopPairs = 4               ; glyph byte pairs drawn into the first tile row
+!TextWin_GlyphLowPairs = 8               ; and into the next (24 bytes in all)
+!TextWin_NextRow2bpp = $00F0             ; TextWin_OutPtr step to the next tile row ($100 bytes on from the
+                                         ; first byte drawn) in TextWin_Blit2bpp's layout
+!TextWin_NextRow4bpp = $01F0             ; and $200 bytes on in TextWin_Blit4bpp's
+!TextWin_ModeBlitMask = $0F              ; TextWin_Mode bits: 0 = TextWin_Blit2bpp, else TextWin_Blit4bpp
+!TextWin_PenShiftMask = $0007            ; TextWin_PenX bits: pixels into the tile
+!TextWin_PenTileMask = $F8               ; TextWin_PenX bits: the tile (* 8)
+!TextWin_RightNibble = $F0               ; TextWinRom_FontRight bits of an even glyph code
+; --- Decimal digits (TextWin_Dec8/16/24): each divisor is shifted left by
+; (quotient bits - 1) for the shift-and-subtract loop ---
+!TextWin_Dec8First = 100<<1              ; hundreds of a byte: 2 bits (0-2)
+!TextWin_DecTens = 10<<3                 ; tens: 4 bits (every converter)
+!TextWin_Dec16First = 10000<<2           ; ten thousands of a word: 3 bits (0-6)
+!TextWin_DecThousands = 1000<<3          ; 4 bits
+!TextWin_DecHundreds = 100<<3            ; 4 bits
+!TextWin_Dec24First = 10000000           ; ten millions of 24 bits: 1 bit (0-1)
+!TextWin_DecMillions = 1000000<<3
+!TextWin_DecHundredK = 100000<<3
+!TextWin_DecTenK = 10000<<3
 
 ; --- Scene objects and tile triggers (C2Scene_ObjWatch, C2Scene_TrigWatch) ---
 !C2Scene_ObjActive = $80                 ; C2Scene_Unk0294 / C2Scene_ObjBFlags bit 7: the object is tested
@@ -370,5 +397,75 @@ if !constants_menu_inc == 0
 !C2Scene_TrigFoundA = $01                ; C2Scene_TrigFound bits: a ListA entry at the tile
 !C2Scene_TrigFoundC = $02                ; a ListC entry
 !C2Scene_TrigFoundB = $04                ; a ListB entry
+
+; --- C2Scene_Unk5775 and C2Scene_ClearUnk8621 ---
+!C2Scene_Unk8604Size = 25                ; bytes of C2Scene_Unk8604Init
+!C2Scene_Unk8621Bytes = $0400            ; bytes C2Scene_ClearUnk8621 zeroes from C2Scene_HdmaArea on
+
+; --- The party leader's task (C2Scene_LeaderTask) and its walk helpers ---
+!C2Scene_PartySlotEmpty = $80            ; Party_Members byte bit 7: no member in the slot (as
+                                         ; C2Scene_ObjWatchFull counts them)
+!C2Scene_StepInput = 1                   ; C2Scene_WalkTask.State: C2Scene_LeaderInput (state 0 of
+                                         ; C2Scene_Unk0280); C2Scene_LeaderStep goes back to it
+!C2Scene_StepsPerTrigState = 8           ; bytes of C2Scene_LeaderWalkSteps per C2Scene_Unk0280 state
+                                         ; (4 words; as a shift: 3)
+!C2Scene_FacingUp = 0                    ; C2Scene_WalkTask.Facing bits 0-1, as the D-pad sets them:
+!C2Scene_FacingDown = 1                  ; Up gives .YVel -1, Down +1, Left .XVel -1, Right +1
+!C2Scene_FacingLeft = 2
+!C2Scene_FacingRight = 3
+!C2Scene_FacingMask = $03
+!C2Scene_WalkMoving = $80                ; .Facing bit 7: the walk animation is running
+!C2Scene_PadUp = $0800                   ; Pad_Unk00F8 read as a word: Pad_Unk00F9 bit 3 (Up in the
+!C2Scene_PadDown = $0400                 ; Pad_Pressed high-byte layout), bit 2 (Down), bit 1 (Left)
+!C2Scene_PadLeft = $0200                 ; and bit 0 (Right)
+!C2Scene_PadRight = $0100
+!Pad_Unk00F8Bit6 = $40                   ; Pad_Unk00F8 bit 6 (X with the default button map): scene
+                                         ; mode C2Scene_ModeMenu in C2Scene_LeaderInput
+!Pad_Unk00F8Bit2 = $04                   ; bit 2 (Select with the default map): mode C2Scene_ModeMode7
+!Pad_Unk00F8Bit0 = $01                   ; bit 0 (Y with the default map): mode C2Scene_ModeMenu9
+!C2Scene_ModeListA = 3                   ; C2Scene_Mode3: act on the ListA entry at C2Scene_Unk1B32
+!C2Scene_ModeMode7 = 6                   ; C2Scene_Mode6: C2Scene_Unk631F (BG mode 7) between mosaics
+!C2Scene_ModeMenu9 = 9                   ; C2Scene_Mode5 with ExitMenu_Mode5
+!C2Scene_Loc1F5 = $01F5                  ; the Loc_Id where the leader gets C2Scene_LeaderAttr1F5
+!C2Scene_LeaderAttr = $A8                ; C2Scene_Task.SprAttr of the leader's sprite (C2Scene_SprAttr*
+!C2Scene_LeaderAttr1F5 = $B8             ; flags; meaning of the bit 4 difference not traced)
+!C2Scene_IdleAnimAt = $F0                ; C2Scene_IdleFrames value at which the idle animation starts
+!C2Scene_IdleHold = $FE                  ; then the count is kept at $FE/$FF (C2Scene_IdleSet: $FF, so
+!C2Scene_IdleSet = $FF                   ; the animation is started only once)
+!C2Scene_AnimIdle = $A2                  ; animation C2Scene_LeaderInput starts after C2Scene_IdleAnimAt
+                                         ; frames without input (not adjusted for C2Scene_AltAnimChar)
+!C2Scene_AltAnimChar = 6                 ; Party_Members character whose walk and stand animations are
+!C2Scene_AltAnimOfs = $0C                ; this many entries further on (C2Scene_SetWalkAnim/SetStandAnim)
+!C2Scene_TrailLen = 16                   ; positions in C2Scene_TrailX/Y
+!C2Scene_TrailMask = $1F                 ; C2Scene_TrailPos wraps within the 16 words
+!C2Scene_TilePropWall = $0303            ; C2Scene_WalkTask.PropUL/UR as a word: bits 0-1 of either
+                                         ; stop a step there (C2Scene_TileBlocked)
+!C2Scene_TilePropTrig = $0404            ; and bit 2 of both: C2Scene_OnTrigTiles (C2Scene_TrigFlags)
+!C2Scene_TilePropLowNibble = $0F         ; a property nibble (C2Scene_GetTileProp, odd column)
+; --- The other party members' task (C2Scene_MemberTask) ---
+!C2Scene_MemberAttr = $A0                ; C2Scene_Task.SprAttr of a member's sprite (C2Scene_LeaderAttr
+!C2Scene_MemberAttr1F5 = $B0             ; - 8), and at Loc_Id C2Scene_Loc1F5
+!C2Scene_Member1Pal = $0A                ; ORed into it for party slot 1 (attribute bits 1-3: palette 5)
+!C2Scene_Member2Pal = $0C                ; and for slot 2 (palette 6)
+!C2Scene_Member1Tile = $0020             ; C2Scene_Task.SprTile of slot 1 (the second $400 bytes of
+!C2Scene_Member2Tile = $0040             ; C2Scene_PartyGfx: 32 tiles on) and of slot 2
+!C2Scene_Slot1 = 1                       ; C2Scene_FollowTask.Slot values: party positions 1 and 2
+!C2Scene_Slot2 = 2
+!C2Scene_FollowWait = 8                  ; C2Scene_Task.Frames a member waits after starting a move or
+                                         ; standing still before it looks at the leader again
+!C2Scene_NearLo16 = $0010                ; C2Scene_LeaderNear16: the leader is near when within -16..+16
+!C2Scene_NearHi16 = $0011                ; pixels of the member on both axes
+!C2Scene_NearLo32 = $0020                ; C2Scene_LeaderNear32: -32..+32
+!C2Scene_NearHi32 = $0021
+!C2Scene_RouteXFirst = $10               ; C2Scene_FollowTask.Route bit 4: the first leg is in X
+!C2Scene_RouteYFirst = $20               ; bit 5: the first leg is in Y
+!C2Scene_RouteLegs = $0F                 ; bits 0-3: the legs (1 or 2) still to go
+!C2Scene_PathXYBlocked = $01             ; C2Scene_PathBlocked bit 0: the X-then-Y path has a wall
+!C2Scene_PathYXBlocked = $02             ; bit 1: the Y-then-X path has one
+!C2Scene_PathBothBlocked = $03
+!C2Scene_TileSnapMask = $FFF8            ; a pixel position AND this: the start of its 8x8 tile
+!C2Scene_TilePropWallBits = $03          ; C2Scene_TilePropWall's bits in one property nibble
+!C2Scene_AnimIdle1 = $A3                 ; idle animations of the slot 1 and 2 members (as
+!C2Scene_AnimIdle2 = $A4                 ; C2Scene_AnimIdle for the leader)
 
 endif
