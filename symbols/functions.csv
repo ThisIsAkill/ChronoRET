@@ -1,8 +1,8 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
 $C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,verified,9e1f38db5616,Mid-game re-entry vector table at the start of the bank.
 $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the interrupt trampolines, clears WRAM, starts the sound driver and bank $C2, then falls into GameLoop_Main."
-$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,f56ffa11c897,trampolines and dispatches on Loc_Id.
-$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,b82aa0cbd435,Loc_Id - Loc_FirstBankC2 is set.
+$C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,33e26a732e9f,trampolines and dispatches on Loc_Id.
+$C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,2916ab1cfa5f,Loc_Id - Loc_FirstBankC2 is set.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
 $C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,e67d24414ed7,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
@@ -11,6 +11,7 @@ $C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,verified,c23486c85fdf,"game logic
 $C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,verified,833278a42a72,"One-time location-load called once per scene entry from GameLoop_LoadField (its only caller, JSR at $C0:0088)."
 $C0:011B,$C0:01A4,138,Field_SaveState,$C0,Engine,verified,8590322c73c3,"(was Sub_011B.) Saves the field before handing control to bank $C2 (BankC2_Entry8000), so Field_RestoreState can rebuild it after: - if Field_Unk29 is set, force it to 1 and clear Field_Unk26/27; - co"
 $C0:01A5,$C0:024B,167,Field_RestoreState,$C0,Engine,verified,d05450e0d6c3,(was Sub_01A5.) Rebuilds the field after a bank-$C2 round trip: 1.
+$C0:024C,$C0:0282,55,Scene_Unk024C,$C0,Engine,verified,7921bd1ffd3f,"The check DefaultHandler makes before starting a battle (its SceneFlag_Battle path): C=1 means no battle after all, and DefaultHandler then clears the flag; C=0 goes on to the battle."
 $C0:0905,$C0:0917,19,Field_RestoreSaveBlock,$C0,Engine,verified,26317c37e94f,"(was Sub_0905.) Copies SceneSave_Buffer ($7F:2000) back over Field_SaveBlock ($7E:0920, $14E0 bytes)."
 $C0:0918,$C0:092A,19,Field_StashSaveBlock,$C0,Engine,verified,854a2d54b96a,"(was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to SceneSave_Buffer ($7F:2000)."
 $C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,verified,76b6af143b0d,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on."
@@ -54,14 +55,18 @@ $C0:2725,$C0:274C,40,Field_WinPulseDraw,$C0,Engine,verified,85a973a8ac2d,"One fr
 $C0:274D,$C0:27EA,158,Field_ServiceUnk54,$C0,Engine,verified,76d008ae5c84,"(was Field_Unk274D.) Per-frame service of the Field_Unk54 requests, first match wins: - bit 4 (Field54_Credits): build the next line of the staff credits."
 $C0:27EB,$C0:2823,57,Field_ServiceUnk54_SendLine,$C0,Engine,verified,26eb4f2d665f,
 $C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,verified,8a44e97cd7a2,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
+$C0:2848,$C0:286B,36,Scene_SettleFrames,$C0,Engine,verified,c192c9e5b4cd,"The field-load fade-in: a copy of Field_FadeInAfterReload just before it, differing in one call."
+$C0:2DC8,$C0:2DF0,41,VramDma_Upload,$C0,Engine,verified,6067cf18af32,"Copies a block to VRAM with DMA channel 7: VMADDL = VramDma_Addr, VMAIN = increment after the high byte, DMAP7 = VramDma_Mode, B-bus target VMDATAL, source VramDma_Src/SrcBank, VramDma_Size bytes."
 $C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,verified,2a8062ed2e09,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
+$C0:2E1E,$C0:2E66,73,Sys_HaltWithColor,$C0,Engine,verified,4eb93cfb459e,"(was the stub LoadSavePath.) Stops the game on a single colour: the first 21 bytes are InitHW's body written inline (interrupts off, forced blank, NMI/DMA/HDMA off, DB=$00), then it also clears Field_"
 $C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,verified,698bb554b9b5,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
 $C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,verified,84c4d964684c,"(was Sub_597D.) Runs object Obj_Cur's init function: the first of its 16 function offsets (Evt_Data + Obj_Cur*16, i.e."
-$C0:881E,$C0:8859,60,Field_FrameUpdate,$C0,Engine,verified,fa16bf4176c8,"Field work done every frame, before input-driven checks such as Field_ActionButton: resets Field_UnkEB (the action-button target) to none, then with DP=$1D00 runs Map_ResetUnk1D2E, clears Map_Unk1D2C/"
+$C0:881E,$C0:8859,60,Field_FrameUpdate,$C0,Engine,verified,0d1a5763990c,"Field work done every frame, before input-driven checks such as Field_ActionButton: resets Field_UnkEB (the action-button target) to none, then with DP=$1D00 runs Map_ResetUnk1D2E, clears Map_Unk1D2C/"
 $C0:885A,$C0:88E4,139,Field_Unk885A,$C0,Engine,verified,e57d3e91ea71,"A two-step job driven by Field_Unk38, run frame after frame by DefaultHandler's map-redraw path until it clears Field_Unk38: - Field_Unk38 = 1: zero Map_Unk1D2E/1D30/1D32/1D33."
 $C0:88E5,$C0:88ED,9,Map_ResetUnk1D2E,$C0,Engine,verified,8480009531b9,Copies Map_Unk1D2A to Map_Unk1D2E and Map_Unk1D2B to Map_Unk1D30 at the start of every Field_FrameUpdate (so those two hold per-frame values derived from a standing pair; meaning unknown).
 $C0:88EE,$C0:8901,20,Field_DpadDispatch,$C0,Engine,verified,e2d7dae72c17,"Unless Field_Unk38 is busy, runs the Field_DpadHandlerTable entry picked by Pad_Unk00F9 bits 0-3 (16 entries; the D-pad bits, if Pad_Unk00F9 is laid out like Pad_Pressed's high byte), with 8-bit X/Y."
 $C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,verified,fcb380055d6f,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
+$C0:B1B2,$C0:B203,82,VramQ_Flush,$C0,Engine,verified,c55fc68b8365,"Uploads every pending entry of the VRAM upload queue (VramQ_*, filled by Obj_BuildFrame4, Obj_BuildFrame8, Obj_BuildFrame8Pass1, Obj_BuildFrame12Pass2 and Obj_BuildFrame12Pass2Alt) with DMA channel 7,"
 $C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,verified,a00b0a1208df,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."
 $C0:B2A8,$C0:B2B1,10,Oam_BucketLoop,$C0,Engine,verified,d57272f16594,
 $C0:B2B2,$C0:B2BF,14,Oam_CheckChain,$C0,Engine,verified,c8de6d8de641,
@@ -335,7 +340,14 @@ $C1:3BC2,$C1:3E32,625,Battle_MoverOrbit,$C1,Battle engine,verified,3ce6a676b774,
 $C1:3E33,$C1:3F59,295,Battle_MoverLoop,$C1,Battle engine,verified,d333f2f75483,
 $C1:3F5A,$C1:4020,199,Battle_MoverFixedDir,$C1,Battle engine,verified,451b0d5729c0,
 $C1:4021,$C1:4057,55,Battle_MoverToCentre,$C1,Battle engine,verified,2810c3762c30,"Mover 8 (move $19): heads from the enemy's position for the middle of the screen (!Battle_ScreenCentreX/Y), faces that way and starts the step, with no probe and no collision test."
+$C2:0043,$C2:010F,205,BankC2_InitHwRegs,$C2,Engine,verified,2da8e81a840c,"Writes the PPU registers from OBSEL to SETINI (all but INIDISP and the data ports OAMDATA, VMDATAL/H and CGDATA) and the CPU registers WRIO-VTIMEH with fixed values, through DP=$2100 and then DP=$4200"
+$C2:225A,$C2:225D,4,Trig_Cos1024,$C2,Engine,verified,7080f9fc7e20,"Signed sine or cosine of a 16-bit angle with 1024 steps per turn, read from !Rom_SineTable: A = sin(angle) × 255 (−255..+255; the table holds |sin| as one byte per step, negated for the second half tu"
+$C2:225E,$C2:2272,21,Trig_Sin1024,$C2,Engine,verified,f2df418408aa,
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,verified,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
-$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
+$CF:F9FB,$CF:FA42,72,Battle_SinLookupCF,$CF,Battle engine,verified,754e4d354d3e,Bank $CF's own scaled sine: returns (sin(A) × !BattleCF_SinScale) >> 8 in A.
+$CF:FDAD,$CF:FE1F,115,BattleMsg_FormatNumber4Digits,$CF,Battle text & numbers,verified,8661fa9c82a1,"A four-digit, long-call version of BattleMsg_FormatNumberDigits ($C1:011F): the same subtract-and-count loops with one more for the thousands, and the digits looked up in !BattleRom_DigitTilesB (tiles"
+$FD:BA61,$FD:BB60,256,RandomTableFD,$FD,Engine,verified,3708c898ce55,A byte-identical copy of RandomTable ($C0:FE00): the same shuffle of 0-255.
+$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,c26a784d418e,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
+$FD:C0D7,$FD:C123,77,Ppu_SetBgLayout,$FD,Engine,verified,f58376e42222,"Sets a fixed background layout through DP=$2100, the way MainInit writes the PPU: mode 1 with BG3 on top, BG1/BG2 tiles at VRAM word $1000 and BG3 tiles at $5000, 64x32 maps at $6800 (BG1), $7000 (BG2"
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,verified,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"
 $FF:F799,$FF:F7D8,64,ScrollWaveFF_B,$FF,Engine,verified,8131a9c66cba,

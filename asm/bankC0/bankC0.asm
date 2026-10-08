@@ -4924,7 +4924,7 @@ GameLoop:
 ; InitHW. DP is not known here (DP=$0100 when falling out of GameLoop,
 ; anything on a JML from another bank), so Loc_Id is read as the
 ; absolute address !DP_Field+!Loc_Id; GameLoop_LoadField sets DP=$0100.
-; Exit: never returns; JML BankC2_Entry0000, BRL LoadSavePath, or into
+; Exit: never returns; JML BankC2_Entry0000, BRL Sys_HaltWithColor, or into
 ; GameLoop_LoadField.
 GameLoop_Main:
     JSR InitHW              ; forced blank, disable NMI/DMA
@@ -4943,16 +4943,16 @@ GameLoop_Main:
 ; a signed compare. Taken together:
 ;   Loc_Id $0000-$01EF  -> GameLoop_LoadField
 ;   Loc_Id $01F0-$81EF  -> bank $C2 (GameLoop_Main's JML)
-;   Loc_Id $81F0-$81FE  -> LoadSavePath, with X = LoadSave_EntryX
+;   Loc_Id $81F0-$81FE  -> Sys_HaltWithColor, with X = Halt_ColorBadLoc
 ;   Loc_Id $81FF-$FFFF  -> GameLoop_LoadField
-; So LoadSavePath needs bit 15 of Loc_Id set; what sets it is not traced yet.
+; So Sys_HaltWithColor needs bit 15 of Loc_Id set; what sets it is not traced yet.
 ; On entry: M=1, X=0, X = Loc_Id (from GameLoop_Main's BMI), DB=$00.
-; Exit: never returns; BRL LoadSavePath or into GameLoop_LoadField.
+; Exit: never returns; BRL Sys_HaltWithColor or into GameLoop_LoadField.
 GameLoop_NotBankC2:
-    CPX.w #!Loc_LoadSave
+    CPX.w #!Loc_HaltLimit
     BMI GameLoop_LoadField
-    LDX.w #!LoadSave_EntryX
-    BRL LoadSavePath
+    LDX.w #!Halt_ColorBadLoc
+    BRL Sys_HaltWithColor
 
 ; GameLoop_LoadField (was GL_ModeOk2): loads the field location Loc_Id
 ; and falls into the per-frame loop. Scene_SettleFrames runs
@@ -5243,6 +5243,61 @@ Field_RestoreState:
     LDA #$03
     STA.l !Field_Unk7F03FE
 .done:
+    RTS
+
+; ============================================================
+; $C0:024C — Scene_Unk024C (55 bytes, $024C–$0282)
+; The check DefaultHandler makes before starting a battle (its
+; SceneFlag_Battle path): C=1 means no battle after all, and
+; DefaultHandler then clears the flag; C=0 goes on to the battle.
+; Field_Unk0617 (8-bit X/Y) fills the list at Field_BattleObjList with
+; the objects found for it, $80-terminated (inferred from reading
+; $C0:0617, not matched). If the list is empty, Field_Unk034B runs and
+; C=1. Otherwise the field is saved much as Field_SaveState starts: if
+; Field_Unk29 is set it is cleared here (Field_SaveState forces it to 1
+; instead) along with Field_Unk26/27, then Field_Unk038F, then
+; Field_StashSaveBlock, and the leader's tile X/Y and facing become the
+; entry point (Loc_EntryX/Y/Facing); C=0. From the Field_Unk29 test to
+; the facing store this is Field_SaveState's opening, with the value
+; stored to Field_Unk29 changed ($00 for $01) and JSR Field_Unk038F
+; added before Field_StashSaveBlock.
+; Callers: DefaultHandler ($C0:1890) and unmatched code at $C0:2628
+;   (event hook handler $C0:260E, from the Field_EventHookDispatch table).
+; On entry: M=1 (8-bit A), X either width (set here), DP=$0100 (the
+; Field_* and Loc_* names are dp), DB=$00 (Obj_* tables read absolute).
+; Exit: M=1, X=0 as the unmatched callees leave it, DP and DB unchanged;
+; C=1: no battle (list empty), C=0: field saved for the battle; A, X
+; and Y clobbered.
+; ============================================================
+org $C0024C
+Scene_Unk024C:
+    SEP #$10                ; X,Y → 8-bit
+    JSR Field_Unk0617       ; fill Field_BattleObjList
+    REP #$10                ; X,Y → 16-bit
+    LDA.b !Field_BattleObjList
+    BMI .no_battle          ; first entry $80: the list is empty
+    LDA.b !Field_Unk29
+    BEQ .save
+    LDA.b #$00
+    STA.b !Field_Unk29
+    LDA.b #$00
+    STA.b !Field_Unk26
+    STZ.b !Field_Unk27
+.save:
+    JSR Field_Unk038F
+    JSR Field_StashSaveBlock ; Field_SaveBlock → SceneSave_Buffer
+    LDY.b !Party_ObjSlot    ; leader's object (16-bit)
+    LDA.w !Obj_TileX,Y
+    STA.b !Loc_EntryX
+    LDA.w !Obj_TileY,Y
+    STA.b !Loc_EntryY
+    LDA.w !Obj_Facing,Y
+    STA.b !Loc_EntryFacing
+    CLC                     ; C=0: go on to the battle
+    RTS
+.no_battle:
+    JSR Field_Unk034B
+    SEC                     ; C=1: no battle
     RTS
 
 ; ============================================================
@@ -5778,6 +5833,47 @@ Fade_StepFixedColor:
     RTS
 
 ; ============================================================
+; $C0:2DC8 — VramDma_Upload (41 bytes, $2DC8–$2DF0)
+; Copies a block to VRAM with DMA channel 7: VMADDL = VramDma_Addr,
+; VMAIN = increment after the high byte, DMAP7 = VramDma_Mode, B-bus
+; target VMDATAL, source VramDma_Src/SrcBank, VramDma_Size bytes. Its
+; last 24 bytes (from the STA BBAD7 on) are the same instructions
+; as ClearRAMDMA's, right after it, through the same argument bytes
+; (VramDma_Src/SrcBank/Size are the DmaFill_* bytes under other names).
+; The callers seen store VramDma_Mode = 1 (word writes); mode and target
+; are not otherwise checked here.
+; Callers (13 JSR, 1 BRL; all unmatched): $C0:6D61, $C0:6E1E, $C0:6E58,
+;   $C0:6E84, $C0:6E9C, $C0:6EC7, $C0:6EED, $C0:6F08, $C0:6F23,
+;   $C0:6F30, $C0:6F4A, $C0:6F57, $C0:6F75 and BRL from $C0:7F74 (e.g.
+;   $C0:6E1E uploads $1000 bytes from $7F:5080 to VRAM $5000).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the address and size are
+; word loads), DP=$0100 (the arguments are dp offsets, shared with
+; ClearRAMDMA; not traced at every caller), DB=$00 (absolute register
+; stores).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+; MDMAEN_Ch7, X = VramDma_Size); Y preserved.
+; ============================================================
+org $C02DC8
+VramDma_Upload:
+    LDX.b !VramDma_Addr
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b !VramDma_Mode
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7               ; B-bus target: VMDATAL ($2118)
+    LDX.b !VramDma_Src
+    STX.w A1T7L
+    LDA.b !VramDma_SrcBank
+    STA.w A1B7
+    LDX.b !VramDma_Size
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN              ; start channel 7 (the CPU halts until it is done)
+    RTS
+
+; ============================================================
 ; $C0:2DF1 — ClearRAMDMA (45 bytes)
 ; Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0
 ; since M7A=M7B=0). Caller sets DmaFill_Dest / DmaFill_Bank /
@@ -5813,6 +5909,67 @@ ClearRAMDMA:
     RTS
 
 ; ============================================================
+; $C0:2E1E — Sys_HaltWithColor (73 bytes, $2E1E–$2E66)
+; (was the stub LoadSavePath.) Stops the game on a single colour: the
+; first 21 bytes are InitHW's body written inline (interrupts off, forced
+; blank, NMI/DMA/HDMA off, DB=$00), then it also clears Field_HdmaEnable,
+; turns every layer off on the main and sub screens (TM = TS = 0, so
+; only the backdrop shows), sets CGRAM colour 0 (the backdrop) to X,
+; points both interrupt trampolines at an RTI, enables NMI and joypad
+; auto-read, sets full brightness, and spins forever with interrupts on.
+; It looks like a fatal-error stop whose colour tells the cases apart:
+; every caller is a BRL with its own X (blue $7C00 from
+; GameLoop_NotBankC2 for Loc_Id $81F0-$81FE, $7FE0 from the six sites at
+; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010, $01F0 and $000F
+; from $C0:5CB3/5CDA/5CE8, $1639 from $C0:5F71 in the handler at
+; $C0:5F6E that Evt_OpcodeTable gives unused event opcodes); the
+; conditions behind the other unmatched ones are not traced.
+; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A) and unmatched
+;   code at $C0:3577, $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4,
+;   $C0:46D4, $C0:483D, $C0:5CB3, $C0:5CDA, $C0:5CE8 and $C0:5F71 (LDX
+;   #$1639 / BRL at $C0:5F6E; xref marks it doubtful, as the bytes
+;   before it are the opcode table, not code).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
+; through TXA), X = BGR555 colour; DP any (Fade_Brightness is written as
+; an absolute address under DP_Field), DB any (set to $00 first).
+; Exit: never returns.
+; ============================================================
+org $C02E1E
+Sys_HaltWithColor:
+    SEI
+    LDA.b #$00
+    PHA
+    PLB                         ; DB = $00
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    LDA.b #$00
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    STA.w !DP_Field+!Field_HdmaEnable
+    STA.w TM                    ; no layers on the main screen
+    STA.w TS                    ; nor the sub screen: only the backdrop
+    STA.w CGADD                 ; CGRAM colour 0 (backdrop)
+    REP #$20                    ; A → 16-bit
+    TXA
+    SEP #$20                    ; A → 8-bit
+    STA.w CGDATA                ; colour low byte
+    XBA
+    STA.w CGDATA                ; colour high byte
+    LDA.b #!Op_RTI
+    STA.w !IrqTrampoline        ; IRQ and NMI now return at once
+    LDA.b #!Op_RTI
+    STA.w !NmiTrampoline
+    LDA.b #!Fade_BrightnessMax
+    STA.w !DP_Field+!Fade_Brightness
+    LDA.b #NMI_ENABLE|AUTOJOY_ENABLE
+    STA.w NMITIMEN
+    LDA.b #!Fade_BrightnessMax
+    STA.w INIDISP               ; forced blank off, full brightness
+    CLI
+.forever:
+    BRA .forever
+
 ; Field frame update and its first helpers ($C0:881E–$C0:8901)
 ; These run with DP = !DP_Map ($1D00): a dp operand is written as
 ; !Map_Name-!DP_Map, and field-page variables are reached absolute
@@ -5832,8 +5989,8 @@ ClearRAMDMA:
 ; what they do (movement, scrolling?) is not traced.
 ; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame
 ;   ($C0:00EB), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload
-;   ($C0:2830) and unmatched code at $C0:02B7, $C0:02DE, $C0:2854 and
-;   $C0:3FC3.
+;   ($C0:2830), Scene_SettleFrames ($C0:2854) and unmatched code at
+;   $C0:02B7, $C0:02DE and $C0:3FC3.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
 ; exit; set to $1D00 inside), DB=$00 (absolute operands are bank $00).
 ; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the unmatched
@@ -6052,6 +6209,68 @@ Obj_ResetStates:
     REP #$10                ; X,Y → 16-bit
     PLD
     BRL SprBuf_FreeAll      ; marks every SprBuf_Owner entry free
+
+; ============================================================
+; $C0:B1B2 — VramQ_Flush (82 bytes, $B1B2–$B203)
+; Uploads every pending entry of the VRAM upload queue (VramQ_*, filled
+; by Obj_BuildFrame4, Obj_BuildFrame8, Obj_BuildFrame8Pass1,
+; Obj_BuildFrame12Pass2 and Obj_BuildFrame12Pass2Alt) with DMA channel 7, two transfers per
+; entry (the A and B halves), then marks the queue empty. Entries are
+; walked 2 bytes at a time from the first until one whose VramQ_Valid
+; low byte is 0; only the first entry's VramQ_Valid is cleared at the
+; end, which is enough for Field_ProcessAnimQueue (it tests only that
+; one). The channel 7 setup before the loop (VMAIN, BBAD7, DMAP7, A1B7)
+; is the same 22 bytes (counting its SEP #$20) as in Spr_LoadLargeObj; every source is in bank
+; $7F.
+; Callers (2 JSR sites, unmatched): $C0:EB8C in NmiHandler (which sets
+;   DP=$1D00 right after) and $C0:B111 (inside PHD/PLD, with REP #$10
+;   before it).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the queue words are
+; loaded into Y), DP any (set to DP_VramQ here), DB=$00 (absolute PPU
+; and DMA register stores).
+; Exit: M=1, X=0, DB unchanged; DP left at DP_VramQ ($0900), not
+; restored; A = 0, X = 2 x entries uploaded, Y clobbered.
+; ============================================================
+org $C0B1B2
+VramQ_Flush:
+    REP #$20                ; A → 16-bit
+    LDA.w #!DP_VramQ
+    TCD                     ; DP = $0900: the queue is reached with dp loads
+    SEP #$20                ; A → 8-bit
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!Bank7F
+    STA.w A1B7              ; every source is in bank $7F
+    LDX.w #$0000
+.entry_loop:
+    LDA.b !VramQ_Valid-!DP_VramQ,X
+    BEQ .done               ; end of the queue
+    LDY.b !VramQ_DestA-!DP_VramQ,X
+    STY.w VMADDL
+    LDY.b !VramQ_SrcA-!DP_VramQ,X
+    STY.w A1T7L
+    LDY.b !VramQ_SizeA-!DP_VramQ,X
+    STY.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN            ; first half
+    LDY.b !VramQ_DestB-!DP_VramQ,X
+    STY.w VMADDL
+    LDY.b !VramQ_SrcB-!DP_VramQ,X
+    STY.w A1T7L
+    LDY.b !VramQ_SizeB-!DP_VramQ,X
+    STY.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN            ; second half
+    INX
+    INX
+    BRA .entry_loop
+.done:
+    STZ.b !VramQ_Valid-!DP_VramQ ; queue empty
+    RTS
 
 ; ============================================================
 ; $C0:B271 — Oam_BuildShadow (152 bytes)
@@ -7162,6 +7381,46 @@ Field_FadeInAfterReload:
     PLA
     STA.b !Field_ControlEnabled
     JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    LDA.b !Fade_Brightness
+    CMP.b #!Fade_BrightnessMax
+    BMI .loop            ; until full brightness
+.done:
+    STZ.b !Field_Unk1E
+    STZ.w !Field_FadeBusy
+    RTS
+
+; ============================================================
+; $C0:2848 — Scene_SettleFrames (36 bytes, $2848–$286B)
+; The field-load fade-in: a copy of Field_FadeInAfterReload just before
+; it, differing in one call. Runs Scene_ReloadStep once; if that returns
+; zero, raises Fade_Brightness one step per frame (input disabled around
+; Field_FrameUpdate) until it reaches full brightness. Each frame runs the
+; full Field_EndOfFrame (including Field_ProcessAnimQueue and the OAM
+; shadow build) where the sibling runs only Field_EndOfFrameShort,
+; presumably so objects are drawn while the screen fades in. Clears
+; Field_Unk1E and Field_FadeBusy on exit.
+; Callers: GameLoop_LoadField ($C0:0094), after the location load.
+; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
+; Field_ControlEnabled and Field_Unk1E are dp; GameLoop_LoadField sets
+; it), DB=$00.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them);
+; A, X, Y and Obj_Cur clobbered (Scene_ReloadStep, Field_FrameUpdate,
+; Field_EndOfFrame and Sub_EC60).
+; ============================================================
+org $C02848
+Scene_SettleFrames:
+    JSR Scene_ReloadStep
+    BNE .done            ; nonzero → skip the fade-in
+.loop:
+    INC.b !Fade_Brightness
+    LDA.b !Field_ControlEnabled
+    PHA
+    STZ.b !Field_ControlEnabled ; no input during the fade
+    JSR Field_FrameUpdate
+    PLA
+    STA.b !Field_ControlEnabled
+    JSR Field_EndOfFrame
     JSR Sub_EC60
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax

@@ -28,6 +28,8 @@ if !constants_engine_inc == 0
                                          ; Field_FrameUpdate)
 !DP_SprBufPage = $0B00                   ; direct page SprBuf_FreeAll points at to reach SprBuf_Owner
                                          ; with dp stores
+!DP_VramQ = $0900                        ; direct page VramQ_Flush points at to reach the VramQ_* queue
+                                         ; ($0940-$09AF) with dp loads
 !BankD2 = $D2                            ; ROM bank $D2 (object tile graphics)
 !Bank7F = $7F                            ; WRAM bank $7F (PHA/PLB, DmaFill_Bank, Obj_GfxBank for
                                          ; graphics already in WRAM)
@@ -45,9 +47,9 @@ if !constants_engine_inc == 0
 ; --- Locations ---
 !Loc_FirstBankC2 = $01F0                 ; GameLoop_Main CPX limit: Loc_Id $01F0-$81EF goes to BankC2_Entry0000
                                          ; (GameLoop_Main)
-!Loc_LoadSave = $01FF                    ; GameLoop_NotBankC2's CPX limit: Loc_Id $81F0-$81FE reach LoadSavePath
+!Loc_HaltLimit = $01FF                   ; GameLoop_NotBankC2's CPX limit: Loc_Id $81F0-$81FE reach Sys_HaltWithColor
                                          ; (GameLoop_Main)
-!LoadSave_EntryX = $7C00                 ; X handed to LoadSavePath (meaning unknown)
+!Halt_ColorBadLoc = $7C00                ; Sys_HaltWithColor colour (BGR555 blue) for Loc_Id $81F0-$81FE
 
 ; --- Field save block ---
 !Field_SaveBlockSize = $14E0             ; bytes in Field_SaveBlock (Field_RestoreSaveBlock /
@@ -55,6 +57,7 @@ if !constants_engine_inc == 0
 
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
+!Op_RTI = $40                            ; 65816 opcode RTI (Sys_HaltWithColor's trampolines)
 
 ; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
@@ -135,6 +138,12 @@ if !constants_engine_inc == 0
 !Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
 !Eng_SignExtNeg = $FF                    ; high byte that sign-extends a negative 8-bit value
 !Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
+!Eng_Invert16 = $FFFF                    ; EOR mask; with INC A negates a 16-bit value
+
+; --- Sine table (Trig_Cos1024 / Trig_Sin1024) ---
+!Trig_QuarterTurn = $0100                ; 90 degrees at 1024 steps per turn (cosine = sine + this)
+!Trig_IndexMask = $03FF                  ; angle wrapped to the 1024-entry (1 B each) sine table
+!Trig_HalfTable = $0200                  ; table offset of 180 degrees: from here the sine is negative
 
 ; --- Tile animation modes (Field_SceneChangeTick dispatch on Map_TileProps) ---
 !TileAnim_ModeE6 = $E6                   ; mode handled by ModeE6_Handler

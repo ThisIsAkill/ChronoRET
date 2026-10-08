@@ -40,7 +40,7 @@ if !ram_engine_inc == 0
 
 ; --- Location (current / return / destination) (dp) ---
 !Loc_Id = $00                            ; 16-bit current location index; GameLoop_Main dispatches on
-                                         ; it ($01F0-$81EF -> bank $C2, $81F0-$81FE -> LoadSavePath)
+                                         ; it ($01F0-$81EF -> bank $C2, $81F0-$81FE -> Sys_HaltWithColor)
 !Loc_EntryX = $02                        ; 8-bit entry tile X (Field_SaveState stores the leader's
                                          ; $1801 here); 16-bit loads also take Loc_EntryY
 !Loc_EntryY = $03                        ; 8-bit entry tile Y (Field_SaveState stores the leader's
@@ -193,10 +193,17 @@ if !ram_engine_inc == 0
 !Fade_FixedColorTimer = $24              ; 8-bit countdown to the next Fade_FixedColor step
                                          ; (Fade_StepFixedColor)
 
-; --- DMA fill arguments (ClearRAMDMA) (dp) ---
+; --- DMA arguments (ClearRAMDMA, VramDma_Upload) (dp) ---
+!VramDma_Addr = $48                      ; 16-bit VRAM word address for VramDma_Upload (VMADDL)
+!VramDma_Mode = $4A                      ; 8-bit DMAP7 value for VramDma_Upload (callers seen store 1:
+                                         ; word writes to VMDATAL/H)
 !DmaFill_Dest = $4B                      ; 16-bit WRAM destination address for ClearRAMDMA
 !DmaFill_Bank = $4D                      ; 8-bit WRAM destination bank for ClearRAMDMA
 !DmaFill_Size = $4E                      ; 16-bit byte count for ClearRAMDMA
+!VramDma_Src = $4B                       ; alias of DmaFill_Dest: 16-bit A-bus source address for
+                                         ; VramDma_Upload
+!VramDma_SrcBank = $4D                   ; alias of DmaFill_Bank: 8-bit source bank for VramDma_Upload
+!VramDma_Size = $4E                      ; alias of DmaFill_Size: 16-bit byte count for VramDma_Upload
 
 ; --- Party and object slots (dp) ---
 !Obj_Cur = $6D                           ; 16-bit current object slot offset (object number x 2; high
@@ -214,6 +221,9 @@ if !ram_engine_inc == 0
                                          ; Party_ReinitIfChanged); $97 is the leader
 !Party_ObjSlot1 = $99                    ; 16-bit object slot of party member 2 (= Party_ObjSlot+2)
 !Party_ObjSlot2 = $9B                    ; 16-bit object slot of party member 3 (= Party_ObjSlot+4)
+!Field_BattleObjList = $9D               ; up to 12 object offsets + $80 end marker, filled by Field_Unk0617
+                                         ; (objects of kind 5/6 near the screen); Scene_Unk024C treats a
+                                         ; negative first entry as "no battle"
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
 
@@ -405,6 +415,8 @@ if !ram_engine_inc == 0
                                          ; $49 (purpose unknown)
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
+!Rom_SineTable = $C0F900                 ; 1024 B in ROM: |sin| for 1024 steps per turn, $00 at +$000/+$200,
+                                         ; $FF at +$100/+$300 (the table the battle code calls !BattleRom_SineTable)
 !RomE4_PtrInit = $E4FFE0                 ; 4 words in ROM: initial low words of Field_E4Ptr0-3
                                          ; (Field_InitLoadState)
 

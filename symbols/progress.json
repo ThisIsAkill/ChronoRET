@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 38698,
+  "emitted_bytes": 39735,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 340,
-      "bytes": 38698
+      "functions": 352,
+      "bytes": 39735
     },
     "readable": {
-      "functions": 340,
-      "bytes": 38698
+      "functions": 352,
+      "bytes": 39735
     },
     "verified": {
-      "functions": 340,
-      "bytes": 38698
+      "functions": 352,
+      "bytes": 39735
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 21979,
+      "emitted_bytes": 22266,
       "matched": {
-        "functions": 141,
-        "bytes": 21979
+        "functions": 146,
+        "bytes": 22266
       },
       "readable": {
-        "functions": 141,
-        "bytes": 21979
+        "functions": 146,
+        "bytes": 22266
       },
       "verified": {
-        "functions": 141,
-        "bytes": 21979
+        "functions": 146,
+        "bytes": 22266
       }
     },
     {
@@ -52,6 +52,23 @@
       }
     },
     {
+      "bank": "$C2",
+      "code_bytes": null,
+      "emitted_bytes": 230,
+      "matched": {
+        "functions": 3,
+        "bytes": 230
+      },
+      "readable": {
+        "functions": 3,
+        "bytes": 230
+      },
+      "verified": {
+        "functions": 3,
+        "bytes": 230
+      }
+    },
+    {
       "bank": "$CC",
       "code_bytes": null,
       "emitted_bytes": 30,
@@ -69,20 +86,37 @@
       }
     },
     {
-      "bank": "$FD",
+      "bank": "$CF",
       "code_bytes": null,
-      "emitted_bytes": 215,
+      "emitted_bytes": 187,
       "matched": {
-        "functions": 1,
-        "bytes": 215
+        "functions": 2,
+        "bytes": 187
       },
       "readable": {
-        "functions": 1,
-        "bytes": 215
+        "functions": 2,
+        "bytes": 187
       },
       "verified": {
-        "functions": 1,
-        "bytes": 215
+        "functions": 2,
+        "bytes": 187
+      }
+    },
+    {
+      "bank": "$FD",
+      "code_bytes": null,
+      "emitted_bytes": 548,
+      "matched": {
+        "functions": 3,
+        "bytes": 548
+      },
+      "readable": {
+        "functions": 3,
+        "bytes": 548
+      },
+      "verified": {
+        "functions": 3,
+        "bytes": 548
       }
     },
     {
@@ -108,7 +142,7 @@
       "bank": "$C0",
       "start": "$C0:0000",
       "end": "$C0:0FFF",
-      "emitted_bytes": 1828,
+      "emitted_bytes": 1883,
       "functions": [
         "ReentryVectors",
         "GameLoop",
@@ -122,6 +156,7 @@
         "LoadLocation",
         "Field_SaveState",
         "Field_RestoreState",
+        "Scene_Unk024C",
         "Field_RestoreSaveBlock",
         "Field_StashSaveBlock",
         "InitHW",
@@ -161,7 +196,7 @@
       "bank": "$C0",
       "start": "$C0:2000",
       "end": "$C0:2FFF",
-      "emitted_bytes": 1684,
+      "emitted_bytes": 1834,
       "functions": [
         "Field_EventHookDispatch",
         "Field_EventHookTable",
@@ -181,7 +216,10 @@
         "Field_ServiceUnk54",
         "Field_ServiceUnk54_SendLine",
         "Field_FadeInAfterReload",
-        "ClearRAMDMA"
+        "Scene_SettleFrames",
+        "VramDma_Upload",
+        "ClearRAMDMA",
+        "Sys_HaltWithColor"
       ]
     },
     {
@@ -252,9 +290,10 @@
       "bank": "$C0",
       "start": "$C0:B000",
       "end": "$C0:BFFF",
-      "emitted_bytes": 3503,
+      "emitted_bytes": 3585,
       "functions": [
         "Obj_ResetStates",
+        "VramQ_Flush",
         "Oam_BuildShadow",
         "Oam_BucketLoop",
         "Oam_CheckChain",
@@ -680,6 +719,123 @@
       "functions": []
     },
     {
+      "bank": "$C2",
+      "start": "$C2:0000",
+      "end": "$C2:0FFF",
+      "emitted_bytes": 205,
+      "functions": [
+        "BankC2_InitHwRegs"
+      ]
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:1000",
+      "end": "$C2:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:2000",
+      "end": "$C2:2FFF",
+      "emitted_bytes": 25,
+      "functions": [
+        "Trig_Cos1024",
+        "Trig_Sin1024"
+      ]
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:3000",
+      "end": "$C2:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:4000",
+      "end": "$C2:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:5000",
+      "end": "$C2:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:6000",
+      "end": "$C2:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:7000",
+      "end": "$C2:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:8000",
+      "end": "$C2:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:9000",
+      "end": "$C2:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:A000",
+      "end": "$C2:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:B000",
+      "end": "$C2:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:C000",
+      "end": "$C2:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:D000",
+      "end": "$C2:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:E000",
+      "end": "$C2:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$C2",
+      "start": "$C2:F000",
+      "end": "$C2:FFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
       "bank": "$CC",
       "start": "$CC:0000",
       "end": "$CC:0FFF",
@@ -794,6 +950,121 @@
       ]
     },
     {
+      "bank": "$CF",
+      "start": "$CF:0000",
+      "end": "$CF:0FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:1000",
+      "end": "$CF:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:2000",
+      "end": "$CF:2FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:3000",
+      "end": "$CF:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:4000",
+      "end": "$CF:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:5000",
+      "end": "$CF:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:6000",
+      "end": "$CF:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:7000",
+      "end": "$CF:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:8000",
+      "end": "$CF:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:9000",
+      "end": "$CF:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:A000",
+      "end": "$CF:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:B000",
+      "end": "$CF:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:C000",
+      "end": "$CF:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:D000",
+      "end": "$CF:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:E000",
+      "end": "$CF:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CF",
+      "start": "$CF:F000",
+      "end": "$CF:FFFF",
+      "emitted_bytes": 187,
+      "functions": [
+        "Battle_SinLookupCF",
+        "BattleMsg_FormatNumber4Digits"
+      ]
+    },
+    {
       "bank": "$FD",
       "start": "$FD:0000",
       "end": "$FD:0FFF",
@@ -874,16 +1145,19 @@
       "bank": "$FD",
       "start": "$FD:B000",
       "end": "$FD:BFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 256,
+      "functions": [
+        "RandomTableFD"
+      ]
     },
     {
       "bank": "$FD",
       "start": "$FD:C000",
       "end": "$FD:CFFF",
-      "emitted_bytes": 215,
+      "emitted_bytes": 292,
       "functions": [
-        "MainInit"
+        "MainInit",
+        "Ppu_SetBgLayout"
       ]
     },
     {

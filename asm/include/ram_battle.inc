@@ -26,6 +26,9 @@ if !ram_battle_inc == 0
 ; ------------------------------------------------------------
 ; Direct page: math helpers (Battle_Mul8 / Mul8x16 / Divide)
 ; ------------------------------------------------------------
+!BattleCF_SinScale       = $00   ; 1 B: scale (radius) multiplied into the sine by Battle_SinLookupCF (bank $CF's own slot)
+!BattleCF_SinFactor16    = $02   ; 2 B: signed sine fed to WRMPYB a byte at a time by Battle_SinLookupCF
+!BattleCF_SinProduct     = $04   ; 3 B: 24-bit product of Battle_SinLookupCF ($04 low .. $06 high)
 !Battle_MulMirrorA       = $77   ; 1 B: copy of the WRMPYA operand (Mul8, Mul8x16 write it; no reader seen in $C1)
 !Battle_MulMirrorB       = $78   ; 1 B: copy of the WRMPYB operand (Mul8, Mul8x16)
 !Battle_DivMirrorLo      = $79   ; 1 B: copy of the dividend low byte (Battle_Divide)
@@ -259,7 +262,7 @@ endstruct
 !Pc_PoseFrames           = $9245 ; 8 B per PC: frame id per pose entry (Battle_RunPcPose)
 !Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
 !BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / BattleMsg_FormatTwoDigits)
-!BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (always blank, $FF)
+!BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (blank, $FF, except from BattleMsg_FormatNumber4Digits)
 !BattleMsg_Digit100      = $949D ; 1 B: hundreds digit tile
 !BattleMsg_Digit10       = $949E ; 1 B: tens digit tile
 !BattleMsg_Digit1        = $949F ; 1 B: ones digit tile
@@ -584,6 +587,7 @@ endstruct
 !BattleRom_FrameDestBase   = $CCF941  ; 2 B per battler slot: bank $7E address its decoded frame tiles go to
                                       ; ($64AD, $67AD, $68AD, ...); what reads that buffer is not traced
 !BattleRom_DigitTiles      = $CCF903  ; 10 B: tile for digits 0-9 ($73-$7C)
+!BattleRom_DigitTilesB     = $CCF90D  ; 10 B: a second set of digit tiles 0-9 ($90-$99), read by BattleMsg_FormatNumber4Digits
 !BattleRom_PcBit           = $CCF9FB  ; 1 B per PC slot: $80/$40/$20, the PC's bit in Item_BattleList.PcMask
 !BattleRom_NameAttrL1    = $CCFA23  ; 2 B per PC slot: map offset of the PC's name block's first attribute byte, layout 1
 !BattleRom_NameAttrL02   = $CCFA29  ; 2 B per PC slot: same for layouts 0 and 2 (BattleUI_HighlightPcName)

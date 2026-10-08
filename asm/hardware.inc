@@ -54,6 +54,24 @@ if !hardware_inc == 0
 !HDMAEN_Ch7            = $80  ; bit 7: HDMA channel 7
 !NMITIMEN_NmiJoy       = $81  ; NMI enable + joypad auto-read
 
+!BG12NBA_Both1000      = $11  ; BG1 and BG2 tiles at VRAM word $1000 (one nibble each, x $1000)
+!BG34NBA_Bg3At5000     = $05  ; BG3 tiles at VRAM word $5000, BG4 at $0000
+!BG1SC_6800_64x32      = $69  ; BG1 map at VRAM word $6800 (bits 7-2 x $400), 64x32 tiles
+!BG2SC_7000_64x32      = $71  ; BG2 map at VRAM word $7000, 64x32 tiles
+!BG3SC_7800_64x32      = $79  ; BG3 map at VRAM word $7800, 64x32 tiles
+!TM_Bg1Bg2Obj          = $13  ; BG1, BG2 and OBJ on the main screen
+!CGWSEL_AddSubscreen   = $02  ; bit 1: color math adds the sub screen instead of the fixed color
+!COLDATA_AllZero       = $E0  ; write the red, green and blue channels, intensity 0
+!OBSEL_Size16And32_Base0000 = $60 ; size %011 = 16x16 and 32x32 sprites, sprite tiles at VRAM word $0000
+!BG1SC_6000_64x32      = $61  ; BG1 map at VRAM word $6000, 64x32 tiles
+!BG2SC_6800_64x32      = $69  ; BG2 map at VRAM word $6800, 64x32 tiles
+!BG4SC_7800_64x32      = $79  ; BG4 map at VRAM word $7800, 64x32 tiles
+!BG12NBA_Both2000      = $22  ; BG1 and BG2 tiles at VRAM word $2000
+!BG34NBA_Both7000      = $77  ; BG3 and BG4 tiles at VRAM word $7000
+!TM_Bg123Obj           = $17  ; BG1, BG2, BG3 and OBJ on the main screen
+!TS_Bg1Bg2Obj          = $13  ; BG1, BG2 and OBJ on the sub screen
+!CGADSUB_HalfAddBg3    = $44  ; color math on BG3 only, add, result halved
+
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)
 ; ------------------------------------------------------------
