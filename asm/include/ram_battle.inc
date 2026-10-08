@@ -68,6 +68,8 @@ if !ram_battle_inc == 0
 ; ------------------------------------------------------------
 !Battle_UnkA4            = $A4   ; 1 B: copied to !Battle_Unk993B around Battle_TickPcSlots and copied back if that
                                  ; changed it (BattleSys_UpkeepTwoFrames); $C1:34A4 counts it up to 3; purpose unknown
+!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames, cleared by the interrupt handler at $CF:FB65 (reached
+                                 ; through $C1:0000/$C1:001B; it saves every register, inferred: the battle NMI)
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above

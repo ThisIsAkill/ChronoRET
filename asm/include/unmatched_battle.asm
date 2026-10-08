@@ -10,9 +10,6 @@
 
 ; --- Bank $C1 (battle engine, not matched yet) ---
 
-org $C1007E
-BattleSys_PumpFrames:                   ; JSR: INC $9E, then JSL $CD0036 until $9E is zero again (inferred: wait for
-                                        ; the frame to end; name from the session notes)
 org $C1283D
 Battle_CacheBattlerCoordsAll:           ; JSR: for each present battler, copies !Battler_ScreenX/Y to $A039/$A050,X
                                         ; and runs $C1:285A on it
@@ -32,6 +29,10 @@ Audio_ProcessEntry:                     ; JSL: run the APU command block !Sfx_Co
 
 org $CD0009
 BattleSys_FrameTickVec:                 ; JSL vector: per-frame service tick (BattleMenu_RefreshIfDirtyAndTick)
+
+org $CD0036
+BattleSys_IdleVecCD0036:                ; JSL vector (JMP $CD:04A6 -> JSR $CD:3E44): called over and over while
+                                        ; BattleSys_PumpFrames waits; not analysed
 
 org $CD0027
 BattleMsg_ShowFromTableCC3A09Vec:       ; JSL vector: info panel for the tech under the cursor (A = tech id)
