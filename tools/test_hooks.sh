@@ -29,8 +29,8 @@ expect() {  # expect <accept|reject> <description>
     git clean -qfd
 }
 
-export GIT_AUTHOR_NAME="Akill" GIT_AUTHOR_EMAIL="goudakhil29@gmail.com"
-export GIT_COMMITTER_NAME="Akill" GIT_COMMITTER_EMAIL="goudakhil29@gmail.com"
+export GIT_AUTHOR_NAME="Akill" GIT_AUTHOR_EMAIL="24420588+ThisIsAkill@users.noreply.github.com"
+export GIT_COMMITTER_NAME="Akill" GIT_COMMITTER_EMAIL="24420588+ThisIsAkill@users.noreply.github.com"
 
 echo "Planted fixtures (each must be rejected):"
 head -c 4096 /dev/zero > planted.sfc && git add -f planted.sfc
