@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 64045,
+  "emitted_bytes": 66123,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 690,
-      "bytes": 64045
+      "functions": 709,
+      "bytes": 66123
     },
     "readable": {
-      "functions": 690,
-      "bytes": 64045
+      "functions": 709,
+      "bytes": 66123
     },
     "verified": {
       "functions": 690,
@@ -20,14 +20,14 @@
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 32012,
+      "emitted_bytes": 34090,
       "matched": {
-        "functions": 257,
-        "bytes": 32012
+        "functions": 276,
+        "bytes": 34090
       },
       "readable": {
-        "functions": 257,
-        "bytes": 32012
+        "functions": 276,
+        "bytes": 34090
       },
       "verified": {
         "functions": 257,
@@ -142,7 +142,7 @@
       "bank": "$C0",
       "start": "$C0:0000",
       "end": "$C0:0FFF",
-      "emitted_bytes": 1883,
+      "emitted_bytes": 2058,
       "functions": [
         "ReentryVectors",
         "GameLoop",
@@ -159,6 +159,7 @@
         "Scene_Unk024C",
         "Field_RestoreSaveBlock",
         "Field_StashSaveBlock",
+        "LocLoad_DrawMap",
         "InitHW",
         "InstallNMI",
         "InstallIRQ",
@@ -277,8 +278,16 @@
       "bank": "$C0",
       "start": "$C0:7000",
       "end": "$C0:7FFF",
-      "emitted_bytes": 2656,
+      "emitted_bytes": 3175,
       "functions": [
+        "Map_InitMasksAndLimits",
+        "Map_InitOrigin",
+        "Field_Unk74D4",
+        "Field_Unk74D4_Tail",
+        "Field_Unk74E8",
+        "Field_Unk74F7",
+        "Map_InitOriginX",
+        "Map_InitOriginY",
         "Map_ClearBufC800",
         "Field_BuildC800Mode1",
         "Map_WriteRow1",
@@ -303,7 +312,7 @@
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 3111,
+      "emitted_bytes": 3156,
       "functions": [
         "Bg_RowSpan64x32",
         "Bg_RowSpan64x32Addr",
@@ -325,6 +334,7 @@
         "Map_BuildColXDec2",
         "Map_BuildColXDec2Half",
         "Map_BuildColXDec3",
+        "Field_Unk87F1",
         "Field_FrameUpdate",
         "Field_Unk885A",
         "Map_ResetUnk1D2E",
@@ -346,7 +356,7 @@
       "bank": "$C0",
       "start": "$C0:9000",
       "end": "$C0:9FFF",
-      "emitted_bytes": 3523,
+      "emitted_bytes": 3625,
       "functions": [
         "Map_Unk9175",
         "Map_Unk91AC",
@@ -389,15 +399,25 @@
         "Map_SlopeBase",
         "Map_SlopeSide",
         "Map_ProbeLevelBlocked",
-        "Map_StepTileEffects"
+        "Map_StepTileEffects",
+        "Map_InitEntryTile"
       ]
     },
     {
       "bank": "$C0",
       "start": "$C0:A000",
       "end": "$C0:AFFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 1237,
+      "functions": [
+        "LocLoad_UnkA33B",
+        "LocLoad_EmptyStep",
+        "Ppu_ApplyMapScreens",
+        "Map_UnpackTilePlanes",
+        "Map_LoadExitTiles",
+        "Map_LoadTreasureTiles",
+        "Map_TreasureTaken",
+        "Obj_ResetFrameState"
+      ]
     },
     {
       "bank": "$C0",

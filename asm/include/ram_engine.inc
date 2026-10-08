@@ -178,6 +178,9 @@ if !ram_engine_inc == 0
                                          ; Field_ActionButton reads it. $80 at load; Field_FrameUpdate
                                          ; resets it to $80 every frame
 !Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by Field_InitLoadState
+!Loc_RecOfs = $FE                        ; 16-bit offset of the current location's LocRom record:
+                                         ; Loc_Id x 14 (LocLoad_Unk092B at $C0:095B; Loc_Id bit 8
+                                         ; adds $E00); read by the location-load steps
 !Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
                                          ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
                                          ; (swapping the two tilemap bases) for 3, then clears it
@@ -394,19 +397,42 @@ if !ram_engine_inc == 0
                                          ; Field_RunBankC2Mode5)
 !Map_Unk0BCF = $0BCF                     ; 8-bit; Field_BuildC800Mode2 (layer edges off) compares it
                                          ; with 16: unequal builds the right-hand 32 columns
-                                         ; (probably layer 2's width in metatiles; setter not traced)
+                                         ; (probably layer 2's width in metatiles); set by
+                                         ; LocLoad_UnkA33B from MapProps.Size1 bits 4-5 ($10-$40)
 !Map_Unk0BD1 = $0BD1                     ; 8-bit; as Map_Unk0BCF: unequal builds rows 32-63 (probably
                                          ; layer 2's height in metatiles)
 !Map_Unk0BD3 = $0BD3                     ; 8-bit; as Map_Unk0BCF for layer 3 (Field_BuildC800Mode4)
 !Map_Unk0BD5 = $0BD5                     ; 8-bit; as Map_Unk0BD1 for layer 3 (Field_BuildC800Mode4)
 !Map_Unk0BC9 = $0BC9                     ; 8-bit; bit 7 set: Map_Unk93E1 moves layer 2 with the
                                          ; half-rate steppers (Map_Scroll2*Half) and the matching
-                                         ; edge builders; who sets it is not traced
-!Ppu_Unk0BD7 = $0BD7                     ; 8-bit; probably the TM (main screen) value: $C0:0691 copies
+                                         ; edge builders; LocLoad_UnkA33B sets it to $80 or 0 from
+                                         ; MapProps.Size3 bit 6
+!Map_Unk0BCA = $0BCA                     ; 8-bit; 1 or 0 from MapProps.Size3 bit 7 (LocLoad_UnkA33B):
+                                         ; bit 0 set, Map_UnpackTilePlanes reads a layer-3 plane
+                                         ; (Map_Layer3Tiles) and the loader at $C0:0ACC builds
+                                         ; layer 3 (probably "the map has its own layer 3")
+!Map_Unk0BCB = $0BCB                     ; 8-bit; $10/$20/$30/$40 from MapProps.Size1 bits 0-1
+                                         ; (LocLoad_UnkA33B): the bytes Map_UnpackTilePlanes reads
+                                         ; per row of layer 1's planes, and Map_InitMasksAndLimits
+                                         ; makes Map_ColMask1 from it (probably layer 1's width in
+                                         ; metatiles)
+!Map_Unk0BCBHi = $0BCC                   ; 8-bit; zeroed with Map_Unk0BCB (LocLoad_UnkA33B), so a
+                                         ; 16-bit read of it sees 0-$FF; no 16-bit reader traced
+!Map_Unk0BCD = $0BCD                     ; 8-bit; as Map_Unk0BCB for layer 1's rows (MapProps.Size1
+                                         ; bits 2-3; Map_RowMask1; probably its height)
+!Map_Unk0BCDHi = $0BCE                   ; 8-bit; as Map_Unk0BCBHi
+!Map_Unk0BCFHi = $0BD0                   ; 8-bit; as Map_Unk0BCBHi for Map_Unk0BCF
+!Map_Unk0BD1Hi = $0BD2                   ; 8-bit; as Map_Unk0BCBHi for Map_Unk0BD1
+!Map_Unk0BD3Hi = $0BD4                   ; 8-bit; as Map_Unk0BCBHi for Map_Unk0BD3
+!Map_Unk0BD5Hi = $0BD6                   ; 8-bit; as Map_Unk0BCBHi for Map_Unk0BD5
+!Ppu_Unk0BD7 = $0BD7                     ; 8-bit; the TM (main screen) value: Ppu_ApplyMapScreens
+                                         ; writes it to TM; set by LocLoad_UnkA33B from
+                                         ; MapProps.Screens. Also, $C0:0691 copies
                                          ; it, Ppu_Unk0BD8, 0, 0, 2 and Ppu_Unk0BDF to $7E:2C66-6B,
                                          ; the order of TM, TS, TMW, TSW, CGWSEL, CGADSUB (not traced
                                          ; to the register)
-!Ppu_Unk0BD8 = $0BD8                     ; 8-bit; probably the TS (sub screen) value (as Ppu_Unk0BD7)
+!Ppu_Unk0BD8 = $0BD8                     ; 8-bit; the TS (sub screen) value (as Ppu_Unk0BD7; written
+                                         ; to TS by Ppu_ApplyMapScreens)
 !Ppu_W12SelShadow = $0BD9                ; 8-bit; the NMI handler writes it to W12SEL ($C0:EC19)
 !Ppu_W34SelShadow = $0BDA                ; 8-bit; the NMI handler writes it to W34SEL ($C0:EC1F)
 !Ppu_WObjSelShadow = $0BDB               ; 8-bit; the NMI handler writes it to WOBJSEL ($C0:EC25)
@@ -414,7 +440,9 @@ if !ram_engine_inc == 0
 !Ppu_Wh3Shadow = $0BDD                   ; 8-bit; the NMI handler writes it to WH3 ($C0:EC31)
 !Ppu_CgwSelShadow = $0BDE                ; 8-bit; the NMI handler writes it to CGWSEL ($C0:EC37); 2
                                          ; at load (Field_InitLoadState)
-!Ppu_Unk0BDF = $0BDF                     ; 8-bit; probably the CGADSUB value: copied after the CGWSEL
+!Ppu_Unk0BDF = $0BDF                     ; 8-bit; the CGADSUB value (Ppu_ApplyMapScreens writes it
+                                         ; there; LocLoad_UnkA33B sets it from MapProps.ColorMath):
+                                         ; copied after the CGWSEL
                                          ; slot into $7E:2C6B by $C0:06AF (see Ppu_Unk0BD7)
 !Ppu_Unk0BE0 = $0BE0                     ; 8-bit; written with Ppu_Unk0BDF by Field_HookWinFixedB,
                                          ; and by event code at $C0:3D2C-3D74; no reader traced
@@ -506,6 +534,12 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0800 = $7F0800                ; per-object word, zeroed by Evt_RunObjInit
 !ObjX_Unk7F0880 = $7F0880                ; per-object word, zeroed by Evt_RunObjInit
 !ObjX_Unk7F0900 = $7F0900                ; per-object word, zeroed by Evt_RunObjInit
+!ObjX_Unk7F0C00 = $7F0C00                ; 8-bit; Map_InitEntryTile zeroes byte 0 of it and of the three
+                                         ; below at a location load (probably $80-byte per-object
+                                         ; tables like the ObjX_* ones above; no reader traced)
+!ObjX_Unk7F0C80 = $7F0C80                ; as ObjX_Unk7F0C00
+!ObjX_Unk7F0D00 = $7F0D00                ; as ObjX_Unk7F0C00
+!ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
 
 ; --- OAM shadow ---
 !Oam_LowTable = $0700                    ; 512-byte OAM low-table shadow (4 bytes per sprite: X, Y,
@@ -786,10 +820,11 @@ if !ram_engine_inc == 0
 !Map_ScrollToY = $1D03                   ; 8-bit target compared with Map_TileOriginY's low byte
 !Map_TreasureRec0 = $1D06                ; 16-bit TreasureRom offset that treasure numbers count from:
                                          ; Field_CheckTileInFront numbers a record (offset -
-                                         ; this) / 4 for Treasure_Flags. Setter not matched
+                                         ; this) / 4 for Treasure_Flags. Map_LoadTreasureTiles sets
+                                         ; it to the first word of TreasureRom_LocOfs
 !Map_TreasureLocRecs = $1D08             ; 16-bit TreasureRom offset of the current location's
-                                         ; record 0 (Map_TreasureIdx values index from it). Setter
-                                         ; not matched
+                                         ; record 0 (Map_TreasureIdx values index from it); set by
+                                         ; Map_LoadTreasureTiles
 !Map_Unk1D0C = $1D0C                     ; 16-bit; its low byte / 2 is the upper column bound of
                                          ; Field_ServiceUnk54's bit-5 box (Map_TileOriginX the lower)
 !Map_Unk1D10 = $1D10                     ; 16-bit; as Map_Unk1D0C for rows (Map_TileOriginY lower)
@@ -807,17 +842,22 @@ if !ram_engine_inc == 0
 !Map_Unk1D1A = $1D1A                     ; 8-bit column: Map_Unk9175 keeps a leftward Map_Unk1D2E
                                          ; out of Map_Unk1D32 once the leader's Obj_TileX <= it;
                                          ; Map_StepStopLeft compares Map_TileOriginX / 2 with it
-                                         ; (looks like a left scroll limit; not established)
+                                         ; (looks like a left scroll limit; not established). Set by
+                                         ; Map_InitMasksAndLimits from LocRom.LimitLeft, or 0
 !Map_Unk1D1B = $1D1B                     ; 8-bit column: as Map_Unk1D1A to the right (leader
                                          ; Obj_TileX >= it; Map_StepStopRight against
-                                         ; Map_Unk1D0C / 2)
+                                         ; Map_Unk1D0C / 2); LocRom.LimitRight, or Map_Unk0BCB - 1
 !Map_Unk1D1C = $1D1C                     ; 8-bit row: as Map_Unk1D1A upwards (leader Obj_TileY <=
-                                         ; it + 1; Map_StepStopUp against Map_TileOriginY / 2)
+                                         ; it + 1; Map_StepStopUp against Map_TileOriginY / 2);
+                                         ; LocRom.LimitTop, or 0
 !Map_Unk1D1D = $1D1D                     ; 8-bit row: as Map_Unk1D1A downwards (leader Obj_TileY >
-                                         ; it; Map_StepStopDown against Map_Unk1D10 / 2)
+                                         ; it; Map_StepStopDown against Map_Unk1D10 / 2);
+                                         ; LocRom.LimitBottom, or Map_Unk0BCD - 1
 !Map_ColMask1 = $1D1E                    ; 8-bit AND mask on layer 1's metatile column in
-                                         ; Map_WriteRow1/Col1 (wraps the column; probably the
-                                         ; layer's width - 1; setter not traced)
+                                         ; Map_WriteRow1/Col1 (wraps the column): $0F/$1F/$3F for
+                                         ; a Map_Unk0BCB of $10/$20/$30-$40 (Map_InitMasksAndLimits;
+                                         ; a 48-wide layer wraps at 64). A 16-bit AND with it also
+                                         ; masks the row with Map_RowMask1
 !Map_RowMask1 = $1D1F                    ; 8-bit; as Map_ColMask1 for layer 1's metatile row
 !Map_ColMask2 = $1D20                    ; 8-bit; as Map_ColMask1 for layer 2 (Map_WriteRow2/Col2)
 !Map_RowMask2 = $1D21                    ; 8-bit; as Map_RowMask1 for layer 2
@@ -924,7 +964,8 @@ if !ram_engine_inc == 0
 ;     scratch; most of these bytes have other names at other times, see above) ---
 !Map_ExitRec0 = $1D04                    ; 16-bit ExitRom offset of the current location's exit
                                          ; record 0 (Map_TileExitIdx values x 7 are added to it in
-                                         ; Map_StepTileEffects). Setter not matched
+                                         ; Map_StepTileEffects); set by Map_LoadExitTiles from
+                                         ; ExitRom_LocOfs
 !Map_Unk1D2EHi = $1D2F                   ; 8-bit high byte that makes Map_Unk1D2E a 16-bit signed
                                          ; step: Map_Unk8A6D sets it to $00 / $FF by the step's sign
                                          ; before its 16-bit adds (16-bit stores of Map_Unk1D2E also
@@ -998,6 +1039,8 @@ if !ram_engine_inc == 0
                                          ; Field_BuildC800Mode4 buffer there)
 !Map_TilemapVram4 = $1D84                ; 16-bit; its high byte is ORed into Hdma_Unk7F14F1 when
                                          ; hook 12 ends
+!Map_TilemapVram4Hi = $1D85              ; high byte of Map_TilemapVram4 (LocLoad_DrawMap stores it
+                                         ; alone, as Map_ScSizeInit)
 !Map_Unk1D86 = $1D86                     ; 8-bit; 1 from $C0:0A8B (with $1D84 and $1D85);
                                          ; Field_BuildC800Mode4 stores 2 when it builds rows 32-63
                                          ; (probably layer 3's BGnSC size bits, 2 = 32x64, as the
@@ -1058,6 +1101,80 @@ if !ram_engine_inc == 0
 !Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0
 !Map_HookTimer = $1DFF                   ; 8-bit frame countdown for hook 12's loops
 
+; --- Location map setup (LocLoad_UnkA33B and its callees, Map_LoadTreasureTiles; DP=$1D00).
+;     Scratch bytes of the page under other names at other times ---
+!Map_LoadScratch = $1D50                 ; 8-bit scratch: LocLoad_UnkA33B keeps the MapProps byte
+                                         ; it is splitting here; Map_LoadTreasureTiles stores a
+                                         ; table offset that nothing reads
+!Map_TreasureNum = $1D50                 ; alias of Map_LoadScratch: 16-bit treasure number in
+                                         ; Map_TreasureTaken, then (8-bit) its BitSet flag bit
+!Map_PropsPart = $1D52                   ; alias of Map_StepTestN: 8-bit scratch of
+                                         ; LocLoad_UnkA33B (a byte or bit field being assembled)
+!Map_OriginTest = $1D52                  ; alias of Map_StepTestN: 8-bit scratch of Map_InitOriginX/Y
+                                         ; (limit + lead, compared with the entry column / row)
+!Map_PlaneEnd = $1D52                    ; alias of Map_StepTestN, 16-bit: Map_UnpackTilePlanes:
+                                         ; rows << 8, the index that ends a plane
+!Map_RecOfs = $1D52                      ; alias of Map_StepTestN, 16-bit: Map_LoadExitTiles /
+                                         ; Map_LoadTreasureTiles: the record being read
+!Map_RowEnd = $1D54                      ; alias of Map_StepTestN2, 16-bit: Map_UnpackTilePlanes:
+                                         ; row << 8 | width, the index that ends the row
+!Map_RowEndRow = $1D55                   ; high byte of Map_RowEnd: the row being filled
+!Map_RecNum = $1D54                      ; alias of Map_StepTestN2: 8-bit number of the record
+                                         ; being read (Map_LoadExitTiles, Map_LoadTreasureTiles)
+!Map_RecEnd = $1D56                      ; alias of Map_ProbeFracY4, 16-bit: the offset that ends
+                                         ; the location's records
+!Map_RunHiBits = $1D58                   ; alias of Map_ProbeHiBits: Map_UnpackTilePlanes: the
+                                         ; Map_TileHiBits byte of a run being repeated
+!Map_RunAttrA = $1D5A                    ; alias of Map_ProbeAttrA: as Map_RunHiBits for Map_TileAttrA
+!Map_RunAttrB = $1D5C                    ; alias of Map_ProbeAttrB: as Map_RunHiBits for Map_TileAttrB
+!Decomp_Src = $0300                      ; 16-bit source offset for Decomp_ToWramVec (bank $C3's
+                                         ; unpacker; the battle side names it Battle_DecompSrc)
+!Decomp_SrcBank = $0302                  ; 8-bit source bank
+!Decomp_Dest = $0303                     ; 16-bit WRAM destination offset
+!Decomp_DestBank = $0305                 ; 8-bit WRAM destination bank
+!Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
+                                         ; MapProps; LocRom.MapProps picks the entry
+!ExitRom_LocOfs = $E50000                ; one word per location (Loc_Id & Loc_IdMask): ExitRom
+                                         ; offset of its first record; the next word ends the list
+                                         ; (Map_LoadExitTiles)
+!TreasureRom_LocOfs = $F5F000            ; as ExitRom_LocOfs for TreasureRom records
+                                         ; (Map_LoadTreasureTiles); the first word is also the
+                                         ; base treasure numbers count from (Map_TreasureRec0)
+
+; One location record in ROM bank $F6 (14 bytes; record Loc_Id at Loc_RecOfs). Only the
+; fields the matched location-load steps read are named.
+struct LocRom $F60000
+    .Unk00: skip 1
+    .Unk01: skip 1       ; read by LocLoad_Unk0960 and LocLoad_Unk09DD ($FF = none)
+    .Unk02: skip 1       ; read by LocLoad_Unk0A14 ($FF = none)
+    .Unk03: skip 1
+    .MapProps: skip 2    ; 16-bit entry number in Map_PropsPtrs (LocLoad_UnkA33B)
+    .Unk06: skip 2
+    .Unk08: skip 2       ; byte 8 read by LocLoad_Unk56D4
+    .LimitLeft: skip 1   ; Map_Unk1D1A (column); bit 7 set: no limits from the record, the
+                         ; four are 0, Map_Unk0BCB - 1, 0, Map_Unk0BCD - 1 instead
+    .LimitTop: skip 1    ; Map_Unk1D1C (row)
+    .LimitRight: skip 1  ; Map_Unk1D1B (column)
+    .LimitBottom: skip 1 ; Map_Unk1D1D (row). "Limit" rests on how Map_Unk9175 and the
+                         ; Map_StepStop* tests use them and on the defaults (the map's edges)
+endstruct
+
+; A location's map properties, unpacked by LocLoad_UnkA33B into WRAM at $7E:B500 (the area
+; LocLoad_Unk09DD later unpacks Map_Meta12TL into, so it only lives through the load).
+struct MapProps $7EB500
+    .Size1: skip 1       ; bits 0-1 -> Map_Unk0BCB, 2-3 -> Map_Unk0BCD (layer 1), 4-5 ->
+                         ; Map_Unk0BCF, 6-7 -> Map_Unk0BD1 (layer 2): sizes $10-$40
+    .Size3: skip 1       ; bits 0-1 -> Map_Unk0BD3, 2-3 -> Map_Unk0BD5 (layer 3); bit 4 / 5:
+                         ; Map_OwnStep2 / Map_OwnStep3; bit 6: Map_Unk0BC9; bit 7: Map_Unk0BCA
+    .Move2: skip 1       ; layer set 2's own step: bits 0-2 n: X step 1 << (n - 1) (0: none),
+                         ; bit 3: negative; bits 4-6 / 7: the same for Y -> Map_OwnStep2X/Y
+    .Move3: skip 1       ; as Move2 for set 3 (Map_OwnStep3X/Y)
+    .Screens: skip 1     ; bits 0-2: BG1-3 and bit 3: OBJ on the main screen; bits 4-7 the
+                         ; same for the sub screen (Ppu_Unk0BD7 / Ppu_Unk0BD8)
+    .ColorMath: skip 1   ; Ppu_Unk0BDF and Ppu_Unk0BE0 (the CGADSUB value)
+    .Planes: skip 1      ; start of the packed tile planes Map_UnpackTilePlanes reads
+endstruct
+
 ; One OAM low-table entry; used as abs,X with X = the entry's address (Oam_BuildShadow)
 struct OamEntry $0000
     .X: skip 1           ; X position (low 8 bits)
@@ -1094,7 +1211,9 @@ endstruct align 8
 struct ExitRom $E50000
     .TileX: skip 1       ; map column the record belongs to
     .TileY: skip 1       ; map row
-    .Unk2: skip 1        ; not read by Map_StepTileEffects
+    .Span: skip 1        ; Map_LoadExitTiles: bits 0-6 = tiles after the first the record
+                         ; also covers, bit 7 set = down the column, clear = along the row
+                         ; (not read by Map_StepTileEffects)
     .DestLo: skip 1      ; Loc_DestId low byte
     .DestHiFacing: skip 1 ; bit 0: Loc_DestId bit 8; bits 1-4: facing; bit 7: Loc_DestFacing bit 7
     .DestX: skip 1       ; Loc_DestX (destination tile X)
