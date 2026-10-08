@@ -95,12 +95,12 @@ $C0:E9FF,$C0:EA1E,32,Sub_E9FF,$C0,Engine (unnamed),matched,e528f5a70bf5,
 $C0:EA1F,$C0:EA41,35,Sub_EA1F,$C0,Engine (unnamed),matched,9cef01f49169,
 $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,208b0705c41c,The CPU comes out of reset in emulation mode with I already set.
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,verified,b4be75de9340,Native-mode interrupt stubs ($FF10–$FF17)
-$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,bd12634e9770,
+$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,verified,bd12634e9770,
 $C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,verified,5084e9025e2a,"A crash trap: it reads a fixed, recognizable address forever and never returns."
 $C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
 $C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,012bbbcead94,
-$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,c6cbab686ed4,"Wave tables ($FF30–$FFAF) One period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored twice."
-$C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,readable,4a7da0a8b51b,
+$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,verified,c6cbab686ed4,"Wave tables ($FF30–$FFAF) One period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored twice."
+$C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,verified,4a7da0a8b51b,
 $C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,verified,1dcc24864b33,"SNES cartridge header ($FFB0–$FFDF), standard layout"
 $C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,verified,4a10f4fbea5d,
 $C0:FFBE,$C0:FFBE,1,RomSpecialVersion,$C0,ROM header,verified,e01cc8c6afac,
@@ -115,7 +115,7 @@ $C0:FFDA,$C0:FFDA,1,RomDeveloperId,$C0,ROM header,verified,e0cc47ba5fa5,
 $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
-$C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,readable,7411a2f15cbb,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
+$C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,7411a2f15cbb,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
 $C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,matched,e6b443f74c5f,8×8→16 HW multiply via $4202/$4203/$4216.
 $C1:00A7,$C1:00D6,48,Battle_MulAccum,$C1,Battle engine,matched,cab6b322dc69,"Multiply-accumulate: $A5 × $A7 via HW mult, 32-bit accumulate into $A9/$AA."
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,matched,019765e644f9,16÷8 HW divide via $4204/$4205/$4206/$4214.
