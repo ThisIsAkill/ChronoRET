@@ -490,19 +490,19 @@ if !constants_menu_inc == 0
 !C2Scene_AnimObjARest5 = $18             ; and with C2Scene_ObjAFlag5
 !C2Scene_AnimObjARise = $19              ; while it goes up (C2Scene_ObjAWait)
 !C2Scene_AnimObjALand = $1A              ; while it comes down (C2Scene_ObjAFly)
-!C2Scene_AnimObjAMark = $4E              ; C2Scene_ObjAMarkShow's sprite above object A
-!C2Scene_AnimObjAMark5 = $1F             ; and below it while it is up with C2Scene_ObjAFlag5
+!C2Scene_AnimMarkAbove = $4E              ; the mark tasks' sprite above object A or B (or a mate)
+!C2Scene_AnimMarkBelow = $1F              ; and below it while it is up
 !C2Scene_SoundCmd86 = $86                ; sound command C2Scene_ObjAInit sends (arguments 0, 0); meaning not
                                          ; traced
 !C2Scene_ObjASongArg = $13               ; C2Scene_SoundCmd10 argument of C2Scene_ObjASound (probably a song)
 !C2Scene_Flag0ObjAGo1DD = $D3            ; C2Scene_Flag0Copy value with which object A, once up, starts
                                          ; C2Scene_ObjAScrGo1DD (meaning not traced)
-!C2Scene_ObjARiseFrames = $30            ; frames C2Scene_ObjARise moves (at -0.5: 24 pixels)
-!C2Scene_ObjALandFrames = $31            ; frames C2Scene_ObjALand moves (at +0.5)
-!C2Scene_ObjARiseAttrAt = 8              ; .Frames at which the rising sprite gets C2Scene_ObjAttrPrio3
-!C2Scene_ObjALandAttrAt = $20            ; and the landing one C2Scene_ObjAttrPrio2
-!C2Scene_ObjALift = $0018                ; 24 pixels: how far object A's sprite goes up
-!C2Scene_ObjALiftUp = $FFE8              ; -24
+!C2Scene_RiseFrames = $30                ; frames the objects (and mates) move up at -0.5: 24 pixels
+!C2Scene_LandFrames = $31                ; frames they move down when landing
+!C2Scene_RiseAttrAt = 8                  ; .Frames at which a rising sprite gets OAM priority 3
+!C2Scene_LandAttrAt = $20                ; and a landing one priority 2 again
+!C2Scene_Lift = $0018                    ; 24 pixels: how far the objects' sprites go up
+!C2Scene_LiftUp = $FFE8                  ; -24
 !C2Scene_HalfPixel = $8000               ; a velocity fraction word: half a pixel a frame
 !C2Scene_ObjALandMask = $0707            ; property nibble bits 0-2 (two nibbles a word) that keep object A
                                          ; from coming down
@@ -520,5 +520,33 @@ if !constants_menu_inc == 0
 !C2Scene_Unk1B58Spot = $4C               ; C2Scene_Unk1B58 while object A is on the spot
 !C2SceneRom_ObjAPalA = $C6F5E0           ; 16 colors object A's scripts fade palettes to (bank $C6)
 !C2SceneRom_ObjAPalB = $C6F600           ; 16 colors C2Scene_ObjAScrLeave sets palette 0 to
+
+; --- Object B's tasks and its mates (C2Scene_ObjBTask, C2Scene_ObjBMateTask and their mark tasks) ---
+!C2Scene_ObjBLanding = $20               ; C2Scene_ObjBFlags bit 5: object B is coming down (set by
+                                         ; C2Scene_ObjBFly, cleared by C2Scene_ObjBLand); the mates go back
+!C2Scene_ObjBStWait = 1                  ; C2Scene_ObjTask.State values of C2Scene_ObjBTask
+!C2Scene_ObjBStFly = 3
+!C2Scene_ObjBStLand = 5
+!C2Scene_ObjBAttrPrio2 = $A8             ; object B's .SprAttr: palette 4 (bits 1-3), C2Scene_SprAttrScroll,
+!C2Scene_ObjBAttrPrio3 = $B8             ; OAM priority 2 or 3
+!C2Scene_AnimObjBRest = $24              ; object B's (and its mates') animation at rest
+!C2Scene_AnimObjBRise = $29              ; object B's while it goes up or down
+!C2Scene_AnimObjBDown = $25              ; C2Scene_ObjBFaceAnims' facing-down entry, loaded as a constant
+!C2Scene_ObjBNoLandCols = $0E            ; BankC6_UnkE74E's rectangle where object B does not come down:
+!C2Scene_ObjBNoLandRows = $34            ; 8x8 columns 0-13, rows 0-51
+!C2Scene_MateStWait = 1                  ; C2Scene_FollowTask.State values of the mate tasks
+!C2Scene_MateStFollow = 3
+!C2Scene_MateStLand = 5                  ; (C2Scene_ObjBMateTask)
+!C2Scene_MateMarkStLand = 4              ; (C2Scene_ObjBMateMarkTask)
+!C2Scene_NoFacing = $FF                  ; .PrevFacing that matches no facing (forces the animation)
+!C2Scene_SprAttrPrioMask = $30           ; C2Scene_Task.SprAttr bits 4-5: the OAM priority (3 when all set)
+!C2Scene_SprAttrPrio2 = $20              ; priority 2
+!C2Scene_AnimMate1Glide = $6F            ; slot 1's mate going up or back to object B
+!C2Scene_AnimMate2Glide = $74            ; slot 2's
+!C2Scene_MateAimFrames = 4               ; frames a mate moves before it aims again
+!C2Scene_MateGlideFrames = $30           ; frames C2Scene_ObjBMateGlideVel's velocity takes to the target
+!C2Scene_SignByte = $FF                  ; the high byte that sign-extends a negative byte
+!C2Scene_MateMarkDrop = $0030            ; 48 pixels: a mate's mark below the mate while up
+!C2Scene_MateMarkDropUp = $FFD0          ; -48
 
 endif

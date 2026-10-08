@@ -56,6 +56,16 @@ Obj_Unk30B3:        ; as Obj_Unk305D toward the position of the object in ObjFro
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
+org $C22273
+C2Scene_Unk2273:    ; JSL from C2Scene_ObjBMateAim: probably the cosine of direction A (0-255): adds $40
+                    ; and runs into C2Scene_Unk2277 (not matched)
+org $C22277
+C2Scene_Unk2277:    ; JSL: probably the sine of direction A from Rom_SineTable256 (sign-extended; $0080 and
+                    ; $FF80 at $40 and $C0) through DB $00 (not matched)
+org $C2229D
+C2Scene_Unk229D:    ; JSR from C2Scene_ObjBMateAim: probably the direction (0-255) between the points
+                    ; (C2Tmp_08, $0A) and (C2Tmp_0C, $0E) on the wrapping map, through the angle table at
+                    ; $C0:F300 (DB $00); X = the table index, 0 within 4 pixels (not matched)
 org $C2631F
 C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
                     ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
@@ -66,6 +76,10 @@ BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P
                     ; at $0A01, forced blank, then the menu (not matched)
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
+org $C6E74E
+BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
+                    ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for
+                    ; left / right / above / below (not matched)
 org $C6E797
 BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
                     ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up

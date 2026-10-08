@@ -349,6 +349,12 @@ endstruct align 8
 !C2Scene_Unk7F00CC = $7F00CC             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_ObjAAfterMode8
                                          ; (C2Scene_ObjALoc1F2); meaning not traced
 !C2Scene_Unk7F00CD = $7F00CD             ; 8-bit; zeroed by C2Scene_ObjAAfterMode8; meaning not traced
+!C2Scene_ObjBAloft = $1BF0               ; 8-bit; 1 while object B is up (C2Scene_ObjBRise to its landing),
+                                         ; 0 otherwise (C2Scene_ObjBMarkShow)
+!C2Scene_ObjBMate1X = $02A6              ; 16-bit position of slot 1's mate of object B
+!C2Scene_ObjBMate1Y = $02A8              ; (C2Scene_ObjBMateSavePos; its mark task follows it)
+!C2Scene_ObjBMate2X = $02AA              ; and of slot 2's
+!C2Scene_ObjBMate2Y = $02AC
 !C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
                                          ; C2Scene_LeaderBoard move (read by unmatched code)
 !C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
