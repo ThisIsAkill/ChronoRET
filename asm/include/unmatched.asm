@@ -129,9 +129,9 @@ BankC2_Entry0000:   ; JML target for game mode >= $01F0 (GameLoop_Main)
 org $C28000
 BankC2_Entry8000:   ; JSL with A = a mode value before InitHW (callers say "set BG mode"; unverified)
 org $C28004
-BankC2_Entry8004:   ; JSL with A = 9, once at boot (GameLoop)
+BankC2_Entry8004:   ; JSL with A = a command; 15 JSL sites (GameLoop passes !BankC2_BootArg, at boot and on each $C0:02CA re-entry)
 org $C70000
-Audio_DriverInit:   ; sound driver bank $C7: init, once at boot
+Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
 org $FDC1EE

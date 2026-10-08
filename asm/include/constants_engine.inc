@@ -40,7 +40,7 @@ if !constants_engine_inc == 0
 !Boot_ClearMainSize = $E900              ; bytes cleared from $7E:0700 to the end of bank $7E
 !Boot_Clear7FStart = $5080               ; first address of the cleared bank-$7F block; also its byte
                                          ; count
-!BankC2_BootArg = $09                    ; A for the one-time BankC2_Entry8004 call at boot
+!BankC2_BootArg = $09                    ; A for the BankC2_Entry8004 call in GameLoop (boot, and again on the $C0:02CA re-entry)
 
 ; --- Locations ---
 !Loc_FirstBankC2 = $01F0                 ; Loc_Id at or above this is handled by BankC2_Entry0000

@@ -31,7 +31,9 @@ incsrc "../hardware.inc"
 ; variables are reached with absolute !DP_Field+ addresses.
 ; On entry: M=1, X=0 (16-bit), DP=$0100, DB=$00 (the high-table
 ; stores through Eng_PtrBase are bank $00), Obj_Cur = object.
-; Exit: M=1, X=0, DP=$0100 (PLD), DB=$00; A, X and Y clobbered.
+; Exit: M=1, X=0, DP=$0100 (PLD), DB=$00; A and X clobbered. Y is
+; preserved (neither this routine nor its callees touch it), which
+; Oam_BuildShadow relies on: it keeps its bucket index in Y across the call.
 ; ============================================================
 org $C0B309
 Spr_AppendToOam:
@@ -3567,7 +3569,10 @@ Spr_Load12:
 ; Field_RestoreState ($C0:0212) for Field_UnkAEObj, and unmatched object
 ; set-up code at $C0:47E9, which first stores the object in
 ; Field_UnkAEObj.
-; Exit: M=1, X/Y 16-bit, DP and DB unchanged.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A, X and Y clobbered;
+; Obj_LastFrame of the object set to 0; DP Spr_GfxPtr, Spr_WramPtr,
+; Spr_FramePtr and Spr_TileCount written; WMADD, VMADD and DMA channel 7
+; registers written.
 ; ============================================================
 org $C0E12A
 Spr_LoadLargeObj:
@@ -9079,7 +9084,8 @@ Obj_BuildFrame8:
 ; On entry: M=1, X/Y 8-bit (widened before the TAX of the record
 ; offset), DP=$0100, DB=$00, X = Obj_Cur: unlike Obj_FrameLayout4 it
 ; does not load X itself, and relies on Obj_BuildFrameLayout's LDX.
-; Exit: M=1, X/Y 8-bit, C=0.
+; Exit: M=1, X/Y 8-bit, C=0; X = Obj_Cur (reloaded), A and Y clobbered;
+; DP Spr_FramePtr and Spr_AttrBase written.
 ; ============================================================
 org $C0D124
 Obj_FrameLayout8:
