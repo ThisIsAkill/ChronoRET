@@ -10,9 +10,6 @@
 
 ; --- Bank $C1 (battle engine, not matched yet) ---
 
-org $C1283D
-Battle_CacheBattlerCoordsAll:           ; JSR: for each present battler, copies !Battler_ScreenX/Y to $A039/$A050,X
-                                        ; and runs $C1:285A on it
 org $C12D9F
 Battle_TickPcSlots:                     ; JSR: per-PC upkeep; zeroes !Battle_FramesDecoded and runs the PCs'
                                         ; frame decodes (Battle_DrawBattlerFrame)

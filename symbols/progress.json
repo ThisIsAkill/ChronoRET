@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 30645,
+  "emitted_bytes": 30974,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 253,
-      "bytes": 30645
+      "functions": 257,
+      "bytes": 30974
     },
     "readable": {
-      "functions": 253,
-      "bytes": 30645
+      "functions": 254,
+      "bytes": 30674
     },
     "verified": {
       "functions": 245,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 10175,
+      "emitted_bytes": 10504,
       "matched": {
-        "functions": 130,
-        "bytes": 10175
+        "functions": 134,
+        "bytes": 10504
       },
       "readable": {
-        "functions": 130,
-        "bytes": 10175
+        "functions": 131,
+        "bytes": 10204
       },
       "verified": {
         "functions": 125,
@@ -463,7 +463,7 @@
       "bank": "$C1",
       "start": "$C1:2000",
       "end": "$C1:2FFF",
-      "emitted_bytes": 2109,
+      "emitted_bytes": 2438,
       "functions": [
         "BattleTgt_SingleAlly",
         "BattleTgt_CollectValidTargets",
@@ -495,7 +495,11 @@
         "BattleTgt_SelectAllCandidates",
         "BattleTgt_CycleNext",
         "BattleTgt_CyclePrev",
-        "BattleTgt_AnyCandidate"
+        "BattleTgt_AnyCandidate",
+        "Battle_CacheBattlerCoordsAll",
+        "Battle_CalcBattlerBox",
+        "Battle_BoxOverlapsOthers",
+        "Battle_BoxHitsBlockedCell"
       ]
     },
     {
