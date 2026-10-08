@@ -8066,7 +8066,9 @@ LocLoad_ClearPage1D00:
 ;   Rows from column c - 1 and columns from row r - 1 match where the
 ;   edge builders start (one column left, one row above the origin).
 ; Callers: Map_Unk93E1 (BRL at $C0:9439 and $C0:9448) and unmatched
-;   code: BRL at $C0:74D1 (Field_Unk74D4's tail), JSR at $C0:74E3 and
+;   code: BRL at $C0:74D1 (the last instruction of the routine before
+;   Field_Unk74D4), JSR at $C0:74E3 (in Field_Unk74D4, also reached by
+;   Field_Unk74E8 and Field_Unk74F7 through its shared tail) and JSR at
 ;   $C0:8819.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map); DB not
 ;   used (all direct page).
