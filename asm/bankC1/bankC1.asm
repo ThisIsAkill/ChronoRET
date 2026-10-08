@@ -23003,11 +23003,11 @@ BattleSys_Unk8C09:
 ; routine sets only !Battle_MathA, so whatever !Battle_MathHi holds
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
-; Callers (37 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1) and unmatched ($C1:8DE8, $C1:95E8,
-;   $C1:98D5, $C1:A48A, $C1:AB30, $C1:C486, $C1:C867, $C1:C8D0, $C1:D29E, $C1:D67C, $C1:DA7C,
-;   $C1:DB1A, $C1:DC94, $C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F,
-;   $C1:E4AE, $C1:E508, $C1:E56F, $C1:E774, $C1:E7BB, $C1:E97A, $C1:E9F0, $C1:EED8, $C1:EEFF,
-;   $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDCB, $C1:FDDA).
+; Callers (37 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), Battle_RandRangeLong ($C1:FDCB) and
+;   unmatched ($C1:8DE8, $C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:C486, $C1:C867, $C1:C8D0,
+;   $C1:D29E, $C1:D67C, $C1:DA7C, $C1:DB1A, $C1:DC94, $C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA,
+;   $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F, $C1:E774, $C1:E7BB, $C1:E97A,
+;   $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDDA).
 ; Callers note: 37 JSR sites, e.g. BattleSys_Main ($C1:807B, $C1:80B1) and
 ;   unmatched code from $C1:8DE8 on (xref).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
@@ -23116,19 +23116,19 @@ BattleSys_ListOffsetTable:
 ; !Battle_MathHi:MathLo = !Battle_MathA * !Battle_MathB. MathB is
 ; shifted out on the way (it ends as garbage; its first shift takes in
 ; the caller's carry).
-; Callers (109 JSR sites): Battle_SetupBattle ($C1:FCA6, $C1:FD75) and unmatched ($C1:B329,
-;   $C1:B455, $C1:B4BC, $C1:BC7D, $C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF, $C1:BF05, $C1:BF3C,
-;   $C1:C60B, $C1:CB50, $C1:CB69, $C1:CB82, $C1:CB9B, $C1:CE8F, $C1:CEC1, $C1:CEF3, $C1:D53A,
-;   $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D,
-;   $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73,
-;   $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9,
-;   $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC,
-;   $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484,
-;   $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D,
-;   $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792, $C1:E8B5, $C1:E8D6,
-;   $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EC1D, $C1:EDA8, $C1:EDC5, $C1:EDEE,
-;   $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C,
-;   $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D, $C1:FDBF).
+; Callers (109 JSR sites): Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long ($C1:FDBF) and
+;   unmatched ($C1:B329, $C1:B455, $C1:B4BC, $C1:BC7D, $C1:BE10, $C1:BE42, $C1:BE88, $C1:BEBF,
+;   $C1:BF05, $C1:BF3C, $C1:C60B, $C1:CB50, $C1:CB69, $C1:CB82, $C1:CB9B, $C1:CE8F, $C1:CEC1,
+;   $C1:CEF3, $C1:D53A, $C1:D5E5, $C1:D772, $C1:D7D8, $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E,
+;   $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B,
+;   $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A,
+;   $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E,
+;   $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5,
+;   $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5,
+;   $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792,
+;   $C1:E8B5, $C1:E8D6, $C1:E9AF, $C1:E9CC, $C1:EA14, $C1:EB28, $C1:EB81, $C1:EC1D, $C1:EDA8,
+;   $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642,
+;   $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -23664,6 +23664,71 @@ Battle_CalcUnk56:
     CLC
     ADC.b #!Battle_Unk56Base
     RTS
+
+; ==================================================================
+; Long veneers for bank $FD ($C1:FDBF–$C1:FDD2)
+; ==================================================================
+; Each is a JSR to a bank-$C1 routine and an RTL, so that the battle
+; helpers in bank $FD (BattleFD_*) can reach it with JSL. They take and
+; leave what the routine they call takes and leaves; the JSR / RTL pair
+; changes no register or flag of its own.
+
+; $C1:FDBF — Battle_Mul16Long (4 bytes, $FDBF–$FDC2)
+; JSL form of Battle_Mul16.
+; Callers (17 JSL sites): BattleFD_LoadUnkB18E ($FD:AADD), BattleFD_LoadUnkB18E2 ($FD:AB0C),
+;   BattleFD_AddEnemyRewards ($FD:ABC1), BattleFD_UnkAE52 ($FD:AE77), BattleFD_UnkAEF2 ($FD:AF22)
+;   and unmatched ($FD:AF98, $FD:B03F, $FD:B061, $FD:B082, $FD:B0A3, $FD:B0C4, $FD:B66C, $FD:B68C,
+;   $FD:B821, $FD:B842, $FD:B899, $FD:B8CC).
+; Entry: as Battle_Mul16: M any, X=0, DP=0, DB any
+; Exit:  as Battle_Mul16: M=1, X=0; A = 0, X = 0; !Battle_MathLo/Hi = the
+;        product
+org $C1FDBF
+Battle_Mul16Long:
+    JSR Battle_Mul16
+    RTL
+
+; $C1:FDC3 — BankC1_AddItemLong (4 bytes, $FDC3–$FDC6)
+; JSL form of BankC1_AddItem (not analysed: add one of item Y).
+; Callers (1 JSL site): unmatched ($FD:B72A).
+; Entry: as BankC1_AddItem; M=1, X=0, DP=0, DB=$7E at its one caller
+;        (BattleFD_UnkB655), Y = item id
+; Exit:  as BankC1_AddItem (not analysed)
+org $C1FDC3
+BankC1_AddItemLong:
+    JSR BankC1_AddItem
+    RTL
+
+; $C1:FDC7 — BattleSys_UnkBFAALong (4 bytes, $FDC7–$FDCA)
+; JSL form of BattleSys_UnkBFAA (not analysed).
+; Callers (3 JSL sites): BattleFD_UnkAB30 ($FD:AB6E, $FD:AB9A) and BattleFD_UnkAC6E ($FD:ACC9).
+; Entry: as BattleSys_UnkBFAA; M=1, X=0, DP=0, DB=$7E at its callers
+; Exit:  as BattleSys_UnkBFAA (not analysed)
+org $C1FDC7
+BattleSys_UnkBFAALong:
+    JSR BattleSys_UnkBFAA
+    RTL
+
+; $C1:FDCB — Battle_RandRangeLong (4 bytes, $FDCB–$FDCE)
+; JSL form of Battle_RandRange.
+; Callers (4 JSL sites): BattleFD_UnkAB30 ($FD:AB55, $FD:AB7D), BattleFD_AddEnemyRewards ($FD:AC23)
+;   and BattleFD_UnkAC6E ($FD:ACA7).
+; Entry: as Battle_RandRange: M=1, X any, DP=0, DB=$7E; A = high bound,
+;        X = low bound
+; Exit:  as Battle_RandRange: M=1, X=0; A = the number
+org $C1FDCB
+Battle_RandRangeLong:
+    JSR Battle_RandRange
+    RTL
+
+; $C1:FDCF — BattleSys_UnkB6D1Long (4 bytes, $FDCF–$FDD2)
+; JSL form of BattleSys_UnkB6D1 (not analysed).
+; Callers (2 JSL sites): unmatched ($FD:A8D8, $FD:A910).
+; Entry: as BattleSys_UnkB6D1; M=1, X=0, DP=0, DB=$7E at its callers
+; Exit:  as BattleSys_UnkB6D1 (not analysed)
+org $C1FDCF
+BattleSys_UnkB6D1Long:
+    JSR BattleSys_UnkB6D1
+    RTL
 
 
 ; ==================================================================

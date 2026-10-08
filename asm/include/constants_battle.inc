@@ -565,4 +565,47 @@ if !constants_battle_inc == 0
 !Battle_CF15Call4A        = $2A
 !Battle_CF15Call4B        = $4B
 
+; --- Bank $FD battle helpers (BattleFD_*) ---
+!Battle_RestoreHpHalf     = 1     ; BattleFD_RestoreEnemies HP mode (script byte +9): half the max HP
+!Battle_RestoreHpQuarter  = 2     ; ... a quarter of it
+!Battle_RestoreHpOne      = 3     ; ... 1 HP (other values: the full HP BattleFD_UnkB438 set)
+!Battle_RestoreActKind    = 2     ; !Battle_ActKind BattleFD_RestoreEnemies sets
+!BattleRom_UnkB18ERecSize = 11    ; bytes per record of !BattleRom_UnkCC6FCB / UnkCC88CB
+!Battle_AutoEnemyBit      = $80   ; BattlerStats.Unk4C+2 / Unk4C+7 bit: BattleFD_UnkAB30 makes the PC attack a random enemy
+!Battle_AutoAnyBit        = $04   ; BattlerStats.Status2 bit: BattleFD_UnkAB30 makes the PC attack a random other battler
+!Battle_UnkB3C9Auto       = $80   ; !Battle_UnkB3C9 value BattleFD_UnkAB30 sets
+!Battle_PercentRange      = 100   ; Battle_RandRange high bound for a 0-99 roll
+!Battle_ItemDrawBelow     = 90    ; BattleFD_AddEnemyRewards: a roll below this gives .ItemA (90%)
+!Battle_RewardListLen     = 3     ; items in each half of !Battle_RewardItems
+!Battle_Unk78CounterBit   = $40   ; BattlerStats.Unk78 bit: the slot may act in BattleFD_UnkAC6E
+!Battle_Unk7AActNowBit    = $80   ; BattlerStats.Unk7A bit: BattleFD_UnkAC6E makes the slot act at once
+!Battle_HitRecClearBytes  = $B0   ; bytes BattleFD_UnkACEE zeroes from !Battle_ActPcHitAmount
+!Battle_UnkB328Bytes      = $84   ; bytes BattleFD_UnkACFD zeroes from !Battle_UnkB328
+!Battle_TechEntryEmpty    = $FF   ; fill of the Tech_MenuEntry blocks (BattleFD_UnkAD09)
+!Battle_TechEntryBlocksBytes = $1A4 ; 3 PCs x $8C B of Tech_MenuEntry records
+!Battle_RewardBitUnk0     = $80   ; !Battle_UnkB2AF bit: BattleFD_UnkAD17 shows message 0 (!Battle_UnkB28C)
+!Battle_RewardBitUnk6     = $10   ; !Battle_UnkB2AF bit: BattleFD_UnkAD17 shows message 1 (!Battle_UnkB2DB)
+!Battle_EndMsgUnk0        = 0     ; BattleSys_UnkVecCD0021 messages of BattleFD_UnkAD17: !Battle_UnkB28C
+!Battle_EndMsgUnk1        = 1     ; ... !Battle_UnkB2DB/B2DD
+!Battle_EndMsgGold        = 2     ; ... !Battle_RewardGold
+!Battle_EndMsgItem        = 3     ; ... one reward item
+!Battle_EndMsgUnk4        = 4     ; ... a PC's !Battle_UnkB2B0 bit 7
+!Battle_EndMsgUnk5        = 5     ; ... an entry of the PC's !Battle_UnkB3CE list
+!Battle_EndMsgUnk6        = 6     ; ... an entry of !Battle_UnkB305
+!Battle_EndMsgUnk7        = 7     ; ... !Battle_UnkB310
+!Battle_B2B0Msg4Bit       = $80   ; !Battle_UnkB2B0 bit: message 4
+!Battle_B2B3Msg5Bit       = $08   ; !Battle_UnkB2B3 bits: messages 5, 6, 7
+!Battle_B2B3Msg6Bit       = $04
+!Battle_B2B3Msg7Bit       = $02
+!Battle_UnkB3CEListMask   = 7     ; entries per PC list of !Battle_UnkB3CE - 1 (8 entries)
+!Battle_CharRecordSize    = $50   ; bytes per character record (!Menu_CharRecords), copied by BattleFD_UnkAE52
+!Battle_Unk57CountId      = $A9   ; BattlerStats.Unk57 value BattleFD_UnkAE99 counts
+!Battle_Unk57FlagId       = $AB   ; BattlerStats.Unk57 value BattleFD_UnkAEC4 flags
+!Battle_Unk50Bit2         = $04   ; BattlerStats.Unk4C+4 (+$50) bit BattleFD_UnkAEC4 sets
+!Battle_Unk1C48Bytes      = 15    ; bytes of !Battle_Unk1C48 BattleFD_UnkAEF2 fills (3 records)
+!Battle_Unk1C48Stride     = 5     ; bytes per PC record of !Battle_Unk1C48
+!Battle_Unk1C4AInit       = $80   ; value BattleFD_UnkAEF2 puts in record byte 2
+!BattleRom_UnkCC06A7Size  = 6     ; bytes per record of !BattleRom_UnkCC06A7
+!Battle_HighBit           = $80   ; bit 7: the top of a bit scan or shift
+
 endif
