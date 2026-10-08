@@ -2200,8 +2200,7 @@ C2Scene_LoadObjGfx:
 ; Unpacks entry C2Scene_UnkC800Pack of C2SceneRom_ObjPacks (the same for
 ; every scene) to C2Scene_UnkC800 ($7E:C800); what it holds is not
 ; traced.
-; Callers: JMP from C2Scene_LoadVram ($C2:2D6D; xref rates the site
-;   doubtful, but it is on an instruction boundary there).
+; Callers: JMP from C2Scene_LoadVram ($C2:2D6D).
 ; Entry: M=1, X=0, DP any, DB=$00
 ; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
 ;        Menu_Decomp* changed
@@ -2975,8 +2974,10 @@ C2Scene_LoadScene:
     JMP C2Scene_TaskSpawnScript
 
 ; $C2:2C93 — C2Scene_ReloadScene (46 bytes, $2C93–$2CC0)
-; Loads the scene's graphics again (scene modes 5 and 8 call it right
-; after C2Scene_RestoreState; mode 6 calls it too, from the unmatched
+; Loads the scene's graphics again (scene modes 5 and 8 call it after
+; C2Scene_RestoreState and C2Scene_VramQInit; mode 8 skips it when
+; $7F:01F4 AND $0A or $7F:01F5 AND $02 is non-zero ($C2:265E); mode 6
+; calls it too, from the unmatched
 ; callers' addresses): C2Scene_Unk5775, the HDMA area cleared and
 ; C2Scene_HdmaValueA916 = C2Scene_HdmaValueA916Init, then the VRAM and
 ; palette loads (C2Scene_LoadVram), the metatiles, the Unk7000, UnkB800
@@ -3102,7 +3103,7 @@ C2Scene_LoadVram:
 ; $C2:2D70 — C2Scene_DmaToVram (33 bytes, $2D70–$2D90)
 ; DMAs A bytes from X in bank $7F to VRAM word address Y on channel 7
 ; (word writes to VMDATAL/H, VMAIN stepping after the high byte).
-; Callers (7 JSR sites): C2Scene_LoadVram ($C2:2CCD, $C2:2CDC, $C2:2CEB,
+; Callers (9 JSR sites): C2Scene_LoadVram ($C2:2CCD, $C2:2CDC, $C2:2CEB,
 ;   $C2:2CFC, $C2:2D0D), C2Scene_LoadLocExtraGfx ($C2:2DBF, $C2:2DDB,
 ;   $C2:2E01, $C2:2E1D).
 ; Entry: M=0 (16-bit count store), X=0, DP any, DB=$00 (absolute register
@@ -3136,8 +3137,7 @@ C2Scene_DmaToVram:
 ; (C2Scene_ExtraPalC) when bit 7 of C2Scene_FlagTailByte1 is set; then
 ; C2Scene_LoadUnkC600 (JMP). Other scenes, or a lower flag byte: nothing.
 ; (Eng_Unk7F0000 is probably a story-progress byte; unverified.)
-; Callers (1 JSR site): C2Scene_LoadVram ($C2:2D6A; xref rates it
-;   doubtful, but it is on an instruction boundary there).
+; Callers (1 JSR site): C2Scene_LoadVram ($C2:2D6A).
 ; Entry: M=1, X=0, DP any, DB=$00 (absolute Loc_Id and register stores);
 ;        forced blank
 ; Exit:  M=1, X=0; A, X, Y clobbered; Menu_Decomp* and DMA channel 7
@@ -3214,9 +3214,11 @@ C2Scene_LoadLocExtraGfx:
 ; ($7E:4000-$6FFF) to C2Scene_SaveBgMaps; $7E:7200-$7DFF to
 ; C2Scene_SaveUnk7200; the four lists ($7E:7E00-$85FF) to
 ; C2Scene_SaveLists. C2Scene_RestoreState copies them back; what the
-; state is not kept for (metatiles, the $7E:7000 pack, graphics) is what
-; C2Scene_ReloadScene loads again. Inferred from the unmatched callers:
-; scene modes 5 and 8 save, do something else, restore and reload.
+; state is not kept for (metatiles, the $7E:7000, $7E:B800 and $7E:C000
+; packs, graphics) is what C2Scene_ReloadScene loads again. Inferred
+; from the unmatched callers: scene modes 5 and 8 save, do something
+; else and restore; mode 5 then reloads, mode 8 only when the flag test
+; at $C2:265E passes.
 ; Callers (2 JSR sites, unmatched): $C2:2542 (C2Scene_Mode5) and $C2:2652
 ;   (C2Scene_Mode8).
 ; Entry: M any (REP #$20 here), X=0, DP any, DB any (saved around the
@@ -3542,7 +3544,7 @@ C2Scene_LoadExtraObjPack:
 ; Unpacks entry C2Scene_ExtraPalPack of C2SceneRom_PalettePacks to A:X
 ; (C2Scene_LoadLocExtraGfx passes bank $00 and an address inside
 ; C2Scene_PaletteBuf).
-; Callers (2 JSR sites, and one more xref rates doubtful):
+; Callers (3 JSR sites):
 ;   C2Scene_LoadLocExtraGfx ($C2:2DC7, $C2:2DED, $C2:2E09).
 ; Entry: M=1 with A = the destination bank, X=0 with X = the destination,
 ;        DP any, DB=$00

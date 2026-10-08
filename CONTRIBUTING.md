@@ -1,7 +1,7 @@
 # Contributing
 
 <!-- status:start -->
-56,989 of 359,278 bytes of game code are matched byte-exact (15.86%, 588 functions); 588 of those meet the readability standard and 548 are verified by independent review.
+56,989 of 359,278 bytes of game code are matched byte-exact (15.86%, 588 functions); 588 of those meet the readability standard and 582 are verified by independent review.
 <!-- status:end -->
 
 This project is early enough that the most valuable contributions right
