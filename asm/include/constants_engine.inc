@@ -698,7 +698,7 @@ endif
 !Nmi_BgMode = BG_MODE_1|BG3_HIGH_PRIO    ; $09: BG mode 1 with BG3 on top, written at each NMI
 !Oam_ShadowBytes = $0220                 ; bytes Oam_UploadShadow sends: Oam_LowTable (512) and
                                          ; Oam_HighTable (32)
-!Field_Unk58Mask = $83FF                 ; Sub_EC60's AND on Field_Unk58 after the INC
+!Field_Unk58Mask = $83FF                 ; Field_WaitFrame's AND on Field_Unk58 after the INC
 !Field_UploadVram5800 = $5800            ; VRAM word base of Field_UploadUnk5800 (plus Field_Unk31
                                          ; x $200)
 !Field_UploadUnk5800Bytes = $0400        ; bytes Field_UploadUnk5800 sends from Field_Unk7EF000

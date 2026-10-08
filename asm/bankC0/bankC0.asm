@@ -4895,7 +4895,7 @@ SprBuf_FreeObj:
 ; A, X, Y (16-bit), DP and DB, sets DB=$00, reads RDNMI (acknowledges
 ; the NMI), turns HDMA off and writes NMITIMEN = Nmi_Nmitimen and
 ; BGMODE = Nmi_BgMode. Then:
-; - If Nmi_FramePending is 0 (the game has not reached Sub_EC60's wait,
+; - If Nmi_FramePending is 0 (the game has not reached Field_WaitFrame's wait,
 ;   i.e. a lag frame) it skips every upload and goes straight to the
 ;   register writes at .regs.
 ; - Otherwise, with DP=$0100, one of three upload sets:
@@ -5154,7 +5154,7 @@ NmiHandler:
     TCD
     SEP #$20
     JSL Hdma_InitChannelsFD
-    STZ.b !Nmi_FramePending             ; releases Sub_EC60's wait
+    STZ.b !Nmi_FramePending             ; releases Field_WaitFrame's wait
 .regs:
     JSL BankC2_Entry8002
     LDA.w !Ppu_W12SelShadow
@@ -5189,12 +5189,10 @@ NmiHandler:
     RTI
 
 ; ============================================================
-; $C0:EC60 — Sub_EC60 (23 bytes, $EC60–$EC76)
+; $C0:EC60 — Field_WaitFrame (23 bytes, $EC60–$EC76)
 ; The field's frame wait: counts Field_Unk58 up (16-bit INC, ANDed with
 ; Field_Unk58Mask), INCs Nmi_FramePending and spins until NmiHandler has
-; done the frame's uploads and zeroed it. It keeps its address name
-; because the verified routines below call it by that name (a better
-; name: Field_WaitFrame).
+; done the frame's uploads and zeroed it.
 ; Callers (33 sites: 28 JSR, 5 BRL): GameLoop_FrameBody (JSR $C0:00BA), Field_IdleFrame (BRL
 ;   $C0:00F1), Scene_Unk0283 (JSR $C0:02BE, JSR $C0:02E5), Field_SceneChangeTick (JSR $C0:0CE5),
 ;   DefaultHandler (JSR $C0:178B, JSR $C0:1797, JSR $C0:17B9, BRL $C0:17C2, JSR $C0:17E2, BRL
@@ -5210,7 +5208,7 @@ NmiHandler:
 ; Exit: M=1, X, Y, DP and DB unchanged; A = 0 (Nmi_FramePending read
 ;   back); Field_Unk58 stepped.
 ; ============================================================
-Sub_EC60:
+Field_WaitFrame:
     REP #$20
     LDA.w !DP_Field+!Field_Unk58
     INC A
@@ -5459,12 +5457,12 @@ GameLoop_FrameBody:
     JSR Field_EventHookDispatch
     JSR Field_ServiceUnk54
     JSR Field_EndOfFrame    ; end-of-frame work and OAM shadow build
-    JSR Sub_EC60            ; wait for the NMI (the frame wait)
+    JSR Field_WaitFrame            ; wait for the NMI (the frame wait)
     BRA GameLoop_FrameBody
 
 ; ============================================================
 ; $C0:00BF — Field_EndOfFrame (was VBlankHandler)
-; End-of-frame work, called once per frame just before Sub_EC60 waits
+; End-of-frame work, called once per frame just before Field_WaitFrame waits
 ; for the NMI; it is not an interrupt handler and waits for nothing
 ; itself. Callers: GameLoop_FrameBody ($C0:00B7), DefaultHandler's
 ; map-redraw loop ($C0:1784) and Scene_SettleFrames ($C0:285A); those
@@ -5510,19 +5508,19 @@ Field_EndOfFrameShort:
     RTS
 
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
-; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail
+; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Field_WaitFrame (tail
 ; jump, whose RTS returns to this routine's caller).
 ; Callers (8 sites: 5 JSR, 3 BRL): Scene_Unk0283 (JSR $C0:02AA, JSR $C0:0319, JSR $C0:0327, JSR
 ;   $C0:0340), Field_Unk034B (BRL $C0:0365, BRL $C0:038C) and DefaultHandler (JSR $C0:18CA, BRL
 ;   $C0:18D6).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (needed by
 ; Field_EndOfFrameShort), DB=$00.
-; Exit: via Sub_EC60: M=1, X=0, DP=$0100; A = 0 (Sub_EC60's wait);
+; Exit: via Field_WaitFrame: M=1, X=0, DP=$0100; A = 0 (Field_WaitFrame's wait);
 ; X and Y are whatever the callees leave (not saved here).
 Field_IdleFrame:
     JSR Field_FrameUpdate
     JSR Field_EndOfFrameShort
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ============================================================
 ; $C0:00F4 — LoadLocation (39 bytes, $00F4–$011A)
@@ -5784,7 +5782,7 @@ Scene_Unk024C:
 ;   1 (unless FieldBtl_EvtFlags has FieldBtl_EvtNoReset): idle frames
 ;     until Pad_Unk00F6 or Pad_Pressed is nonzero, then lower
 ;     Fade_Brightness one step a frame to 0 (Field_FrameUpdate, FdVec_FFF7,
-;     Sub_EC60), InitHW, S = StackTop and BRL GameLoop: the cold start
+;     Field_WaitFrame), InitHW, S = StackTop and BRL GameLoop: the cold start
 ;     (probably the game-over path; that the battle stores 1 when the
 ;     party falls is not traced);
 ;   2 (unless the quirky test below passes): the same fade-out without
@@ -5842,7 +5840,7 @@ Scene_Unk0283:
     DEC.b !Fade_Brightness
     JSR Field_FrameUpdate
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade1
 .restart:
     JSR InitHW
@@ -5860,7 +5858,7 @@ Scene_Unk0283:
     DEC.b !Fade_Brightness
     JSR Field_FrameUpdate
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade2
 .reload:
     JSR InitHW
@@ -7570,7 +7568,7 @@ Field_SceneChangeTick:
     PLA
     STA.b !Field_ControlEnabled
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .run_fade_loop
 
 .enter_transition:
@@ -19083,7 +19081,7 @@ VramQ_Flush:
 ; ============================================================
 ; $C0:B271 — Oam_BuildShadow (152 bytes)
 ; (was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high
-; table) for the next frame; it runs before Sub_EC60's wait for the
+; table) for the next frame; it runs before Field_WaitFrame's wait for the
 ; NMI, not after a VBlank. The shadow is split into three ranges, each with a
 ; low-table pointer (Oam_RangeNLoPtr) and a high-table pointer
 ; (Oam_RangeNHiPtr); Spr_AppendToOam appends each object's tiles to the range
@@ -19899,10 +19897,10 @@ Field_HookLeaveToBankC3:
     JSR Field_EndOfFrameShort
     LDA.b #$01
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Scene_Unk024C
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b #!NMITIMEN_NmiJoy
     STA.l NMITIMEN
     LDA.b #$00
@@ -19919,7 +19917,7 @@ Field_HookLeaveToBankC3:
 ; ------------------------------------------------------------
 ; $C0:264F — Field_HookWinPulse (214 bytes, $264F–$2724)
 ; Hook 12, a blocking sequence that runs its own frames (each one
-; Field_EndOfFrameShort + Sub_EC60, with no Field_FrameUpdate): redraws
+; Field_EndOfFrameShort + Field_WaitFrame, with no Field_FrameUpdate): redraws
 ; the map (Field_BuildC800Mode1, Field_Unk74E8/74F7, redraw step 2),
 ; sets Hdma_Unk7F1520/1522, Map_Unk1DFD and Hdma_Unk7F14F1/1523 and
 ; waits Hook12_WaitFrames frames; then puts window 1 on BG1 and BG2
@@ -19928,12 +19926,12 @@ Field_HookLeaveToBankC3:
 ; Hook12_HoldFrames and shrinks it for Hook12_RampFrames. Then it sets
 ; Field_EventHook to EventHook_Idle, clears the window and layer bytes,
 ; ORs Map_TilemapVram4's high byte into Hdma_Unk7F14F1 and ends with
-; one more frame (tail jump to Sub_EC60).
+; one more frame (tail jump to Field_WaitFrame).
 ; Quirk kept: Map_Unk1DFD is cleared with a long store (STA.l $00:1DFD)
 ; though it was set with an absolute one.
 ; Reached only through Field_EventHookTable (entry 12).
 ; On entry: M=1, X=0, DP=$0100, DB=$00.
-; Exit (through Sub_EC60): M=1, X=0, DP=$0100, DB=$00; A = 0, X and Y
+; Exit (through Field_WaitFrame): M=1, X=0, DP=$0100, DB=$00; A = 0, X and Y
 ; clobbered (the frame helpers do not preserve them).
 ; ------------------------------------------------------------
 Field_HookWinPulse:
@@ -19959,10 +19957,10 @@ Field_HookWinPulse:
     STA.l !Hdma_Unk7F1523
     LDA.b #!Hook12_WaitFrames
     STA.w !Map_HookTimer
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 .wait:
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .wait
     LDA.b #!W12SEL_Bg12Win1
@@ -19985,7 +19983,7 @@ Field_HookWinPulse:
     INC.b !WinFx_Size
     INC.b !WinFx_Size
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .grow
     LDA.b #!Hook12_HoldFrames
@@ -19993,7 +19991,7 @@ Field_HookWinPulse:
 .hold:
     JSR Field_WinPulseDraw
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .hold
     LDA.b #!Hook12_RampFrames
@@ -20003,7 +20001,7 @@ Field_HookWinPulse:
     DEC.b !WinFx_Size
     DEC.b !WinFx_Size
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .shrink
     LDA.b #!EventHook_Idle
@@ -20021,7 +20019,7 @@ Field_HookWinPulse:
     ORA.w !Map_TilemapVram4+1
     STA.l !Hdma_Unk7F14F1
     JSR Field_EndOfFrameShort
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ------------------------------------------------------------
 ; $C0:2725 — Field_WinPulseDraw (40 bytes, $2725–$274C)
@@ -20220,9 +20218,9 @@ Field_ServiceUnk54_SendLine: ; header: see Field_ServiceUnk54
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them,
-; as far as is known: Sub_EC60 and Scene_ReloadStep's Field_UnkB0E6 are
+; as far as is known: Field_WaitFrame and Scene_ReloadStep's Field_UnkB0E6 are
 ; unmatched); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
-; and Sub_EC60).
+; and Field_WaitFrame).
 ; ============================================================
 org $C02824
 Field_FadeInAfterReload:
@@ -20237,7 +20235,7 @@ Field_FadeInAfterReload:
     PLA
     STA.b !Field_ControlEnabled
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax
     BMI .loop            ; until full brightness
@@ -20263,7 +20261,7 @@ Field_FadeInAfterReload:
 ; it), DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them);
 ; A, X, Y and Obj_Cur clobbered (Scene_ReloadStep, Field_FrameUpdate,
-; Field_EndOfFrame and Sub_EC60).
+; Field_EndOfFrame and Field_WaitFrame).
 ; ============================================================
 org $C02848
 Scene_SettleFrames:
@@ -20278,7 +20276,7 @@ Scene_SettleFrames:
     PLA
     STA.b !Field_ControlEnabled
     JSR Field_EndOfFrame
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax
     BMI .loop            ; until full brightness
@@ -20296,7 +20294,7 @@ Scene_SettleFrames:
 ; VRAM uploads and palette setup (Field_UploadUnk1F00, Pal_LoadUnkRow0,
 ; Field_Unk29F7, Field_UploadUnk1D00, Field_Unk2B78,
 ; Field_UploadUnk1C00, Field_UploadUnk0000), Oam_HideFirst4,
-; Field_UploadUnk57E0, Scene_ResumeNmi (NMI back on) and one Sub_EC60
+; Field_UploadUnk57E0, Scene_ResumeNmi (NMI back on) and one Field_WaitFrame
 ; frame wait. Returns Field_Unk1E: its callers skip the fade-in when
 ; it is nonzero.
 ; Callers (2 JSR sites): Field_FadeInAfterReload ($C0:2824) and Scene_SettleFrames ($C0:2848).
@@ -20326,7 +20324,7 @@ Scene_ReloadStep:
     JSR Oam_HideFirst4
     JSR Field_UploadUnk57E0
     JSR Scene_ResumeNmi
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Field_Unk1E                  ; Z: 0 = do the fade-in
     RTS
 
@@ -20801,8 +20799,8 @@ Field_UploadUnk1D00:
 ; given Field_Unk7EF000's other uses) is not traced.
 ; Callers (1 JSR site): NmiHandler ($C0:EB81).
 ; Callers note: NmiHandler ($C0:EB81) runs it while Field_Unk36 is
-;   nonzero (zeroing it first when its bit 7 is set), on frames that
-;   served no Field_Unk47 upload, no redraw step 1-4 and no $7000 /
+;   nonzero (zeroing it first when its bit 7 is set), only when
+;   Field_Unk47 is 0 and there was no redraw step 1-4 and no $7000 /
 ;   $7400 upload.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk31,
 ; VramDma_*), DB=$00 (VramDma_Upload's registers).
@@ -20997,8 +20995,9 @@ Field_ResetUnk0B88:
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur), DB=$00
 ;   (Obj_* tables absolute).
 ; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered; Y unchanged;
-;   C as the handler leaves it (unchanged for bit 7 and the no-op kinds;
-;   Obj_TileSlotAllocKind: C=1 slot(s) taken, C=0 none free).
+;   C unchanged on the bit-7 skip; otherwise C=0 for the no-op kinds
+;   (the ASL clears it) and, for Obj_TileSlotAllocKind, C=1 slot(s)
+;   taken, C=0 none free.
 ; ------------------------------------------------------------
 org $C06F9A
 Obj_Unk6F9A:
@@ -21869,7 +21868,7 @@ Oam_HideFirst4:
 ;
 ; Pause: when Start is newly pressed (Pad_Pressed bit 0) with
 ;   Field_Unk11 = 0 and Field_ControlEnabled set, halve the brightness
-;   and loop (Sub_EC60 + EngFD_UnkC2C1 each frame) until Start is
+;   and loop (Field_WaitFrame + EngFD_UnkC2C1 each frame) until Start is
 ;   pressed again, then restore the brightness. (Earlier notes read
 ;   this as a VBlank-sync wait and had the exit test inverted.)
 ; Then Pad_Unk00F6: bit 0 → Field_FadeToBankC2Mode5; bit 6 (X in the
@@ -21898,7 +21897,7 @@ Field_PauseAndMenuInput:
     LDA.b #!Field_FadeBusyOn
     STA.w !Field_FadeBusy
 .pause_loop:
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.w !Pad_Pressed
     BIT.b #!Pad_Start
     BNE .unpause         ; Start pressed again → resume
@@ -21950,7 +21949,7 @@ Field_PauseAndMenuInput:
     SEP #$10
     JSL EngFD_UnkC2C1
     REP #$10
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade_loop
 .fade_done:
     JSR InitHW
@@ -22018,7 +22017,7 @@ Field_FadeToBankC2Mode5:
     SEP #$10
     JSL EngFD_UnkC2C1
     REP #$10
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade_loop
 .fade_done:
     JSR InitHW
@@ -22668,7 +22667,8 @@ Evt_Op9D_MoveDirVar:
 ;   the opcode, C=0 (the step is still going). Then on each
 ;   run: if Obj_Cur's tile (Obj_TileX/Y) is the target, it has arrived:
 ;   with Obj_Unk1C81 bit 0 (Obj1C81_CentreOnTile) set, Obj_Unk305D steps
-;   it toward the tile's centre first (C=1 from it: Obj_SetMoveAnim, X =
+;   it toward its spot in the tile first, X $80 / Y $F0 (horizontally
+;   centred, near the bottom; C=1 from it: Obj_SetMoveAnim, X =
 ;   the opcode, C=0); arrived, Obj_SetStandAnim and X = the next opcode,
 ;   C=1. Else Obj_CalcDirection to the tile, Obj_Facing from
 ;   Rom_DirToFacing; when Evt_FindSolidObjInFront finds an object in the
@@ -22766,7 +22766,8 @@ Evt_Op96_WalkToTile:
 ;   = ObjX_Unk7F0B00 = frames, Obj_Unk1A80 + 1); once Obj_Unk1A80 is set
 ;   it only waits for Obj_MoveFrames = 0 and then ends (Obj_Unk1A80 = 0,
 ;   Obj_SetStandAnim, X = Y + 4, C=1) wherever the object is. Arriving
-;   first ends it the same way (after the Obj_Unk305D centring, as
+;   first ends it the same way (after the Obj_Unk305D step to X $80 /
+;   Y $F0 in the tile, as
 ;   Evt_Op96_WalkToTile).
 ; Reached through Evt_OpcodeTable (opcode $9A).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
@@ -22967,7 +22968,7 @@ Evt_Op97_WalkToTileVar:
 ; Event opcode $A0 (3 bytes: $A0, column, row): as Evt_Op96_WalkToTile
 ;   without the facing and the animations (no Obj_Facing write, no
 ;   Obj_SetMoveAnim / Obj_SetStandAnim): arrived (after any Obj_Unk305D
-;   centring) X = Y + 3, C=1; else a step of Obj_Unk1000 frames, turned
+;   step to X $80 / Y $F0 in the tile) X = Y + 3, C=1; else a step of Obj_Unk1000 frames, turned
 ;   by Evt_BlockedTurn when Evt_FindSolidObjInFront finds something, C=0.
 ; Reached through Evt_OpcodeTable (opcode $A0).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
@@ -26991,7 +26992,7 @@ ModeFC_Handler:
 ;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + Field_EndOfFrame
 ;         frames until Field_Unk38 clears, then redraw map layers
 ;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
-;         tail into Sub_EC60. This path returns without looking at
+;         tail into Field_WaitFrame. This path returns without looking at
 ;         bit 0, which waits for a later call.
 ;   bit 0 (SceneFlag_Battle)    only when bit 5 is clear; unless
 ;         Scene_Unk024C returns carry,
@@ -27111,13 +27112,13 @@ DefaultHandler:
     JSR Field_EndOfFrame
     LDA.b !Field_Unk38
     BEQ .loop_done
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .loop_885A
 
 .loop_done:
     JSR Field_UnkAF4E
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     ; --- Redraw per Field_MapRedrawSel (1-4) ---
     LDA.b !Field_MapRedrawSel
@@ -27137,10 +27138,10 @@ DefaultHandler:
     LDA #$01
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode1:
     CMP #$02
@@ -27159,10 +27160,10 @@ DefaultHandler:
     LDA #$02
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode2:
     CMP #$03
@@ -27185,7 +27186,7 @@ DefaultHandler:
     LDA #$03
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     PHD
     REP #$20
@@ -27205,7 +27206,7 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA #$02
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     PHD
     REP #$20
@@ -27224,10 +27225,10 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA #$01
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .chk_mode4:
     CMP #$04
@@ -27246,10 +27247,10 @@ DefaultHandler:
     LDA #$04
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
 .exit:
     RTS
@@ -27268,7 +27269,7 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA.b #!Field_Unk53Bit7
     TRB.b !Field_Unk53
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSL EngCall_BattleMain  ; the battle (bank $C1)
     JSR InstallNMI          ; back in the field: reinstall our handlers
     JSR InstallIRQ

@@ -146,7 +146,7 @@ if !ram_engine_inc == 0
                                          ; frame
 !Pad_PressedLatch = $51                  ; 8-bit; GameLoop_FrameBody ORs the low byte of Pad_Pressed
                                          ; into it every frame
-!Nmi_FramePending = $52                  ; 8-bit; Sub_EC60 INCs it and spins until it is 0 again;
+!Nmi_FramePending = $52                  ; 8-bit; Field_WaitFrame INCs it and spins until it is 0 again;
                                          ; NmiHandler does the frame's uploads only while it is
                                          ; nonzero and zeroes it after them (the frame handshake)
 !Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 skips when bit 0 is set;
@@ -159,7 +159,7 @@ if !ram_engine_inc == 0
 !Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState; Map_StepTileEffects
                                          ; stores Map_ProbeLevel here and Map_ProbeLevelBlocked
                                          ; compares with it (looks like the leader's current level)
-!Field_Unk58 = $58                       ; 16-bit; zeroed by Field_InitLoadState; Sub_EC60 counts
+!Field_Unk58 = $58                       ; 16-bit; zeroed by Field_InitLoadState; Field_WaitFrame counts
                                          ; it up once per frame wait, ANDed with Field_Unk58Mask
                                          ; (bits 0-9 wrap at $400, bit 15 kept); no reader traced
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);

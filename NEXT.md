@@ -145,7 +145,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `SprBuf_FreeObj` ($C0:EA42). `Vblank_UnkA810`, `Field_UnkAF4E` and `Field_UnkB0E6` keep
    their names because verified callers use them; better names once those are re-reviewed:
    `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`.
-   Also done (branch match-c0-more): the NMI handler `NmiHandler` ($C0:EA63) with `Sub_EC60`
+   Also done (branch match-c0-more): the NMI handler `NmiHandler` ($C0:EA63) with `Field_WaitFrame`
    (the frame wait; keeps its name for its verified callers, better `Field_WaitFrame`),
    `Credits_UploadLine`, `Oam_UploadShadow`, `Field_UploadUnk5800` ($C0:6ECB) and the 12 layer
    edge uploads `Map_UploadRowYInc1`-`Map_UploadColXDec3` with `Map_EdgeDmaRow/Col`
