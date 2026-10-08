@@ -3528,10 +3528,14 @@ Spr_Load12:
 
 ; ============================================================
 ; $C0:E12A — Spr_LoadLargeObj (1034 bytes, $E12A–$E533)
-; (was Sub_E12A.) Loads a 24-tile ("large", size 3) object in one go.
+; (was Sub_E12A.) Loads a 24-tile ("large") object in one go. It never
+; reads Obj_SprSize; "size 3" is inferred from the 24 records it fills,
+; which only Spr_Place24 (size 3) re-places.
 ; 1. Pointers: Spr_GfxPtr = Obj_GfxBank:Obj_GfxOfs, Spr_FramePtr =
 ;    Obj_FrameBank:Obj_FrameOfs, Spr_WramPtr = $7F:SprBuf_Base (the
-;    object takes the whole tile buffer: Obj_TileBuf = SprBuf_Base).
+;    object uses the whole tile buffer: Obj_TileBuf = SprBuf_Base). It
+;    does not mark any SprBuf_Owner entry, although it overwrites every
+;    chunk.
 ; 2. For each of the 96 tile words at the start of the frame data,
 ;    copy that 32-byte 4bpp tile into the buffer: Spr_CopyTileFlipped
 ;    when bit 14 (SprFrame_HFlip) is set, else Spr_CopyTile.
@@ -3541,8 +3545,10 @@ Spr_Load12:
 ;    16x16 tile numbers $40-$4E / $60-$6E / $80-$8E; Attr = $22.
 ; Earlier notes read the frame data as "scene data" and the position
 ; bytes as palette groups.
-; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100. Called from
+; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100, DB=$00 (absolute
+; object-table loads and DMA register stores). Called from
 ; Field_RestoreState for Field_UnkAEObj.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged.
 ; ============================================================
 org $C0E12A
 Spr_LoadLargeObj:
@@ -3553,8 +3559,8 @@ Spr_LoadLargeObj:
     REP #$20                ; A → 16-bit
     LDA.w !Obj_GfxOfs,X
     STA.b !Spr_GfxPtr
-    SEP #$20                ; A → 8-bit
-    REP #$20                ; A → 16-bit
+    SEP #$20                ; A → 8-bit (undone at once: a redundant
+    REP #$20                ; pair, kept as in the original)
     LDX.b !Obj_Cur
     LDA.w #!SprBuf_Base
     STA.w !Obj_TileBuf,X
@@ -3627,7 +3633,7 @@ Spr_LoadLargeObj:
     SEP #$20                ; A → 8-bit
     LDY.w #!LargeObj_LayoutOfs ; position bytes follow the tile words
     ; per record: X offset byte (sign-extended to 16 bits), Y offset byte
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile.OfsX,X
     BPL .sp01
     LDA.b #!Eng_SignExtNeg
@@ -3638,9 +3644,9 @@ Spr_LoadLargeObj:
     STA.l SprTile.OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile.OfsY,X ; Y offset
+    STA.l SprTile.OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[1].OfsX,X
     BPL .sp02
     LDA.b #!Eng_SignExtNeg
@@ -3651,9 +3657,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[1].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[1].OfsY,X ; Y offset
+    STA.l SprTile[1].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[2].OfsX,X
     BPL .sp03
     LDA.b #!Eng_SignExtNeg
@@ -3664,9 +3670,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[2].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[2].OfsY,X ; Y offset
+    STA.l SprTile[2].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[3].OfsX,X
     BPL .sp04
     LDA.b #!Eng_SignExtNeg
@@ -3677,9 +3683,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[3].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[3].OfsY,X ; Y offset
+    STA.l SprTile[3].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[4].OfsX,X
     BPL .sp05
     LDA.b #!Eng_SignExtNeg
@@ -3690,9 +3696,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[4].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[4].OfsY,X ; Y offset
+    STA.l SprTile[4].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[5].OfsX,X
     BPL .sp06
     LDA.b #!Eng_SignExtNeg
@@ -3703,9 +3709,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[5].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[5].OfsY,X ; Y offset
+    STA.l SprTile[5].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[6].OfsX,X
     BPL .sp07
     LDA.b #!Eng_SignExtNeg
@@ -3716,9 +3722,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[6].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[6].OfsY,X ; Y offset
+    STA.l SprTile[6].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[7].OfsX,X
     BPL .sp08
     LDA.b #!Eng_SignExtNeg
@@ -3729,9 +3735,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[7].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[7].OfsY,X ; Y offset
+    STA.l SprTile[7].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[8].OfsX,X
     BPL .sp09
     LDA.b #!Eng_SignExtNeg
@@ -3742,9 +3748,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[8].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[8].OfsY,X ; Y offset
+    STA.l SprTile[8].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[9].OfsX,X
     BPL .sp10
     LDA.b #!Eng_SignExtNeg
@@ -3755,9 +3761,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[9].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[9].OfsY,X ; Y offset
+    STA.l SprTile[9].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[10].OfsX,X
     BPL .sp11
     LDA.b #!Eng_SignExtNeg
@@ -3768,9 +3774,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[10].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[10].OfsY,X ; Y offset
+    STA.l SprTile[10].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[11].OfsX,X
     BPL .sp12
     LDA.b #!Eng_SignExtNeg
@@ -3781,9 +3787,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[11].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[11].OfsY,X ; Y offset
+    STA.l SprTile[11].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[12].OfsX,X
     BPL .sp13
     LDA.b #!Eng_SignExtNeg
@@ -3794,9 +3800,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[12].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[12].OfsY,X ; Y offset
+    STA.l SprTile[12].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[13].OfsX,X
     BPL .sp14
     LDA.b #!Eng_SignExtNeg
@@ -3807,9 +3813,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[13].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[13].OfsY,X ; Y offset
+    STA.l SprTile[13].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[14].OfsX,X
     BPL .sp15
     LDA.b #!Eng_SignExtNeg
@@ -3820,9 +3826,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[14].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[14].OfsY,X ; Y offset
+    STA.l SprTile[14].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[15].OfsX,X
     BPL .sp16
     LDA.b #!Eng_SignExtNeg
@@ -3833,9 +3839,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[15].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[15].OfsY,X ; Y offset
+    STA.l SprTile[15].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[16].OfsX,X
     BPL .sp17
     LDA.b #!Eng_SignExtNeg
@@ -3846,9 +3852,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[16].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[16].OfsY,X ; Y offset
+    STA.l SprTile[16].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[17].OfsX,X
     BPL .sp18
     LDA.b #!Eng_SignExtNeg
@@ -3859,9 +3865,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[17].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[17].OfsY,X ; Y offset
+    STA.l SprTile[17].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[18].OfsX,X
     BPL .sp19
     LDA.b #!Eng_SignExtNeg
@@ -3872,9 +3878,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[18].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[18].OfsY,X ; Y offset
+    STA.l SprTile[18].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[19].OfsX,X
     BPL .sp20
     LDA.b #!Eng_SignExtNeg
@@ -3885,9 +3891,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[19].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[19].OfsY,X ; Y offset
+    STA.l SprTile[19].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[20].OfsX,X
     BPL .sp21
     LDA.b #!Eng_SignExtNeg
@@ -3898,9 +3904,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[20].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[20].OfsY,X ; Y offset
+    STA.l SprTile[20].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[21].OfsX,X
     BPL .sp22
     LDA.b #!Eng_SignExtNeg
@@ -3911,9 +3917,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[21].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[21].OfsY,X ; Y offset
+    STA.l SprTile[21].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[22].OfsX,X
     BPL .sp23
     LDA.b #!Eng_SignExtNeg
@@ -3924,9 +3930,9 @@ Spr_LoadLargeObj:
     STA.l SprTile[22].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[22].OfsY,X ; Y offset
+    STA.l SprTile[22].OfsY,X
     INY
-    LDA.b [!Spr_FramePtr],Y ; X offset
+    LDA.b [!Spr_FramePtr],Y
     STA.l SprTile[23].OfsX,X
     BPL .sp24
     LDA.b #!Eng_SignExtNeg
@@ -3937,7 +3943,7 @@ Spr_LoadLargeObj:
     STA.l SprTile[23].OfsX+1,X
     INY
     LDA.b [!Spr_FramePtr],Y
-    STA.l SprTile[23].OfsY,X ; Y offset
+    STA.l SprTile[23].OfsY,X
     ; --- Tile numbers: three rows of eight 16x16 tiles ---
     LDA.b #!LargeObj_TileRow0
     STA.l SprTile.Tile,X
@@ -4020,18 +4026,20 @@ Spr_LoadLargeObj:
 ; (was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right,
 ; from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through
 ; WMDATA: each byte goes through BitReverseTable ($C0:FD00), which
-; mirrors a tile row. Earlier notes called it a "palette-like lookup
-; at bank $FD" and gave the entry as AND #$FF / ORA [$0A]; see below.
-; On entry: M=0, A = frame-data tile word (bit 14 set), Y = frame-data
-; index, WMADD already at the destination, DB = $00.
-; Returns with M=0 and Y restored from Spr_SavedY.
+; mirrors a tile row. (Earlier notes called it a "palette-like lookup
+; at bank $FD" and decoded the entry with M=1 as AND #$FF / ORA [$0A];
+; the callers run it with M=0, giving AND #$07FF and five ASLs.)
+; On entry: M=0, X/Y 16-bit (TAY of tile*32), A = frame-data tile word
+; (bit 14 set), Y = frame-data index, WMADD already at the destination,
+; DP=$0100 (Spr_GfxPtr, Spr_SavedY are dp), DB=$00.
+; Returns with M=0 and Y restored from Spr_SavedY; X clobbered.
 ; ============================================================
 org $C0E534
 Spr_CopyTileFlipped:
-    AND.w #!SprFrame_TileMask ; tile number (earlier listings split these
-    ASL                     ; bytes as AND #$FF / ORA [$0A] / 4×ASL,
-    ASL                     ; which is how they decode with M=1; the
-    ASL                     ; caller runs with M=0)
+    AND.w #!SprFrame_TileMask ; tile number
+    ASL
+    ASL
+    ASL
     ASL
     ASL                     ; × 32: byte offset of the 4bpp tile
     STY.b !Spr_SavedY
@@ -4042,162 +4050,162 @@ Spr_CopyTileFlipped:
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 1
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 2
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 3
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 4
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 5
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 6
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 7
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 8
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 9
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 10
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 11
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 12
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 13
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 14
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 15
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 16
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 17
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 18
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 19
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 20
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 21
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 22
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 23
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 24
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 25
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 26
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 27
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 28
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 29
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 30
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; byte 31
+    STA.w WMDATA
     INY
     LDA.b [!Spr_GfxPtr],Y
     TAX
     LDA.w BitReverseTable,X
-    STA.w WMDATA            ; WMDATA (byte 32 — no INY)
+    STA.w WMDATA            ; last byte: no INY
     REP #$20                ; A → 16-bit
     LDY.b !Spr_SavedY
     RTS
@@ -4211,8 +4219,12 @@ Spr_CopyTileFlipped:
 ; $D2/$D3/$D4 → Spr_CopyTileD2/D3/D4, anything else → bank $D5 below.
 ; Each copier is an unrolled 16-word move with DB = $7F, X = source
 ; offset and Y = destination address.
-; On entry: M=0, A = frame-data tile word (bit 14 clear), Y = frame-data
-; index. Returns with M=0, Y restored.
+; On entry: M=0, X/Y 16-bit (TAX of the source offset, LDY of the
+; destination), A = frame-data tile word (bit 14 clear), Y = frame-data
+; index, DP=$0100 (Spr_GfxPtr, Spr_WramPtr, Spr_SavedY are dp), DB=$00
+; (the WMADDL store after the PLB).
+; Returns with M=0, Y restored from Spr_SavedY, X clobbered, WMADD just
+; past the copied tile; the four bank copiers below end the same way.
 ; ============================================================
 org $C0E687
 Spr_CopyTile:
@@ -4295,6 +4307,8 @@ Spr_CopyTile:
 ; $C0:E739 — Spr_CopyTileD4 (131 bytes, $C0:E739–$E7BB)
 ; Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D4).
+; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
+; WMADD past the tile).
 ; ============================================================
 org $C0E739
 Spr_CopyTileD4:
@@ -4347,6 +4361,8 @@ Spr_CopyTileD4:
 ; $C0:E7BC — Spr_CopyTileD2 (131 bytes, $C0:E7BC–$E83E)
 ; Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D2).
+; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
+; WMADD past the tile).
 ; ============================================================
 org $C0E7BC
 Spr_CopyTileD2:
@@ -4399,6 +4415,8 @@ Spr_CopyTileD2:
 ; $C0:E83F — Spr_CopyTileD3 (131 bytes, $C0:E83F–$E8C1)
 ; Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D3).
+; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
+; WMADD past the tile).
 ; ============================================================
 org $C0E83F
 Spr_CopyTileD3:
@@ -4451,6 +4469,8 @@ Spr_CopyTileD3:
 ; $C0:E8C2 — Spr_CopyTile7F (115 bytes, $C0:E8C2–$E934)
 ; Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when
 ; the graphics are already in WRAM); abs,X reads since DB = $7F.
+; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
+; WMADD past the tile).
 ; ============================================================
 org $C0E8C2
 Spr_CopyTile7F:
@@ -4503,9 +4523,10 @@ Spr_CopyTile7F:
 ; $C0:E935 — SprBuf_FreeAll (29 bytes, $E935–$E951)
 ; (was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80),
 ; with DP pointed at $0B00 so each store is a 2-byte dp store.
-; Tail of Obj_ResetStates; also called by Scene_PostLoadInit and
-; after a battle (DefaultHandler).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y).
+; Reached by BRL from Obj_ResetStates and called after a battle by
+; DefaultHandler; those are its only direct callers.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB=$00. DP is saved and
+; restored. Exit: same.
 ; ============================================================
 org $C0E935
 SprBuf_FreeAll:
@@ -4531,7 +4552,8 @@ SprBuf_FreeAll:
 ; (was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the
 ; WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets
 ; Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200.
-; Returns C=1 on success, C=0 when all four are taken.
+; Returns C=1 on success, with X = Obj_Cur (Obj_BuildFrame4 relies on
+; it), C=0 when all four are taken.
 ; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100. Called from Obj_BuildFrame4.
 ; ============================================================
 org $C0E952
@@ -4634,48 +4656,59 @@ SprBuf_Alloc3:
     CLC
     RTS
 
+; ============================================================
+; $C0:E9E2 — SprBuf_Free1 (29 bytes, $E9E2–$E9FE)
+; (was Sub_E9E2.) Releases the SprBuf chunk owned by Obj_Cur: finds it
+; among the first 4 SprBuf_Owner entries and marks it free. Run by
+; Spr_PrepareTiles after Spr_Load4, once the object's tiles are in VRAM.
+; On entry: M=1, X/Y 16-bit, DP=$0100 (Obj_Cur is dp), DB=$00.
+; Exit: M=1, X/Y 16-bit (set again on both paths).
+; Quirk: the LDX.b !Obj_Cur is dead, overwritten by LDX #$00 at once
+; (kept as in the original; SprBuf_Free2/3 have it too).
+; ============================================================
 org $C0E9E2
 SprBuf_Free1:
-    ; (was Sub_E9E2.) 29 bytes ($E9E2-$E9FE). Releases the SprBuf chunk
-    ; owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries
-    ; and marks it free. Run by Spr_PrepareTiles after Spr_Load4.
-    ; Entry M=1; returns with X/Y 16-bit.
-    SEP #$10
-    LDX.b !Obj_Cur
+    SEP #$10                ; X → 8-bit
+    LDX.b !Obj_Cur          ; dead: overwritten by the next load
     LDX #$00
-.e9e2_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
     CMP.b !Obj_Cur
-    BEQ .e9e2_found
+    BEQ .found
     INX
-    CPX #$04
-    BNE .e9e2_loop
+    CPX #$04                ; entries 0-3
+    BNE .loop
     REP #$10
     RTS
-.e9e2_found:
+.found:
     LDA.b #!Obj_None
     STA.w !SprBuf_Owner,X
     REP #$10
     RTS
 
+; ============================================================
+; $C0:E9FF — SprBuf_Free2 (32 bytes, $E9FF–$EA1E)
+; (was Sub_E9FF.) As SprBuf_Free1 for a 2-chunk object: the first of
+; the 3 possible start entries owned by Obj_Cur and the one after it
+; are freed. Run by Spr_PrepareTiles after Spr_Load8.
+; On entry: M=1, X/Y 16-bit, DP=$0100 (Obj_Cur is dp), DB=$00.
+; Exit: M=1, X/Y 16-bit. Same dead LDX.b !Obj_Cur as SprBuf_Free1.
+; ============================================================
 org $C0E9FF
 SprBuf_Free2:
-    ; (was Sub_E9FF.) 32 bytes ($E9FF-$EA1E). As SprBuf_Free1 for a
-    ; 2-chunk object: the first of the 3 possible start entries owned by
-    ; Obj_Cur and the one after it are freed. Run after Spr_Load8.
-    SEP #$10
-    LDX.b !Obj_Cur
+    SEP #$10                ; X → 8-bit
+    LDX.b !Obj_Cur          ; dead: overwritten by the next load
     LDX #$00
-.e9ff_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
     CMP.b !Obj_Cur
-    BEQ .e9ff_found
+    BEQ .found
     INX
-    CPX #$03
-    BNE .e9ff_loop
+    CPX #$03                ; start entries 0-2
+    BNE .loop
     REP #$10
     RTS
-.e9ff_found:
+.found:
     LDA.b #!Obj_None
     STA.w !SprBuf_Owner,X
     STA.w !SprBuf_Owner+1,X

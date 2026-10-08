@@ -539,8 +539,10 @@ if !ram_engine_inc == 0
                                          ; VRAM through the VramQ_* queue, except that
                                          ; Spr_LoadLargeObj DMAs the whole buffer to VRAM word $0400
 !SprBuf_Owner = $0BC0                    ; 8 bytes: object slot owning each $200-byte chunk of
-                                         ; SprBuf_Base ($80 = free); SprBuf_Alloc*/Free* scan the
-                                         ; first 4
+                                         ; SprBuf_Base ($80 = free); SprBuf_Alloc*/Free* only use
+                                         ; entries 0-3. SprBuf_FreeAll clears all 8, but 8 chunks
+                                         ; would not fit the $0C00 buffer: entries 4-7 look unused
+                                         ; (inferred)
 
 ; --- ROM tables ---
 !GfxRom_D2 = $D20000                     ; object tile graphics in ROM bank $D2 (Spr_CopyTileD2 reads

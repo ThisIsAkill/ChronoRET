@@ -79,19 +79,19 @@ $C0:D738,$C0:D7E4,173,Obj_BuildFrame12Pass1Alt,$C0,Sprites & objects,readable,af
 $C0:D7E5,$C0:DA68,644,Obj_BuildFrame12Pass2,$C0,Sprites & objects,readable,b8e5ee76e43b,"(was Sub_D7E5.) Pass 2: tiles 32-47 to +$400, queue the VRAM upload, write the 12 SprTileSrc records (tiles in rows of 8 then 4), INC Obj_State; C=0."
 $C0:DA69,$C0:DD27,703,Obj_BuildFrame12Pass2Alt,$C0,Sprites & objects,readable,7ec5d4a1ee3a,"(was Sub_DA69.) Pass 2, $68 layout: tiles 32-39 to +$300 and 40-47 to +$500, queue the upload, write the 12 SprTileSrc records (rows of 4 then 8); C=0."
 $C0:DD28,$C0:E129,1026,Obj_FrameLayout12,$C0,Sprites & objects,readable,202b8440d3c5,"(was Sub_DD28.) As Obj_FrameLayout4 for a 12-tile object (frame record 120 bytes, positions after 48 tile words), with the two tile-number layouts of the 12-tile builders (Obj_VramTile = $68 → .dd28_a"
-$C0:E12A,$C0:E533,1034,Spr_LoadLargeObj,$C0,Engine,readable,f29091f94dce,"(was Sub_E12A.) Loads a 24-tile (""large"", size 3) object in one go."
-$C0:E534,$C0:E686,339,Spr_CopyTileFlipped,$C0,Engine,readable,08a03d6185ad,"(was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right, from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through WMDATA: each byte goes through BitReverseTable ($C0:FD00), which"
-$C0:E687,$C0:E738,178,Spr_CopyTile,$C0,Engine,readable,f31c3ee8d5ff,"(was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr + (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD past it so a following Spr_CopyTileFlipped writes the next tile."
-$C0:E739,$C0:E7BB,131,Spr_CopyTileD4,$C0,Engine,readable,b1d93f6afa05,Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D4).
-$C0:E7BC,$C0:E83E,131,Spr_CopyTileD2,$C0,Engine,readable,b17386a6fcac,Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D2).
-$C0:E83F,$C0:E8C1,131,Spr_CopyTileD3,$C0,Engine,readable,67bd3197ae3e,Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D3).
-$C0:E8C2,$C0:E934,115,Spr_CopyTile7F,$C0,Engine,readable,12875f4e21f9,"Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when the graphics are already in WRAM); abs,X reads since DB = $7F."
-$C0:E935,$C0:E951,29,SprBuf_FreeAll,$C0,Engine,readable,020f66eb5a7a,"(was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80), with DP pointed at $0B00 so each store is a 2-byte dp store."
-$C0:E952,$C0:E979,40,SprBuf_Alloc1,$C0,Engine,readable,57b8ae5ca78d,"(was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200."
+$C0:E12A,$C0:E533,1034,Spr_LoadLargeObj,$C0,Engine,readable,f862e9b5b837,"(was Sub_E12A.) Loads a 24-tile (""large"") object in one go."
+$C0:E534,$C0:E686,339,Spr_CopyTileFlipped,$C0,Engine,readable,327fc418c825,"(was Sub_E534.) Copies one 32-byte 4bpp tile, mirrored left-right, from Spr_GfxPtr + (tile number × 32) to the WRAM tile buffer through WMDATA: each byte goes through BitReverseTable ($C0:FD00), which"
+$C0:E687,$C0:E738,178,Spr_CopyTile,$C0,Engine,readable,1cd89dead30d,"(was Sub_E687.) Copies one 32-byte 4bpp tile from Spr_GfxPtr + (tile number × 32) to Spr_WramPtr in bank $7F, then moves WMADD past it so a following Spr_CopyTileFlipped writes the next tile."
+$C0:E739,$C0:E7BB,131,Spr_CopyTileD4,$C0,Engine,readable,7567cacc4d27,Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D4).
+$C0:E7BC,$C0:E83E,131,Spr_CopyTileD2,$C0,Engine,readable,8884543fd1aa,Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D2).
+$C0:E83F,$C0:E8C1,131,Spr_CopyTileD3,$C0,Engine,readable,dd2fd5f22025,Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from Spr_CopyTile when the graphics are in bank $D3).
+$C0:E8C2,$C0:E934,115,Spr_CopyTile7F,$C0,Engine,readable,b180966ca497,"Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when the graphics are already in WRAM); abs,X reads since DB = $7F."
+$C0:E935,$C0:E951,29,SprBuf_FreeAll,$C0,Engine,readable,8410783c91b9,"(was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80), with DP pointed at $0B00 so each store is a 2-byte dp store."
+$C0:E952,$C0:E979,40,SprBuf_Alloc1,$C0,Engine,readable,f24f499965c2,"(was Sub_E952.) Gives object Obj_Cur one $200-byte chunk of the WRAM tile buffer: the first free entry n (0-3) of SprBuf_Owner gets Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200."
 $C0:E97A,$C0:E9A9,48,SprBuf_Alloc2,$C0,Engine,readable,ce4c8682dd6d,(was Sub_E97A.) As SprBuf_Alloc1 for two adjacent free chunks (start entries 0-2).
 $C0:E9AA,$C0:E9E1,56,SprBuf_Alloc3,$C0,Engine,readable,50b746e5f35a,(was Sub_E9AA.) As SprBuf_Alloc1 for three adjacent free chunks (start entries 0-1).
-$C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,readable,c51b700e9871,
-$C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,readable,ef33cecb6962,
+$C0:E9E2,$C0:E9FE,29,SprBuf_Free1,$C0,Engine,readable,36bcd6233c5c,(was Sub_E9E2.) Releases the SprBuf chunk owned by Obj_Cur: finds it among the first 4 SprBuf_Owner entries and marks it free.
+$C0:E9FF,$C0:EA1E,32,SprBuf_Free2,$C0,Engine,readable,ecc6fcf33bcf,(was Sub_E9FF.) As SprBuf_Free1 for a 2-chunk object: the first of the 3 possible start entries owned by Obj_Cur and the one after it are freed.
 $C0:EA1F,$C0:EA41,35,SprBuf_Free3,$C0,Engine,readable,48b6702ba2d7,
 $C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,verified,b119b61f6d34,The CPU comes out of reset in emulation mode with I already set.
 $C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,9c2774b7207f,Native-mode interrupt stubs ($FF10–$FF17)
