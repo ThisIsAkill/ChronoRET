@@ -21581,9 +21581,14 @@ BattleSys_Main:
 ;     back) is run block by block through BattleSys_UnkB80DTable, unless
 ;     the enemy's Status2 has any of bits 7, 3-0. A block is one or two
 ;     4-byte records (two when byte 4 is not $FE), then up to a $FE; $FF
-;     ends the part. While a block leaves !Battle_UnkAF24 0, the enemy
-;     acts on it (BattleSys_Unk8CF9, BattleSys_UnkB223) and the part
-;     ends; else the next block is tried (!Battle_UnkB263 counts them).
+;     ends the part. When a block's condition records leave
+;     !Battle_UnkAF24 0, the enemy acts on it (BattleSys_Unk8CF9, which
+;     zeroes AF24 and may set it again, then BattleSys_UnkB223), and
+;     AF24 is stored to !Battle_UnkB24A (2 also zeroes !Battle_UnkB2B6).
+;     Then, if AF24 is 0 the part ends; otherwise the rest of the block
+;     is skipped (for a value other than 2, the remaining conditions to
+;     the $FE first) and the next block is tried, unless $FF follows
+;     (!Battle_UnkB263 counts the blocks tried).
 ;     !Enemy_AnimWanted is saved over the part and put back.
 ;     BattleSys_UnkB575 runs after each entry, BattleSys_ClearUnkB192
 ;     between entries. !Battle_UnkB1D4, !Battle_UnkB24A, !Battle_UnkB263
