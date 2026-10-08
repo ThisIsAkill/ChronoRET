@@ -3677,7 +3677,7 @@ BattleTgt_CollectValidTargets:
     RTS
 
 ; BattleTgt_AllAllies ($C1209A–$C120A8, 15 bytes): every PC
-; (this and the three list modes below: state as SingleAlly, DP $80/$81)
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_AllAllies:
     LDX.w #!Battle_NumPcSlots
     STX.b !BattleTgt_ScanEnd
@@ -3688,6 +3688,7 @@ BattleTgt_AllAllies:
 
 ; BattleTgt_SingleEnemy ($C120A9–$C120B5, 13 bytes): one enemy (3-10),
 ; cursor may cycle. Also called as a list builder by the area modes.
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_SingleEnemy:
     LDX.w #!Battle_NumSlots
     STX.b !BattleTgt_ScanEnd
@@ -3696,6 +3697,7 @@ BattleTgt_SingleEnemy:
     BRA BattleTgt_CollectValidTargets
 
 ; BattleTgt_AllEnemies ($C120B6–$C120C5, 16 bytes)
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_AllEnemies:
     LDX.w #!Battle_NumSlots
     STX.b !BattleTgt_ScanEnd
@@ -3705,6 +3707,7 @@ BattleTgt_AllEnemies:
     JMP BattleTgt_CollectValidTargets
 
 ; BattleTgt_Everyone ($C120C6–$C120D5, 16 bytes): all battlers 0-10
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as BattleTgt_SingleAlly (DP $80/$81)
 BattleTgt_Everyone:
     LDX.w #!Battle_NumSlots
     STX.b !BattleTgt_ScanEnd
@@ -3714,7 +3717,8 @@ BattleTgt_Everyone:
     JMP BattleTgt_CollectValidTargets
 
 ; BattleTgt_Self ($C120D6–$C120DF, 10 bytes): the shown PC only
-; (Entry/Exit M=1, DB=$7E; only A changes, no DP written)
+; Entry/Exit: M=1, X either width, DP any, DB=$7E; only A changes, no DP
+; written
 BattleTgt_Self:
     LDA.w !BattleMenu_ActivePc
     STA.w !BattleTgt_Candidates
@@ -3844,6 +3848,7 @@ BattleTgt_PcByCharId4:
 ; changes.
 
 ; BattleTgt_EnemyLineFromCaster ($C12169–$C121AE, 70 bytes)
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_EnemyLineFromCaster:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -3883,6 +3888,7 @@ BattleTgt_EnemyLineFromCaster:
 ; the cursor before the pad step (CycleNext moves only !BattleTgt_Cursor),
 ; with !BattleTgt_TargetAll = $80 (the cursor may already have moved and
 ; played sound 0).
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_EnemyLineFromChar3:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -3927,6 +3933,7 @@ BattleTgt_EnemyLineFromChar3:
 
 ; BattleTgt_EnemyLineFromCaster2 ($C12203–$C1224A, 72 bytes): same as
 ; EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_EnemyLineFromCaster2:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -3961,6 +3968,7 @@ BattleTgt_EnemyLineFromCaster2:
 
 ; BattleTgt_CasterRadius ($C1224B–$C1225E, 20 bytes): area $10 around
 ; the caster
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_CasterRadius:
     STZ.w !BattleTgt_AreaSide
     LDA.w !BattleTgt_Caster
@@ -3972,6 +3980,7 @@ BattleTgt_CasterRadius:
 
 ; BattleTgt_EnemyRadius ($C1225F–$C122A3, 69 bytes): area around a
 ; chosen enemy; size $19 for mode $1A, else $09
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_EnemyRadius:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -4010,6 +4019,7 @@ BattleTgt_EnemyRadius:
 ; member id 3; size $19 for mode $14, else $10. If no PC has id 3 it
 ; returns at once with nothing listed, so BuildTargetList finds every
 ; selection entry empty and sets !BattleTgt_Result = $FF (no target).
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_Char3Radius:
     STZ.w !BattleTgt_AreaSide
     TDC
@@ -4041,6 +4051,7 @@ BattleTgt_Char3Radius:
 ; BattleTgt_Char6Radius ($C122D3–$C122F4, 34 bytes): area $19 around
 ; party member id 6. If no PC has id 6 it returns at once with nothing
 ; listed (BuildTargetList then sets !BattleTgt_Result = $FF).
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_Char6Radius:
     STZ.w !BattleTgt_AreaSide
     TDC
@@ -4064,6 +4075,7 @@ BattleTgt_Char6Radius:
 ; BattleTgt_EnemyRow ($C122F5–$C12328, 52 bytes incl. dead RTS):
 ; chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around
 ; the anchor's !Battler_ScreenY)
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_EnemyRow:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -4091,6 +4103,7 @@ BattleTgt_EnemyRow:
 
 ; BattleTgt_PartyTriangle ($C12329–$C12331, 9 bytes): enemies inside
 ; the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
+; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
 BattleTgt_PartyTriangle:
     STZ.w !BattleTgt_AreaSide
     JSR BattleTgt_AreaPartyTriangle
@@ -5038,8 +5051,10 @@ BattleTgt_AnyCandidate:
 ; (which checks only the head) would dequeue c again. Whether three PCs
 ; are ever queued at once is not established.
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; X = dequeued slot index (or unchanged if queue was empty)
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (as at every caller; no DP
+;        access here), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = dequeued slot index (or
+;        unchanged if queue was empty); Y unchanged
 ; No JSR/JSL calls.
 org $C11B67
 BattleMenu_DequeueReadyBattler:
@@ -5095,8 +5110,9 @@ BattleMenu_DequeueReadyBattler:
 ; STZ in .clear_targeting overwrites it at once, so it always ends on
 ; the main menu; the first store is dead.
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; !Battle_ArgSlot = slot to remove
-; Exit:  M=1; registers clobbered
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot, STA.b $80,
+;        TDC as zero), DB=$7E; !Battle_ArgSlot = slot to remove
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; DP $80 written; Y unchanged
 ; Callees: BattleMenu_LoadCommandWindowMap
 !BattleMenu_RemoveSlot = !BattleTmp_80   ; 1 B: copy of !Battle_ArgSlot
 org $C11BAA
@@ -5198,8 +5214,13 @@ BattleMenu_RemoveBattlerFromReady:
 ; (both preceding paths branch past them via BRA); reproduced exactly
 ; regardless, since matching the ROM means matching orphaned bytes too.
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, TDC as zero),
+;        DB=$7E
+; Exit:  tail-jumps to one of several handlers, does not fall through;
+;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
+;        pad edges cleared; DP: BuildTargetList's (the mode handler's DP, see its header), plus
+;        CommitAction's $80/$82/$84 on confirm, plus whatever
+;        Battle_PlaySfx0's Audio_ProcessEntry (not matched yet) changes
 ; Callees: BattleMenu_BuildTargetList, Battle_PlaySfx0,
 ;          BattleMenu_CommitAction, BattleMenu_TargetNext,
 ;          BattleMenu_TargetPrev, Battle_ClearPadEdges
@@ -5256,9 +5277,9 @@ BattleMenu_TargetSelectInput:
     INC.w !BattleMenu_WindowMapDirty
 .redraw_cursor:
     LDA.w !BattleMenu_Submenu
-    BNE .cursor_drawn
-    INC.w !BattleUI_PanelRedraw
-.cursor_drawn:
+    BNE .hide_target_cursors
+    INC.w !BattleUI_PanelRedraw     ; main menu back: redraw the command cursor
+.hide_target_cursors:
     LDA.w !BattleOam_HighTable
     ORA.b #!BattleOam_HideCursorBits
     STA.w !BattleOam_HighTable
@@ -5294,7 +5315,8 @@ BattleMenu_TargetSelectInput:
     JMP Battle_ClearPadEdges
 
 ; ==================================================================
-; BattleMenu_CommitAction ($C1161A–$C11749, 308 bytes)
+; BattleMenu_CommitAction ($C1161A–$C1174D, 308 bytes; ends with the JMP to
+; Battle_ClearPadEdges at $C1174B)
 ; ==================================================================
 ; Confirms the currently-selected target and builds the command
 ; record for the shown PC's chosen action (attack/tech/item), then
@@ -5321,8 +5343,9 @@ BattleMenu_TargetSelectInput:
 ; Finally takes the PC out of the roster and shows the next roster
 ; entry, if any (same shape as BattleMenu_RemoveBattlerFromReady's tail).
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (STA.b $80-$84, TDC as zero), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; DP $80, $82 and $84 written
 ; Callees: BattleMenu_ConsumePartnerSlot, Battle_ShiftRight4,
 ;          Battle_ClearPadEdges
 ; Direct-page roles:
@@ -5474,8 +5497,9 @@ BattleMenu_CommitAction:
 ; !BattleMenu_ReadyCount; either way marks its roster entry empty and
 ; clears BattleCmd.State bit 7 ("waiting for a command", set by
 ; BattleMenu_EnqueueReadyBattler) in its command record.
-; Entry: M=1, X=0, DB=$7E; !BattleMenu_PartnerArg = partner PC slot
-; Exit:  M=1; registers clobbered
+; Entry: M=1, X=0, DP=0 (reads its argument with LDA.b !BattleMenu_PartnerArg,
+;        $80), DB=$7E; !BattleMenu_PartnerArg = partner PC slot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y and DP unchanged
 ; No JSR/JSL calls.
 org $C1174E
 BattleMenu_ConsumePartnerSlot:
@@ -5500,8 +5524,17 @@ BattleMenu_ConsumePartnerSlot:
 ; Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at
 ; 11), skipping empty candidate entries, and select the battler it lands
 ; on (!BattleTgt_Selected).
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; The BMI loop has no empty-list guard (BattleTgt_CycleNext has one): with
+; all 11 candidates $FF it would never exit. It cannot happen as far as
+; this bank shows: the only caller, TargetSelectInput, JMPs here in the
+; same call right after BuildTargetList returned a non-negative
+; !BattleTgt_Result, i.e. some !BattleTgt_Selected entry 0-10 is a real
+; slot, and every mode handler fills Selected only with values it also
+; put in Candidates 0-10. (Argued from the handlers, not proven for every
+; caller of the $C10045 services that also write Candidates.)
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
+;        clobbered
 ; Callees: Battle_ClearPadEdges
 org $C1176C
 BattleMenu_TargetNext:
@@ -5524,8 +5557,10 @@ BattleMenu_TargetNext:
 ; Left/Up while cycling targets: mirror of TargetNext — steps
 ; !BattleTgt_Cursor back (wrap to 10) instead. Falls straight through
 ; into Battle_ClearPadEdges (no JMP needed; they're adjacent in ROM).
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; falls through to Battle_ClearPadEdges
+; Same unguarded BMI loop as TargetNext, safe for the same reason.
+; Entry: M=1, X=0, DP=0 (the fall-through writes DP $EE/$EF), DB=$7E
+; Exit:  falls through to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
+;        clobbered
 ; No JSR/JSL calls.
 org $C11786
 BattleMenu_TargetPrev:
@@ -5547,8 +5582,10 @@ BattleMenu_TargetPrev:
 ; Computes the highlighted line of the PC's list into
 ; !BattleMenu_TechListIdx (!Pc_TechScroll + !Pc_TechRow), then polls:
 ; confirm, cancel, Up or Left = previous, Down or Right = next.
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges, STX.b), DB=$7E
+; Exit:  tail-jumps to one of several handlers, does not fall through;
+;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
+;        pad edges cleared; DP $80/$81 written here, plus the handler's
 ; Callees: Battle_PlaySfx0, BattleMenu_TechConfirm,
 ;          BattleMenu_TechListCancel, BattleMenu_TechListPrev,
 ;          BattleMenu_TechListNext, Battle_ClearPadEdges
@@ -5563,30 +5600,30 @@ BattleMenu_TechListInput:
     TAX
     STX.b !BattleMenu_TechListIdx
     LDA.b !Battle_PadEdgeButtons
-    AND.b #!Battle_PadConfirm       ; confirm
+    AND.b #!Battle_PadConfirm
     BEQ .check_cancel
     JSR Battle_PlaySfx0
     JMP BattleMenu_TechConfirm
 .check_cancel:
     LDA.b !Battle_PadEdgeButtons
-    AND.b #!Battle_PadCancel        ; cancel
+    AND.b #!Battle_PadCancel
     BEQ .check_up
     JSR Battle_PlaySfx0
     JMP BattleMenu_TechListCancel
 .check_up:
     LDA.b !Battle_PadEdgeDpad
-    BIT.b #!Battle_DpadUp           ; up
+    BIT.b #!Battle_DpadUp
     BNE .do_up
-    AND.b #!Battle_DpadLeft         ; left
+    AND.b #!Battle_DpadLeft
     BEQ .check_down
 .do_up:
     JSR Battle_PlaySfx0
     JMP BattleMenu_TechListPrev
 .check_down:
     LDA.b !Battle_PadEdgeDpad
-    BIT.b #!Battle_DpadDown         ; down
+    BIT.b #!Battle_DpadDown
     BNE .do_down
-    AND.b #!Battle_DpadRight        ; right
+    AND.b #!Battle_DpadRight
     BEQ .exit
 .do_down:
     JSR Battle_PlaySfx0
@@ -5601,9 +5638,13 @@ BattleMenu_TechListInput:
 ; (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
 ; Otherwise sets !BattleTgt_Mode from the entry's TargetMode, builds the
 ; target list, and — if a valid target was found — enters target
-; selection; if not, just resets the target cursor.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; selection; if not, resets the target cursor. When the TargetMode has
+; bit 7, BuildTargetList has already left the tech list before the
+; missing target is noticed (Submenu = 0, !BattleMenu_ReturnSubmenu
+; saved, command window reloaded), and nothing here undoes that.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered, plus BuildTargetList's (the mode handler's DP, see its header)
 ; Callees: BattleMenu_BuildTargetList, Battle_ClearPadEdges
 org $C11369
 BattleMenu_TechConfirm:
@@ -5630,8 +5671,9 @@ BattleMenu_TechConfirm:
 ; Closes the tech list: reload the command window, back to the main menu,
 ; force a window rebuild, and restore this PC's saved tech-list cursor
 ; (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechScroll).
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
+;        clobbered; no DP written besides the pad edges
 ; Callees: BattleMenu_LoadCommandWindowMap, Battle_ClearPadEdges
 org $C1138F
 BattleMenu_TechListCancel:
@@ -5655,8 +5697,10 @@ BattleMenu_TechListCancel:
 ; moves the cursor row (!Pc_TechRow) back the same number of lines,
 ; scrolling the list (!Pc_TechScroll) up a line at a time while the row
 ; would be negative.
-; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
+;        !BattleMenu_TechListIdx = current line
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; DP $80, $82 and $83 written
 ; Callees: Battle_ClearPadEdges
 !BattleMenu_StepCount = !BattleTmp_82    ; 1 B: lines walked to reach an available tech
 !BattleMenu_NewRow = !BattleTmp_83       ; 1 B: cursor row after that walk (may leave 0-2)
@@ -5686,7 +5730,7 @@ BattleMenu_TechListPrev:
     DEC.b !BattleMenu_StepCount
     BNE .shift_loop
     LDA.b !BattleMenu_NewRow
-    BPL .no_wrap                    ; row still >= 0, no scroll needed
+    BPL .store_row                  ; row still >= 0, no scroll needed
     LDA.w !Pc_TechScroll,X          ; scroll position
     BEQ .no_change                  ; already at top -> no-op
     LDA.b !BattleMenu_NewRow
@@ -5696,7 +5740,7 @@ BattleMenu_TechListPrev:
     CLC
     LDA.w !Pc_TechRow,X
     ADC #$01
-.no_wrap:
+.store_row:
     STA.w !Pc_TechRow,X
     BMI .dec_scroll                 ; still negative -> scroll again
 .no_change:
@@ -5709,8 +5753,10 @@ BattleMenu_TechListPrev:
 ; instead of backward, bounded by the list length (!Pc_TechCount)
 ; instead of the start of the list, and scrolls down instead of up when
 ; the new row would reach 3.
-; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (.b StepCount/NewRow/TechListIdx), DB=$7E;
+;        !BattleMenu_TechListIdx = current line
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; DP $80, $82 and $83 written
 ; Callees: Battle_ClearPadEdges
 org $C113F4
 BattleMenu_TechListNext:
@@ -5740,7 +5786,7 @@ BattleMenu_TechListNext:
     BNE .shift_loop
     LDA.b !BattleMenu_NewRow
     CMP.b #!BattleMenu_ListRows
-    BCC .no_wrap                    ; row still < 3, no scroll needed
+    BCC .store_row                  ; row still < 3, no scroll needed
     LDA.b !BattleMenu_NewRow
     STA.w !Pc_TechRow,X
 .inc_scroll:
@@ -5748,7 +5794,7 @@ BattleMenu_TechListNext:
     SEC
     LDA.w !Pc_TechRow,X
     SBC #$01
-.no_wrap:
+.store_row:
     STA.w !Pc_TechRow,X
     CMP.b #!BattleMenu_ListRows
     BCS .inc_scroll                 ; still >= 3 -> scroll again
@@ -5763,8 +5809,10 @@ BattleMenu_TechListNext:
 ; skip during cursor movement — up/down just move the cursor one row
 ; and scroll via ItemListScrollUp/Down at the edges. The page buttons
 ; page the whole list up/down by 3 rows at once.
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b pad edges), DB=$7E
+; Exit:  tail-jumps to one of several handlers, does not fall through;
+;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
+;        pad edges cleared; DP as in the handler that ran
 ; Callees: Battle_PlaySfx0, BattleMenu_ItemConfirm,
 ;          BattleMenu_ItemListCancel, BattleMenu_ItemCursorUp,
 ;          BattleMenu_ItemCursorDown, BattleMenu_ItemListPageDown,
@@ -5773,30 +5821,30 @@ BattleMenu_TechListNext:
 org $C1143D
 BattleMenu_ItemListInput:
     LDA.b !Battle_PadEdgeButtons
-    AND.b #!Battle_PadConfirm       ; confirm
+    AND.b #!Battle_PadConfirm
     BEQ .check_cancel
     JSR Battle_PlaySfx0
     JMP BattleMenu_ItemConfirm
 .check_cancel:
     LDA.b !Battle_PadEdgeButtons
-    AND.b #!Battle_PadCancel        ; cancel
+    AND.b #!Battle_PadCancel
     BEQ .check_up
     JSR Battle_PlaySfx0
     JMP BattleMenu_ItemListCancel
 .check_up:
     LDA.b !Battle_PadEdgeDpad
-    BIT.b #!Battle_DpadUp           ; up
+    BIT.b #!Battle_DpadUp
     BNE .do_up
-    AND.b #!Battle_DpadLeft         ; left
+    AND.b #!Battle_DpadLeft
     BEQ .check_down
 .do_up:
     JSR Battle_PlaySfx0
     JMP BattleMenu_ItemCursorUp
 .check_down:
     LDA.b !Battle_PadEdgeDpad
-    BIT.b #!Battle_DpadDown         ; down
+    BIT.b #!Battle_DpadDown
     BNE .do_down
-    AND.b #!Battle_DpadRight        ; right
+    AND.b #!Battle_DpadRight
     BEQ .check_page_down
 .do_down:
     JSR Battle_PlaySfx0
@@ -5829,9 +5877,12 @@ BattleMenu_ItemListInput:
 ; bit 7 is set or the quantity is zero. Otherwise sets
 ; !BattleMenu_ItemId, !BattleTgt_Mode and !BattleMenu_ItemRecord, builds
 ; the target list, and enters target selection if a valid target was
-; found.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; found. As in TechConfirm, a TargetMode with bit 7 has already left the
+; item list (inside BuildTargetList) by the time a missing target shows.
+; Entry: M=1, X=0, DP=0 (STA.b Mul8A/ItemListIdx, LDX.b Mul8Product), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; DP $80 written, Battle_Mul8's $77/$78, $AD/$AE and
+;        $AF/$B0, plus BuildTargetList's (the mode handler's DP, see its header)
 ; Callees: Battle_Mul8, BattleMenu_BuildTargetList, Battle_ClearPadEdges
 !BattleMenu_ItemListIdx = !BattleTmp_80  ; 1 B: list line under the cursor (scroll + row)
 org $C11498
@@ -5870,8 +5921,9 @@ BattleMenu_ItemConfirm:
 ; ==================================================================
 ; Closes the item list: reload the command window, back to the main
 ; menu, force a window rebuild, and invalidate the scroll-arrow cache.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (TDC in LoadCommandWindowMap, tail ClearPadEdges), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X
+;        clobbered; no DP written besides the pad edges
 ; Callees: BattleMenu_LoadCommandWindowMap, Battle_ClearPadEdges
 org $C114DB
 BattleMenu_ItemListCancel:
@@ -5887,8 +5939,9 @@ BattleMenu_ItemListCancel:
 ; ==================================================================
 ; Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the
 ; list up via ItemListScrollUp when already at the top row.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_ItemListScrollUp, Battle_ClearPadEdges
 org $C114EC
 BattleMenu_ItemCursorUp:
@@ -5910,8 +5963,9 @@ BattleMenu_ItemCursorUp:
 ; Down/Right in the item list: increment !BattleMenu_ItemRow (max 2),
 ; scrolling the list down via ItemListScrollDown when already at the
 ; bottom row.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (the tail Battle_ClearPadEdges writes DP $EE/$EF), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; at the edge row (Scroll call), RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_ItemListScrollDown, Battle_ClearPadEdges
 org $C11502
 BattleMenu_ItemCursorDown:
@@ -5938,8 +5992,9 @@ BattleMenu_ItemCursorDown:
 ; ItemListScrollDown's shared render+indicator tail
 ; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
 ; that logic.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_ItemListScrollDown_RenderTail, Battle_ClearPadEdges
 org $C1151C
 BattleMenu_ItemListPageDown:
@@ -5948,8 +6003,8 @@ BattleMenu_ItemListPageDown:
     ADC.b #!BattleMenu_ListRows
     CMP.b #!Item_MaxScroll
     BCS .clamp
-    CMP #$00
-    BNE .have_scroll
+    CMP #$00                        ; quirk: never 0 here (scroll <= $FA, so the
+    BNE .have_scroll                ; sum is 3-$F9): always taken, never falls to .clamp
 .clamp:
     LDA.b #!Item_MaxScroll
 .have_scroll:
@@ -5964,8 +6019,10 @@ BattleMenu_ItemListPageDown:
 ; Page-up button: page the item list up 3 rows at once, clamped at 0.
 ; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
 ; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Entry: M=1, X=0, DP=0 (the clamp TDC means A=0 only because D=0, and
+;        STA.b !BattleMenu_ListScroll is DP), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_ItemListScrollUp_RenderTail, Battle_ClearPadEdges
 org $C11537
 BattleMenu_ItemListPageUp:
@@ -5983,10 +6040,12 @@ BattleMenu_ItemListPageUp:
 ; ==================================================================
 ; BattleMenu_ItemListRefresh ($C1154B–$C11560, 22 bytes)
 ; ==================================================================
-; Re-renders the item list rows and invalidates both draw
-; caches when !BattleMenu_ItemRefresh is set, clearing it.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Re-renders the item list rows, invalidates both draw caches and clears
+; !BattleMenu_ItemRefresh. Called (JMP) by ItemListInput when
+; !BattleMenu_ItemRefresh is set and no button was pressed.
+; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E
+; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X, Y
+;        clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_RenderItemListRows, Battle_ClearPadEdges
 org $C1154B
 BattleMenu_ItemListRefresh:
@@ -6000,7 +6059,8 @@ BattleMenu_ItemListRefresh:
     JMP Battle_ClearPadEdges
 
 ; ==================================================================
-; BattleMenu_ItemListScrollUp ($C117A1–$C117BE, 30 bytes)
+; BattleMenu_ItemListScrollUp ($C117A1–$C117B0, 16 bytes; sub-entries
+; _SetScroll $C117B1, _RenderTail $C117B3 and _SkipRender $C117B6–$C117BE)
 ; ==================================================================
 ; Scrolls the item list up one row: decrements !BattleMenu_ItemScroll (min 0), then
 ; re-renders and invalidates both draw caches (row cursor, arrows).
@@ -6011,8 +6071,9 @@ BattleMenu_ItemListRefresh:
 ; indicator writes) can never actually be reached, since reaching that
 ; second branch at all requires the first BEQ to have found the flag
 ; clear. Reproduced exactly regardless.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1
+; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
+;        sub-entries take the same state)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
 ; Callees: BattleMenu_RenderItemListRows
 ; Global (non-dot) labels throughout: BattleMenu_ItemListScrollUp_RenderTail
 ; is a real external entry point (called directly by BattleMenu_ItemListPageUp,
@@ -6039,7 +6100,8 @@ BattleMenu_ItemListScrollUp_SkipRender:
     RTS
 
 ; ==================================================================
-; BattleMenu_ItemListScrollDown ($C117BF–$C117DC, 30 bytes)
+; BattleMenu_ItemListScrollDown ($C117BF–$C117D0, 18 bytes; sub-entries
+; _RenderTail $C117D1 and _SkipRender $C117D4–$C117DC)
 ; ==================================================================
 ; Scrolls the item list down one row: increments !BattleMenu_ItemScroll (clamped at
 ; $FA), then re-renders and invalidates both draw caches.
@@ -6048,8 +6110,10 @@ BattleMenu_ItemListScrollUp_SkipRender:
 ; at the clamp, skips both the increment AND the render entirely.
 ; BattleMenu_ItemListScrollDown_RenderTail is the external entry point
 ; called directly by BattleMenu_ItemListPageDown.
-; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1
+; Entry: M=1, X=0, DP=0 (STA.b !BattleMenu_ListScroll), DB=$7E (the
+;        sub-entries take the same state)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; RenderItemListRows' $80-$87, $8E/$8F and $96-$98
+;        (none when already at $FA)
 ; Callees: BattleMenu_RenderItemListRows
 org $C117BF
 BattleMenu_ItemListScrollDown:
@@ -6072,8 +6136,10 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ; ==================================================================
 ; BattleMenu_UpdateCursorOverlay ($C117DD–$C11B18, 828 bytes)
 ; ==================================================================
-; Per-frame cursor/overlay refresh, called once per frame from the end
-; of the menu rebuild chain (after ProcessInput). Draws whatever cursor
+; Cursor/overlay refresh at the end of the menu rebuild chain (after
+; ProcessInput), so like it only on frames with !BattleMenu_Dirty set:
+; JSR from RefreshIfDirtyL, RefreshIfDirtyAndTick and $C1:10D7 (the not
+; yet matched routine at $C1:106E). Draws whatever cursor
 ; graphic belongs on screen right now, dispatching on menu state:
 ;
 ;   no PC shown (!BattleMenu_ActivePc < 0) -> hide the 4 cursor sprites
@@ -6089,8 +6155,9 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ;                  either changed
 ;
 ; Target selection draws either one cursor on the first selected target
-; (with, on the main menu, an info-panel message for an enemy target
-; through BattleMsg_ShowMsg0BIfKeyChangedVec / BattleMsg_UnkVecCD0030),
+; (with, while !BattleMenu_Submenu = 0, an info-panel message for an
+; enemy target through BattleMsg_ShowMsg0BIfKeyChangedVec /
+; BattleMsg_UnkVecCD0030),
 ; or, when a second target is selected, a sweep over the selection list
 ; that fills up to 4 cursor sprites per frame and resumes next frame
 ; from !BattleTgt_SweepResume.
@@ -6101,9 +6168,10 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ;   offset) − !BattleOam_CursorCentreX on x, written into one of the
 ;   four cursor sprites (BattleOam[0-3]).
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; pad-edge bytes cleared (shared tail, same as
-;        Battle_ClearPadEdges elsewhere)
+; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero; STZ.b/STY.b), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; pad-edge bytes cleared (shared tail, same as
+;        Battle_ClearPadEdges elsewhere); A, X, Y clobbered; DP $80-$83 and
+;        $EC written, plus whatever the JSL targets (not matched yet) change
 ; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
 ;          BattleMenu_DrawCursorSprites, BattleMsg_ShowMsg0BIfKeyChangedVec,
 ;          BattleMsg_UnkVecCD0030 (sibling message vector, not analysed),
@@ -6384,7 +6452,9 @@ BattleMenu_UpdateCursorOverlay:
     LDA.w !BattleTgt_Highlight
     CMP.b #!Battle_FirstEnemySlot   ; slot < 3 -> a PC: no info panel
     BCC .after_info_panel
-    ; enemy target from the main (attack) menu: info-panel message.
+    ; enemy target with Submenu 0: the attack row, or a tech/item whose
+    ; target mode has bit 7 (BuildTargetList closed the submenu for it).
+    ; Info-panel message.
     ; With !Battle_Unk9F34 and the target's !Battler_Unk9F29 set, the
     ; message gets the target's HP too (BattleMsg_ShowMsg0BIfKeyChangedVec);
     ; otherwise BattleMsg_UnkVecCD0030. Either way the argument is the
@@ -6468,8 +6538,13 @@ BattleMenu_UpdateCursorOverlay:
 ; ------------------------------------------------------------------
 ; Sprite 0 marks the first selected target; sprites 1-3 mark selection
 ; entries 0-2 on one frame and 3-5 on the next (!BattleTgt_SweepResume
-; alternates 3 / 0), stopping early if the 4 sprites run out. Entries
-; 6-10 are never reached by this sweep.
+; alternates 3 / 0). Entries 6-10 are never reached by this sweep.
+; The loop has two exits, but with a start index of 0 or 3 the index cap
+; (SweepBatch 3 / SweepWrap 6) always fires after 3 steps, when the
+; sprite index has only reached 3; the BattleOam_CursorSprites test never
+; ends the loop. 0 and 3 are the only values stored to $960B (its one
+; writer is the STA below, checked across banks $C0-$CF); its first value
+; comes from the battle RAM set-up, which is not matched yet.
 .multi_target:
     LDA.w !BattleTgt_Selected
     BMI .multi_loop_init

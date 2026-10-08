@@ -175,37 +175,37 @@ $C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,readable,7fc5986a
 $C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,readable,a03d32c360f0,"Row 0 (Attack) confirm: message call with ""none"", flags the cursor redraw, sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0, builds the target list, sets !BattleMenu_TargetMoved (so UpdateCursor"
 $C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,readable,8888ced30b00,"Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders the tech list lines, builds !Tech_ListAvail, switches to the tech list (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests "
 $C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,readable,befa3636a23d,"Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the item list at !BattleMenu_ItemScroll, queues the item map upload, copies the item box frame (!BattleRom_ItemBoxMap) into !BattleMe"
-$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,readable,96c15494bdb5,
-$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,readable,a4247203ff87,Confirms the highlighted tech: aborts unless the rows have been graded (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
-$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,readable,6260c94fa869,"Closes the tech list: reload the command window, back to the main menu, force a window rebuild, and restore this PC's saved tech-list cursor (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechSc"
-$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,readable,f8f01996005d,
-$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,readable,74a41e0e4779,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length (!Pc_TechCount) instead of the start of the list, and scrolls down instead of up whe"
-$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,readable,44b085fc8cd2,Per-frame input handler while the item list is open (submenu 2).
-$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,readable,d969708fb0bf,
-$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,readable,454be24b701a,"Closes the item list: reload the command window, back to the main menu, force a window rebuild, and invalidate the scroll-arrow cache."
-$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,readable,aa160ba3b259,"Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the list up via ItemListScrollUp when already at the top row."
-$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,readable,07b094dd56c7,"Down/Right in the item list: increment !BattleMenu_ItemRow (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
-$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,readable,0b8cdbdbc4c9,"Page-down button: page the item list down 3 rows at once, clamped at scroll position $FA."
-$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,readable,7b1f3aa49932,"Page-up button: page the item list up 3 rows at once, clamped at 0."
-$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,readable,0cb0d3039f04,"Re-renders the item list rows and invalidates both draw caches when !BattleMenu_ItemRefresh is set, clearing it."
-$C1:1561,$C1:1619,185,BattleMenu_TargetSelectInput,$C1,Battle menu,readable,8621530fdba8,Per-frame input handler while target selection runs (entered from BattleMenu_ProcessInput when !BattleMenu_TargetSelect != 0).
-$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,readable,61650de905d8,
-$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,readable,a54a224860ac,"Removes PC slot !BattleMenu_PartnerArg from the ready state as part of committing a double/triple tech: if it's in the roster, decrements !BattleMenu_ReadyCount; either way marks its roster entry empt"
-$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,readable,a387547ade72,"Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at 11), skipping empty candidate entries, and select the battler it lands on (!BattleTgt_Selected)."
-$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,readable,1447a4a0f030,Left/Up while cycling targets: mirror of TargetNext — steps !BattleTgt_Cursor back (wrap to 10) instead.
+$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,readable,64843a1c92ff,
+$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,readable,05e719df35de,Confirms the highlighted tech: aborts unless the rows have been graded (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
+$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,readable,4ce2a00a6ff4,"Closes the tech list: reload the command window, back to the main menu, force a window rebuild, and restore this PC's saved tech-list cursor (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechSc"
+$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,readable,3dd1be495fe3,
+$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,readable,b534ba7d26ea,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length (!Pc_TechCount) instead of the start of the list, and scrolls down instead of up whe"
+$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,readable,fdf86cb283fe,Per-frame input handler while the item list is open (submenu 2).
+$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,readable,2112ab8dcafb,
+$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,readable,b5829a880a7b,"Closes the item list: reload the command window, back to the main menu, force a window rebuild, and invalidate the scroll-arrow cache."
+$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,readable,c7659d5e1c38,"Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the list up via ItemListScrollUp when already at the top row."
+$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,readable,5c11149b7093,"Down/Right in the item list: increment !BattleMenu_ItemRow (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
+$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,readable,e645f3943f11,"Page-down button: page the item list down 3 rows at once, clamped at scroll position $FA."
+$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,readable,8602a021e014,"Page-up button: page the item list up 3 rows at once, clamped at 0."
+$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,readable,147b16d05658,"Re-renders the item list rows, invalidates both draw caches and clears !BattleMenu_ItemRefresh."
+$C1:1561,$C1:1619,185,BattleMenu_TargetSelectInput,$C1,Battle menu,readable,7a62dfa56c0b,Per-frame input handler while target selection runs (entered from BattleMenu_ProcessInput when !BattleMenu_TargetSelect != 0).
+$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,readable,20b7a458f610,
+$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,readable,806e312bea26,"Removes PC slot !BattleMenu_PartnerArg from the ready state as part of committing a double/triple tech: if it's in the roster, decrements !BattleMenu_ReadyCount; either way marks its roster entry empt"
+$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,readable,3ac7035510cc,"Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at 11), skipping empty candidate entries, and select the battler it lands on (!BattleTgt_Selected)."
+$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,readable,6296d11b2829,Left/Up while cycling targets: mirror of TargetNext — steps !BattleTgt_Cursor back (wrap to 10) instead.
 $C1:179C,$C1:17A0,5,Battle_ClearPadEdges,$C1,Battle engine,readable,9d639f198e8d,Clears both pad-edge bytes and returns.
-$C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,readable,c6f1ef1c4f51,"Scrolls the item list up one row: decrements !BattleMenu_ItemScroll (min 0), then re-renders and invalidates both draw caches (row cursor, arrows)."
+$C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,readable,c54c644578c7,"_SetScroll $C117B1, _RenderTail $C117B3 and _SkipRender $C117B6–$C117BE)"
 $C1:17B1,$C1:17B2,2,BattleMenu_ItemListScrollUp_SetScroll,$C1,Battle menu,verified,06672cd2c585,
 $C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,verified,f325bfe623ce,
 $C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,verified,eb342fca8940,
-$C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,readable,de5ad53b6b32,"Scrolls the item list down one row: increments !BattleMenu_ItemScroll (clamped at $FA), then re-renders and invalidates both draw caches."
+$C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,readable,6ca7ee98e745,_RenderTail $C117D1 and _SkipRender $C117D4–$C117DC)
 $C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,verified,1cb83529e976,
 $C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,verified,1ca8550ddb2b,
-$C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,readable,88788f811983,
+$C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,readable,a9f3ef075d1d,
 $C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,readable,61eb48ba2ba8,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
 $C1:1B55,$C1:1B66,18,Battle_PlaySfx0,$C1,Battle engine,readable,b78418c192a1,APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command / !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's Audio_PlayTileSfxA fills) and calls the audio driver entry.
-$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,readable,2de0a605f112,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
-$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable,cd6e51899c4d,
+$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,readable,9f455ee2d58c,"Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in !BattleMenu_ReadyQueueLen) into the roster: clears its !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow / SavedTechScrol"
+$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,readable,cac9be963439,
 $C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,readable,eb78adf7c970,"Copies the $180-byte command window map (!BattleRom_CommandWindowMap, bank $D1) into !BattleMenu_WindowMap."
 $C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,readable,4ef6de9b402e,"Records the requesting PC (!BattleTgt_Caster), resets the selection state (!BattleTgt_Result/CanCycle/TargetAll, two Unk bytes) and blanks !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) "
 $C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,readable,449abab74e5d,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
@@ -213,24 +213,24 @@ $C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,verified,9779f4140
 $C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,readable,28ab29aaa040,"Target-mode handler table, indexed by (!BattleTgt_Mode & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
 $C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,readable,17786c6051aa,
 $C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,verified,96ac25da6792,
-$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,readable,5fb0711d3fc4,"(this and the three list modes below: state as SingleAlly, DP $80/$81)"
-$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,verified,3af96a43a7ff,cursor may cycle.
-$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,verified,ae599fce70f7,
-$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,verified,a87ffddbacda,
-$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,readable,5662bce9156e,"(Entry/Exit M=1, DB=$7E; only A changes, no DP written)"
+$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,readable,749b85d97385,
+$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,readable,b5c3825ec1e5,cursor may cycle.
+$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,readable,885a269d392b,
+$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,readable,acf939b69bdd,
+$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,readable,376d14cb032e,
 $C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,readable,3db35982000f,"Lists the PCs whose BattlerStats.Status has bit 7 set — by context, KO'd allies, i.e."
 $C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,readable,7b7b0ce0ed60,
 $C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,verified,1098ffd7d8a1,
 $C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,readable,6e7529bc5bab,
-$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,readable,bfe8552cfddd,
-$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,readable,f2e452424fbb,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
-$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,verified,5a7841bb4268,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
-$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,verified,434f2363d6ec,the caster
-$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,verified,10d92bd91fc4,"chosen enemy; size $19 for mode $1A, else $09"
-$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,readable,dc20d5ea5bf6,"member id 3; size $19 for mode $14, else $10."
-$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,readable,8c9512d74d5f,party member id 6.
-$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,verified,fef35bc71450,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
-$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,verified,7ac5d63ffd11,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
+$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,readable,7e1b39434c7c,
+$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,readable,fbaa16e3a412,"but the source is the party member with character id 3 (!Pc_CharRobo, inferred: Robo; the name keeps the numeric id)."
+$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,readable,b182691fe6ce,EnemyLineFromCaster with !BattleTgt_AreaVariant = 1
+$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,readable,61f4201b06f1,the caster
+$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,readable,4db0bc255eb3,"chosen enemy; size $19 for mode $1A, else $09"
+$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,readable,14c66204390c,"member id 3; size $19 for mode $14, else $10."
+$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,readable,2a93487926f5,party member id 6.
+$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,readable,6c940e52b5ca,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's !Battler_ScreenY)
+$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,readable,13176077efea,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
 $C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,readable,48cefc785c11,
 $C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,readable,74bccbfea163,
 $C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,readable,e4006f5241ab,
