@@ -121,8 +121,9 @@ org $C2258D
 C2Scene_Mode6:      ; C2Scene_ModeTable entry 6 (unmatched; not traced)
 org $C2261D
 C2Scene_Mode8:      ; C2Scene_ModeTable entry 8 (unmatched; not traced)
-org $C22C1D
-C2Scene_Unk2C1D:    ; C2Scene_Main setup step: spawns a task (JSR C2Scene_TaskSpawn)
+org $C25775
+C2Scene_Unk5775:    ; JSR from C2Scene_ReloadScene: copies 4 B from $C2:57C2 to $7E:8600 and 25 B from $C2:57C6 to
+                    ; $7E:8604 (probably an HDMA table; not traced)
 org $C258B2
 TextWin_State0:     ; TextWin_StateTable 0: reads the next string byte (>= $A0: a glyph; $21-$9F: a
                     ; bank-$DE table entry, then state 1; below $21: JMP ($5903,X))

@@ -53,6 +53,114 @@ if !constants_menu_inc == 0
 !C2Scene_MapTilesY = $80                 ; and Y into 0-127
 !C2Scene_VramQEntrySize = 8              ; bytes per C2Scene_VramQ entry
 
+; --- Scene loading (C2Scene_LoadScene and the C2Scene_Load* routines) ---
+; ROM tables in bank $C6. Each pack table holds 3-byte long pointers to
+; packed data that Decomp_ToWramVec unpacks; a header byte (below) is
+; the entry number, and a byte with bit 7 set loads nothing.
+!C2SceneRom_HeaderTable = $C6FD00        ; 16-bit address (bank $C6) of each scene's header, indexed by
+                                         ; (Loc_Id AND C2Scene_LocIdMask) - Loc_FirstBankC2
+!C2SceneRom_HeaderBank = $C6             ; bank of the headers (C2Scene_GetHeaderPtr)
+!C2SceneRom_ObjPacks = $C6FDF0           ; sprite graphics packs (C2Scene_LoadObjGfx; entry 0 is the
+                                         ; party's, C2Scene_LoadPartyGfx)
+!C2SceneRom_BgPacks = $C6FE20            ; BG graphics packs (C2Scene_LoadBgGfx, C2Scene_LoadBg3Gfx,
+                                         ; C2Scene_LoadUnkB800)
+!C2SceneRom_PalettePacks = $C6FEA0       ; palette packs (C2Scene_LoadPalettes; entry 0 is the party's;
+                                         ; also C2Scene_LoadUnkC000)
+!C2SceneRom_MetatilePacks = $C6FF00      ; C2Scene_LoadMetatiles
+!C2SceneRom_MapPacks = $C6FF20           ; C2Scene_LoadBgMaps
+!C2SceneRom_Bg3MapPacks = $C6FF40        ; C2Scene_LoadBg3Map
+!C2SceneRom_Unk7000Packs = $C6FF80       ; C2Scene_LoadUnk7000
+!C2SceneRom_Unk7200Packs = $C6FFA0       ; C2Scene_LoadUnk7200
+!C2SceneRom_ListPacks = $C6FFC0          ; C2Scene_LoadLists
+!C2SceneRom_ScriptPacks = $C6FFE0        ; C2Scene_LoadScript
+!C2SceneRom_LastPalRow = $C6F620         ; 32 B (33 copied) for colors $F0-$FF of C2Scene_PaletteBuf
+                                         ; (C2Scene_LoadVram)
+!C2Scene_PackEntrySize = 3               ; bytes per pack-table entry (a long pointer)
+!C2Scene_LocIdMask = $01FF               ; Loc_Id bits that give the location number
+; Scene header: byte offsets (each byte a pack number, bit 7 = none).
+!C2Scene_HdrBgGfx = $00                  ; 7 bytes: BG graphics packs (C2Scene_LoadBgGfx)
+!C2Scene_HdrUnkB800 = $07                ; C2Scene_LoadUnkB800
+!C2Scene_HdrBg3Gfx = $08                 ; C2Scene_LoadBg3Gfx
+!C2Scene_HdrPalettes = $0A               ; C2Scene_LoadPalettes
+!C2Scene_HdrUnkC000 = $0B                ; C2Scene_LoadUnkC000
+!C2Scene_HdrObjGfx = $0C                 ; 4 bytes: sprite graphics packs (C2Scene_LoadObjGfx)
+!C2Scene_HdrMetatiles = $10              ; C2Scene_LoadMetatiles
+!C2Scene_HdrMaps = $11                   ; C2Scene_LoadBgMaps
+!C2Scene_HdrUnk7000 = $12                ; C2Scene_LoadUnk7000
+!C2Scene_HdrUnk7200 = $13                ; C2Scene_LoadUnk7200
+!C2Scene_HdrBg3Map = $14                 ; C2Scene_LoadBg3Map
+!C2Scene_HdrLists = $15                  ; C2Scene_LoadLists
+!C2Scene_HdrScript = $16                 ; C2Scene_LoadScript
+!C2Scene_ObjPackCount = 4                ; sprite graphics packs per scene
+!C2Scene_BgPackCount = 7                 ; BG graphics packs per scene
+!C2Scene_PackSlotSize = $1000            ; C2Scene_DecompBuf bytes per graphics pack
+!C2Scene_PartyObjPack = 0                ; C2SceneRom_ObjPacks entry: the party's sprite graphics
+!C2Scene_UnkC800Pack = 1                 ; C2SceneRom_ObjPacks entry C2Scene_LoadUnkC800 unpacks
+!C2Scene_PartyPalPack = 0                ; C2SceneRom_PalettePacks entry: the party's palettes
+!C2Scene_ExtraObjPack = 3                ; C2SceneRom_ObjPacks entry of C2Scene_LoadExtraObjPack
+!C2Scene_ExtraPalPack = 3                ; C2SceneRom_PalettePacks entry of C2Scene_LoadExtraPalette
+!C2Scene_UnkC600Pack = $12               ; C2SceneRom_PalettePacks entry of C2Scene_LoadUnkC600
+!C2Scene_PartyGfxSize = $0400            ; party graphics bytes per character (C2Scene_CopyPartyGfx)
+!C2Scene_PartyGfxBSize = $40             ; and in each of the two extra blocks (C2Scene_CopyPartyGfxB)
+!C2Scene_PartyGfxBGap = $0200            ; distance between those two blocks (source and destination)
+!C2Scene_PartyPalSize = $10              ; party palette bytes copied per character (8 colors)
+!C2Scene_PartyPalStride = 32             ; bytes per character in C2Scene_PartyPalSrc (as a shift: 5)
+!C2Scene_PalRowBytes = $0020             ; bytes in one 16-color palette row (C2SceneRom_LastPalRow)
+!C2Scene_LastPalRowDest = $0B00          ; = C2Scene_PaletteBuf + $1E0: colors $F0-$FF
+!C2Scene_Gray1 = $14A5                   ; BGR555 (5,5,5): the colors C2Scene_LoadVram puts at
+!C2Scene_Gray2 = $294A                   ; (10,10,10)      $7F:8D02-$8D07 (sprite palette 0, colors 1-3)
+!C2Scene_Gray3 = $6B5A                   ; (26,26,26)
+!C2Scene_HdmaAreaPasses = $0200          ; C2Scene_ClearHdmaArea passes, 4 bytes each
+!C2Scene_HdmaValueA916Init = $A925       ; C2Scene_ReloadScene's value for C2Scene_HdmaValueA916 (use not
+                                         ; traced)
+!C2Scene_ExtraGfxFlagMin = $D4           ; C2Scene_LoadLocExtraGfx does nothing while Eng_Unk7F0000 is
+                                         ; below this
+!C2Scene_Unk0294Bit2 = $04               ; the C2Scene_Unk0294 bit C2Scene_LoadScene clears
+!C2Scene_Unk1B32Init = $FFFF             ; C2Scene_LoadScene's value for the three C2Scene_Unk1B32 words
+; VRAM word addresses and DMA byte counts (BankC2_InitHwRegs: sprite
+; tiles at $0000, BG1/BG2 tiles at $2000, BG3 tiles at $7000, BG3 map at
+; $7800).
+!C2Scene_VramObj = $0000
+!C2Scene_ObjGfxBytes = $4000             ; the four sprite packs
+!C2Scene_VramPartyGfx = $1000            ; where C2Scene_PartyGfx goes
+!C2Scene_PartyGfxBytes = $1000
+!C2Scene_VramBgGfx = $2000
+!C2Scene_BgGfxBytes = $7000              ; the seven BG packs
+!C2Scene_VramBg3Gfx = $7000
+!C2Scene_VramBg3Map = $7800
+!C2Scene_PackBytes = $1000               ; one pack (C2Scene_LoadBg3Gfx, C2Scene_LoadBg3Map)
+!C2Scene_VramExtraObj = $0C00            ; C2Scene_LoadLocExtraGfx's sprite tiles (Loc_Id $01F0-$01F2)
+!C2Scene_ExtraObjBytes = $0800
+!C2Scene_ExtraPalA = $0A40               ; C2Scene_PaletteBuf + $120: colors $90-$9F (Loc_Id $01F0, $01F2)
+!C2Scene_ExtraPalB = $0A80               ; colors $B0-$BF (Loc_Id $01F1, bit 7 of C2Scene_FlagTailByte1
+!C2Scene_ExtraPalC = $0A60               ; clear) or colors $A0-$AF (set)
+!C2Scene_FlagTailBit7 = $80
+; C2Scene_SaveState / C2Scene_RestoreState block sizes
+!C2Scene_SaveDpBytes = $00F0             ; dp $00-$EF
+!C2Scene_SaveLowStart = $0700            ; low WRAM block: $0700-$1DFF
+!C2Scene_SaveLowBytes = $1700
+!C2Scene_SaveSprBytes = $0508            ; C2Scene_SprNodes ($400), C2Scene_SprLinkInit ($100), the heads (8)
+!C2Scene_SaveMapBytes = $3000            ; two C2Scene_MapBytes maps
+!C2Scene_SaveUnk7200Bytes = $0C00        ; $7E:7200-$7DFF
+!C2Scene_SaveListBytes = $0800           ; $7E:7E00-$85FF
+; BG layer redraw (C2Scene_DrawBgLayer)
+!C2Scene_LayerMask = 3                   ; C2Scene_DrawLayer is taken AND this (0 hangs)
+!C2Scene_PxMetaRowMask = $00F0           ; pixel Y bits giving the metatile row within 256 pixels
+!C2Scene_MapCols = $60                   ; 96 metatile columns per layer map (16 px each: 1536 px)
+!C2Scene_MapRows = $40                   ; 64 rows
+!C2Scene_MapBytes = (!C2Scene_MapCols*!C2Scene_MapRows) ; $1800
+!C2Scene_DrawCols = 18                   ; columns drawn per redraw (288 px: the screen and a margin)
+!C2Scene_DrawRows = 16                   ; metatiles per column (256 px of the 32-tile map height)
+!C2Scene_MetatilePx = $10                ; 16 pixels per metatile
+!C2Scene_TilePx = 8                      ; 8 pixels per tile
+!C2Scene_BgXMask = $01FF                 ; BG pixel X wraps at 512 (64-tile map)
+!C2Scene_BgYMask = $00FF                 ; BG pixel Y wraps at 256 (32-tile map)
+!C2Scene_ColBufHalf = $40                ; bytes per tile column in the column buffer (32 words)
+!C2Scene_ColBufMask = $3F                ; byte offset wraps within one tile column
+!C2Scene_ColRowStep = 4                  ; buffer bytes per metatile row (two tile words)
+!C2Scene_MapScreenCols = $20             ; tile columns in the left 32x32 screen of a 64x32 map
+!C2Scene_MapScreen2Skip = $03E0          ; added to reach the right screen: $400 words - 32
+
 ; --- Scene tasks and sprite list ---
 !C2Scene_TaskSize = $40                  ; bytes per C2Scene_Task record
 !C2Scene_TaskCount = 64                  ; records in C2Scene_TaskRecords

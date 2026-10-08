@@ -48,6 +48,8 @@ if !ram_menu_inc == 0
 !Menu_Config = $2990                     ; 32 B $2990-$29AF zeroed by Menu_ClearConfigAndFlags; the first
                                          ; 12 get MenuRom_DefaultConfig
 !Menu_ButtonMap = $2993                  ; 8 B: the JOY1 mask behind each mapped button bit (Menu_MapButtons)
+!Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
+                                         ; to C2Scene_Unk02AE; use unknown
 !Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; use unknown
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
@@ -127,11 +129,17 @@ if !ram_menu_inc == 0
 !C2Scene_VramQLock = $5E                 ; 8-bit; non-zero: C2Scene_VramQFlush does nothing
 !C2Scene_VramQEnd = $5F                  ; 8-bit byte offset past the last C2Scene_VramQ entry (0 = empty)
 !C2Scene_BgTileX = $E3                   ; 2 words, X in tiles (C2Scene_SetStartScroll sets both alike);
-                                         ; probably the BG1/BG2 scroll ($C2:09DB, unmatched, stores 8x
-                                         ; them into the scroll shadows)
+                                         ; word 0 for BG1, word 1 for BG2: C2Scene_DrawBgLayer stores 8x
+                                         ; them into the scroll shadows and draws the map from them
 !C2Scene_BgTileY = $E7                   ; 2 words, Y in tiles (as C2Scene_BgTileX)
 !C2Scene_VramQBufPtr = $E0               ; 24-bit; reset to C2Scene_VramQBuf after each flush (probably
                                          ; where the next queued data is written; unverified)
+                                         ; C2Scene_DrawBgLayer builds each tilemap column at this address
+                                         ; (DB=$7E) and DMAs it from there to VRAM
+!C2Scene_HeaderPtr = $ED                 ; 24-bit pointer to this scene's header in bank $C6 (set by
+                                         ; C2Scene_GetHeaderPtr from C2SceneRom_HeaderTable); each header
+                                         ; byte picks a pack for one C2Scene_Load* routine
+                                         ; (C2Scene_Hdr* offsets in constants_menu.inc)
 
 ; One VRAM DMA request, 8 B, at dp $60 + 8 * n (C2Scene_VramQFlush).
 struct C2Scene_VramQ $0060
@@ -158,7 +166,11 @@ endstruct align 8
 !C2Tmp_0E = $0E                          ; 1-2 B scratch
 !C2Tmp_10 = $10                          ; 1-2 B scratch
 !C2Tmp_13 = $13                          ; 1-2 B scratch
+!C2Tmp_12 = $12                          ; 1-2 B scratch
+!C2Tmp_14 = $14                          ; 1-2 B scratch
 !C2Tmp_16 = $16                          ; 1 B scratch
+!C2Tmp_18 = $18                          ; 1-2 B scratch
+!C2Tmp_1A = $1A                          ; 1-2 B scratch
 
 ; ==== Text window (TextWin_Init / TextWin_Step) ====
 ; A block at $0200 that both run on as their direct page; names are dp
@@ -208,6 +220,84 @@ endstruct align 8
 !C2Scene_Unk1BF6 = $1BF6                 ; 8-bit; zeroed by C2Scene_Main; use unknown
 !C2Scene_Mode = $027C                    ; 8-bit; selects C2Scene_MainLoop's handler (index into
                                          ; C2Scene_ModeTable); who sets it is not traced
+!C2Scene_Unk027D = $027D                 ; 8-bit; zeroed by C2Scene_LoadScene (next to C2Scene_Mode); use unknown
+!C2Scene_Unk0280 = $0280                 ; 3 B $0280-$0282 zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk0294 = $0294                 ; 8-bit; C2Scene_LoadScene clears bit 2 (C2Scene_Unk0294Bit2); use
+                                         ; unknown
+!C2Scene_Unk02AE = $02AE                 ; 8-bit; C2Scene_LoadScene copies the byte at Menu_Config+$1E into it;
+                                         ; use unknown
+!C2Scene_Unk02B1 = $02B1                 ; 3 B $02B1-$02B3 zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; use unknown
+!C2Scene_ListACount = $1B38              ; 8-bit entry count of C2Scene_ListA (C2Scene_LoadLists)
+!C2Scene_ListBCount = $1B39              ; 8-bit entry count of C2Scene_ListB
+!C2Scene_ListCCount = $1B3A              ; 8-bit entry count of C2Scene_ListC (ListD's count is not kept)
+!C2Scene_Unk1B58 = $1B58                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_FlagTailByte1 = $1BA8           ; = C2Scene_FlagTailCopy+1, the copy of $7F:01F1; bit 7 picks the
+                                         ; palette C2Scene_LoadLocExtraGfx loads for Loc_Id $01F1
+
+; Parameter block of Decomp_ToWramVec (the same bytes as Battle_DecompSrc..
+; in ram_battle.inc; the scene loaders fill it with DB=$00).
+!Menu_DecompSrc = $0300                  ; 16-bit address of the packed data
+!Menu_DecompSrcBank = $0302              ; 8-bit its bank
+!Menu_DecompDest = $0303                 ; 16-bit WRAM destination address
+!Menu_DecompDestBank = $0305             ; 8-bit its bank ($7E or $7F; $00 for low WRAM)
+
+; Scene data unpacked into WRAM by the C2Scene_Load* routines (each name
+; says what is inferred; "Unk" ones are only known by where they go).
+!C2Scene_Metatiles = $7E3000             ; 8 B per 16x16 metatile: tile words top-left, top-right,
+                                         ; bottom-left, bottom-right (C2Scene_DrawMetatile); BG1's set
+                                         ; here, BG2's at $7E:3800 (C2Scene_LayerMetatiles)
+!C2Scene_BgMaps = $7E4000                ; one byte (metatile number) per 16x16 cell, 96 x 64 cells per
+                                         ; layer ($1800 B); BG1's map here, BG2's at $7E:5800
+                                         ; (C2Scene_LayerMaps)
+!C2Scene_Unk7000 = $7E7000               ; C2Scene_LoadUnk7000's pack; use unknown
+!C2Scene_Unk7200 = $7E7200               ; C2Scene_LoadUnk7200's pack; use unknown
+!C2Scene_ListA = $7E7E00                 ; 7-byte entries (C2Scene_LoadLists); use unknown
+!C2Scene_ListC = $7E8180                 ; 3-byte entries; use unknown
+!C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
+!C2Scene_ListD = $7E8480                 ; 2-byte entries; use unknown
+!C2Scene_HdmaArea = $7E8621              ; $800 B $7E:8621-$8E20 zeroed by C2Scene_ClearHdmaArea (holds
+                                         ; C2Scene_HdmaValues and C2Scene_HdmaTable)
+!C2Scene_UnkB800 = $7EB800               ; C2Scene_LoadUnkB800's pack; use unknown
+!C2Scene_UnkC000 = $7EC000               ; C2Scene_LoadUnkC000's pack; use unknown
+!C2Scene_UnkC600 = $7EC600               ; C2Scene_LoadUnkC600's pack; use unknown
+!C2Scene_UnkC800 = $7EC800               ; C2Scene_LoadUnkC800's pack; use unknown
+!C2Scene_ListPack = $7F0400              ; C2Scene_LoadLists unpacks the four lists' source here
+!C2Scene_ScriptBuf = $7F0400             ; then C2Scene_LoadScript unpacks the scene's script over it;
+                                         ; C2Scene_LoadScene starts a C2Scene_TaskRunScript task on it
+!C2Scene_SaveDp = $7F3F00                ; C2Scene_SaveState's copy of dp $00-$EF
+!C2Scene_SaveLowRam = $7F2800            ; its copy of $0700-$1DFF
+!C2Scene_SaveSprNodes = $7F4000          ; its copy of $7E:B000-$B507 (C2Scene_SprNodes to the list heads)
+!C2Scene_SaveBgMaps = $7F4600            ; its copy of $7E:4000-$6FFF (C2Scene_BgMaps and after)
+!C2Scene_SaveUnk7200 = $7F7600           ; its copy of $7E:7200-$7DFF
+!C2Scene_SaveLists = $7F8200             ; its copy of $7E:7E00-$85FF (C2Scene_ListA to ListD)
+!C2Scene_PaletteStage = $7F8C00          ; 512 B: the scene's palettes are built here, DMAed to CGRAM and
+                                         ; copied to C2Scene_PaletteBuf (C2Scene_LoadVram)
+!C2Scene_ObjPal0 = $7F8D00               ; colors $80-$83 of C2Scene_PaletteStage (sprite palette 0, colors
+                                         ; 0-3): C2Scene_LoadVram sets black and three grays
+!C2Scene_PartyPalDest = $7F8D80          ; colors $C0, $D0, $E0 (sprite palettes 4-6, 32 B apart): the
+                                         ; party members' palettes (C2Scene_LoadPalettes)
+!C2Scene_PartyPalSrc = $7F8E00           ; the party palettes pack, 32 B per character
+                                         ; (C2Scene_LoadPalettes)
+!C2Scene_DecompBuf = $7F9000             ; staging buffer for graphics packs before their VRAM DMA
+!C2Scene_PartyGfxSrcB = $7FAC00          ; inside the unpacked party graphics pack: $40 B per character
+                                         ; here and at +$200 (C2Scene_CopyPartyGfxB)
+!C2Scene_PartyGfx = $7FB000              ; $1000 B: the party's graphics, built by C2Scene_LoadPartyGfx
+!C2Scene_PartyGfxB = $7FBC00             ; inside it: the second part of each member's graphics, $40 B per
+                                         ; member here and at +$200 (C2Scene_CopyPartyGfxB)
+
+; One 16x16 metatile (C2Scene_DrawMetatile), 8 B, at the layer's
+; C2Scene_LayerMetatiles base + 8 * the map byte; each field a BG tilemap
+; word.
+struct C2Scene_Metatile $0000
+.TopLeft:     skip 2
+.TopRight:    skip 2
+.BottomLeft:  skip 2
+.BottomRight: skip 2
+endstruct
+
 !C2Scene_PaletteBuf = $0920              ; 512 B CGRAM shadow, uploaded by the NMI when C2Scene_NmiFlags
                                          ; bit 1 is set
 !C2Scene_VramQBuf = $7EF000              ; see C2Scene_VramQBufPtr
