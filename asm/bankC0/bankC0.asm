@@ -84,7 +84,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range1LoPtr
-.t0_gfx:                    ; shared low-table copy (size 0)
+.t0_entries:                ; shared low-table copy (size 0)
     LDA.w !Obj_TileRecOfs,X ; object's first SprTile record
     TAX
     SEP #$20
@@ -124,7 +124,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range2LoPtr
-    BRA .t0_gfx
+    BRA .t0_entries
 
 .t0r3:                      ; range 3 (Oam_Range3HiPtr / Oam_Range3LoPtr)
     LDA.l !Obj_OamHiA,X
@@ -140,7 +140,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size0Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range3LoPtr
-    BRA .t0_gfx
+    BRA .t0_entries
 
 ; ============================================================
 ; Size 1: 8 tiles, 2 high-table bytes (via PHA/PLA), 8 entries
@@ -180,7 +180,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range1LoPtr
-.t1_gfx:                    ; shared gfx+OAM entry copy loop (type 1)
+.t1_entries:                ; shared low-table copy (size 1)
     LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
@@ -225,7 +225,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range3LoPtr
-    BRA .t1_gfx
+    BRA .t1_entries
 
 .t1r2:                      ; range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
     LDA.l !Obj_OamHiA+1,X
@@ -246,7 +246,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size1Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range2LoPtr
-    BRL .t1_gfx
+    BRL .t1_entries
 
 ; ============================================================
 ; Size 2: 12 tiles, 3 high-table bytes (via PHA/PLA), 12 entries
@@ -291,7 +291,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range1LoPtr
-.t2_gfx:                    ; shared gfx+OAM entry copy loop (type 2)
+.t2_entries:                ; shared low-table copy (size 2)
     LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
@@ -341,7 +341,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range3LoPtr
-    BRA .t2_gfx
+    BRA .t2_entries
 
 .t2r2:                      ; range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
     LDA.l !Obj_OamHiB,X
@@ -367,7 +367,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size2Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range2LoPtr
-    BRL .t2_gfx
+    BRL .t2_entries
 
 ; ============================================================
 ; Size 3: 24 tiles, 6 high-table bytes (Obj_OamHiA/B/C via PHA/PLA), 24 entries
@@ -427,7 +427,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range1LoPtr
-.t3_gfx:                    ; shared low-table copy (size 3)
+.t3_entries:                ; shared low-table copy (size 3)
     LDA.w !Obj_TileRecOfs,X
     TAX
     SEP #$20
@@ -492,7 +492,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range3LoPtr
-    BRL .t3_gfx
+    BRL .t3_entries
 
 .t3r2:                      ; range 2 (Oam_Range2HiPtr / Oam_Range2LoPtr)
     LDA.l !Obj_OamHiC+1,X
@@ -533,7 +533,7 @@ Spr_AppendToOam:
     CLC
     ADC.w #!Spr_Size3Tiles*!Oam_EntrySize
     STA.w !DP_Field+!Oam_Range2LoPtr
-    BRL .t3_gfx
+    BRL .t3_entries
 
 ; ============================================================
 ; $C0:B701 — Spr_PrepareTiles (135 bytes, $B701–$B787)
@@ -1236,212 +1236,223 @@ Spr_Place24:
 ; ============================================================
 ; $C0:C98A — Obj_AnimTickAndQueue (236 bytes, $C98A–$CA75)
 ; Per-object animation tick, called for object Obj_Cur from the
-; object loop ($C0:A832, $C0:A878). Counts Obj_AnimTimer down; when it
-; runs out the object moves to its next frame:
-;   - it is put in the frame-build queue (ObjQ_Head / ObjQ_Tail, linked
-;     through Obj_QueueNext) unless already there: at the head when
-;     Obj_Unk1100 is 0 (or 1/2 with ObjQ_Unk78 = 2), else at the tail;
+; object loop ($C0:A832, $C0:A878). Counts Obj_AnimTimer down; once it
+; is 0 the object tries to join the frame-build queue (ObjQ_Head /
+; ObjQ_Tail, linked through Obj_QueueNext): at the head when
+; Obj_Unk1100 is 0 (or 1/2 with ObjQ_Unk78 = 2), else at the tail.
+; It advances to its next frame only when it actually joins:
 ;   - Obj_AnimColumn advances, and the new frame's duration is read
 ;     from bank $E4 at Obj_AnimTimeTbl + row*4 + column. A zero
 ;     duration ends the row: the row's first entry becomes the timer
 ;     and the column restarts (mode 2 counts ObjX_AnimLoops first).
+; It returns at once, with no advance and the timer left at 0 (so it
+; tries again on the next call), when Obj_Unk1100 bit 7 is set or the
+; object is already queued: it is the head (head path), or it is the
+; tail or already has an Obj_QueueNext link (tail path).
 ; Earlier notes described the queue as primary/secondary "focus" slots.
-; Entry: M=1, X/Y 8-bit, Obj_Cur = object.
+; On entry: M=1, X/Y 8-bit, DP=$0100 (ObjQ_* and Anim_RowAddr are dp),
+; DB=$00 (the Obj_* tables are absolute), Obj_Cur = object.
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged; A clobbered, X = Obj_Cur;
+; Anim_RowAddr is scratch.
 ; ============================================================
 org $C0C98A
 Obj_AnimTickAndQueue:
-    LDX.b !Obj_Cur        ; current entity slot index
-    LDA.w !Obj_AnimTimer,X ; per-slot animation timer
-    BEQ .tick_done        ; already zero → execute now
-    DEC.w !Obj_AnimTimer,X ; count down
-    BEQ .tick_done        ; just expired → execute
+    LDX.b !Obj_Cur
+    LDA.w !Obj_AnimTimer,X
+    BEQ .tick_done        ; already 0 (an earlier tick could not queue)
+    DEC.w !Obj_AnimTimer,X
+    BEQ .tick_done        ; just ran out
 .rts:
-    RTS                   ; $C996 — timer still running, early exit
-.tick_done:               ; $C997
-    LDA.w !Obj_Unk1100,X  ; sprite state flags
-    BEQ .no_type          ; 0 → slot has no type/owner
-    BMI .rts              ; bit7 set → inactive slot, return
+    RTS                   ; still counting, or cannot queue now
+.tick_done:
+    LDA.w !Obj_Unk1100,X
+    BEQ .queue_head       ; 0 → join at the head
+    BMI .rts              ; bit 7 → skip
     CMP #$01
-    BEQ .type_1_or_2      ; type 1
+    BEQ .kind_1_or_2
     CMP #$02
-    BEQ .type_1_or_2      ; type 2
-    CPX.b !ObjQ_Tail      ; is this slot already the queue tail?
-    BEQ .rts              ; yes → no change needed
-    LDA.b !ObjQ_Tail      ; load queue tail slot index
-    BMI .promote_sec      ; negative ($80) = no secondary → promote
-    LDA.w !Obj_QueueNext,X ; Obj_QueueNext of current slot
-    BPL .rts              ; non-negative → slot occupied, skip
-.promote_sec:             ; $C9B3
-    TXA                   ; A = current slot index
-    LDX.b !ObjQ_Tail      ; X = current queue tail slot
-    CPX.b #!ObjQ_Empty    ; secondary empty ($80)?
-    BPL .set_both2        ; yes → A already holds current slot, set both
-    STA.w !Obj_QueueNext,X ; link old secondary's shadow → current slot
-    STA.b !ObjQ_Tail      ; queue tail = current slot (A)
-    TAX                   ; X = current slot
-    INC.w !Obj_AnimColumn,X ; advance animation column counter
-    BRA .do_anim
-.set_both1:               ; $C9C5 — from .no_type when primary is negative
-    TXA                   ; A = current slot (X = current, A was primary)
-.set_both2:               ; $C9C6 — from .promote_sec / .promote_sec2 when slot empty
-    STA.b !ObjQ_Tail      ; queue tail = current slot
-    STA.b !ObjQ_Head      ; queue head = current slot
-    TAX                   ; X = current slot
-    INC.w !Obj_AnimColumn,X
-    BRA .do_anim
-.no_type:                 ; $C9D0
-    CPX.b !ObjQ_Head      ; is this slot already the queue head?
-    BEQ .rts              ; yes → no change
-    LDA.b !ObjQ_Head      ; load queue head slot index
-    BMI .set_both1        ; negative → no primary, set this as both
-    STA.w !Obj_QueueNext,X ; link primary into current's shadow
-    STX.b !ObjQ_Head      ; queue head = current slot
-    INC.w !Obj_AnimColumn,X
-    BRA .do_anim
-.type_1_or_2:             ; $C9E2
-    LDA.b !ObjQ_Unk78     ; tertiary mode flag
-    CMP #$02
-    BNE .type_sec         ; not 2 → check secondary
-    STZ.b !ObjQ_Unk78     ; reset tertiary mode
-    BRA .no_type          ; re-run as type-0 path
-.type_sec:                ; $C9EC
-    CPX.b !ObjQ_Tail      ; is this slot already the queue tail?
-    BEQ .rts              ; yes → no change
+    BEQ .kind_1_or_2
+    CPX.b !ObjQ_Tail      ; any other value → join at the tail
+    BEQ .rts              ; already the tail
     LDA.b !ObjQ_Tail
-    BMI .promote_sec2     ; negative → no secondary, promote
-    LDA.w !Obj_QueueNext,X ; Obj_QueueNext
-    BPL .rts              ; occupied → skip
-.promote_sec2:            ; $C9F9
+    BMI .append_tail      ; empty queue
+    LDA.w !Obj_QueueNext,X
+    BPL .rts              ; already linked into the queue
+.append_tail:
+    TXA                   ; A = this object
+    LDX.b !ObjQ_Tail
+    CPX.b #!ObjQ_Empty
+    BPL .start_queue2     ; empty: this object becomes head and tail
+    STA.w !Obj_QueueNext,X ; old tail → this object
+    STA.b !ObjQ_Tail
+    TAX
+    INC.w !Obj_AnimColumn,X ; next frame
+    BRA .do_anim
+.start_queue1:            ; from .queue_head when the queue is empty
+    TXA
+.start_queue2:
+    STA.b !ObjQ_Tail      ; only entry: head and tail
+    STA.b !ObjQ_Head
+    TAX
+    INC.w !Obj_AnimColumn,X
+    BRA .do_anim
+.queue_head:
+    CPX.b !ObjQ_Head
+    BEQ .rts              ; already the head
+    LDA.b !ObjQ_Head
+    BMI .start_queue1     ; empty queue
+    STA.w !Obj_QueueNext,X ; this object → old head
+    STX.b !ObjQ_Head
+    INC.w !Obj_AnimColumn,X
+    BRA .do_anim
+.kind_1_or_2:
+    LDA.b !ObjQ_Unk78
+    CMP #$02
+    BNE .queue_tail2
+    STZ.b !ObjQ_Unk78     ; one-shot: this object joins at the head
+    BRA .queue_head
+.queue_tail2:             ; same tail join as above
+    CPX.b !ObjQ_Tail
+    BEQ .rts
+    LDA.b !ObjQ_Tail
+    BMI .append_tail2
+    LDA.w !Obj_QueueNext,X
+    BPL .rts
+.append_tail2:
     TXA
     LDX.b !ObjQ_Tail
     CPX.b #!ObjQ_Empty
-    BPL .set_both2        ; empty secondary → set both (skip TXA)
+    BPL .start_queue2
     STA.w !Obj_QueueNext,X
     STA.b !ObjQ_Tail
     TAX
     INC.w !Obj_AnimColumn,X
-.do_anim:                 ; $CA09 — fall-through from .promote_sec2 and BRAs above
-    LDX.b !Obj_Cur        ; reload entity slot
-    LDA.w !Obj_AnimMode,X ; animation mode byte
-    BEQ .use_primary_row  ; mode 0 → use primary row
-    DEC                   ; mode - 1
-    BEQ .use_primary_row  ; mode 1 → use primary row
-    LDA.w !Obj_AnimRowAlt,X ; mode >= 2 → use secondary row byte
+.do_anim:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_AnimMode,X
+    BEQ .use_row          ; modes 0 and 1: Obj_AnimRow
+    DEC
+    BEQ .use_row
+    LDA.w !Obj_AnimRowAlt,X ; mode 2 and up: Obj_AnimRowAlt
     BRA .got_row
-.use_primary_row:         ; $CA18
-    LDA.w !Obj_AnimRow,X  ; primary animation row byte
-.got_row:                 ; $CA1B
-    REP #$20              ; A=16-bit
-    AND.w #!Eng_LowByteMask ; zero high byte
-    ASL                   ; row × 2
-    ASL                   ; row × 4 (frame row offset)
+.use_row:
+    LDA.w !Obj_AnimRow,X
+.got_row:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL
+    ASL                   ; 4 frames per row
     CLC
-    ADC.w !Obj_AnimTimeTbl,X ; + slot base pointer → frame row address
-    STA.b !Anim_RowAddr   ; save frame row address (16-bit)
-    LDA.w !Obj_AnimColumn,X ; animation column counter (16-bit)
-    AND.w #!Eng_LowByteMask ; zero high byte
-    ADC.b !Anim_RowAddr   ; + frame row = frame-entry address (carry from ADC above)
-    REP #$10              ; X=16-bit
-    TAX                   ; X = 16-bit frame-entry address
-    SEP #$20              ; A=8-bit
-    LDA.l !AnimRom,X      ; read frame-step byte from bank $E4 sprite table
-    BNE .got_frame        ; nonzero → use as timer
-    LDX.b !Anim_RowAddr   ; X = frame row base address (16-bit)
-    LDA.l !AnimRom,X      ; read row-base frame value from bank $E4
-    SEP #$10              ; X=8-bit
-    LDX.b !Obj_Cur        ; reload entity slot
-    STA.w !Obj_AnimTimer,X ; store row-base byte as new timer
-    LDA.w !Obj_AnimMode,X ; check animation mode
+    ADC.w !Obj_AnimTimeTbl,X
+    STA.b !Anim_RowAddr   ; this row's durations in bank $E4
+    LDA.w !Obj_AnimColumn,X
+    AND.w #!Eng_LowByteMask
+    ADC.b !Anim_RowAddr   ; carry is clear from the ADC above
+    REP #$10
+    TAX                   ; X = the new frame's duration entry
+    SEP #$20
+    LDA.l !AnimRom,X
+    BNE .got_frame        ; nonzero → it is the new timer
+    LDX.b !Anim_RowAddr   ; 0 ends the row: use its first entry
+    LDA.l !AnimRom,X
+    SEP #$10
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
     CMP #$02
-    BNE .mode_simple      ; mode != 2 → simple clear and return
-    LDA.l !ObjX_AnimLoops,X ; long: loop-count byte for this slot (ObjX_AnimLoops)
+    BNE .mode_simple      ; not mode 2: restart the row
+    LDA.l !ObjX_AnimLoops,X ; mode 2: count the loops down
     DEC
-    BEQ .loop_end         ; hit 0 → decrement column counter
+    BEQ .loop_end         ; was 1
     DEC
-    BEQ .loop_one         ; hit 0 (was 2) → bump counter then decrement column
-    STA.l !ObjX_AnimLoops,X ; store updated loop count
-    STZ.w !Obj_AnimColumn,X ; reset animation column counter
+    BEQ .loop_one         ; was 2
+    STA.l !ObjX_AnimLoops,X ; was 3 or more: two fewer, restart the row
+    STZ.w !Obj_AnimColumn,X
     RTS
-.loop_one:                ; $CA61
+.loop_one:
     INC
-    STA.l !ObjX_AnimLoops,X
-.loop_end:                ; $CA66
-    DEC.w !Obj_AnimColumn,X ; decrement animation column counter
+    STA.l !ObjX_AnimLoops,X ; leave it at 1
+.loop_end:
+    DEC.w !Obj_AnimColumn,X ; back to the row's last frame
     RTS
-.mode_simple:             ; $CA6A
-    STZ.w !Obj_AnimColumn,X ; clear animation column counter
+.mode_simple:
+    STZ.w !Obj_AnimColumn,X
     RTS
-.got_frame:               ; $CA6E — A = nonzero frame-step byte, X still 16-bit
-    SEP #$10              ; X=8-bit
-    LDX.b !Obj_Cur        ; reload entity slot
-    STA.w !Obj_AnimTimer,X ; store frame-step byte as new animation timer
+.got_frame:               ; X still 16-bit here
+    SEP #$10
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimTimer,X
     RTS
 
 ; ============================================================
 ; $C0:CA76 — Field_ProcessAnimQueue (99 bytes, $CA76–$CAD8)
 ; Builds queued object frames while there is time left in the frame,
-; called from Field_EndOfFrame. Skips the frame if the previous VRAM
-; upload queue (VramQ_Valid) is still pending. Otherwise, while the
-; V counter is past line 240 or below ObjQ_ScanlineLimit, it takes the
-; queue head into Obj_Cur and runs Obj_BuildSpriteFrameStep; when that
-; returns C=0 (step finished) the head is unlinked (Obj_QueueNext =
-; $80) and the queue advances; C=1 retries the same object.
-; Entry: M=1, X/Y 8-bit.
+; called from Field_EndOfFrame ($C0:00D6). Does nothing while the VRAM
+; upload queue from an earlier build is still pending (VramQ_Valid
+; nonzero). Otherwise, while the V counter is at line 240 or later
+; or below ObjQ_ScanlineLimit, it takes the queue head into Obj_Cur and
+; runs Obj_BuildSpriteFrameStep; when that returns C=0 (step finished)
+; the head is unlinked (Obj_QueueNext = $80) and the queue advances;
+; C=1 retries the same object.
+; On entry: M=1, X/Y 8-bit, DP=$0100 (ObjQ_* are dp), DB=$00 (the
+; Obj_* tables, VramQ_Valid and the PPU ports are absolute).
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged; A and X clobbered, Y as
+; the frame builders leave it; Obj_Cur = the last object built.
 ; ============================================================
 org $C0CA76
 Field_ProcessAnimQueue:
-    LDA.w !VramQ_Valid    ; animation-queue busy / processed flag
-    BEQ .proceed          ; zero → proceed
-    RTS                   ; nonzero → already done this frame, exit
-.proceed:                 ; $CA7C
-    REP #$10              ; X=16-bit (NOP: immediately reset below)
-    SEP #$10              ; X=8-bit
-    STZ.b !VramQ_Pos      ; clear scratch byte
-    LDA.w STAT78          ; STAT78: read PPU status (arms latch)
-.latch:                   ; $CA85 — loop re-entry point for each slot step
-    LDA.w SLHV            ; SLHV:  software-latch H/V counters
-    LDA.w OPVCT           ; OPVCT: read vertical counter (low byte)
-    XBA                   ; save low byte in B
-    LDA.w OPVCT           ; OPVCT: read vertical counter (high bit)
-    AND #$01              ; keep only bit 0 (9th bit of V)
-    XBA                   ; restore low byte (B = high bit)
-    REP #$20              ; A=16-bit: A[7:0]=V_low, A[15:8]=V_high_bit
-    CMP.w #!Ppu_FirstHiddenLine ; compare with scanline 240 (vblank)
-    BPL .in_window        ; V >= 240 → safe window, proceed
-    CMP.b !ObjQ_ScanlineLimit ; compare with threshold
-    BCS .exit_sep         ; V >= $6B → too close to display, exit
-.in_window:               ; $CA9D
-    LDA #$0000            ; clear A (16-bit zero)
-    SEP #$20              ; A=8-bit
-    LDA.b !ObjQ_Head      ; queue head slot index
-    BMI .exit_rts         ; negative ($80) = no valid slot, exit
-    STA.b !Obj_Cur        ; current slot = queue head
+    LDA.w !VramQ_Valid
+    BEQ .proceed
+    RTS                   ; an upload is still pending: build nothing
+.proceed:
+    REP #$10              ; (no effect: undone by the next instruction)
+    SEP #$10
+    STZ.b !VramQ_Pos      ; start a new VRAM upload queue
+    LDA.w STAT78          ; reset the OPVCT read flip-flop
+.latch:                   ; read the V counter before each step
+    LDA.w SLHV            ; latch H/V
+    LDA.w OPVCT           ; low 8 bits
+    XBA
+    LDA.w OPVCT           ; bit 0 = bit 8 of V
+    AND #$01
+    XBA
+    REP #$20              ; A = 9-bit V counter
+    CMP.w #!Ppu_FirstHiddenLine
+    BPL .in_window        ; line 240 or later: blanking, keep going
+    CMP.b !ObjQ_ScanlineLimit
+    BCS .exit_sep         ; reached ObjQ_ScanlineLimit: stop for this frame
+.in_window:
+    LDA #$0000            ; clear B
+    SEP #$20
     LDA.b !ObjQ_Head
-    CMP.b !ObjQ_Tail      ; primary == secondary?
-    BEQ .same_slot        ; yes → single-slot path
-    JSR Obj_BuildSpriteFrameStep  ; process primary slot step
-    BCS .latch            ; carry set → step not complete, re-latch
-    LDA.b !ObjQ_Head      ; update queue head via queue links
-    TAX
-    LDA.w !Obj_QueueNext,X ; next slot in queue links
-    STA.b !ObjQ_Head      ; advance queue head
-    LDA.b #!ObjQ_Empty
-    STA.w !Obj_QueueNext,X ; mark old primary as invalid ($80)
-    BRA .latch            ; re-latch and continue
-.same_slot:               ; $CAC2 — $76 == $77
+    BMI .exit_rts         ; queue empty
+    STA.b !Obj_Cur
+    LDA.b !ObjQ_Head
+    CMP.b !ObjQ_Tail
+    BEQ .same_slot        ; only one object queued
     JSR Obj_BuildSpriteFrameStep
-    BCS .latch            ; not complete, retry
-    LDA.b !ObjQ_Head
+    BCS .latch            ; C=1: not finished, run it again
+    LDA.b !ObjQ_Head      ; finished: unlink the head
+    TAX
+    LDA.w !Obj_QueueNext,X
+    STA.b !ObjQ_Head
+    LDA.b #!ObjQ_Empty
+    STA.w !Obj_QueueNext,X
+    BRA .latch
+.same_slot:               ; ObjQ_Head == ObjQ_Tail
+    JSR Obj_BuildSpriteFrameStep
+    BCS .latch
+    LDA.b !ObjQ_Head      ; finished: the queue is now empty
     TAX
     LDA.b #!ObjQ_Empty
-    STA.w !Obj_QueueNext,X ; mark slot invalid
-    STA.b !ObjQ_Head      ; queue head = invalid ($80)
-    STA.b !ObjQ_Tail      ; queue tail = invalid ($80)
-    BRA .latch            ; re-latch
-.exit_rts:                ; $CAD5
+    STA.w !Obj_QueueNext,X
+    STA.b !ObjQ_Head
+    STA.b !ObjQ_Tail
+    BRA .latch
+.exit_rts:
     RTS
-.exit_sep:                ; $CAD6
-    SEP #$20              ; A=8-bit
+.exit_sep:
+    SEP #$20
     RTS
 
 ; ============================================================
@@ -1451,23 +1462,28 @@ Field_ProcessAnimQueue:
 ; Obj_Unk1A81 is 1..$7F and Obj_Unk0F00 is nonzero; then by size class
 ; tail-calls Obj_BuildFrame4 / 8 / 12 (size 3: C=0, nothing).
 ; C=1 from a builder means "call again" (a multi-pass build).
-; Called by Field_ProcessAnimQueue and the map-load pass ($C0:B109).
-; Entry: M=1, X/Y 8-bit.
+; Called by Field_ProcessAnimQueue ($C0:CAAE, $C0:CAC2) and the
+; unmatched map-load pass at $C0:B0E6 ($C0:B109).
+; On entry: M=1, X/Y 8-bit, DP=$0100 (Obj_Cur is dp), DB=$00 (the
+; Obj_* tables are absolute), Obj_Cur = object.
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged (also through the
+; builders, which BRL tail calls reach); C as above; A and X clobbered
+; (X = Obj_Cur on the skip paths), Y as the builder leaves it.
 ; ============================================================
 org $C0CAD9
 Obj_BuildSpriteFrameStep:
-    LDX.b !Obj_Cur        ; entity slot index
-    LDA.w !Obj_Unk1100,X  ; sprite state flags
-    BPL .active           ; bit7 clear → slot active
-.no_carry_rts:            ; $CAE0 — shared CLC+RTS exit
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BPL .active           ; bit 7 set: skip
+.no_carry_rts:            ; shared C=0 exit: nothing to build
     CLC
     RTS
-.active:                  ; $CAE2
-    LDA.w !Obj_Unk1A81,X  ; timer/state byte
-    BEQ .no_carry_rts     ; zero → not ready
-    BMI .no_carry_rts     ; negative → not ready
-    LDA.w !Obj_Unk0F00,X  ; animation type byte
-    BEQ .no_carry_rts     ; zero → no animation
+.active:
+    LDA.w !Obj_Unk1A81,X  ; meaning unknown; must be 1..$7F
+    BEQ .no_carry_rts
+    BMI .no_carry_rts
+    LDA.w !Obj_Unk0F00,X  ; meaning unknown; 0 = no frame to build
+    BEQ .no_carry_rts
     LDA.w !Obj_SprSize,X  ; size class
     AND.b #!ObjSpr_SizeMask ; isolate bits 0-1
     BEQ .type0            ; 0 → 4-tile builder
@@ -3529,8 +3545,9 @@ Spr_Load12:
 ; ============================================================
 ; $C0:E12A — Spr_LoadLargeObj (1034 bytes, $E12A–$E533)
 ; (was Sub_E12A.) Loads a 24-tile ("large") object in one go. It never
-; reads Obj_SprSize; "size 3" is inferred from the 24 records it fills,
-; which only Spr_Place24 (size 3) re-places.
+; reads Obj_SprSize itself; "size 3" is inferred from the 24 records it
+; fills, which only Spr_Place24 (size 3) re-places, and from its caller
+; at $C0:47E9, which calls it only when Obj_SprSize & 3 = 3.
 ; 1. Pointers: Spr_GfxPtr = Obj_GfxBank:Obj_GfxOfs, Spr_FramePtr =
 ;    Obj_FrameBank:Obj_FrameOfs, Spr_WramPtr = $7F:SprBuf_Base (the
 ;    object uses the whole tile buffer: Obj_TileBuf = SprBuf_Base). It
@@ -3546,8 +3563,10 @@ Spr_Load12:
 ; Earlier notes read the frame data as "scene data" and the position
 ; bytes as palette groups.
 ; On entry: X = Obj_Cur (16-bit), M=1, DP=$0100, DB=$00 (absolute
-; object-table loads and DMA register stores). Called from
-; Field_RestoreState for Field_UnkAEObj.
+; object-table loads and DMA register stores). Callers (both JSR):
+; Field_RestoreState ($C0:0212) for Field_UnkAEObj, and unmatched object
+; set-up code at $C0:47E9, which first stores the object in
+; Field_UnkAEObj.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged.
 ; ============================================================
 org $C0E12A
@@ -3592,14 +3611,14 @@ Spr_LoadLargeObj:
 .first_iter:
     LDA.b [!Spr_FramePtr],Y ; tile word
     BIT.w #!SprFrame_HFlip
-    BNE .big_fill
+    BNE .flipped_tile
     JSR Spr_CopyTile
     INY
     INY
     DEC.b !Spr_TileCount
     BNE .next_iter
     BRA .dma
-.big_fill:
+.flipped_tile:          ; SprFrame_HFlip set: mirrored copy
     JSR Spr_CopyTileFlipped
     INY
     INY
@@ -4307,8 +4326,12 @@ Spr_CopyTile:
 ; $C0:E739 — Spr_CopyTileD4 (131 bytes, $C0:E739–$E7BB)
 ; Copies a 32-byte tile from GfxRom_D4+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D4).
-; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
-; WMADD past the tile).
+; On entry (from Spr_CopyTile's BRL): M=1, X/Y 16-bit, X = source
+; offset in bank $D4, Y = destination address in bank $7F, DP=$0100
+; (Spr_SavedY holds the caller's frame-data index), DB=$00 (restored by
+; the PLB before the WMADDL store); A is overwritten at once.
+; Exit: M=0, X/Y 16-bit, DB unchanged, Y = Spr_SavedY, X unchanged
+; (source offset), A = destination + 32, WMADD just past the tile.
 ; ============================================================
 org $C0E739
 Spr_CopyTileD4:
@@ -4361,8 +4384,12 @@ Spr_CopyTileD4:
 ; $C0:E7BC — Spr_CopyTileD2 (131 bytes, $C0:E7BC–$E83E)
 ; Copies a 32-byte tile from GfxRom_D2+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D2).
-; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
-; WMADD past the tile).
+; On entry (from Spr_CopyTile's BRL): M=1, X/Y 16-bit, X = source
+; offset in bank $D2, Y = destination address in bank $7F, DP=$0100
+; (Spr_SavedY holds the caller's frame-data index), DB=$00 (restored by
+; the PLB before the WMADDL store); A is overwritten at once.
+; Exit: M=0, X/Y 16-bit, DB unchanged, Y = Spr_SavedY, X unchanged
+; (source offset), A = destination + 32, WMADD just past the tile.
 ; ============================================================
 org $C0E7BC
 Spr_CopyTileD2:
@@ -4415,8 +4442,12 @@ Spr_CopyTileD2:
 ; $C0:E83F — Spr_CopyTileD3 (131 bytes, $C0:E83F–$E8C1)
 ; Copies a 32-byte tile from GfxRom_D3+X to $7F:Y (BRL from
 ; Spr_CopyTile when the graphics are in bank $D3).
-; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
-; WMADD past the tile).
+; On entry (from Spr_CopyTile's BRL): M=1, X/Y 16-bit, X = source
+; offset in bank $D3, Y = destination address in bank $7F, DP=$0100
+; (Spr_SavedY holds the caller's frame-data index), DB=$00 (restored by
+; the PLB before the WMADDL store); A is overwritten at once.
+; Exit: M=0, X/Y 16-bit, DB unchanged, Y = Spr_SavedY, X unchanged
+; (source offset), A = destination + 32, WMADD just past the tile.
 ; ============================================================
 org $C0E83F
 Spr_CopyTileD3:
@@ -4469,8 +4500,12 @@ Spr_CopyTileD3:
 ; $C0:E8C2 — Spr_CopyTile7F (115 bytes, $C0:E8C2–$E934)
 ; Copies a 32-byte tile from $7F:X to $7F:Y (BRL from Spr_CopyTile when
 ; the graphics are already in WRAM); abs,X reads since DB = $7F.
-; Entry and exit state as Spr_CopyTile (exit: M=0, Y = Spr_SavedY,
-; WMADD past the tile).
+; On entry (from Spr_CopyTile's BRL): M=1, X/Y 16-bit, X = source
+; address in bank $7F, Y = destination address in bank $7F, DP=$0100
+; (Spr_SavedY holds the caller's frame-data index), DB=$00 (restored by
+; the PLB before the WMADDL store); A is overwritten at once.
+; Exit: M=0, X/Y 16-bit, DB unchanged, Y = Spr_SavedY, X unchanged
+; (source address), A = destination + 32, WMADD just past the tile.
 ; ============================================================
 org $C0E8C2
 Spr_CopyTile7F:
@@ -4523,10 +4558,12 @@ Spr_CopyTile7F:
 ; $C0:E935 — SprBuf_FreeAll (29 bytes, $E935–$E951)
 ; (was Sub_E935.) Marks all eight SprBuf_Owner entries free ($80),
 ; with DP pointed at $0B00 so each store is a 2-byte dp store.
-; Reached by BRL from Obj_ResetStates and called after a battle by
-; DefaultHandler; those are its only direct callers.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB=$00. DP is saved and
-; restored. Exit: same.
+; Callers: BRL from Obj_ResetStates ($C0:B1AF), and JSR from
+; DefaultHandler after a battle ($C0:18C7), Scene_ReloadStep
+; ($C0:2878) and Scene_PostLoadInit ($C0:56B9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y). DP is saved and restored;
+; DB does not matter (the stores are dp).
+; Exit: M=1, X=0, DP and DB unchanged; A = Obj_None, X and Y preserved.
 ; ============================================================
 org $C0E935
 SprBuf_FreeAll:
@@ -4554,14 +4591,18 @@ SprBuf_FreeAll:
 ; Obj_Cur, and Obj_TileBuf = SprBuf_Base + n*$200.
 ; Returns C=1 on success, with X = Obj_Cur (Obj_BuildFrame4 relies on
 ; it), C=0 when all four are taken.
-; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100. Called from Obj_BuildFrame4.
+; Called from Obj_BuildFrame4 ($C0:CC0D, its only caller).
+; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100 (Obj_Cur is dp), DB=$00
+; (SprBuf_Owner and Obj_TileBuf are absolute).
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged; A clobbered; X = Obj_Cur
+; on success, 4 on failure; Y preserved.
 ; ============================================================
 org $C0E952
 SprBuf_Alloc1:
     LDX #$00
-.e952_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
-    BPL .e952_next
+    BPL .next
     LDA.b !Obj_Cur
     STA.w !SprBuf_Owner,X
     TXA
@@ -4576,26 +4617,32 @@ SprBuf_Alloc1:
     SEP #$20             ; A → 8-bit
     SEC                  ; success
     RTS
-.e952_next:
+.next:
     INX
     CPX #$04
-    BMI .e952_loop       ; loop for entries 0–3
+    BMI .loop       ; loop for entries 0–3
     CLC                  ; all taken
     RTS
 
 ; ============================================================
 ; $C0:E97A — SprBuf_Alloc2 (48 bytes, $E97A–$E9A9)
 ; (was Sub_E97A.) As SprBuf_Alloc1 for two adjacent free chunks
-; (start entries 0-2). Called from Obj_BuildFrame8 and Obj_BuildFrame8Pass0.
+; (start entries 0-2). Called from Obj_BuildFrame8 ($C0:CF2D) and
+; Obj_BuildFrame8Pass0 ($C0:D299).
+; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100 (Obj_Cur is dp), DB=$00
+; (SprBuf_Owner and Obj_TileBuf are absolute).
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged; C=1 on success with
+; X = Obj_Cur, C=0 with X = 3 when no two adjacent chunks are free;
+; A clobbered, Y preserved.
 ; ============================================================
 org $C0E97A
 SprBuf_Alloc2:
     LDX #$00
-.e97a_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
-    BPL .e97a_next
+    BPL .next
     LDA.w !SprBuf_Owner+1,X
-    BPL .e97a_next
+    BPL .next
     LDA.b !Obj_Cur
     STA.w !SprBuf_Owner,X
     STA.w !SprBuf_Owner+1,X
@@ -4611,28 +4658,34 @@ SprBuf_Alloc2:
     SEP #$20
     SEC
     RTS
-.e97a_next:
+.next:
     INX
     CPX #$03             ; search entries 0–2 (3 positions)
-    BMI .e97a_loop
+    BMI .loop
     CLC
     RTS
 
 ; ============================================================
 ; $C0:E9AA — SprBuf_Alloc3 (56 bytes, $E9AA–$E9E1)
 ; (was Sub_E9AA.) As SprBuf_Alloc1 for three adjacent free chunks
-; (start entries 0-1). Called from Obj_BuildFrame12Pass0 and Obj_BuildFrame12Pass0Alt.
+; (start entries 0-1). Called from Obj_BuildFrame12Pass0 ($C0:D555)
+; and Obj_BuildFrame12Pass0Alt ($C0:D617).
+; On entry: M=1 (8-bit A), X/Y 8-bit, DP=$0100 (Obj_Cur is dp), DB=$00
+; (SprBuf_Owner and Obj_TileBuf are absolute).
+; Exit: M=1, X/Y 8-bit, DP and DB unchanged; C=1 on success with
+; X = Obj_Cur, C=0 with X = 2 when no three adjacent chunks are free;
+; A clobbered, Y preserved.
 ; ============================================================
 org $C0E9AA
 SprBuf_Alloc3:
     LDX #$00
-.e9aa_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
-    BPL .e9aa_next
+    BPL .next
     LDA.w !SprBuf_Owner+1,X
-    BPL .e9aa_next
+    BPL .next
     LDA.w !SprBuf_Owner+2,X
-    BPL .e9aa_next
+    BPL .next
     LDA.b !Obj_Cur
     STA.w !SprBuf_Owner,X
     STA.w !SprBuf_Owner+1,X
@@ -4649,10 +4702,10 @@ SprBuf_Alloc3:
     SEP #$20
     SEC
     RTS
-.e9aa_next:
+.next:
     INX
     CPX #$02             ; only entries 0–1 for triple allocation
-    BMI .e9aa_loop
+    BMI .loop
     CLC
     RTS
 
@@ -4715,23 +4768,31 @@ SprBuf_Free2:
     REP #$10
     RTS
 
+; ============================================================
+; $C0:EA1F — SprBuf_Free3 (35 bytes, $EA1F–$EA41)
+; (was Sub_EA1F.) As SprBuf_Free1 for a 3-chunk object (2 possible
+; start entries). Run by Spr_PrepareTiles after Spr_Load12 (JSR at
+; $C0:B76E, its only caller).
+; On entry: M=1, X/Y 16-bit, DP=$0100 (Obj_Cur is dp), DB=$00.
+; Exit: M=1, X/Y 16-bit (set again on both paths), DP and DB unchanged;
+; A clobbered, X = the start entry found (or 2), Y preserved. Same dead
+; LDX.b !Obj_Cur as SprBuf_Free1.
+; ============================================================
 org $C0EA1F
 SprBuf_Free3:
-    ; (was Sub_EA1F.) 35 bytes ($EA1F–$EA41). As SprBuf_Free1 for a
-    ; 3-chunk object (2 possible start entries). Run after Spr_Load12.
     SEP #$10                ; X → 8-bit
     LDX.b !Obj_Cur          ; (discarded; immediately overwritten)
     LDX #$00
-.ea1f_loop:
+.loop:
     LDA.w !SprBuf_Owner,X
     CMP.b !Obj_Cur
-    BEQ .ea1f_found
+    BEQ .found
     INX
     CPX #$02                ; start entries 0-1
-    BNE .ea1f_loop
+    BNE .loop
     REP #$10                ; X → 16-bit (no match)
     RTS
-.ea1f_found:
+.found:
     LDA.b #!Obj_None
     STA.w !SprBuf_Owner,X   ; free all three chunks
     STA.w !SprBuf_Owner+1,X
@@ -4760,8 +4821,17 @@ ReentryVectors:
     BRL AudioFadeDispatch   ; [4] $C0:1BE6
 
 ; ============================================================
-; $C0:000E — GameLoop: one-time startup init (from MainInit)
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$2100, DB=$00
+; $C0:000E — GameLoop: full (cold) init, then the game loop
+; Installs the interrupt trampolines, clears WRAM, starts the sound
+; driver and bank $C2, then falls into GameLoop_Main. Reached twice
+; over: at boot by JML $C0:000E from MainInit ($FD:C0D3), with DP=$2100,
+; and by BRL from $C0:02CA (in Scene_Unk0283, after InitHW and
+; S=$06FF), with DP=$0100. It sets M, X and DP itself, so only DB
+; matters on entry.
+; On entry: DB=$00 (InstallNMI/InstallIRQ store absolute before InitHW
+; runs; from boot or set by InitHW at $C0:02C3).
+; Exit: never returns; falls into GameLoop_Main with M=1, X=0,
+; DP=$0100, DB=$00.
 ; ============================================================
 GameLoop:
     SEP #$20                ; M=1: A → 8-bit (safety)
@@ -4809,14 +4879,21 @@ GameLoop:
     LDA.b #!BankC2_BootArg
     JSL BankC2_Entry8004
 
-; GameLoop_Main ($C0:005D): warm-restart entry. Reached by falling out
-; of GameLoop, by ReentryVectors[0] (JSL $C0:0000 from other banks) and
-; by Field_SceneChangeTick's warp (BRL ReentryVectors after resetting the
-; stack). Reinstalls the interrupt trampolines and dispatches on Loc_Id.
+; GameLoop_Main ($C0:005D): warm-restart entry. Reinstalls the interrupt
+; trampolines and dispatches on Loc_Id. Reached by:
+;   - falling out of GameLoop;
+;   - BRL GameLoop_Main at $C0:0301 (Scene_Unk0283, after S=$06FF);
+;   - ReentryVectors[0] (BRA here), which is reached by JML $C0:0000
+;     from banks $C2 ($C2:2505, $C2:8349) and $FD ($FD:DA5B, $FD:DABA,
+;     $FD:DB19, $FD:DB93), and by BRL ReentryVectors at $C0:0CC4
+;     (Field_SceneChangeTick's warp) and $C0:3B95, both after S=$06FF.
+; None of these return, so neither does this.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y). DB is set to $00 by
 ; InitHW. DP is not known here (DP=$0100 when falling out of GameLoop,
-; anything on a JSL from another bank), so Loc_Id is read as the
+; anything on a JML from another bank), so Loc_Id is read as the
 ; absolute address !DP_Field+!Loc_Id; GameLoop_LoadField sets DP=$0100.
+; Exit: never returns; JML BankC2_Entry0000, BRL LoadSavePath, or into
+; GameLoop_LoadField.
 GameLoop_Main:
     JSR InitHW              ; forced blank, disable NMI/DMA
     JSR InstallNMI          ; reinstall NMI handler
@@ -4839,7 +4916,12 @@ GameLoop_NotBankC2:
     BRL LoadSavePath
 
 ; GameLoop_LoadField (was GL_ModeOk2): loads the field location Loc_Id
-; and falls into the per-frame loop.
+; and falls into the per-frame loop. Scene_SettleFrames runs
+; Scene_ReloadStep once; if that returns zero it then raises
+; Fade_Brightness one step per frame (Field_FrameUpdate,
+; Field_EndOfFrame, frame wait) until it reaches $0F.
+; On entry: M=1, X=0, DB=$00; DP is set to $0100 here.
+; Exit: never returns (falls into GameLoop_FrameBody).
 GameLoop_LoadField:
     REP #$20
     LDA.w #!DP_Field
@@ -4851,8 +4933,14 @@ GameLoop_LoadField:
     JSR Obj_ResetStates     ; clear Obj_State, then SprBuf_FreeAll
     JSR Scene_PostLoadInit
     JSR TileAnimList_Clear
-    JSR Scene_SettleFrames  ; run frames until the new scene reports ready
+    JSR Scene_SettleFrames  ; reload step, then fade in to full brightness
 
+; GameLoop_FrameBody: the per-frame field loop. Latches newly pressed
+; buttons, runs the frame's field work in order, then Field_EndOfFrame
+; and the frame wait, and loops; it never exits (scene changes leave
+; through the warps reached from its callees, which reset the stack).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: never returns.
 GameLoop_FrameBody:
     LDA.w !Pad_Pressed
     TSB.b !Pad_PressedLatch ; accumulate newly pressed buttons
@@ -4871,14 +4959,17 @@ GameLoop_FrameBody:
 
 ; ============================================================
 ; $C0:00BF — Field_EndOfFrame (was VBlankHandler)
-; End-of-frame work, called once per frame from GameLoop_FrameBody just
-; before Sub_EC60 waits for the NMI; it is not an interrupt handler
-; and waits for nothing itself. Runs the Vblank_* helpers,
+; End-of-frame work, called once per frame just before Sub_EC60 waits
+; for the NMI; it is not an interrupt handler and waits for nothing
+; itself. Callers: GameLoop_FrameBody ($C0:00B7), DefaultHandler's
+; map-redraw loop ($C0:1784) and Scene_SettleFrames ($C0:285A); those
+; are all the JSR sites. Runs the Vblank_* helpers,
 ; EngFD_UnkC2C1, FdVec_FFF7 (ticks the counter table at $0520),
 ; Field_ProcessAnimQueue, then tail-jumps to Oam_BuildShadow, whose RTS
 ; returns to this routine's caller.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
-; Exit (from Oam_BuildShadow): M=1, X=0, DP and DB unchanged.
+; Exit (from Oam_BuildShadow): M=1, X=0, DP and DB unchanged; A, X, Y
+; and Obj_Cur clobbered.
 ; ============================================================
 Field_EndOfFrame:
     SEP #$10                ; X/Y → 8-bit
@@ -4894,10 +4985,14 @@ Field_EndOfFrame:
     BRL Oam_BuildShadow-!BankWrap ; offset wraps around the bank to $B271
 
 ; Field_EndOfFrameShort (was VBlankHandlerShort): the EngFD_UnkC2C1 +
-; FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops
-; (Field_IdleFrame, Field_FadeInAfterReload, DefaultHandler).
+; FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops.
+; Callers: 21 JSR sites: Field_IdleFrame ($C0:00EE),
+; Field_FadeInAfterReload ($C0:2836), 11 in DefaultHandler
+; ($C0:17B0-$C0:189D) and 8 in unmatched code at $C0:261E-$C0:271F
+; (e.g. $C0:261E, $C0:262B, $C0:271F).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100. Sets 8-bit X/Y
-; around EngFD_UnkC2C1, which needs it; exit M=1, X=0.
+; around EngFD_UnkC2C1, which needs it.
+; Exit: M=1, X=0; A, X, Y as the two bank-$FD routines leave them.
 Field_EndOfFrameShort:
     SEP #$10
     JSL EngFD_UnkC2C1
@@ -4906,7 +5001,12 @@ Field_EndOfFrameShort:
     RTS
 
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
-; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60.
+; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail
+; jump, whose RTS returns to this routine's caller).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (needed by
+; Field_EndOfFrameShort), DB=$00.
+; Exit: via Sub_EC60: M=1, X=0, DP=$0100; A = 0 (Sub_EC60's wait);
+; X and Y are whatever the callees leave (not saved here).
 Field_IdleFrame:
     JSR Field_FrameUpdate
     JSR Field_EndOfFrameShort
@@ -4914,10 +5014,14 @@ Field_IdleFrame:
 
 ; ============================================================
 ; $C0:00F4 — LoadLocation (39 bytes, $00F4–$011A)
-; One-time location-load called once per scene entry from GameLoop_Main.
+; One-time location-load called once per scene entry from
+; GameLoop_LoadField (its only caller, JSR at $C0:0088).
 ; Calls 10 location-load steps (JSR) and two bank-$FD service vectors.
 ; NOT called per frame — only when entering a new location/map.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP=$0100 as far as is known: the steps are unmatched,
+; and GameLoop_LoadField carries on without resetting any of them.
+; A, X and Y are not saved.
 ; ============================================================
 LoadLocation:
     JSR LocLoad_Unk092B
@@ -4949,7 +5053,9 @@ LoadLocation:
 ;     Field_Unk1DF9 → SceneSave_Unk1DF9.
 ; Called from Field_SceneChangeTick, Field_PauseAndMenuInput and
 ; Field_FadeToBankC2Mode5.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
+; Obj_* tables and Field_Unk1DF9 are read absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A, X and Y clobbered.
 ; ============================================================
 org $C0011B
 Field_SaveState:
@@ -5023,7 +5129,10 @@ Field_SaveState:
 ; 7. If Field_UnkAEObj names an object, run Spr_LoadLargeObj on it.
 ; 8. If Field_Unk7F03FE is 1 or 2: put party members 2 and 3 on the
 ;    leader's position, enable control, set Field_Unk7F03FE = 3.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
+; Obj_* tables and Field_Unk1DF9 are written absolute).
+; Exit: M=1, X=0, DP=$0100 (as the unmatched load steps leave it);
+; A, X and Y clobbered, and Obj_Cur = Field_UnkAEObj when step 7 ran.
 ; ============================================================
 org $C001A5
 Field_RestoreState:
@@ -5098,7 +5207,9 @@ Field_RestoreState:
 ; Field_SaveBlock ($7E:0920, $14E0 bytes). Reverse of
 ; Field_StashSaveBlock. Called first thing in Field_RestoreState, and
 ; from Scene_Unk0283 ($C0:0286).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP is not used.
+; Exit: M=1, X=0, DB preserved (PHB/PLB around the MVN, which sets DB
+; to the destination bank); A, X and Y clobbered by the MVN.
 ; ============================================================
 org $C00905
 Field_RestoreSaveBlock:
@@ -5117,7 +5228,9 @@ Field_RestoreSaveBlock:
 ; (was Sub_0918.) Copies Field_SaveBlock ($7E:0920, $14E0 bytes) to
 ; SceneSave_Buffer ($7F:2000). Called from Field_SaveState and from
 ; Scene_Unk024C ($C0:0268).
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y); DP is not used.
+; Exit: M=1, X=0, DB preserved (PHB/PLB around the MVN, which sets DB
+; to the destination bank); A, X and Y clobbered by the MVN.
 ; ============================================================
 org $C00918
 Field_StashSaveBlock:
@@ -5133,8 +5246,11 @@ Field_StashSaveBlock:
 
 ; ============================================================
 ; $C0:0B4E — InitHW (22 bytes)
-; Disables interrupts, enables forced blank, clears NMI/DMA/HDMA.
-; Called with M=1, X=0.
+; Disables interrupts, enables forced blank, clears NMI/DMA/HDMA, and
+; sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on.
+; On entry: M=1 (LDA #$00 is the 8-bit form), X either width; DP is not
+; used. Any DB (the PLB comes before the absolute stores).
+; Exit: M=1, X/Y unchanged, DB=$00, A=0, interrupts disabled (SEI).
 ; ============================================================
 org $C00B4E
 InitHW:
@@ -5153,7 +5269,9 @@ InitHW:
 ; ============================================================
 ; $C0:0B64 — InstallNMI (17 bytes)
 ; Writes JML NmiHandler ($C0:EA63) into the RAM trampoline at $7E:0500.
-; Called with M=1 (8-bit A), X=0 (16-bit X).
+; On entry: M=1 (8-bit A), X=0 (16-bit X); DB=$00 (or another bank that
+; maps $0500 to WRAM: the stores are absolute); DP is not used.
+; Exit: M=1, X=0, DB unchanged; A and X clobbered.
 ; ============================================================
 InstallNMI:
     LDA.b #!Op_JML          ; JML opcode
@@ -5169,6 +5287,7 @@ InstallNMI:
 ; Writes JML IrqHandler ($C0:ECCC) into the RAM trampoline at $7E:0504.
 ; Called with M=1 (8-bit A), X=0 (16-bit X); absolute stores, so DP
 ; does not matter (DB=$00 from InitHW or reset).
+; Exit: M=1, X=0, DB unchanged; A and X clobbered.
 ; ============================================================
 InstallIRQ:
     LDA.b #!Op_JML
@@ -5606,9 +5725,14 @@ Fade_StepFixedColor:
 ; Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0
 ; since M7A=M7B=0). Caller sets DmaFill_Dest / DmaFill_Bank /
 ; DmaFill_Size first.
+; Callers (all JSR): GameLoop's three boot clears ($C0:0031, $C0:0042,
+; $C0:0050), LocLoad_ClearPage1D00 ($C0:7F95) and unmatched code at
+; $C0:5717, $C0:58B9 and $C0:58CA.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: DmaFill_Dest and
 ; DmaFill_Size are word loads), DP=$0100 (the DmaFill_* names are dp
-; offsets), DB=$00 (absolute register stores). Exit: same.
+; offsets), DB=$00 (absolute register stores).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+; MDMAEN_Ch7, X = DmaFill_Size); Y preserved.
 ; ============================================================
 org $C02DF1
 ClearRAMDMA:
@@ -5640,6 +5764,9 @@ ClearRAMDMA:
 ; every reload. The DEC/BNE count assumes Evt_ObjCount >= 1: a count of
 ; 0 would run 256 times, with the 8-bit Y wrapping round the page.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; Exit (from SprBuf_FreeAll, BRL tail call): M=1, X=0, DP restored to
+; $0100 (PLD), DB unchanged; A = Obj_None, X = 0, Y = 2 x count (low
+; byte).
 ; ============================================================
 org $C0B192
 Obj_ResetStates:
@@ -5674,10 +5801,14 @@ Obj_ResetStates:
 ; Afterwards, entries between each range's new end and last frame's
 ; end (Oam_RangeNPrevEnd) are parked off screen with Y = $E0.
 ;
-; Entered via BRL tail-call from Field_EndOfFrame.
+; Callers: BRL tail calls from Field_EndOfFrame ($C0:00DB) and from
+; the unmatched routine at $C0:B0E6 ($C0:B124; that routine is called by
+; Scene_ReloadStep), and a JSR from unmatched code at $C0:072B. On the
+; tail calls the RTS returns to that routine's caller.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
 ; absolute stores to OamEntry and WMADDH need bank $00).
-; Exit: same; RTS returns to Field_EndOfFrame's caller.
+; Exit: M=1, X=0, DP and DB unchanged; A = Oam_HiddenY, X =
+; Oam_Range3LoPtr, Y = $FFFE; Obj_Cur = the last object drawn.
 ; ============================================================
 org $C0B271
 Oam_BuildShadow:
@@ -5703,63 +5834,63 @@ Oam_BuildShadow:
     LDX.w #!Oam_Range2Start
     STX.b !Oam_Range2LoPtr
     LDY.w #!Obj_DrawBucketLast ; 64 buckets x 2, last first
-PV_BucketLoop:              ; (was PV_SpriteLoop) one Obj_DrawBucket entry
+Oam_BucketLoop:             ; one Obj_DrawBucket entry
     LDA.w !Obj_DrawBucket,Y
-    BMI PV_NextBucket       ; bit 7: empty bucket
+    BMI Oam_NextBucket       ; bit 7: empty bucket
     STA.b !Obj_Cur          ; first object in the bucket
     JSR Spr_AppendToOam
-PV_CheckChain:
+Oam_CheckChain:
     LDX.b !Obj_Cur
     LDA.w !Obj_DrawNext,X   ; next object in the same bucket
-    BMI PV_NextBucket
+    BMI Oam_NextBucket
     STA.b !Obj_Cur
     JSR Spr_AppendToOam
-    BRA PV_CheckChain
-PV_NextBucket:              ; (was PV_NextSprite)
+    BRA Oam_CheckChain
+Oam_NextBucket:
     DEY
     DEY
-    BPL PV_BucketLoop
+    BPL Oam_BucketLoop
     LDX.b !Oam_Range1LoPtr
     LDA.b #!Oam_HiddenY     ; Y=$E0 parks the entry below the screen
-PV_FillRange1:
+Oam_HideRange1:
     CPX.b !Oam_Range1PrevEnd
-    BCS PV_EndRange1
+    BCS Oam_EndRange1
     STA.w OamEntry.Y,X        ; X = entry address
     INX
     INX
     INX
     INX
     CPX.w #!Oam_Range1Limit
-    BCC PV_FillRange1
-PV_EndRange1:
+    BCC Oam_HideRange1
+Oam_EndRange1:
     LDX.b !Oam_Range1LoPtr
     STX.b !Oam_Range1PrevEnd
     LDX.b !Oam_Range2LoPtr
-PV_FillRange2:
+Oam_HideRange2:
     CPX.b !Oam_Range2PrevEnd
-    BCS PV_EndRange2
+    BCS Oam_EndRange2
     STA.w OamEntry.Y,X
     INX
     INX
     INX
     INX
     CPX.w #!Oam_Range2Limit
-    BCC PV_FillRange2
-PV_EndRange2:
+    BCC Oam_HideRange2
+Oam_EndRange2:
     LDX.b !Oam_Range2LoPtr
     STX.b !Oam_Range2PrevEnd
     LDX.b !Oam_Range3LoPtr
-PV_FillRange3:
+Oam_HideRange3:
     CPX.b !Oam_Range3PrevEnd
-    BCS PV_EndRange3
+    BCS Oam_EndRange3
     STA.w OamEntry.Y,X
     INX
     INX
     INX
     INX
     CPX.w #!Oam_Range3Limit
-    BCC PV_FillRange3
-PV_EndRange3:
+    BCC Oam_HideRange3
+Oam_EndRange3:
     LDX.b !Oam_Range3LoPtr
     STX.b !Oam_Range3PrevEnd
     RTS
@@ -5773,11 +5904,20 @@ PV_EndRange3:
 ; Audio_PlaySfxAtLeader (was Sub_1B90_body) is the shared tail, entered
 ; by Audio_PlayTileSfxB with its own effect id in A.
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Audio_SfxTileAnimA
-; and Party_ObjSlot are dp), DB=$00.
+; and Party_ObjSlot are dp), DB=$00; at Audio_PlaySfxAtLeader, A =
+; effect id.
+; Exit (both entries): M=1, X/Y 16-bit, DP and DB unchanged; A and Y
+; clobbered (Y = the leader's object), and whatever Audio_DriverCommand
+; (unmatched) changes.
 ; ============================================================
 org $C01B90
 Audio_PlayTileSfxA:
     LDA.b !Audio_SfxTileAnimA
+; Audio_PlaySfxAtLeader: shared tail; Audio_PlayTileSfxA falls in here
+; and Audio_PlayTileSfxB branches here (BRA at $C0:1BA9).
+; On entry: A = effect id, M=1, X/Y 16-bit, DP=$0100, DB=$00.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A and Y clobbered (Y = the
+; leader's object), and whatever Audio_DriverCommand (unmatched) changes.
 Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
     STA.w !Audio_CmdArg0
     LDY.b !Party_ObjSlot ; leader's object
@@ -5798,6 +5938,9 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; bank-$C2 round trips.
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the unmatched callees
+; leave them); A, X and Y clobbered (Scene_ReloadStep,
+; Field_FrameUpdate and Sub_EC60).
 ; ============================================================
 org $C02824
 Field_FadeInAfterReload:
@@ -5825,7 +5968,8 @@ Field_FadeInAfterReload:
 ; $C0:18D9 — Field_PauseAndMenuInput (172 bytes, $18D9–$1984)
 ; (was Sub_18D9.) Per-frame pause and menu input, called from
 ; GameLoop_FrameBody before Field_SceneChangeTick.
-; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100.
+; On entry: M=1 (A 8-bit), X/Y 16-bit, DP=$0100, DB=$00 (Pad_Pressed,
+; Pad_Unk00F6 and Field_FadeBusy are absolute).
 ;
 ; Pause: when Start is newly pressed (Pad_Pressed bit 0) with
 ;   Field_Unk11 = 0 and Field_ControlEnabled set, halve the brightness
@@ -5838,7 +5982,8 @@ Field_FadeInAfterReload:
 ;   BankC2_Entry8000 with A = 1 (TDC/XBA leaves DP's high byte in A;
 ;   very likely the main menu), and reload. When bit 6 is clear, run
 ;   Sub_1ADF if Field_Unk62 is set.
-; Exit: M=1, X/Y 16-bit, DP=$0100.
+; Exit: M=1, X/Y 16-bit, DP=$0100, DB=$00 (the menu path runs InitHW
+; again); A, X and Y clobbered.
 ; ============================================================
 org $C018D9
 Field_PauseAndMenuInput:
@@ -5991,7 +6136,12 @@ Field_FadeToBankC2Mode5:
 ; pending SceneFlag_Reload over to FadeFlag_Reloaded, reset object
 ; states and fade in. Reached from Field_SceneChangeTick (when
 ; Field_BankC2Arg is 0) and by fall-through from
-; Field_FadeToBankC2Mode5. On entry: M=1 (A=8-bit), X/Y=16-bit.
+; Field_FadeToBankC2Mode5.
+; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100: TDC/XBA clears B
+; only because DP's low byte is 0. DB=$00 from both callers (InitHW
+; sets it again after the bank-$C2 call).
+; Exit: M=1, X/Y 16-bit, DP=$0100 (set again after the bank-$C2 call),
+; DB=$00 (InitHW); A, X and Y clobbered.
 ; ============================================================
 org $C019C7
 Field_RunBankC2Mode5:
@@ -6030,11 +6180,14 @@ Field_RunBankC2Mode5:
 ; the init function of every character object that exists
 ; (Chr_ObjSlot entries in the order 0, 1, 2, 4, 3, 5, 6) and refresh
 ; the copy. Party_Members holds the party's character ids (earlier notes
-; read them as palette colours). Either way, then put the party members
-; back where Field_SaveState left them (SceneSave_Party*) and restore
-; Field_UnkAB-AD — the second half of Field_SaveState's work.
+; read them as palette colours). Only in that case does it then put the
+; party members back where Field_SaveState left them (SceneSave_Party*)
+; and restore Field_UnkAB-AD — the second half of Field_SaveState's
+; work. When the party is unchanged it returns at once and restores
+; neither.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
-; Exit: same.
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; on the changed path
+; X, Y and Obj_Cur clobbered too.
 ; ============================================================
 org $C01A03
 Party_ReinitIfChanged:
@@ -6133,6 +6286,8 @@ Party_ReinitIfChanged:
 ; bytes".) Called from Field_RestoreState, Scene_Unk0283 ($C0:0330)
 ; and Scene_PostLoadInit ($C0:56C8, on every location load).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; Exit: M=1, X=0; A = 0, X = offset of the closing $00, Obj_Cur = 0
+; (16-bit); Y and anything else are as the last opcode handler left them.
 ; ============================================================
 org $C0595C
 Evt_RunObj0Func1:
@@ -6163,7 +6318,10 @@ Evt_RunObj0Func1:
 ; Obj_ScriptPos = the offset after that $00, eight per-object words in
 ; bank $7F are cleared and Obj_Unk1C00 = 7.
 ; Called from Party_ReinitIfChanged for each character object.
-; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, Obj_Cur = object
+; (Obj_CurHi 0).
+; Exit: M=1, X=0; X = Obj_Cur, A = Obj_Unk1C00Init; Y and anything else
+; are as the last opcode handler left them.
 ; ============================================================
 org $C0597D
 Evt_RunObjInit:
@@ -6211,9 +6369,14 @@ Evt_RunObjInit:
 
 ; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)
-; Leaf routine run by Field_PauseAndMenuInput when Field_Unk62 is set
-; (and Pad_Unk00F6 bit 6 is clear); A = Field_Unk62.
-; On entry: M=1, X/Y 16-bit, DP=$0100, DB=$00. Exit: same.
+; Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66,
+; Pad_Unk00F6-F8) is still unidentified, so it keeps its address name.
+; Leaf routine run by Field_PauseAndMenuInput ($C0:192B, its only
+; caller) when Field_Unk62 is set (and Pad_Unk00F6 bit 6 is clear);
+; A = Field_Unk62.
+; On entry: M=1, X/Y 16-bit, DP=$0100, DB=$00.
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A clobbered, X = 0 when
+; Field_Unk34 is cleared.
 ;
 ; A=1    → if Pad_Unk00F6 bit 7 is set, clear Field_Unk34.
 ; A=2    → Pad_Unk00F7 bit 2 steps Field_Unk63 up (wrapping from
@@ -7709,16 +7872,20 @@ ModeFC_Handler:
 ; The rest of Field_SceneChangeTick's request handling: reached by BRL
 ; when Field_SceneFlags bit 4 is clear or the tile mode is not one of
 ; the five Mode*_Handlers, by BRL at the end of ModeE6-FA, and by
-; fall-through from ModeFC_Handler. Three independent requests:
-;   bit 1 (SceneFlag_TileStep)  advance the single map tile at
-;         Field_TileStepX/Y if its state is $FE or $E0, play
-;         Audio_SfxTileAnimB and queue its four 8x8-tile VRAM
-;         addresses in TileAnim_StepVramAddrs (VramQueue_TileStep).
+; fall-through from ModeFC_Handler. Three requests, tested in this
+; order:
+;   bit 1 (SceneFlag_TileStep)  play Audio_SfxTileAnimB (always, before
+;         the state test), then advance the single map tile at
+;         Field_TileStepX/Y if its state is $FE or $E0 and queue its
+;         four 8x8-tile VRAM addresses in TileAnim_StepVramAddrs
+;         (VramQueue_TileStep). Either way it goes on to bit 5.
 ;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + Field_EndOfFrame
 ;         frames until Field_Unk38 clears, then redraw map layers
 ;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
-;         tail into Sub_EC60.
-;   bit 0 (SceneFlag_Battle)    unless Scene_Unk024C returns carry,
+;         tail into Sub_EC60. This path returns without looking at
+;         bit 0, which waits for a later call.
+;   bit 0 (SceneFlag_Battle)    only when bit 5 is clear; unless
+;         Scene_Unk024C returns carry,
 ;         enter the battle engine (JSL EngCall_BattleMain), then
 ;         reinstall the interrupt handlers and rebuild the field;
 ;         either way set FadeFlag_AfterBattle and finish with
@@ -7727,7 +7894,8 @@ ModeFC_Handler:
 ; "scene swap"; the JSL into bank $C1 identifies bit 0 as the battle.
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100, DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP=$0100 on every path (each builder call
-; restores DP with PLD; the battle path sets it again).
+; restores DP with PLD; the battle path sets it again); A, X and Y
+; clobbered.
 ; ============================================================
 org $C016DC
 DefaultHandler:
@@ -8023,6 +8191,9 @@ DefaultHandler:
 ; Audio_PlaySfxAtLeader. Called from DefaultHandler.
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100
 ; (Audio_SfxTileAnimB is dp), DB=$00.
+; Exit (through Audio_PlaySfxAtLeader): M=1, X/Y 16-bit, DP and DB
+; unchanged; A and Y clobbered (Y = the leader's object), and whatever
+; Audio_DriverCommand (unmatched) changes.
 ; ============================================================
 org $C01BA7
 Audio_PlayTileSfxB:
@@ -8903,7 +9074,8 @@ Obj_BuildFrame8:
 ; tiles take Obj_PrioLow, the last four Obj_PrioHigh (by index, not
 ; by OfsY). Reached by BRL from Obj_BuildFrameLayout.
 ; On entry: M=1, X/Y 8-bit (widened before the TAX of the record
-; offset), DP=$0100, DB=$00.
+; offset), DP=$0100, DB=$00, X = Obj_Cur: unlike Obj_FrameLayout4 it
+; does not load X itself, and relies on Obj_BuildFrameLayout's LDX.
 ; Exit: M=1, X/Y 8-bit, C=0.
 ; ============================================================
 org $C0D124

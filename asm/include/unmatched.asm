@@ -62,8 +62,8 @@ Field_EventHookDispatch: ; per-frame; if dp $39 != 0, JSR through table $C0:21EE
 org $C0274D
 Field_Unk274D:      ; per-frame; tests dp $54 bits 2-5 against $1D0A/$1D0C/$1D0E
 org $C02848
-Scene_SettleFrames: ; runs up to 15 frames (dp $19 counter) of Scene_ReloadStep + frame update
-                    ; + frame wait until the scene reports ready
+Scene_SettleFrames: ; Scene_ReloadStep once; if it returns 0, raises Fade_Brightness (dp $19) one step
+                    ; per frame (frame update, Field_EndOfFrame, frame wait) until it reaches $0F
 org $C0286C
 Scene_ReloadStep:   ; long chain of scene re-init JSRs (TileAnimList_ApplyAll, $0A50, $6F79, ...)
 org $C028AA
