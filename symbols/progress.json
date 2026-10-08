@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 35253,
+  "emitted_bytes": 36267,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 313,
-      "bytes": 35253
+      "functions": 315,
+      "bytes": 36267
     },
     "readable": {
-      "functions": 313,
-      "bytes": 35253
+      "functions": 315,
+      "bytes": 36267
     },
     "verified": {
       "functions": 303,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 14783,
+      "emitted_bytes": 15797,
       "matched": {
-        "functions": 190,
-        "bytes": 14783
+        "functions": 192,
+        "bytes": 15797
       },
       "readable": {
-        "functions": 190,
-        "bytes": 14783
+        "functions": 192,
+        "bytes": 15797
       },
       "verified": {
         "functions": 180,
@@ -535,7 +535,7 @@
       "bank": "$C1",
       "start": "$C1:3000",
       "end": "$C1:3FFF",
-      "emitted_bytes": 2621,
+      "emitted_bytes": 3635,
       "functions": [
         "Battle_PickNextStatusAnim",
         "Battle_ApplyPendingEffect",
@@ -563,7 +563,9 @@
         "Battle_MoverIdle",
         "Battle_MoverApproach",
         "Battle_MoverCharge",
-        "Battle_MoverAxis"
+        "Battle_MoverAxis",
+        "Battle_MoverKeepRange",
+        "Battle_MoverOrbit"
       ]
     },
     {

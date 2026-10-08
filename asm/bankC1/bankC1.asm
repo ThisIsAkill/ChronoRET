@@ -8991,6 +8991,588 @@ Battle_MoverAxis:
     RTS
 
 ; ==================================================================
+; Battle_MoverKeepRange ($C13A3D–$C13BC1, 389 bytes)
+; ==================================================================
+; Mover 4 (moves 6 and $10): makes for the point on a ring around the
+; target, radius $40 (move $10: $80), on the enemy's side of it. Unless a
+; detour is pending (then the turned heading is kept, as in
+; Battle_MoverApproach), it takes the angle from the target to the enemy,
+; puts the ring point there (kept in !Enemy_RingGoalX/Y) and compares the
+; enemy's position with it. Per quadrant of that angle, when the enemy is
+; level with or beyond the point on either axis (further from the
+; target), the heading is turned a half turn, towards the target;
+; otherwise it stays, away from the target. The step starts from the
+; enemy's position. Facing follows the heading.
+; Move 6 ends the move (done path of Battle_MoverApproach) once the
+; enemy's probe is within 4 pixels of the ring point (the point goes in
+; probe entry !Battle_GoalSlot, past the battlers); move $10 never ends
+; it. Otherwise the step is probed and taken, or blocked (a blocking
+; cell or another battler) with a quarter-turn detour, as in
+; Battle_MoverApproach.
+; Quirks, kept as found: the y comparison runs on the borrow of the x
+; comparison (no SEC between), so it is one pixel off when the enemy is
+; left of the point; and the step test still skips the battler test for
+; move 3, which never reaches this mover (copied from
+; Battle_MoverApproach, inferred).
+; Callers: Battle_EnemyMoverTable entry 4.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $80-$86,
+;        $8C-$8F, $77-$78, $A5-$B0 and $D3-$E3 written; probe entry
+;        !Battle_GoalSlot set unless the move is $10
+; Callees: Battle_CalcAngle, Battle_SinLookup, Battle_ShiftRight6,
+;          BattlePos_WithinDist4XYTwin, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers
+!Battle_RingPointX = !BattleTmp_80        ; 1 B: x of the ring point
+!Battle_RingSignX = !BattleTmp_81         ; 1 B: 0 = enemy x >= ring point x, $FF = less
+!Battle_RingPointY = !BattleTmp_82        ; 1 B: y of the ring point
+!Battle_RingSignY = !BattleTmp_83         ; 1 B: 0 = enemy y >= ring point y (see the quirk), $FF = less
+!Battle_RingQuadrant = !BattleTmp_84      ; 1 B: angle >> 6: 0 = right-down, 1 = left-down, 2 = left-up, 3 = right-up
+Battle_MoverKeepRange:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Enemy_Detour,X
+    BEQ .aim
+    LDA.w !Enemy_MoveAngle,X
+    STA.b !Battle_GeoAngle
+    JMP .heading
+.aim:
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointX
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointY
+    STA.w !Enemy_StepStartY,X
+    LDA.b #!Battle_RingRadius
+    STA.b !Battle_SinScale
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveRingFar
+    BNE .radius_set
+    LDA.b #!Battle_RingRadiusFar
+    STA.b !Battle_SinScale
+.radius_set:
+    JSR Battle_CalcAngle            ; target -> enemy
+    JSR Battle_SinLookup
+    CLC
+    ADC.b !Battle_GeoOriginY
+    LDX.b !Battle_MoverEnemy
+    STA.b !Battle_RingPointY
+    STA.w !Enemy_RingGoalY,X
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    CLC
+    ADC.b !Battle_GeoOriginX
+    LDX.b !Battle_MoverEnemy
+    STA.b !Battle_RingPointX
+    STA.w !Enemy_RingGoalX,X
+    LDX.b !Battle_MoverEnemy
+    SEC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    SBC.b !Battle_RingPointX
+    TDC
+    SBC.b #0
+    STA.b !Battle_RingSignX
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    SBC.b !Battle_RingPointY        ; quirk: borrows from the x sign above
+    TDC
+    SBC.b #0
+    STA.b !Battle_RingSignY
+    LDA.b !Battle_GeoAngle
+    JSR Battle_ShiftRight6
+    STA.b !Battle_RingQuadrant
+    AND.b #2
+    BNE .upper
+    LDA.b !Battle_RingQuadrant
+    BNE .left_down
+    LDA.b !Battle_RingSignX         ; right-down
+    BEQ .inward
+    LDA.b !Battle_RingSignY
+    BEQ .inward
+    BRA .heading
+.left_down:
+    LDA.b !Battle_RingSignX
+    BMI .inward
+    LDA.b !Battle_RingSignY
+    BEQ .inward
+    BRA .heading
+.upper:
+    LDA.b !Battle_RingQuadrant
+    AND.b #1
+    BNE .right_up
+    LDA.b !Battle_RingSignX         ; left-up
+    BMI .inward
+    LDA.b !Battle_RingSignY
+    BMI .inward
+    BRA .heading
+.right_up:
+    LDA.b !Battle_RingSignX
+    BEQ .inward
+    LDA.b !Battle_RingSignY
+    BEQ .heading
+.inward:
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleHalfTurn
+    STA.b !Battle_GeoAngle
+.heading:
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDX.b !Battle_MoverEnemy
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveRingFar
+    BEQ .step
+    LDY.w #!Battle_GoalSlot
+    LDA.w !Enemy_RingGoalY,X
+    STA.w !Battler_ProbeY,Y
+    LDA.w !Enemy_RingGoalX,X
+    STA.w !Battler_ProbeX,Y
+    TXA
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    TAX                             ; X = the enemy's battler slot
+    JSR BattlePos_WithinDist4XYTwin
+    LDA.w !BattlePos_Result
+    BMI .step
+    LDX.b !Battle_MoverEnemy
+    INC.w !Enemy_MoveDone,X
+    LDA.w !Enemy_AnimWanted,X
+    STA.w !Enemy_ResumeAnim,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Enemy_DoneTargetX,X
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Enemy_DoneTargetY,X
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.step:
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveNear4
+    BEQ .free                       ; quirk: move 3 never gets here
+    JSR Battle_BoxOverlapsOthers
+    BPL .free
+.blocked:
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    LSR A                           ; round down to a quarter turn
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Battle_GeoAngle
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    INC.w !Enemy_Detour,X
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.free:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_Detour,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+.exit:
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Battle_MoverOrbit ($C13BC2–$C13E32, 625 bytes)
+; ==================================================================
+; Mover 5 (moves $0D-$0F): circles the target on a ring of radius
+; !Battle_OrbitRadius ($20; move $0E: $40). The first part is
+; Battle_MoverKeepRange with that radius (same ring point, same quirks,
+; the detour kept the same way). Then:
+;   - the enemy's probe within 16 pixels of the ring point: orbit (below);
+;   - otherwise move $0D stays put (!Enemy_Stepping cleared; it only
+;     circles once it is on the ring), and the others step towards the
+;     ring point as Battle_MoverKeepRange does, move $0F passing cell
+;     bit 7 and other battlers.
+; Orbit: clears the detour, takes the angle from the target to the enemy
+; again (step start = the enemy's position), moves it on by $10, or back
+; by $10 when !Enemy_OrbitReverse is set, and heads for the point of the
+; ring at that angle. If that heading is exactly the direction to the
+; target it is turned on by 1 unit, by 2 at radius $20 (presumably so as
+; not to walk straight at the target; why is not known). A blocked step
+; reverses the orbit (!Enemy_OrbitReverse flipped) and leaves
+; !Enemy_Stepping as it was; a free one starts it. Move $0F passes cell
+; bit 7 and other battlers here too.
+; The move never ends; the approach part never sets !Enemy_MoveDone.
+; Callers: Battle_EnemyMoverTable entry 5.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MoverEnemy = enemy (0-7),
+;        !Battle_MoverAnim
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, Y clobbered; X and
+;        !Battle_BoxTestSlot = the enemy's battler slot; DP $80-$86,
+;        $8C-$8F, $77-$78, $A5-$B0 and $D3-$E3 written; probe entry
+;        !Battle_GoalSlot set; !Battle_OrbitRadius set unless a detour
+;        was pending
+; Callees: Battle_CalcAngle, Battle_SinLookup, Battle_ShiftRight6,
+;          BattlePos_WithinDist16XY, Battle_CalcBattlerBox,
+;          Battle_BoxHitsBlockedCell, Battle_BoxOverlapsOthers
+Battle_MoverOrbit:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_LoopStarted,X
+    LDA.w !Enemy_Detour,X
+    BEQ .aim
+    LDA.w !Enemy_MoveAngle,X
+    STA.b !Battle_GeoAngle
+    JMP .heading
+.aim:
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointX
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointY
+    STA.w !Enemy_StepStartY,X
+    LDA.b #!Battle_OrbitRadiusSmall
+    STA.w !Battle_OrbitRadius
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitWide
+    BNE .radius_set
+    ASL.w !Battle_OrbitRadius
+.radius_set:
+    LDA.w !Battle_OrbitRadius
+    STA.b !Battle_SinScale
+    JSR Battle_CalcAngle            ; target -> enemy
+    JSR Battle_SinLookup
+    CLC
+    ADC.b !Battle_GeoOriginY
+    LDX.b !Battle_MoverEnemy
+    STA.b !Battle_RingPointY
+    STA.w !Enemy_RingGoalY,X
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    CLC
+    ADC.b !Battle_GeoOriginX
+    LDX.b !Battle_MoverEnemy
+    STA.b !Battle_RingPointX
+    STA.w !Enemy_RingGoalX,X
+    LDX.b !Battle_MoverEnemy
+    SEC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    SBC.b !Battle_RingPointX
+    TDC
+    SBC.b #0
+    STA.b !Battle_RingSignX
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    SBC.b !Battle_RingPointY        ; quirk: borrows from the x sign above
+    TDC
+    SBC.b #0
+    STA.b !Battle_RingSignY
+    LDA.b !Battle_GeoAngle
+    JSR Battle_ShiftRight6
+    STA.b !Battle_RingQuadrant
+    AND.b #2
+    BNE .upper
+    LDA.b !Battle_RingQuadrant
+    BNE .left_down
+    LDA.b !Battle_RingSignX         ; right-down
+    BEQ .inward
+    LDA.b !Battle_RingSignY
+    BEQ .inward
+    BRA .heading
+.left_down:
+    LDA.b !Battle_RingSignX
+    BMI .inward
+    LDA.b !Battle_RingSignY
+    BEQ .inward
+    BRA .heading
+.upper:
+    LDA.b !Battle_RingQuadrant
+    AND.b #1
+    BNE .right_up
+    LDA.b !Battle_RingSignX         ; left-up
+    BMI .inward
+    LDA.b !Battle_RingSignY
+    BMI .inward
+    BRA .heading
+.right_up:
+    LDA.b !Battle_RingSignX
+    BEQ .inward
+    LDA.b !Battle_RingSignY
+    BEQ .heading
+.inward:
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleHalfTurn
+    STA.b !Battle_GeoAngle
+.heading:
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDX.b !Battle_MoverEnemy
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDY.w #!Battle_GoalSlot
+    LDA.w !Enemy_RingGoalY,X
+    STA.w !Battler_ProbeY,Y
+    LDA.w !Enemy_RingGoalX,X
+    STA.w !Battler_ProbeX,Y
+    TXA
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    TAX                             ; X = the enemy's battler slot
+    JSR BattlePos_WithinDist16XY
+    LDA.w !BattlePos_Result
+    BMI .approach
+    JMP .orbit
+.approach:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitHold
+    BNE .step
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.step:
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitPass
+    BNE .test_cells
+    LDA.b #1
+    STA.w !Battle_PassCellBit7
+.test_cells:
+    JSR Battle_BoxHitsBlockedCell
+    BMI .blocked
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitPass
+    BEQ .free                       ; move $0F passes other battlers
+    JSR Battle_BoxOverlapsOthers
+    BPL .free
+.blocked:
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    LSR A                           ; round down to a quarter turn
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Battle_GeoAngle
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    INC.w !Enemy_Detour,X
+    STZ.w !Enemy_Stepping,X
+    BRA .exit
+.free:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_Detour,X
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+.exit:
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    RTS
+.orbit:
+    LDX.b !Battle_MoverEnemy
+    STZ.w !Enemy_Detour,X
+    LDA.w !Enemy_MoveTarget,X
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoOriginY
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointX
+    STA.w !Enemy_StepStartX,X
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoPointY
+    STA.w !Enemy_StepStartY,X
+    JSR Battle_CalcAngle            ; target -> enemy
+    PHA
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_OrbitReverse,X
+    BNE .backwards
+    LDA.b #!Battle_OrbitTurn
+    BRA .turn
+.backwards:
+    LDA.b #!Battle_OrbitTurnBack
+.turn:
+    CLC
+    ADC.b !Battle_GeoAngle
+    STA.b !Battle_GeoAngle
+    LDA.w !Battle_OrbitRadius
+    STA.b !Battle_SinScale
+    LDA.b !Battle_GeoAngle
+    JSR Battle_SinLookup
+    LDX.b !Battle_MoverEnemy
+    CLC
+    ADC.w !Battler_ScreenY,Y
+    STA.b !Battle_GeoPointY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    LDX.b !Battle_MoverEnemy
+    CLC
+    ADC.w !Battler_ScreenX,Y
+    STA.b !Battle_GeoPointX         ; the next point of the ring
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    STA.b !Battle_GeoOriginY
+    JSR Battle_CalcAngle            ; enemy -> that point
+    PLA
+    CLC
+    ADC.b #!Battle_AngleHalfTurn    ; enemy -> target
+    CMP.b !Battle_GeoAngle
+    BNE .orbit_heading
+    INC.b !Battle_GeoAngle
+    LDA.w !Battle_OrbitRadius
+    CMP.b #!Battle_OrbitRadiusSmall
+    BNE .orbit_heading
+    INC.b !Battle_GeoAngle
+.orbit_heading:
+    LDA.b #!Battle_MoveStepLen
+    STA.b !Battle_SinScale
+    LDX.b !Battle_MoverEnemy
+    LDA.b !Battle_GeoAngle
+    STA.w !Enemy_MoveAngle,X
+    JSR Battle_SinLookup
+    STA.b !Battle_MoveStepY
+    CLC
+    LDA.b !Battle_GeoAngle
+    ADC.b #!Battle_AngleQuarter
+    JSR Battle_SinLookup            ; cosine
+    STA.b !Battle_MoveStepX
+    LDA.b !Battle_GeoAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_MoverEnemy
+    STA.w !Battler_Facing+!Battle_FirstEnemySlot,X
+    LDX.b !Battle_MoverEnemy
+    CLC
+    LDA.w !Battler_ScreenY+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepY
+    STA.w !Battler_ProbeY+!Battle_FirstEnemySlot,X
+    CLC
+    LDA.w !Battler_ScreenX+!Battle_FirstEnemySlot,X
+    ADC.b !Battle_MoveStepX
+    STA.w !Battler_ProbeX+!Battle_FirstEnemySlot,X
+    INX
+    INX
+    INX
+    STX.b !Battle_BoxTestSlot
+    JSR Battle_CalcBattlerBox
+    STZ.w !Battle_PassCellBit7
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitPass
+    BNE .orbit_cells
+    LDA.b #1
+    STA.w !Battle_PassCellBit7
+.orbit_cells:
+    JSR Battle_BoxHitsBlockedCell
+    BMI .orbit_blocked
+    LDA.w !Battle_MoverAnim
+    CMP.b #!Enemy_MoveOrbitPass
+    BEQ .orbit_free
+    JSR Battle_BoxOverlapsOthers
+    BPL .orbit_free
+.orbit_blocked:
+    LDX.b !Battle_MoverEnemy
+    LDA.w !Enemy_OrbitReverse,X
+    EOR.b #1
+    STA.w !Enemy_OrbitReverse,X
+    BRA .orbit_exit
+.orbit_free:
+    LDX.b !Battle_MoverEnemy
+    LDA.b #1
+    STA.w !Enemy_Stepping,X
+.orbit_exit:
+    JMP .exit
+
+; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
 ; ==================================================================
 ; Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in
