@@ -282,60 +282,23 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1BFA4
-BattleSys_UnkBFA4:                      ; JSR from BattleSys_UnkAC57: requests service 4 (LDA #4 / JSR $C1:0003); not analysed
 org $C1D7C4
 BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
 org $C1D8D1
 BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
 org $FDABA2
 BattleFD_UnkABA2:                       ; JSL from Battle_ApplyHits with DP $0E = an enemy slot being KO'd; not analysed
-org $C1B575
-BattleSys_UnkB575:                      ; JSR from BattleSys_Unk8461 / BattleSys_Unk883D; reads the BattleCmd partner bytes; not analysed
-org $C1B70E
-BattleSys_UnkB70E:                      ; JSR from BattleSys_Unk8461 (a ready PC, !Battle_Unk2989 bit 5 set); not analysed
-org $C1B725
-BattleSys_UnkB725:                      ; JSR from BattleSys_Unk8461 (!Battle_Unk2989 bit 5 set); not analysed
-org $C1B762
-BattleSys_UnkB762:                      ; JSR from BattleSys_Unk8461 each run; not analysed
-org $C1B967
-BattleSys_UnkB967:                      ; JSR from BattleSys_Unk8461 with !Battle_UnkB18B = PC: probably runs its command; not analysed
-org $C1BCE1
-BattleSys_UnkBCE1:                      ; JSR from BattleSys_Unk8461 (!Battle_UnkAF23 set); not analysed
-org $C1BD6F
-BattleSys_UnkBD6F:                      ; JSR from BattleSys_Unk8461 after an enemy's turn; not analysed
-org $C1B093
-BattleSys_UnkB093:                      ; JSR from BattleSys_Main / Battle_SetupBattle with X = PC slot * $80; not analysed
-org $C1B0B6
-BattleSys_UnkB0B6:                      ; JSR from BattleSys_Main with X = Y * $80, Y = 0-10; not analysed
-org $C1B223
-BattleSys_UnkB223:                      ; JSR from each BattleSys_Main pass; not analysed
-org $C1B3BB
-BattleSys_UnkB3BB:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B3D2
-BattleSys_UnkB3D2:                      ; JSR from BattleSys_Main's !Battle_Unk2989 bit 5 end; not analysed
-org $C1B3F9
-BattleSys_UnkB3F9:                      ; JSR from BattleSys_Main's wait-mode path, X = PC slot, A = its !Battler_UnkAF0A; not analysed
-org $C1B442
-BattleSys_UnkB442:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B4E9
-BattleSys_UnkB4E9:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B7F2
-BattleSys_UnkB7F2:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1BC60
-BattleSys_UnkBC60:                      ; JSR from BattleSys_Main's debug win with !Battle_UnkB18B = PC slot; not analysed
-org $C1C96A
-BattleSys_UnkC96A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CA1A
-BattleSys_UnkCA1A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CCCB
-BattleSys_UnkCCCB:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CDFF
-BattleSys_UnkCDFF:                      ; JSR from Battle_SetupBattle; not analysed
-org $C1CE3A
-BattleSys_UnkCE3A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $02); not analysed
-org $C1CF15
-BattleSys_UnkCF15:                      ; JSR from Battle_SetupBattle with arguments in DP $06, $08, $0A; not analysed
+org $C1C1DD
+BattleSys_UnkC1DD:                      ; JSR from BattleSys_UnkB967 (item and tech paths): fills !Battle_UnkAD8D/AD8E
+                                        ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
+org $C1D490
+BattleSys_UnkD490:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D4AD
+BattleSys_UnkD4AD:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D4D6
+BattleSys_UnkD4D6:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D523
+BattleSys_UnkD523:                      ; JSR from BattleSys_UnkBF79 (after !Battle_UnkAF23 = 0); not analysed
 org $C1CFC2
 BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
                                         ; table at $C1:D126 (6 entries) with argument Y; returns a result in A
@@ -424,10 +387,25 @@ org $CD0030
 BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
 
 org $CD0021
-BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; not analysed
+BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
+                                        ; after a tech, A = 3 or $0D; not analysed
 
 ; --- Bank $FD (called from BattleSys_Main and Battle_SetupBattle; not analysed) ---
 
+org $FDA8A5
+BattleFD_UnkA8A5:                       ; JSL from BattleSys_UnkB967, A = a PC slot taking part; leaves !Battle_UnkB3EA
+org $FDA93C
+BattleFD_UnkA93C:                       ; JSL from BattleSys_UnkB967 when !Battle_UnkB3EA is non-zero
+org $FDA95F
+BattleFD_UnkA95F:                       ; JSL from BattleSys_UnkB575 after it set !Battle_CmdPcs
+org $FDAF80
+BattleFD_UnkAF80:                       ; JSL from BattleSys_UnkCDFF, A = an inventory item id, DP $0E = its count
+org $FDB01C
+BattleFD_UnkB01C:                       ; JSL from BattleSys_UnkCDFF for an empty inventory entry
+org $FDB033
+BattleFD_UnkB033:                       ; JSL from BattleSys_UnkCF15, A = an id byte; returns X = a bank-$CC offset
+org $FDB141
+BattleFD_UnkB141:                       ; JSL from BattleSys_UnkCE3A, DP $08 = a record offset, DP $0E = $29D7
 org $FDA982
 BattleFD_UnkA982:                       ; JSL: first call of BattleSys_Main
 org $FDAA98
@@ -458,7 +436,7 @@ BattleFD_UnkAE99:                       ; JSL from Battle_SetupBattle
 org $FDAD09
 BattleFD_UnkAD09:                       ; JSL from Battle_SetupBattle
 org $FDAEF2
-BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle
+BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle (and BattleSys_UnkBC60's dead body)
 org $FDACEE
 BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle, BattleSys_Unk8461 and turn lists 1 / 9
 org $FDAB30
