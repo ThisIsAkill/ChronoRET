@@ -118,7 +118,8 @@ $C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,verified,310a0a5fa6af,
 $C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,verified,422bc75831ed,
 $C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,verified,b0c39e035e55,
 $C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,verified,cfa3102ede0e,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
-$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,verified,b407f9a2aa74,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
+$C1:007E,$C1:0088,11,BattleSys_PumpFrames,$C1,Battle system,readable,b39b10bd06b9,"Waits for the next frame: sets !Battle_FramePending, then calls BattleSys_IdleVecCD0036 again and again until the interrupt handler at $CF:FB65 has cleared the flag."
+$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,readable,9b9e4ebaed79,8×8→16 HW multiply via WRMPYA/WRMPYB/RDMPYL.
 $C1:00A7,$C1:00D6,48,Battle_Mul8x16,$C1,Battle engine,verified,28c4f8ee0134,"8×16→24 multiply in two hardware passes (the top byte of the product is zeroed first, so nothing from the caller is accumulated): pass 1: Factor8 × low byte of Factor16  -> Product+0/+1 pass 2: Factor"
 $C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,verified,a88ce7d844a5,"16÷8 HW divide via WRDIVL/WRDIVH/WRDIVB, quotient from RDDIVL and remainder from RDMPYL."
 $C1:010D,$C1:0110,4,Battle_ShiftLeft8,$C1,Battle engine,verified,3e303b840b03,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."

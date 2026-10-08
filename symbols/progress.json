@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 30634,
+  "emitted_bytes": 30645,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 252,
-      "bytes": 30634
+      "functions": 253,
+      "bytes": 30645
     },
     "readable": {
-      "functions": 252,
-      "bytes": 30634
+      "functions": 253,
+      "bytes": 30645
     },
     "verified": {
-      "functions": 246,
-      "bytes": 29544
+      "functions": 245,
+      "bytes": 29514
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 10164,
+      "emitted_bytes": 10175,
       "matched": {
-        "functions": 129,
-        "bytes": 10164
+        "functions": 130,
+        "bytes": 10175
       },
       "readable": {
-        "functions": 129,
-        "bytes": 10164
+        "functions": 130,
+        "bytes": 10175
       },
       "verified": {
-        "functions": 126,
-        "bytes": 9232
+        "functions": 125,
+        "bytes": 9202
       }
     },
     {
@@ -348,8 +348,9 @@
       "bank": "$C1",
       "start": "$C1:0000",
       "end": "$C1:0FFF",
-      "emitted_bytes": 3959,
+      "emitted_bytes": 3970,
       "functions": [
+        "BattleSys_PumpFrames",
         "Battle_Mul8",
         "Battle_Mul8x16",
         "Battle_Divide",
