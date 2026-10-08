@@ -29129,8 +29129,8 @@ Evt_Op4D_SetLongVarWord:
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtCopy_Count is
 ;   dp), DB any (restored after the MVN); Y = the opcode's offset in
 ;   Evt_Data.
-; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A = $FF (B
-;   $FF: the MVN's count ran out); Y = dst + len - 2 (where the MVN
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A = X (low
+;   byte in A, high in B: TXA/SBC/TAX after the MVN); Y = dst + len - 2 (where the MVN
 ;   stopped); EvtCopy_Count = len - 3.
 ; ------------------------------------------------------------
 Evt_Op4E_CopyData:
