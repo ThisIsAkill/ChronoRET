@@ -51,8 +51,12 @@ org $C009DD
 LocLoad_Unk09DD:    ; location-load step; reads byte 1 of the location record, table $F6:2100
 org $C00A14
 LocLoad_Unk0A14:    ; location-load step; skipped when dp $BB != 0; table $F6:21C0
-org $C01AAC
-Field_Unk1AAC:      ; per-frame (GameLoop_FrameBody); tests $00F6 bit 7, counts dp $34
+org $C01CFC
+Field_FindObjInFront: ; A = leader facing x 2: finds an object within reach in that direction
+                    ; (per-facing tests at $C0:1D56) and stores it in Field_UnkEB; C=1 found
+org $C01DF4
+Field_CheckTileInFront: ; unless Field_Unk29 is set, checks the map tile in front of the leader
+                    ; (per-facing tests at $C0:1E92, $7E:70C0 map) and may start Field_Unk29 = 1
 org $C01B53
 LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
@@ -81,6 +85,9 @@ Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_Opc
                     ; LDX #$1639, BRL LoadSavePath. Also Field_EventHookTable entries 15-16
 org $C075A0
 Map_Unk75A0:        ; run by Field_ServiceUnk54 for Field_Unk54 bits 2-3 (also JSR at $C0:3E96)
+org $C05AC5
+Evt_StartTargetFunc1: ; X/Y 8-bit: saves Field_UnkEB's script position and points it at its
+                    ; function 1 (Evt_Data offset +2), when the object allows it
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
@@ -104,10 +111,18 @@ org $C07F7E
 LocLoad_ClearPage1D00: ; ClearRAMDMA of $7E:1D00-$1DFF
 org $C087F1
 Field_Unk87F1:      ; DP=$1D00 finalizer after the $C800 builders (DefaultHandler)
-org $C0881E
-Field_FrameUpdate:  ; per-frame update with DP=$1D00 (sets $01EB=$80, calls $88E5/$88EE/...)
-org $C0885A
-Field_Unk885A:      ; DP=$1D00; dispatches on $0138 (DefaultHandler fade path)
+org $C08902
+Field_DpadHandlerTable: ; 16 words: Field_DpadDispatch's handlers by Pad_Unk00F9 bits 0-3
+org $C08A6D
+Map_Unk8A6D:        ; Field_FrameUpdate, X/Y 8-bit, when Field_Unk20 is set (DP=$1D00)
+org $C09175
+Map_Unk9175:        ; Field_FrameUpdate step (DP=$1D00)
+org $C091AC
+Map_Unk91AC:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
+org $C093E1
+Map_Unk93E1:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
+org $C099DE
+Map_Unk99DE:        ; Field_FrameUpdate step (DP=$1D00)
 org $C0A33B
 LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810

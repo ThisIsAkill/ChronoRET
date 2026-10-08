@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 36047,
+  "emitted_bytes": 36326,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 323,
-      "bytes": 36047
+      "functions": 328,
+      "bytes": 36326
     },
     "readable": {
-      "functions": 323,
-      "bytes": 36047
+      "functions": 328,
+      "bytes": 36326
     },
     "verified": {
       "functions": 305,
@@ -20,14 +20,14 @@
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 21700,
+      "emitted_bytes": 21979,
       "matched": {
-        "functions": 136,
-        "bytes": 21700
+        "functions": 141,
+        "bytes": 21979
       },
       "readable": {
-        "functions": 136,
-        "bytes": 21700
+        "functions": 141,
+        "bytes": 21979
       },
       "verified": {
         "functions": 118,
@@ -137,7 +137,7 @@
       "bank": "$C0",
       "start": "$C0:1000",
       "end": "$C0:1FFF",
-      "emitted_bytes": 2974,
+      "emitted_bytes": 3025,
       "functions": [
         "ModeEE_Handler",
         "ModeFA_Handler",
@@ -147,6 +147,7 @@
         "Field_FadeToBankC2Mode5",
         "Field_RunBankC2Mode5",
         "Party_ReinitIfChanged",
+        "Field_ActionButton",
         "Sub_1ADF",
         "Bg_TilemapIndex64x32",
         "Audio_PlayTileSfxA",
@@ -225,8 +226,13 @@
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 228,
+      "functions": [
+        "Field_FrameUpdate",
+        "Field_Unk885A",
+        "Map_ResetUnk1D2E",
+        "Field_DpadDispatch"
+      ]
     },
     {
       "bank": "$C0",

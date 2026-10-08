@@ -4988,7 +4988,7 @@ GameLoop_FrameBody:
     JSR Field_PauseAndMenuInput
     JSR Field_SceneChangeTick
     JSR Field_FrameUpdate
-    JSR Field_Unk1AAC
+    JSR Field_ActionButton
     JSL Field_Unk1F87
     JSR Field_EventHookDispatch
     JSR Field_ServiceUnk54
@@ -5810,6 +5810,210 @@ ClearRAMDMA:
     STX.w DAS7L             ; $4375: byte count
     LDA.b #!MDMAEN_Ch7
     STA.w MDMAEN              ; $420B: enable DMA channel 7 (auto-clears when done)
+    RTS
+
+; ============================================================
+; Field frame update and its first helpers ($C0:881E–$C0:8901)
+; These run with DP = !DP_Map ($1D00): a dp operand is written as
+; !Map_Name-!DP_Map, and field-page variables are reached absolute
+; (!DP_Field+!Name).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:881E — Field_FrameUpdate (60 bytes, $881E–$8859)
+; Field work done every frame, before input-driven checks such as
+; Field_ActionButton: resets Field_UnkEB (the action-button target) to
+; none, then with DP=$1D00 runs Map_ResetUnk1D2E, clears Map_Unk1D2C/
+; 1D2D, runs Field_DpadDispatch only when Field_Unk62 is 0 and
+; Field_ControlEnabled is set (so the fade loops, which clear
+; Field_ControlEnabled around this call, get no input), Map_Unk8A6D
+; (with 8-bit X) when Field_Unk20 is set, and then Map_Unk9175,
+; Map_Unk99DE, Map_Unk91AC and Map_Unk93E1, which are not matched yet;
+; what they do (movement, scrolling?) is not traced.
+; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame
+;   ($C0:00EB), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload
+;   ($C0:2830) and unmatched code at $C0:02B7, $C0:02DE, $C0:2854 and
+;   $C0:3FC3.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
+; exit; set to $1D00 inside), DB=$00 (absolute operands are bank $00).
+; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the unmatched
+; callees leave them (not established).
+; ------------------------------------------------------------
+org $C0881E
+Field_FrameUpdate:
+    LDA.b #!Field_UnkEBInit
+    STA.w !DP_Field+!Field_UnkEB ; no action-button target yet
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00
+    SEP #$20
+    JSR Map_ResetUnk1D2E
+    STZ.b !Map_Unk1D2C-!DP_Map
+    STZ.b !Map_Unk1D2D-!DP_Map
+    LDA.w !DP_Field+!Field_Unk62
+    BNE .no_input
+    LDA.w !DP_Field+!Field_ControlEnabled
+    BEQ .no_input
+    JSR Field_DpadDispatch
+.no_input:
+    LDA.w !DP_Field+!Field_Unk20
+    BEQ .skip_8a6d
+    SEP #$10
+    JSR Map_Unk8A6D
+    REP #$10
+.skip_8a6d:
+    JSR Map_Unk9175
+    JSR Map_Unk99DE
+    JSR Map_Unk91AC
+    JSR Map_Unk93E1
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:885A — Field_Unk885A (139 bytes, $885A–$88E4)
+; A two-step job driven by Field_Unk38, run frame after frame by
+; DefaultHandler's map-redraw path until it clears Field_Unk38:
+; - Field_Unk38 = 1: zero Map_Unk1D2E/1D30/1D32/1D33. If Map_Unk1D93
+;   is set, Map_Unk1D2E = +$10 when the leader's Obj_ScreenX (low byte)
+;   is >= $80, else -$10 ($F0); if Map_Unk1D96 is set, Map_Unk1D30 =
+;   +$10 when the leader's Obj_ScreenY (low byte) is >= $88, else -$10.
+;   If neither is set it clears Field_Unk38 and stops; otherwise it
+;   runs Map_Unk91AC and Map_Unk93E1 and moves on to step 2.
+; - Field_Unk38 = 2: zero Map_Unk1D32/1D33, and Map_Unk1D2E or
+;   Map_Unk1D30 where Map_Unk1D93 / Map_Unk1D96 is clear; if both are
+;   clear it clears Field_Unk38, else runs Map_Unk91AC and Map_Unk93E1
+;   again (and stays at step 2).
+; - any other nonzero value: clears Field_Unk38.
+; By the signs this looks like a step of $10 towards the side of the
+; screen the leader is on (a camera recentre?); not established.
+; Callers: DefaultHandler ($C0:1781), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
+; exit; set to $1D00 inside), DB=$00.
+; Exit: M=1, X=0 (8-bit X/Y only inside step 1), DP=$0100, DB
+; unchanged; A, X clobbered, plus what Map_Unk91AC/93E1 change.
+; ------------------------------------------------------------
+Field_Unk885A:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00
+    SEP #$20
+    LDA.w !DP_Field+!Field_Unk38
+    BNE .active
+    PLD
+    RTS
+.active:
+    DEC A
+    BEQ .step1
+    DEC A
+    BEQ .step2
+    STZ.w !DP_Field+!Field_Unk38 ; unknown step: stop
+    PLD
+    RTS
+.step1:
+    STZ.b !Map_Unk1D2E-!DP_Map
+    STZ.b !Map_Unk1D30-!DP_Map
+    STZ.b !Map_Unk1D32-!DP_Map
+    STZ.b !Map_Unk1D33-!DP_Map
+    SEP #$10
+    LDX.w !DP_Field+!Party_ObjSlot ; leader (8-bit X)
+    LDA.b !Map_Unk1D93-!DP_Map
+    BEQ .check_y
+    LDA.w !Obj_ScreenX,X
+    CMP.b #!Screen_HalfX
+    BCC .x_left
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    BRA .check_y
+.x_left:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2E-!DP_Map
+.check_y:
+    LDA.b !Map_Unk1D96-!DP_Map
+    BNE .y_side
+    LDA.b !Map_Unk1D93-!DP_Map
+    BNE .apply1
+    REP #$10
+    STZ.w !DP_Field+!Field_Unk38 ; neither enabled: done
+    PLD
+    RTS
+.y_side:
+    LDA.w !Obj_ScreenY,X
+    CMP.b #!Screen_SplitY
+    BCC .y_top
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    BRA .apply1
+.y_top:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D30-!DP_Map
+.apply1:
+    REP #$10
+    JSR Map_Unk91AC
+    JSR Map_Unk93E1
+    INC.w !DP_Field+!Field_Unk38 ; on to step 2
+    PLD
+    RTS
+.step2:
+    STZ.b !Map_Unk1D32-!DP_Map
+    STZ.b !Map_Unk1D33-!DP_Map
+    LDA.b !Map_Unk1D93-!DP_Map
+    BNE .keep_x
+    STZ.b !Map_Unk1D2E-!DP_Map
+.keep_x:
+    LDA.b !Map_Unk1D96-!DP_Map
+    BNE .apply2
+    STZ.b !Map_Unk1D30-!DP_Map
+    LDA.b !Map_Unk1D93-!DP_Map
+    BNE .apply2
+    STZ.w !DP_Field+!Field_Unk38 ; neither enabled: done
+    PLD
+    RTS
+.apply2:
+    JSR Map_Unk91AC
+    JSR Map_Unk93E1
+    PLD
+    RTS
+
+; ------------------------------------------------------------
+; $C0:88E5 — Map_ResetUnk1D2E (9 bytes, $88E5–$88ED)
+; Copies Map_Unk1D2A to Map_Unk1D2E and Map_Unk1D2B to Map_Unk1D30 at
+; the start of every Field_FrameUpdate (so those two hold per-frame
+; values derived from a standing pair; meaning unknown).
+; Callers: Field_FrameUpdate ($C0:882C), its only JSR site.
+; On entry: M=1 (8-bit A), DP=$1D00.
+; Exit: M=1, DP unchanged; A = Map_Unk1D2B.
+; ------------------------------------------------------------
+Map_ResetUnk1D2E:
+    LDA.b !Map_Unk1D2A-!DP_Map
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_Unk1D2B-!DP_Map
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:88EE — Field_DpadDispatch (20 bytes, $88EE–$8901)
+; Unless Field_Unk38 is busy, runs the Field_DpadHandlerTable entry
+; picked by Pad_Unk00F9 bits 0-3 (16 entries; the D-pad bits, if
+; Pad_Unk00F9 is laid out like Pad_Pressed's high byte), with 8-bit
+; X/Y. The handlers are not matched yet.
+; Callers: Field_FrameUpdate ($C0:883D), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
+; Exit: M=1, X=0, DP unchanged; A and X clobbered, plus what the
+; handler changes.
+; ------------------------------------------------------------
+Field_DpadDispatch:
+    LDA.w !DP_Field+!Field_Unk38
+    BNE .done
+    LDA.w !Pad_Unk00F9
+    AND.b #!Pad_DpadMask
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Field_DpadHandlerTable,X)
+    REP #$10
+.done:
     RTS
 
 ; ============================================================
@@ -7278,6 +7482,60 @@ Party_ReinitIfChanged:
     LDA.l !SceneSave_UnkAB+2
     STA.b !Field_UnkAD
     RTS
+
+; ============================================================
+; $C0:1AAC — Field_ActionButton (51 bytes, $1AAC–$1ADE)
+; (was Field_Unk1AAC.) Per-frame check of the action button: does
+; nothing unless Pad_Unk00F6 bit 7 (A, if Pad_Unk00F6 has the
+; Pad_Pressed layout) is set. Field_Unk34 = $FFFF swallows that one
+; press (Field_Unk34 goes back to 0); with player control off
+; (Field_ControlEnabled = 0) it returns too. Otherwise: unless
+; Field_UnkEB already names an object, Field_FindObjInFront looks for
+; one near the leader in the facing direction (A = Obj_Facing x 2) and
+; stores it there; if there is one, Evt_StartTargetFunc1 starts that
+; object's function 1 (with 8-bit X/Y). Every path past the control
+; check ends in Field_CheckTileInFront (tail BRL), so the tile check
+; runs whether or not an object was found.
+; Field_FrameUpdate resets Field_UnkEB to $80 each frame before this
+; runs; what may set it in between is not traced.
+; Callers: GameLoop_FrameBody ($C0:00AA), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered, plus what the
+; callees change (Field_CheckTileInFront returns to this routine's
+; caller).
+; ============================================================
+org $C01AAC
+Field_ActionButton:
+    LDA.w !Pad_Unk00F6
+    BIT.b #!Pad_Unk00F6Bit7
+    BNE .pressed
+    RTS
+.pressed:
+    LDX.b !Field_Unk34
+    BEQ .check_control
+    CPX.w #!Field_Unk34Swallow
+    BNE .check_control
+    INX                     ; $FFFF -> 0: this press is swallowed
+    STX.b !Field_Unk34
+    RTS
+.check_control:
+    LDA.b !Field_ControlEnabled
+    BNE .control_on
+    RTS
+.control_on:
+    LDA.b !Field_UnkEB
+    BPL .activate           ; an object is already targeted
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    ASL A
+    JSR Field_FindObjInFront
+    BCC .tile_check         ; C=0: nothing in front
+.activate:
+    SEP #$30
+    JSR Evt_StartTargetFunc1
+    REP #$10
+.tile_check:
+    BRL Field_CheckTileInFront
 
 ; ============================================================
 ; $C0:595C — Evt_RunObj0Func1 (33 bytes, $595C–$597C)

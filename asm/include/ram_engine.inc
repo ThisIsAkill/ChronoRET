@@ -91,7 +91,8 @@ if !ram_engine_inc == 0
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5); saved
                                          ; and cleared around Field_FrameUpdate during fades.
                                          ; Inferred: player control enable
-!Field_Unk20 = $20                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
+!Field_Unk20 = $20                       ; 8-bit; set to 1 by Field_InitLoadState; nonzero makes
+                                         ; Field_FrameUpdate run Map_Unk8A6D
 !Field_BankC2Arg = $25                   ; 8-bit; picks the BankC2_Entry8000 argument on the fade-out
                                          ; path of Field_SceneChangeTick (0 -> Field_RunBankC2Mode5
                                          ; with 5; bit 7 -> bits 7-6 as A, bits 5-0 as X; else bit 0
@@ -111,8 +112,9 @@ if !ram_engine_inc == 0
 !Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
                                          ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
-!Field_Unk38 = $38                       ; 8-bit; Field_Unk885A dispatches on it ($0138);
-                                         ; DefaultHandler sets it to 1
+!Field_Unk38 = $38                       ; 8-bit step of Field_Unk885A (1, 2; it clears it when done);
+                                         ; DefaultHandler sets it to 1. Field_DpadDispatch does
+                                         ; nothing while it is nonzero
 !Field_EventHook = $39                   ; 8-bit; Field_EventHookDispatch runs table entry (value -
                                          ; 1) when nonzero; the handlers drive window (masking)
                                          ; effects and clear it (or move it on) when done
@@ -139,7 +141,8 @@ if !ram_engine_inc == 0
 !Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
 !Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);
-                                         ; blocks the pause/menu paths when nonzero
+                                         ; blocks the pause/menu paths and Field_DpadDispatch when
+                                         ; nonzero
 !Field_Unk63 = $63                       ; 8-bit index stepped up/down by Sub_1ADF and clamped to
                                          ; Field_Unk64/65; $80 at load
 !Field_Unk64 = $64                       ; 8-bit wrap value for Field_Unk63 (Sub_1ADF)
@@ -340,7 +343,8 @@ if !ram_engine_inc == 0
 !Pad_Unk00F6 = $00F6                     ; 8-bit button-style flags (same layout as Pad_Pressed?):
                                          ; bit 6 opens the menu path and bit 0 the
                                          ; Field_FadeToBankC2Mode5 path in Field_PauseAndMenuInput;
-                                         ; bit 7 clears Field_Unk34 (Sub_1ADF)
+                                         ; bit 7 clears Field_Unk34 (Sub_1ADF) and is the action
+                                         ; button of Field_ActionButton
 !Pad_Unk00F7 = $00F7                     ; 8-bit; Sub_1ADF: bit 2 steps Field_Unk63 up, bit 3 steps
                                          ; it down (Down/Up in the Pad_Pressed layout?)
 !Pad_Unk00F8 = $00F8                     ; 8-bit; Sub_1ADF: bit 7 sets Field_Unk62 = 3
@@ -658,7 +662,7 @@ if !ram_engine_inc == 0
                                          ; Field_ServiceUnk54's bit-5 box (Map_TileOriginX the lower)
 !Map_Unk1D10 = $1D10                     ; 16-bit; as Map_Unk1D0C for rows (Map_TileOriginY lower)
 !Map_Unk1D2A = $1D2A                     ; 8-bit; copied to Map_Unk1D2E each frame by
-                                         ; Map_ResetUnk2E30
+                                         ; Map_ResetUnk1D2E
 !Map_Unk1D2B = $1D2B                     ; 8-bit; copied to Map_Unk1D30 each frame (as above)
 !Map_Unk1D2C = $1D2C                     ; 8-bit; zeroed each frame by Field_FrameUpdate
 !Map_Unk1D2D = $1D2D                     ; 8-bit; zeroed each frame by Field_FrameUpdate

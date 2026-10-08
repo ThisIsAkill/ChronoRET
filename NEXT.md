@@ -24,9 +24,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    11. `$C1:4A11` 24 B: `BattleTgt_AreaLine+$F` (part); 1 differs (`JSR Battle_CalcAngle` ->
        `JSR $C1:2AE3`)
    12. `$C0:0304` 24 B: `Field_RestoreState+$F` (part); 3 differ (call targets)
-   13. `$C0:260E` 23 B: `DefaultHandler+$C4` (part); 0 differ
-   14. `$C0:5A46` 23 B: `Field_ProcessAnimQueue+$C` (part); 0 differ
-   15. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
+   13. `$C0:5A46` 23 B: `Field_ProcessAnimQueue+$C` (part); 0 differ
+   14. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
 
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
@@ -37,7 +36,13 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    9-entry table at `$C1:3760`), then its handlers, the enemy movers at `$C1:3772`-`$C1:4057` that use
    the box tests and the distance checks, and service 4 (`$C1:4058`). (`$C1:007E` and
    `$C1:283D`-`$C1:3713` are matched.)
-2. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
+2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
+   `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
+   `Field_ServiceUnk54` $C0:274D). Next, their unmatched callees, in reach order:
+   `Field_FindObjInFront` $C0:1CFC–$C0:1DF3 (with its 4-word facing table at $C0:1D56) and
+   `Field_CheckTileInFront` $C0:1DF4–$C0:1F23 (table at $C0:1E92), `Evt_StartTargetFunc1`
+   $C0:5AC5, `Field_DpadHandlerTable` $C0:8902 and the `Map_Unk*` steps of Field_FrameUpdate
+   ($8A6D, $9175, $91AC, $93E1, $99DE), `Map_Unk75A0`.
 
 ## Tables
 
@@ -55,7 +60,7 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
    Evt_RunObjInit); ends at `$C0:5F6E`, the shared handler for unused opcodes. Needs a name per
    handler first.
 4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
-   `$C0:4009`), `$C0:21EE` (~16, `$C0:21EA`), `$C0:7181` (12, `$C0:717D`), `$C0:6477` (8,
+   `$C0:4009`), `$C0:7181` (12, `$C0:717D`), `$C0:6477` (8,
    `$C0:633D`), `$C0:9FF7` (65, `$C0:9ECD`).
 5. Bank $C1 (`$C1:2D81` and `$C1:3216` are matched as BattlePos_ModeTable and
    Battle_FxHandlerTable): `$C1:3760` (9, `$C1:375C`), `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
