@@ -183,7 +183,8 @@ struct Tech_MenuEntry $1A80
 endstruct
 
 !Battle_Unk1C48          = $1C48 ; 1 B array indexed by !Battle_UnkA0FF; must equal $42 for tech id $74 to be usable
-                                 ; (UpdateTechMpAvail); purpose unknown
+                                 ; (UpdateTechMpAvail); BattleAct_LoadAttack reads the byte at PC slot * 5 as the PC's
+                                 ; attack record number; purpose unknown
 !Battler_TileGfxPtr      = $1C57 ; 3 B per battler slot (index slot*3): long pointer to the battler's 32-byte tiles,
                                  ; which Battle_DrawBattlerFrame copies by tile number; who fills it is not traced
 !Battler_FramesPtr       = $1C78 ; 3 B per battler slot (index slot*3): long pointer to the battler's frame records
@@ -212,8 +213,8 @@ endstruct
                                  ; bit 6 = blocks a battler box, bit 7 = blocks it unless !Battle_PassCellBit7 is
                                  ; set (Battle_BoxHitsBlockedCell). Who fills it is not traced
 
-!Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); also written by the
-                                 ; unmatched code at $C1:4471, $C1:457A and others
+!Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); the same bytes are
+                                 ; !Battle_ActThreadPtr while an action plays
 !Pc_PoseEntry            = $5DC1 ; 1 B per PC: current entry 0-7 of its pose list ($FF = before the first)
 !Battle_PoseSlot         = $5DC5 ; 2 B: PC slot Battle_PoseStep is on (zeroed 16-bit, counted 8-bit)
 !Battle_PoseFramesLeft   = $5DC9 ; 1 B: frames left in Battle_RunPcPose's loop
@@ -466,8 +467,8 @@ endstruct
 !Battle_UnkA0FE          = $A0FE ; 1 B: incremented by services 8 and 9 (the end-of-battle poses); read at $CF:EDC5;
                                  ; meaning unknown
 !Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
-!Battle_StatusAnimWraps  = $A102 ; 1 B: counts Battle_PickNextStatusAnim's wraps past slot 10 ($C1:4124 zeroes it and
-                                 ; waits for 1)
+!Battle_StatusAnimWraps  = $A102 ; 1 B: counts Battle_PickNextStatusAnim's wraps past slot 10 (BattleSys_RunAction zeroes
+                                 ; it and waits for 1)
 !Battler_AnimShown       = $A103 ; 1 B per battler slot: animation id last drawn (Battle_TickPcSlots)
 !Battle_UnkA10E          = $A10E ; 1 B: non-zero skips the message check in BattleSys_UpkeepTwoFrames; purpose unknown
 !BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is 0, or 1..MaxHP/8 with !BattleUI_UnkA110 set
@@ -476,9 +477,11 @@ endstruct
 !BattleUI_UnkA115        = $A115 ; 1-2 B: PC slot compared with the drawn slot in DrawCommandList; purpose unknown
 !BattleUI_UnkA117        = $A117 ; 1 B: zero lets DrawCommandList show the Combo list without the A115 test; purpose unknown
 !Battler_UnkA119         = $A119 ; 1 B per battler slot: non-zero = Battle_PickStatusAnim treats the battler as KO'd
-                                 ; (first record forced, !Battler_KoFlag set); written at $C1:4153/$C1:4204; meaning unknown
-!Battle_AnimFrameList    = $A1E8 ; 2 B: offset in !BattleRom_AnimData of the frame-id list being stepped
-!Battle_AnimDurList      = $A1FE ; 2 B: offset of the frame-duration list being stepped
+                                 ; (first record forced, !Battler_KoFlag set); set for PCs by BattleAct_FlagLethalPcHits (pending hit
+                                 ; reaches the HP) and cleared again by BattleSys_RunAction when it draws the KO frame
+!Battle_AnimFrameList    = $A1E8 ; 2 B: offset in !BattleRom_AnimData of the frame-id list being stepped; 2 B per
+                                 ; battler slot (index slot*2) in BattleAct_StepBattlerAnims
+!Battle_AnimDurList      = $A1FE ; 2 B: offset of the frame-duration list being stepped (per slot there too)
 !Battle_MoverAnim        = $A2B5 ; 1 B: !Enemy_Anim of the enemy being moved (Battle_RunEnemyMover); the movers test it
                                  ; for their variants (!Enemy_Move* constants)
 !Battler_FacingStrideHi  = $A2C8 ; 1 B per battler slot: high byte for !Battler_FacingStrideLo
@@ -547,6 +550,112 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Enemy_NameTiles         = $ACBC ; 24 B per enemy-name line: 11 lower-row tiles, 1 gap byte, 11 upper-row tiles
 
 ; ------------------------------------------------------------
+; Actions (service 4: BattleSys_RunAction and its loaders)
+; ------------------------------------------------------------
+; The action block !Battle_ActCaster..!Battle_ActUnkAE9B is filled by the
+; unmatched code at $C1:ACF0 from the chosen command; the meanings below
+; come from that code and from what service 4 does with the values.
+!Battle_ActCaster        = $AE91 ; 1 B: battler slot that acts (copied from $B18B at $C1:ACF9); 0-2 = a PC, so the
+                                 ; loaders pick the PC or the enemy records by it
+!Battle_ActKind          = $AE92 ; 1 B: loader 0-3 in BattleAct_LoaderTable (4 and up act as 0); from $AEE3
+!Battle_ActId            = $AE93 ; 1 B: record number for the loader (tech id for kind 2, inferred); from $AEE4
+!Battle_ActFlags         = $AE94 ; 1 B: bit 6 = also start the script's second thread group (!Battle_ActSecondGroup);
+                                 ; non-zero also skips BattleAnim_UnkVecCD0018 unless the id is $37
+!Battle_ActUnkAE9B       = $AE9B ; 1 B: bit 7 = a PC attack uses its third record set (the "Alt" fields); also
+                                 ; written at $C1:EDB5; purpose unknown
+!Battle_ActSecondGroup   = $A0B3 ; 2 B: bit 6 of !Battle_ActFlags (stored 16-bit by service 4); non-zero = the loaders
+                                 ; skip the first thread group and start the second; cleared (low byte) after use
+!Battle_ActRunning       = $A013 ; 1 B: counted up when service 4 starts the script, zeroed when it returns
+!Battle_ActFrameHold     = $A012 ; 1 B: set to 2 when BattleAct_StepBattlerAnims decodes a frame; non-zero = it decodes
+                                 ; none (zeroed by service 4 and $CC:F0EF, counted down at $CF:E775, unmatched)
+!Battle_UnkA028          = $A028 ; 1 B: non-zero = BattleAct_StepBattlerAnims decodes no frame; purpose unknown
+!Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in the
+                                 ; unmatched script code, zeroed by BattleAct_ResetState); service 4 waits for it
+!Battle_ActScriptId      = $9877 ; 1 B: script number of the action; first byte of the 16-byte parameter block
+                                 ; ($9877-$9886) that BattleAct_LoadScript clears
+!Battle_ActUnkArg987C    = $987C ; 1 B: A for BattleAnim_UnkVecCD0018 ($FF = do not call it); set to $FF by
+                                 ; BattleAct_LoadScript, from the record by the tech loaders; meaning unknown
+!Battle_Unk5D9B          = $5D9B ; 1 B: service 4 waits for it to be 0 after the script; zeroed by the $CD:0018
+                                 ; vector, counted up at $CD:0D8F/$CD:0E11 (unmatched); purpose unknown
+!Battle_UnkAB4E          = $AB4E ; 1 B: zeroed by service 4 after the script; purpose unknown
+!Battle_ActUnkA1A8       = $A1A8 ; 8 B lists ($A1A8 flags, $A1B0 timers, ...): $CC:F278 counts each set entry's
+                                 ; timer down and runs $CC:F2A9 at 0; service 4 clears 40 bytes from here
+!Battle_ActBattlers      = $A014 ; list of battler slots, $FF-ended ($CC:F156): caster, the two slots from $AE97/$AE98
+                                 ; (for a PC caster $FF there becomes the other two PCs), the main target, the others
+!Battle_ActTargets       = $AC5C ; list of the target slots (main target first), $FF-ended ($CC:F156)
+!Battle_ActPcHitAmount   = $AD9C ; 2 B, 4-byte record per PC: amount compared with the PC's HP by
+                                 ; BattleAct_FlagLethalPcHits (inferred: damage about to be dealt)
+!Battle_ActPcHitKind     = $AD9E ; 2 B, same records: kind of the amount; only kind 3 is checked
+!Battle_UnkA118          = $A118 ; 1 B: set to 2 at the end of service 4 when a PC was among the targets; purpose unknown
+!Battler_ActAnimMode     = $A124 ; 1 B per battler slot: action animation on (non-zero); 2 = loop at the end of the
+                                 ; list, else stop (BattleAct_StepBattlerAnims)
+!Battler_ActAnimTimer    = $A12F ; 1 B per battler slot: frames until the next entry of its action animation
+!Battler_ActAnimEntry    = $A13A ; 1 B per battler slot: current entry of its action animation lists
+!Battler_ActAnimStop     = $A150 ; 1 B per battler slot: non-zero = show entry (value - 1) and switch the animation off
+!Battler_ActFacing       = $A214 ; 1 B per battler slot: facing its action animation was last stepped with
+!Battle_ActAnimNextSlot  = $A21F ; 1 B: slot BattleAct_StepBattlerAnims starts its search at (round robin)
+!Battle_ActCalcSel       = $A4E8 ; 6 B: per entry, 0 = off, n = run BattleAct_RunCalc handler n - 1 every frame
+!Battle_ActCalcOutA      = $A2B0 ; 1 B: first result a BattleAct_RunCalc handler leaves (not analysed)
+!Battle_ActCalcOutB      = $A2B2 ; 1 B: second result
+!Battle_ActCalcResult    = $5DA0 ; 2 B per !Battle_ActCalcSel entry: the two results copied by BattleAct_TickCalcs
+!Battle_ActScriptOfs     = $9878 ; 2 B: offset of the script in its bank ($CE or $CD; see the loaders); zeroed first,
+                                 ; so the 16-bit read of !Battle_ActScriptId sees 0 above it
+!Battle_ActGfxSetA       = $987A ; 1 B: graphics set for BattleAnim_LoadGfx4Vec
+!Battle_ActGfxSetB       = $987B ; 1 B: graphics set for BattleAnim_LoadGfx2Vec
+!Battle_ActFramesIdx     = $987E ; 1 B: index into the sprite-frame pointer table (read 16-bit, $987F zeroed)
+!Battle_ActFramesPtr     = $987F ; 2 B: pointer in bank $D1 to the packed sprite frames (BattleAct_LoadCommon)
+!Battle_ActPalIdx        = $9881 ; 1 B: index into the palette-step pointer table (read 16-bit, $9882 zeroed)
+!Battle_ActPalPtr        = $9882 ; 2 B: offset in bank $CD of the palette steps BattleAct_StepPalettes reads
+!Battle_ActObjIdx        = $9884 ; 1 B: index into the object-record pointer table (read 16-bit, $9885 zeroed)
+!Battle_ActObjPtr        = $9885 ; 2 B: offset in bank $CE of the object records (BattleAct_IndexObjLists)
+!Battle_ActNear          = $9930 ; 1 B: set by BattleAct_CheckReach ($C1:49FF, unmatched): 1 when the main target is
+                                 ; within 40 pixels (BattlePos_WithinDist40XY), then for some characters or when within
+                                 ; reach decided again by $C1:4A71; picks a PC attack's "Near" or "Far" records
+!Battle_ActPcAttackRec   = $A4E7 ; 1 B: record number of the PC attack (from !Battle_Unk1C48); not read in bank $C1's
+                                 ; matched code
+!Battle_ActThreadOn      = $5DAC ; 1 B per script thread 0-15: non-zero = BattleAct_RunThreads runs it (stored 16-bit)
+!Battle_ActThreadPtr     = $5DBD ; 4 B per thread: offset word of its script position, then the bank ($CE or $CD,
+                                 ; !Battle_ActThreadBank) and 0; same bytes as !Pc_PoseTimer and the pose variables
+!Battle_ActThreadBank    = $5DBF ; 2 B per thread (same 4-byte records): bank byte and 0
+!Battle_DecompSrc        = $0300 ; 2 B: Decomp_ToWramVec source address (DP $00 of that routine, which sets DP=$0300)
+!Battle_DecompSrcBank    = $0302 ; 1 B: its bank
+!Battle_DecompDest       = $0303 ; 2 B: WRAM destination address (written to WMADDL)
+!Battle_DecompDestBank   = $0305 ; 1 B: its bank (bit 0 to WMADDH)
+!Battle_DecompLen        = $0306 ; 2 B: read back as the end offset of the output (inferred: BattleAct_LoadCommon
+                                 ; marks the end of the data there)
+!Battle_ActFrameBuf      = $2D00 ; bank $7E buffer the packed sprite frames are unpacked into (also the source of the
+                                 ; graphics uploads at $CD:1314/$CD:1323, unmatched)
+!Battle_ActFrameNum      = $A650 ; 2 B: next frame BattleAct_UnpackFrames builds (0-31)
+!Battle_ActFrameReadOfs  = $A652 ; 2 B: read offset in !Battle_ActFrameBuf
+!Battle_ActFrameSprites  = $A05B ; 1 B per frame 0-31: sprites built for it
+!Battle_ActRowMasks      = $A2D3 ; up to 15 B: column masks of the frame being built, one per row
+!Battle_ActAttrBits      = $A5E3 ; 1 B: ORed into the attribute byte of every action sprite and into byte +3 of the
+                                 ; action objects; who sets it is not traced
+!Battle_ActObjListStart  = $A280 ; 2 B per action object 0-15: offset of its first record (bank $CE)
+!Battle_ActObjMarkCount  = $A2A0 ; 1 B per action object: record count at its last mark (BattleAct_IndexObjLists)
+!Battle_ActObjUnkA07B    = $A07B ; 1 B per action object: set to 1 by BattleAct_LoadCommon; meaning unknown
+
+; Sprites of the action's frames: 4 bytes per sprite, $C0 bytes (48
+; sprites) per frame at the offset !BattleRom_ActFrameBase gives
+; (BattleAct_UnpackFrames). "Sprite" is inferred from the layout.
+struct BattleActSprite $4500
+.X:         skip 1      ; +0: x in the frame, column * 16
+.Y:         skip 1      ; +1: y in the frame, row * 16
+.Tile:      skip 1      ; +2: tile byte from the frame data
+.Attr:      skip 1      ; +3: attribute byte from the frame data, with !Battle_ActAttrBits
+endstruct
+
+; The 16 action objects, 8 bytes each (index object * 8), set up by
+; BattleAct_LoadCommon; what they are is not established.
+struct BattleActObj $5D00
+.Unk0:      skip 1      ; +0: zeroed
+.Unk1:      skip 1      ; +1: zeroed
+.Unk2:      skip 1      ; +2: from BattleRom_ActObjInit.Unk0
+.Unk3:      skip 1      ; +3: from BattleRom_ActObjInit.Unk1, with !Battle_ActAttrBits
+            skip 4
+endstruct
+
+; ------------------------------------------------------------
 ; Banks and ROM data read by bank $C1
 ; ------------------------------------------------------------
 !Battle_WramBank           = $7E      ; WRAM bank (MVN destination)
@@ -610,6 +719,122 @@ endstruct
 !BattleRom_EnemyMover     = $CCFBAB  ; 1 B per !Enemy_Anim id ($1A ids, up to $CC:FBC4): entry 0-8 of
                                       ; Battle_EnemyMoverTable (Battle_RunEnemyMover)
 !BattleRom_Div5           = $CCFBCE  ; 1 B per n: n / 5 (checked for the first 32 bytes); duration byte -> frames
+!BattleRom_ActForceAlt    = $CFFFFF  ; 1 B: non-zero = service 4 sets !Battle_ActUnkAE9B bit 7 and clears the flags (0 here)
+!BattleRom_ActForceSecond = $CFFFFE  ; 1 B: non-zero = service 4 sets !Battle_ActFlags to bit 6 (0 in this ROM)
+!BattleRom_ActForceNone   = $CFFFFD  ; 1 B: non-zero = service 4 clears both (0 in this ROM); the three look like
+                                      ; build switches
+!BattleRom_PcKoFrame      = $D15F42  ; 1 B per character * 4 + facing: frame id service 4 draws for a PC whose
+                                      ; pending hit reaches its HP (inferred from that use: the KO'd pose)
+!BattleRom_ScriptBankPc   = $CE      ; bank of the scripts and object records of PC attacks, PC techs and kind 3
+!BattleRom_ScriptBankEnemy = $CD     ; bank of the scripts of enemy actions
+!BattleRom_ScriptsCE      = $CE0000  ; base for reads at a script offset in bank $CE (thread offsets, object records)
+!BattleRom_ScriptsCD      = $CD0000  ; the same in bank $CD
+; Script header: two 16-bit thread masks, high byte first (BattleAct_LoadAttack and the other loaders).
+struct BattleRom_ScriptHdrCE $CE0000
+.Mask1Hi:   skip 1      ; +0: first group, threads 0-7 (bit 7 = thread 0)
+.Mask1Lo:   skip 1      ; +1: first group, threads 8-15
+.Mask2Hi:   skip 1      ; +2: second group, threads 0-7
+.Mask2Lo:   skip 1      ; +3: second group, threads 8-15
+endstruct
+struct BattleRom_ScriptHdrCD $CD0000
+.Mask1Hi:   skip 1
+.Mask1Lo:   skip 1
+.Mask2Hi:   skip 1
+.Mask2Lo:   skip 1
+endstruct
+; Script number of a PC's attack, 1 B per character (index !Pc_CharId) in each of three lists.
+struct BattleRom_PcAttackScript $CD4000
+.Far:       skip 7      ; !Battle_ActNear = 0
+.Near:      skip 7      ; !Battle_ActNear set
+.Alt:       skip 7      ; !Battle_ActUnkAE9B bit 7 set
+endstruct
+; PC attack records, 15 B per record number (!Battle_ActPcAttackRec): three sets of 5 bytes.
+struct BattleRom_PcAttackAct $CD4015
+.FarGfxA:   skip 1      ; +0: !Battle_ActGfxSetA
+.FarGfxB:   skip 1      ; +1: !Battle_ActGfxSetB
+.FarFrames: skip 1      ; +2: !Battle_ActFramesIdx
+.FarPal:    skip 1      ; +3: !Battle_ActPalIdx
+.FarObj:    skip 1      ; +4: !Battle_ActObjIdx
+.NearGfxA:  skip 1      ; +5: the same five for "Near"
+.NearGfxB:  skip 1
+.NearFrames: skip 1
+.NearPal:   skip 1
+.NearObj:   skip 1
+.AltGfxA:   skip 1      ; +10: the same five for "Alt"
+.AltGfxB:   skip 1
+.AltFrames: skip 1
+.AltPal:    skip 1
+.AltObj:    skip 1
+endstruct
+; Enemy attack records, 6 B per !Battler_Unk984D value: first attack (!Battle_ActId 0) and second.
+struct BattleRom_EnemyAttackAct $CD4926
+.Script:    skip 1      ; +0: !Battle_ActScriptId
+.GfxA:      skip 1      ; +1: !Battle_ActGfxSetA
+.GfxB:      skip 1      ; +2: !Battle_ActGfxSetB
+.Frames:    skip 1      ; +3: !Battle_ActFramesIdx
+.Pal:       skip 1      ; +4: !Battle_ActPalIdx
+.Obj:       skip 1      ; +5: !Battle_ActObjIdx
+endstruct
+struct BattleRom_EnemyAttack2Act $CD4F26
+.Script:    skip 1
+.GfxA:      skip 1
+.GfxB:      skip 1
+.Frames:    skip 1
+.Pal:       skip 1
+.Obj:       skip 1
+endstruct
+; Tech records, 7 B per !Battle_ActId: the six above plus the argument of BattleAnim_UnkVecCD0018.
+struct BattleRom_PcTechAct $CD45A6
+.Script:    skip 1
+.GfxA:      skip 1
+.GfxB:      skip 1
+.Frames:    skip 1
+.Pal:       skip 1
+.Obj:       skip 1
+.Arg:       skip 1      ; +6: !Battle_ActUnkArg987C
+endstruct
+struct BattleRom_EnemyTechAct $CD5526
+.Script:    skip 1
+.GfxA:      skip 1
+.GfxB:      skip 1
+.Frames:    skip 1
+.Pal:       skip 1
+.Obj:       skip 1
+.Arg:       skip 1
+endstruct
+struct BattleRom_Kind3Act $CD5C26   ; 7 B per !Battle_ActId - $BC
+.Script:    skip 1
+.GfxA:      skip 1
+.GfxB:      skip 1
+.Frames:    skip 1
+.Pal:       skip 1
+.Obj:       skip 1
+.Arg:       skip 1
+endstruct
+!BattleRom_PcAttackScripts = $CD5EC6 ; 2 B per script number: script offset in bank $CE (PC attacks)
+!BattleRom_PcTechScripts  = $CD5EF0  ; 2 B per script number: offset in bank $CE (PC techs)
+!BattleRom_EnemyAttackScripts = $CD5FF0 ; 2 B per script number: offset in bank $CD (enemy attacks)
+!BattleRom_EnemyTechScripts = $CD61F0 ; 2 B per script number: offset in bank $CD (enemy techs)
+!BattleRom_Kind3Scripts   = $CD63F0  ; 2 B per script number: offset in bank $CE (kind 3)
+!BattleRom_PcAttackObjs   = $CD64B0  ; 2 B per !Battle_ActObjIdx: object-record offset in bank $CE (PC attacks)
+!BattleRom_TechObjs       = $CD656E  ; the same for PC techs and kind 3
+!BattleRom_EnemyActObjs   = $CD666E  ; the same for enemy attacks and techs
+!BattleRom_PcAttackPals   = $CD686E  ; 2 B per !Battle_ActPalIdx: palette-step offset in bank $CD (PC attacks)
+!BattleRom_PcTechPals     = $CD692C  ; the same for PC techs
+!BattleRom_EnemyActPals   = $CD6A2C  ; the same for enemy attacks and techs
+!BattleRom_Kind3Pals      = $CD6C2C  ; the same for kind 3
+!BattleRom_ActFramesBank  = $D1      ; bank of the sprite-frame pointer tables and the packed frames
+!BattleRom_PcAttackFrames = $D10000  ; 2 B per !Battle_ActFramesIdx: packed sprite frames in bank $D1 (PC attacks)
+!BattleRom_ActFrames      = $D10060  ; the same for every other action
+; Initial bytes +2/+3 of the 16 action objects, 6 B per object.
+struct BattleRom_ActObjInit $D150A2
+.Unk0:      skip 1      ; +0: to BattleActObj.Unk2
+.Unk1:      skip 1      ; +1: to BattleActObj.Unk3
+            skip 4
+endstruct
+!BattleRom_SlotTimes5     = $CCF83F  ; 1 B per PC slot (7 entries, 0-$1E): n * 5
+!BattleRom_ActFrameBase   = $CCF7C0  ; 2 B per action frame 0-31: frame * $C0, its block in BattleActSprite
+!BattleRom_Times16        = $CCF820  ; 1 B per n 0-8: n * 16 (sprite column/row to pixels)
 !BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
 !BattleRom_CommandWindowFrame     = $D159FC  ; 84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell
 !BattleRom_TechBoxMap      = $D15A50  ; $180 B: tech window frame tilemap

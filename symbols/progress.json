@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 39735,
+  "emitted_bytes": 42206,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 364,
+      "bytes": 42206
     },
     "readable": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 364,
+      "bytes": 42206
     },
     "verified": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 348,
+      "bytes": 39645
     }
   },
   "banks": [
@@ -37,18 +37,18 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 16346,
+      "emitted_bytes": 18817,
       "matched": {
-        "functions": 195,
-        "bytes": 16346
+        "functions": 207,
+        "bytes": 18817
       },
       "readable": {
-        "functions": 195,
-        "bytes": 16346
+        "functions": 207,
+        "bytes": 18817
       },
       "verified": {
-        "functions": 195,
-        "bytes": 16346
+        "functions": 191,
+        "bytes": 16256
       }
     },
     {
@@ -636,9 +636,21 @@
       "bank": "$C1",
       "start": "$C1:4000",
       "end": "$C1:4FFF",
-      "emitted_bytes": 88,
+      "emitted_bytes": 2559,
       "functions": [
-        "Battle_MoverToCentre"
+        "Battle_MoverToCentre",
+        "BattleSys_RunAction",
+        "BattleAct_FlagLethalPcHits",
+        "BattleAct_TickCalcs",
+        "BattleAct_StepBattlerAnims",
+        "BattleAct_LoadScript",
+        "BattleAct_LoadAttack",
+        "BattleAct_LoadTech",
+        "BattleAct_LoadNone",
+        "BattleAct_LoadKind3",
+        "BattleAct_LoadCommon",
+        "BattleAct_IndexObjLists",
+        "BattleAct_UnpackFrames"
       ]
     },
     {

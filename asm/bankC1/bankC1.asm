@@ -29,9 +29,10 @@ incsrc "../hardware.inc"
 ; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
 ; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
 ; BattleSys_DefeatPose, BattleSys_VictoryPose (three times),
-; Battle_RunPcPose, and the unmatched code at $C1:405F, $C1:40A0,
-; $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4, $C1:41B7, $C1:4841,
-; $C1:485B, $C1:4864, $C1:488D, $C1:4943.
+; Battle_RunPcPose, BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0,
+; $C1:40E1, $C1:4116, $C1:414B, $C1:41B4, $C1:41B7), BattleAct_LoadCommon
+; ($C1:4841, $C1:485B, $C1:4864, $C1:488D) and BattleAct_UnpackFrames
+; ($C1:4943).
 ; Entry: M=1 (8-bit INC/LDA of the flag), X any, DP=0, DB=$7E (as at
 ;        every caller; the routine itself only touches direct page)
 ; Exit:  M=1, DP=0; A = 0; X, Y, DB as the $CD0036 callee leaves them
@@ -191,7 +192,8 @@ Battle_Divide:
 ;     $C1:6634
 ;   Battle_ShiftLeft4: Battle_FxReset ($C1:30CF), Battle_FxOverlay2Tint
 ;     ($C1:310F)
-;   Battle_ShiftLeft3: Battle_TickEnemyGroup ($C1:3410, $C1:3471), $C1:48BA
+;   Battle_ShiftLeft3: Battle_TickEnemyGroup ($C1:3410, $C1:3471),
+;     BattleAct_LoadCommon ($C1:48BA)
 ;   Battle_ShiftRight8: BattlePos_DistDifference ($C1:2D73)
 ;   Battle_ShiftRight6: $C1:3AB7, $C1:3C41, $C1:53B2, $C1:53B9
 ;   Battle_ShiftRight5: $C1:39F6, $C1:39FE, $C1:3A0A, $C1:3A12
@@ -3524,8 +3526,9 @@ BattleMenu_RefreshIfDirtyL:
 ; flag gate and menu rebuild chain, but always follows up with a
 ; cross-bank per-frame service tick (BattleSys_FrameTickVec) before returning via
 ; plain RTS. Called once per frame from the battle-phase state machine.
-; Callers (7 JSR sites): unmatched code at $C1:40A3, $C1:40B6, $C1:40E4,
-;   $C1:485E, $C1:4867, $C1:4890, $C1:4946.
+; Callers (7 JSR sites): BattleSys_RunAction ($C1:40A3, $C1:40B6,
+;   $C1:40E4), BattleAct_LoadCommon ($C1:485E, $C1:4867, $C1:4890) and
+;   BattleAct_UnpackFrames ($C1:4946).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered, plus whatever BattleSys_FrameTickVec (not matched yet)
@@ -7281,7 +7284,7 @@ Battle_PickStatusAnim:
 ; Battle_TickPcSlots). Then runs Battle_ApplyPendingEffect for all 11
 ; slots. The animation id the pick leaves in !Battle_AnimId is not used
 ; here.
-; Callers (JSR; scanned as above): the unmatched code at $C1:4127, which
+; Callers (JSR; scanned as above): BattleSys_RunAction ($C1:4127), which
 ; starts it at slot 0 and calls it until !Battle_StatusAnimWraps is set
 ; (inferred: one full pass over every battler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; TAX of the slot also copies B, assumed 0
@@ -9908,6 +9911,1539 @@ Battle_MoverToCentre:
     INX
     INX
     STX.b !Battle_BoxTestSlot
+    RTS
+
+; ==================================================================
+; Actions: service 4 and its frame helpers ($C1:4058–$C1:432B)
+; ==================================================================
+; Service 4 of the $C10045 API plays one action (an attack, a tech or
+; the like; "action" is inferred from the records it loads, see
+; BattleAct_LoadScript): it loads the action's script, graphics and
+; palette steps, then runs the script frame by frame until the script
+; says it has ended. The action is described by the block at
+; !Battle_ActCaster..!Battle_ActUnkAE9B, which the unmatched code at
+; $C1:ACF0 fills from the chosen command (caster from $B18B, kind and
+; id from $AEE3/$AEE4, target masks built from the target list at
+; $AECC). The script interpreter itself (the threads that
+; BattleAct_RunThreads at $C1:4BBE runs) is not matched yet.
+
+; ==================================================================
+; BattleSys_RunAction ($C14058–$C141BD, 358 bytes)
+; ==================================================================
+; Service 4 of the cross-bank $C10045 service API (dispatch table at
+; $C10051, entry 4 = $4058; no JSR, JMP or JSL reaches $4058 directly;
+; the one request found is LDA #4 / JSR $C1:0003 at $C1:BFA4, called
+; from $C1:AC57). Plays the action in !Battle_ActCaster.. (see the
+; banner):
+;   1. counts !Battle_UnkA0FD up, resets the action state
+;      (BattleAct_ResetState) and waits a frame. Three ROM bytes at
+;      $CF:FFFD-$CF:FFFF can force !Battle_ActUnkAE9B / !Battle_ActFlags
+;      (they look like build switches; all three are 0 in this ROM, so
+;      none applies);
+;   2. keeps !Battle_UnkA4 on the stack, takes !Battle_ActSecondGroup
+;      from bit 6 of !Battle_ActFlags, sets every !Battler_FxApplied to
+;      $55 (BattleAct_ResetFxApplied), marks the action running
+;      (!Battle_ActRunning), builds the battler lists
+;      (BattleAct_BuildBattlerList) and loads the script
+;      (BattleAct_LoadScript);
+;   3. runs one script frame per frame (battler animations, the menu, timers,
+;      palette steps, the per-entry calculations, the occupied-cell map,
+;      the probes, the script threads) until !Battle_ActScriptDone;
+;   4. sends APU command $18 with parameter $FF, then waits until
+;      !Battle_Unk5D9B is 0;
+;   5. restores !Battle_UnkA4, clears !Battle_UnkAB4E and 40 bytes from
+;      !Battle_ActUnkA1A8, and, for each enemy in !Battle_ActBattlers,
+;      takes its screen position as the start of its next step
+;      (!Enemy_StepStartX/Y; inferred: so the stepper does not pull it
+;      back to where it was before the action);
+;   6. waits a frame, resets the action state again, and runs
+;      Battle_PickNextStatusAnim from slot 0 until it wraps once (every
+;      battler's status animation picked again), keeping
+;      !Battle_StatusAnimNext;
+;   7. if a PC is among the targets (!Battle_ActTargets), flags each PC
+;      whose pending damage reaches its HP (BattleAct_FlagLethalPcHits)
+;      and draws such a PC's frame from !BattleRom_PcKoFrame (character
+;      * 4 + facing), clearing its !Battler_UnkA119 again; sets
+;      !Battle_UnkA118 to 2 and waits two frames;
+;   8. clears !Battle_ActRunning.
+; Quirk: the TAX that takes bit 6 copies the whole 16-bit accumulator,
+; and the loaders test !Battle_ActSecondGroup 16-bit while clearing only
+; its low byte, so the high byte of A here matters; it comes from the
+; callees before (not established, presumably 0).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher, which saves A,
+;        X and Y around the call)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkA4 as
+;        on entry; the callees' DP scratch written
+; Callees: BattleAct_ResetState, BattleSys_PumpFrames,
+;          BattleAct_ResetFxApplied, BattleMenu_RefreshIfDirtyAndTick,
+;          BattleAct_BuildBattlerList, BattleAct_LoadScript,
+;          BattleAct_StepBattlerAnims, BattleAct_TickUnkA1A8,
+;          BattleAct_StepPalettes, BattleAct_TickCalcs,
+;          Battle_BuildOccupiedCellMap, Battle_CacheBattlerCoordsAll,
+;          BattleAct_RunThreads, Audio_ProcessEntry,
+;          Battle_PickNextStatusAnim, BattleAct_FlagLethalPcHits,
+;          Battle_DrawBattlerFrame
+BattleSys_RunAction:
+    INC.w !Battle_UnkA0FD
+    JSL BattleAct_ResetState
+    JSR BattleSys_PumpFrames
+    STZ.b !Battle_UnkE5
+    LDA.l !BattleRom_ActForceAlt
+    BEQ .switch2
+    LDA.b #!Battle_ActAltFlag
+    STA.w !Battle_ActUnkAE9B
+    STZ.w !Battle_ActFlags
+    BRA .run
+.switch2:
+    LDA.l !BattleRom_ActForceSecond
+    BEQ .switch3
+    LDA.b #!Battle_ActFlagSecond
+    STA.w !Battle_ActFlags
+    STZ.w !Battle_ActUnkAE9B
+    BRA .run
+.switch3:
+    LDA.l !BattleRom_ActForceNone
+    BEQ .run
+    STZ.w !Battle_ActUnkAE9B
+    STZ.w !Battle_ActFlags
+.run:
+    LDA.b !Battle_UnkA4
+    PHA
+    LDA.w !Battle_ActFlags
+    AND.b #!Battle_ActFlagSecond
+    TAX                             ; quirk: also copies B (see header)
+    STX.w !Battle_ActSecondGroup
+    JSL BattleAct_ResetFxApplied
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    INC.w !Battle_ActRunning
+    JSL BattleAct_BuildBattlerList
+    JSR BattleAct_LoadScript
+.frame:
+    JSR BattleSys_PumpFrames
+    JSR BattleAct_StepBattlerAnims
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    JSL BattleAct_TickUnkA1A8
+    JSL BattleAct_StepPalettes
+    JSR BattleAct_TickCalcs
+    JSL Battle_BuildOccupiedCellMap
+    JSR Battle_CacheBattlerCoordsAll
+    JSR BattleAct_RunThreads
+    LDA.w !Battle_ActScriptDone
+    BEQ .frame
+    LDA.b #!Sfx_Unk18Arg
+    STA.w !Sfx_Param1
+    LDA.b #!Sfx_CmdUnk18
+    STA.w !Sfx_Command
+    JSL Audio_ProcessEntry
+.wait_5d9b:
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    LDA.w !Battle_Unk5D9B
+    BNE .wait_5d9b
+    PLA
+    STA.b !Battle_UnkA4
+    STZ.w !Battle_UnkAB4E
+    LDX.w #!Battle_ActUnkA1A8Cleared-1
+.clear_a1a8:
+    STZ.w !Battle_ActUnkA1A8,X
+    DEX
+    BPL .clear_a1a8
+    TDC
+    TAX
+.battler:
+    LDA.w !Battle_ActBattlers,X
+    BMI .battlers_done
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .battler_next               ; a PC
+    TAY
+    LDA.w !Battler_ScreenX,Y
+    STA.w !Enemy_StepStartX-!Battle_FirstEnemySlot,Y
+    LDA.w !Battler_ScreenY,Y
+    STA.w !Enemy_StepStartY-!Battle_FirstEnemySlot,Y
+.battler_next:
+    INX
+    BRA .battler
+.battlers_done:
+    JSR BattleSys_PumpFrames
+    JSL BattleAct_ResetState
+    LDA.w !Battle_StatusAnimNext
+    PHA
+    STZ.w !Battle_StatusAnimNext
+    STZ.w !Battle_StatusAnimWraps
+.status_pass:
+    JSR Battle_PickNextStatusAnim
+    LDA.w !Battle_StatusAnimWraps
+    BEQ .status_pass
+    PLA
+    STA.w !Battle_StatusAnimNext
+    STZ.w !Battle_ActFrameHold
+    TDC
+    TAX
+.target:
+    LDA.w !Battle_ActTargets,X
+    BMI .exit                       ; no PC among the targets
+    BEQ .pc_hit
+    DEC A
+    BEQ .pc_hit
+    DEC A
+    BEQ .pc_hit
+    INX
+    BRA .target
+.pc_hit:
+    JSR BattleAct_FlagLethalPcHits
+    JSR BattleSys_PumpFrames
+    LDA.w !Battler_UnkA119
+    BEQ .pc1
+    STZ.w !Battler_UnkA119
+    STZ.w !Battle_FrameSlot         ; PC 0
+    LDA.w !Pc_CharId
+    ASL A
+    ASL A
+    CLC
+    ADC.w !Battler_Facing
+    TAX
+    LDA.l !BattleRom_PcKoFrame,X
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+.pc1:
+    LDA.w !Battler_UnkA119+1
+    BEQ .pc2
+    STZ.w !Battler_UnkA119+1
+    LDA.b #1
+    STA.w !Battle_FrameSlot
+    LDA.w !Pc_CharId+1
+    ASL A
+    ASL A
+    CLC
+    ADC.w !Battler_Facing+1
+    TAX
+    LDA.l !BattleRom_PcKoFrame,X
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+.pc2:
+    LDA.w !Battler_UnkA119+2
+    BEQ .settle
+    STZ.w !Battler_UnkA119+2
+    LDA.b #2
+    STA.w !Battle_FrameSlot
+    LDA.w !Pc_CharId+2
+    ASL A
+    ASL A
+    CLC
+    ADC.w !Battler_Facing+2
+    TAX
+    LDA.l !BattleRom_PcKoFrame,X
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+.settle:
+    LDA.b #2
+    STA.w !Battle_UnkA118
+    JSR BattleSys_PumpFrames
+    JSR BattleSys_PumpFrames
+.exit:
+    STZ.w !Battle_ActRunning
+    RTS
+
+; ==================================================================
+; BattleAct_FlagLethalPcHits ($C141BE–$C14211, 84 bytes)
+; ==================================================================
+; For each PC 0-2, sets its !Battler_UnkA119 to 1 when its pending hit
+; record (!Battle_ActPcHitAmount/Kind, 4 bytes per PC) has kind 3, the
+; PC's HP is not 0, the amount is not 0 and the amount is at least the
+; HP; otherwise to 0. "Hit" and "lethal" are inferred from the amount
+; being compared with BattlerStats.CurHp and from Battle_PickStatusAnim
+; treating a flagged battler as KO'd; what kind 3 means is not known.
+; The counters are bumped with a 16-bit INC (DP $82 + PC), which cannot
+; carry since each is bumped at most once.
+; Quirk: the kind is tested for 0 before it is compared with 3, which
+; changes nothing.
+; Callers (JSR): BattleSys_RunAction ($C1:4148) only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = PC 2's flag; X, Y clobbered; DP
+;        $80-$85 written
+!BattleAct_HitPc = !BattleTmp_80        ; 2 B: PC 0-2 being checked (16-bit)
+!BattleAct_HitFlags = !BattleTmp_82     ; 3 B: flag per PC ($82-$84), copied to !Battler_UnkA119
+BattleAct_FlagLethalPcHits:
+    TDC
+    TAX
+    TAY
+    STY.b !BattleAct_HitPc
+    STY.b !BattleAct_HitFlags
+    STY.b !BattleAct_HitFlags+2
+    REP #$20
+.pc:
+    LDA.b !BattleAct_HitPc
+    XBA
+    LSR A
+    TAX                             ; PC * $80: its BattlerStats offset
+    LDA.w !Battle_ActPcHitKind,Y
+    BEQ .next                       ; quirk: 0 is not 3 either
+    CMP.w #!Battle_ActHitKind3
+    BNE .next
+    LDA.w BattlerStats.CurHp,X
+    BEQ .next
+    LDA.w !Battle_ActPcHitAmount,Y
+    BEQ .next
+    EOR.w #!Battle_Invert16
+    INC A
+    CLC
+    ADC.w BattlerStats.CurHp,X      ; HP - amount
+    BEQ .lethal
+    BCS .next                       ; HP > amount
+.lethal:
+    LDX.b !BattleAct_HitPc
+    INC.b !BattleAct_HitFlags,X
+.next:
+    INY
+    INY
+    INY
+    INY
+    INC.b !BattleAct_HitPc
+    LDA.b !BattleAct_HitPc
+    CMP.w #!Battle_NumPcSlots
+    BNE .pc
+    TDC
+    SEP #$20
+    LDA.b !BattleAct_HitFlags
+    STA.w !Battler_UnkA119
+    LDA.b !BattleAct_HitFlags+1
+    STA.w !Battler_UnkA119+1
+    LDA.b !BattleAct_HitFlags+2
+    STA.w !Battler_UnkA119+2
+    RTS
+
+; ==================================================================
+; BattleAct_TickCalcs ($C14212–$C14239, 40 bytes)
+; ==================================================================
+; For each of the 6 entries of !Battle_ActCalcSel that is non-zero, runs
+; handler (value - 1) of the unmatched table behind BattleAct_RunCalc
+; and stores the two bytes it leaves in !Battle_ActCalcOutA/B into the
+; entry's pair at !Battle_ActCalcResult. What the handlers compute is
+; not analysed (the entries are set by the script code, presumably).
+; Callers (JSR): BattleSys_RunAction ($C1:40C1) only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered; Y unchanged
+;        (BattleAct_RunCalc keeps X and Y); DP $90-$91 written
+; Callees: BattleAct_RunCalc
+!BattleAct_CalcIdx = !BattleTmp_90      ; 2 B: entry 0-5 (zeroed 16-bit, counted 8-bit)
+BattleAct_TickCalcs:
+    TDC
+    TAX
+    STX.b !BattleAct_CalcIdx
+.entry:
+    LDX.b !BattleAct_CalcIdx
+    LDA.w !Battle_ActCalcSel,X
+    BEQ .next
+    DEC A
+    JSR BattleAct_RunCalc
+    LDA.b !BattleAct_CalcIdx
+    ASL A
+    TAX
+    LDA.w !Battle_ActCalcOutA
+    STA.w !Battle_ActCalcResult,X
+    LDA.w !Battle_ActCalcOutB
+    STA.w !Battle_ActCalcResult+1,X
+.next:
+    INC.b !BattleAct_CalcIdx
+    LDA.b !BattleAct_CalcIdx
+    CMP.b #!Battle_ActCalcEntries
+    BNE .entry
+    RTS
+
+; ==================================================================
+; BattleAct_StepBattlerAnims ($C1423A–$C1430F, 214 bytes)
+; ==================================================================
+; Plays the battlers' action animations, decoding at most one frame per
+; call. First counts every non-zero !Battler_ActAnimTimer down. Then,
+; starting at !Battle_ActAnimNextSlot and going round all 11 slots, looks
+; for a battler whose animation is on (!Battler_ActAnimMode) and whose
+; timer has run out. If none, or while !Battle_UnkA028 or
+; !Battle_ActFrameHold is set, it does nothing more. Otherwise, for that
+; battler (and the search starts after it next time):
+;   - remembers its facing in !Battler_ActFacing and takes facing *
+;     facing stride, as Battle_TickPcSlots does;
+;   - moves !Battler_ActAnimEntry on by one; if !Battler_ActAnimStop is
+;     non-zero, the entry becomes that value - 1 and the animation is
+;     switched off (the frame is still drawn);
+;   - reads the entry's duration from the battler's duration list
+;     (!Battle_AnimDurList, 2 bytes per slot here, in bank $E4). A
+;     duration of 0 ends the list: mode 2 starts again at entry 0
+;     (a list starting with 0 would loop for ever), any other mode is
+;     switched off and nothing is drawn;
+;   - else sets the timer to the duration (not divided by 5, unlike
+;     Battle_TickPcSlots), decodes the entry's frame id from the frame
+;     list (!Battle_AnimFrameList + facing offset) with
+;     Battle_DrawBattlerFrame, and sets !Battle_ActFrameHold to 2.
+; The modes and lists are set by code not matched yet (the script
+; threads, presumably); "mode 2 = loop" is read from this routine only.
+; Quirk: when the facing equals !Battler_ActFacing it is loaded again
+; from there, the same value.
+; Callers (JSR): BattleSys_RunAction ($C1:40B3) only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; when a frame was
+;        drawn, DP $80-$83, the multiply's $A5-$AB and
+;        Battle_DrawBattlerFrame's scratch written
+; Callees: Battle_Mul8x16, Battle_DrawBattlerFrame
+!BattleAct_AnimSlot = !BattleTmp_80     ; 1 B: battler slot being stepped
+!BattleAct_AnimFacingOfs = !BattleTmp_82 ; 2 B: facing * facing stride
+BattleAct_StepBattlerAnims:
+    TDC
+    TAX
+.count_down:
+    LDA.w !Battler_ActAnimTimer,X
+    BEQ .count_next
+    DEC.w !Battler_ActAnimTimer,X
+.count_next:
+    INX
+    CPX.w #!Battle_NumSlots
+    BNE .count_down
+    TDC
+    TAY
+    LDA.w !Battle_ActAnimNextSlot
+    TAX
+.find:
+    LDA.w !Battler_ActAnimMode,X
+    BEQ .find_next
+    LDA.w !Battler_ActAnimTimer,X
+    BEQ .found
+.find_next:
+    INX
+    CPX.w #!Battle_NumSlots
+    BNE .find_count
+    TDC
+    TAX
+.find_count:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .find
+.exit:
+    RTS
+.found:
+    LDA.w !Battle_UnkA028
+    BNE .exit
+    LDA.w !Battle_ActFrameHold
+    BNE .exit
+    STX.b !BattleAct_AnimSlot
+    INX
+    CPX.w #!Battle_NumSlots
+    BNE .next_slot
+    TDC
+    TAX
+.next_slot:
+    TXA
+    STA.w !Battle_ActAnimNextSlot
+    LDX.b !BattleAct_AnimSlot
+    LDA.w !Battler_Facing,X
+    CMP.w !Battler_ActFacing,X
+    BEQ .same_facing
+    STA.w !Battler_ActFacing,X
+    BRA .facing
+.same_facing:
+    LDA.w !Battler_ActFacing,X      ; quirk: the value A already holds
+.facing:
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.b !BattleAct_AnimFacingOfs
+    LDA.b !BattleAct_AnimSlot
+    STA.w !Battle_FrameSlot
+    ASL A
+    TAY                             ; slot * 2: its list offsets
+    LDX.b !BattleAct_AnimSlot
+    CLC
+    LDA.w !Battler_ActAnimEntry,X
+    ADC.b #1
+    STA.w !Battler_ActAnimEntry,X
+    LDA.w !Battler_ActAnimStop,X
+    BEQ .duration
+    DEC A
+    STA.w !Battler_ActAnimEntry,X
+    STZ.w !Battler_ActAnimMode,X
+.duration:
+    LDA.w !Battler_ActAnimEntry,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.w !Battle_AnimDurList,Y
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_AnimData,X
+    BNE .draw
+    LDX.b !BattleAct_AnimSlot
+    LDA.w !Battler_ActAnimMode,X
+    CMP.b #!Battle_ActAnimLoop
+    BEQ .restart
+    STZ.w !Battler_ActAnimMode,X
+    BRA .done
+.restart:
+    LDX.b !BattleAct_AnimSlot
+    TDC
+    STA.w !Battler_ActAnimEntry,X
+    BRA .duration
+.draw:
+    LDX.b !BattleAct_AnimSlot
+    STA.w !Battler_ActAnimTimer,X
+    LDA.w !Battler_ActAnimEntry,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !BattleAct_AnimFacingOfs
+    CLC
+    ADC.w !Battle_AnimFrameList,Y
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_AnimData,X     ; frame id
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+    LDA.b #2
+    STA.w !Battle_ActFrameHold
+.done:
+    RTS
+
+; ==================================================================
+; BattleAct_LoadScript ($C14310–$C1432B, 28 bytes)
+; ==================================================================
+; Clears the 16-byte action parameter block (!Battle_ActScriptId ..
+; $9886), sets !Battle_ActUnkArg987C to $FF (none) and calls the loader
+; for !Battle_ActKind through BattleAct_LoaderTable (kinds 4 and up are
+; taken as 0, which loads nothing). The loaders fill the parameter
+; block from the action's records and start the script threads.
+; Callers (JSR): BattleSys_RunAction ($C1:40AD) only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  as the loader (kind 0: A, X clobbered, nothing else)
+; Callees: JSR (BattleAct_LoaderTable,X)
+BattleAct_LoadScript:
+    LDX.w #!Battle_ActParamsLen-1
+.clear:
+    STZ.w !Battle_ActScriptId,X
+    DEX
+    BPL .clear
+    LDA.b #!Battle_ActArgNone
+    STA.w !Battle_ActUnkArg987C
+    LDA.w !Battle_ActKind
+    CMP.b #!Battle_ActNumKinds
+    BCC .dispatch
+    TDC                             ; unknown kind: as kind 0
+.dispatch:
+    ASL A
+    TAX
+    JSR (BattleAct_LoaderTable,X)
+    RTS
+
+; ==================================================================
+; Action loaders ($C1:432C–$C1:49FE)
+; ==================================================================
+; BattleAct_LoadScript calls one loader per !Battle_ActKind. Each reads
+; the action's record: a script number (!Battle_ActScriptId), two
+; graphics set numbers (!Battle_ActGfxSetA/B), and indexes of the
+; compressed sprite frames, the palette steps and the object lists
+; (!Battle_ActFramesIdx, !Battle_ActPalIdx, !Battle_ActObjIdx), which it
+; turns into pointers through the matching tables. Then it starts the
+; script's threads. A script begins with a 4-byte header: two 16-bit
+; thread masks stored high byte first; bit 15 down to bit 0 stand for
+; threads 0-15. The thread offsets follow, one word per set bit, first
+; group's then second group's. For each set bit of the first group (or,
+; when !Battle_ActSecondGroup is set, of the second group only) the
+; thread gets !Battle_ActThreadOn = 1 and its long pointer in
+; !Battle_ActThreadPtr. All loaders end in BattleAct_LoadCommon.
+; "Attack" and "tech" for kinds 1 and 2 are guesses from the records
+; (kind 1: three record sets per !Battle_Unk1C48 value for PCs, two
+; records per enemy type; kind 2: one record per !Battle_ActId, for PCs
+; and for enemies), not checked against what the player sees.
+; Quirks shared by the four thread loops: the flag is stored 16-bit,
+; so the byte after it (the next thread's flag, or $5DBC after thread
+; 15) is zeroed too, which is harmless in order; the second-group test
+; inside the loop is 16-bit, so it also sees the byte after
+; !Battle_ActSecondGroup, while only its low byte is cleared. Every
+; loader also turns 8-bit values into 16-bit indexes (TAX, or REP and
+; 16-bit arithmetic) without clearing B, so it relies on B being 0:
+; BattleAct_BuildBattlerList, the last call before BattleAct_LoadScript,
+; ends with B = 0 (read in its unmatched code).
+
+; ==================================================================
+; BattleAct_LoadAttack ($C1432C–$C1459F, 628 bytes)
+; ==================================================================
+; Kind 1. For a PC caster: rebuilds the occupied-cell map, decides
+; !Battle_ActNear and turns the caster towards the main target
+; (BattleAct_CheckReach), takes the PC's record number from
+; !Battle_Unk1C48 (the byte at offset slot * 5, kept in
+; !Battle_ActPcAttackRec) and reads one of the three 5-byte record sets
+; of BattleRom_PcAttackAct: "Alt" when !Battle_ActUnkAE9B bit 7 is set,
+; else "Near" or "Far" by !Battle_ActNear; the script comes from the
+; matching BattleRom_PcAttackScript list by character. Tables: frames
+; !BattleRom_PcAttackFrames, palettes !BattleRom_PcAttackPals, objects
+; !BattleRom_PcAttackObjs, scripts !BattleRom_PcAttackScripts in bank
+; $CE. For an enemy caster: the record of its !Battler_Unk984D value
+; (presumably its enemy type) in BattleRom_EnemyAttackAct, or
+; BattleRom_EnemyAttack2Act when !Battle_ActId is non-zero; frames
+; !BattleRom_ActFrames, palettes !BattleRom_EnemyActPals, objects
+; !BattleRom_EnemyActObjs, scripts !BattleRom_EnemyAttackScripts in
+; bank $CD. Then starts the threads and jumps to BattleAct_LoadCommon.
+; Quirks: the PC record number is widened to 16 bits with REP and no
+; TDC, so it relies on B being 0 there (as BattleAct_CheckReach leaves
+; it, presumably; see the banner); the "Near" path ends with a BRA to
+; the next instruction.
+; Callers: BattleAct_LoaderTable entry 1.
+; Entry: M=1, X=0, DP=0, DB=$7E; the action block set, the parameter
+;        block cleared (BattleAct_LoadScript)
+; Exit:  as BattleAct_LoadCommon
+; Callees: Battle_BuildOccupiedCellMap, BattleAct_CheckReach,
+;          BattleAct_LoadCommon (JMP)
+!BattleAct_Mask = !BattleTmp_80         ; 2 B: thread mask being walked (bit 15 = thread 0); also the multiply scratch
+!BattleAct_Mask2 = !BattleTmp_82        ; 2 B: the second group's mask
+BattleAct_LoadAttack:
+    LDA.w !Battle_ActCaster
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .pc
+    JMP .enemy
+.pc:
+    JSL Battle_BuildOccupiedCellMap
+    JSR BattleAct_CheckReach
+    LDA.w !Battle_ActCaster
+    TAX
+    LDA.l !BattleRom_SlotTimes5,X
+    TAX
+    LDA.w !Battle_Unk1C48,X
+    STA.w !Battle_ActPcAttackRec
+    REP #$20                        ; quirk: B not cleared (see header)
+    STA.b !BattleAct_Mask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !BattleAct_Mask
+    TAX                             ; record * 15
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActUnkAE9B
+    BPL .not_alt
+    LDA.l BattleRom_PcAttackAct.AltGfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_PcAttackAct.AltGfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_PcAttackAct.AltFrames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_PcAttackAct.AltPal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_PcAttackAct.AltObj,X
+    STA.w !Battle_ActObjIdx
+    LDA.w !Battle_ActCaster
+    TAX
+    LDA.w !Pc_CharId,X
+    TAX
+    LDA.l BattleRom_PcAttackScript.Alt,X
+    STA.w !Battle_ActScriptId
+    BRA .pc_pointers
+.not_alt:
+    LDA.w !Battle_ActNear
+    BNE .near
+    LDA.l BattleRom_PcAttackAct.FarGfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_PcAttackAct.FarGfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_PcAttackAct.FarFrames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_PcAttackAct.FarPal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_PcAttackAct.FarObj,X
+    STA.w !Battle_ActObjIdx
+    LDA.w !Battle_ActCaster
+    TAX
+    LDA.w !Pc_CharId,X
+    TAX
+    LDA.l BattleRom_PcAttackScript.Far,X
+    STA.w !Battle_ActScriptId
+    BRA .pc_pointers
+.near:
+    LDA.l BattleRom_PcAttackAct.NearGfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_PcAttackAct.NearGfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_PcAttackAct.NearFrames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_PcAttackAct.NearPal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_PcAttackAct.NearObj,X
+    STA.w !Battle_ActObjIdx
+    LDA.w !Battle_ActCaster
+    TAX
+    LDA.w !Pc_CharId,X
+    TAX
+    LDA.l BattleRom_PcAttackScript.Near,X
+    STA.w !Battle_ActScriptId
+    BRA .pc_pointers                ; (to the next instruction)
+.pc_pointers:
+    REP #$20
+    LDA.w !Battle_ActFramesIdx      ; 16-bit: the byte after it is still 0
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcAttackFrames,X
+    STA.w !Battle_ActFramesPtr
+    LDA.w !Battle_ActPalIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcAttackPals,X
+    STA.w !Battle_ActPalPtr
+    LDA.w !Battle_ActObjIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcAttackObjs,X
+    STA.w !Battle_ActObjPtr
+    LDA.w !Battle_ActScriptId
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcAttackScripts,X
+    STA.w !Battle_ActScriptOfs
+    TAX
+    TAY
+    TDC
+    SEP #$20
+    LDA.l BattleRom_ScriptHdrCE.Mask1Hi,X
+    STA.b !BattleAct_Mask+1
+    LDA.l BattleRom_ScriptHdrCE.Mask1Lo,X
+    STA.b !BattleAct_Mask
+    LDA.l BattleRom_ScriptHdrCE.Mask2Hi,X
+    STA.b !BattleAct_Mask2+1
+    LDA.l BattleRom_ScriptHdrCE.Mask2Lo,X
+    STA.b !BattleAct_Mask2
+    INY
+    INY
+    INY
+    INY
+    TYX                             ; the first thread offset
+.pc_group:
+    TDC
+    TAY                             ; thread 0
+    REP #$20
+.pc_thread:
+    ASL.b !BattleAct_Mask
+    BCC .pc_thread_next
+    LDA.w !Battle_ActSecondGroup
+    BNE .pc_thread_skip
+    LDA.w #1
+    STA.w !Battle_ActThreadOn,Y     ; 16-bit (see banner)
+    PHY
+    TYA
+    ASL A
+    ASL A
+    TAY
+    LDA.l !BattleRom_ScriptsCE,X
+    STA.w !Battle_ActThreadPtr,Y
+    LDA.w #!BattleRom_ScriptBankPc
+    STA.w !Battle_ActThreadBank,Y
+    PLY
+.pc_thread_skip:
+    INX
+    INX
+.pc_thread_next:
+    INY
+    CPY.w #!Battle_ActThreads
+    BNE .pc_thread
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActSecondGroup
+    BEQ .pc_loaded
+    STZ.w !Battle_ActSecondGroup
+    LDY.b !BattleAct_Mask2
+    STY.b !BattleAct_Mask
+    BRA .pc_group
+.pc_loaded:
+    JMP BattleAct_LoadCommon
+.enemy:
+    SEC
+    LDA.w !Battle_ActCaster
+    SBC.b #!Battle_FirstEnemySlot
+    ASL A
+    TAX
+    REP #$20
+    LDA.w !Battler_Unk984D+(!Battle_FirstEnemySlot*2),X
+    ASL A
+    STA.b !BattleAct_Mask
+    ASL A
+    CLC
+    ADC.b !BattleAct_Mask
+    TAX                             ; value * 6
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActId
+    BNE .enemy_second
+    LDA.l BattleRom_EnemyAttackAct.Script,X
+    STA.w !Battle_ActScriptId
+    LDA.l BattleRom_EnemyAttackAct.GfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_EnemyAttackAct.GfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_EnemyAttackAct.Frames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_EnemyAttackAct.Pal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_EnemyAttackAct.Obj,X
+    STA.w !Battle_ActObjIdx
+    BRA .enemy_pointers
+.enemy_second:
+    LDA.l BattleRom_EnemyAttack2Act.Script,X
+    STA.w !Battle_ActScriptId
+    LDA.l BattleRom_EnemyAttack2Act.GfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_EnemyAttack2Act.GfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_EnemyAttack2Act.Frames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_EnemyAttack2Act.Pal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_EnemyAttack2Act.Obj,X
+    STA.w !Battle_ActObjIdx
+.enemy_pointers:
+    REP #$20
+    LDA.w !Battle_ActFramesIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActFrames,X
+    STA.w !Battle_ActFramesPtr
+    LDA.w !Battle_ActPalIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyActPals,X
+    STA.w !Battle_ActPalPtr
+    LDA.w !Battle_ActObjIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyActObjs,X
+    STA.w !Battle_ActObjPtr
+    LDA.w !Battle_ActScriptId
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyAttackScripts,X
+    STA.w !Battle_ActScriptOfs
+    TAX
+    TAY
+    TDC
+    SEP #$20
+    LDA.l BattleRom_ScriptHdrCD.Mask1Hi,X
+    STA.b !BattleAct_Mask+1
+    LDA.l BattleRom_ScriptHdrCD.Mask1Lo,X
+    STA.b !BattleAct_Mask
+    LDA.l BattleRom_ScriptHdrCD.Mask2Hi,X
+    STA.b !BattleAct_Mask2+1
+    LDA.l BattleRom_ScriptHdrCD.Mask2Lo,X
+    STA.b !BattleAct_Mask2
+    INY
+    INY
+    INY
+    INY
+    TYX
+.enemy_group:
+    TDC
+    TAY
+    REP #$20
+.enemy_thread:
+    ASL.b !BattleAct_Mask
+    BCC .enemy_thread_next
+    LDA.w !Battle_ActSecondGroup
+    BNE .enemy_thread_skip
+    LDA.w #1
+    STA.w !Battle_ActThreadOn,Y
+    PHY
+    TYA
+    ASL A
+    ASL A
+    TAY
+    LDA.l !BattleRom_ScriptsCD,X
+    STA.w !Battle_ActThreadPtr,Y
+    LDA.w #!BattleRom_ScriptBankEnemy
+    STA.w !Battle_ActThreadBank,Y
+    PLY
+.enemy_thread_skip:
+    INX
+    INX
+.enemy_thread_next:
+    INY
+    CPY.w #!Battle_ActThreads
+    BNE .enemy_thread
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActSecondGroup
+    BEQ .enemy_loaded
+    STZ.w !Battle_ActSecondGroup
+    LDY.b !BattleAct_Mask2
+    STY.b !BattleAct_Mask
+    BRA .enemy_group
+.enemy_loaded:
+    JMP BattleAct_LoadCommon
+
+; ==================================================================
+; BattleAct_LoadTech ($C145A0–$C14759, 442 bytes)
+; ==================================================================
+; Kind 2: reads the 7-byte record !Battle_ActId of BattleRom_PcTechAct
+; (PC caster) or BattleRom_EnemyTechAct (enemy caster), including
+; !Battle_ActUnkArg987C, then: frames !BattleRom_ActFrames for both;
+; palettes !BattleRom_PcTechPals / !BattleRom_EnemyActPals; objects
+; !BattleRom_TechObjs / !BattleRom_EnemyActObjs; scripts
+; !BattleRom_PcTechScripts in bank $CE / !BattleRom_EnemyTechScripts in
+; bank $CD. Starts the threads (see the banner) and jumps to
+; BattleAct_LoadCommon.
+; Callers: BattleAct_LoaderTable entry 2.
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleAct_LoadAttack
+; Exit:  as BattleAct_LoadCommon
+; Callees: BattleAct_LoadCommon (JMP)
+BattleAct_LoadTech:
+    LDA.w !Battle_ActCaster
+    CMP.b #!Battle_FirstEnemySlot
+    BCC .pc
+    JMP .enemy
+.pc:
+    LDA.w !Battle_ActId
+    REP #$20
+    STA.b !BattleAct_Mask
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !BattleAct_Mask
+    TAX                             ; id * 7
+    TDC
+    SEP #$20
+    LDA.l BattleRom_PcTechAct.Script,X
+    STA.w !Battle_ActScriptId
+    LDA.l BattleRom_PcTechAct.GfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_PcTechAct.GfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_PcTechAct.Frames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_PcTechAct.Pal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_PcTechAct.Obj,X
+    STA.w !Battle_ActObjIdx
+    LDA.l BattleRom_PcTechAct.Arg,X
+    STA.w !Battle_ActUnkArg987C
+    REP #$20
+    LDA.w !Battle_ActFramesIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActFrames,X
+    STA.w !Battle_ActFramesPtr
+    LDA.w !Battle_ActPalIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcTechPals,X
+    STA.w !Battle_ActPalPtr
+    LDA.w !Battle_ActObjIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_TechObjs,X
+    STA.w !Battle_ActObjPtr
+    LDA.w !Battle_ActScriptId
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcTechScripts,X
+    STA.w !Battle_ActScriptOfs
+    TAX
+    TAY
+    TDC
+    SEP #$20
+    LDA.l BattleRom_ScriptHdrCE.Mask1Hi,X
+    STA.b !BattleAct_Mask+1
+    LDA.l BattleRom_ScriptHdrCE.Mask1Lo,X
+    STA.b !BattleAct_Mask
+    LDA.l BattleRom_ScriptHdrCE.Mask2Hi,X
+    STA.b !BattleAct_Mask2+1
+    LDA.l BattleRom_ScriptHdrCE.Mask2Lo,X
+    STA.b !BattleAct_Mask2
+    INY
+    INY
+    INY
+    INY
+    TYX
+.pc_group:
+    TDC
+    TAY
+    REP #$20
+.pc_thread:
+    ASL.b !BattleAct_Mask
+    BCC .pc_thread_next
+    LDA.w !Battle_ActSecondGroup
+    BNE .pc_thread_skip
+    LDA.w #1
+    STA.w !Battle_ActThreadOn,Y
+    PHY
+    TYA
+    ASL A
+    ASL A
+    TAY
+    LDA.l !BattleRom_ScriptsCE,X
+    STA.w !Battle_ActThreadPtr,Y
+    LDA.w #!BattleRom_ScriptBankPc
+    STA.w !Battle_ActThreadBank,Y
+    PLY
+.pc_thread_skip:
+    INX
+    INX
+.pc_thread_next:
+    INY
+    CPY.w #!Battle_ActThreads
+    BNE .pc_thread
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActSecondGroup
+    BEQ .pc_loaded
+    STZ.w !Battle_ActSecondGroup
+    LDY.b !BattleAct_Mask2
+    STY.b !BattleAct_Mask
+    BRA .pc_group
+.pc_loaded:
+    JMP BattleAct_LoadCommon
+.enemy:
+    LDA.w !Battle_ActId
+    REP #$20
+    STA.b !BattleAct_Mask
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !BattleAct_Mask
+    TAX                             ; id * 7
+    TDC
+    SEP #$20
+    LDA.l BattleRom_EnemyTechAct.Script,X
+    STA.w !Battle_ActScriptId
+    LDA.l BattleRom_EnemyTechAct.GfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_EnemyTechAct.GfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_EnemyTechAct.Frames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_EnemyTechAct.Pal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_EnemyTechAct.Obj,X
+    STA.w !Battle_ActObjIdx
+    LDA.l BattleRom_EnemyTechAct.Arg,X
+    STA.w !Battle_ActUnkArg987C
+    REP #$20
+    LDA.w !Battle_ActFramesIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActFrames,X
+    STA.w !Battle_ActFramesPtr
+    LDA.w !Battle_ActPalIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyActPals,X
+    STA.w !Battle_ActPalPtr
+    LDA.w !Battle_ActObjIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyActObjs,X
+    STA.w !Battle_ActObjPtr
+    LDA.w !Battle_ActScriptId
+    ASL A
+    TAX
+    LDA.l !BattleRom_EnemyTechScripts,X
+    STA.w !Battle_ActScriptOfs
+    TAX
+    TAY
+    TDC
+    SEP #$20
+    LDA.l BattleRom_ScriptHdrCD.Mask1Hi,X
+    STA.b !BattleAct_Mask+1
+    LDA.l BattleRom_ScriptHdrCD.Mask1Lo,X
+    STA.b !BattleAct_Mask
+    LDA.l BattleRom_ScriptHdrCD.Mask2Hi,X
+    STA.b !BattleAct_Mask2+1
+    LDA.l BattleRom_ScriptHdrCD.Mask2Lo,X
+    STA.b !BattleAct_Mask2
+    INY
+    INY
+    INY
+    INY
+    TYX
+.enemy_group:
+    TDC
+    TAY
+    REP #$20
+.enemy_thread:
+    ASL.b !BattleAct_Mask
+    BCC .enemy_thread_next
+    LDA.w !Battle_ActSecondGroup
+    BNE .enemy_thread_skip
+    LDA.w #1
+    STA.w !Battle_ActThreadOn,Y
+    PHY
+    TYA
+    ASL A
+    ASL A
+    TAY
+    LDA.l !BattleRom_ScriptsCD,X
+    STA.w !Battle_ActThreadPtr,Y
+    LDA.w #!BattleRom_ScriptBankEnemy
+    STA.w !Battle_ActThreadBank,Y
+    PLY
+.enemy_thread_skip:
+    INX
+    INX
+.enemy_thread_next:
+    INY
+    CPY.w #!Battle_ActThreads
+    BNE .enemy_thread
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActSecondGroup
+    BEQ .enemy_loaded
+    STZ.w !Battle_ActSecondGroup
+    LDY.b !BattleAct_Mask2
+    STY.b !BattleAct_Mask
+    BRA .enemy_group
+.enemy_loaded:
+    JMP BattleAct_LoadCommon
+
+; ==================================================================
+; BattleAct_LoadNone ($C1475A, 1 byte)
+; ==================================================================
+; Kind 0 (and any kind of 4 and up): loads nothing, so no thread
+; starts.
+; Callers: BattleAct_LoaderTable entry 0.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  unchanged
+BattleAct_LoadNone:
+    RTS
+
+; ==================================================================
+; BattleAct_LoadKind3 ($C1475B–$C14832, 216 bytes)
+; ==================================================================
+; Kind 3: like the PC branch of BattleAct_LoadTech, for any caster, with
+; record !Battle_ActId - $BC of BattleRom_Kind3Act; frames
+; !BattleRom_ActFrames, palettes !BattleRom_Kind3Pals, objects
+; !BattleRom_TechObjs, scripts !BattleRom_Kind3Scripts in bank $CE.
+; What kind 3 is (ids from $BC up) is not known. Starts the threads (see
+; the banner) and falls into BattleAct_LoadCommon.
+; Callers: BattleAct_LoaderTable entry 3.
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleAct_LoadAttack
+; Exit:  as BattleAct_LoadCommon
+BattleAct_LoadKind3:
+    SEC
+    LDA.w !Battle_ActId
+    SBC.b #!Battle_ActKind3FirstId
+    REP #$20
+    STA.b !BattleAct_Mask
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !BattleAct_Mask
+    TAX                             ; (id - $BC) * 7
+    TDC
+    SEP #$20
+    LDA.l BattleRom_Kind3Act.Script,X
+    STA.w !Battle_ActScriptId
+    LDA.l BattleRom_Kind3Act.GfxA,X
+    STA.w !Battle_ActGfxSetA
+    LDA.l BattleRom_Kind3Act.GfxB,X
+    STA.w !Battle_ActGfxSetB
+    LDA.l BattleRom_Kind3Act.Frames,X
+    STA.w !Battle_ActFramesIdx
+    LDA.l BattleRom_Kind3Act.Pal,X
+    STA.w !Battle_ActPalIdx
+    LDA.l BattleRom_Kind3Act.Obj,X
+    STA.w !Battle_ActObjIdx
+    LDA.l BattleRom_Kind3Act.Arg,X
+    STA.w !Battle_ActUnkArg987C
+    REP #$20
+    LDA.w !Battle_ActFramesIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActFrames,X
+    STA.w !Battle_ActFramesPtr
+    LDA.w !Battle_ActPalIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_Kind3Pals,X
+    STA.w !Battle_ActPalPtr
+    LDA.w !Battle_ActObjIdx
+    ASL A
+    TAX
+    LDA.l !BattleRom_TechObjs,X
+    STA.w !Battle_ActObjPtr
+    LDA.w !Battle_ActScriptId
+    ASL A
+    TAX
+    LDA.l !BattleRom_Kind3Scripts,X
+    STA.w !Battle_ActScriptOfs
+    TAX
+    TAY
+    TDC
+    SEP #$20
+    LDA.l BattleRom_ScriptHdrCE.Mask1Hi,X
+    STA.b !BattleAct_Mask+1
+    LDA.l BattleRom_ScriptHdrCE.Mask1Lo,X
+    STA.b !BattleAct_Mask
+    LDA.l BattleRom_ScriptHdrCE.Mask2Hi,X
+    STA.b !BattleAct_Mask2+1
+    LDA.l BattleRom_ScriptHdrCE.Mask2Lo,X
+    STA.b !BattleAct_Mask2
+    INY
+    INY
+    INY
+    INY
+    TYX
+.group:
+    TDC
+    TAY
+    REP #$20
+.thread:
+    ASL.b !BattleAct_Mask
+    BCC .thread_next
+    LDA.w !Battle_ActSecondGroup
+    BNE .thread_skip
+    LDA.w #1
+    STA.w !Battle_ActThreadOn,Y
+    PHY
+    TYA
+    ASL A
+    ASL A
+    TAY
+    LDA.l !BattleRom_ScriptsCE,X
+    STA.w !Battle_ActThreadPtr,Y
+    LDA.w #!BattleRom_ScriptBankPc
+    STA.w !Battle_ActThreadBank,Y
+    PLY
+.thread_skip:
+    INX
+    INX
+.thread_next:
+    INY
+    CPY.w #!Battle_ActThreads
+    BNE .thread
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActSecondGroup
+    BEQ BattleAct_LoadCommon
+    STZ.w !Battle_ActSecondGroup
+    LDY.b !BattleAct_Mask2
+    STY.b !BattleAct_Mask
+    BRA .group
+
+; ==================================================================
+; BattleAct_LoadCommon ($C14833–$C148EB, 185 bytes)
+; ==================================================================
+; The end of every loader:
+;   - loads graphics set !Battle_ActGfxSetA (BattleAnim_LoadGfx4Vec) and
+;     !Battle_ActGfxSetB (BattleAnim_LoadGfx2Vec) and waits a frame;
+;   - calls BattleAnim_UnkVecCD0018 with !Battle_ActUnkArg987C unless
+;     that is $FF, or unless !Battle_ActFlags is non-zero and the id is
+;     not $37 (which id $37 is, is not known);
+;   - waits a frame, splits the object records (BattleAct_IndexObjLists),
+;     waits a frame;
+;   - unpacks the sprite frames at bank $D1 + !Battle_ActFramesPtr into
+;     !Battle_ActFrameBuf (Decomp_ToWramVec) and stores two zero bytes
+;     at the end it reports, so the frame list ends there; waits a frame;
+;   - builds up to 32 frames, 4 per call with a frame wait in each
+;     (BattleAct_UnpackFrames, 8 calls);
+;   - sets up the 16 action objects: BattleActObj bytes +0/+1 zeroed,
+;     +2/+3 from BattleRom_ActObjInit (+3 with !Battle_ActAttrBits
+;     added), !Battle_ActObjUnkA07B = 1. What the objects are is not
+;     established.
+; Each frame wait is BattleSys_PumpFrames followed by
+; BattleMenu_RefreshIfDirtyAndTick, except the first.
+; Callers: JMP from BattleAct_LoadAttack ($C1:4494, $C1:459D) and
+;   BattleAct_LoadTech ($C1:467F, $C1:4757); BattleAct_LoadKind3 falls
+;   in.
+; Entry: M=1, X=0, DP=0, DB=$7E; the parameter block loaded
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $10; X = $60 (6 per object); Y = 15;
+;        DP $80-$87 and $8C and the callees' scratch written
+; Callees: BattleAnim_LoadGfx4Vec, BattleAnim_LoadGfx2Vec,
+;          BattleSys_PumpFrames, BattleAnim_UnkVecCD0018,
+;          BattleMenu_RefreshIfDirtyAndTick, BattleAct_IndexObjLists,
+;          Decomp_ToWramVec, BattleAct_UnpackFrames, Battle_ShiftLeft3
+!BattleAct_ObjIdx = !BattleTmp_80       ; 2 B: action object 0-15 (zeroed 16-bit, counted 8-bit)
+BattleAct_LoadCommon:
+    LDA.w !Battle_ActGfxSetA
+    JSL BattleAnim_LoadGfx4Vec
+    LDA.w !Battle_ActGfxSetB
+    JSL BattleAnim_LoadGfx2Vec
+    JSR BattleSys_PumpFrames
+    LDA.w !Battle_ActId
+    CMP.b #!Battle_ActIdUnk37
+    BEQ .arg
+    LDA.w !Battle_ActFlags
+    BNE .unpack
+.arg:
+    LDA.w !Battle_ActUnkArg987C
+    CMP.b #!Battle_ActArgNone
+    BEQ .unpack
+    JSL BattleAnim_UnkVecCD0018
+.unpack:
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    JSR BattleAct_IndexObjLists
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    LDX.w !Battle_ActFramesPtr
+    STX.w !Battle_DecompSrc
+    LDA.b #!BattleRom_ActFramesBank
+    STA.w !Battle_DecompSrcBank
+    LDX.w #!Battle_ActFrameBuf
+    STX.w !Battle_DecompDest
+    LDA.b #!Battle_WramBank
+    STA.w !Battle_DecompDestBank
+    JSL Decomp_ToWramVec
+    LDX.w !Battle_DecompLen
+    STZ.w !Battle_ActFrameBuf,X     ; a frame header of 0 ends the list
+    STZ.w !Battle_ActFrameBuf+1,X
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    TDC
+    TAX
+    STX.w !Battle_ActFrameNum
+    STX.w !Battle_ActFrameReadOfs
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    JSR BattleAct_UnpackFrames
+    TDC
+    TAX
+    TAY
+    STY.b !BattleAct_ObjIdx
+.object:
+    LDA.b !BattleAct_ObjIdx
+    JSR Battle_ShiftLeft3
+    TAY                             ; object * 8
+    TDC
+    STA.w BattleActObj.Unk0,Y
+    STA.w BattleActObj.Unk1,Y
+    LDA.l BattleRom_ActObjInit.Unk0,X
+    STA.w BattleActObj.Unk2,Y
+    LDA.l BattleRom_ActObjInit.Unk1,X
+    ORA.w !Battle_ActAttrBits
+    STA.w BattleActObj.Unk3,Y
+    LDY.b !BattleAct_ObjIdx
+    LDA.b #1
+    STA.w !Battle_ActObjUnkA07B,Y
+    INX
+    INX
+    INX
+    INX
+    INX
+    INX
+    INC.b !BattleAct_ObjIdx
+    LDA.b !BattleAct_ObjIdx
+    CMP.b #!Battle_ActObjects
+    BNE .object
+    RTS
+
+; ==================================================================
+; BattleAct_IndexObjLists ($C148EC–$C14942, 87 bytes)
+; ==================================================================
+; Splits the 4-byte records at bank $CE + !Battle_ActObjPtr into the
+; lists of the 16 action objects, by the top three bits of each record's
+; first byte:
+;   000  an ordinary record;
+;   1xx  ends the object's list;
+;   010  a mark: the count of records since the list's start or the
+;        previous mark (this one included) goes to the object's
+;        !Battle_ActObjMarkCount and the count restarts;
+;   001  sets !Battle_ActObjMarkCount to 0 and ends the list.
+; !Battle_ActObjListStart gets each list's first record (object 0: the
+; pointer itself; object n: the record after object n-1's end). The
+; first record of lists 1-15 is never tested and counts as 1. Records
+; and marks are read here only; what they say is not analysed.
+; Callers (JSR): BattleAct_LoadCommon ($C1:4861) only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $10; X = the record after object 15's
+;        end; Y clobbered; DP $80-$83 written
+!BattleAct_RecCount = !BattleTmp_80     ; 1 B: records counted since the list start or the last mark
+!BattleAct_ListIdx = !BattleTmp_82      ; 2 B: object 0-15 whose list is being read (zeroed 16-bit, counted 8-bit)
+BattleAct_IndexObjLists:
+    LDX.w !Battle_ActObjPtr
+    STX.w !Battle_ActObjListStart
+    TDC
+    TAY
+    STY.b !BattleAct_RecCount
+    STY.b !BattleAct_ListIdx
+.record:
+    LDA.l !BattleRom_ScriptsCE,X
+    AND.b #!Battle_ActObjRecTypeMask
+    BEQ .count
+    BMI .list_end
+    AND.b #!Battle_ActObjRecMark
+    BNE .mark
+    LDA.b !BattleAct_ListIdx        ; type 001
+    TAY
+    TDC
+    STA.w !Battle_ActObjMarkCount,Y
+    BRA .list_end
+.mark:
+    INX
+    INX
+    INX
+    INX
+    INC.b !BattleAct_RecCount
+    LDA.b !BattleAct_ListIdx
+    TAY
+    LDA.b !BattleAct_RecCount
+    STA.w !Battle_ActObjMarkCount,Y
+    STZ.b !BattleAct_RecCount
+    BRA .record
+.list_end:
+    INX
+    INX
+    INX
+    INX
+    INC.b !BattleAct_ListIdx
+    LDA.b !BattleAct_ListIdx
+    CMP.b #!Battle_ActObjects
+    BEQ .exit
+    ASL A
+    TAY
+    REP #$20
+    TXA
+    STA.w !Battle_ActObjListStart,Y
+    TDC
+    SEP #$20
+    STZ.b !BattleAct_RecCount
+.count:
+    INX
+    INX
+    INX
+    INX
+    INC.b !BattleAct_RecCount
+    BRA .record
+.exit:
+    RTS
+
+; ==================================================================
+; BattleAct_UnpackFrames ($C14943–$C149FE, 188 bytes)
+; ==================================================================
+; Waits a frame (BattleSys_PumpFrames, BattleMenu_RefreshIfDirtyAndTick)
+; and builds up to 4 sprite frames from the unpacked data in
+; !Battle_ActFrameBuf, going on from !Battle_ActFrameNum and
+; !Battle_ActFrameReadOfs. A frame is a header byte (low nibble: row
+; count; high nibble: kept in DP $80 and not read), one bit mask per row
+; (bit 7 = column 0), then for each set bit a tile byte and an attribute
+; byte, then 2 bytes that are skipped. Each set bit gives a 16x16 sprite
+; at (column * 16, row * 16) (!BattleRom_Times16), written into the
+; frame's block of BattleActSprite (block offset from
+; !BattleRom_ActFrameBase, $C0 bytes = 48 sprites per frame) with
+; !Battle_ActAttrBits added to the attribute; the frame's sprite count
+; goes to !Battle_ActFrameSprites. A header of 0 ends the data (the
+; zero bytes BattleAct_LoadCommon appends); the frame number then stays.
+; "Sprite" and "16x16" are inferred from the 4-byte x, y, tile,
+; attribute layout and the 16-pixel steps.
+; Callers (8 JSR sites): BattleAct_LoadCommon ($C1:489B, $C1:489E,
+;   $C1:48A1, $C1:48A4, $C1:48A7, $C1:48AA, $C1:48AD, $C1:48B0).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87 and $8C
+;        written, and the callees' scratch
+; Callees: BattleSys_PumpFrames, BattleMenu_RefreshIfDirtyAndTick
+!BattleAct_FrameHigh = !BattleTmp_80    ; 1 B: high nibble of the frame header (not read)
+!BattleAct_RowsLeft = !BattleTmp_81     ; 1 B: rows still to build
+!BattleAct_Row = !BattleTmp_82          ; 2 B: row count while copying the masks, then the row being built
+!BattleAct_SpriteOfs = !BattleTmp_84    ; 2 B: offset of the next sprite in BattleActSprite
+!BattleAct_Col = !BattleTmp_86          ; 2 B: column 0-7 being tested
+!BattleAct_FramesDone = !BattleTmp_8C   ; 1 B: frames built in this call
+BattleAct_UnpackFrames:
+    JSR BattleSys_PumpFrames
+    JSR BattleMenu_RefreshIfDirtyAndTick
+    STZ.b !BattleAct_FramesDone
+.frame:
+    REP #$20
+    LDA.w !Battle_ActFrameNum
+    ASL A
+    TAX
+    LDA.l !BattleRom_ActFrameBase,X
+    STA.b !BattleAct_SpriteOfs
+    TDC
+    SEP #$20
+    LDX.w !Battle_ActFrameNum
+    STZ.w !Battle_ActFrameSprites,X
+    LDX.w !Battle_ActFrameReadOfs
+    LDA.w !Battle_ActFrameBuf,X
+    BNE .header
+    JMP .exit                       ; end of the data
+.header:
+    AND.b #!Battle_ActFrameRowsMask
+    STA.b !BattleAct_RowsLeft
+    STA.b !BattleAct_Row
+    LDA.w !Battle_ActFrameBuf,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleAct_FrameHigh
+    INX
+    TDC
+    TAY
+.copy_mask:
+    LDA.w !Battle_ActFrameBuf,X
+    STA.w !Battle_ActRowMasks,Y
+    INX
+    INY
+    DEC.b !BattleAct_Row
+    BNE .copy_mask
+    STX.w !Battle_ActFrameReadOfs
+    TDC
+    TAY
+    STY.b !BattleAct_Row
+.row:
+    TDC
+    TAY
+    STY.b !BattleAct_Col
+.col:
+    LDY.b !BattleAct_Row
+    LDA.w !Battle_ActRowMasks,Y
+    ASL A
+    STA.w !Battle_ActRowMasks,Y
+    BCC .col_next
+    LDX.w !Battle_ActFrameReadOfs
+    LDY.b !BattleAct_SpriteOfs
+    LDA.w !Battle_ActFrameBuf,X
+    STA.w BattleActSprite.Tile,Y
+    LDA.w !Battle_ActFrameBuf+1,X
+    ORA.w !Battle_ActAttrBits
+    STA.w BattleActSprite.Attr,Y
+    LDX.b !BattleAct_Row
+    LDA.l !BattleRom_Times16,X
+    STA.w BattleActSprite.Y,Y
+    LDX.b !BattleAct_Col
+    LDA.l !BattleRom_Times16,X
+    STA.w BattleActSprite.X,Y
+    LDX.w !Battle_ActFrameReadOfs
+    INX
+    INX
+    STX.w !Battle_ActFrameReadOfs
+    INY
+    INY
+    INY
+    INY
+    STY.b !BattleAct_SpriteOfs
+    LDX.w !Battle_ActFrameNum
+    INC.w !Battle_ActFrameSprites,X
+.col_next:
+    INC.b !BattleAct_Col
+    LDA.b !BattleAct_Col
+    CMP.b #!Battle_ActFrameCols
+    BNE .col
+    INC.b !BattleAct_Row
+    DEC.b !BattleAct_RowsLeft
+    BNE .row
+    LDX.w !Battle_ActFrameReadOfs
+    INX
+    INX
+    STX.w !Battle_ActFrameReadOfs   ; skip 2 bytes after the frame
+    INC.w !Battle_ActFrameNum
+    INC.b !BattleAct_FramesDone
+    LDA.b !BattleAct_FramesDone
+    CMP.b #!Battle_ActFramesPerCall
+    BEQ .exit
+    JMP .frame
+.exit:
     RTS
 
 ; ==================================================================
