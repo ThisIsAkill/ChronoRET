@@ -1,12 +1,27 @@
 ; ============================================================
-; unmatched_battle.asm — Names for routines outside bank $C1 that the
-; matched battle code calls but that are not matched yet.
+; unmatched_battle.asm — Names for routines that the matched battle
+; code calls but that are not matched yet (in bank $C1 or elsewhere).
 ;
 ; Same format as unmatched.asm: label-only `org` stubs, no bytes. When a
 ; routine gets matched, delete its stub here; the real label takes over.
 ; Names come from the reference disassembly / earlier session notes;
 ; the comment says what the call site expects.
 ; ============================================================
+
+; --- Bank $C1 (battle engine, not matched yet) ---
+
+org $C1007E
+BattleSys_PumpFrames:                   ; JSR: INC $9E, then JSL $CD0036 until $9E is zero again (inferred: wait for
+                                        ; the frame to end; name from the session notes)
+org $C1283D
+Battle_CacheBattlerCoordsAll:           ; JSR: for each present battler, copies !Battler_ScreenX/Y to $A039/$A050,X
+                                        ; and runs $C1:285A on it
+org $C12D9F
+Battle_TickPcSlots:                     ; JSR: per-PC upkeep; zeroes !Battle_FramesDecoded and runs the PCs'
+                                        ; frame decodes (Battle_DrawBattlerFrame)
+org $C13714
+Battle_TickStatusEffectVisuals:         ; JSR: per-slot countdown timers, skipped while !Battle_MenuTimeHold is set;
+                                        ; name from the session notes, not checked
 
 ; --- Bank $C7 (audio) ---
 

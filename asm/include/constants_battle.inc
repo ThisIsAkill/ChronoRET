@@ -213,6 +213,10 @@ if !constants_battle_inc == 0
 !Battle_TileBytes        = $0020 ; one 8x8 4bpp tile (inferred from the 32-byte cell copy)
 !Battle_SignExtendNeg    = $FF   ; high byte of a sign-extended negative byte
 
+; --- Info messages (BattleMsg_ShowFromTableCC3A09Vec, A = id) ---
+!BattleMsg_InfoNone      = $FF   ; sent before message $75 (inferred: clear the panel, as $FF means none for $CD002D)
+!BattleMsg_Info75        = $75   ; shown once by BattleSys_UpkeepTwoFrames; text not traced
+
 ; --- OAM (cursor sprites) ---
 !BattleOam_CursorSprites = 4     ; cursor sprites 0-3
 !BattleOam_CursorBytes   = $0010 ; their low-table bytes (4 x 4)
