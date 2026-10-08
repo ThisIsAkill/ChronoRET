@@ -269,14 +269,27 @@ endstruct
 !Battler_HalfWidth       = $971E ; 11 B per battler slot: box half-width; the box spans probe x +/- this
                                  ; (Battle_CalcBattlerBox); who sets it is not traced
 !Battler_Height          = $9729 ; 11 B per battler slot: box height above the probe y (top = y - this)
+!Battler_PathStep        = $9734 ; 11 B per battler slot: pixels BattlePos_PathClear advances the probe per step (its
+                                 ; radius grows by this each pass); inferred: movement step; who sets it is not traced
 !Battler_BoxLeft         = $975A ; 11 B per battler slot: box left edge, clamped at 0 (Battle_CalcBattlerBox)
 !Battler_BoxTop          = $9765 ; 11 B per battler slot: box top edge, clamped at 0
 !Battler_BoxRight        = $9770 ; 11 B per battler slot: box right edge, clamped at $FF
 !Battler_BoxBottom       = $977B ; 11 B per battler slot: box bottom edge: probe y, + 8 unless !Battle_Unk2989 bit 2
 !Battler_Unk984D         = $984D ; 2 B per battler slot (index slot*2): sent as the info-panel message id and used to
                                  ; index BattleRom_UnkE1DE80; inferred: per-battler type id. Unconfirmed.
+; Position queries (service 5 of the $C10045 API, BattlePos_Query)
+!BattlePos_Mode          = $986E ; 1 B in: query, 0-14 (index into BattlePos_ModeTable)
+!BattlePos_Subject       = $986F ; 1 B in: battler slot the query is about
+!BattlePos_Other         = $9870 ; 1 B in: second battler slot; the nearest/farthest scans overwrite it with each
+                                 ; battler they examine
+!BattlePos_Arg           = $9871 ; 1 B in: query 8: non-zero = also test other battlers' boxes; query 13: a third
+                                 ; battler slot
+!BattlePos_Result        = $9872 ; 1 B out: 0 = the condition holds, $FF = it does not (cleared by BattlePos_Query)
+!BattlePos_Found         = $9873 ; 1 B out: slot found by queries 0-3 (they store 16-bit, so $9874 gets 0 too);
+                                 ; query 13 stores a distance difference here
 !Battle_PassCellBit7     = $9875 ; 1 B: non-zero = !Battle_CellMap bit 7 does not block (Battle_BoxHitsBlockedCell);
                                  ; zeroed before each check, set to 1 by the mover at $C1:3877 when $A2B5 is 3
+!BattlePos_DistLimit     = $9893 ; 2 B: squared-distance limit of the BattlePos_WithinDist* checks (set by each entry)
 !Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
 !Battler_FrameShown      = $9907 ; 1 B per battler slot: frame number last decoded (Battle_DrawBattlerFrame skips a repeat)
 !Battle_FramesDecoded    = $9912 ; 1 B: frames decoded this pass; zeroed at $C1:2D9F, and callers defer a battler
@@ -339,7 +352,7 @@ endstruct
 !Pc_TechCount            = $A02A ; 3 B per PC: number of lines in the PC's tech list
 !Battler_ProbeX          = $A039 ; 11 B per battler slot: x the box and distance checks use; a copy of !Battler_ScreenX
                                  ; (Battle_CacheBattlerCoordsAll), moved ahead by path checks before the real move
-                                 ; (inferred from the movers at $C1:3851 and the path check at $C1:2C02)
+                                 ; (inferred from the movers at $C1:3851 and BattlePos_PathClear)
 !Battler_ProbeY          = $A050 ; 11 B per battler slot: y counterpart of !Battler_ProbeX
 !BattleMenu_TechAvailDone = $A099 ; 1 B: set once UpdateTechMpAvail has graded the visible rows; TechConfirm needs it
 !BattleUI_ForceDigitRefresh      = $A09A ; 1 B: non-zero = BattleUI_UpdateNextPcPanel always refreshes HP/MP digits (no gauges-only
