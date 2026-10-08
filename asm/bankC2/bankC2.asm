@@ -16311,7 +16311,9 @@ C2Scene_ObjBMateSavePos:
 ; draws string C2Scene_Unk1B58 of C2SceneRom_LabelStrings with the text
 ; window code into a buffer, uploads it to VRAM and shows it as a sprite
 ; 48 px above the party's position (every piece of its frame at Y
-; offset $D0; or above object A while the party is in it).
+; offset $D0); while the party is in object A it is placed at
+; C2Scene_ObjAY + C2Scene_LabelBelowObjA ($40) instead, so 16 px below
+; object A's position, just under its sprite.
 ; C2Scene_Unk1B58 is a ListA entry's byte 2 (C2Scene_GetListAUnk02) or
 ; C2Scene_Unk1B58Spot (C2Scene_ObjASpotWatch), so probably the name of
 ; the place the party is on; not traced further. Runs the
