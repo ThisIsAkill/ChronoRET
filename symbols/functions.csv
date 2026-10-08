@@ -711,7 +711,7 @@ $C1:7C3D,$C1:7FFF,963,BankC1_OldBuildLeftovers,$C1,Engine,verified,836b2a9ecbe2,
 $C1:8000,$C1:8002,3,BankC1_BattleStartVec,$C1,Engine,verified,be8958424952,Vector into BattleSys_Main.
 $C1:8003,$C1:8005,3,BankC1_Entry8003,$C1,Engine,verified,84b94346c88a,"Long vector into BankC1_RunService (unmatched, $C1:CFC2), which pushes P, X, DP and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets DB=$7E and DP=0, runs entry A (low byte) of its service table at $C1:"
 $C1:8006,$C1:8460,1115,BattleSys_Main,$C1,Battle system,verified,6025337701cd,
-$C1:8461,$C1:883C,988,BattleSys_Unk8461,$C1,Battle system,readable,12776c5fcdda,
+$C1:8461,$C1:883C,988,BattleSys_Unk8461,$C1,Battle system,verified,12776c5fcdda,
 $C1:883D,$C1:8861,37,BattleSys_Unk883D,$C1,Battle system,verified,34e3401cbc07,"For each PC slot 0-2 whose !Battler_UnkAF0A entry is not $FF: DP $14 (16-bit) = the slot, BattleSys_UnkB575, then BattleSys_UnkB3F9 with X = the slot."
 $C1:8862,$C1:8875,20,BattleSys_ClearUnkB192,$C1,Battle system,verified,d507d92ddb0c,Zeroes the 4-byte !Battle_UnkB192 record of battler slot !Battle_UnkB18B.
 $C1:8876,$C1:88C4,79,BattleSys_ListHandler0,$C1,Battle system,verified,1f689be1bb6a,Turn list 0 (BattleSys_ListHandlerTable entry 0): the usual handler (see the banner); at the end of its runs it clears BattlerStats.Status2 bit 7 of the slot.
