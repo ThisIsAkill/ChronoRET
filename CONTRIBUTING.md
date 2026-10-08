@@ -62,6 +62,10 @@ includes the one before:
 
 `make gate` runs the diff, the coverage proof and the lint in one go.
 
+**Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
+by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
+revision, so no routine is ever judged by a rule its own author just wrote.
+
 ## Getting started
 
 1. `python3 tools/check_env.py` to confirm your toolchain

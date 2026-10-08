@@ -56,4 +56,12 @@ $C1 are in progress.
   (an init sequence), per the independent review of MainInit.
 - The two cross-bank message vectors `$CD002D` / `$CD0030` used by the enemy info panel.
 
+## Decisions
+
+- 2026-10-08: jumps and calls (`JSR`, `JMP`, `JSL`, `JML`, branches) are exempt from the
+  explicit-width rule; each has exactly one encoding, so its width can't drift with how a define
+  is written. Approved by the maintainer after an independent review flagged that the exemption
+  had been added inside a code revision. From now on, standard changes are their own commit
+  (CONTRIBUTING.md, "Changing the standard").
+
 Queue: [NEXT.md](NEXT.md).
