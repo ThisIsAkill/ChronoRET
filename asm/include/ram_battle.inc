@@ -212,6 +212,12 @@ endstruct
 !Battle_CellMap          = $7BFD ; 256 B: one byte per 16x16-pixel screen cell, 16 cells per row (index row*16 + col);
                                  ; bit 6 = blocks a battler box, bit 7 = blocks it unless !Battle_PassCellBit7 is
                                  ; set (Battle_BoxHitsBlockedCell). Who fills it is not traced
+!Battle_PathMap          = $7CFD ; 256 B: copy of !Battle_CellMap with $40 in each battler's cell (Battle_BuildOccupiedCellMap,
+                                 ; $CC:F110); BattleAct_FindPath labels it with wave numbers and marks the path ($E0 bits)
+!Battle_PathFrontier     = $7DFD ; up to 256 B: BattleAct_FindPath's cells to expand this wave, 0-ended
+!Battle_PathNextFrontier = $7EFD ; up to 256 B: the cells found in this wave, 0-ended, copied to !Battle_PathFrontier
+!Battle_PathStartCell    = $A513 ; 1 B: start cell of the last BattleAct_FindPath (also read at $C1:5486, unmatched)
+!Battle_PathGoalCell     = $A515 ; 1 B: goal cell of the last BattleAct_FindPath; no reader found
 
 !Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); the same bytes are
                                  ; !Battle_ActThreadPtr while an action plays
@@ -569,8 +575,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActFrameHold     = $A012 ; 1 B: set to 2 when BattleAct_StepBattlerAnims decodes a frame; non-zero = it decodes
                                  ; none (zeroed by service 4 and $CC:F0EF, counted down at $CF:E775, unmatched)
 !Battle_UnkA028          = $A028 ; 1 B: non-zero = BattleAct_StepBattlerAnims decodes no frame; purpose unknown
-!Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in the
-                                 ; unmatched script code, zeroed by BattleAct_ResetState); service 4 waits for it
+!Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in
+                                 ; BattleAct_OpEndScript, zeroed by BattleAct_ResetState); service 4 waits for it
 !Battle_ActScriptId      = $9877 ; 1 B: script number of the action; first byte of the 16-byte parameter block
                                  ; ($9877-$9886) that BattleAct_LoadScript clears
 !Battle_ActUnkArg987C    = $987C ; 1 B: A for BattleAnim_UnkVecCD0018 ($FF = do not call it); set to $FF by
@@ -582,6 +588,10 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; timer down and runs $CC:F2A9 at 0; service 4 clears 40 bytes from here
 !Battle_ActBattlers      = $A014 ; list of battler slots, $FF-ended ($CC:F156): caster, the two slots from $AE97/$AE98
                                  ; (for a PC caster $FF there becomes the other two PCs), the main target, the others
+!Battle_ActMainTarget    = !Battle_ActBattlers+3 ; 1 B: entry 3 of !Battle_ActBattlers, the main target (the first set bit
+                                 ; of the 16-bit mask at $AE95, $CC:F186)
+!Battle_ActTargetSet     = !Battle_ActBattlers+4 ; entries 4 on: the slots of the 16-bit target mask at $AE99, $FF-ended
+                                 ; ($CC:F1AA; bit 15 = slot 0)
 !Battle_ActTargets       = $AC5C ; list of the target slots (main target first), $FF-ended ($CC:F156)
 !Battle_ActPcHitAmount   = $AD9C ; 2 B, 4-byte record per PC: amount compared with the PC's HP by
                                  ; BattleAct_FlagLethalPcHits (inferred: damage about to be dealt)
@@ -608,15 +618,78 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActPalPtr        = $9882 ; 2 B: offset in bank $CD of the palette steps BattleAct_StepPalettes reads
 !Battle_ActObjIdx        = $9884 ; 1 B: index into the object-record pointer table (read 16-bit, $9885 zeroed)
 !Battle_ActObjPtr        = $9885 ; 2 B: offset in bank $CE of the object records (BattleAct_IndexObjLists)
-!Battle_ActNear          = $9930 ; 1 B: set by BattleAct_CheckReach ($C1:49FF, unmatched): 1 when the main target is
-                                 ; within 40 pixels (BattlePos_WithinDist40XY), then for some characters or when within
-                                 ; reach decided again by $C1:4A71; picks a PC attack's "Near" or "Far" records
+!Battle_ActNear          = $9930 ; 1 B: set by BattleAct_CheckReach: 1 when a path to the main target was found (searched
+                                 ; only when it is within 40 pixels or for characters with !BattleRom_PcPathAlways), else 0;
+                                 ; picks a PC attack's "Near" or "Far" records
 !Battle_ActPcAttackRec   = $A4E7 ; 1 B: record number of the PC attack (from !Battle_Unk1C48); not read in bank $C1's
                                  ; matched code
 !Battle_ActThreadOn      = $5DAC ; 1 B per script thread 0-15: non-zero = BattleAct_RunThreads runs it (stored 16-bit)
 !Battle_ActThreadPtr     = $5DBD ; 4 B per thread: offset word of its script position, then the bank ($CE or $CD,
                                  ; !Battle_ActThreadBank) and 0; same bytes as !Pc_PoseTimer and the pose variables
 !Battle_ActThreadBank    = $5DBF ; 2 B per thread (same 4-byte records): bank byte and 0
+!Battle_ActThreadWait    = $5DFD ; 1 B per thread 0-15: frames BattleAct_RunThread only counts down before running the
+                                 ; thread again (set at $C1:571A, unmatched)
+!Battle_ActScriptPtr     = $E6   ; 3 B (DP long): script position of the thread being run (BattleAct_RunThread); $E9 is
+                                 ; also touched by BattleAct_AdvanceScript's 16-bit add
+!Battle_ActThreadOfs     = $A00E ; 1 B: thread * 4, its !Battle_ActThreadPtr offset, while it runs
+!Battle_ActNextOp        = $A00F ; 1 B: zeroed before each opcode; a handler counts it up to have the next opcode run
+                                 ; in the same frame
+!Battle_ActThread        = $A010 ; 1 B: thread being run (0-15); the handlers pick the actor by it
+!Battle_ActOpcode        = $9895 ; 1 B: opcode being run
+!Battle_ActObjThread     = $A2B6 ; 1 B: object thread 0-7 (thread - 8) while threads 8-15 run (BattleAct_RunThreads)
+!Battle_ActUnkA3D1       = $A3D1 ; 1 B: non-zero = object threads are not run and BattleAct_OpEndScript waits; counted up
+                                 ; at $C1:5AE0, zeroed at $C1:5CE9 and by BattleAct_ResetState; purpose unknown
+!Battle_ActTargetMask    = $AE99 ; 2 B: target set as a mask, bit 15 = slot 0 (expanded into !Battle_ActTargetSet by
+                                 ; $CC:F1AA); thread 4 runs only while it is non-zero
+!Battler_ActAnimStarted  = $A145 ; 1 B per battler slot: set when opcode $03 has started the battler's animation, cleared
+                                 ; when it has ended (BattleAct_OpPlayAnim)
+!Battle_ActObjAnimTimer  = $A1B0 ; 1 B per object thread 0-7: timer of its object list (zeroed on start; the mode is
+                                 ; !Battle_ActUnkA1A8, stepped at $CC:F278, unmatched)
+!Battle_ActObjAnimEntry  = $A1B8 ; 1 B per object thread: current entry ($FF on start)
+!Battle_ActObjAnimStarted = $A1C0 ; 1 B per object thread: opcode $03's started flag (BattleAct_OpPlayAnim)
+!Battle_ActObjAnimStop   = $A1C8 ; 1 B per object thread: opcodes $04-$06's flag (BattleAct_OpShowAnimFrame); read at
+                                 ; $CC:F2DB (unmatched)
+!Battle_ActObjUnkA1D8    = $A1D8 ; 1 B per object thread: counted up by opcode $70 and by opcode $03's start, zeroed when
+                                 ; opcode $03 ends; read at $CF:EDDF; purpose unknown
+!Battle_ActObjAnimList   = $A220 ; 2 B per object thread: !Battle_ActObjListStart of the object list it plays
+!Battle_ActObjAnimCount  = $A238 ; 1 B per object thread: !Battle_ActObjMarkCount of that list
+!Battle_ActObjAnimUnkA2B8 = $A2B8 ; 1 B per object thread: $FF on start, compared at $CC:F2AE (presumably as
+                                 ; !Battler_ActFacing is for the battlers)
+!Battle_ActorMoveDelay   = $A2FE ; 1 B per actor (11 battler slots, then object threads 0-7): frames per move step; the
+                                 ; movers at $CF:EFC4/$CF:EFF4 reload !Battle_ActorMoveTimer from it (opcodes $07-$0F)
+!Battle_ActorMoveSpeed   = $A324 ; 1 B per actor: pixels per move step along the major axis (the move opcodes divide the
+                                 ; distance by it for the step count and scale the unit step by it)
+!Battle_ActorMoving      = $A337 ; 1 B per actor: 1 while a move started by a move opcode runs (the movers at $CF:EFC4
+                                 ; step only these); cleared by the opcode when the move is done
+!Battle_ActorMoveTimer   = $A2EB ; 1 B per actor: frames to the next move step, reloaded from !Battle_ActorMoveDelay
+!Battle_ActorMoveKind    = $A86D ; 1 B per actor: mover the $CF:EFE6 dispatch runs (table at $CF:F01E); 0 = straight
+!Battle_ActorMoveSteps   = $ABEB ; 1 B per actor: steps left; the straight mover sets the done flag at 0 ($CF:F07C)
+!Battle_ActorFromX       = $A35D ; 1 B per actor: x at the start of the move (the mover writes it + the offset to x)
+!Battle_ActorFromY       = $A370 ; 1 B per actor: y at the start
+!Battle_ActorToX         = $A383 ; 1 B per actor: the point moved to
+!Battle_ActorToY         = $A396 ; 1 B per actor
+!Battle_ActorStepX       = $A888 ; 2 B per actor (index actor * 2): signed 8.8 pixels added to the offset each step
+!Battle_ActorStepY       = $A8AE ; 2 B per actor
+!Battle_ActorOfsX        = $A8D4 ; 2 B per actor: signed 8.8 offset from the start; the high byte is added ($CF:F069)
+!Battle_ActorOfsY        = $A8FA ; 2 B per actor
+!Battler_MoveDone        = $A19D ; 1 B per battler slot: set to 1 by the straight mover when the steps run out
+                                 ; ($CF:F083); the move opcodes wait for it
+!Battle_ActObjMoveDone   = $A1E0 ; 1 B per object thread: the same for the objects (written at $CF:F4FF and others)
+!Battle_ActObjX          = $A240 ; 2 B per object thread (index j * 2): the object's x (low byte read as a screen x)
+!Battle_ActObjY          = $A250 ; 2 B per object thread: its y
+!Battle_ActObjMoveAngle  = $A355 ; 1 B per object thread: angle of its last move (Battle_CalcAngle)
+!Battle_ActObjUnkA5B5    = $A5B5 ; 1 B per object thread: also set to that angle; purpose unknown
+!Battle_ActObjFacing     = $A230 ; 1 B per object thread: !BattleRom_FacingByAngle of that angle
+!Battle_ActObjUnkA31C    = $A31C ; 1 B per object thread: zeroed when an object's move starts; purpose unknown
+!Battle_ActThreadOpLen   = $A3A9 ; 1 B per thread: length of the move opcode it waits on, advanced by when it ends
+!Battle_ActUnkPointX     = $5D9E ; 1 B: x of the point opcode $11 moves to; written by several handlers ($C1:5923,
+                                 ; $C1:5A14 and others, unmatched); purpose otherwise unknown
+!Battle_ActUnkPointY     = $5D9F ; 1 B: its y
+!Battle_ActMoveUnitX     = $A880 ; 2 B: signed 8.8 unit step x from BattleAct_CalcMoveStep (scaled by the speed after)
+!Battle_ActMoveUnitY     = $A882 ; 2 B: the same for y
+!Battle_MoveMajorDist    = $AAFE ; 1 B: the larger of |dx| and |dy| of the last BattleAct_CalcMoveStep
+!Battler_DefMoveDelay    = $973F ; 1 B per battler slot: default !Battle_ActorMoveDelay (set at $CC:E3E8, unmatched)
+!Battler_DefMoveSpeed    = $98BF ; 1 B per battler slot: default !Battle_ActorMoveSpeed (set at $CC:E3E3)
 !Battle_DecompSrc        = $0300 ; 2 B: Decomp_ToWramVec source address (DP $00 of that routine, which sets DP=$0300)
 !Battle_DecompSrcBank    = $0302 ; 1 B: its bank
 !Battle_DecompDest       = $0303 ; 2 B: WRAM destination address (written to WMADDL)
@@ -681,6 +754,10 @@ struct BattleRom_CursorSprite $CCF604 ; command cursor, 4 sprites x 4 B
 .Tile:      skip 1      ; +2: tile
 .Attr:      skip 1      ; +3: attribute (palette replaced by !BattleMenu_CursorPalette)
 endstruct
+!BattleRom_PcPathAlways   = $CCF63C  ; 1 B per character id 0-6: non-zero = BattleAct_CheckReach searches a path even to a
+                                      ; target beyond 40 pixels (01 00 00 01 01 01 01: all but characters 1 and 2)
+!BattleRom_ActMoveDelay   = $CCF5BC  ; 8 B: !Battle_ActorMoveDelay for opcodes $08-$0F (4, 2, then 1)
+!BattleRom_ActMoveSpeed   = $CCF4BC  ; 8 B: !Battle_ActorMoveSpeed for them (1, 1, 1, 2, 4, 8, $10, $20)
 !BattleRom_FxTintColours  = $CCF77B  ; 4 B: written into live palette bytes 6-9 by Battle_FxOverlay2Tint (inferred: two colours)
 struct BattleRom_StatusAnim $CCF77F ; 4 B per record, ended by a negative .StatusByte (Battle_PickStatusAnim)
 .StatusByte: skip 1    ; +0: byte to test, as an offset from BattlerStats.Status; negative = end of table

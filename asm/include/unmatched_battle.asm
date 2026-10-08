@@ -14,13 +14,9 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C149FF
-BattleAct_CheckReach:                   ; JSR: sets !Battle_ActNear and turns the caster (a PC) towards the main
-                                        ; target; not matched yet
-
-org $C14BBE
-BattleAct_RunThreads:                   ; JSR: runs the action script's threads whose !Battle_ActThreadOn flag is set
-                                        ; (threads 4 and 8-15 under extra conditions); not analysed
+org $C15FC3
+BattleAct_Op70Body:                     ; JMP: the opcode $70 handler after its STZ $8E ($C1:5FC1): counts
+                                        ; !Battle_ActObjUnkA1D8 of the object thread up; advances 1 only when DP $8E is 0
 
 org $C1762E
 BattleAct_RunCalc:                      ; JSR: A = handler number; calls entry A of the word table at $C1:79D3, keeping
@@ -28,6 +24,11 @@ BattleAct_RunCalc:                      ; JSR: A = handler number; calls entry A
 
 org $C17A63
 BattleAct_LoaderTable:                  ; 4 words: action loader per !Battle_ActKind (JSR (T,X) in BattleAct_LoadScript)
+
+org $C17A6B
+BattleAct_OpcodeTable:                  ; 224 words ($7A6B-$7C2A): handler per script opcode $00-$DA (JSR (T,X) in
+                                        ; BattleAct_RunThread), then 5 unreachable entries ($DB-$DF); 75 entries are
+                                        ; BattleAct_OpEndScript
 
 ; --- Bank $C3 ---
 
