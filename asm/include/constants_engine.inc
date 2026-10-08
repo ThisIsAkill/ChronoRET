@@ -78,6 +78,13 @@ if !constants_engine_inc == 0
                                          ; Chr_ObjSlot and similar
 !Obj_Unk1C00Init = $07                   ; value Evt_RunObjInit stores in Obj_Unk1C00 after the init
                                          ; function
+!Obj_Unk1C00Min = $02                    ; Evt_StartTargetFunc1 does nothing while Obj_Unk1C00 is
+                                         ; below this
+!Obj_Unk1C00Func1 = $01                  ; Obj_Unk1C00 set by Evt_StartTargetFunc1 as it starts
+                                         ; function 1
+!Evt_PrioStride = $80                    ; bytes from one ObjX_Unk7F0580 level table to the next
+                                         ; (the multiplier of Obj_Unk1C00)
+!Evt_Func1Ofs = $0002                    ; offset of function 1 in an object's 16-word function table
 !ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
 
 ; --- Field defaults (Field_InitLoadState) ---
@@ -120,6 +127,9 @@ if !constants_engine_inc == 0
 !Pad_HiDown = $04                        ; high byte of Pad_Pressed, bit 2: Down
 !Pad_HiUp = $08                          ; high byte of Pad_Pressed, bit 3: Up
 !Pad_DpadMask = $0F                      ; bits 0-3 of Pad_Unk00F9: Field_DpadDispatch's table index
+!Pad_Unk00F8Bit1 = $02                   ; Pad_Unk00F8 bit 1: the Field_Dpad* handlers step $20
+                                         ; instead of $10 (a run button? Select in the Pad_Pressed
+                                         ; low-byte layout, so the layout may differ)
 !Pad_Unk00F8Bit7 = $80                   ; Pad_Unk00F8 bit 7 (Sub_1ADF sets Field_Unk62 = 3 on it)
 !Pad_Unk00F6Mode5 = $01                  ; Pad_Unk00F6 bit 0: run Field_FadeToBankC2Mode5
                                          ; (Field_PauseAndMenuInput)
@@ -138,7 +148,8 @@ if !constants_engine_inc == 0
 !Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
 !Eng_SignExtNeg = $FF                    ; high byte that sign-extends a negative 8-bit value
 !Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
-!Eng_Invert16 = $FFFF                    ; EOR mask; with INC A negates a 16-bit value
+!Eng_Invert16 = $FFFF                    ; EOR mask; with INC A negates a 16-bit value (without the
+                                         ; INC: ones' complement, an absolute value one short)
 
 ; --- Sine table (Trig_Cos1024 / Trig_Sin1024) ---
 !Trig_QuarterTurn = $0100                ; 90 degrees at 1024 steps per turn (cosine = sine + this)
@@ -234,8 +245,14 @@ if !constants_engine_inc == 0
 ; --- Field_Unk885A ---
 !Screen_HalfX = $80                      ; leader Obj_ScreenX low byte at or past this: right half
 !Screen_SplitY = $88                     ; leader Obj_ScreenY low byte at or past this: lower part
-!Map_StepPos = $10                       ; Map_Unk1D2E/1D30 value towards the right / bottom
+!Map_StepPos = $10                       ; Map_Unk1D2E/1D30 value towards the right / bottom; also
+                                         ; the walking D-pad step (Field_Dpad*)
 !Map_StepNeg = $F0                       ; Map_Unk1D2E/1D30 value towards the left / top (-$10)
+!Map_FineLimit = $10                     ; Map_Unk1D93/1D96 plus the step / 16 reaching this stops a
+                                         ; right / down step at the limit tile (Map_StepStop*)
+!Eng_Invert8 = $FF                       ; EOR mask: with INC A negates an 8-bit value
+!Map_RunStepPos = $20                    ; D-pad step right / down with Pad_Unk00F8 bit 1 held
+!Map_RunStepNeg = $E0                    ; D-pad step left / up with Pad_Unk00F8 bit 1 held (-$20)
 
 ; --- Window effects (Field_EventHook handlers) ---
 !EventHook_WinFixedA1 = $07              ; Field_EventHook value of Field_HookWinFixedA's first frame
@@ -277,11 +294,15 @@ if !constants_engine_inc == 0
 !Field54_WatchBox = $20                  ; Field_Unk54 bit 5: check Field_TileStepX/Y against the box
 !Field54_Credits = $10                   ; Field_Unk54 bit 4: write the next credits line
 !Field54_MapReq = $0C                    ; Field_Unk54 bits 2-3: shifted left once into
-                                         ; Field_MapRedrawDone bits 3-4, then Map_Unk75A0
+                                         ; Field_MapRedrawDone bits 3-4, then Map_ClearBufC800
+!Field_Unk29Start = $01                  ; Field_Unk29 value Field_CheckTileInFront sets to start
+                                         ; Field_Unk1F87's sequence (not traced)
 !Field_Unk29State0D = $0D                ; Field_Unk29 value set when the watched tile leaves the box
                                          ; (Field_Unk1F87's state $0D; not traced)
 !MapRedraw_CreditsLine = $20             ; Field_MapRedrawDone bit 5: the NMI uploads the credits line
                                          ; (routine at $C0:EC77) and clears it
+!Map_ZeroChunk = $0020                   ; bytes of zeros Map_ClearBufC800 takes from GfxRom_D2; its
+                                         ; later MVNs copy 1, 2, 4 ... 32 times this
 !Credits_ClearCount = $001F              ; MVN count - 1: 32 bytes of zeros from GfxRom_D2
 !Credits_EndBlock = $80                  ; Credits_Text bytes >= this end a block (BMI)
 !Credits_EndLine = $2F                   ; '/': ends a line
@@ -296,5 +317,28 @@ if !constants_engine_inc == 0
 !Credits_RowMask = $003F                 ; Credits_Row bits 0-5: tilemap row
 !Credits_TilemapVram = $7000             ; VRAM word address of the credits tilemap (row 0, column 0)
 !Credits_LineBytes = $0040               ; bytes in a full tilemap row (32 words)
+
+; --- Field_FindObjInFront / Field_CheckTileInFront ---
+!Obj_FacingX2Mask = $0006                ; Obj_Facing x 2 kept to facings 0-3: offset into the
+                                         ; per-facing handler tables
+!Obj_Unk1100Seven = $07                  ; Obj_Unk1100 value that lets Field_FindObjInFront test the
+                                         ; leader's own slot too (meaning unknown)
+!Field_ReachAhead = $01C0                ; Obj_PosX/Y units (1/256 tile): how far ahead of the leader
+                                         ; an object may be (1.75 tiles)
+!Field_ReachSide = $00C0                 ; how far to the side of the facing line (0.75 tile)
+!Map_TreasureIdxMask = $007F             ; Map_TreasureIdx bits 0-6 (16-bit AND also drops the row
+                                         ; byte left in B)
+!Treasure_FlagByteMask = $003F           ; treasure number >> 3 kept to the 64 Treasure_Flags bytes
+!Treasure_FlagBitMask = $07              ; treasure number bits 0-2: bit within the flag byte
+!Treasure_Empty = $4000                  ; TreasureRom.Contents bit 14 (with bit 15 clear): nothing
+                                         ; given and no message started
+!Treasure_ItemMask = $01FF               ; TreasureRom.Contents bits 0-8: item id
+!BankC1Svc_AddItem = $01                 ; BankC1_Entry8003 service: add one of item Y to the
+                                         ; inventory ($C1:D005)
+!BankC1Svc_AddGold = $04                 ; BankC1_Entry8003 service: add Y to the gold sum
+                                         ; ($C1:D0A2)
+!TreasureKind_Item = $00                 ; Field_Unk2A: an item was taken
+!TreasureKind_Gold = $01                 ; Field_Unk2A: gold was taken
+!TreasureKind_Opened = $02               ; Field_Unk2A: the treasure was already taken
 
 endif

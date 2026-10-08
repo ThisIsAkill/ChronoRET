@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 39735,
+  "emitted_bytes": 41105,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 389,
+      "bytes": 41105
     },
     "readable": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 389,
+      "bytes": 41105
     },
     "verified": {
-      "functions": 352,
-      "bytes": 39735
+      "functions": 389,
+      "bytes": 41105
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 22266,
+      "emitted_bytes": 23636,
       "matched": {
-        "functions": 146,
-        "bytes": 22266
+        "functions": 183,
+        "bytes": 23636
       },
       "readable": {
-        "functions": 146,
-        "bytes": 22266
+        "functions": 183,
+        "bytes": 23636
       },
       "verified": {
-        "functions": 146,
-        "bytes": 22266
+        "functions": 183,
+        "bytes": 23636
       }
     },
     {
@@ -172,7 +172,7 @@
       "bank": "$C0",
       "start": "$C0:1000",
       "end": "$C0:1FFF",
-      "emitted_bytes": 3025,
+      "emitted_bytes": 3577,
       "functions": [
         "ModeEE_Handler",
         "ModeFA_Handler",
@@ -188,6 +188,21 @@
         "Audio_PlayTileSfxA",
         "Audio_PlaySfxAtLeader",
         "Audio_PlayTileSfxB",
+        "Field_FindObjInFront",
+        "Field_ObjInReachTable",
+        "Field_ObjInReachUp",
+        "Field_ObjInReachDown",
+        "Field_ObjInReach_No",
+        "Field_ObjInReachLeft",
+        "Field_ObjInReachRight",
+        "Field_CheckTileInFront",
+        "Field_TileInFrontTable",
+        "Field_TileInFrontUp",
+        "Field_TileInFrontDown",
+        "Field_TileInFront_No",
+        "Field_TileInFrontLeft",
+        "Field_TileInFrontRight",
+        "Field_CheckTileInFront_Start",
         "Fade_StepBrightness",
         "Fade_StepFixedColor"
       ]
@@ -240,10 +255,15 @@
       "bank": "$C0",
       "start": "$C0:5000",
       "end": "$C0:5FFF",
-      "emitted_bytes": 125,
+      "emitted_bytes": 257,
       "functions": [
         "Evt_RunObj0Func1",
-        "Evt_RunObjInit"
+        "Evt_RunObjInit",
+        "Evt_StartTargetFunc1",
+        "Map_LeaderPastRowMax",
+        "Map_LeaderPastRowMin",
+        "Map_LeaderPastColMax",
+        "Map_LeaderPastColMin"
       ]
     },
     {
@@ -257,27 +277,46 @@
       "bank": "$C0",
       "start": "$C0:7000",
       "end": "$C0:7FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 73,
+      "functions": [
+        "Map_ClearBufC800"
+      ]
     },
     {
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 228,
+      "emitted_bytes": 591,
       "functions": [
         "Field_FrameUpdate",
         "Field_Unk885A",
         "Map_ResetUnk1D2E",
-        "Field_DpadDispatch"
+        "Field_DpadDispatch",
+        "Field_DpadHandlerTable",
+        "Field_DpadNone",
+        "Field_DpadRight",
+        "Field_DpadLeft",
+        "Field_DpadUp",
+        "Field_DpadDown",
+        "Field_DpadDownRight",
+        "Field_DpadDownLeft",
+        "Field_DpadUpRight",
+        "Field_DpadUpLeft"
       ]
     },
     {
       "bank": "$C0",
       "start": "$C0:9000",
       "end": "$C0:9FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 250,
+      "functions": [
+        "Map_Unk9175",
+        "Map_Unk99DE",
+        "Map_StepStopDown",
+        "Map_StepStopUp",
+        "Map_StepStopRight",
+        "Map_StepStopLeft"
+      ]
     },
     {
       "bank": "$C0",
