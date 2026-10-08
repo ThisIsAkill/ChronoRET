@@ -141,7 +141,9 @@ if !ram_engine_inc == 0
                                          ; frame
 !Pad_PressedLatch = $51                  ; 8-bit; GameLoop_FrameBody ORs the low byte of Pad_Pressed
                                          ; into it every frame
-!Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 skips when bit 0 is set;
+!Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 flips bit 0 each frame and runs
+                                         ; its table 1 handler when it was set, table 0 when clear;
+                                         ; Hdma_InitChannelsFD picks the HDMA table set by bits 0-3;
                                          ; DefaultHandler sets/clears bit 7; Field_PauseAndMenuInput
                                          ; clears it in the pause loop
 !Field_Unk54 = $54                       ; 8-bit request flags read by Field_ServiceUnk54: bit 4 = write
@@ -420,6 +422,12 @@ if !ram_engine_inc == 0
 
 ; --- Scratch (dp) ---
 !Eng_Scratch = $D9                       ; 16-bit general scratch, reused by many routines
+!HdmaGrad_End = $DB                      ; alias of Oam_Range1LoPtr's slot in EngFD_UnkD52D: the table offset
+                                         ; the current step runs to
+!HdmaGrad_Step = $DD                     ; alias of Oam_Range2LoPtr's slot there: bytes per step (quotient * 2)
+!HdmaGrad_Extra = $DF                    ; alias of Oam_Range3LoPtr's slot there: bytes of the middle run
+                                         ; (remainder * 2)
+!HdmaGrad_Value = $E1                    ; 8-bit COLDATA value of the current step (EngFD_UnkD52D)
 !TileAnim_OriginX = $DB                  ; alias of Oam_Range1LoPtr's slot used as scratch by the
                                          ; tile-animation handlers: copy of Map_TileOriginX
 !TileAnim_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot used as scratch by the
@@ -1008,6 +1016,19 @@ if !ram_engine_inc == 0
 !Hdma_Unk7F1522 = $7F1522                ; 8-bit; $17 (BG1-3 + OBJ bits) while a window effect runs,
                                          ; 0 after; probably the TMW byte of HDMA data
 !Hdma_Unk7F1523 = $7F1523                ; 8-bit; as Hdma_Unk7F1522 (probably TSW)
+!Hdma_Unk7F14F0 = $7F14F0                ; 4 B: probably BG1SC-BG4SC data for HDMA channel 0 (EngFD_UnkC124 fills
+                                         ; it from the tilemap bases; Hdma_Unk7F14F1 is its second byte)
+!Hdma_Unk7F14F4 = $7F14F4                ; 4 B: a second such record ($1C, Map_TilemapVram3 high | 1, $1C, 0)
+!Hdma_Unk7F14F8 = $7F14F8                ; 16 B: four 16-bit pairs EngFD_UnkC124 sets (probably H/V scroll data
+                                         ; for HDMA channels 1-3)
+!Hdma_Unk7F1524 = $7F1524                ; 4 B: 5, 0, 0, 0 (EngFD_UnkC124; probably a second TM/TS/TMW/TSW record)
+!Hdma_Unk7F1528 = $7F1528                ; 4 B: 1, 0, 0, 0 (a third)
+!Hdma_Unk7F1530 = $7F1530                ; 4 B: two pairs whose second bytes EngFD_UnkC124 sets to $E0 (probably
+                                         ; CGADSUB / COLDATA for channel 6)
+!Hdma_Unk7F1534 = $7F1534                ; 4 B: two words EngFD_UnkC124 sets to $FF00 (probably WH0 / WH1 for
+                                         ; channel 5)
+!Hdma_Unk7F1538 = $7F1538                ; $100 B: (CGADSUB, COLDATA) pairs built by EngFD_UnkD52D
+!Hdma_Unk7F1600 = $7F1600                ; $100 B: its copy (EngFD_UnkD52D's MVN)
 
 ; --- Staff credits (Field_ServiceUnk54) ---
 !Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO

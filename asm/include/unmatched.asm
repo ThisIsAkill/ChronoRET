@@ -117,13 +117,18 @@ org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
-org $FDC1EE
-Hdma_InitChannelsFD: ; DP=$4300; writes DMAP0-7 / BBAD (HDMA channel setup)
-org $FDC2C1
-EngFD_UnkC2C1:      ; called with 8-bit X once a frame; dispatches via table $FD:C2E5 on dp $26
-                    ; unless dp $53 bit 0 is set (earlier notes guessed an audio tick; unverified)
-org $FDC124
-EngFD_UnkC124:      ; DB=$7F; ORs Map_TilemapVram4.. bytes into HDMA table bytes from $7F:14F0 (not traced)
+org $FDC2EB
+EngFD_UnkC2EB:      ; EngFD_UnkC2C1Table1 entry 0 (Field_Unk26 = 0, Field_Unk53 bit 0 set); not analysed
+org $FDC995
+EngFD_UnkC995:      ; EngFD_UnkC2C1Table1 entry 1; not analysed
+org $FDCFCF
+EngFD_UnkCFCF:      ; EngFD_UnkC2C1Table1 entry 2; not analysed
+org $FDC847
+EngFD_UnkC847:      ; EngFD_UnkC2C1Table0 entry 0 (Field_Unk53 bit 0 clear); not analysed
+org $FDCD0C
+EngFD_UnkCD0C:      ; EngFD_UnkC2C1Table0 entry 1; not analysed
+org $FDD27E
+EngFD_UnkD27E:      ; EngFD_UnkC2C1Table0 entry 2; not analysed
 org $FDFFF4
 FdVec_FFF4:         ; bank $FD service vector: JMP $E292 (runs with DP=$0500)
 org $FDFFF7

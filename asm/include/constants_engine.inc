@@ -679,4 +679,24 @@ if !constants_engine_inc == 0
                                          ; bottom rows (30 tiles)
 !Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
 !Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
+; --- Field HDMA (Hdma_InitChannelsFD, EngFD_UnkC124, EngFD_UnkD52D, EngFD_UnkC2C1) ---
+!Hdma_TableSetA = $0F80                  ; bank-$7F address of the first set of 8 HDMA tables
+!Hdma_TableSetB = $1238                  ; ... of the second set
+!Hdma_TableBytes = $57                   ; bytes per table in a set
+!Field_Unk53HdmaSetMask = $0F            ; Field_Unk53 bits: all clear = table set A
+!Field_Unk53Phase = $01                  ; Field_Unk53 bit EngFD_UnkC2C1 flips each frame
+!Hdma_ScRecord2Unk = $1C                 ; bytes 0 and 2 of Hdma_Unk7F14F4
+!Hdma_ScrollPair0 = $0037                ; second words of the four Hdma_Unk7F14F8 pairs (the first are 0)
+!Hdma_ScrollPair1 = $FFF1
+!Hdma_ScrollPair2 = $FFBC
+!Hdma_ScrollPair3 = $FF76
+!Hdma_WhWholeLine = $FF00                ; a WH0/WH1 word: WH0 = 0, WH1 = $FF
+!HdmaGrad_Lines = 40                     ; EngFD_UnkD52D: dividend ...
+!HdmaGrad_Steps = 8                      ; ... and divisor of its run length (5)
+!HdmaGrad_AddFirst = $E8                 ; COLDATA of its first step (then down to $E1)
+!HdmaGrad_SubLast = $E9                  ; COLDATA of its last step
+!Hdma_GradAdd = $01                      ; CGADSUB byte of the first half: add, BG1
+!Hdma_GradSub = $81                      ; CGADSUB byte of the second half: subtract, BG1
+!Hdma_GradBytes = $0100                  ; bytes EngFD_UnkD52D copies to Hdma_Unk7F1600
+
 endif

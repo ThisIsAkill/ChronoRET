@@ -3102,3 +3102,408 @@ Ppu_SetBgLayout:
     STA.b COLDATA-!DP_PPU
     PLD
     RTL
+
+; ============================================================
+; Field HDMA set-up ($FD:C124–$FD:C2DE, $FD:D52D–$FD:D5D3)
+; The field engine's HDMA: Hdma_InitChannelsFD points the 8 channels at
+; their registers and at one of two sets of indirect tables in bank $7F
+; ($7F:0F80 or $7F:1238, $57 bytes per channel); EngFD_UnkC124 fills
+; the data block at $7F:14F0-$16FF that such tables point into, and
+; EngFD_UnkC2C1 runs one per-frame builder each frame. Called by the
+; field code in bank $C0 with DP=$0100 (!DP_Field) and DB=$00.
+; ============================================================
+
+; $FD:C124 — EngFD_UnkC124 (202 bytes, $C124–$C1ED)
+; Fills the HDMA data block in bank $7F (DB = $7F while it runs). By the
+; registers Hdma_InitChannelsFD gives each channel, the bytes are
+; probably:
+;   - $14F0-$14F3: BG1SC-BG4SC values (channel 0): the high bytes of
+;     !Map_TilemapVram, !Map_TilemapVram3 and !Map_TilemapVramL3 ORed with
+;     !Map_TilemapVram4, !Map_TilemapVram4Hi and !Map_Unk1D86, then 0;
+;     $14F4-$14F7 a second such record: $1C, !Map_TilemapVram3's high
+;     byte | 1, $1C, 0 (the same order FieldBtlPpu.Tilemap1-3 keeps);
+;   - $14F8-$1507: four (16-bit, 16-bit) pairs, probably layer scroll
+;     values for channels 1-3: (0, $37), (0, -$0F), (0, -$44), (0, -$8A);
+;   - $1520-$1523: TM, TS (!Ppu_Unk0BD7 / Ppu_Unk0BD8), TMW, TSW = 0
+;     (channel 4); $1524-$1527 = 5, 0, 0, 0 and $1528-$152B = 1, 0, 0, 0;
+;   - $1531 and $1533 (COLDATA bytes of channel 6's pairs) = $E0, the
+;     words $1534 and $1536 (WH0/WH1 pairs of channel 5) = $FF00, i.e.
+;     WH0 = 0 and WH1 = $FF;
+;   - then EngFD_UnkD52D builds the $100-byte table at $7F:1538 and its
+;     copy at $7F:1600.
+; !Field_Unk27 is zeroed. Which of these records the indirect tables use
+; is not traced; the register reading rests on Hdma_InitChannelsFD.
+; Callers (1 JSL site): Scene_ResumeNmi ($C0:0B28).
+; Entry: M=1, X any (EngFD_UnkD52D sets it), DP=$0100 (.b store to
+;        !Field_Unk27), DB any (saved; set to $7F, restored)
+; Exit:  M=1, X=0; A = $FF (B = $FF, the MVN count left); X = $1638,
+;        Y = $1700; DB restored; DP $DB-$E1 written (EngFD_UnkD52D)
+; Callee: EngFD_UnkD52D
+org $FDC124
+EngFD_UnkC124:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    LDA.l !Map_TilemapVram+1
+    ORA.l !Map_TilemapVram4
+    STA.w !Hdma_Unk7F14F0
+    LDA.l !Map_TilemapVram3+1
+    ORA.l !Map_TilemapVram4Hi
+    STA.w !Hdma_Unk7F14F1
+    LDA.l !Map_TilemapVramL3+1
+    ORA.l !Map_Unk1D86
+    STA.w !Hdma_Unk7F14F0+2
+    LDA.b #0
+    STA.w !Hdma_Unk7F14F0+3
+    LDA.b #!Hdma_ScRecord2Unk
+    STA.w !Hdma_Unk7F14F4
+    LDA.l !Map_TilemapVram3+1
+    ORA.b #1
+    STA.w !Hdma_Unk7F14F4+1
+    LDA.b #!Hdma_ScRecord2Unk
+    STA.w !Hdma_Unk7F14F4+2
+    LDA.b #0
+    STA.l !Hdma_Unk7F14F4+3
+    REP #$20
+    LDA.w #0
+    STA.w !Hdma_Unk7F14F8
+    LDA.w #!Hdma_ScrollPair0
+    STA.w !Hdma_Unk7F14F8+2
+    LDA.w #0
+    STA.w !Hdma_Unk7F14F8+4
+    LDA.w #!Hdma_ScrollPair1
+    STA.w !Hdma_Unk7F14F8+6
+    LDA.w #0
+    STA.w !Hdma_Unk7F14F8+8
+    LDA.w #!Hdma_ScrollPair2
+    STA.w !Hdma_Unk7F14F8+10
+    LDA.w #0
+    STA.w !Hdma_Unk7F14F8+12
+    LDA.w #!Hdma_ScrollPair3
+    STA.w !Hdma_Unk7F14F8+14
+    LDA.w #!Hdma_WhWholeLine
+    STA.w !Hdma_Unk7F1534
+    STA.w !Hdma_Unk7F1534+2
+    SEP #$20
+    LDA.b #!COLDATA_AllZero
+    STA.w !Hdma_Unk7F1530+1
+    STA.w !Hdma_Unk7F1530+3
+    LDA.l !Ppu_Unk0BD7
+    STA.w !Hdma_Unk7F1520
+    LDA.l !Ppu_Unk0BD8
+    STA.w !Hdma_Unk7F1521
+    LDA.b #0
+    STA.w !Hdma_Unk7F1522
+    STA.w !Hdma_Unk7F1523
+    LDA.b #5
+    STA.w !Hdma_Unk7F1524
+    LDA.b #0
+    STA.w !Hdma_Unk7F1524+1
+    LDA.b #0
+    STA.w !Hdma_Unk7F1524+2
+    STA.w !Hdma_Unk7F1524+3
+    LDA.b #1
+    STA.w !Hdma_Unk7F1528
+    LDA.b #0
+    STA.w !Hdma_Unk7F1528+1
+    LDA.b #0
+    STA.w !Hdma_Unk7F1528+2
+    STA.w !Hdma_Unk7F1528+3
+    STZ.b !Field_Unk27
+    JSR EngFD_UnkD52D
+    PLB
+    RTL
+
+; $FD:C1EE — Hdma_InitChannelsFD (211 bytes, $C1EE–$C2C0)
+; Sets up all 8 HDMA channels through DP=$4300 (saved and restored):
+;   channel 0: indirect, 4 registers from BG1SC (BG1SC-BG4SC);
+;   channels 1-3: indirect, 2 registers written twice, from BG1HOFS,
+;     BG2HOFS, BG3HOFS (each layer's H and V scroll);
+;   channel 4: indirect, 4 registers from TM (TM, TS, TMW, TSW);
+;   channel 5: indirect, 2 registers from WH0 (WH0, WH1);
+;   channel 6: indirect, 2 registers from CGADSUB (CGADSUB, COLDATA);
+;   channel 7: indirect, 1 register: WH2, or WH3 when !WinFx_Size bit 0
+;     is set.
+; Table and indirect-data banks are $7F for all eight. The table
+; addresses are the set at $7F:0F80 when !Field_Unk53 bits 0-3 are all
+; clear, else the set at $7F:1238; each set holds one $57-byte table per
+; channel. Which channels run is up to !Field_HdmaEnable (the NMI writes
+; HDMAEN).
+; Callers (10 JSL sites): Field_RestoreState ($C0:01B0), Scene_ResumeNmi ($C0:0B34) and unmatched
+;   ($C0:0B1F, $C0:EAEF, $C0:EB0F, $C0:EB26, $C0:EB3D, $C0:EB51, $C0:EB65, $C0:EC0F).
+; Entry: M=1, X=0 (16-bit table addresses), DP any (saved), DB=$00 (reads
+;        !DP_Field+!WinFx_Size and +!Field_Unk53 absolute)
+; Exit:  M=1, X=0; DP restored; A clobbered; X = the channel 7 table
+;        address; Y unchanged
+org $FDC1EE
+Hdma_InitChannelsFD:
+    PHD
+    REP #$20
+    LDA.w #!DP_DMA
+    TCD
+    SEP #$20
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_FourRegs
+    STA.b DMAP0-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.b DMAP1-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.b DMAP2-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.b DMAP3-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_FourRegs
+    STA.b DMAP4-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegs
+    STA.b DMAP5-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegs
+    STA.b DMAP6-!DP_DMA
+    LDA.b #!DMAP_HdmaIndirect
+    STA.b DMAP7-!DP_DMA
+    LDA.b #!BBAD_BG1SC
+    STA.b BBAD0-!DP_DMA
+    LDA.b #!BBAD_BG1HOFS
+    STA.b BBAD1-!DP_DMA
+    LDA.b #!BBAD_BG2HOFS
+    STA.b BBAD2-!DP_DMA
+    LDA.b #!BBAD_BG3HOFS
+    STA.b BBAD3-!DP_DMA
+    LDA.b #!BBAD_TM
+    STA.b BBAD4-!DP_DMA
+    LDA.b #!BBAD_WH0
+    STA.b BBAD5-!DP_DMA
+    LDA.b #!BBAD_CGADSUB
+    STA.b BBAD6-!DP_DMA
+    LDA.w !DP_Field+!WinFx_Size
+    BIT.b #1
+    BNE .wh3
+    LDA.b #!BBAD_WH2
+    BRA .set_ch7
+.wh3:
+    LDA.b #!BBAD_WH3
+.set_ch7:
+    STA.b BBAD7-!DP_DMA
+    LDA.b #!Bank7F
+    STA.b A1B0-!DP_DMA
+    STA.b A1B1-!DP_DMA
+    STA.b A1B2-!DP_DMA
+    STA.b A1B3-!DP_DMA
+    STA.b A1B4-!DP_DMA
+    STA.b A1B5-!DP_DMA
+    STA.b A1B6-!DP_DMA
+    STA.b A1B7-!DP_DMA
+    STA.b DAS0B-!DP_DMA
+    STA.b DAS1B-!DP_DMA
+    STA.b DAS2B-!DP_DMA
+    STA.b DAS3B-!DP_DMA
+    STA.b DAS4B-!DP_DMA
+    STA.b DAS5B-!DP_DMA
+    STA.b DAS6B-!DP_DMA
+    STA.b DAS7B-!DP_DMA
+    LDA.w !DP_Field+!Field_Unk53
+    AND.b #!Field_Unk53HdmaSetMask
+    BEQ .set_a
+    BRA .set_b
+.set_a:
+    LDX.w #!Hdma_TableSetA
+    STX.b A1T0L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*1)
+    STX.b A1T1L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*2)
+    STX.b A1T2L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*3)
+    STX.b A1T3L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*4)
+    STX.b A1T4L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*5)
+    STX.b A1T5L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*6)
+    STX.b A1T6L-!DP_DMA
+    LDX.w #!Hdma_TableSetA+(!Hdma_TableBytes*7)
+    STX.b A1T7L-!DP_DMA
+    PLD
+    RTL
+.set_b:
+    LDX.w #!Hdma_TableSetB
+    STX.b A1T0L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*1)
+    STX.b A1T1L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*2)
+    STX.b A1T2L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*3)
+    STX.b A1T3L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*4)
+    STX.b A1T4L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*5)
+    STX.b A1T5L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*6)
+    STX.b A1T6L-!DP_DMA
+    LDX.w #!Hdma_TableSetB+(!Hdma_TableBytes*7)
+    STX.b A1T7L-!DP_DMA
+    PLD
+    RTL
+
+; $FD:C2C1 — EngFD_UnkC2C1 (30 bytes, $C2C1–$C2DE)
+; Once a frame: runs entry !Field_Unk26 (0-2) of one of two handler
+; tables and flips !Field_Unk53 bit 0. With bit 0 clear it runs
+; EngFD_UnkC2C1Table0 and sets the bit; with it set, EngFD_UnkC2C1Table1
+; and clears it. So the two tables alternate frame by frame, probably
+; filling the two HDMA table sets in turn (Hdma_InitChannelsFD picks a
+; set by !Field_Unk53; not traced). The handlers are not analysed.
+; Callers (9 JSL sites): Field_EndOfFrame ($C0:00C7), Field_EndOfFrameShort ($C0:00E0),
+;   Field_RestoreState ($C0:01AA), Scene_ResumeNmi ($C0:0B2E), Field_PauseAndMenuInput ($C0:1905,
+;   $C0:194D), Field_FadeToBankC2Mode5 ($C0:19B6) and unmatched ($C0:0B11, $C0:0B15).
+; Entry: M=1, X=1 (8-bit TAX of the doubled index), DP=$0100, DB=$00 at
+;        all callers (what the handlers need is not traced)
+; Exit:  M=1, X=1; !Field_Unk53 bit 0 flipped; A = 1; X and the rest as
+;        the handler leaves them
+; Callees: the 6 handlers of EngFD_UnkC2C1Table0/1 (JSR (table,X))
+org $FDC2C1
+EngFD_UnkC2C1:
+    LDA.b !Field_Unk53
+    BIT.b #!Field_Unk53Phase
+    BNE .phase1
+    LDA.b !Field_Unk26
+    ASL A
+    TAX
+    JSR (EngFD_UnkC2C1Table0,X)
+    LDA.b #!Field_Unk53Phase
+    TSB.b !Field_Unk53
+    RTL
+.phase1:
+    LDA.b !Field_Unk26
+    ASL A
+    TAX
+    JSR (EngFD_UnkC2C1Table1,X)
+    LDA.b #!Field_Unk53Phase
+    TRB.b !Field_Unk53
+    RTL
+
+; $FD:C2DF — EngFD_UnkC2C1Table1 (6 bytes, $C2DF–$C2E4)
+; EngFD_UnkC2C1's handlers by !Field_Unk26 when !Field_Unk53 bit 0 is set.
+EngFD_UnkC2C1Table1:
+    dw EngFD_UnkC2EB                    ; 0
+    dw EngFD_UnkC995                    ; 1
+    dw EngFD_UnkCFCF                    ; 2
+
+; $FD:C2E5 — EngFD_UnkC2C1Table0 (6 bytes, $C2E5–$C2EA)
+; The same when !Field_Unk53 bit 0 is clear.
+EngFD_UnkC2C1Table0:
+    dw EngFD_UnkC847                    ; 0
+    dw EngFD_UnkCD0C                    ; 1
+    dw EngFD_UnkD27E                    ; 2
+
+; $FD:D52D — EngFD_UnkD52D (167 bytes, $D52D–$D5D3)
+; EngFD_UnkC124's helper: builds a table of (CGADSUB, COLDATA) byte
+; pairs at $7F:1538 (channel 6's registers in Hdma_InitChannelsFD), then
+; copies the $100 bytes from $7F:1538 to $7F:1600 (MVN).
+; The run length comes from the hardware divider: 40 / 8 = 5 entries per
+; step (the remainder, 0, would lengthen the middle run). It writes:
+;   - 8 steps of 5 entries ($01, v) with v = $E8 down to $E1;
+;   - an empty middle run ($81, $E0) of remainder * 2 bytes;
+;   - 9 steps of 5 entries ($81, v) with v = $E1 up to $E9.
+; With COLDATA $E0 + n (all three channels at intensity n) and CGADSUB
+; $01 / $81 (add / subtract the fixed colour on BG1), this looks like a
+; brightness gradient down the screen; whether and where the indirect
+; tables use it is not traced.
+; The 7 NOPs wait for the divider; the table is built with 8-bit X/Y.
+; Callers (1 JSR site): EngFD_UnkC124 ($FD:C1E9).
+; Entry: M=1, X any (set to 8-bit, then 16-bit), DP=$0100 (scratch
+;        $DB-$E1), DB=$7F (the table stores)
+; Exit:  M=1, X=0; A = $FFFF (MVN count spent); X = $1638, Y = $1700;
+;        DB = $7F (MVN); DP $DB, $DD, $DF, $E1 written
+org $FDD52D
+EngFD_UnkD52D:
+    LDA.b #!HdmaGrad_Lines
+    STA.l WRDIVL
+    LDA.b #0
+    STA.l WRDIVH
+    LDA.b #!HdmaGrad_Steps
+    STA.l WRDIVB
+    NOP                                 ; the divide takes 16 cycles
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    SEP #$10
+    LDX.b #0
+    LDA.l RDDIVL
+    ASL A
+    STA.b !HdmaGrad_End
+    STA.b !HdmaGrad_Step
+    LDA.l RDMPYL
+    ASL A
+    STA.b !HdmaGrad_Extra
+    LDA.b #!HdmaGrad_AddFirst
+.add_step:
+    STA.b !HdmaGrad_Value
+.add_entry:
+    CPX.b !HdmaGrad_End
+    BEQ .add_next
+    LDA.b !HdmaGrad_Value
+    STA.w !Hdma_Unk7F1538+1,X
+    LDA.b #!Hdma_GradAdd
+    STA.w !Hdma_Unk7F1538,X
+    INX
+    INX
+    BRA .add_entry
+.add_next:
+    LDA.b !HdmaGrad_End
+    CLC
+    ADC.b !HdmaGrad_Step
+    STA.b !HdmaGrad_End
+    LDA.b !HdmaGrad_Value
+    DEC A
+    CMP.b #!COLDATA_AllZero
+    BEQ .middle
+    BRA .add_step
+.middle:
+    LDA.b !HdmaGrad_End
+    CLC
+    ADC.b !HdmaGrad_Extra
+    STA.b !HdmaGrad_End
+.middle_entry:
+    CPX.b !HdmaGrad_End
+    BEQ .sub_start
+    LDA.b #!COLDATA_AllZero
+    STA.w !Hdma_Unk7F1538+1,X
+    LDA.b #!Hdma_GradSub
+    STA.w !Hdma_Unk7F1538,X
+    INX
+    INX
+    BRA .middle_entry
+.sub_start:
+    LDA.b #!COLDATA_AllZero
+    STA.b !HdmaGrad_Value
+    BRA .sub_next
+.sub_step:
+    STA.b !HdmaGrad_Value
+.sub_entry:
+    CPX.b !HdmaGrad_End
+    BEQ .sub_next
+    LDA.b !HdmaGrad_Value
+    STA.w !Hdma_Unk7F1538+1,X
+    LDA.b #!Hdma_GradSub
+    STA.w !Hdma_Unk7F1538,X
+    INX
+    INX
+    BRA .sub_entry
+.sub_next:
+    LDA.b !HdmaGrad_End
+    CLC
+    ADC.b !HdmaGrad_Step
+    STA.b !HdmaGrad_End
+    LDA.b !HdmaGrad_Value
+    CMP.b #!HdmaGrad_SubLast
+    BEQ .copy
+    INC A
+    BRA .sub_step
+.copy:
+    REP #$30
+    LDX.w #!Hdma_Unk7F1538
+    LDY.w #!Hdma_Unk7F1600
+    LDA.w #!Hdma_GradBytes-1
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    RTS
