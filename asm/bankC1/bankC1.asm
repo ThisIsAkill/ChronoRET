@@ -3525,7 +3525,9 @@ BattleMenu_RefreshIfDirtyL:
 ; Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty-
 ; flag gate and menu rebuild chain, but always follows up with a
 ; cross-bank per-frame service tick (BattleSys_FrameTickVec) before returning via
-; plain RTS. Called once per frame from the battle-phase state machine.
+; plain RTS. Runs right after each frame wait in service 4
+; (BattleSys_RunAction) and its loaders BattleAct_LoadCommon and
+; BattleAct_UnpackFrames.
 ; Callers (7 JSR sites): BattleSys_RunAction ($C1:40A3, $C1:40B6,
 ;   $C1:40E4), BattleAct_LoadCommon ($C1:485E, $C1:4867, $C1:4890) and
 ;   BattleAct_UnpackFrames ($C1:4946).
