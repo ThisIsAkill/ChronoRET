@@ -4802,10 +4802,13 @@ SprBuf_Free3:
 
 ; ============================================================
 ; $C0:0000 — ReentryVectors (14 bytes)
-; Mid-game JSL re-entry vector table.  Other banks JSL into one of
-; these entries; the BRA/BRL tail-dispatches to the target routine,
-; and its RTL returns directly to the JSL caller.
-;   [0] $0000  BRA → GameLoop_Main  (warm restart; no RTL return)
+; Mid-game re-entry vector table at the start of the bank. The BRA/BRL
+; tail-dispatches to the target routine.
+;   [0] is entered by JML (from $C2:2505, $C2:8349 and $FD:DA5B/DABA/
+;       DB19/DB93) and by BRL from $C0:0CC4 and $C0:3B95; it never returns.
+;   [1]-[4] are entered by JSL (one call site each in the ROM), and the
+;       target's RTL returns straight to that caller.
+;   [0] $0000  BRA → GameLoop_Main  (warm restart)
 ;   [1] $0002  JSL → ScrollStepAccum  ($C0:2C41)
 ;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)

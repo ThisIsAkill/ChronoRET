@@ -1,5 +1,5 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
-$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,verified,89fc21ebb852,Mid-game JSL re-entry vector table.
+$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,readable,b1c0704c4cd5,Mid-game re-entry vector table at the start of the bank.
 $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,readable,e647c1a1c65f,"Installs the interrupt trampolines, clears WRAM, starts the sound driver and bank $C2, then falls into GameLoop_Main."
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,readable,81e2479105c1,trampolines and dispatches on Loc_Id.
 $C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,1e6af7746290,Loc_FirstBankC2.
