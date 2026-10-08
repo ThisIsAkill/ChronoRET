@@ -108,7 +108,8 @@ if !ram_engine_inc == 0
 !Field_Unk2A = $2A                       ; 8-bit; Field_CheckTileInFront stores the treasure outcome
                                          ; here (TreasureKind_*) as it starts Field_Unk29 = 1
 !Field_Unk2B = $2B                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
-!Field_Unk2D = $2D                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk2D = $2D                       ; 8-bit; the message pointer's bank byte: set by Evt_OpB8_SetMsgPtr,
+                                         ; zeroed by Field_InitLoadState; 0 makes the message opcodes halt
 !Field_Unk2E = $2E                       ; 8-bit; Field_CheckTileInFront stores the leader's object
                                          ; slot here as it starts Field_Unk29 = 1
 !Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
@@ -149,7 +150,9 @@ if !ram_engine_inc == 0
 !Nmi_FramePending = $52                  ; 8-bit; Field_WaitFrame INCs it and spins until it is 0 again;
                                          ; NmiHandler does the frame's uploads only while it is
                                          ; nonzero and zeroes it after them (the frame handshake)
-!Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 skips when bit 0 is set;
+!Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 flips bit 0 each frame and runs
+                                         ; its table 1 handler when it was set, table 0 when clear;
+                                         ; Hdma_InitChannelsFD picks the HDMA table set by bits 0-3;
                                          ; DefaultHandler sets/clears bit 7; Field_PauseAndMenuInput
                                          ; clears it in the pause loop
 !Field_Unk54 = $54                       ; 8-bit request flags read by Field_ServiceUnk54: bit 4 = write
@@ -307,9 +310,20 @@ if !ram_engine_inc == 0
                                          ; a jump)
 !Obj_ArcGravity = $1B81                  ; per object, 8-bit amount added to Obj_VelY per frame in
                                          ; arc mode (an event handler at $C0:4D87 stores it)
+!ObjX_CallWait = $7F0980                 ; 8-bit per object in bank $7F (the table after the eight
+                                         ; ObjX_Unk7F0580 levels): nonzero while opcode $04/$07 of the
+                                         ; object waits for the function it called to end
+!ObjX_Unk7F0A80 = $7F0A80                ; 16-bit per object in bank $7F: set from an event word or
+                                         ; a bank-$7F word by opcodes $19 / $1C, its low byte compared
+                                         ; by opcode $1A (meaning not traced)
+!ObjX_EvtWait = $7F0A01                  ; 8-bit per object in bank $7F (the odd byte beside
+                                         ; ObjX_LeaveView): the script-run counter of the wait
+                                         ; opcodes $AD and $B9-$BD
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
-                                         ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
+                                         ; Field_Unk29 becomes Field_Unk29State0D. The message opcodes
+                                         ; $BB-$C4 set it to 1 while their message is up and clear it
+                                         ; when it is over
 !ObjFront_SavedY = $C7                   ; Evt_FindSolidObjInFront: 16-bit, the caller's Y
 !ObjFront_FacingX2 = $D9                 ; alias of Eng_Scratch there: 8-bit Obj_Facing x 2 of
                                          ; Obj_Cur (index into Evt_InFrontTests)
@@ -330,6 +344,49 @@ if !ram_engine_inc == 0
 !EvtFollow_ScrRow = $DD                  ; as EvtFollow_ScrCol: Map_TileOriginY / 2
 !EvtFace_Target = $D9                    ; alias of Eng_Scratch in Evt_OpA8_FaceObj: 16-bit, the
                                          ; target's slot
+!EvtCall_Level = $D9                     ; alias of Eng_Scratch in the call opcodes $02-$07: 8-bit,
+                                         ; the target's Obj_Unk1C00 (its current level)
+!EvtCall_Slot = $DB                      ; alias of Oam_Range1LoPtr's slot: 16-bit, the target's slot
+                                         ; (low byte stored, EvtCall_SlotHi zeroed)
+!EvtCall_SlotHi = $DC                    ; high byte of EvtCall_Slot
+!EvtCall_Arg = $DD                       ; alias of Oam_Range2LoPtr's slot: 8-bit, the level/function
+                                         ; operand (level in the high nibble, function in the low)
+!EvtCall_NewLevel = $DF                  ; 8-bit: EvtCall_Arg >> 4, the level the call runs at
+!EvtCall_SaveIdx = $E1                   ; 16-bit: level x Evt_PrioStride + the target's slot (index
+                                         ; into ObjX_Unk7F0580)
+!EvtCall_FuncTbl = $E3                   ; 16-bit: the target's slot x 16 (its function table in
+                                         ; Evt_Data); Evt_Unk0920Key's slot
+!EvtIf_OfsPos = $C3                      ; alias of Spr_BaseX in the condition opcodes $12-$16:
+                                         ; 16-bit, the Evt_Data offset of the opcode's jump-distance
+                                         ; byte (its last byte)
+!EvtIf_Left = $D9                        ; alias of Eng_Scratch in the condition opcodes: 8- or 16-bit,
+                                         ; the value tested (Evt_CmpTable8 / Evt_CmpTable16 compare
+                                         ; it with EvtIf_Right)
+!EvtIf_Right = $DB                       ; alias of Oam_Range1LoPtr's slot there: 8- or 16-bit, the
+                                         ; value it is compared with
+!EvtIf_Cmp = $DD                         ; alias of Oam_Range2LoPtr's slot in Evt_Op16_IfMemByte:
+                                         ; 8-bit, the comparison number
+!EvtJump_Dist = $D9                      ; alias of Eng_Scratch in the jump opcodes: 16-bit, the
+                                         ; jump distance (an operand byte, zero-extended)
+!EvtGet_First = $D9                      ; alias of Eng_Scratch in the get opcodes $21-$24: 8-bit, the
+                                         ; object's Obj_TileX (or Obj_Facing) on its way to an event word
+!EvtGet_Second = $DB                     ; alias of Oam_Range1LoPtr's slot there: 8-bit, its Obj_TileY
+!EvtMem_Src = $CD                        ; alias of Spr_GfxPtr in opcodes $48/$49: 24-bit pointer read
+                                         ; from the operands (the byte or word to load)
+!EvtMem_Dst = $D0                        ; alias of Spr_WramPtr in opcodes $4A-$4D: 24-bit pointer read
+                                         ; from the operands (where to store)
+!EvtMem_Pos = $D9                        ; alias of Eng_Scratch in opcodes $48/$49/$4C/$4D: 16-bit, the
+                                         ; Evt_Data offset of the opcode's last byte
+!EvtMem_Value = $D9                      ; alias of Eng_Scratch in opcodes $4F-$5B: 8- or 16-bit, the
+                                         ; value on its way
+!EvtBit_Arg = $DB                        ; alias of Oam_Range1LoPtr's slot in opcodes $65/$66: 8-bit,
+                                         ; the bit operand (bit number in bits 0-3, page in bit 7)
+!EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
+                                         ; the opcode's offset (Y) across the walk opcode they run
+!EvtCtl_SavedY = $C7                     ; alias of ObjFront_SavedY's slot in Evt_OpB0_PartyControl:
+                                         ; 16-bit, the opcode's offset (Y) across its callees
+!EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
+                                         ; (bytes - 1)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
                                          ; (Obj_PalSlotKind0, Obj_PalSlotAny, Obj_Unk72B4): 8-bit,
                                          ; the slot being tried
@@ -458,6 +515,12 @@ if !ram_engine_inc == 0
 
 ; --- Scratch (dp) ---
 !Eng_Scratch = $D9                       ; 16-bit general scratch, reused by many routines
+!HdmaGrad_End = $DB                      ; alias of Oam_Range1LoPtr's slot in EngFD_UnkD52D: the table offset
+                                         ; the current step runs to
+!HdmaGrad_Step = $DD                     ; alias of Oam_Range2LoPtr's slot there: bytes per step (quotient * 2)
+!HdmaGrad_Extra = $DF                    ; alias of Oam_Range3LoPtr's slot there: bytes of the middle run
+                                         ; (remainder * 2)
+!HdmaGrad_Value = $E1                    ; 8-bit COLDATA value of the current step (EngFD_UnkD52D)
 !TileAnim_OriginX = $DB                  ; alias of Oam_Range1LoPtr's slot used as scratch by the
                                          ; tile-animation handlers: copy of Map_TileOriginX
 !TileAnim_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot used as scratch by the
@@ -724,6 +787,8 @@ if !ram_engine_inc == 0
 ; --- Location event data / saved field state ---
 !Evt_ObjCount = $7F2000                  ; 8-bit count of location objects; Obj_ResetStates clears
                                          ; that many Obj_State entries
+!Evt_DataAddr = $2001                    ; Evt_Data's address within bank $7F (Evt_Op4E_CopyData
+                                         ; turns offsets into MVN source addresses with it)
 !Evt_Data = $7F2001                      ; location event data; begins with 16 word function offsets
                                          ; per object (32 bytes, index Obj_Cur*16), and all offsets
                                          ; are relative to it; opcode streams end at opcode $00
@@ -1034,6 +1099,9 @@ if !ram_engine_inc == 0
 !GfxRom_D3 = $D30000                     ; object tile graphics in ROM bank $D3
 !GfxRom_D4 = $D40000                     ; object tile graphics in ROM bank $D4
 !GfxRom_D5 = $D50000                     ; object tile graphics in ROM bank $D5
+!Evt_Mem7F = $7F0000                     ; start of bank $7F as the event opcodes address it: the byte
+                                         ; or word at $7F:0000 + an operand (Eng_Unk7F0000,
+                                         ; Treasure_Flags and Evt_Unk7F0200 lie there)
 !Wram7F_PtrBase = $7F0000                ; base 0 of bank $7F for abs,X / abs,Y accesses whose index
                                          ; holds the full address (DB = $7F)
 
@@ -1072,7 +1140,9 @@ if !ram_engine_inc == 0
 !WinFx_QuadPos = $7F1CE9                 ; 4 x (16-bit X, 16-bit Y), 8.8 fixed point: hook 6's points
 !WinFx_QuadVel = $7F1CF9                 ; 4 x (16-bit X, 16-bit Y): added to WinFx_QuadPos per frame
 !Hdma_Unk7F14F0 = $7F14F0                ; 8-bit; NmiHandler stores Map_TilemapVram's high byte | 1
-                                         ; here after redraw steps 1 and 2 (see Hdma_Unk7F14F1)
+                                         ; here after redraw steps 1 and 2 (see Hdma_Unk7F14F1). The first
+                                         ; of 4 B, probably BG1SC-BG4SC data for HDMA channel 0
+                                         ; (EngFD_UnkC124 fills them from the tilemap bases)
 !Hdma_Unk7F14F1 = $7F14F1                ; 8-bit; the NMI handler stores a tilemap base | 1 at
                                          ; $7F:14F0 (inferred: BG1SC data for HDMA channel 0, which
                                          ; Hdma_InitChannelsFD points at BG1SC-BG4SC); hook 12
@@ -1084,6 +1154,17 @@ if !ram_engine_inc == 0
 !Hdma_Unk7F1522 = $7F1522                ; 8-bit; $17 (BG1-3 + OBJ bits) while a window effect runs,
                                          ; 0 after; probably the TMW byte of HDMA data
 !Hdma_Unk7F1523 = $7F1523                ; 8-bit; as Hdma_Unk7F1522 (probably TSW)
+!Hdma_Unk7F14F4 = $7F14F4                ; 4 B: a second such record ($1C, Map_TilemapVram3 high | 1, $1C, 0)
+!Hdma_Unk7F14F8 = $7F14F8                ; 16 B: four 16-bit pairs EngFD_UnkC124 sets (probably H/V scroll data
+                                         ; for HDMA channels 1-3)
+!Hdma_Unk7F1524 = $7F1524                ; 4 B: 5, 0, 0, 0 (EngFD_UnkC124; probably a second TM/TS/TMW/TSW record)
+!Hdma_Unk7F1528 = $7F1528                ; 4 B: 1, 0, 0, 0 (a third)
+!Hdma_Unk7F1530 = $7F1530                ; 4 B: two pairs whose second bytes EngFD_UnkC124 sets to $E0 (probably
+                                         ; CGADSUB / COLDATA for channel 6)
+!Hdma_Unk7F1534 = $7F1534                ; 4 B: two words EngFD_UnkC124 sets to $FF00 (probably WH0 / WH1 for
+                                         ; channel 5)
+!Hdma_Unk7F1538 = $7F1538                ; $100 B: (CGADSUB, COLDATA) pairs built by EngFD_UnkD52D
+!Hdma_Unk7F1600 = $7F1600                ; $100 B: its copy (EngFD_UnkD52D's MVN)
 
 ; --- Staff credits (Field_ServiceUnk54) ---
 !Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
@@ -1599,6 +1680,31 @@ struct FieldBtlPpu $7E2C56
     .Unk6E: skip 1       ; FieldBtl_PpuUnk6E
     .Unk6F: skip 1       ; 0
     .Scroll2: skip 12    ; the same six words again
+endstruct
+
+; --- Location animation records (FieldFD_LoadAnimSetA/B, the FdVec_FFFA/FFF4 routines) ---
+!DP_FieldAnim = $0500                    ; direct page of the bank-$FD vector routines (FieldFD_LoadAnimSetA/B)
+; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
+struct FieldAnimA $05B0
+    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
+    .Unk1: skip 1        ; 0
+    .Unk2: skip 1        ; list byte
+    .Unk3: skip 1        ; list byte, or $80 for an $80 entry
+    .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
+endstruct
+; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
+; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (not analysed).
+struct FieldAnimB $0520
+    .Unk0: skip 1        ; list byte: high nibble = kind (0 = empty); low nibble = bytes skipped for kind 8
+    .Unk1: skip 1
+    .Unk2: skip 1
+    .Unk3: skip 1        ; 0
+    .Unk4: skip 1        ; 0
+    .Unk5: skip 1
+    .Unk6: skip 1        ; kinds 1 and 8 only
+    .Unk7: skip 1
+    .Unk8: skip 1
+    .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
 endstruct
 
 endif

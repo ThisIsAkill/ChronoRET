@@ -39,18 +39,20 @@ org $C028C0
 TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
 org $C028E1
 TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
-org $C05F6E
-Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_OpcodeTable's end);
-                    ; LDX #$1639, BRL LoadSavePath. Also Field_EventHookTable entries 15-16
+org $C09E29
+Party_Unk9E29:      ; JSR from Evt_OpB0_PartyControl for an Obj_Unk1100 kind-0 object (the leader,
+                    ; probably): JSR $C0:9E84, then copies the Map_Unk1D32/1D33 steps into Obj_VelX/Y
+                    ; and logs them with Map_Unk1D2C/2D, the priorities and Map_Unk1D34 at entry
+                    ; Field_UnkAB (stepped, & $7F) of ObjX_Unk7F0C00-$7F0F00 (not matched)
+org $C0A26B
+Party_UnkA26B:      ; JSR from Evt_OpB0_PartyControl for kind 1: moves Party_ObjSlot1's object by the
+                    ; entries logged above, from Field_UnkAC, lagging $10/$18 entries (not matched)
+org $C0A2CE
+Party_UnkA2CE:      ; as Party_UnkA26B for kind 2: Party_ObjSlot2's object, from Field_UnkAD (not
+                    ; matched)
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
-org $C0305D
-Obj_Unk305D:        ; Obj_Cur's X/Y steps = +-$10 toward position $80 / $F0 within its tile, one
-                    ; frame (Obj_MoveFrames = 1), C=1; C=0 when it is there (not matched)
-org $C030B3
-Obj_Unk30B3:        ; as Obj_Unk305D toward the position of the object in ObjFront_Other (not
-                    ; matched)
 
 ; --- Other banks, called from bank $C0 ---
 
@@ -100,16 +102,18 @@ org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
-org $FDC1EE
-Hdma_InitChannelsFD: ; DP=$4300; writes DMAP0-7 / BBAD (HDMA channel setup)
-org $FDC2C1
-EngFD_UnkC2C1:      ; called with 8-bit X once a frame; dispatches via table $FD:C2E5 on dp $26
-                    ; unless dp $53 bit 0 is set (earlier notes guessed an audio tick; unverified)
-org $FDC124
-EngFD_UnkC124:      ; DB=$7F; ORs Map_TilemapVram4.. bytes into HDMA table bytes from $7F:14F0 (not traced)
-org $FDFFF4
-FdVec_FFF4:         ; bank $FD service vector: JMP $E292 (runs with DP=$0500)
-org $FDFFF7
-FdVec_FFF7:         ; bank $FD service vector: JMP $E39C (runs with DP=$0500)
-org $FDFFFA
-FdVec_FFFA:         ; bank $FD service vector: JMP $DE98 (runs with DP=$0500)
+org $FDC2EB
+EngFD_UnkC2EB:      ; EngFD_UnkC2C1Table1 entry 0 (Field_Unk26 = 0, Field_Unk53 bit 0 set); not analysed
+org $FDC995
+EngFD_UnkC995:      ; EngFD_UnkC2C1Table1 entry 1; not analysed
+org $FDCFCF
+EngFD_UnkCFCF:      ; EngFD_UnkC2C1Table1 entry 2; not analysed
+org $FDC847
+EngFD_UnkC847:      ; EngFD_UnkC2C1Table0 entry 0 (Field_Unk53 bit 0 clear); not analysed
+org $FDCD0C
+EngFD_UnkCD0C:      ; EngFD_UnkC2C1Table0 entry 1; not analysed
+org $FDD27E
+EngFD_UnkD27E:      ; EngFD_UnkC2C1Table0 entry 2; not analysed
+org $FDE39C
+EngFD_UnkE39C:      ; FdVec_FFF7's routine, run every frame by Field_EndOfFrame; works on the FieldAnimB
+                    ; records at $0520 (not analysed)

@@ -690,6 +690,45 @@ if !constants_engine_inc == 0
                                          ; bottom rows (30 tiles)
 !Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
 !Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
+; --- Field HDMA (Hdma_InitChannelsFD, EngFD_UnkC124, EngFD_UnkD52D, EngFD_UnkC2C1) ---
+!Hdma_TableSetA = $0F80                  ; bank-$7F address of the first set of 8 HDMA tables
+!Hdma_TableSetB = $1238                  ; ... of the second set
+!Hdma_TableBytes = $57                   ; bytes per table in a set
+!Field_Unk53HdmaSetMask = $0F            ; Field_Unk53 bits: all clear = table set A
+!Field_Unk53Phase = $01                  ; Field_Unk53 bit EngFD_UnkC2C1 flips each frame
+!Hdma_ScRecord2Unk = $1C                 ; bytes 0 and 2 of Hdma_Unk7F14F4
+!Hdma_ScrollPair0 = $0037                ; second words of the four Hdma_Unk7F14F8 pairs (the first are 0)
+!Hdma_ScrollPair1 = $FFF1
+!Hdma_ScrollPair2 = $FFBC
+!Hdma_ScrollPair3 = $FF76
+!Hdma_WhWholeLine = $FF00                ; a WH0/WH1 word: WH0 = 0, WH1 = $FF
+!HdmaGrad_Lines = 40                     ; EngFD_UnkD52D: dividend ...
+!HdmaGrad_Steps = 8                      ; ... and divisor of its run length (5)
+!HdmaGrad_AddFirst = $E8                 ; COLDATA of its first step (then down to $E1)
+!HdmaGrad_SubLast = $E9                  ; COLDATA of its last step
+!Hdma_GradAdd = $01                      ; CGADSUB byte of the first half: add, BG1
+!Hdma_GradSub = $81                      ; CGADSUB byte of the second half: subtract, BG1
+!Hdma_GradBytes = $0100                  ; bytes EngFD_UnkD52D copies to Hdma_Unk7F1600
+
+; --- Location animation set-up (FieldFD_LoadAnimSetA/B) ---
+!FieldRom_AnimListAPtrs = $FDF290        ; 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA
+!FieldRom_AnimListA = $FDF310            ; the lists FieldFD_LoadAnimSetA reads
+!FieldRom_AnimListBPtrs = $FDF9C7        ; 2 B per LocRom.Palette: offset of its list from FieldRom_AnimListB
+!FieldRom_AnimListB = $FDFA77            ; the lists FieldFD_LoadAnimSetB reads
+!LocRom_AnimSetMask = $3F                ; LocRom.Tileset12 bits that pick FieldFD_LoadAnimSetA's list
+!FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
+!FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
+!FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
+!FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
+!FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops
+!FieldAnim_Kind4 = 4
+!FieldAnimB_KindMask = $F0               ; FieldFD_LoadAnimSetB: the kind nibble of a list byte
+!FieldAnimB_Kind10 = $10                 ; kinds with 9-byte records
+!FieldAnimB_Kind80 = $80                 ; ... the second also stores FieldAnimB.Ptr
+!FieldAnimB_SkipMask = $0F               ; FieldAnimB.Unk0 bits: list bytes skipped (+ 1) after a kind-$80 record
+!FieldAnimB_Size = 12                    ; bytes per FieldAnimB record
+!FieldAnimB_Filled = 6                   ; records FieldFD_LoadAnimSetB fills (the other 6 get .Unk0 = 0)
+
 endif
 
 ; --- NMI handler (NmiHandler, $C0:EA63) ---
@@ -748,3 +787,67 @@ endif
 !ObjAnim_RunKinds = $04                  ; Obj_Unk1100 kinds below this may take ObjAnim_RowRun
 !Obj_AnimModeNormal = $01                ; Obj_AnimMode Obj_SetMoveAnim sets when it leaves
                                          ; Obj_AnimModeFixed (Obj_AnimRow not $FF)
+
+; --- Event call opcodes ($00-$09) ---
+!Halt_ColorBadOpcode = $1639             ; Sys_HaltWithColor colour for an unused event opcode
+                                         ; (Evt_UnusedOpcode)
+!Evt_CallFuncMask = $000F                ; low nibble of a call opcode's level/function operand: the
+                                         ; function number (word index in the 16-word table)
+
+; --- Event jump and condition opcodes ($10-$1C) ---
+!EvtIf_Page1Flag = $80                   ; Evt_Op16_IfMemByte's comparison byte, bit 7: the byte tested
+                                         ; is at $7F:0100 + the operand (else $7F:0000 + it)
+!EvtIf_Page1 = $0100                     ; the offset bit 7 of that byte adds
+
+; --- Event button opcodes ($2D-$44) ---
+; Bits of Menu_PadHeld / Pad_PressedLatch, by Pad_Pressed's low-byte layout (A X L R B Y Select
+; Start, bits 7-0; that layout is inferred from the pad reader at $C2:84F0)
+!Pad_A = $80                             ; bit 7: A
+!Pad_X = $40                             ; bit 6: X
+!Pad_L = $20                             ; bit 5: L
+!Pad_R = $10                             ; bit 4: R
+!Pad_B = $08                             ; bit 3: B
+!Pad_Y = $04                             ; bit 2: Y
+!Pad_Unk00F6Bit1 = $02                   ; Pad_Unk00F6 (and Pad_Unk00F6Latch) bit 1, tested by event
+                                         ; opcode $3B (which button the map puts there not traced)
+
+; --- Event arithmetic and bit opcodes ($5B-$7F) ---
+!EvtBit_NumMask = $0F                    ; bits of opcode $65/$66's bit operand that index BitSet /
+                                         ; BitClear (8 entries each: 8-15 run into the next table)
+
+; --- Event animation and wait opcodes ($AA-$BD) ---
+!Obj_AnimModeLoops = $02                 ; Obj_AnimMode 2: counted passes of Obj_AnimRowAlt
+                                         ; (ObjX_AnimLoops)
+!Evt_AnimLoopsOnce = $02                 ; ObjX_AnimLoops Evt_OpAB_PlayAnimOnce starts with:
+                                         ; Obj_AnimTickAndQueue leaves 1 after a pass of the row
+!Evt_WaitRuns4 = $04                     ; script runs waited by opcode $B9 (Evt_OpB9_Wait4)
+!Evt_WaitRuns8 = $08                     ; ... by opcode $BA
+!Evt_WaitRuns16 = $10                    ; ... by opcode $BC
+!Evt_WaitRuns32 = $20                    ; ... by opcode $BD
+
+; --- Object steps onto a tile centre / another object, touch and push (Obj_Unk305D ...) ---
+!Obj_SubTileMask = $F0                   ; Obj_PosX/Y low byte bits 4-7: the position within the tile
+                                         ; that Obj_Unk305D compares
+!Obj_TileCentreX = $80                   ; Obj_Unk305D's X target within the tile (the middle)
+!Obj_TileFootY = $F0                     ; Obj_Unk305D's Y target within the tile (its last $10)
+!Obj_CentreStep = $10                    ; Obj_VelX/Y step of Obj_Unk305D / Obj_Unk30B3 (+$10)
+!Obj_CentreStepNeg = $F0                 ; ... and its negative (-$10)
+!Obj_PosCoarseMask = $FFF0               ; Obj_PosX/Y bits Obj_Unk30B3 compares (the step grid)
+!Evt_Func2Ofs = $0004                    ; offset of function 2 in an object's 16-word function table
+!Obj_Unk1C00Func2 = $02                  ; Obj_Unk1C00 Evt_StartTargetFunc2 sets as it starts function 2
+!Obj_Unk1C00Func2Min = $03               ; Evt_StartTargetFunc2 starts nothing while Obj_Unk1C00 is
+                                         ; below this
+!Obj_Unk1B01Push = $02                   ; Obj_Unk1B01 bit 1: Evt_PushTarget may move the object
+!Field54_Push = $02                      ; Field_Unk54 bit 1: set by Evt_PushTarget when it sends an
+                                         ; object off; no other push starts while it is set (who
+                                         ; clears it is not traced)
+!Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
+                                         ; offset; what is there is not traced)
+!Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
+                                         ; tile (column, row): the byte after Evt_PushScriptPos
+
+; --- Event message opcodes ($B8-$C4) ---
+!Halt_ColorNoMsgPtr = $7FE0              ; Sys_HaltWithColor colour when a message opcode runs with
+                                         ; Field_Unk2D (the pointer's bank) 0
+!Evt_ChoiceMask = $03                    ; bits 0-1 / 2-3 of a choice message's operand: Field_Unk65
+                                         ; / Field_Unk64
