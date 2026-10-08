@@ -191,6 +191,10 @@ endstruct
                                  ; target modes that search it for ids 3-6. (The field engine uses $2980 for other
                                  ; data; see the wiki's RAM table.)
 
+!Battle_CellMap          = $7BFD ; 256 B: one byte per 16x16-pixel screen cell, 16 cells per row (index row*16 + col);
+                                 ; bit 6 = blocks a battler box, bit 7 = blocks it unless !Battle_PassCellBit7 is
+                                 ; set (Battle_BoxHitsBlockedCell). Who fills it is not traced
+
 ; Battle stat records, $80 bytes per battler slot (BattleRom_StatsOffset
 ; lists slot*$80 for all 11 slots).
 struct BattlerStats $5E00
@@ -262,8 +266,17 @@ endstruct
 !Battler_Present         = $96F5 ; 11 B per battler slot: non-zero = battler exists
 !Battler_ScreenOffsetX   = $9708 ; 11 B per battler slot: added to !Battler_ScreenX for the live cursor x
 !Battler_ScreenOffsetY   = $9713 ; 11 B per battler slot: added to !Battler_ScreenY for the live cursor y
+!Battler_HalfWidth       = $971E ; 11 B per battler slot: box half-width; the box spans probe x +/- this
+                                 ; (Battle_CalcBattlerBox); who sets it is not traced
+!Battler_Height          = $9729 ; 11 B per battler slot: box height above the probe y (top = y - this)
+!Battler_BoxLeft         = $975A ; 11 B per battler slot: box left edge, clamped at 0 (Battle_CalcBattlerBox)
+!Battler_BoxTop          = $9765 ; 11 B per battler slot: box top edge, clamped at 0
+!Battler_BoxRight        = $9770 ; 11 B per battler slot: box right edge, clamped at $FF
+!Battler_BoxBottom       = $977B ; 11 B per battler slot: box bottom edge: probe y, + 8 unless !Battle_Unk2989 bit 2
 !Battler_Unk984D         = $984D ; 2 B per battler slot (index slot*2): sent as the info-panel message id and used to
                                  ; index BattleRom_UnkE1DE80; inferred: per-battler type id. Unconfirmed.
+!Battle_PassCellBit7     = $9875 ; 1 B: non-zero = !Battle_CellMap bit 7 does not block (Battle_BoxHitsBlockedCell);
+                                 ; zeroed before each check, set to 1 by the mover at $C1:3877 when $A2B5 is 3
 !Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
 !Battler_FrameShown      = $9907 ; 1 B per battler slot: frame number last decoded (Battle_DrawBattlerFrame skips a repeat)
 !Battle_FramesDecoded    = $9912 ; 1 B: frames decoded this pass; zeroed at $C1:2D9F, and callers defer a battler
@@ -324,6 +337,10 @@ endstruct
 !Battler_Unk9FF7         = $9FF7 ; 1 B per battler slot: bit 7 set = skipped by every target scan; meaning unknown
 !Battle_DivBusy          = $A029 ; 1 B: non-zero while Battle_Divide runs
 !Pc_TechCount            = $A02A ; 3 B per PC: number of lines in the PC's tech list
+!Battler_ProbeX          = $A039 ; 11 B per battler slot: x the box and distance checks use; a copy of !Battler_ScreenX
+                                 ; (Battle_CacheBattlerCoordsAll), moved ahead by path checks before the real move
+                                 ; (inferred from the movers at $C1:3851 and the path check at $C1:2C02)
+!Battler_ProbeY          = $A050 ; 11 B per battler slot: y counterpart of !Battler_ProbeX
 !BattleMenu_TechAvailDone = $A099 ; 1 B: set once UpdateTechMpAvail has graded the visible rows; TechConfirm needs it
 !BattleUI_ForceDigitRefresh      = $A09A ; 1 B: non-zero = BattleUI_UpdateNextPcPanel always refreshes HP/MP digits (no gauges-only
                                  ; shortcut); set when targeting starts from a submenu (BuildTargetList), cleared on return
@@ -350,6 +367,7 @@ endstruct
 !BattleUI_UnkA117        = $A117 ; 1 B: zero lets DrawCommandList show the Combo list without the A115 test; purpose unknown
 !BattleUI_PanelRedraw    = $A43F ; 1 B: non-zero = redraw the command cursor column (ClearActivePanelColumn)
 !BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
+!Battler_UnkA5CD         = $A5CD ; 1 B per battler slot: bit 7 set = ignored by Battle_BoxOverlapsOthers; meaning unknown
 !BattleTgt_Selected      = $A62D ; 12 B: selected battler slots ($FF = empty); +0 is the command's target
 !BattleTgt_Highlight     = $A64E ; 1 B: battler slot under the single-target cursor
 !BattleTgt_UnkA64F       = $A64F ; 1 B: cleared by BuildTargetList; no reader in bank $C1 yet

@@ -5593,6 +5593,284 @@ BattleTgt_AnyCandidate:
     RTS
 
 ; ==================================================================
+; Battler boxes and collision tests ($C1:283D–$C1:2985)
+; ==================================================================
+; Each battler has a probe position (!Battler_ProbeX/Y, a copy of its
+; screen position) and a box around it: probe x +/- !Battler_HalfWidth,
+; from probe y - !Battler_Height down to probe y (+ 8). Movers write a
+; tentative position into the probe, rebuild the box and test it
+; against the screen cell map and against the other battlers' boxes
+; before committing the move (inferred from the callers at $C1:3851 and
+; following, and from the path check at $C1:2C02).
+
+; ==================================================================
+; Battle_CacheBattlerCoordsAll ($C1283D–$C12859, 29 bytes)
+; ==================================================================
+; Copies every present battler's screen position into its probe
+; position and rebuilds its box.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice), the
+; unmatched service 0 at $C1:002A and $C1:40C8.
+; Entry: M=1, X=0 (16-bit slot counter), DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; X = 11; A clobbered; Y unchanged
+; Callee: Battle_CalcBattlerBox
+org $C1283D
+Battle_CacheBattlerCoordsAll:
+    TDC
+    TAX                             ; slot 0
+.loop:
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_ScreenX,X
+    STA.w !Battler_ProbeX,X
+    LDA.w !Battler_ScreenY,X
+    STA.w !Battler_ProbeY,X
+    JSR Battle_CalcBattlerBox
+.next:
+    INX
+    CPX.w #!Battle_NumSlots
+    BNE .loop
+    RTS
+
+; ==================================================================
+; Battle_CalcBattlerBox ($C1285A–$C128AF, 86 bytes)
+; ==================================================================
+; Builds battler X's box from its probe position:
+;   left   = ProbeX - HalfWidth, clamped at 0
+;   right  = ProbeX + HalfWidth, clamped at $FF
+;   top    = ProbeY - Height, clamped at 0
+;   bottom = ProbeY + 8, or ProbeY when !Battle_Unk2989 bit 2 is set
+; A clamp is only tried on the half of the screen where it can be
+; needed (left/top only when the coordinate is below $80, right only
+; when it is $80 or more), which is right as long as the half-width and
+; height stay below $80. The bottom edge is never clamped.
+; Callers (JSR/JMP, scanned as above): Battle_CacheBattlerCoordsAll,
+; the path check at $C1:2C02 (JSR, and JMP as its tail), and the unmatched
+; movers at $C1:386A, $C1:3925, $C1:39D6, $C1:3B79, $C1:3CEB, $C1:3DFA,
+; $C1:3EF7, $C1:4001, $C1:7C37.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; X = battler slot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X, Y unchanged
+; No calls.
+Battle_CalcBattlerBox:
+    SEC
+    LDA.w !Battler_ProbeX,X
+    BMI .left_right_half
+    SBC.w !Battler_HalfWidth,X
+    BPL .store_left
+    TDC                             ; went below 0: clamp
+    BRA .store_left
+.left_right_half:
+    SBC.w !Battler_HalfWidth,X
+.store_left:
+    STA.w !Battler_BoxLeft,X
+    CLC
+    LDA.w !Battler_ProbeX,X
+    BPL .right_left_half
+    ADC.w !Battler_HalfWidth,X
+    BMI .store_right
+    LDA.b #!Battle_BoxEdgeMax       ; went past $FF: clamp
+    BRA .store_right
+.right_left_half:
+    ADC.w !Battler_HalfWidth,X
+.store_right:
+    STA.w !Battler_BoxRight,X
+    SEC
+    LDA.w !Battler_ProbeY,X
+    BMI .top_lower_half
+    SBC.w !Battler_Height,X
+    BPL .store_top
+    TDC                             ; went below 0: clamp
+    BRA .store_top
+.top_lower_half:
+    SBC.w !Battler_Height,X
+.store_top:
+    STA.w !Battler_BoxTop,X
+    LDA.w !Battle_Unk2989
+    AND.b #!Battle_Unk2989NoBoxPad
+    BEQ .padded_bottom
+    LDA.w !Battler_ProbeY,X
+    STA.w !Battler_BoxBottom,X
+    BRA .exit
+.padded_bottom:
+    CLC
+    LDA.w !Battler_ProbeY,X
+    ADC.b #!Battle_BoxBottomPad
+    STA.w !Battler_BoxBottom,X
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_BoxOverlapsOthers ($C128B0–$C12925, 118 bytes)
+; ==================================================================
+; Tests the box of battler !Battle_BoxTestSlot against the box of every
+; other present battler, skipping those with !Battler_Unk9FF7 or
+; !Battler_UnkA5CD bit 7 set. Edges count as touching (the tests are
+; <= / >=). Stops at the first overlap.
+; Returns A = $80 (N set) when it touches a PC's box, $81 an enemy's,
+; 0 when it touches none; Y = the slot touched (11 when none).
+; The horizontal test is written out twice, once for each order of the
+; two left edges, and each copy repeats the vertical test.
+; Callers (JSR/JMP, scanned as above): the path check at $C1:2C02 and the
+; unmatched movers at $C1:3888, $C1:3930, $C1:39E1, $C1:3B8B, $C1:3D09,
+; $C1:3E18, $C1:3F15, $C1:400C, plus a JMP (tail call) at $C1:7C3A.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot (16-bit,
+;        CPY compares both bytes) = the battler to test
+; Exit:  M=1, X=0, DP=0, DB=$7E; A and Y as above; X = the tested slot
+; No calls.
+!Battle_BoxTestSlot = !BattleTmp_80       ; 2 B in: battler whose box is tested (also Battle_BoxHitsBlockedCell)
+Battle_BoxOverlapsOthers:
+    TDC
+    TAY                             ; other battler, from slot 0
+    LDX.b !Battle_BoxTestSlot
+.loop:
+    CPY.b !Battle_BoxTestSlot
+    BEQ .next                       ; itself
+    LDA.w !Battler_Present,Y
+    BEQ .next
+    LDA.w !Battler_Unk9FF7,Y
+    BMI .next
+    LDA.w !Battler_UnkA5CD,Y
+    BMI .next
+    LDA.w !Battler_BoxLeft,X
+    CMP.w !Battler_BoxLeft,Y
+    BCC .starts_left_of_it
+    CMP.w !Battler_BoxRight,Y
+    BEQ .x_overlap
+    BCS .next                       ; starts right of its box
+.x_overlap:
+    LDA.w !Battler_BoxTop,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .starts_above_it
+    CMP.w !Battler_BoxBottom,Y
+    BEQ .hit
+    BCC .hit
+    BCS .next                       ; starts below its box
+.starts_above_it:
+    LDA.w !Battler_BoxBottom,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .next                       ; ends above its box
+    BCS .hit
+.starts_left_of_it:
+    LDA.w !Battler_BoxRight,X
+    CMP.w !Battler_BoxLeft,Y
+    BCC .next                       ; ends left of its box
+    LDA.w !Battler_BoxTop,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .starts_above_it_2
+    CMP.w !Battler_BoxBottom,Y
+    BEQ .hit
+    BCC .hit
+    BCS .next
+.starts_above_it_2:
+    LDA.w !Battler_BoxBottom,X
+    CMP.w !Battler_BoxTop,Y
+    BCC .next
+    BCS .hit
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .loop
+    TDC                             ; no overlap
+    BRA .exit
+.hit:
+    LDA.b #!Battle_OverlapPc
+    CPY.w #!Battle_FirstEnemySlot
+    BCC .exit
+    INC A                           ; $81: an enemy
+.exit:
+    RTS
+
+; ==================================================================
+; Battle_BoxHitsBlockedCell ($C12926–$C12985, 96 bytes)
+; ==================================================================
+; Tests whether the box of battler !Battle_BoxTestSlot covers a blocked
+; cell of !Battle_CellMap (16x16-pixel cells, 16 per row). Every cell
+; from (top/16, left/16) to (bottom/16, right/16) is checked; one with
+; bit 6 set blocks, and one with bit 7 set blocks unless
+; !Battle_PassCellBit7 is non-zero.
+; Returns A = $FF (N set) when blocked, 0 when not.
+; The cell index row*16 + col is built in 8-bit A and moved with TAY,
+; which also copies B; the index is right only while B is 0 (as after
+; the callers' TDC; assumed, not traced for every caller).
+; Callers (JSR, scanned as above): the path check at $C1:2C02 and the unmatched
+; movers at $C1:387C, $C1:392B, $C1:39DC, $C1:3B7F, $C1:3CFD, $C1:3E0C,
+; $C1:3F09, $C1:4007.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; !Battle_BoxTestSlot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as above; X = the tested slot; Y =
+;        last cell index; DP $82-$86 written
+; No calls.
+!Battle_CellRow = !BattleTmp_82           ; 1 B: cell row being scanned (from top / 16)
+!Battle_CellFirstCol = !BattleTmp_83      ; 1 B: left / 16
+!Battle_CellRowEnd = !BattleTmp_84        ; 1 B: bottom / 16 + 1 (exclusive)
+!Battle_CellColEnd = !BattleTmp_85        ; 1 B: right / 16 + 1 (exclusive)
+!Battle_CellColOffset = !BattleTmp_86     ; 1 B: column, counted from FirstCol
+Battle_BoxHitsBlockedCell:
+    LDX.b !Battle_BoxTestSlot
+    LDA.w !Battler_BoxTop,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Battle_CellRow
+    LDA.w !Battler_BoxLeft,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Battle_CellFirstCol
+    LDA.w !Battler_BoxBottom,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    INC A
+    STA.b !Battle_CellRowEnd
+    LDA.w !Battler_BoxRight,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    INC A
+    STA.b !Battle_CellColEnd
+.row:
+    STZ.b !Battle_CellColOffset
+.cell:
+    LDA.b !Battle_CellRow
+    ASL A
+    ASL A
+    ASL A
+    ASL A                           ; row * 16
+    CLC
+    ADC.b !Battle_CellColOffset
+    ADC.b !Battle_CellFirstCol
+    TAY
+    LDA.w !Battle_CellMap,Y
+    AND.b #!Battle_CellBlocked
+    BNE .blocked
+    LDA.w !Battle_PassCellBit7
+    BNE .next_cell
+    LDA.w !Battle_CellMap,Y
+    BMI .blocked                    ; bit 7 blocks too
+.next_cell:
+    INC.b !Battle_CellColOffset
+    CLC
+    LDA.b !Battle_CellColOffset
+    ADC.b !Battle_CellFirstCol
+    CMP.b !Battle_CellColEnd
+    BCC .cell
+    INC.b !Battle_CellRow
+    LDA.b !Battle_CellRow
+    CMP.b !Battle_CellRowEnd
+    BCC .row
+    TDC                             ; nothing blocks
+    BRA .exit
+.blocked:
+    TDC
+    DEC A                           ; $FF
+.exit:
+    RTS
+
+; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
 ; ==================================================================
 ; Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in
