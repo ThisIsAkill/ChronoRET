@@ -108,12 +108,22 @@ if !ram_engine_inc == 0
 !Field_Unk2D = $2D                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk30 = $30                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
-!Field_Unk34 = $34                       ; 16-bit counter; Field_Unk1AAC counts it up, Sub_1ADF
+!Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
+                                         ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
 !Field_Unk38 = $38                       ; 8-bit; Field_Unk885A dispatches on it ($0138);
                                          ; DefaultHandler sets it to 1
 !Field_EventHook = $39                   ; 8-bit; Field_EventHookDispatch runs table entry (value -
-                                         ; 1) when nonzero
+                                         ; 1) when nonzero; the handlers drive window (masking)
+                                         ; effects and clear it (or move it on) when done
+!WinFx_CenterX = $3A                     ; 8-bit; hooks 1-5 hand it to BankC3_Entry0008 as
+                                         ; WinFx_ArgX (inferred: the shape's centre X)
+!WinFx_CenterY = $3B                     ; 8-bit; handed over as WinFx_ArgY (inferred: centre Y)
+!WinFx_Size = $3C                        ; 8-bit; handed over as WinFx_ArgSize; hooks 1/4 count it up
+                                         ; to WinFx_SizeLimit, hooks 2/5 down to 0, hook 12 by 2s.
+                                         ; Hdma_InitChannelsFD also reads its bit 0 (channel 7's
+                                         ; register)
+!WinFx_SizeLimit = $3D                   ; 8-bit; WinFx_Size limit for hooks 1 and 4
 !Field_Unk44 = $44                       ; 8-bit flags; Field_UnkAF4E acts on bits 0/1
 !Pad_Unk00F6Latch = $50                  ; 8-bit; GameLoop_FrameBody ORs Pad_Unk00F6 into it every
                                          ; frame
@@ -122,8 +132,10 @@ if !ram_engine_inc == 0
 !Field_Unk53 = $53                       ; 8-bit flags; EngFD_UnkC2C1 skips when bit 0 is set;
                                          ; DefaultHandler sets/clears bit 7; Field_PauseAndMenuInput
                                          ; clears it in the pause loop
-!Field_Unk54 = $54                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code;
-                                         ; Field_Unk274D tests bits 2-5
+!Field_Unk54 = $54                       ; 8-bit request flags read by Field_ServiceUnk54: bit 4 = write
+                                         ; one staff-credits line per frame, bits 2-3 = run
+                                         ; Map_Unk75A0, bit 5 = watch Field_TileStepX/Y against the
+                                         ; Map_Unk1D0A-1D10 box; zeroed at load
 !Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
 !Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk62 = $62                       ; 8-bit selector handed to Sub_1ADF in A (1, 2, else);
@@ -147,8 +159,10 @@ if !ram_engine_inc == 0
 !Field_UnkBB = $BB                       ; 8-bit; zeroed at load; LocLoad_Unk0A14 skips its work when
                                          ; nonzero
 !Field_UnkBC = $BC                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
-!Field_UnkEB = $EB                       ; 8-bit; $80 at load; Field_FrameUpdate sets it to $80,
-                                         ; Field_Unk1AAC reads it
+!Field_UnkEB = $EB                       ; 8-bit object slot the action button acts on, $80 = none:
+                                         ; Field_FindObjInFront stores the object it finds;
+                                         ; Field_ActionButton reads it. $80 at load; Field_FrameUpdate
+                                         ; resets it to $80 every frame
 !Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by Field_InitLoadState
 !Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
                                          ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
@@ -330,15 +344,44 @@ if !ram_engine_inc == 0
 !Pad_Unk00F7 = $00F7                     ; 8-bit; Sub_1ADF: bit 2 steps Field_Unk63 up, bit 3 steps
                                          ; it down (Down/Up in the Pad_Pressed layout?)
 !Pad_Unk00F8 = $00F8                     ; 8-bit; Sub_1ADF: bit 7 sets Field_Unk62 = 3
+!Pad_Unk00F9 = $00F9                     ; 8-bit; bits 0-3 index Field_DpadDispatch's handler table
+                                         ; (Up Down Left Right in the Pad_Pressed high-byte layout?)
 !Eng_Unk0400 = $0400                     ; 8-bit; Field_InitLoadState copies it to Field_Unk0400Copy
 !Field_FadeBusy = $0407                  ; 8-bit; $FF while a pause/fade loop runs
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5),
                                          ; cleared after (Field_FadeInAfterReload,
                                          ; Field_RunBankC2Mode5)
-!Field_Unk0BD9 = $0BD9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
-!Field_Unk0BDA = $0BDA                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
-!Field_Unk0BDB = $0BDB                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
-!Field_Unk0BDE = $0BDE                   ; 8-bit; set to 2 by Field_InitLoadState, no other matched use
+!Ppu_Unk0BD7 = $0BD7                     ; 8-bit; probably the TM (main screen) value: $C0:0691 copies
+                                         ; it, Ppu_Unk0BD8, 0, 0, 2 and Ppu_Unk0BDF to $7E:2C66-6B,
+                                         ; the order of TM, TS, TMW, TSW, CGWSEL, CGADSUB (not traced
+                                         ; to the register)
+!Ppu_Unk0BD8 = $0BD8                     ; 8-bit; probably the TS (sub screen) value (as Ppu_Unk0BD7)
+!Ppu_W12SelShadow = $0BD9                ; 8-bit; the NMI handler writes it to W12SEL ($C0:EC19)
+!Ppu_W34SelShadow = $0BDA                ; 8-bit; the NMI handler writes it to W34SEL ($C0:EC1F)
+!Ppu_WObjSelShadow = $0BDB               ; 8-bit; the NMI handler writes it to WOBJSEL ($C0:EC25)
+!Ppu_Wh2Shadow = $0BDC                   ; 8-bit; the NMI handler writes it to WH2 ($C0:EC2B)
+!Ppu_Wh3Shadow = $0BDD                   ; 8-bit; the NMI handler writes it to WH3 ($C0:EC31)
+!Ppu_CgwSelShadow = $0BDE                ; 8-bit; the NMI handler writes it to CGWSEL ($C0:EC37); 2
+                                         ; at load (Field_InitLoadState)
+!Ppu_Unk0BDF = $0BDF                     ; 8-bit; probably the CGADSUB value: copied after the CGWSEL
+                                         ; slot into $7E:2C6B by $C0:06AF (see Ppu_Unk0BD7)
+!Ppu_Unk0BE0 = $0BE0                     ; 8-bit; written with Ppu_Unk0BDF by Field_HookWinFixedB,
+                                         ; and by event code at $C0:3D2C-3D74; no reader traced
+!Field_Unk0BD9 = !Ppu_W12SelShadow       ; older name of Ppu_W12SelShadow, still used by
+                                         ; Field_InitLoadState (rename there on its next edit)
+!Field_Unk0BDA = !Ppu_W34SelShadow       ; older name of Ppu_W34SelShadow (as Field_Unk0BD9)
+!Field_Unk0BDB = !Ppu_WObjSelShadow      ; older name of Ppu_WObjSelShadow (as Field_Unk0BD9)
+!Field_Unk0BDE = !Ppu_CgwSelShadow       ; older name of Ppu_CgwSelShadow (as Field_Unk0BD9)
+!Credits_TextPos = $0BE1                 ; 16-bit offset of the next staff-credits character in
+                                         ; Credits_Text; Field_ServiceUnk54 advances it one line per call
+                                         ; (set by event code at $C0:3ECF)
+!Credits_Column = $0BE3                  ; 8-bit; bits 0-4 = first tilemap column of each credits line
+                                         ; (Field_ServiceUnk54; set by event code at $C0:3F18)
+!Credits_Row = $0BE4                     ; 8-bit credits line counter; bits 0-5 pick the tilemap row
+                                         ; (Field_ServiceUnk54 counts it up; set at $C0:3F20)
+!Credits_VramAddr = $0BE5                ; 16-bit VRAM word address of the credits line just built;
+                                         ; the NMI routine at $C0:EC77 DMAs the line there
+!Credits_DmaSize = $0BE7                 ; 16-bit byte count of that DMA ($C0:EC77)
 !Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
                                          ; (Field_SaveState / Field_RestoreState)
@@ -571,6 +614,73 @@ if !ram_engine_inc == 0
 !VramQ_Valid = $09A0                     ; 16-bit: nonzero for a pending entry, 0 ends the queue;
                                          ; Field_ProcessAnimQueue waits while the first entry is
                                          ; pending
+
+;
+; --- Window effects (Field_EventHook handlers, $C0:220E-$C0:274C) ---
+!WinFx_ArgX = $0350                      ; 8-bit argument block for BankC3_Entry0008, which reads it
+                                         ; with DP=$0300 ($50); hooks 1-5 copy WinFx_CenterX here
+!WinFx_ArgY = $0352                      ; 8-bit (BankC3_Entry0008's $52); WinFx_CenterY
+!WinFx_ArgSize = $0354                   ; 8-bit (BankC3_Entry0008's $54); WinFx_Size
+!WinFx_TablePtr = $0356                  ; 16-bit address of the table BankC3_Entry0008 writes;
+                                         ; bit 0 of WinFx_TableBank picks bank $7F over $7E
+!WinFx_TableBank = $0358                 ; 8-bit bank byte of WinFx_TablePtr
+!WinFx_Busy = $0350                      ; alias of WinFx_ArgX read by hook 3 after BankC3_Entry000E:
+                                         ; nonzero while that effect runs (BankC3_Entry000E clears
+                                         ; it after $20 frames)
+!WinFx_QuadTablePtr = $0350              ; alias of WinFx_ArgX for hook 6: 16-bit table address for
+                                         ; BankC3_Entry0011
+!WinFx_QuadTableBank = $0352             ; alias of WinFx_ArgY for hook 6: its bank byte
+!WinFx_QuadPoints = $0360                ; 8 bytes for BankC3_Entry0011: X, Y of 4 points (the high
+                                         ; bytes of WinFx_QuadPos); it picks the smallest Y first
+!WinFx_QuadTimer = $7F1CE8               ; 8-bit frames left for hook 6
+!WinFx_QuadPos = $7F1CE9                 ; 4 x (16-bit X, 16-bit Y), 8.8 fixed point: hook 6's points
+!WinFx_QuadVel = $7F1CF9                 ; 4 x (16-bit X, 16-bit Y): added to WinFx_QuadPos per frame
+!Hdma_Unk7F14F1 = $7F14F1                ; 8-bit; the NMI handler stores a tilemap base | 1 at
+                                         ; $7F:14F0 (inferred: BG1SC data for HDMA channel 0, which
+                                         ; Hdma_InitChannelsFD points at BG1SC-BG4SC); hook 12
+                                         ; stores Map_TilemapVram3's high byte here (BG2SC?)
+!Hdma_Unk7F1520 = $7F1520                ; 8-bit; set with Ppu_Unk0BD7 by hook 9/10 and to $13 by
+                                         ; hook 12. By analogy with $7F:14F0, probably HDMA data;
+                                         ; which register is not traced
+!Hdma_Unk7F1521 = $7F1521                ; 8-bit; set with Ppu_Unk0BD8 (hooks 9/10)
+!Hdma_Unk7F1522 = $7F1522                ; 8-bit; $17 (BG1-3 + OBJ bits) while a window effect runs,
+                                         ; 0 after; probably the TMW byte of HDMA data
+!Hdma_Unk7F1523 = $7F1523                ; 8-bit; as Hdma_Unk7F1522 (probably TSW)
+
+; --- Staff credits (Field_ServiceUnk54) ---
+!Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
+                                         ; AOKI"...): '/' ends a line, a byte >= $80 ends a block
+!Credits_LineBuf = $7ED800               ; 64 bytes: one tilemap row (32 words) built by
+                                         ; Field_ServiceUnk54, DMAed to VRAM by the NMI ($C0:EC77)
+
+; --- Map page $1D00 (absolute, or dp with DP = !DP_Map) ---
+!Map_Unk1D0C = $1D0C                     ; 16-bit; its low byte / 2 is the upper column bound of
+                                         ; Field_ServiceUnk54's bit-5 box (Map_TileOriginX the lower)
+!Map_Unk1D10 = $1D10                     ; 16-bit; as Map_Unk1D0C for rows (Map_TileOriginY lower)
+!Map_Unk1D2A = $1D2A                     ; 8-bit; copied to Map_Unk1D2E each frame by
+                                         ; Map_ResetUnk2E30
+!Map_Unk1D2B = $1D2B                     ; 8-bit; copied to Map_Unk1D30 each frame (as above)
+!Map_Unk1D2C = $1D2C                     ; 8-bit; zeroed each frame by Field_FrameUpdate
+!Map_Unk1D2D = $1D2D                     ; 8-bit; zeroed each frame by Field_FrameUpdate
+!Map_Unk1D2E = $1D2E                     ; 8-bit; Map_Unk1D2A each frame; Field_Unk885A sets it to
+                                         ; +/-$10 by which half of the screen the leader is in
+                                         ; (X >= $80 -> $10) (inferred: a horizontal step)
+!Map_Unk1D30 = $1D30                     ; 8-bit; as Map_Unk1D2E vertically (screen Y >= $88 -> $10)
+!Map_Unk1D32 = $1D32                     ; 8-bit; zeroed by Field_Unk885A
+!Map_Unk1D33 = $1D33                     ; 8-bit; zeroed by Field_Unk885A
+!Map_TilemapVram3 = $1D7E                ; 16-bit tilemap VRAM base the NMI uses for redraw step 2
+                                         ; (Field_MapRedrawDone = 2)
+!Map_TilemapVram4 = $1D84                ; 16-bit; its high byte is ORed into Hdma_Unk7F14F1 when
+                                         ; hook 12 ends
+!Map_Unk1D8D = $1D8D                     ; 16-bit; one of six words $1D87-$1D91 that $C0:06F1 copies
+                                         ; to $7E:2C5A (BG scroll values? unverified); hooks 7-10
+                                         ; set it to $0100
+!Map_Unk1D8F = $1D8F                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $F01D)
+!Map_Unk1D91 = $1D91                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $01C0)
+!Map_Unk1D93 = $1D93                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D2E
+!Map_Unk1D96 = $1D96                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D30
+!Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0
+!Map_HookTimer = $1DFF                   ; 8-bit frame countdown for hook 12's loops
 
 ; One OAM low-table entry; used as abs,X with X = the entry's address (Oam_BuildShadow)
 struct OamEntry $0000

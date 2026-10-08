@@ -4991,7 +4991,7 @@ GameLoop_FrameBody:
     JSR Field_Unk1AAC
     JSL Field_Unk1F87
     JSR Field_EventHookDispatch
-    JSR Field_Unk274D
+    JSR Field_ServiceUnk54
     JSR Field_EndOfFrame    ; end-of-frame work and OAM shadow build
     JSR Sub_EC60            ; wait for the NMI (the frame wait)
     BRA GameLoop_FrameBody
@@ -5993,6 +5993,938 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
     LDA.b #!Audio_CmdPlaySfx
     STA.w !Audio_CmdId
     JSL Audio_DriverCommand
+    RTS
+
+; ============================================================
+; Field event hooks: window effects ($C0:21E1–$C0:274C)
+;
+; Field_EventHook (dp $39) names a per-frame job; 0 = none. Every
+; handler drives a window (masking) effect: it sets the window and
+; colour-math shadows the NMI handler copies to the PPU
+; (Ppu_W12SelShadow .. Ppu_CgwSelShadow), turns on an HDMA channel
+; (5, or 7 for hook 3) in Field_HdmaEnable, and has a bank-$C3 routine
+; build the shape: BankC3_Entry0008 from WinFx_ArgX/Y/Size (hooks
+; 1-5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
+; from four moving points (hook 6). The shapes those routines draw
+; are not traced, so the handlers keep neutral names. Field_EventHook
+; and WinFx_* are set by unmatched code at $C0:3FA9-$C0:41D8 and
+; $C0:A4C4-$C0:A4F3 (not traced).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:21E1 — Field_EventHookDispatch (13 bytes, $21E1–$21ED)
+; Runs the Field_EventHook handler for this frame: entry
+; Field_EventHook - 1 of Field_EventHookTable; nothing when it is 0.
+; Callers: GameLoop_FrameBody ($C0:00B1), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered, plus whatever
+; the handler changes (see each).
+; ------------------------------------------------------------
+org $C021E1
+Field_EventHookDispatch:
+    TDC                     ; A = 0 (DP's low byte), so XBA clears B
+    XBA
+    LDA.b !Field_EventHook
+    BEQ .done
+    DEC A
+    ASL A
+    TAX
+    JSR (Field_EventHookTable,X)
+.done:
+    RTS
+
+; Field_EventHookTable: 16 handler addresses, indexed by
+; (Field_EventHook - 1) x 2. Entries 7/8 and 9/10 share a handler that
+; runs two frames (the first moves the hook on to the second); 13 is a
+; bare RTS (the tail of Field_HookWinOff3) that hook 12 leaves set; 14
+; is the shutdown tail of hook 5. 15 and 16 point at Evt_UnusedOpcode,
+; the event interpreter's handler for unused opcodes.
+Field_EventHookTable:
+    dw Field_HookWinGrow0           ; 1
+    dw Field_HookWinShrink0         ; 2
+    dw Field_HookWinC3E             ; 3
+    dw Field_HookWinGrow1           ; 4
+    dw Field_HookWinShrink1         ; 5
+    dw Field_HookWinQuad            ; 6
+    dw Field_HookWinFixedA          ; 7
+    dw Field_HookWinFixedA          ; 8
+    dw Field_HookWinFixedB          ; 9
+    dw Field_HookWinFixedB          ; 10
+    dw Field_HookLeaveToBankC3      ; 11
+    dw Field_HookWinPulse           ; 12
+    dw Field_HookIdle               ; 13
+    dw Field_HookWinShrink1_Off     ; 14
+    dw Evt_UnusedOpcode             ; 15
+    dw Evt_UnusedOpcode             ; 16
+
+; ------------------------------------------------------------
+; $C0:220E — Field_HookWinGrow0 (91 bytes, $220E–$2268)
+; Hook 1: one frame of a growing window shape. Enables window 1 on BG1
+; and BG2, HDMA channel 5 and the layer bytes Hdma_Unk7F1522/1523, then
+; has BankC3_Entry0008 (mode 0) build the table for centre
+; WinFx_CenterX/Y and size WinFx_Size into WinFx_TableA or WinFx_TableB
+; (by Field_Unk53), and counts WinFx_Size up. Once WinFx_Size reaches
+; WinFx_SizeLimit it clears Field_EventHook and draws a last frame one
+; size smaller, so WinFx_Size ends at the limit again.
+; Reached only through Field_EventHookTable (entry 1).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered (and whatever
+; BankC3_Entry0008 changes; it saves P, DP and DB).
+; ------------------------------------------------------------
+Field_HookWinGrow0:
+    LDA.b !WinFx_Size
+    CMP.b !WinFx_SizeLimit
+    BCS .done
+.draw:
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #!W12SEL_Bg12Win1
+    STA.w !Ppu_W12SelShadow
+    LDA.b #$00
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b !WinFx_CenterX
+    STA.w !WinFx_ArgX
+    LDA.b !WinFx_CenterY
+    STA.w !WinFx_ArgY
+    LDA.b !WinFx_Size
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode0
+    JSL BankC3_Entry0008
+    INC.b !WinFx_Size
+    RTS
+.done:
+    STZ.b !Field_EventHook
+    DEC.b !WinFx_Size
+    BRA .draw
+
+; ------------------------------------------------------------
+; $C0:2269 — Field_HookWinShrink0 (111 bytes, $2269–$22D7)
+; Hook 2: the reverse of hook 1. While WinFx_Size is nonzero, counts it
+; down and draws the shape as hook 1 does (mode 0); at 0 it clears
+; Field_EventHook, the layer bytes and the three window-select shadows,
+; and turns HDMA channel 5 off.
+; Reached only through Field_EventHookTable (entry 2).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_HookWinShrink0:
+    LDA.b !WinFx_Size
+    BEQ .off
+    DEC.b !WinFx_Size
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #!W12SEL_Bg12Win1
+    STA.w !Ppu_W12SelShadow
+    LDA.b #$00
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b !WinFx_CenterX
+    STA.w !WinFx_ArgX
+    LDA.b !WinFx_CenterY
+    STA.w !WinFx_ArgY
+    LDA.b !WinFx_Size
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode0
+    JSL BankC3_Entry0008
+    RTS
+.off:
+    STZ.b !Field_EventHook
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!HDMAEN_Ch5
+    TRB.b !Field_HdmaEnable
+    RTS
+
+; ------------------------------------------------------------
+; $C0:22D8 — Field_HookWinC3E (82 bytes, $22D8–$2329)
+; Hook 3. While WinFx_Busy (the bank-$C3 work byte at $0350) is
+; nonzero: window 2 on every layer and the colour window, window 2
+; spanning the whole line (WH2 = 0, WH3 = 255), one step of
+; BankC3_Entry000E, HDMA channel 7 on and full brightness. Once
+; BankC3_Entry000E has cleared WinFx_Busy, and only if WinFx_Size < 2,
+; it clears the layer bytes, the window shadows and channel 7. It never
+; clears Field_EventHook itself; other code must (not traced).
+; Hdma_InitChannelsFD points channel 7 at WH2 or WH3 by WinFx_Size bit
+; 0, which may be why WinFx_Size is tested here.
+; Field_HookIdle (hook 13) is this routine's last byte, its RTS.
+; Reached only through Field_EventHookTable (entry 3).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered (and whatever
+; BankC3_Entry000E changes; it saves P, DP and DB).
+; ------------------------------------------------------------
+Field_HookWinC3E:
+    LDA.w !WinFx_Busy
+    BEQ .finished
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #!WSEL_BothWin2
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    STZ.w !Ppu_Wh2Shadow
+    LDA.b #!WH_RightEdge
+    STA.w !Ppu_Wh3Shadow
+    JSL BankC3_Entry000E
+    LDA.b #!HDMAEN_Ch7
+    TSB.b !Field_HdmaEnable
+    LDA.b #!Fade_BrightnessMax
+    STA.b !Fade_Brightness
+    RTS
+.finished:
+    LDA.b !WinFx_Size
+    CMP.b #!WinFx_Hook3SizeMin
+    BCS Field_HookIdle
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    STA.w !Ppu_Wh3Shadow
+    LDA.b #!HDMAEN_Ch7
+    TRB.b !Field_HdmaEnable
+Field_HookIdle:             ; header: see Field_HookWinC3E
+    RTS
+
+; ------------------------------------------------------------
+; $C0:232A — Field_HookWinGrow1 (96 bytes, $232A–$2389)
+; Hook 4: hook 1 with the colour window instead of BG windows:
+; WOBJSEL enables colour window 1, CGWSEL limits colour math to inside
+; the window (with the sub screen added), and BankC3_Entry0008 runs in
+; mode 1. WinFx_Size counts up to WinFx_SizeLimit as in hook 1.
+; Reached only through Field_EventHookTable (entry 4).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_HookWinGrow1:
+    LDA.b !WinFx_Size
+    CMP.b !WinFx_SizeLimit
+    BCS .done
+.draw:
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    LDA.b #!WOBJSEL_ColorWin1
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!CGWSEL_MathInWin
+    STA.w !Ppu_CgwSelShadow
+    LDA.b !WinFx_CenterX
+    STA.w !WinFx_ArgX
+    LDA.b !WinFx_CenterY
+    STA.w !WinFx_ArgY
+    LDA.b !WinFx_Size
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode1
+    JSL BankC3_Entry0008
+    INC.b !WinFx_Size
+    RTS
+.done:
+    STZ.b !Field_EventHook
+    DEC.b !WinFx_Size
+    BRA .draw
+
+; ------------------------------------------------------------
+; $C0:238A — Field_HookWinShrink1 (127 bytes, $238A–$2408)
+; Hook 5: the reverse of hook 4 (mode 1, colour window). At WinFx_Size
+; 0 it falls into Field_HookWinShrink1_Off, which clears
+; Field_EventHook, the layer bytes and window selects, puts CGWSEL back
+; to its load value, resets Fade_FixedColor and its target to
+; Fade_FixedColorInit and turns HDMA channel 5 off.
+; Field_HookWinShrink1_Off is also hook 14 on its own.
+; Reached only through Field_EventHookTable (entries 5 and 14).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_HookWinShrink1:
+    LDA.b !WinFx_Size
+    BEQ Field_HookWinShrink1_Off
+    DEC.b !WinFx_Size
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    LDA.b #!WOBJSEL_ColorWin1
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!CGWSEL_MathInWin
+    STA.w !Ppu_CgwSelShadow
+    LDA.b !WinFx_CenterX
+    STA.w !WinFx_ArgX
+    LDA.b !WinFx_CenterY
+    STA.w !WinFx_ArgY
+    LDA.b !WinFx_Size
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode1
+    JSL BankC3_Entry0008
+    RTS
+Field_HookWinShrink1_Off:   ; header: see Field_HookWinShrink1
+    STZ.b !Field_EventHook
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!CGWSEL_AddSub
+    STA.w !Ppu_CgwSelShadow
+    LDA.b #!Fade_FixedColorInit
+    STA.b !Fade_FixedColor
+    STA.b !Fade_FixedColorTarget
+    LDA.b #!HDMAEN_Ch5
+    TRB.b !Field_HdmaEnable
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2409 — Field_HookWinQuad (267 bytes, $2409–$2513)
+; Hook 6: a colour-window shape from four moving points, for
+; WinFx_QuadTimer frames. Each frame it sets the colour window up as
+; hook 4 does, copies the high bytes of the four WinFx_QuadPos X/Y words
+; to WinFx_QuadPoints, has BankC3_Entry0011 build the table into
+; WinFx_TableA or WinFx_TableB (address in WinFx_QuadTablePtr), then
+; adds each point's WinFx_QuadVel. When the timer is 0 it clears
+; Field_EventHook and the X velocities of the four points (the Y
+; velocities are left alone; the clears are at +0, +4, +8, +12, X
+; only) and draws one last frame.
+; Reached only through Field_EventHookTable (entry 6).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered (and whatever
+; BankC3_Entry0011 changes; it saves P, DP and DB).
+; ------------------------------------------------------------
+Field_HookWinQuad:
+    LDA.l !WinFx_QuadTimer
+    BEQ .last_frame
+    DEC A
+    STA.l !WinFx_QuadTimer
+    BRA .draw
+.last_frame:
+    STZ.b !Field_EventHook
+    REP #$20
+    LDA.w #$0000
+    STA.l !WinFx_QuadVel
+    STA.l !WinFx_QuadVel+4
+    STA.l !WinFx_QuadVel+8
+    STA.l !WinFx_QuadVel+12
+    SEP #$20
+.draw:
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    LDA.b #!WOBJSEL_ColorWin1
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!CGWSEL_MathInWin
+    STA.w !Ppu_CgwSelShadow
+    ; WinFx_QuadPoints = X, Y (integer parts) of points 0-3
+    LDA.l !WinFx_QuadPos+1
+    STA.w !WinFx_QuadPoints
+    LDA.l !WinFx_QuadPos+5
+    STA.w !WinFx_QuadPoints+2
+    LDA.l !WinFx_QuadPos+9
+    STA.w !WinFx_QuadPoints+4
+    LDA.l !WinFx_QuadPos+13
+    STA.w !WinFx_QuadPoints+6
+    LDA.l !WinFx_QuadPos+3
+    STA.w !WinFx_QuadPoints+1
+    LDA.l !WinFx_QuadPos+7
+    STA.w !WinFx_QuadPoints+3
+    LDA.l !WinFx_QuadPos+11
+    STA.w !WinFx_QuadPoints+5
+    LDA.l !WinFx_QuadPos+15
+    STA.w !WinFx_QuadPoints+7
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_QuadTablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_QuadTableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_QuadTablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_QuadTableBank
+.build:
+    JSL BankC3_Entry0011
+    ; move the four points
+    REP #$20
+    LDA.l !WinFx_QuadPos
+    CLC
+    ADC.l !WinFx_QuadVel
+    STA.l !WinFx_QuadPos
+    LDA.l !WinFx_QuadPos+2
+    CLC
+    ADC.l !WinFx_QuadVel+2
+    STA.l !WinFx_QuadPos+2
+    LDA.l !WinFx_QuadPos+4
+    CLC
+    ADC.l !WinFx_QuadVel+4
+    STA.l !WinFx_QuadPos+4
+    LDA.l !WinFx_QuadPos+6
+    CLC
+    ADC.l !WinFx_QuadVel+6
+    STA.l !WinFx_QuadPos+6
+    LDA.l !WinFx_QuadPos+8
+    CLC
+    ADC.l !WinFx_QuadVel+8
+    STA.l !WinFx_QuadPos+8
+    LDA.l !WinFx_QuadPos+10
+    CLC
+    ADC.l !WinFx_QuadVel+10
+    STA.l !WinFx_QuadPos+10
+    LDA.l !WinFx_QuadPos+12
+    CLC
+    ADC.l !WinFx_QuadVel+12
+    STA.l !WinFx_QuadPos+12
+    LDA.l !WinFx_QuadPos+14
+    CLC
+    ADC.l !WinFx_QuadVel+14
+    STA.l !WinFx_QuadPos+14
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2514 — Field_HookWinFixedA (117 bytes, $2514–$2588)
+; Hooks 7 and 8: a fixed shape (centre WinFx_FixedX/Y, size
+; WinFx_FixedSizeA, mode 0) on BG3's window 1, inverted; colour math
+; outside the window only. Also sets Map_Unk1D8D/1D8F/1D91 to fixed
+; values (meaning unknown). Runs two frames: hook 7 moves on to 8, and
+; hook 8 clears Field_EventHook (inferred: so that both buffers,
+; WinFx_TableA and WinFx_TableB, get the table). The window stays on;
+; nothing here turns it off.
+; Reached only through Field_EventHookTable (entries 7 and 8).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_HookWinFixedA:
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!W34SEL_Bg3Win1Inv
+    STA.w !Ppu_W34SelShadow
+    LDA.b #!CGWSEL_MathOutWin
+    STA.w !Ppu_CgwSelShadow
+    LDA.b #!WinFx_FixedX
+    STA.w !WinFx_ArgX
+    LDA.b #!WinFx_FixedY
+    STA.w !WinFx_ArgY
+    LDA.b #!WinFx_FixedSizeA
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    REP #$20
+    LDA.w #!Map_Unk1D8DFixed
+    STA.w !Map_Unk1D8D
+    LDA.w #!Map_Unk1D8FFixed
+    STA.w !Map_Unk1D8F
+    LDA.w #!Map_Unk1D91Fixed
+    STA.w !Map_Unk1D91
+    SEP #$20
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode0
+    JSL BankC3_Entry0008
+    LDA.b !Field_EventHook
+    CMP.b #!EventHook_WinFixedA1
+    BNE .second_frame
+    INC.b !Field_EventHook
+    RTS
+.second_frame:
+    STZ.b !Field_EventHook
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2589 — Field_HookWinFixedB (133 bytes, $2589–$260D)
+; Hooks 9 and 10: as hooks 7/8 with size WinFx_FixedSizeB, window 1 on
+; BG2 and BG3 (not inverted), and different layer and colour-math
+; bytes: Ppu_Unk0BD7/Hdma_Unk7F1520 = BG3, Ppu_Unk0BD8/Hdma_Unk7F1521 =
+; BG1+BG2+OBJ, Ppu_Unk0BDF/Ppu_Unk0BE0 = 4. Only Map_Unk1D8D is set.
+; Two frames, as hooks 7/8.
+; Reached only through Field_EventHookTable (entries 9 and 10).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_HookWinFixedB:
+    LDA.b #!Layer_Bg123Obj
+    STA.l !Hdma_Unk7F1522
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1523
+    LDA.b #!W12SEL_Bg2Win1
+    STA.w !Ppu_W12SelShadow
+    LDA.b #$00
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!W34SEL_Bg3Win1
+    STA.w !Ppu_W34SelShadow
+    LDA.b #!CGWSEL_MathOutWin
+    STA.w !Ppu_CgwSelShadow
+    LDA.b #!Ppu_Unk0BDFHook9
+    STA.w !Ppu_Unk0BDF
+    STA.w !Ppu_Unk0BE0
+    LDA.b #!Layer_Bg3
+    STA.w !Ppu_Unk0BD7
+    STA.l !Hdma_Unk7F1520
+    LDA.b #!Layer_Bg12Obj
+    STA.w !Ppu_Unk0BD8
+    STA.l !Hdma_Unk7F1521
+    REP #$20
+    LDA.w #!Map_Unk1D8DFixed
+    STA.w !Map_Unk1D8D
+    SEP #$20
+    LDA.b #!WinFx_FixedX
+    STA.w !WinFx_ArgX
+    LDA.b #!WinFx_FixedY
+    STA.w !WinFx_ArgY
+    LDA.b #!WinFx_FixedSizeB
+    STA.w !WinFx_ArgSize
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode0
+    JSL BankC3_Entry0008
+    LDA.b !Field_EventHook
+    CMP.b #!EventHook_WinFixedB1
+    BNE .second_frame
+    INC.b !Field_EventHook
+    RTS
+.second_frame:
+    STZ.b !Field_EventHook
+    RTS
+
+; ------------------------------------------------------------
+; $C0:260E — Field_HookLeaveToBankC3 (65 bytes, $260E–$264E)
+; Hook 11: leaves the field for good. Redraws the map as
+; DefaultHandler's redraw mode 1 does (Field_BuildC800Mode1 with
+; DP=$1D00, Field_Unk74D4, a frame with Field_MapRedrawDone = 1), runs
+; Scene_Unk024C and one more frame, then turns HDMA off, sets
+; Field_Unk0F to $80, resets the stack to StackTop and JMLs to
+; BankC3_Entry0000 with A = BankC3_HookArg (B = 0). The first 23 bytes
+; repeat DefaultHandler's mode-1 redraw ($C0:16DC+$C4).
+; Reached only through Field_EventHookTable (entry 11).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: never returns (JML with a fresh stack).
+; ------------------------------------------------------------
+Field_HookLeaveToBankC3:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00 for the builder
+    SEP #$20
+    JSR Field_BuildC800Mode1
+    PLD
+    JSR Field_Unk74D4
+    JSR Field_EndOfFrameShort
+    LDA.b #$01
+    STA.b !Field_MapRedrawDone
+    JSR Sub_EC60
+    JSR Scene_Unk024C
+    JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l HDMAEN
+    LDA.b #!Field_Unk0FHook11
+    STA.l !DP_Field+!Field_Unk0F
+    LDX.w #!StackTop
+    TXS
+    TDC                     ; A = 0 (DP's low byte), so XBA clears B
+    XBA
+    LDA.b #!BankC3_HookArg
+    JML BankC3_Entry0000
+
+; ------------------------------------------------------------
+; $C0:264F — Field_HookWinPulse (214 bytes, $264F–$2724)
+; Hook 12, a blocking sequence that runs its own frames (each one
+; Field_EndOfFrameShort + Sub_EC60, with no Field_FrameUpdate): redraws
+; the map (Field_BuildC800Mode1, Field_Unk74E8/74F7, redraw step 2),
+; sets Hdma_Unk7F1520/1522, Map_Unk1DFD and Hdma_Unk7F14F1/1523 and
+; waits Hook12_WaitFrames frames; then puts window 1 on BG1 and BG2
+; (centre WinFx_Hook12X/Y, mode $80 through Field_WinPulseDraw) and
+; grows WinFx_Size by 2 a frame for Hook12_RampFrames frames, holds for
+; Hook12_HoldFrames and shrinks it for Hook12_RampFrames. Then it sets
+; Field_EventHook to EventHook_Idle, clears the window and layer bytes,
+; ORs Map_TilemapVram4's high byte into Hdma_Unk7F14F1 and ends with
+; one more frame (tail jump to Sub_EC60).
+; Quirk kept: Map_Unk1DFD is cleared with a long store (STA.l $00:1DFD)
+; though it was set with an absolute one.
+; Reached only through Field_EventHookTable (entry 12).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit (through Sub_EC60): M=1, X=0, DP=$0100, DB=$00; A = 0, X and Y
+; clobbered (the frame helpers do not preserve them).
+; ------------------------------------------------------------
+Field_HookWinPulse:
+    PHD
+    REP #$20
+    LDA.w #!DP_Map
+    TCD                     ; DP = $1D00 for the builder
+    SEP #$20
+    JSR Field_BuildC800Mode1
+    PLD
+    JSR Field_Unk74E8
+    JSR Field_Unk74F7
+    JSR Field_EndOfFrameShort
+    LDA.b #$02
+    STA.b !Field_MapRedrawDone
+    LDA.b #!Layer_Bg12Obj
+    STA.l !Hdma_Unk7F1520
+    LDA.b #!Layer_Bg1Obj
+    STA.l !Hdma_Unk7F1522
+    STA.w !Map_Unk1DFD
+    LDA.w !Map_TilemapVram3+1
+    STA.l !Hdma_Unk7F14F1
+    STA.l !Hdma_Unk7F1523
+    LDA.b #!Hook12_WaitFrames
+    STA.w !Map_HookTimer
+    JSR Sub_EC60
+.wait:
+    JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    DEC.w !Map_HookTimer
+    BNE .wait
+    LDA.b #!W12SEL_Bg12Win1
+    STA.w !Ppu_W12SelShadow
+    LDA.b #$00
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!WinFx_Hook12X
+    STA.w !WinFx_ArgX
+    LDA.b #!WinFx_Hook12Y
+    STA.w !WinFx_ArgY
+    LDA.b #!WinFx_Hook12Size
+    STA.b !WinFx_Size
+    LDA.b #!HDMAEN_Ch5
+    TSB.b !Field_HdmaEnable
+    LDA.b #!Hook12_RampFrames
+    STA.w !Map_HookTimer
+.grow:
+    JSR Field_WinPulseDraw
+    INC.b !WinFx_Size
+    INC.b !WinFx_Size
+    JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    DEC.w !Map_HookTimer
+    BNE .grow
+    LDA.b #!Hook12_HoldFrames
+    STA.w !Map_HookTimer
+.hold:
+    JSR Field_WinPulseDraw
+    JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    DEC.w !Map_HookTimer
+    BNE .hold
+    LDA.b #!Hook12_RampFrames
+    STA.w !Map_HookTimer
+.shrink:
+    JSR Field_WinPulseDraw
+    DEC.b !WinFx_Size
+    DEC.b !WinFx_Size
+    JSR Field_EndOfFrameShort
+    JSR Sub_EC60
+    DEC.w !Map_HookTimer
+    BNE .shrink
+    LDA.b #!EventHook_Idle
+    STA.b !Field_EventHook
+    LDA.b #$00
+    STA.l !Map_Unk1DFD      ; long store to $00:1DFD (quirk; set above with STA.w)
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    LDA.b #!HDMAEN_Ch5
+    TRB.b !Field_HdmaEnable
+    LDA.w !Map_TilemapVram3+1
+    ORA.w !Map_TilemapVram4+1
+    STA.l !Hdma_Unk7F14F1
+    JSR Field_EndOfFrameShort
+    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+
+; ------------------------------------------------------------
+; $C0:2725 — Field_WinPulseDraw (40 bytes, $2725–$274C)
+; One frame of Field_HookWinPulse's shape: WinFx_Size to WinFx_ArgSize,
+; table WinFx_TableA or WinFx_TableB by Field_Unk53, then
+; BankC3_Entry0008 in mode $80 (WinFx_ArgX/Y were set by the caller).
+; Callers: Field_HookWinPulse ($C0:26BA, $C0:26D1, $C0:26E4).
+; On entry: M=1, X=0, DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered.
+; ------------------------------------------------------------
+Field_WinPulseDraw:
+    LDA.b !WinFx_Size
+    STA.w !WinFx_ArgSize
+    LDA.b !Field_Unk53
+    BEQ .table_b
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+    BRA .build
+.table_b:
+    LDX.w #!WinFx_TableB
+    STX.w !WinFx_TablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_TableBank
+.build:
+    LDA.b #!WinFx_Mode80
+    JSL BankC3_Entry0008
+    RTS
+
+; ============================================================
+; $C0:274D — Field_ServiceUnk54 (215 bytes, $274D–$2823)
+; (was Field_Unk274D.) Per-frame service of the Field_Unk54 requests,
+; first match wins:
+; - bit 4 (Field54_Credits): build the next line of the staff credits.
+;   The line buffer Credits_LineBuf is cleared with 64 zero bytes (two
+;   MVN copies of the 32 zero bytes at GfxRom_D2), then filled through
+;   WMDATA with one tilemap word per character of Credits_Text from
+;   Credits_TextPos: space -> tile 0, '.' -> tile $1B, other bytes - $40
+;   (so 'A' -> 1), all with attribute byte Credits_TileAttr. A '/' ends
+;   the line; Field_ServiceUnk54_SendLine then stores the position past
+;   it, aims the upload at VRAM Credits_TilemapVram + row x 32 + column
+;   (row = Credits_Row bits 0-5, column = Credits_Column bits 0-4) for
+;   the rest of the row ($40 - 2 x column bytes), counts Credits_Row up
+;   and sets Field_MapRedrawDone bit 5, so the NMI sends it
+;   (its routine at $C0:EC77). A byte >= $80 ends the block: bit 4 is
+;   cleared, the line sent, and Credits_Row counted once more (a blank
+;   line). The text at Credits_Text ("PRODUCER//KAZUHIKO AOKI"...) is
+;   what identifies this as the staff credits.
+; - bit 2 or 3 (Field54_MapReq): copies them, shifted left once, into
+;   Field_MapRedrawDone bits 3-4 (which the NMI handler acts on), runs
+;   Map_Unk75A0 and clears them.
+; - bit 5 (Field54_WatchBox): sets Field_Unk29 to $0D
+;   (Field_Unk29State0D) unless Map_TileOriginX / 2 < Field_TileStepX
+;   <= Map_Unk1D0C / 2 and Map_TileOriginY / 2 < Field_TileStepY <=
+;   Map_Unk1D10 / 2. The bounds are the low bytes of 16-bit variables.
+;   What state $0D does is not traced.
+; Callers: GameLoop_FrameBody ($C0:00B4), its only JSR site. The
+; sub-entry Field_ServiceUnk54_SendLine is reached by BEQ and by the
+; JSR at $C0:27E4, both inside this routine.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X and Y clobbered
+; on the credits path (Y by the MVNs), and whatever Map_Unk75A0 changes
+; on bits 2-3. DB is saved around the MVNs.
+; ============================================================
+org $C0274D
+Field_ServiceUnk54:
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_AnyWork
+    BNE .work
+    BIT.b #!Field54_WatchBox
+    BNE .watch_box
+    RTS
+.watch_box:
+    LDA.w !Map_TileOriginX
+    LSR A
+    CMP.b !Field_TileStepX
+    BCS .outside
+    LDA.w !Map_Unk1D0C
+    LSR A
+    CMP.b !Field_TileStepX
+    BCC .outside
+    LDA.w !Map_TileOriginY
+    LSR A
+    CMP.b !Field_TileStepY
+    BCS .outside
+    LDA.w !Map_Unk1D10
+    LSR A
+    CMP.b !Field_TileStepY
+    BCC .outside
+    RTS
+.outside:
+    LDA.b #!Field_Unk29State0D
+    STA.b !Field_Unk29
+    RTS
+.work:
+    BIT.b #!Field54_Credits
+    BNE .credits
+    AND.b #!Field54_MapReq
+    ASL A
+    TSB.b !Field_MapRedrawDone
+    JSR Map_Unk75A0
+    LDA.b #!Field54_MapReq
+    TRB.b !Field_Unk54
+    RTS
+.credits:
+    ; clear Credits_LineBuf: 2 x 32 zero bytes from the start of bank $D2
+    REP #$20
+    PHB
+    LDX.w #!GfxRom_D2&$FFFF
+    LDY.w #!Credits_LineBuf&$FFFF
+    LDA.w #!Credits_ClearCount
+    MVN !Bank7E,!BankD2     ; $D2:0000 -> $7E:D800  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!GfxRom_D2&$FFFF
+    LDA.w #!Credits_ClearCount
+    MVN !Bank7E,!BankD2     ; $D2:0000 -> $7E:D820  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDX.w #!Credits_LineBuf&$FFFF
+    STX.w WMADDL
+    LDA.b #$00
+    STA.w WMADDH            ; WRAM $7E:D800
+    LDX.w !Credits_TextPos
+.next_char:
+    LDA.l !Credits_Text,X
+    BMI .end_block
+    CMP.b #!Credits_EndLine
+    BEQ Field_ServiceUnk54_SendLine
+    CMP.b #!Credits_Period
+    BEQ .period
+    CMP.b #!Credits_Space
+    BNE .letter
+    LDA.b #!Credits_TileSpace
+    BRA .put
+.period:
+    LDA.b #!Credits_TilePeriod
+    BRA .put
+.letter:
+    SEC
+    SBC.b #!Credits_LetterBias
+.put:
+    STA.w WMDATA
+    LDA.b #!Credits_TileAttr
+    STA.w WMDATA
+    INX
+    BRA .next_char
+.end_block:
+    LDA.b #!Field54_Credits
+    TRB.b !Field_Unk54
+    JSR Field_ServiceUnk54_SendLine
+    INC.w !Credits_Row      ; one blank line after the block
+    RTS
+
+Field_ServiceUnk54_SendLine: ; header: see Field_ServiceUnk54
+    INX                     ; past the '/' (or the end byte)
+    STX.w !Credits_TextPos
+    LDA.w !Credits_Column
+    REP #$20
+    AND.w #!Credits_ColMask
+    STA.b !Eng_Scratch      ; column
+    LDA.w !Credits_Row
+    AND.w #!Credits_RowMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                   ; row x 32
+    CLC
+    ADC.b !Eng_Scratch
+    CLC
+    ADC.w #!Credits_TilemapVram
+    STA.w !Credits_VramAddr
+    LDA.w #!Credits_LineBytes
+    SEC
+    SBC.b !Eng_Scratch
+    SEC
+    SBC.b !Eng_Scratch      ; bytes from the column to the end of the row
+    STA.w !Credits_DmaSize
+    SEP #$20
+    INC.w !Credits_Row
+    LDA.b #!MapRedraw_CreditsLine
+    TSB.b !Field_MapRedrawDone
     RTS
 
 ; ============================================================

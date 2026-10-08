@@ -57,10 +57,6 @@ org $C01B53
 LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
 Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
-org $C021E1
-Field_EventHookDispatch: ; per-frame; if dp $39 != 0, JSR through table $C0:21EE[dp $39 - 1]
-org $C0274D
-Field_Unk274D:      ; per-frame; tests dp $54 bits 2-5 against $1D0A/$1D0C/$1D0E
 org $C02848
 Scene_SettleFrames: ; Scene_ReloadStep once; if it returns 0, raises Fade_Brightness (dp $19) one step
                     ; per frame (frame update, Field_EndOfFrame, frame wait) until it reaches $0F
@@ -80,6 +76,11 @@ org $C059D9
 Vblank_Unk59D9:     ; Field_EndOfFrame step; runs with DP=$1000, reads $7F:2000
 org $C05A46
 Vblank_ReadScanlineCounters: ; Field_EndOfFrame step; latches and reads OPVCT via SLHV/STAT78
+org $C05F6E
+Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_OpcodeTable's end);
+                    ; LDX #$1639, BRL LoadSavePath. Also Field_EventHookTable entries 15-16
+org $C075A0
+Map_Unk75A0:        ; run by Field_ServiceUnk54 for Field_Unk54 bits 2-3 (also JSR at $C0:3E96)
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
@@ -124,6 +125,19 @@ org $C28000
 BankC2_Entry8000:   ; JSL with A = a mode value before InitHW (callers say "set BG mode"; unverified)
 org $C28004
 BankC2_Entry8004:   ; JSL with A = a command; 15 JSL sites (GameLoop passes !BankC2_BootArg, at boot and on each $C0:02CA re-entry)
+org $C30000
+BankC3_Entry0000:   ; JML target (Field_HookLeaveToBankC3, A = $85): reinstalls the NMI/IRQ
+                    ; trampolines into bank $C3, unpacks code via $C3:0557 from a $FE:0003 pointer
+                    ; to $7E:3000 and JMLs there; never returns to the field
+org $C30008
+BankC3_Entry0008:   ; JSL vector (JMP $0077): builds a window table from $0350-$0358 (WinFx_Arg*),
+                    ; A = mode; runs with DP=$0300, saves P/DP/DB (shape not traced)
+org $C3000E
+BankC3_Entry000E:   ; JSL vector (JMP $01E4): DP=$0300; while $0350 != 0 steps a $20-frame effect,
+                    ; then clears $0350 (Field_HookWinC3E)
+org $C30011
+BankC3_Entry0011:   ; JSL vector (JMP $0EFA): window table from 4 points at $0360-$0367
+                    ; (Field_HookWinQuad); starts from the point with the smallest Y
 org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004

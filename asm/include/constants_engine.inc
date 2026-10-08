@@ -218,4 +218,64 @@ if !constants_engine_inc == 0
 !Spr_TileRowStep = $10                   ; OAM tile-number step to the next row of 16 tiles
 !Ppu_FirstHiddenLine = $00F0             ; V counter of the first line below the visible screen (240)
 
+; --- Window effects (Field_EventHook handlers) ---
+!EventHook_WinFixedA1 = $07              ; Field_EventHook value of Field_HookWinFixedA's first frame
+                                         ; (it moves on to 8 for a second frame)
+!EventHook_WinFixedB1 = $09              ; first-frame value of Field_HookWinFixedB (then 10)
+!EventHook_Idle = $0D                    ; Field_EventHook value whose table entry is a bare RTS
+                                         ; (hook 12 leaves it set)
+!WinFx_TableA = $17C8                    ; bank-$7F address BankC3_Entry0008/0011 write to while
+                                         ; Field_Unk53 is nonzero
+!WinFx_TableB = $1AC8                    ; the same while Field_Unk53 is 0 (inferred: the two halves
+                                         ; of a double buffer, as Hdma_InitChannelsFD picks its
+                                         ; tables by Field_Unk53)
+!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10 (what the
+                                         ; mode selects is not traced)
+!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5
+!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12
+!WinFx_Hook3SizeMin = $02                ; hook 3 shuts the window off only when WinFx_Size < this
+!WinFx_FixedX = $7C                      ; WinFx_ArgX of hooks 7-10
+!WinFx_FixedY = $06                      ; WinFx_ArgY of hooks 7-10
+!WinFx_FixedSizeA = $29                  ; WinFx_ArgSize of hooks 7/8
+!WinFx_FixedSizeB = $27                  ; WinFx_ArgSize of hooks 9/10
+!Map_Unk1D8DFixed = $0100                ; Map_Unk1D8D set by hooks 7-10
+!Map_Unk1D8FFixed = $F01D                ; Map_Unk1D8F set by hooks 7/8
+!Map_Unk1D91Fixed = $01C0                ; Map_Unk1D91 set by hooks 7/8
+!Ppu_Unk0BDFHook9 = $04                  ; Ppu_Unk0BDF and Ppu_Unk0BE0 in hooks 9/10 (BG3 bit, if
+                                         ; Ppu_Unk0BDF is CGADSUB)
+!WinFx_Hook12X = $78                     ; WinFx_ArgX of hook 12
+!WinFx_Hook12Y = $20                     ; WinFx_ArgY of hook 12
+!WinFx_Hook12Size = $01                  ; WinFx_Size at the start of hook 12's growth
+!Hook12_WaitFrames = $20                 ; frames hook 12 waits after the map redraw
+!Hook12_RampFrames = $14                 ; frames of growth (WinFx_Size += 2) and of shrinking
+!Hook12_HoldFrames = $20                 ; frames hook 12 holds the full size
+!BankC3_HookArg = $85                    ; A for BankC3_Entry0000 from hook 11; bit 7 makes it set
+                                         ; INIDISP to $0F, HDMAEN to 0 and an IRQ timer ($C3:0035)
+!Field_Unk0FHook11 = $80                 ; Field_Unk0F set by hook 11 before it leaves for bank $C3
+
+; --- Field_ServiceUnk54 (Field_Unk54 bits, staff credits) ---
+!Field54_AnyWork = $1C                   ; Field_Unk54 bits 2-4: map request or credits line
+!Field54_WatchBox = $20                  ; Field_Unk54 bit 5: check Field_TileStepX/Y against the box
+!Field54_Credits = $10                   ; Field_Unk54 bit 4: write the next credits line
+!Field54_MapReq = $0C                    ; Field_Unk54 bits 2-3: shifted left once into
+                                         ; Field_MapRedrawDone bits 3-4, then Map_Unk75A0
+!Field_Unk29State0D = $0D                ; Field_Unk29 value set when the watched tile leaves the box
+                                         ; (Field_Unk1F87's state $0D; not traced)
+!MapRedraw_CreditsLine = $20             ; Field_MapRedrawDone bit 5: the NMI uploads the credits line
+                                         ; (routine at $C0:EC77) and clears it
+!Credits_ClearCount = $001F              ; MVN count - 1: 32 bytes of zeros from GfxRom_D2
+!Credits_EndBlock = $80                  ; Credits_Text bytes >= this end a block (BMI)
+!Credits_EndLine = $2F                   ; '/': ends a line
+!Credits_Period = $2E                    ; '.'
+!Credits_Space = $20                     ; ' '
+!Credits_TileSpace = $00                 ; tile for a space
+!Credits_TilePeriod = $1B                ; tile for '.'
+!Credits_LetterBias = $40                ; subtracted from a letter: 'A' ($41) -> tile 1
+!Credits_TileAttr = $2C                  ; tilemap high byte of every credits tile: priority 1,
+                                         ; palette 3
+!Credits_ColMask = $001F                 ; Credits_Column bits 0-4: first column
+!Credits_RowMask = $003F                 ; Credits_Row bits 0-5: tilemap row
+!Credits_TilemapVram = $7000             ; VRAM word address of the credits tilemap (row 0, column 0)
+!Credits_LineBytes = $0040               ; bytes in a full tilemap row (32 words)
+
 endif

@@ -36,6 +36,23 @@ if !hardware_inc == 0
 !DMAP_TwoRegs          = $01  ; transfer mode 1: alternate two B-bus registers (word writes)
 !BBAD_VMDATAL          = $18  ; B-bus address of VMDATAL ($2118)
 !WMADDH_Bank7F         = $01  ; WMADDH bit 0: WRAM address bit 16, i.e. bank $7F
+!W12SEL_Bg12Win1       = $22  ; BG1 and BG2 window 1 enable
+!W12SEL_Bg2Win1        = $20  ; BG2 window 1 enable
+!W34SEL_Bg3Win1        = $02  ; BG3 window 1 enable
+!WSEL_BothWin2         = $88  ; W12SEL/W34SEL/WOBJSEL: window 2 enable for both layers of the
+                              ; register (OBJ and colour window in WOBJSEL)
+!WOBJSEL_ColorWin1     = $20  ; colour window: window 1 enable
+!WH_RightEdge          = $FF  ; window position 255: the right edge of the screen
+!CGWSEL_AddSub         = $02  ; bit 1: colour math adds the sub screen (Field_InitLoadState's value)
+!CGWSEL_MathInWin      = $12  ; bits 5-4 = 01 (no colour math outside the colour window) + bit 1
+!CGWSEL_MathOutWin     = $22  ; bits 5-4 = 10 (no colour math inside the colour window) + bit 1
+!Layer_Bg3             = $04  ; TM/TS/TMW/TSW/CGADSUB layer bits: BG3
+!Layer_Bg1Obj          = $11  ; layer bits: BG1 + OBJ
+!Layer_Bg12Obj         = $13  ; layer bits: BG1 + BG2 + OBJ
+!Layer_Bg123Obj        = $17  ; layer bits: BG1 + BG2 + BG3 + OBJ
+!HDMAEN_Ch5            = $20  ; bit 5: HDMA channel 5
+!HDMAEN_Ch7            = $80  ; bit 7: HDMA channel 7
+!NMITIMEN_NmiJoy       = $81  ; NMI enable + joypad auto-read
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

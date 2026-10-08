@@ -4,7 +4,7 @@ $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the int
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,f56ffa11c897,trampolines and dispatches on Loc_Id.
 $C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,b82aa0cbd435,Loc_Id - Loc_FirstBankC2 is set.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
-$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,4d54bc759a9d,GameLoop_FrameBody: the per-frame field loop.
+$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,readable,28f5bbe014b2,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
 $C0:00DE,$C0:00EA,13,Field_EndOfFrameShort,$C0,Engine,verified,2e5dc85b9727,"FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops."
 $C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,verified,c23486c85fdf,"game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail jump, whose RTS returns to this routine's caller)."
@@ -35,6 +35,23 @@ $C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,verified,8af6b4d0cdff,Audi
 $C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,verified,8e1af34745a1,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
 $C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,verified,29587b9b9aa5,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
 $C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,verified,48f2c50391f1,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
+$C0:21E1,$C0:21ED,13,Field_EventHookDispatch,$C0,Engine,readable,615cd6da5222,Runs the Field_EventHook handler for this frame: entry Field_EventHook - 1 of Field_EventHookTable; nothing when it is 0.
+$C0:21EE,$C0:220D,32,Field_EventHookTable,$C0,Engine,readable,d7b35ae64fe9,"Field_EventHookTable: 16 handler addresses, indexed by (Field_EventHook - 1) x 2."
+$C0:220E,$C0:2268,91,Field_HookWinGrow0,$C0,Engine,readable,ee9fdb77e1af,Hook 1: one frame of a growing window shape.
+$C0:2269,$C0:22D7,111,Field_HookWinShrink0,$C0,Engine,readable,05249e8befb7,Hook 2: the reverse of hook 1.
+$C0:22D8,$C0:2328,81,Field_HookWinC3E,$C0,Engine,readable,75a7e13a82a3,Hook 3.
+$C0:2329,$C0:2329,1,Field_HookIdle,$C0,Engine,readable,e2a8c510ec03,
+$C0:232A,$C0:2389,96,Field_HookWinGrow1,$C0,Engine,readable,df2b368aaa2f,"Hook 4: hook 1 with the colour window instead of BG windows: WOBJSEL enables colour window 1, CGWSEL limits colour math to inside the window (with the sub screen added), and BankC3_Entry0008 runs in m"
+$C0:238A,$C0:23E1,88,Field_HookWinShrink1,$C0,Engine,readable,974f3d8fedac,"Hook 5: the reverse of hook 4 (mode 1, colour window)."
+$C0:23E2,$C0:2408,39,Field_HookWinShrink1_Off,$C0,Engine,readable,1d8f67c03ee7,
+$C0:2409,$C0:2513,267,Field_HookWinQuad,$C0,Engine,readable,a7a271ae73fc,"Hook 6: a colour-window shape from four moving points, for WinFx_QuadTimer frames."
+$C0:2514,$C0:2588,117,Field_HookWinFixedA,$C0,Engine,readable,1e75a03edc5f,"Hooks 7 and 8: a fixed shape (centre WinFx_FixedX/Y, size WinFx_FixedSizeA, mode 0) on BG3's window 1, inverted; colour math outside the window only."
+$C0:2589,$C0:260D,133,Field_HookWinFixedB,$C0,Engine,readable,e9cde0dfee9c,"Hooks 9 and 10: as hooks 7/8 with size WinFx_FixedSizeB, window 1 on BG2 and BG3 (not inverted), and different layer and colour-math bytes: Ppu_Unk0BD7/Hdma_Unk7F1520 = BG3, Ppu_Unk0BD8/Hdma_Unk7F1521"
+$C0:260E,$C0:264E,65,Field_HookLeaveToBankC3,$C0,Engine,readable,82095f7a0899,Hook 11: leaves the field for good.
+$C0:264F,$C0:2724,214,Field_HookWinPulse,$C0,Engine,readable,81d97b79ffd4,"Hook 12, a blocking sequence that runs its own frames (each one Field_EndOfFrameShort + Sub_EC60, with no Field_FrameUpdate): redraws the map (Field_BuildC800Mode1, Field_Unk74E8/74F7, redraw step 2),"
+$C0:2725,$C0:274C,40,Field_WinPulseDraw,$C0,Engine,readable,85a973a8ac2d,"One frame of Field_HookWinPulse's shape: WinFx_Size to WinFx_ArgSize, table WinFx_TableA or WinFx_TableB by Field_Unk53, then BankC3_Entry0008 in mode $80 (WinFx_ArgX/Y were set by the caller)."
+$C0:274D,$C0:27EA,158,Field_ServiceUnk54,$C0,Engine,readable,76d008ae5c84,"(was Field_Unk274D.) Per-frame service of the Field_Unk54 requests, first match wins: - bit 4 (Field54_Credits): build the next line of the staff credits."
+$C0:27EB,$C0:2823,57,Field_ServiceUnk54_SendLine,$C0,Engine,readable,26eb4f2d665f,
 $C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,verified,8a44e97cd7a2,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
 $C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,verified,2a8062ed2e09,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
 $C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,verified,698bb554b9b5,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
