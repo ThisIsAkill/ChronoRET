@@ -178,37 +178,6 @@ BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used f
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; not analysed
 
-; --- Bank $FD (called from BattleSys_Main and Battle_SetupBattle; not analysed) ---
-
-org $FDB201
-BattleFD_UnkB201:                       ; JSL: BattleSys_Main's victory end, before the gold
-
-org $FDB2DE
-BattleFD_UnkB2DE:                       ; JSL from Battle_SetupBattle
-org $FDB22E
-BattleFD_UnkB22E:                       ; JSL from Battle_SetupBattle
-org $FDB438
-BattleFD_UnkB438:                       ; JSL from Battle_SetupBattle
-org $FDB121
-BattleFD_UnkB121:                       ; JSL from Battle_SetupBattle
-org $FDB3FE
-BattleFD_UnkB3FE:                       ; JSL from Battle_SetupBattle
-org $FDB14D
-BattleFD_UnkB14D:                       ; JSL from Battle_SetupBattle
-org $FDB0D5
-BattleFD_UnkB0D5:                       ; JSL from Battle_SetupBattle
-org $FDB4E7
-BattleFD_UnkB4E7:                       ; JSL from Battle_SetupBattle
-org $FDB7EB
-BattleFD_UnkB7EB:                       ; JSL from Battle_SetupBattle
-org $FDB555
-BattleFD_UnkB555:                       ; JSL from Battle_SetupBattle
-org $FDB732
-BattleFD_UnkB732:                       ; JSL from Battle_SetupBattle
-org $FDB363
-BattleFD_UnkB363:                       ; JSL from Battle_SetupBattle
-org $FDB223
-BattleFD_UnkB223:                       ; JSL from Battle_SetupBattle
 
 ; --- Bank $CF (battle support) ---
 

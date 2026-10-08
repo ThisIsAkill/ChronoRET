@@ -1111,16 +1111,1737 @@ BattleFD_UnkAEF2:
     RTL
 
 ; ============================================================
+; Battle helpers, part 2 ($FD:AF80–$FD:B956)
+; More of the bank-$C1 battle engine's long callees: the item list
+; entries, the per-item record offsets, the stat boosts, and most of
+; Battle_SetupBattle's steps (the battlers' records, the enemies' stats,
+; the turn-list timers, the clears, the first ATB values). Same state
+; as part 1: M=1, X=0, DP=0, DB=$7E, bank-$C1 scratch and math cells.
+; ============================================================
+
+; $FD:AF80 — BattleFD_AddItemEntry (179 bytes, $AF80–$B032)
+; Adds item A to the battle item list (Item_BattleList) at offset DP $04,
+; with quantity DP $0E, when the item is one the list takes: an id of
+; $BC or more whose byte 0 in !BattleRom_ItemUseFlags (3 B per id - $BC)
+; has bit 7 set. The entry gets .Id = the id, .TargetMode from
+; !BattleRom_ItemTargetMode, .Flags = that byte 0 without bit 7,
+; .Quantity = DP $0E, and DP $04 moves on 5 bytes. Otherwise
+; !Battle_UnkAF23 is set to 1 (it is zeroed first). Either way DP $00
+; and $08 are counted up.
+; Quirk: ids below $5A branch to the same place as the others (CMP, then
+; BCS and BRA to one label), so the code for them at $AF8B-$AFD6 is
+; never run; it would fill .Id, .Flags ($80) and .PcMask from the
+; record of !BattleRom_UnkCC06A7 the way BattleFD_UnkAEF2 does.
+; Callers (2 JSL sites): unmatched ($C1:CE2A, $C1:F012).
+; Entry: M=1, X=0, DP=0, DB=$7E; A = item id; DP $04 = list offset,
+;        DP $0E = quantity
+; Exit:  M=1, X=0; A, X, Y clobbered;
+;        DP $00 and $08 + 1, $04 + 5 when added; DP $02, $06, $0A
+;        written; !Battle_UnkAF23 = 0 added, 1 not
+; Callee: Battle_Mul16Long (only in the dead code)
+!BattleFDItem_Rec  = !BattleTmp_02      ; 2 B: offset of the item's record (id - $BC) * 3
+!BattleFDItem_Ofs  = !BattleTmp_04      ; 2 B: the list offset (argument)
+!BattleFDItem_Id   = !BattleTmp_06      ; 1 B: the item id
+!BattleFDItem_Idx  = !BattleTmp_0A      ; 2 B: id - $BC
+!BattleFDItem_Qty  = !BattleTmp_0E      ; 1 B: the quantity (argument)
+org $FDAF80
+BattleFD_AddItemEntry:
+    STZ.w !Battle_UnkAF23
+    STA.b !BattleFDItem_Id
+    CMP.b #!Battle_ItemClass1First
+    BCS .battle_item
+    BRA .battle_item                    ; quirk: the code below is never reached
+.dead:
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Id,X
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!BattleRom_UnkCC06A7Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDX.b !Battle_MathLo
+    STX.b !BattleFDItem_Rec
+    TDC
+    TAY
+    LDX.b !BattleFDItem_Rec
+    LDA.l !BattleRom_UnkCC06A7,X
+.dead_find_bit:
+    BIT.b #!Battle_HighBit
+    BNE .dead_found
+    ASL A
+    INY
+    CPY.w #8
+    BCC .dead_find_bit
+    TDC
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Id,X
+    BRA .advance
+.dead_found:
+    LDA.w !Battle_UnkB1BE,Y
+    BMI .dead_flags
+    TAX
+    LDA.b #!Battle_HighBit
+.dead_shift:
+    DEX
+    BMI .dead_mask
+    LSR A
+    BRA .dead_shift
+.dead_mask:
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.PcMask,X
+.dead_flags:
+    LDA.b #!Battle_ItemFlagUnusable
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Flags,X
+    BRA .quantity
+.battle_item:
+    LDA.b !BattleFDItem_Id
+    CMP.b #!Battle_ItemClass4First
+    BCC .not_added
+    LDA.b !BattleFDItem_Id
+    SEC
+    SBC.b #!Battle_ItemClass4First
+    TAX
+    STX.b !BattleFDItem_Idx
+    ASL A
+    CLC
+    ADC.b !BattleFDItem_Idx
+    TAX
+    STX.b !BattleFDItem_Rec
+    LDX.b !BattleFDItem_Rec
+    LDA.l !BattleRom_ItemUseFlags,X
+    BIT.b #!Battle_ItemListBit
+    BEQ .not_added
+    LDA.b !BattleFDItem_Id
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Id,X
+    LDX.b !BattleFDItem_Idx
+    LDA.l !BattleRom_ItemTargetMode,X
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.TargetMode,X
+    LDX.b !BattleFDItem_Rec
+    LDA.l !BattleRom_ItemUseFlags,X
+    AND.b #!Battle_ItemListBit^$FF
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Flags,X
+.quantity:
+    LDA.b !BattleFDItem_Qty
+    LDX.b !BattleFDItem_Ofs
+    STA.w Item_BattleList.Quantity,X
+.advance:
+    REP #$20
+    LDA.b !BattleFDItem_Ofs
+    CLC
+    ADC.w #!Battle_ItemEntrySize
+    STA.b !BattleFDItem_Ofs
+    TDC
+    SEP #$20
+    BRA .count
+.not_added:
+    INC.w !Battle_UnkAF23
+.count:
+    INC.b !BattleTmp_00
+    INC.b !BattleTmp_08
+    RTL
+
+; $FD:B033 — BattleFD_ItemRecOffset (162 bytes, $B033–$B0D4)
+; Offset in bank $CC of item A's record, by id range:
+;   below $5A: id * 5 + $0262;     $5A-$7A: (id - $5A) * 3 + $047E;
+;   $7B-$93: (id - $7B) * 3 + $04E1; $94-$BB: (id - $94) * 4 + $052C;
+;   $BC-$F1: (id - $BC) * 4 + $05CC; $F2 and up: X as it came.
+; Five tables of records, one per id range (probably the item classes;
+; what the records hold is not traced). Its caller ($C1:CF2F) reads
+; LDA.l $CC0000,X with the result.
+; Callers (1 JSL site): unmatched ($C1:CF2F).
+; Entry: M=1, X=0, DP=0, DB any; A = item id with B = 0 (TAX takes it into
+;        the Mul16 factor)
+; Exit:  M=1, X=0; X = the offset (unchanged for $F2 and up); A = 0 (B
+;        too) after a multiply, else the id; Y unchanged; !Battle_MathA..
+;        MathHi as Battle_Mul16 leaves them
+; Callee: Battle_Mul16Long
+org $FDB033
+BattleFD_ItemRecOffset:
+    CMP.b #!Battle_ItemClass1First
+    BCS .not_class0
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ItemRec0Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Battle_ItemRec0Ofs
+    TAX
+    TDC
+    SEP #$20
+    JMP .done
+.not_class0:
+    CMP.b #!Battle_ItemClass2First
+    BCS .not_class1
+    SEC
+    SBC.b #!Battle_ItemClass1First
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ItemRec1Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Battle_ItemRec1Ofs
+    TAX
+    TDC
+    SEP #$20
+    BRA .done
+.not_class1:
+    CMP.b #!Battle_ItemClass3First
+    BCS .not_class2
+    SEC
+    SBC.b #!Battle_ItemClass2First
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ItemRec1Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Battle_ItemRec2Ofs
+    TAX
+    TDC
+    SEP #$20
+    BRA .done
+.not_class2:
+    CMP.b #!Battle_ItemClass4First
+    BCS .not_class3
+    SEC
+    SBC.b #!Battle_ItemClass3First
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ItemRec3Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Battle_ItemRec3Ofs
+    TAX
+    TDC
+    SEP #$20
+    BRA .done
+.not_class3:
+    CMP.b #!Battle_ItemIdEnd
+    BCS .done
+    SEC
+    SBC.b #!Battle_ItemClass4First
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ItemRec3Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Battle_ItemRec4Ofs
+    TAX
+    TDC
+    SEP #$20
+.done:
+    RTL
+
+; $FD:B0D5 — BattleFD_UnkB0D5 (76 bytes, $B0D5–$B120)
+; Turn-list and panel setup: zeroes the flags of all 13 turn lists
+; (!Battle_ListFlags), sets every !Battle_ListRuns entry to 10
+; (!Battle_ListRunsReset: this is where the runs are first set), zeroes
+; the enemies' 8 !Battler_Unk9F29 bytes and !Battle_Unk9F34, then for
+; each enemy entry with an id in !Battler_UnkAF0A sets its
+; !Battler_Unk9F29 byte to 2 when its BattlerStats.Unk47 bit 1 is clear
+; and to 0 when it is set.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FCFE).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = 0 (B too); X = $400; Y = 8
+org $FDB0D5
+BattleFD_UnkB0D5:
+    TDC
+    TAX
+.clear_flags:
+    STA.w !Battle_ListFlags,X
+    INX
+    CPX.w #!Battle_ListEntries
+    BNE .clear_flags
+    TDC
+    TAX
+    LDA.b #!Battle_ListRunsReset
+.set_runs:
+    STA.w !Battle_ListRuns,X
+    INX
+    CPX.w #!Battle_ListEntries
+    BCC .set_runs
+    TDC
+    TAX
+.clear_9f29:
+    STZ.w !Battler_Unk9F29+!Battle_FirstEnemySlot,X
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .clear_9f29
+    STZ.w !Battle_Unk9F34
+    TDC
+    TAX
+    TAY
+.enemy:
+    LDA.w !Battler_UnkAF0A+!Battle_FirstEnemySlot,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    LDA.w BattlerStats[3].Unk47,X
+    AND.b #!Battle_Unk47Bit1
+    EOR.b #!Battle_Unk47Bit1
+    STA.w !Battler_Unk9F29+!Battle_FirstEnemySlot,Y
+.next:
+    INY
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Battle_StatsStride
+    TAX
+    TDC
+    SEP #$20
+    CPY.w #!Battle_NumEnemies
+    BCC .enemy
+    RTL
+
+; $FD:B121 — BattleFD_UnkB121 (32 bytes, $B121–$B140)
+; Copies bits 0-1 of each enemy's BattlerStats.Unk47 (slots 3-10) to
+; !Battle_UnkA020 (one byte per enemy entry). What they mean is not
+; traced.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FAB9).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = 0 (B too); X = $580; Y = 8
+org $FDB121
+BattleFD_UnkB121:
+    LDX.w #!Battle_FirstEnemySlot*!Battle_StatsStride
+    LDY.w #0
+.enemy:
+    LDA.w BattlerStats.Unk47,X
+    AND.b #!Battle_Unk47Bits01
+    STA.w !Battle_UnkA020,Y
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Battle_StatsStride
+    TAX
+    TDC
+    SEP #$20
+    INY
+    CPY.w #!Battle_NumEnemies
+    BCC .enemy
+    RTL
+
+; $FD:B141 — BattleFD_ApplyRecBoost (12 bytes, $B141–$B14C)
+; Applies the stat boost an item record names: byte 4 of the record at
+; DP $08 (an address in bank $CC; the callers point it at a PC's weapon,
+; armour and helmet records) is a boost number; when it is non-zero this
+; falls into BattleFD_UnkB14D with it, else returns.
+; Callers (3 JSL sites): unmatched ($C1:CEA4, $C1:CED6, $C1:CF08).
+; Entry: M=1, X=0, DP=0, DB=$7E (for BattleFD_UnkB14D's .w stores); DP $08 =
+;        the record's address in bank $CC,
+;        DP $0E = the boost table, DP $00 = the stat block (as
+;        BattleFD_UnkB14D)
+; Exit:  M=1, X=0; as BattleFD_UnkB14D when byte 4 is non-zero; else A = 0
+;        (B too), X = DP $08
+org $FDB141
+BattleFD_ApplyRecBoost:
+    TDC
+    LDX.b !BattleTmp_08
+    LDA.l !BattleRom_BankCC+4,X
+    BNE BattleFD_UnkB14D
+    JMP BattleFD_UnkB14D_Done
+
+; $FD:B14D — BattleFD_UnkB14D (180 bytes, $B14D–$B200)
+; Applies stat boost A to the stat block at DP $00: its 2-byte entry in
+; bank $CC at DP $0E + A * 2 has a stat mask (byte 0) and an amount
+; (byte 1); for each mask bit set, the amount is added to one of the
+; block's stats with a cap: bit 7 .Unk36 (99), bit 6 .Unk38 (16), bit 5
+; .Unk37 (99), bit 4 .Unk3A (99), bit 3 .Unk3B ($FF: kept at $FF when the
+; add carries), bit 2 .Unk39 (99), bit 1 .Unk3C (99); bit 0 is not
+; used. Battle_SetupBattle passes a PC's
+; PcStatBlk.Unk4D with the table !Battle_Unk29D7 ($CC:29D7);
+; BattleFD_ApplyRecBoost an item record's byte 4.
+; BattleFD_UnkB14D_Done ($FD:B200, the RTL) is BattleFD_ApplyRecBoost's
+; exit when there is no boost.
+; The 7 bytes are the ones $C1:CE3A (unmatched) copies from the block's
+; +$0B..+$11. The caps of 99 and 16 look like stat limits; which stats they are is
+; not traced.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FC92).
+; Callers note: also entered by BattleFD_ApplyRecBoost's BNE at $FD:B148,
+;   just before this label.
+; Callers of BattleFD_UnkB14D_Done (1 JMP site): BattleFD_ApplyRecBoost ($FD:B14A).
+; Entry: M=1, X=0, DP=0, DB=$7E (the stores are .w); A = boost number
+;        with B = 0 (it is doubled 16-bit); DP $00 = stat block address
+;        (PcStatBlk), DP $0E = table address in bank $CC
+; Exit:  M=1, X=0; A, X clobbered; Y unchanged; DP $04 (the mask shifted
+;        out), $0A (the amount) and $0C (the entry's offset) written
+!BattleFDBoost_Block = !BattleTmp_00    ; 2 B: the stat block (argument)
+!BattleFDBoost_Mask  = !BattleTmp_04    ; 1 B: the stat mask, shifted left once per stat
+!BattleFDBoost_Add   = !BattleTmp_0A    ; 1 B: the amount
+!BattleFDBoost_Entry = !BattleTmp_0C    ; 2 B: the entry's address in bank $CC
+!BattleFDBoost_Table = !BattleTmp_0E    ; 2 B: the table (argument)
+BattleFD_UnkB14D:
+    REP #$20
+    ASL A
+    CLC
+    ADC.b !BattleFDBoost_Table
+    TAX
+    TDC
+    SEP #$20
+    STX.b !BattleFDBoost_Entry
+    LDA.l !BattleRom_BankCC+1,X
+    STA.b !BattleFDBoost_Add
+    LDA.l !BattleRom_BankCC,X
+    STA.b !BattleFDBoost_Mask
+    BPL .stat38
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk36,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap99
+    BCC .set36
+    LDA.b #!Battle_StatCap99
+.set36:
+    STA.w PcStatBlk.Unk36,X
+.stat38:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL .stat37
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk38,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap16
+    BCC .set38
+    LDA.b #!Battle_StatCap16
+.set38:
+    STA.w PcStatBlk.Unk38,X
+.stat37:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL .stat3a
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk37,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap99
+    BCC .set37
+    LDA.b #!Battle_StatCap99
+.set37:
+    STA.w PcStatBlk.Unk37,X
+.stat3a:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL .stat3b
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk3A,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap99
+    BCC .set3a
+    LDA.b #!Battle_StatCap99
+.set3a:
+    STA.w PcStatBlk.Unk3A,X
+.stat3b:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL .stat39
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk3B,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    BCC .set3b
+    LDA.b #!Battle_StatCapFF
+.set3b:
+    STA.w PcStatBlk.Unk3B,X
+.stat39:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL .stat3c
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk39,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap99
+    BCC .set39
+    LDA.b #!Battle_StatCap99
+.set39:
+    STA.w PcStatBlk.Unk39,X
+.stat3c:
+    ASL.b !BattleFDBoost_Mask
+    LDA.b !BattleFDBoost_Mask
+    BPL BattleFD_UnkB14D_Done
+    LDX.b !BattleFDBoost_Block
+    LDA.w PcStatBlk.Unk3C,X
+    CLC
+    ADC.b !BattleFDBoost_Add
+    CMP.b #!Battle_StatCap99
+    BCC .set3c
+    LDA.b #!Battle_StatCap99
+.set3c:
+    STA.w PcStatBlk.Unk3C,X
+BattleFD_UnkB14D_Done:                  ; header: see BattleFD_UnkB14D
+    RTL
+
+; $FD:B201 — BattleFD_UnkB201 (34 bytes, $B201–$B222)
+; BattleSys_Main's victory path, before the gold is paid: when a PC has
+; BattlerStats.Unk57 = $A9 (!Battle_UnkB3BD non-zero, BattleFD_UnkAE99),
+; adds the !Battle_UnkB28C sum to !Battle_RewardGold, zeroes B28C, and in
+; !Battle_UnkB2AF clears bit 7 (no message 0 in BattleFD_UnkAD17) and
+; sets bit 6 (!Battle_RewardBitGold). So that PC's B28C reward is paid as
+; gold instead (what B28C and the $A9 value are is not traced).
+; Callers (1 JSL site): BattleSys_Main ($C1:83E0).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = !Battle_UnkB2AF, or 0 when !Battle_UnkB3BD is 0;
+;        X, Y unchanged
+org $FDB201
+BattleFD_UnkB201:
+    LDA.w !Battle_UnkB3BD
+    BEQ .done
+    REP #$20
+    LDA.w !Battle_UnkB28C
+    CLC
+    ADC.w !Battle_RewardGold
+    STA.w !Battle_RewardGold
+    TDC
+    STA.w !Battle_UnkB28C
+    SEP #$20
+    LDA.w !Battle_UnkB2AF
+    AND.b #!Battle_RewardBitUnk0^$FF
+    ORA.b #!Battle_RewardBitGold
+    STA.w !Battle_UnkB2AF
+.done:
+    RTL
+
+; $FD:B223 — BattleFD_UnkB223 (11 bytes, $B223–$B22D)
+; Sets !Battle_UnkAE6D entry n to n for n = 0-10.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FDA5).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = 11 (B = 0); X = 10; Y unchanged
+org $FDB223
+BattleFD_UnkB223:
+    TDC
+.entry:
+    TAX
+    STA.w !Battle_UnkAE6D,X
+    INC A
+    CMP.b #!Battle_NumSlots
+    BCC .entry
+    RTL
+
+; $FD:B22E — BattleFD_UnkB22E (176 bytes, $B22E–$B2DD)
+; Battle_SetupBattle's second step: the battlers' entries.
+;   - zeroes $580 bytes from BattlerStats.Unk2D (+$2D of all 11 records
+;     and on to $63AC);
+;   - !Pc_AtbCur and !Pc_AtbMax of the 3 PCs = $FF;
+;   - !Battler_UnkAEFF / !Battler_UnkAF0A of all 11 slots = $FF, the 8
+;     !Battle_UnkAF15 bytes = 0;
+;   - each PC slot whose !Pc_CharId is not negative: both entries = the
+;     id, counted in !Battle_PcCount;
+;   - !Battle_Unk24 = 0; !Battle_UnkB1BE (7 B, per character id) = $FF,
+;     then the slot of each PC taking part at its character's entry;
+;   - the enemies from the 8 records of BattleEnemyInit ($29C4, 12 B
+;     each): a record whose .Unk1 is not negative gives its .Id to the
+;     entry's !Battler_UnkAEFF and !Battler_UnkAF0A; when its .Unk2 is
+;     negative too, !Battler_UnkAEFF is set back to $FF and !Battle_UnkAF15
+;     bit 7 set (so the enemy is in the battle's list but absent at the
+;     start; BattleFD_RestoreEnemies can bring such entries in).
+; !Battle_EnemyCount ends as 8 whatever the records hold: it is counted
+; for every record, used or not.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FA93).
+; Entry: M=1, X=0, DP=0 (TDC as zero; .b store to !Battle_Unk24), DB=$7E
+; Exit:  M=1, X=0; A = 0 (B too); X = $60; Y = 8
+org $FDB22E
+BattleFD_UnkB22E:
+    TDC
+    TAX
+.clear_stats:
+    STA.w BattlerStats.Unk2D,X
+    INX
+    CPX.w #!Battle_NumSlots*!Battle_StatsStride
+    BCC .clear_stats
+    LDA.b #!Battle_AtbEmpty
+    STA.w !Pc_AtbCur
+    STA.w !Pc_AtbCur+1
+    STA.w !Pc_AtbCur+2
+    STA.w !Pc_AtbMax
+    STA.w !Pc_AtbMax+1
+    STA.w !Pc_AtbMax+2
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.clear_ids:
+    STA.w !Battler_UnkAEFF,X
+    STA.w !Battler_UnkAF0A,X
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .clear_ids
+    TDC
+    TAX
+.clear_af15:
+    STA.w !Battle_UnkAF15,X
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .clear_af15
+    STA.w !Battle_PcCount
+    TAX
+.pc:
+    LDA.w !Pc_CharId,X
+    BMI .pc_next
+    STA.w !Battler_UnkAEFF,X
+    STA.w !Battler_UnkAF0A,X
+    INC.w !Battle_PcCount
+.pc_next:
+    INX
+    CPX.w #!Battle_NumPcSlots
+    BCC .pc
+    STZ.b !Battle_Unk24
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.clear_b1be:
+    STA.w !Battle_UnkB1BE,X
+    INX
+    CPX.w #!Battle_NumCharIds
+    BCC .clear_b1be
+    TDC
+    TAX
+.char_slot:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .char_slot_next
+    TAY
+    TXA
+    STA.w !Battle_UnkB1BE,Y
+.char_slot_next:
+    INX
+    CPX.w #!Battle_NumPcSlots
+    BCC .char_slot
+    TDC
+    STA.w !Battle_EnemyCount
+    TAX
+    TAY
+.enemy:
+    LDA.w BattleEnemyInit.Unk1,X
+    BMI .enemy_next
+    LDA.w BattleEnemyInit.Id,X
+    STA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,Y
+    STA.w !Battler_UnkAF0A+!Battle_FirstEnemySlot,Y
+    LDA.w BattleEnemyInit.Unk2,X
+    BPL .enemy_next
+    LDA.b #!Battle_EntryNone
+    STA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,Y
+    LDA.w !Battle_UnkAF15,Y
+    ORA.b #!Battle_AF15Bit7
+    STA.w !Battle_UnkAF15,Y
+.enemy_next:
+    INC.w !Battle_EnemyCount
+    INY
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Battle_EnemyInitSize
+    TAX
+    TDC
+    SEP #$20
+    CPX.w #!Battle_NumEnemies*!Battle_EnemyInitSize
+    BCC .enemy
+    RTL
+
+; $FD:B2DE — BattleFD_UnkB2DE (97 bytes, $B2DE–$B33E)
+; Battle_SetupBattle's first step. Only with !Battle_Unk2989 bit 5 set
+; (the mode in which Battle_RandRange returns its low bound and
+; BattleSys_Main ends after one pass): BattleFD_UnkB33F rebuilds the
+; character records from ROM, then each of the 8 records
+; (!Menu_CharRecords, $50 B apart) gets bytes +11 and +14 = $23, +12 =
+; $80, and the words +3, +5, +7 and +9 from a list in bank $FD: four
+; words per character, from the address !BattleRom_UnkFDB99C holds for
+; !Menu_Config+28 (doubled in 8 bits, so values of $80 and up wrap). So probably a fixed party set-up
+; for that mode; the fields are not traced.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FA8F).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; with bit 5 set A = 0 (B too), X = list end, Y = $280,
+;        !Battle_PcCount = 3, !Battle_UnkAF1D = 0, $2400-$25FF and
+;        $2600-$282F written (BattleFD_UnkB33F); else A = !Battle_Unk2989,
+;        X, Y unchanged
+; Callee: BattleFD_UnkB33F
+org $FDB2DE
+BattleFD_UnkB2DE:
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BNE .set_up
+    JMP .done
+.set_up:
+    JSR BattleFD_UnkB33F
+    TDC
+    LDA.w !Menu_Config+28
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !BattleRom_UnkFDB99C,X
+    TAX
+    TDC
+    SEP #$20
+    TDC
+    TAY
+.record:
+    LDA.b #!Battle_DemoRecUnk0B
+    STA.w !Menu_CharRecords+11,Y
+    STA.w !Menu_CharRecords+14,Y
+    LDA.b #!Battle_DemoRecUnk0C
+    STA.w !Menu_CharRecords+12,Y
+    REP #$20
+    LDA.l !BattleRom_BankFD,X
+    STA.w !Menu_CharRecords+3,Y
+    INX
+    INX
+    LDA.l !BattleRom_BankFD,X
+    STA.w !Menu_CharRecords+5,Y
+    INX
+    INX
+    LDA.l !BattleRom_BankFD,X
+    STA.w !Menu_CharRecords+7,Y
+    INX
+    INX
+    LDA.l !BattleRom_BankFD,X
+    STA.w !Menu_CharRecords+9,Y
+    TYA
+    CLC
+    ADC.w #!Battle_CharRecordSize
+    TAY
+    TDC
+    INX
+    INX
+    SEP #$20
+    CPY.w #!Menu_CharRecordInitSize
+    BCC .record
+.done:
+    RTL
+
+; $FD:B33F — BattleFD_UnkB33F (36 bytes, $B33F–$B362)
+; BattleFD_UnkB2DE's helper: !Battle_UnkAF1D = 0, !Battle_PcCount = 3,
+; copies $230 bytes from !MenuRom_CharRecordInit ($CC:0000, the new-game
+; records Menu_InitNewGameData copies) to !Menu_CharRecords
+; ($2600-$282F), and fills !Menu_Unk2400 ($2400-$25FF) with the low byte
+; of each byte's index (0-255 twice).
+; Callers (1 JSR site): BattleFD_UnkB2DE ($FD:B2E8).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = $FF (B = 0); X = $200; Y unchanged
+org $FDB33F
+BattleFD_UnkB33F:
+    STZ.w !Battle_UnkAF1D
+    LDA.b #!Battle_NumPcSlots
+    STA.w !Battle_PcCount
+    TDC
+    TAX
+.copy:
+    LDA.l !MenuRom_CharRecordInit,X
+    STA.w !Menu_CharRecords,X
+    INX
+    CPX.w #!Battle_DemoRecordBytes
+    BCC .copy
+    TDC
+    TAX
+.fill:
+    TXA
+    STA.w !Menu_Unk2400,X
+    INX
+    CPX.w #!Menu_Unk2400Size
+    BNE .fill
+    RTS
+
+; $FD:B363 — BattleFD_UnkB363 (136 bytes, $B363–$B3EA)
+; For PC slot Y with an id in !Battler_UnkAEFF:
+;   - BattlerStats.Unk79 bit 7 set: ORs .Unk7B into the byte at
+;     BattlerStats.Status + .Unk7A (a status byte picked by .Unk7A);
+;   - BattlerStats.Unk57 = $A0: MaxHp + MaxHp / 4, $A1: MaxHp + MaxHp / 2,
+;     at most 999 (CurHp is left alone).
+; Battle_SetupBattle runs it for PCs 0-2 after saving the max HP
+; (!Battle_SavedMaxHp), which BattleSys_Main puts back at the end.
+; Quirk: a BIT #$40 of .Unk79 branches (BEQ) to the very next
+; instruction, so it has no effect.
+; Callers (3 JSL sites): Battle_SetupBattle ($C1:FD41, $C1:FD48, $C1:FD4F).
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = PC slot
+; Exit:  M=1, X=0; A = 0 (B too) unless the slot is empty ($FF); X =
+;        the slot * $80, or 0 for an empty slot; Y unchanged;
+;        DP $00 = .Unk7B or 0, $02 = slot * $80 or 0, $04 = .Unk7A or 0
+!BattleFDHp_Bits = !BattleTmp_00        ; 1-2 B: .Unk7B, the status bits
+!BattleFDHp_Ofs  = !BattleTmp_02        ; 2 B: slot * $80
+!BattleFDHp_Byte = !BattleTmp_04        ; 2 B: .Unk7A, the status byte's offset
+org $FDB363
+BattleFD_UnkB363:
+    TDC
+    TAX
+    STX.b !BattleFDHp_Bits
+    STX.b !BattleFDHp_Ofs
+    STX.b !BattleFDHp_Byte
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .done
+    REP #$20
+    TYA
+    XBA
+    LSR A
+    TAX                                 ; X = slot * $80
+    STA.b !BattleFDHp_Ofs
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk79,X
+    BIT.b #!Battle_Unk79StatusBit
+    BEQ .no_status
+    TDC
+    LDA.w BattlerStats.Unk7B,X
+    STA.b !BattleFDHp_Bits
+    LDA.w BattlerStats.Unk7A,X
+    STA.b !BattleFDHp_Byte
+    REP #$20
+    TXA
+    CLC
+    ADC.b !BattleFDHp_Byte
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,X
+    ORA.b !BattleFDHp_Bits
+    STA.w BattlerStats.Status,X
+.no_status:
+    LDX.b !BattleFDHp_Ofs
+    LDA.w BattlerStats.Unk79,X
+    BIT.b #!Battle_Unk79Bit6
+    BEQ .hp                             ; quirk: branches to the next instruction
+.hp:
+    LDA.w BattlerStats.Unk57,X
+    CMP.b #!Battle_Unk57HpQuarter
+    BNE .not_quarter
+    REP #$20
+    LDA.w BattlerStats.MaxHp,X
+    LSR A
+    LSR A
+    CLC
+    ADC.w BattlerStats.MaxHp,X
+    CMP.w #!Battle_MaxHpCap
+    BCC .set_quarter
+    LDA.w #!Battle_MaxHpCap
+.set_quarter:
+    STA.w BattlerStats.MaxHp,X
+    BRA .hp_done
+.not_quarter:
+    SEP #$20
+    LDA.w BattlerStats.Unk57,X
+    CMP.b #!Battle_Unk57HpHalf
+    BNE .hp_done
+    REP #$20
+    LDA.w BattlerStats.MaxHp,X
+    LSR A
+    CLC
+    ADC.w BattlerStats.MaxHp,X
+    CMP.w #!Battle_MaxHpCap
+    BCC .set_half
+    LDA.w #!Battle_MaxHpCap
+.set_half:
+    STA.w BattlerStats.MaxHp,X
+.hp_done:
+    TDC                                 ; M is 0 or 1 here, by path
+    SEP #$20
+.done:
+    RTL
+
+; $FD:B3EB — BattleFD_UnkB3EB (19 bytes, $B3EB–$B3FD)
+; Sets BattlerStats.Unk72 of the slot at X to $32 when its .Unk56 is $3D
+; or $42. Run by BattleFD_UnkB555 for each PC whose BattlerStats.Unk57 is
+; $B3. What the values mean is not traced.
+; Quirk: a BRA to the very next instruction after the store.
+; Callers (3 JSL sites): BattleFD_UnkB555 ($FD:B578, $FD:B586, $FD:B594).
+; Entry: M=1, X=0, DP any, DB=$7E; X = slot * $80
+; Exit:  M=1, X=0; A = .Unk56 or $32; X, Y unchanged
+org $FDB3EB
+BattleFD_UnkB3EB:
+    LDA.w BattlerStats.Unk56,X
+    CMP.b #!Battle_Unk56SetA
+    BEQ .set
+    CMP.b #!Battle_Unk56SetB
+    BNE .done
+.set:
+    LDA.b #!Battle_Unk72Value
+    STA.w BattlerStats.Unk72,X
+    BRA .done                           ; quirk: branches to the next instruction
+.done:
+    RTL
+
+; $FD:B3FE — BattleFD_UnkB3FE (58 bytes, $B3FE–$B437)
+; For PC X with an id in !Battler_UnkAEFF: sets the 4 bytes of its
+; BattlerStats.Unk6C to 4, then the byte picked by the highest of
+; BattlerStats.Unk2E bits 7-4 (bit 7: +0, 6: +1, 5: +2, 4: +3) to 5;
+; none set leaves all four at 4.
+; Callers (3 JSL sites): Battle_SetupBattle ($C1:FB3D, $C1:FB47, $C1:FB51).
+; Entry: M=1, X=0, DP any, DB=$7E; X = PC slot, Y = slot * $80
+; Exit:  M=1, X=0; A clobbered; X unchanged; Y + 0 to 3 (the byte set
+;        to 5)
+org $FDB3FE
+BattleFD_UnkB3FE:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .done
+    LDA.b #!Battle_Unk6CBase
+    STA.w BattlerStats.Unk6C,Y
+    STA.w BattlerStats.Unk6C+1,Y
+    STA.w BattlerStats.Unk6C+2,Y
+    STA.w BattlerStats.Unk6C+3,Y
+    LDA.w BattlerStats.Unk2E,Y
+    BIT.b #!Battle_Unk2EBit7
+    BEQ .not_bit7
+    BRA .set
+.not_bit7:
+    BIT.b #!Battle_Unk2EBit6
+    BEQ .not_bit6
+    INY
+    BRA .set
+.not_bit6:
+    BIT.b #!Battle_Unk2EBit5
+    BEQ .not_bit5
+    INY
+    INY
+    BRA .set
+.not_bit5:
+    BIT.b #!Battle_Unk2EBit4
+    BEQ .done
+    INY
+    INY
+    INY
+.set:
+    LDA.b #!Battle_Unk6CRaised
+    STA.w BattlerStats.Unk6C,Y
+.done:
+    RTL
+
+; $FD:B438 — BattleFD_UnkB438 (158 bytes, $B438–$B4D5)
+; Builds an enemy's stat record from ROM: for enemy entry X (also in
+; DP $02), with the id in its !Battler_UnkAF0A entry, the 23-byte record
+; at BattleRom_EnemyStats + id * 23 fills BattlerStats[entry + 3] after
+; BattleFD_ZeroStatBlock clears $80 bytes from its .Unk2D:
+;   .Unk2D = the id; .CurHp = .MaxHp = record +0 (16-bit); .Unk3F =
+;   record +2; .Status, .Status2 and .Unk4C+0 = 0; .Unk4C+3..+7 =
+;   record +3..+7, then .Unk4C+1/.Unk4C+2 = copies of .Unk4C+6/+7;
+;   .Unk64..+$6F = record +8..+$13; .Unk46..+$48 = record +$14..+$16.
+; Battle_SetupBattle runs it for each entry, BattleFD_RestoreEnemies for
+; each enemy it brings back.
+; Quirk: .Unk3F is stored twice.
+; Callers (4 JSL sites): Battle_SetupBattle ($C1:FAAC), BattleFD_RestoreEnemies ($FD:AA2E) and
+;   unmatched ($C1:9C30, $C1:9EDA).
+; Entry: M=1, X=0, DP=0, DB=$7E; X = enemy entry 0-7, DP $02 = the same
+;        (16-bit)
+; Exit:  M=1, X=0; A = 3 (B = 0); X, Y clobbered; DP $00 = 3, $04 =
+;        the id
+; Callee: BattleFD_ZeroStatBlock
+!BattleFDEnemy_Count = !BattleTmp_00    ; 1 B: bytes copied in the current run
+!BattleFDEnemy_Entry = !BattleTmp_02    ; 2 B: the enemy entry (argument)
+!BattleFDEnemy_Id    = !BattleTmp_04    ; 2 B: the id
+org $FDB438
+BattleFD_UnkB438:
+    TDC
+    TAY
+    STY.b !BattleFDEnemy_Id
+    LDA.w !Battler_UnkAF0A+!Battle_FirstEnemySlot,X
+    STA.b !BattleFDEnemy_Id
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleFDEnemy_Count          ; id * 8 for a moment
+    ASL A
+    CLC
+    ADC.b !BattleFDEnemy_Count
+    SEC
+    SBC.b !BattleFDEnemy_Id
+    TAX                                 ; X = id * 23
+    LDA.b !BattleFDEnemy_Entry
+    XBA
+    LSR A
+    TAY                                 ; Y = entry * $80
+    TDC
+    SEP #$20
+    JSR BattleFD_ZeroStatBlock
+    LDA.b !BattleFDEnemy_Id
+    STA.w BattlerStats[3].Unk2D,Y
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].CurHp,Y
+    STA.w BattlerStats[3].MaxHp,Y
+    INX
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].CurHp+1,Y
+    STA.w BattlerStats[3].MaxHp+1,Y
+    INX
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].Unk3F,Y
+    STA.w BattlerStats[3].Unk3F,Y       ; quirk: the same store again
+    PHY
+    TDC
+    STA.b !BattleFDEnemy_Count
+    STA.w BattlerStats[3].Status,Y
+    STA.w BattlerStats[3].Status2,Y
+    STA.w BattlerStats[3].Unk4C,Y
+.copy_4f:
+    INX
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].Unk4C+3,Y
+    INY
+    INC.b !BattleFDEnemy_Count
+    LDA.b !BattleFDEnemy_Count
+    CMP.b #!Battle_EnemyRec4FBytes
+    BCC .copy_4f
+    PLY
+    LDA.w BattlerStats[3].Unk4C+6,Y
+    STA.w BattlerStats[3].Unk4C+1,Y
+    LDA.w BattlerStats[3].Unk4C+7,Y
+    STA.w BattlerStats[3].Unk4C+2,Y
+    PHY
+    TDC
+    STA.b !BattleFDEnemy_Count
+.copy_64:
+    INX
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].Unk64,Y
+    INY
+    INC.b !BattleFDEnemy_Count
+    LDA.b !BattleFDEnemy_Count
+    CMP.b #!Battle_EnemyRec64Bytes
+    BCC .copy_64
+    PLY
+    TDC
+    STA.b !BattleFDEnemy_Count
+.copy_46:
+    INX
+    LDA.l !BattleRom_EnemyStats,X
+    STA.w BattlerStats[3].Unk46,Y
+    INY
+    INC.b !BattleFDEnemy_Count
+    LDA.b !BattleFDEnemy_Count
+    CMP.b #!Battle_EnemyRec46Bytes
+    BCC .copy_46
+    RTL
+
+; $FD:B4D6 — BattleFD_ZeroStatBlock (17 bytes, $B4D6–$B4E6)
+; Zeroes $80 bytes from BattlerStats[3].Unk2D + Y (an enemy's stat block,
+; running into the next record's first $2D bytes).
+; Callers (1 JSR site): BattleFD_UnkB438 ($FD:B458).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; Y = enemy entry * $80
+; Exit:  M=1, X=0; A = 0 (B too); X, Y preserved (pushed and pulled)
+org $FDB4D6
+BattleFD_ZeroStatBlock:
+    PHX
+    PHY
+    TDC
+    TAX
+.zero:
+    STA.w BattlerStats[3].Unk2D,Y
+    INX
+    INY
+    CPX.w #!Battle_StatsStride
+    BCC .zero
+    PLY
+    PLX
+    RTS
+
+; $FD:B4E7 — BattleFD_UnkB4E7 (110 bytes, $B4E7–$B554)
+; Sets the starting values of the turn lists for all 11 slots: the
+; reload value (!Battle_ListReload) and the countdown
+; (!Battle_ListTimers) of lists 0-11 get the same number per list: 0: 60,
+; 1: 150, 2: 90, 3: 110, 4: 90, 5: 60, 6: 60, 7: 60, 8: 30, 9: 25,
+; 10: 60, 11: 120; list 12 (the battlers' turns) gets only its reload
+; value, 105 (!Battle_AtbBase; the same value BattleFD_UnkB7EB starts
+; from).
+; Callers (2 JSL sites): Battle_SetupBattle ($C1:FD02) and unmatched ($C1:FE96).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = 120 (B = 0); X = 11; Y unchanged
+org $FDB4E7
+BattleFD_UnkB4E7:
+    TDC
+    TAX
+.slot:
+    LDA.b #!Battle_List0Time
+    STA.w !Battle_ListReload,X
+    STA.w !Battle_ListTimers,X
+    LDA.b #!Battle_AtbBase
+    STA.w !Battle_ListReload+(!Battle_NumSlots*!Battle_TurnList),X
+    LDA.b #!Battle_List1Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*1),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*1),X
+    LDA.b #!Battle_List2Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*2),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*2),X
+    LDA.b #!Battle_List6Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*6),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*6),X
+    LDA.b #!Battle_List7Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*7),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*7),X
+    LDA.b #!Battle_List8Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*8),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*8),X
+    LDA.b #!Battle_List4Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*4),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*4),X
+    LDA.b #!Battle_List9Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*9),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*9),X
+    LDA.b #!Battle_List3Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*3),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*3),X
+    LDA.b #!Battle_List5Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*5),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*5),X
+    LDA.b #!Battle_List10Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*10),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*10),X
+    LDA.b #!Battle_List11Time
+    STA.w !Battle_ListReload+(!Battle_NumSlots*11),X
+    STA.w !Battle_ListTimers+(!Battle_NumSlots*11),X
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .slot
+    RTL
+
+; $FD:B555 — BattleFD_UnkB555 (256 bytes, $B555–$B654)
+; One of Battle_SetupBattle's last steps:
+;   - zeroes !Battle_UnkAEE6 (17 B), !Battle_UnkB19E (32 B) and the 32
+;     bytes from !Enemy_AnimWanted ($5E0D-$5E2C);
+;   - BattleFD_UnkB3EB for each PC whose BattlerStats.Unk57 (as copied
+;     to !Battle_UnkB3BA) is !Battle_Unk57B3EB ($B3);
+;   - for each PC, twice: when its stat block's .Unk4A is 1, record
+;     .Unk49 of !BattleRom_UnkCC2A05 (3 B each) is applied: record byte 1
+;     is ORed into the byte at the block + record byte 0; the same with
+;     .Unk71 / .Unk72.
+; What the records stand for is not traced (they set bits in the stat
+; block, probably equipment effects).
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FD0A).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A, X, Y clobbered
+; Callee: BattleFD_UnkB3EB
+org $FDB555
+BattleFD_UnkB555:
+    TDC
+    TAX
+.clear_aee6:
+    STA.w !Battle_UnkAEE6,X
+    INX
+    CPX.w #!Battle_UnkAEE6Bytes
+    BCC .clear_aee6
+    TDC
+    TAX
+.clear_b19e:
+    STA.w !Battle_UnkB19E,X
+    STA.w !Enemy_AnimWanted,X
+    INX
+    CPX.w #!Battle_UnkB19EBytes
+    BCC .clear_b19e
+    LDA.w !Battle_UnkB3BA
+    CMP.b #!Battle_Unk57B3EB
+    BNE .pc1_b3eb
+    LDX.w #0
+    JSL BattleFD_UnkB3EB
+.pc1_b3eb:
+    LDA.w !Battle_UnkB3BA+1
+    CMP.b #!Battle_Unk57B3EB
+    BNE .pc2_b3eb
+    LDX.w #!Battle_StatsStride
+    JSL BattleFD_UnkB3EB
+.pc2_b3eb:
+    LDA.w !Battle_UnkB3BA+2
+    CMP.b #!Battle_Unk57B3EB
+    BNE .pc0_rec1
+    LDX.w #!Battle_StatsStride*2
+    JSL BattleFD_UnkB3EB
+.pc0_rec1:
+    TDC
+    LDA.w BattlerStats.Unk2D+PcStatBlk.Unk4A
+    CMP.b #1
+    BNE .pc1_rec1
+    LDA.w BattlerStats.Unk2D+PcStatBlk.Unk49
+    ASL A
+    CLC
+    ADC.w BattlerStats.Unk2D+PcStatBlk.Unk49
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats.Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats.Unk2D,Y
+.pc1_rec1:
+    LDA.w BattlerStats[1].Unk2D+PcStatBlk.Unk4A
+    CMP.b #1
+    BNE .pc2_rec1
+    LDA.w BattlerStats[1].Unk2D+PcStatBlk.Unk49
+    ASL A
+    CLC
+    ADC.w BattlerStats[1].Unk2D+PcStatBlk.Unk49
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats[1].Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats[1].Unk2D,Y
+.pc2_rec1:
+    LDA.w BattlerStats[2].Unk2D+PcStatBlk.Unk4A
+    CMP.b #1
+    BNE .pc0_rec2
+    LDA.w BattlerStats[2].Unk2D+PcStatBlk.Unk49
+    ASL A
+    CLC
+    ADC.w BattlerStats[2].Unk2D+PcStatBlk.Unk49
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats[2].Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats[2].Unk2D,Y
+.pc0_rec2:
+    TDC
+    LDA.w BattlerStats.Unk2D+PcStatBlk.Unk72
+    CMP.b #1
+    BNE .pc1_rec2
+    LDA.w BattlerStats.Unk2D+PcStatBlk.Unk71
+    ASL A
+    CLC
+    ADC.w BattlerStats.Unk2D+PcStatBlk.Unk71
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats.Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats.Unk2D,Y
+.pc1_rec2:
+    LDA.w BattlerStats[1].Unk2D+PcStatBlk.Unk72
+    CMP.b #1
+    BNE .pc2_rec2
+    LDA.w BattlerStats[1].Unk2D+PcStatBlk.Unk71
+    ASL A
+    CLC
+    ADC.w BattlerStats[1].Unk2D+PcStatBlk.Unk71
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats[1].Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats[1].Unk2D,Y
+.pc2_rec2:
+    LDA.w BattlerStats[2].Unk2D+PcStatBlk.Unk72
+    CMP.b #1
+    BNE .done
+    LDA.w BattlerStats[2].Unk2D+PcStatBlk.Unk71
+    ASL A
+    CLC
+    ADC.w BattlerStats[2].Unk2D+PcStatBlk.Unk71
+    TAX
+    LDA.l !BattleRom_UnkCC2A05,X
+    TAY
+    LDA.w BattlerStats[2].Unk2D,Y
+    ORA.l !BattleRom_UnkCC2A05+1,X
+    STA.w BattlerStats[2].Unk2D,Y
+.done:
+    RTL
+
+; $FD:B655 — BattleFD_UnkB655 (221 bytes, $B655–$B731)
+; Puts item DP $06 in the 4-byte record of slot !Battle_UnkB18B in
+; !Battle_PcItem (8 B per slot) when it is an item the battle list takes
+; (as BattleFD_AddItemEntry: id $BC or more with bit 7 of its
+; !BattleRom_ItemUseFlags byte): .Id = the id, .TargetMode from
+; !BattleRom_ItemTargetMode, .Flags = that byte without bit 7, .Quantity
+; = 1; then sets !Battle_UnkB3BF bit 1. Otherwise the item goes back to
+; the inventory (BankC1_AddItemLong with Y = the id). !Battle_UnkAF23 is
+; 0 at the end either way. Probably what happens to an item a PC uses up
+; or takes (not traced).
+; Quirk: as in BattleFD_AddItemEntry, ids below $5A branch to the same
+; place as the others, so the code at $B67F-$B6CA is never run (it
+; would fill the record from !BattleRom_UnkCC06A7 like the dead part of
+; BattleFD_AddItemEntry).
+; Callers (1 JSL site): unmatched ($C1:EA5D).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $06 = item id; !Battle_UnkB18B = slot
+;        (its TAX takes B = 0 from the TDC at the start)
+; Exit:  M=1, X=0; A, X, Y clobbered; DP $00, $02, $04, $08, $0A written;
+;        !Battle_UnkAF23 = 0; !Battle_MathA..MathHi as Battle_Mul16 leaves
+;        them; what BankC1_AddItem changes
+; Callees: Battle_Mul16Long, BankC1_AddItemLong
+!BattleFDPcItem_Rec = !BattleTmp_02     ; 2 B: offset of the item's record (id - $BC) * 3
+!BattleFDPcItem_Ofs = !BattleTmp_04     ; 2 B: slot * 8
+!BattleFDPcItem_Id  = !BattleTmp_06     ; 1 B: the item id (argument)
+!BattleFDPcItem_Idx = !BattleTmp_0A     ; 2 B: id - $BC
+org $FDB655
+BattleFD_UnkB655:
+    TDC
+    TAX
+    STX.b !BattleTmp_00
+    STX.b !BattleFDPcItem_Rec
+    STX.b !BattleFDPcItem_Ofs
+    STX.b !BattleTmp_08
+    STX.b !BattleFDPcItem_Idx
+    LDA.w !Battle_UnkB18B
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_PcItemSize
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDX.b !Battle_MathLo
+    STX.b !BattleFDPcItem_Ofs
+    STZ.w !Battle_UnkAF23
+    LDA.b !BattleFDPcItem_Id
+    CMP.b #!Battle_ItemClass1First
+    BCS .battle_item
+    BRA .battle_item                    ; quirk: the code below is never reached
+.dead:
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Id,X
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!BattleRom_UnkCC06A7Size
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDX.b !Battle_MathLo
+    STX.b !BattleFDPcItem_Rec
+    TDC
+    TAY
+    LDX.b !BattleFDPcItem_Rec
+    LDA.l !BattleRom_UnkCC06A7,X
+.dead_find_bit:
+    BIT.b #!Battle_HighBit
+    BNE .dead_found
+    ASL A
+    INY
+    CPY.w #8
+    BCC .dead_find_bit
+    TDC
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Id,X
+    BRA .taken
+.dead_found:
+    LDA.w !Battle_UnkB1BE,Y
+    BMI .dead_flags
+    TAX
+    LDA.b #!Battle_HighBit
+.dead_shift:
+    DEX
+    BMI .dead_mask
+    LSR A
+    BRA .dead_shift
+.dead_mask:
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.PcMask,X
+.dead_flags:
+    LDA.b #!Battle_ItemFlagUnusable
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Flags,X
+    BRA .quantity
+.battle_item:
+    LDA.b !BattleFDPcItem_Id
+    CMP.b #!Battle_ItemClass4First
+    BCC .not_taken
+    LDA.b !BattleFDPcItem_Id
+    SEC
+    SBC.b #!Battle_ItemClass4First
+    TAX
+    STX.b !BattleFDPcItem_Idx
+    ASL A
+    CLC
+    ADC.b !BattleFDPcItem_Idx
+    TAX
+    STX.b !BattleFDPcItem_Rec
+    LDX.b !BattleFDPcItem_Rec
+    LDA.l !BattleRom_ItemUseFlags,X
+    BIT.b #!Battle_ItemListBit
+    BEQ .not_taken
+    LDA.b !BattleFDPcItem_Id
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Id,X
+    LDX.b !BattleFDPcItem_Idx
+    LDA.l !BattleRom_ItemTargetMode,X
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.TargetMode,X
+    LDX.b !BattleFDPcItem_Rec
+    LDA.l !BattleRom_ItemUseFlags,X
+    AND.b #!Battle_ItemListBit^$FF
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Flags,X
+.quantity:
+    LDA.b #1
+    LDX.b !BattleFDPcItem_Ofs
+    STA.w Battle_PcItem.Quantity,X
+.taken:
+    LDA.w !Battle_UnkB3BF
+    ORA.b #!Battle_B3BFPcItemBit
+    STA.w !Battle_UnkB3BF
+    BRA .clear_af23
+.not_taken:
+    INC.w !Battle_UnkAF23
+    BRA .check_af23
+.clear_af23:
+    STZ.w !Battle_UnkAF23
+.check_af23:
+    LDA.w !Battle_UnkAF23
+    BEQ .done
+    LDA.b !BattleFDPcItem_Id
+    TAY
+    JSL BankC1_AddItemLong
+    STZ.w !Battle_UnkAF23
+.done:
+    RTL
+
+; $FD:B732 — BattleFD_UnkB732 (185 bytes, $B732–$B7EA)
+; Clears the battle's per-battle state (Battle_SetupBattle):
+;   - DP $16-$21 and !Battle_UnkAF25 (16-bit) = 0; !Battle_UnkB1FC,
+;     !Battle_UnkB253, !Battle_UnkAECB, !Battle_UnkB2C0, !Battle_UnkB3B9 = 0;
+;   - the reward state: !Battle_UnkB28C, !Battle_RewardGold, the 24-bit
+;     !Battle_UnkB2DB/B2DD, !Battle_UnkB2AF, !Battle_UnkB2B0-B2B5 and the
+;     6 !Battle_RewardItems = 0;
+;   - the $30 bytes from !Battle_UnkB18E ($B18E-$B1BD) = 0;
+;   - !Battle_UnkAECC and !Battle_UnkAED8 (11 B each) = $FF;
+;   - !Battle_UnkAEB2 = 0, and per enemy !Battle_UnkB2B6, !Battle_UnkAEB3,
+;     !Battle_UnkAE85, !Battle_UnkB320, !Battle_UnkAE7D = 0;
+;   - !Battle_UnkB202 = 0; !Battle_UnkB3CE (24 B) = $FF; !Battle_UnkB30F,
+;     !Battle_UnkB310 = 0; !Battle_UnkB3BE = 3;
+;   - !Battle_UnkB263 and !Battle_UnkB26B (8 B each) = $FF;
+;   - BattleCmd[0..2].Partners = $FF.
+; Quirk: !Battle_UnkB263 is zeroed by an earlier loop and then set to
+; $FF by the last one; !Battle_UnkB26B gets $FF both times.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FD0E).
+; Entry: M=1, X=0, DP=0 (TDC as zero; .b stores), DB=$7E
+; Exit:  M=1, X=0; A = $FF (B = 0); X = 8; Y unchanged
+org $FDB732
+BattleFD_UnkB732:
+    TDC
+    TAX
+    STX.b !BattleTmp_16
+    STX.b !BattleTmp_18
+    STX.b !BattleTmp_1A
+    STX.b !BattleTmp_1C
+    STX.b !BattleTmp_1E
+    STX.b !BattleTmp_20
+    STX.w !Battle_UnkAF25
+    STA.w !Battle_UnkB1FC
+    STA.w !Battle_UnkB253
+    STA.w !Battle_UnkAECB
+    STA.w !Battle_UnkB2C0
+    STA.w !Battle_UnkB3B9
+    STX.w !Battle_UnkB28C
+    STX.w !Battle_RewardGold
+    STX.w !Battle_UnkB2DB
+    STA.w !Battle_UnkB2DD
+    STA.w !Battle_UnkB2AF
+    STX.w !Battle_UnkB2B0
+    STX.w !Battle_UnkB2B0+2
+    STX.w !Battle_UnkB2B0+4
+.clear_b18e:
+    STA.w !Battle_UnkB18E,X
+    INX
+    CPX.w #!Battle_UnkB18EBytes
+    BCC .clear_b18e
+    TAX
+.clear_rewards:
+    STA.w !Battle_RewardItems,X
+    INX
+    CPX.w #!Battle_NumRewardItems
+    BCC .clear_rewards
+    TAX
+    LDA.b #!Battle_EntryNone
+.clear_b263:
+    STZ.w !Battle_UnkB263,X
+    STA.w !Battle_UnkB26B,X
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .clear_b263
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.fill_aecc:
+    STA.w !Battle_UnkAECC,X
+    STA.w !Battle_UnkAED8,X
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .fill_aecc
+    TDC
+    STA.w !Battle_UnkAEB2
+    TAX
+.clear_enemy:
+    STA.w !Battle_UnkB2B6,X
+    STA.w !Battle_UnkAEB3,X
+    STA.w !Battle_UnkAE85,X
+    STA.w !Battle_UnkB320,X
+    STA.w !Battle_UnkAE7D,X
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .clear_enemy
+    STZ.w !Battle_UnkB202
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.fill_b3ce:
+    STA.w !Battle_UnkB3CE,X
+    INX
+    CPX.w #!Battle_NumPcSlots*8
+    BCC .fill_b3ce
+    STZ.w !Battle_UnkB30F
+    STZ.w !Battle_UnkB310
+    LDA.b #!Battle_UnkB3BEInit
+    STA.w !Battle_UnkB3BE
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.fill_b263:
+    STA.w !Battle_UnkB263,X
+    STA.w !Battle_UnkB26B,X
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .fill_b263
+    STA.w BattleCmd.Partners
+    STA.w BattleCmd[1].Partners
+    STA.w BattleCmd[2].Partners
+    RTL
+
+; $FD:B7EB — BattleFD_UnkB7EB (364 bytes, $B7EB–$B956)
+; The battlers' first turn values (Battle_SetupBattle):
+;   - each PC with an id in !Battler_UnkAEFF, and each enemy entry below
+;     !Battle_EnemyCount with an id in !Battler_UnkAF0A: its stat block's
+;     .Unk38 is capped at 16; v = !BattleRom_UnkCC2E31[(!Menu_Config bits
+;     0-2) * 16 + .Unk38 - 1]; !Battle_ListReload of list 12 and
+;     !Battler_UnkAFAB = 105 - .Unk38 * 6 + v (8-bit). A PC's list-12 flag
+;     (!Battle_ListFlags) is set to 1; an enemy's only when its
+;     !Battler_UnkAEFF entry is not empty. An enemy whose block .Unk0A
+;     bit 0 is set gets !Battle_UnkAF15 bit 6 (!Battle_AF15NotCounted).
+;   - then the lowest non-zero !Battler_UnkAFAB of a present slot (slot
+;     0 counts whatever it holds, see below) less 1 is taken off every
+;     present non-zero !Battler_UnkAFAB, so the first battler due has 1;
+;   - !Pc_AtbCur and !Pc_AtbMax of the 3 PCs = their !Battler_UnkAFAB.
+; The 8-bit STA of .Unk38 to !Battle_MathA leaves its high byte 0 from
+; the multiply before (Battle_Mul16 keeps MathA).
+; So .Unk38 probably is the speed stat and !Menu_Config bits 0-2 the
+; battle speed setting (a larger .Unk38 gives a smaller first value); not
+; traced further.
+; Quirk: the search for the lowest value starts from slot 0's without
+; checking that slot 0 is present or non-zero; an absent PC 0 holds $FF
+; there (Battle_SetupBattle), which does not change the result.
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FD06).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0; A = !Battler_UnkAFAB+2; X = 11; Y = the slot with the
+;        lowest value; DP $00 = that value - 1, $02 = !Battle_EnemyCount
+;        (at least 1: the enemy loop runs once before its test), $04
+;        written;
+;        !Battle_MathA..MathHi as Battle_Mul16 leaves them
+; Callee: Battle_Mul16Long
+!BattleFDAtb_Add   = !BattleTmp_00      ; 1 B: the table value v; then the amount taken off
+!BattleFDAtb_Slot  = !BattleTmp_02      ; 2 B: PC slot, then enemy entry
+!BattleFDAtb_Block = !BattleTmp_04      ; 2 B: its stat block
+org $FDB7EB
+BattleFD_UnkB7EB:
+    TDC
+    TAX
+    STX.b !BattleFDAtb_Slot
+.pc:
+    LDX.b !BattleFDAtb_Slot
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .pc_next
+    REP #$20
+    TXA
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcStatBlock,X
+    TAX
+    STX.b !BattleFDAtb_Block
+    TDC
+    SEP #$20
+    LDA.w PcStatBlk.Unk38,X
+    CMP.b #!Battle_StatCap16
+    BCC .pc_capped
+    LDA.b #!Battle_StatCap16
+    STA.w PcStatBlk.Unk38,X
+.pc_capped:
+    TDC
+    LDA.w !Menu_Config
+    AND.b #!Battle_ConfigSpeedMask
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_AtbTableRow
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDX.b !BattleFDAtb_Block
+    LDA.w PcStatBlk.Unk38,X
+    DEC A
+    CLC
+    ADC.b !Battle_MathLo
+    TAX
+    LDA.l !BattleRom_UnkCC2E31,X
+    STA.b !BattleFDAtb_Add
+    LDX.b !BattleFDAtb_Block
+    LDA.w PcStatBlk.Unk38,X
+    TAX
+    STA.b !Battle_MathA
+    LDA.b #!Battle_AtbStepPerUnk38
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDA.b #!Battle_AtbBase
+    SEC
+    SBC.b !Battle_MathLo
+    CLC
+    ADC.b !BattleFDAtb_Add
+    LDX.b !BattleFDAtb_Slot
+    STA.w !Battle_ListReload+(!Battle_NumSlots*!Battle_TurnList),X
+    STA.w !Battler_UnkAFAB,X
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*!Battle_TurnList),X
+.pc_next:
+    INC.b !BattleFDAtb_Slot
+    LDA.b !BattleFDAtb_Slot
+    CMP.b #!Battle_NumPcSlots
+    BCC .pc
+    TDC
+    TAX
+    STX.b !BattleFDAtb_Slot
+.enemy:
+    LDX.b !BattleFDAtb_Slot
+    LDA.w !Battler_UnkAF0A+!Battle_FirstEnemySlot,X
+    CMP.b #!Battle_EntryNone
+    BEQ .enemy_next
+    REP #$20
+    TXA
+    ASL A
+    TAX
+    LDA.l !BattleRom_PcStatBlock+(!Battle_FirstEnemySlot*2),X
+    TAX
+    STX.b !BattleFDAtb_Block
+    TDC
+    SEP #$20
+    LDA.w PcStatBlk.Unk38,X
+    CMP.b #!Battle_StatCap16
+    BCC .enemy_capped
+    LDA.b #!Battle_StatCap16
+    STA.w PcStatBlk.Unk38,X
+.enemy_capped:
+    TDC
+    LDA.w !Menu_Config
+    AND.b #!Battle_ConfigSpeedMask
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_AtbTableRow
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDX.b !BattleFDAtb_Block
+    LDA.w PcStatBlk.Unk38,X
+    DEC A
+    CLC
+    ADC.b !Battle_MathLo
+    TAX
+    LDA.l !BattleRom_UnkCC2E31,X
+    STA.b !BattleFDAtb_Add
+    LDX.b !BattleFDAtb_Block
+    LDA.w PcStatBlk.Unk0A,X
+    BIT.b #!Battle_Unk0ANotCountedBit
+    BEQ .counted
+    LDY.b !BattleFDAtb_Slot
+    LDA.w !Battle_UnkAF15,Y
+    ORA.b #!Battle_AF15NotCounted
+    STA.w !Battle_UnkAF15,Y
+.counted:
+    TDC
+    LDA.w PcStatBlk.Unk38,X
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_AtbStepPerUnk38
+    TAX
+    STX.b !Battle_MathB
+    JSL Battle_Mul16Long
+    LDA.b #!Battle_AtbBase
+    SEC
+    SBC.b !Battle_MathLo
+    CLC
+    ADC.b !BattleFDAtb_Add
+    LDX.b !BattleFDAtb_Slot
+    STA.w !Battle_ListReload+(!Battle_NumSlots*!Battle_TurnList)+!Battle_FirstEnemySlot,X
+    STA.w !Battler_UnkAFAB+!Battle_FirstEnemySlot,X
+    LDA.w !Battler_UnkAEFF+!Battle_FirstEnemySlot,X
+    CMP.b #!Battle_EntryNone
+    BEQ .enemy_next
+    LDA.b #1
+    STA.w !Battle_ListFlags+(!Battle_NumSlots*!Battle_TurnList)+!Battle_FirstEnemySlot,X
+.enemy_next:
+    INC.b !BattleFDAtb_Slot
+    LDA.b !BattleFDAtb_Slot
+    CMP.w !Battle_EnemyCount
+    BCS .lowest
+    JMP .enemy
+.lowest:
+    TDC
+    TAX
+    TAY
+    STX.b !BattleFDAtb_Add
+    LDA.w !Battler_UnkAFAB
+.lowest_slot:
+    INX
+    CMP.w !Battler_UnkAFAB,X
+    BCC .lowest_next
+    LDA.w !Battler_UnkAFAB,X
+    BEQ .lowest_keep
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .lowest_keep
+    TXY
+.lowest_keep:
+    LDA.w !Battler_UnkAFAB,Y
+.lowest_next:
+    CPX.w #!Battle_NumSlots-1
+    BCC .lowest_slot
+    LDA.w !Battler_UnkAFAB,Y
+    DEC A
+    STA.b !BattleFDAtb_Add
+    TDC
+    TAX
+.shift:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .shift_next
+    LDA.w !Battler_UnkAFAB,X
+    BEQ .shift_next
+    SEC
+    SBC.b !BattleFDAtb_Add
+    STA.w !Battler_UnkAFAB,X
+.shift_next:
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .shift
+    LDA.w !Battler_UnkAFAB
+    STA.w !Pc_AtbCur
+    STA.w !Pc_AtbMax
+    LDA.w !Battler_UnkAFAB+1
+    STA.w !Pc_AtbCur+1
+    STA.w !Pc_AtbMax+1
+    LDA.w !Battler_UnkAFAB+2
+    STA.w !Pc_AtbCur+2
+    STA.w !Pc_AtbMax+2
+    RTL
+
+; ============================================================
 ; $FD:BA61 — RandomTableFD (256 bytes, $FD:BA61–$BB60)
 ; A byte-identical copy of RandomTable ($C0:FE00): the same shuffle of
 ; 0-255. Read with LDA.l $FDBA61,X by battle code in bank $C1: at
-; $C1:AF56/AF60 and $C1:AFAE/AFB8 (unmatched), two copies of a roll that
-; take X from a counter (dp $26 in the first, $B3E6 in the second). When
-; the range is $FF they use the entry as is (the reads at $AF56/$AFAE) and
-; leave the counter alone; otherwise they step the counter and reduce the
-; entry with the shift-and-subtract divide at $C1:C92A, using the
-; remainder plus dp $25 (entry mod range, plus a base). What the rolls
-; are for is not traced. The 6 bytes after the table
+; $C1:AF56/AF60 in Battle_RandRange and at $C1:AFAE/AFB8 (unmatched), two
+; copies of a roll that take X from a counter (!Battle_RandIdx in the
+; first, !Battle_UnkB3E6 in the second). When the range is $FF they use
+; the entry as is (the reads at $AF56/$AFAE) and leave the counter alone;
+; otherwise they step the counter and reduce the entry with Battle_Div32,
+; using the remainder plus !Battle_RandMin (entry mod range, plus the low
+; bound). What the second copy's rolls are for is not traced. The 6 bytes
+; after the table
 ; ($FD:BB61–$BB66) repeat its last 6 entries; nothing reads them that
 ; xref finds, and they are left unmatched.
 ; ============================================================

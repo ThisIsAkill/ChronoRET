@@ -23676,9 +23676,10 @@ Battle_CalcUnk56:
 ; $C1:FDBF — Battle_Mul16Long (4 bytes, $FDBF–$FDC2)
 ; JSL form of Battle_Mul16.
 ; Callers (17 JSL sites): BattleFD_LoadUnkB18E ($FD:AADD), BattleFD_LoadUnkB18E2 ($FD:AB0C),
-;   BattleFD_AddEnemyRewards ($FD:ABC1), BattleFD_UnkAE52 ($FD:AE77), BattleFD_UnkAEF2 ($FD:AF22)
-;   and unmatched ($FD:AF98, $FD:B03F, $FD:B061, $FD:B082, $FD:B0A3, $FD:B0C4, $FD:B66C, $FD:B68C,
-;   $FD:B821, $FD:B842, $FD:B899, $FD:B8CC).
+;   BattleFD_AddEnemyRewards ($FD:ABC1), BattleFD_UnkAE52 ($FD:AE77), BattleFD_UnkAEF2 ($FD:AF22),
+;   BattleFD_AddItemEntry ($FD:AF98), BattleFD_ItemRecOffset ($FD:B03F, $FD:B061, $FD:B082,
+;   $FD:B0A3, $FD:B0C4), BattleFD_UnkB655 ($FD:B66C, $FD:B68C) and BattleFD_UnkB7EB ($FD:B821,
+;   $FD:B842, $FD:B899, $FD:B8CC).
 ; Entry: as Battle_Mul16: M any, X=0, DP=0, DB any
 ; Exit:  as Battle_Mul16: M=1, X=0; A = 0, X = 0; !Battle_MathLo/Hi = the
 ;        product
@@ -23689,7 +23690,7 @@ Battle_Mul16Long:
 
 ; $C1:FDC3 — BankC1_AddItemLong (4 bytes, $FDC3–$FDC6)
 ; JSL form of BankC1_AddItem (not analysed: add one of item Y).
-; Callers (1 JSL site): unmatched ($FD:B72A).
+; Callers (1 JSL site): BattleFD_UnkB655 ($FD:B72A).
 ; Entry: as BankC1_AddItem; M=1, X=0, DP=0, DB=$7E at its one caller
 ;        (BattleFD_UnkB655), Y = item id
 ; Exit:  as BankC1_AddItem (not analysed)
