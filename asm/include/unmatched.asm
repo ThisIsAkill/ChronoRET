@@ -52,12 +52,6 @@ org $C009DD
 LocLoad_Unk09DD:    ; location-load step; reads byte 1 of the location record, table $F6:2100
 org $C00A14
 LocLoad_Unk0A14:    ; location-load step; skipped when dp $BB != 0; table $F6:21C0
-org $C01CFC
-Field_FindObjInFront: ; A = leader facing x 2: finds an object within reach in that direction
-                    ; (per-facing tests at $C0:1D56) and stores it in Field_UnkEB; C=1 found
-org $C01DF4
-Field_CheckTileInFront: ; unless Field_Unk29 is set, checks the map tile in front of the leader
-                    ; (per-facing tests at $C0:1E92, $7E:70C0 map) and may start Field_Unk29 = 1
 org $C01B53
 LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
@@ -81,11 +75,6 @@ Vblank_ReadScanlineCounters: ; Field_EndOfFrame step; latches and reads OPVCT vi
 org $C05F6E
 Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_OpcodeTable's end);
                     ; LDX #$1639, BRL LoadSavePath. Also Field_EventHookTable entries 15-16
-org $C075A0
-Map_Unk75A0:        ; run by Field_ServiceUnk54 for Field_Unk54 bits 2-3 (also JSR at $C0:3E96)
-org $C05AC5
-Evt_StartTargetFunc1: ; X/Y 8-bit: saves Field_UnkEB's script position and points it at its
-                    ; function 1 (Evt_Data offset +2), when the object allows it
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
@@ -109,18 +98,12 @@ org $C07F7E
 LocLoad_ClearPage1D00: ; ClearRAMDMA of $7E:1D00-$1DFF
 org $C087F1
 Field_Unk87F1:      ; DP=$1D00 finalizer after the $C800 builders (DefaultHandler)
-org $C08902
-Field_DpadHandlerTable: ; 16 words: Field_DpadDispatch's handlers by Pad_Unk00F9 bits 0-3
 org $C08A6D
 Map_Unk8A6D:        ; Field_FrameUpdate, X/Y 8-bit, when Field_Unk20 is set (DP=$1D00)
-org $C09175
-Map_Unk9175:        ; Field_FrameUpdate step (DP=$1D00)
 org $C091AC
 Map_Unk91AC:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
 org $C093E1
 Map_Unk93E1:        ; Field_FrameUpdate / Field_Unk885A step (DP=$1D00)
-org $C099DE
-Map_Unk99DE:        ; Field_FrameUpdate step (DP=$1D00)
 org $C0A33B
 LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810
@@ -132,6 +115,10 @@ Field_UnkAF4E:      ; acts on dp $44 bits 0/1 with $F0 = $3000/$3040 ...
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
+org $C18003
+BankC1_Entry8003:   ; JSL vector (JMP $CFC2): saves P/X/DP/DB, DB=$7E, DP=0, runs service A (table
+                    ; $C1:D126, 6 entries) with argument Y; 1 = add item Y ($C1:D005), 4 = add Y gold
+                    ; ($C1:D0A2); returns a result in A
 org $C20000
 BankC2_Entry0000:   ; JML target for game mode >= $01F0 (GameLoop_Main)
 org $C28000

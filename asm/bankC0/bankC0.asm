@@ -5720,6 +5720,481 @@ Field_SceneChangeTick:
     BRL DefaultHandler
 
 ; ============================================================
+; Action button: what is in front of the leader ($C0:1CFC–$C0:1F23)
+; Field_ActionButton calls Field_FindObjInFront, then always ends in
+; Field_CheckTileInFront. Both pick a per-facing handler from
+; Obj_Facing x 2 (0 up, 1 down, 2 left, 3 right: inferred from which
+; sign of the Y / X difference each handler accepts, and from the map
+; row / column it steps to; EOR 1 turns a facing around, which fits).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:1CFC — Field_FindObjInFront (90 bytes, $1CFC–$1D55)
+; Looks for an object the leader can act on in the facing direction.
+; Saves the leader's Obj_PosX/Y in Field_FindLeaderX/Y, then walks the
+; object slots from Evt_ObjCount x 2 down to 2 (slot 0 is never tested)
+; and skips a slot whose Obj_Unk0F00 is 0, whose Obj_Unk1100 has bit 7
+; set, or that is the leader itself (unless its Obj_Unk1100 is
+; Obj_Unk1100Seven: that path skips the leader test; the two calls are
+; otherwise the same code twice). The rest are put in Field_UnkEB and
+; tested by the Field_ObjInReachTable handler for the facing; the first
+; one in reach wins (highest slot first).
+; Quirk: the handlers subtract with SBC and no SEC, so the carry left
+; here by the CMP / CPX before the call shifts the first difference by
+; one (kept from the original).
+; Callers: Field_ActionButton ($C0:1AD0), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; A =
+; Obj_Facing x 2 (only bits 1-2 used; B is masked off).
+; Exit: M=1, X=0, DP and DB unchanged. C=1: found, X = Field_UnkEB =
+; the object's slot. C=0: none, X = 0 and Field_UnkEB = $80
+; (Field_UnkEBInit). A clobbered; Field_FindFacing2 ($DB/$DC) and
+; Field_FindLeaderX/Y ($C3-$C6) overwritten, and the 16-bit store to
+; Field_UnkEB also zeroes $01EC.
+; ------------------------------------------------------------
+org $C01CFC
+Field_FindObjInFront:
+    REP #$20
+    AND.w #!Obj_FacingX2Mask
+    STA.b !Field_FindFacing2
+    LDA.w #!Field_UnkEBInit
+    STA.b !Field_UnkEB          ; 16-bit: $EC = 0 as well
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_PosX,X
+    STA.b !Field_FindLeaderX
+    LDA.w !Obj_PosY,X
+    STA.b !Field_FindLeaderY
+    SEP #$30
+    LDA.l !Evt_ObjCount
+    ASL A
+    TAX                         ; last slot (count x 2), 8-bit X
+.next_slot:
+    LDA.w !Obj_Unk0F00,X
+    BNE .candidate
+.skip:
+    DEX
+    DEX
+    BNE .next_slot
+    LDA.b #!Field_UnkEBInit
+    STA.b !Field_UnkEB          ; nothing in reach
+    REP #$10
+    CLC
+    RTS
+.candidate:
+    LDA.w !Obj_Unk1100,X
+    BMI .skip
+    CMP.b #!Obj_Unk1100Seven
+    BEQ .test_any               ; leader test skipped (C=1 from the CMP)
+    CPX.b !Party_ObjSlot
+    BEQ .skip                   ; not the leader itself
+    STX.b !Field_UnkEB
+    LDX.b !Field_FindFacing2
+    JSR (Field_ObjInReachTable,X)
+    LDX.b !Field_UnkEB
+    BCC .skip
+    REP #$10
+    RTS
+.test_any:
+    STX.b !Field_UnkEB
+    LDX.b !Field_FindFacing2
+    JSR (Field_ObjInReachTable,X)
+    LDX.b !Field_UnkEB
+    BCC .skip
+    REP #$10
+    RTS
+
+; Field_ObjInReachTable: Field_FindObjInFront's reach test for each
+; facing, indexed by Obj_Facing x 2.
+Field_ObjInReachTable:
+    dw Field_ObjInReachUp       ; 0
+    dw Field_ObjInReachDown     ; 1
+    dw Field_ObjInReachLeft     ; 2
+    dw Field_ObjInReachRight    ; 3
+
+; ------------------------------------------------------------
+; $C0:1D5E — Field_ObjInReachUp (38 bytes, $1D5E–$1D83)
+; Facing 0: the object in Field_UnkEB is in reach when it is above the
+; leader (Obj_PosY - Field_FindLeaderY negative) by less than
+; Field_ReachAhead and off the leader's column by less than
+; Field_ReachSide. The distances are ones' complements (EOR with
+; Eng_Invert16, no INC) and the SBCs have no SEC, so each bound is off
+; by a unit or two; the first SBC uses the carry the caller left, the
+; second the C=0 of the passed CMP.
+; Reached only through Field_ObjInReachTable (entry 0).
+; On entry: M=1, X=1 (8-bit X/Y), DP=$0100, DB=$00; Field_UnkEB = the
+; object's slot; Field_FindLeaderX/Y set; C as the caller left it.
+; Exit: M=1, X=1, DP and DB unchanged; C=1 in reach, C=0 not;
+; X = Field_UnkEB; A clobbered.
+; ------------------------------------------------------------
+Field_ObjInReachUp:
+    REP #$20
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_PosY,X
+    SBC.b !Field_FindLeaderY    ; no SEC (quirk, see above)
+    BPL Field_ObjInReach_No     ; not above the leader
+    EOR.w #!Eng_Invert16
+    CMP.w #!Field_ReachAhead
+    BCS Field_ObjInReach_No
+    LDA.w !Obj_PosX,X
+    SBC.b !Field_FindLeaderX    ; C=0 here: one more off
+    BPL .dx_abs
+    EOR.w #!Eng_Invert16
+.dx_abs:
+    CMP.w #!Field_ReachSide
+    BCS Field_ObjInReach_No
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1D84 — Field_ObjInReachDown (39 bytes, $1D84–$1DAA)
+; Facing 1: as Field_ObjInReachUp for an object below the leader
+; (Obj_PosY - Field_FindLeaderY not negative). Its tail
+; Field_ObjInReach_No ($C0:1DA7, SEP #$20 / CLC / RTS) is the shared
+; "not in reach" exit of all four handlers.
+; Reached only through Field_ObjInReachTable (entry 1).
+; On entry: M=1, X=1 (8-bit X/Y), DP=$0100, DB=$00; Field_UnkEB = the
+; object's slot; Field_FindLeaderX/Y set; C as the caller left it.
+; Exit: M=1, X=1, DP and DB unchanged; C=1 in reach, C=0 not;
+; X = Field_UnkEB; A clobbered.
+; ------------------------------------------------------------
+Field_ObjInReachDown:
+    REP #$20
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_PosY,X
+    SBC.b !Field_FindLeaderY
+    BMI Field_ObjInReach_No     ; not below the leader
+    CMP.w #!Field_ReachAhead
+    BCS Field_ObjInReach_No
+    LDA.w !Obj_PosX,X
+    SBC.b !Field_FindLeaderX
+    BPL .dx_abs
+    EOR.w #!Eng_Invert16
+.dx_abs:
+    CMP.w #!Field_ReachSide
+    BCS Field_ObjInReach_No
+    SEP #$20
+    SEC
+    RTS
+Field_ObjInReach_No:            ; header: see Field_ObjInReachDown
+    SEP #$20
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1DAB — Field_ObjInReachLeft (38 bytes, $1DAB–$1DD0)
+; Facing 2: as Field_ObjInReachUp with X and Y swapped: in reach when
+; the object is left of the leader (Obj_PosX - Field_FindLeaderX
+; negative) by less than Field_ReachAhead and off its row by less than
+; Field_ReachSide.
+; Reached only through Field_ObjInReachTable (entry 2).
+; On entry: M=1, X=1 (8-bit X/Y), DP=$0100, DB=$00; Field_UnkEB = the
+; object's slot; Field_FindLeaderX/Y set; C as the caller left it.
+; Exit: M=1, X=1, DP and DB unchanged; C=1 in reach, C=0 not;
+; X = Field_UnkEB; A clobbered.
+; ------------------------------------------------------------
+Field_ObjInReachLeft:
+    REP #$20
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_PosX,X
+    SBC.b !Field_FindLeaderX
+    BPL Field_ObjInReach_No     ; not left of the leader
+    EOR.w #!Eng_Invert16
+    CMP.w #!Field_ReachAhead
+    BCS Field_ObjInReach_No
+    LDA.w !Obj_PosY,X
+    SBC.b !Field_FindLeaderY
+    BPL .dy_abs
+    EOR.w #!Eng_Invert16
+.dy_abs:
+    CMP.w #!Field_ReachSide
+    BCS Field_ObjInReach_No
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1DD1 — Field_ObjInReachRight (35 bytes, $1DD1–$1DF3)
+; Facing 3: as Field_ObjInReachLeft for an object right of the leader
+; (Obj_PosX - Field_FindLeaderX not negative).
+; Reached only through Field_ObjInReachTable (entry 3).
+; On entry: M=1, X=1 (8-bit X/Y), DP=$0100, DB=$00; Field_UnkEB = the
+; object's slot; Field_FindLeaderX/Y set; C as the caller left it.
+; Exit: M=1, X=1, DP and DB unchanged; C=1 in reach, C=0 not;
+; X = Field_UnkEB; A clobbered.
+; ------------------------------------------------------------
+Field_ObjInReachRight:
+    REP #$20
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_PosX,X
+    SBC.b !Field_FindLeaderX
+    BMI Field_ObjInReach_No     ; not right of the leader
+    CMP.w #!Field_ReachAhead
+    BCS Field_ObjInReach_No
+    LDA.w !Obj_PosY,X
+    SBC.b !Field_FindLeaderY
+    BPL .dy_abs
+    EOR.w #!Eng_Invert16
+.dy_abs:
+    CMP.w #!Field_ReachSide
+    BCS Field_ObjInReach_No
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1DF4 — Field_CheckTileInFront (158 bytes, $1DF4–$1E91; tail
+; Field_CheckTileInFront_Start $1F0E–$1F23)
+; The action button's map check: treasure on the tile in front of the
+; leader. Does nothing while Field_Unk29 is set (its sequence is still
+; running). The Field_TileInFrontTable handler for the leader's facing
+; puts the map index of the tile in front in Field_FrontTile and
+; returns C=1 when Map_TreasureIdx has bit 7 clear there. Then record
+; (value & $7F) of the location, at TreasureRom +
+; Map_TreasureLocRecs + n*4, must name that same tile (else nothing
+; happens). Its number (record offset - Map_TreasureRec0) / 4 picks a
+; Treasure_Flags bit:
+; - already set: Field_Unk2A = TreasureKind_Opened;
+; - else the bit is set, the tile is stepped (Field_TileStepX/Y =
+;   Field_FrontTile, SceneFlag_TileStep for DefaultHandler) and the
+;   contents given: gold (bit 15: amount bits 0-14 x 2, into
+;   Treasure_Gold, BankC1_Entry8003 service 4, TreasureKind_Gold) or an
+;   item (bits 0-8, into Treasure_ItemId, service 1,
+;   TreasureKind_Item). With Treasure_Empty (bit 14) set it returns
+;   right after stepping the tile: nothing given, no sequence started.
+; Field_CheckTileInFront_Start then stores the kind in Field_Unk2A, the
+; leader's slot in Field_Unk2E, zeroes Field_Unk32, Field_Unk30 and
+; Field_Unk02A1, sets Field_Unk29 = Field_Unk29Start and
+; Field54_WatchBox in Field_Unk54 (presumably the "got it" message,
+; and the step undone if the leader walks out of the box; neither is
+; traced). Field_CheckTileInFront_Start is reached by the BRLs at
+; $C0:1E78, $C0:1E8A and $C0:1E8F above.
+; Callers: Field_ActionButton ($C0:1ADC, BRL), its only call site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A, X clobbered; Y = the item id
+; or amount when something was given, and whatever BankC1_Entry8003
+; leaves (it saves P, X, DP, DB); Field_FrontTile, Field_TreasureRec
+; and Eng_Scratch overwritten.
+; ------------------------------------------------------------
+Field_CheckTileInFront:
+    LDA.b !Field_Unk29
+    BNE .done
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    ASL A
+    REP #$20
+    AND.w #!Obj_FacingX2Mask
+    TAX
+    JSR (Field_TileInFrontTable,X)
+    BCS .treasure_tile
+.done:
+    SEP #$20
+    RTS
+.treasure_tile:
+    REP #$20
+    AND.w #!Map_TreasureIdxMask
+    ASL A
+    ASL A                       ; record n x 4
+    CLC
+    ADC.w !Map_TreasureLocRecs
+    TAX
+    LDA.l TreasureRom.Tile,X
+    CMP.b !Field_FrontTile
+    BNE .done                   ; record is for another tile
+    STX.b !Field_TreasureRec
+    TXA
+    SEC
+    SBC.w !Map_TreasureRec0
+    LSR A
+    LSR A
+    STA.b !Eng_Scratch          ; treasure number
+    LSR A
+    LSR A
+    LSR A
+    AND.w #!Treasure_FlagByteMask
+    TAX                         ; flag byte
+    SEP #$20
+    LDA.b !Eng_Scratch
+    AND.b #!Treasure_FlagBitMask
+    TAY
+    LDA.w BitSet,Y
+    STA.b !Eng_Scratch          ; flag bit
+    LDA.l !Treasure_Flags,X
+    BIT.b !Eng_Scratch
+    BNE .already_opened
+    ORA.b !Eng_Scratch
+    STA.l !Treasure_Flags,X
+    LDA.b #!SceneFlag_TileStep
+    TSB.b !Field_SceneFlags
+    LDX.b !Field_FrontTile
+    STX.b !Field_TileStepX      ; column and row
+    LDX.b !Field_TreasureRec
+    REP #$20
+    LDA.l TreasureRom.Contents,X
+    BMI .gold
+    BIT.w #!Treasure_Empty
+    BEQ .item
+    SEP #$20
+    RTS
+.item:
+    AND.w #!Treasure_ItemMask
+    STA.l !Treasure_ItemId
+    TAY
+    SEP #$20
+    LDA.b #!BankC1Svc_AddItem
+    JSL BankC1_Entry8003
+    LDA.b #!TreasureKind_Item
+    BRL Field_CheckTileInFront_Start
+.gold:
+    ASL A                       ; bits 0-14 x 2
+    STA.w !Treasure_Gold
+    TAY
+    SEP #$20
+    LDA.b #!BankC1Svc_AddGold
+    JSL BankC1_Entry8003
+    LDA.b #!TreasureKind_Gold
+    BRL Field_CheckTileInFront_Start
+.already_opened:
+    LDA.b #!TreasureKind_Opened
+    BRL Field_CheckTileInFront_Start
+
+; Field_TileInFrontTable: Field_CheckTileInFront's tile pick for each
+; facing, indexed by Obj_Facing x 2.
+Field_TileInFrontTable:
+    dw Field_TileInFrontUp      ; 0
+    dw Field_TileInFrontDown    ; 1
+    dw Field_TileInFrontLeft    ; 2
+    dw Field_TileInFrontRight   ; 3
+
+; ------------------------------------------------------------
+; $C0:1E9A — Field_TileInFrontUp (45 bytes, $1E9A–$1EC6)
+; Facing 0: the tile one row above the leader (Obj_TileY - 1). If its
+; Map_TreasureIdx byte has bit 7 set (no treasure) it tries the tile
+; two rows up instead; only this direction looks a second tile ahead.
+; Reached only through Field_TileInFrontTable (entry 0). xref also
+; confirms a JSL at $C9:DC13 (unmatched bank $C9); that is data that
+; decodes as JSL, not a call: this routine ends in RTS, and the bytes
+; around it ($9A $01 $FD $15 $2D ...) don't read as code.
+; On entry: M=0 (set to 1 at once), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: A = the Map_TreasureIdx
+; byte (bit 7 clear), B = its row, Field_FrontTile = its index;
+; C=0: no treasure there. X clobbered.
+; ------------------------------------------------------------
+Field_TileInFrontUp:
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_TileY,X
+    DEC A
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX                         ; row << 8 | column
+    STX.b !Field_FrontTile
+    LDA.l !Map_TreasureIdx,X
+    BMI .two_up
+    SEC
+    RTS
+.two_up:
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_TileY,X
+    DEC A
+    DEC A
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    STX.b !Field_FrontTile
+    LDA.l !Map_TreasureIdx,X
+    BMI Field_TileInFront_No
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1EC7 — Field_TileInFrontDown (25 bytes, $1EC7–$1EDF)
+; Facing 1: the tile one row below the leader. Its tail
+; Field_TileInFront_No ($C0:1EDE, CLC / RTS) is the shared "no
+; treasure" exit of all four handlers.
+; Reached only through Field_TileInFrontTable (entry 1).
+; On entry: M=0 (set to 1 at once), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: A = the Map_TreasureIdx
+; byte (bit 7 clear), B = its row, Field_FrontTile = its index;
+; C=0: no treasure there. X clobbered.
+; ------------------------------------------------------------
+Field_TileInFrontDown:
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_TileY,X
+    INC A
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    STX.b !Field_FrontTile
+    LDA.l !Map_TreasureIdx,X
+    BMI Field_TileInFront_No
+    SEC
+    RTS
+Field_TileInFront_No:           ; header: see Field_TileInFrontDown
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1EE0 — Field_TileInFrontLeft (23 bytes, $1EE0–$1EF6)
+; Facing 2: the tile one column left of the leader.
+; Reached only through Field_TileInFrontTable (entry 2).
+; On entry: M=0 (set to 1 at once), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: A = the Map_TreasureIdx
+; byte (bit 7 clear), B = its row, Field_FrontTile = its index;
+; C=0: no treasure there. X clobbered.
+; ------------------------------------------------------------
+Field_TileInFrontLeft:
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    DEC A
+    TAX
+    STX.b !Field_FrontTile
+    LDA.l !Map_TreasureIdx,X
+    BMI Field_TileInFront_No
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:1EF7 — Field_TileInFrontRight (23 bytes, $1EF7–$1F0D)
+; Facing 3: the tile one column right of the leader.
+; Reached only through Field_TileInFrontTable (entry 3).
+; On entry: M=0 (set to 1 at once), X=0 (16-bit X/Y), DP=$0100, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: A = the Map_TreasureIdx
+; byte (bit 7 clear), B = its row, Field_FrontTile = its index;
+; C=0: no treasure there. X clobbered.
+; ------------------------------------------------------------
+Field_TileInFrontRight:
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    INC A
+    TAX
+    STX.b !Field_FrontTile
+    LDA.l !Map_TreasureIdx,X
+    BMI Field_TileInFront_No
+    SEC
+    RTS
+
+; Field_CheckTileInFront's tail: A = the TreasureKind_* value.
+Field_CheckTileInFront_Start:   ; header: see Field_CheckTileInFront
+    STA.b !Field_Unk2A
+    LDA.b !Party_ObjSlot
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    STZ.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TSB.b !Field_Unk54
+    STZ.w !Field_Unk02A1
+    RTS
+
+; ============================================================
 ; $C0:1F24 — Fade_StepBrightness (54 bytes, $1F24–$1F59)
 ; (was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit
 ; toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and
@@ -5970,6 +6445,53 @@ Sys_HaltWithColor:
 .forever:
     BRA .forever
 
+; ============================================================
+; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
+; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
+; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN
+; copies the 32 zero bytes at GfxRom_D2 to its start, and each later
+; MVN copies the zeroed part onto the bytes right after it (an
+; overlapping forward copy with X restarting at the buffer start), so
+; the cleared size doubles from 64 up to 2,048 bytes.
+; Callers: Field_ServiceUnk54 ($C0:2787) and unmatched code at
+; $C0:3E96.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB any (saved); DP not
+; used.
+; Exit: M=1, X=0, DB unchanged (PHB/PLB around the MVNs, which set it
+; to $7E); A = $FFFF (the last MVN's count ran out; B = $FF), X =
+; $CC00, Y = $D000.
+; ============================================================
+org $C075A0
+Map_ClearBufC800:
+    REP #$20
+    PHB
+    LDX.w #!GfxRom_D2&$FFFF
+    LDY.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk-1
+    MVN !Bank7E,!BankD2         ; 32 zeros -> $7E:C800  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk-1
+    MVN !Bank7E,!Bank7E         ; $C800-$C81F -> $C820 (64 zeroed)  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk*2-1
+    MVN !Bank7E,!Bank7E         ; 128 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk*4-1
+    MVN !Bank7E,!Bank7E         ; 256 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk*8-1
+    MVN !Bank7E,!Bank7E         ; 512 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk*16-1
+    MVN !Bank7E,!Bank7E         ; 1,024 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Map_BufC800&$FFFF
+    LDA.w #!Map_ZeroChunk*32-1
+    MVN !Bank7E,!Bank7E         ; 2,048 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; ============================================================
 ; Field frame update and its first helpers ($C0:881E–$C0:8901)
 ; These run with DP = !DP_Map ($1D00): a dp operand is written as
 ; !Map_Name-!DP_Map, and field-page variables are reached absolute
@@ -6154,7 +6676,8 @@ Map_ResetUnk1D2E:
 ; Unless Field_Unk38 is busy, runs the Field_DpadHandlerTable entry
 ; picked by Pad_Unk00F9 bits 0-3 (16 entries; the D-pad bits, if
 ; Pad_Unk00F9 is laid out like Pad_Pressed's high byte), with 8-bit
-; X/Y. The handlers are not matched yet.
+; X/Y. The handlers (Field_DpadNone ... Field_DpadUpLeft) set the
+; frame's D-pad step in Map_Unk1D2C/1D2D and add it to Map_Unk1D2E/1D30.
 ; Callers: Field_FrameUpdate ($C0:883D), its only JSR site.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
 ; Exit: M=1, X=0, DP unchanged; A and X clobbered, plus what the
@@ -6171,6 +6694,574 @@ Field_DpadDispatch:
     JSR (Field_DpadHandlerTable,X)
     REP #$10
 .done:
+    RTS
+
+; Field_DpadHandlerTable: Field_DpadDispatch's handler for each value of
+; Pad_Unk00F9 bits 0-3, read as Right (bit 0), Left (1), Down (2) and
+; Up (3) from what the handlers do; impossible pairs (Left+Right,
+; Up+Down) and three or more bits go to Field_DpadNone. A 17th word
+; follows that the 4-bit index can never reach.
+Field_DpadHandlerTable:
+    dw Field_DpadNone           ; 0: nothing
+    dw Field_DpadRight          ; 1: Right
+    dw Field_DpadLeft           ; 2: Left
+    dw Field_DpadNone           ; 3: Left+Right
+    dw Field_DpadDown           ; 4: Down
+    dw Field_DpadDownRight      ; 5: Down+Right
+    dw Field_DpadDownLeft       ; 6: Down+Left
+    dw Field_DpadNone           ; 7
+    dw Field_DpadUp             ; 8: Up
+    dw Field_DpadUpRight        ; 9: Up+Right
+    dw Field_DpadUpLeft         ; 10: Up+Left
+    dw Field_DpadNone           ; 11
+    dw Field_DpadNone           ; 12: Up+Down
+    dw Field_DpadNone           ; 13
+    dw Field_DpadNone           ; 14
+    dw Field_DpadNone           ; 15
+    dw Field_DpadNone           ; 16: unreachable (index <= 15)
+
+; ------------------------------------------------------------
+; $C0:8924 — Field_DpadNone (1 byte, $8924)
+; No direction (or an impossible combination): leaves Map_Unk1D2C/1D2D
+; at the 0 Field_FrameUpdate set and Map_Unk1D2E/1D30 as they are.
+; The handlers after it set the D-pad step: Map_Unk1D2C (X) and
+; Map_Unk1D2D (Y) get the signed step of this frame, and the same step
+; is added to Map_Unk1D2E / Map_Unk1D30 (which Map_ResetUnk1D2E reset
+; from Map_Unk1D2A/1D2B just before). Reading these as the leader's
+; movement for the frame (right / down positive) is an inference from
+; the pad bits; how the steps are used is not traced yet.
+; Reached only through Field_DpadHandlerTable (entries 0, 3, 7, 11-16).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: everything unchanged.
+; ------------------------------------------------------------
+Field_DpadNone:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8925 — Field_DpadRight (31 bytes, $8925–$8943)
+; Right: Map_Unk1D2C = +$10 and Map_Unk1D2E += $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 1, Right).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadRight:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8944 — Field_DpadLeft (31 bytes, $8944–$8962)
+; Left: Map_Unk1D2C = -$10 and Map_Unk1D2E -= $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 2, Left).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadLeft:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8963 — Field_DpadUp (31 bytes, $8963–$8981)
+; Up: Map_Unk1D2D = -$10 and Map_Unk1D30 -= $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 8, Up).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadUp:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepNeg
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8982 — Field_DpadDown (31 bytes, $8982–$89A0)
+; Down: Map_Unk1D2D = +$10 and Map_Unk1D30 += $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 4, Down).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadDown:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:89A1 — Field_DpadDownRight (49 bytes, $89A1–$89D1)
+; Down+Right: both steps +$10, both sums up by $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 5, Down+Right).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadDownRight:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:89D2 — Field_DpadDownLeft (53 bytes, $89D2–$8A06)
+; Down+Left: X step -$10 (sum down), Y step +$10 (sum up);
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 6, Down+Left).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadDownLeft:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8A07 — Field_DpadUpRight (53 bytes, $8A07–$8A3B)
+; Up+Right: X step +$10 (sum up), Y step -$10 (sum down);
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 9, Up+Right).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadUpRight:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b #!Map_RunStepNeg
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepPos
+    STA.b !Map_Unk1D2C-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    CLC
+    ADC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8A3C — Field_DpadUpLeft (49 bytes, $8A3C–$8A6C)
+; Up+Left: both steps -$10, both sums down by $10;
+; $20 each instead while Pad_Unk00F8 bit 1 (Pad_Unk00F8Bit1) is set.
+; Reached only through Field_DpadHandlerTable (entry 10, Up+Left).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered.
+; ------------------------------------------------------------
+Field_DpadUpLeft:
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ .walk
+    LDA.b #!Map_RunStepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_RunStepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+.walk:
+    LDA.b #!Map_StepNeg
+    STA.b !Map_Unk1D2C-!DP_Map
+    STA.b !Map_Unk1D2D-!DP_Map
+    LDA.b !Map_Unk1D2E-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D2E-!DP_Map
+    LDA.b !Map_Unk1D30-!DP_Map
+    SEC
+    SBC.b #!Map_StepPos
+    STA.b !Map_Unk1D30-!DP_Map
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9175 — Map_Unk9175 (55 bytes, $9175–$91AB)
+; Field_FrameUpdate's step after the D-pad: zeroes Map_Unk1D32/1D33,
+; then copies Map_Unk1D2E (signed X step) into Map_Unk1D32 unless the
+; leader is already at the limit in that direction (Map_LeaderPastColMax
+; for a positive step, Map_LeaderPastColMin for a negative one), and
+; Map_Unk1D30 into Map_Unk1D33 the same way with
+; Map_LeaderPastRowMax / Map_LeaderPastRowMin. A zero step is left out.
+; What 1D32/1D33 drive is not traced (Map_Unk91AC and Map_Unk93E1 run
+; later in the same frame).
+; Callers: Field_FrameUpdate ($C0:884C), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; X = the leader's slot; A
+; clobbered; Eng_Scratch ($01D9) may be overwritten by the tests.
+; ------------------------------------------------------------
+org $C09175
+Map_Unk9175:
+    STZ.b !Map_Unk1D32-!DP_Map
+    STZ.b !Map_Unk1D33-!DP_Map
+    TDC
+    XBA                         ; B = DP's low byte, 0
+    LDA.w !DP_Field+!Party_ObjSlot
+    TAX                         ; X = the leader's slot (16-bit)
+    LDA.b !Map_Unk1D2E-!DP_Map
+    BEQ .y_step
+    BPL .right
+    JSR Map_LeaderPastColMin
+    BCS .y_step
+    BRA .copy_x
+.right:
+    JSR Map_LeaderPastColMax
+    BCS .y_step
+.copy_x:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    STA.b !Map_Unk1D32-!DP_Map
+.y_step:
+    LDA.b !Map_Unk1D30-!DP_Map
+    BEQ .done
+    BPL .down
+    JSR Map_LeaderPastRowMin
+    BCS .done
+    BRA .copy_y
+.down:
+    JSR Map_LeaderPastRowMax
+    BCS .done
+.copy_y:
+    LDA.b !Map_Unk1D30-!DP_Map
+    STA.b !Map_Unk1D33-!DP_Map
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:99DE — Map_Unk99DE (65 bytes, $99DE–$9A1E)
+; Field_FrameUpdate's step after Map_Unk9175: may drop the frame's
+; steps in Map_Unk1D2E (X) and Map_Unk1D30 (Y). For a nonzero step, n =
+; |step| / 16 goes to the Map_StepStop* test for that direction
+; (Right/Left, Down/Up); C=1 zeroes the step. By what the tests compare
+; (Map_TileOriginX/Y / 2 and Map_Unk1D0C/1D10 / 2 against the limits
+; Map_Unk1D1A-1D1D, the leader's Obj_ScreenX/Y against the screen
+; middle) this looks like keeping a camera scroll inside the map and
+; behind the leader; not established.
+; Quirk: after a positive Y step is dropped there is no branch to the
+; end, so it falls into the negative path: A (left by the test) is
+; negated, shifted and passed to Map_StepStopUp, which may only zero
+; Map_Unk1D30 again. The X half has the BRA. Kept from the original.
+; Callers: Field_FrameUpdate ($C0:884F), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Map_StepTestN
+; and Map_StepTestN2 overwritten.
+; ------------------------------------------------------------
+org $C099DE
+Map_Unk99DE:
+    LDA.b !Map_Unk1D2E-!DP_Map
+    BEQ .y_step
+    BMI .left
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Map_StepStopRight
+    BCC .y_step
+    STZ.b !Map_Unk1D2E-!DP_Map
+    BRA .y_step
+.left:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Map_StepStopLeft
+    BCC .y_step
+    STZ.b !Map_Unk1D2E-!DP_Map
+.y_step:
+    LDA.b !Map_Unk1D30-!DP_Map
+    BEQ .done
+    BMI .up
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Map_StepStopDown
+    BCC .done
+    STZ.b !Map_Unk1D30-!DP_Map ; no BRA: falls into .up (quirk, see above)
+.up:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Map_StepStopUp
+    BCC .done
+    STZ.b !Map_Unk1D30-!DP_Map
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9A1F — Map_StepStopDown (30 bytes, $9A1F–$9A3C)
+; Map_Unk99DE's test for a downward step, A = n (step / 16). Compares
+; L = Map_Unk1D10 / 2 (low byte) with Map_Unk1D1D:
+; - L < Map_Unk1D1D: C=1 when the leader's Obj_ScreenY (low byte) is
+;   at or above Screen_SplitY ($88 >= it), i.e. it is not in the lower
+;   part of the screen;
+; - L = Map_Unk1D1D: C=1 when Map_Unk1D96 + n >= Map_FineLimit;
+; - L > Map_Unk1D1D: C=1.
+; Callers: Map_Unk99DE ($C0:9A09), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: drop the step; A
+; clobbered; X = the leader's slot on the first path; Map_StepTestN = n.
+; ------------------------------------------------------------
+Map_StepStopDown:
+    STA.b !Map_StepTestN-!DP_Map
+    LDA.b !Map_Unk1D10-!DP_Map
+    LSR A
+    CMP.b !Map_Unk1D1D-!DP_Map
+    BCC .by_screen
+    BNE .stop
+    LDA.b !Map_Unk1D96-!DP_Map
+    CLC
+    ADC.b !Map_StepTestN-!DP_Map
+    CMP.b #!Map_FineLimit
+    RTS
+.stop:
+    SEC
+    RTS
+.by_screen:
+    LDA.b #!Screen_SplitY
+    LDX.w !DP_Field+!Party_ObjSlot
+    CMP.w !Obj_ScreenY,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9A3D — Map_StepStopUp (35 bytes, $9A3D–$9A5F)
+; Map_Unk99DE's test for an upward step, A = n. Compares Map_Unk1D1C
+; with T = Map_TileOriginY / 2 (low byte, kept in Map_StepTestN):
+; - Map_Unk1D1C < T: C=1 when the leader's Obj_ScreenY (low byte) is
+;   at or below Screen_SplitY;
+; - Map_Unk1D1C = T: C=1 when Map_Unk1D96 - n is negative;
+; - Map_Unk1D1C > T: C=1.
+; Callers: Map_Unk99DE ($C0:9A17), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: drop the step; A
+; clobbered; X = the leader's slot on the first path; Map_StepTestN =
+; T, Map_StepTestN2 = n.
+; ------------------------------------------------------------
+Map_StepStopUp:
+    STA.b !Map_StepTestN2-!DP_Map
+    LDA.b !Map_TileOriginY-!DP_Map
+    LSR A
+    STA.b !Map_StepTestN-!DP_Map
+    LDA.b !Map_Unk1D1C-!DP_Map
+    CMP.b !Map_StepTestN-!DP_Map
+    BCC .by_screen
+    BNE .stop
+    LDA.b !Map_Unk1D96-!DP_Map
+    SEC
+    SBC.b !Map_StepTestN2-!DP_Map
+    BPL .keep
+.stop:
+    SEC
+    RTS
+.by_screen:
+    LDX.w !DP_Field+!Party_ObjSlot
+    LDA.w !Obj_ScreenY,X
+    CMP.b #!Screen_SplitY
+    RTS
+.keep:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9A60 — Map_StepStopRight (30 bytes, $9A60–$9A7D)
+; As Map_StepStopDown for a rightward step: L = Map_Unk1D0C / 2
+; against Map_Unk1D1B, the leader's Obj_ScreenX against Screen_HalfX
+; (C=1 when it is in the left half or at $80), Map_Unk1D93 + n against
+; Map_FineLimit.
+; Callers: Map_Unk99DE ($C0:99E8), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: drop the step; A
+; clobbered; X = the leader's slot on the first path; Map_StepTestN = n.
+; ------------------------------------------------------------
+Map_StepStopRight:
+    STA.b !Map_StepTestN-!DP_Map
+    LDA.b !Map_Unk1D0C-!DP_Map
+    LSR A
+    CMP.b !Map_Unk1D1B-!DP_Map
+    BCC .by_screen
+    BNE .stop
+    LDA.b !Map_Unk1D93-!DP_Map
+    CLC
+    ADC.b !Map_StepTestN-!DP_Map
+    CMP.b #!Map_FineLimit
+    RTS
+.stop:
+    SEC
+    RTS
+.by_screen:
+    LDA.b #!Screen_HalfX
+    LDX.w !DP_Field+!Party_ObjSlot
+    CMP.w !Obj_ScreenX,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9A7E — Map_StepStopLeft (35 bytes, $9A7E–$9AA0)
+; As Map_StepStopUp for a leftward step: Map_Unk1D1A against T =
+; Map_TileOriginX / 2, the leader's Obj_ScreenX against Screen_HalfX
+; (C=1 when it is in the right half), Map_Unk1D93 - n.
+; Callers: Map_Unk99DE ($C0:99F8), its only JSR site.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00, DB=$00.
+; Exit: M=1, X=0, DP and DB unchanged; C=1: drop the step; A
+; clobbered; X = the leader's slot on the first path; Map_StepTestN =
+; T, Map_StepTestN2 = n.
+; ------------------------------------------------------------
+Map_StepStopLeft:
+    STA.b !Map_StepTestN2-!DP_Map
+    LDA.b !Map_TileOriginX-!DP_Map
+    LSR A
+    STA.b !Map_StepTestN-!DP_Map
+    LDA.b !Map_Unk1D1A-!DP_Map
+    CMP.b !Map_StepTestN-!DP_Map
+    BCC .by_screen
+    BNE .stop
+    LDA.b !Map_Unk1D93-!DP_Map
+    SEC
+    SBC.b !Map_StepTestN2-!DP_Map
+    BPL .keep
+.stop:
+    SEC
+    RTS
+.by_screen:
+    LDX.w !DP_Field+!Party_ObjSlot
+    LDA.w !Obj_ScreenX,X
+    CMP.b #!Screen_HalfX
+    RTS
+.keep:
+    CLC
     RTS
 
 ; ============================================================
@@ -7219,7 +8310,7 @@ Field_WinPulseDraw:
 ;   what identifies this as the staff credits.
 ; - bit 2 or 3 (Field54_MapReq): copies them, shifted left once, into
 ;   Field_MapRedrawDone bits 3-4 (which the NMI handler acts on), runs
-;   Map_Unk75A0 and clears them.
+;   Map_ClearBufC800 and clears them.
 ; - bit 5 (Field54_WatchBox): sets Field_Unk29 to $0D
 ;   (Field_Unk29State0D) unless Map_TileOriginX / 2 < Field_TileStepX
 ;   <= Map_Unk1D0C / 2 and Map_TileOriginY / 2 < Field_TileStepY <=
@@ -7230,8 +8321,8 @@ Field_WinPulseDraw:
 ; JSR at $C0:27E4, both inside this routine.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
 ; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X and Y clobbered
-; on the credits path (Y by the MVNs), and whatever Map_Unk75A0 changes
-; on bits 2-3. DB is saved around the MVNs.
+; on the credits path (Y by the MVNs), and by Map_ClearBufC800 on bits
+; 2-3. DB is saved around the MVNs.
 ; ============================================================
 org $C0274D
 Field_ServiceUnk54:
@@ -7269,7 +8360,7 @@ Field_ServiceUnk54:
     AND.b #!Field54_MapReq
     ASL A
     TSB.b !Field_MapRedrawDone
-    JSR Map_Unk75A0
+    JSR Map_ClearBufC800
     LDA.b #!Field54_MapReq
     TRB.b !Field_Unk54
     RTS
@@ -7887,6 +8978,138 @@ Evt_RunObjInit:
     SEP #$20                ; A → 8-bit
     LDA.b #!Obj_Unk1C00Init
     STA.w !Obj_Unk1C00,X
+    RTS
+
+; ============================================================
+; $C0:5AC5 — Evt_StartTargetFunc1 (90 bytes, $5AC5–$5B1E)
+; Starts function 1 of the object in Field_UnkEB (the one the action
+; button found). It does nothing unless
+; that object's Obj_Unk1C01 is 0, Obj_Unk1100 and Obj_Unk1000 have
+; bit 7 clear and Obj_Unk1C00 is at least Obj_Unk1C00Min. Then it
+; saves Obj_ScriptPos in the ObjX_Unk7F0580 table of level
+; Obj_Unk1C00 (index level x Evt_PrioStride + slot, through the
+; hardware multiplier), points Obj_ScriptPos at function 1 (the second
+; word of the object's function table at Evt_Data + slot x 16), sets
+; Obj_Unk1C00 = 1 and zeroes Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001.
+; Reading Obj_Unk1C00 as a priority level whose interrupted position is
+; kept per level is an inference from this save; not established.
+; The 16-bit loads of Field_UnkEB also take $01EC as the high byte;
+; Field_FindObjInFront's 16-bit store keeps it 0.
+; Callers: Field_ActionButton ($C0:1AD7), its only JSR site.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00;
+; Field_UnkEB = the object's slot (object x 2).
+; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered (when started:
+; A = 1, X = the slot); Eng_Scratch overwritten.
+; ============================================================
+org $C05AC5
+Evt_StartTargetFunc1:
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_Unk1C01,X
+    BNE .done
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_Unk1000,X
+    BMI .done
+    LDA.w !Obj_Unk1C00,X
+    CMP.b #!Obj_Unk1C00Min
+    BCC .done
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                         ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch          ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X     ; save where the object was
+    LDA.b !Field_UnkEB
+    ASL A
+    ASL A
+    ASL A
+    ASL A                       ; slot x 16: its function table
+    CLC
+    ADC.w #!Evt_Func1Ofs
+    TAX
+    LDA.l !Evt_Data,X
+    LDX.b !Field_UnkEB
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #!Obj_Unk1C00Func1
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B63 — Map_LeaderPastRowMax (14 bytes, $5B63–$5B70)
+; Map_Unk9175's test for a downward step: C=1 when the leader's
+; Obj_TileY is past Map_Unk1D1D (TileY >= Map_Unk1D1D + 1).
+; Callers: Map_Unk9175 ($C0:91A2), its only JSR site.
+; On entry: M=1 (8-bit A), X = the leader's slot (either width), DB=$00;
+; absolute operands only, DP not used.
+; Exit: M, X, DP and DB unchanged; C as above; A clobbered; Eng_Scratch
+; ($01D9) = Map_Unk1D1D + 1.
+; ------------------------------------------------------------
+org $C05B63
+Map_LeaderPastRowMax:
+    LDA.w !Map_Unk1D1D
+    INC A
+    STA.w !DP_Field+!Eng_Scratch
+    LDA.w !Obj_TileY,X
+    CMP.w !DP_Field+!Eng_Scratch
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B71 — Map_LeaderPastRowMin (8 bytes, $5B71–$5B78)
+; Map_Unk9175's test for an upward step: C=1 when the leader's
+; Obj_TileY <= Map_Unk1D1C + 1 (one row lower than the other three
+; tests would suggest; kept as found).
+; Callers: Map_Unk9175 ($C0:919B), its only JSR site.
+; On entry: M=1 (8-bit A), X = the leader's slot (either width), DB=$00;
+; absolute operands only, DP not used.
+; Exit: M, X, DP and DB unchanged; C as above; A clobbered.
+; ------------------------------------------------------------
+Map_LeaderPastRowMin:
+    LDA.w !Map_Unk1D1C
+    INC A
+    CMP.w !Obj_TileY,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B79 — Map_LeaderPastColMax (13 bytes, $5B79–$5B85)
+; Map_Unk9175's test for a rightward step: C=1 when the leader's
+; Obj_TileX >= Map_Unk1D1B.
+; Callers: Map_Unk9175 ($C0:918C), its only JSR site.
+; On entry: M=1 (8-bit A), X = the leader's slot (either width), DB=$00;
+; absolute operands only, DP not used.
+; Exit: M, X, DP and DB unchanged; C as above; A clobbered; Eng_Scratch
+; ($01D9) = Map_Unk1D1B.
+; ------------------------------------------------------------
+Map_LeaderPastColMax:
+    LDA.w !Map_Unk1D1B
+    STA.w !DP_Field+!Eng_Scratch
+    LDA.w !Obj_TileX,X
+    CMP.w !DP_Field+!Eng_Scratch
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B86 — Map_LeaderPastColMin (7 bytes, $5B86–$5B8C)
+; Map_Unk9175's test for a leftward step: C=1 when the leader's
+; Obj_TileX <= Map_Unk1D1A.
+; Callers: Map_Unk9175 ($C0:9185), its only JSR site.
+; On entry: M=1 (8-bit A), X = the leader's slot (either width), DB=$00;
+; absolute operands only, DP not used.
+; Exit: M, X, DP and DB unchanged; C as above; A clobbered.
+; ------------------------------------------------------------
+Map_LeaderPastColMin:
+    LDA.w !Map_Unk1D1A
+    CMP.w !Obj_TileX,X
     RTS
 
 ; ============================================================

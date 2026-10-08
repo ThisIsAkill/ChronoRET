@@ -105,10 +105,17 @@ if !ram_engine_inc == 0
                                          ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
 !Field_Unk29 = $29                       ; 8-bit countdown; Field_Unk1F87 dispatches on it;
                                          ; Field_SaveState forces it to 1 when nonzero
+!Field_Unk2A = $2A                       ; 8-bit; Field_CheckTileInFront stores the treasure outcome
+                                         ; here (TreasureKind_*) as it starts Field_Unk29 = 1
 !Field_Unk2B = $2B                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
 !Field_Unk2D = $2D                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk2E = $2E                       ; 8-bit; Field_CheckTileInFront stores the leader's object
+                                         ; slot here as it starts Field_Unk29 = 1
 !Field_Unk2F = $2F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
-!Field_Unk30 = $30                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk30 = $30                       ; 8-bit; zeroed by Field_InitLoadState and by
+                                         ; Field_CheckTileInFront as it starts Field_Unk29 = 1
+!Field_Unk32 = $32                       ; 8-bit; zeroed by Field_CheckTileInFront as it starts
+                                         ; Field_Unk29 = 1
 !Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
                                          ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
@@ -137,7 +144,7 @@ if !ram_engine_inc == 0
                                          ; clears it in the pause loop
 !Field_Unk54 = $54                       ; 8-bit request flags read by Field_ServiceUnk54: bit 4 = write
                                          ; one staff-credits line per frame, bits 2-3 = run
-                                         ; Map_Unk75A0, bit 5 = watch Field_TileStepX/Y against the
+                                         ; Map_ClearBufC800, bit 5 = watch Field_TileStepX/Y against the
                                          ; Map_Unk1D0A-1D10 box; zeroed at load
 !Field_Unk55 = $55                       ; 8-bit; set to 1 by Field_InitLoadState, no other matched use
 !Field_Unk58 = $58                       ; 16-bit; only zeroed (Field_InitLoadState) in matched code
@@ -290,6 +297,17 @@ if !ram_engine_inc == 0
 !TileAnim_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot used as scratch by the
                                          ; tile-animation handlers: copy of Map_TileOriginY
 !Bg_RowWordOfs = $D9                     ; $D9 in Bg_TilemapIndex64x32: row * 32
+!Field_FindFacing2 = $DB                 ; alias of Oam_Range1LoPtr's slot in Field_FindObjInFront:
+                                         ; 16-bit leader facing x 2 (Field_ObjInReachTable offset)
+!Field_FindLeaderX = $C3                 ; alias of Spr_BaseX in Field_FindObjInFront: 16-bit
+                                         ; leader Obj_PosX
+!Field_FindLeaderY = $C5                 ; alias of Spr_BaseY in Field_FindObjInFront: 16-bit
+                                         ; leader Obj_PosY
+!Field_FrontTile = $DB                   ; alias of Oam_Range1LoPtr's slot in Field_CheckTileInFront:
+                                         ; 16-bit map index (row << 8 | column) of the tile the
+                                         ; Field_TileInFront* handlers looked at
+!Field_TreasureRec = $DD                 ; alias of Oam_Range2LoPtr's slot in Field_CheckTileInFront:
+                                         ; 16-bit TreasureRom offset of the record found
 
 ; --- Sprite build scratch (Spr_AppendToOam .. Spr_Place24) (dp) ---
 !Spr_BaseX = $C3                         ; 16-bit: Obj_ScreenX of the object being built; each tile's
@@ -407,12 +425,25 @@ if !ram_engine_inc == 0
 !Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
                                          ; Obj_ScreenX in Audio_PlaySfxAtLeader)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
+!Treasure_Gold = $0200                   ; 16-bit gold amount of the last treasure taken
+                                         ; (Field_CheckTileInFront, DB=$00; reader not traced)
+!Field_Unk02A1 = $02A1                   ; 8-bit; zeroed by Field_CheckTileInFront as it starts
+                                         ; Field_Unk29 = 1
+!Map_TreasureIdx = $7E70C0               ; one byte per map tile, index row << 8 | column (as
+                                         ; Map_TileProps): bit 7 clear = the tile holds treasure
+                                         ; record (value & $7F) of the location; set = none
 !Party_Members = $7E2980                 ; 3 bytes: character id of each party member
                                          ; (Party_ReinitIfChanged re-inits the character objects when
                                          ; they change)
 !Field_Unk7E2989 = $7E2989               ; 8-bit; zeroed by Field_InitLoadState, no other matched use
 !Eng_Unk7F0000 = $7F0000                 ; 8-bit; Field_FadeToBankC2Mode5 only proceeds when it is >=
                                          ; $49 (purpose unknown)
+!Treasure_Flags = $7F0001                ; 64 bytes: one bit per treasure number (bit n & 7 of byte
+                                         ; n >> 3, BitSet order), set by Field_CheckTileInFront when
+                                         ; the treasure is taken; a set bit means already opened
+!Treasure_ItemId = $7F0200               ; 16-bit item id of the last treasure item taken
+                                         ; (Field_CheckTileInFront; reader not traced, probably the
+                                         ; message)
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
 !Rom_SineTable = $C0F900                 ; 1024 B in ROM: |sin| for 1024 steps per turn, $00 at +$000/+$200,
@@ -447,7 +478,9 @@ if !ram_engine_inc == 0
 !Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728; no event
                                          ; handler stores it in matched or traced code
 !ObjX_Unk7F0580 = $7F0580                ; per-object word ($80-byte table in bank $7F), zeroed by
-                                         ; Evt_RunObjInit
+                                         ; Evt_RunObjInit. With the seven tables after it, one per
+                                         ; Obj_Unk1C00 level (Evt_PrioStride apart):
+                                         ; Evt_StartTargetFunc1 saves Obj_ScriptPos at +level*$80
 !ObjX_Unk7F0600 = $7F0600                ; per-object word, zeroed by Evt_RunObjInit
 !ObjX_Unk7F0680 = $7F0680                ; per-object word, zeroed by Evt_RunObjInit
 !ObjX_Unk7F0700 = $7F0700                ; per-object word, zeroed by Evt_RunObjInit
@@ -487,7 +520,15 @@ if !ram_engine_inc == 0
                                          ; per pass); $80 = SprTile records up to date.
                                          ; Obj_ResetStates zeroes it for every location object
 !Obj_Unk1C00 = $1C00                     ; 8-bit per object; Evt_RunObjInit sets 7 after the init
-                                         ; function
+                                         ; function; Evt_StartTargetFunc1 needs it >= 2, saves
+                                         ; Obj_ScriptPos in the ObjX_Unk7F0580 table of that level
+                                         ; and sets 1 (looks like the priority of the running
+                                         ; function, lower = more urgent; not established)
+!Obj_Unk1C01 = $1C01                     ; 8-bit per object; nonzero blocks Evt_StartTargetFunc1
+!Obj_Unk1000 = $1000                     ; 8-bit per object; bit 7 blocks Evt_StartTargetFunc1
+!Obj_Unk1001 = $1001                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
+!Obj_Unk1A01 = $1A01                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
+!Obj_Unk1A80 = $1A80                     ; 8-bit per object; zeroed by Evt_StartTargetFunc1
 !Obj_ScreenY = $0A80                     ; 16-bit per object: screen Y of the sprite origin; the
                                          ; builders use the low 9 bits
 !Obj_OamFlags = $0F80                    ; 8-bit per object; bits 2-3 pick the OAM shadow range (0 =
@@ -667,24 +708,52 @@ if !ram_engine_inc == 0
 ; --- Staff credits (Field_ServiceUnk54) ---
 !Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
                                          ; AOKI"...): '/' ends a line, a byte >= $80 ends a block
+!Map_BufC800 = $7EC800                   ; 2 KB WRAM buffer ($7E:C800-$CFFF) that Field_BuildC800Mode1/2/4
+                                         ; write through WMDATA; Map_ClearBufC800 zeroes it
 !Credits_LineBuf = $7ED800               ; 64 bytes: one tilemap row (32 words) built by
                                          ; Field_ServiceUnk54, DMAed to VRAM by the NMI ($C0:EC77)
 
 ; --- Map page $1D00 (absolute, or dp with DP = !DP_Map) ---
+!Map_TreasureRec0 = $1D06                ; 16-bit TreasureRom offset that treasure numbers count from:
+                                         ; Field_CheckTileInFront numbers a record (offset -
+                                         ; this) / 4 for Treasure_Flags. Setter not matched
+!Map_TreasureLocRecs = $1D08             ; 16-bit TreasureRom offset of the current location's
+                                         ; record 0 (Map_TreasureIdx values index from it). Setter
+                                         ; not matched
 !Map_Unk1D0C = $1D0C                     ; 16-bit; its low byte / 2 is the upper column bound of
                                          ; Field_ServiceUnk54's bit-5 box (Map_TileOriginX the lower)
 !Map_Unk1D10 = $1D10                     ; 16-bit; as Map_Unk1D0C for rows (Map_TileOriginY lower)
+!Map_Unk1D1A = $1D1A                     ; 8-bit column: Map_Unk9175 keeps a leftward Map_Unk1D2E
+                                         ; out of Map_Unk1D32 once the leader's Obj_TileX <= it;
+                                         ; Map_StepStopLeft compares Map_TileOriginX / 2 with it
+                                         ; (looks like a left scroll limit; not established)
+!Map_Unk1D1B = $1D1B                     ; 8-bit column: as Map_Unk1D1A to the right (leader
+                                         ; Obj_TileX >= it; Map_StepStopRight against
+                                         ; Map_Unk1D0C / 2)
+!Map_Unk1D1C = $1D1C                     ; 8-bit row: as Map_Unk1D1A upwards (leader Obj_TileY <=
+                                         ; it + 1; Map_StepStopUp against Map_TileOriginY / 2)
+!Map_Unk1D1D = $1D1D                     ; 8-bit row: as Map_Unk1D1A downwards (leader Obj_TileY >
+                                         ; it; Map_StepStopDown against Map_Unk1D10 / 2)
 !Map_Unk1D2A = $1D2A                     ; 8-bit; copied to Map_Unk1D2E each frame by
                                          ; Map_ResetUnk1D2E
 !Map_Unk1D2B = $1D2B                     ; 8-bit; copied to Map_Unk1D30 each frame (as above)
-!Map_Unk1D2C = $1D2C                     ; 8-bit; zeroed each frame by Field_FrameUpdate
-!Map_Unk1D2D = $1D2D                     ; 8-bit; zeroed each frame by Field_FrameUpdate
-!Map_Unk1D2E = $1D2E                     ; 8-bit; Map_Unk1D2A each frame; Field_Unk885A sets it to
+!Map_Unk1D2C = $1D2C                     ; 8-bit; zeroed each frame by Field_FrameUpdate, then set
+                                         ; to the signed D-pad X step (+/-$10, $20 running) by the
+                                         ; Field_Dpad* handlers
+!Map_Unk1D2D = $1D2D                     ; 8-bit; as Map_Unk1D2C for the Y step (down positive)
+!Map_Unk1D2E = $1D2E                     ; 8-bit; Map_Unk1D2A each frame, plus the D-pad X step
+                                         ; (Field_Dpad*); Field_Unk885A sets it to
                                          ; +/-$10 by which half of the screen the leader is in
                                          ; (X >= $80 -> $10) (inferred: a horizontal step)
 !Map_Unk1D30 = $1D30                     ; 8-bit; as Map_Unk1D2E vertically (screen Y >= $88 -> $10)
-!Map_Unk1D32 = $1D32                     ; 8-bit; zeroed by Field_Unk885A
-!Map_Unk1D33 = $1D33                     ; 8-bit; zeroed by Field_Unk885A
+!Map_Unk1D32 = $1D32                     ; 8-bit; zeroed by Field_Unk885A; Map_Unk9175 zeroes it and
+                                         ; copies Map_Unk1D2E into it when the leader is inside
+                                         ; Map_Unk1D1A/1D1B in that direction
+!Map_Unk1D33 = $1D33                     ; 8-bit; as Map_Unk1D32 for Map_Unk1D30 (rows
+                                         ; Map_Unk1D1C/1D1D)
+!Map_StepTestN = $1D52                   ; 8-bit scratch of the Map_StepStop* tests: the step / 16
+                                         ; (Down, Right) or Map_TileOriginY/X / 2 (Up, Left)
+!Map_StepTestN2 = $1D54                  ; 8-bit scratch of Map_StepStopUp/Left: the step / 16
 !Map_TilemapVram3 = $1D7E                ; 16-bit tilemap VRAM base the NMI uses for redraw step 2
                                          ; (Field_MapRedrawDone = 2)
 !Map_TilemapVram4 = $1D84                ; 16-bit; its high byte is ORed into Hdma_Unk7F14F1 when
@@ -694,8 +763,12 @@ if !ram_engine_inc == 0
                                          ; set it to $0100
 !Map_Unk1D8F = $1D8F                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $F01D)
 !Map_Unk1D91 = $1D91                     ; 16-bit; as Map_Unk1D8D (hooks 7/8 set $01C0)
-!Map_Unk1D93 = $1D93                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D2E
-!Map_Unk1D96 = $1D96                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D30
+!Map_Unk1D93 = $1D93                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D2E; at the
+                                         ; limit column Map_StepStopRight/Left keep the X step only
+                                         ; while it plus / minus the step / 16 stays within 0-$F
+                                         ; (a pixel offset inside a 16-pixel tile?)
+!Map_Unk1D96 = $1D96                     ; 8-bit; nonzero lets Field_Unk885A set Map_Unk1D30; as
+                                         ; Map_Unk1D93 for the Y step (Map_StepStopDown/Up)
 !Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0
 !Map_HookTimer = $1DFF                   ; 8-bit frame countdown for hook 12's loops
 
@@ -728,5 +801,16 @@ struct SprTileSrc $7F4800
     .Tile: skip 1        ; OAM tile number
     .Attr: skip 1        ; OAM attributes (vhppccct)
 endstruct align 8
+
+; One treasure record in ROM bank $F5 (4 bytes; Field_CheckTileInFront reaches record n of
+; the location at Map_TreasureLocRecs + n*4). "Treasure" rests on what the code gives: an item
+; through BankC1_Entry8003 service 1 (adds one to the inventory at $7E:2400/$2500, max 99) or
+; gold through service 4 (adds to the 24-bit sum at $7E:2C53, capped at 9,999,999), once per
+; record (Treasure_Flags), with the tile changed through SceneFlag_TileStep.
+struct TreasureRom $F50000
+    .Tile: skip 2        ; map index (row << 8 | column) the record belongs to
+    .Contents: skip 2    ; bit 15 set: gold, amount = bits 0-14 x 2; else bit 14 set
+                         ; (Treasure_Empty): nothing given; else item id in bits 0-8
+endstruct align 4
 
 endif

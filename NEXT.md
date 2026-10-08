@@ -28,6 +28,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    14. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
+
 1. Bank $C1 from `$C1:4058`: service 4 of the $C10045 API (`$C1:4058`-`$C1:41BD`, 358 B; it calls
    `$C1:41BE`, `$C1:4212`, `$C1:423A`, `$C1:4310`, `$C1:4BBE` and six JSLs into `$CC:F06B`-`$CC:F278`,
    all unmatched), then its callees in bank $C1. (`$C1:007E` and `$C1:283D`-`$C1:4057` are matched;
@@ -35,13 +36,15 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    the enemies (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
    `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
-   `Field_ServiceUnk54` $C0:274D). Next, their unmatched callees, in reach order:
-   `Field_FindObjInFront` $C0:1CFC–$C0:1DF3 (with its 4-word facing table at $C0:1D56) and
-   `Field_CheckTileInFront` $C0:1DF4–$C0:1F23 (table at $C0:1E92), `Evt_StartTargetFunc1`
-   $C0:5AC5, `Field_DpadHandlerTable` $C0:8902 and the `Map_Unk*` steps of Field_FrameUpdate
-   ($8A6D, $9175, $91AC, $93E1, $99DE), `Map_Unk75A0`.
-3. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
-4. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
+   `Field_ServiceUnk54` $C0:274D) and the first of their callees: `Field_FindObjInFront` and
+   `Field_CheckTileInFront` ($C0:1CFC–$C0:1F23), `Evt_StartTargetFunc1` ($C0:5AC5–$C0:5B1E),
+   `Field_DpadHandlerTable` and the D-pad handlers ($C0:8902–$C0:8A6C), `Map_ClearBufC800`
+   ($C0:75A0–$C0:75E8), and the step limits `Map_Unk9175`, `Map_Unk99DE` and the
+   `Map_LeaderPast*` / `Map_StepStop*` tests ($C0:9175–$C0:91AB, $C0:99DE–$C0:9AA0,
+   $C0:5B63–$C0:5B8C). Next, the remaining `Map_Unk*` steps of Field_FrameUpdate, in reach order:
+   `Map_Unk8A6D`, `Map_Unk91AC`, `Map_Unk93E1`; then the treasure-record setters
+   (`Map_TreasureRec0` $1D06, `Map_TreasureLocRecs` $1D08) and who sets the scroll limits
+   `Map_Unk1D1A`-`1D1D`.
 
 ## Tables
 
