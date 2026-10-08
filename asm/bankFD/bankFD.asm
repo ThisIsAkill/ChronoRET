@@ -3507,3 +3507,428 @@ EngFD_UnkD52D:
     MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     SEP #$20
     RTS
+
+; ============================================================
+; Location animation set-up ($FD:DE98–$FD:E021, $FD:E292–$FD:E39B,
+; vectors $FD:FFF4–$FD:FFFC)
+; The last two steps of LoadLocation, reached through the bank's
+; service vectors: FdVec_FFFA fills the 12 five-byte records at $05B0
+; and their data at $7F:0400 from a list picked by the location's
+; LocRom.Tileset12, FdVec_FFF4 the 12 twelve-byte records at $0520 from
+; a list picked by its LocRom.Palette. Field_EndOfFrame runs FdVec_FFF7
+; every frame, which works on the $0520 records (not analysed). So
+; probably the location's tile and palette animations; what the
+; records' bytes mean is not traced.
+; ============================================================
+
+; $FD:DE98 — FieldFD_LoadAnimSetA (394 bytes, $DE98–$E021)
+; FdVec_FFFA's routine. Saves P, DP and DB; runs with DB=$00, DP=$0500,
+; M=1, X=0. The list starts at !FieldRom_AnimListA + the word
+; !FieldRom_AnimListAPtrs holds for LocRom.Tileset12 & $3F; the WRAM
+; port is set to $7F:0400. Then, for each of the 12 FieldAnimA records
+; at $05B0 (DP $18 counts them):
+;   - a list byte of $80 sets .Unk3 = $80 and nothing else;
+;   - otherwise the byte goes to .Unk0, the next two to .Unk2 and .Unk3,
+;     and .Bank = $7F; then by the byte (kind):
+;       2: .Unk0/.Unk1 = 0; the two next list bytes, each * 4 as a word,
+;          go to the port 4 times over, then the 4 bytes after them, 4
+;          times over (16 + 16 bytes; the list moves on 6);
+;       4: .Unk0/.Unk1 = 0; the 4 next bytes * 4 as words, twice over
+;          (16 bytes), then the 8 after them as 4 byte pairs, twice over
+;          (16 bytes; the list moves on 12);
+;       else: .Unk0/.Unk1 = 0; 8 bytes * 4 as words (16 bytes), then 8
+;          byte pairs (16 bytes; the list moves on 24).
+; So each record but an $80 one adds 32 bytes at $7F:0400 on.
+; The word stores to WMDATA-1 ($217F) are 16-bit: their high byte lands
+; in WMDATA, so XBA, STA, XBA, STA sends the word low byte first.
+; Callers (1 JMP site): FdVec_FFFA ($FD:FFFA).
+; Entry: M=1 (its first LDA #0 is 8-bit), X any (P saved; it sets X=0),
+;        DP any (saved), DB any (saved)
+; Exit:  P, DP and DB restored; A = 0, X = list end, Y = $3C (16-bit
+;        values, with the caller's M/X back); $0510 and $0518 (DP $10,
+;        $18) written
+!FieldAnimA_Left  = $18                 ; 1 B dp (DP=$0500): records still to fill
+!FieldAnimA_Count = $10                 ; 1 B dp (DP=$0500): words or byte groups left in a copy
+org $FDDE98
+FieldFD_LoadAnimSetA:
+    PHP
+    PHD
+    PHB
+    LDA.b #0
+    PHA
+    PLB
+    REP #$10
+    SEP #$20
+    LDX.w #!DP_FieldAnim
+    PHX
+    PLD
+    LDA.b #0
+    XBA
+    LDX.w !DP_Field+!Loc_RecOfs
+    LDA.l LocRom.Tileset12,X
+    AND.b #!LocRom_AnimSetMask
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !FieldRom_AnimListAPtrs,X
+    TAX
+    LDA.w #!FieldAnimA_Wram
+    STA.w WMADDL
+    LDA.w #!FieldAnim_NumRecs
+    STA.b !FieldAnimA_Left
+    SEP #$20
+    LDA.b #!Bank7F                      ; WMADDH bit 0 set: bank $7F
+    STA.w WMADDH
+    LDY.w #0
+.record:
+    LDA.l !FieldRom_AnimListA,X
+    INX
+    CMP.b #!FieldAnim_EndRecord
+    BNE .kind
+    LDA.b #!FieldAnim_EndRecord
+    STA.w FieldAnimA.Unk3,Y
+    JMP .next
+.kind:
+    STA.w FieldAnimA.Unk0,Y
+    LDA.l !FieldRom_AnimListA,X
+    STA.w FieldAnimA.Unk2,Y
+    INX
+    LDA.l !FieldRom_AnimListA,X
+    STA.w FieldAnimA.Unk3,Y
+    INX
+    LDA.b #!Bank7F
+    STA.w FieldAnimA.Bank,Y
+    LDA.w FieldAnimA.Unk0,Y
+    CMP.b #!FieldAnim_Kind2
+    BNE .not_kind2
+    LDA.b #0
+    STA.w FieldAnimA.Unk0,Y
+    STA.w FieldAnimA.Unk1,Y
+    LDA.b #4
+    STA.b !FieldAnimA_Count
+.kind2_words:
+    REP #$20
+    LDA.l !FieldRom_AnimListA,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    XBA
+    STA.w WMDATA-1                      ; the high byte (the word's low byte) to WMDATA
+    XBA
+    STA.w WMDATA-1                      ; and its high byte
+    LDA.l !FieldRom_AnimListA+1,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    XBA
+    STA.w WMDATA-1
+    XBA
+    STA.w WMDATA-1
+    SEP #$20
+    DEC.b !FieldAnimA_Count
+    BNE .kind2_words
+    INX
+    INX
+    LDA.b #4
+    STA.b !FieldAnimA_Count
+.kind2_bytes:
+    LDA.l !FieldRom_AnimListA,X
+    STA.w WMDATA
+    LDA.l !FieldRom_AnimListA+1,X
+    STA.w WMDATA
+    LDA.l !FieldRom_AnimListA+2,X
+    STA.w WMDATA
+    LDA.l !FieldRom_AnimListA+3,X
+    STA.w WMDATA
+    DEC.b !FieldAnimA_Count
+    BNE .kind2_bytes
+    INX
+    INX
+    INX
+    INX
+    JMP .next
+.not_kind2:
+    CMP.b #!FieldAnim_Kind4
+    BNE .other
+    LDA.b #0
+    STA.w FieldAnimA.Unk0,Y
+    STA.w FieldAnimA.Unk1,Y
+    LDA.b #8
+    STA.b !FieldAnimA_Count
+.kind4_word_pass:
+    PHX
+.kind4_word:
+    REP #$20
+    LDA.l !FieldRom_AnimListA,X
+    INX
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    XBA
+    STA.w WMDATA-1
+    XBA
+    STA.w WMDATA-1
+    SEP #$20
+    DEC.b !FieldAnimA_Count
+    LDA.b !FieldAnimA_Count
+    AND.b #3
+    BNE .kind4_word
+    PLX
+    LDA.b !FieldAnimA_Count
+    BNE .kind4_word_pass
+    INX
+    INX
+    INX
+    INX
+    LDA.b #8
+    STA.b !FieldAnimA_Count
+.kind4_pair_pass:
+    PHX
+.kind4_pair:
+    LDA.l !FieldRom_AnimListA,X
+    STA.w WMDATA
+    INX
+    LDA.l !FieldRom_AnimListA,X
+    STA.w WMDATA
+    INX
+    DEC.b !FieldAnimA_Count
+    LDA.b !FieldAnimA_Count
+    AND.b #3
+    BNE .kind4_pair
+    PLX
+    LDA.b !FieldAnimA_Count
+    BNE .kind4_pair_pass
+    REP #$21
+    TXA
+    ADC.w #8
+    TAX
+    LDA.w #0
+    SEP #$20
+    JMP .next
+.other:
+    LDA.b #0
+    STA.w FieldAnimA.Unk0,Y
+    STA.w FieldAnimA.Unk1,Y
+    LDA.b #8
+    STA.b !FieldAnimA_Count
+.other_word:
+    REP #$20
+    LDA.l !FieldRom_AnimListA,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    INX
+    DEC.b !FieldAnimA_Count
+    BNE .other_word
+    LDA.b #8
+    STA.b !FieldAnimA_Count
+.other_pair:
+    LDA.l !FieldRom_AnimListA,X
+    STA.w WMDATA
+    LDA.l !FieldRom_AnimListA+1,X
+    STA.w WMDATA
+    INX
+    INX
+    DEC.b !FieldAnimA_Count
+    BNE .other_pair
+.next:
+    REP #$21
+    TYA
+    ADC.w #!FieldAnimA_Size
+    TAY
+    LDA.w #0
+    SEP #$20
+    DEC.b !FieldAnimA_Left
+    BEQ .done
+    JMP .record
+.done:
+    PLB
+    PLD
+    PLP
+    RTL
+
+; $FD:E292 — FieldFD_LoadAnimSetB (266 bytes, $E292–$E39B)
+; FdVec_FFF4's routine. Saves P, DP and DB; runs with DB=$00, DP=$0500,
+; M=1, X=0. The list starts at !FieldRom_AnimListB + the word
+; !FieldRom_AnimListBPtrs holds for LocRom.Palette. It fills the first 6
+; of the 12 FieldAnimB records at $0520, by the high nibble of each
+; list byte:
+;   - 0: .Unk0 = 0 (one byte used);
+;   - $10 or $80: .Unk0-.Unk2 and .Unk5-.Unk8 from 7 bytes, .Unk3/.Unk4
+;     = 0; with $80 also .Ptr = the long address of the bytes after them
+;     in bank $FD, and the list then skips (.Unk0 & $0F) + 1 bytes;
+;   - anything else: .Unk0-.Unk2 and .Unk5 from 4 bytes, .Unk3/.Unk4 = 0.
+; Then .Unk0 of records 6-11 is set to 0.
+; Quirk: it points the WRAM port at $00:0520 and sets DP $18 to 12 as
+; FieldFD_LoadAnimSetA does, but writes the records with plain stores
+; and never reads $0518 (the 6 records are counted by Y).
+; Callers (1 JMP site): FdVec_FFF4 ($FD:FFF4).
+; Entry: M=1 (its first LDA #0 is 8-bit), X any (P saved; it sets X=0),
+;        DP any (saved), DB any (saved)
+; Exit:  P, DP and DB restored; A = 0 (8-bit), X = list end, Y = $48
+;        (with the caller's M/X back); $050E/$050F and $0518 written;
+;        WMADD left at $00:0520
+!FieldAnimB_Skip = $0E                  ; 2 B dp (DP=$0500): .Unk0 & $0F, bytes the list skips
+org $FDE292
+FieldFD_LoadAnimSetB:
+    PHP
+    PHD
+    PHB
+    LDA.b #0
+    PHA
+    PLB
+    REP #$10
+    SEP #$20
+    LDX.w #!DP_FieldAnim
+    PHX
+    PLD
+    LDA.b #0
+    XBA
+    LDX.w !DP_Field+!Loc_RecOfs
+    LDA.l LocRom.Palette,X
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !FieldRom_AnimListBPtrs,X
+    TAX
+    LDA.w #FieldAnimB.Unk0
+    STA.w WMADDL                        ; quirk: the port is not used
+    LDA.w #!FieldAnim_NumRecs
+    STA.b !FieldAnimA_Left              ; quirk: not read here
+    SEP #$20
+    LDA.b #0
+    STA.w WMADDH
+    LDY.w #0
+.record:
+    LDA.l !FieldRom_AnimListB,X
+    AND.b #!FieldAnimB_KindMask
+    BEQ .empty
+    CMP.b #!FieldAnimB_Kind10
+    BEQ .long
+    CMP.b #!FieldAnimB_Kind80
+    BEQ .long
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk0,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk1,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk2,Y
+    INX
+    LDA.b #0
+    STA.w FieldAnimB.Unk3,Y
+    STA.w FieldAnimB.Unk4,Y
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk5,Y
+    INX
+    BRA .next
+.empty:
+    INX
+    STA.w FieldAnimB.Unk0,Y
+    BRA .next
+.long:
+    PHA
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk0,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk1,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk2,Y
+    INX
+    LDA.b #0
+    STA.w FieldAnimB.Unk3,Y
+    STA.w FieldAnimB.Unk4,Y
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk5,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk6,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk7,Y
+    INX
+    LDA.l !FieldRom_AnimListB,X
+    STA.w FieldAnimB.Unk8,Y
+    INX
+    PLA
+    CMP.b #!FieldAnimB_Kind80
+    BNE .next
+    REP #$21
+    TXA
+    ADC.w #!FieldRom_AnimListB&$FFFF
+    STA.w FieldAnimB.Ptr,Y
+    LDA.w #0
+    SEP #$20
+    LDA.b #!FieldRom_AnimListB>>16
+    STA.w FieldAnimB.Ptr+2,Y
+    LDA.w FieldAnimB.Unk0,Y
+    AND.b #!FieldAnimB_SkipMask
+    STA.b !FieldAnimB_Skip
+    STZ.b !FieldAnimB_Skip+1
+    REP #$20
+    TXA
+    SEC                                 ; + 1
+    ADC.b !FieldAnimB_Skip
+    TAX
+    LDA.w #0
+    SEP #$20
+.next:
+    TYA
+    CLC
+    ADC.b #!FieldAnimB_Size
+    TAY
+    CMP.b #!FieldAnimB_Size*!FieldAnimB_Filled
+    BEQ .clear_rest
+    JMP .record
+.clear_rest:
+    LDA.b #0
+    STA.w FieldAnimB[0].Unk0,Y
+    STA.w FieldAnimB[1].Unk0,Y
+    STA.w FieldAnimB[2].Unk0,Y
+    STA.w FieldAnimB[3].Unk0,Y
+    STA.w FieldAnimB[4].Unk0,Y
+    STA.w FieldAnimB[5].Unk0,Y
+    PLB
+    PLD
+    PLP
+    RTL
+
+; $FD:FFF4 — FdVec_FFF4 (3 bytes, $FFF4–$FFF6)
+; The bank's service vectors: three JMPs at fixed addresses near the end
+; of the bank, so code in other banks can JSL them. The routines end with
+; RTL.
+; Callers (1 JSL site): LoadLocation ($C0:0116).
+; Entry: as FieldFD_LoadAnimSetB: M=1, X any, DP any, DB any
+; Exit:  as FieldFD_LoadAnimSetB
+org $FDFFF4
+FdVec_FFF4:
+    JMP FieldFD_LoadAnimSetB
+
+; $FD:FFF7 — FdVec_FFF7 (3 bytes, $FFF7–$FFF9)
+; JMP to EngFD_UnkE39C (not analysed; Field_EndOfFrame runs it every
+; frame, and its header says it ticks the counter table at $0520, the
+; FieldAnimB records).
+; Callers (10 JSL sites): Field_EndOfFrame ($C0:00CD), Field_EndOfFrameShort ($C0:00E6),
+;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793)
+;   and unmatched ($C0:3FC6, $CD:09BF, $CD:0AD6, $D1:F54D).
+; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
+;        banks $CD and $D1 not traced; what EngFD_UnkE39C needs is not
+;        traced)
+; Exit:  as EngFD_UnkE39C (not analysed)
+FdVec_FFF7:
+    JMP EngFD_UnkE39C
+
+; $FD:FFFA — FdVec_FFFA (3 bytes, $FFFA–$FFFC)
+; JMP to FieldFD_LoadAnimSetA.
+; Callers (1 JSL site): LoadLocation ($C0:0112).
+; Entry: as FieldFD_LoadAnimSetA: M=1, X any, DP any, DB any
+; Exit:  as FieldFD_LoadAnimSetA
+FdVec_FFFA:
+    JMP FieldFD_LoadAnimSetA

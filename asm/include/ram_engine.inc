@@ -1546,4 +1546,29 @@ struct FieldBtlPpu $7E2C56
     .Scroll2: skip 12    ; the same six words again
 endstruct
 
+; --- Location animation records (FieldFD_LoadAnimSetA/B, the FdVec_FFFA/FFF4 routines) ---
+!DP_FieldAnim = $0500                    ; direct page of the bank-$FD vector routines (FieldFD_LoadAnimSetA/B)
+; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
+struct FieldAnimA $05B0
+    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
+    .Unk1: skip 1        ; 0
+    .Unk2: skip 1        ; list byte
+    .Unk3: skip 1        ; list byte, or $80 for an $80 entry
+    .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
+endstruct
+; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
+; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (not analysed).
+struct FieldAnimB $0520
+    .Unk0: skip 1        ; list byte: high nibble = kind (0 = empty); low nibble = bytes skipped for kind 8
+    .Unk1: skip 1
+    .Unk2: skip 1
+    .Unk3: skip 1        ; 0
+    .Unk4: skip 1        ; 0
+    .Unk5: skip 1
+    .Unk6: skip 1        ; kinds 1 and 8 only
+    .Unk7: skip 1
+    .Unk8: skip 1
+    .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
+endstruct
+
 endif

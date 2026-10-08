@@ -129,9 +129,6 @@ org $FDCD0C
 EngFD_UnkCD0C:      ; EngFD_UnkC2C1Table0 entry 1; not analysed
 org $FDD27E
 EngFD_UnkD27E:      ; EngFD_UnkC2C1Table0 entry 2; not analysed
-org $FDFFF4
-FdVec_FFF4:         ; bank $FD service vector: JMP $E292 (runs with DP=$0500)
-org $FDFFF7
-FdVec_FFF7:         ; bank $FD service vector: JMP $E39C (runs with DP=$0500)
-org $FDFFFA
-FdVec_FFFA:         ; bank $FD service vector: JMP $DE98 (runs with DP=$0500)
+org $FDE39C
+EngFD_UnkE39C:      ; FdVec_FFF7's routine, run every frame by Field_EndOfFrame; works on the FieldAnimB
+                    ; records at $0520 (not analysed)

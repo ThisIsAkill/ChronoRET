@@ -699,4 +699,23 @@ if !constants_engine_inc == 0
 !Hdma_GradSub = $81                      ; CGADSUB byte of the second half: subtract, BG1
 !Hdma_GradBytes = $0100                  ; bytes EngFD_UnkD52D copies to Hdma_Unk7F1600
 
+; --- Location animation set-up (FieldFD_LoadAnimSetA/B) ---
+!FieldRom_AnimListAPtrs = $FDF290        ; 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA
+!FieldRom_AnimListA = $FDF310            ; the lists FieldFD_LoadAnimSetA reads
+!FieldRom_AnimListBPtrs = $FDF9C7        ; 2 B per LocRom.Palette: offset of its list from FieldRom_AnimListB
+!FieldRom_AnimListB = $FDFA77            ; the lists FieldFD_LoadAnimSetB reads
+!LocRom_AnimSetMask = $3F                ; LocRom.Tileset12 bits that pick FieldFD_LoadAnimSetA's list
+!FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
+!FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
+!FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
+!FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
+!FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops
+!FieldAnim_Kind4 = 4
+!FieldAnimB_KindMask = $F0               ; FieldFD_LoadAnimSetB: the kind nibble of a list byte
+!FieldAnimB_Kind10 = $10                 ; kinds with 9-byte records
+!FieldAnimB_Kind80 = $80                 ; ... the second also stores FieldAnimB.Ptr
+!FieldAnimB_SkipMask = $0F               ; FieldAnimB.Unk0 bits: list bytes skipped (+ 1) after a kind-$80 record
+!FieldAnimB_Size = 12                    ; bytes per FieldAnimB record
+!FieldAnimB_Filled = 6                   ; records FieldFD_LoadAnimSetB fills (the other 6 get .Unk0 = 0)
+
 endif
