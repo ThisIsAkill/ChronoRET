@@ -575,8 +575,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActFrameHold     = $A012 ; 1 B: set to 2 when BattleAct_StepBattlerAnims decodes a frame; non-zero = it decodes
                                  ; none (zeroed by service 4 and $CC:F0EF, counted down at $CF:E775, unmatched)
 !Battle_UnkA028          = $A028 ; 1 B: non-zero = BattleAct_StepBattlerAnims decodes no frame; purpose unknown
-!Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in the
-                                 ; unmatched script code, zeroed by BattleAct_ResetState); service 4 waits for it
+!Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in
+                                 ; BattleAct_OpEndScript, zeroed by BattleAct_ResetState); service 4 waits for it
 !Battle_ActScriptId      = $9877 ; 1 B: script number of the action; first byte of the 16-byte parameter block
                                  ; ($9877-$9886) that BattleAct_LoadScript clears
 !Battle_ActUnkArg987C    = $987C ; 1 B: A for BattleAnim_UnkVecCD0018 ($FF = do not call it); set to $FF by

@@ -11487,7 +11487,7 @@ BattleAct_UnpackFrames:
 ; with ranged attacks is a guess from the data, not checked.
 ; Callers (JSR): BattleAct_LoadAttack ($C1:433A) only, for a PC caster
 ; after Battle_BuildOccupiedCellMap.
-; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_ActCaster a PC slot (0-2; the
+; Entry: M=1, X=0, DP=0, DB=$7E, B=0 (TAX/TAY of 8-bit slots); !Battle_ActCaster a PC slot (0-2; the
 ;        character is read from !Pc_CharId by it)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; B = 0 (Battle_CalcAngle and
 ;        BattleAct_FindPath end with it; BattleAct_LoadAttack relies on
@@ -11821,7 +11821,8 @@ BattleAct_FindPath:
 ; !Battle_ActObjThread to j. Threads 5-7 are never run (their flags are
 ; set by the loaders like any other).
 ; Callers (JSR): BattleSys_RunAction ($C1:40CB) only.
-; Entry: M=1, X=0, DP=0, DB=$7E
+; Entry: M=1, X=0, DP=0, DB=$7E; B=0 (A = thread * 4 goes to a 16-bit TAX
+;        in BattleAct_RunThread; the caller's TDC leaves it 0)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; the threads'
 ;        state and whatever their handlers write
 ; Callees: BattleAct_RunThread
@@ -11944,7 +11945,7 @@ BattleAct_RunThreads:
 ; Callers (13 JSR sites): BattleAct_RunThreads ($C1:4BC8, $C1:4BD5,
 ;   $C1:4BE2, $C1:4BEF, $C1:4C04, $C1:4C1C, $C1:4C2E, $C1:4C40,
 ;   $C1:4C52, $C1:4C64, $C1:4C76, $C1:4C88, $C1:4C9A).
-; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; A = thread * 4 (its
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E; B=0 (16-bit TAX); A = thread * 4 (its
 ;        !Battle_ActThreadPtr offset), Y = thread number
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered;
 ;        !Battle_ActThreadOfs, !Battle_ActThread, !Battle_ActScriptPtr
@@ -12994,8 +12995,8 @@ BattleAct_CalcMoveStep:
 ; again next frame.
 ; Callers (113 JMP sites): the opcode handlers, e.g. BattleAct_OpEndScript
 ;   ($C1:4CFD), BattleAct_OpLoopAnim ($C1:4E1E), BattleAct_OpPlayAnim
-;   ($C1:4E4B), BattleAct_OpSetSpeed ($C1:4FBC) and many in unmatched code
-;   ($C1:5129 on).
+;   ($C1:4E4B), BattleAct_OpSetSpeed ($C1:4FBC) BattleAct_MoveToPoint ($C1:5129,
+;   $C1:5132) and many in unmatched code ($C1:53A8 on).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = byte count, B = 0 (the add is
 ;        16-bit; the handlers come from BattleAct_RunThread's TDC)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X, Y unchanged;
