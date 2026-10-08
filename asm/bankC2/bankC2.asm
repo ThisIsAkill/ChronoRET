@@ -3214,8 +3214,9 @@ C2Scene_LoadLocExtraGfx:
 ; ($7E:4000-$6FFF) to C2Scene_SaveBgMaps; $7E:7200-$7DFF to
 ; C2Scene_SaveUnk7200; the four lists ($7E:7E00-$85FF) to
 ; C2Scene_SaveLists. C2Scene_RestoreState copies them back; what the
-; state is not kept for (metatiles, the $7E:7000, $7E:B800 and $7E:C000
-; packs, graphics) is what C2Scene_ReloadScene loads again. Inferred
+; state is not kept for (metatiles, the $7E:7000, $7E:B800, $7E:C000 and
+; $7E:C800 packs, the $7E:C600 pack of the extra-graphics scenes,
+; graphics) is what C2Scene_ReloadScene loads again. Inferred
 ; from the unmatched callers: scene modes 5 and 8 save, do something
 ; else and restore; mode 5 then reloads, mode 8 only when the flag test
 ; at $C2:265E passes.
