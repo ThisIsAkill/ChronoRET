@@ -18393,8 +18393,10 @@ BattleAct_OpEllipseToUnkPoint:
 ; Opcode $C4 <t> <d>: each frame adds d to the thread's battler's
 ; !Battler_UnkA4AF (the y offset the movers and the position history
 ; use) and waits (advance 0), until the value equals t, then advances
-; by the length (3). The test is for equality before the add, so a d
-; that does not reach t exactly wraps round until it does. By thread:
+; by the length (3). The test is for equality before the add, and the
+; add wraps in 8 bits, so the value reaches t only when gcd(d,256)
+; divides (t - value); otherwise (e.g. d = 0, or an even d with an odd
+; gap) the opcode waits forever. By thread:
 ;   - threads 0-7 other than 4, the thread's battler: as above;
 ;   - thread 4: steps every slot of !Battle_ActTargetSet; it advances
 ;     as soon as one slot (in set order) already equals t, leaving the
