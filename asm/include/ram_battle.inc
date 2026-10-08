@@ -265,7 +265,7 @@ struct BattleCmd $93EE
 endstruct
 
 !Pc_PoseTicks            = $922D ; 8 B per PC (24 B): pose steps per entry, halved durations (Battle_RunPcPose); the
-                                 ; unmatched code at $C1:5AE8-$C1:5C9A and $CF:EEC3 also use $922D, purpose there unknown
+                                 ; same bytes hold the hit-number sprites (Battle_HitNumSprite, opcodes $50-$55)
 !Pc_PoseFrames           = $9245 ; 8 B per PC: frame id per pose entry (Battle_RunPcPose)
 !Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
 !BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / BattleMsg_FormatTwoDigits)
@@ -583,7 +583,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; BattleAct_LoadScript, from the record by the tech loaders; meaning unknown
 !Battle_Unk5D9B          = $5D9B ; 1 B: service 4 waits for it to be 0 after the script; zeroed by the $CD:0018
                                  ; vector, counted up at $CD:0D8F/$CD:0E11 (unmatched); purpose unknown
-!Battle_UnkAB4E          = $AB4E ; 1 B: zeroed by service 4 after the script; purpose unknown
+!Battle_UnkAB4E          = $AB4E ; 1 B: zeroed by service 4 after the script; set by opcode $6B, zeroed by opcode $6D:
+                                 ; non-zero = $CF:E602 rotates colours (probably the palette cycle's on flag)
 !Battle_ActUnkA1A8       = $A1A8 ; 8 B lists ($A1A8 flags, $A1B0 timers, ...): $CC:F278 counts each set entry's
                                  ; timer down and runs $CC:F2A9 at 0; service 4 clears 40 bytes from here
 !Battle_ActBattlers      = $A014 ; list of battler slots, $FF-ended ($CC:F156): caster, the two slots from $AE97/$AE98
@@ -594,7 +595,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; ($CC:F1AA; bit 15 = slot 0)
 !Battle_ActTargets       = $AC5C ; list of the target slots (main target first), $FF-ended ($CC:F156)
 !Battle_ActPcHitAmount   = $AD9C ; 2 B, 4-byte record per PC: amount compared with the PC's HP by
-                                 ; BattleAct_FlagLethalPcHits (inferred: damage about to be dealt)
+                                 ; BattleAct_FlagLethalPcHits (inferred: damage about to be dealt); opcodes $50-$55
+                                 ; read six sets of 11 such records (one per battler slot, !BattleRom_HitSetOffset)
 !Battle_ActPcHitKind     = $AD9E ; 2 B, same records: kind of the amount; only kind 3 is checked
 !Battle_UnkA118          = $A118 ; 1 B: set to 2 at the end of service 4 when a PC was among the targets; purpose unknown
 !Battler_ActAnimMode     = $A124 ; 1 B per battler slot: action animation on (non-zero); 2 = loop at the end of the
@@ -637,8 +639,9 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActThread        = $A010 ; 1 B: thread being run (0-15); the handlers pick the actor by it
 !Battle_ActOpcode        = $9895 ; 1 B: opcode being run
 !Battle_ActObjThread     = $A2B6 ; 1 B: object thread 0-7 (thread - 8) while threads 8-15 run (BattleAct_RunThreads)
-!Battle_ActUnkA3D1       = $A3D1 ; 1 B: non-zero = object threads are not run and BattleAct_OpEndScript waits; counted up
-                                 ; at $C1:5AE0, zeroed at $C1:5CE9 and by BattleAct_ResetState; purpose unknown
+!Battle_ActUnkA3D1       = $A3D1 ; 1 B: non-zero = object threads are not run and BattleAct_OpEndScript waits; the state
+                                 ; of BattleAct_OpShowHitNumbers (0 idle, 1 build, 2 wait for the bounce), also zeroed by
+                                 ; BattleAct_ResetState
 !Battle_ActTargetMask    = $AE99 ; 2 B: target set as a mask, bit 15 = slot 0 (expanded into !Battle_ActTargetSet by
                                  ; $CC:F1AA); thread 4 runs only while it is non-zero
 !Battler_ActAnimStarted  = $A145 ; 1 B per battler slot: set when opcode $03 has started the battler's animation, cleared
@@ -757,6 +760,68 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjListStart  = $A280 ; 2 B per action object 0-15: offset of its first record (bank $CE)
 !Battle_ActObjMarkCount  = $A2A0 ; 1 B per action object: record count at its last mark (BattleAct_IndexObjLists)
 !Battle_ActObjUnkA07B    = $A07B ; 1 B per action object: set to 1 by BattleAct_LoadCommon; meaning unknown
+
+; Hit numbers (opcodes $50-$55, BattleAct_OpShowHitNumbers): up to four
+; digit sprites per battler slot, then bounced by $CF:E781 (unmatched).
+; "Number" is inferred from the digit tiles BattleMsg_FormatNumber4Digits
+; gives; that they show damage is inferred from !Battle_ActPcHitAmount.
+struct Battle_HitNumSprite $922D ; 4 B per sprite, 4 sprites (16 B) per battler slot, 11 slots ($B0 B); the same
+                                 ; bytes as !Pc_PoseTicks, which the pose code uses at other times
+.X:         skip 1      ; +0: screen x
+.Y:         skip 1      ; +1: screen y ($CF:E7BA adds the bounce step to it)
+.Tile:      skip 1      ; +2: digit tile
+.Attr:      skip 1      ; +3: attribute byte
+endstruct
+!Battle_HitNumHigh       = $92DD ; 1 B per battler slot: OAM high-table bits of its four number sprites (2 bits each;
+                                 ; read at $CF:EEB0, unmatched)
+!Battler_HitNumShown     = $A3D4 ; 1 B per battler slot: set to 1 when numbers were built for it (read at $CF:EEA5)
+!Battler_HitNumAltBounce = $A0DC ; 1 B per battler slot: set to 1 for hit kinds other than 1, 3 and 5; $CF:E794 then
+                                 ; takes the bounce steps from $D1:5E49 instead of $D1:5E10
+!Battler_UnkA003         = $A003 ; 1 B per battler slot: non-zero = its numbers are placed at !Battler_ScreenX/Y plus
+                                 ; !Battler_ScreenOffsetX/Y, else at !Battler_ScreenX/Y; who sets it is not traced
+!Battle_HitNumActive     = $AC5A ; 1 B: set to 1 once the numbers are built; $CF:E781 bounces them each frame and
+                                 ; clears it at the end of its step table; opcodes $50-$55 wait for that
+!Battle_HitNumStep       = $A3D2 ; 1 B: step in the bounce table ($CF:E786 reads it, $CF:E7AF counts it up)
+!Battle_HitNumSet        = $A3D3 ; 1 B: record set of the numbers shown (opcode & 7); no reader found in bank $C1
+!Battle_HitNumColoursA   = $999F ; 8 B: colour bytes copied to the start of !Battle_PaletteLive (the palette of
+                                 ; attribute !Battle_HitNumAttr); also written at $CC:EF0D (unmatched)
+!Battle_HitNumColoursB   = $99A7 ; 8 B: the same, copied to !Battle_PaletteLive+$80 (the palette of
+                                 ; !Battle_HitNumAttrAlt)
+
+; Palettes of the action (opcodes $60-$6D):
+!Battle_PaletteSavedLo   = $2000 ; 256 B just before !Battle_PaletteSaved (probably the background half of the same
+                                 ; buffer); opcodes $6A/$6C copy it back over !Battle_PaletteLiveLo
+!Battle_PaletteLiveLo    = $2200 ; 256 B just before !Battle_PaletteLive: the live half that goes with it
+!Battle_ActPalSeqOn      = $A3B9 ; 1 B per palette sequence 0-3: non-zero = BattleAct_StepPalettes ($CC:F1E7) steps it
+!Battle_ActPalSeqStep    = $A3BD ; 1 B per sequence: entries stepped past the first ($FF on start, so the first step
+                                 ; shows the first entry)
+!Battle_ActPalSeqTimer   = $A3C1 ; 1 B per sequence: frames to the next step (1 on start)
+!Battle_ActPalSeqDelay   = $A3C5 ; 1 B per sequence: frames per step (reloads the timer)
+!Battle_ActPalSeqFirst   = $A3C9 ; 1 B per sequence: first palette-list entry; the step wraps back to it
+!Battle_ActPalSeqLast    = $A3CD ; 1 B per sequence: last palette-list entry
+!Battle_Unk99D2          = $99D2 ; 1 B: non-zero = enemies with !Battler_UnkA08C set also get the palette opcodes'
+                                 ; colours in !Battle_PaletteLiveLo from colour !Battle_Unk99D3 on (probably an
+                                 ; enemy drawn on a background layer; not traced)
+!Battle_Unk99D3          = $99D3 ; 1 B: first colour (index of a 2-byte colour) of that part of !Battle_PaletteLiveLo
+!Battler_UnkA08C         = $A08C ; 1 B per battler slot: see !Battle_Unk99D2
+!Battler_BasePalette     = $9888 ; 1 B per battler slot: !Battler_Palette value opcodes $6A and $6C put back
+!Battler_BlinkTimer      = $A17C ; 1 B per battler slot: frames to the next toggle of opcode $6C's blink
+!Battler_BlinkOn         = $A187 ; 1 B per battler slot: opcode $6C's blink state, toggled 0/1 (1 = special palette)
+!Battle_PalCycleTimer    = $AB4A ; 1 B: frames to the next colour rotation ($CF:E60A counts it down)
+!Battle_PalCycleDelay    = $AB4B ; 1 B: frames per rotation (reloads the timer)
+!Battle_PalCycleLo       = $A08B ; 1 B: non-zero = the rotation at $CF:E634 also turns the !Battle_Unk99D3 colours of
+                                 ; !Battle_PaletteLiveLo
+
+; Headings, facings and links (opcodes $72-$77, $85):
+!Battle_ActFacingOut     = $A2B4 ; 1 B: facing left by the BattleAct_CalcFacing handlers
+!Battle_ActObjLinkSlot   = $AB4F ; 1 B per object thread: battler slot opcodes $73/$74 linked it to
+!Battle_ActObjLinks      = $A3DF ; 11 B per object thread (index thread * 11 + battler slot): opcodes $73/$74 store
+                                 ; the object thread with bit 7 or bit 6 there; read at $CF:EDD4 and $CF:F81D (unmatched)
+!Battle_ActHeadToX       = $A5BE ; 1 B: opcode $76: x of the point the heading is taken to
+!Battle_ActHeadFromCalc  = $A5BF ; 1 B: opcode $76: calc handler of the point it is taken from
+!Battle_ActHeadToY       = $A5C0 ; 1 B: opcode $76: y of the point it is taken to
+!Battle_ActOp80Args      = $53   ; up to 15 B (DP): bytes opcode $80 copies from its script (from its length byte on)
+                                 ; for BattleAct_UnkVecCD001B
 
 ; Sprites of the action's frames: 4 bytes per sprite, $C0 bytes (48
 ; sprites) per frame at the offset !BattleRom_ActFrameBase gives
@@ -970,6 +1035,20 @@ endstruct
 !BattleRom_SlotTimes5     = $CCF83F  ; 1 B per PC slot (7 entries, 0-$1E): n * 5
 !BattleRom_ActFrameBase   = $CCF7C0  ; 2 B per action frame 0-31: frame * $C0, its block in BattleActSprite
 !BattleRom_Times16        = $CCF820  ; 1 B per n 0-8: n * 16 (sprite column/row to pixels)
+!BattleRom_HitSetOffset   = $CCF829  ; 1 B per record set 0-5: set * $2C (11 records of 4 B), its offset in
+                                      ; !Battle_ActPcHitAmount/Kind (opcodes $50-$55)
+!BattleRom_HitNumDigitX   = $CCF5C4  ; 4 B per count of leading zeros 0-3: x offset of each of the four digit
+                                      ; sprites from the battler's x (-16, -8, 0, 8 for four digits; one zero more
+                                      ; moves them 4 to the left, which centres the digits shown)
+; Palette lists: 2 B per entry, at !Battle_ActPalPtr + entry * 2 in bank $CD (opcode $60 and BattleAct_StepPalettes).
+!BattleRom_PalListSet     = $CD0000  ; +0: colour set number
+!BattleRom_PalListFlags   = $CD0001  ; +1: bit 7 = a set from !BattleRom_PalSets14, else from !BattleRom_PalSets6;
+                                      ; bits 0-2 (bits 0-1 in BattleAct_StepPalettes) * 8 = where in !Battle_PaletteLive
+!BattleRom_PalSets6       = $D14100  ; 6 B per colour set (3 colours)
+!BattleRom_PalSets14      = $D14400  ; 14 B per colour set (7 colours)
+!BattleRom_SpecialPals    = $D14D90  ; 24 B (12 colours) per entry: opcode $69's palette
+!BattleRom_PcAttackSfxA   = $CD6D4C  ; 1 B per !Battle_ActPcAttackRec: sound id opcode $7C sends
+!BattleRom_PcAttackSfxB   = $CD6DAC  ; 1 B per !Battle_ActPcAttackRec: sound id opcode $7D sends
 !BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
 !BattleRom_CommandWindowFrame     = $D159FC  ; 84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell
 !BattleRom_TechBoxMap      = $D15A50  ; $180 B: tech window frame tilemap

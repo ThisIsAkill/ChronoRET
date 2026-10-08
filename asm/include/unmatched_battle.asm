@@ -14,9 +14,11 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C15FC3
-BattleAct_Op70Body:                     ; JMP: the opcode $70 handler after its STZ $8E ($C1:5FC1): counts
-                                        ; !Battle_ActObjUnkA1D8 of the object thread up; advances 1 only when DP $8E is 0
+org $C175CC
+BattleAct_CalcFacing:                   ; JSR: A = mode; calls entry A of the word table at $C1:79A1, keeping X and
+                                        ; Y; the handler leaves a facing in !Battle_ActFacingOut (modes 0-9: the
+                                        ; !Battler_Facing of !Battle_ActBattlers entry A); the callers set DP $80/$81
+                                        ; to the actor's x/y first (presumably read by the other modes; not analysed)
 
 org $C1762E
 BattleAct_RunCalc:                      ; JSR: A = handler number; calls entry A of the word table at $C1:79D3, keeping
@@ -85,6 +87,10 @@ BattleAnim_LoadGfx4Vec:                 ; JSL vector (JMP $CD:1323): A = graphic
 org $CD002A
 BattleAnim_LoadGfx2Vec:                 ; JSL vector (JMP $CD:1314): A = graphics set; the same for sets A, A+1
                                         ; as parts 4-5
+
+org $CD001B
+BattleAct_UnkVecCD001B:                 ; JSL vector (JMP $CD:003E, which calls $D1:F67A): run by opcode $80 after
+                                        ; it copied its bytes to !Battle_ActOp80Args; not analysed
 
 org $CD0018
 BattleAnim_UnkVecCD0018:                ; JSL vector (JMP $CD:0D28): A = !Battle_ActUnkArg987C; zeroes
