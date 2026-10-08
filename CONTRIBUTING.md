@@ -110,6 +110,22 @@ pointer tables, lookup tables) are the cheapest bytes to match:
 - The draft still needs what any routine needs: a real header (what it holds, how it is
   indexed), names for its targets, and `make gate`.
 
+## Keeping a branch up to date
+
+Bring a feature branch up to date with `main` by merging, never by rebasing:
+
+```sh
+git fetch origin
+git merge origin/main
+```
+
+Nothing generated is committed, so a merge only conflicts where two branches really edited
+the same lines: `symbols/functions.csv` and `progress.json` are not tracked (the tools
+regenerate them), the docs carry no generated numbers, and each review round is its own file
+under `symbols/reviews/`. The pre-push hook checks the identity and messages of every commit
+the push would publish, and skips commits already on `origin` (such as GitHub's merge commits
+brought in by the merge).
+
 **Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
 by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
 revision, so no routine is ever judged by a rule its own author just wrote.
