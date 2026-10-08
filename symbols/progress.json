@@ -12,8 +12,8 @@
       "bytes": 58826
     },
     "verified": {
-      "functions": 607,
-      "bytes": 56844
+      "functions": 642,
+      "bytes": 58826
     }
   },
   "banks": [
@@ -47,8 +47,8 @@
         "bytes": 25315
       },
       "verified": {
-        "functions": 282,
-        "bytes": 23333
+        "functions": 317,
+        "bytes": 25315
       }
     },
     {

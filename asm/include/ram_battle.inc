@@ -597,7 +597,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActPcHitAmount   = $AD9C ; 2 B, 4-byte record per PC: amount compared with the PC's HP by
                                  ; BattleAct_FlagLethalPcHits (inferred: damage about to be dealt); opcodes $50-$55
                                  ; read six sets of 11 such records (one per battler slot, !BattleRom_HitSetOffset)
-!Battle_ActPcHitKind     = $AD9E ; 2 B, same records: kind of the amount; only kind 3 is checked
+!Battle_ActPcHitKind     = $AD9E ; 2 B, same records: kind of the amount; BattleAct_FlagLethalPcHits checks kind 3,
+                                 ; the hit-number opcodes $50-$55 kinds 1, 2, 3 and 5
 !Battle_UnkA118          = $A118 ; 1 B: set to 2 at the end of service 4 when a PC was among the targets; purpose unknown
 !Battler_ActAnimMode     = $A124 ; 1 B per battler slot: action animation on (non-zero); 2 = loop at the end of the
                                  ; list, else stop (BattleAct_StepBattlerAnims)
@@ -652,8 +653,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjAnimStarted = $A1C0 ; 1 B per object thread: opcode $03's started flag (BattleAct_OpPlayAnim)
 !Battle_ActObjAnimStop   = $A1C8 ; 1 B per object thread: opcodes $04-$06's flag (BattleAct_OpShowAnimFrame); read at
                                  ; $CC:F2DB (unmatched)
-!Battle_ActObjUnkA1D8    = $A1D8 ; 1 B per object thread: counted up by opcode $70 and by opcode $03's start, zeroed when
-                                 ; opcode $03 ends; read at $CF:EDDF; purpose unknown
+!Battle_ActObjUnkA1D8    = $A1D8 ; 1 B per object thread: counted up by opcodes $6E and $70 and by opcode $03's start,
+                                 ; zeroed by opcodes $6F and $71 and when opcode $03 ends; read at $CF:EDDF; purpose unknown
 !Battle_ActObjAnimList   = $A220 ; 2 B per object thread: !Battle_ActObjListStart of the object list it plays
 !Battle_ActObjAnimCount  = $A238 ; 1 B per object thread: !Battle_ActObjMarkCount of that list
 !Battle_ActObjAnimUnkA2B8 = $A2B8 ; 1 B per object thread: $FF on start, compared at $CC:F2AE (presumably as
