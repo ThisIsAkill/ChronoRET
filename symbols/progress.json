@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 32015,
+  "emitted_bytes": 32684,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 283,
-      "bytes": 32015
+      "functions": 296,
+      "bytes": 32684
     },
     "readable": {
-      "functions": 283,
-      "bytes": 32015
+      "functions": 296,
+      "bytes": 32684
     },
     "verified": {
       "functions": 243,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 12057,
+      "emitted_bytes": 12726,
       "matched": {
-        "functions": 162,
-        "bytes": 12057
+        "functions": 175,
+        "bytes": 12726
       },
       "readable": {
-        "functions": 162,
-        "bytes": 12057
+        "functions": 175,
+        "bytes": 12726
       },
       "verified": {
         "functions": 125,
@@ -461,7 +461,7 @@
       "bank": "$C1",
       "start": "$C1:2000",
       "end": "$C1:2FFF",
-      "emitted_bytes": 3991,
+      "emitted_bytes": 4096,
       "functions": [
         "BattleTgt_SingleAlly",
         "BattleTgt_CollectValidTargets",
@@ -525,15 +525,29 @@
         "BattlePos_ModeTable",
         "Battle_TickPcSlots",
         "Battle_UnkThunk2F1F",
-        "Battle_UpdatePcFacing"
+        "Battle_UpdatePcFacing",
+        "Battle_PickStatusAnim"
       ]
     },
     {
       "bank": "$C1",
       "start": "$C1:3000",
       "end": "$C1:3FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 564,
+      "functions": [
+        "Battle_PickNextStatusAnim",
+        "Battle_ApplyPendingEffect",
+        "Battle_FxReset",
+        "Battle_FxOverlay2Tint",
+        "Battle_FxOverlay7",
+        "Battle_FxOverlay6",
+        "Battle_FxColourCycle",
+        "Battle_FxOverlay1",
+        "Battle_FxOverlay3",
+        "Battle_FxOverlay4",
+        "Battle_FxOverlay5",
+        "Battle_FxHandlerTable"
+      ]
     },
     {
       "bank": "$C1",

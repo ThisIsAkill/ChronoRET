@@ -82,6 +82,18 @@ if !constants_battle_inc == 0
 !BattlePos_QueryNearestEnemy = 2 ; !BattlePos_Mode of BattlePos_NearestEnemy
 !BattleSys_ServicePosQuery = 5   ; $C10045 service number of BattlePos_Query
 
+; --- Status animations and effects (Battle_PickStatusAnim, Battle_FxHandlerTable) ---
+!Battle_AnimUntargetable = 0     ; !Battle_AnimId default for an !Battler_Untargetable battler; what animation 0 shows is unknown
+!Battle_AnimUnk12        = $12   ; animation for BattlerStats.Unk2F bit 0 when no status record matches; unknown
+!Battle_StatusAnimNone   = $FF   ; BattleRom_StatusAnim.Anim: no animation of its own
+!Battle_StatsUnk2FBit    = $01   ; BattlerStats.Unk2F bit tested by Battle_PickStatusAnim; meaning unknown
+!Battle_FxNone           = $FF   ; !Battler_FxWanted: no effect (runs Battle_FxReset)
+!Battle_FxUnk2F          = $80   ; !Battler_FxWanted from the Unk2F path (also runs Battle_FxReset)
+!Battle_PaletteCopyLen   = $1A   ; bytes Battle_FxReset copies from !Battle_PaletteSaved
+!Battle_PaletteTintCopyLen = $18 ; bytes Battle_FxOverlay2Tint copies, from byte 2 on
+!Battle_FxOverlayStride  = $10   ; !Battler_FxOverlayBase per overlay block (4 frames x 4 B at $CC:F6D4)
+!Battle_FxOverlayFrameStart = $FF ; !Battler_FxOverlayFrame before the first frame (the first tick makes it 0)
+
 ; --- Text and number formatting ---
 !BattleMsg_Hundred       = 100   ; place value subtracted by FormatNumberDigits
 !BattleMsg_Ten           = 10    ; place value subtracted by FormatNumberDigits / FormatTwoDigits

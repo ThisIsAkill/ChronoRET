@@ -6683,7 +6683,7 @@ BattlePos_ModeTable:
 ;          Battle_UpdatePcFacing, Battle_ApplyPendingEffect,
 ;          Battle_Mul8x16, Battle_Divide, Battle_DrawBattlerFrame
 !Battle_TickOrderIdx = !BattleTmp_92      ; 2 B: index into !Pc_TickOrder (zeroed 16-bit, counted 8-bit)
-!Battle_TickSlot = !BattleTmp_94          ; 2 B: PC slot being ticked (16-bit; also read by the callees)
+!Battle_TickSlot = !BattleTmp_94          ; 2 B: battler slot being ticked (16-bit; also read by the callees)
 !Battle_TickFacingOffset = !BattleTmp_82  ; 2 B: AnimId * 4, then Facing * FacingStride
 !Battle_FacingChanged = !BattleTmp_80     ; 1 B: set by Battle_UpdatePcFacing when the facing changed
 !Battle_TickUnk84 = !BattleTmp_84         ; 1 B: set to 3 here; Battle_PickStatusAnim sets it again before use
@@ -6962,6 +6962,485 @@ Battle_UpdatePcFacing:
     INC.b !Battle_FacingChanged
 .exit:
     RTS
+
+; ==================================================================
+; Status animations and status effects ($C1:2F97–$C1:3233)
+; ==================================================================
+
+; ==================================================================
+; Battle_PickStatusAnim ($C12F97–$C1305B, 197 bytes)
+; ==================================================================
+; Picks the animation and the status effect for battler !Battle_TickSlot
+; from its status bytes:
+;   - default animation 3 (!Battle_AnimDefault), or 0 for an
+;     untargetable battler; effect !Battle_FxNone;
+;   - keeps the battler's BattlerStats offset in !Battle_PickStatsOffset
+;     (Battle_UpdatePcFacing uses it next) and clears DP $80-$81;
+;   - a KO'd battler (Status bit 7), or one with !Battler_UnkA119 set,
+;     gets !Battler_KoFlag = 1 and its animation list restarted;
+;   - walks BattleRom_StatusAnim, 4-byte records (status byte, mask,
+;     effect, animation) ended by a negative status byte. The first
+;     record whose bits are set in the battler's stats wins; the first
+;     record (KO) also wins when !Battler_UnkA119 is set. A record
+;     without an animation of its own ($FF) is skipped while
+;     !BattleMenu_Lock is set, otherwise it gives animation 3. A
+;     non-negative effect goes to !Battler_FxWanted, and a new one
+;     restarts the animation list;
+;   - when no record matches and BattlerStats.Unk2F bit 0 is set (and the
+;     battler is targetable): effect !Battle_FxUnk2F and animation $12.
+; The result goes to !Battle_AnimId. The record table (read from the ROM)
+; maps Status bit 7 to animation 8 and Status2 / the bytes at +$4D, +$4E,
+; +$52, +$53 to effects 2-$0E; what those status bits mean in the game is
+; not established here.
+; Quirk: on the Unk2F path the restart test compares
+; !Battler_FxApplied with $12, the animation id, not the effect $80 just
+; stored. The effects written to FxApplied in bank $C1 are 0-$0E, $80 and
+; $FF, so as far as traced the test never matches and a PC's list restarts
+; on every pick (kept as found; the battle-init writers in bank $CC were
+; not checked).
+; Quirk: the restarts at the top and after a record match store into
+; !Battler_AnimFrame,X for any slot, while the array is 3 bytes long; for
+; enemy slots 8-10 the store lands on !Enemy_AnimTimer+0..2
+; (Battle_TickEnemyGroup). Only the Unk2F path checks for a PC slot.
+; Whether that matters in play is not traced.
+; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): Battle_TickPcSlots,
+; Battle_PickNextStatusAnim.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot = battler slot
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$81, $84 and
+;        $A2-$A3 written
+; No calls.
+!Battle_PickAnim = !BattleTmp_84          ; 1 B: animation picked so far
+Battle_PickStatusAnim:
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable
+    BRA .set_default
+.targetable:
+    LDA.b #!Battle_AnimDefault
+.set_default:
+    STA.b !Battle_PickAnim
+    LDA.b #!Battle_FxNone
+    STA.w !Battler_FxWanted,X
+    LDA.b !Battle_TickSlot
+    ASL A
+    TAX
+    REP #$20                        ; A -> 16-bit
+    LDA.l !BattleRom_StatsOffset,X
+    TAY
+    STY.b !Battle_PickStatsOffset
+    TDC
+    STA.b !Battle_FacingChanged     ; (16-bit: clears $80 and $81)
+    SEP #$20                        ; A -> 8-bit
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_UnkA119,X
+    BNE .down
+    LDA.w BattlerStats.Status,Y
+    BPL .scan
+.down:
+    LDA.b #1
+    STA.w !Battler_KoFlag,X
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,X      ; (an enemy slot writes past the PC array)
+.scan:
+    TDC
+    TAX                             ; X = record offset
+.record:
+    LDA.l BattleRom_StatusAnim.StatusByte,X
+    BMI .table_end
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_PickStatsOffset
+    TAY
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.w BattlerStats.Status,Y     ; the record's status byte
+    AND.l BattleRom_StatusAnim.Mask,X
+    BNE .match
+    TXA
+    BNE .next_record
+    LDX.b !Battle_TickSlot          ; first record (KO): Unk A119 forces it
+    LDA.w !Battler_UnkA119,X
+    BEQ .not_forced
+    TDC
+    TAX
+    BRA .match
+.not_forced:
+    TDC
+    TAX
+    BRA .next_record
+.match:
+    LDA.l BattleRom_StatusAnim.Anim,X
+    CMP.b #!Battle_StatusAnimNone
+    BNE .set_anim
+    LDA.w !BattleMenu_Lock
+    BNE .next_record                ; no animation of its own: look further while locked
+    LDA.b #!Battle_AnimDefault
+.set_anim:
+    STA.b !Battle_PickAnim
+    LDY.b !Battle_TickSlot
+    LDA.l BattleRom_StatusAnim.Effect,X
+    BMI .effect_done
+    STA.w !Battler_FxWanted,Y
+    CMP.w !Battler_FxApplied,Y
+    BEQ .effect_done
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,Y      ; (an enemy slot writes past the PC array)
+.effect_done:
+    BRA .use_pick
+.next_record:
+    INX
+    INX
+    INX
+    INX
+    BRA .record
+.table_end:
+    LDY.b !Battle_PickStatsOffset
+    LDA.w BattlerStats.Unk2F,Y
+    AND.b #!Battle_StatsUnk2FBit
+    BEQ .use_pick
+    LDY.b !Battle_TickSlot
+    LDA.w !Battler_Untargetable,Y
+    BNE .use_pick
+    LDA.b #!Battle_FxUnk2F
+    STA.w !Battler_FxWanted,Y
+    LDA.b #!Battle_AnimUnk12
+    CMP.w !Battler_FxApplied,Y      ; quirk: the animation id, not the effect (see header)
+    BEQ .anim_unk12
+    CPY.w #!Battle_NumPcSlots
+    BCS .anim_unk12
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,Y
+.anim_unk12:
+    LDA.b #!Battle_AnimUnk12
+    BRA .store
+.use_pick:
+    LDA.b !Battle_PickAnim
+.store:
+    STA.w !Battle_AnimId
+    RTS
+
+; ==================================================================
+; Battle_PickNextStatusAnim ($C1305C–$C1308B, 48 bytes)
+; ==================================================================
+; Runs Battle_PickStatusAnim for one battler per call, the slot in
+; !Battle_StatusAnimNext (if present), and moves it on; past slot 10 it
+; counts a wrap in !Battle_StatusAnimWraps and goes back to slot 3, so
+; after the first pass only enemies are visited (the PCs are picked by
+; Battle_TickPcSlots). Then runs Battle_ApplyPendingEffect for all 11
+; slots. The animation id the pick leaves in !Battle_AnimId is not used
+; here.
+; Callers (JSR; scanned as above): the unmatched code at $C1:4127, which
+; starts it at slot 0 and calls it until !Battle_StatusAnimWraps is set
+; (inferred: one full pass over every battler).
+; Entry: M=1, X=0, DP=0, DB=$7E; TAX of the slot also copies B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_TickSlot = 11
+;        and the callees' DP scratch written
+; Callees: Battle_PickStatusAnim, Battle_ApplyPendingEffect
+Battle_PickNextStatusAnim:
+    LDA.w !Battle_StatusAnimNext
+    TAX
+    STX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BEQ .advance
+    JSR Battle_PickStatusAnim
+.advance:
+    INC.w !Battle_StatusAnimNext
+    LDA.w !Battle_StatusAnimNext
+    CMP.b #!Battle_NumSlots
+    BNE .apply
+    INC.w !Battle_StatusAnimWraps
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !Battle_StatusAnimNext
+.apply:
+    TDC
+    TAX
+    STX.b !Battle_TickSlot
+.apply_loop:
+    JSR Battle_ApplyPendingEffect
+    INC.b !Battle_TickSlot
+    LDA.b !Battle_TickSlot
+    CMP.b #!Battle_NumSlots
+    BNE .apply_loop
+    RTS
+
+; ==================================================================
+; Battle_ApplyPendingEffect ($C1308C–$C130B5, 42 bytes)
+; ==================================================================
+; For battler !Battle_TickSlot, if present: when the effect picked
+; (!Battler_FxWanted) differs from the one running (!Battler_FxApplied),
+; records it, stops the overlay and the colour cycle, clears
+; !Battler_KoFlag and runs the effect's entry of Battle_FxHandlerTable.
+; A negative effect ($FF none, $80 from the Unk2F path) runs entry 0,
+; Battle_FxReset.
+; Callers (JSR; scanned as above): Battle_TickPcSlots,
+; Battle_PickNextStatusAnim.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot; the TAX of the table
+;        index also copies B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered (and DP $80 by
+;        Battle_FxOverlay2Tint)
+; Callees: JSR (Battle_FxHandlerTable,X)
+Battle_ApplyPendingEffect:
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BEQ .exit
+    LDA.w !Battler_FxWanted,X
+    CMP.w !Battler_FxApplied,X
+    BEQ .exit
+    STA.w !Battler_FxApplied,X
+    STZ.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    STZ.w !Battler_KoFlag,X
+    STZ.w !Battler_FxCycleOn,X
+    LDA.w !Battler_FxWanted,X
+    BPL .run
+    TDC                             ; none / Unk2F: entry 0
+.run:
+    ASL A
+    TAX
+    JSR (Battle_FxHandlerTable,X)
+.exit:
+    RTS
+
+; ==================================================================
+; Status effect handlers ($C1:30B6–$C1:3233)
+; ==================================================================
+; Each handler sets up the visuals of one effect for battler
+; !Battle_TickSlot. Two mechanisms are started here and run elsewhere:
+;   - an overlay (!Battler_FxOverlayOn): frame !Battler_FxOverlayFrame
+;     (0-3, $FF = before the first) steps every !Battler_FxOverlayPeriod
+;     frames (counted in !Battler_FxOverlayTimer), from frame block
+;     !Battler_FxOverlayBase of the table at $CC:F6D4 (code at $CF:EE38);
+;   - a colour cycle (!Battler_FxCycleOn): colours from $CE:0100 by
+;     !Battler_FxCycleStep, written into the battler's live palette
+;     (code at $CF:E7E0).
+; Overlay block n ($10 * n) has its period in !BattleRom_FxOverlayPeriod
+; entry n-1. The "overlay" and "colour cycle" readings come from that
+; code in bank $CF, which is not matched; what each overlay looks like
+; has not been checked.
+; Entry (all): M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot
+; Exit (all):  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered
+
+; Battle_FxReset ($C130B6–$C130E0, 43 bytes)
+; Effect 0 (none): clears the battler's effect flags; for a PC also
+; copies the saved palette (!Battle_PaletteSaved, 26 bytes from
+; !Battler_Palette * 16) back over the live one, undoing a tint or
+; colour cycle.
+; Callers (JSR; scanned as above): Battle_FxHandlerTable entry 0, the
+; handlers Battle_FxOverlay2Tint/3/4/5/6/7 and Battle_FxColourCycle, and
+; the unmatched service 8 at $C1:3582.
+; The ×16 shift runs on an 8-bit A; the TAY also copies B, assumed 0.
+Battle_FxReset:
+    LDX.b !Battle_TickSlot
+    STZ.w !Battler_UnkA483,X
+    STZ.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_UnkA457,X
+    STZ.w !Battler_FxCycleOn,X
+    STZ.w !Battler_FxTinted,X
+    CPX.w #!Battle_NumPcSlots
+    BCS .exit
+    LDA.w !Battler_Palette,X
+    JSR Battle_ShiftLeft4
+    TAY
+    LDX.w #!Battle_PaletteCopyLen
+.copy:
+    LDA.w !Battle_PaletteSaved,Y
+    STA.w !Battle_PaletteLive,Y
+    INY
+    DEX
+    BNE .copy
+.exit:
+    RTS
+
+; Battle_FxOverlay2Tint ($C130E1–$C13140, 96 bytes)
+; Effect 3: resets, starts overlay 2 and marks the battler tinted
+; (!Battler_FxTinted); for a PC also restores the saved palette from
+; byte 2 on (24 bytes) and then writes the 4 bytes at
+; !BattleRom_FxTintColours into live palette bytes 6-9 (inferred: two
+; colours).
+; Callers: Battle_FxHandlerTable entry 3.
+!Battle_FxPalOffset = !BattleTmp_80       ; 2 B: !Battler_Palette * 16
+Battle_FxOverlay2Tint:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*2
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+1
+    STA.w !Battler_FxOverlayPeriod,X
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxTinted,X
+    CPX.w #!Battle_NumPcSlots
+    BCS .exit
+    LDA.w !Battler_Palette,X
+    JSR Battle_ShiftLeft4
+    TAY
+    STY.b !Battle_FxPalOffset
+    LDX.w #!Battle_PaletteTintCopyLen
+.copy:
+    LDA.w !Battle_PaletteSaved+2,Y
+    STA.w !Battle_PaletteLive+2,Y
+    INY
+    DEX
+    BNE .copy
+    LDY.b !Battle_FxPalOffset
+    LDA.l !BattleRom_FxTintColours
+    STA.w !Battle_PaletteLive+6,Y
+    LDA.l !BattleRom_FxTintColours+1
+    STA.w !Battle_PaletteLive+7,Y
+    LDA.l !BattleRom_FxTintColours+2
+    STA.w !Battle_PaletteLive+8,Y
+    LDA.l !BattleRom_FxTintColours+3
+    STA.w !Battle_PaletteLive+9,Y
+.exit:
+    RTS
+
+; Battle_FxOverlay7 ($C13141–$C13162, 34 bytes)
+; Effect $0E: resets and starts overlay 7.
+; Callers: Battle_FxHandlerTable entry $0E.
+Battle_FxOverlay7:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*7
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+6
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay6 ($C13163–$C13184, 34 bytes)
+; Effect 9: resets and starts overlay 6.
+; Callers: Battle_FxHandlerTable entry 9.
+Battle_FxOverlay6:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*6
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+5
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxColourCycle ($C13185–$C13190, 12 bytes)
+; Effects 6, 7, $0B, $0C and $0D: resets and starts the colour cycle
+; from step 0.
+; Callers: Battle_FxHandlerTable entries 6, 7, $0B, $0C, $0D.
+Battle_FxColourCycle:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxCycleOn,X
+    STZ.w !Battler_FxCycleStep,X
+    RTS
+
+; Battle_FxOverlay1 ($C13191–$C131AF, 31 bytes)
+; Effects 1, 2 and $0A: starts overlay 1. Unlike every other handler
+; it does not run Battle_FxReset first, so the previous effect's tint
+; (palette bytes and !Battler_FxTinted) and the Unk A457/A483 flags
+; stay as they were (kept as found; whether that shows in play is not
+; traced).
+; Callers: Battle_FxHandlerTable entries 1, 2, $0A.
+Battle_FxOverlay1:
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*1
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay3 ($C131B0–$C131D1, 34 bytes)
+; Effect 4: resets and starts overlay 3.
+; Callers: Battle_FxHandlerTable entry 4.
+Battle_FxOverlay3:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*3
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+2
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay4 ($C131D2–$C131F3, 34 bytes)
+; Effect 5: resets and starts overlay 4.
+; Callers: Battle_FxHandlerTable entry 5.
+Battle_FxOverlay4:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*4
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+3
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxOverlay5 ($C131F4–$C13215, 34 bytes)
+; Effect 8: resets and starts overlay 5.
+; Callers: Battle_FxHandlerTable entry 8.
+Battle_FxOverlay5:
+    JSR Battle_FxReset
+    LDX.b !Battle_TickSlot
+    INC.w !Battler_FxOverlayOn,X
+    STZ.w !Battler_FxCycleStep,X
+    LDA.b #!Battle_FxOverlayFrameStart
+    STA.w !Battler_FxOverlayFrame,X
+    LDA.b #!Battle_FxOverlayStride*5
+    STA.w !Battler_FxOverlayBase,X
+    LDA.b #1
+    STA.w !Battler_FxOverlayTimer,X
+    LDA.l !BattleRom_FxOverlayPeriod+4
+    STA.w !Battler_FxOverlayPeriod,X
+    RTS
+
+; Battle_FxHandlerTable ($C13216–$C13233, 30 bytes)
+; One handler per status effect id 0-$0E, called from
+; Battle_ApplyPendingEffect.
+Battle_FxHandlerTable:
+    dw Battle_FxReset               ; $00 none
+    dw Battle_FxOverlay1            ; $01
+    dw Battle_FxOverlay1            ; $02
+    dw Battle_FxOverlay2Tint        ; $03
+    dw Battle_FxOverlay3            ; $04
+    dw Battle_FxOverlay4            ; $05
+    dw Battle_FxColourCycle         ; $06
+    dw Battle_FxColourCycle         ; $07
+    dw Battle_FxOverlay5            ; $08
+    dw Battle_FxOverlay6            ; $09
+    dw Battle_FxOverlay1            ; $0A
+    dw Battle_FxColourCycle         ; $0B
+    dw Battle_FxColourCycle         ; $0C
+    dw Battle_FxColourCycle         ; $0D
+    dw Battle_FxOverlay7            ; $0E
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
