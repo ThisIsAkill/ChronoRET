@@ -8355,23 +8355,19 @@ ClearRAMDMA:
 ; It looks like a fatal-error stop whose colour tells the cases apart:
 ; every caller is a BRL with its own X (blue $7C00 from
 ; GameLoop_NotBankC2 for Loc_Id $81F0-$81FE, $7FE0 from the six sites at
-; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010 (Halt_ColorUnk0920Full) from
+; $C0:3577-$C0:36E4 (the message opcodes), $7C1F from $C0:46D4/483D, $4010 (Halt_ColorUnk0920Full) from
 ; Evt_FindOrAddUnk0920 ($C0:5CB3) when Evt_Unk0920 has no free entry,
 ; $01F0 and $000F from LocLoad_CheckEvtData (refused event data, see
-; there), $1639 from $C0:5F71 in the handler at $C0:5F6E that
+; there), $1639 from Evt_UnusedOpcode ($C0:5F71), the handler that
 ; Evt_OpcodeTable gives unused event opcodes); the conditions behind
-; the unmatched ones are not traced.
+; the message opcodes' and $C0:46D4/483D's halts are not traced.
 ; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_OpBB_Msg ($C0:3577),
 ;   Evt_OpC1_MsgUnk30_1 ($C0:35BC), Evt_OpC2_MsgUnk30_2 ($C0:3603), Evt_OpC0_MsgChoice ($C0:364A),
 ;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4), Evt_FindOrAddUnk0920
 ;   ($C0:5CB3), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_UnusedOpcode ($C0:5F71) and unmatched
 ;   ($C0:46D4, $C0:483D).
-; Callers note (13 BRL sites): GameLoop_NotBankC2 ($C0:007A),
-;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_FindOrAddUnk0920
-;   ($C0:5CB3) and unmatched code at $C0:3577, $C0:35BC, $C0:3603,
-;   $C0:364A, $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D and $C0:5F71 (LDX
-;   #$1639 / BRL at $C0:5F6E; xref marks it doubtful, as the bytes
-;   before it are the opcode table, not code).
+; Callers note: Evt_UnusedOpcode is LDX #$1639 / BRL at $C0:5F6E,
+;   right after the opcode table.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
 ; through TXA), X = BGR555 colour; DP any (Fade_Brightness is written as
 ; an absolute address under DP_Field), DB any (set to $00 first).
@@ -24463,9 +24459,8 @@ Evt_OpA1_MoveToTileVar:
 ;   (facing, Evt_BlockedTurn when blocked, Obj_Unk1000 frames,
 ;   Obj_SetVelocityChecked, Obj_SetMoveAnim), X = the opcode, C=0.
 ; Reached through Evt_OpcodeTable (opcode $94); Evt_Op94_Body from
-;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from the opcode $B5
-;   handler at $C0:3548 (unmatched; it then returns its own offset in X,
-;   C=0).
+;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from
+;   Evt_OpB5_FollowObj (it then returns its own offset in X, C=0).
 ; Callers (1 JSR site): Evt_OpB5_FollowObj ($C0:3548).
 ; Callers of Evt_Op94_Body (1 BRL site): Evt_Op95_WalkToPc ($C0:5426).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
@@ -24818,8 +24813,8 @@ Evt_Op98_Body:                          ; header: see Evt_Op98_WalkTowardObj
 ;   party member's object (X = Party_ObjSlot + p; p = 0, 2 or 4, the
 ;   party position x 2) through Evt_Op94_Body; X = the opcode, C=0 while
 ;   Obj_MoveFrames is nonzero.
-; Reached through Evt_OpcodeTable (opcode $95); also JSR from the opcode
-;   $B6 handler at $C0:3551 (unmatched).
+; Reached through Evt_OpcodeTable (opcode $95); also JSR from
+;   Evt_OpB6_FollowPc.
 ; Callers (1 JSR site): Evt_OpB6_FollowPc ($C0:3551).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
@@ -26384,7 +26379,7 @@ Map_LeaderPastColMin:
 
 ; ============================================================
 ; Event helpers ($C0:5B8D–$C0:5CC6)
-; Called from event-opcode handlers (unmatched): the action-target
+; Called from event-opcode handlers: the action-target
 ; test, the in-front object search and the Evt_Unk0920 list.
 ; ============================================================
 
@@ -26393,7 +26388,6 @@ Map_LeaderPastColMin:
 ; C=1 when Field_UnkEB holds an object (bit 7 clear), C=0 when it is
 ;   $80 (none).
 ; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:304F).
-; Callers note: unmatched event code at $C0:304F.
 ; On entry: M=1 (8-bit A), DP=$0100 (Field_UnkEB); X and DB not used.
 ; Exit: M, X, DP and DB unchanged; A = Field_UnkEB; C as above.
 ; ------------------------------------------------------------
