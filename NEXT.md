@@ -38,6 +38,10 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
+
+0. A relocation-tolerant mode for `tools/find_duplicates.py` (masking absolute JSR/JMP/JSL
+   operands) should find more copies. (The byte-identical copies, `Battle_Mul8CC` at `$CC:F365`
+   and `ScrollWaveFF_A/B` at `$FF:F759`/`$FF:F799`, are matched.)
 1. `$C1:1C4A–$C1:1F78`: the gap between `BattleMenu_LoadCommandWindowMap` and
    `BattleMenu_BuildTargetList`.
 2. `$C1:106E–$C1:10E2`: service 3 of the $C10045 API (periodic/idle check). Needs stubs for

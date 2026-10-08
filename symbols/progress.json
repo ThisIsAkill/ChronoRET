@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 29544,
+  "emitted_bytes": 29702,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 246,
-      "bytes": 29544
+      "functions": 249,
+      "bytes": 29702
     },
     "readable": {
-      "functions": 246,
-      "bytes": 29544
+      "functions": 249,
+      "bytes": 29702
     },
     "verified": {
       "functions": 246,
@@ -52,6 +52,23 @@
       }
     },
     {
+      "bank": "$CC",
+      "code_bytes": null,
+      "emitted_bytes": 30,
+      "matched": {
+        "functions": 1,
+        "bytes": 30
+      },
+      "readable": {
+        "functions": 1,
+        "bytes": 30
+      },
+      "verified": {
+        "functions": 0,
+        "bytes": 0
+      }
+    },
+    {
       "bank": "$FD",
       "code_bytes": null,
       "emitted_bytes": 215,
@@ -66,6 +83,23 @@
       "verified": {
         "functions": 1,
         "bytes": 215
+      }
+    },
+    {
+      "bank": "$FF",
+      "code_bytes": null,
+      "emitted_bytes": 128,
+      "matched": {
+        "functions": 2,
+        "bytes": 128
+      },
+      "readable": {
+        "functions": 2,
+        "bytes": 128
+      },
+      "verified": {
+        "functions": 0,
+        "bytes": 0
       }
     }
   ],
@@ -552,6 +586,120 @@
       "functions": []
     },
     {
+      "bank": "$CC",
+      "start": "$CC:0000",
+      "end": "$CC:0FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:1000",
+      "end": "$CC:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:2000",
+      "end": "$CC:2FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:3000",
+      "end": "$CC:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:4000",
+      "end": "$CC:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:5000",
+      "end": "$CC:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:6000",
+      "end": "$CC:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:7000",
+      "end": "$CC:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:8000",
+      "end": "$CC:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:9000",
+      "end": "$CC:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:A000",
+      "end": "$CC:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:B000",
+      "end": "$CC:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:C000",
+      "end": "$CC:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:D000",
+      "end": "$CC:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:E000",
+      "end": "$CC:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$CC",
+      "start": "$CC:F000",
+      "end": "$CC:FFFF",
+      "emitted_bytes": 30,
+      "functions": [
+        "Battle_Mul8CC"
+      ]
+    },
+    {
       "bank": "$FD",
       "start": "$FD:0000",
       "end": "$FD:0FFF",
@@ -664,6 +812,121 @@
       "end": "$FD:FFFF",
       "emitted_bytes": 0,
       "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:0000",
+      "end": "$FF:0FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:1000",
+      "end": "$FF:1FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:2000",
+      "end": "$FF:2FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:3000",
+      "end": "$FF:3FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:4000",
+      "end": "$FF:4FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:5000",
+      "end": "$FF:5FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:6000",
+      "end": "$FF:6FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:7000",
+      "end": "$FF:7FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:8000",
+      "end": "$FF:8FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:9000",
+      "end": "$FF:9FFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:A000",
+      "end": "$FF:AFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:B000",
+      "end": "$FF:BFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:C000",
+      "end": "$FF:CFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:D000",
+      "end": "$FF:DFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:E000",
+      "end": "$FF:EFFF",
+      "emitted_bytes": 0,
+      "functions": []
+    },
+    {
+      "bank": "$FF",
+      "start": "$FF:F000",
+      "end": "$FF:FFFF",
+      "emitted_bytes": 128,
+      "functions": [
+        "ScrollWaveFF_A",
+        "ScrollWaveFF_B"
+      ]
     }
   ]
 }
