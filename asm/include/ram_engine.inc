@@ -119,7 +119,7 @@ if !ram_engine_inc == 0
                                          ; 1) when nonzero; most handlers drive window (masking)
                                          ; effects and clear it (or move it on) when done; hooks 3
                                          ; and 11 never clear it themselves
-!WinFx_CenterX = $3A                     ; 8-bit; hooks 1-5 hand it to BankC3_Entry0008 as
+!WinFx_CenterX = $3A                     ; 8-bit; hooks 1, 2, 4 and 5 hand it to BankC3_Entry0008 as
                                          ; WinFx_ArgX (inferred: the shape's centre X)
 !WinFx_CenterY = $3B                     ; 8-bit; handed over as WinFx_ArgY (inferred: centre Y)
 !WinFx_Size = $3C                        ; 8-bit; handed over as WinFx_ArgSize; hooks 1/4 count it up

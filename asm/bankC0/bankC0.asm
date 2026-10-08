@@ -6210,7 +6210,7 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; (Ppu_W12SelShadow .. Ppu_CgwSelShadow), turns on an HDMA channel
 ; (5, or 7 for hook 3) in Field_HdmaEnable, and has a bank-$C3 routine
 ; build the shape: BankC3_Entry0008 from WinFx_ArgX/Y/Size (hooks
-; 1-5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
+; 1, 2, 4, 5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
 ; from four moving points (hook 6). The shapes those routines draw
 ; are not traced, so the handlers keep neutral names. Field_EventHook
 ; and WinFx_* are set by unmatched code at $C0:3FA9-$C0:41D8 and
