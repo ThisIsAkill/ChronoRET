@@ -5296,9 +5296,9 @@ Oam_UploadShadow:
 ;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
-; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), C2Scene_Mode2 (JML
-;   $C2:2505) and unmatched (BRL $C0:3B95, JML $C2:8349, JML $FD:DA5B, JML $FD:DABA, JML $FD:DB19,
-;   JML $FD:DB93).
+; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), Evt_OpE1_WarpNow (BRL
+;   $C0:3B95), C2Scene_Mode2 (JML $C2:2505) and unmatched (JML $C2:8349, JML $FD:DA5B, JML $FD:DABA,
+;   JML $FD:DB19, JML $FD:DB93).
 ; Entry: each entry only branches, so the state is the target's: [0] as
 ;        GameLoop_Main expects (it sets DB itself); [1]-[4] the JSL
 ;        caller's state, passed through unchanged.
@@ -7291,8 +7291,8 @@ LocLoad_Unk7084:
 ; sets DB=$00 (PHA/PLB), which GameLoop_Main and other callers rely on.
 ; Callers (14 JSR sites): GameLoop ($C0:0020), GameLoop_Main ($C0:005D), Scene_Unk0283 ($C0:02C3,
 ;   $C0:02EA), Field_SceneChangeTick ($C0:0C9A, $C0:0CEA, $C0:0D1C), Field_PauseAndMenuInput
-;   ($C0:1958, $C0:1964), Field_FadeToBankC2Mode5 ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2) and
-;   unmatched ($C0:3B76, $C0:3FD3, $C0:4186).
+;   ($C0:1958, $C0:1964), Field_FadeToBankC2Mode5 ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2),
+;   Evt_OpE1_WarpNow ($C0:3B76) and unmatched ($C0:3FD3, $C0:4186).
 ; On entry: M=1 (LDA #$00 is the 8-bit form), X either width; DP is not
 ; used. Any DB (the PLB comes before the absolute stores).
 ; Exit: M=1, X/Y unchanged, DB=$00, A=0, interrupts disabled (SEI).
@@ -11078,6 +11078,979 @@ Evt_OpD8_StartBattle:
     INX
     INX
     RTS
+
+; ============================================================
+; Event opcodes: locations, control, sound, fades, map effects
+; ($C0:3AB7–$C0:3E83)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E; the dispatchers enter with C=0). A location
+; operand is a word packed as an ExitRom record's destination: bits 0-8
+; the location (Loc_IdMask), and in its high byte bits 1-4 the facing
+; (Exit_FacingMask after one LSR) and bit 7 kept as is
+; (Exit_FacingBit7), followed by the tile column and row.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:3AB7 — Evt_OpE0_Warp (58 bytes, $3AB7–$3AF0)
+; Event opcode $E0 (5 bytes: $E0, location (word), column, row): sets
+;   Loc_DestId / Loc_DestX (column, row) / Loc_DestFacing from the
+;   operands, SceneFlag_Warp in Field_SceneFlags and Fade_Brightness =
+;   Fade_BrightnessMax, so Field_SceneChangeTick fades out and warps
+;   there. While SceneFlag_Warp is already set nothing is changed.
+;   X = the opcode, C=0 on both paths (the warp restarts the scripts).
+; Reached through Evt_OpcodeTable (opcode $E0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_*, the
+;   Field_* bytes and EvtWarp_Word are dp), DB any (operands read long);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A
+;   clobbered; Y unchanged; EvtWarp_Word = the location word when set.
+; ------------------------------------------------------------
+Evt_OpE0_Warp:
+    LDA.b !Field_SceneFlags
+    BMI .pending                        ; SceneFlag_Warp
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtWarp_Word
+    AND.w #!Loc_IdMask
+    STA.b !Loc_DestId
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Loc_DestX                    ; column, row
+    SEP #$20
+    LDA.b !EvtWarp_Word+1
+    LSR A
+    AND.b #!Exit_FacingMask
+    STA.b !Loc_DestFacing
+    LDA.b !EvtWarp_Word+1
+    AND.b #!Exit_FacingBit7
+    TSB.b !Loc_DestFacing
+    LDA.b !Field_SceneFlags
+    ORA.b #!SceneFlag_Warp
+    STA.b !Field_SceneFlags
+    LDA.b #!Fade_BrightnessMax
+    STA.b !Fade_Brightness
+    TYX
+    CLC
+    RTS
+.pending:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3AF1 — Evt_OpDC_SetPrevLoc (42 bytes, $3AF1–$3B1A)
+; Event opcode $DC (5 bytes: $DC, location (word), column, row): sets
+;   Loc_PrevId, Loc_PrevX (column, row) and Loc_PrevFacing from the
+;   operands, as Field_InitLoadState would have stored them for that
+;   place; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $DC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_* and
+;   EvtWarp_Word are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 5, C=1; A clobbered; Y
+;   unchanged; EvtWarp_Word = the location word.
+; ------------------------------------------------------------
+Evt_OpDC_SetPrevLoc:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtWarp_Word
+    AND.w #!Loc_IdMask
+    STA.b !Loc_PrevId
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Loc_PrevX
+    SEP #$20
+    LDA.b !EvtWarp_Word+1
+    LSR A
+    AND.b #!Exit_FacingMask
+    STA.b !Loc_PrevFacing
+    LDA.b !EvtWarp_Word+1
+    AND.b #!Exit_FacingBit7
+    TSB.b !Loc_PrevFacing
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3B1B — Evt_OpDD_SetLoc (42 bytes, $3B1B–$3B44)
+; Event opcode $DD (5 bytes: $DD, location (word), column, row): sets
+;   Loc_Id, Loc_EntryX (column, row) and Loc_EntryFacing from the
+;   operands without loading anything (the next warp of Evt_OpE1_WarpNow
+;   or Field_SceneChangeTick saves them as the return point); X = Y + 5,
+;   C=1. Evt_OpDE_SetLocUnk1E BRAs here.
+; Reached through Evt_OpcodeTable (opcode $DD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_* and
+;   EvtWarp_Word are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 5, C=1; A clobbered; Y
+;   unchanged; EvtWarp_Word = the location word.
+; ------------------------------------------------------------
+Evt_OpDD_SetLoc:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtWarp_Word
+    AND.w #!Loc_IdMask
+    STA.b !Loc_Id
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Loc_EntryX
+    SEP #$20
+    LDA.b !EvtWarp_Word+1
+    LSR A
+    AND.b #!Exit_FacingMask
+    STA.b !Loc_EntryFacing
+    LDA.b !EvtWarp_Word+1
+    AND.b #!Exit_FacingBit7
+    TSB.b !Loc_EntryFacing
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3B45 — Evt_OpDE_SetLocUnk1E (6 bytes, $3B45–$3B4A)
+; Event opcode $DE (5 bytes, as $DD): Field_Unk1E = 1
+;   (Field_Unk1EOn; Field_FadeInAfterReload clears it), then BRA to
+;   Evt_OpDD_SetLoc.
+; Reached through Evt_OpcodeTable (opcode $DE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk1E is
+;   dp), DB any; Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_OpDD_SetLoc (M=1, X=0, DP and DB unchanged; X = Y + 5,
+;   C=1; A clobbered; Y unchanged; EvtWarp_Word written).
+; ------------------------------------------------------------
+Evt_OpDE_SetLocUnk1E:
+    LDA.b #!Field_Unk1EOn
+    STA.b !Field_Unk1E
+    BRA Evt_OpDD_SetLoc
+
+; ------------------------------------------------------------
+; $C0:3B4B — Evt_OpE1_WarpNow (77 bytes, $3B4B–$3B97)
+; Event opcode $E1 (5 bytes: $E1, location (word), column, row): warps
+;   at once, without the fade-out: Loc_Dest* from the operands (as
+;   Evt_OpE0_Warp), then it waits for vblank (RDNMI bit 7), runs InitHW,
+;   saves Loc_Id / Loc_EntryX,Y / Loc_EntryFacing as Loc_ReturnId /
+;   Loc_ReturnX,Y / Loc_ReturnFacing (the location's entry point, not
+;   the leader's tile as Field_SceneChangeTick's warp saves), copies
+;   Loc_Dest* into Loc_Id / Loc_Entry*, resets S to StackTop and BRLs to
+;   ReentryVectors. Never returns. Evt_OpDF_WarpNowUnk1E BRAs here.
+; Reached through Evt_OpcodeTable (opcode $E1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_* and
+;   EvtWarp_Word are dp), DB=$00 (RDNMI read absolute; InitHW's own
+;   writes); Y = the opcode's offset in Evt_Data.
+; Exit: none (the stack is reset and the game restarts through
+;   ReentryVectors with A=0, interrupts disabled by InitHW).
+; ------------------------------------------------------------
+Evt_OpE1_WarpNow:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtWarp_Word
+    AND.w #!Loc_IdMask
+    STA.b !Loc_DestId
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Loc_DestX
+    SEP #$20
+    LDA.b !EvtWarp_Word+1
+    LSR A
+    AND.b #!Exit_FacingMask
+    STA.b !Loc_DestFacing
+    LDA.b !EvtWarp_Word+1
+    AND.b #!Exit_FacingBit7
+    TSB.b !Loc_DestFacing
+.wait_vblank:
+    LDA.w RDNMI
+    BPL .wait_vblank
+    JSR InitHW
+    LDX.b !Loc_Id
+    STX.b !Loc_ReturnId
+    LDX.b !Loc_EntryX
+    STX.b !Loc_ReturnX                  ; and Loc_ReturnY
+    LDA.b !Loc_EntryFacing
+    STA.b !Loc_ReturnFacing
+    LDX.b !Loc_DestId
+    STX.b !Loc_Id
+    LDX.b !Loc_DestX
+    STX.b !Loc_EntryX
+    LDA.b !Loc_DestFacing
+    STA.b !Loc_EntryFacing
+    LDX.w #!StackTop
+    TXS                                 ; the warp never returns
+    BRL ReentryVectors
+
+; ------------------------------------------------------------
+; $C0:3B98 — Evt_OpDF_WarpNowUnk1E (6 bytes, $3B98–$3B9D)
+; Event opcode $DF (5 bytes, as $E1): Field_Unk1E = 1 (Field_Unk1EOn),
+;   then BRA to Evt_OpE1_WarpNow (never returns).
+; Reached through Evt_OpcodeTable (opcode $DF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk1E is
+;   dp), DB=$00 (as Evt_OpE1_WarpNow); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: none (as Evt_OpE1_WarpNow).
+; ------------------------------------------------------------
+Evt_OpDF_WarpNowUnk1E:
+    LDA.b #!Field_Unk1EOn
+    STA.b !Field_Unk1E
+    BRA Evt_OpE1_WarpNow
+
+; ------------------------------------------------------------
+; $C0:3B9E — Evt_OpE2_WarpVars (103 bytes, $3B9E–$3C04)
+; Event opcode $E2 (5 bytes: $E2, a, b, c, d): as Evt_OpE0_Warp with
+;   the destination in event words (Evt_Unk7F0200 + n x 2): Loc_DestId
+;   = word a (all 16 bits, not masked), Loc_DestX = word b's low byte,
+;   Loc_DestY (Loc_DestX+1) = word c's, Loc_DestFacing = word d's (used
+;   as it is, not unpacked); SceneFlag_Warp set, Fade_Brightness =
+;   Fade_BrightnessMax. While SceneFlag_Warp is already set nothing is
+;   changed. X = the opcode, C=0 on both paths.
+; Reached through Evt_OpcodeTable (opcode $E2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_*, the
+;   Field_* bytes and EvtOp_SavedPos are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A
+;   clobbered; Y = the opcode + 4 when set, else unchanged;
+;   EvtOp_SavedPos = the opcode's offset when set.
+; ------------------------------------------------------------
+Evt_OpE2_WarpVars:
+    LDA.b !Field_SceneFlags
+    BMI .pending                        ; SceneFlag_Warp
+    STY.b !EvtOp_SavedPos
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !Loc_DestId
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; 16-bit read, masked to the operand
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !Loc_DestX
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !Loc_DestX+1
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !Loc_DestFacing
+    LDA.b !Field_SceneFlags
+    ORA.b #!SceneFlag_Warp
+    STA.b !Field_SceneFlags
+    LDA.b #!Fade_BrightnessMax
+    STA.b !Fade_Brightness
+    LDX.b !EvtOp_SavedPos
+    CLC
+    RTS
+.pending:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3C05 — Evt_OpE3_SetControl (12 bytes, $3C05–$3C10)
+; Event opcode $E3 (2 bytes: $E3, value): Field_ControlEnabled = value
+;   (0 stops the pause/menu paths; the Map_Unk7F3700 scripts start with
+;   E3 00 and end with E3 01 or E3 00); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $E3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+;   (Field_ControlEnabled is dp), DB any (operand read long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1;
+;   A = value.
+; ------------------------------------------------------------
+Evt_OpE3_SetControl:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !Field_ControlEnabled
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3C11 — Evt_OpE8_SoundCmd18 (30 bytes, $3C11–$3C2E)
+; Event opcode $E8 (2 bytes: $E8, a): sends sound-driver command $18
+;   (Audio_Cmd18, the command bank $C2 sends as C2Scene_SoundCmd18;
+;   meaning not traced) with Audio_CmdArg0 = a and Audio_CmdArg1 =
+;   Audio_Cmd18Arg1 through Audio_DriverCommand (Audio_CmdArg2 is left
+;   as it was); X = Y + 2, C=0.
+; Reached through Evt_OpcodeTable (opcode $E8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB=$00 (the Audio_Cmd* block absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=0; A clobbered; Y =
+;   EvtOp_SavedPos = the opcode + 1; the Audio_Cmd* bytes written, and
+;   whatever Audio_DriverCommand (unmatched) changes.
+; ------------------------------------------------------------
+Evt_OpE8_SoundCmd18:
+    INY
+    TYX
+    STY.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd18Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd18
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDX.b !EvtOp_SavedPos
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3C2F — Evt_OpEA_PlayMusic (29 bytes, $3C2F–$3C4B)
+; Event opcode $EA (2 bytes: $EA, track): Menu_Config1E = track and
+;   Audio_CmdPlayMusic sent with Audio_CmdArg0 = track, as
+;   LocLoad_AudioSetup starts a location's music (Audio_CmdArg1/2 left
+;   as they were); X = Y + 2, C=0.
+; Reached through Evt_OpcodeTable (opcode $EA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB=$00 (the Audio_Cmd* block absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=0; A clobbered; Y =
+;   EvtOp_SavedPos = the opcode + 1; the Audio_Cmd* bytes written, and
+;   whatever Audio_DriverCommand (unmatched) changes.
+; ------------------------------------------------------------
+Evt_OpEA_PlayMusic:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.l !Menu_Config1E
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_CmdPlayMusic
+    STA.w !Audio_CmdId
+    STX.b !EvtOp_SavedPos
+    JSL Audio_DriverCommand
+    LDX.b !EvtOp_SavedPos
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3C4C — Evt_OpEB_SoundCmds81To83 (76 bytes, $3C4C–$3C97)
+; Event opcode $EB (3 bytes: $EB, a, b): sends three sound-driver
+;   commands through Audio_DriverCommand: Audio_CmdUnk81 with arguments
+;   a, b, Audio_Cmd81Arg; then Audio_Cmd82 and Audio_Cmd83, each with
+;   arguments 0, Audio_Cmd82Arg1 (Audio_CmdArg2 still Audio_Cmd81Arg).
+;   What they do is not traced (bank $C2 sends $81 with $0C,$00 and
+;   then $00,$FF, which looks like a volume fade). X = Y + 3, C=0.
+; Reached through Evt_OpcodeTable (opcode $EB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB=$00 (the Audio_Cmd* block absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=0; A clobbered; Y =
+;   the opcode + 1; EvtOp_SavedPos = Y + 2; the Audio_Cmd* bytes written,
+;   and whatever Audio_DriverCommand (unmatched) changes.
+; ------------------------------------------------------------
+Evt_OpEB_SoundCmds81To83:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdArg0
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    STX.b !EvtOp_SavedPos
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDX.b !EvtOp_SavedPos
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3C98 — Evt_OpEC_SoundCmd (36 bytes, $3C98–$3CBB)
+; Event opcode $EC (4 bytes: $EC, command, a, b): Audio_CmdId =
+;   command, Audio_CmdArg0 = a, Audio_CmdArg1 = b (Audio_CmdArg2 left as
+;   it was), sent through Audio_DriverCommand; X = Y + 4, C=0.
+; Reached through Evt_OpcodeTable (opcode $EC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB=$00 (the Audio_Cmd* block absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 4, C=0;
+;   A clobbered; Y = the opcode + 1; the Audio_Cmd* bytes written, and
+;   whatever Audio_DriverCommand (unmatched) changes.
+; ------------------------------------------------------------
+Evt_OpEC_SoundCmd:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdId
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdArg0
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Audio_CmdArg1
+    INX
+    STX.b !EvtOp_SavedPos
+    JSL Audio_DriverCommand
+    LDX.b !EvtOp_SavedPos
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3CBC — Evt_OpED_WaitApuio1 (9 bytes, $3CBC–$3CC4)
+; Event opcode $ED (1 byte): waits while APUIO1 (the sound CPU's port 1)
+;   reads nonzero: X = the opcode then, else X = Y + 1; C=0 either way.
+;   What the driver reports there is not traced.
+; Reached through Evt_OpcodeTable (opcode $ED).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB=$00
+;   (APUIO1 read absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0; A = the port
+;   byte; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpED_WaitApuio1:
+    TYX
+    LDA.w APUIO1
+    BNE .wait
+    INX
+.wait:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3CC5 — Evt_OpEE_WaitApuio3 (11 bytes, $3CC5–$3CCF)
+; Event opcode $EE (1 byte): waits while the low nibble of APUIO3 (the
+;   sound CPU's port 3) is nonzero: X = the opcode then, else X = Y + 1;
+;   C=0 either way. What the driver reports there is not traced.
+; Reached through Evt_OpcodeTable (opcode $EE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB=$00
+;   (APUIO3 read absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0; A = the low
+;   nibble; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpEE_WaitApuio3:
+    TYX
+    LDA.w APUIO3
+    AND.b #!Apuio3_BusyMask
+    BNE .wait
+    INX
+.wait:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3CD0 — Evt_OpF0_FadeBrightness (45 bytes, $3CD0–$3CFC)
+; Event opcode $F0 (2 bytes: $F0, b): the high nibble of b is a screen
+;   brightness (0-15). With the low nibble 0 Fade_Brightness = it at
+;   once. Else the low nibble is the frames between steps
+;   (Fade_BrightnessDelay and Fade_BrightnessTimer), Fade_BrightnessTarget
+;   = the brightness and FadeFlag_Brightness is set, so Fade_StepBrightness
+;   fades to it. X = Y + 2, C=0 either way (wait with Evt_OpF2).
+; Reached through Evt_OpcodeTable (opcode $F0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the Fade_* and
+;   Field_FadeFlags bytes and EvtFade_Arg are dp), DB any (operand read
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=0; A = the
+;   brightness, or FadeFlag_Brightness; Y unchanged; EvtFade_Arg = b.
+; ------------------------------------------------------------
+Evt_OpF0_FadeBrightness:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    INX
+    STA.b !EvtFade_Arg
+    AND.b #!EvtFade_DelayMask
+    BEQ .at_once
+    STA.b !Fade_BrightnessDelay
+    STA.b !Fade_BrightnessTimer
+    LDA.b !EvtFade_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    AND.b #!INIDISP_BrightnessMask
+    STA.b !Fade_BrightnessTarget
+    LDA.b #!FadeFlag_Brightness
+    TSB.b !Field_FadeFlags
+    CLC
+    RTS
+.at_once:
+    LDA.b !EvtFade_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    AND.b #!INIDISP_BrightnessMask
+    STA.b !Fade_Brightness
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3CFD — Evt_OpF2_WaitBrightness (10 bytes, $3CFD–$3D06)
+; Event opcode $F2 (1 byte): waits while FadeFlag_Brightness is set (a
+;   brightness fade runs): X = the opcode then, else X = Y + 1; C=0
+;   either way.
+; Reached through Evt_OpcodeTable (opcode $F2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_FadeFlags
+;   is dp), DB any (not used); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0; A =
+;   Field_FadeFlags; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpF2_WaitBrightness:
+    TYX
+    LDA.b !Field_FadeFlags
+    BIT.b #!FadeFlag_Brightness
+    BNE .wait
+    INX
+.wait:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3D07 — Evt_OpF1_FadeFixedColor (115 bytes, $3D07–$3D79)
+; Event opcode $F1 (2 bytes: $F1, 0, or 3 bytes: $F1, colour, s): the
+;   fixed colour (Fade_FixedColor, COLDATA-style: bits 5-7 the
+;   channels, bits 0-4 the intensity).
+;   - colour 0: Fade_FixedColor = Fade_FixedColorTarget =
+;     Fade_FixedColorInit (no channel, intensity 0) and Ppu_Unk0BE0 =
+;     Ppu_Unk0BDF (the location's CGADSUB value); X = Y + 2, C=1.
+;   - else Fade_FixedColorTarget = colour and Fade_FixedColor takes its
+;     channel bits (keeping its intensity). s bit 7 picks Ppu_Unk0BE0 =
+;     EvtFade_MathSub (subtract on BG1-3 and OBJ) over EvtFade_MathAdd
+;     (add), and s bits 0-6 the frames between steps: 0 sets
+;     Fade_FixedColor = colour at once, X = Y + 3, C=1; else
+;     Fade_FixedColorDelay / Timer = them, the channel bits are merged
+;     again (the same result), Field_FadeFlags |= FadeFlag_FixedColor and
+;     FadeFlag_Unk10 (bit 4; no reader traced), X = Y + 3, C=0 (wait
+;     with Evt_OpF3).
+;   Ppu_Unk0BE0 as the CGADSUB value rests on Field_HookWinFixedB writing
+;   it with Ppu_Unk0BDF; no reader is traced.
+; Reached through Evt_OpcodeTable (opcode $F1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the Fade_* and
+;   Field_FadeFlags bytes and EvtFade_Channels are dp), DB=$00
+;   (Ppu_Unk0BDF/0BE0 absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered; Y
+;   unchanged; EvtFade_Channels = colour's channel bits (colour nonzero).
+; ------------------------------------------------------------
+Evt_OpF1_FadeFixedColor:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    BEQ .clear
+    INX
+    STA.b !Fade_FixedColorTarget
+    AND.b #!Fade_ChannelMask
+    STA.b !EvtFade_Channels
+    LDA.b !Fade_FixedColor
+    AND.b #!Fade_IntensityMask
+    ORA.b !EvtFade_Channels
+    STA.b !Fade_FixedColor
+    LDA.l !Evt_Data,X
+    BEQ .add_at_once
+    BMI .subtract
+    STA.b !Fade_FixedColorDelay
+    STA.b !Fade_FixedColorTimer
+    LDA.b #!EvtFade_MathAdd
+    STA.w !Ppu_Unk0BE0
+.start:
+    LDA.b !Fade_FixedColorTarget
+    AND.b #!Fade_ChannelMask
+    STA.b !EvtFade_Channels
+    LDA.b !Fade_FixedColor
+    AND.b #!Fade_IntensityMask
+    ORA.b !EvtFade_Channels
+    STA.b !Fade_FixedColor
+    LDA.b #!FadeFlag_FixedColor|!FadeFlag_Unk10
+    TSB.b !Field_FadeFlags
+    INX
+    CLC
+    RTS
+.add_at_once:
+    LDA.b !Fade_FixedColorTarget
+    STA.b !Fade_FixedColor
+    LDA.b #!EvtFade_MathAdd
+    STA.w !Ppu_Unk0BE0
+    INX
+    SEC
+    RTS
+.subtract:
+    AND.b #!EvtFade_DelayMask7
+    BEQ .sub_at_once
+    STA.b !Fade_FixedColorDelay
+    STA.b !Fade_FixedColorTimer
+    LDA.b #!EvtFade_MathSub
+    STA.w !Ppu_Unk0BE0
+    BRA .start
+.sub_at_once:
+    LDA.b !Fade_FixedColorTarget
+    STA.b !Fade_FixedColor
+    LDA.b #!EvtFade_MathSub
+    STA.w !Ppu_Unk0BE0
+    INX
+    SEC
+    RTS
+.clear:
+    LDA.b #!Fade_FixedColorInit
+    STA.b !Fade_FixedColorTarget
+    STA.b !Fade_FixedColor
+    LDA.w !Ppu_Unk0BDF
+    STA.w !Ppu_Unk0BE0
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3D7A — Evt_OpF3_WaitFixedColor (10 bytes, $3D7A–$3D83)
+; Event opcode $F3 (1 byte): waits while FadeFlag_FixedColor is set (a
+;   fixed-colour fade runs): X = the opcode then, else X = Y + 1; C=0
+;   either way.
+; Reached through Evt_OpcodeTable (opcode $F3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_FadeFlags
+;   is dp), DB any (not used); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0; A =
+;   Field_FadeFlags; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpF3_WaitFixedColor:
+    TYX
+    LDA.b !Field_FadeFlags
+    BIT.b #!FadeFlag_FixedColor
+    BNE .wait
+    INX
+.wait:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3D84 — Evt_OpF4_SetShake (19 bytes, $3D84–$3D96)
+; Event opcode $F4 (2 bytes: $F4, value): Field_UnkBC = value (nonzero:
+;   Map_Unk91AC sets Map_ShakeX/Y from Eng_Unk0400, a screen shake by
+;   that inference); with 0, Map_ShakeX and Map_ShakeY = 0 too. X = Y +
+;   2, C=1.
+; Reached through Evt_OpcodeTable (opcode $F4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_UnkBC is
+;   dp), DB=$00 (Map_ShakeX/Y absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=1; A = value; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpF4_SetShake:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_UnkBC
+    BNE .done
+    STA.w !Map_ShakeX
+    STA.w !Map_ShakeY
+.done:
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3D97 — Evt_OpE4_CopyMapRegion (46 bytes, $3D97–$3DC4)
+; Event opcode $E4 (8 bytes: $E4, source column, row, end column, row,
+;   destination column, row, planes): MapCopy_SrcX/Y, MapCopy_EndX/Y,
+;   MapCopy_DstX/Y and Field_Unk44 (the MapCopy_* plane bits) from the
+;   operands, then Field_UnkAF4E copies the region now (no redraw
+;   is requested). X = Y + 8, C=0.
+; Reached through Evt_OpcodeTable (opcode $E4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (MapCopy_*,
+;   Field_Unk44 and EvtOp_SavedPos are dp), DB any (as Field_UnkAF4E);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 8, C=0; A and Y
+;   clobbered; EvtOp_SavedPos = Y + 7; Field_UnkAF4E's writes (the map
+;   planes, MapCopy_Plane and the MapCopy_* scratch).
+; ------------------------------------------------------------
+Evt_OpE4_CopyMapRegion:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_SrcX                 ; and MapCopy_SrcY
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_EndX                 ; and MapCopy_EndY
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_DstX                 ; and MapCopy_DstY
+    INX
+    INX
+    SEP #$20
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk44
+    STX.b !EvtOp_SavedPos
+    JSR Field_UnkAF4E
+    LDX.b !EvtOp_SavedPos
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3DC5 — Evt_OpE5_CopyMapRegionRedraw (47 bytes, $3DC5–$3DF3)
+; Event opcode $E5 (8 bytes, as $E4): the same MapCopy_* and Field_Unk44
+;   setup, then Field_MapRedrawSel = the plane bits 0-2 (MapCopy_L1-L3,
+;   the layers) and SceneFlag_MapRedraw set, so DefaultHandler copies
+;   the region (Field_UnkAF4E) and redraws those layers later. X = Y +
+;   8, C=0.
+; Reached through Evt_OpcodeTable (opcode $E5).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (MapCopy_*, the
+;   Field_* bytes are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 8, C=0; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpE5_CopyMapRegionRedraw:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_SrcX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_EndX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !MapCopy_DstX
+    INX
+    INX
+    SEP #$20
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk44
+    AND.b #!MapCopy_LayerBits
+    STA.b !Field_MapRedrawSel
+    LDA.b #!SceneFlag_MapRedraw
+    TSB.b !Field_SceneFlags
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3DF4 — Evt_OpE6_SetDrift (60 bytes, $3DF4–$3E2F)
+; Event opcode $E6 (5 bytes: $E6, x, y, layers, frames): for each of
+;   Map_Layer1/2/3 set in layers, the word Map_Drift1X/2X/3X (with its
+;   Y byte) = x, y: the per-frame amounts Map_Unk91AC adds to that
+;   layer set; Map_DriftTimer = frames (Map_Unk91AC zeroes all six when
+;   it runs out). X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $E6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtDrift_*
+;   scratch is dp), DB=$00 (Map_Drift* absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 5, C=1; A = layers; Y =
+;   the x, y word when a layer bit is set, else unchanged;
+;   EvtDrift_Amount and EvtDrift_Layers written.
+; ------------------------------------------------------------
+Evt_OpE6_SetDrift:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtDrift_Amount
+    INX
+    INX
+    SEP #$20
+    LDA.l !Evt_Data,X
+    STA.b !EvtDrift_Layers
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Map_DriftTimer
+    LDA.b !EvtDrift_Layers
+    BIT.b #!Map_Layer1
+    BEQ .layer2
+    LDY.b !EvtDrift_Amount
+    STY.w !Map_Drift1X                  ; and Map_Drift1Y
+.layer2:
+    BIT.b #!Map_Layer2
+    BEQ .layer3
+    LDY.b !EvtDrift_Amount
+    STY.w !Map_Drift2X
+.layer3:
+    BIT.b #!Map_Layer3
+    BEQ .done
+    LDY.b !EvtDrift_Amount
+    STY.w !Map_Drift3X
+.done:
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3E30 — Evt_OpE7_ScrollTo (44 bytes, $3E30–$3E5B)
+; Event opcode $E7 (3 bytes: $E7, column, row): scrolls the view to a
+;   map tile through Map_Unk91AC's scroll-to, by Map_ScrollToMode:
+;   - 0 (start): Map_ScrollToX = column x 2, Map_ScrollToY = row x 2
+;     (in Map_TileOriginX/Y units), Map_ScrollToMode = 1,
+;     Field_ControlEnabled = 0; X = the opcode, C=0;
+;   - 1 (scrolling): X = the opcode, C=0;
+;   - else (ScrollTo_Arrived): Map_ScrollToMode = 0; X = Y + 3, C=1.
+;   Field_ControlEnabled is not set again here.
+; Reached through Evt_OpcodeTable (opcode $E7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100
+;   (Field_ControlEnabled is dp), DB=$00 (Map_ScrollTo* absolute); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpE7_ScrollTo:
+    LDA.w !Map_ScrollToMode
+    BEQ .start
+    DEC A
+    BEQ .wait
+    STZ.w !Map_ScrollToMode
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    ASL A
+    STA.w !Map_ScrollToX
+    INX
+    LDA.l !Evt_Data,X
+    ASL A
+    STA.w !Map_ScrollToY
+    INC.w !Map_ScrollToMode
+    STZ.b !Field_ControlEnabled
+.wait:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3E5C — Evt_OpF8_BankC2Cmd06And07 (18 bytes, $3E5C–$3E6D; the JSL
+;   from $3E67 on is the sub-entry Evt_BankC2CmdTail)
+; Event opcode $F8 (1 byte): BankC2_Entry8004 commands 6 and 7
+;   (BankC2Cmd_Unk06, BankC2Cmd_Unk07); X = Y + 1. Read from the ROM
+;   (Menu_Unk8C36's table, unmatched): command 6 sets word +3 of each of
+;   the eight $50-byte records at Menu_CharRecords to its word +5 plus a
+;   bonus by byte +$2A ($A1: half, $A0: a quarter), capped at 999;
+;   command 7 copies byte +9 of each record to byte +7. Probably current
+;   HP and MP refilled to their maximums (not established).
+;   Evt_BankC2CmdTail (A = the command; EvtOp_SavedPos = the next
+;   opcode) runs the command and returns; Evt_OpF9, Evt_OpFA and
+;   Evt_BankC2Cmd08Unused BRA to it.
+; There is no SEC: C stays as the dispatcher entered with it (0), so
+;   the object's run ends after this opcode.
+; Reached through Evt_OpcodeTable (opcode $F8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any (the command sets its own); Y = the opcode's offset
+;   in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = EvtOp_SavedPos = the
+;   opcode + 1; C as on entry; A clobbered (the command's result).
+; ------------------------------------------------------------
+Evt_OpF8_BankC2Cmd06And07:
+    INY
+    STY.b !EvtOp_SavedPos
+    LDA.b #!BankC2Cmd_Unk06
+    JSL BankC2_Entry8004
+    LDA.b #!BankC2Cmd_Unk07
+Evt_BankC2CmdTail:                      ; header: see Evt_OpF8_BankC2Cmd06And07
+    JSL BankC2_Entry8004
+    LDX.b !EvtOp_SavedPos
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3E6E — Evt_OpF9_BankC2Cmd06 (7 bytes, $3E6E–$3E74)
+; Event opcode $F9 (1 byte): BankC2_Entry8004 command 6 alone (see
+;   Evt_OpF8_BankC2Cmd06And07) through Evt_BankC2CmdTail; X = Y + 1, C
+;   as on entry (0: the run ends).
+; Reached through Evt_OpcodeTable (opcode $F9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any; Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_OpF8_BankC2Cmd06And07 (M=1, X=0, DP and DB unchanged;
+;   X = Y = EvtOp_SavedPos = the opcode + 1; C as on entry; A clobbered).
+; ------------------------------------------------------------
+Evt_OpF9_BankC2Cmd06:
+    INY
+    STY.b !EvtOp_SavedPos
+    LDA.b #!BankC2Cmd_Unk06
+    BRA Evt_BankC2CmdTail
+
+; ------------------------------------------------------------
+; $C0:3E75 — Evt_OpFA_BankC2Cmd07 (7 bytes, $3E75–$3E7B)
+; Event opcode $FA (1 byte): BankC2_Entry8004 command 7 alone (see
+;   Evt_OpF8_BankC2Cmd06And07) through Evt_BankC2CmdTail; X = Y + 1, C
+;   as on entry (0: the run ends).
+; Reached through Evt_OpcodeTable (opcode $FA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any; Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_OpF8_BankC2Cmd06And07 (M=1, X=0, DP and DB unchanged;
+;   X = Y = EvtOp_SavedPos = the opcode + 1; C as on entry; A clobbered).
+; ------------------------------------------------------------
+Evt_OpFA_BankC2Cmd07:
+    INY
+    STY.b !EvtOp_SavedPos
+    LDA.b #!BankC2Cmd_Unk07
+    BRA Evt_BankC2CmdTail
+
+; ------------------------------------------------------------
+; $C0:3E7C — Evt_BankC2Cmd08Unused (8 bytes, $3E7C–$3E83)
+; A handler shaped like Evt_OpFA_BankC2Cmd07 for a 2-byte opcode:
+;   BankC2_Entry8004 command 8 (BankC2Cmd_Unk08, which stores $FF at
+;   $30:7FE2, read from the ROM) through Evt_BankC2CmdTail; X = Y + 2.
+;   No Evt_OpcodeTable entry and no call or jump reaches it (xref finds
+;   none), so it looks unused.
+; On entry (if it were reached): M=1 (8-bit A), X=0 (16-bit X/Y),
+;   DP=$0100 (EvtOp_SavedPos is dp), DB any; Y = an opcode's offset in
+;   Evt_Data.
+; Exit: as Evt_OpF8_BankC2Cmd06And07, with X = Y = EvtOp_SavedPos = the
+;   opcode + 2.
+; ------------------------------------------------------------
+Evt_BankC2Cmd08Unused:
+    INY
+    INY
+    STY.b !EvtOp_SavedPos
+    LDA.b #!BankC2Cmd_Unk08
+    BRA Evt_BankC2CmdTail
 
 ; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
@@ -20848,9 +21821,9 @@ Obj_SetVelocityAxis:
 ; when Field_Unk44 is 0; Field_Unk44 is not cleared. The two bit copies
 ; are the same code twice. The name is kept because DefaultHandler
 ; calls it by name (probably Map_CopyRegion).
-; Callers (2 JSR sites): DefaultHandler ($C0:1790) and unmatched ($C0:3DBD).
-; Callers note: DefaultHandler ($C0:1790) and $C0:3DBD in unmatched code
-; (the event handler at $C0:3D97).
+; Callers (2 JSR sites): DefaultHandler ($C0:1790) and Evt_OpE4_CopyMapRegion ($C0:3DBD).
+; Callers note: DefaultHandler ($C0:1790) and Evt_OpE4_CopyMapRegion
+; ($C0:3DBD); Evt_OpE5_CopyMapRegionRedraw has DefaultHandler run it.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the plane bases and map
 ; indexes), DP=$0100 (Field_Unk44, MapCopy_* are dp), DB any (the bit
 ; copies set $7E around themselves; Map_CopyRegionPlane's MVN sets it).

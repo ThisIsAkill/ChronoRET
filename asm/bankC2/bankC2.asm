@@ -15285,8 +15285,9 @@ org $C28000
 ; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Evt_OpD7_GetItemCount ($C0:3807),
 ;   Evt_OpCF_IfCharListed ($C0:389B), Evt_OpD0_AddCharToReserve ($C0:38CC), Evt_OpD1_UnlistChar
 ;   ($C0:38E1), Evt_OpD2_IfCharInParty ($C0:38F6), Evt_OpD3_AddCharToParty ($C0:392B),
-;   Evt_OpD4_MoveCharToReserve ($C0:39DA), Evt_OpD5_BankC2Cmd0A ($C0:3A7C), Scene_PostLoadInit
-;   ($C0:56CF) and unmatched ($C0:3E61, $C0:3E67, $FF:FB84, $FF:FB92, $FF:FB98).
+;   Evt_OpD4_MoveCharToReserve ($C0:39DA), Evt_OpD5_BankC2Cmd0A ($C0:3A7C),
+;   Evt_OpF8_BankC2Cmd06And07 ($C0:3E61), Evt_BankC2CmdTail ($C0:3E67), Scene_PostLoadInit
+;   ($C0:56CF) and unmatched ($FF:FB84, $FF:FB92, $FF:FB98).
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry

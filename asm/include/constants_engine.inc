@@ -901,3 +901,26 @@ endif
 !Pal_PartyRow1 = $7E21C0                 ; ... slot 6 (kind 1)
 !Pal_PartyRow2 = $7E21E0                 ; ... slot 7 (kind 2)
 !Pal_RowCopyCount = $001F                ; MVN count - 1: one 16-colour palette row (32 bytes)
+
+; --- Event location, sound, fade and map opcodes ($DC-$FA) ---
+!Field_Unk1EOn = $01                     ; Field_Unk1E value Evt_OpDE / Evt_OpDF store
+!Audio_Cmd18 = $18                       ; sound-driver command Evt_OpE8 sends (bank $C2's
+                                         ; C2Scene_SoundCmd18; meaning not traced)
+!Audio_Cmd18Arg1 = $80                   ; its Audio_CmdArg1
+!Audio_Cmd82 = $82                       ; sound-driver commands Evt_OpEB sends after Audio_CmdUnk81
+!Audio_Cmd83 = $83                       ; (meanings not traced)
+!Audio_Cmd82Arg1 = $FF                   ; Audio_CmdArg1 of both
+!Apuio3_BusyMask = $0F                   ; APUIO3 bits Evt_OpEE_WaitApuio3 waits on (not traced)
+!EvtFade_DelayMask = $0F                 ; Evt_OpF0's operand bits 0-3: frames between steps
+!EvtFade_DelayMask7 = $7F                ; Evt_OpF1's speed operand bits 0-6: frames between steps
+!Fade_ChannelMask = $E0                  ; Fade_FixedColor bits 5-7: the COLDATA channel bits
+!Fade_IntensityMask = $1F                ; Fade_FixedColor bits 0-4: the intensity
+!FadeFlag_Unk10 = $10                    ; Field_FadeFlags bit 4: set with FadeFlag_FixedColor by
+                                         ; Evt_OpF1_FadeFixedColor (no reader traced)
+!EvtFade_MathAdd = !Layer_Bg123Obj       ; Ppu_Unk0BE0 for an adding fixed-colour fade: CGADSUB add
+                                         ; on BG1-3 and OBJ
+!EvtFade_MathSub = $97                   ; ... subtracting (CGADSUB bit 7 + BG1-3 and OBJ)
+!MapCopy_LayerBits = $07                 ; Field_Unk44 bits 0-2 (MapCopy_L1-L3): the layers
+!BankC2Cmd_Unk06 = $06                   ; BankC2_Entry8004 commands of Evt_OpF8-FA (see
+!BankC2Cmd_Unk07 = $07                   ; Evt_OpF8_BankC2Cmd06And07)
+!BankC2Cmd_Unk08 = $08                   ; ... of Evt_BankC2Cmd08Unused

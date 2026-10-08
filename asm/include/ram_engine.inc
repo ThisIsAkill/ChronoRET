@@ -141,7 +141,7 @@ if !ram_engine_inc == 0
                                          ; register)
 !WinFx_SizeLimit = $3D                   ; 8-bit; WinFx_Size limit for hooks 1 and 4
 !Field_Unk44 = $44                       ; 8-bit flags: the planes Field_UnkAF4E copies (MapCopy_*
-                                         ; bits); the event handler at $C0:3D97 stores it; zeroed at
+                                         ; bits); Evt_OpE4/Evt_OpE5 store it; zeroed at
                                          ; load (Field_InitLoadState)
 !Pad_Unk00F6Latch = $50                  ; 8-bit; GameLoop_FrameBody ORs Pad_Unk00F6 into it every
                                          ; frame
@@ -389,6 +389,14 @@ if !ram_engine_inc == 0
                                          ; operand (16-bit in $D3, low byte in $D4/$D6)
 !EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
                                          ; character's object (Chr_ObjSlot)
+!EvtWarp_Word = $D9                      ; alias of Eng_Scratch in opcodes $DC-$E1: 16-bit location
+                                         ; operand (location in bits 0-8, facing in the high byte)
+!EvtFade_Arg = $D9                       ; alias of Eng_Scratch in Evt_OpF0_FadeBrightness: 8-bit
+                                         ; operand (brightness << 4 | frames)
+!EvtFade_Channels = $D9                  ; alias of Eng_Scratch in Evt_OpF1_FadeFixedColor: 8-bit
+                                         ; channel bits of the colour operand
+!EvtDrift_Layers = $D9                   ; alias of Eng_Scratch in Evt_OpE6_SetDrift: 8-bit layer bits
+!EvtDrift_Amount = $DB                   ; alias of Oam_Range1LoPtr's slot there: 16-bit x, y amounts
 !EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
                                          ; 16-bit, the opcode's offset (Y)
 !EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
@@ -693,7 +701,7 @@ if !ram_engine_inc == 0
                                          ; copied after the CGWSEL
                                          ; slot into $7E:2C6B by $C0:06AF (see Ppu_Unk0BD7)
 !Ppu_Unk0BE0 = $0BE0                     ; 8-bit; written with Ppu_Unk0BDF by Field_HookWinFixedB,
-                                         ; and by event code at $C0:3D2C-3D74; no reader traced
+                                         ; and by Evt_OpF1_FadeFixedColor; no reader traced
 !Field_Unk0BD9 = !Ppu_W12SelShadow       ; older name of Ppu_W12SelShadow, still used by
                                          ; Field_InitLoadState (rename there on its next edit)
 !Field_Unk0BDA = !Ppu_W34SelShadow       ; older name of Ppu_W34SelShadow (as Field_Unk0BD9)
@@ -1211,8 +1219,8 @@ if !ram_engine_inc == 0
 ; Map_Unk1D2E/1D30. That they are BG1-BG3 is likely, not traced.
 !Map_ScrollToMode = $1D00                ; 8-bit; nonzero makes Map_Unk91AC set Map_Unk1D2E/1D30 to
                                          ; +/-$10 towards Map_ScrollToX/Y; it stores 2 when both
-                                         ; have arrived (inferred: a scroll-to request; who sets it
-                                         ; is not traced)
+                                         ; have arrived (a scroll-to request: Evt_OpE7_ScrollTo
+                                         ; sets 1 and clears it once it reads 2)
 !Map_ScrollToDone = $1D01                ; 8-bit; bit 0 / bit 1 set by Map_Unk91AC when X / Y has
                                          ; arrived; zeroed when both have
 !Map_ScrollToX = $1D02                   ; 8-bit target compared with Map_TileOriginX's low byte
