@@ -42,14 +42,14 @@ $C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,readable,02a66a36404c,"(was Sub_5
 $C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,readable,f9861ad10b54,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
 $C0:B271,$C0:B2A7,55,PostVBlank,$C0,Engine,readable,1dd12af82ccd,"Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the frame."
 $C0:B2A8,$C0:B2B1,10,PV_SpriteLoop,$C0,Engine,readable,5b0eeb49e66a,
-$C0:B2B2,$C0:B2BF,14,PV_CheckChain,$C0,Engine,readable,c5f564ab0c6b,
+$C0:B2B2,$C0:B2BF,14,PV_CheckChain,$C0,Engine,verified,c5f564ab0c6b,
 $C0:B2C0,$C0:B2C7,8,PV_NextSprite,$C0,Engine,readable,8b91176ef1f5,
-$C0:B2C8,$C0:B2D7,16,PV_FillRange1,$C0,Engine,readable,118b4a76b2cb,
-$C0:B2D8,$C0:B2DD,6,PV_EndRange1,$C0,Engine,readable,e7c230e38649,
-$C0:B2DE,$C0:B2ED,16,PV_FillRange2,$C0,Engine,readable,c94cbc3b3769,
-$C0:B2EE,$C0:B2F3,6,PV_EndRange2,$C0,Engine,readable,d0ea676042da,
-$C0:B2F4,$C0:B303,16,PV_FillRange3,$C0,Engine,readable,40c5ee3fe7f6,
-$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,readable,09d036d33e90,
+$C0:B2C8,$C0:B2D7,16,PV_FillRange1,$C0,Engine,verified,118b4a76b2cb,
+$C0:B2D8,$C0:B2DD,6,PV_EndRange1,$C0,Engine,verified,e7c230e38649,
+$C0:B2DE,$C0:B2ED,16,PV_FillRange2,$C0,Engine,verified,c94cbc3b3769,
+$C0:B2EE,$C0:B2F3,6,PV_EndRange2,$C0,Engine,verified,d0ea676042da,
+$C0:B2F4,$C0:B303,16,PV_FillRange3,$C0,Engine,verified,40c5ee3fe7f6,
+$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,verified,09d036d33e90,
 $C0:B309,$C0:B700,1016,Spr_AppendToOam,$C0,Engine,readable,73ef9b62bef2,(was Sub_B309.) Appends object Obj_Cur's sprite to the OAM shadow.
 $C0:B701,$C0:B787,135,Spr_PrepareTiles,$C0,Engine,readable,4658c23992ec,(was Sub_B701.) Brings object Obj_Cur's SprTile records up to date before Spr_AppendToOam copies them.
 $C0:B788,$C0:B8C9,322,Spr_Place4,$C0,Engine,readable,7fbf72642003,"(was Sub_B788.) Re-places a 4-tile (size 0) object: with DB=$7F, each SprTile record's X = Spr_BaseX + OfsX (bit 8 packed into Obj_OamHiA with the large-size bits) and Y = Spr_BaseY + OfsY, clamped to"
