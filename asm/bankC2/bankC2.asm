@@ -9038,7 +9038,7 @@ org $C22ED9
 ; argument bytes) for the frame loop to send: copies it to the driver
 ; block Audio_CmdId-Audio_CmdArg2, keeps its rank C2Scene_SoundCmdPrio in
 ; C2Scene_SoundCmdPendPrio and sets C2Scene_SoundCmdState to 1
-; (C2Scene_WaitFrames and C2Scene_MainLoop then send it with
+; (C2Scene_WaitFrames and C2Scene_ModeIdle then send it with
 ; Audio_DriverCommand). Refused (C=1, nothing written) while a command
 ; is being sent (state C2Scene_SoundCmdSending, tested as negative), or
 ; when one is already queued with a lower pending rank than the new one;
@@ -13240,8 +13240,10 @@ C2Scene_ObjAWait:
 ;   in.
 ; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (DP_Field and low
 ;        WRAM absolute); C2Scene_TaskCur = the task
-; Exit:  C=0; M=1, X=0; X = the task (a new record's address after the
-;        script starts); A, Y clobbered; else as C2Scene_ObjAFly
+; Exit:  C=0; M=1, X=0; X = the task (C2Anim_Run reloads it after the
+;        script starts); A, Y clobbered; C2Tmp_01, $08 and $0A changed
+;        by C2Scene_TaskSpawnScript when it starts one; else as
+;        C2Scene_ObjAFly
 ; Calls: C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Anim_Run,
 ;   C2Scene_TaskSpawnScript, C2Scene_ObjAFaceAnim, C2Scene_ObjASound.
 C2Scene_ObjARise:
@@ -13341,8 +13343,9 @@ C2Scene_ObjARise:
 ;        temporaries), DB=$00 (Pad_Unk00F8, DP_Field and low WRAM
 ;        absolute); C2Scene_TaskCur = the task. At .done: M any (SEP
 ;        here), X=0, the same DP and DB
-; Exit:  C=0; M=1, X=0; X = the task (or a new record's address after
-;        the script starts); A, Y clobbered; C2Tmp_00-$15 changed by the
+; Exit:  C=0; M=1, X=0; X = the task (.done's C2Anim_Run reloads it
+;        after the script starts; C2Scene_TaskSpawnScript changes C2Tmp_01,
+;        $08 and $0A); A, Y clobbered; C2Tmp_00-$15 changed by the
 ;        callees on the box and step paths; or as C2Scene_ObjAMove
 ; Calls: C2Scene_TaskSpawnScript, C2Scene_ObjBOverlap, BankC6_UnkE797
 ;   (JSL), C2Scene_SetAnim, C2Scene_ZoneSoundAtView, C2Scene_ObjAFaceAnim,
@@ -13659,7 +13662,7 @@ C2Scene_ObjALand:
 
 ; $C2:4728 — C2Scene_ObjAAfterMode8 (251 bytes, $4728–$4822)
 ; State 6 (C2Scene_ObjAStMode8): waits for C2Scene_ObjANextLoc, which
-; this state and C2Scene_ObjAFly zero before scene mode
+; C2Scene_ObjAWait and C2Scene_ObjAFly zero before scene mode
 ; C2Scene_ModeUnk8 (so probably mode 8's sub-program C2Scene_Unk6A34
 ; sets it; not traced). Every frame C2Scene_ObjAX/Y = the position,
 ; C2Scene_Unk1BF7 = 0 and C2Anim_Run. Then:
@@ -13815,8 +13818,9 @@ C2Scene_ObjAAfterMode8:
 ;        script's RAM ops and the task records); C2Scene_TaskCur = the
 ;        task
 ; Exit:  C=0; M=1, X=0; X = the task (not reloaded after a waiting
-;        script: the ops its scripts stop on, C2Script_WaitAnimating and
-;        C2Script_MoveFrames, leave it in X; at the end C2Scene_SetAnim
+;        script: the ops its scripts stop on, C2Script_WaitAnimating,
+;        C2Script_MoveFrames and C2Script_Wait (C2Scene_ObjAScrLeave's
+;        flag-5 path), leave it in X; at the end C2Scene_SetAnim
 ;        or an LDX reloads it); A, Y clobbered
 ; Calls: C2Scene_TaskRunScript, C2Scene_SetAnim, C2Scene_GetTileProps,
 ;   C2Scene_ObjAGetProps, C2Anim_Run.
