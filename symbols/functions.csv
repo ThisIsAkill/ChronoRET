@@ -612,7 +612,7 @@ $C1:6D14,$C1:6F30,541,BattleAct_CircleMoveKind,$C1,Battle engine,verified,45cee5
 $C1:6F31,$C1:6F52,34,BattleAct_OpCircleToUnkPoint,$C1,Battle engine,verified,b9bbfcbe1fe9,Opcode $C1 <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc) round the point in !Battle_ActUnkPointX/Y; length 4.
 $C1:6F53,$C1:6F74,34,BattleAct_OpEllipseToCalc,$C1,Battle engine,verified,809f687c0aeb,"Opcode $C2 <n> <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc) with mover kind !Battle_MoveKindEllipse ($CF:F354, unmatched), which differs from the circle mover only in using half the radius for t"
 $C1:6F75,$C1:6F99,37,BattleAct_OpEllipseToUnkPoint,$C1,Battle engine,verified,08ad2c0d86b7,Opcode $C3 <r> <a> <q>: opcode $C2 (BattleAct_OpEllipseToCalc) round the point in !Battle_ActUnkPointX/Y; length 4.
-$C1:6F9A,$C1:6FA7,14,BattleAct_OpStepUnkA4AF,$C1,Battle engine,readable,dfad6cab951d,
+$C1:6F9A,$C1:6FA7,14,BattleAct_OpStepUnkA4AF,$C1,Battle engine,verified,dfad6cab951d,
 $C1:6FA8,$C1:6FEE,71,BattleAct_StepUnkA4AF,$C1,Battle engine,verified,a4ad2eedb268,
 $C1:6FEF,$C1:6FFB,13,BattleAct_OpStepUnkA4AFTo0,$C1,Battle engine,verified,efb2a954dfba,Opcode $C5 <d>: opcode $C4 (BattleAct_OpStepUnkA4AF) with t = 0: steps !Battler_UnkA4AF back to 0 by d per frame; length 2.
 $C1:6FFC,$C1:702A,47,BattleAct_OpIncUnkA5D8,$C1,Battle engine,verified,63fe994741cb,Opcode $D0: counts the thread's battler's !Battler_UnkA5D8 up by 1 (no reader of it found); length 1.
