@@ -29,7 +29,7 @@ org $C02E1E
 LoadSavePath:       ; entry for mode >= $01FF (load/save/transition)
 
 org $C0EC60
-Sub_EC60:           ; called from main frame loop after VBlankHandler
+Sub_EC60:           ; frame wait: INC $0152, then spin until the NMI clears it (after Field_EndOfFrame)
 
 org $C0EA63
 NmiHandler:         ; real NMI handler; InstallNMI points the RAM trampoline here
@@ -62,8 +62,8 @@ Field_EventHookDispatch: ; per-frame; if dp $39 != 0, JSR through table $C0:21EE
 org $C0274D
 Field_Unk274D:      ; per-frame; tests dp $54 bits 2-5 against $1D0A/$1D0C/$1D0E
 org $C02848
-Scene_SettleFrames: ; runs up to 15 frames (dp $19 counter) of Scene_ReloadStep + frame update
-                    ; + VBlank until the scene reports ready
+Scene_SettleFrames: ; Scene_ReloadStep once; if it returns 0, raises Fade_Brightness (dp $19) one step
+                    ; per frame (frame update, Field_EndOfFrame, frame wait) until it reaches $0F
 org $C0286C
 Scene_ReloadStep:   ; long chain of scene re-init JSRs (TileAnimList_ApplyAll, $0A50, $6F79, ...)
 org $C028AA
@@ -77,9 +77,9 @@ Scene_PostLoadInit: ; sets dp $69/$6B, clears $09A0, runs object/entity init inc
 org $C056D4
 LocLoad_Unk56D4:    ; location-load step; reads byte 8 of the location record, table $FC:F9F0
 org $C059D9
-Vblank_Unk59D9:     ; VBlankHandler step; runs with DP=$1000, reads $7F:2000
+Vblank_Unk59D9:     ; Field_EndOfFrame step; runs with DP=$1000, reads $7F:2000
 org $C05A46
-Vblank_ReadScanlineCounters: ; VBlankHandler step; latches and reads OPVCT via SLHV/STAT78
+Vblank_ReadScanlineCounters: ; Field_EndOfFrame step; latches and reads OPVCT via SLHV/STAT78
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
@@ -110,7 +110,7 @@ Field_Unk885A:      ; DP=$1D00; dispatches on $0138 (DefaultHandler fade path)
 org $C0A33B
 LocLoad_UnkA33B:    ; location-load step; reads byte 4 of the location record, table $F6:1E00
 org $C0A810
-Vblank_UnkA810:     ; VBlankHandler step; reads $7F:2000
+Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
 org $C0AF4E
 Field_UnkAF4E:      ; acts on dp $44 bits 0/1 with $F0 = $3000/$3040 ...
 
@@ -129,15 +129,15 @@ BankC2_Entry0000:   ; JML target for game mode >= $01F0 (GameLoop_Main)
 org $C28000
 BankC2_Entry8000:   ; JSL with A = a mode value before InitHW (callers say "set BG mode"; unverified)
 org $C28004
-BankC2_Entry8004:   ; JSL with A = 9, once at boot (GameLoop)
+BankC2_Entry8004:   ; JSL with A = a command; 15 JSL sites (GameLoop passes !BankC2_BootArg, at boot and on each $C0:02CA re-entry)
 org $C70000
-Audio_DriverInit:   ; sound driver bank $C7: init, once at boot
+Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
 org $FDC1EE
 Hdma_InitChannelsFD: ; DP=$4300; writes DMAP0-7 / BBAD (HDMA channel setup)
 org $FDC2C1
-EngFD_UnkC2C1:      ; called with 8-bit X each VBlank; dispatches via table $FD:C2E5 on dp $26
+EngFD_UnkC2C1:      ; called with 8-bit X once a frame; dispatches via table $FD:C2E5 on dp $26
                     ; unless dp $53 bit 0 is set (earlier notes guessed an audio tick; unverified)
 org $FDFFF4
 FdVec_FFF4:         ; bank $FD service vector: JMP $E292 (runs with DP=$0500)

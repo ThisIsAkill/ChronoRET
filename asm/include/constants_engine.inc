@@ -8,12 +8,12 @@ if !constants_engine_inc == 0
 !constants_engine_inc = 1
 
 ; --- Crash trap ---
-!CrashMarkerRead = $ABCDEF   ; read forever by BRK_Handler; a ROM address (HiROM mirror of
+!CrashMarkerRead = $ABCDEF               ; read forever by BRK_Handler; a ROM address (HiROM mirror of
                              ; file offset $2BCDEF), value discarded. Inferred: chosen to be
                              ; recognizable on a bus trace, not to fetch data.
 
 ; --- Addressing ---
-!BankWrap = $10000   ; one bank: a BRL whose 16-bit offset wraps around the bank
+!BankWrap = $10000                       ; one bank: a BRL whose 16-bit offset wraps around the bank
                      ; boundary is written `BRL Target-!BankWrap` so asar computes
                      ; the same (in-range, wrapped) offset the ROM has
 
@@ -40,7 +40,7 @@ if !constants_engine_inc == 0
 !Boot_ClearMainSize = $E900              ; bytes cleared from $7E:0700 to the end of bank $7E
 !Boot_Clear7FStart = $5080               ; first address of the cleared bank-$7F block; also its byte
                                          ; count
-!BankC2_BootArg = $09                    ; A for the one-time BankC2_Entry8004 call at boot
+!BankC2_BootArg = $09                    ; A for the BankC2_Entry8004 call in GameLoop (boot, and again on the $C0:02CA re-entry)
 
 ; --- Locations ---
 !Loc_FirstBankC2 = $01F0                 ; Loc_Id at or above this is handled by BankC2_Entry0000
@@ -56,7 +56,7 @@ if !constants_engine_inc == 0
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
 
-; --- OAM shadow ranges (PostVBlank, FrameStateInit, Field_RestoreState) ---
+; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
                                          ; 28)
 !Oam_Range1Limit = $08A0                 ; low-table address range 1 may not reach (entry 104)
@@ -77,9 +77,9 @@ if !constants_engine_inc == 0
                                          ; function
 !ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
 
-; --- Field defaults (FrameStateInit) ---
+; --- Field defaults (Field_InitLoadState) ---
 !Fade_FixedColorInit = $E0               ; Fade_FixedColor at load: all colour channels, intensity 0
-!Field_Unk28Init = $5F                   ; Field_Unk28 at load
+!Field_HdmaEnableInit = $5F              ; Field_HdmaEnable at load: HDMA channels 0-4 and 6
 !Field_Unk63Idle = $80                   ; Field_Unk63 at load (negative = Sub_1ADF leaves it alone)
 !Field_UnkEBInit = $80                   ; Field_UnkEB at load
 !Audio_SfxDefaultA = $53                 ; Audio_SfxTileAnimA at load
@@ -94,11 +94,11 @@ if !constants_engine_inc == 0
 !FadeFlag_Reloaded = $40                 ; Field_FadeFlags bit 6: set after a reload
 !Fade_BrightnessMax = $0F                ; full screen brightness (INIDISP bits 0-3)
 !Field_FadeBusyOn = $FF                  ; Field_FadeBusy while a pause/fade loop runs
-!Field_ExitArgXMask = $003F              ; Field_ExitMenuArg bits 5-0 (handed over in X)
+!Field_ExitArgXMask = $003F              ; Field_BankC2Arg bits 5-0 (handed over in X)
 !Eng_Unk7F0000Min = $49                  ; Field_FadeToBankC2Mode5 runs only when Eng_Unk7F0000 >=
                                          ; this
 !ExitMenu_Mode5 = $05                    ; BankC2_Entry8000 argument used by Field_RunBankC2Mode5
-!ExitMenu_Mode6 = $06                    ; BankC2_Entry8000 argument when Field_ExitMenuArg bit 0 is
+!ExitMenu_Mode6 = $06                    ; BankC2_Entry8000 argument when Field_BankC2Arg bit 0 is
                                          ; clear
 !SceneFlag_Battle = $01                  ; Field_SceneFlags bit 0: start a battle (DefaultHandler
                                          ; JSLs EngCall_BattleMain)
@@ -109,7 +109,7 @@ if !constants_engine_inc == 0
                                          ; the battle path
 !VramQueue_TileStep = $02                ; Field_VramQueueFlags bit 1: TileAnim_StepVramAddrs ready
 !VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
-!Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one VBlankHandlerShort
+!Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one Field_EndOfFrameShort
                                          ; before the battle (DefaultHandler)
 
 ; --- Pad ---
@@ -192,18 +192,27 @@ if !constants_engine_inc == 0
 ; --- Object frame build ---
 !Obj_VramTileMask = $01FF                ; tile-number bits of Obj_VramTile
 !ObjTile_AltLayout = $68                 ; Obj_VramTile value that selects the alternate VRAM layout
-                                         ; in the 12-tile builders
+                                         ; in the 12-tile builders: tile $68 is column 8 of a
+                                         ; 16-tile VRAM row, so its first row of 16x16 tiles holds
+                                         ; only 4, giving rows of 4 then 8 instead of 8 then 4
 !Frame4_Bytes = $28                      ; bytes per frame record of a 4-tile object: 16 tile words +
                                          ; 4 position pairs
-!Frame8_Bytes = $50                      ; bytes per frame record of an 8-tile object
-!Frame12_Bytes = $78                     ; bytes per frame record of a 12-tile object
-!Spr_UpperOfsY = $E8                     ; tiles with OfsY >= this (the upper 24 lines) take
-                                         ; Obj_PrioHigh
+!Frame8_Bytes = $50                      ; bytes per frame record of an 8-tile object: 32 tile words
+                                         ; + 8 position pairs
+!Frame12_Bytes = $78                     ; bytes per frame record of a 12-tile object: 48 tile words
+                                         ; + 12 position pairs
+!Spr_UpperOfsY = $E8                     ; 4-tile builders: tiles with OfsY >= this (unsigned; as a
+                                         ; signed byte -24..-1, the 24 lines just above the
+                                         ; origin) take Obj_PrioHigh. Whether that is the upper or
+                                         ; lower part of the sprite depends on where the origin
+                                         ; is, which is not established
 !Anim_EndMarker = $FF                    ; frame-number table entry that ends an animation row
 !Vram_TileRowWords = $0100               ; VRAM words in one row of sixteen 8x8 tiles (the next row
                                          ; holds the lower halves of 16x16 sprites)
 !Gfx_8TilesBytes = $0100                 ; bytes in eight 4bpp 8x8 tiles
 !SprBuf_ChunkTiles = $0010               ; tiles in one $200-byte SprBuf chunk
+!SprBuf_HalfChunkTiles = $0008           ; tiles in half a SprBuf chunk ($100 bytes): one copy run of
+                                         ; the 12-tile builders
 !Frame_TileWordBytes = $02               ; bytes per tile word in a frame record (offsets are written
                                          ; as this x tile index)
 !Spr_TileRowStep = $10                   ; OAM tile-number step to the next row of 16 tiles

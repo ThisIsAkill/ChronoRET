@@ -4,16 +4,16 @@
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 256,
+      "functions": 244,
       "bytes": 29032
     },
     "readable": {
-      "functions": 256,
+      "functions": 244,
       "bytes": 29032
     },
     "verified": {
-      "functions": 68,
-      "bytes": 1980
+      "functions": 244,
+      "bytes": 29032
     }
   },
   "banks": [
@@ -30,8 +30,8 @@
         "bytes": 19585
       },
       "verified": {
-        "functions": 21,
-        "bytes": 188
+        "functions": 117,
+        "bytes": 19585
       }
     },
     {
@@ -39,16 +39,16 @@
       "code_bytes": 63904,
       "emitted_bytes": 9232,
       "matched": {
-        "functions": 138,
+        "functions": 126,
         "bytes": 9232
       },
       "readable": {
-        "functions": 138,
+        "functions": 126,
         "bytes": 9232
       },
       "verified": {
-        "functions": 46,
-        "bytes": 1577
+        "functions": 126,
+        "bytes": 9232
       }
     },
     {
@@ -79,11 +79,11 @@
         "ReentryVectors",
         "GameLoop",
         "GameLoop_Main",
-        "GL_ModeOk1",
-        "GL_ModeOk2",
+        "GameLoop_NotBankC2",
+        "GameLoop_LoadField",
         "GameLoop_FrameBody",
-        "VBlankHandler",
-        "VBlankHandlerShort",
+        "Field_EndOfFrame",
+        "Field_EndOfFrameShort",
         "Field_IdleFrame",
         "LoadLocation",
         "Field_SaveState",
@@ -93,7 +93,7 @@
         "InitHW",
         "InstallNMI",
         "InstallIRQ",
-        "FrameStateInit",
+        "Field_InitLoadState",
         "Field_SceneChangeTick",
         "ModeE6_Handler",
         "ModeEC_Handler"
@@ -198,16 +198,16 @@
       "emitted_bytes": 3503,
       "functions": [
         "Obj_ResetStates",
-        "PostVBlank",
-        "PV_SpriteLoop",
-        "PV_CheckChain",
-        "PV_NextSprite",
-        "PV_FillRange1",
-        "PV_EndRange1",
-        "PV_FillRange2",
-        "PV_EndRange2",
-        "PV_FillRange3",
-        "PV_EndRange3",
+        "Oam_BuildShadow",
+        "Oam_BucketLoop",
+        "Oam_CheckChain",
+        "Oam_NextBucket",
+        "Oam_HideRange1",
+        "Oam_EndRange1",
+        "Oam_HideRange2",
+        "Oam_EndRange2",
+        "Oam_HideRange3",
+        "Oam_EndRange3",
         "Spr_AppendToOam",
         "Spr_PrepareTiles",
         "Spr_Place4",
@@ -344,30 +344,20 @@
         "BattleMenu_DrawCommandWindowFrame",
         "BattleMenu_RenderItemListRows",
         "BattleMenu_RenderItemRow",
-        "CODE_JP_C10A87",
+        "BattleMenu_RenderItemRow_Exit",
         "BattleMenu_RenderTechListRows",
         "BattleMenu_BuildTechAvailFlags",
         "BattleMenu_RenderTechRow",
-        "CODE_JP_C10BB6",
+        "BattleMenu_DrawTechLowerRow",
         "BattleMenu_BlankNameLeadCells",
-        "CODE_JP_C10C00",
+        "BattleMenu_BlankNameTailCells",
         "BattleMenu_UpdateWindows",
-        "CODE_C10C46",
+        "BattleMenu_UpdateWindows_Exit",
         "BattleMenu_UpdateMainWindow",
         "BattleMenu_UpdateTechWindow",
         "BattleMenu_DrawTechCursorRow",
         "BattleMenu_ClearTechCursorTiles",
-        "BattleMenu_UpdateTechMpAvail",
-        "CODE_JP_C10F28",
-        "_ump_check_fd",
-        "_ump_set_grey",
-        "CODE_C10F66_JMP",
-        "_ump_check_battler",
-        "_ump_pc1_ok",
-        "_ump_pc2_ok",
-        "_ump_pc3_ok",
-        "_ump_slot_ready",
-        "_ump_write_bright"
+        "BattleMenu_UpdateTechMpAvail"
       ]
     },
     {
@@ -376,9 +366,7 @@
       "end": "$C1:1FFF",
       "emitted_bytes": 3164,
       "functions": [
-        "_ump_set_unusable",
-        "CODE_JP_C1100F",
-        "CODE_JP_C1103D",
+        "BattleMenu_Return",
         "BattleSys_SlotMenuReadyPredicate",
         "BattleMsg_BlankLeadingZeros",
         "BattleMenu_RefreshIfDirtyL",
