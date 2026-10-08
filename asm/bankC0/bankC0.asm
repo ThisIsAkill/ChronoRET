@@ -8361,9 +8361,11 @@ ClearRAMDMA:
 ; there), $1639 from $C0:5F71 in the handler at $C0:5F6E that
 ; Evt_OpcodeTable gives unused event opcodes); the conditions behind
 ; the unmatched ones are not traced.
-; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_FindOrAddUnk0920 ($C0:5CB3),
-;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_UnusedOpcode ($C0:5F71) and unmatched ($C0:3577,
-;   $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D).
+; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_OpBB_Msg ($C0:3577),
+;   Evt_OpC1_MsgUnk30_1 ($C0:35BC), Evt_OpC2_MsgUnk30_2 ($C0:3603), Evt_OpC0_MsgChoice ($C0:364A),
+;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4), Evt_FindOrAddUnk0920
+;   ($C0:5CB3), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_UnusedOpcode ($C0:5F71) and unmatched
+;   ($C0:46D4, $C0:483D).
 ; Callers note (13 BRL sites): GameLoop_NotBankC2 ($C0:007A),
 ;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_FindOrAddUnk0920
 ;   ($C0:5CB3) and unmatched code at $C0:3577, $C0:35BC, $C0:3603,
@@ -9177,6 +9179,456 @@ Evt_PushTarget:
     STZ.w !Obj_Unk1001,X
     LDA.b #!Field54_Push
     TSB.b !Field_Unk54
+    RTS
+
+; ============================================================
+; Event opcodes: yields, endless follows and messages ($C0:353F–$C0:3710)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E). The message opcodes start Field_Unk1F87's
+; sequence the way Field_CheckTileInFront does for a treasure
+; (Field_Unk29 = Field_Unk29Start, Field_Unk2A = a number, Field_Unk2E =
+; the object, Field_Unk32 = 0), with Field_Unk2B / Field_Unk2D as a
+; 24-bit pointer set by Evt_OpB8_SetMsgPtr; reading it as a text message
+; (Field_Unk2A its number, Field_Unk30 the window's place, Field_Unk62 /
+; 64 / 65 a choice cursor as Sub_1ADF moves it) is an inference from
+; those uses, not traced through Field_Unk1F87. Each message opcode
+; waits while Field_Unk29 is nonzero, starts the message and marks
+; Obj_Cur's ObjX_LeaveView, and goes on once Field_Unk29 is 0 again.
+; ============================================================
+
+org $C0353F
+; ------------------------------------------------------------
+; $C0:353F — Evt_OpB1_Yield (4 bytes, $353F–$3542)
+; Event opcode $B1 (1 byte): ends the object's run here: X = Y + 1 (the
+;   next opcode, for the next run), C=0.
+; Reached through Evt_OpcodeTable (opcode $B1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any, DB any (not used);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A and Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB1_Yield:
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3543 — Evt_OpB2_Halt (3 bytes, $3543–$3545)
+; Event opcode $B2 (1 byte): stops the object on this opcode for good: X
+;   = Y (the opcode again), C=0.
+; Reached through Evt_OpcodeTable (opcode $B2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any, DB any (not used);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y, C=0; A and Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB2_Halt:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3546 — Evt_OpB5_FollowObj (9 bytes, $3546–$354E)
+; Event opcode $B5 (2 bytes: $B5, slot): runs Evt_Op94_WalkToObj (a step
+;   toward the object in slot) and stays on this opcode for good: X = Y,
+;   C=0 whatever the walk returned.
+; Reached through Evt_OpcodeTable (opcode $B5).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_SavedY
+;   and the walk's scratch are dp), DB=$00 (as Evt_Op94_WalkToObj
+;   needs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A and Y
+;   as Evt_Op94_WalkToObj left them; EvtFollow_SavedY = the opcode's
+;   offset, and the walk's scratch written.
+; ------------------------------------------------------------
+Evt_OpB5_FollowObj:
+    STY.b !EvtFollow_SavedY
+    JSR Evt_Op94_WalkToObj
+    LDX.b !EvtFollow_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:354F — Evt_OpB6_FollowPc (8 bytes, $354F–$3556)
+; Event opcode $B6 (2 bytes: $B6, p): runs Evt_Op95_WalkToPc (a step
+;   toward party member p) with X = Y returned: the opcode stays.
+; Quirk: unlike Evt_OpB5_FollowObj there is no CLC, so C is the walk's:
+;   when it has arrived (C=1) the dispatcher runs this opcode again in
+;   the same run (until Evt_StepsLeft runs out).
+; Reached through Evt_OpcodeTable (opcode $B6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_SavedY
+;   and the walk's scratch are dp), DB=$00 (as Evt_Op95_WalkToPc needs);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C as
+;   Evt_Op95_WalkToPc returned; A and Y as it left them;
+;   EvtFollow_SavedY = the opcode's offset, and the walk's scratch
+;   written.
+; ------------------------------------------------------------
+Evt_OpB6_FollowPc:
+    STY.b !EvtFollow_SavedY
+    JSR Evt_Op95_WalkToPc
+    LDX.b !EvtFollow_SavedY
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3557 — Evt_OpB8_SetMsgPtr (25 bytes, $3557–$356F)
+; Event opcode $B8 (4 bytes: $B8, ptr (3 bytes)): Field_Unk2B (word) and
+;   Field_Unk2D (bank) = ptr, the pointer the message opcodes need
+;   (probably to the location's message table); X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $B8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk2B /
+;   Field_Unk2D are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   bank byte; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB8_SetMsgPtr:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2B
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2B+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2D
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3570 — Evt_OpBB_Msg (69 bytes, $3570–$35B4)
+; Event opcode $BB (2 bytes: $BB, msg): shows message msg (probably; see
+;   the banner) with Field_Unk30 = 0. With Field_Unk2D = 0 (no pointer
+;   set) the game stops: Sys_HaltWithColor, colour Halt_ColorNoMsgPtr.
+;   While Field_Unk29 is nonzero: X = the opcode, C=0. Then, with
+;   Obj_Cur's ObjX_LeaveView 0: ObjX_LeaveView = 1, Field_Unk2A = msg,
+;   Field_Unk2E = Obj_Cur, Field_Unk32 = 0, Field_Unk29 =
+;   Field_Unk29Start, Field_Unk30 = 0, Field54_WatchBox cleared in
+;   Field_Unk54; X = the opcode, C=0. With it 1 (the message is over):
+;   ObjX_LeaveView = 0, X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $BB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above (or never
+;   returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBB_Msg:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    STZ.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:35B5 — Evt_OpC1_MsgUnk30_1 (71 bytes, $35B5–$35FB)
+; Event opcode $C1 (2 bytes: $C1, msg): as Evt_OpBB_Msg with Field_Unk30
+;   = 1.
+; Reached through Evt_OpcodeTable (opcode $C1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBB_Msg (or
+;   never returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpC1_MsgUnk30_1:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #$01
+    STA.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:35FC — Evt_OpC2_MsgUnk30_2 (71 bytes, $35FC–$3642)
+; Event opcode $C2 (2 bytes: $C2, msg): as Evt_OpBB_Msg with Field_Unk30
+;   = 2.
+; Reached through Evt_OpcodeTable (opcode $C2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBB_Msg (or
+;   never returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpC2_MsgUnk30_2:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #$02
+    STA.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3643 — Evt_OpC0_MsgChoice (49 bytes, $3643–$3673; then the shared
+;   start Evt_MsgChoiceStart, 54 bytes, $3674–$36A9)
+; Event opcode $C0 (3 bytes: $C0, msg, choices): as Evt_OpBB_Msg
+;   (Field_Unk30 = 0), with a choice: on starting, Field_Unk65 = choices
+;   bits 0-1 and Field_Unk64 = bits 2-3 (Evt_ChoiceMask), Field_Unk62 =
+;   1 (the limits and selector Sub_1ADF moves its cursor Field_Unk63
+;   with). When the message is over: ObjX_LeaveView = 0, Obj_Cur's
+;   ObjX_Unk7F0A80 (low byte) = Field_Unk66 (where Sub_1ADF leaves the
+;   cursor; opcode $1A tests it), Field_Unk62 = 0, X = Y + 3, C=1.
+;   Evt_MsgChoiceStart is the start (X = Obj_Cur, Field_Unk30 set
+;   by the caller): ObjX_LeaveView = 1, the Field_Unk* bytes as in
+;   Evt_OpBB_Msg and the choice bytes; X = the opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $C0).
+; Callers note: Evt_OpC3_MsgChoiceUnk30_1 also branches to
+;   Evt_MsgChoiceStart (BRA at $C0:36C4).
+; Callers of Evt_MsgChoiceStart (1 BRL site): Evt_OpC4_MsgChoiceUnk30_2 ($C0:36F7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data. Evt_MsgChoiceStart: also
+;   X = Obj_Cur.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above (or never
+;   returns); A clobbered; Y unchanged; Eng_Scratch = choices on a
+;   start.
+; ------------------------------------------------------------
+Evt_OpC0_MsgChoice:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    STZ.b !Field_Unk30
+    BRA Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+Evt_MsgChoiceStart:                     ; header: see Evt_OpC0_MsgChoice
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    INX
+    LDA.l !Evt_Data,X                   ; choices
+    STA.b !Eng_Scratch
+    AND.b #!Evt_ChoiceMask
+    STA.b !Field_Unk65
+    LDA.b !Eng_Scratch
+    LSR A
+    LSR A
+    AND.b #!Evt_ChoiceMask
+    STA.b !Field_Unk64
+    LDA.b #$01
+    STA.b !Field_Unk62
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:36AA — Evt_OpC3_MsgChoiceUnk30_1 (51 bytes, $36AA–$36DC)
+; Event opcode $C3 (3 bytes: $C3, msg, choices): as Evt_OpC0_MsgChoice
+;   with Field_Unk30 = 1.
+; Reached through Evt_OpcodeTable (opcode $C3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpC0_MsgChoice
+;   (or never returns); A clobbered; Y unchanged; Eng_Scratch = choices
+;   on a start.
+; ------------------------------------------------------------
+Evt_OpC3_MsgChoiceUnk30_1:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.b !Field_Unk30
+    BRA Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:36DD — Evt_OpC4_MsgChoiceUnk30_2 (52 bytes, $36DD–$3710)
+; Event opcode $C4 (3 bytes: $C4, msg, choices): as Evt_OpC0_MsgChoice
+;   with Field_Unk30 = 2 (it reaches Evt_MsgChoiceStart with a BRL).
+; Reached through Evt_OpcodeTable (opcode $C4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpC0_MsgChoice
+;   (or never returns); A clobbered; Y unchanged; Eng_Scratch = choices
+;   on a start.
+; ------------------------------------------------------------
+Evt_OpC4_MsgChoiceUnk30_2:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$02
+    STA.b !Field_Unk30
+    BRL Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
     RTS
 
 ; ============================================================
@@ -23915,7 +24367,7 @@ Evt_OpA1_MoveToTileVar:
 ;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from the opcode $B5
 ;   handler at $C0:3548 (unmatched; it then returns its own offset in X,
 ;   C=0).
-; Callers (1 JSR site): unmatched ($C0:3548).
+; Callers (1 JSR site): Evt_OpB5_FollowObj ($C0:3548).
 ; Callers of Evt_Op94_Body (1 BRL site): Evt_Op95_WalkToPc ($C0:5426).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
@@ -24269,7 +24721,7 @@ Evt_Op98_Body:                          ; header: see Evt_Op98_WalkTowardObj
 ;   Obj_MoveFrames is nonzero.
 ; Reached through Evt_OpcodeTable (opcode $95); also JSR from the opcode
 ;   $B6 handler at $C0:3551 (unmatched).
-; Callers (1 JSR site): unmatched ($C0:3551).
+; Callers (1 JSR site): Evt_OpB6_FollowPc ($C0:3551).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).

@@ -318,7 +318,9 @@ if !ram_engine_inc == 0
                                          ; opcodes $AD and $B9-$BD
 !ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
                                          ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
-                                         ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
+                                         ; Field_Unk29 becomes Field_Unk29State0D. The message opcodes
+                                         ; $BB-$C4 set it to 1 while their message is up and clear it
+                                         ; when it is over
 !ObjFront_SavedY = $C7                   ; Evt_FindSolidObjInFront: 16-bit, the caller's Y
 !ObjFront_FacingX2 = $D9                 ; alias of Eng_Scratch there: 8-bit Obj_Facing x 2 of
                                          ; Obj_Cur (index into Evt_InFrontTests)
@@ -376,6 +378,8 @@ if !ram_engine_inc == 0
                                          ; value on its way
 !EvtBit_Arg = $DB                        ; alias of Oam_Range1LoPtr's slot in opcodes $65/$66: 8-bit,
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
+!EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
+                                         ; the opcode's offset (Y) across the walk opcode they run
 !EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
                                          ; (bytes - 1)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers

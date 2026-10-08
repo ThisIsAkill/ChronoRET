@@ -806,3 +806,9 @@ endif
                                          ; offset; what is there is not traced)
 !Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
                                          ; tile (column, row): the byte after Evt_PushScriptPos
+
+; --- Event message opcodes ($B8-$C4) ---
+!Halt_ColorNoMsgPtr = $7FE0              ; Sys_HaltWithColor colour when a message opcode runs with
+                                         ; Field_Unk2D (the pointer's bank) 0
+!Evt_ChoiceMask = $03                    ; bits 0-1 / 2-3 of a choice message's operand: Field_Unk65
+                                         ; / Field_Unk64
