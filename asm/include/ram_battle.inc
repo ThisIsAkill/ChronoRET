@@ -66,6 +66,8 @@ if !ram_battle_inc == 0
 ; ------------------------------------------------------------
 ; Direct page: other fixed roles
 ; ------------------------------------------------------------
+!Battle_UnkA4            = $A4   ; 1 B: copied to !Battle_Unk993B around Battle_TickPcSlots and copied back if that
+                                 ; changed it (BattleSys_UpkeepTwoFrames); $C1:34A4 counts it up to 3; purpose unknown
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
@@ -181,6 +183,8 @@ endstruct
 !Sfx_Command             = $1E00 ; 1 B: APU command byte for Audio_ProcessEntry (same block bank $C0's Audio_PlayTileSfxA uses)
 !Sfx_Param1              = $1E01 ; 1 B: first APU command parameter (sound id for command $19)
 !Sfx_Param2              = $1E02 ; 1 B: second APU command parameter
+!Battle_Unk2989          = $2989 ; 1 B: bit 7 set lets BattleSys_UpkeepTwoFrames act on !Battle_Unk99CF/99D0;
+                                 ; purpose unknown (near the config bytes $2990/$2991)
 !Pc_CharId               = $2980 ; 3 B per PC slot: character id (0-6) of the PC in that slot; inferred from the
                                  ; target modes that search it for ids 3-6. (The field engine uses $2980 for other
                                  ; data; see the wiki's RAM table.)
@@ -268,8 +272,13 @@ endstruct
 !BattleMenu_ItemRowDrawn = $991F ; 1 B: item cursor row last drawn ($FF = redraw)
 !BattleMenu_ItemScrollDrawn = $9920 ; 1 B: item scroll position the arrows were last drawn for ($FF = redraw)
 !BattleMenu_Dirty        = $993A ; 1 B: non-zero = rebuild the menu this frame (RefreshIfDirty gates)
+!Battle_Unk993B          = $993B ; 1 B: copy of !Battle_UnkA4 (see there); also compared with it at $C1:3499
 !BattleTgt_Candidates    = $99C0 ; 12 B: candidate battler slots ($FF = empty); 11 used, cleared through index 11
 !BattleTgt_AreaType      = $99CC ; 1 B: area shape for service 7 (index into BattleTgt_AreaTable, 0-6)
+!Battle_Unk99CF          = $99CF ; 1 B: with !Battle_Unk99D0: either non-zero (and !Battle_Unk2989 bit 7) makes
+                                 ; BattleSys_UpkeepTwoFrames clear both and show info message $75 once; purpose unknown
+!Battle_Unk99D0          = $99D0 ; 1 B: see !Battle_Unk99CF
+!Battle_Unk99D1          = $99D1 ; 1 B: latch: set when that message has been shown, so it is shown once
 !Battle_CmdQueue         = $99D4 ; 4 B: PC slots with a committed command, in commit order
 !Battle_CmdQueueLen      = $99D8 ; 1 B: entries in !Battle_CmdQueue
 !Pc_AtbCur               = $99DD ; 3 B per PC: ATB gauge value
@@ -329,7 +338,9 @@ endstruct
                                  ; sets $FF; purpose unknown
 !Pc_SavedTech            = $A0D8 ; 3 B per PC: tech id under the cursor at commit (with CfgListMemory)
 !BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel (battle init $CC:E3AC copies $2990 bit 7)
+!Battle_UnkA0FD          = $A0FD ; 1 B: zeroed by BattleSys_UpkeepTwoFrames unless !Battle_UnkA10E is set; purpose unknown
 !Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
+!Battle_UnkA10E          = $A10E ; 1 B: non-zero skips the message check in BattleSys_UpkeepTwoFrames; purpose unknown
 !BattleUI_LowHp          = $A10F ; 1-2 B: non-zero while drawing a PC whose HP is 0, or 1..MaxHP/8 with !BattleUI_UnkA110 set
 !BattleUI_UnkA110        = $A110 ; 1-2 B: non-zero lets HP 1..MaxHP/8 count as low (HP 0 always does); otherwise unknown
 !BattleMenu_KeepRow      = $A114 ; 1 B: set by alt-confirm; CommitAction then keeps !Pc_SavedMenuRow

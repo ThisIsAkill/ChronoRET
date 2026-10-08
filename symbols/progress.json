@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 30005,
+  "emitted_bytes": 30122,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 249,
-      "bytes": 30005
+      "functions": 250,
+      "bytes": 30122
     },
     "readable": {
-      "functions": 249,
-      "bytes": 30005
+      "functions": 250,
+      "bytes": 30122
     },
     "verified": {
       "functions": 244,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 10047,
+      "emitted_bytes": 10164,
       "matched": {
-        "functions": 128,
-        "bytes": 10047
+        "functions": 129,
+        "bytes": 10164
       },
       "readable": {
-        "functions": 128,
-        "bytes": 10047
+        "functions": 129,
+        "bytes": 10164
       },
       "verified": {
         "functions": 126,
@@ -398,11 +398,12 @@
       "bank": "$C1",
       "start": "$C1:1000",
       "end": "$C1:1FFF",
-      "emitted_bytes": 3979,
+      "emitted_bytes": 4096,
       "functions": [
         "BattleMenu_Return",
         "BattleSys_SlotMenuReadyPredicate",
         "BattleMsg_BlankLeadingZeros",
+        "BattleSys_UpkeepTwoFrames",
         "BattleMenu_RefreshIfDirtyL",
         "BattleMenu_RefreshIfDirtyAndTick",
         "BattleMenu_DrawCursorSprites",
