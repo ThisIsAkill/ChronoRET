@@ -106,6 +106,9 @@ block). The lint requires:
   routine alone, or with its sub-entries).
 - `UNMATCHED`: no header or banner calls an address `unmatched` (`unmatched code at $C1:0027`,
   `$C1:3819 (unmatched)`) once that address lies inside matched code; name the routine instead.
+- `DPDB`: the Entry line states DP and DB itself (`DP any` and `DB any` are statements too).
+  "as Field_Unk74D4" or "see the banner" does not count unless the text it points to is in the
+  same header.
 
 Two kinds of label are exempt from `HEADER`:
 

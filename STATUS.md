@@ -106,6 +106,11 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-08: lint rule `DPDB`: each routine header's Entry line states DP and DB (the standing
+  review decision, now checked); "as X" or "see the banner" counts only if the text is in the
+  same header. Requested by the maintainer. 60 findings in 59 verified routines are
+  grandfathered for this rule alone in `tools/readability_baseline.txt`.
+
 - 2026-10-08: lint rule `UNMATCHED`: header or banner text may not call an address unmatched
   once it lies inside matched code. Requested by the maintainer. 53 findings, all in verified
   routines (15 routines, most of them listed as stale in NEXT.md), are grandfathered for this

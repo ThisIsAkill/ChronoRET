@@ -49,6 +49,11 @@ asm/include/ and are exempt):
          `/AAAA` continuations) in the clause after the word "unmatched", or
          in the list of addresses right before "(unmatched". The finding
          names the routine that now contains it. Needs the ROM and asar.
+  DPDB   every Entry line of a routine header (with the lines continuing
+         it) states DP and DB (`DP=0`, `DP any`, `D=$0100`, `DB=$7E`, ...).
+         "as X", "see the banner" or "Entry/Exit: as Y" do not count,
+         unless another line of the same header states both. Tables and
+         sub-entries are exempt, as for HEADER.
 
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
@@ -479,7 +484,7 @@ def by_function(findings):
 # applies to it in full. A whole-function entry (`path:Function`) exempts it
 # from every rule but keeps it at `matched` (tools/progress.py).
 PER_RULE = ('SIZE', 'UNMATCHED', 'DPDB')
-CLAIM_RULES = {'SIZE', 'UNMATCHED'}
+CLAIM_RULES = {'SIZE', 'UNMATCHED', 'DPDB'}
 EVALUATED = set()       # the per-rule checks this run could make (no ROM: no SIZE/UNMATCHED)
 
 
