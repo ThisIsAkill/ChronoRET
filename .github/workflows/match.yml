@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  readability:
+    name: Readability standard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Lint (functions outside tools/readability_baseline.txt must be clean)
+        run: python3 tools/lint_readability.py
+
   match:
     name: Reassemble and diff
     runs-on: ubuntu-latest
@@ -40,10 +51,10 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y cmake build-essential
-          git clone --depth=1 https://github.com/RPGHacker/asar.git /tmp/asar
-          cmake -S /tmp/asar/src -B /tmp/asar/build -DASAR_GEN_EXE=ON -DASAR_GEN_DLL=OFF
-          cmake --build /tmp/asar/build --target asar
-          sudo cp /tmp/asar/build/asar /usr/local/bin/asar
+          git clone --depth=1 --branch v1.91 https://github.com/RPGHacker/asar.git /tmp/asar
+          cmake -S /tmp/asar/src -B /tmp/asar/build
+          cmake --build /tmp/asar/build --target asar-standalone
+          sudo cp /tmp/asar/build/asar/bin/asar /usr/local/bin/asar
           asar --version
 
       - name: Set up Python
@@ -62,10 +73,10 @@ jobs:
           make diff
           echo "MATCH_RESULT=passed" >> "$GITHUB_ENV"
 
-      - name: Show match percentage
+      - name: Verify full coverage (every source-emitted byte)
         if: env.SKIP_CHECK != '1'
         run: |
-          python3 tools/progress.py
+          python3 tools/verify.py
 
       - name: Fail on mismatch
         if: env.SKIP_CHECK != '1' && env.MATCH_RESULT != 'passed'

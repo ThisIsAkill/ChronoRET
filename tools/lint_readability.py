@@ -13,6 +13,10 @@ asm/include/ and are exempt):
          labels, never raw addresses or offsets.
   CONST  immediates above 8 are named constants. REP/SEP flag masks are
          exempt (they are CPU mode switches, read as such).
+  WIDTH  an instruction whose operand uses a define (!Name) or struct
+         field states its width explicitly (.b/.w/.l). Defines are textual,
+         so without a suffix the encoding silently follows however the
+         define's value happens to be written.
   OPCODE no hand-encoded instructions (`db` standing in for an opcode); use
          a named macro from asm/include/macros.inc instead.
   PLUMB  no test/scaffolding plumbing in game code: print/assert/warnpc/
@@ -150,6 +154,10 @@ def lint_file(path: Path):
         operand = (m.group(3) or '').strip()
         if not operand:
             continue
+
+        named = '!' in operand or re.search(r'[A-Za-z_]\w*(\[[^]]*\])?\.[A-Za-z_]', operand)
+        if named and mnemonic not in FLOW and not m.group(2):
+            report('WIDTH')
 
         if operand.startswith('#'):
             if mnemonic in MODE_SWITCH:
