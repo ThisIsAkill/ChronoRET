@@ -9001,8 +9001,9 @@ C2Scene_ZoneSoundAtEntry:
 ; Entry: M=1 (8-bit loads and adds), X=0, DP=$0000 (C2Scene_BgTileX/Y,
 ;        C2Tmp_00/$01), DB=$00 (low WRAM)
 ; Exit:  M=1, X=0; C as C2Scene_QueueSoundCmd leaves it (0 queued, 1
-;        refused); A, X clobbered; Y unchanged; C2Tmp_00/$01 and
-;        $10-$12 changed when the zone is looked up
+;        refused); A, X clobbered; Y = the column / 2 (C2Scene_GetSoundZone's
+;        TAY) when the zone is looked up, else unchanged; C2Tmp_00/$01
+;        and $10-$12 changed when the zone is looked up
 ; Calls: C2Scene_GetSoundZone, C2Scene_QueueSoundCmd.
 C2Scene_ZoneSoundAtView:
     LDA.l !C2Scene_Unk7F01ED
@@ -9101,8 +9102,11 @@ C2Scene_ZoneSoundInit:
 ;   falls in).
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_00/$01, C2Scene_SoundZone), DB=$00
 ;        (low WRAM); C2Scene_TaskCur = the task
-; Exit:  M=1, X=0, C=0 (the task goes on); A, X clobbered; Y unchanged;
-;        C2Tmp_00/$01 and $10-$12 changed when the zone is looked up
+; Exit:  M=1, X=0, C=0 (the task goes on); A, X clobbered; Y = the
+;        column / 2 (C2Scene_GetSoundZone's TAY) when the zone is looked
+;        up, else unchanged; C2Tmp_00-$02 (the 16-bit store to
+;        C2Scene_ZoneRow writes $02 too) and $10-$12 changed when the
+;        zone is looked up
 ; Calls: C2Scene_QueueSoundCmd, C2Scene_GetSoundZone.
 C2Scene_ZoneSoundWatch:
     LDA.l !C2Scene_Unk7F01ED
