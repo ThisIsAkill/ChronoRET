@@ -6,7 +6,7 @@
 #   - no session links or blocked words in commit messages
 #   - make gate (byte-exact, full coverage, readability) and symbols/ current
 set -euo pipefail
-IDENT='Akhil Moola <goudakhil29@gmail.com>'
+IDENT='Akill <goudakhil29@gmail.com>'
 fail() { printf '\033[0;31m[pre-push] %s\033[0m\n' "$*" >&2; exit 1; }
 
 range="${1:-origin/main..HEAD}"
