@@ -518,7 +518,7 @@ if !constants_battle_inc == 0
 !Battle_List3StatusBit    = $80   ; BattlerStats.Unk4C+1 bit list 3 clears at its end
 !Battle_List4StatusBit    = $40   ; BattlerStats.Unk4C+1 bit list 4 clears at its end
 !Battle_List5StatusBit    = $40   ; BattlerStats.Unk4C+2 bit list 5 clears at its end
-!Battle_List8StatusBit    = $10   ; BattlerStats.Status2 bit that makes list 8 call $C1:EBF8 / $C1:EC7F
+!Battle_List8StatusBit    = $10   ; BattlerStats.Status2 bit that makes list 8 call Battle_RecordHit / Battle_ApplyHits
 !Battle_List9StatusBit    = $20   ; BattlerStats.Unk4C+2 / Unk4C+7 bit that makes list 9 hit
 !Battle_List10StatusBit   = $04   ; BattlerStats.Unk4C+2 bit list 10 clears at its end
 !Battle_ListHalveBit      = $80   ; BattlerStats.Unk4C+1 / Unk4C+6 bit: lists 8 and 9 halve their timer
@@ -539,10 +539,58 @@ if !constants_battle_inc == 0
 !Battle_UnkAEB2Bytes      = 9     ; bytes BattleSys_Unk8461 zeroes from !Battle_UnkAEB2
 !Battle_UnkB192Size       = 4     ; bytes per !Battle_UnkB192 record
 !Battle_AF15Bit7          = $80   ; !Battle_UnkAF15 bit 7: BattleSys_Unk8C09 runs the enemy even with no id
-!BattleAi_BlockEnd        = $FE   ; script byte that ends a block (BattleSys_Unk8461)
+!BattleAi_BlockEnd        = $FE   ; script byte that ends a block's test part and its action part
 !BattleAi_ScriptEnd       = $FF   ; script byte that ends a script part
 !BattleAi_CodeUnk20       = $20   ; first code of a reaction part that lets an empty enemy entry run it (and puts
                                   ; its id back); meaning unknown
+!BattleAi_RecordSize      = 4     ; bytes per test record in a script block
+!BattleAi_SecondTest      = $01   ; !Battle_UnkB1CF: the block has a second test (set before the first runs)
+!BattleAi_FirstPassed     = $80   ; !Battle_UnkB1CF: the first of two tests passed (BattleAi_NoteFirstTest)
+!BattleAi_TestFailed      = 1     ; !Battle_UnkAF24 left by a test that fails (it counts up)
+!BattleAi_NoTarget        = 2     ; !Battle_UnkAF24 left by a choose handler that found no target (BattleAi_RunMainPart
+                                  ; then zeroes !Battle_UnkB2B6 and skips only the action part)
+!BattleAi_ActRestart      = $04   ; action code: a chosen block whose action part starts with it is begun from its
+                                  ; first action again (BattleAi_TestPassed); meaning of the action not traced
+!BattleAi_ActCode1        = 1     ; action code 1: BattleAi_SetCmdBits adds $80 and !Battle_UnkAEEB = 4
+!BattleAi_ActCode2        = 2     ; action code 2: BattleAi_EnemyTurn goes to $C1:D7C4 (others: $C1:D8D1);
+                                  ; BattleAi_SetCmdBits adds $40
+!BattleAi_CmdBitCode1     = $80   ; !Battle_UnkB18E bit for action code 1
+!BattleAi_CmdBitCode2     = $40   ; !Battle_UnkB18E bit for action code 2
+!BattleAi_UnkAEEBCode1    = 4     ; !Battle_UnkAEEB for action code 1
+!BattleAi_RunBuild        = 0     ; !BattleAi_RunMode: build the action block, then play
+!BattleAi_RunPlay         = 1     ; !BattleAi_RunMode: play the block as it is
+!BattleAi_AnimNoTarget    = 4     ; !Enemy_AnimWanted set when the chosen target is an enemy that is gone (one of the
+                                  ; values that let BattleSys_Unk8461 run the enemy's turn)
+!BattleAi_RandPcBound     = $30   ; Battle_RandRange high bound for a random PC: the result / 16 is 0-2
+!BattleAi_NoPlayMask      = $82   ; acting battler's BattlerStats.Status2 bits that stop the play (meaning unknown)
+!BattleAi_AE55Bit3        = $08   ; !Battle_UnkAE55 bit that stops BattleAi_EnemyTurn's reaction flag
+!BattleAi_MaskSlot0       = $8000 ; !Battle_ActMainMask bit of slot 0 (slot n: this >> n)
+!BattleAi_ArgUnk1         = 1     ; BattleAi_ArgToDp0E: !BattleAi_ActArg 1 and 2 give 4,
+!BattleAi_ArgUnk2         = 2
+!BattleAi_ArgUnk3         = 3     ; ... 3 and 4 give $0D (meaning unknown)
+!BattleAi_ArgUnk4         = 4
+!BattleAi_ArgOut12        = 4
+!BattleAi_ArgOut34        = $0D
+!Battle_HitEntrySize      = 4     ; bytes per battler slot in a !Battle_HitAmount / !Battle_ActPcHitAmount set
+!Battle_HitSetSize        = (!Battle_NumSlots*!Battle_HitEntrySize) ; bytes per set ($2C)
+!Battle_HitNegate         = $80   ; !Battle_UnkB202 bit: Battle_RecordHit negates !Battle_UnkAD89 first
+!Battle_HitMpBit          = $4000 ; !Battle_HitFlags bit: the amount is taken off MP, not HP
+!Battle_HitMpBitHi        = $40   ; the same bit in !Battle_HitFlagsHi
+!Battle_HitCancelBitHi    = $20   ; !Battle_HitFlagsHi bit: Battle_ClearCancelledHits zeroes the slot's amounts
+!Battle_StatsEnd          = (!Battle_NumSlots*!Battle_StatsStride) ; offset past the last BattlerStats record ($580)
+!BattleAi_TargetMarked40  = $40   ; !BattleAi_Targets bit set by BattleAi_AddPcByByte (PcStatBlk.Unk20 bit 5)
+!BattleAi_PcUnk20Bit5     = $20   ; PcStatBlk.Unk20 bits BattleAi_AddPcByByte copies into the entry's marks
+!BattleAi_PcUnk20Bit4     = $10
+!BattleAi_PcMaskAny       = $FF   ; !BattleAi_PcByteMask: any bit (BattleAi_TargetsByPcByte)
+!BattleAi_TargetMarked    = $80   ; !BattleAi_Targets bit: a test accepted the entry
+!BattleAi_TargetSlotMask  = $0F   ; !BattleAi_Targets bits that hold the slot
+!BattleAi_TargetUseFirst  = $80   ; target code bit: use !BattleAi_FirstTarget instead of a target handler
+!BattleAi_ScriptUnk8D08   = $8D08 ; bank-$CC script BattleAi_PickScript uses instead of the enemy's own when
+                                  ; BattlerStats.Unk4C+2 or +7 has bit 7 (one test-0 block, action 1; meaning unknown)
+!BattleAi_ScriptUnk8D1E   = $8D1E ; ... and when BattlerStats.Status2 has bit 2 that .Unk4C+4 lacks (action 4 list)
+!BattleAi_Unk4CBit7       = $80   ; the BattlerStats.Unk4C+2 / +7 bit for !BattleAi_ScriptUnk8D08
+!BattleAi_Status2Bit2     = $04   ; the BattlerStats.Status2 bit for !BattleAi_ScriptUnk8D1E (the same bit as
+                                  ; !Battle_TurnNoReactBit)
 
 ; --- Battle setup (Battle_SetupBattle) ---
 !Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56
@@ -564,5 +612,80 @@ if !constants_battle_inc == 0
 !Battle_CF15Call3B        = $48
 !Battle_CF15Call4A        = $2A
 !Battle_CF15Call4B        = $4B
+
+; --- PC command runner (BattleSys_UnkB967) ---
+!BattleCmd_ClearQueued    = $FF^!BattleCmd_StateQueued ; mask clearing .State bit 6
+!BattleCmd_KindUnk10      = $10   ; .Kind bit 4 (from !Battle_Unk9F38, probably): calls BattleSys_UnkBC60
+!BattleCmd_MenuTech       = 1     ; .Menu: the tech menu (BattleSys_UnkB967 runs a tech only from menu 1 or 3)
+!BattleCmd_MenuUnk3       = 3     ; .Menu value 3, also accepted for a tech; what sets it is not traced
+!BattleCmd_RecSize        = 7     ; bytes per BattleCmd record
+!Tech_PartnerNone         = $0F   ; a Partners nibble: no partner
+!Battle_ActKindAttack     = 1     ; !Battle_ActKind: BattleAct_LoadAttack
+!Battle_ActKindTech       = 2     ; !Battle_ActKind: BattleAct_LoadTech
+!Battle_ActKindItem       = 3     ; !Battle_ActKind: BattleAct_LoadKind3, which BattleSys_UnkB967's item path uses
+                                  ; (id = item id, record = id - !Battle_ActKind3FirstId)
+!Battle_B1FCAttackBit     = $02   ; !Battle_UnkB1FC bit 1: set over BattleSys_RunPcAttack
+!Battle_GaugeCap          = $FF   ; !Battler_UnkAFAB: the largest value (doubling and the tech wait saturate here)
+!Battle_GaugeTenths       = 10    ; BattleSys_ResetTechUsers: the tech wait is in tenths of the reload value
+!BattleSys_ServiceRemoveReady = 2 ; $C10045 service BattleMenu_RemoveBattlerFromReady
+!BattleSys_ServiceRunAction = 4   ; $C10045 service BattleSys_RunAction
+!Battle_CD0021Unk3        = 3     ; A for $CD:0021 after a tech with !Battle_UnkB3BF positive; meaning unknown
+!Battle_CD0021Unk0D       = $0D   ; A for it with !Battle_UnkB3BF = $FF
+!Battle_UnkB3BFUnkFF      = $FF   ; the negative !Battle_UnkB3BF value that is acted on
+!Battle_UnkAEE6Bytes      = 17    ; bytes BattleSys_UnkBF81 copies
+!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_UnkD490
+!Battle_Rec05CCBit2       = $04   ; ... BattleSys_UnkD4AD
+!Battle_Rec05CCBit6       = $40   ; ... BattleSys_UnkD4D6
+!Battle_Unk1C48Stride     = 5     ; bytes per PC in !Battle_Unk1C48 (entries 0, 5, 10)
+!Battle_InvSlots          = $0100 ; entries in !Battle_InvIds
+!Battle_InvKeepCount      = 2     ; BattleSys_UnkBC60: an inventory entry with this many or more is left alone
+!Battle_BC60CF15Arg3      = 5     ; third and fourth arguments of BattleSys_UnkBC60's $C1:CF15 call
+!Battle_BC60CF15Arg4      = 4     ; (its first two are !Battle_CF15Call1A/B)
+
+; --- Tech MP costs ---
+!Battle_TechRecSize       = 11    ; bytes per BattleRom_TechRec record
+!Battle_TechRecNumMask    = $7F   ; the bits of a BattleRom_TechRec byte used as an index (bit 7 masked off)
+!Battle_MpCostHalfId      = $A2   ; !Pc_UnkB3BA value: the cost is halved (rounded up)
+!Battle_MpCostQuarterId   = $A3   ; !Pc_UnkB3BA value: the cost is quartered (rounded up twice)
+
+; --- Turn helpers ($C1:B4E9-$C1:B80C) ---
+!BattleCmd_StateArmed     = 1     ; .State 1: set by BattleSys_Unk8461 before service 1 adds bit 7
+!Battle_CmdGroupBytes     = 9     ; bytes of !Battle_CmdGroups
+!Battle_ItemListBytes     = !Item_RecordSize*$100 ; the 256 Item_BattleList records ($500 bytes)
+!Battle_ItemListEntries   = $0100 ; records in Item_BattleList (BattleSys_RefundItem's scan)
+!Battle_FixedAtbMax       = $30   ; !Pc_AtbMax of each PC in the !Battle_Unk2989 bit-5 battle (BattleSys_UnkB725)
+!BattleCmd_AllBytes       = 3*!BattleCmd_RecSize ; the three BattleCmd records (21 bytes)
+
+; --- Battler checks ($C1:B093-$C1:B487) ---
+!Battle_LowHpShift        = 3     ; BattleSys_UnkB093: HP at most MaxHp >> this sets BattlerStats.Unk2F bit 0
+!Battle_ListPartBit       = $01   ; !Battle_ListFlags bit 0: the slot takes part in the list (BattleSys_UnkB0B6)
+!Battle_List2StatusBit    = $20   ; BattlerStats.Status2 bit for list 2 (the same bit as !Battle_ListDoubleBit)
+!Battle_List11StatusBit   = $02   ; BattlerStats.Unk4C+1 / Unk4C+6 bit for list 11
+!Battle_Status2LockBit    = $08   ; BattlerStats.Status2 bit 3: sets the PC's !Pc_LockStatus (BattleSys_UnkB0B6)
+!Battle_EnemyAnimStatus7  = 4     ; !Enemy_AnimWanted BattleSys_UnkB0B6 sets while Status2 bit 7 is on
+!Battle_NoActMask2        = $86   ; BattlerStats.Status2 bits 7, 2, 1: BattleSys_UnkB3F9 drops the PC's command
+!Battle_Unk4C3ReviveBit   = $80   ; BattlerStats.Unk4C+3 bit 7: BattleSys_UpdateKo revives the KO'd PC once
+!Battle_ReviveHpMul       = 5     ; BattlerStats.Unk66 times this = the revive's HP amount
+!Battle_ActIdRevive       = $7A   ; !Battle_ActId (kind 2) of the revive's action (by context)
+!Battle_CD0021Unk09       = 9     ; A for $CD:0021 after the revive (BattleMsg_InfoArgs.Id = the character)
+!Battle_CharRecordSize    = $50   ; bytes per !Menu_CharRecords record (BattleSys_UnkB442 copies a PC's block back)
+
+; --- Tech menu builders ---
+!Tech_FirstTripleId       = $66   ; tech ids from here up are triple techs (the doubles end here)
+!Tech_TripleEnd           = $75   ; one past the last triple tech
+!Battle_TechInfoFlagsMask = $3F   ; the bits of !BattleRom_TechInfo byte 1 copied to TechMenuRec.Flags
+!Battle_TechBitFirst      = $80   ; the !Battle_TechBits* bit of the tech being looked at (shifted in from bit 0 up)
+!Battle_DoubleBitsPerByte = 3     ; double techs per !Battle_TechBits2 byte
+!Battle_TripleBitsPerByte = 1     ; triple techs per !Battle_TechBits3 byte
+!Battle_MaxDoubleEntries  = 6     ; BattleSys_UnkCA1A stops after this many double-tech entries
+!Battle_CA1AUnk0AStep     = 12    ; BattleSys_UnkCA1A adds this to DP $0A per tech (never read there)
+!Tech_EntrySize           = 7     ; bytes per Tech_MenuEntry record
+!Tech_MpCostNone          = $FF   ; a Tech_MenuEntry .MpCost value: that slot does not take part
+
+; --- Setup: item list and the PCs' records ---
+!Battle_EquipRecSize      = 6     ; bytes per !BattleRom_EquipRec* record
+!Battle_EquipBase2        = $5A   ; first .Unk28 id (subtracted before indexing !BattleRom_EquipRec2)
+!Battle_EquipBase3        = $7B   ; first .Unk27 id (subtracted before indexing !BattleRom_EquipRec3)
+!Battle_EquipBonusMask    = $0F   ; !BattleRom_EquipBonus bits 3-0: the amount added
 
 endif

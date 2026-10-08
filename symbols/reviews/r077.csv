@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:B279,BattleSys_UpdateKo,2026-10-08,rev77a,changes,ae3509e7c58f,"New Exit OK. Revive hit sign wrong: ActPcHitAmount/kind-1 entry gets +Unk66*5; only Battle_RecordHit's HitAmount set-0 entry (HitNegate) is -(Unk66*5). Say both."
