@@ -3002,7 +3002,7 @@ BattleMenu_LoadCommandWindowMap:
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
 ; Exit:  see Battle_DrawBattlerFrameAnyLayout (layout 3: M=1, X=0, DP=0,
 ;        DB=$7E, X = slot, A = 3, nothing written)
-; Callers: JSR from $C1:2F10, $C1:345D, $C1:3702, $C1:416A, $C1:418B,
+; Callers: JSR from Battle_TickPcSlots ($C1:2F10), $C1:345D, $C1:3702, $C1:416A, $C1:418B,
 ;          $C1:41AC and $C1:4307 (searched: every JSR $1C4A in bank $C1;
 ;          no JMP or JSL reaches it)
 org $C11C4A
@@ -6625,6 +6625,327 @@ BattlePos_ModeTable:
     dw BattlePos_SubjectLeftPart    ; $0C
     dw BattlePos_DistDifference     ; $0D
     dw BattlePos_WithinDist48       ; $0E
+
+; ==================================================================
+; PC animation tick ($C1:2D9F–$C1:2F96)
+; ==================================================================
+
+; ==================================================================
+; Battle_TickPcSlots ($C12D9F–$C12F1E, 384 bytes)
+; ==================================================================
+; Per-frame animation step for the three PCs. With !Battle_UnkA4 set it
+; jumps to Battle_TickUnkA4Mode instead (not matched). Otherwise it
+; visits the PCs in !Pc_TickOrder, starting with the first PC whose
+; frame decode was put off (!Battler_FrameDeferred; 0,1,2 / 1,2,0 /
+; 2,0,1), and for each present PC:
+;   - once a frame has been decoded this pass (!Battle_FramesDecoded =
+;     1), only marks the PC deferred, so it goes first next time
+;     (inferred: one decode per frame);
+;   - counts down !Pc_AnimTimer; at 0 it picks the animation
+;     (Battle_PickStatusAnim, into !Battle_AnimId), updates the facing
+;     (Battle_UpdatePcFacing) and the status effect
+;     (Battle_ApplyPendingEffect). Animation 3 becomes $2B while
+;     !Battle_Unk99CF or !Battle_Unk99D0 is set, restarting the list;
+;   - steps !Battler_AnimFrame through the animation's lists in bank $E4
+;     (!BattleRom_AnimData): the duration list (!Battler_AnimDurBase +
+;     AnimId * 4) and the frame-id list (!Battler_AnimFrameBase +
+;     AnimId * 4 + Facing * FacingStride). A duration of 0 ends the list
+;     and the index goes back to 0 (a list whose first entry is 0 would
+;     loop for ever). The timer is reloaded with duration / 5 (at
+;     least 1);
+;   - decodes the frame (Battle_DrawBattlerFrame) when the animation
+;     changed, or when it is not animation 3, or when animation 3 has a
+;     new facing or belongs to the PC whose menu is shown.
+; Lists, ids and the "facing" reading are inferred from how the values
+; combine; the animation data itself has not been looked at.
+; Callers (JSR, scanned for JSR/JSL/JML/JMP/BRL, hits inside other
+; instructions discarded): BattleSys_UpkeepTwoFrames only.
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$94 and the
+;        callees' scratch written
+; Callees: Battle_TickUnkA4Mode (JMP), Battle_PickStatusAnim,
+;          Battle_UpdatePcFacing, Battle_ApplyPendingEffect,
+;          Battle_Mul8x16, Battle_Divide, Battle_DrawBattlerFrame
+!Battle_TickOrderIdx = !BattleTmp_92      ; 2 B: index into !Pc_TickOrder (zeroed 16-bit, counted 8-bit)
+!Battle_TickSlot = !BattleTmp_94          ; 2 B: PC slot being ticked (16-bit; also read by the callees)
+!Battle_TickFacingOffset = !BattleTmp_82  ; 2 B: AnimId * 4, then Facing * FacingStride
+!Battle_FacingChanged = !BattleTmp_80     ; 1 B: set by Battle_UpdatePcFacing when the facing changed
+!Battle_TickUnk84 = !BattleTmp_84         ; 1 B: set to 3 here; Battle_PickStatusAnim sets it again before use
+Battle_TickPcSlots:
+    STZ.w !Battle_FramesDecoded
+    LDA.b !Battle_UnkA4
+    BEQ .order
+    JMP Battle_TickUnkA4Mode
+.order:
+    LDA.b #!Battle_AnimDefault
+    STA.b !Battle_TickUnk84         ; (overwritten before it is read)
+    LDA.w !Battler_FrameDeferred
+    BEQ .pc1_deferred
+    STZ.w !Battler_FrameDeferred
+    TDC
+    STA.w !Pc_TickOrder             ; 0, 1, 2
+    INC A
+    STA.w !Pc_TickOrder+1
+    INC A
+    STA.w !Pc_TickOrder+2
+    BRA .tick
+.pc1_deferred:
+    LDA.w !Battler_FrameDeferred+1
+    BEQ .pc2_deferred
+    STZ.w !Battler_FrameDeferred+1
+    LDA.b #1
+    STA.w !Pc_TickOrder             ; 1, 2, 0
+    INC A
+    STA.w !Pc_TickOrder+1
+    TDC
+    STA.w !Pc_TickOrder+2
+    BRA .tick
+.pc2_deferred:
+    LDA.w !Battler_FrameDeferred+2
+    BEQ .none_deferred
+    STZ.w !Battler_FrameDeferred+2
+    LDA.b #2
+    STA.w !Pc_TickOrder             ; 2, 0, 1
+    TDC
+    STA.w !Pc_TickOrder+1
+    INC A
+    STA.w !Pc_TickOrder+2
+    BRA .tick
+.none_deferred:
+    TDC
+    STA.w !Pc_TickOrder             ; 0, 1, 2
+    INC A
+    STA.w !Pc_TickOrder+1
+    INC A
+    STA.w !Pc_TickOrder+2
+.tick:
+    TDC
+    TAX
+    STX.b !Battle_TickOrderIdx
+.loop:
+    LDX.b !Battle_TickOrderIdx
+    LDA.w !Pc_TickOrder,X
+    TAX
+    STX.b !Battle_TickSlot
+    LDA.w !Battler_Present,X
+    BNE .present
+    JMP .next
+.present:
+    LDA.w !Battle_FramesDecoded
+    CMP.b #1
+    BNE .count_down
+    INC.w !Battler_FrameDeferred,X  ; a frame was decoded already: go first next time
+    JMP .next
+.count_down:
+    LDX.b !Battle_TickSlot
+    DEC.w !Pc_AnimTimer,X
+    BEQ .step
+    JMP .next
+.step:
+    JSR Battle_PickStatusAnim
+    JSR Battle_UpdatePcFacing
+    JSR Battle_ApplyPendingEffect
+    LDA.w !Battle_AnimId
+    CMP.b #!Battle_AnimDefault
+    BNE .lists
+    LDA.w !Battle_Unk99CF
+    ORA.w !Battle_Unk99D0
+    BEQ .lists
+    LDA.b #!Battle_AnimUnk2B
+    STA.w !Battle_AnimId
+    LDX.b !Battle_TickSlot
+    LDA.b #!Battle_AnimRestart
+    STA.w !Battler_AnimFrame,X
+.lists:
+    LDA.b !Battle_TickSlot
+    ASL A
+    CLC
+    ADC.b !Battle_TickSlot
+    TAX                             ; slot * 3
+    LDA.w !Battler_AnimFrameBase,X
+    STA.w !Battle_AnimFrameList
+    LDA.w !Battler_AnimFrameBase+1,X
+    STA.w !Battle_AnimFrameList+1
+    LDA.w !Battler_AnimDurBase,X
+    STA.w !Battle_AnimDurList
+    LDA.w !Battler_AnimDurBase+1,X
+    STA.w !Battle_AnimDurList+1
+    LDA.w !Battle_AnimId
+    REP #$20                        ; A -> 16-bit
+    ASL A
+    ASL A
+    STA.b !Battle_TickFacingOffset  ; AnimId * 4
+    CLC
+    ADC.w !Battle_AnimDurList
+    STA.w !Battle_AnimDurList
+    CLC
+    LDA.b !Battle_TickFacingOffset
+    ADC.w !Battle_AnimFrameList
+    STA.w !Battle_AnimFrameList
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_Facing,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    LDX.b !Battle_MulProduct
+    STX.b !Battle_TickFacingOffset  ; Facing * FacingStride
+    LDA.b !Battle_TickSlot
+    STA.w !Battle_FrameSlot
+    ASL A
+    TAY                             ; (Y is not used below)
+    LDX.b !Battle_TickSlot
+    CLC
+    LDA.w !Battler_AnimFrame,X
+    ADC.b #1
+.set_frame:
+    STA.w !Battler_AnimFrame,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.w !Battle_AnimDurList
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.l !BattleRom_AnimData,X     ; this frame's duration
+    BNE .duration
+    TDC                             ; end of the list: back to frame 0
+    LDX.b !Battle_TickSlot
+    BRA .set_frame
+.duration:
+    LDX.b !Battle_TickSlot
+    STA.b !Battle_DivDividend
+    STZ.b !Battle_DivDividend+1
+    LDA.b #!Battle_AnimTicksDivisor
+    STA.b !Battle_DivDivisor
+    JSR Battle_Divide
+    LDA.b !Battle_DivQuotient
+    BNE .timer
+    INC A                           ; at least 1
+.timer:
+    STA.w !Pc_AnimTimer,X
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_AnimFrame,X
+    REP #$21                        ; A -> 16-bit, carry clear
+    ADC.b !Battle_TickFacingOffset
+    CLC
+    ADC.w !Battle_AnimFrameList
+    TAX
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDA.l !BattleRom_AnimData,X     ; frame id
+    STA.w !Battle_FrameId
+    LDX.b !Battle_TickSlot
+    LDA.w !Battle_AnimId
+    CMP.w !Battler_AnimShown,X
+    BEQ .same_anim
+    STA.w !Battler_AnimShown,X
+    BRA .draw
+.same_anim:
+    CMP.b #!Battle_AnimDefault
+    BNE .draw
+    LDA.b !Battle_FacingChanged
+    BNE .draw
+    LDA.w !BattleMenu_ActivePc
+    CMP.b !Battle_TickSlot
+    BNE .next                       ; idle, same facing, menu not shown: skip
+.draw:
+    JSR Battle_DrawBattlerFrame
+.next:
+    INC.b !Battle_TickOrderIdx
+    LDA.b !Battle_TickOrderIdx
+    CMP.b #!Battle_NumPcSlots
+    BEQ .exit
+    JMP .loop
+.exit:
+    RTS
+
+; Battle_UnkThunk2F1F ($C12F1F–$C12F21, 3 bytes): a lone JMP to the RTS
+; at $C1:34A6. Nothing reaches it (searched: no JSR, JMP, JSL, JML or
+; BRL targets $2F1F, and no word table holds it); kept as found.
+Battle_UnkThunk2F1F:
+    JMP Battle_UnkReturn34A6
+
+; ==================================================================
+; Battle_UpdatePcFacing ($C12F22–$C12F96, 117 bytes)
+; ==================================================================
+; Turns PC !Battle_TickSlot toward its nearest enemy, one PC at a time:
+; !Battle_FacingTurn holds the PC whose turn it is (bit 7 = the turn was
+; handed on and has not been taken yet). A PC that is not the one named
+; hands the turn to itself (sets FacingTurn = slot | $80) if bit 7 is
+; clear, and returns. The PC named clears bit 7 and, unless it is KO'd
+; (BattlerStats.Status bit 7) or BattlerStats.Status2 bit 1 is set, runs
+; position query 2 (nearest enemy, BattlePos_NearestEnemy) through
+; service 5, keeps the enemy in !Pc_FacingTarget, and sets
+; !Battler_Facing from !BattleRom_FacingByAngle[angle to the enemy].
+; Returns !Battle_FacingChanged = 1 when the facing changed, else 0.
+; The turn-passing reading and the meaning of the Status2 bit are inferred
+; or unknown. The BattlerStats offset in !Battle_PickStatsOffset comes
+; from Battle_PickStatusAnim, which runs first.
+; Callers (JSR, scanned as above): Battle_TickPcSlots only.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TickSlot, and
+;        !Battle_PickStatsOffset = its BattlerStats offset
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$81 written
+;        (and the query's and Battle_CalcAngle's scratch when it runs)
+; Callees: BattleSys_RunService (service 5), Battle_CalcAngle
+!Battle_FacingTurnSlot = !BattleTmp_81    ; 1 B: !Battle_FacingTurn without bit 7
+!Battle_PickStatsOffset = !BattleTmp_A2   ; 2 B: BattlerStats offset of !Battle_TickSlot (set by Battle_PickStatusAnim)
+Battle_UpdatePcFacing:
+    STZ.b !Battle_FacingChanged
+    LDA.w !Battle_FacingTurn
+    AND.b #!Battle_FacingSlotMask
+    STA.b !Battle_FacingTurnSlot
+    LDA.b !Battle_TickSlot
+    CMP.b !Battle_FacingTurnSlot
+    BEQ .my_turn
+    LDA.w !Battle_FacingTurn
+    BMI .exit                       ; already handed on
+    LDA.b !Battle_TickSlot
+    ORA.b #!Battle_FacingHandedOn
+    STA.w !Battle_FacingTurn
+    BRA .exit
+.my_turn:
+    LDA.b !Battle_FacingTurnSlot
+    STA.w !Battle_FacingTurn        ; take it (bit 7 clear)
+    LDY.b !Battle_PickStatsOffset
+    LDA.w BattlerStats.Status,Y
+    BPL .alive
+    BRA .exit                       ; KO'd
+.alive:
+    LDA.w BattlerStats.Status2,Y
+    AND.b #!Battle_StatusUnk4BNoTurn
+    BNE .exit
+    LDA.b #!BattlePos_QueryNearestEnemy
+    STA.w !BattlePos_Mode
+    LDA.b !Battle_TickSlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunService
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    LDA.w !BattlePos_Found
+    STA.w !Pc_FacingTarget,X
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    STZ.b !Battle_FacingChanged
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_TickSlot
+    CMP.w !Battler_Facing,X
+    BEQ .exit
+    STA.w !Battler_Facing,X
+    INC.b !Battle_FacingChanged
+.exit:
+    RTS
 
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
