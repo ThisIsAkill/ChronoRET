@@ -40,10 +40,27 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    (`$C1:75CC`-`$C1:7A62`), `BattleAct_LoaderTable` and `BattleAct_OpcodeTable`
    (`$C1:7A63`-`$C1:7C2A`), `BattleAct_ProbeBoxOverlap` `$C1:7C2B`, and
    `BankC1_OldBuildLeftovers` (`$C1:7C3D`-`$C1:7FFF`: no code, the cut-off remains of older
-   assemblies of those tables and ProbeBoxOverlap, then $FF fill). Next: `$C1:8000` on, a new
-   part of the bank (`JMP $8006`, then `BankC1_Entry8003`'s `JMP $CFC2`; `$C1:8006` starts with
-   `JSL $FD:A982` and fills `$B163`/`$B16E`/`$B23A` lists from `$AEFF`/`$AF0D`, calling
-   `$C1:AF22` and `$C1:FA8B`). Verified headers that
+   assemblies of those tables and ProbeBoxOverlap, then $FF fill). From `$C1:8000` on (a new
+   part of the bank) matched: `BankC1_BattleStartVec` / `BankC1_Entry8003` and the battle's
+   main routine `BattleSys_Main` (`$C1:8000`-`$C1:8460`: setup, shuffles, the per-pass turn
+   lists, the victory / defeat / `!Battle_Unk99CD` ends and the dead pad-2 debug win), its
+   setup `Battle_SetupBattle` + `Battle_CalcUnk56` (`$C1:FA8B`-`$C1:FDBE`), `Battle_RandRange`
+   (`$C1:AF22`) and the DP math `Battle_Mul16` / `Battle_Div32` (`$C1:C90B`-`$C1:C95B`, 109 and
+   59 callers). Next, in reach order: the turn-list handlers `BattleSys_ListHandlerTable`
+   (`$C1:B92D`, 13 words: `$8876` ... `$8C08`, entry 12 `BattleSys_Unk8461`) with the offset table
+   `BattleSys_ListOffsetTable` (`$C1:B947`), `BattleSys_Unk8461` (`$C1:8461`, ~988 B, also run
+   while `!Battle_UnkAF25` is set), `BattleSys_Unk8C09`, and the small per-pass / end callees
+   `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/`BC60`/`EA9D`/
+   `EAE8`/`F93E`, `BattleSys_Unk895B`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
+   and its many bank-$FD callees (`BattleFD_Unk*`, stubs in unmatched_battle.asm); the vectors
+   `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`) and service 0
+   (`$C1:0023`). Open: what the 13 turn lists and their handlers are (ATB-like timers per slot
+   in `!Battle_ListTimers`/`!Battle_ListFlags`), what `!Battle_Unk24`, `!Battle_Unk99CD`,
+   `!Battle_Unk2989` bit 5 and `PcStatBlk`'s fields mean; the `$CC:0262` table the
+   setup's dead X looks meant for. Stale after this batch (verified headers, fix at their next
+   edit): BattleSys_DefeatPose / BattleSys_VictoryPose call their caller "the unmatched code at
+   $C1:815F / $C1:8186" (now BattleSys_Main); BankC1_OldBuildLeftovers calls $C1:8000
+   unmatched. Verified headers that
    still call now-matched sites "unmatched" (fix them at their next edit): BattleAct_CalcMoveStep
    (`$C1:62F5`/`$C1:6436`, now BattleAct_OpArcToCalc; `$C1:7261`, now BattleAct_OpMoveToMidpoint;
    `$C1:7468`, now BattleAct_OpPointTowardCalc); BattleAct_StartBattlerMove (`$C1:7231`, now
