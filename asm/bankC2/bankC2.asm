@@ -10916,8 +10916,9 @@ TextWin_CodeNadia:
 ; Codes TextWin_FirstMemberName-$1D: the name of the character in party
 ; position (code - $1B): Party_Members gives the TextWin_CharNamePtrs
 ; index; then as TextWin_CodeCharName.
-; Quirk, kept: an empty position (bit 7 set) is not checked; its id,
-; doubled, would index far past the 7 pointers.
+; Quirk, kept: an empty position (bit 7 set) is not checked; the 8-bit
+; ASL drops bit 7, so the empty value $80 (Menu_PartyEmpty) reads entry
+; 0 and prints the first name.
 ; Callers note: none direct (TextWin_CodeTable).
 ; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner);
 ;        Y = the code
@@ -11328,8 +11329,8 @@ TextWin_CharNameLen:
 ; $C2:5DAD)
 ; Drops the leading zero digits of the 8 (5, 3) digits at
 ; TextWin_Digits, keeping at least one: while the first is 0, shifts
-; the rest down one byte. A = the digits left. The 16-bit moves also
-; shift the byte after the last digit (left as it was).
+; the rest down one byte. A = the digits left. The moves copy only the
+; digits left; the old last digit byte is not cleared and stays stale.
 ; Callers (1 JSR site): TextWin_CodeNum24 ($C2:59F9).
 ; Callers of TextWin_TrimZeros5 (1 JSR site): TextWin_CodeNum16 ($C2:59A7).
 ; Callers of TextWin_TrimZeros3 (1 JSR site): TextWin_CodeNum8 ($C2:596C).
