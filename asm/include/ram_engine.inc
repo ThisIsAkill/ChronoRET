@@ -383,6 +383,13 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
+!EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
+                                         ; 16-bit, the opcode's offset (Y)
+!EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
+                                         ; opcode's offset) across a member's redirect
+!EvtParty_Col = $DB                      ; alias of Oam_Range1LoPtr's slot in Evt_OpD9: 8-bit column
+                                         ; operand (bit 7 included)
+!EvtParty_Row = $DD                      ; alias of Oam_Range2LoPtr's slot there: 8-bit row operand
 !EvtCtl_SavedY = $C7                     ; alias of ObjFront_SavedY's slot in Evt_OpB0_PartyControl:
                                          ; 16-bit, the opcode's offset (Y) across its callees
 !EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
@@ -766,8 +773,13 @@ if !ram_engine_inc == 0
                                          ; message)
 !Evt_Unk7F0200 = $7F0200                 ; alias of Treasure_ItemId: start of the Evt_Unk7F0200Bytes
                                          ; Evt_InitObjects clears at each location load
-!Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
-                                         ; 2/3 on the leader and sets it to 3
+!Evt_PartyWalkCount = $7F03FC           ; 8-bit, event word $FE's low byte: Evt_OpD9_PartyWalkToTiles'
+                                         ; count (0 = idle; 4 less the members sent, +1 by each
+                                         ; member's Map_Unk7F3700 block as it arrives)
+!Field_Unk7F03FE = $7F03FE               ; 8-bit, event word $FF's low byte; when 1-2 Field_RestoreState
+                                         ; stacks party members 2/3 on the leader and sets it to 3.
+                                         ; Evt_OpDA_PartyGather's count: 3 less the members sent,
+                                         ; +1 by Map_Unk7F3700's block 0 as each arrives
 !Rom_DirToFacing = $C0F700               ; 256 bytes in ROM: the Obj_Facing (0 up, 1 down, 2 left, 3
                                          ; right) for each Obj_Direction: $E0-$1F right, $20-$5F
                                          ; down, $60-$9F left, $A0-$DF up; read absolute through
@@ -808,14 +820,19 @@ if !ram_engine_inc == 0
                                          ; (LocLoad_InitUnk7F3700); Map_Unk7F3728/3748/3768/3781 lie
                                          ; inside them
 !Map_Unk7F3728 = $7F3728                 ; 16-bit; saved/restored around bank $C2 (Field_SaveState,
-                                         ; Field_RestoreState). An event opcode handler at $C0:3311
-                                         ; stores two script bytes AND $7F into its low and high
-                                         ; byte (an X/Y-like pair, inferred). Earlier notes called
-                                         ; it scroll X0; nothing shows it is a scroll value
-!Map_Unk7F3748 = $7F3748                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3398)
-!Map_Unk7F3768 = $7F3768                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3421)
-!Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728; no event
-                                         ; handler stores it in matched or traced code
+                                         ; Field_RestoreState). The column / row operand of the $96
+                                         ; walk in Map_Unk7F3700's block 1 (the script
+                                         ; Evt_OpD9_PartyWalkToTiles sends the leader to), which
+                                         ; stores two operand bytes AND $7F here. Earlier notes
+                                         ; called it scroll X0; nothing shows it is a scroll value
+!Evt_PartyWalkFacing0 = $7F372B          ; 8-bit: the $A6 facing operand in block 1 (Evt_OpD9)
+!Map_Unk7F3748 = $7F3748                 ; 16-bit; as Map_Unk7F3728, block 2 (party member 2)
+!Evt_PartyWalkFacing1 = $7F374B          ; 8-bit: as Evt_PartyWalkFacing0, block 2
+!Map_Unk7F3768 = $7F3768                 ; 16-bit; as Map_Unk7F3728, block 3 (party member 3)
+!Evt_PartyWalkFacing2 = $7F376B          ; 8-bit: as Evt_PartyWalkFacing0, block 3
+!Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728: the $96
+                                         ; walk's column / row in the fifth block, which
+                                         ; Evt_PushTarget writes (Evt_PushTileOfs)
 !ObjX_Unk7F0580 = $7F0580                ; per-object word ($80-byte table in bank $7F), zeroed by
                                          ; Evt_RunObjInit. With the seven tables after it, one per
                                          ; Obj_Unk1C00 level (Evt_PrioStride apart):
@@ -833,6 +850,8 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0C80 = $7F0C80                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0D00 = $7F0D00                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
+!ObjX_Unk7F0F00 = $7F0F00                ; 8-bit; Evt_OpD9/Evt_OpDA zero its byte at Field_UnkAB with
+                                         ; those of ObjX_Unk7F0C00 / 7F0D00 (no reader traced)
 
 ; --- OAM shadow ---
 !Obj_PalPrev = $0B00                     ; 8-bit per object (index Obj_Cur): the object before it in

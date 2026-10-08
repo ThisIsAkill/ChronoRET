@@ -9278,6 +9278,456 @@ Evt_PushTarget:
     RTS
 
 ; ============================================================
+; Event opcodes: party walks and gathers ($C0:326C–$C0:353E)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E). Both send party members off on the small
+; scripts LocLoad_InitUnk7F3700 seeds at Map_Unk7F3700 (each member's
+; Obj_ScriptPos is saved in the ObjX_Unk7F0580 table of its level, as
+; Evt_StartTargetFunc1 saves it, and the member runs at level 0), then
+; wait in the calling object until every member has come back. Read as
+; opcodes, the seeded blocks are:
+;   block 0 ($7F:3700, Evt_RedirectPos): E3 00, 89 40, 0D 00, 0E 02, AE,
+;     95 00 (walk to the leader), 0E 00, 71 FF (Field_Unk7F03FE + 1),
+;     12 FF 03 04 04 (until it is 3 or more: 11 09 jumps back to the
+;     $12), E3 01, 00 (return);
+;   blocks 1-3 ($7F:3720/3740/3760): E3 00, 89 40, 0D 00, AE, 96 col
+;     row (walk to the tile; the operand is Map_Unk7F3728/3748/3768),
+;     A6 facing (at +$B), 71 FE (Evt_PartyWalkCount + 1), 12 FE 04 04 04
+;     (until it is 4 or more), E3 00, 00.
+; Opcode $00 at level 0 steps the member back up to the level it was
+; interrupted at, so a member whose Obj_Unk1C00 is nonzero again is done
+; (Evt_Op00_Return). Each counter starts at its end value less the
+; members sent, so it reaches the end value when the last one arrives.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:326C — Evt_OpD9_PartyWalkToTiles (494 bytes, $326C–$3459)
+; Event opcode $D9 (7 bytes: $D9, then column, row for the leader,
+;   member 2 and member 3): walks the party members to three tiles.
+;   Each operand byte's bits 0-6 are the column / row; their bits 7
+;   pick the facing at the end (column bit 7 clear: up (row bit 7
+;   clear) or down; set: left or right).
+; - Evt_PartyWalkCount 0 (start): Field_ControlEnabled = 0; the leader
+;   (Party_ObjSlot) is sent to Map_Unk7F3700's block 1
+;   (Evt_PartyWalkPos0) with its tile in Map_Unk7F3728 and its facing in
+;   the block's $A6 operand; with member 2 present (Party_ObjSlot1 bit 7
+;   clear), member 2 the same through block 2 (Map_Unk7F3748), and with
+;   member 3 present, member 3 through block 3 (Map_Unk7F3768). The
+;   count becomes 4 less the members sent (EvtD9_Count1/2/3Sent). X = the
+;   opcode, C=0.
+; - Count 1-3: a member is still on its way: X = the opcode, C=0.
+; - Count 4 or more: Field_UnkAC = Field_UnkAD = Field_UnkAB (the
+;   followers' places in the step log, probably: Evt_OpB0_PartyControl's
+;   callees), and the bytes at Field_UnkAB of ObjX_Unk7F0C00,
+;   ObjX_Unk7F0D00 and ObjX_Unk7F0F00 = 0. While a present member's
+;   Obj_Unk1C00 is still 0 (its block has not returned): X = the opcode,
+;   C=0. Else the count = 0, X = the opcode + 7, C=0.
+; Quirks: ObjX_Unk7F0C00 and ObjX_Unk7F0D00 are each zeroed twice in a
+;   row (the second stores perhaps meant ObjX_Unk7F0C80 / 7F0D80, which
+;   Map_InitEntryTile zeroes with them); the leader is sent without a
+;   presence test; Field_ControlEnabled is not set again here.
+; Reached through Evt_OpcodeTable (opcode $D9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot*,
+;   Field_Unk* and the scratch are dp; its low byte must be 0: TDC/XBA
+;   sets B from it), DB=$00 (Obj_* tables and the multiplier
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0 on every path; Y
+;   unchanged; A and B clobbered; EvtParty_SavedY = the opcode's
+;   offset; on a start Field_ControlEnabled = 0 and Eng_Scratch,
+;   EvtParty_Col / Row written.
+; ------------------------------------------------------------
+Evt_OpD9_PartyWalkToTiles:
+    STY.b !EvtParty_SavedY
+    LDA.l !Evt_PartyWalkCount
+    BEQ .start
+    CMP.b #!EvtD9_AllThere
+    BCS .all_there
+.wait:
+    TYX
+    CLC
+    RTS
+.all_there:
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Field_UnkAB
+    STA.b !Field_UnkAC
+    STA.b !Field_UnkAD
+    TAX
+    LDA.b #$00
+    STA.l !ObjX_Unk7F0C00,X
+    STA.l !ObjX_Unk7F0C00,X             ; the same byte again (quirk)
+    STA.l !ObjX_Unk7F0D00,X
+    STA.l !ObjX_Unk7F0D00,X             ; the same byte again (quirk)
+    STA.l !ObjX_Unk7F0F00,X
+    LDA.b !Party_ObjSlot
+    BMI .test2
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    BEQ .wait                           ; still in its block
+.test2:
+    LDA.b !Party_ObjSlot1
+    BMI .test3
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    BEQ .wait
+.test3:
+    LDA.b !Party_ObjSlot2
+    BMI .done
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    BEQ .wait
+.done:
+    LDA.b #$00
+    STA.l !Evt_PartyWalkCount
+    INY
+    INY
+    INY
+    INY
+    INY
+    INY
+    INY
+    TYX
+    CLC
+    RTS
+.start:
+    STZ.b !Field_ControlEnabled
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Unk1C00,X
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Party_ObjSlot
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the member was
+    LDX.b !Party_ObjSlot
+    LDA.w #!Evt_PartyWalkPos0
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    REP #$10
+    LDX.b !EvtParty_SavedY
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Col
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3728
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Row
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3728+1
+    LDA.b !EvtParty_Col
+    BMI .lead_left_right
+    LDA.b !EvtParty_Row
+    BMI .lead_down
+    LDA.b #!Obj_FacingUp
+    BRA .lead_facing
+.lead_down:
+    LDA.b #!Obj_FacingDown
+    BRA .lead_facing
+.lead_left_right:
+    LDA.b !EvtParty_Row
+    BMI .lead_right
+    LDA.b #!Obj_FacingLeft
+    BRA .lead_facing
+.lead_right:
+    LDA.b #!Obj_FacingRight
+.lead_facing:
+    STA.l !Evt_PartyWalkFacing0
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot1
+    BPL .member2
+    LDA.b #!EvtD9_Count1Sent
+    STA.l !Evt_PartyWalkCount
+    LDX.b !EvtParty_SavedY
+    CLC
+    RTS
+.member2:
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Party_ObjSlot1
+    STA.b !Eng_Scratch
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X
+    LDX.b !Party_ObjSlot1
+    LDA.w #!Evt_PartyWalkPos1
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    REP #$10
+    LDX.b !EvtParty_SavedY
+    INX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Col
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3748
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Row
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3748+1
+    LDA.b !EvtParty_Col
+    BMI .m2_left_right
+    LDA.b !EvtParty_Row
+    BMI .m2_down
+    LDA.b #!Obj_FacingUp
+    BRA .m2_facing
+.m2_down:
+    LDA.b #!Obj_FacingDown
+    BRA .m2_facing
+.m2_left_right:
+    LDA.b !EvtParty_Row
+    BMI .m2_right
+    LDA.b #!Obj_FacingLeft
+    BRA .m2_facing
+.m2_right:
+    LDA.b #!Obj_FacingRight
+.m2_facing:
+    STA.l !Evt_PartyWalkFacing1
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot2
+    BPL .member3
+    LDA.b #!EvtD9_Count2Sent
+    STA.l !Evt_PartyWalkCount
+    LDX.b !EvtParty_SavedY
+    CLC
+    RTS
+.member3:
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Party_ObjSlot2
+    STA.b !Eng_Scratch
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X
+    LDX.b !Party_ObjSlot2
+    LDA.w #!Evt_PartyWalkPos2
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    REP #$10
+    LDX.b !EvtParty_SavedY
+    INX
+    INX
+    INX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Col
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3768
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtParty_Row
+    AND.b #!EvtD9_TileMask
+    STA.l !Map_Unk7F3768+1
+    LDA.b !EvtParty_Col
+    BMI .m3_left_right
+    LDA.b !EvtParty_Row
+    BMI .m3_down
+    LDA.b #!Obj_FacingUp
+    BRA .m3_facing
+.m3_down:
+    LDA.b #!Obj_FacingDown
+    BRA .m3_facing
+.m3_left_right:
+    LDA.b !EvtParty_Row
+    BMI .m3_right
+    LDA.b #!Obj_FacingLeft
+    BRA .m3_facing
+.m3_right:
+    LDA.b #!Obj_FacingRight
+.m3_facing:
+    STA.l !Evt_PartyWalkFacing2
+    LDA.b #!EvtD9_Count3Sent
+    STA.l !Evt_PartyWalkCount
+    LDX.b !EvtParty_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:345A — Evt_OpDA_PartyGather (229 bytes, $345A–$353E)
+; Event opcode $DA (1 byte): party members 2 and 3 walk to the leader.
+;   With no member 2 (Party_ObjSlot1 bit 7 set): X = the opcode + 1,
+;   C=0 at once. Else, by Field_Unk54 bit 0 (Field54_Gather):
+; - clear (start): member 2, and member 3 when present, are sent to
+;   Map_Unk7F3700's block 0 (Evt_RedirectPos, as Evt_RedirectObjScript
+;   sends one), Field_Unk7F03FE = 3 less the members sent
+;   (EvtDA_Count2Sent / EvtDA_Count1Sent), Field54_Gather is set; X =
+;   the opcode, C=0.
+; - set, Field_Unk7F03FE below 3: still walking: X = the opcode, C=0.
+; - set, 3 or more: Field54_Gather cleared, Field_UnkAC = Field_UnkAD =
+;   Field_UnkAB and the bytes at Field_UnkAB of ObjX_Unk7F0C00,
+;   ObjX_Unk7F0D00 and ObjX_Unk7F0F00 = 0 (as Evt_OpD9_PartyWalkToTiles
+;   does); X = the opcode + 1, C=1.
+; Unlike Evt_OpD9_PartyWalkToTiles it does not wait for the members'
+;   blocks to return (they end on their own after the count reaches 3).
+; Quirk: ObjX_Unk7F0C00 and ObjX_Unk7F0D00 are each zeroed twice in a
+;   row, as in Evt_OpD9_PartyWalkToTiles.
+; Reached through Evt_OpcodeTable (opcode $DA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot*,
+;   Field_Unk* and the scratch are dp; its low byte must be 0: TDC/XBA
+;   sets B from it), DB=$00 (Obj_* tables and the multiplier
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; Y unchanged; A
+;   and B clobbered; EvtParty_SavedY = the opcode's offset; on a start
+;   EvtParty_SavedX (= the opcode's offset) and Eng_Scratch written.
+; ------------------------------------------------------------
+Evt_OpDA_PartyGather:
+    STY.b !EvtParty_SavedY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot1
+    BPL .have_member2
+    INX
+    CLC
+    RTS
+.have_member2:
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_Gather
+    BEQ .start
+    LDA.l !Field_Unk7F03FE
+    CMP.b #!EvtDA_AllThere
+    BCS .all_there
+    TYX
+    CLC
+    RTS
+.all_there:
+    LDA.b #!Field54_Gather
+    TRB.b !Field_Unk54
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Field_UnkAB
+    STA.b !Field_UnkAC
+    STA.b !Field_UnkAD
+    TAX
+    LDA.b #$00
+    STA.l !ObjX_Unk7F0C00,X
+    STA.l !ObjX_Unk7F0C00,X             ; the same byte again (quirk)
+    STA.l !ObjX_Unk7F0D00,X
+    STA.l !ObjX_Unk7F0D00,X             ; the same byte again (quirk)
+    STA.l !ObjX_Unk7F0F00,X
+    LDX.b !EvtParty_SavedY
+    INX
+    SEC
+    RTS
+.start:
+    STX.b !EvtParty_SavedX
+    LDA.b !Party_ObjSlot1
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Party_ObjSlot1
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the member was
+    LDX.b !Party_ObjSlot1
+    LDA.w #!Evt_RedirectPos
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    REP #$10
+    LDX.b !EvtParty_SavedX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Party_ObjSlot2
+    BPL .member3
+    LDA.b #!EvtDA_Count1Sent
+    STA.l !Field_Unk7F03FE
+    LDX.b !EvtParty_SavedY
+    LDA.b #!Field54_Gather
+    TSB.b !Field_Unk54
+    CLC
+    RTS
+.member3:
+    STX.b !EvtParty_SavedX
+    TAX
+    LDA.w !Obj_Unk1C00,X
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Party_ObjSlot2
+    STA.b !Eng_Scratch
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X
+    LDX.b !Party_ObjSlot2
+    LDA.w #!Evt_RedirectPos
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    REP #$10
+    LDX.b !EvtParty_SavedX
+    LDA.b #!EvtDA_Count2Sent
+    STA.l !Field_Unk7F03FE
+    LDA.b #!Field54_Gather
+    TSB.b !Field_Unk54
+    CLC
+    RTS
+
+; ============================================================
 ; Event opcodes: yields, endless follows and messages ($C0:353F–$C0:3710)
 ; Entered as the other opcode handlers (see the banner of the call
 ; opcodes at $C0:5F6E). The message opcodes start Field_Unk1F87's

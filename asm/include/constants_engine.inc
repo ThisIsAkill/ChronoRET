@@ -631,7 +631,8 @@ if !constants_engine_inc == 0
 !FieldBtl_PpuUnk6A = $02                 ; FieldBtlPpu.Unk6A (CGWSEL position)
 !FieldBtl_PpuUnk6E = $09                 ; FieldBtlPpu.Unk6E
 !Evt_RedirectPos = $16FF                 ; Obj_ScriptPos Evt_RedirectObjScript sets (an Evt_Data
-                                         ; offset; what is there is not traced)
+                                         ; offset: Map_Unk7F3700's block 0, a walk to the leader;
+                                         ; see the banner of Evt_OpD9_PartyWalkToTiles)
 
 ; --- Object motion and view test (Vblank_UnkA810 and its steps) ---
 !Obj_Unk1100FreeMove = $03               ; Obj_Unk1100 below this: Vblank_UnkA810 moves the object
@@ -842,7 +843,8 @@ endif
                                          ; object off; no other push starts while it is set (who
                                          ; clears it is not traced)
 !Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
-                                         ; offset; what is there is not traced)
+                                         ; offset: Map_Unk7F3700's fifth block, seeded 96 col row,
+                                         ; then FF 9D 00, from LocLoad_Unk7F3700Init_Rec4)
 !Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
                                          ; tile (column, row): the byte after Evt_PushScriptPos
 
@@ -851,3 +853,22 @@ endif
                                          ; Field_Unk2D (the pointer's bank) 0
 !Evt_ChoiceMask = $03                    ; bits 0-1 / 2-3 of a choice message's operand: Field_Unk65
                                          ; / Field_Unk64
+
+; --- Event party walk / gather opcodes ($D9/$DA) ---
+!Obj_FacingUp = $00                      ; Obj_Facing values (Rom_DirToFacing, Evt_OpA6_Face)
+!Obj_FacingDown = $01
+!Obj_FacingLeft = $02
+!Obj_FacingRight = $03
+!Evt_PartyWalkPos0 = $171F               ; Obj_ScriptPos Evt_OpD9 gives the leader: the Evt_Data
+                                         ; offset of Map_Unk7F3700's block 1 ($7F:3720)
+!Evt_PartyWalkPos1 = $173F               ; ... member 2: block 2 ($7F:3740)
+!Evt_PartyWalkPos2 = $175F               ; ... member 3: block 3 ($7F:3760)
+!EvtD9_TileMask = $7F                    ; Evt_OpD9's column / row operand bits 0-6 (bit 7: facing)
+!EvtD9_AllThere = $04                    ; Evt_PartyWalkCount once every member sent has arrived
+!EvtD9_Count3Sent = $01                  ; Evt_PartyWalkCount after sending three members
+!EvtD9_Count2Sent = $02                  ; ... two
+!EvtD9_Count1Sent = $03                  ; ... the leader alone
+!Field54_Gather = $01                    ; Field_Unk54 bit 0: Evt_OpDA_PartyGather has sent members off
+!EvtDA_AllThere = $03                    ; Field_Unk7F03FE once every member sent has arrived
+!EvtDA_Count2Sent = $01                  ; Field_Unk7F03FE after sending members 2 and 3
+!EvtDA_Count1Sent = $02                  ; ... member 2 alone
