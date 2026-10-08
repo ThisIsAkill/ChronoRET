@@ -1,19 +1,19 @@
 {
   "schema": 2,
-  "emitted_bytes": 43576,
+  "emitted_bytes": 44805,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 401,
-      "bytes": 43576
+      "functions": 419,
+      "bytes": 44805
     },
     "readable": {
-      "functions": 401,
-      "bytes": 43576
+      "functions": 419,
+      "bytes": 44805
     },
     "verified": {
-      "functions": 401,
-      "bytes": 43576
+      "functions": 419,
+      "bytes": 44805
     }
   },
   "banks": [
@@ -54,18 +54,18 @@
     {
       "bank": "$C2",
       "code_bytes": null,
-      "emitted_bytes": 230,
+      "emitted_bytes": 1459,
       "matched": {
-        "functions": 3,
-        "bytes": 230
+        "functions": 21,
+        "bytes": 1459
       },
       "readable": {
-        "functions": 3,
-        "bytes": 230
+        "functions": 21,
+        "bytes": 1459
       },
       "verified": {
-        "functions": 3,
-        "bytes": 230
+        "functions": 21,
+        "bytes": 1459
       }
     },
     {
@@ -773,9 +773,21 @@
       "bank": "$C2",
       "start": "$C2:0000",
       "end": "$C2:0FFF",
-      "emitted_bytes": 205,
+      "emitted_bytes": 924,
       "functions": [
-        "BankC2_InitHwRegs"
+        "BankC2_Entry0000",
+        "BankC2_Entry0003",
+        "BankC2_Entry0006",
+        "BankC2_Entry0009",
+        "BankC2_Entry000C",
+        "BankC2_SceneBoot",
+        "BankC2_InitHwRegs",
+        "C2Scene_InstallInterrupts",
+        "C2Scene_ClearDp",
+        "C2Scene_NmiHandler",
+        "C2Scene_IrqHandler",
+        "C2Scene_WaitFrame",
+        "C2Scene_VramQFlush"
       ]
     },
     {
@@ -841,8 +853,15 @@
       "bank": "$C2",
       "start": "$C2:9000",
       "end": "$C2:9FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 510,
+      "functions": [
+        "Menu_InitPpuAndRam",
+        "Menu_DmaZeroWord",
+        "Menu_DmaClearWram",
+        "Menu_DmaCopyFFToWram",
+        "Menu_InitNewGameData",
+        "Menu_ClearConfigAndFlags"
+      ]
     },
     {
       "bank": "$C2",

@@ -119,10 +119,30 @@ org $C18003
 BankC1_Entry8003:   ; JSL vector (JMP $CFC2): saves P/X/DP/DB, DB=$7E, DP=0, runs service A (table
                     ; $C1:D126, 6 entries) with argument Y; 1 = add item Y ($C1:D005), 4 = add Y gold
                     ; ($C1:D0A2); returns a result in A
-org $C20000
-BankC2_Entry0000:   ; JML target for game mode >= $01F0 (GameLoop_Main)
+org $C203EF
+C2Scene_Unk03EF:    ; scene-mode boot step (BankC2_SceneBoot); also JSR from $C2:2560/$25F0
+org $C21DB5
+C2Scene_Unk1DB5:    ; scene-mode boot step (BankC2_SceneBoot)
+org $C223A8
+C2Scene_Main:       ; scene-mode main (JMP from BankC2_SceneBoot): sets C2Scene_NmiFlags, NMI on,
+                    ; then dispatches on $027C
+org $C2034D
+C2Scene_Unk034D:    ; per-frame NMI step; stores $E0 (an off-screen Y?) into OAM shadow bytes
+org $C2051D
+C2Scene_Unk051D:    ; per-frame NMI step; walks $40-byte records at $0B30-$1B2F, calling each
+                    ; non-zero one's handler
+org $C20C4D
+C2Scene_Unk0C4D:    ; per-frame NMI step (DB=$7E; builds $7E:B000-$B5xx)
+org $C20CEA
+C2Scene_Unk0CEA:    ; per-frame NMI step
+org $C257DF
+TextWin_Init:       ; JSL via BankC2_Entry0003/0006 (DP=$0200)
+org $C25823
+TextWin_Step:       ; JSL via BankC2_Entry0009/000C (DP=$0200)
 org $C28000
 BankC2_Entry8000:   ; JSL with A = a mode value before InitHW (callers say "set BG mode"; unverified)
+org $C28002
+BankC2_Entry8002:   ; JSL: joypad read (BRA to JSR $84D2; RTL); also from the scene NMI
 org $C28004
 BankC2_Entry8004:   ; JSL with A = a command; 15 JSL sites (GameLoop passes !BankC2_BootArg, at boot and on each $C0:02CA re-entry)
 org $C30000

@@ -71,6 +71,19 @@ if !hardware_inc == 0
 !TM_Bg123Obj           = $17  ; BG1, BG2, BG3 and OBJ on the main screen
 !TS_Bg1Bg2Obj          = $13  ; BG1, BG2 and OBJ on the sub screen
 !CGADSUB_HalfAddBg3    = $44  ; color math on BG3 only, add, result halved
+!DMAP_FixedSource      = $08  ; bit 3: do not step the A-bus address (fill from one source)
+!BBAD_WMDATA           = $80  ; B-bus address of WMDATA ($2180)
+!BBAD_OAMDATA          = $04  ; B-bus address of OAMDATA ($2104)
+!BBAD_CGDATA           = $22  ; B-bus address of CGDATA ($2122)
+!COLDATA_Red           = $20  ; bit 5: write the intensity to the red channel
+!COLDATA_Green         = $40  ; bit 6: ... green channel
+!COLDATA_Blue          = $80  ; bit 7: ... blue channel
+!NMITIMEN_NmiAutoJoy   = $81  ; NMI on, auto-joypad read on
+!OBSEL_Size8And16_Base4000 = $02 ; size %000 = 8x8 and 16x16 sprites, sprite tiles at VRAM word $4000
+!BG1SC_5800_32x64      = $5A  ; BG1 map at VRAM word $5800, 32x64 tiles
+!BG2SC_6000_32x64      = $62  ; BG2 map at VRAM word $6000, 32x64 tiles
+!BG3SC_6800_32x64      = $6A  ; BG3 map at VRAM word $6800, 32x64 tiles
+!BG34NBA_Bg3At7000     = $07  ; BG3 tiles at VRAM word $7000, BG4 at $0000
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)
