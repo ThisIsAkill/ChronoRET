@@ -8819,12 +8819,111 @@ Evt_WaitRuns:                           ; header: see Evt_OpBC_Wait16
     CLC
     RTS
 
+; ------------------------------------------------------------
+; $C0:2FFD — Evt_OpAF_PartyControlOnce (5 bytes, $2FFD–$3001)
+; Event opcode $AF (1 byte): one run of Evt_OpB0_PartyControl, then the
+;   script goes on: X = Y + 1 (the next opcode, for the next run), C=0.
+; Reached through Evt_OpcodeTable (opcode $AF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (as
+;   Evt_OpB0_PartyControl needs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A and the rest as
+;   Evt_OpB0_PartyControl leaves them.
+; ------------------------------------------------------------
+Evt_OpAF_PartyControlOnce:
+    JSR Evt_OpB0_PartyControl
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3002 — Evt_OpB0_PartyControl (91 bytes, $3002–$305C)
+; Event opcode $B0 (1 byte): the script of a party member's object stays
+;   here (X = Y, C=0 on every path) and moves it each run. While
+;   Field_Unk38 is nonzero nothing else happens. Else, by Obj_Cur's
+;   Obj_Unk1100 (with 8-bit X; Obj_MoveFrames = 1 first on each of the
+;   three paths):
+;   - 0: Party_Unk9E29 (the leader's step, probably: it logs the
+;     Map_Unk1D32/1D33 steps at Field_UnkAB), then, when
+;     Evt_HasActionTarget finds an object (Field_UnkEB),
+;     Evt_StartTargetFunc2 (touch / push);
+;   - 1: Party_UnkA26B (follows the log as Party_ObjSlot1's object);
+;   - 2: Party_UnkA2CE (the same for Party_ObjSlot2's);
+;   - other kinds: nothing.
+;   Reading kinds 0-2 as the leader and party members 2 and 3 rests on
+;   the callees' Party_ObjSlot1 / Party_ObjSlot2 use.
+; The LDA of Obj_Facing before Evt_HasActionTarget is dead (that routine
+;   loads Field_UnkEB into A at once); kept as found.
+; Reached through Evt_OpcodeTable (opcode $B0).
+; Callers (1 JSR site): Evt_OpAF_PartyControlOnce ($C0:2FFD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk38,
+;   Obj_Cur and EvtCtl_SavedY are dp), DB=$00 (Obj_* tables absolute; the
+;   callees read Map_Unk1D32 etc. absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A clobbered;
+;   Y unchanged on the Field_Unk38 path; past it the SEP #$10 clears Y's
+;   high byte, and Y is then as the callees left it (the opcode's offset
+;   & $FF for other kinds); EvtCtl_SavedY = the opcode's offset (not on the Field_Unk38
+;   path); the callees' writes (object steps, the Field_UnkAB-AD log
+;   positions; not traced in full).
+; ------------------------------------------------------------
+Evt_OpB0_PartyControl:
+    LDA.b !Field_Unk38
+    BEQ .go
+    TYX
+    CLC
+    RTS
+.go:
+    STY.b !EvtCtl_SavedY
+    SEP #$10
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BEQ .kind0
+    DEC A
+    BEQ .kind1
+    DEC A
+    BEQ .kind2
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind2:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_UnkA2CE
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind1:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_UnkA26B
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind0:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_Unk9E29
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X                 ; dead: Evt_HasActionTarget reloads A
+    JSR Evt_HasActionTarget
+    BCC .no_target
+    JSR Evt_StartTargetFunc2
+.no_target:
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+
 ; ============================================================
 ; Object steps toward a tile centre or onto another object, and the
 ; leader's touch and push ($C0:305D–$C0:326B)
 ; ============================================================
 
-org $C0305D
 ; ------------------------------------------------------------
 ; $C0:305D — Obj_Unk305D (86 bytes, $305D–$30B2)
 ; Steps Obj_Cur toward the point $80 / $F0 within its tile
@@ -9006,7 +9105,7 @@ Obj_Unk30B3:
 ;   Either way it then runs Evt_PushTarget.
 ; Called by the opcode $B0 handler (unmatched) when Evt_HasActionTarget
 ;   finds an object in front of the leader.
-; Callers (1 JSR site): unmatched ($C0:3054).
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3054).
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_UnkEB and
 ;   Eng_Scratch are dp), DB=$00 (Obj_* tables absolute); Field_UnkEB =
 ;   the object's slot (its 16-bit loads take $01EC as the high byte, as
@@ -26293,7 +26392,7 @@ Map_LeaderPastColMin:
 ; $C0:5B8D — Evt_HasActionTarget (8 bytes, $5B8D–$5B94)
 ; C=1 when Field_UnkEB holds an object (bit 7 clear), C=0 when it is
 ;   $80 (none).
-; Callers (1 JSR site): unmatched ($C0:304F).
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:304F).
 ; Callers note: unmatched event code at $C0:304F.
 ; On entry: M=1 (8-bit A), DP=$0100 (Field_UnkEB); X and DB not used.
 ; Exit: M, X, DP and DB unchanged; A = Field_UnkEB; C as above.

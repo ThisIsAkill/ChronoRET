@@ -380,6 +380,8 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
+!EvtCtl_SavedY = $C7                     ; alias of ObjFront_SavedY's slot in Evt_OpB0_PartyControl:
+                                         ; 16-bit, the opcode's offset (Y) across its callees
 !EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
                                          ; (bytes - 1)
 !ObjPal_Slot = $C3                       ; alias of Spr_BaseX in the palette-slot handlers
