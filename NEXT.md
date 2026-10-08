@@ -135,10 +135,21 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    builders `Field_Unk29F7`/`Field_Unk2B78` ($C0:29F7–$C0:2C40). `Scene_Unk0283`, `Field_Unk034B`/`038F`/`0617` and
    `Field_Unk29F7`/`2B78` keep their names because verified code calls them by name; better
    names once those callers are re-reviewed: `Scene_RebuildAfterBattle`, `FieldBtl_Save`,
-   `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably). Next, in
-   reach order: `Field_UnkB0E6` (Scene_ReloadStep's last unmatched callee; calls
-   `Obj_DrawLink` and $C0:AB45) and the other draw-bucket users at $C0:A810–$C0:A950 (the
-   unmatched `Obj_DrawUnlink`/`Obj_DrawLink` sites); `Obj_Unk72B4`/`Obj_Unk734C` (they work
+   `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably).
+   Also done: the whole $C0:A810–$C0:B191 block (object motion and view culling):
+   `Vblank_UnkA810` (the per-frame object pass), `Obj_UpdateInView`, `Obj_FlagInView`,
+   `Obj_MoveStep` (+ `Obj_MoveStep_Arc`), `Obj_MoveStepFree`, `Obj_CalcScreenPos`,
+   `Obj_CalcDirection`, `Obj_SetVelocity`, `Obj_SetVelocityChecked` (+ `_Probe`),
+   `Obj_SetVelocityAxis` (no caller found), the map region copy `Field_UnkAF4E` /
+   `Map_CopyRegionPlane`, the load-time pass `Field_UnkB0E6` and `Obj_ActivateIfInView`; and
+   `SprBuf_FreeObj` ($C0:EA42). `Vblank_UnkA810`, `Field_UnkAF4E` and `Field_UnkB0E6` keep
+   their names because verified callers use them; better names once those are re-reviewed:
+   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`. Open from it: the stubs
+   `Obj_Unk6F9A` / `Obj_Unk7170` (dispatch on Obj_Unk1100 through tables $C0:6FA7 / $C0:7181)
+   and `Obj_Unk7056` (the $0B88 entry), who writes `ObjX_LeaveView` ($7F:0A00), and the
+   event-opcode handlers that call `Obj_CalcDirection` / `Obj_SetVelocity*` ($C0:4D22-$C0:55E6,
+   they set `Obj_MoveFrames` / `Obj_ArcGravity`) and the region copy ($C0:3D97). Next, in
+   reach order: `Obj_Unk72B4`/`Obj_Unk734C` (they work
    on the $0B00/$0B80 tables, up to $C0:7398); the NMI handler's upload calls
    ($C0:EA9E–$C0:EB86, which also call the Field_Upload* routines and Pal_UploadCgram); the
    `Evt_Unk0920` list code at $C0:5C90 and the halts at $C0:5CB3; `Vblank_ReadScanlineCounters`

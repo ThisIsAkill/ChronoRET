@@ -134,7 +134,9 @@ if !ram_engine_inc == 0
                                          ; Hdma_InitChannelsFD also reads its bit 0 (channel 7's
                                          ; register)
 !WinFx_SizeLimit = $3D                   ; 8-bit; WinFx_Size limit for hooks 1 and 4
-!Field_Unk44 = $44                       ; 8-bit flags; Field_UnkAF4E acts on bits 0/1
+!Field_Unk44 = $44                       ; 8-bit flags: the planes Field_UnkAF4E copies (MapCopy_*
+                                         ; bits); the event handler at $C0:3D97 stores it; zeroed at
+                                         ; load (Field_InitLoadState)
 !Pad_Unk00F6Latch = $50                  ; 8-bit; GameLoop_FrameBody ORs Pad_Unk00F6 into it every
                                          ; frame
 !Pad_PressedLatch = $51                  ; 8-bit; GameLoop_FrameBody ORs the low byte of Pad_Pressed
@@ -182,6 +184,8 @@ if !ram_engine_inc == 0
                                          ; Field_ActionButton reads it. $80 at load; Field_FrameUpdate
                                          ; resets it to $80 every frame
 !Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by Field_InitLoadState
+                                         ; then stepped as a RandomTable index (Obj_SetVelocityChecked
+                                         ; INCs it before each read; $C0:6D0B does too)
 !Loc_RecOfs = $FE                        ; 16-bit offset of the current location's LocRom record:
                                          ; Loc_Id x 14 (LocLoad_Unk092B at $C0:095B; Loc_Id bit 8
                                          ; adds $E00); read by the location-load steps
@@ -267,6 +271,96 @@ if !ram_engine_inc == 0
                                          ; Obj_DrawBucket offset while the links are rewritten
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
+
+; --- Object motion, view test and screen position (Vblank_UnkA810 and its steps) ---
+!Obj_VelX = $1900                        ; alias of Obj_Unk1900 (the page Evt_InitObjects clears):
+                                         ; per object, signed X step added to Obj_PosX each frame
+                                         ; while Obj_MoveFrames runs. The move steps use the low
+                                         ; byte only, the arc step the word (Obj_MoveStep); set from
+                                         ; a direction by Obj_SetVelocity / Obj_SetVelocityChecked
+!Obj_VelXHi = $1901                      ; high byte of Obj_VelX: its sign extension
+!Obj_VelY = $1980                        ; per object, signed Y step (as Obj_VelX, for Obj_PosY)
+!Obj_VelYHi = $1981                      ; high byte of Obj_VelY; the arc step carries into it
+!Obj_Speed = $1A00                       ; alias of Obj_Unk1A00: per object, the speed
+                                         ; Obj_SetVelocity* multiplies the direction's sine and
+                                         ; cosine by (step = speed x sin / 256)
+!Obj_MoveFrames = $1A01                  ; alias of Obj_Unk1A01: per object, frames of movement
+                                         ; left; Obj_MoveStep* decrement it and move while it is
+                                         ; nonzero (an event handler at $C0:4D7C sets it to the
+                                         ; distance / the step)
+!Obj_ArcMode = $1B80                     ; alias of Obj_Unk1B80: per object, low byte nonzero =
+                                         ; Obj_MoveStep moves with the 16-bit steps and adds
+                                         ; Obj_ArcGravity to Obj_VelY every frame (an arc, probably
+                                         ; a jump)
+!Obj_ArcGravity = $1B81                  ; per object, 8-bit amount added to Obj_VelY per frame in
+                                         ; arc mode (an event handler at $C0:4D87 stores it)
+!ObjX_LeaveView = $7F0A00                ; per object in bank $7F: nonzero = when the object leaves
+                                         ; the view window (Obj_UpdateInView) and Field_Unk30 is 0,
+                                         ; Field_Unk29 becomes Field_Unk29State0D. No writer traced
+!ObjView_Left = $C3                      ; alias of Spr_BaseX in Obj_UpdateInView / Obj_FlagInView /
+                                         ; Obj_ActivateIfInView: 8-bit first column of the view
+                                         ; window, in 8-pixel columns (Map_TileOriginX units)
+!ObjView_Right = $C4                     ; 8-bit column past the window (Spr_BaseX+1)
+!ObjView_Top = $C5                       ; 8-bit first row of the window (Spr_BaseY)
+!ObjView_Bottom = $C6                    ; 8-bit row past the window (Spr_BaseYHi)
+!ObjMove_Step = $D9                      ; alias of Eng_Scratch in Obj_MoveStep: 8-bit size of a
+                                         ; negative step being subtracted
+!ObjScr_FineX = $D9                      ; alias of Eng_Scratch in Obj_CalcScreenPos: 16-bit
+                                         ; Map_Unk1D87 & 7 (the pixel within the 8-pixel column)
+!ObjScr_FineY = $DB                      ; 16-bit Map_Unk1D89 & 7 (Obj_CalcScreenPos)
+!ObjScr_ViewX = $DD                      ; 16-bit Map_TileOriginX x 8 + ObjScr_FineX: the view's
+                                         ; left edge in pixels (Obj_CalcScreenPos)
+!ObjScr_ViewY = $DF                      ; 16-bit Map_TileOriginY x 8 + ObjScr_FineY: the top edge
+!Obj_Direction = $EE                     ; alias of Spr_NewFrame's slot: 8-bit direction, 256 per
+                                         ; turn, $00 = +X, $40 = +Y, $80 = -X, $C0 = -Y; result of
+                                         ; Obj_CalcDirection, input of Obj_SetVelocity*
+!Obj_DirectionHi = $EF                   ; zeroed by Obj_CalcDirection (no reader in the cluster)
+!ObjDir_FromX = $F0                      ; alias of FieldBtl_RestOriginX in Obj_CalcDirection: 8-bit
+                                         ; column of the start point (callers store Obj_TileX)
+!ObjDir_FromY = $F1                      ; 8-bit row of the start point (callers store Obj_TileY)
+!ObjDir_ToX = $F2                        ; 8-bit column of the target (script bytes in the event
+                                         ; handler at $C0:4D22)
+!ObjDir_ToY = $F3                        ; 8-bit row of the target
+!ObjDir_Index = $F4                      ; 16-bit: the run part of the Rom_AngleTable index
+!ObjDir_Run = $F6                        ; 8-bit distance along the octant's first axis
+!ObjDir_Rise = $F7                       ; 8-bit distance along the second axis
+!ObjVel_Y = $DB                          ; alias of Oam_Range1LoPtr's slot in Obj_SetVelocity*:
+                                         ; 8-bit Y step, $DC = its sign extension
+!ObjVel_YHi = $DC                        ; sign extension of ObjVel_Y
+!ObjVel_X = $DD                          ; 8-bit X step (Oam_Range2LoPtr's slot)
+!ObjVel_XHi = $DE                        ; sign extension of ObjVel_X
+!ObjVel_NewX = $DF                       ; 16-bit Obj_PosX + the X step: the probed position
+!ObjVel_NewTileX = $E0                   ; high byte of ObjVel_NewX: the probed tile column
+!ObjVel_AttrA = $E1                      ; 8-bit Map_TileAttrA of the probed tile
+!ObjVel_AttrB = $E5                      ; 8-bit Map_TileAttrB of the probed tile (Spr_HiBits' slot)
+!ObjVel_Flags = $D9                      ; alias of Eng_Scratch: Obj_OamFlags while the fixed
+                                         ; priorities are split
+!ObjVel_AbsX = $D9                       ; alias of Eng_Scratch in Obj_SetVelocityAxis: |X step|
+
+; --- Map region copy (Field_UnkAF4E, Map_CopyRegionPlane) (dp) ---
+!MapCopy_SrcX = $3E                      ; 8-bit first column of the source rectangle (map tiles);
+                                         ; with MapCopy_SrcY a 16-bit plane index (row << 8 | column).
+                                         ; The event handler at $C0:3D97 loads $3E-$44 from 7 script
+                                         ; bytes, then calls Field_UnkAF4E
+!MapCopy_SrcY = $3F                      ; 8-bit first row of the source rectangle
+!MapCopy_EndX = $40                      ; 8-bit last column of the source rectangle (inclusive)
+!MapCopy_EndY = $41                      ; 8-bit last row of the source rectangle (inclusive)
+!MapCopy_DstX = $42                      ; 8-bit first column of the destination; with
+                                         ; MapCopy_DstY a 16-bit plane index
+!MapCopy_DstY = $43                      ; 8-bit first row of the destination
+!MapCopy_Width = $DB                     ; alias of Oam_Range1LoPtr's slot in the copy: 16-bit
+                                         ; columns - 1 (MapCopy_EndX - MapCopy_SrcX, high byte 0)
+!MapCopy_Rows = $DD                      ; 8-bit rows still to copy after the current one
+                                         ; (Oam_Range2LoPtr's slot; $DE zeroed)
+!MapCopy_RowsHi = $DE                    ; zeroed with MapCopy_Rows (not read)
+!MapCopy_SrcCol = $DF                    ; 16-bit first source column (row index base)
+!MapCopy_DstCol = $E1                    ; 16-bit first destination column
+!MapCopy_ColsLeft = $E3                  ; 8-bit columns still to do in the row (bit copies)
+!MapCopy_ColsLeftHi = $E4                ; zeroed by the bit copies (not read)
+!MapCopy_Bit = $D9                       ; alias of Eng_Scratch: the source tile's bit being copied
+!MapCopy_Plane = $F0                     ; alias of FieldBtl_RestOriginX's slot: 16-bit offset in
+                                         ; bank $7E of the plane Map_CopyRegionPlane copies in
+                                         ; (Map_TileProps, Map_Layer2Tiles, ... low word)
 
 ; --- OAM shadow build (Oam_BuildShadow / Spr_AppendToOam) (dp) ---
 !Oam_Range1PrevEnd = $7B                 ; 16-bit OAM shadow address where range 1 ended last frame;
@@ -569,6 +663,13 @@ if !ram_engine_inc == 0
                                          ; Evt_InitObjects clears at each location load
 !Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
                                          ; 2/3 on the leader and sets it to 3
+!Rom_AngleTable = $C0F300                ; 32 x 32 bytes in ROM: angle (256 per turn, $40 = a
+                                         ; quarter) of the vector (run, rise) at rise x 32 + run;
+                                         ; Obj_CalcDirection reads it through DB=$00 (the table the
+                                         ; battle code calls !BattleRom_AngleTable)
+!Rom_SineTable256 = $C0F800              ; 256 signed bytes in ROM: 127 x sin, 256 steps per turn
+                                         ; ($00, $7F at +$40, $81 at +$C0); Obj_SetVelocity* read
+                                         ; it through DB=$00 (sine at the direction, cosine at +$40)
 !Rom_SineTable = $C0F900                 ; 1024 B in ROM: |sin| for 1024 steps per turn, $00 at +$000/+$200,
                                          ; $FF at +$100/+$300 (the table the battle code calls !BattleRom_SineTable)
 !RomE4_PtrInit = $E4FFE0                 ; 4 words in ROM: initial low words of Field_E4Ptr0-3

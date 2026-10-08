@@ -54,18 +54,21 @@ Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_Opc
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
-org $C0B0E6
-Field_UnkB0E6:      ; JSR from Scene_ReloadStep; calls $C0:A9CD and $C0:AB45 (not traced)
+org $C06F9A
+Obj_Unk6F9A:        ; JSR (table $C0:6FA7, x Obj_Unk1100) unless Obj_Unk1100 bit 7; run when an object
+                    ; enters the view window (Obj_UpdateInView, Obj_ActivateIfInView; not traced)
+org $C07056
+Obj_Unk7056:        ; Obj_UpdateInView's drop step: frees the object's $0B88 entry (index
+                    ; Obj_TileRecOfs >> 5) when it holds Obj_Cur; C=1 then (not traced)
+org $C07170
+Obj_Unk7170:        ; JSR (table $C0:7181, x Obj_Unk1100) unless Field_Unk54 or Obj_Unk1100 bit 7;
+                    ; with Obj_Unk6F9A on entering the view window (not traced)
 org $C072B4
 Obj_Unk72B4:        ; FieldBtl_SaveObj, for an object with Obj_Unk1A81 bit 7 set; writes its
                     ; $0B00/$0B80 entries and Obj_OamAttr palette bits, copies $E4 colours (not traced)
 org $C0734C
 Obj_Unk734C:        ; FieldBtl_RestoreObj's removal, for Obj_Unk1A81 bit 7 set; undoes Obj_Unk72B4's
                     ; $0B00/$0B80 links (probably; not traced)
-org $C0A810
-Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
-org $C0AF4E
-Field_UnkAF4E:      ; acts on dp $44 bits 0/1 with $F0 = $3000/$3040 ...
 
 ; --- Other banks, called from bank $C0 ---
 
