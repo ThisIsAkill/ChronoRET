@@ -187,8 +187,6 @@ if !ram_engine_inc == 0
 !Party_ObjSlot2 = $9B                    ; 16-bit object slot of party member 3 (= Party_ObjSlot+4)
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
-!Obj_FocusMode3 = $78                    ; 8-bit tertiary focus mode flag (Obj_AnimTickAndQueue);
-                                         ; zeroed at load
 !Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
                                          ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
                                          ; (swapping the two tilemap bases) for 3, then clears it
@@ -284,6 +282,27 @@ if !ram_engine_inc == 0
 !Spr_SavedY = $C5                        ; alias of Spr_BaseY in the tile copiers: the caller's Y
                                          ; (frame-data index) saved across the copy
 
+; --- Object frame queue and animation (Obj_AnimTickAndQueue, Field_ProcessAnimQueue) (dp) ---
+!ObjQ_ScanlineLimit = $6B                ; 16-bit: Field_ProcessAnimQueue stops building frames once
+                                         ; the V counter reaches this (unless past line 240)
+!ObjQ_Head = $76                         ; 8-bit: first object waiting for a frame build ($80 = queue
+                                         ; empty); objects are linked through Obj_QueueNext
+!ObjQ_Tail = $77                         ; 8-bit: last object in the frame-build queue ($80 = empty)
+!ObjQ_Unk78 = $78                        ; 8-bit; when 2, Obj_AnimTickAndQueue queues kind-1/2
+                                         ; objects at the head and clears it; zeroed at load
+!VramQ_Pos = $79                         ; 8-bit byte offset of the next free entry in the VRAM
+                                         ; upload queue (VramQ_*); cleared by Field_ProcessAnimQueue
+!Anim_RowAddr = $C1                      ; 16-bit scratch: Obj_AnimTimeTbl + row*4, the current
+                                         ; animation row in bank $E4 (Obj_AnimTickAndQueue)
+!Anim_FramePtr = $D6                     ; 24-bit pointer (bank $E4 in byte +2) to the current frame-
+                                         ; number entry (Obj_AnimFrameLookup)
+!Spr_NewFrame = $EE                      ; 8-bit: frame number being built (saved across
+                                         ; SprBuf_Alloc*)
+!Anim_Column = $D9                       ; alias of Eng_Scratch in Obj_AnimFrameLookup: the column
+                                         ; (frame within the row)
+!Spr_AttrBase = $D9                      ; alias of Eng_Scratch in the frame builders: Obj_OamAttr |
+                                         ; Obj_VramTile high byte, before the priority bits
+
 ;
 ; Absolute names. Low WRAM ($0000-$1FFF) is given as a 16-bit address
 ; (reached through the bank-$00 mirror); other WRAM and ROM as a full
@@ -351,7 +370,7 @@ if !ram_engine_inc == 0
 !SceneSave_PartyPosX = $7F1D09           ; 3 words: party members' Obj_PosX saved by Field_SaveState,
                                          ; restored by Party_ReinitIfChanged
 !SceneSave_PartyPosY = $7F1D0F           ; 3 words: party members' Obj_PosY (as above)
-!SceneSave_PartyUnk0C00 = $7F1D15        ; 3 words: party members' Obj_Unk0C00 (as above)
+!SceneSave_PartyPrio = $7F1D15           ; 3 words: party members' Obj_PrioLow/High word (as above)
 !SceneSave_UnkAB = $7F1D1B               ; 3 bytes: Field_UnkAB/AC/AD saved by Field_SaveState,
                                          ; restored by Party_ReinitIfChanged
 !SceneSave_Scroll = $7F1D1E              ; 4 words: Map_ScrollA-D saved by Field_SaveState, restored
@@ -384,8 +403,6 @@ if !ram_engine_inc == 0
                                          ; builders add each tile's SprTile.OfsX);
                                          ; Audio_PlaySfxAtLeader passes the leader's low byte as
                                          ; Audio_CmdArg1, presumably for panning
-!Obj_Unk0C00 = $0C00                     ; 16-bit per object; saved/restored for the party with the
-                                         ; positions (Field_SaveState/Party_ReinitIfChanged)
 !Obj_DrawBucket = $0E00                  ; 64 words: first object of each draw bucket (low byte; bit
                                          ; 7 = empty); PostVBlank walks them from the last
 !Obj_DrawNext = $0E81                    ; 8-bit per object: next object in the same draw bucket (bit
@@ -435,6 +452,47 @@ if !ram_engine_inc == 0
 !Obj_FrameBank = $1300                   ; 8-bit per object: bank of its frame data
 !Obj_FrameOfs = $1380                    ; 16-bit per object: offset of its frame data in
                                          ; Obj_FrameBank
+!Obj_PrioLow = $0C00                     ; 8-bit per object: OAM priority bits for tiles whose OfsY
+                                         ; is below $E8 (the lower body); saved with the party
+                                         ; positions
+!Obj_PrioHigh = $0C01                    ; 8-bit per object: OAM priority bits for tiles with OfsY >=
+                                         ; $E8 (the upper 24 lines)
+!Obj_VramTile = $0D00                    ; 16-bit per object: first OAM tile number of its graphics
+                                         ; (bits 0-8); the high byte also feeds the attributes. $68
+                                         ; selects the alternate layout in the 12-tile builders
+!Obj_VramTileHi = $0D01                  ; high byte of Obj_VramTile, ORed into the OAM attributes
+                                         ; (tile bit 8)
+!Obj_Unk0F00 = $0F00                     ; 8-bit per object; 0 = no frame to build
+                                         ; (Obj_BuildSpriteFrameStep, Obj_BuildFrameLayout)
+!Obj_OamAttr = $0F81                     ; 8-bit per object: OAM attribute bits (palette/priority)
+                                         ; ORed into every tile
+!Obj_QueueNext = $1081                   ; 8-bit per object: next object in the frame-build queue
+                                         ; ($80 = not queued / end)
+!Obj_Unk1100 = $1100                     ; 8-bit per object; bit 7 = skip; 0 = queue at the head; 1/2
+                                         ; = queue at the tail (head when ObjQ_Unk78 = 2)
+!Obj_FixedFrame = $1301                  ; 8-bit per object: frame number used when Obj_AnimMode = 3
+                                         ; (no animation lookup)
+!Obj_AnimFacingStride = $1480            ; 16-bit per object: bytes per facing in its frame-number
+                                         ; table (Obj_AnimFrameLookup multiplies by the facing)
+!Obj_AnimFrameTbl = $1500                ; 16-bit per object: offset in bank $E4 of its frame-number
+                                         ; table
+!Obj_AnimTimeTbl = $1580                 ; 16-bit per object: offset in bank $E4 of its frame-
+                                         ; duration table
+!Obj_AnimTimer = $1601                   ; 8-bit per object: frames until the next animation step
+                                         ; (Obj_AnimTickAndQueue)
+!Obj_AnimRow = $1680                     ; 8-bit per object: current animation (row of 4 frames) for
+                                         ; modes 0/1
+!Obj_AnimColumn = $1681                  ; 8-bit per object: frame within the animation row; $FF
+                                         ; after the row ran out
+!Obj_AnimMode = $1780                    ; 8-bit per object: 0/1 = normal, 2 = counted loops
+                                         ; (ObjX_AnimLoops, row Obj_AnimRowAlt), 3 = fixed frame
+!Obj_AnimRowAlt = $1781                  ; 8-bit per object: animation row used in mode 2
+!Obj_Unk1A81 = $1A81                     ; 8-bit per object; must be 1..$7F for a frame build
+!ObjX_AnimLoops = $7F0B01                ; 8-bit per object in bank $7F: loops left for animation
+                                         ; mode 2
+!AnimRom = $E40000                       ; bank $E4: object animation tables (frame numbers and
+                                         ; durations), reached through Obj_AnimFrameTbl /
+                                         ; Obj_AnimTimeTbl
 
 ; --- Saved field block (menu round trip) ---
 !Field_SaveBlock = $0920                 ; start of the $14E0-byte WRAM block Field_StashSaveBlock
@@ -482,6 +540,20 @@ if !ram_engine_inc == 0
 !GfxRom_D5 = $D50000                     ; object tile graphics in ROM bank $D5
 !Wram7F_PtrBase = $7F0000                ; base 0 of bank $7F for abs,X / abs,Y accesses whose index
                                          ; holds the full address (DB = $7F)
+
+; --- VRAM upload queue ($0940; 8 entries, index VramQ_Pos) ---
+!VramQ_SrcA = $0940                      ; 16-bit: bank-$7F source address of the first half
+                                         ; (Obj_TileBuf)
+!VramQ_DestA = $0950                     ; 16-bit: VRAM word address for the first half (Obj_VramTile
+                                         ; * 16)
+!VramQ_SrcB = $0960                      ; 16-bit: source of the second half (first + $100 bytes)
+!VramQ_DestB = $0970                     ; 16-bit: VRAM address of the second half (first + $100
+                                         ; words: the next row of 16 tiles)
+!VramQ_SizeA = $0980                     ; 16-bit byte count of the first half
+!VramQ_SizeB = $0990                     ; 16-bit byte count of the second half
+!VramQ_Valid = $09A0                     ; 16-bit: nonzero for a pending entry, 0 ends the queue;
+                                         ; Field_ProcessAnimQueue waits while the first entry is
+                                         ; pending
 
 ; One OAM low-table entry; used as abs,X with X = the entry's address (PostVBlank)
 struct OamEntry $0000

@@ -185,4 +185,25 @@ if !constants_engine_inc == 0
 !BankD2 = $D2                            ; ROM bank $D2 (object tile graphics)
 !Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
 
+; --- Object frame build ---
+!Obj_VramTileMask = $01FF                ; tile-number bits of Obj_VramTile
+!ObjTile_AltLayout = $68                 ; Obj_VramTile value that selects the alternate VRAM layout
+                                         ; in the 12-tile builders
+!Frame4_Bytes = $28                      ; bytes per frame record of a 4-tile object: 16 tile words +
+                                         ; 4 position pairs
+!Frame8_Bytes = $50                      ; bytes per frame record of an 8-tile object
+!Frame12_Bytes = $78                     ; bytes per frame record of a 12-tile object
+!Spr_UpperOfsY = $E8                     ; tiles with OfsY >= this (the upper 24 lines) take
+                                         ; Obj_PrioHigh
+!Anim_EndMarker = $FF                    ; frame-number table entry that ends an animation row
+!ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
+!Vram_TileRowWords = $0100               ; VRAM words in one row of sixteen 8x8 tiles (the next row
+                                         ; holds the lower halves of 16x16 sprites)
+!Gfx_8TilesBytes = $0100                 ; bytes in eight 4bpp 8x8 tiles
+!SprBuf_ChunkTiles = $0010               ; tiles in one $200-byte SprBuf chunk
+!Frame_TileWordBytes = $02               ; bytes per tile word in a frame record (offsets are written
+                                         ; as this x tile index)
+!Spr_TileRowStep = $10                   ; OAM tile-number step to the next row of 16 tiles
+!Ppu_FirstHiddenLine = $00F0             ; V counter of the first line below the visible screen (240)
+
 endif
