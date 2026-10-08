@@ -22,12 +22,29 @@ How the boundary is decided:
                  source is assembled with asar's address-to-line mapping;
                  a site is a boundary exactly when an instruction line of
                  the source starts there. Authoritative.
-  unmatched code a self-synchronising sweep: decode forward from every
-                 offset in the 64 bytes before the site, under each of the
-                 four M/X start states, tracking REP/SEP. A sweep that
-                 decodes BRK, COP, STP or WDM is implausible and dropped;
-                 of the rest, the site is CONFIRMED when more than half land
-                 exactly on it. The score printed is that fraction.
+  unmatched code first the flow (basis `flow`): every matched routine is
+                 decoded from its label under the start states whose
+                 instructions all fall on the source's instruction lines;
+                 from where control leaves it (branches, jumps, calls,
+                 matched word tables behind JMP/JSR (a,X), falling off the
+                 end) the unmatched code is decoded path by path, tracking
+                 M/X through REP, SEP, PHP/PLP and the exit widths of every
+                 routine called. A site where such a path starts an
+                 instruction is CONFIRMED; one inside the operand of such an
+                 instruction is DOUBTFUL.
+                 Elsewhere (basis `sweep`) a self-synchronising sweep:
+                 decode forward from every offset in the 64 bytes before the
+                 site, under each of the four M/X start states, tracking
+                 REP/SEP and the exit widths of the routines called. A sweep
+                 that decodes BRK, COP, STP or WDM is implausible and
+                 dropped; of the rest, the site is CONFIRMED when more than
+                 half land exactly on it. The score printed is that fraction.
+
+The command line judges unmatched code as above. The library (Xref(), what
+the lint's CALLERS rule and draft.py use) still judges it by the sweep alone,
+without the exit widths, until the routine headers list the callers the
+fuller analysis finds; Xref(deep=True) gives the command line's verdicts,
+and --sweep-only gives the library's.
 
 Each hit names the matched routine that contains it, if any.
 
@@ -36,6 +53,7 @@ Usage:
     python3 tools/xref.py Battle_Divide --branches
     python3 tools/xref.py $C0:00BF --json
     python3 tools/xref.py $C0:00BF --confirmed  only CONFIRMED hits
+    python3 tools/xref.py $C0:00BF --sweep-only the lint's verdicts
 """
 
 import argparse
@@ -67,6 +85,14 @@ BRANCH_OPS = {0x10: 'BPL', 0x30: 'BMI', 0x50: 'BVC', 0x70: 'BVS', 0x80: 'BRA',
 STATES = ((True, False, 0.60), (False, False, 0.25), (True, True, 0.10), (False, True, 0.05))
 STATE_NAMES = ('m8x16', 'm16x16', 'm8x8', 'm16x8')
 DATA_DIRECTIVES = ('db', 'dw', 'dl', 'dd', 'incbin', 'fill', 'skip')
+
+# Control flow, for the descent from matched code.
+COND_BRANCHES = {0x10, 0x30, 0x50, 0x70, 0x90, 0xB0, 0xD0, 0xF0}
+RETURNS = {0x40, 0x60, 0x6B}                     # RTI, RTS, RTL
+DEAD_ENDS = {0x6C, 0x7C, 0xDC, 0xFB}             # JMP (a), JMP (a,X), JML [a], XCE
+PHP_DEPTH = 4                                    # deeper PHP nesting: width unknown
+EXIT_BUDGET = 4000                               # instructions per callee summary
+STATE_ORDER = tuple((m, x) for m, x, _ in STATES)
 
 _EXTRA = {'impl': 0, 'A': 0, 'imm': 1, 'dp': 1, 'dp_x': 1, 'dp_y': 1, 'dp_ind': 1,
           'dp_x_ind': 1, 'dp_ind_y': 1, 'dp_ind_long': 1, 'dp_ind_long_y': 1, 'sr': 1,
@@ -118,13 +144,23 @@ class Hit:
 class Xref:
     """ROM, matched rows and source boundaries, loaded once and reused."""
 
-    def __init__(self, rom_path: Path = ROM_PATH):
+    def __init__(self, rom_path: Path = ROM_PATH, hide=(), deep: bool = False):
+        """deep: judge unmatched code by flow() first and give the sweep the
+        exit widths of the routines it calls (the command line's default; the
+        library default stays the plain sweep, see the module docstring).
+        hide: start offsets of matched rows to treat as unmatched (tests use
+        it to score the unmatched-code verdicts against the source)."""
+        self.deep = deep
         self.rom = rom_path.read_bytes()
-        self.rows = self._read_rows()
+        self.rows = [r for r in self._read_rows() if r[0] not in set(hide)]
         self._row_starts = [r[0] for r in self.rows]
         self.labels, self.boundaries, self.source_lines = self._assemble(rom_path)
         self._memo: dict[int, dict] = {}
         self._index = None
+        self._exits: dict[tuple, tuple | None] = {}
+        self._busy: set[tuple] = set()
+        self._flow = None
+        self._tables = None
 
     # ── loading ────────────────────────────────────────────────────────────
     @staticmethod
@@ -240,6 +276,249 @@ class Xref:
                         sites.append((pos, BRANCH_OPS[rom[pos]]))
         return sorted(set(sites))
 
+    # ── control flow ───────────────────────────────────────────────────────
+    def _decode(self, o: int, st: tuple):
+        """One instruction at o under st = (M 8-bit, X 8-bit, PHP stack).
+
+        None when the bytes cannot be code under st (BRK, COP, STP, WDM, or an
+        instruction running off its bank). Otherwise (length, state after,
+        jumps, calls, falls, lost): jumps are the offsets a branch or jump can
+        go to, calls the JSR/JSL targets (-1 for one that is not known), falls
+        whether execution goes on at o + length (after a call: once it
+        returns), lost whether the widths are unknown after it (PLP of
+        nothing, XCE). JMP (a,X) and JSR (a,X) through a matched word table
+        go to every entry of the table; through anything else they lead
+        nowhere known.
+        """
+        rom = self.rom
+        if o is None or o >= len(rom) or rom[o] in IMPLAUSIBLE:
+            return None
+        op = rom[o]
+        m, x, ps = st
+        ln = _LEN[(m, x)][op]
+        end = o + ln
+        if end > len(rom) or (end - 1) >> 16 != o >> 16:
+            return None
+        bank = o & ~0xFFFF
+        word = rom[o + 1] | rom[o + 2] << 8 if ln >= 3 else 0
+        jumps, calls, falls, lost = (), (), True, False
+        if op == 0xC2:                                   # REP
+            m, x = m and not rom[o + 1] & 0x20, x and not rom[o + 1] & 0x10
+        elif op == 0xE2:                                 # SEP
+            m, x = m or bool(rom[o + 1] & 0x20), x or bool(rom[o + 1] & 0x10)
+        elif op == 0x08:                                 # PHP
+            lost = len(ps) >= PHP_DEPTH
+            ps = ps + ((m, x),)
+        elif op == 0x28:                                 # PLP
+            lost = not ps
+            if ps:
+                (m, x), ps = ps[-1], ps[:-1]
+        elif op in COND_BRANCHES or op == 0x80:          # Bxx, BRA
+            rel = rom[o + 1] - (256 if rom[o + 1] >= 128 else 0)
+            jumps, falls = (bank | (end + rel) & 0xFFFF,), op != 0x80
+        elif op == 0x82:                                 # BRL
+            jumps, falls = (bank | (end + word) & 0xFFFF,), False
+        elif op == 0x4C:                                 # JMP abs
+            jumps, falls = (bank | word,), False
+        elif op == 0x5C:                                 # JML long
+            t = to_offset(rom[o + 3], word)
+            jumps, falls = ((t,) if t is not None else ()), False
+        elif op == 0x20:                                 # JSR abs
+            calls = (bank | word,)
+        elif op == 0x22:                                 # JSL long
+            t = to_offset(rom[o + 3], word)
+            calls = (t if t is not None and t < len(rom) else -1,)
+        elif op == 0xFC:                                 # JSR (abs,X)
+            calls = self._table_targets(bank | word) or (-1,)
+        elif op == 0x7C:                                 # JMP (abs,X)
+            jumps, falls = self._table_targets(bank | word), False
+        elif op in RETURNS or op in DEAD_ENDS:
+            falls, lost = False, op == 0xFB
+        if lost:
+            falls = False
+        return ln, (m, x, ps), jumps, calls, falls, lost
+
+    def exit_state(self, target: int, m: bool, x: bool):
+        """(M, X) when the routine at target returns, entered with (m, x).
+
+        Decodes every path of the routine (following branches, jumps and
+        nested calls) and collects the widths at each RTS/RTL/RTI. None when
+        they disagree, a path decodes a byte that is no instruction, the
+        widths get lost, or the routine is too long or recursive. A nested
+        call whose exit is unknown is assumed to keep the widths it got.
+        """
+        key = (target, m, x)
+        if key in self._exits:
+            return self._exits[key]
+        if key in self._busy or len(self._busy) > 24:
+            return None
+        self._busy.add(key)
+        rets, seen, work, ok = set(), set(), [(target, (m, x, ()))], True
+        while work and ok:
+            o, st = work.pop()
+            if (o, st) in seen:
+                continue
+            if len(seen) >= EXIT_BUDGET:
+                ok = False
+                break
+            seen.add((o, st))
+            d = self._decode(o, st)
+            if d is None or d[5]:
+                ok = False
+                break
+            ln, nst, jumps, calls, falls, _ = d
+            if self.rom[o] in RETURNS:
+                rets.add(nst[:2])
+            work.extend((j, nst) for j in jumps)
+            if calls:
+                nst = self._after_call(calls, nst) or nst
+            if falls:
+                work.append((o + ln, nst))
+        self._busy.discard(key)
+        res = rets.pop() if ok and len(rets) == 1 else None
+        self._exits[key] = res
+        return res
+
+    def _after_call(self, calls: tuple, st: tuple):
+        """State after a JSR/JSL returns, or None when a callee's exit is unknown
+        or the callees (of a JSR (a,X)) disagree."""
+        exits = {self.exit_state(c, st[0], st[1]) if c >= 0 else None for c in calls}
+        ex = exits.pop() if len(exits) == 1 else None
+        return None if ex is None else (ex[0], ex[1], st[2])
+
+    def _table_targets(self, table: int) -> tuple:
+        """The entries of the matched word table that starts at table, as offsets."""
+        if self._tables is None:
+            self._tables = {}
+            for s, e, _ in self.rows:
+                b = self.boundaries.get(s)
+                if b and not b[2] and (e - s) % 2 == 1:
+                    self._tables[s] = tuple(s & ~0xFFFF | self.rom[o] | self.rom[o + 1] << 8
+                                            for o in range(s, e, 2))
+        return self._tables.get(table, ())
+
+    def _row_exits(self, start: int, end: int):
+        """Where control leaves a matched routine, with the widths it leaves with.
+
+        The routine is decoded from its label under each start state; a state
+        counts only when every instruction it decodes inside the routine starts
+        on an instruction line of the source. Transfers out of the routine
+        (branches, jumps, calls, falling off its end) under the states that
+        count are returned as (offset, state).
+        """
+        out = []
+        for m0, x0 in STATE_ORDER:
+            seen, work, ok, leave = set(), [(start, (m0, x0, ()))], True, []
+            while work and ok:
+                o, st = work.pop()
+                if o is None:
+                    continue
+                if not start <= o <= end:
+                    leave.append((o, st))
+                    continue
+                if (o, st) in seen:
+                    continue
+                seen.add((o, st))
+                b = self.boundaries.get(o)
+                d = self._decode(o, st)
+                if not b or not b[2] or d is None:
+                    ok = False
+                    break
+                ln, nst, jumps, calls, falls, _ = d
+                if o + ln <= end and o + ln not in self.boundaries:
+                    ok = False
+                    break
+                work.extend((j, nst) for j in jumps)
+                if calls:
+                    leave.extend((c, (nst[0], nst[1], ())) for c in calls if c >= 0)
+                    # Unknown exit: assume the widths are kept. A wrong guess
+                    # shows as a decode that leaves the source's lines.
+                    nst = self._after_call(calls, nst) or nst
+                if falls:
+                    work.append((o + ln, nst))
+            if ok:
+                out.extend(leave)
+        return out
+
+    def flow(self):
+        """Instruction starts reached by decoding from matched code.
+
+        Seeds are the transfers out of every matched routine (_row_exits).
+        From there the unmatched code is decoded block by block, following
+        branches, jumps and calls, with the widths tracked through REP, SEP,
+        PHP/PLP and the exit widths of each callee (exit_state). A path stops
+        at a return, an indirect jump, matched code, or a call whose exit
+        widths are unknown. A block that decodes a byte that cannot be code,
+        or runs into matched code anywhere but on an instruction line, is
+        dropped with everything after it.
+
+        Returns (start, cover, via): start[o] is set where a decoded
+        instruction starts, cover[o] where a byte is an operand of one, and
+        via[o] the matched routine the path came from.
+        """
+        if self._flow is not None:
+            return self._flow
+        n = len(self.rom)
+        start, cover, via = bytearray(n), bytearray(n), {}
+        seen = set()
+        work = []
+        for s, e, name in self.rows:
+            work.extend((o, st, name) for o, st in self._row_exits(s, e))
+        while work:
+            o, st, origin = work.pop()
+            block, nexts, ok = [], [], True
+            while True:
+                if o is None or (o, st) in seen:
+                    break
+                if self.routine_at(o):
+                    b = self.boundaries.get(o)
+                    ok = bool(b and b[2])
+                    break
+                d = self._decode(o, st)
+                if d is None:
+                    ok = False
+                    break
+                ln, nst, jumps, calls, falls, lost = d
+                if self.routine_at(o + ln - 1):
+                    ok = False
+                    break
+                block.append((o, ln, st))
+                nexts.extend((j, nst) for j in jumps)
+                if calls:
+                    nexts.extend((c, (nst[0], nst[1], ())) for c in calls if c >= 0)
+                    nst = self._after_call(calls, nst)
+                    if nst is None:
+                        break
+                if not falls:
+                    break
+                if jumps:                                # conditional branch
+                    nexts.append((o + ln, nst))
+                    break
+                o, st = o + ln, nst
+            if not ok:
+                continue
+            for o, ln, st in block:
+                seen.add((o, st))
+                start[o] = 1
+                via.setdefault(o, origin)
+                for i in range(o + 1, o + ln):
+                    cover[i] = 1
+            work.extend((j, s2, origin) for j, s2 in nexts)
+        self._flow = (start, cover, via)
+        return self._flow
+
+    def _flow_verdict(self, pos: int):
+        """CONFIRMED/DOUBTFUL from flow(), or None when it has no clear answer."""
+        start, cover, via = self.flow()
+        if start[pos] and not cover[pos]:
+            return True, 1.0, f'reached by decoding from {via[pos]}'
+        if cover[pos] and not start[pos]:
+            for back in range(1, 4):
+                if start[pos - back]:
+                    return False, 0.0, (f'operand of the instruction at {fmt(pos - back)}, reached '
+                                        f'by decoding from {via[pos - back]}')
+        return None
+
     # ── boundary test ──────────────────────────────────────────────────────
     def _source_verdict(self, pos: int):
         b = self.boundaries.get(pos)
@@ -282,6 +561,11 @@ class Xref:
                     elif op == 0xE2:                       # SEP
                         m = m or bool(rom[o + 1] & 0x20)
                         x = x or bool(rom[o + 1] & 0x10)
+                    elif self.deep and op in (0x20, 0x22) and o + ln <= pos:   # JSR, JSL
+                        d = self._decode(o, (m, x, ()))
+                        after = self._after_call(d[3], (m, x, ())) if d else None
+                        if after is not None:
+                            m, x = after[:2]
                     o += ln
                 for key in path:
                     memo[key] = res
@@ -302,8 +586,12 @@ class Xref:
             ok, score, note = self._source_verdict(pos)
             basis = 'source'
         else:
-            ok, score, note = self._sweep(pos)
-            basis = 'sweep'
+            verdict = self._flow_verdict(pos) if self.deep else None
+            if verdict:
+                (ok, score, note), basis = verdict, 'flow'
+            else:
+                ok, score, note = self._sweep(pos)
+                basis = 'sweep'
         return Hit(fmt(pos), kind, 'CONFIRMED' if ok else 'DOUBTFUL', basis,
                    round(score, 2), routine, note, pos)
 
@@ -332,12 +620,14 @@ def main() -> int:
     ap.add_argument('--branches', action='store_true', help='also 8-bit relative branches')
     ap.add_argument('--confirmed', action='store_true', help='only CONFIRMED hits')
     ap.add_argument('--json', action='store_true')
+    ap.add_argument('--sweep-only', action='store_true',
+                    help='judge unmatched code by the sweep alone, as the lint does')
     args = ap.parse_args()
 
     if not ROM_PATH.exists():
         print(f'xref: no ROM at {ROM_PATH}', file=sys.stderr)
         return 2
-    xr = Xref()
+    xr = Xref(deep=not args.sweep_only)
     target = xr.resolve(args.address)
     hits = xr.xref(target, args.branches)
     if args.confirmed:
