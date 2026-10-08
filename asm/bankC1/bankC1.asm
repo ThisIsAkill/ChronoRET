@@ -2726,7 +2726,7 @@ BattleMenu_LoadCommandWindowMap:
 ; ==================================================================
 ; JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the
 ; bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3.
-; If the menu-dirty flag $993A is set: clear it and rerun the full
+; If !BattleMenu_Dirty is set: clear it and rerun the full
 ; menu rebuild chain (dequeue ready battler, update windows, process
 ; input, redraw cursor overlay). Returns with RTL (long return) since
 ; callers reach this via JSL through the $C10012 vector, not a
@@ -2737,10 +2737,10 @@ BattleMenu_LoadCommandWindowMap:
 ;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay
 org $C110E3
 BattleMenu_RefreshIfDirtyL:
-    LDA.w $993A                     ; menu-dirty flag
+    LDA.w !BattleMenu_Dirty
     BEQ .exit
-    STZ.w $993A                     ; clear flag
-    STZ $E5
+    STZ.w !BattleMenu_Dirty
+    STZ.b !Battle_UnkE5
     JSR BattleMenu_DequeueReadyBattler
     JSR BattleMenu_UpdateWindows
     JSR BattleMenu_ProcessInput
@@ -2753,40 +2753,37 @@ BattleMenu_RefreshIfDirtyL:
 ; ==================================================================
 ; Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty-
 ; flag gate and menu rebuild chain, but always follows up with a
-; cross-bank per-frame service tick (JSL $CD0009) before returning via
+; cross-bank per-frame service tick (BattleSys_FrameTickVec) before returning via
 ; plain RTS. Called from several places in the battle-phase state
 ; machine ($C140A3 and others) once per frame.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; registers clobbered by callees
 ; Callees: BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
 ;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay,
-;          JSL $CD0009 (cross-bank per-frame service tick)
+;          BattleSys_FrameTickVec
 org $C110FA
 BattleMenu_RefreshIfDirtyAndTick:
-    LDA.w $993A                     ; menu-dirty flag
+    LDA.w !BattleMenu_Dirty
     BEQ .tick
-    STZ.w $993A                     ; clear flag
-    STZ $E5
+    STZ.w !BattleMenu_Dirty
+    STZ.b !Battle_UnkE5
     JSR BattleMenu_DequeueReadyBattler
     JSR BattleMenu_UpdateWindows
     JSR BattleMenu_ProcessInput
     JSR BattleMenu_UpdateCursorOverlay
 .tick:
-    JSL $CD0009                     ; per-frame service tick (cross-bank)
+    JSL BattleSys_FrameTickVec
     RTS
 
 ; ==================================================================
 ; BattleMenu_DrawCursorSprites ($C11115–$C11152, 62 bytes)
 ; ==================================================================
-; Builds the 4 OAM entries for the command-window selection cursor at
-; WRAM $0700, positioned relative to the active PC slot ($95D5). Reads
-; a 4-tile x/y/tile/attr template from ROM table $CCF604-$CCF607
-; (indexed by X = 0,4,8,12) and adds per-slot cursor coordinates from
-; $1D0C,Y (X-origin) / $1D23,Y (Y-origin). The attribute byte's low
-; palette bits are replaced from the current cursor-flash palette
-; ($9F46). Also marks OAM high-table byte $0900 = $AA (all 4 sprites
-; present, size bit set). Called from BattleMenu_ProcessInput once per
-; frame while the command menu is active.
+; Builds OAM sprites 0-3 (BattleOam) for the command cursor over the
+; shown PC: each of the 4 template sprites in BattleRom_CursorSprite is
+; offset by the PC's !Battler_ScreenX/Y, and its palette bits are
+; replaced with !BattleMenu_CursorPalette. Sets the high-table byte to
+; !BattleOam_CursorSizeBits (all 4 large, x bit 8 clear). Called from
+; BattleMenu_ProcessInput once per frame while a menu is open.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; X=$0010; A/Y clobbered
 ; No JSR/JSL calls.
@@ -2794,50 +2791,51 @@ org $C11115
 BattleMenu_DrawCursorSprites:
     TDC
     TAX
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc
     TAY
-.loop:
+.loop:                              ; X = sprite × 4
     CLC
-    LDA.l $CCF604,X                 ; template X-offset
-    ADC.w $1D0C,Y                   ; + slot cursor X-origin
-    STA.w $0700,X                   ; OAM X
+    LDA.l BattleRom_CursorSprite.X,X
+    ADC.w !Battler_ScreenX,Y
+    STA.w BattleOam.X,X
     CLC
-    LDA.l $CCF605,X                 ; template Y-offset
-    ADC.w $1D23,Y                   ; + slot cursor Y-origin
-    STA.w $0701,X                   ; OAM Y
-    LDA.l $CCF606,X                 ; template tile index
-    STA.w $0702,X
-    LDA.l $CCF607,X                 ; template attr byte
-    AND #$F1                        ; clear palette bits, keep priority/flip
-    ORA.w $9F46                     ; OR in current cursor-flash palette
-    STA.w $0703,X
+    LDA.l BattleRom_CursorSprite.Y,X
+    ADC.w !Battler_ScreenY,Y
+    STA.w BattleOam.Y,X
+    LDA.l BattleRom_CursorSprite.Tile,X
+    STA.w BattleOam.Tile,X
+    LDA.l BattleRom_CursorSprite.Attr,X
+    AND.b #!BattleOam_AttrKeepMask  ; drop the template palette
+    ORA.w !BattleMenu_CursorPalette ; use the current cursor palette
+    STA.w BattleOam.Attr,X
     INX
     INX
     INX
     INX
-    CPX #$0010
+    CPX.w #!BattleOam_CursorBytes
     BNE .loop
-    LDA #$AA
-    STA.w $0900                     ; OAM high-table: all 4 sprites, size bit
+    LDA.b #!BattleOam_CursorSizeBits
+    STA.w !BattleOam_HighTable
     RTS
 
 ; ==================================================================
 ; BattleMenu_ProcessInput ($C11153–$C111E0, 142 bytes)
 ; ==================================================================
 ; Battle command-window input handler, called once per frame from the
-; menu dirty-flag gates (RefreshIfDirtyL/AndTick). Reads two pad-edge
-; bytes ($EE, $EF — button/D-pad bits that went low-to-high this
+; menu dirty-flag gates (RefreshIfDirtyL/AndTick). Reads the pad-edge
+; bytes (!Battle_PadEdgeButtons / !Battle_PadEdgeDpad, pressed this
 ; frame) and dispatches:
-;   - no active PC ($95D5 < 0) or target-select active ($9609 != 0):
-;     bail out early (ZeroResultEE / TargetSelectInput)
-;   - submenu type ($95DB): 1 = tech list, 2 = item list, 0 = main menu
-;   - main menu: $A862 (force-confirm) or $EE bit $40 (with $A0D4 cursor-
-;     save setting) can jump straight to ConfirmCommand; otherwise polls
-;     $EF for Left/Up/Down/Right (cycle PC / move cursor) and $EE bit
-;     $80 for confirm
+;   - no PC shown (!BattleMenu_ActivePc < 0) → Battle_ZeroResultEE;
+;     target selection running → BattleMenu_TargetSelectInput
+;   - !BattleMenu_Submenu 1 / 2 → tech / item list input (with
+;     !Battle_MenuTimeHold = !Battle_CfgBattleMode)
+;   - main menu: !BattleMenu_UnkA862, or the alt-confirm button with
+;     !BattleMenu_CfgCursorMemory on (row forced to 0, !BattleMenu_KeepRow
+;     set), go straight to ConfirmCommand; otherwise Left/Right cycle the
+;     PC, Up/Down move the cursor, confirm confirms
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
-; Callees: JSL $CFFAE2 (Battle_MergePendingEntries1580, cross-bank),
+; Callees: Battle_MergePendingEntries1580,
 ;          BattleMenu_TargetSelectInput, BattleMenu_DrawCursorSprites,
 ;          BattleMenu_TechListInput, BattleMenu_ItemListInput,
 ;          BattleMenu_ConfirmCommand, BattleMenu_CycleActivePcPrev,
@@ -2845,68 +2843,68 @@ BattleMenu_DrawCursorSprites:
 ;          BattleMenu_CursorDown, Battle_StopSfx, Battle_ZeroResultEE
 org $C11153
 BattleMenu_ProcessInput:
-    JSL $CFFAE2                     ; Battle_MergePendingEntries1580 (cross-bank)
-    LDA.w $95D5                     ; active PC slot index
+    JSL Battle_MergePendingEntries1580
+    LDA.w !BattleMenu_ActivePc
     BPL .slot_valid
-    JMP Battle_ZeroResultEE         ; no active PC -> clear pad-edge bytes, return
+    JMP Battle_ZeroResultEE         ; no PC shown -> clear pad-edge bytes, return
 .slot_valid:
-    LDA.w $9609                     ; target-select active flag
+    LDA.w !BattleMenu_TargetSelect
     BEQ .not_targeting
     JMP BattleMenu_TargetSelectInput
 .not_targeting:
     JSR BattleMenu_DrawCursorSprites
-    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item
+    LDA.w !BattleMenu_Submenu       ; 0=main, 1=tech, 2=item
     BEQ .main_menu
     DEC
     BNE .item_menu
-    LDA.w $99E1                     ; battle-mode setting
-    STA.w $99E0
+    LDA.w !Battle_CfgBattleMode
+    STA.w !Battle_MenuTimeHold
     JMP BattleMenu_TechListInput
 .item_menu:
-    LDA.w $99E1
-    STA.w $99E0
+    LDA.w !Battle_CfgBattleMode
+    STA.w !Battle_MenuTimeHold
     JMP BattleMenu_ItemListInput
 .main_menu:
-    STZ.w $A09A
-    STZ.w $99E0
-    LDA.w $A862
-    BNE .confirm                    ; force-confirm flag set -> skip input polling
-    LDA.w $A0D4                     ; cursor-position-save setting
+    STZ.w !BattleUI_PanelHold
+    STZ.w !Battle_MenuTimeHold
+    LDA.w !BattleMenu_UnkA862
+    BNE .confirm                    ; set -> confirm without polling
+    LDA.w !BattleMenu_CfgCursorMemory
     BEQ .poll_dpad
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA $EE                         ; pad-edge byte (button bits)
-    AND #$40
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadAltConfirm
     BEQ .poll_dpad
-    INC.w $A114
+    INC.w !BattleMenu_KeepRow
     TDC
-    STA.w $95DC,X                   ; force cursor row 0 for this slot
+    STA.w !Pc_MenuRow,X             ; force cursor row 0 for this slot
     JMP BattleMenu_ConfirmCommand
 .poll_dpad:
-    LDA $EF                         ; pad-edge byte (D-pad bits)
-    AND #$02                        ; Left
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadLeft
     BEQ .poll_up
     JMP BattleMenu_CycleActivePcPrev
 .poll_up:
-    LDA $EF
-    AND #$08                        ; Up
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadUp
     BEQ .poll_down
     JSR Battle_StopSfx
     JMP BattleMenu_CursorUp
 .poll_down:
-    LDA $EF
-    AND #$04                        ; Down
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadDown
     BEQ .poll_right
     JSR Battle_StopSfx
     JMP BattleMenu_CursorDown
 .poll_right:
-    LDA $EF
-    AND #$01                        ; Right
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadRight
     BEQ .poll_confirm
     JMP BattleMenu_CycleActivePcNext
 .poll_confirm:
-    LDA $EE
-    AND #$80                        ; confirm button
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadConfirm
     BEQ .no_input
     JSR Battle_StopSfx
 .confirm:
@@ -2917,139 +2915,138 @@ BattleMenu_ProcessInput:
 ; ==================================================================
 ; BattleMenu_CycleActivePcPrev ($C111E1–$C11217, 55 bytes)
 ; ==================================================================
-; Left D-pad: decrement active PC index $A6DD (wrap 0..2), skipping
-; slots whose $A6D9 entry is invalid (negative). Plays the cursor-move
-; SFX unless $A6DE (active PC count) is 1. Carries the previous slot's
-; cursor row ($95DC) to the newly-active slot, unless $A0D4 (cursor-
-; position-save setting) is set, in which case it instead overwrites
-; $95DC for the OLD slot from a per-PC default-row table ($9916) — a
+; Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping
+; roster entries that are negative. Plays the cursor sound unless only
+; one PC is in the roster. Carries the previously shown PC's !Pc_MenuRow
+; to the new one, unless !BattleMenu_CfgCursorMemory is set, in which
+; case it instead restores the OLD PC's row from !Pc_SavedMenuRow — a
 ; path the reference disassembly marks as unreachable in practice.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_StopSfx, Battle_ZeroResultEE
 org $C111E1
 BattleMenu_CycleActivePcPrev:
-    LDA.w $A6DE                     ; active PC count
+    LDA.w !BattleMenu_ReadyCount
     DEC
     BEQ .retry                      ; only 1 PC -> skip the cursor-move sound
     JSR Battle_StopSfx
 .retry:
-    DEC.w $A6DD                     ; active PC index, wrap 0..2
-    LDA.w $A6DD
+    DEC.w !BattleMenu_RosterIdx     ; wrap 0..2
+    LDA.w !BattleMenu_RosterIdx
     BPL .have_index
-    LDA #$02
-    STA.w $A6DD
+    LDA.b #!Battle_LastPcSlot
+    STA.w !BattleMenu_RosterIdx
 .have_index:
     TAX
-    LDA.w $A6D9,X                   ; slot valid?
-    BMI .retry                      ; invalid slot -> keep decrementing
+    LDA.w !BattleMenu_Roster,X      ; entry valid?
+    BMI .retry                      ; no -> keep decrementing
     TAX
-    LDA.w $95D5                     ; previous active slot
+    LDA.w !BattleMenu_ActivePc      ; previously shown PC
     TAY
-    LDA.w $A0D4                     ; cursor-position-save setting
+    LDA.w !BattleMenu_CfgCursorMemory
     BNE .default_row                ; (reference: unreachable in practice)
-    LDA.w $95DC,Y                   ; carry cursor row from old slot
-    STA.w $95DC,X
+    LDA.w !Pc_MenuRow,Y             ; carry cursor row from old slot
+    STA.w !Pc_MenuRow,X
     BRA .done
 .default_row:
-    LDA.w $9916,Y                   ; per-PC default cursor row
-    STA.w $95DC,Y
+    LDA.w !Pc_SavedMenuRow,Y        ; old PC's remembered row
+    STA.w !Pc_MenuRow,Y
 .done:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_CycleActivePcNext ($C11218–$C1124F, 56 bytes)
 ; ==================================================================
-; Right D-pad: mirror of CycleActivePcPrev — increment $A6DD (wrap at
-; 3 back to 0) instead of decrementing.
+; Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx
+; forward (wrap at 3 back to 0) instead.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_StopSfx, Battle_ZeroResultEE
 org $C11218
 BattleMenu_CycleActivePcNext:
-    LDA.w $A6DE                     ; active PC count
+    LDA.w !BattleMenu_ReadyCount
     DEC
     BEQ .retry
     JSR Battle_StopSfx
 .retry:
-    INC.w $A6DD                     ; active PC index, wrap at 3 -> 0
-    LDA.w $A6DD
-    CMP #$03
+    INC.w !BattleMenu_RosterIdx     ; wrap at 3 -> 0
+    LDA.w !BattleMenu_RosterIdx
+    CMP.b #!Battle_NumPcSlots
     BNE .have_index
-    STZ.w $A6DD
+    STZ.w !BattleMenu_RosterIdx
     TDC
 .have_index:
     TAX
-    LDA.w $A6D9,X                   ; slot valid?
-    BMI .retry                      ; invalid slot -> keep incrementing
+    LDA.w !BattleMenu_Roster,X      ; entry valid?
+    BMI .retry                      ; no -> keep incrementing
     TAX
-    LDA.w $95D5                     ; previous active slot
+    LDA.w !BattleMenu_ActivePc      ; previously shown PC
     TAY
-    LDA.w $A0D4                     ; cursor-position-save setting
+    LDA.w !BattleMenu_CfgCursorMemory
     BNE .default_row                ; (reference: unreachable in practice)
-    LDA.w $95DC,Y                   ; carry cursor row from old slot
-    STA.w $95DC,X
+    LDA.w !Pc_MenuRow,Y             ; carry cursor row from old slot
+    STA.w !Pc_MenuRow,X
     BRA .done
 .default_row:
-    LDA.w $9916,Y                   ; per-PC default cursor row
-    STA.w $95DC,Y
+    LDA.w !Pc_SavedMenuRow,Y        ; old PC's remembered row
+    STA.w !Pc_MenuRow,Y
 .done:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_CursorUp ($C11250–$C11263, 20 bytes)
 ; ==================================================================
-; Up D-pad: decrement the active PC's menu cursor row $95DC (wrap 0..2),
-; flag a redraw via $A43F.
+; Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag
+; the cursor redraw (!BattleUI_PanelRedraw).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
 org $C11250
 BattleMenu_CursorUp:
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc      ; active PC slot
     TAX
-    DEC.w $95DC,X
+    DEC.w !Pc_MenuRow,X
     BPL .done
-    LDA #$02
-    STA.w $95DC,X
+    LDA.b #!BattleMenu_LastRow
+    STA.w !Pc_MenuRow,X
 .done:
-    INC.w $A43F                     ; flag redraw
+    INC.w !BattleUI_PanelRedraw     ; flag redraw
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_CursorDown ($C11264–$C1127A, 23 bytes)
 ; ==================================================================
-; Down D-pad: increment the active PC's menu cursor row $95DC, wrap at
-; 3 back to 0, flag a redraw via $A43F.
+; Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to
+; 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
 org $C11264
 BattleMenu_CursorDown:
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc      ; active PC slot
     TAX
-    INC.w $95DC,X
-    LDA.w $95DC,X
-    CMP #$03
+    INC.w !Pc_MenuRow,X
+    LDA.w !Pc_MenuRow,X
+    CMP.b #!BattleMenu_ListRows
     BNE .done
-    STZ.w $95DC,X
+    STZ.w !Pc_MenuRow,X
 .done:
-    INC.w $A43F                     ; flag redraw
+    INC.w !BattleUI_PanelRedraw     ; flag redraw
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; Battle_ZeroResultEE ($C1179C–$C117A0, 5 bytes)
 ; ==================================================================
-; Clears both pad-edge bytes ($EE, $EF) and returns. Shared tail used
-; by most of the command-window input handlers above once they've
-; consumed this frame's input.
+; Clears both pad-edge bytes and returns. Shared tail used by most of the
+; command-window input handlers above once they've consumed this frame's
+; input.
 ; Entry: M=1, DB=$7E
-; Exit:  M=1; $EE=$EF=0
+; Exit:  M=1; !Battle_PadEdgeButtons = !Battle_PadEdgeDpad = 0
 ; No JSR/JSL calls.
 org $C1179C
 Battle_ZeroResultEE:
-    STZ $EE
-    STZ $EF
+    STZ.b !Battle_PadEdgeButtons
+    STZ.b !Battle_PadEdgeDpad
     RTS
 
 ; ==================================================================
@@ -3057,97 +3054,95 @@ Battle_ZeroResultEE:
 ; ==================================================================
 ; Service 1 of the cross-bank $C10045 service API (dispatch table at
 ; $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady).
-; Called when battler slot $A1 becomes ready for a command (presumably
-; its ATB gauge filled): appends it to the ATB-ready queue that
+; Called when battler slot !Battle_ArgSlot becomes ready for a command
+; (presumably its ATB gauge filled): appends it to the ready queue that
 ; BattleMenu_DequeueReadyBattler later pops from.
 ;
-; Skipped entirely if the slot is already in the active roster
-; ($A6D9,X non-negative). Otherwise: sets bit 7 of the battler's
-; sprite flag byte at $93EE (via the $CCFAF0 slot->sprite lookup) —
-; the same bit ConsumePartnerSlot/CommitAction clear, i.e. "waiting
-; for a command" — writes the slot to the queue tail ($95D6+count),
-; resets the battler's menu cursor row ($95DC,X) to its per-PC
-; default ($9916,X), bumps the queue count ($95DA), and plays a sound
-; cue through the same SPC command $19 interface Battle_StopSfx uses,
-; here with $1E01 = $42 instead of 0 (inferred: the "turn ready" cue).
+; Skipped entirely if the slot is already in the roster
+; (!BattleMenu_Roster entry non-negative). Otherwise: sets
+; BattleCmd.State bit 7 ("waiting for a command"; the bit
+; ConsumePartnerSlot/CommitAction clear) in the slot's command record
+; (offset from !BattleRom_CmdOffset), appends the slot to
+; !BattleMenu_ReadyQueue, resets its !Pc_MenuRow to !Pc_SavedMenuRow,
+; and plays a sound through the same APU command Battle_StopSfx uses,
+; here with sound id $42 instead of 0 (inferred: the "turn ready" cue).
 ;
 ; Note: does not check whether the slot is already queued; callers
 ; are trusted not to enqueue twice.
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; !Battle_ArgSlot = battler slot
 ; Exit:  M=1; registers clobbered
-; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+; Callees: Audio_ProcessEntry
 org $C11B19
 BattleMenu_EnqueueReadyBattler:
-    LDA $A1                         ; battler slot that became ready
+    LDA.b !Battle_ArgSlot           ; battler slot that became ready
     TAX
-    LDA.w $A6D9,X                   ; roster presence (<0 = absent)
-    BPL .exit                       ; already in the active roster
-    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    LDA.w !BattleMenu_Roster,X      ; negative = not in the roster
+    BPL .exit                       ; already in the roster
+    LDA.l !BattleRom_CmdOffset,X    ; slot -> BattleCmd record offset
     TAX
-    LDA.w $93EE,X
-    ORA #$80                        ; mark "waiting for command"
-    STA.w $93EE,X
-    LDA.w $95DA                     ; queue count = tail index
+    LDA.w BattleCmd.State,X
+    ORA.b #!BattleCmd_StateWaiting
+    STA.w BattleCmd.State,X
+    LDA.w !BattleMenu_ReadyQueueLen ; = tail index
     TAX
-    LDA $A1
-    STA.w $95D6,X                   ; append slot to ready queue
+    LDA.b !Battle_ArgSlot
+    STA.w !BattleMenu_ReadyQueue,X  ; append to the queue
     TAX
-    LDA.w $9916,X                   ; per-PC default cursor row
-    STA.w $95DC,X
-    INC.w $95DA                     ; queue count
-    LDA #$42                        ; sound id (turn-ready cue, inferred)
-    STA.w $1E01
-    LDA #$19                        ; SPC command $19
-    STA.w $1E00
-    LDA #$80
-    STA.w $1E02
-    JSL $C70004                     ; Audio_Process_Entry (cross-bank)
+    LDA.w !Pc_SavedMenuRow,X
+    STA.w !Pc_MenuRow,X
+    INC.w !BattleMenu_ReadyQueueLen
+    LDA.b #!Sfx_TurnReady           ; sound id
+    STA.w !Sfx_Param1
+    LDA.b #!Sfx_CmdPlay
+    STA.w !Sfx_Command
+    LDA.b #!Sfx_Param2Default
+    STA.w !Sfx_Param2
+    JSL Audio_ProcessEntry
 .exit:
     RTS
 
 ; ==================================================================
 ; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
 ; ==================================================================
-; SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90
-; pattern): sets $1E00-$1E02 and JSLs into the audio driver entry.
-; Used here to play/cancel a sound cue when the cursor moves or a
-; command is confirmed.
+; APU command !Sfx_CmdPlay with sound id 0 (mirrors bank $C0's Sub_1B90
+; pattern): fills !Sfx_Command/!Sfx_Param1/!Sfx_Param2 and calls the
+; audio driver entry. Used when the cursor moves or a command is
+; confirmed; whether sound 0 is a cursor beep or a stop is not settled.
 ; Entry: M=1, DB=$7E
 ; Exit:  M=1
-; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+; Callees: Audio_ProcessEntry
 org $C11B55
 Battle_StopSfx:
-    STZ.w $1E01
-    LDA #$19
-    STA.w $1E00
-    LDA #$80
-    STA.w $1E02
-    JSL $C70004
+    STZ.w !Sfx_Param1
+    LDA.b #!Sfx_CmdPlay
+    STA.w !Sfx_Command
+    LDA.b #!Sfx_Param2Default
+    STA.w !Sfx_Param2
+    JSL Audio_ProcessEntry
     RTS
 
 ; ==================================================================
 ; BattleMenu_ConfirmCommand ($C1127B–$C1129B, 33 bytes)
 ; ==================================================================
-; Confirm-button dispatch: sets a sentinel at $A0D7 (compared elsewhere,
-; e.g. BattleUI_BuildStatusBarFrame, to force a status-bar refresh),
-; reloads the active-PC pointer via JSL $CFFD9E, then reads the active
-; PC's menu cursor row ($95DC,X: 0/1/2 = Attack/Tech/Item) and tail-
-; jumps to the matching row handler.
+; Confirm-button dispatch: sets !BattleUI_UnkA0D7 to $FF (compared by
+; BattleUI_BuildStatusBarFrame with the first selected target), calls
+; BattleFx_SetPtrA2FromTable for the shown PC, then tail-jumps on that
+; PC's !Pc_MenuRow (0/1/2 = Attack/Tech/Item).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of three row handlers, does not fall through
-; Callees: JSL $CFFD9E (BattleFx_SetPtrA2FromTable, cross-bank),
+; Callees: BattleFx_SetPtrA2FromTable,
 ;          BattleMenu_ChooseAttack, BattleMenu_OpenTechList,
 ;          BattleMenu_OpenItemList
 org $C1127B
 BattleMenu_ConfirmCommand:
-    LDA #$FF
-    STA.w $A0D7                     ; sentinel: force refresh elsewhere
-    LDA.w $95D5
-    JSL $CFFD9E                     ; BattleFx_SetPtrA2FromTable (cross-bank)
-    LDA.w $95D5
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleUI_UnkA0D7
+    LDA.w !BattleMenu_ActivePc
+    JSL BattleFx_SetPtrA2FromTable
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $95DC,X                   ; menu cursor row for active PC
+    LDA.w !Pc_MenuRow,X
     BNE .not_row0
     JMP BattleMenu_ChooseAttack
 .not_row0:
@@ -3160,96 +3155,94 @@ BattleMenu_ConfirmCommand:
 ; ==================================================================
 ; BattleMenu_ChooseAttack ($C1129C–$C112BB, 32 bytes)
 ; ==================================================================
-; Row 0 (Attack) confirm: shows the command message, flags two redraws
-; via $A43F, sets target mode $960D=$07 (attack targeting), clears
-; $9615 (submenu-open marker), builds the valid-target list, then
-; enters target-select mode by incrementing $9609.
+; Row 0 (Attack) confirm: message call with "none", flags the cursor
+; redraw (twice), sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0,
+; builds the target list, then enters target selection.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: JSL $CD002D (BattleMsg_ShowMsg0BIfKeyChangedVec, cross-bank),
+; Callees: BattleMsg_ShowMsg0BIfKeyChangedVec,
 ;          BattleMenu_BuildTargetList, Battle_ZeroResultEE
 org $C1129C
 BattleMenu_ChooseAttack:
-    LDA #$FF
-    JSL $CD002D                     ; BattleMsg_ShowMsg0BIfKeyChangedVec (cross-bank)
-    INC.w $A43F                     ; flag redraw
-    INC.w $A43F                     ; flag redraw (twice)
-    LDA #$07
-    STA.w $960D                     ; target mode: attack
-    STZ.w $9615                     ; submenu-open marker: none
+    LDA.b #!BattleMsg_ArgNone
+    JSL BattleMsg_ShowMsg0BIfKeyChangedVec
+    INC.w !BattleUI_PanelRedraw
+    INC.w !BattleUI_PanelRedraw     ; (twice)
+    LDA.b #!BattleTgt_ModeAttack
+    STA.w !BattleTgt_Mode
+    STZ.w !BattleMenu_CmdMenu       ; command from the attack row
     JSR BattleMenu_BuildTargetList
-    INC.w $A4EE
-    INC.w $9609                     ; enter target-select mode
+    INC.w !BattleMenu_TargetMoved
+    INC.w !BattleMenu_TargetSelect  ; enter target selection
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_OpenTechList ($C112BC–$C112EC, 49 bytes)
 ; ==================================================================
-; Row 1 (Tech) confirm: unless $A0A7 bit 0 is set (tech list locked),
-; renders the tech list rows, builds per-tech availability flags,
-; switches the submenu to tech ($95DB=1, $9615=1), and marks the tech
-; window active ($A86A).
+; Row 1 (Tech) confirm: unless !BattleMenu_Lock bit 0 is set, renders
+; the tech list lines, builds !Tech_ListAvail, switches to the tech list
+; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests the tech
+; box frame (!BattleMenu_TechWindowNew).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_RenderTechListRows, BattleMenu_BuildTechAvailFlags,
 ;          Battle_ZeroResultEE
 org $C112BC
 BattleMenu_OpenTechList:
-    LDA.w $A0A7
-    AND #$01
-    BNE .exit                       ; tech list locked -> no-op
-    LDA #$FF
-    STA.w $9EE7
-    STZ.w $A09A
-    STZ.w $A099
-    INC.w $A862
+    LDA.w !BattleMenu_Lock
+    AND.b #!BattleMenu_LockTech
+    BNE .exit                       ; tech list blocked -> no-op
+    LDA.b #!Tech_NoPartners
+    STA.w Tech_CursorEntry.Partners ; no cursor entry yet
+    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleMenu_TechAvailDone
+    INC.w !BattleMenu_UnkA862
     JSR BattleMenu_RenderTechListRows
     JSR BattleMenu_BuildTechAvailFlags
-    STZ.w $A862
-    LDA #$01
-    STA.w $9615                     ; submenu-open marker: tech
-    LDA #$01
-    STA.w $95DB                     ; submenu type: tech list
-    STZ.w $A869
-    INC.w $A86A                     ; mark tech window active
+    STZ.w !BattleMenu_UnkA862
+    LDA.b #!BattleMenu_SubmenuTech
+    STA.w !BattleMenu_CmdMenu       ; command from the tech list
+    LDA.b #!BattleMenu_SubmenuTech
+    STA.w !BattleMenu_Submenu
+    STZ.w !BattleMenu_UnkA869
+    INC.w !BattleMenu_TechWindowNew
 .exit:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_OpenItemList ($C112ED–$C1131F, 51 bytes)
 ; ==================================================================
-; Row 2 (Item) confirm: unless $A0A7 is set (item list locked), renders
-; the item list rows, queues the $0E80 tilemap for VRAM upload, copies
-; the $180-byte item-window graphic (ROM $D15BD0, "ItemBoxBattles")
-; into the command-window tilemap $0B40, and switches the submenu to
-; item ($95DB=2).
+; Row 2 (Item) confirm: unless !BattleMenu_Lock is non-zero, renders the
+; item list at !BattleMenu_ItemScroll, queues the item map upload, copies
+; the item box frame (!BattleRom_ItemBoxMap, "ItemBoxBattles") into
+; !BattleMenu_WindowMap, and switches to the item list
+; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 2).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_RenderItemListRows,
-;          JSL $CFFD6A (Battle_QueueVramUpload_0E80, cross-bank),
+; Callees: BattleMenu_RenderItemListRows, Battle_QueueVramUpload_0E80,
 ;          Battle_ZeroResultEE
 org $C112ED
 BattleMenu_OpenItemList:
-    LDA.w $A0A7
-    BNE .exit                       ; item list locked -> no-op
-    STZ.w $A09A
-    LDA #$02
-    STA.w $9615                     ; submenu-open marker: item
-    LDA.w $95E6                     ; item-list scroll position
-    STA $80
+    LDA.w !BattleMenu_Lock
+    BNE .exit                       ; item list blocked -> no-op
+    STZ.w !BattleUI_PanelHold
+    LDA.b #!BattleMenu_SubmenuItem
+    STA.w !BattleMenu_CmdMenu       ; command from the item list
+    LDA.w !BattleMenu_ItemScroll
+    STA.b !BattleMenu_ListScroll
     JSR BattleMenu_RenderItemListRows
-    JSL $CFFD6A                     ; Battle_QueueVramUpload_0E80 (cross-bank)
+    JSL Battle_QueueVramUpload_0E80
     TDC
     TAX
 .copy_loop:
-    LDA.l $D15BD0,X                 ; ItemBoxBattles (bank $D1)
-    STA.w $0B40,X
+    LDA.l !BattleRom_ItemBoxMap,X
+    STA.w !BattleMenu_WindowMap,X
     INX
-    CPX #$0180
+    CPX.w #!BattleMenu_WindowBytes
     BNE .copy_loop
-    INC.w $99E2
-    LDA #$02
-    STA.w $95DB                     ; submenu type: item list
+    INC.w !BattleMenu_WindowMapDirty
+    LDA.b #!BattleMenu_SubmenuItem
+    STA.w !BattleMenu_Submenu
 .exit:
     JMP Battle_ZeroResultEE
 
@@ -4723,50 +4716,50 @@ BattleTgt_AnyCandidate:
 ; ==================================================================
 ; BattleMenu_DequeueReadyBattler ($C11B67–$C11BA9, 67 bytes)
 ; ==================================================================
-; Pops the head of the ATB-ready queue ($95D6-$95D9, up to 3 deep,
-; count in $95DA) into the active menu roster: restores that battler's
-; saved cursor position ($A863/$A866 -> $95DF/$95EB), marks it present
-; in the roster ($A6D9,X = X, i.e. identity-maps the slot), forces a
-; command-window reload sentinel ($A6DF = $FE), shifts the queue down
-; one slot, decrements the queue count, and increments the active-PC
-; count ($A6DE). If no PC was already active ($A6DD negative), makes
-; the newly dequeued battler the active one.
+; Pops the head of !BattleMenu_ReadyQueue (up to 3 deep, count in
+; !BattleMenu_ReadyQueueLen) into the roster: clears its
+; !Battle_Unk9F38, restores its tech-list cursor (!Pc_SavedTechRow /
+; SavedTechScroll -> !Pc_TechRow / TechScroll), marks it present
+; (!BattleMenu_Roster entry = its own slot), forces a window rebuild,
+; shifts the queue down one entry, and counts it in
+; !BattleMenu_ReadyCount. If no roster entry was shown
+; (!BattleMenu_RosterIdx negative), shows the new one.
 ;
-; Note: the second queue-shift step reads $95D8 twice (into both
-; $95D7 and $95D9) rather than reading $95D9 for the second copy —
-; reproduced exactly as found; harmless in practice since $95DA (the
-; live count) never exceeds what the shift correctly updates.
+; Note: the queue shift reads ReadyQueue+2 twice (into both +1 and +3)
+; rather than reading +3 for the second copy — reproduced exactly as
+; found; harmless in practice since the live count never exceeds what
+; the shift correctly updates.
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; X = dequeued slot index (or unchanged if queue was empty)
 ; No JSR/JSL calls.
 org $C11B67
 BattleMenu_DequeueReadyBattler:
-    LDA.w $95D6                     ; queue head
+    LDA.w !BattleMenu_ReadyQueue    ; queue head
     BMI .exit                       ; queue empty -> nothing to do
     TAX
-    STZ.w $9F38,X                   ; clear per-slot pending flag
-    LDA.w $A863,X                   ; saved cursor row
-    STA.w $95DF,X
-    LDA.w $A866,X                   ; saved cursor scroll
-    STA.w $95EB,X
-    LDA.w $95D6
+    STZ.w !Battle_Unk9F38,X
+    LDA.w !Pc_SavedTechRow,X
+    STA.w !Pc_TechRow,X
+    LDA.w !Pc_SavedTechScroll,X
+    STA.w !Pc_TechScroll,X
+    LDA.w !BattleMenu_ReadyQueue
     TAX
-    STA.w $A6D9,X                   ; mark slot present (identity-map)
-    LDA #$FE
-    STA.w $A6DF                     ; force command-window reload
-    LDA.w $95D7
-    STA.w $95D6                     ; shift queue down
-    LDA.w $95D8
-    STA.w $95D7
-    LDA.w $95D8
-    STA.w $95D9
-    DEC.w $95DA                     ; queue count
-    INC.w $A6DE                     ; active PC count
-    LDA.w $A6DD
-    BPL .exit                       ; already have an active PC
+    STA.w !BattleMenu_Roster,X      ; in the roster (entry = own slot)
+    LDA.b #!BattleMenu_RosterRedraw
+    STA.w !BattleMenu_RosterIdxDrawn ; force a window rebuild
+    LDA.w !BattleMenu_ReadyQueue+1
+    STA.w !BattleMenu_ReadyQueue    ; shift the queue down
+    LDA.w !BattleMenu_ReadyQueue+2
+    STA.w !BattleMenu_ReadyQueue+1
+    LDA.w !BattleMenu_ReadyQueue+2
+    STA.w !BattleMenu_ReadyQueue+3
+    DEC.w !BattleMenu_ReadyQueueLen
+    INC.w !BattleMenu_ReadyCount
+    LDA.w !BattleMenu_RosterIdx
+    BPL .exit                       ; something already shown
     TXA
-    STA.w $A6DD                     ; make the dequeued battler active
+    STA.w !BattleMenu_RosterIdx     ; show the dequeued PC
 .exit:
     RTS
 
@@ -4774,115 +4767,115 @@ BattleMenu_DequeueReadyBattler:
 ; BattleMenu_RemoveBattlerFromReady ($C11BAA–$C11C39, 144 bytes)
 ; ==================================================================
 ; Service 2 of the cross-bank $C10045 service API (see the entry-vector
-; table near the top of this bank). Removes battler slot $A1 from the
-; menu-ready state, whether it's currently queued (in $95D6-$95D9) or
-; already the active menu PC.
+; table near the top of this bank). Removes battler slot !Battle_ArgSlot
+; from the menu-ready state, whether it's currently queued (in
+; !BattleMenu_ReadyQueue) or already in the roster.
 ;
 ; If queued: scans the queue for a matching entry and shifts everything
 ; after it down by one (a generalized version of DequeueReadyBattler's
 ; shift, starting from wherever the match was found instead of always
 ; slot 0), then decrements the queue count.
 ;
-; If it's the active roster slot ($A6D9,X non-negative): decrements the
-; active-PC count. If it wasn't the currently-displayed active PC
-; ($95D5), just clears its roster presence and forces a redraw. If it
-; WAS the active PC, additionally cancels any open submenu/targeting
-; state ($9609/$960E/$9614/$95DB/$99E0), clears its roster slot, then
-; scans for another valid roster slot to promote to active (or sets
-; "no active PC" if none remain).
+; If it's in the roster (!BattleMenu_Roster entry non-negative):
+; decrements !BattleMenu_ReadyCount. If it isn't the PC shown
+; (!BattleMenu_ActivePc), just clears its roster entry and forces a
+; rebuild. If it IS the shown PC, additionally cancels any open
+; submenu/targeting state, clears its roster entry, then scans for
+; another roster entry to show (or sets "none" if none remain).
 ;
-; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot to remove
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1; registers clobbered
 ; Callees: BattleMenu_LoadCommandWindowMap
+!BattleMenu_RemoveSlot = !BattleTmp_80   ; 1 B: copy of !Battle_ArgSlot
 org $C11BAA
 BattleMenu_RemoveBattlerFromReady:
     TDC
     TAX
-    LDA $A1                         ; battler slot to remove
-    STA $80
+    LDA.b !Battle_ArgSlot
+    STA.b !BattleMenu_RemoveSlot
     TAX
-    LDA.w $A6D9,X                   ; roster presence value for this slot
+    LDA.w !BattleMenu_Roster,X
     BPL .active_roster
     TDC
     TAX
-    LDA $80
+    LDA.b !BattleMenu_RemoveSlot
 .scan_queue:
-    CMP.w $95D6,X
+    CMP.w !BattleMenu_ReadyQueue,X
     BEQ .shift_queue
     INX
-    CPX #$0003
+    CPX.w #!BattleMenu_ReadyQueueSize
     BNE .scan_queue
     RTS                              ; not queued -> nothing to remove
 .shift_queue:
-    LDA.w $95D7,X
-    STA.w $95D6,X
+    LDA.w !BattleMenu_ReadyQueue+1,X
+    STA.w !BattleMenu_ReadyQueue,X
     INX
-    CPX #$0003
+    CPX.w #!BattleMenu_ReadyQueueSize
     BCC .shift_queue
-    DEC.w $95DA                     ; queue count
+    DEC.w !BattleMenu_ReadyQueueLen
     RTS
 .active_roster:
-    DEC.w $A6DE                     ; active PC count
-    CMP.w $95D5                     ; is this slot the current active PC?
+    DEC.w !BattleMenu_ReadyCount
+    CMP.w !BattleMenu_ActivePc      ; the PC shown?
     BEQ .removing_active_pc
-    LDA $A1
+    LDA.b !Battle_ArgSlot
     TAX
-    LDA #$FF
-    STA.w $A6D9,X                   ; clear roster presence
-    LDA #$FE
-    STA.w $A6DF                     ; force command-window reload
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_Roster,X      ; out of the roster
+    LDA.b #!BattleMenu_RosterRedraw
+    STA.w !BattleMenu_RosterIdxDrawn ; force a window rebuild
     BRA .redraw
 .removing_active_pc:
-    LDA.w $A86B                     ; saved submenu type (cancel target)
+    LDA.w !BattleMenu_ReturnSubmenu
     BEQ .clear_targeting
     DEC
-    STA.w $95DB
-    STZ.w $A86B
-    STZ.w $A09A
+    STA.w !BattleMenu_Submenu
+    STZ.w !BattleMenu_ReturnSubmenu
+    STZ.w !BattleUI_PanelHold
 .clear_targeting:
-    STZ.w $9609                     ; target-select mode
-    STZ.w $960E
-    STZ.w $9614
-    STZ.w $95DB                     ; submenu type -> main
-    STZ.w $99E0
-    LDA #$FE
-    STA.w $A6DF                     ; force command-window reload
-    LDA $A1
+    STZ.w !BattleMenu_TargetSelect
+    STZ.w !BattleTgt_Unk960E
+    STZ.w !BattleTgt_Cursor
+    STZ.w !BattleMenu_Submenu       ; back to the main menu
+    STZ.w !Battle_MenuTimeHold
+    LDA.b #!BattleMenu_RosterRedraw
+    STA.w !BattleMenu_RosterIdxDrawn ; force a window rebuild
+    LDA.b !Battle_ArgSlot
     TAX
-    LDA #$FF
-    STA.w $A6D9,X                   ; clear roster presence
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_Roster,X      ; out of the roster
     TDC
     TAX
 .find_next_active:
-    LDA.w $A6D9,X                   ; next roster slot's presence value
-    STA.w $A6DD
-    STA.w $95D5
-    BPL .redraw                     ; found a valid slot -> promote it
+    LDA.w !BattleMenu_Roster,X      ; entry X (its slot, or negative)
+    STA.w !BattleMenu_RosterIdx
+    STA.w !BattleMenu_ActivePc
+    BPL .redraw                     ; valid -> show it
     INX
-    CPX #$0003
+    CPX.w #!Battle_NumPcSlots
     BNE .find_next_active
-    LDA #$FF                        ; none left -> no active PC
-    STA.w $A6DD
-    STA.w $95D5
+    LDA.b #!BattleMenu_NoSlot       ; none left -> nothing shown
+    STA.w !BattleMenu_RosterIdx
+    STA.w !BattleMenu_ActivePc
 .redraw:
     JSR BattleMenu_LoadCommandWindowMap
-    STZ.w $A862
+    STZ.w !BattleMenu_UnkA862
     RTS
 
 ; ==================================================================
 ; BattleMenu_TargetSelectInput ($C11561–$C11619, 185 bytes)
 ; ==================================================================
-; Per-frame input handler while target-select mode is active (entered
-; from BattleMenu_ProcessInput when $9609 != 0). Rebuilds the target
-; list every call, then either cancels back to the previous menu
-; (no valid target, or cancel button $EE bit $08) or polls for
-; confirm ($EE bits $C0) / cycle-target ($EF bits) input.
+; Per-frame input handler while target selection runs (entered from
+; BattleMenu_ProcessInput when !BattleMenu_TargetSelect != 0). Rebuilds
+; the target list every call, then either cancels back to the previous
+; menu (no valid target, or the cancel button) or polls for confirm
+; (either confirm button) / cursor (D-pad) input.
 ;
 ; The cancel path restores whichever submenu was open before targeting
-; started ($A86B), redrawing its window contents (tech: just re-flags
-; $A86A; item: reloads the $180-byte ItemBoxBattles graphic). It then
-; falls through to a cursor-highlight update (OAM attr OR $55, four
-; X-position bytes set to $F0) shared with the non-cancel exit path.
+; started (!BattleMenu_ReturnSubmenu), redrawing its window (tech: just
+; requests the tech box again; item: reloads the item box frame). It
+; then hides the four cursor sprites (high-table x bit 8 set, y parked
+; at $F0); with the main menu back, the command cursor is redrawn too.
 ;
 ; Contains one 18-byte block of dead code ($115B6-$115C7): a byte-for-
 ; byte duplicate of the item-graphic copy loop above it, except its
@@ -4901,88 +4894,88 @@ BattleMenu_RemoveBattlerFromReady:
 org $C11561
 BattleMenu_TargetSelectInput:
     JSR BattleMenu_BuildTargetList
-    LDA.w $9613                     ; target result (from BuildTargetList)
+    LDA.w !BattleTgt_Result
     BPL .have_target
-    STZ.w $9614
+    STZ.w !BattleTgt_Cursor         ; no valid target -> cancel
     BRA .cancel
 .have_target:
-    LDA $EE                         ; pad-edge byte (button bits)
-    AND #$08                        ; cancel button
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadCancel
     BEQ .poll_input
     JSR Battle_StopSfx
 .cancel:
-    STZ.w $9614
-    STZ.w $960E
-    DEC.w $9609                     ; leave target-select mode
-    LDA.w $A86B                     ; saved submenu type
+    STZ.w !BattleTgt_Cursor
+    STZ.w !BattleTgt_Unk960E
+    DEC.w !BattleMenu_TargetSelect  ; leave target selection
+    LDA.w !BattleMenu_ReturnSubmenu
     BEQ .redraw_cursor
     DEC
-    STA.w $95DB
-    STZ.w $A09A
-    STZ.w $A86B
-    LDA.w $95DB
+    STA.w !BattleMenu_Submenu
+    STZ.w !BattleUI_PanelHold
+    STZ.w !BattleMenu_ReturnSubmenu
+    LDA.w !BattleMenu_Submenu
     DEC
-    BEQ .tech_return                ; $95DB was 1 (tech) -> just re-flag it
-    TDC                              ; else (item) -> reload item window gfx
+    BEQ .tech_return                ; tech list -> request the tech box again
+    TDC                             ; item list -> reload the item box frame
     TAX
 .copy_loop1:
-    LDA.l $D15BD0,X                 ; ItemBoxBattles (bank $D1)
-    STA.w $0B40,X
+    LDA.l !BattleRom_ItemBoxMap,X
+    STA.w !BattleMenu_WindowMap,X
     INX
-    CPX #$0180
+    CPX.w #!BattleMenu_WindowBytes
     BNE .copy_loop1
-    LDA #$FF
-    STA.w $9920
-    INC.w $99E2
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_ItemScrollDrawn
+    INC.w !BattleMenu_WindowMapDirty
     BRA .redraw_cursor
 .tech_return:
-    STZ.w $A869
-    INC.w $A86A
+    STZ.w !BattleMenu_UnkA869
+    INC.w !BattleMenu_TechWindowNew
     BRA .redraw_cursor
 ; --- dead code: unreachable, see routine header ---
     TDC
     TAX
 .dead_copy_loop:
-    LDA.l $D15BD0,X
-    STA.w $0B40,X
+    LDA.l !BattleRom_ItemBoxMap,X
+    STA.w !BattleMenu_WindowMap,X
     INX
-    CPX #$0180
+    CPX.w #!BattleMenu_WindowBytes
     BNE .poll_input                 ; escapes into live code after 1 iteration
-    INC.w $99E2
+    INC.w !BattleMenu_WindowMapDirty
 .redraw_cursor:
-    LDA.w $95DB
+    LDA.w !BattleMenu_Submenu
     BNE .cursor_drawn
-    INC.w $A43F
+    INC.w !BattleUI_PanelRedraw
 .cursor_drawn:
-    LDA.w $0900                     ; OAM high-table
-    ORA #$55
-    STA.w $0900
-    LDA #$F0
-    STA.w $0701                     ; cursor sprite X positions
-    STA.w $0705
-    STA.w $0709
-    STA.w $070D
+    LDA.w !BattleOam_HighTable
+    ORA.b #!BattleOam_HideCursorBits
+    STA.w !BattleOam_HighTable
+    LDA.b #!BattleOam_OffscreenY
+    STA.w BattleOam.Y               ; park the 4 cursor sprites
+    STA.w BattleOam[1].Y
+    STA.w BattleOam[2].Y
+    STA.w BattleOam[3].Y
     BRA .exit
 .poll_input:
-    LDA $EE
-    AND #$C0                        ; confirm buttons
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadConfirmAny
     BEQ .check_cycle
     JSR Battle_StopSfx
     JMP BattleMenu_CommitAction
 .check_cycle:
-    LDA.w $960C                     ; target-all flag
+    LDA.w !BattleTgt_TargetAll
     BMI .exit                       ; target-all -> no per-target cycling
-    LDA $EF                         ; pad-edge byte (D-pad bits)
-    AND #$05                        ; right/down
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadRightDown
     BEQ .check_prev
-    INC.w $A4EE
+    INC.w !BattleMenu_TargetMoved
     JSR Battle_StopSfx
     JMP BattleMenu_TargetNext
 .check_prev:
-    LDA $EF
-    AND #$0A                        ; left/up
+    LDA.b !Battle_PadEdgeDpad
+    AND.b #!Battle_DpadLeftUp
     BEQ .exit
-    INC.w $A4EE
+    INC.w !BattleMenu_TargetMoved
     JSR Battle_StopSfx
     JMP BattleMenu_TargetPrev
 .exit:
@@ -4992,296 +4985,296 @@ BattleMenu_TargetSelectInput:
 ; BattleMenu_CommitAction ($C1161A–$C11749, 308 bytes)
 ; ==================================================================
 ; Confirms the currently-selected target and builds the command
-; record for the active PC's chosen action (attack/tech/item), then
-; enqueues it and hands the menu focus to the next ready battler.
+; record for the shown PC's chosen action (attack/tech/item), then
+; queues it and hands the menu to the next ready PC.
 ;
-; Restores whichever submenu was saved for cancel-to-return ($A86B),
-; then dispatches on $95DB (0=attack, 1=tech, 2=item) to fill in
-; type-specific fields:
-;   attack: $80=$80 (type flag), $82=$FF (no tech/item id)
-;   tech:   saves cursor position if $A0D5 set; consumes the primary
-;           partner slot from $9EE7's low nibble (and, for a triple-
-;           tech, the high nibble too via Battle_ShiftRight4) so those
-;           slots don't also act this round; $80=$20, $82/$84 = tech
-;           id/table row from $9EE7/$9EE3
-;   item:   decrements the item's stock count ($1583,X from $9F36),
-;           $80=$40, $82=$FF, $84=item id ($9F35); clears the item-
-;           list scroll position unless $A0D5 is set
-; All three converge to build/queue the record: save the current
-; menu-cursor row as this PC's remembered row (unless $A114 override
-; is set) via BattleUI's $9916 table, then write an 8-byte command
-; record at $93EE+(sprite index from $CCFAF0 lookup): type byte
-; (bit 6 = "queued"), the $80/$9F38 flag byte, submenu type ($9615),
-; target ($A62D), and the tech/item id pair ($82/$84). Finally clears
-; this PC's roster slot, advances the active-PC index/count, and
-; scans for another valid roster slot to promote (or clears active-PC
-; if none remain — same shape as BattleMenu_RemoveBattlerFromReady's
-; tail).
+; Restores whichever submenu was saved for cancel-to-return
+; (!BattleMenu_ReturnSubmenu), then dispatches on !BattleMenu_Submenu
+; (0=attack, 1=tech, 2=item) to fill in the fields:
+;   attack: Kind = $80, Partners = $FF (ActionId left stale)
+;   tech:   with !BattleMenu_CfgListMemory on, saves the tech-list cursor
+;           and tech id; consumes the partner slot in the low nibble of
+;           Tech_CursorEntry.Partners (and, for a triple tech, the high
+;           nibble via Battle_ShiftRight4) so those PCs don't also act;
+;           Kind = $20, Partners = the nibbles, ActionId = tech id
+;   item:   decrements the item's Quantity (record !BattleMenu_ItemRecord),
+;           Kind = $40, Partners = $FF, ActionId = item id; resets the
+;           item-list cursor unless CfgListMemory is on
+; All three converge: remember the command row in !Pc_SavedMenuRow
+; (unless !BattleMenu_KeepRow; rows of all PCs reset to 0 unless
+; !BattleMenu_CfgCursorMemory), append the PC to !Battle_CmdQueue and
+; fill its BattleCmd record (offset from !BattleRom_CmdOffset): State
+; bit 6 set / bit 7 cleared, Kind | !Battle_Unk9F38, Menu, the first
+; selected target, Partners, ActionId.
+; Finally takes the PC out of the roster and shows the next roster
+; entry, if any (same shape as BattleMenu_RemoveBattlerFromReady's tail).
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_ConsumePartnerSlot, Battle_ShiftRight4,
 ;          Battle_ZeroResultEE
+; Direct-page roles:
+!BattleMenu_CmdKindArg = !BattleTmp_80    ; 1 B: BattleCmd.Kind being built
+!BattleMenu_CmdPartners = !BattleTmp_82   ; 1 B: BattleCmd.Partners being built
+!BattleMenu_CmdActionId = !BattleTmp_84   ; 1 B: BattleCmd.ActionId being built
+!BattleMenu_PartnerArg = !BattleTmp_80    ; 1 B: partner PC slot for ConsumePartnerSlot (its input)
 org $C1161A
 BattleMenu_CommitAction:
-    LDA.w $A86B                     ; saved submenu type (cancel target)
+    LDA.w !BattleMenu_ReturnSubmenu
     BEQ .dispatch
     DEC
-    STA.w $95DB
-    STZ.w $A86B
+    STA.w !BattleMenu_Submenu
+    STZ.w !BattleMenu_ReturnSubmenu
 .dispatch:
-    DEC.w $9609                     ; leave target-select mode
-    LDA.w $95DB                     ; confirmed submenu: 0=attack,1=tech,2=item
+    DEC.w !BattleMenu_TargetSelect  ; leave target selection
+    LDA.w !BattleMenu_Submenu       ; 0=attack, 1=tech, 2=item
     BNE .not_attack
-    LDA #$80                        ; type flag: attack
-    STA $80
-    LDA #$FF                        ; no tech/item id
-    STA $82
+    LDA.b #!BattleCmd_KindAttack
+    STA.b !BattleMenu_CmdKindArg
+    LDA.b #!Tech_NoPartners
+    STA.b !BattleMenu_CmdPartners
     BRA .after_type
 .not_attack:
     DEC
     BNE .item_path
-    LDA.w $A0D5                     ; save-skill-cursor setting
+    LDA.w !BattleMenu_CfgListMemory
     BEQ .tech_partner_check
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $95EB,X
-    STA.w $A866,X
-    LDA.w $95DF,X
-    STA.w $A863,X
-    LDA.w $9EE3
-    STA.w $A0D8,X
+    LDA.w !Pc_TechScroll,X
+    STA.w !Pc_SavedTechScroll,X
+    LDA.w !Pc_TechRow,X
+    STA.w !Pc_SavedTechRow,X
+    LDA.w Tech_CursorEntry.TechId
+    STA.w !Pc_SavedTech,X
 .tech_partner_check:
-    LDA.w $9EE7                     ; dual/triple-tech partner nibbles
-    CMP #$FF
-    BEQ .tech_type_fields
-    AND #$0F                        ; primary partner slot
-    STA $80
+    LDA.w Tech_CursorEntry.Partners
+    CMP.b #!Tech_NoPartners
+    BEQ .tech_type_fields           ; single tech
+    AND.b #!Tech_PartnerLoMask      ; first partner slot
+    STA.b !BattleMenu_PartnerArg
     JSR BattleMenu_ConsumePartnerSlot
-    LDA.w $9EE7
-    AND #$F0
-    CMP #$F0
-    BEQ .tech_type_fields
-    JSR Battle_ShiftRight4          ; secondary partner slot (triple-tech)
-    STA $80
+    LDA.w Tech_CursorEntry.Partners
+    AND.b #!Tech_PartnerHiMask
+    CMP.b #!Tech_PartnerHiMask
+    BEQ .tech_type_fields           ; no second partner
+    JSR Battle_ShiftRight4          ; second partner slot (triple tech)
+    STA.b !BattleMenu_PartnerArg
     JSR BattleMenu_ConsumePartnerSlot
 .tech_type_fields:
-    LDA.w $9EE7
-    STA $82                          ; tech id
-    LDA.w $9EE3
-    STA $84                          ; tech table row
-    LDA #$20                        ; type flag: tech
-    STA $80
+    LDA.w Tech_CursorEntry.Partners
+    STA.b !BattleMenu_CmdPartners
+    LDA.w Tech_CursorEntry.TechId
+    STA.b !BattleMenu_CmdActionId
+    LDA.b #!BattleCmd_KindTech
+    STA.b !BattleMenu_CmdKindArg
     BRA .after_type
 .item_path:
-    LDX.w $9F36                     ; item slot
-    DEC.w $1583,X                   ; decrement stock count
-    LDA #$FF
-    STA.w $9920
-    LDA #$40                        ; type flag: item
-    STA $80
-    LDA.w $9F35                     ; item id
-    STA $84
-    LDA #$FF                        ; no tech id
-    STA $82
-    LDA.w $A0D5                     ; save-skill-cursor setting
+    LDX.w !BattleMenu_ItemRecord
+    DEC.w Item_BattleList.Quantity,X ; use one up
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_ItemScrollDrawn
+    LDA.b #!BattleCmd_KindItem
+    STA.b !BattleMenu_CmdKindArg
+    LDA.w !BattleMenu_ItemId
+    STA.b !BattleMenu_CmdActionId
+    LDA.b #!Tech_NoPartners
+    STA.b !BattleMenu_CmdPartners
+    LDA.w !BattleMenu_CfgListMemory
     BNE .after_type
-    STZ.w $95E5
-    STZ.w $95E6
+    STZ.w !BattleMenu_ItemRow
+    STZ.w !BattleMenu_ItemScroll
 .after_type:
-    LDA.w $A114                     ; cursor-row override flag
+    LDA.w !BattleMenu_KeepRow
     BNE .cursor_done
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $95DC,X                   ; current menu cursor row
-    STA.w $9916,X                   ; remember for this PC
-    LDA.w $A0D4                     ; cursor-position-save setting
+    LDA.w !Pc_MenuRow,X
+    STA.w !Pc_SavedMenuRow,X        ; remember for this PC
+    LDA.w !BattleMenu_CfgCursorMemory
     BNE .cursor_done
-    STZ.w $95DC
-    STZ.w $95DD
-    STZ.w $95DE
-    STZ.w $9916
-    STZ.w $9917
-    STZ.w $9918
+    STZ.w !Pc_MenuRow
+    STZ.w !Pc_MenuRow+1
+    STZ.w !Pc_MenuRow+2
+    STZ.w !Pc_SavedMenuRow
+    STZ.w !Pc_SavedMenuRow+1
+    STZ.w !Pc_SavedMenuRow+2
 .cursor_done:
-    STZ.w $A114
-    STZ.w $960E
-    STZ.w $9614
-    STZ.w $A09A
-    LDA.w $99D8                     ; command queue count
+    STZ.w !BattleMenu_KeepRow
+    STZ.w !BattleTgt_Unk960E
+    STZ.w !BattleTgt_Cursor
+    STZ.w !BattleUI_PanelHold
+    LDA.w !Battle_CmdQueueLen
     TAX
-    LDA.w $95D5
+    LDA.w !BattleMenu_ActivePc
     TAY
-    STA.w $99D4,X                   ; enqueue this PC's slot
+    STA.w !Battle_CmdQueue,X        ; append this PC
     TAX
-    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    LDA.l !BattleRom_CmdOffset,X    ; slot -> BattleCmd record offset
     TAX
-    LDA.w $93EE,X
-    AND #$7F
-    ORA #$40                        ; mark queued
-    STA.w $93EE,X
-    LDA $80                          ; type flag
-    ORA.w $9F38,Y
-    STA.w $93EF,X
-    LDA.w $9615                     ; submenu type
-    STA.w $93F0,X
-    LDA.w $A62D                     ; confirmed target
-    STA.w $93F1,X
-    LDA $82                          ; tech id (or $FF)
-    STA.w $93F3,X
-    LDA $84                          ; item id / tech table row
-    STA.w $93F4,X
-    INC.w $99D8
-    STZ.w $95DB                     ; back to main menu
-    LDA #$FE
-    STA.w $A6DF                     ; force command-window reload
-    DEC.w $A6DE                     ; active PC count
-    LDA.w $95D5
+    LDA.w BattleCmd.State,X
+    AND.b #!BattleCmd_ClearWaiting
+    ORA.b #!BattleCmd_StateQueued
+    STA.w BattleCmd.State,X
+    LDA.b !BattleMenu_CmdKindArg
+    ORA.w !Battle_Unk9F38,Y
+    STA.w BattleCmd.Kind,X
+    LDA.w !BattleMenu_CmdMenu
+    STA.w BattleCmd.Menu,X
+    LDA.w !BattleTgt_Selected       ; first selected target
+    STA.w BattleCmd.Target,X
+    LDA.b !BattleMenu_CmdPartners   ; partner nibbles (or $FF)
+    STA.w BattleCmd.Partners,X
+    LDA.b !BattleMenu_CmdActionId   ; tech id / item id
+    STA.w BattleCmd.ActionId,X
+    INC.w !Battle_CmdQueueLen
+    STZ.w !BattleMenu_Submenu       ; back to the main menu
+    LDA.b #!BattleMenu_RosterRedraw
+    STA.w !BattleMenu_RosterIdxDrawn ; force a window rebuild
+    DEC.w !BattleMenu_ReadyCount
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA #$FF
-    STA.w $A6D9,X                   ; clear this PC's roster slot
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_Roster,X      ; out of the roster
     TDC
     TAX
 .find_next_active:
-    LDA.w $A6D9,X                   ; next roster slot's presence value
-    STA.w $A6DD
-    STA.w $95D5
-    BPL .done                       ; found a valid slot -> promote it
+    LDA.w !BattleMenu_Roster,X      ; entry X (its slot, or negative)
+    STA.w !BattleMenu_RosterIdx
+    STA.w !BattleMenu_ActivePc
+    BPL .done                       ; valid -> show it
     INX
-    CPX #$0003
+    CPX.w #!Battle_NumPcSlots
     BNE .find_next_active
-    LDA #$FF                        ; none left -> no active PC
-    STA.w $A6DD
-    STA.w $95D5
+    LDA.b #!BattleMenu_NoSlot       ; none left -> nothing shown
+    STA.w !BattleMenu_RosterIdx
+    STA.w !BattleMenu_ActivePc
 .done:
-    STZ.w $A862
-    STZ.w $99E0
+    STZ.w !BattleMenu_UnkA862
+    STZ.w !Battle_MenuTimeHold
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ConsumePartnerSlot ($C1174E–$C1176B, 30 bytes)
 ; ==================================================================
-; Removes battler slot $80 from the ready/active state as part of
-; committing a dual/triple-tech: if it's currently the active roster
-; slot, decrements the active-PC count; either way marks the slot
-; absent ($A6D9,X = $FF) and clears the "waiting for command" bit (bit
-; 7, set by BattleMenu_EnqueueReadyBattler) of its sprite flag byte at
-; $93EE (via the same $CCFAF0 slot->sprite lookup used in
-; BattleMenu_CommitAction).
-; Entry: M=1, X=0, DB=$7E; $80 = partner battler slot
+; Removes PC slot !BattleMenu_PartnerArg from the ready state as part of
+; committing a double/triple tech: if it's in the roster, decrements
+; !BattleMenu_ReadyCount; either way marks its roster entry empty and
+; clears BattleCmd.State bit 7 ("waiting for a command", set by
+; BattleMenu_EnqueueReadyBattler) in its command record.
+; Entry: M=1, X=0, DB=$7E; !BattleMenu_PartnerArg = partner PC slot
 ; Exit:  M=1; registers clobbered
 ; No JSR/JSL calls.
 org $C1174E
 BattleMenu_ConsumePartnerSlot:
-    LDA $80
+    LDA.b !BattleMenu_PartnerArg
     TAX
-    LDA.w $A6D9,X
+    LDA.w !BattleMenu_Roster,X
     BMI .clear_slot
-    DEC.w $A6DE                     ; active PC count
+    DEC.w !BattleMenu_ReadyCount
 .clear_slot:
-    LDA #$FF
-    STA.w $A6D9,X                   ; mark slot absent
-    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_Roster,X      ; out of the roster
+    LDA.l !BattleRom_CmdOffset,X    ; slot -> BattleCmd record offset
     TAX
-    LDA.w $93EE,X
-    AND #$7F                        ; clear "waiting for command" bit
-    STA.w $93EE,X
+    LDA.w BattleCmd.State,X
+    AND.b #!BattleCmd_ClearWaiting  ; no longer waiting for a command
+    STA.w BattleCmd.State,X
     RTS
 
 ; ==================================================================
 ; BattleMenu_TargetNext ($C1176C–$C11785, 26 bytes)
 ; ==================================================================
-; Right/Down while cycling targets: advance $9614 (wrap at 11), skip
-; candidate-list slots whose $99C0,X entry is invalid, store the
-; landed battler id to $A62D.
+; Right/Down while cycling targets: advance !BattleTgt_Cursor (wrap at
+; 11), skipping empty candidate entries, and select the battler it lands
+; on (!BattleTgt_Selected).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
 org $C1176C
 BattleMenu_TargetNext:
-    INC.w $9614
-    LDA.w $9614
-    CMP #$0B
+    INC.w !BattleTgt_Cursor
+    LDA.w !BattleTgt_Cursor
+    CMP.b #!Battle_NumSlots
     BNE .have_index
     TDC
-    STA.w $9614
+    STA.w !BattleTgt_Cursor
 .have_index:
     TAX
-    LDA.w $99C0,X                   ; candidate list entry
+    LDA.w !BattleTgt_Candidates,X   ; candidate list entry
     BMI BattleMenu_TargetNext       ; invalid -> keep advancing
-    STA.w $A62D
+    STA.w !BattleTgt_Selected
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_TargetPrev ($C11786–$C1179B, 22 bytes)
 ; ==================================================================
-; Left/Up while cycling targets: mirror of TargetNext — decrement
-; $9614 (wrap to 10) instead of incrementing. Falls straight through
+; Left/Up while cycling targets: mirror of TargetNext — steps
+; !BattleTgt_Cursor back (wrap to 10) instead. Falls straight through
 ; into Battle_ZeroResultEE (no JMP needed; they're adjacent in ROM).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; falls through to Battle_ZeroResultEE
 ; No JSR/JSL calls.
 org $C11786
 BattleMenu_TargetPrev:
-    DEC.w $9614
-    LDA.w $9614
+    DEC.w !BattleTgt_Cursor
+    LDA.w !BattleTgt_Cursor
     BPL .have_index
-    LDA #$0A
-    STA.w $9614
+    LDA.b #!Battle_LastSlot
+    STA.w !BattleTgt_Cursor
 .have_index:
     TAX
-    LDA.w $99C0,X                   ; candidate list entry
+    LDA.w !BattleTgt_Candidates,X   ; candidate list entry
     BMI BattleMenu_TargetPrev       ; invalid -> keep decrementing
-    STA.w $A62D
+    STA.w !BattleTgt_Selected
 
 ; ==================================================================
 ; BattleMenu_TechListInput ($C11320–$C11368, 73 bytes)
 ; ==================================================================
-; Per-frame input handler while the tech list is open ($95DB==1).
-; Computes the currently-highlighted tech's list index into $80
-; (scroll $95EB + cursor $95DF), then polls pad-edge bytes: $EE bit
-; $80 = confirm, $EE bit $08 = cancel, $EF bits $08/$02 = up (via
-; Y-axis bit or Left), $EF bits $04/$01 = down (via Y-axis bit or
-; Right).
+; Per-frame input handler while the tech list is open (submenu 1).
+; Computes the highlighted line of the PC's list into
+; !BattleMenu_TechListIdx (!Pc_TechScroll + !Pc_TechRow), then polls:
+; confirm, cancel, Up or Left = previous, Down or Right = next.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
 ; Callees: Battle_StopSfx, BattleMenu_TechConfirm,
 ;          BattleMenu_TechListCancel, BattleMenu_TechListPrev,
 ;          BattleMenu_TechListNext, Battle_ZeroResultEE
+!BattleMenu_TechListIdx = !BattleTmp_80  ; 2 B: line of the PC's tech list under the cursor (Prev/Next input)
 org $C11320
 BattleMenu_TechListInput:
-    LDA.w $95D5                     ; active PC slot
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $95EB,X                   ; scroll position
+    LDA.w !Pc_TechScroll,X
     CLC
-    ADC.w $95DF,X                   ; + cursor row
+    ADC.w !Pc_TechRow,X             ; scroll + row
     TAX
-    STX $80                          ; highlighted tech list index
-    LDA $EE
-    AND #$80                        ; confirm
+    STX.b !BattleMenu_TechListIdx
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadConfirm       ; confirm
     BEQ .check_cancel
     JSR Battle_StopSfx
     JMP BattleMenu_TechConfirm
 .check_cancel:
-    LDA $EE
-    AND #$08                        ; cancel
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadCancel        ; cancel
     BEQ .check_up
     JSR Battle_StopSfx
     JMP BattleMenu_TechListCancel
 .check_up:
-    LDA $EF
-    BIT #$08                        ; up
+    LDA.b !Battle_PadEdgeDpad
+    BIT.b #!Battle_DpadUp           ; up
     BNE .do_up
-    AND #$02                        ; left
+    AND.b #!Battle_DpadLeft         ; left
     BEQ .check_down
 .do_up:
     JSR Battle_StopSfx
     JMP BattleMenu_TechListPrev
 .check_down:
-    LDA $EF
-    BIT #$04                        ; down
+    LDA.b !Battle_PadEdgeDpad
+    BIT.b #!Battle_DpadDown         ; down
     BNE .do_down
-    AND #$01                        ; right
+    AND.b #!Battle_DpadRight        ; right
     BEQ .exit
 .do_down:
     JSR Battle_StopSfx
@@ -5292,106 +5285,107 @@ BattleMenu_TechListInput:
 ; ==================================================================
 ; BattleMenu_TechConfirm ($C11369–$C1138E, 38 bytes)
 ; ==================================================================
-; Confirms the highlighted tech: aborts if the tech-availability check
-; ($A099) is clear or the tech's flag byte ($9EE5) marks it
-; unavailable (bit 7). Otherwise sets target mode from $9EE4, builds
-; the target list, and — if a valid target was found — enters
-; target-select mode; if not, just resets the target cursor.
+; Confirms the highlighted tech: aborts unless the rows have been graded
+; (!BattleMenu_TechAvailDone) and Tech_CursorEntry.Flags bit 7 is clear.
+; Otherwise sets !BattleTgt_Mode from the entry's TargetMode, builds the
+; target list, and — if a valid target was found — enters target
+; selection; if not, just resets the target cursor.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_BuildTargetList, Battle_ZeroResultEE
 org $C11369
 BattleMenu_TechConfirm:
-    LDA.w $A099                     ; tech-availability check
-    BEQ .exit
-    LDA.w $9EE5                     ; tech flag byte
-    BMI .exit                       ; unavailable
-    LDA.w $9EE4                     ; target mode for this tech
-    STA.w $960D
+    LDA.w !BattleMenu_TechAvailDone
+    BEQ .exit                       ; rows not graded yet
+    LDA.w Tech_CursorEntry.Flags
+    BMI .exit                       ; unusable
+    LDA.w Tech_CursorEntry.TargetMode
+    STA.w !BattleTgt_Mode
     JSR BattleMenu_BuildTargetList
-    LDA.w $9613                     ; target result
+    LDA.w !BattleTgt_Result         ; target result
     BPL .have_target
-    STZ.w $9614
+    STZ.w !BattleTgt_Cursor
     BRA .exit
 .have_target:
-    INC.w $A4EE
-    INC.w $9609                     ; enter target-select mode
+    INC.w !BattleMenu_TargetMoved
+    INC.w !BattleMenu_TargetSelect  ; enter target-select mode
 .exit:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_TechListCancel ($C1138F–$C113AC, 30 bytes)
 ; ==================================================================
-; Closes the tech list: back to main menu ($95DB=0), force a command-
-; window reload sentinel, and restore this PC's saved cursor/scroll
-; position ($A863/$A866 -> $95DF/$95EB).
+; Closes the tech list: reload the command window, back to the main menu,
+; force a window rebuild, and restore this PC's saved tech-list cursor
+; (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechScroll).
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_LoadCommandWindowMap, Battle_ZeroResultEE
 org $C1138F
 BattleMenu_TechListCancel:
     JSR BattleMenu_LoadCommandWindowMap
-    STZ.w $95DB                     ; submenu type -> main
-    LDA #$FF
-    STA.w $A6DF                     ; force command-window reload
-    LDA.w $95D5
+    STZ.w !BattleMenu_Submenu       ; back to the main menu
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_RosterIdxDrawn ; force command-window reload
+    LDA.w !BattleMenu_ActivePc
     TAX
-    LDA.w $A863,X                   ; saved cursor row
-    STA.w $95DF,X
-    LDA.w $A866,X                   ; saved scroll position
-    STA.w $95EB,X
+    LDA.w !Pc_SavedTechRow,X        ; saved cursor row
+    STA.w !Pc_TechRow,X
+    LDA.w !Pc_SavedTechScroll,X     ; saved scroll position
+    STA.w !Pc_TechScroll,X
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_TechListPrev ($C113AD–$C113F3, 71 bytes)
 ; ==================================================================
-; Up/Left in the tech list: walks backward from the current index
-; ($80) looking for an entry whose availability byte ($1CDB,X) is
-; nonzero, skipping unavailable techs. Once found, recomputes the
-; cursor row / scroll position pair ($95DF/$95EB) by walking the same
-; distance backward from the current (row, scroll) state, scrolling
-; the list up a row at a time if the new row would go negative.
-; Entry: M=1, X=0, DB=$7E; $80 = current list index
+; Up/Left in the tech list: walks backward from !BattleMenu_TechListIdx
+; to the previous line whose !Tech_ListAvail is non-zero. Once found,
+; moves the cursor row (!Pc_TechRow) back the same number of lines,
+; scrolling the list (!Pc_TechScroll) up a line at a time while the row
+; would be negative.
+; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
+!BattleMenu_StepCount = !BattleTmp_82    ; 1 B: lines walked to reach an available tech
+!BattleMenu_NewRow = !BattleTmp_83       ; 1 B: cursor row after that walk (may leave 0-2)
 org $C113AD
 BattleMenu_TechListPrev:
-    STZ $82                          ; steps walked
-    LDA.w $95D5
+    STZ.b !BattleMenu_StepCount      ; steps walked
+    LDA.w !BattleMenu_ActivePc
     TAY
 .retry:
-    INC $82
+    INC.b !BattleMenu_StepCount
     SEC
-    LDA $80
+    LDA.b !BattleMenu_TechListIdx
     SBC #$01
     BCC .no_change                  ; ran off the start -> no-op
-    STA $80
+    STA.b !BattleMenu_TechListIdx
     TAX
-    LDA.w $1CDB,X                   ; tech availability
+    LDA.w !Tech_ListAvail,X         ; tech availability
     BEQ .retry                      ; unavailable -> keep walking back
-    LDA.w $95DF,Y                   ; current cursor row
-    STA $83
+    LDA.w !Pc_TechRow,Y             ; current cursor row
+    STA.b !BattleMenu_NewRow
     TYX
 .shift_loop:
     SEC
-    LDA $83
+    LDA.b !BattleMenu_NewRow
     SBC #$01
-    STA $83
-    DEC $82
+    STA.b !BattleMenu_NewRow
+    DEC.b !BattleMenu_StepCount
     BNE .shift_loop
-    LDA $83
+    LDA.b !BattleMenu_NewRow
     BPL .no_wrap                    ; row still >= 0, no scroll needed
-    LDA.w $95EB,X                   ; scroll position
+    LDA.w !Pc_TechScroll,X          ; scroll position
     BEQ .no_change                  ; already at top -> no-op
-    LDA $83
-    STA.w $95DF,X
+    LDA.b !BattleMenu_NewRow
+    STA.w !Pc_TechRow,X
 .dec_scroll:
-    DEC.w $95EB,X
+    DEC.w !Pc_TechScroll,X
     CLC
-    LDA.w $95DF,X
+    LDA.w !Pc_TechRow,X
     ADC #$01
 .no_wrap:
-    STA.w $95DF,X
+    STA.w !Pc_TechRow,X
     BMI .dec_scroll                 ; still negative -> scroll again
 .no_change:
     JMP Battle_ZeroResultEE
@@ -5400,51 +5394,51 @@ BattleMenu_TechListPrev:
 ; BattleMenu_TechListNext ($C113F4–$C1143C, 73 bytes)
 ; ==================================================================
 ; Down/Right in the tech list: mirror of TechListPrev — walks forward
-; instead of backward, bounded by the list length ($A02A,Y) instead of
-; the start of the list, and scrolls the row/scroll pair down instead
-; of up when the new row would reach 3.
-; Entry: M=1, X=0, DB=$7E; $80 = current list index
+; instead of backward, bounded by the list length (!Pc_TechCount)
+; instead of the start of the list, and scrolls down instead of up when
+; the new row would reach 3.
+; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
 org $C113F4
 BattleMenu_TechListNext:
-    STZ $82                          ; steps walked
-    LDA.w $95D5
+    STZ.b !BattleMenu_StepCount      ; steps walked
+    LDA.w !BattleMenu_ActivePc
     TAY
 .retry:
-    INC $82
+    INC.b !BattleMenu_StepCount
     CLC
-    LDA $80
+    LDA.b !BattleMenu_TechListIdx
     ADC #$01
-    CMP.w $A02A,Y                   ; list length for this PC
+    CMP.w !Pc_TechCount,Y           ; list length for this PC
     BCS .exit                       ; ran off the end -> no-op
-    STA $80
+    STA.b !BattleMenu_TechListIdx
     TAX
-    LDA.w $1CDB,X                   ; tech availability
+    LDA.w !Tech_ListAvail,X         ; tech availability
     BEQ .retry                      ; unavailable -> keep walking forward
-    LDA.w $95DF,Y                   ; current cursor row
-    STA $83
+    LDA.w !Pc_TechRow,Y             ; current cursor row
+    STA.b !BattleMenu_NewRow
     TYX
 .shift_loop:
     CLC
-    LDA $83
+    LDA.b !BattleMenu_NewRow
     ADC #$01
-    STA $83
-    DEC $82
+    STA.b !BattleMenu_NewRow
+    DEC.b !BattleMenu_StepCount
     BNE .shift_loop
-    LDA $83
-    CMP #$03
+    LDA.b !BattleMenu_NewRow
+    CMP.b #!BattleMenu_ListRows
     BCC .no_wrap                    ; row still < 3, no scroll needed
-    LDA $83
-    STA.w $95DF,X
+    LDA.b !BattleMenu_NewRow
+    STA.w !Pc_TechRow,X
 .inc_scroll:
-    INC.w $95EB,X                   ; scroll position
+    INC.w !Pc_TechScroll,X          ; scroll position
     SEC
-    LDA.w $95DF,X
+    LDA.w !Pc_TechRow,X
     SBC #$01
 .no_wrap:
-    STA.w $95DF,X
-    CMP #$03
+    STA.w !Pc_TechRow,X
+    CMP.b #!BattleMenu_ListRows
     BCS .inc_scroll                 ; still >= 3 -> scroll again
 .exit:
     JMP Battle_ZeroResultEE
@@ -5452,11 +5446,11 @@ BattleMenu_TechListNext:
 ; ==================================================================
 ; BattleMenu_ItemListInput ($C1143D–$C11497, 91 bytes)
 ; ==================================================================
-; Per-frame input handler while the item list is open ($95DB==2).
+; Per-frame input handler while the item list is open (submenu 2).
 ; Unlike the tech list, item rows have no per-slot "available" flag to
 ; skip during cursor movement — up/down just move the cursor one row
-; and scroll via ItemListScrollUp/Down at the edges. $EE bit $20/$10
-; also let the player page the whole list up/down by 3 rows at once.
+; and scroll via ItemListScrollUp/Down at the edges. The page buttons
+; page the whole list up/down by 3 rows at once.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
 ; Callees: Battle_StopSfx, BattleMenu_ItemConfirm,
@@ -5466,49 +5460,49 @@ BattleMenu_TechListNext:
 ;          Battle_ZeroResultEE
 org $C1143D
 BattleMenu_ItemListInput:
-    LDA $EE
-    AND #$80                        ; confirm
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadConfirm       ; confirm
     BEQ .check_cancel
     JSR Battle_StopSfx
     JMP BattleMenu_ItemConfirm
 .check_cancel:
-    LDA $EE
-    AND #$08                        ; cancel
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadCancel        ; cancel
     BEQ .check_up
     JSR Battle_StopSfx
     JMP BattleMenu_ItemListCancel
 .check_up:
-    LDA $EF
-    BIT #$08                        ; up
+    LDA.b !Battle_PadEdgeDpad
+    BIT.b #!Battle_DpadUp           ; up
     BNE .do_up
-    AND #$02                        ; left
+    AND.b #!Battle_DpadLeft         ; left
     BEQ .check_down
 .do_up:
     JSR Battle_StopSfx
     JMP BattleMenu_ItemCursorUp
 .check_down:
-    LDA $EF
-    BIT #$04                        ; down
+    LDA.b !Battle_PadEdgeDpad
+    BIT.b #!Battle_DpadDown         ; down
     BNE .do_down
-    AND #$01                        ; right
+    AND.b #!Battle_DpadRight        ; right
     BEQ .check_page_down
 .do_down:
     JSR Battle_StopSfx
     JMP BattleMenu_ItemCursorDown
 .check_page_down:
-    LDA $EE
-    AND #$20                        ; page down (3 rows)
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadPageDown      ; page down (3 rows)
     BEQ .check_page_up
     JSR Battle_StopSfx
     JMP BattleMenu_ItemListPageDown
 .check_page_up:
-    LDA $EE
-    AND #$10                        ; page up (3 rows)
+    LDA.b !Battle_PadEdgeButtons
+    AND.b #!Battle_PadPageUp        ; page up (3 rows)
     BEQ .check_refresh
     JSR Battle_StopSfx
     JMP BattleMenu_ItemListPageUp
 .check_refresh:
-    LDA.w $A0D0                     ; refresh-pending flag
+    LDA.w !BattleMenu_ItemRefresh
     BEQ .exit
     JMP BattleMenu_ItemListRefresh
 .exit:
@@ -5517,90 +5511,91 @@ BattleMenu_ItemListInput:
 ; ==================================================================
 ; BattleMenu_ItemConfirm ($C11498–$C114DA, 67 bytes)
 ; ==================================================================
-; Confirms the highlighted item: index = (scroll $95E6 + cursor $95E5)
-; * 5 into the item record table at $1580 (id, target mode, flags,
-; quantity — one padding byte, 5-byte stride). Aborts if the flags
-; byte is negative (unusable) or the quantity is zero. Otherwise sets
-; $9F35 = item id, $960D = target mode, $9F36 = record index, builds
-; the target list, and enters target-select mode if a valid target
-; was found.
+; Confirms the highlighted item: record offset = (!BattleMenu_ItemScroll
+; + !BattleMenu_ItemRow) * 5 into Item_BattleList (id, target mode,
+; flags, quantity, PC mask). Aborts if Flags
+; bit 7 is set or the quantity is zero. Otherwise sets
+; !BattleMenu_ItemId, !BattleTgt_Mode and !BattleMenu_ItemRecord, builds
+; the target list, and enters target selection if a valid target was
+; found.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_Mul8, BattleMenu_BuildTargetList, Battle_ZeroResultEE
+!BattleMenu_ItemListIdx = !BattleTmp_80  ; 1 B: list line under the cursor (scroll + row)
 org $C11498
 BattleMenu_ItemConfirm:
     CLC
-    LDA.w $95E6                     ; item-list scroll position
-    ADC.w $95E5                     ; + cursor row
-    STA $80
-    STA $AD
-    LDA #$05                        ; record stride
-    STA $AE
-    JSR Battle_Mul8                 ; record index * 5
-    LDX $AF
-    LDA.w $1582,X                   ; item status flags
+    LDA.w !BattleMenu_ItemScroll
+    ADC.w !BattleMenu_ItemRow       ; line under the cursor
+    STA.b !BattleMenu_ItemListIdx
+    STA.b !Battle_Mul8A
+    LDA.b #!Item_RecordSize
+    STA.b !Battle_Mul8B
+    JSR Battle_Mul8                 ; line * 5 = record offset
+    LDX.b !Battle_Mul8Product
+    LDA.w Item_BattleList.Flags,X
     BMI .exit                       ; unusable
-    LDA.w $1583,X                   ; item quantity
+    LDA.w Item_BattleList.Quantity,X
     BEQ .exit                       ; none left
-    LDA.w $1580,X                   ; item id
-    STA.w $9F35
-    LDA.w $1581,X                   ; target mode
-    STA.w $960D
-    STX.w $9F36                     ; record index
+    LDA.w Item_BattleList.Id,X
+    STA.w !BattleMenu_ItemId
+    LDA.w Item_BattleList.TargetMode,X
+    STA.w !BattleTgt_Mode
+    STX.w !BattleMenu_ItemRecord
     JSR BattleMenu_BuildTargetList
-    LDA.w $9613                     ; target result
+    LDA.w !BattleTgt_Result         ; target result
     BPL .have_target
-    STZ.w $9614
+    STZ.w !BattleTgt_Cursor
     BRA .exit
 .have_target:
-    INC.w $A4EE
-    INC.w $9609                     ; enter target-select mode
+    INC.w !BattleMenu_TargetMoved
+    INC.w !BattleMenu_TargetSelect  ; enter target-select mode
 .exit:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemListCancel ($C114DB–$C114EB, 17 bytes)
 ; ==================================================================
-; Closes the item list: back to main menu ($95DB=0), force a command-
-; window reload sentinel, and invalidate the scroll-arrow indicators.
+; Closes the item list: reload the command window, back to the main
+; menu, force a window rebuild, and invalidate the scroll-arrow cache.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: Battle_ZeroResultEE
 org $C114DB
 BattleMenu_ItemListCancel:
     JSR BattleMenu_LoadCommandWindowMap
-    STZ.w $95DB                     ; submenu type -> main
-    LDA #$FF
-    STA.w $A6DF                     ; force command-window reload
-    STA.w $9920                     ; invalidate scroll-arrow indicator
+    STZ.w !BattleMenu_Submenu       ; back to the main menu
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_RosterIdxDrawn ; force command-window reload
+    STA.w !BattleMenu_ItemScrollDrawn ; redraw the arrows next time
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemCursorUp ($C114EC–$C11501, 22 bytes)
 ; ==================================================================
-; Up/Left in the item list: decrement cursor row $95E5, scrolling the
+; Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the
 ; list up via ItemListScrollUp when already at the top row.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_ItemListScrollUp, Battle_ZeroResultEE
 org $C114EC
 BattleMenu_ItemCursorUp:
-    LDA.w $95E5                     ; cursor row
+    LDA.w !BattleMenu_ItemRow       ; cursor row
     BNE .move
     JSR BattleMenu_ItemListScrollUp
 .move:
     SEC
-    LDA.w $95E5
+    LDA.w !BattleMenu_ItemRow
     SBC #$01
     BCC .exit
-    STA.w $95E5
+    STA.w !BattleMenu_ItemRow
 .exit:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemCursorDown ($C11502–$C1151B, 26 bytes)
 ; ==================================================================
-; Down/Right in the item list: increment cursor row $95E5 (max 2),
+; Down/Right in the item list: increment !BattleMenu_ItemRow (max 2),
 ; scrolling the list down via ItemListScrollDown when already at the
 ; bottom row.
 ; Entry: M=1, X=0, DB=$7E
@@ -5608,24 +5603,24 @@ BattleMenu_ItemCursorUp:
 ; Callees: BattleMenu_ItemListScrollDown, Battle_ZeroResultEE
 org $C11502
 BattleMenu_ItemCursorDown:
-    LDA.w $95E5                     ; cursor row
-    CMP #$02
+    LDA.w !BattleMenu_ItemRow       ; cursor row
+    CMP.b #!BattleMenu_LastRow
     BNE .move
     JSR BattleMenu_ItemListScrollDown
 .move:
     CLC
-    LDA.w $95E5
+    LDA.w !BattleMenu_ItemRow
     ADC #$01
-    CMP #$03
+    CMP.b #!BattleMenu_ListRows
     BCS .exit
-    STA.w $95E5
+    STA.w !BattleMenu_ItemRow
 .exit:
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemListPageDown ($C1151C–$C11536, 27 bytes)
 ; ==================================================================
-; $EE bit $20: page the item list down 3 rows at once, clamped at
+; Page-down button: page the item list down 3 rows at once, clamped at
 ; scroll position $FA. Sets the scroll position and index itself, then
 ; JSRs directly into ItemListScrollDown's shared render+indicator tail
 ; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
@@ -5637,24 +5632,24 @@ BattleMenu_ItemCursorDown:
 org $C1151C
 BattleMenu_ItemListPageDown:
     CLC
-    LDA.w $95E6                     ; scroll position
-    ADC #$03
-    CMP #$FA
+    LDA.w !BattleMenu_ItemScroll    ; scroll position
+    ADC.b #!BattleMenu_ListRows
+    CMP.b #!Item_MaxScroll
     BCS .clamp
     CMP #$00
     BNE .have_scroll
 .clamp:
-    LDA #$FA
+    LDA.b #!Item_MaxScroll
 .have_scroll:
-    STA.w $95E6
-    STA $80
+    STA.w !BattleMenu_ItemScroll
+    STA.b !BattleMenu_ListScroll
     JSR BattleMenu_ItemListScrollDown_RenderTail
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemListPageUp ($C11537–$C1154A, 20 bytes)
 ; ==================================================================
-; $EE bit $10: page the item list up 3 rows at once, clamped at 0.
+; Page-up button: page the item list up 3 rows at once, clamped at 0.
 ; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
 ; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
 ; Entry: M=1, X=0, DB=$7E
@@ -5663,42 +5658,42 @@ BattleMenu_ItemListPageDown:
 org $C11537
 BattleMenu_ItemListPageUp:
     SEC
-    LDA.w $95E6                     ; scroll position
-    SBC #$03
+    LDA.w !BattleMenu_ItemScroll    ; scroll position
+    SBC.b #!BattleMenu_ListRows
     BCS .have_scroll
     TDC
 .have_scroll:
-    STA.w $95E6
-    STA $80
+    STA.w !BattleMenu_ItemScroll
+    STA.b !BattleMenu_ListScroll
     JSR BattleMenu_ItemListScrollUp_RenderTail
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemListRefresh ($C1154B–$C11560, 22 bytes)
 ; ==================================================================
-; Re-renders the item list rows and invalidates the scroll-arrow
-; indicators when $A0D0 (refresh-pending flag) is set, clearing it.
+; Re-renders the item list rows and invalidates both draw
+; caches when !BattleMenu_ItemRefresh is set, clearing it.
 ; Entry: M=1, X=0, DB=$7E
 ; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
 ; Callees: BattleMenu_RenderItemListRows, Battle_ZeroResultEE
 org $C1154B
 BattleMenu_ItemListRefresh:
-    LDA.w $95E6                     ; scroll position
-    STA $80
+    LDA.w !BattleMenu_ItemScroll    ; scroll position
+    STA.b !BattleMenu_ListScroll
     JSR BattleMenu_RenderItemListRows
-    LDA #$FF
-    STA.w $991F                     ; scroll-arrow indicator
-    STA.w $9920                     ; scroll-arrow indicator
-    STZ.w $A0D0                     ; clear refresh-pending flag
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
+    STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
+    STZ.w !BattleMenu_ItemRefresh
     JMP Battle_ZeroResultEE
 
 ; ==================================================================
 ; BattleMenu_ItemListScrollUp ($C117A1–$C117BE, 30 bytes)
 ; ==================================================================
-; Scrolls the item list up one row: decrements $95E6 (min 0), then
-; re-renders and invalidates the scroll-arrow indicators.
+; Scrolls the item list up one row: decrements !BattleMenu_ItemScroll (min 0), then
+; re-renders and invalidates both draw caches (row cursor, arrows).
 ;
-; Contains a redundant double branch: after testing $95E6==0 once,
+; Contains a redundant double branch: after testing the scroll for 0 once,
 ; a second BEQ immediately re-tests the same (unchanged) zero flag —
 ; its target (skip both the decrement AND the render, straight to the
 ; indicator writes) can never actually be reached, since reaching that
@@ -5709,33 +5704,33 @@ BattleMenu_ItemListRefresh:
 ; Callees: BattleMenu_RenderItemListRows
 ; Global (non-dot) labels throughout: BattleMenu_ItemListScrollUp_RenderTail
 ; is a real external entry point (called directly by BattleMenu_ItemListPageUp,
-; which sets $95E6/$80 itself and skips straight to the render), and per
+; which sets the scroll itself and skips straight to the render), and per
 ; this project's asar-quirk-6 workaround, a JSR target reached from another
 ; routine's scope must not be a local .dot label.
 org $C117A1
 BattleMenu_ItemListScrollUp:
-    LDA.w $95E6                     ; scroll position
+    LDA.w !BattleMenu_ItemScroll    ; scroll position
     BEQ BattleMenu_ItemListScrollUp_SetScroll
     BEQ BattleMenu_ItemListScrollUp_SkipRender ; unreachable: flag already tested clear above
     SEC
-    LDA.w $95E6
+    LDA.w !BattleMenu_ItemScroll
     SBC #$01
-    STA.w $95E6
+    STA.w !BattleMenu_ItemScroll
 BattleMenu_ItemListScrollUp_SetScroll:
-    STA $80
+    STA.b !BattleMenu_ListScroll
 BattleMenu_ItemListScrollUp_RenderTail:
     JSR BattleMenu_RenderItemListRows
 BattleMenu_ItemListScrollUp_SkipRender:
-    LDA #$FF
-    STA.w $991F                     ; scroll-arrow indicator
-    STA.w $9920                     ; scroll-arrow indicator
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
+    STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
     RTS
 
 ; ==================================================================
 ; BattleMenu_ItemListScrollDown ($C117BF–$C117DC, 30 bytes)
 ; ==================================================================
-; Scrolls the item list down one row: increments $95E6 (clamped at
-; $FA), then re-renders and invalidates the scroll-arrow indicators.
+; Scrolls the item list down one row: increments !BattleMenu_ItemScroll (clamped at
+; $FA), then re-renders and invalidates both draw caches.
 ; Mirror of ItemListScrollUp, but with a single, genuinely-reachable
 ; bounds check instead of the redundant double branch — when already
 ; at the clamp, skips both the increment AND the render entirely.
@@ -5746,20 +5741,20 @@ BattleMenu_ItemListScrollUp_SkipRender:
 ; Callees: BattleMenu_RenderItemListRows
 org $C117BF
 BattleMenu_ItemListScrollDown:
-    LDA.w $95E6                     ; scroll position
-    CMP #$FA
+    LDA.w !BattleMenu_ItemScroll    ; scroll position
+    CMP.b #!Item_MaxScroll
     BCS BattleMenu_ItemListScrollDown_SkipRender ; already at max -> skip increment and render
     CLC
-    LDA.w $95E6
+    LDA.w !BattleMenu_ItemScroll
     ADC #$01
-    STA.w $95E6
-    STA $80
+    STA.w !BattleMenu_ItemScroll
+    STA.b !BattleMenu_ListScroll
 BattleMenu_ItemListScrollDown_RenderTail:
     JSR BattleMenu_RenderItemListRows
 BattleMenu_ItemListScrollDown_SkipRender:
-    LDA #$FF
-    STA.w $991F                     ; scroll-arrow indicator
-    STA.w $9920                     ; scroll-arrow indicator
+    LDA.b #!BattleMenu_CacheInvalid
+    STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
+    STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
     RTS
 
 ; ==================================================================
@@ -5769,54 +5764,54 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ; of the menu rebuild chain (after ProcessInput). Draws whatever cursor
 ; graphic belongs on screen right now, dispatching on menu state:
 ;
-;   no active PC ($95D5 < 0)     -> hide the 4-sprite main cursor
-;   target-select mode ($9609)   -> draw target-highlight cursor(s)
-;   else, by submenu ($95DB):
+;   no PC shown (!BattleMenu_ActivePc < 0) -> hide the 4 cursor sprites
+;   target selection (!BattleMenu_TargetSelect) -> target cursor(s)
+;   else, by !BattleMenu_Submenu:
 ;     0 (main)  -> nothing to do here (DrawCursorSprites already ran
 ;                  from ProcessInput); just fall through to the tail
 ;     1 (tech)  -> tech-list cursor: normal single highlight, or a
-;                  2-3 sprite cluster over the caster + dual/triple-
+;                  2-3 sprite cluster over the caster + double/triple-
 ;                  tech partner(s) when the highlighted tech needs them
-;     2 (item)  -> item-list cursor: recomputes the up/down scroll-
-;                  arrow glow and the row-highlight tile quad, queuing
-;                  a VRAM upload ($CFFD6A) only if either changed
+;     2 (item)  -> item-list cursor: redraws the scroll arrows and the
+;                  row cursor quad, queuing the item map upload only if
+;                  either changed
 ;
-; Also, still within target-select mode, handles the "confirm-target"
-; single-cursor placement (including a special enemy-vs-ally info-
-; panel dispatch via JSL $CD002D/$CD0030) and a separate multi-target
-; ("target all") sweep that walks the 11-entry selection list
-; ($A62D-$A637) a few slots at a time, resuming next frame from a
-; saved index ($960B) — the same incremental-scan pattern used by
-; BattleMenu_BuildTargetList's own list handling.
+; Target selection draws either one cursor on the first selected target
+; (with, on the main menu, an info-panel message for an enemy target
+; through BattleMsg_ShowMsg0BIfKeyChangedVec / BattleMsg_UnkVecCD0030),
+; or, when a second target is selected, a sweep over the selection list
+; that fills up to 4 cursor sprites per frame and resumes next frame
+; from !BattleTgt_SweepResume.
 ;
-; Common idiom used throughout (X = a battler/target slot id, not
-; just a PC index 0-2 — this table is indexed by any of the 11
-; selectable battler slots): compute a live screen position as
-;   base origin ($1D0C,X / $1D23,X, same tables DrawCursorSprites
-;   uses) + per-slot live offset ($9708,X / $9713,X, not yet named
-;   elsewhere — likely each battler's current animated screen
-;   position) - $10 (sprite-origin centering constant), written into
-;   one of the four cursor OAM slots at $0700-$070F.
+; Common idiom (X = any battler slot 0-10): cursor position =
+;   !Battler_ScreenX/Y (same tables DrawCursorSprites uses) +
+;   !Battler_ScreenOffsetX/Y (inferred: the battler's current animated
+;   offset) − !BattleOam_CursorCentreX on x, written into one of the
+;   four cursor sprites (BattleOam[0-3]).
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; pad-edge bytes $EE/$EF cleared (shared tail, same as
+; Exit:  M=1; pad-edge bytes cleared (shared tail, same as
 ;        Battle_ZeroResultEE elsewhere)
 ; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
-;          BattleMenu_DrawCursorSprites, JSL $CD002D
-;          (BattleMsg_ShowMsg0BIfKeyChangedVec), JSL $CD0030 (cross-
-;          bank, sibling message vector — not yet analyzed), JSL
-;          $CFFD6A (Battle_QueueVramUpload_0E80)
+;          BattleMenu_DrawCursorSprites, BattleMsg_ShowMsg0BIfKeyChangedVec,
+;          BattleMsg_UnkVecCD0030 (sibling message vector, not analysed),
+;          Battle_QueueVramUpload_0E80
+; Direct-page roles:
+!BattleMenu_OverlayChanged = !BattleTmp_80 ; 1 B: item path: non-zero when arrows or row cursor changed
+!BattleMenu_TargetStats = !BattleTmp_80   ; 2 B: single target: BattlerStats offset of the target
+!BattleTgt_SweepIdx = !BattleTmp_80       ; 2 B: multi target: selection-list index being drawn
+!BattleMenu_SweepOam = !BattleTmp_82      ; 2 B: multi target: cursor sprite being filled
 org $C117DD
 BattleMenu_UpdateCursorOverlay:
-    LDA.w $95D5                     ; active PC slot (signed; <0 = none)
+    LDA.w !BattleMenu_ActivePc      ; (signed; <0 = none)
     BPL .check_target_select
     JMP .no_active_pc
 .check_target_select:
-    LDA.w $9609                     ; target-select mode depth
+    LDA.w !BattleMenu_TargetSelect
     BEQ .dispatch_submenu
     JMP .target_select
 .dispatch_submenu:
-    LDA.w $95DB                     ; submenu type: 0=main, 1=tech, 2=item
+    LDA.w !BattleMenu_Submenu       ; 0=main, 1=tech, 2=item
     BEQ .main_menu
     DEC
     BNE .item_dispatch
@@ -5829,89 +5824,89 @@ BattleMenu_UpdateCursorOverlay:
 ; ------------------------------------------------------------------
 ; Tech-list cursor ($17FE-$18A9)
 ; ------------------------------------------------------------------
-; $9EE3 (tech id copied from the cursor's tech record by
-; UpdateTechWindow) below $39 means a single-character tech — those
-; never need partner highlighting, so go straight to the normal
-; single cursor. $39 and up are dual/triple techs; $9EE7's low nibble
-; names the primary partner slot (sentinel $FF = "no partner data
-; resolved yet", also falls back to the normal single cursor).
+; Tech_CursorEntry.TechId (copied by UpdateTechWindow) below $39 means
+; a single-character tech — those never need partner highlighting, so go
+; straight to the normal single cursor. $39 and up are double/triple
+; techs; the low nibble of Tech_CursorEntry.Partners names the first
+; partner slot (sentinel $FF = "no entry resolved yet", also falls back
+; to the normal single cursor).
 .tech_path:
-    LDA.w $9EE3                     ; tech id at cursor
-    CMP #$39
+    LDA.w Tech_CursorEntry.TechId
+    CMP.b #!Tech_FirstComboId
     BCS .tech_check_group
 .tech_single_jmp:
     JMP .tech_single_cursor
 .tech_check_group:
-    LDA.w $9EE7                     ; dual/triple-tech partner nibbles
-    CMP #$FF
+    LDA.w Tech_CursorEntry.Partners
+    CMP.b #!Tech_NoPartners
     BEQ .tech_single_jmp
-    LDA.w $0900                     ; hide all 4 main-cursor OAM slots first
-    ORA #$55
-    STA.w $0900
-    LDA #$F0
-    STA.w $0701
-    STA.w $0705
-    STA.w $0709
-    STA.w $070D
-    LDA #$32
-    STA.w $0703
-    STA.w $0707
-    STA.w $070B
-    STZ.w $0702
-    STZ.w $0706
-    STZ.w $070A
-    ; OAM slot 0: caster (active PC slot)
-    LDA.w $95D5
+    LDA.w !BattleOam_HighTable      ; hide all 4 cursor sprites first
+    ORA.b #!BattleOam_HideCursorBits
+    STA.w !BattleOam_HighTable
+    LDA.b #!BattleOam_OffscreenY
+    STA.w BattleOam.Y
+    STA.w BattleOam[1].Y
+    STA.w BattleOam[2].Y
+    STA.w BattleOam[3].Y
+    LDA.b #!BattleOam_CursorAttr
+    STA.w BattleOam.Attr
+    STA.w BattleOam[1].Attr
+    STA.w BattleOam[2].Attr
+    STZ.w BattleOam.Tile
+    STZ.w BattleOam[1].Tile
+    STZ.w BattleOam[2].Tile
+    ; sprite 0: caster (the shown PC)
+    LDA.w !BattleMenu_ActivePc
     TAX
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0700
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam.X
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0701
-    ; OAM slot 1: primary partner (low nibble of $9EE7)
-    LDA.w $9EE7
-    AND #$0F
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam.Y
+    ; sprite 1: first partner (low nibble of Partners)
+    LDA.w Tech_CursorEntry.Partners
+    AND.b #!Tech_PartnerLoMask
     TAX
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0704
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam[1].X
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0705
-    LDA.w $0900                     ; reveal caster + primary-partner sprites
-    AND #$FE
-    AND #$FB
-    STA.w $0900
-    ; OAM slot 2: second partner, only for a triple-tech (high nibble
-    ; of $9EE7 present; $F = "no third partner")
-    LDA.w $9EE7
-    AND #$F0
-    CMP #$F0
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam[1].Y
+    LDA.w !BattleOam_HighTable      ; show sprites 0 and 1
+    AND.b #!BattleOam_ShowSprite0
+    AND.b #!BattleOam_ShowSprite1
+    STA.w !BattleOam_HighTable
+    ; sprite 2: second partner, only for a triple tech (high nibble of
+    ; Partners present; $F = "no second partner")
+    LDA.w Tech_CursorEntry.Partners
+    AND.b #!Tech_PartnerHiMask
+    CMP.b #!Tech_PartnerHiMask
     BEQ .tech_group_done
     JSR Battle_ShiftRight4          ; high nibble -> low nibble
     TAX
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0708
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam[2].X
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0709
-    LDA.w $0900                     ; reveal second-partner sprite
-    AND #$EF
-    STA.w $0900
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam[2].Y
+    LDA.w !BattleOam_HighTable      ; show sprite 2
+    AND.b #!BattleOam_ShowSprite2
+    STA.w !BattleOam_HighTable
 .tech_group_done:
     JMP .tail
 .tech_single_cursor:
@@ -5923,110 +5918,107 @@ BattleMenu_UpdateCursorOverlay:
 ; ------------------------------------------------------------------
 ; Two independent change-tracked updates, each only redrawn (and only
 ; queued to VRAM) when its cached compare value differs from the live
-; one; $80 tallies whether either actually changed this frame.
+; one; !BattleMenu_OverlayChanged tallies whether either changed.
 .item_path:
-    STZ $80
-    ; Scroll-arrow glow: recompute the up/down arrow tile+attr pairs
-    ; ($0EFC/$0EFD = up arrow, $0FFC/$0FFD = down arrow) whenever the
-    ; scroll position ($95E6) differs from the cached value ($9920).
-    ; Tile $FF hides an arrow entirely (nothing further that way);
-    ; attr $A9 (vs the normal $29) is used only on the down arrow, and
-    ; only while it's still visible — drawing attention toward more
-    ; items below except at the very bottom of the list.
-    LDA.w $95E6                     ; scroll position
-    CMP.w $9920                     ; cached scroll-arrow state
+    STZ.b !BattleMenu_OverlayChanged
+    ; Scroll arrows: redraw the up/down arrow cells whenever
+    ; !BattleMenu_ItemScroll differs from !BattleMenu_ItemScrollDrawn.
+    ; Tile $FF hides an arrow. Both arrows use the same tile ($7F); the
+    ; down arrow gets attribute $A9 = palette 2 + vertical flip, which
+    ; turns it upside down.
+    LDA.w !BattleMenu_ItemScroll
+    CMP.w !BattleMenu_ItemScrollDrawn
     BNE .arrow_check_zero
     JMP .row_check
 .arrow_check_zero:
-    LDA.w $95E6
+    LDA.w !BattleMenu_ItemScroll
     BNE .arrow_check_max
-    LDA #$FF                        ; top of list -> hide up arrow
-    STA.w $0EFC
-    LDA #$7F                        ; down arrow visible + flashing
-    STA.w $0FFC
-    LDA #$A9
-    STA.w $0EFD
-    STA.w $0FFD
+    LDA.b #!BattleUI_TileBlank      ; top of list -> hide up arrow
+    STA.w !BattleMenu_UpArrowTile
+    LDA.b #!BattleMenu_TileArrow    ; down arrow
+    STA.w !BattleMenu_DownArrowTile
+    LDA.b #!BattleUI_AttrPal2VFlip
+    STA.w !BattleMenu_UpArrowAttr
+    STA.w !BattleMenu_DownArrowAttr
     BRA .arrow_done
 .arrow_check_max:
-    LDA.w $95E6
-    CMP #$FA
+    LDA.w !BattleMenu_ItemScroll
+    CMP.b #!Item_MaxScroll
     BEQ .arrow_at_max
-    LDA #$7F                        ; middle of list -> both arrows visible
-    STA.w $0EFC
-    STA.w $0FFC
-    LDA #$29                        ; up arrow normal
-    STA.w $0EFD
-    LDA #$A9                        ; down arrow flashing
-    STA.w $0FFD
+    LDA.b #!BattleMenu_TileArrow    ; middle of list -> both arrows visible
+    STA.w !BattleMenu_UpArrowTile
+    STA.w !BattleMenu_DownArrowTile
+    LDA.b #!BattleUI_AttrPal2       ; up arrow upright
+    STA.w !BattleMenu_UpArrowAttr
+    LDA.b #!BattleUI_AttrPal2VFlip  ; down arrow flipped
+    STA.w !BattleMenu_DownArrowAttr
     BRA .arrow_done
 .arrow_at_max:
-    LDA #$7F                        ; up arrow visible, normal
-    STA.w $0EFC
-    LDA #$FF                        ; bottom of list -> hide down arrow
-    STA.w $0FFC
-    LDA #$29
-    STA.w $0EFD
-    STA.w $0FFD
+    LDA.b #!BattleMenu_TileArrow    ; up arrow
+    STA.w !BattleMenu_UpArrowTile
+    LDA.b #!BattleUI_TileBlank      ; bottom of list -> hide down arrow
+    STA.w !BattleMenu_DownArrowTile
+    LDA.b #!BattleUI_AttrPal2
+    STA.w !BattleMenu_UpArrowAttr
+    STA.w !BattleMenu_DownArrowAttr
 .arrow_done:
-    INC $80
-    ; Row-highlight quad: if either the cursor row ($95E5) or the
-    ; scroll-arrow state changed, blank the old row's 4-tile marker
-    ; (looked up via $CCFAE9) and draw the new one (tiles $60-$63,
-    ; attr $29) — the same tile ids/scheme BattleMenu_DrawTechCursorRow
-    ; uses for its own cursor row.
+    INC.b !BattleMenu_OverlayChanged
+    ; Row cursor: if either the cursor row or the scroll position changed,
+    ; blank the old row's 2×2 cursor (placed through
+    ; !BattleRom_ItemCursorCell) and draw the new one (tiles $60-$63,
+    ; palette 2) — the same cursor quad BattleMenu_DrawTechCursorRow uses.
 .row_check:
-    LDA.w $95E5                     ; cursor row
-    CMP.w $991F                     ; cached row-highlight state
+    LDA.w !BattleMenu_ItemRow
+    CMP.w !BattleMenu_ItemRowDrawn
     BNE .row_redraw
-    LDA.w $95E6
-    CMP.w $9920
+    LDA.w !BattleMenu_ItemScroll
+    CMP.w !BattleMenu_ItemScrollDrawn
     BEQ .item_upload_check
-    STA.w $9920
+    STA.w !BattleMenu_ItemScrollDrawn
 .row_redraw:
-    LDA.w $991F
+    LDA.w !BattleMenu_ItemRowDrawn
     BPL .have_old_row
     TDC
 .have_old_row:
     ASL
     TAX
-    REP #$20                        ; A=16-bit: fetch tile-quad pointer
-    LDA.l $CCFAE9,X
+    REP #$20                        ; A=16-bit: 16-bit table entry
+    LDA.l !BattleRom_ItemCursorCell,X
     TAX
     TDC
     SEP #$20                        ; A=8-bit
-    LDA #$FF
-    STA.w $0E80,X
-    STA.w $0E82,X
-    STA.w $0EC0,X
-    STA.w $0EC2,X
-    LDA.w $95E5
-    STA.w $991F                     ; cache new row
+    LDA.b #!BattleUI_TileBlank
+    STA.w BattleMenu_ItemTile(0,0),X
+    STA.w BattleMenu_ItemTile(0,1),X
+    STA.w BattleMenu_ItemTile(1,0),X
+    STA.w BattleMenu_ItemTile(1,1),X
+    LDA.w !BattleMenu_ItemRow
+    STA.w !BattleMenu_ItemRowDrawn  ; remember the new row
     ASL
     TAX
     REP #$20
-    LDA.l $CCFAE9,X
+    LDA.l !BattleRom_ItemCursorCell,X
     TAX
     TDC
     SEP #$20
-    LDA #$60
-    STA.w $0E80,X
-    LDA #$61
-    STA.w $0E82,X
-    LDA #$62
-    STA.w $0EC0,X
-    LDA #$63
-    STA.w $0EC2,X
-    LDA #$29
-    STA.w $0E81,X
-    STA.w $0E83,X
-    STA.w $0EC1,X
-    STA.w $0EC3,X
-    INC $80
+    LDA.b #!BattleMenu_TileCursorTL
+    STA.w BattleMenu_ItemTile(0,0),X
+    LDA.b #!BattleMenu_TileCursorTR
+    STA.w BattleMenu_ItemTile(0,1),X
+    LDA.b #!BattleMenu_TileCursorBL
+    STA.w BattleMenu_ItemTile(1,0),X
+    LDA.b #!BattleMenu_TileCursorBR
+    STA.w BattleMenu_ItemTile(1,1),X
+    LDA.b #!BattleUI_AttrPal2
+    STA.w BattleMenu_ItemAttr(0,0),X
+    STA.w BattleMenu_ItemAttr(0,1),X
+    STA.w BattleMenu_ItemAttr(1,0),X
+    STA.w BattleMenu_ItemAttr(1,1),X
+    INC.b !BattleMenu_OverlayChanged
 .item_upload_check:
-    LDA $80
+    LDA.b !BattleMenu_OverlayChanged
     BEQ .item_no_upload
-    JSL $CFFD6A                     ; Battle_QueueVramUpload_0E80 (cross-bank)
+    JSL Battle_QueueVramUpload_0E80
 .item_no_upload:
     JMP .tail
 
@@ -6034,212 +6026,215 @@ BattleMenu_UpdateCursorOverlay:
 ; Target-select cursor ($1979-$1AFD)
 ; ------------------------------------------------------------------
 .target_select:
-    LDA.w $9613                     ; target-found flag (0=found, <0=none)
+    LDA.w !BattleTgt_Result         ; 0 = target found, <0 = none
     BPL .target_have
     JMP .to_tail
 .target_have:
-    LDA.w $95DB                     ; submenu type
+    LDA.w !BattleMenu_Submenu
     DEC
     BNE .target_hide_tech_cursor_done
-    JSR BattleMenu_ClearTechCursorTiles ; leaving tech list -> clear its cursor tiles
+    JSR BattleMenu_ClearTechCursorTiles ; targeting from the tech list
 .target_hide_tech_cursor_done:
-    LDA.w $0900                     ; hide all 4 main-cursor OAM slots first
-    ORA #$55
-    STA.w $0900
-    LDA #$32
-    STA.w $0703
-    STA.w $0707
-    STA.w $070B
-    STA.w $070F
-    STZ.w $0702
-    STZ.w $0706
-    STZ.w $070A
-    STZ.w $070E
-    LDA.w $A62E                     ; second selection-list slot (multi-target?)
+    LDA.w !BattleOam_HighTable      ; hide all 4 cursor sprites first
+    ORA.b #!BattleOam_HideCursorBits
+    STA.w !BattleOam_HighTable
+    LDA.b #!BattleOam_CursorAttr
+    STA.w BattleOam.Attr
+    STA.w BattleOam[1].Attr
+    STA.w BattleOam[2].Attr
+    STA.w BattleOam[3].Attr
+    STZ.w BattleOam.Tile
+    STZ.w BattleOam[1].Tile
+    STZ.w BattleOam[2].Tile
+    STZ.w BattleOam[3].Tile
+    LDA.w !BattleTgt_Selected+1     ; a second target selected?
     BMI .target_check_primary
     JMP .multi_target
 .target_check_primary:
-    LDA.w $A62D                     ; primary selection-list slot
+    LDA.w !BattleTgt_Selected       ; first target
     BPL .target_single
     JMP .to_tail
 .target_single:
-    STA.w $A64E                     ; confirmed/highlighted target id
+    STA.w !BattleTgt_Highlight
     TAX
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0700
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam.X
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0701
-    LDA.w $95DB
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam.Y
+    LDA.w !BattleMenu_Submenu
     BNE .after_marker
-    LDA.w $A64E
-    CMP #$03                        ; target id < 3 -> a PC ally slot
+    LDA.w !BattleTgt_Highlight
+    CMP.b #!Battle_FirstEnemySlot   ; slot < 3 -> a PC: no info panel
     BCC .after_marker
-    ; enemy target while in the main attack menu: look up the
-    ; enemy's info-panel dispatch id and route through one of two
-    ; cross-bank message calls depending on a per-enemy flag table
+    ; enemy target from the main (attack) menu: info-panel message.
+    ; With !Battle_Unk9F34 and the target's !Battler_Unk9F29 set, the
+    ; message gets the target's HP too (BattleMsg_ShowMsg0BIfKeyChangedVec);
+    ; otherwise BattleMsg_UnkVecCD0030. Either way the argument is the
+    ; target slot, or $FF when BattleRom_UnkE1DE80[Unk984D] is set.
     ASL
     TAX
-    LDA.w $984D,X                   ; info-panel dispatch id for this target
-    STA.w $0200
-    LDA.l $CCF8ED,X                 ; battler work-area pointer, low
-    STA $80
-    LDA.l $CCF8EE,X                 ; battler work-area pointer, high
-    STA $81
-    LDA.w $9F34
+    LDA.w !Battler_Unk984D,X
+    STA.w BattleMsg_InfoArgs.Id
+    LDA.l !BattleRom_StatsOffset,X
+    STA.b !BattleMenu_TargetStats
+    LDA.l !BattleRom_StatsOffset+1,X
+    STA.b !BattleMenu_TargetStats+1
+    LDA.w !Battle_Unk9F34
     BEQ .enemy_marker_check2
-    LDA.w $A64E
+    LDA.w !BattleTgt_Highlight
     TAY
-    LDA.w $9F29,Y
-    BNE .ally_target
+    LDA.w !Battler_Unk9F29,Y
+    BNE .ally_target                ; (despite the label, an enemy target)
 .enemy_marker_check2:
-    LDA.w $0200
+    LDA.w BattleMsg_InfoArgs.Id
     TAX
-    LDA.l $E1DE80,X
+    LDA.l !BattleRom_UnkE1DE80,X
     BEQ .enemy_marker_fallback1
-    LDA #$FF
+    LDA.b #!BattleMsg_ArgNone
     BRA .enemy_marker_send1
 .enemy_marker_fallback1:
-    LDA.w $A64E
+    LDA.w !BattleTgt_Highlight
 .enemy_marker_send1:
-    JSL $CD0030                     ; cross-bank message call (sibling of $CD002D)
+    JSL BattleMsg_UnkVecCD0030
     BRA .after_marker
 .ally_target:
-    LDX $80
-    LDA.w $5E30,X                   ; ally battler data -> scratch record
-    STA.w $0201
-    LDA.w $5E31,X
-    STA.w $0202
-    LDA.w $5E32,X
-    STA.w $0203
-    LDA.w $5E33,X
-    STA.w $0204
-    LDA.w $0200
+    LDX.b !BattleMenu_TargetStats
+    LDA.w BattlerStats.CurHp,X      ; the target's HP / MaxHP -> InfoArgs
+    STA.w BattleMsg_InfoArgs.CurHp
+    LDA.w BattlerStats.CurHp+1,X
+    STA.w BattleMsg_InfoArgs.CurHp+1
+    LDA.w BattlerStats.MaxHp,X
+    STA.w BattleMsg_InfoArgs.MaxHp
+    LDA.w BattlerStats.MaxHp+1,X
+    STA.w BattleMsg_InfoArgs.MaxHp+1
+    LDA.w BattleMsg_InfoArgs.Id
     TAX
-    LDA.l $E1DE80,X
+    LDA.l !BattleRom_UnkE1DE80,X
     BEQ .ally_marker_fallback
-    LDA #$FF
+    LDA.b #!BattleMsg_ArgNone
     BRA .ally_marker_send
 .ally_marker_fallback:
-    LDA.w $A64E
+    LDA.w !BattleTgt_Highlight
 .ally_marker_send:
-    JSL $CD002D                     ; BattleMsg_ShowMsg0BIfKeyChangedVec (cross-bank)
+    JSL BattleMsg_ShowMsg0BIfKeyChangedVec
 .after_marker:
-    LDA.w $0900                     ; reveal OAM slot 0 (single-target cursor)
-    AND #$FE
-    STA.w $0900
-    ; blink-direction latch: nudged whenever the target was just
-    ; cycled/confirmed ($A4EE), based on which half of the screen the
-    ; cursor currently sits in ($0701 vs $2D/$9C)
-    LDA.w $A4EE
+    LDA.w !BattleOam_HighTable      ; show sprite 0 (the single cursor)
+    AND.b #!BattleOam_ShowSprite0
+    STA.w !BattleOam_HighTable
+    ; !Battle_UnkEC latch, updated only right after the target moved
+    ; (!BattleMenu_TargetMoved) and when the cursor may move: set when
+    ; the cursor's y is above CursorTopY, cleared at CursorBottomY or
+    ; below (the earlier "blink-direction" reading is unconfirmed)
+    LDA.w !BattleMenu_TargetMoved
     BEQ .blink_done
-    STZ.w $A4EE
-    LDA.w $960A
+    STZ.w !BattleMenu_TargetMoved
+    LDA.w !BattleTgt_CanCycle
     BEQ .blink_done
-    LDA $EC
+    LDA.b !Battle_UnkEC
     BNE .blink_check_high
-    LDA.w $0701
-    CMP #$2D
+    LDA.w BattleOam.Y
+    CMP.b #!BattleMenu_CursorTopY
     BCS .blink_done
-    INC $EC
+    INC.b !Battle_UnkEC
     BRA .blink_done
 .blink_check_high:
-    LDA.w $0701
-    CMP #$9C
+    LDA.w BattleOam.Y
+    CMP.b #!BattleMenu_CursorBottomY
     BCC .blink_done
-    STZ $EC
+    STZ.b !Battle_UnkEC
 .blink_done:
     JMP .to_tail
 
 ; ------------------------------------------------------------------
 ; Multi-target ("target all") cursor sweep ($1A7B-$1AFA)
 ; ------------------------------------------------------------------
-; Walks the 11-entry selection list ($A62D-$A637), drawing one cursor
-; OAM slot per confirmed target (up to the 4 available: $0700-$070F),
-; resuming next frame from a saved scan index ($960B) rather than
-; redoing the whole list every frame.
+; Sprite 0 marks the first selected target; sprites 1-3 mark selection
+; entries 0-2 on one frame and 3-5 on the next (!BattleTgt_SweepResume
+; alternates 3 / 0), stopping early if the 4 sprites run out. Entries
+; 6-10 are never reached by this sweep.
 .multi_target:
-    LDA.w $A62D
+    LDA.w !BattleTgt_Selected
     BMI .multi_loop_init
     TAX
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0700
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam.X
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0701
-    LDA.w $0900
-    AND.l $CCFB8D                   ; reveal OAM slot 0 (visibility-bit-clear table)
-    STA.w $0900
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam.Y
+    LDA.w !BattleOam_HighTable
+    AND.l !BattleRom_OamShowMask    ; show sprite 0
+    STA.w !BattleOam_HighTable
 .multi_loop_init:
     LDY #$0001
-    STY $82                         ; next OAM slot index (slot 0 handled above)
-    LDA.w $960B                     ; resume index from last frame
+    STY.b !BattleMenu_SweepOam      ; next sprite (0 is done above)
+    LDA.w !BattleTgt_SweepResume
     TAY
-    STY $80
+    STY.b !BattleTgt_SweepIdx
 .multi_loop:
-    LDY $80
-    LDA.w $A62D,Y                   ; selection-list slot
+    LDY.b !BattleTgt_SweepIdx
+    LDA.w !BattleTgt_Selected,Y
     BMI .multi_loop_next
     TAX
-    LDA $82
+    LDA.b !BattleMenu_SweepOam
     ASL
     ASL
-    TAY                              ; Y = OAM slot index * 4 (OAM entry stride)
+    TAY                             ; Y = sprite × 4
     CLC
-    LDA.w $1D0C,X
-    ADC.w $9708,X
+    LDA.w !Battler_ScreenX,X
+    ADC.w !Battler_ScreenOffsetX,X
     SEC
-    SBC #$10
-    STA.w $0700,Y
+    SBC.b #!BattleOam_CursorCentreX
+    STA.w BattleOam.X,Y
     CLC
-    LDA.w $1D23,X
-    ADC.w $9713,X
-    STA.w $0701,Y
-    LDX $82
-    LDA.w $0900
-    AND.l $CCFB8D,X                 ; reveal this OAM slot
-    STA.w $0900
+    LDA.w !Battler_ScreenY,X
+    ADC.w !Battler_ScreenOffsetY,X
+    STA.w BattleOam.Y,Y
+    LDX.b !BattleMenu_SweepOam
+    LDA.w !BattleOam_HighTable
+    AND.l !BattleRom_OamShowMask,X  ; show this sprite
+    STA.w !BattleOam_HighTable
 .multi_loop_next:
-    INC $80
-    LDA $80
-    CMP #$03
+    INC.b !BattleTgt_SweepIdx
+    LDA.b !BattleTgt_SweepIdx
+    CMP.b #!BattleTgt_SweepBatch
     BEQ .multi_loop_cap
-    CMP #$06
+    CMP.b #!BattleTgt_SweepWrap
     BEQ .multi_loop_cap
-    INC $82
-    LDA $82
-    CMP #$04
+    INC.b !BattleMenu_SweepOam
+    LDA.b !BattleMenu_SweepOam
+    CMP.b #!BattleOam_CursorSprites
     BNE .multi_loop
 .multi_loop_cap:
-    LDA $80
-    CMP #$06
+    LDA.b !BattleTgt_SweepIdx
+    CMP.b #!BattleTgt_SweepWrap
     BNE .multi_loop_save
     TDC
 .multi_loop_save:
-    STA.w $960B                     ; save scan index for next frame
+    STA.w !BattleTgt_SweepResume    ; save scan index for next frame
 .to_tail:
     JMP .tail
 
 .no_active_pc:
-    LDA.w $0900                     ; hide all 4 main-cursor OAM slots
-    ORA #$55
-    STA.w $0900
-    LDA #$F0
-    STA.w $0701
-    STA.w $0705
-    STA.w $0709
-    STA.w $070D
+    LDA.w !BattleOam_HighTable      ; hide all 4 main-cursor OAM slots
+    ORA.b #!BattleOam_HideCursorBits
+    STA.w !BattleOam_HighTable
+    LDA.b #!BattleOam_OffscreenY
+    STA.w BattleOam.Y
+    STA.w BattleOam[1].Y
+    STA.w BattleOam[2].Y
+    STA.w BattleOam[3].Y
 .tail:
-    STZ $EE                         ; clear pad-edge bytes (same tail idiom
-    STZ $EF                         ; as Battle_ZeroResultEE)
+    STZ.b !Battle_PadEdgeButtons    ; clear pad-edge bytes (same tail idiom
+    STZ.b !Battle_PadEdgeDpad       ; as Battle_ZeroResultEE)
     RTS
