@@ -226,18 +226,31 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    TextWin_Init's header ("the text decoder ... is not matched"). Open from it: who sets
    C2Scene_TrigFlags (bits 0/1), C2Scene_ObjBusy and the objects' counts (the code at
    $C2:42FC-$C2:5590 reads $0290-$029F heavily), C2Scene_Unk027E state 1, who reads the task
-   byte C2Scene_TrigListA/C set (probably the third watcher at $C2:3404, unreferenced too: it
-   dispatches on C2Scene_Unk027E through $C2:342D, compares C2Scene_Unk027F/0281, runs
-   C2Anim_Run and has handlers out to $C2:3B00 via the tables $C2:345D, $C2:3493, $C2:34A3);
-   C2Scene_Unk1B47 and why C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex.
-   Next, in reach order: that third watcher ($C2:3404-$C2:3BCx, with $C2:3ACB); the glyph
-   drawer `TextWin_DrawGlyph` ($C2:5DC4-$C2:5E35, its blitters $C2:5E36/$C2:5F07, width table
-   $C2:60E6) and the decimal converters `TextWin_Dec8/16/24` ($C2:614B-$C2:6262, with the data
-   `TextWin_CharNamePtrs` $C2:5FD8 and `TextWin_StrNadia` $C2:6146, now stubs); the layer
-   scroll calls at $C2:3702-$C2:371E; the mode sub-programs `C2Scene_Unk631F` (mode 6, BG mode
-   7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); `C2Scene_Unk5775` ($C2:5775-$C2:57DE, with
-   `$C2:5798` and the data before `TextWin_Init`; its callers at $C2:5700-$C2:5774 read
-   object A); the menu's
+   byte C2Scene_TrigListA/C set (still open); C2Scene_Unk1B47 and why
+   C2Scene_GetListCUnk03 reads ListC + 3; who sets TextWin_NumHex. Also matched: the party
+   leader's task `C2Scene_LeaderTask` with its states, steps and tables (D-pad walking in
+   8-pixel steps that scroll BG1/BG2 through `C2Scene_Unk0568`/`066C` at $C2:3702-$C2:371E,
+   the buttons that set scene modes 3/5/6/9, the idle animation, the ListD member script, and
+   walking onto an object) and its helpers (trail, walk/stand animations, tile property
+   lookups `C2Scene_GetTileProps`/`GetTileProp` over BG2's map and the $7E:7000 pack, step
+   target, object count, `C2Scene_SetEntryTile`) ($C2:3404-$C2:3AE1, $C2:6291-$C2:62EC); the
+   other members' follow task `C2Scene_MemberTask` with its route planner
+   (`C2Scene_MemberRoute`, `C2Scene_PathBlocked`, `C2Scene_ScanRow/ScanCol`) ($C2:3AE2-$C2:42DC);
+   `TextWin_DrawGlyph` with `TextWin_Blit2bpp/4bpp`, their shift tables, the tile offset and
+   width tables, `TextWin_CharNamePtrs`, `TextWin_StrNadia` and `TextWin_Dec8/16/24` with their
+   division loops ($C2:5DC4-$C2:6262); `C2Scene_Unk5775`, `C2Scene_ClearUnk8621` and the data
+   before `TextWin_Init` ($C2:5775-$C2:57DE). Neither party task has a reference (scene data,
+   as the watchers). The headers this batch made stale (C2Scene_Unk0568/066C, C2Anim_Run,
+   C2Scene_TaskMove, C2Scene_WrapTaskPos, C2Scene_SetAnim, C2Scene_TaskRunScript, TextWin_State0
+   and its banner) are fixed and need review again. Still stale: TextWin_State1-3's Entry lines
+   ("DB as TextWin_DrawGlyph needs (not traced)"; it takes any DB). Open from it: who
+   starts the two party tasks and sets `.Slot` (+$24); what the $7E:7000 property nibbles'
+   bit 3 and the other bit 2 uses are; `C2Scene_Unk1BF1/1BF3` and `C2Scene_Unk1BF7` readers;
+   what $7E:8600-$861C hold (`C2Scene_Unk8600/8604`) and the unreferenced `C2Scene_Unk57B0` and
+   `C2Scene_GetMapCell`. Next, in reach order: the object tasks after the members
+   ($C2:42DD on, a state table at $C2:42E6; $C2:42FC-$C2:5590 read objects A/B), the code at
+   $C2:5700-$C2:5774 (calls `C2Scene_ClearUnk8621`); the mode sub-programs `C2Scene_Unk631F`
+   (mode 6, BG mode 7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); the menu's
    own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
    `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
