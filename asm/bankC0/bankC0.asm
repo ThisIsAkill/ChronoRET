@@ -16556,7 +16556,8 @@ Field_ResetUnk0B88:
 ; (Pal_BufBytes) to Pal_CgramBuf ($7E:2200):
 ; - 30 bytes from FieldRom_PalRow0Sets + 2 + n x 16, n = Menu_Config01
 ;   (Menu_Config+1) bits 0-2, go to Pal_Buf+2 (MVN). The sets are 16 bytes apart but 30
-;   are copied, so each takes the next set's first 14 bytes along;
+;   are copied: set n's last 14 bytes (its colours 1-7) and all 16 of
+;   set n+1 (as colours 8-15);
 ; - colours 9, 10 and 11 are then forced to Pal_Grey9 ($0C63), Pal_Grey10
 ;   ($18C6) and Pal_Grey11 ($739C).
 ; Menu_Config+1 bits 0-2 picking the colours suggests a player setting

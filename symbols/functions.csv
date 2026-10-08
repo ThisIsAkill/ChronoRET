@@ -106,7 +106,7 @@ $C0:6F0C,$C0:6F5D,82,Field_UploadUnk0000,$C0,Engine,readable,76a58fff9a5b,"start
 $C0:6F5E,$C0:6F78,27,Field_UploadUnk57E0,$C0,Engine,readable,7941d176ff3f,"($FF:9260) to VRAM $57E0, the last $20 words of the area LocLoad_Unk6DCF fills from LocGfx_VramL3 ($5000), so it overwrites the end of the layer-3 graphics."
 $C0:6F79,$C0:6F99,33,Field_ResetUnk0B88,$C0,Engine,readable,b3a81211465b,"With DP=$2100, writes Field_Unk0B80Empty ($80) to the Field_Unk0B88Bytes (30) bytes of Field_Unk0B88 through the WRAM port."
 $C0:7084,$C0:70E8,101,LocLoad_Unk7084,$C0,Engine,readable,90c5c34e56b0,"Copies the location's palette rows: LocPal_Rom entry LocRom.Palette (LocPal_SetBytes = 7 x 30 bytes, offset by the hardware multiplier) goes with seven MVNs of LocPal_RowBytes each to Pal_LocRows and "
-$C0:70E9,$C0:712D,69,Pal_LoadUnkRow0,$C0,Engine,readable,76fa1cc25f80,"Sets colours 1-15 of Pal_Buf row 0 and then copies all of Pal_Buf (Pal_BufBytes) to Pal_CgramBuf ($7E:2200): - 30 bytes from FieldRom_PalRow0Sets + 2 + n x 16, n = Menu_Config01 (Menu_Config+1) bits 0"
+$C0:70E9,$C0:712D,69,Pal_LoadUnkRow0,$C0,Engine,readable,5084a0f498f8,"Sets colours 1-15 of Pal_Buf row 0 and then copies all of Pal_Buf (Pal_BufBytes) to Pal_CgramBuf ($7E:2200): - 30 bytes from FieldRom_PalRow0Sets + 2 + n x 16, n = Menu_Config01 (Menu_Config+1) bits 0"
 $C0:712E,$C0:7153,38,Pal_UploadCgram,$C0,Engine,readable,63e6c564a3e3,"Sends Pal_CgramBuf (Pal_BufBytes from $7E:2200) to CGRAM from colour 0 with DMA channel 7 (mode 0, B-bus CGDATA)."
 $C0:7154,$C0:7154,1,Pal_UploadCgram_Rts,$C0,Engine,readable,deff5580c585,
 $C0:7155,$C0:716F,27,Field_ResetUnk0B80,$C0,Engine,readable,a04b6521ddbd,"Writes Field_Unk0B80Empty ($80) to the 8 bytes of Field_Unk0B80, one STA each (see Field_ResetUnk0B88)."
