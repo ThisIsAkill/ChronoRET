@@ -216,7 +216,7 @@ endstruct
                                  ; $CC:F110); BattleAct_FindPath labels it with wave numbers and marks the path ($E0 bits)
 !Battle_PathFrontier     = $7DFD ; up to 256 B: BattleAct_FindPath's cells to expand this wave, 0-ended
 !Battle_PathNextFrontier = $7EFD ; up to 256 B: the cells found in this wave, 0-ended, copied to !Battle_PathFrontier
-!Battle_PathStartCell    = $A513 ; 1 B: start cell of the last BattleAct_FindPath (also read at $C1:5486, unmatched)
+!Battle_PathStartCell    = $A513 ; 1 B: start cell of the last BattleAct_FindPath (also read by BattleAct_PathToPoint)
 !Battle_PathGoalCell     = $A515 ; 1 B: goal cell of the last BattleAct_FindPath; no reader found
 
 !Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); the same bytes are
@@ -682,9 +682,59 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjFacing     = $A230 ; 1 B per object thread: !BattleRom_FacingByAngle of that angle
 !Battle_ActObjUnkA31C    = $A31C ; 1 B per object thread: zeroed when an object's move starts; purpose unknown
 !Battle_ActThreadOpLen   = $A3A9 ; 1 B per thread: length of the move opcode it waits on, advanced by when it ends
-!Battle_ActUnkPointX     = $5D9E ; 1 B: x of the point opcode $11 moves to; written by several handlers ($C1:5923,
-                                 ; $C1:5A14 and others, unmatched); purpose otherwise unknown
-!Battle_ActUnkPointY     = $5D9F ; 1 B: its y
+!Battle_ActUnkPointX     = $5D9E ; 1 B: x of the point opcodes $11, $14, $17 and $1A use (variable $1E of
+                                 ; !Battle_ActVars); set by opcodes $33 (BattleAct_OpCalcToUnkPoint),
+                                 ; BattleAct_OpOffsetToUnkPoint and BattleAct_OpActorPosToUnkPoint; purpose otherwise unknown
+!Battle_ActUnkPointY     = $5D9F ; 1 B: its y (variable $1F); opcode $21 also tests it for 0
+!Battle_ActVars          = $5D80 ; script variables, 1 B each, index n from the operand (opcodes $22, $30, $34, $37,
+                                 ; $3A, $3C, $41, $42, $49); just after the 16 BattleActObj records, cleared by BattleAct_ResetState
+                                 ; ($5D80-$5E0C); entries $1C-$1F have opcodes of their own
+!Battle_ActVar1C         = $5D9C ; 1 B: variable $1C (opcodes $23, $31, $35, $38, $3B, $3C; also BattleAct_OpCopyVar1C and
+                                 ; the swap opcodes)
+!Battle_ActVar1D         = $5D9D ; 1 B: variable $1D (opcodes $24, $32, $36, $39)
+!Battle_ActThreadReturn  = $A569 ; 2 B per thread (index thread * 4): offset to return to from a subscript (opcode $1E)
+!Battle_ActThreadReturnBank = $A56B ; 2 B per thread (same records): its bank byte, then 0
+!Battle_ActObjFollow     = $A437 ; 1 B per object thread: what the object follows ($CF:ECC2 copies its position each
+                                 ; frame): a battler slot, or !Battle_ActFollowObj + object thread; $FF = nothing
+                                 ; (set by BattleAct_ResetState)
+!Battle_ActUnkCFFF       = $CFFF ; 1 B: set to 1 by opcode $2D, to 0 by opcode $2E; also written at $CD:18C4
+                                 ; (unmatched); purpose unknown
+!Battler_UnkA4A4         = $A4A4 ; 1 B per battler slot: zeroed by opcode $2B; used by the movers in bank $CF ($CF:F21D and
+                                 ; others); purpose unknown
+!Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; also $C1:6FBF, unmatched)
+; The curving move (opcodes $13-$15, mover kind 7 at $CF:F405, unmatched):
+!Battle_ActorHeading     = $AC11 ; 1 B per actor: heading angle of a curving move; the opcode sets the start heading,
+                                 ; the mover turns it towards the point by up to !Battle_ActorMoveSpeed per step and
+                                 ; moves along it (sine lookups at $CF:F48D)
+!Battle_ActorTurnDir     = $AC37 ; 1 B per actor: 0 = the heading turns by increasing the angle, 1 = by decreasing it
+                                 ; (BattleAct_CurveTurnDir picks the shorter way)
+!Battle_ActorOnCourse    = $AC24 ; 1 B per actor: zeroed at the start; the mover counts it up when the heading reaches
+                                 ; the angle to the point, and from then on stops turning
+!Battle_ActorUnkA311     = $A311 ; 1 B per actor: zeroed when a curving move starts (the object part is
+                                 ; !Battle_ActObjUnkA31C); read and written at $CF:F1B9; purpose unknown
+!Battle_ActorUnkA5AA     = $A5AA ; 1 B per actor: start heading of a curving move whose operand is $FF; for the objects
+                                 ; ($A5B5, !Battle_ActObjUnkA5B5) the straight move stores its angle there, so probably
+                                 ; the last heading; written by many unmatched handlers ($C1:60BF and on)
+; The path walk (opcodes $16-$18, stepped by $CF:EC78, unmatched):
+!Battler_PathMaps        = $7FFD ; 256 B per battler slot (offset !BattleRom_SlotTimes256): the battler's copy of
+                                 ; !Battle_PathMap with its path marked, kept for the whole walk
+!Battle_PathWalkMap      = $8AFD ; 256 B: the walking battler's map, copied back from !Battler_PathMaps before each step
+!Battler_PathWalking     = $A15B ; 1 B per battler slot: 1 while it walks a path; $CF:EC78 steps only these
+!Battler_UnkA166         = $A166 ; 1 B per battler slot: counted up when a path walk starts; no reader found
+!Battle_ActThreadPathLen = $A4F0 ; 1 B per thread: length of the path opcode it runs, kept because
+                                 ; BattleAct_FindPath overwrites DP $8E
+!Battler_PathStepFrame   = $A500 ; 1 B per battler slot: frames left of the step to the next cell, 7 down to 0;
+                                 ; negative = the step is done ($CF:EC78 counts it down; $FF on start)
+!Battler_PathStepKind    = $A517 ; 1 B per battler slot: kind of the step, direction * 8 + 0-4 (straight, two
+                                 ; diagonals, two curved diagonals); $CF:EC78 adds entry kind * 8 + frame of the
+                                 ; tables at $CC:F494 (x) and $CC:F594 (y) to !Battler_ScreenX/Y
+!Battler_UnkA522         = $A522 ; 1 B per battler slot: zeroed when a path walk starts; no other access found
+!Battler_PathCell        = $A53D ; 1 B per battler slot: cell the battler walks from (the one it steps to, once
+                                 ; the step is chosen)
+!Battler_PathFromDir     = $A548 ; 1 B per battler slot: direction of the cell it came from (!Battle_PathDirUp..),
+                                 ; not looked at for the next step; !Battle_PathDirNone at the start
+!Battler_PathStartX      = $A553 ; 1 B per battler slot: x when the path walk started; no reader found
+!Battler_PathStartY      = $A55E ; 1 B per battler slot: y
 !Battle_ActMoveUnitX     = $A880 ; 2 B: signed 8.8 unit step x from BattleAct_CalcMoveStep (scaled by the speed after)
 !Battle_ActMoveUnitY     = $A882 ; 2 B: the same for y
 !Battle_MoveMajorDist    = $AAFE ; 1 B: the larger of |dx| and |dy| of the last BattleAct_CalcMoveStep
@@ -756,6 +806,14 @@ struct BattleRom_CursorSprite $CCF604 ; command cursor, 4 sprites x 4 B
 endstruct
 !BattleRom_PcPathAlways   = $CCF63C  ; 1 B per character id 0-6: non-zero = BattleAct_CheckReach searches a path even to a
                                       ; target beyond 40 pixels (01 00 00 01 01 01 01: all but characters 1 and 2)
+!BattleRom_ActSubscripts  = $CE0000  ; 2 B per subscript: its offset in bank $CE (opcode $1E)
+!BattleRom_SlotTimes256   = $CCF67C  ; 2 B per battler slot: slot * $100 (offset in !Battler_PathMaps)
+!BattleRom_PathFromDir    = $CCF414  ; 1 B per path step kind: the !Battler_PathFromDir it leaves (opposite of the move; for a
+                                      ; diagonal, of its sideways part)
+!BattleRom_PathFacing     = $CCF434  ; 1 B per path step kind: !Battler_Facing for it (the direction: 0-3)
+!BattleRom_PathAhead      = $CCF454  ; 8 B per direction: cell index steps +0 two cells ahead, +1/+2 the two diagonals
+                                      ; ahead (for up: -32, -17, -15)
+!BattleRom_PathSide       = $CCF474  ; 8 B per direction: +1/+2 the side cell next to each diagonal (for up: -1, +1)
 !BattleRom_ActMoveDelay   = $CCF5BC  ; 8 B: !Battle_ActorMoveDelay for opcodes $08-$0F (4, 2, then 1)
 !BattleRom_ActMoveSpeed   = $CCF4BC  ; 8 B: !Battle_ActorMoveSpeed for them (1, 1, 1, 2, 4, 8, $10, $20)
 !BattleRom_FxTintColours  = $CCF77B  ; 4 B: written into live palette bytes 6-9 by Battle_FxOverlay2Tint (inferred: two colours)
