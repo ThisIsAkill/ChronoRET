@@ -346,7 +346,7 @@ Battle_SinLookup:
     AND.w #!Battle_LowByteMask  ; zero-extend the scale byte
     STA.b !Battle_MulFactor8    ; (16-bit store: also clears $A6)
     SEP #$20                    ; A → 8-bit
-    JSR Battle_Mul8x16         ; Factor8 × Factor16 → 24-bit product
+    JSR Battle_Mul8x16          ; Factor8 × Factor16 → 24-bit product
     LDA.b !Battle_MulProduct+1  ; return product >> 8
     RTS
 
@@ -710,7 +710,7 @@ BattleUI_DrawPcNamePanel:
     ADC.w #!BattleUI_MpOffsetL2     ; layout 2
 .mp_fmt:
     TAY
-    JSR BattleMsg_FormatTwoDigits           ; exits M=1
+    JSR BattleMsg_FormatTwoDigits   ; exits M=1
     LDA.w !BattleUI_GaugeLayout
     BNE .mp_blanking
     JSR BattleMsg_BlankLeadingZeros
@@ -1035,7 +1035,7 @@ BattleUI_UpdateNextPcPanel:
     ADC.w #!BattleUI_MpCellL12
 .mp_dest_done:
     TAY
-    JSR BattleMsg_FormatTwoDigits           ; MP digits (exits M=1)
+    JSR BattleMsg_FormatTwoDigits   ; MP digits (exits M=1)
     LDA.w !BattleUI_GaugeLayout
     BNE .mp_not_type0
     JSR BattleMsg_BlankLeadingZeros
@@ -1696,7 +1696,7 @@ BattleMenu_RenderItemRow:
     LDA.w Item_BattleList.Quantity,X
     REP #$20                        ; M=0 (B is 0: zero-extended)
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; two digits
+    JSR BattleMsg_FormatTwoDigits   ; two digits
     JSR BattleMsg_BlankLeadingZeros
     LDX.b !BattleMenu_RowMapOffset  ; (M=1 again after both calls)
     LDA.w !BattleMsg_Digit10
@@ -2189,7 +2189,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats.CurMp        ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(1,24)
@@ -2210,7 +2210,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats[1].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(3,24)
@@ -2231,7 +2231,7 @@ BattleMenu_UpdateTechWindow:
     REP #$20                        ; M=0
     LDA.w BattlerStats[2].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     JSR BattleMsg_BlankLeadingZeros
     LDA.w !BattleMsg_Digit10
     STA.w BattleMenu_TechTile(5,24)
@@ -2314,7 +2314,7 @@ BattleMenu_UpdateTechWindow:
     BMI .check_slot1_cost            ; PC slot 0 not involved
     REP #$20                        ; M=0 (B is 0: zero-extended)
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero     ; tens digit zero?
     BNE .slot0_two_digits
@@ -2333,7 +2333,7 @@ BattleMenu_UpdateTechWindow:
     BMI .check_slot2_cost            ; PC slot 1 not involved
     REP #$20
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
     BNE .slot1_two_digits
@@ -2352,7 +2352,7 @@ BattleMenu_UpdateTechWindow:
     BMI BattleMenu_DrawTechCursorRow ; PC slot 2 not involved
     REP #$20
     STA.w !BattleMsg_NumValue
-    JSR BattleMsg_FormatTwoDigits           ; → M=1
+    JSR BattleMsg_FormatTwoDigits   ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
     BNE .slot2_two_digits
@@ -2852,7 +2852,7 @@ BattleMenu_DrawCursorSprites:
 ; menu dirty-flag gates (RefreshIfDirtyL/AndTick). Reads the pad-edge
 ; bytes (!Battle_PadEdgeButtons / !Battle_PadEdgeDpad, pressed this
 ; frame) and dispatches:
-;   - no PC shown (!BattleMenu_ActivePc < 0) → Battle_ZeroResultEE;
+;   - no PC shown (!BattleMenu_ActivePc < 0) → Battle_ClearPadEdges;
 ;     target selection running → BattleMenu_TargetSelectInput
 ;   - !BattleMenu_Submenu 1 / 2 → tech / item list input (with
 ;     !Battle_MenuTimeHold = !Battle_CfgBattleMode)
@@ -2867,13 +2867,13 @@ BattleMenu_DrawCursorSprites:
 ;          BattleMenu_TechListInput, BattleMenu_ItemListInput,
 ;          BattleMenu_ConfirmCommand, BattleMenu_CycleActivePcPrev,
 ;          BattleMenu_CycleActivePcNext, BattleMenu_CursorUp,
-;          BattleMenu_CursorDown, Battle_StopSfx, Battle_ZeroResultEE
+;          BattleMenu_CursorDown, Battle_PlaySfx0, Battle_ClearPadEdges
 org $C11153
 BattleMenu_ProcessInput:
     JSL Battle_MergePendingEntries1580
     LDA.w !BattleMenu_ActivePc
     BPL .slot_valid
-    JMP Battle_ZeroResultEE         ; no PC shown -> clear pad-edge bytes, return
+    JMP Battle_ClearPadEdges        ; no PC shown -> clear pad-edge bytes, return
 .slot_valid:
     LDA.w !BattleMenu_TargetSelect
     BEQ .not_targeting
@@ -2916,13 +2916,13 @@ BattleMenu_ProcessInput:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUp
     BEQ .poll_down
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_CursorUp
 .poll_down:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDown
     BEQ .poll_right
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_CursorDown
 .poll_right:
     LDA.b !Battle_PadEdgeDpad
@@ -2933,30 +2933,34 @@ BattleMenu_ProcessInput:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadConfirm
     BEQ .no_input
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
 .confirm:
     JMP BattleMenu_ConfirmCommand
 .no_input:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_CycleActivePcPrev ($C111E1–$C11217, 55 bytes)
 ; ==================================================================
 ; Left D-pad: step !BattleMenu_RosterIdx back (wrap 0..2), skipping
-; roster entries that are negative. Plays the cursor sound unless only
-; one PC is in the roster. Carries the previously shown PC's !Pc_MenuRow
-; to the new one, unless !BattleMenu_CfgCursorMemory is set, in which
-; case it instead restores the OLD PC's row from !Pc_SavedMenuRow — a
-; path the reference disassembly marks as unreachable in practice.
+; roster entries that are negative. Plays sound 0 (Battle_PlaySfx0;
+; inferred to be the cursor sound, not settled) unless only one PC is in
+; the roster. Carries the previously shown PC's !Pc_MenuRow to the new
+; one, unless !BattleMenu_CfgCursorMemory is set, in which case the new
+; PC keeps its own row and the OLD PC's row is restored from
+; !Pc_SavedMenuRow. The reference disassembly marks that path as
+; unreachable, but the battle init code at $CC:E39C sets
+; CfgCursorMemory from config byte $2991 bit 6, so it runs whenever that
+; setting is on (inferred: the cursor-memory option).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_StopSfx, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_PlaySfx0, Battle_ClearPadEdges
 org $C111E1
 BattleMenu_CycleActivePcPrev:
     LDA.w !BattleMenu_ReadyCount
     DEC
-    BEQ .retry                      ; only 1 PC -> skip the cursor-move sound
-    JSR Battle_StopSfx
+    BEQ .retry                      ; only 1 PC -> no sound
+    JSR Battle_PlaySfx0
 .retry:
     DEC.w !BattleMenu_RosterIdx     ; wrap 0..2
     LDA.w !BattleMenu_RosterIdx
@@ -2971,30 +2975,31 @@ BattleMenu_CycleActivePcPrev:
     LDA.w !BattleMenu_ActivePc      ; previously shown PC
     TAY
     LDA.w !BattleMenu_CfgCursorMemory
-    BNE .default_row                ; (reference: unreachable in practice)
+    BNE .restore_saved_row          ; cursor-memory setting on
     LDA.w !Pc_MenuRow,Y             ; carry cursor row from old slot
     STA.w !Pc_MenuRow,X
     BRA .done
-.default_row:
+.restore_saved_row:
     LDA.w !Pc_SavedMenuRow,Y        ; old PC's remembered row
     STA.w !Pc_MenuRow,Y
 .done:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_CycleActivePcNext ($C11218–$C1124F, 56 bytes)
 ; ==================================================================
 ; Right D-pad: mirror of CycleActivePcPrev — steps !BattleMenu_RosterIdx
-; forward (wrap at 3 back to 0) instead.
+; forward (wrap at 3 back to 0) instead; the same sound 0 and the same
+; cursor-memory handling.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_StopSfx, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_PlaySfx0, Battle_ClearPadEdges
 org $C11218
 BattleMenu_CycleActivePcNext:
     LDA.w !BattleMenu_ReadyCount
     DEC
     BEQ .retry
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
 .retry:
     INC.w !BattleMenu_RosterIdx     ; wrap at 3 -> 0
     LDA.w !BattleMenu_RosterIdx
@@ -3010,15 +3015,15 @@ BattleMenu_CycleActivePcNext:
     LDA.w !BattleMenu_ActivePc      ; previously shown PC
     TAY
     LDA.w !BattleMenu_CfgCursorMemory
-    BNE .default_row                ; (reference: unreachable in practice)
+    BNE .restore_saved_row          ; cursor-memory setting on
     LDA.w !Pc_MenuRow,Y             ; carry cursor row from old slot
     STA.w !Pc_MenuRow,X
     BRA .done
-.default_row:
+.restore_saved_row:
     LDA.w !Pc_SavedMenuRow,Y        ; old PC's remembered row
     STA.w !Pc_MenuRow,Y
 .done:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_CursorUp ($C11250–$C11263, 20 bytes)
@@ -3026,8 +3031,8 @@ BattleMenu_CycleActivePcNext:
 ; Up D-pad: step the shown PC's !Pc_MenuRow back (wrap 0..2) and flag
 ; the cursor redraw (!BattleUI_PanelRedraw).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_ClearPadEdges
 org $C11250
 BattleMenu_CursorUp:
     LDA.w !BattleMenu_ActivePc      ; active PC slot
@@ -3038,7 +3043,7 @@ BattleMenu_CursorUp:
     STA.w !Pc_MenuRow,X
 .done:
     INC.w !BattleUI_PanelRedraw     ; flag redraw
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_CursorDown ($C11264–$C1127A, 23 bytes)
@@ -3046,8 +3051,8 @@ BattleMenu_CursorUp:
 ; Down D-pad: step the shown PC's !Pc_MenuRow forward (wrap at 3 back to
 ; 0) and flag the cursor redraw (!BattleUI_PanelRedraw).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_ClearPadEdges
 org $C11264
 BattleMenu_CursorDown:
     LDA.w !BattleMenu_ActivePc      ; active PC slot
@@ -3059,10 +3064,10 @@ BattleMenu_CursorDown:
     STZ.w !Pc_MenuRow,X
 .done:
     INC.w !BattleUI_PanelRedraw     ; flag redraw
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
-; Battle_ZeroResultEE ($C1179C–$C117A0, 5 bytes)
+; Battle_ClearPadEdges ($C1179C–$C117A0, 5 bytes)
 ; ==================================================================
 ; Clears both pad-edge bytes and returns. Shared tail used by most of the
 ; command-window input handlers above once they've consumed this frame's
@@ -3071,7 +3076,7 @@ BattleMenu_CursorDown:
 ; Exit:  M=1; !Battle_PadEdgeButtons = !Battle_PadEdgeDpad = 0
 ; No JSR/JSL calls.
 org $C1179C
-Battle_ZeroResultEE:
+Battle_ClearPadEdges:
     STZ.b !Battle_PadEdgeButtons
     STZ.b !Battle_PadEdgeDpad
     RTS
@@ -3091,7 +3096,7 @@ Battle_ZeroResultEE:
 ; ConsumePartnerSlot/CommitAction clear) in the slot's command record
 ; (offset from !BattleRom_CmdOffset), appends the slot to
 ; !BattleMenu_ReadyQueue, resets its !Pc_MenuRow to !Pc_SavedMenuRow,
-; and plays a sound through the same APU command Battle_StopSfx uses,
+; and plays a sound through the same APU command Battle_PlaySfx0 uses,
 ; here with sound id $42 instead of 0 (inferred: the "turn ready" cue).
 ;
 ; Note: does not check whether the slot is already queued; callers
@@ -3130,17 +3135,18 @@ BattleMenu_EnqueueReadyBattler:
     RTS
 
 ; ==================================================================
-; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
+; Battle_PlaySfx0 ($C11B55–$C11B66, 18 bytes)
 ; ==================================================================
-; APU command !Sfx_CmdPlay with sound id 0 (mirrors bank $C0's Sub_1B90
-; pattern): fills !Sfx_Command/!Sfx_Param1/!Sfx_Param2 and calls the
-; audio driver entry. Used when the cursor moves or a command is
-; confirmed; whether sound 0 is a cursor beep or a stop is not settled.
+; APU command !Sfx_CmdPlay with sound id 0: fills !Sfx_Command /
+; !Sfx_Param1 / !Sfx_Param2 (the same command block bank $C0's
+; Audio_PlayTileSfxA fills) and calls the audio driver entry. Used when
+; the cursor moves or a command is confirmed; whether sound 0 is a
+; cursor beep or a stop is not settled, hence the neutral name.
 ; Entry: M=1, DB=$7E
 ; Exit:  M=1
 ; Callees: Audio_ProcessEntry
 org $C11B55
-Battle_StopSfx:
+Battle_PlaySfx0:
     STZ.w !Sfx_Param1
     LDA.b #!Sfx_CmdPlay
     STA.w !Sfx_Command
@@ -3186,9 +3192,9 @@ BattleMenu_ConfirmCommand:
 ; redraw (twice), sets !BattleTgt_Mode = attack, !BattleMenu_CmdMenu = 0,
 ; builds the target list, then enters target selection.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
 ; Callees: BattleMsg_ShowMsg0BIfKeyChangedVec,
-;          BattleMenu_BuildTargetList, Battle_ZeroResultEE
+;          BattleMenu_BuildTargetList, Battle_ClearPadEdges
 org $C1129C
 BattleMenu_ChooseAttack:
     LDA.b #!BattleMsg_ArgNone
@@ -3201,7 +3207,7 @@ BattleMenu_ChooseAttack:
     JSR BattleMenu_BuildTargetList
     INC.w !BattleMenu_TargetMoved
     INC.w !BattleMenu_TargetSelect  ; enter target selection
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_OpenTechList ($C112BC–$C112EC, 49 bytes)
@@ -3211,9 +3217,9 @@ BattleMenu_ChooseAttack:
 ; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 1) and requests the tech
 ; box frame (!BattleMenu_TechWindowNew).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
 ; Callees: BattleMenu_RenderTechListRows, BattleMenu_BuildTechAvailFlags,
-;          Battle_ZeroResultEE
+;          Battle_ClearPadEdges
 org $C112BC
 BattleMenu_OpenTechList:
     LDA.w !BattleMenu_Lock
@@ -3234,7 +3240,7 @@ BattleMenu_OpenTechList:
     STZ.w !BattleMenu_UnkA869
     INC.w !BattleMenu_TechWindowNew
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_OpenItemList ($C112ED–$C1131F, 51 bytes)
@@ -3245,9 +3251,9 @@ BattleMenu_OpenTechList:
 ; !BattleMenu_WindowMap, and switches to the item list
 ; (!BattleMenu_Submenu = !BattleMenu_CmdMenu = 2).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
 ; Callees: BattleMenu_RenderItemListRows, Battle_QueueVramUpload_0E80,
-;          Battle_ZeroResultEE
+;          Battle_ClearPadEdges
 org $C112ED
 BattleMenu_OpenItemList:
     LDA.w !BattleMenu_Lock
@@ -3271,7 +3277,7 @@ BattleMenu_OpenItemList:
     LDA.b #!BattleMenu_SubmenuItem
     STA.w !BattleMenu_Submenu
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_BuildTargetList ($C11F79–$C11FDC, 100 bytes)
@@ -3281,7 +3287,8 @@ BattleMenu_OpenItemList:
 ; !BattleTgt_Candidates and !BattleTgt_Selected (indices 0-11) to $FF.
 ; If !BattleTgt_Mode bit 7 is set and no return target is saved yet,
 ; saves submenu + 1 in !BattleMenu_ReturnSubmenu, switches to the main
-; menu (with the panel refresh held) and reloads the command window, so
+; menu, sets !BattleUI_ForceDigitRefresh (UpdateNextPcPanel then always
+; refreshes the HP/MP digits) and reloads the command window, so
 ; cancelling target selection comes back to the submenu.
 ;
 ; Then runs the mode's handler: mode & $7F (clamped to $20) indexes
@@ -3387,7 +3394,8 @@ BattleTgt_AreaTable:
 ; enemies) and seeds !BattleTgt_Selected from the cursor
 ; (!BattleTgt_Cursor). !BattleTgt_TargetAll = $80 means "target
 ; everything in the list"; !BattleTgt_CanCycle non-zero means the player
-; may move the cursor; !BattleTgt_Result = $80 means "no valid target".
+; may move the cursor; a negative !BattleTgt_Result means "no valid
+; target" (the handlers store $80, BuildTargetList's empty-list check $FF).
 ;
 ; Mode -> handler (unlisted modes use BattleTgt_SingleAlly):
 ;   $01,$04 AllAllies          $02 Self             $03 SingleKoAlly
@@ -3602,8 +3610,9 @@ BattleTgt_SingleKoAlly:
 ; Targets the one party member whose !Pc_CharId equals
 ; !BattleTgt_WantedChar (5 for this entry, 4 via BattleTgt_PcByCharId4).
 ; In bank $C1, !Pc_CharId behaves like the party's character-id list; if
-; so these are "target Ayla"/"target Frog" modes, used by dual/triple
-; techs that act on a specific partner.
+; so these are "target Ayla"/"target Frog" modes. Which techs use target
+; modes 5 and 6 is not established. The routine names keep the numeric
+; ids because the character constants (!Pc_CharAyla etc.) are inferred.
 !BattleTgt_WantedChar = !BattleTmp_80    ; 1 B in: character id FindPcByCharId looks for
 BattleTgt_PcByCharId5:
     LDA.b #!Pc_CharAyla
@@ -3650,7 +3659,7 @@ BattleTgt_PcByCharId4:
 ;   battler, AreaSize = shape size, AreaVariant = variant flag,
 ;   AreaSide = 0 (scan the enemies)
 ; The enemy-anchored ones build the enemy list first and let the pad
-; move the aim: D-pad up/right or down/left each play Battle_StopSfx and
+; move the aim: D-pad up/right or down/left each play Battle_PlaySfx0 and
 ; step the cursor. Note the three "line" modes step forward for both pad
 ; groups; the radius/row modes step backward for the second group.
 
@@ -3663,14 +3672,14 @@ BattleTgt_EnemyLineFromCaster:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUpRight
     BEQ .check_other
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDownLeft
     BEQ .setup
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
 .setup:
     STZ.w !BattleTgt_AreaSide
@@ -3687,7 +3696,12 @@ BattleTgt_EnemyLineFromCaster:
     JMP BattleTgt_SelectAllCandidates
 
 ; BattleTgt_EnemyLineFromChar3 ($C121AF–$C12202, 84 bytes): as above,
-; but the source is the party member with id 3 (no-op if absent)
+; but the source is the party member with character id 3 (!Pc_CharRobo,
+; inferred: Robo; the name keeps the numeric id). If no PC has that id it
+; returns before the area step, leaving what BattleTgt_SingleEnemy and
+; the pad step set up: the cursor's enemy in !BattleTgt_Selected, with
+; !BattleTgt_TargetAll = $80 (the cursor may already have moved and
+; played sound 0).
 BattleTgt_EnemyLineFromChar3:
     JSR BattleTgt_SingleEnemy
     STZ.w !BattleTgt_CanCycle
@@ -3696,14 +3710,14 @@ BattleTgt_EnemyLineFromChar3:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUpRight
     BEQ .check_other
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
     BRA .find_source
 .check_other:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDownLeft
     BEQ .find_source
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
 .find_source:
     TDC
@@ -3740,14 +3754,14 @@ BattleTgt_EnemyLineFromCaster2:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUpRight
     BEQ .check_other
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDownLeft
     BEQ .setup
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
 .setup:
     STZ.w !BattleTgt_AreaSide
@@ -3783,14 +3797,14 @@ BattleTgt_EnemyRadius:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUpRight
     BEQ .check_other
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDownLeft
     BEQ .setup
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CyclePrev
 .setup:
     STZ.w !BattleTgt_AreaSide
@@ -3872,14 +3886,14 @@ BattleTgt_EnemyRow:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadUpRight
     BEQ .check_other
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CycleNext
     BRA .setup
 .check_other:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadDownLeft
     BEQ .setup
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JSR BattleTgt_CyclePrev
 .setup:
     STZ.w !BattleTgt_AreaSide
@@ -4167,37 +4181,37 @@ BattleTgt_AreaPartyTriangle:
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoPointY
-    JSR Battle_CalcAngle                ; P0 vs P1
+    JSR Battle_CalcAngle            ; P0 vs P1
     STA.b !BattleTgt_P0ArcFrom
     LDA.b !BattleTgt_P2X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P2Y
     STA.b !Battle_GeoPointY
-    JSR Battle_CalcAngle                ; P0 vs P2
+    JSR Battle_CalcAngle            ; P0 vs P2
     STA.b !BattleTgt_P0ArcTo
     LDA.b !BattleTgt_P1X
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoOriginY
-    JSR Battle_CalcAngle                ; P1 vs P2
+    JSR Battle_CalcAngle            ; P1 vs P2
     STA.b !BattleTgt_P1ArcFrom
     LDA.b !BattleTgt_P0X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P0Y
     STA.b !Battle_GeoPointY
-    JSR Battle_CalcAngle                ; P1 vs P0
+    JSR Battle_CalcAngle            ; P1 vs P0
     STA.b !BattleTgt_P1ArcTo
     LDA.b !BattleTgt_P2X
     STA.b !Battle_GeoOriginX
     LDA.b !BattleTgt_P2Y
     STA.b !Battle_GeoOriginY
-    JSR Battle_CalcAngle                ; P2 vs P0
+    JSR Battle_CalcAngle            ; P2 vs P0
     STA.b !BattleTgt_P2ArcFrom
     LDA.b !BattleTgt_P1X
     STA.b !Battle_GeoPointX
     LDA.b !BattleTgt_P1Y
     STA.b !Battle_GeoPointY
-    JSR Battle_CalcAngle                ; P2 vs P1
+    JSR Battle_CalcAngle            ; P2 vs P1
     STA.b !BattleTgt_P2ArcTo
     LDA.b !BattleTgt_P0ArcTo
     CMP.b !BattleTgt_P0ArcFrom
@@ -4376,7 +4390,7 @@ BattleTgt_AreaLine:
     STA.b !Battle_GeoPointX
     LDA.w !Battler_ScreenY,Y
     STA.b !Battle_GeoPointY
-    JSR Battle_CalcAngle                ; A = GeoAngle = θ
+    JSR Battle_CalcAngle            ; A = GeoAngle = θ
     JSR Battle_SinLookup
     STA.b !BattleTgt_PaX            ; r*sin θ
     CLC
@@ -4689,7 +4703,8 @@ BattleTgt_AreaAddAnchor:
 
 ; BattleTgt_CompactCandidates ($C127C5–$C127D8, 20 bytes): if the
 ; front slot is empty (requester wasn't eligible), shift the list
-; left by one. Reads one byte past the list (entry 11) on the last step.
+; left by one. The last step reads entry 11, one past the 11 used
+; entries (the list has 12 bytes).
 org $C127C5
 BattleTgt_CompactCandidates:
     LDA.w !BattleTgt_Candidates
@@ -4732,7 +4747,9 @@ BattleTgt_SelectAllCandidates:
 
 ; BattleTgt_CycleNext ($C127FA–$C12813, 26 bytes): advance !BattleTgt_Cursor to the
 ; next non-empty candidate (wrap at 11); no-op on an empty list. Same
-; logic as BattleMenu_TargetNext, duplicated rather than shared.
+; cursor stepping as BattleMenu_TargetNext, plus an empty-list guard
+; (TargetNext would loop forever on an empty list); unlike TargetNext it
+; does not write !BattleTgt_Selected.
 BattleTgt_CycleNext:
     JSR BattleTgt_AnyCandidate
     BEQ .exit                       ; list empty
@@ -4794,10 +4811,12 @@ BattleTgt_AnyCandidate:
 ; !BattleMenu_ReadyCount. If no roster entry was shown
 ; (!BattleMenu_RosterIdx negative), shows the new one.
 ;
-; Note: the queue shift reads ReadyQueue+2 twice (into both +1 and +3)
-; rather than reading +3 for the second copy — reproduced exactly as
-; found; harmless in practice since the live count never exceeds what
-; the shift correctly updates.
+; Quirk: the queue shift copies +1 to +0, +2 to +1 and +2 to +3 (the
+; ROM bytes confirm it), so +2 is never cleared. With three entries
+; queued, [a,b,c] becomes [b,c,c,c] and then [c,c,c,c]; once the count
+; reaches 0 the head is still c, which is not negative, so this routine
+; (which checks only the head) would dequeue c again. Whether three PCs
+; are ever queued at once is not established.
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; X = dequeued slot index (or unchanged if queue was empty)
@@ -4851,6 +4870,10 @@ BattleMenu_DequeueReadyBattler:
 ; rebuild. If it IS the shown PC, additionally cancels any open
 ; submenu/targeting state, clears its roster entry, then scans for
 ; another roster entry to show (or sets "none" if none remain).
+; Quirk: when targeting had started from a submenu, it first restores
+; !BattleMenu_Submenu to that submenu (ReturnSubmenu - 1), but the
+; STZ in .clear_targeting overwrites it at once, so it always ends on
+; the main menu; the first store is dead.
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; !Battle_ArgSlot = slot to remove
 ; Exit:  M=1; registers clobbered
@@ -4898,7 +4921,7 @@ BattleMenu_RemoveBattlerFromReady:
     LDA.w !BattleMenu_ReturnSubmenu
     BEQ .clear_targeting
     DEC
-    STA.w !BattleMenu_Submenu
+    STA.w !BattleMenu_Submenu       ; dead store: .clear_targeting zeroes it next
     STZ.w !BattleMenu_ReturnSubmenu
     STZ.w !BattleUI_ForceDigitRefresh
 .clear_targeting:
@@ -4946,10 +4969,10 @@ BattleMenu_RemoveBattlerFromReady:
 ; then hides the four cursor sprites (high-table x bit 8 set, y parked
 ; at $F0); with the main menu back, the command cursor is redrawn too.
 ;
-; Contains one 18-byte block of dead code ($115B6-$115C7): a byte-for-
-; byte duplicate of the item-graphic copy loop above it, except its
-; loop-continue branch (BNE) targets the input-polling code at $15E8
-; instead of looping back on itself — meaning on real hardware it always
+; Contains one 18-byte block of dead code ($C115B6-$C115C7): a byte-for-
+; byte duplicate of the item box frame copy loop above it, except its
+; loop-continue branch (BNE) targets the input polling at .poll_input
+; ($C115E8) instead of looping back on itself — meaning on real hardware it always
 ; escapes after exactly one iteration rather than functioning as a copy
 ; loop. Nothing in this routine's control flow can reach these bytes
 ; (both preceding paths branch past them via BRA); reproduced exactly
@@ -4957,9 +4980,9 @@ BattleMenu_RemoveBattlerFromReady:
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
-; Callees: BattleMenu_BuildTargetList, Battle_StopSfx,
+; Callees: BattleMenu_BuildTargetList, Battle_PlaySfx0,
 ;          BattleMenu_CommitAction, BattleMenu_TargetNext,
-;          BattleMenu_TargetPrev, Battle_ZeroResultEE
+;          BattleMenu_TargetPrev, Battle_ClearPadEdges
 org $C11561
 BattleMenu_TargetSelectInput:
     JSR BattleMenu_BuildTargetList
@@ -4971,7 +4994,7 @@ BattleMenu_TargetSelectInput:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadCancel
     BEQ .poll_input
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
 .cancel:
     STZ.w !BattleTgt_Cursor
     STZ.w !BattleTgt_Unk960E
@@ -5029,7 +5052,7 @@ BattleMenu_TargetSelectInput:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadConfirmAny
     BEQ .check_cycle
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_CommitAction
 .check_cycle:
     LDA.w !BattleTgt_TargetAll
@@ -5038,17 +5061,17 @@ BattleMenu_TargetSelectInput:
     AND.b #!Battle_DpadRightDown
     BEQ .check_prev
     INC.w !BattleMenu_TargetMoved
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TargetNext
 .check_prev:
     LDA.b !Battle_PadEdgeDpad
     AND.b #!Battle_DpadLeftUp
     BEQ .exit
     INC.w !BattleMenu_TargetMoved
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TargetPrev
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_CommitAction ($C1161A–$C11749, 308 bytes)
@@ -5079,9 +5102,9 @@ BattleMenu_TargetSelectInput:
 ; entry, if any (same shape as BattleMenu_RemoveBattlerFromReady's tail).
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
 ; Callees: BattleMenu_ConsumePartnerSlot, Battle_ShiftRight4,
-;          Battle_ZeroResultEE
+;          Battle_ClearPadEdges
 ; Direct-page roles:
 !BattleMenu_CmdKindArg = !BattleTmp_80    ; 1 B: BattleCmd.Kind being built
 !BattleMenu_CmdPartners = !BattleTmp_82   ; 1 B: BattleCmd.Partners being built
@@ -5221,7 +5244,7 @@ BattleMenu_CommitAction:
 .done:
     STZ.w !BattleMenu_UnkA862
     STZ.w !Battle_MenuTimeHold
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ConsumePartnerSlot ($C1174E–$C1176B, 30 bytes)
@@ -5258,8 +5281,8 @@ BattleMenu_ConsumePartnerSlot:
 ; 11), skipping empty candidate entries, and select the battler it lands
 ; on (!BattleTgt_Selected).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_ClearPadEdges
 org $C1176C
 BattleMenu_TargetNext:
     INC.w !BattleTgt_Cursor
@@ -5273,16 +5296,16 @@ BattleMenu_TargetNext:
     LDA.w !BattleTgt_Candidates,X   ; candidate list entry
     BMI BattleMenu_TargetNext       ; invalid -> keep advancing
     STA.w !BattleTgt_Selected
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_TargetPrev ($C11786–$C1179B, 22 bytes)
 ; ==================================================================
 ; Left/Up while cycling targets: mirror of TargetNext — steps
 ; !BattleTgt_Cursor back (wrap to 10) instead. Falls straight through
-; into Battle_ZeroResultEE (no JMP needed; they're adjacent in ROM).
+; into Battle_ClearPadEdges (no JMP needed; they're adjacent in ROM).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; falls through to Battle_ZeroResultEE
+; Exit:  M=1; falls through to Battle_ClearPadEdges
 ; No JSR/JSL calls.
 org $C11786
 BattleMenu_TargetPrev:
@@ -5306,9 +5329,9 @@ BattleMenu_TargetPrev:
 ; confirm, cancel, Up or Left = previous, Down or Right = next.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
-; Callees: Battle_StopSfx, BattleMenu_TechConfirm,
+; Callees: Battle_PlaySfx0, BattleMenu_TechConfirm,
 ;          BattleMenu_TechListCancel, BattleMenu_TechListPrev,
-;          BattleMenu_TechListNext, Battle_ZeroResultEE
+;          BattleMenu_TechListNext, Battle_ClearPadEdges
 !BattleMenu_TechListIdx = !BattleTmp_80  ; 2 B: line of the PC's tech list under the cursor (Prev/Next input)
 org $C11320
 BattleMenu_TechListInput:
@@ -5322,13 +5345,13 @@ BattleMenu_TechListInput:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadConfirm       ; confirm
     BEQ .check_cancel
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TechConfirm
 .check_cancel:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadCancel        ; cancel
     BEQ .check_up
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TechListCancel
 .check_up:
     LDA.b !Battle_PadEdgeDpad
@@ -5337,7 +5360,7 @@ BattleMenu_TechListInput:
     AND.b #!Battle_DpadLeft         ; left
     BEQ .check_down
 .do_up:
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TechListPrev
 .check_down:
     LDA.b !Battle_PadEdgeDpad
@@ -5346,10 +5369,10 @@ BattleMenu_TechListInput:
     AND.b #!Battle_DpadRight        ; right
     BEQ .exit
 .do_down:
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_TechListNext
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_TechConfirm ($C11369–$C1138E, 38 bytes)
@@ -5360,8 +5383,8 @@ BattleMenu_TechListInput:
 ; target list, and — if a valid target was found — enters target
 ; selection; if not, just resets the target cursor.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_BuildTargetList, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_BuildTargetList, Battle_ClearPadEdges
 org $C11369
 BattleMenu_TechConfirm:
     LDA.w !BattleMenu_TechAvailDone
@@ -5379,7 +5402,7 @@ BattleMenu_TechConfirm:
     INC.w !BattleMenu_TargetMoved
     INC.w !BattleMenu_TargetSelect  ; enter target-select mode
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_TechListCancel ($C1138F–$C113AC, 30 bytes)
@@ -5388,8 +5411,8 @@ BattleMenu_TechConfirm:
 ; force a window rebuild, and restore this PC's saved tech-list cursor
 ; (!Pc_SavedTechRow / SavedTechScroll -> !Pc_TechRow / TechScroll).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_LoadCommandWindowMap, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_LoadCommandWindowMap, Battle_ClearPadEdges
 org $C1138F
 BattleMenu_TechListCancel:
     JSR BattleMenu_LoadCommandWindowMap
@@ -5402,7 +5425,7 @@ BattleMenu_TechListCancel:
     STA.w !Pc_TechRow,X
     LDA.w !Pc_SavedTechScroll,X     ; saved scroll position
     STA.w !Pc_TechScroll,X
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_TechListPrev ($C113AD–$C113F3, 71 bytes)
@@ -5413,8 +5436,8 @@ BattleMenu_TechListCancel:
 ; scrolling the list (!Pc_TechScroll) up a line at a time while the row
 ; would be negative.
 ; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_ClearPadEdges
 !BattleMenu_StepCount = !BattleTmp_82    ; 1 B: lines walked to reach an available tech
 !BattleMenu_NewRow = !BattleTmp_83       ; 1 B: cursor row after that walk (may leave 0-2)
 org $C113AD
@@ -5457,7 +5480,7 @@ BattleMenu_TechListPrev:
     STA.w !Pc_TechRow,X
     BMI .dec_scroll                 ; still negative -> scroll again
 .no_change:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_TechListNext ($C113F4–$C1143C, 73 bytes)
@@ -5467,8 +5490,8 @@ BattleMenu_TechListPrev:
 ; instead of the start of the list, and scrolls down instead of up when
 ; the new row would reach 3.
 ; Entry: M=1, X=0, DB=$7E; !BattleMenu_TechListIdx = current line
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_ClearPadEdges
 org $C113F4
 BattleMenu_TechListNext:
     STZ.b !BattleMenu_StepCount      ; steps walked
@@ -5510,7 +5533,7 @@ BattleMenu_TechListNext:
     CMP.b #!BattleMenu_ListRows
     BCS .inc_scroll                 ; still >= 3 -> scroll again
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListInput ($C1143D–$C11497, 91 bytes)
@@ -5522,23 +5545,23 @@ BattleMenu_TechListNext:
 ; page the whole list up/down by 3 rows at once.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; tail-jumps to one of several handlers, does not fall through
-; Callees: Battle_StopSfx, BattleMenu_ItemConfirm,
+; Callees: Battle_PlaySfx0, BattleMenu_ItemConfirm,
 ;          BattleMenu_ItemListCancel, BattleMenu_ItemCursorUp,
 ;          BattleMenu_ItemCursorDown, BattleMenu_ItemListPageDown,
 ;          BattleMenu_ItemListPageUp, BattleMenu_ItemListRefresh,
-;          Battle_ZeroResultEE
+;          Battle_ClearPadEdges
 org $C1143D
 BattleMenu_ItemListInput:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadConfirm       ; confirm
     BEQ .check_cancel
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemConfirm
 .check_cancel:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadCancel        ; cancel
     BEQ .check_up
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemListCancel
 .check_up:
     LDA.b !Battle_PadEdgeDpad
@@ -5547,7 +5570,7 @@ BattleMenu_ItemListInput:
     AND.b #!Battle_DpadLeft         ; left
     BEQ .check_down
 .do_up:
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemCursorUp
 .check_down:
     LDA.b !Battle_PadEdgeDpad
@@ -5556,26 +5579,26 @@ BattleMenu_ItemListInput:
     AND.b #!Battle_DpadRight        ; right
     BEQ .check_page_down
 .do_down:
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemCursorDown
 .check_page_down:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadPageDown      ; page down (3 rows)
     BEQ .check_page_up
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemListPageDown
 .check_page_up:
     LDA.b !Battle_PadEdgeButtons
     AND.b #!Battle_PadPageUp        ; page up (3 rows)
     BEQ .check_refresh
-    JSR Battle_StopSfx
+    JSR Battle_PlaySfx0
     JMP BattleMenu_ItemListPageUp
 .check_refresh:
     LDA.w !BattleMenu_ItemRefresh
     BEQ .exit
     JMP BattleMenu_ItemListRefresh
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemConfirm ($C11498–$C114DA, 67 bytes)
@@ -5588,8 +5611,8 @@ BattleMenu_ItemListInput:
 ; the target list, and enters target selection if a valid target was
 ; found.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_Mul8, BattleMenu_BuildTargetList, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: Battle_Mul8, BattleMenu_BuildTargetList, Battle_ClearPadEdges
 !BattleMenu_ItemListIdx = !BattleTmp_80  ; 1 B: list line under the cursor (scroll + row)
 org $C11498
 BattleMenu_ItemConfirm:
@@ -5620,7 +5643,7 @@ BattleMenu_ItemConfirm:
     INC.w !BattleMenu_TargetMoved
     INC.w !BattleMenu_TargetSelect  ; enter target-select mode
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListCancel ($C114DB–$C114EB, 17 bytes)
@@ -5628,8 +5651,8 @@ BattleMenu_ItemConfirm:
 ; Closes the item list: reload the command window, back to the main
 ; menu, force a window rebuild, and invalidate the scroll-arrow cache.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_LoadCommandWindowMap, Battle_ClearPadEdges
 org $C114DB
 BattleMenu_ItemListCancel:
     JSR BattleMenu_LoadCommandWindowMap
@@ -5637,7 +5660,7 @@ BattleMenu_ItemListCancel:
     LDA.b #!BattleMenu_CacheInvalid
     STA.w !BattleMenu_RosterIdxDrawn ; force command-window reload
     STA.w !BattleMenu_ItemScrollDrawn ; redraw the arrows next time
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemCursorUp ($C114EC–$C11501, 22 bytes)
@@ -5645,8 +5668,8 @@ BattleMenu_ItemListCancel:
 ; Up/Left in the item list: decrement !BattleMenu_ItemRow, scrolling the
 ; list up via ItemListScrollUp when already at the top row.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_ItemListScrollUp, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_ItemListScrollUp, Battle_ClearPadEdges
 org $C114EC
 BattleMenu_ItemCursorUp:
     LDA.w !BattleMenu_ItemRow       ; cursor row
@@ -5659,7 +5682,7 @@ BattleMenu_ItemCursorUp:
     BCC .exit
     STA.w !BattleMenu_ItemRow
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemCursorDown ($C11502–$C1151B, 26 bytes)
@@ -5668,8 +5691,8 @@ BattleMenu_ItemCursorUp:
 ; scrolling the list down via ItemListScrollDown when already at the
 ; bottom row.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_ItemListScrollDown, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_ItemListScrollDown, Battle_ClearPadEdges
 org $C11502
 BattleMenu_ItemCursorDown:
     LDA.w !BattleMenu_ItemRow       ; cursor row
@@ -5684,20 +5707,20 @@ BattleMenu_ItemCursorDown:
     BCS .exit
     STA.w !BattleMenu_ItemRow
 .exit:
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListPageDown ($C1151C–$C11536, 27 bytes)
 ; ==================================================================
 ; Page-down button: page the item list down 3 rows at once, clamped at
-; scroll position $FA. Sets the scroll position and index itself, then
-; JSRs directly into ItemListScrollDown's shared render+indicator tail
+; scroll position $FA. Sets !BattleMenu_ItemScroll and
+; !BattleMenu_ListScroll itself, then JSRs directly into
+; ItemListScrollDown's shared render+indicator tail
 ; (BattleMenu_ItemListScrollDown_RenderTail) rather than duplicating
-; that logic — the same "call into another routine's tail" pattern
-; already seen elsewhere in this bank (e.g. Sub_1BA7 in bank $C0).
+; that logic.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_ItemListScrollDown_RenderTail, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_ItemListScrollDown_RenderTail, Battle_ClearPadEdges
 org $C1151C
 BattleMenu_ItemListPageDown:
     CLC
@@ -5713,7 +5736,7 @@ BattleMenu_ItemListPageDown:
     STA.w !BattleMenu_ItemScroll
     STA.b !BattleMenu_ListScroll
     JSR BattleMenu_ItemListScrollDown_RenderTail
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListPageUp ($C11537–$C1154A, 20 bytes)
@@ -5722,8 +5745,8 @@ BattleMenu_ItemListPageDown:
 ; Mirror of ItemListPageDown, JSRs into ItemListScrollUp's shared
 ; render+indicator tail (BattleMenu_ItemListScrollUp_RenderTail).
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_ItemListScrollUp_RenderTail, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_ItemListScrollUp_RenderTail, Battle_ClearPadEdges
 org $C11537
 BattleMenu_ItemListPageUp:
     SEC
@@ -5735,7 +5758,7 @@ BattleMenu_ItemListPageUp:
     STA.w !BattleMenu_ItemScroll
     STA.b !BattleMenu_ListScroll
     JSR BattleMenu_ItemListScrollUp_RenderTail
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListRefresh ($C1154B–$C11560, 22 bytes)
@@ -5743,8 +5766,8 @@ BattleMenu_ItemListPageUp:
 ; Re-renders the item list rows and invalidates both draw
 ; caches when !BattleMenu_ItemRefresh is set, clearing it.
 ; Entry: M=1, X=0, DB=$7E
-; Exit:  M=1; tail-jumps to Battle_ZeroResultEE
-; Callees: BattleMenu_RenderItemListRows, Battle_ZeroResultEE
+; Exit:  M=1; tail-jumps to Battle_ClearPadEdges
+; Callees: BattleMenu_RenderItemListRows, Battle_ClearPadEdges
 org $C1154B
 BattleMenu_ItemListRefresh:
     LDA.w !BattleMenu_ItemScroll    ; scroll position
@@ -5754,7 +5777,7 @@ BattleMenu_ItemListRefresh:
     STA.w !BattleMenu_ItemRowDrawn  ; redraw the row cursor
     STA.w !BattleMenu_ItemScrollDrawn ; and the arrows
     STZ.w !BattleMenu_ItemRefresh
-    JMP Battle_ZeroResultEE
+    JMP Battle_ClearPadEdges
 
 ; ==================================================================
 ; BattleMenu_ItemListScrollUp ($C117A1–$C117BE, 30 bytes)
@@ -5860,7 +5883,7 @@ BattleMenu_ItemListScrollDown_SkipRender:
 ;
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E
 ; Exit:  M=1; pad-edge bytes cleared (shared tail, same as
-;        Battle_ZeroResultEE elsewhere)
+;        Battle_ClearPadEdges elsewhere)
 ; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
 ;          BattleMenu_DrawCursorSprites, BattleMsg_ShowMsg0BIfKeyChangedVec,
 ;          BattleMsg_UnkVecCD0030 (sibling message vector, not analysed),
@@ -6137,10 +6160,10 @@ BattleMenu_UpdateCursorOverlay:
     ADC.w !Battler_ScreenOffsetY,X
     STA.w BattleOam.Y
     LDA.w !BattleMenu_Submenu
-    BNE .after_marker
+    BNE .after_info_panel
     LDA.w !BattleTgt_Highlight
     CMP.b #!Battle_FirstEnemySlot   ; slot < 3 -> a PC: no info panel
-    BCC .after_marker
+    BCC .after_info_panel
     ; enemy target from the main (attack) menu: info-panel message.
     ; With !Battle_Unk9F34 and the target's !Battler_Unk9F29 set, the
     ; message gets the target's HP too (BattleMsg_ShowMsg0BIfKeyChangedVec);
@@ -6155,24 +6178,24 @@ BattleMenu_UpdateCursorOverlay:
     LDA.l !BattleRom_StatsOffset+1,X
     STA.b !BattleMenu_TargetStats+1
     LDA.w !Battle_Unk9F34
-    BEQ .enemy_marker_check2
+    BEQ .panel_check_arg
     LDA.w !BattleTgt_Highlight
     TAY
     LDA.w !Battler_Unk9F29,Y
-    BNE .ally_target                ; (despite the label, an enemy target)
-.enemy_marker_check2:
+    BNE .panel_with_hp              ; the panel also shows the target's HP
+.panel_check_arg:
     LDA.w BattleMsg_InfoArgs.Id
     TAX
     LDA.l !BattleRom_UnkE1DE80,X
-    BEQ .enemy_marker_fallback1
+    BEQ .panel_arg_slot
     LDA.b #!BattleMsg_ArgNone
-    BRA .enemy_marker_send1
-.enemy_marker_fallback1:
+    BRA .panel_send
+.panel_arg_slot:
     LDA.w !BattleTgt_Highlight
-.enemy_marker_send1:
+.panel_send:
     JSL BattleMsg_UnkVecCD0030
-    BRA .after_marker
-.ally_target:
+    BRA .after_info_panel
+.panel_with_hp:
     LDX.b !BattleMenu_TargetStats
     LDA.w BattlerStats.CurHp,X      ; the target's HP / MaxHP -> InfoArgs
     STA.w BattleMsg_InfoArgs.CurHp
@@ -6185,39 +6208,39 @@ BattleMenu_UpdateCursorOverlay:
     LDA.w BattleMsg_InfoArgs.Id
     TAX
     LDA.l !BattleRom_UnkE1DE80,X
-    BEQ .ally_marker_fallback
+    BEQ .panel_hp_arg_slot
     LDA.b #!BattleMsg_ArgNone
-    BRA .ally_marker_send
-.ally_marker_fallback:
+    BRA .panel_hp_send
+.panel_hp_arg_slot:
     LDA.w !BattleTgt_Highlight
-.ally_marker_send:
+.panel_hp_send:
     JSL BattleMsg_ShowMsg0BIfKeyChangedVec
-.after_marker:
+.after_info_panel:
     LDA.w !BattleOam_HighTable      ; show sprite 0 (the single cursor)
     AND.b #!BattleOam_ShowSprite0
     STA.w !BattleOam_HighTable
     ; !Battle_UnkEC latch, updated only right after the target moved
     ; (!BattleMenu_TargetMoved) and when the cursor may move: set when
     ; the cursor's y is above CursorTopY, cleared at CursorBottomY or
-    ; below (the earlier "blink-direction" reading is unconfirmed)
+    ; below (what the latch is for is not known)
     LDA.w !BattleMenu_TargetMoved
-    BEQ .blink_done
+    BEQ .latch_done
     STZ.w !BattleMenu_TargetMoved
     LDA.w !BattleTgt_CanCycle
-    BEQ .blink_done
+    BEQ .latch_done
     LDA.b !Battle_UnkEC
-    BNE .blink_check_high
+    BNE .latch_check_bottom         ; latched: clear it at the bottom
     LDA.w BattleOam.Y
     CMP.b #!BattleMenu_CursorTopY
-    BCS .blink_done
+    BCS .latch_done
     INC.b !Battle_UnkEC
-    BRA .blink_done
-.blink_check_high:
+    BRA .latch_done
+.latch_check_bottom:
     LDA.w BattleOam.Y
     CMP.b #!BattleMenu_CursorBottomY
-    BCC .blink_done
+    BCC .latch_done
     STZ.b !Battle_UnkEC
-.blink_done:
+.latch_done:
     JMP .to_tail
 
 ; ------------------------------------------------------------------
@@ -6305,5 +6328,5 @@ BattleMenu_UpdateCursorOverlay:
     STA.w BattleOam[3].Y
 .tail:
     STZ.b !Battle_PadEdgeButtons    ; clear pad-edge bytes (same tail idiom
-    STZ.b !Battle_PadEdgeDpad       ; as Battle_ZeroResultEE)
+    STZ.b !Battle_PadEdgeDpad       ; as Battle_ClearPadEdges)
     RTS

@@ -12,8 +12,8 @@
       "bytes": 29032
     },
     "verified": {
-      "functions": 105,
-      "bytes": 3003
+      "functions": 83,
+      "bytes": 1989
     }
   },
   "banks": [
@@ -47,8 +47,8 @@
         "bytes": 9232
       },
       "verified": {
-        "functions": 82,
-        "bytes": 2747
+        "functions": 60,
+        "bytes": 1733
       }
     },
     {
@@ -411,7 +411,7 @@
         "BattleMenu_ConsumePartnerSlot",
         "BattleMenu_TargetNext",
         "BattleMenu_TargetPrev",
-        "Battle_ZeroResultEE",
+        "Battle_ClearPadEdges",
         "BattleMenu_ItemListScrollUp",
         "BattleMenu_ItemListScrollUp_SetScroll",
         "BattleMenu_ItemListScrollUp_RenderTail",
@@ -421,7 +421,7 @@
         "BattleMenu_ItemListScrollDown_SkipRender",
         "BattleMenu_UpdateCursorOverlay",
         "BattleMenu_EnqueueReadyBattler",
-        "Battle_StopSfx",
+        "Battle_PlaySfx0",
         "BattleMenu_DequeueReadyBattler",
         "BattleMenu_RemoveBattlerFromReady",
         "BattleMenu_LoadCommandWindowMap",

@@ -65,7 +65,7 @@ if !ram_battle_inc == 0
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
                                  ;      (UpdateCursorOverlay, only right after the target moved); purpose unknown
 !Battle_PadEdgeButtons   = $EE   ; 1 B: buttons pressed this frame (bit 7 confirm, 6 alt-confirm, 5/4 page, 3 cancel);
-                                 ;      cleared by Battle_ZeroResultEE once consumed
+                                 ;      cleared by Battle_ClearPadEdges once consumed
 !Battle_PadEdgeDpad      = $EF   ; 1 B: D-pad pressed this frame (bit 3 up, 2 down, 1 left, 0 right)
 
 ; ------------------------------------------------------------
@@ -166,7 +166,7 @@ endstruct
                                  ; (BuildTechAvailFlags; TechListPrev/Next skip zeros)
 !Battler_ScreenX         = $1D0C ; 11 B per battler slot: base screen x (cursor and area-target geometry)
 !Battler_ScreenY         = $1D23 ; 11 B per battler slot: base screen y
-!Sfx_Command             = $1E00 ; 1 B: APU command byte for Audio_ProcessEntry (same block bank $C0's Sub_1B90 uses)
+!Sfx_Command             = $1E00 ; 1 B: APU command byte for Audio_ProcessEntry (same block bank $C0's Audio_PlayTileSfxA uses)
 !Sfx_Param1              = $1E01 ; 1 B: first APU command parameter (sound id for command $19)
 !Sfx_Param2              = $1E02 ; 1 B: second APU command parameter
 !Pc_CharId               = $2980 ; 3 B per PC slot: character id (0-6) of the PC in that slot; inferred from the
@@ -233,7 +233,7 @@ endstruct
                                  ; submenu while targeting and return to it on cancel (BuildTargetList)
 !BattleTgt_Unk960E       = $960E ; 1 B: cleared on target cancel/commit and battler removal; no reader in bank $C1 yet
 !BattleTgt_Caster        = $960F ; 2 B: battler slot that requested the target list (the active PC)
-!BattleTgt_Result        = $9613 ; 1 B: 0 = a target exists, $80 (negative) = no valid target
+!BattleTgt_Result        = $9613 ; 1 B: 0 = a target exists, negative = no valid target ($80 from the handlers, $FF from BuildTargetList)
 !BattleTgt_Cursor        = $9614 ; 1 B: cursor index into !BattleTgt_Candidates
 !BattleMenu_CmdMenu      = $9615 ; 1 B: menu the pending command comes from (0 attack, 1 tech, 2 item)
 !Battler_Present         = $96F5 ; 11 B per battler slot: non-zero = battler exists
