@@ -11383,13 +11383,18 @@ BitReverseTable:
 
 ; ============================================================
 ; $C0:FE00 — RandomTable (256 bytes, $C0:FE00–$FEFF)
-; The game's pseudo-random bytes: a shuffle of 0-255 (every value appears
-; exactly once; checked against the ROM). Callers keep their own 8-bit
-; counter, step it and read the entry at it: INC $F8 then LDX $F8 /
-; LDA $FE00,X at $C0:AE29 (LDA $F8 / TAX at $C0:A231), and LDX $1B30 /
-; LDA.l $C0FE00,X / INC $1B30 at $C2:2338 (none of these readers is
-; matched yet). Other long reads come from banks $C2, $C3, $CC, $CD and
-; $FD (found by tools/tables.py). The name is inferred from that use.
+; The game's pseudo-random bytes, probably: a shuffle of 0-255 (every
+; value appears exactly once; checked against the ROM). The name is
+; inferred from how most readers use it, stepping a counter of their own
+; and reading the entry at it:
+;   $C0:AE29  INC $F8 / LDX $F8 / LDA $FE00,X  ($C0:A231: LDA $F8 / TAX)
+;   $C0:6D11  LDA $F8 / INC / STA $F8 / TAX / LDA $FE00,X
+;   $C2:2338  LDX $1B30 / LDA.l $C0FE00,X / INC $1B30
+; Other readers index it differently: $C2:8F09 and $C2:B119 read 16-bit
+; words at $C0FE00,X (+2, +4) from an index in $0D00, and $CD:0B19 forms
+; its index with ADC $7C. Further long reads in bank $C3 were found by
+; tools/tables.py; apparent reads in banks $CC and $FD sit in data and
+; are not counted. None of these readers is matched yet.
 ; Follows BitReverseTable directly; the boot code at $C0:FF00
 ; (bank00.asm) comes next.
 ; ============================================================
