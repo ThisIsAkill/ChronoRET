@@ -195,7 +195,7 @@ if !ram_engine_inc == 0
 !Field_MapRedrawDone = $46               ; 8-bit; DefaultHandler stores the redraw step just done
                                          ; (1-4)
 
-; --- OAM shadow build (PostVBlank / Sub_B309) (dp) ---
+; --- OAM shadow build (PostVBlank / Spr_AppendToOam) (dp) ---
 !Oam_Range1PrevEnd = $7B                 ; 16-bit OAM shadow address where range 1 ended last frame;
                                          ; PostVBlank hides entries from the new end up to here
 !Oam_Range2PrevEnd = $7D                 ; 16-bit previous-frame end of range 2 (as
@@ -203,8 +203,8 @@ if !ram_engine_inc == 0
 !Oam_Range3PrevEnd = $7F                 ; 16-bit previous-frame end of range 3 (as
                                          ; Oam_Range1PrevEnd)
 !Oam_Range1HiPtr = $81                   ; 16-bit write pointer into the OAM high-table shadow for
-                                         ; range 1 (starts $0907); Sub_B309 stores one byte per 4
-                                         ; tiles
+                                         ; range 1 (starts $0907); Spr_AppendToOam stores one byte
+                                         ; per 4 tiles
 !Oam_Range1HiUnk = $83                   ; 16-bit; zeroed with Oam_Range1HiPtr each frame
                                          ; (PostVBlank), no other matched use
 !Oam_Range2HiPtr = $85                   ; 16-bit high-table write pointer for range 2 (starts $091A)
@@ -214,8 +214,8 @@ if !ram_engine_inc == 0
 !Oam_Range3HiUnk = $8B                   ; 16-bit; zeroed each frame (PostVBlank), no other matched
                                          ; use
 !Oam_Range1LoPtr = $DB                   ; 16-bit write pointer into the OAM low-table shadow for
-                                         ; range 1 (starts $0770); Sub_B309 aims WMADD here and
-                                         ; advances it 4 bytes per tile
+                                         ; range 1 (starts $0770); Spr_AppendToOam aims WMADD here
+                                         ; and advances it 4 bytes per tile
 !Oam_Range2LoPtr = $DD                   ; 16-bit low-table write pointer for range 2 (starts $08A0)
 !Oam_Range3LoPtr = $DF                   ; 16-bit low-table write pointer for range 3 (starts $0710)
 
@@ -256,6 +256,23 @@ if !ram_engine_inc == 0
 !TileAnim_OriginY = $DD                  ; alias of Oam_Range2LoPtr's slot used as scratch by the
                                          ; tile-animation handlers: copy of Map_TileOriginY
 !Bg_RowWordOfs = $D9                     ; $D9 in Bg_TilemapIndex64x32: row * 32
+
+; --- Sprite build scratch (Spr_AppendToOam .. Spr_Place24) (dp) ---
+!Spr_BaseX = $C3                         ; 16-bit: Obj_ScreenX of the object being built; each tile's
+                                         ; SprTile.OfsX is added to it
+!Spr_BaseY = $C5                         ; 8-bit: low byte of the object's 9-bit Obj_ScreenY; 16-bit
+                                         ; stores also write Spr_BaseYHi
+!Spr_BaseYHi = $C6                       ; 8-bit: bit 8 of Obj_ScreenY; nonzero selects the "below
+                                         ; the screen" Y clamp
+!Spr_TileCount = $C9                     ; 8-bit loop counter: tiles left to copy/clamp
+!Spr_HiBits = $E5                        ; 8-bit: OAM high-table bits being packed, 2 per tile (X bit
+                                         ; 8 of each tile)
+!Spr_HiBitTmp = $E6                      ; 8-bit: one tile's X bit 8 while packing Spr_HiBits
+!Spr_HiBitTmp2 = $E7                     ; 8-bit: another tile's X bit 8 while packing Spr_HiBits
+!Spr_FirstRec = $D9                      ; alias of Eng_Scratch in the sprite builders: the object's
+                                         ; first SprTile record offset (Obj_TileRecOfs)
+!Spr_GroupRec = $E7                      ; alias of Spr_HiBitTmp2 in the 8/12-tile builders: 16-bit
+                                         ; record offset where the current group of 4 tiles starts
 
 ;
 ; Absolute names. Low WRAM ($0000-$1FFF) is given as a 16-bit address
@@ -300,8 +317,8 @@ if !ram_engine_inc == 0
                                          ; sent by Audio_DriverCommand
 !Audio_CmdArg0 = $1E01                   ; 8-bit first command argument (sound-effect id in
                                          ; Audio_PlayTileSfxA)
-!Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (Obj_SfxArg of the leader in
-                                         ; Audio_PlayTileSfxA)
+!Audio_CmdArg1 = $1E02                   ; 8-bit second command argument (low byte of the leader's
+                                         ; Obj_ScreenX in Audio_PlaySfxAtLeader)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by FrameStateInit, no other matched use
 !Party_Members = $7E2980                 ; 3 bytes: character id of each party member
                                          ; (Party_ReinitIfChanged re-inits the character objects when
@@ -353,8 +370,10 @@ if !ram_engine_inc == 0
 !Oam_HighTable = $0900                   ; 32-byte OAM high-table shadow (2 bits per sprite)
 
 ; --- Per-object tables (index = object number x 2, Obj_Cur) ---
-!Obj_SfxArg = $0A00                      ; 8-bit per object; Audio_PlayTileSfxA passes the leader's
-                                         ; value as the second sound-command argument
+!Obj_ScreenX = $0A00                     ; 16-bit per object: screen X of the sprite origin (sprite
+                                         ; builders add each tile's SprTile.OfsX);
+                                         ; Audio_PlaySfxAtLeader passes the leader's low byte as
+                                         ; Audio_CmdArg1, presumably for panning
 !Obj_Unk0C00 = $0C00                     ; 16-bit per object; saved/restored for the party with the
                                          ; positions (Field_SaveState/Party_ReinitIfChanged)
 !Obj_DrawBucket = $0E00                  ; 64 words: first object of each draw bucket (low byte; bit
@@ -371,11 +390,29 @@ if !ram_engine_inc == 0
 !Obj_TileX = $1801                       ; 8-bit high byte of Obj_PosX: tile column
 !Obj_PosY = $1880                        ; 16-bit per object Y position; high byte is the tile row
 !Obj_TileY = $1881                       ; 8-bit high byte of Obj_PosY: tile row
-!Obj_State = $1B00                       ; per-object byte: render state read by Sub_B701 (0 =
-                                         ; inactive, $80 = ready); Obj_ResetStates zeroes it for
+!Obj_State = $1B00                       ; per-object byte: render state read by Spr_PrepareTiles (0
+                                         ; = inactive, $80 = ready); Obj_ResetStates zeroes it for
                                          ; every location object
 !Obj_Unk1C00 = $1C00                     ; 8-bit per object; Evt_RunObjInit sets 7 after the init
                                          ; function
+!Obj_ScreenY = $0A80                     ; 16-bit per object: screen Y of the sprite origin; the
+                                         ; builders use the low 9 bits
+!Obj_OamFlags = $0F80                    ; 8-bit per object; bits 2-3 pick the OAM shadow range (0 =
+                                         ; range 1, bit 2 = range 2, bit 3 = range 3) in
+                                         ; Spr_AppendToOam
+!Obj_SprSize = $1201                     ; 8-bit per object; bits 0-1 = sprite size class: 0/1/2/3 =
+                                         ; 4/8/12/24 tiles (Spr_PrepareTiles, Spr_AppendToOam)
+!Obj_TileRecOfs = $1700                  ; 16-bit per object: offset of its first 8-byte record in
+                                         ; SprTile/SprTileSrc
+!Obj_OamHiA = $7F4F00                    ; 2 bytes per object (bank $7F): packed OAM high-table bytes
+                                         ; for tiles 0-7
+!Obj_OamHiB = $7F4B40                    ; 2 bytes per object (bank $7F): high-table bytes for tiles
+                                         ; 8-15 (24-tile objects)
+!Obj_OamHiC = $7F4F80                    ; 2 bytes per object (bank $7F): high-table bytes for tiles
+                                         ; 16-23 (24-tile objects)
+!Eng_PtrBase = $0000                     ; base 0 for abs,X / abs,Y accesses whose index register
+                                         ; holds the full address (e.g. Spr_AppendToOam storing at
+                                         ; Oam_Range1HiPtr)
 
 ; --- Saved field block (menu round trip) ---
 !Field_SaveBlock = $0920                 ; start of the $14E0-byte WRAM block Field_StashSaveBlock
@@ -415,5 +452,27 @@ struct OamEntry $0000
     .Tile: skip 1        ; tile number (low 8 bits)
     .Attr: skip 1        ; vhppccct attributes
 endstruct align 4
+
+; One tile of an object's sprite as built for OAM (bank $7F, 8-byte records; an object's
+; tiles start at Obj_TileRecOfs). Spr_AppendToOam copies X, Y, Tile, Attr into the OAM shadow.
+struct SprTile $7F4BC0
+    .X: skip 1           ; OAM X (low 8 bits) after adding Spr_BaseX
+    .Y: skip 1           ; OAM Y after adding Spr_BaseY and clamping
+    .OfsX: skip 2        ; 16-bit X offset of the tile from the object origin
+    .OfsY: skip 2        ; Y offset of the tile (low byte used)
+    .Tile: skip 1        ; OAM tile number
+    .Attr: skip 1        ; OAM attributes (vhppccct)
+endstruct align 8
+
+; Source records with the SprTile layout (bank $7F, same Obj_TileRecOfs index); the
+; "init" builders copy OfsX/OfsY/Tile/Attr from here into SprTile.
+struct SprTileSrc $7F4800
+    .X: skip 1           ; OAM X (low 8 bits) after adding Spr_BaseX
+    .Y: skip 1           ; OAM Y after adding Spr_BaseY and clamping
+    .OfsX: skip 2        ; 16-bit X offset of the tile from the object origin
+    .OfsY: skip 2        ; Y offset of the tile (low byte used)
+    .Tile: skip 1        ; OAM tile number
+    .Attr: skip 1        ; OAM attributes (vhppccct)
+endstruct align 8
 
 endif

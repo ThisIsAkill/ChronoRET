@@ -59,7 +59,6 @@ if !constants_engine_inc == 0
 !Oam_Range1HiStart = $0907               ; high-table byte for entries 28-31 (range 1 start)
 !Oam_Range2HiStart = $091A               ; high-table byte for entries 104-107 (range 2 start)
 !Oam_Range3HiStart = $0901               ; high-table byte for entries 4-7 (range 3 start)
-!Oam_HiddenY = $E0                       ; sprite Y that parks an entry below the visible screen
 !Obj_DrawBucketLast = $007E              ; offset of the last Obj_DrawBucket word (64 buckets x 2)
 
 ; --- Object / party slots ---
@@ -142,5 +141,25 @@ if !constants_engine_inc == 0
                                          ; before the battle (DefaultHandler)
 !DP_Map = $1D00                          ; direct page of the map/BG routines (Field_BuildC800*,
                                          ; Field_FrameUpdate)
+
+; --- Sprite build ---
+!ObjState_Ready = $80                    ; Obj_State value once the object's SprTile records are
+                                         ; built
+!ObjState_CountMask = $7F                ; Obj_State bits 0-6 (a count compared against 2 or 3 by
+                                         ; Spr_PrepareTiles)
+!ObjSpr_SizeMask = $03                   ; Obj_SprSize bits 0-1: size class
+!ObjOam_RangeMask = $0C                  ; Obj_OamFlags bits 2-3: OAM shadow range
+!ObjOam_Range2 = $04                     ; Obj_OamFlags bit 2: range 2 (bit 3 alone = range 3)
+!SprTile_Stride = $0008                  ; bytes per SprTile / SprTileSrc record
+!Spr_Size0Tiles = $04                    ; tiles in a size-0 object
+!Spr_Size1Tiles = $08                    ; tiles in a size-1 object
+!Spr_Size2Tiles = $0C                    ; tiles in a size-2 object
+!Spr_Size3Tiles = $18                    ; tiles in a size-3 object
+!Oam_EntrySize = $04                     ; bytes per OAM low-table entry
+!Spr_YMask9 = $01FF                      ; low 9 bits of Obj_ScreenY
+!Oam_HiLarge4 = $AA                      ; OAM high-table byte with the size bit set for all 4
+                                         ; sprites
+!Oam_HiddenY = $E0                       ; sprite Y that parks an entry below the visible screen
+                                         ; (also the Y clamp limit)
 
 endif

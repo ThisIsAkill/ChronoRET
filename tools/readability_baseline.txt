@@ -4,16 +4,6 @@
 asm/bankC0/bankC0.asm:Field_ProcessAnimQueue
 asm/bankC0/bankC0.asm:Obj_AnimTickAndQueue
 asm/bankC0/bankC0.asm:Obj_BuildSpriteFrameStep
-asm/bankC0/bankC0.asm:Sub_B309
-asm/bankC0/bankC0.asm:Sub_B701
-asm/bankC0/bankC0.asm:Sub_B788
-asm/bankC0/bankC0.asm:Sub_B8CA
-asm/bankC0/bankC0.asm:Sub_BA65
-asm/bankC0/bankC0.asm:Sub_BCDC
-asm/bankC0/bankC0.asm:Sub_BFF2
-asm/bankC0/bankC0.asm:Sub_C2BF
-asm/bankC0/bankC0.asm:Sub_C6E7
-asm/bankC0/bankC0.asm:Sub_C73A
 asm/bankC0/bankC0.asm:Sub_CB0A
 asm/bankC0/bankC0.asm:Sub_CB3A
 asm/bankC0/bankC0.asm:Sub_CBDC
