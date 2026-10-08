@@ -74,6 +74,7 @@ if !ram_battle_inc == 0
                                  ; through $C1:0000/$C1:001B; it saves every register, inferred: the battle NMI)
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
+                                 ; Battle_PoseStep, which steps only when it finds 1 (every second frame); purpose unknown
 !Battle_UnkEC            = $EC   ; 1 B: set when the single target cursor's OAM y is below $2D, cleared at $9C or above
                                  ;      (UpdateCursorOverlay, only right after the target moved); purpose unknown
 !Battle_PadEdgeButtons   = $EE   ; 1 B: buttons pressed this frame (bit 7 confirm, 6 alt-confirm, 5/4 page, 3 cancel);
@@ -207,6 +208,15 @@ endstruct
                                  ; bit 6 = blocks a battler box, bit 7 = blocks it unless !Battle_PassCellBit7 is
                                  ; set (Battle_BoxHitsBlockedCell). Who fills it is not traced
 
+!Pc_PoseTimer            = $5DBD ; 1 B per PC: pose steps until the next entry (Battle_PoseStep); also written by the
+                                 ; unmatched code at $C1:4471, $C1:457A and others
+!Pc_PoseEntry            = $5DC1 ; 1 B per PC: current entry 0-7 of its pose list ($FF = before the first)
+!Battle_PoseSlot         = $5DC5 ; 2 B: PC slot Battle_PoseStep is on (zeroed 16-bit, counted 8-bit)
+!Battle_PoseFramesLeft   = $5DC9 ; 1 B: frames left in Battle_RunPcPose's loop
+!Battle_PoseUnk5DDD      = $5DDD ; 1 B: 1 for the battle-start pose, 0 for services 8/9; Battle_PoseStep tests it with no
+                                 ; effect (both branches meet)
+!Battle_PoseIncludeKo    = $5DDE ; 1 B: non-zero = Battle_PoseStep also animates KO'd PCs (service 9 only)
+!Pc_PoseListOfs          = $5DF1 ; 2 B per PC: animation * 4, offset of the PC's pose list in its bank $E4 lists
 !Enemy_AnimWanted        = $5E0D ; 1 B per enemy (0-7): animation it should show; Battle_TickEnemyGroup reloads the lists
                                  ; when it differs from !Enemy_Anim. Lies in the first $30 bytes of BattlerStats[0],
                                  ; which the struct leaves unnamed; written by unmatched code ($C1:3793, $C1:8806, ...)
@@ -237,6 +247,9 @@ struct BattleCmd $93EE
 .ActionId:  skip 1      ; +6: tech id or item id (left stale for attack)
 endstruct
 
+!Pc_PoseTicks            = $922D ; 8 B per PC (24 B): pose steps per entry, halved durations (Battle_RunPcPose); the
+                                 ; unmatched code at $C1:5AE8-$C1:5C9A and $CF:EEC3 also use $922D, purpose there unknown
+!Pc_PoseFrames           = $9245 ; 8 B per PC: frame id per pose entry (Battle_RunPcPose)
 !Pc_NameTiles            = $9412 ; 10 B per PC slot (offset from BattleRom_PcNameOffset): 5 lower-row then 5 upper-row name tiles
 !BattleMsg_NumValue      = $9499 ; 2 B: value to format (BattleMsg_FormatNumberDigits / BattleMsg_FormatTwoDigits)
 !BattleMsg_Digit1000     = $949C ; 1 B: thousands digit tile (always blank, $FF)
@@ -328,6 +341,8 @@ endstruct
 !Battle_PassCellBit7     = $9875 ; 1 B: non-zero = !Battle_CellMap bit 7 does not block (Battle_BoxHitsBlockedCell);
                                  ; zeroed before each check, set to 1 by the mover at $C1:3877 when $A2B5 is 3
 !BattlePos_DistLimit     = $9893 ; 2 B: squared-distance limit of the BattlePos_WithinDist* checks (set by each entry)
+!Enemy_Unk98A7           = $98A7 ; 1 B per enemy: cleared by BattleSys_VictoryPose; written by the unmatched enemy code
+                                 ; from $C1:384C on and read at $CF:F97F; meaning unknown
 !Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
 !Battler_FrameShown      = $9907 ; 1 B per battler slot: frame number last decoded (Battle_DrawBattlerFrame skips a repeat)
 !Battle_FramesDecoded    = $9912 ; 1 B: frames decoded this pass; zeroed by Battle_TickPcSlots, and callers defer a battler
@@ -418,6 +433,8 @@ endstruct
 !Pc_SavedTech            = $A0D8 ; 3 B per PC: tech id under the cursor at commit (with CfgListMemory)
 !BattleMenu_CfgInfoPanel = $A0DB ; 1 B: config: bit 7 = show the tech/item info panel (battle init $CC:E3AC copies $2990 bit 7)
 !Battle_UnkA0FD          = $A0FD ; 1 B: zeroed by BattleSys_UpkeepTwoFrames unless !Battle_UnkA10E is set; purpose unknown
+!Battle_UnkA0FE          = $A0FE ; 1 B: incremented by services 8 and 9 (the end-of-battle poses); read at $CF:EDC5;
+                                 ; meaning unknown
 !Battle_UnkA0FF          = $A0FF ; 2 B: index into !Battle_Unk1C48; purpose unknown
 !Battle_StatusAnimWraps  = $A102 ; 1 B: counts Battle_PickNextStatusAnim's wraps past slot 10 ($C1:4124 zeroes it and
                                  ; waits for 1)

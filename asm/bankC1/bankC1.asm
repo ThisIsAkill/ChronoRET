@@ -22,10 +22,11 @@ incsrc "../hardware.inc"
 ; inferred from that handler (it saves every register and zeroes $9E
 ; first); what the $CD0036 callee does meanwhile is not analysed.
 ; Callers (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
-; instructions discarded): BattleSys_UpkeepTwoFrames (twice) and the
-; unmatched code at $C1:3554, $C1:358E, $C1:3596, $C1:359E, $C1:3686,
-; $C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
-; $C1:41B7, $C1:4841, $C1:485B, $C1:4864, $C1:488D, $C1:4943.
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
+; BattleSys_DefeatPose, BattleSys_VictoryPose (three times),
+; Battle_RunPcPose, and the unmatched code at $C1:405F, $C1:40A0,
+; $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4, $C1:41B7, $C1:4841,
+; $C1:485B, $C1:4864, $C1:488D, $C1:4943.
 ; Entry: M=1 (8-bit INC/LDA of the flag), X any, DP=0, DB=$7E (as at
 ;        every caller; the routine itself only touches direct page)
 ; Exit:  M=1, DP=0; A = 0; X, Y, DB as the $CD0036 callee leaves them
@@ -2173,9 +2174,8 @@ BattleMenu_BlankNameTailCells:
 ;   1 → BattleMenu_UpdateTechMpAvail + BattleMenu_UpdateTechWindow
 ;   other → BattleMenu_UpdateWindows_Exit → BattleMenu_Return (RTS)
 ; Callers (4 JSRs, checked in the ROM): BattleMenu_RefreshIfDirtyL,
-;   BattleMenu_RefreshIfDirtyAndTick, $C1:10D1 (the not yet matched routine
-;   at $C1:106E, behind the same !BattleMenu_Dirty gate) and $C1:35A6 (not
-;   yet matched).
+;   BattleMenu_RefreshIfDirtyAndTick, BattleSys_UpkeepTwoFrames (behind
+;   the same !BattleMenu_Dirty gate) and BattleSys_VictoryPose.
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered, plus the DP scratch of
 ;        whichever window routine ran (see their headers) and whatever
@@ -3010,9 +3010,10 @@ BattleMenu_LoadCommandWindowMap:
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_FrameSlot and !Battle_FrameId set
 ; Exit:  see Battle_DrawBattlerFrameAnyLayout (layout 3: M=1, X=0, DP=0,
 ;        DB=$7E, X = slot, A = 3, nothing written)
-; Callers: JSR from Battle_TickPcSlots ($C1:2F10), $C1:345D, $C1:3702, $C1:416A, $C1:418B,
-;          $C1:41AC and $C1:4307 (searched: every JSR $1C4A in bank $C1;
-;          no JMP or JSL reaches it)
+; Callers: JSR from Battle_TickPcSlots, Battle_TickEnemyGroup,
+;          Battle_PoseStep, $C1:416A, $C1:418B, $C1:41AC and $C1:4307
+;          (searched: every JSR $1C4A in bank $C1; no JMP or JSL
+;          reaches it)
 org $C11C4A
 Battle_DrawBattlerFrame:
     LDX.w !Battle_FrameSlot
@@ -3049,7 +3050,7 @@ Battle_DrawBattlerFrame:
 ;        $80-$85, $88-$89, $8C-$8D, $A5, $A7-$B0 (partly the multiply
 ;        helpers') and $BA-$BE written.
 ;        An unchanged frame returns early with X = slot and A = FrameId.
-; Callers: JSR from $C1:34C0 (a loop over all 11 slots), and the fall-in
+; Callers: JSR from Battle_DrawAllBattlerFrames (all 11 slots), and the fall-in
 ;          from Battle_DrawBattlerFrame (searched: no other JSR, JMP or JSL
 ;          reaches $1C55)
 ; Callees: Battle_Mul8x16, Battle_Mul8
@@ -7228,7 +7229,7 @@ Battle_ApplyPendingEffect:
 ; colour cycle.
 ; Callers (JSR; scanned as above): Battle_FxHandlerTable entry 0, the
 ; handlers Battle_FxOverlay2Tint/3/4/5/6/7 and Battle_FxColourCycle, and
-; the unmatched service 8 at $C1:3582.
+; BattleSys_VictoryPose.
 ; The ×16 shift runs on an 8-bit A; the TAY also copies B, assumed 0.
 Battle_FxReset:
     LDX.b !Battle_TickSlot
@@ -7857,6 +7858,416 @@ Battle_DrawAllBattlerFrames:
     STA.w !Pc_AnimTimer+1
     INC A
     STA.w !Pc_AnimTimer+2
+    RTS
+
+; ==================================================================
+; PC poses: battle start, services 8 and 9 ($C1:34DB–$C1:3713)
+; ==================================================================
+; A pose plays one animation list on all three PCs for 64 frames
+; (Battle_RunPcPose). Each PC's list is chosen by !Pc_PoseListOfs, an
+; offset (animation * 4) into its lists in bank $E4, the same layout
+; Battle_TickPcSlots steps through.
+
+; ==================================================================
+; Battle_StartPose ($C134DB–$C1350E, 52 bytes)
+; ==================================================================
+; The last step of the battle set-up (service 0, which JMPs here): turns
+; every PC toward its nearest enemy, then plays animation $0C on the
+; targetable PCs (animation 0 on the others) through Battle_RunPcPose,
+; with !Battle_PoseUnk5DDD set and KO'd PCs left out. That this is the
+; PCs' entry into battle is inferred from where it runs.
+; Callers (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
+; inside other instructions discarded): service 0 at $C1:0042 only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  as Battle_RunPcPose
+; Callees: Battle_FaceAllPcsNearestEnemy, Battle_RunPcPose (JMP)
+Battle_StartPose:
+    JSR Battle_FaceAllPcsNearestEnemy
+    LDX.w #!Battle_LastPcSlot
+    LDY.w #!Battle_LastPcSlot*2
+.slot:
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+    BRA .next
+.targetable:
+    LDA.b #!Battle_AnimUnk0C*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+.next:
+    DEY
+    DEY
+    DEX
+    BPL .slot
+    LDA.b #1
+    STA.w !Battle_PoseUnk5DDD
+    STZ.w !Battle_PoseIncludeKo
+    JMP Battle_RunPcPose
+
+; ==================================================================
+; Battle_FaceAllPcsNearestEnemy ($C1350F–$C1354C, 62 bytes)
+; ==================================================================
+; Sets !Battler_Facing of PCs 2, 1, 0 from the angle to each one's
+; nearest enemy (position query 2 through service 5, as in
+; Battle_UpdatePcFacing, but for every PC at once and without the
+; presence, KO, Status2 and turn checks, and without updating
+; !Pc_FacingTarget). The query mode is set once; the value 2 also serves
+; as the first PC slot of the loop. Assumes the query leaves
+; !BattlePos_Mode alone (it is not written by BattlePos_Query).
+; Callers (JSR; scanned as above): Battle_StartPose only.
+; Entry: M=1, X=0, DP=0, DB=$7E; the TAX of the found enemy and of the
+;        angle also copy B, assumed 0
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_TickSlot =
+;        low byte $FF, and the query's and Battle_CalcAngle's
+;        scratch written
+; Callees: BattleSys_RunService (service 5), Battle_CalcAngle
+Battle_FaceAllPcsNearestEnemy:
+    LDA.b #!BattlePos_QueryNearestEnemy
+    STA.w !BattlePos_Mode
+    TAX                             ; 2: also the last PC slot
+    STX.b !Battle_TickSlot
+.slot:
+    LDA.b !Battle_TickSlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunService
+    LDX.b !Battle_TickSlot
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoOriginX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoOriginY
+    LDA.w !BattlePos_Found
+    TAX
+    LDA.w !Battler_ScreenX,X
+    STA.b !Battle_GeoPointX
+    LDA.w !Battler_ScreenY,X
+    STA.b !Battle_GeoPointY
+    JSR Battle_CalcAngle
+    TAX
+    LDA.l !BattleRom_FacingByAngle,X
+    LDX.b !Battle_TickSlot
+    STA.w !Battler_Facing,X
+    DEC.b !Battle_TickSlot
+    BPL .slot
+    RTS
+
+; ==================================================================
+; BattleSys_DefeatPose ($C1354D–$C1356C, 32 bytes)
+; ==================================================================
+; Service 9 of the cross-bank $C10045 service API (dispatch table at
+; $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D directly).
+; Ticks the frame service, counts !Battle_UnkA0FE up, waits a frame and
+; plays animation 8 on all three PCs, KO'd ones included
+; (!Battle_PoseIncludeKo). Animation 8 is the one BattleRom_StatusAnim
+; gives a KO'd battler; the "defeat" reading is inferred from that and
+; from the caller (the unmatched code at $C1:815F, which first runs
+; service 3 eight times with !Battle_UnkA10E set).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher, which saves A,
+;        X and Y around the call)
+; Exit:  as Battle_RunPcPose
+; Callees: BattleSys_FrameTickVec, BattleSys_PumpFrames,
+;          Battle_RunPcPose (BRA)
+BattleSys_DefeatPose:
+    JSL BattleSys_FrameTickVec
+    INC.w !Battle_UnkA0FE
+    JSR BattleSys_PumpFrames
+    LDX.w #!Battle_AnimDown*4
+    STX.w !Pc_PoseListOfs           ; all three PCs
+    STX.w !Pc_PoseListOfs+2
+    STX.w !Pc_PoseListOfs+4
+    STZ.w !Battle_PoseUnk5DDD
+    LDA.b #1
+    STA.w !Battle_PoseIncludeKo
+    BRA Battle_RunPcPose
+
+; ==================================================================
+; BattleSys_VictoryPose ($C1356D–$C135DC, 112 bytes)
+; ==================================================================
+; Service 8 of the cross-bank $C10045 service API (dispatch table at
+; $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D directly).
+; Ticks the frame service, counts !Battle_UnkA0FE up, clears
+; !Enemy_Unk98A7, stops the PCs' status effects (Battle_FxReset), takes
+; the three PCs out of the ready queue one per frame, closes the menu
+; (!BattleMenu_ActivePc = none, BattleMenu_UpdateWindows), and then,
+; unless !Battle_Unk2989 bit 0 is set, plays animation $0A on the
+; targetable PCs (0 on the others; KO'd PCs left out), falling into
+; Battle_RunPcPose. The "victory" reading is inferred from the caller
+; (the unmatched code at $C1:8186 runs it when all 8 bytes at $AF02 are
+; $FF, presumably no enemy left).
+; Entry: M=1, X=0, DP=0, DB=$7E (through the dispatcher)
+; Exit:  as Battle_RunPcPose, or after the menu update when bit 0 of
+;        !Battle_Unk2989 is set
+; Callees: BattleSys_FrameTickVec, Battle_FxReset,
+;          BattleMenu_RemoveBattlerFromReady, BattleSys_PumpFrames,
+;          BattleMenu_UpdateWindows, Battle_RunPcPose (falls through)
+BattleSys_VictoryPose:
+    JSL BattleSys_FrameTickVec
+    INC.w !Battle_UnkA0FE
+    LDX.w #!Battle_LastSlot-!Battle_FirstEnemySlot
+.clear:
+    STZ.w !Enemy_Unk98A7,X
+    DEX
+    BPL .clear
+    LDX.w #!Battle_LastPcSlot
+    STX.b !Battle_TickSlot
+.reset_fx:
+    JSR Battle_FxReset
+    DEC.b !Battle_TickSlot
+    BPL .reset_fx
+    STZ.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    INC.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    INC.b !Battle_ArgSlot
+    JSR BattleMenu_RemoveBattlerFromReady
+    JSR BattleSys_PumpFrames
+    LDA.b #!BattleMenu_NoSlot
+    STA.w !BattleMenu_ActivePc
+    JSR BattleMenu_UpdateWindows
+    LDA.w !Battle_Unk2989
+    AND.b #!Battle_Unk2989NoEndPose
+    BEQ .pose
+    RTS
+.pose:
+    LDX.w #!Battle_LastPcSlot
+    LDY.w #!Battle_LastPcSlot*2
+.slot:
+    LDA.w !Battler_Untargetable,X
+    BEQ .targetable
+    LDA.b #!Battle_AnimUntargetable*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+    BRA .next
+.targetable:
+    LDA.b #!Battle_AnimUnk0A*4
+    STA.w !Pc_PoseListOfs,Y
+    LDA.b #0
+    STA.w !Pc_PoseListOfs+1,Y
+.next:
+    DEY
+    DEY
+    DEX
+    BPL .slot
+    STZ.w !Battle_PoseUnk5DDD
+    STZ.w !Battle_PoseIncludeKo
+    ; falls through into Battle_RunPcPose
+
+; ==================================================================
+; Battle_RunPcPose ($C135DD–$C13699, 189 bytes)
+; ==================================================================
+; Copies, for each present PC, the first 8 entries of its pose list into
+; !Pc_PoseTicks (durations, halved) and !Pc_PoseFrames (frame ids, for
+; its current facing): the lists come from bank $E4 at
+; !Battler_AnimDurBase / !Battler_AnimFrameBase + !Pc_PoseListOfs (+
+; Facing * FacingStride for the frame ids), as in Battle_TickPcSlots.
+; Then starts the PCs on entry 0 with timers 1, 2 and 3 and runs 64
+; frames: wait (BattleSys_PumpFrames), frame service tick, and
+; Battle_PoseStep, which advances the poses every second call.
+; !Battle_UnkE5 and !Battle_UnkA4 are cleared before and after.
+; Durations are halved here (LSR) where Battle_TickPcSlots divides by 5;
+; the tick buffer is cleared (24 bytes), the frame buffer is not.
+; Callers: Battle_StartPose (JMP), BattleSys_DefeatPose (BRA),
+; BattleSys_VictoryPose (falls through); scanned as above, no other.
+; Entry: M=1, X=0, DP=0, DB=$7E; !Pc_PoseListOfs, !Battle_PoseUnk5DDD,
+;        !Battle_PoseIncludeKo
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$85 and the
+;        callees' scratch written
+; Callees: Battle_Mul8x16, BattleSys_PumpFrames, BattleSys_FrameTickVec,
+;          Battle_PoseStep
+!Battle_PoseSetupSlot = !BattleTmp_80     ; 2 B: PC slot whose lists are copied (zeroed 16-bit, counted 8-bit)
+!Battle_PoseCopyLeft = !BattleTmp_82      ; 1 B: entries left to copy
+!Battle_PoseDest = !BattleTmp_84          ; 2 B: slot * 8, its block in !Pc_PoseTicks/Frames
+Battle_RunPcPose:
+    LDX.w #!Battle_PoseTicksLast
+.clear:
+    STZ.w !Pc_PoseTicks,X
+    DEX
+    BPL .clear
+    INX
+    STX.b !Battle_PoseSetupSlot
+.slot:
+    LDX.b !Battle_PoseSetupSlot
+    LDA.w !Battler_Present,X
+    BEQ .next
+    LDA.w !Battler_Facing,X
+    STA.b !Battle_MulFactor8
+    LDA.w !Battler_FacingStrideLo,X
+    STA.b !Battle_MulFactor16
+    LDA.w !Battler_FacingStrideHi,X
+    STA.b !Battle_MulFactor16+1
+    JSR Battle_Mul8x16
+    REP #$20                        ; A -> 16-bit
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Battle_PoseDest          ; slot * 8
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    CLC
+    ADC.b !Battle_PoseSetupSlot
+    TAX                             ; slot * 3
+    LDA.b !Battle_PoseSetupSlot
+    ASL A
+    TAY                             ; slot * 2
+    CLC
+    LDA.w !Pc_PoseListOfs,Y
+    ADC.w !Battler_AnimDurBase,X
+    STA.w !Battle_AnimDurList
+    CLC
+    LDA.w !Pc_PoseListOfs,Y
+    ADC.w !Battler_AnimFrameBase,X
+    CLC
+    ADC.b !Battle_MulProduct        ; + Facing * FacingStride
+    STA.w !Battle_AnimFrameList
+    TDC
+    SEP #$20                        ; A -> 8-bit
+    LDY.b !Battle_PoseDest
+    LDX.w !Battle_AnimDurList
+    LDA.b #!Battle_PoseListLen
+    STA.b !Battle_PoseCopyLeft
+.copy_ticks:
+    LDA.l !BattleRom_AnimData,X
+    LSR A                           ; duration / 2
+    STA.w !Pc_PoseTicks,Y
+    INY
+    INX
+    DEC.b !Battle_PoseCopyLeft
+    BNE .copy_ticks
+    LDA.b #!Battle_PoseListLen
+    STA.b !Battle_PoseCopyLeft
+    LDX.w !Battle_AnimFrameList
+    LDY.b !Battle_PoseDest
+.copy_frames:
+    LDA.l !BattleRom_AnimData,X
+    STA.w !Pc_PoseFrames,Y
+    INY
+    INX
+    DEC.b !Battle_PoseCopyLeft
+    BNE .copy_frames
+.next:
+    INC.b !Battle_PoseSetupSlot
+    LDA.b !Battle_PoseSetupSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .slot
+    LDA.b #1
+    STA.w !Pc_PoseTimer             ; timers 1, 2, 3
+    INC A
+    STA.w !Pc_PoseTimer+1
+    INC A
+    STA.w !Pc_PoseTimer+2
+    LDA.b #!Battle_PoseEntryStart
+    STA.w !Pc_PoseEntry             ; the first step makes it 0
+    STA.w !Pc_PoseEntry+1
+    STA.w !Pc_PoseEntry+2
+    STZ.b !Battle_UnkE5
+    STZ.b !Battle_UnkA4
+    LDA.b #!Battle_PoseFrames
+    STA.w !Battle_PoseFramesLeft
+.frame:
+    JSR BattleSys_PumpFrames
+    JSL BattleSys_FrameTickVec
+    JSR Battle_PoseStep
+    DEC.w !Battle_PoseFramesLeft
+    BNE .frame
+    STZ.b !Battle_UnkE5
+    STZ.b !Battle_UnkA4
+    RTS
+
+; ==================================================================
+; Battle_PoseStep ($C1369A–$C13713, 122 bytes)
+; ==================================================================
+; One pose step, run on every second call: !Battle_UnkE5 flips between
+; 0 (set it, return) and 1 (clear it, step). A step sets !Battle_UnkA4
+; to 1 for its duration and, for PCs 0-2: skips a KO'd PC unless
+; !Battle_PoseIncludeKo is set (the BattlerStats offset comes from
+; BattleFx_SetPtrA2FromTable), skips an absent one, counts down
+; !Pc_PoseTimer, and at 0 moves !Pc_PoseEntry on and reloads the timer
+; from !Pc_PoseTicks; a non-zero tick count draws the entry's frame
+; (Battle_DrawBattlerFrame). Entry 8 or a 0 tick count ends the pose:
+; the timer stays 0, so the next count-down wraps it to 255 steps, longer
+; than the 64-frame run.
+; Quirk: at a 0 tick count it tests !Battle_PoseUnk5DDD, but both
+; outcomes go to the next PC, so the flag has no effect here (kept as
+; found; the code may once have done something for the battle-start
+; pose, which sets it).
+; Why !Battle_UnkA4 is set during the step is not known; Battle_TickPcSlots
+; would tick enemy group 1 if it ran meanwhile.
+; Callers (JSR; scanned as above): Battle_RunPcPose only.
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80 and $A2-$A3
+;        written, plus the decoder's scratch
+; Callees: BattleFx_SetPtrA2FromTable, Battle_DrawBattlerFrame
+!Battle_PoseStatsOffset = !BattleTmp_A2   ; 2 B: BattlerStats offset left by BattleFx_SetPtrA2FromTable (inferred)
+!Battle_PoseEntryIdx = !BattleTmp_80      ; 1 B: the PC's new !Pc_PoseEntry
+Battle_PoseStep:
+    LDA.b !Battle_UnkE5
+    BNE .step
+    INC.b !Battle_UnkE5
+    RTS
+.step:
+    STZ.b !Battle_UnkE5
+    LDA.b #1
+    STA.b !Battle_UnkA4
+    TDC
+    TAX
+    STX.w !Battle_PoseSlot
+.slot:
+    LDA.w !Battle_PoseIncludeKo
+    BNE .alive
+    LDA.w !Battle_PoseSlot
+    JSL BattleFx_SetPtrA2FromTable
+    LDX.b !Battle_PoseStatsOffset
+    LDA.w BattlerStats.Status,X
+    BMI .next                       ; KO'd
+.alive:
+    LDX.w !Battle_PoseSlot
+    LDA.w !Battler_Present,X
+    BEQ .next
+    DEC.w !Pc_PoseTimer,X
+    BNE .next
+    INC.w !Pc_PoseEntry,X
+    LDA.w !Pc_PoseEntry,X
+    CMP.b #!Battle_PoseListLen
+    BNE .entry
+.stop:
+    BRA .next                       ; past the last entry
+.entry:
+    LDA.w !Pc_PoseEntry,X
+    STA.b !Battle_PoseEntryIdx
+    LDA.w !Battle_PoseSlot
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !Battle_PoseEntryIdx
+    TAY                             ; slot * 8 + entry
+    LDA.w !Pc_PoseTicks,Y
+    STA.w !Pc_PoseTimer,X
+    BNE .draw
+    LDA.w !Battle_PoseUnk5DDD
+    BEQ .stop                       ; quirk: both ways lead to .next
+    BRA .next
+.draw:
+    LDA.w !Battle_PoseSlot
+    STA.w !Battle_FrameSlot
+    LDA.w !Pc_PoseFrames,Y
+    STA.w !Battle_FrameId
+    JSR Battle_DrawBattlerFrame
+.next:
+    INC.w !Battle_PoseSlot
+    LDA.w !Battle_PoseSlot
+    CMP.b #!Battle_NumPcSlots
+    BNE .slot
+    STZ.b !Battle_UnkA4
+    STZ.b !Battle_UnkE5
     RTS
 
 ; ==================================================================
