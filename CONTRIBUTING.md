@@ -77,22 +77,19 @@ includes the one before:
   `make xref` output; a reviewer then only judges whether the header is right, not whether it
   is complete.
 
-**Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
-by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
-revision, so no routine is ever judged by a rule its own author just wrote.
-
-## Workflow
-
-The core loop is in README.md, "Workflow". Data tables next to matched code (jump tables,
+- Data tables next to matched code (jump tables,
 pointer tables, lookup tables) are the cheapest bytes to match:
-
-- `make tables-scan BANK=C1` ranks candidate tables in the bank's unmatched bytes, with the
+  - `make tables-scan BANK=C1` ranks candidate tables in the bank's unmatched bytes, with the
   instruction that reads each one (`JSR (T,X)` at ...) and a confidence.
 - `python3 tools/tables.py emit '$C1:1FF8' --count 33 --kind words` prints a table as source:
   header, then `dw`/`dl`/`db` lines whose pointers use existing label names (`; TODO name` where
   the target has none). `--kind bytes` and `--kind records:SIZE` give aligned hex rows.
 - The draft still needs what any routine needs: a real header (what it holds, how it is
   indexed), names for its targets, and `make gate`.
+
+**Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
+by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
+revision, so no routine is ever judged by a rule its own author just wrote.
 
 ## Getting started
 
