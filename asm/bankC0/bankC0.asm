@@ -5083,11 +5083,11 @@ InitHW:
 ; ============================================================
 InstallNMI:
     LDA.b #!Op_JML          ; JML opcode
-    STA.w !NmiTrampolineOp
+    STA.w !NmiTrampoline
     LDX.w #NmiHandler       ; low 16 bits of the target
-    STX.w !NmiTrampolineAddr
+    STX.w !NmiTrampoline+1
     LDA.b #bank(NmiHandler) ; bank byte
-    STA.w !NmiTrampolineBank
+    STA.w !NmiTrampoline+3
     RTS
 
 ; ============================================================
@@ -5096,11 +5096,11 @@ InstallNMI:
 ; ============================================================
 InstallIRQ:
     LDA.b #!Op_JML
-    STA.w !IrqTrampolineOp
+    STA.w !IrqTrampoline
     LDX.w #IrqHandler
-    STX.w !IrqTrampolineAddr
+    STX.w !IrqTrampoline+1
     LDA.b #bank(IrqHandler)
-    STA.w !IrqTrampolineBank
+    STA.w !IrqTrampoline+3
     RTS
 
 ; ============================================================

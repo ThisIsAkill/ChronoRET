@@ -17,12 +17,15 @@ if !constants_engine_inc == 0
 
 ; --- Banks and direct-page bases ---
 !Bank7E = $7E                            ; WRAM bank $7E (PHA/PLB, DmaFill_Bank)
-!Bank7F = $7F                            ; WRAM bank $7F (PHA/PLB, DmaFill_Bank, Obj_GfxBank for
-                                         ; graphics already in WRAM)
-
-; --- Banks ---
 !Bank00 = $00                            ; bank $00 (MVN bank operand for the low-WRAM mirror)
 !BankE4 = $E4                            ; ROM bank $E4 (bank byte of the Field_E4Ptr pointers)
+!DP_Map = $1D00                          ; direct page of the map/BG routines (Field_BuildC800*,
+                                         ; Field_FrameUpdate)
+!DP_SprBufPage = $0B00                   ; direct page SprBuf_FreeAll points at to reach SprBuf_Owner
+                                         ; with dp stores
+!BankD2 = $D2                            ; ROM bank $D2 (object tile graphics)
+!Bank7F = $7F                            ; WRAM bank $7F (PHA/PLB, DmaFill_Bank, Obj_GfxBank for
+                                         ; graphics already in WRAM)
 
 ; --- Boot WRAM clear (GameLoop) ---
 !Boot_ClearLowSize = $0500               ; bytes cleared from $7E:0000 (stops before the interrupt
@@ -65,6 +68,9 @@ if !constants_engine_inc == 0
 ; --- Object / party slots ---
 !Obj_None = $80                          ; empty object-slot marker (bit 7 set) in Party_ObjSlot,
                                          ; Chr_ObjSlot and similar
+!Obj_Unk1C00Init = $07                   ; value Evt_RunObjInit stores in Obj_Unk1C00 after the init
+                                         ; function
+!ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
 
 ; --- Field defaults (FrameStateInit) ---
 !Fade_FixedColorInit = $E0               ; Fade_FixedColor at load: all colour channels, intensity 0
@@ -86,49 +92,9 @@ if !constants_engine_inc == 0
 !Field_ExitArgXMask = $003F              ; Field_ExitMenuArg bits 5-0 (handed over in X)
 !Eng_Unk7F0000Min = $49                  ; Field_FadeToBankC2Mode5 runs only when Eng_Unk7F0000 >=
                                          ; this
-!Pad_Start = $01                         ; Pad_Pressed bit 0: Start
-!Pad_HiDown = $04                        ; high byte of Pad_Pressed, bit 2: Down
-!Pad_HiUp = $08                          ; high byte of Pad_Pressed, bit 3: Up
 !ExitMenu_Mode5 = $05                    ; BankC2_Entry8000 argument used by Field_RunBankC2Mode5
 !ExitMenu_Mode6 = $06                    ; BankC2_Entry8000 argument when Field_ExitMenuArg bit 0 is
                                          ; clear
-
-; --- Audio ---
-!Audio_CmdPlaySfx = $19                  ; Audio_CmdId: play the sound effect in Audio_CmdArg0
-
-; --- Generic ---
-!Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
-
-; --- Tile animation modes (Field_SceneChangeTick dispatch on Map_TileProps) ---
-!TileAnim_ModeE6 = $E6                   ; mode handled by ModeE6_Handler
-!TileAnim_ModeEC = $EC                   ; mode handled by ModeEC_Handler
-!TileAnim_ModeEE = $EE                   ; mode handled by ModeEE_Handler
-!TileAnim_ModeFA = $FA                   ; mode handled by ModeFA_Handler
-!TileAnim_ModeFC = $FC                   ; mode handled by ModeFC_Handler
-!Obj_Unk1C00Init = $07                   ; value Evt_RunObjInit stores in Obj_Unk1C00 after the init
-                                         ; function
-
-; --- Pad ---
-!Pad_Unk00F8Bit7 = $80                   ; Pad_Unk00F8 bit 7 (Sub_1ADF sets Field_Unk62 = 3 on it)
-!Pad_Unk00F6Mode5 = $01                  ; Pad_Unk00F6 bit 0: run Field_FadeToBankC2Mode5
-                                         ; (Field_PauseAndMenuInput)
-!Pad_Unk00F6Menu = $40                   ; Pad_Unk00F6 bit 6: fade out and call BankC2_Entry8000 with
-                                         ; 1 (Field_PauseAndMenuInput); X in the Pad_Pressed layout
-!Pad_Unk00F6Bit7 = $80                   ; Pad_Unk00F6 bit 7: Sub_1ADF clears Field_Unk34 on it (A in
-                                         ; the Pad_Pressed layout)
-
-; --- Map / BG ---
-!Map_RowStride = $0100                   ; Map_TileProps bytes per map row (index - $100 = the tile
-                                         ; above)
-!Bg_ColMask64 = $003F                    ; wraps an 8x8 tile column into a 64-wide tilemap
-!Bg_RowMask32 = $001F                    ; wraps an 8x8 tile row into a 32-tall tilemap
-!Bg_ScreenWidth = $0020                  ; tiles per row of one 32x32 tilemap screen
-!Bg_ScreenWords = $0400                  ; words in one 32x32 tilemap screen (offset of the right-
-                                         ; hand screen)
-!TileAnim_StateFE = $FE                  ; Map_TileProps value DefaultHandler steps to $FF
-                                         ; (TileAnim_StepKind 0)
-!TileAnim_StateE0 = $E0                  ; Map_TileProps value DefaultHandler steps to $E1
-                                         ; (TileAnim_StepKind 1)
 !SceneFlag_Battle = $01                  ; Field_SceneFlags bit 0: start a battle (DefaultHandler
                                          ; JSLs EngCall_BattleMain)
 !SceneFlag_TileStep = $02                ; Field_SceneFlags bit 1: step one tile (DefaultHandler)
@@ -140,8 +106,46 @@ if !constants_engine_inc == 0
 !VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
 !Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one VBlankHandlerShort
                                          ; before the battle (DefaultHandler)
-!DP_Map = $1D00                          ; direct page of the map/BG routines (Field_BuildC800*,
-                                         ; Field_FrameUpdate)
+
+; --- Pad ---
+!Pad_Start = $01                         ; Pad_Pressed bit 0: Start
+!Pad_HiDown = $04                        ; high byte of Pad_Pressed, bit 2: Down
+!Pad_HiUp = $08                          ; high byte of Pad_Pressed, bit 3: Up
+!Pad_Unk00F8Bit7 = $80                   ; Pad_Unk00F8 bit 7 (Sub_1ADF sets Field_Unk62 = 3 on it)
+!Pad_Unk00F6Mode5 = $01                  ; Pad_Unk00F6 bit 0: run Field_FadeToBankC2Mode5
+                                         ; (Field_PauseAndMenuInput)
+!Pad_Unk00F6Menu = $40                   ; Pad_Unk00F6 bit 6: fade out and call BankC2_Entry8000 with
+                                         ; 1 (Field_PauseAndMenuInput); X in the Pad_Pressed layout
+!Pad_Unk00F6Bit7 = $80                   ; Pad_Unk00F6 bit 7: Sub_1ADF clears Field_Unk34 on it (A in
+                                         ; the Pad_Pressed layout)
+
+; --- Audio ---
+!Audio_CmdPlaySfx = $19                  ; Audio_CmdId: play the sound effect in Audio_CmdArg0
+
+; --- Generic ---
+!Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
+!Eng_SignExtNeg = $FF                    ; high byte that sign-extends a negative 8-bit value
+!Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
+
+; --- Tile animation modes (Field_SceneChangeTick dispatch on Map_TileProps) ---
+!TileAnim_ModeE6 = $E6                   ; mode handled by ModeE6_Handler
+!TileAnim_ModeEC = $EC                   ; mode handled by ModeEC_Handler
+!TileAnim_ModeEE = $EE                   ; mode handled by ModeEE_Handler
+!TileAnim_ModeFA = $FA                   ; mode handled by ModeFA_Handler
+!TileAnim_ModeFC = $FC                   ; mode handled by ModeFC_Handler
+!TileAnim_StateFE = $FE                  ; Map_TileProps value DefaultHandler steps to $FF
+                                         ; (TileAnim_StepKind 0)
+!TileAnim_StateE0 = $E0                  ; Map_TileProps value DefaultHandler steps to $E1
+                                         ; (TileAnim_StepKind 1)
+
+; --- Map / BG ---
+!Map_RowStride = $0100                   ; Map_TileProps bytes per map row (index - $100 = the tile
+                                         ; above)
+!Bg_ColMask64 = $003F                    ; wraps an 8x8 tile column into a 64-wide tilemap
+!Bg_RowMask32 = $001F                    ; wraps an 8x8 tile row into a 32-tall tilemap
+!Bg_ScreenWidth = $0020                  ; tiles per row of one 32x32 tilemap screen
+!Bg_ScreenWords = $0400                  ; words in one 32x32 tilemap screen (offset of the right-
+                                         ; hand screen)
 
 ; --- Sprite build ---
 !ObjState_Ready = $80                    ; Obj_State value once the object's SprTile records are
@@ -164,8 +168,6 @@ if !constants_engine_inc == 0
                                          ; (also the Y clamp limit)
 
 ; --- Object graphics ---
-!DP_SprBufPage = $0B00                   ; direct page SprBuf_FreeAll points at to reach SprBuf_Owner
-                                         ; with dp stores
 !SprBuf_Tiles = $0060                    ; tiles in the WRAM tile buffer (96 x 32 bytes = $0C00)
 !SprBuf_Bytes = $0C00                    ; bytes in the WRAM tile buffer
 !SprBuf_VramWord = $0400                 ; VRAM word address the tile buffer is uploaded to
@@ -175,15 +177,12 @@ if !constants_engine_inc == 0
                                          ; (Spr_CopyTileFlipped)
 !LargeObj_LayoutOfs = $00C0              ; offset of the 24 position byte pairs in a large object's
                                          ; frame data (after 96 tile words)
-!Eng_SignExtNeg = $FF                    ; high byte that sign-extends a negative 8-bit value
 !LargeObj_TileRow0 = $40                 ; OAM tile number of the first 16x16 tile in row 0 of a
                                          ; large object (tiles step by 2)
 !LargeObj_TileRow1 = $60                 ; OAM tile number of the first 16x16 tile in row 1
 !LargeObj_TileRow2 = $80                 ; OAM tile number of the first 16x16 tile in row 2
 !LargeObj_Attr = $22                     ; OAM attributes of every large-object tile: priority 2,
                                          ; palette 1
-!BankD2 = $D2                            ; ROM bank $D2 (object tile graphics)
-!Eng_HighByteMask = $FF00                ; AND mask keeping the high byte of 16-bit A
 
 ; --- Object frame build ---
 !Obj_VramTileMask = $01FF                ; tile-number bits of Obj_VramTile
@@ -196,7 +195,6 @@ if !constants_engine_inc == 0
 !Spr_UpperOfsY = $E8                     ; tiles with OfsY >= this (the upper 24 lines) take
                                          ; Obj_PrioHigh
 !Anim_EndMarker = $FF                    ; frame-number table entry that ends an animation row
-!ObjQ_Empty = $80                        ; ObjQ_Head/ObjQ_Tail/Obj_QueueNext value for "none"
 !Vram_TileRowWords = $0100               ; VRAM words in one row of sixteen 8x8 tiles (the next row
                                          ; holds the lower halves of 16x16 sprites)
 !Gfx_8TilesBytes = $0100                 ; bytes in eight 4bpp 8x8 tiles

@@ -144,6 +144,11 @@ if !ram_engine_inc == 0
 !Field_UnkEB = $EB                       ; 8-bit; $80 at load; Field_FrameUpdate sets it to $80,
                                          ; Field_Unk1AAC reads it
 !Field_Unk0400Copy = $F8                 ; 8-bit copy of Eng_Unk0400 taken by FrameStateInit
+!Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
+                                         ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
+                                         ; (swapping the two tilemap bases) for 3, then clears it
+!Field_MapRedrawDone = $46               ; 8-bit; DefaultHandler stores the redraw step just done
+                                         ; (1-4)
 
 ; --- Fades (dp) ---
 !Fade_Brightness = $19                   ; 8-bit screen brightness 0-15: Fade_StepBrightness steps it
@@ -187,11 +192,6 @@ if !ram_engine_inc == 0
 !Party_ObjSlot2 = $9B                    ; 16-bit object slot of party member 3 (= Party_ObjSlot+4)
 !Field_UnkAEObj = $AE                    ; 8-bit object slot (or $80 = none) that Field_RestoreState
                                          ; runs Spr_LoadLargeObj on after a reload
-!Field_MapRedrawSel = $45                ; 8-bit; DefaultHandler (Field_SceneFlags bit 5) runs
-                                         ; Field_BuildC800Mode1/2/4 for 1/2/4, modes 1 and 2
-                                         ; (swapping the two tilemap bases) for 3, then clears it
-!Field_MapRedrawDone = $46               ; 8-bit; DefaultHandler stores the redraw step just done
-                                         ; (1-4)
 
 ; --- OAM shadow build (PostVBlank / Spr_AppendToOam) (dp) ---
 !Oam_Range1PrevEnd = $7B                 ; 16-bit OAM shadow address where range 1 ended last frame;
@@ -327,14 +327,6 @@ if !ram_engine_inc == 0
                                          ; (Field_PauseAndMenuInput, Field_FadeToBankC2Mode5),
                                          ; cleared after (Field_FadeInAfterReload,
                                          ; Field_RunBankC2Mode5)
-!NmiTrampolineOp = $0500                 ; 8-bit JML opcode byte of the NMI trampoline (=
-                                         ; !NmiTrampoline)
-!NmiTrampolineAddr = $0501               ; 16-bit low word of the NMI trampoline's JML target
-!NmiTrampolineBank = $0503               ; 8-bit bank byte of the NMI trampoline's JML target
-!IrqTrampolineOp = $0504                 ; 8-bit JML opcode byte of the IRQ trampoline (=
-                                         ; !IrqTrampoline)
-!IrqTrampolineAddr = $0505               ; 16-bit low word of the IRQ trampoline's JML target
-!IrqTrampolineBank = $0507               ; 8-bit bank byte of the IRQ trampoline's JML target
 !Field_Unk0BD9 = $0BD9                   ; 8-bit; zeroed by FrameStateInit, no other matched use
 !Field_Unk0BDA = $0BDA                   ; 8-bit; zeroed by FrameStateInit, no other matched use
 !Field_Unk0BDB = $0BDB                   ; 8-bit; zeroed by FrameStateInit, no other matched use
@@ -411,15 +403,17 @@ if !ram_engine_inc == 0
                                          ; script continues (Evt_RunObjInit sets it past the init
                                          ; function)
 !Obj_Facing = $1600                      ; 8-bit per object facing; EOR 1 turns it around
-                                         ; (Field_SceneChangeTick)
+                                         ; (Field_SceneChangeTick); Obj_AnimFrameLookup picks the
+                                         ; facing block from it (0, negative, 2, other)
 !Obj_PosX = $1800                        ; 16-bit per object X position; the high byte is the tile
                                          ; column (Field_SaveState copies it to Loc_EntryX)
 !Obj_TileX = $1801                       ; 8-bit high byte of Obj_PosX: tile column
 !Obj_PosY = $1880                        ; 16-bit per object Y position; high byte is the tile row
 !Obj_TileY = $1881                       ; 8-bit high byte of Obj_PosY: tile row
-!Obj_State = $1B00                       ; per-object byte: render state read by Spr_PrepareTiles (0
-                                         ; = inactive, $80 = ready); Obj_ResetStates zeroes it for
-                                         ; every location object
+!Obj_State = $1B00                       ; per-object byte read by Spr_PrepareTiles: 0 = nothing to
+                                         ; draw; bits 0-6 count finished Obj_BuildFrame* passes (INC
+                                         ; per pass); $80 = SprTile records up to date.
+                                         ; Obj_ResetStates zeroes it for every location object
 !Obj_Unk1C00 = $1C00                     ; 8-bit per object; Evt_RunObjInit sets 7 after the init
                                          ; function
 !Obj_ScreenY = $0A80                     ; 16-bit per object: screen Y of the sprite origin; the
@@ -526,8 +520,10 @@ if !ram_engine_inc == 0
                                          ; animated map tile, 4 per tile (TL, TR, BL, BR)
 
 ; --- Object tile buffer (bank $7F) ---
-!SprBuf_Base = $7F3800                   ; WRAM tile buffer for object graphics, $0C00 bytes in six
-                                         ; $200-byte chunks; uploaded to VRAM word $0400
+!SprBuf_Base = $7F3800                   ; WRAM tile buffer for object graphics, $0C00 bytes in
+                                         ; $200-byte chunks handed out by SprBuf_Alloc*; chunks reach
+                                         ; VRAM through the VramQ_* queue, except that
+                                         ; Spr_LoadLargeObj DMAs the whole buffer to VRAM word $0400
 !SprBuf_Owner = $0BC0                    ; 8 bytes: object slot owning each $200-byte chunk of
                                          ; SprBuf_Base ($80 = free); SprBuf_Alloc*/Free* scan the
                                          ; first 4
