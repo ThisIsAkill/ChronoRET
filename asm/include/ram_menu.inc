@@ -205,8 +205,27 @@ endstruct align 8
 !TextWin_TextPtr = $31                   ; 24-bit pointer to the next byte of the string
 !TextWin_PenX = $34                      ; 8-bit pen X in pixels (inferred: $C2:5DC4 uses bits 0-2 as the
                                          ; shift within a tile and bits 3-7 as the tile)
-!TextWin_Unk3D = $3D                     ; 24-bit; TextWin_Init sets it to $00:0200 (= TextWin_Dp); use not
-                                         ; traced
+!TextWin_Unk3D = $3D                     ; 24-bit; TextWin_Init sets it to $00:0200 (= TextWin_Dp). Control
+                                         ; codes $0D-$0F and $11-$12 read their value from here and step it
+                                         ; on (the argument pointer)
+!TextWin_Code3Arg = $16                  ; 8-bit; the byte after control code $03 (TextWin_CodeStatusArg);
+                                         ; use not traced
+!TextWin_Glyph = $35                     ; 16-bit glyph code for TextWin_DrawGlyph ($00A0-$00FF, or $01xx/$02xx
+                                         ; after the prefix codes $01/$02)
+!TextWin_SubPtr = $37                    ; 24-bit pointer into the sub-string states 1-3 read
+!TextWin_SubLeft = $3A                   ; 8-bit bytes (glyphs) of the sub-string still to draw
+!TextWin_DictCode = $3B                  ; 8-bit the last dictionary code (TextWin_State0, code $12); not read
+                                         ; in the decoder
+!TextWin_Digits = $40                    ; 8 B the digits of a number for states 2 (0-9) and 3 (glyphs),
+                                         ; read through TextWin_SubPtr = $00:0240
+!TextWin_DecDigits = $60                 ; 8 B decimal digits from TextWin_Dec8/16/24 (most significant first)
+!TextWin_HexIn = $60                     ; 8-bit the byte TextWin_HexByte prints (written as a word)
+!TextWin_NumValue = $68                  ; 24-bit the value codes $0D-$0F read (1, 2 or 3 bytes)
+!TextWin_HexPos = $6A                    ; 16-bit TextWin_HexByte's write offset into TextWin_Digits
+!TextWin_NumHex = $A1                    ; 8-bit; non-zero: codes $0D/$0E print in hexadecimal (2 or 4
+                                         ; digits); who sets it is not traced
+!TextWin_CharNames = $7E2C23             ; 6-byte character names (TextWin_CharNamePtrs points at the first 7;
+                                         ; code $20 prints the 8th, at $7E:2C4D); read up to 5 bytes or a 0
 
 ; --- Scene mode absolute RAM ---
 !C2Scene_Unk0B20 = $0B20                 ; 16 B $0B20-$0B2F zeroed by C2Scene_ClearPalette (right after
@@ -217,7 +236,8 @@ endstruct align 8
 !C2Scene_TaskRecords = $0B30             ; 64 C2Scene_Task records, $0B30-$1B2F (C2Scene_TaskRunAll walks
                                          ; them all; C2Scene_TaskClearAll frees them all)
 !C2Scene_TaskRecordsEnd = $1B30          ; first address past the records
-!C2Scene_Unk1B30 = $1B30                 ; 8-bit; zeroed by C2Scene_ClearUnk1B30; use unknown
+!C2Scene_Unk1B30 = $1B30                 ; 8-bit; zeroed by C2Scene_ClearUnk1B30; C2Scene_Random's index
+                                         ; into RandomTable (one up per call)
 !C2Scene_Unk1B31 = $1B31                 ; 8-bit; zeroed by C2Scene_ClearUnk1B30; use unknown
 !C2Scene_Flag0Copy = $1BA6               ; 8-bit copy of Eng_Unk7F0000 (C2Scene_SaveFlagTail)
 !C2Scene_FlagTailCopy = $1BA7            ; 16 B copy of $7F:01F0-$01FF, the end of Menu_FlagBlock7F
@@ -243,19 +263,46 @@ endstruct align 8
                                          ; C2Scene_ModeTable); who sets it is not traced
 !C2Scene_Unk027D = $027D                 ; 8-bit; zeroed by C2Scene_LoadScene (next to C2Scene_Mode); use unknown
 !C2Scene_Unk0280 = $0280                 ; 3 B $0280-$0282 zeroed by C2Scene_LoadScene; use unknown
-!C2Scene_Unk0294 = $0294                 ; 8-bit; C2Scene_LoadScene clears bit 2 (C2Scene_Unk0294Bit2); use
-                                         ; unknown
+!C2Scene_Unk0294 = $0294                 ; 8-bit; C2Scene_LoadScene clears bit 2 (C2Scene_Unk0294Bit2).
+                                         ; Object A's flags (C2Scene_ObjWatch): C2Scene_ObjActive,
+                                         ; C2Scene_ObjBusy and the count C2Scene_ObjCountMask
 !C2Scene_Unk02AE = $02AE                 ; 8-bit; C2Scene_LoadScene copies the byte at Menu_Config+$1E into it;
                                          ; use unknown
 !C2Scene_Unk02B1 = $02B1                 ; 3 B $02B1-$02B3 zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1B32 = $1B32                 ; 3 words $1B32-$1B37 set to $FFFF by C2Scene_LoadScene; the first
                                          ; is the byte offset of the C2Scene_ListA entry C2Scene_Mode3
                                          ; acts on (who sets it is not matched)
-!C2Scene_Unk1B43 = $1B43                 ; 8-bit; zeroed by C2Scene_Mode3 before a ListD script; use unknown
+!C2Scene_Unk1B43 = $1B43                 ; 8-bit; zeroed by C2Scene_Mode3 and C2Scene_TrigListAB before a
+                                         ; ListD script; C2Scene_TrigWatchWait waits for it to be non-zero
+                                         ; (probably set by the script when it ends; not traced)
 !C2Scene_Unk1B45 = $1B45                 ; 16-bit; the address of the ListD script C2Scene_Mode3 started
                                          ; (also read by unmatched code); use unknown
 !C2Scene_Unk027E = $027E                 ; 8-bit; non-zero keeps the zone task from changing the song
                                          ; (C2Scene_ZoneSoundWatch); use unknown
+!C2Scene_Unk027F = $027F                 ; 8-bit; C2Scene_ObjWatch copies C2Scene_Unk027E here before each
+                                         ; step (the state it last ran)
+!C2Scene_Unk0281 = $0281                 ; 8-bit; C2Scene_TrigWatch copies its state C2Scene_Unk0280 here
+                                         ; before each step
+!C2Scene_TrigFlags = $0282               ; 8-bit (byte 3 of C2Scene_Unk0280): bit 0
+                                         ; (C2Scene_TrigRecheck) makes C2Scene_TrigWatchCheck look the
+                                         ; party's tile up in the lists; bit 1 (C2Scene_TrigKeep) keeps
+                                         ; what it found. Who sets them is not traced
+!C2Scene_ObjSel = $028F                  ; 8-bit; which object C2Scene_ObjWatch follows:
+                                         ; C2Scene_ObjSelA, C2Scene_ObjSelB, or 0 (none)
+!C2Scene_ObjAX = $0290                   ; 16-bit X of object A (the C2Scene_ObjABox test); same units
+                                         ; as C2Scene_StartX (probably pixels)
+!C2Scene_ObjAY = $0292                   ; 16-bit Y of object A
+                                         ; (object A's flags are C2Scene_Unk0294)
+!C2Scene_ObjBX = $029A                   ; 16-bit X of object B (the C2Scene_ObjBBox test)
+!C2Scene_ObjBY = $029C                   ; 16-bit Y of object B
+!C2Scene_ObjBFlags = $029E               ; 8-bit flags of object B, as C2Scene_Unk0294's for A
+                                         ; (C2Scene_ObjActive, C2Scene_ObjBusy, C2Scene_ObjCountMask)
+!C2Scene_ObjALoc = $029F                 ; 16-bit Loc_Id (bits 0-8) object A is at: C2Scene_ObjWatchIdle
+                                         ; tests it only when this equals the current one
+!C2Scene_TrigFound = $1B44               ; 8-bit C2Scene_TrigDispatch's mask of the lists with an entry at
+                                         ; the party's tile: bit 0 ListA, bit 1 ListC, bit 2 ListB
+!C2Scene_Unk1B47 = $1B47                 ; 8-bit; C2Scene_GetListCUnk03 copies a ListC byte here; use not
+                                         ; traced
 !C2Scene_ZoneSounds = $1B9B              ; bytes indexed by a sound zone (0-15): the argument sent with
                                          ; C2Scene_SoundCmd10 for it (probably a song). Who fills it is not found
 !C2Scene_SoundZone = $EB                 ; 8-bit dp: the sound zone C2Scene_ZoneSoundWatch last looked up
@@ -263,7 +310,8 @@ endstruct align 8
 !C2Scene_ListACount = $1B38              ; 8-bit entry count of C2Scene_ListA (C2Scene_LoadLists)
 !C2Scene_ListBCount = $1B39              ; 8-bit entry count of C2Scene_ListB
 !C2Scene_ListCCount = $1B3A              ; 8-bit entry count of C2Scene_ListC (ListD's count is not kept)
-!C2Scene_Unk1B58 = $1B58                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
+!C2Scene_Unk1B58 = $1B58                 ; 8-bit; zeroed by C2Scene_LoadScene; C2Scene_GetListAUnk02 copies
+                                         ; byte 2 of a ListA entry here; use unknown
 !C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_SavedReturnId = $04FC          ; 16-bit; C2Script_GoToLocation copies Loc_ReturnId here; use not
@@ -452,12 +500,22 @@ endstruct
 ; script ops $28-$2B): the state and what they read from the spawning op.
 ; One C2Scene_ListA entry (7 B). Only the fields C2Scene_Mode3 reads are named.
 struct C2Scene_ListAEntry $7E7E00
-.Flags:     skip 1     ; bit 7: C2Scene_ListEntryBit7 (script ops $44/$45)
-            skip 2
+.Flags:     skip 1     ; bit 7: C2Scene_ListEntryBit7 (script ops $44/$45); bits 0-6: tile X
+                       ; (C2Scene_FindTrigEntries matches the word at +0 AND C2Scene_ListTileMask)
+.TileY:     skip 1     ; bits 0-5: tile Y
+.Unk02:     skip 1     ; C2Scene_GetListAUnk02 copies it to C2Scene_Unk1B58
 .Loc:       skip 2     ; bits 0-8: a Loc_Id (C2Scene_ListANoLoc: none); the high byte / 2 is the entry
                        ; facing (as script op $05's argument)
 .EntryX:    skip 1     ; Loc_EntryX; with no location, the C2Scene_ListD index
 .EntryY:    skip 1     ; Loc_EntryY
+endstruct
+
+; One C2Scene_ListB entry (3 B): a tile trigger that starts a ListD script
+; (C2Scene_TrigListB, C2Scene_GetListBScript).
+struct C2Scene_ListBEntry $7E8300
+.Flags:     skip 1     ; bit 7: C2Scene_ListEntryBit7 (the trigger is live); bits 0-6: tile X
+.TileY:     skip 1     ; bits 0-5: tile Y
+.Script:    skip 1     ; index of the C2Scene_ListD script it starts
 endstruct
 
 struct C2Scene_FxTask $0000

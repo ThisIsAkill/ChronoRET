@@ -859,9 +859,9 @@ C2Scene_TaskSpawnLow:
 ; Callers (22 sites: 20 JSR, 2 JMP): C2Script_SpawnScript (JSR $C2:1203), C2Scene_Mode3 (JSR
 ;   $C2:242E, JSR $C2:2459), C2Scene_Mode5 (JSR $C2:2527, JSR $C2:256B), C2Scene_Mode6 (JSR
 ;   $C2:2596, JSR $C2:25FB), C2Scene_Mode8 (JSR $C2:2626, JSR $C2:2676), C2Scene_LoadScene (JMP
-;   $C2:2C90) and unmatched (JSR $C2:3154, JSR $C2:33B2, JSR $C2:33DF, JSR $C2:4479, JSR $C2:452C,
-;   JSR $C2:63AE, JSR $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP
-;   $C2:7457).
+;   $C2:2C90), C2Scene_ObjWatchIdle (JSR $C2:3154), C2Scene_TrigListB (JSR $C2:33B2),
+;   C2Scene_TrigListAB (JSR $C2:33DF) and unmatched (JSR $C2:4479, JSR $C2:452C, JSR $C2:63AE, JSR
+;   $C2:66DF, JSR $C2:66FF, JSR $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP $C2:7457).
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -7014,6 +7014,124 @@ C2Scene_ClearUnk1B30:
     RTS
 
 ; ============================================================
+; Scene helpers: random byte, box overlap ($C2:2336–$C2:23A7)
+; ============================================================
+
+; $C2:2336 — C2Scene_Random (15 bytes, $2336–$2344)
+; Returns the next byte of RandomTable ($C0:FE00): the one at index
+; C2Scene_Unk1B30, which then goes up by one (wrapping at 256).
+; Callers (7 JSR sites): unmatched ($C2:7575, $C2:7598, $C2:79E0, $C2:7A0C, $C2:7A1F, $C2:7A31,
+;   $C2:7A44).
+; Callers note (7 JSR sites, all unmatched): $C2:7575, $C2:7598, $C2:79E0,
+;   $C2:7A0C, $C2:7A1F, $C2:7A31 and $C2:7A44 (xref also finds a doubtful
+;   one at $C2:754D).
+; Entry: M, X any (SEP #$30 here), DP any, DB with low WRAM at
+;        $0000-$1FFF (C2Scene_Unk1B30 is read absolute)
+; Exit:  M=1, X=0; A = the random byte; X = the index used (8-bit, so
+;        its high byte is 0); Y unchanged; C2Scene_Unk1B30 + 1
+; No calls.
+C2Scene_Random:
+    SEP #$30
+    LDX.w !C2Scene_Unk1B30
+    LDA.l RandomTable,X
+    INC.w !C2Scene_Unk1B30
+    REP #$10
+    RTS
+
+; $C2:2345 — C2Scene_BoxesOverlap (99 bytes, $2345–$23A7)
+; Tests whether two boxes overlap. Box A is centred on (C2Scene_BoxAX,
+; C2Scene_BoxAY) and box B on (C2Scene_BoxBX, C2Scene_BoxBY); each has
+; four 16-bit extents at its long pointer (C2Scene_BoxAPtr,
+; C2Scene_BoxBPtr): +0 left, +2 right, +4 up, +6 down (inferred from
+; which extent is used on which side). .test_x takes the X distance
+; between the centres less A's extent towards B and B's extent towards
+; A; a negative result (a gap) gives C=0. The same for Y in .test_y.
+; Equal centres count as overlapping on that axis; boxes that just
+; touch (a result of exactly 0) do not.
+; Quirk, kept: the SEC before the last RTS is redundant (C is already 1
+; when .test_y returns there).
+; Callers (5 JSR sites): C2Scene_ObjWatchIdle ($C2:3118, $C2:317D) and unmatched ($C2:490E,
+;   $C2:493D, $C2:4A03).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (the C2Tmp block holds the
+;        centres and pointers), DB any (all reads are direct page or long
+;        indirect)
+; Exit:  M=0, X=0; C=1: the boxes overlap, C=0: they do not; A clobbered;
+;        Y = 2, 4 or 6 (the last extent offset used); X and DP unchanged
+; Calls: .test_x, .test_y (internal JSRs).
+!C2Scene_BoxAX = !C2Tmp_08              ; in: box A's centre X (16-bit)
+!C2Scene_BoxAY = !C2Tmp_0A              ; in: box A's centre Y
+!C2Scene_BoxBX = !C2Tmp_0C              ; in: box B's centre X
+!C2Scene_BoxBY = !C2Tmp_0E              ; in: box B's centre Y
+!C2Scene_BoxAPtr = !C2Tmp_10            ; in: 24-bit pointer to box A's extents ($10-$12)
+!C2Scene_BoxBPtr = !C2Tmp_13            ; in: 24-bit pointer to box B's extents ($13-$15)
+C2Scene_BoxesOverlap:
+    REP #$20
+    JSR .test_x
+    BCC .done
+    JSR .test_y
+    BCC .done
+    SEC
+.done:
+    RTS
+.test_x:
+    LDY.w #2
+    LDA.b !C2Scene_BoxBX
+    SEC
+    SBC.b !C2Scene_BoxAX
+    BEQ .x_hit
+    BCC .b_left
+    SEC                         ; B right of A: minus A's right, B's left
+    SBC.b [!C2Scene_BoxAPtr],Y
+    SEC
+    SBC.b [!C2Scene_BoxBPtr]
+    BMI .x_hit
+    CLC
+    RTS
+.b_left:
+    EOR.w #!Eng_Invert16
+    INC A                       ; |distance|: minus B's right, A's left
+    SEC
+    SBC.b [!C2Scene_BoxBPtr],Y
+    SEC
+    SBC.b [!C2Scene_BoxAPtr]
+    BMI .x_hit
+    CLC
+    RTS
+.x_hit:
+    SEC
+    RTS
+.test_y:
+    SEC
+    LDA.b !C2Scene_BoxBY
+    SBC.b !C2Scene_BoxAY
+    BEQ .y_hit
+    BCC .b_above
+    LDY.w #6                    ; B below A: minus A's down, B's up
+    SEC
+    SBC.b [!C2Scene_BoxAPtr],Y
+    LDY.w #4
+    SEC
+    SBC.b [!C2Scene_BoxBPtr],Y
+    BMI .y_hit
+    CLC
+    RTS
+.b_above:
+    EOR.w #!Eng_Invert16
+    INC A                       ; |distance|: minus B's down, A's up
+    LDY.w #6
+    SEC
+    SBC.b [!C2Scene_BoxBPtr],Y
+    LDY.w #4
+    SEC
+    SBC.b [!C2Scene_BoxAPtr],Y
+    BMI .y_hit
+    CLC
+    RTS
+.y_hit:
+    SEC
+    RTS
+
+; ============================================================
 ; Scene main loop ($C2:23A8–$C2:2401)
 ; ============================================================
 
@@ -9290,6 +9408,737 @@ C2Scene_ZoneSoundQueue:
     RTS
 
 ; ============================================================
+; Scene objects and tile triggers ($C2:309E–$C2:3403)
+; ============================================================
+; Two per-frame watchers, each a state machine that returns C=0 (as a
+; task handler that never ends). No reference to either entry is in the
+; bank's code or found by a byte search, so they are probably started
+; from scene data (script op $35, C2Script_SpawnTask, or called by op
+; $34, C2Script_CallNear; not traced). Both read the party's position
+; as C2Scene_StartX/Y (C2Scene_TaskZoneSound follows the same words).
+;
+; C2Scene_ObjWatch (state C2Scene_Unk027E) watches two objects, A
+; ($0290-$0294, $029F) and B ($029A-$029E): when the button held in
+; Pad_Unk00F8 bit 7 (A with the default button map) is down and the
+; party's box overlaps an active object's, it selects that object and
+; waits until as many party members are counted in the object's flags
+; as are in the party, then until the object's busy bit clears, then
+; until its count is back to 0. That looks like the party getting into
+; something and out again, but what the objects are is not traced.
+;
+; C2Scene_TrigWatch (state C2Scene_Unk0280) looks the party's 16-pixel
+; tile up in C2Scene_ListA, ListB and ListC (entries whose bit 7 is set)
+; when C2Scene_TrigFlags asks it to, and acts on what it finds: a ListA
+; entry (an exit, as C2Scene_Mode3 uses it) sets the current task's
+; .Unk02; a ListB entry starts its C2Scene_ListD script once (clearing
+; its bit 7) and waits for C2Scene_Unk1B43; a ListC entry selects the
+; scene mode C2Scene_ModeHalt.
+
+; $C2:309E — C2Scene_ObjWatch (35 bytes, $309E–$30C0)
+; While C2Scene_Mode is 0 or 1 and C2Scene_TrigWatch is in its check
+; state (C2Scene_Unk0280 = 0): copies C2Scene_Unk027E to
+; C2Scene_Unk027F and runs its state through C2Scene_ObjWatchStates.
+; Otherwise returns C=0 at once.
+; Callers note: none found (see the banner).
+; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0 (M=0 from C2Scene_ObjWatchIdle when the button is
+;        up); the state's changes; A, X clobbered when a state runs
+; Calls: a C2Scene_ObjWatchStates handler (JMP (abs,X)).
+C2Scene_ObjWatch:
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeIdle1
+    BEQ .mode_ok
+    CMP.b #0
+    BEQ .mode_ok
+    CLC
+    RTS
+.mode_ok:
+    LDA.w !C2Scene_Unk0280
+    BEQ .step
+    CLC
+    RTS
+.step:
+    LDA.w !C2Scene_Unk027E
+    STA.w !C2Scene_Unk027F
+    TDC                         ; A = DP = 0: clears the high byte
+    LDA.w !C2Scene_Unk027E
+    ASL A
+    TAX
+    JMP (C2Scene_ObjWatchStates,X)
+
+; $C2:30C1 — C2Scene_ObjWatchStates (6 words, $30C1–$30CC)
+; C2Scene_ObjWatch's handler for each C2Scene_Unk027E state 0-5.
+; Nothing in this code sets state 1.
+C2Scene_ObjWatchStates:
+    dw C2Scene_ObjWatchIdle     ; 0 (C2Scene_ObjWatchStIdle)
+    dw C2Scene_ObjWatchNone     ; 1
+    dw C2Scene_ObjWatchBusyA    ; 2 (C2Scene_ObjWatchStBusyA)
+    dw C2Scene_ObjWatchBusyB    ; 3 (C2Scene_ObjWatchStBusyB)
+    dw C2Scene_ObjWatchFull     ; 4 (C2Scene_ObjWatchStFull)
+    dw C2Scene_ObjWatchEmpty    ; 5 (C2Scene_ObjWatchStEmpty)
+
+; $C2:30CD — C2Scene_ObjWatchIdle (219 bytes, $30CD–$31A7)
+; State 0. Does nothing unless Pad_Unk00F8 bit 7 is set. Then box A of
+; C2Scene_BoxesOverlap is C2Scene_PartyBox at (C2Scene_StartX,
+; C2Scene_StartY), and:
+; - object A, if C2Scene_Unk0294 has C2Scene_ObjActive and the current
+;   Loc_Id AND C2Scene_LocIdMask equals the word C2Scene_ObjALoc: box B is
+;   C2Scene_ObjABox at (C2Scene_ObjAX, C2Scene_ObjAY). On an overlap,
+;   with C2Scene_Flag0Copy = C2Scene_Flag0ObjAScript it selects scene
+;   mode C2Scene_ModeIdle7 and starts the script C2Scene_ScrGoToLoc1D8
+;   (which leaves for location $1D8); otherwise C2Scene_ObjSel =
+;   C2Scene_ObjSelA and state C2Scene_ObjWatchStFull;
+; - if A is not active, elsewhere, or not overlapped, object B the same
+;   way, if C2Scene_ObjBFlags has C2Scene_ObjActive and Loc_Id is
+;   C2Scene_ObjBLocId: C2Scene_ObjBBox at (C2Scene_ObjBX, C2Scene_ObjBY);
+;   on an overlap C2Scene_ObjSel = C2Scene_ObjSelB and state
+;   C2Scene_ObjWatchStFull.
+; Selecting an object also zeroes C2Scene_Unk1B58/1B59,
+; C2Scene_TrigFound and C2Scene_TrigFlags, and sets the three
+; C2Scene_Unk1B32 words to C2Scene_Unk1B32Init.
+; Quirks, kept: when the button is up it returns with M=0 (the JMP to
+; .done comes before the SEP). Object B's Loc_Id is compared unmasked
+; (bits 9-15 must be clear too), and the AND #$FF before that CPX does
+; nothing (A is not used after it).
+; Callers note: none direct (C2Scene_ObjWatchStates).
+; Entry: M=1, X=0, DP=$0000 (the C2Scene_Box* temporaries), DB=$00
+;        (Pad_Unk00F8, DP_Field and low WRAM absolute)
+; Exit:  C=0; M=0 (button up) or M=1, X=0; A, X, Y clobbered;
+;        C2Tmp_08-$15 set for the box test; C2Scene_TaskSpawnScript's
+;        temporaries when the script starts
+; Calls: C2Scene_BoxesOverlap, C2Scene_TaskSpawnScript.
+C2Scene_ObjWatchIdle:
+    REP #$20
+    LDA.w !Pad_Unk00F8
+    BIT.w #!Pad_Unk00F8Bit7
+    BNE .pressed
+    JMP .done
+.pressed:
+    SEP #$20
+    LDX.w !C2Scene_StartX
+    STX.b !C2Scene_BoxAX
+    LDX.w !C2Scene_StartY
+    STX.b !C2Scene_BoxAY
+    LDX.w #C2Scene_PartyBox
+    STX.b !C2Scene_BoxAPtr
+    LDA.b #bank(C2Scene_PartyBox)
+    STA.b !C2Scene_BoxAPtr+2
+    LDA.w !C2Scene_Unk0294
+    BPL .try_b                  ; not C2Scene_ObjActive
+    REP #$20
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    CMP.w !C2Scene_ObjALoc
+    SEP #$20
+    BNE .try_b
+    LDX.w !C2Scene_ObjAX
+    STX.b !C2Scene_BoxBX
+    LDX.w !C2Scene_ObjAY
+    STX.b !C2Scene_BoxBY
+    LDX.w #C2Scene_ObjABox
+    STX.b !C2Scene_BoxBPtr
+    LDA.b #bank(C2Scene_ObjABox)
+    STA.b !C2Scene_BoxBPtr+2
+    REP #$20
+    JSR C2Scene_BoxesOverlap
+    SEP #$20
+    BCC .try_b
+    LDA.w !C2Scene_Flag0Copy
+    CMP.b #!C2Scene_Flag0ObjAScript
+    BEQ .script
+    LDA.b #!C2Scene_ObjSelA
+    STA.w !C2Scene_ObjSel
+    LDA.b #!C2Scene_ObjWatchStFull
+    STA.w !C2Scene_Unk027E
+    STZ.w !C2Scene_Unk1B58
+    STZ.w !C2Scene_Unk1B59
+    LDX.w #!C2Scene_Unk1B32Init
+    STX.w !C2Scene_Unk1B32
+    STX.w !C2Scene_Unk1B32+2
+    STX.w !C2Scene_Unk1B32+4
+    STZ.w !C2Scene_TrigFound
+    STZ.w !C2Scene_TrigFlags
+    BRA .done
+.script:
+    LDA.b #!C2Scene_ModeIdle7
+    STA.w !C2Scene_Mode
+    LDA.b #bank(C2Scene_ScrGoToLoc1D8)
+    LDX.w #C2Scene_ScrGoToLoc1D8
+    JSR C2Scene_TaskSpawnScript
+    CLC
+    RTS
+.try_b:
+    LDA.w !C2Scene_ObjBFlags
+    BPL .done                   ; not C2Scene_ObjActive
+    LDX.w !DP_Field+!Loc_Id
+    AND.b #!Eng_LowByteMask     ; quirk: no effect (see the header)
+    CPX.w #!C2Scene_ObjBLocId
+    BNE .done
+    LDX.w !C2Scene_ObjBX
+    STX.b !C2Scene_BoxBX
+    LDX.w !C2Scene_ObjBY
+    STX.b !C2Scene_BoxBY
+    LDX.w #C2Scene_ObjBBox
+    STX.b !C2Scene_BoxBPtr
+    LDA.b #bank(C2Scene_ObjBBox)
+    STA.b !C2Scene_BoxBPtr+2
+    REP #$20
+    JSR C2Scene_BoxesOverlap
+    SEP #$20
+    BCC .done
+    STZ.w !C2Scene_Unk1B58
+    STZ.w !C2Scene_Unk1B59
+    LDX.w #!C2Scene_Unk1B32Init
+    STX.w !C2Scene_Unk1B32
+    STX.w !C2Scene_Unk1B32+2
+    STX.w !C2Scene_Unk1B32+4
+    STZ.w !C2Scene_TrigFound
+    STZ.w !C2Scene_TrigFlags
+    LDA.b #!C2Scene_ObjSelB
+    STA.w !C2Scene_ObjSel
+    LDA.b #!C2Scene_ObjWatchStFull
+    STA.w !C2Scene_Unk027E
+.done:
+    CLC
+    RTS
+
+; $C2:31A8 — C2Scene_ScrGoToLoc1D8 (10 bytes, $31A8–$31B1)
+; Scene script (C2Scene_TaskRunScript) started by C2Scene_ObjWatchIdle:
+; fade out, wait, then leave for location $1D8 (op $05 argument word
+; $03D8: Loc_Id $1D8, entry facing 1) at tile (7, 8).
+C2Scene_ScrGoToLoc1D8:
+    db $28,$01                  ; C2Script_SpawnUnk20A2 (fade out), 1 frame per step
+    db $38,$12                  ; C2Script_Wait, 18 frames
+    db $05,$D8,$03,$07,$08      ; C2Script_GoToLocation: $03D8, X 7, Y 8
+    db $52                      ; C2Script_End
+
+; $C2:31B2 — C2Scene_ObjWatchNone (2 bytes, $31B2–$31B3)
+; State 1, and C2Scene_ObjSel 0 and 1 in C2Scene_ObjFullTable and
+; C2Scene_ObjEmptyTable (shared label): nothing; C=0.
+; Callers note: none direct (C2Scene_ObjWatchStates; the two tables).
+; Entry: M=1 (any), X any, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_ObjWatchNone:
+    CLC
+    RTS
+
+; $C2:31B4 — C2Scene_ObjWatchBusyA (14 bytes, $31B4–$31C1, with
+; C2Scene_ObjWatchBusyB at $C2:31C2, 14 bytes)
+; States 2 and 3: wait until object A's (C2Scene_Unk0294) or object
+; B's (C2Scene_ObjBFlags) C2Scene_ObjBusy bit is clear, then state
+; C2Scene_ObjWatchStEmpty.
+; Callers note: none direct (C2Scene_ObjWatchStates).
+; Entry: M=1, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1; A = the flags byte, or C2Scene_ObjWatchStEmpty
+C2Scene_ObjWatchBusyA:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjBusy
+    BNE .wait
+    LDA.b #!C2Scene_ObjWatchStEmpty
+    STA.w !C2Scene_Unk027E
+.wait:
+    CLC
+    RTS
+
+C2Scene_ObjWatchBusyB:          ; header: see C2Scene_ObjWatchBusyA
+    LDA.w !C2Scene_ObjBFlags
+    BIT.b #!C2Scene_ObjBusy
+    BNE .wait
+    LDA.b #!C2Scene_ObjWatchStEmpty
+    STA.w !C2Scene_Unk027E
+.wait:
+    CLC
+    RTS
+
+; $C2:31D0 — C2Scene_ObjWatchFull (34 bytes, $31D0–$31F1)
+; State 4: counts the party members in C2Scene_PartyCount (each
+; Party_Members byte with bit 7 clear; bit 7 is taken to mean an empty
+; slot) and runs C2Scene_ObjSel through C2Scene_ObjFullTable: for the
+; selected object, when its count (flags AND C2Scene_ObjCountMask)
+; equals the party count, state C2Scene_ObjWatchStBusyA or
+; C2Scene_ObjWatchStBusyB.
+; Callers note: none direct (C2Scene_ObjWatchStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX of the doubled C2Scene_ObjSel;
+;        from C2Scene_ObjWatch's TDC), DP=$0000 (C2Scene_PartyCount),
+;        DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; A, X clobbered; C2Scene_PartyCount set
+; Calls: a C2Scene_ObjFullTable handler (JMP (abs,X)).
+!C2Scene_PartyCount = !C2Tmp_00         ; 8-bit: party members counted by C2Scene_ObjWatchFull
+C2Scene_ObjWatchFull:
+    STZ.b !C2Scene_PartyCount
+    LDA.l !Party_Members
+    BMI .member2
+    INC.b !C2Scene_PartyCount
+.member2:
+    LDA.l !Party_Members+1
+    BMI .member3
+    INC.b !C2Scene_PartyCount
+.member3:
+    LDA.l !Party_Members+2
+    BMI .counted
+    INC.b !C2Scene_PartyCount
+.counted:
+    LDA.w !C2Scene_ObjSel
+    ASL A
+    TAX
+    JMP (C2Scene_ObjFullTable,X)
+
+; $C2:31F2 — C2Scene_ObjFullTable (4 words, $31F2–$31F9)
+; C2Scene_ObjWatchFull's handler for C2Scene_ObjSel 0-3.
+C2Scene_ObjFullTable:
+    dw C2Scene_ObjFullNone      ; 0
+    dw C2Scene_ObjFullNone      ; 1
+    dw C2Scene_ObjFullA         ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_ObjFullB         ; 3 (C2Scene_ObjSelB)
+
+; $C2:31FA — C2Scene_ObjFullNone (2 bytes, $31FA–$31FB)
+; No object selected: nothing; C=0.
+; Callers note: none direct (C2Scene_ObjFullTable).
+; Entry: M=1 (any), X any, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_ObjFullNone:
+    CLC
+    RTS
+
+; $C2:31FC — C2Scene_ObjFullA (16 bytes, $31FC–$320B, with
+; C2Scene_ObjFullB at $C2:320C, 16 bytes)
+; Object A's (C2Scene_Unk0294) or B's (C2Scene_ObjBFlags) count equal to
+; C2Scene_PartyCount: state C2Scene_ObjWatchStBusyA or
+; C2Scene_ObjWatchStBusyB.
+; Callers note: none direct (C2Scene_ObjFullTable).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_PartyCount), DB=$00 (low WRAM
+;        absolute)
+; Exit:  C=0; M=1; A = the count or the new state
+C2Scene_ObjFullA:
+    LDA.w !C2Scene_Unk0294
+    AND.b #!C2Scene_ObjCountMask
+    CMP.b !C2Scene_PartyCount
+    BNE .wait
+    LDA.b #!C2Scene_ObjWatchStBusyA
+    STA.w !C2Scene_Unk027E
+.wait:
+    CLC
+    RTS
+
+C2Scene_ObjFullB:               ; header: see C2Scene_ObjFullA
+    LDA.w !C2Scene_ObjBFlags
+    AND.b #!C2Scene_ObjCountMask
+    CMP.b !C2Scene_PartyCount
+    BNE .wait
+    LDA.b #!C2Scene_ObjWatchStBusyB
+    STA.w !C2Scene_Unk027E
+.wait:
+    CLC
+    RTS
+
+; $C2:321C — C2Scene_ObjWatchEmpty (8 bytes, $321C–$3223)
+; State 5: runs C2Scene_ObjSel through C2Scene_ObjEmptyTable: when the
+; selected object's count is 0, back to state C2Scene_ObjWatchStIdle
+; with no object selected.
+; Callers note: none direct (C2Scene_ObjWatchStates).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX; from C2Scene_ObjWatch's TDC),
+;        DP any, DB=$00 (low WRAM absolute)
+; Exit:  the handler's: C=0; M=1, X=0; A, X clobbered
+; Calls: a C2Scene_ObjEmptyTable handler (JMP (abs,X)).
+C2Scene_ObjWatchEmpty:
+    LDA.w !C2Scene_ObjSel
+    ASL A
+    TAX
+    JMP (C2Scene_ObjEmptyTable,X)
+
+; $C2:3224 — C2Scene_ObjEmptyTable (4 words, $3224–$322B)
+; C2Scene_ObjWatchEmpty's handler for C2Scene_ObjSel 0-3.
+C2Scene_ObjEmptyTable:
+    dw C2Scene_ObjEmptyNone     ; 0
+    dw C2Scene_ObjEmptyNone     ; 1
+    dw C2Scene_ObjEmptyA        ; 2 (C2Scene_ObjSelA)
+    dw C2Scene_ObjEmptyB        ; 3 (C2Scene_ObjSelB)
+
+; $C2:322C — C2Scene_ObjEmptyNone (2 bytes, $322C–$322D)
+; No object selected: nothing; C=0.
+; Callers note: none direct (C2Scene_ObjEmptyTable).
+; Entry: M=1 (any), X any, DP and DB any (no accesses)
+; Exit:  C=0; nothing else changed
+C2Scene_ObjEmptyNone:
+    CLC
+    RTS
+
+; $C2:322E — C2Scene_ObjEmptyA (15 bytes, $322E–$323C, with
+; C2Scene_ObjEmptyB at $C2:323D, 15 bytes)
+; Object A's (C2Scene_Unk0294) or B's (C2Scene_ObjBFlags) count at 0:
+; C2Scene_Unk027E = C2Scene_ObjWatchStIdle and C2Scene_ObjSel = 0.
+; Callers note: none direct (C2Scene_ObjEmptyTable).
+; Entry: M=1, X any, DP any, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1; A = the count
+C2Scene_ObjEmptyA:
+    LDA.w !C2Scene_Unk0294
+    AND.b #!C2Scene_ObjCountMask
+    BNE .wait
+    STZ.w !C2Scene_Unk027E
+    STZ.w !C2Scene_ObjSel
+.wait:
+    CLC
+    RTS
+
+C2Scene_ObjEmptyB:              ; header: see C2Scene_ObjEmptyA
+    LDA.w !C2Scene_ObjBFlags
+    AND.b #!C2Scene_ObjCountMask
+    BNE .wait
+    STZ.w !C2Scene_Unk027E
+    STZ.w !C2Scene_ObjSel
+.wait:
+    CLC
+    RTS
+
+; $C2:324C — C2Scene_PartyBox (4 words, $324C–$3253)
+; C2Scene_BoxesOverlap extents (left, right, up, down) of the party in
+; C2Scene_ObjWatchIdle: 8 each way.
+C2Scene_PartyBox:
+    dw 8,8,8,8
+
+; $C2:3254 — C2Scene_ObjABox (4 words, $3254–$325B)
+; Extents of object A: only 8 down from its position.
+C2Scene_ObjABox:
+    dw 0,0,0,8
+
+; $C2:325C — C2Scene_ObjBBox (4 words, $325C–$3263)
+; Extents of object B: the same as object A's.
+C2Scene_ObjBBox:
+    dw 0,0,0,8
+
+; $C2:3264 — C2Scene_TrigWatch (17 bytes, $3264–$3274)
+; Copies its state C2Scene_Unk0280 to C2Scene_Unk0281 and runs it
+; through C2Scene_TrigWatchStates (0: C2Scene_TrigWatchCheck,
+; C2Scene_TrigStWait: C2Scene_TrigWatchWait).
+; Callers note: none found (see the banner).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (TDC for 0), DB=$00 (low
+;        WRAM absolute)
+; Exit:  the state's: C=0; M=1, X=0
+; Calls: a C2Scene_TrigWatchStates handler (JMP (abs,X)).
+C2Scene_TrigWatch:
+    SEP #$20
+    LDA.w !C2Scene_Unk0280
+    STA.w !C2Scene_Unk0281
+    TDC                         ; A = DP = 0: clears the high byte
+    LDA.w !C2Scene_Unk0280
+    ASL A
+    TAX
+    JMP (C2Scene_TrigWatchStates,X)
+
+; $C2:3275 — C2Scene_TrigWatchStates (2 words, $3275–$3278)
+; C2Scene_TrigWatch's handler for each C2Scene_Unk0280 state.
+C2Scene_TrigWatchStates:
+    dw C2Scene_TrigWatchCheck   ; 0
+    dw C2Scene_TrigWatchWait    ; 1 (C2Scene_TrigStWait)
+
+; $C2:3279 — C2Scene_TrigWatchCheck (62 bytes, $3279–$32B6)
+; State 0. When C2Scene_TrigFlags has C2Scene_TrigRecheck it clears it,
+; takes the party's tile (C2Scene_StartX / 16, C2Scene_StartY / 16),
+; finds the list entries there (C2Scene_FindTrigEntries) and acts on
+; them (C2Scene_TrigDispatch). Then, unless C2Scene_TrigFlags has
+; C2Scene_TrigKeep, it forgets them again: C2Scene_Unk1B58 = 0 and the
+; three C2Scene_Unk1B32 words = C2Scene_Unk1B32Init (also when nothing
+; was looked up).
+; Callers note: none direct (C2Scene_TrigWatchStates).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TrigTile), DB=$00 (low WRAM
+;        absolute)
+; Exit:  C=0; M=1, X=0; A, X, Y clobbered when it looked up (and what
+;        C2Scene_TrigDispatch's action changes)
+; Calls: C2Scene_FindTrigEntries, C2Scene_TrigDispatch.
+!C2Scene_TrigTile = !C2Tmp_00           ; 16-bit: the party's tile X (low byte), tile Y (high byte)
+C2Scene_TrigWatchCheck:
+    LDA.w !C2Scene_TrigFlags
+    BIT.b #!C2Scene_TrigRecheck
+    BEQ .forget
+    LDA.b #!C2Scene_TrigRecheck
+    TRB.w !C2Scene_TrigFlags
+    REP #$20
+    LDA.w !C2Scene_StartX
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_TrigTile     ; tile X in $00 (its high byte is overwritten next)
+    LDA.w !C2Scene_StartY
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !C2Scene_TrigTile+1   ; tile Y in $01
+    JSR C2Scene_FindTrigEntries
+    JSR C2Scene_TrigDispatch
+.forget:
+    LDA.w !C2Scene_TrigFlags
+    BIT.b #!C2Scene_TrigKeep
+    BNE .done
+    STZ.w !C2Scene_Unk1B58
+    LDX.w #!C2Scene_Unk1B32Init
+    STX.w !C2Scene_Unk1B32
+    STX.w !C2Scene_Unk1B32+2
+    STX.w !C2Scene_Unk1B32+4
+.done:
+    CLC
+    RTS
+
+; $C2:32B7 — C2Scene_TrigWatchWait (22 bytes, $32B7–$32CC)
+; State C2Scene_TrigStWait (set when a ListB script starts): once
+; C2Scene_Unk1B43 is non-zero, back to state 0 with the three
+; C2Scene_Unk1B32 words at C2Scene_Unk1B32Init.
+; Callers note: none direct (C2Scene_TrigWatchStates).
+; Entry: M=1, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  C=0; M=1, X=0; X = C2Scene_Unk1B32Init when it ends the wait
+C2Scene_TrigWatchWait:
+    LDA.w !C2Scene_Unk1B43
+    BEQ .done
+    STZ.w !C2Scene_Unk0280
+    LDX.w #!C2Scene_Unk1B32Init
+    STX.w !C2Scene_Unk1B32
+    STX.w !C2Scene_Unk1B32+2
+    STX.w !C2Scene_Unk1B32+4
+.done:
+    CLC
+    RTS
+
+; $C2:32CD — C2Scene_FindTrigEntries (124 bytes, $32CD–$3348)
+; For C2Scene_ListA, ListB and ListC in turn: the byte offset of the
+; first entry that has C2Scene_ListEntryBit7 set and whose first word
+; AND C2Scene_ListTileMask equals C2Scene_TrigTile, or C2Scene_NoEntry,
+; into C2Scene_Unk1B32 (ListA), C2Scene_Unk1B32+2 (ListB) and
+; C2Scene_Unk1B32+4 (ListC).
+; Quirk, kept: a list count of 0 is not special-cased: the DEY/BNE loop
+; then runs 65536 times (reading far past the list).
+; Callers (1 JSR site): C2Scene_TrigWatchCheck ($C2:3299).
+; Entry: M=0, X=0, DP=$0000 (C2Scene_TrigTile), DB=$00 (the counts and
+;        C2Scene_Unk1B32 absolute)
+; Exit:  M=0, X=0; X = ListC's result; A clobbered; Y = 0 when the last
+;        search ran out, else the entries left
+; No calls.
+C2Scene_FindTrigEntries:
+    LDA.w !C2Scene_ListACount
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDX.w #0
+.next_a:
+    LDA.l C2Scene_ListAEntry.Flags,X
+    BIT.w #!C2Scene_ListEntryBit7
+    BEQ .skip_a
+    AND.w #!C2Scene_ListTileMask
+    CMP.b !C2Scene_TrigTile
+    BEQ .found_a
+.skip_a:
+    TXA
+    CLC
+    ADC.w #!C2Scene_ListAEntrySize
+    TAX
+    DEY
+    BNE .next_a
+    LDX.w #!C2Scene_NoEntry
+.found_a:
+    STX.w !C2Scene_Unk1B32
+    LDA.w !C2Scene_ListBCount
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDX.w #0
+.next_b:
+    LDA.l C2Scene_ListBEntry.Flags,X
+    BIT.w #!C2Scene_ListEntryBit7
+    BEQ .skip_b
+    AND.w #!C2Scene_ListTileMask
+    CMP.b !C2Scene_TrigTile
+    BEQ .found_b
+.skip_b:
+    TXA
+    CLC
+    ADC.w #!C2Scene_ListBCEntrySize
+    TAX
+    DEY
+    BNE .next_b
+    LDX.w #!C2Scene_NoEntry
+.found_b:
+    STX.w !C2Scene_Unk1B32+2
+    LDA.w !C2Scene_ListCCount
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDX.w #0
+.next_c:
+    LDA.l !C2Scene_ListC,X
+    BIT.w #!C2Scene_ListEntryBit7
+    BEQ .skip_c
+    AND.w #!C2Scene_ListTileMask
+    CMP.b !C2Scene_TrigTile
+    BEQ .found_c
+.skip_c:
+    TXA
+    CLC
+    ADC.w #!C2Scene_ListBCEntrySize
+    TAX
+    DEY
+    BNE .next_c
+    LDX.w #!C2Scene_NoEntry
+.found_c:
+    STX.w !C2Scene_Unk1B32+4
+    RTS
+
+; $C2:3349 — C2Scene_TrigDispatch (53 bytes, $3349–$337D)
+; Zeroes C2Scene_Unk1B58, builds C2Scene_TrigFound from which of the
+; three C2Scene_Unk1B32 words is not C2Scene_NoEntry (bit 7 of the high
+; byte clear): C2Scene_TrigFoundA (ListA), C2Scene_TrigFoundC (ListC),
+; C2Scene_TrigFoundB (ListB), and runs that mask through
+; C2Scene_TrigActions.
+; Callers (1 JSR site): C2Scene_TrigWatchCheck ($C2:329C).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Scene_TrigMask; TDC
+;        for 0), DB=$00 (low WRAM absolute)
+; Exit:  the action's: M=1, X=0; A, X (and Y) clobbered
+; Calls: a C2Scene_TrigActions handler (JMP (abs,X)).
+!C2Scene_TrigMask = !C2Tmp_00           ; 8-bit: the mask being built
+C2Scene_TrigDispatch:
+    SEP #$20
+    STZ.w !C2Scene_Unk1B58
+    STZ.b !C2Scene_TrigMask
+    LDA.w !C2Scene_Unk1B32+1
+    BMI .no_a
+    LDA.b !C2Scene_TrigMask
+    ORA.b #!C2Scene_TrigFoundA
+    STA.b !C2Scene_TrigMask
+.no_a:
+    LDA.w !C2Scene_Unk1B32+5
+    BMI .no_c
+    LDA.b !C2Scene_TrigMask
+    ORA.b #!C2Scene_TrigFoundC
+    STA.b !C2Scene_TrigMask
+.no_c:
+    LDA.w !C2Scene_Unk1B32+3
+    BMI .no_b
+    LDA.b !C2Scene_TrigMask
+    ORA.b #!C2Scene_TrigFoundB
+    STA.b !C2Scene_TrigMask
+.no_b:
+    LDA.b !C2Scene_TrigMask
+    STA.w !C2Scene_TrigFound
+    TDC                         ; A = DP = 0: clears the high byte
+    LDA.b !C2Scene_TrigMask
+    ASL A
+    TAX
+    JMP (C2Scene_TrigActions,X)
+
+; $C2:337E — C2Scene_TrigActions (8 words, $337E–$338D)
+; C2Scene_TrigDispatch's action for each C2Scene_TrigFound mask: ListB
+; wins over ListA's task byte, ListA over ListC's mode.
+C2Scene_TrigActions:
+    dw C2Scene_TrigNone         ; none
+    dw C2Scene_TrigListA        ; A
+    dw C2Scene_TrigListC        ; C
+    dw C2Scene_TrigListA        ; A + C
+    dw C2Scene_TrigListB        ; B
+    dw C2Scene_TrigListAB       ; A + B
+    dw C2Scene_TrigListB        ; B + C
+    dw C2Scene_TrigListAB       ; A + B + C
+
+; $C2:338E — C2Scene_TrigNone (1 byte, $338E)
+; No entry at the tile: nothing.
+; Callers note: none direct (C2Scene_TrigActions).
+; Entry: M=1, X=0, DP and DB any (no accesses)
+; Exit:  nothing changed
+C2Scene_TrigNone:
+    RTS
+
+; $C2:338F — C2Scene_TrigListA (11 bytes, $338F–$3399)
+; A ListA entry (and no ListB one): the current task's .Unk02
+; (C2Scene_TaskCur) = C2Scene_TrigTaskState1, and the entry's .Unk02
+; to C2Scene_Unk1B58 (C2Scene_GetListAUnk02). What reads that task
+; byte is not matched.
+; Callers note: none direct (C2Scene_TrigActions).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (the task record
+;        and C2Scene_Unk1B32 absolute)
+; Exit:  M=1, X=0; A = the entry byte; X = C2Scene_Unk1B32
+; Calls: C2Scene_GetListAUnk02.
+C2Scene_TrigListA:
+    LDX.b !C2Scene_TaskCur
+    LDA.b #!C2Scene_TrigTaskState1
+    STA.w C2Scene_Task.Unk02,X
+    JSR C2Scene_GetListAUnk02
+    RTS
+
+; $C2:339A — C2Scene_TrigListC (16 bytes, $339A–$33A9)
+; A ListC entry only: the current task's .Unk02 =
+; C2Scene_TrigTaskState1, a ListC byte to C2Scene_Unk1B47
+; (C2Scene_GetListCUnk03), and scene mode C2Scene_ModeHalt
+; (C2Scene_Mode4, which never leaves).
+; Callers note: none direct (C2Scene_TrigActions).
+; Entry: M=1, X=0, DP=$0000 (C2Scene_TaskCur), DB=$00 (low WRAM
+;        absolute)
+; Exit:  M=1, X=0; A = C2Scene_ModeHalt; X = C2Scene_Unk1B32+4's offset
+; Calls: C2Scene_GetListCUnk03.
+C2Scene_TrigListC:
+    LDX.b !C2Scene_TaskCur
+    LDA.b #!C2Scene_TrigTaskState1
+    STA.w C2Scene_Task.Unk02,X
+    JSR C2Scene_GetListCUnk03
+    LDA.b #!C2Scene_ModeHalt
+    STA.w !C2Scene_Mode
+    RTS
+
+; $C2:33AA — C2Scene_TrigListB (42 bytes, $33AA–$33D3)
+; A ListB entry (and no ListA one): starts its C2Scene_ListD script
+; (C2Scene_GetListBScript; bank $7F, as C2Scene_Mode3 does), zeroes
+; C2Scene_MemberWords, clears the entry's C2Scene_ListEntryBit7 (so it
+; fires once) and puts C2Scene_TrigWatch in C2Scene_TrigStWait. Unlike
+; C2Scene_TrigListAB and C2Scene_Mode3 it leaves C2Scene_Unk1B43 as it
+; is.
+; Callers note: none direct (C2Scene_TrigActions).
+; Entry: M=1, X=0, B=0 (for C2Scene_GetListBScript's TAX; from
+;        C2Scene_TrigDispatch's TDC), DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=1, X=0; A = C2Scene_TrigStWait; X = the ListB offset; Y and
+;        C2Tmp_01/$08/$0A as C2Scene_TaskSpawnScript leaves them
+; Calls: C2Scene_GetListBScript, C2Scene_TaskSpawnScript.
+C2Scene_TrigListB:
+    JSR C2Scene_GetListBScript
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    LDX.w !C2Scene_Unk1B45
+    JSR C2Scene_TaskSpawnScript
+    LDX.w #0
+    STX.w !C2Scene_MemberWords
+    STX.w !C2Scene_MemberWords+2
+    STX.w !C2Scene_MemberWords+4
+    LDX.w !C2Scene_Unk1B32+2
+    LDA.l C2Scene_ListBEntry.Flags,X
+    AND.b #!C2Scene_ListEntryBit7^$FF
+    STA.l C2Scene_ListBEntry.Flags,X
+    LDA.b #!C2Scene_TrigStWait
+    STA.w !C2Scene_Unk0280
+    RTS
+
+; $C2:33D4 — C2Scene_TrigListAB (48 bytes, $33D4–$3403)
+; A ListA and a ListB entry: the ListA entry's .Unk02 to
+; C2Scene_Unk1B58 (C2Scene_GetListAUnk02), then as C2Scene_TrigListB,
+; and C2Scene_Unk1B43 = 0. The task byte C2Scene_TrigListA sets is not
+; set here.
+; Callers note: none direct (C2Scene_TrigActions).
+; Entry: M=1, X=0, B=0 (from C2Scene_TrigDispatch's TDC), DP=$0000,
+;        DB=$00 (low WRAM), as C2Scene_TrigListB
+; Exit:  as C2Scene_TrigListB
+; Calls: C2Scene_GetListAUnk02, C2Scene_GetListBScript,
+;   C2Scene_TaskSpawnScript.
+C2Scene_TrigListAB:
+    JSR C2Scene_GetListAUnk02
+    JSR C2Scene_GetListBScript
+    LDA.b #bank(!C2Scene_ScriptBuf)
+    LDX.w !C2Scene_Unk1B45
+    JSR C2Scene_TaskSpawnScript
+    LDX.w #0
+    STX.w !C2Scene_MemberWords
+    STX.w !C2Scene_MemberWords+2
+    STX.w !C2Scene_MemberWords+4
+    LDX.w !C2Scene_Unk1B32+2
+    LDA.l C2Scene_ListBEntry.Flags,X
+    AND.b #!C2Scene_ListEntryBit7^$FF
+    STA.l C2Scene_ListBEntry.Flags,X
+    LDA.b #!C2Scene_TrigStWait
+    STA.w !C2Scene_Unk0280
+    STZ.w !C2Scene_Unk1B43
+    RTS
+
+; ============================================================
 ; Text window entries ($C2:57DF–$C2:58B1)
 ; ============================================================
 ; A text box drawn into a buffer one step at a time, called from other
@@ -9503,6 +10352,1105 @@ TextWin_StatusPenIndent:        ; header: see TextWin_StatusRun
     STA.b !TextWin_PenX
 .run:
     CLC
+    RTS
+
+; ============================================================
+; Text decoder states and control codes ($C2:58B2–$C2:5DC3)
+; ============================================================
+; TextWin_Step's state handlers (TextWin_StateTable) and the routines
+; they use, all on the $0200 block (DP=TextWin_Dp). A string is a run of
+; bytes at TextWin_TextPtr:
+; - $A0-$FF: a glyph, drawn by TextWin_DrawGlyph (not matched). The
+;   digit table TextWin_HexGlyphs gives "0"-"9" as $D4-$DD and "A"-"F"
+;   as $A0-$A5, so $A0-$B9 are probably "A"-"Z" and $BA-$D3 "a"-"z"
+;   (the ROM names below read as words that way);
+; - $21-$9F: a dictionary entry (TextWin_DictPtrs): a sub-string of
+;   glyphs drawn in state 1 (TextWin_StateDict);
+; - $00-$20: a control code (TextWin_CodeTable): set TextWin_Status, a
+;   two-byte glyph, a number (states 2 and 3) or a name (state 1).
+; Each glyph drawn takes one of TextWin_StepCount; when it runs out the
+; step ends with TextWin_Status = TextWin_StatusStepDone, and the next
+; step goes on in the same state. A control code that only sets the
+; status ends the step at once.
+; Every handler here runs with M=1 and X=0 (16-bit index), DP=$0200,
+; and DB with low WRAM at $0000-$1FFF (some stores to the block are
+; absolute, e.g. TextWin_Dp+TextWin_SubPtr); B=0 is assumed on entry
+; (TextWin_Step loads $0000 before its SEP, and TextWin_DrawGlyph and
+; the handlers leave B=0 with LDA #0 / XBA) wherever a byte is
+; doubled into a 16-bit index.
+
+; $C2:58B2 — TextWin_State0 (81 bytes, $58B2–$5902, with the sub-entry
+; TextWin_State0_Draw at $C2:58BE)
+; State 0: reads the next string byte (TextWin_TextPtr + 1):
+; - a glyph (TextWin_FirstGlyph or more): TextWin_State0_Draw puts it in
+;   TextWin_Glyph (16-bit, with B as the high byte: 0, or the prefix
+;   TextWin_CodeWide puts there) and draws it (TextWin_DrawGlyph); then
+;   TextWin_StepCount - 1: while not 0 the next byte follows, else
+;   TextWin_Status = TextWin_StatusStepDone and return;
+; - TextWin_FirstDict-$9F: TextWin_DictCode = the byte; TextWin_SubPtr =
+;   entry (byte - $21) of TextWin_DictPtrs in bank $DE; its first byte
+;   (the length) to TextWin_SubLeft; state TextWin_StateDict, and on in
+;   TextWin_State1;
+; - $00-$20: Y = the code, then JMP through TextWin_CodeTable.
+; Callers (3 JMP sites): TextWin_State1Resume ($C2:5C39), TextWin_State2Resume ($C2:5C72) and
+;   TextWin_State3Resume ($C2:5CBB).
+; Callers of TextWin_State0_Draw (1 JMP site): TextWin_CodeWide ($C2:5B11).
+; Callers note: none direct (TextWin_StateTable entry 0); TextWin_State0_Draw:
+;   JMP from TextWin_CodeWide; TextWin_State0: JMP from
+;   TextWin_State1Resume, TextWin_State2Resume and TextWin_State3Resume.
+; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  M=1, X=0; A, X, Y as the path leaves them; TextWin_TextPtr
+;        advanced
+; Calls: TextWin_DrawGlyph; continues in TextWin_State1 or a
+;   TextWin_CodeTable handler.
+TextWin_State0:
+    LDA.b [!TextWin_TextPtr]
+    REP #$20
+    INC.b !TextWin_TextPtr
+    SEP #$20
+    CMP.b #!TextWin_FirstGlyph
+    BCC TextWin_State0_Draw_not_glyph
+TextWin_State0_Draw:            ; header: see TextWin_State0
+    REP #$20
+    STA.b !TextWin_Glyph
+    SEP #$20
+    JSR TextWin_DrawGlyph
+    DEC.b !TextWin_StepCount
+    BNE TextWin_State0
+    LDA.b #!TextWin_StatusStepDone
+    STA.b !TextWin_Status
+    RTS
+.not_glyph:
+    CMP.b #!TextWin_FirstDict
+    BCC .control
+    STA.b !TextWin_DictCode
+    SEC
+    SBC.b #!TextWin_FirstDict
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !TextWin_DictPtrs,X
+    STA.b !TextWin_SubPtr
+    LDA.w #$0000
+    SEP #$20
+    LDA.b #bank(!TextWin_DictPtrs)
+    STA.b !TextWin_SubPtr+2
+    LDA.b [!TextWin_SubPtr]
+    STA.b !TextWin_SubLeft
+    REP #$20
+    INC.b !TextWin_SubPtr
+    SEP #$20
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JMP TextWin_State1
+.control:
+    TAY
+    ASL A
+    TAX
+    JMP (TextWin_CodeTable,X)
+
+; $C2:5903 — TextWin_CodeTable (33 words, $5903–$5944)
+; TextWin_State0's handler for each control code $00-$20 (Y = the code).
+TextWin_CodeTable:
+    dw TextWin_CodeSetStatus    ; $00 (status 0: idle, probably the end)
+    dw TextWin_CodeWide         ; $01
+    dw TextWin_CodeWide         ; $02
+    dw TextWin_CodeStatusArg    ; $03
+    dw TextWin_CodeSetStatus    ; $04
+    dw TextWin_CodeSetStatus    ; $05
+    dw TextWin_CodeSetStatus    ; $06
+    dw TextWin_CodeSetStatus    ; $07
+    dw TextWin_CodeSetStatus    ; $08
+    dw TextWin_CodeSetStatus    ; $09
+    dw TextWin_CodeSetStatus    ; $0A
+    dw TextWin_CodeSetStatus    ; $0B
+    dw TextWin_CodeSetStatus    ; $0C
+    dw TextWin_CodeNum8         ; $0D
+    dw TextWin_CodeNum16        ; $0E
+    dw TextWin_CodeNum24        ; $0F
+    dw TextWin_CodeNop          ; $10
+    dw TextWin_CodeArgName      ; $11
+    dw TextWin_CodeExt          ; $12
+    dw TextWin_CodeCharName     ; $13
+    dw TextWin_CodeCharName     ; $14
+    dw TextWin_CodeCharName     ; $15
+    dw TextWin_CodeCharName     ; $16
+    dw TextWin_CodeCharName     ; $17
+    dw TextWin_CodeCharName     ; $18
+    dw TextWin_CodeCharName     ; $19
+    dw TextWin_CodeName0        ; $1A
+    dw TextWin_CodeMemberName   ; $1B
+    dw TextWin_CodeMemberName   ; $1C
+    dw TextWin_CodeMemberName   ; $1D
+    dw TextWin_CodeNadia        ; $1E
+    dw TextWin_CodeItemName     ; $1F
+    dw TextWin_CodeName7        ; $20
+
+; $C2:5945 — TextWin_CodeStatusArg (10 bytes, $5945–$594E, with the
+; sub-entry TextWin_CodeSetStatus at $C2:594F, 4 bytes)
+; Code $03: the next string byte to TextWin_Code3Arg, then as
+; TextWin_CodeSetStatus. TextWin_CodeSetStatus (codes $00 and $04-$0C):
+; TextWin_Status = the code (TextWin_StatusTable: 0 idle, 5-12 the pen
+; resets), which ends the step.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB any (direct page only); Y = the code
+; Exit:  M=1; A = the code; TextWin_Status set; X, Y unchanged
+TextWin_CodeStatusArg:
+    LDA.b [!TextWin_TextPtr]
+    STA.b !TextWin_Code3Arg
+    REP #$20
+    INC.b !TextWin_TextPtr
+    SEP #$20
+TextWin_CodeSetStatus:          ; header: see TextWin_CodeStatusArg
+    TYA
+    STA.b !TextWin_Status
+    RTS
+
+; $C2:5953 — TextWin_CodeNum8 (50 bytes, $5953–$5984)
+; Code $0D: prints the byte at TextWin_Unk3D (which steps on by 1).
+; Decimal: TextWin_Dec8's three digits, leading zeros dropped
+; (TextWin_TrimZeros3), drawn in state TextWin_StateDec
+; (TextWin_StartDec). With TextWin_NumHex set: two hex digit glyphs
+; (TextWin_HexByte), drawn in state TextWin_StateHex (TextWin_StartHex).
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State2 or TextWin_State3 (the number's first
+;        glyphs drawn this step)
+; Calls: TextWin_Dec8, TextWin_TrimZeros3 or TextWin_HexByte; continues
+;   in TextWin_StartDec or TextWin_StartHex.
+TextWin_CodeNum8:
+    LDA.b [!TextWin_Unk3D]
+    STA.b !TextWin_NumValue
+    REP #$20
+    INC.b !TextWin_Unk3D
+    SEP #$20
+    LDA.b !TextWin_NumHex
+    BNE .hex
+    JSR TextWin_Dec8
+    LDX.b !TextWin_DecDigits
+    STX.b !TextWin_Digits
+    LDA.b !TextWin_DecDigits+2
+    STA.b !TextWin_Digits+2
+    JSR TextWin_TrimZeros3
+    JMP TextWin_StartDec
+.hex:
+    REP #$20
+    STZ.b !TextWin_HexPos
+    LDA.b !TextWin_NumValue
+    STA.b !TextWin_HexIn
+    JSR TextWin_HexByte
+    LDA.w #!TextWin_HexDigitCount8
+    SEP #$20
+    JMP TextWin_StartHex
+
+; $C2:5985 — TextWin_CodeNum16 (67 bytes, $5985–$59C7)
+; Code $0E: as TextWin_CodeNum8 for the 16-bit value at TextWin_Unk3D
+; (steps on by 2): five decimal digits (TextWin_Dec16,
+; TextWin_TrimZeros5), or four hex digits, high byte first.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State2 or TextWin_State3
+; Calls: TextWin_Dec16, TextWin_TrimZeros5 or TextWin_HexByte (twice);
+;   continues in TextWin_StartDec or TextWin_StartHex.
+TextWin_CodeNum16:
+    REP #$20
+    LDA.b [!TextWin_Unk3D]
+    STA.b !TextWin_NumValue
+    INC.b !TextWin_Unk3D
+    INC.b !TextWin_Unk3D
+    LDA.w #$0000
+    SEP #$20
+    LDA.b !TextWin_NumHex
+    BNE .hex
+    JSR TextWin_Dec16
+    LDX.b !TextWin_DecDigits
+    STX.b !TextWin_Digits
+    LDX.b !TextWin_DecDigits+2
+    STX.b !TextWin_Digits+2
+    LDA.b !TextWin_DecDigits+4
+    STA.b !TextWin_Digits+4
+    JSR TextWin_TrimZeros5
+    JMP TextWin_StartDec
+.hex:
+    REP #$20
+    STZ.b !TextWin_HexPos
+    LDA.b !TextWin_NumValue
+    XBA
+    STA.b !TextWin_HexIn
+    JSR TextWin_HexByte
+    LDA.b !TextWin_NumValue
+    STA.b !TextWin_HexIn
+    JSR TextWin_HexByte
+    LDA.w #!TextWin_HexDigitCount16
+    SEP #$20
+    JMP TextWin_StartHex
+
+; $C2:59C8 — TextWin_CodeNum24 (94 bytes, $59C8–$5A25, with the
+; sub-entries TextWin_StartDec at $C2:59FC and TextWin_StartHex at
+; $C2:5A11, 21 bytes each)
+; Code $0F: the 24-bit value at TextWin_Unk3D (steps on by 3) as eight
+; decimal digits (TextWin_Dec24, TextWin_TrimZeros8); unlike codes $0D
+; and $0E it ignores TextWin_NumHex.
+; TextWin_StartDec / TextWin_StartHex: with A = the digit count, set
+; TextWin_SubLeft to it and TextWin_SubPtr to TextWin_Digits ($00:0240),
+; and go on in state TextWin_StateDec (TextWin_State2) or
+; TextWin_StateHex (TextWin_State3) with B=0.
+; Callers of TextWin_StartDec (2 JMP sites): TextWin_CodeNum8 ($C2:596F) and TextWin_CodeNum16
+;   ($C2:59AA).
+; Callers of TextWin_StartHex (2 JMP sites): TextWin_CodeNum8 ($C2:5982) and TextWin_CodeNum16
+;   ($C2:59C5).
+; Callers note: none direct (TextWin_CodeTable). TextWin_StartDec: JMP from
+;   TextWin_CodeNum8 and TextWin_CodeNum16; TextWin_StartHex: the same.
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner);
+;        TextWin_StartDec/Hex with A = the count
+; Exit:  as TextWin_State2 or TextWin_State3
+; Calls: TextWin_Dec24, TextWin_TrimZeros8; continues in TextWin_State2
+;   or TextWin_State3.
+TextWin_CodeNum24:
+    REP #$20
+    LDA.b [!TextWin_Unk3D]
+    STA.b !TextWin_NumValue
+    SEP #$20
+    LDY.w #2
+    LDA.b [!TextWin_Unk3D],Y
+    STA.b !TextWin_NumValue+2
+    REP #$20
+    LDA.b !TextWin_Unk3D
+    CLC
+    ADC.w #3
+    STA.b !TextWin_Unk3D
+    LDA.w #$0000
+    SEP #$20
+    JSR TextWin_Dec24
+    LDX.b !TextWin_DecDigits
+    STX.b !TextWin_Digits
+    LDX.b !TextWin_DecDigits+2
+    STX.b !TextWin_Digits+2
+    LDX.b !TextWin_DecDigits+4
+    STX.b !TextWin_Digits+4
+    LDX.b !TextWin_DecDigits+6
+    STX.b !TextWin_Digits+6
+    JSR TextWin_TrimZeros8
+TextWin_StartDec:               ; header: see TextWin_CodeNum24
+    STA.b !TextWin_SubLeft
+    LDX.w #!TextWin_Dp+!TextWin_Digits
+    STX.b !TextWin_SubPtr
+    LDA.b #0
+    STA.b !TextWin_SubPtr+2
+    LDA.b #!TextWin_StateDec
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State2
+TextWin_StartHex:               ; header: see TextWin_CodeNum24
+    STA.b !TextWin_SubLeft
+    LDX.w #!TextWin_Dp+!TextWin_Digits
+    STX.b !TextWin_SubPtr
+    LDA.b #0
+    STA.b !TextWin_SubPtr+2
+    LDA.b #!TextWin_StateHex
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State3
+
+; $C2:5A26 — TextWin_CodeArgName (38 bytes, $5A26–$5A4B)
+; Code $11: the name whose TextWin_CharNamePtrs index is the byte at
+; TextWin_Unk3D (which steps on by 1): TextWin_SubPtr at it in bank $7E,
+; TextWin_SubLeft = its length (TextWin_CharNameLen), state
+; TextWin_StateDict, on in TextWin_State1.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, B=0 (the index is doubled 16-bit), DP=$0200, DB with
+;        low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: TextWin_CharNameLen; continues in TextWin_State1.
+TextWin_CodeArgName:
+    LDA.b [!TextWin_Unk3D]
+    REP #$20
+    INC.b !TextWin_Unk3D
+    ASL A
+    TAX
+    LDA.l TextWin_CharNamePtrs,X
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWin_CharNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JSR TextWin_CharNameLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5A4C — TextWin_CodeExt (62 bytes, $5A4C–$5A89)
+; Code $12 and the next string byte b: b from TextWin_Code12Dict up is
+; dictionary entry TextWin_Code12DictBase + (b - 8) (as TextWin_State0's
+; dictionary bytes, also kept in TextWin_DictCode); below that, b
+; selects a TextWin_ExtTable handler.
+; Quirk, kept: the table has 2 entries but b = 2-7 is not refused; those
+; would jump through the code bytes after it.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: continues in TextWin_State1 or a TextWin_ExtTable handler.
+TextWin_CodeExt:
+    LDA.b [!TextWin_TextPtr]
+    REP #$20
+    INC.b !TextWin_TextPtr
+    SEP #$20
+    CMP.b #!TextWin_Code12Dict
+    BCC .table
+    STA.b !TextWin_DictCode
+    SEC
+    SBC.b #!TextWin_Code12Dict
+    REP #$20
+    CLC
+    ADC.w #!TextWin_Code12DictBase
+    ASL A
+    TAX
+    LDA.l !TextWin_DictPtrs,X
+    STA.b !TextWin_SubPtr
+    LDA.w #$0000
+    SEP #$20
+    LDA.b #bank(!TextWin_DictPtrs)
+    STA.b !TextWin_SubPtr+2
+    LDA.b [!TextWin_SubPtr]
+    STA.b !TextWin_SubLeft
+    REP #$20
+    INC.b !TextWin_SubPtr
+    SEP #$20
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JMP TextWin_State1
+.table:
+    ASL A
+    TAX
+    JMP (TextWin_ExtTable,X)
+
+; $C2:5A8A — TextWin_ExtTable (2 words, $5A8A–$5A8D)
+; TextWin_CodeExt's handler for b = 0 and 1.
+TextWin_ExtTable:
+    dw TextWin_ExtTechName      ; 0
+    dw TextWin_ExtEnemyName     ; 1
+
+; $C2:5A8E — TextWin_ExtTechName (66 bytes, $5A8E–$5ACF)
+; Code $12 $00: name number (the byte at TextWin_Unk3D, which steps on)
+; of TextWinRom_TechNames (TextWin_RomNameSize bytes each, by the
+; multiplier): TextWin_SubLeft = its length up to the first
+; TextWin_NamePad (TextWin_NameLen11); when it starts with
+; TextWin_TechIconByte that byte is skipped and the rest counted again
+; with TextWin_NameLen10. Then TextWin_StartSubName.
+; Callers note: none direct (TextWin_ExtTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: TextWin_NameLen11, TextWin_NameLen10; continues in
+;   TextWin_StartSubName.
+TextWin_ExtTechName:
+    LDA.b [!TextWin_Unk3D]
+    REP #$20
+    INC.b !TextWin_Unk3D
+    SEP #$20
+    STA.l WRMPYA
+    LDA.b #!TextWin_RomNameSize
+    STA.l WRMPYB
+    NOP
+    CLC
+    REP #$20
+    LDA.l RDMPYL
+    ADC.w #!TextWinRom_TechNames&$FFFF
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWinRom_TechNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    JSR TextWin_NameLen11
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b [!TextWin_SubPtr]
+    CMP.b #!TextWin_TechIconByte
+    BNE .counted
+    REP #$20
+    INC.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    JSR TextWin_NameLen10
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+.counted:
+    BRA TextWin_StartSubName
+
+; $C2:5AD0 — TextWin_ExtEnemyName (54 bytes, $5AD0–$5B05, with the
+; sub-entry TextWin_StartSubName at $C2:5AFC)
+; Code $12 $01: name number (the byte at TextWin_Unk3D) of
+; TextWinRom_EnemyNames, all TextWin_RomNameSize bytes of it (the
+; padding is drawn too). TextWin_StartSubName: state TextWin_StateDict,
+; B=0, on in TextWin_State1.
+; Callers note: none direct (TextWin_ExtTable). TextWin_StartSubName: BRA
+;   from TextWin_ExtTechName.
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: continues in TextWin_State1.
+TextWin_ExtEnemyName:
+    LDA.b [!TextWin_Unk3D]
+    REP #$20
+    INC.b !TextWin_Unk3D
+    SEP #$20
+    STA.l WRMPYA
+    LDA.b #!TextWin_RomNameSize
+    STA.l WRMPYB
+    NOP
+    CLC
+    REP #$20
+    LDA.l RDMPYL
+    ADC.w #!TextWinRom_EnemyNames&$FFFF
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWinRom_EnemyNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_RomNameSize
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+TextWin_StartSubName:           ; header: see TextWin_ExtEnemyName
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5B06 — TextWin_CodeWide (14 bytes, $5B06–$5B13)
+; Codes $01 and $02 (TextWin_Wide1/2): the next string byte with the
+; code as its high byte is a 16-bit glyph ($01xx or $02xx), drawn by
+; TextWin_State0_Draw.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (TextWin_TextPtr is
+;        stepped with an absolute INC); Y = the code
+; Exit:  as TextWin_State0
+; Calls: continues in TextWin_State0_Draw.
+TextWin_CodeWide:
+    TYA
+    XBA
+    LDA.b [!TextWin_TextPtr]
+    REP #$20
+    INC.w !TextWin_Dp+!TextWin_TextPtr
+    SEP #$20
+    JMP TextWin_State0_Draw
+
+; $C2:5B14 — TextWin_CodeNop (1 byte, $5B14)
+; Code $10: nothing; the step ends.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP and DB any (no accesses)
+; Exit:  nothing changed
+TextWin_CodeNop:
+    RTS
+
+; $C2:5B15 — TextWin_CodeCharName (38 bytes, $5B15–$5B3A)
+; Codes TextWin_FirstCharName-$19: the name at TextWin_CharNamePtrs
+; entry (code - $13), in bank $7E, its length by TextWin_CharNameLen,
+; drawn in state TextWin_StateDict.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner);
+;        Y = the code
+; Exit:  as TextWin_State1
+; Calls: TextWin_CharNameLen; continues in TextWin_State1.
+TextWin_CodeCharName:
+    TYA
+    SEC
+    SBC.b #!TextWin_FirstCharName
+    ASL A
+    TAX
+    REP #$20
+    LDA.l TextWin_CharNamePtrs,X
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWin_CharNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JSR TextWin_CharNameLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5B3B — TextWin_CodeName0 (27 bytes, $5B3B–$5B55)
+; Code $1A: the first name at TextWin_CharNames (the one
+; TextWin_CharNamePtrs entry 0 also points at), as
+; TextWin_CodeCharName.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: TextWin_CharNameLen; continues in TextWin_State1.
+TextWin_CodeName0:
+    LDX.w #!TextWin_CharNames&$FFFF
+    LDA.b #bank(!TextWin_CharNames)
+    STX.w !TextWin_Dp+!TextWin_SubPtr
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    JSR TextWin_CharNameLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5B56 — TextWin_CodeNadia (26 bytes, $5B56–$5B6F)
+; Code $1E: the TextWin_StrNadiaLen glyphs at TextWin_StrNadia
+; ($C2:6146, which spell "Nadia" with $A0 = "A", $BA = "a"), in state
+; TextWin_StateDict.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: continues in TextWin_State1.
+TextWin_CodeNadia:
+    LDX.w #TextWin_StrNadia
+    LDA.b #bank(TextWin_StrNadia)
+    STX.w !TextWin_Dp+!TextWin_SubPtr
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_StrNadiaLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5B70 — TextWin_CodeMemberName (43 bytes, $5B70–$5B9A)
+; Codes TextWin_FirstMemberName-$1D: the name of the character in party
+; position (code - $1B): Party_Members gives the TextWin_CharNamePtrs
+; index; then as TextWin_CodeCharName.
+; Quirk, kept: an empty position (bit 7 set) is not checked; its id,
+; doubled, would index far past the 7 pointers.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, B=0, DP=$0200, DB with low WRAM (see the banner);
+;        Y = the code
+; Exit:  as TextWin_State1
+; Calls: TextWin_CharNameLen; continues in TextWin_State1.
+TextWin_CodeMemberName:
+    TYA
+    SEC
+    SBC.b #!TextWin_FirstMemberName
+    TAX
+    LDA.l !Party_Members,X
+    ASL A
+    TAX
+    REP #$20
+    LDA.l TextWin_CharNamePtrs,X
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWin_CharNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JSR TextWin_CharNameLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5B9B — TextWin_CodeItemName (59 bytes, $5B9B–$5BD5)
+; Code $1F: the name of item Treasure_ItemId (its low byte) in
+; TextWinRom_ItemNames, from its second byte (the first is an icon), up
+; to the first TextWin_NamePad (TextWin_NameLen10).
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: TextWin_NameLen10; continues in TextWin_State1.
+TextWin_CodeItemName:
+    REP #$20
+    LDA.l !Treasure_ItemId
+    AND.w #!Eng_LowByteMask
+    SEP #$20
+    STA.l WRMPYA
+    LDA.b #!TextWin_RomNameSize
+    STA.l WRMPYB
+    NOP
+    CLC
+    REP #$20
+    LDA.l RDMPYL
+    ADC.w #!TextWinRom_ItemNames&$FFFF
+    INC A                       ; past the icon byte
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWinRom_ItemNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    JSR TextWin_NameLen10
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5BD6 — TextWin_CodeName7 (31 bytes, $5BD6–$5BF4)
+; Code $20: the eighth name at TextWin_CharNames ($7E:2C4D, after the
+; seven TextWin_CharNamePtrs points at), as TextWin_CodeCharName.
+; Callers note: none direct (TextWin_CodeTable).
+; Entry: M=1, X=0, DP=$0200, DB with low WRAM (see the banner)
+; Exit:  as TextWin_State1
+; Calls: TextWin_CharNameLen; continues in TextWin_State1.
+TextWin_CodeName7:
+    REP #$20
+    LDA.w #(!TextWin_CharNames+(7*!TextWin_CharNameSize))&$FFFF
+    STA.w !TextWin_Dp+!TextWin_SubPtr
+    SEP #$20
+    LDA.b #bank(!TextWin_CharNames)
+    STA.w !TextWin_Dp+!TextWin_SubPtr+2
+    LDA.b #!TextWin_StateDict
+    STA.b !TextWin_State
+    JSR TextWin_CharNameLen
+    STA.w !TextWin_Dp+!TextWin_SubLeft
+    LDA.b #0
+    XBA
+    JMP TextWin_State1
+
+; $C2:5BF5 — TextWin_State1 (51 bytes, $5BF5–$5C27, with the exits
+; TextWin_State1End $C2:5C30, TextWin_State1Pause $C2:5C32,
+; TextWin_State1Resume $C2:5C37 and TextWin_State1Loop $C2:5C3C)
+; State TextWin_StateDict: draws the next glyph of the sub-string at
+; TextWin_SubPtr (a TextWin_Wide1/2 byte makes the next byte the low
+; byte of a 16-bit glyph). Then TextWin_SubLeft - 1 and
+; TextWin_StepCount - 1 pick the exit (TextWin_State1Next):
+; - both at 0, TextWin_State1End: state 0, then as TextWin_State1Pause;
+; - steps at 0, TextWin_State1Pause: TextWin_Status =
+;   TextWin_StatusStepDone, return (the next step goes on here);
+; - sub-string done, TextWin_State1Resume: state 0, on with the string
+;   (TextWin_State0);
+; - neither, TextWin_State1Loop: the next glyph.
+; Quirk, kept: a TextWin_SubLeft of 0 is not special-cased (the DEC
+; makes it $FF, so 256 glyphs are drawn); and on the two-byte path the
+; REP #$20 is done twice.
+; Callers (10 JMP sites): TextWin_State0_Draw ($C2:58FA), TextWin_CodeArgName ($C2:5A49),
+;   TextWin_CodeExt ($C2:5A82), TextWin_StartSubName ($C2:5B03), TextWin_CodeCharName ($C2:5B38),
+;   TextWin_CodeName0 ($C2:5B53), TextWin_CodeNadia ($C2:5B6D), TextWin_CodeMemberName ($C2:5B98),
+;   TextWin_CodeItemName ($C2:5BD3) and TextWin_CodeName7 ($C2:5BF2).
+; Callers note: TextWin_StateTable entry 1; 10 JMP sites: TextWin_State0
+;   ($C2:58FA), TextWin_CodeArgName, TextWin_CodeExt,
+;   TextWin_StartSubName, TextWin_CodeCharName, TextWin_CodeName0,
+;   TextWin_CodeNadia, TextWin_CodeMemberName, TextWin_CodeItemName and
+;   TextWin_CodeName7.
+; Entry: M=1, X=0, DP=$0200, DB as TextWin_DrawGlyph needs (not traced;
+;        this code is direct page only); B = 0 for a one-byte glyph (its
+;        high byte)
+; Exit:  M=1, X=0; A, X as the exit leaves them
+; Calls: TextWin_DrawGlyph; exits through TextWin_State1Next.
+TextWin_State1:
+    LDA.b [!TextWin_SubPtr]
+    REP #$20
+    INC.b !TextWin_SubPtr
+    SEP #$20
+    CMP.b #!TextWin_Wide1
+    BEQ .wide
+    CMP.b #!TextWin_Wide2
+    BNE .draw
+.wide:
+    XBA
+    LDA.b [!TextWin_SubPtr]
+    REP #$20
+    INC.b !TextWin_SubPtr
+.draw:
+    REP #$20
+    STA.b !TextWin_Glyph
+    SEP #$20
+    JSR TextWin_DrawGlyph
+    LDA.b #0
+    DEC.b !TextWin_SubLeft
+    BEQ .sub_done
+    ORA.b #1
+.sub_done:
+    DEC.b !TextWin_StepCount
+    BEQ .steps_done
+    ORA.b #2
+.steps_done:
+    ASL A
+    TAX
+    JMP (TextWin_State1Next,X)
+
+; $C2:5C28 — TextWin_State1Next (4 words, $5C28–$5C2F)
+; TextWin_State1's exit by (sub-string left) + 2 * (steps left).
+TextWin_State1Next:
+    dw TextWin_State1End        ; 0
+    dw TextWin_State1Pause      ; 1: sub-string left
+    dw TextWin_State1Resume     ; 2: steps left
+    dw TextWin_State1Loop       ; 3: both
+
+TextWin_State1End:              ; header: see TextWin_State1
+    STZ.b !TextWin_State
+TextWin_State1Pause:            ; header: see TextWin_State1
+    LDA.b #!TextWin_StatusStepDone
+    STA.b !TextWin_Status
+    RTS
+TextWin_State1Resume:           ; header: see TextWin_State1
+    STZ.b !TextWin_State
+    JMP TextWin_State0
+TextWin_State1Loop:             ; header: see TextWin_State1
+    BRA TextWin_State1
+
+; $C2:5C3E — TextWin_State2 (35 bytes, $5C3E–$5C60, with the exits
+; TextWin_State2End $C2:5C69, TextWin_State2Pause $C2:5C6B,
+; TextWin_State2Resume $C2:5C70 and TextWin_State2Loop $C2:5C75)
+; State TextWin_StateDec: draws the next decimal digit at TextWin_SubPtr
+; as glyph TextWin_DigitGlyph0 + the digit, then exits as TextWin_State1
+; does (TextWin_State2Next).
+; Callers (1 JMP site): TextWin_StartDec ($C2:5A0E).
+; Callers note: none direct (TextWin_StateTable entry 2); JMP from
+;   TextWin_StartDec.
+; Entry: M=1, X=0, B=0 (the glyph's high byte), DP=$0200, DB as
+;        TextWin_DrawGlyph needs (not traced)
+; Exit:  M=1, X=0; A, X as the exit leaves them
+; Calls: TextWin_DrawGlyph; exits through TextWin_State2Next.
+TextWin_State2:
+    LDA.b [!TextWin_SubPtr]
+    CLC
+    ADC.b #!TextWin_DigitGlyph0
+    REP #$20
+    STA.b !TextWin_Glyph
+    INC.b !TextWin_SubPtr
+    SEP #$20
+    JSR TextWin_DrawGlyph
+    LDA.b #0
+    DEC.b !TextWin_SubLeft
+    BEQ .sub_done
+    ORA.b #1
+.sub_done:
+    DEC.b !TextWin_StepCount
+    BEQ .steps_done
+    ORA.b #2
+.steps_done:
+    ASL A
+    TAX
+    JMP (TextWin_State2Next,X)
+
+; $C2:5C61 — TextWin_State2Next (4 words, $5C61–$5C68)
+; TextWin_State2's exit, as TextWin_State1Next.
+TextWin_State2Next:
+    dw TextWin_State2End        ; 0
+    dw TextWin_State2Pause      ; 1: digits left
+    dw TextWin_State2Resume     ; 2: steps left
+    dw TextWin_State2Loop       ; 3: both
+
+TextWin_State2End:              ; header: see TextWin_State2
+    STZ.b !TextWin_State
+TextWin_State2Pause:            ; header: see TextWin_State2
+    LDA.b #!TextWin_StatusStepDone
+    STA.b !TextWin_Status
+    RTS
+TextWin_State2Resume:           ; header: see TextWin_State2
+    STZ.b !TextWin_State
+    JMP TextWin_State0
+TextWin_State2Loop:             ; header: see TextWin_State2
+    BRA TextWin_State2
+
+; $C2:5C77 — TextWin_State3 (51 bytes, $5C77–$5CA9, with the exits
+; TextWin_State3End $C2:5CB2, TextWin_State3Pause $C2:5CB4,
+; TextWin_State3Resume $C2:5CB9 and TextWin_State3Loop $C2:5CBE)
+; State TextWin_StateHex: the same code as TextWin_State1 (glyph bytes,
+; with the two-byte prefixes) with its own exits (TextWin_State3Next);
+; the hex digits TextWin_HexByte stored are drawn this way.
+; Quirks, kept: as TextWin_State1's.
+; Callers (1 JMP site): TextWin_StartHex ($C2:5A23).
+; Callers note: none direct (TextWin_StateTable entry 3); JMP from
+;   TextWin_StartHex.
+; Entry: M=1, X=0, B=0 for a one-byte glyph, DP=$0200, DB as
+;        TextWin_DrawGlyph needs (not traced)
+; Exit:  M=1, X=0; A, X as the exit leaves them
+; Calls: TextWin_DrawGlyph; exits through TextWin_State3Next.
+TextWin_State3:
+    LDA.b [!TextWin_SubPtr]
+    REP #$20
+    INC.b !TextWin_SubPtr
+    SEP #$20
+    CMP.b #!TextWin_Wide1
+    BEQ .wide
+    CMP.b #!TextWin_Wide2
+    BNE .draw
+.wide:
+    XBA
+    LDA.b [!TextWin_SubPtr]
+    REP #$20
+    INC.b !TextWin_SubPtr
+.draw:
+    REP #$20
+    STA.b !TextWin_Glyph
+    SEP #$20
+    JSR TextWin_DrawGlyph
+    LDA.b #0
+    DEC.b !TextWin_SubLeft
+    BEQ .sub_done
+    ORA.b #1
+.sub_done:
+    DEC.b !TextWin_StepCount
+    BEQ .steps_done
+    ORA.b #2
+.steps_done:
+    ASL A
+    TAX
+    JMP (TextWin_State3Next,X)
+
+; $C2:5CAA — TextWin_State3Next (4 words, $5CAA–$5CB1)
+; TextWin_State3's exit, as TextWin_State1Next.
+TextWin_State3Next:
+    dw TextWin_State3End        ; 0
+    dw TextWin_State3Pause      ; 1: glyphs left
+    dw TextWin_State3Resume     ; 2: steps left
+    dw TextWin_State3Loop       ; 3: both
+
+TextWin_State3End:              ; header: see TextWin_State3
+    STZ.b !TextWin_State
+TextWin_State3Pause:            ; header: see TextWin_State3
+    LDA.b #!TextWin_StatusStepDone
+    STA.b !TextWin_Status
+    RTS
+TextWin_State3Resume:           ; header: see TextWin_State3
+    STZ.b !TextWin_State
+    JMP TextWin_State0
+TextWin_State3Loop:             ; header: see TextWin_State3
+    BRA TextWin_State3
+
+; $C2:5CC0 — TextWin_HexByte (67 bytes, $5CC0–$5D02)
+; Appends the two hex digit glyphs of TextWin_HexIn (high digit first,
+; from TextWin_HexGlyphs) to TextWin_Digits at TextWin_HexPos, which
+; goes up by one per glyph (by two for a TextWin_WideGlyphMin or higher
+; entry, stored prefix first; the table has none).
+; Note: each store is 16-bit, so the byte after the glyph is zeroed too.
+; Callers (3 JSR sites): TextWin_CodeNum8 ($C2:597A) and TextWin_CodeNum16 ($C2:59B6, $C2:59BD).
+; Entry: M any (REP #$20 here), X=0, DP=$0200, DB any (long table)
+; Exit:  M=0, X=0; A = the low digit's glyph, X = TextWin_HexPos before
+;        the last store; TextWin_HexPos advanced; Y unchanged
+; No calls.
+TextWin_HexByte:
+    REP #$20
+    LDA.b !TextWin_HexIn
+    AND.w #!TextWin_NibbleHi
+    LSR A
+    LSR A
+    LSR A                       ; the high digit * 2
+    TAX
+    LDA.l TextWin_HexGlyphs,X
+    LDX.b !TextWin_HexPos
+    CMP.w #!TextWin_WideGlyphMin
+    BCC .narrow_hi
+    XBA
+    STA.b !TextWin_Digits,X
+    INC.b !TextWin_HexPos
+    INC.b !TextWin_HexPos
+    BRA .low
+.narrow_hi:
+    STA.b !TextWin_Digits,X
+    INC.b !TextWin_HexPos
+.low:
+    LDA.b !TextWin_HexIn
+    AND.w #!TextWin_NibbleLo
+    ASL A
+    TAX
+    LDA.l TextWin_HexGlyphs,X
+    LDX.b !TextWin_HexPos
+    CMP.w #!TextWin_WideGlyphMin
+    BCC .narrow_lo
+    XBA
+    STA.b !TextWin_Digits,X
+    INC.b !TextWin_HexPos
+    INC.b !TextWin_HexPos
+    BRA .done
+.narrow_lo:
+    STA.b !TextWin_Digits,X
+    INC.b !TextWin_HexPos
+.done:
+    RTS
+
+; $C2:5D03 — TextWin_HexGlyphs (16 words, $5D03–$5D22)
+; The glyph of each hex digit 0-F (TextWin_HexByte): "0"-"9" are
+; $D4-$DD, "A"-"F" $A0-$A5.
+TextWin_HexGlyphs:
+    dw $00D4,$00D5,$00D6,$00D7,$00D8,$00D9,$00DA,$00DB
+    dw $00DC,$00DD,$00A0,$00A1,$00A2,$00A3,$00A4,$00A5
+
+; $C2:5D23 — TextWin_NameLen10 (17 bytes, $5D23–$5D33)
+; A = the number of bytes at TextWin_SubPtr before the first
+; TextWin_NamePad, at most 10.
+; Callers (2 JSR sites): TextWin_ExtTechName ($C2:5AC8) and TextWin_CodeItemName ($C2:5BC6).
+; Entry: M=1, X=0, DP=$0200, DB any
+; Exit:  M=1, X=0; A = Y = the count; X unchanged
+; No calls.
+TextWin_NameLen10:
+    LDY.w #0
+.next:
+    LDA.b [!TextWin_SubPtr],Y
+    CMP.b #!TextWin_NamePad
+    BEQ .done
+    INY
+    CPY.w #!TextWin_RomNameSize-1
+    BCC .next
+.done:
+    TYA
+    RTS
+
+; $C2:5D34 — TextWin_NameLen11 (17 bytes, $5D34–$5D44)
+; As TextWin_NameLen10, at most 11 (a whole TextWinRom name).
+; Callers (1 JSR site): TextWin_ExtTechName ($C2:5AB5).
+; Entry: M=1, X=0, DP=$0200, DB any
+; Exit:  M=1, X=0; A = Y = the count; X unchanged
+; No calls.
+TextWin_NameLen11:
+    LDY.w #0
+.next:
+    LDA.b [!TextWin_SubPtr],Y
+    CMP.b #!TextWin_NamePad
+    BEQ .done
+    INY
+    CPY.w #!TextWin_RomNameSize
+    BCC .next
+.done:
+    TYA
+    RTS
+
+; $C2:5D45 — TextWin_CharNameLen (17 bytes, $5D45–$5D55)
+; A = the number of bytes at TextWin_SubPtr before the first 0, at most
+; TextWin_CharNameMax.
+; Callers (5 JSR sites): TextWin_CodeArgName ($C2:5A40), TextWin_CodeCharName ($C2:5B2F),
+;   TextWin_CodeName0 ($C2:5B46), TextWin_CodeMemberName ($C2:5B8F) and TextWin_CodeName7
+;   ($C2:5BE9).
+; Entry: M=1, X=0, DP=$0200, DB any
+; Exit:  M=1, X=0; A = Y = the count; X unchanged
+; No calls.
+TextWin_CharNameLen:
+    LDY.w #0
+.next:
+    LDA.b [!TextWin_SubPtr],Y
+    CMP.b #0
+    BEQ .done
+    INY
+    CPY.w #!TextWin_CharNameMax
+    BCC .next
+.done:
+    TYA
+    RTS
+
+; $C2:5D56 — TextWin_TrimZeros8 (110 bytes, $5D56–$5DC3, with the
+; sub-entries TextWin_TrimZeros5 at $C2:5D91 and TextWin_TrimZeros3 at
+; $C2:5DAD)
+; Drops the leading zero digits of the 8 (5, 3) digits at
+; TextWin_Digits, keeping at least one: while the first is 0, shifts
+; the rest down one byte. A = the digits left. The 16-bit moves also
+; shift the byte after the last digit (left as it was).
+; Callers (1 JSR site): TextWin_CodeNum24 ($C2:59F9).
+; Callers of TextWin_TrimZeros5 (1 JSR site): TextWin_CodeNum16 ($C2:59A7).
+; Callers of TextWin_TrimZeros3 (1 JSR site): TextWin_CodeNum8 ($C2:596C).
+; Entry: M any for TextWin_TrimZeros8 (SEP #$20 here), M=1 for the
+;        sub-entries; X=0, DP=$0200, DB any (direct page only)
+; Exit:  M=1, X=0; A = Y = the digit count; X = the last word moved
+;        (unchanged when none was)
+; No calls.
+TextWin_TrimZeros8:
+    SEP #$20
+    LDY.w #8
+    LDA.b !TextWin_Digits
+    BNE TextWin_TrimZeros3_done
+    LDA.b !TextWin_Digits+1
+    STA.b !TextWin_Digits
+    LDX.b !TextWin_Digits+2
+    STX.b !TextWin_Digits+1
+    LDX.b !TextWin_Digits+4
+    STX.b !TextWin_Digits+3
+    LDX.b !TextWin_Digits+6
+    STX.b !TextWin_Digits+5
+    DEY
+    LDA.b !TextWin_Digits
+    BNE TextWin_TrimZeros3_done
+    LDX.b !TextWin_Digits+1
+    STX.b !TextWin_Digits
+    LDX.b !TextWin_Digits+3
+    STX.b !TextWin_Digits+2
+    LDX.b !TextWin_Digits+5
+    STX.b !TextWin_Digits+4
+    DEY
+    LDA.b !TextWin_Digits
+    BNE TextWin_TrimZeros3_done
+    LDA.b !TextWin_Digits+1
+    STA.b !TextWin_Digits
+    LDX.b !TextWin_Digits+2
+    STX.b !TextWin_Digits+1
+    LDX.b !TextWin_Digits+4
+    STX.b !TextWin_Digits+3
+TextWin_TrimZeros5:             ; header: see TextWin_TrimZeros8
+    LDY.w #5
+    LDA.b !TextWin_Digits
+    BNE TextWin_TrimZeros3_done
+    LDX.b !TextWin_Digits+1
+    STX.b !TextWin_Digits
+    LDX.b !TextWin_Digits+3
+    STX.b !TextWin_Digits+2
+    DEY
+    LDA.b !TextWin_Digits
+    BNE TextWin_TrimZeros3_done
+    LDA.b !TextWin_Digits+1
+    STA.b !TextWin_Digits
+    LDX.b !TextWin_Digits+2
+    STX.b !TextWin_Digits+1
+TextWin_TrimZeros3:             ; header: see TextWin_TrimZeros8
+    LDY.w #3
+    LDA.b !TextWin_Digits
+    BNE .done
+    LDX.b !TextWin_Digits+1
+    STX.b !TextWin_Digits
+    DEY
+    LDA.b !TextWin_Digits
+    BNE .done
+    LDA.b !TextWin_Digits+1
+    STA.b !TextWin_Digits
+    DEY
+.done:
+    TYA
+    RTS
+
+; ============================================================
+; Tile trigger list readers ($C2:6263–$C2:6290)
+; ============================================================
+; Read the entries C2Scene_FindTrigEntries found (offsets in the three
+; C2Scene_Unk1B32 words) for the C2Scene_TrigActions handlers.
+
+org $C26263
+; $C2:6263 — C2Scene_GetListAUnk02 (11 bytes, $6263–$626D)
+; C2Scene_Unk1B58 = .Unk02 of the ListA entry at offset C2Scene_Unk1B32.
+; Callers (2 JSR sites): C2Scene_TrigListA ($C2:3396) and C2Scene_TrigListAB ($C2:33D4).
+; Entry: M=1, X=0, DP any, DB=$00 (C2Scene_Unk1B32 and C2Scene_Unk1B58
+;        absolute)
+; Exit:  M=1, X=0; A = the byte, X = the offset; Y unchanged
+; No calls.
+C2Scene_GetListAUnk02:
+    LDX.w !C2Scene_Unk1B32
+    LDA.l C2Scene_ListAEntry.Unk02,X
+    STA.w !C2Scene_Unk1B58
+    RTS
+
+; $C2:626E — C2Scene_GetListBScript (24 bytes, $626E–$6285)
+; C2Scene_Unk1B45 = the C2Scene_ListD word (a script address in bank
+; $7F) picked by .Script of the ListB entry at offset C2Scene_Unk1B32+2.
+; Callers (2 JSR sites): C2Scene_TrigListB ($C2:33AA) and C2Scene_TrigListAB ($C2:33D7).
+; Entry: M=1, X=0, B=0 (the 16-bit TAX of the doubled index), DP any,
+;        DB=$00 (low WRAM absolute)
+; Exit:  M=1, X=0; A = the address's high byte, X = the index * 2; Y
+;        unchanged
+; No calls.
+C2Scene_GetListBScript:
+    LDX.w !C2Scene_Unk1B32+2
+    LDA.l C2Scene_ListBEntry.Script,X
+    ASL A
+    TAX
+    LDA.l !C2Scene_ListD,X
+    STA.w !C2Scene_Unk1B45
+    LDA.l !C2Scene_ListD+1,X
+    STA.w !C2Scene_Unk1B45+1
+    RTS
+
+; $C2:6286 — C2Scene_GetListCUnk03 (11 bytes, $6286–$6290)
+; C2Scene_Unk1B47 = the byte 3 past the start of the ListC entry at
+; offset C2Scene_Unk1B32+4. ListC entries are 3 bytes
+; (C2Scene_ListBCEntrySize), so this is the first byte of the next
+; entry (or the byte after the list); kept as it is, why is not traced.
+; Callers (1 JSR site): C2Scene_TrigListC ($C2:33A1).
+; Entry: M=1, X=0, DP any, DB=$00 (low WRAM absolute)
+; Exit:  M=1, X=0; A = the byte, X = the offset; Y unchanged
+; No calls.
+C2Scene_GetListCUnk03:
+    LDX.w !C2Scene_Unk1B32+4
+    LDA.l !C2Scene_ListC+!C2Scene_ListBCEntrySize,X
+    STA.w !C2Scene_Unk1B47
     RTS
 
 ; ============================================================
