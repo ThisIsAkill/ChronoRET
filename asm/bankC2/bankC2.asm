@@ -1054,9 +1054,10 @@ C2Scene_LayerVramMaps:
 ; use).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) ends in an endless
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
-; Callers (10 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
+; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691),
 ;   C2Script_ScrollLayerFrames ($C2:173C); unmatched: $C2:3702, $C2:3709,
-;   $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and $C2:785B.
+;   $C2:38FB, $C2:3902, $C2:468A, $C2:4691, $C2:4F93, $C2:4F9A and
+;   $C2:785B (xref rates $38FB and $3902 doubtful; they are real calls).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
 ;        DB=$00 (absolute C2Scene_BgTileX and the VRAM queue);
 ;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
@@ -1227,9 +1228,10 @@ C2Scene_Unk0568:
 ; one; then C2Scene_QueueEdgeRow).
 ; Quirk, kept: a layer number of 0 (or 4, 8, ...) loops for good
 ; (.hang). 0 pixels does nothing.
-; Callers (9 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
+; Callers (11 JSR sites): C2Script_ScrollFrames ($C2:16C7, $C2:16CE),
 ;   C2Script_ScrollLayerFrames ($C2:1751); unmatched: $C2:3717, $C2:371E,
-;   $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF.
+;   $C2:385B, $C2:3862, $C2:469F, $C2:46A6, $C2:4FA8 and $C2:4FAF (xref
+;   rates $385B and $3862 doubtful; they are real calls).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (work area; TDC for 0),
 ;        DB=$00 (absolute C2Scene_BgTileY and the VRAM queue);
 ;        C2Scene_ScrollLayer and C2Scene_ScrollPx set
@@ -7101,9 +7103,12 @@ C2Scene_ModeIdle:
 ;   C2Scene_FadeOutWaitFrames frames with C2Scene_WaitFrame, so no queued
 ;   sound is sent meanwhile), turns NMI off and sets up the location
 ;   change as script op $05 does (C2Script_GoToLocation: the return
-;   location, X, Y and facing from the current location and BG2's tile
+;   location, X and Y from the current location and BG2's tile
 ;   position, also copied to C2Scene_SavedReturnId/X/Y), here with the
-;   entry's .Loc, .EntryX and .EntryY; then falls into C2Scene_Mode2,
+;   entry's .Loc, .EntryX and .EntryY. The entry facing is .Loc's high
+;   byte shifted right once (bits 9-15), and the return facing is that
+;   facing turned around (C2Scene_TurnAround[facing AND 3]), as op $05
+;   does; then falls into C2Scene_Mode2,
 ;   which leaves the scene.
 ; Callers: none direct (C2Scene_ModeTable entry 3).
 ; Entry: M=1, X=0, DP=$0000 (TDC for 0), DB=$00 (absolute registers,
@@ -7419,8 +7424,10 @@ C2Scene_Mode6:
 ; (C2Scene_ScrFadeIn, C2Scene_Unk1B59 + 1 when C2Scene_Unk1B58 is set).
 ; NMI updates and NMI on either way; with the flags clear it waits
 ; C2Scene_FadeWaitFrames frames and sets mode C2Scene_ModeIdle1, with
-; them set it goes back to the loop at once, still in mode 8 (so mode 8
-; runs again on the next frame).
+; them set it goes back to the loop at once, in whatever mode was set
+; while C2Scene_Unk6A34 ran (it loops at $C2:6A9C-$C2:6AA4 until
+; C2Scene_Mode is no longer 8, and C2Scene_RestoreState does not
+; restore it).
 ; Callers: none direct (C2Scene_ModeTable entry 8).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
