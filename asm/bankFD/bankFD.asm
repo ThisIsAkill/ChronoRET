@@ -3140,8 +3140,8 @@ Ppu_SetBgLayout:
 ;   - $1531 and $1533 (COLDATA bytes of channel 6's pairs) = $E0, the
 ;     words $1534 and $1536 (WH0/WH1 pairs of channel 5) = $FF00, i.e.
 ;     WH0 = 0 and WH1 = $FF;
-;   - then EngFD_UnkD52D builds the $100-byte table at $7F:1538 and its
-;     copy at $7F:1600.
+;   - then EngFD_UnkD52D builds the $B4-byte table at $7F:1538 and
+;     copies $100 bytes from there to $7F:1600.
 ; !Field_Unk27 is zeroed. Which of these records the indirect tables use
 ; is not traced; the register reading rests on Hdma_InitChannelsFD.
 ; Callers (1 JSL site): Scene_ResumeNmi ($C0:0B28).
@@ -3406,12 +3406,16 @@ EngFD_UnkC2C1Table0:
 ; $FD:D52D — EngFD_UnkD52D (167 bytes, $D52D–$D5D3)
 ; EngFD_UnkC124's helper: builds a table of (CGADSUB, COLDATA) byte
 ; pairs at $7F:1538 (channel 6's registers in Hdma_InitChannelsFD), then
-; copies the $100 bytes from $7F:1538 to $7F:1600 (MVN).
+; copies $100 bytes from $7F:1538 to $7F:1600 (MVN; the source overlaps
+; the destination, but the table's $B4 bytes are copied intact).
 ; The run length comes from the hardware divider: 40 / 8 = 5 entries per
 ; step (the remainder, 0, would lengthen the middle run). It writes:
 ;   - 8 steps of 5 entries ($01, v) with v = $E8 down to $E1;
-;   - an empty middle run ($81, $E0) of remainder * 2 bytes;
-;   - 9 steps of 5 entries ($81, v) with v = $E1 up to $E9.
+;   - a middle run of 5 entries ($81, $E0): a step is added to its end
+;     offset before the $E0 test, so it is a step plus remainder * 2
+;     bytes;
+;   - 9 steps of 5 entries ($81, v) with v = $E1 up to $E9;
+; 90 pairs, $B4 bytes ($7F:1538-$15EB).
 ; With COLDATA $E0 + n (all three channels at intensity n) and CGADSUB
 ; $01 / $81 (add / subtract the fixed colour on BG1), this looks like a
 ; brightness gradient down the screen; whether and where the indirect
