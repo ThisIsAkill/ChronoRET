@@ -4,7 +4,7 @@ $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,verified,e647c1a1c65f,"Installs the int
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,verified,f56ffa11c897,trampolines and dispatches on Loc_Id.
 $C0:0072,$C0:007C,11,GameLoop_NotBankC2,$C0,Engine,verified,b82aa0cbd435,Loc_Id - Loc_FirstBankC2 is set.
 $C0:007D,$C0:0096,26,GameLoop_LoadField,$C0,Engine,verified,2997eb15fd52,and falls into the per-frame loop.
-$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,4d54bc759a9d,GameLoop_FrameBody: the per-frame field loop.
+$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,verified,e67d24414ed7,GameLoop_FrameBody: the per-frame field loop.
 $C0:00BF,$C0:00DD,31,Field_EndOfFrame,$C0,Engine,verified,c64f4e317d81,"End-of-frame work, called once per frame just before Sub_EC60 waits for the NMI; it is not an interrupt handler and waits for nothing itself."
 $C0:00DE,$C0:00EA,13,Field_EndOfFrameShort,$C0,Engine,verified,2e5dc85b9727,"FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops."
 $C0:00EB,$C0:00F3,9,Field_IdleFrame,$C0,Engine,verified,c23486c85fdf,"game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail jump, whose RTS returns to this routine's caller)."
@@ -28,6 +28,7 @@ $C0:18D9,$C0:1984,172,Field_PauseAndMenuInput,$C0,Engine,verified,81a5d1737539,"
 $C0:1985,$C0:19C6,66,Field_FadeToBankC2Mode5,$C0,Engine,verified,7a60ad43b399,(was Sub_1985.) Called from Field_PauseAndMenuInput when Pad_Unk00F6 bit 0 is set.
 $C0:19C7,$C0:1A02,60,Field_RunBankC2Mode5,$C0,Engine,verified,7af99c86cc5a,"(was Sub_19C7.) Calls BankC2_Entry8000 with A = 5, X = 0 (meaning of 5 unverified; earlier notes called it ""BG mode 5""), then reloads the field: restore state, re-init changed party members, move a pe"
 $C0:1A03,$C0:1AAB,169,Party_ReinitIfChanged,$C0,Engine,verified,add4c2baa065,"(was Sub_1A03.) After a bank-$C2 round trip: if Party_Members no longer matches the copy taken at load (Party_MembersCache), re-run the init function of every character object that exists (Chr_ObjSlot"
+$C0:1AAC,$C0:1ADE,51,Field_ActionButton,$C0,Engine,verified,1cd27431bb2f,"(was Field_Unk1AAC.) Per-frame check of the action button: does nothing unless Pad_Unk00F6 bit 7 (A, if Pad_Unk00F6 has the Pad_Pressed layout) is set."
 $C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),verified,c63ce00d7b6b,"Purpose unknown: every variable it touches (Field_Unk34, Field_Unk62-66, Pad_Unk00F6-F8) is still unidentified, so it keeps its address name."
 $C0:1B36,$C0:1B52,29,Bg_TilemapIndex64x32,$C0,Engine,verified,e94e5beac473,(was Sub_1B36.) Word offset of an 8x8 tile in a 64x32 BG tilemap made of two 32x32 screens side by side.
 $C0:1B90,$C0:1B91,2,Audio_PlayTileSfxA,$C0,Engine,verified,dd25ac14dfe8,"(was Sub_1B90.) Plays sound effect Audio_SfxTileAnimA through the sound driver: Audio_CmdId = $19 (play effect), Arg0 = effect id, Arg1 = the low byte of the party leader's Obj_ScreenX (presumably for"
@@ -35,10 +36,31 @@ $C0:1B92,$C0:1BA6,21,Audio_PlaySfxAtLeader,$C0,Engine,verified,8af6b4d0cdff,Audi
 $C0:1BA7,$C0:1BAA,4,Audio_PlayTileSfxB,$C0,Engine,verified,8e1af34745a1,"(was Sub_1BA7.) Plays sound effect Audio_SfxTileAnimB: same as Audio_PlayTileSfxA with the other effect id, sharing its tail Audio_PlaySfxAtLeader."
 $C0:1F24,$C0:1F59,54,Fade_StepBrightness,$C0,Engine,verified,29587b9b9aa5,(was Sub_1F24.) Brightness fade: steps Fade_Brightness one unit toward Fade_BrightnessTarget every Fade_BrightnessDelay+1 frames and clears FadeFlag_Brightness when it gets there (or reaches 0 going d
 $C0:1F5A,$C0:1F86,45,Fade_StepFixedColor,$C0,Engine,verified,48f2c50391f1,(was Sub_1F5A.) Fixed-colour fade: steps Fade_FixedColor one unit toward Fade_FixedColorTarget every Fade_FixedColorDelay+1 frames and clears FadeFlag_FixedColor when it gets there.
+$C0:21E1,$C0:21ED,13,Field_EventHookDispatch,$C0,Engine,verified,26e74b170878,Runs the Field_EventHook handler for this frame: entry Field_EventHook - 1 of Field_EventHookTable; nothing when it is 0.
+$C0:21EE,$C0:220D,32,Field_EventHookTable,$C0,Engine,verified,9bc0fe249616,"Field_EventHookTable: 16 handler addresses, indexed by (Field_EventHook - 1) x 2."
+$C0:220E,$C0:2268,91,Field_HookWinGrow0,$C0,Engine,verified,ee9fdb77e1af,Hook 1: one frame of a growing window shape.
+$C0:2269,$C0:22D7,111,Field_HookWinShrink0,$C0,Engine,verified,05249e8befb7,Hook 2: the reverse of hook 1.
+$C0:22D8,$C0:2328,81,Field_HookWinC3E,$C0,Engine,verified,75a7e13a82a3,Hook 3.
+$C0:2329,$C0:2329,1,Field_HookIdle,$C0,Engine,verified,e2a8c510ec03,
+$C0:232A,$C0:2389,96,Field_HookWinGrow1,$C0,Engine,verified,df2b368aaa2f,"Hook 4: hook 1 with the colour window instead of BG windows: WOBJSEL enables colour window 1, CGWSEL limits colour math to inside the window (with the sub screen added), and BankC3_Entry0008 runs in m"
+$C0:238A,$C0:23E1,88,Field_HookWinShrink1,$C0,Engine,verified,974f3d8fedac,"Hook 5: the reverse of hook 4 (mode 1, colour window)."
+$C0:23E2,$C0:2408,39,Field_HookWinShrink1_Off,$C0,Engine,verified,1d8f67c03ee7,
+$C0:2409,$C0:2513,267,Field_HookWinQuad,$C0,Engine,verified,a7a271ae73fc,"Hook 6: a colour-window shape from four moving points, for WinFx_QuadTimer frames."
+$C0:2514,$C0:2588,117,Field_HookWinFixedA,$C0,Engine,verified,1e75a03edc5f,"Hooks 7 and 8: a fixed shape (centre WinFx_FixedX/Y, size WinFx_FixedSizeA, mode 0) on BG3's window 1, inverted; colour math outside the window only."
+$C0:2589,$C0:260D,133,Field_HookWinFixedB,$C0,Engine,verified,e9cde0dfee9c,"Hooks 9 and 10: as hooks 7/8 with size WinFx_FixedSizeB, window 1 on BG2 and BG3 (not inverted), and different layer and colour-math bytes: Ppu_Unk0BD7/Hdma_Unk7F1520 = BG3, Ppu_Unk0BD8/Hdma_Unk7F1521"
+$C0:260E,$C0:264E,65,Field_HookLeaveToBankC3,$C0,Engine,verified,82095f7a0899,Hook 11: leaves the field for good.
+$C0:264F,$C0:2724,214,Field_HookWinPulse,$C0,Engine,verified,81d97b79ffd4,"Hook 12, a blocking sequence that runs its own frames (each one Field_EndOfFrameShort + Sub_EC60, with no Field_FrameUpdate): redraws the map (Field_BuildC800Mode1, Field_Unk74E8/74F7, redraw step 2),"
+$C0:2725,$C0:274C,40,Field_WinPulseDraw,$C0,Engine,verified,85a973a8ac2d,"One frame of Field_HookWinPulse's shape: WinFx_Size to WinFx_ArgSize, table WinFx_TableA or WinFx_TableB by Field_Unk53, then BankC3_Entry0008 in mode $80 (WinFx_ArgX/Y were set by the caller)."
+$C0:274D,$C0:27EA,158,Field_ServiceUnk54,$C0,Engine,verified,76d008ae5c84,"(was Field_Unk274D.) Per-frame service of the Field_Unk54 requests, first match wins: - bit 4 (Field54_Credits): build the next line of the staff credits."
+$C0:27EB,$C0:2823,57,Field_ServiceUnk54_SendLine,$C0,Engine,verified,26eb4f2d665f,
 $C0:2824,$C0:2847,36,Field_FadeInAfterReload,$C0,Engine,verified,8a44e97cd7a2,"(was Sub_2824.) Fade-in after a reload: unless Scene_ReloadStep returns nonzero, raises Fade_Brightness one step per frame (input disabled around Field_FrameUpdate) until it reaches full brightness."
 $C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,verified,2a8062ed2e09,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
 $C0:595C,$C0:597C,33,Evt_RunObj0Func1,$C0,Engine,verified,698bb554b9b5,"(was Sub_595C.) Runs one event-script function of object 0: the offset stored at Evt_Data+2 (object 0's second function pointer), executing opcodes through Evt_OpcodeTable until opcode $00."
 $C0:597D,$C0:59D8,92,Evt_RunObjInit,$C0,Engine,verified,84c4d964684c,"(was Sub_597D.) Runs object Obj_Cur's init function: the first of its 16 function offsets (Evt_Data + Obj_Cur*16, i.e."
+$C0:881E,$C0:8859,60,Field_FrameUpdate,$C0,Engine,verified,fa16bf4176c8,"Field work done every frame, before input-driven checks such as Field_ActionButton: resets Field_UnkEB (the action-button target) to none, then with DP=$1D00 runs Map_ResetUnk1D2E, clears Map_Unk1D2C/"
+$C0:885A,$C0:88E4,139,Field_Unk885A,$C0,Engine,verified,e57d3e91ea71,"A two-step job driven by Field_Unk38, run frame after frame by DefaultHandler's map-redraw path until it clears Field_Unk38: - Field_Unk38 = 1: zero Map_Unk1D2E/1D30/1D32/1D33."
+$C0:88E5,$C0:88ED,9,Map_ResetUnk1D2E,$C0,Engine,verified,8480009531b9,Copies Map_Unk1D2A to Map_Unk1D2E and Map_Unk1D2B to Map_Unk1D30 at the start of every Field_FrameUpdate (so those two hold per-frame values derived from a standing pair; meaning unknown).
+$C0:88EE,$C0:8901,20,Field_DpadDispatch,$C0,Engine,verified,e2d7dae72c17,"Unless Field_Unk38 is busy, runs the Field_DpadHandlerTable entry picked by Pad_Unk00F9 bits 0-3 (16 entries; the D-pad bits, if Pad_Unk00F9 is laid out like Pad_Pressed's high byte), with 8-bit X/Y."
 $C0:B192,$C0:B1B1,32,Obj_ResetStates,$C0,Sprites & objects,verified,fcb380055d6f,"(was Sub_B192.) Clears Obj_State for every object the location defines (count in Evt_ObjCount), pointing DP at the Obj_State table so each clear is a 2-byte dp store, then tail-jumps to SprBuf_FreeAll"
 $C0:B271,$C0:B2A7,55,Oam_BuildShadow,$C0,Engine,verified,a00b0a1208df,"(was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high table) for the next frame; it runs before Sub_EC60's wait for the NMI, not after a VBlank."
 $C0:B2A8,$C0:B2B1,10,Oam_BucketLoop,$C0,Engine,verified,d57272f16594,

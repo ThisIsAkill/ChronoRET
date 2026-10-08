@@ -1,37 +1,37 @@
 {
   "schema": 2,
-  "emitted_bytes": 36816,
+  "emitted_bytes": 38698,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 318,
-      "bytes": 36816
+      "functions": 340,
+      "bytes": 38698
     },
     "readable": {
-      "functions": 318,
-      "bytes": 36816
+      "functions": 340,
+      "bytes": 38698
     },
     "verified": {
-      "functions": 318,
-      "bytes": 36816
+      "functions": 340,
+      "bytes": 38698
     }
   },
   "banks": [
     {
       "bank": "$C0",
       "code_bytes": 61779,
-      "emitted_bytes": 20097,
+      "emitted_bytes": 21979,
       "matched": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 141,
+        "bytes": 21979
       },
       "readable": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 141,
+        "bytes": 21979
       },
       "verified": {
-        "functions": 119,
-        "bytes": 20097
+        "functions": 141,
+        "bytes": 21979
       }
     },
     {
@@ -137,7 +137,7 @@
       "bank": "$C0",
       "start": "$C0:1000",
       "end": "$C0:1FFF",
-      "emitted_bytes": 2974,
+      "emitted_bytes": 3025,
       "functions": [
         "ModeEE_Handler",
         "ModeFA_Handler",
@@ -147,6 +147,7 @@
         "Field_FadeToBankC2Mode5",
         "Field_RunBankC2Mode5",
         "Party_ReinitIfChanged",
+        "Field_ActionButton",
         "Sub_1ADF",
         "Bg_TilemapIndex64x32",
         "Audio_PlayTileSfxA",
@@ -160,8 +161,25 @@
       "bank": "$C0",
       "start": "$C0:2000",
       "end": "$C0:2FFF",
-      "emitted_bytes": 81,
+      "emitted_bytes": 1684,
       "functions": [
+        "Field_EventHookDispatch",
+        "Field_EventHookTable",
+        "Field_HookWinGrow0",
+        "Field_HookWinShrink0",
+        "Field_HookWinC3E",
+        "Field_HookIdle",
+        "Field_HookWinGrow1",
+        "Field_HookWinShrink1",
+        "Field_HookWinShrink1_Off",
+        "Field_HookWinQuad",
+        "Field_HookWinFixedA",
+        "Field_HookWinFixedB",
+        "Field_HookLeaveToBankC3",
+        "Field_HookWinPulse",
+        "Field_WinPulseDraw",
+        "Field_ServiceUnk54",
+        "Field_ServiceUnk54_SendLine",
         "Field_FadeInAfterReload",
         "ClearRAMDMA"
       ]
@@ -208,8 +226,13 @@
       "bank": "$C0",
       "start": "$C0:8000",
       "end": "$C0:8FFF",
-      "emitted_bytes": 0,
-      "functions": []
+      "emitted_bytes": 228,
+      "functions": [
+        "Field_FrameUpdate",
+        "Field_Unk885A",
+        "Map_ResetUnk1D2E",
+        "Field_DpadDispatch"
+      ]
     },
     {
       "bank": "$C0",
