@@ -623,7 +623,7 @@ if !ram_engine_inc == 0
 ;
 ; --- Window effects (Field_EventHook handlers, $C0:220E-$C0:274C) ---
 !WinFx_ArgX = $0350                      ; 8-bit argument block for BankC3_Entry0008, which reads it
-                                         ; with DP=$0300 ($50); hooks 1-5 copy WinFx_CenterX here
+                                         ; with DP=$0300 ($50); hooks 1, 2, 4 and 5 copy WinFx_CenterX here
 !WinFx_ArgY = $0352                      ; 8-bit (BankC3_Entry0008's $52); WinFx_CenterY
 !WinFx_ArgSize = $0354                   ; 8-bit (BankC3_Entry0008's $54); WinFx_Size
 !WinFx_TablePtr = $0356                  ; 16-bit address of the table BankC3_Entry0008 writes;
