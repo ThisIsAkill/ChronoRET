@@ -161,16 +161,42 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_CopyRegionPlane`, the load-time pass `Field_UnkB0E6` and `Obj_ActivateIfInView`; and
    `SprBuf_FreeObj` ($C0:EA42). `Vblank_UnkA810`, `Field_UnkAF4E` and `Field_UnkB0E6` keep
    their names because verified callers use them; better names once those are re-reviewed:
-   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`. Open from it: the stubs
-   `Obj_Unk6F9A` / `Obj_Unk7170` (dispatch on Obj_Unk1100 through tables $C0:6FA7 / $C0:7181)
-   and `Obj_Unk7056` (the $0B88 entry), who writes `ObjX_LeaveView` ($7F:0A00), and the
-   event-opcode handlers that call `Obj_CalcDirection` / `Obj_SetVelocity*` ($C0:4D22-$C0:55E6,
-   they set `Obj_MoveFrames` / `Obj_ArcGravity`) and the region copy ($C0:3D97). Next, in
-   reach order: `Obj_Unk72B4`/`Obj_Unk734C` (they work
-   on the $0B00/$0B80 tables, up to $C0:7398); the NMI handler's upload calls
-   ($C0:EA9E–$C0:EB86, which also call the Field_Upload* routines and Pal_UploadCgram); the
-   `Evt_Unk0920` list code at $C0:5C90 and the halts at $C0:5CB3; `Vblank_ReadScanlineCounters`
-   ($C0:5A46, walks the `ObjQ_Unk74` list through `Obj_Unk1080`). Open from the hand-off: who
+   `Obj_FrameUpdateAll`, `Map_CopyRegion`, `Obj_DrawAllAtLoad`.
+   Also done (branch match-c0-more): the NMI handler `NmiHandler` ($C0:EA63) with `Field_WaitFrame`
+   (the frame wait; keeps its name for its verified callers, better `Field_WaitFrame`),
+   `Credits_UploadLine`, `Oam_UploadShadow`, `Field_UploadUnk5800` ($C0:6ECB) and the 12 layer
+   edge uploads `Map_UploadRowYInc1`-`Map_UploadColXDec3` with `Map_EdgeDmaRow/Col`
+   ($C0:8445-$C0:87F0); the tile-slot allocator `Obj_Unk6F9A` / `Obj_Unk7056` (`Obj_TileSlot`,
+   was Field_Unk0B88) and the palette-slot allocator `Obj_Unk7170` / `Obj_Unk72B4` /
+   `Obj_Unk734C` with its handlers (`Obj_PalSlot`, was Field_Unk0B80; `Obj_PalPrev/Next`,
+   `Obj_PalSrc`) ($C0:6F9A-$C0:7083, $C0:7170-$C0:7398; the Unk names stay for their callers:
+   better `Obj_TileSlotAlloc/Free`, `Obj_PalSlotAlloc/AllocBtl/Free`); the event helpers
+   `Evt_HasActionTarget`, `Evt_FindSolidObjInFront` with the four in-front tests and
+   `Evt_FindOrAddUnk0920` ($C0:5B8D-$C0:5CC6); the object script scheduler `Vblank_Unk59D9`,
+   `Vblank_ReadScanlineCounters` and `Evt_RunObjScriptSteps` ($C0:59D9-$C0:5AC4; better
+   names `Obj_QueueScripts` / `Obj_RunQueuedScripts`); and the event movement / facing opcodes
+   $7A, $7B, $92, $9C, $9D, $96, $9A, $97, $A0, $A1, $94, $9E, $98, $95, $8F, $9F, $99, $0F,
+   $17, $1B, $1D, $A6, $A7, $1E, $1F, $25, $26, $A8, $A9 with `Obj_SetMoveAnim` /
+   `Obj_SetStandAnim` ($C0:4D06-$C0:56A5). Open from these: `Obj_Unk305D` / `Obj_Unk30B3`
+   (stubs: step to the tile centre / onto another object), the opcodes before them
+   ($C0:4CD5-$C0:4D05: $90, $91, $7E, $7C, $7D share a tail at $C0:4CD9) and the opcode $B5/$B6
+   wrappers at $C0:3546/$C0:354F; the event code at $C0:304F, $C0:4626 and $C0:4781 that calls
+   the helpers; who writes `Field_Unk31`/`Field_Unk36` (NMI upload to VRAM $5800), the
+   `Field_Unk47` bits 1-2, `Obj_Unk1C81`, `ObjX_Unk7F0B00` and
+   `ObjX_LeaveView` ($7F:0A00); the region-copy event opcode $E4 ($C0:3D97); the meaning of
+   `Obj_Unk1100` kinds (0-2 fixed palette slots 5-7, 3/4 tile slots, 5/6 palette slots 1-3).
+   Quirks recorded: `Obj_PalSlotFixed`'s shared path writes `Obj_PalSlot` + an object offset
+   (kinds 0-2), the missing SEC/CLC in `Evt_InFront*` and `Field_UploadUnk5800`, the kind-0
+   head insert in `Vblank_Unk59D9`. Stale headers to fix at their next edit (they still call
+   now-matched sites "unmatched" or "not traced"): VramDma_Upload (`$C0:6EED`),
+   Map_UploadBufTo7400 (`$C0:EAE1`-`$C0:EB5E`), Field_UploadUnk1F00/1D00/1C00/57E0 and
+   Pal_UploadCgram (NMI sites), VramQ_Flush (`$C0:EB8C`), Evt_ClearUnk0920 (`$C0:5C90`),
+   Obj_CalcDirection / Obj_SetVelocity / Obj_SetVelocityChecked (their callers are the event
+   opcodes now), Obj_UpdateInView / Obj_ActivateIfInView / FieldBtl_SaveObj /
+   FieldBtl_RestoreObj (the Obj_Unk* callees are matched), and the `Field_Unk0B80/0B88` uses in
+   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`). Next, in reach
+   order: the rest of the event opcode handlers ($C0:2E67-$C0:4CD4 and $C0:5F6E-$C0:6D2E)
+   and `Evt_OpcodeTable` ($C0:5D6E) once they have names. Open from the hand-off: who
    writes `FieldBtl_Result` = 2 and what the battle does with `FieldBtlObj.Flags` (0 removes the
    object), what `Eng_Unk0010` holds (Scene_Unk0283's `BIT $0010` quirk), the readers of
    `FieldBtlPpu`, `FieldBtl_AttrA/B` and `Field_Unk47`, and what

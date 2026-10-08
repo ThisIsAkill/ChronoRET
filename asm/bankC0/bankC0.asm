@@ -4885,6 +4885,405 @@ SprBuf_FreeObj:
     RTS
 
 ; ============================================================
+; Field NMI handler and its upload steps
+; ============================================================
+
+; ============================================================
+; $C0:EA63 — NmiHandler (509 bytes, $EA63–$EC5F)
+; The field's vertical-blank interrupt, entered through the RAM
+; trampoline InstallNMI writes (JML NmiHandler at $7E:0500). It saves
+; A, X, Y (16-bit), DP and DB, sets DB=$00, reads RDNMI (acknowledges
+; the NMI), turns HDMA off and writes NMITIMEN = Nmi_Nmitimen and
+; BGMODE = Nmi_BgMode. Then:
+; - If Nmi_FramePending is 0 (the game has not reached Field_WaitFrame's wait,
+;   i.e. a lag frame) it skips every upload and goes straight to the
+;   register writes at .regs.
+; - Otherwise, with DP=$0100, one of three upload sets:
+;   1. Field_Unk47 nonzero: the first of its bits 0-3 that is set is
+;      cleared and its upload runs (Field_UploadUnk1D00, 1C00, 1F00,
+;      57E0; one per frame); with only bits 4-7 set nothing runs. Either
+;      way it goes on at .common, skipping step 2 and Field_Unk36.
+;   2. Field_MapRedrawDone = MapRedraw_Step1-4: Map_BufC800 (2 KB, via
+;      Map_UploadBuf2K) to Map_TilemapVram, Map_TilemapVram3,
+;      Map_TilemapVram2 or Map_TilemapVramL3, Field_MapRedrawDone = 0;
+;      steps 1 and 2 both store Map_TilemapVram's high byte | 1 in
+;      Hdma_Unk7F14F0 (step 2 too, although it uploaded to
+;      Map_TilemapVram3). Else bit 3 (MapRedraw_UploadTo7000) or bit 4
+;      (MapRedraw_UploadTo7400) uploads the buffer to VRAM $7000 / $7400
+;      and clears that bit. All six then run Hdma_InitChannelsFD, zero
+;      Nmi_FramePending and go to .regs, skipping .common's uploads. Else
+;      bit 5 (MapRedraw_CreditsLine) runs Credits_UploadLine and clears
+;      it, then (as when Field_MapRedrawDone is 0 or matches none of
+;      these) Field_Unk36: nonzero runs Field_UploadUnk5800, after
+;      zeroing Field_Unk36 when its bit 7 is set.
+;   .common: Pal_UploadCgram, Oam_UploadShadow, VramQ_Flush, then with
+;      DP=$1D00 the edge uploads for each layer bit (Map_Layer1/2/3) set
+;      in Map_BuiltRowYInc, Map_BuiltRowYDec, Map_BuiltColXInc and
+;      Map_BuiltColXDec (Map_UploadRowYInc1 ... Map_UploadColXDec3, in
+;      that order), zeroes those four bytes, DP=$0100,
+;      Hdma_InitChannelsFD and Nmi_FramePending = 0.
+; - .regs (every NMI): JSL BankC2_Entry8002 (the pad reader), the
+;   window shadows Ppu_W12SelShadow ... Ppu_CgwSelShadow to W12SEL,
+;   W34SEL, WOBJSEL, WH2, WH3, CGWSEL; COLDATA = COLDATA_AllZero then
+;   Fade_FixedColor; HDMAEN = Field_HdmaEnable; INIDISP = Fade_Brightness,
+;   or FORCED_BLANK when it is 0. These read the field bytes absolute
+;   ($0100 + offset), since on the lag path DP is still the interrupted
+;   code's. Then it restores DB, DP, Y, X, A and returns with RTI.
+; Callers note: none by call; the NMI vector's trampoline (InstallNMI).
+; Entry: any M, X, DP and DB (an interrupt; all saved and restored).
+;   The upload steps run with M=1, X=0, DB=$00 and DP=$0100 (DP=$1D00 for
+;   the edge uploads).
+; Exit: RTI: P, A, X, Y, DP and DB as interrupted. Changed: the PPU and
+;   DMA registers above, Field_Unk47 / Field_MapRedrawDone bits served,
+;   Field_Unk36 (bit 7 case), Map_BuiltRowYInc-ColXDec, Nmi_FramePending
+;   = 0 after uploads, the VramDma_* bytes and what the callees change
+;   (BankC2_Entry8002 not traced here).
+; ============================================================
+org $C0EA63
+NmiHandler:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHD
+    PHB
+    SEP #$20
+    LDA.b #$00
+    PHA
+    PLB                                 ; DB = $00
+    LDA.w RDNMI                         ; acknowledge the NMI
+    LDA.b #$00
+    STA.w HDMAEN
+    LDA.b #!Nmi_Nmitimen
+    STA.w NMITIMEN
+    LDA.b #!Nmi_BgMode
+    STA.w BGMODE
+    LDA.w !DP_Field+!Nmi_FramePending
+    BNE .frame_ready
+    BRL .regs                           ; lag frame: no uploads
+.frame_ready:
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDA.b !Field_Unk47
+    BEQ .redraw
+    BIT.b #!Field47_Upload1D00
+    BEQ .not_1d00
+    LDA.b #!Field47_Upload1D00
+    TRB.b !Field_Unk47
+    JSR Field_UploadUnk1D00
+    BRL .common
+.not_1d00:
+    BIT.b #!Field47_Upload1C00
+    BEQ .not_1c00
+    LDA.b #!Field47_Upload1C00
+    TRB.b !Field_Unk47
+    JSR Field_UploadUnk1C00
+    BRL .common
+.not_1c00:
+    BIT.b #!Field47_Upload1F00
+    BEQ .not_1f00
+    LDA.b #!Field47_Upload1F00
+    TRB.b !Field_Unk47
+    JSR Field_UploadUnk1F00
+    BRL .common
+.not_1f00:
+    BIT.b #!Field47_Upload57E0
+    BEQ .no_47_upload
+    LDA.b #!Field47_Upload57E0
+    TRB.b !Field_Unk47
+    JSR Field_UploadUnk57E0
+    BRL .common
+.no_47_upload:
+    BRL .common                         ; only bits 4-7 set: nothing uploaded
+.redraw:
+    LDA.b !Field_MapRedrawDone
+    BNE .redraw_pending
+    BRL .check_36
+.redraw_pending:
+    CMP.b #!MapRedraw_Step1
+    BNE .not_step1
+    LDX.w !Map_TilemapVram
+    STX.b !VramDma_Addr
+    JSR Map_UploadBuf2K
+    STZ.b !Field_MapRedrawDone
+    LDA.w !Map_TilemapVram+1
+    ORA.b #$01
+    STA.l !Hdma_Unk7F14F0
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_step1:
+    CMP.b #!MapRedraw_Step2
+    BNE .not_step2
+    LDX.w !Map_TilemapVram3
+    STX.b !VramDma_Addr
+    JSR Map_UploadBuf2K
+    STZ.b !Field_MapRedrawDone
+    LDA.w !Map_TilemapVram+1            ; Map_TilemapVram, as for step 1
+    ORA.b #$01
+    STA.l !Hdma_Unk7F14F0
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_step2:
+    CMP.b #!MapRedraw_Step3
+    BNE .not_step3
+    LDX.w !Map_TilemapVram2
+    STX.b !VramDma_Addr
+    JSR Map_UploadBuf2K
+    STZ.b !Field_MapRedrawDone
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_step3:
+    CMP.b #!MapRedraw_Step4
+    BNE .not_step4
+    LDX.w !Map_TilemapVramL3
+    STX.b !VramDma_Addr
+    JSR Map_UploadBuf2K
+    STZ.b !Field_MapRedrawDone
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_step4:
+    BIT.b #!MapRedraw_UploadTo7000
+    BEQ .not_7000
+    JSR Map_UploadBufTo7000
+    LDA.b #!MapRedraw_UploadTo7000
+    TRB.b !Field_MapRedrawDone
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_7000:
+    BIT.b #!MapRedraw_UploadTo7400
+    BEQ .not_7400
+    JSR Map_UploadBufTo7400
+    LDA.b #!MapRedraw_UploadTo7400
+    TRB.b !Field_MapRedrawDone
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending
+    BRL .regs
+.not_7400:
+    BIT.b #!MapRedraw_CreditsLine
+    BEQ .check_36
+    JSR Credits_UploadLine
+    LDA.b #!MapRedraw_CreditsLine
+    TRB.b !Field_MapRedrawDone
+.check_36:
+    LDA.b !Field_Unk36
+    BEQ .common
+    BPL .upload_5800                    ; bit 7 clear: keep it, upload every frame
+    STZ.b !Field_Unk36                  ; bit 7 set: once
+.upload_5800:
+    JSR Field_UploadUnk5800
+    BRA .common                         ; (branch to the next instruction)
+.common:
+    JSR Pal_UploadCgram
+    JSR Oam_UploadShadow
+    JSR VramQ_Flush                     ; leaves DP = DP_VramQ
+    REP #$20
+    LDA.w #!DP_Map
+    TCD
+    SEP #$20
+    LDA.b !Map_BuiltRowYInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .rowyinc_2
+    JSR Map_UploadRowYInc1
+    LDA.b !Map_BuiltRowYInc-!DP_Map
+.rowyinc_2:
+    BIT.b #!Map_Layer2
+    BEQ .rowyinc_3
+    JSR Map_UploadRowYInc2
+    LDA.b !Map_BuiltRowYInc-!DP_Map
+.rowyinc_3:
+    BIT.b #!Map_Layer3
+    BEQ .rowydec
+    JSR Map_UploadRowYInc3
+.rowydec:
+    LDA.b !Map_BuiltRowYDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .rowydec_2
+    JSR Map_UploadRowYDec1
+    LDA.b !Map_BuiltRowYDec-!DP_Map
+.rowydec_2:
+    BIT.b #!Map_Layer2
+    BEQ .rowydec_3
+    JSR Map_UploadRowYDec2
+    LDA.b !Map_BuiltRowYDec-!DP_Map
+.rowydec_3:
+    BIT.b #!Map_Layer3
+    BEQ .colxinc
+    JSR Map_UploadRowYDec3
+.colxinc:
+    LDA.b !Map_BuiltColXInc-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .colxinc_2
+    JSR Map_UploadColXInc1
+    LDA.b !Map_BuiltColXInc-!DP_Map
+.colxinc_2:
+    BIT.b #!Map_Layer2
+    BEQ .colxinc_3
+    JSR Map_UploadColXInc2
+    LDA.b !Map_BuiltColXInc-!DP_Map
+.colxinc_3:
+    BIT.b #!Map_Layer3
+    BEQ .colxdec
+    JSR Map_UploadColXInc3
+.colxdec:
+    LDA.b !Map_BuiltColXDec-!DP_Map
+    BIT.b #!Map_Layer1
+    BEQ .colxdec_2
+    JSR Map_UploadColXDec1
+    LDA.b !Map_BuiltColXDec-!DP_Map
+.colxdec_2:
+    BIT.b #!Map_Layer2
+    BEQ .colxdec_3
+    JSR Map_UploadColXDec2
+    LDA.b !Map_BuiltColXDec-!DP_Map
+.colxdec_3:
+    BIT.b #!Map_Layer3
+    BEQ .edges_done
+    JSR Map_UploadColXDec3
+.edges_done:
+    REP #$20
+    STZ.b !Map_BuiltRowYInc-!DP_Map     ; 16-bit: also Map_BuiltRowYDec
+    STZ.b !Map_BuiltColXInc-!DP_Map     ; and Map_BuiltColXDec
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    JSL Hdma_InitChannelsFD
+    STZ.b !Nmi_FramePending             ; releases Field_WaitFrame's wait
+.regs:
+    JSL BankC2_Entry8002
+    LDA.w !Ppu_W12SelShadow
+    STA.w W12SEL
+    LDA.w !Ppu_W34SelShadow
+    STA.w W34SEL
+    LDA.w !Ppu_WObjSelShadow
+    STA.w WOBJSEL
+    LDA.w !Ppu_Wh2Shadow
+    STA.w WH2
+    LDA.w !Ppu_Wh3Shadow
+    STA.w WH3
+    LDA.w !Ppu_CgwSelShadow
+    STA.w CGWSEL
+    LDA.b #!COLDATA_AllZero
+    STA.w COLDATA
+    LDA.w !DP_Field+!Fade_FixedColor
+    STA.w COLDATA
+    LDA.w !DP_Field+!Field_HdmaEnable
+    STA.w HDMAEN
+    LDA.w !DP_Field+!Fade_Brightness
+    BNE .set_inidisp
+    LDA.b #FORCED_BLANK                 ; brightness 0: blank the screen
+.set_inidisp:
+    STA.w INIDISP
+    REP #$30
+    PLB
+    PLD
+    PLY
+    PLX
+    PLA
+    RTI
+
+; ============================================================
+; $C0:EC60 — Field_WaitFrame (23 bytes, $EC60–$EC76)
+; The field's frame wait: counts Field_Unk58 up (16-bit INC, ANDed with
+; Field_Unk58Mask), INCs Nmi_FramePending and spins until NmiHandler has
+; done the frame's uploads and zeroed it.
+; Callers (33 sites: 28 JSR, 5 BRL): GameLoop_FrameBody (JSR $C0:00BA), Field_IdleFrame (BRL
+;   $C0:00F1), Scene_Unk0283 (JSR $C0:02BE, JSR $C0:02E5), Field_SceneChangeTick (JSR $C0:0CE5),
+;   DefaultHandler (JSR $C0:178B, JSR $C0:1797, JSR $C0:17B9, BRL $C0:17C2, JSR $C0:17E2, BRL
+;   $C0:17EB, JSR $C0:180B, JSR $C0:1832, JSR $C0:1856, BRL $C0:185F, JSR $C0:187F, JSR $C0:1888,
+;   JSR $C0:18A4), Field_PauseAndMenuInput (JSR $C0:18F4, JSR $C0:1953), Field_FadeToBankC2Mode5
+;   (JSR $C0:19BC), Field_HookLeaveToBankC3 (JSR $C0:2625, JSR $C0:262E), Field_HookWinPulse (JSR
+;   $C0:2688, JSR $C0:268E, JSR $C0:26C4, JSR $C0:26D7, JSR $C0:26EE, BRL $C0:2722),
+;   Field_FadeInAfterReload (JSR $C0:2839), Scene_SettleFrames (JSR $C0:285D), Scene_ReloadStep (JSR
+;   $C0:28A4) and unmatched (JSR $C0:3FCA).
+; Entry: M=1 (8-bit A), X any, DP any and DB=$00 (Field_Unk58 and
+;   Nmi_FramePending are reached absolute, $0100 + offset); the NMI must
+;   be on, or it never returns.
+; Exit: M=1, X, Y, DP and DB unchanged; A = 0 (Nmi_FramePending read
+;   back); Field_Unk58 stepped.
+; ============================================================
+Field_WaitFrame:
+    REP #$20
+    LDA.w !DP_Field+!Field_Unk58
+    INC A
+    AND.w #!Field_Unk58Mask
+    STA.w !DP_Field+!Field_Unk58
+    SEP #$20
+    INC.w !DP_Field+!Nmi_FramePending
+.wait:
+    LDA.w !DP_Field+!Nmi_FramePending
+    BNE .wait                           ; until NmiHandler zeroes it
+    RTS
+
+; ============================================================
+; $C0:EC77 — Credits_UploadLine (44 bytes, $EC77–$ECA2)
+; Sends the staff-credits line Field_ServiceUnk54 built in
+; Credits_LineBuf to VRAM: Credits_DmaSize bytes to VRAM word
+; Credits_VramAddr with DMA channel 7 (word writes, VMAIN increment
+; after the high byte).
+; Callers (1 JSR site): NmiHandler ($C0:EB72).
+; Callers note: NmiHandler ($C0:EB72), for Field_MapRedrawDone bit 5
+;   (MapRedraw_CreditsLine).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: word loads), DP any (not used),
+;   DB=$00 (registers and Credits_* absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
+;   Credits_DmaSize; Y unchanged.
+; ============================================================
+Credits_UploadLine:
+    LDX.w !Credits_VramAddr
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.w #!Credits_LineBuf&$FFFF
+    STX.w A1T7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDX.w !Credits_DmaSize
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; ============================================================
+; $C0:ECA3 — Oam_UploadShadow (41 bytes, $ECA3–$ECCB)
+; Copies the OAM shadow (Oam_LowTable and Oam_HighTable, $00:0700,
+; Oam_ShadowBytes = $220) to OAM from address 0 with DMA channel 7 (mode
+; 0, B-bus target OAMDATA).
+; Callers (1 JSR site): NmiHandler ($C0:EB89).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: word stores), DP any (not used),
+;   DB=$00 (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A = MDMAEN_Ch7, X =
+;   Oam_ShadowBytes; Y unchanged.
+; ============================================================
+Oam_UploadShadow:
+    LDA.b #$00
+    STA.w OAMADDL
+    STA.w OAMADDH
+    LDA.b #$00                          ; DMA mode 0: one register, bytes
+    STA.w DMAP7
+    LDA.b #!BBAD_OAMDATA
+    STA.w BBAD7
+    LDX.w #!Oam_LowTable
+    STX.w A1T7L
+    LDA.b #!Bank00
+    STA.w A1B7
+    LDX.w #!Oam_ShadowBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; ============================================================
 ; $C0:0000 — ReentryVectors (14 bytes)
 ; Mid-game re-entry vector table at the start of the bank. The BRA/BRL
 ; tail-dispatches to the target routine.
@@ -5058,12 +5457,12 @@ GameLoop_FrameBody:
     JSR Field_EventHookDispatch
     JSR Field_ServiceUnk54
     JSR Field_EndOfFrame    ; end-of-frame work and OAM shadow build
-    JSR Sub_EC60            ; wait for the NMI (the frame wait)
+    JSR Field_WaitFrame            ; wait for the NMI (the frame wait)
     BRA GameLoop_FrameBody
 
 ; ============================================================
 ; $C0:00BF — Field_EndOfFrame (was VBlankHandler)
-; End-of-frame work, called once per frame just before Sub_EC60 waits
+; End-of-frame work, called once per frame just before Field_WaitFrame waits
 ; for the NMI; it is not an interrupt handler and waits for nothing
 ; itself. Callers: GameLoop_FrameBody ($C0:00B7), DefaultHandler's
 ; map-redraw loop ($C0:1784) and Scene_SettleFrames ($C0:285A); those
@@ -5109,19 +5508,19 @@ Field_EndOfFrameShort:
     RTS
 
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
-; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail
+; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Field_WaitFrame (tail
 ; jump, whose RTS returns to this routine's caller).
 ; Callers (8 sites: 5 JSR, 3 BRL): Scene_Unk0283 (JSR $C0:02AA, JSR $C0:0319, JSR $C0:0327, JSR
 ;   $C0:0340), Field_Unk034B (BRL $C0:0365, BRL $C0:038C) and DefaultHandler (JSR $C0:18CA, BRL
 ;   $C0:18D6).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (needed by
 ; Field_EndOfFrameShort), DB=$00.
-; Exit: via Sub_EC60: M=1, X=0, DP=$0100; A = 0 (Sub_EC60's wait);
+; Exit: via Field_WaitFrame: M=1, X=0, DP=$0100; A = 0 (Field_WaitFrame's wait);
 ; X and Y are whatever the callees leave (not saved here).
 Field_IdleFrame:
     JSR Field_FrameUpdate
     JSR Field_EndOfFrameShort
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ============================================================
 ; $C0:00F4 — LoadLocation (39 bytes, $00F4–$011A)
@@ -5383,7 +5782,7 @@ Scene_Unk024C:
 ;   1 (unless FieldBtl_EvtFlags has FieldBtl_EvtNoReset): idle frames
 ;     until Pad_Unk00F6 or Pad_Pressed is nonzero, then lower
 ;     Fade_Brightness one step a frame to 0 (Field_FrameUpdate, FdVec_FFF7,
-;     Sub_EC60), InitHW, S = StackTop and BRL GameLoop: the cold start
+;     Field_WaitFrame), InitHW, S = StackTop and BRL GameLoop: the cold start
 ;     (probably the game-over path; that the battle stores 1 when the
 ;     party falls is not traced);
 ;   2 (unless the quirky test below passes): the same fade-out without
@@ -5441,7 +5840,7 @@ Scene_Unk0283:
     DEC.b !Fade_Brightness
     JSR Field_FrameUpdate
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade1
 .restart:
     JSR InitHW
@@ -5459,7 +5858,7 @@ Scene_Unk0283:
     DEC.b !Fade_Brightness
     JSR Field_FrameUpdate
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade2
 .reload:
     JSR InitHW
@@ -7169,7 +7568,7 @@ Field_SceneChangeTick:
     PLA
     STA.b !Field_ControlEnabled
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .run_fade_loop
 
 .enter_transition:
@@ -7869,17 +8268,17 @@ Fade_StepFixedColor:
 ; are not otherwise checked here.
 ; Callers (14 sites: 13 JSR, 1 BRL): LocLoad_UploadPack (JSR $C0:6D61), LocLoad_Unk6DCF (JSR
 ;   $C0:6E1E), Field_UploadUnk1F00 (JSR $C0:6E84, JSR $C0:6E9C), Field_UploadUnk1D00 (JSR $C0:6EC7),
-;   Field_UploadUnk1C00 (JSR $C0:6F08), Field_UploadUnk0000 (JSR $C0:6F23, JSR $C0:6F30, JSR
-;   $C0:6F4A, JSR $C0:6F57), Field_UploadUnk57E0 (JSR $C0:6F75), Map_UploadBuf_Tail (BRL $C0:7F74)
-;   and unmatched (JSR $C0:6E58, JSR $C0:6EED).
+;   Field_UploadUnk5800 (JSR $C0:6EED), Field_UploadUnk1C00 (JSR $C0:6F08), Field_UploadUnk0000 (JSR
+;   $C0:6F23, JSR $C0:6F30, JSR $C0:6F4A, JSR $C0:6F57), Field_UploadUnk57E0 (JSR $C0:6F75),
+;   Map_UploadBuf_Tail (BRL $C0:7F74) and unmatched (JSR $C0:6E58).
 ; Callers note (13 JSR, 1 BRL): LocLoad_UploadPack ($C0:6D61),
 ;   LocLoad_Unk6DCF ($C0:6E1E), Field_UploadUnk1F00 ($C0:6E84,
 ;   $C0:6E9C), Field_UploadUnk1D00 ($C0:6EC7), Field_UploadUnk1C00
 ;   ($C0:6F08), Field_UploadUnk0000 ($C0:6F23, $C0:6F30, $C0:6F4A,
-;   $C0:6F57), Field_UploadUnk57E0 ($C0:6F75), Map_UploadBufTo7400's
-;   shared tail (BRL at $C0:7F74) and unmatched code at $C0:6E58 and
-;   $C0:6EED (e.g.
-;   $C0:6E1E uploads $1000 bytes from $7F:5080 to VRAM $5000).
+;   $C0:6F57), Field_UploadUnk5800 ($C0:6EED), Field_UploadUnk57E0
+;   ($C0:6F75), Map_UploadBufTo7400's shared tail (BRL at $C0:7F74) and
+;   unmatched code at $C0:6E58 (e.g. $C0:6E1E uploads $1000 bytes from
+;   $7F:5080 to VRAM $5000).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the address and size are
 ; word loads), DP=$0100 (the arguments are dp offsets, shared with
 ; ClearRAMDMA; not traced at every caller), DB=$00 (absolute register
@@ -7956,18 +8355,19 @@ ClearRAMDMA:
 ; It looks like a fatal-error stop whose colour tells the cases apart:
 ; every caller is a BRL with its own X (blue $7C00 from
 ; GameLoop_NotBankC2 for Loc_Id $81F0-$81FE, $7FE0 from the six sites at
-; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010 from $C0:5CB3,
+; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010 (Halt_ColorUnk0920Full) from
+; Evt_FindOrAddUnk0920 ($C0:5CB3) when Evt_Unk0920 has no free entry,
 ; $01F0 and $000F from LocLoad_CheckEvtData (refused event data, see
 ; there), $1639 from $C0:5F71 in the handler at $C0:5F6E that
 ; Evt_OpcodeTable gives unused event opcodes); the conditions behind
 ; the unmatched ones are not traced.
-; Callers (12 BRL sites): GameLoop_NotBankC2 ($C0:007A), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8)
-;   and unmatched ($C0:3577, $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D,
-;   $C0:5CB3).
+; Callers (12 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_FindOrAddUnk0920 ($C0:5CB3),
+;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8) and unmatched ($C0:3577, $C0:35BC, $C0:3603, $C0:364A,
+;   $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D).
 ; Callers note (13 BRL sites): GameLoop_NotBankC2 ($C0:007A),
-;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8) and unmatched code at
-;   $C0:3577, $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4,
-;   $C0:46D4, $C0:483D, $C0:5CB3 and $C0:5F71 (LDX
+;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_FindOrAddUnk0920
+;   ($C0:5CB3) and unmatched code at $C0:3577, $C0:35BC, $C0:3603,
+;   $C0:364A, $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D and $C0:5F71 (LDX
 ;   #$1639 / BRL at $C0:5F6E; xref marks it doubtful, as the bytes
 ;   before it are the opcode table, not code).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
@@ -9537,16 +9937,17 @@ Map_WriteCol3:
 ;   The 4 KB entry sits after the BRL and branches back into the shared
 ;   tail Map_UploadBuf_Tail; Map_UploadBufToX is the shared store of X
 ;   into VramDma_Addr (global labels because the entries are global).
-; Callers (1 JSR site): unmatched ($C0:EB5E).
-; Callers of Map_UploadBufTo7000 (1 JSR site): unmatched ($C0:EB4A).
+; Callers (1 JSR site): NmiHandler ($C0:EB5E).
+; Callers of Map_UploadBufTo7000 (1 JSR site): NmiHandler ($C0:EB4A).
 ; Callers of Map_UploadBufToX (1 JML site): unmatched ($D5:677B).
 ; Callers of Map_UploadBuf2K (7 JSR sites): LocLoad_DrawMap ($C0:0A9F, $C0:0AC0, $C0:0AED) and
-;   unmatched ($C0:EAE1, $C0:EB01, $C0:EB21, $C0:EB38).
+;   NmiHandler ($C0:EAE1, $C0:EB01, $C0:EB21, $C0:EB38).
 ; Callers of Map_UploadBuf4K (2 JSR sites): LocLoad_DrawMap ($C0:0ABB, $C0:0AE8).
-; Callers note: Map_UploadBufTo7400 from unmatched code at $C0:EB5E;
-;   Map_UploadBufTo7000 from unmatched code at $C0:EB4A; Map_UploadBuf2K
-;   from LocLoad_DrawMap ($C0:0A9F, $C0:0AC0, $C0:0AED) and unmatched
-;   code at $C0:EAE1, $C0:EB01, $C0:EB21 and $C0:EB38; Map_UploadBuf4K
+; Callers note: Map_UploadBufTo7400 and Map_UploadBufTo7000 from
+;   NmiHandler ($C0:EB5E, $C0:EB4A: Field_MapRedrawDone bits
+;   MapRedraw_UploadTo7400 / 7000); Map_UploadBuf2K from LocLoad_DrawMap
+;   ($C0:0A9F, $C0:0AC0, $C0:0AED) and NmiHandler ($C0:EAE1, $C0:EB01,
+;   $C0:EB21, $C0:EB38: redraw steps 1-4); Map_UploadBuf4K
 ;   from LocLoad_DrawMap ($C0:0ABB, $C0:0AE8) (e.g. $C0:0AAF loads
 ;   VramDma_Addr from Map_TilemapVram3 after Field_BuildC800Mode2).
 ;   xref also confirms a JML to Map_UploadBufToX at $D5:677B, inside the
@@ -10589,6 +10990,687 @@ Map_BuildColXDec3:
     LDA.b #!Map_Layer3
     TSB.b !Map_BuiltColXDec-!DP_Map
     RTS
+
+; ============================================================
+; Layer edge uploads ($C0:8445–$C0:87F0)
+; The NMI side of the edge builders above: for each Map_Built* bit
+; NmiHandler runs the matching routine here, which DMAs the row or column
+; the builder left in the layer's edge buffer (Map_BufC800 / D000 /
+; D800) to the tilemap VRAM addresses Sub_C07F9A computed
+; (Map_EdgeVram1-3), in the pieces it sized (Map_EdgeSize1-3: a row or
+; column that wraps around the 64 x 32 tilemap is split). Rows use
+; Map_EdgeDmaRow, columns Map_EdgeDmaCol.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:8445 — Map_UploadRowYInc1 (98 bytes, $8445–$84A6)
+; Layer-1 row upload for Map_BuiltRowYInc bit 0: sends the row in
+;   Map_BufC800 to VRAM as three pieces, at most, of
+;   Map_EdgeSize1 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row 28 below the
+;   layer's row bias (Map_EdgeVram1 +6/+8/+10); the DMA itself is
+;   Map_EdgeDmaRow (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EB9D).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYInc1:
+    LDX.b !Map_EdgeSize1-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1+6-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufC800&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize1+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize1+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1+8-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    CLC
+    ADC.w #!Map_BufC800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize1+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize1+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1+10-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize1+2-!DP_Map
+    ADC.w #!Map_BufC800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:84A7 — Map_EdgeDmaRow (26 bytes, $84A7–$84C0)
+; The shared end of the row uploads: VMAIN = increment by 1 word after
+;   the high byte, DMA channel 7 in word mode (DMAP_TwoRegs) to VMDATAL,
+;   source bank $7E, and starts it. The caller has set DAS7, VMADD and
+;   A1T7.
+; Callers (18 JSR sites): Map_UploadRowYInc1 ($C0:845D, $C0:847F, $C0:84A3), Map_UploadRowYInc2
+;   ($C0:84D9, $C0:84FB, $C0:851F), Map_UploadRowYInc3 ($C0:853B, $C0:855D, $C0:8581),
+;   Map_UploadRowYDec1 ($C0:859D, $C0:85BF, $C0:85E3), Map_UploadRowYDec2 ($C0:85FF, $C0:8621,
+;   $C0:8645) and Map_UploadRowYDec3 ($C0:8661, $C0:8683, $C0:86A7).
+; Entry: M=1 (8-bit A), X any, DP any (not used), DB=$00 (registers
+;   absolute).
+; Exit: M=1, X, Y, DP and DB unchanged; A = MDMAEN_Ch7.
+; ------------------------------------------------------------
+Map_EdgeDmaRow:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; ------------------------------------------------------------
+; $C0:84C1 — Map_UploadRowYInc2 (98 bytes, $84C1–$8522)
+; Layer-2 row upload for Map_BuiltRowYInc bit 1: sends the row in
+;   Map_BufD000 to VRAM as three pieces, at most, of
+;   Map_EdgeSize2 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row 28 below the
+;   layer's row bias (Map_EdgeVram2 +6/+8/+10); the DMA itself is
+;   Map_EdgeDmaRow (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EBA6).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYInc2:
+    LDX.b !Map_EdgeSize2-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2+6-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize2+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize2+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2+8-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    CLC
+    ADC.w #!Map_BufD000&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize2+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize2+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2+10-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize2+2-!DP_Map
+    ADC.w #!Map_BufD000&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8523 — Map_UploadRowYInc3 (98 bytes, $8523–$8584)
+; Layer-3 row upload for Map_BuiltRowYInc bit 2: sends the row in
+;   Map_BufD800 to VRAM as three pieces, at most, of
+;   Map_EdgeSize3 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row 28 below the
+;   layer's row bias (Map_EdgeVram3 +6/+8/+10); the DMA itself is
+;   Map_EdgeDmaRow (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EBAF).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYInc3:
+    LDX.b !Map_EdgeSize3-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3+6-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufD800&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize3+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize3+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3+8-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    CLC
+    ADC.w #!Map_BufD800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize3+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize3+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3+10-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize3+2-!DP_Map
+    ADC.w #!Map_BufD800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8585 — Map_UploadRowYDec1 (98 bytes, $8585–$85E6)
+; Layer-1 row upload for Map_BuiltRowYDec bit 0: sends the row in
+;   Map_BufC800 to VRAM as three pieces, at most, of
+;   Map_EdgeSize1 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row at the layer's row
+;   bias (Map_EdgeVram1 +0/+2/+4); the DMA itself is Map_EdgeDmaRow
+;   (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EBB8).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYDec1:
+    LDX.b !Map_EdgeSize1-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufC800&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize1+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize1+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1+2-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    CLC
+    ADC.w #!Map_BufC800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize1+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize1+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram1+4-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize1+2-!DP_Map
+    ADC.w #!Map_BufC800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:85E7 — Map_UploadRowYDec2 (98 bytes, $85E7–$8648)
+; Layer-2 row upload for Map_BuiltRowYDec bit 1: sends the row in
+;   Map_BufD000 to VRAM as three pieces, at most, of
+;   Map_EdgeSize2 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row at the layer's row
+;   bias (Map_EdgeVram2 +0/+2/+4); the DMA itself is Map_EdgeDmaRow
+;   (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EBC1).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYDec2:
+    LDX.b !Map_EdgeSize2-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufD000&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize2+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize2+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2+2-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    CLC
+    ADC.w #!Map_BufD000&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize2+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize2+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram2+4-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize2+2-!DP_Map
+    ADC.w #!Map_BufD000&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8649 — Map_UploadRowYDec3 (98 bytes, $8649–$86AA)
+; Layer-3 row upload for Map_BuiltRowYDec bit 2: sends the row in
+;   Map_BufD800 to VRAM as three pieces, at most, of
+;   Map_EdgeSize3 +0/+2/+4 bytes (a piece of size 0 is skipped), each
+;   from where the previous ended, to the VRAM row at the layer's row
+;   bias (Map_EdgeVram3 +0/+2/+4); the DMA itself is Map_EdgeDmaRow
+;   (VMAIN step 1).
+; Callers (1 JSR site): NmiHandler ($C0:EBCA).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadRowYDec3:
+    LDX.b !Map_EdgeSize3-!DP_Map
+    BEQ .piece2
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3-!DP_Map
+    STX.w VMADDL
+    LDX.w #!Map_BufD800&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaRow
+.piece2:
+    LDX.b !Map_EdgeSize3+2-!DP_Map
+    BEQ .piece3
+    REP #$20
+    LDA.b !Map_EdgeSize3+2-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3+2-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    CLC
+    ADC.w #!Map_BufD800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.piece3:
+    LDX.b !Map_EdgeSize3+4-!DP_Map
+    BEQ .done
+    REP #$20
+    LDA.b !Map_EdgeSize3+4-!DP_Map
+    STA.w DAS7L
+    SEP #$20
+    LDX.b !Map_EdgeVram3+4-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3-!DP_Map
+    CLC
+    ADC.b !Map_EdgeSize3+2-!DP_Map
+    ADC.w #!Map_BufD800&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaRow
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:86AB — Map_UploadColXInc1 (50 bytes, $86AB–$86DC)
+; Layer-1 column upload for Map_BuiltColXInc bit 0: sends the column at
+;   Map_BufC800 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize1 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column 32 right of
+;   the layer's column bias (Map_EdgeVram1 +16/+18); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EBD3).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXInc1:
+    LDX.b !Map_EdgeSize1+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram1+16-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize1+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram1+18-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:86DD — Map_EdgeDmaCol (26 bytes, $86DD–$86F6)
+; As Map_EdgeDmaRow with VMAIN = increment by 32 words after the high
+;   byte (VRAM_INC_32), so the words go down a tilemap column.
+; Callers (12 JSR sites): Map_UploadColXInc1 ($C0:86BD, $C0:86D9), Map_UploadColXInc2 ($C0:8709,
+;   $C0:8725), Map_UploadColXInc3 ($C0:873B, $C0:8757), Map_UploadColXDec1 ($C0:876D, $C0:8789),
+;   Map_UploadColXDec2 ($C0:879F, $C0:87BB) and Map_UploadColXDec3 ($C0:87D1, $C0:87ED).
+; Entry: M=1 (8-bit A), X any, DP any (not used), DB=$00 (registers
+;   absolute).
+; Exit: M=1, X, Y, DP and DB unchanged; A = MDMAEN_Ch7.
+; ------------------------------------------------------------
+Map_EdgeDmaCol:
+    LDA.b #!VMAIN_IncAfterHigh|VRAM_INC_32
+    STA.w VMAIN
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; ------------------------------------------------------------
+; $C0:86F7 — Map_UploadColXInc2 (50 bytes, $86F7–$8728)
+; Layer-2 column upload for Map_BuiltColXInc bit 1: sends the column at
+;   Map_BufD000 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize2 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column 32 right of
+;   the layer's column bias (Map_EdgeVram2 +16/+18); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EBDC).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXInc2:
+    LDX.b !Map_EdgeSize2+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram2+16-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize2+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram2+18-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:8729 — Map_UploadColXInc3 (50 bytes, $8729–$875A)
+; Layer-3 column upload for Map_BuiltColXInc bit 2: sends the column at
+;   Map_BufD800 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize3 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column 32 right of
+;   the layer's column bias (Map_EdgeVram3 +16/+18); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EBE5).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXInc3:
+    LDX.b !Map_EdgeSize3+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram3+16-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize3+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram3+18-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:875B — Map_UploadColXDec1 (50 bytes, $875B–$878C)
+; Layer-1 column upload for Map_BuiltColXDec bit 0: sends the column at
+;   Map_BufC800 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize1 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column at the
+;   layer's column bias (Map_EdgeVram1 +12/+14); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EBEE).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXDec1:
+    LDX.b !Map_EdgeSize1+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram1+12-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize1+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram1+14-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize1+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufC800+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:878D — Map_UploadColXDec2 (50 bytes, $878D–$87BE)
+; Layer-2 column upload for Map_BuiltColXDec bit 1: sends the column at
+;   Map_BufD000 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize2 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column at the
+;   layer's column bias (Map_EdgeVram2 +12/+14); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EBF7).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXDec2:
+    LDX.b !Map_EdgeSize2+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram2+12-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize2+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram2+14-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize2+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufD000+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:87BF — Map_UploadColXDec3 (50 bytes, $87BF–$87F0)
+; Layer-3 column upload for Map_BuiltColXDec bit 2: sends the column at
+;   Map_BufD800 + Map_BufColOfs to VRAM as two pieces, at most, of
+;   Map_EdgeSize3 +6/+8 bytes (a piece of size 0 is skipped), the
+;   second from where the first ended, to the VRAM column at the
+;   layer's column bias (Map_EdgeVram3 +12/+14); the DMA itself is
+;   Map_EdgeDmaCol (VMAIN step 32).
+; Callers (1 JSR site): NmiHandler ($C0:EC00).
+; Entry: M=1 (8-bit A), X=0 (16-bit X: sizes and addresses are word
+;   loads), DP=$1D00 (!DP_Map: the Map_Edge* words are dp), DB=$00
+;   (registers absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (A =
+;   MDMAEN_Ch7 after a DMA); Y unchanged.
+; ------------------------------------------------------------
+Map_UploadColXDec3:
+    LDX.b !Map_EdgeSize3+6-!DP_Map
+    BEQ .piece2
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram3+12-!DP_Map
+    STX.w VMADDL
+    LDX.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STX.w A1T7L
+    JSR Map_EdgeDmaCol
+.piece2:
+    LDX.b !Map_EdgeSize3+8-!DP_Map
+    BEQ .done
+    STX.w DAS7L
+    LDX.b !Map_EdgeVram3+14-!DP_Map
+    STX.w VMADDL
+    REP #$20
+    LDA.b !Map_EdgeSize3+6-!DP_Map
+    CLC
+    ADC.w #(!Map_BufD800+!Map_BufColOfs)&$FFFF
+    STA.w A1T7L
+    SEP #$20
+    JSR Map_EdgeDmaCol
+.done:
+    RTS
+
 
 ; ============================================================
 ; Field frame update and its first helpers ($C0:881E–$C0:8901)
@@ -15838,11 +16920,12 @@ Vblank_UnkA810:
 ; - In it: if Obj_Unk0F00 is already Active, nothing; else it is set
 ;   up: Obj_DrawPrev / Obj_DrawNext / Obj_Unk0F00 = $80, Obj_AnimColumn
 ;   = 0, Obj_AnimTimer = 0, Obj_State = 0, Obj_LastFrame =
-;   Obj_LastFrameNone, then Obj_Unk7170, Obj_Unk6F9A (both dispatch on
-;   Obj_Unk1100; not traced) and Obj_DrawLink. C=1 either way.
+;   Obj_LastFrameNone, then Obj_Unk7170 (a palette slot by the
+;   Obj_Unk1100 kind), Obj_Unk6F9A (tile slots, kinds 3 and 4) and
+;   Obj_DrawLink. C=1 either way.
 ; - Out of it: if Obj_Unk0F00 is Active, it is dropped: Obj_Unk0F00 =
-;   0, SprBuf_FreeObj, Obj_Unk734C, Obj_Unk7056 (not traced) and
-;   Obj_DrawUnlink; then, when ObjX_LeaveView is nonzero and
+;   0, SprBuf_FreeObj, Obj_Unk734C (out of its palette slot's chain),
+;   Obj_Unk7056 (its tile slots freed) and Obj_DrawUnlink; then, when ObjX_LeaveView is nonzero and
 ;   Field_Unk30 is 0, Field_Unk29 = Field_Unk29State0D. In every out
 ;   case ObjX_AnimLoops, when nonzero, becomes ObjX_AnimLoopsOut. C=0.
 ; The 5 bytes after the RTS ($C0:A942: JSR Obj_Unk734C, CLC, RTS) are
@@ -16435,13 +17518,13 @@ Obj_CalcScreenPos:
 ; index stays in the 32 x 32 table. Quirk, kept: bit 7 of a distance
 ; (128 tiles or more) is never looked at; such a distance loses it.
 ; Both points equal give $40. Obj_DirectionHi is zeroed.
-; Callers (11 JSR sites): unmatched ($C0:4D46, $C0:4FAB, $C0:503D, $C0:50EA, $C0:516D, $C0:51F1,
-;   $C0:5281, $C0:5326, $C0:53CA, $C0:54B6, $C0:55E6).
-; Callers note (11 JSR sites in unmatched code, probably event-opcode
-;   handlers like the one at $C0:4D22): $C0:4D46, $C0:4FAB, $C0:503D, $C0:50EA, $C0:516D, $C0:51F1,
-;   $C0:5281, $C0:5326, $C0:53CA, $C0:54B6 and $C0:55E6. The one at
-;   $C0:4D22 stores Obj_TileX/Y of Obj_Cur as the start and two script
-;   bytes as the target.
+; Callers (11 JSR sites): Evt_Op7A_ArcToTile ($C0:4D46), Evt_Op96_WalkToTile ($C0:4FAB),
+;   Evt_Op9A_WalkTowardTile ($C0:503D), Evt_Op97_WalkToTileVar ($C0:50EA), Evt_OpA0_MoveToTile
+;   ($C0:516D), Evt_OpA1_MoveToTileVar ($C0:51F1), Evt_Op94_Body ($C0:5281), Evt_Op9E_Body
+;   ($C0:5326), Evt_Op98_Body ($C0:53CA), Evt_Op8F_FollowPc ($C0:54B6) and Evt_OpA8_Body ($C0:55E6).
+; Callers note: all in the event movement and facing opcodes (or their
+;   shared bodies). Evt_Op7A_ArcToTile, for one, stores Obj_TileX/Y of
+;   Obj_Cur as the start and its two operand bytes as the target.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: TAX of the 10-bit index),
 ; DP=$0100 (the ObjDir_* bytes are dp), DB=$00 or $C0 (Rom_AngleTable
 ; read absolute, through the bank $00 mirror).
@@ -16580,9 +17663,9 @@ Obj_CalcDirection:
 ; are sign-extended into Obj_VelYHi / Obj_VelXHi. ObjVel_Y gets a copy
 ; of the Y step. The opening STZs of Obj_VelX / Obj_VelY are
 ; overwritten before anything reads them (kept as found).
-; Callers (1 JSR site): unmatched ($C0:4D4B).
-; Callers note: $C0:4D4B in unmatched code (the event handler at $C0:4D22,
-; right after Obj_CalcDirection), its only call site.
+; Callers (1 JSR site): Evt_Op7A_ArcToTile ($C0:4D4B).
+; Callers note: Evt_Op7A_ArcToTile ($C0:4D4B, right after its
+; Obj_CalcDirection), its only call site.
 ; On entry: M=1 (8-bit A), X any (SEP #$10 here) = Obj_Cur, DP=$0100
 ; (Obj_Cur, Obj_Direction and ObjVel_Y are dp), DB=$00 (Obj_*,
 ; multiplier registers and the ROM table absolute).
@@ -16698,12 +17781,14 @@ Obj_SetVelocity:
 ;   Obj_OamFlags itself: Obj_PrioHigh = its bits 4-5, Obj_PrioLow = its
 ;   bits 0-1 moved to bits 4-5.
 ; The opening STZs of Obj_VelX / Obj_VelY are overwritten (kept).
-; Callers (12 JSR sites): unmatched ($C0:4EBD, $C0:4F03, $C0:4F5A, $C0:4FE0, $C0:507A, $C0:511F,
-;   $C0:518A, $C0:520E, $C0:52B6, $C0:5343, $C0:5406, $C0:54EB).
+; Callers (12 JSR sites): Evt_Op92_WalkDir ($C0:4EBD), Evt_Op9C_MoveDir ($C0:4F03),
+;   Evt_Op9D_MoveDirVar ($C0:4F5A), Evt_Op96_WalkToTile ($C0:4FE0), Evt_Op9A_WalkTowardTile
+;   ($C0:507A), Evt_Op97_WalkToTileVar ($C0:511F), Evt_OpA0_MoveToTile ($C0:518A),
+;   Evt_OpA1_MoveToTileVar ($C0:520E), Evt_Op94_Body ($C0:52B6), Evt_Op9E_Body ($C0:5343),
+;   Evt_Op98_Body ($C0:5406) and Evt_Op8F_FollowPc ($C0:54EB).
 ; Callers of Obj_SetVelocityChecked_Probe (2 BRL sites): Obj_SetVelocityAxis ($C0:AF46, $C0:AF4B).
-; Callers note (12 JSR sites in unmatched code, near the Obj_CalcDirection
-;   ones): $C0:4EBD, $C0:4F03, $C0:4F5A, $C0:4FE0, $C0:507A, $C0:511F,
-;   $C0:518A, $C0:520E, $C0:52B6, $C0:5343, $C0:5406 and $C0:54EB.
+; Callers note: all in the event movement opcodes (or their shared
+;   bodies), the same family that calls Obj_CalcDirection.
 ; On entry: M=1 (8-bit A), X any (SEP #$10 here) = Obj_Cur, DP=$0100
 ; (Obj_Cur, Obj_Direction, the ObjVel_* scratch and Field_Unk0400Copy
 ; are dp), DB=$00 (Obj_*, the multiplier and the ROM tables absolute;
@@ -17429,10 +18514,12 @@ Field_UnkB0E6:
 ; Callers (1 JSR site): Field_UnkB0E6 ($C0:B0FC).
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y) with X = Obj_Cur, DP=$0100
 ; (Obj_Cur and the ObjView_* scratch are dp), DB=$00.
-; Exit: M=1, X=1, DP and DB unchanged (as far as Obj_Unk7170 /
-; Obj_Unk6F9A go; not traced); C as above; A clobbered, X = Obj_Cur,
-; Y unchanged on the C=0 paths; ObjView_Left/Right/Top/Bottom ($C3-$C6)
-; written once Obj_Unk1A81 passed.
+; Exit: M=1, X=1, DP and DB unchanged (Obj_Unk7170 and Obj_Unk6F9A
+; keep them); C as above; C=0: A clobbered, X = Obj_Cur, Y unchanged;
+; C=1: A and X clobbered by those two, Y too when Obj_Unk7170 claims a
+; palette slot (its MVNs);
+; ObjView_Left/Right/Top/Bottom ($C3-$C6) written once Obj_Unk1A81
+; passed.
 ; ------------------------------------------------------------
 Obj_ActivateIfInView:
     LDA.w !Obj_Unk1A81,X
@@ -17940,7 +19027,7 @@ Obj_ResetStates:
 ; one). The channel 7 setup before the loop (VMAIN, BBAD7, DMAP7, A1B7)
 ; is the same 22 bytes (counting its SEP #$20) as in Spr_LoadLargeObj; every source is in bank
 ; $7F.
-; Callers (2 JSR sites): Field_UnkB0E6 ($C0:B111) and unmatched ($C0:EB8C).
+; Callers (2 JSR sites): Field_UnkB0E6 ($C0:B111) and NmiHandler ($C0:EB8C).
 ; Callers note: $C0:EB8C is in NmiHandler (which sets DP=$1D00 right
 ;   after); $C0:B111 is in Field_UnkB0E6, inside PHD/PLD, with REP #$10
 ;   before it.
@@ -17994,7 +19081,7 @@ VramQ_Flush:
 ; ============================================================
 ; $C0:B271 — Oam_BuildShadow (152 bytes)
 ; (was PostVBlank.) Rebuilds the OAM shadow ($0700 low table, $0900 high
-; table) for the next frame; it runs before Sub_EC60's wait for the
+; table) for the next frame; it runs before Field_WaitFrame's wait for the
 ; NMI, not after a VBlank. The shadow is split into three ranges, each with a
 ; low-table pointer (Oam_RangeNLoPtr) and a high-table pointer
 ; (Oam_RangeNHiPtr); Spr_AppendToOam appends each object's tiles to the range
@@ -18810,10 +19897,10 @@ Field_HookLeaveToBankC3:
     JSR Field_EndOfFrameShort
     LDA.b #$01
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Scene_Unk024C
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b #!NMITIMEN_NmiJoy
     STA.l NMITIMEN
     LDA.b #$00
@@ -18830,7 +19917,7 @@ Field_HookLeaveToBankC3:
 ; ------------------------------------------------------------
 ; $C0:264F — Field_HookWinPulse (214 bytes, $264F–$2724)
 ; Hook 12, a blocking sequence that runs its own frames (each one
-; Field_EndOfFrameShort + Sub_EC60, with no Field_FrameUpdate): redraws
+; Field_EndOfFrameShort + Field_WaitFrame, with no Field_FrameUpdate): redraws
 ; the map (Field_BuildC800Mode1, Field_Unk74E8/74F7, redraw step 2),
 ; sets Hdma_Unk7F1520/1522, Map_Unk1DFD and Hdma_Unk7F14F1/1523 and
 ; waits Hook12_WaitFrames frames; then puts window 1 on BG1 and BG2
@@ -18839,12 +19926,12 @@ Field_HookLeaveToBankC3:
 ; Hook12_HoldFrames and shrinks it for Hook12_RampFrames. Then it sets
 ; Field_EventHook to EventHook_Idle, clears the window and layer bytes,
 ; ORs Map_TilemapVram4's high byte into Hdma_Unk7F14F1 and ends with
-; one more frame (tail jump to Sub_EC60).
+; one more frame (tail jump to Field_WaitFrame).
 ; Quirk kept: Map_Unk1DFD is cleared with a long store (STA.l $00:1DFD)
 ; though it was set with an absolute one.
 ; Reached only through Field_EventHookTable (entry 12).
 ; On entry: M=1, X=0, DP=$0100, DB=$00.
-; Exit (through Sub_EC60): M=1, X=0, DP=$0100, DB=$00; A = 0, X and Y
+; Exit (through Field_WaitFrame): M=1, X=0, DP=$0100, DB=$00; A = 0, X and Y
 ; clobbered (the frame helpers do not preserve them).
 ; ------------------------------------------------------------
 Field_HookWinPulse:
@@ -18870,10 +19957,10 @@ Field_HookWinPulse:
     STA.l !Hdma_Unk7F1523
     LDA.b #!Hook12_WaitFrames
     STA.w !Map_HookTimer
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 .wait:
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .wait
     LDA.b #!W12SEL_Bg12Win1
@@ -18896,7 +19983,7 @@ Field_HookWinPulse:
     INC.b !WinFx_Size
     INC.b !WinFx_Size
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .grow
     LDA.b #!Hook12_HoldFrames
@@ -18904,7 +19991,7 @@ Field_HookWinPulse:
 .hold:
     JSR Field_WinPulseDraw
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .hold
     LDA.b #!Hook12_RampFrames
@@ -18914,7 +20001,7 @@ Field_HookWinPulse:
     DEC.b !WinFx_Size
     DEC.b !WinFx_Size
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     DEC.w !Map_HookTimer
     BNE .shrink
     LDA.b #!EventHook_Idle
@@ -18932,7 +20019,7 @@ Field_HookWinPulse:
     ORA.w !Map_TilemapVram4+1
     STA.l !Hdma_Unk7F14F1
     JSR Field_EndOfFrameShort
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 ; ------------------------------------------------------------
 ; $C0:2725 — Field_WinPulseDraw (40 bytes, $2725–$274C)
@@ -19130,10 +20217,9 @@ Field_ServiceUnk54_SendLine: ; header: see Field_ServiceUnk54
 ;   (JSR $C0:197E) and Field_RunBankC2Mode5 (JSR $C0:19FC).
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
-; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them,
-; as far as is known: Sub_EC60 and Scene_ReloadStep's Field_UnkB0E6 are
-; unmatched); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
-; and Sub_EC60).
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave
+; them); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
+; and Field_WaitFrame).
 ; ============================================================
 org $C02824
 Field_FadeInAfterReload:
@@ -19148,7 +20234,7 @@ Field_FadeInAfterReload:
     PLA
     STA.b !Field_ControlEnabled
     JSR Field_EndOfFrameShort
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax
     BMI .loop            ; until full brightness
@@ -19174,7 +20260,7 @@ Field_FadeInAfterReload:
 ; it), DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them);
 ; A, X, Y and Obj_Cur clobbered (Scene_ReloadStep, Field_FrameUpdate,
-; Field_EndOfFrame and Sub_EC60).
+; Field_EndOfFrame and Field_WaitFrame).
 ; ============================================================
 org $C02848
 Scene_SettleFrames:
@@ -19189,7 +20275,7 @@ Scene_SettleFrames:
     PLA
     STA.b !Field_ControlEnabled
     JSR Field_EndOfFrame
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Fade_Brightness
     CMP.b #!Fade_BrightnessMax
     BMI .loop            ; until full brightness
@@ -19207,7 +20293,7 @@ Scene_SettleFrames:
 ; VRAM uploads and palette setup (Field_UploadUnk1F00, Pal_LoadUnkRow0,
 ; Field_Unk29F7, Field_UploadUnk1D00, Field_Unk2B78,
 ; Field_UploadUnk1C00, Field_UploadUnk0000), Oam_HideFirst4,
-; Field_UploadUnk57E0, Scene_ResumeNmi (NMI back on) and one Sub_EC60
+; Field_UploadUnk57E0, Scene_ResumeNmi (NMI back on) and one Field_WaitFrame
 ; frame wait. Returns Field_Unk1E: its callers skip the fade-in when
 ; it is nonzero.
 ; Callers (2 JSR sites): Field_FadeInAfterReload ($C0:2824) and Scene_SettleFrames ($C0:2848).
@@ -19237,7 +20323,7 @@ Scene_ReloadStep:
     JSR Oam_HideFirst4
     JSR Field_UploadUnk57E0
     JSR Scene_ResumeNmi
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.b !Field_Unk1E                  ; Z: 0 = do the fade-in
     RTS
 
@@ -19622,9 +20708,9 @@ Scene_ResumeNmi:
 ; offsets come from Field_UploadUnk1F00Srcs (PHK/PLB around the read,
 ; so DB = this bank for it). Using the same setting as the colours
 ; suggests a window frame (probably); not traced.
-; Callers (2 JSR sites): Scene_ReloadStep ($C0:2884) and unmatched ($C0:EABA).
-; Callers note: Scene_ReloadStep ($C0:2884) and unmatched code at $C0:EABA
-;   (NMI handler).
+; Callers (2 JSR sites): Scene_ReloadStep ($C0:2884) and NmiHandler ($C0:EABA).
+; Callers note: NmiHandler runs it for Field_Unk47 bit Field47_Upload1F00
+;   (clearing it; one Field_Unk47 upload per frame).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
 ; DB=$00 (VramDma_Upload's registers).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
@@ -19678,9 +20764,9 @@ Field_UploadUnk1F00Srcs:
 ; Uploads Field_UploadUnk1D00Bytes ($280) from Field_Unk7EF000 to VRAM
 ; $1D00 (VramDma_Upload, word writes): the 32 x 10 tilemap Field_Unk29F7
 ; writes there (a bordered panel, probably a window background).
-; Callers (2 JSR sites): Scene_ReloadStep ($C0:288E) and unmatched ($C0:EA9E).
-; Callers note: Scene_ReloadStep ($C0:288E) and unmatched code at $C0:EA9E
-;   (NMI handler).
+; Callers (2 JSR sites): Scene_ReloadStep ($C0:288E) and NmiHandler ($C0:EA9E).
+; Callers note: NmiHandler runs it for Field_Unk47 bit Field47_Upload1D00
+;   (clearing it; one Field_Unk47 upload per frame).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
 ; DB=$00 (VramDma_Upload's registers).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (as
@@ -19702,13 +20788,52 @@ Field_UploadUnk1D00:
     RTS
 
 ; ------------------------------------------------------------
+; $C0:6ECB — Field_UploadUnk5800 (38 bytes, $6ECB–$6EF0)
+; Uploads Field_UploadUnk5800Bytes ($400) from Field_Unk7EF000 to VRAM
+; word Field_UploadVram5800 + Field_Unk31 x $200 (VramDma_Upload, word
+; writes). Quirk: the ADC has no CLC before it, so the carry the ASL
+; shifted out (bit 7 of Field_Unk31) is added, and that bit's own $10000
+; drops out of the 16-bit sum: the address is $5800 + (Field_Unk31 &
+; $7F) x $200, plus 1 when bit 7 is set. What the data is (a tilemap,
+; given Field_Unk7EF000's other uses) is not traced.
+; Callers (1 JSR site): NmiHandler ($C0:EB81).
+; Callers note: NmiHandler ($C0:EB81) runs it while Field_Unk36 is
+;   nonzero (zeroing it first when its bit 7 is set), only when
+;   Field_Unk47 is 0 and there was no redraw step 1-4 and no $7000 /
+;   $7400 upload.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk31,
+; VramDma_*), DB=$00 (VramDma_Upload's registers).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
+; the VramDma_* arguments written.
+; ------------------------------------------------------------
+Field_UploadUnk5800:
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.b !VramDma_Src
+    LDA.b !Field_Unk31
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    XBA
+    ASL A                               ; x $200; C = bit 7 of Field_Unk31
+    ADC.w #!Field_UploadVram5800        ; no CLC: the carry is added (see above)
+    STA.b !VramDma_Addr
+    SEP #$20
+    LDX.w #!Field_UploadUnk5800Bytes
+    STX.b !VramDma_Size
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDA.b #!Bank7E
+    STA.b !VramDma_SrcBank
+    JSR VramDma_Upload
+    RTS
+
+; ------------------------------------------------------------
 ; $C0:6EF1 — Field_UploadUnk1C00 (27 bytes, $6EF1–$6F0B)
 ; As Field_UploadUnk1D00 with VRAM $1C00 and Field_UploadUnk1C00Bytes
 ; ($200), from the same Field_Unk7EF000: the 32 x 8 tilemap of tiles
 ; $00-$FF that Field_Unk2B78 writes there.
-; Callers (2 JSR sites): Scene_ReloadStep ($C0:2895) and unmatched ($C0:EAAC).
-; Callers note: Scene_ReloadStep ($C0:2895) and unmatched code at $C0:EAAC
-;   (NMI handler).
+; Callers (2 JSR sites): Scene_ReloadStep ($C0:2895) and NmiHandler ($C0:EAAC).
+; Callers note: NmiHandler runs it for Field_Unk47 bit Field47_Upload1C00
+;   (clearing it; one Field_Unk47 upload per frame).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
 ; DB=$00 (VramDma_Upload's registers).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
@@ -19787,9 +20912,9 @@ Field_UploadUnk0000:
 ; ($FF:9260) to VRAM $57E0, the last $20 words of the area
 ; LocLoad_Unk6DCF fills from LocGfx_VramL3 ($5000), so it overwrites the
 ; end of the layer-3 graphics. What the 64 bytes are is not traced.
-; Callers (2 JSR sites): Scene_ReloadStep ($C0:289E) and unmatched ($C0:EAC8).
-; Callers note: Scene_ReloadStep ($C0:289E) and unmatched code at $C0:EAC8
-;   (NMI handler).
+; Callers (2 JSR sites): Scene_ReloadStep ($C0:289E) and NmiHandler ($C0:EAC8).
+; Callers note: NmiHandler runs it for Field_Unk47 bit Field47_Upload57E0
+;   (clearing it; one Field_Unk47 upload per frame).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
 ; DB=$00 (VramDma_Upload's registers).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; Y preserved;
@@ -19842,6 +20967,230 @@ Field_ResetUnk0B88:
     BNE .fill
     REP #$10
     PLD
+    RTS
+
+; ============================================================
+; Object tile slots ($C0:6F9A–$C0:7083)
+; Obj_TileSlot is a table of OBJ tile slots, each holding the object that
+; owns it ($80 = free). Slot n stands for the OAM tile numbers from
+; (n & $FE) x 16 + (n & 1) x 8, and for the SprTile records from n x $20
+; (four 8-byte records). Obj_Unk6F9A hands an object of Obj_Unk1100
+; kind 3 or 4 one slot (size class 0) or an even/odd pair of them;
+; Obj_Unk7056 gives them back. The names keep their Unk form because
+; Obj_UpdateInView and Obj_ActivateIfInView call them by those names
+; (better: Obj_TileSlotAlloc / Obj_TileSlotFree).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:6F9A — Obj_Unk6F9A (13 bytes, $6F9A–$6FA6)
+; Runs Obj_TileSlotHandlers entry Obj_Unk1100 of Obj_Cur, unless bit 7
+;   of it is set. Only kinds 3 and 4 do anything (Obj_TileSlotAllocKind);
+;   the table has 9 entries, so kinds 9-11 (which Obj_Unk7170's table
+;   does have) would take a word of the code after it as a handler
+;   (not known to happen).
+; Callers (2 JSR sites): Obj_UpdateInView ($C0:A908) and Obj_ActivateIfInView ($C0:B18B).
+; Callers note: Obj_UpdateInView ($C0:A908) and Obj_ActivateIfInView
+;   ($C0:B18B), right after Obj_Unk7170, as the object comes into view.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur), DB=$00
+;   (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered; Y unchanged;
+;   C unchanged on the bit-7 skip; otherwise C=0 for the no-op kinds
+;   (the ASL clears it) and, for Obj_TileSlotAllocKind, C=1 slot(s)
+;   taken, C=0 none free.
+; ------------------------------------------------------------
+org $C06F9A
+Obj_Unk6F9A:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    ASL A
+    TAX
+    JSR (Obj_TileSlotHandlers,X)
+.done:
+    RTS
+
+; Obj_Unk6F9A's handlers by Obj_Unk1100 (9 words, kinds 0-8).
+Obj_TileSlotHandlers:
+    dw Obj_TileSlotNone                 ; 0
+    dw Obj_TileSlotNone                 ; 1
+    dw Obj_TileSlotNone                 ; 2
+    dw Obj_TileSlotAllocKind            ; 3
+    dw Obj_TileSlotAllocKind            ; 4
+    dw Obj_TileSlotNone                 ; 5
+    dw Obj_TileSlotNone                 ; 6
+    dw Obj_TileSlotNone                 ; 7
+    dw Obj_TileSlotNone                 ; 8
+
+; ------------------------------------------------------------
+; $C0:6FB9 — Obj_TileSlotNone (1 byte, $6FB9)
+; Obj_TileSlotHandlers' entry for the kinds that take no tile slot: RTS.
+; On entry: as Obj_Unk6F9A (M=1, X=1, DP=$0100, DB=$00).
+; Exit: everything unchanged.
+; ------------------------------------------------------------
+Obj_TileSlotNone:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6FBA — Obj_TileSlotAllocKind (156 bytes, $6FBA–$7055)
+; Gives Obj_Cur tile slots in Obj_TileSlot by its size class
+;   (Obj_SprSize & ObjSpr_SizeMask):
+;   - class 0: the first free slot from ObjTile_SingleTop ($19) down to
+;     1 (slot 0 is never tried);
+;   - classes 1-3: the first even slot from ObjTile_PairFirst ($0C) to
+;     $16 that is free together with the odd slot after it; both are
+;     taken.
+;   For the slot n taken (the even one of a pair): Obj_TileSlot[n] (and
+;   [n + 1]) = Obj_Cur, Obj_VramTile = (n & $FE) x 16 + (n & 1) x 8 and
+;   Obj_TileRecOfs = n x $20, then C=1. Nothing free: C=0. The two
+;   searches overlap at slots $0C-$17.
+; Reached through Obj_TileSlotHandlers (kinds 3 and 4).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur,
+;   Eng_Scratch), DB=$00 (Obj_* and Obj_TileSlot absolute).
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A clobbered; X =
+;   Obj_Cur when a slot was taken, else 0 (class 0) or $18; Y
+;   unchanged; Eng_Scratch ($D9-$DA) clobbered.
+; ------------------------------------------------------------
+Obj_TileSlotAllocKind:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_SprSize,X
+    AND.b #!ObjSpr_SizeMask
+    BEQ .single
+    BRA .pair
+.single:
+    LDX.b #!ObjTile_SingleTop
+.single_loop:
+    LDA.w !Obj_TileSlot,X
+    BPL .single_next                    ; taken
+    LDA.b !Obj_Cur
+    STA.w !Obj_TileSlot,X
+    TXA
+    REP #$20
+    AND.w #!ObjTile_PairMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; (n & $FE) x 16
+    STA.b !Eng_Scratch
+    TXA
+    AND.w #!ObjTile_OddBit
+    ASL A
+    ASL A
+    ASL A                               ; (n & 1) x 8
+    CLC
+    ADC.b !Eng_Scratch
+    STX.b !Eng_Scratch                  ; 8-bit X: the slot number
+    LDX.b !Obj_Cur
+    STA.w !Obj_VramTile,X
+    SEP #$20
+    LDA.b !Eng_Scratch
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; n x $20
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    SEC
+    RTS
+.single_next:
+    DEX
+    BNE .single_loop
+    CLC
+    RTS
+.pair:
+    LDX.b #!ObjTile_PairFirst
+.pair_loop:
+    LDA.w !Obj_TileSlot,X
+    BPL .pair_next
+    LDA.w !Obj_TileSlot+1,X
+    BPL .pair_next
+    LDA.b !Obj_Cur
+    STA.w !Obj_TileSlot,X
+    STA.w !Obj_TileSlot+1,X
+    TXA
+    REP #$20
+    AND.w #!ObjTile_PairMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !Eng_Scratch
+    TXA
+    AND.w #!ObjTile_OddBit              ; always 0 here: n is even
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !Eng_Scratch
+    STX.b !Eng_Scratch
+    LDX.b !Obj_Cur
+    STA.w !Obj_VramTile,X
+    SEP #$20
+    LDA.b !Eng_Scratch
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    SEC
+    RTS
+.pair_next:
+    INX
+    INX
+    CPX.b #!ObjTile_PairEnd
+    BMI .pair_loop
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:7056 — Obj_Unk7056 (46 bytes, $7056–$7083)
+; Gives back Obj_Cur's tile slot(s): n = Obj_TileRecOfs / $20 (the slot
+;   Obj_TileSlotAllocKind took). If Obj_TileSlot[n] is not Obj_Cur:
+;   C=0, nothing changed. Else slot n is freed ($80), and slot n + 1 too
+;   when it also holds Obj_Cur (a pair); C=1. Run for every object that
+;   leaves the view, whatever its kind: for one that never took a slot
+;   the check on slot n is what keeps it from freeing another object's.
+; Callers (1 JSR site): Obj_UpdateInView ($C0:A91E).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y; the 16-bit A is moved to
+;   the 8-bit X), DP=$0100 (Obj_Cur), DB=$00 (Obj_* and Obj_TileSlot
+;   absolute).
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A = Obj_Cur (C=0)
+;   or $80, X = n; Y unchanged.
+; ------------------------------------------------------------
+Obj_Unk7056:
+    LDX.b !Obj_Cur
+    REP #$20
+    LDA.w !Obj_TileRecOfs,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A                               ; / $20: the slot
+    TAX
+    SEP #$20
+    LDA.b !Obj_Cur
+    CMP.w !Obj_TileSlot,X
+    BEQ .owned
+    CLC
+    RTS
+.owned:
+    CMP.w !Obj_TileSlot+1,X
+    BNE .free_one
+    LDA.b #!Field_Unk0B80Empty
+    STA.w !Obj_TileSlot+1,X
+    STA.w !Obj_TileSlot,X
+    SEC
+    RTS
+.free_one:
+    LDA.b #!Field_Unk0B80Empty
+    STA.w !Obj_TileSlot,X
+    SEC
     RTS
 
 ; ------------------------------------------------------------
@@ -19900,10 +21249,11 @@ Pal_LoadUnkRow0:
 ; with DMA channel 7 (mode 0, B-bus CGDATA). A second RTS follows the
 ; first at $C0:7154: Pal_UploadCgram_Rts, the target of
 ; Field_UploadUnk0000's do-nothing JSR.
-; Callers (1 JSR site): unmatched ($C0:EB86).
+; Callers (1 JSR site): NmiHandler ($C0:EB86).
 ; Callers of Pal_UploadCgram_Rts (1 JSR site): Field_UploadUnk0000 ($C0:6F5A).
-; Callers note: unmatched code at $C0:EB86 (NMI handler); the sub-entry
-;   Pal_UploadCgram_Rts: Field_UploadUnk0000 ($C0:6F5A).
+; Callers note: NmiHandler ($C0:EB86), the first of its .common
+;   uploads; the sub-entry Pal_UploadCgram_Rts: Field_UploadUnk0000
+;   ($C0:6F5A).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the address and size are word
 ; stores), DB=$00 (registers absolute); DP not used. Meant for a
 ; vertical blank or forced blank (CGRAM writes).
@@ -19949,6 +21299,476 @@ Field_ResetUnk0B80:
     STA.w !Field_Unk0B80+5
     STA.w !Field_Unk0B80+6
     STA.w !Field_Unk0B80+7
+    RTS
+
+; ============================================================
+; Object palette slots ($C0:7170–$C0:7398)
+; Obj_PalSlot holds, for each of the 8 sprite palettes (Pal_Buf rows
+; 8-15), the newest object using it ($80 = free). Objects whose colours
+; come from the same Obj_PalSrc share a slot: they are chained through
+; Obj_PalPrev / Obj_PalNext, with the slot naming the end of the chain.
+; Claiming a slot copies the 12 colours at $E4:Obj_PalSrc to colours
+; 1-12 of that palette in Pal_Buf and in Pal_CgramBuf (so the NMI's
+; Pal_UploadCgram sends them) and sets Obj_OamAttr to the palette
+; (slot x 2). Which slots an object may use depends on its
+; Obj_Unk1100 kind. The entry points keep their Unk names because
+; matched callers use them (better: Obj_PalSlotAlloc,
+; Obj_PalSlotAllocBtl, Obj_PalSlotFree).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:7170 — Obj_Unk7170 (17 bytes, $7170–$7180)
+; Unless Field_Unk54 bit 7 is set or Obj_Cur's Obj_Unk1100 has bit 7
+;   set, runs Obj_PalSlotHandlers entry Obj_Unk1100 (kinds 0-11) to give
+;   the object a palette slot.
+; Callers (2 JSR sites): Obj_UpdateInView ($C0:A905) and Obj_ActivateIfInView ($C0:B188).
+; Callers note: Obj_UpdateInView ($C0:A905) and Obj_ActivateIfInView
+;   ($C0:B188), as the object comes into view.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk54,
+;   Obj_Cur), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A and X clobbered; Y clobbered
+;   by the MVNs when a slot is claimed; C unchanged when skipped, else
+;   as the handler leaves it (C=1 slot claimed or shared, C=0 none).
+; ------------------------------------------------------------
+org $C07170
+Obj_Unk7170:
+    LDA.b !Field_Unk54
+    BMI .done
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    ASL A
+    TAX
+    JSR (Obj_PalSlotHandlers,X)
+.done:
+    RTS
+
+; Obj_Unk7170's handlers by Obj_Unk1100 (12 words, kinds 0-11).
+Obj_PalSlotHandlers:
+    dw Obj_PalSlotKind0                 ; 0: slot 5
+    dw Obj_PalSlotKind1                 ; 1: slot 6
+    dw Obj_PalSlotKind2                 ; 2: slot 7
+    dw Obj_PalSlotAny                   ; 3: slots 0-4
+    dw Obj_PalSlotAny                   ; 4
+    dw Obj_Unk72B4                      ; 5: slots 1-3
+    dw Obj_Unk72B4                      ; 6
+    dw Obj_PalSlotAny                   ; 7
+    dw Obj_PalSlotAny                   ; 8
+    dw Obj_PalSlotAny                   ; 9
+    dw Obj_PalSlotAny                   ; 10
+    dw Obj_PalSlotAny                   ; 11
+
+; ------------------------------------------------------------
+; $C0:7199 — Obj_PalSlotKind0 (2 bytes, $7199–$719A)
+; Kind 0: X = ObjPal_SlotKind0 (slot 5), then falls into
+;   Obj_PalSlotFixed.
+; Reached through Obj_PalSlotHandlers.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur), DB=$00
+;   (Obj_* tables absolute).
+; Exit: as Obj_PalSlotFixed (C=1 claimed / shared, C=0 not).
+; ------------------------------------------------------------
+Obj_PalSlotKind0:
+    LDX.b #!ObjPal_SlotKind0
+
+; ------------------------------------------------------------
+; $C0:719B — Obj_PalSlotFixed (119 bytes, $719B–$7211)
+; Gives Obj_Cur the palette slot X (5, 6 or 7 for kinds 0, 1 and 2). If
+;   the slot is free, Obj_Cur claims it: Obj_PalPrev/Next = $80,
+;   Obj_PalSlot[slot] = Obj_Cur, Obj_OamAttr = slot x 2 and the colour
+;   copy (see the banner), C=1. If it is taken, the owner's Obj_PalSrc
+;   is compared with Obj_Cur's: different, C=0; the same, Obj_Cur is
+;   chained after the owner (Obj_PalPrev = owner, Obj_PalNext = $80, the
+;   owner's Obj_PalNext = Obj_Cur) and the claim code is entered at
+;   .claim.
+; Quirk: that branch lands after the LDX of the slot that the free path
+;   does (the kind 3+ handlers reload it), so on the shared path X is
+;   the owner's object offset: Obj_Cur is stored at Obj_PalSlot + that
+;   offset (anywhere in $0B80-$0BFF, over Obj_TileSlot or SprBuf_Owner),
+;   and Obj_OamAttr and the colour destination come from (offset x 2) &
+;   $0E instead of the slot. Kept as is; whether two objects of kinds
+;   0-2 ever share a palette is not traced.
+; Callers (2 BRL sites): Obj_PalSlotKind1 ($C0:7214) and Obj_PalSlotKind2 ($C0:7219).
+; Callers note: Obj_PalSlotKind0 (falls in), Obj_PalSlotKind1 (BRL at
+;   $C0:7214) and Obj_PalSlotKind2 (BRL at $C0:7219).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur,
+;   ObjPal_Slot / ObjPal_Owner scratch), DB=$00 (Obj_* tables absolute);
+;   X = the slot.
+; Exit: M=1, X=1 (SEP #$30 after the copy), DP and DB unchanged (DB
+;   saved around the MVNs); C=1 claimed / shared, C=0 not; A, X and Y
+;   clobbered; ObjPal_Slot ($C3) written, ObjPal_Owner ($DB) when the
+;   slot was taken.
+; ------------------------------------------------------------
+Obj_PalSlotFixed:
+    LDA.w !Obj_PalSlot,X
+    BPL .taken
+    STX.b !ObjPal_Slot
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_None
+    STA.w !Obj_PalPrev,X
+    STA.w !Obj_PalNext,X
+    LDA.b !Obj_Cur
+    LDX.b !ObjPal_Slot
+.claim:
+    STA.w !Obj_PalSlot,X
+    TXA
+    ASL A
+    AND.b #!ObjPal_AttrMask
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x $20: its Pal_Buf row
+    INC A
+    INC A                               ; colour 1
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf       ; the same colours in Pal_CgramBuf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$30
+    SEC
+    RTS
+.differs:
+    CLC
+    RTS
+.taken:
+    STX.b !ObjPal_Slot
+    STA.b !ObjPal_Owner
+    TAX
+    REP #$20
+    LDA.w !Obj_PalSrc,X
+    LDX.b !Obj_Cur
+    CMP.w !Obj_PalSrc,X
+    BNE .differs
+    SEP #$20
+    LDA.b !ObjPal_Owner
+    STA.w !Obj_PalPrev,X
+    LDA.b #!Obj_None
+    STA.w !Obj_PalNext,X
+    TXA
+    LDX.b !ObjPal_Owner
+    STA.w !Obj_PalNext,X
+    BRA .claim                          ; quirk: X = the owner, not the slot (see above)
+
+; ------------------------------------------------------------
+; $C0:7212 — Obj_PalSlotKind1 (5 bytes, $7212–$7216)
+; Kind 1: Obj_PalSlotFixed with X = ObjPal_SlotKind1 (slot 6).
+; Reached through Obj_PalSlotHandlers.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur), DB=$00
+;   (Obj_* tables absolute).
+; Exit: as Obj_PalSlotFixed (C=1 claimed / shared, C=0 not).
+; ------------------------------------------------------------
+Obj_PalSlotKind1:
+    LDX.b #!ObjPal_SlotKind1
+    BRL Obj_PalSlotFixed
+
+; ------------------------------------------------------------
+; $C0:7217 — Obj_PalSlotKind2 (5 bytes, $7217–$721B)
+; Kind 2: Obj_PalSlotFixed with X = ObjPal_SlotKind2 (slot 7).
+; Reached through Obj_PalSlotHandlers.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur), DB=$00
+;   (Obj_* tables absolute).
+; Exit: as Obj_PalSlotFixed (C=1 claimed / shared, C=0 not).
+; ------------------------------------------------------------
+Obj_PalSlotKind2:
+    LDX.b #!ObjPal_SlotKind2
+    BRL Obj_PalSlotFixed
+
+; ------------------------------------------------------------
+; $C0:721C — Obj_PalSlotAny (152 bytes, $721C–$72B3)
+; Kinds 3, 4 and 7-11: first looks through slots 0 to ObjPal_AnyEnd - 1
+;   (0-4) for a taken one whose owner has Obj_Cur's Obj_PalSrc and, at
+;   the first, chains Obj_Cur after the owner (Obj_PalPrev = owner,
+;   Obj_PalNext = $80, the owner's Obj_PalNext = Obj_Cur); if none
+;   shares, takes the first free slot of 0-4 (Obj_PalPrev/Next = $80).
+;   Either way Obj_PalSlot[slot] = Obj_Cur, Obj_OamAttr = slot x 2 and
+;   the colours are copied (see the banner; done again when shared,
+;   with the same colours), C=1. No slot free: C=0.
+; Reached through Obj_PalSlotHandlers.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   ObjPal_* scratch), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged (DB saved around the MVNs); C as
+;   above; A, X and Y clobbered; ObjPal_Slot ($C3) written, ObjPal_Owner
+;   ($DB) when a taken slot was compared.
+; ------------------------------------------------------------
+Obj_PalSlotAny:
+    LDX.b #$00
+.share_loop:
+    LDA.w !Obj_PalSlot,X
+    BPL .compare
+.share_next_slot:
+    INX
+    CPX.b #!ObjPal_AnyEnd
+    BMI .share_loop
+.find_free:
+    LDX.b #$00
+.free_loop:
+    LDA.w !Obj_PalSlot,X
+    BPL .free_next
+    STX.b !ObjPal_Slot
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_None
+    STA.w !Obj_PalPrev,X
+    STA.w !Obj_PalNext,X
+    LDA.b !Obj_Cur
+.claim:
+    LDX.b !ObjPal_Slot
+    STA.w !Obj_PalSlot,X
+    TXA
+    ASL A
+    AND.b #!ObjPal_AttrMask
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    INC A
+    INC A
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$30
+    SEC
+    RTS
+.differs:
+    SEP #$20
+    LDX.b !ObjPal_Slot
+    INX
+    CPX.b #!ObjPal_AnyEnd
+    BMI .share_loop
+    BRA .find_free
+.compare:
+    STX.b !ObjPal_Slot
+    STA.b !ObjPal_Owner
+    TAX
+    REP #$20
+    LDA.w !Obj_PalSrc,X
+    LDX.b !Obj_Cur
+    CMP.w !Obj_PalSrc,X
+    BNE .differs
+    SEP #$20
+    LDA.b !ObjPal_Owner
+    STA.w !Obj_PalPrev,X
+    LDA.b #!Obj_None
+    STA.w !Obj_PalNext,X
+    TXA
+    LDX.b !ObjPal_Owner
+    STA.w !Obj_PalNext,X
+    BRA .claim
+.free_next:
+    INX
+    CPX.b #!ObjPal_AnyEnd
+    BCS .none
+    BRL .free_loop
+.none:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:72B4 — Obj_Unk72B4 (152 bytes, $72B4–$734B)
+; As Obj_PalSlotAny over slots ObjPal_BtlFirst to ObjPal_BtlEnd - 1
+;   (1-3): kinds 5 and 6 through Obj_PalSlotHandlers, and FieldBtl_SaveObj
+;   for an object with Obj_Unk1A81 bit 7 set. It keeps its Unk name
+;   because FieldBtl_SaveObj calls it by that name.
+; Callers (1 JSR site): FieldBtl_SaveObj ($C0:05F4).
+; Callers note: FieldBtl_SaveObj ($C0:05F4), with Obj_Cur = the object.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   ObjPal_* scratch), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged (DB saved around the MVNs); C=1
+;   slot claimed or shared, C=0 none free; A, X and Y clobbered;
+;   ObjPal_Slot ($C3) written, ObjPal_Owner ($DB) when a taken slot was
+;   compared.
+; ------------------------------------------------------------
+Obj_Unk72B4:
+    LDX.b #!ObjPal_BtlFirst
+.share_loop:
+    LDA.w !Obj_PalSlot,X
+    BPL .compare
+.share_next_slot:
+    INX
+    CPX.b #!ObjPal_BtlEnd
+    BMI .share_loop
+.find_free:
+    LDX.b #!ObjPal_BtlFirst
+.free_loop:
+    LDA.w !Obj_PalSlot,X
+    BPL .free_next
+    STX.b !ObjPal_Slot
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_None
+    STA.w !Obj_PalPrev,X
+    STA.w !Obj_PalNext,X
+    LDA.b !Obj_Cur
+.claim:
+    LDX.b !ObjPal_Slot
+    STA.w !Obj_PalSlot,X
+    TXA
+    ASL A
+    AND.b #!ObjPal_AttrMask
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    INC A
+    INC A
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$30
+    SEC
+    RTS
+.differs:
+    SEP #$20
+    LDX.b !ObjPal_Slot
+    INX
+    CPX.b #!ObjPal_BtlEnd
+    BMI .share_loop
+    BRA .find_free
+.compare:
+    STX.b !ObjPal_Slot
+    STA.b !ObjPal_Owner
+    TAX
+    REP #$20
+    LDA.w !Obj_PalSrc,X
+    LDX.b !Obj_Cur
+    CMP.w !Obj_PalSrc,X
+    BNE .differs
+    SEP #$20
+    LDA.b !ObjPal_Owner
+    STA.w !Obj_PalPrev,X
+    LDA.b #!Obj_None
+    STA.w !Obj_PalNext,X
+    TXA
+    LDX.b !ObjPal_Owner
+    STA.w !Obj_PalNext,X
+    BRA .claim
+.free_next:
+    INX
+    CPX.b #!ObjPal_BtlEnd
+    BCS .none
+    BRL .free_loop
+.none:
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:734C — Obj_Unk734C (77 bytes, $734C–$7398)
+; Takes Obj_Cur out of its palette slot's chain, unless Field_Unk54 bit
+;   7 is set (then nothing, C=1). With p = Obj_PalPrev and n =
+;   Obj_PalNext of Obj_Cur and the slot = Obj_OamAttr / 2:
+;   - n = none, p = none: Obj_PalSlot[slot] = $80 (free);
+;   - n = none, p set: Obj_PalSlot[slot] = p, p's Obj_PalNext = $80;
+;   - n set, p = none: n's Obj_PalPrev = $80;
+;   - n set, p set: n's Obj_PalPrev = p, p's Obj_PalNext = n.
+;   C=1 always. Obj_Cur's own links are left as they were. Nothing
+;   checks that Obj_Cur is in the slot's chain: with both links $80 it
+;   frees whatever slot its Obj_OamAttr names. It keeps its Unk name
+;   because its callers use it.
+; Callers (3 JSR sites): FieldBtl_RestoreObj ($C0:0802) and Obj_UpdateInView ($C0:A91B, $C0:A942).
+; Callers note: FieldBtl_RestoreObj ($C0:0802) and Obj_UpdateInView
+;   ($C0:A91B, and $C0:A942 in its unreached tail).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk54,
+;   Obj_Cur, Eng_Scratch), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; C=1; A and X clobbered; Y
+;   unchanged; Eng_Scratch ($D9) written on the linked paths.
+; ------------------------------------------------------------
+Obj_Unk734C:
+    LDA.b !Field_Unk54
+    BMI .done
+    LDX.b !Obj_Cur
+    LDA.w !Obj_PalNext,X
+    BPL .has_next
+    LDA.w !Obj_PalPrev,X
+    BMI .alone
+    STA.b !Eng_Scratch                  ; p
+    LDA.w !Obj_OamAttr,X
+    LSR A
+    TAX                                 ; the slot
+    LDA.b !Eng_Scratch
+    STA.w !Obj_PalSlot,X                ; p is now the newest
+    TAX
+    LDA.b #!Obj_None
+    STA.w !Obj_PalNext,X
+.done:
+    SEC
+    RTS
+.alone:
+    LDA.w !Obj_OamAttr,X
+    LSR A
+    TAX
+    LDA.b #!Field_Unk0B80Empty
+    STA.w !Obj_PalSlot,X                ; slot free
+    SEC
+    RTS
+.has_next:
+    STA.b !Eng_Scratch                  ; n
+    LDA.w !Obj_PalPrev,X
+    BMI .first
+    LDX.b !Eng_Scratch
+    STA.w !Obj_PalPrev,X
+    TAX
+    LDA.b !Eng_Scratch
+    STA.w !Obj_PalNext,X
+    SEC
+    RTS
+.first:
+    LDX.b !Eng_Scratch
+    LDA.b #!Obj_None
+    STA.w !Obj_PalPrev,X
+    SEC
     RTS
 
 ; ------------------------------------------------------------
@@ -20047,7 +21867,7 @@ Oam_HideFirst4:
 ;
 ; Pause: when Start is newly pressed (Pad_Pressed bit 0) with
 ;   Field_Unk11 = 0 and Field_ControlEnabled set, halve the brightness
-;   and loop (Sub_EC60 + EngFD_UnkC2C1 each frame) until Start is
+;   and loop (Field_WaitFrame + EngFD_UnkC2C1 each frame) until Start is
 ;   pressed again, then restore the brightness. (Earlier notes read
 ;   this as a VBlank-sync wait and had the exit test inverted.)
 ; Then Pad_Unk00F6: bit 0 → Field_FadeToBankC2Mode5; bit 6 (X in the
@@ -20076,7 +21896,7 @@ Field_PauseAndMenuInput:
     LDA.b #!Field_FadeBusyOn
     STA.w !Field_FadeBusy
 .pause_loop:
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     LDA.w !Pad_Pressed
     BIT.b #!Pad_Start
     BNE .unpause         ; Start pressed again → resume
@@ -20128,7 +21948,7 @@ Field_PauseAndMenuInput:
     SEP #$10
     JSL EngFD_UnkC2C1
     REP #$10
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade_loop
 .fade_done:
     JSR InitHW
@@ -20196,7 +22016,7 @@ Field_FadeToBankC2Mode5:
     SEP #$10
     JSL EngFD_UnkC2C1
     REP #$10
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .fade_loop
 .fade_done:
     JSR InitHW
@@ -20406,6 +22226,1932 @@ Field_ActionButton:
     REP #$10
 .tile_check:
     BRL Field_CheckTileInFront
+
+; ============================================================
+; Event opcodes: object movement and facing ($C0:4D06–$C0:56A5)
+; Handlers in Evt_OpcodeTable (unmatched) for moving and turning
+; objects, with the two animation helpers they share. Every handler is
+; entered with Y = its opcode's offset in Evt_Data and returns X = where
+; the script goes on: the next opcode with C=1 (keep running), or with
+; C=0 (stop this object for this run), or the opcode itself with C=0
+; (run it again next time: a move in progress). The movement opcodes
+; keep Obj_Unk1A80 nonzero while a timed move they started runs.
+; Operands named "slot" are object x 2; "p" is 0, 2 or 4, the
+; party member (Party_ObjSlot + p); "a" / "b" name event words at
+; Evt_Unk7F0200 + a x 2 (their low byte is used).
+; ============================================================
+
+org $C04D06
+; ------------------------------------------------------------
+; $C0:4D06 — Evt_Op7A_ArcToTile (287 bytes, $4D06–$4E24)
+; Event opcode $7A (4 bytes: $7A, column, row, g): moves Obj_Cur along an
+;   arc (Obj_ArcMode, probably a jump) to map tile (column, row). First
+;   run (Obj_Unk1A80 = 0): Obj_CalcDirection from its Obj_TileX/Y to the
+;   tile, Obj_SetVelocity, then the frames: |dx| x 256 / |Obj_VelX| with
+;   the hardware divider (8 NOPs for the result); when dx or Obj_VelX is
+;   0, |dy| x 256 / |Obj_VelY|; when that is 0 too, g frames. Obj_MoveFrames
+;   = the frames, Obj_ArcGravity = g, Obj_VelY -= frames x g / 2 (so the
+;   arc comes back down at the end), Obj_Unk1A80 = Obj_ArcMode = 1; X =
+;   the opcode again, C=0. Later runs: while Obj_MoveFrames is nonzero X
+;   = the opcode, C=0; then Obj_Unk1A80 = Obj_ArcMode = 0, X = the next
+;   opcode (Y + 4), C=1.
+; Reached through Evt_OpcodeTable (opcode $7A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y unchanged; first run: Obj_Direction, ObjDir_*, ObjVel_Y,
+;   EvtArc_Gravity ($C1) and ObjFront_SavedY ($C7) written.
+; ------------------------------------------------------------
+Evt_Op7A_ArcToTile:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .start
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_ArcMode,X
+    TYX
+    INX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    STY.b !ObjFront_SavedY
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToY
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtArc_Gravity
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    JSR Obj_CalcDirection
+    LDX.b !Obj_Cur
+    JSR Obj_SetVelocity
+    LDA.b !ObjDir_ToX
+    SEC
+    SBC.b !ObjDir_FromX
+    BEQ .try_y
+    BCS .dx_abs
+    EOR.b #!Eng_Invert8
+    INC A
+.dx_abs:
+    XBA
+    LDA.b #$00
+    REP #$20
+    STA.w WRDIVL
+    SEP #$20
+    LDA.w !Obj_VelX,X
+    BEQ .try_y
+    BPL .x_div
+    EOR.b #!Eng_Invert8
+    INC A
+.x_div:
+    STA.w WRDIVB
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDDIVL
+    STA.w !Obj_MoveFrames,X
+    STA.w WRMPYA
+    LDA.b !EvtArc_Gravity
+    STA.w WRMPYB
+    STA.w !Obj_ArcGravity,X
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    LSR A
+    EOR.w #!Eng_Invert16
+    INC A
+    CLC
+    ADC.w !Obj_VelY,X
+    STA.w !Obj_VelY,X
+    SEP #$20
+    BRA .started
+.try_y:
+    LDA.b !ObjDir_ToY
+    SEC
+    SBC.b !ObjDir_FromY
+    BEQ .g_frames
+    BCS .dy_abs
+    EOR.b #!Eng_Invert8
+    INC A
+.dy_abs:
+    XBA
+    LDA.b #$00
+    REP #$20
+    STA.w WRDIVL
+    SEP #$20
+    LDA.w !Obj_VelY,X
+    BEQ .g_frames
+    BPL .y_div
+    EOR.b #!Eng_Invert8
+    INC A
+.y_div:
+    STA.w WRDIVB
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDDIVL
+    STA.w !Obj_MoveFrames,X
+    STA.w WRMPYA
+    LDA.b !EvtArc_Gravity
+    STA.w WRMPYB
+    STA.w !Obj_ArcGravity,X
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    LSR A
+    EOR.w #!Eng_Invert16
+    INC A
+    CLC
+    ADC.w !Obj_VelY,X
+    STA.w !Obj_VelY,X
+    SEP #$20
+    BRA .started
+.g_frames:
+    LDA.b !EvtArc_Gravity
+    STA.w !Obj_MoveFrames,X
+    STA.w WRMPYA
+    LDA.b !EvtArc_Gravity
+    STA.w WRMPYB
+    STA.w !Obj_ArcGravity,X
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    LSR A
+    EOR.w #!Eng_Invert16
+    INC A
+    CLC
+    ADC.w !Obj_VelY,X
+    STA.w !Obj_VelY,X
+    SEP #$20
+.started:
+    LDA.b #$01
+    STA.w !Obj_Unk1A80,X
+    STA.w !Obj_ArcMode,X
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4E25 — Evt_Op7B_ArcSteps (78 bytes, $4E25–$4E72)
+; Event opcode $7B (5 bytes: $7B, vx, vy, g, frames): as Evt_Op7A_ArcToTile
+;   with the arc given directly: first run Obj_VelX = vx, Obj_VelY = vy,
+;   Obj_ArcGravity = g, Obj_MoveFrames = frames, Obj_Unk1A80 = Obj_ArcMode
+;   = 1, X = the opcode, C=0; then waits for Obj_MoveFrames = 0, clears
+;   both and goes on at Y + 5 (C=1). Only the low bytes of the steps are
+;   stored (Obj_VelXHi / Obj_VelYHi are left as they were).
+; Reached through Evt_OpcodeTable (opcode $7B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y = Obj_Cur after a first run, else unchanged; ObjFront_SavedY ($C7)
+;   written on the first run.
+; ------------------------------------------------------------
+Evt_Op7B_ArcSteps:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .start
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_ArcMode,X
+    TYX
+    INX
+    INX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    STY.b !ObjFront_SavedY
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    LDY.b !Obj_Cur
+    STA.w !Obj_VelX,Y
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Obj_VelY,Y
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Obj_ArcGravity,Y
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Obj_MoveFrames,Y
+    LDA.b #$01
+    STA.w !Obj_Unk1A80,Y
+    STA.w !Obj_ArcMode,Y
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4E73 — Evt_Op92_WalkDir (84 bytes, $4E73–$4EC6)
+; Event opcode $92 (3 bytes: $92, direction, frames): walks Obj_Cur in a
+;   direction for a number of frames. First run: Obj_Direction = the
+;   direction (256 per turn), Obj_Facing = Rom_DirToFacing of it,
+;   ObjX_Unk7F0B00 = ObjX_Unk7F0B00Dir, Obj_MoveFrames = frames,
+;   Obj_Unk1A80 + 1, Obj_SetVelocityChecked and Obj_SetMoveAnim; X = the
+;   opcode, C=0. Later runs wait for Obj_MoveFrames = 0, then Obj_Unk1A80
+;   = 0, Obj_SetStandAnim, X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $92).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
+;   else unchanged; Obj_Direction and
+;   ObjFront_SavedY ($C7) written on a first run.
+; ------------------------------------------------------------
+Evt_Op92_WalkDir:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .start
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    LDA.b #!ObjX_Unk7F0B00Dir
+    STA.l !ObjX_Unk7F0B00,X
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    INC.w !Obj_Unk1A80,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4EC7 — Evt_Op9C_MoveDir (67 bytes, $4EC7–$4F09)
+; Event opcode $9C (3 bytes: $9C, direction, frames): as Evt_Op92_WalkDir
+;   without the facing and the animation: Obj_Direction, ObjX_Unk7F0B00 =
+;   ObjX_Unk7F0B00Dir, Obj_MoveFrames, Obj_Unk1A80 + 1 and
+;   Obj_SetVelocityChecked; then waits and goes on at Y + 3 (C=1).
+; Reached through Evt_OpcodeTable (opcode $9C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
+;   else unchanged; Obj_Direction and
+;   ObjFront_SavedY ($C7) written on a first run.
+; ------------------------------------------------------------
+Evt_Op9C_MoveDir:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .start
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !Obj_Direction
+    SEP #$20
+    INX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    LDA.b #!ObjX_Unk7F0B00Dir
+    STA.l !ObjX_Unk7F0B00,X
+    INC.w !Obj_Unk1A80,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4F0A — Evt_Op9D_MoveDirVar (87 bytes, $4F0A–$4F60)
+; Event opcode $9D (3 bytes: $9D, a, b): as Evt_Op9C_MoveDir with the
+;   direction and the frames taken from the low bytes of the event words
+;   Evt_Unk7F0200 + a x 2 and + b x 2.
+; Reached through Evt_OpcodeTable (opcode $9D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
+;   else unchanged; Obj_Direction and
+;   ObjFront_SavedY ($C7) written on a first run.
+; ------------------------------------------------------------
+Evt_Op9D_MoveDirVar:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .start
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    AND.w #!Eng_LowByteMask
+    STA.b !Obj_Direction
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    LDA.b #!ObjX_Unk7F0B00Dir
+    STA.l !ObjX_Unk7F0B00,X
+    INC.w !Obj_Unk1A80,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4F61 — Evt_Op96_WalkToTile (137 bytes, $4F61–$4FE9)
+; Event opcode $96 (3 bytes: $96, column, row): walks Obj_Cur to a map
+;   tile, one step per script run. While Obj_MoveFrames is nonzero: X =
+;   the opcode, C=0 (the step is still going). Then on each
+;   run: if Obj_Cur's tile (Obj_TileX/Y) is the target, it has arrived:
+;   with Obj_Unk1C81 bit 0 (Obj1C81_CentreOnTile) set, Obj_Unk305D steps
+;   it toward its spot in the tile first, X $80 / Y $F0 (horizontally
+;   centred, near the bottom; C=1 from it: Obj_SetMoveAnim, X =
+;   the opcode, C=0); arrived, Obj_SetStandAnim and X = the next opcode,
+;   C=1. Else Obj_CalcDirection to the tile, Obj_Facing from
+;   Rom_DirToFacing; when Evt_FindSolidObjInFront finds an object in the
+;   way the direction turns by Evt_BlockedTurn ($30, 3/16 of a turn,
+;   from right toward down) and the facing follows. Obj_MoveFrames = ObjX_Unk7F0B00 = Obj_Unk1000 (the object's
+;   script period, so the step lasts until its next run),
+;   Obj_SetVelocityChecked, Obj_SetMoveAnim; X = the opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $96).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op96_WalkToTile:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToY
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .step
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .step
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_CentreOnTile
+    BEQ .arrived
+    JSR Obj_Unk305D
+    BCS .centring
+.arrived:
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.centring:
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4FEA — Evt_Op9A_WalkTowardTile (154 bytes, $4FEA–$5083)
+; Event opcode $9A (4 bytes: $9A, column, row, frames): as
+;   Evt_Op96_WalkToTile, but a single step of the given frames (Obj_MoveFrames
+;   = ObjX_Unk7F0B00 = frames, Obj_Unk1A80 + 1); once Obj_Unk1A80 is set
+;   it only waits for Obj_MoveFrames = 0 and then ends (Obj_Unk1A80 = 0,
+;   Obj_SetStandAnim, X = Y + 4, C=1) wherever the object is. Arriving
+;   first ends it the same way (after the Obj_Unk305D step to X $80 /
+;   Y $F0 in the tile, as
+;   Evt_Op96_WalkToTile).
+; Reached through Evt_OpcodeTable (opcode $9A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op9A_WalkTowardTile:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .aim
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToY
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .step
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .step
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_CentreOnTile
+    BEQ .arrived
+    JSR Obj_Unk305D
+    BCS .centring
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.centring:
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    TYX
+    INX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    INC.w !Obj_Unk1A80,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5084 — Evt_Op97_WalkToTileVar (165 bytes, $5084–$5128)
+; Event opcode $97 (3 bytes: $97, a, b): as Evt_Op96_WalkToTile with the
+;   column and row from the low bytes of the event words Evt_Unk7F0200
+;   + a x 2 and + b x 2.
+; Reached through Evt_OpcodeTable (opcode $97).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op97_WalkToTileVar:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !ObjDir_ToX
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !ObjDir_ToY
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .step
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .step
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_CentreOnTile
+    BEQ .arrived
+    JSR Obj_Unk305D
+    BCS .centring
+.arrived:
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.centring:
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5129 — Evt_OpA0_MoveToTile (104 bytes, $5129–$5190)
+; Event opcode $A0 (3 bytes: $A0, column, row): as Evt_Op96_WalkToTile
+;   without the facing and the animations (no Obj_Facing write, no
+;   Obj_SetMoveAnim / Obj_SetStandAnim): arrived (after any Obj_Unk305D
+;   step to X $80 / Y $F0 in the tile) X = Y + 3, C=1; else a step of Obj_Unk1000 frames, turned
+;   by Evt_BlockedTurn when Evt_FindSolidObjInFront finds something, C=0.
+; Reached through Evt_OpcodeTable (opcode $A0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_OpA0_MoveToTile:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !ObjDir_ToY
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .step
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .step
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_CentreOnTile
+    BEQ .arrived
+    JSR Obj_Unk305D
+    BCS .centring
+.arrived:
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.centring:
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    JSR Evt_FindSolidObjInFront
+    BCC .dir_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+.dir_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5191 — Evt_OpA1_MoveToTileVar (132 bytes, $5191–$5214)
+; Event opcode $A1 (3 bytes: $A1, a, b): as Evt_OpA0_MoveToTile with the
+;   column and row from the low bytes of the event words Evt_Unk7F0200
+;   + a x 2 and + b x 2.
+; Reached through Evt_OpcodeTable (opcode $A1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_OpA1_MoveToTileVar:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !ObjDir_ToX
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !ObjDir_ToY
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .step
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .step
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_CentreOnTile
+    BEQ .arrived
+    JSR Obj_Unk305D
+    BCS .centring
+.arrived:
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.centring:
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    JSR Evt_FindSolidObjInFront
+    BCC .dir_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+.dir_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5215 — Evt_Op94_WalkToObj (19 bytes, $5215–$5227; its body
+;   Evt_Op94_Body follows, 152 bytes, $5228–$52BF)
+; Event opcode $94 (2 bytes: $94, slot): walks Obj_Cur next to the object
+;   in slot (object x 2), one step per script run. While Obj_MoveFrames
+;   is nonzero: X = the opcode, C=0. Then, with X = the slot, Evt_Op94_Body
+;   (also entered by Evt_Op95_WalkToPc with a party member's slot): if its
+;   Obj_Unk1100 has bit 7 set the opcode ends at once. Else, when
+;   Obj_Cur's tile is within one row and one column of the target's
+;   (Obj_TileX/Y each equal or 1 off) it has arrived: with Obj_Unk1C81
+;   bit 1 (Obj1C81_OntoObj) set, Obj_Unk30B3 steps it onto the target's
+;   position first (ObjFront_Other = the target).
+;   C=1 from that: Obj_SetMoveAnim, X = the opcode, C=0; done:
+;   Obj_SetStandAnim, X = Y + 2, C=1 (also when the target is skipped).
+;   Else a step as in Evt_Op96_WalkToTile toward the target's tile
+;   (facing, Evt_BlockedTurn when blocked, Obj_Unk1000 frames,
+;   Obj_SetVelocityChecked, Obj_SetMoveAnim), X = the opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $94); Evt_Op94_Body from
+;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from the opcode $B5
+;   handler at $C0:3548 (unmatched; it then returns its own offset in X,
+;   C=0).
+; Callers (1 JSR site): unmatched ($C0:3548).
+; Callers of Evt_Op94_Body (1 BRL site): Evt_Op95_WalkToPc ($C0:5426).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+;   Evt_Op94_Body: X = the target's slot (16-bit, high byte 0).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op94_WalkToObj:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+Evt_Op94_Body:                          ; header: see Evt_Op94_WalkToObj
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_ToY
+    STX.b !ObjFront_Other
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    INC A
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToY
+    BNE .step
+.near_y:
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    INC A
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToX
+    BNE .step
+.near:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_OntoObj
+    BEQ .done
+    JSR Obj_Unk30B3
+    BCS .onto_obj
+.done:
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.onto_obj:
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:52C0 — Evt_Op9E_MoveToObj (19 bytes, $52C0–$52D2; its body
+;   Evt_Op9E_Body follows, 119 bytes, $52D3–$5349)
+; Event opcode $9E (2 bytes: $9E, slot): as Evt_Op94_WalkToObj without the
+;   facing and the animations; Evt_Op9E_Body (X = the target's slot) is
+;   also entered by Evt_Op9F_MoveToPc. Done (target skipped, or near and
+;   no Obj_Unk30B3 step pending): X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $9E); Evt_Op9E_Body from
+;   Evt_Op9F_MoveToPc (BRL at $C0:550B).
+; Callers of Evt_Op9E_Body (1 BRL site): Evt_Op9F_MoveToPc ($C0:550B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+;   Evt_Op9E_Body: X = the target's slot (16-bit, high byte 0).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op9E_MoveToObj:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+Evt_Op9E_Body:                          ; header: see Evt_Op9E_MoveToObj
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_ToY
+    STX.b !ObjFront_Other
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    INC A
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToY
+    BNE .step
+.near_y:
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    INC A
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToX
+    BNE .step
+.near:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_OntoObj
+    BEQ .done
+    JSR Obj_Unk30B3
+    BCS .onto_obj
+.done:
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.onto_obj:
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    JSR Evt_FindSolidObjInFront
+    BCC .dir_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+.dir_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:534A — Evt_Op98_WalkTowardObj (33 bytes, $534A–$536A; its body
+;   Evt_Op98_Body follows, 165 bytes, $536B–$540F)
+; Event opcode $98 (3 bytes: $98, slot, frames): as Evt_Op94_WalkToObj
+;   but a single step of the given frames (Obj_MoveFrames =
+;   ObjX_Unk7F0B00 = frames, Obj_Unk1A80 + 1); with Obj_Unk1A80 set it
+;   waits for Obj_MoveFrames = 0 and ends (Obj_Unk1A80 = 0, X = Y + 3,
+;   C=1). Done earlier (target skipped, or near): Obj_Unk1A80 = 0,
+;   Obj_SetStandAnim, X = Y + 3, C=1. Evt_Op98_Body (X = the target's
+;   slot) is also entered by Evt_Op99_WalkTowardPc.
+; Reached through Evt_OpcodeTable (opcode $98); Evt_Op98_Body from
+;   Evt_Op99_WalkTowardPc (BRL at $C0:5532).
+; Callers of Evt_Op98_Body (1 BRL site): Evt_Op99_WalkTowardPc ($C0:5532).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+;   Evt_Op98_Body: X = the target's slot (16-bit, high byte 0).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+; ------------------------------------------------------------
+Evt_Op98_WalkTowardObj:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .aim
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+Evt_Op98_Body:                          ; header: see Evt_Op98_WalkTowardObj
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_ToY
+    STX.b !ObjFront_Other
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    INC A
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToY
+    BNE .step
+.near_y:
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    INC A
+    CMP.b !ObjDir_ToX
+    BEQ .near
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToX
+    BNE .step
+.near:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1C81,X
+    BIT.b #!Obj1C81_OntoObj
+    BEQ .done
+    JSR Obj_Unk30B3
+    BCS .onto_obj
+.done:
+    LDX.b !Obj_Cur
+    STZ.w !Obj_Unk1A80,X
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.onto_obj:
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    INC.w !Obj_Unk1A80,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5410 — Evt_Op95_WalkToPc (25 bytes, $5410–$5428)
+; Event opcode $95 (2 bytes: $95, p): Evt_Op94_WalkToObj toward a
+;   party member's object (X = Party_ObjSlot + p; p = 0, 2 or 4, the
+;   party position x 2) through Evt_Op94_Body; X = the opcode, C=0 while
+;   Obj_MoveFrames is nonzero.
+; Reached through Evt_OpcodeTable (opcode $95); also JSR from the opcode
+;   $B6 handler at $C0:3551 (unmatched).
+; Callers (1 JSR site): unmatched ($C0:3551).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_Op94_WalkToObj.
+; ------------------------------------------------------------
+Evt_Op95_WalkToPc:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    TAX
+    BRL Evt_Op94_Body
+
+; ------------------------------------------------------------
+; $C0:5429 — Evt_Op8F_FollowPc (204 bytes, $5429–$54F4)
+; Event opcode $8F (2 bytes: $8F, p): walks Obj_Cur toward a party
+;   member's object (X = Party_ObjSlot + p; p = 0, 2 or 4, the party
+;   position x 2), one step per script run, as Evt_Op94_WalkToObj without the
+;   Obj_Unk30B3 step: it ends (Obj_SetStandAnim, X = Y + 2, C=1) when
+;   the member's Obj_Unk1100 has bit 7 set, when Obj_Cur is within one
+;   row and column of it, or when Obj_Cur is well inside the screen: its
+;   column minus EvtFollow_ScrCol (Map_TileOriginX / 2) is 2 to
+;   EvtFollow_ColLimit - 1 ($0D) and its row minus EvtFollow_ScrRow
+;   (Map_TileOriginY / 2) is 2 to EvtFollow_RowLimit - 1 ($0C). Else a
+;   step toward the member (facing, Evt_BlockedTurn when blocked, Obj_Unk1000
+;   frames, Obj_SetMoveAnim), X = the opcode, C=0.
+; The 6 bytes after the done path's RTS ($C0:54B0: JSR Obj_SetMoveAnim,
+;   TYX, CLC, RTS) are never reached.
+; Reached through Evt_OpcodeTable (opcode $8F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
+;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   ObjFront_SavedY ($C7) written when a step was set up.
+;   EvtFollow_ScrCol/Row ($DB/$DD) written when not near.
+; ------------------------------------------------------------
+Evt_Op8F_FollowPc:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    TAX
+    LDA.w !Obj_Unk1100,X
+    BMI .done_x
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_ToY
+    STX.b !ObjFront_Other
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    INC A
+    CMP.b !ObjDir_ToY
+    BEQ .near_y
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToY
+    BNE .check_screen
+.near_y:
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BEQ .done
+    INC A
+    CMP.b !ObjDir_ToX
+    BEQ .done
+    DEC A
+    DEC A
+    CMP.b !ObjDir_ToX
+    BEQ .done
+.check_screen:
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !EvtFollow_ScrCol
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !EvtFollow_ScrRow
+    LDA.b !ObjDir_FromX
+    SEC
+    SBC.b !EvtFollow_ScrCol
+    BEQ .step
+    CMP.b #$01
+    BEQ .step
+    CMP.b #!EvtFollow_ColLimit
+    BCS .step
+    LDA.b !ObjDir_FromY
+    SEC
+    SBC.b !EvtFollow_ScrRow
+    BEQ .step
+    CMP.b #$01
+    BEQ .step
+    CMP.b #!EvtFollow_RowLimit
+    BCS .step
+.done:
+    LDX.b !Obj_Cur
+.done_x:
+    JSR Obj_SetStandAnim
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+    ; never reached (nothing branches here):
+    JSR Obj_SetMoveAnim
+    TYX
+    CLC
+    RTS
+.step:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    JSR Evt_FindSolidObjInFront
+    BCC .facing_set
+    LDA.b !Obj_Direction
+    CLC
+    ADC.b #!Evt_BlockedTurn
+    STA.b !Obj_Direction
+    TAX
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+.facing_set:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1000,X
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    STY.b !ObjFront_SavedY
+    JSR Obj_SetVelocityChecked
+    JSR Obj_SetMoveAnim
+    LDX.b !ObjFront_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:54F5 — Evt_Op9F_MoveToPc (25 bytes, $54F5–$550D)
+; Event opcode $9F (2 bytes: $9F, p): Evt_Op9E_MoveToObj toward a
+;   party member's object (X = Party_ObjSlot + p; p = 0, 2 or 4, the
+;   party position x 2) through Evt_Op9E_Body; X = the opcode, C=0 while
+;   Obj_MoveFrames is nonzero.
+; Reached through Evt_OpcodeTable (opcode $9F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_Op9E_MoveToObj.
+; ------------------------------------------------------------
+Evt_Op9F_MoveToPc:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_MoveFrames,X
+    BEQ .aim
+    TYX
+    CLC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    TAX
+    BRL Evt_Op9E_Body
+
+; ------------------------------------------------------------
+; $C0:550E — Evt_Op99_WalkTowardPc (39 bytes, $550E–$5534)
+; Event opcode $99 (3 bytes: $99, p, frames): Evt_Op98_WalkTowardObj
+;   toward a party member's object (X = Party_ObjSlot + p) through
+;   Evt_Op98_Body; with Obj_Unk1A80 set it waits for Obj_MoveFrames = 0
+;   and ends (Obj_Unk1A80 = 0, X = Y + 3, C=1).
+; Reached through Evt_OpcodeTable (opcode $99).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_Op98_WalkTowardObj.
+; ------------------------------------------------------------
+Evt_Op99_WalkTowardPc:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1A80,X
+    BEQ .aim
+    LDA.w !Obj_MoveFrames,X
+    BEQ .arrived
+    TYX
+    CLC
+    RTS
+.arrived:
+    STZ.w !Obj_Unk1A80,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.aim:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    TAX
+    BRL Evt_Op98_Body
+
+; ------------------------------------------------------------
+; $C0:5535 — Evt_Op0F_FaceUp (4 bytes, $5535–$5538)
+; Event opcode $0F (1 byte): Obj_Cur faces up (facing 0) through
+;   Evt_SetFacing; X = Y + 1.
+; Reached through Evt_OpcodeTable (opcode $0F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode, C=0 (the
+;   script stops for this run); A = the facing; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op0F_FaceUp:
+    LDA.b #$00
+    BRA Evt_SetFacing
+
+; ------------------------------------------------------------
+; $C0:5539 — Evt_Op17_FaceDown (4 bytes, $5539–$553C)
+; Event opcode $17 (1 byte): Obj_Cur faces down (facing 1) through
+;   Evt_SetFacing; X = Y + 1.
+; Reached through Evt_OpcodeTable (opcode $17).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode, C=0 (the
+;   script stops for this run); A = the facing; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op17_FaceDown:
+    LDA.b #$01
+    BRA Evt_SetFacing
+
+; ------------------------------------------------------------
+; $C0:553D — Evt_Op1B_FaceLeft (4 bytes, $553D–$5540)
+; Event opcode $1B (1 byte): Obj_Cur faces left (facing 2) through
+;   Evt_SetFacing; X = Y + 1.
+; Reached through Evt_OpcodeTable (opcode $1B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode, C=0 (the
+;   script stops for this run); A = the facing; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op1B_FaceLeft:
+    LDA.b #$02
+    BRA Evt_SetFacing
+
+; ------------------------------------------------------------
+; $C0:5541 — Evt_Op1D_FaceRight (4 bytes, $5541–$5544)
+; Event opcode $1D (1 byte): Obj_Cur faces right (facing 3) through
+;   Evt_SetFacing; X = Y + 1.
+; Reached through Evt_OpcodeTable (opcode $1D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode, C=0 (the
+;   script stops for this run); A = the facing; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op1D_FaceRight:
+    LDA.b #$03
+    BRA Evt_SetFacing
+
+; ------------------------------------------------------------
+; $C0:5545 — Evt_OpA6_Face (6 bytes, $5545–$554A; then the sub-entries
+;   Evt_SetFacing, 2 bytes, $554B–$554C, and Evt_SetFacingOfX, 10 bytes,
+;   $554D–$5556)
+; Event opcode $A6 (2 bytes: $A6, facing): Obj_Cur's Obj_Facing = the
+;   operand. Evt_SetFacing (A = the facing; X = Obj_Cur) and
+;   Evt_SetFacingOfX (A = the facing, X = an object's slot) store it,
+;   zero Obj_AnimTimer (the animation steps at once) and return X = Y + 1,
+;   C=0; the one-byte facing opcodes enter with Y at the opcode, the
+;   two-byte ones after INY.
+; Reached through Evt_OpcodeTable (opcode $A6). Evt_SetFacing: BRA from
+;   Evt_Op0F_FaceUp, Evt_Op17_FaceDown, Evt_Op1B_FaceLeft, Evt_Op1D_FaceRight
+;   and Evt_OpA7_FaceVar; Evt_SetFacingOfX: BRA from Evt_Op1E_ObjFaceUp,
+;   Evt_Op1F_ObjFaceDown, Evt_Op25_ObjFaceLeft and Evt_Op26_ObjFaceRight.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the next opcode), C=0
+;   (the script stops for this run); A = the facing; Y = the opcode + 1
+;   after the INY of the two-byte opcodes, else unchanged.
+; ------------------------------------------------------------
+Evt_OpA6_Face:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+Evt_SetFacing:                          ; header: see Evt_OpA6_Face
+    LDX.b !Obj_Cur
+Evt_SetFacingOfX:                       ; header: see Evt_OpA6_Face
+    STA.w !Obj_Facing,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5557 — Evt_OpA7_FaceVar (21 bytes, $5557–$556B)
+; Event opcode $A7 (2 bytes: $A7, a): Obj_Cur's Obj_Facing = the low byte
+;   of the event word Evt_Unk7F0200 + a x 2, through Evt_SetFacing.
+; Reached through Evt_OpcodeTable (opcode $A7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA6_Face (X = Y + 2 of the entry Y, C=0; Y = the
+;   opcode + 1).
+; ------------------------------------------------------------
+Evt_OpA7_FaceVar:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    BRA Evt_SetFacing
+
+; ------------------------------------------------------------
+; $C0:556C — Evt_Op1E_ObjFaceUp (13 bytes, $556C–$5578)
+; Event opcode $1E (2 bytes: $1E, slot): the object in slot (object x 2)
+;   faces up (facing 0) through Evt_SetFacingOfX.
+; Reached through Evt_OpcodeTable (opcode $1E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA6_Face (X = Y + 2 of the entry Y, C=0; Y = the
+;   opcode + 1); B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op1E_ObjFaceUp:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$00
+    BRA Evt_SetFacingOfX
+
+; ------------------------------------------------------------
+; $C0:5579 — Evt_Op1F_ObjFaceDown (13 bytes, $5579–$5585)
+; Event opcode $1F (2 bytes: $1F, slot): the object in slot (object x 2)
+;   faces down (facing 1) through Evt_SetFacingOfX.
+; Reached through Evt_OpcodeTable (opcode $1F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA6_Face (X = Y + 2 of the entry Y, C=0; Y = the
+;   opcode + 1); B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op1F_ObjFaceDown:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$01
+    BRA Evt_SetFacingOfX
+
+; ------------------------------------------------------------
+; $C0:5586 — Evt_Op25_ObjFaceLeft (13 bytes, $5586–$5592)
+; Event opcode $25 (2 bytes: $25, slot): the object in slot (object x 2)
+;   faces left (facing 2) through Evt_SetFacingOfX.
+; Reached through Evt_OpcodeTable (opcode $25).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA6_Face (X = Y + 2 of the entry Y, C=0; Y = the
+;   opcode + 1); B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op25_ObjFaceLeft:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$02
+    BRA Evt_SetFacingOfX
+
+; ------------------------------------------------------------
+; $C0:5593 — Evt_Op26_ObjFaceRight (13 bytes, $5593–$559F)
+; Event opcode $26 (2 bytes: $26, slot): the object in slot (object x 2)
+;   faces right (facing 3) through Evt_SetFacingOfX.
+; Reached through Evt_OpcodeTable (opcode $26).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA6_Face (X = Y + 2 of the entry Y, C=0; Y = the
+;   opcode + 1); B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op26_ObjFaceRight:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$03
+    BRA Evt_SetFacingOfX
+
+; ------------------------------------------------------------
+; $C0:55A0 — Evt_OpA8_FaceObj (9 bytes, $55A0–$55A8; its body
+;   Evt_OpA8_Body follows, 92 bytes, $55A9–$5604)
+; Event opcode $A8 (2 bytes: $A8, slot): turns Obj_Cur toward the object
+;   in slot. Evt_OpA8_Body (X = the target, also entered by
+;   Evt_OpA9_FacePc): when the target's Obj_Unk1100 has bit 7 set, X = Y
+;   + 2, C=1. Else Obj_CalcDirection from Obj_Cur's tile to the
+;   target's; when both are on the same tile, from the low bytes of
+;   Obj_PosX/Y instead (the positions within the tile). Obj_Facing =
+;   Rom_DirToFacing of it, Obj_AnimTimer = 0; X = Y + 2, C=0.
+; Reached through Evt_OpcodeTable (opcode $A8); Evt_OpA8_Body from
+;   Evt_OpA9_FacePc (BRL at $C0:5611).
+; Callers of Evt_OpA8_Body (1 BRL site): Evt_OpA9_FacePc ($C0:5611).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+;   Evt_OpA8_Body: X = the target's slot (16-bit, high byte 0).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
+;   Y unchanged; EvtFace_Target ($D9), Obj_Direction and ObjDir_*
+;   written unless the target was skipped.
+; ------------------------------------------------------------
+Evt_OpA8_FaceObj:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+Evt_OpA8_Body:                          ; header: see Evt_OpA8_FaceObj
+    LDA.w !Obj_Unk1100,X
+    BMI .skip
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_ToY
+    STX.b !EvtFace_Target
+    LDX.b !Obj_Cur
+    LDA.w !Obj_TileX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_TileY,X
+    STA.b !ObjDir_FromY
+    CMP.b !ObjDir_ToY
+    BNE .aim
+    LDA.b !ObjDir_FromX
+    CMP.b !ObjDir_ToX
+    BNE .aim
+    LDA.w !Obj_PosX,X
+    STA.b !ObjDir_FromX
+    LDA.w !Obj_PosY,X
+    STA.b !ObjDir_FromY
+    LDX.b !EvtFace_Target
+    LDA.w !Obj_PosX,X
+    STA.b !ObjDir_ToX
+    LDA.w !Obj_PosY,X
+    STA.b !ObjDir_ToY
+.aim:
+    JSR Obj_CalcDirection
+    REP #$20
+    LDA.b !Obj_Direction
+    TAX
+    SEP #$20
+    LDA.w !Rom_DirToFacing,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Facing,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    INX
+    CLC
+    RTS
+.skip:
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5605 — Evt_OpA9_FacePc (15 bytes, $5605–$5613)
+; Event opcode $A9 (2 bytes: $A9, p): Evt_OpA8_FaceObj toward a party
+;   member's object (X = Party_ObjSlot + p, p = 0, 2 or 4) through
+;   Evt_OpA8_Body.
+; Reached through Evt_OpcodeTable (opcode $A9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
+; Exit: as Evt_OpA8_FaceObj.
+; ------------------------------------------------------------
+Evt_OpA9_FacePc:
+    TYX
+    INX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    TAX
+    BRL Evt_OpA8_Body
+
+; ------------------------------------------------------------
+; $C0:5614 — Obj_SetMoveAnim (119 bytes, $5614–$568A)
+; Picks Obj_Cur's animation row from its speed. Only in Obj_AnimMode 0;
+;   in Obj_AnimModeFixed (3) it first leaves that mode: to mode 1 (and
+;   stops there) unless Obj_AnimRow is $FF, then to mode 0; modes 1 and 2
+;   are left alone. With s = |Obj_VelX| + |Obj_VelY| (low bytes): s = 0
+;   row ObjAnim_RowStand (0); s below ObjAnim_RunSpeed ($20) row
+;   ObjAnim_RowWalk (1); s at or above it row ObjAnim_RowRun (6) when
+;   Obj_Unk1100 is below ObjAnim_RunKinds (4), else row 1. A row is set
+;   only when it differs, with Obj_AnimColumn and Obj_AnimTimer = 0.
+;   (Rows read as stand / walk / run from this use; not checked against
+;   the frames.)
+; Callers (13 JSR sites): Evt_Op92_WalkDir ($C0:4EC0), Evt_Op96_WalkToTile ($C0:4FA5, $C0:4FE3),
+;   Evt_Op9A_WalkTowardTile ($C0:5037, $C0:507D), Evt_Op97_WalkToTileVar ($C0:50E4, $C0:5122),
+;   Evt_Op94_Body ($C0:527B, $C0:52B9), Evt_Op98_Body ($C0:53C4, $C0:5409) and Evt_Op8F_FollowPc
+;   ($C0:54B0, $C0:54EE).
+; Callers note: Evt_Op8F_FollowPc's $C0:54B0 is in its unreached bytes.
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$0100 (Obj_Cur,
+;   Eng_Scratch), DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered, X = Obj_Cur, Y
+;   unchanged; Eng_Scratch ($D9) written in mode 0.
+; ------------------------------------------------------------
+Obj_SetMoveAnim:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_AnimMode,X
+    BEQ .by_speed
+    CMP.b #!Obj_AnimModeFixed
+    BEQ .fixed
+    RTS
+.fixed:
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!Anim_EndMarker
+    BEQ .to_mode0
+    LDA.b #!Obj_AnimModeNormal
+    STA.w !Obj_AnimMode,X
+    RTS
+.to_mode0:
+    STZ.w !Obj_AnimMode,X
+.by_speed:
+    LDA.w !Obj_VelX,X
+    BPL .x_abs
+    EOR.b #!Eng_Invert8
+    INC A
+.x_abs:
+    STA.b !Eng_Scratch
+    LDA.w !Obj_VelY,X
+    BPL .y_abs
+    EOR.b #!Eng_Invert8
+    INC A
+.y_abs:
+    CLC
+    ADC.b !Eng_Scratch
+    BEQ .stand
+    CMP.b #!ObjAnim_RunSpeed
+    BCS .fast
+.walk:
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!ObjAnim_RowWalk
+    BEQ .done
+    LDA.b #!ObjAnim_RowWalk
+    STA.w !Obj_AnimRow,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    RTS
+.stand:
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!ObjAnim_RowStand
+    BEQ .done
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+.done:
+    RTS
+.fast:
+    LDA.w !Obj_Unk1100,X
+    CMP.b #!ObjAnim_RunKinds
+    BCS .walk
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!ObjAnim_RowRun
+    BEQ .done
+    LDA.b #!ObjAnim_RowRun
+    STA.w !Obj_AnimRow,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:568B — Obj_SetStandAnim (27 bytes, $568B–$56A5)
+; In Obj_AnimMode 0 only: Obj_Cur's Obj_AnimRow = ObjAnim_RowStand (0)
+;   unless it already is, with Obj_AnimColumn and Obj_AnimTimer = 0.
+; Callers (7 JSR sites): Evt_Op92_WalkDir ($C0:4E85), Evt_Op96_WalkToTile ($C0:4F9C),
+;   Evt_Op9A_WalkTowardTile ($C0:502D), Evt_Op97_WalkToTileVar ($C0:50DB), Evt_Op94_Body ($C0:5273),
+;   Evt_Op98_Body ($C0:53BB) and Evt_Op8F_FollowPc ($C0:54A8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X), DP=$0100 (Obj_Cur), DB=$00
+;   (Obj_* tables absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered, X = Obj_Cur, Y
+;   unchanged.
+; ------------------------------------------------------------
+Obj_SetStandAnim:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_AnimMode,X
+    BEQ .mode0
+    RTS
+.mode0:
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!ObjAnim_RowStand
+    BEQ .done
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+.done:
+    RTS
+
 
 ; ============================================================
 ; Location objects and event data at a location load ($C0:56A6-
@@ -20810,9 +24556,10 @@ Evt_InitObjects:
 ; ------------------------------------------------------------
 ; $C0:5929 — Evt_ClearUnk0920 (51 bytes, $5929–$595B)
 ; Sets the 16 bytes Evt_Unk0920 to Evt_Unk0920Free ($FF), one STA each.
-; The unmatched code at $C0:5C90 searches this list for dp $E3, takes
-; the first $FF entry for a new one and keeps Obj_Cur beside it in
-; Evt_Unk0930; what the entries stand for is not traced.
+; Evt_FindOrAddUnk0920 searches this list for Evt_Unk0920Key (dp $E3),
+; takes the first free entry for a new key and keeps the low byte of
+; Obj_Cur beside it in Evt_Unk0930; what the entries stand for is not
+; traced.
 ; Callers (1 JSR site): Scene_PostLoadInit ($C0:56BC).
 ; On entry: M=1 (8-bit A), DB=$00 (absolute stores); X and DP not used.
 ; Exit: M, X, DP and DB unchanged; A = Evt_Unk0920Free.
@@ -20930,6 +24677,208 @@ Evt_RunObjInit:
     SEP #$20                ; A → 8-bit
     LDA.b #!Obj_Unk1C00Init
     STA.w !Obj_Unk1C00,X
+    RTS
+
+; ============================================================
+; Object script scheduler ($C0:59D9–$C0:5AC4)
+; Each frame Field_EndOfFrame first runs Vblank_Unk59D9, which counts
+; down every object's script timer and queues the objects whose timer
+; ran out (the ObjQ_Unk74 list, linked through Obj_Unk1080), then
+; Vblank_ReadScanlineCounters, which runs the queued objects' scripts
+; (Evt_RunObjScriptSteps) while the frame still has time. An opcode
+; handler returns C=1 to go on with the next opcode, C=0 to stop the
+; object for this frame, and X = where its script goes on.
+; The two keep their names because Field_EndOfFrame calls them by them
+; (better: Obj_QueueScripts and Obj_RunQueuedScripts).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:59D9 — Vblank_Unk59D9 (109 bytes, $59D9–$5A45)
+; With DP=$1000 (the Obj_Unk1000 page), for each object slot below
+;   Evt_ObjSlotEnd (= Evt_ObjCount x 2, stored here) whose Obj_Unk1000
+;   has bit 7 clear: Obj_Unk1001 is counted down (when not already 0);
+;   at 0 the object is queued, unless its Obj_Unk1100 has bit 7 set:
+;   - Obj_Unk1100 = 0: at the head of the ObjQ_Unk74 list (Obj_Unk1080
+;     = the old head), unless it is the head already;
+;   - other kinds: at the tail (ObjQ_Unk75; the old tail's
+;     Obj_Unk1080 = it), unless it is the tail or already queued
+;     (Obj_Unk1080 bit 7 clear);
+;   - into an empty list: head and tail.
+;   On queueing Obj_Unk1001 is reloaded from Obj_Unk1000 (the period;
+;   Obj_Unk1000Init = 4 at load); an object left unqueued keeps
+;   Obj_Unk1001 = 0 and is tried again next frame.
+; Quirk: the head insert checks only that the object is not the head,
+;   not Obj_Unk1080, so an object of kind 0 already further down the
+;   list would be linked in twice (not known to happen).
+; Callers (1 JSR site): Field_EndOfFrame ($C0:00C1).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP any (saved; set to
+;   $1000 here, restored), DB=$00 (Obj_Unk1100 and the field bytes
+;   absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered;
+;   Evt_ObjSlotEnd, ObjQ_Unk74/75 and the objects' Obj_Unk1001 /
+;   Obj_Unk1080 written.
+; ------------------------------------------------------------
+Vblank_Unk59D9:
+    PHD
+    REP #$20
+    LDA.w #!Obj_Unk1000
+    TCD
+    SEP #$20
+    LDA.l !Evt_ObjCount
+    ASL A
+    STA.w !DP_Field+!Evt_ObjSlotEnd
+    LDX.b #$00
+.obj_loop:
+    LDA.b !Obj_Unk1000-!Obj_Unk1000,X
+    BMI .next
+    LDA.b !Obj_Unk1001-!Obj_Unk1000,X
+    BEQ .due
+    DEC.b !Obj_Unk1001-!Obj_Unk1000,X
+    BEQ .due
+.next:
+    INX
+    INX
+    CPX.w !DP_Field+!Evt_ObjSlotEnd
+    BNE .obj_loop
+    PLD
+    RTS
+.due:
+    LDA.w !Obj_Unk1100,X
+    BEQ .at_head
+    BMI .next
+    CPX.w !DP_Field+!ObjQ_Unk75
+    BEQ .next                           ; already the tail
+    LDA.b !Obj_Unk1080-!Obj_Unk1000,X
+    BPL .next                           ; already linked
+    LDA.w !DP_Field+!ObjQ_Unk75
+    BMI .first
+    TXY
+    TAX
+    TYA
+    STA.b !Obj_Unk1080-!Obj_Unk1000,X   ; old tail -> this object
+    STA.w !DP_Field+!ObjQ_Unk75
+    TAX
+    LDA.b !Obj_Unk1000-!Obj_Unk1000,X
+    STA.b !Obj_Unk1001-!Obj_Unk1000,X   ; reload the timer
+    BRA .next
+.first:
+    STX.w !DP_Field+!ObjQ_Unk74
+    STX.w !DP_Field+!ObjQ_Unk75
+    LDA.b !Obj_Unk1000-!Obj_Unk1000,X
+    STA.b !Obj_Unk1001-!Obj_Unk1000,X
+    BRA .next
+.at_head:
+    CPX.w !DP_Field+!ObjQ_Unk74
+    BEQ .next                           ; already the head
+    LDA.w !DP_Field+!ObjQ_Unk74
+    BMI .first
+    STA.b !Obj_Unk1080-!Obj_Unk1000,X   ; this object -> old head
+    STX.w !DP_Field+!ObjQ_Unk74
+    LDA.b !Obj_Unk1000-!Obj_Unk1000,X
+    STA.b !Obj_Unk1001-!Obj_Unk1000,X
+    BRA .next
+
+; ------------------------------------------------------------
+; $C0:5A46 — Vblank_ReadScanlineCounters (77 bytes, $5A46–$5A92)
+; Runs the queued objects' scripts while there is time left in the
+;   frame: before each object it reads the V counter (as
+;   Field_ProcessAnimQueue does) and stops once it is at ObjQ_Unk69 or
+;   more but below line 240 (Ppu_FirstHiddenLine). Each time it takes
+;   the ObjQ_Unk74 head off the list (its Obj_Unk1080 = $80; when it was
+;   also the tail the list becomes empty) and runs
+;   Evt_RunObjScriptSteps for it. Returns when the list is empty.
+; Quirk: the TAX right after the LDA of the head is redundant (both
+;   paths load X again).
+; Callers (1 JSR site): Field_EndOfFrame ($C0:00C4).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (ObjQ_*, Obj_Cur),
+;   DB=$00 (PPU counters and Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (and what
+;   the opcode handlers change); Obj_Cur = the last object run.
+; ------------------------------------------------------------
+Vblank_ReadScanlineCounters:
+    LDA.w STAT78                        ; reset the OPVCT read flip-flop
+.latch:
+    LDA.w SLHV                          ; latch H/V
+    LDA.w OPVCT                         ; low 8 bits
+    XBA
+    LDA.w OPVCT                         ; bit 0 = bit 8 of V
+    AND.b #$01
+    XBA
+    REP #$20                            ; A = 9-bit V counter
+    CMP.w #!Ppu_FirstHiddenLine
+    BPL .in_window                      ; line 240 or later: keep going
+    CMP.b !ObjQ_Unk69
+    BCS .exit                           ; out of time for this frame
+.in_window:
+    LDA.w #$0000                        ; clear B
+    SEP #$20
+    LDA.b !ObjQ_Unk74
+    BMI .exit                           ; list empty
+    TAX                                 ; (redundant)
+    LDA.b !ObjQ_Unk74
+    CMP.b !ObjQ_Unk75
+    BEQ .last
+    TAX
+    LDA.w !Obj_Unk1080,X
+    STA.b !ObjQ_Unk74                   ; next becomes the head
+    LDA.b #!ObjQ_Empty
+    STA.w !Obj_Unk1080,X
+    JSR Evt_RunObjScriptSteps
+    BRA .latch
+.last:
+    TAX
+    LDA.b #!ObjQ_Empty
+    STA.w !Obj_Unk1080,X
+    STA.b !ObjQ_Unk74
+    STA.b !ObjQ_Unk75
+    JSR Evt_RunObjScriptSteps
+    BRA .latch
+.exit:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5A93 — Evt_RunObjScriptSteps (50 bytes, $5A93–$5AC4)
+; Runs object X's script from Obj_ScriptPos: Obj_Cur = X, then up to
+;   Field_Unk68 opcodes (Evt_StepsLeft counts them; 5 from load) through
+;   Evt_OpcodeTable, each with Y = the opcode's Evt_Data offset; it goes
+;   on while a handler returns C=1 and stops at the first C=0. The X the
+;   last handler returned is stored back in Obj_ScriptPos.
+; Callers (2 JSR sites): Vblank_ReadScanlineCounters ($C0:5A7C, $C0:5A8B).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk68,
+;   Evt_StepsLeft, Obj_Cur), DB=$00 (Obj_ScriptPos absolute); X = the
+;   object's slot; Obj_CurHi = 0 (only the low byte is stored, and
+;   16-bit loads of Obj_Cur follow).
+; Exit: M=1, X=1 (SEP #$30), DP and DB unchanged; A, X and Y clobbered
+;   (and what the handlers change); Obj_Cur = the slot (low byte).
+; ------------------------------------------------------------
+Evt_RunObjScriptSteps:
+    LDA.b !Field_Unk68
+    STA.b !Evt_StepsLeft
+    REP #$20
+    LDA.w !Obj_ScriptPos,X
+    STX.b !Obj_Cur                      ; 8-bit store: Obj_CurHi stays 0
+    REP #$10
+    TAX
+    SEP #$20
+.step:
+    LDA.l !Evt_Data,X                   ; opcode
+    TXY                                 ; Y = the opcode's offset
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    JSR (Evt_OpcodeTable,X)             ; returns X = where to go on
+    BCC .stop                           ; C=0: wait for a later frame
+    DEC.b !Evt_StepsLeft
+    BNE .step
+.stop:
+    REP #$20
+    TXA
+    LDX.b !Obj_Cur
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
     RTS
 
 ; ============================================================
@@ -21112,6 +25061,299 @@ Map_LeaderPastColMax:
 Map_LeaderPastColMin:
     LDA.w !Map_Unk1D1A
     CMP.w !Obj_TileX,X
+    RTS
+
+; ============================================================
+; Event helpers ($C0:5B8D–$C0:5CC6)
+; Called from event-opcode handlers (unmatched): the action-target
+; test, the in-front object search and the Evt_Unk0920 list.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:5B8D — Evt_HasActionTarget (8 bytes, $5B8D–$5B94)
+; C=1 when Field_UnkEB holds an object (bit 7 clear), C=0 when it is
+;   $80 (none).
+; Callers (1 JSR site): unmatched ($C0:304F).
+; Callers note: unmatched event code at $C0:304F.
+; On entry: M=1 (8-bit A), DP=$0100 (Field_UnkEB); X and DB not used.
+; Exit: M, X, DP and DB unchanged; A = Field_UnkEB; C as above.
+; ------------------------------------------------------------
+Evt_HasActionTarget:
+    LDA.b !Field_UnkEB
+    BPL .target
+    CLC
+    RTS
+.target:
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5B95 — Evt_FindSolidObjInFront (93 bytes, $5B95–$5BF1)
+; Looks for a solid object within a tile in front of Obj_Cur. Nothing
+;   (C=0) unless Obj_Cur's Obj_Unk0F00 is nonzero and its Obj_Unk1C80 has
+;   bit 1 (Obj_Unk1C80Front) set. Then for each object from
+;   Evt_ObjCount x 2 down to 2 (object 0 is never tested) that has
+;   Obj_Unk0F00 nonzero, Obj_Unk1100 bit 7 clear, Obj_Unk1B01Solid set
+;   and is not Obj_Cur, runs Evt_InFrontTests entry Obj_Facing (of
+;   Obj_Cur; not masked to 0-3) with ObjFront_X/Y = Obj_Cur's
+;   Obj_PosX/Y; the first that gives C=1 ends the search.
+; Callers (9 JSR sites): Evt_Op96_WalkToTile ($C0:4FBD), Evt_Op9A_WalkTowardTile ($C0:504F),
+;   Evt_Op97_WalkToTileVar ($C0:50FC), Evt_OpA0_MoveToTile ($C0:5170), Evt_OpA1_MoveToTileVar
+;   ($C0:51F4), Evt_Op94_Body ($C0:5293), Evt_Op9E_Body ($C0:5329), Evt_Op98_Body ($C0:53DC) and
+;   Evt_Op8F_FollowPc ($C0:54C8).
+; Callers note: all in the event movement opcodes (or their shared
+;   bodies).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   ObjFront_* scratch), DB=$00 (Obj_* tables absolute); Y = the
+;   caller's script offset.
+; Exit: M=1, X=0, DP and DB unchanged; Y as on entry (saved in
+;   ObjFront_SavedY); C=1: X = the object found; C=0: X = 0 after a
+;   search, or Obj_Cur when it did not search; A clobbered;
+;   ObjFront_OtherHi = 0, and after a search ObjFront_FacingX2,
+;   ObjFront_X/Y and ObjFront_Other written.
+; ------------------------------------------------------------
+Evt_FindSolidObjInFront:
+    STZ.b !ObjFront_OtherHi
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk0F00,X
+    BNE .active
+.none:
+    CLC
+    RTS
+.active:
+    LDA.w !Obj_Unk1C80,X
+    BIT.b #!Obj_Unk1C80Front
+    BEQ .none
+    STY.b !ObjFront_SavedY
+    LDA.w !Obj_Facing,X
+    ASL A
+    STA.b !ObjFront_FacingX2
+    REP #$20
+    LDA.w !Obj_PosX,X
+    STA.b !ObjFront_X
+    LDA.w !Obj_PosY,X
+    STA.b !ObjFront_Y
+    SEP #$30
+    LDA.l !Evt_ObjCount
+    ASL A
+    TAX
+.obj_loop:
+    LDA.w !Obj_Unk0F00,X
+    BNE .candidate
+.next:
+    DEX
+    DEX
+    BNE .obj_loop
+    REP #$10
+    LDY.b !ObjFront_SavedY
+    CLC
+    RTS
+.candidate:
+    LDA.w !Obj_Unk1100,X
+    BMI .next
+    CPX.b !Obj_Cur
+    BEQ .next
+    LDA.w !Obj_Unk1B01,X
+    BIT.b #!Obj_Unk1B01Solid
+    BEQ .next
+    STX.b !ObjFront_Other
+    LDX.b !ObjFront_FacingX2
+    JSR (Evt_InFrontTests,X)
+    LDX.b !ObjFront_Other
+    BCC .next
+    REP #$10
+    LDY.b !ObjFront_SavedY
+    RTS
+
+; Evt_FindSolidObjInFront's tests by Obj_Facing x 2 (facings 0-3).
+Evt_InFrontTests:
+    dw Evt_InFrontUp                    ; 0
+    dw Evt_InFrontDown                  ; 1
+    dw Evt_InFrontLeft                  ; 2
+    dw Evt_InFrontRight                 ; 3
+
+; ------------------------------------------------------------
+; $C0:5BFA — Evt_InFrontUp (38 bytes, $5BFA–$5C1F)
+; Facing 0: C=1 when ObjFront_Other is above Obj_Cur and within a tile:
+;   its Obj_PosY - ObjFront_Y is negative with magnitude under
+;   ObjFront_Reach, and its |Obj_PosX - ObjFront_X| is under it too.
+; Quirk: neither SBC has a SEC before it. The first takes the carry of
+;   Evt_FindSolidObjInFront's CPX of the slot against Obj_Cur (set when
+;   the slot is the higher, so the difference is exact, else one less);
+;   the second the clear carry of the CMP before it (one less). The
+;   negative differences are then complemented with EOR, not negated
+;   (one less again), so the bounds are off by one or two units.
+; Reached through Evt_InFrontTests.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (ObjFront_*),
+;   DB=$00 (Obj_* tables absolute); ObjFront_OtherHi = 0.
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A clobbered; X =
+;   ObjFront_Other; Y unchanged.
+; ------------------------------------------------------------
+Evt_InFrontUp:
+    REP #$20
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    SBC.b !ObjFront_Y                   ; no SEC (see above)
+    BPL Evt_InFrontNo
+    EOR.w #!Eng_Invert16
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    LDA.w !Obj_PosX,X
+    SBC.b !ObjFront_X                   ; C = 0 from the CMP
+    BPL .x_abs
+    EOR.w #!Eng_Invert16
+.x_abs:
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5C20 — Evt_InFrontDown (35 bytes, $5C20–$5C42; then the shared
+;   failure exit Evt_InFrontNo, 4 bytes, $5C43–$5C46)
+; Facing 1: C=1 when ObjFront_Other is below Obj_Cur within a tile:
+;   Obj_PosY - ObjFront_Y from 0 to under ObjFront_Reach and
+;   |Obj_PosX - ObjFront_X| under it, with the same SBC carries as
+;   Evt_InFrontUp. Evt_InFrontNo (SEP #$20, CLC, RTS) is where every
+;   test fails to.
+; Reached through Evt_InFrontTests; Evt_InFrontNo by branches from all
+;   four tests.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (ObjFront_*),
+;   DB=$00 (Obj_* tables absolute); ObjFront_OtherHi = 0.
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A clobbered; X =
+;   ObjFront_Other; Y unchanged.
+; ------------------------------------------------------------
+Evt_InFrontDown:
+    REP #$20
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    SBC.b !ObjFront_Y
+    BMI Evt_InFrontNo
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    LDA.w !Obj_PosX,X
+    SBC.b !ObjFront_X
+    BPL .x_abs
+    EOR.w #!Eng_Invert16
+.x_abs:
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    SEP #$20
+    SEC
+    RTS
+Evt_InFrontNo:                          ; header: see Evt_InFrontDown
+    SEP #$20
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5C47 — Evt_InFrontLeft (38 bytes, $5C47–$5C6C)
+; Facing 2: as Evt_InFrontUp on the other axis: C=1 when
+;   Obj_PosX - ObjFront_X is negative with magnitude under
+;   ObjFront_Reach and |Obj_PosY - ObjFront_Y| is under it (same SBC
+;   carries).
+; Reached through Evt_InFrontTests.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (ObjFront_*),
+;   DB=$00 (Obj_* tables absolute); ObjFront_OtherHi = 0.
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A clobbered; X =
+;   ObjFront_Other; Y unchanged.
+; ------------------------------------------------------------
+Evt_InFrontLeft:
+    REP #$20
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosX,X
+    SBC.b !ObjFront_X
+    BPL Evt_InFrontNo
+    EOR.w #!Eng_Invert16
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    LDA.w !Obj_PosY,X
+    SBC.b !ObjFront_Y
+    BPL .y_abs
+    EOR.w #!Eng_Invert16
+.y_abs:
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5C6D — Evt_InFrontRight (35 bytes, $5C6D–$5C8F)
+; Facing 3: as Evt_InFrontDown on the other axis: C=1 when
+;   Obj_PosX - ObjFront_X is from 0 to under ObjFront_Reach and
+;   |Obj_PosY - ObjFront_Y| is under it (same SBC carries).
+; Reached through Evt_InFrontTests.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (ObjFront_*),
+;   DB=$00 (Obj_* tables absolute); ObjFront_OtherHi = 0.
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A clobbered; X =
+;   ObjFront_Other; Y unchanged.
+; ------------------------------------------------------------
+Evt_InFrontRight:
+    REP #$20
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosX,X
+    SBC.b !ObjFront_X
+    BMI Evt_InFrontNo
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    LDA.w !Obj_PosY,X
+    SBC.b !ObjFront_Y
+    BPL .y_abs
+    EOR.w #!Eng_Invert16
+.y_abs:
+    CMP.w #!ObjFront_Reach
+    BCS Evt_InFrontNo
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5C90 — Evt_FindOrAddUnk0920 (55 bytes, $5C90–$5CC6)
+; Looks up Evt_Unk0920Key in the Evt_Unk0920Entries (16) bytes of
+;   Evt_Unk0920: found at n, A = Evt_Unk0930[n] (the Obj_Cur stored with
+;   it) and C=1. Not found: the first free entry (Evt_Unk0920Free) gets
+;   the key and Evt_Unk0930 = the low byte of Obj_Cur, C=0. No free
+;   entry: the game stops on colour Halt_ColorUnk0920Full
+;   (Sys_HaltWithColor, never returns).
+; Callers (2 JSR sites): unmatched ($C0:4626, $C0:4781).
+; Callers note: unmatched event code at $C0:4626 and $C0:4781.
+; On entry: M=1 (8-bit A), X=0 (16-bit X: CPX #imm is 3 bytes),
+;   DP=$0100 (Evt_Unk0920Key, Obj_Cur), DB=$00 or $7E (Evt_Unk0920/0930
+;   absolute, low WRAM).
+; Exit: M=1, X=0, DP and DB unchanged; C as above; X = the entry; A =
+;   its Evt_Unk0930 (C=1) or Obj_Cur (C=0); Y unchanged.
+; ------------------------------------------------------------
+Evt_FindOrAddUnk0920:
+    LDA.b !Evt_Unk0920Key
+    LDX.w #$0000
+.find:
+    CMP.w !Evt_Unk0920,X
+    BEQ .found
+    INX
+    CPX.w #!Evt_Unk0920Entries
+    BMI .find
+    LDX.w #$0000
+    LDA.b #!Evt_Unk0920Free
+.find_free:
+    CMP.w !Evt_Unk0920,X
+    BEQ .add
+    INX
+    CPX.w #!Evt_Unk0920Entries
+    BMI .find_free
+    LDX.w #!Halt_ColorUnk0920Full
+    BRL Sys_HaltWithColor
+.add:
+    LDA.b !Evt_Unk0920Key
+    STA.w !Evt_Unk0920,X
+    LDA.b !Obj_Cur
+    STA.w !Evt_Unk0930,X
+    CLC
+    RTS
+.found:
+    LDA.w !Evt_Unk0930,X
+    SEC
     RTS
 
 ; ------------------------------------------------------------
@@ -22749,7 +26991,7 @@ ModeFC_Handler:
 ;   bit 5 (SceneFlag_MapRedraw) run Field_Unk885A + Field_EndOfFrame
 ;         frames until Field_Unk38 clears, then redraw map layers
 ;         with the DP=$1D00 builders chosen by Field_MapRedrawSel and
-;         tail into Sub_EC60. This path returns without looking at
+;         tail into Field_WaitFrame. This path returns without looking at
 ;         bit 0, which waits for a later call.
 ;   bit 0 (SceneFlag_Battle)    only when bit 5 is clear; unless
 ;         Scene_Unk024C returns carry,
@@ -22869,13 +27111,13 @@ DefaultHandler:
     JSR Field_EndOfFrame
     LDA.b !Field_Unk38
     BEQ .loop_done
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     BRA .loop_885A
 
 .loop_done:
     JSR Field_UnkAF4E
     JSL FdVec_FFF7
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     ; --- Redraw per Field_MapRedrawSel (1-4) ---
     LDA.b !Field_MapRedrawSel
@@ -22895,10 +27137,10 @@ DefaultHandler:
     LDA #$01
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode1:
     CMP #$02
@@ -22917,10 +27159,10 @@ DefaultHandler:
     LDA #$02
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .not_mode2:
     CMP #$03
@@ -22943,7 +27185,7 @@ DefaultHandler:
     LDA #$03
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     PHD
     REP #$20
@@ -22963,7 +27205,7 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA #$02
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
     PHD
     REP #$20
@@ -22982,10 +27224,10 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA #$01
     STA.b !Field_MapRedrawDone
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    BRL Sub_EC60-!BankWrap  ; offset wraps around the bank to $EC60
+    BRL Field_WaitFrame-!BankWrap  ; offset wraps around the bank to $EC60
 
 .chk_mode4:
     CMP #$04
@@ -23004,10 +27246,10 @@ DefaultHandler:
     LDA #$04
     STA.b !Field_MapRedrawDone
     STZ.b !Field_MapRedrawSel
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSR Field_EndOfFrameShort
     JSR Field_Unk87F1
-    JSR Sub_EC60
+    JSR Field_WaitFrame
 
 .exit:
     RTS
@@ -23026,7 +27268,7 @@ DefaultHandler:
     JSR Field_EndOfFrameShort
     LDA.b #!Field_Unk53Bit7
     TRB.b !Field_Unk53
-    JSR Sub_EC60
+    JSR Field_WaitFrame
     JSL EngCall_BattleMain  ; the battle (bank $C1)
     JSR InstallNMI          ; back in the field: reinstall our handlers
     JSR InstallIRQ
