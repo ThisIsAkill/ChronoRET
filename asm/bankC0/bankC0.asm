@@ -8355,21 +8355,20 @@ ClearRAMDMA:
 ; It looks like a fatal-error stop whose colour tells the cases apart:
 ; every caller is a BRL with its own X (blue $7C00 from
 ; GameLoop_NotBankC2 for Loc_Id $81F0-$81FE, $7FE0 from the six sites at
-; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010 (Halt_ColorUnk0920Full) from
+; $C0:3577-$C0:36E4 (the message opcodes), $7C1F from $C0:46D4/483D, $4010 (Halt_ColorUnk0920Full) from
 ; Evt_FindOrAddUnk0920 ($C0:5CB3) when Evt_Unk0920 has no free entry,
 ; $01F0 and $000F from LocLoad_CheckEvtData (refused event data, see
-; there), $1639 from $C0:5F71 in the handler at $C0:5F6E that
-; Evt_OpcodeTable gives unused event opcodes); the conditions behind
-; the unmatched ones are not traced.
-; Callers (12 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_FindOrAddUnk0920 ($C0:5CB3),
-;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8) and unmatched ($C0:3577, $C0:35BC, $C0:3603, $C0:364A,
-;   $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D).
-; Callers note (13 BRL sites): GameLoop_NotBankC2 ($C0:007A),
-;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_FindOrAddUnk0920
-;   ($C0:5CB3) and unmatched code at $C0:3577, $C0:35BC, $C0:3603,
-;   $C0:364A, $C0:36B1, $C0:36E4, $C0:46D4, $C0:483D and $C0:5F71 (LDX
-;   #$1639 / BRL at $C0:5F6E; xref marks it doubtful, as the bytes
-;   before it are the opcode table, not code).
+; there), $1639 from Evt_UnusedOpcode ($C0:5F71), the handler that
+; Evt_OpcodeTable gives unused event opcodes). The message opcodes
+; ($BB, $C0-$C4) halt when Field_Unk2D (the message pointer's bank
+; byte) is 0; the conditions behind $C0:46D4/483D are not traced.
+; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_OpBB_Msg ($C0:3577),
+;   Evt_OpC1_MsgUnk30_1 ($C0:35BC), Evt_OpC2_MsgUnk30_2 ($C0:3603), Evt_OpC0_MsgChoice ($C0:364A),
+;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4), Evt_FindOrAddUnk0920
+;   ($C0:5CB3), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_UnusedOpcode ($C0:5F71) and unmatched
+;   ($C0:46D4, $C0:483D).
+; Callers note: Evt_UnusedOpcode is LDX #$1639 / BRL at $C0:5F6E,
+;   right after the opcode table.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
 ; through TXA), X = BGR555 colour; DP any (Fade_Brightness is written as
 ; an absolute address under DP_Field), DB any (set to $00 first).
@@ -8410,6 +8409,1323 @@ Sys_HaltWithColor:
     CLI
 .forever:
     BRA .forever
+
+; ============================================================
+; Event opcodes: animation and waits ($C0:2E67–$C0:2FFC)
+; Handlers in Evt_OpcodeTable (unmatched), entered as the other opcode
+; handlers (see the banner of the call opcodes at $C0:5F6E): Y = the
+; opcode's offset in Evt_Data, X returned = where the script goes on,
+; C=1 to go on in this run, C=0 to stop the object for this run. They
+; set Obj_Cur's animation (Obj_AnimRow in modes 0/1, Obj_AnimRowAlt with
+; ObjX_AnimLoops in mode 2, Obj_FixedFrame in mode 3; see
+; Obj_AnimTickAndQueue and Obj_AnimFrameLookup), or wait a number of
+; the object's script runs (ObjX_EvtWait).
+; ============================================================
+
+org $C02E67
+; ------------------------------------------------------------
+; $C0:2E67 — Evt_OpAA_SetAnimRow (32 bytes, $2E67–$2E86; with the
+;   sub-entries Evt_SetAnimRow at $2E6D and Evt_SetAnimMode at $2E74)
+; Event opcode $AA (2 bytes: $AA, row): Obj_Cur's Obj_AnimRow = row,
+;   Obj_AnimMode = Obj_AnimModeNormal (1), and Obj_AnimTimer,
+;   ObjX_AnimLoops and Obj_AnimColumn = 0 (the row starts over at once);
+;   X = Y + 1, C=1. Evt_SetAnimRow does this with A = the row (Y = the
+;   opcode for the one-byte opcodes $B3/$B4); Evt_SetAnimMode with A =
+;   the mode and X = Obj_Cur (Evt_OpAE_AnimReset).
+; Reached through Evt_OpcodeTable (opcode $AA).
+; Callers note: Evt_SetAnimRow is branched to (BRA) by Evt_OpB3_AnimRow0
+;   and Evt_OpB4_AnimRow1, Evt_SetAnimMode by Evt_OpAE_AnimReset.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the next opcode), C=1;
+;   A = 0; Y = the opcode + 1 here, unchanged through the sub-entries.
+; ------------------------------------------------------------
+Evt_OpAA_SetAnimRow:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+Evt_SetAnimRow:                         ; header: see Evt_OpAA_SetAnimRow
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimRow,X
+    LDA.b #!Obj_AnimModeNormal
+Evt_SetAnimMode:                        ; header: see Evt_OpAA_SetAnimRow
+    STA.w !Obj_AnimMode,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STZ.w !Obj_AnimColumn,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2E87 — Evt_OpB3_AnimRow0 (4 bytes, $2E87–$2E8A)
+; Event opcode $B3 (1 byte): Evt_SetAnimRow with row 0
+;   (ObjAnim_RowStand, the row Obj_SetStandAnim uses); X = Y + 1, C=1.
+; Reached through Evt_OpcodeTable (opcode $B3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB3_AnimRow0:
+    LDA.b #!ObjAnim_RowStand
+    BRA Evt_SetAnimRow
+
+; ------------------------------------------------------------
+; $C0:2E8B — Evt_OpB4_AnimRow1 (4 bytes, $2E8B–$2E8E)
+; Event opcode $B4 (1 byte): Evt_SetAnimRow with row 1
+;   (ObjAnim_RowWalk, the row Obj_SetMoveAnim walks with); X = Y + 1,
+;   C=1.
+; Reached through Evt_OpcodeTable (opcode $B4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB4_AnimRow1:
+    LDA.b #!ObjAnim_RowWalk
+    BRA Evt_SetAnimRow
+
+; ------------------------------------------------------------
+; $C0:2E8F — Evt_OpAE_AnimReset (11 bytes, $2E8F–$2E99)
+; Event opcode $AE (1 byte): Obj_Cur's Obj_AnimRow = 0
+;   (ObjAnim_RowStand) and Obj_AnimMode = 0, then as Evt_SetAnimMode
+;   (timer, loops and column 0); X = Y + 1, C=1.
+; Reached through Evt_OpcodeTable (opcode $AE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpAE_AnimReset:
+    LDX.b !Obj_Cur
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+    BRA Evt_SetAnimMode
+
+; ------------------------------------------------------------
+; $C0:2E9A — Evt_OpAB_PlayAnimOnce (103 bytes, $2E9A–$2F00)
+; Event opcode $AB (2 bytes: $AB, row): plays animation row once in mode
+;   2 and waits for it. With Obj_Cur's ObjX_AnimLoops 0 it starts:
+;   Obj_AnimRowAlt = row, column and timer 0, Obj_AnimRow = $FF
+;   (Anim_EndMarker) when Obj_AnimMode was 0 (a marker for the end),
+;   Obj_AnimMode = Obj_AnimModeLoops, ObjX_AnimLoops = Evt_AnimLoopsOnce;
+;   X = the opcode, C=0. While ObjX_AnimLoops is 2 or more: if
+;   Obj_AnimRowAlt still is row, X = the opcode, C=0; if not (something
+;   changed it), it starts over with row. Once ObjX_AnimLoops is 1 (the
+;   pass is over): loops, timer and column = 0; Obj_AnimMode = 1, or 0
+;   with Obj_AnimRow = 0 when the marker is there; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $AB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpAB_PlayAnimOnce:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_AnimLoops,X
+    BEQ .start
+    DEC A
+    BEQ .done
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+    CMP.w !Obj_AnimRowAlt,X
+    BNE .set_row
+    BRA .wait
+.done:
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STA.w !Obj_AnimTimer,X
+    STZ.w !Obj_AnimColumn,X
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!Anim_EndMarker
+    BEQ .was_mode0
+    LDA.b #!Obj_AnimModeNormal
+    BRA .set_mode
+.was_mode0:
+    STZ.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+.set_mode:
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+.set_row:
+    STA.w !Obj_AnimRowAlt,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .loops
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X                ; mark: return to mode 0
+.loops:
+    LDA.b #!Obj_AnimModeLoops
+    STA.w !Obj_AnimMode,X
+    LDA.b #!Evt_AnimLoopsOnce
+    STA.l !ObjX_AnimLoops,X
+.wait:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F01 — Evt_OpB7_PlayAnimLoops (112 bytes, $2F01–$2F70)
+; Event opcode $B7 (3 bytes: $B7, row, count): as Evt_OpAB_PlayAnimOnce
+;   with ObjX_AnimLoops = count + 1 at the start (Obj_AnimTickAndQueue
+;   takes 2 off per pass of the row and stops at 1); done: X = Y + 3,
+;   C=1.
+; Reached through Evt_OpcodeTable (opcode $B7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in
+;   Evt_OpAB_PlayAnimOnce; A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB7_PlayAnimLoops:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_AnimLoops,X
+    BEQ .start
+    DEC A
+    BEQ .done
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+    CMP.w !Obj_AnimRowAlt,X
+    BNE .set_row
+    BRA .wait
+.done:
+    LDA.b #$00
+    STA.l !ObjX_AnimLoops,X
+    STA.w !Obj_AnimTimer,X
+    STZ.w !Obj_AnimColumn,X
+    LDA.w !Obj_AnimRow,X
+    CMP.b #!Anim_EndMarker
+    BEQ .was_mode0
+    LDA.b #!Obj_AnimModeNormal
+    BRA .set_mode
+.was_mode0:
+    STZ.w !Obj_AnimRow,X
+    LDA.b #$00                          ; mode 0
+.set_mode:
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; row
+    LDX.b !Obj_Cur
+.set_row:
+    STA.w !Obj_AnimRowAlt,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .loops
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X                ; mark: return to mode 0
+.loops:
+    LDA.b #!Obj_AnimModeLoops
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; count
+    INC A
+    LDX.b !Obj_Cur
+    STA.l !ObjX_AnimLoops,X
+.wait:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F71 — Evt_OpAC_ShowFrame (37 bytes, $2F71–$2F95)
+; Event opcode $AC (2 bytes: $AC, frame): Obj_Cur shows a fixed frame:
+;   Obj_FixedFrame = frame, column and timer 0, Obj_AnimRow = $FF when
+;   Obj_AnimMode was 0 (as in Evt_OpAB_PlayAnimOnce), Obj_AnimMode =
+;   Obj_AnimModeFixed; X = Y + 2, C=0 (the object stops for this run).
+; Reached through Evt_OpcodeTable (opcode $AC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 3;
+;   Y unchanged.
+; ------------------------------------------------------------
+Evt_OpAC_ShowFrame:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; frame
+    LDX.b !Obj_Cur
+    STA.w !Obj_FixedFrame,X
+    STZ.w !Obj_AnimColumn,X
+    STZ.w !Obj_AnimTimer,X
+    LDA.w !Obj_AnimMode,X
+    BNE .fixed
+    LDA.b #!Anim_EndMarker
+    STA.w !Obj_AnimRow,X
+.fixed:
+    LDA.b #!Obj_AnimModeFixed
+    STA.w !Obj_AnimMode,X
+    TYX
+    INX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2F96 — Evt_OpAD_WaitRuns (48 bytes, $2F96–$2FC5)
+; Event opcode $AD (2 bytes: $AD, n): waits n of the object's script
+;   runs. While Obj_Cur's ObjX_EvtWait is below n it is incremented and
+;   X = the opcode, C=0; once it equals n it is cleared and X = Y + 2,
+;   C=1.
+; Quirk: a counter already above n (left by another wait) is cleared
+;   with X = the opcode and C=1, so the opcode runs again at once and
+;   then counts from 0.
+; Reached through Evt_OpcodeTable (opcode $AD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A = the new
+;   counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpAD_WaitRuns:
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; n
+    LDX.b !Obj_Cur
+    CMP.l !ObjX_EvtWait,X
+    BEQ .done
+    BCS .count
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    SEC
+    RTS
+.done:
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.count:
+    LDA.l !ObjX_EvtWait,X
+    INC A
+    STA.l !ObjX_EvtWait,X
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2FC6 — Evt_OpB9_Wait4 (4 bytes, $2FC6–$2FC9)
+; Event opcode $B9 (1 byte): Evt_WaitRuns with n = 4; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $B9).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB9_Wait4:
+    LDA.b #!Evt_WaitRuns4
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FCA — Evt_OpBA_Wait8 (4 bytes, $2FCA–$2FCD)
+; Event opcode $BA (1 byte): Evt_WaitRuns with n = 8; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $BA).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBA_Wait8:
+    LDA.b #!Evt_WaitRuns8
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FCE — Evt_OpBD_Wait32 (4 bytes, $2FCE–$2FD1)
+; Event opcode $BD (1 byte): Evt_WaitRuns with n = $20; X = Y + 1 when
+;   done.
+; Reached through Evt_OpcodeTable (opcode $BD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBC_Wait16;
+;   A = the new counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBD_Wait32:
+    LDA.b #!Evt_WaitRuns32
+    BRA Evt_WaitRuns
+
+; ------------------------------------------------------------
+; $C0:2FD2 — Evt_OpBC_Wait16 (2 bytes, $2FD2–$2FD3; then its body
+;   Evt_WaitRuns, 41 bytes, $2FD4–$2FFC)
+; Event opcode $BC (1 byte): Evt_WaitRuns with n = $10.
+;   Evt_WaitRuns (A = n): Evt_OpAD_WaitRuns for the one-byte waits: while
+;   ObjX_EvtWait is below n it is incremented, X = the opcode, C=0; at n
+;   it is cleared, X = Y + 1, C=1; above n (the same quirk as there) it
+;   is cleared with X = the opcode, C=1.
+; Reached through Evt_OpcodeTable (opcode $BC).
+; Callers note: Evt_WaitRuns is branched to (BRA) by Evt_OpB9_Wait4,
+;   Evt_OpBA_Wait8 and Evt_OpBD_Wait32.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A = the new
+;   counter; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBC_Wait16:
+    LDA.b #!Evt_WaitRuns16
+Evt_WaitRuns:                           ; header: see Evt_OpBC_Wait16
+    LDX.b !Obj_Cur
+    CMP.l !ObjX_EvtWait,X
+    BEQ .done
+    BCS .count
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    SEC
+    RTS
+.done:
+    LDA.b #$00
+    STA.l !ObjX_EvtWait,X
+    TYX
+    INX
+    SEC
+    RTS
+.count:
+    LDA.l !ObjX_EvtWait,X
+    INC A
+    STA.l !ObjX_EvtWait,X
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2FFD — Evt_OpAF_PartyControlOnce (5 bytes, $2FFD–$3001)
+; Event opcode $AF (1 byte): one run of Evt_OpB0_PartyControl, then the
+;   script goes on: X = Y + 1 (the next opcode, for the next run), C=0.
+; Reached through Evt_OpcodeTable (opcode $AF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (as
+;   Evt_OpB0_PartyControl needs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A and the rest as
+;   Evt_OpB0_PartyControl leaves them.
+; ------------------------------------------------------------
+Evt_OpAF_PartyControlOnce:
+    JSR Evt_OpB0_PartyControl
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3002 — Evt_OpB0_PartyControl (91 bytes, $3002–$305C)
+; Event opcode $B0 (1 byte): the script of a party member's object stays
+;   here (X = Y, C=0 on every path) and moves it each run. While
+;   Field_Unk38 is nonzero nothing else happens. Else, by Obj_Cur's
+;   Obj_Unk1100 (with 8-bit X; Obj_MoveFrames = 1 first on each of the
+;   three paths):
+;   - 0: Party_Unk9E29 (the leader's step, probably: it logs the
+;     Map_Unk1D32/1D33 steps at Field_UnkAB), then, when
+;     Evt_HasActionTarget finds an object (Field_UnkEB),
+;     Evt_StartTargetFunc2 (touch / push);
+;   - 1: Party_UnkA26B (follows the log as Party_ObjSlot1's object);
+;   - 2: Party_UnkA2CE (the same for Party_ObjSlot2's);
+;   - other kinds: nothing.
+;   Reading kinds 0-2 as the leader and party members 2 and 3 rests on
+;   the callees' Party_ObjSlot1 / Party_ObjSlot2 use.
+; The LDA of Obj_Facing before Evt_HasActionTarget is dead (that routine
+;   loads Field_UnkEB into A at once); kept as found.
+; Reached through Evt_OpcodeTable (opcode $B0).
+; Callers (1 JSR site): Evt_OpAF_PartyControlOnce ($C0:2FFD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk38,
+;   Obj_Cur and EvtCtl_SavedY are dp), DB=$00 (Obj_* tables absolute; the
+;   callees read Map_Unk1D32 etc. absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A clobbered;
+;   Y unchanged on the Field_Unk38 path; past it the SEP #$10 clears Y's
+;   high byte, and Y is then as the callees left it (the opcode's offset
+;   & $FF for other kinds); EvtCtl_SavedY = the opcode's offset (not on the Field_Unk38
+;   path); the callees' writes (object steps, the Field_UnkAB-AD log
+;   positions; not traced in full).
+; ------------------------------------------------------------
+Evt_OpB0_PartyControl:
+    LDA.b !Field_Unk38
+    BEQ .go
+    TYX
+    CLC
+    RTS
+.go:
+    STY.b !EvtCtl_SavedY
+    SEP #$10
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1100,X
+    BEQ .kind0
+    DEC A
+    BEQ .kind1
+    DEC A
+    BEQ .kind2
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind2:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_UnkA2CE
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind1:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_UnkA26B
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+.kind0:
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.w !Obj_MoveFrames,X
+    JSR Party_Unk9E29
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X                 ; dead: Evt_HasActionTarget reloads A
+    JSR Evt_HasActionTarget
+    BCC .no_target
+    JSR Evt_StartTargetFunc2
+.no_target:
+    REP #$10
+    LDX.b !EvtCtl_SavedY
+    CLC
+    RTS
+
+; ============================================================
+; Object steps toward a tile centre or onto another object, and the
+; leader's touch and push ($C0:305D–$C0:326B)
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:305D — Obj_Unk305D (86 bytes, $305D–$30B2)
+; Steps Obj_Cur toward the point $80 / $F0 within its tile
+;   (Obj_TileCentreX, Obj_TileFootY: the middle column, the bottom row of
+;   the tile), one frame at a time. Obj_VelX and Obj_VelY (low bytes) are
+;   zeroed; when Obj_PosX's low byte & $F0 is not $80, Obj_VelX = +$10 or
+;   -$10 toward it; when Obj_PosY's low byte & $F0 is not $F0, Obj_VelY =
+;   +$10. With a step set: Obj_MoveFrames = 1, C=1. Already there:
+;   C=0.
+; Quirk: the -$10 Y step (.y_up) is never taken: the BCS before it
+;   follows a CMP #$F0 of a value that is not $F0, so always below it.
+; It keeps its stub name because the verified movement opcodes call it
+;   by it (better: Obj_StepToTileCentre).
+; Callers (5 JSR sites): Evt_Op96_WalkToTile ($C0:4F97), Evt_Op9A_WalkTowardTile ($C0:5025),
+;   Evt_Op97_WalkToTileVar ($C0:50D6), Evt_OpA0_MoveToTile ($C0:515F) and Evt_OpA1_MoveToTileVar
+;   ($C0:51E3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=0, DP and DB unchanged; C as above; X = Obj_Cur; A
+;   clobbered; Y unchanged.
+; ------------------------------------------------------------
+Obj_Unk305D:
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    LDA.w !Obj_PosX,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileCentreX
+    BNE .x_off
+    LDA.w !Obj_PosY,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileFootY
+    BNE .y_off
+    CLC
+    RTS
+.x_off:
+    BCS .x_left
+    LDA.b #!Obj_CentreStep
+    STA.w !Obj_VelX,X
+    BRA .check_y
+.x_left:
+    LDA.b #!Obj_CentreStepNeg
+    STA.w !Obj_VelX,X
+    BRA .check_y                        ; branch to the next instruction, as found
+.check_y:
+    LDA.w !Obj_PosY,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileFootY
+    BNE .y_off
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+.y_off:
+    BCS .y_up                           ; never taken (see the header)
+    LDA.b #!Obj_CentreStep
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+.y_up:
+    LDA.b #!Obj_CentreStepNeg
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:30B3 — Obj_Unk30B3 (161 bytes, $30B3–$3153)
+; Steps Obj_Cur onto the position of the object in ObjFront_Other, one
+;   frame at a time: compares Obj_PosX and then Obj_PosY of the two with
+;   the low four bits masked (Obj_PosCoarseMask). Obj_VelX / Obj_VelY
+;   (low bytes) are zeroed, then set to +$10 / -$10 toward the target on
+;   each axis that differs. With a step set: Obj_MoveFrames = 1 and
+;   ObjX_Unk7F0B00 = 1 (Obj_Unk305D does not set it), C=1. Both equal:
+;   C=0.
+; It keeps its stub name because the verified walk-to-object opcodes
+;   call it by it (better: Obj_StepOntoObj).
+; Callers (3 JSR sites): Evt_Op94_Body ($C0:526E), Evt_Op9E_Body ($C0:5319) and Evt_Op98_Body
+;   ($C0:53B1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: ObjFront_Other is loaded
+;   whole, its high byte 0), DP=$0100 (Obj_Cur, ObjFront_Other and
+;   Eng_Scratch are dp), DB=$00 (Obj_* tables absolute);
+;   ObjFront_Other = the target's slot.
+; Exit: M=1, X=0, DP and DB unchanged; C as above; X = Obj_Cur, or
+;   ObjFront_Other when both are equal; A clobbered; Y unchanged;
+;   Eng_Scratch = Obj_Cur's masked X or Y.
+; ------------------------------------------------------------
+Obj_Unk30B3:
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    REP #$20
+    LDA.w !Obj_PosX,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosX,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .x_off
+    LDX.b !Obj_Cur
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .y_off
+    SEP #$20
+    CLC
+    RTS
+.x_off:
+    BCC .x_left
+    SEP #$20
+    LDA.b #!Obj_CentreStep
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelX,X
+    BRA .check_y
+.x_left:
+    SEP #$20
+    LDA.b #!Obj_CentreStepNeg
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelX,X
+    BRA .check_y                        ; branch to the next instruction, as found
+.check_y:
+    REP #$20
+    LDX.b !Obj_Cur
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .y_off
+    LDX.b !Obj_Cur
+    SEP #$20
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+.y_off:
+    BCC .y_up
+    SEP #$20
+    LDA.b #!Obj_CentreStep
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+.y_up:
+    SEP #$20
+    LDA.b #!Obj_CentreStepNeg
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3154 — Evt_StartTargetFunc2 (93 bytes, $3154–$31B0)
+; The touch counterpart of Evt_StartTargetFunc1: starts function 2 of
+;   the object in Field_UnkEB. Nothing happens while that object's
+;   Obj_Unk1C01 is nonzero or its Obj_Unk1100 or Obj_Unk1000 has bit 7
+;   set. Else, when its Obj_Unk1C00 is at least Obj_Unk1C00Func2Min (3),
+;   Obj_ScriptPos is saved in the ObjX_Unk7F0580 table of that level
+;   (level x Evt_PrioStride + slot), Obj_ScriptPos = function 2 (the
+;   third word of the object's function table), Obj_Unk1C00 =
+;   Obj_Unk1C00Func2 (2) and Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001 = 0.
+;   Either way it then runs Evt_PushTarget.
+; Called by Evt_OpB0_PartyControl (its kind-0 path) when Evt_HasActionTarget
+;   finds an object in front of the leader.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3054).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_UnkEB and
+;   Eng_Scratch are dp), DB=$00 (Obj_* tables absolute); Field_UnkEB =
+;   the object's slot (its 16-bit loads take $01EC as the high byte, as
+;   in Evt_StartTargetFunc1).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (see
+;   Evt_PushTarget); Eng_Scratch written when started.
+; ------------------------------------------------------------
+Evt_StartTargetFunc2:
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_Unk1C01,X
+    BNE .done
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_Unk1000,X
+    BMI .done
+    LDA.w !Obj_Unk1C00,X
+    CMP.b #!Obj_Unk1C00Func2Min
+    BCC .push
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the object was
+    LDA.b !Field_UnkEB
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x 16: its function table
+    CLC
+    ADC.w #!Evt_Func2Ofs
+    TAX
+    LDA.l !Evt_Data,X
+    LDX.b !Field_UnkEB
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #!Obj_Unk1C00Func2
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+.push:
+    JSR Evt_PushTarget
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:31B1 — Evt_PushTarget (187 bytes, $31B1–$326B)
+; Moves the object in Field_UnkEB one tile on in the leader's facing,
+;   probably a push. Nothing happens while Field_Unk54 bit 1
+;   (Field54_Push) is set, when the object's Obj_Unk1C00 is 0 or its
+;   Obj_Unk1B01 bit 1 (Obj_Unk1B01Push) is clear, or when the tile next
+;   to the object in the leader's (Party_ObjSlot's) Obj_Facing is off the
+;   map edge (row or column 0 going up / left) or has Map_TileAttrB bit 7
+;   set (blocking, as Obj_SetVelocityChecked reads it; the index is row x
+;   256 + column, without the Map_ColMask1 mask Obj_SetVelocityChecked
+;   applies). Else that tile (column, row) is stored at Evt_PushTileOfs in
+;   Evt_Data, the object's Obj_ScriptPos is saved in the ObjX_Unk7F0580
+;   table of its level, Obj_ScriptPos = Evt_PushScriptPos, Obj_Unk1C00 =
+;   0, Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001 = 0, and Field54_Push is
+;   set in Field_Unk54.
+; Quirk: the 16-bit store of Evt_PrioStride to WRMPYB also writes 0 to
+;   the next register, WRDIVL.
+; Callers (1 JSR site): Evt_StartTargetFunc2 ($C0:31AD).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk54,
+;   Field_UnkEB, Party_ObjSlot and Eng_Scratch are dp), DB=$00 (Obj_*
+;   tables absolute); X = Field_UnkEB.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; Y = Field_UnkEB once
+;   past the first two tests; X as the path left it (the leader's slot
+;   or the tile index when refused, Field_UnkEB when started);
+;   Eng_Scratch written when started.
+; ------------------------------------------------------------
+Evt_PushTarget:
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_Push
+    BNE .done
+    BRA .try
+.refused:
+    SEP #$10
+.done:
+    RTS
+.try:
+    LDA.w !Obj_Unk1C00,X
+    BEQ .done
+    STA.w WRMPYA                        ; level, for the save below
+    LDY.b !Field_UnkEB
+    LDA.w !Obj_Unk1B01,Y
+    BIT.b #!Obj_Unk1B01Push
+    BEQ .done
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    BEQ .up
+    DEC A
+    BEQ .down
+    DEC A
+    BEQ .left
+    LDA.w !Obj_TileY,Y                  ; right
+    XBA
+    LDA.w !Obj_TileX,Y
+    INC A
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.left:
+    LDA.w !Obj_TileY,Y
+    XBA
+    LDA.w !Obj_TileX,Y
+    BEQ .refused
+    DEC A
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.up:
+    LDA.w !Obj_TileY,Y
+    BEQ .refused
+    DEC A
+    XBA
+    LDA.w !Obj_TileX,Y
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.down:
+    LDA.w !Obj_TileY,Y
+    INC A
+    XBA
+    LDA.w !Obj_TileX,Y
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+.start:
+    REP #$20
+    TXA                                 ; the tile: row << 8 | column
+    LDX.w #!Evt_PushTileOfs
+    STA.l !Evt_Data,X
+    LDA.w #!Evt_PrioStride
+    STA.w WRMPYB                        ; 16-bit store: WRDIVL = 0 too
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the object was
+    LDA.w #!Evt_PushScriptPos
+    LDX.b !Field_UnkEB
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    LDA.b #!Field54_Push
+    TSB.b !Field_Unk54
+    RTS
+
+; ============================================================
+; Event opcodes: yields, endless follows and messages ($C0:353F–$C0:3710)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E). The message opcodes start Field_Unk1F87's
+; sequence the way Field_CheckTileInFront does for a treasure
+; (Field_Unk29 = Field_Unk29Start, Field_Unk2A = a number, Field_Unk2E =
+; the object, Field_Unk32 = 0), with Field_Unk2B / Field_Unk2D as a
+; 24-bit pointer set by Evt_OpB8_SetMsgPtr; reading it as a text message
+; (Field_Unk2A its number, Field_Unk30 the window's place, Field_Unk62 /
+; 64 / 65 a choice cursor as Sub_1ADF moves it) is an inference from
+; those uses, not traced through Field_Unk1F87. Each message opcode
+; waits while Field_Unk29 is nonzero, starts the message and marks
+; Obj_Cur's ObjX_LeaveView, and goes on once Field_Unk29 is 0 again.
+; ============================================================
+
+org $C0353F
+; ------------------------------------------------------------
+; $C0:353F — Evt_OpB1_Yield (4 bytes, $353F–$3542)
+; Event opcode $B1 (1 byte): ends the object's run here: X = Y + 1 (the
+;   next opcode, for the next run), C=0.
+; Reached through Evt_OpcodeTable (opcode $B1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any, DB any (not used);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A and Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_OpB1_Yield:
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3543 — Evt_OpB2_Halt (3 bytes, $3543–$3545)
+; Event opcode $B2 (1 byte): stops the object on this opcode for good: X
+;   = Y (the opcode again), C=0.
+; Reached through Evt_OpcodeTable (opcode $B2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any, DB any (not used);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y, C=0; A and Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB2_Halt:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3546 — Evt_OpB5_FollowObj (9 bytes, $3546–$354E)
+; Event opcode $B5 (2 bytes: $B5, slot): runs Evt_Op94_WalkToObj (a step
+;   toward the object in slot) and stays on this opcode for good: X = Y,
+;   C=0 whatever the walk returned.
+; Reached through Evt_OpcodeTable (opcode $B5).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_SavedY
+;   and the walk's scratch are dp), DB=$00 (as Evt_Op94_WalkToObj
+;   needs); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C=0; A and Y
+;   as Evt_Op94_WalkToObj left them; EvtFollow_SavedY = the opcode's
+;   offset, and the walk's scratch written.
+; ------------------------------------------------------------
+Evt_OpB5_FollowObj:
+    STY.b !EvtFollow_SavedY
+    JSR Evt_Op94_WalkToObj
+    LDX.b !EvtFollow_SavedY
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:354F — Evt_OpB6_FollowPc (8 bytes, $354F–$3556)
+; Event opcode $B6 (2 bytes: $B6, p): runs Evt_Op95_WalkToPc (a step
+;   toward party member p) with X = Y returned: the opcode stays.
+; Quirk: unlike Evt_OpB5_FollowObj there is no CLC, so C is the walk's:
+;   when it has arrived (C=1) the dispatcher runs this opcode again in
+;   the same run (until Evt_StepsLeft runs out).
+; Reached through Evt_OpcodeTable (opcode $B6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_SavedY
+;   and the walk's scratch are dp), DB=$00 (as Evt_Op95_WalkToPc needs);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode, C as
+;   Evt_Op95_WalkToPc returned; A and Y as it left them;
+;   EvtFollow_SavedY = the opcode's offset, and the walk's scratch
+;   written.
+; ------------------------------------------------------------
+Evt_OpB6_FollowPc:
+    STY.b !EvtFollow_SavedY
+    JSR Evt_Op95_WalkToPc
+    LDX.b !EvtFollow_SavedY
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3557 — Evt_OpB8_SetMsgPtr (25 bytes, $3557–$356F)
+; Event opcode $B8 (4 bytes: $B8, ptr (3 bytes)): Field_Unk2B (word) and
+;   Field_Unk2D (bank) = ptr, the pointer the message opcodes need
+;   (probably to the location's message table); X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $B8).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk2B /
+;   Field_Unk2D are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   bank byte; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpB8_SetMsgPtr:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2B
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2B+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !Field_Unk2D
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3570 — Evt_OpBB_Msg (69 bytes, $3570–$35B4)
+; Event opcode $BB (2 bytes: $BB, msg): shows message msg (probably; see
+;   the banner) with Field_Unk30 = 0. With Field_Unk2D = 0 (no pointer
+;   set) the game stops: Sys_HaltWithColor, colour Halt_ColorNoMsgPtr.
+;   While Field_Unk29 is nonzero: X = the opcode, C=0. Then, with
+;   Obj_Cur's ObjX_LeaveView 0: ObjX_LeaveView = 1, Field_Unk2A = msg,
+;   Field_Unk2E = Obj_Cur, Field_Unk32 = 0, Field_Unk29 =
+;   Field_Unk29Start, Field_Unk30 = 0, Field54_WatchBox cleared in
+;   Field_Unk54; X = the opcode, C=0. With it 1 (the message is over):
+;   ObjX_LeaveView = 0, X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $BB).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above (or never
+;   returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpBB_Msg:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    STZ.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:35B5 — Evt_OpC1_MsgUnk30_1 (71 bytes, $35B5–$35FB)
+; Event opcode $C1 (2 bytes: $C1, msg): as Evt_OpBB_Msg with Field_Unk30
+;   = 1.
+; Reached through Evt_OpcodeTable (opcode $C1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBB_Msg (or
+;   never returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpC1_MsgUnk30_1:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #$01
+    STA.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:35FC — Evt_OpC2_MsgUnk30_2 (71 bytes, $35FC–$3642)
+; Event opcode $C2 (2 bytes: $C2, msg): as Evt_OpBB_Msg with Field_Unk30
+;   = 2.
+; Reached through Evt_OpcodeTable (opcode $C2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   Field_Unk* bytes are dp), DB any (all other accesses long); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpBB_Msg (or
+;   never returns); A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Evt_OpC2_MsgUnk30_2:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #$02
+    STA.b !Field_Unk30
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3643 — Evt_OpC0_MsgChoice (49 bytes, $3643–$3673; then the shared
+;   start Evt_MsgChoiceStart, 54 bytes, $3674–$36A9)
+; Event opcode $C0 (3 bytes: $C0, msg, choices): as Evt_OpBB_Msg
+;   (Field_Unk30 = 0), with a choice: on starting, Field_Unk65 = choices
+;   bits 0-1 and Field_Unk64 = bits 2-3 (Evt_ChoiceMask), Field_Unk62 =
+;   1 (the limits and selector Sub_1ADF moves its cursor Field_Unk63
+;   with). When the message is over: ObjX_LeaveView = 0, Obj_Cur's
+;   ObjX_Unk7F0A80 (low byte) = Field_Unk66 (where Sub_1ADF leaves the
+;   cursor; opcode $1A tests it), Field_Unk62 = 0, X = Y + 3, C=1.
+;   Evt_MsgChoiceStart is the start (X = Obj_Cur, Field_Unk30 set
+;   by the caller): ObjX_LeaveView = 1, the Field_Unk* bytes as in
+;   Evt_OpBB_Msg and the choice bytes; X = the opcode, C=0.
+; Reached through Evt_OpcodeTable (opcode $C0).
+; Callers note: Evt_OpC3_MsgChoiceUnk30_1 also branches to
+;   Evt_MsgChoiceStart (BRA at $C0:36C4).
+; Callers of Evt_MsgChoiceStart (1 BRL site): Evt_OpC4_MsgChoiceUnk30_2 ($C0:36F7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data. Evt_MsgChoiceStart: also
+;   X = Obj_Cur.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above (or never
+;   returns); A clobbered; Y unchanged; Eng_Scratch = choices on a
+;   start.
+; ------------------------------------------------------------
+Evt_OpC0_MsgChoice:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    STZ.b !Field_Unk30
+    BRA Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+Evt_MsgChoiceStart:                     ; header: see Evt_OpC0_MsgChoice
+    LDA.b #$01
+    STA.l !ObjX_LeaveView,X
+    TYX
+    INX
+    LDA.l !Evt_Data,X                   ; msg
+    STA.b !Field_Unk2A
+    INX
+    LDA.l !Evt_Data,X                   ; choices
+    STA.b !Eng_Scratch
+    AND.b #!Evt_ChoiceMask
+    STA.b !Field_Unk65
+    LDA.b !Eng_Scratch
+    LSR A
+    LSR A
+    AND.b #!Evt_ChoiceMask
+    STA.b !Field_Unk64
+    LDA.b #$01
+    STA.b !Field_Unk62
+    LDA.b !Obj_Cur
+    STA.b !Field_Unk2E
+    STZ.b !Field_Unk32
+    LDA.b #!Field_Unk29Start
+    STA.b !Field_Unk29
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:36AA — Evt_OpC3_MsgChoiceUnk30_1 (51 bytes, $36AA–$36DC)
+; Event opcode $C3 (3 bytes: $C3, msg, choices): as Evt_OpC0_MsgChoice
+;   with Field_Unk30 = 1.
+; Reached through Evt_OpcodeTable (opcode $C3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpC0_MsgChoice
+;   (or never returns); A clobbered; Y unchanged; Eng_Scratch = choices
+;   on a start.
+; ------------------------------------------------------------
+Evt_OpC3_MsgChoiceUnk30_1:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$01
+    STA.b !Field_Unk30
+    BRA Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:36DD — Evt_OpC4_MsgChoiceUnk30_2 (52 bytes, $36DD–$3710)
+; Event opcode $C4 (3 bytes: $C4, msg, choices): as Evt_OpC0_MsgChoice
+;   with Field_Unk30 = 2 (it reaches Evt_MsgChoiceStart with a BRL).
+; Reached through Evt_OpcodeTable (opcode $C4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_Unk* bytes and Eng_Scratch are dp), DB any (all other accesses
+;   long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in Evt_OpC0_MsgChoice
+;   (or never returns); A clobbered; Y unchanged; Eng_Scratch = choices
+;   on a start.
+; ------------------------------------------------------------
+Evt_OpC4_MsgChoiceUnk30_2:
+    LDA.b !Field_Unk2D
+    BNE .have_ptr
+    LDX.w #!Halt_ColorNoMsgPtr
+    BRL Sys_HaltWithColor
+.have_ptr:
+    LDA.b !Field_Unk29
+    BNE .busy
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_LeaveView,X
+    BNE .over
+    LDA.b #$02
+    STA.b !Field_Unk30
+    BRL Evt_MsgChoiceStart
+.over:
+    LDA.b #$00
+    STA.l !ObjX_LeaveView,X
+    LDA.b !Field_Unk66
+    STA.l !ObjX_Unk7F0A80,X             ; the choice made
+    STZ.b !Field_Unk62
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.busy:
+    TYX
+    CLC
+    RTS
 
 ; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
@@ -23144,10 +24460,9 @@ Evt_OpA1_MoveToTileVar:
 ;   (facing, Evt_BlockedTurn when blocked, Obj_Unk1000 frames,
 ;   Obj_SetVelocityChecked, Obj_SetMoveAnim), X = the opcode, C=0.
 ; Reached through Evt_OpcodeTable (opcode $94); Evt_Op94_Body from
-;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from the opcode $B5
-;   handler at $C0:3548 (unmatched; it then returns its own offset in X,
-;   C=0).
-; Callers (1 JSR site): unmatched ($C0:3548).
+;   Evt_Op95_WalkToPc (BRL at $C0:5426). Also JSR from
+;   Evt_OpB5_FollowObj (it then returns its own offset in X, C=0).
+; Callers (1 JSR site): Evt_OpB5_FollowObj ($C0:3548).
 ; Callers of Evt_Op94_Body (1 BRL site): Evt_Op95_WalkToPc ($C0:5426).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
@@ -23499,9 +24814,9 @@ Evt_Op98_Body:                          ; header: see Evt_Op98_WalkTowardObj
 ;   party member's object (X = Party_ObjSlot + p; p = 0, 2 or 4, the
 ;   party position x 2) through Evt_Op94_Body; X = the opcode, C=0 while
 ;   Obj_MoveFrames is nonzero.
-; Reached through Evt_OpcodeTable (opcode $95); also JSR from the opcode
-;   $B6 handler at $C0:3551 (unmatched).
-; Callers (1 JSR site): unmatched ($C0:3551).
+; Reached through Evt_OpcodeTable (opcode $95); also JSR from
+;   Evt_OpB6_FollowPc.
+; Callers (1 JSR site): Evt_OpB6_FollowPc ($C0:3551).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
@@ -25065,7 +26380,7 @@ Map_LeaderPastColMin:
 
 ; ============================================================
 ; Event helpers ($C0:5B8D–$C0:5CC6)
-; Called from event-opcode handlers (unmatched): the action-target
+; Called from event-opcode handlers: the action-target
 ; test, the in-front object search and the Evt_Unk0920 list.
 ; ============================================================
 
@@ -25073,8 +26388,7 @@ Map_LeaderPastColMin:
 ; $C0:5B8D — Evt_HasActionTarget (8 bytes, $5B8D–$5B94)
 ; C=1 when Field_UnkEB holds an object (bit 7 clear), C=0 when it is
 ;   $80 (none).
-; Callers (1 JSR site): unmatched ($C0:304F).
-; Callers note: unmatched event code at $C0:304F.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:304F).
 ; On entry: M=1 (8-bit A), DP=$0100 (Field_UnkEB); X and DB not used.
 ; Exit: M, X, DP and DB unchanged; A = Field_UnkEB; C as above.
 ; ------------------------------------------------------------
@@ -25458,6 +26772,3470 @@ LocLoad_Unk7F3700Init:
     db $04,$04,$04,$E3,$00,$00,$11,$09
 .Rec4:
     db $96,$00,$00,$FF,$9D,$00
+
+; ============================================================
+; Event opcodes: function calls and object control ($C0:5F6E–$C0:62B4)
+; Handlers in Evt_OpcodeTable (unmatched), entered as the movement
+; opcodes are (see their banner): Y = the opcode's offset in Evt_Data,
+; X returned = where the script goes on, C=1 to go on with it in this
+; run, C=0 to stop the object for this run. Each object has 16 function
+; offsets at Evt_Data + slot x 16 and runs at a level, Obj_Unk1C00
+; (7 after its init function, lower = more urgent, probably: a call
+; only interrupts an object running at a higher level). A call saves the
+; target's Obj_ScriptPos in the ObjX_Unk7F0580 table of the level it
+; interrupts (Evt_PrioStride bytes per level, as Evt_StartTargetFunc1
+; does), and opcode $00 returns to the first saved position above the
+; ending level. "slot" operands are object x 2, "p" is 0, 2 or 4 (the
+; party member, Party_ObjSlot + p); the level/function operand holds
+; the level in its high nibble and the function number in the low one.
+; ============================================================
+
+org $C05F6E
+; ------------------------------------------------------------
+; $C0:5F6E — Evt_UnusedOpcode (6 bytes, $5F6E–$5F73)
+; The handler Evt_OpcodeTable gives every unused event opcode ($01,
+;   $3A, $3D, $3E, $45, $46, $6E, $70, $74, $78, $79, $85, $86, $93, $9B,
+;   $A2-$A5, $BE, $BF, $C5, $C6, $DB, $E9, $EF, $F5-$F7, $FB-$FD): stops
+;   the game on the colour Halt_ColorBadOpcode through Sys_HaltWithColor.
+; Reached through Evt_OpcodeTable (the unused opcodes).
+; Callers note: Field_EventHookTable entries 15 and 16 also point here
+;   (no hook number that reaches them is known to be set).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the LDX.w loads the whole
+;   colour word), DP any, DB any (Sys_HaltWithColor sets DB=$00 itself).
+; Exit: never returns.
+; ------------------------------------------------------------
+Evt_UnusedOpcode:
+    LDX.w #!Halt_ColorBadOpcode
+    BRL Sys_HaltWithColor
+
+; ------------------------------------------------------------
+; $C0:5F74 — Evt_Op00_Return (66 bytes, $5F74–$5FB5)
+; Event opcode $00 (1 byte): ends the function Obj_Cur is running. At
+;   level Obj_Unk1C00Init (7, the level Evt_RunObjInit leaves the object's
+;   script at) it does nothing:
+;   X = the opcode, C=0, so the object stays on it. Otherwise it zeroes
+;   the ObjX_Unk7F0580 entry of the current level, then steps
+;   Obj_Unk1C00 up one level at a time until that level's entry is
+;   nonzero: the position saved there (an interrupted script, or a call
+;   queued by opcode $02) becomes X, C=1, and Obj_Unk1C00 stays at that
+;   level. The entry it resumes from is left as it is.
+; Quirk: the search has no upper bound; with no entry saved at levels
+;   above, it would read on past level 7 into ObjX_CallWait and the
+;   tables after it (not known to happen).
+; Reached through Evt_OpcodeTable (opcode $00) from
+;   Evt_RunObjScriptSteps only: Evt_RunObjInit and Evt_RunObj0Func1 end
+;   their loops on opcode $00 before dispatching.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; Y unchanged. Level 7: X = Y,
+;   C=0, A = 7. Else X = the resumed position, C=1, A = its low byte
+;   (B its high byte).
+; ------------------------------------------------------------
+Evt_Op00_Return:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1C00,X
+    CMP.b #!Obj_Unk1C00Init
+    BEQ .stay
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$20
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Obj_Cur
+    TAX                                 ; level x $80 + slot
+    LDA.w #$0000
+    STA.l !ObjX_Unk7F0580,X             ; nothing saved at this level any more
+.next_level:
+    TXA
+    CLC
+    ADC.w #!Evt_PrioStride              ; the next level's table
+    SEP #$20
+    LDX.b !Obj_Cur
+    INC.w !Obj_Unk1C00,X
+    REP #$20
+    TAX
+    LDA.l !ObjX_Unk7F0580,X
+    BEQ .next_level
+    LDX.b !Obj_Cur                      ; dead: the TAX below replaces it
+    TAX                                 ; X = the saved position
+    SEP #$20
+    SEC
+    RTS
+.stay:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:5FB6 — Evt_Op02_CallObjFunc (8 bytes, $5FB6–$5FBD; then its body
+;   Evt_Op02_Body, 192 bytes, $5FBE–$607D)
+; Event opcode $02 (3 bytes: $02, slot, level/function): makes the
+;   object in slot run one of its functions, without waiting. Nothing
+;   happens when the target's Obj_Unk1C01 is nonzero or its Obj_Unk1100
+;   or Obj_Unk1000 has bit 7 set, or when the new level equals the
+;   target's Obj_Unk1C00. A new level below the target's: its
+;   Obj_ScriptPos is saved at index (its level) x Evt_PrioStride + slot
+;   in ObjX_Unk7F0580, Obj_ScriptPos = the function's offset (word
+;   function of Evt_Data + slot x 16), Obj_Unk1C00 = the new level,
+;   Obj_Unk1A80 and Obj_Unk1A01 = 0 (Obj_Unk1001 is left as it is, unlike
+;   Evt_StartTargetFunc1). A new level above the target's: the function's
+;   offset is queued as the new level's ObjX_Unk7F0580 entry, unless one
+;   is already there; opcode $00 starts it once the levels below end.
+;   Always X = Y + 3, C=1.
+;   Evt_Op02_Body is the same after the slot read, with A = the slot and
+;   Y = the opcode + 1 (Evt_Op05_CallPcFunc).
+; Not handled specially: a call on Obj_Cur itself, whose Obj_ScriptPos
+;   Evt_RunObjScriptSteps rewrites when the run stops (not traced
+;   whether scripts do it).
+; Reached through Evt_OpcodeTable (opcode $02).
+; Callers of Evt_Op02_Body (1 BRL site): Evt_Op05_CallPcFunc ($C0:61F6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data. Evt_Op02_Body: also A = the slot and
+;   B = 0 (the 16-bit TAX), Y = the opcode + 1.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1;
+;   A clobbered; EvtCall_Slot written, and EvtCall_Level / Arg /
+;   NewLevel when the target was not skipped, EvtCall_SaveIdx (and
+;   EvtCall_FuncTbl when it stored) when the levels differ.
+; ------------------------------------------------------------
+Evt_Op02_CallObjFunc:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op02_Body:                          ; header: see Evt_Op02_CallObjFunc
+    STA.b !EvtCall_Slot
+    TAX
+    STZ.b !EvtCall_SlotHi
+    LDA.w !Obj_Unk1C01,X
+    BNE .skip
+    LDA.w !Obj_Unk1100,X
+    BMI .skip
+    LDA.w !Obj_Unk1000,X
+    BMI .skip
+    LDA.w !Obj_Unk1C00,X
+    STA.b !EvtCall_Level
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !EvtCall_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtCall_NewLevel
+    CMP.b !EvtCall_Level
+    BEQ .next
+    BCS .queue
+    LDA.b !EvtCall_Level
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$20
+    CLC
+    LDA.w RDMPYL
+    ADC.b !EvtCall_Slot
+    STA.b !EvtCall_SaveIdx              ; old level x $80 + slot
+    LDX.b !EvtCall_Slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !EvtCall_SaveIdx
+    STA.l !ObjX_Unk7F0580,X             ; save where the target was
+    LDA.b !EvtCall_Slot
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtCall_FuncTbl              ; slot x 16: its function table
+    LDA.b !EvtCall_Arg
+    AND.w #!Evt_CallFuncMask
+    ASL A
+    CLC
+    ADC.b !EvtCall_FuncTbl
+    TAX
+    LDA.l !Evt_Data,X                   ; the function's offset
+    LDX.b !EvtCall_Slot
+    STA.w !Obj_ScriptPos,X
+    SEP #$20
+    LDA.b !EvtCall_NewLevel
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    BRA .next
+.skip:
+    INY
+.next:
+    INY
+    TYX
+    SEC
+    RTS
+.queue:
+    STA.w WRMPYA                        ; A = the new level
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$20
+    CLC
+    LDA.w RDMPYL
+    ADC.b !EvtCall_Slot
+    STA.b !EvtCall_SaveIdx              ; new level x $80 + slot
+    TAX
+    LDA.l !ObjX_Unk7F0580,X
+    BNE .queued                         ; that level holds a position already
+    LDA.b !EvtCall_Slot
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtCall_FuncTbl
+    LDA.b !EvtCall_Arg
+    AND.w #!Evt_CallFuncMask
+    ASL A
+    CLC
+    ADC.b !EvtCall_FuncTbl
+    TAX
+    LDA.l !Evt_Data,X
+    LDX.b !EvtCall_SaveIdx
+    STA.l !ObjX_Unk7F0580,X             ; run it when the levels below end
+.queued:
+    SEP #$20
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:607E — Evt_Op03_CallObjFuncRetry (8 bytes, $607E–$6085; then its
+;   body Evt_Op03_Body, 131 bytes, $6086–$6108)
+; Event opcode $03 (3 bytes: $03, slot, level/function): as
+;   Evt_Op02_CallObjFunc, but it starts the call or waits: while the
+;   target's Obj_Unk1C01 is nonzero or the new level is not below the
+;   target's Obj_Unk1C00, X = the opcode, C=0 (tried again next run).
+;   A target with Obj_Unk1100 or Obj_Unk1000 bit 7 set is skipped. When
+;   started (as Evt_Op02_CallObjFunc) or skipped: X = Y + 3, C=1.
+;   Evt_Op03_Body is the same after the slot read, with A = the slot
+;   (Evt_Op06_CallPcFuncRetry).
+; Reached through Evt_OpcodeTable (opcode $03).
+; Callers of Evt_Op03_Body (1 BRL site): Evt_Op06_CallPcFuncRetry ($C0:620B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data. Evt_Op03_Body: also A = the slot and
+;   B = 0 (the 16-bit TAX).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; Y unchanged;
+;   A clobbered; EvtCall_Slot written, EvtCall_Level / Arg / NewLevel
+;   when the levels were compared, EvtCall_SaveIdx / FuncTbl when
+;   started.
+; ------------------------------------------------------------
+Evt_Op03_CallObjFuncRetry:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op03_Body:                          ; header: see Evt_Op03_CallObjFuncRetry
+    STA.b !EvtCall_Slot
+    TAX
+    STZ.b !EvtCall_SlotHi
+    LDA.w !Obj_Unk1C01,X
+    BNE .retry
+    LDA.w !Obj_Unk1100,X
+    BMI .next
+    LDA.w !Obj_Unk1000,X
+    BMI .next
+    LDA.w !Obj_Unk1C00,X
+    STA.b !EvtCall_Level
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtCall_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtCall_NewLevel
+    CMP.b !EvtCall_Level
+    BEQ .retry
+    BCS .retry
+    LDA.b !EvtCall_Level
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$20
+    CLC
+    LDA.w RDMPYL
+    ADC.b !EvtCall_Slot
+    STA.b !EvtCall_SaveIdx              ; old level x $80 + slot
+    LDX.b !EvtCall_Slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !EvtCall_SaveIdx
+    STA.l !ObjX_Unk7F0580,X             ; save where the target was
+    LDA.b !EvtCall_Slot
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtCall_FuncTbl              ; slot x 16: its function table
+    LDA.b !EvtCall_Arg
+    AND.w #!Evt_CallFuncMask
+    ASL A
+    CLC
+    ADC.b !EvtCall_FuncTbl
+    TAX
+    LDA.l !Evt_Data,X                   ; the function's offset
+    LDX.b !EvtCall_Slot
+    STA.w !Obj_ScriptPos,X
+    SEP #$20
+    LDA.b !EvtCall_NewLevel
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+.next:
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.retry:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6109 — Evt_Op04_CallObjFuncWait (25 bytes, $6109–$6121; then
+;   Evt_Op04_Start, 141 bytes, $6122–$61AE, and Evt_Op04_WaitSlot, 58
+;   bytes, $61AF–$61E8)
+; Event opcode $04 (3 bytes: $04, slot, level/function): as
+;   Evt_Op03_CallObjFuncRetry, and then waits for the function to end.
+;   Obj_Cur's ObjX_CallWait tells the two phases apart:
+;   - 0: as Evt_Op03_CallObjFuncRetry (X = the opcode, C=0 while it
+;     cannot start; a skipped target: X = Y + 3, C=1), but once the call
+;     is started ObjX_CallWait = 1 and X = the opcode, C=0.
+;   - nonzero (Evt_Op04_Start's .wait): while the new level is not below
+;     the target's Obj_Unk1C00 (it is still in that function, or in a
+;     more urgent one), X = the opcode, C=0. Once its level is above
+;     the new one again, or its Obj_Unk1100 or Obj_Unk1000 has bit 7
+;     set, ObjX_CallWait = 0 and X = Y + 3, C=1.
+;   Evt_Op04_Start (the first phase) and Evt_Op04_WaitSlot (the second)
+;   take A = the slot, after the slot read (Evt_Op07_CallPcFuncWait).
+;   The head and Evt_Op04_Start branch to each other's local labels
+;   by their full names (Evt_Op04_CallObjFuncWait_next,
+;   Evt_Op04_Start_wait).
+; Reached through Evt_OpcodeTable (opcode $04).
+; Callers of Evt_Op04_Start (1 BRL site): Evt_Op07_CallPcFuncWait ($C0:6229).
+; Callers of Evt_Op04_WaitSlot (1 BRL site): Evt_Op07_CallPcFuncWait ($C0:623D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data. Evt_Op04_Start / Evt_Op04_WaitSlot:
+;   also A = the slot and B = 0 (the 16-bit TAX).
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; Y unchanged;
+;   A clobbered; EvtCall_Slot written, EvtCall_Level / Arg / NewLevel
+;   when the levels were compared, EvtCall_SaveIdx / FuncTbl when
+;   started.
+; ------------------------------------------------------------
+Evt_Op04_CallObjFuncWait:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_CallWait,X
+    BEQ .start
+    BRL Evt_Op04_Start_wait
+.next:
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.start:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op04_Start:                         ; header: see Evt_Op04_CallObjFuncWait
+    STA.b !EvtCall_Slot
+    STZ.b !EvtCall_SlotHi
+    TAX
+    LDA.w !Obj_Unk1C01,X
+    BNE .retry
+    LDA.w !Obj_Unk1100,X
+    BMI Evt_Op04_CallObjFuncWait_next
+    LDA.w !Obj_Unk1000,X
+    BMI Evt_Op04_CallObjFuncWait_next
+    LDA.w !Obj_Unk1C00,X
+    STA.b !EvtCall_Level
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtCall_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtCall_NewLevel
+    CMP.b !EvtCall_Level
+    BEQ .retry
+    BCS .retry
+    LDA.b !EvtCall_Level
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$20
+    CLC
+    LDA.w RDMPYL
+    ADC.b !EvtCall_Slot
+    STA.b !EvtCall_SaveIdx              ; old level x $80 + slot
+    LDX.b !EvtCall_Slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !EvtCall_SaveIdx
+    STA.l !ObjX_Unk7F0580,X             ; save where the target was
+    LDA.b !EvtCall_Slot
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtCall_FuncTbl              ; slot x 16: its function table
+    LDA.b !EvtCall_Arg
+    AND.w #!Evt_CallFuncMask
+    ASL A
+    CLC
+    ADC.b !EvtCall_FuncTbl
+    TAX
+    LDA.l !Evt_Data,X                   ; the function's offset
+    LDX.b !EvtCall_Slot
+    STA.w !Obj_ScriptPos,X
+    SEP #$20
+    LDA.b !EvtCall_NewLevel
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    LDA.b #$01
+    LDX.b !Obj_Cur
+    STA.l !ObjX_CallWait,X              ; now wait for it to end
+.retry:
+    TYX
+    CLC
+    RTS
+.wait:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op04_WaitSlot:                      ; header: see Evt_Op04_CallObjFuncWait
+    STA.b !EvtCall_Slot
+    STZ.b !EvtCall_SlotHi
+    TAX
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_Unk1000,X
+    BMI .done
+    LDA.w !Obj_Unk1C00,X
+    STA.b !EvtCall_Level
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtCall_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtCall_NewLevel
+    CMP.b !EvtCall_Level
+    BEQ .waiting
+    BCS .waiting
+.done:
+    LDA.b #$00
+    LDX.b !Obj_Cur
+    STA.l !ObjX_CallWait,X
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+.waiting:
+    TYX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:61E9 — Evt_Op05_CallPcFunc (21 bytes, $61E9–$61FD)
+; Event opcode $05 (3 bytes: $05, p, level/function): Evt_Op02_CallObjFunc
+;   on party member p's object (Party_ObjSlot + p). With no member there
+;   (bit 7 set): X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $05).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   the EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A
+;   clobbered; EvtCall_* written as in Evt_Op02_CallObjFunc (none with no
+;   member).
+; ------------------------------------------------------------
+Evt_Op05_CallPcFunc:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BMI .none
+    BRL Evt_Op02_Body
+.none:
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:61FE — Evt_Op06_CallPcFuncRetry (22 bytes, $61FE–$6213)
+; Event opcode $06 (3 bytes: $06, p, level/function):
+;   Evt_Op03_CallObjFuncRetry on party member p's object. With no member
+;   there (bit 7 set): X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $06).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   the EvtCall_* scratch are dp), DB=$00 (Obj_* tables absolute); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in
+;   Evt_Op03_CallObjFuncRetry; A clobbered; Y = the opcode + 3 with no
+;   member, else unchanged; EvtCall_* written as there.
+; ------------------------------------------------------------
+Evt_Op06_CallPcFuncRetry:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BMI .none
+    BRL Evt_Op03_Body
+.none:
+    INY
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6214 — Evt_Op07_CallPcFuncWait (44 bytes, $6214–$623F)
+; Event opcode $07 (3 bytes: $07, p, level/function):
+;   Evt_Op04_CallObjFuncWait on party member p's object: with
+;   ObjX_CallWait 0 through Evt_Op04_Start (no member, bit 7 set: X = Y +
+;   3, C=1), else through Evt_Op04_WaitSlot.
+; Quirk: the waiting phase does not test for a member: with none, slot
+;   $80 (Obj_None) is read as an object (not known to happen).
+; Reached through Evt_OpcodeTable (opcode $07).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur,
+;   Party_ObjSlot and the EvtCall_* scratch are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X and C as in
+;   Evt_Op04_CallObjFuncWait; A clobbered; Y = the opcode + 3 with no
+;   member, else unchanged; EvtCall_* written as there.
+; ------------------------------------------------------------
+Evt_Op07_CallPcFuncWait:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_CallWait,X
+    BNE .wait
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BMI .none
+    BRL Evt_Op04_Start
+.none:
+    INY
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+.wait:
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BRL Evt_Op04_WaitSlot
+
+; ------------------------------------------------------------
+; $C0:6240 — Evt_Op08_BlockCalls (7 bytes, $6240–$6246; then the shared
+;   tail Evt_Op08_Next, 4 bytes, $6247–$624A)
+; Event opcode $08 (1 byte): Obj_Cur's Obj_Unk1C01 = 1. While it is
+;   nonzero the call opcodes $02-$07 leave the object alone (skip or
+;   wait) and Evt_StartTargetFunc1 does nothing for it.
+;   Evt_Op08_Next returns X = Y + 1, C=1 (go on after the byte at Y).
+; Reached through Evt_OpcodeTable (opcode $08).
+; Callers note: Evt_Op08_Next is branched to by Evt_Op09_AllowCalls (BRA
+;   at $C0:6252), Evt_Op0A_RemoveObj (BRA at $C0:6267) and
+;   Evt_Op0B_StopObjScript (BNE at $C0:627C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data
+;   (Evt_Op08_Next: Y = the last byte of the opcode).
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; Y unchanged;
+;   A = 1 (Evt_Op08_Next leaves A as its caller had it).
+; ------------------------------------------------------------
+Evt_Op08_BlockCalls:
+    LDX.b !Obj_Cur
+    LDA.b #$01
+    STA.w !Obj_Unk1C01,X
+Evt_Op08_Next:                          ; header: see Evt_Op08_BlockCalls
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:624B — Evt_Op09_AllowCalls (9 bytes, $624B–$6253)
+; Event opcode $09 (1 byte): Obj_Cur's Obj_Unk1C01 = 0 (undoes
+;   Evt_Op08_BlockCalls); X = Y + 1, C=1 through Evt_Op08_Next.
+; Reached through Evt_OpcodeTable (opcode $09).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=1; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op09_AllowCalls:
+    LDX.b !Obj_Cur
+    LDA.b #$00
+    STA.w !Obj_Unk1C01,X
+    BRA Evt_Op08_Next
+
+; ------------------------------------------------------------
+; $C0:6254 — Evt_Op0A_RemoveObj (21 bytes, $6254–$6268)
+; Event opcode $0A (2 bytes: $0A, slot): the object in slot gets
+;   Obj_Unk1100 = $80 (bit 7: Vblank_Unk59D9 never queues its script and
+;   the call opcodes skip it) and Obj_Unk1A81 = 0 (no frame build), so it
+;   probably leaves the scene; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $0A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00
+;   (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = 0;
+;   Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op0A_RemoveObj:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #!Obj_Unk1100Skip
+    STA.w !Obj_Unk1100,X
+    LDA.b #$00
+    STA.w !Obj_Unk1A81,X
+    BRA Evt_Op08_Next
+
+; ------------------------------------------------------------
+; $C0:6269 — Evt_Op0B_StopObjScript (25 bytes, $6269–$6281)
+; Event opcode $0B (2 bytes: $0B, slot): sets bit 7 of the object's
+;   Obj_Unk1000 (Obj_Unk1000Bit7): Vblank_Unk59D9 stops counting its
+;   script timer, so its script no longer runs, and the call opcodes
+;   skip it. X = Y + 2; C=1, or C=0 when the object is Obj_Cur itself
+;   (its run ends here).
+; Reached through Evt_OpcodeTable (opcode $0B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C as above;
+;   A = the new Obj_Unk1000; Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op0B_StopObjScript:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Obj_Unk1000,X
+    ORA.b #!Obj_Unk1000Bit7
+    STA.w !Obj_Unk1000,X
+    CPX.b !Obj_Cur
+    BNE Evt_Op08_Next
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6282 — Evt_Op0C_StartObjScript (19 bytes, $6282–$6294)
+; Event opcode $0C (2 bytes: $0C, slot): clears bit 7 of the object's
+;   Obj_Unk1000 (undoes Evt_Op0B_StopObjScript); X = Y + 2, C=1 through
+;   Evt_Op0E_Next.
+; Reached through Evt_OpcodeTable (opcode $0C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00
+;   (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   new Obj_Unk1000; Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op0C_StartObjScript:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7^$FF
+    STA.w !Obj_Unk1000,X
+    BRA Evt_Op0E_Next
+
+; ------------------------------------------------------------
+; $C0:6295 — Evt_Op0D_SetUnk1C80 (15 bytes, $6295–$62A3)
+; Event opcode $0D (2 bytes: $0D, value): Obj_Cur's Obj_Unk1C80 = value
+;   (bit 0 Obj_Unk1C80Block: tile blocking in Obj_SetVelocityChecked; bit
+;   1 Obj_Unk1C80Front: Evt_FindSolidObjInFront looks for objects);
+;   X = Y + 2, C=1 through Evt_Op0E_Next.
+; Reached through Evt_OpcodeTable (opcode $0D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   value; Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op0D_SetUnk1C80:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1C80,X
+    BRA Evt_Op0E_Next
+
+; ------------------------------------------------------------
+; $C0:62A4 — Evt_Op0E_SetUnk1C81 (13 bytes, $62A4–$62B0; then the shared
+;   tail Evt_Op0E_Next, 4 bytes, $62B1–$62B4)
+; Event opcode $0E (2 bytes: $0E, value): Obj_Cur's Obj_Unk1C81 = value
+;   (bit 0 Obj1C81_CentreOnTile, bit 1 Obj1C81_OntoObj: what the walk
+;   opcodes do on arriving). Evt_Op0E_Next returns X = Y + 1, C=1 (the
+;   same code as Evt_Op08_Next).
+; Reached through Evt_OpcodeTable (opcode $0E).
+; Callers note: Evt_Op0E_Next is branched to by Evt_Op0C_StartObjScript
+;   (BRA at $C0:6293) and Evt_Op0D_SetUnk1C80 (BRA at $C0:62A2).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data
+;   (Evt_Op0E_Next: Y = the last byte of the opcode).
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the opcode + 2 here),
+;   C=1; A = the value; Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op0E_SetUnk1C81:
+    INY
+    TYX
+    TDC
+    XBA
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1C81,X
+Evt_Op0E_Next:                          ; header: see Evt_Op0E_SetUnk1C81
+    TYX
+    INX
+    SEC
+    RTS
+
+; ============================================================
+; Event opcodes: jumps and conditions ($C0:62B5–$C0:658E)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). A jump distance is an unsigned operand byte counted from
+; that byte itself: forward for every opcode here but $11. A condition
+; opcode goes on with the next opcode when its condition holds and
+; jumps when it does not. The comparisons are the routines in
+; Evt_CmpTable8 / Evt_CmpTable16 (C=0: holds); "a" / "b" name event
+; words at Evt_Unk7F0200 + a x 2.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:62B5 — Evt_Op10_JumpFwd (22 bytes, $62B5–$62CA)
+; Event opcode $10 (2 bytes: $10, n): the script goes on n bytes after
+;   the operand byte: X = Y + 1 + n, C=1. Its last five bytes (.store)
+;   are also Evt_Op11_JumpBack's tail (BRA Evt_Op10_JumpFwd_store).
+; Reached through Evt_OpcodeTable (opcode $10).
+; Callers note: Evt_Op11_JumpBack branches to .store (BRA at $C0:62DC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB any (operands read long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the target, C=1; A = its low
+;   byte (B its high byte); Y = the opcode + 1; EvtJump_Dist = n.
+; ------------------------------------------------------------
+Evt_Op10_JumpFwd:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+.store:
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:62CB — Evt_Op11_JumpBack (19 bytes, $62CB–$62DD)
+; Event opcode $11 (2 bytes: $11, n): the script goes back n bytes from
+;   the operand byte: X = Y + 1 - n, C=1 (through Evt_Op10_JumpFwd's
+;   .store).
+; Reached through Evt_OpcodeTable (opcode $11).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB any (operands read long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the target, C=1; A = its low
+;   byte (B its high byte); Y = the opcode + 1; EvtJump_Dist = n.
+; ------------------------------------------------------------
+Evt_Op11_JumpBack:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    SEC
+    SBC.b !EvtJump_Dist
+    BRA Evt_Op10_JumpFwd_store
+
+; ------------------------------------------------------------
+; $C0:62DE — Evt_Op12_IfVarByte (53 bytes, $62DE–$6312)
+; Event opcode $12 (5 bytes: $12, a, value, cmp, n): EvtIf_Left = the
+;   low byte of event word a, EvtIf_Right = value; comparison cmp of
+;   Evt_CmpTable8 (0 =, 1 !=, 2 >, 3 <, 4 >=, 5 <=, 6 AND nonzero, 7 OR
+;   nonzero; not masked: a larger cmp indexes past the table). Holds
+;   (C=0): X = Y + 5, the next opcode; else Evt_JumpFromOfsPos jumps n
+;   bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $12).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtIf_*
+;   scratch is dp), DB any (operands read long; the JSR (abs,X) table is
+;   read through the program bank); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 2; EvtIf_Left / Right / OfsPos written (and
+;   EvtJump_Dist over EvtIf_Left on a jump).
+; ------------------------------------------------------------
+Evt_Op12_IfVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Left
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !EvtIf_Right
+    INX
+    LDA.l !Evt_Data,X                   ; cmp
+    INX
+    STX.b !EvtIf_OfsPos
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Evt_CmpTable8,X)
+    BCS Evt_JumpFromOfsPos
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6313 — Evt_Op13_IfVarWord (54 bytes, $6313–$6348; then the shared
+;   tail Evt_JumpFromOfsPos, 24 bytes, $6349–$6360)
+; Event opcode $13 (6 bytes: $13, a, value (word), cmp, n): as
+;   Evt_Op12_IfVarByte with the whole event word a and a 16-bit value,
+;   through Evt_CmpTable16. Holds: X = Y + 6.
+;   Evt_JumpFromOfsPos is the jump of opcodes $12-$16: X = EvtIf_OfsPos +
+;   the byte there (EvtJump_Dist), C=1.
+; Reached through Evt_OpcodeTable (opcode $13).
+; Callers note: Evt_JumpFromOfsPos is also branched to by
+;   Evt_Op12_IfVarByte (BCS at $C0:630A) and Evt_Op14_IfVarVarByte (BCS
+;   at $C0:639B).
+; Callers of Evt_JumpFromOfsPos (2 BRL sites): Evt_Op15_IfVarVarWord ($C0:63DC) and
+;   Evt_Op16_IfMemByte ($C0:6438).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtIf_*
+;   scratch is dp), DB any (operands read long; the JSR (abs,X) table is
+;   read through the program bank); Y = the opcode's offset in Evt_Data.
+;   Evt_JumpFromOfsPos: M=1, X=1 (it sets X=0 itself), EvtIf_OfsPos =
+;   the offset of the jump distance.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 2; EvtIf_Left / Right / OfsPos written (and
+;   EvtJump_Dist over EvtIf_Left on a jump).
+; ------------------------------------------------------------
+Evt_Op13_IfVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Left
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; the 16-bit value
+    STA.b !EvtIf_Right
+    INX
+    INX
+    SEP #$20
+    LDA.l !Evt_Data,X                   ; cmp
+    INX
+    STX.b !EvtIf_OfsPos
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Evt_CmpTable16,X)
+    BCS Evt_JumpFromOfsPos
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    INX
+    SEC
+    RTS
+Evt_JumpFromOfsPos:                     ; header: see Evt_Op13_IfVarWord
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6361 — Evt_Op14_IfVarVarByte (67 bytes, $6361–$63A3)
+; Event opcode $14 (5 bytes: $14, a, b, cmp, n): as Evt_Op12_IfVarByte
+;   with EvtIf_Right = the low byte of event word b. Holds: X = Y + 5.
+; Reached through Evt_OpcodeTable (opcode $14).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtIf_*
+;   scratch is dp), DB any (operands read long; the JSR (abs,X) table is
+;   read through the program bank); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 3; EvtIf_Left / Right / OfsPos written (and
+;   EvtJump_Dist over EvtIf_Left on a jump).
+; ------------------------------------------------------------
+Evt_Op14_IfVarVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Left
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Right
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; cmp
+    INX
+    STX.b !EvtIf_OfsPos
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Evt_CmpTable8,X)
+    BCS Evt_JumpFromOfsPos
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:63A4 — Evt_Op15_IfVarVarWord (66 bytes, $63A4–$63E5)
+; Event opcode $15 (5 bytes: $15, a, b, cmp, n): as Evt_Op14_IfVarVarByte
+;   with the whole event words, through Evt_CmpTable16. Holds: X = Y + 5.
+; Reached through Evt_OpcodeTable (opcode $15).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtIf_*
+;   scratch is dp), DB any (operands read long; the JSR (abs,X) table is
+;   read through the program bank); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 3; EvtIf_Left / Right / OfsPos written (and
+;   EvtJump_Dist over EvtIf_Left on a jump).
+; ------------------------------------------------------------
+Evt_Op15_IfVarVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Left
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; 16-bit read, masked to b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtIf_Right
+    INY
+    TYX
+    SEP #$20
+    LDA.l !Evt_Data,X                   ; cmp
+    INX
+    STX.b !EvtIf_OfsPos
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Evt_CmpTable16,X)
+    BCC .holds
+    BRL Evt_JumpFromOfsPos
+.holds:
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:63E6 — Evt_Op16_IfMemByte (92 bytes, $63E6–$6441)
+; Event opcode $16 (5 bytes: $16, m, value, cmp, n): EvtIf_Left = the
+;   byte at Evt_Mem7F + m, or at Evt_Mem7F + $100 + m when bit 7
+;   (EvtIf_Page1Flag) of cmp is set; EvtIf_Right = value; comparison cmp
+;   & $7F of Evt_CmpTable8 (EvtIf_Cmp). Holds: X = Y + 5; else
+;   Evt_JumpFromOfsPos. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $16).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtIf_*
+;   scratch is dp), DB any (operands read long; the JSR (abs,X) table is
+;   read through the program bank); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 1; EvtIf_Left / Right / Cmp / OfsPos written (and
+;   EvtJump_Dist over EvtIf_Left on a jump).
+; ------------------------------------------------------------
+Evt_Op16_IfMemByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !EvtIf_Left                   ; m for now
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtIf_Right
+    INX
+    LDA.l !Evt_Data,X                   ; cmp
+    BPL .page0
+    INX
+    STX.b !EvtIf_OfsPos
+    AND.b #!EvtIf_Page1Flag^$FF
+    STA.b !EvtIf_Cmp
+    LDA.b !EvtIf_Left
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ORA.w #!EvtIf_Page1
+    TAX
+    SEP #$20
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtIf_Left
+    BRA .compare
+.page0:
+    INX
+    STX.b !EvtIf_OfsPos
+    STA.b !EvtIf_Cmp
+    LDA.b !EvtIf_Left
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    TAX
+    SEP #$20
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtIf_Left
+.compare:
+    LDA.b !EvtIf_Cmp
+    ASL A
+    SEP #$10
+    TAX
+    JSR (Evt_CmpTable8,X)
+    BCC .holds
+    BRL Evt_JumpFromOfsPos
+.holds:
+    REP #$10
+    LDX.b !EvtIf_OfsPos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6442 — Evt_Op18_IfUnk7F0000Below (37 bytes, $6442–$6466)
+; Event opcode $18 (3 bytes: $18, value, n): goes on (X = Y + 3) while
+;   Eng_Unk7F0000 < value; from value up it jumps n bytes on from the n
+;   byte. C=1 either way. (Eng_Unk7F0000 is also the value
+;   Field_FadeToBankC2Mode5 tests; what it counts is not traced.)
+; Reached through Evt_OpcodeTable (opcode $18).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB any (all reads long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 1; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op18_IfUnk7F0000Below:
+    INY
+    TYX
+    LDA.l !Eng_Unk7F0000
+    CMP.l !Evt_Data,X
+    BCS .jump
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6467 — Evt_CmpTable8 (16 bytes, $6467–$6476)
+; The byte comparisons of the condition opcodes $12, $14 and $16,
+;   indexed by cmp x 2 (JSR (Evt_CmpTable8,X) with 8-bit X).
+; ------------------------------------------------------------
+Evt_CmpTable8:
+    dw Evt_Cmp8Eq                       ; 0: =
+    dw Evt_Cmp8Ne                       ; 1: !=
+    dw Evt_Cmp8Gt                       ; 2: >
+    dw Evt_Cmp8Lt                       ; 3: <
+    dw Evt_Cmp8Ge                       ; 4: >=
+    dw Evt_Cmp8Le                       ; 5: <=
+    dw Evt_Cmp8And                      ; 6: AND nonzero
+    dw Evt_Cmp8Or                       ; 7: OR nonzero
+
+; ------------------------------------------------------------
+; $C0:6477 — Evt_CmpTable16 (16 bytes, $6477–$6486)
+; The word comparisons of opcodes $13 and $15, in the order of
+;   Evt_CmpTable8.
+; ------------------------------------------------------------
+Evt_CmpTable16:
+    dw Evt_Cmp16Eq                      ; 0: =
+    dw Evt_Cmp16Ne                      ; 1: !=
+    dw Evt_Cmp16Gt                      ; 2: >
+    dw Evt_Cmp16Lt                      ; 3: <
+    dw Evt_Cmp16Ge                      ; 4: >=
+    dw Evt_Cmp16Le                      ; 5: <=
+    dw Evt_Cmp16And                     ; 6: AND nonzero
+    dw Evt_Cmp16Or                      ; 7: OR nonzero
+
+; ------------------------------------------------------------
+; $C0:6487 — Evt_Cmp8Eq (8 bytes, $6487–$648E; with its siblings
+;   Evt_Cmp8Ne, Evt_Cmp8Gt, Evt_Cmp8Lt, Evt_Cmp8Ge, the shared tail
+;   Evt_Cmp8Holds, Evt_Cmp8Le, Evt_Cmp8And and Evt_Cmp8Or, 180 bytes,
+;   $6487–$653A with the 16-bit set)
+; The byte comparisons of Evt_CmpTable8: each compares EvtIf_Left with
+;   EvtIf_Right (unsigned) and returns C=0 when the relation holds, C=1
+;   when not: Eq =, Ne !=, Gt >, Lt <, Ge >=, Le <=, And (Left AND Right)
+;   nonzero, Or (Left OR Right) nonzero. Evt_Cmp8Holds is the shared
+;   CLC / RTS.
+; The word comparisons of Evt_CmpTable16 (Evt_Cmp16Eq, Evt_Cmp16Ne,
+;   Evt_Cmp16Gt, Evt_Cmp16Lt, Evt_Cmp16Ge, Evt_Cmp16Le, Evt_Cmp16And,
+;   Evt_Cmp16Or) do the same in 16 bits (REP #$20 first, SEP #$20
+;   before returning; Evt_Cmp16Holds is their shared SEP / CLC / RTS).
+; Reached through Evt_CmpTable8 / Evt_CmpTable16 (JSR (abs,X) in
+;   Evt_Op12_IfVarByte ... Evt_Op16_IfMemByte).
+; On entry: M=1 (8-bit A), X=1 (8-bit X, as the JSR (abs,X) left it; not
+;   used), DP=$0100 (EvtIf_Left / EvtIf_Right are dp), DB any.
+; Exit: M=1, X=1, DP and DB unchanged; C as above; A = EvtIf_Left
+;   (the AND / OR result in And / Or); X and Y unchanged.
+; ------------------------------------------------------------
+Evt_Cmp8Eq:
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8Ne:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BNE Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8Gt:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ .fails
+    BCS Evt_Cmp8Holds
+.fails:
+    SEC
+    RTS
+Evt_Cmp8Lt:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BCC Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8Ge:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp8Holds
+    BCS Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8Holds:                          ; header: see Evt_Cmp8Eq
+    CLC
+    RTS
+Evt_Cmp8Le:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp8Holds
+    BCC Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8And:                            ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    AND.b !EvtIf_Right
+    BNE Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp8Or:                             ; header: see Evt_Cmp8Eq
+    LDA.b !EvtIf_Left
+    ORA.b !EvtIf_Right
+    BNE Evt_Cmp8Holds
+    SEC
+    RTS
+Evt_Cmp16Eq:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Ne:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BNE Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Gt:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ .fails
+    BCS Evt_Cmp16Holds
+.fails:
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Lt:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ .fails
+    BCC Evt_Cmp16Holds
+.fails:
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Ge:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp16Holds
+    BCS Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Le:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    CMP.b !EvtIf_Right
+    BEQ Evt_Cmp16Holds
+    BCC Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Holds:                         ; header: see Evt_Cmp8Eq
+    SEP #$20
+    CLC
+    RTS
+Evt_Cmp16And:                           ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    AND.b !EvtIf_Right
+    BNE Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+Evt_Cmp16Or:                            ; header: see Evt_Cmp8Eq
+    REP #$20
+    LDA.b !EvtIf_Left
+    ORA.b !EvtIf_Right
+    BNE Evt_Cmp16Holds
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:653B — Evt_Op19_SetUnk7F0A80Var (19 bytes, $653B–$654D)
+; Event opcode $19 (2 bytes: $19, a): Obj_Cur's ObjX_Unk7F0A80 = event
+;   word a; X = Y + 2, C=1, through the store at the end of
+;   Evt_Op1C_SetUnk7F0A80Mem (BRA Evt_Op1C_SetUnk7F0A80Mem_store).
+; Reached through Evt_OpcodeTable (opcode $19).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all reads and the store long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   word's low byte (B its high byte); Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op19_SetUnk7F0A80Var:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    BRA Evt_Op1C_SetUnk7F0A80Mem_store
+
+; ------------------------------------------------------------
+; $C0:654E — Evt_Op1C_SetUnk7F0A80Mem (26 bytes, $654E–$6567)
+; Event opcode $1C (3 bytes: $1C, m (word)): Obj_Cur's ObjX_Unk7F0A80 =
+;   the word at Evt_Mem7F + m; X = Y + 3, C=1. Its .store is also
+;   Evt_Op19_SetUnk7F0A80Var's tail.
+; Reached through Evt_OpcodeTable (opcode $1C).
+; Callers note: Evt_Op19_SetUnk7F0A80Var branches to .store (BRA at
+;   $C0:654C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB any (all reads and the store long); Y = the opcode's offset in
+;   Evt_Data (.store: M=0, A = the value, Y = the opcode's last byte).
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the opcode + 3), C=1;
+;   A = the word's low byte (B its high byte); Y = the opcode + 2.
+; ------------------------------------------------------------
+Evt_Op1C_SetUnk7F0A80Mem:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    INY
+    TAX
+    LDA.l !Evt_Mem7F,X
+.store:
+    LDX.b !Obj_Cur
+    STA.l !ObjX_Unk7F0A80,X
+    SEP #$20
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6568 — Evt_Op1A_IfUnk7F0A80 (39 bytes, $6568–$658E)
+; Event opcode $1A (3 bytes: $1A, value, n): goes on (X = Y + 3) when
+;   the low byte of Obj_Cur's ObjX_Unk7F0A80 equals value, else jumps n
+;   bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $1A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and
+;   EvtJump_Dist are dp), DB any (all reads long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
+;   = the opcode + 1; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op1A_IfUnk7F0A80:
+    LDX.b !Obj_Cur
+    LDA.l !ObjX_Unk7F0A80,X
+    INY
+    TYX
+    CMP.l !Evt_Data,X
+    BNE .jump
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ============================================================
+; Event opcodes: party and object queries ($C0:658F–$C0:66A4)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). The get opcodes copy a byte into the low byte of an event
+; word (Evt_Unk7F0200 + a x 2; the high byte is left as it was); the
+; test opcodes go on with the next opcode when the test holds and else
+; jump n bytes on from their last byte (n), as the condition opcodes do.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:658F — Evt_Op20_GetPartyMember0 (27 bytes, $658F–$65A9)
+; Event opcode $20 (2 bytes: $20, a): event word a's low byte = the first
+;   byte of Party_Members (the character id of party member 1, probably
+;   the leader); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $20).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   the character id.
+; ------------------------------------------------------------
+Evt_Op20_GetPartyMember0:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Party_Members
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:65AA — Evt_Op21_GetObjTile (8 bytes, $65AA–$65B1; then its body
+;   Evt_Op21_Body, 57 bytes, $65B2–$65EA)
+; Event opcode $21 (4 bytes: $21, slot, a, b): event word a's low byte =
+;   the object's Obj_TileX, event word b's = its Obj_TileY; X = Y + 4,
+;   C=1. Evt_Op21_Body is the same after the slot read, with A = the
+;   slot (Evt_Op22_GetPcTile).
+; Reached through Evt_OpcodeTable (opcode $21).
+; Callers note: Evt_Op22_GetPcTile branches to Evt_Op21_Body (BRA at
+;   $C0:65F6).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtGet_First /
+;   EvtGet_Second are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data. Evt_Op21_Body: also A = the slot, B = 0
+;   (the 16-bit TAX), Y = the opcode + 1.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the row; EvtGet_First / EvtGet_Second = the column / row.
+; ------------------------------------------------------------
+Evt_Op21_GetObjTile:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op21_Body:                          ; header: see Evt_Op21_GetObjTile
+    TAX
+    LDA.w !Obj_TileX,X
+    STA.b !EvtGet_First
+    LDA.w !Obj_TileY,X
+    STA.b !EvtGet_Second
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_First
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_Second
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:65EB — Evt_Op22_GetPcTile (13 bytes, $65EB–$65F7)
+; Event opcode $22 (4 bytes: $22, p, a, b): Evt_Op21_GetObjTile for party
+;   member p's object (Party_ObjSlot + p); X = Y + 4, C=1.
+; Quirk: no test for a missing member: with none (Obj_None, $80) object
+;   $80's bytes are read (not known to happen).
+; Reached through Evt_OpcodeTable (opcode $22).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   EvtGet_First / EvtGet_Second are dp), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the row; EvtGet_First / EvtGet_Second = the column / row.
+; ------------------------------------------------------------
+Evt_Op22_GetPcTile:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BRA Evt_Op21_Body
+
+; ------------------------------------------------------------
+; $C0:65F8 — Evt_Op23_GetObjFacing (8 bytes, $65F8–$65FF; then its body
+;   Evt_Op23_Body, 31 bytes, $6600–$661E)
+; Event opcode $23 (3 bytes: $23, slot, a): event word a's low byte = the
+;   object's Obj_Facing; X = Y + 3, C=1. Evt_Op23_Body is the same after
+;   the slot read, with A = the slot (Evt_Op24_GetPcFacing).
+; Reached through Evt_OpcodeTable (opcode $23).
+; Callers note: Evt_Op24_GetPcFacing branches to Evt_Op23_Body (BRA at
+;   $C0:662A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtGet_First is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the opcode's offset in
+;   Evt_Data. Evt_Op23_Body: also A = the slot, B = 0 (the 16-bit TAX),
+;   Y = the opcode + 1.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   EvtGet_First = the facing.
+; ------------------------------------------------------------
+Evt_Op23_GetObjFacing:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+Evt_Op23_Body:                          ; header: see Evt_Op23_GetObjFacing
+    TAX
+    LDA.w !Obj_Facing,X
+    STA.b !EvtGet_First
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtGet_First
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:661F — Evt_Op24_GetPcFacing (13 bytes, $661F–$662B)
+; Event opcode $24 (3 bytes: $24, p, a): Evt_Op23_GetObjFacing for party
+;   member p's object; X = Y + 3, C=1.
+; Quirk: no test for a missing member, as in Evt_Op22_GetPcTile.
+; Reached through Evt_OpcodeTable (opcode $24).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Party_ObjSlot and
+;   EvtGet_First are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   EvtGet_First = the facing.
+; ------------------------------------------------------------
+Evt_Op24_GetPcFacing:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b !Party_ObjSlot,X
+    BRA Evt_Op23_Body
+
+; ------------------------------------------------------------
+; $C0:662C — Evt_Op27_IfObjUnk0F00 (41 bytes, $662C–$6654)
+; Event opcode $27 (3 bytes: $27, slot, n): goes on (X = Y + 3) when the
+;   object's Obj_Unk0F00 is nonzero (it has a frame to build), else jumps
+;   n bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $27).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y =
+;   the opcode + 1; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op27_IfObjUnk0F00:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Obj_Unk0F00,X
+    BEQ .jump
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6655 — Evt_Op28_IfObjInsideScreen (80 bytes, $6655–$66A4)
+; Event opcode $28 (3 bytes: $28, slot, n): goes on (X = Y + 3) when the
+;   object is well inside the screen, by Evt_Op8F_FollowPc's test: its
+;   Obj_TileX minus EvtFollow_ScrCol (Map_TileOriginX / 2) is 2 to
+;   EvtFollow_ColLimit - 1 ($0D) and its Obj_TileY minus EvtFollow_ScrRow
+;   (Map_TileOriginY / 2) is 2 to EvtFollow_RowLimit - 1 ($0C); else it
+;   jumps n bytes on from the n byte. C=1 either way.
+; Reached through Evt_OpcodeTable (opcode $28).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFollow_* and
+;   EvtJump_Dist are dp), DB=$00 (Obj_* and Map_TileOrigin* absolute); Y
+;   = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y =
+;   the opcode + 1; EvtFollow_ScrCol / ScrRow written; EvtJump_Dist = n
+;   on a jump.
+; ------------------------------------------------------------
+Evt_Op28_IfObjInsideScreen:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.w !Map_TileOriginX
+    LSR A
+    STA.b !EvtFollow_ScrCol
+    LDA.w !Map_TileOriginY
+    LSR A
+    STA.b !EvtFollow_ScrRow
+    LDA.w !Obj_TileX,X
+    SEC
+    SBC.b !EvtFollow_ScrCol
+    BEQ .jump
+    CMP.b #$01
+    BEQ .jump
+    CMP.b #!EvtFollow_ColLimit
+    BCS .jump
+    LDA.w !Obj_TileY,X
+    SEC
+    SBC.b !EvtFollow_ScrRow
+    BEQ .jump
+    CMP.b #$01
+    BEQ .jump
+    CMP.b #!EvtFollow_RowLimit
+    BCS .jump
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+.jump:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ============================================================
+; Event opcodes: button tests ($C0:66A5–$C0:6791)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). Each test takes 2 bytes ($op, n): when the button is held
+; (or was pressed) the script goes on with the next opcode (X = Y + 2,
+; through Evt_PadGoOn / Evt_PadGoOn2), else it jumps n bytes on from
+; the n byte (Evt_PadJump). C=1 either way. The held tests read
+; Menu_PadHeld, or Pad_Unk00F8 / Pad_Unk00F9 (the held buttons through
+; the configured button map); the pressed tests read the latches
+; Pad_PressedLatch / Pad_Unk00F6Latch (GameLoop_FrameBody ORs the new
+; presses in every frame) and clear the bit they found set. Button
+; names follow Pad_Pressed's layout note.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:66A5 — Evt_Op2D_IfAnyHeld (13 bytes, $66A5–$66B1)
+; Event opcode $2D (2 bytes: $2D, n): goes on when Pad_Unk00F8 or
+;   Pad_Unk00F9 is nonzero (any button or D-pad direction held, through
+;   the button map), else jumps.
+; Reached through Evt_OpcodeTable (opcode $2D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op2D_IfAnyHeld:
+    INY
+    LDA.w !Pad_Unk00F8
+    BNE Evt_PadGoOn
+    LDA.w !Pad_Unk00F9
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66B2 — Evt_Op30_IfMapHeldBit1 (10 bytes, $66B2–$66BB)
+; Event opcode $30 (2 bytes: $30, n): goes on when Pad_Unk00F8 bit 1
+;   (Pad_Unk00F8Bit1, the button the D-pad handlers run with) is held,
+;   else jumps.
+; Reached through Evt_OpcodeTable (opcode $30).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op30_IfMapHeldBit1:
+    INY
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit1
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66BC — Evt_Op31_IfMapHeldBit7 (10 bytes, $66BC–$66C5)
+; Event opcode $31 (2 bytes: $31, n): goes on when Pad_Unk00F8 bit 7
+;   (Pad_Unk00F8Bit7) is held, else jumps.
+; Reached through Evt_OpcodeTable (opcode $31).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op31_IfMapHeldBit7:
+    INY
+    LDA.w !Pad_Unk00F8
+    BIT.b #!Pad_Unk00F8Bit7
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66C6 — Evt_Op34_IfHeldA (10 bytes, $66C6–$66CF;
+;   then the shared tail Evt_PadJump, 21 bytes, $66D0–$66E4)
+; Event opcode $34 (2 bytes: $34, n): goes on when A (Pad_A) is held in
+;   Menu_PadHeld, else jumps.
+;   Evt_PadJump, the jump of all the button tests, follows: X = Y + the
+;   byte at Y (Y = the n byte), C=1.
+; Reached through Evt_OpcodeTable (opcode $34).
+; Callers note: Evt_PadJump is also branched to (BEQ) by every held test
+;   ($2D-$39) and by Evt_Op3B_IfMapPressedBit1.
+; Callers of Evt_PadJump (7 BRL sites): Evt_Op3C_IfMapPressedBit7 ($C0:672B), Evt_Op3F_IfPressedA
+;   ($C0:6739), Evt_Op40_IfPressedB ($C0:6747), Evt_Op41_IfPressedX ($C0:6755), Evt_Op42_IfPressedY
+;   ($C0:6763), Evt_Op43_IfPressedL ($C0:6771) and Evt_Op44_IfPressedR ($C0:677F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op34_IfHeldA:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_A
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+Evt_PadJump:                            ; header: see Evt_Op34_IfHeldA
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtJump_Dist
+    TXA
+    CLC
+    ADC.b !EvtJump_Dist
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:66E5 — Evt_Op35_IfHeldB (10 bytes, $66E5–$66EE)
+; Event opcode $35 (2 bytes: $35, n): goes on when B (Pad_B) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $35).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op35_IfHeldB:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_B
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66EF — Evt_Op36_IfHeldX (10 bytes, $66EF–$66F8)
+; Event opcode $36 (2 bytes: $36, n): goes on when X (Pad_X) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $36).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op36_IfHeldX:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_X
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:66F9 — Evt_Op37_IfHeldY (8 bytes, $66F9–$6700;
+;   then the shared tail Evt_PadGoOn, 4 bytes, $6701–$6704)
+; Event opcode $37 (2 bytes: $37, n): goes on when Y (Pad_Y) is held in
+;   Menu_PadHeld, else jumps.
+;   Evt_PadGoOn, the go-on of the tests, follows: Y + 1, X = Y, C=1.
+; Reached through Evt_OpcodeTable (opcode $37).
+; Callers note: Evt_PadGoOn is branched to (BNE / BRA) by
+;   Evt_Op2D_IfAnyHeld, the other held tests $30-$39 (this one falls
+;   in), Evt_Op3B_IfMapPressedBit1, Evt_Op3C_IfMapPressedBit7 and
+;   Evt_Op3F_IfPressedA.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op37_IfHeldY:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_Y
+    BEQ Evt_PadJump
+Evt_PadGoOn:                            ; header: see Evt_Op37_IfHeldY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6705 — Evt_Op38_IfHeldL (10 bytes, $6705–$670E)
+; Event opcode $38 (2 bytes: $38, n): goes on when L (Pad_L) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $38).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op38_IfHeldL:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_L
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:670F — Evt_Op39_IfHeldR (10 bytes, $670F–$6718)
+; Event opcode $39 (2 bytes: $39, n): goes on when R (Pad_R) is held in
+;   Menu_PadHeld, else jumps.
+; Reached through Evt_OpcodeTable (opcode $39).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtJump_Dist is
+;   dp), DB=$00 (the pad bytes read absolute); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); EvtJump_Dist = n on a
+;   jump.
+; ------------------------------------------------------------
+Evt_Op39_IfHeldR:
+    INY
+    LDA.w !Menu_PadHeld
+    BIT.b #!Pad_R
+    BEQ Evt_PadJump
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6719 — Evt_Op3B_IfMapPressedBit1 (11 bytes, $6719–$6723)
+; Event opcode $3B (2 bytes: $3B, n): when Pad_Unk00F6Latch bit 1
+;   (Pad_Unk00F6Bit1) is set it is cleared and the script goes on, else
+;   it jumps.
+; Reached through Evt_OpcodeTable (opcode $3B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3B_IfMapPressedBit1:
+    INY
+    LDA.b !Pad_Unk00F6Latch
+    AND.b #!Pad_Unk00F6Bit1
+    BEQ Evt_PadJump
+    TRB.b !Pad_Unk00F6Latch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6724 — Evt_Op3C_IfMapPressedBit7 (14 bytes, $6724–$6731)
+; Event opcode $3C (2 bytes: $3C, n): as Evt_Op3B_IfMapPressedBit1 with
+;   bit 7 (Pad_Unk00F6Bit7, the button Field_ActionButton acts on).
+; Reached through Evt_OpcodeTable (opcode $3C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3C_IfMapPressedBit7:
+    INY
+    LDA.b !Pad_Unk00F6Latch
+    AND.b #!Pad_Unk00F6Bit7
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_Unk00F6Latch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6732 — Evt_Op3F_IfPressedA (14 bytes, $6732–$673F)
+; Event opcode $3F (2 bytes: $3F, n): when A (Pad_A) is set in
+;   Pad_PressedLatch it is cleared and the script goes on, else it
+;   jumps.
+; Reached through Evt_OpcodeTable (opcode $3F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op3F_IfPressedA:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_A
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn
+
+; ------------------------------------------------------------
+; $C0:6740 — Evt_Op40_IfPressedB (14 bytes, $6740–$674D)
+; Event opcode $40 (2 bytes: $40, n): as Evt_Op3F_IfPressedA with B
+;   (Pad_B); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $40).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op40_IfPressedB:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_B
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:674E — Evt_Op41_IfPressedX (14 bytes, $674E–$675B)
+; Event opcode $41 (2 bytes: $41, n): as Evt_Op3F_IfPressedA with X
+;   (Pad_X); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $41).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op41_IfPressedX:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_X
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:675C — Evt_Op42_IfPressedY (14 bytes, $675C–$6769)
+; Event opcode $42 (2 bytes: $42, n): as Evt_Op3F_IfPressedA with Y
+;   (Pad_Y); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $42).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op42_IfPressedY:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_Y
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:676A — Evt_Op43_IfPressedL (14 bytes, $676A–$6777)
+; Event opcode $43 (2 bytes: $43, n): as Evt_Op3F_IfPressedA with L
+;   (Pad_L); goes on through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $43).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op43_IfPressedL:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_L
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+    BRA Evt_PadGoOn2
+
+; ------------------------------------------------------------
+; $C0:6778 — Evt_Op44_IfPressedR (12 bytes, $6778–$6783;
+;   then the shared tail Evt_PadGoOn2, 4 bytes, $6784–$6787)
+; Event opcode $44 (2 bytes: $44, n): as Evt_Op3F_IfPressedA with R
+;   (Pad_R). Evt_PadGoOn2 follows: the same code as Evt_PadGoOn (Y + 1,
+;   X = Y, C=1).
+; Reached through Evt_OpcodeTable (opcode $44).
+; Callers note: Evt_PadGoOn2 is branched to (BRA) by Evt_Op40_IfPressedB,
+;   Evt_Op41_IfPressedX, Evt_Op42_IfPressedY, Evt_Op43_IfPressedL and
+;   Evt_Op47_SetScanlineLimit.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the latches and
+;   EvtJump_Dist are dp), DB any (no absolute operand); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered;
+;   Y = the opcode + 2 (go on) or + 1 (jump); the bit cleared in the
+;   latch on going on; EvtJump_Dist = n on a jump.
+; ------------------------------------------------------------
+Evt_Op44_IfPressedR:
+    INY
+    LDA.b !Pad_PressedLatch
+    AND.b #!Pad_R
+    BNE .pressed
+    BRL Evt_PadJump
+.pressed:
+    TRB.b !Pad_PressedLatch
+Evt_PadGoOn2:                           ; header: see Evt_Op44_IfPressedR
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6788 — Evt_Op47_SetScanlineLimit (10 bytes, $6788–$6791)
+; Event opcode $47 (2 bytes: $47, v): the low byte of ObjQ_ScanlineLimit
+;   = v (Field_ProcessAnimQueue stops building frames once the V counter
+;   reaches it); X = Y + 2, C=1 through Evt_PadGoOn2.
+; Reached through Evt_OpcodeTable (opcode $47).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (ObjQ_ScanlineLimit
+;   is dp), DB any (operand read long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   v.
+; ------------------------------------------------------------
+Evt_Op47_SetScanlineLimit:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !ObjQ_ScanlineLimit
+    BRA Evt_PadGoOn2
+
+; ============================================================
+; Event opcodes: loads, stores and copies ($C0:6792–$C0:6A1E)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). They move bytes or words between the event words
+; (Evt_Unk7F0200 + a x 2: "a" / "b" operands), bank $7F (Evt_Mem7F + m,
+; "m" a word operand), any long address ("ptr", 3 bytes, low first) and
+; the script's own bytes. A byte stored into an event word goes to its
+; low byte only.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:6792 — Evt_Op48_GetLongByte (16 bytes, $6792–$67A1)
+; Event opcode $48 (5 bytes: $48, ptr, a): event word a's low byte = the
+;   byte at ptr; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $48).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   byte; Y unchanged; EvtMem_Src = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op48_GetLongByte:
+    JSR Evt_ReadSrcPtrAndVar
+    SEP #$20
+    LDA.b [!EvtMem_Src]
+    STA.l !Evt_Unk7F0200,X
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67A2 — Evt_ReadSrcPtrAndVar (37 bytes, $67A2–$67C6)
+; Reads the operands of opcodes $48 / $49: EvtMem_Src = the 3 bytes at
+;   Y + 1 (ptr), then X = the event word index (the byte at Y + 4) x 2,
+;   with EvtMem_Pos = Y + 4. Returns with 16-bit A.
+; Callers (2 JSR sites): Evt_Op48_GetLongByte ($C0:6792) and Evt_Op49_GetLongWord ($C0:67C7).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (operands read long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=0 (16-bit A), X=0, DP and DB unchanged; X = A = a x 2; Y
+;   unchanged; EvtMem_Src and EvtMem_Pos written.
+; ------------------------------------------------------------
+Evt_ReadSrcPtrAndVar:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Src+2
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67C7 — Evt_Op49_GetLongWord (16 bytes, $67C7–$67D6)
+; Event opcode $49 (5 bytes: $49, ptr, a): event word a = the word at
+;   ptr; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $49).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Src /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   word's low byte (B its high byte); Y unchanged; EvtMem_Src = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op49_GetLongWord:
+    JSR Evt_ReadSrcPtrAndVar
+    LDA.b [!EvtMem_Src]
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67D7 — Evt_Op4A_SetLongByte (12 bytes, $67D7–$67E2)
+; Event opcode $4A (5 bytes: $4A, ptr, value): the byte at ptr = value;
+;   X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A =
+;   value; Y unchanged; EvtMem_Dst = ptr.
+; ------------------------------------------------------------
+Evt_Op4A_SetLongByte:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X
+    STA.b [!EvtMem_Dst]
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67E3 — Evt_ReadDstPtr (24 bytes, $67E3–$67FA)
+; Reads the pointer operand of opcodes $4A-$4D: EvtMem_Dst = the 3
+;   bytes at Y + 1; X = Y + 4 (the next operand).
+; Callers (4 JSR sites): Evt_Op4A_SetLongByte ($C0:67D7), Evt_Op4B_SetLongWord ($C0:67FB),
+;   Evt_Op4C_SetLongVarByte ($C0:680C) and Evt_Op4D_SetLongVarWord ($C0:6829).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (operands read long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 4; A = the pointer's bank
+;   byte; Y unchanged; EvtMem_Dst written.
+; ------------------------------------------------------------
+Evt_ReadDstPtr:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst+1
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtMem_Dst+2
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:67FB — Evt_Op4B_SetLongWord (17 bytes, $67FB–$680B)
+; Event opcode $4B (6 bytes: $4B, ptr, value (word)): the word at ptr =
+;   value; X = Y + 6, C=1.
+; Reached through Evt_OpcodeTable (opcode $4B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 6, C=1; A =
+;   value's low byte (B its high byte); Y unchanged; EvtMem_Dst = ptr.
+; ------------------------------------------------------------
+Evt_Op4B_SetLongWord:
+    JSR Evt_ReadDstPtr
+    REP #$20
+    LDA.l !Evt_Data,X
+    STA.b [!EvtMem_Dst]
+    SEP #$20
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:680C — Evt_Op4C_SetLongVarByte (29 bytes, $680C–$6828)
+; Event opcode $4C (5 bytes: $4C, ptr, a): the byte at ptr = event word
+;   a's low byte; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   byte; Y unchanged; EvtMem_Dst = ptr, EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op4C_SetLongVarByte:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    STA.b [!EvtMem_Dst]
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6829 — Evt_Op4D_SetLongVarWord (29 bytes, $6829–$6845)
+; Event opcode $4D (5 bytes: $4D, ptr, a): the word at ptr = event word
+;   a; X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $4D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Dst /
+;   EvtMem_Pos are dp), DB any (all accesses long); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A = the
+;   word's low byte (B its high byte); Y unchanged; EvtMem_Dst = ptr,
+;   EvtMem_Pos = the opcode + 4.
+; ------------------------------------------------------------
+Evt_Op4D_SetLongVarWord:
+    JSR Evt_ReadDstPtr
+    LDA.l !Evt_Data,X                   ; a
+    STX.b !EvtMem_Pos
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b [!EvtMem_Dst]
+    SEP #$20
+    LDX.b !EvtMem_Pos
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6846 — Evt_Op4E_CopyData (95 bytes, $6846–$68A4)
+; Event opcode $4E (variable: $4E, dst (word), bank, len (word), then len
+;   - 2 data bytes): copies the data bytes with MVN to dst in bank $7E
+;   when bank is $7E, else in bank $7F (any other bank byte); len counts
+;   itself and the data. The script goes on after the data: X = Y + 4 +
+;   len, C=1 (taken from the MVN's end source address less
+;   Evt_DataAddr). DB is saved around the MVN (which sets it to the
+;   destination bank).
+; Reached through Evt_OpcodeTable (opcode $4E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtCopy_Count is
+;   dp), DB any (restored after the MVN); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A = X (low
+;   byte in A, high in B: TXA/SBC/TAX after the MVN); Y = dst + len - 2 (where the MVN
+;   stopped); EvtCopy_Count = len - 3.
+; ------------------------------------------------------------
+Evt_Op4E_CopyData:
+    TYX
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; dst
+    TAY
+    SEP #$20
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; bank
+    CMP.b #!Bank7E
+    BEQ .to_7e
+    REP #$20
+    INX
+    LDA.l !Evt_Data,X                   ; len
+    DEC A
+    DEC A
+    DEC A
+    STA.b !EvtCopy_Count                ; data bytes - 1
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr                ; the data's address in bank $7F
+    TAX
+    LDA.b !EvtCopy_Count
+    PHB
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA
+    SEC
+    SBC.w #!Evt_DataAddr                ; back to an Evt_Data offset: after the data
+    TAX
+    SEP #$20
+    SEC
+    RTS
+.to_7e:
+    REP #$20
+    INX
+    LDA.l !Evt_Data,X                   ; len
+    DEC A
+    DEC A
+    DEC A
+    STA.b !EvtCopy_Count                ; data bytes - 1
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr                ; the data's address in bank $7F
+    TAX
+    LDA.b !EvtCopy_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes (destination $7E, source $7F); asar rejects a width suffix
+    PLB
+    TXA
+    SEC
+    SBC.w #!Evt_DataAddr                ; back to an Evt_Data offset: after the data
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68A5 — Evt_Op4F_SetVarByte (33 bytes, $68A5–$68C5)
+; Event opcode $4F (3 bytes: $4F, value, a): event word a's low byte =
+;   value; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $4F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A =
+;   EvtMem_Value = value; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op4F_SetVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68C6 — Evt_Op50_SetVarWord (35 bytes, $68C6–$68E8)
+; Event opcode $50 (4 bytes: $50, value (word), a): event word a = value;
+;   X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $50).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A =
+;   value's low byte (B its high byte), EvtMem_Value = value; Y = the
+;   opcode + 1.
+; ------------------------------------------------------------
+Evt_Op50_SetVarWord:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:68E9 — Evt_Op51_CopyVarByte (42 bytes, $68E9–$6912)
+; Event opcode $51 (3 bytes: $51, a, b): event word b's low byte = event
+;   word a's low byte (a is read as a word, only its low byte stored);
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $51).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A = the
+;   byte; EvtMem_Value = event word a; Y = the opcode + 2.
+; ------------------------------------------------------------
+Evt_Op51_CopyVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6913 — Evt_Op52_CopyVarWord (42 bytes, $6913–$693C)
+; Event opcode $52 (3 bytes: $52, a, b): event word b = event word a;
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $52).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A = the
+;   word's low byte (B its high byte), EvtMem_Value = the word; Y = the
+;   opcode + 2.
+; ------------------------------------------------------------
+Evt_Op52_CopyVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:693D — Evt_Op53_GetMemByte (39 bytes, $693D–$6963)
+; Event opcode $53 (4 bytes: $53, m (word), a): event word a's low byte =
+;   the byte at Evt_Mem7F + m (read as a word, its low byte stored);
+;   X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $53).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   byte; EvtMem_Value = the word at m; Y = the opcode + 3.
+; ------------------------------------------------------------
+Evt_Op53_GetMemByte:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtMem_Value
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6964 — Evt_Op54_GetMemWord (39 bytes, $6964–$698A)
+; Event opcode $54 (4 bytes: $54, m (word), a): event word a = the word
+;   at Evt_Mem7F + m; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $54).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 4, C=1; A = the
+;   word's low byte (B its high byte), EvtMem_Value = the word; Y = the
+;   opcode + 3.
+; ------------------------------------------------------------
+Evt_Op54_GetMemWord:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    STA.b !EvtMem_Value
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:698B — Evt_Op55_GetUnk7F0000 (27 bytes, $698B–$69A5)
+; Event opcode $55 (2 bytes: $55, a): event word a's low byte =
+;   Eng_Unk7F0000; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $55).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   byte; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op55_GetUnk7F0000:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Eng_Unk7F0000
+    STA.l !Evt_Unk7F0200,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69A6 — Evt_Op56_SetMemByte (30 bytes, $69A6–$69C3)
+; Event opcode $56 (4 bytes: $56, value, m (word)): the byte at
+;   Evt_Mem7F + m = value; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $56).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   EvtMem_Value = value (B = m's high byte).
+; ------------------------------------------------------------
+Evt_Op56_SetMemByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69C4 — Evt_Op58_SetMemVarByte (39 bytes, $69C4–$69EA)
+; Event opcode $58 (4 bytes: $58, a, m (word)): the byte at Evt_Mem7F +
+;   m = event word a's low byte; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $58).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the byte (B = m's high byte); EvtMem_Value = event word a.
+; ------------------------------------------------------------
+Evt_Op58_SetMemVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:69EB — Evt_Op59_SetMemVarWord (39 bytes, $69EB–$6A11)
+; Event opcode $59 (4 bytes: $59, a, m (word)): the word at Evt_Mem7F +
+;   m = event word a; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $59).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the word's low byte (B its high byte); EvtMem_Value = the word.
+; ------------------------------------------------------------
+Evt_Op59_SetMemVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    SEP #$20
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6A12 — Evt_Op5A_SetUnk7F0000 (13 bytes, $6A12–$6A1E)
+; Event opcode $5A (2 bytes: $5A, value): Eng_Unk7F0000 = value; X = Y +
+;   2, C=1.
+; Reached through Evt_OpcodeTable (opcode $5A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A =
+;   value; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op5A_SetUnk7F0000:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.l !Eng_Unk7F0000
+    INX
+    SEC
+    RTS
+
+; ============================================================
+; Event opcodes: arithmetic and bits ($C0:6A1F–$C0:6D2E)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes). They change event words (Evt_Unk7F0200 + a x 2) in place,
+; a byte opcode only the word's low byte (no carry into the high byte),
+; or bits of bank $7F (Evt_Mem7F). All go on with the next opcode, C=1.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:6A1F — Evt_Op5B_AddVarByte (38 bytes, $6A1F–$6A44)
+; Event opcode $5B (3 bytes: $5B, value, a): event word a's low byte +=
+;   value; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $5B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = value.
+; ------------------------------------------------------------
+Evt_Op5B_AddVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    CLC
+    ADC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6A45 — Evt_Op5D_AddVarVarByte (47 bytes, $6A45–$6A73)
+; Event opcode $5D (3 bytes: $5D, a, b): event word b's low byte += event
+;   word a's low byte; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $5D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = event word a.
+; ------------------------------------------------------------
+Evt_Op5D_AddVarVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    CLC
+    ADC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6A74 — Evt_Op5E_AddVarVarWord (47 bytes, $6A74–$6AA2)
+; Event opcode $5E (3 bytes: $5E, a, b): event word b += event word a; X =
+;   Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $5E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new low byte (B the high byte); EvtMem_Value = event word a.
+; ------------------------------------------------------------
+Evt_Op5E_AddVarVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    CLC
+    ADC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6AA3 — Evt_Op5F_SubVarByte (38 bytes, $6AA3–$6AC8)
+; Event opcode $5F (3 bytes: $5F, value, a): event word a's low byte -=
+;   value; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $5F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = value.
+; ------------------------------------------------------------
+Evt_Op5F_SubVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    SEC
+    SBC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6AC9 — Evt_Op60_SubVarWord (40 bytes, $6AC9–$6AF0)
+; Event opcode $60 (4 bytes: $60, value (word), a): event word a -=
+;   value; X = Y + 4, C=1.
+; Reached through Evt_OpcodeTable (opcode $60).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 4, C=1; A =
+;   the new word's low byte (B its high byte); EvtMem_Value = value.
+; ------------------------------------------------------------
+Evt_Op60_SubVarWord:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X                   ; value
+    STA.b !EvtMem_Value
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    SEC
+    SBC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    INY
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6AF1 — Evt_Op61_SubVarVarByte (47 bytes, $6AF1–$6B1F)
+; Event opcode $61 (3 bytes: $61, a, b): event word b's low byte -=
+;   event word a's low byte; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $61).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = event word a.
+; ------------------------------------------------------------
+Evt_Op61_SubVarVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; b
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    SEC
+    SBC.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6B20 — Evt_Op63_SetVarBit (43 bytes, $6B20–$6B4A)
+; Event opcode $63 (3 bytes: $63, bit, a): sets bit number bit (0-7, through
+;   BitSet) in event word a's low byte; X = Y + 3, C=1. A bit number of
+;   8 or more reads past the 8-byte table (not masked).
+; Reached through Evt_OpcodeTable (opcode $63).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB=$00 (BitSet is read absolute, at $00:FF20; the rest long); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = the mask.
+; ------------------------------------------------------------
+Evt_Op63_SetVarBit:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X                   ; bit
+    TAX
+    LDA.w BitSet,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    ORA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6B4B — Evt_Op64_ClearVarBit (43 bytes, $6B4B–$6B75)
+; Event opcode $64 (3 bytes: $64, bit, a): clears bit number bit (0-7, through
+;   BitClear) in event word a's low byte; X = Y + 3, C=1. A bit number of
+;   8 or more reads past the 8-byte table (not masked).
+; Reached through Evt_OpcodeTable (opcode $64).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB=$00 (BitClear is read absolute, at $00:FF28; the rest long); Y =
+;   the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = the mask.
+; ------------------------------------------------------------
+Evt_Op64_ClearVarBit:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X                   ; bit
+    TAX
+    LDA.w BitClear,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    AND.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6B76 — Evt_Op65_SetMemBit (46 bytes, $6B76–$6BA3)
+; Event opcode $65 (3 bytes: $65, bit, m): sets a bit of the byte at
+;   Evt_Mem7F + m, or at Evt_Mem7F + $100 + m when bit 7 of the bit operand
+;   is set; the bit number is the operand's bits 0-3 (EvtBit_NumMask,
+;   through BitSet: numbers 8-15 read past its 8 bytes); bits 4-6 are
+;   ignored. X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $65).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value /
+;   EvtBit_Arg are dp), DB=$00 (BitSet is read absolute, at $00:FF20; the
+;   rest long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte (B = the page bit); EvtMem_Value = the mask,
+;   EvtBit_Arg = the bit operand.
+; ------------------------------------------------------------
+Evt_Op65_SetMemBit:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X                   ; bit operand
+    STA.b !EvtBit_Arg
+    AND.b #!EvtBit_NumMask
+    TAX
+    LDA.w BitSet,X
+    STA.b !EvtMem_Value
+    LDA.b !EvtBit_Arg
+    ROL A
+    ROL A                               ; operand bit 7 to bit 0
+    AND.b #$01
+    XBA                                 ; B = the page ($100s)
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    ORA.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6BA4 — Evt_Op66_ClearMemBit (46 bytes, $6BA4–$6BD1)
+; Event opcode $66 (3 bytes: $66, bit, m): clears a bit of the byte at
+;   Evt_Mem7F + m, or at Evt_Mem7F + $100 + m when bit 7 of the bit operand
+;   is set; the bit number is the operand's bits 0-3 (EvtBit_NumMask,
+;   through BitClear: numbers 8-15 read past its 8 bytes); bits 4-6 are
+;   ignored. X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $66).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value /
+;   EvtBit_Arg are dp), DB=$00 (BitClear is read absolute, at $00:FF28; the
+;   rest long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte (B = the page bit); EvtMem_Value = the mask,
+;   EvtBit_Arg = the bit operand.
+; ------------------------------------------------------------
+Evt_Op66_ClearMemBit:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X                   ; bit operand
+    STA.b !EvtBit_Arg
+    AND.b #!EvtBit_NumMask
+    TAX
+    LDA.w BitClear,X
+    STA.b !EvtMem_Value
+    LDA.b !EvtBit_Arg
+    ROL A
+    ROL A                               ; operand bit 7 to bit 0
+    AND.b #$01
+    XBA                                 ; B = the page ($100s)
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; m
+    TAX
+    LDA.l !Evt_Mem7F,X
+    AND.b !EvtMem_Value
+    STA.l !Evt_Mem7F,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6BD2 — Evt_Op67_AndVarByte (37 bytes, $6BD2–$6BF6)
+; Event opcode $67 (3 bytes: $67, mask, a): ANDs event word a's low byte
+;   with mask; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $67).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = mask.
+; ------------------------------------------------------------
+Evt_Op67_AndVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; mask
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    AND.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6BF7 — Evt_Op69_OrVarByte (37 bytes, $6BF7–$6C1B)
+; Event opcode $69 (3 bytes: $69, mask, a): ORs event word a's low byte
+;   with mask; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $69).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = mask.
+; ------------------------------------------------------------
+Evt_Op69_OrVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; mask
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    ORA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6C1C — Evt_Op6B_EorVarByte (37 bytes, $6C1C–$6C40)
+; Event opcode $6B (3 bytes: $6B, mask, a): EORs event word a's low byte
+;   with mask; X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $6B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = mask.
+; ------------------------------------------------------------
+Evt_Op6B_EorVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; mask
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    EOR.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6C41 — Evt_Op6F_ShrVarByte (40 bytes, $6C41–$6C68)
+; Event opcode $6F (3 bytes: $6F, count, a): shifts event word a's low
+;   byte right count times; X = Y + 3, C=1.
+; Quirk: the loop decrements before it tests, so a count of 0 shifts
+;   256 times (the byte ends 0).
+; Reached through Evt_OpcodeTable (opcode $6F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtMem_Value is
+;   dp), DB any (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 3, C=1; A =
+;   the new byte; EvtMem_Value = 0 (the count, run down).
+; ------------------------------------------------------------
+Evt_Op6F_ShrVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X                   ; count
+    STA.b !EvtMem_Value
+    INX
+    LDA.l !Evt_Data,X                   ; a
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+.shift:
+    LSR A
+    DEC.b !EvtMem_Value
+    BNE .shift
+    STA.l !Evt_Unk7F0200,X
+    INY
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6C69 — Evt_Op71_IncVarByte (28 bytes, $6C69–$6C84)
+; Event opcode $71 (2 bytes: $71, a): adds 1 to event word a's low byte
+;   (wrapping in the byte); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $71).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   the new byte.
+; ------------------------------------------------------------
+Evt_Op71_IncVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    INC A
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6C85 — Evt_Op72_IncVarWord (28 bytes, $6C85–$6CA0)
+; Event opcode $72 (2 bytes: $72, a): adds 1 to event word a;
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $72).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   the new word's low byte (B its high byte).
+; ------------------------------------------------------------
+Evt_Op72_IncVarWord:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l !Evt_Unk7F0200,X
+    INC A
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6CA1 — Evt_Op73_DecVarByte (28 bytes, $6CA1–$6CBC)
+; Event opcode $73 (2 bytes: $73, a): subtracts 1 from event word a's low
+;   byte (wrapping in the byte); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $73).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   the new byte.
+; ------------------------------------------------------------
+Evt_Op73_DecVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    DEC A
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6CBD — Evt_Op75_SetVarByte1 (25 bytes, $6CBD–$6CD5)
+; Event opcode $75 (2 bytes: $75, a): event word a's low byte = 1;
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $75).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   1.
+; ------------------------------------------------------------
+Evt_Op75_SetVarByte1:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b #$01
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6CD6 — Evt_Op76_SetVarWord1 (26 bytes, $6CD6–$6CEF)
+; Event opcode $76 (2 bytes: $76, a): event word a = 1; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $76).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   1 (B 0).
+; ------------------------------------------------------------
+Evt_Op76_SetVarWord1:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.w #$0001
+    STA.l !Evt_Unk7F0200,X
+    SEP #$20
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6CF0 — Evt_Op77_ClearVarByte (25 bytes, $6CF0–$6D08)
+; Event opcode $77 (2 bytes: $77, a): event word a's low byte = 0;
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $77).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (all accesses long); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   0.
+; ------------------------------------------------------------
+Evt_Op77_ClearVarByte:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b #$00
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:6D09 — Evt_Op7F_RandomVarByte (38 bytes, $6D09–$6D2E)
+; Event opcode $7F (2 bytes: $7F, a): event word a's low byte = the next
+;   RandomTable byte: Field_Unk0400Copy is incremented and indexes it
+;   (as Obj_SetVelocityChecked does); X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $7F).
+; Callers (1 JMP site): unmatched ($C0:5E6B).
+; Callers note: the JMP at $C0:5E6B is not code: it is Evt_OpcodeTable's
+;   bytes (the $4C high byte of entry $7E, then entry $7F, $6D09).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk0400Copy /
+;   EvtMem_Value are dp), DB=$00 (RandomTable read absolute, in bank $C0
+;   through the $00 mirror; the rest long); Y = the opcode's offset in
+;   Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = the opcode + 2, C=1; A =
+;   EvtMem_Value = the random byte; Field_Unk0400Copy + 1.
+; ------------------------------------------------------------
+Evt_Op7F_RandomVarByte:
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.b !Field_Unk0400Copy
+    INC A
+    STA.b !Field_Unk0400Copy
+    TAX
+    LDA.w RandomTable,X
+    STA.b !EvtMem_Value
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.b !EvtMem_Value
+    STA.l !Evt_Unk7F0200,X
+    INY
+    TYX
+    SEC
+    RTS
 
 ; ============================================================
 ; $C0:1ADF — Sub_1ADF (87 bytes, $1ADF–$1B35)

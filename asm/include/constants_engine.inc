@@ -787,3 +787,67 @@ endif
 !ObjAnim_RunKinds = $04                  ; Obj_Unk1100 kinds below this may take ObjAnim_RowRun
 !Obj_AnimModeNormal = $01                ; Obj_AnimMode Obj_SetMoveAnim sets when it leaves
                                          ; Obj_AnimModeFixed (Obj_AnimRow not $FF)
+
+; --- Event call opcodes ($00-$09) ---
+!Halt_ColorBadOpcode = $1639             ; Sys_HaltWithColor colour for an unused event opcode
+                                         ; (Evt_UnusedOpcode)
+!Evt_CallFuncMask = $000F                ; low nibble of a call opcode's level/function operand: the
+                                         ; function number (word index in the 16-word table)
+
+; --- Event jump and condition opcodes ($10-$1C) ---
+!EvtIf_Page1Flag = $80                   ; Evt_Op16_IfMemByte's comparison byte, bit 7: the byte tested
+                                         ; is at $7F:0100 + the operand (else $7F:0000 + it)
+!EvtIf_Page1 = $0100                     ; the offset bit 7 of that byte adds
+
+; --- Event button opcodes ($2D-$44) ---
+; Bits of Menu_PadHeld / Pad_PressedLatch, by Pad_Pressed's low-byte layout (A X L R B Y Select
+; Start, bits 7-0; that layout is inferred from the pad reader at $C2:84F0)
+!Pad_A = $80                             ; bit 7: A
+!Pad_X = $40                             ; bit 6: X
+!Pad_L = $20                             ; bit 5: L
+!Pad_R = $10                             ; bit 4: R
+!Pad_B = $08                             ; bit 3: B
+!Pad_Y = $04                             ; bit 2: Y
+!Pad_Unk00F6Bit1 = $02                   ; Pad_Unk00F6 (and Pad_Unk00F6Latch) bit 1, tested by event
+                                         ; opcode $3B (which button the map puts there not traced)
+
+; --- Event arithmetic and bit opcodes ($5B-$7F) ---
+!EvtBit_NumMask = $0F                    ; bits of opcode $65/$66's bit operand that index BitSet /
+                                         ; BitClear (8 entries each: 8-15 run into the next table)
+
+; --- Event animation and wait opcodes ($AA-$BD) ---
+!Obj_AnimModeLoops = $02                 ; Obj_AnimMode 2: counted passes of Obj_AnimRowAlt
+                                         ; (ObjX_AnimLoops)
+!Evt_AnimLoopsOnce = $02                 ; ObjX_AnimLoops Evt_OpAB_PlayAnimOnce starts with:
+                                         ; Obj_AnimTickAndQueue leaves 1 after a pass of the row
+!Evt_WaitRuns4 = $04                     ; script runs waited by opcode $B9 (Evt_OpB9_Wait4)
+!Evt_WaitRuns8 = $08                     ; ... by opcode $BA
+!Evt_WaitRuns16 = $10                    ; ... by opcode $BC
+!Evt_WaitRuns32 = $20                    ; ... by opcode $BD
+
+; --- Object steps onto a tile centre / another object, touch and push (Obj_Unk305D ...) ---
+!Obj_SubTileMask = $F0                   ; Obj_PosX/Y low byte bits 4-7: the position within the tile
+                                         ; that Obj_Unk305D compares
+!Obj_TileCentreX = $80                   ; Obj_Unk305D's X target within the tile (the middle)
+!Obj_TileFootY = $F0                     ; Obj_Unk305D's Y target within the tile (its last $10)
+!Obj_CentreStep = $10                    ; Obj_VelX/Y step of Obj_Unk305D / Obj_Unk30B3 (+$10)
+!Obj_CentreStepNeg = $F0                 ; ... and its negative (-$10)
+!Obj_PosCoarseMask = $FFF0               ; Obj_PosX/Y bits Obj_Unk30B3 compares (the step grid)
+!Evt_Func2Ofs = $0004                    ; offset of function 2 in an object's 16-word function table
+!Obj_Unk1C00Func2 = $02                  ; Obj_Unk1C00 Evt_StartTargetFunc2 sets as it starts function 2
+!Obj_Unk1C00Func2Min = $03               ; Evt_StartTargetFunc2 starts nothing while Obj_Unk1C00 is
+                                         ; below this
+!Obj_Unk1B01Push = $02                   ; Obj_Unk1B01 bit 1: Evt_PushTarget may move the object
+!Field54_Push = $02                      ; Field_Unk54 bit 1: set by Evt_PushTarget when it sends an
+                                         ; object off; no other push starts while it is set (who
+                                         ; clears it is not traced)
+!Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
+                                         ; offset; what is there is not traced)
+!Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
+                                         ; tile (column, row): the byte after Evt_PushScriptPos
+
+; --- Event message opcodes ($B8-$C4) ---
+!Halt_ColorNoMsgPtr = $7FE0              ; Sys_HaltWithColor colour when a message opcode runs with
+                                         ; Field_Unk2D (the pointer's bank) 0
+!Evt_ChoiceMask = $03                    ; bits 0-1 / 2-3 of a choice message's operand: Field_Unk65
+                                         ; / Field_Unk64

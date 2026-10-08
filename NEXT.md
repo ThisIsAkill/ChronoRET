@@ -205,13 +205,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    names `Obj_QueueScripts` / `Obj_RunQueuedScripts`); and the event movement / facing opcodes
    $7A, $7B, $92, $9C, $9D, $96, $9A, $97, $A0, $A1, $94, $9E, $98, $95, $8F, $9F, $99, $0F,
    $17, $1B, $1D, $A6, $A7, $1E, $1F, $25, $26, $A8, $A9 with `Obj_SetMoveAnim` /
-   `Obj_SetStandAnim` ($C0:4D06-$C0:56A5). Open from these: `Obj_Unk305D` / `Obj_Unk30B3`
-   (stubs: step to the tile centre / onto another object), the opcodes before them
-   ($C0:4CD5-$C0:4D05: $90, $91, $7E, $7C, $7D share a tail at $C0:4CD9) and the opcode $B5/$B6
-   wrappers at $C0:3546/$C0:354F; the event code at $C0:304F, $C0:4626 and $C0:4781 that calls
-   the helpers; who writes `Field_Unk31`/`Field_Unk36` (NMI upload to VRAM $5800), the
-   `Field_Unk47` bits 1-2, `Obj_Unk1C81`, `ObjX_Unk7F0B00` and
-   `ObjX_LeaveView` ($7F:0A00); the region-copy event opcode $E4 ($C0:3D97); the meaning of
+   `Obj_SetStandAnim` ($C0:4D06-$C0:56A5). Open from these: the opcodes before them
+   ($C0:4CD5-$C0:4D05: $90, $91, $7E, $7C, $7D share a tail at $C0:4CD9); the event code at
+   $C0:4626 and $C0:4781 that calls the helpers; who writes `Field_Unk31`/`Field_Unk36` (NMI
+   upload to VRAM $5800), the `Field_Unk47` bits 1-2 and the other `ObjX_Unk7F0B00` values
+   (Obj_Unk30B3 stores 1); the region-copy event opcode $E4 ($C0:3D97); the meaning of
    `Obj_Unk1100` kinds (0-2 fixed palette slots 5-7, 3/4 tile slots, 5/6 palette slots 1-3).
    Quirks recorded: `Obj_PalSlotFixed`'s shared path writes `Obj_PalSlot` + an object offset
    (kinds 0-2), the missing SEC/CLC in `Evt_InFront*` and `Field_UploadUnk5800`, the kind-0
@@ -222,9 +220,40 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Obj_CalcDirection / Obj_SetVelocity / Obj_SetVelocityChecked (their callers are the event
    opcodes now), Obj_UpdateInView / Obj_ActivateIfInView / FieldBtl_SaveObj /
    FieldBtl_RestoreObj (the Obj_Unk* callees are matched), and the `Field_Unk0B80/0B88` uses in
-   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`). Next, in reach
-   order: the rest of the event opcode handlers ($C0:2E67-$C0:4CD4 and $C0:5F6E-$C0:6D2E)
-   and `Evt_OpcodeTable` ($C0:5D6E) once they have names. Open from the hand-off: who
+   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`).
+   Also done (branch match-c0-evtops): the event opcode handlers $C0:5F6E-$C0:6D2E (all of
+   $00-$7F there): `Evt_UnusedOpcode`, the return / call opcodes $00, $02-$07 (`Obj_Unk1C00`
+   read as a level, saved positions in the `ObjX_Unk7F0580` tables, `ObjX_CallWait`), object
+   control $08-$0E, jumps and conditions $10-$1C with `Evt_CmpTable8/16` and the 18 compare
+   routines, the party / object queries $20-$28, the button tests $2D-$44 and $47, loads /
+   stores / copies $48-$5A (`Evt_Op4E_CopyData`'s MVN), arithmetic and bits $5B-$7F; and in
+   $C0:2E67-$C0:3710: the animation and wait opcodes $AA-$BD, the party control $AF/$B0
+   (stubs `Party_Unk9E29/A26B/A2CE`, the leader's step log and the members' follow, probably),
+   `Obj_Unk305D` / `Obj_Unk30B3` (kept names; better `Obj_StepToTileCentre` /
+   `Obj_StepOntoObj`), `Evt_StartTargetFunc2` (touch, function 2 at level 2),
+   `Evt_PushTarget`, the yields / endless follows $B1/$B2/$B5/$B6 and the message opcodes
+   $B8/$BB/$C0-$C4 (`Field_Unk2A`-`2E`, `Field_Unk30`, `Field_Unk62`-`66` read as a message and
+   its choice cursor: inferred, `Field_Unk1F87` not traced). Quirks recorded: Evt_Op00_Return's
+   unbounded level search and dead LDX, Evt_Op07's unchecked absent member in its wait,
+   Evt_Op22/24's unchecked member, Evt_Op6F's count 0 = 256 shifts, the unmasked comparison
+   numbers ($12-$16) and bit numbers ($63-$66), Evt_OpAD/Evt_WaitRuns re-running at once when
+   the counter is past n, Evt_OpB6's missing CLC, Obj_Unk305D's dead -$10 Y step,
+   Evt_PushTarget's 16-bit WRMPYB store, Evt_OpB0's dead Obj_Facing load. Stale after this
+   batch (verified headers, grandfathered `UNMATCHED` in the baseline; fix at their next edit):
+   Sys_HaltWithColor (its callers note names $C0:5F71 and $C0:3577-$C0:36E4 unmatched),
+   Evt_Op94_WalkToObj ($C0:3548, now Evt_OpB5_FollowObj), Evt_Op95_WalkToPc ($C0:3551, now
+   Evt_OpB6_FollowPc), Evt_HasActionTarget ($C0:304F, now Evt_OpB0_PartyControl); the
+   `ObjX_LeaveView` define now names its writers (the message opcodes, so Obj_UpdateInView's
+   test reads as "the object's message is up"). Next, in reach order: the rest of the event opcode handlers,
+   $C0:326C-$C0:353E (opcodes $D9 at $C0:326C, $DA at $C0:345A) and $C0:3711-$C0:4CD4 ($33,
+   $C7-$FF, $29-$2F, $32, the one-line group $57/$5C/$62/$68/$6A/$6C/$6D at $C0:41E4, $80-$8E,
+   then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all have names;
+   and the party control callees `Party_Unk9E29` ($C0:9E84 first), `Party_UnkA26B`,
+   `Party_UnkA2CE` (with `$C0:9ED1`, `$C0:9F20`, `$C0:9F6F`). Open from it: what Field_Unk1F87
+   does with the message bytes (and whether `Field_Unk30` is the window's place), who clears
+   `Field54_Push`, what lies at Evt_Data + `Evt_PushScriptPos` / `Evt_RedirectPos`, what
+   `Eng_Unk7F0000` and `ObjX_Unk7F0A80` mean beyond the opcodes, and what `Obj_Unk1C80`/`1C81`
+   bits beyond 0-1 do. Open from the hand-off: who
    writes `FieldBtl_Result` = 2 and what the battle does with `FieldBtlObj.Flags` (0 removes the
    object), what `Eng_Unk0010` holds (Scene_Unk0283's `BIT $0010` quirk), the readers of
    `FieldBtlPpu`, `FieldBtl_AttrA/B` and `Field_Unk47`, and what
@@ -372,11 +401,11 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 2. `$C1:0051`, 10 words: the $C10045 service dispatcher's table (`JSR (T,X)` at `$C1:004A`);
    services 1, 2 and 7 are matched, the rest need stubs.
 3. `$C0:5D6E` `Evt_OpcodeTable`, 256 words (`JSR (T,X)` at `$C0:5977` in Evt_RunObj0Func1, and
-   Evt_RunObjInit); ends at `$C0:5F6E`, the shared handler for unused opcodes. Needs a name per
-   handler first.
+   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 81
+   entries still have none ($29-$2C, $2E, $2F, $32, $33, $57, $5C, $62, $68, $6A, $6C, $6D,
+   $7C-$7E, $80-$84, $87-$8E, $90, $91, $C7-$DA, $DC-$E8, $EA-$EE, $F0-$F4, $F8-$FA, $FE, $FF).
 4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
-   `$C0:4009`), `$C0:7181` (12, `$C0:717D`), `$C0:6477` (8,
-   `$C0:633D`), `$C0:9FF7` (65, `$C0:9ECD`).
+   `$C0:4009`), `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
 5. Bank $C1 (`$C1:2D81`, `$C1:3216` and `$C1:3760` are matched as BattlePos_ModeTable,
    Battle_FxHandlerTable and Battle_EnemyMoverTable): `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

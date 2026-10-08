@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:2E1E,Sys_HaltWithColor,2026-10-08,rev83a,approved,4e74f75bddb1,"R80 fix OK: msg opcodes LDA Field_Unk2D/BNE/LDX #$7FE0. Verified all 13 BRL colours, Loc_Id $81F0-$81FE range, 21-byte InitHW body, $0128/TM/TS/CGRAM/RTI trampolines, Entry"
+$C0:3154,Evt_StartTargetFunc2,2026-10-08,rev83a,approved,f88dc4f010ea,"R80 fix OK: called from Evt_OpB0_PartyControl kind-0 path. Verified skip tests, >=3 test, level x $80 + slot save, func2 at +4, 1C00=2, clears, push; 'touch' backed by Map_ProbeHitsObj"
+$C0:6254,Evt_Op0A_RemoveObj,2026-10-08,rev83a,approved,83187627429f,"R80 fix OK: Entry now DP=$0100 with low byte 0 for TDC/XBA (B=0 before 16-bit TAX). Verified $80 to Obj_Unk1100, 0 to Obj_Unk1A81, X = opcode+2, C=1, A=0, Y = opcode+1"
+$C0:6282,Evt_Op0C_StartObjScript,2026-10-08,rev83a,approved,c708eab15892,"R80 fix OK: Entry DP=$0100 low byte 0 for TDC/XBA. Verified AND #$7F on Obj_Unk1000, BRA Evt_Op0E_Next (X = opcode+2, C=1), A = new value, Y = opcode+1, B=0"
+$C0:62B5,Evt_Op10_JumpFwd,2026-10-08,rev83a,approved,e50885796667,"R80 fix OK: .store = TAX/SEP/SEC/RTS, five bytes $62C6-$62CA; Op11's BRA at $62DC lands there. Verified X = opcode+1+n, C=1, A/B = target, Y, EvtJump_Dist = n, DB any"
+$C0:6846,Evt_Op4E_CopyData,2026-10-08,rev83a,approved,07156bec6ee6,"R80 fix OK: Exit A = X after TXA/SBC/TAX/SEP. Verified layout, $7E vs other bank MVN (54 7E 7F / 54 7F 7F), len-2 bytes, X = opcode+4+len, Y = dst+len-2, Count = len-3, PHB/PLB"
