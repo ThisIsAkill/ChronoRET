@@ -44,30 +44,16 @@ org $C00617
 Field_Unk0617:      ; 8-bit X/Y: lists objects of kind 5/6 ($1100,X) near the screen tile origin in dp $9D.. (max 12, $80 ends)
 org $C00283
 Scene_Unk0283:      ; scene post-init from DefaultHandler; starts JSR $B262, JSR Field_RestoreSaveBlock
-org $C0092B
-LocLoad_Unk092B:    ; location-load step 1 (LoadLocation); multiplies dp $00 by 14 via WRMPYA/B
-org $C00960
-LocLoad_Unk0960:    ; location-load step; reads byte 1 of the $F6:0000 location record (index dp $FE)
-org $C009DD
-LocLoad_Unk09DD:    ; location-load step; reads byte 1 of the location record, table $F6:2100
-org $C00A14
-LocLoad_Unk0A14:    ; location-load step; skipped when dp $BB != 0; table $F6:21C0
 org $C01B53
 LocLoad_AudioSetup: ; fills the $1E00 audio command block and JSLs Audio_DriverCommand
 org $C01F87
 Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
-org $C0286C
-Scene_ReloadStep:   ; long chain of scene re-init JSRs (TileAnimList_ApplyAll, $0A50, $6F79, ...)
 org $C028AA
 TileAnimList_Clear: ; fills the 16-word list at $7F:1CC8 with $8080 (empty)
 org $C028C0
 TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
 org $C028E1
 TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
-org $C056A6
-Scene_PostLoadInit: ; sets dp $69/$6B, clears $09A0, runs object/entity init incl. Evt_RunObj0Func1
-org $C056D4
-LocLoad_Unk56D4:    ; location-load step; reads byte 8 of the location record, table $FC:F9F0
 org $C059D9
 Vblank_Unk59D9:     ; Field_EndOfFrame step; runs with DP=$1000, reads $7F:2000
 org $C05A46
@@ -78,10 +64,12 @@ Evt_UnusedOpcode:   ; event opcode handler shared by the unused opcodes (Evt_Opc
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
-org $C06DCF
-LocLoad_Unk6DCF:    ; location-load step; reads byte 2 of the location record, table $F6:2220
-org $C07084
-LocLoad_Unk7084:    ; location-load step; reads byte 3 of the location record (x $D2 records)
+org $C02B78
+Field_Unk2B78:      ; JSL from Scene_ReloadStep; ends RTL (not traced)
+org $C029F7
+Field_Unk29F7:      ; JSL from Scene_ReloadStep; ends RTL (not traced)
+org $C0B0E6
+Field_UnkB0E6:      ; JSR from Scene_ReloadStep; calls $C0:A9CD and $C0:AB45 (not traced)
 org $C0A810
 Vblank_UnkA810:     ; Field_EndOfFrame step; reads $7F:2000
 org $C0AF4E
@@ -221,6 +209,8 @@ Hdma_InitChannelsFD: ; DP=$4300; writes DMAP0-7 / BBAD (HDMA channel setup)
 org $FDC2C1
 EngFD_UnkC2C1:      ; called with 8-bit X once a frame; dispatches via table $FD:C2E5 on dp $26
                     ; unless dp $53 bit 0 is set (earlier notes guessed an audio tick; unverified)
+org $FDC124
+EngFD_UnkC124:      ; DB=$7F; ORs Map_TilemapVram4.. bytes into HDMA table bytes from $7F:14F0 (not traced)
 org $FDFFF4
 FdVec_FFF4:         ; bank $FD service vector: JMP $E292 (runs with DP=$0500)
 org $FDFFF7

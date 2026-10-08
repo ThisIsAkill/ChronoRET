@@ -22,6 +22,9 @@ if !constants_engine_inc == 0
 
 ; --- Banks and direct-page bases ---
 !Bank7E = $7E                            ; WRAM bank $7E (PHA/PLB, DmaFill_Bank)
+!BankF6 = $F6                            ; ROM bank $F6 (location tables; MVN source bank)
+!BankC0 = $C0                            ; ROM bank $C0 (this bank; MVN source bank)
+!BankFF = $FF                            ; ROM bank $FF (MVN source bank of Pal_LoadUnkRow0)
 !Bank00 = $00                            ; bank $00 (MVN bank operand for the low-WRAM mirror)
 !BankE4 = $E4                            ; ROM bank $E4 (bank byte of the Field_E4Ptr pointers)
 !DP_Map = $1D00                          ; direct page of the map/BG routines (Field_BuildC800*,
@@ -503,4 +506,80 @@ if !constants_engine_inc == 0
 !Map_EntryLevelMin = $01                 ; Field_Unk55 Map_InitEntryTile sets when the entry tile's
                                          ; level is 0
 
+
+; --- Location-load graphics, metatile and palette steps (LocLoad_Unk092B, LocLoad_Unk0960,
+;     LocLoad_Unk6DCF, LocLoad_Unk7084, LocLoad_Unk09DD, LocLoad_Unk0A14) ---
+!LocRom_RecSize = $0E                    ; bytes per LocRom record (LocLoad_Unk092B's multiplier)
+!Loc_IdHiBit8 = $01                      ; Loc_Id+1 bit 0: Loc_Id bit 8 (the second 256 records)
+!LocRom_HalfOfs = $0E00                  ; LocRom offset of record 256 (256 x LocRom_RecSize)
+!LocRom_SetNone = $FF                    ; LocRom.Tileset12 / Tileset3 value: nothing to load
+!LocGfx_ListSize = $08                   ; bytes per LocGfx_Lists entry (pack numbers)
+!LocGfx_PackPtrSize = $03                ; bytes per LocGfx_PackPtrs / LocGfx_Meta*Ptrs entry
+!LocGfx_Vram0 = $2000                    ; VRAM word address of the first of the six packs
+!LocGfx_VramStep = $0800                 ; VRAM words from one pack to the next ($1000 bytes)
+!LocGfx_PackBytes = $1000                ; bytes uploaded for each of packs 0-4 and the layer-3 pack
+!LocGfx_Pack5Bytes = $0F80               ; bytes uploaded for pack 5 ($80 short of a full pack)
+!LocGfx_VramL3 = $5000                   ; VRAM word address of the LocRom.Tileset3 graphics pack
+!LocPal_RowBytes = $1E                   ; bytes copied per palette row: colours 1-15
+!LocPal_RowStep = $20                    ; bytes from one palette row to the next in Pal_Buf
+!LocPal_SetBytes = $D2                   ; bytes per LocPal_Rom entry: 7 rows x LocPal_RowBytes
+
+; --- Location objects and event data (Scene_PostLoadInit, LocLoad_Unk56D4, Evt_InitObjects,
+;     LocLoad_CheckEvtData, LocLoad_InitUnk7F3700) ---
+!ObjQ_Unk69Init = $0048                  ; ObjQ_Unk69 set by Scene_PostLoadInit
+!ObjQ_ScanlineInit = $0078               ; ObjQ_ScanlineLimit set by Scene_PostLoadInit (line 120)
+!BankC2_PostLoadArg = $0B                ; A for the BankC2_Entry8004 call ending Scene_PostLoadInit
+                                         ; (the command is not traced)
+!Evt_FuncTableBytes = $0020              ; bytes of one object's function table in Evt_Data (16 words)
+!Evt_Unk7F0200Bytes = $0200              ; bytes of Evt_Unk7F0200 Evt_InitObjects clears
+!Obj_Unk1000Init = $04                   ; Obj_Unk1000 set by Evt_InitObjects
+!Obj_Unk1100SkipSlots = $3F              ; Obj_Unk1100 entries Evt_InitObjects first sets to
+                                         ; Obj_Unk1100Skip (63 of the 64)
+!Obj_Unk1100Skip = $80                   ; Obj_Unk1100 bit 7: the slot is skipped
+!Obj_PosOffMap = $FF00                   ; Obj_PosX / Obj_PosY set by Evt_InitObjects: tile 255
+                                         ; (probably "not placed yet")
+!Obj_Unk1A00Init = $10                   ; Obj_Unk1A00 set by Evt_InitObjects
+!Obj_Unk1A81Init = $01                   ; Obj_Unk1A81 set by Evt_InitObjects (a frame build
+                                         ; needs 1..$7F)
+!Obj_Unk1C80Init = $03                   ; Obj_Unk1C80 set by Evt_InitObjects
+!Obj_OamFlagsInit = $80                  ; Obj_OamFlags set by Evt_InitObjects (bit 7; range 1)
+!ObjX_Unk7F0B80Init = $FF                ; both bytes of ObjX_Unk7F0B80 per object (wiped again at once)
+!Obj_Unk1900Bytes = $0100                ; bytes of Obj_Unk1900 Evt_InitObjects clears
+!ObjX_ClearBytes = $15C0                 ; bytes Evt_InitObjects clears from ObjX_Unk7F0580
+                                         ; ($7F:0580-$7F:1B3F)
+!ObjQ_Unk71Init = $8000                  ; ObjQ_Unk71 set by Evt_InitObjects
+!Evt_Unk0920Free = $FF                   ; Evt_Unk0920 entry value for "free"
+!Evt_BadObjCount = $0D                   ; Evt_ObjCount LocLoad_CheckEvtData refuses together with
+!Evt_BadFirstByte = $0A                  ; this first Evt_Data byte
+!Halt_ColorEvtUnk = $01F0                ; Sys_HaltWithColor colour for that pair
+!Evt_DataMax = $1700                     ; most bytes of event data: $7F:2000 up to Map_Unk7F3700
+!Halt_ColorEvtLong = $000F               ; Sys_HaltWithColor colour (BGR555 red) for longer data
+!Map_Unk7F3700RecBytes = $20             ; bytes of each of the four Map_Unk7F3700 blocks
+!Map_Unk7F3700TailBytes = $06            ; bytes of the fifth block, at $7F:3780
+
+; --- Scene reload (Scene_ReloadStep and its matched callees) ---
+!Scene_VIrqLine = $00D3                  ; VTIMEL value Scene_ResumeNmi sets (line 211)
+!Field_UploadVram1F00 = $1F00            ; VRAM word address of Field_UploadUnk1F00's first part
+!Field_UploadUnk1F00Bytes = $0200        ; bytes of that part
+!Field_UploadVram4FC0 = $4FC0            ; VRAM word address of its second part
+!Field_UploadUnk4FC0Bytes = $0080        ; bytes of that part
+!Field_UploadUnk0000Bytes = $0040        ; bytes of each Field_UploadUnk0000 upload
+!Field_UploadVram0000 = $0000            ; its four VRAM word addresses
+!Field_UploadVram0100 = $0100
+!Field_UploadVram0030 = $0030
+!Field_UploadVram0130 = $0130
+!Field_UploadVram1D00 = $1D00            ; VRAM word address of Field_UploadUnk1D00
+!Field_UploadUnk1D00Bytes = $0280        ; bytes it uploads
+!Field_UploadVram1C00 = $1C00            ; VRAM word address of Field_UploadUnk1C00
+!Field_UploadUnk1C00Bytes = $0200        ; bytes it uploads
+!Field_UploadVram57E0 = $57E0            ; VRAM word address of Field_UploadUnk57E0
+!Field_UploadUnk57E0Bytes = $0040        ; bytes it uploads
+!Field_Unk0B88Bytes = $1E                ; bytes of Field_Unk0B88 (Field_ResetUnk0B88)
+!Field_Unk0B80Empty = $80                ; value Field_ResetUnk0B80/0B88 store (probably "none")
+!Pal_Row0SetMask = $0007                 ; Menu_Config+1 bits 0-2: the FieldRom_PalRow0Sets entry
+!Pal_Grey9 = $0C63                       ; BGR555 (3,3,3): colour 9 of Pal_Buf row 0 (Pal_LoadUnkRow0)
+!Pal_Grey10 = $18C6                      ; BGR555 (6,6,6): colour 10
+!Pal_Grey11 = $739C                      ; BGR555 (28,28,28): colour 11
+!Pal_BufBytes = $0200                    ; bytes of Pal_Buf / Pal_CgramBuf (16 rows x 16 colours x 2)
+!Obj_DrawFillWords = $0010               ; words Obj_ResetDrawLists writes through WMDATA (32 bytes)
 endif

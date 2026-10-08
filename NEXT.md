@@ -87,26 +87,42 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_TreasureLocRecs`), `Map_TreasureTaken` and `Obj_ResetFrameState` ($C0:A33B–$C0:A80F);
    `LocLoad_DrawMap` ($C0:0A50–$C0:0AFE), `Map_InitOrigin` / `Map_InitOriginX/Y` and
    `Field_Unk74D4/74E8/74F7` ($C0:74A6–$C0:759F), and `Field_Unk87F1` ($C0:87F1).
+   Also done: the location-load steps `LocLoad_Unk092B`/`0960`/`09DD`/`0A14` ($C0:092B–$C0:0A4F),
+   `LocLoad_UploadPack`, `LocLoad_UnpackPacks67`, `LocLoad_Unk6DCF` ($C0:6D2F–$C0:6E26) and
+   `LocLoad_Unk7084` ($C0:7084; `LocRom.Tileset12`/`Tileset3`/`Palette`/`Events` named, with the
+   bank-$F6 tables `LocGfx_*` / `LocPal_Rom`); the event data and object init `Scene_PostLoadInit`,
+   `LocLoad_Unk56D4`, `Evt_InitObjects` (the object loop that ends in the BRL at $C0:5926),
+   `Evt_ClearUnk0920` ($C0:56A6–$C0:595B), `LocLoad_CheckEvtData`, `LocLoad_InitUnk7F3700` and its
+   table ($C0:5CC7–$C0:5D6D); and `Scene_ReloadStep` ($C0:286C) with `Scene_ResumeNmi` ($C0:0B28),
+   `Field_UploadUnk1F00` (+ table), `Field_UploadUnk1D00`/`1C00`/`0000`/`57E0`,
+   `Field_ResetUnk0B88`/`0B80`, `Pal_LoadUnkRow0`, `Pal_UploadCgram` ($C0:6E5C–$C0:6F99,
+   $C0:70E9–$C0:716F), `Obj_ResetDrawLists` and `Oam_HideFirst4` ($C0:B204–$C0:B270).
    Stale now (verified headers, fix on their next review): Field_FrameUpdate's header says
    Map_Unk8A6D is unmatched; `Map_ProbeTileAttrsAny` / `Map_ProbeTileLevel` list $C0:9DEA /
    $C0:9DF5 as unmatched (now Map_InitEntryTile); `Sub_C07F9A` lists $C0:74D1 / $C0:74E3 and
-   `Map_BuildColXInc1` $C0:87FA as unmatched. Next, in reach order: the location-load code
-   around the BRL at $C0:5926 (`LocLoad_Unk56D4` at $C0:56D4 and the object loop
-   $C0:58C0–$C0:5928, which runs each object's init through `Evt_OpcodeTable`); the other
-   location-load steps `LocLoad_Unk092B`, `LocLoad_Unk0960`, `LocLoad_Unk09DD`,
-   `LocLoad_Unk0A14`, `LocLoad_Unk6DCF`, `LocLoad_Unk7084` (they read `LocRom.Unk01`-`Unk03`;
-   name those fields as they are matched; `LocLoad_Unk09DD` unpacks to $7E:B000, probably
-   `Map_Meta12*`, and `Map_Meta3*` is still untraced) and `Scene_ReloadStep` ($C0:286C) / `Scene_Unk0283`
-   (the third caller of `LocLoad_UnkA33B`, $C0:0316); who reads `Map_Unk1D34`,
-   `ObjX_Unk7F0C00`-`7F0D80` and `Field_Unk0BE9`; the NMI side that reads `Map_EdgeVram*` /
-   `Map_EdgeSize*` and the `Map_Built*` bits (then `Sub_C07F9A` can take a real name; it is
-   left `Sub_` because Map_Unk93E1 branches to it by that name); the upload callers in the
-   NMI at `$C0:EAE1`–`$C0:EB5E`; who sets `Map_ScrollToMode`, `Map_Drift*`/`Map_DriftTimer`.
+   `Map_BuildColXInc1` $C0:87FA as unmatched; `VramDma_Upload` calls $C0:6D61, $C0:6E1E,
+   $C0:6E84/6E9C/6EC7/6EED/6F08-6F57 "unmatched"; `ClearRAMDMA` ($C0:5717/58B9/58CA),
+   `Sys_HaltWithColor` ($C0:5CDA/5CE8), `Map_InitEntryTile` ($C0:5926) and
+   `Obj_ResetFrameState` ($C0:287E/56C2) name now-matched callers as unmatched; LoadLocation's,
+   Field_RestoreState's and Field_FadeInAfterReload's Exit lines still hedge on "unmatched"
+   steps. Next, in reach order: `Scene_Unk0283` ($C0:0283–$C0:034A, the third caller of the
+   location-load steps) and the rest of Scene_ReloadStep's callees: `Field_UnkB0E6` (calls
+   $C0:A9CD, $C0:AB45), `Field_Unk29F7` and `Field_Unk2B78` (JSL, RTL); `LocLoad_AudioSetup`
+   ($C0:1B53); the NMI handler's upload calls ($C0:EA9E–$C0:EB86, which also call the
+   Field_Upload* routines and Pal_UploadCgram); the `Evt_Unk0920` list code at $C0:5C90 and the
+   halts at $C0:5CB3; `Vblank_ReadScanlineCounters` ($C0:5A46, walks the `ObjQ_Unk74` list
+   through `Obj_Unk1080`). Open questions: who reads `LocGfx_Unk7F6000`/`7F7000`,
+   `Field_Unk7EF000`, `Map_Unk7F3700` (its seed bytes look like scripts), `Field_Unk0B80`/`0B88`,
+   `Map_Unk1D34`, `ObjX_Unk7F0C00`-`7F0D80` and `Field_Unk0BE9`; the NMI side that reads
+   `Map_EdgeVram*` / `Map_EdgeSize*` and the `Map_Built*` bits (then `Sub_C07F9A` can take a real
+   name; it is left `Sub_` because Map_Unk93E1 branches to it by that name); the upload callers
+   in the NMI at `$C0:EAE1`–`$C0:EB5E`; who sets `Map_ScrollToMode`, `Map_Drift*`/`Map_DriftTimer`.
    Once Field_Unk885A's review can be redone, `Map_Unk91AC` / `Map_Unk93E1` could take real
    names (the layer scroll accumulate / apply), and once their callers' reviews can be redone,
-   `LocLoad_UnkA33B` (the map-properties loader), `Field_Unk74D4/74E8/74F7` (reset layer
-   1/2/3 scroll) and `Field_Unk87F1` (right-edge columns) could too; `Map_Unk0BCB`–`0BD5`
-   look like the layer widths / heights in metatiles.
+   `LocLoad_UnkA33B` (the map-properties loader), the other `LocLoad_Unk*` steps (graphics,
+   metatiles, palette, event data), `Field_Unk74D4/74E8/74F7` (reset layer 1/2/3 scroll),
+   `Field_Unk87F1` (right-edge columns) and `Field_UnkBB` (no layer 3) could too;
+   `Map_Unk0BCB`–`0BD5` look like the layer widths / heights in metatiles.
 3. Bank $C2: matched are the entry vectors ($C2:0000, $C2:8000-$800D), the scene boot, NMI and
    setup steps, the VRAM queue, the task system ($C2:0454-$C2:0567, with the BG layer tables),
    the BG layer redraw `C2Scene_DrawBgLayer` ($C2:09C5-$C2:0B52), the sprite list
