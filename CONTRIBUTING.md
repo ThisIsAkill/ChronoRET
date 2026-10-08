@@ -62,6 +62,17 @@ includes the one before:
 
 `make gate` runs the diff, the coverage proof and the lint in one go.
 
+## Workflow tools
+
+- `make xref ADDR=C100D7` (also `$C1:00D7` quoted, or a label; `tools/xref.py`) lists every
+  `JSR`/`JMP` (same bank), `JSL`/`JML` (any mirror) and `BRL` to an address, plus 8-bit branches
+  with `XREF_FLAGS=--branches` and machine output with `--json`. Each hit is CONFIRMED (on an
+  instruction boundary) or DOUBTFUL (inside another instruction's operand, or in data), and
+  names the matched routine that contains it. Matched code is judged from the assembled source
+  (asar's address-to-line map); unmatched code by decoding forward from the 64 bytes before
+  the hit under each M/X start state and voting. The vote is a heuristic: read a CONFIRMED hit
+  in unmatched code before you rely on it.
+
 **Changing the standard.** A change to STYLE.md or to the lint's rules is its own commit, approved
 by the maintainer and logged under "Decisions" in STATUS.md. It never rides along inside a code
 revision, so no routine is ever judged by a rule its own author just wrote.
