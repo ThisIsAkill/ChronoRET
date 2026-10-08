@@ -31,7 +31,6 @@ Usage:
 import argparse
 import csv
 import datetime as dt
-import hashlib
 import io
 import json
 import os
@@ -43,6 +42,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import asm_source  # noqa: E402
 import lint_readability  # noqa: E402
 import verify  # noqa: E402
 
@@ -94,43 +94,16 @@ def pct(n: int, d: int) -> str:
 
 # ── Source ───────────────────────────────────────────────────────────────────
 
-GLOBAL = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):')
-
-
 def source_functions() -> dict[str, dict]:
-    """Global labels in bank files: file, header note, hash of their source."""
-    found = {}
-    for path in sorted(Path('asm').glob('bank*/*.asm')):
-        lines = path.read_text().splitlines()
-        starts = [i for i, l in enumerate(lines) if GLOBAL.match(l)]
+    """Global labels in bank files: file, header note, hash of their source.
 
-        def is_code(line: str) -> bool:
-            # An instruction or data line (indented, not a comment) or a label.
-            s = line.strip()
-            return bool(s) and not s.startswith(';') and (line[:1].isspace() or s.endswith(':')
-                                                          or GLOBAL.match(line) is not None)
-
-        def last_code(lo: int, hi: int) -> int:
-            for j in range(hi - 1, lo - 1, -1):
-                if is_code(lines[j]) and not lines[j].strip().lower().startswith('org'):
-                    return j
-            return lo
-
-        prev_end = 0
-        for n, i in enumerate(starts):
-            name = GLOBAL.match(lines[i]).group(1)
-            nxt = starts[n + 1] if n + 1 < len(starts) else len(lines)
-            # A routine owns everything after the previous routine's last code
-            # line (its header comments, org, local defines) through its own
-            # last code line, so editing its header voids its review too.
-            end = last_code(i, nxt) + 1
-            body = '\n'.join(l.rstrip() for l in lines[prev_end:end]).strip()
-            prev_end = end
-            found[name] = {
-                'file': str(path), 'note': header_note(lines, i, name),
-                'source_hash': hashlib.sha256(body.encode()).hexdigest()[:12],
-            }
-    return found
+    A routine owns everything after the previous routine's last code line
+    (its header comments, org, local defines) through its own last code
+    line, so editing its header voids its review too (tools/asm_source.py).
+    """
+    return {name: {'file': r.file, 'note': header_note(r.lines, r.label, name),
+                   'source_hash': r.source_hash}
+            for name, r in asm_source.regions().items()}
 
 
 def header_note(lines: list[str], i: int, name: str) -> str:
@@ -151,7 +124,7 @@ def header_note(lines: list[str], i: int, name: str) -> str:
             continue
         if name in line and '(' in line and not text:
             continue
-        if re.match(r'^(On entry|Entry|Exit|Callees|In|Out)\b', line):
+        if re.match(r'^(?:(?:On entry|Entry|Exit|Callees|Callers?|In|Out)\b|header:)', line):
             break
         line = re.sub(r'^\$[0-9A-F]{2}:[0-9A-F]{4}\s*[—-]\s*' + re.escape(name) + r'\b[^A-Za-z]*', '', line)
         if line:
