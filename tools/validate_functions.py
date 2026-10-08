@@ -6,7 +6,8 @@ Needs no ROM, so it runs in CI as well as the hook:
   - functions.csv: known columns, addresses `$BB:AAAA` strictly ascending,
     status one of matched/readable/verified, notes on one line (<= 200 chars);
   - reviews.csv: known columns, ISO dates, a reviewer, verdict approved or
-    changes, a 12-hex source_hash, and a name that exists in functions.csv;
+    changes and a 12-hex source_hash; rows naming a routine that has since
+    been renamed or removed are kept as history and count for nothing;
   - every `verified` function has an approved review of its current
     source_hash, and no function is `verified` without one.
 """
@@ -57,10 +58,13 @@ def main() -> int:
             reviews = list(reader)
     names = {row['name']: row for row in functions}
     latest = {}
+    historical = 0
     for n, row in enumerate(reviews, 2):
         where = f'{REVIEWS}:{n} {row.get("name")}'
+        # A row naming a routine that no longer exists (renamed or removed)
+        # stays as history; it just can't make anything verified.
         if row['name'] not in names:
-            errors.append(f'{where}: no such function in {FUNCTIONS}')
+            historical += 1
         if not re.match(r'^\d{4}-\d{2}-\d{2}$', row['date'] or ''):
             errors.append(f'{where}: date must be YYYY-MM-DD')
         if not (row['reviewer'] or '').strip():
@@ -85,7 +89,8 @@ def main() -> int:
     if errors:
         print(f'FAIL: {len(errors)} problem(s) in symbols/.')
         return 1
-    print(f'symbols/ valid: {len(functions)} functions, {len(reviews)} review row(s).')
+    print(f'symbols/ valid: {len(functions)} functions, {len(reviews)} review row(s)'
+          f' ({historical} for routines since renamed or removed).')
     return 0
 
 
