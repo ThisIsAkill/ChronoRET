@@ -14,12 +14,6 @@ org $C10045
 BattleSys_RunService:                   ; JSR: A = service number; saves A, X, Y and calls entry A of the table at
                                         ; $C1:0051 (also reached through JMP at $C1:0003)
 
-org $C13714
-Battle_TickStatusEffectVisuals:         ; JSR: skipped while !Battle_MenuTimeHold is set; counts down per-enemy timers
-                                        ; ($9897) and dispatches on !Enemy_Anim through the table at $C1:3760. The name
-                                        ; is from the session notes and looks wrong (enemy movement, not status visuals;
-                                        ; not checked in detail)
-
 ; --- Bank $C7 (audio) ---
 
 org $C70004

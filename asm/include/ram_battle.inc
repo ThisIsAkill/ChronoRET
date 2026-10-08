@@ -220,7 +220,13 @@ endstruct
 !Pc_PoseListOfs          = $5DF1 ; 2 B per PC: animation * 4, offset of the PC's pose list in its bank $E4 lists
 !Enemy_AnimWanted        = $5E0D ; 1 B per enemy (0-7): animation it should show; Battle_TickEnemyGroup reloads the lists
                                  ; when it differs from !Enemy_Anim. Lies in the first $30 bytes of BattlerStats[0],
-                                 ; which the struct leaves unnamed; written by unmatched code ($C1:3793, $C1:8806, ...)
+                                 ; which the struct leaves unnamed; written by unmatched code ($C1:8806, ...) and by
+                                 ; Battle_MoverIdle (from !Enemy_ResumeAnim)
+!Enemy_TargetWanted      = $5E15 ; 1 B per enemy: battler slot the enemy should move relative to; Battle_RunEnemyMover
+                                 ; copies it into !Enemy_MoveTarget. Same unnamed area as !Enemy_AnimWanted; no
+                                 ; absolute write to it found, so who sets it is not traced
+!Enemy_ResumeAnim        = $5E1D ; 1 B per enemy: !Enemy_AnimWanted saved when a move ends (the movers' "done" paths);
+                                 ; Battle_MoverIdle puts it back once the target has moved away (same unnamed area)
 
 ; Battle stat records, $80 bytes per battler slot (BattleRom_StatsOffset
 ; lists slot*$80 for all 11 slots).
@@ -322,11 +328,22 @@ endstruct
 !Battler_BoxRight        = $9770 ; 11 B per battler slot: box right edge, clamped at $FF
 !Battler_BoxBottom       = $977B ; 11 B per battler slot: box bottom edge: probe y, + 8 unless !Battle_Unk2989 bit 2
 !Enemy_Anim              = $974A ; 1 B per enemy: animation its lists were loaded for (Battle_TickEnemyGroup; battle init
-                                 ; $CC:E34E writes it); also selects the handler at $C1:375C
+                                 ; $CC:E34E writes it). The same id ($00-$19 seen in the tables) also picks the enemy's
+                                 ; mover (!BattleRom_EnemyMover, Battle_RunEnemyMover); 0 = no mover runs
+                                 ; (Battle_TickEnemyMovers), negative = none either
+!Enemy_MoveTarget        = $9752 ; 1 B per enemy: battler slot the movers steer by (copy of !Enemy_TargetWanted)
+!Enemy_MoveAngle         = $9786 ; 1 B per enemy: heading of the current 8-pixel step (256 units per turn); the
+                                 ; unmatched stepper at $CF:F978 moves the enemy along it
+!Enemy_Detour            = $9791 ; 1 B per enemy: non-zero = the last step was blocked and !Enemy_MoveAngle was turned
+                                 ; a quarter; the next step keeps that heading instead of aiming again
 !Enemy_AnimTicks         = $9799 ; 8 B per enemy (index enemy * 8): frames per list entry, 0 = end of the list
 !Enemy_AnimFrames        = $97D9 ; 8 B per enemy: frame id per list entry (!Battle_FrameId)
-!Enemy_Unk9829           = $9829 ; 1 B per enemy: cleared when a kind-1 list is loaded (and at $C1:3796); also
-                                 ; incremented by the unmatched code from $C1:3833 on; meaning unknown
+!Enemy_MoveDone          = $9829 ; 1 B per enemy: non-zero = the current move has ended (target reached, or a step
+                                 ; blocked for the charge, axis and fixed-direction movers); incremented by the movers,
+                                 ; cleared when a kind-1 list is loaded (Battle_TickEnemyGroup) and by Battle_MoverIdle.
+                                 ; Inferred from the movers; what reads it outside bank $C1 is not traced
+!Enemy_DoneTargetX       = $9831 ; 1 B per enemy: target's screen x when the move ended (Battle_MoverIdle compares)
+!Enemy_DoneTargetY       = $9839 ; 1 B per enemy: target's screen y when the move ended
 !Battle_EnemyTickIdx     = $9841 ; 1 B: index into !Battle_TickOrder in Battle_TickEnemyGroup
 !Battler_Unk984D         = $984D ; 2 B per battler slot (index slot*2): sent as the info-panel message id and used to
                                  ; index BattleRom_UnkE1DE80; inferred: per-battler type id. Unconfirmed.
@@ -341,10 +358,16 @@ endstruct
 !BattlePos_Found         = $9873 ; 1 B out: slot found by queries 0-3 (they store 16-bit, so $9874 gets 0 too);
                                  ; query 13 stores a distance difference here
 !Battle_PassCellBit7     = $9875 ; 1 B: non-zero = !Battle_CellMap bit 7 does not block (Battle_BoxHitsBlockedCell);
-                                 ; zeroed before each check, set to 1 by the mover at $C1:3877 when $A2B5 is 3
+                                 ; zeroed before each check, set to 1 by the movers for moves 3, $0C and $0F
 !BattlePos_DistLimit     = $9893 ; 2 B: squared-distance limit of the BattlePos_WithinDist* checks (set by each entry)
-!Enemy_Unk98A7           = $98A7 ; 1 B per enemy: cleared by BattleSys_VictoryPose; written by the unmatched enemy code
-                                 ; from $C1:384C on and read at $CF:F97F; meaning unknown
+!Enemy_MoveTimer         = $9897 ; 1 B per enemy: frames until its mover runs again (Battle_TickEnemyMovers); battle
+                                 ; init writes it at $CC:E3F3/$CC:EBFA
+!Enemy_MoveInterval      = $989F ; 1 B per enemy: reload value of !Enemy_MoveTimer (battle init, $CC:EBF4)
+!Enemy_Stepping          = $98A7 ; 1 B per enemy: non-zero = an 8-pixel step is under way: the unmatched stepper at
+                                 ; $CF:F978 moves the enemy from !Enemy_StepStartX/Y along !Enemy_MoveAngle and clears
+                                 ; it after 8 pixels. Set by the movers, cleared by BattleSys_VictoryPose
+!Enemy_StepStartX        = $98AF ; 1 B per enemy: screen x the current step starts from (the stepper adds to it)
+!Enemy_StepStartY        = $98B7 ; 1 B per enemy: screen y the current step starts from
 !Enemy_NameLineUsed      = $98CC ; 3 B: non-zero = enemy-name line 0-2 of the status bar is in use
 !Battler_FrameShown      = $9907 ; 1 B per battler slot: frame number last decoded (Battle_DrawBattlerFrame skips a repeat)
 !Battle_FramesDecoded    = $9912 ; 1 B: frames decoded this pass; zeroed by Battle_TickPcSlots, and callers defer a battler
@@ -453,6 +476,8 @@ endstruct
                                  ; (first record forced, !Battler_KoFlag set); written at $C1:4153/$C1:4204; meaning unknown
 !Battle_AnimFrameList    = $A1E8 ; 2 B: offset in !BattleRom_AnimData of the frame-id list being stepped
 !Battle_AnimDurList      = $A1FE ; 2 B: offset of the frame-duration list being stepped
+!Battle_MoverAnim        = $A2B5 ; 1 B: !Enemy_Anim of the enemy being moved (Battle_RunEnemyMover); the movers test it
+                                 ; for their variants (!Enemy_Move* constants)
 !Battler_FacingStrideHi  = $A2C8 ; 1 B per battler slot: high byte for !Battler_FacingStrideLo
 !BattleUI_PanelRedraw    = $A43F ; 1 B: non-zero = redraw the command cursor column (ClearActivePanelColumn)
 !Battle_AnimId           = $A440 ; 1 B: animation picked for the battler being ticked (Battle_PickStatusAnim; 3 =
@@ -479,6 +504,21 @@ endstruct
                                  ; handlers run only after the start frames are drawn (inferred)
 !BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
 !Battler_UnkA5CD         = $A5CD ; 1 B per battler slot: bit 7 set = ignored by Battle_BoxOverlapsOthers; meaning unknown
+!Enemy_RingGoalX         = $A5E4 ; 1 B per enemy: x of the point on the ring around the target that the ring movers
+                                 ; (Battle_MoverKeepRange, Battle_MoverOrbit) head for
+!Enemy_RingGoalY         = $A5EC ; 1 B per enemy: y of that point
+!Enemy_OrbitReverse      = $A5F4 ; 1 B per enemy: 0 = Battle_MoverOrbit circles with the angle growing, 1 = shrinking;
+                                 ; flipped when an orbit step is blocked
+!Battle_OrbitRadius      = $A5FC ; 1 B: ring radius of the enemy Battle_MoverOrbit is moving ($20, or $40 for move $0E)
+!Enemy_LoopStarted       = $A5FD ; 1 B per enemy: non-zero = Battle_MoverLoop has set up its loop; cleared by the other
+                                 ; movers except the fixed-direction and centre ones (Battle_MoverIdle only once a
+                                 ; move has ended)
+!Enemy_LoopCentreX       = $A605 ; 1 B per enemy: x of the centre of Battle_MoverLoop's loop (its x at the start)
+!Enemy_LoopCentreY       = $A60D ; 1 B per enemy: y of that centre (its y at the start + 16)
+!Enemy_LoopPhase         = $A615 ; 1 B per enemy: angle of the loop point it heads for (starts at $C0, straight up)
+!Enemy_LoopReverse       = $A61D ; 1 B per enemy: 0 = the phase grows by $10 per step, 1 = it shrinks
+!Battle_LoopRadius       = $A625 ; 1 B: vertical loop radius of the enemy Battle_MoverLoop is moving ($20, or $10 for
+                                 ; move $0A); the horizontal one is $20 more
 !BattleTgt_Selected      = $A62D ; 12 B: selected battler slots ($FF = empty); +0 is the command's target
 !BattleTgt_Highlight     = $A64E ; 1 B: battler slot under the single-target cursor
 !BattleTgt_UnkA64F       = $A64F ; 1 B: cleared by BuildTargetList; no reader in bank $C1 yet
@@ -563,6 +603,8 @@ endstruct
 !BattleRom_OamShowMask     = $CCFB8D  ; 4 B: high-table mask clearing x bit 8 of cursor sprite 0-3
 !BattleRom_EnemyAnimKind  = $CCFB91  ; 1 B per enemy animation id (0-8 seen): which list block Battle_TickEnemyGroup loads
                                       ; (0 = list 3, 1 = list 1, else list 6); meaning unknown
+!BattleRom_EnemyMover     = $CCFBAB  ; 1 B per !Enemy_Anim id ($1A ids, up to $CC:FBC4): entry 0-8 of
+                                      ; Battle_EnemyMoverTable (Battle_RunEnemyMover)
 !BattleRom_Div5           = $CCFBCE  ; 1 B per n: n / 5 (checked for the first 32 bytes); duration byte -> frames
 !BattleRom_CommandWindowMap = $D15800 ; $180 B: command window tilemap
 !BattleRom_CommandWindowFrame     = $D159FC  ; 84 B: one 7x6 command-window frame, 2 B (tile, attribute) per cell

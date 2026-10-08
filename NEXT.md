@@ -32,11 +32,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
 
 
-1. Bank $C1 past `$C1:3714`: the routine at `$C1:3714` (stub `Battle_TickStatusEffectVisuals`; the name
-   looks wrong: it counts down per-enemy timers at `$9897` and dispatches on `!Enemy_Anim` through the
-   9-entry table at `$C1:3760`), then its handlers, the enemy movers at `$C1:3772`-`$C1:4057` that use
-   the box tests and the distance checks, and service 4 (`$C1:4058`). (`$C1:007E` and
-   `$C1:283D`-`$C1:3713` are matched.)
+1. Bank $C1 from `$C1:4058`: service 4 of the $C10045 API (`$C1:4058`-`$C1:41BD`, 358 B; it calls
+   `$C1:41BE`, `$C1:4212`, `$C1:423A`, `$C1:4310`, `$C1:4BBE` and six JSLs into `$CC:F06B`-`$CC:F278`,
+   all unmatched), then its callees in bank $C1. (`$C1:007E` and `$C1:283D`-`$C1:4057` are matched;
+   the enemy movers end at `$C1:4057`.) Open from the movers: the stepper at `$CF:F978` that moves
+   the enemies (`!Enemy_Stepping`), and who writes `!Enemy_TargetWanted` (`$5E15`).
 2. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
 
 ## Tables
@@ -57,6 +57,6 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
    `$C0:4009`), `$C0:21EE` (~16, `$C0:21EA`), `$C0:7181` (12, `$C0:717D`), `$C0:6477` (8,
    `$C0:633D`), `$C0:9FF7` (65, `$C0:9ECD`).
-5. Bank $C1 (`$C1:2D81` and `$C1:3216` are matched as BattlePos_ModeTable and
-   Battle_FxHandlerTable): `$C1:3760` (9, `$C1:375C`), `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
+5. Bank $C1 (`$C1:2D81`, `$C1:3216` and `$C1:3760` are matched as BattlePos_ModeTable,
+   Battle_FxHandlerTable and Battle_EnemyMoverTable): `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

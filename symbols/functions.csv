@@ -166,7 +166,7 @@ $C1:0EE1,$C1:103C,348,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,verified,ade2
 $C1:103D,$C1:103D,1,BattleMenu_Return,$C1,Battle menu,verified,4724a106a5ca,"Shared RTS, also the JMP target of BattleMenu_UpdateMainWindow, BattleMenu_DrawTechCursorRow and BattleMenu_UpdateWindows_Exit."
 $C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,verified,9da3dea2639c,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.
 $C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,verified,d52acb37a2c3,Leading-zero suppression for the number formatter's digits.
-$C1:106E,$C1:10E2,117,BattleSys_UpkeepTwoFrames,$C1,Battle system,verified,0853914cb44d,"Service 3 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $1"
+$C1:106E,$C1:10E2,117,BattleSys_UpkeepTwoFrames,$C1,Battle system,verified,e2b9ad105ea5,"Service 3 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 3 = $106E; searched: no JSR, JMP or JSL reaches $1"
 $C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,verified,7b1e36fb6214,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
 $C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,verified,a8d65967b090,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (BattleSys_FrameTickVec) before ret"
 $C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,verified,24e55a80fe50,"Builds OAM sprites 0-3 (BattleOam) for the command cursor over the shown PC: each of the 4 template sprites in BattleRom_CursorSprite is offset by the PC's !Battler_ScreenX/Y, and its palette bits are"
@@ -293,14 +293,26 @@ $C1:31B0,$C1:31D1,34,Battle_FxOverlay3,$C1,Battle engine,verified,18147b206ff6,E
 $C1:31D2,$C1:31F3,34,Battle_FxOverlay4,$C1,Battle engine,verified,434bb49fe227,Effect 5: resets and starts overlay 4.
 $C1:31F4,$C1:3215,34,Battle_FxOverlay5,$C1,Battle engine,verified,a4972fb9a2d4,Effect 8: resets and starts overlay 5.
 $C1:3216,$C1:3233,30,Battle_FxHandlerTable,$C1,Battle engine,verified,11c9da760b29,"One handler per status effect id 0-$0E, called from Battle_ApplyPendingEffect."
-$C1:3234,$C1:34A6,627,Battle_TickEnemyGroup,$C1,Battle engine,verified,eae55bebf8de,
+$C1:3234,$C1:34A6,627,Battle_TickEnemyGroup,$C1,Battle engine,verified,ec9e166d43c4,
 $C1:34A7,$C1:34DA,52,Battle_DrawAllBattlerFrames,$C1,Battle engine,verified,c3e1b8987a7c,"Draws the starting frame (!Battler_StartFrame) of every present battler, any frame layout (Battle_DrawBattlerFrameAnyLayout), then sets the three PC animation timers to 1, 2 and 3 so the PCs take thei"
 $C1:34DB,$C1:350E,52,Battle_StartPose,$C1,Battle engine,verified,80c585ad73b1,"The last step of the battle set-up (service 0, which JMPs here): turns every PC toward its nearest enemy, then plays animation $0C on the targetable PCs (animation 0 on the others) through Battle_RunP"
 $C1:350F,$C1:354C,62,Battle_FaceAllPcsNearestEnemy,$C1,Battle engine,verified,508575ebb51c,"Sets !Battler_Facing of PCs 2, 1, 0 from the angle to each one's nearest enemy (position query 2 through service 5, as in Battle_UpdatePcFacing, but for every PC at once and without the presence, KO, "
 $C1:354D,$C1:356C,32,BattleSys_DefeatPose,$C1,Battle system,verified,99967a9ab522,"Service 9 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 9 = $354D; no JSR, JMP or JSL reaches $354D direct"
-$C1:356D,$C1:35DC,112,BattleSys_VictoryPose,$C1,Battle system,verified,1d822f08f3f2,"Service 8 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D direct"
+$C1:356D,$C1:35DC,112,BattleSys_VictoryPose,$C1,Battle system,verified,2a65f2771e72,"Service 8 of the same-bank $C10045 service dispatcher (reached only by JSR $0003/$0045 inside bank $C1; returns RTS; dispatch table at $C10051, entry 8 = $356D; no JSR, JMP or JSL reaches $356D direct"
 $C1:35DD,$C1:3699,189,Battle_RunPcPose,$C1,Battle engine,verified,1ac43637b622,
 $C1:369A,$C1:3713,122,Battle_PoseStep,$C1,Battle engine,verified,b34241c31cd9,
+$C1:3714,$C1:373A,39,Battle_TickEnemyMovers,$C1,Battle engine,verified,18c3997e7812,
+$C1:373B,$C1:375F,37,Battle_RunEnemyMover,$C1,Battle engine,verified,898f55414b33,"Runs the mover of enemy !Battle_MoverEnemy, if that enemy is present: copies !Enemy_TargetWanted into !Enemy_MoveTarget, then, unless !Enemy_Anim is negative, stores the id in !Battle_MoverAnim and ca"
+$C1:3760,$C1:3771,18,Battle_EnemyMoverTable,$C1,Battle engine,verified,e901c8bde511,"One mover per !BattleRom_EnemyMover entry, called from Battle_RunEnemyMover."
+$C1:3772,$C1:3799,40,Battle_MoverIdle,$C1,Battle engine,verified,543649b3b581,Mover 0 (move 4): stays put.
+$C1:379A,$C1:38BE,293,Battle_MoverApproach,$C1,Battle engine,verified,e0facc9d911e,
+$C1:38BF,$C1:3958,154,Battle_MoverCharge,$C1,Battle engine,verified,81f37ad575ff,"Mover 2 (move 7): heads straight for the target from the enemy's position every time and starts the step, until a step is blocked by a blocking cell or another battler (the target included): then the "
+$C1:3959,$C1:3A3C,228,Battle_MoverAxis,$C1,Battle engine,verified,836194094b21,
+$C1:3A3D,$C1:3BC1,389,Battle_MoverKeepRange,$C1,Battle engine,verified,0150640bb50b,
+$C1:3BC2,$C1:3E32,625,Battle_MoverOrbit,$C1,Battle engine,verified,3ce6a676b774,Mover 5 (moves $0D-$0F): circles the target on a ring of radius !Battle_OrbitRadius ($20; move $0E: $40).
+$C1:3E33,$C1:3F59,295,Battle_MoverLoop,$C1,Battle engine,verified,d333f2f75483,
+$C1:3F5A,$C1:4020,199,Battle_MoverFixedDir,$C1,Battle engine,verified,451b0d5729c0,
+$C1:4021,$C1:4057,55,Battle_MoverToCentre,$C1,Battle engine,verified,2810c3762c30,"Mover 8 (move $19): heads from the enemy's position for the middle of the screen (!Battle_ScreenCentreX/Y), faces that way and starts the step, with no probe and no collision test."
 $CC:F365,$CC:F382,30,Battle_Mul8CC,$CC,Battle engine,verified,0de954b5aa42,A byte-identical copy of Battle_Mul8 ($C1:0089): 8×8→16 hardware multiply through WRMPYA/WRMPYB/RDMPYL.
 $FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,verified,e99f23370872,"Called via: JML from Reset ($00:FF03), which also carries the soft resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and S=$06FF)."
 $FF:F759,$FF:F798,64,ScrollWaveFF_A,$FF,Engine,verified,1e89e21da307,"Wave tables ($FF:F759–$FF:F7D8) A byte-identical copy of ScrollWaveA/ScrollWaveB in bank $00 ($C0:FF30–$C0:FFAF): one period of a sine-like wave between -6 and +6 (32 signed 16-bit entries), stored tw"
