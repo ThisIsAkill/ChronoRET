@@ -13,6 +13,8 @@
 ; Defines must be visible before any bank uses them.
 
 incsrc "include/constants.inc"
+incsrc "include/constants_engine.inc"
+incsrc "include/constants_battle.inc"
 incsrc "include/ram_engine.inc"
 incsrc "include/ram_battle.inc"
 incsrc "include/macros.inc"
