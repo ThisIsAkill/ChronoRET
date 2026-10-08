@@ -28,9 +28,11 @@ incsrc "include/macros.inc"
 incsrc "bank00/bank00.asm"
 incsrc "bankC0/bankC0.asm"
 incsrc "bankC1/bankC1.asm"
+incsrc "bankCC/bankCC.asm"
 ; incsrc "bank01/bank01.asm"
 ; incsrc "bank02/bank02.asm"
 incsrc "bankFD/bankFD.asm"
+incsrc "bankFF/bankFF.asm"
 
 ; --- Names for not-yet-matched routines (label-only, no bytes) ---
 incsrc "include/unmatched.asm"
