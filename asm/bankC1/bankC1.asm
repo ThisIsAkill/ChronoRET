@@ -10034,16 +10034,16 @@ Battle_MoverToCentre:
 ; ==================================================================
 ; BattleSys_RunAction ($C14058–$C141BD, 358 bytes)
 ; ==================================================================
-; Service 4 of the cross-bank $C10045 service API (dispatch table at
+; Service 4 of the $C10045 service API (dispatch table at
 ; $C10051, entry 4 = $4058; no JSR, JMP or JSL reaches $4058 directly;
 ; the one request found is LDA #4 / JSR $C1:0003 at $C1:BFA4, called
 ; from $C1:AC57). Plays the action in !Battle_ActCaster.. (see the
 ; banner):
 ;   1. counts !Battle_UnkA0FD up, resets the action state
-;      (BattleAct_ResetState) and waits a frame. Three ROM bytes at
-;      $CF:FFFD-$CF:FFFF can force !Battle_ActUnkAE9B / !Battle_ActFlags
-;      (they look like build switches; all three are 0 in this ROM, so
-;      none applies);
+;      (BattleAct_ResetState), waits a frame and zeroes !Battle_UnkE5.
+;      Three ROM bytes at $CF:FFFD-$CF:FFFF can force
+;      !Battle_ActUnkAE9B / !Battle_ActFlags (they look like build
+;      switches; all three are 0 in this ROM, so none applies);
 ;   2. keeps !Battle_UnkA4 on the stack, takes !Battle_ActSecondGroup
 ;      from bit 6 of !Battle_ActFlags, sets every !Battler_FxApplied to
 ;      $55 (BattleAct_ResetFxApplied), marks the action running
@@ -22801,7 +22801,8 @@ BattleSys_ListHandler8:
 ; Callers note: none by call; entry 9 of BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X
-;        clobbered; Y = the slot; DP $10 = slot * $80; on the hit path
+;        clobbered; Y = the slot, or $2C after a hit (BattleSys_Unk895B
+;        reaches Battle_ApplyHits); DP $10 = slot * $80; on the hit path
 ;        !Battle_UnkAD89/B1FD/B202 and whatever the callees change
 BattleSys_ListHandler9:
     TDC
@@ -23039,8 +23040,11 @@ BattleSys_Unk8C09:
 ;     more. Else BattleAi_ChooseTable[code] runs, and then, if
 ;     !Battle_UnkB252 is below 8, !Battle_UnkB2B6[enemy] = 1
 ;     (BattleSys_Unk8C09 then leaves the enemy out).
-; Quirk: $C1:8C90–$C1:8C9C is dead (the BRA before it jumps over it):
-; it would have stored !Battle_UnkB273 in !Battle_UnkB1D4[enemy].
+; $C1:8C90 (.restart_from_b273) is not reached from the code above (the
+; BRA before it jumps over it); BattleAi_Choose04 enters there instead
+; (PLY / JMP $8C90 at $C1:995C), which first sets !Battle_UnkB1D4[enemy]
+; = !Battle_UnkB273 (the action part's start) and then goes on at
+; .resume.
 ; Callers (42 JSR sites): BattleAi_Test00 ($C1:8EA7) and unmatched ($C1:8F0D, $C1:8F7C, $C1:8FCF,
 ;   $C1:9008, $C1:903A, $C1:9077, $C1:90B3, $C1:9125, $C1:9183, $C1:91EE, $C1:9252, $C1:9298,
 ;   $C1:9310, $C1:9389, $C1:93D1, $C1:93DB, $C1:941F, $C1:945B, $C1:9469, $C1:94B2, $C1:94C7,
@@ -23048,7 +23052,8 @@ BattleSys_Unk8C09:
 ;   $C1:9647, $C1:9652, $C1:969A, $C1:96C9, $C1:971F, $C1:9751, $C1:975C, $C1:97A0, $C1:97B5,
 ;   $C1:97CA, $C1:9803).
 ; Callers note: 42 JSR sites in the test handlers, $C1:8EA7 to $C1:9803
-;   (e.g. BattleAi_Test00 at $C1:8EA7).
+;   (e.g. BattleAi_Test00 at $C1:8EA7); BattleAi_Choose04 JMPs to
+;   .restart_from_b273 ($C1:995C).
 ; Entry: M=1, X=0, DP any (not used), DB=$7E; A any (TDC first);
 ;        !Battle_UnkB252 = enemy entry, !Battle_UnkB1D2 = the passing
 ;        test record's address
@@ -23096,7 +23101,7 @@ BattleAi_TestPassed:
     TDC
     SEP #$20
     BRA .resume
-    ; dead (see the header): no path reaches $C1:8C90-$C1:8C9C
+.restart_from_b273:                     ; BattleAi_Choose04's JMP target (see the header)
     LDA.w !Battle_UnkB252
     ASL A
     TAY
@@ -23565,9 +23570,8 @@ BattleSys_UnkAC5E:
 ; Calls Battle_ApplyHits.
 ; Callers (1 JSR site): BattleSys_UnkAC57 ($C1:AC5A).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  M=1, X=0 (as Battle_ApplyHits assumes after BattleFD_UnkACFD),
-;        DP=0, DB=$7E; A clobbered, X = $580, Y = $2C (unless
-;        BattleFD_UnkACFD changes them); plus what Battle_ApplyHits
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, X = $84, Y = $2C (as
+;        Battle_ApplyHits leaves them); plus what Battle_ApplyHits
 ;        changes
 BattleSys_UnkAC85:
     JSR Battle_ApplyHits
@@ -23585,7 +23589,8 @@ BattleSys_UnkAC85:
 ; Callers note: $C1:9A2D, $C1:9B24, $C1:A130, $C1:A378 (run handlers, not
 ;   matched).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = enemy entry (0-7); DP $0E = the
-;        value for code 2 (from BattleAi_ArgToDp0E, probably)
+;        value for code 2, whatever earlier code left there (all four
+;        callers run BattleAi_ArgToDp0E only after this; not traced)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $10 = !Battle_UnkB18E; X, Y
 ;        unchanged; the bytes above written
 BattleAi_SetCmdBits:
@@ -23823,8 +23828,8 @@ BattleAi_TargetsByPcByte:
 ; Quirks: with !BattleAi_Marked80Count set, a matching entry without
 ; the $80 mark sends the BPL at $C1:ADD1 back to the same compare with
 ; the same X and Y, so the loop never ends (it hangs, unless the
-; entries are marked consistently). $C1:AE0C-$C1:AE12 is dead (after
-; the BRA at $C1:AE0A): it would set the count to 0. The order only
+; entries are marked consistently). $C1:AE0D-$C1:AE12 is dead (after
+; the BRA at $C1:AE0B): it would set the count to 0. The order only
 ; matches PC slots 0-2 that also are enemy entry numbers in
 ; !Battle_EnemyOrder, so with few enemies some PCs can never be taken.
 ; Callers (20 JSR sites): BattleAi_TargetsByPcByte ($C1:AD9D) and unmatched ($C1:A59F, $C1:A5CF,
@@ -23900,7 +23905,7 @@ BattleAi_PickPcTarget:
     BEQ .one
     JSR BattleAi_Target07
     BRA .done
-    ; dead (see the header): no path reaches $C1:AE0C-$C1:AE12
+    ; dead (see the header): no path reaches $C1:AE0D-$C1:AE12
     TDC
     STA.w !BattleAi_TargetCount
     BRA .done
@@ -24260,9 +24265,11 @@ Battle_RandRange:
 ; Done: !Battle_UnkB263[enemy] = 0.
 ; Quirk: when BattleAi_PickScript swaps in a fixed script, the second
 ; test record is still read at !Battle_UnkB1D0 + 4, in the enemy's own
-; script, and !Battle_UnkB1CF comes from there too; the fixed scripts
-; ($CC:8D08, $CC:8D1E) are one block of a single test $00, so it does
-; not matter there. PickScript also runs again for each block, so a
+; script, and !Battle_UnkB1CF comes from there too. The fixed scripts
+; ($CC:8D08, $CC:8D1E) are one block of a single test $00, so when the
+; enemy's own block has a second test (byte 4 not $FE), that test still
+; runs after test $00 has chosen the fixed action, and can choose again
+; (it holds) or fail the block (it does not). PickScript also runs again for each block, so a
 ; fixed script would start over at each block (its one test, $00, always holds).
 ; Callers (1 JSR site): BattleSys_Unk8C09 ($C1:8C30).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = the enemy's id, B = 0 (16-bit
@@ -24788,7 +24795,9 @@ Battle_Div32:
 ; DP $0E = !Battle_UnkAD9B * !Battle_HitSetSize + !Battle_UnkB1FD * 4:
 ; the offset of slot !Battle_UnkB1FD's entry in set !Battle_UnkAD9B of
 ; the !Battle_ActPcHitAmount records (the callers index those with it).
-; The sum is 8-bit (DP $0F stays 0), enough for the 6 sets.
+; Quirk: the sum is 8-bit (DP $0F stays 0). Set 5 starts at $DC, so
+; its slots 9 and 10 ($100, $104) wrap to 0 and 4, set 0's first two
+; entries.
 ; Callers (13 JSR sites): BattleSys_ListHandler1 ($C1:8924), BattleSys_ListHandler9 ($C1:8B90) and
 ;   unmatched ($C1:B33B, $C1:D414, $C1:DAB7, $C1:DB42, $C1:DD72, $C1:DE65, $C1:E822, $C1:E8FE,
 ;   $C1:E92D, $C1:E956, $C1:F059).
@@ -24936,12 +24945,13 @@ Battle_ClearCancelledHits:
 ;     analysed); .CurHp = 0 and MP is skipped.
 ;   - MP: .CurMp -= the amount of each set whose flags have
 ;     !Battle_HitMpBit; kept between 0 and .MaxMp.
-; Then BattleFD_UnkACFD. A negated amount (see Battle_RecordHit)
-; raises HP or MP.
+; Then BattleFD_UnkACFD, which zeroes $7E:B328-$B3AB (the three hit
+; sets) and leaves A = 0, X = $84. A negated amount (see
+; Battle_RecordHit) raises HP or MP.
 ; Callers (2 JSR sites): BattleSys_ListHandler8 ($C1:8B0C) and BattleSys_UnkAC85 ($C1:AC85).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  M=1, X=0 (as assumed after BattleFD_UnkACFD, not analysed),
-;        DP=0, DB=$7E; A clobbered; X = $580, Y = $2C; DP $0E = the
+; Exit:  M=1, X=0 (BattleFD_UnkACFD keeps both), DP=0, DB=$7E;
+;        A = 0, X = $84 (from BattleFD_UnkACFD), Y = $2C; DP $0E = the
 ;        last enemy slot KO'd here, if any; BattlerStats .CurHp, .CurMp
 ;        and .Status written; !Battle_HitAmount zeroed where cancelled
 ;        (and the rest Battle_ClearCancelledHits writes), plus what
