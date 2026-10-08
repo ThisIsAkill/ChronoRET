@@ -14,8 +14,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    2. `$C0:2848` 36 B: `Field_FadeInAfterReload` (whole); 1 differs (`JSR Field_EndOfFrameShort`
       -> `JSR Field_EndOfFrame`): the sibling routine right after it
    3. `$C0:58FD` 33 B: `Evt_RunObjInit+$10` (part); 0 differ
-   4. `$C2:0073` 32 B: `MainInit+$60` (part, PPU write-twice register clears); 0 differ
-   5. `$C2:9445` 32 B: `MainInit+$60` (part, same); 0 differ
+   4. `$C2:0073` 32 B: `MainInit+$60` (part, PPU write-twice register clears): matched, inside
+      `BankC2_InitHwRegs`
+   5. `$C2:9445` 32 B: `MainInit+$60` (part, same): matched, inside `Menu_InitPpuAndRam`
    6. `$CC:F365` 30 B: `Battle_Mul8` (whole, byte-identical); 0 differ
    7. `$C1:6699` 26 B: `Battle_CalcAngle+$1A` (part); 0 differ
    8. `$C0:2DD9` 24 B: `ClearRAMDMA+$15` (part, DMA channel 7 setup tail); 0 differ
@@ -28,6 +29,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    14. `$C0:B1B8` 22 B: `Spr_LoadLargeObj+$6C` (part); 0 differ
    More of the same shape (22 B and down) in the full `make duplicates-reloc` output; also
    `$C1:656F`/`$C1:65E4` (`Battle_CalcAngle+$1A`), `$C2:225E` (`Battle_SinLookup+$4`, ends RTL).
+
 1. Bank $C1 from `$C1:4058`: service 4 of the $C10045 API (`$C1:4058`-`$C1:41BD`, 358 B; it calls
    `$C1:41BE`, `$C1:4212`, `$C1:423A`, `$C1:4310`, `$C1:4BBE` and six JSLs into `$CC:F06B`-`$CC:F278`,
    all unmatched), then its callees in bank $C1. (`$C1:007E` and `$C1:283D`-`$C1:4057` are matched;
@@ -40,8 +42,13 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Field_CheckTileInFront` $C0:1DF4–$C0:1F23 (table at $C0:1E92), `Evt_StartTargetFunc1`
    $C0:5AC5, `Field_DpadHandlerTable` $C0:8902 and the `Map_Unk*` steps of Field_FrameUpdate
    ($8A6D, $9175, $91AC, $93E1, $99DE), `Map_Unk75A0`.
-3. Bank $C1 past `$C1:283D`: enemy logic, battle animation (scouted in session 33).
-4. `$C0:881E` and the per-frame calls `$1AAC`, `$21E1`, `$274D` from the main loop.
+3. Bank $C2: the entry vectors, the scene boot (`BankC2_SceneBoot`, `BankC2_InitHwRegs`), the
+   scene interrupts and NMI handler ($C2:0000–$C2:0453 except `$C2:034D`-`$C2:0404`), and
+   `Menu_InitPpuAndRam` with the new-game data init ($C2:940D–$C2:960A) are matched. Next, the
+   scene NMI's unmatched per-frame steps (`C2Scene_Unk034D`, `C2Scene_Unk051D`,
+   `C2Scene_Unk0C4D`, `C2Scene_Unk0CEA`), then the boot steps `C2Scene_Unk03EF` and
+   `C2Scene_Unk1DB5` and `C2Scene_Main` ($C2:23A8); the text-window entries `TextWin_Init`
+   ($C2:57DF) and `TextWin_Step` ($C2:5823) and the joypad entry `BankC2_Entry8002`.
 
 ## Tables
 
