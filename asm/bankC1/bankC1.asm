@@ -24671,8 +24671,9 @@ BattleSys_UnkB223:
 ; (HP 0: Status = $80, KO'd; or such an enemy): turn-list-12 byte = 0,
 ; !Battler_UnkAEFF = $FF, Status2 and Unk4C..Unk4C+2 = 0, Unk2F bit 0
 ; cleared, and:
-;   - a PC: if its BattleCmd.Kind has bit 4, BattleSys_UnkBC60 (which
-;     does nothing) and the bit is cleared. If BattlerStats.Unk4C+3 has
+;   - a PC: if its BattleCmd.Kind has bit 4, !Battle_UnkB18B = the
+;     slot, BattleSys_UnkBC60 (which does nothing) and the bit is
+;     cleared. If BattlerStats.Unk4C+3 has
 ;     bit 7, it is cleared and the PC is revived (probably): a hit of
 ;     -(Unk66 * 5) (kind 1, !Battle_HitNegate) is recorded for it
 ;     (Battle_HitEntryOffset, Battle_RecordHit), the action kind 2 /
@@ -24692,7 +24693,9 @@ BattleSys_UnkB223:
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = slot (0-10), X = slot * $80
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = the slot; X = slot * $80,
 ;        but clobbered by the revive path; DP $06/$07 = the PC's
-;        BattleCmd record address (PC KO path); the revive path also
+;        BattleCmd record address (PC KO path); !Battle_UnkB18B = the
+;        slot when its .Kind had bit 4 (BattleSys_Unk8461 reads it
+;        after BattleSys_UnkB223); the revive path also
 ;        writes !Battle_UnkAD89, !Battle_UnkB1FD, !Battle_UnkB2C7,
 ;        !Battle_UnkB202, the action block, DP $0E and the math DP
 ;        bytes, plus what its callees change
@@ -25225,7 +25228,8 @@ BattleSys_UnkB4E9:
 ; Callers (3 JSR sites): BattleSys_Unk8461 ($C1:8538, $C1:8809) and BattleSys_Unk883D ($C1:884B).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  as BattleFD_UnkA95F leaves them (not analysed); before it, X =
-;        3 and A = 0 or 1. The loops assume BattleFD_UnkA8A5 keeps X.
+;        0-3 and A = 0, 1 or $FF. The loops assume BattleFD_UnkA8A5
+;        keeps X.
 BattleSys_UnkB575:
     TDC
     TAX
