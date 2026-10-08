@@ -6204,7 +6204,8 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ;
 ; Field_EventHook (dp $39) names a per-frame job; 0 = none. Hooks 1-10
 ; and 12 drive a window (masking) effect (hook 11 leaves the field for
-; bank $C3; 13-16 are idle or unused): each sets the window and
+; bank $C3; 13 is idle, 14 is hook 5's shutdown tail, 15-16 unused):
+; each sets the window and
 ; colour-math shadows the NMI handler copies to the PPU
 ; (Ppu_W12SelShadow .. Ppu_CgwSelShadow), turns on an HDMA channel
 ; (5, or 7 for hook 3) in Field_HdmaEnable, and has a bank-$C3 routine
