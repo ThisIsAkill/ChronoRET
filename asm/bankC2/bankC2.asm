@@ -7045,7 +7045,8 @@ C2Scene_Random:
 ; C2Scene_BoxBPtr): +0 left, +2 right, +4 up, +6 down (inferred from
 ; which extent is used on which side). .test_x takes the X distance
 ; between the centres less A's extent towards B and B's extent towards
-; A; a negative result (a gap) gives C=0. The same for Y in .test_y.
+; A; a negative result means they overlap on that axis (C=1), 0 or more
+; is a gap (C=0). The same for Y in .test_y.
 ; Equal centres count as overlapping on that axis; boxes that just
 ; touch (a result of exactly 0) do not.
 ; Quirk, kept: the SEC before the last RTS is redundant (C is already 1
@@ -7056,7 +7057,8 @@ C2Scene_Random:
 ;        centres and pointers), DB any (all reads are direct page or long
 ;        indirect)
 ; Exit:  M=0, X=0; C=1: the boxes overlap, C=0: they do not; A clobbered;
-;        Y = 2, 4 or 6 (the last extent offset used); X and DP unchanged
+;        Y = 2 (decided in .test_x) or 4 (in .test_y), the last extent
+;        offset used; X and DP unchanged
 ; Calls: .test_x, .test_y (internal JSRs).
 !C2Scene_BoxAX = !C2Tmp_08              ; in: box A's centre X (16-bit)
 !C2Scene_BoxAY = !C2Tmp_0A              ; in: box A's centre Y
