@@ -11385,16 +11385,19 @@ BitReverseTable:
 ; $C0:FE00 — RandomTable (256 bytes, $C0:FE00–$FEFF)
 ; The game's pseudo-random bytes, probably: a shuffle of 0-255 (every
 ; value appears exactly once; checked against the ROM). The name is
-; inferred from how most readers use it, stepping a counter of their own
-; and reading the entry at it:
-;   $C0:AE29  INC $F8 / LDX $F8 / LDA $FE00,X  ($C0:A231: LDA $F8 / TAX)
-;   $C0:6D11  LDA $F8 / INC / STA $F8 / TAX / LDA $FE00,X
-;   $C2:2338  LDX $1B30 / LDA.l $C0FE00,X / INC $1B30
-; Other readers index it differently: $C2:8F09 and $C2:B119 read 16-bit
-; words at $C0FE00,X (+2, +4) from an index in $0D00, and $CD:0B19 forms
-; its index with ADC $7C. Further long reads in bank $C3 were found by
-; tools/tables.py; apparent reads in banks $CC and $FD sit in data and
-; are not counted. None of these readers is matched yet.
+; inferred from how its readers use it. Readers are spread over many
+; banks and none is matched yet, so the list below gives verified
+; examples, not every reader:
+;   - step a counter of their own and read the entry at it:
+;     $C0:AE29 (INC $F8 / LDX $F8 / LDA $FE00,X),
+;     $C0:6D0B (LDA $F8 / INC / STA $F8 / TAX / LDA $FE00,X),
+;     $C2:2338 (LDX $1B30 / LDA.l $C0FE00,X / INC $1B30; bank $C6 has
+;     more readers sharing the $1B30 counter),
+;     $CD:2AAF (LDA $CD3B / INC $CD3B / TAX / LDA.l $C0FE00,X);
+;   - $C2:B10E reads one byte with X from $0D00 and multiplies it by
+;     100 (WRMPYA = $64), probably a 0-99 roll;
+;   - $C2:8F09 copies 16-bit words from $C0FE00,X (+2, +4) with X from
+;     $0D00, and $CD:0B19 forms its index with ADC $7C.
 ; Follows BitReverseTable directly; the boot code at $C0:FF00
 ; (bank00.asm) comes next.
 ; ============================================================
