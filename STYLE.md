@@ -48,8 +48,9 @@ someone finds out.
 ids, sentinels. Literals left in code are small values whose meaning is the literal itself (a
 shift count, an index into a table declared right there). `REP`/`SEP` masks are exempt.
 
-**Explicit widths.** Every instruction whose operand uses a define or struct field says `.b`,
-`.w` or `.l`. Defines are textual and asar doesn't track the M/X flags, so without a suffix the
+**Explicit widths.** Every data instruction whose operand uses a define or struct field says
+`.b`, `.w` or `.l`. (Jumps and calls are exempt: `JSR`, `JMP`, `JSL`, `JML` and branches have one
+encoding each, so their width can't drift.) Defines are textual and asar doesn't track the M/X flags, so without a suffix the
 encoding would depend on how the value happens to be written.
 
 **No hand-encoded instructions.** No `db $A9,$7F ; LDA #$7F`: write the instruction with the

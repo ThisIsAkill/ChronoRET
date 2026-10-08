@@ -68,6 +68,7 @@ SUBSYSTEMS = [
     ('Obj_', 'Sprites & objects'), ('Sprite', 'Sprites & objects'),
     ('Sub_', 'Engine (unnamed)'), ('MainInit', 'Boot'), ('Reset', 'Boot'),
     ('NMI', 'Boot'), ('IRQ', 'Boot'), ('BRK', 'Boot'),
+    ('Rom', 'ROM header'), ('ROMTitle', 'ROM header'),
 ]
 
 
@@ -105,6 +106,11 @@ def source_functions() -> dict[str, dict]:
         for n, i in enumerate(starts):
             name = GLOBAL.match(lines[i]).group(1)
             end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+            # Stop at the routine's last code line: the comment block (and
+            # org) before the next label belongs to the next routine.
+            while end > i + 1 and (not lines[end - 1].strip() or lines[end - 1].startswith(';')
+                                   or lines[end - 1].strip().lower().startswith('org')):
+                end -= 1
             body = '\n'.join(l.rstrip() for l in lines[i:end]).strip()
             found[name] = {
                 'file': str(path), 'note': header_note(lines, i, name),

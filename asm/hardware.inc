@@ -18,14 +18,13 @@ if !hardware_inc == 0
 !DP_PPU = $2100   ; PPU registers ($2100-$213F)
 
 ; ------------------------------------------------------------
-; Register values (named by the bits they set)
+; Register values (named by the bits they set; single-bit values
+; use the bit names further down, e.g. FORCED_BLANK)
 ; ------------------------------------------------------------
-!INIDISP_ForcedBlank   = $80  ; bit 7: screen off, VRAM/CGRAM/OAM writable
 !MEMSEL_FastRom        = $01  ; bit 0: 3.58 MHz access for banks $80-$FF
 !WRIO_AllHigh          = $FF  ; all programmable I/O pins high (latch idle)
-!OBSEL_Init            = $63  ; size %011 = 16x16/32x32 sprites, name select 0,
-                              ; base %011 = sprite tiles at VRAM word $6000
-!BGMODE_Mode1Bg3Prio   = $09  ; mode 1 (%001) + bit 3: BG3 high priority
+!OBSEL_Size16x32_Base6000 = $63 ; size %011 = 16x16/32x32 sprites, name select 0,
+                                ; base %011 = sprite tiles at VRAM word $6000
 !W34SEL_Bg3Win1Inv     = $03  ; BG3 window 1 enable + invert
 !TM_AllLayers          = $1F  ; BG1-4 + OBJ enabled
 !COLDATA_GreenBlueZero = $C0  ; write green+blue channels, intensity 0

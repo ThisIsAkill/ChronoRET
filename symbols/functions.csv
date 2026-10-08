@@ -1,45 +1,45 @@
 address,end,size,name,bank,subsystem,status,source_hash,notes
-$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,matched,ec539028b4d4,Mid-game JSL re-entry vector table.
+$C0:0000,$C0:000D,14,ReentryVectors,$C0,Engine,matched,83385beab003,Mid-game JSL re-entry vector table.
 $C0:000E,$C0:005C,79,GameLoop,$C0,Engine,matched,fadd3d61a031,
 $C0:005D,$C0:0071,21,GameLoop_Main,$C0,Engine,matched,cf13d1c3c85f,
 $C0:0072,$C0:007C,11,GL_ModeOk1,$C0,Engine,matched,b7788f5d1a1e,
 $C0:007D,$C0:0096,26,GL_ModeOk2,$C0,Engine,matched,94766b16acb7,
-$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,matched,0575c4d92ef3,
+$C0:0097,$C0:00BE,40,GameLoop_FrameBody,$C0,Engine,matched,44d8b6869dd1,
 $C0:00BF,$C0:00DD,31,VBlankHandler,$C0,Engine,matched,ebef2a5541d2,Performs per-VBlank audio + DMA tasks; tail-jumps to PostVBlank.
 $C0:00DE,$C0:00EA,13,VBlankHandlerShort,$C0,Engine,matched,2a441894bf88,
-$C0:00EB,$C0:00F3,9,Sub_00EB,$C0,Engine (unnamed),matched,5384cea7e530,
-$C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,matched,a332e70379cc,One-time location-load called once per scene entry from GameLoop_Main.
-$C0:011B,$C0:01A4,138,Sub_011B,$C0,Engine (unnamed),matched,b641065c637c,Build scene context workspace before a scene transition.
-$C0:01A5,$C0:024B,167,Sub_01A5,$C0,Engine (unnamed),matched,ca8e4e0904ae,Full location engine init after a scene transition.
-$C0:0905,$C0:0917,19,Sub_0905,$C0,Engine (unnamed),matched,9e808a9b1afd,Block-copy $14E0 bytes from $7F:2000 to $00:0920 (= WRAM $7E:0920).
-$C0:0918,$C0:092A,19,Sub_0918,$C0,Engine (unnamed),matched,42dcaeae165d,Block-copy $14E0 bytes from $00:0920 (= WRAM $7E:0920) to $7F:2000.
-$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,matched,f22b3964d4a3,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA."
-$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,matched,94bb6cc7a427,Writes JML $C0:EA63 (5C 63 EA C0) to WRAM $7E:0500.
-$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,matched,29d64215e3a0,Writes JML $C0:ECCC (5C CC EC C0) to WRAM $7E:0504.
-$C0:0B86,$C0:0C75,240,FrameStateInit,$C0,Engine,matched,c6852b75f8d0,Called from GameLoop_Main at the start of each scene iteration.
-$C0:0C76,$C0:0D77,258,Sub_0C76,$C0,Engine (unnamed),matched,2a801f959647,"Per-frame state-machine controller, called after FrameStateInit."
-$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,matched,e8a1c592114a,Mode-$E6 scroll-map update.
-$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,matched,c68b56f804ca,Mode-$EC scroll-map update.
-$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,matched,1d7b0601d16d,"Scroll mode $EE handler: updates 4 entries in the $7E:3000 layer table, then computes VRAM word-indices for 16 tilemap corners (4 passes × 4 corners), storing to $09CA–$09E8."
-$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,matched,87c183aafc44,"Scroll mode $FA handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
-$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,matched,d8338b88177d,"Scroll mode $FC handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
-$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,matched,ae914d379af2,"The ""all other modes"" arm of Sub_0C76's per-frame dispatch."
-$C0:18D9,$C0:1984,172,Sub_18D9,$C0,Engine (unnamed),matched,8a9af837b523,VBlank-sync wait + mode-transition manager.
-$C0:1985,$C0:19C6,66,Sub_1985,$C0,Engine (unnamed),matched,88977605d71d,Mode-5 transition guard + fade.
-$C0:19C7,$C0:1A02,60,Sub_19C7,$C0,Engine (unnamed),matched,ba5f62b610b5,Mode-5 warm-restart.
-$C0:1A03,$C0:1AAB,169,Sub_1A03,$C0,Engine (unnamed),matched,97b220086ed4,Scene display-state restore: sprite color sync + scene table restore.
-$C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),matched,84be604bf1b6,Mode-index update dispatcher.
-$C0:1B36,$C0:1B52,29,Sub_1B36,$C0,Engine (unnamed),matched,1c71a2048b80,VRAM tilemap word-index calculator.
+$C0:00EB,$C0:00F3,9,Sub_00EB,$C0,Engine (unnamed),matched,32986216a091,
+$C0:00F4,$C0:011A,39,LoadLocation,$C0,Engine,matched,eefe2ba6f7a7,One-time location-load called once per scene entry from GameLoop_Main.
+$C0:011B,$C0:01A4,138,Sub_011B,$C0,Engine (unnamed),matched,5312c8bb47c8,Build scene context workspace before a scene transition.
+$C0:01A5,$C0:024B,167,Sub_01A5,$C0,Engine (unnamed),matched,a03952e28b5e,Full location engine init after a scene transition.
+$C0:0905,$C0:0917,19,Sub_0905,$C0,Engine (unnamed),matched,3bd65bcb1757,Block-copy $14E0 bytes from $7F:2000 to $00:0920 (= WRAM $7E:0920).
+$C0:0918,$C0:092A,19,Sub_0918,$C0,Engine (unnamed),matched,3ef765be9c7d,Block-copy $14E0 bytes from $00:0920 (= WRAM $7E:0920) to $7F:2000.
+$C0:0B4E,$C0:0B63,22,InitHW,$C0,Engine,matched,93db7cb3420a,"Disables interrupts, enables forced blank, clears NMI/DMA/HDMA."
+$C0:0B64,$C0:0B74,17,InstallNMI,$C0,Engine,matched,920d1d8a63fc,Writes JML $C0:EA63 (5C 63 EA C0) to WRAM $7E:0500.
+$C0:0B75,$C0:0B85,17,InstallIRQ,$C0,Engine,matched,7daed1c1e226,Writes JML $C0:ECCC (5C CC EC C0) to WRAM $7E:0504.
+$C0:0B86,$C0:0C75,240,FrameStateInit,$C0,Engine,matched,7999a2cb4456,Called from GameLoop_Main at the start of each scene iteration.
+$C0:0C76,$C0:0D77,258,Sub_0C76,$C0,Engine (unnamed),matched,95c330c0d11e,"Per-frame state-machine controller, called after FrameStateInit."
+$C0:0D78,$C0:0E5E,231,ModeE6_Handler,$C0,Engine,matched,f700e0ed039a,Mode-$E6 scroll-map update.
+$C0:0E5F,$C0:1013,437,ModeEC_Handler,$C0,Engine,matched,c3ecc82604b2,Mode-$EC scroll-map update.
+$C0:1014,$C0:11C8,437,ModeEE_Handler,$C0,Engine,matched,081f2e209cd5,"Scroll mode $EE handler: updates 4 entries in the $7E:3000 layer table, then computes VRAM word-indices for 16 tilemap corners (4 passes × 4 corners), storing to $09CA–$09E8."
+$C0:11C9,$C0:1453,651,ModeFA_Handler,$C0,Engine,matched,a364b036227c,"Scroll mode $FA handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
+$C0:1454,$C0:16DB,648,ModeFC_Handler,$C0,Engine,matched,17421958e1d8,"Scroll mode $FC handler: updates 6 entries in the $7E:3000 layer table, then computes VRAM word-indices for 24 tilemap corners (6 passes × 4 corners), storing to $09CA–$09F8."
+$C0:16DC,$C0:18D8,509,DefaultHandler,$C0,Engine,matched,e5ba29d92e9a,"The ""all other modes"" arm of Sub_0C76's per-frame dispatch."
+$C0:18D9,$C0:1984,172,Sub_18D9,$C0,Engine (unnamed),matched,bfb75816a344,VBlank-sync wait + mode-transition manager.
+$C0:1985,$C0:19C6,66,Sub_1985,$C0,Engine (unnamed),matched,c79800523357,Mode-5 transition guard + fade.
+$C0:19C7,$C0:1A02,60,Sub_19C7,$C0,Engine (unnamed),matched,473d49718cc2,Mode-5 warm-restart.
+$C0:1A03,$C0:1AAB,169,Sub_1A03,$C0,Engine (unnamed),matched,6fcc3ad25bad,Scene display-state restore: sprite color sync + scene table restore.
+$C0:1ADF,$C0:1B35,87,Sub_1ADF,$C0,Engine (unnamed),matched,6636df782a98,Mode-index update dispatcher.
+$C0:1B36,$C0:1B52,29,Sub_1B36,$C0,Engine (unnamed),matched,2f3b7fd3a2f5,VRAM tilemap word-index calculator.
 $C0:1B90,$C0:1B91,2,Sub_1B90,$C0,Engine (unnamed),matched,796715edcafd,SPC audio command dispatcher.
-$C0:1B92,$C0:1BA6,21,Sub_1B90_body,$C0,Engine (unnamed),matched,a08d051e6b0f,
-$C0:1BA7,$C0:1BAA,4,Sub_1BA7,$C0,Engine (unnamed),matched,0c925cfe26a3,Variant entry of Sub_1B90 that loads dp:$FB as the first SPC command argument instead of dp:$FC.
-$C0:1F24,$C0:1F59,54,Sub_1F24,$C0,Engine (unnamed),matched,b27eac5a9c8e,Scroll-X target tracker: moves dp:$19 (low nibble) toward dp:$1B.
-$C0:1F5A,$C0:1F86,45,Sub_1F5A,$C0,Engine (unnamed),matched,ef1b1ce01f72,Scroll-Y target tracker: moves dp:$21 toward dp:$22.
-$C0:2824,$C0:2847,36,Sub_2824,$C0,Engine (unnamed),matched,b544bf6f8bc4,Post-transition setup/fade loop.
-$C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,matched,69289953b119,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
-$C0:595C,$C0:597C,33,Sub_595C,$C0,Engine (unnamed),matched,ec4b089265a5,Scene entity-table dispatcher.
-$C0:597D,$C0:59D8,92,Sub_597D,$C0,Engine (unnamed),matched,7214f563d5b5,Sprite-slot entity dispatcher and slot-data reset.
-$C0:B192,$C0:B1B1,32,Sub_B192,$C0,Engine (unnamed),matched,c0609e995765,"Zero $1Bxx sprite table entries, then BRL-tail to Sub_E935."
+$C0:1B92,$C0:1BA6,21,Sub_1B90_body,$C0,Engine (unnamed),matched,aae5e9c9cd5e,
+$C0:1BA7,$C0:1BAA,4,Sub_1BA7,$C0,Engine (unnamed),matched,219c6b08235b,Variant entry of Sub_1B90 that loads dp:$FB as the first SPC command argument instead of dp:$FC.
+$C0:1F24,$C0:1F59,54,Sub_1F24,$C0,Engine (unnamed),matched,6c481f71dd57,Scroll-X target tracker: moves dp:$19 (low nibble) toward dp:$1B.
+$C0:1F5A,$C0:1F86,45,Sub_1F5A,$C0,Engine (unnamed),matched,b6889f6cc2f6,Scroll-Y target tracker: moves dp:$21 toward dp:$22.
+$C0:2824,$C0:2847,36,Sub_2824,$C0,Engine (unnamed),matched,208bdd1da02e,Post-transition setup/fade loop.
+$C0:2DF1,$C0:2E1D,45,ClearRAMDMA,$C0,Engine,matched,993c0ef58c9e,"Zeros a WRAM region via DMA channel 7, sourcing from MPYL (always 0 since M7A=M7B=0)."
+$C0:595C,$C0:597C,33,Sub_595C,$C0,Engine (unnamed),matched,c45444455f8e,Scene entity-table dispatcher.
+$C0:597D,$C0:59D8,92,Sub_597D,$C0,Engine (unnamed),matched,bdf35628fea1,Sprite-slot entity dispatcher and slot-data reset.
+$C0:B192,$C0:B1B1,32,Sub_B192,$C0,Engine (unnamed),matched,b2f36a927669,"Zero $1Bxx sprite table entries, then BRL-tail to Sub_E935."
 $C0:B271,$C0:B2A7,55,PostVBlank,$C0,Engine,matched,de5dac6c9c5f,OAM buffer culling routine.
 $C0:B2A8,$C0:B2B1,10,PV_SpriteLoop,$C0,Engine,matched,123225369af5,
 $C0:B2B2,$C0:B2BF,14,PV_CheckChain,$C0,Engine,matched,f04488ee91f9,
@@ -49,62 +49,76 @@ $C0:B2D8,$C0:B2DD,6,PV_EndRange1,$C0,Engine,matched,42a5accff791,
 $C0:B2DE,$C0:B2ED,16,PV_FillRange2,$C0,Engine,matched,c699bcabbeaf,
 $C0:B2EE,$C0:B2F3,6,PV_EndRange2,$C0,Engine,matched,eea8aa5ff57b,
 $C0:B2F4,$C0:B303,16,PV_FillRange3,$C0,Engine,matched,5644e3d4a3e6,
-$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,matched,d2cbcac2d3d4,
-$C0:B309,$C0:B700,1016,Sub_B309,$C0,Engine (unnamed),matched,89d5d67a6638,Sprite descriptor → OAM buffer + WRAM palette copy.
-$C0:B701,$C0:B787,135,Sub_B701,$C0,Engine (unnamed),matched,5cba4ae6b5c5,Sprite state gate called from Sub_B309.
-$C0:B788,$C0:B8C9,322,Sub_B788,$C0,Engine (unnamed),matched,03836a92a06e,
-$C0:B8CA,$C0:BA64,411,Sub_B8CA,$C0,Engine (unnamed),matched,6c463775adfa,
-$C0:BA65,$C0:BCDB,631,Sub_BA65,$C0,Engine (unnamed),matched,16651914ffad,
-$C0:BCDC,$C0:BFF1,790,Sub_BCDC,$C0,Engine (unnamed),matched,1ea400326805,
-$C0:BFF2,$C0:C2BE,717,Sub_BFF2,$C0,Engine (unnamed),matched,726c5bc9e325,
-$C0:C2BF,$C0:C6E6,1064,Sub_C2BF,$C0,Engine (unnamed),matched,25ce22be0f60,
-$C0:C6E7,$C0:C739,83,Sub_C6E7,$C0,Engine (unnamed),matched,646dc0d5ae78,
-$C0:C73A,$C0:C989,592,Sub_C73A,$C0,Engine (unnamed),matched,9f59f07d6787,
-$C0:C98A,$C0:CA75,236,Obj_AnimTickAndQueue,$C0,Sprites & objects,matched,5781e3a4aa24,Per-frame animation tick and sprite-frame queuer.
-$C0:CA76,$C0:CAD8,99,Field_ProcessAnimQueue,$C0,Engine,matched,84f5da5fb7b8,VBlank-time sprite animation queue processor.
-$C0:CAD9,$C0:CB09,49,Obj_BuildSpriteFrameStep,$C0,Sprites & objects,matched,1061b27b47eb,Single sprite-frame build step for the current slot ($6D).
-$C0:CB0A,$C0:CB39,48,Sub_CB0A,$C0,Engine (unnamed),matched,ff3631e2ce5c,Top-level sprite-slot init dispatcher.
-$C0:CB3A,$C0:CBDB,162,Sub_CB3A,$C0,Engine (unnamed),matched,cad6a9aaeadd,Animation-frame gate for sprite-slot init routines.
-$C0:CBDC,$C0:CDC7,492,Sub_CBDC,$C0,Engine (unnamed),matched,ab2bce2c26e1,"Single-slot, animation-gated, 16-tile sprite-slot init."
-$C0:CDC8,$C0:CEF4,301,Sub_CDC8,$C0,Engine (unnamed),matched,4e3c91c4e3f2,"Single-slot, no animation gate, OAM-update for $7F:4BC2+slot."
-$C0:CEF5,$C0:D123,559,Sub_CEF5,$C0,Engine (unnamed),matched,696e9bfa9cf3,"Complex sprite-slot dispatch with three paths: type==3  ($1780,X==$03): full 32-tile dual-slot init via Sub_E97A + 32-entry loop."
-$C0:D124,$C0:D289,358,Sub_D124,$C0,Engine (unnamed),matched,93ebaafa40ec,"8-slot OAM buffer init, pass-1 path (sprite type 1)."
-$C0:D28A,$C0:D30C,131,Sub_D28A,$C0,Engine (unnamed),matched,6c155c042b9d,"Dual-slot, animation-gated, 16-tile sprite-slot init."
-$C0:D30D,$C0:D4F6,490,Sub_D30D,$C0,Engine (unnamed),matched,1d75b155df9c,Dual-slot second-pass: 16 tiles from Y=$20 into VRAM base+$200.
-$C0:D4F7,$C0:D545,79,Sub_D4F7,$C0,Engine (unnamed),matched,b36269ec0d34,Triple-slot sprite-init dispatch; analogous to Sub_CEF5 (dual-slot).
-$C0:D546,$C0:D607,194,Sub_D546,$C0,Engine (unnamed),matched,985b34ef2381,"Triple-slot first-pass, non-$68 variant."
-$C0:D608,$C0:D68A,131,Sub_D608,$C0,Engine (unnamed),matched,be17c4c45cb9,"Triple-slot first-pass, $68 variant (Obj_BuildFrameSize2_Start)."
-$C0:D68B,$C0:D737,173,Sub_D68B,$C0,Engine (unnamed),matched,728a893c8707,"Triple-slot pass-1, non-$68 variant."
-$C0:D738,$C0:D7E4,173,Sub_D738,$C0,Engine (unnamed),matched,bccdd86b6678,"Triple-slot pass-1, $68 variant."
-$C0:D7E5,$C0:DA68,644,Sub_D7E5,$C0,Engine (unnamed),matched,5cb8948a8c5d,"Triple-slot pass-2+, non-$68 variant."
-$C0:DA69,$C0:DD27,703,Sub_DA69,$C0,Engine (unnamed),matched,f20d3e1e1a6a,"Triple-slot pass-2+, $68 variant."
+$C0:B304,$C0:B308,5,PV_EndRange3,$C0,Engine,matched,ea99bb0e1d97,
+$C0:B309,$C0:B700,1016,Sub_B309,$C0,Engine (unnamed),matched,3053dea8bf1f,Sprite descriptor → OAM buffer + WRAM palette copy.
+$C0:B701,$C0:B787,135,Sub_B701,$C0,Engine (unnamed),matched,9f55cd141590,Sprite state gate called from Sub_B309.
+$C0:B788,$C0:B8C9,322,Sub_B788,$C0,Engine (unnamed),matched,ca437e13e944,
+$C0:B8CA,$C0:BA64,411,Sub_B8CA,$C0,Engine (unnamed),matched,ab363db7c373,
+$C0:BA65,$C0:BCDB,631,Sub_BA65,$C0,Engine (unnamed),matched,b5bf92d511aa,
+$C0:BCDC,$C0:BFF1,790,Sub_BCDC,$C0,Engine (unnamed),matched,a1f2b83a89d7,
+$C0:BFF2,$C0:C2BE,717,Sub_BFF2,$C0,Engine (unnamed),matched,8380c8f37f1f,
+$C0:C2BF,$C0:C6E6,1064,Sub_C2BF,$C0,Engine (unnamed),matched,780e68c224d2,
+$C0:C6E7,$C0:C739,83,Sub_C6E7,$C0,Engine (unnamed),matched,3e40d1efc82f,
+$C0:C73A,$C0:C989,592,Sub_C73A,$C0,Engine (unnamed),matched,447441b18ecc,
+$C0:C98A,$C0:CA75,236,Obj_AnimTickAndQueue,$C0,Sprites & objects,matched,1ca5ccc24dd4,Per-frame animation tick and sprite-frame queuer.
+$C0:CA76,$C0:CAD8,99,Field_ProcessAnimQueue,$C0,Engine,matched,563f0fce2e56,VBlank-time sprite animation queue processor.
+$C0:CAD9,$C0:CB09,49,Obj_BuildSpriteFrameStep,$C0,Sprites & objects,matched,6229b5fd35d0,Single sprite-frame build step for the current slot ($6D).
+$C0:CB0A,$C0:CB39,48,Sub_CB0A,$C0,Engine (unnamed),matched,48bdac01bd1e,Top-level sprite-slot init dispatcher.
+$C0:CB3A,$C0:CBDB,162,Sub_CB3A,$C0,Engine (unnamed),matched,240c76a65871,Animation-frame gate for sprite-slot init routines.
+$C0:CBDC,$C0:CDC7,492,Sub_CBDC,$C0,Engine (unnamed),matched,c9b427dc9baf,"Single-slot, animation-gated, 16-tile sprite-slot init."
+$C0:CDC8,$C0:CEF4,301,Sub_CDC8,$C0,Engine (unnamed),matched,b5c4d79ce8e3,"Single-slot, no animation gate, OAM-update for $7F:4BC2+slot."
+$C0:CEF5,$C0:D123,559,Sub_CEF5,$C0,Engine (unnamed),matched,2d9e911c5584,"Complex sprite-slot dispatch with three paths: type==3  ($1780,X==$03): full 32-tile dual-slot init via Sub_E97A + 32-entry loop."
+$C0:D124,$C0:D289,358,Sub_D124,$C0,Engine (unnamed),matched,26d9f9724946,"8-slot OAM buffer init, pass-1 path (sprite type 1)."
+$C0:D28A,$C0:D30C,131,Sub_D28A,$C0,Engine (unnamed),matched,20a2063587a3,"Dual-slot, animation-gated, 16-tile sprite-slot init."
+$C0:D30D,$C0:D4F6,490,Sub_D30D,$C0,Engine (unnamed),matched,d21d46f371f4,Dual-slot second-pass: 16 tiles from Y=$20 into VRAM base+$200.
+$C0:D4F7,$C0:D545,79,Sub_D4F7,$C0,Engine (unnamed),matched,fda7db143e92,Triple-slot sprite-init dispatch; analogous to Sub_CEF5 (dual-slot).
+$C0:D546,$C0:D607,194,Sub_D546,$C0,Engine (unnamed),matched,0035cfbc3880,"Triple-slot first-pass, non-$68 variant."
+$C0:D608,$C0:D68A,131,Sub_D608,$C0,Engine (unnamed),matched,099fb666d153,"Triple-slot first-pass, $68 variant (Obj_BuildFrameSize2_Start)."
+$C0:D68B,$C0:D737,173,Sub_D68B,$C0,Engine (unnamed),matched,1292a180f1f0,"Triple-slot pass-1, non-$68 variant."
+$C0:D738,$C0:D7E4,173,Sub_D738,$C0,Engine (unnamed),matched,5ce79524f1fb,"Triple-slot pass-1, $68 variant."
+$C0:D7E5,$C0:DA68,644,Sub_D7E5,$C0,Engine (unnamed),matched,f830ef6113a0,"Triple-slot pass-2+, non-$68 variant."
+$C0:DA69,$C0:DD27,703,Sub_DA69,$C0,Engine (unnamed),matched,4f24a3443285,"Triple-slot pass-2+, $68 variant."
 $C0:DD28,$C0:E129,1026,Sub_DD28,$C0,Engine (unnamed),matched,0bed8b456a44,"12-slot OAM buffer init, pass-1 path (sprite type 2)."
-$C0:E12A,$C0:E533,1034,Sub_E12A,$C0,Engine (unnamed),matched,58b26df67945,"Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene data, DMAs it to VRAM (destination word-addr $0400), then populates the OAM staging buffer at $7F:4BC2+X with palette values, tile in"
-$C0:E534,$C0:E686,339,Sub_E534,$C0,Engine (unnamed),matched,0d6c99bdfa53,"FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA."
-$C0:E687,$C0:E738,178,Sub_E687,$C0,Engine (unnamed),matched,6998e1377b26,Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM graphics bank into WRAM at the address in dp:$D0.
-$C0:E739,$C0:E7BB,131,Sub_E739,$C0,Engine (unnamed),matched,2e99c09fcf05,Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
-$C0:E7BC,$C0:E83E,131,Sub_E7BC,$C0,Engine (unnamed),matched,b366180d61b4,Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
-$C0:E83F,$C0:E8C1,131,Sub_E83F,$C0,Engine (unnamed),matched,a683224d0b9f,Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
-$C0:E8C2,$C0:E934,115,Sub_E8C2,$C0,Engine (unnamed),matched,b27265d2dc5f,Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
-$C0:E935,$C0:E951,29,Sub_E935,$C0,Engine (unnamed),matched,b236c4155574,"Initialize 8 sprite-slot ""uninitialized"" flags at $0BC0-$0BC7 to $80."
-$C0:E952,$C0:E979,40,Sub_E952,$C0,Engine (unnamed),matched,e49a64163684,Sprite slot allocator — single-slot variant.
-$C0:E97A,$C0:E9A9,48,Sub_E97A,$C0,Engine (unnamed),matched,3ee4f28836d1,Sprite slot allocator — dual-slot variant.
-$C0:E9AA,$C0:E9E1,56,Sub_E9AA,$C0,Engine (unnamed),matched,e941acd52e35,Sprite slot allocator — triple-slot variant.
-$C0:E9E2,$C0:E9FE,29,Sub_E9E2,$C0,Engine (unnamed),matched,0b765b9751af,
-$C0:E9FF,$C0:EA1E,32,Sub_E9FF,$C0,Engine (unnamed),matched,3114343e9d58,
-$C0:EA1F,$C0:EA41,35,Sub_EA1F,$C0,Engine (unnamed),matched,0268097952da,
-$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,7d1550ba1974,SNES emulation-mode RESET vector ($FFFC/$FFFD) = $FF00.
-$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,1964cd813ad3,Native-mode interrupt stubs ($FF10–$FF1F) RAM handlers are installed during MainInit; these stubs dispatch there.
-$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,2275d2a13258,
-$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,44801a10bb74,"Both native BRK and emulation-mode COP point here (see $FFE6, $FFF4)."
-$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N)."
-$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,verified,acb443291953,
-$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,c6cbab686ed4,Scroll wave tables ($FF30–$FFAF) Two identical 32-entry signed 16-bit tables (64 bytes each).
-$C0:FF70,$C0:FFBF,80,ScrollWaveB,$C0,Engine,readable,7b557115940e,
-$C0:FFC0,$C0:FFFF,64,ROMTitle,$C0,Engine,readable,77ab30e48f4e,
-$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,matched,2aae59525635,8×8→16 HW multiply via $4202/$4203/$4216.
-$C1:00A7,$C1:00D6,48,Battle_MulAccum,$C1,Battle engine,matched,f999e18ec806,"Multiply-accumulate: $A5 × $A7 via HW mult, 32-bit accumulate into $A9/$AA."
-$C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,matched,3e70737efe23,16÷8 HW divide via $4204/$4205/$4206/$4214.
+$C0:E12A,$C0:E533,1034,Sub_E12A,$C0,Engine (unnamed),matched,924dc2b82aef,"Sprite init pass: fills WRAM staging buffer at $7F:3800 from scene data, DMAs it to VRAM (destination word-addr $0400), then populates the OAM staging buffer at $7F:4BC2+X with palette values, tile in"
+$C0:E534,$C0:E686,339,Sub_E534,$C0,Engine (unnamed),matched,41ae445940f4,"FD00-table WRAM fill: reads 32 sprite-data bytes through a palette-like lookup table at bank $FD ($FD00,X) and streams them to WRAM via WMDATA."
+$C0:E687,$C0:E738,178,Sub_E687,$C0,Engine (unnamed),matched,dfef32d3121d,Bank-switched tile-data WRAM copy: copies 32 bytes (16 words) from a ROM graphics bank into WRAM at the address in dp:$D0.
+$C0:E739,$C0:E7BB,131,Sub_E739,$C0,Engine (unnamed),matched,536d1ada9584,Bank-$D4 tile-data WRAM copy: 16 words from $D4:index → $7F:Y.
+$C0:E7BC,$C0:E83E,131,Sub_E7BC,$C0,Engine (unnamed),matched,ab67e4af407c,Bank-$D2 tile-data WRAM copy: 16 words from $D2:index → $7F:Y.
+$C0:E83F,$C0:E8C1,131,Sub_E83F,$C0,Engine (unnamed),matched,5ec0fb4af57e,Bank-$D3 tile-data WRAM copy: 16 words from $D3:index → $7F:Y.
+$C0:E8C2,$C0:E934,115,Sub_E8C2,$C0,Engine (unnamed),matched,9480e0d49641,Bank-$7F tile-data WRAM copy: 16 words from $7F:index → $7F:Y.
+$C0:E935,$C0:E951,29,Sub_E935,$C0,Engine (unnamed),matched,070f595d770e,"Initialize 8 sprite-slot ""uninitialized"" flags at $0BC0-$0BC7 to $80."
+$C0:E952,$C0:E979,40,Sub_E952,$C0,Engine (unnamed),matched,3074830cc667,Sprite slot allocator — single-slot variant.
+$C0:E97A,$C0:E9A9,48,Sub_E97A,$C0,Engine (unnamed),matched,c69dc74f7d12,Sprite slot allocator — dual-slot variant.
+$C0:E9AA,$C0:E9E1,56,Sub_E9AA,$C0,Engine (unnamed),matched,07a879cf6e8b,Sprite slot allocator — triple-slot variant.
+$C0:E9E2,$C0:E9FE,29,Sub_E9E2,$C0,Engine (unnamed),matched,3206d2cfabb8,
+$C0:E9FF,$C0:EA1E,32,Sub_E9FF,$C0,Engine (unnamed),matched,e528f5a70bf5,
+$C0:EA1F,$C0:EA41,35,Sub_EA1F,$C0,Engine (unnamed),matched,9cef01f49169,
+$C0:FF00,$C0:FF0F,16,Reset,$C0,Boot,readable,208b0705c41c,The CPU comes out of reset in emulation mode with I already set.
+$C0:FF10,$C0:FF13,4,NMI_Stub,$C0,Boot,readable,b4be75de9340,Native-mode interrupt stubs ($FF10–$FF17)
+$C0:FF14,$C0:FF17,4,IRQ_Stub,$C0,Boot,readable,bd12634e9770,
+$C0:FF18,$C0:FF1F,8,BRK_Handler,$C0,Boot,readable,5084e9025e2a,"A crash trap: it reads a fixed, recognizable address forever and never returns."
+$C0:FF20,$C0:FF27,8,BitSet,$C0,Engine,verified,67df1a0aff8b,"Bitmask lookup tables ($FF20–$FF2F) BitSet[N] = (1 << N), BitClear[N] = ~(1 << N), for N = 0..7."
+$C0:FF28,$C0:FF2F,8,BitClear,$C0,Engine,readable,012bbbcead94,
+$C0:FF30,$C0:FF6F,64,ScrollWaveA,$C0,Engine,readable,c6cbab686ed4,Wave tables ($FF30–$FFAF) Two identical 32-entry signed 16-bit tables: one period of a sine-like wave between -6 and +6.
+$C0:FF70,$C0:FFAF,64,ScrollWaveB,$C0,Engine,readable,5a72ed739650,
+$C0:FFB0,$C0:FFBC,13,RomExtHeader,$C0,ROM header,readable,1dcc24864b33,"SNES cartridge header ($FFB0–$FFDF), standard layout"
+$C0:FFBD,$C0:FFBD,1,RomExpansionRam,$C0,ROM header,readable,4a10f4fbea5d,
+$C0:FFBE,$C0:FFBE,1,RomSpecialVersion,$C0,ROM header,readable,e01cc8c6afac,
+$C0:FFBF,$C0:FFBF,1,RomCartridgeSubtype,$C0,ROM header,readable,6c2cda2586f8,
+$C0:FFC0,$C0:FFD4,21,ROMTitle,$C0,ROM header,readable,dd0883bd0760,
+$C0:FFD5,$C0:FFD5,1,RomMapMode,$C0,ROM header,readable,0f84279bb47f,
+$C0:FFD6,$C0:FFD6,1,RomType,$C0,ROM header,readable,04c3c05561f6,
+$C0:FFD7,$C0:FFD7,1,RomSize,$C0,ROM header,readable,753bbf27c372,
+$C0:FFD8,$C0:FFD8,1,RomSramSize,$C0,ROM header,readable,5da94208e63c,
+$C0:FFD9,$C0:FFD9,1,RomRegion,$C0,ROM header,readable,d4f657cb4395,
+$C0:FFDA,$C0:FFDA,1,RomDeveloperId,$C0,ROM header,readable,e0cc47ba5fa5,
+$C0:FFDB,$C0:FFDB,1,RomVersion,$C0,ROM header,readable,310a0a5fa6af,
+$C0:FFDC,$C0:FFDD,2,RomChecksumComplement,$C0,ROM header,readable,422bc75831ed,
+$C0:FFDE,$C0:FFDF,2,RomChecksum,$C0,ROM header,readable,b0c39e035e55,
+$C0:FFE0,$C0:FFFF,32,RomVectors,$C0,ROM header,readable,de5dde7a79b3,Interrupt vector table ($FFE0–$FFFF) Native mode: $FFE4–$FFEF.
+$C1:0089,$C1:00A6,30,Battle_Mul8,$C1,Battle engine,matched,e6b443f74c5f,8×8→16 HW multiply via $4202/$4203/$4216.
+$C1:00A7,$C1:00D6,48,Battle_MulAccum,$C1,Battle engine,matched,cab6b322dc69,"Multiply-accumulate: $A5 × $A7 via HW mult, 32-bit accumulate into $A9/$AA."
+$C1:00D7,$C1:010C,54,Battle_Divide,$C1,Battle engine,matched,019765e644f9,16÷8 HW divide via $4204/$4205/$4206/$4214.
 $C1:010D,$C1:0110,4,Battle_ShiftLeft7,$C1,Battle engine,readable,bb2d214c96cb,"$C1:010D–$C1:011E — Shift helpers (18 bytes, $010D–$011E) Overlapping fall-through stubs for power-of-2 left/right shifts on A."
 $C1:0111,$C1:0111,1,Battle_ShiftLeft4,$C1,Battle engine,readable,77e03f9cac8b,
 $C1:0112,$C1:0115,4,Battle_ShiftLeft3,$C1,Battle engine,readable,fe9eb52af7ca,
@@ -112,39 +126,39 @@ $C1:0116,$C1:0117,2,Loc_C10116,$C1,Engine,readable,73e069287465,
 $C1:0118,$C1:0118,1,Battle_ShiftRight6,$C1,Battle engine,readable,91b05803d8eb,
 $C1:0119,$C1:0119,1,Battle_ShiftRight5,$C1,Battle engine,readable,d4172c45304d,
 $C1:011A,$C1:011A,1,Battle_ShiftRight4,$C1,Battle engine,readable,d022f8f89c7c,
-$C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,readable,ef79d7418312,
-$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,matched,fbf2bcbb47fe,"Format the 16-bit value at $9499 into four font digit tiles: $949C = $FF (blank, thousands), $949D = hundreds, $949E = tens, $949F = ones."
-$C1:0174,$C1:01A8,53,Battle_DivTen9499,$C1,Battle engine,matched,fca785c79f9b,Two-digit variant of BattleMsg_FormatNumberDigits: formats $9499 as tens+ones only.
-$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,matched,fed8172cc0fe,"Copy 16-char source buf $94C0–$94CF (backup), blank $94A0/$94B0, then re-encode each char byte into tile ($94A0,X) + plane marker ($94B0,X): $40–$68 → tile += $40, plane = $71 $69–$72 → tile += $17, p"
-$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,matched,7c66aac365f6,Sine lookup: computes sin(A) × $AE and stores result in $AA.
-$C1:0222,$C1:0298,119,Calc_Delta16,$C1,Engine,matched,9d4a83eda7f3,16-bit signed vector delta and direction-angle computation.
+$C1:011B,$C1:011E,4,Battle_ShiftRight3,$C1,Battle engine,readable,26c7786bd957,
+$C1:011F,$C1:0173,85,BattleMsg_FormatNumberDigits,$C1,Battle text & numbers,matched,80ccd27ce3c1,"Format the 16-bit value at $9499 into four font digit tiles: $949C = $FF (blank, thousands), $949D = hundreds, $949E = tens, $949F = ones."
+$C1:0174,$C1:01A8,53,Battle_DivTen9499,$C1,Battle engine,matched,d313344acbf2,Two-digit variant of BattleMsg_FormatNumberDigits: formats $9499 as tens+ones only.
+$C1:01A9,$C1:01F8,80,BattleMsg_ReencodeTextBuffer,$C1,Battle text & numbers,matched,3d6cbe91600f,"Copy 16-char source buf $94C0–$94CF (backup), blank $94A0/$94B0, then re-encode each char byte into tile ($94A0,X) + plane marker ($94B0,X): $40–$68 → tile += $40, plane = $71 $69–$72 → tile += $17, p"
+$C1:01F9,$C1:0221,41,Battle_SinLookup,$C1,Battle engine,matched,096e9c1e1580,Sine lookup: computes sin(A) × $AE and stores result in $AA.
+$C1:0222,$C1:0298,119,Calc_Delta16,$C1,Engine,matched,e8da06957676,16-bit signed vector delta and direction-angle computation.
 $C1:0299,$C1:0304,108,BattleUI_BuildStatusBarFrame,$C1,Battle status bar,matched,ae0194ad5d6e,Initialises the battle status-bar tilemap buffer at WRAM $7E:0CC0: 1.
 $C1:0305,$C1:04C4,448,BattleUI_DrawPcNamePanel,$C1,Battle status bar,matched,0d6ac0bbb209,
-$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,matched,697b3e1aafd5,
+$C1:04C5,$C1:05A6,226,BattleUI_NextNamePanel,$C1,Battle status bar,matched,8e4fc9e039db,
 $C1:05A7,$C1:06DA,308,BattleUI_UpdateNextPcPanel,$C1,Battle status bar,matched,9bf0a49c8bf6,Peer to BattleUI_BuildStatusBarFrame: refreshes HP/MP display and ATB gauge bars for the next-active PC slot.
 $C1:06DB,$C1:06EE,20,Battle_DrawHpBars,$C1,Battle engine,matched,c608b870c1d7,
-$C1:06EF,$C1:06EF,1,UpdateNpc_exit,$C1,Engine,readable,f41176e8c712,
-$C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,matched,8a154077138f,Render the ATB gauge bar for PC slot $80 into the status-bar tilemap.
-$C1:0785,$C1:081D,153,BattleSys_SlotPanelRefresh,$C1,Battle system,matched,84a6852f386e,Write a 6-row × 7-col panel tile strip for PC slot A into the status-bar tilemap at base offset slot×12.
-$C1:081E,$C1:0871,84,BattleMenu_DrawReadyWindowEdges,$C1,Battle menu,matched,363cb91883b4,Draw the command-window border strips for all active PC slots and then clear/repaint the active-PC column (BattleUI_ClearActivePanelColumn).
-$C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,matched,b3f5a6932e93,"Zero a 6-row × 2-col block of tilemap ($0CC0/$0E02 + slot×12) for the current active slot ($95D5), then repaint ATB-source corner tiles if $A43F was set (newly-active PC $A6DD)."
-$C1:08E8,$C1:0928,65,BattleUI_SetPanelAttrColumn,$C1,Battle status bar,matched,1e84d5a7543e,"For PC slot A: pick the status-bar tilemap column offset from table $CCFA29 or $CCFA23 (depending on party layout $9F20) and write attr $29 to a 5-tile-high × 2-col block ($0CC0..$0D08,X stride $02)."
-$C1:0929,$C1:095C,52,BattleMenu_DrawWindowEdgeStrip,$C1,Battle menu,matched,dbefea7881df,Copy a 6-row window-border strip from tile table $D159FC into the command-window tilemap at $0B40+$82.
-$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,matched,3bf362e0dd37,Renders 3 visible item-list rows: 1.
+$C1:06EF,$C1:06EF,1,UpdateNpc_exit,$C1,Engine,readable,55fe22759e22,
+$C1:06F0,$C1:0784,149,BattleUI_DrawSlotGaugeBar,$C1,Battle status bar,matched,28ad98087a4d,Render the ATB gauge bar for PC slot $80 into the status-bar tilemap.
+$C1:0785,$C1:081D,153,BattleSys_SlotPanelRefresh,$C1,Battle system,matched,c71e56857713,Write a 6-row × 7-col panel tile strip for PC slot A into the status-bar tilemap at base offset slot×12.
+$C1:081E,$C1:0871,84,BattleMenu_DrawReadyWindowEdges,$C1,Battle menu,matched,621e30fb07f8,Draw the command-window border strips for all active PC slots and then clear/repaint the active-PC column (BattleUI_ClearActivePanelColumn).
+$C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,matched,c604d147e267,"Zero a 6-row × 2-col block of tilemap ($0CC0/$0E02 + slot×12) for the current active slot ($95D5), then repaint ATB-source corner tiles if $A43F was set (newly-active PC $A6DD)."
+$C1:08E8,$C1:0928,65,BattleUI_SetPanelAttrColumn,$C1,Battle status bar,matched,85f1a737ae40,"For PC slot A: pick the status-bar tilemap column offset from table $CCFA29 or $CCFA23 (depending on party layout $9F20) and write attr $29 to a 5-tile-high × 2-col block ($0CC0..$0D08,X stride $02)."
+$C1:0929,$C1:095C,52,BattleMenu_DrawWindowEdgeStrip,$C1,Battle menu,matched,7bec005a5626,Copy a 6-row window-border strip from tile table $D159FC into the command-window tilemap at $0B40+$82.
+$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,matched,143b9f88546c,Renders 3 visible item-list rows: 1.
 $C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,matched,555d369e2844,"CODE_JP_C10A87 (1 byte, $0A87) Renders one item-list row for item record at $7E:1580+$80."
-$C1:0A87,$C1:0A87,1,CODE_JP_C10A87,$C1,Engine,readable,60c035c0ae5e,
-$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,matched,e4fde5a04745,Renders 4 tech-list rows (2 per outer loop iteration) for the active PC.
-$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,matched,8de95c4a0968,"Builds availability array $7E:1CDB (20 entries, one per display slot) for the active PC's tech list."
-$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,matched,8e864f6b6ff1,"Renders one tech-list row into 16-word buffer $94A0 (cleared to $FFFF), then copies tile+attr pairs into window tilemap buffers $9A2F/$99EF."
-$C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,matched,413962414931,"Blank/fixed-string exit path from BattleMenu_RenderTechRow: increments scroll tracker, blanks MP digit fields, then copies 18 tile+attr pairs from $94A0 into tech-window buffer $9A29."
-$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankMpCostDigits,$C1,Battle menu,matched,00fc68cd7a66,Blanks two 3-cell MP-cost digit fields in the tech window: $9A29+$82 and $99E9+$82 (tile=$FF attr=$2D pairs × 3 each).
-$C1:0C00,$C1:0C2C,45,CODE_JP_C10C00,$C1,Engine,matched,316ba6b9dd35,"Tech-name exit path from BattleMenu_RenderTechRow: blanks two 4-cell tech-window digit fields: $9A45+$82 (MP cost) and $9A05+$82 (second field), 4 pairs each."
+$C1:0A87,$C1:0A87,1,CODE_JP_C10A87,$C1,Engine,readable,00edb101698a,
+$C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,matched,f34d8b620471,Renders 4 tech-list rows (2 per outer loop iteration) for the active PC.
+$C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,matched,3bc7d1499f88,"Builds availability array $7E:1CDB (20 entries, one per display slot) for the active PC's tech list."
+$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,matched,f57bb5b3ed98,"Renders one tech-list row into 16-word buffer $94A0 (cleared to $FFFF), then copies tile+attr pairs into window tilemap buffers $9A2F/$99EF."
+$C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,matched,c8e44870a665,"Blank/fixed-string exit path from BattleMenu_RenderTechRow: increments scroll tracker, blanks MP digit fields, then copies 18 tile+attr pairs from $94A0 into tech-window buffer $9A29."
+$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankMpCostDigits,$C1,Battle menu,matched,595f48e03927,Blanks two 3-cell MP-cost digit fields in the tech window: $9A29+$82 and $99E9+$82 (tile=$FF attr=$2D pairs × 3 each).
+$C1:0C00,$C1:0C2C,45,CODE_JP_C10C00,$C1,Engine,matched,f99f87df3b7a,"Tech-name exit path from BattleMenu_RenderTechRow: blanks two 4-cell tech-window digit fields: $9A45+$82 (MP cost) and $9A05+$82 (second field), 4 pairs each."
 $C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,matched,a31609962ab8,Per-frame window upkeep dispatcher.
-$C1:0C46,$C1:0C48,3,CODE_C10C46,$C1,Engine,readable,c214a307b7a5,
-$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,matched,74db9a102a94,Main command-window upkeep (submenu type 0): - If $A6DD (active-PC index) changed vs.
-$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,matched,89738e6ea6fb,"Tech-window content refresh (submenu type 1, called after UpdateTechMpAvail): 1."
-$C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,matched,a8c6c4d732e6,Clears old cursor tiles then draws row cursor ($60-$63) at the tech-list row given by $95DF[slot] (indexed via $CCFAE3 offset table) into window buffer $A6E1/$A721.
-$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,matched,7e349184be8c,"Writes $FF over the cursor-column tile slots of all 6 tech-window buffer rows ($A6E3/$A6E5, $A723/$A725, $A763/$A765, $A7A3/$A7A5, $A7E3/$A7E5, $A823/$A825)."
+$C1:0C46,$C1:0C48,3,CODE_C10C46,$C1,Engine,readable,f100e6f42dbf,
+$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,matched,703a5fc683dd,Main command-window upkeep (submenu type 0): - If $A6DD (active-PC index) changed vs.
+$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,matched,c190b65b5a6d,"Tech-window content refresh (submenu type 1, called after UpdateTechMpAvail): 1."
+$C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,matched,366a6a8dc13b,Clears old cursor tiles then draws row cursor ($60-$63) at the tech-list row given by $95DF[slot] (indexed via $CCFAE3 offset table) into window buffer $A6E1/$A721.
+$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,matched,a24f4932250a,"Writes $FF over the cursor-column tile slots of all 6 tech-window buffer rows ($A6E3/$A6E5, $A723/$A725, $A763/$A765, $A7A3/$A7A5, $A7E3/$A7E5, $A823/$A825)."
 $C1:0EE1,$C1:0F27,71,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,matched,e33d9e08baea,Per-row tech-availability sweep for the tech window (submenu type 1).
 $C1:0F28,$C1:0F56,47,CODE_JP_C10F28,$C1,Engine,matched,a26183999faa,
 $C1:0F57,$C1:0F61,11,_ump_check_fd,$C1,Engine,matched,6d14873c45a0,
@@ -158,86 +172,86 @@ $C1:0FD5,$C1:0FF0,28,_ump_slot_ready,$C1,Engine,matched,013b9b33cee1,
 $C1:0FF1,$C1:1000,16,_ump_write_bright,$C1,Engine,matched,45ef330bfbae,
 $C1:1001,$C1:100E,14,_L1001,$C1,Engine,matched,f461a5603099,
 $C1:100F,$C1:103C,46,CODE_JP_C1100F,$C1,Engine,matched,97b3d44a1a8e,
-$C1:103D,$C1:103D,1,CODE_JP_C1103D,$C1,Engine,readable,ef6b9bb28620,
-$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,matched,ef2e7b0c88d4,"Returns A=0 if battler for slot $80 is menu-ready (slot's $A6D9,X entry is valid / not negative, and $A0D1 lock flag is clear); nonzero otherwise."
-$C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,matched,5abb7c403e30,Leading-zero suppression for 3-digit HP/reward display.
-$C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,matched,71a2bade5e86,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
-$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,matched,9ed8dcf1621a,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (JSL $CD0009) before returning via "
-$C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,matched,d5cb2e0bb382,"Builds the 4 OAM entries for the command-window selection cursor at WRAM $0700, positioned relative to the active PC slot ($95D5)."
-$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,matched,c44064eea8a3,"Battle command-window input handler, called once per frame from the menu dirty-flag gates (RefreshIfDirtyL/AndTick)."
-$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,matched,751ab97b8c60,"Left D-pad: decrement active PC index $A6DD (wrap 0..2), skipping slots whose $A6D9 entry is invalid (negative)."
-$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,matched,9d2f86f1a915,Right D-pad: mirror of CycleActivePcPrev — increment $A6DD (wrap at 3 back to 0) instead of decrementing.
-$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,matched,d3cc744dff72,"Up D-pad: decrement the active PC's menu cursor row $95DC (wrap 0..2), flag a redraw via $A43F."
-$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,matched,6994142c83ce,"Down D-pad: increment the active PC's menu cursor row $95DC, wrap at 3 back to 0, flag a redraw via $A43F."
-$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,matched,9bd5a2fbccf6,"Confirm-button dispatch: sets a sentinel at $A0D7 (compared elsewhere, e.g."
-$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,matched,0acb818dc063,"Row 0 (Attack) confirm: shows the command message, flags two redraws via $A43F, sets target mode $960D=$07 (attack targeting), clears $9615 (submenu-open marker), builds the valid-target list, then en"
-$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,matched,34e9e58c6bf7,"Row 1 (Tech) confirm: unless $A0A7 bit 0 is set (tech list locked), renders the tech list rows, builds per-tech availability flags, switches the submenu to tech ($95DB=1, $9615=1), and marks the tech "
-$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,matched,902c8bdc7808,"Row 2 (Item) confirm: unless $A0A7 is set (item list locked), renders the item list rows, queues the $0E80 tilemap for VRAM upload, copies the $180-byte item-window graphic (ROM $D15BD0, ""ItemBoxBattl"
-$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,matched,69cedba42461,Per-frame input handler while the tech list is open ($95DB==1).
-$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,matched,5a2978eb7903,Confirms the highlighted tech: aborts if the tech-availability check ($A099) is clear or the tech's flag byte ($9EE5) marks it unavailable (bit 7).
-$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,matched,82f3d54b575f,"Closes the tech list: back to main menu ($95DB=0), force a command- window reload sentinel, and restore this PC's saved cursor/scroll position ($A863/$A866 -> $95DF/$95EB)."
-$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,matched,e9719a941d69,"Up/Left in the tech list: walks backward from the current index ($80) looking for an entry whose availability byte ($1CDB,X) is nonzero, skipping unavailable techs."
-$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,matched,1c0aae3b3789,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length ($A02A,Y) instead of the start of the list, and scrolls the row/scroll pair down ins"
-$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,matched,2701253db1c6,Per-frame input handler while the item list is open ($95DB==2).
-$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,matched,0106ecfcc398,"Confirms the highlighted item: index = (scroll $95E6 + cursor $95E5) * 5 into the item record table at $1580 (id, target mode, flags, quantity — one padding byte, 5-byte stride)."
-$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,matched,d9d1c7cd3d84,"Closes the item list: back to main menu ($95DB=0), force a command- window reload sentinel, and invalidate the scroll-arrow indicators."
-$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,matched,329d4dbc2c29,"Up/Left in the item list: decrement cursor row $95E5, scrolling the list up via ItemListScrollUp when already at the top row."
-$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,matched,aa5d3cc30c66,"Down/Right in the item list: increment cursor row $95E5 (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
-$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,matched,1e1748d60736,"$EE bit $20: page the item list down 3 rows at once, clamped at scroll position $FA."
-$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,matched,33cc38227e95,"$EE bit $10: page the item list up 3 rows at once, clamped at 0."
-$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,matched,0d661e46e250,"Re-renders the item list rows and invalidates the scroll-arrow indicators when $A0D0 (refresh-pending flag) is set, clearing it."
-$C1:1561,$C1:1619,185,BattleMenu_TargetSelectInput,$C1,Battle menu,matched,fe12475073a7,Per-frame input handler while target-select mode is active (entered from BattleMenu_ProcessInput when $9609 != 0).
-$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,matched,37f801417854,"Confirms the currently-selected target and builds the command record for the active PC's chosen action (attack/tech/item), then enqueues it and hands the menu focus to the next ready battler."
-$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,matched,0f7bed3d3a73,"Removes battler slot $80 from the ready/active state as part of committing a dual/triple-tech: if it's currently the active roster slot, decrements the active-PC count; either way marks the slot absen"
-$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,matched,735c6abd2c7d,"Right/Down while cycling targets: advance $9614 (wrap at 11), skip candidate-list slots whose $99C0,X entry is invalid, store the landed battler id to $A62D."
-$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,matched,abb0ff3f754b,Left/Up while cycling targets: mirror of TargetNext — decrement $9614 (wrap to 10) instead of incrementing.
-$C1:179C,$C1:17A0,5,Battle_ZeroResultEE,$C1,Battle engine,matched,fa0f6c9899c0,"Clears both pad-edge bytes ($EE, $EF) and returns."
+$C1:103D,$C1:103D,1,CODE_JP_C1103D,$C1,Engine,readable,c974e5d65b7f,
+$C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,matched,5f92371ff9df,"Returns A=0 if battler for slot $80 is menu-ready (slot's $A6D9,X entry is valid / not negative, and $A0D1 lock flag is clear); nonzero otherwise."
+$C1:104E,$C1:106D,32,BattleMsg_BlankLeadingZeros,$C1,Battle text & numbers,matched,cf7b9cb03d92,Leading-zero suppression for 3-digit HP/reward display.
+$C1:10E3,$C1:10F9,23,BattleMenu_RefreshIfDirtyL,$C1,Battle menu,matched,0e99654e26ce,"JSL-entry twin of BattleMenu_RefreshIfDirtyAndTick, reached via the bank's cross-bank entry-vector table: JSL $C10012 -> JMP $C110E3."
+$C1:10FA,$C1:1114,27,BattleMenu_RefreshIfDirtyAndTick,$C1,Battle menu,matched,e8b8b9c98965,"Same-bank JSR twin of BattleMenu_RefreshIfDirtyL — identical dirty- flag gate and menu rebuild chain, but always follows up with a cross-bank per-frame service tick (JSL $CD0009) before returning via "
+$C1:1115,$C1:1152,62,BattleMenu_DrawCursorSprites,$C1,Battle menu,matched,67917af2801b,"Builds the 4 OAM entries for the command-window selection cursor at WRAM $0700, positioned relative to the active PC slot ($95D5)."
+$C1:1153,$C1:11E0,142,BattleMenu_ProcessInput,$C1,Battle menu,matched,9bb4a9b870a4,"Battle command-window input handler, called once per frame from the menu dirty-flag gates (RefreshIfDirtyL/AndTick)."
+$C1:11E1,$C1:1217,55,BattleMenu_CycleActivePcPrev,$C1,Battle menu,matched,18d690a327d2,"Left D-pad: decrement active PC index $A6DD (wrap 0..2), skipping slots whose $A6D9 entry is invalid (negative)."
+$C1:1218,$C1:124F,56,BattleMenu_CycleActivePcNext,$C1,Battle menu,matched,bd972d137205,Right D-pad: mirror of CycleActivePcPrev — increment $A6DD (wrap at 3 back to 0) instead of decrementing.
+$C1:1250,$C1:1263,20,BattleMenu_CursorUp,$C1,Battle menu,matched,35f48f041880,"Up D-pad: decrement the active PC's menu cursor row $95DC (wrap 0..2), flag a redraw via $A43F."
+$C1:1264,$C1:127A,23,BattleMenu_CursorDown,$C1,Battle menu,matched,28df562588f6,"Down D-pad: increment the active PC's menu cursor row $95DC, wrap at 3 back to 0, flag a redraw via $A43F."
+$C1:127B,$C1:129B,33,BattleMenu_ConfirmCommand,$C1,Battle menu,matched,c53e33e04cd2,"Confirm-button dispatch: sets a sentinel at $A0D7 (compared elsewhere, e.g."
+$C1:129C,$C1:12BB,32,BattleMenu_ChooseAttack,$C1,Battle menu,matched,89715b858b29,"Row 0 (Attack) confirm: shows the command message, flags two redraws via $A43F, sets target mode $960D=$07 (attack targeting), clears $9615 (submenu-open marker), builds the valid-target list, then en"
+$C1:12BC,$C1:12EC,49,BattleMenu_OpenTechList,$C1,Battle menu,matched,6863802c46a3,"Row 1 (Tech) confirm: unless $A0A7 bit 0 is set (tech list locked), renders the tech list rows, builds per-tech availability flags, switches the submenu to tech ($95DB=1, $9615=1), and marks the tech "
+$C1:12ED,$C1:131F,51,BattleMenu_OpenItemList,$C1,Battle menu,matched,8a644afe6de0,"Row 2 (Item) confirm: unless $A0A7 is set (item list locked), renders the item list rows, queues the $0E80 tilemap for VRAM upload, copies the $180-byte item-window graphic (ROM $D15BD0, ""ItemBoxBattl"
+$C1:1320,$C1:1368,73,BattleMenu_TechListInput,$C1,Battle menu,matched,d62ab5acce01,Per-frame input handler while the tech list is open ($95DB==1).
+$C1:1369,$C1:138E,38,BattleMenu_TechConfirm,$C1,Battle menu,matched,d3c3f3346f92,Confirms the highlighted tech: aborts if the tech-availability check ($A099) is clear or the tech's flag byte ($9EE5) marks it unavailable (bit 7).
+$C1:138F,$C1:13AC,30,BattleMenu_TechListCancel,$C1,Battle menu,matched,d84c4e79bc2e,"Closes the tech list: back to main menu ($95DB=0), force a command- window reload sentinel, and restore this PC's saved cursor/scroll position ($A863/$A866 -> $95DF/$95EB)."
+$C1:13AD,$C1:13F3,71,BattleMenu_TechListPrev,$C1,Battle menu,matched,77d68610294a,"Up/Left in the tech list: walks backward from the current index ($80) looking for an entry whose availability byte ($1CDB,X) is nonzero, skipping unavailable techs."
+$C1:13F4,$C1:143C,73,BattleMenu_TechListNext,$C1,Battle menu,matched,b7b170235358,"Down/Right in the tech list: mirror of TechListPrev — walks forward instead of backward, bounded by the list length ($A02A,Y) instead of the start of the list, and scrolls the row/scroll pair down ins"
+$C1:143D,$C1:1497,91,BattleMenu_ItemListInput,$C1,Battle menu,matched,79d556f37291,Per-frame input handler while the item list is open ($95DB==2).
+$C1:1498,$C1:14DA,67,BattleMenu_ItemConfirm,$C1,Battle menu,matched,39f5cc137b5c,"Confirms the highlighted item: index = (scroll $95E6 + cursor $95E5) * 5 into the item record table at $1580 (id, target mode, flags, quantity — one padding byte, 5-byte stride)."
+$C1:14DB,$C1:14EB,17,BattleMenu_ItemListCancel,$C1,Battle menu,matched,a5321f45a735,"Closes the item list: back to main menu ($95DB=0), force a command- window reload sentinel, and invalidate the scroll-arrow indicators."
+$C1:14EC,$C1:1501,22,BattleMenu_ItemCursorUp,$C1,Battle menu,matched,905766b41b8a,"Up/Left in the item list: decrement cursor row $95E5, scrolling the list up via ItemListScrollUp when already at the top row."
+$C1:1502,$C1:151B,26,BattleMenu_ItemCursorDown,$C1,Battle menu,matched,f0c0672db551,"Down/Right in the item list: increment cursor row $95E5 (max 2), scrolling the list down via ItemListScrollDown when already at the bottom row."
+$C1:151C,$C1:1536,27,BattleMenu_ItemListPageDown,$C1,Battle menu,matched,48d067502fbe,"$EE bit $20: page the item list down 3 rows at once, clamped at scroll position $FA."
+$C1:1537,$C1:154A,20,BattleMenu_ItemListPageUp,$C1,Battle menu,matched,1ceaf4ed976f,"$EE bit $10: page the item list up 3 rows at once, clamped at 0."
+$C1:154B,$C1:1560,22,BattleMenu_ItemListRefresh,$C1,Battle menu,matched,f34ba6e0049c,"Re-renders the item list rows and invalidates the scroll-arrow indicators when $A0D0 (refresh-pending flag) is set, clearing it."
+$C1:1561,$C1:1619,185,BattleMenu_TargetSelectInput,$C1,Battle menu,matched,f43098509702,Per-frame input handler while target-select mode is active (entered from BattleMenu_ProcessInput when $9609 != 0).
+$C1:161A,$C1:174D,308,BattleMenu_CommitAction,$C1,Battle menu,matched,3705a98c66d7,"Confirms the currently-selected target and builds the command record for the active PC's chosen action (attack/tech/item), then enqueues it and hands the menu focus to the next ready battler."
+$C1:174E,$C1:176B,30,BattleMenu_ConsumePartnerSlot,$C1,Battle menu,matched,5b4714a63a11,"Removes battler slot $80 from the ready/active state as part of committing a dual/triple-tech: if it's currently the active roster slot, decrements the active-PC count; either way marks the slot absen"
+$C1:176C,$C1:1785,26,BattleMenu_TargetNext,$C1,Battle menu,matched,4541b705d069,"Right/Down while cycling targets: advance $9614 (wrap at 11), skip candidate-list slots whose $99C0,X entry is invalid, store the landed battler id to $A62D."
+$C1:1786,$C1:179B,22,BattleMenu_TargetPrev,$C1,Battle menu,matched,7d097ea40905,Left/Up while cycling targets: mirror of TargetNext — decrement $9614 (wrap to 10) instead of incrementing.
+$C1:179C,$C1:17A0,5,Battle_ZeroResultEE,$C1,Battle engine,matched,38721f33eb6a,"Clears both pad-edge bytes ($EE, $EF) and returns."
 $C1:17A1,$C1:17B0,16,BattleMenu_ItemListScrollUp,$C1,Battle menu,matched,7feab2963cec,"Scrolls the item list up one row: decrements $95E6 (min 0), then re-renders and invalidates the scroll-arrow indicators."
 $C1:17B1,$C1:17B2,2,BattleMenu_ItemListScrollUp_SetScroll,$C1,Battle menu,matched,10ac251bc8e5,
 $C1:17B3,$C1:17B5,3,BattleMenu_ItemListScrollUp_RenderTail,$C1,Battle menu,readable,f325bfe623ce,
-$C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,matched,3e9ff9a90c3b,
+$C1:17B6,$C1:17BE,9,BattleMenu_ItemListScrollUp_SkipRender,$C1,Battle menu,matched,fcdda0be25e5,
 $C1:17BF,$C1:17D0,18,BattleMenu_ItemListScrollDown,$C1,Battle menu,matched,2136e249e6d1,"Scrolls the item list down one row: increments $95E6 (clamped at $FA), then re-renders and invalidates the scroll-arrow indicators."
 $C1:17D1,$C1:17D3,3,BattleMenu_ItemListScrollDown_RenderTail,$C1,Battle menu,readable,1cb83529e976,
-$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,matched,191e38c24bd4,
+$C1:17D4,$C1:17DC,9,BattleMenu_ItemListScrollDown_SkipRender,$C1,Battle menu,matched,8e6ae8d74412,
 $C1:17DD,$C1:1B18,828,BattleMenu_UpdateCursorOverlay,$C1,Battle menu,matched,416c9b4977c0,"Per-frame cursor/overlay refresh, called once per frame from the end of the menu rebuild chain (after ProcessInput)."
-$C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,matched,66127efddd69,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
-$C1:1B55,$C1:1B66,18,Battle_StopSfx,$C1,Battle engine,matched,699bf9d22d8b,SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90 pattern): sets $1E00-$1E02 and JSLs into the audio driver entry.
-$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,matched,0aa7d70c03db,"Pops the head of the ATB-ready queue ($95D6-$95D9, up to 3 deep, count in $95DA) into the active menu roster: restores that battler's saved cursor position ($A863/$A866 -> $95DF/$95EB), marks it prese"
-$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,matched,08233ed500cd,Service 2 of the cross-bank $C10045 service API (see the entry-vector table near the top of this bank).
-$C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,matched,6a03b33b6c39,Loads $180 bytes from bank $D1 (TechBoxBattles at $D15800) into WRAM $7E:0B40.
-$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,matched,07128562f067,"Resets the target-selection state ($9613/$960A/$960C/$A64F/$A6D8), blanks the 11-entry candidate list ($99C0-$99CA) and selection list ($A62D-$A637) to $FF, then — unless already in a ""return to main "
-$C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,matched,e06611d1c8f1,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
-$C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,readable,d4fd8cdb7582,
-$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,readable,1d3f6a0fe8b3,"Target-mode handler table, indexed by ($960D & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
+$C1:1B19,$C1:1B54,60,BattleMenu_EnqueueReadyBattler,$C1,Battle menu,matched,b6c3e371b56b,"Service 1 of the cross-bank $C10045 service API (dispatch table at $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady)."
+$C1:1B55,$C1:1B66,18,Battle_StopSfx,$C1,Battle engine,matched,f48d9328f78f,SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90 pattern): sets $1E00-$1E02 and JSLs into the audio driver entry.
+$C1:1B67,$C1:1BA9,67,BattleMenu_DequeueReadyBattler,$C1,Battle menu,matched,85ac21c6579e,"Pops the head of the ATB-ready queue ($95D6-$95D9, up to 3 deep, count in $95DA) into the active menu roster: restores that battler's saved cursor position ($A863/$A866 -> $95DF/$95EB), marks it prese"
+$C1:1BAA,$C1:1C39,144,BattleMenu_RemoveBattlerFromReady,$C1,Battle menu,matched,fea2d0313e1a,Service 2 of the cross-bank $C10045 service API (see the entry-vector table near the top of this bank).
+$C1:1C3A,$C1:1C49,16,BattleMenu_LoadCommandWindowMap,$C1,Battle menu,matched,948eae9f021c,Loads $180 bytes from bank $D1 (TechBoxBattles at $D15800) into WRAM $7E:0B40.
+$C1:1F79,$C1:1FDC,100,BattleMenu_BuildTargetList,$C1,Battle menu,matched,23c6a907af29,"Resets the target-selection state ($9613/$960A/$960C/$A64F/$A6D8), blanks the 11-entry candidate list ($99C0-$99CA) and selection list ($A62D-$A637) to $FF, then — unless already in a ""return to main "
+$C1:1FDD,$C1:1FE9,13,BattleTgt_RunAreaQuery,$C1,Battle targeting,matched,0a502788d2b6,Service 7 of the cross-bank $C10045 service API (dispatch table at $C10051).
+$C1:1FEA,$C1:1FF7,14,BattleTgt_AreaTable,$C1,Battle targeting,readable,e4274e1883f8,
+$C1:1FF8,$C1:2039,66,BattleTgt_ModeTable,$C1,Battle targeting,readable,47a5d17e8158,"Target-mode handler table, indexed by ($960D & $7F) clamped to $20, called from BattleMenu_BuildTargetList."
 $C1:203A,$C1:2044,11,BattleTgt_SingleAlly,$C1,Battle targeting,matched,fc23366f069c,"Default mode: one PC (slots 0-2), cursor may cycle."
-$C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,matched,e3c5f4a0e413,
-$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,matched,e0774c25e147,
-$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,matched,98aaf3cb0a1c,cursor may cycle.
-$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,matched,7a98d57761e7,
-$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,matched,beaf7f5e3ee0,
-$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,matched,783740b5e591,
-$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,matched,b9d1982b211d,"Lists the PCs whose status byte (+$4A in each PC's $80-byte battle record at $5E00) has bit 7 set — by context, KO'd allies, i.e."
+$C1:2045,$C1:2099,85,BattleTgt_CollectValidTargets,$C1,Battle targeting,matched,a3a3e1530e01,
+$C1:209A,$C1:20A8,15,BattleTgt_AllAllies,$C1,Battle targeting,matched,77f6548c64e8,
+$C1:20A9,$C1:20B5,13,BattleTgt_SingleEnemy,$C1,Battle targeting,matched,e5a40d733e61,cursor may cycle.
+$C1:20B6,$C1:20C5,16,BattleTgt_AllEnemies,$C1,Battle targeting,matched,c02159422e82,
+$C1:20C6,$C1:20D5,16,BattleTgt_Everyone,$C1,Battle targeting,matched,de016e5a6d72,
+$C1:20D6,$C1:20DF,10,BattleTgt_Self,$C1,Battle targeting,matched,4aa19e3ad103,
+$C1:20E0,$C1:2135,86,BattleTgt_SingleKoAlly,$C1,Battle targeting,matched,f3cc7362c02e,"Lists the PCs whose status byte (+$4A in each PC's $80-byte battle record at $5E00) has bit 7 set — by context, KO'd allies, i.e."
 $C1:2136,$C1:2139,4,BattleTgt_PcByCharId5,$C1,Battle targeting,matched,7d6df814b908,"Targets the one party member whose $2980,X entry equals $80 (5 for this entry, 4 via BattleTgt_PcByCharId4)."
-$C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,matched,997d52aab9aa,
-$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,matched,195239eb89fc,
-$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,matched,37fead2de494,
-$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,matched,aa0730b64374,but the source is the party member with id 3 (no-op if absent)
-$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,matched,ec433a9b8ab4,EnemyLineFromCaster with variant flag $9608 = 1
-$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,matched,d53fbb6e216e,the caster
-$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,matched,45fdf7179f7d,"chosen enemy; size $19 for mode $1A, else $09"
-$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,matched,22f7daab05bd,"member id 3; size $19 for mode $14, else $10"
-$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,matched,2d9a7c132171,party member id 6
-$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,matched,4c507a3d92b8,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's $1D23 screen y)
-$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,matched,1f6e7e011651,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
-$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,matched,70fdf49789b0,"""Row"" area: every eligible battler on the scanned side whose screen y ($1D23,X) lies within +/-$20 of the centre battler's y."
-$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,matched,af83e119a9da,"Enemies inside the triangle whose corners are the screen positions of party slots 0, 1 and 2 ($1D0C/$1D23 for X = 0-2)."
-$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,matched,4d143caa2016,"""Line"" area from the source battler ($9605) towards the aimed-at battler ($9606), half-width r = $9607 * 8 (scale passed to Battle_SinLookup via $AE; $9607 = $02 from every caller seen)."
+$C1:213A,$C1:2162,41,BattleTgt_FindPcByCharId,$C1,Battle targeting,matched,68de08b2438f,
+$C1:2163,$C1:2168,6,BattleTgt_PcByCharId4,$C1,Battle targeting,matched,461786da564e,
+$C1:2169,$C1:21AE,70,BattleTgt_EnemyLineFromCaster,$C1,Battle targeting,matched,b70fb1a0079f,
+$C1:21AF,$C1:2202,84,BattleTgt_EnemyLineFromChar3,$C1,Battle targeting,matched,56b61021b599,but the source is the party member with id 3 (no-op if absent)
+$C1:2203,$C1:224A,72,BattleTgt_EnemyLineFromCaster2,$C1,Battle targeting,matched,4fe635980a21,EnemyLineFromCaster with variant flag $9608 = 1
+$C1:224B,$C1:225E,20,BattleTgt_CasterRadius,$C1,Battle targeting,matched,a9918d9b32d6,the caster
+$C1:225F,$C1:22A3,69,BattleTgt_EnemyRadius,$C1,Battle targeting,matched,9d146ab0984a,"chosen enemy; size $19 for mode $1A, else $09"
+$C1:22A4,$C1:22D2,47,BattleTgt_Char3Radius,$C1,Battle targeting,matched,7aacf4885054,"member id 3; size $19 for mode $14, else $10"
+$C1:22D3,$C1:22F4,34,BattleTgt_Char6Radius,$C1,Battle targeting,matched,110bffff7f23,party member id 6
+$C1:22F5,$C1:2328,52,BattleTgt_EnemyRow,$C1,Battle targeting,matched,4e94e4d08b03,chosen enemy as anchor for BattleTgt_AreaRow (a +/-$20 band around the anchor's $1D23 screen y)
+$C1:2329,$C1:2331,9,BattleTgt_PartyTriangle,$C1,Battle targeting,matched,aa857118c677,the triangle formed by the three PCs (BattleTgt_AreaPartyTriangle)
+$C1:2332,$C1:23A3,114,BattleTgt_AreaRow,$C1,Battle targeting,matched,299685ac6dd8,"""Row"" area: every eligible battler on the scanned side whose screen y ($1D23,X) lies within +/-$20 of the centre battler's y."
+$C1:23A4,$C1:25A2,511,BattleTgt_AreaPartyTriangle,$C1,Battle targeting,matched,cc761876e4bb,"Enemies inside the triangle whose corners are the screen positions of party slots 0, 1 and 2 ($1D0C/$1D23 for X = 0-2)."
+$C1:25A3,$C1:2700,350,BattleTgt_AreaLine,$C1,Battle targeting,matched,a84e1a91116d,"""Line"" area from the source battler ($9605) towards the aimed-at battler ($9606), half-width r = $9607 * 8 (scale passed to Battle_SinLookup via $AE; $9607 = $02 from every caller seen)."
 $C1:2701,$C1:27AC,172,BattleTgt_AreaCircle,$C1,Battle targeting,matched,72d881e85a02,"""Circle"" area around the centre battler ($9605)."
-$C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,matched,f5057da087b6,
-$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,matched,e16cf345c9cf,"front slot is empty (requester wasn't eligible), shift the list left by one."
-$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,matched,a6d5f0ec5fbd,"and selection lists (12 entries each, one more than they use)"
-$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,matched,0f4830a9e8b4,target-all and copy the 11 candidates into the selection list
-$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,matched,84242cae68c7,next non-empty candidate (wrap at 11); no-op on an empty list.
-$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,matched,aacc0f683bf4,
-$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,matched,deee43e54016,"candidate slots are $FF, Z=0 as soon as one isn't"
-$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,readable,8154143b5e4a,MainInit — hardware initialization File offset: $3DC000 | SNES $FD:C000 Called via: JML from Reset ($00:FF03)
+$C1:27AD,$C1:27C4,24,BattleTgt_AreaAddAnchor,$C1,Battle targeting,matched,2d5e1c1a17e2,
+$C1:27C5,$C1:27D8,20,BattleTgt_CompactCandidates,$C1,Battle targeting,matched,56686fd4a465,"front slot is empty (requester wasn't eligible), shift the list left by one."
+$C1:27D9,$C1:27E7,15,BattleTgt_ClearLists,$C1,Battle targeting,matched,b37888452985,"and selection lists (12 entries each, one more than they use)"
+$C1:27E8,$C1:27F9,18,BattleTgt_SelectAllCandidates,$C1,Battle targeting,matched,d0b472621092,target-all and copy the 11 candidates into the selection list
+$C1:27FA,$C1:2813,26,BattleTgt_CycleNext,$C1,Battle targeting,matched,069fbcdd3edd,next non-empty candidate (wrap at 11); no-op on an empty list.
+$C1:2814,$C1:282C,25,BattleTgt_CyclePrev,$C1,Battle targeting,matched,d2737ff6cfbd,
+$C1:282D,$C1:283C,16,BattleTgt_AnyCandidate,$C1,Battle targeting,matched,948fe3d5fb82,"candidate slots are $FF, Z=0 as soon as one isn't"
+$FD:C000,$FD:C0D6,215,MainInit,$FD,Boot,readable,d2e8dff554e2,Called via: JML from Reset ($00:FF03)

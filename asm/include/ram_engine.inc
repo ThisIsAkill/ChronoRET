@@ -20,9 +20,12 @@ if !ram_engine_inc == 0
 
 ; --- Stack / fixed RAM ---
 !StackTop        = $06FF     ; initial S (MainInit); stack grows down from $06FF
-!NmiTrampoline   = $000500   ; 4 B: JML to the NMI handler, installed at boot (bank $00 NMI_Stub jumps here)
-!IrqTrampoline   = $000504   ; 4 B: JML to the IRQ handler, installed at boot
-!CrashMarkerRead = $ABCDEF   ; BRK/COP trap reads this recognizable address in a loop;
-                             ; inferred: a marker for bus traces/debuggers, not real data
+!NmiTrampoline   = $000500   ; 4 B: JML target of the native NMI stub ($00:FF10). Installed by
+                             ; InstallNMI ($C0:0B64, from the GameLoop init path) as JML $C0:EA63;
+                             ; set to RTI ($40) by $C0:2E4B and repointed into bank $FD by
+                             ; $FD:EAF4 (JML $FD:DE15). Not touched by MainInit.
+!IrqTrampoline   = $000504   ; 4 B: JML target of the native IRQ stub ($00:FF14). Installed by
+                             ; $C0:0B75 as JML $C0:ECCC; set to RTI by $C0:2E4B and repointed by
+                             ; $FD:EAF9 (JML $FD:DE87).
 
 endif

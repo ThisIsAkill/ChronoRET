@@ -4,16 +4,16 @@
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 242,
+      "functions": 256,
       "bytes": 29032
     },
     "readable": {
-      "functions": 27,
+      "functions": 41,
       "bytes": 584
     },
     "verified": {
-      "functions": 2,
-      "bytes": 16
+      "functions": 1,
+      "bytes": 8
     }
   },
   "banks": [
@@ -22,16 +22,16 @@
       "code_bytes": 61779,
       "emitted_bytes": 19585,
       "matched": {
-        "functions": 103,
+        "functions": 117,
         "bytes": 19585
       },
       "readable": {
-        "functions": 9,
+        "functions": 23,
         "bytes": 256
       },
       "verified": {
-        "functions": 2,
-        "bytes": 16
+        "functions": 1,
+        "bytes": 8
       }
     },
     {
@@ -291,7 +291,21 @@
         "BitClear",
         "ScrollWaveA",
         "ScrollWaveB",
-        "ROMTitle"
+        "RomExtHeader",
+        "RomExpansionRam",
+        "RomSpecialVersion",
+        "RomCartridgeSubtype",
+        "ROMTitle",
+        "RomMapMode",
+        "RomType",
+        "RomSize",
+        "RomSramSize",
+        "RomRegion",
+        "RomDeveloperId",
+        "RomVersion",
+        "RomChecksumComplement",
+        "RomChecksum",
+        "RomVectors"
       ]
     },
     {
