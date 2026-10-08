@@ -2936,8 +2936,9 @@ BattleMsg_BlankLeadingZeros:
 ; directly). Runs the battle's per-frame upkeep across two waits:
 ;   1. Unless !Battle_UnkA10E is set: clear !Battle_UnkA0FD, and if
 ;      !Battle_Unk99CF or !Battle_Unk99D0 is set while !Battle_Unk2989
-;      bit 7 is set, clear both and, the first time only
-;      (!Battle_Unk99D1 latch), send info message $FF then $75.
+;      bit 7 is set, clear both and, once per L+R hold (!Battle_Unk99D1
+;      latch, cleared again by the bank-$CF frame routine at $CF:E732
+;      whenever L and R are not both held), send info message $FF then $75.
 ;   2. Wait (BattleSys_PumpFrames), service tick, PC upkeep
 ;      (Battle_TickPcSlots, with !Battle_UnkA4 saved in !Battle_Unk993B
 ;      and taken back from it if that changed), the slot timers and the

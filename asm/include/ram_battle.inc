@@ -365,7 +365,7 @@ endstruct
 !Battle_Unk99CF          = $99CF ; 1 B: with !Battle_Unk99D0: either non-zero (and !Battle_Unk2989 bit 7) makes
                                  ; BattleSys_UpkeepTwoFrames clear both and show info message $75 once; purpose unknown
 !Battle_Unk99D0          = $99D0 ; 1 B: see !Battle_Unk99CF
-!Battle_Unk99D1          = $99D1 ; 1 B: latch: set when that message has been shown, so it is shown once
+!Battle_Unk99D1          = $99D1 ; 1 B: latch: set when that message is shown; $CF:E732 clears it whenever L+R are not both held, so once per hold
 !Battle_CmdQueue         = $99D4 ; 4 B: PC slots with a committed command, in commit order
 !Battle_CmdQueueLen      = $99D8 ; 1 B: entries in !Battle_CmdQueue
 !Battle_StatusAnimNext   = $99D9 ; 1 B: battler slot Battle_PickNextStatusAnim picks next (3-10 after the first pass;
