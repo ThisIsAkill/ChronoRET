@@ -21587,15 +21587,16 @@ BattleSys_Main:
 ;     BattleSys_UnkB575 runs after each entry, BattleSys_ClearUnkB192
 ;     between entries. !Battle_UnkB1D4, !Battle_UnkB24A, !Battle_UnkB263
 ;     and !Battle_UnkB2B6 are indexed here by the list position
-;     !Battle_UnkB315, where BattleSys_Unk8C09 indexes them by enemy
-;     (a bug or not, not known). The reading as "reactions to the last action"
+;     !Battle_UnkB315; BattleSys_Unk8C09 (through BattleSys_UnkAFD2)
+;     indexes B24A, B263 and B2B6 by enemy instead (a bug or not, not
+;     known). The reading as "reactions to the last action"
 ;     rests on !Battle_UnkB3AC being copied right after it; not traced.
 ;   - .end: BattleSys_UnkAC5E; unless DP !Battle_Unk24 is set,
 ;     BattleSys_Unk8C09; !Battle_UnkB18B = !Battle_UnkB3B7,
 ;     BattleSys_ClearUnkB192, BattleSys_UnkAC46, BattleFD_UnkACEE;
 ;     !Battle_UnkB2C0 = 0.
 ; Quirks: a NOP after the bit-5 test ($C1:864A); in .react the LDX of
-; !Battle_UnkB1D2 at $C1:87F0 is dead (X is reloaded at once).
+; !Battle_UnkB1D2 at $C1:87EE is dead (X is reloaded at once).
 ; Callers: BattleSys_Main ($C1:822B); also entry 12 of
 ;   BattleSys_ListHandlerTable.
 ; Entry: M=1, X=0, DP=0, DB=$7E (.b direct page, .w WRAM operands); A
@@ -22149,8 +22150,9 @@ BattleSys_ClearUnkB192:
 ; (see the banner); at the end of its runs it clears BattlerStats.Status2
 ; bit 7 of the slot.
 ; Callers: none by call; entry 0 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
@@ -22321,8 +22323,9 @@ BattleSys_Unk895B:
 ; the entry: no status bit is cleared.
 ; Quirk: it still computes X = slot * $80 there and does not use it.
 ; Callers: none by call; entry 2 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
@@ -22368,8 +22371,9 @@ BattleSys_ListHandler2:
 ; Turn list 3: the usual handler; at the end of its runs it clears bit 7
 ; of the slot's BattlerStats.Unk4C+1 (+$4D).
 ; Callers: none by call; entry 3 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
@@ -22418,8 +22422,9 @@ BattleSys_ListHandler3:
 ; Turn list 4: the usual handler; at the end of its runs it clears bit 6
 ; of the slot's BattlerStats.Unk4C+1 (+$4D).
 ; Callers: none by call; entry 4 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
@@ -22468,8 +22473,9 @@ BattleSys_ListHandler4:
 ; Turn list 5: the usual handler; at the end of its runs it clears bit 6
 ; of the slot's BattlerStats.Unk4C+2 (+$4E).
 ; Callers: none by call; entry 5 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
@@ -22704,8 +22710,9 @@ BattleSys_ListHandler9:
 ; Turn list 10: the usual handler; at the end of its runs it clears
 ; bit 2 of the slot's BattlerStats.Unk4C+2 (+$4E).
 ; Callers: none by call; entry 10 of BattleSys_ListHandlerTable.
-; Entry: M=1, X=0, DP=0 (not used), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X = the list's !Battle_SlotOrder
+; Entry: M=1, X=0, DP=0 (TDC loads A = 0 for the B=0 TAX/TAY), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the runs left (B=0), 0 after
+;        the last run; X = the list's !Battle_SlotOrder
 ;        position, or slot * $80 after the last run; Y = the slot; the list's
 ;        !Battle_ListDue bit cleared and its entries for the slot
 ;        changed as above
