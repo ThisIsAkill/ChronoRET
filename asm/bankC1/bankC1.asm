@@ -26585,14 +26585,18 @@ BattleSys_UnkBD6F:
 ;   - !Battle_UnkB188[slot] = 0 (after a dead store of 1),
 ;     !Battler_UnkAFAB = !Battle_UnkB158, BattleSys_UnkBD6F;
 ;   - unless that is $FF: + !Battler_UnkAFAB * n / 10, at most $FF, n =
-;     the high nibble of !BattleRom_TechWaitNib[!Battle_UnkB18C] for
-;     user 0, its low nibble for user 1, the low nibble of
-;     !BattleRom_TechWaitNib3[!Battle_UnkB18C] for user 2;
+;     the low nibble of !BattleRom_TechWaitNib[!Battle_UnkB18C] for
+;     user 1, the low nibble of !BattleRom_TechWaitNib3[!Battle_UnkB18C]
+;     for user 2; user 0 gets + 0 (see the quirk), although its code
+;     multiplies by the high nibble of !BattleRom_TechWaitNib[...];
 ;   - !Pc_AtbMax (users 1 and 2: and !Pc_AtbCur) = the result;
 ;   - if its turn-list-12 byte is non-zero: = 1, !Battle_UnkB188 = 0 and
 ;     its BattleCmd.State = 0.
 ; Quirks: for user 0 the divisor is never stored (LDX of 10 but no STX
-; to !Battle_MathB), so it divides by what Battle_Mul16 left in MathB;
+; to !Battle_MathB), so it divides by what Battle_Mul16 left in MathB:
+; the carry it was entered with (its 16 RORs shift only zeros out of
+; MathLo after it), here 0 (CMP #$FF below $FF clears it). Battle_Div32
+; then divides by 0, which gives 0, so user 0's wait is not added;
 ; user 0's !Pc_AtbCur keeps BattleSys_UnkBD6F's value (without the
 ; wait). The users are taken to be PCs (the slot
 ; indexes the 3-byte !Pc_Atb* arrays).
@@ -27465,8 +27469,9 @@ BattleSys_TechMpCost3:
 ; !BattleRom_TechUserSets; $FF = no user).
 ; Callers (5 JSR sites): BattleSys_UnkC96A ($C1:C9B6), BattleSys_UnkCA1A ($C1:CA63),
 ;   BattleSys_UnkCCCB ($C1:CD18) and unmatched ($C1:C1E4, $C1:C756).
-; Callers note: $C1:C1E4 and $C1:C756 are in BattleSys_UnkC1DD (not
-;   matched).
+; Callers note: $C1:C1E4 is in BattleSys_UnkC1DD and $C1:C756 in a
+;   subroutine at $C1:C74C (RTS at $C1:C78C) that C1DD calls from
+;   $C1:C59A; neither is matched.
 ; Entry: M=1, X=0, DP=0, DB=$7E (.w stores); A = tech, B = 0 (16-bit
 ;        TAX)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the third id, B = 0; X = set * 3;
@@ -27962,8 +27967,9 @@ BattleSys_UnkCE36:
 ;   BattleSys_UnkCE36 falls in.
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $02 = PC slot (0-2, high byte 0)
 ; Exit:  M=1, X=0 (as assumed after BattleFD_UnkB141, not analysed),
-;        DP=0, DB=$7E; A = 0, B = 0; X, Y clobbered; DP $00 = the stat
-;        block address, DP $04, $08, $0A, $0E written,
+;        DP=0, DB=$7E; A = $FF for an empty slot, else as
+;        BattleSys_UnkCF69 leaves it; B = 0; X, Y clobbered; DP $00 =
+;        the stat block address, DP $04, $08, $0A, $0E written,
 ;        !Battle_MathA/B/Lo/Hi (Battle_Mul16), plus what
 ;        BattleFD_UnkB141 changes
 !PcRec_Blk = !BattleTmp_00              ; 2 B: the PC's stat block address
@@ -28137,13 +28143,15 @@ BattleSys_UnkCF15:
     RTS                                 ; never reached
 
 ; $C1:CF52 — BattleSys_UnkCF52 (23 bytes, $CF52–$CF68)
-; X = A * 4 (16-bit, from B:A), A = 0. It tests DP $06 for $29 first,
-; but both branches do the same (REP, ASL, ASL, CLC), so the test has
-; no effect. No caller found (xref finds no JSR/JMP to it); it sits
-; between BattleSys_UnkCF15 and BattleSys_UnkCF69, whose callers pass
-; $29 in DP $06 (Battle_SetupBattle), so probably a leftover.
-; Entry: M=1, X=0, DP=0, DB any; A (with B) = the value
-; Exit:  M=1, X=0; X = A * 4; A = 0, B = 0; Y unchanged
+; X = (B : DP $06) * 4 (16-bit), A = 0: it loads DP $06 into A (the
+; incoming A is not used), tests it for $29, but both branches do the
+; same (REP, ASL, ASL, CLC), so the test has no effect. No caller found
+; (xref finds no JSR/JMP to it); it sits between BattleSys_UnkCF15,
+; whose callers pass $29 in DP $06 (Battle_SetupBattle), and
+; BattleSys_UnkCF69, so probably a leftover.
+; Entry: M=1, X=0, DP=0, DB any; DP $06 = the value (low byte), B = its
+;        high byte
+; Exit:  M=1, X=0; X = (B : DP $06) * 4; A = 0, B = 0; Y unchanged
 BattleSys_UnkCF52:
     LDA.b !BattleTmp_06
     CMP.b #!Battle_CF15Call1A
