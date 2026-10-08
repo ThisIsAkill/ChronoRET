@@ -622,6 +622,55 @@ if !constants_engine_inc == 0
 !Evt_RedirectPos = $16FF                 ; Obj_ScriptPos Evt_RedirectObjScript sets (an Evt_Data
                                          ; offset; what is there is not traced)
 
+; --- Object motion and view test (Vblank_UnkA810 and its steps) ---
+!Obj_Unk1100FreeMove = $03               ; Obj_Unk1100 below this: Vblank_UnkA810 moves the object
+                                         ; with Obj_MoveStepFree (others with Obj_MoveStep)
+!Obj_Unk1100Eight = $08                  ; Obj_Unk1100 value Vblank_UnkA810 leaves alone (no move,
+                                         ; no view test, no redraw)
+!Obj_Unk0F00Active = $80                 ; Obj_Unk0F00 bit 7: the object is in the view window and
+                                         ; set up for drawing (Obj_UpdateInView sets and clears it)
+!ObjView_MarginX = $04                   ; 8-pixel columns the view window reaches past the view on
+                                         ; each side (two map tiles)
+!ObjView_MarginTop = $02                 ; rows it reaches above Map_TileOriginY (Obj_UpdateInView)
+!ObjView_MarginBottom = $05              ; rows it reaches below Map_Unk1D10
+!ObjView_Max = $FF                       ; window bound clamped here when the margin overflows
+!ObjX_AnimLoopsOut = $02                 ; ObjX_AnimLoops value set (when nonzero) as an object
+                                         ; leaves the window
+!Obj_ScreenWrap = $0100                  ; bit 8 of a 9-bit screen coordinate, set when the object
+                                         ; lies left of / above the view (Obj_CalcScreenPos)
+!Obj_ScreenXMask = $01FF                 ; low 9 bits of Obj_ScreenX
+!Map_FineScrollMask = $0007              ; pixel within an 8-pixel column / row of the scroll
+!Dir_QuarterTurn = $40                   ; a quarter turn in Obj_Direction units (256 per turn)
+!Dir_HalfTurn = $80                      ; half a turn; also where the sine turns negative
+!Dir_ThreeQuarters = $C0                 ; three quarters of a turn
+!Dir_Over63 = $40                        ; a distance with this bit set is scaled by 1/4 for the
+                                         ; angle lookup (Obj_CalcDirection)
+!Dir_Over31 = $20                        ; one with this bit set (and not Dir_Over63) by 1/2
+!Dir_Low5 = $001F                        ; a distance below 32 indexes Rom_AngleTable directly
+!Dir_Low7 = $007F                        ; bits kept before the 1/4 scaling (bit 7 is dropped)
+!Dir_Rise7Mask = $007C                   ; rise bits kept for the 1/4 scaling (shifted to x 32)
+!Dir_Low6 = $003F                        ; bits kept before the 1/2 scaling
+!Dir_Rise6Mask = $003E                   ; rise bits kept for the 1/2 scaling
+!TileAttr_Prio = $40                     ; Map_TileAttrA/B bit 6: the tile's OAM priority bit
+!Obj_OamFlagsTilePrio = $80              ; Obj_OamFlags bit 7: priorities follow the tile under
+                                         ; the object (Obj_SetVelocityChecked)
+!Obj_OamFlagsPrioMask = $30              ; Obj_OamFlags bits 4-5 (Obj_PrioHigh) and, shifted left 4,
+                                         ; bits 0-1 (Obj_PrioLow): the fixed OAM priorities
+!Obj_Unk1C80Block = $01                 ; Obj_Unk1C80 bit 0: Obj_SetVelocityChecked turns the object
+                                         ; when the tile ahead blocks
+!SprBuf_UsedEntries = $04                ; SprBuf_Owner entries the allocators use (0-3)
+
+; --- Map region copy (Field_UnkAF4E: Field_Unk44 bits) ---
+!MapCopy_L1 = $01                        ; copy the Map_TileProps plane (layer 1's tiles)
+!MapCopy_L2 = $02                        ; copy Map_Layer2Tiles
+!MapCopy_L3 = $04                        ; copy Map_Layer3Tiles
+!MapCopy_HiBits = $08                    ; copy Map_TileHiBits (whole bytes)
+!MapCopy_AttrA = $10                     ; copy Map_TileAttrA
+!MapCopy_AttrB = $20                     ; copy Map_TileAttrB
+!MapCopy_L1Bit8 = $40                    ; copy only Map_TileHiBits bit 0 (TileHiBits_L1Bit8)
+!MapCopy_L2Bit8 = $80                    ; copy only Map_TileHiBits bit 1 (TileHiBits_L2Bit8)
+!TileHiBits_L2Bit8 = $02                 ; Map_TileHiBits bit 1: bit 8 of the layer-2 metatile
+
 ; --- Field_Unk7EF000 tilemaps (Field_Unk29F7, Field_Unk2B78) ---
 !Field_Unk7EF000Tile = $F0               ; first tile of Field_Unk29F7's map (it uses this + 0-15)
 !Field_Unk7EF000Hi = $20                 ; tilemap high byte: priority, palette 0, tile bits 8-9 = 0
