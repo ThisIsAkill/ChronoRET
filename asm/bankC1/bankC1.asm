@@ -1535,7 +1535,8 @@ BattleMenu_DrawCommandWindowFrame:
 ;   3. Calls BattleMenu_RenderItemRow for lines 0-2, advancing the record
 ;      by one and the map offset by !BattleMenu_ListRowStride each time.
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ListScroll = scroll position
-; Exit:  M=1; DP $80-$87 clobbered
+; Exit:  M=1; DP $80-$87, $8E-$8F, $96-$98 clobbered (the last three
+;        partly by BattleMenu_RenderItemRow)
 ; Calls: BattleMenu_RenderItemRow
 ; Direct-page roles (shared with RenderItemRow and the list scroll routines):
 !BattleMenu_ListScroll = !BattleTmp_80    ; 1 B in: list scroll position
@@ -1614,7 +1615,7 @@ BattleMenu_RenderItemListRows:
 ;   - Attribute for the whole line: palette 3 (greyed) when .Flags bit 7 is
 ;     set and .PcMask lacks the active PC's bit, else palette 2.
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_ItemRecOffset, !BattleMenu_RowMapOffset
-; Exit:  M=1; DP $84/$8E/$98 clobbered
+; Exit:  M=1; DP $84-$85, $8E-$8F, $98 clobbered
 ; Calls: BattleMsg_ReencodeTextBuffer, BattleMsg_FormatTwoDigits, BattleMsg_BlankLeadingZeros
 !BattleMenu_RowAttr = !BattleTmp_98      ; 1 B: attribute for the whole line (palette 2 or greyed 3)
 org $C109B0
@@ -1826,15 +1827,17 @@ BattleMenu_BuildTechAvailFlags:
 ; TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx],
 ; and copies them into the tech text buffer at !BattleMenu_RowMapOffset:
 ;   $FF/$FE → blank line (via CODE_JP_C10BB6)
-;   $FD     → "[Triple Tech]" header (!BattleRom_TechFixedText + $12)
-;   $FC     → "[Double Tech]" header (!BattleRom_TechFixedText + 0)
-;   $FB     → nothing drawn, only the edge cells are blanked
+;   $FD     → "Triple Technique" header (!BattleRom_TechFixedText + $12)
+;   $FC     → "Double Technique" header (!BattleRom_TechFixedText + 0)
+;             (each 18 bytes, the text between end glyphs $5B and $5C)
+;   $FB     → blank line: the still-blank text rows go through the tech-name
+;             path, so cols 3-20 of both rows are blanked
 ;   else    → tech name: bank $CC, !Tech_NameTable + code × 11, re-encoded;
 ;             upper/lower rows from col 6, palette 3
 ; Every path advances !BattleMenu_TechRowNum.
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_TechCodeIdx, !BattleMenu_RowMapOffset
 ; Exit:  M=1
-; Calls: BattleMsg_ReencodeTextBuffer, BattleMenu_BlankMpCostDigits,
+; Calls: BattleMsg_ReencodeTextBuffer, BattleMenu_BlankNameLeadCells,
 ;        CODE_JP_C10BB6, CODE_JP_C10C00
 org $C10B0B
 BattleMenu_RenderTechRow:
@@ -1855,17 +1858,17 @@ BattleMenu_RenderTechRow:
     CMP.b #!Tech_CodeBlank2
     BEQ .fixedstr_skip              ; blank line
     CMP.b #!Tech_CodeTripleHeader
-    BEQ .unreach_fd                 ; "[Triple Tech]"
+    BEQ .triple_header              ; "Triple Technique"
     CMP.b #!Tech_CodeDoubleHeader
-    BEQ .fixedstr_fc                ; "[Double Tech]"
+    BEQ .double_header              ; "Double Technique"
     CMP.b #!Tech_CodeSkip
     BNE .tech_name                  ; anything else is a tech
-    LDX.b !BattleMenu_TechRowNum    ; skip line (X not used further)
+    LDX.b !BattleMenu_TechRowNum    ; $FB blank line (X not used further)
     BRA .copy_out
-.fixedstr_fc:
+.double_header:
     LDX.w #!Tech_DoubleHeaderText
     BRA .into_fixedstr
-.unreach_fd:
+.triple_header:
     LDX.w #!Tech_TripleHeaderText
 .into_fixedstr:
     TDC
@@ -1905,7 +1908,7 @@ BattleMenu_RenderTechRow:
     JSR BattleMsg_ReencodeTextBuffer
 .copy_out:
     INC.b !BattleMenu_TechRowNum
-    JSR BattleMenu_BlankMpCostDigits
+    JSR BattleMenu_BlankNameLeadCells
     TDC
     TAY
     LDX.b !BattleMenu_RowMapOffset
@@ -1941,11 +1944,11 @@ BattleMenu_RenderTechRow:
 ; tiles from !BattleMsg_TextTiles into the line from col 3 (palette 3).
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1
-; Calls: BattleMenu_BlankMpCostDigits
+; Calls: BattleMenu_BlankNameLeadCells
 org $C10BB6
 CODE_JP_C10BB6:
     INC.b !BattleMenu_TechRowNum
-    JSR BattleMenu_BlankMpCostDigits
+    JSR BattleMenu_BlankNameLeadCells
     TDC
     TAY
     LDX.b !BattleMenu_RowMapOffset
@@ -1961,17 +1964,17 @@ CODE_JP_C10BB6:
     BNE .copy_loop
     RTS
 
-; $C1:0BD3 — BattleMenu_BlankMpCostDigits (45 bytes, $0BD3–$0BFF)
-; Blanks cols 3-5 (left of the name) on both rows of the tech-list line
-; at !BattleMenu_RowMapOffset (blank tile, palette 3). Despite the label,
-; these cells are not where MP costs are drawn: the name starts at col 6
-; and costs go to the tech window by UpdateTechWindow.
+; $C1:0BD3 — BattleMenu_BlankNameLeadCells (45 bytes, $0BD3–$0BFF)
+; Blanks cols 3-5, the lead cells left of the name (which starts at
+; col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset
+; (blank tile, palette 3). MP costs are not drawn here: they go to the
+; tech window (BattleMenu_UpdateTechWindow).
 ; Called from BattleMenu_RenderTechRow and CODE_JP_C10BB6.
 ; Entry: M=1, X=0 (16-bit), DB=$7E; !BattleMenu_RowMapOffset
 ; Exit:  M=1; X/Y clobbered
 ; No JSR/JSL calls.
 org $C10BD3
-BattleMenu_BlankMpCostDigits:
+BattleMenu_BlankNameLeadCells:
     TDC
     TAY
     LDX.b !BattleMenu_RowMapOffset
@@ -2120,7 +2123,8 @@ BattleMenu_UpdateMainWindow:
 ;    as two digits at cols 24-25 and blank cost cells 29-30; for an
 ;    absent PC only col 27 is blanked.
 ; 4. Copies the Tech_MenuEntry under the cursor to Tech_CursorEntry
-;    (all $FF, plus PC 1's cost cells, when the line has no entry) and
+;    (all $FF, plus PC slot 1's cost cells (row 3), when the line has no
+;    entry) and
 ;    writes its MP cost for each involved PC at cols 29-30 of that PC's
 ;    row, the tens digit suppressed when zero.
 ; 5. Falls through into BattleMenu_DrawTechCursorRow.
@@ -2181,7 +2185,7 @@ BattleMenu_UpdateTechWindow:
 
     ; PC slot 0's MP (window row 1)
     LDA.w !Battler_Present
-    BEQ .pc1_mp_absent
+    BEQ .slot0_mp_absent
     REP #$20                        ; M=0
     LDA.w BattlerStats.CurMp        ; (16-bit)
     STA.w !BattleMsg_NumValue
@@ -2194,15 +2198,15 @@ BattleMenu_UpdateTechWindow:
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(1,29) ; cost cells
     STA.w BattleMenu_TechTile(1,30)
-    BRA .pc2_check
-.pc1_mp_absent:
+    BRA .slot1_check
+.slot0_mp_absent:
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(1,27)
 
     ; PC slot 1's MP (window row 3)
-.pc2_check:
+.slot1_check:
     LDA.w !Battler_Present+1
-    BEQ .pc2_mp_absent
+    BEQ .slot1_mp_absent
     REP #$20                        ; M=0
     LDA.w BattlerStats[1].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
@@ -2215,15 +2219,15 @@ BattleMenu_UpdateTechWindow:
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(3,29)
     STA.w BattleMenu_TechTile(3,30)
-    BRA .pc3_check
-.pc2_mp_absent:
+    BRA .slot2_check
+.slot1_mp_absent:
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(3,27)
 
     ; PC slot 2's MP (window row 5)
-.pc3_check:
+.slot2_check:
     LDA.w !Battler_Present+2
-    BEQ .pc3_mp_absent
+    BEQ .slot2_mp_absent
     REP #$20                        ; M=0
     LDA.w BattlerStats[2].CurMp     ; (16-bit)
     STA.w !BattleMsg_NumValue
@@ -2237,7 +2241,7 @@ BattleMenu_UpdateTechWindow:
     STA.w BattleMenu_TechTile(5,29)
     STA.w BattleMenu_TechTile(5,30)
     BRA .cursor_resolve
-.pc3_mp_absent:
+.slot2_mp_absent:
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(5,27)
 
@@ -2256,7 +2260,7 @@ BattleMenu_UpdateTechWindow:
     LDA.w !Tech_ListEntry,X
     CMP.b #!Tech_NoEntry
     BNE .slot_present
-    ; no entry on this line: A = $FF into PC 1's cost cells and the copy
+    ; no entry on this line: A = $FF into PC slot 1's cost cells (row 3) and the copy
     STA.w BattleMenu_TechTile(3,29)
     STA.w BattleMenu_TechTile(3,30)
     STA.w Tech_CursorEntry.TechId
@@ -2307,43 +2311,43 @@ BattleMenu_UpdateTechWindow:
 
     ; MP cost for each PC involved (cost byte >= $80 = not involved)
     LDA.w Tech_CursorEntry.MpCost0
-    BMI .check_pc2_digit            ; PC slot 0 not involved
+    BMI .check_slot1_cost            ; PC slot 0 not involved
     REP #$20                        ; M=0 (B is 0: zero-extended)
     STA.w !BattleMsg_NumValue
     JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero     ; tens digit zero?
-    BNE .pc1_nonzero
+    BNE .slot0_two_digits
     LDA.b #!BattleUI_TileBlank      ; yes: one digit, left-aligned
     STA.w BattleMenu_TechTile(1,30)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(1,29)
-    BRA .check_pc2_digit
-.pc1_nonzero:                       ; (UNREACH_C10DFD in the reference)
+    BRA .check_slot1_cost
+.slot0_two_digits:                       ; (UNREACH_C10DFD in the reference)
     STA.w BattleMenu_TechTile(1,29)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(1,30)
 
-.check_pc2_digit:
+.check_slot1_cost:
     LDA.w Tech_CursorEntry.MpCost1
-    BMI .check_pc3_digit            ; PC slot 1 not involved
+    BMI .check_slot2_cost            ; PC slot 1 not involved
     REP #$20
     STA.w !BattleMsg_NumValue
     JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
-    BNE .pc2_nonzero
+    BNE .slot1_two_digits
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(3,30)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(3,29)
-    BRA .check_pc3_digit
-.pc2_nonzero:                       ; (UNREACH_C10E27 in the reference)
+    BRA .check_slot2_cost
+.slot1_two_digits:                       ; (UNREACH_C10E27 in the reference)
     STA.w BattleMenu_TechTile(3,29)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(3,30)
 
-.check_pc3_digit:
+.check_slot2_cost:
     LDA.w Tech_CursorEntry.MpCost2
     BMI BattleMenu_DrawTechCursorRow ; PC slot 2 not involved
     REP #$20
@@ -2351,13 +2355,13 @@ BattleMenu_UpdateTechWindow:
     JSR BattleMsg_FormatTwoDigits           ; → M=1
     LDA.w !BattleMsg_Digit10
     CMP.b #!BattleMsg_GlyphZero
-    BNE .pc3_nonzero
+    BNE .slot2_two_digits
     LDA.b #!BattleUI_TileBlank
     STA.w BattleMenu_TechTile(5,30)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(5,29)
     BRA BattleMenu_DrawTechCursorRow
-.pc3_nonzero:                       ; (UNREACH_C10E51 in the reference)
+.slot2_two_digits:                       ; (UNREACH_C10E51 in the reference)
     STA.w BattleMenu_TechTile(5,29)
     LDA.w !BattleMsg_Digit1
     STA.w BattleMenu_TechTile(5,30)
@@ -2451,9 +2455,10 @@ BattleMenu_ClearTechCursorTiles:
 ; ==================================================================
 ; Grades the 3 visible tech-list lines (submenu 1) and colours each line
 ; in the window map: palette 2 = usable, palette 3 = greyed.
-;   - Line code with the high nibble $F (special line): "[Double Tech]" is
-;     greyed with fewer than 2 PCs in the roster, "[Triple Tech]" with
-;     fewer than 3; other special codes keep palette 2.
+;   - Line code with the high nibble $F (special line): the "Double
+;     Technique" header is greyed with fewer than 2 PCs in the roster,
+;     "Triple Technique" with fewer than 3; other special codes keep
+;     palette 2.
 ;   - Real entry (via !Tech_ListEntry and the PC's Tech_MenuEntry block):
 ;     greyed when any involved PC's current MP is below its cost, when a
 ;     partner (Partners nibbles) is not menu-ready, when the shown PC has
@@ -2532,7 +2537,7 @@ CODE_JP_C10F28:
     BNE _ump_check_fd
     LDA.w !BattleMenu_ReadyCount
     CMP.b #!BattleMenu_DoubleTechPcs
-    BCC _ump_set_bright             ; fewer than 2 PCs ready → grey
+    BCC _ump_set_grey               ; fewer than 2 PCs ready → grey
     BRA CODE_C10F66_JMP             ; else keep palette 2
 _ump_check_fd:
     CMP.b #!Tech_CodeTripleHeader
@@ -2540,7 +2545,7 @@ _ump_check_fd:
     LDA.w !BattleMenu_ReadyCount
     CMP.b #!BattleMenu_TripleTechPcs
     BCS CODE_C10F66_JMP             ; 3 PCs ready → keep palette 2
-_ump_set_bright:                    ; (despite the label, this greys the line)
+_ump_set_grey:                     ; header line: grey
     LDA.b #!BattleUI_AttrPal3
     STA.b !BattleMenu_MpRowAttr
 CODE_C10F66_JMP:                    ; several branches converge here
@@ -2567,7 +2572,7 @@ _ump_check_battler:
     SBC.w Tech_MenuEntry.MpCost0,X
     LDA.b !BattleMenu_MpPc0+1
     SBC #$00
-    BCC _L1001                      ; borrow → can't afford
+    BCC _ump_set_unusable           ; borrow → can't afford
 
 _ump_pc1_ok:
     ; PC slot 1's MP vs its cost
@@ -2578,7 +2583,7 @@ _ump_pc1_ok:
     SBC.w Tech_MenuEntry.MpCost1,X
     LDA.b !BattleMenu_MpPc1+1
     SBC #$00
-    BCC _L1001
+    BCC _ump_set_unusable
 
 _ump_pc2_ok:
     ; PC slot 2's MP vs its cost
@@ -2589,7 +2594,7 @@ _ump_pc2_ok:
     SBC.w Tech_MenuEntry.MpCost2,X
     LDA.b !BattleMenu_MpPc2+1
     SBC #$00
-    BCC _L1001
+    BCC _ump_set_unusable
 
 _ump_pc3_ok:
     ; partners must be menu-ready
@@ -2600,7 +2605,7 @@ _ump_pc3_ok:
     AND.b #!Tech_PartnerLoMask      ; first partner slot
     STA.b !BattleMenu_ReadySlotArg
     JSR BattleSys_SlotMenuReadyPredicate ; A=0 if ready
-    BNE _L1001                      ; not ready → grey
+    BNE _ump_set_unusable           ; not ready → grey
     LDA.b !BattleMenu_MpPartners
     AND.b #!Tech_PartnerHiMask
     CMP.b #!Tech_PartnerHiMask      ; no second partner (double tech)?
@@ -2608,14 +2613,14 @@ _ump_pc3_ok:
     JSR Battle_ShiftRight4          ; second partner slot
     STA.b !BattleMenu_ReadySlotArg
     JSR BattleSys_SlotMenuReadyPredicate
-    BNE _L1001
+    BNE _ump_set_unusable
 
 _ump_slot_ready:
     ; the shown PC must not be locked; tech $74 needs one more check
     LDA.w !BattleMenu_ActivePc
     TAX
     LDA.w !Pc_LockStatus,X
-    BNE _L1001                      ; locked → grey
+    BNE _ump_set_unusable           ; locked → grey
     LDX.b !BattleMenu_MpEntry
     LDA.w Tech_MenuEntry.TechId,X
     CMP.b #!Tech_IdUnk74
@@ -2623,7 +2628,7 @@ _ump_slot_ready:
     LDX.w !Battle_UnkA0FF
     LDA.w !Battle_Unk1C48,X
     CMP.b #!Battle_Unk1C48Wanted
-    BNE _L1001                      ; fail → grey
+    BNE _ump_set_unusable           ; fail → grey
 
 _ump_write_bright:
     LDX.b !BattleMenu_MpEntry
@@ -2634,7 +2639,7 @@ _ump_write_bright:
     STA.b !BattleMenu_MpRowAttr
     BRA CODE_JP_C1100F              ; → colour the line
 
-_L1001:                             ; can't afford / partner not ready / locked
+_ump_set_unusable:                 ; can't afford / partner not ready / locked / tech $74 check failed
     LDX.b !BattleMenu_MpEntry
     LDA.w Tech_MenuEntry.Flags,X
     ORA.b #!Tech_FlagUnusable       ; unusable

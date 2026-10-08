@@ -143,34 +143,34 @@ $C1:0785,$C1:081D,153,BattleMenu_DrawCommandList,$C1,Battle menu,readable,c7df8d
 $C1:081E,$C1:0871,84,BattleMenu_DrawCommandWindowFrames,$C1,Battle menu,readable,c2a2b6e58a27,
 $C1:0872,$C1:08E7,118,BattleUI_ClearActivePanelColumn,$C1,Battle status bar,verified,e4c2eea52432,
 $C1:08E8,$C1:0928,65,BattleUI_HighlightPcName,$C1,Battle status bar,readable,fc0547ab61a6,Highlight PC slot A's name in the status bar: look up the slot's offset in !BattleRom_NameAttrL1 (layout 1) or !BattleRom_NameAttrL02 (layouts 0 and 2) and set the attribute of a 5-wide × 2-high block
-$C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,readable,16d64944fdb8,
-$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,readable,4adf6c5402e2,
+$C1:0929,$C1:095C,52,BattleMenu_DrawCommandWindowFrame,$C1,Battle menu,readable,08776b16ce3a,
+$C1:095D,$C1:09AF,83,BattleMenu_RenderItemListRows,$C1,Battle menu,readable,5d0e60e81f58,
 $C1:09B0,$C1:0A86,215,BattleMenu_RenderItemRow,$C1,Battle menu,readable,acba63357065,
 $C1:0A87,$C1:0A87,1,CODE_JP_C10A87,$C1,Engine,verified,2eaaeaac91fa,
 $C1:0A88,$C1:0AD2,75,BattleMenu_RenderTechListRows,$C1,Battle menu,verified,6006e8423467,
 $C1:0AD3,$C1:0B0A,56,BattleMenu_BuildTechAvailFlags,$C1,Battle menu,verified,0ccc2d3e6c87,
-$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,readable,5450dca7f99b,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
-$C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,verified,e3fd77921a91,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
-$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankMpCostDigits,$C1,Battle menu,readable,87afc17949cd,"Blanks cols 3-5 (left of the name) on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
+$C1:0B0B,$C1:0BB5,171,BattleMenu_RenderTechRow,$C1,Battle menu,readable,1633f1bab977,"Renders one tech-list line: blanks the text rows (!BattleMsg_TextTiles / TextTopTiles), fills them by the line code !Tech_ListCode[TechCodeIdx], and copies them into the tech text buffer at !BattleMen"
+$C1:0BB6,$C1:0BD2,29,CODE_JP_C10BB6,$C1,Engine,readable,f433f3faf0b1,"Blank-line / header exit path of BattleMenu_RenderTechRow: advances !BattleMenu_TechRowNum, blanks the lead cells, then copies 18 lower-row tiles from !BattleMsg_TextTiles into the line from col 3 (pa"
+$C1:0BD3,$C1:0BFF,45,BattleMenu_BlankNameLeadCells,$C1,Battle menu,readable,b88f0a74fe3d,"Blanks cols 3-5, the lead cells left of the name (which starts at col 6), on both rows of the tech-list line at !BattleMenu_RowMapOffset (blank tile, palette 3)."
 $C1:0C00,$C1:0C2C,45,CODE_JP_C10C00,$C1,Engine,verified,495500541b89,"Tech-name exit path of BattleMenu_RenderTechRow: blanks cols 17-20 (right of the 11-tile name) on both rows of the line (blank tile, palette 3)."
 $C1:0C2D,$C1:0C45,25,BattleMenu_UpdateWindows,$C1,Battle menu,verified,4510786d3153,Per-frame window upkeep dispatcher.
 $C1:0C46,$C1:0C48,3,CODE_C10C46,$C1,Engine,verified,f100e6f42dbf,
-$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,readable,06ef3df73c96,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
-$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,readable,a265a24404d0,
+$C1:0C49,$C1:0C82,58,BattleMenu_UpdateMainWindow,$C1,Battle menu,readable,fac94d40ef69,Main command-window upkeep (submenu 0): - If !BattleMenu_RosterIdx differs from !BattleMenu_RosterIdxDrawn: reload the command window map and rebuild the status bar.
+$C1:0C83,$C1:0E59,471,BattleMenu_UpdateTechWindow,$C1,Battle menu,readable,830cbeb1b340,
 $C1:0E5A,$C1:0EB9,96,BattleMenu_DrawTechCursorRow,$C1,Battle menu,verified,2e73276c82a7,
-$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,verified,6b152e20eed0,Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
+$C1:0EBA,$C1:0EE0,39,BattleMenu_ClearTechCursorTiles,$C1,Battle menu,readable,6942f083be66,Blanks cols 1-2 (the row-cursor columns) of all 6 tech-window rows.
 $C1:0EE1,$C1:0F27,71,BattleMenu_UpdateTechMpAvail,$C1,Battle menu,readable,80afd91a6a7d,
-$C1:0F28,$C1:0F56,47,CODE_JP_C10F28,$C1,Engine,verified,4bed02b5928a,
+$C1:0F28,$C1:0F56,47,CODE_JP_C10F28,$C1,Engine,readable,49634a829a30,
 $C1:0F57,$C1:0F61,11,_ump_check_fd,$C1,Engine,verified,4d9653d6d117,
-$C1:0F62,$C1:0F65,4,_ump_set_bright,$C1,Engine,readable,da37d9580d02,
+$C1:0F62,$C1:0F65,4,_ump_set_grey,$C1,Engine,readable,f8ea85fee54d,
 $C1:0F66,$C1:0F68,3,CODE_C10F66_JMP,$C1,Engine,verified,efb036b61102,
-$C1:0F69,$C1:0F8E,38,_ump_check_battler,$C1,Engine,verified,96d1139aa71e,
-$C1:0F8F,$C1:0F9F,17,_ump_pc1_ok,$C1,Engine,verified,9a79e9261dc1,
-$C1:0FA0,$C1:0FB0,17,_ump_pc2_ok,$C1,Engine,verified,418bb4cb5769,
-$C1:0FB1,$C1:0FD4,36,_ump_pc3_ok,$C1,Engine,verified,6f03f6e62aa8,
-$C1:0FD5,$C1:0FF0,28,_ump_slot_ready,$C1,Engine,verified,d6a7c5a52ae6,
+$C1:0F69,$C1:0F8E,38,_ump_check_battler,$C1,Engine,readable,66ce20178bf5,
+$C1:0F8F,$C1:0F9F,17,_ump_pc1_ok,$C1,Engine,readable,b0ffa666dcda,
+$C1:0FA0,$C1:0FB0,17,_ump_pc2_ok,$C1,Engine,readable,588e49be2d74,
+$C1:0FB1,$C1:0FD4,36,_ump_pc3_ok,$C1,Engine,readable,27107d9eb796,
+$C1:0FD5,$C1:0FF0,28,_ump_slot_ready,$C1,Engine,readable,cd3010385c2d,
 $C1:0FF1,$C1:1000,16,_ump_write_bright,$C1,Engine,verified,24aeb1ec2361,
-$C1:1001,$C1:100E,14,_L1001,$C1,Engine,readable,b0df31582f5b,
+$C1:1001,$C1:100E,14,_ump_set_unusable,$C1,Engine,readable,74ca8ec54d7c,
 $C1:100F,$C1:103C,46,CODE_JP_C1100F,$C1,Engine,verified,b5af1bff666d,
 $C1:103D,$C1:103D,1,CODE_JP_C1103D,$C1,Engine,verified,c974e5d65b7f,
 $C1:103E,$C1:104D,16,BattleSys_SlotMenuReadyPredicate,$C1,Battle system,verified,d5bebdee8203,Returns A=0 if PC slot !BattleMenu_ReadySlotArg is menu-ready: in the roster (!BattleMenu_Roster entry not negative) and !Pc_LockStatus clear; nonzero otherwise.

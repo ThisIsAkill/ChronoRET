@@ -12,8 +12,8 @@
       "bytes": 29032
     },
     "verified": {
-      "functions": 113,
-      "bytes": 3254
+      "functions": 105,
+      "bytes": 3003
     }
   },
   "banks": [
@@ -47,8 +47,8 @@
         "bytes": 9232
       },
       "verified": {
-        "functions": 90,
-        "bytes": 2998
+        "functions": 82,
+        "bytes": 2747
       }
     },
     {
@@ -349,7 +349,7 @@
         "BattleMenu_BuildTechAvailFlags",
         "BattleMenu_RenderTechRow",
         "CODE_JP_C10BB6",
-        "BattleMenu_BlankMpCostDigits",
+        "BattleMenu_BlankNameLeadCells",
         "CODE_JP_C10C00",
         "BattleMenu_UpdateWindows",
         "CODE_C10C46",
@@ -360,7 +360,7 @@
         "BattleMenu_UpdateTechMpAvail",
         "CODE_JP_C10F28",
         "_ump_check_fd",
-        "_ump_set_bright",
+        "_ump_set_grey",
         "CODE_C10F66_JMP",
         "_ump_check_battler",
         "_ump_pc1_ok",
@@ -376,7 +376,7 @@
       "end": "$C1:1FFF",
       "emitted_bytes": 3164,
       "functions": [
-        "_L1001",
+        "_ump_set_unusable",
         "CODE_JP_C1100F",
         "CODE_JP_C1103D",
         "BattleSys_SlotMenuReadyPredicate",
