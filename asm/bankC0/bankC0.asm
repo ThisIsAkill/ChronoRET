@@ -5027,8 +5027,8 @@ Field_EndOfFrame:
 ; FdVec_FFF7 part of Field_EndOfFrame only, for the fade and idle loops.
 ; Callers: 21 JSR sites: Field_IdleFrame ($C0:00EE),
 ; Field_FadeInAfterReload ($C0:2836), 11 in DefaultHandler
-; ($C0:17B0-$C0:189D) and 8 in unmatched code at $C0:261E-$C0:271F
-; (e.g. $C0:261E, $C0:262B, $C0:271F).
+; ($C0:17B0-$C0:189D), 2 in Field_HookLeaveToBankC3 ($C0:261E,
+; $C0:262B) and 6 in Field_HookWinPulse ($C0:2662-$C0:271F).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100. Sets 8-bit X/Y
 ; around EngFD_UnkC2C1, which needs it.
 ; Exit: M=1, X=0; A, X, Y as the two bank-$FD routines leave them.
@@ -5042,9 +5042,9 @@ Field_EndOfFrameShort:
 ; Field_IdleFrame (was Sub_00EB): one frame of field upkeep without
 ; game logic: Field_FrameUpdate, Field_EndOfFrameShort, Sub_EC60 (tail
 ; jump, whose RTS returns to this routine's caller).
-; Callers (8 sites: 5 JSR, 3 BRL): DefaultHandler ($C0:18CA, $C0:18D6) and
-;   unmatched code at $C0:02AA, $C0:0319, $C0:0327, $C0:0340, $C0:0365,
-;   $C0:038C.
+; Callers (8 sites: 5 JSR, 3 BRL): DefaultHandler ($C0:18CA, $C0:18D6),
+;   Scene_Unk0283 ($C0:02AA, $C0:0319, $C0:0327, $C0:0340) and
+;   Field_Unk034B ($C0:0365, $C0:038C).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (needed by
 ; Field_EndOfFrameShort), DB=$00.
 ; Exit: via Sub_EC60: M=1, X=0, DP=$0100; A = 0 (Sub_EC60's wait);
@@ -5061,8 +5061,9 @@ Field_IdleFrame:
 ; Calls 10 location-load steps (JSR) and two bank-$FD service vectors.
 ; NOT called per frame — only when entering a new location/map.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
-; Exit: M=1, X=0, DP=$0100 as far as is known: the steps are unmatched,
-; and GameLoop_LoadField carries on without resetting any of them.
+; Exit: M=1, X=0, DP=$0100 as far as is known: the ten steps keep them,
+; the two bank-$FD vectors are unmatched, and GameLoop_LoadField carries
+; on without resetting any of them.
 ; A, X and Y are not saved.
 ; ============================================================
 LoadLocation:
@@ -5175,7 +5176,7 @@ Field_SaveState:
 ;   ($C0:1975) and Field_RunBankC2Mode5 ($C0:19E3).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
 ; Obj_* tables and Field_Unk1DF9 are written absolute).
-; Exit: M=1, X=0, DP=$0100 (as the unmatched load steps leave it);
+; Exit: M=1, X=0, DP=$0100 (as the load steps leave it);
 ; A, X and Y clobbered, and Obj_Cur = Field_UnkAEObj when step 7 ran.
 ; ============================================================
 org $C001A5
@@ -5251,8 +5252,7 @@ Field_RestoreState:
 ; SceneFlag_Battle path): C=1 means no battle after all, and
 ; DefaultHandler then clears the flag; C=0 goes on to the battle.
 ; Field_Unk0617 (8-bit X/Y) fills the list at Field_BattleObjList with
-; the objects found for it, $80-terminated (inferred from reading
-; $C0:0617, not matched). If the list is empty, Field_Unk034B runs and
+; the objects found for it, ended by Obj_None ($80). If the list is empty, Field_Unk034B runs and
 ; C=1. Otherwise the field is saved much as Field_SaveState starts: if
 ; Field_Unk29 is set it is cleared here (Field_SaveState forces it to 1
 ; instead) along with Field_Unk26/27, then Field_Unk038F, then
@@ -5261,13 +5261,14 @@ Field_RestoreState:
 ; the facing store this is Field_SaveState's opening, with the value
 ; stored to Field_Unk29 changed ($00 for $01) and JSR Field_Unk038F
 ; added before Field_StashSaveBlock.
-; Callers: DefaultHandler ($C0:1890) and unmatched code at $C0:2628
-;   (event hook handler $C0:260E, from the Field_EventHookDispatch table).
+; Callers: DefaultHandler ($C0:1890) and Field_HookLeaveToBankC3
+;   ($C0:2628; an event hook handler from the Field_EventHookDispatch
+;   table).
 ; On entry: M=1 (8-bit A), X either width (set here), DP=$0100 (the
 ; Field_* and Loc_* names are dp), DB=$00 (Obj_* tables read absolute).
-; Exit: M=1, X=0 as the unmatched callees leave it, DP and DB unchanged;
-; C=1: no battle (list empty), C=0: field saved for the battle; A, X
-; and Y clobbered.
+; Exit: M=1, X=0 (set after Field_Unk0617; the callees keep it), DP and
+; DB unchanged; C=1: no battle (list empty), C=0: field saved for the
+; battle; A, X and Y clobbered.
 ; ============================================================
 org $C0024C
 Scene_Unk024C:
@@ -6498,7 +6499,7 @@ LocLoad_Unk0960:
 ; Decomp_ToWramVec to Map_Meta12TL ($7E:B000), over the MapProps that
 ; LocLoad_UnkA33B has already used.
 ; Callers: LoadLocation ($C0:0109), Field_RestoreState ($C0:01D2) and
-;   unmatched code at $C0:0324 (Scene_Unk0283).
+;   Scene_Unk0283 ($C0:0324).
 ; On entry: M=1 (8-bit A), X=0, DP=$0100 (Loc_RecOfs, Eng_Scratch),
 ; DB=$00 (the Decomp_* block absolute).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (and what
@@ -6536,7 +6537,7 @@ LocLoad_Unk09DD:
 ; LocGfx_Meta3Ptrs entry is unpacked with Decomp_ToWramVec to
 ; Map_Meta3TL ($7E:C000). The two exits are separate RTSs.
 ; Callers: LoadLocation ($C0:010C), Field_RestoreState ($C0:01D5) and
-;   unmatched code at $C0:032A (Scene_Unk0283).
+;   Scene_Unk0283 ($C0:032A).
 ; On entry: M=1 (8-bit A), X=0, DP=$0100 (Field_UnkBB, Loc_RecOfs,
 ; Eng_Scratch), DB=$00 (the Decomp_* block absolute).
 ; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered (and what
@@ -6811,8 +6812,9 @@ LocLoad_Unk7084:
 ; Callers (14 JSR sites): GameLoop ($C0:0020), GameLoop_Main ($C0:005D),
 ;   Field_SceneChangeTick ($C0:0C9A, $C0:0CEA, $C0:0D1C),
 ;   Field_PauseAndMenuInput ($C0:1958, $C0:1964), Field_FadeToBankC2Mode5
-;   ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2) and unmatched code at
-;   $C0:02C3, $C0:02EA, $C0:3B76, $C0:3FD3, $C0:4186.
+;   ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2), Scene_Unk0283
+;   ($C0:02C3, $C0:02EA) and unmatched code at $C0:3B76, $C0:3FD3,
+;   $C0:4186.
 ; On entry: M=1 (LDA #$00 is the 8-bit form), X either width; DP is not
 ; used. Any DB (the PLB comes before the absolute stores).
 ; Exit: M=1, X/Y unchanged, DB=$00, A=0, interrupts disabled (SEI).
@@ -7781,9 +7783,13 @@ Fade_StepFixedColor:
 ; (VramDma_Src/SrcBank/Size are the DmaFill_* bytes under other names).
 ; The callers seen store VramDma_Mode = 1 (word writes); mode and target
 ; are not otherwise checked here.
-; Callers (13 JSR, 1 BRL; all unmatched): $C0:6D61, $C0:6E1E, $C0:6E58,
-;   $C0:6E84, $C0:6E9C, $C0:6EC7, $C0:6EED, $C0:6F08, $C0:6F23,
-;   $C0:6F30, $C0:6F4A, $C0:6F57, $C0:6F75 and BRL from $C0:7F74 (e.g.
+; Callers (13 JSR, 1 BRL): LocLoad_UploadPack ($C0:6D61),
+;   LocLoad_Unk6DCF ($C0:6E1E), Field_UploadUnk1F00 ($C0:6E84,
+;   $C0:6E9C), Field_UploadUnk1D00 ($C0:6EC7), Field_UploadUnk1C00
+;   ($C0:6F08), Field_UploadUnk0000 ($C0:6F23, $C0:6F30, $C0:6F4A,
+;   $C0:6F57), Field_UploadUnk57E0 ($C0:6F75), Map_UploadBufTo7400's
+;   shared tail (BRL at $C0:7F74) and unmatched code at $C0:6E58 and
+;   $C0:6EED (e.g.
 ;   $C0:6E1E uploads $1000 bytes from $7F:5080 to VRAM $5000).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the address and size are
 ; word loads), DP=$0100 (the arguments are dp offsets, shared with
@@ -7818,8 +7824,8 @@ VramDma_Upload:
 ; since M7A=M7B=0). Caller sets DmaFill_Dest / DmaFill_Bank /
 ; DmaFill_Size first.
 ; Callers (all JSR): GameLoop's three boot clears ($C0:0031, $C0:0042,
-; $C0:0050), LocLoad_ClearPage1D00 ($C0:7F95) and unmatched code at
-; $C0:5717, $C0:58B9 and $C0:58CA.
+; $C0:0050), LocLoad_ClearPage1D00 ($C0:7F95) and Evt_InitObjects
+; ($C0:5717, $C0:58B9, $C0:58CA).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: DmaFill_Dest and
 ; DmaFill_Size are word loads), DP=$0100 (the DmaFill_* names are dp
 ; offsets), DB=$00 (absolute register stores).
@@ -7859,13 +7865,15 @@ ClearRAMDMA:
 ; It looks like a fatal-error stop whose colour tells the cases apart:
 ; every caller is a BRL with its own X (blue $7C00 from
 ; GameLoop_NotBankC2 for Loc_Id $81F0-$81FE, $7FE0 from the six sites at
-; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010, $01F0 and $000F
-; from $C0:5CB3/5CDA/5CE8, $1639 from $C0:5F71 in the handler at
-; $C0:5F6E that Evt_OpcodeTable gives unused event opcodes); the
-; conditions behind the other unmatched ones are not traced.
-; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A) and unmatched
-;   code at $C0:3577, $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4,
-;   $C0:46D4, $C0:483D, $C0:5CB3, $C0:5CDA, $C0:5CE8 and $C0:5F71 (LDX
+; $C0:3577-$C0:36E4, $7C1F from $C0:46D4/483D, $4010 from $C0:5CB3,
+; $01F0 and $000F from LocLoad_CheckEvtData (refused event data, see
+; there), $1639 from $C0:5F71 in the handler at $C0:5F6E that
+; Evt_OpcodeTable gives unused event opcodes); the conditions behind
+; the unmatched ones are not traced.
+; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A),
+;   LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8) and unmatched code at
+;   $C0:3577, $C0:35BC, $C0:3603, $C0:364A, $C0:36B1, $C0:36E4,
+;   $C0:46D4, $C0:483D, $C0:5CB3 and $C0:5F71 (LDX
 ;   #$1639 / BRL at $C0:5F6E; xref marks it doubtful, as the bytes
 ;   before it are the opcode table, not code).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
@@ -7984,7 +7992,7 @@ org $C075E9
 ;   column Map_TileOriginX: 2,048 bytes, the whole buffer.
 ; Callers: DefaultHandler ($C0:17A9, $C0:17FE, $C0:183E),
 ;   Field_HookLeaveToBankC3 ($C0:2617), Field_HookWinPulse ($C0:2658)
-;   and unmatched code at $C0:0A96.
+;   and LocLoad_DrawMap ($C0:0A96).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ;   (WMADDL/H here and WMDATA in Map_WriteRow1 are written absolute).
 ; Exit: M=1, X=0, DP and DB unchanged; Map_RowsLeft = 0, Map_BuildRow
@@ -8464,8 +8472,8 @@ Map_WriteCol1:
 ;     4 KB (Map_UploadBuf4K) when the bit is set.
 ; Quirk: the two layer-2-moving paths start with a REP #$20 that the
 ;   SEP #$20 after the branch undoes at once; kept.
-; Callers: DefaultHandler ($C0:17D2, $C0:1817) and unmatched code at
-;   $C0:0AAB.
+; Callers: DefaultHandler ($C0:17D2, $C0:1817) and LocLoad_DrawMap
+;   ($C0:0AAB).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ;   (Map_LayerEdgeOff, Map_Unk0BC9, Map_Unk0BCF/0BD1, WMADD and WMDATA
 ;   are absolute).
@@ -9030,7 +9038,7 @@ Map_WriteCol2:
 ;   second 2 KB chosen by Map_Unk0BD3 / Map_Unk0BD5 (not 16: columns
 ;   32-63 / rows 32-63, the latter storing 2 in Map_Unk1D86; else rows
 ;   0-31 again).
-; Callers: DefaultHandler ($C0:186F) and unmatched code at $C0:0AD8.
+; Callers: DefaultHandler ($C0:186F) and LocLoad_DrawMap ($C0:0AD8).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ;   (Map_LayerEdgeOff, Map_Unk0BD3/0BD5, WMADD and WMDATA are absolute).
 ; Exit: M=1, X=0, DP and DB unchanged; Map_BuildCol/Row/Len, A, X,
@@ -9441,10 +9449,11 @@ Map_WriteCol3:
 ;   The 4 KB entry sits after the BRL and branches back into the shared
 ;   tail Map_UploadBuf_Tail; Map_UploadBufToX is the shared store of X
 ;   into VramDma_Addr (global labels because the entries are global).
-; Callers (all unmatched): Map_UploadBufTo7400 from $C0:EB5E;
-;   Map_UploadBufTo7000 from $C0:EB4A; Map_UploadBuf2K from $C0:0A9F,
-;   $C0:0AC0, $C0:0AED, $C0:EAE1, $C0:EB01, $C0:EB21 and $C0:EB38;
-;   Map_UploadBuf4K from $C0:0ABB and $C0:0AE8 (e.g. $C0:0AAF loads
+; Callers: Map_UploadBufTo7400 from unmatched code at $C0:EB5E;
+;   Map_UploadBufTo7000 from unmatched code at $C0:EB4A; Map_UploadBuf2K
+;   from LocLoad_DrawMap ($C0:0A9F, $C0:0AC0, $C0:0AED) and unmatched
+;   code at $C0:EAE1, $C0:EB01, $C0:EB21 and $C0:EB38; Map_UploadBuf4K
+;   from LocLoad_DrawMap ($C0:0ABB, $C0:0AE8) (e.g. $C0:0AAF loads
 ;   VramDma_Addr from Map_TilemapVram3 after Field_BuildC800Mode2).
 ;   xref also confirms a JML to Map_UploadBufToX at $D5:677B, inside the
 ;   object graphics of bank $D5 (GfxRom_D5), so data, not a call.
@@ -9526,11 +9535,10 @@ LocLoad_ClearPage1D00:
 ;     +16/+18.
 ;   Rows from column c - 1 and columns from row r - 1 match where the
 ;   edge builders start (one column left, one row above the origin).
-; Callers: Map_Unk93E1 (BRL at $C0:9439 and $C0:9448) and unmatched
-;   code: BRL at $C0:74D1 (the last instruction of the routine before
-;   Field_Unk74D4), JSR at $C0:74E3 (in Field_Unk74D4, also reached by
-;   Field_Unk74E8 and Field_Unk74F7 through its shared tail) and JSR at
-;   $C0:8819.
+; Callers: Map_Unk93E1 (BRL at $C0:9439 and $C0:9448), Map_InitOrigin
+;   (BRL at $C0:74D1, its last instruction), Field_Unk74D4 (JSR at
+;   $C0:74E3 in its shared tail Field_Unk74D4_Tail, also reached by
+;   Field_Unk74E8 and Field_Unk74F7) and Field_Unk87F1 (JSR at $C0:8819).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map); DB not
 ;   used (all direct page).
 ; Exit: M=1, X=0, DP unchanged; A, X and Y clobbered; the Map_Span*
@@ -10001,7 +10009,7 @@ Bg_ColSpan64x32Addr:
 ; points WMADD at the layer's edge buffer (Map_BufC800 / D000 / D800,
 ; columns at +Map_BufColOfs), passes the first column, the row and a
 ; length in Map_BuildCol / Map_BuildRow / Map_BuildLen to the layer's
-; row or column writer (not matched), and sets the layer's bit in the
+; row or column writer (Map_WriteRow1-3 / Map_WriteCol1-3), and sets the layer's bit in the
 ; matching Map_Built* byte. Rows start one column left of the layer's
 ; left origin; columns start one row above its top origin. Rows for a
 ; rising Y go at the bottom bound (Map_Unk1D10 or Map_Unk1D18), for a
@@ -10248,7 +10256,7 @@ Map_BuildRowYDec3:
 ;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol1
 ;   and sets bit 0 in Map_BuiltColXInc.
 ; Callers: Map_EdgeColsXInc ($C0:97A1), Map_EdgeColsXIncHalf ($C0:97D2)
-;   and unmatched code at $C0:87FA.
+;   and Field_Unk87F1 ($C0:87FA).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
 ;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
 ; Exit: M=1, DP and DB unchanged; A = Map_Layer1; X and the rest as
@@ -10277,7 +10285,7 @@ Map_BuildColXInc1:
 ;   Map_BufColOfs, Map_BuildCol = Map_Unk1D0C, Map_BuildLen =
 ;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol2
 ;   and sets bit 1 in Map_BuiltColXInc.
-; Callers: Map_EdgeColsXInc ($C0:97B1) and unmatched code at $C0:880D.
+; Callers: Map_EdgeColsXInc ($C0:97B1) and Field_Unk87F1 ($C0:880D).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
 ;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
 ; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
@@ -10306,8 +10314,8 @@ Map_BuildColXInc2:
 ;   Map_BufColOfs, Map_BuildCol = Map_Unk1D14, Map_BuildLen =
 ;   Map_EdgeColLen, Map_BuildRow = Map_Unk1D16 - 1; runs Map_WriteCol2
 ;   and sets bit 1 in Map_BuiltColXInc.
-; Callers: Map_EdgeColsXIncHalf ($C0:97E2) and unmatched code at
-;   $C0:8808.
+; Callers: Map_EdgeColsXIncHalf ($C0:97E2) and Field_Unk87F1
+;   ($C0:8808).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
 ;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
 ; Exit: M=1, DP and DB unchanged; A = Map_Layer2; X and the rest as
@@ -10337,7 +10345,7 @@ Map_BuildColXInc2Half:
 ;   Map_EdgeColLen, Map_BuildRow = Map_TileOriginY - 1; runs Map_WriteCol3
 ;   and sets bit 2 in Map_BuiltColXInc.
 ; Callers: Map_EdgeColsXInc ($C0:97C1), Map_EdgeColsXIncHalf ($C0:97F2)
-;   and unmatched code at $C0:8816.
+;   and Field_Unk87F1 ($C0:8816).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X for the WMADDL/H pair), DP=$1D00
 ;   (!DP_Map), DB=$00 (WMADDL and WMADDH are written absolute).
 ; Exit: M=1, DP and DB unchanged; A = Map_Layer3; X and the rest as
@@ -10493,19 +10501,18 @@ Map_BuildColXDec3:
 ; 1D2D, runs Field_DpadDispatch only when Field_Unk62 is 0 and
 ; Field_ControlEnabled is set (so the fade loops, which clear
 ; Field_ControlEnabled around this call, get no input), Map_Unk8A6D
-; (with 8-bit X) when Field_Unk20 is set (not matched yet), and then
+; (with 8-bit X) when Field_Unk20 is set, and then
 ; Map_Unk9175 (copies the X/Y steps to Map_Unk1D32/1D33 unless the
 ; leader is at that limit), Map_Unk99DE (may drop the frame's X/Y steps
 ; via Map_StepStop*), Map_Unk91AC and Map_Unk93E1 (the layer scroll).
 ; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame
 ;   ($C0:00EB), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload
-;   ($C0:2830), Scene_SettleFrames ($C0:2854) and unmatched code at
-;   $C0:02B7, $C0:02DE and $C0:3FC3.
+;   ($C0:2830), Scene_SettleFrames ($C0:2854), Scene_Unk0283 ($C0:02B7,
+;   $C0:02DE) and unmatched code at $C0:3FC3.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
 ; exit; set to $1D00 inside), DB=$00 (absolute operands are bank $00).
 ; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the callees
-; leave them (Map_Unk93E1 ends in the unmatched Sub_C07F9A; not
-; established).
+; leave them (not saved here; Map_Unk93E1 ends in Sub_C07F9A).
 ; ------------------------------------------------------------
 org $C0881E
 Field_FrameUpdate:
@@ -12520,8 +12527,8 @@ Map_Unk91AC:
 ; - zeroes Map_BuiltRowYInc/YDec and Map_BuiltColXInc/XDec, then runs
 ;   Map_EdgeRowsYDec, YInc, Map_EdgeColsXDec, XInc (the *Half versions
 ;   with Map_Unk0BC9 bit 7, which use other builders for layer 2), and
-;   ends in a BRL to
-;   Sub_C07F9A (not matched; also called by Field_Unk74D4).
+;   ends in a BRL to Sub_C07F9A (also called by Map_InitOrigin,
+;   Field_Unk74D4 and Field_Unk87F1).
 ; Callers: Field_FrameUpdate ($C0:8855), Field_Unk885A ($C0:88BC,
 ;   $C0:88E0).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the scroll words are stepped
@@ -14027,8 +14034,8 @@ Map_ProbeTileAttrs_Load:            ; header: see Map_ProbeTileAttrs
 ; $C0:9AC8 — Map_ProbeTileAttrsAny (11 bytes, $9AC8–$9AD2)
 ; As Map_ProbeTileAttrs without the treasure test: always reads the
 ; three bytes (branches into Map_ProbeTileAttrs_Load) and returns C=0.
-; Callers (2 JSR sites): Map_StepTileEffects ($C0:9C8D) and unmatched
-;   code at $C0:9DEA.
+; Callers (2 JSR sites): Map_StepTileEffects ($C0:9C8D) and
+;   Map_InitEntryTile ($C0:9DEA).
 ; On entry: M=1 (8-bit A), X either, DP=$1D00 (!DP_Map), DB any; A = row
 ; << 8 | column (16-bit value).
 ; Exit: M=1, X=1 (8-bit), DP and DB unchanged; X = the index's low byte;
@@ -14063,7 +14070,7 @@ Map_ProbeTileAttrsAny:
 ; when bit 6 of Map_ProbeAttrA / Map_ProbeAttrB is set (OAM priority 2
 ; or 3, for the leader's Obj_PrioLow / Obj_PrioHigh).
 ; Callers (3 JSR sites): Map_Unk8A6D ($C0:8AAC, in its .test_probe),
-;   Map_StepTileEffects ($C0:9C90) and unmatched code at $C0:9DF5.
+;   Map_StepTileEffects ($C0:9C90) and Map_InitEntryTile ($C0:9DF5).
 ; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the table index and shift
 ; count), DP=$1D00 (!DP_Map), DB any (tables read long); Map_ProbeHiBits,
 ; Map_ProbeAttrA/B and Map_ProbeX/Y set.
@@ -14806,7 +14813,7 @@ Map_InitMasksAndLimits:
 ; - and calls Map_InitMasksAndLimits, Map_UnpackTilePlanes (which reads
 ;   the rest of MapProps from MapProps.Planes) and Map_LoadExitTiles.
 ; Callers: LoadLocation ($C0:0106), Field_RestoreState ($C0:01CF) and
-;   unmatched code at $C0:0316.
+;   Scene_Unk0283 ($C0:0316).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (!DP_Field:
 ; Loc_RecOfs read as dp), DB=$00 (Map_Unk0BC9-0BE0 and Field_UnkBB
 ; absolute; Map_UnpackTilePlanes needs the WRAM port registers).
@@ -15425,7 +15432,7 @@ Map_LoadExitTiles:
 ; stepped to when the treasure is taken (probably the opened chest).
 ; Map_TreasureLocRecs is left at the first record (of the list used).
 ; The STX to Map_LoadScratch is never read (kept as found).
-; Callers (2 JSR sites): unmatched code at $C0:033C and LocLoad_DrawMap
+; Callers (2 JSR sites): Scene_Unk0283 ($C0:033C) and LocLoad_DrawMap
 ;   ($C0:0A59).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$1D00 (!DP_Map), DB=$00
 ; (Loc_Id read absolute, and Map_TreasureTaken reads BitSet at $FF20);
@@ -15569,8 +15576,8 @@ Map_TreasureTaken:
 ; data port from Obj_Unk0F00 on: two bytes per object, the objects'
 ; 2-byte slot stride. The DEC/BNE count assumes Evt_ObjCount >= 1 (0
 ; would write 256 pairs; kept as found).
-; Callers (2 JSR sites): unmatched code at $C0:287E (in Scene_ReloadStep)
-;   and $C0:56C2.
+; Callers (2 JSR sites): Scene_ReloadStep ($C0:287E) and
+;   Scene_PostLoadInit ($C0:56C2).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (saved, set to $2100
 ; = !DP_PPU, restored), DB any (Evt_ObjCount read long).
 ; Exit: M=1, X=0, DP restored, DB unchanged; A = 0, X = 0, Y =
@@ -16239,7 +16246,7 @@ VramQ_Flush:
 ;
 ; Callers: BRL tail calls from Field_EndOfFrame ($C0:00DB) and from
 ; the unmatched routine at $C0:B0E6 ($C0:B124; that routine is called by
-; Scene_ReloadStep), and a JSR from unmatched code at $C0:072B. On the
+; Scene_ReloadStep), and a JSR from FieldBtl_Restore ($C0:072B). On the
 ; tail calls the RTS returns to that routine's caller.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00 (the
 ; absolute stores to OamEntry and WMADDH need bank $00).
@@ -16425,8 +16432,9 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; 1, 2, 4, 5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
 ; from four moving points (hook 6). The shapes those routines draw
 ; are not traced, so the handlers keep neutral names. Field_EventHook
-; and WinFx_* are set by unmatched code at $C0:3FA9-$C0:41D8 and
-; $C0:A4C4-$C0:A4F3 (not traced).
+; and WinFx_* are set by unmatched code at $C0:3FA9-$C0:41D8 (not
+; traced). The dp $39/$3A stores at $C0:A4C4-$C0:A4F3 are not more of
+; them: they are LocLoad_UnkA33B's, with DP=$1D00 (Map_OwnStep3X/3Y).
 ; ============================================================
 
 ; ------------------------------------------------------------
@@ -17357,9 +17365,10 @@ Field_ServiceUnk54_SendLine: ; header: see Field_ServiceUnk54
 ;   Field_PauseAndMenuInput ($C0:197E) and Field_RunBankC2Mode5 ($C0:19FC).
 ; On entry: M=1 (A=8-bit), X/Y=16-bit, DP=$0100 (Fade_Brightness,
 ; Field_ControlEnabled and Field_Unk1E are dp), DB=$00.
-; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the unmatched callees
-; leave them); A, X and Y clobbered (Scene_ReloadStep,
-; Field_FrameUpdate and Sub_EC60).
+; Exit: M=1, X/Y 16-bit, DP and DB unchanged (as the callees leave them,
+; as far as is known: Sub_EC60 and Scene_ReloadStep's Field_UnkB0E6 are
+; unmatched); A, X and Y clobbered (Scene_ReloadStep, Field_FrameUpdate
+; and Sub_EC60).
 ; ============================================================
 org $C02824
 Field_FadeInAfterReload:
@@ -17903,7 +17912,8 @@ Field_UploadUnk1F00Srcs:
 ; ------------------------------------------------------------
 ; $C0:6EB0 — Field_UploadUnk1D00 (27 bytes, $6EB0–$6ECA)
 ; Uploads Field_UploadUnk1D00Bytes ($280) from Field_Unk7EF000 to VRAM
-; $1D00 (VramDma_Upload, word writes). What the data is, is not traced.
+; $1D00 (VramDma_Upload, word writes): the 32 x 10 tilemap Field_Unk29F7
+; writes there (a bordered panel, probably a window background).
 ; Callers: Scene_ReloadStep ($C0:288E) and unmatched code at $C0:EA9E
 ;   (NMI handler).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
@@ -17929,7 +17939,8 @@ Field_UploadUnk1D00:
 ; ------------------------------------------------------------
 ; $C0:6EF1 — Field_UploadUnk1C00 (27 bytes, $6EF1–$6F0B)
 ; As Field_UploadUnk1D00 with VRAM $1C00 and Field_UploadUnk1C00Bytes
-; ($200), from the same Field_Unk7EF000.
+; ($200), from the same Field_Unk7EF000: the 32 x 8 tilemap of tiles
+; $00-$FF that Field_Unk2B78 writes there.
 ; Callers: Scene_ReloadStep ($C0:2895) and unmatched code at $C0:EAAC
 ;   (NMI handler).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_*),
@@ -18245,8 +18256,8 @@ Obj_ResetDrawLists:
 ; $C0:B262 — Oam_HideFirst4 (15 bytes, $B262–$B270)
 ; Parks OAM shadow sprites 0-3 below the screen: their Y bytes in
 ; Oam_LowTable = Oam_HiddenY.
-; Callers: Scene_ReloadStep ($C0:289B) and unmatched code at $C0:0283
-;   (Scene_Unk0283's first call).
+; Callers: Scene_ReloadStep ($C0:289B) and Scene_Unk0283 ($C0:0283, its
+;   first call).
 ; On entry: M=1 (8-bit A), DB=$00 (absolute stores); X and DP not used.
 ; Exit: M, X, DP and DB unchanged; A = Oam_HiddenY.
 ; ------------------------------------------------------------
@@ -18683,7 +18694,7 @@ Scene_PostLoadInit:
 ; seeds Map_Unk7F3700 from ROM. (Called as LocLoad_Unk56D4 by verified
 ; code, so the name stays.)
 ; Callers: LoadLocation ($C0:010F), Field_RestoreState ($C0:01D8) and
-;   unmatched code at $C0:032D (Scene_Unk0283).
+;   Scene_Unk0283 ($C0:032D).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_RecOfs,
 ; Eng_Scratch), DB=$00 (the Decomp_* block absolute).
 ; Exit (through LocLoad_InitUnk7F3700): M=1, X=0, DP and DB unchanged;
@@ -21279,8 +21290,9 @@ Audio_PlayTileSfxB:
 ; (was Sub_CB0A.) Like Obj_BuildSpriteFrameStep, but for objects whose
 ; tiles are already in VRAM: tail-calls Obj_FrameLayout4 / 8 / 12,
 ; which only rewrite the SprTile records for Obj_LastFrame.
-; Reached by BRL from $C0:086E and $C0:0902 (unmatched object set-up
-; code), each right after JSR $C0:A9CD, which returns with X/Y 8-bit.
+; Reached by BRL from FieldBtl_RestoreObj ($C0:086E) and
+; FieldBtl_RestorePc ($C0:0902), each right after JSR Obj_DrawLink,
+; which returns with X/Y 8-bit.
 ; On entry: M=1, X/Y 8-bit, DP=$0100, DB=$00, Obj_Cur = object.
 ; Exit: M=1, X/Y 8-bit. The early RTS (object skipped) leaves C as it
 ; was; size 3 returns C=0; the layouts return C=0.
@@ -24353,8 +24365,8 @@ Obj_FrameLayout12:
 ; byte, so reversing each byte mirrors the row left-right.
 ; Read by Spr_CopyTileFlipped (32 × LDA.w BitReverseTable,X, DB=$00, so
 ; through the $00:FD00 mirror), and with LDA.l from bank $C1 (32 sites
-; from $C1:1DDE, in the unmatched gap before BattleMenu_BuildTargetList),
-; $C2 and $CD (found by tools/tables.py).
+; from $C1:1DDE, in Battle_DrawBattlerFrameAnyLayout), $C2 and $CD
+; (found by tools/tables.py).
 ; ============================================================
 org $C0FD00
 BitReverseTable:

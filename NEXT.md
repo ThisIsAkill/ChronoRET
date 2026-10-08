@@ -101,28 +101,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Field_UploadUnk1F00` (+ table), `Field_UploadUnk1D00`/`1C00`/`0000`/`57E0`,
    `Field_ResetUnk0B88`/`0B80`, `Pal_LoadUnkRow0`, `Pal_UploadCgram` ($C0:6E5C–$C0:6F99,
    $C0:70E9–$C0:716F), `Obj_ResetDrawLists` and `Oam_HideFirst4` ($C0:B204–$C0:B270).
-   Stale now (verified headers, fix on their next review): Field_FrameUpdate's header says
-   Map_Unk8A6D is unmatched; `Map_ProbeTileAttrsAny` / `Map_ProbeTileLevel` list $C0:9DEA /
-   $C0:9DF5 as unmatched (now Map_InitEntryTile); `Sub_C07F9A` lists $C0:74D1 / $C0:74E3 and
-   `Map_BuildColXInc1` $C0:87FA as unmatched; `VramDma_Upload` calls $C0:6D61, $C0:6E1E,
-   $C0:6E84/6E9C/6EC7/6EED/6F08-6F57 "unmatched"; `ClearRAMDMA` ($C0:5717/58B9/58CA),
-   `Sys_HaltWithColor` ($C0:5CDA/5CE8), `Map_InitEntryTile` ($C0:5926) and
-   `Obj_ResetFrameState` ($C0:287E/56C2) name now-matched callers as unmatched; LoadLocation's,
-   Field_RestoreState's and Field_FadeInAfterReload's Exit lines still hedge on "unmatched"
-   steps. Also done: the field/battle hand-off ($C0:0283–$C0:0904): `Scene_Unk0283` (post-battle
+   Also done: the field/battle hand-off ($C0:0283–$C0:0904): `Scene_Unk0283` (post-battle
    rebuild, with the `FieldBtl_Result` exits), `Field_Unk034B`, `Field_Unk038F` with
    `FieldBtl_SaveTileAttrs`/`SavePartyPos`/`SaveObjs`/`SaveObj`/`SavePpu`, `Field_Unk0617`,
    `FieldBtl_Restore` with `FieldBtl_RestoreObjs`/`RestoreObj`/`RestoreParty`/`RestorePc` (the
    block is the `FieldBtlPc`/`FieldBtlObj`/`FieldBtlPpu` structs at $7E:29B0-$7E:2C7B);
    `Evt_RedirectObjScript` ($C0:5B1F); the draw-bucket links `Obj_DrawUnlink`/`Obj_DrawLink`
    ($C0:A98A–$C0:AA06); `LocLoad_AudioSetup` ($C0:1B53); and the `Field_Unk7EF000` tilemap
-   builders `Field_Unk29F7`/`Field_Unk2B78` ($C0:29F7–$C0:2C40). More stale callers from this
-   batch: `Field_IdleFrame` ($C0:02AA/0319/0327/0340/0365/038C), `LocLoad_Unk09DD` ($C0:0324),
-   `LocLoad_Unk0A14` ($C0:032A), `LocLoad_UnkA33B` ($C0:0316), `Map_LoadTreasureTiles`
-   ($C0:033C), `Oam_BuildShadow` ($C0:072B), `Oam_HideFirst4` ($C0:0283), `LocLoad_Unk56D4`
-   ($C0:032D) and `Obj_BuildFrameLayout` ($C0:086E/0902) call now-matched sites unmatched;
-   `Scene_Unk024C` still says Field_Unk0617 is not matched; `Field_UploadUnk1D00`/`1C00` say the
-   data is not traced. `Scene_Unk0283`, `Field_Unk034B`/`038F`/`0617` and
+   builders `Field_Unk29F7`/`Field_Unk2B78` ($C0:29F7–$C0:2C40). `Scene_Unk0283`, `Field_Unk034B`/`038F`/`0617` and
    `Field_Unk29F7`/`2B78` keep their names because verified code calls them by name; better
    names once those callers are re-reviewed: `Scene_RebuildAfterBattle`, `FieldBtl_Save`,
    `Field_ListBattleObjs`, `Field_BuildPanelMap`/`Field_BuildGridMap` (probably). Next, in
