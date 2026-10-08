@@ -46,16 +46,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    lists, the victory / defeat / `!Battle_Unk99CD` ends and the dead pad-2 debug win), its
    setup `Battle_SetupBattle` + `Battle_CalcUnk56` (`$C1:FA8B`-`$C1:FDBE`), `Battle_RandRange`
    (`$C1:AF22`) and the DP math `Battle_Mul16` / `Battle_Div32` (`$C1:C90B`-`$C1:C95B`, 109 and
-   59 callers). Next, in reach order: the turn-list handlers `BattleSys_ListHandlerTable`
-   (`$C1:B92D`, 13 words: `$8876` ... `$8C08`, entry 12 `BattleSys_Unk8461`) with the offset table
-   `BattleSys_ListOffsetTable` (`$C1:B947`), `BattleSys_Unk8461` (`$C1:8461`, ~988 B, also run
-   while `!Battle_UnkAF25` is set), `BattleSys_Unk8C09`, and the small per-pass / end callees
-   `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/`BC60`/`EA9D`/
-   `EAE8`/`F93E`, `BattleSys_Unk895B`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
+   59 callers). Also matched: the turn-list handlers `$C1:8461`-`$C1:8C3D` (`BattleSys_Unk8461`,
+   list 12, the battlers' turns, with `BattleSys_Unk883D` / `BattleSys_ClearUnkB192`;
+   `BattleSys_ListHandler0`-`11`; `BattleSys_Unk895B`; `BattleSys_Unk8C09`) and the tables
+   `BattleSys_ListHandlerTable` / `BattleSys_ListOffsetTable` (`$C1:B92D`-`$C1:B960`). Next, in
+   reach order: the enemy script code `BattleSys_UnkAFD2` (`$C1:AFD2`-`$C1:B092`, reads `$CC:8B08`),
+   `BattleSys_UnkB488`/`B4AA` and the script-code table `BattleSys_UnkB80DTable` (`$C1:B80D`,
+   157 words, handlers from `$C1:8EA7`), `BattleSys_Unk8CF9` (an enemy's action), `BattleSys_UnkB967`
+   (a PC's command), the turn-list hit helpers `BattleSys_UnkE89F`/`EBF8`/`EC7F`, the other callees of
+   Unk8461 (`$C1:AC46`/`AC57`/`AC5E`, `B575`, `B70E`, `B725`, `B762`, `BCE1`, `BD6F`) and the small
+   per-pass / end callees `BattleSys_UnkB093`/`B0B6`/`B223`/`B3BB`/`B3D2`/`B3F9`/`B442`/`B4E9`/`B7F2`/
+   `BC60`/`EA9D`/`EAE8`/`F93E`; the setup's `$C1:C96A`/`CA1A`/`CCCB`/`CDFF`/`CE3A`/`CF15`
    and its many bank-$FD callees (`BattleFD_Unk*`, stubs in unmatched_battle.asm); the vectors
    `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`) and service 0
-   (`$C1:0023`). Open: what the 13 turn lists and their handlers are (ATB-like timers per slot
-   in `!Battle_ListTimers`/`!Battle_ListFlags`), what `!Battle_Unk24`, `!Battle_Unk99CD`,
+   (`$C1:0023`). Open: which status each turn list stands for (lists 0-5, 8-10 look like timed
+   statuses; 6, 7 and 11 are empty), who fills `!Battle_ListRuns`/`!Battle_ListReload` and sets a
+   list's flags, what `!Battle_UnkAF24`'s script results and the `!Battle_UnkB24A`/`B263`/`B2B6`
+   indexing in Unk8461 (by list position, by enemy in Unk8C09) mean; what `!Battle_Unk24`, `!Battle_Unk99CD`,
    `!Battle_Unk2989` bit 5 and `PcStatBlk`'s fields mean; the `$CC:0262` table the
    setup's dead X looks meant for. Stale after this batch (verified headers, fix at their next
    edit): BattleSys_DefeatPose / BattleSys_VictoryPose call their caller "the unmatched code at
