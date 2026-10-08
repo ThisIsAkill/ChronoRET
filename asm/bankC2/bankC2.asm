@@ -14326,8 +14326,9 @@ C2Scene_ObjAScrGo1DD:
 ; dash at 8 pixels a frame (C2Scene_ObjAScrDash, 50 rounds of 2 frames;
 ; sideways it is split in 14 and 36 with a C2Scene_ObjAJump between),
 ; palette 8 faded to C2SceneRom_ObjAPalA, 12 more rounds, sound $AD,
-; $80, every palette set at once (0 from C2SceneRom_ObjAPalB, the others
-; from C2SceneRom_ObjAPalA) and a fade out. Both end at .go:
+; $80, palettes 0-7 and 9-15 set at once (0 from C2SceneRom_ObjAPalB,
+; the others from C2SceneRom_ObjAPalA; palette 8 is still in its 32-step
+; fade, 24 frames along) and a fade out. Both end at .go:
 ; Loc_ReturnId = Loc_Id, C2Scene_ObjALoc = C2Scene_ObjANextLoc,
 ; scene mode C2Scene_ModeUnk2 (C2Scene_Mode2 leaves the scene), Loc_Id =
 ; C2Scene_ObjANextLoc, and an 8-frame wait.
