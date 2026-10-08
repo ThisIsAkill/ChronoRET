@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:2824,Field_FadeInAfterReload,2026-10-08,rev73a,approved,2717a7c2a2a7,"Fix checked: Exit no longer calls matched callees unmatched; ReloadStep Z/A=Unk1E skip, BMI loop to $0F, input save, Unk1E/FadeBusy clears, DP/DB verified. nit: all 3 callers follow a C2 round trip"

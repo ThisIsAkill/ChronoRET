@@ -353,6 +353,13 @@ if !constants_engine_inc == 0
                                          ; Field_Unk1F87's sequence (not traced)
 !Field_Unk29State0D = $0D                ; Field_Unk29 value set when the watched tile leaves the box
                                          ; (Field_Unk1F87's state $0D; not traced)
+!MapRedraw_Step1 = $01                   ; Field_MapRedrawDone values 1-4 (DefaultHandler's redraw
+!MapRedraw_Step2 = $02                   ; steps): NmiHandler uploads Map_BufC800 (2 KB) to
+!MapRedraw_Step3 = $03                   ; Map_TilemapVram, Map_TilemapVram3, Map_TilemapVram2 and
+!MapRedraw_Step4 = $04                   ; Map_TilemapVramL3 for them, then zeroes it
+!MapRedraw_UploadTo7000 = $08            ; Field_MapRedrawDone bit 3 (Field54_MapReq): the NMI uploads
+                                         ; Map_BufC800 to VRAM $7000 (Map_UploadBufTo7000)
+!MapRedraw_UploadTo7400 = $10            ; bit 4: the same to VRAM $7400 (Map_UploadBufTo7400)
 !MapRedraw_CreditsLine = $20             ; Field_MapRedrawDone bit 5: the NMI uploads the credits line
                                          ; (routine at $C0:EC77) and clears it
 !Map_ZeroChunk = $0020                   ; bytes of zeros Map_ClearBufC800 takes from GfxRom_D2; its
@@ -593,6 +600,10 @@ if !constants_engine_inc == 0
                                          ; instead of the FieldBtl_Result = 1 reset
 !FieldBtl_EvtUnk80 = $80                 ; FieldBtl_EvtFlags bit 7: Field_Unk034B leaves members 2
                                          ; and 3 alone and sets Field_Unk7F03FE = 3
+!Field47_Upload1D00 = $01                ; Field_Unk47 bits NmiHandler serves, one per frame in this
+!Field47_Upload1C00 = $02                ; order, clearing it: Field_UploadUnk1D00, 1C00, 1F00 and
+!Field47_Upload1F00 = $04                ; 57E0
+!Field47_Upload57E0 = $08
 !Field_Unk47Bits03 = $09                 ; bits 0 and 3 Scene_Unk0283 sets in Field_Unk47
 !FieldBtl_AttrSide = $0010               ; FieldBtl_AttrA/B window: 16 rows of 16 tiles
 !FieldBtl_SubMask = $0F                  ; low 4 bits of Obj_ScreenX/Y: pixel within the tile
@@ -680,3 +691,60 @@ if !constants_engine_inc == 0
 !Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
 !Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
 endif
+
+; --- NMI handler (NmiHandler, $C0:EA63) ---
+!Nmi_Nmitimen = NMI_ENABLE|IRQ_HV_ENABLE|AUTOJOY_ENABLE ; $A1: NMI, the V-count IRQ (bit 5)
+                                         ; and joypad auto-read, written at each NMI
+!Nmi_BgMode = BG_MODE_1|BG3_HIGH_PRIO    ; $09: BG mode 1 with BG3 on top, written at each NMI
+!Oam_ShadowBytes = $0220                 ; bytes Oam_UploadShadow sends: Oam_LowTable (512) and
+                                         ; Oam_HighTable (32)
+!Field_Unk58Mask = $83FF                 ; Field_WaitFrame's AND on Field_Unk58 after the INC
+!Field_UploadVram5800 = $5800            ; VRAM word base of Field_UploadUnk5800 (plus Field_Unk31
+                                         ; x $200)
+!Field_UploadUnk5800Bytes = $0400        ; bytes Field_UploadUnk5800 sends from Field_Unk7EF000
+
+; --- Object tile slots (Obj_Unk6F9A / Obj_Unk7056, Obj_TileSlot) ---
+!ObjTile_SingleTop = $19                 ; the one-slot search tries slots $19 down to 1
+!ObjTile_PairFirst = $0C                 ; the two-slot search tries the even slots $0C-$16
+!ObjTile_PairEnd = $18                   ; ... and stops here
+!ObjTile_PairMask = $00FE                ; slot & this: the even slot of a pair
+!ObjTile_OddBit = $0001                  ; slot & this: the odd half (8 tiles further)
+
+; --- Object palette slots (Obj_Unk7170 / Obj_Unk72B4 / Obj_Unk734C, Obj_PalSlot) ---
+!ObjPal_SlotKind0 = $05                  ; Obj_Unk1100 = 0 always uses palette slot 5,
+!ObjPal_SlotKind1 = $06                  ; 1 slot 6
+!ObjPal_SlotKind2 = $07                  ; and 2 slot 7
+!ObjPal_AnyEnd = $05                     ; kinds 3, 4 and 7-11 use slots 0-4
+!ObjPal_BtlFirst = $01                   ; kinds 5 and 6 (and FieldBtl_SaveObj) use slots 1-3
+!ObjPal_BtlEnd = $04
+!ObjPal_AttrMask = $0E                   ; slot x 2 & this: Obj_OamAttr (palette bits 1-3)
+!ObjPal_CopyCount = $0017                ; MVN count - 1: 24 bytes, colours 1-12
+
+; --- Evt_FindSolidObjInFront / Evt_FindOrAddUnk0920 ---
+!Obj_Unk1C80Front = $02                  ; Obj_Unk1C80 bit 1: Evt_FindSolidObjInFront looks for
+                                         ; objects only when it is set
+!ObjFront_Reach = $0100                  ; |distance| limit of the in-front tests (one tile: the
+                                         ; positions' high byte is the tile)
+!Evt_Unk0920Entries = $0010              ; entries of Evt_Unk0920 / Evt_Unk0930
+!Halt_ColorUnk0920Full = $4010           ; Sys_HaltWithColor colour when Evt_Unk0920 has no free entry
+
+; --- Event movement opcodes (Evt_Op7A_ArcToTile ... Obj_SetStandAnim) ---
+!Evt_BlockedTurn = $30                   ; Obj_Direction step (3/16 of a turn) the movement opcodes add
+                                         ; when Evt_FindSolidObjInFront finds an object in the way
+!Obj1C81_CentreOnTile = $01              ; Obj_Unk1C81 bit 0: on arriving at a target tile, run
+                                         ; Obj_Unk305D (steps toward the tile's centre, probably)
+!Obj1C81_OntoObj = $02                   ; Obj_Unk1C81 bit 1: next to a target object, run
+                                         ; Obj_Unk30B3 (steps onto its position, probably)
+!ObjX_Unk7F0B00Dir = $80                 ; ObjX_Unk7F0B00 value the direction moves (opcodes $92,
+                                         ; $9C, $9D) store; the others store their frame count
+!EvtFollow_ColLimit = $0E                ; Evt_Op8F_FollowPc stops when the object's screen column is
+                                         ; 2 to this - 1
+!EvtFollow_RowLimit = $0D                ; ... and its screen row 2 to this - 1
+!ObjAnim_RowStand = $00                  ; Obj_AnimRow Obj_SetMoveAnim / Obj_SetStandAnim use at rest
+!ObjAnim_RowWalk = $01                   ; ... moving slower than ObjAnim_RunSpeed
+!ObjAnim_RowRun = $06                    ; ... moving at ObjAnim_RunSpeed or more (kinds below
+                                         ; ObjAnim_RunKinds only)
+!ObjAnim_RunSpeed = $20                  ; |Obj_VelX| + |Obj_VelY| from which Obj_SetMoveAnim runs
+!ObjAnim_RunKinds = $04                  ; Obj_Unk1100 kinds below this may take ObjAnim_RowRun
+!Obj_AnimModeNormal = $01                ; Obj_AnimMode Obj_SetMoveAnim sets when it leaves
+                                         ; Obj_AnimModeFixed (Obj_AnimRow not $FF)
