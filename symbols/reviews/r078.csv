@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:B279,BattleSys_UpdateKo,2026-10-08,rev78a,approved,b62f1f41170b,"Revive sign fixed: ActPcHitAmount/kind 1 = +Unk66*5, RecordHit (HitNegate, set B2C7=0) stores -(Unk66*5). KO/gauge/enemy paths, constants, Entry/Exit, B18B note OK."

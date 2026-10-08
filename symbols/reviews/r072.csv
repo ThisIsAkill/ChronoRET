@@ -1,0 +1,10 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:4058,BattleSys_RunAction,2026-10-08,rev72a,approved,9f1cac49ffe5,"Fixed: no ""cross-bank"". Verified table entry 4, sole LDA #4 request at BFA4, $CF:FFFD-F all 0, TAX/ActSecondGroup quirk, steps 1-8, Exit. nit: STZ !Battle_ActFrameHold unstated"
+$C1:8B10,BattleSys_ListHandler9,2026-10-08,rev72a,approved,0ebe45237c30,"Fixed: Y = slot, or $2C after a hit (895B->AC57->AC85->ApplyHits; dispatcher and FD:ACEE keep Y). Verified halve quirk, constants 5/2/$C0/$7F/10, KO skip, DP $0E/$10"
+$C1:8C3E,BattleAi_TestPassed,2026-10-08,rev72a,changes,48d881826a50,"Choose04 note false: before PLY/JMP $8C90 it rewrites B273 (=B1D2+1, maybe +1-3 actions by random), so B1D4 = its picked action, not the part's start. PLY drops the JSR return; say so"
+$C1:AC85,BattleSys_UnkAC85,2026-10-08,rev72a,approved,8b6ec032b455,"Fixed: Exit A = 0, X = $84 (FD:ACFD TDC/TAX, loop to $84), Y = $2C (ApplyHits slot loop); M=1/X=0 kept, DP/DB as stated"
+$C1:AC89,BattleAi_SetCmdBits,2026-10-08,rev72a,approved,a4532106d91d,"Fixed: DP $0E is now earlier code's, not ArgToDp0E (all 4 sites call it right after; A = LDA $AEC8). Verified A+3 OR, codes 0/1/2 constants, DP $10, Exit X/Y kept"
+$C1:ADA1,BattleAi_PickPcTarget,2026-10-08,rev72a,approved,51b1dff7bf99,"Fixed: dead bytes $AE0D-$AE12 (TDC/STA/BRA) after BRA at $AE0B, JSR Target07 at $AE08. Verified BPL $ADD1 hang quirk, scans, .one, $40 check, Exit"
+$C1:AFD2,BattleAi_RunMainPart,2026-10-08,rev72a,approved,a8859f556f11,"Fixed: quirk now says the own 2nd test runs after test $00. Verified block loop, skips, B263/B242/B2B6, DP $0A. nit: a 2nd test that calls NoteFirstTest sets B1CF=$80, so no re-choice"
+$C1:E89F,Battle_HitEntryOffset,2026-10-08,rev72a,approved,b9a122df6146,"Fixed: wrap quirk stated (set 5 at $DC, slots 9/10 -> 0/4; 8-bit ADC, DP $0F = 0). Verified formula, Exit A = DP $0E, X = 0 (Mul16), Y kept, MathA = $2C"
+$C1:EC7F,Battle_ApplyHits,2026-10-08,rev72a,approved,a681844aba75,"Fixed: Exit A = 0, X = $84 (FD:ACFD zeroes $B328-$B3AB), Y = $2C. Verified MP-bit skip, 3-set HP/MP sums, clamps, KO path (AEFF $FF, ABA2 with DP $0E for enemies)"

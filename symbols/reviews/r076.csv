@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:B279,BattleSys_UpdateKo,2026-10-08,rev76a,changes,4ab9de1e50d9,"B18B fix OK. Exit 'Y = the slot' false on revive path: $CD:0021 reaches $C2:57DF (TAY); RunAction writes DP scratch too. Say revive path clobbers Y and DP $06/$07."
+$C1:B575,BattleSys_UnkB575,2026-10-08,rev76a,approved,cd92519e7434,"Exit X 0-3 / A 0,1,$FF fix checked on all paths to .done; rotated rows, nibble masks, marks per row, A8A5 keeps X. nit: A95F does read the marks (drop 'probably')."
+$C1:BDB3,BattleSys_ResetTechUsers,2026-10-08,rev76a,approved,c200e6eebc10,"Checked user-0 +0: Mul16's 16 RORs leave MathB = carry-in (0 after CMP #$FF), Div32 exits on divisor 0 with MathLo 0. Nibble tables, AtbCur/Max, list-12/B188/State, Exit OK."
+$C1:CB93,BattleSys_LoadTechUsers,2026-10-08,rev76a,approved,f05b11ad29b2,"Callers note checked: C1E4 in C1DD; C756 in sub $C74C-$C78C (RTS at $C74B before it), sole JSR from $C59A. Rec*11, UserSet&$7F, set*3, B=0, MathHi=0 Exit OK."
+$C1:CE3A,BattleSys_UnkCE3A,2026-10-08,rev76a,approved,f1e625d4cb53,"Exit A fix OK ($FF empty, else CF69's). Checked 0B-11->36-3C copies, bases $5A/$7B, 6-B recs, $0E args, dead BC60 site/CE36 fall-in. nit: DP $00 is set only for a present slot."
+$C1:CF52,BattleSys_UnkCF52,2026-10-08,rev76a,approved,48741ddcedf5,"Checked: LDA DP $06 replaces A, both branches REP/ASL/ASL/CLC, X=(B:$06)*4, TDC->A=0 (DP=0), DB unused, no xref callers. nit: CF15's callers pass $29, $27, $28, $2A."

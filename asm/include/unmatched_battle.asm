@@ -18,72 +18,287 @@ org $C10003
 BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
 org $C10006
 BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
-org $C18CF9
-BattleSys_Unk8CF9:                      ; JSR from BattleSys_Unk8461 with !Battle_UnkAEC8 = enemy: probably the enemy's action; not analysed
-org $C1AC46
-BattleSys_UnkAC46:                      ; JSR from BattleSys_Unk8461's end; not analysed
-org $C1AC57
-BattleSys_UnkAC57:                      ; JSR from BattleSys_Unk895B after it fills the action block; not analysed
-org $C1AC5E
-BattleSys_UnkAC5E:                      ; JSR from BattleSys_Unk8461's end; not analysed
-org $C1AFD2
-BattleSys_UnkAFD2:                      ; JSR from BattleSys_Unk8C09, A = enemy id: reads $CC:8B08 (probably runs its behaviour script); not analysed
-org $C1B488
-BattleSys_UnkB488:                      ; JSR from BattleSys_Unk8461, A = enemy id: leaves a bank-$CC script address in !Battle_UnkB1D2
-org $C1B575
-BattleSys_UnkB575:                      ; JSR from BattleSys_Unk8461 / BattleSys_Unk883D; reads the BattleCmd partner bytes; not analysed
-org $C1B70E
-BattleSys_UnkB70E:                      ; JSR from BattleSys_Unk8461 (a ready PC, !Battle_Unk2989 bit 5 set); not analysed
-org $C1B725
-BattleSys_UnkB725:                      ; JSR from BattleSys_Unk8461 (!Battle_Unk2989 bit 5 set); not analysed
-org $C1B762
-BattleSys_UnkB762:                      ; JSR from BattleSys_Unk8461 each run; not analysed
-org $C1B80D
-BattleSys_UnkB80DTable:                 ; 157 words: JSR (T,X) from BattleSys_Unk8461 by a script code * 2; not analysed
-org $C1B967
-BattleSys_UnkB967:                      ; JSR from BattleSys_Unk8461 with !Battle_UnkB18B = PC: probably runs its command; not analysed
-org $C1BCE1
-BattleSys_UnkBCE1:                      ; JSR from BattleSys_Unk8461 (!Battle_UnkAF23 set); not analysed
-org $C1BD6F
-BattleSys_UnkBD6F:                      ; JSR from BattleSys_Unk8461 after an enemy's turn; not analysed
-org $C1E89F
-BattleSys_UnkE89F:                      ; JSR from turn lists 1 and 9 with !Battle_UnkAD89 / B1FD set; leaves DP $0E (not analysed)
-org $C1EBF8
-BattleSys_UnkEBF8:                      ; JSR from turn lists 1, 8 and 9 with !Battle_UnkB202 set; not analysed
-org $C1EC7F
-BattleSys_UnkEC7F:                      ; JSR from turn list 8; not analysed
-org $C1B093
-BattleSys_UnkB093:                      ; JSR from BattleSys_Main / Battle_SetupBattle with X = PC slot * $80; not analysed
-org $C1B0B6
-BattleSys_UnkB0B6:                      ; JSR from BattleSys_Main with X = Y * $80, Y = 0-10; not analysed
-org $C1B223
-BattleSys_UnkB223:                      ; JSR from each BattleSys_Main pass; not analysed
-org $C1B3BB
-BattleSys_UnkB3BB:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B3D2
-BattleSys_UnkB3D2:                      ; JSR from BattleSys_Main's !Battle_Unk2989 bit 5 end; not analysed
-org $C1B3F9
-BattleSys_UnkB3F9:                      ; JSR from BattleSys_Main's wait-mode path, X = PC slot, A = its !Battler_UnkAF0A; not analysed
-org $C1B442
-BattleSys_UnkB442:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B4E9
-BattleSys_UnkB4E9:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1B7F2
-BattleSys_UnkB7F2:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1BC60
-BattleSys_UnkBC60:                      ; JSR from BattleSys_Main's debug win with !Battle_UnkB18B = PC slot; not analysed
-org $C1C96A
-BattleSys_UnkC96A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CA1A
-BattleSys_UnkCA1A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CCCB
-BattleSys_UnkCCCB:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $06); not analysed
-org $C1CDFF
-BattleSys_UnkCDFF:                      ; JSR from Battle_SetupBattle; not analysed
-org $C1CE3A
-BattleSys_UnkCE3A:                      ; JSR from Battle_SetupBattle for PCs 0-2 (PC in DP $02); not analysed
-org $C1CF15
-BattleSys_UnkCF15:                      ; JSR from Battle_SetupBattle with arguments in DP $06, $08, $0A; not analysed
+; --- Enemy script handlers (tables BattleAi_TestTable, BattleAi_ChooseTable,
+;     BattleAi_RunTable, BattleAi_TargetTable at $C1:B80D-$C1:B92C; not analysed) ---
+org $C18EAB
+BattleAi_Test01:                        ; BattleAi_TestTable entry $01
+org $C18F11
+BattleAi_Test02:                        ; BattleAi_TestTable entry $02
+org $C18F87
+BattleAi_Test03:                        ; BattleAi_TestTable entry $03
+org $C18FDA
+BattleAi_Test04:                        ; BattleAi_TestTable entry $04
+org $C19013
+BattleAi_Test05:                        ; BattleAi_TestTable entry $05
+org $C19045
+BattleAi_Test06:                        ; BattleAi_TestTable entry $06
+org $C19082
+BattleAi_Test07:                        ; BattleAi_TestTable entry $07
+org $C190BE
+BattleAi_Test08:                        ; BattleAi_TestTable entry $08
+org $C19130
+BattleAi_Test09:                        ; BattleAi_TestTable entry $09
+org $C1918E
+BattleAi_Test0A:                        ; BattleAi_TestTable entry $0A
+org $C191F9
+BattleAi_Test0B:                        ; BattleAi_TestTable entry $0B
+org $C1925D
+BattleAi_Test0C:                        ; BattleAi_TestTable entry $0C
+org $C192A3
+BattleAi_Test0D:                        ; BattleAi_TestTable entry $0D
+org $C19314
+BattleAi_Test0E:                        ; BattleAi_TestTable entry $0E
+org $C1938D
+BattleAi_Test0F:                        ; BattleAi_TestTable entry $0F
+org $C193E6
+BattleAi_Test10:                        ; BattleAi_TestTable entry $10
+org $C1942A
+BattleAi_Test11:                        ; BattleAi_TestTable entry $11
+org $C19474
+BattleAi_Test12:                        ; BattleAi_TestTable entry $12
+org $C194D2
+BattleAi_Test13:                        ; BattleAi_TestTable entry $13
+org $C19514
+BattleAi_Test14:                        ; BattleAi_TestTable entry $14
+org $C1959A
+BattleAi_Test15:                        ; BattleAi_TestTable entry $15
+org $C195D6
+BattleAi_Test16:                        ; BattleAi_TestTable entry $16
+org $C195DA
+BattleAi_Test17:                        ; BattleAi_TestTable entry $17
+org $C195FA
+BattleAi_Test18:                        ; BattleAi_TestTable entries $18, $23, $24, $25, $26, $27, $28
+org $C19652
+BattleAi_Test19:                        ; BattleAi_TestTable entry $19
+org $C19656
+BattleAi_Test1A:                        ; BattleAi_TestTable entry $1A
+org $C196A5
+BattleAi_Test1B:                        ; BattleAi_TestTable entry $1B
+org $C196D4
+BattleAi_Test1C:                        ; BattleAi_TestTable entry $1C
+org $C19728
+BattleAi_Test1D:                        ; BattleAi_TestTable entry $1D
+org $C1975C
+BattleAi_Test1E:                        ; BattleAi_TestTable entry $1E
+org $C19765
+BattleAi_Test1F:                        ; BattleAi_TestTable entry $1F
+org $C197AB
+BattleAi_Test20:                        ; BattleAi_TestTable entry $20
+org $C197C0
+BattleAi_Test21:                        ; BattleAi_TestTable entry $21
+org $C197D5
+BattleAi_Test22:                        ; BattleAi_TestTable entry $22
+org $C19810
+BattleAi_Choose00:                      ; BattleAi_ChooseTable entry $00
+org $C1983A
+BattleAi_Choose01:                      ; BattleAi_ChooseTable entries $01, $02
+org $C198C4
+BattleAi_Choose03:                      ; BattleAi_ChooseTable entry $03
+org $C198C5
+BattleAi_Choose04:                      ; BattleAi_ChooseTable entry $04
+org $C19960
+BattleAi_Choose05:                      ; BattleAi_ChooseTable entry $05
+org $C19961
+BattleAi_Choose06:                      ; BattleAi_ChooseTable entry $06
+org $C19962
+BattleAi_Choose07:                      ; BattleAi_ChooseTable entry $07
+org $C19966
+BattleAi_Choose08:                      ; BattleAi_ChooseTable entry $08
+org $C19967
+BattleAi_Choose09:                      ; BattleAi_ChooseTable entry $09
+org $C19978
+BattleAi_Choose0A:                      ; BattleAi_ChooseTable entry $0A
+org $C19979
+BattleAi_Choose0B:                      ; BattleAi_ChooseTable entry $0B
+org $C1997D
+BattleAi_Choose0C:                      ; BattleAi_ChooseTable entry $0C
+org $C1997E
+BattleAi_Choose0D:                      ; BattleAi_ChooseTable entry $0D
+org $C1997F
+BattleAi_Choose0E:                      ; BattleAi_ChooseTable entry $0E
+org $C19980
+BattleAi_Choose0F:                      ; BattleAi_ChooseTable entry $0F
+org $C19981
+BattleAi_Choose10:                      ; BattleAi_ChooseTable entries $10, $16
+org $C199B4
+BattleAi_Choose11:                      ; BattleAi_ChooseTable entries $11, $12, $13, $14, $15
+org $C199B8
+BattleAi_Run00:                         ; BattleAi_RunTable entry $00
+org $C199BE
+BattleAi_Run01:                         ; BattleAi_RunTable entry $01
+org $C19A39
+BattleAi_Run02:                         ; BattleAi_RunTable entry $02
+org $C19B46
+BattleAi_Run03:                         ; BattleAi_RunTable entry $03
+org $C19B47
+BattleAi_Run04:                         ; BattleAi_RunTable entry $04
+org $C19B48
+BattleAi_Run05:                         ; BattleAi_RunTable entry $05
+org $C19B8C
+BattleAi_Run06:                         ; BattleAi_RunTable entry $06
+org $C19B8D
+BattleAi_Run07:                         ; BattleAi_RunTable entry $07
+org $C19C6E
+BattleAi_Run08:                         ; BattleAi_RunTable entry $08
+org $C19C6F
+BattleAi_Run09:                         ; BattleAi_RunTable entry $09
+org $C19CB3
+BattleAi_Run0A:                         ; BattleAi_RunTable entry $0A
+org $C19D1B
+BattleAi_Run0B:                         ; BattleAi_RunTable entry $0B
+org $C19D72
+BattleAi_Run0C:                         ; BattleAi_RunTable entry $0C
+org $C19DCE
+BattleAi_Run0D:                         ; BattleAi_RunTable entry $0D
+org $C19E62
+BattleAi_Run0E:                         ; BattleAi_RunTable entry $0E
+org $C19E63
+BattleAi_Run0F:                         ; BattleAi_RunTable entry $0F
+org $C19E78
+BattleAi_Run10:                         ; BattleAi_RunTable entry $10
+org $C19F5A
+BattleAi_Run11:                         ; BattleAi_RunTable entry $11
+org $C19FD2
+BattleAi_Run12:                         ; BattleAi_RunTable entry $12
+org $C1A14E
+BattleAi_Run13:                         ; BattleAi_RunTable entry $13
+org $C1A188
+BattleAi_Run14:                         ; BattleAi_RunTable entry $14
+org $C1A20B
+BattleAi_Run15:                         ; BattleAi_RunTable entry $15
+org $C1A396
+BattleAi_Run16:                         ; BattleAi_RunTable entry $16
+org $C1A3F6
+BattleAi_Target00:                      ; BattleAi_TargetTable entry $00
+org $C1A3F7
+BattleAi_Target01:                      ; BattleAi_TargetTable entry $01
+org $C1A411
+BattleAi_Target02:                      ; BattleAi_TargetTable entry $02
+org $C1A42E
+BattleAi_Target03:                      ; BattleAi_TargetTable entry $03
+org $C1A43D
+BattleAi_Target04:                      ; BattleAi_TargetTable entry $04
+org $C1A452
+BattleAi_Target05:                      ; BattleAi_TargetTable entry $05
+org $C1A4AF
+BattleAi_Target06:                      ; BattleAi_TargetTable entry $06
+org $C1A4E0
+BattleAi_Target07:                      ; BattleAi_TargetTable entry $07
+org $C1A508
+BattleAi_Target08:                      ; BattleAi_TargetTable entry $08
+org $C1A541
+BattleAi_Target09:                      ; BattleAi_TargetTable entry $09
+org $C1A54B
+BattleAi_Target0A:                      ; BattleAi_TargetTable entry $0A
+org $C1A555
+BattleAi_Target0B:                      ; BattleAi_TargetTable entry $0B
+org $C1A55F
+BattleAi_Target0C:                      ; BattleAi_TargetTable entry $0C
+org $C1A569
+BattleAi_Target0D:                      ; BattleAi_TargetTable entry $0D
+org $C1A573
+BattleAi_Target0E:                      ; BattleAi_TargetTable entry $0E
+org $C1A5A3
+BattleAi_Target0F:                      ; BattleAi_TargetTable entry $0F
+org $C1A5D3
+BattleAi_Target10:                      ; BattleAi_TargetTable entry $10
+org $C1A603
+BattleAi_Target11:                      ; BattleAi_TargetTable entry $11
+org $C1A633
+BattleAi_Target12:                      ; BattleAi_TargetTable entry $12
+org $C1A663
+BattleAi_Target13:                      ; BattleAi_TargetTable entry $13
+org $C1A693
+BattleAi_Target14:                      ; BattleAi_TargetTable entry $14
+org $C1A6C3
+BattleAi_Target15:                      ; BattleAi_TargetTable entry $15
+org $C1A6ED
+BattleAi_Target16:                      ; BattleAi_TargetTable entry $16
+org $C1A709
+BattleAi_Target17:                      ; BattleAi_TargetTable entry $17
+org $C1A737
+BattleAi_Target18:                      ; BattleAi_TargetTable entry $18
+org $C1A765
+BattleAi_Target19:                      ; BattleAi_TargetTable entry $19
+org $C1A7A9
+BattleAi_Target1A:                      ; BattleAi_TargetTable entry $1A
+org $C1A7E5
+BattleAi_Target1B:                      ; BattleAi_TargetTable entry $1B
+org $C1A819
+BattleAi_Target1C:                      ; BattleAi_TargetTable entry $1C
+org $C1A855
+BattleAi_Target1D:                      ; BattleAi_TargetTable entry $1D
+org $C1A889
+BattleAi_Target1E:                      ; BattleAi_TargetTable entry $1E
+org $C1A8C5
+BattleAi_Target1F:                      ; BattleAi_TargetTable entry $1F
+org $C1A8F9
+BattleAi_Target20:                      ; BattleAi_TargetTable entry $20
+org $C1A935
+BattleAi_Target21:                      ; BattleAi_TargetTable entry $21
+org $C1A971
+BattleAi_Target22:                      ; BattleAi_TargetTable entry $22
+org $C1A9AD
+BattleAi_Target23:                      ; BattleAi_TargetTable entry $23
+org $C1A9E9
+BattleAi_Target24:                      ; BattleAi_TargetTable entry $24
+org $C1AA25
+BattleAi_Target25:                      ; BattleAi_TargetTable entry $25
+org $C1AA61
+BattleAi_Target26:                      ; BattleAi_TargetTable entry $26
+org $C1AAAB
+BattleAi_Target27:                      ; BattleAi_TargetTable entry $27
+org $C1AAB6
+BattleAi_Target28:                      ; BattleAi_TargetTable entry $28
+org $C1AAC1
+BattleAi_Target29:                      ; BattleAi_TargetTable entry $29
+org $C1AACC
+BattleAi_Target2A:                      ; BattleAi_TargetTable entry $2A
+org $C1AAD7
+BattleAi_Target2B:                      ; BattleAi_TargetTable entry $2B
+org $C1AAE2
+BattleAi_Target2C:                      ; BattleAi_TargetTable entry $2C
+org $C1AAED
+BattleAi_Target2D:                      ; BattleAi_TargetTable entry $2D
+org $C1AAF8
+BattleAi_Target2E:                      ; BattleAi_TargetTable entry $2E
+org $C1AB03
+BattleAi_Target2F:                      ; BattleAi_TargetTable entry $2F
+org $C1AB4E
+BattleAi_Target30:                      ; BattleAi_TargetTable entry $30
+org $C1AB59
+BattleAi_Target31:                      ; BattleAi_TargetTable entry $31
+org $C1AB64
+BattleAi_Target32:                      ; BattleAi_TargetTable entry $32
+org $C1AB6F
+BattleAi_Target33:                      ; BattleAi_TargetTable entry $33
+org $C1AB7A
+BattleAi_Target34:                      ; BattleAi_TargetTable entry $34
+org $C1AB85
+BattleAi_Target35:                      ; BattleAi_TargetTable entry $35
+org $C1AB90
+BattleAi_Target36:                      ; BattleAi_TargetTable entry $36
+org $C1AB9B
+BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
+org $C1ABC9
+BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
+org $C1D7C4
+BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
+org $C1D8D1
+BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
+org $FDABA2
+BattleFD_UnkABA2:                       ; JSL from Battle_ApplyHits with DP $0E = an enemy slot being KO'd; not analysed
+org $C1C1DD
+BattleSys_UnkC1DD:                      ; JSR from BattleSys_UnkB967 (item and tech paths): fills !Battle_UnkAD8D/AD8E
+                                        ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
+org $C1D490
+BattleSys_UnkD490:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D4AD
+BattleSys_UnkD4AD:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D4D6
+BattleSys_UnkD4D6:                      ; JSR from BattleSys_UnkBF46; not analysed
+org $C1D523
+BattleSys_UnkD523:                      ; JSR from BattleSys_UnkBF79 (after !Battle_UnkAF23 = 0); not analysed
 org $C1CFC2
 BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
                                         ; table at $C1:D126 (6 entries) with argument Y; returns a result in A
@@ -172,10 +387,25 @@ org $CD0030
 BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
 
 org $CD0021
-BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; not analysed
+BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
+                                        ; after a tech, A = 3 or $0D; not analysed
 
 ; --- Bank $FD (called from BattleSys_Main and Battle_SetupBattle; not analysed) ---
 
+org $FDA8A5
+BattleFD_UnkA8A5:                       ; JSL from BattleSys_UnkB967, A = a PC slot taking part; leaves !Battle_UnkB3EA
+org $FDA93C
+BattleFD_UnkA93C:                       ; JSL from BattleSys_UnkB967 when !Battle_UnkB3EA is non-zero
+org $FDA95F
+BattleFD_UnkA95F:                       ; JSL from BattleSys_UnkB575 after it set !Battle_CmdPcs
+org $FDAF80
+BattleFD_UnkAF80:                       ; JSL from BattleSys_UnkCDFF, A = an inventory item id, DP $0E = its count
+org $FDB01C
+BattleFD_UnkB01C:                       ; JSL from BattleSys_UnkCDFF for an empty inventory entry
+org $FDB033
+BattleFD_UnkB033:                       ; JSL from BattleSys_UnkCF15, A = an id byte; returns X = a bank-$CC offset
+org $FDB141
+BattleFD_UnkB141:                       ; JSL from BattleSys_UnkCE3A, DP $08 = a record offset, DP $0E = $29D7
 org $FDA982
 BattleFD_UnkA982:                       ; JSL: first call of BattleSys_Main
 org $FDAA98
@@ -206,7 +436,7 @@ BattleFD_UnkAE99:                       ; JSL from Battle_SetupBattle
 org $FDAD09
 BattleFD_UnkAD09:                       ; JSL from Battle_SetupBattle
 org $FDAEF2
-BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle
+BattleFD_UnkAEF2:                       ; JSL from Battle_SetupBattle (and BattleSys_UnkBC60's dead body)
 org $FDACEE
 BattleFD_UnkACEE:                       ; JSL from Battle_SetupBattle, BattleSys_Unk8461 and turn lists 1 / 9
 org $FDAB30
