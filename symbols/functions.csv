@@ -606,7 +606,31 @@ $C1:692B,$C1:69B9,143,BattleAct_SetPosHistory,$C1,Battle engine,verified,0b5f50d
 $C1:69BA,$C1:69C2,9,BattleAct_OpStopPosHistory,$C1,Battle engine,verified,62bfb4138f22,Opcode $A5: !Battler_PosHistOn = 0 for the same battlers as opcode $A4 (BattleAct_OpStartPosHistory); advances 1.
 $C1:69C3,$C1:6AEF,301,BattleAct_OpMoveHeadingSteps,$C1,Battle engine,verified,768fe4773763,
 $C1:6AF0,$C1:6CF2,515,BattleAct_OpMoveHeadingChecked,$C1,Battle engine,verified,73c4ada71ec6,
+$C1:6CF3,$C1:6D0F,29,BattleAct_OpCircleToCalc,$C1,Battle engine,readable,0b3379717991,
+$C1:6D10,$C1:6D13,4,BattleAct_CircleMove,$C1,Battle engine,readable,567f6fcb8f53,
+$C1:6D14,$C1:6F30,541,BattleAct_CircleMoveKind,$C1,Battle engine,readable,45cee5e32fed,
+$C1:6F31,$C1:6F52,34,BattleAct_OpCircleToUnkPoint,$C1,Battle engine,readable,b9bbfcbe1fe9,Opcode $C1 <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc) round the point in !Battle_ActUnkPointX/Y; length 4.
+$C1:6F53,$C1:6F74,34,BattleAct_OpEllipseToCalc,$C1,Battle engine,readable,809f687c0aeb,"Opcode $C2 <n> <r> <a> <q>: opcode $C0 (BattleAct_OpCircleToCalc) with mover kind !Battle_MoveKindEllipse ($CF:F354, unmatched), which differs from the circle mover only in using half the radius for t"
+$C1:6F75,$C1:6F99,37,BattleAct_OpEllipseToUnkPoint,$C1,Battle engine,readable,08ad2c0d86b7,Opcode $C3 <r> <a> <q>: opcode $C2 (BattleAct_OpEllipseToCalc) round the point in !Battle_ActUnkPointX/Y; length 4.
+$C1:6F9A,$C1:6FA7,14,BattleAct_OpStepUnkA4AF,$C1,Battle engine,readable,080834532e59,
+$C1:6FA8,$C1:6FEE,71,BattleAct_StepUnkA4AF,$C1,Battle engine,readable,a4ad2eedb268,
+$C1:6FEF,$C1:6FFB,13,BattleAct_OpStepUnkA4AFTo0,$C1,Battle engine,readable,efb2a954dfba,Opcode $C5 <d>: opcode $C4 (BattleAct_OpStepUnkA4AF) with t = 0: steps !Battler_UnkA4AF back to 0 by d per frame; length 2.
+$C1:6FFC,$C1:702A,47,BattleAct_OpIncUnkA5D8,$C1,Battle engine,readable,63fe994741cb,Opcode $D0: counts the thread's battler's !Battler_UnkA5D8 up by 1 (no reader of it found); length 1.
+$C1:702B,$C1:7059,47,BattleAct_OpClearUnkA5D8,$C1,Battle engine,readable,1ee2d9ef93b8,"Opcode $D1: zeroes !Battler_UnkA5D8, for the same battlers as opcode $D0 (BattleAct_OpIncUnkA5D8); length 1."
+$C1:705A,$C1:720D,436,BattleAct_OpMoveKind4ToCalc,$C1,Battle engine,readable,545c1ddc61c6,
+$C1:720E,$C1:7348,315,BattleAct_OpMoveToMidpoint,$C1,Battle engine,readable,19802164daae,"Opcode $D3: sets up, without starting it, a straight move of the thread's actor to the raised midpoint opcode $D2 left (!Battle_ActUnkMidX/Y, copied to !Battle_ActCalcOutA/B); length 1; it advances at"
+$C1:7349,$C1:7363,27,BattleAct_OpRunMoveAfterUnkAAFC,$C1,Battle engine,readable,76343a38f28c,BattleAct_OpRunMove)
+$C1:7364,$C1:73A2,63,BattleAct_OpRunMove,$C1,Battle engine,readable,fb3aaacea770,
+$C1:73A3,$C1:73A7,5,BattleAct_OpRunMove_Wait,$C1,Battle engine,readable,b061a46e3907,
+$C1:73A8,$C1:73AC,5,BattleAct_OpRunMove_Done,$C1,Battle engine,readable,9c3e996d1d11,
+$C1:73AD,$C1:740A,94,BattleAct_OpRunMoveAfterMajorDist,$C1,Battle engine,readable,85542bd829c5,"Opcode $D5: opcode $D4 (BattleAct_OpRunMoveAfterUnkAAFC) with the other delay opcode $D3 leaves: waits while the 16-bit !Battle_MoveMajorDist is not 0, counting it down by 1 a frame; then sets the act"
+$C1:740B,$C1:74B3,169,BattleAct_OpPointTowardCalc,$C1,Battle engine,readable,163bda6a22fb,
+$C1:74B4,$C1:7539,134,BattleAct_OpShake,$C1,Battle engine,readable,9717a284ef5c,
+$C1:753A,$C1:7578,63,BattleAct_OpSetActAttr,$C1,Battle engine,readable,bdf3dc8e16cb,
+$C1:7579,$C1:75BA,66,BattleAct_OpResetActAttr,$C1,Battle engine,readable,cfbcbea541b0,"Opcode $DA: puts the thread's actor's attribute value back to its initial one (!Battler_ActAttrInit into !Battler_ActAttr, for thread 4 every slot of !Battle_ActTargetSet, !Battle_ActObjAttrInit into "
 $C1:75BB,$C1:75CB,17,BattleAct_AdvanceScript,$C1,Battle engine,verified,ed3894dbf886,"Moves the thread's script pointer !Battle_ActScriptPtr on by A bytes: a 16-bit add to the offset, with the carry going into the bank byte (added 16-bit, so DP $E9 takes part too)."
+$C1:7A63,$C1:7A6A,8,BattleAct_LoaderTable,$C1,Battle engine,readable,53e77eaf08fc,"Action loader per !Battle_ActKind 0-3, called by BattleAct_LoadScript through JSR (BattleAct_LoaderTable,X) with X = kind * 2 (kinds 4 and up are taken as 0)."
+$C1:7A6B,$C1:7C2A,448,BattleAct_OpcodeTable,$C1,Battle engine,readable,ca94c9dc6822,"Handler per action-script opcode, called by BattleAct_RunThread through JSR (BattleAct_OpcodeTable,X) with X = opcode * 2."
 $C1:7C2B,$C1:7C3C,18,BattleAct_ProbeBoxOverlap,$C1,Battle engine,verified,fc44558e5d3f,"Puts battler X's probe (!Battler_ProbeX/Y) at its screen position, builds its box (Battle_CalcBattlerBox) and tests it against the other battlers' boxes (Battle_BoxOverlapsOthers, tail JMP)."
 $C2:0000,$C2:0002,3,BankC2_Entry0000,$C2,Engine,verified,8f79873f075c,"vectors, five JMPs reached from other banks by JML/JSL: $0000 BankC2_Entry0000 → BankC2_SceneBoot (JML from GameLoop_Main for Loc_Id $01F0-$81EF; it never returns) $0003 BankC2_Entry0003 and $0006 Ban"
 $C2:0003,$C2:0005,3,BankC2_Entry0003,$C2,Engine,verified,3820532e261c,

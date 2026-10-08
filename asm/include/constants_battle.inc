@@ -449,6 +449,13 @@ if !constants_battle_inc == 0
 !Battle_CellBlocksAny    = $C0   ; !Battle_CellMap bits 6-7: either kind of blocking cell
 !Battle_ActMidRise       = $40   ; BattleAct_CalcMidpointSteps: !Battle_ActUnkMidY is this far above the midpoint
 !Battle_ActUnkAAFCStart  = $24   ; BattleAct_CalcMidpointSteps: start value of !Battle_ActUnkAAFC
+; Circle, kind-4, shake moves (opcodes $C0-$C3, $D2-$D8):
+!Battle_MoveKindCircle   = 3     ; !Battle_ActorMoveKind: circle around a centre ($CF:F1F8)
+!Battle_MoveKindUnk4     = 4     ; ... opcode $D2's arc-like move ($CF:F23D; see BattleAct_OpMoveKind4ToCalc)
+!Battle_MoveKindEllipse  = 5     ; ... the circle with half the radius in y ($CF:F354)
+!Battle_MoveKindShake    = 6     ; ... the offset toggled on and off along a heading ($CF:F39F)
+!Battle_CircleRadiusMask = $7F   ; circle opcodes: low 7 bits of the first operand = radius (bit 7 = direction)
+!Battle_Kind4AccelDiv    = $80   ; opcode $D2: !Battle_ArcSpeedHalf / this = the accel ($FF)
 
 ; --- Sound (APU command block !Sfx_Command) ---
 !Sfx_CmdPlay             = $19   ; APU command used for every menu sound in this bank (inferred: play SFX)

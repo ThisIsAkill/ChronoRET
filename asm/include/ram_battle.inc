@@ -705,7 +705,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; (unmatched); purpose unknown
 !Battler_UnkA4A4         = $A4A4 ; 1 B per battler slot: zeroed by opcode $2B; used by the movers in bank $CF ($CF:F21D and
                                  ; others); purpose unknown
-!Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; also $C1:6FBF, unmatched); the arc
+!Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; stepped by opcodes $C4/$C5); the arc
                                  ; mover writes its height here (see the arc moves below)
 ; The curving move (opcodes $13-$15, mover kind 7 at $CF:F405, unmatched):
 !Battle_ActorHeading     = $AC11 ; 1 B per actor: heading angle of a curving move; the opcode sets the start heading,
@@ -743,7 +743,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battler_PathStartY      = $A55E ; 1 B per battler slot: y
 !Battle_ActMoveUnitX     = $A880 ; 2 B: signed 8.8 unit step x from BattleAct_CalcMoveStep (scaled by the speed after)
 !Battle_ActMoveUnitY     = $A882 ; 2 B: the same for y
-!Battle_MoveMajorDist    = $AAFE ; 1 B: the larger of |dx| and |dy| of the last BattleAct_CalcMoveStep
+!Battle_MoveMajorDist    = $AAFE ; 1 B: the larger of |dx| and |dy| of the last BattleAct_CalcMoveStep (opcodes
+                                 ; $D3/$D5 reuse it, 2 B, as a frame count)
 !Battler_DefMoveDelay    = $973F ; 1 B per battler slot: default !Battle_ActorMoveDelay (set at $CC:E3E8, unmatched)
 !Battler_DefMoveSpeed    = $98BF ; 1 B per battler slot: default !Battle_ActorMoveSpeed (set at $CC:E3E3)
 !Battle_DecompSrc        = $0300 ; 2 B: Decomp_ToWramVec source address (DP $00 of that routine, which sets DP=$0300)
@@ -862,6 +863,36 @@ endstruct
 !Battle_ActUnkMidY       = $AAFA ; 1 B: y halfway, minus !Battle_ActMidRise (0 at least); read at $C1:7214
 !Battle_ActUnkAAFC       = $AAFC ; 1 B: set to !Battle_ActUnkAAFCStart; read and written at $C1:7327-$C1:7357
 !Battle_ActUnkAAFD       = $AAFD ; 1 B: zeroed with it; read at $C1:735A and $C1:B74C
+; Circle moves (opcodes $C0-$C3, BattleAct_OpCircleToCalc; mover kinds !Battle_MoveKindCircle at $CF:F1F8 and
+; !Battle_MoveKindEllipse at $CF:F354, unmatched): each step the mover adds the angle step to the angle and
+; writes radius * sin(angle) to !Battler_UnkA4AF and radius * cos(angle) to !Battler_UnkA4A4 (kind 5: the
+; sine with half the radius), counts the steps down and sets the done flag at 0. All are 1 B per actor
+; (11 battler slots, then object threads 0-7 from index 11) unless said.
+!Battle_ActorCircleX     = $AA74 ; 1 B per actor: x of the centre (the opcode also puts a battler there); no
+                                 ; reader of the battlers' part found; the objects' part is read at $CF:F6B6
+!Battle_ActorCircleY     = $AA87 ; 1 B per actor: y of the centre
+!Battle_ActorCircleAngle = $AA9A ; 1 B per actor: angle on the circle (256 units per turn)
+!Battle_ActorCircleSteps = $AAAD ; 2 B per actor (index actor * 2): steps left
+!Battle_ActorCircleStep  = $AAD3 ; 1 B per actor: signed angle added per step (+ or - the actor's move speed)
+!Battle_ActorCircleRadius = $AAE6 ; 1 B per actor: radius in pixels
+!Battle_ActorUnkAB00     = $AB00 ; 1 B per actor: zeroed by opcode $D2; the kind-4 mover ($CF:F25A) sets it when it
+                                 ; ends the move near the point and then tests the point with a 1-pixel margin
+                                 ; instead of 16 (also read in bank $CC, $CC:D88B, maybe for something else)
+!Battler_UnkA5D8         = $A5D8 ; 1 B per battler slot: counted up by opcode $D0, zeroed by opcode $D1; no reader
+                                 ; found
+; Shake (opcode $D8, mover kind !Battle_MoveKindShake at $CF:F39F, unmatched), 1 B per battler slot:
+!Battler_ShakeFrames     = $AB13 ; frames left + 1; at 0 the mover zeroes the offset and !Battle_ActorMoving
+!Battler_ShakeAmp        = $AB1E ; distance of the offset, along !Battle_ActorUnkA5AA
+!Battler_ShakeTimer      = $AB29 ; frames to the next toggle
+!Battler_ShakePeriod     = $AB34 ; frames between toggles (reloads the timer)
+!Battler_ShakeOff        = $AB3F ; toggled each time: 0 = the offset is set (sin/cos of the heading), 1 = zeroed
+; Per-actor attribute bits (opcodes $D9/$DA). Battle init ($CC:E3FC) fills both copies with
+; !Battle_ActAttrBits, so probably sprite attribute bits; $CF:EEF8 loads the objects' current value into DP $A1
+; while building their sprites and $CF:FE36 tests the battlers' for non-zero (neither traced further).
+!Battler_ActAttr         = $99B5 ; 1 B per battler slot: current value (opcode $D9 sets it)
+!Battler_ActAttrInit     = $9F3B ; 1 B per battler slot: initial value (opcode $DA copies it back)
+!Battle_ActObjAttrInit   = $AB57 ; 1 B per object thread: initial value
+!Battle_ActObjAttr       = $AB5F ; 1 B per object thread: current value
 ; Position history (opcodes $A4/$A5; recorded by $CF:ED1D, unmatched): every !Battler_PosHistDelay frames the
 ; four records shift one place and record 0 gets !Battler_ScreenX/Y + !Battler_UnkA4A4/A4AF (probably for
 ; after-images; who draws them is not traced).

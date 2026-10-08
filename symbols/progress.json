@@ -1,15 +1,15 @@
 {
   "schema": 2,
-  "emitted_bytes": 71206,
+  "emitted_bytes": 73910,
   "code_bytes": 359278,
   "totals": {
     "matched": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 823,
+      "bytes": 73910
     },
     "readable": {
-      "functions": 799,
-      "bytes": 71206
+      "functions": 823,
+      "bytes": 73910
     },
     "verified": {
       "functions": 799,
@@ -37,14 +37,14 @@
     {
       "bank": "$C1",
       "code_bytes": 63904,
-      "emitted_bytes": 27800,
+      "emitted_bytes": 30504,
       "matched": {
-        "functions": 333,
-        "bytes": 27800
+        "functions": 357,
+        "bytes": 30504
       },
       "readable": {
-        "functions": 333,
-        "bytes": 27800
+        "functions": 357,
+        "bytes": 30504
       },
       "verified": {
         "functions": 333,
@@ -892,7 +892,7 @@
       "bank": "$C1",
       "start": "$C1:6000",
       "end": "$C1:6FFF",
-      "emitted_bytes": 3315,
+      "emitted_bytes": 4096,
       "functions": [
         "BattleAct_OpLinkObjBit7",
         "BattleAct_OpLinkObjBit6",
@@ -923,16 +923,40 @@
         "BattleAct_SetPosHistory",
         "BattleAct_OpStopPosHistory",
         "BattleAct_OpMoveHeadingSteps",
-        "BattleAct_OpMoveHeadingChecked"
+        "BattleAct_OpMoveHeadingChecked",
+        "BattleAct_OpCircleToCalc",
+        "BattleAct_CircleMove",
+        "BattleAct_CircleMoveKind",
+        "BattleAct_OpCircleToUnkPoint",
+        "BattleAct_OpEllipseToCalc",
+        "BattleAct_OpEllipseToUnkPoint",
+        "BattleAct_OpStepUnkA4AF",
+        "BattleAct_StepUnkA4AF",
+        "BattleAct_OpStepUnkA4AFTo0",
+        "BattleAct_OpIncUnkA5D8"
       ]
     },
     {
       "bank": "$C1",
       "start": "$C1:7000",
       "end": "$C1:7FFF",
-      "emitted_bytes": 35,
+      "emitted_bytes": 1958,
       "functions": [
+        "BattleAct_OpClearUnkA5D8",
+        "BattleAct_OpMoveKind4ToCalc",
+        "BattleAct_OpMoveToMidpoint",
+        "BattleAct_OpRunMoveAfterUnkAAFC",
+        "BattleAct_OpRunMove",
+        "BattleAct_OpRunMove_Wait",
+        "BattleAct_OpRunMove_Done",
+        "BattleAct_OpRunMoveAfterMajorDist",
+        "BattleAct_OpPointTowardCalc",
+        "BattleAct_OpShake",
+        "BattleAct_OpSetActAttr",
+        "BattleAct_OpResetActAttr",
         "BattleAct_AdvanceScript",
+        "BattleAct_LoaderTable",
+        "BattleAct_OpcodeTable",
         "BattleAct_ProbeBoxOverlap"
       ]
     },
