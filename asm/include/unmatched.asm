@@ -42,12 +42,6 @@ TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $
 org $C05D6E
 Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
                     ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
-org $C0305D
-Obj_Unk305D:        ; Obj_Cur's X/Y steps = +-$10 toward position $80 / $F0 within its tile, one
-                    ; frame (Obj_MoveFrames = 1), C=1; C=0 when it is there (not matched)
-org $C030B3
-Obj_Unk30B3:        ; as Obj_Unk305D toward the position of the object in ObjFront_Other (not
-                    ; matched)
 
 ; --- Other banks, called from bank $C0 ---
 

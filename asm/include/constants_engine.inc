@@ -785,3 +785,24 @@ endif
 !Evt_WaitRuns8 = $08                     ; ... by opcode $BA
 !Evt_WaitRuns16 = $10                    ; ... by opcode $BC
 !Evt_WaitRuns32 = $20                    ; ... by opcode $BD
+
+; --- Object steps onto a tile centre / another object, touch and push (Obj_Unk305D ...) ---
+!Obj_SubTileMask = $F0                   ; Obj_PosX/Y low byte bits 4-7: the position within the tile
+                                         ; that Obj_Unk305D compares
+!Obj_TileCentreX = $80                   ; Obj_Unk305D's X target within the tile (the middle)
+!Obj_TileFootY = $F0                     ; Obj_Unk305D's Y target within the tile (its last $10)
+!Obj_CentreStep = $10                    ; Obj_VelX/Y step of Obj_Unk305D / Obj_Unk30B3 (+$10)
+!Obj_CentreStepNeg = $F0                 ; ... and its negative (-$10)
+!Obj_PosCoarseMask = $FFF0               ; Obj_PosX/Y bits Obj_Unk30B3 compares (the step grid)
+!Evt_Func2Ofs = $0004                    ; offset of function 2 in an object's 16-word function table
+!Obj_Unk1C00Func2 = $02                  ; Obj_Unk1C00 Evt_StartTargetFunc2 sets as it starts function 2
+!Obj_Unk1C00Func2Min = $03               ; Evt_StartTargetFunc2 starts nothing while Obj_Unk1C00 is
+                                         ; below this
+!Obj_Unk1B01Push = $02                   ; Obj_Unk1B01 bit 1: Evt_PushTarget may move the object
+!Field54_Push = $02                      ; Field_Unk54 bit 1: set by Evt_PushTarget when it sends an
+                                         ; object off; no other push starts while it is set (who
+                                         ; clears it is not traced)
+!Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
+                                         ; offset; what is there is not traced)
+!Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
+                                         ; tile (column, row): the byte after Evt_PushScriptPos

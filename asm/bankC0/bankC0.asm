@@ -8818,6 +8818,368 @@ Evt_WaitRuns:                           ; header: see Evt_OpBC_Wait16
     RTS
 
 ; ============================================================
+; Object steps toward a tile centre or onto another object, and the
+; leader's touch and push ($C0:305D–$C0:326B)
+; ============================================================
+
+org $C0305D
+; ------------------------------------------------------------
+; $C0:305D — Obj_Unk305D (86 bytes, $305D–$30B2)
+; Steps Obj_Cur toward the point $80 / $F0 within its tile
+;   (Obj_TileCentreX, Obj_TileFootY: the middle column, the bottom row of
+;   the tile), one frame at a time. Obj_VelX and Obj_VelY (low bytes) are
+;   zeroed; when Obj_PosX's low byte & $F0 is not $80, Obj_VelX = +$10 or
+;   -$10 toward it; when Obj_PosY's low byte & $F0 is not $F0, Obj_VelY =
+;   +$10. With a step set: Obj_MoveFrames = 1, C=1. Already there:
+;   C=0.
+; Quirk: the -$10 Y step (.y_up) is never taken: the BCS before it
+;   follows a CMP #$F0 of a value that is not $F0, so always below it.
+; It keeps its stub name because the verified movement opcodes call it
+;   by it (better: Obj_StepToTileCentre).
+; Callers (5 JSR sites): Evt_Op96_WalkToTile ($C0:4F97), Evt_Op9A_WalkTowardTile ($C0:5025),
+;   Evt_Op97_WalkToTileVar ($C0:50D6), Evt_OpA0_MoveToTile ($C0:515F) and Evt_OpA1_MoveToTileVar
+;   ($C0:51E3).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute).
+; Exit: M=1, X=0, DP and DB unchanged; C as above; X = Obj_Cur; A
+;   clobbered; Y unchanged.
+; ------------------------------------------------------------
+Obj_Unk305D:
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    LDA.w !Obj_PosX,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileCentreX
+    BNE .x_off
+    LDA.w !Obj_PosY,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileFootY
+    BNE .y_off
+    CLC
+    RTS
+.x_off:
+    BCS .x_left
+    LDA.b #!Obj_CentreStep
+    STA.w !Obj_VelX,X
+    BRA .check_y
+.x_left:
+    LDA.b #!Obj_CentreStepNeg
+    STA.w !Obj_VelX,X
+    BRA .check_y                        ; branch to the next instruction, as found
+.check_y:
+    LDA.w !Obj_PosY,X
+    AND.b #!Obj_SubTileMask
+    CMP.b #!Obj_TileFootY
+    BNE .y_off
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+.y_off:
+    BCS .y_up                           ; never taken (see the header)
+    LDA.b #!Obj_CentreStep
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+.y_up:
+    LDA.b #!Obj_CentreStepNeg
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:30B3 — Obj_Unk30B3 (161 bytes, $30B3–$3153)
+; Steps Obj_Cur onto the position of the object in ObjFront_Other, one
+;   frame at a time: compares Obj_PosX and then Obj_PosY of the two with
+;   the low four bits masked (Obj_PosCoarseMask). Obj_VelX / Obj_VelY
+;   (low bytes) are zeroed, then set to +$10 / -$10 toward the target on
+;   each axis that differs. With a step set: Obj_MoveFrames = 1 and
+;   ObjX_Unk7F0B00 = 1 (Obj_Unk305D does not set it), C=1. Both equal:
+;   C=0.
+; It keeps its stub name because the verified walk-to-object opcodes
+;   call it by it (better: Obj_StepOntoObj).
+; Callers (3 JSR sites): Evt_Op94_Body ($C0:526E), Evt_Op9E_Body ($C0:5319) and Evt_Op98_Body
+;   ($C0:53B1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: ObjFront_Other is loaded
+;   whole, its high byte 0), DP=$0100 (Obj_Cur, ObjFront_Other and
+;   Eng_Scratch are dp), DB=$00 (Obj_* tables absolute);
+;   ObjFront_Other = the target's slot.
+; Exit: M=1, X=0, DP and DB unchanged; C as above; X = Obj_Cur, or
+;   ObjFront_Other when both are equal; A clobbered; Y unchanged;
+;   Eng_Scratch = Obj_Cur's masked X or Y.
+; ------------------------------------------------------------
+Obj_Unk30B3:
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    REP #$20
+    LDA.w !Obj_PosX,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosX,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .x_off
+    LDX.b !Obj_Cur
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .y_off
+    SEP #$20
+    CLC
+    RTS
+.x_off:
+    BCC .x_left
+    SEP #$20
+    LDA.b #!Obj_CentreStep
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelX,X
+    BRA .check_y
+.x_left:
+    SEP #$20
+    LDA.b #!Obj_CentreStepNeg
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelX,X
+    BRA .check_y                        ; branch to the next instruction, as found
+.check_y:
+    REP #$20
+    LDX.b !Obj_Cur
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    STA.b !Eng_Scratch
+    LDX.b !ObjFront_Other
+    LDA.w !Obj_PosY,X
+    AND.w #!Obj_PosCoarseMask
+    CMP.b !Eng_Scratch
+    BNE .y_off
+    LDX.b !Obj_Cur
+    SEP #$20
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+.y_off:
+    BCC .y_up
+    SEP #$20
+    LDA.b #!Obj_CentreStep
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+.y_up:
+    SEP #$20
+    LDA.b #!Obj_CentreStepNeg
+    LDX.b !Obj_Cur
+    STA.w !Obj_VelY,X
+    LDA.b #$01
+    STA.w !Obj_MoveFrames,X
+    STA.l !ObjX_Unk7F0B00,X
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3154 — Evt_StartTargetFunc2 (93 bytes, $3154–$31B0)
+; The touch counterpart of Evt_StartTargetFunc1: starts function 2 of
+;   the object in Field_UnkEB. Nothing happens while that object's
+;   Obj_Unk1C01 is nonzero or its Obj_Unk1100 or Obj_Unk1000 has bit 7
+;   set. Else, when its Obj_Unk1C00 is at least Obj_Unk1C00Func2Min (3),
+;   Obj_ScriptPos is saved in the ObjX_Unk7F0580 table of that level
+;   (level x Evt_PrioStride + slot), Obj_ScriptPos = function 2 (the
+;   third word of the object's function table), Obj_Unk1C00 =
+;   Obj_Unk1C00Func2 (2) and Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001 = 0.
+;   Either way it then runs Evt_PushTarget.
+; Called by the opcode $B0 handler (unmatched) when Evt_HasActionTarget
+;   finds an object in front of the leader.
+; Callers (1 JSR site): unmatched ($C0:3054).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_UnkEB and
+;   Eng_Scratch are dp), DB=$00 (Obj_* tables absolute); Field_UnkEB =
+;   the object's slot (its 16-bit loads take $01EC as the high byte, as
+;   in Evt_StartTargetFunc1).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (see
+;   Evt_PushTarget); Eng_Scratch written when started.
+; ------------------------------------------------------------
+Evt_StartTargetFunc2:
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_Unk1C01,X
+    BNE .done
+    LDA.w !Obj_Unk1100,X
+    BMI .done
+    LDA.w !Obj_Unk1000,X
+    BMI .done
+    LDA.w !Obj_Unk1C00,X
+    CMP.b #!Obj_Unk1C00Func2Min
+    BCC .push
+    STA.w WRMPYA
+    LDA.b #!Evt_PrioStride
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the object was
+    LDA.b !Field_UnkEB
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x 16: its function table
+    CLC
+    ADC.w #!Evt_Func2Ofs
+    TAX
+    LDA.l !Evt_Data,X
+    LDX.b !Field_UnkEB
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #!Obj_Unk1C00Func2
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+.push:
+    JSR Evt_PushTarget
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:31B1 — Evt_PushTarget (187 bytes, $31B1–$326B)
+; Moves the object in Field_UnkEB one tile on in the leader's facing,
+;   probably a push. Nothing happens while Field_Unk54 bit 1
+;   (Field54_Push) is set, when the object's Obj_Unk1C00 is 0 or its
+;   Obj_Unk1B01 bit 1 (Obj_Unk1B01Push) is clear, or when the tile next
+;   to the object in the leader's (Party_ObjSlot's) Obj_Facing is off the
+;   map edge (row or column 0 going up / left) or has Map_TileAttrB bit 7
+;   set (blocking, as Obj_SetVelocityChecked reads it; the index is row x
+;   256 + column, without the Map_ColMask1 mask Obj_SetVelocityChecked
+;   applies). Else that tile (column, row) is stored at Evt_PushTileOfs in
+;   Evt_Data, the object's Obj_ScriptPos is saved in the ObjX_Unk7F0580
+;   table of its level, Obj_ScriptPos = Evt_PushScriptPos, Obj_Unk1C00 =
+;   0, Obj_Unk1A80, Obj_Unk1A01 and Obj_Unk1001 = 0, and Field54_Push is
+;   set in Field_Unk54.
+; Quirk: the 16-bit store of Evt_PrioStride to WRMPYB also writes 0 to
+;   the next register, WRDIVL.
+; Callers (1 JSR site): Evt_StartTargetFunc2 ($C0:31AD).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk54,
+;   Field_UnkEB, Party_ObjSlot and Eng_Scratch are dp), DB=$00 (Obj_*
+;   tables absolute); X = Field_UnkEB.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; Y = Field_UnkEB once
+;   past the first two tests; X as the path left it (the leader's slot
+;   or the tile index when refused, Field_UnkEB when started);
+;   Eng_Scratch written when started.
+; ------------------------------------------------------------
+Evt_PushTarget:
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_Push
+    BNE .done
+    BRA .try
+.refused:
+    SEP #$10
+.done:
+    RTS
+.try:
+    LDA.w !Obj_Unk1C00,X
+    BEQ .done
+    STA.w WRMPYA                        ; level, for the save below
+    LDY.b !Field_UnkEB
+    LDA.w !Obj_Unk1B01,Y
+    BIT.b #!Obj_Unk1B01Push
+    BEQ .done
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    BEQ .up
+    DEC A
+    BEQ .down
+    DEC A
+    BEQ .left
+    LDA.w !Obj_TileY,Y                  ; right
+    XBA
+    LDA.w !Obj_TileX,Y
+    INC A
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.left:
+    LDA.w !Obj_TileY,Y
+    XBA
+    LDA.w !Obj_TileX,Y
+    BEQ .refused
+    DEC A
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.up:
+    LDA.w !Obj_TileY,Y
+    BEQ .refused
+    DEC A
+    XBA
+    LDA.w !Obj_TileX,Y
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+    BRA .start
+.down:
+    LDA.w !Obj_TileY,Y
+    INC A
+    XBA
+    LDA.w !Obj_TileX,Y
+    REP #$10
+    TAX
+    LDA.l !Map_TileAttrB,X
+    BMI .refused
+.start:
+    REP #$20
+    TXA                                 ; the tile: row << 8 | column
+    LDX.w #!Evt_PushTileOfs
+    STA.l !Evt_Data,X
+    LDA.w #!Evt_PrioStride
+    STA.w WRMPYB                        ; 16-bit store: WRDIVL = 0 too
+    NOP                                 ; wait for the product
+    NOP
+    REP #$30
+    CLC
+    LDA.w RDMPYL
+    ADC.b !Field_UnkEB
+    STA.b !Eng_Scratch                  ; level x $80 + slot
+    LDX.b !Field_UnkEB
+    LDA.w !Obj_ScriptPos,X
+    LDX.b !Eng_Scratch
+    STA.l !ObjX_Unk7F0580,X             ; save where the object was
+    LDA.w #!Evt_PushScriptPos
+    LDX.b !Field_UnkEB
+    STA.w !Obj_ScriptPos,X
+    SEP #$30
+    LDA.b #$00
+    STA.w !Obj_Unk1C00,X
+    STZ.w !Obj_Unk1A80,X
+    STZ.w !Obj_Unk1A01,X
+    STZ.w !Obj_Unk1001,X
+    LDA.b #!Field54_Push
+    TSB.b !Field_Unk54
+    RTS
+
+; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN
