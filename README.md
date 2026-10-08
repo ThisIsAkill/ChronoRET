@@ -94,7 +94,8 @@ Documentation (progress, bank map, architecture, devlog) is published as
 ## Workflow
 
 1. Pick the next target from [NEXT.md](NEXT.md).
-2. Disassemble it (`tools/disasm.py`) and work out what it does.
+2. Draft it (`make draft ADDR=C1:3714`, see CONTRIBUTING.md "Workflow") and work out what
+   it does.
 3. Write it readable from the start ([STYLE.md](STYLE.md)): named RAM, calls
    and constants. A literal transcription is fine on a work branch, never on
    `main`.
