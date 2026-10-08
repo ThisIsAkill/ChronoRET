@@ -2966,6 +2966,60 @@ Battle_ZeroResultEE:
     RTS
 
 ; ==================================================================
+; BattleMenu_EnqueueReadyBattler ($C11B19–$C11B54, 60 bytes)
+; ==================================================================
+; Service 1 of the cross-bank $C10045 service API (dispatch table at
+; $C10051: service 0 -> $0023, 1 -> here, 2 -> RemoveBattlerFromReady).
+; Called when battler slot $A1 becomes ready for a command (presumably
+; its ATB gauge filled): appends it to the ATB-ready queue that
+; BattleMenu_DequeueReadyBattler later pops from.
+;
+; Skipped entirely if the slot is already in the active roster
+; ($A6D9,X non-negative). Otherwise: sets bit 7 of the battler's
+; sprite flag byte at $93EE (via the $CCFAF0 slot->sprite lookup) —
+; the same bit ConsumePartnerSlot/CommitAction clear, i.e. "waiting
+; for a command" — writes the slot to the queue tail ($95D6+count),
+; resets the battler's menu cursor row ($95DC,X) to its per-PC
+; default ($9916,X), bumps the queue count ($95DA), and plays a sound
+; cue through the same SPC command $19 interface Battle_StopSfx uses,
+; here with $1E01 = $42 instead of 0 (inferred: the "turn ready" cue).
+;
+; Note: does not check whether the slot is already queued; callers
+; are trusted not to enqueue twice.
+;
+; Entry: M=1 (8-bit A), X=0 (16-bit), DB=$7E; $A1 = battler slot
+; Exit:  M=1; registers clobbered
+; Callees: JSL $C70004 (Audio_Process_Entry, cross-bank)
+org $C11B19
+BattleMenu_EnqueueReadyBattler:
+    LDA $A1                         ; battler slot that became ready
+    TAX
+    LDA.w $A6D9,X                   ; roster presence (<0 = absent)
+    BPL .exit                       ; already in the active roster
+    LDA.l $CCFAF0,X                 ; slot -> sprite index
+    TAX
+    LDA.w $93EE,X
+    ORA #$80                        ; mark "waiting for command"
+    STA.w $93EE,X
+    LDA.w $95DA                     ; queue count = tail index
+    TAX
+    LDA $A1
+    STA.w $95D6,X                   ; append slot to ready queue
+    TAX
+    LDA.w $9916,X                   ; per-PC default cursor row
+    STA.w $95DC,X
+    INC.w $95DA                     ; queue count
+    LDA #$42                        ; sound id (turn-ready cue, inferred)
+    STA.w $1E01
+    LDA #$19                        ; SPC command $19
+    STA.w $1E00
+    LDA #$80
+    STA.w $1E02
+    JSL $C70004                     ; Audio_Process_Entry (cross-bank)
+.exit:
+    RTS
+
+; ==================================================================
 ; Battle_StopSfx ($C11B55–$C11B66, 18 bytes)
 ; ==================================================================
 ; SPC audio command $19 dispatcher (mirrors bank $C0's Sub_1B90
@@ -3631,8 +3685,9 @@ BattleMenu_CommitAction:
 ; Removes battler slot $80 from the ready/active state as part of
 ; committing a dual/triple-tech: if it's currently the active roster
 ; slot, decrements the active-PC count; either way marks the slot
-; absent ($A6D9,X = $FF) and clears the "queued" bit of its sprite
-; flag byte at $93EE (via the same $CCFAF0 slot->sprite lookup used in
+; absent ($A6D9,X = $FF) and clears the "waiting for command" bit (bit
+; 7, set by BattleMenu_EnqueueReadyBattler) of its sprite flag byte at
+; $93EE (via the same $CCFAF0 slot->sprite lookup used in
 ; BattleMenu_CommitAction).
 ; Entry: M=1, X=0, DB=$7E; $80 = partner battler slot
 ; Exit:  M=1; registers clobbered
@@ -3650,7 +3705,7 @@ BattleMenu_ConsumePartnerSlot:
     LDA.l $CCFAF0,X                 ; slot -> sprite index
     TAX
     LDA.w $93EE,X
-    AND #$7F                        ; clear "queued" bit
+    AND #$7F                        ; clear "waiting for command" bit
     STA.w $93EE,X
     RTS
 
