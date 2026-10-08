@@ -13530,8 +13530,8 @@ Map_StepTileEffects:
 ; Before that it zeroes Field_UnkAB-AD and byte 0 of ObjX_Unk7F0C00,
 ; 7F0C80, 7F0D00 and 7F0D80 (object 0's entry, if those are per-object
 ; tables like the ObjX_* ones; not established).
-; Callers: BRL from unmatched location-load code at $C0:5926 (its
-;   only call site; it returns to that code's caller).
+; Callers: BRL from Evt_InitObjects at $C0:5926 (its only call site;
+;   it returns to Evt_InitObjects' caller).
 ; On entry: M=1 (8-bit A), X either (8-bit inside), DP any (saved, set
 ; to $1D00 = !DP_Map, restored), DB=$00 or $7E (Field_*, Obj_Prio*
 ; and Map_Unk1D34 written absolute in low RAM).
@@ -17132,8 +17132,9 @@ Field_ActionButton:
 ; Callers: GameLoop_LoadField ($C0:008E), its only call site.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00
 ; (VramQ_Valid absolute; the callees assume the same).
-; Exit: M=1, X=0 as far as is known (the bank-$C2 command is not
-; matched); A, X, Y clobbered, Obj_Cur and what the callees change.
+; Exit: M=1, X=0, DP=$0100 and DB=$00 unchanged as far as is known
+; (the bank-$C2 command is not matched); A, X, Y clobbered, Obj_Cur and
+; what the callees change.
 ; ------------------------------------------------------------
 org $C056A6
 Scene_PostLoadInit:
