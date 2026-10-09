@@ -870,6 +870,7 @@ if !constants_battle_inc == 0
 !Battle_AE4DBit4         = $10    ; !Battle_UnkAE4D bit 4: BattleSys_Effect03 skips its first test
 !Battle_AE4DBit2         = $04    ; bit 2: BattleSys_Effect03 also runs BattleSys_UnkE976
 !Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs $C1:E9D5
+!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and $C1:DA37
 !Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run $C1:E77B
 !Battle_Eff05Bit6        = $40
 !Battle_Eff05Bit7Arg     = 3      ; DP $1A for the bit-7 run

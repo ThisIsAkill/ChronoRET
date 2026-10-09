@@ -30015,8 +30015,8 @@ BattleSys_EffRecArgs12C:
 ; byte 3 & $3F, DP $18 = byte 2 & $0F, DP $1A = byte 1 (each 16-bit,
 ; high byte 0). What the effect routines make of them is not traced.
 ; Callers (2 JSR sites): BattleSys_Effect29 ($C1:D496) and BattleSys_Effect2A ($C1:D4BF).
-; Entry: M=1, X=0, DP=0, DB any (long reads); B any (TDC first)
-; Exit:  M=1, X=0, DP=0; A = byte 1, B = 0; X = !Battle_UnkB18C * 4 (8-bit
+; Entry: M=1, X=0, DP=0, DB=$7E (!Battle_UnkB18C); B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = byte 1, B = 0; X = !Battle_UnkB18C * 4 (8-bit
 ;        shifts: & $FF);
 ;        Y unchanged; DP $16-$1B as above
 !EffArg_16 = !BattleTmp_16              ; 2 B: first argument
@@ -30048,9 +30048,8 @@ BattleSys_LoadEffectArgs:
 ; DP $16 = byte 3 of the !BattleRom_UnkCC05CC record of
 ; !Battle_UnkB18C, all of it (16-bit, high byte 0).
 ; Callers (1 JSR site): BattleSys_Effect2A ($C1:D4B3).
-; Entry: M=1, X=0, DP=0, DB any (long read); B = 0 (16-bit TAX of the
-;        record offset)
-; Exit:  M=1, X=0, DP=0; A = the byte; X = (!Battle_UnkB18C * 4) & $FF; Y
+; Entry: M=1, X=0, DP=0, DB=$7E (!Battle_UnkB18C); B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the byte, B = 0; X = (!Battle_UnkB18C * 4) & $FF; Y
 ;        unchanged; DP $16/$17 as above
 BattleSys_LoadEffectArg3:
     TDC
@@ -30069,8 +30068,8 @@ BattleSys_LoadEffectArg3:
 ; record of !Battle_UnkB18C, whole. DP $17 is zeroed; DP $19 is left as
 ; it was.
 ; Callers (1 JSR site): BattleSys_Effect2B ($C1:D4DC).
-; Entry: M=1, X=0, DP=0, DB any (long reads); B = 0 (16-bit TAX)
-; Exit:  M=1, X=0, DP=0; A = byte 2; X = (!Battle_UnkB18C * 4) & $FF; Y
+; Entry: M=1, X=0, DP=0, DB=$7E (!Battle_UnkB18C); B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = byte 2, B = 0; X = (!Battle_UnkB18C * 4) & $FF; Y
 ;        unchanged; DP $16/$17 and $18 as above
 BattleSys_LoadEffectArgs12:
     TDC
@@ -30094,9 +30093,13 @@ BattleSys_LoadEffectArgs12:
 ; the first, counting !Battle_UnkAD8D down, and leave each target's
 ; command bytes with BattleSys_StoreTargetCmd. The routines that do the
 ; arithmetic ($C1:DA37 on) are not analysed, so what each type stands
-; for is not established. A path that ends in BattleSys_RecordMiss
-; (a cancelled hit, drawn as kind 5) sets !Battle_UnkB200 bit 7; the
-; others clear it.
+; for is not established. !Battle_UnkB200: in BattleSys_Effect02 and
+; BattleSys_Effect03 a target whose path ends in BattleSys_RecordMiss
+; (a cancelled hit, drawn as kind 5) sets it to $80 and any other
+; target to 0, so the last target's value is left (BattleSys_Effect08
+; leaves what its last Effect03 run left). BattleSys_Effect00, 01, 05,
+; 06 (its miss path too) and 07 end with it = 0; BattleSys_Effect04
+; does not touch it.
 ; All run in BattleSys_RunTechParts' state: M=1, X=0, DP=0, DB=$7E,
 ; with !Battle_UnkAD8D = 1 or more and the effect record in
 ; !Battle_UnkAEE6.
@@ -30141,7 +30144,7 @@ BattleSys_Effect01:
     JSR BattleSys_EffRecArgs12
     JSR BattleSys_UnkDB5E
     LDA.b !EffRec_16
-    BIT.b #!Battle_EffArg3Bit6
+    BIT.b #!Battle_Eff01Bit6
     BEQ .store
     JSR BattleSys_EffRecArgsUnk66
     JSR BattleSys_UnkDA37
@@ -30479,7 +30482,10 @@ BattleSys_Effect07:
 ; BattleSys_Effect03's second test). !Battle_UnkB2C7 = 0 first. At the
 ; end !Battle_UnkAE7B goes into !Battle_UnkAD89, recorded as a hit on
 ; !Battle_UnkB1FD (Battle_RecordHit, !Battle_UnkB202 = 0), and
-; BattleSys_StoreTargetCmd.
+; BattleSys_StoreTargetCmd. Quirk: unless it was an attack,
+; BattleSys_Effect03 leaves !Battle_UnkAD8D = 0, so that final
+; BattleSys_StoreTargetCmd takes !Battle_UnkAD8E[$FF] ($7E:AE8D) as its
+; target (the count 0 - 1 = $FF, B = 0).
 ; Callers note: BattleSys_EffectTable entry 8.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
 ; Exit:  M=1, X=0 (as assumed after the callees), DP=0, DB=$7E; A, X,
@@ -30653,8 +30659,9 @@ BattleSys_Effect2C:
 ;   BattleSys_Effect02 ($C1:D2D2), BattleSys_Effect03 ($C1:D354), BattleSys_Effect05 ($C1:D3AE),
 ;   BattleSys_Effect06 ($C1:D3EB), BattleSys_Effect08 ($C1:D48B), BattleSys_Effect29 ($C1:D49C),
 ;   BattleSys_Effect2A ($C1:D4C5) and BattleSys_Effect2B ($C1:D4E7).
-; Entry: M=1, X=0, DP any, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0, DP and DB unchanged; A = !Battle_UnkB191, B = 0;
+; Entry: M=1, X=0, DP=0 (TDC: Y starts at 0 and B, the high byte of
+;        the TAX index, is 0), DB=$7E; !Battle_UnkAD8D = 1 or more
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkB191, B = 0;
 ;        X = the record's end, Y = 4
 BattleSys_StoreTargetCmd:
     TDC
@@ -30985,8 +30992,8 @@ BattleSys_RunTechParts:
 
 ; $C1:D74F — BattleSys_CheckTechMp (117 bytes, $D74F–$D7C3)
 ; Whether every user of tech !Battle_UnkB18C (!Battle_TechUsers, as
-; loaded) can take part: for users 0-2 (!Battle_UnkB2D0 the index) up
-; to the first $FF id, the user's slot (!Battle_UnkB1BE) fails when its
+; loaded) can take part: for each of users 0-2 (!Battle_UnkB2D0 the
+; index; a $FF id is skipped and the loop goes on), the user's slot (!Battle_UnkB1BE) fails when its
 ; !Pc_LockStatus is set, when its part's MP cost (BattleSys_TechMpCost1-3
 ; through BattleSys_TechMpCostTable, cut by BattleSys_AdjustMpCost for
 ; its !Pc_UnkB3BA) is above its BattlerStats.CurMp, or, when the cost is
@@ -31352,8 +31359,9 @@ BattleSys_UnkD8D1:
 
 ; BattleSys_EffectTable ($C1D9D7–$C1DA30, 45 words)
 ; The effect routines by effect type (byte 0 of the effect record in
-; !Battle_UnkAEE6), called by BattleSys_RunTechParts with
-; JSR (BattleSys_EffectTable,X) at $C1:D703. Types $09-$28 do nothing.
+; !Battle_UnkAEE6), called with JSR (BattleSys_EffectTable,X) by
+; BattleSys_RunTechParts ($C1:D704), BattleSys_UnkD7C4 ($C1:D893) and
+; BattleSys_UnkD8D1 ($C1:D999). Types $09-$28 do nothing.
 org $C1D9D7
 BattleSys_EffectTable:
     dw BattleSys_Effect00               ; $00
@@ -31405,7 +31413,7 @@ BattleSys_EffectTable:
 ; BattleSys_TechMpCostTable ($C1DA31–$C1DA36, 3 words)
 ; The MP cost routine of each user (0-2) of a tech, called by
 ; BattleSys_CheckTechMp with JSR (BattleSys_TechMpCostTable,X) at
-; $C1:D78A.
+; $C1:D783.
 BattleSys_TechMpCostTable:
     dw BattleSys_TechMpCost1
     dw BattleSys_TechMpCost2
@@ -31689,7 +31697,7 @@ BattleSys_LoadTargetStats:
 ; record in !Battle_UnkAEE6 (meaning unknown).
 ; Callers (3 JSR sites): BattleSys_RunTechParts ($C1:D626), BattleSys_UnkD7C4 ($C1:D85A) and
 ;   BattleSys_UnkD8D1 ($C1:D967).
-; Entry: M=1, X any, DP any, DB=$7E
+; Entry: M=1, X any, DP=0 (TDC), DB=$7E
 ; Exit:  M=1, X, Y, DP and DB unchanged; A = byte 8, B = 0
 org $C1EB0E
 BattleSys_CopyEffectBytes78:
