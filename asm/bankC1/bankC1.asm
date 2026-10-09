@@ -24189,7 +24189,9 @@ BattleAi_NoteFirstTest:
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
-;        back); Y unchanged; !Battle_RandMin and !Battle_UnkB31E written;
+;        back); Y's low byte kept, high byte cleared (the SEP #$10 at
+;        entry; REP #$10 does not restore it); !Battle_RandMin and
+;        !Battle_UnkB31E written;
 ;        on the divide path !Battle_RandIdx advanced and !Battle_MathA,
 ;        MathB, MathHi and MathRem changed (Battle_Div32; MathLo is
 ;        saved and put back)
@@ -24258,7 +24260,9 @@ Battle_RandRange:
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
-;        back); Y unchanged; !Battle_RandMin and !Battle_UnkB31E written;
+;        back); Y's low byte kept, high byte cleared (the SEP #$10 at
+;        entry; REP #$10 does not restore it); !Battle_RandMin and
+;        !Battle_UnkB31E written;
 ;        on the divide path !Battle_UnkB3E6 advanced and !Battle_MathA,
 ;        MathB, MathHi and MathRem changed (Battle_Div32; MathLo is
 ;        saved and put back)
@@ -32217,8 +32221,9 @@ BattleSys_SetStatus:
 ; Callers (1 JSR site): BattleSys_Effect03 ($C1:D316).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 and DP $18 as said
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = DP $16's 16-bit
-;        value before the result (the chance); Y unchanged;
-;        DP $16 (0 or 1, DP $17 = 0) and DP $18 (the roll) written,
+;        value before the result (the chance); Y's low byte kept, high
+;        byte cleared (Battle_RandRange's SEP #$10); DP $16 (0 or 1,
+;        DP $17 = 0) and DP $18 (the roll) written,
 ;        plus the math DP bytes and !Battle_RandIdx (callees)
 !RollHit_Hit = !BattleTmp_16            ; 2 B: the caster's value, then the chance, then the result
 !RollHit_Evade = !BattleTmp_18          ; 1 B: the target's value, then the roll
@@ -33864,8 +33869,9 @@ BattleSys_AdjustDefence:
 ;        full-range case, 0-255; $FF + 1 wraps to the bound 0, which
 ;        returns 0); its only caller, BattleSys_HitModRandomStatus,
 ;        passes 100
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $1A = the number; X and Y
-;        unchanged; what Battle_RandRange changes
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $1A = the number; X unchanged
+;        (PHX/PLX); Y's low byte kept, high byte cleared (Battle_RandRange's
+;        SEP #$10); what else Battle_RandRange changes
 !RollUpTo_Value = !BattleTmp_1A         ; 1 B: the highest value, then the number
 BattleSys_RollUpTo1A:
     PHX
@@ -34634,13 +34640,18 @@ BattleSys_RunUnkB2CCHandler:
 ; restore of the current target by the caster's BattlerStats.Unk66 x 5
 ; (BattleSys_RestoreHpMp: DP $16 = .Unk66, DP $18 = 5, DP $1A =
 ; !Battle_RestoreHpBit), then .Unk4C+3 bit 7 (!Battle_Unk4C3ReviveBit)
-; cleared: the same amount and bit as BattleSys_UpdateKo's one-time
-; revive, which does it inline; probably an older form of it.
+; cleared. Like BattleSys_UpdateKo's one-time revive (the same bit and
+; the same Unk66 x 5 base), probably an older form of it, but not the
+; same amount: UpdateKo stores Unk66 x 5 as it is, while
+; BattleSys_RestoreHpMp adds a random 0 .. Unk66 - 1 when the product
+; is not a multiple of 50 and caps a PC target at 999.
 ; Quirk: the bit is cleared at $7E:5E4F, slot 0's byte, with an absolute
 ; LDA / STA: the LDX !Battle_UnkB1F6 before them is not used.
 ; Entry: M=1, X=0, DP=0, DB=$7E; as BattleSys_RestoreHpMp
 ;        (!Battle_UnkAD8D, !Battle_UnkB1F6 / B1FD set), and
-;        !Battle_UnkB1F4 = the caster's offset
+;        !Battle_UnkB1F4 = the caster's offset; DP $17 and $19 = 0
+;        (only the low bytes of DP $16 and $18 are written here, and
+;        BattleSys_RestoreHpMp reads both as words)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = slot 0's new .Unk4C+3; X =
 ;        !Battle_UnkB1F6; Y clobbered; DP $16, $18, $1A written; what
 ;        BattleSys_RestoreHpMp changes
@@ -35057,7 +35068,8 @@ Battle_ApplyHits:
 ; chance, the "Alt" records the critical's), not proven.
 ; Callers note: BattleSys_HitModTable entry $00 (BattleSys_RunUnkB2CCHandler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1E = the factor; !Battle_UnkB1F4 set
-; Exit:  M=1, X=0, DP=0, DB=$7E; DP $1C = .Unk72; Y unchanged; no
+; Exit:  M=1, X=0, DP=0, DB=$7E; DP $1C = .Unk72; Y's low byte kept,
+;        high byte cleared (Battle_RandRangeAlt's SEP #$10); no
 ;        multiply: A = the roll, X = !Battle_MathLo; multiply: A =
 ;        !Battle_ActUnkAE9B, B = 0, X = the new amount, !Battle_MathA,
 ;        MathB, MathLo/Hi written (Battle_Mul16); Battle_RandRangeAlt's
@@ -35329,7 +35341,8 @@ BattleSys_HitModRandomStatus:
 ; Exit:  M=1, X=0, DP=0, DB=$7E; set: as BattleSys_SetStatus leaves
 ;        them (A clobbered, B = 0; X, Y clobbered; DP $16 = 0, or 1 when
 ;        refused), DP $18 = DP $1E; else A = the roll or 0, X = !Battle_
-;        MathLo or !Battle_UnkB1F6, Y unchanged, DP $16-$19 = 0;
+;        MathLo or !Battle_UnkB1F6, Y's low byte kept and high byte
+;        cleared (Battle_RandRange's SEP #$10), DP $16-$19 = 0;
 ;        Battle_RandRange's changes either way
 BattleSys_HitModUnk47Status:
     TDC
@@ -35364,8 +35377,9 @@ BattleSys_HitModUnk47Status:
 ; Exit:  M=1, X=0, DP=0, DB=$7E; set: as BattleSys_SetStatus leaves
 ;        them (A clobbered, B = 0; X, Y clobbered; DP $16 = 0, or 1 when
 ;        refused), DP $18 = DP $1E; else A = the roll, X = !Battle_
-;        MathLo, Y unchanged, DP $16-$19 = 0; Battle_RandRange's
-;        changes either way
+;        MathLo, Y's low byte kept and high byte cleared
+;        (Battle_RandRange's SEP #$10), DP $16-$19 = 0;
+;        Battle_RandRange's changes either way
 BattleSys_HitModChanceStatus:
     TDC
     TAX
@@ -35394,7 +35408,8 @@ BattleSys_HitModChanceStatus:
 ; Callers note: BattleSys_HitModTable entry $09 (BattleSys_RunUnkB2CCHandler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 set; B
 ;        any (TDC first)
-; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; done: A = !Battle_UnkB1FC,
+; Exit:  M=1, X=0, DP=0, DB=$7E; Y's low byte kept, high byte cleared
+;        (Battle_RandRange's SEP #$10); done: A = !Battle_UnkB1FC,
 ;        B = 0, X = !Battle_UnkB1F6; else A = the roll, X = !Battle_
 ;        MathLo; Battle_RandRange's changes either way
 BattleSys_HitModLeaveOneHp:
@@ -35442,7 +35457,8 @@ BattleSys_HitModLeaveOneHp:
 ; Callers note: BattleSys_HitModTable entry $0A (BattleSys_RunUnkB2CCHandler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB190 and !Battle_UnkB1F6
 ;        set; !Battle_MathB < $100 (as said); B any (TDC first)
-; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; no bit: A = 0, B = 0, X
+; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; no bit: A =
+;        !Battle_UnkB190 (BIT leaves A; its bits 7-4 clear), B = 0, X
 ;        unchanged, DP $2C = !Battle_UnkB190 (8 bits); else A = 0, B =
 ;        0, X = the new amount, !Battle_Unk6CIndex / Divisor / Factor
 ;        and !Battle_MathA, MathB, MathLo, MathHi, MathRem written
@@ -35534,8 +35550,9 @@ BattleSys_HitModScaleThenUnk6C:
 ; $1A is not 0.
 ; Callers note: BattleSys_HitModTable entry $0C (BattleSys_RunUnkB2CCHandler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = the roll; X = !Battle_MathLo; Y
-;        unchanged; DP $1A as said; Battle_RandRange's changes
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the roll; X = !Battle_MathLo; Y's
+;        low byte kept, high byte cleared (Battle_RandRange's SEP #$10);
+;        DP $1A as said; Battle_RandRange's changes
 !HitMod_Dp1A = !BattleTmp_1A            ; 1 B: the result (BattleSys_StealItem's !Steal_Better)
 BattleSys_HitModRollDp1A:
     STZ.b !HitMod_Dp1A
@@ -35697,10 +35714,11 @@ BattleSys_HitModRestore:
 ; Callers note: BattleSys_HitModTable entry $0E (BattleSys_RunUnkB2CCHandler).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 set;
 ;        B any (TDC first)
-; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; bit 7: A = $80, X =
-;        !Battle_UnkB1F6; done: A = 0, B = 0, X = !Battle_UnkB1F6; else
-;        A = the roll, X = !Battle_MathLo; Battle_RandRange's changes
-;        when it rolls
+; Exit:  M=1, X=0, DP=0, DB=$7E; bit 7: A = $80, X = !Battle_UnkB1F6,
+;        Y unchanged; when it rolls, Y's low byte kept and high byte
+;        cleared (Battle_RandRange's SEP #$10), then done: A = 0, B = 0,
+;        X = !Battle_UnkB1F6; else A = the roll, X = !Battle_MathLo;
+;        Battle_RandRange's changes when it rolls
 BattleSys_HitModHalveHp:
     TDC
     LDX.w !Battle_UnkB1F6
@@ -35841,7 +35859,8 @@ BattleSys_HitModZeroHp:
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 /
 ;        B1FD set; B any (TDC first)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X clobbered (a mask, or
-;        0); Y unchanged; drop path: DP $2C/$2D = the inverted bit,
+;        0); Y unchanged on the bit-7 path, low byte kept and high byte
+;        cleared when it rolls (Battle_RandRange's SEP #$10); drop path: DP $2C/$2D = the inverted bit,
 ;        !Battle_UnkAD89 = 0, !Battle_SavedTargetMasks written; the
 ;        masks and !Battle_ActFlags as said; Battle_RandRange's changes
 ;        when it rolls
@@ -36250,9 +36269,10 @@ BattleSys_BuildComboMasks:
 ; low word is then $967F or more and its high byte $98 or more, it is
 ; set to 9,999,999.
 ; Quirks: after T - L, the loop asks TryNextTech again with
-; !Battle_UnkB2DB still the whole award, so the award is taken off the
-; new need a second time (and pays for the next tech when it covers
-; it). The cap misses a total whose high byte goes above $98 while its
+; !Battle_UnkB2DB as it stands (nothing in the loop resets it): the
+; award, or the leftover L that the last T < L step stored there. That
+; amount is taken off the new need a second time (and pays for the
+; next tech when it covers it). The cap misses a total whose high byte goes above $98 while its
 ; low word is below $967F (from 9,999,999, an award of $6981 or more).
 ; Callers (1 JSR site): BattleSys_AwardTechPoints ($C1:F24B).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TpCharId, DP $00, !Battle_UnkB2DB
