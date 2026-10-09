@@ -114,6 +114,7 @@ FdVec_FFFD:         ; JMP $FD:E022; JSL from IrqHandler on the frames Field_Unk5
                     ; (not analysed)
 org $FDFFF1
 FdVec_FFF1:         ; JMP $FD:DA00; JML target of Evt_OpFF_Misc for $FF $80
-org $FDE39C
-EngFD_UnkE39C:      ; FdVec_FFF7's routine, run every frame by Field_EndOfFrame; works on the FieldAnimB
-                    ; records at $0520 (not analysed)
+org $FDE807
+PalAnim_UnkE807:    ; FieldAnimB kind 6 (PalAnim_TickAll); BRAs into PalAnim_UnkE82C's code at $FD:E869
+org $FDE82C
+PalAnim_UnkE82C:    ; FieldAnimB kind 4 (PalAnim_TickAll); not analysed

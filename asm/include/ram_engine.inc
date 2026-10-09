@@ -1861,6 +1861,15 @@ endstruct
 
 ; --- Location animation records (FieldFD_LoadAnimSetA/B, the FdVec_FFFA/FFF4 routines) ---
 !DP_FieldAnim = $0500                    ; direct page of the bank-$FD vector routines (FieldFD_LoadAnimSetA/B)
+!PalAnimRom = $F60000                    ; ROM bank $F6 base: kinds 1 and 8 of PalAnim_TickAll copy colours
+                                         ; from here + FieldAnimB.Unk6 (as a word) + frame x count x 2
+!PalAnim_Save = $0C                      ; 2 B dp (DP=$0500): a Pal_Buf colour held across a rotation;
+                                         ; in the PalAnim_Scale* routines the colour's unscaled channels
+!PalAnim_SaveCgram = $0E                 ; 2 B dp: the Pal_CgramBuf colour held across a rotation
+!PalAnim_End = $10                       ; 2 B dp: the last offset a rotation reaches (colour x 2)
+!PalAnim_Span = $12                      ; 2 B dp: FieldAnimB.Unk2 x 2 in the rotations
+!PalAnim_Dest = $18                      ; 3 B dp: long Pal_CgramBuf address kinds 1 and 8 write
+                                         ; (kind 8 first uses it to read its list byte)
 ; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
 struct FieldAnimA $05B0
     .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
@@ -1870,17 +1879,19 @@ struct FieldAnimA $05B0
     .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
 endstruct
 ; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
-; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (not analysed).
+; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (PalAnim_TickAll).
 struct FieldAnimB $0520
     .Unk0: skip 1        ; list byte: high nibble = kind (0 = empty); low nibble = bytes skipped for kind 8
-    .Unk1: skip 1
-    .Unk2: skip 1
-    .Unk3: skip 1        ; 0
-    .Unk4: skip 1        ; 0
-    .Unk5: skip 1
-    .Unk6: skip 1        ; kinds 1 and 8 only
-    .Unk7: skip 1
-    .Unk8: skip 1
+                         ; (PalAnim_TickAll: frames - 1 for kinds 1 and 8)
+    .Unk1: skip 1        ; first colour the PalAnim_* kinds work on
+    .Unk2: skip 1        ; colour count
+    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 5/7)
+    .Unk4: skip 1        ; 0; frame counter up to .Unk5 (PalAnim_TickAll)
+    .Unk5: skip 1        ; frames between steps
+    .Unk6: skip 1        ; kinds 1 and 8 only; with .Unk7 the ROM offset of their colours; kinds
+                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel)
+    .Unk7: skip 1        ; kind 5 level, kind 7 phase
+    .Unk8: skip 1        ; kind 5 target level, kind 7 depth
     .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
 endstruct
 

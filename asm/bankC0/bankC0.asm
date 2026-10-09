@@ -15361,8 +15361,8 @@ Evt_Op83_InitEnemySprite:
 ; place and priority bits, and the two opcodes that start the location's
 ; palette animations: they fill a free FieldAnimB record (the 12-byte
 ; records FieldFD_LoadAnimSetB fills from the location's list, worked on
-; each frame by FdVec_FFF7: not analysed, so the record fields keep Unk
-; names) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
+; each frame by FdVec_FFF7's PalAnim_TickAll; the record fields keep
+; Unk names, their roles are in the PalAnim_* headers) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
 ; other handlers: entered with Y = the opcode's offset in Evt_Data, they
 ; return X = where the script goes on and C=1 (keep running) or C=0
 ; (stop this object for this run). "a" / "b" name event words at

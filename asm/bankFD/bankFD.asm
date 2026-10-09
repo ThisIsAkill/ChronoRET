@@ -5769,9 +5769,9 @@ EngFD_UnkD52D:
 ; and their data at $7F:0400 from a list picked by the location's
 ; LocRom.Tileset12, FdVec_FFF4 the 12 twelve-byte records at $0520 from
 ; a list picked by its LocRom.Palette. Field_EndOfFrame runs FdVec_FFF7
-; every frame, which works on the $0520 records (not analysed). So
-; probably the location's tile and palette animations; what the
-; records' bytes mean is not traced.
+; every frame, which works on the $0520 records (PalAnim_TickAll: they
+; are palette animations). So the $05B0 records are probably the
+; location's tile animations; what their bytes mean is not traced.
 ; ============================================================
 
 ; $FD:DE98 — FieldFD_LoadAnimSetA (394 bytes, $DE98–$E021)
@@ -6153,6 +6153,837 @@ FieldFD_LoadAnimSetB:
     PLP
     RTL
 
+; ============================================================
+; Palette animation ($FD:E39C–$FD:E806)
+; PalAnim_TickAll runs the 12 FieldAnimB records at $0520 every frame
+; (FdVec_FFF7, from Field_EndOfFrame and others). A record's .Unk4
+; counts frames up to .Unk5; then the record's kind (.Unk0 high nibble)
+; acts on the colours .Unk1 to .Unk1 + .Unk2 - 1 of Pal_Buf (the
+; palette) and Pal_CgramBuf (what is sent to CGRAM): 1 and 8 copy a
+; frame of colours from ROM, 2 and 3 rotate the colours, 5 fades them
+; toward a level, 7 pulses them; 4 and 6 (PalAnim_UnkE82C/E807) are not
+; matched yet. FieldFD_LoadAnimSetB sets records up per location,
+; Evt_Op88_ObjPalAnim / Evt_Op2E_PalAnim from events.
+; ============================================================
+
+; $FD:E39C — PalAnim_TickAll (155 bytes, $E39C–$E436)
+; FdVec_FFF7's routine. Sets DP=$0500 and DB = DP's low byte on entry.
+; For each of the 12 records (Y = 0, 12, ... $84): .Unk4 += 1; unless it
+; now equals .Unk5 nothing else happens. Then .Unk4 = 0; for kinds 1
+; and 8 (.Unk0 & $F0 = $10 / $80) the frame .Unk3 steps, wrapping to 0
+; after (.Unk0 & $0F); then by .Unk0 >> 4: 0 nothing, 1
+; PalAnim_CopyRomFrame, 2 PalAnim_RotateDown, 3 PalAnim_RotateUp, 4
+; PalAnim_UnkE82C, 5 PalAnim_Fade, 6 PalAnim_UnkE807, 7 PalAnim_Pulse,
+; 8-15 PalAnim_CopyListFrame. B is cleared before each record (the
+; kinds rely on it for 16-bit index arithmetic).
+; Callers (1 JMP site): FdVec_FFF7 ($FD:FFF7).
+; Entry: M=1, X=0 (16-bit LDX of the DP), DP any whose low byte is 0
+;        (it becomes DB; $0100 at the field callers, so DB=$00, which the
+;        FieldAnimB and multiplier accesses need), DB any (saved)
+; Exit:  M=1, X=0; DP and DB restored; A = $90, B = 0; Y = $90; X
+;        clobbered; $050C-$0513 and $0518-$051A as the kinds leave them;
+;        FieldAnimB .Unk0/.Unk3/.Unk4/.Unk7, Pal_Buf, Pal_CgramBuf and
+;        WRMPYA/WRMPYB written
+org $FDE39C
+PalAnim_TickAll:
+    PHB
+    PHD
+    TDC
+    PHA
+    PLB
+    LDX.w #!DP_FieldAnim
+    PHX
+    PLD
+    LDA.b #0
+    XBA
+    LDY.w #0
+.record:
+    LDA.w FieldAnimB.Unk4,Y
+    INC A
+    STA.w FieldAnimB.Unk4,Y
+    CMP.w FieldAnimB.Unk5,Y
+    BNE .next
+    LDA.b #0
+    STA.w FieldAnimB.Unk4,Y
+    LDA.w FieldAnimB.Unk0,Y
+    AND.b #!PalAnim_KindMask
+    CMP.b #!PalAnimKind_Rom
+    BEQ .step_frame
+    CMP.b #!PalAnimKind_List
+    BNE .dispatch
+.step_frame:
+    LDA.w FieldAnimB.Unk3,Y
+    INC A
+    STA.w FieldAnimB.Unk3,Y
+    LDA.w FieldAnimB.Unk0,Y
+    AND.b #!PalAnim_LenMask
+    INC A
+    CMP.w FieldAnimB.Unk3,Y
+    BNE .dispatch
+    LDA.b #0
+    STA.w FieldAnimB.Unk3,Y
+.dispatch:
+    LDA.w FieldAnimB.Unk0,Y
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    BEQ .next
+    DEC A
+    BNE .kind2
+    JSR PalAnim_CopyRomFrame
+    BRA .next
+.kind2:
+    DEC A
+    BNE .kind3
+    JSR PalAnim_RotateDown
+    BRA .next
+.kind3:
+    DEC A
+    BNE .kind4
+    JSR PalAnim_RotateUp
+    BRA .next
+.kind4:
+    DEC A
+    BNE .kind5
+    JSR PalAnim_UnkE82C
+    BRA .next
+.kind5:
+    DEC A
+    BNE .kind6
+    JSR PalAnim_Fade
+    BRA .next
+.kind6:
+    DEC A
+    BNE .kind7
+    JSR PalAnim_UnkE807
+    BRA .next
+.kind7:
+    DEC A
+    BNE .kind8_up
+    JSR PalAnim_Pulse
+    BRA .next
+.kind8_up:
+    JSR PalAnim_CopyListFrame
+.next:
+    LDA.b #0
+    XBA
+    TYA
+    CLC
+    ADC.b #!FieldAnimB_Bytes
+    TAY
+    CMP.b #!FieldAnim_NumRecs*!FieldAnimB_Bytes
+    BEQ .done
+    JMP .record
+.done:
+    PLD
+    PLB
+    RTL
+
+; $FD:E437 — PalAnim_CopyRomFrame (78 bytes, $E437–$E484)
+; Kind 1: copies .Unk2 colours from PalAnimRom + .Unk6 (a word,
+; .Unk6/.Unk7) + .Unk3 x .Unk2 x 2 (frame .Unk3; product by the
+; multiplier) to Pal_CgramBuf from colour .Unk1 (through PalAnim_Dest).
+; Pal_Buf is left alone.
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E3ED).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (PalAnim_Dest), DB=$00
+;        (FieldAnimB, multiplier); Y = the record's offset; B = 0
+; Exit:  M=1, X=0; Y preserved; X = past the source; B = 0, A = the high
+;        byte of the last colour; PalAnim_Dest = past the last colour
+org $FDE437
+PalAnim_CopyRomFrame:
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$21
+    ASL A
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    STA.b !PalAnim_Dest
+    LDA.w #0
+    SEP #$20
+    LDA.b #!Bank7E
+    STA.b !PalAnim_Dest+2
+    LDA.w FieldAnimB.Unk3,Y
+    STA.w WRMPYA
+    LDA.w FieldAnimB.Unk2,Y
+    ASL A
+    STA.w WRMPYB
+    NOP
+    REP #$21
+    LDA.w FieldAnimB.Unk6,Y
+    ADC.w RDMPYL
+    TAX
+    LDA.w #0
+    SEP #$20
+    PHY
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+    REP #$20
+.copy:
+    LDA.l !PalAnimRom,X
+    STA.b [!PalAnim_Dest]
+    INC.b !PalAnim_Dest
+    INC.b !PalAnim_Dest
+    INX
+    INX
+    DEY
+    BNE .copy
+    SEP #$20
+    LDA.b #0
+    XBA
+    PLY
+    RTS
+
+; $FD:E485 — PalAnim_CopyListFrame (99 bytes, $E485–$E4E7)
+; Kinds 8-15: as PalAnim_CopyRomFrame, but the frame is the byte at
+; .Ptr + .Unk3 (the list FieldFD_LoadAnimSetB points .Ptr at), read
+; through PalAnim_Dest before it is reused for the destination.
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E422).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (PalAnim_Dest), DB=$00; Y = the
+;        record's offset; B = 0
+; Exit:  M=1, X=0; Y preserved; X = past the source; B = 0, A = the high
+;        byte of the last colour; PalAnim_Dest = past the last colour
+org $FDE485
+PalAnim_CopyListFrame:
+    LDA.w FieldAnimB.Unk3,Y
+    REP #$21
+    ADC.w FieldAnimB.Ptr,Y
+    STA.b !PalAnim_Dest
+    LDA.w #0
+    SEP #$20
+    LDA.w FieldAnimB.Ptr+2,Y
+    STA.b !PalAnim_Dest+2
+    LDA.b [!PalAnim_Dest]
+    PHA
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$21
+    ASL A
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    STA.b !PalAnim_Dest
+    LDA.w #0
+    SEP #$20
+    LDA.b #!Bank7E
+    STA.b !PalAnim_Dest+2
+    PLA
+    STA.w WRMPYA
+    LDA.w FieldAnimB.Unk2,Y
+    ASL A
+    STA.w WRMPYB
+    NOP
+    REP #$21
+    LDA.w FieldAnimB.Unk6,Y
+    ADC.w RDMPYL
+    TAX
+    LDA.w #0
+    SEP #$20
+    PHY
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+    REP #$20
+.copy:
+    LDA.l !PalAnimRom,X
+    STA.b [!PalAnim_Dest]
+    INC.b !PalAnim_Dest
+    INC.b !PalAnim_Dest
+    INX
+    INX
+    DEY
+    BNE .copy
+    SEP #$20
+    LDA.b #0
+    XBA
+    PLY
+    RTS
+
+; $FD:E4E8 — PalAnim_RotateUp (74 bytes, $E4E8–$E531)
+; Kind 3: rotates colours .Unk1 to .Unk1 + .Unk2 (.Unk2 + 1 colours,
+; one more than the other kinds touch) up by one in both Pal_Buf and
+; Pal_CgramBuf: each takes the colour below it, the top one wraps to
+; .Unk1. Runs with DB=$7E, then sets DB to DP's low byte ($00).
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E3FD).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (scratch; its low byte becomes
+;        DB), DB=$00 (FieldAnimB); Y = the record's offset; B = 0
+; Exit:  M=1, X=0; DB=$00; A = 0, B = $05 (TDC); X = .Unk1 x 2; Y
+;        unchanged; PalAnim_Save, PalAnim_SaveCgram, PalAnim_End and
+;        PalAnim_Span written
+org $FDE4E8
+PalAnim_RotateUp:
+    LDA.w FieldAnimB.Unk2,Y
+    ASL A
+    STA.b !PalAnim_Span
+    STZ.b !PalAnim_Span+1
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$21
+    ASL A
+    STA.b !PalAnim_End
+    ADC.b !PalAnim_Span
+    TAX
+    SEP #$20
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w !Pal_Buf,X
+    STA.b !PalAnim_Save
+    LDA.w !Pal_CgramBuf,X
+    STA.b !PalAnim_SaveCgram
+.shift:
+    LDA.w !Pal_Buf-2,X
+    STA.w !Pal_Buf,X
+    LDA.w !Pal_CgramBuf-2,X
+    STA.w !Pal_CgramBuf,X
+    DEX
+    DEX
+    CPX.b !PalAnim_End
+    BNE .shift
+    LDA.b !PalAnim_Save
+    STA.w !Pal_Buf,X
+    LDA.b !PalAnim_SaveCgram
+    STA.w !Pal_CgramBuf,X
+    LDA.w #0
+    SEP #$20
+    TDC
+    PHA
+    PLB
+    RTS
+
+; $FD:E532 — PalAnim_RotateDown (74 bytes, $E532–$E57B)
+; Kind 2: as PalAnim_RotateUp the other way: each of colours .Unk1 to
+; .Unk1 + .Unk2 takes the colour above it, colour .Unk1 wraps to the top.
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E3F5).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (scratch; its low byte becomes
+;        DB), DB=$00 (FieldAnimB); Y = the record's offset; B = 0
+; Exit:  M=1, X=0; DB=$00; A = 0, B = $05 (TDC); X = (.Unk1 + .Unk2) x 2;
+;        Y unchanged; PalAnim_Save, PalAnim_SaveCgram, PalAnim_End and
+;        PalAnim_Span written
+org $FDE532
+PalAnim_RotateDown:
+    LDA.w FieldAnimB.Unk2,Y
+    ASL A
+    STA.b !PalAnim_Span
+    STZ.b !PalAnim_Span+1
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$21
+    ASL A
+    TAX
+    ADC.b !PalAnim_Span
+    STA.b !PalAnim_End
+    SEP #$20
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDA.w !Pal_Buf,X
+    STA.b !PalAnim_Save
+    LDA.w !Pal_CgramBuf,X
+    STA.b !PalAnim_SaveCgram
+.shift:
+    LDA.w !Pal_Buf+2,X
+    STA.w !Pal_Buf,X
+    LDA.w !Pal_CgramBuf+2,X
+    STA.w !Pal_CgramBuf,X
+    INX
+    INX
+    CPX.b !PalAnim_End
+    BNE .shift
+    LDA.b !PalAnim_Save
+    STA.w !Pal_Buf,X
+    LDA.b !PalAnim_SaveCgram
+    STA.w !Pal_CgramBuf,X
+    LDA.w #0
+    SEP #$20
+    TDC
+    PHA
+    PLB
+    RTS
+
+; $FD:E57C — PalAnim_Pulse (40 bytes, $E57C–$E5A3)
+; Kind 7: the phase .Unk7 += .Unk3 (8-bit, wrapping); h = the high byte
+; of 2|.Unk7| x .Unk8 (|$80| stays $80, and 2 x $80 is 0); the level is
+; -h (8-bit), then PalAnim_ApplyLevel scales the colours by it. So the
+; level falls from about 256 as the phase moves from 0, a triangle
+; wave. Quirk: where h is 0 (around phase 0) the level is 0, not 256,
+; and the colours go black for that tick; kept as found.
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E41D).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500, DB=$00; Y = the record's
+;        offset; B = 0
+; Exit:  as PalAnim_Fade (Y preserved)
+org $FDE57C
+PalAnim_Pulse:
+    PHY
+    LDA.w FieldAnimB.Unk7,Y
+    CLC
+    ADC.w FieldAnimB.Unk3,Y
+    STA.w FieldAnimB.Unk7,Y
+    BPL .positive
+    EOR.b #!PalAnim_Invert
+    INC A
+.positive:
+    ASL A
+    STA.w WRMPYA
+    LDA.w FieldAnimB.Unk8,Y
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    EOR.b #!PalAnim_Invert
+    INC A
+    STA.w WRMPYA
+    BRA PalAnim_ApplyLevel
+
+; $FD:E5A4 — PalAnim_Fade (171 bytes, $E5A4–$E64E, with
+; PalAnim_ApplyLevel)
+; Kind 5: steps the level .Unk7 by .Unk3 toward .Unk8 (down when .Unk7
+; >= .Unk8). Going up, a result at or past .Unk8 sets .Unk7 = .Unk8 and
+; ends the record (.Unk0 = 0); going down, a result below .Unk8 (or below
+; 0) does, so landing exactly on .Unk8 going down ends it only on the
+; next step (which then goes below and clamps). A step up
+; that passes 255 instead ends the record and copies the .Unk2 colours
+; from Pal_Buf to Pal_CgramBuf unscaled (.overflow), without storing the
+; level. Quirk: a .Unk5 (the period) of $80 or more skips the stepping
+; and stores .Unk5 itself as the level; kept as found (whether any record
+; has one is not traced).
+; PalAnim_ApplyLevel (also the tail of PalAnim_Pulse, with the level in
+; WRMPYA and the record's Y pushed): X = .Unk1 x 2, then by .Unk6 the
+; channels scaled: 0 RGB (PalAnim_ScaleRGB), 1 GB, 2 RB, 3 B, 4 RG, 5 G,
+; 6 and up R; so .Unk6 bits 0-2 = red, green, blue kept, with 7 acting
+; as 6.
+; Callers (1 JSR site): PalAnim_TickAll ($FD:E40D).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500, DB=$00; Y = the record's
+;        offset; B = 0
+; Exit:  M=1, X=0; Y preserved; X = past the colours; A clobbered;
+;        WRMPYA/WRMPYB and PalAnim_Save written (not on .overflow)
+org $FDE5A4
+PalAnim_Fade:
+    PHY
+    LDA.w FieldAnimB.Unk5,Y
+    BMI .store
+    LDA.w FieldAnimB.Unk7,Y
+    CMP.w FieldAnimB.Unk8,Y
+    BCS .down
+    ADC.w FieldAnimB.Unk3,Y
+    BCS PalAnim_ApplyLevel_overflow
+    CMP.w FieldAnimB.Unk8,Y
+    BCC .store
+    LDA.b #0
+    STA.w FieldAnimB.Unk0,Y
+    LDA.w FieldAnimB.Unk8,Y
+    BRA .store
+.down:
+    SBC.w FieldAnimB.Unk3,Y
+    BCC .reached
+    CMP.w FieldAnimB.Unk8,Y
+    BCS .store
+.reached:
+    LDA.b #0
+    STA.w FieldAnimB.Unk0,Y
+    LDA.w FieldAnimB.Unk8,Y
+.store:
+    STA.w FieldAnimB.Unk7,Y
+    LDA.w FieldAnimB.Unk7,Y
+    STA.w WRMPYA
+PalAnim_ApplyLevel:                ; header: see PalAnim_Fade
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$20
+    ASL A
+    TAX
+    LDA.w #0
+    SEP #$20
+    LDA.w FieldAnimB.Unk6,Y
+    BNE .not0
+    JSR PalAnim_ScaleRGB
+    PLY
+    RTS
+.not0:
+    DEC A
+    BNE .not1
+    JSR PalAnim_ScaleGB
+    PLY
+    RTS
+.not1:
+    DEC A
+    BNE .not2
+    JSR PalAnim_ScaleRB
+    PLY
+    RTS
+.not2:
+    DEC A
+    BNE .not3
+    JSR PalAnim_ScaleB
+    PLY
+    RTS
+.not3:
+    DEC A
+    BNE .not4
+    JSR PalAnim_ScaleRG
+    PLY
+    RTS
+.not4:
+    DEC A
+    BNE .not5
+    JSR PalAnim_ScaleG
+    PLY
+    RTS
+.not5:
+    JSR PalAnim_ScaleR
+    PLY
+    RTS
+.overflow:
+    LDA.b #0
+    STA.w FieldAnimB.Unk0,Y
+    LDA.w FieldAnimB.Unk1,Y
+    REP #$20
+    ASL A
+    TAX
+    LDA.w #0
+    SEP #$20
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+    REP #$20
+.restore:
+    LDA.l !Pal_Buf,X
+    STA.l !Pal_CgramBuf,X
+    INX
+    INX
+    DEY
+    BNE .restore
+    LDA.w #0
+    SEP #$20
+    PLY
+    RTS
+
+; $FD:E64F — PalAnim_ScaleRGB (82 bytes, $E64F–$E6A0)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 0: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with red, green and blue
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and nothing kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E5F2).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE64F
+PalAnim_ScaleRGB:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf+1,X
+    AND.b #!Col_BlueHiMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    XBA
+    LDA.l !Pal_Buf,X
+    AND.b #!Col_RedMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    REP #$20
+    AND.w #!Col_RedBlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenMask
+    LSR A
+    LSR A
+    SEP #$20
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    AND.b #!Col_GreenScaledMask
+    REP #$20
+    ASL A
+    ASL A
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
+; $FD:E6A1 — PalAnim_ScaleB (48 bytes, $E6A1–$E6D0)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 3: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with blue
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and red and green kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E60A).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE6A1
+PalAnim_ScaleB:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf+1,X
+    AND.b #!Col_BlueHiMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    XBA
+    REP #$20
+    AND.w #!Col_BlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_RedGreenMask
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
+; $FD:E6D1 — PalAnim_ScaleG (55 bytes, $E6D1–$E707)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 5: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with green
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and red and blue kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E61A).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE6D1
+PalAnim_ScaleG:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    REP #$20
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_RedBlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenMask
+    LSR A
+    LSR A
+    SEP #$20
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    AND.b #!Col_GreenScaledMask
+    REP #$20
+    ASL A
+    ASL A
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
+; $FD:E708 — PalAnim_ScaleR (50 bytes, $E708–$E739)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 6 or more: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with red
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and green and blue kept. It ends with B = 0.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E61F).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE708
+PalAnim_ScaleR:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf,X
+    AND.b #!Col_RedMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    REP #$20
+    AND.w #!Col_RedMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenBlueMask
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    LDA.b #0
+    XBA
+    RTS
+
+; $FD:E73A — PalAnim_ScaleRB (63 bytes, $E73A–$E778)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 2: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with red and blue
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and green kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E602).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE73A
+PalAnim_ScaleRB:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf+1,X
+    AND.b #!Col_BlueHiMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    XBA
+    LDA.l !Pal_Buf,X
+    AND.b #!Col_RedMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    REP #$20
+    AND.w #!Col_RedBlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenMask
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
+; $FD:E779 — PalAnim_ScaleRG (71 bytes, $E779–$E7BF)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 4: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with red and green
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and blue kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E612).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE779
+PalAnim_ScaleRG:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf+1,X
+    XBA
+    LDA.l !Pal_Buf,X
+    AND.b #!Col_RedMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    REP #$20
+    AND.w #!Col_RedBlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenMask
+    LSR A
+    LSR A
+    SEP #$20
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    AND.b #!Col_GreenScaledMask
+    REP #$20
+    ASL A
+    ASL A
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
+; $FD:E7C0 — PalAnim_ScaleGB (71 bytes, $E7C0–$E806)
+; PalAnim_ApplyLevel's routine for FieldAnimB.Unk6 = 1: for each of the
+; .Unk2 colours from X, Pal_CgramBuf gets the Pal_Buf colour with green and blue
+; scaled by the level in WRMPYA (channel x level / 256, by the
+; multiplier's high byte) and red kept.
+; Callers (1 JSR site): PalAnim_ApplyLevel ($FD:E5FA).
+; Entry: M=1, X=0 (16-bit X/Y), DP any (.b PalAnim_Save at DP+$0C;
+;        $0500 here), DB=$00 (FieldAnimB and the multiplier registers);
+;        X = first colour x 2, Y = the record's offset, WRMPYA = level,
+;        B = 0 (16-bit TAY of .Unk2)
+; Exit:  M=1, X=0; X = past the last colour x 2, Y = 0; A clobbered;
+;        PalAnim_Save written
+org $FDE7C0
+PalAnim_ScaleGB:
+    LDA.w FieldAnimB.Unk2,Y
+    TAY
+.colour:
+    LDA.l !Pal_Buf+1,X
+    AND.b #!Col_BlueHiMask
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    XBA
+    LDA.l !Pal_Buf,X
+    REP #$20
+    AND.w #!Col_RedBlueMask
+    STA.b !PalAnim_Save
+    LDA.l !Pal_Buf,X
+    AND.w #!Col_GreenMask
+    LSR A
+    LSR A
+    SEP #$20
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    AND.b #!Col_GreenScaledMask
+    REP #$20
+    ASL A
+    ASL A
+    ORA.b !PalAnim_Save
+    STA.l !Pal_CgramBuf,X
+    SEP #$20
+    INX
+    INX
+    DEY
+    BNE .colour
+    RTS
+
 ; $FD:FFF4 — FdVec_FFF4 (3 bytes, $FFF4–$FFF6)
 ; The bank's service vectors: three JMPs at fixed addresses near the end
 ; of the bank, so code in other banks can JSL them. The routines end with
@@ -6165,18 +6996,17 @@ FdVec_FFF4:
     JMP FieldFD_LoadAnimSetB
 
 ; $FD:FFF7 — FdVec_FFF7 (3 bytes, $FFF7–$FFF9)
-; JMP to EngFD_UnkE39C (not analysed; Field_EndOfFrame runs it every
-; frame, and its header says it ticks the counter table at $0520, the
-; FieldAnimB records).
+; JMP to PalAnim_TickAll, which runs the 12 FieldAnimB palette
+; animation records at $0520 (Field_EndOfFrame calls it every frame).
 ; Callers (10 JSL sites): Field_EndOfFrame ($C0:00CD), Field_EndOfFrameShort ($C0:00E6),
 ;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793),
 ;   Evt_OpFF_Misc ($C0:3FC6) and unmatched ($CD:09BF, $CD:0AD6, $D1:F54D).
 ; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
-;        banks $CD and $D1 not traced; what EngFD_UnkE39C needs is not
-;        traced)
-; Exit:  as EngFD_UnkE39C (not analysed)
+;        banks $CD and $D1 not traced); PalAnim_TickAll needs X=0 and a
+;        DP whose low byte is 0 (it becomes DB, and DB=$00 is needed)
+; Exit:  as PalAnim_TickAll
 FdVec_FFF7:
-    JMP EngFD_UnkE39C
+    JMP PalAnim_TickAll
 
 ; $FD:FFFA — FdVec_FFFA (3 bytes, $FFFA–$FFFC)
 ; JMP to FieldFD_LoadAnimSetA.

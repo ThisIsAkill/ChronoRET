@@ -758,6 +758,21 @@ if !constants_engine_inc == 0
 !LocRom_AnimSetMask = $3F                ; LocRom.Tileset12 bits that pick FieldFD_LoadAnimSetA's list
 !FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
 !FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
+!FieldAnimB_Bytes = $0C                  ; bytes per FieldAnimB record
+; --- Palette animation (PalAnim_TickAll and its kinds) ---
+!PalAnim_KindMask = $F0                  ; FieldAnimB.Unk0 high nibble: the kind (0 = none)
+!PalAnim_LenMask = $0F                   ; FieldAnimB.Unk0 low nibble: frames - 1 (kinds 1 and 8)
+!PalAnimKind_Rom = $10                   ; kind 1: colours from bank $F6, frame by frame
+!PalAnimKind_List = $80                  ; kind 8: the same, frames picked by a list
+!PalAnim_Invert = $FF                    ; EOR mask; with INC A negates an 8-bit value
+!Col_RedMask = $001F                     ; BGR555 red (bits 0-4)
+!Col_GreenMask = $03E0                   ; BGR555 green (bits 5-9)
+!Col_BlueMask = $7C00                    ; BGR555 blue (bits 10-14)
+!Col_RedBlueMask = $7C1F                 ; red and blue
+!Col_RedGreenMask = $03FF                ; red and green
+!Col_GreenBlueMask = $7FE0               ; green and blue
+!Col_BlueHiMask = $7C                    ; blue in a colour's high byte (blue x 4)
+!Col_GreenScaledMask = $F8               ; green x 8 (as the scalers shift it) without the fraction bits
 !FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
 !FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
 !FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops
