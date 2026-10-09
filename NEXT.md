@@ -329,10 +329,18 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    open target, AudioFadeDispatch's PLB/PLD in the wrong order (DB and D scrambled unless the
    caller has D = 0 and DB = 0) and its dead DEC, ScrollStepAccum's zero test on layer 2 X only,
    TileAnimList_ApplyOne writing $E7 to the $E6 column's upper tile where the IRQ draws metatile
-   $1E5, IrqHandler's dead RTS. Next in bank $C0, the last unmatched code: `Irq_UnkF05E`
-   ($C0:F05E-$C0:F10F, run by the IRQ while `Field_Unk63` is not negative: VRAM writes at $1C02 /
-   $1C22, the choice cursor, probably) with its callees $C0:F110/F12B/F142/F159, then whatever
-   follows up to $C0:FCFF (not looked at: data, probably), and `FdVec_FFFD` (bank $FD, JMP
+   $1E5, IrqHandler's dead RTS. Also done (branch match-c0-tail): bank $C0 is
+   now fully matched. `Irq_DrawChoiceCursor` ($C0:F05E, was the stub `Irq_UnkF05E`; the
+   IrqHandler banner and Irq_UploadTileAnim edited for it, back to review) draws a 2x2 picture
+   (tiles $0FC-$0FF) at choice row `Field_Unk63` (0-3) of the $1C00 tilemap and puts
+   Field_Unk2B78's grid entries back in the other rows (`Irq_ChoiceCursorClearRow0-3`,
+   $C0:F110-$C0:F16F); 4 or more clears all four rows and sets `Field_Unk63` idle. The data
+   after it: `BankC0_OldBuildLeftovers` ($C0:F170-$C0:F2FF: tails of earlier builds of that code,
+   no reference found, then $FF fill), `Rom_AngleTable` ($C0:F300), `Rom_DirToFacing`
+   ($C0:F700), `Rom_SineTable256` ($C0:F800) and `Rom_SineTable` ($C0:F900-$C0:FCFF), labelled
+   with the readers of their defines. Open from it: what tiles $0FC-$0FF show (the hand cursor,
+   probably) and which BG layer uses the $1C00 tilemap; the readers of the tables in unmatched
+   code ($CE:E85B, $CF:FAA7, $CF:F47F, $CF:F910). Next near here: `FdVec_FFFD` (bank $FD, JMP
    $FD:E022, the IRQ's other phase). Open from this batch: what reads `Audio_Unk1E10`,
    `Field_Unk33`, `LayerDrift_*` writers, the sound commands $11/$14/$70, who sets
    `Field_Unk0F` bit 7 (the IRQ does nothing then), `Field_Unk53Bit7`'s readers, the FieldAnimB

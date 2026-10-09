@@ -5284,14 +5284,14 @@ Oam_UploadShadow:
     RTS
 
 ; ============================================================
-; The field's IRQ ($C0:ECCC–$C0:F05D)
+; The field's IRQ ($C0:ECCC–$C0:F16F)
 ; NmiHandler enables the V-count IRQ each frame (Nmi_Nmitimen), and
 ; Scene_ResumeNmi sets VTIMEL to Scene_VIrqLine (line 211), so the IRQ
 ; fires near the bottom of the picture. It blanks the screen there and
 ; uses the rest of the frame for VRAM writes the NMI does not do: the
-; tile animations' tilemap words and (through Irq_UnkF05E) something
-; that runs while Field_Unk63 is not negative (the message choice
-; cursor, probably; not analysed).
+; tile animations' tilemap words and, while Field_Unk63 is not
+; negative, Irq_DrawChoiceCursor's 2x2 picture in the $1C00 tilemap
+; (the message choice cursor, probably).
 ; ============================================================
 
 ; ------------------------------------------------------------
@@ -5360,7 +5360,7 @@ IrqHandler:
 ; ------------------------------------------------------------
 ; $C0:ED15 — Irq_UploadTileAnim (841 bytes, $ED15–$F05D)
 ; With DP = DP_Field (set here and left set; IrqHandler restores D):
-;   Irq_UnkF05E when Field_Unk63 is not negative; then one queued
+;   Irq_DrawChoiceCursor when Field_Unk63 is not negative; then one queued
 ;   tilemap job, by Field_VramQueueFlags:
 ; - VramQueue_TileAnim (a Mode*_Handler ran): the new metatiles'
 ;   four tilemap words (Map_Meta12TL/TR/BL/BR of metatile $100 + state,
@@ -5381,12 +5381,12 @@ IrqHandler:
 ; One job per call: a step queued with an animation waits for the next
 ;   IRQ that runs this.
 ; Callers (1 JSR site): IrqHandler ($C0:ED03).
-; On entry: M=1 (8-bit A), X=0 (16-bit X for Irq_UnkF05E; IrqHandler
+; On entry: M=1 (8-bit A), X=0 (16-bit X for Irq_DrawChoiceCursor; IrqHandler
 ;   sets it), DP any (set here), DB=$00
 ;   (VMAIN/VMADDL/VMDATAL and TileAnim_VramAddrs absolute; the
 ;   metatiles long).
 ; Exit: M=1, DP = DP_Field, DB unchanged; A clobbered; X and Y as
-;   Irq_UnkF05E leaves them; Field_VramQueueFlags bit cleared.
+;   Irq_DrawChoiceCursor leaves them; Field_VramQueueFlags bit cleared.
 ; ------------------------------------------------------------
 Irq_UploadTileAnim:
     REP #$20
@@ -5395,7 +5395,7 @@ Irq_UploadTileAnim:
     SEP #$20
     LDA.b !Field_Unk63
     BMI .tile_anim_test
-    JSR Irq_UnkF05E
+    JSR Irq_DrawChoiceCursor
 .tile_anim_test:
     LDA.b !Field_VramQueueFlags
     BIT.b #!VramQueue_TileAnim
@@ -5677,6 +5677,226 @@ Irq_UploadTileAnim:
     LDA.b #!VramQueue_TileStep
     TRB.b !Field_VramQueueFlags
     RTS
+
+; ------------------------------------------------------------
+; $C0:F05E — Irq_DrawChoiceCursor (178 bytes, $F05E–$F10F)
+; Draws a 2x2-tile picture (tiles $0FC/$0FD over $0FE/$0FF, palette 2,
+;   priority: ChoiceCursor_TileTop / TileBottom) at choice row
+;   Field_Unk63 of the tilemap Field_UploadUnk1C00 sends to VRAM $1C00
+;   (columns 2-3 of map rows 2 x Field_Unk63 and 2 x Field_Unk63 + 1),
+;   and puts Field_Unk2B78's grid entries back at the same place in the
+;   other three choice rows (Irq_ChoiceCursorClearRow0-3). Field_Unk63
+;   4 or more (up to $7F): all four rows cleared, then Field_Unk63 =
+;   Field_Unk63Idle, so the next IRQs skip this. That this is the
+;   choice cursor is probable, not traced on screen: Field_Unk63 is the
+;   index Sub_1ADF steps with Up/Down while Field_Unk62 =
+;   FieldMsg_ChoiceActive (Field_Unk1F87 starts it at Field_Unk64),
+;   and Sub_1ADF forces it to 4 for Field_Unk62 values other than 1
+;   and 2 (which this turns into "no cursor").
+; Writes VMAIN = VMAIN_IncAfterHigh, then 16 tilemap words (two VMADDL
+;   writes per row, two VMDATA words each).
+; Field_Unk63 is read absolute (DP_Field + offset) while DP = DP_PPU,
+;   but the Idle store after the PLD goes through the caller's DP: it
+;   hits Field_Unk63 only because Irq_UploadTileAnim has DP = DP_Field.
+; Callers (1 JSR site): Irq_UploadTileAnim ($C0:ED21).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the VRAM addresses and
+;   tilemap words go through X), DP = DP_Field (saved, set to DP_PPU,
+;   restored; the Field_Unk63 store after the restore needs it), DB=$00
+;   (Field_Unk63 read absolute); Field_Unk63 0-$7F (the caller skips
+;   negative values).
+; Exit: M=1, X=0, DP restored, DB unchanged; Y unchanged. Rows 0-3: A
+;   = 0, X = ChoiceCursor_TileBottom + 1. Field_Unk63 4-$7F: A =
+;   Field_Unk63Idle, X = row 3's last grid entry
+;   (ChoiceCursor_GridRow0 + 3 x GridRowStep + GridLine + 1, from
+;   Irq_ChoiceCursorClearRow3), Field_Unk63 = Field_Unk63Idle.
+; ------------------------------------------------------------
+org $C0F05E
+Irq_DrawChoiceCursor:
+    PHD
+    REP #$20
+    LDA.w #!DP_PPU
+    TCD
+    SEP #$20
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.b VMAIN-!DP_PPU
+    LDA.w !DP_Field+!Field_Unk63
+    BEQ .row0
+    DEC A
+    BEQ .row1
+    DEC A
+    BEQ .row2
+    DEC A
+    BEQ .row3
+    JSR Irq_ChoiceCursorClearRow0       ; 4 or more: no cursor
+    JSR Irq_ChoiceCursorClearRow1
+    JSR Irq_ChoiceCursorClearRow2
+    JSR Irq_ChoiceCursorClearRow3
+    PLD
+    LDA.b #!Field_Unk63Idle
+    STA.b !Field_Unk63                  ; through the restored DP (DP_Field)
+    RTS
+.row0:
+    JSR Irq_ChoiceCursorClearRow1
+    JSR Irq_ChoiceCursorClearRow2
+    JSR Irq_ChoiceCursorClearRow3
+    LDX.w #!ChoiceCursor_VramRow0
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileTop
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileBottom
+    BRA .bottom_row
+.row3:
+    JSR Irq_ChoiceCursorClearRow0
+    JSR Irq_ChoiceCursorClearRow1
+    JSR Irq_ChoiceCursorClearRow2
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*3)
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileTop
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*3)+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileBottom
+.bottom_row:
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    PLD
+    RTS
+.row2:
+    JSR Irq_ChoiceCursorClearRow0
+    JSR Irq_ChoiceCursorClearRow1
+    JSR Irq_ChoiceCursorClearRow3
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*2)
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileTop
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*2)+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileBottom
+    BRA .bottom_row
+.row1:
+    JSR Irq_ChoiceCursorClearRow0
+    JSR Irq_ChoiceCursorClearRow2
+    JSR Irq_ChoiceCursorClearRow3
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramRowStep
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileTop
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramRowStep+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_TileBottom
+    BRA .bottom_row
+
+; ------------------------------------------------------------
+; $C0:F110 — Irq_ChoiceCursorClearRow3 (27 bytes, $F110–$F12A)
+; Puts Field_Unk2B78's grid entries back where choice row 3's cursor
+;   goes: VRAM ChoiceCursor_VramRow0 + 3 x VramRowStep ($1CC2) gets
+;   ChoiceCursor_GridRow0 + 3 x GridRowStep and + 1 ($29C2, $29C3: tiles
+;   $1C2/$1C3), one map row down ($1CE2) that + GridLine and + 1 ($29D2,
+;   $29D3). VMAIN must already step after the high byte
+;   (Irq_DrawChoiceCursor sets it).
+; Its last three instructions, Irq_ChoiceCursorClearTail ($F125–$F12A:
+;   STX VMDATAL, INX, STX VMDATAL, RTS), are shared: Irq_ChoiceCursorClearRow0,
+;   Row1 and Row2 load their lower row's VRAM address and first grid
+;   entry and BRA there.
+; Callers (4 JSR sites): Irq_DrawChoiceCursor ($C0:F082, $C0:F091, $C0:F0D6, $C0:F0F6).
+; On entry: M any (no A use), X=0 (16-bit X), DP = DP_PPU (VMADDL /
+;   VMDATAL as dp), DB any (no absolute operand).
+; Exit: M, DP and DB unchanged; A and Y unchanged; X = the last entry
+;   written ($29D3 here; the tail leaves the BRA-ing routine's lower
+;   entry + 1).
+; ------------------------------------------------------------
+Irq_ChoiceCursorClearRow3:
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*3)
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+(!ChoiceCursor_GridRowStep*3)
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*3)+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+(!ChoiceCursor_GridRowStep*3)+!ChoiceCursor_GridLine
+Irq_ChoiceCursorClearTail:              ; header: see Irq_ChoiceCursorClearRow3
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    RTS
+
+; ------------------------------------------------------------
+; $C0:F12B — Irq_ChoiceCursorClearRow2 (23 bytes, $F12B–$F141)
+; As Irq_ChoiceCursorClearRow3 for choice row 2: VRAM $1C82 gets $2982,
+;   $2983 (tiles $182/$183), $1CA2 gets $2992, $2993 (through
+;   Irq_ChoiceCursorClearTail).
+; Callers (4 JSR sites): Irq_DrawChoiceCursor ($C0:F07F, $C0:F08E, $C0:F0B1, $C0:F0F3).
+; On entry: M any (no A use), X=0 (16-bit X), DP = DP_PPU (VMADDL /
+;   VMDATAL as dp), DB any (no absolute operand).
+; Exit: M, DP and DB unchanged; A and Y unchanged; X = $2993.
+; ------------------------------------------------------------
+Irq_ChoiceCursorClearRow2:
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*2)
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+(!ChoiceCursor_GridRowStep*2)
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+(!ChoiceCursor_VramRowStep*2)+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+(!ChoiceCursor_GridRowStep*2)+!ChoiceCursor_GridLine
+    BRA Irq_ChoiceCursorClearTail
+
+; ------------------------------------------------------------
+; $C0:F142 — Irq_ChoiceCursorClearRow1 (23 bytes, $F142–$F158)
+; As Irq_ChoiceCursorClearRow3 for choice row 1: VRAM $1C42 gets $2942,
+;   $2943 (tiles $142/$143), $1C62 gets $2952, $2953 (through
+;   Irq_ChoiceCursorClearTail).
+; Callers (4 JSR sites): Irq_DrawChoiceCursor ($C0:F07C, $C0:F08B, $C0:F0AE, $C0:F0D3).
+; On entry: M any (no A use), X=0 (16-bit X), DP = DP_PPU (VMADDL /
+;   VMDATAL as dp), DB any (no absolute operand).
+; Exit: M, DP and DB unchanged; A and Y unchanged; X = $2953.
+; ------------------------------------------------------------
+Irq_ChoiceCursorClearRow1:
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramRowStep
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+!ChoiceCursor_GridRowStep
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramRowStep+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+!ChoiceCursor_GridRowStep+!ChoiceCursor_GridLine
+    BRA Irq_ChoiceCursorClearTail
+
+; ------------------------------------------------------------
+; $C0:F159 — Irq_ChoiceCursorClearRow0 (23 bytes, $F159–$F16F)
+; As Irq_ChoiceCursorClearRow3 for choice row 0: VRAM $1C02 gets $2902,
+;   $2903 (tiles $102/$103), $1C22 gets $2912, $2913 (through
+;   Irq_ChoiceCursorClearTail).
+; Callers (4 JSR sites): Irq_DrawChoiceCursor ($C0:F079, $C0:F0AB, $C0:F0D0, $C0:F0F0).
+; On entry: M any (no A use), X=0 (16-bit X), DP = DP_PPU (VMADDL /
+;   VMDATAL as dp), DB any (no absolute operand).
+; Exit: M, DP and DB unchanged; A and Y unchanged; X = $2913.
+; ------------------------------------------------------------
+Irq_ChoiceCursorClearRow0:
+    LDX.w #!ChoiceCursor_VramRow0
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0
+    STX.b VMDATAL-!DP_PPU
+    INX
+    STX.b VMDATAL-!DP_PPU
+    LDX.w #!ChoiceCursor_VramRow0+!ChoiceCursor_VramLine
+    STX.b VMADDL-!DP_PPU
+    LDX.w #!ChoiceCursor_GridRow0+!ChoiceCursor_GridLine
+    BRA Irq_ChoiceCursorClearTail
 
 ; ============================================================
 ; $C0:0000 — ReentryVectors (14 bytes)
@@ -43280,6 +43500,300 @@ Obj_FrameLayout12:
     SEP #$10
     CLC
     RTS
+
+; ==================================================================
+; BankC0_OldBuildLeftovers ($C0:F170–$C0:F2FF, 400 bytes)
+; ==================================================================
+; Not code and, as far as found, never read. tools/xref.py, run on
+; every address of $C0:F170-$C0:F2FF, finds no call or jump from
+; matched code: its DOUBTFUL hits are operand bytes in matched code
+; ($C0:8543, $C0:8669, $C0:56F2) or data (Evt_OpcodeTable, the JSR
+; pattern at $C0:F171 below) or in unmatched bytes it judges data
+; ($C9, $D8, $ED, $F5); its two CONFIRMED hits, JML $C0:F1CB at
+; $FF:84B8 and JML $C0:F25E at $CA:5ED5, sit in byte runs that read as
+; text ($FF:84B8, among $EF-separated words and $00 ends) and packed
+; data ($CA:5ED5), not checked further. A search of the ROM for long
+; operands $C0:F170-$C0:F2FF / $00:F170-$00:F2FF finds them only in
+; such unmatched banks (C3, C6, C7, CA, D7, D8, E0, EA, ED, F7, F8,
+; FF), none of them a known reader. The bytes are tails of the code just before them
+; (Irq_DrawChoiceCursor and its four Irq_ChoiceCursorClearRow*
+; routines): every segment below repeats the bytes of a stretch of the
+; current code that ends at $C0:F16F, so each segment ends exactly
+; where a copy of that code would. Probably what earlier, longer
+; assemblies of this part of the bank left behind (as with
+; BankC1_OldBuildLeftovers), each later build cut off the front of the
+; one before; that the builds were longer is inferred from the
+; offsets, not known. Only the first segment holds an absolute
+; operand: its JSR at $C0:F171 targets $F18B, which is where that
+; copy's Irq_ChoiceCursorClearRow3 lies ($F110 + $7B); the others
+; hold only immediates and relative branches, so their bytes are the
+; current ones. Kept as bytes since they never run. Then
+; $F2F0-$F2FF: $FF fill up to Rom_AngleTable.
+; Entry/Exit: not code (data; never executed).
+org $C0F170
+BankC0_OldBuildLeftovers:
+.copy7B:                                ; $C0:F170-$C0:F1EA: as $C0:F0F5-$C0:F16F with its JSR operands + $7B
+    db $F1,$20,$8B,$F1,$A2,$42,$1C,$86,$16,$A2,$FC,$28,$86,$18,$E8,$86 ; $F170
+    db $18,$A2,$62,$1C,$86,$16,$A2,$FE,$28,$80,$B9,$A2,$C2,$1C,$86,$16 ; $F180
+    db $A2,$C2,$29,$86,$18,$E8,$86,$18,$A2,$E2,$1C,$86,$16,$A2,$D2,$29 ; $F190
+    db $86,$18,$E8,$86,$18,$60,$A2,$82,$1C,$86,$16,$A2,$82,$29,$86,$18 ; $F1A0
+    db $E8,$86,$18,$A2,$A2,$1C,$86,$16,$A2,$92,$29,$80,$E3,$A2,$42,$1C ; $F1B0
+    db $86,$16,$A2,$42,$29,$86,$18,$E8,$86,$18,$A2,$62,$1C,$86,$16,$A2 ; $F1C0
+    db $52,$29,$80,$CC,$A2,$02,$1C,$86,$16,$A2,$02,$29,$86,$18,$E8,$86 ; $F1D0
+    db $18,$A2,$22,$1C,$86,$16,$A2,$12,$29,$80,$B5 ; $F1E0
+.copyAF:                                ; $C0:F1EB-$C0:F21E: as $C0:F13C-$C0:F16F
+    db $16,$A2,$92,$29,$80,$E3,$A2,$42,$1C,$86,$16,$A2,$42,$29,$86,$18 ; $F1EB
+    db $E8,$86,$18,$A2,$62,$1C,$86,$16,$A2,$52,$29,$80,$CC,$A2,$02,$1C ; $F1FB
+    db $86,$16,$A2,$02,$29,$86,$18,$E8,$86,$18,$A2,$22,$1C,$86,$16,$A2 ; $F20B
+    db $12,$29,$80,$B5 ; $F21B
+.copyC5:                                ; $C0:F21F-$C0:F234: as $C0:F15A-$C0:F16F
+    db $02,$1C,$86,$16,$A2,$02,$29,$86,$18,$E8,$86,$18,$A2,$22,$1C,$86 ; $F21F
+    db $16,$A2,$12,$29,$80,$B5 ; $F22F
+.copyFE:                                ; $C0:F235-$C0:F26D: as $C0:F137-$C0:F16F
+    db $18,$A2,$A2,$1C,$86,$16,$A2,$92,$29,$80,$E3,$A2,$42,$1C,$86,$16 ; $F235
+    db $A2,$42,$29,$86,$18,$E8,$86,$18,$A2,$62,$1C,$86,$16,$A2,$52,$29 ; $F245
+    db $80,$CC,$A2,$02,$1C,$86,$16,$A2,$02,$29,$86,$18,$E8,$86,$18,$A2 ; $F255
+    db $22,$1C,$86,$16,$A2,$12,$29,$80,$B5 ; $F265
+.copy155:                               ; $C0:F26E-$C0:F2C4: as $C0:F119-$C0:F16F
+    db $18,$E8,$86,$18,$A2,$E2,$1C,$86,$16,$A2,$D2,$29,$86,$18,$E8,$86 ; $F26E
+    db $18,$60,$A2,$82,$1C,$86,$16,$A2,$82,$29,$86,$18,$E8,$86,$18,$A2 ; $F27E
+    db $A2,$1C,$86,$16,$A2,$92,$29,$80,$E3,$A2,$42,$1C,$86,$16,$A2,$42 ; $F28E
+    db $29,$86,$18,$E8,$86,$18,$A2,$62,$1C,$86,$16,$A2,$52,$29,$80,$CC ; $F29E
+    db $A2,$02,$1C,$86,$16,$A2,$02,$29,$86,$18,$E8,$86,$18,$A2,$22,$1C ; $F2AE
+    db $86,$16,$A2,$12,$29,$80,$B5 ; $F2BE
+.copy15B:                               ; $C0:F2C5-$C0:F2CA: as $C0:F16A-$C0:F16F
+    db $16,$A2,$12,$29,$80,$B5 ; $F2C5
+.copy169:                               ; $C0:F2CB-$C0:F2D8: as $C0:F162-$C0:F16F
+    db $18,$E8,$86,$18,$A2,$22,$1C,$86,$16,$A2,$12,$29,$80,$B5 ; $F2CB
+.copy180:                               ; $C0:F2D9-$C0:F2EF: as $C0:F159-$C0:F16F
+    db $A2,$02,$1C,$86,$16,$A2,$02,$29,$86,$18,$E8,$86,$18,$A2,$22,$1C ; $F2D9
+    db $86,$16,$A2,$12,$29,$80,$B5 ; $F2E9
+.fill:                                  ; $C0:F2F0-$C0:F2FF: $FF up to Rom_AngleTable
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; $F2F0
+
+; ==================================================================
+; Rom_AngleTable ($C0:F300–$C0:F6FF, 1024 bytes)
+; ==================================================================
+; The direction (256 per turn, $40 = a quarter) of the vector (run,
+; rise) for run and rise 0-31, at rise x 32 + run: within about 1 of
+; atan2(rise, run) x 256 / 2 pi (checked against the ROM for all 1024
+; entries; run 0 gives $40, rise 0 with run > 0 gives 0, and (0, 0)
+; gives $40). Callers fold the signs into quadrants themselves.
+; Read by Obj_CalcDirection (LDA.w !Rom_AngleTable,X with DB $00 or
+; $C0; through $00 that is the $00:F300 mirror) and Battle_CalcAngle (LDA.l
+; !BattleRom_AngleTable,X, index (|dy| & ~7) x 4 + |dx| >> 3); also
+; by the unmatched C2Scene_Unk229D ($C2:229D, through DB $00) and LDA.l
+; at $CE:E85B and $CF:FAA7 (unmatched, not read here). The readers use
+; the defines !Rom_AngleTable / !BattleRom_AngleTable, both = this
+; address.
+; ==================================================================
+Rom_AngleTable:
+    db $40,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; rise 0, run 0-15
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; rise 0, run 16-31
+    db $40,$20,$12,$0D,$0A,$08,$06,$06,$05,$04,$04,$04,$03,$03,$03,$02 ; rise 1, run 0-15
+    db $02,$02,$02,$02,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01 ; rise 1, run 16-31
+    db $40,$2D,$20,$17,$12,$0F,$0D,$0B,$0A,$09,$08,$07,$06,$06,$06,$05 ; rise 2, run 0-15
+    db $05,$04,$04,$04,$04,$04,$04,$03,$03,$03,$03,$03,$03,$02,$02,$02 ; rise 2, run 16-31
+    db $40,$32,$28,$20,$1A,$15,$12,$10,$0E,$0D,$0B,$0B,$0A,$09,$09,$08 ; rise 3, run 0-15
+    db $07,$07,$06,$06,$06,$06,$05,$05,$05,$04,$04,$04,$04,$04,$04,$04 ; rise 3, run 16-31
+    db $40,$35,$2D,$26,$20,$1B,$17,$15,$12,$10,$0F,$0E,$0D,$0C,$0B,$0A ; rise 4, run 0-15
+    db $0A,$09,$09,$08,$08,$07,$07,$06,$06,$06,$06,$06,$06,$05,$05,$05 ; rise 4, run 16-31
+    db $40,$37,$30,$2A,$24,$20,$1C,$19,$17,$15,$12,$11,$10,$0F,$0E,$0D ; rise 5, run 0-15
+    db $0C,$0B,$0B,$0A,$0A,$09,$09,$09,$08,$08,$07,$07,$07,$06,$06,$06 ; rise 5, run 16-31
+    db $40,$39,$32,$2D,$28,$24,$20,$1C,$1A,$17,$15,$14,$12,$11,$10,$0F ; rise 6, run 0-15
+    db $0E,$0E,$0D,$0C,$0B,$0B,$0B,$0A,$0A,$09,$09,$09,$09,$08,$08,$07 ; rise 6, run 16-31
+    db $40,$3A,$35,$2F,$2B,$26,$23,$20,$1D,$1A,$18,$17,$15,$14,$12,$12 ; rise 7, run 0-15
+    db $10,$10,$0F,$0E,$0E,$0D,$0C,$0B,$0B,$0B,$0B,$0A,$0A,$09,$09,$09 ; rise 7, run 16-31
+    db $40,$3A,$35,$31,$2D,$29,$26,$22,$20,$1D,$1B,$1A,$17,$16,$15,$14 ; rise 8, run 0-15
+    db $12,$12,$10,$10,$0F,$0E,$0E,$0E,$0D,$0C,$0C,$0B,$0B,$0B,$0A,$0A ; rise 8, run 16-31
+    db $40,$3B,$37,$32,$2F,$2B,$28,$25,$22,$20,$1D,$1C,$1A,$18,$17,$15 ; rise 9, run 0-15
+    db $15,$13,$12,$12,$11,$10,$10,$0F,$0E,$0E,$0E,$0D,$0C,$0C,$0B,$0B ; rise 9, run 16-31
+    db $40,$3C,$37,$34,$30,$2D,$2A,$27,$24,$22,$20,$1E,$1C,$1A,$19,$17 ; rise 10, run 0-15
+    db $17,$15,$15,$13,$12,$12,$11,$10,$10,$0F,$0F,$0E,$0E,$0E,$0D,$0C ; rise 10, run 16-31
+    db $40,$3C,$38,$35,$32,$2E,$2B,$29,$26,$24,$21,$20,$1E,$1C,$1B,$1A ; rise 11, run 0-15
+    db $18,$17,$16,$15,$14,$13,$12,$12,$11,$10,$10,$10,$0F,$0E,$0E,$0E ; rise 11, run 16-31
+    db $40,$3C,$39,$35,$32,$30,$2D,$2A,$28,$26,$24,$21,$20,$1E,$1C,$1B ; rise 12, run 0-15
+    db $1A,$19,$17,$17,$15,$15,$14,$13,$12,$12,$11,$10,$10,$10,$0F,$0F ; rise 12, run 16-31
+    db $40,$3C,$3A,$37,$33,$30,$2E,$2B,$29,$27,$25,$23,$21,$20,$1E,$1C ; rise 13, run 0-15
+    db $1C,$1A,$19,$18,$17,$16,$15,$15,$14,$13,$12,$12,$11,$11,$10,$10 ; rise 13, run 16-31
+    db $40,$3C,$3A,$37,$35,$32,$2F,$2D,$2B,$29,$26,$24,$23,$21,$20,$1F ; rise 14, run 0-15
+    db $1D,$1C,$1A,$1A,$18,$17,$17,$16,$15,$15,$14,$13,$12,$12,$12,$11 ; rise 14, run 16-31
+    db $40,$3D,$3A,$37,$35,$32,$30,$2E,$2B,$2A,$28,$26,$24,$23,$21,$20 ; rise 15, run 0-15
+    db $1F,$1D,$1C,$1B,$1A,$19,$18,$17,$17,$15,$15,$15,$14,$13,$12,$12 ; rise 15, run 16-31
+    db $40,$3D,$3A,$38,$35,$33,$31,$2F,$2D,$2B,$29,$27,$26,$24,$22,$21 ; rise 16, run 0-15
+    db $20,$1F,$1D,$1C,$1B,$1A,$1A,$18,$17,$17,$16,$15,$15,$14,$14,$13 ; rise 16, run 16-31
+    db $40,$3D,$3B,$38,$36,$34,$32,$30,$2E,$2C,$2A,$29,$26,$25,$24,$22 ; rise 17, run 0-15
+    db $21,$20,$1F,$1D,$1C,$1B,$1A,$1A,$19,$18,$17,$17,$16,$15,$15,$14 ; rise 17, run 16-31
+    db $40,$3D,$3B,$39,$37,$35,$32,$30,$2F,$2D,$2B,$29,$28,$26,$25,$24 ; rise 18, run 0-15
+    db $22,$21,$20,$1F,$1D,$1C,$1C,$1B,$1A,$19,$18,$17,$17,$16,$15,$15 ; rise 18, run 16-31
+    db $40,$3D,$3B,$3A,$37,$35,$33,$31,$30,$2E,$2C,$2A,$29,$27,$26,$24 ; rise 19, run 0-15
+    db $23,$22,$21,$20,$1F,$1E,$1C,$1C,$1B,$1A,$1A,$19,$18,$17,$17,$16 ; rise 19, run 16-31
+    db $40,$3E,$3C,$3A,$37,$35,$34,$32,$30,$2E,$2D,$2B,$2A,$28,$27,$26 ; rise 20, run 0-15
+    db $24,$23,$22,$21,$20,$1F,$1E,$1D,$1C,$1B,$1A,$1A,$19,$18,$17,$17 ; rise 20, run 16-31
+    db $40,$3E,$3C,$3A,$38,$36,$35,$32,$31,$2F,$2E,$2C,$2B,$29,$28,$26 ; rise 21, run 0-15
+    db $25,$24,$23,$21,$21,$20,$1F,$1E,$1D,$1C,$1B,$1A,$1A,$19,$18,$18 ; rise 21, run 16-31
+    db $40,$3E,$3C,$3A,$38,$37,$35,$33,$32,$30,$2E,$2D,$2B,$2A,$29,$27 ; rise 22, run 0-15
+    db $26,$25,$24,$23,$21,$21,$20,$1F,$1E,$1D,$1C,$1C,$1B,$1A,$1A,$19 ; rise 22, run 16-31
+    db $40,$3E,$3C,$3A,$39,$37,$35,$34,$32,$30,$2F,$2E,$2C,$2B,$29,$28 ; rise 23, run 0-15
+    db $27,$26,$24,$24,$22,$21,$21,$20,$1F,$1E,$1D,$1C,$1C,$1B,$1A,$1A ; rise 23, run 16-31
+    db $40,$3E,$3C,$3A,$39,$37,$35,$34,$32,$31,$30,$2E,$2D,$2B,$2A,$29 ; rise 24, run 0-15
+    db $28,$26,$26,$24,$24,$22,$21,$21,$20,$1F,$1E,$1D,$1C,$1C,$1B,$1A ; rise 24, run 16-31
+    db $40,$3E,$3C,$3B,$39,$37,$36,$35,$33,$32,$30,$2F,$2E,$2C,$2B,$2A ; rise 25, run 0-15
+    db $29,$27,$26,$25,$24,$23,$22,$21,$21,$20,$1F,$1E,$1D,$1C,$1C,$1B ; rise 25, run 16-31
+    db $40,$3E,$3C,$3B,$3A,$38,$37,$35,$33,$32,$30,$30,$2E,$2D,$2B,$2B ; rise 26, run 0-15
+    db $29,$28,$27,$26,$25,$24,$23,$22,$21,$21,$20,$1F,$1E,$1D,$1C,$1C ; rise 26, run 16-31
+    db $40,$3E,$3C,$3B,$3A,$38,$37,$35,$34,$32,$31,$30,$2F,$2E,$2C,$2B ; rise 27, run 0-15
+    db $2A,$29,$28,$26,$26,$25,$24,$23,$22,$21,$21,$20,$1F,$1E,$1D,$1D ; rise 27, run 16-31
+    db $40,$3E,$3C,$3B,$3A,$38,$37,$35,$35,$33,$32,$30,$2F,$2E,$2D,$2B ; rise 28, run 0-15
+    db $2B,$29,$29,$27,$26,$26,$24,$24,$23,$22,$21,$21,$20,$1F,$1F,$1E ; rise 28, run 16-31
+    db $40,$3F,$3D,$3C,$3A,$39,$37,$36,$35,$33,$32,$31,$30,$2E,$2E,$2C ; rise 29, run 0-15
+    db $2B,$2A,$29,$28,$27,$26,$25,$24,$24,$23,$22,$21,$21,$20,$1F,$1F ; rise 29, run 16-31
+    db $40,$3F,$3D,$3C,$3A,$39,$37,$36,$35,$34,$32,$31,$30,$2F,$2E,$2D ; rise 30, run 0-15
+    db $2B,$2B,$2A,$29,$28,$27,$26,$25,$24,$24,$23,$22,$21,$20,$20,$1F ; rise 30, run 16-31
+    db $40,$3F,$3D,$3C,$3A,$39,$38,$37,$35,$34,$33,$32,$30,$30,$2E,$2E ; rise 31, run 0-15
+    db $2C,$2B,$2A,$29,$29,$27,$26,$26,$25,$24,$24,$22,$21,$21,$20,$20 ; rise 31, run 16-31
+
+; ==================================================================
+; Rom_DirToFacing ($C0:F700–$C0:F7FF, 256 bytes)
+; ==================================================================
+; The facing (0 up, 1 down, 2 left, 3 right, the Obj_Facing values)
+; for each direction 0-255 (Rom_AngleTable's units): $00-$1F 3, $20-$5F
+; 1, $60-$9F 2, $A0-$DF 0, $E0-$FF 3 (checked against the ROM), so each
+; facing covers the quarter turn centred on its axis.
+; Read with LDA.w through DB=$00 by the event movement opcodes
+; (Evt_Op8F_FollowPc, Evt_Op92_WalkDir, Evt_Op94_Body,
+; Evt_Op96_WalkToTile, Evt_Op97_WalkToTileVar, Evt_Op98_Body,
+; Evt_Op9A_WalkTowardTile, Evt_OpA8_Body; define !Rom_DirToFacing),
+; with LDA.l by the battle movers and actions in bank $C1
+; (Battle_UpdatePcFacing, Battle_FaceAllPcsNearestEnemy, the
+; Battle_Mover* routines, the BattleAct_* move and face routines;
+; define !BattleRom_FacingByAngle), by C2Scene_ObjBMateFaceDir
+; ($C2:5468), and at $CF:F47F and $CF:F910 (unmatched, not read here).
+; ==================================================================
+Rom_DirToFacing:
+    db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 ; $000
+    db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 ; $010
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01 ; $020
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01 ; $030
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01 ; $040
+    db $01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01,$01 ; $050
+    db $02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02 ; $060
+    db $02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02 ; $070
+    db $02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02 ; $080
+    db $02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02,$02 ; $090
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; $0A0
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; $0B0
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; $0C0
+    db $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00 ; $0D0
+    db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 ; $0E0
+    db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 ; $0F0
+
+; ==================================================================
+; Rom_SineTable256 ($C0:F800–$C0:F8FF, 256 bytes)
+; ==================================================================
+; Signed sine, 256 steps per turn: entry N = 127 x sin(N x 2 pi / 256)
+; rounded to nearest ($00, $7F at $40, $00 at $80, $81 at $C0; checked
+; against the ROM for all 256 entries). The cosine is the entry at N +
+; $40.
+; Read with LDA.w through DB=$00 by Obj_SetVelocity and
+; Obj_SetVelocityChecked (sine at the direction, cosine at + $40;
+; define !Rom_SineTable256), and by the unmatched C2Scene_Unk2277
+; ($C2:2277, through DB $00).
+; ==================================================================
+Rom_SineTable256:
+    db $00,$03,$06,$09,$0C,$10,$13,$16,$19,$1C,$1F,$22,$25,$28,$2B,$2E ; $000
+    db $31,$33,$36,$39,$3C,$3F,$41,$44,$47,$49,$4C,$4E,$51,$53,$55,$58 ; $010
+    db $5A,$5C,$5E,$60,$62,$64,$66,$68,$6A,$6B,$6D,$6F,$70,$71,$73,$74 ; $020
+    db $75,$76,$78,$79,$7A,$7A,$7B,$7C,$7D,$7D,$7E,$7E,$7E,$7F,$7F,$7F ; $030
+    db $7F,$7F,$7F,$7F,$7E,$7E,$7E,$7D,$7D,$7C,$7B,$7A,$7A,$79,$78,$76 ; $040
+    db $75,$74,$73,$71,$70,$6F,$6D,$6B,$6A,$68,$66,$64,$62,$60,$5E,$5C ; $050
+    db $5A,$58,$55,$53,$51,$4E,$4C,$49,$47,$44,$41,$3F,$3C,$39,$36,$33 ; $060
+    db $31,$2E,$2B,$28,$25,$22,$1F,$1C,$19,$16,$13,$10,$0C,$09,$06,$03 ; $070
+    db $00,$FD,$FA,$F7,$F4,$F0,$ED,$EA,$E7,$E4,$E1,$DE,$DB,$D8,$D5,$D2 ; $080
+    db $CF,$CD,$CA,$C7,$C4,$C1,$BF,$BC,$B9,$B7,$B4,$B2,$AF,$AD,$AB,$A8 ; $090
+    db $A6,$A4,$A2,$A0,$9E,$9C,$9A,$98,$96,$95,$93,$91,$90,$8F,$8D,$8C ; $0A0
+    db $8B,$8A,$88,$87,$86,$86,$85,$84,$83,$83,$82,$82,$82,$81,$81,$81 ; $0B0
+    db $81,$81,$81,$81,$82,$82,$82,$83,$83,$84,$85,$86,$86,$87,$88,$8A ; $0C0
+    db $8B,$8C,$8D,$8F,$90,$91,$93,$95,$96,$98,$9A,$9C,$9E,$A0,$A2,$A4 ; $0D0
+    db $A6,$A8,$AB,$AD,$AF,$B2,$B4,$B7,$B9,$BC,$BF,$C1,$C4,$C7,$CA,$CD ; $0E0
+    db $CF,$D2,$D5,$D8,$DB,$DE,$E1,$E4,$E7,$EA,$ED,$F0,$F4,$F7,$FA,$FD ; $0F0
+
+; ==================================================================
+; Rom_SineTable ($C0:F900–$C0:FCFF, 1024 bytes)
+; ==================================================================
+; |sin| for 1024 steps per turn, scaled to $FF: entry N is within 1 of
+; 255 x |sin(N x 2 pi / 1024)| ($00 at $000 and $200, $FF around $100
+; and $300); checked against the ROM. The second half ($C0:FB00-$FCFF)
+; repeats the first byte for byte, as |sin| does.
+; Read with LDA.l by Battle_SinLookup ($C1:0201), Trig_Sin1024
+; ($C2:2262) and Battle_SinLookupCF ($CF:FA03); defines
+; !Rom_SineTable and !BattleRom_SineTable. BitReverseTable follows.
+; ==================================================================
+Rom_SineTable:
+    db $00,$01,$03,$04,$06,$07,$09,$0A,$0C,$0E,$0F,$11,$12,$14,$15,$17 ; $000
+    db $19,$1A,$1C,$1D,$1F,$20,$22,$24,$25,$27,$28,$2A,$2B,$2D,$2E,$30 ; $010
+    db $31,$33,$35,$36,$38,$39,$3B,$3C,$3E,$3F,$41,$42,$44,$45,$47,$48 ; $020
+    db $4A,$4B,$4D,$4E,$50,$51,$53,$54,$56,$57,$59,$5A,$5C,$5D,$5F,$60 ; $030
+    db $61,$63,$64,$66,$67,$69,$6A,$6C,$6D,$6E,$70,$71,$73,$74,$75,$77 ; $040
+    db $78,$7A,$7B,$7C,$7E,$7F,$80,$82,$83,$84,$86,$87,$88,$8A,$8B,$8C ; $050
+    db $8E,$8F,$90,$92,$93,$94,$95,$97,$98,$99,$9B,$9C,$9D,$9E,$9F,$A1 ; $060
+    db $A2,$A3,$A4,$A6,$A7,$A8,$A9,$AA,$AB,$AD,$AE,$AF,$B0,$B1,$B2,$B3 ; $070
+    db $B5,$B6,$B7,$B8,$B9,$BA,$BB,$BC,$BD,$BE,$BF,$C0,$C1,$C2,$C3,$C4 ; $080
+    db $C5,$C6,$C7,$C8,$C9,$CA,$CB,$CC,$CD,$CE,$CF,$D0,$D1,$D2,$D3,$D3 ; $090
+    db $D4,$D5,$D6,$D7,$D8,$D9,$D9,$DA,$DB,$DC,$DD,$DD,$DE,$DF,$E0,$E1 ; $0A0
+    db $E1,$E2,$E3,$E3,$E4,$E5,$E6,$E6,$E7,$E8,$E8,$E9,$EA,$EA,$EB,$EB ; $0B0
+    db $EC,$ED,$ED,$EE,$EE,$EF,$EF,$F0,$F1,$F1,$F2,$F2,$F3,$F3,$F4,$F4 ; $0C0
+    db $F4,$F5,$F5,$F6,$F6,$F7,$F7,$F7,$F8,$F8,$F9,$F9,$F9,$FA,$FA,$FA ; $0D0
+    db $FB,$FB,$FB,$FB,$FC,$FC,$FC,$FC,$FD,$FD,$FD,$FD,$FE,$FE,$FE,$FE ; $0E0
+    db $FE,$FE,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; $0F0
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FE ; $100
+    db $FE,$FE,$FE,$FE,$FE,$FD,$FD,$FD,$FD,$FC,$FC,$FC,$FC,$FB,$FB,$FB ; $110
+    db $FB,$FA,$FA,$FA,$F9,$F9,$F9,$F8,$F8,$F7,$F7,$F7,$F6,$F6,$F5,$F5 ; $120
+    db $F4,$F4,$F4,$F3,$F3,$F2,$F2,$F1,$F1,$F0,$EF,$EF,$EE,$EE,$ED,$ED ; $130
+    db $EC,$EB,$EB,$EA,$EA,$E9,$E8,$E8,$E7,$E6,$E6,$E5,$E4,$E3,$E3,$E2 ; $140
+    db $E1,$E1,$E0,$DF,$DE,$DD,$DD,$DC,$DB,$DA,$D9,$D9,$D8,$D7,$D6,$D5 ; $150
+    db $D4,$D3,$D3,$D2,$D1,$D0,$CF,$CE,$CD,$CC,$CB,$CA,$C9,$C8,$C7,$C6 ; $160
+    db $C5,$C4,$C3,$C2,$C1,$C0,$BF,$BE,$BD,$BC,$BB,$BA,$B9,$B8,$B7,$B6 ; $170
+    db $B5,$B3,$B2,$B1,$B0,$AF,$AE,$AD,$AB,$AA,$A9,$A8,$A7,$A6,$A4,$A3 ; $180
+    db $A2,$A1,$9F,$9E,$9D,$9C,$9B,$99,$98,$97,$95,$94,$93,$92,$90,$8F ; $190
+    db $8E,$8C,$8B,$8A,$88,$87,$86,$84,$83,$82,$80,$7F,$7E,$7C,$7B,$7A ; $1A0
+    db $78,$77,$75,$74,$73,$71,$70,$6E,$6D,$6C,$6A,$69,$67,$66,$64,$63 ; $1B0
+    db $61,$60,$5F,$5D,$5C,$5A,$59,$57,$56,$54,$53,$51,$50,$4E,$4D,$4B ; $1C0
+    db $4A,$48,$47,$45,$44,$42,$41,$3F,$3E,$3C,$3B,$39,$38,$36,$35,$33 ; $1D0
+    db $31,$30,$2E,$2D,$2B,$2A,$28,$27,$25,$24,$22,$20,$1F,$1D,$1C,$1A ; $1E0
+    db $19,$17,$15,$14,$12,$11,$0F,$0E,$0C,$0A,$09,$07,$06,$04,$03,$01 ; $1F0
+    db $00,$01,$03,$04,$06,$07,$09,$0A,$0C,$0E,$0F,$11,$12,$14,$15,$17 ; $200
+    db $19,$1A,$1C,$1D,$1F,$20,$22,$24,$25,$27,$28,$2A,$2B,$2D,$2E,$30 ; $210
+    db $31,$33,$35,$36,$38,$39,$3B,$3C,$3E,$3F,$41,$42,$44,$45,$47,$48 ; $220
+    db $4A,$4B,$4D,$4E,$50,$51,$53,$54,$56,$57,$59,$5A,$5C,$5D,$5F,$60 ; $230
+    db $61,$63,$64,$66,$67,$69,$6A,$6C,$6D,$6E,$70,$71,$73,$74,$75,$77 ; $240
+    db $78,$7A,$7B,$7C,$7E,$7F,$80,$82,$83,$84,$86,$87,$88,$8A,$8B,$8C ; $250
+    db $8E,$8F,$90,$92,$93,$94,$95,$97,$98,$99,$9B,$9C,$9D,$9E,$9F,$A1 ; $260
+    db $A2,$A3,$A4,$A6,$A7,$A8,$A9,$AA,$AB,$AD,$AE,$AF,$B0,$B1,$B2,$B3 ; $270
+    db $B5,$B6,$B7,$B8,$B9,$BA,$BB,$BC,$BD,$BE,$BF,$C0,$C1,$C2,$C3,$C4 ; $280
+    db $C5,$C6,$C7,$C8,$C9,$CA,$CB,$CC,$CD,$CE,$CF,$D0,$D1,$D2,$D3,$D3 ; $290
+    db $D4,$D5,$D6,$D7,$D8,$D9,$D9,$DA,$DB,$DC,$DD,$DD,$DE,$DF,$E0,$E1 ; $2A0
+    db $E1,$E2,$E3,$E3,$E4,$E5,$E6,$E6,$E7,$E8,$E8,$E9,$EA,$EA,$EB,$EB ; $2B0
+    db $EC,$ED,$ED,$EE,$EE,$EF,$EF,$F0,$F1,$F1,$F2,$F2,$F3,$F3,$F4,$F4 ; $2C0
+    db $F4,$F5,$F5,$F6,$F6,$F7,$F7,$F7,$F8,$F8,$F9,$F9,$F9,$FA,$FA,$FA ; $2D0
+    db $FB,$FB,$FB,$FB,$FC,$FC,$FC,$FC,$FD,$FD,$FD,$FD,$FE,$FE,$FE,$FE ; $2E0
+    db $FE,$FE,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF ; $2F0
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FE ; $300
+    db $FE,$FE,$FE,$FE,$FE,$FD,$FD,$FD,$FD,$FC,$FC,$FC,$FC,$FB,$FB,$FB ; $310
+    db $FB,$FA,$FA,$FA,$F9,$F9,$F9,$F8,$F8,$F7,$F7,$F7,$F6,$F6,$F5,$F5 ; $320
+    db $F4,$F4,$F4,$F3,$F3,$F2,$F2,$F1,$F1,$F0,$EF,$EF,$EE,$EE,$ED,$ED ; $330
+    db $EC,$EB,$EB,$EA,$EA,$E9,$E8,$E8,$E7,$E6,$E6,$E5,$E4,$E3,$E3,$E2 ; $340
+    db $E1,$E1,$E0,$DF,$DE,$DD,$DD,$DC,$DB,$DA,$D9,$D9,$D8,$D7,$D6,$D5 ; $350
+    db $D4,$D3,$D3,$D2,$D1,$D0,$CF,$CE,$CD,$CC,$CB,$CA,$C9,$C8,$C7,$C6 ; $360
+    db $C5,$C4,$C3,$C2,$C1,$C0,$BF,$BE,$BD,$BC,$BB,$BA,$B9,$B8,$B7,$B6 ; $370
+    db $B5,$B3,$B2,$B1,$B0,$AF,$AE,$AD,$AB,$AA,$A9,$A8,$A7,$A6,$A4,$A3 ; $380
+    db $A2,$A1,$9F,$9E,$9D,$9C,$9B,$99,$98,$97,$95,$94,$93,$92,$90,$8F ; $390
+    db $8E,$8C,$8B,$8A,$88,$87,$86,$84,$83,$82,$80,$7F,$7E,$7C,$7B,$7A ; $3A0
+    db $78,$77,$75,$74,$73,$71,$70,$6E,$6D,$6C,$6A,$69,$67,$66,$64,$63 ; $3B0
+    db $61,$60,$5F,$5D,$5C,$5A,$59,$57,$56,$54,$53,$51,$50,$4E,$4D,$4B ; $3C0
+    db $4A,$48,$47,$45,$44,$42,$41,$3F,$3E,$3C,$3B,$39,$38,$36,$35,$33 ; $3D0
+    db $31,$30,$2E,$2D,$2B,$2A,$28,$27,$25,$24,$22,$20,$1F,$1D,$1C,$1A ; $3E0
+    db $19,$17,$15,$14,$12,$11,$0F,$0E,$0C,$0A,$09,$07,$06,$04,$03,$01 ; $3F0
 
 ; ============================================================
 ; $C0:FD00 — BitReverseTable (256 bytes, $C0:FD00–$FDFF)

@@ -17,9 +17,6 @@
 
 
 
-org $C0F05E
-Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negative (the message
-                    ; choice cursor, probably); not analysed
 
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
