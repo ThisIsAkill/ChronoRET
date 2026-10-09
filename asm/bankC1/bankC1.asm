@@ -26821,8 +26821,7 @@ BattleSys_ResetTechUsers:
 ; Callers (1 JSR site): BattleSys_UnkB967 ($C1:BB0C).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D/AD8E = the targets
 ;        (1 or more)
-; Exit:  M=1, X=0, DP=0, DB=$7E (as assumed after the effect routines'
-;        callees, not analysed); DP $00/$01 = the record's offset in
+; Exit:  M=1, X=0, DP=0, DB=$7E; DP $00/$01 = the record's offset in
 ;        bank $CC (DP $16-$1B also written by the effect routine); A,
 ;        X clobbered; !Battle_UnkAD8D = 0 after an effect routine; plus
 ;        what the callee changes
@@ -30122,8 +30121,8 @@ BankC1_ServiceTable:
 ; Loaders for the effect routines (BattleSys_Effect00-08): each puts
 ; bytes of the effect record in !Battle_UnkAEE6, or of the caster's or
 ; target's BattlerStats, into DP $16/$18/$1A (or $1E/$20) for the
-; unanalysed routines the effects call. Whatever those make of them is
-; not traced; the names say only where the bytes come from.
+; routines the effects call ($C1:DA37 on); the names say only where the
+; bytes come from.
 
 ; $C1:D132 — BattleSys_EffRecArgsUnk66 (29 bytes, $D132–$D14E)
 ; DP $16 = the caster's BattlerStats.Unk66 (!Battle_UnkB1F4), DP $18 =
@@ -30310,14 +30309,13 @@ BattleSys_EffRecArgs12C:
 ; to !Battle_UnkAEE6; its byte 0 is the effect type, the index into
 ; BattleSys_EffectTable. An item runs one of the types $29-$2B straight
 ; from BattleSys_UnkBF46, by the bits of its !BattleRom_UnkCC05CC
-; record. What each effect type does is not analysed beyond what is
-; said in the effect routines' headers (the routines doing the
-; arithmetic, $C1:DA37 on, are not matched).
+; record. What each effect type does is said in the effect routines'
+; headers and in those of the arithmetic they call ($C1:DA37 on).
 
 ; $C1:D1D3 — BattleSys_LoadEffectArgs (38 bytes, $D1D3–$D1F8)
 ; From the !BattleRom_UnkCC05CC record of !Battle_UnkB18C: DP $16 =
 ; byte 3 & $3F, DP $18 = byte 2 & $0F, DP $1A = byte 1 (each 16-bit,
-; high byte 0). What the effect routines make of them is not traced.
+; high byte 0): BattleSys_RestoreHpMp's amount base, factor and bits.
 ; Callers (2 JSR sites): BattleSys_Effect29 ($C1:D496) and BattleSys_Effect2A ($C1:D4BF).
 ; Entry: M=1, X=0, DP=0, DB=$7E (!Battle_UnkB18C); B any (TDC first)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = byte 1, B = 0; X = !Battle_UnkB18C * 4 (8-bit
@@ -30395,9 +30393,11 @@ BattleSys_LoadEffectArgs12:
 ; The effect routines BattleSys_EffectTable lists first. They work on
 ; the targets from the last (!Battle_UnkAD8E[!Battle_UnkAD8D - 1]) to
 ; the first, counting !Battle_UnkAD8D down, and leave each target's
-; command bytes with BattleSys_StoreTargetCmd. The routines that do the
-; arithmetic ($C1:DA37 on) are not analysed, so what each type stands
-; for is not established. !Battle_UnkB200: in BattleSys_Effect02 and
+; command bytes with BattleSys_StoreTargetCmd. From the arithmetic they
+; call ($C1:DA37 on), probably: 0 restores HP / MP, 1 cures statuses
+; (and may restore), 2 sets statuses, 3 is a hit with damage, 5 drains
+; HP / MP, 6 steals, 7 gives up the caster's HP, 8 repeats type 3.
+; !Battle_UnkB200: in BattleSys_Effect02 and
 ; BattleSys_Effect03 a target whose path ends in BattleSys_RecordMiss
 ; (a cancelled hit, drawn as kind 5) sets it to $80 and any other
 ; target to 0, so the last target's value is left (BattleSys_Effect08
@@ -30410,12 +30410,13 @@ BattleSys_LoadEffectArgs12:
 
 ; $C1:D221 — BattleSys_Effect00 (29 bytes, $D221–$D23D)
 ; Effect type 0: BattleSys_LoadCasterStats, then per target
-; BattleSys_LoadTargetStats, BattleSys_EffRecArgsUnk66, $C1:DA37,
-; BattleSys_StoreTargetCmd; then !Battle_UnkB200 = 0.
+; BattleSys_LoadTargetStats, BattleSys_EffRecArgsUnk66,
+; BattleSys_RestoreHpMp, BattleSys_StoreTargetCmd; then
+; !Battle_UnkB200 = 0.
 ; Callers note: BattleSys_EffectTable entry 0.
 ; Callers (1 JSR site): BattleSys_Effect07 ($C1:D3F4).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0 (as assumed after $C1:DA37), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkAD8D = 0, !Battle_UnkB200 = 0; X, Y and DP $16-$1B
 ;        as the callees leave them, plus what they change
 org $C1D221
@@ -30435,12 +30436,12 @@ BattleSys_Effect00:
 
 ; $C1:D23E — BattleSys_Effect01 (41 bytes, $D23E–$D266)
 ; Effect type 1: as BattleSys_Effect00, but per target
-; BattleSys_EffRecArgs12 and $C1:DB5E, and when bit 6 of effect byte 1
-; (DP $16) is set also BattleSys_EffRecArgsUnk66 and $C1:DA37.
+; BattleSys_EffRecArgs12 and BattleSys_CureStatus, and when bit 6 of
+; effect byte 1 (DP $16) is set also BattleSys_EffRecArgsUnk66 and
+; BattleSys_RestoreHpMp.
 ; Callers note: BattleSys_EffectTable entry 1.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  as BattleSys_Effect00 (the callees $C1:DB5E and $C1:DA37 not
-;        analysed)
+; Exit:  as BattleSys_Effect00
 BattleSys_Effect01:
     JSR BattleSys_LoadCasterStats
 .target:
@@ -30467,15 +30468,16 @@ BattleSys_Effect01:
 ; the caster's BattlerStats.Unk66 / effect byte 6 (Battle_Div32,
 ; 8-bit sum); a roll above it is a miss (BattleSys_EffRecArg11,
 ; BattleSys_RecordMiss, !Battle_UnkB200 = $80). Otherwise
-; BattleSys_EffRecArgs12 and $C1:DBAA; if that leaves DP $16 = $80, a
-; miss as well; else !Battle_UnkB200 = 0. Then
+; BattleSys_EffRecArgs12 and BattleSys_SetStatus; if that leaves DP
+; $16 = $80, a miss as well (it never does: see BattleSys_SetStatus);
+; else !Battle_UnkB200 = 0. Then
 ; BattleSys_StoreTargetCmd. Nothing clears !Battle_UnkB200 at the end.
 ; Quirk: the divisor is stored 8-bit (STA with M=1), so
 ; !Battle_MathB's high byte and !Battle_MathHi are what they were
 ; (Battle_Div32 divides MathHi:MathA by all of MathB).
 ; Callers note: BattleSys_EffectTable entry 2.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0 (as assumed after $C1:DBAA), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkAD8D = 0; !Battle_UnkB200 as the last target left
 ;        it; X, Y and DP $16-$1D as the callees leave them, plus what
 ;        they change
@@ -30542,26 +30544,29 @@ BattleSys_Effect02:
 ; $C1:D2DE — BattleSys_Effect03 (146 bytes, $D2DE–$D36F)
 ; Effect type 3, per target:
 ;   - unless !Battle_UnkAE4D has !Battle_AE4DBit4:
-;     BattleSys_EffRecArg10Unk46 and $C1:DE87; DP $16 non-zero = a miss
+;     BattleSys_EffRecArg10Unk46 and BattleSys_TestEnemyUnk46; DP $16
+;     non-zero = a miss
 ;     (BattleSys_EffRecArg11, DP $1C = 1, BattleSys_RecordMiss,
 ;     !Battle_UnkB200 = $80);
 ;   - unless it has !Battle_AE4DBit5: BattleSys_EffRecStatPair,
-;     $C1:DE9E, $C1:DEF0, $C1:DC64; DP $16 = 0 = a miss (the same with
-;     DP $1C = 0);
-;   - else, or when both pass: BattleSys_EffRecArgs56, $C1:E0F5,
-;     $C1:E65F, $C1:DCAD; with !Battle_AE4DBit2 also
+;     BattleSys_AdjustHit, BattleSys_AdjustEvade, BattleSys_RollHit;
+;     DP $16 = 0 = a miss (the same with DP $1C = 0);
+;   - else, or when both pass: BattleSys_EffRecArgs56,
+;     BattleSys_CalcDamage, BattleSys_AdjustDefence,
+;     BattleSys_ApplyDamage; with !Battle_AE4DBit2 also
 ;     BattleSys_EffRecArgs12 and BattleSys_UnkE976; with
-;     !Battle_AE4DBit1 also $C1:E9D5; !Battle_UnkB200 = 0.
+;     !Battle_AE4DBit1 also BattleSys_StealItem; !Battle_UnkB200 = 0.
 ; Then BattleSys_StoreTargetCmd. With !Battle_UnkB1FC's
 ; !Battle_B1FCAttackBit set (an attack, BattleSys_RunPcAttack) it stops
 ; after one target; otherwise !Battle_UnkAD8D counts down, and a
-; negative count is set to 0 and ends it. The two tests look like
-; evade and hit checks before the damage routines (not traced).
+; negative count is set to 0 and ends it. The second test is the hit
+; roll; the first, an enemy-only bit test, probably an immunity.
 ; Callers (1 JSR site): BattleSys_Effect08 ($C1:D462).
 ; Callers note: also BattleSys_EffectTable entry 3; the JSR is
 ;   BattleSys_Effect08's.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0 (as assumed after the callees, not analysed), DP=0,
+; Exit:  M=1, X=0 (as assumed after the B2CC handlers its callees run,
+;        not analysed), DP=0,
 ;        DB=$7E; A, X, Y clobbered; !Battle_UnkAD8D = 0 (unchanged
 ;        after an attack); !Battle_UnkB200 as the last target left it;
 ;        DP $16-$1D written, plus what the callees change
@@ -30643,15 +30648,16 @@ BattleSys_Effect04:
     RTS
 
 ; $C1:D371 — BattleSys_Effect05 (78 bytes, $D371–$D3BE)
-; Effect type 5: DP $20 = effect byte 1 (not read here; $C1:E77B
-; may), BattleSys_LoadCasterStats; per target:
+; Effect type 5: DP $20 = effect byte 1 (not read here nor by
+; BattleSys_DrainHpMp), BattleSys_LoadCasterStats; per target:
 ; BattleSys_LoadTargetStats, DP $1E = effect byte 1,
-; !Battle_UnkAD9B = 0; with bit 7 of it $C1:E77B with DP $1A = 3, then
-; !Battle_UnkAD9B + 1; with bit 6 $C1:E77B with DP $1A = 7 and DP $16 =
-; 20; BattleSys_StoreTargetCmd. Then !Battle_UnkB200 = 0.
+; !Battle_UnkAD9B = 0; with bit 7 of it BattleSys_DrainHpMp with DP $1A
+; = 3, then !Battle_UnkAD9B + 1; with bit 6 BattleSys_DrainHpMp with DP
+; $1A = 7 and DP $16 = 20 (which it does not read);
+; BattleSys_StoreTargetCmd. Then !Battle_UnkB200 = 0.
 ; Callers note: BattleSys_EffectTable entry 5.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0 (as assumed after $C1:E77B), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkAD8D = 0, !Battle_UnkB200 = 0, !Battle_UnkAD9B 0 or
 ;        1; DP $16-$21 written, plus what the callees change
 !Eff05_Byte1 = !BattleTmp_1E            ; 1 B: effect byte 1 (bits 7, 6)
@@ -30697,14 +30703,16 @@ BattleSys_Effect05:
 
 ; $C1:D3BF — BattleSys_Effect06 (53 bytes, $D3BF–$D3F3)
 ; Effect type 6, for the last target only: BattleSys_LoadCasterStats,
-; BattleSys_LoadTargetStats, BattleSys_EffRecArgs12, $C1:E9D5; DP $16 =
+; BattleSys_LoadTargetStats, BattleSys_EffRecArgs12, BattleSys_StealItem;
+; DP $16 =
 ; $FE after it = a miss (BattleSys_EffRecArg11, DP $1C = 0,
 ; BattleSys_RecordMiss); then BattleSys_StoreTargetCmd and
 ; !Battle_UnkB200 = 0. Quirk: the $80 stored in !Battle_UnkB200 for
 ; DP $16 = $FE or $FF is overwritten by that 0, so it is dead.
 ; Callers note: BattleSys_EffectTable entry 6.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = 1 or more
-; Exit:  M=1, X=0 (as assumed after $C1:E9D5), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0 (as assumed after the B2CC handler BattleSys_StealItem
+;        runs, not analysed), DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkB200 = 0; !Battle_UnkAD8D unchanged; DP $16-$1D
 ;        as the callees leave them, plus what they change
 BattleSys_Effect06:
@@ -30850,13 +30858,13 @@ BattleSys_EffectNone:
 ; bit 7 (BattleSys_UnkBF46). BattleSys_LoadCasterStats, then for each
 ; target from the last (!Battle_UnkAD8E[!Battle_UnkAD8D - 1]) down to
 ; the first: BattleSys_LoadTargetStats, BattleSys_LoadEffectArgs,
-; $C1:DA37 (not analysed), BattleSys_StoreTargetCmd; !Battle_UnkAD8D
+; BattleSys_RestoreHpMp, BattleSys_StoreTargetCmd; !Battle_UnkAD8D
 ; counts down to 0. Then !Battle_UnkB200 = 0.
 ; Callers (1 JSR site): BattleSys_UnkBF46 ($C1:BF61).
 ; Callers note: also BattleSys_EffectTable entry $29.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = the number of
 ;        targets (1 or more; 0 would wrap to 255)
-; Exit:  M=1, X=0 (as assumed after $C1:DA37), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkAD8D = 0, !Battle_UnkB200 = 0; X, Y and DP $16-$1B
 ;        as the callees leave them, plus what they change
 ;        (!Battle_UnkB1F4/B1F6/B1FD, !Battle_UnkB192, the math DP bytes)
@@ -30877,15 +30885,15 @@ BattleSys_Effect29:
 ; $C1:D4AD — BattleSys_Effect2A (41 bytes, $D4AD–$D4D5)
 ; Effect type $2A; also an item whose !BattleRom_UnkCC05CC byte 0 has
 ; bit 2 (and not bit 7). As BattleSys_Effect29, but per target:
-; BattleSys_LoadTargetStats, BattleSys_LoadEffectArg3, $C1:DB5E (not
-; analysed), and when bit 6 of byte 3 (DP $16) is set also
-; BattleSys_LoadEffectArgs and $C1:DA37; then BattleSys_StoreTargetCmd.
+; BattleSys_LoadTargetStats, BattleSys_LoadEffectArg3,
+; BattleSys_CureStatus, and when bit 6 of byte 3 (DP $16) is set also
+; BattleSys_LoadEffectArgs and BattleSys_RestoreHpMp; then
+; BattleSys_StoreTargetCmd.
 ; Callers (1 JSR site): BattleSys_UnkBF46 ($C1:BF6A).
 ; Callers note: also BattleSys_EffectTable entry $2A.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = the number of
 ;        targets (1 or more)
-; Exit:  as BattleSys_Effect29 (the callees $C1:DB5E and $C1:DA37 not
-;        analysed)
+; Exit:  as BattleSys_Effect29
 BattleSys_Effect2A:
     JSR BattleSys_LoadCasterStats
 .target:
@@ -30909,13 +30917,13 @@ BattleSys_Effect2A:
 ; $C1:D4D6 — BattleSys_Effect2B (29 bytes, $D4D6–$D4F2)
 ; Effect type $2B; also an item whose !BattleRom_UnkCC05CC byte 0 has
 ; bit 6 (and not bits 7 or 2). Per target, last to first:
-; BattleSys_LoadTargetStats, BattleSys_LoadEffectArgs12, $C1:DBAA (not
-; analysed), !Battle_UnkB200 = 0, BattleSys_StoreTargetCmd.
+; BattleSys_LoadTargetStats, BattleSys_LoadEffectArgs12,
+; BattleSys_SetStatus, !Battle_UnkB200 = 0, BattleSys_StoreTargetCmd.
 ; Callers (1 JSR site): BattleSys_UnkBF46 ($C1:BF73).
 ; Callers note: also BattleSys_EffectTable entry $2B.
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D = the number of
 ;        targets (1 or more)
-; Exit:  M=1, X=0 (as assumed after $C1:DBAA), DP=0, DB=$7E; A = 0;
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0;
 ;        !Battle_UnkAD8D = 0, !Battle_UnkB200 = 0; X, Y and DP $16-$18
 ;        as the callees leave them, plus what they change
 BattleSys_Effect2B:
@@ -31033,7 +31041,8 @@ BattleSys_StoreTargetCmd:
 ; Callers (1 JSR site): BattleSys_UnkBF79 ($C1:BF7D).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18C = the tech (or attack)
 ;        number, !Battle_UnkAD8D/AD8E the targets, !Battle_ActKind set
-; Exit:  M=1, X=0 (as assumed after the effect routines, not analysed),
+; Exit:  M=1, X=0 (as assumed after the B2CC handlers some effect
+;        routines run, not analysed),
 ;        DP=0, DB=$7E; A, X, Y clobbered; DP $00/$01 written ($1A and
 ;        $10-$13 when Battle_SumHitSets runs); the RAM above, plus what
 ;        the callees change
@@ -31401,7 +31410,8 @@ BattleSys_CheckTechMp:
 ; Callers (1 JSR site): BattleAi_EnemyTurn ($C1:8E15).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18C = the record number,
 ;        !Battle_UnkAD8D/AD8E the targets, B18E-B191 as loaded
-; Exit:  M=1, X=0 (as assumed after the effect routine, not analysed),
+; Exit:  M=1, X=0 (as assumed after the B2CC handlers some effect
+;        routines run, not analysed),
 ;        DP=0, DB=$7E; A, X, Y clobbered; DP $1A written (and $10-$13
 ;        when Battle_SumHitSets runs); the RAM above, plus what the
 ;        callees change
@@ -34133,14 +34143,15 @@ BattleSys_RecordMiss:
 ; $C1:E976 — BattleSys_UnkE976 (45 bytes, $E976–$E9A2)
 ; A percentage roll (0-99, kept in DP $0E) against DP $16 (effect byte
 ; 1 as BattleSys_Effect03 passes it): when DP $16 is at least the roll,
-; DP $16 = 1 and $C1:DBAA runs, and then, unless the caster's
+; DP $16 = 1 and BattleSys_SetStatus runs (status byte 1, .Status2,
+; with the bits DP $18), and then, unless the caster's
 ; BattlerStats.Unk73 is $FF, !Battle_UnkB29A[!Battle_UnkB1FD] = that
-; .Unk73. What this adds to the effect is not traced.
+; .Unk73.
 ; Callers (1 JSR site): BattleSys_Effect03 ($C1:D342).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 = the chance
-; Exit:  M=1, X=0 (as assumed after $C1:DBAA), DP=0, DB=$7E; A, X
-;        clobbered; DP $0A, $0E and $16 written, plus what $C1:DBAA
-;        and Battle_RandRange change
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X
+;        clobbered; DP $0A, $0E and $16 written, plus what
+;        BattleSys_SetStatus and Battle_RandRange change
 !E976_Roll = !BattleTmp_0E              ; 1 B: the roll
 !E976_Unk73 = !BattleTmp_0A             ; 1 B: the caster's .Unk73
 BattleSys_UnkE976:
@@ -34786,10 +34797,6 @@ Battle_ApplyHits:
     JSL BattleFD_UnkACFD
     RTS
 
-; ==================================================================
-; Battle setup ($C1:FA8B–$C1:FDBE)
-; ==================================================================
-
 
 ; BattleSys_UnkB2CCHandlerTable ($C1FA61–$C1FA8A, 21 words)
 ; The routines BattleSys_RunUnkB2CCHandler runs, by byte 0 of a
@@ -34818,6 +34825,10 @@ BattleSys_UnkB2CCHandlerTable:
     dw BattleSys_UnkB2CCHandler12        ; $12
     dw BattleSys_UnkB2CCHandler13        ; $13
     dw BattleSys_UnkB2CCHandler14        ; $14
+
+; ==================================================================
+; Battle setup ($C1:FA8B–$C1:FDBE)
+; ==================================================================
 
 ; $C1:FA8B — Battle_SetupBattle (803 bytes, $FA8B–$FDAD)
 ; BattleSys_Main's first step: builds the battle state before the

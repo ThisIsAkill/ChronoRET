@@ -843,7 +843,7 @@ if !constants_battle_inc == 0
 ; --- Action effects (BattleSys_RunTechParts, BattleSys_Effect*) ---
 !Battle_EffArg3Mask      = $3F    ; !BattleRom_UnkCC05CC byte 3 bits 5-0: DP $16 of BattleSys_LoadEffectArgs
 !Battle_EffArg2Mask      = $0F    ; byte 2 bits 3-0: its DP $18
-!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and $C1:DA37
+!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and BattleSys_RestoreHpMp
 !Battle_StatusBit6       = $40    ; BattlerStats.Status bit 6: cleared by BattleSys_Effect2C; meaning unknown
 !Battle_TechParts        = 3      ; parts (users) of a tech: BattleRom_TechRec.Part1-3
 !Battle_TechPartNone     = $80    ; a .Part byte with bit 7: BattleSys_RunTechParts skips the part
@@ -864,14 +864,14 @@ if !constants_battle_inc == 0
 !Battle_EnemyPartNone    = $FF    ; an enemy record's part number: no effect
 !Battle_TechFlagsStopBit = $80    ; enemy record flags bit 7: with !Battle_UnkB200 bit 7, no hit set merge
 !Battle_EffByte1Mask     = $1F    ; effect byte 1 bits 4-0: DP $18 of BattleSys_EffRecArgsUnk66
-!Battle_EffResultMiss    = $80    ; DP $16 after $C1:DBAA in BattleSys_Effect02: a miss
-!Battle_EffResultMissFE  = $FE    ; DP $16 after $C1:E9D5 in BattleSys_Effect06: a miss
+!Battle_EffResultMiss    = $80    ; DP $16 after BattleSys_SetStatus in BattleSys_Effect02: a miss (never produced)
+!Battle_EffResultMissFE  = $FE    ; DP $16 after BattleSys_StealItem in BattleSys_Effect06: a miss
 !Battle_EffResultNoneFF  = $FF    ; ... $FF: !Battle_UnkB200 bit 7 (a dead store there)
 !Battle_AE4DBit4         = $10    ; !Battle_UnkAE4D bit 4: BattleSys_Effect03 skips its first test
 !Battle_AE4DBit2         = $04    ; bit 2: BattleSys_Effect03 also runs BattleSys_UnkE976
-!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs $C1:E9D5
-!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and $C1:DA37
-!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run $C1:E77B
+!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs BattleSys_StealItem
+!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and BattleSys_RestoreHpMp
+!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run BattleSys_DrainHpMp
 !Battle_Eff05Bit6        = $40
 !Battle_Eff05Bit7Arg     = 3      ; DP $1A for the bit-7 run
 !Battle_Eff05Bit6Arg     = 7      ; DP $1A for the bit-6 run
@@ -881,7 +881,7 @@ if !constants_battle_inc == 0
 !Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
 !Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 
-; --- Effect arithmetic ($C1:DA37-$C1:EA9B) ---
+; --- Effect arithmetic ($C1:DA37-$C1:EB48) ---
 !Battle_RestoreHpBit     = $80    ; BattleSys_RestoreHpMp: DP $1A bit 7: restore HP
 !Battle_RestoreMpBit     = $40    ; ... bit 6: restore MP
 !Battle_RestoreFull      = $0F    ; ... DP $18 value: restore to .MaxHp / .MaxMp

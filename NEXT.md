@@ -88,10 +88,16 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleSys_TechMpCostTable` (`$C1:D9D7`-`$C1:DA36`), and the helpers `BattleSys_CasterHitOffset`,
    `BattleSys_RecordMiss`, `BattleSys_UnkE976`, `BattleSys_LoadCasterStats`/`LoadTargetStats`
    (`$C1:E8C0`-`$C1:E9D4`), `BattleSys_CopyEffectBytes78` (`$C1:EB0E`) and `Battle_SumHitSets`
-   (`$C1:EB68`). Next, in reach order: the effect arithmetic the effect types call, `$C1:DA37` on
-   (stubs `BattleSys_UnkDA37`/`DB5E`/`DBAA`/`DC64`/`DCAD`/`DE87`/`DE9E`/`DEF0`/`E0F5`/`E65F`/
-   `E77B`/`E9D5`; the `Battle_Scale*` callers sit in `$C1:E1E9`-`$C1:EE44`); `$C1:CFBE`-`$C1:D131`
-   (`BankC1_RunService` and its table `$C1:D126`, `BankC1_AddItem`/`AddGold`); the script handlers themselves (stubs `BattleAi_TestNN`
+   (`$C1:EB68`). Also matched (the effect-arithmetic batch): `$C1:DA37`-`$C1:E89E`
+   (`BattleSys_RestoreHpMp`, `CureStatus`, `SetStatus`, `RollHit`, `ApplyDamage`,
+   `TestEnemyUnk46`, `AdjustHit`, `AdjustEvade`, `ArmStatusList`, `CalcDamage`, `WakeTarget`,
+   `AdjustDefence`, `RollUpTo1A`, `DrainHpMp`), `BattleSys_StealItem` / `RunUnkB2CCHandlers`
+   (`$C1:E9D5`-`$C1:EA9C`), `BattleSys_RunUnkB2CCHandler` (`$C1:EB1C`) with
+   `BattleSys_UnkB2CCHandlerTable` (`$C1:FA61`), and `$C1:CFBE`-`$C1:D131` (`BattleAi_EnemyTurnJsr`,
+   `BankC1_RunService`, the six inventory / gold services and `BankC1_ServiceTable`). Next, in
+   reach order: the B2CC handlers `BattleSys_UnkB2CCHandler00`-`14` (stubs, `$C1:ED89`-`$C1:F1EF`
+   and on; the second `Battle_ScaleWord10` caller is at `$C1:EE44`); the other `BattleSys_SetStatus`
+   callers `$C1:EECC`-`$C1:EF10` and `BattleSys_RollUpTo1A`'s at `$C1:EEA3` sit in them; the script handlers themselves (stubs `BattleAi_TestNN`
    `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
    `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callee `$C1:AF79` (a second Battle_RandRange on
    `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
@@ -114,8 +120,19 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    service 6 does with `!Battle_UnkAEB3` (the defeated enemies' exit, probably), whether
    BattleAct_LoadKind3 is the item loader (B967's item path uses kind 3 with id - $BC; its
    verified header still says unknown), and why BattleSys_ResetTechUsers' first user divides
-   by a stale `!Battle_MathB`. Open from the action-effect batch: what the effect types and the
-   effect record bytes stand for (the arithmetic is unmatched), `!Battle_UnkB200` (bit 7 after a
+   by a stale `!Battle_MathB`. Open from the effect-arithmetic batch: what the BattlerStats
+   fields the formulas read stand for (.Unk3F, .Unk63-.Unk70, .Unk4C+n; community stat names are
+   leads only), the status bits (.Status2 bits 0-2, 7; the timed lists: 0/1/2/8 time .Status2
+   bits 7/6/5/4, 3/4 .Unk4C+1 bits 7/6, 5/9 .Unk4C+2 bits 6/5, per BattleSys_ArmStatusList; lists
+   6/7 would time .Unk4C bits 7/6 but that code is dead), `!Battle_UnkB1F8` (read by
+   CalcDamage kinds 7/8, never written in matched code), `!Battle_UnkB1FC` bits 0 and 6 (who sets
+   them), `!Battle_UnkAE51`, effect bytes 7/8 (`!Battle_UnkAE4D`/`AE4E` bits), and what the B2CC
+   handlers do (DP $1A for BattleSys_StealItem). Headers edited by this batch (back to review):
+   BattleSys_Effect00-03, 05, 06, 29, 2A, 2B, BattleSys_UnkE976, BattleSys_EffRecArgsUnk66 and
+   BattleSys_LoadEffectArgs (banners), BattleSys_RunTechParts, BattleSys_UnkD7C4,
+   BattleSys_UnkBF46 (Exit lines), Battle_ScaleByte20 (banner), BankC1_Entry8003, BankC1_AddItemLong,
+   BattleAi_EnemyTurn (Callers note) and Evt_Op33_SetPalette (the bank $C0 item / gold banner).
+   Open from the action-effect batch: what the effect record bytes stand for, `!Battle_UnkB200` (bit 7 after a
    miss stops a tech's parts with the `$7E:B1F5` read, probably meant as BattleRom_TechRec.Flags),
    the bytes read long at `$00:00FA`/`$00:00FB` by target mode 9 (whose roll is compared through
    a restored `!Battle_MathLo`, a quirk), `!Battle_UnkAE6D` (BattleSys_MapEmptyTarget's

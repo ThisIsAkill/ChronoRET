@@ -1698,7 +1698,7 @@ endstruct
 !Battle_UnkAE57           = $AE57 ; 1 B: !Battle_UnkB2CC kept over BattleSys_Effect03 by BattleSys_Effect08
 !Battle_UnkAE5B           = $AE5B ; 2 B: BattleSys_CheckTechMp's scratch (a stats offset, then that battler's MP)
 
-; --- Effect arithmetic ($C1:DA37-$C1:EA9B) ---
+; --- Effect arithmetic ($C1:DA37-$C1:EB48) ---
 !Enemy_AnimWantedBase    = !Enemy_AnimWanted-!Battle_FirstEnemySlot ; !Enemy_AnimWanted indexed by battler slot
 !BattleTmp_40             = $40   ; 1 B scratch (BattleSys_SetStatus stores $80 here; nothing found reads it)
 !Battle_UnkAE51           = $AE51 ; 1 B per PC slot: cleared by BattleSys_CureStatus when below 3; meaning unknown
