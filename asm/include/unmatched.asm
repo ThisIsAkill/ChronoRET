@@ -26,22 +26,57 @@
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C22273
-C2Scene_Unk2273:    ; JSL from C2Scene_ObjBMateAim: probably the cosine of direction A (0-255): adds $40
-                    ; and runs into C2Scene_Unk2277 (not matched)
-org $C22277
-C2Scene_Unk2277:    ; JSL: probably the sine of direction A from Rom_SineTable256 (sign-extended; $0080 and
-                    ; $FF80 at $40 and $C0) through DB $00 (not matched)
-org $C2229D
-C2Scene_Unk229D:    ; JSR from C2Scene_ObjBMateAim: probably the direction (0-255) between the points
-                    ; (C2Tmp_08, $0A) and (C2Tmp_0C, $0E) on the wrapping map, through the angle table at
-                    ; $C0:F300 (DB $00); X = the table index, 0 within 4 pixels (not matched)
-org $C2800E
-BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
-                    ; at $0A01, forced blank, then the menu (not matched)
 org $C285D6
 Menu_Unk85D6:       ; JSR from Menu_Nmi when Menu_FrameReady has bit 7 clear (with HDMA off): probably
                     ; the menu's per-frame upload (not traced)
+org $C293A8
+Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
+                    ; the list (probably "the current character cannot equip it"; not matched)
+org $C2968D
+Menu_Unk968D:       ; JSR from Menu_InitSystems (REP #$30 first; not matched)
+org $C2984A
+Menu_Unk984A:       ; JSR from Menu_InitSystems (not matched)
+org $C29875
+Menu_Unk9875:       ; JSR from Menu_InitSystems (PHP first; not matched)
+org $C292F4
+Menu_Unk92F4:       ; JSR from Menu_InitSystems (not matched)
+org $C2D156
+Menu_UnkD156:       ; JSR from Menu_InitSystems (not matched)
+org $C2E91B
+Menu_UnkE91B:       ; thread 3, started by Menu_RunThreads (not matched)
+org $C2F3CA
+Menu_UnkF3CA:       ; JSR from Menu_InitSystems (not matched)
+org $C2F5ED
+Menu_UnkF5ED:       ; JSR from Menu_Unk834D, A = a character id: returns X = $4B00 + 6 x a byte the
+                    ; character picks (via $CD:6CEC) and A = 5, the MVN source and count (not matched)
+org $FFF958
+BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
+org $C299CA
+Menu_Mode00List:    ; Menu_ModeLists entries: lists of handler addresses (not matched)
+org $C29C29
+Menu_Mode01List:
+org $C2AA34
+Menu_Mode02List:
+org $C2B353
+Menu_Mode03List:
+org $C2BF35
+Menu_Mode04List:
+org $C2C621
+Menu_Mode05List:
+org $C2CED4
+Menu_Mode06List:
+org $C2C7A6
+Menu_Mode07List:
+org $C2D4F0
+Menu_Mode0BList:
+org $C2D519
+Menu_Mode0CList:
+org $C2E1E3
+Menu_Mode0DList:
+org $C2E60B
+Menu_Mode0EList:
+org $C2FE0A
+Menu_Mode0FList:
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
 org $C6E74E
