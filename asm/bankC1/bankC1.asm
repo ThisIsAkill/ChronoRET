@@ -21103,7 +21103,7 @@ BankC1_Entry8003:
 ;          BattleSys_RunServiceVec (services 0, 3, 6, 8, 9),
 ;          Battle_RandRange, BattleSys_Unk8C09/8461/895B,
 ;          BattleSys_UnkB223/B3BB/B3D2/B3F9/B442/B4E9/B7F2/B093/B0B6/BC60,
-;          BattleSys_UnkEA9D/EAE8, BattleSys_AwardExpAndTp,
+;          BattleSys_ClearPcStatuses/ClearPcKo, BattleSys_AwardExpAndTp,
 ;          BattleSys_UnkVecCD0021,
 ;          BattleSys_ListHandlerTable entries, BankC1_AddGold,
 ;          BankC1_AddItem, BattleSys_ExitVec (JMP)
@@ -21270,7 +21270,7 @@ BattleSys_Main:
     LDA.b !Battle_Unk24
     BEQ .check_enemies
     ; Defeat end.
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     JSR BattleSys_UnkB3BB
     LDA.b #1
     STA.l !Battle_Unk7F01EC
@@ -21308,7 +21308,7 @@ BattleSys_Main:
     STA.l !Battle_Unk7F01EC
     LDA.b #!Battle_EntryNone
     STA.w !Battle_UnkA5A9
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     LDA.b #!BattleSys_ServiceVictory
     JSR BattleSys_RunServiceVec
     JMP .victory
@@ -21371,11 +21371,11 @@ BattleSys_Main:
     JSL BattleFD_UnkAA98
     LDA.b #!Battle_EndUnkCD0021Arg
     JSL BattleSys_UnkVecCD0021
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     JSR BattleSys_UnkB7F2
     LDA.b #!Battle_EndUnk895BArg
     JSR BattleSys_Unk895B
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
     JSR BattleSys_UnkB4E9
     JSR BattleSys_UnkB3BB
@@ -21630,7 +21630,7 @@ BattleSys_Main:
     JSR BattleSys_AwardExpAndTp
 .no_gold:
     JSL BattleFD_UnkAD17
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
     JSR BattleSys_UnkB4E9
     TDC
@@ -21662,8 +21662,8 @@ BattleSys_Main:
     STA.w BattlerStats[2].MaxHp
     TDC
     SEP #$20
-    JSR BattleSys_UnkEA9D
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcStatuses
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
 .end_common:
     LDA.b !Battle_RandIdx
@@ -26430,7 +26430,7 @@ BattleSys_UnkB967:
 ; is not known (the PC's .Kind bit 4 leads here).
 ; Callers (9 sites: 8 JSR, 1 JMP): BattleSys_Main (JSR $C1:8394, JSR $C1:839A, JSR $C1:83A0),
 ;   BattleSys_UpdateKo (JSR $C1:B300), BattleSys_UnkB967 (JMP $C1:BA62, JSR $C1:BA72, JSR $C1:BB43,
-;   JSR $C1:BB53) and unmatched (JSR $C1:EAF1).
+;   JSR $C1:BB53) and BattleSys_ClearPcKo (JSR $C1:EAF1).
 ; Callers note: BattleSys_Main's three sites ($C1:8394, $C1:839A,
 ;   $C1:83A0) are the debug win, for PCs 0-2.
 ; Entry: M=1, X=0, DP=0, DB=$7E (only the dead body depends on them);
@@ -31857,7 +31857,8 @@ BattleSys_TechMpCostTable:
 ; At the end !Battle_UnkAD9B = 0 and !Battle_UnkB2C7 is as it came
 ; (the + 1 for the MP part is taken back).
 ; Callers (5 JSR sites): BattleSys_Effect00 ($C1:D22A), BattleSys_Effect01 ($C1:D253),
-;   BattleSys_Effect29 ($C1:D499), BattleSys_Effect2A ($C1:D4C2) and unmatched ($C1:EB59).
+;   BattleSys_Effect29 ($C1:D499), BattleSys_Effect2A ($C1:D4C2) and BattleSys_ReviveHeal
+;   ($C1:EB59).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 (16-bit), $18 (16-bit) and $1A
 ;        as said (BattleSys_EffRecArgsUnk66: the caster's .Unk66,
 ;        effect byte 1 & $1F, effect byte 2; BattleSys_LoadEffectArgs
@@ -34292,7 +34293,8 @@ BattleSys_UnkE976:
 ; Callers (11 JSR sites): BattleSys_Effect00 ($C1:D221), BattleSys_Effect01 ($C1:D23E),
 ;   BattleSys_Effect02 ($C1:D267), BattleSys_Effect03 ($C1:D2DE), BattleSys_Effect05 ($C1:D378),
 ;   BattleSys_Effect06 ($C1:D3BF), BattleSys_Effect29 ($C1:D490), BattleSys_Effect2A ($C1:D4AD),
-;   BattleSys_Effect2B ($C1:D4D6) and unmatched ($C1:EAA6, $C1:EAF4).
+;   BattleSys_Effect2B ($C1:D4D6), BattleSys_ClearPcStatuses ($C1:EAA6) and BattleSys_ClearPcKo
+;   ($C1:EAF4).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A any (TDC first)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = the offset; Y
 ;        unchanged; !Battle_MathA = $80, !Battle_MathLo/Hi = the
@@ -34484,6 +34486,93 @@ BattleSys_RunUnkB2CCHandlers:
     RTS
     RTS                                 ; quirk: never reached
 
+; $C1:EA9D — BattleSys_ClearPcStatuses (75 bytes, $EA9D–$EAE7)
+; For PC slots 0-2 (!Battle_UnkB18B = the slot, BattleSys_LoadCasterStats):
+; .Status2 and .Unk4C-.Unk4C+7 = 0, .Status keeps only bit 7
+; (!Battle_StatusKo), .Unk2F bit 0 (!Battle_StatsUnk2FBit) is cleared, and
+; !Battle_UnkAE51[slot] = 0. BattleSys_Main runs it on every end of the
+; battle (defeat, victory, the !Battle_Unk99CD end, and the end shared by
+; defeat, the 99CD end and bit 5), so the battle statuses do not outlast
+; it, probably.
+; Callers (4 JSR sites): BattleSys_Main ($C1:8137, $C1:8183, $C1:8207, $C1:843A).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3, B = 0; X = 2; Y unchanged;
+;        !Battle_UnkB18B = 2, !Battle_UnkB1F4 = slot 2's offset; DP
+;        $16/$17 = 3; !Battle_MathA, MathB, MathLo/Hi written
+;        (BattleSys_LoadCasterStats)
+!EndClear_Slot = !BattleTmp_16          ; 2 B: the PC slot (0-2)
+BattleSys_ClearPcStatuses:
+    TDC
+    TAX
+    STX.b !EndClear_Slot
+.slot:
+    LDA.b !EndClear_Slot
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_LoadCasterStats
+    LDX.w !Battle_UnkB1F4
+    TDC
+    STA.w BattlerStats.Status2,X
+    STA.w BattlerStats.Unk4C,X
+    STA.w BattlerStats.Unk4C+1,X
+    STA.w BattlerStats.Unk4C+2,X
+    STA.w BattlerStats.Unk4C+3,X
+    STA.w BattlerStats.Unk4C+4,X
+    STA.w BattlerStats.Unk4C+5,X
+    STA.w BattlerStats.Unk4C+6,X
+    STA.w BattlerStats.Unk4C+7,X
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    STA.w BattlerStats.Status,X
+    LDA.w BattlerStats.Unk2F,X
+    AND.b #$FF^!Battle_StatsUnk2FBit
+    STA.w BattlerStats.Unk2F,X
+    LDA.b !EndClear_Slot
+    TAX
+    TDC
+    STA.w !Battle_UnkAE51,X
+    INC.b !EndClear_Slot
+    LDA.b !EndClear_Slot
+    CMP.b #!Battle_NumPcSlots
+    BCC .slot
+    RTS
+
+; $C1:EAE8 — BattleSys_ClearPcKo (38 bytes, $EAE8–$EB0D)
+; For PC slots 0-2 (!Battle_UnkB18B = the slot): BattleSys_UnkBC60
+; (which does nothing), BattleSys_LoadCasterStats, then .Status = 0, so
+; the KO bit BattleSys_ClearPcStatuses kept goes too. BattleSys_Main runs
+; it after the victory messages (BattleFD_UnkAD17) and on the shared
+; defeat / !Battle_Unk99CD / bit-5 end, after BattleSys_ClearPcStatuses.
+; Quirk: the KO bit is tested (AND #$80) and the BEQ after it goes to the
+; next instruction, so both ways do the same.
+; Callers (3 JSR sites): BattleSys_Main ($C1:8212, $C1:83F9, $C1:843D).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3, B = 0; X = slot 2's offset; Y
+;        unchanged; !Battle_UnkB18B = 2, !Battle_UnkB1F4 as X; DP
+;        $16/$17 = 3; !Battle_MathA, MathB, MathLo/Hi written
+;        (BattleSys_LoadCasterStats)
+!EndKo_Slot = !BattleTmp_16             ; 2 B: the PC slot (0-2)
+BattleSys_ClearPcKo:
+    TDC
+    TAX
+    STX.b !EndKo_Slot
+.slot:
+    LDA.b !EndKo_Slot
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_UnkBC60
+    JSR BattleSys_LoadCasterStats
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .clear                          ; quirk: goes to the next instruction
+.clear:
+    TDC
+    STA.w BattlerStats.Status,X
+    INC.b !EndKo_Slot
+    LDA.b !EndKo_Slot
+    CMP.b #!Battle_NumPcSlots
+    BCC .slot
+    RTS
+
 ; $C1:EB0E — BattleSys_CopyEffectBytes78 (14 bytes, $EB0E–$EB1B)
 ; !Battle_UnkAE4D = byte 7 and !Battle_UnkAE4E = byte 8 of the effect
 ; record in !Battle_UnkAEE6 (meaning unknown).
@@ -34538,6 +34627,36 @@ BattleSys_RunUnkB2CCHandler:
     ASL A
     TAX
     JSR (BattleSys_HitModTable,X)
+    RTS
+
+; $C1:EB49 — BattleSys_ReviveHeal (31 bytes, $EB49–$EB67)
+; Not called (xref finds no call; no table entry is known). An HP
+; restore of the current target by the caster's BattlerStats.Unk66 x 5
+; (BattleSys_RestoreHpMp: DP $16 = .Unk66, DP $18 = 5, DP $1A =
+; !Battle_RestoreHpBit), then .Unk4C+3 bit 7 (!Battle_Unk4C3ReviveBit)
+; cleared: the same amount and bit as BattleSys_UpdateKo's one-time
+; revive, which does it inline; probably an older form of it.
+; Quirk: the bit is cleared at $7E:5E4F, slot 0's byte, with an absolute
+; LDA / STA: the LDX !Battle_UnkB1F6 before them is not used.
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleSys_RestoreHpMp
+;        (!Battle_UnkAD8D, !Battle_UnkB1F6 / B1FD set), and
+;        !Battle_UnkB1F4 = the caster's offset
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = slot 0's new .Unk4C+3; X =
+;        !Battle_UnkB1F6; Y clobbered; DP $16, $18, $1A written; what
+;        BattleSys_RestoreHpMp changes
+BattleSys_ReviveHeal:
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Unk66,X
+    STA.b !Restore_Base
+    LDA.b #!Battle_ReviveHpMul
+    STA.b !Restore_Factor
+    LDA.b #!Battle_RestoreHpBit
+    STA.b !Restore_Bits
+    JSR BattleSys_RestoreHpMp
+    LDX.w !Battle_UnkB1F6               ; quirk: not used below
+    LDA.w BattlerStats.Unk4C+3
+    AND.b #$FF^!Battle_Unk4C3ReviveBit
+    STA.w BattlerStats.Unk4C+3
     RTS
 
 ; $C1:EB68 — Battle_SumHitSets (144 bytes, $EB68–$EBF7)

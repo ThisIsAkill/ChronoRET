@@ -282,10 +282,6 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1EA9D
-BattleSys_UnkEA9D:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1EAE8
-BattleSys_UnkEAE8:                      ; JSR from BattleSys_Main's end paths; not analysed
 
 ; --- Bank $C3 ---
 
