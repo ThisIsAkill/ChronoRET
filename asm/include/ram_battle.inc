@@ -1707,5 +1707,12 @@ endstruct
 !Battle_UnkB1F8           = $B1F8 ; 2 B: a BattlerStats offset, probably (BattleSys_CalcDamage kinds 7 and 8 index
                                   ; .Unk70 with it); not written in the code matched so far
 !Battle_UnkAE78           = $AE78 ; 1 B: !Battle_UnkB2CC kept over BattleSys_RunUnkB2CCHandlers
+!Battle_UnkAE5DBase       = !Battle_UnkAE5D-!Battle_FirstEnemySlot ; !Battle_UnkAE5D indexed by battler slot
+!Battle_Gold              = $2C53 ; 3 B: the gold, 24-bit (BankC1_AddGold caps it at 9,999,999; the event gold
+                                  ; commands use these services); the menu's !Menu_Unk2C53
+!Battle_GoldHi            = $2C55 ; 1 B: its high byte
+!Battle_SvcArg            = $AEF7 ; 2 B: BankC1_RunService's argument Y, kept by each service
+!Battle_SvcSlot           = $AEF9 ; 2 B: BankC1_AddItem's first empty entry (0 if none); BankC1_RemoveGold's new low word
+!Battle_SvcSlotFound      = $AEFB ; 1 B: BankC1_AddItem: non-zero once an empty entry was found
 
 endif

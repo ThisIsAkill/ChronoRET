@@ -21021,12 +21021,12 @@ BankC1_BattleStartVec:
     JMP BattleSys_Main
 
 ; $C1:8003 — BankC1_Entry8003 (3 bytes)
-; Long vector into BankC1_RunService (unmatched, $C1:CFC2), which
-; pushes P, X, DP and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets
-; DB=$7E and DP=0, runs entry A (low byte) of its service table at
-; $C1:D126 with argument Y, pulls them back and returns with RTL; service 1 is
-; BankC1_AddItem, service 4 BankC1_AddGold (!BankC1Svc_AddItem /
-; AddGold, as Field_CheckTileInFront uses them).
+; Long vector into BankC1_RunService ($C1:CFC2), which pushes P, X, DP
+; and DB itself (PHP, REP #$30, PHX, PHD, PHB), sets DB=$7E and DP=0,
+; runs entry A (low byte) of BankC1_ServiceTable with argument Y, pulls
+; them back and returns with RTL; service 1 is BankC1_AddItem, service
+; 4 BankC1_AddGold (!BankC1Svc_AddItem / AddGold, as
+; Field_CheckTileInFront uses them).
 ; Callers (8 JSL sites): Field_CheckTileInFront ($C0:1E72, $C0:1E84), Evt_OpC9_IfHasItem ($C0:378E),
 ;   Evt_AddItemTail ($C0:37BF), Evt_OpCB_RemoveItem ($C0:37F1), Evt_OpCC_IfHasGold ($C0:3838),
 ;   Evt_OpCD_AddGold ($C0:386C) and Evt_OpCE_RemoveGold ($C0:3885).
@@ -23209,9 +23209,10 @@ BattleAi_TestPassed:
 ; random-PC path returns at $C1:8DE1 without .done's clean-up; .step is
 ; reached with M=0 from the JMP at $C1:8D70 (its TDC / SEP #$20 sets
 ; M=1 again).
-; Callers (3 JSR sites): BattleSys_Unk8461 ($C1:84D6, $C1:8780) and unmatched ($C1:CFBE).
-; Callers note: BattleSys_Unk8461 ($C1:84D6, $C1:8780) and $C1:CFBE (not
-;   matched).
+; Callers (3 JSR sites): BattleSys_Unk8461 ($C1:84D6, $C1:8780) and BattleAi_EnemyTurnJsr
+;   ($C1:CFBE).
+; Callers note: BattleSys_Unk8461 ($C1:84D6, $C1:8780) and
+;   BattleAi_EnemyTurnJsr ($C1:CFBE, itself unreferenced).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A any (TDC first);
 ;        !Battle_UnkAEC8 = the enemy entry (0-7)
 ; Exit:  M=1, X=0 (as the code assumes after its callees, which are not
@@ -24179,9 +24180,9 @@ BattleAi_NoteFirstTest:
 ;   BattleSys_RunTechParts ($C1:D67C), BattleSys_RestoreHpMp ($C1:DA7C, $C1:DB1A), BattleSys_RollHit
 ;   ($C1:DC94), BattleSys_CalcDamage ($C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4,
 ;   $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F), BattleSys_RollUpTo1A ($C1:E774), BattleSys_DrainHpMp
-;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), Battle_RandRangeLong ($C1:FDCB) and unmatched
-;   ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:E9F0, $C1:EED8, $C1:EEFF, $C1:EF18,
-;   $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDDA).
+;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), BattleSys_StealItem ($C1:E9F0), Battle_RandRangeLong
+;   ($C1:FDCB) and unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:EED8, $C1:EEFF,
+;   $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDDA).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
@@ -28564,11 +28565,12 @@ BattleSys_MapEmptyTarget:
 ;   $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D), BattleSys_AdjustDefence ($C1:E696,
 ;   $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751), BattleSys_DrainHpMp ($C1:E792),
 ;   Battle_HitEntryOffset ($C1:E8B5), BattleSys_CasterHitOffset ($C1:E8D6),
-;   BattleSys_LoadCasterStats ($C1:E9AF), BattleSys_LoadTargetStats ($C1:E9CC), Battle_SumHitSets
-;   ($C1:EB81), Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75),
-;   Battle_Mul16Long ($C1:FDBF) and unmatched ($C1:EA14, $C1:EB28, $C1:EDA8, $C1:EDC5, $C1:EDEE,
-;   $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C,
-;   $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D).
+;   BattleSys_LoadCasterStats ($C1:E9AF), BattleSys_LoadTargetStats ($C1:E9CC), BattleSys_StealItem
+;   ($C1:EA14), BattleSys_RunUnkB2CCHandler ($C1:EB28), Battle_SumHitSets ($C1:EB81),
+;   Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long
+;   ($C1:FDBF) and unmatched ($C1:EDA8, $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE,
+;   $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770,
+;   $C1:FA11, $C1:FA2D).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -29820,6 +29822,300 @@ BattleSys_UnkCF69:
 .done:
     RTS
 
+; $C1:CFBE — BattleAi_EnemyTurnJsr (4 bytes, $CFBE–$CFC1)
+; BattleAi_EnemyTurn through a JSR of its own.
+; Callers note: xref finds no call (unreferenced, or reached through a
+;   pointer not found).
+; Entry: as BattleAi_EnemyTurn: M=1, X=0, DP=0, DB=$7E
+; Exit:  as BattleAi_EnemyTurn
+BattleAi_EnemyTurnJsr:
+    JSR BattleAi_EnemyTurn
+    RTS
+
+; ==================================================================
+; Inventory and gold services ($C1:CFC2–$C1:D131)
+; ==================================================================
+; BankC1_Entry8003's six services, for the event commands $C9-$CE
+; (Evt_OpC9_IfHasItem .. Evt_OpCE_RemoveGold) and the field. The
+; inventory is 256 entries of an item id (!Battle_InvIds, 0 = empty)
+; and its count (!Battle_InvCounts); the gold a 24-bit sum
+; (!Battle_Gold, high byte !Battle_GoldHi). Each service takes its
+; argument in Y (16-bit, kept in !Battle_SvcArg; item ids are compared
+; by their low byte) and returns its result in A; Y = 0 returns at
+; once (A = 0 for the item services, $FF for the gold ones).
+
+; $C1:CFC2 — BankC1_RunService (39 bytes, $CFC2–$CFE8)
+; Saves P, X (16-bit), DP and DB, sets DB=$7E and DP=0, and runs entry
+; A (low byte) of BankC1_ServiceTable with M=1, X=0, A = 0 (B too) and
+; Y as it came; then pulls DB, DP, X and P back and returns with RTL.
+; There is no bound check on A (6 services).
+; Callers (1 JMP site): BankC1_Entry8003 ($C1:8003).
+; Entry: M and X any (REP #$30 first), DP and DB any; A = the service
+;        number, Y = its argument (X=1: the low byte, high byte 0)
+; Exit:  P, X, DP and DB as on entry; A = the service's result; Y as
+;        the service leaves it (all of them leave it)
+BankC1_RunService:
+    PHP
+    REP #$30
+    PHX
+    PHD
+    PHB
+    SEP #$20
+    PHA
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    PLA
+    REP #$20
+    LDX.w #0
+    PHX
+    PLD
+    AND.w #!Battle_LowByteMask
+    ASL A
+    TAX
+    LDA.w #0
+    SEP #$20
+    JSR (BankC1_ServiceTable,X)
+    PLB
+    PLD
+    PLX
+    PLP
+    RTL
+
+; $C1:CFE9 — BankC1_FindItem (28 bytes, $CFE9–$D004)
+; Service 0 (!BankC1Svc_FindItem): A = the item id Y when an
+; !Battle_InvIds entry holds it (X = its index), else 0.
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index, or
+;        $100 after a miss (X unchanged for Y = 0); Y unchanged;
+;        !Battle_SvcArg = Y
+BankC1_FindItem:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .none
+    LDX.w #0
+.scan:
+    LDA.w !Battle_InvIds,X
+    CMP.w !Battle_SvcArg
+    BEQ .done
+    INX
+    CPX.w #!Battle_InvSlots
+    BCC .scan
+.none:
+    LDA.b #0
+.done:
+    RTS
+
+; $C1:D005 — BankC1_AddItem (81 bytes, $D005–$D055)
+; Service 1 (!BankC1Svc_AddItem): one more of item Y. When an entry
+; holds it, its count goes up by one unless it is 99 already (then A =
+; 0); else the first empty entry (id 0) found on the way gets the id and
+; its count + 1. A = the new count (0 for Y = 0 or a full count).
+; Quirk: with no empty entry, entry 0 (!Battle_SvcSlot's start value) is
+; overwritten with the id and keeps its old count + 1.
+; Callers (3 JSR sites): BattleSys_Main ($C1:840E), BankC1_AddItemLong ($C1:FDC3) and unmatched
+;   ($C1:F01E).
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index (the
+;        scan's $100 replaced by the empty entry's); Y unchanged;
+;        !Battle_SvcArg, !Battle_SvcSlot and !Battle_SvcSlotFound
+;        written
+BankC1_AddItem:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .none
+    LDX.w #0
+    STX.w !Battle_SvcSlot
+    STZ.w !Battle_SvcSlotFound
+.scan:
+    LDA.w !Battle_InvIds,X
+    BNE .compare
+    LDA.w !Battle_SvcSlotFound
+    BNE .compare
+    STX.w !Battle_SvcSlot
+    INC.w !Battle_SvcSlotFound
+.compare:
+    LDA.w !Battle_InvIds,X
+    CMP.w !Battle_SvcArg
+    BEQ .found
+    INX
+    CPX.w #!Battle_InvSlots
+    BCC .scan
+    LDX.w !Battle_SvcSlot
+    LDA.w !Battle_SvcArg
+    STA.w !Battle_InvIds,X
+    LDA.w !Battle_InvCounts,X
+    INC A
+    STA.w !Battle_InvCounts,X
+    BRA .done
+.found:
+    LDA.w !Battle_InvCounts,X
+    CMP.b #!Battle_ItemCountMax
+    BCS .none
+    INC A
+    STA.w !Battle_InvCounts,X
+    BRA .done
+.none:
+    LDA.b #0
+.done:
+    RTS
+
+; $C1:D056 — BankC1_RemoveItem (48 bytes, $D056–$D085)
+; Service 2 (!BankC1Svc_RemoveItem): one fewer of item Y. A = the new
+; count; when it reaches 0 the entry is emptied (id 0) and A = $FF.
+; A = 0 when no entry holds the item, its count is 0 already, or Y = 0.
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index, or
+;        $100 after a miss (X unchanged for Y = 0); Y unchanged;
+;        !Battle_SvcArg = Y
+BankC1_RemoveItem:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .none
+    LDX.w #0
+.scan:
+    LDA.w !Battle_InvIds,X
+    CMP.w !Battle_SvcArg
+    BEQ .found
+    INX
+    CPX.w #!Battle_InvSlots
+    BCC .scan
+    BRA .none
+.found:
+    LDA.w !Battle_InvCounts,X
+    BEQ .none
+    DEC A
+    STA.w !Battle_InvCounts,X
+    BNE .done
+    STA.w !Battle_InvIds,X
+    LDA.b #!BankC1Svc_Emptied
+    BRA .done
+.none:
+    LDA.b #0
+.done:
+    RTS
+
+; $C1:D086 — BankC1_HasGold (28 bytes, $D086–$D0A1)
+; Service 3 (!BankC1Svc_HasGold): A = $FF when the gold is at least Y
+; (its low word not below Y, or its high byte not 0) or Y = 0, else 0.
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said (B as it came: 0 from
+;        BankC1_RunService); X = the gold's low word (unchanged for
+;        Y = 0); Y unchanged; !Battle_SvcArg = Y
+BankC1_HasGold:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .enough
+    LDX.w !Battle_Gold
+    CPX.w !Battle_SvcArg
+    BCS .enough
+    LDA.w !Battle_GoldHi
+    BNE .enough
+    LDA.b #0
+    BRA .done
+.enough:
+    LDA.b #!BankC1Svc_Yes
+.done:
+    RTS
+
+; $C1:D0A2 — BankC1_AddGold (75 bytes, $D0A2–$D0EC)
+; Service 4 (!BankC1Svc_AddGold): adds Y to the 24-bit gold. When the
+; high byte is then $98 or more it is set to $98, and when the low word
+; is also $9680 or more the sum is set to 9,999,999 ($98967F) and A =
+; 0; otherwise A = $FF (B = 0), Y = 0 included.
+; Quirk: a sum whose high byte is above $98 and whose low word is below
+; $9680 drops to $98 xx xx, under the cap (it cannot come from a 16-bit
+; Y added to a capped sum).
+; Callers (1 JSR site): BattleSys_Main ($C1:83E7).
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X and Y unchanged;
+;        !Battle_SvcArg = Y; !Battle_Gold changed
+BankC1_AddGold:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .not_capped
+    REP #$20
+    LDA.w !Battle_Gold
+    CLC
+    ADC.w !Battle_SvcArg
+    STA.w !Battle_Gold
+    BCC .cap_test
+    LDA.w #0
+    SEP #$20
+    INC.w !Battle_GoldHi
+.cap_test:
+    SEP #$20
+    LDA.w !Battle_GoldHi
+    CMP.b #!Battle_GoldCapHi
+    BCC .not_capped
+    LDA.b #!Battle_GoldCapHi
+    STA.w !Battle_GoldHi
+    REP #$20
+    LDA.w !Battle_Gold
+    CMP.w #!Battle_GoldCapLo+1
+    BCC .not_capped
+    LDA.w #!Battle_GoldCapLo
+    STA.w !Battle_Gold
+    LDA.w #0
+    SEP #$20
+    BRA .done
+.not_capped:
+    SEP #$20
+    LDA.b #0
+    XBA
+    LDA.b #!BankC1Svc_Yes
+.done:
+    RTS
+
+; $C1:D0ED — BankC1_RemoveGold (57 bytes, $D0ED–$D125)
+; Service 5 (!BankC1Svc_RemoveGold): takes Y off the 24-bit gold. When
+; the low word borrows and the high byte is 0, nothing changes and A =
+; 0; otherwise the gold is lowered and A = $FF (B = 0), Y = 0 included.
+; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X and Y unchanged;
+;        !Battle_SvcArg = Y, !Battle_SvcSlot = the new low word
+;        (unless Y = 0); !Battle_Gold changed
+BankC1_RemoveGold:
+    STY.w !Battle_SvcArg
+    CPY.w #0
+    BEQ .yes
+    REP #$20
+    LDA.w !Battle_Gold
+    SEC
+    SBC.w !Battle_SvcArg
+    STA.w !Battle_SvcSlot
+    BCS .store
+    LDA.w #0
+    SEP #$20
+    LDA.w !Battle_GoldHi
+    BEQ .not_enough
+    DEC.w !Battle_GoldHi
+    BRA .store
+.not_enough:
+    LDA.b #0
+    BRA .done
+.store:
+    REP #$20
+    LDA.w !Battle_SvcSlot
+    STA.w !Battle_Gold
+    LDA.w #0
+    SEP #$20
+.yes:
+    LDA.b #!BankC1Svc_Yes
+.done:
+    RTS
+
+; BankC1_ServiceTable ($C1D126–$C1D131, 6 words)
+; BankC1_RunService's services, by its A (JSR (BankC1_ServiceTable,X)
+; at $C1:CFE1).
+BankC1_ServiceTable:
+    dw BankC1_FindItem                  ; !BankC1Svc_FindItem
+    dw BankC1_AddItem                   ; !BankC1Svc_AddItem
+    dw BankC1_RemoveItem                ; !BankC1Svc_RemoveItem
+    dw BankC1_HasGold                   ; !BankC1Svc_HasGold
+    dw BankC1_AddGold                   ; !BankC1Svc_AddGold
+    dw BankC1_RemoveGold                ; !BankC1Svc_RemoveGold
+
 ; ==================================================================
 ; Effect record arguments ($C1:D132–$C1:D1D2)
 ; ==================================================================
@@ -29974,7 +30270,7 @@ BattleSys_EffRecArg11:
 ; $C1:D1BB — BattleSys_CasterUnk73 (20 bytes, $D1BB–$D1CE)
 ; DP $20 = the caster's BattlerStats.Unk73, DP $1E = its .Unk74
 ; (DP $1F/$21 = 0).
-; Callers (1 JSR site): unmatched ($C1:EA84).
+; Callers (1 JSR site): BattleSys_RunUnkB2CCHandlers ($C1:EA84).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB1F4 set
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = .Unk74, B = 0; X =
 ;        !Battle_UnkB1F4; Y unchanged; DP $1E-$21 as above
@@ -30318,7 +30614,7 @@ BattleSys_Effect03:
     LDA.w !Battle_UnkAE4D
     AND.b #!Battle_AE4DBit1
     BEQ .hit
-    JSR BattleSys_UnkE9D5
+    JSR BattleSys_StealItem
 .hit:
     LDA.b #0
     STA.w !Battle_UnkB200
@@ -30415,7 +30711,7 @@ BattleSys_Effect06:
     JSR BattleSys_LoadCasterStats
     JSR BattleSys_LoadTargetStats
     JSR BattleSys_EffRecArgs12
-    JSR BattleSys_UnkE9D5
+    JSR BattleSys_StealItem
     LDA.b !EffRec_16
     CMP.b #!Battle_EffResultMissFE
     BNE .not_fe
@@ -33931,6 +34227,149 @@ BattleSys_LoadTargetStats:
     STX.w !Battle_UnkB1F6
     RTS
 
+; $C1:E9D5 — BattleSys_StealItem (154 bytes, $E9D5–$EA6E)
+; An item taken from the target enemy, probably (BattleSys_Effect06;
+; BattleSys_Effect03 with !Battle_AE4DBit1). The chance DP $16 (effect
+; byte 1) is tripled (8 bits) when the caster's BattlerStats.Unk57 is
+; $A5; a roll (0-99, Battle_RandRange) above it fails: DP $16 =
+; !Battle_UnkB3BF = $FE. Else BattleSys_RunUnkB2CCHandler runs for the
+; part's !Battle_UnkB2CC, and from the target's !Battle_UnkAE5D byte
+; (Battle_SetupBattle: bit 7 = its BattleRom_EnemyReward.ItemB is not 0,
+; bit 6 = .ItemA): when DP $1A (as the handler leaves it) is not 0 and
+; bit 7 is set, bit 7 is cleared and .ItemB taken; else when bit 6 is
+; set, it is cleared and .ItemA taken (the enemy id is
+; !Battler_UnkAF0A[slot]); !Battle_UnkB3BF + 1 either way. A non-zero
+; item goes to DP $06 for BattleFD_UnkB655 (into the caster's
+; !Battle_PcItem record, or the inventory) and DP $16 = 0; no bit, or
+; an item 0, gives DP $16 = !Battle_UnkB3BF = $FF.
+; Quirks: the LDA of DP $16 before the roll is dead (TDC follows), and
+; DP $20 = !Battle_UnkB2CC is overwritten by the handler call at once.
+; Callers (2 JSR sites): BattleSys_Effect03 ($C1:D34C) and BattleSys_Effect06 ($C1:D3C8).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 = the chance; !Battle_UnkB1F4
+;        and B1FD set (an enemy target: for a PC slot the bytes read
+;        are !Battle_UnkAE5A..AE5C)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $16 = 0, $FE or $FF; X, Y
+;        clobbered; !Battle_UnkB3BF as said (0 + 1 after a take); DP
+;        $0A/$0B and $0C/$0D (offsets) and $1C-$21 written, plus what
+;        the callees change
+!Steal_Chance = !BattleTmp_16           ; 1 B: the chance, then the result
+!Steal_Slot = !BattleTmp_0C             ; 2 B: the target slot
+!Steal_RecOfs = !BattleTmp_0A           ; 2 B: the enemy id * 7
+!Steal_ItemArg = !BattleTmp_06          ; 1 B: BattleFD_UnkB655's item id
+!Steal_Better = !BattleTmp_1A           ; 1 B: non-zero = try .ItemB first (from the handler)
+BattleSys_StealItem:
+    STZ.w !Battle_UnkB3BF
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Unk57,X
+    CMP.b #!Battle_StealTripleUnk57
+    BNE .roll
+    LDA.b !Steal_Chance
+    ASL A
+    CLC
+    ADC.b !Steal_Chance
+    STA.b !Steal_Chance
+.roll:
+    LDA.b !Steal_Chance                 ; dead: TDC follows
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Steal_Chance
+    BEQ .take
+    BCC .take
+    LDA.b #!Battle_EffResultMissFE
+    STA.b !Steal_Chance
+    STA.w !Battle_UnkB3BF
+    BRA .done
+.take:
+    TDC
+    LDA.w !Battle_UnkB1FD
+    TAX
+    STX.b !Steal_Slot
+    LDA.w !Battler_UnkAF0A,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_EnemyRecUnk5E04Size
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Steal_RecOfs
+    LDA.w !Battle_UnkB2CC
+    STA.b !EffRec_20
+    JSR BattleSys_RunUnkB2CCHandler
+    LDA.b !Steal_Better
+    BEQ .item_a
+    LDX.b !Steal_Slot
+    LDA.w !Battle_UnkAE5DBase,X
+    BIT.b #!Battle_AE5DBit7
+    BEQ .item_a
+    AND.b #$FF^!Battle_AE5DBit7
+    STA.w !Battle_UnkAE5DBase,X
+    INC.w !Battle_UnkB3BF
+    LDX.b !Steal_RecOfs
+    LDA.l !BattleRom_EnemyUnk5E05,X
+    BRA .give
+.item_a:
+    LDX.b !Steal_Slot
+    LDA.w !Battle_UnkAE5DBase,X
+    BIT.b #!Battle_AE5DBit6
+    BEQ .nothing
+    AND.b #$FF^!Battle_AE5DBit6
+    INC.w !Battle_UnkB3BF
+    STA.w !Battle_UnkAE5DBase,X
+    LDX.b !Steal_RecOfs
+    LDA.l !BattleRom_EnemyUnk5E04,X
+.give:
+    CMP.b #0
+    BEQ .nothing
+    STA.b !Steal_ItemArg
+    JSL BattleFD_UnkB655
+    LDA.b #0
+    STA.b !Steal_Chance
+    BRA .done
+.nothing:
+    LDA.b #!Battle_EffResultNoneFF
+    STA.b !Steal_Chance
+    STA.w !Battle_UnkB3BF
+.done:
+    RTS
+
+; $C1:EA6F — BattleSys_RunUnkB2CCHandlers (46 bytes, $EA6F–$EA9C)
+; Runs BattleSys_RunUnkB2CCHandler for the part's !Battle_UnkB2CC when
+; it is not 0, then, when !Battle_UnkAE4E (effect byte 8) has bit 7
+; (!Battle_AE4EBit7), loads the caster's .Unk73 / .Unk74
+; (BattleSys_CasterUnk73: DP $20 / DP $1E) and, when .Unk74 has bit 0,
+; runs it again with !Battle_UnkB2CC = .Unk73. !Battle_UnkB2CC is put
+; back from !Battle_UnkAE78 at the end. A second RTS at $C1:EA9C is
+; never reached.
+; Callers (1 JSR site): BattleSys_ApplyDamage ($C1:DCFD).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkB2CC; X, Y as the
+;        callees leave them; !Battle_UnkAE78 = !Battle_UnkB2CC; DP
+;        $1C-$21 written, plus what the handlers change
+BattleSys_RunUnkB2CCHandlers:
+    LDA.w !Battle_UnkB2CC
+    STA.w !Battle_UnkAE78
+    LDA.w !Battle_UnkB2CC
+    BEQ .caster
+    JSR BattleSys_RunUnkB2CCHandler
+.caster:
+    LDA.w !Battle_UnkAE4E
+    AND.b #!Battle_AE4EBit7
+    BEQ .done
+    JSR BattleSys_CasterUnk73
+    LDA.b !EffRec_20
+    STA.w !Battle_UnkB2CC
+    LDA.b !EffRec_1E
+    AND.b #!Battle_Unk74RunBit
+    BEQ .done
+    JSR BattleSys_RunUnkB2CCHandler
+.done:
+    LDA.w !Battle_UnkAE78
+    STA.w !Battle_UnkB2CC
+    RTS
+    RTS                                 ; quirk: never reached
+
 ; $C1:EB0E — BattleSys_CopyEffectBytes78 (14 bytes, $EB0E–$EB1B)
 ; !Battle_UnkAE4D = byte 7 and !Battle_UnkAE4E = byte 8 of the effect
 ; record in !Battle_UnkAEE6 (meaning unknown).
@@ -33945,6 +34384,43 @@ BattleSys_CopyEffectBytes78:
     STA.w !Battle_UnkAE4D
     LDA.w !Battle_UnkAEE6+8
     STA.w !Battle_UnkAE4E
+    RTS
+
+; $C1:EB1C — BattleSys_RunUnkB2CCHandler (45 bytes, $EB1C–$EB48)
+; Reads record !Battle_UnkB2CC of !BattleRom_UnkCC2A05 (3 bytes): DP
+; $1C = byte 1, DP $1E = byte 2, DP $20 = byte 0, and runs entry byte 0
+; of BattleSys_UnkB2CCHandlerTable (JSR (table,X), X = byte 0 * 2, 8
+; bits, B = 0 from Battle_Mul16). What the handlers do is not analysed.
+; Callers (3 JSR sites): BattleSys_StealItem ($C1:EA20) and BattleSys_RunUnkB2CCHandlers ($C1:EA7A,
+;   $C1:EA92).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB2CC set; B any (TDC first)
+; Exit:  M=1, X=0 as the callers assume, DP=0, DB=$7E (the handlers
+;        are not analysed); DP $1C/$1E/$20 as said
+;        (DP $1D/$1F/$21 unchanged) unless the handler changes them
+!Handler_Arg1 = !BattleTmp_1C           ; 1 B: record byte 1
+!Handler_Arg2 = !BattleTmp_1E           ; 1 B: record byte 2
+!Handler_Index = !BattleTmp_20          ; 1 B: record byte 0
+BattleSys_RunUnkB2CCHandler:
+    TDC
+    LDA.b #3
+    TAX
+    STX.b !Battle_MathB
+    LDA.w !Battle_UnkB2CC
+    TAX
+    STX.b !Battle_MathA
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    LDA.l !BattleRom_UnkCC2A05+1,X
+    STA.b !Handler_Arg1
+    LDX.b !Battle_MathLo
+    LDA.l !BattleRom_UnkCC2A05+2,X
+    STA.b !Handler_Arg2
+    LDX.b !Battle_MathLo
+    LDA.l !BattleRom_UnkCC2A05,X
+    STA.b !Handler_Index
+    ASL A
+    TAX
+    JSR (BattleSys_UnkB2CCHandlerTable,X)
     RTS
 
 ; $C1:EB68 — Battle_SumHitSets (144 bytes, $EB68–$EBF7)
@@ -34313,6 +34789,35 @@ Battle_ApplyHits:
 ; ==================================================================
 ; Battle setup ($C1:FA8B–$C1:FDBE)
 ; ==================================================================
+
+
+; BattleSys_UnkB2CCHandlerTable ($C1FA61–$C1FA8A, 21 words)
+; The routines BattleSys_RunUnkB2CCHandler runs, by byte 0 of a
+; !BattleRom_UnkCC2A05 record (JSR (BattleSys_UnkB2CCHandlerTable,X)
+; at $C1:EB45). The handlers (from $C1:ED89 on) are not analysed.
+org $C1FA61
+BattleSys_UnkB2CCHandlerTable:
+    dw BattleSys_UnkB2CCHandler00        ; $00
+    dw BattleSys_UnkB2CCHandler01        ; $01
+    dw BattleSys_UnkB2CCHandler02        ; $02
+    dw BattleSys_UnkB2CCHandler03        ; $03
+    dw BattleSys_UnkB2CCHandler04        ; $04
+    dw BattleSys_UnkB2CCHandler05        ; $05
+    dw BattleSys_UnkB2CCHandler06        ; $06
+    dw BattleSys_UnkB2CCHandler07        ; $07
+    dw BattleSys_UnkB2CCHandler08        ; $08
+    dw BattleSys_UnkB2CCHandler09        ; $09
+    dw BattleSys_UnkB2CCHandler0A        ; $0A
+    dw BattleSys_UnkB2CCHandler0B        ; $0B
+    dw BattleSys_UnkB2CCHandler0C        ; $0C
+    dw BattleSys_UnkB2CCHandler0D        ; $0D
+    dw BattleSys_UnkB2CCHandler0E        ; $0E
+    dw BattleSys_UnkB2CCHandler0F        ; $0F
+    dw BattleSys_UnkB2CCHandler10        ; $10
+    dw BattleSys_UnkB2CCHandler11        ; $11
+    dw BattleSys_UnkB2CCHandler12        ; $12
+    dw BattleSys_UnkB2CCHandler13        ; $13
+    dw BattleSys_UnkB2CCHandler14        ; $14
 
 ; $C1:FA8B — Battle_SetupBattle (803 bytes, $FA8B–$FDAD)
 ; BattleSys_Main's first step: builds the battle state before the
@@ -34784,11 +35289,11 @@ Battle_Mul16Long:
     RTL
 
 ; $C1:FDC3 — BankC1_AddItemLong (4 bytes, $FDC3–$FDC6)
-; JSL form of BankC1_AddItem (not analysed: add one of item Y).
+; JSL form of BankC1_AddItem (add one of item Y).
 ; Callers (1 JSL site): BattleFD_UnkB655 ($FD:B72A).
 ; Entry: as BankC1_AddItem; M=1, X=0, DP=0, DB=$7E at its one caller
 ;        (BattleFD_UnkB655), Y = item id
-; Exit:  as BankC1_AddItem (not analysed)
+; Exit:  as BankC1_AddItem (A = the new count, or 0)
 org $C1FDC3
 BankC1_AddItemLong:
     JSR BankC1_AddItem

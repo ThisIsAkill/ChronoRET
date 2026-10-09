@@ -935,5 +935,11 @@ if !constants_battle_inc == 0
 !Battle_AE4EScaleMask    = $03    ; !Battle_UnkAE4E bits 1-0: n, the defence x n / 4 when not 0
 !Battle_ActHitKind4      = 4      ; !Battle_ActPcHitKind of an MP drain's target (BattleSys_DrainHpMp)
 !Battle_DrainRandDiv     = 10     ; BattleSys_DrainHpMp: the random part is below amount / this + 3
+!Battle_StealTripleUnk57 = $A5    ; BattleSys_StealItem: the caster's .Unk57 value that triples the chance
+!Battle_AE4EBit7         = $80    ; !Battle_UnkAE4E bit 7: BattleSys_RunUnkB2CCHandlers also tries the caster's .Unk73
+!Battle_Unk74RunBit      = $01    ; BattlerStats.Unk74 bit 0: ... and runs it
+!Battle_ItemCountMax     = 99     ; BankC1_AddItem: the most of one item
+!Battle_GoldCapHi        = $98    ; BankC1_AddGold: the gold cap 9,999,999 = $98967F, high byte
+!Battle_GoldCapLo        = $967F  ; ... its low word
 
 endif
