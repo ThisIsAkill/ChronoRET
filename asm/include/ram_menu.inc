@@ -358,8 +358,20 @@ endstruct align 8
 !C2Scene_ObjBMate2X = $02AA              ; and of slot 2's
 !C2Scene_ObjBMate2Y = $02AC
 !C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
-                                         ; C2Scene_LeaderBoard move (read by unmatched code)
-!C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
+                                         ; C2Scene_LeaderBoard move; the BG3 tasks (C2Scene_TaskBg3Drift ...)
+                                         ; add it to C2Scene_Bg3HScroll and zero it
+!C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel (added to C2Scene_Bg3VScroll)
+!C2Scene_PartySave = $1BA3               ; 3 B: Party_Members saved by C2Scene_SaveParty (read back by
+                                         ; C2Scene_RestoreParty)
+!C2Scene_Unk01E2 = $01E2                 ; 16-bit; the phase C2Scene_TaskBg3LineWave reaches through a
+                                         ; stale index (task +$22 with X = $1C0); other use not traced
+!C2Scene_Unk7F00F7 = $7F00F7             ; 8-bit in Menu_FlagBlock7F; bit 1 read by C2Scene_TestUnk7F00F7Bit1
+!C2Scene_Unk7F00CE = $7F00CE             ; 8-bit in Menu_FlagBlock7F; C2Scene_SetUnk7F00CE stores C2Tmp_00 here
+!C2Scene_Unk7F00DA = $7F00DA             ; 8-bit in Menu_FlagBlock7F; C2Scene_SetUnk7F00DA stores C2Tmp_00 here
+!C2Scene_PatternTiles = $7F9000          ; = C2Scene_DecompBuf: C2Scene_BuildPatternTiles' eight pattern tiles
+!C2Scene_PatternSolid = $7F9100          ; and its two solid tiles after them
+!C2Scene_Unk7F00AA = $7F00AA             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_SetUnk7F00AABit0
+!C2Scene_Unk7F019A = $7F019A             ; 8-bit in Menu_FlagBlock7F; bit 3 set by C2Scene_SetUnk7F019ABit3
 !C2Scene_IdleFrames = $02B1              ; 3 B, C2Scene_Unk02B1, one per party slot: frames the leader
                                          ; (C2Scene_LeaderInput) or member (C2Scene_MemberFollow) has
                                          ; stood still (see C2Scene_IdleAnimAt)
@@ -390,6 +402,165 @@ endstruct align 8
 !Menu_DecompSrcBank = $0302              ; 8-bit its bank
 !Menu_DecompDest = $0303                 ; 16-bit WRAM destination address
 !Menu_DecompDestBank = $0305             ; 8-bit its bank ($7E or $7F; $00 for low WRAM)
+
+; --- The menu kernel (BankC2_MenuEntry and its thread scheduler) ---
+; The menu runs with DP=$0000 and DB=$7E; these are bank-$7E offsets.
+!Menu_Tmp00 = $0000                      ; 8-bit scratch (also Menu_JumpVec's low byte)
+!Menu_Tmp01 = $0001                      ; 8-bit scratch
+!Menu_Tmp02 = $0002                      ; 8-bit scratch
+!Menu_Tmp03 = $0003                      ; 8-bit scratch
+!Menu_Tmp04 = $0004                      ; 8-bit scratch
+!Menu_JumpVec = $0000                    ; 16-bit scratch: JMP (abs) target of Menu_RunThreads and
+                                         ; Menu_MainThread
+!Menu_ListPtr = $0016                    ; 24-bit scratch: Menu_MainThread's pointer into Menu_ModeLists'
+                                         ; list for Menu_Mode
+!Menu_Unk51 = $0051                      ; 16-bit; zeroed by Menu_InitSystems, then the start offset of its
+                                         ; Menu_CharRecords division loop (set by the calls between; not
+                                         ; traced) and Menu_CursorStepD's OAM offset
+!Menu_Unk56 = $0056                      ; 16-bit; zeroed by Menu_Setup; use not traced
+!Menu_Unk58 = $0058                      ; 16-bit; set to $3020 by Menu_RunThreads before thread 3 starts
+                                         ; (written absolute); use not traced
+!Menu_Mode = $0067                       ; 8-bit; the menu's mode, from Menu_EntryModes by the entry
+                                         ; argument: picks Menu_MainThread's handler list
+!Menu_ThreadVar = $0068                  ; 8-bit; one byte per thread: Menu_RunThreads zeroes it when a
+                                         ; thread starts and keeps it in Menu_Thread.SavedVar while it
+                                         ; waits; the main thread's handler index (Menu_MainThread)
+!Menu_CurThread = $006E                  ; 8-bit byte offset of the running thread's Menu_Thread slot
+!Menu_PartyActive = $0073                ; 8-bit; members Menu_BuildPartyLists found in the first 3
+                                         ; Menu_PartyOrder positions
+!Menu_PartyTotal = $0075                 ; 8-bit; and in all 9
+!Menu_CallerSp = $0920                   ; 16-bit S at BankC2_MenuEntry (after its pushes); Menu_Exit returns
+                                         ; through it
+!Menu_EntryArg = $0A00                   ; 8-bit; BankC2_MenuEntry's A (0-6, Menu_EntryModes' index)
+!Menu_EntryX = $0A01                     ; 16-bit; BankC2_MenuEntry's X
+!Menu_VramQueue = $0C00                  ; Menu_VramRec records (8 B) Menu_QueueVramRom / Menu_QueueVramWram
+                                         ; append and Menu_FlushVramQueue sends to VRAM
+!Menu_Unk0D06 = $0D06                    ; 16-bit; set to $FFFF by Menu_Setup (with $0D0A and $0D0E)
+!Menu_Unk0D0A = $0D0A
+!Menu_Unk0D0E = $0D0E
+!Menu_VramQueueEnd = $0D11               ; 8-bit byte offset past the last Menu_VramQueue record
+!Menu_FadeStep = $0D20                   ; 8-bit signed brightness step of Menu_Fade
+!Menu_FadeFrames = $0D21                 ; 8-bit frames per step (Menu_Fade sets 1)
+!Menu_Unk0D38 = $0D38                    ; 7 words: Menu_Setup's quotients (word +$3F of seven
+                                         ; Menu_CharRecords) / 10; use not traced
+!Menu_PartyList = $0D5F                  ; 9 B: the character ids of Menu_PartyOrder that are present, in
+                                         ; order ($FF after them, Menu_Setup)
+!Menu_PartyListPos = $0D68               ; 9 B: the Menu_PartyOrder position of each
+!Menu_Unk21BA = $21BA                    ; 3 x $20 B; Menu_Unk834D copies 6 B from bank $D1 to the start of
+                                         ; each, one per active party member; use not traced
+!Menu_Unk04A4 = $04A4                    ; 5 B; Menu_Unk82E1 tests the byte for each value $AE-$B2
+!Menu_Unk2857 = $2857                    ; 5 B; Menu_Unk82E1 zeroes them and sets the byte of each value
+                                         ; $AE-$B2 that a record's +$2A holds while its Menu_Unk04A4 byte is
+                                         ; non-zero to $80
+!Menu_Unk9B76 = $9B76                    ; 32 B set to $FF by Menu_Setup; use not traced
+!Menu_SramUnk7FE1 = $307FE1              ; 8-bit in SRAM; zeroed (with $7FE2) by BankC2_MenuEntry's new-game
+!Menu_SramUnk7FE2 = $307FE2              ; path; use not traced
+!Menu_Unk29AD = $29AD                    ; 8-bit, Menu_Config+$1D; BankC2_MenuEntry's new-game path copies
+                                         ; Menu_NmiFrames ($7E:0D00, the menu NMI count) into it
+
+; One VRAM upload of Menu_VramQueue (Menu_FlushVramQueue sends it with DMA
+; channel 7 to VMDATAL/H, the VRAM address step as VMAIN stands).
+struct Menu_VramRec $0000
+.Dest:      skip 2     ; VRAM word address
+.Src:       skip 2     ; source address
+.SrcBank:   skip 1     ; its bank
+.Size:      skip 2     ; byte count
+            skip 1
+endstruct
+
+; The inventory and the current character (Menu_AddItem ... Menu_LoadCharRec).
+!Menu_InvIds = $2400                     ; 256 B: item id per inventory slot (0 = empty)
+!Menu_InvCounts = $2500                  ; 256 B: the count of each slot (at most 99)
+!Menu_ItemSlot = $04C7                   ; 16-bit; the slot Menu_FindItem found
+!Menu_ItemId = $04C9                     ; 8-bit; the item id the inventory routines work on
+!Menu_ItemCount = $04CB                  ; 8-bit; how many to add or remove
+!Menu_ItemCategory = $04CC               ; 16-bit; Menu_ItemCategory's result (0-4)
+!Menu_ItemIndex = $04CE                  ; 16-bit; the id's index within its category
+!Menu_ItemDataPtr = $0D28                ; 16-bit; Menu_ItemDataPtrA's result (an address in bank $CC)
+!Menu_ItemDataPtrB = $0D2A               ; 16-bit; Menu_ItemDataPtrB's result (an address in bank $CC)
+!Menu_CurCharRecPtr = $006F              ; 16-bit; address of the Menu_CharRecords record
+                                         ; Menu_LoadCharRecA copied
+!Menu_CurMember = $0071                  ; 8-bit (stored as a word by BankC2_MenuEntry, from Menu_EntryX):
+                                         ; the Menu_PartyList index Menu_LoadPartyCharRec loads
+!Menu_ListKind = $0077                   ; 8-bit; Menu_ListEquipItems' id range (Menu_EquipListRanges)
+!Menu_CurIsReserve = $0078               ; 8-bit; Menu_LoadPartyCharRec: $FF when Menu_CurMember is past
+                                         ; the active members, else 0
+!Menu_CurCharRec = $9A90                 ; $50 B: copy of a Menu_CharRecords record (Menu_LoadCharRecA)
+!Menu_CurCharExtra = $9AE0               ; 6 B: its Menu_Unk2C23 entry
+!Menu_Unk2C23 = $2C23                    ; 8 x 6 B, by the record's first byte AND 7 (Menu_LoadCharRecA)
+!Menu_EquipChars = $104D                 ; 7 B: character ids Menu_CountEquippedBy checks ($80 ends the list)
+!Menu_EquipFlags = $1056                 ; 7 B: per entry, 1 when that character has Menu_ItemId equipped
+!Menu_EquipCount = $0D82                 ; 8-bit; how many of them have it
+!Menu_EquipList = $0F00                  ; item ids Menu_ListEquipItems lists (0 ends the list) ...
+!Menu_EquipListCounts = $0F62            ; ... and their counts
+!Menu_EquipListLen = $0FC6               ; 8-bit; how many it listed
+!Menu_ItemSortKeys = $7C00               ; 256 B: a sort key per item id (Menu_ListEquipItems sorts by it,
+                                         ; largest first); who fills it is not traced
+!Menu_PalBuf = $9480                     ; 512 B: the menu's CGRAM copy (Menu_UploadPalette)
+!Menu_PalDirty = $0D15                   ; 8-bit; non-zero: Menu_UploadPalette sends Menu_PalBuf (and zeroes it)
+!Menu_GradTable = $9DE9                  ; 32 B: Menu_GradientSteps copied by Menu_BuildGradient
+!Menu_GradTableFlat = $9DF9              ; = its entry 8 (CGADSUB $02, COLDATA $E0)
+!Menu_GradSpec = $9D99                   ; 2-byte entries Menu_BuildGradient reads: a count (bit 7: end)
+                                         ; and a step, or 0 and a line count
+!Menu_GradHdmaA = $9E19                  ; the HDMA table (3-byte entries: lines, CGADSUB, COLDATA) built
+!Menu_GradHdmaB = $9F19                  ; in one of these two buffers
+!Menu_GradStep = $A019                   ; 16-bit; the entry's step x 16
+!Menu_GradAccum = $A01B                  ; 16-bit; lines accumulated (8.8; the high byte is taken)
+!Menu_GradBufSel = $A01D                 ; 16-bit; 0 or $100: the buffer offset of the table last built
+                                         ; (the menu NMI reads the high byte, $C2:8657)
+
+; The cursors and list arrows (Menu_StartCursorA ... Menu_ListArrowsThread).
+!Menu_OamCursor0 = $0774                 ; OAM entry 29 in the copy at $0700 (X, Y, tile, attributes):
+!Menu_OamCursor1 = $0778                 ; the cursor sprite; entries 30 and 31 the other cursors /
+!Menu_OamCursor2 = $077C                 ; the list arrows (probably sent by the menu NMI; not traced)
+!Menu_Unk0416 = $0416                    ; 8-bit; Menu_CursorStepA subtracts it from Menu_Unk0D9D
+!Menu_Unk0772 = $0772                    ; 16-bit; copied to Menu_CursorTileAttr by Menu_StartCursorB/C
+!Menu_Unk80 = $0080                      ; 8-bit; Menu_CursorThreadB's Menu_Unk0DA8 - this = the list scroll
+!Menu_ArrowX = $0D92                     ; 8-bit; the list arrows' X
+!Menu_ArrowY = $0D93                     ; 8-bit; their base Y
+!Menu_ListRows = $0D94                   ; 8-bit; 0: no arrows; the down arrow shows while Menu_ListTop is below it
+!Menu_ListTop = $0D95                    ; 8-bit; the up arrow shows while it is non-zero
+!Menu_ArrowTimer = $0D96                 ; 8-bit blink countdown of the arrows
+!Menu_ArrowBlink = $0D97                 ; 8-bit; bit 0: the arrows' phase
+!Menu_ArrowMulA = $0D98                  ; 8-bit; Y factors of Menu_ListTop (high byte of the
+!Menu_ArrowMulB = $0D99                  ; product with this one, low byte with the other)
+!Menu_ArrowsOff = $0D9A                  ; 8-bit; non-zero: Menu_ListArrowsThread places nothing
+!Menu_Unk0D9B = $0D9B                    ; 8-bit; set to $20 by Menu_CursorStepD
+!Menu_CursorIndex = $0D9C                ; 8-bit; the Menu_CursorPos record the cursor points at
+!Menu_Unk0D9D = $0D9D                    ; 8-bit; see Menu_CursorStepA
+!Menu_CursorYOfs = $0D9E                 ; 8-bit (zeroed as a word); added to the cursor's Y
+!Menu_CursorBlink = $0DA0                ; 8-bit; bits 0-2: the blink phase of sprites 0-2
+!Menu_CursorTileAttr = $0DA1             ; 16-bit tile and attributes of cursors B and C
+!Menu_BlinkTimers = $0DA3                ; 3 B: blink countdowns of sprites 0-2
+!Menu_BlinkMask = $0DA6                  ; 8-bit; Menu_CursorBlinkMasked's timer mask (Menu_StartCursorC: $FC)
+!Menu_Unk0DA8 = $0DA8                    ; 8-bit; see Menu_CursorThreadB
+
+; A cursor position record (6 bytes; Menu_CursorRecOffset); only X and Y
+; are read here.
+struct Menu_CursorPos $9380
+.X:         skip 1
+.Y:         skip 1
+            skip 4
+endstruct align 6
+
+; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
+struct Menu_Thread $00B0
+.State:     skip 1     ; 0 free, 1 to start at .Entry, 2 waiting, 3 running
+.Wait:      skip 1     ; frames left to wait (runs when it counts down to 0)
+.Entry:     skip 2     ; start address (Menu_StartThread)
+.SavedSp:   skip 2     ; S at its last yield
+.SavedVar:  skip 1     ; its Menu_ThreadVar at that yield
+            skip 1
+endstruct align 8
+
+; A Menu_CharRecords record ($50 B); only the fields read here.
+struct Menu_CharRec $0000
+            skip $2A
+.Unk2A:     skip 1     ; Menu_Unk82E1 looks for $AE-$B2 here
+            skip $14
+.Unk3F:     skip 2     ; Menu_Setup divides it by 10
+            skip $0F
+endstruct align $50
 
 ; Scene data unpacked into WRAM by the C2Scene_Load* routines (each name
 ; says what is inferred; "Unk" ones are only known by where they go).
@@ -472,10 +643,16 @@ struct C2Scene_HdmaTable $7E8A35
 .Value0: skip 2
 .Count1: skip 1
 .Value1: skip 2
-         skip 7
+.End:    skip 1        ; the effect routines at $C2:754D-$C2:7DE3 write 0 here (ends the table)
+         skip 6
 endstruct align 13
 !C2Scene_HdmaTableA918 = $7EA918         ; probably an HDMA table of 3-byte entries (count, word):
                                          ; the NMI writes the word of entries 0-3
+!C2Scene_WaveBuf = $7EA925               ; 64 words: one BG3HOFS value per line of a 64-line band
+                                         ; (C2Scene_TaskBg3Wave), the HDMA source C2Scene_HdmaValueA916
+                                         ; points into
+!C2Scene_WaveBufCopy = $7EA9A5           ; 64 words: a copy of C2Scene_WaveBuf, so that 64 words can be read
+                                         ; from any start inside it
 
 ;
 ; A scene task: one 64-byte record of C2Scene_TaskRecords, run once per
@@ -641,6 +818,20 @@ endstruct
 
 ; Object A's task (C2Scene_ObjATask) and its mark task: the fields after
 ; C2Scene_Task's motion words (+$22-$25 and the targets as C2Scene_WalkTask).
+; The screen-effect tasks and script routines at $C2:754D-$C2:7DE3 use
+; three more fields; the scripts that start them set them (op $0D).
+struct C2Scene_EffectTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: 0 until the task's first frame
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.Var22:     skip 2     ; +$22 frame counter or wave phase (the BG3 tasks), window size byte
+                       ; (C2Scene_Win1Step / Win2Step) or wave amplitude byte (C2Scene_Bg2HWaveStep)
+.Var24:     skip 2     ; +$24 buffer toggle byte (C2Scene_Win1Step / Win2Step) or wave
+                       ; phase word (C2Scene_Bg2HWaveStep)
+.Var26:     skip 1     ; +$26 buffer toggle byte (C2Scene_Bg2HWaveStep / Bg2VWaveStep)
+            skip $19
+endstruct
+
 struct C2Scene_ObjTask $0000
             skip 2     ; +$00 .Handler
 .State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state (C2Scene_ObjAStates)
@@ -715,6 +906,9 @@ endstruct
 !C2Scene_DialEdgeX = $1BDC               ; X, 8.8
 !C2Scene_DialEdgeLines = $1BE2           ; lines left - 1 (the low byte counts)
 !C2Scene_DialFlags = $1BF5               ; 8-bit; buffer flags C2Scene_DialHandBuf/SwirlBuf/FlagBit2
+; C2Scene_HandBufA/B and C2Scene_SwirlCosA/B are also the four 224-word line buffers that the
+; effect routines at $C2:754D-$C2:7DE3 fill and point C2Scene_HdmaValues at (each value covers 112
+; lines: a buffer, then the buffer + C2Scene_HdmaHalfBytes).
 !C2Scene_HandBufA = $7E8B56              ; the two hand buffers: WH0/WH1 per line (C2Scene_HdmaBufBytes)
 !C2Scene_HandBufB = $7E8DF6
 !C2Scene_SwirlCosA = $7E9176             ; the swirl's M7A/M7D values per line, buffer A

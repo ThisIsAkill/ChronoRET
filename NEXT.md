@@ -496,14 +496,43 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`; what the label strings ($C6:F400 table, numbers
    $6A-$6F) and the dial's pack data show; what `C2Scene_MapFilterColor`'s hidden colours are;
    `C2Scene_DialFlagBit2`; `Menu_Unk83`, `Menu_NmiTimer` and `Menu_Unk85D6` (the menu NMI's
-   upload); which RAM vector the JMLs at $C2:8406/$C2:840A sit behind. Next, in reach order:
-   the code after the dial's scripts ($C2:754D on, starts with `JSR C2Scene_Random`); the
-   unmatched $C2:2273-$C2:232C (`C2Scene_Unk2273/2277/229D`); `Menu_Unk85D6`, the vector JMLs
-   ($C2:8406-$C2:840D) and
-   `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
+   upload). Next: `Menu_Unk85D6`; `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
    $7E:C000, $7E:C600, $7E:C800) and the four lists `C2Scene_ListA`-`D` hold; the code at
    `$C2:0568` (also reads the BG layer tables).
+   Also matched (branch match-c2-after-dial): the direction helpers `C2Scene_Unk2273`/`Unk2277`
+   (cos / sin of a 256-step direction, x128) and `C2Scene_Unk229D` (direction between two points
+   on the wrapping map, with its dead tail $C2:232A) ($C2:2273-$C2:232C; better names
+   `C2Scene_Cos256`/`Sin256`/`DirToPoint` once `C2Scene_ObjBMateAim` is next edited); the scene
+   screen effects and script routines $C2:754D-$C2:7DE3 (called by script op $34 or started by op
+   $35 from the bank $C3 scene scripts: placement and velocity helpers, the BG3 drift / slide /
+   wave tasks, the window tables through `BankC3_Entry0008`, the ROM-noise and BG2 line waves on
+   HDMA, party save / restore, flag setters, `C2Scene_BuildPatternTiles`) and the $FF fill to
+   $C2:8000 (`BankC2_FreeSpace7DE4`); the menu's entry and thread scheduler $C2:800E-$C2:840D
+   (`BankC2_MenuEntry`, `Menu_InitSystems`, `Menu_BuildPartyLists`, `Menu_RunThreads` with
+   `Menu_ThreadEnd`/`Yield`/`YieldFrames`, `Menu_StartThread`, `Menu_KillThreads`,
+   `Menu_MainThread` and `Menu_ModeLists`, `Menu_Exit`, `Menu_ExitToGame`, the VRAM queue adders,
+   `Menu_Fade`, `Menu_InterruptVectors`); `Menu_FlushVramQueue`, `Menu_UploadPalette`,
+   `Menu_BuildGradient`, the inventory (`Menu_AddItem`/`RemoveItem`/`FindItem`), the character
+   record loaders, `Menu_ItemCategory`, `Menu_ItemDataPtrA/B`, `Menu_CountEquippedBy`,
+   `Menu_ListEquipItems` ($C2:8663-$C2:89E3); the cursor threads and list arrows
+   ($C2:89E4-$C2:8C35) and `Menu_CursorRecOffset` ($C2:EA27). Quirks recorded: the missing CLCs in
+   `C2Scene_PlaceBelowView` (no effect), `Menu_RunThreads` (slot 0's stack starts at $0A40) and
+   `Menu_ListArrowsThread`; `C2Scene_TaskBg3LineWave`'s stale X (its phase lives at $01E2);
+   `C2Scene_NoiseInit`'s MVN one byte long; `Menu_CursorStepD` calling `Menu_CursorPosAB` with
+   M=0; dead code at $C2:232A and $C2:8A96. Re-review needed (verified headers edited):
+   `C2Scene_Random`, `Trig_Cos1024`, `BankC2_Entry8000`, `Menu_InitPpuAndRam`,
+   `Menu_InitNewGameData`; merging match-c2-modes2 also edited the verified `Menu_Nmi` and
+   `Menu_Irq` headers and their banner (the vector JMLs and `BankC2_MenuEntry` are matched now) and
+   the `Trig_Cos1024` / `C2Scene_Random` caller notes, and took main's names for shared RAM
+   (`Menu_FrameReady`, `Menu_InidispShadow`, `Menu_NmiFrames`, `C2Scene_HandBufA/B`,
+   `C2Scene_SwirlCosA/B`, `C2Scene_HdmaHalfBytes/BufBytes`). Stubs added: the `Menu_Init*` callees `Menu_Unk968D`/`D156`/`984A`/`92F4`/`F3CA`/`9875`,
+   `Menu_UnkE91B` (thread 3), `Menu_UnkF5ED`, `Menu_Unk93A8`, `BankFF_UnkF958` and the mode lists
+   `Menu_Mode00List`-`0FList`. Next, in reach order: `Menu_Unk8C36` (the `BankC2_Entry8004` command
+   dispatcher, which calls the inventory routines), the `Menu_Init*` callees, thread 3
+   (`Menu_UnkE91B`) and the mode handler lists. Open: who fills `Menu_ItemSortKeys`,
+   `Menu_GradSpec` and `Menu_CursorPos`; what `Menu_Unk82E1`'s values $AE-$B2 are; what the
+   `C2Scene_PatternTiles` are for.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:

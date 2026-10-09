@@ -85,6 +85,7 @@ if !hardware_inc == 0
 !BBAD_BG1SC            = $07  ; B-bus address of BG1SC ($2107)
 !BBAD_BG1HOFS          = $0D  ; B-bus address of BG1HOFS ($210D)
 !BBAD_BG2HOFS          = $0F  ; B-bus address of BG2HOFS ($210F)
+!BBAD_BG2VOFS          = $10  ; B-bus address of BG2VOFS ($2110)
 !BBAD_BG3HOFS          = $11  ; B-bus address of BG3HOFS ($2111)
 !BBAD_WH0              = $26  ; B-bus address of WH0 ($2126)
 !BBAD_WH2              = $28  ; B-bus address of WH2 ($2128)
