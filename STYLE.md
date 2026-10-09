@@ -109,6 +109,14 @@ block). The lint requires:
 - `DPDB`: the Entry line states DP and DB itself (`DP any` and `DB any` are statements too).
   "as Field_Unk74D4" or "see the banner" does not count unless the text it points to is in the
   same header.
+- `INDEX`: an Exit claim that X or Y is unchanged (kept, preserved, intact, as on entry) holds
+  for a caller entering with X=0: no path through the routine or its callees sets the X flag
+  (`SEP #$10`/`#$30`, a `PLP` restoring X=1, a callee returning with X=1) and leaves the
+  register without its high byte (a `PHY`/`PLY` pair at 16 bits brings it back; at 8 bits it
+  does not). Say what happens instead: `Y's low byte kept, high byte cleared (SEP #$10 at
+  $C0:AC69)`, or `with X=1 at entry`, or declare X=1 on the Entry line. A claim limited to
+  some paths (`else Y unchanged`) fails only when no exit keeps the register.
+  `python3 tools/index_claims.py --explain NAME` shows the reasoning.
 
 Two kinds of label are exempt from `HEADER`:
 
