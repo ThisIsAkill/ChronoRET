@@ -9555,7 +9555,7 @@ Sys_HaltWithColor:
 
 ; ============================================================
 ; Event opcodes: animation and waits ($C0:2E67–$C0:2FFC)
-; Handlers in Evt_OpcodeTable (unmatched), entered as the other opcode
+; Handlers in Evt_OpcodeTable, entered as the other opcode
 ; handlers (see the banner of the call opcodes at $C0:5F6E): Y = the
 ; opcode's offset in Evt_Data, X returned = where the script goes on,
 ; C=1 to go on in this run, C=0 to stop the object for this run. They
@@ -31375,7 +31375,7 @@ Field_ActionButton:
 
 ; ============================================================
 ; Event opcodes: object movement and facing ($C0:4D06–$C0:56A5)
-; Handlers in Evt_OpcodeTable (unmatched) for moving and turning
+; Handlers in Evt_OpcodeTable for moving and turning
 ; objects, with the two animation helpers they share. Every handler is
 ; entered with Y = its opcode's offset in Evt_Data and returns X = where
 ; the script goes on: the next opcode with C=1 (keep running), or with
@@ -34876,7 +34876,7 @@ Evt_OpcodeTable:
 
 ; ============================================================
 ; Event opcodes: function calls and object control ($C0:5F6E–$C0:62B4)
-; Handlers in Evt_OpcodeTable (unmatched), entered as the movement
+; Handlers in Evt_OpcodeTable, entered as the movement
 ; opcodes are (see their banner): Y = the opcode's offset in Evt_Data,
 ; X returned = where the script goes on, C=1 to go on with it in this
 ; run, C=0 to stop the object for this run. Each object has 16 function
