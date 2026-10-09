@@ -120,7 +120,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    BattleAct_OpMoveKind4ToCalc); BattleAct_FindPath (`$C1:5479`/`$C1:549B`, now
    BattleAct_PathToPoint); BattleAct_OpLoopAnim (`$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now
    BattleAct_OpShowAnimEntry); BattleAct_OpEndThread (`$C1:577A`, now BattleAct_OpEndIfNoTarget);
-   the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched.
+   the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched;
+   the "Actions: service 4" banner before BattleSys_RunAction says the script interpreter (the
+   threads BattleAct_RunThreads runs) "is not matched yet", though it is.
    Open readers, all out of this bank: the movers in bank $CF (dispatch `$CF:EFC4`, kind table
    `$CF:F01E`: straight `$CF:F040`, arc `$CF:F087`, heading `$CF:F194` with its edge test
    `$CF:FADD`, circle `$CF:F1F8`, kind 4 `$CF:F23D` with its near test `$CF:F957`, ellipse
@@ -220,7 +222,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Obj_CalcDirection / Obj_SetVelocity / Obj_SetVelocityChecked (their callers are the event
    opcodes now), Obj_UpdateInView / Obj_ActivateIfInView / FieldBtl_SaveObj /
    FieldBtl_RestoreObj (the Obj_Unk* callees are matched), and the `Field_Unk0B80/0B88` uses in
-   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`).
+   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`); and the comments on
+   `!NmiTrampoline` / `!IrqTrampoline` in ram_engine.inc cite the RTI stores at `$C0:2E4B` without
+   naming them (inside Sys_HaltWithColor).
    Also done (branch match-c0-evtops): the event opcode handlers $C0:5F6E-$C0:6D2E (all of
    $00-$7F there): `Evt_UnusedOpcode`, the return / call opcodes $00, $02-$07 (`Obj_Unk1C00`
    read as a level, saved positions in the `ObjX_Unk7F0580` tables, `ObjX_CallWait`), object
