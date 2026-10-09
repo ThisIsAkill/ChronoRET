@@ -741,7 +741,10 @@ C2Scene_WaitFrames:
 ; pending sound command.
 ; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF), C2Scene_MapView ($C2:63BA) and C2Scene_Dial
 ;   ($C2:6A9C).
-; Entry/Exit: those of C2Scene_WaitFrame.
+; Entry: M=1 (8-bit compare), X any, DP=$0000 (C2Scene_FrameCounter is
+;        read through .b), DB any; NMI enabled
+; Exit:  M=1; A = the counter before the change; X, Y unchanged
+; Calls: C2Scene_WaitFrame (JMP).
 C2Scene_WaitOneFrame:
     JMP C2Scene_WaitFrame
 
@@ -16700,10 +16703,11 @@ TextWin_Init:
 ; Callers note: JMP from BankC2_Entry0009 ($C2:0009) and BankC2_Entry000C
 ;   ($C2:000C), the cross-bank JSL vectors; JSL from C2Scene_LabelDraw
 ;   ($C2:569E) and C2Scene_MapViewLabel ($C2:69C4).
-; Entry: any M (P saved), X=0 or 1 (kept for the JSR (abs,X); the
+; Entry: any M (P saved), X=0 (kept through the JSR (abs,X): the state
+;        handlers use 16-bit X/Y, e.g. LDX.w/LDY.w # immediates; the
 ;        16-bit LDA before the SEP leaves B = 0 for the index), DP any
-;        (saved; DP=$0200 here), DB as the state handlers need (not
-;        traced)
+;        (saved; DP=$0200 here), DB with low WRAM at $0000-$1FFF (the
+;        handlers' absolute stores to the $0200 block)
 ; Exit:  P and DP restored; A = $00 high byte, the old B in the low
 ;        byte (LDA #0 / XBA); X, Y as the handlers leave them
 ; Calls: TextWin_CheckStatus, a TextWin_StateTable handler.
@@ -18927,8 +18931,10 @@ C2Scene_MapViewBuild:
 ; Probably one pixel standing for the tile's colour (inferred: it is the
 ; only colour C2Scene_MapCellPixels takes from a tile).
 ; Callers (1 JSR site): C2Scene_MapViewBuild ($C2:63E2).
-; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB any (set to $7F and
-;        restored; WMDATA written long)
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB in $00-$3F or
+;        $80-$BF (the STX.w WMADDL / STA.w WMADDH run before the PHB/PLB;
+;        $00 from C2Scene_MapViewBuild); then set to $7F and restored,
+;        WMDATA written long
 ; Exit:  M=1, X=0; A = C2Scene_MapTileCount (B = $03, which
 ;        C2Scene_MapDrawPixels' first MVN uses as its count's high
 ;        byte); X = C2Scene_TileColors' address, Y = 4; C2Tmp_00,
@@ -19374,8 +19380,9 @@ C2Scene_MapZoomStates:
 ; BG1's horizontal scroll = -C2Scene_M7X, its vertical scroll 0; .Angle
 ; and .Step = 0. Falls into C2Scene_MapZoomOut.
 ; Callers note: none direct (C2Scene_MapZoomStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM: the task record);
-;        C2Scene_TaskCur = the task
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM: the task
+;        record); C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_MapZoomOut
 ; No calls (falls into C2Scene_MapZoomOut).
 C2Scene_MapZoomInit:
@@ -19415,8 +19422,9 @@ C2Scene_MapZoomInit:
 ; spawn copied this record's +$05-$3F into it, so the value is the same.
 ; Callers note: none direct (C2Scene_MapZoomStates; C2Scene_MapZoomInit
 ;   falls in).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM: the
-;        task record); C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM: the task record); C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0, C=0 (the task goes on); A, X, Y and C2Tmp_00-$11 as
 ;        C2Scene_MapZoomMatrix leaves them; the mode-7 matrix shadows set;
 ;        on the last step C2Tmp_01, $08 and $0A changed by the spawn
@@ -19452,8 +19460,9 @@ C2Scene_MapZoomOut:
 ; State 2: when Pad_Unk00F6 has C2Scene_MapViewExitBtn (bit 3), .State =
 ; 3 and the script C2Scene_ScrMapViewExit starts.
 ; Callers note: none direct (C2Scene_MapZoomStates).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A clobbered; when pressed X = the script task and
 ;        C2Tmp_01, $08, $0A changed (C2Scene_TaskSpawnScript), else X
 ;        unchanged
@@ -19480,8 +19489,9 @@ C2Scene_MapZoomWait:
 ; C2Scene_ModeIdle7, which ends C2Scene_MapView's wait, and the task
 ; ends (C=1).
 ; Callers note: none direct (C2Scene_MapZoomStates).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  going on: M=0, X=0, C=0; done: M=1, X=0, C=1, A =
 ;        C2Scene_ModeIdle7; A, X, Y and C2Tmp_00-$11 otherwise as
 ;        C2Scene_MapZoomMatrix leaves them
@@ -19658,8 +19668,9 @@ C2Scene_MapZoomDivide:
 ; C2Scene_MapMarkersOff is 0 it runs the animation (C2Anim_Run, C=0);
 ; once it is set the task ends (C=1).
 ; Callers note: none direct (C2Scene_ScrMapViewMarkers, op $35).
-; Entry: M any (SEP #$20 here), X any, DP=$0000, DB=$00 (low WRAM: the
-;        task record); C2Scene_TaskCur = the task
+; Entry: M any (SEP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM: the task record); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0; C=1: ended, A = C2Scene_MapMarkersOff; C=0: as
 ;        C2Anim_Run leaves it (X = the task)
 ; Calls: C2Scene_MapMarkerPos, C2Anim_Run.
@@ -19704,8 +19715,9 @@ C2Scene_TaskLeaderMarker:
 ; (so .SprTile's low byte is zeroed twice), and the end at another
 ; location returns with M=0.
 ; Callers note: none direct (C2Scene_ScrMapViewMarkers, op $35).
-; Entry: M any (SEP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (SEP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_TaskLeaderMarker; ended at another location: M=0,
 ;        X=0, C=1, A = the location number
 ; Calls: C2Scene_MapMarkerPos, C2Anim_Run.
@@ -20192,8 +20204,9 @@ C2Scene_DialStates:
 ; centre, which C2Scene_DialDrawHand sets again.) Falls into
 ; C2Scene_DialInput.
 ; Callers note: none direct (C2Scene_DialStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM and registers);
-;        C2Scene_TaskCur = the task
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM and
+;        registers); C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_DialInput
 ; Calls: C2Scene_DialFindLoc, C2Scene_DialDrawHand (falls into
 ;   C2Scene_DialInput).
@@ -20252,11 +20265,15 @@ C2Scene_DialInit:
     JSR C2Scene_DialDrawHand
 
 ; $C2:6B5E — C2Scene_DialInput (182 bytes, $6B5E–$6C13)
-; State 1: reads Pad_Unk00F8 as a word, first match wins:
-; - C2Scene_DialBtnBack, C2Scene_PadRight or C2Scene_PadUp: .Sel - 1
-;   (kept at 0), .Vel = -C2Scene_DialTurnStep;
-; - C2Scene_DialBtnFwd, C2Scene_PadLeft or C2Scene_PadDown: .Sel + 1
-;   (kept at C2Scene_DialLastSel), .Vel = +C2Scene_DialTurnStep;
+; State 1: reads Pad_Unk00F8 as a word and tests, in this order (first
+; match wins, so e.g. C2Scene_DialBtnFwd beats C2Scene_PadRight and
+; C2Scene_PadUp): C2Scene_DialBtnBack (back), C2Scene_DialBtnFwd
+; (forward), C2Scene_PadRight (back), C2Scene_PadLeft (forward),
+; C2Scene_PadUp (back), C2Scene_PadDown (forward), C2Scene_DialBtnOk,
+; C2Scene_DialBtnCancel:
+; - back: .Sel - 1 (kept at 0), .Vel = -C2Scene_DialTurnStep;
+; - forward: .Sel + 1 (kept at C2Scene_DialLastSel), .Vel =
+;   +C2Scene_DialTurnStep;
 ;   either way .Target = the C2Scene_DialAngles entry of .Sel and .State
 ;   = 2, falling into C2Scene_DialTurn;
 ; - C2Scene_DialBtnOk: if .Sel's location (C2Scene_DialSelLoc) is not
@@ -20271,8 +20288,9 @@ C2Scene_DialInit:
 ; finds at once.
 ; Callers note: none direct (C2Scene_DialStates; C2Scene_DialInit falls
 ;   in).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  C=0. No button: M=0, X = the task. Ok and cancel: M=1, A, X
 ;        clobbered (C2Tmp_08 = the location number on ok); the sound:
 ;        as Audio_DriverCommand leaves the registers. Move: as
@@ -20379,8 +20397,9 @@ C2Scene_DialInput:
 ; its angle, still in state 2.
 ; Callers note: none direct (C2Scene_DialStates; C2Scene_DialInput falls
 ;   in).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  C=0. Turning: M=1, X=0, A, X, Y as C2Scene_DialDrawHand leaves
 ;        them. At the target: M=1 (state 1) or M=0 (skip), A, X, Y
 ;        clobbered; C2Tmp_08 = .Sel's location number; C2Tmp_10-$12 as
@@ -20863,7 +20882,8 @@ C2Scene_DialHandShape:
 ; Entry: M any, X any (SEP #$30 here), DP=$0000, DB=$00 (WRMPY/RDMPY
 ;        absolute)
 ; Exit:  M=1, X=0 (the PLP brings back M=1, X=1 from the SEP; REP #$10);
-;        A clobbered, X = |byte|, Y = the word's high byte (high bytes 0);
+;        A clobbered, X = 0 (the LDX #$00 for C2Scene_MulProduct+2), Y =
+;        |word|'s high byte (high bytes of X and Y 0);
 ;        C2Tmp_07, $0E-$0F and $19-$1B changed
 ; No calls.
 C2Scene_DialMul:
@@ -20947,8 +20967,9 @@ C2Scene_SwirlStates:
 ; per line; .Angle = a after the last line. (So the matrix changes down
 ; the screen; that this shows as a swirl is inferred, not seen.)
 ; Callers note: none direct (C2Scene_SwirlStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM and registers);
-;        C2Scene_TaskCur = the task
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM and
+;        registers); C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A clobbered, X = the task, Y past the last sine;
 ;        C2Tmp_00-$01, $08-$09, $10-$11 and $13-$14 changed; DB restored
 ; Calls: Trig_Cos1024, Trig_Sin1024 (JSL).
@@ -21065,8 +21086,9 @@ C2Scene_SwirlInit:
 ; per-line angles scroll up one line per frame. (The MVNs leave DB =
 ; $7E for the two stores; PHB/PLB put it back.)
 ; Callers note: none direct (C2Scene_SwirlStates).
-; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
-;        C2Scene_TaskCur = the task
+; Entry: M any (REP #$20 here), X=0 (from C2Scene_TaskRunAll;
+;        C2Scene_TaskCur's record address, $0B30 up, is 16-bit), DP=$0000,
+;        DB=$00 (low WRAM); C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0, C=0; A clobbered, X = the sine buffer, Y = the task;
 ;        C2Tmp_10-$11 and $13-$14 changed; DB restored
 ; Calls: Trig_Cos1024, Trig_Sin1024 (JSL).
@@ -21172,8 +21194,9 @@ C2Scene_DialMarkStates:
 ; .SprX/.SprY = the bytes of C2Scene_DialMarkPos for .Sel (high bytes
 ; 0). Falls into C2Scene_DialMarkHidden.
 ; Callers note: none direct (C2Scene_DialMarkStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0 (TDC in
-;        C2Scene_TaskDialMark: .Sel * 2 is a 16-bit index);
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM); B = 0
+;        (TDC in C2Scene_TaskDialMark: .Sel * 2 is a 16-bit index);
 ;        C2Scene_TaskCur = the task
 ; Exit:  as C2Scene_DialMarkHidden
 ; No calls (falls into C2Scene_DialMarkHidden).
@@ -21202,7 +21225,8 @@ C2Scene_DialMarkInit:
 ; started and run.
 ; Callers note: none direct (C2Scene_DialMarkStates; C2Scene_DialMarkInit
 ;   falls in).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0;
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM); B = 0;
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X, Y clobbered (as C2Anim_Run leaves them
 ;        when it runs)
@@ -21227,8 +21251,9 @@ C2Scene_DialMarkHidden:
 ; State 2: runs the animation; once .AnimTimer is 0 at the start of a
 ; frame, .State = 3.
 ; Callers note: none direct (C2Scene_DialMarkStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); C2Scene_TaskCur = the
-;        task
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
 ; Calls: C2Anim_Run.
 C2Scene_DialMarkSelect:
@@ -21246,7 +21271,8 @@ C2Scene_DialMarkSelect:
 ; .State = 4 and the deselect animation (C2Scene_DialMarkAnims, second
 ; byte) starts first.
 ; Callers note: none direct (C2Scene_DialMarkStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0;
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM); B = 0;
 ;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
 ; Calls: C2Scene_SetAnim, C2Anim_Run.
@@ -21270,8 +21296,9 @@ C2Scene_DialMarkShown:
 ; State 4: runs the animation; once .AnimTimer is 0 at the start of a
 ; frame, .State = 1 (hidden again).
 ; Callers note: none direct (C2Scene_DialMarkStates).
-; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); C2Scene_TaskCur = the
-;        task
+; Entry: M=1, X=0 (from C2Scene_TaskRunAll; C2Scene_TaskCur's record
+;        address, $0B30 up, is 16-bit), DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
 ; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
 ; Calls: C2Anim_Run.
 C2Scene_DialMarkDeselect:
