@@ -368,8 +368,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    code ($CE:E85B, $CF:FAA7, $CF:F47F, $CF:F910). Next near here: `FdVec_FFFD` (bank $FD, JMP
    $FD:E022, the IRQ's other phase). Open from this batch: what reads `Audio_Unk1E10`,
    `Field_Unk33`, `LayerDrift_*` writers, the sound commands $11/$14/$70, who sets
-   `Field_Unk0F` bit 7 (the IRQ does nothing then), `Field_Unk53Bit7`'s readers, the FieldAnimB
-   record fields (`EngFD_UnkE39C`, FdVec_FFF7), and whether the $E6 column's upper tile really
+   `Field_Unk0F` bit 7 (the IRQ does nothing then), `Field_Unk53Bit7`'s readers (now known:
+   FieldHdma_BuildPlainA/B), the FieldAnimB record fields (mostly traced by PalAnim_TickAll; kinds
+   4 and 6 open), and whether the $E6 column's upper tile really
    starts at $E4. Stale, not edited (fix at their next edit): Map_InitEntryTile calls
    `ObjX_Unk7F0C00`-`7F0D80` "per-object tables ... not established" (they are the `PartyLog_*`
    rings); the banners before Evt_OpB1_Yield ($C0:353F), Evt_Op7A_ArcToTile ($C0:4D06) and
@@ -538,7 +539,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    record loaders, `Menu_ItemCategory`, `Menu_ItemDataPtrA/B`, `Menu_CountEquippedBy`,
    `Menu_ListEquipItems` ($C2:8663-$C2:89E3); the cursor threads and list arrows
    ($C2:89E4-$C2:8C35) and `Menu_CursorRecOffset` ($C2:EA27). Quirks recorded: the missing CLCs in
-   `C2Scene_PlaceBelowView` (no effect), `Menu_RunThreads` (slot 0's stack starts at $0A40) and
+   `C2Scene_PlaceBelowView` (no effect), `Menu_RunThreads` (no effect: the carry is always clear, S = $0A3F + 64 x slot) and
    `Menu_ListArrowsThread`; `C2Scene_TaskBg3LineWave`'s stale X (its phase lives at $01E2);
    `C2Scene_NoiseInit`'s MVN one byte long; `Menu_CursorStepD` calling `Menu_CursorPosAB` with
    M=0; dead code at $C2:232A and $C2:8A96. Re-review needed (verified headers edited):
@@ -563,7 +564,10 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `$C1:FDBF`-`$C1:FDD2` (`Battle_Mul16Long`, `BankC1_AddItemLong`, `BattleSys_RunPcAttackLong`,
    `Battle_RandRangeLong`, `BattleSys_RefundItemLong`); the field HDMA set-up `EngFD_UnkC124`,
    `Hdma_InitChannelsFD`, `EngFD_UnkC2C1` with its two handler tables (`$FD:C124`-`$FD:C2EA`) and
-   `EngFD_UnkD52D`; the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
+   `EngFD_UnkD52D`; the HDMA table builders behind its tables, `FieldHdma_*` (`$FD:C2EB`-`$FD:D52C`:
+   plain screen, top band and bottom band for each table set, the channel 2/7 helpers, the data
+   fill with the BG3 wave, the wave run adders); the palette animation ticker `PalAnim_TickAll`
+   (`$FD:E39C`-`$FD:E806`: kinds 1, 2, 3, 5, 7, 8 and the seven channel scalers); the location animation set-up `FieldFD_LoadAnimSetA` (`$FD:DE98`) and
    `FieldFD_LoadAnimSetB` (`$FD:E292`) and the vectors `FdVec_FFF4`/`FFF7`/`FFFA`. The `BattleFD_Unk*`
    and `EngFD_Unk*` routines keep their names because verified code calls them by name; better names
    once those callers are re-reviewed: `BattleFD_UnkA982` ClearWorkRam, `UnkAA98` KoAllEnemies,
@@ -576,10 +580,18 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    (verified headers, fix at their next edit): Battle_SetupBattle ("callees that are not analysed
    (bank $FD ...)"), LoadLocation ("the two bank-$FD vectors are unmatched"), Scene_ResumeNmi
    ("the bank-$FD callees are not matched"), and RandomTableFD needs a new review (its region changed with the
-   code matched before it). Next, in reach order: the HDMA builders behind EngFD_UnkC2C1's tables
-   (`$FD:C2EB`, `$C847`, `$C995`, `$CD0C`, `$CFCF`, `$D27E`, about $1240 bytes in all, up to
-   `$FD:D52C`); `EngFD_UnkE39C` (FdVec_FFF7, every frame, with its subroutines `$FD:E437`-`$E82C`);
-   the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
+   code matched before it). Re-review needed from the HDMA/palette batch (verified headers
+   edited): `EngFD_UnkC2C1` and its two tables (handlers renamed, "not analysed" removed),
+   `FdVec_FFF7`, `FieldFD_LoadAnimSetA` (its banner), `Evt_Op84_SetUnk1B01` (the bank $C0 banner
+   over the palette-animation opcodes) and `ScrollWaveA` (its readers named). Quirks recorded: the
+   missing CLC in FieldHdma_FillDataA/B (carry in = Hdma_Unk7F0351 bit 0, then each line's carry
+   out), the band builders' extra 41-n TM run and the TM table ending at the band when
+   Field_Unk27 = 1, PalAnim_Pulse's level 0 (black) where 256 was meant, PalAnim_Fade storing
+   .Unk5 as the level when it is $80 or more. Better names once the verified callers are
+   re-reviewed: `EngFD_UnkC2C1` FieldHdma_RunFrame. Next, in reach order: `PalAnim_UnkE82C` (kind 4,
+   `$FD:E82C`, with its callees up to about `$FD:EAA0`) and `PalAnim_UnkE807` (kind 6, which
+   branches into it at `$FD:E869`); who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
    BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967) and the data at `$FD:B957` (pointer table and
    records read from `!BattleRom_UnkFDB99C`). Open: what the BattleRom_EnemyReward `.Unk0`/`.Unk6`
    sums, the end messages 4-7 and their bits (`!Battle_UnkB2B0`/`B2B3`), the `BattlerStats.Unk57`

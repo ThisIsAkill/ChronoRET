@@ -8924,15 +8924,18 @@ Fade_StepFixedColor:
 ; to VRAM $5800 + Field_Unk31 x $200 (Field_UploadUnk5800) while
 ; Field_Unk36 is set, so Field_Unk31 reads as the text line (0-3)
 ; being written. Field_Unk26 / Field_Unk27 are the window's place and
-; how far it is open (EngFD_UnkC2C1 dispatches on Field_Unk26; not
-; analysed). The status codes come from the string (TextWin_Status:
-; the control codes $00 and $03-$0C set them): 0 = the end, 3 = a wait
-; of its argument x 15 frames, 5-8 = a new line (7/8 after a button
-; press), 9-$C = a new page ($B/$C after a button press), $10 = one
-; glyph drawn. That reading of the codes comes from what this code
-; does with them (Field_Unk34 = Field_Unk34Swallow waits for a press in
-; Field_ActionButton, probably). Field_Unk1F87 keeps its name for its
-; verified caller (better: Field_MessageStep).
+; how far it is open: EngFD_UnkC2C1 dispatches on Field_Unk26 to the
+; FieldHdma band builders, which put a band of 2 x Field_Unk27 lines on
+; the HDMA tables centred on line 48 (1, FieldHdma_BuildTopBandA/B) or
+; line 171 (2, FieldHdma_BuildBottomBandA/B). The status codes come
+; from the string (TextWin_Status: the control codes $00 and $03-$0C
+; set them): 0 = the end, 3 = a wait of its argument x 15 frames, 5-8 =
+; a new line (7/8 after a button press), 9-$C = a new page ($B/$C after
+; a button press), $10 = one glyph drawn. That reading of the codes
+; comes from what this code does with them (Field_Unk34 =
+; Field_Unk34Swallow waits for a press in Field_ActionButton,
+; probably). Field_Unk1F87 keeps its name for its verified caller
+; (better: Field_MessageStep).
 ; ============================================================
 
 org $C01F87
@@ -15365,8 +15368,8 @@ Evt_Op83_InitEnemySprite:
 ; place and priority bits, and the two opcodes that start the location's
 ; palette animations: they fill a free FieldAnimB record (the 12-byte
 ; records FieldFD_LoadAnimSetB fills from the location's list, worked on
-; each frame by FdVec_FFF7: not analysed, so the record fields keep Unk
-; names) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
+; each frame by FdVec_FFF7's PalAnim_TickAll; the record fields keep
+; Unk names, their roles are in the PalAnim_* headers) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
 ; other handlers: entered with Y = the opcode's offset in Evt_Data, they
 ; return X = where the script goes on and C=1 (keep running) or C=0
 ; (stop this object for this run). "a" / "b" name event words at

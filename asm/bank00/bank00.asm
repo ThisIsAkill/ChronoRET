@@ -90,17 +90,16 @@ BitClear:               ; $FF28 — bit N clear, others set
 ; ============================================================
 ; Wave tables ($FF30–$FFAF)
 ; One period of a sine-like wave between -6 and +6 (32 signed 16-bit
-; entries), stored twice. Two routines read it, at $FD:C5A7 and $FD:C6F7
-; (the table reads start at $FD:C5F3 / $FD:C743). Each masks a phase with
-; AND #$3E, then makes 16 reads, $C0FF30,X, $C0FF34,X, ... $C0FF6C,X (a
-; step of 4 per output), adds the word at $1D8F with ADC.l $001D8F and
-; stores to $1D27, $1D2B, ... (first routine) or $1DA7 ... $1DE3 (second).
-; There is no CLC between outputs, so a carry from one sum passes into the
-; next; reproduced as found, effect not traced.
+; entries), stored twice. Two routines read it, FieldHdma_FillDataA and
+; FieldHdma_FillDataB (bank $FD). Each masks a phase with AND #$3E, then
+; makes 16 reads, $C0FF30,X, $C0FF34,X, ... $C0FF6C,X (a step of 4 per
+; output), adds Map_Unk1D8F and stores the 16 words as the BG3 H scroll
+; of 16 lines of HDMA data (Hdma_WaveA / Hdma_WaveB): a per-line wave on
+; layer 3, so "Scroll" in the names holds. There is no CLC between
+; outputs; the effect (a line 1 pixel further after a sum that carried)
+; is described in FieldHdma_FillDataA.
 ; The reads run past A into B (up to $FFAB), so B is A's second period:
 ; it lets them read ahead without masking each index.
-; What the outputs drive is not traced yet; "Scroll" in the names is a
-; guess.
 ; ============================================================
 ScrollWaveA:            ; $FF30 (32 × sint16)
     dw  $0000,$0001,$0002,$0003,$0004,$0005,$0005,$0006
