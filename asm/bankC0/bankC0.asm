@@ -11331,8 +11331,8 @@ Evt_OpC4_MsgChoiceUnk30_2:
 ; opcodes at $C0:5F6E). The dispatchers enter every handler with C=0
 ; (their ASL of a zero-extended opcode), so a handler that never sets C
 ; returns C=0 and ends the object's run. The item and gold opcodes use
-; the bank $C1 services behind BankC1_Entry8003 (the service table at
-; $C1:D126, unmatched; read from the ROM): 0 looks item Y up in the
+; the bank $C1 services behind BankC1_Entry8003 (BankC1_ServiceTable
+; at $C1:D126): 0 looks item Y up in the
 ; inventory ids at $7E:2400 (A = the id when found, else 0), 1 adds one
 ; of item Y (BankC1_AddItem), 2 takes one away (A = 0 when it is not
 ; held), 3 tests the 24-bit gold sum at $7E:2C53 against Y (A = $FF
