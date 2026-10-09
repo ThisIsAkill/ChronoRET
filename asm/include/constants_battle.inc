@@ -559,6 +559,20 @@ if !constants_battle_inc == 0
 !BattleAi_UnkAEEBCode1    = 4     ; !Battle_UnkAEEB for action code 1
 !BattleAi_RunBuild        = 0     ; !BattleAi_RunMode: build the action block, then play
 !BattleAi_RunPlay         = 1     ; !BattleAi_RunMode: play the block as it is
+!BattleAi_RunNone         = 2     ; !BattleAi_RunMode: neither; BattleAi_EnemyTurn only steps on to the next action
+!BattleAi_ActCodeSwapped  = 5     ; !BattleAi_ActCode left by run handler $07 (read later: not traced)
+!BattleAi_ActCodeGone     = 7     ; !BattleAi_ActCode left by run handler $09 (read later: not traced)
+!BattleAi_StatDeltaSub    = $80   ; run handler $0C: delta bit 7 set = subtract the rest
+!BattleAi_StatByteMax     = $FF   ; run handler $0C: the sum is capped here
+!BattleAi_FlagsNop7       = $80   ; run handler $0D's flag bits, highest first: $80 nothing ...
+!BattleAi_FlagsClearB320  = $40   ; ... zero the enemy's !Battle_UnkB320 ...
+!BattleAi_FlagsClearSt1   = $20   ; ... clear BattlerStats.Status bit 1 ...
+!BattleAi_FlagsNop4       = $10   ; ... nothing ...
+!BattleAi_FlagsClearClock = $08   ; ... zero !Battle_FrameCounter's low 3 bytes ...
+!BattleAi_FlagsIncB320    = $04   ; ... count !Battle_UnkB320 up ...
+!BattleAi_FlagsSetSt1     = $02   ; ... set BattlerStats.Status bit 1 ...
+!BattleAi_FlagsNop0       = $01   ; ... nothing
+!BattleAi_StatusBit1      = $02   ; the BattlerStats.Status bit run handler $0D sets / clears (meaning unknown)
 !BattleAi_AnimNoTarget    = 4     ; !Enemy_AnimWanted set when the chosen target is an enemy that is gone (one of the
                                   ; values that let BattleSys_Unk8461 run the enemy's turn)
 !BattleAi_RandPcBound     = $30   ; Battle_RandRange high bound for a random PC: the result / 16 is 0-2
@@ -591,6 +605,28 @@ if !constants_battle_inc == 0
 !BattleAi_Unk4CBit7       = $80   ; the BattlerStats.Unk4C+2 / +7 bit for !BattleAi_ScriptUnk8D08
 !BattleAi_Status2Bit2     = $04   ; the BattlerStats.Status2 bit for !BattleAi_ScriptUnk8D1E (the same bit as
                                   ; !Battle_TurnNoReactBit)
+!BattleAi_TgtCodePcs      = $01   ; target code 1: the present PCs (BattleAi_TargetTable entry 1); test $02's choice
+!BattleAi_TgtCodeUnk16    = $16   ; target code $16 (handler not analysed): test $02's other choice
+!BattlePos_QueryWithin32  = 4     ; !BattlePos_Mode: subject within 32 pixels of other (test $0C)
+!BattlePos_QuerySameRow   = 5     ; !BattlePos_Mode: |dy| within !BattlePos_RowBand (test $0D)
+!BattlePos_QueryAbove     = 6     ; !BattlePos_Mode: subject above other; + 1 = left of other (test $0E)
+!BattlePos_QueryPathClear = 8     ; !BattlePos_Mode: path to the other is clear (test $0F)
+!BattlePos_QueryLowerHalf = 9     ; !BattlePos_Mode: subject in the lower half (test $10) ...
+!BattlePos_QueryUpperHalf = $0A   ; ... upper half
+!BattlePos_QueryRightPart = $0B   ; ... right part
+!BattlePos_QueryLeftPart  = $0C   ; ... left part
+!BattlePos_QueryWithin48  = $0E   ; !BattlePos_Mode: subject within 48 pixels of other (test $1F)
+!BattleAi_PathArgBit0     = $01   ; test $0F: !BattlePos_Arg = record byte 2 * 4 + this
+!BattleAi_PercentBound    = 100   ; Battle_RandRange high bound for a 0-99 roll (test $17, choose $04)
+!BattleAi_B19EKindMask    = $F0   ; !Battle_UnkB19E byte 0 bits tests $11/$12 compare
+!BattleAi_B19EKind0       = $40   ; ... with this when the record's selector is 0
+!BattleAi_B19EKind1       = $50   ; ... with this when it is 1
+!BattleAi_B19EBit4        = $10   ; !Battle_UnkB19E byte 0 bit tests $13/$14 look at
+!BattleAi_B19ELowMask     = $0F   ; !Battle_UnkB19E byte 0 low nibble (test $14: a battler slot, probably)
+!BattleAi_ChanceStep1     = 25    ; choose $04: rolls 0-99 below this take the next action ...
+!BattleAi_ChanceStep2     = 50    ; ... below this the one after it ...
+!BattleAi_ChanceStep3     = 75    ; ... below this the third; the rest the fourth
+!BattleAi_EffByte2Keep    = $F0   ; choose $04 keeps these bits of !Battle_UnkAEE6+2 and ORs DP $0E into the rest
 
 ; --- Battle setup (Battle_SetupBattle) ---
 !Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56

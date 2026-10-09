@@ -1,0 +1,8 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:8F87,BattleAi_TestTargetId,2026-10-09,rev109a,approved,048e92df2ee1,"Fix holds: B1D2 +1 (ReadTargets) on the BEQ .fail path, +2 after the INX; record [$03, code, id, -], AEFF compare/mark, pick/fail paths, DP $06-$08, M/X/DP/DB checked"
+$C1:90BE,BattleAi_TestHpAtMost,2026-10-09,rev109a,approved,032ca67ed7d4,"Fix holds: +1 without targets, +2 with (INX, then byte 2 and +1); 16-bit CurHp <= value marks; DP $08/$09 (STZ $09), $0A, $0C, pick/fail paths and CPU state checked"
+$C1:9130,BattleAi_TestStatByteAtLeast,2026-10-09,rev109a,approved,9cf997213a06,"Fix holds: +1 without targets, +3 with (two INX); LDA ($0A),Y = offset + block, DP $08/$0A/$0B/$0E, no-mark quirk vs PickMarkedTarget (count 1: slot 1) checked"
+$C1:9810,BattleAi_ChooseAnimTarget,2026-10-09,rev109a,approved,94a62938fdf9,"Fix holds: own INX + ReadTargets INX = code at byte 2, INX = ActArg byte 3, B1D2 + 3; $5E0D/$5E15 by enemy entry, A = Targets[0], X = entry; DP=0 for ReadTargets"
+$C1:9E63,BattleAi_RunMessage,2026-10-09,rev109a,approved,5f48ebb8189d,"Hedge added (message, probably; vector not analysed), matches stub; byte +1, CMP #0/BEQ, JSL $CD:0033, RunMode = RunNone (2); Exit A/X/Y checked"
+$C1:AC14,BattleAi_ReadTargets,2026-10-09,rev109a,approved,985cd4348771,"Entry DP=0 fixed and true ($A541 STX $0A, JSR $AD68 reads DP $0A); $80/BPL paths, AD8E copy (X=11), B2AE, sub-entry B=0 checked. nit: TestStatusBits clears the list itself at $8F2D"
+$C1:B88D,BattleAi_RunTable,2026-10-09,rev109a,approved,9fd73248d4a5,"23 words in ROM = the 23 handler labels, JSR ($B88D,X) at $8D88; $07 ('it seems') and $0F ('a message, probably') now hedged; other summaries match the handler headers"
