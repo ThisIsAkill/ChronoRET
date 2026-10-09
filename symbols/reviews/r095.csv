@@ -1,0 +1,5 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:1F87,Field_Unk1F87,2026-10-09,rev95a,approved,f40d5b586849,"Quirk fix right (LDA #$29/DEC once, then up to 5 CMPs); state dispatch, place choice, wait/choice/status paths, close loop, constants and M/X/DP/DB checked vs ROM"
+$C0:2E67,Evt_OpAA_SetAnimRow,2026-10-09,rev95a,approved,e4731373ee44,"Fix right: INY/TYX/INX gives X = opcode+2, Y = opcode+1; sub-entries X = Y+1, Y kept; BRA targets from $B3/$B4/$AE, table entries, writes, A=0, C=1 checked vs ROM"
+$C0:A079,Party_AnimLeftWalk,2026-10-09,rev95a,approved,607f24c2e00d,"Fix right: walk group $A079-$A0A0, run $A0A1-$A0C8; facings 2/3/0/1, BRL targets $A171/$A18C, table entries 3,1,24,8,4,2,32,16 and Exit (X = Obj_Cur) checked vs ROM"
+$C0:ED15,Irq_UploadTileAnim,2026-10-09,rev95a,approved,7f325ec42dc3,"Fix right: Irq_UnkF05E needs X=0 (LDX #$1C02), IrqHandler leaves X=0; metatiles $1E7..$1FF/$1E1, job order, one job per call checked. nit: Exit omit X flag, F05E's Unk63=$80"

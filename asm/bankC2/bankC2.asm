@@ -34,10 +34,10 @@ incsrc "../hardware.inc"
 ; before them.) TextWin_Init and TextWin_Step end in RTL, so the
 ; $0003/$0009 vectors are JSL targets.
 ; Callers (1 JML site): GameLoop_Main ($C0:006E).
-; Callers of BankC2_Entry0003 (6 JSL sites): unmatched ($C0:2121, $C2:F91F, $C2:F9E4, $C2:FA3F,
-;   $C2:FA99, $CD:0278).
-; Callers of BankC2_Entry0009 (5 JSL sites): unmatched ($C0:2172, $C2:F928, $C2:FAB2, $CD:0282,
-;   $CD:04E9).
+; Callers of BankC2_Entry0003 (6 JSL sites): Field_MsgStart ($C0:2121) and unmatched ($C2:F91F,
+;   $C2:F9E4, $C2:FA3F, $C2:FA99, $CD:0278).
+; Callers of BankC2_Entry0009 (5 JSL sites): Field_MsgStep ($C0:2172) and unmatched ($C2:F928,
+;   $C2:FAB2, $CD:0282, $CD:04E9).
 ; Entry/Exit: those of the routine each vector jumps to.
 org $C20000
 BankC2_Entry0000:

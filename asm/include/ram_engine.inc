@@ -103,7 +103,7 @@ if !ram_engine_inc == 0
 !Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState
 !Field_HdmaEnable = $28                  ; 8-bit HDMA channel mask: the NMI handler writes it to HDMAEN
                                          ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
-!Field_Unk29 = $29                       ; 8-bit countdown; Field_Unk1F87 dispatches on it;
+!Field_Unk29 = $29                       ; 8-bit message state; Field_Unk1F87 dispatches on it;
                                          ; Field_SaveState forces it to 1 when nonzero
 !Field_Unk2A = $2A                       ; 8-bit; Field_CheckTileInFront stores the treasure outcome
                                          ; here (TreasureKind_*) as it starts Field_Unk29 = 1
@@ -116,15 +116,19 @@ if !ram_engine_inc == 0
 !Field_Unk30 = $30                       ; 8-bit; zeroed by Field_InitLoadState and by
                                          ; Field_CheckTileInFront as it starts Field_Unk29 = 1
 !Field_Unk31 = $31                       ; 8-bit; Field_UploadUnk5800 uploads to VRAM word
-                                         ; $5800 + this x $200 (no writer traced)
+                                         ; $5800 + this x $200; the message text line 0-3
+                                         ; (Field_Unk1F87 / Field_MsgStep step it)
 !Field_Unk32 = $32                       ; 8-bit; zeroed by Field_CheckTileInFront as it starts
                                          ; Field_Unk29 = 1
+!Field_Unk33 = $33                       ; 8-bit; zeroed by Field_Unk1F87 as the message window opens
+                                         ; (no reader traced)
 !Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
                                          ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
 !Field_Unk36 = $36                       ; 8-bit; NmiHandler runs Field_UploadUnk5800 while it is
                                          ; nonzero: every frame while bit 7 is clear, once (it is
-                                         ; zeroed first) when bit 7 is set; no writer traced
+                                         ; zeroed first) when bit 7 is set; Field_Unk1F87 and
+                                         ; Field_MsgStep set it
 !Field_Unk38 = $38                       ; 8-bit step of Field_Unk885A (1, 2; it clears it when done);
                                          ; DefaultHandler sets it to 1. Field_DpadDispatch does
                                          ; nothing while it is nonzero
@@ -383,8 +387,25 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
-!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33 and
-                                         ; $C7-$D7: 16-bit, an Evt_Data offset kept across a call
+!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33,
+                                         ; $C7-$D7, $2E and $88: 16-bit, an Evt_Data offset (the
+                                         ; opcode's) kept across a call
+!EvtPal_Arg = $D9                        ; alias of Eng_Scratch in Evt_Op88_ObjPalAnim / Evt_Op2E_PalAnim:
+                                         ; 8-bit, the kind operand, then a colour / count operand
+!EvtPal_Base = $DB                       ; alias of Oam_Range1LoPtr's slot there: 8-bit, the object's
+                                         ; colour 0 (Obj_OamAttr x 8 + EvtPal_SpriteColor0)
+!EvtPal_Src = $DB                        ; the same slot in their kind-$8x copy: 16-bit, the address in
+                                         ; bank $7F of the colour bytes
+!EvtPal_Speeds = $DD                     ; alias of Oam_Range2LoPtr's slot there: 8-bit operand whose
+                                         ; nibbles go to FieldAnimB.Unk7 / .Unk8
+!EvtPal_ColOfs = $DD                     ; the same slot in the kind-$8x copy: 16-bit, colour number x 2
+!EvtPal_Count = $C1                      ; alias of Anim_RowAddr's slot there: 16-bit MVN count
+!EvtTile_Pos = $D9                       ; alias of Eng_Scratch in Evt_Op8B / Evt_Op8C: 16-bit, the tile
+                                         ; (column | row << 8), the map index of Map_TileAttrA/B; then
+                                         ; 8-bit, the priority bits from Map_TileAttrA
+!EvtTile_PrioA = $D9                     ; that 8-bit use (also in Evt_Op8D / Evt_Op8E)
+!EvtPrio_Flags = $D9                     ; alias of Eng_Scratch in Evt_Op8E_SetOamFlags: 8-bit, the
+                                         ; new Obj_OamFlags
 !EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6 and the character
                                          ; opcodes: the character (16-bit in $D3, else the low byte)
 !EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
@@ -519,7 +540,8 @@ if !ram_engine_inc == 0
 !Oam_Range3LoPtr = $DF                   ; 16-bit low-table write pointer for range 3 (starts $0710)
 
 ; --- Audio (dp) ---
-!Audio_SfxUnkFA = $FA                    ; 8-bit sound-effect id, $45 at load; no matched reader
+!Audio_SfxUnkFA = $FA                    ; 8-bit, $45 at load; MusicCueDispatch sends it with Audio_Cmd14
+                                         ; before a battle (the battle music, probably; not a sound effect)
 !Audio_SfxTileAnimB = $FB                ; 8-bit sound-effect id passed by Audio_PlayTileSfxB
                                          ; (DefaultHandler tile animation); $65 at load
 !Audio_SfxTileAnimA = $FC                ; 8-bit sound-effect id passed by Audio_PlayTileSfxA (Mode*
@@ -541,12 +563,12 @@ if !ram_engine_inc == 0
 !Field_TileStepY = $5E                   ; 8-bit map row for DefaultHandler's single-tile step
 !Field_VramQueueFlags = $5F              ; 8-bit; bit 4 = TileAnim_VramAddrs filled by a
                                          ; Mode*_Handler, bit 1 = TileAnim_StepVramAddrs filled by
-                                         ; DefaultHandler (inferred: picked up by the tilemap
-                                         ; uploader)
+                                         ; DefaultHandler; Irq_UploadTileAnim sends them and
+                                         ; clears the bit
 !TileAnim_PairCount = $60                ; 8-bit tiles changed / 2, minus 1: 0 for ModeE6 (2 tiles),
                                          ; 1 for ModeEC/EE (4), 2 for ModeFA/FC (6). Inferred from
-                                         ; the setters and the VRAM uploader at $C0:ED24, which
-                                         ; sends 8/16/24 VRAM words for 0/1/2 (not converted yet)
+                                         ; the setters and Irq_UploadTileAnim, which sends 8/16/24
+                                         ; VRAM words for 0/1/2
 !TileAnim_StepKind = $61                 ; 8-bit; DefaultHandler sets 0 when the stepped tile was
                                          ; $FE, 1 when it was $E0
 
@@ -749,6 +771,8 @@ if !ram_engine_inc == 0
 !Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (the last byte of the block
                                          ; Audio_DriverCommand sends; bank $C2's C2Scene_QueueSoundCmd
                                          ; fills all four bytes $1E00-$1E03)
+!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after
+                                         ; (next to the Audio_Cmd* block; reader not traced)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
                                          ; colours) that Pal_LoadUnkRow0 copies to Pal_CgramBuf, the
@@ -762,6 +786,25 @@ if !ram_engine_inc == 0
                                          ; bytes from entry + 2 to Pal_Buf row 0
 !FieldRom_Unk9CF0 = $FF9CF0              ; ROM: four 64-byte pieces Field_UploadUnk0000 sends to VRAM
 !FieldRom_Unk9260 = $FF9260              ; ROM: 64 bytes Field_UploadUnk57E0 sends to VRAM $57E0
+!LayerDrift_Flags = $7F3415              ; 8-bit: bit 1 / bit 2 make ScrollStepAccum step layer 2 / 3 (no
+                                         ; writer traced; the LayerDrift_* bytes are read with DB=$7F)
+!LayerDrift_L2SpeedX = $7F3417           ; 8-bit signed: layer 2's X speed in 1/16 pixels per call
+!LayerDrift_L2SpeedY = $7F3418           ; ... its Y speed
+!LayerDrift_L3SpeedX = $7F3419           ; ... layer 3's X speed
+!LayerDrift_L3SpeedY = $7F341A           ; ... layer 3's Y speed
+!LayerDrift_L2FracX = $7F341D            ; 8-bit signed fraction (1/16 pixels) carried between calls
+!LayerDrift_L2FracY = $7F341E
+!LayerDrift_L3FracX = $7F341F
+!LayerDrift_L3FracY = $7F3420
+!LayerDrift_L2X = $7F346B                ; 16-bit: layer 2's X position (copied to FieldBtlPpu.Scroll2+4)
+!LayerDrift_L2Y = $7F346D                ; ... Y (Scroll2+6)
+!LayerDrift_L3X = $7F346F                ; ... layer 3's X (Scroll2+8)
+!LayerDrift_L3Y = $7F3471                ; ... Y (Scroll2+$A)
+!LayerDrift_Scratch = $D9                ; alias of Eng_Scratch in ScrollStepAccum (DP_Field): 16-bit,
+                                         ; the whole pixels of a negative step
+!TileAnimList = $7F1CC8                  ; 16 words: Map_TileProps indexes (row << 8 | column) of the
+                                         ; tiles animated at this location (TileAnimList_AddCurrent),
+                                         ; re-applied by TileAnimList_ApplyAll after a reload
 !Field_Unk7EF000 = $7EF000               ; WRAM source of Field_UploadUnk1C00/1D00 (VRAM $1C00/$1D00);
                                          ; Field_Unk29F7 / Field_Unk2B78 write the two tilemaps
 !Field_Unk7EF000RunEnd = $D9             ; alias of Eng_Scratch in Field_Unk2B78 (written absolute,
@@ -886,6 +929,24 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0F00 = $7F0F00                ; 8-bit; Evt_OpD9/Evt_OpDA zero its byte at Field_UnkAB with
                                          ; those of ObjX_Unk7F0C00 / 7F0D00 (no reader traced)
+!PartyLog_StepX = $7F0C00                ; alias of ObjX_Unk7F0C00: 128-entry ring (Field_UnkAB/AC/AD) of
+                                         ; the leader's X steps (Map_Unk1D32) logged by Party_Unk9E29
+                                         ; and replayed by Party_UnkA26B/A2CE as Obj_VelX
+!PartyLog_StepY = $7F0C80                ; alias of ObjX_Unk7F0C80: the same for Y (Map_Unk1D33)
+!PartyLog_PadX = $7F0D00                 ; alias of ObjX_Unk7F0D00: the D-pad X step (Map_Unk1D2C)
+                                         ; logged with it (the followers' facing and row)
+!PartyLog_PadY = $7F0D80                 ; alias of ObjX_Unk7F0D80: the D-pad Y step (Map_Unk1D2D)
+!PartyLog_PrioLow = $7F0E00              ; the leader's Obj_PrioLow logged with the step
+!PartyLog_PrioHigh = $7F0E80             ; the leader's Obj_PrioHigh logged with the step
+!PartyLog_Flags = $7F0F00                ; alias of ObjX_Unk7F0F00: Map_Unk1D34 (the step's tile flags)
+                                         ; logged with the step
+!Party_TileFlagged = $E5                 ; alias of ObjVel_AttrB's slot in Party_LeaderAnim and the
+                                         ; other *Anim routines: 8-bit, 1 when the leader's
+                                         ; Map_Unk1D34 is nonzero without Map_ProbeShape1E (only
+                                         ; Party_LeaderAnim sets it); 0 lets Party_AnimRun pick
+                                         ; ObjAnim_RowUnk17
+!Party_StepXCode = $DB                   ; alias of Oam_Range1LoPtr's slot there: 8-bit, the X step code
+                                         ; >> 3
 
 ; --- OAM shadow ---
 !Obj_PalPrev = $0B00                     ; 8-bit per object (index Obj_Cur): the object before it in
@@ -1050,6 +1111,11 @@ if !ram_engine_inc == 0
                                          ; (then clears it again with the ObjX_* block)
 !ObjX_Unk7F0B80 = $7F0B80                ; 16-bit per object in bank $7F; Evt_InitObjects writes
                                          ; ObjX_Unk7F0B80Init twice, then clears it again
+!ObjX_PalAnimRec = $7F0B80               ; alias of ObjX_Unk7F0B80: 16-bit per object, the offset of
+                                         ; the FieldAnimB record Evt_Op88_ObjPalAnim gave it (kinds
+                                         ; $20/$30), ObjX_PalAnimNone when none (bit 15 tested);
+                                         ; 0 after a load (Evt_InitObjects' clear wipes its $FFFF),
+                                         ; which reads as record 0
 !ObjX_AnimLoops = $7F0B01                ; 8-bit per object in bank $7F: loops left for animation
                                          ; mode 2
 !AnimRom = $E40000                       ; bank $E4: object animation tables (frame numbers and

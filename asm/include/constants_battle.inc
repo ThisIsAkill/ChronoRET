@@ -843,7 +843,7 @@ if !constants_battle_inc == 0
 ; --- Action effects (BattleSys_RunTechParts, BattleSys_Effect*) ---
 !Battle_EffArg3Mask      = $3F    ; !BattleRom_UnkCC05CC byte 3 bits 5-0: DP $16 of BattleSys_LoadEffectArgs
 !Battle_EffArg2Mask      = $0F    ; byte 2 bits 3-0: its DP $18
-!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and $C1:DA37
+!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and BattleSys_RestoreHpMp
 !Battle_StatusBit6       = $40    ; BattlerStats.Status bit 6: cleared by BattleSys_Effect2C; meaning unknown
 !Battle_TechParts        = 3      ; parts (users) of a tech: BattleRom_TechRec.Part1-3
 !Battle_TechPartNone     = $80    ; a .Part byte with bit 7: BattleSys_RunTechParts skips the part
@@ -864,14 +864,14 @@ if !constants_battle_inc == 0
 !Battle_EnemyPartNone    = $FF    ; an enemy record's part number: no effect
 !Battle_TechFlagsStopBit = $80    ; enemy record flags bit 7: with !Battle_UnkB200 bit 7, no hit set merge
 !Battle_EffByte1Mask     = $1F    ; effect byte 1 bits 4-0: DP $18 of BattleSys_EffRecArgsUnk66
-!Battle_EffResultMiss    = $80    ; DP $16 after $C1:DBAA in BattleSys_Effect02: a miss
-!Battle_EffResultMissFE  = $FE    ; DP $16 after $C1:E9D5 in BattleSys_Effect06: a miss
+!Battle_EffResultMiss    = $80    ; DP $16 after BattleSys_SetStatus in BattleSys_Effect02: a miss (never produced)
+!Battle_EffResultMissFE  = $FE    ; DP $16 after BattleSys_StealItem in BattleSys_Effect06: a miss
 !Battle_EffResultNoneFF  = $FF    ; ... $FF: !Battle_UnkB200 bit 7 (a dead store there)
 !Battle_AE4DBit4         = $10    ; !Battle_UnkAE4D bit 4: BattleSys_Effect03 skips its first test
 !Battle_AE4DBit2         = $04    ; bit 2: BattleSys_Effect03 also runs BattleSys_UnkE976
-!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs $C1:E9D5
-!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and $C1:DA37
-!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run $C1:E77B
+!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs BattleSys_StealItem
+!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and BattleSys_RestoreHpMp
+!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run BattleSys_DrainHpMp
 !Battle_Eff05Bit6        = $40
 !Battle_Eff05Bit7Arg     = 3      ; DP $1A for the bit-7 run
 !Battle_Eff05Bit6Arg     = 7      ; DP $1A for the bit-6 run
@@ -880,5 +880,66 @@ if !constants_battle_inc == 0
 !Battle_MissSecondBit6   = $40    ;   with DP $1C = 0, bit 6 with DP $1C = 1)
 !Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
 !Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
+
+; --- Effect arithmetic ($C1:DA37-$C1:EB48) ---
+!Battle_RestoreHpBit     = $80    ; BattleSys_RestoreHpMp: DP $1A bit 7: restore HP
+!Battle_RestoreMpBit     = $40    ; ... bit 6: restore MP
+!Battle_RestoreFull      = $0F    ; ... DP $18 value: restore to .MaxHp / .MaxMp
+!Battle_RestoreHpStep    = 50     ; ... an HP amount not a multiple of this gets a random part
+!Battle_RestoreMpStep    = 10     ; ... MP: the amount is DP $18 times this (and the same test)
+!Battle_CureKoBit        = $80    ; BattleSys_CureStatus: DP $16 bit 7: also clear the KO bit
+!Battle_CureKeepStatus   = $C0    ; ... the .Status bits it keeps
+!Battle_CureKeepUnk4C    = $C2    ; ... the .Unk4C bits it keeps
+!Battle_StatusIdxNone    = $FF    ; BattleSys_SetStatus: DP $16 value: set nothing
+!Battle_SetStatusRefused = $80    ; ... DP $40 value when status byte 1 is refused
+!Battle_SureHitChance    = 99     ; BattleSys_RollHit: the chance when the hit value is not below the evade
+!Battle_Status2Bits12    = $06    ; BattlerStats.Status2 bits 1-2: cleared by damage (BattleSys_ApplyDamage,
+                                  ; BattleSys_WakeTarget)
+!Battle_Status2Bits02    = $05    ; .Status2 bits 0 and 2: BattleSys_AdjustHit / AdjustEvade cut the value
+!Battle_Status2Bits71    = $82    ; .Status2 bits 7 and 1: BattleSys_AdjustEvade x 4 / 20
+!Battle_Unk4DBit0        = $01    ; .Unk4C+1 / .Unk4C+6 bit 0: BattleSys_AdjustEvade doubles the value
+!Battle_Twentieths       = 20     ; the divisor of the x n / 20 cuts of AdjustHit, AdjustEvade, AdjustDefence
+!Battle_Twentieths10     = 10     ; x 10 / 20
+!Battle_Twentieths15     = 15     ; x 15 / 20
+!Battle_Twentieths16     = 16     ; x 16 / 20
+!Battle_Twentieths18     = 18     ; x 18 / 20
+!Battle_DefenceRange     = $0100  ; BattleSys_ApplyDamage: damage x (this - defence) / this
+!Battle_B1FCBit0         = $01    ; !Battle_UnkB1FC bit 0: BattleSys_ApplyDamage skips the x 7 / 10 cuts
+!Battle_B1FCHealBit      = $40    ; !Battle_UnkB1FC bit 6: BattleSys_ApplyDamage gives the amount back (and clears it)
+!Battle_AE4DBit6         = $40    ; !Battle_UnkAE4D bit 6: no x 7 / 10 for !Battle_List10StatusBit
+!Battle_AE4DBit7         = $80    ; !Battle_UnkAE4D bit 7: no x 7 / 10 for !Battle_List5StatusBit
+!Battle_BarrierDiv       = 10     ; BattleSys_ApplyDamage: the cut is / this, then x !Battle_BarrierMul
+!Battle_BarrierMul       = 7
+!Battle_ArmStatus2Bits   = $F0    ; BattleSys_ArmStatusList: the .Status2 bits that have a list
+!Battle_ArmUnk4CBits     = $C0    ; ... the .Unk4C / .Unk4C+1 bits that have one
+!Battle_ArmUnk4C2Bits    = $60    ; ... the .Unk4C+2 bits that have one
+!Battle_List6StatusBit   = $80    ; .Unk4C bit list 6 would start (dead code in BattleSys_ArmStatusList)
+!Battle_List7StatusBit   = $40    ; .Unk4C bit list 7 would start (the same)
+!Battle_StatMax          = $FF    ; the cap of a byte value: BattleSys_AdjustEvade, AdjustDefence
+
+!Battle_DmgKind9         = 9      ; BattleSys_CalcDamage: formula kinds 9 and 10 (effect byte 5; their code is dead)
+!Battle_DmgKind10        = 10
+!Battle_DmgMul12         = 12     ; ... the factors and divisors of its formulas
+!Battle_DmgMul16         = 16
+!Battle_DmgDiv15         = 15
+!Battle_DmgDiv18         = 18
+!Battle_DmgDiv20         = 20
+!Battle_DmgDiv140        = 140
+!Battle_DmgCutDiv        = 10     ; ... the caster's .Status2 cuts: x 8 / this
+!Battle_DmgBoostBit7     = $80    ; the caster's .Unk4C+2 | .Unk4C+7 bits: x 3 / 2 (16-bit, no truncation)
+!Battle_DmgBoostBit3     = $08    ; ... / 2 x 3
+!Battle_DmgBoostBit1     = $02    ; ... / 4 x 5
+!Battle_Status2Bit2      = $04    ; .Status2 bit 2: BattleSys_CalcDamage divides by 4
+!Battle_DefUnk6B         = $3E    ; BattleSys_AdjustDefence: effect byte 6 value: the target's .Unk6B
+!Battle_DefUnk69         = $3C    ; ... value: the target's .Unk69 x 5 / 2
+!Battle_AE4EScaleMask    = $03    ; !Battle_UnkAE4E bits 1-0: n, the defence x n / 4 when not 0
+!Battle_ActHitKind4      = 4      ; !Battle_ActPcHitKind of an MP drain's target (BattleSys_DrainHpMp)
+!Battle_DrainRandDiv     = 10     ; BattleSys_DrainHpMp: the random part is below amount / this + 3
+!Battle_StealTripleUnk57 = $A5    ; BattleSys_StealItem: the caster's .Unk57 value that triples the chance
+!Battle_AE4EBit7         = $80    ; !Battle_UnkAE4E bit 7: BattleSys_RunUnkB2CCHandlers also tries the caster's .Unk73
+!Battle_Unk74RunBit      = $01    ; BattlerStats.Unk74 bit 0: ... and runs it
+!Battle_ItemCountMax     = 99     ; BankC1_AddItem: the most of one item
+!Battle_GoldCapHi        = $98    ; BankC1_AddGold: the gold cap 9,999,999 = $98967F, high byte
+!Battle_GoldCapLo        = $967F  ; ... its low word
 
 endif
