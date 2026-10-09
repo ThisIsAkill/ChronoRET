@@ -49,10 +49,51 @@ MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the st
                     ; SRAM +$0603 byte is the last entry not above it
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
-org $C299CA
-Menu_Mode00List:    ; Menu_ModeLists entries: lists of handler addresses (not matched)
+org $C2A051
+Menu_UnkA051:       ; Menu_MainPreviewTable entry 0 (icon 0's preview; not analysed)
+org $C2AD50
+Menu_UnkAD50:       ; Menu_MainPreviewTable entry 1 (not analysed)
+org $C2B8DA
+Menu_UnkB8DA:       ; Menu_MainPreviewTable entry 2 (not analysed)
+org $C2C2FF
+Menu_UnkC2FF:       ; Menu_MainPreviewTable entry 3 (not analysed)
+org $C2C9E5
+Menu_UnkC9E5:       ; Menu_MainPreviewTable entry 4 (not analysed)
+org $C2D065
+Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
+org $C2A101
+Menu_UnkA101:       ; Menu_MainRedrawTable entry 0 (not analysed)
+org $C2ADC3
+Menu_UnkADC3:       ; Menu_MainRedrawTable entry 1 (not analysed)
+org $C2B960
+Menu_UnkB960:       ; Menu_MainRedrawTable entry 2 (not analysed)
+org $C2C397
+Menu_UnkC397:       ; Menu_MainRedrawTable entry 3 (not analysed)
+org $C2CAE6
+Menu_UnkCAE6:       ; Menu_MainRedrawTable entry 4 (not analysed)
+org $C2D0DB
+Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
+org $C2E984
+Menu_UnkE984:       ; JSR from Menu_MainMenuLoop: the menu's pad handling; moves Menu_CursorSel and sets
+                    ; Menu_PadAction bits 7/6 from the Menu_ButtonMap buttons (read from the ROM; not matched)
+org $C2EAC2
+Menu_UnkEAC2:       ; JSR/JMP from the main menu: A = 0, then JSR $C2:EB03 (not analysed)
+org $C2ED31
+Menu_UnkED31:       ; JSR with X = a bank-$FF address: runs a list of command bytes there until one has
+                    ; bit 7 set (DB=$FF while it runs; not analysed)
+org $C2F28D
+Menu_UnkF28D:       ; JSR from Menu_MainMenuLoop with X = a tilemap address and Y = clock bytes: draws
+                    ; hours:minutes (99:59 when the byte at Y+4 is set; not matched)
+org $C2FBE3
+Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
+                    ; Menu_MainMenuLoop after the clock is drawn)
+org $C2FBF8
+Menu_VramRecBg2:    ; Menu_VramRec in unmatched data: VRAM $6000 = $7E:3E00 (Menu_Bg2Map), $1000 bytes
+org $C2FBFF
+Menu_VramRecBg2B:   ; Menu_VramRec in unmatched data: VRAM $6040 = $7E:3E80, $680 bytes (its first byte
+                    ; is the last of Menu_VramRecBg2)
 org $C29C29
-Menu_Mode01List:
+Menu_Mode01List:    ; Menu_ModeLists entries: lists of handler addresses (not matched)
 org $C2AA34
 Menu_Mode02List:
 org $C2B353

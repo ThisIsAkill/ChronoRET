@@ -973,4 +973,34 @@ if !constants_menu_inc == 0
 !Menu_SprUnitWords = $80                 ; VRAM words of 8 tiles
 !Menu_SprRowEvenMask = $FE
 
+; --- Menu mode 0 ---
+!Menu_SubThreads = $74                   ; Menu_KillThreads mask: slots 2, 4, 5, 6
+!MenuRom_MainConfirmList = $FFBD51       ; Menu_UnkED31 lists of the main menu
+!MenuRom_MainIconList = $FFBD2E
+!MenuRom_MainIconOam = $FFBD5C           ; 6 OAM entries: the icons
+!MenuRom_MainPalA = $FFCC14              ; 8 colours -> $80-$87
+!MenuRom_MainPalB = $FFCC24              ; 8 colours per icon -> $88-$8F
+!MenuRom_MainPalC = $FF9E0A              ; 3 colours -> $FD-$FF
+!Menu_MainHdmaBits = $83                 ; Menu_HdmaenShadow bits: HDMA 0, 1 and Menu_NmiMoveReq
+!Menu_MainMoveBytes = $001E
+!Menu_MainIconLit = $20                  ; tile offset of the selected icon
+!Menu_ArrowBelowOfs = $1001              ; X + 1, Y + 16 (one word)
+!Menu_ArrowAboveOfs = $2000              ; Y - 32 from there
+!Menu_ArrowTileAttr = $3E22              ; tile $22, attributes $3E
+!Menu_ArrowTileAttrFlip = $BE22          ; the same flipped vertically
+!Menu_MapRowBytes = $0040                ; bytes of a 32-tile tilemap row
+!Menu_MainFrameInner = $001C             ; bytes the frame rows' MVNs fill + 3
+!Menu_Bg2Rest = $0780
+!Menu_FrameLastCol = $001E              ; byte offset of the frame's right column (tile 15)
+!Menu_FrameTopLeft = $3FA4               ; frame tiles of Menu_MainMenuMaps
+!Menu_FrameTop = $3FA5
+!Menu_FrameTopRight = $3FA6
+!Menu_FrameLeft = $3FA7
+!Menu_FrameRight = $3FA8
+!Menu_FrameBottomLeft = $3FA9
+!Menu_FrameBottom = $3FAA
+!Menu_FrameBottomRight = $3FAB
+!Menu_FrameFill = $3FAC
+!Menu_Bg2Tile0 = $1FA0                  ; first of the 2 x 2 BG2 pattern tiles
+
 endif

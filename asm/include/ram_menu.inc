@@ -1053,6 +1053,27 @@ struct Menu_Spr $0000
 .FrameData:     skip $1E ; the frame record's last .TileCount x 8 bytes
 endstruct
 
+; --- Menu mode 0: the main menu ---
+!Menu_MainSel = $0411                    ; 8-bit; the main menu's icon (0-5); mode = it + 1 on confirm
+!Menu_Unk0412 = $0412                    ; 8-bit; reset with Menu_CfgA5 clear; += Menu_Unk0413, below 3
+!Menu_Unk0413 = $0413
+!Menu_Unk0415 = $0415                    ; 4 B $0415-$0418 zeroed with Menu_Unk0412 on an icon change
+!Menu_Unk0419 = $0419                    ; 8-bit; += Menu_Unk041A, below 3
+!Menu_Unk041A = $041A
+!Menu_Unk7F = $007F                      ; 8-bit; zeroed by the main menu (use not traced)
+!Menu_UnkAF = $00AF                      ; 8-bit; likewise
+!Menu_PadAction = $0D1D                  ; 8-bit; bit 7 confirm, bit 6 cancel (set by Menu_UnkE984)
+!Menu_Unk0D17 = $0D17                    ; 8-bit; set to $FF on entering a submenu (use not traced)
+!Menu_MainFrame = $5780                  ; tilemap rows of $40 B: the main menu's 16 x 6 frame
+!Menu_MainFrameRow1 = $57C0
+!Menu_MainFrameRow5 = $58C0
+!Menu_Bg2Map = $3E00                     ; BG2 tilemap built by Menu_MainMenuMaps
+!Menu_MainMoveSrc = $9750                ; the NMI block move Menu_MainMenuIcons queues ...
+!Menu_MainMoveDest = $9080               ; ... (use not traced)
+!Menu_OamArrowA = $0718                  ; OAM copy entries 6 and 7: the arrows at the selected icon
+!Menu_OamArrowB = $071C
+!Menu_MainClockTile = $3390              ; tilemap address Menu_UnkF28D draws the clock at
+
 ; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
 !Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers
 !Menu_CmdChar = $04C0                    ; 8-bit; the command's Y: a character id (record index for $0A)
