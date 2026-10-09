@@ -259,7 +259,9 @@ struct BattlerStats $5E00
 .Unk46:     skip 1      ; +$46: an enemy's first of 3 bytes from its BattleRom_EnemyStats record (BattleFD_UnkB438)
 .Unk47:     skip 1      ; +$47: an enemy's bits 0-1 go to !Battle_UnkA020 (BattleFD_UnkB121), bit 1 (inverted) to
                         ; !Battler_Unk9F29 (BattleFD_UnkB0D5); meaning unknown
-            skip 2
+.Unk48:     skip 1      ; +$48: an enemy's record +$16 (BattleFD_UnkB438); run handler $01 uses it as the
+                        ; action number (an enemy's attack, probably)
+            skip 1
 .Status:    skip 1      ; +$4A: status bits; bit 7 set = KO'd (by context: BattleTgt_SingleKoAlly lists these)
 .Status2:   skip 1      ; +$4B: more status bits; bit 1 set = Battle_UpdatePcFacing leaves the facing alone (meaning unknown)
 .Unk4C:     skip $0A    ; +$4C
@@ -1296,6 +1298,9 @@ endstruct
 !Battle_UnkB3B9           = $B3B9 ; 1 B: zeroed at BattleSys_Unk8461's start; meaning unknown
 !Battle_UnkB3BE           = $B3BE ; 1 B: counts 2, 1, 0, 2, ... while a PC is latched (BattleSys_Unk8461)
 !Battle_UnkB3CA           = $B3CA ; 2 B: !Battle_UnkB1D4 entry saved over a script block (BattleSys_Unk8461)
+!Battle_UnkB3C7           = $B3C7 ; 1 B: script byte the run handlers pass in A to BattleMsg_UnkVecCD0033 when non-zero
+                                  ; (a message number, probably); run handler $11 stores it 16-bit
+!Battle_UnkAF15Base       = !Battle_UnkAF15-!Battle_FirstEnemySlot ; !Battle_UnkAF15 indexed by battler slot
 !Battle_UnkB3F4           = $B3F4 ; 1 B: PC slot stored when !Battle_UnkAF23 is set (BattleSys_Unk8461)
 !Battle_UnkAD89           = $AD89 ; 2 B: amount of the turn-list hits (lists 1, 8, 9); goes to !Battle_ActPcHitAmount
 !BattleAi_TargetCount     = $AECB ; 1 B: entries in !BattleAi_Targets (written by the target-code handlers; 1 after

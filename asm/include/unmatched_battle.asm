@@ -20,38 +20,6 @@ org $C10006
 BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
 ; --- Enemy script handlers (tables BattleAi_TestTable, BattleAi_ChooseTable,
 ;     BattleAi_RunTable, BattleAi_TargetTable at $C1:B80D-$C1:B92C; not analysed) ---
-org $C199B8
-BattleAi_Run00:                         ; BattleAi_RunTable entry $00
-org $C199BE
-BattleAi_Run01:                         ; BattleAi_RunTable entry $01
-org $C19A39
-BattleAi_Run02:                         ; BattleAi_RunTable entry $02
-org $C19B46
-BattleAi_Run03:                         ; BattleAi_RunTable entry $03
-org $C19B47
-BattleAi_Run04:                         ; BattleAi_RunTable entry $04
-org $C19B48
-BattleAi_Run05:                         ; BattleAi_RunTable entry $05
-org $C19B8C
-BattleAi_Run06:                         ; BattleAi_RunTable entry $06
-org $C19B8D
-BattleAi_Run07:                         ; BattleAi_RunTable entry $07
-org $C19C6E
-BattleAi_Run08:                         ; BattleAi_RunTable entry $08
-org $C19C6F
-BattleAi_Run09:                         ; BattleAi_RunTable entry $09
-org $C19CB3
-BattleAi_Run0A:                         ; BattleAi_RunTable entry $0A
-org $C19D1B
-BattleAi_Run0B:                         ; BattleAi_RunTable entry $0B
-org $C19D72
-BattleAi_Run0C:                         ; BattleAi_RunTable entry $0C
-org $C19DCE
-BattleAi_Run0D:                         ; BattleAi_RunTable entry $0D
-org $C19E62
-BattleAi_Run0E:                         ; BattleAi_RunTable entry $0E
-org $C19E63
-BattleAi_Run0F:                         ; BattleAi_RunTable entry $0F
 org $C19E78
 BattleAi_Run10:                         ; BattleAi_RunTable entry $10
 org $C19F5A
@@ -253,6 +221,10 @@ BattleMsg_ShowMsg0BIfKeyChangedVec:     ; JSL vector: battle message / info pane
 
 org $CD0030
 BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
+
+org $CD0033
+BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-zero script byte (!Battle_UnkB3C7);
+                                        ; run by the enemy-script run handlers; a battle message, probably; not analysed
 
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
