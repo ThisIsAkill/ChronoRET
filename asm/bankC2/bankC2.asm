@@ -24904,8 +24904,7 @@ Menu_NmiUpload:
     BEQ .hdma_table
     LDX.w #!Menu_GradHdmaB
 .hdma_table:
-    STX.w A1T0L
-    ; falls into Menu_FlushVramQueue
+    STX.w A1T0L                         ; (then falls into Menu_FlushVramQueue)
 
 ; ============================================================
 ; Menu uploads, inventory and character helpers ($C2:8663–$C2:89E3)
