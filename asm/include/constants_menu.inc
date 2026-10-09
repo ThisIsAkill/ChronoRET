@@ -582,4 +582,11 @@ if !constants_menu_inc == 0
 !C2Scene_DialNibbleBytes = $0400
 !C2Scene_DialNibbleMask = $0F
 
+; --- The menu's NMI (Menu_Nmi) ---
+!Menu_NmiDp = $0D00                      ; direct page of Menu_Nmi (the menu's frame state)
+!Menu_HdmaenMask = $7F                   ; Menu_HdmaenShadow bits written to HDMAEN (channel 7 kept off)
+!Menu_FrameDone = $FF                    ; Menu_FrameReady after the NMI's upload
+!Menu_StackTopByte = $01                 ; stack-relative offset of the byte pushed last
+!Menu_PadHeldNoBit0 = $FFFE              ; Menu_PadHeld bits that count as held for the repeat stage
+
 endif

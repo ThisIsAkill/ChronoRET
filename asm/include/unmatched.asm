@@ -61,6 +61,9 @@ EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls i
 org $C2800E
 BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
                     ; at $0A01, forced blank, then the menu (not matched)
+org $C285D6
+Menu_Unk85D6:       ; JSR from Menu_Nmi when Menu_FrameReady has bit 7 clear (with HDMA off): probably
+                    ; the menu's per-frame upload (not traced)
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
 org $C30000

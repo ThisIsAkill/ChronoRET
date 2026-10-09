@@ -18333,6 +18333,178 @@ BankC2_CommandLong:
     RTL
 
 ; ============================================================
+; The menu's NMI ($C2:840E–$C2:84D1)
+; ============================================================
+; The menu (BankC2_MenuEntry, not matched) runs with its own NMI and IRQ
+; code; the JMLs at $C2:8406/$C2:840A (not matched) lead here. Its
+; frame state is a direct page at Menu_NmiDp ($0D00).
+
+org $C2840E
+; $C2:840E — Menu_Nmi (100 bytes, $840E–$8471)
+; The menu's NMI handler: saves DB, X, Y, P, then on its own stack
+; (Menu_NmiStackTop; the old S kept in Menu_NmiSavedSp) A, D and P; DB
+; = $00, DP = Menu_NmiDp. Acknowledges the NMI (RDNMI), counts
+; Menu_NmiFrames, forces blank, and when Menu_FrameReady has bit 7 clear
+; (the menu loop has a frame ready) turns HDMA off, runs the upload
+; (Menu_Unk85D6, not matched), sets HDMAEN from Menu_HdmaenShadow (bit
+; 7 masked off) and Menu_FrameReady = $FF, which the menu loop waits for
+; ($C2:81CA). Then the pad and clock (Menu_NmiPad), BG mode Nmi_BgMode,
+; INIDISP = Menu_InidispShadow (forced blank when it is 0), and
+; Menu_NmiTimer - 1 unless 0. Restores everything and returns.
+; Callers note: the JML at $C2:8406 (not matched) is probably what the
+;   menu's NMI vector points at; nothing else jumps here.
+; Callers (1 JML site): unmatched ($C2:8406).
+; Entry: an NMI in native mode; any M, X, DP, DB
+; Exit:  RTI with A, X, Y, DP, DB, P and S as they were
+; Calls: Menu_Unk85D6, Menu_NmiPad.
+Menu_Nmi:
+    PHB
+    PHX
+    PHY
+    PHP
+    REP #$30
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    TSX
+    STX.w !Menu_NmiSavedSp
+    LDX.w #!Menu_NmiStackTop
+    TXS
+    PHA
+    PHD
+    PHP
+    SEP #$20
+    PEA.w !Menu_NmiDp
+    PLD
+    CMP.w RDNMI                         ; acknowledge the NMI
+    INC.b !Menu_NmiFrames
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    LDA.b !Menu_FrameReady
+    BPL .upload
+    NOP
+    NOP
+    BRA .pad
+.upload:
+    STZ.w HDMAEN
+    JSR Menu_Unk85D6
+    LDA.b !Menu_HdmaenShadow
+    AND.b #!Menu_HdmaenMask
+    STA.w HDMAEN
+    LDA.b #!Menu_FrameDone
+    STA.b !Menu_FrameReady
+.pad:
+    JSR Menu_NmiPad
+    LDA.b #!Nmi_BgMode
+    STA.w BGMODE
+    LDA.b !Menu_InidispShadow
+    BNE .display
+    LDA.b #FORCED_BLANK
+.display:
+    STA.w INIDISP
+    LDA.w !Menu_NmiDp+!Menu_NmiTimer
+    BEQ .restore
+    DEC.w !Menu_NmiDp+!Menu_NmiTimer
+.restore:
+    PLP
+    PLD
+    PLA
+    LDX.w !Menu_NmiSavedSp
+    TXS
+    PLP
+    PLY
+    PLX
+    PLB
+    RTI
+
+; $C2:8472 — Menu_Irq (1 byte, $8472–$8472)
+; The menu's IRQ handler (through the JML at $C2:840A, not matched):
+; returns at once.
+; Callers note: the JML at $C2:840A (not matched), probably the menu's
+;   IRQ vector target.
+; Callers (1 JML site): unmatched ($C2:840A).
+; Entry: an IRQ; any M, X, DP and DB (nothing is touched)
+; Exit:  RTI: everything as it was
+; No calls.
+Menu_Irq:
+    RTI
+
+; $C2:8473 — Menu_NmiPad (93 bytes, $8473–$84CF)
+; The menu NMI's pad step. When Menu_RepeatFast is set,
+; Menu_PadRepeatDelay and Menu_PadRepeatTimer = 1 first. Reads the pad
+; (Menu_PollPad), copies JOY2L/H to Menu_Joy2Copy and ticks the clock
+; (Menu_TickPlayTime), with DB, DP and P saved around them (no
+; Menu_MapButtons here). Then the auto-repeat delay: with nothing held
+; but bit 0 (AND Menu_PadHeldNoBit0), Menu_RepeatStage = 1; while held,
+; each frame with a Menu_PadRepeat event takes it 1 down to 0 (a 16-bit
+; DEC of the dp word); Menu_PadRepeatDelay = Menu_RepeatDelays[stage]:
+; $20 frames before the first repeat, then 5. Menu_RepeatFast = 0.
+; Last, when the low byte of Menu_PadHeld has every bit of
+; Menu_ButtonMap+1 OR 1, Menu_Unk83 = that mask (what it is for is not
+; traced).
+; Callers (1 JSR site): Menu_Nmi ($C2:844D).
+; Entry: M any (SEP #$30 here), X any, DP = Menu_NmiDp, DB=$00 (the pad
+;        bytes and registers absolute)
+; Exit:  P as on entry (PLP); A = the mask, X = the stage; Y, DP and DB
+;        unchanged; the pad bytes, Menu_PlayTime and Menu_Joy2Copy
+;        updated
+; Calls: Menu_PollPad, Menu_TickPlayTime.
+Menu_NmiPad:
+    PHP
+    SEP #$30
+    LDA.b !Menu_RepeatFast
+    BEQ .poll
+    LDA.b #1
+    STA.w !Menu_PadRepeatDelay
+    STA.w !Menu_PadRepeatTimer
+.poll:
+    REP #$30
+    PHB
+    PHD
+    PHP
+    JSR Menu_PollPad
+    LDA.w JOY2L                         ; M=0 from Menu_PollPad: JOY2L/H
+    STA.w !Menu_Joy2Copy
+    JSR Menu_TickPlayTime
+    PLP
+    PLD
+    PLB
+    LDA.w !Menu_PadHeld
+    AND.w #!Menu_PadHeldNoBit0
+    BEQ .released
+    LDA.w !Menu_PadRepeat
+    BEQ .delay
+    DEC.b !Menu_RepeatStage
+    BPL .delay
+    STZ.b !Menu_RepeatStage
+    BRA .delay
+.released:
+    LDA.w #1
+    STA.b !Menu_RepeatStage
+.delay:
+    SEP #$30
+    LDX.b !Menu_RepeatStage
+    LDA.l Menu_RepeatDelays,X
+    STA.w !Menu_PadRepeatDelay
+    STZ.b !Menu_RepeatFast
+    LDA.l !Menu_ButtonMap1Long
+    ORA.b #$01
+    PHA
+    AND.w !Menu_PadHeld
+    CMP.b !Menu_StackTopByte,S          ; all of the mask's bits held?
+    BNE .done
+    STA.b !Menu_Unk83
+.done:
+    PLA
+    PLP
+    RTS
+
+; $C2:84D0 — Menu_RepeatDelays (2 bytes, $84D0–$84D1)
+; Menu_PadRepeatDelay for Menu_RepeatStage 0 and 1.
+Menu_RepeatDelays:
+    db $05,$20
+
+; ============================================================
 ; Joypad reader and play-time clock ($C2:84D2–$C2:85D5)
 ; ============================================================
 
@@ -18381,9 +18553,7 @@ Menu_ReadPad:
 ;   down; at 0 the held buttons are added to Menu_PadRepeat and the timer
 ;   reloads from Menu_PadRepeatDelay, as it does whenever nothing is
 ;   held.
-; Callers (2 JSR sites): Menu_ReadPad ($C2:84DB) and unmatched ($C2:8487).
-; Callers note (2 JSR sites): Menu_ReadPad ($C2:84DB); unmatched: $C2:8487
-;   (the menu's own NMI code).
+; Callers (2 JSR sites): Menu_NmiPad ($C2:8487) and Menu_ReadPad ($C2:84DB).
 ; Entry: M any (SEP #$20 here), X=0 (16-bit X for the held word copy),
 ;        DP and DB any (set to $0000 and $00 here, not restored)
 ; Exit:  M=0, X=1; DP=$0000, DB=$00; A = the held buttons that were
@@ -18516,9 +18686,7 @@ Menu_MapButtonsOne:             ; header: see Menu_MapButtons
 ; When the last one carries too (99:59:59 and 59 frames, with the
 ; limits as they are) the clock is all zeros again and
 ; Menu_PlayTimeMaxed is set to 1.
-; Callers (2 JSR sites): Menu_ReadPad ($C2:84E1) and unmatched ($C2:8490).
-; Callers note (2 JSR sites): Menu_ReadPad ($C2:84E1); unmatched: $C2:8490
-;   (the menu's own NMI code).
+; Callers (2 JSR sites): Menu_NmiPad ($C2:8490) and Menu_ReadPad ($C2:84E1).
 ; Entry: M, X any (SEP #$30 here), DP any (set to $0400 here, not
 ;        restored), DB any (the limits are read long)
 ; Exit:  M=1, X=1; DP=$0400; A, X clobbered; Y and DB unchanged

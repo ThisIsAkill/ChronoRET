@@ -65,8 +65,8 @@ if !ram_menu_inc == 0
 !Menu_PadRepeatMapped = $00FA            ; 8-bit Menu_PadRepeat through the button map (Menu_MapButtons)
 !Menu_PadRepeatDpad = $00FB              ; 8-bit copy of Menu_PadRepeat's high byte (the D-pad)
 !Menu_PadRepeatDelay = $00FC             ; 8-bit; frames before (and between) auto-repeats: what
-                                         ; Menu_PadRepeatTimer reloads from (the menu's NMI code sets it
-                                         ; at $C2:847C and $C2:84B8)
+                                         ; Menu_PadRepeatTimer reloads from (Menu_NmiPad sets it from
+                                         ; Menu_RepeatDelays)
 !Menu_PadRepeatTimer = $00FD             ; 8-bit auto-repeat countdown
 !Menu_PadPrevHeld = $00FE                ; 16-bit Menu_PadHeld of the frame before
 
@@ -702,5 +702,24 @@ struct C2Scene_SwirlTask $0000
 .Angle:     skip 2     ; +$18 angle of the next new line
             skip $26
 endstruct
+
+; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
+!Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
+!Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_Unk85D6) and
+                                         ; sets it to Menu_FrameDone; the menu loop waits for non-zero
+                                         ; ($C2:81CA)
+!Menu_InidispShadow = $10                ; 8-bit; INIDISP after the NMI (0: forced blank)
+!Menu_HdmaenShadow = $13                 ; 8-bit; HDMAEN after the upload (bit 7 masked off)
+!Menu_RepeatFast = $18                   ; 8-bit; non-zero: Menu_NmiPad sets the repeat delay and timer
+                                         ; to 1 once, then clears it
+!Menu_RepeatStage = $19                  ; 8-bit index into Menu_RepeatDelays (1 after a release, 0
+                                         ; after the first repeat); handled as a word by Menu_NmiPad
+!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0 (who sets it not traced)
+!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here (use not
+                                         ; traced)
+!Menu_NmiSavedSp = $1DFE                 ; 16-bit S at the menu NMI's entry
+!Menu_NmiStackTop = $1DFD                ; the menu NMI's own stack
+!Menu_ButtonMap1Long = $7E2994          ; Menu_ButtonMap+1 as a long address (Menu_NmiPad)
+!Menu_Joy2Copy = $041F                   ; 16-bit JOY2L/H copied by Menu_NmiPad each menu NMI
 
 endif
