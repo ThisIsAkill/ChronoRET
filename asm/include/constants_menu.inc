@@ -602,6 +602,14 @@ if !constants_menu_inc == 0
 !C2Scene_RandPosBX = $00E0               ; C2Scene_RandPosB: X $E0-$1DF ...
 !C2Scene_RandPosBY = $FFB8               ; ... and Y -$48 to $B7
 !C2Scene_NoiseStep = $0040               ; C2Scene_NoiseStep: 32 lines further into the noise each call
+!C2Scene_Unk7F00F7Bit1 = $02
+!C2Scene_PatternTileBytes = $0100        ; C2Scene_BuildPatternTiles: 8 tiles of 32 bytes zeroed ...
+!C2Scene_PatternSolidBytes = $0040       ; ... then 2 tiles set to $FF
+!C2Scene_PatternAllSet = $FF             ; every pixel colour 15
+!C2Scene_PatternRowCount = $20           ; bytes of C2Scene_PatternRows
+!C2Scene_Tile4bppBytes = $0020           ; bytes in one 8x8 4bpp tile
+!C2Scene_TilePlanes01Mask = $000F        ; offset within a tile's 16 bytes of bit planes 0-1
+!C2Scene_PatternNextPair = $0030         ; from past one tile's planes 0-1 to the next tile pair
 !C2Scene_Unk7F00AABit0 = $01
 !C2Scene_Unk7F019ABit3 = $08
 

@@ -6977,7 +6977,8 @@ C2Scene_MosaicInStep:
 ; the signed value is returned in A instead of being multiplied.
 ; Callers (5 JSL sites): unmatched ($C2:6752, $C2:6D10, $C2:704F, $C2:711D, $C6:E9FF).
 ; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_TaskBg3Wave ($C2:76CB), C2Scene_TaskBg3LineWave
-;   ($C2:77D9) and unmatched ($C2:673B, $C2:6D17, $C2:7062, $C2:712D, $C2:7D33, $C2:7DB9, $C6:EA17).
+;   ($C2:77D9), C2Scene_Bg2HWaveStep ($C2:7D33), C2Scene_Bg2VWaveStep ($C2:7DB9) and unmatched
+;   ($C2:673B, $C2:6D17, $C2:7062, $C2:712D, $C6:EA17).
 ; Callers note: $C2:6D10 and $C2:6D17 take the cosine and the sine of
 ;   the same angle.
 ; Entry (both): M=0 (16-bit A, set by the caller; the immediates carry
@@ -20063,6 +20064,394 @@ C2Scene_LoadUnkC600:
     STA.w !Menu_DecompSrcBank
     JSL Decomp_ToWramVec
     RTS
+; ============================================================
+; More script routines and the BG2 line waves ($C2:7BC4–$C2:7DE3)
+; ============================================================
+; As the routines at $C2:754D-$C2:7B59: called by script op $34 from the
+; bank $C3 scene scripts (M=1, X=0, DP=$0000, DB=$00, C2Scene_TaskCur =
+; the task), the result, where there is one, in C2Tmp_00 for the
+; script's next test.
+
+; $C2:7BC4 — C2Scene_TestUnk7F00F7Bit1 (13 bytes, $7BC4–$7BD0)
+; Script routine (op $34 at $C3:98F4): C2Tmp_00 = 1 when bit 1 of
+; C2Scene_Unk7F00F7 is set, else 0.
+; Entry: M=1 (8-bit), X any, DP=$0000 (C2Tmp_00), DB any (long read)
+; Exit:  M=1; A = C2Scene_Unk7F00F7; C2Tmp_00 = 0 or 1; X, Y unchanged
+; No calls.
+C2Scene_TestUnk7F00F7Bit1:
+    STZ.b !C2Tmp_00
+    LDA.l !C2Scene_Unk7F00F7
+    BIT.b #!C2Scene_Unk7F00F7Bit1
+    BEQ .done
+    INC.b !C2Tmp_00
+.done:
+    RTS
+
+; $C2:7BD1 — C2Scene_SetConfig1E (7 bytes, $7BD1–$7BD7)
+; Script routine (op $34 at $C3:B665 and $C3:C669): Menu_Config1E (the
+; byte LocLoad_AudioSetup keeps the music track in) = C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetConfig1E:
+    LDA.b !C2Tmp_00
+    STA.l !Menu_Config1E
+    RTS
+
+; $C2:7BD8 — C2Scene_BuildPatternTiles (80 bytes, $7BD8–$7C27)
+; Script routine (no op $34 reference found): builds ten 4bpp tiles at
+; C2Scene_PatternTiles ($7F:9000, the unpack buffer): zeroes the first
+; eight ($100 bytes) and sets the two after them (C2Scene_PatternSolid,
+; $40 bytes) to $FF (colour 15), each by storing one byte and copying it
+; up with an overlapping MVN; then writes the 32 bytes of
+; C2Scene_PatternRows as bit plane 0 of the eight tiles, 8 rows per
+; pair of tiles, both tiles of a pair alike. The patterns get denser
+; from pair to pair (probably the steps of a dissolve; who uploads the
+; tiles is not traced).
+; The MVNs set DB to $7F, so the plane stores are absolute in bank $7F;
+; DB is saved and restored around them.
+; Entry: M=1 (8-bit stores), X=0 (16-bit addresses), DP=$0000 (TDC for
+;        0), DB any (saved)
+; Exit:  M=1, X=0; X = $20, Y = $9100 (the last tile pair's end + $30);
+;        A = the last pattern byte; DB unchanged
+; No calls.
+C2Scene_BuildPatternTiles:
+    TDC
+    STA.l !C2Scene_PatternTiles
+    LDA.b #!C2Scene_PatternAllSet
+    STA.l !C2Scene_PatternSolid
+    PHB
+    REP #$20
+    LDX.w #!C2Scene_PatternTiles&$FFFF
+    TXY
+    INY
+    LDA.w #!C2Scene_PatternTileBytes-2
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_PatternSolid&$FFFF
+    TXY
+    INY
+    LDA.w #!C2Scene_PatternSolidBytes-2
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20                            ; DB = $7F from here
+    LDY.w #!C2Scene_PatternTiles&$FFFF
+    LDX.w #0
+.row:
+    LDA.l C2Scene_PatternRows,X
+    STA.w !Eng_PtrBase,Y                ; plane 0 of this row ...
+    STA.w !Eng_PtrBase+!C2Scene_Tile4bppBytes,Y ; ... and of the same row of the next tile
+    INX
+    INY
+    INY
+    REP #$20
+    TYA
+    AND.w #!C2Scene_TilePlanes01Mask
+    BNE .same_pair
+    CLC                                 ; 8 rows done: on to the next pair
+    TYA
+    ADC.w #!C2Scene_PatternNextPair
+    TAY
+.same_pair:
+    SEP #$20
+    CPX.w #!C2Scene_PatternRowCount
+    BCC .row
+    PLB
+    RTS
+
+; $C2:7C28 — C2Scene_PatternRows (32 bytes, $7C28–$7C47)
+; Bit plane 0 rows of the four tile pairs C2Scene_BuildPatternTiles
+; builds, 8 rows per pair, sparse to full.
+C2Scene_PatternRows:
+    db $00,$00,$00,$00,$88,$00,$22,$00
+    db $88,$22,$88,$22,$CC,$33,$CC,$33
+    db $EE,$BB,$EE,$BB,$EE,$FF,$FB,$BF
+    db $FF,$FF,$EF,$FF,$FF,$FF,$FF,$FF
+
+; $C2:7C48 — C2Scene_SetUnk7F00CE (7 bytes, $7C48–$7C4E)
+; Script routine (no op $34 reference found): C2Scene_Unk7F00CE =
+; C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00CE:
+    LDA.b !C2Tmp_00
+    STA.l !C2Scene_Unk7F00CE
+    RTS
+
+; $C2:7C4F — C2Scene_SetUnk7F00DA (7 bytes, $7C4F–$7C55)
+; Script routine (op $34 at $C3:C448): C2Scene_Unk7F00DA = C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00DA:
+    LDA.b !C2Tmp_00
+    STA.l !C2Scene_Unk7F00DA
+    RTS
+
+; $C2:7C56 — C2Scene_Bg2HWaveInit (65 bytes, $7C56–$7C96)
+; Script routine (op $34 at $C3:C18F): sets up C2Scene_HdmaTable[0] (two
+; runs of 112 lines) as HDMA channel 1 to BG2HOFS (indirect, one register
+; twice) and turns it on, zeroes the buffer toggle .Var26 and zeroes
+; $7E:8B56-$7E:8FB5 (C2Scene_LineBufA to the end of C2Scene_LineBufB,
+; with the $E0 bytes between them) for C2Scene_Bg2HWaveStep.
+; Entry: M=1 (8-bit stores), X=0, DP=$0000 (TDC for 0, the shadows),
+;        DB=$00 (the DMA registers and the record; saved around the MVN)
+; Exit:  M=0, X=0; A = $FFFF, X = $8FB5, Y = $8FB6 (the MVN's ends); DB
+;        unchanged
+; No calls.
+C2Scene_Bg2HWaveInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_BG2HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var26,X
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_LineBufA
+    LDX.w #!C2Scene_LineBufA&$FFFF
+    TXY
+    INY
+    LDA.w #(!C2Scene_LineBufB+!C2Scene_LineBufBytes-!C2Scene_LineBufA)-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7C97 — C2Scene_Bg2VWaveInit (65 bytes, $7C97–$7CD7)
+; Script routine (no op $34 reference found): as C2Scene_Bg2HWaveInit
+; for BG2VOFS: C2Scene_HdmaTable[1] as HDMA channel 2, zeroes .Var26 and
+; $7E:9176-$7E:95D5 (C2Scene_LineBufC to the end of C2Scene_LineBufD)
+; for C2Scene_Bg2VWaveStep.
+; Entry: M=1, X=0, DP=$0000, DB=$00 (saved around the MVN)
+; Exit:  M=0, X=0; A = $FFFF, X = $95D5, Y = $95D6; DB unchanged
+; No calls.
+C2Scene_Bg2VWaveInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[1].Count0
+    STA.l C2Scene_HdmaTable[1].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[1].End
+    LDY.w #(!BBAD_BG2VOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[1].Count0&$FFFF
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var26,X
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_LineBufC
+    LDX.w #!C2Scene_LineBufC&$FFFF
+    TXY
+    INY
+    LDA.w #(!C2Scene_LineBufD+!C2Scene_LineBufBytes-!C2Scene_LineBufC)-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7CD8 — C2Scene_Bg2HWaveStep (134 bytes, $7CD8–$7D5D)
+; Script routine (op $34 at $C3:C1A1, probably once a frame): one step of
+; a wave that runs up BG2: adds one to .Var26 and, by its parity, shows
+; C2Scene_LineBufA (now even) or C2Scene_LineBufB (odd) through
+; C2Scene_HdmaValues words 0-1 and fills that buffer with the other one
+; moved up a line (lines 0-222 from 1-223, by MVN); the new line 223 is
+; sin(.Var24 + 16) x the amplitude .Var22 / 256 (Trig_Sin1024's
+; magnitude times .Var22 with WRMPYA/B, the sign put back), and .Var24
+; keeps the new phase. The value is the whole BG2HOFS (C2Scene_Bg2HScroll
+; is not added).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur,
+;        C2Tmp_10-$12), DB=$00 (the record and the multiplier; saved
+;        around the MVN, which sets $7E); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = the new line's value; X = the sine; Y = the task;
+;        C2Tmp_10-$12 = the new line's address; C as Trig_Sin1024 left
+;        it (1 for the second half turn); DB unchanged
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_Bg2HWaveStep:
+    SEP #$20
+    PHB
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var26,X
+    LDA.w C2Scene_EffectTask.Var26,X
+    LSR A
+    REP #$20
+    BCS .buf_b
+    LDA.w #!C2Scene_LineBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_LineBufA+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    LDX.w #(!C2Scene_LineBufB+2)&$FFFF
+    LDY.w #!C2Scene_LineBufA&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_LineBufA+!C2Scene_LineBufBytes-2)&$FFFF
+    BRA .new_line
+.buf_b:
+    LDA.w #!C2Scene_LineBufB&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_LineBufB+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    LDX.w #(!C2Scene_LineBufA+2)&$FFFF
+    LDY.w #!C2Scene_LineBufB&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_LineBufB+!C2Scene_LineBufBytes-2)&$FFFF
+.new_line:
+    STY.b !C2Tmp_10
+    PLB
+    LDY.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_EffectTask.Var24,Y
+    ADC.w #!C2Scene_WaveLineStep
+    STA.w C2Scene_EffectTask.Var24,Y
+    JSL Trig_Sin1024
+    TAX
+    PHP                                 ; keep the sign
+    BPL .magnitude
+    EOR.w #!Eng_Invert16
+    INC A
+.magnitude:
+    SEP #$20
+    STA.w WRMPYA
+    LDA.w C2Scene_EffectTask.Var22,Y
+    STA.w WRMPYB
+    LDA.b #bank(!C2Scene_LineBufA)
+    STA.b !C2Tmp_12
+    TDC                                 ; B = 0: the 8-bit load below gives a word
+    LDA.w RDMPYH
+    REP #$20
+    PLP
+    BPL .store
+    EOR.w #!Eng_Invert16
+    INC A
+.store:
+    STA.b [!C2Tmp_10]
+    RTS
+
+; $C2:7D5E — C2Scene_Bg2VWaveStep (134 bytes, $7D5E–$7DE3)
+; Script routine (no op $34 reference found): C2Scene_Bg2HWaveStep for
+; BG2VOFS: C2Scene_LineBufC (even) or C2Scene_LineBufD (odd) through
+; C2Scene_HdmaValues words 2-3 (C2Scene_HdmaTable[1]).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$00 (saved around the
+;        MVN); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = the new line's value; X = the sine; Y = the task;
+;        C2Tmp_10-$12 = the new line's address; C as Trig_Sin1024 left
+;        it; DB unchanged
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_Bg2VWaveStep:
+    SEP #$20
+    PHB
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var26,X
+    LDA.w C2Scene_EffectTask.Var26,X
+    LSR A
+    REP #$20
+    BCS .buf_d
+    LDA.w #!C2Scene_LineBufC&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_LineBufC+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+6
+    LDX.w #(!C2Scene_LineBufD+2)&$FFFF
+    LDY.w #!C2Scene_LineBufC&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_LineBufC+!C2Scene_LineBufBytes-2)&$FFFF
+    BRA .new_line
+.buf_d:
+    LDA.w #!C2Scene_LineBufD&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_LineBufD+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+6
+    LDX.w #(!C2Scene_LineBufC+2)&$FFFF
+    LDY.w #!C2Scene_LineBufD&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_LineBufD+!C2Scene_LineBufBytes-2)&$FFFF
+.new_line:
+    STY.b !C2Tmp_10
+    PLB
+    LDY.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_EffectTask.Var24,Y
+    ADC.w #!C2Scene_WaveLineStep
+    STA.w C2Scene_EffectTask.Var24,Y
+    JSL Trig_Sin1024
+    TAX
+    PHP
+    BPL .magnitude
+    EOR.w #!Eng_Invert16
+    INC A
+.magnitude:
+    SEP #$20
+    STA.w WRMPYA
+    LDA.w C2Scene_EffectTask.Var22,Y
+    STA.w WRMPYB
+    LDA.b #bank(!C2Scene_LineBufC)
+    STA.b !C2Tmp_12
+    TDC
+    LDA.w RDMPYH
+    REP #$20
+    PLP
+    BPL .store
+    EOR.w #!Eng_Invert16
+    INC A
+.store:
+    STA.b [!C2Tmp_10]
+    RTS
+
+; $C2:7DE4 — BankC2_FreeSpace7DE4 (540 bytes, $7DE4–$7FFF)
+; $FF fill up to $C2:8000, where the menu part of the bank starts
+; (BankC2_Entry8000). Not code; nothing reads it.
+BankC2_FreeSpace7DE4:
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+
 
 ; ============================================================
 ; Menu bank vectors ($C2:8000–$C2:800D)

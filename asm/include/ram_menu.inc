@@ -363,6 +363,11 @@ endstruct align 8
                                          ; C2Scene_RestoreParty)
 !C2Scene_Unk01E2 = $01E2                 ; 16-bit; the phase C2Scene_TaskBg3LineWave reaches through a
                                          ; stale index (task +$22 with X = $1C0); other use not traced
+!C2Scene_Unk7F00F7 = $7F00F7             ; 8-bit in Menu_FlagBlock7F; bit 1 read by C2Scene_TestUnk7F00F7Bit1
+!C2Scene_Unk7F00CE = $7F00CE             ; 8-bit in Menu_FlagBlock7F; C2Scene_SetUnk7F00CE stores C2Tmp_00 here
+!C2Scene_Unk7F00DA = $7F00DA             ; 8-bit in Menu_FlagBlock7F; C2Scene_SetUnk7F00DA stores C2Tmp_00 here
+!C2Scene_PatternTiles = $7F9000          ; = C2Scene_DecompBuf: C2Scene_BuildPatternTiles' eight pattern tiles
+!C2Scene_PatternSolid = $7F9100          ; and its two solid tiles after them
 !C2Scene_Unk7F00AA = $7F00AA             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_SetUnk7F00AABit0
 !C2Scene_Unk7F019A = $7F019A             ; 8-bit in Menu_FlagBlock7F; bit 3 set by C2Scene_SetUnk7F019ABit3
 !C2Scene_IdleFrames = $02B1              ; 3 B, C2Scene_Unk02B1, one per party slot: frames the leader
