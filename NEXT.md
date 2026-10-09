@@ -77,17 +77,25 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleSys_LoadTechUsers`, `BattleSys_StoreMpCost`/`10`/`18`, `BattleSys_AdjustMpCost`,
    `BattleSys_PayTechMp`) and the setup helpers `$C1:CDFF`-`$C1:CFBD` (`BattleSys_UnkCDFF`,
    `BattleSys_UnkCE36`/`CE3A`, `BattleSys_UnkCF15`, `BattleSys_UnkCF52`, `BattleSys_UnkCF69`).
-   Next, in reach order: `BattleSys_UnkC1DD` (`$C1:C1DD`-`$C1:C8F6`, 1,818 B: the item / tech
-   target resolution B967 calls; fills `!Battle_UnkAD8D`/`AD8E`, sets `!Battle_UnkAF23`; part of
-   it, `$C1:C731`-`$C1:C82C`, is reached only through the 7-word table at `$C1:C95C` with
-   `JSR ($C95C,X)` at `$C1:C732`) with `$C1:C8F7`; `BattleSys_UnkD523` (`$C1:D523`-`$C1:D74E`,
-   after `BattleSys_UnkBF79`) and `BattleSys_UnkD490`/`D4AD`/`D4D6` (the item effect dispatch of
-   `BattleSys_UnkBF46`); the script handlers themselves (stubs `BattleAi_TestNN`
+   Also matched (the action-effect batch): the fixed-fraction scalers `Battle_Scale*`
+   (`$C1:C02A`-`$C1:C1DC`), the target resolution `BattleSys_UnkC1DD` with
+   `BattleSys_MapEmptyTarget` and `BattleSys_AreaParamTable` (`$C1:C1DD`-`$C1:C90A`, `$C1:C95C`),
+   the effect-record loaders `BattleSys_EffRec*` (`$C1:D132`-`$C1:D1D2`) and item-record loaders
+   `BattleSys_LoadEffectArg*` (`$C1:D1D3`-`$C1:D220`), the effect types `BattleSys_Effect00`-`08`,
+   `EffectNone` and `Effect29`-`2C` with `BattleSys_StoreTargetCmd` (`$C1:D221`-`$C1:D522`), the
+   tech part runner `BattleSys_RunTechParts`, `BattleSys_CheckTechMp` and the enemy runners
+   `BattleSys_UnkD7C4`/`D8D1` (`$C1:D523`-`$C1:D9D6`), `BattleSys_EffectTable` /
+   `BattleSys_TechMpCostTable` (`$C1:D9D7`-`$C1:DA36`), and the helpers `BattleSys_CasterHitOffset`,
+   `BattleSys_RecordMiss`, `BattleSys_UnkE976`, `BattleSys_LoadCasterStats`/`LoadTargetStats`
+   (`$C1:E8C0`-`$C1:E9D4`), `BattleSys_CopyEffectBytes78` (`$C1:EB0E`) and `Battle_SumHitSets`
+   (`$C1:EB68`). Next, in reach order: the effect arithmetic the effect types call, `$C1:DA37` on
+   (stubs `BattleSys_UnkDA37`/`DB5E`/`DBAA`/`DC64`/`DCAD`/`DE87`/`DE9E`/`DEF0`/`E0F5`/`E65F`/
+   `E77B`/`E9D5`; the `Battle_Scale*` callers sit in `$C1:E1E9`-`$C1:EE44`); `$C1:CFBE`-`$C1:D131`
+   (`BankC1_RunService` and its table `$C1:D126`, `BankC1_AddItem`/`AddGold`); the script handlers themselves (stubs `BattleAi_TestNN`
    `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
-   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callees
-   `BattleSys_UnkD7C4`/`D8D1`, `$C1:AF79` (a second Battle_RandRange on
+   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callee `$C1:AF79` (a second Battle_RandRange on
    `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
-   `$C1:C02A` (math, from `$C1:E2C0`); the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
+   the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
    (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
    `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
    and service 0
@@ -106,7 +114,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    service 6 does with `!Battle_UnkAEB3` (the defeated enemies' exit, probably), whether
    BattleAct_LoadKind3 is the item loader (B967's item path uses kind 3 with id - $BC; its
    verified header still says unknown), and why BattleSys_ResetTechUsers' first user divides
-   by a stale `!Battle_MathB`. Stale from the PC-command batch (verified headers, fix at their
+   by a stale `!Battle_MathB`. Open from the action-effect batch: what the effect types and the
+   effect record bytes stand for (the arithmetic is unmatched), `!Battle_UnkB200` (bit 7 after a
+   miss stops a tech's parts with the `$7E:B1F5` read, probably meant as BattleRom_TechRec.Flags),
+   the bytes read long at `$00:00FA`/`$00:00FB` by target mode 9 (whose roll is compared through
+   a restored `!Battle_MathLo`, a quirk), `!Battle_UnkAE6D` (BattleSys_MapEmptyTarget's
+   replacement slots), `!Battle_UnkAE4D`'s bits, and the enemy record tables' true base
+   (`!BattleRom_UnkCC6FCB` - 2). Headers edited by that batch (back to review): BattleSys_LoadTechUsers
+   (Callers note), BattleSys_UnkBF46, BattleSys_UnkBF79, BattleAi_EnemyTurn. Stale from the PC-command batch (verified headers, fix at their
    next edit): Battle_SetupBattle's header calls the `$C1:C96A`-`$C1:CF15` group "not analysed"
    (now matched); Battle_Mul16's example sites `$C1:B329`/`$C1:B455`/`$C1:B4BC` are now in
    BattleSys_UpdateKo / BattleSys_UnkB442 / BattleAi_PickScript. Stale after an earlier batch (verified headers, fix at their next
@@ -395,14 +410,29 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    same song either way. Stubs added: `C2Scene_Unk2273`/`Unk2277` (probably cos/sin of a
    256-step direction) and `C2Scene_Unk229D` (probably the direction between two points), in the
    unmatched $C2:2273-$C2:232C; `BankC6_UnkE74E` (tile-in-rectangle test) and `BankC6_UnkE797`
-   (per-location landing check of object A). Open from it: who sets `C2Scene_ObjAFlag5`,
-   `C2Scene_ObjANextLoc` (probably `C2Scene_Unk6A34`), `C2Scene_SpotX/Y`, the mates' `.Slot`;
-   who starts the object, mark, mate and label tasks; what objects A and B are; what sound
-   commands $86 and $18 (with $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`. Next, in reach order:
-   the mode sub-programs `C2Scene_Unk631F`
-   (mode 6, BG mode 7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); the menu's
-   own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
-   `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
+   (per-location landing check of object A). Also matched (branch match-c2-modes2): the map
+   view of mode 6, `C2Scene_MapView` with its picture builders (`C2Scene_MapViewBuild`,
+   `MapTileColors`, `MapDrawPixels`, `MapCellPixels`, `MapFilterColor`, `MapBuildTilemap`), the
+   zoom task `C2Scene_TaskMapZoom` and its states and matrix (`C2Scene_MapZoomMatrix`/
+   `MapZoomDivide`), the three marker tasks, the gradient and label set-up and their
+   scripts/animations ($C2:631F-$C2:6A33); the dial of mode 8, `C2Scene_Dial` with
+   `C2Scene_TaskDial` (pick one of seven locations, `C2Scene_DialLocs`; the result goes to
+   `C2Scene_ObjANextLoc`, which object A's `C2Scene_ObjAAfterMode8` reads), the hand rasterizer
+   `C2Scene_DialDrawHand` (window 1 by HDMA), `C2Scene_TaskSwirl` (per-line mode-7 matrix by
+   HDMA), the marker tasks, the loader `C2Scene_DialLoad` and its helpers and scripts
+   ($C2:6A34-$C2:754C); the menu's NMI `Menu_Nmi`, `Menu_Irq`, `Menu_NmiPad` and
+   `Menu_RepeatDelays` ($C2:840E-$C2:84D1). That batch renamed `C2Scene_Unk631F`/`Unk6A34` to
+   `C2Scene_MapView`/`C2Scene_Dial` and so edited the verified C2Scene_Mode6 and C2Scene_Mode8,
+   and fixed now-false caller notes in C2Scene_WaitOneFrame, Trig_Cos1024, TextWin_Init,
+   TextWin_Step, Menu_PollPad and Menu_TickPlayTime; merging it with match-c2-objects also
+   edited the verified `C2Scene_ObjAAfterMode8` header and the object A banner (the dial now
+   proven to set `C2Scene_ObjANextLoc`): all need review again. Open: who sets
+   `C2Scene_ObjAFlag5`, `C2Scene_SpotX/Y`, the mates' `.Slot`; who starts the object, mark,
+   mate and label tasks; what objects A and B are; what sound commands $86 and $18 (with
+   $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`; what the label strings ($C6:F400 table, numbers
+   $6A-$6F) and the dial's pack data show; what `C2Scene_MapFilterColor`'s hidden colours are;
+   `C2Scene_DialFlagBit2`; `Menu_Unk83`, `Menu_NmiTimer` and `Menu_Unk85D6` (the menu NMI's
+   upload). Next: `Menu_Unk85D6`; `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
    $7E:C000, $7E:C600, $7E:C800) and the four lists `C2Scene_ListA`-`D` hold; the code at
    `$C2:0568` (also reads the BG layer tables).
@@ -428,8 +458,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `C2Scene_NoiseInit`'s MVN one byte long; `Menu_CursorStepD` calling `Menu_CursorPosAB` with
    M=0; dead code at $C2:232A and $C2:8A96. Re-review needed (verified headers edited):
    `C2Scene_Random`, `Trig_Cos1024`, `BankC2_Entry8000`, `Menu_InitPpuAndRam`,
-   `Menu_InitNewGameData`. Stubs added: `Menu_Nmi`/`Menu_Irq` (matched on match-c2-modes2: drop the
-   stubs when merging), the `Menu_Init*` callees `Menu_Unk968D`/`D156`/`984A`/`92F4`/`F3CA`/`9875`,
+   `Menu_InitNewGameData`; merging match-c2-modes2 also edited the verified `Menu_Nmi` and
+   `Menu_Irq` headers and their banner (the vector JMLs and `BankC2_MenuEntry` are matched now) and
+   the `Trig_Cos1024` / `C2Scene_Random` caller notes, and took main's names for shared RAM
+   (`Menu_FrameReady`, `Menu_InidispShadow`, `Menu_NmiFrames`, `C2Scene_HandBufA/B`,
+   `C2Scene_SwirlCosA/B`, `C2Scene_HdmaHalfBytes/BufBytes`). Stubs added: the `Menu_Init*` callees `Menu_Unk968D`/`D156`/`984A`/`92F4`/`F3CA`/`9875`,
    `Menu_UnkE91B` (thread 3), `Menu_UnkF5ED`, `Menu_Unk93A8`, `BankFF_UnkF958` and the mode lists
    `Menu_Mode00List`-`0FList`. Next, in reach order: `Menu_Unk8C36` (the `BankC2_Entry8004` command
    dispatcher, which calls the inventory routines), the `Menu_Init*` callees, thread 3

@@ -58,16 +58,9 @@ Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (tabl
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C2631F
-C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
-                    ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
-org $C26A34
-C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
-org $C2840E
-Menu_Nmi:           ; the menu's NMI handler (JML from Menu_InterruptVectors, copied to NmiTrampoline;
-                    ; not matched here)
-org $C28472
-Menu_Irq:           ; the menu's IRQ handler (JML from Menu_InterruptVectors; not matched here)
+org $C285D6
+Menu_Unk85D6:       ; JSR from Menu_Nmi when Menu_FrameReady has bit 7 clear (with HDMA off): probably
+                    ; the menu's per-frame upload (not traced)
 org $C293A8
 Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
                     ; the list (probably "the current character cannot equip it"; not matched)

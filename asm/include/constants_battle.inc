@@ -741,9 +741,9 @@ if !constants_battle_inc == 0
 !Battle_CD0021Unk0D       = $0D   ; A for it with !Battle_UnkB3BF = $FF
 !Battle_UnkB3BFUnkFF      = $FF   ; the negative !Battle_UnkB3BF value that is acted on
 !Battle_UnkAEE6Bytes      = 17    ; bytes of !Battle_UnkAEE6: BattleSys_UnkBF81 copies them, BattleFD_UnkB555 zeroes them
-!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_UnkD490
-!Battle_Rec05CCBit2       = $04   ; ... BattleSys_UnkD4AD
-!Battle_Rec05CCBit6       = $40   ; ... BattleSys_UnkD4D6
+!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_Effect29
+!Battle_Rec05CCBit2       = $04   ; ... BattleSys_Effect2A
+!Battle_Rec05CCBit6       = $40   ; ... BattleSys_Effect2B
 !Battle_Unk1C48Stride     = 5     ; bytes per PC in !Battle_Unk1C48 (entries 0, 5, 10; BattleFD_UnkAEF2 fills 3)
 !Battle_InvSlots          = $0100 ; entries in !Battle_InvIds
 !Battle_InvKeepCount      = 2     ; BattleSys_UnkBC60: an inventory entry with this many or more is left alone
@@ -796,5 +796,89 @@ if !constants_battle_inc == 0
 !Battle_EquipBase2        = $5A   ; first .Unk28 id (subtracted before indexing !BattleRom_EquipRec2)
 !Battle_EquipBase3        = $7B   ; first .Unk27 id (subtracted before indexing !BattleRom_EquipRec3)
 !Battle_EquipBonusMask    = $0F   ; !BattleRom_EquipBonus bits 3-0: the amount added
+
+
+; --- Action target resolution (BattleSys_UnkC1DD) ---
+; Target modes as BattleSys_UnkC1DD tests them; the names follow the
+; BattleTgt_ModeTable handler of the same number (the menu's meaning).
+!BattleTgt_ModeSingleAlly = 0     ; mode 0: one target
+!BattleTgt_ModeAllAllies = 1      ; mode 1: the caster's side
+!BattleTgt_ModeSingleKoAlly = 3   ; mode 3: one KO'd target
+!BattleTgt_ModePcByCharId5 = 5    ; mode 5: one target
+!BattleTgt_ModePcByCharId4 = 6    ; mode 6: one target
+!BattleTgt_ModeAllEnemies = 8     ; mode 8: the other side
+!BattleTgt_ModeEveryone  = 9      ; mode 9: BattleSys_UnkC1DD picks one of four ways (see there)
+!BattleTgt_ModeAllEnemies2 = $0A  ; mode $0A: AllEnemies in the menu; BattleSys_UnkC1DD fills no list for it
+!BattleTgt_ModeEnemyLineFromCaster = $0B ; mode $0B
+!BattleTgt_ModeEnemyLineFromCaster2 = $0C ; mode $0C
+!BattleTgt_ModeEnemyLineFromChar3 = $0D ; mode $0D
+!BattleTgt_ModeUnk0E     = $0E    ; mode $0E: SingleAlly in the menu; BattleSys_UnkC1DD picks an enemy target
+!BattleTgt_ModeEnemyRow  = $0F    ; mode $0F
+!BattleTgt_ModeUnk10     = $10    ; mode $10: SingleAlly in the menu; an area mode for BattleSys_UnkC1DD
+!BattleTgt_ModeCasterRadius = $11 ; mode $11
+!BattleTgt_ModeEnemyRadius = $12  ; mode $12
+!BattleTgt_ModeChar3Radius = $13  ; mode $13
+!BattleTgt_ModeUnk15     = $15    ; mode $15: SingleAlly in the menu; an area mode for BattleSys_UnkC1DD
+!BattleTgt_ModeChar6Radius = $1B  ; mode $1B
+!BattleTgt_ModeUnk32     = $32    ; mode $32: past BattleTgt_ModeTable; BattleSys_UnkC1DD adds the chosen target to the area's list
+!BattleSys_ServiceAreaQuery = 7   ; $C10045 service number of BattleTgt_RunAreaQuery
+!Battle_Unk4CNoActMask   = $18    ; BattlerStats.Unk4C bits 4-3: either set = BattleSys_UnkC1DD drops the action
+!Battle_RandWayPick1     = 8      ; mode 9: under this (of 100) = pick an enemy target
+!Battle_RandWayOwnSide1  = 12     ; ... under this = the caster's side
+!Battle_RandWayPick2     = 18     ; ... under this = pick an enemy target
+!Battle_RandWayOtherSide = 20     ; ... under this = the other side; else the action is dropped
+!Battle_AreaEntryBytes   = 3      ; bytes per area record entry (!BattleRom_AreaRecPtr)
+!Battle_AreaQueryBit     = $80    ; entry byte 1 bit 7: a position query (service 5), not an area
+!Battle_AreaParamMask    = $7F    ; entry byte 1 bits 6-0: BattleSys_AreaParamTable index
+!Battle_AreaSizeMask     = $7F    ; entry byte 2 bits 6-0: !BattleTgt_AreaSize
+!Battle_AreaVariantBit   = $80    ; entry byte 2 bit 7: !BattleTgt_AreaVariant = 1
+!Battle_TwoEmptyEntries  = $FFFF  ; two $FF list entries read as one word
+!Battle_AD8EShiftEnd     = 10     ; BattleSys_UnkC1DD shifts !Battle_UnkAD8E entries 0-9 down (entry 10 stays)
+!Battle_NoTargetMaskHi   = $10    ; !Battle_ActMainMask high byte of the no-target action (bit 12; meaning unknown)
+!Battle_NoTargetTech1    = $7B    ; !Battle_ActId of the action a PC's area tech plays when the area finds no one:
+!Battle_NoTargetTech2    = $7C    ;   one user, two users, three users (probably a "nothing happens" display; not
+!Battle_NoTargetTech3    = $7D    ;   traced)
+
+
+; --- Action effects (BattleSys_RunTechParts, BattleSys_Effect*) ---
+!Battle_EffArg3Mask      = $3F    ; !BattleRom_UnkCC05CC byte 3 bits 5-0: DP $16 of BattleSys_LoadEffectArgs
+!Battle_EffArg2Mask      = $0F    ; byte 2 bits 3-0: its DP $18
+!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and $C1:DA37
+!Battle_StatusBit6       = $40    ; BattlerStats.Status bit 6: cleared by BattleSys_Effect2C; meaning unknown
+!Battle_TechParts        = 3      ; parts (users) of a tech: BattleRom_TechRec.Part1-3
+!Battle_TechPartNone     = $80    ; a .Part byte with bit 7: BattleSys_RunTechParts skips the part
+!Battle_TechFlagsBit6    = $40    ; BattleRom_TechRec.Flags bit 6: !Battle_UnkB2CA gets !Battle_B2CABit5
+!Battle_TechFlagsBit5    = $20    ; .Flags bit 5: !Battle_UnkB2CA gets !Battle_B2CABit4
+!Battle_TechFlagsMergeMask = $07  ; .Flags bits 2-0: the last !Battle_ActPcHitAmount set Battle_SumHitSets folds
+!Battle_B2CABit5         = $20    ; !Battle_UnkB2CA bits, ORed into !Battle_UnkAE4D for each part; meaning unknown
+!Battle_B2CABit4         = $10
+!Battle_EffectRecSize    = 12     ; bytes per effect record (!BattleRom_UnkCC213F, by part number)
+!Battle_B1F5StopBit      = $80    ; bit 7 of the byte BattleSys_RunTechParts reads at $7E:B1F5 + the tech offset
+!Battle_B200StopBit      = $80    ; !Battle_UnkB200 bit 7: with the bit above, the tech's remaining parts are skipped
+!Battle_TechMpFail       = $FF    ; !Battle_UnkB3C8 from BattleSys_CheckTechMp: a user cannot take part
+!Battle_EnemyTechFlagsBit6 = $40 ; enemy record flags bit 6: BattleSys_UnkD7C4/D8D1 set !Battle_UnkB2CA to !Battle_B2CABit6
+!Battle_B2CABit6         = $40    ; !Battle_UnkB2CA value of the enemy runners: !Battle_UnkAE4D gets !Battle_AE4DBit5
+!Battle_B2CABit7         = $80    ; !Battle_UnkB2CA bit 7: cleared by the enemy runners (never set there)
+!Battle_B2CABits76       = $C0    ; either bit: the enemy runners OR !Battle_AE4DBit5 into !Battle_UnkAE4D
+!Battle_AE4DBit5         = $20    ; !Battle_UnkAE4D bit 5; meaning unknown
+!Battle_EnemyPartNone    = $FF    ; an enemy record's part number: no effect
+!Battle_TechFlagsStopBit = $80    ; enemy record flags bit 7: with !Battle_UnkB200 bit 7, no hit set merge
+!Battle_EffByte1Mask     = $1F    ; effect byte 1 bits 4-0: DP $18 of BattleSys_EffRecArgsUnk66
+!Battle_EffResultMiss    = $80    ; DP $16 after $C1:DBAA in BattleSys_Effect02: a miss
+!Battle_EffResultMissFE  = $FE    ; DP $16 after $C1:E9D5 in BattleSys_Effect06: a miss
+!Battle_EffResultNoneFF  = $FF    ; ... $FF: !Battle_UnkB200 bit 7 (a dead store there)
+!Battle_AE4DBit4         = $10    ; !Battle_UnkAE4D bit 4: BattleSys_Effect03 skips its first test
+!Battle_AE4DBit2         = $04    ; bit 2: BattleSys_Effect03 also runs BattleSys_UnkE976
+!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs $C1:E9D5
+!Battle_Eff01Bit6        = $40    ; BattleSys_Effect01: effect byte 1 bit 6: also run BattleSys_EffRecArgsUnk66 and $C1:DA37
+!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run $C1:E77B
+!Battle_Eff05Bit6        = $40
+!Battle_Eff05Bit7Arg     = 3      ; DP $1A for the bit-7 run
+!Battle_Eff05Bit6Arg     = 7      ; DP $1A for the bit-6 run
+!Battle_Eff05Bit6Arg16   = 20     ; DP $16 for the bit-6 run
+!Battle_MissSecondBit7   = $80    ; effect byte 11 bits: BattleSys_RecordMiss also sets !Battle_ActFlagSecond (bit 7
+!Battle_MissSecondBit6   = $40    ;   with DP $1C = 0, bit 6 with DP $1C = 1)
+!Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
+!Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 
 endif

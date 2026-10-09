@@ -282,21 +282,30 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1D7C4
-BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
-org $C1D8D1
-BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
-org $C1C1DD
-BattleSys_UnkC1DD:                      ; JSR from BattleSys_UnkB967 (item and tech paths): fills !Battle_UnkAD8D/AD8E
-                                        ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
-org $C1D490
-BattleSys_UnkD490:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D4AD
-BattleSys_UnkD4AD:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D4D6
-BattleSys_UnkD4D6:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D523
-BattleSys_UnkD523:                      ; JSR from BattleSys_UnkBF79 (after !Battle_UnkAF23 = 0); not analysed
+org $C1DC64
+BattleSys_UnkDC64:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DCAD
+BattleSys_UnkDCAD:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DE87
+BattleSys_UnkDE87:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DE9E
+BattleSys_UnkDE9E:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DEF0
+BattleSys_UnkDEF0:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E0F5
+BattleSys_UnkE0F5:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E65F
+BattleSys_UnkE65F:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E77B
+BattleSys_UnkE77B:                      ; JSR from BattleSys_Effect05; not analysed
+org $C1E9D5
+BattleSys_UnkE9D5:                      ; JSR from BattleSys_Effect03/06; not analysed
+org $C1DA37
+BattleSys_UnkDA37:                      ; JSR from BattleSys_Effect29/2A and $C1:D221-$C1:D48E; not analysed
+org $C1DB5E
+BattleSys_UnkDB5E:                      ; JSR from BattleSys_Effect2A and $C1:D221-$C1:D48E; not analysed
+org $C1DBAA
+BattleSys_UnkDBAA:                      ; JSR from BattleSys_Effect2B and $C1:D221-$C1:D48E; not analysed
 org $C1CFC2
 BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
                                         ; table at $C1:D126 (6 entries) with argument Y; returns a result in A

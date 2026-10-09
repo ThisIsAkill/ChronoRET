@@ -65,8 +65,8 @@ if !ram_menu_inc == 0
 !Menu_PadRepeatMapped = $00FA            ; 8-bit Menu_PadRepeat through the button map (Menu_MapButtons)
 !Menu_PadRepeatDpad = $00FB              ; 8-bit copy of Menu_PadRepeat's high byte (the D-pad)
 !Menu_PadRepeatDelay = $00FC             ; 8-bit; frames before (and between) auto-repeats: what
-                                         ; Menu_PadRepeatTimer reloads from (the menu's NMI code sets it
-                                         ; at $C2:847C and $C2:84B8)
+                                         ; Menu_PadRepeatTimer reloads from (Menu_NmiPad sets it from
+                                         ; Menu_RepeatDelays)
 !Menu_PadRepeatTimer = $00FD             ; 8-bit auto-repeat countdown
 !Menu_PadPrevHeld = $00FE                ; 16-bit Menu_PadHeld of the frame before
 
@@ -339,8 +339,9 @@ endstruct align 8
 !C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene and by C2Scene_LeaderInput
                                          ; when a step starts; use unknown
 !C2Scene_ObjANextLoc = $02AF            ; 16-bit; zeroed by object A before scene mode C2Scene_ModeUnk8;
-                                         ; C2Scene_ObjAAfterMode8 waits for it: negative = none, else a
-                                         ; Loc_Id the party leaves for (probably set by C2Scene_Unk6A34)
+                                         ; the dial (C2Scene_Dial, mode 8) writes the Loc_Id it picked, or
+                                         ; C2Scene_DialNoDest on a cancel; C2Scene_ObjAAfterMode8 waits for
+                                         ; it: negative = none, else a Loc_Id the party leaves for
 !C2Scene_ObjAAloft = $1BEF               ; 8-bit; 1 while object A is up (C2Scene_ObjARise to
                                          ; C2Scene_ObjAFly's landing), 0 otherwise (C2Scene_ObjAMarkShow)
 !C2Scene_SpotX = $02A2                   ; 16-bit centre X of the spot C2Scene_ObjASpotWatch tests
@@ -433,14 +434,9 @@ endstruct align 8
 !Menu_EntryX = $0A01                     ; 16-bit; BankC2_MenuEntry's X
 !Menu_VramQueue = $0C00                  ; Menu_VramRec records (8 B) Menu_QueueVramRom / Menu_QueueVramWram
                                          ; append and Menu_FlushVramQueue sends to VRAM
-!Menu_FrameState = $0D01                 ; 8-bit; Menu_RunThreads waits for it to be non-zero, runs the
-                                         ; threads once and zeroes it (the menu NMI sets it to $FF after its
-                                         ; upload, $C2:8462)
 !Menu_Unk0D06 = $0D06                    ; 16-bit; set to $FFFF by Menu_Setup (with $0D0A and $0D0E)
 !Menu_Unk0D0A = $0D0A
 !Menu_Unk0D0E = $0D0E
-!Menu_Inidisp = $0D10                    ; 8-bit; what the menu NMI writes to INIDISP (0 = forced blank);
-                                         ; Menu_Fade steps its brightness bits
 !Menu_VramQueueEnd = $0D11               ; 8-bit byte offset past the last Menu_VramQueue record
 !Menu_FadeStep = $0D20                   ; 8-bit signed brightness step of Menu_Fade
 !Menu_FadeFrames = $0D21                 ; 8-bit frames per step (Menu_Fade sets 1)
@@ -451,8 +447,6 @@ endstruct align 8
 !Menu_PartyListPos = $0D68               ; 9 B: the Menu_PartyOrder position of each
 !Menu_Unk21BA = $21BA                    ; 3 x $20 B; Menu_Unk834D copies 6 B from bank $D1 to the start of
                                          ; each, one per active party member; use not traced
-!Menu_Unk0D00 = $0D00                    ; 8-bit; BankC2_MenuEntry's new-game path copies it into
-                                         ; Menu_Unk29AD (the menu NMI's direct page starts here, $C2:8420)
 !Menu_Unk04A4 = $04A4                    ; 5 B; Menu_Unk82E1 tests the byte for each value $AE-$B2
 !Menu_Unk2857 = $2857                    ; 5 B; Menu_Unk82E1 zeroes them and sets the byte of each value
                                          ; $AE-$B2 that a record's +$2A holds while its Menu_Unk04A4 byte is
@@ -461,7 +455,7 @@ endstruct align 8
 !Menu_SramUnk7FE1 = $307FE1              ; 8-bit in SRAM; zeroed (with $7FE2) by BankC2_MenuEntry's new-game
 !Menu_SramUnk7FE2 = $307FE2              ; path; use not traced
 !Menu_Unk29AD = $29AD                    ; 8-bit, Menu_Config+$1D; BankC2_MenuEntry's new-game path copies
-                                         ; $7E:0D00 into it
+                                         ; Menu_NmiFrames ($7E:0D00, the menu NMI count) into it
 
 ; One VRAM upload of Menu_VramQueue (Menu_FlushVramQueue sends it with DMA
 ; channel 7 to VMDATAL/H, the VRAM address step as VMAIN stands).
@@ -658,10 +652,6 @@ endstruct align 13
                                          ; points into
 !C2Scene_WaveBufCopy = $7EA9A5           ; 64 words: a copy of C2Scene_WaveBuf, so that 64 words can be read
                                          ; from any start inside it
-!C2Scene_LineBufA = $7E8B56              ; four buffers of 224 words, one per screen line, that the
-!C2Scene_LineBufB = $7E8DF6              ; effect routines at $C2:754D-$C2:7DE3 fill and point
-!C2Scene_LineBufC = $7E9176              ; C2Scene_HdmaValues at (each value covers 112 lines:
-!C2Scene_LineBufD = $7E9416              ; a buffer, then the buffer + C2Scene_LineBufHalf)
 
 ;
 ; A scene task: one 64-byte record of C2Scene_TaskRecords, run once per
@@ -883,5 +873,86 @@ endstruct
                                          ; frame by C2Scene_SprResetLists)
 !C2Scene_SprActiveHead = $7EB500         ; 4 B .Prev/.Next: head of the list C2Scene_SprDrawList draws
 !C2Scene_SprFreeHead = $7EB504           ; 4 B .Prev/.Next: head of the free nodes
+
+; --- The map view (C2Scene_MapView, scene mode 6) ---
+!C2Scene_TileColors = $7EAB25            ; $380 B: one colour (0-15) per BG tile, built by
+                                         ; C2Scene_MapTileColors for the mode-7 picture
+!C2Scene_MapMarkersOff = $1B48           ; 8-bit; zeroed by C2Scene_ScrMapViewMarkers, raised by
+                                         ; C2Scene_ScrMapViewExit; non-zero ends the marker tasks
+!C2Scene_MapGradTop = $7E8B56            ; 112 B: COLDATA values of the gradient's top half
+                                         ; (C2Scene_MapViewGradient; inside C2Scene_HdmaArea)
+!C2Scene_MapGradBottom = $7E8BC6         ; and of its bottom half (the first 112 of 1792 written)
+
+struct C2Scene_ZoomTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: C2Scene_MapZoomStates index
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.Angle:     skip 2     ; +$22 rotation (Trig_Sin1024 units); zeroed and never changed here
+.DivA:      skip 2     ; +$24 C2SceneRom_ZoomDivA entry: divisor of M7A/M7B (low byte used)
+.DivB:      skip 2     ; +$26 C2SceneRom_ZoomDivB entry: divisor of M7C/M7D
+.Step:      skip 2     ; +$28 byte offset into both tables (0-$3E)
+            skip $16
+endstruct
+
+; --- The dial (C2Scene_Dial, scene mode 8) ---
+!C2Scene_DialSel = $1BB7                 ; 8-bit; the marker the hand rests on (C2Scene_DialInit/Turn);
+                                         ; the marker tasks show the one it names
+!C2Scene_DialVerts = $1BB8               ; 6 B: the hand's three points, X then Y (C2Scene_DialDrawHand)
+!C2Scene_DialEdgeActive = $1BC4          ; 3 words each, one per edge of the hand: non-zero while drawn
+!C2Scene_DialEdgeSlope = $1BCA           ; signed X step per line, 8.8
+!C2Scene_DialEdgeTop = $1BD0             ; top line in the high byte
+!C2Scene_DialEdgeBottom = $1BD6          ; last line in the high byte
+!C2Scene_DialEdgeX = $1BDC               ; X, 8.8
+!C2Scene_DialEdgeLines = $1BE2           ; lines left - 1 (the low byte counts)
+!C2Scene_DialFlags = $1BF5               ; 8-bit; buffer flags C2Scene_DialHandBuf/SwirlBuf/FlagBit2
+; C2Scene_HandBufA/B and C2Scene_SwirlCosA/B are also the four 224-word line buffers that the
+; effect routines at $C2:754D-$C2:7DE3 fill and point C2Scene_HdmaValues at (each value covers 112
+; lines: a buffer, then the buffer + C2Scene_HdmaHalfBytes).
+!C2Scene_HandBufA = $7E8B56              ; the two hand buffers: WH0/WH1 per line (C2Scene_HdmaBufBytes)
+!C2Scene_HandBufB = $7E8DF6
+!C2Scene_SwirlCosA = $7E9176             ; the swirl's M7A/M7D values per line, buffer A
+!C2Scene_SwirlCosB = $7E9416             ; and buffer B
+!C2Scene_SwirlSinA = $7E9796             ; its M7B/M7C values, buffer A
+!C2Scene_SwirlSinB = $7E9A36             ; and B
+
+struct C2Scene_DialTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state
+            skip $11   ; +$03-$13
+.Target:    skip 2     ; +$14 (= .SprX) the hand angle being turned to
+            skip 2
+.Pos:       skip 2     ; +$18 (= .SprY) the hand's angle now
+            skip 6
+.Vel:       skip 2     ; +$20 (= .YVel) hand angle step per frame (+/- C2Scene_DialTurnStep)
+.Sel:       skip 1     ; +$22 marker 0-6 (also the marker tasks' own number)
+            skip $1D
+endstruct
+
+struct C2Scene_SwirlTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02
+            skip $15
+.Angle:     skip 2     ; +$18 angle of the next new line
+            skip $26
+endstruct
+
+; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
+!Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
+!Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_Unk85D6) and
+                                         ; sets it to Menu_FrameDone; the menu loop waits for non-zero
+                                         ; ($C2:81CA)
+!Menu_InidispShadow = $10                ; 8-bit; INIDISP after the NMI (0: forced blank)
+!Menu_HdmaenShadow = $13                 ; 8-bit; HDMAEN after the upload (bit 7 masked off)
+!Menu_RepeatFast = $18                   ; 8-bit; non-zero: Menu_NmiPad sets the repeat delay and timer
+                                         ; to 1 once, then clears it
+!Menu_RepeatStage = $19                  ; 8-bit index into Menu_RepeatDelays (1 after a release, 0
+                                         ; after the first repeat); handled as a word by Menu_NmiPad
+!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0 (who sets it not traced)
+!Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here (use not
+                                         ; traced)
+!Menu_NmiSavedSp = $1DFE                 ; 16-bit S at the menu NMI's entry
+!Menu_NmiStackTop = $1DFD                ; the menu NMI's own stack
+!Menu_ButtonMap1Long = $7E2994          ; Menu_ButtonMap+1 as a long address (Menu_NmiPad)
+!Menu_Joy2Copy = $041F                   ; 16-bit JOY2L/H copied by Menu_NmiPad each menu NMI
 
 endif
