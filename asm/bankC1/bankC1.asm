@@ -23185,8 +23185,9 @@ BattleAi_TestPassed:
 ;     !Enemy_AnimWanted[enemy] = !BattleAi_AnimNoTarget,
 ;     !Battle_UnkB242[enemy] = $FF, .done.
 ;   - .have_target: !BattleAi_Targets[0] = the slot,
-;     BattleAi_SetMainMask, !Battle_UnkAE4D/AE4E = 0, then $C1:D7C4
-;     for action code 2, $C1:D8D1 for the others (neither analysed);
+;     BattleAi_SetMainMask, !Battle_UnkAE4D/AE4E = 0, then
+;     BattleSys_UnkD7C4 for action code 2, BattleSys_UnkD8D1 for the
+;     others (each runs the action's effect record);
 ;     !Battle_UnkB242[enemy] = $FF. .done when !BattleAi_TargetCount is
 ;     0, when the acting battler (!Battle_ActCaster) is KO'd and
 ;     !Battle_UnkAEB3[enemy] is 0, or when its Status2 has any of
@@ -28535,18 +28536,19 @@ BattleSys_MapEmptyTarget:
 ;   BattleSys_TechMpCost1 ($C1:CB50), BattleSys_TechMpCost2 ($C1:CB69), BattleSys_TechMpCost3
 ;   ($C1:CB82), BattleSys_LoadTechUsers ($C1:CB9B), BattleSys_UnkCE3A ($C1:CE8F, $C1:CEC1,
 ;   $C1:CEF3), BattleSys_RunTechParts ($C1:D53A, $C1:D5E5), BattleSys_CheckTechMp ($C1:D772),
+;   BattleSys_UnkD7C4 ($C1:D7D8, $C1:D82E), BattleSys_UnkD8D1 ($C1:D8E5, $C1:D93B),
 ;   Battle_HitEntryOffset ($C1:E8B5), BattleSys_LoadCasterStats ($C1:E9AF),
 ;   BattleSys_LoadTargetStats ($C1:E9CC), Battle_SumHitSets ($C1:EB81), Battle_RecordHit ($C1:EC1D),
-;   Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long ($C1:FDBF) and unmatched ($C1:D7D8,
-;   $C1:D82E, $C1:D8E5, $C1:D93B, $C1:DA4E, $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68,
-;   $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B, $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111,
-;   $C1:E126, $C1:E140, $C1:E14B, $C1:E19A, $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228,
-;   $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E, $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330,
-;   $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5, $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9,
-;   $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5, $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6,
-;   $C1:E70A, $C1:E72E, $C1:E751, $C1:E792, $C1:E8D6, $C1:EA14, $C1:EB28, $C1:EDA8, $C1:EDC5,
-;   $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667,
-;   $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770, $C1:FA11, $C1:FA2D).
+;   Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long ($C1:FDBF) and unmatched ($C1:DA4E,
+;   $C1:DAEC, $C1:DC7D, $C1:DCCA, $C1:DD3B, $C1:DD68, $C1:DEB3, $C1:DEDB, $C1:DF06, $C1:DF2B,
+;   $C1:DF4C, $C1:DF73, $C1:DF9A, $C1:DFBF, $C1:E111, $C1:E126, $C1:E140, $C1:E14B, $C1:E19A,
+;   $C1:E1AF, $C1:E1C9, $C1:E1D4, $C1:E212, $C1:E228, $C1:E242, $C1:E24D, $C1:E28C, $C1:E29E,
+;   $C1:E2AA, $C1:E2EC, $C1:E2FF, $C1:E325, $C1:E330, $C1:E37E, $C1:E38B, $C1:E3A5, $C1:E3F5,
+;   $C1:E400, $C1:E484, $C1:E48F, $C1:E4DE, $C1:E4E9, $C1:E549, $C1:E554, $C1:E5B1, $C1:E5D5,
+;   $C1:E5EB, $C1:E60D, $C1:E696, $C1:E6C0, $C1:E6E6, $C1:E70A, $C1:E72E, $C1:E751, $C1:E792,
+;   $C1:E8D6, $C1:EA14, $C1:EB28, $C1:EDA8, $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8,
+;   $C1:F1DE, $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B,
+;   $C1:F770, $C1:FA11, $C1:FA2D).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -30073,8 +30075,10 @@ BattleSys_StoreTargetCmd:
 ;     BattleSys_EffectTable, and !Battle_UnkAD9B + 1. The parts stop
 ;     early when bit 7 of the byte read at $7E:B1F5 + !Battle_UnkB2C3
 ;     and bit 7 of !Battle_UnkB200 are both set (quirk, probably: that
-;     read is in RAM; BattleRom_TechRec byte 10 would be $CC:1BF5 +
-;     the offset). Else !Battle_UnkB2C7 and !Battle_UnkB2C9 + 1.
+;     read is in RAM; the enemy runners BattleSys_UnkD7C4/D8D1 test
+;     their record's flags byte there, which would be
+;     BattleRom_TechRec.Flags, $CC:1BEC + the offset). Else
+;     !Battle_UnkB2C7 and !Battle_UnkB2C9 + 1.
 ;   - After the third part: Battle_SumHitSets with DP $1A = .Flags &
 ;     7, when that is not 0.
 ;   - Always at the end: !Battle_UnkB18E-!Battle_UnkB191 = 0.
@@ -30421,6 +30425,294 @@ BattleSys_CheckTechMp:
 .done:
     RTS
 
+; $C1:D7C4 — BattleSys_UnkD7C4 (269 bytes, $D7C4–$D8D0)
+; An enemy's action for action code 2 (BattleAi_EnemyTurn): the enemy
+; counterpart of BattleSys_RunTechParts with one part. Its records,
+; 11 B per !Battle_UnkB18C, have BattleRom_TechRec's layout from
+; !BattleRom_UnkCC6FCB - 2 (flags at - 1, the part number at + 3, the
+; per-part byte at + 6; BattleFD_LoadUnkB18E reads + 0 and + 1 into
+; !Battle_UnkB18E/B190). Steps: BattleFD_UnkACFD, !Battle_UnkAE7B = 0,
+; !Battle_UnkB2C3 = the offset (number * 11), !Battle_UnkB2C7/B2C9/
+; B2CA and !Battle_UnkAD9B = 0; !Battle_UnkB2CA = $40 when flags bit 6
+; is set; !Battle_UnkB2ED = !Battle_UnkAD8D (and back). The part
+; number goes to !Battle_UnkB2C8; $FF = no effect (straight to the hit
+; set merge). Else the 12-byte effect record at
+; !BattleRom_EnemyEffectRecA + number * 12 (!Battle_UnkB2C5 = the
+; offset) goes to !Battle_UnkAEE6, !Battle_UnkB2CC = byte + 6,
+; BattleSys_CopyEffectBytes78, and with !Battle_UnkB2CA bit 7 or 6
+; set !Battle_UnkAE4D |= $20 (and bit 7 of !Battle_UnkB2CA cleared,
+; which only ever holds $40 here); !Battle_UnkAE55 = byte + 1;
+; !Battle_UnkAE4F = 0, !Battle_UnkB29A (11 B) zeroed, and the effect
+; type's routine (BattleSys_EffectTable). When !Battle_UnkB200 bit 7
+; and flags bit 7 are both set it ends there; else !Battle_UnkB2C7 and
+; !Battle_UnkB2C9 + 1 and, when flags bits 2-0 are not 0,
+; Battle_SumHitSets with that count. At the end
+; !Battle_UnkB18E-!Battle_UnkB191 = 0.
+; Unlike BattleSys_RunTechParts it leaves !Battle_UnkAEB2,
+; !Battle_UnkB3BF, the users and the target alone.
+; Callers (1 JSR site): BattleAi_EnemyTurn ($C1:8E15).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18C = the record number,
+;        !Battle_UnkAD8D/AD8E the targets, B18E-B191 as loaded
+; Exit:  M=1, X=0 (as assumed after the effect routine, not analysed),
+;        DP=0, DB=$7E; A, X, Y clobbered; DP $1A written (and $10-$13
+;        when Battle_SumHitSets runs); the RAM above, plus what the
+;        callees change
+!EnemyPart_MergeSets = !BattleTmp_1A    ; 1 B: Battle_SumHitSets' set count
+org $C1D7C4
+BattleSys_UnkD7C4:
+    JSL BattleFD_UnkACFD
+    TDC
+    TAX
+    STX.w !Battle_UnkAE7B
+    LDA.w !Battle_UnkB18C
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!BattleRom_UnkB18ERecSize
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkB2C3
+    STZ.w !Battle_UnkB2C7
+    STZ.w !Battle_UnkB2C9
+    STZ.w !Battle_UnkB2CA
+    STZ.w !Battle_UnkAD9B
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC6FCB-1,X
+    AND.b #!Battle_EnemyTechFlagsBit6
+    BEQ .save_count
+    LDA.b #!Battle_B2CABit6
+    STA.w !Battle_UnkB2CA
+.save_count:
+    LDA.w !Battle_UnkAD8D
+    STA.w !Battle_UnkB2ED
+    TDC
+    LDA.w !Battle_UnkB2ED
+    STA.w !Battle_UnkAD8D
+    LDA.w !Battle_UnkB2C7
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB2C3
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_UnkCC6FCB+3,X
+    STA.w !Battle_UnkB2C8
+    CMP.b #!Battle_EnemyPartNone
+    BNE .load_effect
+    JMP .after_part
+.load_effect:
+    TAX
+    STX.w !Battle_MathA
+    LDA.b #!Battle_EffectRecSize
+    TAX
+    STX.w !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkB2C5
+    TDC
+    TAY
+.copy_effect:
+    LDA.l !BattleRom_EnemyEffectRecA,X
+    STA.w !Battle_UnkAEE6,Y
+    INX
+    INY
+    CPY.w #!Battle_EffectRecSize
+    BCC .copy_effect
+    LDA.w !Battle_UnkB2C7
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB2C3
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_UnkCC6FCB+6,X
+    STA.w !Battle_UnkB2CC
+    JSR BattleSys_CopyEffectBytes78
+    LDA.w !Battle_UnkB2CA
+    BIT.b #!Battle_B2CABits76
+    BEQ .clear
+    LDA.w !Battle_UnkAE4D
+    ORA.b #!Battle_AE4DBit5
+    STA.w !Battle_UnkAE4D
+    LDA.w !Battle_UnkB2CA
+    AND.b #$FF^!Battle_B2CABit7
+    STA.w !Battle_UnkB2CA
+.clear:
+    LDA.l !BattleRom_UnkCC6FCB+1,X
+    STA.w !Battle_UnkAE55
+    TDC
+    TAY
+    STA.w !Battle_UnkAE4F
+.clear_b29a:
+    STA.w !Battle_UnkB29A,Y
+    INY
+    CPY.w #!Battle_NumSlots
+    BCC .clear_b29a
+    LDA.w !Battle_UnkAEE6
+    REP #$20
+    ASL A
+    TAX
+    TDC
+    SEP #$20
+    JSR (BattleSys_EffectTable,X)
+    LDA.w !Battle_UnkB200
+    BIT.b #!Battle_B200StopBit
+    BEQ .after_part
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC6FCB-1,X
+    BIT.b #!Battle_TechFlagsStopBit
+    BEQ .after_part
+    BRA .done
+.after_part:
+    INC.w !Battle_UnkB2C7
+    INC.w !Battle_UnkB2C9
+    TDC
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC6FCB-1,X
+    AND.b #!Battle_TechFlagsMergeMask
+    STA.b !EnemyPart_MergeSets
+    BNE .sum
+    JMP .done
+.sum:
+    JSR Battle_SumHitSets
+.done:
+    STZ.w !Battle_UnkB18E
+    STZ.w !Battle_UnkB18F
+    STZ.w !Battle_UnkB190
+    STZ.w !Battle_UnkB191
+    RTS
+
+; $C1:D8D1 — BattleSys_UnkD8D1 (262 bytes, $D8D1–$D9D6)
+; An enemy's action for the action codes other than 2: BattleSys_UnkD7C4
+; with the records at !BattleRom_UnkCC88CB (the ones
+; BattleFD_LoadUnkB18E2 reads) and the effect records at
+; !BattleRom_EnemyEffectRecB; it does not set !Battle_UnkAE55.
+; Callers (1 JSR site): BattleAi_EnemyTurn ($C1:8E10).
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleSys_UnkD7C4
+; Exit:  as BattleSys_UnkD7C4
+BattleSys_UnkD8D1:
+    JSL BattleFD_UnkACFD
+    TDC
+    TAX
+    STX.w !Battle_UnkAE7B
+    LDA.w !Battle_UnkB18C
+    TAX
+    STX.b !Battle_MathA
+    LDA.b #!BattleRom_UnkB18ERecSize
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkB2C3
+    STZ.w !Battle_UnkB2C7
+    STZ.w !Battle_UnkB2C9
+    STZ.w !Battle_UnkB2CA
+    STZ.w !Battle_UnkAD9B
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC88CB-1,X
+    AND.b #!Battle_EnemyTechFlagsBit6
+    BEQ .save_count
+    LDA.b #!Battle_B2CABit6
+    STA.w !Battle_UnkB2CA
+.save_count:
+    LDA.w !Battle_UnkAD8D
+    STA.w !Battle_UnkB2ED
+    TDC
+    LDA.w !Battle_UnkB2ED
+    STA.w !Battle_UnkAD8D
+    LDA.w !Battle_UnkB2C7
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB2C3
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_UnkCC88CB+3,X
+    STA.w !Battle_UnkB2C8
+    CMP.b #!Battle_EnemyPartNone
+    BNE .load_effect
+    JMP .after_part
+.load_effect:
+    TAX
+    STX.w !Battle_MathA
+    LDA.b #!Battle_EffectRecSize
+    TAX
+    STX.w !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkB2C5
+    TDC
+    TAY
+.copy_effect:
+    LDA.l !BattleRom_EnemyEffectRecB,X
+    STA.w !Battle_UnkAEE6,Y
+    INX
+    INY
+    CPY.w #!Battle_EffectRecSize
+    BCC .copy_effect
+    LDA.w !Battle_UnkB2C7
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB2C3
+    TAX
+    TDC
+    SEP #$20
+    LDA.l !BattleRom_UnkCC88CB+6,X
+    STA.w !Battle_UnkB2CC
+    JSR BattleSys_CopyEffectBytes78
+    LDA.w !Battle_UnkB2CA
+    BIT.b #!Battle_B2CABits76
+    BEQ .clear
+    LDA.w !Battle_UnkAE4D
+    ORA.b #!Battle_AE4DBit5
+    STA.w !Battle_UnkAE4D
+    LDA.w !Battle_UnkB2CA
+    AND.b #$FF^!Battle_B2CABit7
+    STA.w !Battle_UnkB2CA
+.clear:
+    TDC
+    TAY
+    STA.w !Battle_UnkAE4F
+.clear_b29a:
+    STA.w !Battle_UnkB29A,Y
+    INY
+    CPY.w #!Battle_NumSlots
+    BCC .clear_b29a
+    LDA.w !Battle_UnkAEE6
+    REP #$20
+    ASL A
+    TAX
+    TDC
+    SEP #$20
+    JSR (BattleSys_EffectTable,X)
+    LDA.w !Battle_UnkB200
+    BIT.b #!Battle_B200StopBit
+    BEQ .after_part
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC88CB-1,X
+    BIT.b #!Battle_TechFlagsStopBit
+    BEQ .after_part
+    BRA .done
+.after_part:
+    INC.w !Battle_UnkB2C7
+    INC.w !Battle_UnkB2C9
+    TDC
+    LDX.w !Battle_UnkB2C3
+    LDA.l !BattleRom_UnkCC88CB-1,X
+    AND.b #!Battle_TechFlagsMergeMask
+    STA.b !EnemyPart_MergeSets
+    BNE .sum
+    JMP .done
+.sum:
+    JSR Battle_SumHitSets
+.done:
+    STZ.w !Battle_UnkB18E
+    STZ.w !Battle_UnkB18F
+    STZ.w !Battle_UnkB190
+    STZ.w !Battle_UnkB191
+    RTS
+
 ; BattleSys_EffectTable ($C1D9D7–$C1DA30, 45 words)
 ; The effect routines by effect type (byte 0 of the effect record in
 ; !Battle_UnkAEE6), called by BattleSys_RunTechParts with
@@ -30587,7 +30879,8 @@ BattleSys_LoadTargetStats:
 ; $C1:EB0E — BattleSys_CopyEffectBytes78 (14 bytes, $EB0E–$EB1B)
 ; !Battle_UnkAE4D = byte 7 and !Battle_UnkAE4E = byte 8 of the effect
 ; record in !Battle_UnkAEE6 (meaning unknown).
-; Callers (3 JSR sites): BattleSys_RunTechParts ($C1:D626) and unmatched ($C1:D85A, $C1:D967).
+; Callers (3 JSR sites): BattleSys_RunTechParts ($C1:D626), BattleSys_UnkD7C4 ($C1:D85A) and
+;   BattleSys_UnkD8D1 ($C1:D967).
 ; Entry: M=1, X any, DP any, DB=$7E
 ; Exit:  M=1, X, Y, DP and DB unchanged; A = byte 8, B = 0
 org $C1EB0E
@@ -30607,7 +30900,8 @@ BattleSys_CopyEffectBytes78:
 ; not 0, except that a kind 5 already in set n - 1 is kept (kind 5
 ; always wins). Then set 0's enemy amounts are capped at 9999
 ; (!Battle_HitAmountMax). The PC entries (slots 0-2) are not touched.
-; Callers (3 JSR sites): BattleSys_RunTechParts ($C1:D73F) and unmatched ($C1:D8C1, $C1:D9C7).
+; Callers (3 JSR sites): BattleSys_RunTechParts ($C1:D73F), BattleSys_UnkD7C4 ($C1:D8C1) and
+;   BattleSys_UnkD8D1 ($C1:D9C7).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1A = the last set (1 or more; 0
 ;        would run 256 times)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = $2C, B = 0; X = $28; Y unchanged;

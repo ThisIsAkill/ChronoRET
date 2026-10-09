@@ -282,10 +282,6 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1D7C4
-BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
-org $C1D8D1
-BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
 org $C1D221
 BattleSys_Effect00:                     ; BattleSys_EffectTable entry $00; not analysed
 org $C1D23E

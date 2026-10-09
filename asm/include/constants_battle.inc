@@ -856,6 +856,13 @@ if !constants_battle_inc == 0
 !Battle_B1F5StopBit      = $80    ; bit 7 of the byte BattleSys_RunTechParts reads at $7E:B1F5 + the tech offset
 !Battle_B200StopBit      = $80    ; !Battle_UnkB200 bit 7: with the bit above, the tech's remaining parts are skipped
 !Battle_TechMpFail       = $FF    ; !Battle_UnkB3C8 from BattleSys_CheckTechMp: a user cannot take part
+!Battle_EnemyTechFlagsBit6 = $40 ; enemy record flags bit 6: BattleSys_UnkD7C4/D8D1 set !Battle_UnkB2CA to !Battle_B2CABit6
+!Battle_B2CABit6         = $40    ; !Battle_UnkB2CA value of the enemy runners: !Battle_UnkAE4D gets !Battle_AE4DBit5
+!Battle_B2CABit7         = $80    ; !Battle_UnkB2CA bit 7: cleared by the enemy runners (never set there)
+!Battle_B2CABits76       = $C0    ; either bit: the enemy runners OR !Battle_AE4DBit5 into !Battle_UnkAE4D
+!Battle_AE4DBit5         = $20    ; !Battle_UnkAE4D bit 5; meaning unknown
+!Battle_EnemyPartNone    = $FF    ; an enemy record's part number: no effect
+!Battle_TechFlagsStopBit = $80    ; enemy record flags bit 7: with !Battle_UnkB200 bit 7, no hit set merge
 !Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
 !Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 

@@ -1595,7 +1595,8 @@ endstruct
 !Battle_MsgArg2           = $0202 ; 1 B: third argument byte
 !Battle_Unk7F01EE         = $7F01EE ; 1 B (long): bit n = enemy entry n's !Battle_UnkAE85 was non-zero (BattleFD_UnkAAB0,
                                   ; the battle's last step); probably read by the field (not traced)
-!BattleRom_UnkCC6FCB      = $CC6FCB ; 11 B per !Battle_UnkB18C: bytes 0 and 1 go to !Battle_UnkB18E / B190
+!BattleRom_UnkCC6FCB      = $CC6FCB ; 11 B per !Battle_UnkB18C: bytes 0 and 1 go to !Battle_UnkB18E / B190; the records
+                                    ; have BattleRom_TechRec's layout from 2 bytes earlier (BattleSys_UnkD7C4)
 !BattleRom_UnkCC88CB      = $CC88CB ; 11 B per !Battle_UnkB18C: the same for BattleFD_LoadUnkB18E2
 !BattleRom_UnkCC06A7      = $CC06A7 ; 6 B per PcStatBlk.Unk29 value: byte 0's highest set bit picks a
                                     ; !Battle_UnkB1BE entry (BattleFD_UnkAEF2)
@@ -1669,8 +1670,11 @@ endstruct
 !Battle_UnkB1F6           = $B1F6 ; 2 B: the current target's BattlerStats offset (BattleSys_LoadTargetStats)
 !Battle_UnkB200           = $B200 ; 1 B: zeroed by the item effects; bit 7 (with the $7E:B1F5 byte's) stops a
                                   ; tech's remaining parts; set elsewhere (not traced)
-!Battle_UnkLongB1F5       = $7EB1F5 ; read long, indexed by the BattleRom_TechRec offset (BattleSys_RunTechParts; a
-                                    ; slip for $CC:1BF5, TechRec byte 10, probably)
+!Battle_UnkLongB1F5       = $7EB1F5 ; read long, indexed by the BattleRom_TechRec offset (BattleSys_RunTechParts); the
+                                    ; enemy runners test their record's flags byte there, so a slip for
+                                    ; BattleRom_TechRec.Flags ($CC:1BEC), probably
+!BattleRom_EnemyEffectRecA = $CC7AC9 ; 12 B per part number: effect records of BattleSys_UnkD7C4
+!BattleRom_EnemyEffectRecB = $CC89C6 ; 12 B per part number: effect records of BattleSys_UnkD8D1
 !Battle_UnkAE7B           = $AE7B ; 2 B: zeroed by BattleSys_RunTechParts; meaning unknown
 !Battle_UnkB2C1           = $B2C1 ; 2 B: the tech's user set * 3 (offset in !BattleRom_TechUserSets)
 !Battle_UnkB2C5           = $B2C5 ; 2 B: offset of the current part's effect record (number * 12)
