@@ -7091,16 +7091,18 @@ C2Scene_Unk2277:                        ; header: see C2Scene_Unk2273
 ;        stays in the table); X = the table
 ;        index, 0 when |dx| and |dy| are both below 4 (the caller's "there"
 ;        test); C2Tmp_00 = start Y - target Y and C2Tmp_04 = start X -
-;        target X (after the wrap), C2Tmp_02 = |dy|, C2Tmp_06 = the
-;        table's angle (low byte; the high byte is 0); Y, DP and DB unchanged
+;        target X, each only negated when it was half the map or more
+;        (the sign of the wrapped difference, but the size not wrapped);
+;        C2Tmp_02 = |dy| (wrapped), C2Tmp_06 = the table's angle (low
+;        byte; the high byte is 0); Y, DP and DB unchanged
 ; No calls.
 !C2Scene_DirFromX = !C2Tmp_08          ; in: the start point
 !C2Scene_DirFromY = !C2Tmp_0A
 !C2Scene_DirToX = !C2Tmp_0C             ; in: the target point
 !C2Scene_DirToY = !C2Tmp_0E
-!C2Scene_AimDy = !C2Tmp_00              ; start Y - target Y, signed
+!C2Scene_AimDy = !C2Tmp_00              ; start Y - target Y, signed; only negated (size not wrapped) from half the map
 !C2Scene_AimAbsDy = !C2Tmp_02           ; |dy|
-!C2Scene_AimDx = !C2Tmp_04              ; start X - target X, signed
+!C2Scene_AimDx = !C2Tmp_04              ; start X - target X, signed; only negated (size not wrapped) from half the map
 !C2Scene_AimAbsDx = !C2Tmp_06           ; |dx|, then |dx| / 4, then the table's angle
 C2Scene_Unk229D:
     SEC
@@ -7223,7 +7225,8 @@ C2Scene_ClearUnk1B30:
 ; Entry: M, X any (SEP #$30 here), DP any, DB with low WRAM at
 ;        $0000-$1FFF (C2Scene_Unk1B30 is read absolute)
 ; Exit:  M=1, X=0; A = the random byte; X = the index used (8-bit, so
-;        its high byte is 0); Y unchanged; C2Scene_Unk1B30 + 1
+;        its high byte is 0); Y's low byte kept, its high byte cleared
+;        (the SEP #$30; REP #$10 does not restore it); C2Scene_Unk1B30 + 1
 ; No calls.
 C2Scene_Random:
     SEP #$30
@@ -22013,7 +22016,8 @@ org $C2754D
 ; Entry: M=1 (the 8-bit AND/STZ; C2Scene_Random sets M=1 again), X=0,
 ;        DP=$0000 (C2Tmp_08, the tile words), DB=$00 (the task record
 ;        and C2Scene_Random's index); C2Scene_TaskCur = the task
-; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
 ;        C2Tmp_08 = the random part (a word); C2Scene_Unk1B30 + 1
 ; Calls: C2Scene_Random.
 C2Scene_PlaceBelowView:
@@ -22046,7 +22050,8 @@ C2Scene_PlaceBelowView:
 ; view; Y is again 256 pixels below the top of BG2's view.
 ; Entry: M=1 (C2Scene_Random leaves M=1), X=0, DP=$0000, DB=$00;
 ;        C2Scene_TaskCur = the task
-; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
 ;        C2Tmp_08 = the random byte (a word); C2Scene_Unk1B30 + 1
 ; Calls: C2Scene_Random.
 C2Scene_PlaceBelowViewAt178:
@@ -22211,7 +22216,7 @@ C2Scene_TaskBg3DriftWave:
 ; band shows the same 64 words) as HDMA channel 1 to BG3HOFS (indirect,
 ; one register written twice), turns the channel on, writes the 64
 ; words of C2Scene_WaveBuf, C2Scene_Bg3HScroll + sin(phase + 16 x line)
-; / 4 (Trig_Sin1024: one period over the 64 lines, -63..+63 pixels),
+; / 4 (Trig_Sin1024: one period over the 64 lines, -64..+63 pixels),
 ; with the phase taken before .Var22 goes up by one, and copies them to
 ; C2Scene_WaveBufCopy. Never ends.
 ; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it; not
@@ -22578,8 +22583,10 @@ C2Scene_RestoreParty:
 ; pixels left of / above the screen to 16 right of it and 32 below.
 ; Entry: M=1 (REP #$20 here), X=0, DP=$0000 (the scroll shadows and
 ;        C2Tmp), DB=$00 (the record); C2Scene_TaskCur = the task
-; Exit:  M=1, X=0; X = the task; A = C2Tmp_00 = 1 or 0 (8-bit; C2Tmp_01
-;        unchanged); C2Tmp_08/0A = the relative X/Y; Y unchanged
+; Exit:  M=1, X=0; X = the task; C2Tmp_00 = 1 (in view) or 0 (8-bit;
+;        C2Tmp_01 unchanged); A = 1 in view, else the relative X (or Y
+;        when X passed) that failed the test (low byte in A, high byte
+;        in B); C2Tmp_08/0A = the relative X/Y; Y unchanged
 ; No calls.
 C2Scene_TaskInView:
     LDX.b !C2Scene_TaskCur
@@ -22788,7 +22795,8 @@ C2Scene_AddGravity:
 ; Entry: M=1 (8-bit multiply; C2Scene_Random leaves M=1), X=0,
 ;        DP=$0000, DB=$00 (the multiplier registers and the record);
 ;        C2Scene_TaskCur = the task
-; Exit:  M=0, X=0; X = the task; A = the new .SprX; Y unchanged;
+; Exit:  M=0, X=0; X = the task; A = the new .SprX; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
 ;        C2Scene_Unk1B30 + 1
 ; Calls: C2Scene_Random.
 C2Scene_NudgeXRandom:
@@ -22822,7 +22830,8 @@ C2Scene_NudgeXRandom:
 ; Entry (both): M=1 (C2Scene_Random leaves M=1; SEP #$20 before the
 ;        sub-entry), X=0, DP=$0000, DB=$00 (the record and the random
 ;        index); C2Scene_TaskCur = the task
-; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y's high
+;        byte cleared (C2Scene_Random's SEP #$30), low byte kept;
 ;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYA)
 ; Calls: C2Scene_Random.
 C2Scene_RandPosA:
@@ -22849,7 +22858,8 @@ C2Scene_RandYA:                         ; header: see C2Scene_RandPosA
 ; falling into the sub-entry C2Scene_RandYB ($C2:7A44): .SprY = -$48 + a
 ; random 0-255.
 ; Entry (both): M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
-; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y's high
+;        byte cleared (C2Scene_Random's SEP #$30), low byte kept;
 ;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYB)
 ; Calls: C2Scene_Random.
 C2Scene_RandPosB:
@@ -23170,8 +23180,8 @@ C2Scene_SetConfig1E:
 ; DB is saved and restored around them.
 ; Entry: M=1 (8-bit stores), X=0 (16-bit addresses), DP=$0000 (TDC for
 ;        0), DB any (saved)
-; Exit:  M=1, X=0; X = $20, Y = $9100 (the last tile pair's end + $30);
-;        A = the last pattern byte; DB unchanged
+; Exit:  M=1, X=0; X = $20, Y = $9100 (the end of the last tile pair);
+;        A = $9100 (low byte $00, B = $91: the last TYA/ADC); DB unchanged
 ; No calls.
 C2Scene_BuildPatternTiles:
     TDC
@@ -23778,7 +23788,8 @@ Menu_InitSystems:
 ; Callers (2 JSR sites): Menu_InitSystems ($C2:8130) and unmatched ($C2:C725).
 ; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (the counts),
 ;        DB=$7E (the lists)
-; Exit:  P restored; A = the last entry read; X = 9; Y = the number listed
+; Exit:  P restored; A = 8 when position 8 was listed (the TXA), else
+;        its entry ($80 or more); X = 9; Y = the number listed
 ; No calls.
 Menu_BuildPartyLists:
     PHP
@@ -23828,8 +23839,11 @@ Menu_BuildPartyLists:
 ;   256).
 ; Both yields push X, Y, P and D (Menu_YieldSave, $C2:8236, keeps S in
 ; .SavedSp and Menu_ThreadVar in .SavedVar; .State = waiting). On the
-; resume the thread has its X, Y, P and DP back but DB=$7E and A = its
+; resume the thread has its X, Y, P and DP back and A = its
 ; Menu_ThreadVar (low byte; B = the high byte of its S).
+; DB is set to $7E only at the start of each frame, never between
+; threads: a thread starts or resumes with the DB the thread run before
+; it in that frame yielded or ended with ($7E for the first one).
 ; Quirk, kept: there is no CLC before the stack's ADC. For slots 1-7 the
 ; carry is that of the slot loop's CMP (clear); for slot 0 it is that of
 ; the CMP that ended the previous frame's scan (set), so a new thread in
@@ -23855,9 +23869,11 @@ Menu_BuildPartyLists:
 ;        absolute but the slot records are read direct page; set again
 ;        each frame), DB=$7E (set again each frame). The sub-entries are
 ;        used from inside a thread (Menu_CurThread and the thread's
-;        stack), M and X any (SEP here), DB any: Menu_ThreadEnd with
-;        DP=$0000; Menu_Yield / Menu_YieldFrames with DP any (pushed,
-;        then set to $0000)
+;        stack), M and X any (SEP here), DB not changed: it must map low
+;        WRAM for the STZ.w of Menu_FrameReady ($0D01) when the scan
+;        ends, and the next thread run starts or resumes with it;
+;        Menu_ThreadEnd with DP=$0000; Menu_Yield / Menu_YieldFrames
+;        with DP any (pushed, then set to $0000)
 ; Exit:  never returns; Menu_Yield / Menu_YieldFrames return to their
 ;        caller a frame or more later as above
 ; Calls: Menu_StartThread; the threads (JMP (abs)).
@@ -23997,8 +24013,10 @@ Menu_StartThread:
 ;   JSR $C2:B1DE, JSR $C2:B3C2, JSR $C2:B4BE, JSR $C2:C6F4, JSR $C2:D76F, JSR $C2:E261).
 ; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_JumpVec as
 ;        scratch), DB any
-; Exit:  P restored; A = $40; X = the last slot freed (or unchanged); Y
-;        unchanged; Menu_JumpVec's low byte = 0
+; Exit:  P restored (the SEP #$30 has zeroed the high bytes of X and Y,
+;        which PLP cannot bring back); A = $40; X's low byte = the last
+;        slot freed (or kept); Y's low byte kept; Menu_JumpVec's low
+;        byte = 0
 ; No calls.
 Menu_KillThreads:
     PHP
@@ -24116,7 +24134,8 @@ Menu_Exit:
 ; Callers (2 JSR sites): Menu_Unk834D ($C2:837F) and unmatched ($C2:B9AB).
 ; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E (absolute)
 ; Exit:  P restored; A = X = $2830 (past the last record); Y = the last
-;        value marked (or unchanged)
+;        Unk2A value in $AE-$B2, marked or not (the TAY comes before the
+;        Menu_Unk04A4 test), or unchanged when there is none
 ; No calls.
 Menu_Unk82E1:
     PHP
@@ -24358,9 +24377,9 @@ Menu_FadeOut:
 ; Callers note: also reached by Menu_FadeOut's BRA.
 ; Entry: from a menu thread, M any (SEP #$20 here), X any, DP=$0000
 ;        (the yields), DB=$7E (Menu_InidispShadow, Menu_FadeStep); A = the step
-; Exit:  M=1; A = the brightness before the last step + the step (when
-;        it reached 15), or as Menu_Yield returns (low byte the thread's
-;        Menu_ThreadVar); X, Y unchanged; Menu_InidispShadow bits 0-3 = 0 or 15
+; Exit:  M=1; A = $0F (when it reached 15: the .full path's LDA), or
+;        as Menu_Yield returns (low byte the thread's Menu_ThreadVar);
+;        X, Y unchanged; Menu_InidispShadow bits 0-3 = 0 or 15
 ; Calls: Menu_YieldFrames; jumps to Menu_Yield.
 Menu_Fade:
     SEP #$20
@@ -24513,9 +24532,10 @@ Menu_Irq:
 ; Callers (1 JSR site): Menu_Nmi ($C2:844D).
 ; Entry: M any (SEP #$30 here), X any, DP = Menu_NmiDp, DB=$00 (the pad
 ;        bytes and registers absolute)
-; Exit:  P as on entry (PLP); A = the mask, X = the stage; Y, DP and DB
-;        unchanged; the pad bytes, Menu_PlayTime and Menu_Joy2Copy
-;        updated
+; Exit:  P as on entry (PLP); A = the mask, X = the stage (high byte
+;        0); Y's low byte kept, its high byte cleared (the SEP #$30;
+;        Menu_Nmi calls with X=0); DP and DB unchanged; the pad bytes,
+;        Menu_PlayTime and Menu_Joy2Copy updated
 ; Calls: Menu_PollPad, Menu_TickPlayTime.
 Menu_NmiPad:
     PHP
@@ -24849,8 +24869,9 @@ Menu_FlushVramQueue:
 ; Callers (2 JSR sites): unmatched ($C2:8651, $C2:9834).
 ; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit LDX/STX
 ;        immediates), DP any, DB any (set to $00)
-; Exit:  P and DB restored; A clobbered (0 when nothing was sent); X =
-;        Menu_PalBytes when sent; Y unchanged
+; Exit:  P and DB restored; A's low byte = $FF (Menu_PalDirtyAll, left
+;        by the TRB) when nothing was sent, $80 (DMA_CH7) after the DMA;
+;        X = Menu_PalBytes when sent; Y unchanged
 ; No calls.
 Menu_UploadPalette:
     PHB
@@ -25199,7 +25220,8 @@ Menu_LoadCharRecA:
 ;   $C2:B0B1, $C2:DDA3, $C2:DFAD).
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E; A =
 ;        the item id
-; Exit:  P and X restored; A = the index; Y unchanged
+; Exit:  P and X restored; A = the category (0-4, = Menu_ItemCategory's
+;        low byte; the TXA comes after the index store); Y unchanged
 ; No calls.
 Menu_ItemCategory:
     PHX
@@ -25232,7 +25254,9 @@ Menu_ItemCategoryBounds:
 
 ; $C2:88AD — Menu_ItemDataPtrA (43 bytes, $88AD–$88D7)
 ; Menu_ItemCategory for item A, then X = Menu_ItemDataPtr = the address
-; (bank $FF) of the item's record in its category's table:
+; (bank $CC: the callers read the record with LDA $CC0000,X; only the
+; pointer and size tables are in bank $FF) of the item's record in its
+; category's table:
 ; MenuRom_ItemTablesA[category] + index x MenuRom_ItemRecSizesA[category].
 ; What the records hold is not traced.
 ; Callers (1 JSR site): unmatched ($C2:98BB).
@@ -25264,7 +25288,8 @@ Menu_ItemDataPtrA:
 ; As Menu_ItemDataPtrA for the second set of per-category tables
 ; (MenuRom_ItemTablesB, MenuRom_ItemRecSizesB), using the
 ; Menu_ItemCategory / Menu_ItemIndex left by an earlier call; result in
-; Menu_ItemDataPtrB and X.
+; Menu_ItemDataPtrB and X: again an address in bank $CC (the callers
+; read LDA $CC0000,X and $CC0001,X), not in bank $FF.
 ; Callers (3 JSR sites): unmatched ($C2:9930, $C2:9955, $C2:B0C3).
 ; Entry: M any (P saved; SEP #$20 here), X any, DP any, DB=$7E;
 ;        Menu_ItemCategory and Menu_ItemIndex set
@@ -25545,7 +25570,10 @@ Menu_StartCursorB:
 ; Menu_CursorYOfs is added.
 ; Quirk, kept: the PLP and RTS after the loop ($C2:8A96-$8A97) are never
 ; reached.
-; Entry: from Menu_RunThreads (any M, X; DP=$0000, DB=$7E)
+; Entry: from Menu_RunThreads: M any (SEP #$20 here), X=0 (the
+;        scheduler's REP #$30, kept across Menu_Yield; the 16-bit
+;        LDX.w/STX.w copy the whole Menu_CursorTileAttr word), DP=$0000,
+;        DB=$7E
 ; Exit:  never returns
 ; Calls: Menu_CursorBlink, Menu_CursorPosAB, Menu_Yield.
 Menu_CursorThreadB:

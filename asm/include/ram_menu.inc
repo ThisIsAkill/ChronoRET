@@ -475,8 +475,8 @@ endstruct
 !Menu_ItemCount = $04CB                  ; 8-bit; how many to add or remove
 !Menu_ItemCategory = $04CC               ; 16-bit; Menu_ItemCategory's result (0-4)
 !Menu_ItemIndex = $04CE                  ; 16-bit; the id's index within its category
-!Menu_ItemDataPtr = $0D28                ; 16-bit; Menu_ItemDataPtrA's result (bank $FF)
-!Menu_ItemDataPtrB = $0D2A               ; 16-bit; Menu_ItemDataPtrB's result (bank $FF)
+!Menu_ItemDataPtr = $0D28                ; 16-bit; Menu_ItemDataPtrA's result (an address in bank $CC)
+!Menu_ItemDataPtrB = $0D2A               ; 16-bit; Menu_ItemDataPtrB's result (an address in bank $CC)
 !Menu_CurCharRecPtr = $006F              ; 16-bit; address of the Menu_CharRecords record
                                          ; Menu_LoadCharRecA copied
 !Menu_CurMember = $0071                  ; 8-bit (stored as a word by BankC2_MenuEntry, from Menu_EntryX):
