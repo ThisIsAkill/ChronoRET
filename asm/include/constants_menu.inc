@@ -675,4 +675,26 @@ if !constants_menu_inc == 0
 !MenuRom_ItemTablesB = $FFCF1D           ; the same for a second set of tables (Menu_ItemDataPtrB)
 !MenuRom_ItemRecSizesB = $FFCF27
 
+; --- Menu cursors and list arrows ($C2:89E4-$C2:8C35) ---
+!Menu_CursorSlot = $0030                 ; thread slot 6 (byte offset): the cursor threads
+!Menu_ArrowsSlot = $0020                 ; slot 4: Menu_ListArrowsThread
+!Menu_CursorRowsA = $0A                  ; Menu_CursorStepA draws rows 0-9 only
+!Menu_CursorTileAttrA = $2020            ; tile $20, attributes $20
+!Menu_CursorTileAttrD = $3020            ; tile $20, attributes $30
+!Menu_CursorFixedRows = 3                ; Menu_CursorThreadB: indexes from 3 on are scrolled
+!Menu_CursorRowStep = $30                ; 48 pixels per scroll step
+!Menu_CursorWrapMin = $F0                ; Y below this after wrapping upward: not drawn
+!Menu_BlinkMaskDefault = $FC             ; TRB mask leaving a 2-bit countdown (4 frames per phase)
+!Menu_BlinkTimersInit = $0103            ; Menu_StartCursorD: timers 0 and 1 = 3 and 1 ...
+!Menu_BlinkTimer2Init = $02              ; ... timer 2 = 2
+!Menu_CursorBlinkDInit = $02             ; and Menu_CursorBlink = 2
+!Menu_Blink0 = $01                       ; Menu_CursorBlink bits of sprites 0, 1, 2
+!Menu_Blink1 = $02
+!Menu_Blink2 = $04
+!Menu_ArrowHidden = $E000                ; X 0, Y $E0 (never stored, see Menu_ListArrowsThread)
+!Menu_ArrowTimerMask = $F8               ; a 3-bit countdown (8 frames per phase)
+!Menu_ArrowGap = $08                     ; the down arrow's Y below the up arrow's
+!Menu_ArrowUpTile = $3022                ; tile $22, attributes $30
+!Menu_ArrowDownTile = $B022              ; tile $22, attributes $B0 (vertical flip)
+
 endif

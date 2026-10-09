@@ -406,12 +406,15 @@ endstruct align 8
 !Menu_Tmp00 = $0000                      ; 8-bit scratch (also Menu_JumpVec's low byte)
 !Menu_Tmp01 = $0001                      ; 8-bit scratch
 !Menu_Tmp02 = $0002                      ; 8-bit scratch
+!Menu_Tmp03 = $0003                      ; 8-bit scratch
+!Menu_Tmp04 = $0004                      ; 8-bit scratch
 !Menu_JumpVec = $0000                    ; 16-bit scratch: JMP (abs) target of Menu_RunThreads and
                                          ; Menu_MainThread
 !Menu_ListPtr = $0016                    ; 24-bit scratch: Menu_MainThread's pointer into Menu_ModeLists'
                                          ; list for Menu_Mode
-!Menu_Unk51 = $0051                      ; 16-bit; zeroed by Menu_Setup, then the start offset of its
-                                         ; Menu_CharRecords division loop (set by the calls between; not traced)
+!Menu_Unk51 = $0051                      ; 16-bit; zeroed by Menu_InitSystems, then the start offset of its
+                                         ; Menu_CharRecords division loop (set by the calls between; not
+                                         ; traced) and Menu_CursorStepD's OAM offset
 !Menu_Unk56 = $0056                      ; 16-bit; zeroed by Menu_Setup; use not traced
 !Menu_Unk58 = $0058                      ; 16-bit; set to $3020 by Menu_RunThreads before thread 3 starts
                                          ; (written absolute); use not traced
@@ -510,6 +513,40 @@ endstruct
 !Menu_GradAccum = $A01B                  ; 16-bit; lines accumulated (8.8; the high byte is taken)
 !Menu_GradBufSel = $A01D                 ; 16-bit; 0 or $100: the buffer offset of the table last built
                                          ; (the menu NMI reads the high byte, $C2:8657)
+
+; The cursors and list arrows (Menu_StartCursorA ... Menu_ListArrowsThread).
+!Menu_OamCursor0 = $0774                 ; OAM entry 29 in the copy at $0700 (X, Y, tile, attributes):
+!Menu_OamCursor1 = $0778                 ; the cursor sprite; entries 30 and 31 the other cursors /
+!Menu_OamCursor2 = $077C                 ; the list arrows (probably sent by the menu NMI; not traced)
+!Menu_Unk0416 = $0416                    ; 8-bit; Menu_CursorStepA subtracts it from Menu_Unk0D9D
+!Menu_Unk0772 = $0772                    ; 16-bit; copied to Menu_CursorTileAttr by Menu_StartCursorB/C
+!Menu_Unk80 = $0080                      ; 8-bit; Menu_CursorThreadB's Menu_Unk0DA8 - this = the list scroll
+!Menu_ArrowX = $0D92                     ; 8-bit; the list arrows' X
+!Menu_ArrowY = $0D93                     ; 8-bit; their base Y
+!Menu_ListRows = $0D94                   ; 8-bit; 0: no arrows; the down arrow shows while Menu_ListTop is below it
+!Menu_ListTop = $0D95                    ; 8-bit; the up arrow shows while it is non-zero
+!Menu_ArrowTimer = $0D96                 ; 8-bit blink countdown of the arrows
+!Menu_ArrowBlink = $0D97                 ; 8-bit; bit 0: the arrows' phase
+!Menu_ArrowMulA = $0D98                  ; 8-bit; Y factors of Menu_ListTop (high byte of the
+!Menu_ArrowMulB = $0D99                  ; product with this one, low byte with the other)
+!Menu_ArrowsOff = $0D9A                  ; 8-bit; non-zero: Menu_ListArrowsThread places nothing
+!Menu_Unk0D9B = $0D9B                    ; 8-bit; set to $20 by Menu_CursorStepD
+!Menu_CursorIndex = $0D9C                ; 8-bit; the Menu_CursorPos record the cursor points at
+!Menu_Unk0D9D = $0D9D                    ; 8-bit; see Menu_CursorStepA
+!Menu_CursorYOfs = $0D9E                 ; 8-bit (zeroed as a word); added to the cursor's Y
+!Menu_CursorBlink = $0DA0                ; 8-bit; bits 0-2: the blink phase of sprites 0-2
+!Menu_CursorTileAttr = $0DA1             ; 16-bit tile and attributes of cursors B and C
+!Menu_BlinkTimers = $0DA3                ; 3 B: blink countdowns of sprites 0-2
+!Menu_BlinkMask = $0DA6                  ; 8-bit; Menu_CursorBlinkMasked's timer mask (Menu_StartCursorC: $FC)
+!Menu_Unk0DA8 = $0DA8                    ; 8-bit; see Menu_CursorThreadB
+
+; A cursor position record (6 bytes; Menu_CursorRecOffset); only X and Y
+; are read here.
+struct Menu_CursorPos $9380
+.X:         skip 1
+.Y:         skip 1
+            skip 4
+endstruct align 6
 
 ; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
 struct Menu_Thread $00B0

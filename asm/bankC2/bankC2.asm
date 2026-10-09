@@ -20781,15 +20781,16 @@ Menu_BuildPartyLists:
 ; Callers of Menu_ThreadEnd (5 JMP sites): Menu_FadeInThread ($C2:83C7) and unmatched ($C2:9044,
 ;   $C2:CBE8, $C2:FA46, $C2:FAA2).
 ; Callers of Menu_Yield (56 sites: 53 JSR, 3 JMP): Menu_MainThread (JSR $C2:826C), Menu_FadeInThread
-;   (JSR $C2:83BD), Menu_Fade (JMP $C2:8403) and unmatched (JSR $C2:89F5, JSR $C2:8A91, JSR
-;   $C2:8AB5, JSR $C2:8AF8, JSR $C2:8C30, JSR $C2:8FC3, JSR $C2:904C, JSR $C2:9C5B, JSR $C2:9E3C,
-;   JSR $C2:9EFD, JSR $C2:A04C, JSR $C2:A0AC, JSR $C2:A0BD, JSR $C2:A511, JSR $C2:A661, JSR
-;   $C2:A6DC, JSR $C2:A785, JSR $C2:A85F, JSR $C2:A88F, JSR $C2:A945, JSR $C2:AAFF, JSR $C2:AB4D,
-;   JSR $C2:AD7F, JSR $C2:ADA1, JSR $C2:AF5C, JSR $C2:AF6D, JSR $C2:B1A5, JSR $C2:B228, JSR
-;   $C2:B651, JSR $C2:B705, JSR $C2:B8F2, JSR $C2:BE98, JSR $C2:C337, JSR $C2:C7D0, JSR $C2:C936,
-;   JSR $C2:CA2D, JSR $C2:CA33, JSR $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55, JMP $C2:CF5B, JSR
-;   $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7, JSR $C2:D8CA, JSR $C2:E0CF, JSR $C2:E14B, JSR $C2:E906,
-;   JSR $C2:E91E, JSR $C2:E97F, JMP $C2:EB98, JSR $C2:F696, JSR $C2:FAA5).
+;   (JSR $C2:83BD), Menu_Fade (JMP $C2:8403), Menu_CursorThreadA (JSR $C2:89F5), Menu_CursorThreadB
+;   (JSR $C2:8A91), Menu_CursorThreadC (JSR $C2:8AB5), Menu_CursorThreadD (JSR $C2:8AF8),
+;   Menu_ListArrowsThread (JSR $C2:8C30) and unmatched (JSR $C2:8FC3, JSR $C2:904C, JSR $C2:9C5B,
+;   JSR $C2:9E3C, JSR $C2:9EFD, JSR $C2:A04C, JSR $C2:A0AC, JSR $C2:A0BD, JSR $C2:A511, JSR
+;   $C2:A661, JSR $C2:A6DC, JSR $C2:A785, JSR $C2:A85F, JSR $C2:A88F, JSR $C2:A945, JSR $C2:AAFF,
+;   JSR $C2:AB4D, JSR $C2:AD7F, JSR $C2:ADA1, JSR $C2:AF5C, JSR $C2:AF6D, JSR $C2:B1A5, JSR
+;   $C2:B228, JSR $C2:B651, JSR $C2:B705, JSR $C2:B8F2, JSR $C2:BE98, JSR $C2:C337, JSR $C2:C7D0,
+;   JSR $C2:C936, JSR $C2:CA2D, JSR $C2:CA33, JSR $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55, JMP
+;   $C2:CF5B, JSR $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7, JSR $C2:D8CA, JSR $C2:E0CF, JSR $C2:E14B,
+;   JSR $C2:E906, JSR $C2:E91E, JSR $C2:E97F, JMP $C2:EB98, JSR $C2:F696, JSR $C2:FAA5).
 ; Callers of Menu_YieldFrames (3 JSR sites): Menu_Fade ($C2:83F8) and unmatched ($C2:B4F9,
 ;   $C2:CECB).
 ; Entry: M, X any (REP #$30 here), DP=$0000 (the first .State clear is
@@ -20914,9 +20915,10 @@ Menu_YieldSave:                         ; header: see Menu_RunThreads
 ; $C2:8249 — Menu_StartThread (12 bytes, $8249–$8254)
 ; Puts a new thread in the slot at byte offset X: .Entry = A, .State =
 ; new and .Wait = 1 (it starts on the scheduler's next pass).
-; Callers (12 sites: 11 JSR, 1 JMP): Menu_RunThreads (JSR $C2:81A7, JSR $C2:81B6), Menu_StartFadeIn
-;   (JMP $C2:83BA) and unmatched (JSR $C2:8A40, JSR $C2:8AAD, JSR $C2:8ADE, JSR $C2:8BA1, JSR
-;   $C2:8FBF, JSR $C2:CBBB, JSR $C2:F652, JSR $C2:F9AD, JSR $C2:FA96).
+; Callers (13 sites: 11 JSR, 2 JMP): Menu_RunThreads (JSR $C2:81A7, JSR $C2:81B6), Menu_StartFadeIn
+;   (JMP $C2:83BA), Menu_StartCursorA (JMP $C2:89EF), Menu_StartCursorB (JSR $C2:8A40),
+;   Menu_StartCursorC (JSR $C2:8AAD), Menu_StartCursorD (JSR $C2:8ADE), Menu_StartListArrows (JSR
+;   $C2:8BA1) and unmatched (JSR $C2:8FBF, JSR $C2:CBBB, JSR $C2:F652, JSR $C2:F9AD, JSR $C2:FA96).
 ; Entry: M any (P saved; REP #$20 here: A must hold the whole address),
 ;        X = the slot offset (0, 8, ... $38), DP=$0000, DB any
 ; Exit:  P restored; A = Menu_ThNewWait1; X, Y unchanged
@@ -22217,6 +22219,470 @@ Menu_EquipListRanges:
     db $94,$BC
 
 ; ============================================================
+; Menu cursors and list arrows ($C2:89E4–$C2:8C35)
+; ============================================================
+; Threads (Menu_RunThreads) that draw the menu's pointing-hand cursor
+; sprites, blinking, into OAM entries 29-31 of the copy at $0700
+; (Menu_OamCursor0-2: X, Y, tile, attributes; probably what the menu NMI
+; uploads, not traced), at the positions of Menu_CursorPos records; and
+; the up/down arrows of a scrolling list. Each cursor thread runs in slot
+; 6, the arrows in slot 4.
+
+; $C2:89E4 — Menu_StartCursorA (14 bytes, $89E4–$89F1)
+; Menu_CursorYOfs = 0 and starts Menu_CursorThreadA in slot 6.
+; Callers (1 JMP site): unmatched ($C2:AAAA).
+; Entry: M, X any (REP #$30 here), DP=$0000 (Menu_StartThread), DB=$7E
+; Exit:  M=0, X=0; as Menu_StartThread (A = Menu_ThNewWait1, X = $30)
+; Calls: jumps to Menu_StartThread.
+Menu_StartCursorA:
+    REP #$30
+    STZ.w !Menu_CursorYOfs
+    LDA.w #Menu_CursorThreadA
+    LDX.w #!Menu_CursorSlot
+    JMP Menu_StartThread
+
+; $C2:89F2 — Menu_CursorThreadA (8 bytes, $89F2–$89F9)
+; Thread: Menu_CursorStepA, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepA, Menu_Yield.
+Menu_CursorThreadA:
+    JSR Menu_CursorStepA
+    JSR Menu_Yield
+    BRA Menu_CursorThreadA
+
+; $C2:89FA — Menu_CursorStepA (55 bytes, $89FA–$8A30)
+; One frame of cursor A: blinks (Menu_CursorBlink) and, in the shown
+; phase, when row Menu_Unk0D9D - Menu_Unk0416 + Menu_CursorIndex is below
+; 10 (probably the row on screen of a scrolled list), puts sprite 0 at
+; that row's Menu_CursorPos (X + 2, Y - 1 + Menu_CursorYOfs) with tile and
+; attributes $2020. In the hidden phase nothing is written (the sprite
+; keeps its last place and tile).
+; Callers (1 JSR site): Menu_CursorThreadA ($C2:89F2).
+; Entry: M, X any (P saved; REP #$10 / SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A, X clobbered; Y unchanged; Menu_CursorBlink and
+;        Menu_BlinkTimers changed
+; Calls: Menu_CursorBlink, Menu_CursorRecOffset.
+Menu_CursorStepA:
+    PHP
+    REP #$10
+    SEP #$20
+    JSR Menu_CursorBlink
+    BCC .done
+    LDA.w !Menu_Unk0D9D
+    SEC
+    SBC.w !Menu_Unk0416
+    CLC
+    ADC.w !Menu_CursorIndex
+    CMP.b #!Menu_CursorRowsA
+    BCS .done
+    JSR Menu_CursorRecOffset
+    LDA.w Menu_CursorPos.X,X
+    INC A
+    INC A
+    STA.w !Menu_OamCursor0
+    LDA.w Menu_CursorPos.Y,X
+    DEC A
+    CLC
+    ADC.w !Menu_CursorYOfs
+    STA.w !Menu_OamCursor0+1
+    LDX.w #!Menu_CursorTileAttrA
+    STX.w !Menu_OamCursor0+2
+.done:
+    PLP
+    RTS
+
+; $C2:8A31 — Menu_StartCursorB (20 bytes, $8A31–$8A44)
+; Menu_CursorTileAttr = Menu_Unk0772 and starts Menu_CursorThreadB in
+; slot 6.
+; Callers (1 JMP site): unmatched ($C2:C6B0).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorB:
+    PHP
+    REP #$30
+    LDA.w !Menu_Unk0772
+    STA.w !Menu_CursorTileAttr
+    LDA.w #Menu_CursorThreadB
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8A45 — Menu_CursorThreadB (83 bytes, $8A45–$8A97)
+; Thread: each frame blinks (Menu_CursorBlink) and, in its phase with
+; bit 0 clear, puts sprite 0 at Menu_CursorIndex's Menu_CursorPos (X + 2;
+; Y - 1) with Menu_CursorTileAttr. From index 3 on the Y is moved by
+; (Menu_Unk0DA8 - Menu_Unk80) x 48 (a list scrolled by 48-pixel steps,
+; probably) and the cursor is not drawn when that leaves the screen
+; (past 255 going down; below $F0 after wrapping going up), then
+; Menu_CursorYOfs is added.
+; Quirk, kept: the PLP and RTS after the loop ($C2:8A96-$8A97) are never
+; reached.
+; Entry: from Menu_RunThreads (any M, X; DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorBlink, Menu_CursorPosAB, Menu_Yield.
+Menu_CursorThreadB:
+    SEP #$20
+    JSR Menu_CursorBlink
+    BCS .wait
+    TDC                                 ; B = 0
+    LDA.w !Menu_CursorIndex
+    JSR Menu_CursorPosAB
+    STA.w !Menu_OamCursor0
+    LDA.w !Menu_CursorIndex
+    CMP.b #!Menu_CursorFixedRows
+    BCC .place                          ; (B = the Y)
+    LDA.b #!Menu_CursorRowStep
+    STA.l WRMPYA
+    LDA.w !Menu_Unk0DA8
+    SBC.b !Menu_Unk80                   ; (C=1 from the CMP)
+    STA.l WRMPYB
+    XBA                                 ; A = the Y
+    BCC .up
+    CLC
+    ADC.l RDMPYL
+    BCC .add_ofs
+    BRA .wait                           ; past the bottom
+.up:
+    ADC.l RDMPYL                        ; (C=0 from the SBC)
+    BCS .add_ofs
+    CMP.b #!Menu_CursorWrapMin
+    BCC .wait
+.add_ofs:
+    CLC
+    ADC.w !Menu_CursorYOfs
+    XBA
+.place:
+    XBA
+    STA.w !Menu_OamCursor0+1
+    LDX.w !Menu_CursorTileAttr
+    STX.w !Menu_OamCursor0+2
+.wait:
+    JSR Menu_Yield
+    BRA Menu_CursorThreadB
+    PLP                                 ; never reached
+    RTS
+
+; $C2:8A98 — Menu_StartCursorC (26 bytes, $8A98–$8AB1)
+; Menu_BlinkMask = $FC, Menu_CursorTileAttr = Menu_Unk0772, and starts
+; Menu_CursorThreadC in slot 6.
+; Callers (1 JSR site): unmatched ($C2:D533).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorC:
+    PHP
+    REP #$30
+    LDA.w #!Menu_BlinkMaskDefault
+    STA.w !Menu_BlinkMask
+    LDA.w !Menu_Unk0772
+    STA.w !Menu_CursorTileAttr
+    LDA.w #Menu_CursorThreadC
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8AB2 — Menu_CursorThreadC (8 bytes, $8AB2–$8AB9)
+; Thread: Menu_CursorStepC, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepC, Menu_Yield.
+Menu_CursorThreadC:
+    JSR Menu_CursorStepC
+    JSR Menu_Yield
+    BRA Menu_CursorThreadC
+
+; $C2:8ABA — Menu_CursorStepC (27 bytes, $8ABA–$8AD4)
+; One frame of cursor C: blinks with Menu_BlinkMask (Menu_CursorBlinkMasked)
+; and, in its phase with bit 0 clear, puts sprite 0 at Menu_CursorIndex's
+; Menu_CursorPos (X + 2, Y - 1) with Menu_CursorTileAttr.
+; Callers (1 JSR site): Menu_CursorThreadC ($C2:8AB2).
+; Entry: M, X any (P saved; SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A, X clobbered; Y unchanged
+; Calls: Menu_CursorBlinkMasked, Menu_CursorPosAB.
+Menu_CursorStepC:
+    PHP
+    SEP #$20
+    JSR Menu_CursorBlinkMasked
+    BCS .done
+    LDA.w !Menu_CursorIndex
+    JSR Menu_CursorPosAB
+    REP #$20
+    STA.w !Menu_OamCursor0              ; X and Y
+    LDA.w !Menu_CursorTileAttr
+    STA.w !Menu_OamCursor0+2
+.done:
+    PLP
+    RTS
+
+; $C2:8AD5 — Menu_StartCursorD (32 bytes, $8AD5–$8AF4)
+; Starts Menu_CursorThreadD in slot 6 with the three blink timers at 3,
+; 1 and 2 and Menu_CursorBlink = 2 (sprite 1 starts hidden).
+; Callers (2 JSR sites): unmatched ($C2:B1A2, $C2:B485).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = 2; X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorD:
+    PHP
+    REP #$30
+    LDA.w #Menu_CursorThreadD
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    LDA.w #!Menu_BlinkTimersInit
+    STA.w !Menu_BlinkTimers             ; timers 0 and 1
+    SEP #$20
+    LDA.b #!Menu_BlinkTimer2Init
+    STA.w !Menu_BlinkTimers+2
+    LDA.b #!Menu_CursorBlinkDInit
+    STA.w !Menu_CursorBlink
+    PLP
+    RTS
+
+; $C2:8AF5 — Menu_CursorThreadD (8 bytes, $8AF5–$8AFC)
+; Thread: Menu_CursorStepD, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepD, Menu_Yield.
+Menu_CursorThreadD:
+    JSR Menu_CursorStepD
+    JSR Menu_Yield
+    BRA Menu_CursorThreadD
+
+; $C2:8AFD — Menu_CursorStepD (108 bytes, $8AFD–$8B68)
+; One frame of cursor D, one blinking cursor per active party member
+; (Menu_PartyActive of them): tiles and attributes $3020 into all three
+; sprites (and $20 into Menu_Unk0D9B); each of the three Menu_BlinkTimers
+; counts 3..0 and toggles its bit of Menu_CursorBlink when it wraps;
+; then for member n (from Menu_CursorIndex on) whose bit is clear,
+; Menu_CursorPosAB's position goes to the sprite at Menu_OamCursor0 +
+; Menu_Unk51 + 4n.
+; Quirk, kept: Menu_CursorPosAB runs with M=0 here, so its 16-bit load of
+; the X word undoes the Y - 1: these cursors sit one pixel lower than
+; the others (X + 2 as a word).
+; Callers (1 JSR site): Menu_CursorThreadD ($C2:8AF5).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00-$04,
+;        Menu_Unk51, Menu_PartyActive), DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-$04 changed
+; Calls: Menu_CursorPosAB.
+Menu_CursorStepD:
+    PHP
+    REP #$30
+    LDA.w #!Menu_CursorTileAttrD
+    STA.w !Menu_OamCursor0+2
+    STA.w !Menu_OamCursor1+2
+    STA.w !Menu_OamCursor2+2
+    SEP #$20
+    STA.w !Menu_Unk0D9B                 ; (the low byte, $20)
+    LDA.b #!Menu_BlinkMaskDefault
+    TRB.w !Menu_BlinkTimers
+    TRB.w !Menu_BlinkTimers+1
+    TRB.w !Menu_BlinkTimers+2
+    LDA.b #0
+    DEC.w !Menu_BlinkTimers
+    BPL .timer1
+    ORA.b #!Menu_Blink0
+.timer1:
+    DEC.w !Menu_BlinkTimers+1
+    BPL .timer2
+    ORA.b #!Menu_Blink1
+.timer2:
+    DEC.w !Menu_BlinkTimers+2
+    BPL .toggle
+    ORA.b #!Menu_Blink2
+.toggle:
+    EOR.w !Menu_CursorBlink
+    STA.w !Menu_CursorBlink
+    LDA.w !Menu_CursorIndex
+    STA.b !Menu_Tmp04                   ; the member's index
+    REP #$30
+    LDA.w !Menu_CursorBlink
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_Tmp00                   ; the blink bits
+    LDA.b !Menu_PartyActive
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_Tmp02                   ; cursors left
+    LDY.b !Menu_Unk51
+.member:
+    LSR.b !Menu_Tmp00
+    BCS .next                           ; hidden this frame
+    LDA.b !Menu_Tmp04
+    JSR Menu_CursorPosAB
+    STA.w !Menu_OamCursor0,Y
+.next:
+    INY
+    INY
+    INY
+    INY
+    INC.b !Menu_Tmp04
+    DEC.b !Menu_Tmp02
+    BNE .member
+    PLP
+    RTS
+
+; $C2:8B69 — Menu_CursorBlinkMasked (28 bytes with Menu_CursorBlink, $8B69–$8B84)
+; Blink timer 0: clears the bits of Menu_BlinkTimers[0] that A has set
+; (Menu_CursorBlinkMasked passes Menu_BlinkMask; the sub-entry
+; Menu_CursorBlink, $C2:8B6E, $FC, leaving a count 0-3), counts it down
+; and, when it wraps, toggles bit 0 of Menu_CursorBlink: C = that bit.
+; Callers (1 JSR site): Menu_CursorStepC ($C2:8ABD).
+; Callers of Menu_CursorBlink (2 JSR sites): Menu_CursorStepA ($C2:89FF) and Menu_CursorThreadB
+;   ($C2:8A47).
+; Entry (both): M=1 (8-bit), X any, DP any, DB=$7E
+; Exit (both):  M=1; C = Menu_CursorBlink bit 0; A = Menu_CursorBlink / 2;
+;        X, Y unchanged
+; No calls.
+Menu_CursorBlinkMasked:
+    LDA.w !Menu_BlinkMask
+    BRA Menu_CursorBlink_mask
+Menu_CursorBlink:                       ; header: see Menu_CursorBlinkMasked
+    LDA.b #!Menu_BlinkMaskDefault
+.mask:
+    TRB.w !Menu_BlinkTimers
+    DEC.w !Menu_BlinkTimers
+    BPL .show
+    LDA.w !Menu_CursorBlink
+    EOR.b #!Menu_Blink0
+    STA.w !Menu_CursorBlink
+.show:
+    LDA.w !Menu_CursorBlink
+    LSR A
+    RTS
+
+; $C2:8B85 — Menu_CursorPosAB (14 bytes, $8B85–$8B92)
+; The sprite position for cursor index A: with M=1, A = X + 2 and B = Y -
+; 1 of its Menu_CursorPos record (X = the record offset,
+; Menu_CursorRecOffset). With M=0 (Menu_CursorStepD) the 16-bit loads
+; give A = the X/Y word + 2 instead (see there).
+; Callers (3 JSR sites): Menu_CursorThreadB ($C2:8A50), Menu_CursorStepC ($C2:8AC5) and
+;   Menu_CursorStepD ($C2:8B57).
+; Entry: M=1 (or 0 as above), X any, DP any, DB=$7E; A = the index (low
+;        byte)
+; Exit:  M as on entry; A (and B) as above; X = the record offset; Y
+;        unchanged
+; Calls: Menu_CursorRecOffset.
+Menu_CursorPosAB:
+    JSR Menu_CursorRecOffset
+    LDA.w Menu_CursorPos.Y,X
+    DEC A
+    XBA
+    LDA.w Menu_CursorPos.X,X
+    INC A
+    INC A
+    RTS
+
+; $C2:8B93 — Menu_StartListArrows (19 bytes, $8B93–$8BA5)
+; Menu_ArrowsOff = 0 and starts Menu_ListArrowsThread in slot 4.
+; Callers (7 JSR sites): unmatched ($C2:A193, $C2:A4A3, $C2:AE02, $C2:B9DA, $C2:CB5A, $C2:DCB3,
+;   $C2:DEC2).
+; Entry: M, X any (P saved; SEP #$20 / REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $20; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartListArrows:
+    PHP
+    SEP #$20
+    STZ.w !Menu_ArrowsOff
+    REP #$30
+    LDA.w #Menu_ListArrowsThread
+    LDX.w #!Menu_ArrowsSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8BA6 — Menu_Times4 (18 bytes, $8BA6–$8BB7)
+; A = the low byte of A x 4, through the hardware multiplier (two XBAs
+; and a NOP as the wait).
+; Callers (6 JSR sites): unmatched ($C2:9F17, $C2:9FBE, $C2:A49A, $C2:B6F2, $C2:B7BA, $C2:BB76).
+; Entry: M=1 (8-bit), X any, DP any, DB any (long registers)
+; Exit:  M=1; A = (A x 4) AND $FF; B unchanged; X, Y unchanged
+; No calls.
+Menu_Times4:
+    STA.l WRMPYA
+    LDA.b #4
+    STA.l WRMPYB
+    XBA
+    XBA
+    NOP
+    LDA.l RDMPYL
+    RTS
+
+; $C2:8BB8 — Menu_ListArrowsThread (126 bytes, $8BB8–$8C35)
+; Thread (slot 4): each frame counts Menu_ArrowTimer (7..0) and toggles
+; bit 0 of Menu_ArrowBlink when it wraps. In the phase with the bit set,
+; unless Menu_ArrowsOff: the arrows' Y = Menu_ArrowY + the high byte of
+; Menu_ListTop x Menu_ArrowMulA + the low byte of Menu_ListTop x
+; Menu_ArrowMulB (the down arrow 8 lower, 9 when that sum carried: the
+; ADC has no CLC), at X = Menu_ArrowX; when
+; Menu_ListRows is 0 nothing more is done; else the up arrow (sprite 1)
+; is placed when Menu_ListTop is not 0, the down arrow (sprite 2) when
+; Menu_ListTop is below Menu_ListRows. Then (also in the other phase)
+; sprites 1 and 2 get tile $22 with attributes $30 and $B0 (the down
+; arrow flipped vertically). An arrow that is not placed keeps its last
+; position.
+; Quirks, kept: X and Y are loaded with $E000 (off screen) each frame
+; but that value is never stored; the down arrow's ADC has no CLC.
+; Entry: from Menu_RunThreads (any M; X=0: the 16-bit loads), DP=$0000
+;        (Menu_Tmp00-$03), DB=$7E
+; Exit:  never returns
+; Calls: Menu_Yield.
+Menu_ListArrowsThread:
+    SEP #$20
+    LDX.w #!Menu_ArrowHidden            ; (never stored)
+    TXY
+    LDA.b #!Menu_ArrowTimerMask
+    TRB.w !Menu_ArrowTimer
+    DEC.w !Menu_ArrowTimer
+    BPL .phase
+    LDA.w !Menu_ArrowBlink
+    EOR.b #!Menu_Blink0
+    STA.w !Menu_ArrowBlink
+.phase:
+    LDA.w !Menu_ArrowBlink
+    LSR A
+    BCC .tiles
+    LDA.w !Menu_ArrowsOff
+    BNE .wait
+    LDA.w !Menu_ListTop
+    STA.l WRMPYA
+    LDA.w !Menu_ArrowMulA
+    STA.l WRMPYB
+    LDA.w !Menu_ArrowX
+    STA.b !Menu_Tmp00                   ; up arrow X
+    STA.b !Menu_Tmp02                   ; down arrow X
+    LDA.l RDMPYH
+    PHA
+    LDA.w !Menu_ArrowMulB
+    STA.l WRMPYB
+    PLA
+    CLC
+    ADC.w !Menu_ArrowY
+    ADC.l RDMPYL
+    STA.b !Menu_Tmp01                   ; up arrow Y
+    ADC.b #!Menu_ArrowGap               ; no CLC (see the header)
+    STA.b !Menu_Tmp03                   ; down arrow Y
+    LDA.w !Menu_ListRows
+    BEQ .wait
+    LDA.w !Menu_ListTop
+    BEQ .no_up
+    LDX.b !Menu_Tmp00
+    STX.w !Menu_OamCursor1
+.no_up:
+    CMP.w !Menu_ListRows
+    BCS .tiles
+    LDY.b !Menu_Tmp02
+    STY.w !Menu_OamCursor2
+.tiles:
+    LDX.w #!Menu_ArrowUpTile
+    STX.w !Menu_OamCursor1+2
+    LDX.w #!Menu_ArrowDownTile
+    STX.w !Menu_OamCursor2+2
+.wait:
+    JSR Menu_Yield
+    JMP Menu_ListArrowsThread
+
+; ============================================================
 ; Menu setup: PPU and RAM init, DMA fill/copy helpers, new-game
 ; data ($C2:940D–$C2:960A)
 ; ============================================================
@@ -22547,5 +23013,32 @@ Menu_ClearConfigAndFlags:
     LDY.w #!Menu_Unk0408
     LDA.w #!Menu_Unk0408Size-1
     MVN !Bank7E,bank(!MenuRom_DefaultButtonMap) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; ============================================================
+; Menu cursor record offset ($C2:EA27–$C2:EA35)
+; ============================================================
+
+org $C2EA27
+; $C2:EA27 — Menu_CursorRecOffset (15 bytes, $EA27–$EA35)
+; X = (A AND $FF) x 6: the byte offset of a 6-byte Menu_CursorPos record.
+; Callers (5 JSR sites): Menu_CursorStepA ($C2:8A13), Menu_CursorPosAB ($C2:8B85) and unmatched
+;   ($C2:C9CF, $C2:E95F, $C2:EA08).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB any; A = the
+;        index (low byte)
+; Exit:  P restored; X = the offset; A = (A AND $FF) x 2 (both bytes);
+;        Y unchanged
+; No calls.
+Menu_CursorRecOffset:
+    PHP
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    PHA
+    ASL A
+    ADC.b 1,S                           ; x 4 + x 2 (C=0 from the ASL)
+    TAX
+    PLA
     PLP
     RTS
