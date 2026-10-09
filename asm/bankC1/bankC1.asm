@@ -26822,9 +26822,13 @@ BattleSys_ResetTechUsers:
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkAD8D/AD8E = the targets
 ;        (1 or more)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; DP $00/$01 = the record's offset in
-;        bank $CC (DP $16-$1B also written by the effect routine); A,
-;        X clobbered; !Battle_UnkAD8D = 0 after an effect routine; plus
-;        what the callee changes
+;        bank $CC until the effect routine overwrites it: kept with no
+;        effect routine and after BattleSys_Effect2B; after
+;        BattleSys_Effect29 (and BattleSys_Effect2A when byte 3 has bit
+;        6) BattleSys_RestoreHpMp leaves its amount there when DP $1A
+;        has bit 7 or 6; DP $16-$1B also written by the effect
+;        routine; A, X clobbered; !Battle_UnkAD8D = 0 after an effect
+;        routine; plus what the callee changes
 !BF46_RecOfs = !BattleTmp_00            ; 2 B: offset of the record in bank $CC
 BattleSys_UnkBF46:
     TDC
@@ -29884,6 +29888,7 @@ BankC1_RunService:
 ; $C1:CFE9 — BankC1_FindItem (28 bytes, $CFE9–$D004)
 ; Service 0 (!BankC1Svc_FindItem): A = the item id Y when an
 ; !Battle_InvIds entry holds it (X = its index), else 0.
+; Callers note: BankC1_ServiceTable entry 0 (BankC1_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index, or
 ;        $100 after a miss (X unchanged for Y = 0); Y unchanged;
@@ -29912,6 +29917,7 @@ BankC1_FindItem:
 ; its count + 1. A = the new count (0 for Y = 0 or a full count).
 ; Quirk: with no empty entry, entry 0 (!Battle_SvcSlot's start value) is
 ; overwritten with the id and keeps its old count + 1.
+; Callers note: BankC1_ServiceTable entry 1 (BankC1_RunService).
 ; Callers (3 JSR sites): BattleSys_Main ($C1:840E), BankC1_AddItemLong ($C1:FDC3) and unmatched
 ;   ($C1:F01E).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
@@ -29963,6 +29969,7 @@ BankC1_AddItem:
 ; Service 2 (!BankC1Svc_RemoveItem): one fewer of item Y. A = the new
 ; count; when it reaches 0 the entry is emptied (id 0) and A = $FF.
 ; A = 0 when no entry holds the item, its count is 0 already, or Y = 0.
+; Callers note: BankC1_ServiceTable entry 2 (BankC1_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index, or
 ;        $100 after a miss (X unchanged for Y = 0); Y unchanged;
@@ -29997,6 +30004,7 @@ BankC1_RemoveItem:
 ; $C1:D086 — BankC1_HasGold (28 bytes, $D086–$D0A1)
 ; Service 3 (!BankC1Svc_HasGold): A = $FF when the gold is at least Y
 ; (its low word not below Y, or its high byte not 0) or Y = 0, else 0.
+; Callers note: BankC1_ServiceTable entry 3 (BankC1_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said (B as it came: 0 from
 ;        BankC1_RunService); X = the gold's low word (unchanged for
@@ -30023,8 +30031,11 @@ BankC1_HasGold:
 ; is also $9680 or more the sum is set to 9,999,999 ($98967F) and A =
 ; 0; otherwise A = $FF (B = 0), Y = 0 included.
 ; Quirk: a sum whose high byte is above $98 and whose low word is below
-; $9680 drops to $98 xx xx, under the cap (it cannot come from a 16-bit
-; Y added to a capped sum).
+; $9680 drops to $98 xx xx, under the cap: any add that carries out of
+; the low word while the high byte is $98 does this. 9,999,999 + 30,000
+; carries the high byte to $99 with the low word $0BAF, and the gold
+; is then set to $980BAF (9,964,463).
+; Callers note: BankC1_ServiceTable entry 4 (BankC1_RunService).
 ; Callers (1 JSR site): BattleSys_Main ($C1:83E7).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X and Y unchanged;
@@ -30070,6 +30081,7 @@ BankC1_AddGold:
 ; Service 5 (!BankC1Svc_RemoveGold): takes Y off the 24-bit gold. When
 ; the low word borrows and the high byte is 0, nothing changes and A =
 ; 0; otherwise the gold is lowered and A = $FF (B = 0), Y = 0 included.
+; Callers note: BankC1_ServiceTable entry 5 (BankC1_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the amount (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X and Y unchanged;
 ;        !Battle_SvcArg = Y, !Battle_SvcSlot = the new low word
@@ -32206,8 +32218,9 @@ BattleSys_RollHit:
 ; Quirks: the BEQ at $C1:DDDF (an amount of 0 there) can never be taken,
 ; as the target's HP, not 0, is at most the amount; it would reach the
 ; code after it with M=0. The second cap at 9999 ($C1:DE3E) changes
-; nothing. Through the BEQ at $C1:DDCC (HP 0) the routine ends with
-; TDC / SEP #$20 from M=0.
+; nothing. Through the JMP .done at $C1:DDCC (reached at HP 0, when
+; the BNE at $C1:DDCA is not taken) the routine ends with TDC / SEP
+; #$20 from M=0.
 ; Callers (1 JSR site): BattleSys_Effect03 ($C1:D335).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 (16-bit) and DP $18 (16-bit, at
 ;        most $FF) as said; !Battle_UnkB1F6 / B1FD, !Battle_UnkAD8D,
@@ -32549,11 +32562,18 @@ BattleSys_AdjustHit:
 ;     (!Battle_ListDoubleBit): * 15 / 20 + 1, and after it, as after no
 ;     match, bit 6: * 10 / 20 + 1.
 ; Then, when the caster's BattlerStats.Unk3F is at least the target's,
-; their difference / 20 / 20 is added to DP $18 and a carry out of the
-; byte makes it $FF. Quirks: the second Battle_Div32 meant / 2 (LDX #2)
-; but !Battle_MathB still holds 20, and the sum is stored only when it
-; overflows; since a byte difference / 400 is 0, this last part never
-; changes anything.
+; q = their difference / 20 is divided again and the quotient's low
+; byte added to DP $18; only a carry out of the byte is stored (DP $18
+; = $FF). Quirks: the second Battle_Div32 meant / 2 (LDX #2) but
+; !Battle_MathB still holds 20; the sum is stored only when it
+; overflows; and the first divide is entered with C=1 (from the SEC /
+; SBC), which Battle_Div32 leaves in bit 15 of !Battle_MathHi, so the
+; second one divides $8000:q by 20. With !Battle_MathHi 0 when the
+; first divide starts (as after each status case above; with none it
+; is what the caller left), a difference below 20 gives q = 0 and adds
+; nothing, and one of 20 or more gives $6666 ($6667 for 240 or more):
+; then a DP $18 (low byte) of $9A or more ($99 with $67) carries, and
+; DP $18 becomes $FF (DP $19 unchanged).
 ; Callers (1 JSR site): BattleSys_Effect03 ($C1:D313).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (16-bit TAX of the difference);
 ;        DP $18 (DP $19 = 0) as said; !Battle_UnkB1F4 / B1F6 set
@@ -32717,8 +32737,11 @@ BattleSys_AdjustEvade:
 ;     the target's BattlerStats.Unk64), bit 5 list 2, bit 4 list 8;
 ;   - byte 3 (.Unk4C+1): bit 7 list 3, bit 6 list 4;
 ;   - byte 4 (.Unk4C+2): bit 6 list 5, bit 5 list 9.
-; These are the bits the list handlers clear when their runs end
-; (!Battle_List0StatusBit etc.), so the lists time those statuses.
+; Lists 0, 3, 4 and 5 clear their bit when their runs end
+; (!Battle_List0StatusBit etc.), so they time those statuses; list 2
+; ends without clearing any bit; lists 1, 8 and 9 never end, and test
+; their bit (list 9: in .Unk4C+2 or .Unk4C+7) to decide whether to hit
+; the slot.
 ; Quirk: byte 2 (.Unk4C) jumps to the end straight after a BIT #$C0;
 ; the code after the JMP, which would start list 6 for bit 7 and list 7
 ; for bit 6, is never reached (the handler table's lists 6 and 7 are
@@ -33759,7 +33782,10 @@ BattleSys_AdjustDefence:
 ; high bound DP $1A + 1); X is kept.
 ; Callers (1 JSR site): unmatched ($C1:EEA3).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1A = the highest value wanted
-;        (below $FF: $FF + 1 wraps to the bound 0, which returns 0)
+;        (below $FE: $FE gives the bound $FF, Battle_RandRange's
+;        full-range case, 0-255; $FF + 1 wraps to the bound 0, which
+;        returns 0); its only caller, BattleSys_UnkB2CCHandler06 at
+;        $C1:EE9F (unmatched), passes 100
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $1A = the number; X and Y
 ;        unchanged; what Battle_RandRange changes
 !RollUpTo_Value = !BattleTmp_1A         ; 1 B: the highest value, then the number
