@@ -11574,8 +11574,11 @@ Evt_OpC4_MsgChoiceUnk30_2:
 ; empties its place; $0C gives A = the count of item X held. The
 ; Menu_RunCommand path saves and restores P, so C comes back unchanged. It
 ; does not save Y: its closing pass ($C2:834D, then $C2:82E1) loads Y
-; (LDY #$21BA, LDY #$2859, TAY), and a PLP with X=1 clears Y's high
-; byte, so Y comes back clobbered after every command.
+; (LDY #$21BA, LDY #$2859 and its MVN, TAY), so Y comes back clobbered
+; after every command. Commands 6, 7 and $0A return with X=0, which
+; $C2:834D's PLP keeps, so an X=0 caller gets a 16-bit Y: $285C, or the
+; last record's .Unk2A value in $AE-$B2. After the other commands that
+; PLP sets X=1 and clears Y's high byte ($005C, or $00AE-$00B2).
 ; ============================================================
 
 ; ------------------------------------------------------------
@@ -12383,7 +12386,9 @@ Evt_OpD6_DropCharObj:
 ;   (BankC2Cmd_Unk0A) with Y = a and X = b; X = Y + 3. The command
 ;   (Menu_CmdEquip) equips item b on the $50-byte record a at $7E:2600,
 ;   the old item of its category going back to the inventory; b = 0
-;   sets all four equipment bytes to their "no item" ids instead.
+;   sets the equipment bytes to their "no item" ids instead: all four,
+;   except that record 5 keeps its category-0 byte $29 (the check at
+;   $C2:8DB3). An item b of category 4 (not equipment) equips nothing.
 ; There is no SEC: C stays as the dispatcher entered with it (0), so
 ;   the object's run ends after this opcode.
 ; Reached through Evt_OpcodeTable (opcode $D5).

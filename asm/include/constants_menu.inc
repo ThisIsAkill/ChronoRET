@@ -854,7 +854,7 @@ if !constants_menu_inc == 0
 !MenuRom_Tiles3bpp = $FFDBE4             ; $95 3bpp tiles expanded after them
 !Menu_Tiles3bppCount = $0095
 !Menu_Tiles3bppOr3 = $0008               ; of those, the first 8 get plane 3 = OR
-!Menu_TilesBBytes = $12A0                ; bytes moved to Menu_TileBuf ($30 + $95 tiles)
+!Menu_TilesBBytes = $12A0                ; bytes moved to Menu_TileBuf ($95 tiles: the $30 4bpp ones, then the first $65 expanded)
 !MenuRom_WindowGfx = $FF9E10             ; 8 window styles of $280 B (20 4bpp tiles each)
 !Menu_WindowGfxBytes = $1400
 !Menu_WinStyleBytes = $0280
@@ -869,7 +869,7 @@ if !constants_menu_inc == 0
 !MenuRom_ObjTiles = $FF9CF0              ; 4 pieces of 64 B laid over sprite tiles $20, $30, $22, $32
 !Menu_ObjPieceBytes = $0040
 !Menu_ObjClearBytes = $1000              ; Menu_TileBuf bytes cleared before the sprite tiles
-!Menu_ObjExtraTile = $70                 ; Menu_Bg3TileBuf tile copied (twice 12 tiles) to tiles 4, $14
+!Menu_ObjExtraTile = $70                 ; first of 24 Menu_Bg3TileBuf tiles in a row: $70-$7B to tile 4, $7C-$87 to tile $14
 !Menu_ObjExtraTiles = 12
 !Menu_ObjCopyBytes = $0400               ; Menu_TileBuf tiles 0-$1F copied to tile $20
 !Menu_TileBufBytes = $4000               ; Menu_TileBuf bytes cleared at the end

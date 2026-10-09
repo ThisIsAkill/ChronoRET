@@ -1001,7 +1001,7 @@ endstruct
 !Menu_Unk0D7C = $0D7C                    ; 16-bit; $FFFF when Menu_Flag7F00BA bit 0 is set, else 0
 !Menu_Unk0D7E = $0D7E                    ; 16-bit; $FFFF when bit 0 is set and bit 1 clear, else 0
 !Menu_Unk0D32 = $0D32                    ; 16-bit; $FFFF when the menu was opened from a field location
-!Menu_Unk0D34 = $0D34                    ; 16-bit; $FFFF when so and Menu_Flag7F01CE bit 7 is clear
+!Menu_Unk0D34 = $0D34                    ; 16-bit; $FFFF when so and bit 7 of $7F:01CF (bit 15 of the word at Menu_Flag7F01CE) is clear
 !Menu_Unk0D36 = $0D36                    ; 16-bit; set to $FFFF by Menu_BuildItemTables
 !Menu_Flag7F00BA = $7F00BA               ; bytes of Menu_FlagBlock7F that Menu_BuildItemTables tests
 !Menu_Flag7F01CE = $7F01CE

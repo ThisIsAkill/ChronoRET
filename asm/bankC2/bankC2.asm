@@ -26075,8 +26075,12 @@ Menu_ListArrowsThread:
 ; Exit:  P, DP and DB restored (so C, N, Z as on entry: callers test A);
 ;        A = the result: with M=1 handlers (0-5, 8, 9, $0B, $0C) B = 0
 ;        and A's low byte the result; after 6, 7 and $0A the 16-bit word
-;        the handler left; X and Y as Menu_Unk834D leaves them (high
-;        bytes cleared when the caller runs with X=0: the SEP #$30);
+;        the handler left; X and Y from Menu_Unk834D (Menu_Unk82E1):
+;        after 6, 7 and $0A, which return with X=0 (Menu_Unk834D's PLP
+;        keeps it), X = $2830 and Y = $285C or the last record's .Unk2A
+;        value in $AE-$B2; after the other commands Menu_Unk834D's PLP
+;        sets X=1, so X = $0030 and Y = $005C or $00AE-$00B2 (for an
+;        X=1 caller the final PLP clears the high bytes either way);
 ;        Menu_CmdChar, Menu_ItemId and Menu_CmdResult (2 bytes when M=0)
 ;        changed
 ; Calls: the command (Menu_CommandTable), Menu_Unk834D.
@@ -26394,8 +26398,9 @@ Menu_CmdSetSram7FE2:
 ; Callers note: command 9 of Menu_CommandTable.
 ; Entry: M, X any (SEP #$30 here), DP=$0400 (Menu_SaveSlot), DB=$7E
 ; Exit:  M=1, X=1; A = Menu_DataInitDone's new value (0 or 2);
-;        Menu_SaveSlot = the slot found, or 3; X, Y as the callees leave
-;        them (high bytes 0)
+;        Menu_SaveSlot = 0 on both paths (the slot found, or 3, is
+;        zeroed again: both run Menu_ClearConfigAndFlags, which clears
+;        $0400-$04FF); X, Y as the callees leave them (high bytes 0)
 ; Calls: BankFF_UnkF9C4 (JSL), Menu_InitNewGameData,
 ;   Menu_ClearConfigAndFlags.
 Menu_CmdBootCheckSaves:
@@ -27533,7 +27538,8 @@ Menu_TileOrPlane2:
 ; sources are MenuRom_* (what each picture is was not looked at):
 ; 1. MenuRom_Font2bpp ($E00 B, 2bpp) to $7E:5000, MenuRom_Font2bppB
 ;    ($100 B) over $5100. Its $F0 2bpp tiles from $4F00 (the first 16
-;    bytes still zero) become 4bpp tiles $10-$FF of Menu_TileBuf
+;    tiles, $4F00-$4FFF, lie before the font and are still zero from
+;    Menu_InitPpuAndRam) become 4bpp tiles $10-$FF of Menu_TileBuf
 ;    (planes 2-3 left as cleared), tile $2F and tiles $D4-$DD get plane
 ;    2 = 0 OR 1 (Menu_TileOrPlane2). Menu_VramRecsFont: VRAM $0000 =
 ;    Menu_TileBuf ($2000 B, BG1/BG2 tiles 0-255), VRAM $7000 =
@@ -27543,8 +27549,9 @@ Menu_TileOrPlane2:
 ;    of those with plane 3 = OR (Menu_TilesOrPlane3); the $12A0 bytes
 ;    moved to Menu_TileBuf; Menu_VramRecFontB: VRAM $1000 ($1300 B).
 ; 3. MenuRom_WindowGfx ($1400 B: the 8 window styles) to Menu_TileBuf,
-;    $1A0 bytes of the expanded tiles (from tile $88 of Menu_Bg3TileBuf)
-;    after it, plane 3 = OR on all $A4 tiles; Menu_VramRecsWin: VRAM
+;    $1A0 bytes of the expanded tiles (13 tiles from tile $88 of
+;    Menu_Bg3TileBuf) after it, so the buffer holds $AD tiles ($A0 +
+;    13); plane 3 = OR on the first $A4 of them; Menu_VramRecsWin: VRAM
 ;    $2010 = $FF:0000 ($1F80 B), $3000 = Menu_TileBuf ($2000 B), $1E00
 ;    = $FF:E55C ($380 B) (the queue is sent newest first).
 ; 4. Palette colours 0-3 and 4-7 = MenuRom_PalA, 16-19 = MenuRom_PalB,
@@ -27731,8 +27738,9 @@ Menu_LoadGraphics:
 
 ; $C2:984A — Menu_ClearOam (43 bytes, $984A–$9874)
 ; Hides every sprite of the OAM copy: all 128 low-table entries =
-; Menu_OamHidden (X 0, Y $E0, tile 0, attributes 0) and the 32 high-table
-; bytes = Menu_OamHighInit ($AA: every sprite large, X bit 8 clear).
+; X 0, Y $E0, tile 0, attributes $E0 (the word Menu_OamHidden, $E000,
+; repeated) and the 32 high-table bytes = Menu_OamHighInit ($AA: every
+; sprite large, X bit 8 clear).
 ; Callers (7 JSR sites): Menu_InitSystems ($C2:812A), Menu_ResetMainCursor ($C2:E926) and unmatched
 ;   ($C2:ADB2, $C2:C386, $C2:CAFC, $C2:D0C2, $C2:DAD5).
 ; Entry: M, X any (P and DB saved; REP #$30 here), DP any, DB=$7E (the
@@ -27767,8 +27775,9 @@ Menu_ClearOam:
 ;   (0D7C) and also bit 1 clear (0D7E); Menu_Unk0D32/0D34 = 0 and
 ;   Menu_Unk0D36 = $FFFF; when Loc_Id is below Loc_FirstBankC2 (the menu
 ;   opened from a field location) Menu_Unk0D32 = $FFFF, and then also
-;   Menu_Unk0D34 = $FFFF while Menu_Flag7F01CE has bit 7 clear (what
-;   the flags mean is not traced);
+;   Menu_Unk0D34 = $FFFF while bit 7 of $7F:01CF is clear (M=0 there:
+;   the word load at Menu_Flag7F01CE and BMI test its bit 15; what the
+;   flags mean is not traced);
 ; - for every item id below Menu_ItemIdEnd, from its record A
 ;   (Menu_ItemDataPtrA, bank $CC): Menu_ItemInfo0[id] = byte 0 AND $1E,
 ;   Menu_ItemInfo1[id] = word 1, Menu_ItemEquipChars[id] = byte 3,
@@ -27947,8 +27956,8 @@ Menu_CleanInventory:
 ; Callers (1 JSR site): Menu_BuildItemTables ($C2:9977).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp02),
 ;        DB=$7E
-; Exit:  P restored; Menu_Tmp02-03 = 7; A, X, Y as the callees leave
-;        them
+; Exit:  P restored; Menu_Tmp02-03 = 7; A = 7 (the last LDA Menu_Tmp02);
+;        X, Y as Menu_CharRecalc leaves them (past its last MVN)
 ; Calls: Menu_LoadCharRec, Menu_CharRecalc.
 Menu_RefreshAllChars:
     PHP
@@ -28032,8 +28041,9 @@ Menu_MainMenuInit:
 ; $C2:9A1B — Menu_MainMenuLoop (125 bytes, $9A1B–$9A97)
 ; Handler 1 of mode 0, every frame: Menu_CursorSel = Menu_MainSel,
 ; Menu_UnkE984 (the pad: it moves Menu_CursorSel and sets
-; Menu_PadAction, read from the ROM). Confirm (bit 7): the sounds or
-; layout list at MenuRom_MainConfirmList (Menu_UnkED31), Menu_Mode =
+; Menu_PadAction, read from the ROM). Confirm (bit 7): Menu_UnkED31
+; runs the command list at MenuRom_MainConfirmList (what its commands do
+; is not analysed), Menu_Mode =
 ; Menu_MainSel + 1, Menu_ThreadVar = 0, colours $80-$8F =
 ; MenuRom_ObjPal, Menu_Unk0D17 = $FF. Cancel (bit 6): Menu_Exit. Else,
 ; a new Menu_CursorSel: Menu_MainSel = it, with Menu_CfgA5 clear the
@@ -28526,7 +28536,12 @@ Menu_SlotLabelVramRec:
 
 ; $C2:D19F — Menu_ReadSlotSummary (199 bytes, $D19F–$D265)
 ; Copies what the slot screen shows of slot Menu_SlotIdx from SRAM into
-; its Menu_SlotSummaries block ($40 bytes at $7E:7600 + slot x $40):
+; its Menu_SlotSummaries block ($40 bytes at $7E:7600 + slot x $40).
+; The slot's SRAM layout is inferred from these reads only: the offsets
+; match a copy of $7E:2400 on (+$0200 = Menu_CharRecords at $2600, $50 B
+; each; +$0580 = Menu_PartyOrder at $2980), so the slot probably holds
+; the party order and the character records there; the other bytes'
+; meanings are not traced.
 ; - for each of the 3 active party places (Menu_SramPartyOrder): a
 ;   16-byte entry; byte 0 = $FF when the place is empty, else bytes 0-8
 ;   of the character's record (SRAM +$0200 + id x $50), the 6 bytes at
@@ -28535,8 +28550,10 @@ Menu_SlotLabelVramRec:
 ; - at +$30: the word at SRAM +$059C capped at 999; +$32: the word at
 ;   +$05F3 AND $1FF; +$34: the 10 bytes at +$05E0; +$3E: the word at
 ;   +$059E;
-; - when SRAM +$0793 has bit 7 set: bytes +4 to +6 = Menu_Unk51's
-;   bytes (0 here: two word stores);
+; - when SRAM +$0793 has bit 7 set: bytes +$34 to +$36 = Menu_Unk51's
+;   bytes (0 here: two word stores at Menu_SumPtr + 4, Menu_SumPtr being
+;   the block + $30 after the loop), over the first three bytes copied
+;   from +$05E0;
 ; then Menu_SlotLocName.
 ; Quirk, dead byte: .Unk12 is stored as a word at +$0F, so its high byte
 ; lands at +$10, which the next entry's $FF (or, after the third, the
@@ -28640,7 +28657,11 @@ Menu_ReadSlotSummary:
     RTS
 
 ; $C2:D266 — Menu_SlotLocName (39 bytes, $D266–$D28C)
-; Menu_SlotWinStyle[slot] = SRAM Menu_Config01 copy (+$0591) AND 7; then
+; Menu_SlotWinStyle[slot] = the SRAM byte at +$0591 AND 7, probably the
+; slot's copy of Menu_Config01 ($7E:2991; inferred: +$0591 is where it
+; falls if the slot copies $7E:2400 on, as the records at +$0200 and the
+; party order at +$0580 suggest, and bits 0-2 are the window style as in
+; Menu_Config01); then
 ; the string index: the last entry of MenuRom_SlotLocBounds (26 rising
 ; bytes from 0) that is not above the SRAM byte at +$0603, drawn with
 ; Menu_DrawSlotText (probably the name of the place the game was saved
@@ -29267,7 +29288,9 @@ Menu_SprResetChars:
 ; Callers (2 JSR sites): unmatched ($C2:C9F3, $C2:DC21).
 ; Entry: M, X any (P and DP saved; SEP #$30 / REP #$21 here), DP any
 ;        (set to the pages), DB any
-; Exit:  P and DP restored; A = $17C0
+; Exit:  P and DP restored; A = $17C0; X, Y keep their low bytes only
+;        (the SEP #$30 clears the high bytes); the caller at $C2:C9F3
+;        relies on X (0 or 2) for its JSR ($CA63,X) after the call
 ; No calls.
 Menu_SprHideAll:
     PHP
@@ -29383,15 +29406,17 @@ Menu_WeaponRecSrc:
     RTS
 
 ; $C2:F626 — Menu_Times64 (29 bytes, $F626–$F642)
-; Y = Menu_Unk0D2C = (A AND $FF) x $40 (by the hardware multiplier), A
-; and P kept.
+; Y = Menu_Unk0D2C = (A AND $FF) x $40 (by the hardware multiplier), P
+; kept, A kept for a caller with M=0 (with M=1 see Exit).
 ; Callers (11 JSR sites): unmatched ($C2:8F9F, $C2:B00E, $C2:BA10, $C2:BAFF, $C2:BEFB, $C2:C959,
 ;   $C2:CDB3, $C2:CE58, $C2:D60B, $C2:DC40, $C2:DDEB).
 ; Entry: M, X any (A and P saved; SEP #$20 / REP #$30 here), DP any, DB
 ;        any (the multiplier is read long; DB=$7E for Menu_Unk0D2C); A =
 ;        the factor (low byte)
-; Exit:  A and P restored; Y = the product (16-bit when the caller has
-;        X=0); X unchanged
+; Exit:  P restored; A restored when the caller has M=0; with M=1 (e.g.
+;        the caller at $C2:BA10) the PLA restores only A's low byte and
+;        B = the product's high byte (from the 16-bit LDA RDMPYL); Y =
+;        the product (16-bit when the caller has X=0); X unchanged
 ; No calls.
 Menu_Times64:
     PHA
@@ -29625,7 +29650,9 @@ Menu_SprFrameBytes:
 
 ; $C2:F75C — Menu_SprUploadTiles (277 bytes, $F75C–$F870)
 ; Builds the frame's tiles in WRAM and queues them for VRAM: Y =
-; Menu_SprTileBufPtr = $8000 + (Menu_Unk0D72 word x 2 AND $FF00); for
+; Menu_SprVramRec.Src = Menu_SprTileBuf ($8000) + (Menu_Unk0D72 word x 2
+; AND $FF00), plus 1 when bit 7 of $0D73 is set (the ASL's carry goes
+; into the ADC); for
 ; each of the .TileCount x 16 words of Menu_SprScratch: 0 = 32 zero
 ; bytes (a blank tile), else the 32 bytes of tile (word AND $7FF) from
 ; .GfxPtr (through Menu_NmiMoveCode, its bank set here), mirrored
@@ -29647,7 +29674,7 @@ Menu_SprUploadTiles:
     SEP #$30
     LDA.b Menu_Spr.GfxPtr+2
     STA.w !Menu_NmiMoveCode+2           ; MVN's source bank
-    REP #$31                            ; (also C=0)
+    REP #$31                            ; (its C=0 is lost: the ASL's carry is added)
     LDA.w !Menu_Unk0D72
     ASL A
     AND.w #!Eng_HighByteMask
@@ -29794,8 +29821,9 @@ org $C2F90C
 ; Entry: M any (P saved; SEP #$20 here), X=0 (TextWin_Init needs it),
 ;        DP any (TextWin_* are written absolute; TextWin_Init/Step set
 ;        their own), DB=$7E
-; Exit:  P restored; A, X, Y as TextWin_Step leaves them; TextWin_*
-;        changed
+; Exit:  P restored; A = TextWin_Status in the low byte (the last LDA)
+;        and B = 0 (TextWin_Step's LDA #0 / XBA); X, Y as TextWin_Step
+;        leaves them; TextWin_* changed
 ; Calls: BankC2_Entry0003 (TextWin_Init, JSL), BankC2_Entry0009
 ;   (TextWin_Step, JSL).
 Menu_DrawText:
