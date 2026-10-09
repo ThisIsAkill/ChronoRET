@@ -274,7 +274,9 @@ struct BattlerStats $5E00
 .Unk6C:     skip 4      ; +$6C: 4 B set to 4 for each PC by BattleFD_UnkB3FE, one of them to 5 by .Unk2E; meaning unknown
             skip 2
 .Unk72:     skip 1      ; +$72: set to $32 by BattleFD_UnkB3EB; meaning unknown
-            skip 5
+.Unk73:     skip 1      ; +$73: the caster's byte BattleSys_UnkE976 copies to !Battle_UnkB29A unless $FF; meaning unknown
+.Unk74:     skip 1      ; +$74: read with .Unk73 by BattleSys_CasterUnk73; meaning unknown
+            skip 3
 .Unk78:     skip 1      ; +$78: bit 6 set = the slot may act in BattleFD_UnkAC6E (probably a counter-attack)
 .Unk79:     skip 1      ; +$79: bit 7 set = BattleFD_UnkB363 ORs .Unk7B into the status byte at .Status + .Unk7A
 .Unk7A:     skip 1      ; +$7A: BattleFD_UnkAC6E: bit 7 set = act at once, clear = set !Battler_UnkAFAB to 1;
@@ -1458,7 +1460,9 @@ endstruct
 !BattleRom_TechWaitNib    = $CC2BDC ; 1 B per !Battle_UnkB18C: high nibble = tenths added to the first tech user's
                                     ; gauge reload, low nibble = the second user's (BattleSys_ResetTechUsers)
 !BattleRom_TechWaitNib3   = $CC2BEB ; the same table 15 bytes on: its low nibble is the third user's
-!BattleRom_UnkCC213F      = $CC213F ; 17 B per !Battle_UnkB18C: copied to !Battle_UnkAEE6 by BattleSys_UnkBF81
+!BattleRom_UnkCC213F      = $CC213F ; effect records: BattleSys_RunTechParts copies 12 B at part number * 12 to
+                                    ; !Battle_UnkAEE6 (byte 0 = effect type); the unreferenced BattleSys_UnkBF81
+                                    ; copies 17 B at !Battle_UnkB18C * 17
 !BattleRom_UnkCC05CC      = $CC05CC ; 4 B per !Battle_UnkB18C: byte 0 bits 7, 2, 6 pick BattleSys_UnkBF46's callee
 !Battle_UnkAF22           = $AF22 ; 1 B: 1 while BattleSys_UnkB967 runs (set at its start, cleared on its way out)
 !Battle_CmdPcs            = $B3E7 ; 3 B, one per PC slot, probably read in bank $FD: BattleSys_UnkB967 sets 1 for the
@@ -1498,11 +1502,15 @@ endstruct
 ; the bytes the cost helpers read are named; bit 7 of each is masked off (meaning unknown).
 struct BattleRom_TechRec $CC1BEB
 .UserSet:   skip 1      ; +0: index of the tech's user set in !BattleRom_TechUserSets (BattleSys_LoadTechUsers)
-            skip 4
+.Flags:     skip 1      ; +1: bits 6, 5 -> !Battle_UnkB2CA; bits 2-0 = Battle_SumHitSets' last set (BattleSys_RunTechParts)
+.Unk2:      skip 1      ; +2: ORed with the user's slot into !Battle_UnkB18E (BattleSys_RunTechParts)
+.Unk3:      skip 1      ; +3: -> !Battle_UnkB190 (BattleSys_RunTechParts)
+            skip 1
 .Part1:     skip 1      ; +5: the first user's part: index into !BattleRom_TechMpCost (BattleSys_TechMpCost1)
+                        ; and the effect record number (BattleSys_RunTechParts); bit 7 = no part
 .Part2:     skip 1      ; +6: the second user's (BattleSys_TechMpCost2)
 .Part3:     skip 1      ; +7: the third user's (BattleSys_TechMpCost3)
-            skip 3
+.PartUnk:   skip 3      ; +8: one byte per part -> !Battle_UnkB2CC (BattleSys_RunTechParts); meaning unknown
 endstruct
 !BattleRom_TechUserSets   = $CC249F ; 3 B per set: character ids of a tech's users, $FF = none (BattleSys_LoadTechUsers)
 !BattleRom_TechMpCost     = $CC253B ; 1 B per part: its MP cost (inferred: BattleSys_PayTechMp takes it off
@@ -1565,7 +1573,8 @@ endstruct
 !Battle_UnkAECC           = $AECC ; 11 B: slots of the enemies BattleFD_RestoreEnemies put back, in order ($FF-filled by
                                   ; BattleFD_UnkB732)
 !Battle_UnkB190           = $B190 ; 1 B: byte 1 of the !Battle_UnkB18C record (BattleFD_LoadUnkB18E); meaning unknown
-!Battle_UnkB1F4           = $B1F4 ; 1 B (stored 16-bit): PC loop counter of BattleFD_UnkAD17
+!Battle_UnkB1F4           = $B1F4 ; 2 B: the acting battler's BattlerStats offset (BattleSys_LoadCasterStats); also
+                                  ; BattleFD_UnkAD17's PC loop counter
 !Battle_UnkB26B           = $B26B ; 8 B per enemy: set to $FF when BattleFD_RestoreEnemies puts it back
 !Battle_UnkB28C           = $B28C ; 2 B: sum of the defeated enemies' BattleRom_EnemyReward.Unk0
                                   ; (BattleFD_AddEnemyRewards); message 0 of BattleFD_UnkAD17 (probably experience)
@@ -1588,7 +1597,8 @@ endstruct
 !Battle_MsgArg2           = $0202 ; 1 B: third argument byte
 !Battle_Unk7F01EE         = $7F01EE ; 1 B (long): bit n = enemy entry n's !Battle_UnkAE85 was non-zero (BattleFD_UnkAAB0,
                                   ; the battle's last step); probably read by the field (not traced)
-!BattleRom_UnkCC6FCB      = $CC6FCB ; 11 B per !Battle_UnkB18C: bytes 0 and 1 go to !Battle_UnkB18E / B190
+!BattleRom_UnkCC6FCB      = $CC6FCB ; 11 B per !Battle_UnkB18C: bytes 0 and 1 go to !Battle_UnkB18E / B190; the records
+                                    ; have BattleRom_TechRec's layout from 2 bytes earlier (BattleSys_UnkD7C4)
 !BattleRom_UnkCC88CB      = $CC88CB ; 11 B per !Battle_UnkB18C: the same for BattleFD_LoadUnkB18E2
 !BattleRom_UnkCC06A7      = $CC06A7 ; 6 B per PcStatBlk.Unk29 value: byte 0's highest set bit picks a
                                     ; !Battle_UnkB1BE entry (BattleFD_UnkAEF2)
@@ -1644,5 +1654,42 @@ endstruct
                                     ; ORs in there
 !BattleRom_UnkCC2E31      = $CC2E31 ; 16 B per !Menu_Config bits 0-2 value, 1 B per .Unk38 - 1: added to a
                                     ; battler's first !Battler_UnkAFAB (BattleFD_UnkB7EB)
+
+
+; Action target resolution (BattleSys_UnkC1DD)
+!BattleRom_AreaRecPtr     = $CC2AB0 ; 2 B per area number (!BattleRom_TechInfo byte 1, !BattleRom_EnemyTechTarget byte
+                                    ; 1): bank-$CC address of an area record: a count byte, then 3-byte entries
+!BattleRom_AreaRec        = $CC0000 ; base the area records are read from (indexed by the !BattleRom_AreaRecPtr address)
+!BattleRom_EnemyTechTarget = $CC86C9 ; 2 B per !Battle_UnkB18C when an enemy acts: target mode, area number (the
+                                    ; enemy side's counterpart of !BattleRom_TechInfo, probably)
+!Battle_UnkLong00FA       = $0000FA ; 1 B read long ($00:00FA): DP $04 on mode 9's first two ways (the PC scan end on the
+                                    ; second, BattleSys_UnkC1DD); meaning unknown
+!Battle_UnkLong00FB       = $0000FB ; 1 B read long ($00:00FB): the same on the last two ways (the PC scan end on the fourth
+                                    ; when an enemy acts); meaning unknown
+
+
+; Action effects (BattleSys_RunTechParts, BattleSys_Effect*)
+!Battle_UnkB1F6           = $B1F6 ; 2 B: the current target's BattlerStats offset (BattleSys_LoadTargetStats)
+!Battle_UnkB200           = $B200 ; 1 B: zeroed by the item effects; bit 7 (with the $7E:B1F5 byte's) stops a
+                                  ; tech's remaining parts; set elsewhere (not traced)
+!Battle_UnkLongB1F5       = $7EB1F5 ; read long, indexed by the BattleRom_TechRec offset (BattleSys_RunTechParts); the
+                                    ; enemy runners test their record's flags byte there, so a slip for
+                                    ; BattleRom_TechRec.Flags ($CC:1BEC), probably
+!BattleRom_EnemyEffectRecA = $CC7AC9 ; 12 B per part number: effect records of BattleSys_UnkD7C4
+!BattleRom_EnemyEffectRecB = $CC89C6 ; 12 B per part number: effect records of BattleSys_UnkD8D1
+!Battle_UnkAE7B           = $AE7B ; 2 B: zeroed by BattleSys_RunTechParts; meaning unknown
+!Battle_UnkB2C1           = $B2C1 ; 2 B: the tech's user set * 3 (offset in !BattleRom_TechUserSets)
+!Battle_UnkB2C5           = $B2C5 ; 2 B: offset of the current part's effect record (number * 12)
+!Battle_UnkB2C8           = $B2C8 ; 1 B: the current part's number (BattleRom_TechRec.Part1-3)
+!Battle_UnkB2C9           = $B2C9 ; 1 B: counted with !Battle_UnkB2C7 per part; not read here
+!Battle_UnkB2CA           = $B2CA ; 1 B: bits from BattleRom_TechRec.Flags ORed into !Battle_UnkAE4D per part
+!Battle_UnkB2CB           = $B2CB ; 1 B: the current part's user slot
+!Battle_UnkB2CC           = $B2CC ; 1 B: BattleRom_TechRec.PartUnk of the current part; meaning unknown
+!Battle_UnkB2D0           = $B2D0 ; 1 B: user index (0-2) of BattleSys_CheckTechMp
+!Battle_UnkB2ED           = $B2ED ; 1 B: !Battle_UnkAD8D kept over the parts (each starts with it again)
+!Battle_UnkAE4F           = $AE4F ; 1 B: zeroed before each effect routine; meaning unknown
+!Battle_UnkB29A           = $B29A ; 11 B: zeroed before each effect routine; meaning unknown
+!Battle_UnkAE57           = $AE57 ; 1 B: !Battle_UnkB2CC kept over BattleSys_Effect03 by BattleSys_Effect08
+!Battle_UnkAE5B           = $AE5B ; 2 B: BattleSys_CheckTechMp's scratch (a stats offset, then that battler's MP)
 
 endif

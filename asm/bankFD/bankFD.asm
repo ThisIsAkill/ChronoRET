@@ -665,8 +665,9 @@ BattleFD_UnkACEE:
 ; $2C-byte hit sets (!Battle_HitAmount/!Battle_HitFlags per battler slot)
 ; that Battle_RecordHit fills and Battle_ApplyHits applies, which runs it
 ; at its end. BattleSys_Main also runs it every pass.
-; Callers (6 JSL sites): BattleSys_Main ($C1:812C), Battle_ApplyHits ($C1:ED84), Battle_SetupBattle
-;   ($C1:FD12) and unmatched ($C1:D523, $C1:D7C4, $C1:D8D1).
+; Callers (6 JSL sites): BattleSys_Main ($C1:812C), BattleSys_RunTechParts ($C1:D523),
+;   BattleSys_UnkD7C4 ($C1:D7C4), BattleSys_UnkD8D1 ($C1:D8D1), Battle_ApplyHits ($C1:ED84) and
+;   Battle_SetupBattle ($C1:FD12).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 0 (B too); X = $84; Y unchanged
 org $FDACFD

@@ -39,14 +39,12 @@ org $C2229D
 C2Scene_Unk229D:    ; JSR from C2Scene_ObjBMateAim: probably the direction (0-255) between the points
                     ; (C2Tmp_08, $0A) and (C2Tmp_0C, $0E) on the wrapping map, through the angle table at
                     ; $C0:F300 (DB $00); X = the table index, 0 within 4 pixels (not matched)
-org $C2631F
-C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
-                    ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
-org $C26A34
-C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
 org $C2800E
 BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
                     ; at $0A01, forced blank, then the menu (not matched)
+org $C285D6
+Menu_Unk85D6:       ; JSR from Menu_Nmi when Menu_FrameReady has bit 7 clear (with HDMA off): probably
+                    ; the menu's per-frame upload (not traced)
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
 org $C6E74E

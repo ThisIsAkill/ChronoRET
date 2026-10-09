@@ -424,7 +424,7 @@ if !constants_menu_inc == 0
 !Pad_Unk00F8Bit2 = $04                   ; bit 2 (Select with the default map): mode C2Scene_ModeMode7
 !Pad_Unk00F8Bit0 = $01                   ; bit 0 (Y with the default map): mode C2Scene_ModeMenu9
 !C2Scene_ModeListA = 3                   ; C2Scene_Mode3: act on the ListA entry at C2Scene_Unk1B32
-!C2Scene_ModeMode7 = 6                   ; C2Scene_Mode6: C2Scene_Unk631F (BG mode 7) between mosaics
+!C2Scene_ModeMode7 = 6                   ; C2Scene_Mode6: C2Scene_MapView (BG mode 7) between mosaics
 !C2Scene_ModeMenu9 = 9                   ; C2Scene_Mode5 with ExitMenu_Mode5
 !C2Scene_Loc1F5 = $01F5                  ; the Loc_Id where the leader gets C2Scene_LeaderAttr1F5
 !C2Scene_LeaderAttr = $A8                ; C2Scene_Task.SprAttr of the leader's sprite (C2Scene_SprAttr*
@@ -468,6 +468,122 @@ if !constants_menu_inc == 0
 !C2Scene_AnimIdle1 = $A3                 ; idle animations of the slot 1 and 2 members (as
 !C2Scene_AnimIdle2 = $A4                 ; C2Scene_AnimIdle for the leader)
 
+; --- The map view (C2Scene_MapView, scene mode 6) ---
+!C2Scene_BgMode7 = $07                   ; C2Scene_BgModeShadow: BG mode 7
+!C2Scene_MapObjVram = $6000              ; VRAM word address of the sprite tiles in the map view (OBSEL
+                                         ; OBSEL_Size16And32_Base6000)
+!C2Scene_TileBytes = $0020               ; bytes in one 8x8 4bpp tile
+!C2Scene_TileWords = 16                  ; VRAM words in one 8x8 4bpp tile
+!C2SceneRom_MapMarkerTiles = $C6F500     ; two 4bpp tiles: sprite tiles 0 and 2 of the map view
+!C2SceneRom_MapViewObjPal = $C6F540      ; 16 colours: sprite palette 0 of the map view (33 B copied)
+!C2Scene_ObjPal0Dest = $0A20             ; = C2Scene_PaletteBuf + $100: colour $80 (sprite palette 0)
+!C2Scene_MapViewEndFrames = $11          ; frames C2Scene_MapView waits after the zoom-in ends
+!C2Scene_MapTileCount = $0380            ; tiles in the seven BG packs ($7000 bytes / 32)
+!C2Scene_TileRow2Plane0 = $04            ; byte offsets in a 4bpp tile of row 2's bit planes 0-3
+!C2Scene_TileRow2Plane1 = $05            ; (C2Scene_MapTileColors takes bit 4 of each: column 3)
+!C2Scene_TileRow2Plane2 = $14
+!C2Scene_TileRow2Plane3 = $15
+!C2Scene_TilePalBits = $1C               ; tile word high byte bits 2-4: the palette (* 4)
+!C2Scene_TileNumMask = $03FF             ; tile word bits 0-9: the tile number
+!C2Scene_Mode7RowBytes = 8               ; bytes per pixel row of a mode-7 tile (one per pixel)
+!C2Scene_MapBandBytes = $0300            ; one band of the picture: 12 mode-7 tiles of 64 bytes
+!C2Scene_MapBandWords = $0300            ; the same in VRAM words (the DMA writes VMDATAH only)
+!C2Scene_MapBandRowMask = $0003          ; metatile rows per band - 1 (two pixel rows each)
+!C2Scene_MapTilePxMask = $0007           ; metatile columns per mode-7 tile - 1 (one pixel each)
+!C2Scene_MapNextTile = (64-7)            ; from a tile's 8th pixel to the next tile's first: + 57
+!C2Scene_MapBackToRow = ($300-$10)       ; from past the band's row end back to its first tile,
+                                         ; two pixel rows further down
+!C2Scene_MapFirstTileVram = $0040        ; VRAM word of mode-7 tile 1 (64 words per tile)
+!C2Scene_MapHideColA = $0F               ; C2Scene_MapFilterColor: colours shown as 0 (palette * 16 +
+!C2Scene_MapHideColB = $2F               ; colour): $0F, $2F and $24-$2B; at Loc_Id
+!C2Scene_MapHideFrom = $24               ; C2Scene_MapLoc1F3 $40-$4E instead
+!C2Scene_MapHideTo = $2C
+!C2Scene_MapLoc1F3 = $01F3               ; the Loc_Id with its own hidden colours
+!C2Scene_MapHide1F3From = $40
+!C2Scene_MapHide1F3To = $4F
+!C2Scene_TmBytes = $0400                 ; the 32 x 32 tile block C2Scene_MapBuildTilemap builds
+!C2Scene_TmRowBytes = $20                ; bytes (tiles) per row of it
+!C2Scene_TmRows = $20                    ; its rows
+!C2Scene_Mode7MapWidth = $0080           ; VRAM words per row of the 128 x 128 mode-7 tilemap
+!C2Scene_MapTileCol0 = 2                 ; the picture's first tile column in the mode-7 map
+!C2Scene_MapTileRow0 = 6                 ; and its first tile row
+!C2Scene_MapFirstTile = 1                ; the picture's first mode-7 tile (tile 0 stays blank)
+!C2Scene_MapTilesWide = 12               ; the picture in tiles: 96 metatiles at 8 per tile
+!C2Scene_MapTilesHigh = 16               ; 64 metatile rows at 4 per tile
+!C2Scene_ZoomSteps = 32                  ; entries of C2SceneRom_ZoomDivA/B (word offsets 0-$3E)
+!C2SceneRom_ZoomDivA = $C6F560           ; 32 words $FF, $F0, ... $10: the zoom's M7A/M7B divisors
+!C2SceneRom_ZoomDivB = $C6F5A0           ; 32 words $7F, $78, ... $08: its M7C/M7D divisors
+!C2Scene_MapViewExitBtn = $0008          ; Pad_Unk00F6 bit 3 (read as a word): ends the map view
+!C2Scene_MapMarkerAttr = $30             ; C2Scene_Task.SprAttr of the map markers: OAM attribute bits
+                                         ; 4-5 (priority 3), palette 0
+!C2Scene_LocMarkerY = $00C0              ; C2Scene_TaskLocMarker's screen Y
+!C2Scene_AnimLocLabel = $0047            ; its C2SceneRom_AnimTable entry
+!C2Scene_MapGradLines = $0007            ; lines per step of the map view's gradient
+!C2Scene_MapGradLevels = $10             ; steps per half (blue 0-15, then 16-31)
+!C2Scene_MapGradRun = $F0                ; HDMA line-count byte: repeat (bit 7), 112 lines
+!C2Scene_MapLabelVram = $6200            ; VRAM word of sprite tile $20: where the label goes
+!C2Scene_MapLabelA = $6C                 ; label string replaced by C2Scene_MapLabelEarly while
+!C2Scene_MapLabelAFlag = $36             ; C2Scene_Flag0Copy is below this
+!C2Scene_MapLabelB = $6B                 ; label string replaced by it while C2Scene_FlagTailCopy+6
+!C2Scene_MapLabelBBit = $01              ; has this bit clear
+!C2Scene_MapLabelEarly = $6F             ; the replacement string
+!C2Scene_MapLabelGlyphs = $0C            ; TextWin_StepCount for the label's one TextWin_Step
+
+; --- The dial (C2Scene_Dial, scene mode 8) ---
+!C2Scene_DialBg1X = $FF80                ; C2Scene_Bg1HScroll in the dial (-128)
+!C2Scene_DialBg1Y = $FF90                ; C2Scene_Bg1VScroll (-112)
+!C2Scene_M7OneHigh = $01                 ; high byte of 1.0 in a mode-7 matrix value
+!C2Scene_DialWobjsel = $20               ; WOBJSEL: window 1 makes the colour window
+!C2Scene_DialWinLayers = $11             ; TMW/TSW: BG1 and OBJ
+!C2Scene_DialGrey = $0F                  ; the fixed colour's red, green and blue intensity
+!C2Scene_DialFadeFrames = $12            ; frames C2Scene_Dial waits after the start and after its fade out
+!C2Scene_DialCentreX = $84               ; screen point the hand turns about
+!C2Scene_DialCentreY = $70
+!C2Scene_WinEmpty = $0001                ; WH0 = 1, WH1 = 0 as a word: left past right, an empty window
+!C2Scene_HdmaBufBytes = $01C0            ; 224 lines of one word (the hand and swirl buffers)
+!C2Scene_HdmaHalfBytes = $00E0           ; the 112 lines of one HDMA run
+!C2Scene_HdmaLastLine = $01BE            ; byte offset of line 223's word
+!C2Scene_ScreenLines = $00E0             ; 224 visible lines
+!C2Scene_DialBtnBack = $0010             ; Pad_Unk00F8 bits (as a word) the dial reads: bit 4 turns
+!C2Scene_DialBtnFwd = $0020              ; back, bit 5 forward (as Right/Up and Left/Down),
+!C2Scene_DialBtnOk = $0080               ; bit 7 confirms, bit 3 cancels
+!C2Scene_DialBtnCancel = $0008
+!C2Scene_DialTurnStep = 4                ; hand angle units per frame
+!C2Scene_DialMarks = 7                   ; markers (and C2Scene_DialLocs entries)
+!C2Scene_DialLastSel = 6
+!C2Scene_DialNoDest = $FFFF              ; C2Scene_ObjANextLoc after a cancel
+!C2Scene_DialSfxSame = $01               ; C2Scene_SoundCmd18 argument when the current location is picked
+!C2Scene_DialLateFlag = $CC              ; C2Scene_Flag0Copy from which C2Scene_DialLocsLate is used
+!C2Scene_DialHandBuf = $01               ; C2Scene_DialFlags bit 0: C2Scene_HandBufB is on screen
+!C2Scene_DialSwirlBuf = $02              ; bit 1: the swirl's B buffers are on screen
+!C2Scene_DialFlagBit2 = $04              ; bit 2: cleared by C2Scene_SwirlInit, not otherwise used here
+!C2Scene_HandClearFrom = $0090           ; C2Scene_DialDrawHand's clear: from line 72's word
+!C2Scene_HandClearCount = $009D          ; MVN count - 1: lines 73-151
+!C2Scene_HandPointCount = 3              ; points (and edges) of the hand
+!C2Scene_SwirlPhase = $0080              ; added to the angle for the M7B/M7C sine (1/8 turn)
+!C2Scene_SwirlLineStep = 4               ; angle units per line (and per frame)
+!C2Scene_DialPack0Bank = $C3             ; source bank of C2Scene_DialPacks entry 0
+!C2Scene_DialPack12Bank = $C6            ; and of entries 1 and 2
+!C2Scene_DialObjVramB = $6400            ; sprite tile $40
+!C2Scene_DialObjSrcB = $7F9800           ; pack 0 from $800 on: sprite tiles $40-$7F
+!C2Scene_DialObjBytesB = $0800
+!C2Scene_DialObjTiles = $0040            ; entries of C2Scene_DialObjTileList
+!C2Scene_DialWhite = $FFFF               ; the colour C2Scene_DialLoad stores
+!C2Scene_DialWhiteColor = $D1            ; at this colour of C2Scene_PaletteStage
+!C2Scene_DialPixelBytes = $0800          ; mode-7 tiles 0-31, 64 pixels each
+!C2Scene_DialMapRows = $20               ; rows of one 32 x 32 block
+!C2Scene_DialMapRowBytes = $0040         ; bytes (words) of one row
+!C2Scene_DialMapBlockCount = 16
+!C2SceneRom_DialNibbles = $C6F700        ; $400 B: two 4-bit pixels per byte, high first
+!C2Scene_DialNibbleBytes = $0400
+!C2Scene_DialNibbleMask = $0F
+
+; --- The menu's NMI (Menu_Nmi) ---
+!Menu_NmiDp = $0D00                      ; direct page of Menu_Nmi (the menu's frame state)
+!Menu_HdmaenMask = $7F                   ; Menu_HdmaenShadow bits written to HDMAEN (channel 7 kept off)
+!Menu_FrameDone = $FF                    ; Menu_FrameReady after the NMI's upload
+!Menu_StackTopByte = $01                 ; stack-relative offset of the byte pushed last
+!Menu_PadHeldNoBit0 = $FFFE              ; Menu_PadHeld bits that count as held for the repeat stage
 ; --- Object A's tasks (C2Scene_ObjATask, C2Scene_ObjAMarkTask, C2Scene_ObjASpotWatch) ---
 !C2Scene_ObjAFlag5 = $20                 ; C2Scene_Unk0294 bit 5: object A goes up and is steered when the
                                          ; party is in (else it starts mode 8 at once) and uses the other
@@ -477,7 +593,8 @@ if !constants_menu_inc == 0
 !C2Scene_ObjAOnSpot = $08                ; bit 3: object A overlaps the spot at C2Scene_SpotX/Y
                                          ; (C2Scene_ObjASpotWatch)
 !C2Scene_ObjASpotBits = $0C              ; bits 2-3 (C2Scene_Unk0294Bit2 and C2Scene_ObjAOnSpot)
-!C2Scene_ModeUnk8 = 8                    ; C2Scene_Mode8 (runs C2Scene_Unk6A34), set by object A
+!C2Scene_ModeUnk8 = 8                    ; C2Scene_Mode8: C2Scene_Dial runs while the mode stays this; set
+                                         ; by object A
 !C2Scene_ObjAStWait = 1                  ; C2Scene_ObjTask.State values of C2Scene_ObjATask
 !C2Scene_ObjAStFly = 3                   ; (C2Scene_ObjAStates)
 !C2Scene_ObjAStLand = 5
@@ -485,7 +602,8 @@ if !constants_menu_inc == 0
 !C2Scene_ObjAStScript = 7
 !C2Scene_ObjAStWaitEmpty = 8
 !C2Scene_ObjAttrPrio2 = $A0              ; C2Scene_Task.SprAttr: C2Scene_SprAttrScroll and OAM priority 2
-!C2Scene_ObjAttrPrio3 = $B0              ; the same with priority 3 (attribute bits 4-5)
+!C2Scene_ObjAttrPrio3 = $B0              ; the same with priority 3 (attribute bits 4-5); also the dial's
+                                         ; markers (C2Scene_DialMarkInit)
 !C2Scene_AnimObjARest = $2D              ; object A's animation at rest
 !C2Scene_AnimObjARest5 = $18             ; and with C2Scene_ObjAFlag5
 !C2Scene_AnimObjARise = $19              ; while it goes up (C2Scene_ObjAWait)
@@ -551,7 +669,8 @@ if !constants_menu_inc == 0
 
 ; --- The label task (C2Scene_LabelTask) ---
 !C2Scene_LabelStWait = 1                 ; C2Scene_ObjTask.State of C2Scene_LabelWait
-!C2SceneRom_LabelStrings = $C6F400       ; the string table C2Scene_LabelTask draws from (bank $C6)
+!C2SceneRom_LabelStrings = $C6F400       ; the string table C2Scene_LabelTask draws from (bank $C6): 16-bit
+                                         ; string addresses; also C2Scene_MapViewLabel's TextWin_StrTable
 !C2Scene_LabelHalfOfs = $0200            ; buffer offset of the text's second half (the lower 8 rows)
 !C2Scene_LabelVramTop = $1E00            ; VRAM word addresses of the two halves
 !C2Scene_LabelVramBottom = $1F00
