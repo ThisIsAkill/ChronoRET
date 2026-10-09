@@ -1144,7 +1144,7 @@ BattleFD_UnkAEF2:
 ; entry, so the list keeps an entry there with whatever it held; DP $04
 ; moves on 5 bytes and DP $00 and $08 are counted up, nothing else is
 ; written.
-; Callers (2 JSL sites): BattleSys_UnkCDFF ($C1:CE2A) and unmatched ($C1:F012).
+; Callers (2 JSL sites): BattleSys_UnkCDFF ($C1:CE2A) and BattleSys_AddBattleItem ($C1:F012).
 ; Callers of BattleFD_AddItemEntry_Skip (1 JSL site): BattleSys_UnkCDFF ($C1:CE1C).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = item id; DP $04 = list offset,
 ;        DP $0E = quantity (BattleFD_AddItemEntry_Skip: M any, X=0, DP=0,
@@ -2855,13 +2855,14 @@ BattleFD_UnkB7EB:
 ; $FD:BA61 — RandomTableFD (256 bytes, $FD:BA61–$BB60)
 ; A byte-identical copy of RandomTable ($C0:FE00): the same shuffle of
 ; 0-255. Read with LDA.l $FDBA61,X by battle code in bank $C1: at
-; $C1:AF56/AF60 in Battle_RandRange and at $C1:AFAE/AFB8 (unmatched), two
-; copies of a roll that take X from a counter (!Battle_RandIdx in the
-; first, !Battle_UnkB3E6 in the second). When the range is $FF they use
+; $C1:AF56/AF60 in Battle_RandRange and at $C1:AFAE/AFB8 in
+; Battle_RandRangeAlt, two copies of a roll that take X from a counter
+; (!Battle_RandIdx in the first, !Battle_UnkB3E6 in the second). When the range is $FF they use
 ; the entry as is (the reads at $AF56/$AFAE) and leave the counter alone;
 ; otherwise they step the counter and reduce the entry with Battle_Div32,
 ; using the remainder plus !Battle_RandMin (entry mod range, plus the low
-; bound). What the second copy's rolls are for is not traced. The 6 bytes
+; bound). The second copy's one caller is BattleSys_HitModChanceMul's
+; roll against the caster's .Unk72. The 6 bytes
 ; after the table
 ; ($FD:BB61–$BB66) repeat its last 6 entries; nothing reads them that
 ; xref finds, and they are left unmatched.

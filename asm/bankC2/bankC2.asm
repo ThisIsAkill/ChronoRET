@@ -21895,8 +21895,8 @@ org $C28000
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
 ;   Field_RunBankC2Mode5 ($C0:19CE) and C2Scene_Mode5 ($C2:2552).
-; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), C2Scene_NmiHandler ($C2:031B)
-;   and unmatched ($C1:EE27, $CD:091A, $CD:09C6).
+; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), BattleSys_HitModPlayTime
+;   ($C1:EE27), C2Scene_NmiHandler ($C2:031B) and unmatched ($CD:091A, $CD:09C6).
 ; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Evt_OpD7_GetItemCount ($C0:3807),
 ;   Evt_OpCF_IfCharListed ($C0:389B), Evt_OpD0_AddCharToReserve ($C0:38CC), Evt_OpD1_UnlistChar
 ;   ($C0:38E1), Evt_OpD2_IfCharInParty ($C0:38F6), Evt_OpD3_AddCharToParty ($C0:392B),

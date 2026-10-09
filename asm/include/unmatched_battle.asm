@@ -282,48 +282,6 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1ED89
-BattleSys_UnkB2CCHandler00:            ; BattleSys_UnkB2CCHandlerTable entry $00; not analysed
-org $C1EDB9
-BattleSys_UnkB2CCHandler01:            ; BattleSys_UnkB2CCHandlerTable entry $01; not analysed
-org $C1EDBA
-BattleSys_UnkB2CCHandler02:            ; BattleSys_UnkB2CCHandlerTable entry $02; not analysed
-org $C1EDDA
-BattleSys_UnkB2CCHandler03:            ; BattleSys_UnkB2CCHandlerTable entry $03; not analysed
-org $C1EDFD
-BattleSys_UnkB2CCHandler04:            ; BattleSys_UnkB2CCHandlerTable entry $04; not analysed
-org $C1EE27
-BattleSys_UnkB2CCHandler05:            ; BattleSys_UnkB2CCHandlerTable entry $05; not analysed
-org $C1EE9F
-BattleSys_UnkB2CCHandler06:            ; BattleSys_UnkB2CCHandlerTable entry $06; not analysed
-org $C1EED0
-BattleSys_UnkB2CCHandler07:            ; BattleSys_UnkB2CCHandlerTable entry $07; not analysed
-org $C1EEF7
-BattleSys_UnkB2CCHandler08:            ; BattleSys_UnkB2CCHandlerTable entry $08; not analysed
-org $C1EF14
-BattleSys_UnkB2CCHandler09:            ; BattleSys_UnkB2CCHandlerTable entry $09; not analysed
-org $C1EF39
-BattleSys_UnkB2CCHandler0A:            ; BattleSys_UnkB2CCHandlerTable entry $0A; not analysed
-org $C1EFBC
-BattleSys_UnkB2CCHandler0B:            ; BattleSys_UnkB2CCHandlerTable entry $0B; not analysed
-org $C1EFC3
-BattleSys_UnkB2CCHandler0C:            ; BattleSys_UnkB2CCHandlerTable entry $0C; not analysed
-org $C1F036
-BattleSys_UnkB2CCHandler0D:            ; BattleSys_UnkB2CCHandlerTable entry $0D; not analysed
-org $C1F095
-BattleSys_UnkB2CCHandler0E:            ; BattleSys_UnkB2CCHandlerTable entry $0E; not analysed
-org $C1F0BD
-BattleSys_UnkB2CCHandler0F:            ; BattleSys_UnkB2CCHandlerTable entry $0F; not analysed
-org $C1F0D9
-BattleSys_UnkB2CCHandler10:            ; BattleSys_UnkB2CCHandlerTable entry $10; not analysed
-org $C1F10D
-BattleSys_UnkB2CCHandler11:            ; BattleSys_UnkB2CCHandlerTable entry $11; not analysed
-org $C1F132
-BattleSys_UnkB2CCHandler12:            ; BattleSys_UnkB2CCHandlerTable entry $12; not analysed
-org $C1F1C7
-BattleSys_UnkB2CCHandler13:            ; BattleSys_UnkB2CCHandlerTable entry $13; not analysed
-org $C1F1EF
-BattleSys_UnkB2CCHandler14:            ; BattleSys_UnkB2CCHandlerTable entry $14; not analysed
 org $C1EA9D
 BattleSys_UnkEA9D:                      ; JSR from BattleSys_Main's end paths; not analysed
 org $C1EAE8

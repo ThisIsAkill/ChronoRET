@@ -1378,7 +1378,8 @@ endstruct
 !Battle_UnkB3C0           = $B3C0 ; 1 B: slot counter of the turn-list countdown (0-10, wraps)
 !Battle_UnkB3C2           = $B3C2 ; 2 B: zeroed by Battle_SetupBattle
 !Battle_UnkB3C4           = $B3C4 ; 2 B: entry counter of the turn-list countdown (0-$8E)
-!Battle_UnkB3E6           = $B3E6 ; 1 B: !Battle_RandIdx as the battle started; not read in bank $C1's matched code
+!Battle_UnkB3E6           = $B3E6 ; 1 B: !Battle_RandIdx as the battle started; then Battle_RandRangeAlt's index into
+                                  ; RandomTableFD (it steps it)
 !Battle_Unk7F01EC         = $7F01EC ; 1 B (long): BattleSys_Main writes 1 before the defeat pose and 0 on the other
                                   ; ends; purpose unknown
 !BattleRom_DebugFlag      = $C1FFFF ; 1 B: the last byte of bank $C1; non-zero enables BattleSys_Main's pad-2 Select
@@ -1714,5 +1715,14 @@ endstruct
 !Battle_SvcArg            = $AEF7 ; 2 B: BankC1_RunService's argument Y, kept by each service
 !Battle_SvcSlot           = $AEF9 ; 2 B: BankC1_AddItem's first empty entry (0 if none); BankC1_RemoveGold's new low word
 !Battle_SvcSlotFound      = $AEFB ; 1 B: BankC1_AddItem: non-zero once an empty entry was found
+
+
+; --- Hit modifiers ($C1:ED89-$C1:F204) ---
+!Battle_EmptyPcCount      = $AD9A ; 1 B: PC slots 0-2 with no PC (!Battler_UnkAEFF $FF), counted by BattleSys_HitModPerEmptyPc
+!Battle_SavedTargetMasks  = $AE58 ; 2 B: !Battle_ActMainMask | !Battle_ActTargetMask as BattleSys_HitModKoOrDrop
+                                  ; found them before dropping the target; not read in matched code
+!Battle_Unk6CIndex        = $B2CD ; 1 B: BattleSys_HitModUnk6CScale: n (0-3), the target's .Unk6C+n byte used
+!Battle_Unk6CDivisor      = $B2CE ; 1 B: ... that byte, then its divisor (bits 5-0, less 2 with bit 6)
+!Battle_Unk6CFactor       = $B2CF ; 1 B: ... the factor, 4 (!Battle_Unk6CFactorValue)
 
 endif
