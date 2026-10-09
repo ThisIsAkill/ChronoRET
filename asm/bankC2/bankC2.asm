@@ -620,7 +620,7 @@ C2Scene_HideAllSprites:
 ; C2Scene_VramQEnd, points C2Scene_VramQBufPtr at C2Scene_VramQBuf
 ; ($7E:F000) and zeroes all 16 C2Scene_VramQ entries (dp $60-$DF).
 ; Callers (6 JSR sites): BankC2_SceneBoot ($C2:003A), C2Scene_Mode5 ($C2:2560), C2Scene_Mode6
-;   ($C2:25F0), C2Scene_Mode8 ($C2:265B), C2Scene_MapView ($C2:6331) and unmatched ($C2:6A37).
+;   ($C2:25F0), C2Scene_Mode8 ($C2:265B), C2Scene_MapView ($C2:6331) and C2Scene_Dial ($C2:6A37).
 ; Entry: M=1 (8-bit bank store), X=0 (16-bit pointer store and loop
 ;        count), DP=$0000, DB any
 ; Exit:  M=1, X=0; A = bank(C2Scene_VramQBuf), X = $FFFF; Y, DP and DB
@@ -714,7 +714,7 @@ C2Scene_VramQFlush:
 ; with Audio_DriverCommand, the state marked C2Scene_SoundCmdSending
 ; meanwhile and cleared after.
 ; Callers (9 JSR sites): C2Scene_Mode5 ($C2:2532, $C2:2582), C2Scene_Mode6 ($C2:25A1, $C2:2612),
-;   C2Scene_Mode8 ($C2:2631, $C2:269D), C2Scene_MapView ($C2:63C7) and unmatched ($C2:6A99,
+;   C2Scene_Mode8 ($C2:2631, $C2:269D), C2Scene_MapView ($C2:63C7) and C2Scene_Dial ($C2:6A99,
 ;   $C2:6AB1).
 ; Entry: M=1 (8-bit flag loads), X=0 with X = the number of frames (0
 ;        waits 65536), DP=$0000, DB with low WRAM at $0000-$1FFF; NMI on
@@ -739,7 +739,7 @@ C2Scene_WaitFrames:
 ; $C2:046E — C2Scene_WaitOneFrame (3 bytes, $046E–$0470)
 ; A JMP to C2Scene_WaitFrame: waits for the next NMI without sending a
 ; pending sound command.
-; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF), C2Scene_MapView ($C2:63BA) and unmatched
+; Callers (3 JSR sites): C2Scene_MainLoop ($C2:23CF), C2Scene_MapView ($C2:63BA) and C2Scene_Dial
 ;   ($C2:6A9C).
 ; Entry/Exit: those of C2Scene_WaitFrame.
 C2Scene_WaitOneFrame:
@@ -749,7 +749,7 @@ C2Scene_WaitOneFrame:
 ; Frees all 64 task records (zeroes each .Handler) and points
 ; C2Scene_TaskCur at the first record, so that tasks spawned before any
 ; task runs copy their parameters from record 0.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23B1), C2Scene_MapView ($C2:6334) and unmatched
+; Callers (3 JSR sites): C2Scene_Main ($C2:23B1), C2Scene_MapView ($C2:6334) and C2Scene_Dial
 ;   ($C2:6A3A).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF
@@ -784,7 +784,7 @@ C2Scene_TaskClearAll:
 ;   C2Script_SpawnUnk1DD4 ($C2:10F7), C2Script_SpawnUnk20A2 ($C2:1590), C2Script_SpawnUnk2105
 ;   ($C2:159E), C2Script_SpawnUnk21F8 ($C2:15AC), C2Script_SpawnUnk2194 ($C2:15BA),
 ;   C2Script_SpawnTask ($C2:183F), C2Scene_TaskUnk1DD4 ($C2:1DE2), C2Scene_MapView ($C2:63A6) and
-;   unmatched ($C2:7417, $C2:742D, $C2:7441).
+;   C2Scene_DialLoad ($C2:7417, $C2:742D, $C2:7441).
 ; Entry: M any, X=0 with X = the handler address, DP=$0000, DB with low
 ;        WRAM at $0000-$1FFF (the MVN copies in bank $00 and leaves DB
 ;        as it was)
@@ -862,8 +862,8 @@ C2Scene_TaskSpawnLow:
 ;   $C2:2596, JSR $C2:25FB), C2Scene_Mode8 (JSR $C2:2626, JSR $C2:2676), C2Scene_LoadScene (JMP
 ;   $C2:2C90), C2Scene_ObjWatchIdle (JSR $C2:3154), C2Scene_TrigListB (JSR $C2:33B2),
 ;   C2Scene_TrigListAB (JSR $C2:33DF), C2Scene_MapView (JSR $C2:63AE), C2Scene_MapZoomOut (JSR
-;   $C2:66DF), C2Scene_MapZoomWait (JSR $C2:66FF) and unmatched (JSR $C2:4479, JSR $C2:452C, JSR
-;   $C2:6AAB, JSR $C2:741F, JSR $C2:7427, JMP $C2:7457).
+;   $C2:66DF), C2Scene_MapZoomWait (JSR $C2:66FF), C2Scene_Dial (JSR $C2:6AAB), C2Scene_DialLoad
+;   (JSR $C2:741F, JSR $C2:7427, JMP $C2:7457) and unmatched (JSR $C2:4479, JSR $C2:452C).
 ; Entry: M=1 with A = the script bank, X=0 with X = the script address,
 ;        DP=$0000, DB with low WRAM at $0000-$1FFF
 ; Exit:  M=1, X=0; X = the new record, A = the bank; Y as
@@ -2654,12 +2654,13 @@ org $C20E1D
 ;   ($C2:38C0), C2Scene_LeaderBoardX ($C2:3915), C2Scene_MemberWalk ($C2:3B3F), C2Scene_MemberFollow
 ;   ($C2:3CD5), C2Scene_MemberMoveX ($C2:3D36), C2Scene_MemberMoveY ($C2:3D97), C2Scene_MemberBoardX
 ;   ($C2:3E76), C2Scene_MemberBoardY ($C2:3EDA), C2Scene_TaskLeaderMarker ($C2:6834),
-;   C2Scene_TaskObjAMarker ($C2:6883), C2Scene_TaskLocMarker ($C2:68DD) and unmatched ($C2:4340,
-;   $C2:4382, $C2:43D2, $C2:445C, $C2:447C, $C2:450B, $C2:46B9, $C2:4700, $C2:4723, $C2:481E,
-;   $C2:4852, $C2:4870, $C2:4894, $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E, $C2:4D96, $C2:4F73,
-;   $C2:4FC2, $C2:5008, $C2:5032, $C2:508A, $C2:510B, $C2:516F, $C2:51E8, $C2:523E, $C2:525D,
-;   $C2:5285, $C2:5553, $C2:55A2, $C2:55CC, $C2:55E2, $C2:5600, $C2:5770, $C2:719A, $C2:71A9,
-;   $C2:71C7, $C2:71D8).
+;   C2Scene_TaskObjAMarker ($C2:6883), C2Scene_TaskLocMarker ($C2:68DD), C2Scene_DialMarkHidden
+;   ($C2:719A), C2Scene_DialMarkSelect ($C2:71A9), C2Scene_DialMarkShown ($C2:71C7),
+;   C2Scene_DialMarkDeselect ($C2:71D8) and unmatched ($C2:4340, $C2:4382, $C2:43D2, $C2:445C,
+;   $C2:447C, $C2:450B, $C2:46B9, $C2:4700, $C2:4723, $C2:481E, $C2:4852, $C2:4870, $C2:4894,
+;   $C2:49CA, $C2:4D14, $C2:4D32, $C2:4D3E, $C2:4D96, $C2:4F73, $C2:4FC2, $C2:5008, $C2:5032,
+;   $C2:508A, $C2:510B, $C2:516F, $C2:51E8, $C2:523E, $C2:525D, $C2:5285, $C2:5553, $C2:55A2,
+;   $C2:55CC, $C2:55E2, $C2:5600, $C2:5770).
 ; Callers note: xref also lists a doubtful byte pattern at $C2:4E1B.
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
@@ -5766,12 +5767,12 @@ C2Scene_WrapTaskPos:
 ; Callers (37 sites: 34 JSR, 3 JMP): C2Script_SetAnim (JSR $C2:1614), C2Script_MoveToX (JSR
 ;   $C2:1981, JSR $C2:1993), C2Script_MoveToY (JSR $C2:19EA, JSR $C2:19FC), C2Scene_LeaderInput (JSR
 ;   $C2:35CD), C2Scene_SetWalkAnim (JMP $C2:397C), C2Scene_SetStandAnim (JMP $C2:39A7),
-;   C2Scene_MemberFollow (JSR $C2:3CA7, JSR $C2:3CC7), C2Scene_TaskLocMarker (JSR $C2:68D3) and
-;   unmatched (JSR $C2:4336, JSR $C2:433D, JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747,
-;   JSR $C2:483B, JSR $C2:499C, JSR $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR
-;   $C2:4E9B, JSR $C2:4F1A, JSR $C2:501E, JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5,
-;   JMP $C2:5488, JSR $C2:54BC, JSR $C2:550B, JSR $C2:556A, JSR $C2:559F, JSR $C2:7197, JSR
-;   $C2:71C4).
+;   C2Scene_MemberFollow (JSR $C2:3CA7, JSR $C2:3CC7), C2Scene_TaskLocMarker (JSR $C2:68D3),
+;   C2Scene_DialMarkHidden (JSR $C2:7197), C2Scene_DialMarkShown (JSR $C2:71C4) and unmatched (JSR
+;   $C2:4336, JSR $C2:433D, JSR $C2:4439, JSR $C2:45A0, JSR $C2:470F, JSR $C2:4747, JSR $C2:483B,
+;   JSR $C2:499C, JSR $C2:4D11, JSR $C2:4D2F, JSR $C2:4D76, JSR $C2:4DC1, JSR $C2:4E9B, JSR
+;   $C2:4F1A, JSR $C2:501E, JSR $C2:5087, JSR $C2:50EB, JSR $C2:5149, JSR $C2:51E5, JMP $C2:5488,
+;   JSR $C2:54BC, JSR $C2:550B, JSR $C2:556A, JSR $C2:559F).
 ; Callers note: xref also lists doubtful byte patterns at $C2:48BB,
 ;   $C2:48C2 and $C2:49B5.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
@@ -6961,15 +6962,13 @@ C2Scene_MosaicInStep:
 ; its AND on, minus the scale multiply: the same index mask, the same
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
-; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752) and unmatched ($C2:6D10, $C2:704F,
-;   $C2:711D, $C6:E9FF).
-; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B) and unmatched ($C2:6D17,
-;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
-; Callers note (JSL): Trig_Cos1024 from $C2:6752, $C2:6D10, $C2:704F,
-;   $C2:711D and $C6:E9FF; Trig_Sin1024 from $C2:673B, $C2:6D17,
-;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9 and
-;   $C6:EA17 (all unmatched; e.g. $C2:6D10/6D17 take the cosine and the
-;   sine of the same angle).
+; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752), C2Scene_DialDrawHand ($C2:6D10),
+;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and unmatched ($C6:E9FF).
+; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B), C2Scene_DialDrawHand
+;   ($C2:6D17), C2Scene_SwirlInit ($C2:7062), C2Scene_SwirlStep ($C2:712D) and unmatched ($C2:76CB,
+;   $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
+; Callers note: each matched caller takes both, e.g. C2Scene_DialDrawHand
+;   the cosine and the sine of the same angle ($C2:6D10, $C2:6D17).
 ; Entry (both): M=0 (16-bit A, set by the caller; the immediates carry
 ;        an explicit .w), X=0 (16-bit: TAX / CPX.w take the whole index),
 ;        DP any (no direct page), DB any (table read with .l); A = angle
@@ -7557,12 +7556,12 @@ C2Scene_Mode6:
     JMP C2Scene_MainLoop
 
 ; $C2:261D — C2Scene_Mode8 (139 bytes, $261D–$26A7)
-; Mode 8: runs C2Scene_Unk6A34 (not matched; it clears VRAM and the
-; tasks itself) over a saved scene. Fades out (C2Scene_ScrFadeOut,
+; Mode 8: runs C2Scene_Dial (it clears VRAM and the tasks itself) over
+; a saved scene. Fades out (C2Scene_ScrFadeOut,
 ; C2Scene_FadeOutWaitFrames frames), turns interrupts, NMI, DMA and HDMA
 ; (and its shadow) off,
 ; sends C2Scene_SoundCmd82 (arguments 0, $FF) straight to the driver,
-; saves the scene (C2Scene_SaveState), runs C2Scene_Unk6A34, restores
+; saves the scene (C2Scene_SaveState), runs C2Scene_Dial, restores
 ; (C2Scene_RestoreState) and resets the VRAM queue. Then, unless
 ; $7F:01F4 AND $0A or $7F:01F5 AND $02 is non-zero (two flag bytes of
 ; Menu_FlagBlock7F; who sets them is not traced), it
@@ -7571,14 +7570,14 @@ C2Scene_Mode6:
 ; NMI updates and NMI on either way; with the flags clear it waits
 ; C2Scene_FadeWaitFrames frames and sets mode C2Scene_ModeIdle1, with
 ; them set it goes back to the loop at once, in whatever mode was set
-; while C2Scene_Unk6A34 ran (it loops at $C2:6A9C-$C2:6AA4 until
+; while C2Scene_Dial ran (it loops at $C2:6A9C-$C2:6AA4 until
 ; C2Scene_Mode is no longer 8, and C2Scene_RestoreState does not
 ; restore it).
 ; Callers note: none direct (C2Scene_ModeTable entry 8).
 ; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM)
 ; Exit:  continues at C2Scene_MainLoop with M=1, X=0; A, X, Y clobbered
 ; Calls: C2Scene_TaskSpawnScript, C2Scene_WaitFrames, Audio_DriverCommand
-;   (JSL), C2Scene_SaveState, C2Scene_Unk6A34, C2Scene_RestoreState,
+;   (JSL), C2Scene_SaveState, C2Scene_Dial, C2Scene_RestoreState,
 ;   C2Scene_VramQInit, C2Scene_ReloadScene.
 C2Scene_Mode8:
     TDC
@@ -7603,7 +7602,7 @@ C2Scene_Mode8:
     STA.w !Audio_CmdArg1
     JSL Audio_DriverCommand
     JSR C2Scene_SaveState
-    JSR C2Scene_Unk6A34
+    JSR C2Scene_Dial
     JSR C2Scene_RestoreState
     JSR C2Scene_VramQInit
     LDA.l !C2Scene_Unk7F01F4
@@ -7643,7 +7642,7 @@ org $C226A8
 ; VMDATAL/H from the fixed source C2Scene_ZeroWord, VRAM address 0, a
 ; byte count of 0 (= 65536 bytes). Needs forced blank, which the boot has
 ; set.
-; Callers (3 JSR sites): C2Scene_Main ($C2:23A8), C2Scene_MapView ($C2:632E) and unmatched
+; Callers (3 JSR sites): C2Scene_Main ($C2:23A8), C2Scene_MapView ($C2:632E) and C2Scene_Dial
 ;   ($C2:6A34).
 ; Entry: M=1 (8-bit register values), X=0 (16-bit address and count
 ;        stores), DP any, DB=$00 (absolute register stores)
@@ -16481,6 +16480,1739 @@ C2Scene_FrameMapMarkerA:
 C2Scene_FrameMapMarkerB:
     db $01
     db $FC,$FC : dw $0002       ; X -4, Y -4, tile 2
+
+; ============================================================
+; The dial: scene mode 8 ($C2:6A34–$C2:754C)
+; ============================================================
+; C2Scene_Mode8 runs C2Scene_Dial: a BG mode 7 screen (its per-line
+; matrix animated by C2Scene_TaskSwirl) with seven marker sprites
+; (C2Scene_TaskDialMark) around a centre at C2Scene_DialCentreX/Y, and
+; a hand drawn with window 1 (C2Scene_DialDrawHand: the fixed colour is
+; added inside it) that turns from marker to marker as the player picks
+; one (C2Scene_TaskDial). Each marker stands for a location of
+; C2Scene_DialLocs (or C2Scene_DialLocsLate); confirming a marker that
+; is not the current location stores it in C2Scene_DialDest. The hand's
+; tip at angle 0 lands on marker 1's position, which is how the markers'
+; table and the hand were matched up.
+
+; $C2:6A34 — C2Scene_Dial (148 bytes, $6A34–$6AC7)
+; Mode 8's sub-program: clears VRAM, the VRAM queue and the tasks; BG
+; mode 7, OBSEL OBSEL_Size8And16_Base6000; BG1 scroll
+; (C2Scene_DialBg1X, C2Scene_DialBg1Y), the BG2/BG3 scrolls, C2Scene_M7B,
+; M7C, M7X and M7Y 0, the high bytes of C2Scene_M7A and M7D 1 (their low
+; bytes are left as they were); no BG windows, the colour window from
+; window 1 (C2Scene_DialWobjsel), TMW/TSW C2Scene_DialWinLayers, colour
+; math only inside the window (CGWSEL_MathInWinFixed) adding the fixed
+; colour (C2Scene_DialGrey for red, green and blue) to Layer_Bg123Obj;
+; C2Scene_DialFlags = 0. Loads the graphics and starts the tasks
+; (C2Scene_DialLoad), turns on the NMI update and the NMI, waits
+; C2Scene_DialFadeFrames frames, then frame by frame until C2Scene_Mode
+; is no longer C2Scene_ModeDial (C2Scene_DialInput sets
+; C2Scene_ModeIdle7). Then it starts C2Scene_ScrDialFadeOut, waits
+; C2Scene_DialFadeFrames frames, puts BG mode C2Scene_InitBgMode and
+; OBSEL back to the boot values and turns NMI, DMA and HDMA off.
+; Callers (1 JSR site): C2Scene_Mode8 ($C2:2655).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (absolute registers and low WRAM);
+;        interrupts off (C2Scene_Mode8 has saved the scene)
+; Exit:  M=1, X=0; A = 0; X, Y clobbered; NMITIMEN, MDMAEN and HDMAEN =
+;        0; dp, the tasks, VRAM, C2Scene_PaletteBuf and the buffers
+;        named in the callees changed (C2Scene_Mode8 restores the scene);
+;        the HDMA enable bits the tasks set in C2Scene_HdmaenShadow are
+;        left set
+; Calls: C2Scene_ClearVram, C2Scene_VramQInit, C2Scene_TaskClearAll,
+;   C2Scene_DialLoad, C2Scene_WaitFrames, C2Scene_WaitOneFrame,
+;   C2Scene_TaskSpawnScript.
+C2Scene_Dial:
+    JSR C2Scene_ClearVram
+    JSR C2Scene_VramQInit
+    JSR C2Scene_TaskClearAll
+    LDA.b #!C2Scene_BgMode7
+    STA.b !C2Scene_BgModeShadow
+    LDA.b #!OBSEL_Size8And16_Base6000
+    STA.w OBSEL
+    LDX.w #!C2Scene_DialBg1X
+    STX.b !C2Scene_Bg1HScroll
+    LDX.w #!C2Scene_DialBg1Y
+    STX.b !C2Scene_Bg1VScroll
+    LDX.w #$0000
+    STX.b !C2Scene_Bg2HScroll
+    STX.b !C2Scene_Bg2VScroll
+    STX.b !C2Scene_Bg3HScroll
+    STX.b !C2Scene_Bg3VScroll
+    STX.b !C2Scene_M7B
+    STX.b !C2Scene_M7C
+    STX.b !C2Scene_M7X
+    STX.b !C2Scene_M7Y
+    LDA.b #!C2Scene_M7OneHigh
+    STA.b !C2Scene_M7A+1
+    STA.b !C2Scene_M7D+1
+    STZ.b !C2Scene_W12SelShadow
+    STZ.b !C2Scene_W34SelShadow
+    LDA.b #!C2Scene_DialWobjsel
+    STA.b !C2Scene_WObjSelShadow
+    LDA.b #!C2Scene_DialWinLayers
+    STA.b !C2Scene_TmwShadow
+    STA.b !C2Scene_TswShadow
+    LDA.b #!CGWSEL_MathInWinFixed
+    STA.b !C2Scene_CgwselShadow
+    LDA.b #!Layer_Bg123Obj
+    STA.b !C2Scene_CgadsubShadow
+    LDA.b #!C2Scene_DialGrey
+    STA.b !C2Scene_FixedBlue
+    STA.b !C2Scene_FixedRed
+    STA.b !C2Scene_FixedGreen
+    STZ.w !C2Scene_DialFlags
+    JSR C2Scene_DialLoad
+    LDA.b #!C2Scene_NmiUpdate|!C2Scene_NmiPalette
+    TSB.b !C2Scene_NmiFlags
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDX.w #!C2Scene_DialFadeFrames
+    JSR C2Scene_WaitFrames
+.wait:
+    JSR C2Scene_WaitOneFrame
+    LDA.w !C2Scene_Mode
+    CMP.b #!C2Scene_ModeDial
+    BEQ .wait
+    LDA.b #bank(C2Scene_ScrDialFadeOut)
+    LDX.w #C2Scene_ScrDialFadeOut
+    JSR C2Scene_TaskSpawnScript
+    LDX.w #!C2Scene_DialFadeFrames
+    JSR C2Scene_WaitFrames
+    LDA.b #!C2Scene_InitBgMode
+    STA.b !C2Scene_BgModeShadow
+    LDA.b #!OBSEL_Size16And32_Base0000
+    STA.w OBSEL
+    TDC
+    STA.w NMITIMEN
+    STA.w MDMAEN
+    STA.w HDMAEN
+    RTS
+
+; $C2:6AC8 — C2Scene_TaskDial (9 bytes, $6AC8–$6AD0)
+; Task handler started by C2Scene_DialLoad: runs .State through
+; C2Scene_DialStates. 0: set up, fall into 1; 1: read the pad; 2: turn
+; the hand to the target, then back to 1. The task never ends.
+; Callers note: none direct (C2Scene_DialLoad spawns it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's
+; Calls: the C2Scene_DialStates handlers (JMP (abs,X)).
+C2Scene_TaskDial:
+    TDC
+    LDA.w C2Scene_DialTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_DialStates,X)
+
+; $C2:6AD1 — C2Scene_DialStates (3 words, $6AD1–$6AD6)
+; C2Scene_TaskDial's handler for each .State.
+C2Scene_DialStates:
+    dw C2Scene_DialInit         ; 0
+    dw C2Scene_DialInput        ; 1
+    dw C2Scene_DialTurn         ; 2
+
+; $C2:6AD7 — C2Scene_DialInit (135 bytes, $6AD7–$6B5D)
+; State 0: .State = 1; .Sel = the current location's entry
+; (C2Scene_DialFindLoc). HDMA channel 1 writes WH0/WH1 (window 1's left
+; and right edges) every line, indirect from C2Scene_HdmaTable record 0
+; (two runs of 112 lines, C2Scene_MapGradRun); both hand buffers
+; (C2Scene_HandBufA/B, 224 lines of two bytes) are filled with
+; C2Scene_WinEmpty (left 1, right 0: an empty window); C2Tmp_18 = their
+; bank for C2Scene_DialDrawHand. .Pos and .Target = the
+; C2Scene_DialAngles entry of .Sel, C2Scene_DialSel = .Sel, and the hand
+; is drawn (C2Scene_DialDrawHand). (It also sets C2Tmp_00/$01 to the
+; centre, which C2Scene_DialDrawHand sets again.) Falls into
+; C2Scene_DialInput.
+; Callers note: none direct (C2Scene_DialStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM and registers);
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_DialInput
+; Calls: C2Scene_DialFindLoc, C2Scene_DialDrawHand (falls into
+;   C2Scene_DialInput).
+C2Scene_DialInit:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_DialTask.State,X
+    JSR C2Scene_DialFindLoc
+    LDX.b !C2Scene_TaskCur
+    STA.w C2Scene_DialTask.Sel,X
+    LDA.b #!C2Scene_MapGradRun
+    STA.l C2Scene_HdmaTable.Count0
+    STA.l C2Scene_HdmaTable.Count1
+    TDC
+    STA.l C2Scene_HdmaTable.Value1+2    ; the end of the table (count 0)
+    LDA.b #bank(!C2Scene_HandBufA)
+    STA.b !C2Tmp_18                     ; the bank byte of C2Scene_DialDrawHand's buffer pointer
+    LDY.w #(!BBAD_WH0<<8)|!DMAP_HdmaIndirect|!DMAP_TwoRegs
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable.Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B                         ; the indirect data's bank
+    LDA.b #!HDMAEN_Ch1
+    TSB.b !C2Scene_HdmaenShadow
+    LDA.b #!C2Scene_DialCentreX
+    STA.b !C2Tmp_00                     ; (not used before C2Scene_DialDrawHand sets them again)
+    LDA.b #!C2Scene_DialCentreY
+    STA.b !C2Tmp_01
+    REP #$20
+    PHB
+    LDA.w #!C2Scene_WinEmpty
+    STA.l !C2Scene_HandBufA
+    DEC A
+    STA.l !C2Scene_HandBufA+1
+    LDX.w #!C2Scene_HandBufA&$FFFF
+    LDY.w #(!C2Scene_HandBufA&$FFFF)+2
+    LDA.w #!C2Scene_HdmaBufBytes-3      ; repeats the pair over the buffer
+    MVN bank(!C2Scene_HandBufA),bank(!C2Scene_HandBufA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_HandBufA&$FFFF
+    LDY.w #!C2Scene_HandBufB&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-1
+    MVN bank(!C2Scene_HandBufB),bank(!C2Scene_HandBufA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    LDY.b !C2Scene_TaskCur
+    LDA.w C2Scene_DialTask.Sel,Y
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l C2Scene_DialAngles,X
+    STA.w C2Scene_DialTask.Pos,Y
+    STA.w C2Scene_DialTask.Target,Y
+    SEP #$20
+    LDA.w C2Scene_DialTask.Sel,Y
+    STA.w !C2Scene_DialSel
+    JSR C2Scene_DialDrawHand
+
+; $C2:6B5E — C2Scene_DialInput (182 bytes, $6B5E–$6C13)
+; State 1: reads Pad_Unk00F8 as a word, first match wins:
+; - C2Scene_DialBtnBack, C2Scene_PadRight or C2Scene_PadUp: .Sel - 1
+;   (kept at 0), .Vel = -C2Scene_DialTurnStep;
+; - C2Scene_DialBtnFwd, C2Scene_PadLeft or C2Scene_PadDown: .Sel + 1
+;   (kept at C2Scene_DialLastSel), .Vel = +C2Scene_DialTurnStep;
+;   either way .Target = the C2Scene_DialAngles entry of .Sel and .State
+;   = 2, falling into C2Scene_DialTurn;
+; - C2Scene_DialBtnOk: if .Sel's location (C2Scene_DialSelLoc) is not
+;   the current one, C2Scene_DialDest = it and C2Scene_Mode =
+;   C2Scene_ModeIdle7 (which ends C2Scene_Dial); if it is, sound command
+;   C2Scene_SoundCmd18 with C2Scene_DialSfxSame, C2Scene_SoundArg80 goes
+;   straight to the driver (probably a refusal sound);
+; - C2Scene_DialBtnCancel: C2Scene_DialDest = C2Scene_DialNoDest and
+;   C2Scene_Mode = C2Scene_ModeIdle7.
+; Quirk, kept: .Sel is clamped but the move is not undone, so at either
+; end the hand still turns: to the same .Target, which C2Scene_DialTurn
+; finds at once.
+; Callers note: none direct (C2Scene_DialStates; C2Scene_DialInit falls
+;   in).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  C=0. No button: M=0, X = the task. Ok and cancel: M=1, A, X
+;        clobbered (C2Tmp_08 = the location number on ok); the sound:
+;        as Audio_DriverCommand leaves the registers. Move: as
+;        C2Scene_DialTurn
+; Calls: C2Scene_DialSelLoc, Audio_DriverCommand (JSL) (falls into
+;   C2Scene_DialTurn).
+!C2Scene_DialHere = !C2Tmp_08         ; 16-bit: the current location number
+C2Scene_DialInput:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.b !Pad_Unk00F8
+    BIT.w #!C2Scene_DialBtnBack
+    BNE .back
+    BIT.w #!C2Scene_DialBtnFwd
+    BNE .forward
+    BIT.w #!C2Scene_PadRight
+    BNE .back
+    BIT.w #!C2Scene_PadLeft
+    BNE .forward
+    BIT.w #!C2Scene_PadUp
+    BNE .back
+    BIT.w #!C2Scene_PadDown
+    BNE .forward
+    BIT.w #!C2Scene_DialBtnOk
+    BNE .confirm
+    BIT.w #!C2Scene_DialBtnCancel
+    BNE .cancel
+    CLC
+    RTS
+.back:
+    SEP #$20
+    DEC.w C2Scene_DialTask.Sel,X
+    BPL .back_vel
+    STZ.w C2Scene_DialTask.Sel,X
+.back_vel:
+    REP #$20
+    LDA.w #$10000-!C2Scene_DialTurnStep
+    STA.w C2Scene_DialTask.Vel,X
+    BRA .turn
+.forward:
+    SEP #$20
+    INC.w C2Scene_DialTask.Sel,X
+    LDA.w C2Scene_DialTask.Sel,X
+    CMP.b #!C2Scene_DialMarks
+    BCC .fwd_vel
+    LDA.b #!C2Scene_DialLastSel
+    STA.w C2Scene_DialTask.Sel,X
+.fwd_vel:
+    REP #$20
+    LDA.w #!C2Scene_DialTurnStep
+    STA.w C2Scene_DialTask.Vel,X
+    BRA .turn
+.confirm:
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    STA.b !C2Scene_DialHere
+    JSR C2Scene_DialSelLoc
+    CMP.b !C2Scene_DialHere
+    BEQ .same
+    STA.w !C2Scene_DialDest
+    SEP #$20
+    LDA.b #!C2Scene_ModeIdle7
+    STA.w !C2Scene_Mode
+    CLC
+    RTS
+.same:
+    SEP #$20
+    LDA.b #!C2Scene_SoundCmd18
+    STA.w !Audio_CmdId
+    LDA.b #!C2Scene_DialSfxSame
+    STA.w !Audio_CmdArg0
+    LDA.b #!C2Scene_SoundArg80
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    CLC
+    RTS
+.cancel:
+    LDA.w #!C2Scene_DialNoDest
+    STA.w !C2Scene_DialDest
+    SEP #$20
+    LDA.b #!C2Scene_ModeIdle7
+    STA.w !C2Scene_Mode
+    CLC
+    RTS
+.turn:
+    TXY
+    LDA.w C2Scene_DialTask.Sel,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l C2Scene_DialAngles,X
+    STA.w C2Scene_DialTask.Target,Y
+    SEP #$20
+    TYX
+    INC.w C2Scene_DialTask.State,X
+
+; $C2:6C14 — C2Scene_DialTurn (131 bytes, $6C14–$6C96)
+; State 2, once per frame. While .Pos is not .Target: .Pos + .Vel and
+; the hand is redrawn (C2Scene_DialDrawHand). At the target: if .Sel's
+; location is not the current one, C2Scene_DialSel = .Sel (the markers
+; follow it) and .State = 1. If it is, the current location is skipped:
+; .Sel moves one more in the direction of .Vel (at either end it bounces:
+; .Sel 7 becomes 5, -1 becomes 1, and .Vel is negated) and .Target =
+; its angle, still in state 2.
+; Callers note: none direct (C2Scene_DialStates; C2Scene_DialInput falls
+;   in).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  C=0. Turning: M=1, X=0, A, X, Y as C2Scene_DialDrawHand leaves
+;        them. At the target: M=1 (state 1) or M=0 (skip), A, X, Y
+;        clobbered; C2Tmp_08 = .Sel's location number; C2Tmp_10-$12 as
+;        C2Scene_DialSelLoc leaves them
+; Calls: C2Scene_DialSelLoc, C2Scene_DialDrawHand.
+C2Scene_DialTurn:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_DialTask.Pos,X
+    CMP.w C2Scene_DialTask.Target,X
+    BNE .step
+    JSR C2Scene_DialSelLoc
+    STA.b !C2Scene_DialHere
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    CMP.b !C2Scene_DialHere
+    BNE .arrived
+    LDA.w C2Scene_DialTask.Vel,X
+    SEP #$20
+    BMI .skip_back
+    INC.w C2Scene_DialTask.Sel,X
+    LDA.w C2Scene_DialTask.Sel,X
+    CMP.b #!C2Scene_DialMarks
+    BCC .retarget
+    SEC
+    SBC.b #2
+    STA.w C2Scene_DialTask.Sel,X
+    BRA .bounce
+.skip_back:
+    DEC.w C2Scene_DialTask.Sel,X
+    LDA.w C2Scene_DialTask.Sel,X
+    BPL .retarget
+    CLC
+    ADC.b #2
+    STA.w C2Scene_DialTask.Sel,X
+.bounce:
+    REP #$20
+    LDA.w C2Scene_DialTask.Vel,X
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.w C2Scene_DialTask.Vel,X
+.retarget:
+    REP #$20
+    LDY.b !C2Scene_TaskCur
+    LDA.w C2Scene_DialTask.Sel,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l C2Scene_DialAngles,X
+    STA.w C2Scene_DialTask.Target,Y
+    CLC
+    RTS
+.arrived:
+    SEP #$20
+    LDA.w C2Scene_DialTask.Sel,X
+    STA.w !C2Scene_DialSel
+    LDA.b #1
+    STA.w C2Scene_DialTask.State,X
+    CLC
+    RTS
+.step:
+    CLC
+    LDA.w C2Scene_DialTask.Pos,X
+    ADC.w C2Scene_DialTask.Vel,X
+    STA.w C2Scene_DialTask.Pos,X
+    SEP #$20
+    JSR C2Scene_DialDrawHand
+    CLC
+    RTS
+
+; $C2:6C97 — C2Scene_DialLocs (7 words, $6C97–$6CA4)
+; The Loc_Id of each marker 0-6 (C2Scene_DialSelLoc,
+; C2Scene_DialFindLoc).
+C2Scene_DialLocs:
+    dw $01D9,$01F2,$01F7,$01F0,$01F1,$01F4,$01F3
+
+; $C2:6CA5 — C2Scene_DialLocsLate (7 words, $6CA5–$6CB2)
+; The list used once C2Scene_Flag0Copy is C2Scene_DialLateFlag or more:
+; marker 5 is $01F6 instead of $01F4.
+C2Scene_DialLocsLate:
+    dw $01D9,$01F2,$01F7,$01F0,$01F1,$01F6,$01F3
+
+; $C2:6CB3 — C2Scene_DialAngles (7 words, $6CB3–$6CC0)
+; The hand's angle (Trig_Sin1024 units, 1024 per turn) for marker 0-6.
+C2Scene_DialAngles:
+    dw $FF80,$0000,$0064,$00CC,$0130,$0198,$0200
+
+; $C2:6CC1 — C2Scene_DialDrawHand (620 bytes, $6CC1–$6F2C)
+; Draws the hand at angle .Pos into the hand buffer not on screen and
+; shows it: toggles C2Scene_DialHandBuf in C2Scene_DialFlags and points
+; C2Scene_HdmaValues 0/1 (the two 112-line halves) at C2Scene_HandBufB
+; or C2Scene_HandBufA. Then:
+; - "clears" it: $01,$00,$00 at its first three bytes, and the pair at
+;   +$90/$91 (line 72) copied over +$92-$12F (lines 73-151): see the
+;   quirk;
+; - the triangle C2Scene_DialHandShape, its points (dx, dy) turned by the
+;   angle about (C2Scene_DialCentreX, C2Scene_DialCentreY): x = cx +
+;   (dx cos + dy sin) / 256, y = cy + (dy cos - dx sin) / 256
+;   (C2Scene_DialMul), into C2Scene_DialVerts through WMDATA;
+; - its three edges as C2Scene_DialEdge* records, skipping flat ones:
+;   from the top point down to one line above the bottom point, X in
+;   8.8 fixed point and the signed X step per line (hardware divider);
+; - from the topmost line to the lowest edge end, each line's window
+;   edges: each active edge's X (whole part), lower first, through
+;   WMDATA into the buffer at line * 2.
+; Quirks, kept: the clear's MVN starts at line 72 instead of the buffer
+; start, so lines 0-71 and 152-223 keep what this buffer held two frames
+; before, and lines 73-151 get line 72's old pair (the hand, 40 pixels
+; from the centre at line 112, stays within lines 72-152; whether line
+; 72 ever holds a span there is not traced). The ADCs that add
+; the centre keep the carry of the 16-bit sum (x) or of the subtraction
+; (y), so the point can be one pixel off.
+; Callers (2 JSR sites): C2Scene_DialInit ($C2:6B5B) and C2Scene_DialTurn ($C2:6C92).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (low WRAM and registers absolute);
+;        C2Scene_TaskCur = the dial task; C2Scene_HandPtr+2 = the
+;        buffers' bank
+; Exit:  M=1, X=0; A, X, Y clobbered; C2Tmp_00-$16, $19-$1B changed;
+;        C2Scene_DialVerts and the edge records rewritten; WMADD past
+;        the last line written
+; Calls: Trig_Cos1024, Trig_Sin1024 (JSL), C2Scene_DialMul.
+!C2Scene_MulByte = !C2Tmp_07
+!C2Scene_MulWord = !C2Tmp_0E
+!C2Scene_MulProduct = !C2Tmp_19
+!C2Scene_HandCentreX = !C2Tmp_00       ; points: 8-bit centre
+!C2Scene_HandCentreY = !C2Tmp_01
+!C2Scene_HandDx = !C2Tmp_02            ; 8-bit point offsets
+!C2Scene_HandDy = !C2Tmp_03
+!C2Scene_HandSum = !C2Tmp_04           ; 16-bit first product
+!C2Scene_HandPoints = !C2Tmp_06        ; 8-bit points left
+!C2Scene_HandCos = !C2Tmp_08           ; 16-bit cosine
+!C2Scene_HandSin = !C2Tmp_0A           ; 16-bit sine
+!C2Scene_HandShapeOfs = !C2Tmp_0C      ; byte offset into C2Scene_DialHandShape
+!C2Scene_HandEdgesLeft = !C2Tmp_00     ; edges: 8-bit edges left to build
+!C2Scene_HandAbsDx = !C2Tmp_02         ; 8-bit |x1 - x0|
+!C2Scene_HandLines = !C2Tmp_04         ; 8-bit y1 - 1 - y0
+!C2Scene_HandX0 = !C2Tmp_08            ; 8-bit top point
+!C2Scene_HandY0 = !C2Tmp_0A
+!C2Scene_HandX1 = !C2Tmp_0C            ; 8-bit bottom point
+!C2Scene_HandY1 = !C2Tmp_0E
+!C2Scene_HandEdgeOfs = !C2Tmp_10       ; 16-bit byte offset of the edge's first point
+!C2Scene_HandRec = !C2Tmp_13           ; 16-bit byte offset of the next edge record
+!C2Scene_HandPtr = !C2Tmp_16           ; 24-bit address of the hand buffer being drawn
+!C2Scene_HandEdges = !C2Tmp_19         ; 16-bit edge records made (C2Scene_DialMul uses $19-$1B
+                                       ; before)
+!C2Scene_HandSpanA = !C2Tmp_00         ; lines: 16-bit 8.8 X of the first active edge
+!C2Scene_HandSpanB = !C2Tmp_02         ; and of the second
+!C2Scene_HandLine = !C2Tmp_08          ; 8-bit line being written
+!C2Scene_HandLast = !C2Tmp_0A          ; 8-bit lowest edge end
+!C2Scene_HandActiveLeft = !C2Tmp_10    ; 8-bit edges left to step
+!C2Scene_HandLinesLeft = !C2Tmp_13     ; 8-bit lines left
+C2Scene_DialDrawHand:
+    LDA.w !C2Scene_DialFlags
+    BIT.b #!C2Scene_DialHandBuf
+    BNE .use_a
+    LDA.b #!C2Scene_DialHandBuf
+    TSB.w !C2Scene_DialFlags
+    REP #$20
+    LDA.w #!C2Scene_HandBufB&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufB&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    LDY.w #!C2Scene_HandBufB&$FFFF
+    BRA .clear
+.use_a:
+    LDA.b #!C2Scene_DialHandBuf
+    TRB.w !C2Scene_DialFlags
+    REP #$20
+    LDA.w #!C2Scene_HandBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufA&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    LDY.w #!C2Scene_HandBufA&$FFFF
+.clear:
+    STY.b !C2Scene_HandPtr
+    LDA.b #!C2Scene_DialCentreX
+    STA.b !C2Scene_HandCentreX
+    LDA.b #!C2Scene_DialCentreY
+    STA.b !C2Scene_HandCentreY
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_DialTask.Pos,X
+    TAY
+    JSL Trig_Cos1024
+    STA.b !C2Scene_HandCos
+    TYA
+    JSL Trig_Sin1024
+    STA.b !C2Scene_HandSin
+    PHB
+    LDA.w #!C2Scene_WinEmpty
+    TAY
+    STA.b [!C2Scene_HandPtr]
+    DEC A
+    STA.b [!C2Scene_HandPtr],Y
+    LDA.b !C2Scene_HandPtr
+    CLC
+    ADC.w #!C2Scene_HandClearFrom       ; quirk: line 72, not the start
+    TAX
+    TAY
+    INY
+    INY
+    LDA.w #!C2Scene_HandClearCount
+    MVN bank(!C2Scene_HandBufA),bank(!C2Scene_HandBufA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    STZ.b !C2Scene_HandShapeOfs
+    LDA.w #!C2Scene_DialVerts
+    STA.w WMADDL
+    SEP #$20
+    LDA.b #!Bank00
+    STA.w WMADDH
+    LDA.b #!C2Scene_HandPointCount
+    STA.b !C2Scene_HandPoints
+.point:
+    LDX.b !C2Scene_HandShapeOfs
+    LDA.l C2Scene_DialHandShape,X
+    STA.b !C2Scene_HandDx
+    INX
+    LDA.l C2Scene_DialHandShape,X
+    STA.b !C2Scene_HandDy
+    INX
+    STX.b !C2Scene_HandShapeOfs
+    LDX.b !C2Scene_HandCos
+    STX.b !C2Scene_MulWord
+    LDA.b !C2Scene_HandDx
+    STA.b !C2Scene_MulByte
+    JSR C2Scene_DialMul                 ; dx cos
+    LDX.b !C2Scene_MulProduct
+    STX.b !C2Scene_HandSum
+    LDX.b !C2Scene_HandSin
+    STX.b !C2Scene_MulWord
+    LDA.b !C2Scene_HandDy
+    STA.b !C2Scene_MulByte
+    JSR C2Scene_DialMul                 ; dy sin
+    REP #$20
+    LDA.b !C2Scene_MulProduct
+    CLC
+    ADC.b !C2Scene_HandSum
+    XBA                                 ; / 256
+    SEP #$20
+    ADC.b !C2Scene_HandCentreX          ; no CLC: the sum's carry is added too
+    STA.w WMDATA
+    LDX.b !C2Scene_HandSin
+    STX.b !C2Scene_MulWord
+    LDA.b !C2Scene_HandDx
+    STA.b !C2Scene_MulByte
+    JSR C2Scene_DialMul                 ; dx sin
+    LDX.b !C2Scene_MulProduct
+    STX.b !C2Scene_HandSum
+    LDX.b !C2Scene_HandCos
+    STX.b !C2Scene_MulWord
+    LDA.b !C2Scene_HandDy
+    STA.b !C2Scene_MulByte
+    JSR C2Scene_DialMul                 ; dy cos
+    REP #$20
+    LDA.b !C2Scene_MulProduct
+    SEC
+    SBC.b !C2Scene_HandSum
+    XBA
+    SEP #$20
+    ADC.b !C2Scene_HandCentreY          ; no CLC: the borrow's carry is added too
+    STA.w WMDATA
+    DEC.b !C2Scene_HandPoints
+    BNE .point
+    LDA.b #!C2Scene_HandPointCount      ; edges to build
+    STA.b !C2Scene_HandEdgesLeft
+    LDX.w #$0000
+    STX.b !C2Scene_HandEdges
+    STX.b !C2Scene_HandEdgeOfs
+    STX.b !C2Scene_HandRec
+.edge:
+    LDX.b !C2Scene_HandEdgeOfs
+    LDA.w !C2Scene_DialVerts,X
+    STA.b !C2Scene_HandX0
+    LDA.w !C2Scene_DialVerts+1,X
+    STA.b !C2Scene_HandY0
+    LDA.b !C2Scene_HandEdgesLeft
+    CMP.b #1
+    BNE .next_point
+    LDA.w !C2Scene_DialVerts            ; the last edge closes on point 0
+    STA.b !C2Scene_HandX1
+    LDA.w !C2Scene_DialVerts+1
+    STA.b !C2Scene_HandY1
+    BRA .ordered
+.next_point:
+    LDA.w !C2Scene_DialVerts+2,X
+    STA.b !C2Scene_HandX1         ; x1
+    LDA.w !C2Scene_DialVerts+3,X
+    STA.b !C2Scene_HandY1           ; y1
+.ordered:
+    CMP.b !C2Scene_HandY0
+    BNE .not_flat
+    JMP .edge_done
+.not_flat:
+    BCS .downward
+    LDY.b !C2Scene_HandY0              ; swap the ends: (x0, y0) on top
+    STY.b !C2Scene_HandY1
+    STA.b !C2Scene_HandY0
+    LDA.b !C2Scene_HandX0
+    LDY.b !C2Scene_HandX1
+    STY.b !C2Scene_HandX0
+    STA.b !C2Scene_HandX1
+.downward:
+    DEC.b !C2Scene_HandY1           ; the bottom line is not drawn
+    LDA.b !C2Scene_HandY1
+    SEC
+    SBC.b !C2Scene_HandY0
+    STA.b !C2Scene_HandLines              ; lines - 1
+    LDA.b !C2Scene_HandX1
+    SEC
+    SBC.b !C2Scene_HandX0
+    STA.b !C2Scene_HandAbsDx               ; x1 - x0
+    PHP
+    BPL .dx_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !C2Scene_HandAbsDx
+.dx_pos:
+    TDC
+    STA.w WRDIVL
+    LDA.b !C2Scene_HandAbsDx
+    STA.w WRDIVH                        ; |dx| * 256
+    LDA.b !C2Scene_HandLines
+    STA.w WRDIVB                        ; / (lines - 1)
+    LDX.b !C2Scene_HandRec
+    STZ.w !C2Scene_DialEdgeActive,X
+    LDA.b !C2Scene_HandX0
+    STA.w !C2Scene_DialEdgeX+1,X
+    STZ.w !C2Scene_DialEdgeX,X
+    LDA.b !C2Scene_HandY0
+    STA.w !C2Scene_DialEdgeTop+1,X
+    STZ.w !C2Scene_DialEdgeTop,X
+    LDA.b !C2Scene_HandY1
+    SEC
+    SBC.b !C2Scene_HandY0
+    STA.w !C2Scene_DialEdgeLines,X
+    STZ.w !C2Scene_DialEdgeLines+1,X
+    LDA.b !C2Scene_HandY1
+    STA.w !C2Scene_DialEdgeBottom+1,X
+    STZ.w !C2Scene_DialEdgeBottom,X
+    PLP
+    REP #$20
+    BPL .slope_pos
+    LDA.w RDDIVL
+    EOR.w #!Eng_Invert16
+    INC A
+    BRA .slope
+.slope_pos:
+    LDA.w RDDIVL
+.slope:
+    STA.w !C2Scene_DialEdgeSlope,X
+    INC.b !C2Scene_HandEdges
+    INC.b !C2Scene_HandRec
+    INC.b !C2Scene_HandRec
+.edge_done:
+    REP #$20
+    INC.b !C2Scene_HandEdgeOfs
+    INC.b !C2Scene_HandEdgeOfs
+    SEP #$20
+    DEC.b !C2Scene_HandEdgesLeft
+    BEQ .span
+    JMP .edge
+.span:
+    LDY.b !C2Scene_HandEdges            ; the topmost line
+    DEY
+    LDA.w !C2Scene_DialEdgeTop+1
+    STA.b !C2Scene_HandLine
+    LDX.w #2
+.min_top:
+    LDA.w !C2Scene_DialEdgeTop+1,X
+    CMP.b !C2Scene_HandLine
+    BCS .not_higher
+    STA.b !C2Scene_HandLine
+.not_higher:
+    INX
+    INX
+    DEY
+    BNE .min_top
+    LDY.b !C2Scene_HandEdges            ; the lowest edge end
+    DEY
+    LDA.w !C2Scene_DialEdgeBottom+1
+    STA.b !C2Scene_HandLast
+    LDX.w #2
+.max_bottom:
+    LDA.w !C2Scene_DialEdgeBottom+1,X
+    CMP.b !C2Scene_HandLast
+    BCC .not_lower
+    STA.b !C2Scene_HandLast
+.not_lower:
+    INX
+    INX
+    DEY
+    BNE .max_bottom
+    LDA.b !C2Scene_HandLast
+    SEC
+    SBC.b !C2Scene_HandLine
+    STA.b !C2Scene_HandLinesLeft              ; lines to write
+    REP #$20
+    LDA.b !C2Scene_HandLine
+    AND.w #!Eng_LowByteMask
+    ASL A                               ; 2 bytes per line (C=0)
+    ADC.b !C2Scene_HandPtr
+    STA.w WMADDL
+    SEP #$20
+    LDA.b !C2Scene_HandPtr+2
+    STA.w WMADDH
+.line:
+    LDY.b !C2Scene_HandEdges            ; start the edges whose top is this line
+    LDX.w #$0000
+.start:
+    LDA.w !C2Scene_DialEdgeTop+1,X
+    CMP.b !C2Scene_HandLine
+    BNE .not_starting
+    INC.w !C2Scene_DialEdgeActive,X
+.not_starting:
+    INX
+    INX
+    DEY
+    BNE .start
+    LDA.b !C2Scene_HandEdges
+    STA.b !C2Scene_HandActiveLeft
+    LDX.w #$0000
+    LDY.w #$0000
+.active:
+    LDA.w !C2Scene_DialEdgeActive,X
+    BEQ .next_edge
+    REP #$20
+    LDA.w !C2Scene_DialEdgeX,X
+    STA.w !Eng_PtrBase,Y                ; C2Scene_HandSpanA, then SpanB: X in 8.8
+    CLC
+    ADC.w !C2Scene_DialEdgeSlope,X
+    STA.w !C2Scene_DialEdgeX,X
+    INY
+    INY
+    SEP #$20
+    DEC.w !C2Scene_DialEdgeLines,X
+    BPL .next_edge
+    STZ.w !C2Scene_DialEdgeActive,X
+.next_edge:
+    INX
+    INX
+    DEC.b !C2Scene_HandActiveLeft
+    BNE .active
+    LDA.b !C2Scene_HandSpanA+1          ; the first edge's whole X
+    CMP.b !C2Scene_HandSpanB+1               ; the second's
+    BCC .first_left
+    LDA.b !C2Scene_HandSpanB+1
+    STA.w WMDATA                        ; WH0
+    LDA.b !C2Scene_HandSpanA+1
+    STA.w WMDATA                        ; WH1
+    BRA .line_done
+.first_left:
+    LDA.b !C2Scene_HandSpanA+1
+    STA.w WMDATA
+    LDA.b !C2Scene_HandSpanB+1
+    STA.w WMDATA
+.line_done:
+    INC.b !C2Scene_HandLine
+    DEC.b !C2Scene_HandLinesLeft
+    BEQ .done
+    JMP .line
+.done:
+    RTS
+
+; $C2:6F2D — C2Scene_DialHandShape (6 bytes, $6F2D–$6F32)
+; The hand's three points (dx, dy, signed bytes) about the centre at
+; angle 0: the tip 40 pixels up, the base 4 pixels left and right.
+C2Scene_DialHandShape:
+    db $00,$D8                  ; (0, -40)
+    db $FC,$00                  ; (-4, 0)
+    db $04,$00                  ; (4, 0)
+
+; $C2:6F33 — C2Scene_DialMul (82 bytes, $6F33–$6F84)
+; Signed multiply: C2Scene_MulProduct (24-bit, $19-$1B) = the signed
+; byte C2Scene_MulByte times the signed word C2Scene_MulWord, from the
+; magnitudes on the hardware multiplier (low byte, then high byte added
+; in at bit 8), negated when the signs differ. C2Scene_MulByte and
+; C2Scene_MulWord are left as their magnitudes.
+; Callers (4 JSR sites): C2Scene_DialDrawHand ($C2:6D65, $C2:6D74, $C2:6D8E, $C2:6D9D).
+; Entry: M any, X any (SEP #$30 here), DP=$0000, DB=$00 (WRMPY/RDMPY
+;        absolute)
+; Exit:  M=1, X=0 (the PLP brings back M=1, X=1 from the SEP; REP #$10);
+;        A clobbered, X = |byte|, Y = the word's high byte (high bytes 0);
+;        C2Tmp_07, $0E-$0F and $19-$1B changed
+; No calls.
+C2Scene_DialMul:
+    SEP #$30
+    LDA.b !C2Scene_MulWord+1
+    EOR.b !C2Scene_MulByte              ; N = the product's sign
+    PHP
+    LDA.b !C2Scene_MulByte
+    BPL .byte_pos
+    EOR.b #!Eng_Invert8
+    INC A
+    STA.b !C2Scene_MulByte
+.byte_pos:
+    REP #$20
+    LDA.b !C2Scene_MulWord
+    BPL .word_pos
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_MulWord
+.word_pos:
+    LDX.b !C2Scene_MulByte
+    LDY.b !C2Scene_MulWord
+    STX.w WRMPYA
+    STY.w WRMPYB                        ; byte * low byte
+    LDY.b !C2Scene_MulWord+1
+    LDX.b #$00
+    STX.b !C2Scene_MulProduct+2
+    LDA.w RDMPYL
+    STY.w WRMPYB                        ; byte * high byte
+    STA.b !C2Scene_MulProduct
+    NOP
+    CLC
+    LDA.w RDMPYL
+    ADC.b !C2Scene_MulProduct+1
+    STA.b !C2Scene_MulProduct+1
+    PLP
+    BPL .done
+    REP #$20                            ; negate the 24 bits
+    SEC
+    TDC
+    SBC.b !C2Scene_MulProduct
+    STA.b !C2Scene_MulProduct
+    SEP #$20
+    TDC
+    SBC.b !C2Scene_MulProduct+2
+    STA.b !C2Scene_MulProduct+2
+.done:
+    REP #$10
+    RTS
+
+; $C2:6F85 — C2Scene_TaskSwirl (9 bytes, $6F85–$6F8D)
+; Task handler started by C2Scene_DialLoad: runs .State through
+; C2Scene_SwirlStates (0: set up, 1: every frame after). It never ends.
+; Callers note: none direct (C2Scene_DialLoad spawns it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's
+; Calls: the C2Scene_SwirlStates handlers (JMP (abs,X)).
+C2Scene_TaskSwirl:
+    TDC
+    LDA.w C2Scene_SwirlTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_SwirlStates,X)
+
+; $C2:6F8E — C2Scene_SwirlStates (2 words, $6F8E–$6F91)
+; C2Scene_TaskSwirl's handler for each .State.
+C2Scene_SwirlStates:
+    dw C2Scene_SwirlInit        ; 0
+    dw C2Scene_SwirlStep        ; 1
+
+; $C2:6F92 — C2Scene_SwirlInit (245 bytes, $6F92–$7086)
+; State 0: .State = 1, .Angle = 0. HDMA channels 2 and 5 write M7A and
+; M7D, 3 and 4 write M7B and M7C, every line (indirect, one register
+; written twice), from C2Scene_HdmaTable records 1 and 2 (two runs of
+; 112 lines each); their halves point (C2Scene_HdmaValues 2-5) at the
+; first pair of buffers, C2Scene_SwirlCosA and C2Scene_SwirlSinA, and
+; C2Scene_DialSwirlBuf and C2Scene_DialFlagBit2 are cleared. Fills them
+; for the 224 lines: M7A/M7D = cos(a), M7B/M7C = sin(a +
+; C2Scene_SwirlPhase), a starting at .Angle and + C2Scene_SwirlLineStep
+; per line; .Angle = a after the last line. (So the matrix changes down
+; the screen; that this shows as a swirl is inferred, not seen.)
+; Callers note: none direct (C2Scene_SwirlStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM and registers);
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A clobbered, X = the task, Y past the last sine;
+;        C2Tmp_00-$01, $08-$09, $10-$11 and $13-$14 changed; DB restored
+; Calls: Trig_Cos1024, Trig_Sin1024 (JSL).
+!C2Scene_SwirlLines = !C2Tmp_00        ; 16-bit lines left
+!C2Scene_SwirlA = !C2Tmp_08            ; 16-bit angle of the line
+!C2Scene_SwirlCosPtr = !C2Tmp_10       ; 16-bit next cosine (bank $7E)
+!C2Scene_SwirlSinPtr = !C2Tmp_13       ; 16-bit next sine
+C2Scene_SwirlInit:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_SwirlTask.State,X
+    STZ.w C2Scene_SwirlTask.Angle,X
+    STZ.w C2Scene_SwirlTask.Angle+1,X
+    LDA.b #!C2Scene_MapGradRun
+    STA.l C2Scene_HdmaTable[1].Count0
+    STA.l C2Scene_HdmaTable[2].Count0
+    STA.l C2Scene_HdmaTable[1].Count1
+    STA.l C2Scene_HdmaTable[2].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[1].Value1+2 ; the ends of the tables
+    STA.l C2Scene_HdmaTable[2].Value1+2
+    LDY.w #(!BBAD_M7A<<8)|!DMAP_HdmaIndirect|!DMAP_OneRegTwice
+    STY.w DMAP2
+    LDY.w #(!BBAD_M7D<<8)|!DMAP_HdmaIndirect|!DMAP_OneRegTwice
+    STY.w DMAP5
+    LDY.w #C2Scene_HdmaTable[1].Count0&$FFFF
+    STY.w A1T2L
+    STY.w A1T5L
+    LDA.b #!Bank7E
+    STA.w A1B2
+    STA.w DAS2B
+    STA.w A1B5
+    STA.w DAS5B
+    LDY.w #(!BBAD_M7B<<8)|!DMAP_HdmaIndirect|!DMAP_OneRegTwice
+    STY.w DMAP3
+    LDY.w #(!BBAD_M7C<<8)|!DMAP_HdmaIndirect|!DMAP_OneRegTwice
+    STY.w DMAP4
+    LDY.w #C2Scene_HdmaTable[2].Count0&$FFFF
+    STY.w A1T3L
+    STY.w A1T4L
+    LDA.b #!Bank7E
+    STA.w A1B3
+    STA.w DAS3B
+    STA.w A1B4
+    STA.w DAS4B
+    LDA.b #!HDMAEN_Ch2To5
+    TSB.b !C2Scene_HdmaenShadow
+    LDA.b #!C2Scene_DialSwirlBuf
+    TRB.w !C2Scene_DialFlags
+    REP #$20
+    LDA.w #!C2Scene_SwirlCosA&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_SwirlCosA&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+6
+    SEP #$20
+    LDX.w #!C2Scene_SwirlCosA&$FFFF
+    STX.b !C2Scene_SwirlCosPtr
+    LDA.b #!C2Scene_DialFlagBit2
+    TRB.w !C2Scene_DialFlags
+    REP #$20
+    LDA.w #!C2Scene_SwirlSinA&$FFFF
+    STA.l !C2Scene_HdmaValues+8
+    LDA.w #(!C2Scene_SwirlSinA&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+10
+    SEP #$20
+    LDY.w #!C2Scene_SwirlSinA&$FFFF
+    STY.b !C2Scene_SwirlSinPtr
+    PHB
+    LDA.b #!Bank7E
+    PHA
+    PLB
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_SwirlTask.Angle,X
+    STA.b !C2Scene_SwirlA
+    LDA.w #!C2Scene_ScreenLines
+    STA.b !C2Scene_SwirlLines
+.line:
+    LDA.b !C2Scene_SwirlA
+    JSL Trig_Cos1024
+    LDY.b !C2Scene_SwirlCosPtr
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    STY.b !C2Scene_SwirlCosPtr
+    LDA.b !C2Scene_SwirlA
+    CLC
+    ADC.w #!C2Scene_SwirlPhase
+    JSL Trig_Sin1024
+    LDY.b !C2Scene_SwirlSinPtr
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    STY.b !C2Scene_SwirlSinPtr
+    LDA.b !C2Scene_SwirlA
+    CLC
+    ADC.w #!C2Scene_SwirlLineStep
+    STA.b !C2Scene_SwirlA
+    DEC.b !C2Scene_SwirlLines
+    BNE .line
+    LDX.b !C2Scene_TaskCur
+    LDA.b !C2Scene_SwirlA
+    STA.w C2Scene_SwirlTask.Angle,X
+    SEP #$20
+    PLB
+    CLC
+    RTS
+
+; $C2:7087 — C2Scene_SwirlStep (188 bytes, $7087–$7142)
+; State 1, every frame: toggles C2Scene_DialSwirlBuf and points
+; C2Scene_HdmaValues 2-5 at the other pair of buffers (C2Scene_SwirlCosB/
+; SinB, or back to A); copies the shown pair one line up into it (lines
+; 1-223 to 0-222, MVN) and writes line 223: cos(.Angle) and sin(.Angle +
+; C2Scene_SwirlPhase); then .Angle + C2Scene_SwirlLineStep. So the
+; per-line angles scroll up one line per frame. (The MVNs leave DB =
+; $7E for the two stores; PHB/PLB put it back.)
+; Callers note: none direct (C2Scene_SwirlStates).
+; Entry: M any (REP #$20 here), X any, DP=$0000, DB=$00 (low WRAM);
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0, C=0; A clobbered, X = the sine buffer, Y = the task;
+;        C2Tmp_10-$11 and $13-$14 changed; DB restored
+; Calls: Trig_Cos1024, Trig_Sin1024 (JSL).
+C2Scene_SwirlStep:
+    REP #$20
+    PHB
+    LDA.w !C2Scene_DialFlags
+    BIT.w #!C2Scene_DialSwirlBuf
+    BNE .to_a
+    LDA.w #!C2Scene_DialSwirlBuf
+    TSB.w !C2Scene_DialFlags
+    LDA.w #!C2Scene_SwirlCosB&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_SwirlCosB&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+6
+    LDA.w #!C2Scene_SwirlSinB&$FFFF
+    STA.l !C2Scene_HdmaValues+8
+    LDA.w #(!C2Scene_SwirlSinB&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+10
+    LDY.w #!C2Scene_SwirlCosB&$FFFF
+    LDX.w #(!C2Scene_SwirlCosA&$FFFF)+2
+    LDA.w #!C2Scene_HdmaBufBytes-2      ; one byte past line 223's word: overwritten below
+    MVN bank(!C2Scene_SwirlCosB),bank(!C2Scene_SwirlCosA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #!C2Scene_SwirlSinB&$FFFF
+    LDX.w #(!C2Scene_SwirlSinA&$FFFF)+2
+    LDA.w #!C2Scene_HdmaBufBytes-2
+    MVN bank(!C2Scene_SwirlSinB),bank(!C2Scene_SwirlSinA) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SwirlCosB&$FFFF
+    LDY.w #!C2Scene_SwirlSinB&$FFFF
+    BRA .last_line
+.to_a:
+    LDA.w #!C2Scene_DialSwirlBuf
+    TRB.w !C2Scene_DialFlags
+    LDA.w #!C2Scene_SwirlCosA&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_SwirlCosA&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+6
+    LDA.w #!C2Scene_SwirlSinA&$FFFF
+    STA.l !C2Scene_HdmaValues+8
+    LDA.w #(!C2Scene_SwirlSinA&$FFFF)+!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+10
+    LDY.w #!C2Scene_SwirlCosA&$FFFF
+    LDX.w #(!C2Scene_SwirlCosB&$FFFF)+2
+    LDA.w #!C2Scene_HdmaBufBytes-2      ; one byte past line 223's word: overwritten below
+    MVN bank(!C2Scene_SwirlCosA),bank(!C2Scene_SwirlCosB) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #!C2Scene_SwirlSinA&$FFFF
+    LDX.w #(!C2Scene_SwirlSinB&$FFFF)+2
+    LDA.w #!C2Scene_HdmaBufBytes-2
+    MVN bank(!C2Scene_SwirlSinA),bank(!C2Scene_SwirlSinB) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_SwirlCosA&$FFFF
+    LDY.w #!C2Scene_SwirlSinA&$FFFF
+.last_line:
+    STX.b !C2Scene_SwirlCosPtr
+    STY.b !C2Scene_SwirlSinPtr
+    LDY.b !C2Scene_TaskCur
+    LDA.w C2Scene_SwirlTask.Angle,Y
+    JSL Trig_Cos1024
+    LDX.b !C2Scene_SwirlCosPtr
+    STA.w !C2Scene_HdmaLastLine,X      ; DB = $7E from the MVN
+    LDA.w C2Scene_SwirlTask.Angle,Y
+    CLC
+    ADC.w #!C2Scene_SwirlPhase
+    JSL Trig_Sin1024
+    LDX.b !C2Scene_SwirlSinPtr
+    STA.w !C2Scene_HdmaLastLine,X
+    LDA.w C2Scene_SwirlTask.Angle,Y
+    CLC
+    ADC.w #!C2Scene_SwirlLineStep
+    STA.w C2Scene_SwirlTask.Angle,Y     ; DB = $7E: written to $7E's mirror of the record
+    PLB
+    CLC
+    RTS
+
+; $C2:7143 — C2Scene_TaskDialMark (9 bytes, $7143–$714B)
+; Task handler of the seven markers (C2Scene_DialLoad starts one per
+; .Sel 0-6): runs .State through C2Scene_DialMarkStates. 0: set up; 1:
+; hidden until C2Scene_DialSel is this marker; 2: its select animation
+; until the frame's timer runs out; 3: shown until C2Scene_DialSel
+; changes; 4: its deselect animation, then back to 1. Never ends.
+; Callers note: none direct (C2Scene_DialLoad spawns it).
+; Entry: M=1, X=0 with X = the task, DP=$0000 (TDC loads 0), DB=$00 (low
+;        WRAM: the task record); C2Scene_TaskCur = the task
+; Exit:  the state's
+; Calls: the C2Scene_DialMarkStates handlers (JMP (abs,X)).
+C2Scene_TaskDialMark:
+    TDC
+    LDA.w C2Scene_DialTask.State,X
+    ASL A
+    TAX
+    JMP (C2Scene_DialMarkStates,X)
+
+; $C2:714C — C2Scene_DialMarkStates (5 words, $714C–$7155)
+; C2Scene_TaskDialMark's handler for each .State.
+C2Scene_DialMarkStates:
+    dw C2Scene_DialMarkInit     ; 0
+    dw C2Scene_DialMarkHidden   ; 1
+    dw C2Scene_DialMarkSelect   ; 2
+    dw C2Scene_DialMarkShown    ; 3
+    dw C2Scene_DialMarkDeselect ; 4
+
+; $C2:7156 — C2Scene_DialMarkInit (43 bytes, $7156–$7180)
+; State 0: .State = 1, .SprAttr = C2Scene_DialMarkAttr, .SprTile = 0,
+; .SprX/.SprY = the bytes of C2Scene_DialMarkPos for .Sel (high bytes
+; 0). Falls into C2Scene_DialMarkHidden.
+; Callers note: none direct (C2Scene_DialMarkStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0 (TDC in
+;        C2Scene_TaskDialMark: .Sel * 2 is a 16-bit index);
+;        C2Scene_TaskCur = the task
+; Exit:  as C2Scene_DialMarkHidden
+; No calls (falls into C2Scene_DialMarkHidden).
+C2Scene_DialMarkInit:
+    LDX.b !C2Scene_TaskCur
+    TXY
+    INC.w C2Scene_DialTask.State,X
+    LDA.b #!C2Scene_DialMarkAttr
+    STA.w C2Scene_Task.SprAttr,X
+    STZ.w C2Scene_Task.SprTile,X
+    STZ.w C2Scene_Task.SprTile+1,X
+    LDA.w C2Scene_DialTask.Sel,X
+    ASL A
+    TAX
+    LDA.l C2Scene_DialMarkPos,X
+    STA.w C2Scene_Task.SprX,Y
+    LDA.l C2Scene_DialMarkPos+1,X
+    STA.w C2Scene_Task.SprY,Y
+    TYX
+    STZ.w C2Scene_Task.SprX+1,X
+    STZ.w C2Scene_Task.SprY+1,X
+
+; $C2:7181 — C2Scene_DialMarkHidden (30 bytes, $7181–$719E)
+; State 1: nothing drawn until C2Scene_DialSel = .Sel; then .State = 2,
+; the marker's select animation (C2Scene_DialMarkAnims, first byte) is
+; started and run.
+; Callers note: none direct (C2Scene_DialMarkStates; C2Scene_DialMarkInit
+;   falls in).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0;
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A, X, Y clobbered (as C2Anim_Run leaves them
+;        when it runs)
+; Calls: C2Scene_SetAnim, C2Anim_Run.
+C2Scene_DialMarkHidden:
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_DialSel
+    CMP.w C2Scene_DialTask.Sel,X
+    BNE .hidden
+    INC.w C2Scene_DialTask.State,X
+    LDA.w C2Scene_DialTask.Sel,X
+    ASL A
+    TAX
+    LDA.l C2Scene_DialMarkAnims,X
+    JSR C2Scene_SetAnim
+    JSR C2Anim_Run
+.hidden:
+    CLC
+    RTS
+
+; $C2:719F — C2Scene_DialMarkSelect (15 bytes, $719F–$71AD)
+; State 2: runs the animation; once .AnimTimer is 0 at the start of a
+; frame, .State = 3.
+; Callers note: none direct (C2Scene_DialMarkStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); C2Scene_TaskCur = the
+;        task
+; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
+; Calls: C2Anim_Run.
+C2Scene_DialMarkSelect:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.AnimTimer,X
+    BNE .run
+    INC.w C2Scene_DialTask.State,X
+.run:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:71AE — C2Scene_DialMarkShown (30 bytes, $71AE–$71CB)
+; State 3: runs the animation; when C2Scene_DialSel is no longer .Sel,
+; .State = 4 and the deselect animation (C2Scene_DialMarkAnims, second
+; byte) starts first.
+; Callers note: none direct (C2Scene_DialMarkStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); B = 0;
+;        C2Scene_TaskCur = the task
+; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
+; Calls: C2Scene_SetAnim, C2Anim_Run.
+C2Scene_DialMarkShown:
+    LDX.b !C2Scene_TaskCur
+    LDA.w !C2Scene_DialSel
+    CMP.w C2Scene_DialTask.Sel,X
+    BEQ .run
+    INC.w C2Scene_DialTask.State,X
+    LDA.w C2Scene_DialTask.Sel,X
+    ASL A
+    TAX
+    LDA.l C2Scene_DialMarkAnims+1,X
+    JSR C2Scene_SetAnim
+.run:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:71CC — C2Scene_DialMarkDeselect (17 bytes, $71CC–$71DC)
+; State 4: runs the animation; once .AnimTimer is 0 at the start of a
+; frame, .State = 1 (hidden again).
+; Callers note: none direct (C2Scene_DialMarkStates).
+; Entry: M=1, X any, DP=$0000, DB=$00 (low WRAM); C2Scene_TaskCur = the
+;        task
+; Exit:  M=1, X=0, C=0; A, X, Y as C2Anim_Run leaves them
+; Calls: C2Anim_Run.
+C2Scene_DialMarkDeselect:
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_Task.AnimTimer,X
+    BNE .run
+    LDA.b #1
+    STA.w C2Scene_DialTask.State,X
+.run:
+    JSR C2Anim_Run
+    CLC
+    RTS
+
+; $C2:71DD — C2Scene_DialMarkPos (14 bytes, $71DD–$71EA)
+; Screen X and Y (one byte each) of markers 0-6: around
+; (C2Scene_DialCentreX, C2Scene_DialCentreY), marker 1 at the hand's tip
+; for angle 0.
+C2Scene_DialMarkPos:
+    db $A4,$50, $84,$48, $6C,$50, $5E,$64, $5E,$7C, $6C,$90, $84,$98
+
+; $C2:71EB — C2Scene_DialMarkAnims (14 bytes, $71EB–$71F8)
+; C2SceneRom_AnimTable numbers of markers 0-6: select, then deselect.
+C2Scene_DialMarkAnims:
+    db $43,$44, $41,$42, $3F,$40, $3D,$3E, $3B,$3C, $39,$3A, $37,$38
+
+; $C2:71F9 — C2Scene_DialUnpack (39 bytes, $71F9–$721F)
+; Unpacks entry C2Tmp_08 of C2Scene_DialPacks, its source in bank A, to
+; bank $7F (Decomp_ToWramVec).
+; Callers (3 JSR sites): C2Scene_DialLoad ($C2:738D, $C2:73DC, $C2:7408).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (Menu_Decomp* absolute); A = the
+;        source bank; C2Tmp_08 = the entry
+; Exit:  M=1, X=0; as Decomp_ToWramVec leaves the registers;
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+!C2Scene_DialPackNum = !C2Tmp_08
+C2Scene_DialUnpack:
+    STA.w !Menu_DecompSrcBank
+    REP #$20
+    LDA.b !C2Scene_DialPackNum
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    TAX
+    LDA.l C2Scene_DialPacks,X
+    STA.w !Menu_DecompSrc
+    LDA.l C2Scene_DialPacks+2,X
+    STA.w !Menu_DecompDest
+    SEP #$20
+    LDA.b #!Bank7F
+    STA.w !Menu_DecompDestBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7220 — C2Scene_DialPacks (12 bytes, $7220–$722B)
+; Source and destination (bank $7F) address of the three packs
+; C2Scene_DialLoad unpacks (the source banks are its arguments).
+C2Scene_DialPacks:
+    dw $8000,$9000              ; 0: $C3:8000 → C2Scene_DecompBuf
+    dw $FB00,$8C00              ; 1: $C6:FB00 → C2Scene_PaletteStage
+    dw $2000,$9000              ; 2: $C6:2000 → C2Scene_DecompBuf
+
+; $C2:722C — C2Scene_DialUploadPixels (40 bytes, $722C–$7253)
+; DMAs C2Scene_DialPixelBytes bytes of C2Scene_DecompBuf to VMDATAH from
+; VRAM word 0: the pixels of mode-7 tiles 0-31.
+; Callers (1 JSR site): C2Scene_DialLoad ($C2:7411).
+; Entry: M=1, X=0, DP any, DB=$00 (registers absolute)
+; Exit:  M=1, X=0; A = MDMAEN_Ch7, X = C2Scene_DialPixelBytes; Y unchanged
+; No calls.
+C2Scene_DialUploadPixels:
+    LDX.w #$0000
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #!BBAD_VMDATAH<<8             ; DMAP7 = 0 (one register), BBAD7 = VMDATAH
+    STX.w DMAP7
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w A1B7
+    LDX.w #!C2Scene_DialPixelBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    RTS
+
+; $C2:7254 — C2Scene_DialUploadMap (100 bytes, $7254–$72B7)
+; DMAs the 32 rows of 32 words at C2Scene_DecompBuf (pack 2: tilemap low
+; bytes, pixel high bytes) to VRAM 16 times, once at each
+; C2Scene_DialMapBlocks address: a 4 x 4 grid of 32 x 32 blocks over
+; the 128 x 128 mode-7 map (row step C2Scene_Mode7MapWidth words).
+; Callers (1 JSR site): C2Scene_DialLoad ($C2:740B).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (registers
+;        absolute)
+; Exit:  M=1, X=0; A clobbered, X = 32; C2Tmp_00, $08-$0D changed
+; No calls.
+!C2Scene_DialRowsLeft = !C2Tmp_00      ; 8-bit
+!C2Scene_DialVram = !C2Tmp_08          ; 16-bit VRAM word address of the row
+!C2Scene_DialSrc = !C2Tmp_0A           ; 16-bit source of the row (bank $7F)
+!C2Scene_DialBlockOfs = !C2Tmp_0C      ; 16-bit byte offset into C2Scene_DialMapBlocks
+C2Scene_DialUploadMap:
+    REP #$20
+    STZ.b !C2Scene_DialBlockOfs
+.block:
+    LDX.b !C2Scene_DialBlockOfs
+    LDA.l C2Scene_DialMapBlocks,X
+    STA.b !C2Scene_DialVram
+    SEP #$20
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.b !C2Scene_DialSrc
+    LDA.b #!C2Scene_DialMapRows
+    STA.b !C2Scene_DialRowsLeft
+.row:
+    LDX.b !C2Scene_DialVram
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDX.b !C2Scene_DialSrc
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w A1B7
+    LDX.w #!C2Scene_DialMapRowBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    LDA.b !C2Scene_DialVram
+    CLC
+    ADC.w #!C2Scene_Mode7MapWidth
+    STA.b !C2Scene_DialVram
+    LDA.b !C2Scene_DialSrc
+    CLC
+    ADC.w #!C2Scene_DialMapRowBytes
+    STA.b !C2Scene_DialSrc
+    SEP #$20
+    DEC.b !C2Scene_DialRowsLeft
+    BNE .row
+    REP #$20
+    INC.b !C2Scene_DialBlockOfs
+    INC.b !C2Scene_DialBlockOfs
+    LDX.b !C2Scene_DialBlockOfs
+    CPX.w #!C2Scene_DialMapBlockCount*2
+    BNE .block
+    SEP #$20
+    RTS
+
+; $C2:72B8 — C2Scene_DialMapBlocks (16 words, $72B8–$72D7)
+; VRAM word address of each 32 x 32 block of C2Scene_DialUploadMap.
+C2Scene_DialMapBlocks:
+    dw $0000,$0020,$0040,$0060
+    dw $1000,$1020,$1040,$1060
+    dw $2000,$2020,$2040,$2060
+    dw $3000,$3020,$3040,$3060
+
+; $C2:72D8 — C2Scene_DialUploadObjTiles (73 bytes, $72D8–$7320)
+; For each of C2Scene_DialObjLeft bytes of the list at C2Scene_DialList
+; (24-bit, stepped on): DMAs 4bpp tile (byte) of the source at
+; C2Scene_DialObjSrc (24-bit; tile * 32 added) to VRAM C2Scene_DialVram,
+; which steps C2Scene_TileWords on: sprite tiles in list order.
+; Callers (1 JSR site): C2Scene_DialLoad ($C2:73D3).
+; Entry: M any (REP #$20 here), X=0, DP=$0000, DB=$00 (registers
+;        absolute); the four C2Tmp slots set as above
+; Exit:  M=1, X=0; A clobbered, X = C2Scene_TileBytes; C2Tmp_00,
+;        $08-$0B and $10-$11 changed
+; No calls.
+!C2Scene_DialObjLeft = !C2Tmp_00       ; 16-bit tiles left
+!C2Scene_DialList = !C2Tmp_10          ; 24-bit
+!C2Scene_DialObjSrc = !C2Tmp_13        ; 24-bit
+C2Scene_DialUploadObjTiles:
+    REP #$20
+.tile:
+    LDA.b [!C2Scene_DialList]
+    INC.b !C2Scene_DialList
+    AND.w #!Eng_LowByteMask
+    XBA
+    LSR A
+    LSR A
+    LSR A                               ; * 32 (C=0)
+    ADC.b !C2Scene_DialObjSrc
+    STA.b !C2Scene_DialSrc
+    SEP #$20
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.b !C2Scene_DialVram
+    STX.w VMADDL
+    LDX.b !C2Scene_DialSrc
+    STX.w A1T7L
+    LDA.b !C2Scene_DialObjSrc+2
+    STA.w A1B7
+    LDX.w #!C2Scene_TileBytes
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    REP #$20
+    CLC
+    LDA.b !C2Scene_DialVram
+    ADC.w #!C2Scene_TileWords
+    STA.b !C2Scene_DialVram
+    DEC.b !C2Scene_DialObjLeft
+    BNE .tile
+    SEP #$20
+    RTS
+
+; $C2:7321 — C2Scene_DialObjTileList (64 bytes, $7321–$7360)
+; The tiles of pack 0 that become sprite tiles 0-$3F
+; (C2Scene_DialUploadObjTiles).
+C2Scene_DialObjTileList:
+    db $12,$13,$14,$15,$1A,$1B,$1C,$1D,$06,$07,$08,$09,$0A,$0B,$22,$23
+    db $16,$17,$18,$19,$1E,$1F,$20,$21,$0C,$0D,$0E,$0F,$10,$11,$28,$29
+    db $24,$25,$26,$27,$00,$00,$00,$00,$00,$00,$00,$2E,$2F,$30,$31,$32
+    db $2A,$2B,$2C,$2D,$00,$01,$02,$03,$04,$05,$00,$00,$00,$00,$33,$00
+
+; $C2:7361 — C2Scene_DialUnpackNibbles (40 bytes, $7361–$7388)
+; Splits the C2Scene_DialNibbleBytes bytes at C2SceneRom_DialNibbles
+; into two bytes each, high nibble first, written through WMDATA to
+; C2Scene_DecompBuf: one byte per pixel, as mode-7 tiles take them.
+; Callers (1 JSR site): C2Scene_DialLoad ($C2:740E).
+; Entry: M=1, X=0, DP=$0000 (TDC loads 0), DB=$00 (registers absolute)
+; Exit:  M=1, X=0; A = the last low nibble (B = 0), X =
+;        C2Scene_DialNibbleBytes, Y = the last byte; WMADD past the data
+; No calls.
+C2Scene_DialUnpackNibbles:
+    TDC
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w WMADDL
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w WMADDH
+    LDX.w #$0000
+.byte:
+    LDA.l !C2SceneRom_DialNibbles,X
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.w WMDATA
+    TYA
+    AND.b #!C2Scene_DialNibbleMask
+    STA.w WMDATA
+    INX
+    CPX.w #!C2Scene_DialNibbleBytes
+    BNE .byte
+    RTS
+
+; $C2:7389 — C2Scene_DialLoad (209 bytes, $7389–$7459)
+; Loads the dial and starts its tasks:
+; - pack 0 (bank C2Scene_DialPack0Bank) into C2Scene_DecompBuf; its
+;   $800 bytes from C2Scene_DialObjSrcB to sprite tiles $40 on (VRAM
+;   C2Scene_DialObjVramB), and the 64 tiles of C2Scene_DialObjTileList
+;   to sprite tiles 0-$3F (C2Scene_MapObjVram, C2Scene_DialUploadObjTiles);
+; - pack 1 (palettes) into C2Scene_PaletteStage; copied to
+;   C2Scene_UnkC000 (the source of the palette loads in
+;   C2Scene_ScrDialCentre and C2Scene_ScrDialPalCycle); colour
+;   C2Scene_DialWhiteColor of the stage = $FFFF; the stage copied to
+;   C2Scene_PaletteBuf;
+; - pack 2 into C2Scene_DecompBuf, uploaded as the mode-7 map
+;   (C2Scene_DialUploadMap); then the tile pixels from
+;   C2SceneRom_DialNibbles (C2Scene_DialUnpackNibbles,
+;   C2Scene_DialUploadPixels);
+; - starts C2Scene_TaskDial, the scripts C2Scene_ScrDialCentre and
+;   C2Scene_ScrDialPalCycle, C2Scene_TaskSwirl, seven
+;   C2Scene_TaskDialMark with .Sel 0-6 (set in the record they copy,
+;   C2Scene_TaskCur's, and put back after), and C2Scene_ScrDialFadeIn.
+; Callers (1 JSR site): C2Scene_Dial ($C2:6A8A).
+; Entry: M=1, X=0, DP=$0000, DB=$00 (registers and low WRAM);
+;        C2Scene_TaskCur = record 0 (C2Scene_TaskClearAll); NMI and DMA
+;        off
+; Exit:  as C2Scene_TaskSpawnScript (M=1, X=0); A, X, Y clobbered;
+;        C2Tmp_00-$15 changed
+; Calls: C2Scene_DialUnpack, C2Scene_DialUploadObjTiles,
+;   C2Scene_DialUploadMap, C2Scene_DialUnpackNibbles,
+;   C2Scene_DialUploadPixels, C2Scene_TaskSpawn, C2Scene_TaskSpawnScript
+;   (JMP at the end).
+!C2Scene_DialMarksLeft = !C2Tmp_01     ; 8-bit
+!C2Scene_DialSavedSel = !C2Tmp_0A      ; 8-bit: record 0's .Sel byte before the loop
+C2Scene_DialLoad:
+    STZ.b !C2Scene_DialPackNum
+    LDA.b #!C2Scene_DialPack0Bank
+    JSR C2Scene_DialUnpack
+    LDX.w #!C2Scene_DialObjVramB
+    STX.w VMADDL
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDX.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STX.w DMAP7
+    LDX.w #!C2Scene_DialObjSrcB&$FFFF
+    STX.w A1T7L
+    LDA.b #bank(!C2Scene_DialObjSrcB)
+    STA.w A1B7
+    LDX.w #!C2Scene_DialObjBytesB
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    LDX.w #!C2Scene_MapObjVram
+    STX.b !C2Scene_DialVram
+    LDX.w #C2Scene_DialObjTileList
+    STX.b !C2Scene_DialList
+    LDA.b #bank(C2Scene_DialObjTileList)
+    STA.b !C2Scene_DialList+2
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.b !C2Scene_DialObjSrc
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.b !C2Scene_DialObjSrc+2
+    LDX.w #!C2Scene_DialObjTiles
+    STX.b !C2Scene_DialObjLeft
+    JSR C2Scene_DialUploadObjTiles
+    LDA.b #1
+    STA.b !C2Scene_DialPackNum
+    LDA.b #!C2Scene_DialPack12Bank
+    JSR C2Scene_DialUnpack
+    REP #$20
+    PHB
+    LDX.w #!C2Scene_PaletteStage&$FFFF
+    LDY.w #!C2Scene_UnkC000&$FFFF
+    LDA.w #!C2Scene_PaletteBytes-1
+    MVN bank(!C2Scene_UnkC000),bank(!C2Scene_PaletteStage) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!C2Scene_DialWhite
+    STA.l !C2Scene_PaletteStage+(!C2Scene_DialWhiteColor*2)
+    LDX.w #!C2Scene_PaletteStage&$FFFF
+    LDY.w #!C2Scene_PaletteBuf
+    LDA.w #!C2Scene_PaletteBytes-1
+    MVN !Bank00,bank(!C2Scene_PaletteStage) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    INC.b !C2Scene_DialPackNum
+    LDA.b #!C2Scene_DialPack12Bank
+    JSR C2Scene_DialUnpack
+    JSR C2Scene_DialUploadMap
+    JSR C2Scene_DialUnpackNibbles
+    JSR C2Scene_DialUploadPixels
+    LDX.w #C2Scene_TaskDial
+    JSR C2Scene_TaskSpawn
+    LDA.b #bank(C2Scene_ScrDialCentre)
+    LDX.w #C2Scene_ScrDialCentre
+    JSR C2Scene_TaskSpawnScript
+    LDA.b #bank(C2Scene_ScrDialPalCycle)
+    LDX.w #C2Scene_ScrDialPalCycle
+    JSR C2Scene_TaskSpawnScript
+    LDX.w #C2Scene_TaskSwirl
+    JSR C2Scene_TaskSpawn
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_DialTask.Sel,X
+    STA.b !C2Scene_DialSavedSel
+    STZ.w C2Scene_DialTask.Sel,X
+    LDA.b #!C2Scene_DialMarks
+    STA.b !C2Scene_DialMarksLeft
+.mark:
+    LDX.w #C2Scene_TaskDialMark
+    JSR C2Scene_TaskSpawn
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_DialTask.Sel,X
+    DEC.b !C2Scene_DialMarksLeft
+    BNE .mark
+    LDA.b !C2Scene_DialSavedSel
+    STA.w C2Scene_DialTask.Sel,X
+    LDA.b #bank(C2Scene_ScrDialFadeIn)
+    LDX.w #C2Scene_ScrDialFadeIn
+    JMP C2Scene_TaskSpawnScript
+
+; $C2:745A — C2Scene_DialSelLoc (32 bytes, $745A–$7479)
+; A = the Loc_Id word of marker .Sel (task X) in C2Scene_DialLocs, or in
+; C2Scene_DialLocsLate once C2Scene_Flag0Copy is C2Scene_DialLateFlag
+; or more.
+; Callers (2 JSR sites): C2Scene_DialInput ($C2:6BC5) and C2Scene_DialTurn ($C2:6C20).
+; Entry: M any (SEP #$20 here), X=0 with X = the dial task, DP=$0000,
+;        DB=$00 (low WRAM)
+; Exit:  M=0, X=0; A = the location; Y = .Sel * 2; X unchanged;
+;        C2Tmp_10-$12 = the list
+; No calls.
+!C2Scene_DialListPtr = !C2Tmp_10       ; 24-bit
+C2Scene_DialSelLoc:
+    SEP #$20
+    TDC
+    LDY.w #C2Scene_DialLocs
+    LDA.w !C2Scene_Flag0Copy
+    CMP.b #!C2Scene_DialLateFlag
+    BCC .early
+    LDY.w #C2Scene_DialLocsLate
+.early:
+    STY.b !C2Scene_DialListPtr
+    LDA.b #bank(C2Scene_DialLocs)
+    STA.b !C2Scene_DialListPtr+2
+    LDA.w C2Scene_DialTask.Sel,X
+    ASL A
+    TAY
+    REP #$20
+    LDA.b [!C2Scene_DialListPtr],Y
+    RTS
+
+; $C2:747A — C2Scene_DialFindLoc (52 bytes, $747A–$74AD)
+; A = the marker (0-6) whose location in the list C2Scene_DialSelLoc
+; would use is Loc_Id AND C2Scene_LocIdMask; 6 when none is.
+; Callers (1 JSR site): C2Scene_DialInit ($C2:6ADC).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$00 (low WRAM)
+; Exit:  M=1, X=0; A = the marker (B = 0); X = 7 - the marker when
+;        found, else 0; Y = the marker * 2; C2Tmp_10-$12 = the list
+; No calls.
+C2Scene_DialFindLoc:
+    SEP #$20
+    TDC
+    LDY.w #C2Scene_DialLocs
+    LDA.w !C2Scene_Flag0Copy
+    CMP.b #!C2Scene_DialLateFlag
+    BCC .early
+    LDY.w #C2Scene_DialLocsLate
+.early:
+    STY.b !C2Scene_DialListPtr
+    LDA.b #bank(C2Scene_DialLocs)
+    STA.b !C2Scene_DialListPtr+2
+    REP #$20
+    LDX.w #!C2Scene_DialMarks
+    LDY.w #$0000
+.find:
+    LDA.w !DP_Field+!Loc_Id
+    AND.w #!C2Scene_LocIdMask
+    CMP.b [!C2Scene_DialListPtr],Y
+    BEQ .found
+    INY
+    INY
+    DEX
+    BNE .find
+    DEY                                 ; none: the last entry
+    DEY
+.found:
+    TYA
+    LSR A
+    SEP #$20
+    RTS
+
+; $C2:74AE — C2Scene_ScrDialFadeIn (5 bytes, $74AE–$74B2)
+; Started last by C2Scene_DialLoad: fade in at 1 frame per step, wait 16
+; frames, end.
+C2Scene_ScrDialFadeIn:
+    db $29,$01                  ; C2Script_SpawnUnk2105 (fade in), 1 frame per step
+    db $38,$10                  ; C2Script_Wait, 16 frames
+    db $52                      ; C2Script_End
+
+; $C2:74B3 — C2Scene_ScrDialFadeOut (5 bytes, $74B3–$74B7)
+; Started by C2Scene_Dial when the mode changes: fade out at 1 frame per
+; step, wait 16 frames, end.
+C2Scene_ScrDialFadeOut:
+    db $28,$01                  ; C2Script_SpawnUnk20A2 (fade out), 1 frame per step
+    db $38,$10                  ; C2Script_Wait, 16 frames
+    db $52                      ; C2Script_End
+
+; $C2:74B8 — C2Scene_ScrDialCentre (76 bytes, $74B8–$7503)
+; Started by C2Scene_DialLoad: a large sprite (.SprTile bit 14:
+; C2Scene_SprTileLarge in the high byte) at (C2Scene_DialCentreX + 4,
+; $60) with priority bits $30 and palette bits 8, animation $36; then
+; for good: palette 12 loaded at once from the next of seven 32-byte
+; rows of C2Scene_UnkC000 ($7E:C1E0 down to $7E:C120), with 8 frames of
+; the animation between (probably a colour cycle).
+C2Scene_ScrDialCentre:
+    db $00                      ; C2Script_ResetTask
+    db $0E,$11,$40              ; C2Script_OrTaskByte: .SprTile+1 |= C2Scene_SprTileLarge
+    db $02,$30                  ; C2Script_SetSprPriority
+    db $01,$08                  ; C2Script_SetSprPalette
+    db $2C : dw $0088,$0060     ; C2Script_SetPosition: X $88, Y $60
+    db $30,$36                  ; C2Script_SetAnim
+    db $39                      ; C2Script_WaitAnimating, 8 frames (its argument is the
+.loop:                          ; byte C2Script_Jump's target is one before)
+    db $08
+    db $04 : dl $7EC1E0 : db $0C,$00 ; C2Script_SpawnUnk1DD4: palette 12 from $7E:C1E0, at once
+    db $39,$08                  ; C2Script_WaitAnimating, 8 frames
+    db $04 : dl $7EC1C0 : db $0C,$00
+    db $39,$08
+    db $04 : dl $7EC1A0 : db $0C,$00
+    db $39,$08
+    db $04 : dl $7EC180 : db $0C,$00
+    db $39,$08
+    db $04 : dl $7EC160 : db $0C,$00
+    db $39,$08
+    db $04 : dl $7EC140 : db $0C,$00
+    db $39,$08
+    db $04 : dl $7EC120 : db $0C,$00
+    db $39,$08
+    db $1A : dw .loop           ; C2Script_Jump: goes on at .loop + 1
+
+; $C2:7504 — C2Scene_ScrDialPalCycle (73 bytes, $7504–$754C)
+; Started by C2Scene_DialLoad: for good, palette 0 faded (12 frames per
+; step) to the next of seven 32-byte rows of C2Scene_UnkC000 ($7E:C020
+; to $7E:C0C0, then $7E:C000), 384 frames apart.
+C2Scene_ScrDialPalCycle:
+    db $04 : dl $7EC020 : db $00,$0C ; C2Script_SpawnUnk1DD4: palette 0 from $7E:C020, rate 12
+    db $38,$C0                  ; C2Script_Wait, 192 frames
+    db $38,$C0
+    db $04 : dl $7EC040 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $04 : dl $7EC060 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $04 : dl $7EC080 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $04 : dl $7EC0A0 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $04 : dl $7EC0C0 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $04 : dl $7EC000 : db $00,$0C
+    db $38,$C0
+    db $38,$C0
+    db $1A : dw C2Scene_ScrDialPalCycle-1 ; C2Script_Jump: goes on at the start
 
 ; ============================================================
 ; Scene extra-graphics loaders ($C2:7B5A–$C2:7BC3)

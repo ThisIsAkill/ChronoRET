@@ -58,8 +58,6 @@ Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (tabl
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C26A34
-C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
 org $C2800E
 BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
                     ; at $0A01, forced blank, then the menu (not matched)

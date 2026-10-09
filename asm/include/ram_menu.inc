@@ -662,4 +662,45 @@ struct C2Scene_ZoomTask $0000
             skip $16
 endstruct
 
+; --- The dial (C2Scene_Dial, scene mode 8) ---
+!C2Scene_DialSel = $1BB7                 ; 8-bit; the marker the hand rests on (C2Scene_DialInit/Turn);
+                                         ; the marker tasks show the one it names
+!C2Scene_DialVerts = $1BB8               ; 6 B: the hand's three points, X then Y (C2Scene_DialDrawHand)
+!C2Scene_DialEdgeActive = $1BC4          ; 3 words each, one per edge of the hand: non-zero while drawn
+!C2Scene_DialEdgeSlope = $1BCA           ; signed X step per line, 8.8
+!C2Scene_DialEdgeTop = $1BD0             ; top line in the high byte
+!C2Scene_DialEdgeBottom = $1BD6          ; last line in the high byte
+!C2Scene_DialEdgeX = $1BDC               ; X, 8.8
+!C2Scene_DialEdgeLines = $1BE2           ; lines left - 1 (the low byte counts)
+!C2Scene_DialFlags = $1BF5               ; 8-bit; buffer flags C2Scene_DialHandBuf/SwirlBuf/FlagBit2
+!C2Scene_DialDest = $02AF                ; 16-bit; the Loc_Id the dial picked, or C2Scene_DialNoDest on a
+                                         ; cancel (who reads it is not traced)
+!C2Scene_HandBufA = $7E8B56              ; the two hand buffers: WH0/WH1 per line (C2Scene_HdmaBufBytes)
+!C2Scene_HandBufB = $7E8DF6
+!C2Scene_SwirlCosA = $7E9176             ; the swirl's M7A/M7D values per line, buffer A
+!C2Scene_SwirlCosB = $7E9416             ; and buffer B
+!C2Scene_SwirlSinA = $7E9796             ; its M7B/M7C values, buffer A
+!C2Scene_SwirlSinB = $7E9A36             ; and B
+
+struct C2Scene_DialTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state
+            skip $11   ; +$03-$13
+.Target:    skip 2     ; +$14 (= .SprX) the hand angle being turned to
+            skip 2
+.Pos:       skip 2     ; +$18 (= .SprY) the hand's angle now
+            skip 6
+.Vel:       skip 2     ; +$20 (= .YVel) hand angle step per frame (+/- C2Scene_DialTurnStep)
+.Sel:       skip 1     ; +$22 marker 0-6 (also the marker tasks' own number)
+            skip $1D
+endstruct
+
+struct C2Scene_SwirlTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02
+            skip $15
+.Angle:     skip 2     ; +$18 angle of the next new line
+            skip $26
+endstruct
+
 endif

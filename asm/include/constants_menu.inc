@@ -530,4 +530,56 @@ if !constants_menu_inc == 0
 !C2Scene_MapLabelEarly = $6F             ; the replacement string
 !C2Scene_MapLabelGlyphs = $0C            ; TextWin_StepCount for the label's one TextWin_Step
 
+; --- The dial (C2Scene_Dial, scene mode 8) ---
+!C2Scene_ModeDial = 8                    ; C2Scene_Mode8: C2Scene_Dial runs while the mode stays this
+!C2Scene_DialBg1X = $FF80                ; C2Scene_Bg1HScroll in the dial (-128)
+!C2Scene_DialBg1Y = $FF90                ; C2Scene_Bg1VScroll (-112)
+!C2Scene_M7OneHigh = $01                 ; high byte of 1.0 in a mode-7 matrix value
+!C2Scene_DialWobjsel = $20               ; WOBJSEL: window 1 makes the colour window
+!C2Scene_DialWinLayers = $11             ; TMW/TSW: BG1 and OBJ
+!C2Scene_DialGrey = $0F                  ; the fixed colour's red, green and blue intensity
+!C2Scene_DialFadeFrames = $12            ; frames C2Scene_Dial waits after the start and after its fade out
+!C2Scene_DialCentreX = $84               ; screen point the hand turns about
+!C2Scene_DialCentreY = $70
+!C2Scene_WinEmpty = $0001                ; WH0 = 1, WH1 = 0 as a word: left past right, an empty window
+!C2Scene_HdmaBufBytes = $01C0            ; 224 lines of one word (the hand and swirl buffers)
+!C2Scene_HdmaHalfBytes = $00E0           ; the 112 lines of one HDMA run
+!C2Scene_HdmaLastLine = $01BE            ; byte offset of line 223's word
+!C2Scene_ScreenLines = $00E0             ; 224 visible lines
+!C2Scene_DialBtnBack = $0010             ; Pad_Unk00F8 bits (as a word) the dial reads: bit 4 turns
+!C2Scene_DialBtnFwd = $0020              ; back, bit 5 forward (as Right/Up and Left/Down),
+!C2Scene_DialBtnOk = $0080               ; bit 7 confirms, bit 3 cancels
+!C2Scene_DialBtnCancel = $0008
+!C2Scene_DialTurnStep = 4                ; hand angle units per frame
+!C2Scene_DialMarks = 7                   ; markers (and C2Scene_DialLocs entries)
+!C2Scene_DialLastSel = 6
+!C2Scene_DialNoDest = $FFFF              ; C2Scene_DialDest after a cancel
+!C2Scene_DialSfxSame = $01               ; C2Scene_SoundCmd18 argument when the current location is picked
+!C2Scene_DialLateFlag = $CC              ; C2Scene_Flag0Copy from which C2Scene_DialLocsLate is used
+!C2Scene_DialHandBuf = $01               ; C2Scene_DialFlags bit 0: C2Scene_HandBufB is on screen
+!C2Scene_DialSwirlBuf = $02              ; bit 1: the swirl's B buffers are on screen
+!C2Scene_DialFlagBit2 = $04              ; bit 2: cleared by C2Scene_SwirlInit, not otherwise used here
+!C2Scene_HandClearFrom = $0090           ; C2Scene_DialDrawHand's clear: from line 72's word
+!C2Scene_HandClearCount = $009D          ; MVN count - 1: lines 73-151
+!C2Scene_HandPointCount = 3              ; points (and edges) of the hand
+!C2Scene_SwirlPhase = $0080              ; added to the angle for the M7B/M7C sine (1/8 turn)
+!C2Scene_SwirlLineStep = 4               ; angle units per line (and per frame)
+!C2Scene_DialMarkAttr = $B0              ; C2Scene_Task.SprAttr of the markers: C2Scene_SprAttrScroll
+                                         ; and priority 3
+!C2Scene_DialPack0Bank = $C3             ; source bank of C2Scene_DialPacks entry 0
+!C2Scene_DialPack12Bank = $C6            ; and of entries 1 and 2
+!C2Scene_DialObjVramB = $6400            ; sprite tile $40
+!C2Scene_DialObjSrcB = $7F9800           ; pack 0 from $800 on: sprite tiles $40-$7F
+!C2Scene_DialObjBytesB = $0800
+!C2Scene_DialObjTiles = $0040            ; entries of C2Scene_DialObjTileList
+!C2Scene_DialWhite = $FFFF               ; the colour C2Scene_DialLoad stores
+!C2Scene_DialWhiteColor = $D1            ; at this colour of C2Scene_PaletteStage
+!C2Scene_DialPixelBytes = $0800          ; mode-7 tiles 0-31, 64 pixels each
+!C2Scene_DialMapRows = $20               ; rows of one 32 x 32 block
+!C2Scene_DialMapRowBytes = $0040         ; bytes (words) of one row
+!C2Scene_DialMapBlockCount = 16
+!C2SceneRom_DialNibbles = $C6F700        ; $400 B: two 4-bit pixels per byte, high first
+!C2Scene_DialNibbleBytes = $0400
+!C2Scene_DialNibbleMask = $0F
+
 endif
