@@ -5381,7 +5381,8 @@ IrqHandler:
 ; One job per call: a step queued with an animation waits for the next
 ;   IRQ that runs this.
 ; Callers (1 JSR site): IrqHandler ($C0:ED03).
-; On entry: M=1 (8-bit A), X any (not used), DP any (set here), DB=$00
+; On entry: M=1 (8-bit A), X=0 (16-bit X for Irq_UnkF05E; IrqHandler
+;   sets it), DP any (set here), DB=$00
 ;   (VMAIN/VMADDL/VMDATAL and TileAnim_VramAddrs absolute; the
 ;   metatiles long).
 ; Exit: M=1, DP = DP_Field, DB unchanged; A clobbered; X and Y as
@@ -8747,7 +8748,7 @@ org $C01F87
 ;   0, Field_Unk26 = 0 and Field54_WatchBox in Field_Unk54 cleared.
 ; - $0E and up: nothing.
 ; Quirk: the opening test loads FieldMsg_OpenSize and decrements it
-;   before each compare (the target is $28); kept as found.
+;   once (A = $28) before up to five compares; kept as found.
 ; Callers (1 JSL site): GameLoop_FrameBody ($C0:00AD).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: Field_Unk34 and the
 ;   callees' word loads), DP=$0100 (the Field_* bytes are dp), DB=$00
@@ -9572,16 +9573,18 @@ org $C02E67
 ; Event opcode $AA (2 bytes: $AA, row): Obj_Cur's Obj_AnimRow = row,
 ;   Obj_AnimMode = Obj_AnimModeNormal (1), and Obj_AnimTimer,
 ;   ObjX_AnimLoops and Obj_AnimColumn = 0 (the row starts over at once);
-;   X = Y + 1, C=1. Evt_SetAnimRow does this with A = the row (Y = the
-;   opcode for the one-byte opcodes $B3/$B4); Evt_SetAnimMode with A =
-;   the mode and X = Obj_Cur (Evt_OpAE_AnimReset).
+;   X = the opcode + 2 (Y + 1 via the sub-entries), C=1. Evt_SetAnimRow
+;   does this with A = the row (Y = the opcode for the one-byte
+;   opcodes $B3/$B4); Evt_SetAnimMode with A = the mode and X = Obj_Cur
+;   (Evt_OpAE_AnimReset).
 ; Reached through Evt_OpcodeTable (opcode $AA).
 ; Callers note: Evt_SetAnimRow is branched to (BRA) by Evt_OpB3_AnimRow0
 ;   and Evt_OpB4_AnimRow1, Evt_SetAnimMode by Evt_OpAE_AnimReset.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
 ;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
-; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the next opcode), C=1;
-;   A = 0; Y = the opcode + 1 here, unchanged through the sub-entries.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2 (the next
+;   opcode; Y + 1 via the sub-entries), C=1; A = 0; Y = the opcode + 1
+;   here, unchanged through the sub-entries.
 ; ------------------------------------------------------------
 Evt_OpAA_SetAnimRow:
     INY
@@ -23935,7 +23938,7 @@ Party_AnimTable:
 ; Party_AnimTable handlers for the four straight directions: Obj_Cur's
 ;   Obj_Facing = the direction, then Party_AnimWalk (walk row) or
 ;   Party_AnimRun (run row). Eight of them, 10 bytes each: Left / Right
-;   / Up / Down walk ($A079-$A09E), then Left / Right / Up / Down run
+;   / Up / Down walk ($A079-$A0A0), then Left / Right / Up / Down run
 ;   ($A0A1-$A0C8); the seven after this one are sub-entries with this
 ;   header.
 ; Callers note: Party_AnimTable entries 3 (this one), 1
