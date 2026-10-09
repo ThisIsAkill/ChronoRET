@@ -77,17 +77,25 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleSys_LoadTechUsers`, `BattleSys_StoreMpCost`/`10`/`18`, `BattleSys_AdjustMpCost`,
    `BattleSys_PayTechMp`) and the setup helpers `$C1:CDFF`-`$C1:CFBD` (`BattleSys_UnkCDFF`,
    `BattleSys_UnkCE36`/`CE3A`, `BattleSys_UnkCF15`, `BattleSys_UnkCF52`, `BattleSys_UnkCF69`).
-   Next, in reach order: `BattleSys_UnkC1DD` (`$C1:C1DD`-`$C1:C8F6`, 1,818 B: the item / tech
-   target resolution B967 calls; fills `!Battle_UnkAD8D`/`AD8E`, sets `!Battle_UnkAF23`; part of
-   it, `$C1:C731`-`$C1:C82C`, is reached only through the 7-word table at `$C1:C95C` with
-   `JSR ($C95C,X)` at `$C1:C732`) with `$C1:C8F7`; `BattleSys_UnkD523` (`$C1:D523`-`$C1:D74E`,
-   after `BattleSys_UnkBF79`) and `BattleSys_UnkD490`/`D4AD`/`D4D6` (the item effect dispatch of
-   `BattleSys_UnkBF46`); the script handlers themselves (stubs `BattleAi_TestNN`
+   Also matched (the action-effect batch): the fixed-fraction scalers `Battle_Scale*`
+   (`$C1:C02A`-`$C1:C1DC`), the target resolution `BattleSys_UnkC1DD` with
+   `BattleSys_MapEmptyTarget` and `BattleSys_AreaParamTable` (`$C1:C1DD`-`$C1:C90A`, `$C1:C95C`),
+   the effect-record loaders `BattleSys_EffRec*` (`$C1:D132`-`$C1:D1D2`) and item-record loaders
+   `BattleSys_LoadEffectArg*` (`$C1:D1D3`-`$C1:D220`), the effect types `BattleSys_Effect00`-`08`,
+   `EffectNone` and `Effect29`-`2C` with `BattleSys_StoreTargetCmd` (`$C1:D221`-`$C1:D522`), the
+   tech part runner `BattleSys_RunTechParts`, `BattleSys_CheckTechMp` and the enemy runners
+   `BattleSys_UnkD7C4`/`D8D1` (`$C1:D523`-`$C1:D9D6`), `BattleSys_EffectTable` /
+   `BattleSys_TechMpCostTable` (`$C1:D9D7`-`$C1:DA36`), and the helpers `BattleSys_CasterHitOffset`,
+   `BattleSys_RecordMiss`, `BattleSys_UnkE976`, `BattleSys_LoadCasterStats`/`LoadTargetStats`
+   (`$C1:E8C0`-`$C1:E9D4`), `BattleSys_CopyEffectBytes78` (`$C1:EB0E`) and `Battle_SumHitSets`
+   (`$C1:EB68`). Next, in reach order: the effect arithmetic the effect types call, `$C1:DA37` on
+   (stubs `BattleSys_UnkDA37`/`DB5E`/`DBAA`/`DC64`/`DCAD`/`DE87`/`DE9E`/`DEF0`/`E0F5`/`E65F`/
+   `E77B`/`E9D5`; the `Battle_Scale*` callers sit in `$C1:E1E9`-`$C1:EE44`); `$C1:CFBE`-`$C1:D131`
+   (`BankC1_RunService` and its table `$C1:D126`, `BankC1_AddItem`/`AddGold`); the script handlers themselves (stubs `BattleAi_TestNN`
    `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
-   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callees
-   `BattleSys_UnkD7C4`/`D8D1`, `$C1:AF79` (a second Battle_RandRange on
+   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callee `$C1:AF79` (a second Battle_RandRange on
    `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
-   `$C1:C02A` (math, from `$C1:E2C0`); the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
+   the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
    (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
    `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
    and service 0
@@ -106,7 +114,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    service 6 does with `!Battle_UnkAEB3` (the defeated enemies' exit, probably), whether
    BattleAct_LoadKind3 is the item loader (B967's item path uses kind 3 with id - $BC; its
    verified header still says unknown), and why BattleSys_ResetTechUsers' first user divides
-   by a stale `!Battle_MathB`. Stale from the PC-command batch (verified headers, fix at their
+   by a stale `!Battle_MathB`. Open from the action-effect batch: what the effect types and the
+   effect record bytes stand for (the arithmetic is unmatched), `!Battle_UnkB200` (bit 7 after a
+   miss stops a tech's parts with the `$7E:B1F5` read, probably meant as BattleRom_TechRec.Flags),
+   the bytes read long at `$00:00FA`/`$00:00FB` by target mode 9 (whose roll is compared through
+   a restored `!Battle_MathLo`, a quirk), `!Battle_UnkAE6D` (BattleSys_MapEmptyTarget's
+   replacement slots), `!Battle_UnkAE4D`'s bits, and the enemy record tables' true base
+   (`!BattleRom_UnkCC6FCB` - 2). Headers edited by that batch (back to review): BattleSys_LoadTechUsers
+   (Callers note), BattleSys_UnkBF46, BattleSys_UnkBF79, BattleAi_EnemyTurn. Stale from the PC-command batch (verified headers, fix at their
    next edit): Battle_SetupBattle's header calls the `$C1:C96A`-`$C1:CF15` group "not analysed"
    (now matched); Battle_Mul16's example sites `$C1:B329`/`$C1:B455`/`$C1:B4BC` are now in
    BattleSys_UpdateKo / BattleSys_UnkB442 / BattleAi_PickScript. Stale after an earlier batch (verified headers, fix at their next
