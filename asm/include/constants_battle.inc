@@ -976,4 +976,28 @@ if !constants_battle_inc == 0
 !Battle_AltBoostMaxArg   = 1      ; BattleSys_HitModAltBoost: DP $1E value that makes the amount 9999
 !Battle_AltBoostMul      = 2      ; ... else the amount x this
 
+
+; --- Experience and tech points ($C1:F205-$C1:FA60) ---
+!Battle_TotalCapHi       = $98    ; the 24-bit experience / tech point totals: cap 9,999,999 = $98967F, high byte
+!Battle_TotalCapLo       = $967F  ; ... its low word
+!Battle_TotalCapLoOver   = $9680  ; ... BattleSys_AddExp: a low word from this up becomes !Battle_TotalCapLo
+!Battle_LevelMax         = 99     ; the highest level
+!Battle_GrowStatMax      = 99     ; BattleSys_LevelUpStep: the cap of .Unk0B-.Unk11
+!Battle_GrowStat0DMax    = 50     ; ... and of .Unk0D
+!Battle_GrowDiv          = 100    ; ... the growth is the record byte x (level - 1) / this
+!Battle_StatGrowthSize   = 7      ; bytes per !BattleRom_StatGrowth record
+!Battle_MaxMpCap         = 99     ; BattleSys_GrowHpMp: the max MP cap
+!Battle_ReserveExpMul    = 15     ; BattleSys_AwardReserveExp: a character not in the battle gets x 15 / 20
+!Battle_ReserveExpDiv    = 20
+!Battle_ComboMsgListLen  = 10     ; bytes of !Battle_UnkB305 BattleSys_AwardTechPoints sets to $FF
+!Battle_ComboKinds       = 4      ; !Battle_ComboMasks entries (three pairs, one trio)
+!Battle_ComboRecSize     = 5      ; bytes per !BattleRom_ComboTechs record
+!Battle_ComboReqSize     = 3      ; bytes per tech in a record's requirement list (one per member)
+!Battle_ComboDouble      = 2      ; members of a double tech (message 6)
+!Battle_ComboTriple      = 3      ; members of a triple tech (message 7)
+!Battle_ComboNone        = $FF    ; a !BattleRom_ComboTechs record's first tech id: no techs
+!Battle_TechBit0         = $80    ; the first tech's bit in a !Battle_TechBits1/2/3 byte (the next ones follow down)
+!Battle_TechNeedsUnlock  = $80    ; BattleRom_TechRec.UserSet bit 7: the tech needs the character's !Battle_Unk7F01E0 bit
+!Battle_Unk2FAllTechs    = $10    ; BattlerStats.Unk2F bit 4: all the PC's single techs are learned
+
 endif

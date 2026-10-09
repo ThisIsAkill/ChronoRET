@@ -286,8 +286,6 @@ org $C1EA9D
 BattleSys_UnkEA9D:                      ; JSR from BattleSys_Main's end paths; not analysed
 org $C1EAE8
 BattleSys_UnkEAE8:                      ; JSR from BattleSys_Main's end paths; not analysed
-org $C1F93E
-BattleSys_UnkF93E:                      ; JSR from BattleSys_Main's victory path after the gold; not analysed
 
 ; --- Bank $C3 ---
 

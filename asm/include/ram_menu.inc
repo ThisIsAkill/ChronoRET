@@ -52,7 +52,8 @@ if !ram_menu_inc == 0
                                          ; colour set Pal_LoadUnkRow0 loads and Field_UploadUnk1F00's graphics set
 !Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
                                          ; to C2Scene_Unk02AE; use unknown
-!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; use unknown
+!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; low byte bit 7 - n:
+                                         ; character n is recruited, probably (BattleSys_AwardReserveExp)
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 

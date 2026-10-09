@@ -718,10 +718,13 @@ BattleFD_UnkAD09:
 ;     at !Battle_UnkB3CE (arg 1 = the entry) up to an $FF or the eighth;
 ;     6 when bit 2 is set, once per entry of !Battle_UnkB305 up to an $FF
 ;     (arg 0 = the entry); 7 when bit 1 is set (arg 0 = !Battle_UnkB310).
-; The bits are set elsewhere (not traced). Messages 2 and 3 show the
-; gold and items BattleSys_Main pays; 0, 1 and 4-7 probably show the
-; other rewards (experience, tech points, level-ups, new techs; not
-; traced).
+; Messages 2 and 3 show the gold and items BattleSys_Main pays; the
+; bits and lists of 0, 1 and 4-7 are set by BattleSys_AwardExpAndTp and
+; its callees (BattleSys_ApplyExpStep: bit 7 and !Battle_UnkB2B0 /
+; B311, level-ups; BattleSys_TryNextTech: bit 4; BattleSys_LearnSingleTech
+; / LearnComboTechs: !Battle_UnkB2B3 and the lists, new techs), so they
+; probably show the experience, tech points, level-ups and new single,
+; double and triple techs.
 ; Quirks: message 1 tests only the low 16 bits (LDX sets Z), so a sum
 ; of exactly a multiple of $10000 shows nothing; message 3 writes its
 ; argument to $7F:0200, not $7E:0200 like the others (whether
