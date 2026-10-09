@@ -1,0 +1,12 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:BF46,BattleSys_UnkBF46,2026-10-09,rev94a,approved,18d2f86456bd,"Fix ok: only RestoreHpMp ($DA37-$DB5D) writes DP $00 among Effect29/2A/2B callees (traced); 8-bit *4 wrap, bit 7/2/6 order, $BC item offset, M/X/DP/DB checked."
+$C1:CFE9,BankC1_FindItem,2026-10-09,rev94a,approved,86ba38775f1c,"Callers note ok: ROM table $C1:D126 word 0 = $CFE9, JSR (tbl,X) at $C1:CFE1 in RunService. Rest of header checked: Y=0 path, X=$100 on miss, A = id."
+$C1:D005,BankC1_AddItem,2026-10-09,rev94a,approved,f1715f4cbfaa,"Callers note ok: ROM table entry 1 = $D005. Header checked: 99 cap (BCS), first-empty slot, entry-0 overwrite quirk, Exit X/SvcSlot. nit: Exit could say X unchanged for Y=0."
+$C1:D056,BankC1_RemoveItem,2026-10-09,rev94a,approved,cee4289c47af,"Callers note ok: ROM table entry 2 = $D056. Header checked: count 0 -> A=0, emptied -> id 0 and A=$FF, miss X=$100, Y=0 path."
+$C1:D086,BankC1_HasGold,2026-10-09,rev94a,approved,070525dcd4a5,"Callers note ok: ROM table entry 3 = $D086. Header checked: low word >= Y or high byte != 0 or Y=0 -> $FF; X = gold low word; B kept."
+$C1:D0A2,BankC1_AddGold,2026-10-09,rev94a,approved,a6294ec9700f,"Fix ok: carry with hi $98 gives hi $99, low <= $967E, set to $98xxxx; $98967F+30000 -> $980BAF = 9,964,463 verified. Note entry 4 = $D0A2 in ROM; cap, A/B checked."
+$C1:D0ED,BankC1_RemoveGold,2026-10-09,rev94a,approved,9b5e24498a9f,"Callers note ok: ROM table entry 5 = $D0ED. Header checked: borrow with hi 0 -> no change, A=0 (SvcSlot still written, as Exit says); else DEC hi, A=$FF, B=0."
+$C1:DCAD,BattleSys_ApplyDamage,2026-10-09,rev94a,approved,3cebfb689545,"Fix ok: BNE $DDCA, JMP $DE83 at $DDCC (M=0 to TDC/SEP). Formula via Mul16/Div32, 7/10 cuts, heal/lethal/survive paths, BEQ $DDDF and $DE3E cap quirks, Exit checked."
+$C1:DEF0,BattleSys_AdjustEvade,2026-10-09,rev94a,approved,8b3229489c78,"Fix ok: simulated Div32: C=1 leaves MathHi=$8000, q=diff/20, 2nd gives $6666 ($6667 at 240+); Mul16 ends C=0 so status cases leave MathHi 0. Status cases, Exit checked."
+$C1:E006,BattleSys_ArmStatusList,2026-10-09,rev94a,approved,a39672ed242d,"Fix ok vs ListHandler0-10: 0/3/4/5 clear their bits, 2 none, 1/8/9 never stop and test bit 6/bit 4/Unk4C+2|+7 bit 5. Bit-to-list map, dead byte-2 code, slot*$80 Y checked."
+$C1:E76E,BattleSys_RollUpTo1A,2026-10-09,rev94a,approved,7bd31fc23253,"Fix ok: $FE -> bound $FF = RandRange full-range 0-255; $FF wraps to 0 -> 0. Caller BattleSys_UnkB2CCHandler06 $C1:EE9F: LDA #$64 / JSR at $EEA3. PHX/PLX, Exit checked."
