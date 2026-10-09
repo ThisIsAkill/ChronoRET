@@ -504,7 +504,8 @@ endstruct
 !Menu_EquipListLen = $0FC6               ; 8-bit; how many it listed
 !Menu_ItemSortKeys = $7C00               ; 256 B: a sort key per item id (Menu_ListEquipItems sorts by it,
                                          ; largest first); Menu_BuildItemTables fills ids 0-$93 with
-                                         ; byte 0 of the item's record B
+                                         ; byte 0 of the item's record B; Menu_EquipStat* add it as the
+                                         ; weapon's power / armour sum (probably attack and defence)
 !Menu_PalBuf = $9480                     ; 512 B: the menu's CGRAM copy (Menu_UploadPalette)
 !Menu_PalDirty = $0D15                   ; 8-bit; non-zero: Menu_UploadPalette sends Menu_PalBuf (and zeroes it)
 !Menu_GradTable = $9DE9                  ; 32 B: Menu_GradientSteps copied by Menu_BuildGradient
@@ -569,13 +570,16 @@ struct Menu_CharRec $0000
 .Word5:     skip 2     ; (probably maximum HP)
 .Word7:     skip 2     ; Menu_CmdRefillByte7 copies .Word9's low byte here (probably MP)
 .Word9:     skip 2
-            skip 7
-.Unk12:     skip 2     ; Menu_ReadSlotSummary copies its low byte
-            skip $15
+.Stats:     skip 7     ; seven base stats (Menu_CharCalcStats adds the equipment boosts)
+.Unk12:     skip 2     ; Menu_ReadSlotSummary copies its low byte; Menu_AttackFormulaC indexes by it
+            skip $13
+.Unk27:     skip 1     ; equipment of category 2 (Menu_EquipSlotOffsets)
+.Unk28:     skip 1     ; ... category 1
 .Unk29:     skip 1     ; the weapon (Menu_EquipSlotOffsets category 0; Menu_WeaponRecSrc)
-.Unk2A:     skip 1     ; Menu_Unk82E1 looks for $AE-$B2 here
-            skip $14
-.Unk3F:     skip 2     ; Menu_Setup divides it by 10
+.Unk2A:     skip 1     ; the accessory (category 3); Menu_Unk82E1 looks for $AE-$B2 here
+            skip $0B
+.Derived:   skip 9     ; Menu_CharRecalc's copy of Menu_CurStats, Menu_CurAttack, Menu_CurDefense
+.Unk3F:     skip 2     ; ... and Menu_CurMaxHp; Menu_Setup divides it by 10
             skip $0F
 endstruct align $50
 
@@ -1052,6 +1056,16 @@ struct Menu_Spr $0000
 .LoopFrame:     skip 1
 .FrameData:     skip $1E ; the frame record's last .TileCount x 8 bytes
 endstruct
+
+; --- Menu character stats (Menu_CharRecalc) ---
+!Menu_EquipSlotIdx = $0DAD               ; 8-bit; the slot Menu_EquipSlotStats adds (3 down to 0)
+!Menu_StatBoosts = $0DAE                 ; 7 B: the equipment's boost per stat
+!Menu_WeaponPower = $0DB5                ; 8-bit; Menu_ItemSortKeys of the weapon
+!Menu_ArmorSum = $0DB6                   ; 8-bit; Menu_ItemSortKeys of categories 1 and 2, summed
+!Menu_CurStats = $9B1C                   ; 7 B: the current character's stats with boosts, capped
+!Menu_CurAttack = $9B23                  ; 8-bit; the formula's quotient (at most $FF)
+!Menu_CurDefense = $9B24                 ; 8-bit; stat 1 + Menu_ArmorSum (at most $FF)
+!Menu_CurMaxHp = $9B25                   ; 16-bit; .Word5 with the accessory bonus, at most 999
 
 ; --- Menu mode 0: the main menu ---
 !Menu_MainSel = $0411                    ; 8-bit; the main menu's icon (0-5); mode = it + 1 on confirm

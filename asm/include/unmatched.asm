@@ -38,10 +38,6 @@ org $FFF9C4
 BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves (DP=$0400) and Menu_LoadSlotSummaries (DP=0):
                     ; A and dp $00 = 0 or not for the slot at dp $79; probably checks a save slot in
                     ; SRAM and sets dp $7B to its offset (not analysed)
-org $C29137
-Menu_Unk9137:       ; JSR from Menu_RefreshAllChars after Menu_LoadCharRec (also from three other
-                    ; menu sites): works on Menu_CurCharRec, probably the character's derived stats
-                    ; (not analysed)
 org $FFF813
 BankFF_UnkF813:     ; JSL from Menu_BuildItemTables (not analysed)
 org $FFD024

@@ -26525,6 +26525,344 @@ Menu_CmdItemCount:
     RTS
 
 ; ============================================================
+; Menu character stats ($C2:9137–$C2:92F3)
+; ============================================================
+; Recomputes the current character's derived values (Menu_CurCharRec,
+; the copy Menu_LoadCharRec makes): seven stats from .Stats plus the
+; equipment's boosts, an attack value from the weapon by a per-character
+; formula, a defence sum, and the maximum HP word with an accessory
+; bonus. The names say what the code does; "attack", "defence" and "HP"
+; are probable meanings (the 999 cap, the use as sort keys), not proven.
+
+org $C29137
+; $C2:9137 — Menu_CharRecalc (55 bytes, $9137–$916D)
+; Menu_CharCalcStats; with accessory Menu_DoubleStat5Item, stat 5 is
+; doubled (ASL); then the record's .Word3 = Menu_CurCharRec's (as
+; capped by Menu_EquipStatCat3), and the 11 derived bytes
+; (Menu_CurStats ... Menu_CurMaxHp) are copied to the record at
+; Menu_CurCharRecPtr + .Derived and to Menu_CurCharRec + .Derived.
+; Callers (4 JSR sites): Menu_RefreshAllChars ($C2:99BC) and unmatched ($C2:A247, $C2:B311,
+;   $C2:D7B2).
+; Entry: M, X any (P saved; SEP #$20 / REP #$30 here), DP=$0000
+;        (Menu_CurCharRecPtr, Menu_Tmp00/01), DB=$7E; Menu_LoadCharRec
+;        done
+; Exit:  P restored; A = $FFFF, X and Y past the last MVN
+; Calls: Menu_CharCalcStats.
+Menu_CharRecalc:
+    PHP
+    JSR Menu_CharCalcStats
+    SEP #$20
+    LDA.w !Menu_CurCharRec+Menu_CharRec.Unk2A
+    CMP.b #!Menu_DoubleStat5Item
+    BNE .store
+    ASL.w !Menu_CurStats+5
+.store:
+    REP #$30
+    LDY.b !Menu_CurCharRecPtr
+    LDA.w !Menu_CurCharRec+Menu_CharRec.Word3
+    STA.w Menu_CharRec.Word3,Y
+    LDX.w #!Menu_CurStats
+    TYA
+    CLC
+    ADC.w #Menu_CharRec.Derived
+    TAY
+    LDA.w #!Menu_CurDerivedBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_CurStats
+    LDY.w #!Menu_CurCharRec+Menu_CharRec.Derived
+    LDA.w #!Menu_CurDerivedBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; $C2:916E — Menu_CharCalcStats (109 bytes, $916E–$91DA)
+; Menu_StatBoosts, Menu_WeaponPower and Menu_ArmorSum ($0DAE-$0DB6) =
+; 0; Menu_EquipSlotStats for slots 3, 2, 1, 0 (Menu_EquipSlotIdx); then
+; for i = 6 down to 0, stat s = MenuRom_StatOrder[i]: Menu_CurStats[s]
+; = .Stats[s] + Menu_StatBoosts[s], at most MenuRom_StatCaps[i]
+; (stats compared and capped as bytes; a sum past 255 wraps before the
+; cap). The character's formula (Menu_AttackFormulas by its record byte
+; 0 AND 7) leaves the dividend in WRDIV and the divisor in A: the
+; quotient goes to Menu_CurAttack ($FF when above 255);
+; Menu_CurDefense = stat 1 + Menu_ArmorSum, $FF when it carries.
+; Callers (4 JSR sites): Menu_CharRecalc ($C2:9138) and unmatched ($C2:A5EA, $C2:DE08, $C2:E18D).
+; Entry: M, X any (P saved; REP #$30 / SEP #$30 here), DP=$0000
+;        (Menu_Tmp00/01), DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00/01 changed
+; Calls: Menu_EquipSlotStats, the formula (JSR (abs,X)).
+Menu_CharCalcStats:
+    PHP
+    REP #$30
+    STZ.w !Menu_StatBoosts
+    LDX.w #!Menu_StatBoosts
+    LDY.w #!Menu_StatBoosts+2
+    LDA.w #!Menu_StatCalcBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$30
+    LDA.b #!Menu_EquipSlots-1
+    STA.w !Menu_EquipSlotIdx
+.slot:
+    JSR Menu_EquipSlotStats
+    DEC.w !Menu_EquipSlotIdx
+    BPL .slot
+    LDX.b #!Menu_StatCount-1
+.stat:
+    LDA.l !MenuRom_StatOrder,X
+    TAY
+    LDA.w !Menu_CurCharRec+Menu_CharRec.Stats,Y
+    CLC
+    ADC.w !Menu_StatBoosts,Y
+    CMP.l !MenuRom_StatCaps,X
+    BCC .store
+    LDA.l !MenuRom_StatCaps,X
+.store:
+    STA.w !Menu_CurStats,Y
+    DEX
+    BPL .stat
+    LDA.w !Menu_CurCharRec
+    AND.b #!Menu_CharIdMask
+    ASL A
+    TAX
+    JSR (Menu_AttackFormulas,X)
+    STA.l WRDIVB
+    LDA.w !Menu_CurStats+1
+    CLC
+    ADC.w !Menu_ArmorSum
+    BCC .defense
+    LDA.b #!Menu_ByteMax
+.defense:
+    STA.w !Menu_CurDefense
+    LDA.l RDDIVL
+    TAX
+    LDA.l RDDIVH
+    BEQ .attack
+    LDX.b #!Menu_ByteMax
+.attack:
+    STX.w !Menu_CurAttack
+    PLP
+    RTS
+
+; $C2:91DB — Menu_AttackFormulas (16 bytes, $91DB–$91EA)
+; The attack formula by character (record byte 0 AND 7): A for 0, 3,
+; 4, 6 and 7, B for 1 and 2, C for 5.
+Menu_AttackFormulas:
+    dw Menu_AttackFormulaA, Menu_AttackFormulaB, Menu_AttackFormulaB, Menu_AttackFormulaA
+    dw Menu_AttackFormulaA, Menu_AttackFormulaC, Menu_AttackFormulaA, Menu_AttackFormulaA
+
+; $C2:91EB — Menu_AttackFormulaA (56 bytes, $91EB–$9222)
+; WRDIV = 5 x Menu_WeaponPower + 12 x stat 0; A = 9 (the divisor).
+; Callers note: Menu_AttackFormulas entries 0, 3, 4, 6 and 7.
+; Entry: M=1, X=1 (from Menu_CharCalcStats), DP=$0000 (Menu_Tmp00/01),
+;        DB=$7E
+; Exit:  M=1; A = 9; Menu_Tmp00/01 = 5 x Menu_WeaponPower
+; No calls.
+Menu_AttackFormulaA:
+    LDA.b #!Menu_AtkWeaponMulA
+    STA.l WRMPYA
+    LDA.w !Menu_WeaponPower
+    STA.l WRMPYB
+    XBA                                 ; (wait for the product)
+    NOP
+    REP #$20
+    LDA.l RDMPYL
+    STA.b !Menu_Tmp00
+    SEP #$20
+    LDA.b #!Menu_AtkStatMulA
+    STA.l WRMPYA
+    LDA.w !Menu_CurStats
+    STA.l WRMPYB
+    NOP
+    REP #$21                            ; (also C=0)
+    LDA.b !Menu_Tmp00
+    ADC.l RDMPYL
+    STA.l WRDIVL
+    SEP #$20
+    LDA.b #!Menu_AtkDivisorA
+    RTS
+
+; $C2:9223 — Menu_AttackFormulaB (25 bytes, $9223–$923B)
+; WRDIV = 2 x (stat 4 + Menu_WeaponPower); A = 3.
+; Callers note: Menu_AttackFormulas entries 1 and 2.
+; Entry: M=1, X=1, DP=$0000 (Menu_Tmp00/01; the TDC gives 0), DB=$7E
+; Exit:  M=1; A = 3; Menu_Tmp00/01 = Menu_WeaponPower (a word)
+; No calls.
+Menu_AttackFormulaB:
+    STZ.b !Menu_Tmp01
+    LDA.w !Menu_WeaponPower
+    STA.b !Menu_Tmp00
+    TDC                                 ; B = 0
+    LDA.w !Menu_CurStats+4
+    REP #$21                            ; (also C=0)
+    ADC.b !Menu_Tmp00
+    ASL A
+    STA.l WRDIVL
+    SEP #$20
+    LDA.b #!Menu_AtkDivisorB
+    RTS
+
+; $C2:923C — Menu_AttackFormulaC (37 bytes, $923C–$9260)
+; WRDIV = 16 x stat 0 + MenuRom_Char5Attack[record byte $12] (a word
+; table; the doubled index is taken 8-bit); A = 9.
+; Callers note: Menu_AttackFormulas entry 5.
+; Entry: M=1, X=1 (8-bit TAX), DP any, DB=$7E
+; Exit:  M=1; A = 9; X = the doubled byte
+; No calls.
+Menu_AttackFormulaC:
+    LDA.b #!Menu_AtkStatMulC
+    STA.l WRMPYA
+    LDA.w !Menu_CurStats
+    STA.l WRMPYB
+    LDA.w !Menu_CurCharRec+Menu_CharRec.Unk12
+    ASL A
+    TAX
+    REP #$21                            ; (also C=0)
+    LDA.l !MenuRom_Char5Attack,X
+    ADC.l RDMPYL
+    STA.l WRDIVL
+    SEP #$20
+    LDA.b #!Menu_AtkDivisorC
+    RTS
+
+; $C2:9261 — Menu_EquipSlotStats (13 bytes, $9261–$926D)
+; Adds equipment slot Menu_EquipSlotIdx (0-3) to the sums through
+; Menu_EquipStatTable.
+; Callers (1 JSR site): Menu_CharCalcStats ($C2:9187).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00/01 changed
+; Calls: the slot's routine (JSR (abs,X)).
+Menu_EquipSlotStats:
+    PHP
+    SEP #$30
+    LDA.w !Menu_EquipSlotIdx
+    ASL A
+    TAX
+    JSR (Menu_EquipStatTable,X)
+    PLP
+    RTS
+
+; $C2:926E — Menu_EquipStatTable (8 bytes, $926E–$9275)
+; Menu_EquipSlotStats' routine per slot: 0 the weapon byte (.Unk29), 1
+; .Unk28, 2 .Unk27, 3 the accessory (.Unk2A), the category order of
+; Menu_EquipSlotOffsets.
+Menu_EquipStatTable:
+    dw Menu_EquipStatWeapon, Menu_EquipStatCat1, Menu_EquipStatCat2, Menu_EquipStatCat3
+
+; $C2:9276 — Menu_EquipStatWeapon (11 bytes, $9276–$9280)
+; Menu_WeaponPower = Menu_ItemSortKeys[weapon], then its boosts
+; (Menu_AddItemBoosts, a branch).
+; Callers note: Menu_EquipStatTable entry 0.
+; Entry: M=1, X=1 (from Menu_EquipSlotStats), DP=$0000, DB=$7E
+; Exit:  as Menu_AddItemBoosts
+; Calls: branches to Menu_AddItemBoosts.
+Menu_EquipStatWeapon:
+    LDX.w !Menu_CurCharRec+Menu_CharRec.Unk29
+    LDA.w !Menu_ItemSortKeys,X
+    STA.w !Menu_WeaponPower
+    BRA Menu_AddItemBoosts
+
+; $C2:9281 — Menu_EquipStatCat1 (5 bytes, $9281–$9285)
+; X = the .Unk28 item, then Menu_EquipStatCat2's .add.
+; Callers note: Menu_EquipStatTable entry 1.
+; Entry: M=1, X=1, DP=$0000, DB=$7E
+; Exit:  as Menu_AddItemBoosts
+; Calls: branches into Menu_EquipStatCat2.
+Menu_EquipStatCat1:
+    LDX.w !Menu_CurCharRec+Menu_CharRec.Unk28
+    BRA Menu_EquipStatCat2_add
+
+; $C2:9286 — Menu_EquipStatCat2 (15 bytes, $9286–$9294)
+; Menu_ArmorSum += Menu_ItemSortKeys[.Unk27 item] (from .add: the item
+; in X), then its boosts (Menu_AddItemBoosts).
+; Callers note: Menu_EquipStatTable entry 2.
+; Entry: M=1, X=1, DP=$0000, DB=$7E
+; Exit:  as Menu_AddItemBoosts
+; Calls: branches to Menu_AddItemBoosts.
+Menu_EquipStatCat2:
+    LDX.w !Menu_CurCharRec+Menu_CharRec.Unk27
+.add:
+    LDA.w !Menu_ItemSortKeys,X
+    CLC
+    ADC.w !Menu_ArmorSum
+    STA.w !Menu_ArmorSum
+    BRA Menu_AddItemBoosts
+
+; $C2:9295 — Menu_EquipStatCat3 (44 bytes, $9295–$92C0)
+; The accessory: Menu_CurMaxHp = .Word5 + .Word5 / 2 (Menu_BonusHalfId)
+; or / 4 (Menu_BonusQuarterId) or + 0, at most 999; .Word3 lowered to
+; it when above; then the accessory's boosts (falls into
+; Menu_AddItemBoosts with M=0).
+; Callers note: Menu_EquipStatTable entry 3.
+; Entry: M=1, X=1 (8-bit item in X), DP=$0000, DB=$7E
+; Exit:  as Menu_AddItemBoosts
+; Calls: falls into Menu_AddItemBoosts.
+Menu_EquipStatCat3:
+    REP #$20
+    LDX.w !Menu_CurCharRec+Menu_CharRec.Unk2A
+    LDA.w !Menu_CurCharRec+Menu_CharRec.Word5
+    CPX.b #!Menu_BonusHalfId
+    BEQ .half
+    CPX.b #!Menu_BonusQuarterId
+    BEQ .quarter
+    LDA.w #0
+.quarter:
+    LSR A
+.half:
+    LSR A
+    CLC
+    ADC.w !Menu_CurCharRec+Menu_CharRec.Word5
+    CMP.w #!Menu_StatMax
+    BCC .store
+    LDA.w #!Menu_StatMax
+.store:
+    STA.w !Menu_CurMaxHp
+    CMP.w !Menu_CurCharRec+Menu_CharRec.Word3
+    BCS Menu_AddItemBoosts
+    STA.w !Menu_CurCharRec+Menu_CharRec.Word3
+
+; $C2:92C1 — Menu_AddItemBoosts (51 bytes, $92C1–$92F3)
+; For item X: v = Menu_ItemInfo4[X]; when non-zero, the word
+; MenuRom_ItemBoosts[v] gives in its low byte (bit 0 dropped) one bit
+; per stat order entry from bit 7 down (MenuRom_StatOrder[i] for the
+; i-th bit) and in its high byte the amount added to that
+; Menu_StatBoosts byte.
+; Callers note: the branch target of the Menu_EquipStat* routines (and
+;   Menu_EquipStatCat3 falls into it).
+; Entry: M any (P saved; REP #$20 / SEP #$30 here), X=1 (8-bit item),
+;        DP=$0000 (Menu_Tmp00/01), DB=$7E; X = the item id
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00/01 changed when v is
+;        non-zero
+; No calls.
+Menu_AddItemBoosts:
+    PHP
+    REP #$20
+    LDA.w !Menu_ItemInfo4,X
+    AND.w #!Eng_LowByteMask
+    BEQ .done
+    ASL A
+    TAX
+    LDA.l !MenuRom_ItemBoosts,X
+    AND.w #!Menu_BoostFlagsMask
+    STA.b !Menu_Tmp00
+    SEP #$30
+    LDX.b #0
+.bit:
+    ASL.b !Menu_Tmp00
+    BCC .next
+    LDA.l !MenuRom_StatOrder,X
+    TAY
+    LDA.b !Menu_Tmp01
+    CLC
+    ADC.w !Menu_StatBoosts,Y
+    STA.w !Menu_StatBoosts,Y
+.next:
+    INX
+    LDA.b !Menu_Tmp00
+    BNE .bit
+.done:
+    PLP
+    RTS
+
+; ============================================================
 ; Menu settings and equip test ($C2:92F4–$C2:934E, $C2:93A8–$C2:93BE)
 ; ============================================================
 
@@ -27487,14 +27825,14 @@ Menu_CleanInventory:
     RTS
 
 ; $C2:99B2 — Menu_RefreshAllChars (24 bytes, $99B2–$99C9)
-; For characters 0-6: Menu_LoadCharRec, then Menu_Unk9137 (not
-; analysed: it works on the copy Menu_LoadCharRec made).
+; For characters 0-6: Menu_LoadCharRec, then Menu_CharRecalc (the
+; derived stats, written back to the record).
 ; Callers (1 JSR site): Menu_BuildItemTables ($C2:9977).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp02),
 ;        DB=$7E
 ; Exit:  P restored; Menu_Tmp02-03 = 7; A, X, Y as the callees leave
 ;        them
-; Calls: Menu_LoadCharRec, Menu_Unk9137.
+; Calls: Menu_LoadCharRec, Menu_CharRecalc.
 Menu_RefreshAllChars:
     PHP
     REP #$30
@@ -27502,7 +27840,7 @@ Menu_RefreshAllChars:
 .char:
     LDA.b !Menu_Tmp02
     JSR Menu_LoadCharRec
-    JSR Menu_Unk9137
+    JSR Menu_CharRecalc
     INC.b !Menu_Tmp02
     LDA.b !Menu_Tmp02
     CMP.w #!Menu_CharRecCount

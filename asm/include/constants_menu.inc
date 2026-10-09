@@ -1003,4 +1003,23 @@ if !constants_menu_inc == 0
 !Menu_FrameFill = $3FAC
 !Menu_Bg2Tile0 = $1FA0                  ; first of the 2 x 2 BG2 pattern tiles
 
+; --- Menu character stats ---
+!Menu_DoubleStat5Item = $A8              ; accessory with which Menu_CharRecalc doubles stat 5
+!Menu_StatCalcBytes = 9                  ; bytes zeroed: Menu_StatBoosts, Menu_WeaponPower, Menu_ArmorSum
+!Menu_StatCount = 7
+!Menu_CurDerivedBytes = 11              ; Menu_CurStats to Menu_CurMaxHp ($9B1C-$9B26)
+!MenuRom_StatOrder = $FFCF2C             ; 7 B: stat numbers in the order the loops visit them
+!MenuRom_StatCaps = $FFCF33              ; 7 B: the cap of each (by visit order)
+!MenuRom_ItemBoosts = $CC29D7            ; words by Menu_ItemInfo4: stat bits (low byte), amount (high)
+!MenuRom_Char5Attack = $CC2D69           ; words by record byte $12 (Menu_AttackFormulaC)
+!Menu_CharIdMask = $07                   ; record byte 0 bits picking the attack formula
+!Menu_ByteMax = $FF                      ; cap of the 8-bit results
+!Menu_AtkWeaponMulA = 5                  ; Menu_AttackFormulaA: 5 x power + 12 x stat 0, / 9
+!Menu_AtkStatMulA = 12
+!Menu_AtkDivisorA = 9
+!Menu_AtkDivisorB = 3                    ; Menu_AttackFormulaB: 2 x (stat 4 + power) / 3
+!Menu_AtkStatMulC = 16                   ; Menu_AttackFormulaC: 16 x stat 0 + table, / 9
+!Menu_AtkDivisorC = 9
+!Menu_BoostFlagsMask = $FFFE
+
 endif
