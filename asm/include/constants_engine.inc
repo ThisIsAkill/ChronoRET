@@ -937,14 +937,14 @@ endif
 !BankC1Svc_RemoveGold = $05              ; ... takes Y off the gold when there is that much ($C1:D0ED)
 !BankC1Svc_Yes = $FF                     ; a service's "yes" result (BankC1_HasGold, AddGold, RemoveGold)
 !BankC1Svc_Emptied = $FF                 ; BankC1_RemoveItem: the entry's count reached 0
-!BankC2Cmd_FindInParty = $00             ; BankC2_Entry8004 commands (Menu_Unk8C36's table at
+!BankC2Cmd_FindInParty = $00             ; BankC2_Entry8004 commands (Menu_CommandTable at
                                          ; $C2:8C5B, Y = a character): A = 0 when it is in the party
 !BankC2Cmd_AddToParty = $01              ; ... put it in the party
 !BankC2Cmd_PartyToReserve = $02          ; ... move it from the party to the reserve
 !BankC2Cmd_FindListed = $03              ; ... A = 0 when it is anywhere in Menu_PartyOrder
 !BankC2Cmd_AddToReserve = $04            ; ... add it to the reserve unless listed
 !BankC2Cmd_Unlist = $05                  ; ... empty its place in Menu_PartyOrder
-!BankC2Cmd_Unk0A = $0A                   ; ... not traced (Y = a character, probably; X = an argument)
+!BankC2Cmd_Unk0A = $0A                   ; ... equip item X on record Y (Menu_CmdEquip)
 !BankC2Cmd_ItemCount = $0C               ; ... A = the count of item X held (X, not Y)
 !ObjQ_Unk78Set1 = $01                    ; ObjQ_Unk78 value Evt_OpD3_AddCharToParty stores; the next
                                          ; member 2 / 3 Evt_InitCharCommon sets up turns it into

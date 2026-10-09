@@ -47,7 +47,6 @@ asm/bankC0/bankC0.asm:Spr_Place12 DPDB
 asm/bankC0/bankC0.asm:Spr_Place4 DPDB
 asm/bankC0/bankC0.asm:Spr_Place8 DPDB
 asm/bankC1/bankC1.asm:Battle_UnkThunk2F1F DPDB
-asm/bankC2/bankC2.asm:BankC2_CommandLong DPDB
 asm/bankC2/bankC2.asm:BankC2_Entry0000 DPDB
 asm/bankC2/bankC2.asm:BankC2_Entry8000 DPDB
 asm/bankC2/bankC2.asm:BankC2_ReadPadLong DPDB

@@ -310,7 +310,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Map_Unk7F3700` blocks are event scripts, block 0 = `Evt_RedirectPos`, 1-3 the walk-to-tile
    blocks, the fifth `Evt_PushScriptPos`) and $C0:3711-$C0:4866: $33 (palette), the items /
    gold / characters / battle opcodes $C7-$D8 (bank $C1 services 0-5 and the bank $C2
-   `Menu_Unk8C36` commands 0-8, $0A, $0C read from the ROM and named as constants), the
+   `Menu_RunCommand` commands 0-8, $0A, $0C, now matched), the
    locations / control / sound / fade / map opcodes $DC-$FA, the credits and layer-3 opcodes
    $29-$2C, $2F, $32 with `Credits_LoadGfx` ($C0:6E27), the window effects $FE and $FF with
    `Evt_OpFFTable` ($C0:400E, 20 words: sub-ops $90-$9F, $A0-$A3 unused), the character opcodes
@@ -517,9 +517,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    mate and label tasks; what objects A and B are; what sound commands $86 and $18 (with
    $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`; what the label strings ($C6:F400 table, numbers
    $6A-$6F) and the dial's pack data show; what `C2Scene_MapFilterColor`'s hidden colours are;
-   `C2Scene_DialFlagBit2`; `Menu_Unk83`, `Menu_NmiTimer` and `Menu_Unk85D6` (the menu NMI's
-   upload). Next: `Menu_Unk85D6`; `Menu_Unk8C36`, the command handler behind
-   `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
+   `C2Scene_DialFlagBit2`; `Menu_Unk83` and `Menu_NmiTimer`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
    $7E:C000, $7E:C600, $7E:C800) and the four lists `C2Scene_ListA`-`D` hold; the code at
    `$C2:0568` (also reads the BG layer tables).
    Also matched (branch match-c2-after-dial): the direction helpers `C2Scene_Unk2273`/`Unk2277`
@@ -550,11 +548,33 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    (`Menu_FrameReady`, `Menu_InidispShadow`, `Menu_NmiFrames`, `C2Scene_HandBufA/B`,
    `C2Scene_SwirlCosA/B`, `C2Scene_HdmaHalfBytes/BufBytes`). Stubs added: the `Menu_Init*` callees `Menu_Unk968D`/`D156`/`984A`/`92F4`/`F3CA`/`9875`,
    `Menu_UnkE91B` (thread 3), `Menu_UnkF5ED`, `Menu_Unk93A8`, `BankFF_UnkF958` and the mode lists
-   `Menu_Mode00List`-`0FList`. Next, in reach order: `Menu_Unk8C36` (the `BankC2_Entry8004` command
-   dispatcher, which calls the inventory routines), the `Menu_Init*` callees, thread 3
-   (`Menu_UnkE91B`) and the mode handler lists. Open: who fills `Menu_ItemSortKeys`,
-   `Menu_GradSpec` and `Menu_CursorPos`; what `Menu_Unk82E1`'s values $AE-$B2 are; what the
-   `C2Scene_PatternTiles` are for.
+   `Menu_Mode00List`-`0FList`. Open: who fills `Menu_GradSpec` and `Menu_CursorPos`; what
+   `Menu_Unk82E1`'s values $AE-$B2 are; what the `C2Scene_PatternTiles` are for.
+   Also matched (branch match-c2-menu-cmds): the menu NMI's upload `Menu_NmiUpload` ($C2:85D6,
+   falls into `Menu_FlushVramQueue`); the `BankC2_Entry8004` dispatcher `Menu_RunCommand` with
+   `Menu_CommandTable` and its 12 handlers (party order, record refills, `Menu_CmdEquip`, the boot
+   save-slot check `Menu_CmdBootCheckSaves`, item count; $C2:8C36-$C2:8E2C); every
+   `Menu_InitSystems` callee: `Menu_LoadGraphics` with the tile helpers ($C2:960B-$C2:9849),
+   the window style tiles/palette (`Menu_LoadWindowGfx` $C2:C511, `Menu_LoadWindowPal`
+   $C2:ED08), the VRAM lists at $C2:FC6F, `Menu_ClearOam`, `Menu_BuildItemTables` with
+   `Menu_CleanInventory`/`Menu_RefreshAllChars` ($C2:984A-$C2:99C9), the save slot summaries
+   `Menu_LoadSlotSummaries` ($C2:D156-$C2:D32B) with `Menu_DrawText` ($C2:F90C),
+   `Menu_UnpackConfig`/`Menu_PackConfig`, `Menu_CanEquip`, `Menu_PageScroll`
+   ($C2:92F4-$C2:940C), the character stats `Menu_CharRecalc` and its formulas
+   ($C2:9137-$C2:92F3), the sprite objects `Menu_InitSprites` ... `Menu_SprUploadTiles` with
+   `Menu_WeaponRecSrc` ($C2:F3CA-$C2:F870); thread 3 `Menu_MainCursorThread` ($C2:E91B-$C2:E97B);
+   mode 0, the main menu (`Menu_Mode00List`, `Menu_MainMenuInit`/`Loop`,
+   `Menu_ReturnToMainMenu`, $C2:99CA-$C2:9C28), and the handler lists of modes 1-7, $0B-$0F
+   (handlers stubbed as `Menu_ModeNNHk`). Found: `Menu_Unk29AF` is a joined-character bit set,
+   `Menu_ItemEquipChars` the per-item equip mask, `Menu_ItemSortKeys` weapon power / armour
+   values, `Menu_Unk2C53` probably the gold; `Menu_InitSystems` returns with M=1 (so
+   `BankC2_MenuEntry` stores only Menu_EntryX's low byte). Quirks recorded: `Menu_RunCommand`'s
+   LDA #$00/XBA decoding as LDA #$EB00 after the M=0 handlers; `Menu_LoadWindowGfx` copies $281
+   bytes; the dead byte in `Menu_ReadSlotSummary`; the dead INC in `Menu_SprAnimEnd`;
+   `Menu_SprAnimate`'s frame data running past the page for .TileCount 6. Next, in reach order:
+   the main menu's preview/redraw routines (`Menu_MainPreviewTable`, `Menu_MainRedrawTable`), the
+   menu pad handler `Menu_UnkE984`, `Menu_UnkED31`/`EAC2`/`F28D`, `Menu_UnkF871` (sprite OAM),
+   then the mode handlers `Menu_Mode01H0` on, and `BankFF_UnkF9C4`/`F813`/`F958`.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
