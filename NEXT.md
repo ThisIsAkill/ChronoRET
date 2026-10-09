@@ -77,17 +77,25 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleSys_LoadTechUsers`, `BattleSys_StoreMpCost`/`10`/`18`, `BattleSys_AdjustMpCost`,
    `BattleSys_PayTechMp`) and the setup helpers `$C1:CDFF`-`$C1:CFBD` (`BattleSys_UnkCDFF`,
    `BattleSys_UnkCE36`/`CE3A`, `BattleSys_UnkCF15`, `BattleSys_UnkCF52`, `BattleSys_UnkCF69`).
-   Next, in reach order: `BattleSys_UnkC1DD` (`$C1:C1DD`-`$C1:C8F6`, 1,818 B: the item / tech
-   target resolution B967 calls; fills `!Battle_UnkAD8D`/`AD8E`, sets `!Battle_UnkAF23`; part of
-   it, `$C1:C731`-`$C1:C82C`, is reached only through the 7-word table at `$C1:C95C` with
-   `JSR ($C95C,X)` at `$C1:C732`) with `$C1:C8F7`; `BattleSys_UnkD523` (`$C1:D523`-`$C1:D74E`,
-   after `BattleSys_UnkBF79`) and `BattleSys_UnkD490`/`D4AD`/`D4D6` (the item effect dispatch of
-   `BattleSys_UnkBF46`); the script handlers themselves (stubs `BattleAi_TestNN`
+   Also matched (the action-effect batch): the fixed-fraction scalers `Battle_Scale*`
+   (`$C1:C02A`-`$C1:C1DC`), the target resolution `BattleSys_UnkC1DD` with
+   `BattleSys_MapEmptyTarget` and `BattleSys_AreaParamTable` (`$C1:C1DD`-`$C1:C90A`, `$C1:C95C`),
+   the effect-record loaders `BattleSys_EffRec*` (`$C1:D132`-`$C1:D1D2`) and item-record loaders
+   `BattleSys_LoadEffectArg*` (`$C1:D1D3`-`$C1:D220`), the effect types `BattleSys_Effect00`-`08`,
+   `EffectNone` and `Effect29`-`2C` with `BattleSys_StoreTargetCmd` (`$C1:D221`-`$C1:D522`), the
+   tech part runner `BattleSys_RunTechParts`, `BattleSys_CheckTechMp` and the enemy runners
+   `BattleSys_UnkD7C4`/`D8D1` (`$C1:D523`-`$C1:D9D6`), `BattleSys_EffectTable` /
+   `BattleSys_TechMpCostTable` (`$C1:D9D7`-`$C1:DA36`), and the helpers `BattleSys_CasterHitOffset`,
+   `BattleSys_RecordMiss`, `BattleSys_UnkE976`, `BattleSys_LoadCasterStats`/`LoadTargetStats`
+   (`$C1:E8C0`-`$C1:E9D4`), `BattleSys_CopyEffectBytes78` (`$C1:EB0E`) and `Battle_SumHitSets`
+   (`$C1:EB68`). Next, in reach order: the effect arithmetic the effect types call, `$C1:DA37` on
+   (stubs `BattleSys_UnkDA37`/`DB5E`/`DBAA`/`DC64`/`DCAD`/`DE87`/`DE9E`/`DEF0`/`E0F5`/`E65F`/
+   `E77B`/`E9D5`; the `Battle_Scale*` callers sit in `$C1:E1E9`-`$C1:EE44`); `$C1:CFBE`-`$C1:D131`
+   (`BankC1_RunService` and its table `$C1:D126`, `BankC1_AddItem`/`AddGold`); the script handlers themselves (stubs `BattleAi_TestNN`
    `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
-   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callees
-   `BattleSys_UnkD7C4`/`D8D1`, `$C1:AF79` (a second Battle_RandRange on
+   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callee `$C1:AF79` (a second Battle_RandRange on
    `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
-   `$C1:C02A` (math, from `$C1:E2C0`); the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
+   the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
    (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
    `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
    and service 0
@@ -106,7 +114,14 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    service 6 does with `!Battle_UnkAEB3` (the defeated enemies' exit, probably), whether
    BattleAct_LoadKind3 is the item loader (B967's item path uses kind 3 with id - $BC; its
    verified header still says unknown), and why BattleSys_ResetTechUsers' first user divides
-   by a stale `!Battle_MathB`. Stale from the PC-command batch (verified headers, fix at their
+   by a stale `!Battle_MathB`. Open from the action-effect batch: what the effect types and the
+   effect record bytes stand for (the arithmetic is unmatched), `!Battle_UnkB200` (bit 7 after a
+   miss stops a tech's parts with the `$7E:B1F5` read, probably meant as BattleRom_TechRec.Flags),
+   the bytes read long at `$00:00FA`/`$00:00FB` by target mode 9 (whose roll is compared through
+   a restored `!Battle_MathLo`, a quirk), `!Battle_UnkAE6D` (BattleSys_MapEmptyTarget's
+   replacement slots), `!Battle_UnkAE4D`'s bits, and the enemy record tables' true base
+   (`!BattleRom_UnkCC6FCB` - 2). Headers edited by that batch (back to review): BattleSys_LoadTechUsers
+   (Callers note), BattleSys_UnkBF46, BattleSys_UnkBF79, BattleAi_EnemyTurn. Stale from the PC-command batch (verified headers, fix at their
    next edit): Battle_SetupBattle's header calls the `$C1:C96A`-`$C1:CF15` group "not analysed"
    (now matched); Battle_Mul16's example sites `$C1:B329`/`$C1:B455`/`$C1:B4BC` are now in
    BattleSys_UpdateKo / BattleSys_UnkB442 / BattleAi_PickScript. Stale after an earlier batch (verified headers, fix at their next
@@ -120,7 +135,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    BattleAct_OpMoveKind4ToCalc); BattleAct_FindPath (`$C1:5479`/`$C1:549B`, now
    BattleAct_PathToPoint); BattleAct_OpLoopAnim (`$C1:57A5`/`$C1:57C8`/`$C1:57F2`, now
    BattleAct_OpShowAnimEntry); BattleAct_OpEndThread (`$C1:577A`, now BattleAct_OpEndIfNoTarget);
-   the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched.
+   the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched;
+   the "Actions: service 4" banner before BattleSys_RunAction says the script interpreter (the
+   threads BattleAct_RunThreads runs) "is not matched yet", though it is.
    Open readers, all out of this bank: the movers in bank $CF (dispatch `$CF:EFC4`, kind table
    `$CF:F01E`: straight `$CF:F040`, arc `$CF:F087`, heading `$CF:F194` with its edge test
    `$CF:FADD`, circle `$CF:F1F8`, kind 4 `$CF:F23D` with its near test `$CF:F957`, ellipse
@@ -220,7 +237,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Obj_CalcDirection / Obj_SetVelocity / Obj_SetVelocityChecked (their callers are the event
    opcodes now), Obj_UpdateInView / Obj_ActivateIfInView / FieldBtl_SaveObj /
    FieldBtl_RestoreObj (the Obj_Unk* callees are matched), and the `Field_Unk0B80/0B88` uses in
-   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`).
+   Field_ResetUnk0B80/0B88 (now aliases of `Obj_PalSlot` / `Obj_TileSlot`); and the comments on
+   `!NmiTrampoline` / `!IrqTrampoline` in ram_engine.inc cite the RTI stores at `$C0:2E4B` without
+   naming them (inside Sys_HaltWithColor).
    Also done (branch match-c0-evtops): the event opcode handlers $C0:5F6E-$C0:6D2E (all of
    $00-$7F there): `Evt_UnusedOpcode`, the return / call opcodes $00, $02-$07 (`Obj_Unk1C00`
    read as a level, saved positions in the `ObjX_Unk7F0580` tables, `ObjX_CallWait`), object
@@ -244,10 +263,31 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Evt_Op94_WalkToObj ($C0:3548, now Evt_OpB5_FollowObj), Evt_Op95_WalkToPc ($C0:3551, now
    Evt_OpB6_FollowPc), Evt_HasActionTarget ($C0:304F, now Evt_OpB0_PartyControl); the
    `ObjX_LeaveView` define now names its writers (the message opcodes, so Obj_UpdateInView's
-   test reads as "the object's message is up"). Next, in reach order: the rest of the event opcode handlers,
-   $C0:326C-$C0:353E (opcodes $D9 at $C0:326C, $DA at $C0:345A) and $C0:3711-$C0:4CD4 ($33,
-   $C7-$FF, $29-$2F, $32, the one-line group $57/$5C/$62/$68/$6A/$6C/$6D at $C0:41E4, $80-$8E,
-   then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all have names;
+   test reads as "the object's message is up"). Also done (branch match-c0-evtops2): the event
+   opcodes $C0:326C-$C0:353E ($D9 `Evt_OpD9_PartyWalkToTiles`, $DA `Evt_OpDA_PartyGather`: the
+   `Map_Unk7F3700` blocks are event scripts, block 0 = `Evt_RedirectPos`, 1-3 the walk-to-tile
+   blocks, the fifth `Evt_PushScriptPos`) and $C0:3711-$C0:4866: $33 (palette), the items /
+   gold / characters / battle opcodes $C7-$D8 (bank $C1 services 0-5 and the bank $C2
+   `Menu_Unk8C36` commands 0-8, $0A, $0C read from the ROM and named as constants), the
+   locations / control / sound / fade / map opcodes $DC-$FA, the credits and layer-3 opcodes
+   $29-$2C, $2F, $32 with `Credits_LoadGfx` ($C0:6E27), the window effects $FE and $FF with
+   `Evt_OpFFTable` ($C0:400E, 20 words: sub-ops $90-$9F, $A0-$A3 unused), the character opcodes
+   $57/$5C/$62/$68/$6A/$6C/$6D and $80, and the sprite opcodes $81-$83 (`Evt_LoadSpriteRec`,
+   `Evt_InitWramSprite`, `RomE4_SprRec` / `RomE4_EnemySprRec`). Quirks recorded: the doubled
+   ObjX_Unk7F0C00/0D00 stores in $D9/$DA, $D4's move-up with no member 2, the handlers with no
+   SEC that end the run ($D0, $D1, $D3, $D5, $F8-$FA), $2C's dead STZ, the ADD of 0 to
+   Obj_PalSrc, the 16-bit `Obj_TileSlot` stores of the character opcodes, the unbounded $FF
+   sub-op. Verified headers edited (back to review with this batch): Field_UnkAF4E,
+   Field_EventHookDispatch, VramDma_Upload, MainInit (bank $FD), Spr_LoadLargeObj,
+   Evt_FindOrAddUnk0920 (their "unmatched" caller notes). Stale, not edited (fix at their next
+   edit): Field_HookWinC3E ("other code must" clear Field_EventHook: the $FF $92-$95 opcodes
+   do). Open from these: what `Field_Unk0BE9`, `ObjX_Unk7F0F00`, `Field54_Unk80`,
+   `FadeFlag_Unk10`, `Ppu_Unk0BE0` and the `FieldBtlObj[0-2].GfxOfs` stores of $82 are read
+   by; the bank $C2 command $0A; the bank-$FD vectors `FdVec_FFE5/E8/EB/F1` ($FF $80-$8F);
+   whether the $2600 records' words +3/+5 are HP (commands 6/7). Next, in reach order: the
+   rest of the event opcode handlers, $C0:4867-$C0:4CD4 ($84, $87, $88, $2E at $C0:4A4E,
+   $89-$8E), then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all
+   have names;
    and the party control callees `Party_Unk9E29` ($C0:9E84 first), `Party_UnkA26B`,
    `Party_UnkA2CE` (with `$C0:9ED1`, `$C0:9F20`, `$C0:9F6F`). Open from it: what Field_Unk1F87
    does with the message bytes (and whether `Field_Unk30` is the window's place), who clears
@@ -445,11 +485,10 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 2. `$C1:0051`, 10 words: the $C10045 service dispatcher's table (`JSR (T,X)` at `$C1:004A`);
    services 1, 2 and 7 are matched, the rest need stubs.
 3. `$C0:5D6E` `Evt_OpcodeTable`, 256 words (`JSR (T,X)` at `$C0:5977` in Evt_RunObj0Func1, and
-   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 81
-   entries still have none ($29-$2C, $2E, $2F, $32, $33, $57, $5C, $62, $68, $6A, $6C, $6D,
-   $7C-$7E, $80-$84, $87-$8E, $90, $91, $C7-$DA, $DC-$E8, $EA-$EE, $F0-$F4, $F8-$FA, $FE, $FF).
-4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
-   `$C0:4009`), `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
+   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 16
+   entries still have none ($2E, $7C-$7E, $84, $87-$8E, $90, $91).
+4. Dispatch tables right after (or near) their dispatcher, bank $C0 (`$C0:400E` is matched as
+   Evt_OpFFTable): `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
 5. Bank $C1 (`$C1:2D81`, `$C1:3216` and `$C1:3760` are matched as BattlePos_ModeTable,
    Battle_FxHandlerTable and Battle_EnemyMoverTable): `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

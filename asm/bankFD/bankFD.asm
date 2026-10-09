@@ -665,8 +665,9 @@ BattleFD_UnkACEE:
 ; $2C-byte hit sets (!Battle_HitAmount/!Battle_HitFlags per battler slot)
 ; that Battle_RecordHit fills and Battle_ApplyHits applies, which runs it
 ; at its end. BattleSys_Main also runs it every pass.
-; Callers (6 JSL sites): BattleSys_Main ($C1:812C), Battle_ApplyHits ($C1:ED84), Battle_SetupBattle
-;   ($C1:FD12) and unmatched ($C1:D523, $C1:D7C4, $C1:D8D1).
+; Callers (6 JSL sites): BattleSys_Main ($C1:812C), BattleSys_RunTechParts ($C1:D523),
+;   BattleSys_UnkD7C4 ($C1:D7C4), BattleSys_UnkD8D1 ($C1:D8D1), Battle_ApplyHits ($C1:ED84) and
+;   Battle_SetupBattle ($C1:FD12).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 0 (B too); X = $84; Y unchanged
 org $FDACFD
@@ -2888,10 +2889,11 @@ RandomTableFD:
 ; ============================================================
 ; MainInit ($FD:C000)
 ; Called via: JML from Reset ($00:FF03), which also carries the soft
-; resets, and JML $FDC000 at $C0:418D (unmatched; after JSR InitHW and
-; S=$06FF). The bytes at $FD:851D read as JSR $C000 but sit in a block of
+; resets, and JML $FDC000 at $C0:418D (Evt_OpFF96_Reset, after JSR
+; InitHW and S=$06FF). The bytes at $FD:851D read as JSR $C000 but sit in a block of
 ; packed data ($FD:8480 onwards does not decode as code), not a caller.
-; Callers (3 sites: 1 JSR, 2 JML): Reset (JML $C0:FF03) and unmatched (JML $C0:418D, JSR $FD:851D).
+; Callers (3 sites: 1 JSR, 2 JML): Evt_OpFF96_Reset (JML $C0:418D), Reset (JML $C0:FF03) and
+;   unmatched (JSR $FD:851D).
 ; Entry: native mode; from a hardware reset M=1 X=1, D=$0000, DB=$00;
 ;        from $C0:418D M=1, X=0, DB=$00. Steps 1-3 set M, X, S, DB and DP,
 ;        so nothing else about the entry state matters
@@ -3940,8 +3942,8 @@ FdVec_FFF4:
 ; frame, and its header says it ticks the counter table at $0520, the
 ; FieldAnimB records).
 ; Callers (10 JSL sites): Field_EndOfFrame ($C0:00CD), Field_EndOfFrameShort ($C0:00E6),
-;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793)
-;   and unmatched ($C0:3FC6, $CD:09BF, $CD:0AD6, $D1:F54D).
+;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793),
+;   Evt_OpFF_Misc ($C0:3FC6) and unmatched ($CD:09BF, $CD:0AD6, $D1:F54D).
 ; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
 ;        banks $CD and $D1 not traced; what EngFD_UnkE39C needs is not
 ;        traced)
