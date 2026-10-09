@@ -13,46 +13,17 @@
 
 ; --- Bank $C0 ---
 
-org $C00AFF
-AudioDrvSync:       ; JSL re-entry: force 2 audio driver ticks, restore DB/DP; RTL
 
-org $C01BAB
-MusicCueDispatch:   ; JSL re-entry: SPC start ($14) or fade ($70) per $7E2A1F bit 6; RTL
 
-org $C01BE6
-AudioFadeDispatch:  ; JSL re-entry: conditional SPC fade/start via $7F01EC counter; RTL
 
-org $C02C41
-ScrollStepAccum:    ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
 
-org $C0ECCC
-IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline here
+org $C0F05E
+Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negative (the message
+                    ; choice cursor, probably); not analysed
 
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
 
-org $C01F87
-Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
-org $C028AA
-TileAnimList_Clear: ; fills the 16-word list at $7F:1CC8 with $8080 (empty)
-org $C028C0
-TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
-org $C028E1
-TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
-org $C09E29
-Party_Unk9E29:      ; JSR from Evt_OpB0_PartyControl for an Obj_Unk1100 kind-0 object (the leader,
-                    ; probably): JSR $C0:9E84, then copies the Map_Unk1D32/1D33 steps into Obj_VelX/Y
-                    ; and logs them with Map_Unk1D2C/2D, the priorities and Map_Unk1D34 at entry
-                    ; Field_UnkAB (stepped, & $7F) of ObjX_Unk7F0C00-$7F0F00 (not matched)
-org $C0A26B
-Party_UnkA26B:      ; JSR from Evt_OpB0_PartyControl for kind 1: moves Party_ObjSlot1's object by the
-                    ; entries logged above, from Field_UnkAC, lagging $10/$18 entries (not matched)
-org $C0A2CE
-Party_UnkA2CE:      ; as Party_UnkA26B for kind 2: Party_ObjSlot2's object, from Field_UnkAD (not
-                    ; matched)
-org $C05D6E
-Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
-                    ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
 
 ; --- Other banks, called from bank $C0 ---
 
@@ -118,6 +89,9 @@ org $FDFFE8
 FdVec_FFE8:         ; JMP $FD:DABE; JML target of Evt_OpFF_Misc for $FF $82
 org $FDFFEB
 FdVec_FFEB:         ; JMP $FD:DA5F; JML target of Evt_OpFF_Misc for $FF $81
+org $FDFFFD
+FdVec_FFFD:         ; JMP $FD:E022; JSL from IrqHandler on the frames Field_Unk53 bit 0 is set
+                    ; (not analysed)
 org $FDFFF1
 FdVec_FFF1:         ; JMP $FD:DA00; JML target of Evt_OpFF_Misc for $FF $80
 org $FDE39C

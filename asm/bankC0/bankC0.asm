@@ -5284,6 +5284,401 @@ Oam_UploadShadow:
     RTS
 
 ; ============================================================
+; The field's IRQ ($C0:ECCC–$C0:F05D)
+; NmiHandler enables the V-count IRQ each frame (Nmi_Nmitimen), and
+; Scene_ResumeNmi sets VTIMEL to Scene_VIrqLine (line 211), so the IRQ
+; fires near the bottom of the picture. It blanks the screen there and
+; uses the rest of the frame for VRAM writes the NMI does not do: the
+; tile animations' tilemap words and (through Irq_UnkF05E) something
+; that runs while Field_Unk63 is not negative (the message choice
+; cursor, probably; not analysed).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:ECCC — IrqHandler (73 bytes, $ECCC–$ED14)
+; Reached through the RAM trampoline InstallIRQ writes (JML IrqHandler
+;   at IrqTrampoline). Saves A, X, Y (16-bit), D and DB. Nothing more
+;   happens when bit 7 of Field_Unk0F is set (TIMEUP is then not read,
+;   so the IRQ flag stays set; who sets that bit is not traced) or when
+;   TIMEUP bit 7 is clear (not a timer IRQ). Else: NMITIMEN =
+;   NMITIMEN_NmiJoy (the V-count IRQ off until the next NMI), DB = $00,
+;   a wait for H-blank (HVBJOY bit 6), INIDISP = FORCED_BLANK, HDMAEN =
+;   0, and by Field_Unk53 bit 0 (Field_Unk53Phase, which
+;   EngFD_UnkC2C1 flips each frame): clear, Irq_UploadTileAnim; set,
+;   FdVec_FFFD (bank $FD, unmatched). So the tile writes happen every
+;   other frame. The RTS after the RTI ($ED14) is never reached.
+; Callers note: entered only as the IRQ (IrqTrampoline).
+; On entry: any state (an interrupt): it sets REP #$30 and then M=1;
+;   DP is the interrupted code's (Field_Unk0F and Field_Unk53 are read
+;   through DP_Field absolute / long, not dp); DB any until it sets
+;   $00.
+; Exit: RTI with A, X, Y, D, DB and P restored; Irq_UploadTileAnim /
+;   FdVec_FFFD's writes.
+; ------------------------------------------------------------
+IrqHandler:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHD
+    PHB
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk0F
+    BMI .done
+    LDA.l TIMEUP
+    BPL .done                           ; not the timer IRQ
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.l NMITIMEN
+    LDA.b #$00
+    PHA
+    PLB                                 ; DB = $00
+.wait_hblank:
+    LDA.w HVBJOY
+    BIT.b #!HVBJOY_HBlank
+    BEQ .wait_hblank
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    LDA.b #$00
+    STA.w HDMAEN
+    LDA.w !DP_Field+!Field_Unk53
+    AND.b #!Field_Unk53Phase
+    BNE .phase1
+    JSR Irq_UploadTileAnim
+    BRA .done
+.phase1:
+    JSL FdVec_FFFD
+.done:
+    REP #$30
+    PLB
+    PLD
+    PLY
+    PLX
+    PLA
+    RTI
+    RTS                                 ; dead: after the RTI
+
+; ------------------------------------------------------------
+; $C0:ED15 — Irq_UploadTileAnim (841 bytes, $ED15–$F05D)
+; With DP = DP_Field (set here and left set; IrqHandler restores D):
+;   Irq_UnkF05E when Field_Unk63 is not negative; then one queued
+;   tilemap job, by Field_VramQueueFlags:
+; - VramQueue_TileAnim (a Mode*_Handler ran): the new metatiles'
+;   four tilemap words (Map_Meta12TL/TR/BL/BR of metatile $100 + state,
+;   TileAnim_MetaPage) go to the VRAM addresses in TileAnim_VramAddrs,
+;   4 per map tile, by TileAnim_PairCount: 0, metatiles $1E7, $1E5
+;   (the lower and upper tile of an $E6 column); 1, $1ED, $1E9, $1EF,
+;   $1EB (a 2x2 block: bottom-left, top-left, bottom-right, top-right);
+;   2 or more, $1FB, $1F7, $1F3, $1FD, $1F9, $1F5 (a 2x3 block, left
+;   column bottom up, then the right one). The metatiles are fixed: the
+;   writes assume each tile's start state (TileAnim_ModeE6 /
+;   ColumnTop, ModeEC / EE / Box2*, ModeFA / FC / Box3*) plus 1, in
+;   the pass order the handlers fill TileAnim_VramAddrs (ModeEE / FC
+;   start from the right-hand tile; how their passes are ordered is not
+;   checked here). Then VramQueue_TileAnim is cleared.
+; - else VramQueue_TileStep (DefaultHandler's single tile): metatile
+;   $1FF (TileAnim_StepKind 0, from $FE) or $1E1 (kind 1, from $E0) to
+;   TileAnim_StepVramAddrs; VramQueue_TileStep cleared.
+; One job per call: a step queued with an animation waits for the next
+;   IRQ that runs this.
+; Callers (1 JSR site): IrqHandler ($C0:ED03).
+; On entry: M=1 (8-bit A), X=0 (16-bit X for Irq_UnkF05E; IrqHandler
+;   sets it), DP any (set here), DB=$00
+;   (VMAIN/VMADDL/VMDATAL and TileAnim_VramAddrs absolute; the
+;   metatiles long).
+; Exit: M=1, DP = DP_Field, DB unchanged; A clobbered; X and Y as
+;   Irq_UnkF05E leaves them; Field_VramQueueFlags bit cleared.
+; ------------------------------------------------------------
+Irq_UploadTileAnim:
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDA.b !Field_Unk63
+    BMI .tile_anim_test
+    JSR Irq_UnkF05E
+.tile_anim_test:
+    LDA.b !Field_VramQueueFlags
+    BIT.b #!VramQueue_TileAnim
+    BNE .tile_anim
+    BRL .step_test
+.tile_anim:
+    LDA.b !TileAnim_PairCount
+    BNE .more
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.more:
+    DEC A
+    BEQ .four
+    BRL .six
+.four:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+16
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+18
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+20
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+22
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+24
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+26
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+28
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+30
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.six:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+16
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+18
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+20
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+22
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+24
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+26
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+28
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+30
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+32
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+34
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+36
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+38
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+40
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+42
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+44
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+46
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.step_test:
+    BIT.b #!VramQueue_TileStep
+    BNE .step
+    RTS
+.step:
+    LDA.b !TileAnim_StepKind
+    BNE .step_e0
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_StepVramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileStep
+    TRB.b !Field_VramQueueFlags
+    RTS
+.step_e0:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_StepVramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileStep
+    TRB.b !Field_VramQueueFlags
+    RTS
+
+; ============================================================
 ; $C0:0000 — ReentryVectors (14 bytes)
 ; Mid-game re-entry vector table at the start of the bank. The BRA/BRL
 ; tail-dispatches to the target routine.
@@ -5293,7 +5688,7 @@ Oam_UploadShadow:
 ;       target's RTL returns straight to that caller.
 ;   [0] $0000  BRA → GameLoop_Main  (warm restart)
 ;   [1] $0002  JSL → ScrollStepAccum  ($C0:2C41)
-;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
+;   [2] $0005  JSL → Field_RefreshHdmaLong ($C0:0AFF)
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
 ; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), Evt_OpE1_WarpNow (BRL
@@ -5310,7 +5705,7 @@ org $C00000
 ReentryVectors:
     BRA GameLoop_Main       ; [0] warm restart — skip init, enter frame loop
     BRL ScrollStepAccum     ; [1] $C0:2C41
-    BRL AudioDrvSync        ; [2] $C0:0AFF
+    BRL Field_RefreshHdmaLong ; [2] $C0:0AFF
     BRL MusicCueDispatch    ; [3] $C0:1BAB
     BRL AudioFadeDispatch   ; [4] $C0:1BE6
 
@@ -8295,6 +8690,717 @@ Fade_StepFixedColor:
     RTS
 
 ; ============================================================
+; Field messages: the message window's frame step ($C0:1F87–$C0:21E0)
+; Field_Unk1F87 runs every frame (GameLoop_FrameBody) and steps the
+; sequence a treasure (Field_CheckTileInFront) or a message opcode
+; starts with Field_Unk29 = Field_Unk29Start. The text is drawn by bank
+; $C2's text window (TextWin_Init / TextWin_Step through
+; BankC2_Entry0003 / 0009, on the block at TextWin_Dp) into the 1 KB
+; buffer Field_Unk7EF000, one glyph per step; the NMI sends that buffer
+; to VRAM $5800 + Field_Unk31 x $200 (Field_UploadUnk5800) while
+; Field_Unk36 is set, so Field_Unk31 reads as the text line (0-3)
+; being written. Field_Unk26 / Field_Unk27 are the window's place and
+; how far it is open (EngFD_UnkC2C1 dispatches on Field_Unk26; not
+; analysed). The status codes come from the string (TextWin_Status:
+; the control codes $00 and $03-$0C set them): 0 = the end, 3 = a wait
+; of its argument x 15 frames, 5-8 = a new line (7/8 after a button
+; press), 9-$C = a new page ($B/$C after a button press), $10 = one
+; glyph drawn. That reading of the codes comes from what this code
+; does with them (Field_Unk34 = Field_Unk34Swallow waits for a press in
+; Field_ActionButton, probably). Field_Unk1F87 keeps its name for its
+; verified caller (better: Field_MessageStep).
+; ============================================================
+
+org $C01F87
+; ------------------------------------------------------------
+; $C0:1F87 — Field_Unk1F87 (299 bytes, $1F87–$20B1)
+; By Field_Unk29 (the message state):
+; - 0: nothing.
+; - 1 and 8 (start / new page): Field_MsgClearBuf, then the next state,
+;   Field_Unk31 = 0 and Field_Unk36 = Field_Unk36Upload (the NMI sends
+;   the cleared buffer to line 0).
+; - 2-4 and 9-11: the next state and line (the cleared buffer goes to
+;   lines 1-3 on the next frames).
+; - 5 (open): the first time (Field_Unk26 = 0) the window's place:
+;   Field_Unk26 = Field_Unk30 when that is 1 or 2, else by the low
+;   byte of Field_Unk2E's object's Obj_ScreenY: FieldMsg_Place2 below
+;   $80 (the upper half of the screen), FieldMsg_Place1 from $80 on
+;   (the window away from the object, probably); Field_Unk27 = 0,
+;   Field_Unk31 = 0, Field_Unk33 = 0, Field_Unk36 = 0, and
+;   Field_MsgStart. Later frames open it: Field_Unk27 + 1 up to four
+;   times, and when it reaches FieldMsg_OpenSize - 1 ($28), Field_Unk29
+;   = Field_Unk29Text and Field_MsgStep.
+; - 6 (text): Field_MsgStep.
+; - 7 (wait): with Field_Unk62 = 0 the wait below; 1: while
+;   TextWin_Status is nonzero the wait, at 0 Field_Unk63 = Field_Unk64
+;   and Field_Unk62 = 2 (the choice cursor starts, probably); 2:
+;   nothing (the cursor moves, Sub_1ADF); 3: the next state at once (a
+;   choice was made); other: nothing. The wait: Field_Unk34 =
+;   Field_Unk34Swallow: nothing (until a press, probably); other
+;   nonzero: count it down; 0: the next state by TextWin_Status: 9-$C
+;   Field_Unk29Page, 5-8 Field_Unk29Page when Field_Unk31 = 3 (the
+;   last line) else Field_Unk29Text, 3 Field_Unk29Text when
+;   TextWin_Code3Arg is nonzero, anything else (0: the end)
+;   Field_Unk29State0D.
+; - 12: Field_Unk29 = Field_Unk29Text and Field_MsgStep (the first line
+;   of a new page).
+; - $0D (close): Field_Unk27 - 1 up to four times; at 0 Field_Unk29 =
+;   0, Field_Unk26 = 0 and Field54_WatchBox in Field_Unk54 cleared.
+; - $0E and up: nothing.
+; Quirk: the opening test loads FieldMsg_OpenSize and decrements it
+;   once (A = $28) before up to five compares; kept as found.
+; Callers (1 JSL site): GameLoop_FrameBody ($C0:00AD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: Field_Unk34 and the
+;   callees' word loads), DP=$0100 (the Field_* bytes are dp), DB=$00
+;   (Obj_ScreenY, the TextWin_Dp block and the callees' registers
+;   absolute).
+; Exit: M=1, X=0, DP and DB unchanged (RTL); A, X and Y clobbered (Y
+;   by the callees); the Field_* bytes above and the callees' writes.
+; ------------------------------------------------------------
+Field_Unk1F87:
+    LDA.b !Field_Unk29
+    BNE .state
+    RTL
+.state:
+    DEC A
+    BEQ .clear_first                    ; 1
+    DEC A
+    BEQ .next_line                      ; 2
+    DEC A
+    BEQ .next_line                      ; 3
+    DEC A
+    BEQ .next_line                      ; 4
+    DEC A
+    BEQ .open                           ; 5
+    DEC A
+    BEQ .text                           ; 6
+    DEC A
+    BEQ .wait                           ; 7
+    DEC A
+    BEQ .clear_first                    ; 8
+    DEC A
+    BEQ .next_line                      ; 9
+    DEC A
+    BEQ .next_line                      ; 10
+    DEC A
+    BEQ .next_line                      ; 11
+    DEC A
+    BEQ .page_text                      ; 12
+    DEC A
+    BEQ .close                          ; $0D
+    RTL
+.clear_first:
+    JSR Field_MsgClearBuf
+    INC.b !Field_Unk29
+    STZ.b !Field_Unk31
+    LDA.b #!Field_Unk36Upload
+    STA.b !Field_Unk36
+    RTL
+.next_line:
+    INC.b !Field_Unk29
+    INC.b !Field_Unk31
+    RTL
+.page_text:
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    JSR Field_MsgStep
+    RTL
+.open:
+    LDA.b !Field_Unk26
+    BNE .opening
+    LDA.b !Field_Unk30
+    BEQ .by_object
+    CMP.b #!FieldMsg_Place1
+    BEQ .lower
+    CMP.b #!FieldMsg_Place2
+    BEQ .upper
+.by_object:
+    LDX.b !Field_Unk2E
+    LDA.w !Obj_ScreenY,X
+    BPL .upper
+.lower:
+    LDA.b #!FieldMsg_Place1
+    BRA .set_place
+.upper:
+    LDA.b #!FieldMsg_Place2
+.set_place:
+    STA.b !Field_Unk26
+    STZ.b !Field_Unk27
+    STZ.b !Field_Unk31
+    STZ.b !Field_Unk33
+    STZ.b !Field_Unk36
+    JSR Field_MsgStart
+    RTL
+.opening:
+    LDA.b #!FieldMsg_OpenSize
+    DEC A                               ; the target is one less (quirk)
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    RTL
+.text:
+    JSR Field_MsgStep
+    RTL
+.wait:
+    LDA.b !Field_Unk62
+    BEQ .wait_count
+    CMP.b #!FieldMsg_ChoiceStart
+    BNE .choice_other
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BNE .wait_count
+    LDA.b !Field_Unk64
+    STA.b !Field_Unk63
+    LDA.b #!FieldMsg_ChoiceActive
+    STA.b !Field_Unk62
+    RTL
+.close:
+    LDA.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    RTL
+.opened:
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    JSR Field_MsgStep
+    RTL
+.closed:
+    STZ.b !Field_Unk29
+    STZ.b !Field_Unk26
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    RTL
+.wait_count:
+    BRA .countdown
+.after_wait:
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BEQ .end
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .page
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .arg
+.end:
+    LDA.b #!Field_Unk29State0D
+    STA.b !Field_Unk29
+    RTL
+.page:
+    LDA.b #!Field_Unk29Page
+    STA.b !Field_Unk29
+    RTL
+.line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BEQ .page
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    RTL
+.arg:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .end
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    RTL
+.choice_other:
+    CMP.b #!FieldMsg_ChoiceMade
+    BEQ .after_wait
+    RTL
+.countdown:
+    LDX.b !Field_Unk34
+    BEQ .after_wait
+    CPX.w #!Field_Unk34Swallow
+    BEQ .hold
+    DEX
+    STX.b !Field_Unk34
+.hold:
+    RTL
+
+; ------------------------------------------------------------
+; $C0:20B2 — Field_MsgClearBuf (64 bytes, $20B2–$20F1)
+; Zeroes the 1 KB text buffer Field_Unk7EF000 ($7E:F000-$7E:F3FF) as
+;   Map_ClearBufC800 does: two MVNs copy the 32 zero bytes at
+;   GfxRom_D2 to its first 64 bytes, then each MVN copies the zeroed
+;   part to the bytes right after it (64, 128, 256, 512 bytes).
+; Callers (2 JSR sites): Field_Unk1F87 ($C0:1FB4) and Field_MsgStep ($C0:216A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (saved; the MVNs set it to $7E).
+; Exit: M=1, X=0, DP and DB unchanged; A = $FFFF (B = $FF), X = $F200,
+;   Y = $F400.
+; ------------------------------------------------------------
+Field_MsgClearBuf:
+    PHB
+    LDX.w #!GfxRom_D2&$FFFF
+    LDY.w #!Field_Unk7EF000&$FFFF
+    REP #$20
+    LDA.w #!Map_ZeroChunk-1
+    MVN !Bank7E,!BankD2                 ; 32 zeros -> $7E:F000  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Map_ZeroChunk-1
+    LDX.w #!GfxRom_D2&$FFFF
+    MVN !Bank7E,!BankD2                 ; and again -> $F020  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*2-1
+    MVN !Bank7E,!Bank7E                 ; 128 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*4-1
+    MVN !Bank7E,!Bank7E                 ; 256 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*8-1
+    MVN !Bank7E,!Bank7E                 ; 512 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*16-1
+    MVN !Bank7E,!Bank7E                 ; 1,024 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:20F2 — Field_MsgStart (52 bytes, $20F2–$2125)
+; Starts the text window on the message: TextWin_StrIndex =
+;   Field_Unk2A; the string table TextWin_StrTable = FieldMsg_TreasureStrs
+;   ($DE:FF00) while Field54_WatchBox is set in Field_Unk54 (a treasure
+;   message: Field_CheckTileInFront sets it with Field_Unk2A = the
+;   TreasureKind), else Field_Unk2B / Field_Unk2D (the pointer
+;   Evt_OpB8_SetMsgPtr set); TextWin_GfxBuf = Field_Unk7EF000,
+;   TextWin_Mode = 0; then TextWin_Init (BankC2_Entry0003).
+; Callers (1 JSR site): Field_Unk1F87 ($C0:1FF4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: word stores), DP=$0100
+;   (Field_Unk2A-2D and Field_Unk54 are dp), DB=$00 (the TextWin_Dp
+;   block absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A, X and Y as TextWin_Init
+;   leaves them (it saves P, DP and DB); the TextWin_Dp block set up.
+; ------------------------------------------------------------
+Field_MsgStart:
+    LDA.b !Field_Unk2A
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_WatchBox
+    BEQ .event_text
+    LDX.w #!FieldMsg_TreasureStrs&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b #!FieldMsg_TreasureStrs>>16
+    BRA .set_bank
+.event_text:
+    LDX.b !Field_Unk2B
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b !Field_Unk2D
+.set_bank:
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.b #!Bank7E
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    LDA.b #$00
+    STA.w !TextWin_Dp+!TextWin_Mode
+    JSL BankC2_Entry0003
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2126 — Field_MsgStep (187 bytes, $2126–$21E0)
+; One step of the message text. First by TextWin_Status (the last
+;   step's): 0: Field_Unk36 = 0 and nothing more (the text has ended);
+;   9-$C (new page): Field_Unk31 = 0; 5-8 (new line): Field_Unk31 + 1,
+;   or 0 after line 3; for both Field_Unk32 = 0 and Field_MsgClearBuf;
+;   3: with TextWin_Code3Arg 0, as status 0; other: no change. Then
+;   TextWin_StepCount = 1 and TextWin_Step (BankC2_Entry0009), and by
+;   the new status:
+; - $10 (a glyph drawn) and the others not below: Field_Unk36 =
+;   Field_Unk36Upload (the line goes to VRAM every frame).
+; - 0 (the end) and $B/$C: Field_Unk34 = Field_Unk34Swallow (wait for a
+;   press, probably), then as 9/$A.
+; - 9/$A: Field_Unk29 = Field_Unk29Wait and Field_Unk36 =
+;   Field_Unk36Once (one more upload).
+; - 7/8: Field_Unk34 = Field_Unk34Swallow and Field_Unk29 =
+;   Field_Unk29Wait, then as 5/6.
+; - 5/6: on the last line (Field_Unk31 = 3) as 9/$A, else Field_Unk36 =
+;   Field_Unk36Upload (Field_Unk29 unchanged: for 5/6 the text goes on
+;   next frame; for 7/8 it waits).
+; - 3: with TextWin_Code3Arg 0 as 9/$A; else Field_Unk34 =
+;   TextWin_Code3Arg x FieldMsg_WaitUnit (15) frames, Field_Unk29 =
+;   Field_Unk29Wait, Field_Unk36 = Field_Unk36Upload.
+; Callers (3 JSR sites): Field_Unk1F87 ($C0:1FC9, $C0:2018, $C0:2049).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: Field_Unk34 and the
+;   product are words), DP=$0100 (the Field_* bytes are dp), DB=$00
+;   (the TextWin_Dp block and the multiplier absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X, Y as
+;   TextWin_Step / Field_MsgClearBuf leave them, X = Field_Unk34 when it
+;   was set here; the Field_* bytes above.
+; ------------------------------------------------------------
+Field_MsgStep:
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BNE .status
+.idle:
+    STZ.b !Field_Unk36
+    RTS
+.status:
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .arg
+    BRA .step
+.arg:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .idle
+    BRA .step
+.new_line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BNE .line_down
+.first_line:
+    LDA.b #$00
+    BRA .set_line
+.line_down:
+    INC A
+.set_line:
+    STA.b !Field_Unk31
+    STZ.b !Field_Unk32
+    JSR Field_MsgClearBuf
+.step:
+    LDA.b #$01
+    STA.w !TextWin_Dp+!TextWin_StepCount
+    JSL BankC2_Entry0009
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BEQ .ended
+    CMP.b #!TextWin_StatusStepDone
+    BEQ .go_on
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .wait
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .wait
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .ended
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .ended
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .line_wait
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .line_wait
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .timed
+.go_on:
+    LDA.b #!Field_Unk36Upload
+    STA.b !Field_Unk36
+    RTS
+.timed:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .wait
+    STA.w WRMPYA
+    LDA.b #!FieldMsg_WaitUnit
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+    LDX.w RDMPYL
+    STX.b !Field_Unk34
+    BRA .go_on
+.line_wait:
+    LDX.w #!Field_Unk34Swallow
+    STX.b !Field_Unk34
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+.line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BNE .go_on
+    BRA .wait
+.ended:
+    LDX.w #!Field_Unk34Swallow
+    STX.b !Field_Unk34
+.wait:
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+    LDA.b #!Field_Unk36Once
+    STA.b !Field_Unk36
+    RTS
+
+; ============================================================
+; $C0:2C41 — ScrollStepAccum (391 bytes, $2C41–$2DC7)
+; Steps the scroll positions of layers 2 and 3 by signed per-frame
+; speeds in 1/16 pixels, the copies of them that FieldBtlPpu.Scroll2
+; holds for the battle. For layer 2 when bit 1 of LayerDrift_Flags is
+; set (LayerDrift_Layer2), for layer 3 when bit 2 is (LayerDrift_Layer3);
+; for each axis: the speed is added to the 8-bit fraction (4.4 fixed
+; point, signed); its whole part (the fraction / 16, rounded toward 0)
+; is added to the 16-bit position (LayerDrift_L2X ...) and that is
+; stored to the FieldBtlPpu.Scroll2 word of the layer and axis
+; (+4/+6 layer 2 X/Y, +8/+$A layer 3); the fraction keeps its low
+; nibble with the sign (ORA $F0 when negative, unless the nibble is 0).
+; Only layer 2's X skips the update when the new fraction is 0 (the
+; other three add 0 then); kept as found. Who sets the speeds and flags
+; is not traced (unmatched code); the name is kept from the stub for
+; its verified callers (better: LayerDrift_Step, probably the battle
+; backgrounds' drift: bank $CD calls it through ReentryVectors [1]).
+; Callers (2 sites: 1 JSL, 1 BRL): ReentryVectors (BRL $C0:0002) and DefaultHandler (JSL $C0:1895).
+; Callers note: the BRL in ReentryVectors is vector [1], which bank $CD
+;   reaches by JSL $C0:0002 (at $CD:0C8C).
+; On entry: M=1 (8-bit A), X any (not used), DP any (saved; set to
+;   DP_Field for the scratch), DB any (saved; set to $7F for the
+;   LayerDrift_* bytes).
+; Exit: M=1, DP and DB restored (RTL); A clobbered; X and Y unchanged;
+;   LayerDrift_Scratch ($0100+$D9/$DA, Eng_Scratch) written on the
+;   negative paths.
+; ============================================================
+org $C02C41
+ScrollStepAccum:
+    PHD
+    PHB
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    LDA.w !LayerDrift_Flags
+    BIT.b #!LayerDrift_Layer2
+    BNE .layer2
+    BRL .layer3_test
+.layer2:
+    CLC
+    LDA.w !LayerDrift_L2SpeedX
+    ADC.w !LayerDrift_L2FracX
+    STA.w !LayerDrift_L2FracX
+    CLC
+    LDA.w !LayerDrift_L2SpeedY
+    ADC.w !LayerDrift_L2FracY
+    STA.w !LayerDrift_L2FracY
+    LDA.w !LayerDrift_L2FracX
+    BEQ .l2_y                           ; only this axis skips a 0 (quirk)
+    BMI .l2x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L2X
+    STA.w !LayerDrift_L2X
+    STA.l FieldBtlPpu.Scroll2+4
+    SEP #$20
+    BRA .l2x_frac
+.l2x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L2X
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L2X
+    STA.l FieldBtlPpu.Scroll2+4
+    SEP #$20
+.l2x_frac:
+    LDA.w !LayerDrift_L2FracX
+    AND.b #!LayerDrift_FracMask
+    BEQ .l2x_store
+    LDA.w !LayerDrift_L2FracX
+    BPL .l2x_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l2x_store
+.l2x_pos:
+    AND.b #!LayerDrift_FracMask
+.l2x_store:
+    STA.w !LayerDrift_L2FracX
+.l2_y:
+    LDA.w !LayerDrift_L2FracY
+    BMI .l2y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L2Y
+    STA.w !LayerDrift_L2Y
+    STA.l FieldBtlPpu.Scroll2+6
+    SEP #$20
+    BRA .l2y_frac
+.l2y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L2Y
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L2Y
+    STA.l FieldBtlPpu.Scroll2+6
+    SEP #$20
+.l2y_frac:
+    LDA.w !LayerDrift_L2FracY
+    AND.b #!LayerDrift_FracMask
+    BEQ .l2y_store
+    LDA.w !LayerDrift_L2FracY
+    BPL .l2y_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l2y_store
+.l2y_pos:
+    AND.b #!LayerDrift_FracMask
+.l2y_store:
+    STA.w !LayerDrift_L2FracY
+.layer3_test:
+    LDA.w !LayerDrift_Flags
+    BIT.b #!LayerDrift_Layer3
+    BNE .layer3
+    BRL .done
+.layer3:
+    CLC
+    LDA.w !LayerDrift_L3SpeedX
+    ADC.w !LayerDrift_L3FracX
+    STA.w !LayerDrift_L3FracX
+    CLC
+    LDA.w !LayerDrift_L3SpeedY
+    ADC.w !LayerDrift_L3FracY
+    STA.w !LayerDrift_L3FracY
+    LDA.w !LayerDrift_L3FracX
+    BMI .l3x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L3X
+    STA.w !LayerDrift_L3X
+    STA.l FieldBtlPpu.Scroll2+8
+    SEP #$20
+    BRA .l3x_frac
+.l3x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L3X
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L3X
+    STA.l FieldBtlPpu.Scroll2+8
+    SEP #$20
+.l3x_frac:
+    LDA.w !LayerDrift_L3FracX
+    AND.b #!LayerDrift_FracMask
+    BEQ .l3x_store
+    LDA.w !LayerDrift_L3FracX
+    BPL .l3x_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l3x_store
+.l3x_pos:
+    AND.b #!LayerDrift_FracMask
+.l3x_store:
+    STA.w !LayerDrift_L3FracX
+    LDA.w !LayerDrift_L3FracY
+    BMI .l3y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L3Y
+    STA.w !LayerDrift_L3Y
+    STA.l FieldBtlPpu.Scroll2+10
+    SEP #$20
+    BRA .l3y_frac
+.l3y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L3Y
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L3Y
+    STA.l FieldBtlPpu.Scroll2+10
+    SEP #$20
+.l3y_frac:
+    LDA.w !LayerDrift_L3FracY
+    AND.b #!LayerDrift_FracMask
+    BEQ .l3y_store
+    LDA.w !LayerDrift_L3FracY
+    BPL .l3y_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l3y_store
+.l3y_pos:
+    AND.b #!LayerDrift_FracMask
+.l3y_store:
+    STA.w !LayerDrift_L3FracY
+.done:
+    PLB
+    PLD
+    RTL
+
+; ============================================================
 ; $C0:2DC8 — VramDma_Upload (41 bytes, $2DC8–$2DF0)
 ; Copies a block to VRAM with DMA channel 7: VMADDL = VramDma_Addr,
 ; VMAIN = increment after the high byte, DMAP7 = VramDma_Mode, B-bus
@@ -8450,7 +9556,7 @@ Sys_HaltWithColor:
 
 ; ============================================================
 ; Event opcodes: animation and waits ($C0:2E67–$C0:2FFC)
-; Handlers in Evt_OpcodeTable (unmatched), entered as the other opcode
+; Handlers in Evt_OpcodeTable, entered as the other opcode
 ; handlers (see the banner of the call opcodes at $C0:5F6E): Y = the
 ; opcode's offset in Evt_Data, X returned = where the script goes on,
 ; C=1 to go on in this run, C=0 to stop the object for this run. They
@@ -8467,16 +9573,18 @@ org $C02E67
 ; Event opcode $AA (2 bytes: $AA, row): Obj_Cur's Obj_AnimRow = row,
 ;   Obj_AnimMode = Obj_AnimModeNormal (1), and Obj_AnimTimer,
 ;   ObjX_AnimLoops and Obj_AnimColumn = 0 (the row starts over at once);
-;   X = Y + 1, C=1. Evt_SetAnimRow does this with A = the row (Y = the
-;   opcode for the one-byte opcodes $B3/$B4); Evt_SetAnimMode with A =
-;   the mode and X = Obj_Cur (Evt_OpAE_AnimReset).
+;   X = the opcode + 2 (Y + 1 via the sub-entries), C=1. Evt_SetAnimRow
+;   does this with A = the row (Y = the opcode for the one-byte
+;   opcodes $B3/$B4); Evt_SetAnimMode with A = the mode and X = Obj_Cur
+;   (Evt_OpAE_AnimReset).
 ; Reached through Evt_OpcodeTable (opcode $AA).
 ; Callers note: Evt_SetAnimRow is branched to (BRA) by Evt_OpB3_AnimRow0
 ;   and Evt_OpB4_AnimRow1, Evt_SetAnimMode by Evt_OpAE_AnimReset.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
 ;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
-; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1 (the next opcode), C=1;
-;   A = 0; Y = the opcode + 1 here, unchanged through the sub-entries.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2 (the next
+;   opcode; Y + 1 via the sub-entries), C=1; A = 0; Y = the opcode + 1
+;   here, unchanged through the sub-entries.
 ; ------------------------------------------------------------
 Evt_OpAA_SetAnimRow:
     INY
@@ -14024,6 +15132,958 @@ Evt_Op83_InitEnemySprite:
     LDA.b [!Field_E4Ptr0],Y
     STA.w !Obj_GfxBank,X
     BRL .tile_slot
+
+; ============================================================
+; Event opcodes: object settings and palette animations
+; ($C0:4867–$C0:4D05)
+; Handlers in Evt_OpcodeTable for the object's flags, speed,
+; place and priority bits, and the two opcodes that start the location's
+; palette animations: they fill a free FieldAnimB record (the 12-byte
+; records FieldFD_LoadAnimSetB fills from the location's list, worked on
+; each frame by FdVec_FFF7: not analysed, so the record fields keep Unk
+; names) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
+; other handlers: entered with Y = the opcode's offset in Evt_Data, they
+; return X = where the script goes on and C=1 (keep running) or C=0
+; (stop this object for this run). "a" / "b" name event words at
+; Evt_Unk7F0200 + a x 2 (their low byte is used).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:4867 — Evt_Op84_SetUnk1B01 (15 bytes, $4867–$4875)
+; Event opcode $84 (2 bytes: $84, value): Obj_Cur's Obj_Unk1B01 = value
+;   (bit 0: the object blocks the leader, Obj_Unk1B01Solid; bit 1: it
+;   can be pushed, Obj_Unk1B01Push). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $84).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   value; Y = the opcode + 2.
+; ------------------------------------------------------------
+Evt_Op84_SetUnk1B01:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1B01,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4876 — Evt_Op87_SetScriptPeriod (28 bytes, $4876–$4891)
+; Event opcode $87 (2 bytes: $87, n): Obj_Cur's Obj_Unk1000 = (n + 1)
+;   | its old bit 7 (Obj_Unk1000Bit7 kept): the object's script runs
+;   every n + 1 frames (Vblank_Unk59D9 reloads Obj_Unk1001 from it), and
+;   Obj_Unk1001 (the countdown) gets the same value at once. Quirk: the
+;   countdown is not masked, so with bit 7 set it gets bit 7 too; n + 1
+;   is not masked either (n = $7F gives bit 7). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $87).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   new Obj_Unk1000; Y = the opcode + 1; Eng_Scratch ($D9) = n + 1.
+; ------------------------------------------------------------
+Evt_Op87_SetScriptPeriod:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    INC A
+    STA.b !Eng_Scratch
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7
+    ORA.b !Eng_Scratch
+    STA.w !Obj_Unk1000,X
+    STA.w !Obj_Unk1001,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4892 — Evt_Op88_ObjPalAnim (444 bytes, $4892–$4A4D)
+; Event opcode $88 ($88, kind, ...): palette animations on Obj_Cur's
+;   own palette (its colour 0 is EvtPal_Base = Obj_OamAttr x 8 +
+;   EvtPal_SpriteColor0: Obj_OamAttr holds the palette slot x 2). By
+;   the kind byte:
+; - 0 (2 bytes): undo: when ObjX_PalAnimRec is not ObjX_PalAnimNone,
+;   that record's FieldAnimB.Unk0 = 0 (free) and ObjX_PalAnimRec =
+;   ObjX_PalAnimNone, and the object's 12 colours are copied again
+;   from bank $E4 (Obj_PalSrc) into colours 1-12 of its rows in
+;   Pal_Buf and Pal_CgramBuf, as Obj_PalSlotFixed does. X = Y + 2, C=1
+;   (also when there was no record: nothing is copied then).
+; - $20 or $30 exactly (4 bytes: $88, kind, c, s): a free record (from
+;   Evt_FindFreeAnimB) gets .Unk0 = kind, .Unk1 = EvtPal_Base + (c >>
+;   4), .Unk2 = c & $0F, .Unk4 = 0, .Unk5 = s; ObjX_PalAnimRec = its
+;   offset (a record the object already had is not freed). X = Y + 4,
+;   C=1; with no record free X = Y + 4, C=0 (the opcode is dropped).
+; - $4x or $5x (5 bytes: $88, kind, c, d, s): a free record gets .Unk0
+;   = kind & $F0, .Unk6 = kind & $0F, .Unk1 / .Unk2 from c as above,
+;   .Unk3 = EvtPal_Unk3Init, .Unk4 = 0, .Unk5 = s, .Unk7 = d's high
+;   nibble in both nibbles, .Unk8 = d's low nibble in both; not linked
+;   to the object. X = Y + 5, C=1; no record free: X = Y + 5, C=0.
+; - $8x (2 + n bytes: $88, kind, the word n, n - 2 colour bytes): the
+;   colour bytes are copied (MVN from bank $7F) to Pal_CgramBuf and
+;   Pal_Buf from colour EvtPal_Base | (kind & $0F) on. X = Y + n + 2,
+;   C=1.
+; - any other kind (2 bytes): nothing; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $88).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   EvtPal_* scratch are dp; EvtOp_SavedPos), DB=$00 (Obj_* tables and
+;   FieldAnimB absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged (DB saved around the MVNs); X and
+;   C as above; A and Y clobbered (Y = the record's offset on the
+;   record paths); EvtOp_SavedPos = the opcode's offset; EvtPal_Arg,
+;   EvtPal_Base / Src, EvtPal_Speeds / ColOfs and EvtPal_Count ($C1)
+;   written on the paths that use them.
+; ------------------------------------------------------------
+Evt_Op88_ObjPalAnim:
+    STY.b !EvtOp_SavedPos
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    BEQ .restore
+    STA.b !EvtPal_Arg
+    CMP.b #!EvtPal_Kind20
+    BEQ .linked
+    CMP.b #!EvtPal_Kind30
+    BEQ .linked
+    AND.b #!FieldAnimB_KindMask
+    CMP.b #!EvtPal_Kind40
+    BNE .not_40
+    BRL .cycle
+.not_40:
+    CMP.b #!EvtPal_Kind50
+    BNE .not_50
+    BRL .cycle
+.not_50:
+    CMP.b #!FieldAnimB_Kind80
+    BNE .ignored
+    BRL .copy
+.ignored:
+    INX
+    SEC
+    RTS
+.restore:
+    LDX.b !Obj_Cur
+    REP #$20
+    LDA.l !ObjX_PalAnimRec,X
+    BMI .no_record
+    TAY
+    LDA.w #!ObjX_PalAnimNone
+    STA.l !ObjX_PalAnimRec,X
+    SEP #$20
+    LDA.b #$00
+    STA.w FieldAnimB.Unk0,Y             ; free the record
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x $20: its Pal_Buf row
+    INC A
+    INC A                               ; colour 1
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf       ; the same colours in Pal_CgramBuf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    SEC
+    RTS
+.no_record:
+    SEP #$20
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    SEC
+    RTS
+.linked:
+    JSR Evt_FindFreeAnimB
+    BCC .linked_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.linked_free:
+    REP #$20
+    TYA
+    LDX.b !Obj_Cur
+    STA.l !ObjX_PalAnimRec,X
+    SEP #$20
+    LDA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk0,Y
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg                   ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    INX
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk2,Y
+    LDA.b !EvtPal_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.b !EvtPal_Base
+    STA.w FieldAnimB.Unk1,Y
+    SEC
+    RTS
+.cycle:
+    JSR Evt_FindFreeAnimB
+    BCC .cycle_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.cycle_free:
+    LDA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    STA.w FieldAnimB.Unk0,Y
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk6,Y
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg                   ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Speeds                ; d
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    LDA.b #!EvtPal_Unk3Init
+    STA.w FieldAnimB.Unk3,Y
+    INX
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk2,Y
+    LDA.b !EvtPal_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.b !EvtPal_Base
+    STA.w FieldAnimB.Unk1,Y
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk7,Y             ; d's high nibble, twice
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk8,Y             ; d's low nibble, twice
+    SEC
+    RTS
+.copy:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Base                  ; the first colour
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    STA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    TAY
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; the word n
+    DEC A
+    DEC A
+    DEC A                               ; MVN count: n - 2 bytes
+    STA.b !EvtPal_Count
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr
+    STA.b !EvtPal_Src
+    TAX
+    LDA.b !EvtPal_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_Buf&$FFFF
+    TAY
+    LDX.b !EvtPal_Src
+    LDA.b !EvtPal_Count
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA                                 ; past the colour bytes
+    SEC
+    SBC.w #!Evt_DataAddr
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4A4E — Evt_Op2E_PalAnim (222 bytes, $4A4E–$4B2B)
+; Event opcode $2E ($2E, kind, ...): as Evt_Op88_ObjPalAnim's kinds
+;   $4x/$5x and $8x, with absolute colour numbers instead of the
+;   object's palette. By kind & $F0:
+; - $40 or $50 (6 bytes: $2E, kind, c, e, d, s): a free FieldAnimB
+;   record (Evt_FindFreeAnimB) gets .Unk0 = kind & $F0, .Unk6 = kind &
+;   $0F, .Unk1 = c, .Unk2 = e, .Unk3 = EvtPal_Unk3Init, .Unk4 = 0,
+;   .Unk5 = s, .Unk7 = d's high nibble in both nibbles, .Unk8 = d's low
+;   nibble in both. X = Y + 6, C=1; with no record free X = Y + 6, C=0
+;   (the opcode is dropped).
+; - $80 (3 + n bytes: $2E, kind, c, the word n, n - 2 colour bytes): the
+;   colour bytes are copied (MVN from bank $7F) to Pal_CgramBuf and
+;   Pal_Buf from colour c on. X = Y + n + 3, C=1.
+; - any other (2 bytes): nothing; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $2E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtPal_*
+;   scratch and EvtOp_SavedPos are dp), DB=$00 (FieldAnimB absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged (DB saved around the MVNs); X and
+;   C as above; A and Y clobbered (Y = the record's offset on the
+;   record path); EvtOp_SavedPos = the opcode's offset; EvtPal_Arg,
+;   EvtPal_Speeds / ColOfs, EvtPal_Src and EvtPal_Count ($C1) written
+;   on the paths that use them.
+; ------------------------------------------------------------
+Evt_Op2E_PalAnim:
+    STY.b !EvtOp_SavedPos
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    CMP.b #!EvtPal_Kind40
+    BNE .not_40
+    BRL .cycle
+.not_40:
+    CMP.b #!EvtPal_Kind50
+    BNE .not_50
+    BRL .cycle
+.not_50:
+    CMP.b #!FieldAnimB_Kind80
+    BNE .ignored
+    BRL .copy
+.ignored:
+    INX
+    SEC
+    RTS
+.cycle:
+    JSR Evt_FindFreeAnimB
+    BCC .cycle_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.cycle_free:
+    LDA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    STA.w FieldAnimB.Unk0,Y
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk6,Y
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk1,Y             ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk2,Y             ; e
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Speeds                ; d
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    LDA.b #!EvtPal_Unk3Init
+    STA.w FieldAnimB.Unk3,Y
+    INX
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk7,Y             ; d's high nibble, twice
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk8,Y             ; d's low nibble, twice
+    SEC
+    RTS
+.copy:
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; c
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    STA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    TAY
+    INX
+    LDA.l !Evt_Data,X                   ; the word n
+    DEC A
+    DEC A
+    DEC A                               ; MVN count: n - 2 bytes
+    STA.b !EvtPal_Count
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr
+    STA.b !EvtPal_Src
+    TAX
+    LDA.b !EvtPal_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_Buf&$FFFF
+    TAY
+    LDX.b !EvtPal_Src
+    LDA.b !EvtPal_Count
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA                                 ; past the colour bytes
+    SEC
+    SBC.w #!Evt_DataAddr
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B2C — Evt_FindFreeAnimB (29 bytes, $4B2C–$4B48)
+; Finds a free FieldAnimB record (.Unk0 = 0) among the first
+;   FieldAnimB_Searched (8) of the 12, from record 0 on; records 8-11
+;   are never handed out here.
+; Callers (3 JSR sites): Evt_Op88_ObjPalAnim ($C0:4919, $C0:4970) and Evt_Op2E_PalAnim ($C0:4A72).
+; On entry: M=1 (8-bit A), X=0 (16-bit Y), DP any (not used), DB=$00
+;   (FieldAnimB absolute).
+; Exit: M=1, X=0, DP and DB unchanged; C=0: Y = the free record's
+;   offset; C=1: none free, Y = FieldAnimB_Size x 8; A clobbered; X
+;   unchanged.
+; ------------------------------------------------------------
+Evt_FindFreeAnimB:
+    LDY.w #$0000
+.loop:
+    LDA.w FieldAnimB.Unk0,Y
+    BEQ .free
+    REP #$20
+    TYA
+    CLC
+    ADC.w #!FieldAnimB_Size
+    TAY
+    SEP #$20
+    CPY.w #!FieldAnimB_Size*!FieldAnimB_Searched
+    BCS .none
+    BRA .loop
+.free:
+    CLC
+    RTS
+.none:
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B49 — Evt_Op89_SetSpeed (15 bytes, $4B49–$4B57)
+; Event opcode $89 (2 bytes: $89, speed): Obj_Cur's Obj_Speed = speed
+;   (the step the Obj_SetVelocity* routines scale the direction by).
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $89).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   speed; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op89_SetSpeed:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Speed,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B58 — Evt_Op8A_SetSpeedVar (28 bytes, $4B58–$4B73)
+; Event opcode $8A (2 bytes: $8A, a): as Evt_Op89_SetSpeed with the low
+;   byte of the event word a. X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $8A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   speed (B = a x 2 >> 8); Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op8A_SetSpeedVar:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Speed,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B74 — Evt_Op8B_PlaceAtTile (79 bytes, $4B74–$4BC2)
+; Event opcode $8B (3 bytes: $8B, column, row): puts Obj_Cur on the
+;   tile: Obj_PosX = column << 8 | EvtChar_SubXCentre, Obj_PosY = row
+;   << 8 | EvtChar_SubYLower. When its Obj_OamFlags bit 7 is set
+;   (Obj_OamFlagsTilePrio) the priorities follow the tile: Obj_PrioHigh
+;   = (Map_TileAttrA & TileAttr_Prio) >> 2 | Oam_Prio2, Obj_PrioLow =
+;   the same from Map_TileAttrB. That is the other way round from
+;   Obj_SetVelocityChecked (A to PrioLow, B to PrioHigh); kept as found.
+;   The tile index is column | row << 8 unmasked (no Map_ColMask1).
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $8B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_Pos are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A
+;   clobbered; Y = the opcode + 2; EvtTile_Pos ($D9/$DA) written.
+; ------------------------------------------------------------
+Evt_Op8B_PlaceAtTile:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileX,X
+    STA.b !EvtTile_Pos
+    LDA.b #!EvtChar_SubXCentre
+    STA.w !Obj_PosX,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileY,X
+    STA.b !EvtTile_Pos+1
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDX.b !EvtTile_Pos
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4BC3 — Evt_Op8C_PlaceAtTileVar (100 bytes, $4BC3–$4C26)
+; Event opcode $8C (3 bytes: $8C, a, b): as Evt_Op8B_PlaceAtTile with
+;   the column and row from the low bytes of the event words a and b,
+;   except that Obj_PosX's low byte is not set (only Obj_TileX; the
+;   object keeps its old place within the column). Priorities from the
+;   tile as there (Map_TileAttrA to Obj_PrioHigh). X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $8C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_Pos are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A
+;   clobbered; Y = the opcode + 2; EvtTile_Pos ($D9/$DA) written.
+; ------------------------------------------------------------
+Evt_Op8C_PlaceAtTileVar:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileX,X
+    STA.b !EvtTile_Pos
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileY,X
+    STA.b !EvtTile_Pos+1
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDX.b !EvtTile_Pos
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4C27 — Evt_Op8D_SetPos (77 bytes, $4C27–$4C73)
+; Event opcode $8D (5 bytes: $8D, the words x, y): Obj_Cur's Obj_PosX =
+;   x, Obj_PosY = y (16-bit: tile in the high byte); with Obj_OamFlags
+;   bit 7 set the priorities follow the new tile (Obj_TileY << 8 |
+;   Obj_TileX, unmasked) as in Evt_Op8B_PlaceAtTile (Map_TileAttrA to
+;   Obj_PrioHigh). X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $8D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_PrioA are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A
+;   clobbered; Y = the opcode + 3; EvtTile_PrioA ($D9) written on the
+;   bit-7 path.
+; ------------------------------------------------------------
+Evt_Op8D_SetPos:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_PosX,X
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_PosY,X
+    SEP #$20
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4C74 — Evt_Op8E_SetOamFlags (97 bytes, $4C74–$4CD4)
+; Event opcode $8E (2 bytes: $8E, flags): Obj_Cur's Obj_OamFlags =
+;   flags. With bit 7 (Obj_OamFlagsTilePrio) the priorities follow the
+;   object's tile as in Evt_Op8D_SetPos (Map_TileAttrA to Obj_PrioHigh);
+;   else they are fixed: Obj_PrioHigh = flags & $30
+;   (Obj_OamFlagsPrioMask), Obj_PrioLow = (flags << 4) & $30. Either way
+;   Obj_LastFrame = Obj_LastFrameNone and Obj_AnimTimer = 0 (the frame
+;   is built again, probably). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $8E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and the scratch are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A =
+;   Obj_LastFrameNone; Y = the opcode + 1; Eng_Scratch ($D9) written
+;   (EvtTile_PrioA or EvtPrio_Flags).
+; ------------------------------------------------------------
+Evt_Op8E_SetOamFlags:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamFlags,X
+    BIT.b #!Obj_OamFlagsTilePrio
+    BEQ .fixed
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    SEC
+    RTS
+.fixed:
+    STA.b !EvtPrio_Flags
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioHigh,X
+    LDA.b !EvtPrio_Flags
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioLow,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4CD5 — Evt_Op90_SetUnk1A81On (11 bytes, $4CD5–$4CDF)
+; Event opcode $90 (1 byte): Obj_Cur's Obj_Unk1A81 = Obj_Unk1A81On (1:
+;   its frames are built, so it is probably shown). X = Y + 1, C=0 (the
+;   object's run ends here).
+; Evt_Op90_Store (the STA, X = Y + 1, C=0, with A = the value and X =
+;   the object) is the shared tail of Evt_Op91_ClearUnk1A81,
+;   Evt_Op7E_SetUnk1A81Bit7, Evt_Op7C_SetObjUnk1A81On and
+;   Evt_Op7D_ClearObjUnk1A81 (BRA).
+; Reached through Evt_OpcodeTable (opcode $90).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = the value
+;   stored; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op90_SetUnk1A81On:
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_Unk1A81On
+Evt_Op90_Store:                         ; header: see Evt_Op90_SetUnk1A81On
+    STA.w !Obj_Unk1A81,X
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4CE0 — Evt_Op91_ClearUnk1A81 (6 bytes, $4CE0–$4CE5)
+; Event opcode $91 (1 byte): Obj_Cur's Obj_Unk1A81 = 0 (no frame build:
+;   hidden, probably); X = Y + 1, C=0 through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $91).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op91_ClearUnk1A81:
+    LDX.b !Obj_Cur
+    LDA.b #$00
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CE6 — Evt_Op7E_SetUnk1A81Bit7 (6 bytes, $4CE6–$4CEB)
+; Event opcode $7E (1 byte): Obj_Cur's Obj_Unk1A81 = $80 (bit 7 only,
+;   FieldBtl_ObjUnk1A81Bit: outside 1..$7F, so no frame build, and the
+;   battle hand-off treats the object specially); X = Y + 1, C=0
+;   through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = $80; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op7E_SetUnk1A81Bit7:
+    LDX.b !Obj_Cur
+    LDA.b #!FieldBtl_ObjUnk1A81Bit
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CEC — Evt_Op7C_SetObjUnk1A81On (13 bytes, $4CEC–$4CF8)
+; Event opcode $7C (2 bytes: $7C, slot): as Evt_Op90_SetUnk1A81On for
+;   the object in slot: Obj_Unk1A81 = Obj_Unk1A81On. X = Y + 2, C=0
+;   through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 1;
+;   Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op7C_SetObjUnk1A81On:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #!Obj_Unk1A81On
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CF9 — Evt_Op7D_ClearObjUnk1A81 (13 bytes, $4CF9–$4D05)
+; Event opcode $7D (2 bytes: $7D, slot): as Evt_Op91_ClearUnk1A81 for
+;   the object in slot: Obj_Unk1A81 = 0. X = Y + 2, C=0 through
+;   Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 0;
+;   Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op7D_ClearObjUnk1A81:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$00
+    BRA Evt_Op90_Store
 
 ; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
@@ -21411,6 +23471,982 @@ Map_InitEntryTile:
     RTS
 
 ; ============================================================
+; Party control: the leader's step log and the followers
+; ($C0:9E29–$C0:A33A)
+; Evt_OpB0_PartyControl's callees, run once per script run of a party
+; member's object (with 8-bit X/Y). The leader's routine
+; (Party_Unk9E29) logs every frame it moves in a 128-entry ring at
+; Field_UnkAB in bank $7F: PartyLog_StepX/Y (the step it was given,
+; Map_Unk1D32/1D33), PartyLog_PadX/Y (the D-pad step, Map_Unk1D2C/
+; 1D2D), PartyLog_PrioLow/High (its priority bits) and PartyLog_Flags
+; (Map_Unk1D34, the tile flags of the step). Member 2 (Party_UnkA26B)
+; replays the entries from Field_UnkAC on and member 3 (Party_UnkA2CE)
+; from Field_UnkAD, each keeping $18 entries behind the one ahead
+; ($10 when the leader stands), so they walk the leader's path. Reading
+; the ring as the leader's path rests on these stores and replays; the
+; Party_* names are kept from the stubs (better: Party_LeaderStep,
+; Party_FollowMember2/3).
+; The animation part picks the object's facing and animation row from
+; the step: walk (ObjAnim_RowWalk), run (ObjAnim_RowRun), and when
+; there is no step stand or, now and then, an idle row; rows $17, $19,
+; $1B and $21 are named by when they are chosen (what they show is
+; not traced).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:9E29 — Party_Unk9E29 (91 bytes, $9E29–$9E83)
+; The leader's step (kind-0 object of Evt_OpB0_PartyControl): picks its
+;   animation (Party_LeaderAnim), then, when Map_Unk1D32 or Map_Unk1D33
+;   (its X / Y step this frame) is nonzero, steps Field_UnkAB (& $7F)
+;   and logs at the new entry PartyLog_StepX/Y = Map_Unk1D32/1D33 (also
+;   Obj_Cur's Obj_VelX/VelY), PartyLog_PadX/Y = Map_Unk1D2C/1D2D,
+;   PartyLog_PrioLow/High = its Obj_PrioLow/High and PartyLog_Flags =
+;   Map_Unk1D34. With no step Obj_VelX = Obj_VelY = 0 and nothing is
+;   logged. The LDA of Map_Unk1D33 at .step_x is dead (A is reloaded at
+;   once); kept as found.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3047).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the ring index is 7 bits),
+;   DP=$0100 (Field_UnkAB, Obj_Cur and the callee's scratch are dp),
+;   DB=$00 (Obj_* tables and Map_Unk1D2C-1D34 absolute; the log is
+;   long).
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; on a logged step X =
+;   the new Field_UnkAB and Y = Obj_Cur; else X = Obj_Cur and Y as
+;   Party_LeaderAnim left it (Obj_Cur); Party_LeaderAnim's writes.
+; ------------------------------------------------------------
+Party_Unk9E29:
+    JSR Party_LeaderAnim
+    LDA.w !Map_Unk1D32
+    BNE .step_x
+    LDA.w !Map_Unk1D33
+    BNE .log
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    RTS
+.step_x:
+    LDA.w !Map_Unk1D33                  ; dead: reloaded below
+.log:
+    LDA.b !Field_UnkAB
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAB
+    TAX
+    LDY.b !Obj_Cur
+    LDA.w !Map_Unk1D32
+    STA.l !PartyLog_StepX,X
+    STA.w !Obj_VelX,Y
+    LDA.w !Map_Unk1D33
+    STA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D2C
+    STA.l !PartyLog_PadX,X
+    LDA.w !Map_Unk1D2D
+    STA.l !PartyLog_PadY,X
+    LDA.w !Obj_PrioLow,Y
+    STA.l !PartyLog_PrioLow,X
+    LDA.w !Obj_PrioHigh,Y
+    STA.l !PartyLog_PrioHigh,X
+    LDA.w !Map_Unk1D34
+    STA.l !PartyLog_Flags,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9E84 — Party_LeaderAnim (77 bytes, $9E84–$9ED0)
+; The leader's facing and animation row from this frame's D-pad step
+;   (Map_Unk1D2C/1D2D) and tile flags (Map_Unk1D34):
+; - flags with Map_ProbeShape1E (bit 2): with no Y step the animation
+;   stops (Obj_AnimColumn = Obj_AnimTimer = 0); else row
+;   ObjAnim_RowUnk1B (Party_AnimRowUnk1B). The CMP of |Y step| with $18
+;   before that BRL is dead (nothing tests the flags); kept as found.
+; - else (Party_TileFlagged = 1 when the flags are nonzero): the step
+;   code of X and Y indexes Party_AnimTable.
+; The step code: a step v gives v when 0 or positive, (v ^ $FF) +
+;   Party_StepNegCode = |v| + $20 when negative; the X code is shifted
+;   right 3 and ORed with the Y code, & $7E (Party_AnimIdxMask). For
+;   the D-pad steps ($10 walk, $20 run) the X part gives 0/2/4/6/8
+;   (none, right walk / run, left walk / run) and the Y part 0/$10/$20/
+;   $30/$40 (none, down walk / run, up walk / run).
+; Callers (1 JSR site): Party_Unk9E29 ($C0:9E29).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the table index), DP=$0100
+;   (Obj_Cur, Party_TileFlagged and Party_StepXCode are dp), DB=$00
+;   (Map_Unk1D2C-1D34 and Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged ($E5) and Party_StepXCode ($DB) written; the
+;   handler's writes (Obj_Facing, Obj_AnimRow/Column/Timer,
+;   Field_Unk58, Field_Unk0400Copy).
+; ------------------------------------------------------------
+Party_LeaderAnim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.w !Map_Unk1D34
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    INC.b !Party_TileFlagged
+    BRA .code
+.shape_1e:
+    LDA.w !Map_Unk1D2D
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.w !Map_Unk1D2C
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.w !Map_Unk1D2D
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9ED1 — Party_Member2Anim (79 bytes, $9ED1–$9F1F)
+; As Party_LeaderAnim from a log entry: the facing and row from
+;   PartyLog_PadX/Y and PartyLog_Flags at X (the D-pad step the leader
+;   had there). The difference: Party_TileFlagged stays 0 (the
+;   bit-2-clear branch only skips to the code). Byte for byte the same
+;   code as Party_Member3Anim (only the BRL distances differ).
+; Callers (1 BRL site): Party_UnkA26B ($C0:A2CB).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry.
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_Member2Anim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.l !PartyLog_Flags,X
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    BRA .code
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.l !PartyLog_PadX,X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_PadY,X
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9F20 — Party_Member3Anim (79 bytes, $9F20–$9F6E)
+; Party_Member2Anim again, byte for byte, for member 3.
+; Callers (1 BRL site): Party_UnkA2CE ($C0:A338).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry.
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_Member3Anim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.l !PartyLog_Flags,X
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    BRA .code
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.l !PartyLog_PadX,X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_PadY,X
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9F6F — Party_FollowerHoldAnim (131 bytes, $9F6F–$9FF1)
+; A follower's animation while it holds its place (Party_UnkA26B /
+;   A2CE when it is close enough behind), from the log entry X it is
+;   at: with PartyLog_Flags 0, Party_AnimNoStep (stand / idle). With
+;   Map_ProbeShape1E: when PartyLog_PadY or PartyLog_StepY is 0, or
+;   they are equal, the animation stops (column / timer 0); else
+;   nothing changes. Otherwise the step code (as in Party_LeaderAnim)
+;   of PartyLog_PadX/Y less PartyLog_StepX/Y indexes Party_AnimTable;
+;   a step with bit 3 set is first moved 8 further from 0 (a $x8 step
+;   counts as the next multiple of $10). That difference is the part of
+;   the pad step the leader did not make there, probably (walking on
+;   the spot against a pushing tile).
+; Unlike Party_Member2Anim it does not load Y: Y is the caller's member
+;   slot (Party_ObjSlot1 / Party_ObjSlot2), while the table handlers
+;   set the facing of Obj_Cur.
+; Callers (4 BRL sites): Party_UnkA26B ($C0:A28A, $C0:A29A) and Party_UnkA2CE ($C0:A2ED, $C0:A307).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry; Y = the member's slot.
+; Exit: M=1, X=1, DP and DB unchanged; Y unchanged; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_FollowerHoldAnim:
+    STZ.b !Party_TileFlagged
+    LDA.l !PartyLog_Flags,X
+    BEQ Party_AnimNoStep
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    LDA.l !PartyLog_StepX,X
+    BPL .x_round_pos
+    BIT.b #!Party_StepHalf
+    BEQ .x_diff
+    SEC
+    SBC.b #!Party_StepHalf
+    BRA .x_diff
+.x_round_pos:
+    BIT.b #!Party_StepHalf
+    BEQ .x_diff
+    CLC
+    ADC.b #!Party_StepHalf
+.x_diff:
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.l !PartyLog_PadX,X              ; pad X - step X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_StepY,X
+    BPL .y_round_pos
+    BIT.b #!Party_StepHalf
+    BEQ .y_diff
+    SEC
+    SBC.b #!Party_StepHalf
+    BRA .y_diff
+.y_round_pos:
+    BIT.b #!Party_StepHalf
+    BEQ .y_diff
+    CLC
+    ADC.b #!Party_StepHalf
+.y_diff:
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.l !PartyLog_PadY,X              ; pad Y - step Y
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    LDA.l !PartyLog_StepY,X
+    BEQ .stop
+    SEC
+    SBC.l !PartyLog_PadY,X
+    BEQ .stop
+    RTS
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9FF2 — Party_AnimNoStep (5 bytes, $9FF2–$9FF6)
+; Party_AnimTable's handler for no step (entry 0 and every code that
+;   is not a D-pad direction): X = Obj_Cur, then Party_AnimIdle.
+; Callers note: Party_AnimTable entries 0, 5-7, 13-15, 21-23, 29-31 and
+;   37-64; Party_FollowerHoldAnim branches here (BEQ) when the entry's
+;   flags are 0.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00; Y = the
+;   object's slot.
+; Exit: as Party_AnimIdle: M=1, X=1, DP and DB unchanged; X = Obj_Cur,
+;   or Field_Unk0400Copy after an idle try; A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Party_AnimNoStep:
+    LDX.b !Obj_Cur
+    BRL Party_AnimIdle
+
+; $C0:9FF7 — Party_AnimTable (130 bytes, $9FF7–$A078, 65 words)
+; The facing / animation handler for each step code (JSR
+; (Party_AnimTable,X) in Party_LeaderAnim, Party_Member2Anim,
+; Party_Member3Anim and Party_FollowerHoldAnim; X = code & $7E, so
+; entries 0-63). Entry = X code / 2 + Y code / 2: X 1/2 right walk /
+; run, 3/4 left walk / run; Y 8/16 down walk / run, 24/32 up walk /
+; run. The diagonal entries keep the facing when it is one of the two
+; directions, else face the horizontal one; a walk and a run together
+; run. Codes the D-pad steps cannot give go to Party_AnimNoStep. The
+; 65th word (index $80) can never be reached; it is Party_AnimNoStep
+; too.
+Party_AnimTable:
+    dw Party_AnimNoStep             ; 0: no step
+    dw Party_AnimRightWalk          ; 1
+    dw Party_AnimRightRun           ; 2
+    dw Party_AnimLeftWalk           ; 3
+    dw Party_AnimLeftRun            ; 4
+    dw Party_AnimNoStep             ; 5
+    dw Party_AnimNoStep             ; 6
+    dw Party_AnimNoStep             ; 7
+    dw Party_AnimDownWalk           ; 8
+    dw Party_AnimDownRightWalk      ; 9
+    dw Party_AnimDownRightRun       ; 10
+    dw Party_AnimDownLeftWalk       ; 11
+    dw Party_AnimDownLeftRun        ; 12
+    dw Party_AnimNoStep             ; 13
+    dw Party_AnimNoStep             ; 14
+    dw Party_AnimNoStep             ; 15
+    dw Party_AnimDownRun            ; 16
+    dw Party_AnimDownRightRun       ; 17
+    dw Party_AnimDownRightRun       ; 18
+    dw Party_AnimDownLeftRun        ; 19
+    dw Party_AnimDownLeftRun        ; 20
+    dw Party_AnimNoStep             ; 21
+    dw Party_AnimNoStep             ; 22
+    dw Party_AnimNoStep             ; 23
+    dw Party_AnimUpWalk             ; 24
+    dw Party_AnimUpRightWalk        ; 25
+    dw Party_AnimUpRightRun         ; 26
+    dw Party_AnimUpLeftWalk         ; 27
+    dw Party_AnimUpLeftRun          ; 28
+    dw Party_AnimNoStep             ; 29
+    dw Party_AnimNoStep             ; 30
+    dw Party_AnimNoStep             ; 31
+    dw Party_AnimUpRun              ; 32
+    dw Party_AnimUpRightRun         ; 33
+    dw Party_AnimUpRightRun         ; 34
+    dw Party_AnimUpLeftRun          ; 35
+    dw Party_AnimUpLeftRun          ; 36
+    dw Party_AnimNoStep             ; 37
+    dw Party_AnimNoStep             ; 38
+    dw Party_AnimNoStep             ; 39
+    dw Party_AnimNoStep             ; 40
+    dw Party_AnimNoStep             ; 41
+    dw Party_AnimNoStep             ; 42
+    dw Party_AnimNoStep             ; 43
+    dw Party_AnimNoStep             ; 44
+    dw Party_AnimNoStep             ; 45
+    dw Party_AnimNoStep             ; 46
+    dw Party_AnimNoStep             ; 47
+    dw Party_AnimNoStep             ; 48
+    dw Party_AnimNoStep             ; 49
+    dw Party_AnimNoStep             ; 50
+    dw Party_AnimNoStep             ; 51
+    dw Party_AnimNoStep             ; 52
+    dw Party_AnimNoStep             ; 53
+    dw Party_AnimNoStep             ; 54
+    dw Party_AnimNoStep             ; 55
+    dw Party_AnimNoStep             ; 56
+    dw Party_AnimNoStep             ; 57
+    dw Party_AnimNoStep             ; 58
+    dw Party_AnimNoStep             ; 59
+    dw Party_AnimNoStep             ; 60
+    dw Party_AnimNoStep             ; 61
+    dw Party_AnimNoStep             ; 62
+    dw Party_AnimNoStep             ; 63
+    dw Party_AnimNoStep             ; 64: unreachable (index <= $7E)
+
+; ------------------------------------------------------------
+; $C0:A079 — Party_AnimLeftWalk (10 bytes, $A079–$A082)
+; Party_AnimTable handlers for the four straight directions: Obj_Cur's
+;   Obj_Facing = the direction, then Party_AnimWalk (walk row) or
+;   Party_AnimRun (run row). Eight of them, 10 bytes each: Left / Right
+;   / Up / Down walk ($A079-$A0A0), then Left / Right / Up / Down run
+;   ($A0A1-$A0C8); the seven after this one are sub-entries with this
+;   header.
+; Callers note: Party_AnimTable entries 3 (this one), 1
+;   (Party_AnimRightWalk), 24 (Party_AnimUpWalk), 8 (Party_AnimDownWalk),
+;   4 (Party_AnimLeftRun), 2 (Party_AnimRightRun), 32 (Party_AnimUpRun)
+;   and 16 (Party_AnimDownRun).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the object's slot (its
+;   animation).
+; Exit: M=1, X=1, DP and DB unchanged; X = Obj_Cur; A clobbered;
+;   Obj_Facing and the tail's writes.
+; ------------------------------------------------------------
+Party_AnimLeftWalk:
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimRightWalk:                    ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimUpWalk:                       ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingUp
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimDownWalk:                     ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimLeftRun:                      ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimRightRun:                     ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimUpRun:                        ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingUp
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimDownRun:                      ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+
+; ------------------------------------------------------------
+; $C0:A0C9 — Party_AnimDownLeftWalk (21 bytes, $A0C9–$A0DD)
+; Party_AnimTable handlers for the diagonals: Obj_Cur keeps its facing
+;   when it is one of the two directions, else faces the horizontal
+;   one; then Party_AnimWalk or Party_AnimRun. Eight of them, 21 bytes
+;   each: DownLeft / DownRight / UpLeft / UpRight walk ($A0C9-$A11C),
+;   then the same four run ($A11D-$A170); the seven after this one are
+;   sub-entries with this header.
+; Callers note: Party_AnimTable entries 11 (this one), 9
+;   (Party_AnimDownRightWalk), 27 (Party_AnimUpLeftWalk), 25
+;   (Party_AnimUpRightWalk), 12/19/20 (Party_AnimDownLeftRun), 10/17/18
+;   (Party_AnimDownRightRun), 28/35/36 (Party_AnimUpLeftRun) and
+;   26/33/34 (Party_AnimUpRightRun).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the object's slot (its
+;   animation).
+; Exit: M=1, X=1, DP and DB unchanged; X = Obj_Cur; A clobbered;
+;   Obj_Facing and the tail's writes.
+; ------------------------------------------------------------
+Party_AnimDownLeftWalk:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .walk
+    CMP.b #!Obj_FacingDown
+    BEQ .walk
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimDownRightWalk:                ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .walk
+    CMP.b #!Obj_FacingDown
+    BEQ .walk
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimUpLeftWalk:                   ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .walk
+    CMP.b #!Obj_FacingUp
+    BEQ .walk
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimUpRightWalk:                  ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .walk
+    CMP.b #!Obj_FacingUp
+    BEQ .walk
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimDownLeftRun:                  ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .run
+    CMP.b #!Obj_FacingDown
+    BEQ .run
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimDownRightRun:                 ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .run
+    CMP.b #!Obj_FacingDown
+    BEQ .run
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimUpLeftRun:                    ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .run
+    CMP.b #!Obj_FacingUp
+    BEQ .run
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimUpRightRun:                   ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .run
+    CMP.b #!Obj_FacingUp
+    BEQ .run
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+
+; ------------------------------------------------------------
+; $C0:A171 — Party_AnimWalk (27 bytes, $A171–$A18B)
+; Field_Unk58 = 0 (the frames-standing count, probably: Field_WaitFrame
+;   counts it up and Party_AnimIdle tests it), then the object at Y
+;   gets Obj_AnimRow = ObjAnim_RowWalk, column 0 and Obj_AnimTimer 0,
+;   unless that row is already set.
+; Callers (8 BRL sites): Party_AnimLeftWalk ($C0:A080), Party_AnimRightWalk ($C0:A08A),
+;   Party_AnimUpWalk ($C0:A094), Party_AnimDownWalk ($C0:A09E), Party_AnimDownLeftWalk ($C0:A0DB),
+;   Party_AnimDownRightWalk ($C0:A0F0), Party_AnimUpLeftWalk ($C0:A105) and Party_AnimUpRightWalk
+;   ($C0:A11A).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk58 is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimWalk:
+    STZ.b !Field_Unk58
+    STZ.b !Field_Unk58+1
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowWalk
+    BEQ .done
+    LDA.b #!ObjAnim_RowWalk
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A18C — Party_AnimRun (70 bytes, $A18C–$A1D1)
+; Field_Unk58 = 0, then the object at Y gets Obj_AnimRow =
+;   ObjAnim_RowRun (column and timer 0, unless already set); but when
+;   the leader has no step this frame (Map_Unk1D32 and 1D33 both 0),
+;   Y is the leader (Party_ObjSlot) and Party_TileFlagged is 0, the row
+;   is ObjAnim_RowUnk17 instead (the run is held, probably: a run on
+;   the D-pad with no movement).
+; Callers (8 BRL sites): Party_AnimLeftRun ($C0:A0A8), Party_AnimRightRun ($C0:A0B2),
+;   Party_AnimUpRun ($C0:A0BC), Party_AnimDownRun ($C0:A0C6), Party_AnimDownLeftRun ($C0:A12F),
+;   Party_AnimDownRightRun ($C0:A144), Party_AnimUpLeftRun ($C0:A159) and Party_AnimUpRightRun
+;   ($C0:A16E).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: CPY of Party_ObjSlot's low
+;   byte), DP=$0100 (Field_Unk58, Party_ObjSlot and Party_TileFlagged
+;   are dp), DB=$00 (Map_Unk1D32/1D33 and Obj_* tables absolute); Y =
+;   the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRun:
+    STZ.b !Field_Unk58
+    STZ.b !Field_Unk58+1
+    LDA.w !Map_Unk1D32
+    BNE .run
+    LDA.w !Map_Unk1D33
+    BNE .run
+    CPY.b !Party_ObjSlot
+    BNE .run
+    LDA.b !Party_TileFlagged
+    BNE .run
+    BRA .held
+.run:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowRun
+    BEQ .run_done
+    LDA.b #!ObjAnim_RowRun
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.run_done:
+    RTS
+.held:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk17
+    BEQ .held_done
+    LDA.b #!ObjAnim_RowUnk17
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.held_done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A1D2 — Party_AnimRowUnk19 (23 bytes, $A1D2–$A1E8)
+; The object at Y gets Obj_AnimRow = ObjAnim_RowUnk19 (column and timer
+;   0, unless already set). Reached from Party_AnimIdle (BRA) for the
+;   leader while Field_Unk62 = 2.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP any (not used), DB=$00
+;   (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRowUnk19:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk19
+    BEQ .done
+    LDA.b #!ObjAnim_RowUnk19
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A1E9 — Party_AnimIdle (107 bytes, $A1E9–$A253)
+; No step: the animation row while standing, for the object at Y.
+; - Field_Unk62 = 2 and Y is the leader (Party_ObjSlot):
+;   Party_AnimRowUnk19.
+; - Field_ControlEnabled = 0: the stand row (ObjAnim_RowStand, column
+;   and timer 0, unless already set).
+; - Else by Field_Unk58 (16-bit; Field_WaitFrame counts it up, the walk
+;   and run rows zero it): below Party_IdleDelay ($02FF) stand; at it,
+;   or above it with bits 0-6 all set (every $80 frames), a try: bit 15
+;   of Field_Unk58 is set (Field_Unk58Idle: it stays above the delay
+;   from then on, as Field_WaitFrame keeps bit 15), Field_Unk0400Copy
+;   steps and indexes RandomTable, and a byte below Party_IdleChance
+;   (8 in 256) gives ObjAnim_RowIdle (column and timer 0, unless
+;   already set), anything else the stand row. Other frames above the
+;   delay change nothing.
+; Callers (1 BRL site): Party_AnimNoStep ($C0:9FF4).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the RandomTable index),
+;   DP=$0100 (Field_Unk62, Field_ControlEnabled, Field_Unk58,
+;   Field_Unk0400Copy and Party_ObjSlot are dp), DB=$00 (Obj_* tables
+;   and RandomTable absolute: $00:FE00 is the bank-$C0 mirror); Y = the
+;   object's slot.
+; Exit: M=1 (16-bit only inside), X=1, DP and DB unchanged; A
+;   clobbered; X = Field_Unk0400Copy after a try, else unchanged; Y
+;   unchanged.
+; ------------------------------------------------------------
+Party_AnimIdle:
+    LDA.b !Field_Unk62
+    BEQ .control
+    CMP.b #!Party_Unk62Row19
+    BNE .control
+    CPY.b !Party_ObjSlot
+    BNE .control
+    BRA Party_AnimRowUnk19
+.control:
+    LDA.b !Field_ControlEnabled
+    BEQ .stand
+    REP #$20
+    LDA.b !Field_Unk58
+    CMP.w #!Party_IdleDelay
+    BEQ .try
+    BCC .stand
+    AND.w #!Party_IdleRepeatMask
+    CMP.w #!Party_IdleRepeatMask
+    BEQ .try
+    SEP #$20
+    RTS
+.stand:
+    SEP #$20
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowStand
+    BEQ .stand_done
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.stand_done:
+    RTS
+.try:
+    LDA.w #!Field_Unk58Idle
+    TSB.b !Field_Unk58
+    SEP #$20
+    INC.b !Field_Unk0400Copy
+    LDA.b !Field_Unk0400Copy
+    TAX
+    LDA.w RandomTable,X
+    CMP.b #!Party_IdleChance
+    BCS .stand
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowIdle
+    BEQ .idle_done
+    LDA.b #!ObjAnim_RowIdle
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.idle_done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A254 — Party_AnimRowUnk1B (23 bytes, $A254–$A26A)
+; The object at Y gets Obj_AnimRow = ObjAnim_RowUnk1B (column and timer
+;   0, unless already set): the row on a shape-$1E tile
+;   (Map_ProbeShape1E) with a Y step.
+; Callers (3 BRL sites): Party_LeaderAnim ($C0:9EA1), Party_Member2Anim ($C0:9EEE) and
+;   Party_Member3Anim ($C0:9F3D).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP any (not used), DB=$00
+;   (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRowUnk1B:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk1B
+    BEQ .done
+    LDA.b #!ObjAnim_RowUnk1B
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A26B — Party_UnkA26B (99 bytes, $A26B–$A2CD)
+; Member 2's step (kind-1 object of Evt_OpB0_PartyControl), on
+;   Party_ObjSlot1's object: Obj_VelX = Obj_VelY = 0; then the lag is
+;   Field_UnkAB - Field_UnkAC (& $7F). Below Party_LagMoving ($18)
+;   while the leader steps (Map_Unk1D32 | 1D33 nonzero), or below
+;   Party_LagStill ($10) when it does not, the member holds its place:
+;   Party_FollowerHoldAnim at entry Field_UnkAC. Else Field_UnkAC steps
+;   (& $7F) and the member replays that entry: Obj_VelX = PartyLog_StepX
+;   when nonzero, Obj_VelY = PartyLog_StepY (its store is skipped when
+;   StepX is nonzero and StepY is 0: it is 0 already),
+;   Obj_PrioLow/High = PartyLog_PrioLow/High; then Party_Member2Anim
+;   for that entry.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3037).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: Party_ObjSlot1's low byte
+;   in Y), DP=$0100 (Party_ObjSlot1 and Field_UnkAB/AC are dp), DB=$00
+;   (Obj_* tables and Map_Unk1D32/1D33 absolute; the log is long).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (Y =
+;   Party_ObjSlot1 or Obj_Cur, by the callee); Field_UnkAC stepped on a
+;   replay; the callees' writes.
+; ------------------------------------------------------------
+Party_UnkA26B:
+    LDY.b !Party_ObjSlot1
+    LDA.b #$00
+    STA.w !Obj_VelX,Y
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D32
+    ORA.w !Map_Unk1D33
+    BEQ .leader_still
+    LDA.b !Field_UnkAB
+    SEC
+    SBC.b !Field_UnkAC
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagMoving
+    BCS .replay
+    LDX.b !Field_UnkAC
+    BRL Party_FollowerHoldAnim
+.leader_still:
+    LDA.b !Field_UnkAB
+    SEC
+    SBC.b !Field_UnkAC
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagStill
+    BCS .replay
+    LDX.b !Field_UnkAC
+    BRL Party_FollowerHoldAnim
+.replay:
+    LDA.b !Field_UnkAC
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAC
+    TAX
+    LDY.b !Party_ObjSlot1
+    LDA.l !PartyLog_StepX,X
+    BEQ .vel_y
+    STA.w !Obj_VelX,Y
+    LDA.l !PartyLog_StepY,X
+    BEQ .prio
+.vel_y:
+    LDA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+.prio:
+    LDA.l !PartyLog_PrioLow,X
+    STA.w !Obj_PrioLow,Y
+    LDA.l !PartyLog_PrioHigh,X
+    STA.w !Obj_PrioHigh,Y
+    BRL Party_Member2Anim
+
+; ------------------------------------------------------------
+; $C0:A2CE — Party_UnkA2CE (109 bytes, $A2CE–$A33A)
+; Member 3's step (kind 2), as Party_UnkA26B on Party_ObjSlot2's
+;   object, following member 2: the lag is Field_UnkAC - Field_UnkAD,
+;   it replays from Field_UnkAD and ends in Party_Member3Anim. The
+;   leader-still hold path zeroes Obj_VelX/VelY a second time before
+;   Party_FollowerHoldAnim (they are 0 already); kept as found.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3027).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: Party_ObjSlot2's low byte
+;   in Y), DP=$0100 (Party_ObjSlot2 and Field_UnkAC/AD are dp), DB=$00
+;   (Obj_* tables and Map_Unk1D32/1D33 absolute; the log is long).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (Y =
+;   Party_ObjSlot2 or Obj_Cur, by the callee); Field_UnkAD stepped on a
+;   replay; the callees' writes.
+; ------------------------------------------------------------
+Party_UnkA2CE:
+    LDY.b !Party_ObjSlot2
+    LDA.b #$00
+    STA.w !Obj_VelX,Y
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D32
+    ORA.w !Map_Unk1D33
+    BEQ .leader_still
+    LDA.b !Field_UnkAC
+    SEC
+    SBC.b !Field_UnkAD
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagMoving
+    BCS .replay
+    LDX.b !Field_UnkAD
+    BRL Party_FollowerHoldAnim
+.leader_still:
+    LDA.b !Field_UnkAC
+    SEC
+    SBC.b !Field_UnkAD
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagStill
+    BCS .replay
+    LDY.b !Party_ObjSlot2
+    LDA.b #$00
+    STA.w !Obj_VelX,Y                   ; again (quirk)
+    STA.w !Obj_VelY,Y
+    LDX.b !Field_UnkAD
+    BRL Party_FollowerHoldAnim
+.replay:
+    LDA.b !Field_UnkAD
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAD
+    TAX
+    LDY.b !Party_ObjSlot2
+    LDA.l !PartyLog_StepX,X
+    BEQ .vel_y
+    STA.w !Obj_VelX,Y
+    LDA.l !PartyLog_StepY,X
+    BEQ .prio
+.vel_y:
+    LDA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+.prio:
+    LDA.l !PartyLog_PrioLow,X
+    STA.w !Obj_PrioLow,Y
+    LDA.l !PartyLog_PrioHigh,X
+    STA.w !Obj_PrioHigh,Y
+    BRL Party_Member3Anim
+
+; ============================================================
 ; Location map setup: the map-properties step of a location load
 ; (LocLoad_UnkA33B) with its three callees, which fill the layer sizes,
 ; wrap masks, scroll limits, own-step amounts, screen layers and the
@@ -24308,6 +27344,49 @@ LocLoad_DrawMap:
 .done:
     RTS
 
+; ============================================================
+; $C0:0AFF — Field_RefreshHdmaLong (41 bytes, $0AFF–$0B27)
+; (was the stub AudioDrvSync; it touches no sound.) A JSL service for
+; other banks (ReentryVectors [2]): with DP_Field and DB=$00, sets
+; Field_Unk53Bit7, runs EngFD_UnkC2C1 twice (so both of its handler
+; tables run once, filling both HDMA table sets, probably), clears the
+; bit, sets up the HDMA channels (Hdma_InitChannelsFD) and returns
+; Field_HdmaEnable in A (the channel mask the NMI writes to HDMAEN;
+; what the caller does with it is not traced).
+; Callers (1 BRL site): ReentryVectors ($C0:0005).
+; Callers note: vector [2], reached by JSL $C0:0005 from $D1:F4E2
+;   (unmatched).
+; On entry: M=1 (8-bit A), X any (it sets X=1, then X=0), DP any
+;   (saved; set to DP_Field), DB any (saved; set to $00).
+; Exit: M=1, X=0, DP and DB restored (RTL); A = Field_HdmaEnable; X =
+;   the channel 7 table address (Hdma_InitChannelsFD); Y as the
+;   EngFD_UnkC2C1 handlers leave it; Field_Unk53 bit 0 back as it was
+;   (flipped twice).
+; ============================================================
+org $C00AFF
+Field_RefreshHdmaLong:
+    PHD
+    PHB
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$30
+    LDA.b #$00
+    PHA
+    PLB                                 ; DB = $00
+    LDA.b #!Field_Unk53Bit7
+    TSB.b !Field_Unk53
+    JSL EngFD_UnkC2C1
+    JSL EngFD_UnkC2C1
+    LDA.b #!Field_Unk53Bit7
+    TRB.b !Field_Unk53
+    REP #$10
+    JSL Hdma_InitChannelsFD
+    LDA.b !Field_HdmaEnable
+    PLB
+    PLD
+    RTL
+
 ; ------------------------------------------------------------
 ; $C0:74A6 — Map_InitOrigin (46 bytes, $74A6–$74D3)
 ; Sets the scroll origin for the leader's entry point: Map_InitOriginX
@@ -24882,6 +27961,211 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
     STA.w !Audio_CmdId
     JSL Audio_DriverCommand
     RTS
+
+; ============================================================
+; The battle music cues: ReentryVectors [3] and [4] ($C0:1BAB–$C0:1CFB)
+; Two JSL services for other banks (bank $D1 before a battle and the
+; battle's bank $CD after it, through ReentryVectors) that send sound
+; driver commands with Audio_DriverCommand. FieldBtl_EvtFlags bit 6
+; (FieldBtl_EvtKeepMusic) skips the music change, probably keeping the
+; field's music through the battle. Commands $14, $70 and $11 appear
+; nowhere else in bank $C0; what the driver does with them is not
+; traced, so the readings below (start the battle music, the game-over
+; music, the field music again) are guesses from where they are sent.
+; ============================================================
+
+org $C01BAB
+; ------------------------------------------------------------
+; $C0:1BAB — MusicCueDispatch (59 bytes, $1BAB–$1BE5)
+; Before a battle, probably: with FieldBtl_EvtKeepMusic clear,
+;   Audio_Unk1E10 = $FF and command Audio_Cmd14 with Audio_CmdArg0 =
+;   Audio_SfxUnkFA ($45 at load: the battle music, probably); with it
+;   set, Audio_Cmd70 with argument 1.
+; Callers (1 BRL site): ReentryVectors ($C0:0008).
+; Callers note: vector [3], reached by JSL $C0:0008 from $D1:F405
+;   (unmatched).
+; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
+;   DP any (saved; set to DP_Field), DB any (saved; set to $00 from
+;   DP_Field's low byte by PHA/PLB).
+; Exit: M=1, DP and DB restored (RTL); A clobbered; X and Y as
+;   Audio_DriverCommand leaves them; the Audio_Cmd* bytes written.
+; ------------------------------------------------------------
+MusicCueDispatch:
+    PHB
+    PHD
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    PHA                                 ; DP_Field's low byte: DB = $00
+    PLB
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtKeepMusic
+    BNE .keep
+    LDA.b #!Audio_Unk1E10Set
+    STA.w !Audio_Unk1E10
+    LDA.b !Audio_SfxUnkFA
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd14
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLD
+    PLB
+    RTL
+.keep:
+    LDA.b #$01
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd70
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLD
+    PLB
+    RTL
+
+; ------------------------------------------------------------
+; $C0:1BE6 — AudioFadeDispatch (278 bytes, $1BE6–$1CFB)
+; After a battle, probably, by FieldBtl_Result:
+; - 1 (wait for a button and restart: the party lost, probably) unless
+;   FieldBtl_EvtNoReset: Audio_Unk1E10 = 0; Audio_CmdUnk81 (0, 0,
+;   $FF); Audio_Cmd14 with $26 (Audio_SongUnk26); Audio_CmdUnk81 ($80,
+;   $FF, $FF); Audio_Cmd82 and Audio_Cmd83 (0, $FF).
+; - else (0, 2, or 1 with FieldBtl_EvtNoReset): with
+;   FieldBtl_EvtKeepMusic Audio_Cmd70 with argument 0; without it
+;   Audio_Unk1E10 = 0, Audio_CmdUnk81 (0, 0, $FF), Audio_Cmd11 with
+;   Menu_Config1E, Audio_CmdUnk81 ($40, $FF, $FF), Audio_Cmd82 and
+;   Audio_Cmd83 (0, $FF).
+; The DEC on the 2 path is dead (it branches to the same place either
+;   way). Quirk: it saves DB then D (PHB, PHD) but restores DB first
+;   (PLB, PLD): on return DB = the caller's D low byte and D = the
+;   caller's DB << 8 | its D high byte. That is harmless only when the
+;   caller has D = $0000 and DB = $00 (not traced at $CD:043E); kept
+;   as found.
+; Callers (1 BRL site): ReentryVectors ($C0:000B).
+; Callers note: vector [4], reached by JSL $C0:000B from $CD:043E
+;   (unmatched).
+; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
+;   DP any (saved; set to DP_Field), DB any (saved; set to $00).
+; Exit: M=1 (RTL); D and DB scrambled as above; A clobbered; X and Y as
+;   Audio_DriverCommand leaves them; the Audio_Cmd* bytes written.
+; ------------------------------------------------------------
+AudioFadeDispatch:
+    PHB
+    PHD
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    PHA                                 ; DP_Field's low byte: DB = $00
+    PLB
+    LDA.l !FieldBtl_Result
+    BEQ .field_music
+    DEC A
+    BEQ .result1
+    DEC A                               ; dead: both ways go on below
+    BRA .field_music
+.result1:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtNoReset
+    BNE .field_music
+    BRL .lost
+.field_music:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtKeepMusic
+    BNE .keep
+    LDA.b #$00
+    STA.w !Audio_Unk1E10
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #$00
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.l !Menu_Config1E
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd11
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd81Arg40
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
+.keep:
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd70
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
+.lost:
+    LDA.b #$00
+    STA.w !Audio_Unk1E10
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #$00
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_SongUnk26
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd14
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd81Arg80
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
 
 ; ============================================================
 ; Field event hooks: window effects ($C0:21E1–$C0:274C)
@@ -25940,6 +29224,257 @@ Scene_ReloadStep:
     JSR Field_WaitFrame
     LDA.b !Field_Unk1E                  ; Z: 0 = do the fade-in
     RTS
+
+; ============================================================
+; The tile-animation list ($C0:28AA–$C0:29F6)
+; TileAnimList (16 words at $7F:1CC8) remembers the map tiles whose
+; animation ran at this location (Field_SceneChangeTick adds each one
+; as it starts a Mode*_Handler), so a reload of the location
+; (Scene_ReloadStep) can put their final states back into
+; Map_TileProps before the map is drawn. An entry is a Map_TileProps
+; index (row << 8 | column, as Field_TileAnimX/Y); TileAnimList_Empty
+; ($8080, bit 15 set) marks the end. Map_TileProps states, from the
+; Mode*_Handlers and the metatiles Irq_UploadTileAnim then draws: $E6
+; the lower tile of a 1x2 column (the upper one $E4, probably); $EC /
+; $EE the bottom-left / bottom-right tile of a 2x2 block (top row $E8,
+; $EA); $FA / $FC the bottom-left / bottom-right tile of a 2x3 block
+; (rows above $F6 $F8, then $F2 $F4); a handler adds 1 to each tile's
+; state.
+; ============================================================
+
+org $C028AA
+; ------------------------------------------------------------
+; $C0:28AA — TileAnimList_Clear (22 bytes, $28AA–$28BF)
+; Fills TileAnimList with TileAnimList_Empty (all 16 entries).
+; Callers (1 JSR site): GameLoop_LoadField ($C0:0091).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the offset), DP any, DB any
+;   (long stores).
+; Exit: M=1, X=0, DP and DB unchanged; A = TileAnimList_Empty (B =
+;   $80), X = TileAnimList_Bytes; Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_Clear:
+    REP #$20
+    LDA.w #!TileAnimList_Empty
+    LDX.w #$0000
+.loop:
+    STA.l !TileAnimList,X
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:28C0 — TileAnimList_AddCurrent (33 bytes, $28C0–$28E0)
+; Adds the tile at Field_TileAnimX/Y (the 16-bit word) to TileAnimList:
+;   from the first entry on, it stops at an entry equal to it (already
+;   listed) or puts it in the first empty one. With all 16 entries
+;   taken by other tiles nothing is stored.
+; Callers (1 JSR site): Field_SceneChangeTick ($C0:0D49).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the offset), DP=$0100
+;   (Field_TileAnimX/Y are dp), DB any (long list).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered (B = the entry's
+;   high byte, or Field_TileAnimY); X = the entry's offset (or
+;   TileAnimList_Bytes when full); Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_AddCurrent:
+    REP #$20
+    LDX.w #$0000
+.loop:
+    LDA.l !TileAnimList,X
+    BMI .empty
+    CMP.b !Field_TileAnimX              ; 16-bit: row << 8 | column
+    BEQ .done
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+.done:
+    SEP #$20
+    RTS
+.empty:
+    LDA.b !Field_TileAnimX
+    STA.l !TileAnimList,X
+    BRA .done
+
+; ------------------------------------------------------------
+; $C0:28E1 — TileAnimList_ApplyAll (24 bytes, $28E1–$28F8)
+; Runs TileAnimList_ApplyOne for each TileAnimList entry up to the
+;   first empty one (or all 16).
+; Callers (2 JSR sites): DefaultHandler ($C0:18C4) and Scene_ReloadStep ($C0:286C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB
+;   any (long accesses).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X = the offset of
+;   the empty entry (or TileAnimList_Bytes); Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_ApplyAll:
+    REP #$20
+    LDX.w #$0000
+.loop:
+    LDA.l !TileAnimList,X
+    BMI .done
+    JSR TileAnimList_ApplyOne
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+.done:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:28F9 — TileAnimList_ApplyOne (254 bytes, $28F9–$29F6)
+; Puts the animated states of one listed tile into Map_TileProps, by
+;   the state at the index A holds (only the five start states count;
+;   any other leaves the map alone):
+; - $E6: the tile and the one above it = $E7;
+; - $EC: the tile $ED, the one right of it $EF, above those $EB (right)
+;   and $E9;
+; - $EE: the tile $EF, the one left of it $ED, above those $E9 (left)
+;   and $EB;
+; - $FA: the tile $FB, right of it $FD; the row above $F7 / $F9 (left
+;   / right); two rows up $F3 / $F5;
+; - $FC: the tile $FD, left of it $FB; the row above $F7 / $F9; two
+;   rows up $F3 / $F5.
+; Those are the states the Mode*_Handlers leave (each adds 1), so it
+;   assumes the other tiles of the block are still at their start
+;   states. Except for the $E6 column's upper tile: ModeE6_Handler adds
+;   1 to it and Irq_UploadTileAnim draws metatile $1E5 there (state
+;   $E5), while this writes $E7; probably a slip of the original (not
+;   checked in play), kept as found.
+; Callers (1 JSR site): TileAnimList_ApplyAll ($C0:28EC).
+; On entry: M=0 (16-bit A: the Map_TileProps index), X=0 (16-bit X/Y),
+;   DP any (not used), DB any (long accesses).
+; Exit: M=0, X=0, DP and DB unchanged; X preserved (PHX/PLX); A
+;   clobbered; Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_ApplyOne:
+    PHX
+    TAX
+    SEP #$20
+    LDA.l !Map_TileProps,X
+    CMP.b #!TileAnim_ModeE6
+    BEQ .column
+    CMP.b #!TileAnim_ModeEC
+    BEQ .block2_left
+    CMP.b #!TileAnim_ModeEE
+    BEQ .block2_right
+    CMP.b #!TileAnim_ModeFA
+    BEQ .block3_left
+    CMP.b #!TileAnim_ModeFC
+    BNE .done
+    BRL .block3_right
+.done:
+    REP #$20
+    PLX
+    RTS
+.column:
+    INC A
+    STA.l !Map_TileProps,X
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_ModeE6+1
+    STA.l !Map_TileProps,X              ; the tile above
+    BRA .done
+.block2_left:
+    INC A
+    STA.l !Map_TileProps,X
+    INX
+    LDA.b #!TileAnim_ModeEE+1
+    STA.l !Map_TileProps,X              ; right
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box2TopRight+1
+    STA.l !Map_TileProps,X              ; above right
+    LDA.b #!TileAnim_Box2TopLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; above
+    BRA .done
+.block2_right:
+    INC A
+    STA.l !Map_TileProps,X
+    DEX
+    LDA.b #!TileAnim_ModeEC+1
+    STA.l !Map_TileProps,X              ; left
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box2TopLeft+1
+    STA.l !Map_TileProps,X              ; above left
+    LDA.b #!TileAnim_Box2TopRight+1
+    INX
+    STA.l !Map_TileProps,X              ; above
+    BRA .done
+.block3_left:
+    INC A
+    STA.l !Map_TileProps,X
+    INX
+    LDA.b #!TileAnim_ModeFC+1
+    STA.l !Map_TileProps,X              ; right
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3MidRight+1
+    STA.l !Map_TileProps,X              ; above right
+    LDA.b #!TileAnim_Box3MidLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; above
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3TopLeft+1
+    STA.l !Map_TileProps,X              ; two up
+    LDA.b #!TileAnim_Box3TopRight+1
+    INX
+    STA.l !Map_TileProps,X              ; two up, right
+    BRL .done
+.block3_right:
+    INC A
+    STA.l !Map_TileProps,X
+    DEX
+    LDA.b #!TileAnim_ModeFA+1
+    STA.l !Map_TileProps,X              ; left
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3MidLeft+1
+    STA.l !Map_TileProps,X              ; above left
+    LDA.b #!TileAnim_Box3MidRight+1
+    INX
+    STA.l !Map_TileProps,X              ; above
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3TopRight+1
+    STA.l !Map_TileProps,X              ; two up
+    LDA.b #!TileAnim_Box3TopLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; two up, left
+    BRL .done
 
 ; ============================================================
 ; $C0:29F7 — Field_Unk29F7 (385 bytes, $29F7–$2B77)
@@ -27843,7 +31378,7 @@ Field_ActionButton:
 
 ; ============================================================
 ; Event opcodes: object movement and facing ($C0:4D06–$C0:56A5)
-; Handlers in Evt_OpcodeTable (unmatched) for moving and turning
+; Handlers in Evt_OpcodeTable for moving and turning
 ; objects, with the two animation helpers they share. Every handler is
 ; entered with Y = its opcode's offset in Evt_Data and returns X = where
 ; the script goes on: the next opcode with C=1 (keep running), or with
@@ -31072,9 +34607,279 @@ LocLoad_Unk7F3700Init:
 .Rec4:
     db $96,$00,$00,$FF,$9D,$00
 
+; $C0:5D6E — Evt_OpcodeTable (512 bytes, $5D6E–$5F6D)
+; The event-script opcode handlers, one word per opcode $00-$FF (bank
+; $C0 addresses), indexed by opcode x 2: the script runners read the
+; opcode byte at Evt_Data + the script position, set Y = that offset,
+; double the opcode and JSR (Evt_OpcodeTable,X). The 32 unused opcodes ($01, $3A, $3D, $3E, $45,
+; $46, $6E, $70, $74, $78, $79, $85, $86, $93, $9B, $A2-$A5, $BE, $BF,
+; $C5, $C6, $DB, $E9, $EF, $F5-$F7, $FB-$FD) point at Evt_UnusedOpcode
+; (a halt through Sys_HaltWithColor). Its first two bytes are also read by
+; LocLoad_InitUnk7F3700's 32-byte copies (see LocLoad_Unk7F3700Init).
+; Read by JSR (Evt_OpcodeTable,X) at $C0:5910 (Evt_InitObjects),
+; $C0:5977 (Evt_RunObj0Func1), $C0:59A0 (Evt_RunObjInit) and $C0:5AB1
+; (Evt_RunObjScriptSteps).
+Evt_OpcodeTable:
+    dw Evt_Op00_Return              ; $00
+    dw Evt_UnusedOpcode             ; $01
+    dw Evt_Op02_CallObjFunc         ; $02
+    dw Evt_Op03_CallObjFuncRetry    ; $03
+    dw Evt_Op04_CallObjFuncWait     ; $04
+    dw Evt_Op05_CallPcFunc          ; $05
+    dw Evt_Op06_CallPcFuncRetry     ; $06
+    dw Evt_Op07_CallPcFuncWait      ; $07
+    dw Evt_Op08_BlockCalls          ; $08
+    dw Evt_Op09_AllowCalls          ; $09
+    dw Evt_Op0A_RemoveObj           ; $0A
+    dw Evt_Op0B_StopObjScript       ; $0B
+    dw Evt_Op0C_StartObjScript      ; $0C
+    dw Evt_Op0D_SetUnk1C80          ; $0D
+    dw Evt_Op0E_SetUnk1C81          ; $0E
+    dw Evt_Op0F_FaceUp              ; $0F
+    dw Evt_Op10_JumpFwd             ; $10
+    dw Evt_Op11_JumpBack            ; $11
+    dw Evt_Op12_IfVarByte           ; $12
+    dw Evt_Op13_IfVarWord           ; $13
+    dw Evt_Op14_IfVarVarByte        ; $14
+    dw Evt_Op15_IfVarVarWord        ; $15
+    dw Evt_Op16_IfMemByte           ; $16
+    dw Evt_Op17_FaceDown            ; $17
+    dw Evt_Op18_IfUnk7F0000Below    ; $18
+    dw Evt_Op19_SetUnk7F0A80Var     ; $19
+    dw Evt_Op1A_IfUnk7F0A80         ; $1A
+    dw Evt_Op1B_FaceLeft            ; $1B
+    dw Evt_Op1C_SetUnk7F0A80Mem     ; $1C
+    dw Evt_Op1D_FaceRight           ; $1D
+    dw Evt_Op1E_ObjFaceUp           ; $1E
+    dw Evt_Op1F_ObjFaceDown         ; $1F
+    dw Evt_Op20_GetPartyMember0     ; $20
+    dw Evt_Op21_GetObjTile          ; $21
+    dw Evt_Op22_GetPcTile           ; $22
+    dw Evt_Op23_GetObjFacing        ; $23
+    dw Evt_Op24_GetPcFacing         ; $24
+    dw Evt_Op25_ObjFaceLeft         ; $25
+    dw Evt_Op26_ObjFaceRight        ; $26
+    dw Evt_Op27_IfObjUnk0F00        ; $27
+    dw Evt_Op28_IfObjInsideScreen   ; $28
+    dw Evt_Op29_StartCredits        ; $29
+    dw Evt_Op2A_Field54Bit2         ; $2A
+    dw Evt_Op2B_Field54Bit3         ; $2B
+    dw Evt_Op2C_SetLayer3Pos        ; $2C
+    dw Evt_Op2D_IfAnyHeld           ; $2D
+    dw Evt_Op2E_PalAnim             ; $2E
+    dw Evt_Op2F_SetCreditsPos       ; $2F
+    dw Evt_Op30_IfMapHeldBit1       ; $30
+    dw Evt_Op31_IfMapHeldBit7       ; $31
+    dw Evt_Op32_CreditsLine         ; $32
+    dw Evt_Op33_SetPalette          ; $33
+    dw Evt_Op34_IfHeldA             ; $34
+    dw Evt_Op35_IfHeldB             ; $35
+    dw Evt_Op36_IfHeldX             ; $36
+    dw Evt_Op37_IfHeldY             ; $37
+    dw Evt_Op38_IfHeldL             ; $38
+    dw Evt_Op39_IfHeldR             ; $39
+    dw Evt_UnusedOpcode             ; $3A
+    dw Evt_Op3B_IfMapPressedBit1    ; $3B
+    dw Evt_Op3C_IfMapPressedBit7    ; $3C
+    dw Evt_UnusedOpcode             ; $3D
+    dw Evt_UnusedOpcode             ; $3E
+    dw Evt_Op3F_IfPressedA          ; $3F
+    dw Evt_Op40_IfPressedB          ; $40
+    dw Evt_Op41_IfPressedX          ; $41
+    dw Evt_Op42_IfPressedY          ; $42
+    dw Evt_Op43_IfPressedL          ; $43
+    dw Evt_Op44_IfPressedR          ; $44
+    dw Evt_UnusedOpcode             ; $45
+    dw Evt_UnusedOpcode             ; $46
+    dw Evt_Op47_SetScanlineLimit    ; $47
+    dw Evt_Op48_GetLongByte         ; $48
+    dw Evt_Op49_GetLongWord         ; $49
+    dw Evt_Op4A_SetLongByte         ; $4A
+    dw Evt_Op4B_SetLongWord         ; $4B
+    dw Evt_Op4C_SetLongVarByte      ; $4C
+    dw Evt_Op4D_SetLongVarWord      ; $4D
+    dw Evt_Op4E_CopyData            ; $4E
+    dw Evt_Op4F_SetVarByte          ; $4F
+    dw Evt_Op50_SetVarWord          ; $50
+    dw Evt_Op51_CopyVarByte         ; $51
+    dw Evt_Op52_CopyVarWord         ; $52
+    dw Evt_Op53_GetMemByte          ; $53
+    dw Evt_Op54_GetMemWord          ; $54
+    dw Evt_Op55_GetUnk7F0000        ; $55
+    dw Evt_Op56_SetMemByte          ; $56
+    dw Evt_Op57_InitChar0           ; $57
+    dw Evt_Op58_SetMemVarByte       ; $58
+    dw Evt_Op59_SetMemVarWord       ; $59
+    dw Evt_Op5A_SetUnk7F0000        ; $5A
+    dw Evt_Op5B_AddVarByte          ; $5B
+    dw Evt_Op5C_InitChar1           ; $5C
+    dw Evt_Op5D_AddVarVarByte       ; $5D
+    dw Evt_Op5E_AddVarVarWord       ; $5E
+    dw Evt_Op5F_SubVarByte          ; $5F
+    dw Evt_Op60_SubVarWord          ; $60
+    dw Evt_Op61_SubVarVarByte       ; $61
+    dw Evt_Op62_InitChar2           ; $62
+    dw Evt_Op63_SetVarBit           ; $63
+    dw Evt_Op64_ClearVarBit         ; $64
+    dw Evt_Op65_SetMemBit           ; $65
+    dw Evt_Op66_ClearMemBit         ; $66
+    dw Evt_Op67_AndVarByte          ; $67
+    dw Evt_Op68_InitChar4           ; $68
+    dw Evt_Op69_OrVarByte           ; $69
+    dw Evt_Op6A_InitChar3           ; $6A
+    dw Evt_Op6B_EorVarByte          ; $6B
+    dw Evt_Op6C_InitChar5           ; $6C
+    dw Evt_Op6D_InitChar6           ; $6D
+    dw Evt_UnusedOpcode             ; $6E
+    dw Evt_Op6F_ShrVarByte          ; $6F
+    dw Evt_UnusedOpcode             ; $70
+    dw Evt_Op71_IncVarByte          ; $71
+    dw Evt_Op72_IncVarWord          ; $72
+    dw Evt_Op73_DecVarByte          ; $73
+    dw Evt_UnusedOpcode             ; $74
+    dw Evt_Op75_SetVarByte1         ; $75
+    dw Evt_Op76_SetVarWord1         ; $76
+    dw Evt_Op77_ClearVarByte        ; $77
+    dw Evt_UnusedOpcode             ; $78
+    dw Evt_UnusedOpcode             ; $79
+    dw Evt_Op7A_ArcToTile           ; $7A
+    dw Evt_Op7B_ArcSteps            ; $7B
+    dw Evt_Op7C_SetObjUnk1A81On     ; $7C
+    dw Evt_Op7D_ClearObjUnk1A81     ; $7D
+    dw Evt_Op7E_SetUnk1A81Bit7      ; $7E
+    dw Evt_Op7F_RandomVarByte       ; $7F
+    dw Evt_Op80_InitCharObj         ; $80
+    dw Evt_Op81_InitSprite          ; $81
+    dw Evt_Op82_InitWramSprite      ; $82
+    dw Evt_Op83_InitEnemySprite     ; $83
+    dw Evt_Op84_SetUnk1B01          ; $84
+    dw Evt_UnusedOpcode             ; $85
+    dw Evt_UnusedOpcode             ; $86
+    dw Evt_Op87_SetScriptPeriod     ; $87
+    dw Evt_Op88_ObjPalAnim          ; $88
+    dw Evt_Op89_SetSpeed            ; $89
+    dw Evt_Op8A_SetSpeedVar         ; $8A
+    dw Evt_Op8B_PlaceAtTile         ; $8B
+    dw Evt_Op8C_PlaceAtTileVar      ; $8C
+    dw Evt_Op8D_SetPos              ; $8D
+    dw Evt_Op8E_SetOamFlags         ; $8E
+    dw Evt_Op8F_FollowPc            ; $8F
+    dw Evt_Op90_SetUnk1A81On        ; $90
+    dw Evt_Op91_ClearUnk1A81        ; $91
+    dw Evt_Op92_WalkDir             ; $92
+    dw Evt_UnusedOpcode             ; $93
+    dw Evt_Op94_WalkToObj           ; $94
+    dw Evt_Op95_WalkToPc            ; $95
+    dw Evt_Op96_WalkToTile          ; $96
+    dw Evt_Op97_WalkToTileVar       ; $97
+    dw Evt_Op98_WalkTowardObj       ; $98
+    dw Evt_Op99_WalkTowardPc        ; $99
+    dw Evt_Op9A_WalkTowardTile      ; $9A
+    dw Evt_UnusedOpcode             ; $9B
+    dw Evt_Op9C_MoveDir             ; $9C
+    dw Evt_Op9D_MoveDirVar          ; $9D
+    dw Evt_Op9E_MoveToObj           ; $9E
+    dw Evt_Op9F_MoveToPc            ; $9F
+    dw Evt_OpA0_MoveToTile          ; $A0
+    dw Evt_OpA1_MoveToTileVar       ; $A1
+    dw Evt_UnusedOpcode             ; $A2
+    dw Evt_UnusedOpcode             ; $A3
+    dw Evt_UnusedOpcode             ; $A4
+    dw Evt_UnusedOpcode             ; $A5
+    dw Evt_OpA6_Face                ; $A6
+    dw Evt_OpA7_FaceVar             ; $A7
+    dw Evt_OpA8_FaceObj             ; $A8
+    dw Evt_OpA9_FacePc              ; $A9
+    dw Evt_OpAA_SetAnimRow          ; $AA
+    dw Evt_OpAB_PlayAnimOnce        ; $AB
+    dw Evt_OpAC_ShowFrame           ; $AC
+    dw Evt_OpAD_WaitRuns            ; $AD
+    dw Evt_OpAE_AnimReset           ; $AE
+    dw Evt_OpAF_PartyControlOnce    ; $AF
+    dw Evt_OpB0_PartyControl        ; $B0
+    dw Evt_OpB1_Yield               ; $B1
+    dw Evt_OpB2_Halt                ; $B2
+    dw Evt_OpB3_AnimRow0            ; $B3
+    dw Evt_OpB4_AnimRow1            ; $B4
+    dw Evt_OpB5_FollowObj           ; $B5
+    dw Evt_OpB6_FollowPc            ; $B6
+    dw Evt_OpB7_PlayAnimLoops       ; $B7
+    dw Evt_OpB8_SetMsgPtr           ; $B8
+    dw Evt_OpB9_Wait4               ; $B9
+    dw Evt_OpBA_Wait8               ; $BA
+    dw Evt_OpBB_Msg                 ; $BB
+    dw Evt_OpBC_Wait16              ; $BC
+    dw Evt_OpBD_Wait32              ; $BD
+    dw Evt_UnusedOpcode             ; $BE
+    dw Evt_UnusedOpcode             ; $BF
+    dw Evt_OpC0_MsgChoice           ; $C0
+    dw Evt_OpC1_MsgUnk30_1          ; $C1
+    dw Evt_OpC2_MsgUnk30_2          ; $C2
+    dw Evt_OpC3_MsgChoiceUnk30_1    ; $C3
+    dw Evt_OpC4_MsgChoiceUnk30_2    ; $C4
+    dw Evt_UnusedOpcode             ; $C5
+    dw Evt_UnusedOpcode             ; $C6
+    dw Evt_OpC7_AddItemVar          ; $C7
+    dw Evt_OpC8_EnterBankC2         ; $C8
+    dw Evt_OpC9_IfHasItem           ; $C9
+    dw Evt_OpCA_AddItem             ; $CA
+    dw Evt_OpCB_RemoveItem          ; $CB
+    dw Evt_OpCC_IfHasGold           ; $CC
+    dw Evt_OpCD_AddGold             ; $CD
+    dw Evt_OpCE_RemoveGold          ; $CE
+    dw Evt_OpCF_IfCharListed        ; $CF
+    dw Evt_OpD0_AddCharToReserve    ; $D0
+    dw Evt_OpD1_UnlistChar          ; $D1
+    dw Evt_OpD2_IfCharInParty       ; $D2
+    dw Evt_OpD3_AddCharToParty      ; $D3
+    dw Evt_OpD4_MoveCharToReserve   ; $D4
+    dw Evt_OpD5_BankC2Cmd0A         ; $D5
+    dw Evt_OpD6_DropCharObj         ; $D6
+    dw Evt_OpD7_GetItemCount        ; $D7
+    dw Evt_OpD8_StartBattle         ; $D8
+    dw Evt_OpD9_PartyWalkToTiles    ; $D9
+    dw Evt_OpDA_PartyGather         ; $DA
+    dw Evt_UnusedOpcode             ; $DB
+    dw Evt_OpDC_SetPrevLoc          ; $DC
+    dw Evt_OpDD_SetLoc              ; $DD
+    dw Evt_OpDE_SetLocUnk1E         ; $DE
+    dw Evt_OpDF_WarpNowUnk1E        ; $DF
+    dw Evt_OpE0_Warp                ; $E0
+    dw Evt_OpE1_WarpNow             ; $E1
+    dw Evt_OpE2_WarpVars            ; $E2
+    dw Evt_OpE3_SetControl          ; $E3
+    dw Evt_OpE4_CopyMapRegion       ; $E4
+    dw Evt_OpE5_CopyMapRegionRedraw ; $E5
+    dw Evt_OpE6_SetDrift            ; $E6
+    dw Evt_OpE7_ScrollTo            ; $E7
+    dw Evt_OpE8_SoundCmd18          ; $E8
+    dw Evt_UnusedOpcode             ; $E9
+    dw Evt_OpEA_PlayMusic           ; $EA
+    dw Evt_OpEB_SoundCmds81To83     ; $EB
+    dw Evt_OpEC_SoundCmd            ; $EC
+    dw Evt_OpED_WaitApuio1          ; $ED
+    dw Evt_OpEE_WaitApuio3          ; $EE
+    dw Evt_UnusedOpcode             ; $EF
+    dw Evt_OpF0_FadeBrightness      ; $F0
+    dw Evt_OpF1_FadeFixedColor      ; $F1
+    dw Evt_OpF2_WaitBrightness      ; $F2
+    dw Evt_OpF3_WaitFixedColor      ; $F3
+    dw Evt_OpF4_SetShake            ; $F4
+    dw Evt_UnusedOpcode             ; $F5
+    dw Evt_UnusedOpcode             ; $F6
+    dw Evt_UnusedOpcode             ; $F7
+    dw Evt_OpF8_BankC2Cmd06And07    ; $F8
+    dw Evt_OpF9_BankC2Cmd06         ; $F9
+    dw Evt_OpFA_BankC2Cmd07         ; $FA
+    dw Evt_UnusedOpcode             ; $FB
+    dw Evt_UnusedOpcode             ; $FC
+    dw Evt_UnusedOpcode             ; $FD
+    dw Evt_OpFE_WinQuad             ; $FE
+    dw Evt_OpFF_Misc                ; $FF
+
 ; ============================================================
 ; Event opcodes: function calls and object control ($C0:5F6E–$C0:62B4)
-; Handlers in Evt_OpcodeTable (unmatched), entered as the movement
+; Handlers in Evt_OpcodeTable, entered as the movement
 ; opcodes are (see their banner): Y = the opcode's offset in Evt_Data,
 ; X returned = where the script goes on, C=1 to go on with it in this
 ; run, C=0 to stop the object for this run. Each object has 16 function
@@ -34502,7 +38307,6 @@ Evt_Op77_ClearVarByte:
 ;   RandomTable byte: Field_Unk0400Copy is incremented and indexes it
 ;   (as Obj_SetVelocityChecked does); X = Y + 2, C=1.
 ; Reached through Evt_OpcodeTable (opcode $7F).
-; Callers (1 JMP site): unmatched ($C0:5E6B).
 ; Callers note: the JMP at $C0:5E6B is not code: it is Evt_OpcodeTable's
 ;   bytes (the $4C high byte of entry $7E, then entry $7F, $6D09).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk0400Copy /

@@ -123,7 +123,8 @@ if !constants_engine_inc == 0
 !VramQueue_TileStep = $02                ; Field_VramQueueFlags bit 1: TileAnim_StepVramAddrs ready
 !VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
 !Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one Field_EndOfFrameShort
-                                         ; before the battle (DefaultHandler)
+                                         ; before the battle (DefaultHandler) and around the two
+                                         ; EngFD_UnkC2C1 runs of Field_RefreshHdmaLong
 
 ; --- Pad ---
 !Pad_Start = $01                         ; Pad_Pressed bit 0: Start
@@ -350,9 +351,9 @@ if !constants_engine_inc == 0
 !Field54_MapReq = $0C                    ; Field_Unk54 bits 2-3: shifted left once into
                                          ; Field_MapRedrawDone bits 3-4, then Map_ClearBufC800
 !Field_Unk29Start = $01                  ; Field_Unk29 value Field_CheckTileInFront sets to start
-                                         ; Field_Unk1F87's sequence (not traced)
+                                         ; Field_Unk1F87's message sequence (clear, open, text)
 !Field_Unk29State0D = $0D                ; Field_Unk29 value set when the watched tile leaves the box
-                                         ; (Field_Unk1F87's state $0D; not traced)
+                                         ; (Field_Unk1F87's state $0D: the window closes)
 !MapRedraw_Step1 = $01                   ; Field_MapRedrawDone values 1-4 (DefaultHandler's redraw
 !MapRedraw_Step2 = $02                   ; steps): NmiHandler uploads Map_BufC800 (2 KB) to
 !MapRedraw_Step3 = $03                   ; Map_TilemapVram, Map_TilemapVram3, Map_TilemapVram2 and
@@ -1002,3 +1003,109 @@ endif
 !ObjSpr_SizeLarge = $03                  ; Obj_SprSize size class 3 (24 tiles, Spr_LoadLargeObj)
 !Halt_ColorWramGfxFull = $7C1F           ; Sys_HaltWithColor colour when ObjQ_Unk71 runs past the end
                                          ; of bank $7F (opcodes $82/$83)
+
+; --- Event opcodes $2E, $84, $87-$8E, $90/$91, $7C-$7E ($C0:4867-$C0:4D05) ---
+!EvtPal_Kind20 = $20                     ; Evt_Op88_ObjPalAnim operand: a FieldAnimB record of kind $20
+!EvtPal_Kind30 = $30                     ; ... of kind $30 (both: colours relative to the object's palette)
+!EvtPal_Kind40 = $40                     ; Evt_Op88 / Evt_Op2E operand high nibble: a 9-byte kind-$40 record
+!EvtPal_Kind50 = $50                     ; ... or kind $50 (FieldFD_LoadAnimSetB's "other" kinds)
+!EvtPal_NibbleMask = $0F                 ; low nibble of an Evt_Op88 / Evt_Op2E operand byte
+!EvtPal_Unk3Init = $08                   ; FieldAnimB.Unk3 the kind-$40/$50 records start with
+!EvtPal_SpriteColor0 = $80               ; CGRAM colour number of sprite palette 0's colour 0 (sprite
+                                         ; palettes are CGRAM $80-$FF; Obj_OamAttr x 8 + this = the
+                                         ; object's colour 0)
+!EvtPal_CopyFixed = 3                    ; Evt_Op88 / Evt_Op2E kind $8x: the length word less this is the
+                                         ; MVN count (length - 2 colour bytes are copied)
+!FieldAnimB_Searched = 8                 ; records Evt_FindFreeAnimB searches (of the 12)
+!ObjX_PalAnimNone = $FFFF                ; ObjX_PalAnimRec: the object has no FieldAnimB record
+
+; --- Party control: the step log and the followers ($C0:9E29-$C0:A33A) ---
+!PartyLog_IdxMask = $7F                  ; Field_UnkAB/AC/AD wrap: the PartyLog_* rings hold 128 entries
+!Party_LagMoving = $18                   ; Party_UnkA26B/A2CE: entries a follower keeps behind the one
+                                         ; ahead while the leader steps (it replays from this lag on)
+!Party_LagStill = $10                    ; ... while the leader has no step
+!Party_Unk18 = $18                       ; Party_LeaderAnim / Member2/3Anim: |Y step| is compared with it
+                                         ; before Party_AnimRowUnk1B, but nothing tests the result
+!Party_StepNegCode = $21                 ; (v ^ $FF) + this = |v| + $20: the step code of a negative step
+!Party_AnimIdxMask = $7E                 ; step code -> Party_AnimTable index (even, 0-$7E)
+!Party_StepHalf = $08                    ; Party_FollowerHoldAnim: a step with this bit is moved 8 from 0
+!Party_Unk62Row19 = $02                  ; Field_Unk62 value for which Party_AnimIdle gives the leader
+                                         ; ObjAnim_RowUnk19
+!Party_IdleDelay = $02FF                 ; Field_Unk58 (frames standing, probably) at which Party_AnimIdle
+                                         ; first tries the idle row
+!Party_IdleRepeatMask = $007F            ; past the delay, it tries again when these bits are all set
+!Field_Unk58Idle = $8000                 ; Field_Unk58 bit 15, set by Party_AnimIdle's first try
+                                         ; (Field_Unk58Mask keeps it)
+!Party_IdleChance = $08                  ; a try gives the idle row when the RandomTable byte is below this
+!ObjAnim_RowUnk17 = $17                  ; Obj_AnimRow Party_AnimRun gives the leader with no step and
+                                         ; Party_TileFlagged 0 (a run held against something, probably)
+!ObjAnim_RowUnk19 = $19                  ; Obj_AnimRow Party_AnimIdle gives the leader while
+                                         ; Field_Unk62 = 2
+!ObjAnim_RowUnk1B = $1B                  ; Obj_AnimRow on a shape-$1E tile with a Y step
+!ObjAnim_RowIdle = $21                   ; Obj_AnimRow Party_AnimIdle picks now and then while standing
+
+; --- Field messages (Field_Unk1F87 and its callees, $C0:1F87-$C0:21E0) ---
+!Field_Unk29Text = $06                   ; Field_Unk29 state 6: a text step each frame (Field_MsgStep)
+!Field_Unk29Wait = $07                   ; state 7: wait (Field_Unk34 count / a press / the choice)
+!Field_Unk29Page = $08                   ; state 8: clear the lines for a new page
+!Field_Unk36Upload = $01                 ; Field_Unk36: the NMI sends the text line every frame
+!Field_Unk36Once = $81                   ; Field_Unk36: one more upload (bit 7: zeroed by the NMI)
+!FieldMsg_Place1 = $01                   ; Field_Unk26 / Field_Unk30: the window's place (1 for an object
+                                         ; in the lower half of the screen)
+!FieldMsg_Place2 = $02                   ; ... (2 for one in the upper half)
+!FieldMsg_OpenSize = $29                 ; Field_Unk27 opens to this less 1 (the LDA / DEC in Field_Unk1F87)
+!FieldMsg_ChoiceStart = $01              ; Field_Unk62 set by the message opcodes: start the choice cursor
+                                         ; at the end of the text (probably)
+!FieldMsg_ChoiceActive = $02             ; Field_Unk62 while Sub_1ADF moves Field_Unk63 (probably)
+!FieldMsg_ChoiceMade = $03               ; Field_Unk62: Field_Unk1F87 goes on to the next state
+!FieldMsg_StatusArg = $03                ; TextWin_Status after control code $03 (TextWin_Code3Arg): a wait
+!FieldMsg_StatusLineA = $05              ; TextWin_Status $05-$08: a new line (pen reset); 7/8 wait first
+!FieldMsg_StatusLineB = $06
+!FieldMsg_StatusLineWaitA = $07
+!FieldMsg_StatusLineWaitB = $08
+!FieldMsg_StatusPageA = $09              ; TextWin_Status $09-$0C: a new page; $0B/$0C wait first
+!FieldMsg_StatusPageB = $0A
+!FieldMsg_StatusPageWaitA = $0B
+!FieldMsg_StatusPageWaitB = $0C
+!FieldMsg_LastLine = $03                 ; Field_Unk31 of the last text line (lines 0-3)
+!FieldMsg_WaitUnit = 15                  ; frames per unit of TextWin_Code3Arg (Field_Unk34 = arg x this)
+!FieldMsg_TreasureStrs = $DEFF00         ; ROM: the string table TextWin_Init gets for a treasure message
+                                         ; (indexed by Field_Unk2A, the TreasureKind)
+
+; --- The tile-animation list ($C0:28AA-$C0:29F6) ---
+!TileAnimList_Empty = $8080              ; TileAnimList entry: empty (bit 15 set; ends the list)
+!TileAnimList_Bytes = $0020              ; bytes of TileAnimList (16 word entries)
+!TileAnim_Box2TopLeft = $E8              ; Map_TileProps start state of a 2x2 block's top-left tile (bottom
+                                         ; row TileAnim_ModeEC / ModeEE)
+!TileAnim_Box2TopRight = $EA             ; ... its top-right tile
+!TileAnim_Box3MidLeft = $F6              ; a 2x3 block's middle-row left tile (bottom row ModeFA / ModeFC)
+!TileAnim_Box3MidRight = $F8             ; ... middle-row right
+!TileAnim_Box3TopLeft = $F2              ; ... top-row left
+!TileAnim_Box3TopRight = $F4             ; ... top-row right
+
+; --- ScrollStepAccum ($C0:2C41) ---
+!LayerDrift_Layer2 = $02                 ; LayerDrift_Flags bit 1: step layer 2
+!LayerDrift_Layer3 = $04                 ; LayerDrift_Flags bit 2: step layer 3
+!LayerDrift_FracMask = $0F               ; the 1/16-pixel part a fraction keeps
+!LayerDrift_FracNeg = $F0                ; ORed into a negative fraction's kept part (its sign)
+
+; --- Battle music cues (MusicCueDispatch / AudioFadeDispatch, $C0:1BAB-$C0:1CFB) ---
+!FieldBtl_EvtKeepMusic = $40             ; FieldBtl_EvtFlags bit 6: the music cues send only Audio_Cmd70
+                                         ; (keep the field music through the battle, probably)
+!Audio_Cmd14 = $14                       ; sound-driver command sent with a song in Audio_CmdArg0 (meaning
+                                         ; not traced: start a song, probably)
+!Audio_Cmd70 = $70                       ; sound-driver command, argument 1 before / 0 after a battle
+                                         ; (not traced)
+!Audio_Cmd11 = $11                       ; sound-driver command sent with Menu_Config1E after a battle
+                                         ; (not traced: the field music again, probably)
+!Audio_Cmd81Arg40 = $40                  ; Audio_CmdArg0 of an Audio_CmdUnk81 after a battle
+!Audio_Cmd81Arg80 = $80                  ; ... and after a lost one
+!Audio_Unk1E10Set = $FF                  ; Audio_Unk1E10 before a battle (0 after it)
+!Audio_SongUnk26 = $26                   ; Audio_Cmd14's argument after a lost battle (a song, probably)
+
+; --- The field's IRQ ($C0:ECCC-$C0:F05D) ---
+!HVBJOY_HBlank = $40                     ; HVBJOY bit 6: in H-blank (IrqHandler waits for it)
+!TileAnim_MetaPage = $0800               ; Map_Meta12 offset of metatile $100: the animated tiles use
+                                         ; metatiles $100 + their Map_TileProps state
+!TileAnim_ColumnTop = $E4                ; start state of an $E6 column's upper tile, probably: the IRQ
+                                         ; draws metatile $1E5 there after ModeE6_Handler adds 1
