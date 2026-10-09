@@ -27519,7 +27519,7 @@ Battle_ScaleWord10:
 ;        (dropped); A, X, Y clobbered; !Battle_UnkAD8E/AD8D, and on the
 ;        paths above !Battle_UnkB2AE, !BattleAi_Targets/TargetCount,
 ;        !Battle_TechUsers, !Battle_ActUnkAE97/AE98, the action block;
-;        DP $00-$15 and $3A-$3D written, plus what the callees change
+;        DP $00-$14 and $3A-$3D written, plus what the callees change
 ;        (the math DP bytes, the area or position query's DP scratch and
 ;        outputs, BattleSys_UnkAC57's)
 !C1DD_Mode = !BattleTmp_00              ; 1 B: target mode, then user 0's slot (.load_user_slots)
