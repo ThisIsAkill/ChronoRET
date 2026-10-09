@@ -1,0 +1,6 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:8190,Menu_RunThreads,2026-10-09,rev98a,approved,711bb6ce1333,"Fix ok: 8-bit X (<=$38) zero-extended, 3rd ASL shifts out bit 13 so C=0, S=$0A3F+offset*8. Verified slot clear/MVN, states, wait, yield save/resume, sub-entry addrs, DB/DP"
+$C2:84EC,Menu_PollPad,2026-10-09,rev98a,approved,cf1e16d70afa,"Exit fix ok: Y untouched, SEP #$10 clears its high byte; both callers REP #$30 first. Verified JOY1 layout, $3030 soft reset, pressed/repeat logic, A/X exit. nit: reload also when only new presses"
+$C2:85AE,Menu_TickPlayTime,2026-10-09,rev98a,approved,7592b1b1950f,"Exit fix true (SEP #$30). Verified DP $0400, pause byte $0407, limits 60,60,10,6,10,10 in ROM, wrap to 0 + Maxed $0406. nit: both callers already arrive X=1 after Menu_PollPad"
+$C2:8881,Menu_ItemCategory,2026-10-09,rev98a,approved,ef12a908827f,"Y fix ok (SEP #$30, PLP can't restore high). Verified bounds $00,$5A,$7B,$94,$BC,$F2, loop to X=4, index/category words. nit: with M=0 callers A's high byte is the entry id's"
+$C2:88AD,Menu_ItemDataPtrA,2026-10-09,rev98a,approved,dff74ba94a82,"Y fix ok; define now says bank $CC (caller $98BB: LDA $CC0000,X; FF:CF0E ptrs chain contiguously). Verified ASL C=0, WRMPY math. nit: X=1 entry would keep only X's low byte"
