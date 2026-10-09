@@ -9370,6 +9370,7 @@ Evt_PushTarget:
 ;   sets B from it), DB=$00 (Obj_* tables and the multiplier
 ;   absolute); Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X as above, C=0 on every path; Y
+;   = the opcode + 7 on the done path (the INYs before TYX), else
 ;   unchanged; A and B clobbered; EvtParty_SavedY = the opcode's
 ;   offset; on a start Field_ControlEnabled = 0 and Eng_Scratch,
 ;   EvtParty_Col / Row written.
@@ -10238,7 +10239,10 @@ Evt_OpC4_MsgChoiceUnk30_2:
 ; the reserve); 2 moves it from the party to the front of the reserve;
 ; 4 adds it to the first empty reserve place unless it is listed; 5
 ; empties its place; $0C gives A = the count of item X held. The
-; Menu_Unk8C36 path saves and restores P, so C comes back unchanged.
+; Menu_Unk8C36 path saves and restores P, so C comes back unchanged. It
+; does not save Y: its closing pass ($C2:834D, then $C2:82E1) loads Y
+; (LDY #$21BA, LDY #$2859, TAY), and a PLP with X=1 clears Y's high
+; byte, so Y comes back clobbered after every command.
 ; ============================================================
 
 ; ------------------------------------------------------------
@@ -10497,7 +10501,8 @@ Evt_OpCB_RemoveItem:
 ;   it), DB any (all reads and writes long; the command sets its own);
 ;   Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=1; A = the count; Y
-;   unchanged; EvtOp_SavedPos = Y + 2; Eng_Scratch low byte = the count.
+;   clobbered by the command (see the banner); EvtOp_SavedPos = Y + 2;
+;   Eng_Scratch low byte = the count.
 ; ------------------------------------------------------------
 Evt_OpD7_GetItemCount:
     TYX
@@ -10638,7 +10643,7 @@ Evt_OpCE_RemoveGold:
 ;   it), DB any (operands read long; the command sets its own); Y = the
 ;   opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
-;   = char (the command saves and restores it); EvtOp_SavedPos = Y + 2;
+;   clobbered by the command (see the banner); EvtOp_SavedPos = Y + 2;
 ;   Eng_Scratch = n on a jump.
 ; ------------------------------------------------------------
 Evt_OpCF_IfCharListed:
@@ -10684,7 +10689,8 @@ Evt_OpCF_IfCharListed:
 ;   (operand read long; the command sets its own); Y = the opcode's
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
-;   on entry; A clobbered; Y = char.
+;   on entry; A clobbered; Y clobbered by the command (see the
+;   banner).
 ; ------------------------------------------------------------
 Evt_OpD0_AddCharToReserve:
     TYX
@@ -10713,7 +10719,8 @@ Evt_OpD0_AddCharToReserve:
 ;   (operand read long; the command sets its own); Y = the opcode's
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
-;   on entry; A clobbered; Y = char.
+;   on entry; A clobbered; Y clobbered by the command (see the
+;   banner).
 ; ------------------------------------------------------------
 Evt_OpD1_UnlistChar:
     TYX
@@ -10740,7 +10747,8 @@ Evt_OpD1_UnlistChar:
 ;   it), DB any (operands read long; the command sets its own); Y = the
 ;   opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X as above, C=1; A clobbered; Y
-;   = char; EvtOp_SavedPos = Y + 2; Eng_Scratch = n on a jump.
+;   clobbered by the command (see the banner); EvtOp_SavedPos = Y + 2;
+;   Eng_Scratch = n on a jump.
 ; ------------------------------------------------------------
 Evt_OpD2_IfCharInParty:
     TYX
@@ -10789,7 +10797,8 @@ Evt_OpD2_IfCharInParty:
 ;   be 0: TDC/XBA sets B from it), DB any (operand read long; the
 ;   command sets its own); Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
-;   on entry; A clobbered; Y = char; EvtChar_Id = char (16-bit), and
+;   on entry; A clobbered; Y clobbered by the command (see the
+;   banner); EvtChar_Id = char (16-bit), and
 ;   EvtChar_Obj = its object when it has one.
 ; ------------------------------------------------------------
 Evt_OpD3_AddCharToParty:
@@ -10858,7 +10867,8 @@ Evt_OpD3_AddCharToParty:
 ;   TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute; saved
 ;   around the MVNs); Y = the opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2; C as
-;   above; A clobbered; Y = char; EvtChar_Id (low byte) = char.
+;   above; A clobbered; Y clobbered by the command (see the banner);
+;   EvtChar_Id (low byte) = char.
 ; ------------------------------------------------------------
 Evt_OpD4_MoveCharToReserve:
     TYX
@@ -10966,9 +10976,11 @@ Evt_OpD4_MoveCharToReserve:
 ; Event opcode $D6 (2 bytes: $D6, char): the first present party member
 ;   (Party_ObjSlot, then 1, then 2) whose Obj_Unk1101 is char gets
 ;   Obj_Unk1100 = 3 (Obj_Unk1100Out), and its place in Party_ObjSlot*
-;   and in Party_Members is set to Obj_None. Unlike
-;   Evt_OpD4_MoveCharToReserve nothing moves up, no palette moves and
-;   Menu_PartyOrder is not touched. X = Y + 2.
+;   and in Party_Members is set to Obj_None ($80). Party_Members
+;   ($7E:2980) is Menu_PartyOrder's first three places, so that party
+;   place is marked empty there too. Unlike Evt_OpD4_MoveCharToReserve
+;   nothing moves up, no palette moves, no BankC2_Entry8004 command runs
+;   and the reserve places are not touched. X = Y + 2.
 ; There is no SEC/CLC: C is left by the last CMP (C=1 after a match;
 ;   else that of the last present member's test, or the dispatcher's
 ;   C=0 with none present).
@@ -11046,7 +11058,8 @@ Evt_OpD6_DropCharObj:
 ;   (operands read long; the command sets its own); Y = the opcode's
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 3; C as
-;   on entry; A clobbered; Y = a.
+;   on entry; A clobbered; Y clobbered by the command (see the
+;   banner).
 ; ------------------------------------------------------------
 Evt_OpD5_BankC2Cmd0A:
     TYX
@@ -11220,9 +11233,11 @@ Evt_OpDC_SetPrevLoc:
 ; $C0:3B1B — Evt_OpDD_SetLoc (42 bytes, $3B1B–$3B44)
 ; Event opcode $DD (5 bytes: $DD, location (word), column, row): sets
 ;   Loc_Id, Loc_EntryX (column, row) and Loc_EntryFacing from the
-;   operands without loading anything (the next warp of Evt_OpE1_WarpNow
-;   or Field_SceneChangeTick saves them as the return point); X = Y + 5,
-;   C=1. Evt_OpDE_SetLocUnk1E BRAs here.
+;   operands without loading anything; X = Y + 5, C=1. A following
+;   Evt_OpE1_WarpNow saves all three as the return point (Loc_Return*);
+;   Field_SceneChangeTick's warp (.hard_restart) saves only Loc_Id, the
+;   return tile and facing coming from the leader's object.
+;   Evt_OpDE_SetLocUnk1E BRAs here.
 ; Reached through Evt_OpcodeTable (opcode $DD).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Loc_* and
 ;   EvtWarp_Word are dp), DB any (operands read long); Y = the opcode's
@@ -11286,7 +11301,8 @@ Evt_OpDE_SetLocUnk1E:
 ;   EvtWarp_Word are dp), DB=$00 (RDNMI read absolute; InitHW's own
 ;   writes); Y = the opcode's offset in Evt_Data.
 ; Exit: none (the stack is reset and the game restarts through
-;   ReentryVectors with A=0, interrupts disabled by InitHW).
+;   ReentryVectors with A = Loc_DestFacing, the last value loaded, and
+;   interrupts disabled by InitHW).
 ; ------------------------------------------------------------
 Evt_OpE1_WarpNow:
     INY
@@ -12022,8 +12038,10 @@ Evt_OpE7_ScrollTo:
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
 ;   is dp), DB any (the command sets its own); Y = the opcode's offset
 ;   in Evt_Data.
-; Exit: M=1, X=0, DP and DB unchanged; X = Y = EvtOp_SavedPos = the
-;   opcode + 1; C as on entry; A clobbered (the command's result).
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = the opcode
+;   + 1; C as on entry; A clobbered (the command's result); Y clobbered
+;   by the command (Menu_Unk8C36 does not save it; see the banner of
+;   the item and character opcodes at $C0:3711).
 ; ------------------------------------------------------------
 Evt_OpF8_BankC2Cmd06And07:
     INY
@@ -12045,7 +12063,8 @@ Evt_BankC2CmdTail:                      ; header: see Evt_OpF8_BankC2Cmd06And07
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
 ;   is dp), DB any; Y = the opcode's offset in Evt_Data.
 ; Exit: as Evt_OpF8_BankC2Cmd06And07 (M=1, X=0, DP and DB unchanged;
-;   X = Y = EvtOp_SavedPos = the opcode + 1; C as on entry; A clobbered).
+;   X = EvtOp_SavedPos = the opcode + 1; C as on entry; A and Y
+;   clobbered).
 ; ------------------------------------------------------------
 Evt_OpF9_BankC2Cmd06:
     INY
@@ -12062,7 +12081,8 @@ Evt_OpF9_BankC2Cmd06:
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
 ;   is dp), DB any; Y = the opcode's offset in Evt_Data.
 ; Exit: as Evt_OpF8_BankC2Cmd06And07 (M=1, X=0, DP and DB unchanged;
-;   X = Y = EvtOp_SavedPos = the opcode + 1; C as on entry; A clobbered).
+;   X = EvtOp_SavedPos = the opcode + 1; C as on entry; A and Y
+;   clobbered).
 ; ------------------------------------------------------------
 Evt_OpFA_BankC2Cmd07:
     INY
@@ -12078,8 +12098,9 @@ Evt_OpFA_BankC2Cmd07:
 ; Reached through Evt_OpFFTable (entry $9F; Evt_OpFF_Misc returns C=0).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
 ;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
-; Exit: as Evt_OpF8_BankC2Cmd06And07, with X = Y = EvtOp_SavedPos = the
-;   opcode + 2.
+; Exit: as Evt_OpF8_BankC2Cmd06And07 (M=1, X=0, DP and DB unchanged; C
+;   as on entry; A and Y clobbered), with X = EvtOp_SavedPos = the opcode
+;   + 2.
 ; ------------------------------------------------------------
 Evt_OpFF9F_BankC2Cmd08:
     INY
