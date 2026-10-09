@@ -917,4 +917,23 @@ if !constants_battle_inc == 0
 !Battle_List7StatusBit   = $40    ; .Unk4C bit list 7 would start (the same)
 !Battle_StatMax          = $FF    ; the cap of a byte value: BattleSys_AdjustEvade, AdjustDefence
 
+!Battle_DmgKind9         = 9      ; BattleSys_CalcDamage: formula kinds 9 and 10 (effect byte 5; their code is dead)
+!Battle_DmgKind10        = 10
+!Battle_DmgMul12         = 12     ; ... the factors and divisors of its formulas
+!Battle_DmgMul16         = 16
+!Battle_DmgDiv15         = 15
+!Battle_DmgDiv18         = 18
+!Battle_DmgDiv20         = 20
+!Battle_DmgDiv140        = 140
+!Battle_DmgCutDiv        = 10     ; ... the caster's .Status2 cuts: x 8 / this
+!Battle_DmgBoostBit7     = $80    ; the caster's .Unk4C+2 | .Unk4C+7 bits: x 3 / 2 (16-bit, no truncation)
+!Battle_DmgBoostBit3     = $08    ; ... / 2 x 3
+!Battle_DmgBoostBit1     = $02    ; ... / 4 x 5
+!Battle_Status2Bit2      = $04    ; .Status2 bit 2: BattleSys_CalcDamage divides by 4
+!Battle_DefUnk6B         = $3E    ; BattleSys_AdjustDefence: effect byte 6 value: the target's .Unk6B
+!Battle_DefUnk69         = $3C    ; ... value: the target's .Unk69 x 5 / 2
+!Battle_AE4EScaleMask    = $03    ; !Battle_UnkAE4E bits 1-0: n, the defence x n / 4 when not 0
+!Battle_ActHitKind4      = 4      ; !Battle_ActPcHitKind of an MP drain's target (BattleSys_DrainHpMp)
+!Battle_DrainRandDiv     = 10     ; BattleSys_DrainHpMp: the random part is below amount / this + 3
+
 endif

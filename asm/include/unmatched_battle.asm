@@ -282,12 +282,6 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1E0F5
-BattleSys_UnkE0F5:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1E65F
-BattleSys_UnkE65F:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1E77B
-BattleSys_UnkE77B:                      ; JSR from BattleSys_Effect05; not analysed
 org $C1E9D5
 BattleSys_UnkE9D5:                      ; JSR from BattleSys_Effect03/06; not analysed
 org $C1CFC2
