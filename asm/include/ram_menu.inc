@@ -1067,6 +1067,14 @@ endstruct
 !Menu_CurDefense = $9B24                 ; 8-bit; stat 1 + Menu_ArmorSum (at most $FF)
 !Menu_CurMaxHp = $9B25                   ; 16-bit; .Word5 with the accessory bonus, at most 999
 
+; --- List paging (Menu_PageScroll) ---
+!Menu_PageStep = $0DD8                   ; 8-bit; rows per page
+!Menu_PageTop = $0DD9                    ; 8-bit; the list's top row
+!Menu_PageMax = $0DDA                    ; 8-bit; the largest top row
+!Menu_PageCursorFirst = $0DDB            ; 8-bit; Menu_CursorSel when paging back past the start
+!Menu_PageCursorLast = $0DDC             ; 8-bit; ... and on past the end
+!Menu_Unk81 = $0081                      ; 8-bit; set to $FF when the page changes (use not traced)
+
 ; --- Menu mode 0: the main menu ---
 !Menu_MainSel = $0411                    ; 8-bit; the main menu's icon (0-5); mode = it + 1 on confirm
 !Menu_Unk0412 = $0412                    ; 8-bit; reset with Menu_CfgA5 clear; += Menu_Unk0413, below 3

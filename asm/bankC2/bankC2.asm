@@ -26863,7 +26863,7 @@ Menu_AddItemBoosts:
     RTS
 
 ; ============================================================
-; Menu settings and equip test ($C2:92F4–$C2:934E, $C2:93A8–$C2:93BE)
+; Menu settings, equip test and list paging ($C2:92F4–$C2:940C)
 ; ============================================================
 
 org $C292F4
@@ -26922,7 +26922,62 @@ Menu_UnpackConfig:
     PLP
     RTS
 
-org $C293A8
+; $C2:934F — Menu_PackConfig (89 bytes, $934F–$93A7)
+; The reverse of Menu_UnpackConfig: Menu_Config byte 0 = Menu_CfgA7,
+; A6, A5, A4, A3 (bit 0 of each) in bits 7-3 and Menu_CfgALow AND 7;
+; byte 1 = Menu_CfgB7, B6 in bits 7-6, (Menu_CfgBMid AND 7) x 8 and
+; Menu_WinStyle AND 7; byte 2 = Menu_CfgCLow AND 3.
+; Callers (1 JSR site): unmatched ($C2:BF67).
+; Entry: M any (P saved; SEP #$20 here), X any, DP=$0000 (Menu_Tmp00),
+;        DB=$7E
+; Exit:  P restored; A = byte 2; Menu_Tmp00 changed
+; No calls.
+Menu_PackConfig:
+    PHP
+    SEP #$20
+    STZ.b !Menu_Tmp00
+    LDA.w !Menu_CfgA3
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgA4
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgA5
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgA6
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgA7
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgALow
+    AND.b #!Menu_Cfg3BitMask
+    ORA.b !Menu_Tmp00
+    STA.w !Menu_Config
+    STZ.b !Menu_Tmp00
+    LDA.w !Menu_CfgB6
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgB7
+    LSR A
+    ROR.b !Menu_Tmp00
+    LDA.w !Menu_CfgBMid
+    AND.b #!Menu_Cfg3BitMask
+    ASL A
+    ASL A
+    ASL A
+    TSB.b !Menu_Tmp00
+    LDA.w !Menu_WinStyle
+    AND.b #!Menu_WinStyleMask
+    ORA.b !Menu_Tmp00
+    STA.w !Menu_Config+1
+    LDA.w !Menu_CfgCLow
+    AND.b #!Menu_Cfg2BitMask
+    STA.w !Menu_Config+2
+    PLP
+    RTS
+
 ; $C2:93A8 — Menu_CanEquip (23 bytes, $93A8–$93BE)
 ; Whether the current character can equip item Menu_ItemId: A =
 ; Menu_ItemEquipChars[id] AND the character's BankFF_CharBits bit (the
@@ -26945,6 +27000,63 @@ Menu_CanEquip:
     AND.l BankFF_CharBits,X
     PLP
     PLX
+    RTS
+
+; $C2:93BF — Menu_PageScroll (78 bytes, $93BF–$940C)
+; Pages a list on Menu_PadAction bits 1 (back) and 0 (on; bit 1 wins):
+; the new top is Menu_PageTop - Menu_PageStep (no borrow test: a wrap
+; is caught by the compare with Menu_PageMax, and the top becomes 0
+; with Menu_CursorSel = Menu_PageCursorFirst) or + Menu_PageStep (a
+; carry or Menu_PageMax and above: the top becomes Menu_PageMax with
+; Menu_CursorSel = Menu_PageCursorLast). A new top is stored in
+; Menu_PageTop and Menu_ListTop and Menu_Unk81 = $FF.
+; Callers (5 JSR sites): unmatched ($C2:9F0D, $C2:AC42, $C2:B6E8, $C2:D7D7, $C2:D8BA).
+; Entry: M any (P saved; SEP #$20 here), X any, DP=$0000
+;        (Menu_CursorSel, Menu_Unk81), DB=$7E
+; Exit:  P restored (flags too: test A); A = $FF when the top changed,
+;        else 0 (also with neither bit)
+; No calls.
+Menu_PageScroll:
+    PHP
+    SEP #$20
+    LDA.w !Menu_PadAction
+    AND.b #!Menu_PadPageBits
+    BEQ .done
+    BIT.b #!Menu_PadPageBack
+    BEQ .forward
+    LDA.w !Menu_PageTop
+    SEC
+    SBC.w !Menu_PageStep
+    CMP.w !Menu_PageMax
+    BCC .set
+    LDA.w !Menu_PageCursorFirst
+    STA.b !Menu_CursorSel
+    LDA.b #0
+    BRA .set
+.forward:
+    LDA.w !Menu_PageTop
+    CLC
+    ADC.w !Menu_PageStep
+    BCS .last
+    CMP.w !Menu_PageMax
+    BCC .set
+.last:
+    LDA.w !Menu_PageCursorLast
+    STA.b !Menu_CursorSel
+    LDA.w !Menu_PageMax
+.set:
+    CMP.w !Menu_PageTop
+    BEQ .same
+    STA.w !Menu_PageTop
+    STA.w !Menu_ListTop
+    LDA.b #!Menu_Unk81Set
+    STA.b !Menu_Unk81
+.done:
+    PLP
+    RTS
+.same:
+    LDA.b #0
+    PLP
     RTS
 
 ; ============================================================

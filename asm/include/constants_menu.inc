@@ -1022,4 +1022,9 @@ if !constants_menu_inc == 0
 !Menu_AtkDivisorC = 9
 !Menu_BoostFlagsMask = $FFFE
 
+; --- List paging ---
+!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_UnkE984)
+!Menu_PadPageBack = $02
+!Menu_Unk81Set = $FF
+
 endif
