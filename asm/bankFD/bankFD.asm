@@ -2387,7 +2387,7 @@ BattleFD_UnkB555:
 ; place as the others, so the code at $B67F-$B6CA is never run (it
 ; would fill the record from !BattleRom_UnkCC06A7 like the dead part of
 ; BattleFD_AddItemEntry).
-; Callers (1 JSL site): unmatched ($C1:EA5D).
+; Callers (1 JSL site): BattleSys_StealItem ($C1:EA5D).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $06 = item id; !Battle_UnkB18B = slot
 ;        (its TAX takes B = 0 from the TDC at the start)
 ; Exit:  M=1, X=0; A, X, Y clobbered; DP $00, $02, $04, $08, $0A written;

@@ -881,6 +881,8 @@ endif
 !BankC1Svc_RemoveItem = $02              ; ... one fewer of item Y ($C1:D056)
 !BankC1Svc_HasGold = $03                 ; ... A nonzero when the gold is at least Y ($C1:D086)
 !BankC1Svc_RemoveGold = $05              ; ... takes Y off the gold when there is that much ($C1:D0ED)
+!BankC1Svc_Yes = $FF                     ; a service's "yes" result (BankC1_HasGold, AddGold, RemoveGold)
+!BankC1Svc_Emptied = $FF                 ; BankC1_RemoveItem: the entry's count reached 0
 !BankC2Cmd_FindInParty = $00             ; BankC2_Entry8004 commands (Menu_Unk8C36's table at
                                          ; $C2:8C5B, Y = a character): A = 0 when it is in the party
 !BankC2Cmd_AddToParty = $01              ; ... put it in the party

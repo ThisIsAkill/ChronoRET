@@ -265,14 +265,20 @@ struct BattlerStats $5E00
                         ; battle ends; Battle_SetupBattle derives it for a PC whose .Unk2D is 5; meaning unknown
 .Unk57:     skip 1      ; +$57: byte $2A of a PC's character record (BattleFD_UnkAE52); BattleFD_UnkAE99 counts
                         ; the PCs with $A9 here, BattleFD_UnkAEC4 flags those with $AB; meaning unknown
-            skip $0C
+            skip $0B
+.Unk63:     skip 1      ; +$63: a caster stat of BattleSys_CalcDamage (kinds 1, 5, 7-9); meaning unknown
 .Unk64:     skip 1      ; +$64: added to turn list 1's timer reload, and (halved, + 8) the divisor of its HP
                         ; amount (BattleSys_ListHandler1); meaning unknown
             skip 1
 .Unk66:     skip 1      ; +$66: x 5 = the HP amount of BattleSys_UpdateKo's revive hit; meaning unknown
-            skip 5
+.Unk67:     skip 1      ; +$67: a caster stat of BattleSys_CalcDamage (kind 2); meaning unknown
+            skip 1
+.Unk69:     skip 1      ; +$69: x 5 / 2 = the defence of BattleSys_AdjustDefence for effect byte 6 = $3C
+.Unk6A:     skip 1      ; +$6A: a caster stat of BattleSys_CalcDamage (kind 4); meaning unknown
+.Unk6B:     skip 1      ; +$6B: the defence of BattleSys_AdjustDefence for effect byte 6 = $3E
 .Unk6C:     skip 4      ; +$6C: 4 B set to 4 for each PC by BattleFD_UnkB3FE, one of them to 5 by .Unk2E; meaning unknown
-            skip 2
+.Unk70:     skip 1      ; +$70: a caster stat of BattleSys_CalcDamage (kinds 1, 2, 7, 9); meaning unknown
+            skip 1
 .Unk72:     skip 1      ; +$72: set to $32 by BattleFD_UnkB3EB; meaning unknown
 .Unk73:     skip 1      ; +$73: the caster's byte BattleSys_UnkE976 copies to !Battle_UnkB29A unless $FF; meaning unknown
 .Unk74:     skip 1      ; +$74: read with .Unk73 by BattleSys_CasterUnk73; meaning unknown
@@ -1691,5 +1697,22 @@ endstruct
 !Battle_UnkB29A           = $B29A ; 11 B: zeroed before each effect routine; meaning unknown
 !Battle_UnkAE57           = $AE57 ; 1 B: !Battle_UnkB2CC kept over BattleSys_Effect03 by BattleSys_Effect08
 !Battle_UnkAE5B           = $AE5B ; 2 B: BattleSys_CheckTechMp's scratch (a stats offset, then that battler's MP)
+
+; --- Effect arithmetic ($C1:DA37-$C1:EB48) ---
+!Enemy_AnimWantedBase    = !Enemy_AnimWanted-!Battle_FirstEnemySlot ; !Enemy_AnimWanted indexed by battler slot
+!BattleTmp_40             = $40   ; 1 B scratch (BattleSys_SetStatus stores $80 here; nothing found reads it)
+!Battle_UnkAE51           = $AE51 ; 1 B per PC slot: cleared by BattleSys_CureStatus when below 3; meaning unknown
+!Battle_UnkB2BE           = $B2BE ; 1 B: BattleSys_CalcDamage's random part, added to the damage by
+                                  ; BattleSys_ApplyDamage
+!Battle_UnkB1F8           = $B1F8 ; 2 B: a BattlerStats offset, probably (BattleSys_CalcDamage kinds 7 and 8 index
+                                  ; .Unk70 with it); not written in the code matched so far
+!Battle_UnkAE78           = $AE78 ; 1 B: !Battle_UnkB2CC kept over BattleSys_RunUnkB2CCHandlers
+!Battle_UnkAE5DBase       = !Battle_UnkAE5D-!Battle_FirstEnemySlot ; !Battle_UnkAE5D indexed by battler slot
+!Battle_Gold              = $2C53 ; 3 B: the gold, 24-bit (BankC1_AddGold caps it at 9,999,999; the event gold
+                                  ; commands use these services); the menu's !Menu_Unk2C53
+!Battle_GoldHi            = $2C55 ; 1 B: its high byte
+!Battle_SvcArg            = $AEF7 ; 2 B: BankC1_RunService's argument Y, kept by each service
+!Battle_SvcSlot           = $AEF9 ; 2 B: BankC1_AddItem's first empty entry (0 if none); BankC1_RemoveGold's new low word
+!Battle_SvcSlotFound      = $AEFB ; 1 B: BankC1_AddItem: non-zero once an empty entry was found
 
 endif
