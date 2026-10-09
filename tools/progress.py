@@ -115,30 +115,81 @@ def source_functions() -> dict[str, dict]:
 
 
 def header_note(lines: list[str], i: int, name: str) -> str:
-    """First descriptive sentence of the comment block above a label."""
+    """First descriptive sentence of the comment block above a label.
+
+    The block may open with a title naming the routine, as
+    `Name ($C0:005D): text`, `Name ($C1224B–$C1225E, 20 bytes): text` or
+    `$C2:0000 — Name (15 bytes, $0000–$000E; then ...): text`, its
+    parenthesis possibly running onto the next line. The title is dropped
+    and the note is the first sentence of what follows it, up to the
+    Entry/Exit/Callers lines.
+    """
     block, j = [], i - 1
-    while j >= 0 and (lines[j].startswith(';') or lines[j].strip().lower().startswith('org')
-                      or not lines[j].strip()):
+    while j >= 0:
+        line = lines[j].strip()
         if lines[j].startswith(';'):
             block.append(lines[j][1:].strip())
-        elif not lines[j].strip() and block:
+        elif not line:
+            if block:
+                break
+        elif not (line.lower().startswith('org') or line.startswith('!')):
             break
         j -= 1
     text = []
     for line in reversed(block):
         if not line or set(line) <= set('=-~ '):
-            if text:
+            if strip_title(' '.join(text), name):
                 break
-            continue
-        if name in line and '(' in line and not text:
-            continue
+            continue        # nothing but the title yet: the description follows
         if re.match(r'^(?:(?:On entry|Entry|Exit|Callees|Callers?|In|Out)\b|header:)', line):
             break
-        line = re.sub(r'^\$[0-9A-F]{2}:[0-9A-F]{4}\s*[—-]\s*' + re.escape(name) + r'\b[^A-Za-z]*', '', line)
-        if line:
-            text.append(line)
-    note = re.split(r'(?<=[.!?])\s', ' '.join(text), maxsplit=1)[0]
-    return note[:200]
+        title = strip_title(' '.join(text), name)
+        if (len(text) == 1 and title and title != text[0] and not title.endswith(('.', ':', ';', ','))
+                and re.match(r'[A-Z][a-z]+ ', line)):
+            break           # a one-line title summary with no full stop; a sentence follows
+        text.append(line)
+    return shorten(first_sentence(strip_title(' '.join(text), name)))
+
+
+def strip_title(text: str, name: str) -> str:
+    """Drop a leading `[$BB:AAAA — ]Name [(...)][:|—]` title from a note."""
+    m = re.match(r'(?:\$[0-9A-F]{2}:[0-9A-F]{4}\s*[—–-]\s*)?' + re.escape(name) + r'\b\s*', text)
+    if not m:
+        return text
+    rest = text[m.end():]
+    if rest.startswith('('):
+        depth = 0
+        for k, ch in enumerate(rest):
+            depth += {'(': 1, ')': -1}.get(ch, 0)
+            if depth == 0:
+                rest = rest[k + 1:]
+                break
+        else:
+            return ''
+    return re.sub(r'^\s*(?:[:—–-]\s*)?', '', rest)
+
+
+NOTE_MAX = 200  # tools/validate_functions.py's limit for the notes column
+
+
+def shorten(note: str) -> str:
+    """A note of at most NOTE_MAX characters, cut at a word with '...' when longer."""
+    if len(note) <= NOTE_MAX:
+        return note
+    cut = note[:NOTE_MAX - 3]
+    if ' ' in cut:
+        cut = cut[:cut.rindex(' ')]
+    return cut.rstrip(' ,;:-—(') + '...'
+
+
+def first_sentence(text: str) -> str:
+    """Text up to the first sentence end (a full stop not inside a parenthesis)."""
+    depth = 0
+    for k, ch in enumerate(text):
+        depth += {'(': 1, ')': -1}.get(ch, 0)
+        if ch in '.!?' and depth <= 0 and (k + 1 == len(text) or text[k + 1] == ' '):
+            return text[:k + 1]
+    return text
 
 
 def read_reviews() -> dict[str, dict]:
