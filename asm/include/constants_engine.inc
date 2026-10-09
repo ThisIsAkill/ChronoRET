@@ -984,3 +984,19 @@ endif
 !Obj_PalSrcBase = $0000                  ; added to the palette offset (nothing)
 !EvtSpr_PrioInit = $2020                 ; Obj_PrioLow/High word: OAM attribute bit 5 (priority bit 1)
                                          ; in both (FieldBtl_PcPrio's bit)
+
+; --- Event sprite-object opcodes $82/$83 (graphics unpacked to bank $7F) ---
+!Obj_Unk1100Kind4 = $04                  ; Obj_Unk1100 Evt_Op82_InitWramSprite gives its object
+!Obj_Unk1100Kind5 = $05                  ; ... Evt_Op83_InitEnemySprite
+!Obj_Unk1100Kind6 = $06                  ; ... Evt_Op83_InitEnemySprite with its slot operand's bit 7
+!SprRec_FirstNpc = 7                     ; RomE4_SprRec record of Evt_Op82's operand 0 (after the
+                                         ; seven characters)
+!RomE4_NpcSprRec = !RomE4_SprRec+(!SprRec_FirstNpc*!SprRec_Bytes) ; record SprRec_FirstNpc ($E4:F023)
+!RomE4_EnemySprRec = $E4F600             ; ROM: Evt_Op83's records, EvtSpr_EnemyRecBytes each (the
+                                         ; first five bytes as a RomE4_SprRec record)
+!EvtSpr_EnemyRecBytes = $0A              ; bytes per RomE4_EnemySprRec record
+!EvtSpr_RomGfxMin = $F8                  ; Evt_Op83 operands from here on use ROM graphics as they are
+!EvtSpr_SlotMask = $7F                   ; Evt_Op83's slot operand bits 0-6: the tile slot - 1
+!ObjSpr_SizeLarge = $03                  ; Obj_SprSize size class 3 (24 tiles, Spr_LoadLargeObj)
+!Halt_ColorWramGfxFull = $7C1F           ; Sys_HaltWithColor colour when ObjQ_Unk71 runs past the end
+                                         ; of bank $7F (opcodes $82/$83)

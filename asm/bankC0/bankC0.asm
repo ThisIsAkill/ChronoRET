@@ -3580,12 +3580,12 @@ Spr_Load12:
 ;    16x16 tile numbers $40-$4E / $60-$6E / $80-$8E; Attr = $22.
 ; Earlier notes read the frame data as "scene data" and the position
 ; bytes as palette groups.
-; Callers (2 JSR sites): Field_RestoreState ($C0:0212) and unmatched ($C0:47E9).
+; Callers (2 JSR sites): Field_RestoreState ($C0:0212) and Evt_Op83_InitEnemySprite ($C0:47E9).
 ; On entry: X = Obj_Cur (8- or 16-bit: the $C0:47E9 caller runs with X
 ; 8-bit; the routine widens X/Y itself), M=1, DP=$0100, DB=$00 (absolute
 ; object-table loads and DMA register stores). Callers (both JSR):
-; Field_RestoreState ($C0:0212) for Field_UnkAEObj, and unmatched object
-; set-up code at $C0:47E9, which first stores the object in
+; Field_RestoreState ($C0:0212) for Field_UnkAEObj, and
+; Evt_Op83_InitEnemySprite at $C0:47E9, which first stores the object in
 ; Field_UnkAEObj.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A, X and Y clobbered;
 ; Obj_LastFrame of the object set to 0; DP Spr_GfxPtr, Spr_WramPtr,
@@ -8402,9 +8402,9 @@ ClearRAMDMA:
 ; byte) is 0; the conditions behind $C0:46D4/483D are not traced.
 ; Callers (13 BRL sites): GameLoop_NotBankC2 ($C0:007A), Evt_OpBB_Msg ($C0:3577),
 ;   Evt_OpC1_MsgUnk30_1 ($C0:35BC), Evt_OpC2_MsgUnk30_2 ($C0:3603), Evt_OpC0_MsgChoice ($C0:364A),
-;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4), Evt_FindOrAddUnk0920
-;   ($C0:5CB3), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8), Evt_UnusedOpcode ($C0:5F71) and unmatched
-;   ($C0:46D4, $C0:483D).
+;   Evt_OpC3_MsgChoiceUnk30_1 ($C0:36B1), Evt_OpC4_MsgChoiceUnk30_2 ($C0:36E4),
+;   Evt_Op82_InitWramSprite ($C0:46D4), Evt_Op83_InitEnemySprite ($C0:483D), Evt_FindOrAddUnk0920
+;   ($C0:5CB3), LocLoad_CheckEvtData ($C0:5CDA, $C0:5CE8) and Evt_UnusedOpcode ($C0:5F71).
 ; Callers note: Evt_UnusedOpcode is LDX #$1639 / BRL at $C0:5F6E,
 ;   right after the opcode table.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: the whole colour word moves
@@ -13537,15 +13537,15 @@ Evt_LoadSpriteRec:                      ; header: see Evt_Op81_InitSprite
 
 ; ------------------------------------------------------------
 ; $C0:4557 — Evt_InitWramSprite (57 bytes, $4557–$458F)
-; The common start of the event opcodes $82 and $83 (JSR from $C0:4592
-;   and $C0:46E1, with A = the Obj_Unk1100 kind, 4 or 5): Obj_Unk1100 =
+; The common start of Evt_Op82_InitWramSprite and Evt_Op83_InitEnemySprite
+;   (A = the Obj_Unk1100 kind, 4 or 5): Obj_Unk1100 =
 ;   A, Obj_Unk1101 = the operand after the opcode (also left in WRMPYA
 ;   for the caller's record product), Obj_GfxOfs = ObjQ_Unk71 with
 ;   Obj_GfxBank = $7F (the graphics go to WRAM there, unpacked by the
 ;   caller), Obj_PrioLow/High = EvtSpr_PrioInit, Obj_Facing =
 ;   Obj_FacingDown, Obj_AnimRow = Obj_AnimColumn = 0. Returns Y = the
 ;   opcode's offset + 2, C=0.
-; Callers (2 JSR sites): unmatched ($C0:4592, $C0:46E1).
+; Callers (2 JSR sites): Evt_Op82_InitWramSprite ($C0:4592) and Evt_Op83_InitEnemySprite ($C0:46E1).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and
 ;   ObjQ_Unk71 are dp), DB=$00 (Obj_* tables and the multiplier
 ;   absolute); Y = the opcode's offset in Evt_Data; A = the kind.
@@ -13578,6 +13578,426 @@ Evt_InitWramSprite:
     INY
     CLC
     RTS
+
+; ------------------------------------------------------------
+; $C0:4590 — Evt_Op82_InitWramSprite (335 bytes, $4590–$46DE)
+; Event opcode $82 (2 bytes: $82, n): Evt_InitWramSprite with kind 4
+;   (Obj_Unk1100Kind4), then Obj_Unk1B01 = Obj_Unk1B01Solid and sprite
+;   record SprRec_FirstNpc + n of RomE4_SprRec loaded as
+;   Evt_LoadSpriteRec loads one (frames, palette, animation, size), but
+;   the graphics are unpacked to bank $7F: the record's SprRec_Gfx index
+;   is looked up with Evt_FindOrAddUnk0920 (Evt_Unk0920Key). Found (an
+;   object already unpacked it): Obj_GfxOfs = that object's. Not found:
+;   the pack its Field_E4Ptr0 pointer names is unpacked (Decomp_ToWramVec)
+;   to $7F:ObjQ_Unk71 (where Evt_InitWramSprite pointed Obj_GfxOfs) and
+;   ObjQ_Unk71 moves past it (Decomp_OutLen); if that wraps below
+;   ObjQ_Unk71Init, the game stops on colour Halt_ColorWramGfxFull
+;   (Sys_HaltWithColor, never returns). On both paths ObjQ_Unk71 (as it
+;   was before the unpack) is stored in the GfxOfs field of FieldBtlObj
+;   record 0, 1 or 2 by ObjQ_Unk73 (0, 1, 2 or more; what reads them
+;   there outside a battle is not traced) and ObjQ_Unk73 counts up.
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $82).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, ObjQ_*,
+;   the Field_E4Ptr* pointers and the scratch are dp), DB=$00 (Obj_*
+;   tables, the Decomp_* block and the multiplier absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 2, C=1;
+;   A and Y clobbered; EvtSpr_RecOfs, EvtSpr_Idx, Evt_Unk0920Key and the
+;   Decomp_* block (when unpacked) written.
+; ------------------------------------------------------------
+Evt_Op82_InitWramSprite:
+    LDA.b #!Obj_Unk1100Kind4
+    JSR Evt_InitWramSprite
+    LDA.b #!SprRec_Bytes
+    STA.w WRMPYB
+    STY.b !EvtOp_SavedPos
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    LDX.w RDMPYL
+    STX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_NpcSprRec+!SprRec_Frames,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr1],Y
+    LDX.b !Obj_Cur
+    STA.w !Obj_FrameOfs,X
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr1],Y
+    STA.w !Obj_FrameBank,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_NpcSprRec+!SprRec_Pal,X
+    STA.w WRMPYA
+    LDA.b #!Pal_ObjColorBytes
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!Obj_PalSrcBase              ; adds 0 (quirk)
+    LDX.b !Obj_Cur
+    STA.w !Obj_PalSrc,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_NpcSprRec+!SprRec_Anim,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    INY
+    INY
+    LDA.b [!Field_E4Ptr2],Y             ; the next entry
+    DEY
+    DEY
+    SEC
+    SBC.b [!Field_E4Ptr2],Y
+    LSR A
+    LSR A
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimFacingStride,X
+    LDA.b [!Field_E4Ptr2],Y
+    STA.w !Obj_AnimFrameTbl,X
+    LDA.b [!Field_E4Ptr3],Y
+    STA.w !Obj_AnimTimeTbl,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_NpcSprRec+!SprRec_Size,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_SprSize,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_NpcSprRec+!SprRec_Gfx,X
+    STA.b !Evt_Unk0920Key
+    JSR Evt_FindOrAddUnk0920
+    BCC .unpack
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    TAX
+    LDA.w !Obj_GfxOfs,X                 ; the object that unpacked it
+    LDX.b !Obj_Cur
+    STA.w !Obj_GfxOfs,X
+    SEP #$20
+    LDA.b !ObjQ_Unk73
+    CMP.b #$01
+    BMI .shared_rec0
+    BEQ .shared_rec1
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[2].GfxOfs
+    SEP #$20
+    BRA .shared_done
+.shared_rec0:
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[0].GfxOfs
+    SEP #$20
+    BRA .shared_done
+.shared_rec1:
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[1].GfxOfs
+    SEP #$20
+.shared_done:
+    INC.b !ObjQ_Unk73
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+.unpack:
+    LDA.b !Evt_Unk0920Key
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Decomp_Src
+    LDA.b !ObjQ_Unk71
+    STA.w !Decomp_Dest
+    SEP #$20
+    LDA.b !ObjQ_Unk73
+    CMP.b #$01
+    BMI .unpack_rec0
+    BEQ .unpack_rec1
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[2].GfxOfs
+    SEP #$20
+    BRA .unpack_go
+.unpack_rec0:
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[0].GfxOfs
+    SEP #$20
+    BRA .unpack_go
+.unpack_rec1:
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.l FieldBtlObj[1].GfxOfs
+    SEP #$20
+.unpack_go:
+    INY
+    INY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    REP #$20
+    LDA.w !Decomp_OutLen
+    CLC
+    ADC.b !ObjQ_Unk71
+    STA.b !ObjQ_Unk71
+    CMP.w #!ObjQ_Unk71Init
+    BPL .fits
+    SEP #$20
+    LDX.w #!Halt_ColorWramGfxFull
+    BRL Sys_HaltWithColor
+.fits:
+    SEP #$20
+    INC.b !ObjQ_Unk73
+    LDX.b !EvtOp_SavedPos
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:46DF — Evt_Op83_InitEnemySprite (392 bytes, $46DF–$4866)
+; Event opcode $83 (3 bytes: $83, n, b): Evt_InitWramSprite with kind 5
+;   (Obj_Unk1100Kind5), Obj_Unk1B01 = Obj_Unk1B01Solid, then record n
+;   of RomE4_EnemySprRec (EvtSpr_EnemyRecBytes each; its first five
+;   bytes laid out as a RomE4_SprRec record; "enemy" is a guess from the
+;   table's size and its own graphics path) loaded as
+;   Evt_Op82_InitWramSprite loads one, except for the graphics:
+;   - n below EvtSpr_RomGfxMin: Evt_FindOrAddUnk0920 as in opcode $82
+;     (shared, or unpacked to $7F:ObjQ_Unk71 with the same overflow
+;     stop), without the FieldBtlObj stores and ObjQ_Unk73;
+;   - n EvtSpr_RomGfxMin ($F8) and up: Obj_GfxOfs / Obj_GfxBank = the
+;     Field_E4Ptr0 pointer itself (graphics read from ROM).
+;   Then (.tile_slot) the object gets the fixed OBJ tile slot s = (b &
+;   EvtSpr_SlotMask) + 1: Obj_TileSlot[s] = Obj_Cur, Obj_VramTile = (s &
+;   $FE) x 16 + (s & 1) x 8 and Obj_TileRecOfs = s x $20 (as the slot
+;   banner of Obj_Unk6F9A reads them); with Obj_SprSize size class 3,
+;   Field_UnkAEObj = Obj_Cur and Spr_LoadLargeObj; with b bit 7 set,
+;   Obj_Unk1100 = Obj_Unk1100Kind6. X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $83).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, ObjQ_*,
+;   the Field_E4Ptr* pointers and the scratch are dp), DB=$00 (Obj_*
+;   tables, the Decomp_* block and the multiplier absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0 (REP #$10 after the 8-bit slot code), DP and DB
+;   unchanged; X = Y + 3, C=1; A and Y clobbered; EvtOp_SavedPos = Y +
+;   2; EvtSpr_RecOfs, EvtSpr_Idx (its low byte = s at the end),
+;   Evt_Unk0920Key and EvtSpr_SlotArg written, the Decomp_* block when
+;   unpacked, Field_UnkAEObj and Spr_LoadLargeObj's writes for size 3.
+; ------------------------------------------------------------
+Evt_Op83_InitEnemySprite:
+    LDA.b #!Obj_Unk1100Kind5
+    JSR Evt_InitWramSprite
+    LDA.b #!EvtSpr_EnemyRecBytes
+    STA.w WRMPYB
+    STY.b !EvtOp_SavedPos
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    LDX.w RDMPYL
+    STX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_EnemySprRec+!SprRec_Frames,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr1],Y
+    LDX.b !Obj_Cur
+    STA.w !Obj_FrameOfs,X
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr1],Y
+    STA.w !Obj_FrameBank,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_EnemySprRec+!SprRec_Pal,X
+    STA.w WRMPYA
+    LDA.b #!Pal_ObjColorBytes
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!Obj_PalSrcBase              ; adds 0 (quirk)
+    LDX.b !Obj_Cur
+    STA.w !Obj_PalSrc,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_EnemySprRec+!SprRec_Anim,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    INY
+    INY
+    LDA.b [!Field_E4Ptr2],Y             ; the next entry
+    DEY
+    DEY
+    SEC
+    SBC.b [!Field_E4Ptr2],Y
+    LSR A
+    LSR A
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimFacingStride,X
+    LDA.b [!Field_E4Ptr2],Y
+    STA.w !Obj_AnimFrameTbl,X
+    LDA.b [!Field_E4Ptr3],Y
+    STA.w !Obj_AnimTimeTbl,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_EnemySprRec+!SprRec_Size,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_SprSize,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_EnemySprRec+!SprRec_Gfx,X
+    STA.b !Evt_Unk0920Key
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Unk1101,X
+    CMP.b #!EvtSpr_RomGfxMin
+    BCC .lookup
+    BRL .rom_gfx
+.lookup:
+    JSR Evt_FindOrAddUnk0920
+    BCS .shared
+    BRL .unpack
+.shared:
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    TAX
+    LDA.w !Obj_GfxOfs,X                 ; the object that unpacked it
+    LDX.b !Obj_Cur
+    STA.w !Obj_GfxOfs,X
+    SEP #$20
+.tile_slot:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    STA.b !EvtSpr_SlotArg
+    AND.b #!EvtSpr_SlotMask
+    INC A
+    SEP #$10
+    TAX
+    LDA.b !Obj_Cur
+    STA.w !Obj_TileSlot,X
+    TXA
+    REP #$20
+    AND.w #!ObjTile_PairMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtSpr_Idx
+    TXA
+    AND.w #!ObjTile_OddBit
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !EvtSpr_Idx
+    STX.b !EvtSpr_Idx
+    LDX.b !Obj_Cur
+    STA.w !Obj_VramTile,X
+    SEP #$20
+    LDA.b !EvtSpr_Idx
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    LDA.w !Obj_SprSize,X
+    AND.b #!ObjSpr_SizeMask
+    CMP.b #!ObjSpr_SizeLarge
+    BCC .not_large
+    LDX.b !Obj_Cur
+    STX.b !Field_UnkAEObj
+    JSR Spr_LoadLargeObj
+.not_large:
+    LDA.b !EvtSpr_SlotArg
+    BPL .done
+    LDA.b #!Obj_Unk1100Kind6
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+.done:
+    REP #$10
+    LDX.b !EvtOp_SavedPos
+    INX
+    SEC
+    RTS
+.unpack:
+    LDA.b !Evt_Unk0920Key
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Decomp_Src
+    LDA.b !ObjQ_Unk71
+    STA.w !Decomp_Dest
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    REP #$20
+    LDA.w !Decomp_OutLen
+    CLC
+    ADC.b !ObjQ_Unk71
+    STA.b !ObjQ_Unk71
+    CMP.w #!ObjQ_Unk71Init
+    BPL .fits
+    SEP #$20
+    LDX.w #!Halt_ColorWramGfxFull
+    BRL Sys_HaltWithColor
+.fits:
+    SEP #$20
+    BRL .tile_slot
+.rom_gfx:
+    LDA.b !Evt_Unk0920Key
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr0],Y
+    LDX.b !Obj_Cur
+    STA.w !Obj_GfxOfs,X
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Obj_GfxBank,X
+    BRL .tile_slot
 
 ; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
@@ -30483,8 +30903,9 @@ Evt_InFrontRight:
 ;   the key and Evt_Unk0930 = the low byte of Obj_Cur, C=0. No free
 ;   entry: the game stops on colour Halt_ColorUnk0920Full
 ;   (Sys_HaltWithColor, never returns).
-; Callers (2 JSR sites): unmatched ($C0:4626, $C0:4781).
-; Callers note: unmatched event code at $C0:4626 and $C0:4781.
+; Callers (2 JSR sites): Evt_Op82_InitWramSprite ($C0:4626) and Evt_Op83_InitEnemySprite ($C0:4781).
+; Callers note: Evt_Op82_InitWramSprite ($C0:4626) and Evt_Op83_InitEnemySprite
+;   ($C0:4781), with the sprite's graphics index as the key.
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: CPX #imm is 3 bytes),
 ;   DP=$0100 (Evt_Unk0920Key, Obj_Cur), DB=$00 or $7E (Evt_Unk0920/0930
 ;   absolute, low WRAM).

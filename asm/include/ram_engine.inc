@@ -335,7 +335,7 @@ if !ram_engine_inc == 0
                                          ; first, the low byte stored with 8-bit X)
 !ObjFront_OtherHi = $EA                  ; high byte of ObjFront_Other
 !Evt_Unk0920Key = $E3                    ; 8-bit value Evt_FindOrAddUnk0920 looks up in Evt_Unk0920
-                                         ; (set by its callers, event code at $C0:4626 / $C0:4781)
+                                         ; (set by its callers, Evt_Op82 / Evt_Op83: a graphics index)
 !EvtArc_Gravity = $C1                    ; alias of Anim_RowAddr in Evt_Op7A_ArcToTile: 8-bit, its
                                          ; third operand (Obj_ArcGravity, and the frames when there
                                          ; is no distance)
@@ -411,6 +411,8 @@ if !ram_engine_inc == 0
 !EvtSpr_RecOfs = $BF                     ; 16-bit dp scratch of Evt_LoadSpriteRec (and opcodes $82/$83):
                                          ; the record number x its record size (no other use known)
 !EvtSpr_Idx = $D9                        ; alias of Eng_Scratch there: 16-bit record index byte
+!EvtSpr_SlotArg = $E1                   ; alias of EvtCall_SaveIdx's slot in Evt_Op83_InitEnemySprite:
+                                         ; 8-bit, the slot operand (bit 7: kind 6)
 !EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
                                          ; 16-bit, the opcode's offset (Y)
 !EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
