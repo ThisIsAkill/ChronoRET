@@ -5201,7 +5201,7 @@ NmiHandler:
 ;   (JSR $C0:19BC), Field_HookLeaveToBankC3 (JSR $C0:2625, JSR $C0:262E), Field_HookWinPulse (JSR
 ;   $C0:2688, JSR $C0:268E, JSR $C0:26C4, JSR $C0:26D7, JSR $C0:26EE, BRL $C0:2722),
 ;   Field_FadeInAfterReload (JSR $C0:2839), Scene_SettleFrames (JSR $C0:285D), Scene_ReloadStep (JSR
-;   $C0:28A4) and unmatched (JSR $C0:3FCA).
+;   $C0:28A4) and Evt_OpFF_Misc (JSR $C0:3FCA).
 ; Entry: M=1 (8-bit A), X any, DP any and DB=$00 (Field_Unk58 and
 ;   Nmi_FramePending are reached absolute, $0100 + offset); the NMI must
 ;   be on, or it never returns.
@@ -7211,6 +7211,44 @@ LocLoad_Unk6DCF:
     RTS
 
 ; ------------------------------------------------------------
+; $C0:6E27 — Credits_LoadGfx (53 bytes, $6E27–$6E5B)
+; Unpacks the pack at Credits_GfxPack ($FD:0000) to LocGfx_StageL3 and
+;   uploads Credits_GfxBytes of it to VRAM LocGfx_VramL3, as
+;   LocLoad_Unk6DCF loads a location's layer-3 graphics. Read as the
+;   staff-credits font because Evt_Op29_StartCredits, its only caller,
+;   loads it before pointing Credits_TextPos into Credits_Text (and
+;   Field_ServiceUnk54's credits lines use letter tiles from 1 on);
+;   not checked against the graphics.
+; Callers (1 JSR site): Evt_Op29_StartCredits ($C0:3E93).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (VramDma_* are
+;   dp), DB=$00 (Decomp_* block absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A and X clobbered; the Decomp_*
+;   block and the VramDma_* arguments written.
+; ------------------------------------------------------------
+Credits_LoadGfx:
+    LDX.w #!Credits_GfxPack&$FFFF
+    STX.w !Decomp_Src
+    LDX.w #!LocGfx_StageL3&$FFFF
+    STX.w !Decomp_Dest
+    LDA.b #!Credits_GfxPack>>16
+    STA.w !Decomp_SrcBank
+    LDA.b #!Bank7F
+    STA.w !Decomp_DestBank
+    JSL Decomp_ToWramVec
+    LDX.w #!LocGfx_VramL3
+    STX.b !VramDma_Addr
+    LDX.w #!LocGfx_StageL3&$FFFF
+    STX.b !VramDma_Src
+    LDA.b #!Bank7F
+    STA.b !VramDma_SrcBank
+    LDA.b #!DMAP_TwoRegs
+    STA.b !VramDma_Mode
+    LDX.w #!Credits_GfxBytes
+    STX.b !VramDma_Size
+    JSR VramDma_Upload
+    RTS
+
+; ------------------------------------------------------------
 ; $C0:7084 — LocLoad_Unk7084 (101 bytes, $7084–$70E8)
 ; Copies the location's palette rows: LocPal_Rom entry LocRom.Palette
 ; (LocPal_SetBytes = 7 x 30 bytes, offset by the hardware multiplier)
@@ -7292,7 +7330,7 @@ LocLoad_Unk7084:
 ; Callers (14 JSR sites): GameLoop ($C0:0020), GameLoop_Main ($C0:005D), Scene_Unk0283 ($C0:02C3,
 ;   $C0:02EA), Field_SceneChangeTick ($C0:0C9A, $C0:0CEA, $C0:0D1C), Field_PauseAndMenuInput
 ;   ($C0:1958, $C0:1964), Field_FadeToBankC2Mode5 ($C0:19C1), Field_RunBankC2Mode5 ($C0:19D2),
-;   Evt_OpE1_WarpNow ($C0:3B76) and unmatched ($C0:3FD3, $C0:4186).
+;   Evt_OpE1_WarpNow ($C0:3B76), Evt_OpFF_Misc ($C0:3FD3) and Evt_OpFF96_Reset ($C0:4186).
 ; On entry: M=1 (LDA #$00 is the 8-bit form), X either width; DP is not
 ; used. Any DB (the PLB comes before the absolute stores).
 ; Exit: M=1, X/Y unchanged, DB=$00, A=0, interrupts disabled (SEI).
@@ -8267,17 +8305,17 @@ Fade_StepFixedColor:
 ; The callers seen store VramDma_Mode = 1 (word writes); mode and target
 ; are not otherwise checked here.
 ; Callers (14 sites: 13 JSR, 1 BRL): LocLoad_UploadPack (JSR $C0:6D61), LocLoad_Unk6DCF (JSR
-;   $C0:6E1E), Field_UploadUnk1F00 (JSR $C0:6E84, JSR $C0:6E9C), Field_UploadUnk1D00 (JSR $C0:6EC7),
-;   Field_UploadUnk5800 (JSR $C0:6EED), Field_UploadUnk1C00 (JSR $C0:6F08), Field_UploadUnk0000 (JSR
-;   $C0:6F23, JSR $C0:6F30, JSR $C0:6F4A, JSR $C0:6F57), Field_UploadUnk57E0 (JSR $C0:6F75),
-;   Map_UploadBuf_Tail (BRL $C0:7F74) and unmatched (JSR $C0:6E58).
+;   $C0:6E1E), Credits_LoadGfx (JSR $C0:6E58), Field_UploadUnk1F00 (JSR $C0:6E84, JSR $C0:6E9C),
+;   Field_UploadUnk1D00 (JSR $C0:6EC7), Field_UploadUnk5800 (JSR $C0:6EED), Field_UploadUnk1C00 (JSR
+;   $C0:6F08), Field_UploadUnk0000 (JSR $C0:6F23, JSR $C0:6F30, JSR $C0:6F4A, JSR $C0:6F57),
+;   Field_UploadUnk57E0 (JSR $C0:6F75) and Map_UploadBuf_Tail (BRL $C0:7F74).
 ; Callers note (13 JSR, 1 BRL): LocLoad_UploadPack ($C0:6D61),
 ;   LocLoad_Unk6DCF ($C0:6E1E), Field_UploadUnk1F00 ($C0:6E84,
 ;   $C0:6E9C), Field_UploadUnk1D00 ($C0:6EC7), Field_UploadUnk1C00
 ;   ($C0:6F08), Field_UploadUnk0000 ($C0:6F23, $C0:6F30, $C0:6F4A,
 ;   $C0:6F57), Field_UploadUnk5800 ($C0:6EED), Field_UploadUnk57E0
 ;   ($C0:6F75), Map_UploadBufTo7400's shared tail (BRL at $C0:7F74) and
-;   unmatched code at $C0:6E58 (e.g. $C0:6E1E uploads $1000 bytes from
+;   Credits_LoadGfx ($C0:6E58) (e.g. $C0:6E1E uploads $1000 bytes from
 ;   $7F:5080 to VRAM $5000).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the address and size are
 ; word loads), DP=$0100 (the arguments are dp offsets, shared with
@@ -11977,7 +12015,7 @@ Evt_OpE7_ScrollTo:
 ;   HP and MP refilled to their maximums (not established).
 ;   Evt_BankC2CmdTail (A = the command; EvtOp_SavedPos = the next
 ;   opcode) runs the command and returns; Evt_OpF9, Evt_OpFA and
-;   Evt_BankC2Cmd08Unused BRA to it.
+;   Evt_OpFF9F_BankC2Cmd08 BRA to it.
 ; There is no SEC: C stays as the dispatcher entered with it (0), so
 ;   the object's run ends after this opcode.
 ; Reached through Evt_OpcodeTable (opcode $F8).
@@ -12033,24 +12071,871 @@ Evt_OpFA_BankC2Cmd07:
     BRA Evt_BankC2CmdTail
 
 ; ------------------------------------------------------------
-; $C0:3E7C — Evt_BankC2Cmd08Unused (8 bytes, $3E7C–$3E83)
-; A handler shaped like Evt_OpFA_BankC2Cmd07 for a 2-byte opcode:
-;   BankC2_Entry8004 command 8 (BankC2Cmd_Unk08, which stores $FF at
-;   $30:7FE2, read from the ROM) through Evt_BankC2CmdTail; X = Y + 2.
-;   No Evt_OpcodeTable entry and no call or jump reaches it (xref finds
-;   none), so it looks unused.
-; On entry (if it were reached): M=1 (8-bit A), X=0 (16-bit X/Y),
-;   DP=$0100 (EvtOp_SavedPos is dp), DB any; Y = an opcode's offset in
-;   Evt_Data.
+; $C0:3E7C — Evt_OpFF9F_BankC2Cmd08 (8 bytes, $3E7C–$3E83)
+; Opcode $FF $9F (2 bytes): BankC2_Entry8004 command 8 (BankC2Cmd_Unk08,
+;   which stores $FF at $30:7FE2, read from the ROM) through
+;   Evt_BankC2CmdTail; X = Y + 2.
+; Reached through Evt_OpFFTable (entry $9F; Evt_OpFF_Misc returns C=0).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
+;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
 ; Exit: as Evt_OpF8_BankC2Cmd06And07, with X = Y = EvtOp_SavedPos = the
 ;   opcode + 2.
 ; ------------------------------------------------------------
-Evt_BankC2Cmd08Unused:
+Evt_OpFF9F_BankC2Cmd08:
     INY
     INY
     STY.b !EvtOp_SavedPos
     LDA.b #!BankC2Cmd_Unk08
     BRA Evt_BankC2CmdTail
+
+
+; ============================================================
+; Event opcodes: credits, layer 3, window effects and scene exits
+; ($C0:3E84–$C0:41E3)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E; the dispatchers enter with C=0). Opcode $FF
+; takes a second byte: below $90 it leaves the field for good (bank
+; $C3 or one of the bank-$FD vectors), from $90 on it runs a
+; sub-handler of Evt_OpFFTable, most of which start one of the
+; Field_EventHook window effects (see the banner of
+; Field_EventHookDispatch) and wait for it.
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:3E84 — Evt_Op29_StartCredits (82 bytes, $3E84–$3ED5)
+; Event opcode $29 (2 bytes: $29, b): sets layer 3 up for the staff
+;   credits, probably (the font load and the Credits_Text position):
+;   Map_OwnStep3 set in Map_OwnStepFlags and in Map_LayerEdgeOff (layer
+;   3 moves by its own step, which is zeroed: Map_OwnStep3X/Y = 0),
+;   Credits_LoadGfx, Map_ClearBufC800. Then b: bit 7 clear,
+;   Field_Unk0BE9 = 1 and block b; set, Field_Unk0BE9 = 2 and block b &
+;   Credits_BlockMask. Credits_TextPos = the offset in Credits_Text
+;   past that many blocks (each ends at a byte with bit 7 set,
+;   Credits_EndBlock). X = Y + 2, C=1 (the search ends on an equal CMP).
+;   No reader of Field_Unk0BE9 is traced.
+; Reached through Evt_OpcodeTable (opcode $29).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the scratch is
+;   dp; Credits_LoadGfx's VramDma_* and DmaFill_* are dp), DB=$00
+;   (Map_*, Field_Unk0BE9 and Credits_TextPos absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=1; A clobbered; Y
+;   unchanged (saved around the callees); EvtOp_SavedPos = Y + 1,
+;   EvtCredits_Block / EvtCredits_Count written; the callees' writes
+;   (Decomp_*, VramDma_*, Map_BufC800).
+; ------------------------------------------------------------
+Evt_Op29_StartCredits:
+    PHY
+    LDA.b #!Map_OwnStep3
+    TSB.w !Map_OwnStepFlags
+    TSB.w !Map_LayerEdgeOff
+    STZ.w !Map_OwnStep3X
+    STZ.w !Map_OwnStep3Y
+    JSR Credits_LoadGfx
+    JSR Map_ClearBufC800
+    PLY
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    BMI .set2
+    STA.b !EvtCredits_Block
+    LDA.b #!Field_Unk0BE9Set1
+    STA.w !Field_Unk0BE9
+    BRA .find
+.set2:
+    AND.b #!Credits_BlockMask
+    STA.b !EvtCredits_Block
+    LDA.b #!Field_Unk0BE9Set2
+    STA.w !Field_Unk0BE9
+.find:
+    STX.b !EvtOp_SavedPos
+    LDX.w #$0000
+    STZ.b !EvtCredits_Count
+.next_block:
+    LDA.b !EvtCredits_Block
+    CMP.b !EvtCredits_Count
+    BEQ .found
+.skip:
+    LDA.l !Credits_Text,X
+    BMI .block_end                      ; Credits_EndBlock
+    INX
+    BRA .skip
+.block_end:
+    INX
+    INC.b !EvtCredits_Count
+    BRA .next_block
+.found:
+    STX.w !Credits_TextPos
+    LDX.b !EvtOp_SavedPos
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3ED6 — Evt_Op2A_Field54Bit2 (8 bytes, $3ED6–$3EDD; the TSB from
+;   $3ED8 on is the sub-entry Evt_SetField54Tail)
+; Event opcode $2A (1 byte): sets Field_Unk54 bit 2 (Field54_MapReq's
+;   low bit), a request Field_ServiceUnk54 serves (bits 2-3 shifted left
+;   once go to the map redraw); X = Y + 1, C=0. Evt_SetField54Tail (A =
+;   the bits) does the TSB and the return; Evt_Op2B and Evt_Op32 BRA to
+;   it.
+; Reached through Evt_OpcodeTable (opcode $2A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk54 is
+;   dp), DB any (not used); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = the bit; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op2A_Field54Bit2:
+    LDA.b #!Field54_Bit2
+Evt_SetField54Tail:                     ; header: see Evt_Op2A_Field54Bit2
+    TSB.b !Field_Unk54
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3EDE — Evt_Op2B_Field54Bit3 (4 bytes, $3EDE–$3EE1)
+; Event opcode $2B (1 byte): sets Field_Unk54 bit 3 (Field54_Bit3, the
+;   other bit of Field54_MapReq) through Evt_SetField54Tail; X = Y + 1,
+;   C=0.
+; Reached through Evt_OpcodeTable (opcode $2B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk54 is
+;   dp), DB any; Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_Op2A_Field54Bit2 (M=1, X=0, DP and DB unchanged; X = Y +
+;   1, C=0; A = the bit; Y unchanged).
+; ------------------------------------------------------------
+Evt_Op2B_Field54Bit3:
+    LDA.b #!Field54_Bit3
+    BRA Evt_SetField54Tail
+
+; ------------------------------------------------------------
+; $C0:3EE2 — Evt_Op32_CreditsLine (4 bytes, $3EE2–$3EE5)
+; Event opcode $32 (1 byte): sets Field54_Credits in Field_Unk54, so
+;   Field_ServiceUnk54 writes the next staff-credits line, through
+;   Evt_SetField54Tail; X = Y + 1, C=0.
+; Reached through Evt_OpcodeTable (opcode $32).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk54 is
+;   dp), DB any; Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_Op2A_Field54Bit2 (M=1, X=0, DP and DB unchanged; X = Y +
+;   1, C=0; A = the bit; Y unchanged).
+; ------------------------------------------------------------
+Evt_Op32_CreditsLine:
+    LDA.b #!Field54_Credits
+    BRA Evt_SetField54Tail
+
+; ------------------------------------------------------------
+; $C0:3EE6 — Evt_Op2C_SetLayer3Pos (44 bytes, $3EE6–$3F11)
+; Event opcode $2C (3 bytes: $2C, x, y): Map_Acc3X/Y = 0, Map_Unk1D8F
+;   (layer 3 X) = x x 8 and Map_Unk1D91 (layer 3 Y) = y x 8, both 16-bit
+;   (8-pixel units, probably). X = Y + 3, C=0.
+; Quirk: the STZ of Map_Unk1D91's high byte is redundant, as the 16-bit
+;   store of y x 8 follows.
+; Reached through Evt_OpcodeTable (opcode $2C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte must
+;   be 0: TDC/XBA sets B from it), DB=$00 (Map_* absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=0; A clobbered; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op2C_SetLayer3Pos:
+    STZ.w !Map_Acc3X
+    STZ.w !Map_Acc3Y
+    STZ.w !Map_Unk1D91+1
+    TYX
+    INX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit shifts
+    LDA.l !Evt_Data,X
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Map_Unk1D8F
+    INX
+    LDA.l !Evt_Data,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Map_Unk1D91
+    SEP #$20
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3F12 — Evt_Op2F_SetCreditsPos (20 bytes, $3F12–$3F25)
+; Event opcode $2F (3 bytes: $2F, column, row): Credits_Column = column,
+;   Credits_Row = row (where Field_ServiceUnk54 puts the next credits
+;   line); X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $2F).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB=$00
+;   (Credits_* absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=1; A = row; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op2F_SetCreditsPos:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Credits_Column
+    INX
+    LDA.l !Evt_Data,X
+    STA.w !Credits_Row
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3F26 — Evt_OpFE_WinQuad (137 bytes, $3F26–$3FAE)
+; Event opcode $FE (18 bytes: $FE, frames, then eight pairs start, end
+;   for X0, Y0, X1, Y1, X2, Y2, X3, Y3): starts hook 6
+;   (Field_HookWinQuad) moving four points from their starts to their
+;   ends in frames frames: WinFx_QuadTimer = frames, and for each value
+;   WinFx_QuadPos = start x 256 (8.8) and WinFx_QuadVel = (end - start)
+;   x 256 / frames, signed (the hardware divider on the magnitude, the
+;   sign put back); Field_EventHook = EventHook_WinQuad. X = Y + 18,
+;   C=0 (no wait).
+; Reached through Evt_OpcodeTable (opcode $FE).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtQuad_*
+;   scratch and Field_EventHook are dp), DB=$00 (the divider
+;   registers absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 18,
+;   C=0; A = EventHook_WinQuad; Y unchanged; EvtQuad_* written
+;   (EvtQuad_Left = 0, EvtQuad_Ofs = $10).
+; ------------------------------------------------------------
+Evt_OpFE_WinQuad:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtQuad_Frames
+    STA.l !WinFx_QuadTimer
+    INX
+    STX.b !EvtOp_SavedPos
+    STZ.b !EvtQuad_Start                ; low byte of each start stays 0
+    STZ.b !EvtQuad_Ofs
+    STZ.b !EvtQuad_Ofs+1
+    LDA.b #!EvtQuad_Values
+    STA.b !EvtQuad_Left
+.value:
+    LDX.b !EvtOp_SavedPos
+    LDA.l !Evt_Data,X
+    STA.b !EvtQuad_Start+1              ; start x 256
+    INX
+    LDA.l !Evt_Data,X
+    INX
+    STX.b !EvtOp_SavedPos
+    XBA
+    LDA.b #$00                          ; end x 256
+    REP #$20
+    SEC
+    SBC.b !EvtQuad_Start
+    BEQ .store
+    BCS .positive
+    EOR.w #!Eng_Invert16
+    INC A                               ; |end - start|
+    STA.w WRDIVL
+    SEP #$20
+    LDA.b !EvtQuad_Frames
+    STA.w WRDIVB
+    NOP                                 ; wait for the quotient
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDDIVL
+    EOR.w #!Eng_Invert16
+    INC A                               ; negative again
+    BRA .store
+.positive:
+    STA.w WRDIVL
+    SEP #$20
+    LDA.b !EvtQuad_Frames
+    STA.w WRDIVB
+    NOP                                 ; wait for the quotient
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDDIVL
+.store:
+    LDX.b !EvtQuad_Ofs
+    STA.l !WinFx_QuadVel,X
+    LDA.b !EvtQuad_Start
+    STA.l !WinFx_QuadPos,X
+    INX
+    INX
+    STX.b !EvtQuad_Ofs
+    SEP #$20
+    DEC.b !EvtQuad_Left
+    BNE .value
+    LDA.b #!EventHook_WinQuad
+    STA.b !Field_EventHook
+    LDX.b !EvtOp_SavedPos
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:3FAF — Evt_OpFF_Misc (95 bytes, $3FAF–$400D)
+; Event opcode $FF (2 bytes or more: $FF, sub, ...): sub is kept in
+;   EvtFF_Sub.
+;   - sub below EvtFF_FirstSub ($90): leaves the field for good. It
+;     fades the screen out one Fade_Brightness step a frame (with
+;     Field_FrameUpdate, FdVec_FFF7 and Field_WaitFrame, as
+;     Field_SceneChangeTick's fade does) unless it is already dark, then
+;     InitHW, S = StackTop and a JML with A = sub (B = 0): sub $00-$7F to
+;     BankC3_Entry0000, $80 to FdVec_FFF1, $81 to FdVec_FFEB, $82 to
+;     FdVec_FFE8, $83-$8F to FdVec_FFE5 (bank $FD vectors, unmatched).
+;     Never returns.
+;   - else: JSR to entry sub - $90 of Evt_OpFFTable (with Y = the
+;     opcode's offset), then C=0; the sub-handler sets X. sub is not
+;     bounded: past $A3 the JSR would read beyond the table.
+; Reached through Evt_OpcodeTable (opcode $FF).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtFF_Sub,
+;   Fade_Brightness are dp; its low byte must be 0: TDC/XBA sets B from
+;   it), DB=$00 (as the frame calls and the sub-handlers need); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: sub $90 and up: M=1, X=0, DP and DB unchanged; X as the
+;   sub-handler returns it, C=0; A and the rest as the sub-handler
+;   leaves them; EvtFF_Sub = sub. Below $90: never returns.
+; ------------------------------------------------------------
+Evt_OpFF_Misc:
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtFF_Sub
+    CMP.b #!EvtFF_FirstSub
+    BCS .sub_handler
+    LDA.b !Fade_Brightness
+    BEQ .dark
+    BMI .dark
+.fade:
+    DEC.b !Fade_Brightness
+    JSR Field_FrameUpdate
+    JSL FdVec_FFF7
+    JSR Field_WaitFrame
+    LDA.b !Fade_Brightness
+    CMP.b #!EvtFF_FadeLast
+    BPL .fade
+.dark:
+    JSR InitHW
+    LDX.w #!StackTop
+    TXS                                 ; never returns
+    TDC
+    XBA                                 ; B = 0
+    LDA.b !EvtFF_Sub
+    BMI .to_bank_fd
+    JML BankC3_Entry0000
+.to_bank_fd:
+    CMP.b #!EvtFF_SubFFF1
+    BNE .not_fff1
+    JML FdVec_FFF1
+.not_fff1:
+    CMP.b #!EvtFF_SubFFEB
+    BNE .not_ffeb
+    JML FdVec_FFEB
+.not_ffeb:
+    CMP.b #!EvtFF_SubFFE8
+    BNE .other
+    JML FdVec_FFE8
+.other:
+    JML FdVec_FFE5
+.sub_handler:
+    TDC
+    XBA                                 ; B = 0 for the 16-bit ASL/TAX
+    LDA.b !EvtFF_Sub
+    SEC
+    SBC.b #!EvtFF_FirstSub
+    ASL A
+    TAX
+    JSR (Evt_OpFFTable,X)
+    CLC
+    RTS
+
+; Evt_OpFFTable: 20 handler addresses for opcode $FF's second byte $90-$A3,
+; indexed by (sub - $90) x 2 (JSR (abs,X) at $C0:4009 in Evt_OpFF_Misc).
+; $A0-$A3 point at Evt_UnusedOpcode.
+Evt_OpFFTable:
+    dw Evt_OpFF90_WinGrow0              ; $90
+    dw Evt_OpFF91_WinShrink0            ; $91
+    dw Evt_OpFF92_WinC3E1               ; $92
+    dw Evt_OpFF93_WinC3E2               ; $93
+    dw Evt_OpFF94_WinC3E1Dark           ; $94
+    dw Evt_OpFF95_WinC3E2Dark           ; $95
+    dw Evt_OpFF96_Reset                 ; $96
+    dw Evt_OpFF97_WinGrow1              ; $97
+    dw Evt_OpFF98_WinShrink1            ; $98
+    dw Evt_OpFF99_WinFixedA             ; $99
+    dw Evt_OpFF9A_WinFixedB             ; $9A
+    dw Evt_OpFF9B_LeaveToBankC3         ; $9B
+    dw Evt_OpFF9C_WinShrink1Off         ; $9C
+    dw Evt_OpFF9D_ClearPush             ; $9D
+    dw Evt_OpFF9E_WinPulse              ; $9E
+    dw Evt_OpFF9F_BankC2Cmd08           ; $9F
+    dw Evt_UnusedOpcode                 ; $A0
+    dw Evt_UnusedOpcode                 ; $A1
+    dw Evt_UnusedOpcode                 ; $A2
+    dw Evt_UnusedOpcode                 ; $A3
+
+; ------------------------------------------------------------
+; $C0:4036 — Evt_OpFF90_WinGrow0 (31 bytes, $4036–$4054)
+; Opcode $FF $90 (5 bytes: $FF, $90, x, y, limit): WinFx_CenterX/Y = x,
+;   y, WinFx_SizeLimit = limit, WinFx_Size = 0, Field_EventHook =
+;   EventHook_WinGrow0 (hook 1 grows the window shape to the limit);
+;   X = Y + 5 (no wait).
+; Reached through Evt_OpFFTable (entry $90).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (WinFx_* and
+;   Field_EventHook are dp), DB any (operands read long); Y = the $FF
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 5; A = the hook; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF90_WinGrow0:
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_CenterX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_CenterY
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_SizeLimit
+    STZ.b !WinFx_Size
+    LDA.b #!EventHook_WinGrow0
+    STA.b !Field_EventHook
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4055 — Evt_OpFF91_WinShrink0 (8 bytes, $4055–$405C)
+; Opcode $FF $91 (2 bytes): Field_EventHook = EventHook_WinShrink0
+;   (hook 2 shrinks the shape to 0 and turns the window off); X = Y + 2
+;   (no wait).
+; Reached through Evt_OpFFTable (entry $91).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any (not used); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2; A = the hook; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF91_WinShrink0:
+    TYX
+    INX
+    INX
+    LDA.b #!EventHook_WinShrink0
+    STA.b !Field_EventHook
+    RTS
+
+; ------------------------------------------------------------
+; $C0:405D — Evt_OpFF92_WinC3E1 (86 bytes, $405D–$40B2)
+; Opcode $FF $92 (2 bytes): runs hook 3 (Field_HookWinC3E, the
+;   BankC3_Entry000E effect) with mode 1 and WinFx_Size 0, and waits for
+;   it to end:
+;   - Field_EventHook 0 (start): while WinFx_C3EMode (WinFx_Busy) is
+;     still nonzero nothing happens; else WinFx_C3EMode = 1 (16-bit),
+;     WinFx_C3ETablePtr / Bank = WinFx_TableA in bank $7F,
+;     Field_EventHook = EventHook_WinC3E, WinFx_Size = 0. X = the
+;     opcode.
+;   - hook 3 and WinFx_Busy 0 (done): Field_EventHook = 0, the layer
+;     bytes Hdma_Unk7F1522/1523 and the window shadows
+;     Ppu_W12Sel/W34Sel/WObjSel/Wh3 = 0, HDMA channel 7 off (what hook 3
+;     itself does only for WinFx_Size below 2); X = Y + 2.
+;   - else (running, or another hook): X = the opcode.
+; Reached through Evt_OpFFTable (entry $92).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   and Field_HdmaEnable are dp), DB=$00 (the $0350 block and the
+;   shadows absolute); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above; A clobbered; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF92_WinC3E1:
+    LDA.b !Field_EventHook
+    BEQ .start
+    CMP.b #!EventHook_WinC3E
+    BNE .wait
+    LDA.w !WinFx_Busy
+    BEQ .done
+.wait:
+    TYX
+    RTS
+.done:
+    STZ.b !Field_EventHook
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    STA.w !Ppu_Wh3Shadow
+    LDA.b #!HDMAEN_Ch7
+    TRB.b !Field_HdmaEnable
+    TYX
+    INX
+    INX
+    RTS
+.start:
+    LDA.w !WinFx_Busy
+    BEQ .go
+    TYX
+    RTS
+.go:
+    STZ.w !WinFx_C3EMode+1
+    LDA.b #!WinFx_C3EMode1
+    STA.w !WinFx_C3EMode
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_C3ETablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_C3ETableBank
+    LDA.b #!EventHook_WinC3E
+    STA.b !Field_EventHook
+    LDA.b #$00
+    STA.w !DP_Field+!WinFx_Size
+    TYX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:40B3 — Evt_OpFF94_WinC3E1Dark (60 bytes, $40B3–$40EE)
+; Opcode $FF $94 (2 bytes): as Evt_OpFF92_WinC3E1 (mode 1) with
+;   WinFx_Size = 3 (WinFx_SizeBit1 | WinFx_SizeBit0), so hook 3 leaves
+;   the window on; when it is done this opcode sets Fade_Brightness = 0
+;   (the screen dark) instead of clearing the window, Field_EventHook =
+;   0, X = Y + 2. Otherwise X = the opcode.
+; Reached through Evt_OpFFTable (entry $94).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   and Fade_Brightness are dp), DB=$00 (the $0350 block absolute); Y =
+;   the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above; A clobbered; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF94_WinC3E1Dark:
+    LDA.b !Field_EventHook
+    BEQ .start
+    CMP.b #!EventHook_WinC3E
+    BNE .wait
+    LDA.w !WinFx_Busy
+    BEQ .done
+.wait:
+    TYX
+    RTS
+.done:
+    STZ.b !Fade_Brightness
+    STZ.b !Field_EventHook
+    TYX
+    INX
+    INX
+    RTS
+.start:
+    LDA.w !WinFx_Busy
+    BEQ .go
+    TYX
+    RTS
+.go:
+    STZ.w !WinFx_C3EMode+1
+    LDA.b #!WinFx_C3EMode1
+    STA.w !WinFx_C3EMode
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_C3ETablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_C3ETableBank
+    LDA.b #!EventHook_WinC3E
+    STA.b !Field_EventHook
+    LDA.b #!WinFx_SizeBit1|!WinFx_SizeBit0
+    STA.w !DP_Field+!WinFx_Size
+    TYX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:40EF — Evt_OpFF93_WinC3E2 (86 bytes, $40EF–$4144)
+; Opcode $FF $93 (2 bytes): as Evt_OpFF92_WinC3E1 with mode 2
+;   (WinFx_C3EMode2) and WinFx_Size = 1 (WinFx_SizeBit0); the window is
+;   cleared when done, X = Y + 2. Otherwise X = the opcode.
+; Reached through Evt_OpFFTable (entry $93).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   and Field_HdmaEnable are dp), DB=$00 (the $0350 block and the
+;   shadows absolute); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above; A clobbered; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF93_WinC3E2:
+    LDA.b !Field_EventHook
+    BEQ .start
+    CMP.b #!EventHook_WinC3E
+    BNE .wait
+    LDA.w !WinFx_Busy
+    BEQ .done
+.wait:
+    TYX
+    RTS
+.done:
+    STZ.b !Field_EventHook
+    LDA.b #$00
+    STA.l !Hdma_Unk7F1522
+    STA.l !Hdma_Unk7F1523
+    LDA.b #$00
+    STA.w !Ppu_W12SelShadow
+    STA.w !Ppu_W34SelShadow
+    STA.w !Ppu_WObjSelShadow
+    STA.w !Ppu_Wh3Shadow
+    LDA.b #!HDMAEN_Ch7
+    TRB.b !Field_HdmaEnable
+    TYX
+    INX
+    INX
+    RTS
+.start:
+    LDA.w !WinFx_Busy
+    BEQ .go
+    TYX
+    RTS
+.go:
+    STZ.w !WinFx_C3EMode+1
+    LDA.b #!WinFx_C3EMode2
+    STA.w !WinFx_C3EMode
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_C3ETablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_C3ETableBank
+    LDA.b #!EventHook_WinC3E
+    STA.b !Field_EventHook
+    LDA.b #!WinFx_SizeBit0
+    STA.w !DP_Field+!WinFx_Size
+    TYX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4145 — Evt_OpFF95_WinC3E2Dark (60 bytes, $4145–$4180)
+; Opcode $FF $95 (2 bytes): as Evt_OpFF94_WinC3E1Dark with mode 2
+;   (WinFx_C3EMode2) and WinFx_Size = 2 (WinFx_SizeBit1): when done
+;   Fade_Brightness = 0, Field_EventHook = 0, X = Y + 2. Otherwise X =
+;   the opcode.
+; Reached through Evt_OpFFTable (entry $95).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   and Fade_Brightness are dp), DB=$00 (the $0350 block absolute); Y =
+;   the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above; A clobbered; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF95_WinC3E2Dark:
+    LDA.b !Field_EventHook
+    BEQ .start
+    CMP.b #!EventHook_WinC3E
+    BNE .wait
+    LDA.w !WinFx_Busy
+    BEQ .done
+.wait:
+    TYX
+    RTS
+.done:
+    STZ.b !Fade_Brightness
+    STZ.b !Field_EventHook
+    TYX
+    INX
+    INX
+    RTS
+.start:
+    LDA.w !WinFx_Busy
+    BEQ .go
+    TYX
+    RTS
+.go:
+    STZ.w !WinFx_C3EMode+1
+    LDA.b #!WinFx_C3EMode2
+    STA.w !WinFx_C3EMode
+    LDX.w #!WinFx_TableA
+    STX.w !WinFx_C3ETablePtr
+    LDA.b #!Bank7F
+    STA.w !WinFx_C3ETableBank
+    LDA.b #!EventHook_WinC3E
+    STA.b !Field_EventHook
+    LDA.b #!WinFx_SizeBit1
+    STA.w !DP_Field+!WinFx_Size
+    TYX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4181 — Evt_OpFF96_Reset (16 bytes, $4181–$4190)
+; Opcode $FF $96 (2 bytes): waits for vblank (RDNMI bit 7), InitHW,
+;   S = StackTop and JML MainInit: the game restarts from its cold init
+;   (a reset, probably the end of a game). Never returns.
+; Reached through Evt_OpFFTable (entry $96).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any, DB=$00 (RDNMI read
+;   absolute); Y = the $FF opcode's offset in Evt_Data.
+; Exit: none (MainInit with a fresh stack, interrupts disabled by
+;   InitHW).
+; ------------------------------------------------------------
+Evt_OpFF96_Reset:
+    LDA.w RDNMI
+    BPL Evt_OpFF96_Reset
+    JSR InitHW
+    LDX.w #!StackTop
+    TXS
+    JML MainInit
+
+; ------------------------------------------------------------
+; $C0:4191 — Evt_OpFF97_WinGrow1 (31 bytes, $4191–$41AF)
+; Opcode $FF $97 (5 bytes: $FF, $97, x, y, limit): as
+;   Evt_OpFF90_WinGrow0 with Field_EventHook = EventHook_WinGrow1 (hook
+;   4, the colour-window version); X = Y + 5 (no wait).
+; Reached through Evt_OpFFTable (entry $97).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (WinFx_* and
+;   Field_EventHook are dp), DB any (operands read long); Y = the $FF
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 5; A = the hook; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF97_WinGrow1:
+    TYX
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_CenterX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_CenterY
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !WinFx_SizeLimit
+    STZ.b !WinFx_Size
+    LDA.b #!EventHook_WinGrow1
+    STA.b !Field_EventHook
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:41B0 — Evt_OpFF98_WinShrink1 (4 bytes, $41B0–$41B3)
+; Opcode $FF $98 (2 bytes): Field_EventHook = EventHook_WinShrink1 (hook
+;   5) through Evt_OpFF_SetHookTail; X = Y + 2 (no wait).
+; Reached through Evt_OpFFTable (entry $98).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
+; Exit: as Evt_OpFF9A_WinFixedB (X = Y + 2; A = the hook; Y unchanged;
+;   M=1, X=0, DP, DB and C unchanged).
+; ------------------------------------------------------------
+Evt_OpFF98_WinShrink1:
+    LDA.b #!EventHook_WinShrink1
+    BRA Evt_OpFF_SetHookTail
+
+; ------------------------------------------------------------
+; $C0:41B4 — Evt_OpFF99_WinFixedA (4 bytes, $41B4–$41B7)
+; Opcode $FF $99 (2 bytes): Field_EventHook = EventHook_WinFixedA1
+;   (hooks 7/8) through Evt_OpFF_SetHookTail; X = Y + 2 (no wait).
+; Reached through Evt_OpFFTable (entry $99).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
+; Exit: as Evt_OpFF9A_WinFixedB (X = Y + 2; A = the hook; Y unchanged;
+;   M=1, X=0, DP, DB and C unchanged).
+; ------------------------------------------------------------
+Evt_OpFF99_WinFixedA:
+    LDA.b #!EventHook_WinFixedA1
+    BRA Evt_OpFF_SetHookTail
+
+; ------------------------------------------------------------
+; $C0:41B8 — Evt_OpFF9A_WinFixedB (8 bytes, $41B8–$41BF; the store from
+;   $41BA on is the sub-entry Evt_OpFF_SetHookTail)
+; Opcode $FF $9A (2 bytes): Field_EventHook = EventHook_WinFixedB1
+;   (hooks 9/10); X = Y + 2 (no wait). Evt_OpFF_SetHookTail (A = the
+;   hook) stores it and returns; Evt_OpFF98, Evt_OpFF99, Evt_OpFF9B and
+;   Evt_OpFF9C BRA to it.
+; Reached through Evt_OpFFTable (entry $9A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any (not used); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2; A = the hook; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF9A_WinFixedB:
+    LDA.b #!EventHook_WinFixedB1
+Evt_OpFF_SetHookTail:                   ; header: see Evt_OpFF9A_WinFixedB
+    STA.b !Field_EventHook
+    TYX
+    INX
+    INX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:41C0 — Evt_OpFF9B_LeaveToBankC3 (4 bytes, $41C0–$41C3)
+; Opcode $FF $9B (2 bytes): Field_EventHook = EventHook_LeaveToBankC3
+;   (hook 11 redraws the map and leaves the field for bank $C3 on its
+;   next frame) through Evt_OpFF_SetHookTail; X = Y + 2.
+; Reached through Evt_OpFFTable (entry $9B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
+; Exit: as Evt_OpFF9A_WinFixedB (X = Y + 2; A = the hook; Y unchanged;
+;   M=1, X=0, DP, DB and C unchanged).
+; ------------------------------------------------------------
+Evt_OpFF9B_LeaveToBankC3:
+    LDA.b #!EventHook_LeaveToBankC3
+    BRA Evt_OpFF_SetHookTail
+
+; ------------------------------------------------------------
+; $C0:41C4 — Evt_OpFF9C_WinShrink1Off (4 bytes, $41C4–$41C7)
+; Opcode $FF $9C (2 bytes): Field_EventHook = EventHook_WinShrink1Off
+;   (hook 14, hook 5's shutdown: the window off at once) through
+;   Evt_OpFF_SetHookTail; X = Y + 2.
+; Reached through Evt_OpFFTable (entry $9C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any; Y = the $FF opcode's offset in Evt_Data.
+; Exit: as Evt_OpFF9A_WinFixedB (X = Y + 2; A = the hook; Y unchanged;
+;   M=1, X=0, DP, DB and C unchanged).
+; ------------------------------------------------------------
+Evt_OpFF9C_WinShrink1Off:
+    LDA.b #!EventHook_WinShrink1Off
+    BRA Evt_OpFF_SetHookTail
+
+; ------------------------------------------------------------
+; $C0:41C8 — Evt_OpFF9E_WinPulse (20 bytes, $41C8–$41DB)
+; Opcode $FF $9E (2 bytes): runs hook 12 (Field_HookWinPulse, which
+;   ends by setting EventHook_Idle) and waits for it: Field_EventHook 0:
+;   it is set to EventHook_WinPulse, X = the opcode; EventHook_Idle: X =
+;   Y + 2 (the hook is left at EventHook_Idle, a bare RTS); any other
+;   hook: X = the opcode.
+; Reached through Evt_OpFFTable (entry $9E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_EventHook
+;   is dp), DB any (not used); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X as above; A clobbered; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF9E_WinPulse:
+    LDA.b !Field_EventHook
+    BEQ .start
+    CMP.b #!EventHook_Idle
+    BEQ .done
+    TYX
+    RTS
+.done:
+    TYX
+    INX
+    INX
+    RTS
+.start:
+    LDA.b #!EventHook_WinPulse
+    STA.b !Field_EventHook
+    TYX
+    RTS
+
+; ------------------------------------------------------------
+; $C0:41DC — Evt_OpFF9D_ClearPush (8 bytes, $41DC–$41E3)
+; Opcode $FF $9D (2 bytes): clears Field54_Push in Field_Unk54, which
+;   lets Evt_PushTarget start another push; X = Y + 2.
+; Reached through Evt_OpFFTable (entry $9D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk54 is
+;   dp), DB any (not used); Y = the $FF opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2; A = Field54_Push; Y
+;   unchanged; C unchanged (Evt_OpFF_Misc returns C=0).
+; ------------------------------------------------------------
+Evt_OpFF9D_ClearPush:
+    LDA.b #!Field54_Push
+    TRB.b !Field_Unk54
+    TYX
+    INX
+    INX
+    RTS
 
 ; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
@@ -12061,7 +12946,7 @@ Evt_BankC2Cmd08Unused:
 ; after it (adjacent, not overlapping; X restarts at the buffer start
 ; each time, n = 32 up to 1,024), so the cleared size doubles from 64
 ; up to 2,048 bytes.
-; Callers (2 JSR sites): Field_ServiceUnk54 ($C0:2787) and unmatched ($C0:3E96).
+; Callers (2 JSR sites): Field_ServiceUnk54 ($C0:2787) and Evt_Op29_StartCredits ($C0:3E96).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DB any (saved); DP not
 ; used.
 ; Exit: M=1, X=0, DB unchanged (PHB/PLB around the MVNs, which set it
@@ -15334,7 +16219,7 @@ Map_UploadColXDec3:
 ; via Map_StepStop*), Map_Unk91AC and Map_Unk93E1 (the layer scroll).
 ; Callers (8 JSR sites): GameLoop_FrameBody ($C0:00A7), Field_IdleFrame ($C0:00EB), Scene_Unk0283
 ;   ($C0:02B7, $C0:02DE), Field_SceneChangeTick ($C0:0CDB), Field_FadeInAfterReload ($C0:2830),
-;   Scene_SettleFrames ($C0:2854) and unmatched ($C0:3FC3).
+;   Scene_SettleFrames ($C0:2854) and Evt_OpFF_Misc ($C0:3FC3).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (restored on
 ; exit; set to $1D00 inside), DB=$00 (absolute operands are bank $00).
 ; Exit: M=1, X=0, DP=$0100, DB unchanged; A, X and Y as the callees
@@ -22924,8 +23809,8 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
 ; 1, 2, 4, 5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
 ; from four moving points (hook 6). The shapes those routines draw
 ; are not traced, so the handlers keep neutral names. Field_EventHook
-; and WinFx_* are set by unmatched code at $C0:3FA9-$C0:41D8 (not
-; traced). The dp $39/$3A stores at $C0:A4C4-$C0:A4F3 are not more of
+; and WinFx_* are set by the event opcodes $FE (Evt_OpFE_WinQuad) and
+; $FF $90-$9E (Evt_OpFFTable's handlers). The dp $39/$3A stores at $C0:A4C4-$C0:A4F3 are not more of
 ; them: they are LocLoad_UnkA33B's, with DP=$1D00 (Map_OwnStep3X/3Y).
 ; ============================================================
 

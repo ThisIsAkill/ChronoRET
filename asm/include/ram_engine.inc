@@ -397,6 +397,17 @@ if !ram_engine_inc == 0
                                          ; channel bits of the colour operand
 !EvtDrift_Layers = $D9                   ; alias of Eng_Scratch in Evt_OpE6_SetDrift: 8-bit layer bits
 !EvtDrift_Amount = $DB                   ; alias of Oam_Range1LoPtr's slot there: 16-bit x, y amounts
+!EvtCredits_Block = $D9                  ; alias of Eng_Scratch in Evt_Op29_StartCredits: 8-bit, the
+                                         ; Credits_Text block wanted
+!EvtCredits_Count = $DD                  ; alias of Oam_Range2LoPtr's slot there: 8-bit, blocks skipped
+!EvtQuad_Start = $F0                     ; alias of FieldBtl_RestOriginX in Evt_OpFE_WinQuad: 16-bit,
+                                         ; a start value x 256 (low byte 0)
+!EvtQuad_Frames = $F4                    ; alias of ObjDir_Index there: 8-bit, the frames operand
+!EvtQuad_Ofs = $F6                       ; alias of ObjDir_Run/Rise there: 16-bit offset into
+                                         ; WinFx_QuadPos / WinFx_QuadVel
+!EvtQuad_Left = $EE                      ; alias of FieldBtl_RecFlags's slot there: 8-bit values left
+!EvtFF_Sub = $DF                         ; alias of EvtCall_NewLevel's slot in Evt_OpFF_Misc: 8-bit,
+                                         ; the opcode's second byte
 !EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
                                          ; 16-bit, the opcode's offset (Y)
 !EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
@@ -717,7 +728,8 @@ if !ram_engine_inc == 0
 !Credits_VramAddr = $0BE5                ; 16-bit VRAM word address of the credits line just built;
                                          ; the NMI routine at $C0:EC77 DMAs the line there
 !Credits_DmaSize = $0BE7                 ; 16-bit byte count of that DMA ($C0:EC77)
-!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState; Evt_Op29_StartCredits
+                                         ; sets 1 or 2 (no reader traced)
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
                                          ; (Field_SaveState / Field_RestoreState)
 !Audio_CmdId = $1E00                     ; 8-bit sound-driver command byte ($19 = play sound effect),
@@ -1167,6 +1179,11 @@ if !ram_engine_inc == 0
 !WinFx_QuadTablePtr = $0350              ; alias of WinFx_ArgX for hook 6: 16-bit table address for
                                          ; BankC3_Entry0011
 !WinFx_QuadTableBank = $0352             ; alias of WinFx_ArgY for hook 6: its bank byte
+!WinFx_C3EMode = $0350                   ; alias of WinFx_ArgX for hook 3: 16-bit mode word the $FF
+                                         ; $92-$95 opcodes give BankC3_Entry000E (WinFx_Busy is its
+                                         ; low byte)
+!WinFx_C3ETablePtr = $0352               ; alias of WinFx_ArgY for hook 3: 16-bit table address
+!WinFx_C3ETableBank = $0354              ; alias of WinFx_ArgSize for hook 3: its bank byte
 !WinFx_QuadPoints = $0360                ; 8 bytes for BankC3_Entry0011: X, Y of 4 points (the high
                                          ; bytes of WinFx_QuadPos); it picks the smallest Y first
 !WinFx_QuadTimer = $7F1CE8               ; 8-bit frames left for hook 6

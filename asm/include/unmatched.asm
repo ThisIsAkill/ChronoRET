@@ -97,6 +97,14 @@ org $FDCD0C
 EngFD_UnkCD0C:      ; EngFD_UnkC2C1Table0 entry 1; not analysed
 org $FDD27E
 EngFD_UnkD27E:      ; EngFD_UnkC2C1Table0 entry 2; not analysed
+org $FDFFE5
+FdVec_FFE5:         ; JMP $FD:DB1D; JML target of Evt_OpFF_Misc for $FF $83-$8F
+org $FDFFE8
+FdVec_FFE8:         ; JMP $FD:DABE; JML target of Evt_OpFF_Misc for $FF $82
+org $FDFFEB
+FdVec_FFEB:         ; JMP $FD:DA5F; JML target of Evt_OpFF_Misc for $FF $81
+org $FDFFF1
+FdVec_FFF1:         ; JMP $FD:DA00; JML target of Evt_OpFF_Misc for $FF $80
 org $FDE39C
 EngFD_UnkE39C:      ; FdVec_FFF7's routine, run every frame by Field_EndOfFrame; works on the FieldAnimB
                     ; records at $0520 (not analysed)

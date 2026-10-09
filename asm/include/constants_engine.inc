@@ -840,8 +840,8 @@ endif
                                          ; below this
 !Obj_Unk1B01Push = $02                   ; Obj_Unk1B01 bit 1: Evt_PushTarget may move the object
 !Field54_Push = $02                      ; Field_Unk54 bit 1: set by Evt_PushTarget when it sends an
-                                         ; object off; no other push starts while it is set (who
-                                         ; clears it is not traced)
+                                         ; object off; no other push starts while it is set (event
+                                         ; opcode $FF $9D, Evt_OpFF9D_ClearPush, clears it)
 !Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
                                          ; offset: Map_Unk7F3700's fifth block, seeded 96 col row,
                                          ; then FF 9D 00, from LocLoad_Unk7F3700Init_Rec4)
@@ -923,4 +923,32 @@ endif
 !MapCopy_LayerBits = $07                 ; Field_Unk44 bits 0-2 (MapCopy_L1-L3): the layers
 !BankC2Cmd_Unk06 = $06                   ; BankC2_Entry8004 commands of Evt_OpF8-FA (see
 !BankC2Cmd_Unk07 = $07                   ; Evt_OpF8_BankC2Cmd06And07)
-!BankC2Cmd_Unk08 = $08                   ; ... of Evt_BankC2Cmd08Unused
+!BankC2Cmd_Unk08 = $08                   ; ... of Evt_OpFF9F_BankC2Cmd08
+
+; --- Event credits, layer-3 and window-effect opcodes ($29-$2F, $32, $FE, $FF) ---
+!Credits_GfxPack = $FD0000               ; ROM pack Credits_LoadGfx unpacks (probably the credits font)
+!Credits_GfxBytes = $0400                ; bytes of it Credits_LoadGfx uploads to VRAM
+!Credits_BlockMask = $7F                 ; Evt_Op29's block operand bits 0-6 (bit 7 picks Field_Unk0BE9)
+!Field_Unk0BE9Set1 = $01                 ; Field_Unk0BE9 by Evt_Op29: block operand bit 7 clear
+!Field_Unk0BE9Set2 = $02                 ; ... bit 7 set
+!Field54_Bit2 = $04                      ; Field_Unk54 bit 2 (Evt_Op2A): the low bit of Field54_MapReq
+!Field54_Bit3 = $08                      ; Field_Unk54 bit 3 (Evt_Op2B): the high bit of Field54_MapReq
+!EvtQuad_Values = $08                    ; Evt_OpFE's start/end pairs: X and Y of four points
+!EventHook_WinGrow0 = $01                ; Field_EventHook values the $FF and $FE opcodes set: hook 1
+!EventHook_WinShrink0 = $02              ; hook 2
+!EventHook_WinC3E = $03                  ; hook 3
+!EventHook_WinGrow1 = $04                ; hook 4
+!EventHook_WinShrink1 = $05              ; hook 5
+!EventHook_WinQuad = $06                 ; hook 6
+!EventHook_LeaveToBankC3 = $0B           ; hook 11
+!EventHook_WinPulse = $0C                ; hook 12 (it ends at EventHook_Idle)
+!EventHook_WinShrink1Off = $0E           ; hook 14
+!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95
+!WinFx_C3EMode2 = $02                    ; (what BankC3_Entry000E does with them is not traced)
+!WinFx_SizeBit0 = $01                    ; WinFx_Size bit 0 (Hdma_InitChannelsFD's channel-7 choice)
+!WinFx_SizeBit1 = $02                    ; WinFx_Size bit 1: hook 3 leaves the window on when set
+!EvtFF_FirstSub = $90                    ; opcode $FF's second byte: first Evt_OpFFTable entry
+!EvtFF_SubFFF1 = $80                     ; ... JML FdVec_FFF1
+!EvtFF_SubFFEB = $81                     ; ... JML FdVec_FFEB
+!EvtFF_SubFFE8 = $82                     ; ... JML FdVec_FFE8 ($83-$8F: FdVec_FFE5)
+!EvtFF_FadeLast = $01                    ; Evt_OpFF_Misc's fade steps while Fade_Brightness >= this
