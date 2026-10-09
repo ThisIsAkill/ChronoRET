@@ -1015,3 +1015,28 @@ endif
                                          ; MVN count (length - 2 colour bytes are copied)
 !FieldAnimB_Searched = 8                 ; records Evt_FindFreeAnimB searches (of the 12)
 !ObjX_PalAnimNone = $FFFF                ; ObjX_PalAnimRec: the object has no FieldAnimB record
+
+; --- Party control: the step log and the followers ($C0:9E29-$C0:A33A) ---
+!PartyLog_IdxMask = $7F                  ; Field_UnkAB/AC/AD wrap: the PartyLog_* rings hold 128 entries
+!Party_LagMoving = $18                   ; Party_UnkA26B/A2CE: entries a follower keeps behind the one
+                                         ; ahead while the leader steps (it replays from this lag on)
+!Party_LagStill = $10                    ; ... while the leader has no step
+!Party_Unk18 = $18                       ; Party_LeaderAnim / Member2/3Anim: |Y step| is compared with it
+                                         ; before Party_AnimRowUnk1B, but nothing tests the result
+!Party_StepNegCode = $21                 ; (v ^ $FF) + this = |v| + $20: the step code of a negative step
+!Party_AnimIdxMask = $7E                 ; step code -> Party_AnimTable index (even, 0-$7E)
+!Party_StepHalf = $08                    ; Party_FollowerHoldAnim: a step with this bit is moved 8 from 0
+!Party_Unk62Row19 = $02                  ; Field_Unk62 value for which Party_AnimIdle gives the leader
+                                         ; ObjAnim_RowUnk19
+!Party_IdleDelay = $02FF                 ; Field_Unk58 (frames standing, probably) at which Party_AnimIdle
+                                         ; first tries the idle row
+!Party_IdleRepeatMask = $007F            ; past the delay, it tries again when these bits are all set
+!Field_Unk58Idle = $8000                 ; Field_Unk58 bit 15, set by Party_AnimIdle's first try
+                                         ; (Field_Unk58Mask keeps it)
+!Party_IdleChance = $08                  ; a try gives the idle row when the RandomTable byte is below this
+!ObjAnim_RowUnk17 = $17                  ; Obj_AnimRow Party_AnimRun gives the leader with no step and
+                                         ; Party_TileFlagged 0 (a run held against something, probably)
+!ObjAnim_RowUnk19 = $19                  ; Obj_AnimRow Party_AnimIdle gives the leader while
+                                         ; Field_Unk62 = 2
+!ObjAnim_RowUnk1B = $1B                  ; Obj_AnimRow on a shape-$1E tile with a Y step
+!ObjAnim_RowIdle = $21                   ; Obj_AnimRow Party_AnimIdle picks now and then while standing

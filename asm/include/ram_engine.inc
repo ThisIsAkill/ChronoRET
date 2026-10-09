@@ -903,6 +903,24 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0F00 = $7F0F00                ; 8-bit; Evt_OpD9/Evt_OpDA zero its byte at Field_UnkAB with
                                          ; those of ObjX_Unk7F0C00 / 7F0D00 (no reader traced)
+!PartyLog_StepX = $7F0C00                ; alias of ObjX_Unk7F0C00: 128-entry ring (Field_UnkAB/AC/AD) of
+                                         ; the leader's X steps (Map_Unk1D32) logged by Party_Unk9E29
+                                         ; and replayed by Party_UnkA26B/A2CE as Obj_VelX
+!PartyLog_StepY = $7F0C80                ; alias of ObjX_Unk7F0C80: the same for Y (Map_Unk1D33)
+!PartyLog_PadX = $7F0D00                 ; alias of ObjX_Unk7F0D00: the D-pad X step (Map_Unk1D2C)
+                                         ; logged with it (the followers' facing and row)
+!PartyLog_PadY = $7F0D80                 ; alias of ObjX_Unk7F0D80: the D-pad Y step (Map_Unk1D2D)
+!PartyLog_PrioLow = $7F0E00              ; the leader's Obj_PrioLow logged with the step
+!PartyLog_PrioHigh = $7F0E80             ; the leader's Obj_PrioHigh logged with the step
+!PartyLog_Flags = $7F0F00                ; alias of ObjX_Unk7F0F00: Map_Unk1D34 (the step's tile flags)
+                                         ; logged with the step
+!Party_TileFlagged = $E5                 ; alias of ObjVel_AttrB's slot in Party_LeaderAnim and the
+                                         ; other *Anim routines: 8-bit, 1 when the leader's
+                                         ; Map_Unk1D34 is nonzero without Map_ProbeShape1E (only
+                                         ; Party_LeaderAnim sets it); 0 lets Party_AnimRun pick
+                                         ; ObjAnim_RowUnk17
+!Party_StepXCode = $DB                   ; alias of Oam_Range1LoPtr's slot there: 8-bit, the X step code
+                                         ; >> 3
 
 ; --- OAM shadow ---
 !Obj_PalPrev = $0B00                     ; 8-bit per object (index Obj_Cur): the object before it in

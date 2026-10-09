@@ -39,17 +39,6 @@ org $C028C0
 TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
 org $C028E1
 TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
-org $C09E29
-Party_Unk9E29:      ; JSR from Evt_OpB0_PartyControl for an Obj_Unk1100 kind-0 object (the leader,
-                    ; probably): JSR $C0:9E84, then copies the Map_Unk1D32/1D33 steps into Obj_VelX/Y
-                    ; and logs them with Map_Unk1D2C/2D, the priorities and Map_Unk1D34 at entry
-                    ; Field_UnkAB (stepped, & $7F) of ObjX_Unk7F0C00-$7F0F00 (not matched)
-org $C0A26B
-Party_UnkA26B:      ; JSR from Evt_OpB0_PartyControl for kind 1: moves Party_ObjSlot1's object by the
-                    ; entries logged above, from Field_UnkAC, lagging $10/$18 entries (not matched)
-org $C0A2CE
-Party_UnkA2CE:      ; as Party_UnkA26B for kind 2: Party_ObjSlot2's object, from Field_UnkAD (not
-                    ; matched)
 
 ; --- Other banks, called from bank $C0 ---
 

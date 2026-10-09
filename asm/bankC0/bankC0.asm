@@ -22363,6 +22363,982 @@ Map_InitEntryTile:
     RTS
 
 ; ============================================================
+; Party control: the leader's step log and the followers
+; ($C0:9E29–$C0:A33A)
+; Evt_OpB0_PartyControl's callees, run once per script run of a party
+; member's object (with 8-bit X/Y). The leader's routine
+; (Party_Unk9E29) logs every frame it moves in a 128-entry ring at
+; Field_UnkAB in bank $7F: PartyLog_StepX/Y (the step it was given,
+; Map_Unk1D32/1D33), PartyLog_PadX/Y (the D-pad step, Map_Unk1D2C/
+; 1D2D), PartyLog_PrioLow/High (its priority bits) and PartyLog_Flags
+; (Map_Unk1D34, the tile flags of the step). Member 2 (Party_UnkA26B)
+; replays the entries from Field_UnkAC on and member 3 (Party_UnkA2CE)
+; from Field_UnkAD, each keeping $18 entries behind the one ahead
+; ($10 when the leader stands), so they walk the leader's path. Reading
+; the ring as the leader's path rests on these stores and replays; the
+; Party_* names are kept from the stubs (better: Party_LeaderStep,
+; Party_FollowMember2/3).
+; The animation part picks the object's facing and animation row from
+; the step: walk (ObjAnim_RowWalk), run (ObjAnim_RowRun), and when
+; there is no step stand or, now and then, an idle row; rows $17, $19,
+; $1B and $21 are named by when they are chosen (what they show is
+; not traced).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:9E29 — Party_Unk9E29 (91 bytes, $9E29–$9E83)
+; The leader's step (kind-0 object of Evt_OpB0_PartyControl): picks its
+;   animation (Party_LeaderAnim), then, when Map_Unk1D32 or Map_Unk1D33
+;   (its X / Y step this frame) is nonzero, steps Field_UnkAB (& $7F)
+;   and logs at the new entry PartyLog_StepX/Y = Map_Unk1D32/1D33 (also
+;   Obj_Cur's Obj_VelX/VelY), PartyLog_PadX/Y = Map_Unk1D2C/1D2D,
+;   PartyLog_PrioLow/High = its Obj_PrioLow/High and PartyLog_Flags =
+;   Map_Unk1D34. With no step Obj_VelX = Obj_VelY = 0 and nothing is
+;   logged. The LDA of Map_Unk1D33 at .step_x is dead (A is reloaded at
+;   once); kept as found.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3047).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the ring index is 7 bits),
+;   DP=$0100 (Field_UnkAB, Obj_Cur and the callee's scratch are dp),
+;   DB=$00 (Obj_* tables and Map_Unk1D2C-1D34 absolute; the log is
+;   long).
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; on a logged step X =
+;   the new Field_UnkAB and Y = Obj_Cur; else X = Obj_Cur and Y as
+;   Party_LeaderAnim left it (Obj_Cur); Party_LeaderAnim's writes.
+; ------------------------------------------------------------
+Party_Unk9E29:
+    JSR Party_LeaderAnim
+    LDA.w !Map_Unk1D32
+    BNE .step_x
+    LDA.w !Map_Unk1D33
+    BNE .log
+    LDX.b !Obj_Cur
+    STZ.w !Obj_VelX,X
+    STZ.w !Obj_VelY,X
+    RTS
+.step_x:
+    LDA.w !Map_Unk1D33                  ; dead: reloaded below
+.log:
+    LDA.b !Field_UnkAB
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAB
+    TAX
+    LDY.b !Obj_Cur
+    LDA.w !Map_Unk1D32
+    STA.l !PartyLog_StepX,X
+    STA.w !Obj_VelX,Y
+    LDA.w !Map_Unk1D33
+    STA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D2C
+    STA.l !PartyLog_PadX,X
+    LDA.w !Map_Unk1D2D
+    STA.l !PartyLog_PadY,X
+    LDA.w !Obj_PrioLow,Y
+    STA.l !PartyLog_PrioLow,X
+    LDA.w !Obj_PrioHigh,Y
+    STA.l !PartyLog_PrioHigh,X
+    LDA.w !Map_Unk1D34
+    STA.l !PartyLog_Flags,X
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9E84 — Party_LeaderAnim (77 bytes, $9E84–$9ED0)
+; The leader's facing and animation row from this frame's D-pad step
+;   (Map_Unk1D2C/1D2D) and tile flags (Map_Unk1D34):
+; - flags with Map_ProbeShape1E (bit 2): with no Y step the animation
+;   stops (Obj_AnimColumn = Obj_AnimTimer = 0); else row
+;   ObjAnim_RowUnk1B (Party_AnimRowUnk1B). The CMP of |Y step| with $18
+;   before that BRL is dead (nothing tests the flags); kept as found.
+; - else (Party_TileFlagged = 1 when the flags are nonzero): the step
+;   code of X and Y indexes Party_AnimTable.
+; The step code: a step v gives v when 0 or positive, (v ^ $FF) +
+;   Party_StepNegCode = |v| + $20 when negative; the X code is shifted
+;   right 3 and ORed with the Y code, & $7E (Party_AnimIdxMask). For
+;   the D-pad steps ($10 walk, $20 run) the X part gives 0/2/4/6/8
+;   (none, right walk / run, left walk / run) and the Y part 0/$10/$20/
+;   $30/$40 (none, down walk / run, up walk / run).
+; Callers (1 JSR site): Party_Unk9E29 ($C0:9E29).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the table index), DP=$0100
+;   (Obj_Cur, Party_TileFlagged and Party_StepXCode are dp), DB=$00
+;   (Map_Unk1D2C-1D34 and Obj_* tables absolute).
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged ($E5) and Party_StepXCode ($DB) written; the
+;   handler's writes (Obj_Facing, Obj_AnimRow/Column/Timer,
+;   Field_Unk58, Field_Unk0400Copy).
+; ------------------------------------------------------------
+Party_LeaderAnim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.w !Map_Unk1D34
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    INC.b !Party_TileFlagged
+    BRA .code
+.shape_1e:
+    LDA.w !Map_Unk1D2D
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.w !Map_Unk1D2C
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.w !Map_Unk1D2D
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9ED1 — Party_Member2Anim (79 bytes, $9ED1–$9F1F)
+; As Party_LeaderAnim from a log entry: the facing and row from
+;   PartyLog_PadX/Y and PartyLog_Flags at X (the D-pad step the leader
+;   had there). The difference: Party_TileFlagged stays 0 (the
+;   bit-2-clear branch only skips to the code). Byte for byte the same
+;   code as Party_Member3Anim (only the BRL distances differ).
+; Callers (1 BRL site): Party_UnkA26B ($C0:A2CB).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry.
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_Member2Anim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.l !PartyLog_Flags,X
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    BRA .code
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.l !PartyLog_PadX,X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_PadY,X
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9F20 — Party_Member3Anim (79 bytes, $9F20–$9F6E)
+; Party_Member2Anim again, byte for byte, for member 3.
+; Callers (1 BRL site): Party_UnkA2CE ($C0:A338).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry.
+; Exit: M=1, X=1, DP and DB unchanged; Y = Obj_Cur; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_Member3Anim:
+    STZ.b !Party_TileFlagged
+    LDY.b !Obj_Cur
+    LDA.l !PartyLog_Flags,X
+    BEQ .code
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    BRA .code
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    BPL .abs_y
+    EOR.b #!Eng_Invert8
+    INC A
+.abs_y:
+    CMP.b #!Party_Unk18                 ; dead: the flags are not tested
+    BRL Party_AnimRowUnk1B
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+.code:
+    LDA.l !PartyLog_PadX,X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_PadY,X
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9F6F — Party_FollowerHoldAnim (131 bytes, $9F6F–$9FF1)
+; A follower's animation while it holds its place (Party_UnkA26B /
+;   A2CE when it is close enough behind), from the log entry X it is
+;   at: with PartyLog_Flags 0, Party_AnimNoStep (stand / idle). With
+;   Map_ProbeShape1E: when PartyLog_PadY or PartyLog_StepY is 0, or
+;   they are equal, the animation stops (column / timer 0); else
+;   nothing changes. Otherwise the step code (as in Party_LeaderAnim)
+;   of PartyLog_PadX/Y less PartyLog_StepX/Y indexes Party_AnimTable;
+;   a step with bit 3 set is first moved 8 further from 0 (a $x8 step
+;   counts as the next multiple of $10). That difference is the part of
+;   the pad step the leader did not make there, probably (walking on
+;   the spot against a pushing tile).
+; Unlike Party_Member2Anim it does not load Y: Y is the caller's member
+;   slot (Party_ObjSlot1 / Party_ObjSlot2), while the table handlers
+;   set the facing of Obj_Cur.
+; Callers (4 BRL sites): Party_UnkA26B ($C0:A28A, $C0:A29A) and Party_UnkA2CE ($C0:A2ED, $C0:A307).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute; the log is long);
+;   X = the log entry; Y = the member's slot.
+; Exit: M=1, X=1, DP and DB unchanged; Y unchanged; A and X clobbered;
+;   Party_TileFlagged = 0, Party_StepXCode written (code path); the
+;   handler's writes.
+; ------------------------------------------------------------
+Party_FollowerHoldAnim:
+    STZ.b !Party_TileFlagged
+    LDA.l !PartyLog_Flags,X
+    BEQ Party_AnimNoStep
+    BIT.b #!Map_ProbeShape1E
+    BNE .shape_1e
+    LDA.l !PartyLog_StepX,X
+    BPL .x_round_pos
+    BIT.b #!Party_StepHalf
+    BEQ .x_diff
+    SEC
+    SBC.b #!Party_StepHalf
+    BRA .x_diff
+.x_round_pos:
+    BIT.b #!Party_StepHalf
+    BEQ .x_diff
+    CLC
+    ADC.b #!Party_StepHalf
+.x_diff:
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.l !PartyLog_PadX,X              ; pad X - step X
+    BPL .x_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.x_pos:
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Party_StepXCode
+    LDA.l !PartyLog_StepY,X
+    BPL .y_round_pos
+    BIT.b #!Party_StepHalf
+    BEQ .y_diff
+    SEC
+    SBC.b #!Party_StepHalf
+    BRA .y_diff
+.y_round_pos:
+    BIT.b #!Party_StepHalf
+    BEQ .y_diff
+    CLC
+    ADC.b #!Party_StepHalf
+.y_diff:
+    EOR.b #!Eng_Invert8
+    INC A
+    CLC
+    ADC.l !PartyLog_PadY,X              ; pad Y - step Y
+    BPL .y_pos
+    EOR.b #!Eng_Invert8
+    CLC
+    ADC.b #!Party_StepNegCode
+.y_pos:
+    ORA.b !Party_StepXCode
+    AND.b #!Party_AnimIdxMask
+    TAX
+    JSR (Party_AnimTable,X)
+    RTS
+.shape_1e:
+    LDA.l !PartyLog_PadY,X
+    BEQ .stop
+    LDA.l !PartyLog_StepY,X
+    BEQ .stop
+    SEC
+    SBC.l !PartyLog_PadY,X
+    BEQ .stop
+    RTS
+.stop:
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+    RTS
+
+; ------------------------------------------------------------
+; $C0:9FF2 — Party_AnimNoStep (5 bytes, $9FF2–$9FF6)
+; Party_AnimTable's handler for no step (entry 0 and every code that
+;   is not a D-pad direction): X = Obj_Cur, then Party_AnimIdle.
+; Callers note: Party_AnimTable entries 0, 5-7, 13-15, 21-23, 29-31 and
+;   37-64; Party_FollowerHoldAnim branches here (BEQ) when the entry's
+;   flags are 0.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100, DB=$00; Y = the
+;   object's slot.
+; Exit: as Party_AnimIdle: M=1, X=1, DP and DB unchanged; X = Obj_Cur,
+;   or Field_Unk0400Copy after an idle try; A clobbered; Y unchanged.
+; ------------------------------------------------------------
+Party_AnimNoStep:
+    LDX.b !Obj_Cur
+    BRL Party_AnimIdle
+
+; $C0:9FF7 — Party_AnimTable (130 bytes, $9FF7–$A078, 65 words)
+; The facing / animation handler for each step code (JSR
+; (Party_AnimTable,X) in Party_LeaderAnim, Party_Member2Anim,
+; Party_Member3Anim and Party_FollowerHoldAnim; X = code & $7E, so
+; entries 0-63). Entry = X code / 2 + Y code / 2: X 1/2 right walk /
+; run, 3/4 left walk / run; Y 8/16 down walk / run, 24/32 up walk /
+; run. The diagonal entries keep the facing when it is one of the two
+; directions, else face the horizontal one; a walk and a run together
+; run. Codes the D-pad steps cannot give go to Party_AnimNoStep. The
+; 65th word (index $80) can never be reached; it is Party_AnimNoStep
+; too.
+Party_AnimTable:
+    dw Party_AnimNoStep             ; 0: no step
+    dw Party_AnimRightWalk          ; 1
+    dw Party_AnimRightRun           ; 2
+    dw Party_AnimLeftWalk           ; 3
+    dw Party_AnimLeftRun            ; 4
+    dw Party_AnimNoStep             ; 5
+    dw Party_AnimNoStep             ; 6
+    dw Party_AnimNoStep             ; 7
+    dw Party_AnimDownWalk           ; 8
+    dw Party_AnimDownRightWalk      ; 9
+    dw Party_AnimDownRightRun       ; 10
+    dw Party_AnimDownLeftWalk       ; 11
+    dw Party_AnimDownLeftRun        ; 12
+    dw Party_AnimNoStep             ; 13
+    dw Party_AnimNoStep             ; 14
+    dw Party_AnimNoStep             ; 15
+    dw Party_AnimDownRun            ; 16
+    dw Party_AnimDownRightRun       ; 17
+    dw Party_AnimDownRightRun       ; 18
+    dw Party_AnimDownLeftRun        ; 19
+    dw Party_AnimDownLeftRun        ; 20
+    dw Party_AnimNoStep             ; 21
+    dw Party_AnimNoStep             ; 22
+    dw Party_AnimNoStep             ; 23
+    dw Party_AnimUpWalk             ; 24
+    dw Party_AnimUpRightWalk        ; 25
+    dw Party_AnimUpRightRun         ; 26
+    dw Party_AnimUpLeftWalk         ; 27
+    dw Party_AnimUpLeftRun          ; 28
+    dw Party_AnimNoStep             ; 29
+    dw Party_AnimNoStep             ; 30
+    dw Party_AnimNoStep             ; 31
+    dw Party_AnimUpRun              ; 32
+    dw Party_AnimUpRightRun         ; 33
+    dw Party_AnimUpRightRun         ; 34
+    dw Party_AnimUpLeftRun          ; 35
+    dw Party_AnimUpLeftRun          ; 36
+    dw Party_AnimNoStep             ; 37
+    dw Party_AnimNoStep             ; 38
+    dw Party_AnimNoStep             ; 39
+    dw Party_AnimNoStep             ; 40
+    dw Party_AnimNoStep             ; 41
+    dw Party_AnimNoStep             ; 42
+    dw Party_AnimNoStep             ; 43
+    dw Party_AnimNoStep             ; 44
+    dw Party_AnimNoStep             ; 45
+    dw Party_AnimNoStep             ; 46
+    dw Party_AnimNoStep             ; 47
+    dw Party_AnimNoStep             ; 48
+    dw Party_AnimNoStep             ; 49
+    dw Party_AnimNoStep             ; 50
+    dw Party_AnimNoStep             ; 51
+    dw Party_AnimNoStep             ; 52
+    dw Party_AnimNoStep             ; 53
+    dw Party_AnimNoStep             ; 54
+    dw Party_AnimNoStep             ; 55
+    dw Party_AnimNoStep             ; 56
+    dw Party_AnimNoStep             ; 57
+    dw Party_AnimNoStep             ; 58
+    dw Party_AnimNoStep             ; 59
+    dw Party_AnimNoStep             ; 60
+    dw Party_AnimNoStep             ; 61
+    dw Party_AnimNoStep             ; 62
+    dw Party_AnimNoStep             ; 63
+    dw Party_AnimNoStep             ; 64: unreachable (index <= $7E)
+
+; ------------------------------------------------------------
+; $C0:A079 — Party_AnimLeftWalk (10 bytes, $A079–$A082)
+; Party_AnimTable handlers for the four straight directions: Obj_Cur's
+;   Obj_Facing = the direction, then Party_AnimWalk (walk row) or
+;   Party_AnimRun (run row). Eight of them, 10 bytes each: Left / Right
+;   / Up / Down walk ($A079-$A09E), then Left / Right / Up / Down run
+;   ($A0A1-$A0C8); the seven after this one are sub-entries with this
+;   header.
+; Callers note: Party_AnimTable entries 3 (this one), 1
+;   (Party_AnimRightWalk), 24 (Party_AnimUpWalk), 8 (Party_AnimDownWalk),
+;   4 (Party_AnimLeftRun), 2 (Party_AnimRightRun), 32 (Party_AnimUpRun)
+;   and 16 (Party_AnimDownRun).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the object's slot (its
+;   animation).
+; Exit: M=1, X=1, DP and DB unchanged; X = Obj_Cur; A clobbered;
+;   Obj_Facing and the tail's writes.
+; ------------------------------------------------------------
+Party_AnimLeftWalk:
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimRightWalk:                    ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimUpWalk:                       ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingUp
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimDownWalk:                     ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    BRL Party_AnimWalk
+Party_AnimLeftRun:                      ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimRightRun:                     ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimUpRun:                        ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingUp
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+Party_AnimDownRun:                      ; header: see Party_AnimLeftWalk
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    BRL Party_AnimRun
+
+; ------------------------------------------------------------
+; $C0:A0C9 — Party_AnimDownLeftWalk (21 bytes, $A0C9–$A0DD)
+; Party_AnimTable handlers for the diagonals: Obj_Cur keeps its facing
+;   when it is one of the two directions, else faces the horizontal
+;   one; then Party_AnimWalk or Party_AnimRun. Eight of them, 21 bytes
+;   each: DownLeft / DownRight / UpLeft / UpRight walk ($A0C9-$A11C),
+;   then the same four run ($A11D-$A170); the seven after this one are
+;   sub-entries with this header.
+; Callers note: Party_AnimTable entries 11 (this one), 9
+;   (Party_AnimDownRightWalk), 27 (Party_AnimUpLeftWalk), 25
+;   (Party_AnimUpRightWalk), 12/19/20 (Party_AnimDownLeftRun), 10/17/18
+;   (Party_AnimDownRightRun), 28/35/36 (Party_AnimUpLeftRun) and
+;   26/33/34 (Party_AnimUpRightRun).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the object's slot (its
+;   animation).
+; Exit: M=1, X=1, DP and DB unchanged; X = Obj_Cur; A clobbered;
+;   Obj_Facing and the tail's writes.
+; ------------------------------------------------------------
+Party_AnimDownLeftWalk:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .walk
+    CMP.b #!Obj_FacingDown
+    BEQ .walk
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimDownRightWalk:                ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .walk
+    CMP.b #!Obj_FacingDown
+    BEQ .walk
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimUpLeftWalk:                   ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .walk
+    CMP.b #!Obj_FacingUp
+    BEQ .walk
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimUpRightWalk:                  ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .walk
+    CMP.b #!Obj_FacingUp
+    BEQ .walk
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.walk:
+    BRL Party_AnimWalk
+Party_AnimDownLeftRun:                  ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .run
+    CMP.b #!Obj_FacingDown
+    BEQ .run
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimDownRightRun:                 ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .run
+    CMP.b #!Obj_FacingDown
+    BEQ .run
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimUpLeftRun:                    ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingLeft
+    BEQ .run
+    CMP.b #!Obj_FacingUp
+    BEQ .run
+    LDA.b #!Obj_FacingLeft
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+Party_AnimUpRightRun:                   ; header: see Party_AnimDownLeftWalk
+    LDX.b !Obj_Cur
+    LDA.w !Obj_Facing,X
+    CMP.b #!Obj_FacingRight
+    BEQ .run
+    CMP.b #!Obj_FacingUp
+    BEQ .run
+    LDA.b #!Obj_FacingRight
+    STA.w !Obj_Facing,X
+.run:
+    BRL Party_AnimRun
+
+; ------------------------------------------------------------
+; $C0:A171 — Party_AnimWalk (27 bytes, $A171–$A18B)
+; Field_Unk58 = 0 (the frames-standing count, probably: Field_WaitFrame
+;   counts it up and Party_AnimIdle tests it), then the object at Y
+;   gets Obj_AnimRow = ObjAnim_RowWalk, column 0 and Obj_AnimTimer 0,
+;   unless that row is already set.
+; Callers (8 BRL sites): Party_AnimLeftWalk ($C0:A080), Party_AnimRightWalk ($C0:A08A),
+;   Party_AnimUpWalk ($C0:A094), Party_AnimDownWalk ($C0:A09E), Party_AnimDownLeftWalk ($C0:A0DB),
+;   Party_AnimDownRightWalk ($C0:A0F0), Party_AnimUpLeftWalk ($C0:A105) and Party_AnimUpRightWalk
+;   ($C0:A11A).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP=$0100 (Field_Unk58 is
+;   dp), DB=$00 (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimWalk:
+    STZ.b !Field_Unk58
+    STZ.b !Field_Unk58+1
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowWalk
+    BEQ .done
+    LDA.b #!ObjAnim_RowWalk
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A18C — Party_AnimRun (70 bytes, $A18C–$A1D1)
+; Field_Unk58 = 0, then the object at Y gets Obj_AnimRow =
+;   ObjAnim_RowRun (column and timer 0, unless already set); but when
+;   the leader has no step this frame (Map_Unk1D32 and 1D33 both 0),
+;   Y is the leader (Party_ObjSlot) and Party_TileFlagged is 0, the row
+;   is ObjAnim_RowUnk17 instead (the run is held, probably: a run on
+;   the D-pad with no movement).
+; Callers (8 BRL sites): Party_AnimLeftRun ($C0:A0A8), Party_AnimRightRun ($C0:A0B2),
+;   Party_AnimUpRun ($C0:A0BC), Party_AnimDownRun ($C0:A0C6), Party_AnimDownLeftRun ($C0:A12F),
+;   Party_AnimDownRightRun ($C0:A144), Party_AnimUpLeftRun ($C0:A159) and Party_AnimUpRightRun
+;   ($C0:A16E).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: CPY of Party_ObjSlot's low
+;   byte), DP=$0100 (Field_Unk58, Party_ObjSlot and Party_TileFlagged
+;   are dp), DB=$00 (Map_Unk1D32/1D33 and Obj_* tables absolute); Y =
+;   the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRun:
+    STZ.b !Field_Unk58
+    STZ.b !Field_Unk58+1
+    LDA.w !Map_Unk1D32
+    BNE .run
+    LDA.w !Map_Unk1D33
+    BNE .run
+    CPY.b !Party_ObjSlot
+    BNE .run
+    LDA.b !Party_TileFlagged
+    BNE .run
+    BRA .held
+.run:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowRun
+    BEQ .run_done
+    LDA.b #!ObjAnim_RowRun
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.run_done:
+    RTS
+.held:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk17
+    BEQ .held_done
+    LDA.b #!ObjAnim_RowUnk17
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.held_done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A1D2 — Party_AnimRowUnk19 (23 bytes, $A1D2–$A1E8)
+; The object at Y gets Obj_AnimRow = ObjAnim_RowUnk19 (column and timer
+;   0, unless already set). Reached from Party_AnimIdle (BRA) for the
+;   leader while Field_Unk62 = 2.
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP any (not used), DB=$00
+;   (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRowUnk19:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk19
+    BEQ .done
+    LDA.b #!ObjAnim_RowUnk19
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A1E9 — Party_AnimIdle (107 bytes, $A1E9–$A253)
+; No step: the animation row while standing, for the object at Y.
+; - Field_Unk62 = 2 and Y is the leader (Party_ObjSlot):
+;   Party_AnimRowUnk19.
+; - Field_ControlEnabled = 0: the stand row (ObjAnim_RowStand, column
+;   and timer 0, unless already set).
+; - Else by Field_Unk58 (16-bit; Field_WaitFrame counts it up, the walk
+;   and run rows zero it): below Party_IdleDelay ($02FF) stand; at it,
+;   or above it with bits 0-6 all set (every $80 frames), a try: bit 15
+;   of Field_Unk58 is set (Field_Unk58Idle: it stays above the delay
+;   from then on, as Field_WaitFrame keeps bit 15), Field_Unk0400Copy
+;   steps and indexes RandomTable, and a byte below Party_IdleChance
+;   (8 in 256) gives ObjAnim_RowIdle (column and timer 0, unless
+;   already set), anything else the stand row. Other frames above the
+;   delay change nothing.
+; Callers (1 BRL site): Party_AnimNoStep ($C0:9FF4).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: the RandomTable index),
+;   DP=$0100 (Field_Unk62, Field_ControlEnabled, Field_Unk58,
+;   Field_Unk0400Copy and Party_ObjSlot are dp), DB=$00 (Obj_* tables
+;   and RandomTable absolute: $00:FE00 is the bank-$C0 mirror); Y = the
+;   object's slot.
+; Exit: M=1 (16-bit only inside), X=1, DP and DB unchanged; A
+;   clobbered; X = Field_Unk0400Copy after a try, else unchanged; Y
+;   unchanged.
+; ------------------------------------------------------------
+Party_AnimIdle:
+    LDA.b !Field_Unk62
+    BEQ .control
+    CMP.b #!Party_Unk62Row19
+    BNE .control
+    CPY.b !Party_ObjSlot
+    BNE .control
+    BRA Party_AnimRowUnk19
+.control:
+    LDA.b !Field_ControlEnabled
+    BEQ .stand
+    REP #$20
+    LDA.b !Field_Unk58
+    CMP.w #!Party_IdleDelay
+    BEQ .try
+    BCC .stand
+    AND.w #!Party_IdleRepeatMask
+    CMP.w #!Party_IdleRepeatMask
+    BEQ .try
+    SEP #$20
+    RTS
+.stand:
+    SEP #$20
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowStand
+    BEQ .stand_done
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.stand_done:
+    RTS
+.try:
+    LDA.w #!Field_Unk58Idle
+    TSB.b !Field_Unk58
+    SEP #$20
+    INC.b !Field_Unk0400Copy
+    LDA.b !Field_Unk0400Copy
+    TAX
+    LDA.w RandomTable,X
+    CMP.b #!Party_IdleChance
+    BCS .stand
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowIdle
+    BEQ .idle_done
+    LDA.b #!ObjAnim_RowIdle
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.idle_done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A254 — Party_AnimRowUnk1B (23 bytes, $A254–$A26A)
+; The object at Y gets Obj_AnimRow = ObjAnim_RowUnk1B (column and timer
+;   0, unless already set): the row on a shape-$1E tile
+;   (Map_ProbeShape1E) with a Y step.
+; Callers (3 BRL sites): Party_LeaderAnim ($C0:9EA1), Party_Member2Anim ($C0:9EEE) and
+;   Party_Member3Anim ($C0:9F3D).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y), DP any (not used), DB=$00
+;   (Obj_* tables absolute); Y = the object's slot.
+; Exit: M=1, X=1, DP and DB unchanged; A clobbered; X and Y unchanged.
+; ------------------------------------------------------------
+Party_AnimRowUnk1B:
+    LDA.w !Obj_AnimRow,Y
+    CMP.b #!ObjAnim_RowUnk1B
+    BEQ .done
+    LDA.b #!ObjAnim_RowUnk1B
+    STA.w !Obj_AnimRow,Y
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,Y
+    LDA.b #$00
+    STA.w !Obj_AnimTimer,Y
+.done:
+    RTS
+
+; ------------------------------------------------------------
+; $C0:A26B — Party_UnkA26B (99 bytes, $A26B–$A2CD)
+; Member 2's step (kind-1 object of Evt_OpB0_PartyControl), on
+;   Party_ObjSlot1's object: Obj_VelX = Obj_VelY = 0; then the lag is
+;   Field_UnkAB - Field_UnkAC (& $7F). Below Party_LagMoving ($18)
+;   while the leader steps (Map_Unk1D32 | 1D33 nonzero), or below
+;   Party_LagStill ($10) when it does not, the member holds its place:
+;   Party_FollowerHoldAnim at entry Field_UnkAC. Else Field_UnkAC steps
+;   (& $7F) and the member replays that entry: Obj_VelX = PartyLog_StepX
+;   when nonzero, Obj_VelY = PartyLog_StepY (its store is skipped when
+;   StepX is nonzero and StepY is 0: it is 0 already),
+;   Obj_PrioLow/High = PartyLog_PrioLow/High; then Party_Member2Anim
+;   for that entry.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3037).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: Party_ObjSlot1's low byte
+;   in Y), DP=$0100 (Party_ObjSlot1 and Field_UnkAB/AC are dp), DB=$00
+;   (Obj_* tables and Map_Unk1D32/1D33 absolute; the log is long).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (Y =
+;   Party_ObjSlot1 or Obj_Cur, by the callee); Field_UnkAC stepped on a
+;   replay; the callees' writes.
+; ------------------------------------------------------------
+Party_UnkA26B:
+    LDY.b !Party_ObjSlot1
+    LDA.b #$00
+    STA.w !Obj_VelX,Y
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D32
+    ORA.w !Map_Unk1D33
+    BEQ .leader_still
+    LDA.b !Field_UnkAB
+    SEC
+    SBC.b !Field_UnkAC
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagMoving
+    BCS .replay
+    LDX.b !Field_UnkAC
+    BRL Party_FollowerHoldAnim
+.leader_still:
+    LDA.b !Field_UnkAB
+    SEC
+    SBC.b !Field_UnkAC
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagStill
+    BCS .replay
+    LDX.b !Field_UnkAC
+    BRL Party_FollowerHoldAnim
+.replay:
+    LDA.b !Field_UnkAC
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAC
+    TAX
+    LDY.b !Party_ObjSlot1
+    LDA.l !PartyLog_StepX,X
+    BEQ .vel_y
+    STA.w !Obj_VelX,Y
+    LDA.l !PartyLog_StepY,X
+    BEQ .prio
+.vel_y:
+    LDA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+.prio:
+    LDA.l !PartyLog_PrioLow,X
+    STA.w !Obj_PrioLow,Y
+    LDA.l !PartyLog_PrioHigh,X
+    STA.w !Obj_PrioHigh,Y
+    BRL Party_Member2Anim
+
+; ------------------------------------------------------------
+; $C0:A2CE — Party_UnkA2CE (109 bytes, $A2CE–$A33A)
+; Member 3's step (kind 2), as Party_UnkA26B on Party_ObjSlot2's
+;   object, following member 2: the lag is Field_UnkAC - Field_UnkAD,
+;   it replays from Field_UnkAD and ends in Party_Member3Anim. The
+;   leader-still hold path zeroes Obj_VelX/VelY a second time before
+;   Party_FollowerHoldAnim (they are 0 already); kept as found.
+; Callers (1 JSR site): Evt_OpB0_PartyControl ($C0:3027).
+; On entry: M=1 (8-bit A), X=1 (8-bit X/Y: Party_ObjSlot2's low byte
+;   in Y), DP=$0100 (Party_ObjSlot2 and Field_UnkAC/AD are dp), DB=$00
+;   (Obj_* tables and Map_Unk1D32/1D33 absolute; the log is long).
+; Exit: M=1, X=1, DP and DB unchanged; A, X and Y clobbered (Y =
+;   Party_ObjSlot2 or Obj_Cur, by the callee); Field_UnkAD stepped on a
+;   replay; the callees' writes.
+; ------------------------------------------------------------
+Party_UnkA2CE:
+    LDY.b !Party_ObjSlot2
+    LDA.b #$00
+    STA.w !Obj_VelX,Y
+    STA.w !Obj_VelY,Y
+    LDA.w !Map_Unk1D32
+    ORA.w !Map_Unk1D33
+    BEQ .leader_still
+    LDA.b !Field_UnkAC
+    SEC
+    SBC.b !Field_UnkAD
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagMoving
+    BCS .replay
+    LDX.b !Field_UnkAD
+    BRL Party_FollowerHoldAnim
+.leader_still:
+    LDA.b !Field_UnkAC
+    SEC
+    SBC.b !Field_UnkAD
+    AND.b #!PartyLog_IdxMask
+    CMP.b #!Party_LagStill
+    BCS .replay
+    LDY.b !Party_ObjSlot2
+    LDA.b #$00
+    STA.w !Obj_VelX,Y                   ; again (quirk)
+    STA.w !Obj_VelY,Y
+    LDX.b !Field_UnkAD
+    BRL Party_FollowerHoldAnim
+.replay:
+    LDA.b !Field_UnkAD
+    INC A
+    AND.b #!PartyLog_IdxMask
+    STA.b !Field_UnkAD
+    TAX
+    LDY.b !Party_ObjSlot2
+    LDA.l !PartyLog_StepX,X
+    BEQ .vel_y
+    STA.w !Obj_VelX,Y
+    LDA.l !PartyLog_StepY,X
+    BEQ .prio
+.vel_y:
+    LDA.l !PartyLog_StepY,X
+    STA.w !Obj_VelY,Y
+.prio:
+    LDA.l !PartyLog_PrioLow,X
+    STA.w !Obj_PrioLow,Y
+    LDA.l !PartyLog_PrioHigh,X
+    STA.w !Obj_PrioHigh,Y
+    BRL Party_Member3Anim
+
+; ============================================================
 ; Location map setup: the map-properties step of a location load
 ; (LocLoad_UnkA33B) with its three callees, which fill the layer sizes,
 ; wrap masks, scroll limits, own-step amounts, screen layers and the
