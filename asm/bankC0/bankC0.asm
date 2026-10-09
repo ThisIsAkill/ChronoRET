@@ -35,9 +35,11 @@ incsrc "../hardware.inc"
 ; Exit: M=1, X=0, DP=$0100 (PLD), DB=$00; A and X clobbered;
 ; Spr_TileCount left at 0; Spr_PrepareTiles and its callees write DP
 ; Spr_BaseX/BaseY ($C3-$C6), Spr_FirstRec ($D9) and Spr_HiBits/HiBitTmp
-; ($E5-$E7). Y is
-; preserved (neither this routine nor its callees touch it), which
-; Oam_BuildShadow relies on: it keeps its bucket index in Y across the call.
+; ($E5-$E7). Y's low
+; byte kept, high byte cleared (SEP #$10 at $C0:E9FF in SprBuf_Free2, and
+; likewise in SprBuf_Free1/3, when Spr_PrepareTiles loads tiles), which
+; Oam_BuildShadow relies on: it keeps its bucket index (below $80, so its
+; high byte is 0 anyway) in Y across the call.
 ; ============================================================
 org $C0B309
 Spr_AppendToOam:
@@ -4821,7 +4823,8 @@ SprBuf_Free2:
 ; Callers (1 JSR site): Spr_PrepareTiles ($C0:B76E).
 ; On entry: M=1, X/Y 16-bit, DP=$0100 (Obj_Cur is dp), DB=$00.
 ; Exit: M=1, X/Y 16-bit (set again on both paths), DP and DB unchanged;
-; A clobbered, X = the start entry found (or 2), Y preserved. Same dead
+; A clobbered, X = the start entry found (or 2), Y's low byte kept, high
+; byte cleared (SEP #$10 at $C0:EA1F). Same dead
 ; LDX.b !Obj_Cur as SprBuf_Free1.
 ; ============================================================
 org $C0EA1F
@@ -10977,8 +10980,9 @@ Evt_OpD9_PartyWalkToTiles:
 ;   Field_Unk* and the scratch are dp; its low byte must be 0: TDC/XBA
 ;   sets B from it), DB=$00 (Obj_* tables and the multiplier
 ;   absolute); Y = the opcode's offset in Evt_Data.
-; Exit: M=1, X=0, DP and DB unchanged; X and C as above; Y unchanged; A
-;   and B clobbered; EvtParty_SavedY = the opcode's offset; on a start
+; Exit: M=1, X=0, DP and DB unchanged; X and C as above; Y unchanged,
+;   but on a start Y's low byte kept, high byte cleared (SEP #$30 at
+;   $C0:34CC); A and B clobbered; EvtParty_SavedY = the opcode's offset; on a start
 ;   EvtParty_SavedX (= the opcode's offset) and Eng_Scratch written.
 ; ------------------------------------------------------------
 Evt_OpDA_PartyGather:
@@ -26541,7 +26545,8 @@ Obj_CalcDirection:
 ; (Obj_Cur, Obj_Direction and ObjVel_Y are dp), DB=$00 (Obj_*,
 ; multiplier registers and the ROM table absolute).
 ; Exit: M=1, X=0 (16-bit, REP #$10 at the end), DP and DB unchanged;
-; A clobbered, X = Obj_Cur, Y unchanged; Obj_VelX/VelXHi/VelY/VelYHi
+; A clobbered, X = Obj_Cur, Y's low byte kept, high byte cleared (SEP
+; #$10 at $C0:AC69); Obj_VelX/VelXHi/VelY/VelYHi
 ; and ObjVel_Y ($DB) written.
 ; ------------------------------------------------------------
 Obj_SetVelocity:
@@ -26665,7 +26670,8 @@ Obj_SetVelocity:
 ; are dp), DB=$00 (Obj_*, the multiplier and the ROM tables absolute;
 ; Map_TileAttrA/B read long).
 ; Exit: M=1, X=0 (16-bit), DP and DB unchanged; A clobbered, X =
-; Obj_Cur, Y = Obj_Cur when a tile was probed (else unchanged);
+; Obj_Cur, Y = Obj_Cur when a tile was probed (else Y's low byte kept,
+; high byte cleared: SEP #$10 at $C0:ACFD);
 ; Obj_VelX / Obj_VelY, maybe Obj_PrioHigh / Obj_PrioLow, Obj_Direction
 ; and Field_Unk0400Copy (after a block) written; ObjVel_* ($D9-$E1,
 ; $E5) scratch.
@@ -31630,7 +31636,9 @@ org $C04D06
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y unchanged; first run: Obj_Direction, ObjDir_*, ObjVel_Y,
+;   Y unchanged on later runs; first run: Y's low byte kept, high byte
+;   cleared (Obj_SetVelocity's SEP #$10 at $C0:AC69); Obj_Direction,
+;   ObjDir_*, ObjVel_Y,
 ;   EvtArc_Gravity ($C1) and ObjFront_SavedY ($C7) written.
 ; ------------------------------------------------------------
 Evt_Op7A_ArcToTile:
@@ -32050,8 +32058,9 @@ Evt_Op9D_MoveDirVar:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op96_WalkToTile:
@@ -32143,8 +32152,9 @@ Evt_Op96_WalkToTile:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op9A_WalkTowardTile:
@@ -32240,8 +32250,9 @@ Evt_Op9A_WalkTowardTile:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op97_WalkToTileVar:
@@ -32344,8 +32355,9 @@ Evt_Op97_WalkToTileVar:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_OpA0_MoveToTile:
@@ -32418,8 +32430,9 @@ Evt_OpA0_MoveToTile:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_OpA1_MoveToTileVar:
@@ -32523,8 +32536,9 @@ Evt_OpA1_MoveToTileVar:
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ;   Evt_Op94_Body: X = the target's slot (16-bit, high byte 0).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op94_WalkToObj:
@@ -32639,8 +32653,9 @@ Evt_Op94_Body:                          ; header: see Evt_Op94_WalkToObj
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ;   Evt_Op9E_Body: X = the target's slot (16-bit, high byte 0).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op9E_MoveToObj:
@@ -32744,8 +32759,9 @@ Evt_Op9E_Body:                          ; header: see Evt_Op9E_MoveToObj
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ;   Evt_Op98_Body: X = the target's slot (16-bit, high byte 0).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ; ------------------------------------------------------------
 Evt_Op98_WalkTowardObj:
@@ -32914,8 +32930,9 @@ Evt_Op95_WalkToPc:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y as on entry, or Obj_Cur when Obj_SetVelocityChecked probed a
-;   tile for a step; Obj_Direction, ObjDir_*, ObjFront_* and
+;   Y as on entry; when a step was set up, Y's low byte as on entry
+;   (high byte cleared by Obj_SetVelocityChecked's SEP #$10), or
+;   Obj_Cur when it probed a tile for the step; Obj_Direction, ObjDir_*, ObjFront_* and
 ;   ObjFront_SavedY ($C7) written when a step was set up.
 ;   EvtFollow_ScrCol/Row ($DB/$DD) written when not near.
 ; ------------------------------------------------------------
