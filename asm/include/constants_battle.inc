@@ -942,4 +942,62 @@ if !constants_battle_inc == 0
 !Battle_GoldCapHi        = $98    ; BankC1_AddGold: the gold cap 9,999,999 = $98967F, high byte
 !Battle_GoldCapLo        = $967F  ; ... its low word
 
+
+; --- Hit modifiers ($C1:ED89-$C1:F204, BattleSys_HitModTable) ---
+!Battle_PlayTimeDiv      = 10     ; BattleSys_HitModPlayTime: Menu_PlayTime+1 mod this picks the factor
+!Battle_PlayTimeKeepFrom = 3      ; ... remainders 1-2 halve the amount, from this on it is kept
+!Battle_PlayTimeAddFrom  = 5      ; ... from this on half of DP $00 is added (a quirk)
+!Battle_PlayTimeDoubleFrom = 7    ; ... from this on doubled
+!Battle_PlayTimeTripleFrom = 9    ; ... from this on tripled
+!Battle_StatusRollTop    = 100    ; BattleSys_HitModRandomStatus: the roll is 0 to this (BattleSys_RollUpTo1A)
+!Battle_StatusByte2      = 1      ; BattleSys_SetStatus's DP $16 for status byte 1 (.Status2)
+!Battle_StatusRoll1Below = 40     ; BattleSys_HitModRandomStatus: a roll below this sets .Status2 bit 2
+!Battle_StatusRoll1Bits  = $04
+!Battle_StatusRoll2Below = 65     ; ... below this, bit 7
+!Battle_StatusRoll2Bits  = $80
+!Battle_StatusRoll3Below = 90     ; ... below this, bit 1
+!Battle_StatusRoll3Bits  = $02
+!Battle_StatusRoll4Below = 100    ; ... below this, bit 6 (100 itself keeps A = $64: the quirk)
+!Battle_StatusRoll4Bits  = $40
+!Battle_Unk47StatusChance = 80    ; BattleSys_HitModUnk47Status: the roll must be at most this
+!Battle_B190Bit7         = $80    ; !Battle_UnkB190 bits BattleSys_HitModUnk6CScale tests in this order:
+!Battle_B190Bit6         = $40    ;   the first one set picks .Unk6C+0, +1, +2, +3
+!Battle_B190Bit5         = $20
+!Battle_B190Bit4         = $10
+!Battle_Unk6CFactorValue = 4      ; BattleSys_HitModUnk6CScale: the amount x this / the .Unk6C value
+!Battle_Unk6CHealBit     = $80    ; BattlerStats.Unk6C+n bit 7: the amount is given back (!Battle_B1FCHealBit)
+!Battle_Unk6CBit6        = $40    ; ... bit 6: the divisor is 2 less
+!Battle_Unk6CValueMask   = $3F    ; ... bits 5-0: the divisor
+!Battle_Unk6CBit6Cut     = 2      ; ... what bit 6 takes off it
+!Battle_HitModRestoreHpBit = $80  ; BattleSys_HitModRestore: DP $1C bit 7: restore the target's HP to .MaxHp
+!Battle_HitModCureBit    = $40    ; ... bit 6: clear its statuses
+!Battle_Unk46Bit7        = $80    ; BattlerStats.Unk46 bit 7: BattleSys_HitModHalveHp / KoOrDrop do not act on it
+!Battle_HpDigitDiv       = 10     ; BattleSys_HitModHpDigit: the caster's HP mod this
+!Battle_AltBoostMaxArg   = 1      ; BattleSys_HitModAltBoost: DP $1E value that makes the amount 9999
+!Battle_AltBoostMul      = 2      ; ... else the amount x this
+
+
+; --- Experience and tech points ($C1:F205-$C1:FA60) ---
+!Battle_TotalCapHi       = $98    ; the 24-bit experience / tech point totals: cap 9,999,999 = $98967F, high byte
+!Battle_TotalCapLo       = $967F  ; ... its low word
+!Battle_TotalCapLoOver   = $9680  ; ... BattleSys_AddExp: a low word from this up becomes !Battle_TotalCapLo
+!Battle_LevelMax         = 99     ; the highest level
+!Battle_GrowStatMax      = 99     ; BattleSys_LevelUpStep: the cap of .Unk0B-.Unk11
+!Battle_GrowStat0DMax    = 50     ; ... and of .Unk0D
+!Battle_GrowDiv          = 100    ; ... the growth is the record byte x (level - 1) / this
+!Battle_StatGrowthSize   = 7      ; bytes per !BattleRom_StatGrowth record
+!Battle_MaxMpCap         = 99     ; BattleSys_GrowHpMp: the max MP cap
+!Battle_ReserveExpMul    = 15     ; BattleSys_AwardReserveExp: a character not in the battle gets x 15 / 20
+!Battle_ReserveExpDiv    = 20
+!Battle_ComboMsgListLen  = 10     ; bytes of !Battle_UnkB305 BattleSys_AwardTechPoints sets to $FF
+!Battle_ComboKinds       = 4      ; !Battle_ComboMasks entries (three pairs, one trio)
+!Battle_ComboRecSize     = 5      ; bytes per !BattleRom_ComboTechs record
+!Battle_ComboReqSize     = 3      ; bytes per tech in a record's requirement list (one per member)
+!Battle_ComboDouble      = 2      ; members of a double tech (message 6)
+!Battle_ComboTriple      = 3      ; members of a triple tech (message 7)
+!Battle_ComboNone        = $FF    ; a !BattleRom_ComboTechs record's first tech id: no techs
+!Battle_TechBit0         = $80    ; the first tech's bit in a !Battle_TechBits1/2/3 byte (the next ones follow down)
+!Battle_TechNeedsUnlock  = $80    ; BattleRom_TechRec.UserSet bit 7: the tech needs the character's !Battle_Unk7F01E0 bit
+!Battle_Unk2FAllTechs    = $10    ; BattlerStats.Unk2F bit 4: all the PC's single techs are learned
+
 endif

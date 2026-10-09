@@ -253,7 +253,9 @@ struct BattlerStats $5E00
 .MaxMp:     skip 2      ; +$36: max MP (inferred: Battle_ApplyHits caps .CurMp at it, as .CurHp at .MaxHp)
             skip 7
 .Unk3F:     skip 1      ; +$3F: Battle_CalcUnk56's input (see .Unk2D); meaning unknown
-            skip 6
+            skip 3
+.TechPtTotal: skip 3    ; +$43: 24-bit; BattleSys_SpendTechPoints adds the battle's !Battle_UnkB2DB to it (capped
+                        ; near 9,999,999): a PC's tech points so far, probably
 .Unk46:     skip 1      ; +$46: an enemy's first of 3 bytes from its BattleRom_EnemyStats record (BattleFD_UnkB438)
 .Unk47:     skip 1      ; +$47: an enemy's bits 0-1 go to !Battle_UnkA020 (BattleFD_UnkB121), bit 1 (inverted) to
                         ; !Battler_Unk9F29 (BattleFD_UnkB0D5); meaning unknown
@@ -265,7 +267,10 @@ struct BattlerStats $5E00
                         ; battle ends; Battle_SetupBattle derives it for a PC whose .Unk2D is 5; meaning unknown
 .Unk57:     skip 1      ; +$57: byte $2A of a PC's character record (BattleFD_UnkAE52); BattleFD_UnkAE99 counts
                         ; the PCs with $A9 here, BattleFD_UnkAEC4 flags those with $AB; meaning unknown
-            skip $0B
+            skip 2
+.TechPtNeed: skip 2     ; +$5A: tech points still needed for the PC's next single tech (BattleSys_TryNextTech
+                        ; pays it from !Battle_UnkB2DB; probably)
+            skip 7
 .Unk63:     skip 1      ; +$63: a caster stat of BattleSys_CalcDamage (kinds 1, 5, 7-9); meaning unknown
 .Unk64:     skip 1      ; +$64: added to turn list 1's timer reload, and (halved, + 8) the divisor of its HP
                         ; amount (BattleSys_ListHandler1); meaning unknown
@@ -1378,7 +1383,8 @@ endstruct
 !Battle_UnkB3C0           = $B3C0 ; 1 B: slot counter of the turn-list countdown (0-10, wraps)
 !Battle_UnkB3C2           = $B3C2 ; 2 B: zeroed by Battle_SetupBattle
 !Battle_UnkB3C4           = $B3C4 ; 2 B: entry counter of the turn-list countdown (0-$8E)
-!Battle_UnkB3E6           = $B3E6 ; 1 B: !Battle_RandIdx as the battle started; not read in bank $C1's matched code
+!Battle_UnkB3E6           = $B3E6 ; 1 B: !Battle_RandIdx as the battle started; then Battle_RandRangeAlt's index into
+                                  ; RandomTableFD (it steps it)
 !Battle_Unk7F01EC         = $7F01EC ; 1 B (long): BattleSys_Main writes 1 before the defeat pose and 0 on the other
                                   ; ends; purpose unknown
 !BattleRom_DebugFlag      = $C1FFFF ; 1 B: the last byte of bank $C1; non-zero enables BattleSys_Main's pad-2 Select
@@ -1388,7 +1394,12 @@ endstruct
 ; !BattleRom_PcStatBlock (BattlerStats[n].Unk2D), so +n here = BattlerStats + $2D + n.
 ; Only the fields that code touches; what they hold is not traced.
 struct PcStatBlk $0000
-            skip $0A
+.CharId:    skip 1      ; +$00 (= BattlerStats.Unk2D): the character id; the experience and tech-point code
+                        ; indexes per-character tables with it (BattleSys_GrowHpMp, BattleSys_AwardTechPoints)
+            skip 4
+.MaxHp:     skip 2      ; +$05 (= BattlerStats.MaxHp); BattleSys_GrowHpMp adds to it, capped at 999
+            skip 2
+.MaxMp:     skip 1      ; +$09 (= BattlerStats.MaxMp, 2 B with .Unk0A); BattleSys_GrowHpMp adds to it, capped at 99
 .Unk0A:     skip 1      ; +$0A: an enemy's bit 0 set = BattleFD_UnkB7EB sets its !Battle_UnkAF15 bit 6 (not counted)
 .Unk0B:     skip 1      ; +$0B-$11: copied to .Unk36-.Unk3C (each + $2B) by BattleSys_UnkCE3A (base values
 .Unk0C:     skip 1      ;   of the stats there, probably)
@@ -1397,7 +1408,9 @@ struct PcStatBlk $0000
 .Unk0F:     skip 1
 .Unk10:     skip 1
 .Unk11:     skip 1
-            skip $0B
+.Level:     skip 1      ; +$12: the level (1-99): BattleSys_ApplyExpStep raises it, the growth uses it
+.Exp:       skip 3      ; +$13: 24-bit experience total (BattleSys_AddExp adds !Battle_UnkB28C, capped)
+            skip 7
 .Status:    skip 1      ; +$1D (= BattlerStats.Status): bit 7 = KO'd (BattleAi_AddPcByByte skips the PC)
             skip 2
 .Unk20:     skip 1      ; +$20 (= BattlerStats.Unk4C+1): bits 5 and 4 make BattleAi_AddPcByByte mark the entry
@@ -1405,7 +1418,11 @@ struct PcStatBlk $0000
 .Unk27:     skip 1      ; +$27: an id from $7B up (BattleSys_UnkCE3A's third record; a helmet, probably)
 .Unk28:     skip 1      ; +$28: an id from $5A up (its second record; armour, probably)
 .Unk29:     skip 1      ; +$29 (= BattlerStats.Unk56)
-            skip $0C
+            skip 1
+.ExpNeed:   skip 2      ; +$2B: experience still needed for the next level (BattleSys_ApplyExpStep; 0 at 99)
+            skip 2
+.GrowBase:  skip 7      ; +$2F-$35: the base values of .Unk0B-.Unk11 BattleSys_LevelUpStep adds the growth to
+                        ; (in the order .Unk0B, 0C, 0D, 0F, 10, 0E, 11)
 .Unk36:     skip 1      ; +$36: added to the bank-$CC byte for .Unk3D (character ids other than 1 and 2)
 .Unk37:     skip 1      ; +$37: summed into .Unk3E
 .Unk38:     skip 1      ; +$38-$3C: with .Unk36/37, set from .Unk0B-.Unk11 by BattleSys_UnkCE3A.
@@ -1501,6 +1518,7 @@ endstruct
                                   ; !Menu_Unk2400); BattleSys_UnkBC60's dead body searches it
 !Battle_InvCounts         = $2500 ; 256 B: the count of each !Battle_InvIds entry, probably
 !BattleTmp_30             = $30   ; 2 B scratch
+!BattleTmp_3B             = $3B   ; 1 B scratch
 !BattleTmp_3D             = $3D   ; 1 B scratch
 
 ; --- Tech MP costs ($C1:CB48-$C1:CCCA) ---
@@ -1556,6 +1574,8 @@ endstruct
 !BattleRom_CharFirstTech  = $FDA89D ; 1 B per character id (0-6, then an end byte): its first single tech id (1, 9,
                                     ; ... $31, then $39); the next character's entry ends the range
 !BattleRom_TechInfo       = $CC1ACB ; 2 B per tech id: byte 0 -> TechMenuRec.TargetMode, byte 1 & $3F -> .Flags
+!Battle_TechCount         = $2830 ; 1 B per character id: single techs learned so far (0-8); the tech-point code
+                                  ; counts it up as it sets the !Battle_TechBits1 bits (BattleSys_LearnSingleTech)
 !Battle_TechBits1         = $2837 ; 1 B per character id: bit 7 down = its 8 single techs in order; a set bit gets
                                   ; a menu entry (BattleSys_UnkC96A), so probably "learned"
 !Battle_TechBits2         = $283E ; double techs $39-$65, 3 per byte from bit 7 (BattleSys_UnkCA1A)
@@ -1714,5 +1734,46 @@ endstruct
 !Battle_SvcArg            = $AEF7 ; 2 B: BankC1_RunService's argument Y, kept by each service
 !Battle_SvcSlot           = $AEF9 ; 2 B: BankC1_AddItem's first empty entry (0 if none); BankC1_RemoveGold's new low word
 !Battle_SvcSlotFound      = $AEFB ; 1 B: BankC1_AddItem: non-zero once an empty entry was found
+
+
+; --- Hit modifiers ($C1:ED89-$C1:F204) ---
+!Battle_EmptyPcCount      = $AD9A ; 1 B: PC slots 0-2 with no PC (!Battler_UnkAEFF $FF), counted by BattleSys_HitModPerEmptyPc
+!Battle_SavedTargetMasks  = $AE58 ; 2 B: !Battle_ActMainMask | !Battle_ActTargetMask as BattleSys_HitModKoOrDrop
+                                  ; found them before dropping the target; not read in matched code
+!Battle_Unk6CIndex        = $B2CD ; 1 B: BattleSys_HitModUnk6CScale: n (0-3), the target's .Unk6C+n byte used
+!Battle_Unk6CDivisor      = $B2CE ; 1 B: ... that byte, then its divisor (bits 5-0, less 2 with bit 6)
+!Battle_Unk6CFactor       = $B2CF ; 1 B: ... the factor, 4 (!Battle_Unk6CFactorValue)
+
+
+; --- Experience and tech points ($C1:F205-$C1:FA60) ---
+!Battle_RosterBits        = $AE79 ; 2 B: zeroed, then the low byte of !Menu_Unk29AF, shifted left once per character id
+                                  ; (bit 7 = the id being looked at is in the roster; BattleSys_AwardReserveExp)
+!Battle_ExpRec            = $B285 ; 2 B: address of the stat block (or character record) being levelled up
+!Battle_ExpRecOther1      = $B287 ; 2 B: BattleSys_AwardExpAndTp's other two PC blocks; not read in matched code
+!Battle_ExpRecOther2      = $B289 ; 2 B
+!Battle_NoLevelUp         = $B28B ; 1 B: 0 when BattleSys_ApplyExpStep raised the level, $FF when not
+!Battle_GrowthRec         = $B294 ; 2 B: address in bank $CC of the character's !BattleRom_StatGrowth record
+!Battle_RewardLoop        = $B2D0 ; 1 B: PC slot (0-2), then combination (0-3), of BattleSys_AwardTechPoints
+!Battle_TpCharId          = $B2D1 ; 1 B: the character id BattleSys_SpendTechPoints works on
+!Battle_ComboRecIdx       = $B2D2 ; 1 B: index of the !BattleRom_ComboTechs record found (its !Battle_TechBits2 byte)
+!Battle_ComboPcBit        = $B2D3 ; 3 B: $80 >> character id of PC slots 0-2 (0 for an empty slot), sorted up
+!Battle_ComboMasks        = $B2D6 ; 4 B: the three pairs and the trio of those bits (BattleSys_BuildComboMasks)
+!Battle_TpLearned         = $B2DA ; 1 B: 0 when BattleSys_TryNextTech paid for a tech, $FF when not
+!Battle_ComboMask         = $B2DE ; 1 B: the combination BattleSys_LearnComboTechs works on
+!Battle_ComboTechBit      = $B2DF ; 1 B: the current tech's bit in its !Battle_TechBits2/3 byte ($80 down)
+!Battle_ComboTechsLeft    = $B2E0 ; 1 B: techs of the record still to look at
+!Battle_ComboCounts       = $B2E1 ; 8 B: each member's !Battle_TechCount, in character id order, $FF-ended
+!Battle_ComboLacking      = $B2E9 ; 1 B: $FF when a member lacks the singles for the current tech; not read
+!Battle_ComboTechId       = $B304 ; 1 B: the current tech's id (record byte 1, counted up)
+!Battle_Unk7F01E0         = $7F01E0 ; 1 B (long): bit n (1 << character id) lets a tech whose BattleRom_TechRec.UserSet
+                                  ; has bit 7 be paid for with tech points (BattleSys_TryNextTech); set elsewhere
+!BattleRom_HpGrowth       = $CC258A ; 8 B per character id: 4 (top level, HP gain) pairs (BattleSys_GrowHpMp)
+!BattleRom_MpGrowth       = $CC25C2 ; 8 B per character id: the same for MP
+!BattleRom_StatGrowth     = $CC25FA ; 7 B per character id: growth of .Unk0B, 0C, (unused), 0F, 10, 0E, 11 per level
+!BattleRom_ExpToLevel     = $CC2632 ; 2 B per level: experience needed to reach the next one
+!BattleRom_TechTpCost     = $CC26FA ; 2 B per tech, 8 per character id (16 B): the tech points for it
+!BattleRom_CharTechs      = $CC276A ; 2 B per character id: its first single tech id, then how many it has
+!BattleRom_ComboTechs     = $CC2778 ; 5 B per record, $FF-ended: the members' $80 >> id bits, the first tech id ($FF:
+                                  ; none), the number of techs, and the address in bank $CC of their requirements
 
 endif

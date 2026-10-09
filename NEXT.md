@@ -93,14 +93,26 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `TestEnemyUnk46`, `AdjustHit`, `AdjustEvade`, `ArmStatusList`, `CalcDamage`, `WakeTarget`,
    `AdjustDefence`, `RollUpTo1A`, `DrainHpMp`), `BattleSys_StealItem` / `RunUnkB2CCHandlers`
    (`$C1:E9D5`-`$C1:EA9C`), `BattleSys_RunUnkB2CCHandler` (`$C1:EB1C`) with
-   `BattleSys_UnkB2CCHandlerTable` (`$C1:FA61`), and `$C1:CFBE`-`$C1:D131` (`BattleAi_EnemyTurnJsr`,
-   `BankC1_RunService`, the six inventory / gold services and `BankC1_ServiceTable`). Next, in
-   reach order: the B2CC handlers `BattleSys_UnkB2CCHandler00`-`14` (stubs, `$C1:ED89`-`$C1:F1EF`
-   and on; the second `Battle_ScaleWord10` caller is at `$C1:EE44`); the other `BattleSys_SetStatus`
-   callers `$C1:EECC`-`$C1:EF10` and `BattleSys_RollUpTo1A`'s at `$C1:EEA3` sit in them; the script handlers themselves (stubs `BattleAi_TestNN`
+   `BattleSys_HitModTable` (`$C1:FA61`, was `BattleSys_UnkB2CCHandlerTable`), and `$C1:CFBE`-`$C1:D131`
+   (`BattleAi_EnemyTurnJsr`, `BankC1_RunService`, the six inventory / gold services and
+   `BankC1_ServiceTable`). Also matched (the hit-modifier / experience batch): the 21 hit modifiers
+   `BattleSys_HitMod*` (`$C1:ED89`-`$C1:F204`, the B2CC handlers: damage scalers, chance statuses,
+   HP cuts, the element-like `.Unk6C` scale, the steal roll), the unreferenced `BattleSys_AddBattleItem`
+   (`$C1:EFD3`) and `BattleSys_ReviveHeal` (`$C1:EB49`), `Battle_RandRangeAlt` (`$C1:AF79`, the
+   `!Battle_UnkB3E6` stream), the battle-end clears `BattleSys_ClearPcStatuses` / `ClearPcKo`
+   (`$C1:EA9D`-`$C1:EB0D`), and the experience and tech points `$C1:F205`-`$C1:FA60`
+   (`BattleSys_AwardExpAndTp`, was `UnkF93E`, with `AddExp`, `LevelUpStep`, `ApplyExpStep`,
+   `GrowHpMp`, `AwardReserveExp`, `AwardTechPoints`, `BuildComboMasks`, `SpendTechPoints`,
+   `TryNextTech`, `LearnSingleTech`, `LearnComboTechs`). Open from it: what the `!BattleRom_UnkCC2A05`
+   records stand for (which techs / weapons use which modifier), `BattlerStats.Unk46` bit 7, `.Unk47`,
+   `.Unk6C` (element resistances, probably) and `!Battle_UnkB190`'s bits, `!Battle_Unk7F01E0` (who
+   sets it; magic, probably), the double counting of tech points in `BattleSys_SpendTechPoints`
+   (a quirk as the code reads; worth a check in an emulator), and who reads `!Battle_SavedTargetMasks`.
+   Headers edited by it (back to review): BattleSys_Main (the renamed calls), BattleSys_RunUnkB2CCHandler,
+   BattleSys_HitModTable (renamed), BattleSys_RollUpTo1A, RandomTableFD and BattleFD_UnkAD17. Next, in
+   reach order: the script handlers themselves (stubs `BattleAi_TestNN`
    `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
-   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`); the action callee `$C1:AF79` (a second Battle_RandRange on
-   `!Battle_UnkB3E6`, called from `$C1:ED95`); the end callees `BattleSys_UnkEA9D`/`EAE8`/`F93E`;
+   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`);
    the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
    (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
    `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
