@@ -631,7 +631,8 @@ if !constants_engine_inc == 0
 !FieldBtl_PpuUnk6A = $02                 ; FieldBtlPpu.Unk6A (CGWSEL position)
 !FieldBtl_PpuUnk6E = $09                 ; FieldBtlPpu.Unk6E
 !Evt_RedirectPos = $16FF                 ; Obj_ScriptPos Evt_RedirectObjScript sets (an Evt_Data
-                                         ; offset; what is there is not traced)
+                                         ; offset: Map_Unk7F3700's block 0, a walk to the leader;
+                                         ; see the banner of Evt_OpD9_PartyWalkToTiles)
 
 ; --- Object motion and view test (Vblank_UnkA810 and its steps) ---
 !Obj_Unk1100FreeMove = $03               ; Obj_Unk1100 below this: Vblank_UnkA810 moves the object
@@ -839,10 +840,11 @@ endif
                                          ; below this
 !Obj_Unk1B01Push = $02                   ; Obj_Unk1B01 bit 1: Evt_PushTarget may move the object
 !Field54_Push = $02                      ; Field_Unk54 bit 1: set by Evt_PushTarget when it sends an
-                                         ; object off; no other push starts while it is set (who
-                                         ; clears it is not traced)
+                                         ; object off; no other push starts while it is set (event
+                                         ; opcode $FF $9D, Evt_OpFF9D_ClearPush, clears it)
 !Evt_PushScriptPos = $177F               ; Obj_ScriptPos Evt_PushTarget gives the object (an Evt_Data
-                                         ; offset; what is there is not traced)
+                                         ; offset: Map_Unk7F3700's fifth block, seeded 96 col row,
+                                         ; then FF 9D 00, from LocLoad_Unk7F3700Init_Rec4)
 !Evt_PushTileOfs = $1780                 ; Evt_Data offset where Evt_PushTarget stores the target
                                          ; tile (column, row): the byte after Evt_PushScriptPos
 
@@ -851,3 +853,150 @@ endif
                                          ; Field_Unk2D (the pointer's bank) 0
 !Evt_ChoiceMask = $03                    ; bits 0-1 / 2-3 of a choice message's operand: Field_Unk65
                                          ; / Field_Unk64
+
+; --- Event party walk / gather opcodes ($D9/$DA) ---
+!Obj_FacingUp = $00                      ; Obj_Facing values (Rom_DirToFacing, Evt_OpA6_Face)
+!Obj_FacingDown = $01
+!Obj_FacingLeft = $02
+!Obj_FacingRight = $03
+!Evt_PartyWalkPos0 = $171F               ; Obj_ScriptPos Evt_OpD9 gives the leader: the Evt_Data
+                                         ; offset of Map_Unk7F3700's block 1 ($7F:3720)
+!Evt_PartyWalkPos1 = $173F               ; ... member 2: block 2 ($7F:3740)
+!Evt_PartyWalkPos2 = $175F               ; ... member 3: block 3 ($7F:3760)
+!EvtD9_TileMask = $7F                    ; Evt_OpD9's column / row operand bits 0-6 (bit 7: facing)
+!EvtD9_AllThere = $04                    ; Evt_PartyWalkCount once every member sent has arrived
+!EvtD9_Count3Sent = $01                  ; Evt_PartyWalkCount after sending three members
+!EvtD9_Count2Sent = $02                  ; ... two
+!EvtD9_Count1Sent = $03                  ; ... the leader alone
+!Field54_Gather = $01                    ; Field_Unk54 bit 0: Evt_OpDA_PartyGather has sent members off
+!EvtDA_AllThere = $03                    ; Field_Unk7F03FE once every member sent has arrived
+!EvtDA_Count2Sent = $01                  ; Field_Unk7F03FE after sending members 2 and 3
+!EvtDA_Count1Sent = $02                  ; ... member 2 alone
+
+; --- Event item, gold, character and battle opcodes ($33, $C7-$D8) ---
+!Field54_Unk80 = $80                     ; Field_Unk54 bit 7: set by Evt_Op33_SetPalette (no reader
+                                         ; traced)
+!BankC1Svc_FindItem = $00                ; BankC1_Entry8003 service: A = item Y's id when it is in the
+                                         ; inventory ids at $7E:2400, else 0 ($C1:CFE9)
+!BankC1Svc_RemoveItem = $02              ; ... one fewer of item Y ($C1:D056)
+!BankC1Svc_HasGold = $03                 ; ... A nonzero when the gold is at least Y ($C1:D086)
+!BankC1Svc_RemoveGold = $05              ; ... takes Y off the gold when there is that much ($C1:D0ED)
+!BankC2Cmd_FindInParty = $00             ; BankC2_Entry8004 commands (Menu_Unk8C36's table at
+                                         ; $C2:8C5B, Y = a character): A = 0 when it is in the party
+!BankC2Cmd_AddToParty = $01              ; ... put it in the party
+!BankC2Cmd_PartyToReserve = $02          ; ... move it from the party to the reserve
+!BankC2Cmd_FindListed = $03              ; ... A = 0 when it is anywhere in Menu_PartyOrder
+!BankC2Cmd_AddToReserve = $04            ; ... add it to the reserve unless listed
+!BankC2Cmd_Unlist = $05                  ; ... empty its place in Menu_PartyOrder
+!BankC2Cmd_Unk0A = $0A                   ; ... not traced (Y = a character, probably; X = an argument)
+!BankC2Cmd_ItemCount = $0C               ; ... A = the count of item X held (X, not Y)
+!ObjQ_Unk78Set1 = $01                    ; ObjQ_Unk78 value Evt_OpD3_AddCharToParty stores; the next
+                                         ; member 2 / 3 Evt_InitCharCommon sets up turns it into
+                                         ; ObjQ_Unk78Head
+!Obj_Unk1100Leader = $00                 ; Obj_Unk1100 of the leader's object (Evt_OpB0_PartyControl's
+                                         ; kind 0)
+!Obj_Unk1100Member2 = $01                ; ... of party member 2 (kind 1); member 3 is kind 2
+!Obj_Unk1100Out = $03                    ; Obj_Unk1100 Evt_OpD4 / Evt_OpD6 give an object leaving
+                                         ; the party
+!Pal_PartyRow0 = $7E21A0                 ; Pal_Buf row of sprite palette slot 5 (party kind 0)
+!Pal_PartyRow1 = $7E21C0                 ; ... slot 6 (kind 1)
+!Pal_PartyRow2 = $7E21E0                 ; ... slot 7 (kind 2)
+!Pal_RowCopyCount = $001F                ; MVN count - 1: one 16-colour palette row (32 bytes)
+
+; --- Event location, sound, fade and map opcodes ($DC-$FA) ---
+!Field_Unk1EOn = $01                     ; Field_Unk1E value Evt_OpDE / Evt_OpDF store
+!Audio_Cmd18 = $18                       ; sound-driver command Evt_OpE8 sends (bank $C2's
+                                         ; C2Scene_SoundCmd18; meaning not traced)
+!Audio_Cmd18Arg1 = $80                   ; its Audio_CmdArg1
+!Audio_Cmd82 = $82                       ; sound-driver commands Evt_OpEB sends after Audio_CmdUnk81
+!Audio_Cmd83 = $83                       ; (meanings not traced)
+!Audio_Cmd82Arg1 = $FF                   ; Audio_CmdArg1 of both
+!Apuio3_BusyMask = $0F                   ; APUIO3 bits Evt_OpEE_WaitApuio3 waits on (not traced)
+!EvtFade_DelayMask = $0F                 ; Evt_OpF0's operand bits 0-3: frames between steps
+!EvtFade_DelayMask7 = $7F                ; Evt_OpF1's speed operand bits 0-6: frames between steps
+!Fade_ChannelMask = $E0                  ; Fade_FixedColor bits 5-7: the COLDATA channel bits
+!Fade_IntensityMask = $1F                ; Fade_FixedColor bits 0-4: the intensity
+!FadeFlag_Unk10 = $10                    ; Field_FadeFlags bit 4: set with FadeFlag_FixedColor by
+                                         ; Evt_OpF1_FadeFixedColor (no reader traced)
+!EvtFade_MathAdd = !Layer_Bg123Obj       ; Ppu_Unk0BE0 for an adding fixed-colour fade: CGADSUB add
+                                         ; on BG1-3 and OBJ
+!EvtFade_MathSub = $97                   ; ... subtracting (CGADSUB bit 7 + BG1-3 and OBJ)
+!MapCopy_LayerBits = $07                 ; Field_Unk44 bits 0-2 (MapCopy_L1-L3): the layers
+!BankC2Cmd_Unk06 = $06                   ; BankC2_Entry8004 commands of Evt_OpF8-FA (see
+!BankC2Cmd_Unk07 = $07                   ; Evt_OpF8_BankC2Cmd06And07)
+!BankC2Cmd_Unk08 = $08                   ; ... of Evt_OpFF9F_BankC2Cmd08
+
+; --- Event credits, layer-3 and window-effect opcodes ($29-$2F, $32, $FE, $FF) ---
+!Credits_GfxPack = $FD0000               ; ROM pack Credits_LoadGfx unpacks (probably the credits font)
+!Credits_GfxBytes = $0400                ; bytes of it Credits_LoadGfx uploads to VRAM
+!Credits_BlockMask = $7F                 ; Evt_Op29's block operand bits 0-6 (bit 7 picks Field_Unk0BE9)
+!Field_Unk0BE9Set1 = $01                 ; Field_Unk0BE9 by Evt_Op29: block operand bit 7 clear
+!Field_Unk0BE9Set2 = $02                 ; ... bit 7 set
+!Field54_Bit2 = $04                      ; Field_Unk54 bit 2 (Evt_Op2A): the low bit of Field54_MapReq
+!Field54_Bit3 = $08                      ; Field_Unk54 bit 3 (Evt_Op2B): the high bit of Field54_MapReq
+!EvtQuad_Values = $08                    ; Evt_OpFE's start/end pairs: X and Y of four points
+!EventHook_WinGrow0 = $01                ; Field_EventHook values the $FF and $FE opcodes set: hook 1
+!EventHook_WinShrink0 = $02              ; hook 2
+!EventHook_WinC3E = $03                  ; hook 3
+!EventHook_WinGrow1 = $04                ; hook 4
+!EventHook_WinShrink1 = $05              ; hook 5
+!EventHook_WinQuad = $06                 ; hook 6
+!EventHook_LeaveToBankC3 = $0B           ; hook 11
+!EventHook_WinPulse = $0C                ; hook 12 (it ends at EventHook_Idle)
+!EventHook_WinShrink1Off = $0E           ; hook 14
+!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95
+!WinFx_C3EMode2 = $02                    ; (what BankC3_Entry000E does with them is not traced)
+!WinFx_SizeBit0 = $01                    ; WinFx_Size bit 0 (Hdma_InitChannelsFD's channel-7 choice)
+!WinFx_SizeBit1 = $02                    ; WinFx_Size bit 1: hook 3 leaves the window on when set
+!EvtFF_FirstSub = $90                    ; opcode $FF's second byte: first Evt_OpFFTable entry
+!EvtFF_SubFFF1 = $80                     ; ... JML FdVec_FFF1
+!EvtFF_SubFFEB = $81                     ; ... JML FdVec_FFEB
+!EvtFF_SubFFE8 = $82                     ; ... JML FdVec_FFE8 ($83-$8F: FdVec_FFE5)
+!EvtFF_FadeLast = $01                    ; Evt_OpFF_Misc's fade steps while Fade_Brightness >= this
+
+; --- Event character and sprite-object opcodes ($57-$6D one-byte, $80, $81) ---
+!Obj_Unk1100Member3 = $02                ; Obj_Unk1100 of party member 3's object (kind 2)
+!Obj_Unk1100Kind3 = $03                  ; Obj_Unk1100 Evt_Op81_InitSprite gives its object
+!Obj_Unk1A81On = $01                     ; Obj_Unk1A81 the character opcodes set (frames built)
+!ObjQ_Unk78Head = $02                    ; ObjQ_Unk78: Obj_AnimTickAndQueue queues the next kind-1/2
+                                         ; object at the head once
+!Obj_FacingMask = $03                    ; Obj_Facing values 0-3 (Loc_EntryFacing bits 0-1)
+!Loc_EntrySubYBit = $08                  ; Loc_EntryFacing bit 3: Obj_PosY low byte EvtChar_SubYUpper
+!Loc_EntrySubXBit = $04                  ; Loc_EntryFacing bit 2: Obj_PosX low byte 0
+!EvtChar_SubYLower = $FF                 ; Obj_PosY low byte with bit 3 clear (the tile's last line)
+!EvtChar_SubYUpper = $7F                 ; ... with bit 3 set (half way down)
+!EvtChar_SubXCentre = $80                ; Obj_PosX low byte with bit 2 clear (half way across)
+!EvtChar_ScriptPeriod = $01              ; Obj_Unk1000 low bits for a party member: a run every frame
+!EvtChar_VramTile0 = $0008               ; Obj_VramTile of the leader's object
+!EvtChar_VramTile1 = $0020               ; ... of member 2's
+!EvtChar_VramTile2 = $0028               ; ... of member 3's
+!EvtChar_TileRecOfs1 = $0020             ; Obj_TileRecOfs of member 2's object (the leader's is 0)
+!EvtChar_TileRecOfs2 = $0040             ; ... of member 3's
+!RomE4_SprRec = $E4F000                  ; ROM: sprite records, SprRec_Bytes each (records 0-6: the
+                                         ; seven characters)
+!SprRec_Gfx = 0                          ; record byte: index of a 3-byte pointer at Field_E4Ptr0
+!SprRec_Frames = 1                       ; ... of a 3-byte pointer at Field_E4Ptr1
+!SprRec_Pal = 2                          ; ... palette number (x Pal_ObjColorBytes: Obj_PalSrc)
+!SprRec_Anim = 3                         ; ... of a word at Field_E4Ptr2 / Field_E4Ptr3
+!SprRec_Size = 4                         ; ... Obj_SprSize
+!SprRec_Bytes = 5                        ; bytes per RomE4_SprRec record
+!Pal_ObjColorBytes = $18                 ; bytes of one Obj_PalSrc colour set (12 colours)
+!Obj_PalSrcBase = $0000                  ; added to the palette offset (nothing)
+!EvtSpr_PrioInit = $2020                 ; Obj_PrioLow/High word: OAM attribute bit 5 (priority bit 1)
+                                         ; in both (FieldBtl_PcPrio's bit)
+
+; --- Event sprite-object opcodes $82/$83 (graphics unpacked to bank $7F) ---
+!Obj_Unk1100Kind4 = $04                  ; Obj_Unk1100 Evt_Op82_InitWramSprite gives its object
+!Obj_Unk1100Kind5 = $05                  ; ... Evt_Op83_InitEnemySprite
+!Obj_Unk1100Kind6 = $06                  ; ... Evt_Op83_InitEnemySprite with its slot operand's bit 7
+!SprRec_FirstNpc = 7                     ; RomE4_SprRec record of Evt_Op82's operand 0 (after the
+                                         ; seven characters)
+!RomE4_NpcSprRec = !RomE4_SprRec+(!SprRec_FirstNpc*!SprRec_Bytes) ; record SprRec_FirstNpc ($E4:F023)
+!RomE4_EnemySprRec = $E4F600             ; ROM: Evt_Op83's records, EvtSpr_EnemyRecBytes each (the
+                                         ; first five bytes as a RomE4_SprRec record)
+!EvtSpr_EnemyRecBytes = $0A              ; bytes per RomE4_EnemySprRec record
+!EvtSpr_RomGfxMin = $F8                  ; Evt_Op83 operands from here on use ROM graphics as they are
+!EvtSpr_SlotMask = $7F                   ; Evt_Op83's slot operand bits 0-6: the tile slot - 1
+!ObjSpr_SizeLarge = $03                  ; Obj_SprSize size class 3 (24 tiles, Spr_LoadLargeObj)
+!Halt_ColorWramGfxFull = $7C1F           ; Sys_HaltWithColor colour when ObjQ_Unk71 runs past the end
+                                         ; of bank $7F (opcodes $82/$83)
