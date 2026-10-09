@@ -653,7 +653,9 @@ C2Scene_VramQInit:
 ; Entry: M=1 (8-bit A), X=0, DP=$0000 (queue on the direct page), DB=$00
 ;        (absolute DMA and PPU registers)
 ; Exit:  M=1, X=0 (SEP #$10 for the loop, REP #$10 after); after a flush
-;        A = bank(C2Scene_VramQBuf) and X = its address; Y, DP and DB
+;        A = bank(C2Scene_VramQBuf) and X = its address, and Y's low byte
+;        kept, high byte cleared (SEP #$10 at $C2:040F; C2Scene_NmiHandler
+;        saves and restores Y itself); Y unchanged otherwise; DP and DB
 ;        unchanged
 ; No calls.
 org $C20405
@@ -1750,8 +1752,9 @@ C2Scene_EdgeRowSetup:
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
 ;        C2Scene_EdgeCol = the column's BG pixel X, C2Scene_ScrollVramMap
 ;        set
-; Exit:  M=0, X=0; A = the new buffer pointer; X = the entry's offset; Y
-;        unchanged; C2Scene_EdgeCol = the VRAM address
+; Exit:  M=0, X=0; A = the new buffer pointer; X = the entry's offset; Y's
+;        low byte kept, high byte cleared (SEP #$30 at $C2:0923);
+;        C2Scene_EdgeCol = the VRAM address
 ; No calls.
 C2Scene_QueueEdgeCol:
     LDA.b !C2Scene_EdgeCol
@@ -1805,7 +1808,8 @@ C2Scene_QueueEdgeCol:
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
 ;        C2Scene_EdgeRow = the row's BG pixel Y, C2Scene_ScrollVramMap set
 ; Exit:  M=0, X=0; A = the new buffer pointer; X = the first entry's
-;        offset; Y unchanged; C2Scene_EdgeCol / C2Scene_EdgeRow = the two
+;        offset; Y's low byte kept, high byte cleared (SEP #$30 at
+;        $C2:0972); C2Scene_EdgeCol / C2Scene_EdgeRow = the two
 ;        VRAM addresses
 ; No calls.
 C2Scene_QueueEdgeRow:
@@ -25017,8 +25021,9 @@ Menu_GradientSteps:
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E (the
 ;        inventory)
 ; Exit:  P and X restored; A = 0 (added), Menu_InvFull (no free slot) or
-;        the id (0, $5A, $7B, $94: not added); Y unchanged;
-;        Menu_ItemSlot as Menu_FindItem left it
+;        the id (0, $5A, $7B, $94: not added); Y unchanged with X=1 at
+;        entry; with X=0 its high byte is cleared by the SEP #$30
+;        ($C2:8793); Menu_ItemSlot as Menu_FindItem left it
 ; Calls: Menu_FindItem.
 Menu_AddItem:
     PHX
@@ -25068,7 +25073,8 @@ Menu_ItemSetCount:                      ; header: see Menu_AddItem
 ; Callers (5 JSR sites): unmatched ($C2:8E13, $C2:9CD9, $C2:B331, $C2:D6A2, $C2:D7AA).
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E
 ; Exit:  P and X restored; A = 0 (taken or id 0), Menu_ItemShort or
-;        Menu_InvFull (not found); Y unchanged
+;        Menu_InvFull (not found); Y unchanged with X=1 at entry; with
+;        X=0 its high byte is cleared by the SEP #$30 ($C2:87D7)
 ; Calls: Menu_FindItem.
 Menu_RemoveItem:
     PHX
