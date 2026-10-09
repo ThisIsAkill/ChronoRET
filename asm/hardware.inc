@@ -97,6 +97,18 @@ if !hardware_inc == 0
 !BG2SC_6000_32x64      = $62  ; BG2 map at VRAM word $6000, 32x64 tiles
 !BG3SC_6800_32x64      = $6A  ; BG3 map at VRAM word $6800, 32x64 tiles
 !BG34NBA_Bg3At7000     = $07  ; BG3 tiles at VRAM word $7000, BG4 at $0000
+!BBAD_VMDATAH          = $19  ; B-bus address of VMDATAH ($2119)
+!BBAD_COLDATA          = $32  ; B-bus address of COLDATA ($2132)
+!HDMAEN_Ch1            = $02  ; bit 1: HDMA channel 1
+!CGADSUB_AddBackdrop   = $20  ; colour math on the backdrop only, add, not halved
+!BBAD_M7A              = $1B  ; B-bus address of M7A ($211B)
+!BBAD_M7B              = $1C  ; B-bus address of M7B ($211C)
+!BBAD_M7C              = $1D  ; B-bus address of M7C ($211D)
+!BBAD_M7D              = $1E  ; B-bus address of M7D ($211E)
+!DMAP_OneRegTwice      = $02  ; transfer mode 2: one B-bus register written twice
+!HDMAEN_Ch2To5         = $3C  ; bits 2-5: HDMA channels 2, 3, 4 and 5
+!CGWSEL_MathInWinFixed = $10  ; bits 5-4 = 01 (no colour math outside the colour window), fixed colour
+!OBSEL_Size8And16_Base6000 = $03 ; size %000 = 8x8 and 16x16 sprites, sprite tiles at VRAM word $6000
 
 ; ------------------------------------------------------------
 ; PPU — Picture Processing Unit ($2100–$213F)

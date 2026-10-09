@@ -427,13 +427,32 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    same song either way. Stubs added: `C2Scene_Unk2273`/`Unk2277` (probably cos/sin of a
    256-step direction) and `C2Scene_Unk229D` (probably the direction between two points), in the
    unmatched $C2:2273-$C2:232C; `BankC6_UnkE74E` (tile-in-rectangle test) and `BankC6_UnkE797`
-   (per-location landing check of object A). Open from it: who sets `C2Scene_ObjAFlag5`,
-   `C2Scene_ObjANextLoc` (probably `C2Scene_Unk6A34`), `C2Scene_SpotX/Y`, the mates' `.Slot`;
-   who starts the object, mark, mate and label tasks; what objects A and B are; what sound
-   commands $86 and $18 (with $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`. Next, in reach order:
-   the mode sub-programs `C2Scene_Unk631F`
-   (mode 6, BG mode 7, $C2:631F on) and `C2Scene_Unk6A34` (mode 8); the menu's
-   own NMI ($C2:8410-$C2:84D1, which also calls `Menu_PollPad` and `Menu_TickPlayTime`) and
+   (per-location landing check of object A). Also matched (branch match-c2-modes2): the map
+   view of mode 6, `C2Scene_MapView` with its picture builders (`C2Scene_MapViewBuild`,
+   `MapTileColors`, `MapDrawPixels`, `MapCellPixels`, `MapFilterColor`, `MapBuildTilemap`), the
+   zoom task `C2Scene_TaskMapZoom` and its states and matrix (`C2Scene_MapZoomMatrix`/
+   `MapZoomDivide`), the three marker tasks, the gradient and label set-up and their
+   scripts/animations ($C2:631F-$C2:6A33); the dial of mode 8, `C2Scene_Dial` with
+   `C2Scene_TaskDial` (pick one of seven locations, `C2Scene_DialLocs`; the result goes to
+   `C2Scene_ObjANextLoc`, which object A's `C2Scene_ObjAAfterMode8` reads), the hand rasterizer
+   `C2Scene_DialDrawHand` (window 1 by HDMA), `C2Scene_TaskSwirl` (per-line mode-7 matrix by
+   HDMA), the marker tasks, the loader `C2Scene_DialLoad` and its helpers and scripts
+   ($C2:6A34-$C2:754C); the menu's NMI `Menu_Nmi`, `Menu_Irq`, `Menu_NmiPad` and
+   `Menu_RepeatDelays` ($C2:840E-$C2:84D1). That batch renamed `C2Scene_Unk631F`/`Unk6A34` to
+   `C2Scene_MapView`/`C2Scene_Dial` and so edited the verified C2Scene_Mode6 and C2Scene_Mode8,
+   and fixed now-false caller notes in C2Scene_WaitOneFrame, Trig_Cos1024, TextWin_Init,
+   TextWin_Step, Menu_PollPad and Menu_TickPlayTime; merging it with match-c2-objects also
+   edited the verified `C2Scene_ObjAAfterMode8` header and the object A banner (the dial now
+   proven to set `C2Scene_ObjANextLoc`): all need review again. Open: who sets
+   `C2Scene_ObjAFlag5`, `C2Scene_SpotX/Y`, the mates' `.Slot`; who starts the object, mark,
+   mate and label tasks; what objects A and B are; what sound commands $86 and $18 (with
+   $AC-$AE, $C8) do; `C2Scene_Unk7F00CC/CD`; what the label strings ($C6:F400 table, numbers
+   $6A-$6F) and the dial's pack data show; what `C2Scene_MapFilterColor`'s hidden colours are;
+   `C2Scene_DialFlagBit2`; `Menu_Unk83`, `Menu_NmiTimer` and `Menu_Unk85D6` (the menu NMI's
+   upload); which RAM vector the JMLs at $C2:8406/$C2:840A sit behind. Next, in reach order:
+   the code after the dial's scripts ($C2:754D on, starts with `JSR C2Scene_Random`); the
+   unmatched $C2:2273-$C2:232C (`C2Scene_Unk2273/2277/229D`); `Menu_Unk85D6`, the vector JMLs
+   ($C2:8406-$C2:840D) and
    `BankC2_MenuEntry` ($C2:800E); `Menu_Unk8C36`, the command handler behind
    `BankC2_Entry8004`. Open in the loader: what the `Unk` packs ($7E:7000, $7E:7200, $7E:B800,
    $7E:C000, $7E:C600, $7E:C800) and the four lists `C2Scene_ListA`-`D` hold; the code at

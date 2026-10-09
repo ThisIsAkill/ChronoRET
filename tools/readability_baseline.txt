@@ -63,7 +63,6 @@ asm/bankC2/bankC2.asm:C2Scene_NegateYVel DPDB
 asm/bankC2/bankC2.asm:C2Scene_TaskCallHandler DPDB
 asm/bankC2/bankC2.asm:C2Scene_TaskSpawnLow DPDB
 asm/bankC2/bankC2.asm:C2Scene_TaskSpawnScriptLow DPDB
-asm/bankC2/bankC2.asm:C2Scene_WaitOneFrame DPDB
 asm/bankC2/bankC2.asm:C2Script_GoToLocation DPDB
 asm/bankC2/bankC2.asm:C2Script_Halt DPDB
 asm/bankC2/bankC2.asm:C2Script_MoveFrames DPDB
