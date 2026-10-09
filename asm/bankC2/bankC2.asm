@@ -24146,7 +24146,8 @@ Menu_Exit:
 ; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E (absolute)
 ; Exit:  P restored; A = X = $2830 (past the last record); Y = the last
 ;        Unk2A value in $AE-$B2, marked or not (the TAY comes before the
-;        Menu_Unk04A4 test), or unchanged when there is none
+;        Menu_Unk04A4 test), or $285C when there is none (left by the
+;        MVN from $2859)
 ; No calls.
 Menu_Unk82E1:
     PHP
