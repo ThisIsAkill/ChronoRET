@@ -18,22 +18,8 @@ org $C10003
 BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
 org $C10006
 BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
-; --- Enemy script handlers (tables BattleAi_TestTable, BattleAi_ChooseTable,
-;     BattleAi_RunTable, BattleAi_TargetTable at $C1:B80D-$C1:B92C; not analysed) ---
-org $C19E78
-BattleAi_Run10:                         ; BattleAi_RunTable entry $10
-org $C19F5A
-BattleAi_Run11:                         ; BattleAi_RunTable entry $11
-org $C19FD2
-BattleAi_Run12:                         ; BattleAi_RunTable entry $12
-org $C1A14E
-BattleAi_Run13:                         ; BattleAi_RunTable entry $13
-org $C1A188
-BattleAi_Run14:                         ; BattleAi_RunTable entry $14
-org $C1A20B
-BattleAi_Run15:                         ; BattleAi_RunTable entry $15
-org $C1A396
-BattleAi_Run16:                         ; BattleAi_RunTable entry $16
+; --- Enemy script target handlers (BattleAi_TargetTable at $C1:B8BB-$C1:B92C;
+;     not analysed) ---
 org $C1A3F6
 BattleAi_Target00:                      ; BattleAi_TargetTable entry $00
 org $C1A3F7
