@@ -29,9 +29,6 @@ Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negat
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C285D6
-Menu_Unk85D6:       ; JSR from Menu_Nmi when Menu_FrameReady has bit 7 clear (with HDMA off): probably
-                    ; the menu's per-frame upload (not traced)
 org $C293A8
 Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
                     ; the list (probably "the current character cannot equip it"; not matched)
@@ -52,6 +49,11 @@ Menu_UnkF3CA:       ; JSR from Menu_InitSystems (not matched)
 org $C2F5ED
 Menu_UnkF5ED:       ; JSR from Menu_Unk834D, A = a character id: returns X = $4B00 + 6 x a byte the
                     ; character picks (via $CD:6CEC) and A = 5, the MVN source and count (not matched)
+org $FFF9BB
+BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
+org $FFF9C4
+BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves with DP=$0400: A = 0 or not for slot
+                    ; Menu_SaveSlot ($0479); probably checks a save slot in SRAM (not analysed)
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
 org $C299CA
@@ -80,8 +82,6 @@ org $C2E60B
 Menu_Mode0EList:
 org $C2FE0A
 Menu_Mode0FList:
-org $C28C36
-Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
 org $C6E74E
 BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
                     ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for

@@ -52,7 +52,9 @@ if !ram_menu_inc == 0
                                          ; colour set Pal_LoadUnkRow0 loads and Field_UploadUnk1F00's graphics set
 !Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
                                          ; to C2Scene_Unk02AE; use unknown
-!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; use unknown
+!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; Menu_CmdJoin sets
+                                         ; the character's BankFF_CharBits bit in the low byte (probably
+                                         ; "has joined")
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 
@@ -511,7 +513,7 @@ endstruct
 ; The cursors and list arrows (Menu_StartCursorA ... Menu_ListArrowsThread).
 !Menu_OamCursor0 = $0774                 ; OAM entry 29 in the copy at $0700 (X, Y, tile, attributes):
 !Menu_OamCursor1 = $0778                 ; the cursor sprite; entries 30 and 31 the other cursors /
-!Menu_OamCursor2 = $077C                 ; the list arrows (probably sent by the menu NMI; not traced)
+!Menu_OamCursor2 = $077C                 ; the list arrows (Menu_NmiUpload sends $0700 to OAM)
 !Menu_Unk0416 = $0416                    ; 8-bit; Menu_CursorStepA subtracts it from Menu_Unk0D9D
 !Menu_Unk0772 = $0772                    ; 16-bit; copied to Menu_CursorTileAttr by Menu_StartCursorB/C
 !Menu_Unk80 = $0080                      ; 8-bit; Menu_CursorThreadB's Menu_Unk0DA8 - this = the list scroll
@@ -554,7 +556,12 @@ endstruct align 8
 
 ; A Menu_CharRecords record ($50 B); only the fields read here.
 struct Menu_CharRec $0000
-            skip $2A
+            skip 3
+.Word3:     skip 2     ; Menu_RecRefillWord3 sets it from .Word5 (probably current HP)
+.Word5:     skip 2     ; (probably maximum HP)
+.Word7:     skip 2     ; Menu_CmdRefillByte7 copies .Word9's low byte here (probably MP)
+.Word9:     skip 2
+            skip $1F
 .Unk2A:     skip 1     ; Menu_Unk82E1 looks for $AE-$B2 here
             skip $14
 .Unk3F:     skip 2     ; Menu_Setup divides it by 10
@@ -938,7 +945,7 @@ endstruct
 
 ; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
 !Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
-!Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_Unk85D6) and
+!Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_NmiUpload) and
                                          ; sets it to Menu_FrameDone; the menu loop waits for non-zero
                                          ; ($C2:81CA)
 !Menu_InidispShadow = $10                ; 8-bit; INIDISP after the NMI (0: forced blank)
@@ -954,5 +961,24 @@ endstruct
 !Menu_NmiStackTop = $1DFD                ; the menu NMI's own stack
 !Menu_ButtonMap1Long = $7E2994          ; Menu_ButtonMap+1 as a long address (Menu_NmiPad)
 !Menu_Joy2Copy = $041F                   ; 16-bit JOY2L/H copied by Menu_NmiPad each menu NMI
+!Menu_ScrollShadow = $0D04               ; 12 B: BG1HOFS, BG1VOFS ... BG3VOFS as words, written to the
+                                         ; registers by Menu_NmiUpload (Menu_Unk0D06/0D0A/0D0E are the
+                                         ; V words)
+!Menu_WinRegShadow = $9680               ; 16 B: W12SEL-COLDATA ($2123-$2132), Menu_NmiUpload copies them
+!Menu_NmiMoveCode = $9690                ; 4 B: Menu_NmiUpload writes MVN $7E,$7E / RTL here and calls it
+!Menu_NmiMoveCodeLong = $7E9690          ; (the same, for the JSL)
+!Menu_NmiMoveSrc = $9694                 ; 16-bit: that move's source (X) ...
+!Menu_NmiMoveDest = $9696                ; ... destination (Y) ...
+!Menu_NmiMoveSize = $9698                ; ... and byte count (who sets them is not traced)
+!Menu_GradBufSelHiLong = $7EA01E         ; Menu_GradBufSel's high byte as a long address (Menu_NmiUpload)
+
+; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
+!Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers
+!Menu_CmdChar = $04C0                    ; 8-bit; the command's Y: a character id (record index for $0A)
+!Menu_CmdResult = $04C1                  ; 8-bit (a word after commands 6, 7, $0A): the result
+!Menu_CmdLimit = $04C2                   ; 8-bit; positions Menu_CmdFindListed searches
+!Menu_CmdRecPtr = $04C3                  ; 16-bit; Menu_CmdEquip's record address
+!Menu_CmdNewItem = $04C5                 ; 8-bit; Menu_CmdEquip's item (Menu_ItemId saved)
+!Menu_SaveSlot = $0479                   ; 8-bit; the slot Menu_CmdBootCheckSaves passes to BankFF_UnkF9C4
 
 endif

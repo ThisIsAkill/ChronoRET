@@ -814,4 +814,20 @@ if !constants_menu_inc == 0
 !Menu_ArrowUpTile = $3022                ; tile $22, attributes $30
 !Menu_ArrowDownTile = $B022              ; tile $22, attributes $B0 (vertical flip)
 
+; --- Menu NMI upload and commands ($C2:85D6-$C2:8662, $C2:8C36-$C2:8E2C) ---
+!Menu_NmiMoveReq = $80                   ; Menu_HdmaenShadow bit 7: Menu_NmiUpload runs the queued move
+!Menu_WinRegBytes = $10                  ; bytes of Menu_WinRegShadow
+!Menu_MoveCodeMvn = $7E54                ; MVN opcode $54, destination bank $7E
+!Menu_MoveCodeRtl = $6B7E                ; source bank $7E, RTL ($6B)
+!Menu_PartyOrderBytes = 9                ; positions in Menu_PartyOrder
+!Menu_BonusHalfId = $A1                  ; Menu_CharRec.Unk2A values: Menu_RecRefillWord3 adds half ...
+!Menu_BonusQuarterId = $A0               ; ... or a quarter of .Word5
+!Menu_StatMax = 999                      ; cap of Menu_RecRefillWord3
+!Menu_SramUnk7FE2Set = $FF               ; Menu_CmdSetSram7FE2's value
+!Menu_SaveSlots = 3                      ; slots Menu_CmdBootCheckSaves tries
+!Menu_DataNew = 0                        ; Menu_DataInitDone after Menu_CmdBootCheckSaves: no slot passed
+!Menu_DataFromSave = 2                   ; ... one passed
+!Menu_EquipKeepChar = 5                  ; record whose category-0 byte Menu_CmdEquip's id-0 path keeps
+!Menu_EquipSlots = 4                     ; equipment bytes per record (categories 0-3)
+
 endif

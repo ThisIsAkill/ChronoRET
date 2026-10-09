@@ -11338,8 +11338,8 @@ Evt_OpC4_MsgChoiceUnk30_2:
 ; held), 3 tests the 24-bit gold sum at $7E:2C53 against Y (A = $FF
 ; when it is at least Y, or Y is 0; else 0), 4 adds Y to it
 ; (BankC1_AddGold), 5 takes Y off when there is that much. The
-; character opcodes use BankC2_Entry8004 (Menu_Unk8C36, unmatched; its
-; command table is at $C2:8C5B; read from the ROM), with the 9-byte
+; character opcodes use BankC2_Entry8004 (Menu_RunCommand, with its
+; command table Menu_CommandTable at $C2:8C5B), with the 9-byte
 ; list Menu_PartyOrder (three party places, then six reserve places;
 ; bit 7 = empty): 0 / 3 give A = 0 when character Y is in the party /
 ; anywhere in the list, else $FF; 1 puts it in the party (first empty
@@ -11347,7 +11347,7 @@ Evt_OpC4_MsgChoiceUnk30_2:
 ; the reserve); 2 moves it from the party to the front of the reserve;
 ; 4 adds it to the first empty reserve place unless it is listed; 5
 ; empties its place; $0C gives A = the count of item X held. The
-; Menu_Unk8C36 path saves and restores P, so C comes back unchanged. It
+; Menu_RunCommand path saves and restores P, so C comes back unchanged. It
 ; does not save Y: its closing pass ($C2:834D, then $C2:82E1) loads Y
 ; (LDY #$21BA, LDY #$2859, TAY), and a PLP with X=1 clears Y's high
 ; byte, so Y comes back clobbered after every command.
@@ -12156,8 +12156,9 @@ Evt_OpD6_DropCharObj:
 ; $C0:3A68 — Evt_OpD5_BankC2Cmd0A (27 bytes, $3A68–$3A82)
 ; Event opcode $D5 (3 bytes: $D5, a, b): BankC2_Entry8004 command $0A
 ;   (BankC2Cmd_Unk0A) with Y = a and X = b; X = Y + 3. The command
-;   indexes $50-byte records at $7E:2600 by a (one per character,
-;   probably) and branches on b being 0; what it does is not traced.
+;   (Menu_CmdEquip) equips item b on the $50-byte record a at $7E:2600,
+;   the old item of its category going back to the inventory; b = 0
+;   sets all four equipment bytes to their "no item" ids instead.
 ; There is no SEC: C stays as the dispatcher entered with it (0), so
 ;   the object's run ends after this opcode.
 ; Reached through Evt_OpcodeTable (opcode $D5).
@@ -13131,8 +13132,8 @@ Evt_OpE7_ScrollTo:
 ; $C0:3E5C — Evt_OpF8_BankC2Cmd06And07 (18 bytes, $3E5C–$3E6D; the JSL
 ;   from $3E67 on is the sub-entry Evt_BankC2CmdTail)
 ; Event opcode $F8 (1 byte): BankC2_Entry8004 commands 6 and 7
-;   (BankC2Cmd_Unk06, BankC2Cmd_Unk07); X = Y + 1. Read from the ROM
-;   (Menu_Unk8C36's table, unmatched): command 6 sets word +3 of each of
+;   (BankC2Cmd_Unk06, BankC2Cmd_Unk07); X = Y + 1. Command 6
+;   (Menu_CmdRefillWord3) and 7 (Menu_CmdRefillByte7): command 6 sets word +3 of each of
 ;   the seven $50-byte records at Menu_CharRecords ($2600-$282F) to its
 ;   word +5 plus a bonus by byte +$2A ($A1: half, $A0: a quarter),
 ;   capped at 999; command 7 copies byte +9 of each record to byte +7
@@ -13149,7 +13150,7 @@ Evt_OpE7_ScrollTo:
 ;   in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = the opcode
 ;   + 1; C as on entry; A clobbered (the command's result); Y clobbered
-;   by the command (Menu_Unk8C36 does not save it; see the banner of
+;   by the command (Menu_RunCommand does not save it; see the banner of
 ;   the item and character opcodes at $C0:3711).
 ; ------------------------------------------------------------
 Evt_OpF8_BankC2Cmd06And07:
@@ -13202,7 +13203,7 @@ Evt_OpFA_BankC2Cmd07:
 ; ------------------------------------------------------------
 ; $C0:3E7C — Evt_OpFF9F_BankC2Cmd08 (8 bytes, $3E7C–$3E83)
 ; Opcode $FF $9F (2 bytes): BankC2_Entry8004 command 8 (BankC2Cmd_Unk08,
-;   which stores $FF at $30:7FE2, read from the ROM) through
+;   Menu_CmdSetSram7FE2, which stores $FF at $30:7FE2) through
 ;   Evt_BankC2CmdTail; X = Y + 2.
 ; Reached through Evt_OpFFTable (entry $9F; Evt_OpFF_Misc returns C=0).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (EvtOp_SavedPos
