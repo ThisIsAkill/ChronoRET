@@ -1054,8 +1054,8 @@ C2Scene_LayerVramMaps:
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
 ; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
 ;   ($C2:173C), C2Scene_LeaderStep ($C2:3702, $C2:3709), C2Scene_LeaderBoardX ($C2:38FB, $C2:3902),
-;   C2Scene_ObjAMove ($C2:468A, $C2:4691), C2Scene_ObjBMove ($C2:4F93, $C2:4F9A) and unmatched
-;   ($C2:785B).
+;   C2Scene_ObjAMove ($C2:468A, $C2:4691), C2Scene_ObjBMove ($C2:4F93, $C2:4F9A) and
+;   C2Scene_TaskBg1Pan ($C2:785B).
 ; Callers note: C2Scene_LeaderStep and C2Scene_LeaderBoardX call it for
 ;   layers 1 and 2 with the leader's X velocity, so the view follows the
 ;   walking leader.
@@ -2935,8 +2935,8 @@ C2Anim_OpEnd:
 ;   ($C2:4454), C2Scene_ObjAMove ($C2:4679), C2Scene_ObjALand ($C2:46FA), C2Scene_ObjBRise
 ;   ($C2:4D90), C2Scene_ObjBMove ($C2:4F82), C2Scene_ObjBLand ($C2:5002), C2Scene_ObjBMateRise
 ;   ($C2:5166), C2Scene_ObjBMateMove ($C2:5235), C2Scene_ObjBMateLand ($C2:5254),
-;   C2Scene_ObjBMateMarkRise ($C2:554D), C2Scene_ObjBMateMarkLand ($C2:55DC) and unmatched
-;   ($C2:7734, $C2:7824).
+;   C2Scene_ObjBMateMarkRise ($C2:554D), C2Scene_ObjBMateMarkLand ($C2:55DC), C2Scene_TaskBg3Slide
+;   ($C2:7734) and C2Scene_TaskBg3SlideFast ($C2:7824).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -6976,13 +6976,10 @@ C2Scene_MosaicInStep:
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
 ; Callers (5 JSL sites): unmatched ($C2:6752, $C2:6D10, $C2:704F, $C2:711D, $C6:E9FF).
-; Callers of Trig_Sin1024 (9 JSL sites): unmatched ($C2:673B, $C2:6D17, $C2:7062, $C2:712D,
-;   $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
-; Callers note (JSL): Trig_Cos1024 from $C2:6752, $C2:6D10, $C2:704F,
-;   $C2:711D and $C6:E9FF; Trig_Sin1024 from $C2:673B, $C2:6D17,
-;   $C2:7062, $C2:712D, $C2:76CB, $C2:77D9, $C2:7D33, $C2:7DB9 and
-;   $C6:EA17 (all unmatched; e.g. $C2:6D10/6D17 take the cosine and the
-;   sine of the same angle).
+; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_TaskBg3Wave ($C2:76CB), C2Scene_TaskBg3LineWave
+;   ($C2:77D9) and unmatched ($C2:673B, $C2:6D17, $C2:7062, $C2:712D, $C2:7D33, $C2:7DB9, $C6:EA17).
+; Callers note: $C2:6D10 and $C2:6D17 take the cosine and the sine of
+;   the same angle.
 ; Entry (both): M=0 (16-bit A, set by the caller; the immediates carry
 ;        an explicit .w), X=0 (16-bit: TAX / CPX.w take the whole index),
 ;        DP any (no direct page), DB any (table read with .l); A = angle
@@ -7202,11 +7199,9 @@ C2Scene_ClearUnk1B30:
 ; $C2:2336 — C2Scene_Random (15 bytes, $2336–$2344)
 ; Returns the next byte of RandomTable ($C0:FE00): the one at index
 ; C2Scene_Unk1B30, which then goes up by one (wrapping at 256).
-; Callers (7 JSR sites): unmatched ($C2:7575, $C2:7598, $C2:79E0, $C2:7A0C, $C2:7A1F, $C2:7A31,
-;   $C2:7A44).
-; Callers note (7 JSR sites, all unmatched): $C2:7575, $C2:7598, $C2:79E0,
-;   $C2:7A0C, $C2:7A1F, $C2:7A31 and $C2:7A44 (xref also finds a doubtful
-;   one at $C2:754D).
+; Callers (8 JSR sites): C2Scene_PlaceBelowView ($C2:754D), C2Scene_PlaceBelowViewAt178 ($C2:7575),
+;   C2Scene_RandomVelocity ($C2:7598), C2Scene_NudgeXRandom ($C2:79E0), C2Scene_RandPosA ($C2:7A0C),
+;   C2Scene_RandYA ($C2:7A1F), C2Scene_RandPosB ($C2:7A31) and C2Scene_RandYB ($C2:7A44).
 ; Entry: M, X any (SEP #$30 here), DP any, DB with low WRAM at
 ;        $0000-$1FFF (C2Scene_Unk1B30 is read absolute)
 ; Exit:  M=1, X=0; A = the random byte; X = the index used (8-bit, so
@@ -18929,6 +18924,1072 @@ C2Scene_GetSoundZone:
     RTS
 .odd:
     AND.b #!C2Scene_ZoneMask
+    RTS
+
+; ============================================================
+; Screen effects and script routines ($C2:754D–$C2:7B59)
+; ============================================================
+; Small routines for the scene scripts and the tasks they start, none
+; referenced from bank $C2 code. The routines ending in RTS without a
+; task's C=0/C=1 meaning are called by script op $34 (C2Script_CallNear,
+; M=1 and X=0; found as "$34 lo hi" in the bank $C3 scene scripts, e.g.
+; $C3:8E67 calls C2Scene_PlaceBelowViewAt178); the task handlers are
+; started by op $35 (C2Script_SpawnTask, "$35 lo hi" at $C3:8BBD and on).
+; All run inside C2Scene_TaskRunAll (from the scene NMI), with DP=$0000
+; and DB=$00, C2Scene_TaskCur = the running task. The BG3 tasks wait while
+; object A is in scene mode 8 (C2Scene_ObjAInMode8) and also scroll BG3
+; by the leader's last move (C2Scene_Unk1BF1/1BF3), which they then zero.
+; The HDMA effects use C2Scene_HdmaTable records 0/1 (two runs of 112
+; lines, whose addresses the NMI copies from C2Scene_HdmaValues) in
+; indirect mode, pointing into the C2Scene_LineBuf* buffers.
+
+org $C2754D
+; $C2:754D — C2Scene_PlaceBelowView (40 bytes, $754D–$7574)
+; Script routine: puts the task at a random X 64-191 pixels into BG2's
+; view (C2Scene_BgTileX+2 x 8 + a random 0-127 + 64) and 256 pixels below
+; the view's top (C2Scene_BgTileY+2 + 32 tile rows, x 8): just under the
+; screen.
+; Quirk, kept: the first ADC has no CLC; the carry is bit 13 of the tile
+; X shifted out by the third ASL, 0 for any tile X (0-191).
+; Entry: M=1 (the 8-bit AND/STZ; C2Scene_Random sets M=1 again), X=0,
+;        DP=$0000 (C2Tmp_08, the tile words), DB=$00 (the task record
+;        and C2Scene_Random's index); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+;        C2Tmp_08 = the random part (a word); C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_PlaceBelowView:
+    JSR C2Scene_Random
+    AND.b #!C2Scene_PlaceRandMask
+    STA.b !C2Tmp_08
+    STZ.b !C2Tmp_09
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.b !C2Scene_BgTileX+2            ; BG2's tile X, x 8
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Tmp_08                     ; no CLC (see the header)
+    CLC
+    ADC.w #!C2Scene_PlaceMarginX
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_PlaceRowsDown
+    ASL A
+    ASL A
+    ASL A
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7575 — C2Scene_PlaceBelowViewAt178 (35 bytes, $7575–$7597)
+; Script routine: as C2Scene_PlaceBelowView, but X is pixel $178 (tile
+; column C2Scene_PlaceFixedCol) + a random 0-255, not relative to the
+; view; Y is again 256 pixels below the top of BG2's view.
+; Entry: M=1 (C2Scene_Random leaves M=1), X=0, DP=$0000, DB=$00;
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+;        C2Tmp_08 = the random byte (a word); C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_PlaceBelowViewAt178:
+    JSR C2Scene_Random
+    STA.b !C2Tmp_08
+    STZ.b !C2Tmp_09
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.w #!C2Scene_PlaceFixedCol
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Tmp_08                     ; the carry is 0 here ($2F x 8 does not overflow)
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_PlaceRowsDown
+    ASL A
+    ASL A
+    ASL A
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7598 — C2Scene_RandomVelocity (43 bytes, $7598–$75C2)
+; Script routine: gives the task one of 16 velocities at random: the
+; four words of entry (random AND 15) of C2SceneRom_RandVelocities go to
+; .XVelFrac, .XVel, .YVelFrac and .YVel.
+; Entry: M=1 (C2Scene_Random leaves M=1), X=0, DP=$0000 (C2Scene_TaskCur),
+;        DB=$00 (the task record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the entry x 8; Y = the task; A = the new .YVel;
+;        C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_RandomVelocity:
+    JSR C2Scene_Random
+    LDY.b !C2Scene_TaskCur
+    REP #$20
+    AND.w #!C2Scene_RandVelMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !C2SceneRom_RandVelocities,X
+    STA.w C2Scene_Task.XVelFrac,Y
+    LDA.l !C2SceneRom_RandVelocities+2,X
+    STA.w C2Scene_Task.XVel,Y
+    LDA.l !C2SceneRom_RandVelocities+4,X
+    STA.w C2Scene_Task.YVelFrac,Y
+    LDA.l !C2SceneRom_RandVelocities+6,X
+    STA.w C2Scene_Task.YVel,Y
+    RTS
+
+; $C2:75C3 — C2Scene_TaskBg3Drift (58 bytes, $75C3–$75FC)
+; Task handler (started by op $35 at $C3:8BBD): while object A is not
+; in mode 8, counts frames in .Var22 and moves BG3 one pixel left every
+; 4th frame and one pixel down every 8th; then adds the leader's last
+; move (C2Scene_Unk1BF1/1BF3) to BG3's scroll and zeroes it. Never ends.
+; Entry: M=1 (8-bit flag test), X=0, DP=$0000 (the scroll shadows),
+;        DB=$00 (C2Scene_Unk0294, the record, C2Scene_Unk1BF1/1BF3);
+;        C2Scene_TaskCur = the task
+; Exit:  C=0 (the task goes on); M=1 when object A is in mode 8 (nothing
+;        done), else M=0 with X = the task and A = C2Scene_Bg3VScroll;
+;        C2Scene_Bg3HScroll/VScroll, .Var22 and C2Scene_Unk1BF1/1BF3
+;        changed
+; No calls.
+C2Scene_TaskBg3Drift:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftHMask
+    BNE .no_left
+    DEC.b !C2Scene_Bg3HScroll
+.no_left:
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftVMask
+    BNE .no_down
+    INC.b !C2Scene_Bg3VScroll
+.no_down:
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:75FD — C2Scene_TaskBg3DriftWave (85 bytes, $75FD–$7651)
+; Task handler (op $35 at $C3:980D, next to C2Scene_TaskBg3Wave's at
+; $C3:9811): as C2Scene_TaskBg3Drift, but BG3 moves one pixel left and
+; one down together every 4th frame, and the leader's Y move also slides
+; the wave's start (C2Scene_HdmaValueA916) by that many lines (2 bytes
+; each), kept inside the first copy of the 64-line wave
+; (C2Scene_WaveBuf - C2Scene_WaveBufCopy - 1) by adding or subtracting
+; its 128 bytes. The ASL doubles C2Scene_Unk1BF3 in place before it is
+; zeroed. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = the new C2Scene_HdmaValueA916;
+;        C2Scene_Bg3HScroll/VScroll, .Var22, C2Scene_HdmaValueA916 and
+;        C2Scene_Unk1BF1/1BF3 changed
+; No calls.
+C2Scene_TaskBg3DriftWave:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftHMask
+    BNE .no_step
+    DEC.b !C2Scene_Bg3HScroll
+    INC.b !C2Scene_Bg3VScroll
+.no_step:
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    ASL.w !C2Scene_Unk1BF3              ; lines to bytes
+    LDA.l !C2Scene_HdmaValueA916
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    CMP.w #!C2Scene_WaveBuf&$FFFF
+    BCS .not_below
+    CLC
+    ADC.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+    BRA .store
+.not_below:
+    CMP.w #!C2Scene_WaveBufCopy&$FFFF
+    BCC .store
+    SEC
+    SBC.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+.store:
+    STA.l !C2Scene_HdmaValueA916
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7652 — C2Scene_TaskBg3Wave (176 bytes, $7652–$7701)
+; Task handler (op $35 at $C3:9811): a horizontal wave on BG3. In forced
+; blank (C2Scene_InidispShadow bit 7) it only turns HDMA channel 1 off;
+; while object A is in mode 8 it waits. Else, on its first frame
+; (.State 0 -> 1) it zeroes the phase .Var22 and starts the wave at
+; C2Scene_WaveBuf (C2Scene_HdmaValueA916). Each frame it sets up
+; C2Scene_HdmaTableA918 (three runs of 64 lines and one of 32, whose
+; addresses the NMI fills from C2Scene_HdmaValueA916, so every 64-line
+; band shows the same 64 words) as HDMA channel 1 to BG3HOFS (indirect,
+; one register written twice), turns the channel on, writes the 64
+; words of C2Scene_WaveBuf, C2Scene_Bg3HScroll + sin(phase + 16 x line)
+; / 4 (Trig_Sin1024: one period over the 64 lines, -63..+63 pixels),
+; with the phase taken before .Var22 goes up by one, and copies them to
+; C2Scene_WaveBufCopy. Never ends.
+; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it; not
+;        reloaded), DP=$0000 (C2Tmp_08-$12, the shadows), DB=$00 (the
+;        record, the DMA registers)
+; Exit:  C=0; M=1 (forced blank or mode 8: nothing else done) or M=0
+;        with A = $FFFF, X = $A9A5, Y = $AA25 (the MVN's ends) and DB
+;        unchanged (saved around the MVN); C2Tmp_08,
+;        $0A and $10-$12 changed
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_TaskBg3Wave:
+    LDA.b !C2Scene_InidispShadow
+    BPL .shown
+    LDA.b #DMA_CH1
+    TRB.b !C2Scene_HdmaenShadow
+    CLC
+    RTS
+.shown:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BEQ .run
+    CLC
+    RTS
+.run:
+    LDA.w C2Scene_EffectTask.State,X
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    STZ.w C2Scene_EffectTask.Var22,X
+    STZ.w C2Scene_EffectTask.Var22+1,X
+    REP #$20
+    LDA.w #!C2Scene_WaveBuf&$FFFF
+    STA.l !C2Scene_HdmaValueA916
+    SEP #$20
+.started:
+    LDA.b #!C2Scene_HdmaRun64
+    STA.l !C2Scene_HdmaTableA918
+    STA.l !C2Scene_HdmaTableA918+3
+    STA.l !C2Scene_HdmaTableA918+6
+    LDA.b #!C2Scene_HdmaRun32
+    STA.l !C2Scene_HdmaTableA918+9
+    TDC
+    STA.l !C2Scene_HdmaTableA918+12     ; end of the table
+    LDY.w #(!BBAD_BG3HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #!C2Scene_HdmaTableA918&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B                         ; bank of the indirect addresses
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDY.w #!C2Scene_WaveBuf&$FFFF
+    STY.b !C2Tmp_10
+    LDA.b #bank(!C2Scene_WaveBuf)
+    STA.b !C2Tmp_12
+    REP #$20
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.b !C2Tmp_0A
+    CLC
+    ADC.w #1
+    STA.w C2Scene_EffectTask.Var22,X
+    LDY.w #0
+.line:
+    LDA.b !C2Tmp_0A
+    JSL Trig_Sin1024
+    STA.b !C2Tmp_08
+    LDA.b !C2Tmp_0A
+    CLC
+    ADC.w #!C2Scene_WaveLineStep
+    STA.b !C2Tmp_0A
+    LDA.b !C2Tmp_08
+    BPL .positive
+    LSR A                               ; / 4, keeping the sign
+    LSR A
+    ORA.w #!C2Scene_WaveSignBits
+    BRA .add
+.positive:
+    LSR A
+    LSR A
+.add:
+    CLC
+    ADC.b !C2Scene_Bg3HScroll
+    STA.b [!C2Tmp_10],Y
+    INY
+    INY
+    CPY.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+    BNE .line
+    PHB
+    LDX.w #!C2Scene_WaveBuf&$FFFF
+    LDY.w #!C2Scene_WaveBufCopy&$FFFF
+    LDA.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    CLC
+    RTS
+
+; $C2:7702 — C2Scene_TaskBg3Slide (87 bytes, $7702–$7758)
+; Task handler (op $35 at $C3:9F92): while object A is not in mode 8,
+; moves BG3 by a fixed velocity, X about -3.46 and Y +2 pixels a frame
+; (set into .XVelFrac-.YVel on the first frame, .State 0 -> 1), through
+; the task's own position (.SprX/.SprY = the BG3 scroll, C2Scene_TaskMove,
+; back into the scroll, keeping the fractions in .XFrac/.YFrac); then
+; adds the leader's last move as C2Scene_TaskBg3Drift. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = C2Scene_Bg3VScroll; the scroll, the
+;        task's position and C2Scene_Unk1BF1/1BF3 changed
+; Calls: C2Scene_TaskMove.
+C2Scene_TaskBg3Slide:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.State,X
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    LDA.w #!C2Scene_SlideXVelFrac
+    STA.w C2Scene_Task.XVelFrac,X
+    LDA.w #!C2Scene_SlideXVel
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    LDA.w #!C2Scene_SlideYVel
+    STA.w C2Scene_Task.YVel,X
+.started:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_Bg3VScroll
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_TaskMove
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_Bg3HScroll
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_Bg3VScroll
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7759 — C2Scene_TaskBg3LineWave (153 bytes, $7759–$77F1)
+; Task handler (no reference found; laid out as C2Scene_TaskBg3Wave):
+; in forced blank only turns HDMA channel 1 off; waits while object A is
+; in mode 8. Else (on the first frame .State 0 -> 1 and .Var22 = 0) sets
+; up C2Scene_HdmaTable[0] as two runs of 112 lines on HDMA channel 1 to
+; BG3HOFS (indirect, one register twice) from C2Scene_LineBufA and its
+; second half, turns the channel on, and fills C2Scene_LineBufA: every
+; even line C2Scene_Bg3HScroll, every odd line C2Scene_Bg3HScroll +
+; sin(phase + n) (Trig_Sin1024, -255..+255 pixels; n = 0, 1, ... down
+; the odd lines), the phase going up by 4 each frame. Never ends.
+; Quirk, kept: after the even-line loop X is $1C0, not the task, so the
+; phase is read from and written to $0022 + $1C0 = C2Scene_Unk01E2 in
+; low WRAM; the .Var22 the first frame zeroes is never used.
+; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it),
+;        DP=$0000, DB=$00 (the record, C2Scene_Unk01E2, the DMA
+;        registers)
+; Exit:  C=0; M=1 (forced blank or mode 8: nothing else done) or M=0
+;        with X = $01C2, Y = $01BE; C2Tmp_0A = the phase + 112;
+;        C2Scene_Unk01E2 + 4
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_TaskBg3LineWave:
+    LDA.b !C2Scene_InidispShadow
+    BPL .shown
+    LDA.b #DMA_CH1
+    TRB.b !C2Scene_HdmaenShadow
+    CLC
+    RTS
+.shown:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BEQ .run
+    CLC
+    RTS
+.run:
+    LDA.w C2Scene_EffectTask.State,X
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    STZ.w C2Scene_EffectTask.Var22,X
+    STZ.w C2Scene_EffectTask.Var22+1,X
+.started:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    REP #$20
+    LDA.w #!C2Scene_LineBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_LineBufA+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    LDY.w #(!BBAD_BG3HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    REP #$20
+    LDX.w #0
+.even:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.l !C2Scene_LineBufA,X
+    INX
+    INX
+    INX
+    INX
+    CPX.w #!C2Scene_LineBufBytes
+    BNE .even
+    LDA.w C2Scene_EffectTask.Var22,X    ; X = $1C0 here: C2Scene_Unk01E2 (see the header)
+    STA.b !C2Tmp_0A
+    CLC
+    ADC.w #!C2Scene_LineWaveStep
+    STA.w C2Scene_EffectTask.Var22,X
+    LDX.w #2
+.odd:
+    TXY
+    LDA.b !C2Tmp_0A
+    JSL Trig_Sin1024
+    INC.b !C2Tmp_0A
+    TYX
+    CLC
+    ADC.b !C2Scene_Bg3HScroll
+    STA.l !C2Scene_LineBufA,X
+    INX
+    INX
+    INX
+    INX
+    CPX.w #!C2Scene_LineBufBytes+2
+    BNE .odd
+    CLC
+    RTS
+
+; $C2:77F2 — C2Scene_TaskBg3SlideFast (87 bytes, $77F2–$7848)
+; Task handler (op $35 at $C3:AC92): C2Scene_TaskBg3Slide with the
+; velocity X about -17.32 and Y -10 pixels a frame. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = C2Scene_Bg3VScroll; the scroll, the
+;        task's position and C2Scene_Unk1BF1/1BF3 changed
+; Calls: C2Scene_TaskMove.
+C2Scene_TaskBg3SlideFast:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.State,X
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    LDA.w #!C2Scene_SlideFastXVelFrac
+    STA.w C2Scene_Task.XVelFrac,X
+    LDA.w #!C2Scene_SlideFastXVel
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    LDA.w #!C2Scene_SlideFastYVel
+    STA.w C2Scene_Task.YVel,X
+.started:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_Bg3VScroll
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_TaskMove
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_Bg3HScroll
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_Bg3VScroll
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7849 — C2Scene_TaskBg1Pan (23 bytes, $7849–$785F)
+; Task handler (no op $35 reference found): counts frames in .Var22
+; (8-bit) and every 4th frame scrolls layer 1 one pixel
+; (C2Scene_Unk0568 with C2Scene_ScrollLayer = C2Scene_ScrollPx = 1),
+; which also builds the tile column that comes into view. Never ends.
+; Entry: M=1 (8-bit counter), X=0, DP=$0000, DB=$00 (the record and
+;        C2Scene_Unk0568's state); C2Scene_TaskCur = the task
+; Exit:  C=0; M=1, X=0; X = the task (no scroll) or as C2Scene_Unk0568
+;        leaves it; A, Y and C2Tmp_00-$1A as C2Scene_Unk0568 leaves them
+; Calls: C2Scene_Unk0568.
+C2Scene_TaskBg1Pan:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.b #!C2Scene_PanMask
+    BNE .done
+    LDA.b #1
+    STA.b !C2Scene_ScrollPx
+    STA.b !C2Scene_ScrollLayer          ; layer 1
+    JSR C2Scene_Unk0568
+.done:
+    CLC
+    RTS
+
+; $C2:7860 — C2Scene_ClearParty (15 bytes, $7860–$786E)
+; Script routine: marks all three Party_Members slots empty
+; (C2Scene_PartySlotEmpty).
+; Entry: M=1 (8-bit stores), X any, DP any, DB any (long stores)
+; Exit:  M=1; A = C2Scene_PartySlotEmpty; X, Y unchanged
+; No calls.
+C2Scene_ClearParty:
+    LDA.b #!C2Scene_PartySlotEmpty
+    STA.l !Party_Members
+    STA.l !Party_Members+1
+    STA.l !Party_Members+2
+    RTS
+
+; $C2:786F — C2Scene_SaveParty (25 bytes, $786F–$7887)
+; Script routine: copies the three Party_Members bytes to
+; C2Scene_PartySave (C2Scene_RestoreParty puts them back).
+; Entry: M=1, X any, DP any, DB any (long addressing throughout)
+; Exit:  M=1; A = the third member byte; X, Y unchanged
+; No calls.
+C2Scene_SaveParty:
+    LDA.l !Party_Members
+    STA.l !C2Scene_PartySave
+    LDA.l !Party_Members+1
+    STA.l !C2Scene_PartySave+1
+    LDA.l !Party_Members+2
+    STA.l !C2Scene_PartySave+2
+    RTS
+
+; $C2:7888 — C2Scene_RestoreParty (25 bytes, $7888–$78A0)
+; Script routine: copies C2Scene_PartySave back to Party_Members.
+; Entry: M=1, X any, DP any, DB any (long addressing throughout)
+; Exit:  M=1; A = the third member byte; X, Y unchanged
+; No calls.
+C2Scene_RestoreParty:
+    LDA.l !C2Scene_PartySave
+    STA.l !Party_Members
+    LDA.l !C2Scene_PartySave+1
+    STA.l !Party_Members+1
+    LDA.l !C2Scene_PartySave+2
+    STA.l !Party_Members+2
+    RTS
+
+; $C2:78A1 — C2Scene_TaskInView (66 bytes, $78A1–$78E2)
+; Script routine (op $34 at $C3:8E82, followed by an op $23 test of
+; $0000): C2Tmp_00 = 1 when the task is in BG2's view with a margin,
+; else 0. The position relative to the view plus 16 (.SprX -
+; C2Scene_Bg2HScroll + 16, wrapped by the map width when negative; Y the
+; same with the map height) must be below 288 (X) and 272 (Y): from 16
+; pixels left of / above the screen to 16 right of it and 32 below.
+; Entry: M=1 (REP #$20 here), X=0, DP=$0000 (the scroll shadows and
+;        C2Tmp), DB=$00 (the record); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; A = C2Tmp_00 = 1 or 0 (8-bit; C2Tmp_01
+;        unchanged); C2Tmp_08/0A = the relative X/Y; Y unchanged
+; No calls.
+C2Scene_TaskInView:
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.w C2Scene_Task.SprX,X
+    SEC
+    SBC.b !C2Scene_Bg2HScroll
+    CLC
+    ADC.w #!C2Scene_ViewMargin
+    BPL .x_done
+    CLC
+    ADC.w #!C2Scene_MapWidthPx
+.x_done:
+    STA.b !C2Tmp_08
+    LDA.w C2Scene_Task.SprY,X
+    SEC
+    SBC.b !C2Scene_Bg2VScroll
+    CLC
+    ADC.w #!C2Scene_ViewMargin
+    BPL .y_done
+    CLC
+    ADC.w #!C2Scene_MapHeightPx
+.y_done:
+    STA.b !C2Tmp_0A
+    LDA.b !C2Tmp_08
+    CMP.w #!C2Scene_ViewTestW
+    BCS .out
+    LDA.b !C2Tmp_0A
+    CMP.w #!C2Scene_ViewTestH
+    BCS .out
+    SEP #$20
+    LDA.b #1
+    STA.b !C2Tmp_00
+    RTS
+.out:
+    SEP #$20
+    STZ.b !C2Tmp_00
+    RTS
+
+; $C2:78E3 — C2Scene_Win1Init (116 bytes with C2Scene_Win1Step, $78E3–$7956)
+; Script routine: sets up C2Scene_HdmaTable[0] (two runs of 112 lines)
+; as HDMA channel 1 to WH0/WH1 (indirect, two registers), turns the
+; channel on, zeroes the buffer toggle .Var24 and falls into the
+; sub-entry C2Scene_Win1Step ($C2:7911; op $34 at $C3:9C06 calls it on
+; its own, probably once a frame): picks C2Scene_LineBufA (.Var24 even)
+; or C2Scene_LineBufB (odd), points both C2Scene_HdmaValues words and
+; WinFx_TablePtr (bank $7E) at it, adds one to .Var24, and has
+; BankC3_Entry0008 (A = WinFx_Mode0) build the window table there from
+; the task's .SprX, .SprY and .Var22 (low bytes, as WinFx_ArgX, ArgY and
+; ArgSize; the shape is not traced). The table written is the one the
+; next NMI shows, while the other stays on screen.
+; Entry (both): M any at C2Scene_Win1Init (SEP #$20 there), M=1 at
+;        C2Scene_Win1Step (the 8-bit toggle; op $34 calls it with M=1),
+;        X=0, DP=$0000 (the shadows and
+;        C2Scene_TaskCur), DB=$00 (the record, the DMA registers and
+;        WinFx_*); C2Scene_TaskCur = the task
+; Exit (both):  M=1, X=0 (as BankC3_Entry0008 returns, saving P); X, Y
+;        and A as BankC3_Entry0008 leaves them (not traced); .Var24 + 1;
+;        WinFx_* and C2Scene_HdmaValues words 0-1 changed
+; Calls: BankC3_Entry0008 (JSL).
+C2Scene_Win1Init:
+    SEP #$20
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_WH0<<8)|!DMAP_HdmaIndirect|DMA_MODE_2BYTE
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var24,X
+C2Scene_Win1Step:                       ; header: see C2Scene_Win1Init
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.Var24,X
+    LSR A
+    REP #$20
+    BCC .buf_a
+    LDA.w #!C2Scene_LineBufB&$FFFF
+    LDY.w #(!C2Scene_LineBufB+!C2Scene_LineBufHalf)&$FFFF
+    BRA .set
+.buf_a:
+    LDA.w #!C2Scene_LineBufA&$FFFF
+    LDY.w #(!C2Scene_LineBufA+!C2Scene_LineBufHalf)&$FFFF
+.set:
+    STA.l !C2Scene_HdmaValues
+    STA.w !WinFx_TablePtr
+    TYA
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    INC.w C2Scene_EffectTask.Var24,X
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !WinFx_ArgX
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !WinFx_ArgY
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.w !WinFx_ArgSize
+    LDA.b #bank(!C2Scene_LineBufA)
+    STA.w !WinFx_TableBank
+    TDC                                 ; A = WinFx_Mode0
+    JSL BankC3_Entry0008
+    RTS
+
+; $C2:7957 — C2Scene_Win2Init (42 bytes, $7957–$7980)
+; Script routine (op $34 at $C3:A937): sets up C2Scene_HdmaTable[1] (two
+; runs of 112 lines) as HDMA channel 2 to WH2/WH3 (indirect, two
+; registers) and turns the channel on. Unlike C2Scene_Win1Init it leaves
+; .Var24 alone and does not build a table (C2Scene_Win2Step does).
+; Entry: M any (SEP #$20 here), X=0 (16-bit STY), DP=$0000
+;        (C2Scene_HdmaenShadow), DB=$00 (the DMA registers)
+; Exit:  M=1, X=0; A = DMA_CH2; Y = C2Scene_HdmaTable[1]'s address; X
+;        unchanged
+; No calls.
+C2Scene_Win2Init:
+    SEP #$20
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[1].Count0
+    STA.l C2Scene_HdmaTable[1].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[1].End
+    LDY.w #(!BBAD_WH2<<8)|!DMAP_HdmaIndirect|DMA_MODE_2BYTE
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[1].Count0&$FFFF
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    RTS
+
+; $C2:7981 — C2Scene_Win2Step (71 bytes, $7981–$79C7)
+; Script routine (op $34 at $C3:A93E, right after C2Scene_Win2Init's):
+; adds one to .Var24 and picks C2Scene_LineBufD (now odd) or
+; C2Scene_LineBufC (even) as WinFx_TablePtr (bank $7E), has
+; BankC3_Entry0008 (A = WinFx_Mode1) build the window table there from
+; .SprX, .SprY and .Var22 as C2Scene_Win1Step does, then points
+; C2Scene_HdmaValues words 2-3 (C2Scene_HdmaTable[1]) at the buffer and
+; its second half.
+; Entry: M=1 (8-bit loads; op $34 calls it with M=1), X=0, DP=$0000,
+;        DB=$00; C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the buffer + C2Scene_LineBufHalf; Y
+;        as BankC3_Entry0008 leaves it; .Var24 + 1; WinFx_* and
+;        C2Scene_HdmaValues words 2-3 changed
+; Calls: BankC3_Entry0008 (JSL).
+C2Scene_Win2Step:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var24,X
+    LDA.w C2Scene_EffectTask.Var24,X
+    LSR A
+    BCS .buf_d
+    LDY.w #!C2Scene_LineBufC&$FFFF
+    BRA .set
+.buf_d:
+    LDY.w #!C2Scene_LineBufD&$FFFF
+.set:
+    STY.w !WinFx_TablePtr
+    LDA.b #bank(!C2Scene_LineBufC)
+    STA.w !WinFx_TableBank
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !WinFx_ArgX
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !WinFx_ArgY
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.w !WinFx_ArgSize
+    LDA.b #!WinFx_Mode1
+    JSL BankC3_Entry0008
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !WinFx_TablePtr
+    STA.l !C2Scene_HdmaValues+4
+    CLC
+    ADC.w #!C2Scene_LineBufHalf
+    STA.l !C2Scene_HdmaValues+6
+    RTS
+
+; $C2:79C8 — C2Scene_AddGravity (24 bytes, $79C8–$79DF)
+; Script routine: adds 1/8 pixel a frame (C2Scene_GravityFrac) to the
+; task's Y velocity (.YVelFrac, carrying into .YVel).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (the record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .YVel; Y unchanged
+; No calls.
+C2Scene_AddGravity:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_Task.YVelFrac,X
+    ADC.w #!C2Scene_GravityFrac
+    STA.w C2Scene_Task.YVelFrac,X
+    LDA.w C2Scene_Task.YVel,X
+    ADC.w #0
+    STA.w C2Scene_Task.YVel,X
+    RTS
+
+; $C2:79E0 — C2Scene_NudgeXRandom (44 bytes, $79E0–$7A0B)
+; Script routine (op $34 at $C3:B792 and $C3:CB7E): moves the task right
+; by a random 0-48 pixels: a random byte x C2Scene_NudgeRange / 256
+; (WRMPYA/B), rounded up when the low byte of the product has bit 7 set.
+; Entry: M=1 (8-bit multiply; C2Scene_Random leaves M=1), X=0,
+;        DP=$0000, DB=$00 (the multiplier registers and the record);
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprX; Y unchanged;
+;        C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_NudgeXRandom:
+    JSR C2Scene_Random
+    STA.w WRMPYA
+    LDA.b #!C2Scene_NudgeRange
+    STA.w WRMPYB
+    NOP                                 ; the multiplier's 8 cycles
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYL
+    BMI .round_up
+    LDA.w RDMPYH
+    BRA .add
+.round_up:
+    LDA.w RDMPYH
+    INC A
+.add:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w C2Scene_Task.SprX,X
+    STA.w C2Scene_Task.SprX,X
+    RTS
+
+; $C2:7A0C — C2Scene_RandPosA (37 bytes with C2Scene_RandYA, $7A0C–$7A30)
+; Script routine: .SprX = $220 + a random 0-255, then falls into the
+; sub-entry C2Scene_RandYA ($C2:7A1F): .SprY = $38 + a random 0-255.
+; Entry (both): M=1 (C2Scene_Random leaves M=1; SEP #$20 before the
+;        sub-entry), X=0, DP=$0000, DB=$00 (the record and the random
+;        index); C2Scene_TaskCur = the task
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYA)
+; Calls: C2Scene_Random.
+C2Scene_RandPosA:
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosAX
+    STA.w C2Scene_Task.SprX,X
+    SEP #$20
+C2Scene_RandYA:                         ; header: see C2Scene_RandPosA
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosAY
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7A31 — C2Scene_RandPosB (37 bytes with C2Scene_RandYB, $7A31–$7A55)
+; Script routine: as C2Scene_RandPosA with .SprX = $E0 + a random 0-255,
+; falling into the sub-entry C2Scene_RandYB ($C2:7A44): .SprY = -$48 + a
+; random 0-255.
+; Entry (both): M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y unchanged;
+;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYB)
+; Calls: C2Scene_Random.
+C2Scene_RandPosB:
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosBX
+    STA.w C2Scene_Task.SprX,X
+    SEP #$20
+C2Scene_RandYB:                         ; header: see C2Scene_RandPosB
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosBY
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7A56 — C2Scene_NoiseInit (89 bytes, $7A56–$7AAE)
+; Script routine (op $34 at $C3:C953): sets up C2Scene_HdmaTable[0]
+; (two runs of 112 lines) as both HDMA channel 1 to BG1HOFS and channel
+; 2 to BG2HOFS (indirect, one register twice: both layers get the same
+; values) and turns them on. Fills C2Scene_LineBufA with the first $1C0
+; bytes of ROM bank $C0 (code, used as noise) and C2Scene_LineBufB with
+; C2Scene_Bg1HScroll on every line (one word stored, then copied up by
+; an overlapping MVN).
+; Quirk, kept: that MVN moves $1BF bytes, one more than the buffer's
+; rest, so the low byte of the scroll also lands at $7E:8FB6, the byte
+; after C2Scene_LineBufB. The table is pointed at a buffer by
+; C2Scene_NoiseShow / NoiseHide / NoiseStep.
+; Entry: M=1 (8-bit stores), X=0, DP=$0000 (C2Scene_Bg1HScroll,
+;        C2Scene_HdmaenShadow), DB=$00 (the DMA registers; saved around
+;        the MVNs)
+; Exit:  M=0, X=0; A = $FFFF, X = $8FB5, Y = $8FB7 (the last MVN's
+;        ends); DB unchanged
+; No calls.
+C2Scene_NoiseInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_BG1HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #(!BBAD_BG2HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH1|DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    REP #$20
+    PHB
+    LDX.w #0                            ; from $C0:0000
+    LDY.w #!C2Scene_LineBufA&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-1
+    MVN !Bank7E,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !C2Scene_Bg1HScroll
+    STA.l !C2Scene_LineBufB
+    LDX.w #!C2Scene_LineBufB&$FFFF
+    LDY.w #(!C2Scene_LineBufB+2)&$FFFF
+    LDA.w #!C2Scene_LineBufBytes-2      ; one byte too many (see the header)
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7AAF — C2Scene_NoiseStep (43 bytes, $7AAF–$7AD9)
+; Script routine: moves both C2Scene_HdmaValues words 0-1 on by 32
+; lines (C2Scene_NoiseStep bytes), back to C2Scene_LineBufA when they
+; reach its end ($8D16), so the screen shows the next part of the noise
+; (the second word can end up before the first; each wraps on its own).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long addressing)
+; Exit:  M=0; A = the new word 1; X, Y unchanged
+; No calls.
+C2Scene_NoiseStep:
+    REP #$20
+    LDA.l !C2Scene_HdmaValues
+    CLC
+    ADC.w #!C2Scene_NoiseStep
+    CMP.w #(!C2Scene_LineBufA+!C2Scene_LineBufBytes)&$FFFF
+    BCC .store0
+    LDA.w #!C2Scene_LineBufA&$FFFF
+.store0:
+    STA.l !C2Scene_HdmaValues
+    LDA.l !C2Scene_HdmaValues+2
+    CLC
+    ADC.w #!C2Scene_NoiseStep
+    CMP.w #(!C2Scene_LineBufA+!C2Scene_LineBufBytes)&$FFFF
+    BCC .store1
+    LDA.w #!C2Scene_LineBufA&$FFFF
+.store1:
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7ADA — C2Scene_NoiseShow (17 bytes, $7ADA–$7AEA)
+; Script routine (op $34 at $C3:CA30): points C2Scene_HdmaValues words
+; 0-1 at C2Scene_LineBufA and its second half (the noise).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long stores)
+; Exit:  M=0; A = the second address; X, Y unchanged
+; No calls.
+C2Scene_NoiseShow:
+    REP #$20
+    LDA.w #!C2Scene_LineBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_LineBufA+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7AEB — C2Scene_NoiseHide (17 bytes, $7AEB–$7AFB)
+; Script routine (no reference found): points C2Scene_HdmaValues words
+; 0-1 at C2Scene_LineBufB and its second half (every line the plain
+; C2Scene_Bg1HScroll that C2Scene_NoiseInit stored).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long stores)
+; Exit:  M=0; A = the second address; X, Y unchanged
+; No calls.
+C2Scene_NoiseHide:
+    REP #$20
+    LDA.w #!C2Scene_LineBufB&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_LineBufB+!C2Scene_LineBufHalf)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7AFC — C2Scene_UnpackBgPack (36 bytes, $7AFC–$7B1F)
+; Script routine (op $34 at $C3:A130 and $C3:C16E): unpacks the
+; C2SceneRom_BgPacks entry at byte offset C2Tmp_08 (entry x 3, a word set
+; by the script) into C2Scene_DecompBuf.
+; Entry: M=1, X=0 (the 16-bit offset), DP=$0000 (C2Tmp_08), DB=$00
+;        (Menu_Decomp*)
+; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_UnpackBgPack:
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.b !C2Tmp_08
+    REP #$20
+    LDA.l !C2SceneRom_BgPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_BgPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B20 — C2Scene_UnpackBg3MapPack (36 bytes, $7B20–$7B43)
+; Script routine (no op $34 reference found): as C2Scene_UnpackBgPack
+; from C2SceneRom_Bg3MapPacks.
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_08), DB=$00 (Menu_Decomp*)
+; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_UnpackBg3MapPack:
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDX.b !C2Tmp_08
+    REP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B44 — C2Scene_SetUnk7F00AABit0 (11 bytes, $7B44–$7B4E)
+; Script routine (op $34 at $C3:CCA3): sets bit 0 of C2Scene_Unk7F00AA
+; (a byte of Menu_FlagBlock7F; what it means is not traced).
+; Entry: M=1, X any, DP any, DB any (long addressing)
+; Exit:  M=1; A = the new byte; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00AABit0:
+    LDA.l !C2Scene_Unk7F00AA
+    ORA.b #!C2Scene_Unk7F00AABit0
+    STA.l !C2Scene_Unk7F00AA
+    RTS
+
+; $C2:7B4F — C2Scene_SetUnk7F019ABit3 (11 bytes, $7B4F–$7B59)
+; Script routine (op $34 at $C3:9238): sets bit 3 of C2Scene_Unk7F019A
+; (Menu_FlagBlock7F; meaning not traced).
+; Entry: M=1, X any, DP any, DB any (long addressing)
+; Exit:  M=1; A = the new byte; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F019ABit3:
+    LDA.l !C2Scene_Unk7F019A
+    ORA.b #!C2Scene_Unk7F019ABit3
+    STA.l !C2Scene_Unk7F019A
     RTS
 
 ; ============================================================

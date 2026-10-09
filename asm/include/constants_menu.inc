@@ -567,4 +567,42 @@ if !constants_menu_inc == 0
 !C2Scene_FullTurn = $0100                ; a whole turn in direction units (256): C2Scene_Unk229D's
                                          ; result for the up-right quarter is this - the angle
 
+; --- Screen effects and script routines ($C2:754D-$C2:7DE3) ---
+!C2Scene_PlaceRandMask = $7F             ; C2Scene_PlaceBelowView: random X spread 0-127 ...
+!C2Scene_PlaceMarginX = $0040            ; ... from 64 pixels into BG2's view
+!C2Scene_PlaceRowsDown = $0020           ; 32 tile rows (256 pixels) below the top of BG2's view
+!C2Scene_PlaceFixedCol = $002F           ; C2Scene_PlaceBelowViewAt178: tile column 47 (pixel $178)
+!C2Scene_RandVelMask = $000F             ; C2Scene_RandomVelocity: 16 entries ...
+!C2SceneRom_RandVelocities = $C6F640     ; ... of 8 bytes: .XVelFrac, .XVel, .YVelFrac, .YVel words
+!C2Scene_DriftHMask = $0003              ; C2Scene_TaskBg3Drift: BG3 one pixel left every 4 frames ...
+!C2Scene_DriftVMask = $0007              ; ... and one down every 8
+!C2Scene_HdmaRun112 = $F0                ; HDMA line count byte: repeat mode, 112 lines
+!C2Scene_HdmaRun64 = $C0                 ; repeat mode, 64 lines
+!C2Scene_HdmaRun32 = $A0                 ; repeat mode, 32 lines
+!C2Scene_WaveLineStep = $0010            ; sine steps (of 1024 a turn) from one line to the next: 64 lines
+                                         ; make one period
+!C2Scene_WaveSignBits = $C000            ; the sign bits a shift right by 2 clears (the wave is sin / 4)
+!C2Scene_LineBufHalf = $00E0             ; 112 lines of one word: the second half of a line buffer
+!C2Scene_LineBufBytes = $01C0            ; 224 lines of one word
+!C2Scene_LineWaveStep = $0004            ; C2Scene_TaskBg3LineWave: phase steps per frame
+!C2Scene_SlideXVelFrac = $8931           ; C2Scene_TaskBg3Slide's BG3 velocity: X -4 + $8931/65536
+!C2Scene_SlideXVel = $FFFC               ; (about -3.46 pixels a frame) ...
+!C2Scene_SlideYVel = $0002               ; ... and Y +2
+!C2Scene_SlideFastXVelFrac = $ADF4       ; C2Scene_TaskBg3SlideFast's: X -18 + $ADF4/65536
+!C2Scene_SlideFastXVel = $FFEE           ; (about -17.32) ...
+!C2Scene_SlideFastYVel = $FFF6           ; ... and Y -10
+!C2Scene_PanMask = $03                   ; C2Scene_TaskBg1Pan: one pixel every 4 frames
+!C2Scene_ViewMargin = $0010              ; C2Scene_TaskInView: the view test reaches 16 pixels past the
+!C2Scene_ViewTestW = $0120               ; left and top edges and spans 288 x 272 pixels
+!C2Scene_ViewTestH = $0110
+!C2Scene_GravityFrac = $2000             ; C2Scene_AddGravity: +1/8 pixel a frame to .YVel each call
+!C2Scene_NudgeRange = $30                ; C2Scene_NudgeXRandom: a random byte * this / 256 (0-48 rounded)
+!C2Scene_RandPosAX = $0220               ; C2Scene_RandPosA: X $220-$31F ...
+!C2Scene_RandPosAY = $0038               ; ... and Y $38-$137
+!C2Scene_RandPosBX = $00E0               ; C2Scene_RandPosB: X $E0-$1DF ...
+!C2Scene_RandPosBY = $FFB8               ; ... and Y -$48 to $B7
+!C2Scene_NoiseStep = $0040               ; C2Scene_NoiseStep: 32 lines further into the noise each call
+!C2Scene_Unk7F00AABit0 = $01
+!C2Scene_Unk7F019ABit3 = $08
+
 endif

@@ -356,8 +356,15 @@ endstruct align 8
 !C2Scene_ObjBMate2X = $02AA              ; and of slot 2's
 !C2Scene_ObjBMate2Y = $02AC
 !C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
-                                         ; C2Scene_LeaderBoard move (read by unmatched code)
-!C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
+                                         ; C2Scene_LeaderBoard move; the BG3 tasks (C2Scene_TaskBg3Drift ...)
+                                         ; add it to C2Scene_Bg3HScroll and zero it
+!C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel (added to C2Scene_Bg3VScroll)
+!C2Scene_PartySave = $1BA3               ; 3 B: Party_Members saved by C2Scene_SaveParty (read back by
+                                         ; C2Scene_RestoreParty)
+!C2Scene_Unk01E2 = $01E2                 ; 16-bit; the phase C2Scene_TaskBg3LineWave reaches through a
+                                         ; stale index (task +$22 with X = $1C0); other use not traced
+!C2Scene_Unk7F00AA = $7F00AA             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_SetUnk7F00AABit0
+!C2Scene_Unk7F019A = $7F019A             ; 8-bit in Menu_FlagBlock7F; bit 3 set by C2Scene_SetUnk7F019ABit3
 !C2Scene_IdleFrames = $02B1              ; 3 B, C2Scene_Unk02B1, one per party slot: frames the leader
                                          ; (C2Scene_LeaderInput) or member (C2Scene_MemberFollow) has
                                          ; stood still (see C2Scene_IdleAnimAt)
@@ -470,10 +477,20 @@ struct C2Scene_HdmaTable $7E8A35
 .Value0: skip 2
 .Count1: skip 1
 .Value1: skip 2
-         skip 7
+.End:    skip 1        ; the effect routines at $C2:754D-$C2:7DE3 write 0 here (ends the table)
+         skip 6
 endstruct align 13
 !C2Scene_HdmaTableA918 = $7EA918         ; probably an HDMA table of 3-byte entries (count, word):
                                          ; the NMI writes the word of entries 0-3
+!C2Scene_WaveBuf = $7EA925               ; 64 words: one BG3HOFS value per line of a 64-line band
+                                         ; (C2Scene_TaskBg3Wave), the HDMA source C2Scene_HdmaValueA916
+                                         ; points into
+!C2Scene_WaveBufCopy = $7EA9A5           ; 64 words: a copy of C2Scene_WaveBuf, so that 64 words can be read
+                                         ; from any start inside it
+!C2Scene_LineBufA = $7E8B56              ; four buffers of 224 words, one per screen line, that the
+!C2Scene_LineBufB = $7E8DF6              ; effect routines at $C2:754D-$C2:7DE3 fill and point
+!C2Scene_LineBufC = $7E9176              ; C2Scene_HdmaValues at (each value covers 112 lines:
+!C2Scene_LineBufD = $7E9416              ; a buffer, then the buffer + C2Scene_LineBufHalf)
 
 ;
 ; A scene task: one 64-byte record of C2Scene_TaskRecords, run once per
@@ -639,6 +656,20 @@ endstruct
 
 ; Object A's task (C2Scene_ObjATask) and its mark task: the fields after
 ; C2Scene_Task's motion words (+$22-$25 and the targets as C2Scene_WalkTask).
+; The screen-effect tasks and script routines at $C2:754D-$C2:7DE3 use
+; three more fields; the scripts that start them set them (op $0D).
+struct C2Scene_EffectTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: 0 until the task's first frame
+            skip $1F   ; +$03-$21: as C2Scene_Task
+.Var22:     skip 2     ; +$22 frame counter or wave phase (the BG3 tasks), window size byte
+                       ; (C2Scene_Win1Step / Win2Step) or wave amplitude byte (C2Scene_Bg2HWaveStep)
+.Var24:     skip 2     ; +$24 buffer toggle byte (C2Scene_Win1Step / Win2Step) or wave
+                       ; phase word (C2Scene_Bg2HWaveStep)
+.Var26:     skip 1     ; +$26 buffer toggle byte (C2Scene_Bg2HWaveStep / Bg2VWaveStep)
+            skip $19
+endstruct
+
 struct C2Scene_ObjTask $0000
             skip 2     ; +$00 .Handler
 .State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state (C2Scene_ObjAStates)
