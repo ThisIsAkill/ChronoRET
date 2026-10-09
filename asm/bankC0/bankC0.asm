@@ -28341,6 +28341,252 @@ Scene_ReloadStep:
     RTS
 
 ; ============================================================
+; The tile-animation list ($C0:28AA–$C0:29F6)
+; TileAnimList (16 words at $7F:1CC8) remembers the map tiles whose
+; animation ran at this location (Field_SceneChangeTick adds each one
+; as it starts a Mode*_Handler), so a reload of the location
+; (Scene_ReloadStep) can put their final states back into
+; Map_TileProps before the map is drawn. An entry is a Map_TileProps
+; index (row << 8 | column, as Field_TileAnimX/Y); TileAnimList_Empty
+; ($8080, bit 15 set) marks the end. Map_TileProps states, from the
+; Mode*_Handlers: $E6 a 1x2 column (both tiles $E6); $EC / $EE the
+; bottom-left / bottom-right tile of a 2x2 block (top row $E8, $EA);
+; $FA / $FC the bottom-left / bottom-right tile of a 2x3 block (rows
+; above $F6 $F8, then $F2 $F4); a handler adds 1 to each tile's state.
+; ============================================================
+
+org $C028AA
+; ------------------------------------------------------------
+; $C0:28AA — TileAnimList_Clear (22 bytes, $28AA–$28BF)
+; Fills TileAnimList with TileAnimList_Empty (all 16 entries).
+; Callers (1 JSR site): GameLoop_LoadField ($C0:0091).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the offset), DP any, DB any
+;   (long stores).
+; Exit: M=1, X=0, DP and DB unchanged; A = TileAnimList_Empty (B =
+;   $80), X = TileAnimList_Bytes; Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_Clear:
+    REP #$20
+    LDA.w #!TileAnimList_Empty
+    LDX.w #$0000
+.loop:
+    STA.l !TileAnimList,X
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:28C0 — TileAnimList_AddCurrent (33 bytes, $28C0–$28E0)
+; Adds the tile at Field_TileAnimX/Y (the 16-bit word) to TileAnimList:
+;   from the first entry on, it stops at an entry equal to it (already
+;   listed) or puts it in the first empty one. With all 16 entries
+;   taken by other tiles nothing is stored.
+; Callers (1 JSR site): Field_SceneChangeTick ($C0:0D49).
+; On entry: M=1 (8-bit A), X=0 (16-bit X: the offset), DP=$0100
+;   (Field_TileAnimX/Y are dp), DB any (long list).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered (B = the entry's
+;   high byte, or Field_TileAnimY); X = the entry's offset (or
+;   TileAnimList_Bytes when full); Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_AddCurrent:
+    REP #$20
+    LDX.w #$0000
+.loop:
+    LDA.l !TileAnimList,X
+    BMI .empty
+    CMP.b !Field_TileAnimX              ; 16-bit: row << 8 | column
+    BEQ .done
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+.done:
+    SEP #$20
+    RTS
+.empty:
+    LDA.b !Field_TileAnimX
+    STA.l !TileAnimList,X
+    BRA .done
+
+; ------------------------------------------------------------
+; $C0:28E1 — TileAnimList_ApplyAll (24 bytes, $28E1–$28F8)
+; Runs TileAnimList_ApplyOne for each TileAnimList entry up to the
+;   first empty one (or all 16).
+; Callers (2 JSR sites): DefaultHandler ($C0:18C4) and Scene_ReloadStep ($C0:286C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB
+;   any (long accesses).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X = the offset of
+;   the empty entry (or TileAnimList_Bytes); Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_ApplyAll:
+    REP #$20
+    LDX.w #$0000
+.loop:
+    LDA.l !TileAnimList,X
+    BMI .done
+    JSR TileAnimList_ApplyOne
+    INX
+    INX
+    CPX.w #!TileAnimList_Bytes
+    BCC .loop
+.done:
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:28F9 — TileAnimList_ApplyOne (254 bytes, $28F9–$29F6)
+; Puts the animated states of one listed tile into Map_TileProps, by
+;   the state at the index A holds (only the five start states count;
+;   any other leaves the map alone):
+; - $E6: the tile and the one above it = $E7;
+; - $EC: the tile $ED, the one right of it $EF, above those $EB (right)
+;   and $E9;
+; - $EE: the tile $EF, the one left of it $ED, above those $E9 (left)
+;   and $EB;
+; - $FA: the tile $FB, right of it $FD; the row above $F7 / $F9 (left
+;   / right); two rows up $F3 / $F5;
+; - $FC: the tile $FD, left of it $FB; the row above $F7 / $F9; two
+;   rows up $F3 / $F5.
+; Those are the states the Mode*_Handlers leave (each adds 1), so it
+;   assumes the other tiles of the block are still at their start
+;   states.
+; Callers (1 JSR site): TileAnimList_ApplyAll ($C0:28EC).
+; On entry: M=0 (16-bit A: the Map_TileProps index), X=0 (16-bit X/Y),
+;   DP any (not used), DB any (long accesses).
+; Exit: M=0, X=0, DP and DB unchanged; X preserved (PHX/PLX); A
+;   clobbered; Y unchanged.
+; ------------------------------------------------------------
+TileAnimList_ApplyOne:
+    PHX
+    TAX
+    SEP #$20
+    LDA.l !Map_TileProps,X
+    CMP.b #!TileAnim_ModeE6
+    BEQ .column
+    CMP.b #!TileAnim_ModeEC
+    BEQ .block2_left
+    CMP.b #!TileAnim_ModeEE
+    BEQ .block2_right
+    CMP.b #!TileAnim_ModeFA
+    BEQ .block3_left
+    CMP.b #!TileAnim_ModeFC
+    BNE .done
+    BRL .block3_right
+.done:
+    REP #$20
+    PLX
+    RTS
+.column:
+    INC A
+    STA.l !Map_TileProps,X
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_ModeE6+1
+    STA.l !Map_TileProps,X              ; the tile above
+    BRA .done
+.block2_left:
+    INC A
+    STA.l !Map_TileProps,X
+    INX
+    LDA.b #!TileAnim_ModeEE+1
+    STA.l !Map_TileProps,X              ; right
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box2TopRight+1
+    STA.l !Map_TileProps,X              ; above right
+    LDA.b #!TileAnim_Box2TopLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; above
+    BRA .done
+.block2_right:
+    INC A
+    STA.l !Map_TileProps,X
+    DEX
+    LDA.b #!TileAnim_ModeEC+1
+    STA.l !Map_TileProps,X              ; left
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box2TopLeft+1
+    STA.l !Map_TileProps,X              ; above left
+    LDA.b #!TileAnim_Box2TopRight+1
+    INX
+    STA.l !Map_TileProps,X              ; above
+    BRA .done
+.block3_left:
+    INC A
+    STA.l !Map_TileProps,X
+    INX
+    LDA.b #!TileAnim_ModeFC+1
+    STA.l !Map_TileProps,X              ; right
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3MidRight+1
+    STA.l !Map_TileProps,X              ; above right
+    LDA.b #!TileAnim_Box3MidLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; above
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3TopLeft+1
+    STA.l !Map_TileProps,X              ; two up
+    LDA.b #!TileAnim_Box3TopRight+1
+    INX
+    STA.l !Map_TileProps,X              ; two up, right
+    BRL .done
+.block3_right:
+    INC A
+    STA.l !Map_TileProps,X
+    DEX
+    LDA.b #!TileAnim_ModeFA+1
+    STA.l !Map_TileProps,X              ; left
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3MidLeft+1
+    STA.l !Map_TileProps,X              ; above left
+    LDA.b #!TileAnim_Box3MidRight+1
+    INX
+    STA.l !Map_TileProps,X              ; above
+    REP #$20
+    TXA
+    SEC
+    SBC.w #!Map_RowStride
+    TAX
+    SEP #$20
+    LDA.b #!TileAnim_Box3TopRight+1
+    STA.l !Map_TileProps,X              ; two up
+    LDA.b #!TileAnim_Box3TopLeft+1
+    DEX
+    STA.l !Map_TileProps,X              ; two up, left
+    BRL .done
+
+; ============================================================
 ; $C0:29F7 — Field_Unk29F7 (385 bytes, $29F7–$2B77)
 ; Writes a 32 x 10 tilemap (Field_UploadUnk1D00Bytes, $280 bytes) to
 ; Field_Unk7EF000 through the WRAM data port, DP = DP_PPU; Field_UploadUnk1D00

@@ -31,12 +31,6 @@ IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline her
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
 
-org $C028AA
-TileAnimList_Clear: ; fills the 16-word list at $7F:1CC8 with $8080 (empty)
-org $C028C0
-TileAnimList_AddCurrent: ; adds dp $5B to the $7F:1CC8 list unless already present
-org $C028E1
-TileAnimList_ApplyAll: ; for each non-empty $7F:1CC8 entry, applies it through $28F9 ($7E:3000 table)
 
 ; --- Other banks, called from bank $C0 ---
 

@@ -783,6 +783,9 @@ if !ram_engine_inc == 0
                                          ; bytes from entry + 2 to Pal_Buf row 0
 !FieldRom_Unk9CF0 = $FF9CF0              ; ROM: four 64-byte pieces Field_UploadUnk0000 sends to VRAM
 !FieldRom_Unk9260 = $FF9260              ; ROM: 64 bytes Field_UploadUnk57E0 sends to VRAM $57E0
+!TileAnimList = $7F1CC8                  ; 16 words: Map_TileProps indexes (row << 8 | column) of the
+                                         ; tiles animated at this location (TileAnimList_AddCurrent),
+                                         ; re-applied by TileAnimList_ApplyAll after a reload
 !Field_Unk7EF000 = $7EF000               ; WRAM source of Field_UploadUnk1C00/1D00 (VRAM $1C00/$1D00);
                                          ; Field_Unk29F7 / Field_Unk2B78 write the two tilemaps
 !Field_Unk7EF000RunEnd = $D9             ; alias of Eng_Scratch in Field_Unk2B78 (written absolute,

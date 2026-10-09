@@ -1068,3 +1068,14 @@ endif
 !FieldMsg_WaitUnit = 15                  ; frames per unit of TextWin_Code3Arg (Field_Unk34 = arg x this)
 !FieldMsg_TreasureStrs = $DEFF00         ; ROM: the string table TextWin_Init gets for a treasure message
                                          ; (indexed by Field_Unk2A, the TreasureKind)
+
+; --- The tile-animation list ($C0:28AA-$C0:29F6) ---
+!TileAnimList_Empty = $8080              ; TileAnimList entry: empty (bit 15 set; ends the list)
+!TileAnimList_Bytes = $0020              ; bytes of TileAnimList (16 word entries)
+!TileAnim_Box2TopLeft = $E8              ; Map_TileProps start state of a 2x2 block's top-left tile (bottom
+                                         ; row TileAnim_ModeEC / ModeEE)
+!TileAnim_Box2TopRight = $EA             ; ... its top-right tile
+!TileAnim_Box3MidLeft = $F6              ; a 2x3 block's middle-row left tile (bottom row ModeFA / ModeFC)
+!TileAnim_Box3MidRight = $F8             ; ... middle-row right
+!TileAnim_Box3TopLeft = $F2              ; ... top-row left
+!TileAnim_Box3TopRight = $F4             ; ... top-row right
