@@ -18,156 +18,8 @@ org $C10003
 BattleSys_RunServiceVec:                ; JSR: JMP $0045 (BattleSys_RunService), A = service number
 org $C10006
 BattleSys_ExitVec:                      ; JMP from BattleSys_Main's end: JMP $001F -> JML $CF:FBE5 (not analysed)
-; --- Enemy script handlers (tables BattleAi_TestTable, BattleAi_ChooseTable,
-;     BattleAi_RunTable, BattleAi_TargetTable at $C1:B80D-$C1:B92C; not analysed) ---
-org $C18EAB
-BattleAi_Test01:                        ; BattleAi_TestTable entry $01
-org $C18F11
-BattleAi_Test02:                        ; BattleAi_TestTable entry $02
-org $C18F87
-BattleAi_Test03:                        ; BattleAi_TestTable entry $03
-org $C18FDA
-BattleAi_Test04:                        ; BattleAi_TestTable entry $04
-org $C19013
-BattleAi_Test05:                        ; BattleAi_TestTable entry $05
-org $C19045
-BattleAi_Test06:                        ; BattleAi_TestTable entry $06
-org $C19082
-BattleAi_Test07:                        ; BattleAi_TestTable entry $07
-org $C190BE
-BattleAi_Test08:                        ; BattleAi_TestTable entry $08
-org $C19130
-BattleAi_Test09:                        ; BattleAi_TestTable entry $09
-org $C1918E
-BattleAi_Test0A:                        ; BattleAi_TestTable entry $0A
-org $C191F9
-BattleAi_Test0B:                        ; BattleAi_TestTable entry $0B
-org $C1925D
-BattleAi_Test0C:                        ; BattleAi_TestTable entry $0C
-org $C192A3
-BattleAi_Test0D:                        ; BattleAi_TestTable entry $0D
-org $C19314
-BattleAi_Test0E:                        ; BattleAi_TestTable entry $0E
-org $C1938D
-BattleAi_Test0F:                        ; BattleAi_TestTable entry $0F
-org $C193E6
-BattleAi_Test10:                        ; BattleAi_TestTable entry $10
-org $C1942A
-BattleAi_Test11:                        ; BattleAi_TestTable entry $11
-org $C19474
-BattleAi_Test12:                        ; BattleAi_TestTable entry $12
-org $C194D2
-BattleAi_Test13:                        ; BattleAi_TestTable entry $13
-org $C19514
-BattleAi_Test14:                        ; BattleAi_TestTable entry $14
-org $C1959A
-BattleAi_Test15:                        ; BattleAi_TestTable entry $15
-org $C195D6
-BattleAi_Test16:                        ; BattleAi_TestTable entry $16
-org $C195DA
-BattleAi_Test17:                        ; BattleAi_TestTable entry $17
-org $C195FA
-BattleAi_Test18:                        ; BattleAi_TestTable entries $18, $23, $24, $25, $26, $27, $28
-org $C19652
-BattleAi_Test19:                        ; BattleAi_TestTable entry $19
-org $C19656
-BattleAi_Test1A:                        ; BattleAi_TestTable entry $1A
-org $C196A5
-BattleAi_Test1B:                        ; BattleAi_TestTable entry $1B
-org $C196D4
-BattleAi_Test1C:                        ; BattleAi_TestTable entry $1C
-org $C19728
-BattleAi_Test1D:                        ; BattleAi_TestTable entry $1D
-org $C1975C
-BattleAi_Test1E:                        ; BattleAi_TestTable entry $1E
-org $C19765
-BattleAi_Test1F:                        ; BattleAi_TestTable entry $1F
-org $C197AB
-BattleAi_Test20:                        ; BattleAi_TestTable entry $20
-org $C197C0
-BattleAi_Test21:                        ; BattleAi_TestTable entry $21
-org $C197D5
-BattleAi_Test22:                        ; BattleAi_TestTable entry $22
-org $C19810
-BattleAi_Choose00:                      ; BattleAi_ChooseTable entry $00
-org $C1983A
-BattleAi_Choose01:                      ; BattleAi_ChooseTable entries $01, $02
-org $C198C4
-BattleAi_Choose03:                      ; BattleAi_ChooseTable entry $03
-org $C198C5
-BattleAi_Choose04:                      ; BattleAi_ChooseTable entry $04
-org $C19960
-BattleAi_Choose05:                      ; BattleAi_ChooseTable entry $05
-org $C19961
-BattleAi_Choose06:                      ; BattleAi_ChooseTable entry $06
-org $C19962
-BattleAi_Choose07:                      ; BattleAi_ChooseTable entry $07
-org $C19966
-BattleAi_Choose08:                      ; BattleAi_ChooseTable entry $08
-org $C19967
-BattleAi_Choose09:                      ; BattleAi_ChooseTable entry $09
-org $C19978
-BattleAi_Choose0A:                      ; BattleAi_ChooseTable entry $0A
-org $C19979
-BattleAi_Choose0B:                      ; BattleAi_ChooseTable entry $0B
-org $C1997D
-BattleAi_Choose0C:                      ; BattleAi_ChooseTable entry $0C
-org $C1997E
-BattleAi_Choose0D:                      ; BattleAi_ChooseTable entry $0D
-org $C1997F
-BattleAi_Choose0E:                      ; BattleAi_ChooseTable entry $0E
-org $C19980
-BattleAi_Choose0F:                      ; BattleAi_ChooseTable entry $0F
-org $C19981
-BattleAi_Choose10:                      ; BattleAi_ChooseTable entries $10, $16
-org $C199B4
-BattleAi_Choose11:                      ; BattleAi_ChooseTable entries $11, $12, $13, $14, $15
-org $C199B8
-BattleAi_Run00:                         ; BattleAi_RunTable entry $00
-org $C199BE
-BattleAi_Run01:                         ; BattleAi_RunTable entry $01
-org $C19A39
-BattleAi_Run02:                         ; BattleAi_RunTable entry $02
-org $C19B46
-BattleAi_Run03:                         ; BattleAi_RunTable entry $03
-org $C19B47
-BattleAi_Run04:                         ; BattleAi_RunTable entry $04
-org $C19B48
-BattleAi_Run05:                         ; BattleAi_RunTable entry $05
-org $C19B8C
-BattleAi_Run06:                         ; BattleAi_RunTable entry $06
-org $C19B8D
-BattleAi_Run07:                         ; BattleAi_RunTable entry $07
-org $C19C6E
-BattleAi_Run08:                         ; BattleAi_RunTable entry $08
-org $C19C6F
-BattleAi_Run09:                         ; BattleAi_RunTable entry $09
-org $C19CB3
-BattleAi_Run0A:                         ; BattleAi_RunTable entry $0A
-org $C19D1B
-BattleAi_Run0B:                         ; BattleAi_RunTable entry $0B
-org $C19D72
-BattleAi_Run0C:                         ; BattleAi_RunTable entry $0C
-org $C19DCE
-BattleAi_Run0D:                         ; BattleAi_RunTable entry $0D
-org $C19E62
-BattleAi_Run0E:                         ; BattleAi_RunTable entry $0E
-org $C19E63
-BattleAi_Run0F:                         ; BattleAi_RunTable entry $0F
-org $C19E78
-BattleAi_Run10:                         ; BattleAi_RunTable entry $10
-org $C19F5A
-BattleAi_Run11:                         ; BattleAi_RunTable entry $11
-org $C19FD2
-BattleAi_Run12:                         ; BattleAi_RunTable entry $12
-org $C1A14E
-BattleAi_Run13:                         ; BattleAi_RunTable entry $13
-org $C1A188
-BattleAi_Run14:                         ; BattleAi_RunTable entry $14
-org $C1A20B
-BattleAi_Run15:                         ; BattleAi_RunTable entry $15
-org $C1A396
-BattleAi_Run16:                         ; BattleAi_RunTable entry $16
+; --- Enemy script target handlers (BattleAi_TargetTable at $C1:B8BB-$C1:B92C;
+;     not analysed) ---
 org $C1A3F6
 BattleAi_Target00:                      ; BattleAi_TargetTable entry $00
 org $C1A3F7
@@ -355,6 +207,10 @@ BattleMsg_ShowMsg0BIfKeyChangedVec:     ; JSL vector: battle message / info pane
 
 org $CD0030
 BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
+
+org $CD0033
+BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-zero script byte (!Battle_UnkB3C7);
+                                        ; run by the enemy-script run handlers; a battle message, probably; not analysed
 
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967

@@ -55,7 +55,8 @@ BattleFD_UnkA982:
 
 ; $FD:A990 — BattleFD_RestoreEnemies (264 bytes, $A990–$AA97)
 ; Probably a script command that brings removed enemies back: the
-; caller ($C1:A3B6, unmatched) leaves the script read address in
+; caller (BattleAi_RunRestoreAndSetStats, run handler $16, at $C1:A3B6)
+; leaves the script read address in
 ; !Battle_UnkB1D2 (bank $CC) and the record id in !BattleTmp_12.
 ;   - Script bytes +3..+10 are four (offset, value) pairs: each value is
 ;     written to the stat block of slot !Battle_UnkB18B (the address in
@@ -77,7 +78,7 @@ BattleFD_UnkA982:
 ; the id back from !Battler_UnkAF0A.
 ; Quirk: the HP choice reuses DP $0E, the offset of the fourth pair, so
 ; the same script byte both picks a stat-block byte and the HP.
-; Callers (1 JSL site): unmatched ($C1:A3B6).
+; Callers (1 JSL site): BattleAi_RunRestoreAndSetStats ($C1:A3B6).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB1D2 = script address in bank
 ;        $CC, !Battle_UnkB18B = the slot whose stat block is written,
 ;        !BattleTmp_12 = record id for !Battle_ActId
@@ -275,7 +276,8 @@ BattleFD_UnkAAB0:
 ; the record's offset. BattleFD_LoadUnkB18E2 is the same for the table at
 ; !BattleRom_UnkCC88CB. What the records hold is not traced
 ; (BattleAi_SetCmdBits, $C1:AC89, ORs a slot + 3 into B18E).
-; Callers (3 JSL sites): unmatched ($C1:9B1C, $C1:A128, $C1:A370).
+; Callers (3 JSL sites): BattleAi_RunTech ($C1:9B1C), BattleAi_RunSetStatsTech ($C1:A128) and
+;   BattleAi_RunAddStatsTech ($C1:A370).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B (A's high byte) = 0, presumably: both
 ;        TAX copy it into the Mul16 factors (not traced at the callers)
 ; Exit:  M=1, X=0; A = record byte 1; X = record offset; Y unchanged;
@@ -304,7 +306,7 @@ BattleFD_LoadUnkB18E:
 
 ; $FD:AB01 — BattleFD_LoadUnkB18E2 (47 bytes, $AB01–$AB2F)
 ; BattleFD_LoadUnkB18E with the records of !BattleRom_UnkCC88CB.
-; Callers (1 JSL site): unmatched ($C1:9A25).
+; Callers (1 JSL site): BattleAi_RunAttack ($C1:9A25).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0, presumably (as BattleFD_LoadUnkB18E)
 ; Exit:  M=1, X=0; A = record byte 1; X = record offset; Y unchanged;
 ;        !Battle_MathA/B/Lo/Hi as Battle_Mul16 leaves them
@@ -2062,8 +2064,8 @@ BattleFD_UnkB3FE:
 ; Battle_SetupBattle runs it for each entry, BattleFD_RestoreEnemies for
 ; each enemy it brings back.
 ; Quirk: .Unk3F is stored twice.
-; Callers (4 JSL sites): Battle_SetupBattle ($C1:FAAC), BattleFD_RestoreEnemies ($FD:AA2E) and
-;   unmatched ($C1:9C30, $C1:9EDA).
+; Callers (4 JSL sites): BattleAi_RunSwapInEnemy ($C1:9C30), BattleAi_RunRestoreEnemies ($C1:9EDA),
+;   Battle_SetupBattle ($C1:FAAC) and BattleFD_RestoreEnemies ($FD:AA2E).
 ; Entry: M=1, X=0, DP=0, DB=$7E; X = enemy entry 0-7, DP $02 = the same
 ;        (16-bit)
 ; Exit:  M=1, X=0; A = 3 (B = 0); X, Y clobbered; DP $00 = 3, $04 =

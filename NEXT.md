@@ -109,10 +109,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    sets it; magic, probably), the double counting of tech points in `BattleSys_SpendTechPoints`
    (a quirk as the code reads; worth a check in an emulator), and who reads `!Battle_SavedTargetMasks`.
    Headers edited by it (back to review): BattleSys_Main (the renamed calls), BattleSys_RunUnkB2CCHandler,
-   BattleSys_HitModTable (renamed), BattleSys_RollUpTo1A, RandomTableFD and BattleFD_UnkAD17. Next, in
-   reach order: the script handlers themselves (stubs `BattleAi_TestNN`
-   `$C1:8EAB`-`$C1:980F`, `BattleAi_ChooseNN` `$C1:9810`-`$C1:99B7`, `BattleAi_RunNN`
-   `$C1:99B8`-`$C1:A3F5`, `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`);
+   BattleSys_HitModTable (renamed), BattleSys_RollUpTo1A, RandomTableFD and BattleFD_UnkAD17. Also matched (the
+   script-handler batch): the test handlers `$C1:8EAB`-`$C1:980F` (`BattleAi_TestHpHalfOrLess` ...
+   `BattleAi_TestUnkB158`, BattleAi_TestTable entries $01-$28), the choose handlers
+   `$C1:9810`-`$C1:99B7` (`BattleAi_ChooseAnimTarget`, `ChooseTarget`, `ChooseByChance`,
+   `ChooseActId`, `ChooseIfGoneEnemy`, the `ChooseClear*` / `ChooseNop*` ones) and the run handlers
+   `$C1:99B8`-`$C1:A3F5` (`BattleAi_RunAttack`, `RunTech`, `RunSwapInEnemy`, `RunLeave`, `RunKoSelf`,
+   `RunRestoreEnemies`, the stat-byte setters, `RunRestoreAndSetStats`, `BattleAi_AddStatByteAtY`);
+   each header keeps its table index. Headers edited by it (back to review): BattleAi_TestPassed
+   (`.pick_action` label, names), BattleAi_ReadTargets, ClearTargets, ArgToDp0E, PickMarkedTarget,
+   NoteFirstTest, SetCmdBits, FillActBlock, SetTargetMask, RunMainPart (Exit line), the
+   TestTable / ChooseTable / RunTable headers, BattleSys_MapEmptyTarget and
+   BattleFD_RestoreEnemies. Open from it: what `$CD:0033` shows (`BattleMsg_UnkVecCD0033`, a
+   message by `!Battle_UnkB3C7`, probably), `!Battle_UnkB19E`'s 4-byte records (tests $11-$15),
+   `!Battle_UnkB320`, `!Battle_UnkB158`, what the action codes 5 / 7 left in `!BattleAi_ActCode`
+   by run handlers $07 / $09 do later, and the many quirks recorded in the headers (tests
+   $01, $0D, $0E, $14, $18, $1C; run handlers $0D, $12, $15). Next, in reach order: the target
+   handlers (stubs `BattleAi_TargetNN` `$C1:A3F6`-`$C1:AC13`);
    the bank-$FD callees still unmatched, `$FD:A8A5`/`A93C`/`A95F`
    (stubs in unmatched_battle.asm; `$FD:A8A5` sets `!Battle_UnkB3EA`, `$FD:A95F` reads
    `!Battle_CmdPcs`, probably; the other `BattleFD_*` callees are matched, see item 4); the vectors `$C1:0000`-`$C1:0050` (`BattleSys_RunServiceVec`, `BattleSys_ExitVec`)
