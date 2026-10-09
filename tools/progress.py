@@ -6,7 +6,7 @@ Builds the source, proves which bytes it emits (tools/verify.py's two-base
 method), reads label addresses from asar, applies the readability lint and
 the review log, and writes:
 
-  symbols/functions.csv         one row per function: where, how big, status
+  symbols/functions.csv         one row per function: where, how big, kind, status
   symbols/progress.json         totals, per bank, per 4 KB address-map slice
   symbols/progress_history.csv  one row per working day (--update-history)
 
@@ -14,6 +14,11 @@ functions.csv and progress.json are not tracked: every tool that reads them
 regenerates them when they are stale (tools/generated.py), and the docs
 carry no generated numbers. Run `--update` to have them on disk (the wiki
 sync reads them from here). Never type a count or percentage by hand.
+
+A function's kind is `data` when its source body (label through last
+code line) emits only through data directives (db/dw/dl/dd/fill/incbin...)
+and `code` otherwise, mixed bodies included (tools/asm_source.py). Every
+"share of game code" counts code bytes only; data bytes are reported beside.
 
 A function's status (each level includes the previous):
   matched    every byte from its label to the next is emitted by source
@@ -64,8 +69,19 @@ DOCS = [Path('README.md'), Path('CONTRIBUTING.md'), Path('STATUS.md')]
 GENERATED_BLOCK = re.compile(r'<!-- (progress|status):start -->')
 
 # Code-byte denominators: re-surveyed only when the code/data boundary is.
-CODE_BYTES_TOTAL = 359278
-CODE_BYTES = {'$C0': 61779, '$C1': 63904}
+# A bank fully covered by source needs no survey: its code bytes are those
+# of its routines whose kind is code (functions.csv). $C0 is fully covered
+# (65,536 bytes) and its routines count 60,857 code bytes and 4,679 data
+# bytes; the one-off survey had 61,779 (it took some tables and fill for
+# code). CODE_BYTES['$C0'] is the counted figure, and CODE_BYTES_TOTAL moved
+# by the same difference (-922, from 359,278). $C1 is not fully covered yet
+# and keeps its survey. A bank whose matched code outgrows its survey is
+# reported against the matched figure and flagged "survey low".
+CODE_BYTES_TOTAL = 358356
+CODE_BYTES = {'$C0': 60857, '$C1': 63904}
+# progress.json: 2 had bytes per level; 3 splits them into code_bytes and
+# data_bytes, adds surveyed_code_bytes and per-bank survey_low.
+SCHEMA = 3
 SLICE = 0x1000
 LEVELS = ('matched', 'readable', 'verified')
 
@@ -110,7 +126,7 @@ def source_functions() -> dict[str, dict]:
     line, so editing its header voids its review too (tools/asm_source.py).
     """
     return {name: {'file': r.file, 'note': header_note(r.lines, r.label, name),
-                   'source_hash': r.source_hash}
+                   'source_hash': r.source_hash, 'kind': r.kind}
             for name, r in asm_source.regions().items()}
 
 
@@ -237,7 +253,7 @@ def analyse() -> dict:
         functions.append({
             'address': offset_to_snes(start), 'end': offset_to_snes(end - 1), 'size': end - start,
             'name': name, 'bank': f'${0xC0 + (start >> 16):02X}', 'subsystem': subsystem(name),
-            'status': 'matched', 'source_hash': source[name]['source_hash'],
+            'kind': source[name]['kind'], 'status': 'matched', 'source_hash': source[name]['source_hash'],
             'notes': source[name]['note'], '_start': start,
         })
 
@@ -257,16 +273,24 @@ def analyse() -> dict:
         out = {}
         for level in LEVELS:
             reached = [f for f in rows if LEVELS.index(f['status']) >= LEVELS.index(level)]
-            out[level] = {'functions': len(reached), 'bytes': sum(f['size'] for f in reached)}
+            code = sum(f['size'] for f in reached if f['kind'] == 'code')
+            data = sum(f['size'] for f in reached if f['kind'] == 'data')
+            out[level] = {'functions': len(reached), 'bytes': code + data,
+                          'code_bytes': code, 'data_bytes': data}
         return out
 
     banks = sorted({f'${0xC0 + (o >> 16):02X}' for o in emitted} | set(CODE_BYTES))
     bank_rows = []
     for b in banks:
         rows = [f for f in functions if f['bank'] == b]
-        bank_rows.append({'bank': b, 'code_bytes': CODE_BYTES.get(b),
+        levels = level_totals(rows)
+        surveyed = CODE_BYTES.get(b)
+        matched_code = levels['matched']['code_bytes']
+        bank_rows.append({'bank': b, 'code_bytes': max(surveyed, matched_code) if surveyed else None,
+                          'surveyed_code_bytes': surveyed,
+                          'survey_low': bool(surveyed) and matched_code > surveyed,
                           'emitted_bytes': sum(1 for o in emitted if f'${0xC0 + (o >> 16):02X}' == b),
-                          **level_totals(rows)})
+                          **levels})
 
     slices = []
     for b in banks:
@@ -279,14 +303,19 @@ def analyse() -> dict:
             })
     for f in functions:
         del f['_start']
-    return {'emitted_bytes': len(emitted), 'code_bytes': CODE_BYTES_TOTAL,
+    # A surveyed bank whose matched code outgrows its survey was surveyed
+    # low: its share is taken against the matched code, and so is the total.
+    excess = sum(b['code_bytes'] - b['surveyed_code_bytes'] for b in bank_rows if b['survey_low'])
+    return {'emitted_bytes': len(emitted), 'code_bytes': CODE_BYTES_TOTAL + excess,
+            'surveyed_code_bytes': CODE_BYTES_TOTAL,
             'totals': level_totals(functions), 'banks': bank_rows,
             'slices': slices, 'functions': functions}
 
 
 # ── Outputs ──────────────────────────────────────────────────────────────────
 
-CSV_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'status', 'source_hash', 'notes']
+CSV_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'kind', 'status', 'source_hash',
+            'notes']
 
 
 def render_functions_csv(result) -> str:
@@ -298,34 +327,47 @@ def render_functions_csv(result) -> str:
 
 
 def render_progress_json(result) -> str:
-    data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'totals', 'banks', 'slices')}
-    return json.dumps({'schema': 2, **data}, indent=2) + '\n'
+    data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'surveyed_code_bytes', 'totals',
+                                   'banks', 'slices')}
+    return json.dumps({'schema': SCHEMA, **data}, indent=2) + '\n'
 
 
 def render_summary(result) -> str:
-    """The local numbers, as a plain table for the terminal."""
+    """The local numbers, as a plain table for the terminal.
+
+    Shares count code bytes only; data bytes (tables, fill) are listed beside.
+    """
     t, code = result['totals'], result['code_bytes']
-    lines = [f'{"":<10}{"Functions":>10}{"Bytes":>10}  Share of game code ({code:,} bytes surveyed)']
+    lines = [f'{"":<10}{"Functions":>10}{"Code bytes":>12}{"Data bytes":>12}'
+             f'  Share of game code ({code:,} code bytes)']
     for level in LEVELS:
-        lines.append(f'{level.capitalize():<10}{t[level]["functions"]:>10}{t[level]["bytes"]:>10,}'
-                     f'  {pct(t[level]["bytes"], code)}')
-    lines += ['', f'{"Bank":<6}{"Code bytes":>14}' + ''.join(f'{l.capitalize():>20}' for l in LEVELS)]
+        lines.append(f'{level.capitalize():<10}{t[level]["functions"]:>10}'
+                     f'{t[level]["code_bytes"]:>12,}{t[level]["data_bytes"]:>12,}'
+                     f'  {pct(t[level]["code_bytes"], code)}')
+    lines += ['', f'{"Bank":<6}{"Code bytes":>14}' + ''.join(f'{l.capitalize() + " code":>22}' for l in LEVELS)
+              + f'{"Matched data":>14}']
+    flags = []
     for b in result['banks']:
         code_b = f'{b["code_bytes"]:,}' if b['code_bytes'] else 'not surveyed'
+        if b['survey_low']:
+            code_b += '*'
+            flags.append(f'* {b["bank"]}: survey low ({b["surveyed_code_bytes"]:,} code bytes surveyed, '
+                         f'{b["code_bytes"]:,} matched); shares use the matched figure')
         cells = []
         for level in LEVELS:
-            cell = f'{b[level]["bytes"]:,}'
+            cell = f'{b[level]["code_bytes"]:,}'
             if b['code_bytes']:
-                cell += f' ({pct(b[level]["bytes"], b["code_bytes"])})'
-            cells.append(f'{cell:>20}')
-        lines.append(f'{b["bank"]:<6}{code_b:>14}' + ''.join(cells))
-    return '\n'.join(lines)
+                cell += f' ({pct(b[level]["code_bytes"], b["code_bytes"])})'
+            cells.append(f'{cell:>22}')
+        lines.append(f'{b["bank"]:<6}{code_b:>14}' + ''.join(cells) + f'{b["matched"]["data_bytes"]:>14,}')
+    return '\n'.join(lines + flags)
 
 
 def render_status_line(result) -> str:
     t, code = result['totals'], result['code_bytes']
-    return (f'{t["matched"]["bytes"]:,} of {code:,} bytes of game code are matched byte-exact '
-            f'({pct(t["matched"]["bytes"], code)}, {t["matched"]["functions"]} functions); '
+    return (f'{t["matched"]["code_bytes"]:,} of {code:,} bytes of game code are matched byte-exact '
+            f'({pct(t["matched"]["code_bytes"], code)}, {t["matched"]["functions"]} functions, '
+            f'plus {t["matched"]["data_bytes"]:,} bytes of data); '
             f'{t["readable"]["functions"]} of those meet the readability standard and '
             f'{t["verified"]["functions"]} are verified by independent review.')
 
@@ -364,6 +406,9 @@ def history_rows(result) -> list[dict]:
     today = dt.date.today().isoformat()
     t = result['totals']
     row = {'date': today, 'matched_bytes': t['matched']['bytes'],
+           'matched_code_bytes': t['matched']['code_bytes'],
+           'matched_data_bytes': t['matched']['data_bytes'],
+           'code_bytes': result['code_bytes'],
            'matched_functions': t['matched']['functions'],
            'readable_functions': t['readable']['functions'],
            'verified_functions': t['verified']['functions']}
@@ -371,9 +416,16 @@ def history_rows(result) -> list[dict]:
     return sorted(rows, key=lambda r: r['date'])
 
 
+# matched_bytes counts every matched byte, code and data alike (the only
+# figure rows before 2026-10-09 carry); matched_code_bytes / code_bytes is
+# the share of game code, and matched_data_bytes the tables and fill beside.
+HISTORY_COLS = ['date', 'matched_bytes', 'matched_code_bytes', 'matched_data_bytes', 'code_bytes',
+                'matched_functions', 'readable_functions', 'verified_functions']
+
+
 def render_history(rows) -> str:
     buf = io.StringIO()
-    cols = ['date', 'matched_bytes', 'matched_functions', 'readable_functions', 'verified_functions']
+    cols = HISTORY_COLS
     w = csv.DictWriter(buf, fieldnames=cols, lineterminator='\n')
     w.writeheader()
     w.writerows({c: r.get(c, '') for c in cols} for r in rows)
