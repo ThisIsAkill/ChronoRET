@@ -29,31 +29,23 @@ Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negat
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C293A8
-Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
-                    ; the list (probably "the current character cannot equip it"; not matched)
-org $C292F4
-Menu_Unk92F4:       ; JSR from Menu_InitSystems (not matched)
-org $C2D156
-Menu_UnkD156:       ; JSR from Menu_InitSystems (not matched)
-org $C2E91B
-Menu_UnkE91B:       ; thread 3, started by Menu_RunThreads (not matched)
 org $C2F3CA
 Menu_UnkF3CA:       ; JSR from Menu_InitSystems (not matched)
-org $C2F5ED
-Menu_UnkF5ED:       ; JSR from Menu_Unk834D, A = a character id: returns X = $4B00 + 6 x a byte the
-                    ; character picks (via $CD:6CEC) and A = 5, the MVN source and count (not matched)
 org $FFF9BB
 BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
 org $FFF9C4
-BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves with DP=$0400: A = 0 or not for slot
-                    ; Menu_SaveSlot ($0479); probably checks a save slot in SRAM (not analysed)
+BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves (DP=$0400) and Menu_LoadSlotSummaries (DP=0):
+                    ; A and dp $00 = 0 or not for the slot at dp $79; probably checks a save slot in
+                    ; SRAM and sets dp $7B to its offset (not analysed)
 org $C29137
 Menu_Unk9137:       ; JSR from Menu_RefreshAllChars after Menu_LoadCharRec (also from three other
                     ; menu sites): works on Menu_CurCharRec, probably the character's derived stats
                     ; (not analysed)
 org $FFF813
 BankFF_UnkF813:     ; JSL from Menu_BuildItemTables (not analysed)
+org $FFD024
+MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
+                    ; SRAM +$0603 byte is the last entry not above it
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
 org $C299CA

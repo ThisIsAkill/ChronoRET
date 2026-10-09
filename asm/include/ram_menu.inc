@@ -55,7 +55,9 @@ if !ram_menu_inc == 0
 !Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; Menu_CmdJoin sets
                                          ; the character's BankFF_CharBits bit in the low byte (probably
                                          ; "has joined")
-!Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs)
+!Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs);
+                                         ; probably the gold (the C0 opcodes' gold sum; unmatched code at
+                                         ; $C2:FDF1 caps it at 9,999,999)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 
 ; --- Joypad (Menu_PollPad / Menu_MapButtons), dp $F0-$FF with DP=$0000 ---
@@ -418,9 +420,12 @@ endstruct align 8
 !Menu_Unk51 = $0051                      ; 16-bit; zeroed by Menu_InitSystems, then the start offset of its
                                          ; Menu_CharRecords division loop (set by the calls between; not
                                          ; traced) and Menu_CursorStepD's OAM offset
-!Menu_Unk56 = $0056                      ; 16-bit; zeroed by Menu_Setup; use not traced
+!Menu_Unk56 = $0056                      ; 16-bit; zeroed by Menu_Setup; non-zero: Menu_DrawMainCursor flips
+                                         ; the cursor (OAM attribute bit 6)
+!Menu_CursorSel = $0054                  ; 8-bit; the Menu_CursorPos record of the main cursor
 !Menu_Unk58 = $0058                      ; 16-bit; set to $3020 by Menu_RunThreads before thread 3 starts
-                                         ; (written absolute); use not traced
+                                         ; (written absolute): the main cursor's tile and attributes
+                                         ; (Menu_DrawMainCursor)
 !Menu_Mode = $0067                       ; 8-bit; the menu's mode, from Menu_EntryModes by the entry
                                          ; argument: picks Menu_MainThread's handler list
 !Menu_ThreadVar = $0068                  ; 8-bit; one byte per thread: Menu_RunThreads zeroes it when a
@@ -448,7 +453,8 @@ endstruct align 8
                                          ; order ($FF after them, Menu_Setup)
 !Menu_PartyListPos = $0D68               ; 9 B: the Menu_PartyOrder position of each
 !Menu_Unk21BA = $21BA                    ; 3 x $20 B; Menu_Unk834D copies 6 B from bank $D1 to the start of
-                                         ; each, one per active party member; use not traced
+                                         ; each, one per active party member (picked by its weapon,
+                                         ; Menu_WeaponRecSrc); use not traced
 !Menu_Unk04A4 = $04A4                    ; 5 B; Menu_Unk82E1 tests the byte for each value $AE-$B2
 !Menu_Unk2857 = $2857                    ; 5 B; Menu_Unk82E1 zeroes them and sets the byte of each value
                                          ; $AE-$B2 that a record's +$2A holds while its Menu_Unk04A4 byte is
@@ -481,7 +487,7 @@ endstruct
 !Menu_ItemDataPtrB = $0D2A               ; 16-bit; Menu_ItemDataPtrB's result (an address in bank $CC)
 !Menu_CurCharRecPtr = $006F              ; 16-bit; address of the Menu_CharRecords record
                                          ; Menu_LoadCharRecA copied
-!Menu_CurMember = $0071                  ; 8-bit (stored as a word by BankC2_MenuEntry, from Menu_EntryX):
+!Menu_CurMember = $0071                  ; 8-bit (BankC2_MenuEntry stores Menu_EntryX's low byte):
                                          ; the Menu_PartyList index Menu_LoadPartyCharRec loads
 !Menu_ListKind = $0077                   ; 8-bit; Menu_ListEquipItems' id range (Menu_EquipListRanges)
 !Menu_CurIsReserve = $0078               ; 8-bit; Menu_LoadPartyCharRec: $FF when Menu_CurMember is past
@@ -562,7 +568,10 @@ struct Menu_CharRec $0000
 .Word5:     skip 2     ; (probably maximum HP)
 .Word7:     skip 2     ; Menu_CmdRefillByte7 copies .Word9's low byte here (probably MP)
 .Word9:     skip 2
-            skip $1F
+            skip 7
+.Unk12:     skip 2     ; Menu_ReadSlotSummary copies its low byte
+            skip $15
+.Unk29:     skip 1     ; the weapon (Menu_EquipSlotOffsets category 0; Menu_WeaponRecSrc)
 .Unk2A:     skip 1     ; Menu_Unk82E1 looks for $AE-$B2 here
             skip $14
 .Unk3F:     skip 2     ; Menu_Setup divides it by 10
@@ -991,7 +1000,9 @@ endstruct
 !Menu_Flag7F01CE = $7F01CE
 !Menu_ItemInfo0 = $7700                  ; 242 B: per item id, record A byte 0 AND $1E
 !Menu_ItemInfo1 = $7800                  ; 242 words: per item id, record A bytes 1-2
-!Menu_ItemInfo3 = $7A00                  ; 242 B: per item id, record A byte 3 (0 from category 4 on)
+!Menu_ItemEquipChars = $7A00             ; 242 B: per item id, record A byte 3 (0 from category 4 on): a bit
+                                         ; per character that can equip it ($80 = character 0, as
+                                         ; BankFF_CharBits; inferred from Menu_CanEquip)
 !Menu_ItemInfo4 = $7B00                  ; 242 B: record A byte 4 below category 3; for category 3 record
                                          ; B byte 2 when its byte 1 has bit 6, else 0; 0 from category 4
 !Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id (probably name offsets; not traced)
@@ -1005,5 +1016,42 @@ endstruct
 !Menu_CmdRecPtr = $04C3                  ; 16-bit; Menu_CmdEquip's record address
 !Menu_CmdNewItem = $04C5                 ; 8-bit; Menu_CmdEquip's item (Menu_ItemId saved)
 !Menu_SaveSlot = $0479                   ; 8-bit; the slot Menu_CmdBootCheckSaves passes to BankFF_UnkF9C4
+                                         ; (its dp $79 with DP=$0400)
+
+; --- Menu settings, equip test and save slots ---
+!Menu_CfgA3 = $0D86                      ; 8-bit, 0 or 1: Menu_Config byte 0 bit 3 (Menu_UnpackConfig)
+!Menu_CfgA4 = $0D87                      ; ... bit 4
+!Menu_CfgA5 = $0D88                      ; ... bit 5
+!Menu_CfgA6 = $0D89                      ; ... bit 6
+!Menu_CfgCLow = $0D8A                    ; 8-bit: Menu_Config byte 2 bits 0-1
+!Menu_CfgALow = $0D8B                    ; 8-bit: byte 0 bits 0-2
+!Menu_CfgB6 = $0D8D                      ; 8-bit, 0 or 1: byte 1 bit 6
+!Menu_CfgB7 = $0D8E                      ; ... bit 7
+!Menu_CfgA7 = $0D8F                      ; ... byte 0 bit 7
+!Menu_CfgBMid = $0D90                    ; 8-bit: byte 1 bits 3-5
+!Menu_EquipCharsCopy = $0D71             ; 8-bit; Menu_ItemEquipChars of the item Menu_CanEquip tested
+!Menu_LastWeapon = $041B                 ; 16-bit; the weapon id Menu_WeaponRecSrc read last
+!Menu_SlotIdx = $0079                    ; 8-bit (zeroed as a word); the slot Menu_LoadSlotSummaries works
+                                         ; on (dp $79, which BankFF_UnkF9C4 reads)
+!Menu_SlotSramOfs = $007B                ; 16-bit; the slot's SRAM offset (set by BankFF_UnkF9C4, probably)
+!Menu_SumPtr = $0061                     ; 16-bit; Menu_ReadSlotSummary's write pointer
+!Menu_SumPlace = $0022                   ; 16-bit; its SRAM offset of the party place (low byte stepped)
+!Menu_SumLeft = $0024                    ; 8-bit; places left
+!Menu_SlotValid = $0D49                  ; 3 B: 1 when the slot passed BankFF_UnkF9C4, else 0
+!Menu_Unk0D4C = $0D4C                    ; 8-bit; set to $FF by Menu_LoadSlotSummaries; use not traced
+!Menu_SlotWinStyle = $0D79               ; 3 B: each slot's window style (its Menu_Config01 AND 7)
+!Menu_SlotSummaries = $7600              ; 3 x $40 B: Menu_ReadSlotSummary's blocks
+!Menu_SlotTextBufs = $7000               ; 3 x $200 B: each slot's text (Menu_DrawSlotText)
+!Menu_SlotLabelArea = $6E00              ; $200 B sent to VRAM $7000 (Menu_SlotLabelVramRec) ...
+!Menu_SlotLabelFirst = $6E10             ; ... with slot n's label drawn at this + n x $20
+!Menu_TextDest = $0DC5                   ; 16-bit; bank-$7E address Menu_DrawText draws into
+!Menu_SramBank = $300000                 ; SRAM (bank $30) base for LDA.l this+field,X
+!Menu_SramPartyOrder = $300580           ; the bytes of a slot that Menu_ReadSlotSummary and
+!Menu_SramConfig01 = $300591             ; Menu_SlotLocName read (X = Menu_SlotSramOfs; +$0580 and
+!Menu_SramUnk059C = $30059C              ; +$0591 probably the copies of Menu_PartyOrder and
+!Menu_SramUnk059E = $30059E              ; Menu_Config01)
+!Menu_SramUnk05F3 = $3005F3
+!Menu_SramUnk0603 = $300603
+!Menu_SramUnk0793 = $300793
 
 endif

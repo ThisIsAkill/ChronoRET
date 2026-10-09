@@ -754,7 +754,7 @@ if !constants_menu_inc == 0
 !Menu_ThNewWait1 = $0101                 ; .State = Menu_ThStNew with .Wait = 1, as one word
 !Menu_ThWait1 = $0102                    ; .State = Menu_ThStWaiting with .Wait = 1
 !Menu_MainThreadSlot = $0008             ; slot 1 (byte offset): Menu_MainThread
-!Menu_Thread3Slot = $0018                ; slot 3: Menu_UnkE91B
+!Menu_Thread3Slot = $0018                ; slot 3: Menu_MainCursorThread
 !Menu_Unk58Init = $3020                  ; Menu_Unk58's value before thread 3 starts
 !Menu_FadeInSlot = $0000                 ; slot 0: Menu_FadeInThread
 !Menu_AllThreads = $FF                   ; Menu_KillThreads mask: every slot
@@ -819,7 +819,6 @@ if !constants_menu_inc == 0
 !Menu_WinRegBytes = $10                  ; bytes of Menu_WinRegShadow
 !Menu_MoveCodeMvn = $7E54                ; MVN opcode $54, destination bank $7E
 !Menu_MoveCodeRtl = $6B7E                ; source bank $7E, RTL ($6B)
-!Menu_PartyOrderBytes = 9                ; positions in Menu_PartyOrder
 !Menu_BonusHalfId = $A1                  ; Menu_CharRec.Unk2A values: Menu_RecRefillWord3 adds half ...
 !Menu_BonusQuarterId = $A0               ; ... or a quarter of .Word5
 !Menu_StatMax = 999                      ; cap of Menu_RecRefillWord3
@@ -897,5 +896,53 @@ if !constants_menu_inc == 0
 !Menu_ItemNameBytes = $000B              ; ... and the step
 !Menu_Flag7F00BABit0 = $0001             ; Menu_Flag7F00BA bits Menu_BuildItemTables tests
 !Menu_Flag7F00BABit1 = $0002
+
+; --- Menu settings, weapon records, save slots, text ---
+!Menu_CfgBytes = $0C                     ; bytes Menu_UnpackConfig zeroes ($0D86-$0D91)
+!Menu_Cfg3BitMask = $07
+!Menu_Cfg2BitMask = $03
+!MenuRom_WeaponUnkIdx = $CD6CEC          ; a byte per weapon id: its 6-byte record in bank $D1
+!Menu_Unk21BASrc = $4B00                 ; bank-$D1 address of record 0
+!Menu_Unk21BABytes = 6
+!Menu_SramBankByte = $30                 ; SRAM bank (MVN source)
+!Menu_SramRecordsOfs = $0200             ; a slot's character records
+!Menu_SramUnk05B0Ofs = $05B0             ; 6 B per character id
+!Menu_SramUnk05B0Bytes = 6
+!Menu_SramUnk05E0Ofs = $05E0             ; 10 B copied to summary +$34
+!Menu_SramUnk05E0Bytes = 10
+!Menu_SramUnk05F3Mask = $01FF
+!Menu_SramUnk0793Bit7 = $0080
+!Menu_SumEmpty = $FF                     ; summary entry byte 0: empty place
+!Menu_SumRecBytes = 9                    ; record bytes copied per entry
+!Menu_SumEntryBytes = $10
+!Menu_SumEntryMask = $F0
+!Menu_SumEntryUnk04 = $0004              ; entry offsets of the bytes Menu_ReadSlotSummary writes by hand
+!Menu_SumEntryUnk0F = $000F
+!Menu_Unk0D4CInit = $FF
+!Menu_StrEmptySlot = $1A                 ; MenuRom_SlotStrings string of an empty slot (after the 26
+!Menu_SlotLocCount = $1A                 ; strings MenuRom_SlotLocBounds picks from)
+!MenuRom_SlotStrings = $FFD03E           ; string table (TextWin_StrTable) of the slot texts
+!MenuRom_SlotLabelStrings = $FFD3FE      ; string table of the slot labels
+!Menu_StrSlotLabel0 = $0E                ; its string of slot 0 (slot n: $0E + n)
+!Menu_SlotIdxHiMask = $0300              ; Menu_SlotIdx in the high byte of a word load
+!Menu_SlotTextBytes = $0200
+!Menu_SlotLabelBytes = $20
+!Menu_SlotLabelAreaBytes = $0200
+!Menu_LabelTileA = $0000                 ; Menu_ShiftLabelRight: left and right tile of the upper row ...
+!Menu_LabelTileB = $0010
+!Menu_LabelTileC = $0100                 ; ... and of the row below
+!Menu_LabelTileD = $0110
+!Menu_TextWinMode = $80                  ; TextWin_Mode of Menu_DrawText (bit 7: pen X from 0; 2bpp)
+!Menu_TextStepCount = $20                ; TextWin_StepCount per TextWin_Step
+!Menu_TextLineBreak = 5                  ; TextWin_Status at which Menu_DrawText moves on $400 bytes
+
+; --- Menu main cursor (thread 3) ---
+!Menu_OamHideFirst = $0740               ; OAM copy entry 16: Menu_DrawMainCursor hides entries 16-95 ...
+!Menu_OamHideBytes = $0140
+!Menu_OamHighHideFirst = $0904           ; ... and their high-table bytes
+!Menu_OamHighHideBytes = $0014
+!Menu_OamMainCursor = $0770              ; OAM copy entry 28: the main cursor
+!Menu_OamFlipH = $40                     ; OAM attribute bit 6: horizontal flip
+!Menu_Unk0D9BAll = $FF                   ; TRB mask clearing Menu_Unk0D9B
 
 endif
