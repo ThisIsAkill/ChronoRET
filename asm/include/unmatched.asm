@@ -68,8 +68,9 @@ Menu_Nmi:           ; the menu's NMI handler (JML from Menu_InterruptVectors, co
                     ; not matched here)
 org $C28472
 Menu_Irq:           ; the menu's IRQ handler (JML from Menu_InterruptVectors; not matched here)
-org $C28663
-Menu_Unk8663:       ; JSR from Menu_InitSystems (PHB/PHD/PHP first; not matched)
+org $C293A8
+Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
+                    ; the list (probably "the current character cannot equip it"; not matched)
 org $C2968D
 Menu_Unk968D:       ; JSR from Menu_InitSystems (REP #$30 first; not matched)
 org $C2984A

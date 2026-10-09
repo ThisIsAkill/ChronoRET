@@ -403,6 +403,9 @@ endstruct align 8
 
 ; --- The menu kernel (BankC2_MenuEntry and its thread scheduler) ---
 ; The menu runs with DP=$0000 and DB=$7E; these are bank-$7E offsets.
+!Menu_Tmp00 = $0000                      ; 8-bit scratch (also Menu_JumpVec's low byte)
+!Menu_Tmp01 = $0001                      ; 8-bit scratch
+!Menu_Tmp02 = $0002                      ; 8-bit scratch
 !Menu_JumpVec = $0000                    ; 16-bit scratch: JMP (abs) target of Menu_RunThreads and
                                          ; Menu_MainThread
 !Menu_ListPtr = $0016                    ; 24-bit scratch: Menu_MainThread's pointer into Menu_ModeLists'
@@ -418,7 +421,6 @@ endstruct align 8
                                          ; thread starts and keeps it in Menu_Thread.SavedVar while it
                                          ; waits; the main thread's handler index (Menu_MainThread)
 !Menu_CurThread = $006E                  ; 8-bit byte offset of the running thread's Menu_Thread slot
-!Menu_EntryXCopy = $0071                 ; 16-bit; BankC2_MenuEntry copies Menu_EntryX here (use not traced)
 !Menu_PartyActive = $0073                ; 8-bit; members Menu_BuildPartyLists found in the first 3
                                          ; Menu_PartyOrder positions
 !Menu_PartyTotal = $0075                 ; 8-bit; and in all 9
@@ -426,8 +428,8 @@ endstruct align 8
                                          ; through it
 !Menu_EntryArg = $0A00                   ; 8-bit; BankC2_MenuEntry's A (0-6, Menu_EntryModes' index)
 !Menu_EntryX = $0A01                     ; 16-bit; BankC2_MenuEntry's X
-!Menu_RecList = $0C00                    ; 8-byte records Menu_AddRomRec / Menu_AddWramRec append (what
-                                         ; reads them is not traced; probably the menu NMI's upload)
+!Menu_VramQueue = $0C00                  ; Menu_VramRec records (8 B) Menu_QueueVramRom / Menu_QueueVramWram
+                                         ; append and Menu_FlushVramQueue sends to VRAM
 !Menu_FrameState = $0D01                 ; 8-bit; Menu_RunThreads waits for it to be non-zero, runs the
                                          ; threads once and zeroes it (the menu NMI sets it to $FF after its
                                          ; upload, $C2:8462)
@@ -436,7 +438,7 @@ endstruct align 8
 !Menu_Unk0D0E = $0D0E
 !Menu_Inidisp = $0D10                    ; 8-bit; what the menu NMI writes to INIDISP (0 = forced blank);
                                          ; Menu_Fade steps its brightness bits
-!Menu_RecListEnd = $0D11                 ; 8-bit byte offset past the last Menu_RecList record
+!Menu_VramQueueEnd = $0D11               ; 8-bit byte offset past the last Menu_VramQueue record
 !Menu_FadeStep = $0D20                   ; 8-bit signed brightness step of Menu_Fade
 !Menu_FadeFrames = $0D21                 ; 8-bit frames per step (Menu_Fade sets 1)
 !Menu_Unk0D38 = $0D38                    ; 7 words: Menu_Setup's quotients (word +$3F of seven
@@ -457,6 +459,57 @@ endstruct align 8
 !Menu_SramUnk7FE2 = $307FE2              ; path; use not traced
 !Menu_Unk29AD = $29AD                    ; 8-bit, Menu_Config+$1D; BankC2_MenuEntry's new-game path copies
                                          ; $7E:0D00 into it
+
+; One VRAM upload of Menu_VramQueue (Menu_FlushVramQueue sends it with DMA
+; channel 7 to VMDATAL/H, the VRAM address step as VMAIN stands).
+struct Menu_VramRec $0000
+.Dest:      skip 2     ; VRAM word address
+.Src:       skip 2     ; source address
+.SrcBank:   skip 1     ; its bank
+.Size:      skip 2     ; byte count
+            skip 1
+endstruct
+
+; The inventory and the current character (Menu_AddItem ... Menu_LoadCharRec).
+!Menu_InvIds = $2400                     ; 256 B: item id per inventory slot (0 = empty)
+!Menu_InvCounts = $2500                  ; 256 B: the count of each slot (at most 99)
+!Menu_ItemSlot = $04C7                   ; 16-bit; the slot Menu_FindItem found
+!Menu_ItemId = $04C9                     ; 8-bit; the item id the inventory routines work on
+!Menu_ItemCount = $04CB                  ; 8-bit; how many to add or remove
+!Menu_ItemCategory = $04CC               ; 16-bit; Menu_ItemCategory's result (0-4)
+!Menu_ItemIndex = $04CE                  ; 16-bit; the id's index within its category
+!Menu_ItemDataPtr = $0D28                ; 16-bit; Menu_ItemDataPtrA's result (bank $FF)
+!Menu_ItemDataPtrB = $0D2A               ; 16-bit; Menu_ItemDataPtrB's result (bank $FF)
+!Menu_CurCharRecPtr = $006F              ; 16-bit; address of the Menu_CharRecords record
+                                         ; Menu_LoadCharRecA copied
+!Menu_CurMember = $0071                  ; 8-bit (stored as a word by BankC2_MenuEntry, from Menu_EntryX):
+                                         ; the Menu_PartyList index Menu_LoadPartyCharRec loads
+!Menu_ListKind = $0077                   ; 8-bit; Menu_ListEquipItems' id range (Menu_EquipListRanges)
+!Menu_CurIsReserve = $0078               ; 8-bit; Menu_LoadPartyCharRec: $FF when Menu_CurMember is past
+                                         ; the active members, else 0
+!Menu_CurCharRec = $9A90                 ; $50 B: copy of a Menu_CharRecords record (Menu_LoadCharRecA)
+!Menu_CurCharExtra = $9AE0               ; 6 B: its Menu_Unk2C23 entry
+!Menu_Unk2C23 = $2C23                    ; 8 x 6 B, by the record's first byte AND 7 (Menu_LoadCharRecA)
+!Menu_EquipChars = $104D                 ; 7 B: character ids Menu_CountEquippedBy checks ($80 ends the list)
+!Menu_EquipFlags = $1056                 ; 7 B: per entry, 1 when that character has Menu_ItemId equipped
+!Menu_EquipCount = $0D82                 ; 8-bit; how many of them have it
+!Menu_EquipList = $0F00                  ; item ids Menu_ListEquipItems lists (0 ends the list) ...
+!Menu_EquipListCounts = $0F62            ; ... and their counts
+!Menu_EquipListLen = $0FC6               ; 8-bit; how many it listed
+!Menu_ItemSortKeys = $7C00               ; 256 B: a sort key per item id (Menu_ListEquipItems sorts by it,
+                                         ; largest first); who fills it is not traced
+!Menu_PalBuf = $9480                     ; 512 B: the menu's CGRAM copy (Menu_UploadPalette)
+!Menu_PalDirty = $0D15                   ; 8-bit; non-zero: Menu_UploadPalette sends Menu_PalBuf (and zeroes it)
+!Menu_GradTable = $9DE9                  ; 32 B: Menu_GradientSteps copied by Menu_BuildGradient
+!Menu_GradTableFlat = $9DF9              ; = its entry 8 (CGADSUB $02, COLDATA $E0)
+!Menu_GradSpec = $9D99                   ; 2-byte entries Menu_BuildGradient reads: a count (bit 7: end)
+                                         ; and a step, or 0 and a line count
+!Menu_GradHdmaA = $9E19                  ; the HDMA table (3-byte entries: lines, CGADSUB, COLDATA) built
+!Menu_GradHdmaB = $9F19                  ; in one of these two buffers
+!Menu_GradStep = $A019                   ; 16-bit; the entry's step x 16
+!Menu_GradAccum = $A01B                  ; 16-bit; lines accumulated (8.8; the high byte is taken)
+!Menu_GradBufSel = $A01D                 ; 16-bit; 0 or $100: the buffer offset of the table last built
+                                         ; (the menu NMI reads the high byte, $C2:8657)
 
 ; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
 struct Menu_Thread $00B0

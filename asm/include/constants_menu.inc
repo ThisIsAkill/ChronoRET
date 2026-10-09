@@ -641,7 +641,7 @@ if !constants_menu_inc == 0
 !Menu_Unk58Init = $3020                  ; Menu_Unk58's value before thread 3 starts
 !Menu_FadeInSlot = $0000                 ; slot 0: Menu_FadeInThread
 !Menu_AllThreads = $FF                   ; Menu_KillThreads mask: every slot
-!Menu_RecBytes = 8                       ; bytes in one Menu_RecList record
+!Menu_VramRecBytes = 8                       ; bytes in one Menu_VramQueue record
 !Menu_FadeInStep = $02                   ; Menu_FadeInThread's brightness step
 !Menu_FadeOutStep = $FE                  ; Menu_FadeOut's (-2)
 !Menu_BrightnessMask = $0F               ; INIDISP bits 0-3: the brightness
@@ -654,5 +654,25 @@ if !constants_menu_inc == 0
 !Menu_Unk21BAGap = $001A                 ; bytes Menu_Unk834D skips after each member's 6 in Menu_Unk21BA
 !Menu_Unk21BASrcBank = $D1               ; source bank of its MVN
 !Menu_VectorBytes = 8                    ; bytes of Menu_InterruptVectors (two JMLs)
+
+; --- Menu uploads, inventory and character helpers ($C2:8663-$C2:89E3) ---
+!Menu_PalBytes = $0200                   ; bytes of Menu_PalBuf (256 colours)
+!Menu_PalDirtyAll = $FF                  ; Menu_UploadPalette clears every bit of Menu_PalDirty (TRB)
+!Menu_GradTableBytes = $20               ; bytes of Menu_GradientSteps / Menu_GradTable
+!Menu_ItemCat1First = $5A                ; first ids of item categories 1-3 (Menu_ItemCategoryBounds);
+!Menu_ItemCat2First = $7B                ; Menu_AddItem does not add these ids
+!Menu_ItemCat3First = $94
+!Menu_ItemLastCategory = 4
+!Menu_ItemIdEnd = $F2                    ; one past the last item id / inventory slot scanned
+!Menu_ItemMaxCount = 99                  ; most of one item in a slot
+!Menu_InvFull = $FF                      ; Menu_AddItem: no free slot; Menu_RemoveItem: not found
+!Menu_ItemShort = $FE                    ; Menu_RemoveItem: fewer than asked
+!Menu_Unk2C23Mask = $07
+!Menu_Unk2C23Bytes = 6
+!Menu_EquipChecks = 7                    ; entries of Menu_EquipChars
+!MenuRom_ItemTablesA = $FFCF0E           ; 5 words: per item category, the address (bank $FF) of a table
+!MenuRom_ItemRecSizesA = $FFCF18         ; 5 bytes: its record size (Menu_ItemDataPtrA)
+!MenuRom_ItemTablesB = $FFCF1D           ; the same for a second set of tables (Menu_ItemDataPtrB)
+!MenuRom_ItemRecSizesB = $FFCF27
 
 endif

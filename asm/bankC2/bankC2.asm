@@ -20528,7 +20528,7 @@ BankC2_CommandLong:
 ; - Otherwise: S = Menu_StackTop, Menu_InitSystems, play time running (Menu_PlayTimePaused = 0),
 ;   Menu_Mode = Menu_EntryModes[argument], the pad repeat delay and timer
 ;   1, NMI on, interrupts on, then Menu_RunThreads (never returns).
-;   Menu_EntryX is copied to Menu_EntryXCopy with M as Menu_InitSystems
+;   Menu_EntryX is copied to Menu_CurMember with M as Menu_InitSystems
 ;   returns (M=0: a word, as far as traced).
 ; Callers note: none direct (BRA from BankC2_Entry8000, whose JSL return
 ;   address Menu_Exit returns to).
@@ -20583,7 +20583,7 @@ BankC2_MenuEntry:
     TXS
     JSR Menu_InitSystems
     LDA.w !Menu_EntryX
-    STA.w !Menu_EntryXCopy              ; a word (M=0 after Menu_InitSystems)
+    STA.w !Menu_CurMember               ; a word (M=0 after Menu_InitSystems)
     SEP #$30
     STZ.w !Menu_PlayTimePaused
     LDX.w !Menu_EntryArg
@@ -20611,7 +20611,7 @@ Menu_EntryModes:
 ; meanings not traced); Menu_InitPpuAndRam; Menu_Unk0D06/0D0A/0D0E =
 ; $FFFF; Menu_Unk51 = Menu_Unk56 = 0; Menu_Unk9B76 (32 bytes) and
 ; Menu_PartyList (9 bytes) filled with $FF; then Menu_Unk968D,
-; Menu_UnkD156, Menu_Unk984A, Menu_Unk8663, Menu_BuildPartyLists,
+; Menu_UnkD156, Menu_Unk984A, Menu_FlushVramQueue, Menu_BuildPartyLists,
 ; Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875 (not traced); last, word
 ; Menu_CharRec.Unk3F of seven Menu_CharRecords / 10 (WRDIV) into
 ; Menu_Unk0D38, both offsets starting at Menu_Unk51 (the record offset
@@ -20625,7 +20625,7 @@ Menu_EntryModes:
 ;        it; Menu_Unk968D sets M=0, X=0; their ends not traced); DP=$0000,
 ;        DB=$7E; A, X, Y clobbered
 ; Calls: Audio_DriverCommand (JSL), Menu_InitPpuAndRam, Menu_Unk968D,
-;   Menu_UnkD156, Menu_Unk984A, Menu_Unk8663, Menu_BuildPartyLists,
+;   Menu_UnkD156, Menu_Unk984A, Menu_FlushVramQueue, Menu_BuildPartyLists,
 ;   Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875.
 Menu_InitSystems:
     REP #$30
@@ -20682,7 +20682,7 @@ Menu_InitSystems:
     JSR Menu_Unk968D
     JSR Menu_UnkD156
     JSR Menu_Unk984A
-    JSR Menu_Unk8663
+    JSR Menu_FlushVramQueue
     JSR Menu_BuildPartyLists
     JSR Menu_Unk92F4
     JSR Menu_UnkF3CA
@@ -21171,11 +21171,12 @@ Menu_Unk834D:
     PLB
     RTS
 
-; $C2:8385 — Menu_AddRomRec (29 bytes with its sub-entries, $8385–$83A1)
-; Appends the 8-byte record at $C2:X to Menu_RecList (at
-; Menu_RecListEnd, which then goes up by 8); the sub-entry
-; Menu_AddWramRec ($C2:838E) does the same from $7E:X. Both MVNs go
-; through Menu_RecDest, then the shared tail Menu_AddRecTail ($C2:8395).
+; $C2:8385 — Menu_QueueVramRom (29 bytes with its sub-entries, $8385–$83A1)
+; Appends the 8-byte VRAM upload (Menu_VramRec) at $C2:X to
+; Menu_VramQueue (at Menu_VramQueueEnd, which then goes up by 8;
+; Menu_FlushVramQueue sends them); the sub-entry
+; Menu_QueueVramWram ($C2:838E) does the same from $7E:X. Both MVNs go
+; through Menu_VramQueueSlot, then the shared tail Menu_QueueVramTail ($C2:8395).
 ; Callers (155 sites: 135 JSR, 20 JMP): unmatched (JSR $C2:8F76, JSR $C2:971E, JSR $C2:9813, JSR
 ;   $C2:9A40, JSR $C2:9B4F, JMP $C2:9B80, JMP $C2:9C6A, JSR $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34,
 ;   JSR $C2:9E6D, JSR $C2:9EAB, JSR $C2:9EEE, JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB, JSR
@@ -21201,47 +21202,47 @@ Menu_Unk834D:
 ;   JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR
 ;   $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE,
 ;   JSR $C2:FEF4, JSR $C2:FF21).
-; Callers of Menu_AddWramRec (6 JSR sites): unmatched ($C2:E90C, $C2:F84D, $C2:F859, $C2:F86C,
+; Callers of Menu_QueueVramWram (6 JSR sites): unmatched ($C2:E90C, $C2:F84D, $C2:F859, $C2:F86C,
 ;   $C2:FB17, $C2:FB92).
-; Entry (all): M, X any (P saved; Menu_RecDest sets M=0, X=0), DP any,
-;        DB=$7E (Menu_RecListEnd is read absolute); X = the record's
+; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
+;        DB=$7E (Menu_VramQueueEnd is read absolute); X = the record's
 ;        address (16-bit)
 ; Exit (all):  P restored; DB=$7E (the MVN's destination bank); X, Y past
-;        the copied bytes; A = the new Menu_RecListEnd (low byte; B =
+;        the copied bytes; A = the new Menu_VramQueueEnd (low byte; B =
 ;        $FF)
-; Calls: Menu_RecDest.
-Menu_AddRomRec:
+; Calls: Menu_VramQueueSlot.
+Menu_QueueVramRom:
     PHP
-    JSR Menu_RecDest
-    MVN !Bank7E,bank(Menu_AddRomRec)    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    BRA Menu_AddRecTail
-Menu_AddWramRec:                        ; header: see Menu_AddRomRec
+    JSR Menu_VramQueueSlot
+    MVN !Bank7E,bank(Menu_QueueVramRom)    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    BRA Menu_QueueVramTail
+Menu_QueueVramWram:                        ; header: see Menu_QueueVramRom
     PHP
-    JSR Menu_RecDest
+    JSR Menu_VramQueueSlot
     MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-Menu_AddRecTail:                        ; header: see Menu_AddRomRec
+Menu_QueueVramTail:                        ; header: see Menu_QueueVramRom
     SEP #$20
-    LDA.w !Menu_RecListEnd
+    LDA.w !Menu_VramQueueEnd
     CLC
-    ADC.b #!Menu_RecBytes
-    STA.w !Menu_RecListEnd
+    ADC.b #!Menu_VramRecBytes
+    STA.w !Menu_VramQueueEnd
     PLP
     RTS
 
-; $C2:83A2 — Menu_RecDest (16 bytes, $83A2–$83B1)
-; Y = Menu_RecList + Menu_RecListEnd (the next record's address) and A =
+; $C2:83A2 — Menu_VramQueueSlot (16 bytes, $83A2–$83B1)
+; Y = Menu_VramQueue + Menu_VramQueueEnd (the next record's address) and A =
 ; 7 (the MVN count of 8 bytes).
-; Callers (2 JSR sites): Menu_AddRomRec ($C2:8386) and Menu_AddWramRec ($C2:838F).
+; Callers (2 JSR sites): Menu_QueueVramRom ($C2:8386) and Menu_QueueVramWram ($C2:838F).
 ; Entry: M, X any (REP #$31 here: also C=0), DP any, DB=$7E
 ; Exit:  M=0, X=0, C=0; A = 7; Y = the address; X unchanged
 ; No calls.
-Menu_RecDest:
+Menu_VramQueueSlot:
     REP #$31
-    LDA.w !Menu_RecListEnd
+    LDA.w !Menu_VramQueueEnd
     AND.w #!Eng_LowByteMask
-    ADC.w #!Menu_RecList
+    ADC.w #!Menu_VramQueue
     TAY
-    LDA.w #!Menu_RecBytes-1
+    LDA.w #!Menu_VramRecBytes-1
     RTS
 
 ; $C2:83B2 — Menu_StartFadeIn (11 bytes, $83B2–$83BC)
@@ -21558,6 +21559,662 @@ Menu_TickPlayTime:
 ; hours in two digits (10, 10).
 Menu_PlayTimeLimits:
     db 60, 60, 10, 6, 10, 10
+
+; ============================================================
+; Menu uploads, inventory and character helpers ($C2:8663–$C2:89E3)
+; ============================================================
+
+org $C28663
+; $C2:8663 — Menu_FlushVramQueue (70 bytes, $8663–$86A8)
+; Sends Menu_VramQueue to VRAM, newest record first, each by DMA channel
+; 7 to VMDATAL/H (two registers): VMADD = .Dest, from .SrcBank:.Src,
+; .Size bytes (the direct page walks the records), then empties the
+; queue (Menu_VramQueueEnd = 0). VMAIN is left as it is. Nothing is done
+; when the queue is empty.
+; Callers (5 JSR sites): Menu_InitSystems ($C2:812D) and unmatched ($C2:96EB, $C2:9721, $C2:9758,
+;   $C2:9816).
+; Entry: M, X any (P, DP and DB saved; SEP #$30 here), DP any, DB any
+;        (set to $00 for the DMA registers and the queue)
+; Exit:  P, DP and DB restored; A, X, Y clobbered
+; No calls.
+Menu_FlushVramQueue:
+    PHB
+    PHD
+    PHP
+    SEP #$30
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    LDX.w !Menu_VramQueueEnd
+    BEQ .done
+    STZ.w !Menu_VramQueueEnd
+    REP #$21                            ; (also C=0 for the ADC)
+    LDA.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STA.w DMAP7
+    TXA
+    ADC.w #!Menu_VramQueue-!Menu_VramRecBytes ; the last record
+    LDX.b #DMA_CH7
+.record:
+    TCD
+    LDA.b Menu_VramRec.Dest
+    STA.w VMADDL
+    LDA.b Menu_VramRec.Src
+    STA.w A1T7L
+    LDY.b Menu_VramRec.SrcBank          ; (8-bit Y: the bank only)
+    STY.w A1B7
+    LDA.b Menu_VramRec.Size
+    STA.w DAS7L
+    STX.w MDMAEN
+    TDC
+    SEC
+    SBC.w #!Menu_VramRecBytes
+    CMP.w #!Menu_VramQueue
+    BCS .record
+.done:
+    PLP
+    PLD
+    PLB
+    RTS
+
+; $C2:86A9 — Menu_UploadPalette (52 bytes, $86A9–$86DC)
+; When Menu_PalDirty is non-zero: zeroes it and sends the 512 bytes of
+; Menu_PalBuf ($7E:9480) to CGRAM from colour 0 by DMA channel 7.
+; Callers (2 JSR sites): unmatched ($C2:8651, $C2:9834).
+; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit LDX/STX
+;        immediates), DP any, DB any (set to $00)
+; Exit:  P and DB restored; A clobbered (0 when nothing was sent); X =
+;        Menu_PalBytes when sent; Y unchanged
+; No calls.
+Menu_UploadPalette:
+    PHB
+    PHP
+    SEP #$20
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    LDA.b #!Menu_PalDirtyAll
+    TRB.w !Menu_PalDirty
+    BEQ .done
+    LDX.w #!BBAD_CGDATA<<8              ; one register, CGDATA
+    STX.w DMAP7
+    LDX.w #!Menu_PalBuf
+    STX.w A1T7L
+    LDX.w #!Menu_PalBytes
+    STX.w DAS7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDA.b #$00
+    STA.w CGADD
+    LDA.b #DMA_CH7
+    STA.w MDMAEN
+.done:
+    PLP
+    PLB
+    RTS
+
+; $C2:86DD — Menu_BuildGradient (148 bytes, $86DD–$8770)
+; Builds an HDMA table of colour math lines for channel 0 (direct, two
+; registers: CGADSUB then COLDATA, set here; the table address is set by
+; the menu NMI from Menu_GradBufSel): copies Menu_GradientSteps to
+; Menu_GradTable, picks the buffer not built last (Menu_GradHdmaA or B,
+; Menu_GradBufSel toggles 0 / $100) and walks Menu_GradSpec's 2-byte
+; entries until one with bit 7 set:
+; - a non-zero first byte: 16 entries, one per Menu_GradTable word, each
+;   with the next step of an 8.8 line count that grows by the second
+;   byte x 16 (Menu_GradAccum keeps the fraction from entry to entry);
+; - a zero first byte: one entry of the second byte's line count with
+;   Menu_GradTableFlat (CGADSUB $02, COLDATA $E0: no change).
+; Quirks, kept: the buffer addresses loaded into A with the offsets are
+; never used; no end byte is written after the last entry.
+; Callers (8 JSR sites): unmatched ($C2:A0C0, $C2:ADA4, $C2:B94F, $C2:CA42, $C2:D0C5, $C2:DB73,
+;   $C2:E5A2, $C2:E7F6).
+; Entry: M, X any (P and DB saved; REP #$30 here), DP any (not used), DB
+;        any (the MVN sets $7E)
+; Exit:  P and DB restored; A, X, Y clobbered; Menu_GradBufSel,
+;        Menu_GradStep, Menu_GradAccum changed
+; No calls.
+Menu_BuildGradient:
+    PHP
+    PHB
+    REP #$30
+    LDX.w #Menu_GradientSteps
+    LDY.w #!Menu_GradTable
+    LDA.w #!Menu_GradTableBytes-1
+    MVN !Bank7E,bank(Menu_GradientSteps) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #(!BBAD_CGADSUB<<8)|!DMAP_TwoRegs
+    STA.l DMAP0
+    LDA.w #!Bank7E                      ; A1B0 = $7E, DAS0L = 0
+    STA.l A1B0
+    LDY.w #0
+    LDA.w #!Menu_GradHdmaA              ; (not used)
+    LDX.w !Menu_GradBufSel
+    BNE .use_a
+    LDY.w #!Menu_GradHdmaB-!Menu_GradHdmaA
+    LDA.w #!Menu_GradHdmaB              ; (not used)
+.use_a:
+    STY.w !Menu_GradBufSel
+    STZ.w !Menu_GradAccum
+    LDX.w #0
+.spec:
+    SEP #$20
+    LDA.w !Menu_GradSpec,X
+    BMI .done
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BEQ .flat
+    LDA.w !Menu_GradSpec+1,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Menu_GradStep
+    PHX
+    LDX.w #0
+.line:
+    REP #$20
+    LDA.w !Menu_GradAccum
+    CLC
+    ADC.w !Menu_GradStep
+    STA.w !Menu_GradAccum
+    SEP #$20
+    XBA                                 ; the whole lines
+    STA.w !Menu_GradHdmaA,Y
+    STZ.w !Menu_GradAccum+1             ; keep the fraction
+    REP #$20
+    LDA.w !Menu_GradTable,X
+    STA.w !Menu_GradHdmaA+1,Y
+    INX
+    INX
+    INY
+    INY
+    INY
+    CPX.w #!Menu_GradTableBytes
+    BCC .line
+    PLX
+    BRA .next
+.flat:
+    LDA.w !Menu_GradSpec+1,X            ; the line count (and a byte overwritten next)
+    STA.w !Menu_GradHdmaA,Y
+    LDA.w !Menu_GradTableFlat
+    STA.w !Menu_GradHdmaA+1,Y
+    INY
+    INY
+    INY
+.next:
+    INX
+    INX
+    BRA .spec
+.done:
+    PLB
+    PLP
+    RTS
+
+; $C2:8771 — Menu_GradientSteps (32 bytes, $8771–$8790)
+; 16 CGADSUB / COLDATA pairs for Menu_BuildGradient: add (CGADSUB $02:
+; BG2) the fixed colour of intensity 8 down to 0 (COLDATA $E8-$E0, all
+; three channels), then subtract ($82) intensity 1 up to 7.
+Menu_GradientSteps:
+    db $02,$E8,$02,$E7,$02,$E6,$02,$E5,$02,$E4,$02,$E3,$02,$E2,$02,$E1
+    db $02,$E0,$82,$E1,$82,$E2,$82,$E3,$82,$E4,$82,$E5,$82,$E6,$82,$E7
+
+; $C2:8791 — Menu_AddItem (68 bytes, $8791–$87D4)
+; Adds Menu_ItemCount of item Menu_ItemId to the inventory: to its slot
+; (Menu_FindItem) or else to the first empty one (id stored, count 0),
+; the count capped at 99. Ids 0, $5A, $7B and $94 (the first id of
+; categories 0-3, Menu_ItemCategoryBounds) are not added. The tail
+; Menu_ItemSetCount ($C2:87CD; Menu_RemoveItem branches to it) stores A
+; as the slot's count and returns 0.
+; Callers (4 JSR sites): unmatched ($C2:8E09, $C2:9CCE, $C2:D62A, $C2:D79F).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E (the
+;        inventory)
+; Exit:  P and X restored; A = 0 (added), Menu_InvFull (no free slot) or
+;        the id (0, $5A, $7B, $94: not added); Y unchanged;
+;        Menu_ItemSlot as Menu_FindItem left it
+; Calls: Menu_FindItem.
+Menu_AddItem:
+    PHX
+    PHP
+    SEP #$30
+    LDA.w !Menu_ItemId
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat1First
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat2First
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat3First
+    BEQ Menu_ItemSetCount_exit
+    JSR Menu_FindItem
+    BCC .add                            ; X = its slot
+.find_empty:                            ; (X = 0 here)
+    LDA.w !Menu_InvIds,X
+    BEQ .empty
+    INX
+    BNE .find_empty
+    LDA.b #!Menu_InvFull
+    BRA Menu_ItemSetCount_exit
+.empty:
+    LDA.w !Menu_ItemId
+    STA.w !Menu_InvIds,X
+    STZ.w !Menu_InvCounts,X
+.add:
+    LDA.w !Menu_InvCounts,X
+    CLC
+    ADC.w !Menu_ItemCount
+    CMP.b #!Menu_ItemMaxCount
+    BCC Menu_ItemSetCount
+    LDA.b #!Menu_ItemMaxCount
+Menu_ItemSetCount:                      ; header: see Menu_AddItem
+    STA.w !Menu_InvCounts,X
+    LDA.b #0
+.exit:
+    PLP
+    PLX
+    RTS
+
+; $C2:87D5 — Menu_RemoveItem (37 bytes, $87D5–$87F9)
+; Takes Menu_ItemCount of item Menu_ItemId from its slot: A =
+; Menu_ItemShort when it has fewer (nothing changed), Menu_InvFull when
+; it is not there; else the new count is stored (Menu_ItemSetCount) and,
+; at 0, the slot is emptied; A = 0. Id 0 returns 0 at once.
+; Callers (5 JSR sites): unmatched ($C2:8E13, $C2:9CD9, $C2:B331, $C2:D6A2, $C2:D7AA).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E
+; Exit:  P and X restored; A = 0 (taken or id 0), Menu_ItemShort or
+;        Menu_InvFull (not found); Y unchanged
+; Calls: Menu_FindItem.
+Menu_RemoveItem:
+    PHX
+    PHP
+    SEP #$30
+    LDA.w !Menu_ItemId
+    BEQ .exit
+    JSR Menu_FindItem
+    LDA.b #!Menu_InvFull
+    BCS .exit
+    LDA.w !Menu_InvCounts,X
+    SEC
+    SBC.w !Menu_ItemCount
+    BCC .short
+    BNE Menu_ItemSetCount
+    STZ.w !Menu_InvIds,X                ; none left: free the slot
+    BRA Menu_ItemSetCount
+.short:
+    LDA.b #!Menu_ItemShort
+.exit:
+    PLP
+    PLX
+    RTS
+
+; $C2:87FA — Menu_FindItem (28 bytes, $87FA–$8815)
+; Finds the slot of item A with a non-zero count: C=0 with X = the slot
+; and Menu_ItemSlot = X (a word), or C=1 with X = 0 (all 256 slots
+; looked at). A slot with the id but count 0 is passed over (A is
+; reloaded from Menu_ItemId after its count is read).
+; Callers (3 JSR sites): Menu_AddItem ($C2:87A6), Menu_RemoveItem ($C2:87DE) and unmatched
+;   ($C2:8E20).
+; Entry: M=1, X=1 (8-bit slot index), DP any, DB=$7E; A = Menu_ItemId
+; Exit:  M=1, X=1; C and X as above; A = the id or the count read last;
+;        Y unchanged
+; No calls.
+Menu_FindItem:
+    LDX.b #0
+.slot:
+    CMP.w !Menu_InvIds,X
+    BNE .next
+    LDA.w !Menu_InvCounts,X
+    BNE .found
+    LDA.w !Menu_ItemId
+.next:
+    INX
+    BNE .slot
+    SEC
+    RTS
+.found:
+    STX.w !Menu_ItemSlot
+    STZ.w !Menu_ItemSlot+1
+    CLC
+    RTS
+
+; $C2:8816 — Menu_LoadCharRec (10 bytes, $8816–$881F)
+; Menu_LoadCharRecA for character A, keeping P and X.
+; Callers (4 JSR sites): unmatched ($C2:99B9, $C2:BBA7, $C2:DC3A, $C2:DDDF).
+; Entry: M, X any (P and X saved; SEP #$20 here), DP=$0000, DB=$7E; A =
+;        the character id
+; Exit:  P and X restored; A and Y as Menu_LoadCharRecA leaves them
+; Calls: Menu_LoadCharRecA.
+Menu_LoadCharRec:
+    PHX
+    PHP
+    SEP #$20
+    JSR Menu_LoadCharRecA
+    PLP
+    PLX
+    RTS
+
+; $C2:8820 — Menu_LoadPartyCharRec (25 bytes, $8820–$8838)
+; Loads the character at Menu_PartyList[Menu_CurMember]
+; (Menu_LoadCharRecA); Menu_CurIsReserve = $FF when that index is past
+; the active members (Menu_PartyActive), else 0.
+; Callers (29 JSR sites): unmatched ($C2:8E5D, $C2:8F99, $C2:9DB9, $C2:A1C3, $C2:A244, $C2:A2DE,
+;   $C2:A336, $C2:AFFB, $C2:B28B, $C2:B2E0, $C2:B30E, $C2:B41F, $C2:B4B2, $C2:B507, $C2:B5D8,
+;   $C2:B696, $C2:B6DF, $C2:B82E, $C2:B89E, $C2:B9F2, $C2:BA78, $C2:BC9E, $C2:BE88, $C2:C8CB,
+;   $C2:CD9E, $C2:D7BE, $C2:E0C0, $C2:E131, $C2:E165).
+; Entry: M, X any (P, X and Y saved; SEP #$30 here), DP=$0000, DB=$7E
+; Exit:  P, X and Y restored; A as Menu_LoadCharRecA leaves it
+; Calls: Menu_LoadCharRecA.
+Menu_LoadPartyCharRec:
+    PHX
+    PHY
+    PHP
+    SEP #$30
+    STZ.b !Menu_CurIsReserve
+    LDX.b !Menu_CurMember
+    CPX.b !Menu_PartyActive
+    BCC .active
+    DEC.b !Menu_CurIsReserve
+.active:
+    LDA.w !Menu_PartyList,X
+    JSR Menu_LoadCharRecA
+    PLP
+    PLY
+    PLX
+    RTS
+
+; $C2:8839 — Menu_LoadCharRecA (72 bytes, $8839–$8880)
+; Copies the Menu_CharRecords record of character A (A x $50) to
+; Menu_CurCharRec (its address kept in Menu_CurCharRecPtr), then the
+; 6-byte Menu_Unk2C23 entry of the record's first byte AND 7 to
+; Menu_CurCharExtra right after it. A character id with bit 7 set (no
+; character) returns at once.
+; Callers (2 JSR sites): Menu_LoadCharRec ($C2:881A) and Menu_LoadPartyCharRec ($C2:8832).
+; Entry: M=1 (8-bit id; the ORA immediate), X any (REP #$31 sets X=0),
+;        DP=$0000, DB any (long multiplier; the MVNs set $7E); A = the id
+; Exit:  bit 7 set: M=1, A = the id, nothing else changed. Else M=0,
+;        X=0, DB=$7E; A = 0; X, Y past the second MVN
+; No calls.
+Menu_LoadCharRecA:
+    STA.l WRMPYA
+    ORA.b #0
+    BMI .done
+    LDA.b #!Menu_CharRecBytes
+    STA.l WRMPYB
+    NOP
+    REP #$31
+    LDA.w #!Menu_CharRecords
+    ADC.l RDMPYL
+    STA.b !Menu_CurCharRecPtr
+    TAX
+    LDY.w #!Menu_CurCharRec
+    LDA.w #!Menu_CharRecBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.w !Menu_CurCharRec
+    AND.b #!Menu_Unk2C23Mask
+    STA.l WRMPYA
+    LDA.b #!Menu_Unk2C23Bytes
+    STA.l WRMPYB
+    REP #$21
+    NOP
+    LDA.w #!Menu_Unk2C23
+    ADC.l RDMPYL
+    TAX
+    LDA.w #!Menu_Unk2C23Bytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    INC A                               ; $FFFF + 1 = 0
+.done:
+    RTS
+
+; $C2:8881 — Menu_ItemCategory (38 bytes, $8881–$88A6)
+; The category of item A by Menu_ItemCategoryBounds (0: below $5A, 1:
+; $5A-$7A, 2: $7B-$93, 3: $94-$BB, 4: from $BC) into Menu_ItemCategory,
+; and its index within the category (A - the category's first id) into
+; Menu_ItemIndex (both as words).
+; Callers (7 JSR sites): Menu_ItemDataPtrA ($C2:88B0) and unmatched ($C2:992D, $C2:9952, $C2:AF1C,
+;   $C2:B0B1, $C2:DDA3, $C2:DFAD).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E; A =
+;        the item id
+; Exit:  P and X restored; A = the index; Y unchanged
+; No calls.
+Menu_ItemCategory:
+    PHX
+    PHP
+    SEP #$30
+    LDX.b #0
+.bound:
+    CMP.l Menu_ItemCategoryBounds+1,X
+    BCC .found
+    INX
+    CPX.b #!Menu_ItemLastCategory
+    BCC .bound
+.found:
+    SEC
+    SBC.l Menu_ItemCategoryBounds,X
+    STA.w !Menu_ItemIndex
+    STZ.w !Menu_ItemIndex+1
+    TXA
+    STA.w !Menu_ItemCategory
+    STZ.w !Menu_ItemCategory+1
+    PLP
+    PLX
+    RTS
+
+; $C2:88A7 — Menu_ItemCategoryBounds (6 bytes, $88A7–$88AC)
+; The first item id of categories 0-4, then the end of the ids ($F2, the
+; slot count Menu_ListEquipItems scans; not read by Menu_ItemCategory).
+Menu_ItemCategoryBounds:
+    db $00,$5A,$7B,$94,$BC,$F2
+
+; $C2:88AD — Menu_ItemDataPtrA (43 bytes, $88AD–$88D7)
+; Menu_ItemCategory for item A, then X = Menu_ItemDataPtr = the address
+; (bank $FF) of the item's record in its category's table:
+; MenuRom_ItemTablesA[category] + index x MenuRom_ItemRecSizesA[category].
+; What the records hold is not traced.
+; Callers (1 JSR site): unmatched ($C2:98BB).
+; Entry: M any (P saved; SEP #$20 here), X any (the category is read as
+;        a byte or word; its high byte is 0), DP any, DB=$7E; A = the id
+; Exit:  P restored; A = X = the address; Y unchanged
+; Calls: Menu_ItemCategory.
+Menu_ItemDataPtrA:
+    PHP
+    SEP #$20
+    JSR Menu_ItemCategory
+    LDA.w !Menu_ItemIndex
+    STA.l WRMPYA
+    LDX.w !Menu_ItemCategory
+    LDA.l !MenuRom_ItemRecSizesA,X
+    STA.l WRMPYB
+    REP #$30
+    TXA
+    ASL A                               ; (also C=0)
+    TAX
+    LDA.l !MenuRom_ItemTablesA,X
+    ADC.l RDMPYL
+    STA.w !Menu_ItemDataPtr
+    TAX
+    PLP
+    RTS
+
+; $C2:88D8 — Menu_ItemDataPtrB (40 bytes, $88D8–$88FF)
+; As Menu_ItemDataPtrA for the second set of per-category tables
+; (MenuRom_ItemTablesB, MenuRom_ItemRecSizesB), using the
+; Menu_ItemCategory / Menu_ItemIndex left by an earlier call; result in
+; Menu_ItemDataPtrB and X.
+; Callers (3 JSR sites): unmatched ($C2:9930, $C2:9955, $C2:B0C3).
+; Entry: M any (P saved; SEP #$20 here), X any, DP any, DB=$7E;
+;        Menu_ItemCategory and Menu_ItemIndex set
+; Exit:  P restored; A = X = the address; Y unchanged
+; No calls.
+Menu_ItemDataPtrB:
+    PHP
+    SEP #$20
+    LDA.w !Menu_ItemIndex
+    STA.l WRMPYA
+    LDX.w !Menu_ItemCategory
+    LDA.l !MenuRom_ItemRecSizesB,X
+    STA.l WRMPYB
+    REP #$30
+    TXA
+    ASL A
+    TAX
+    LDA.l !MenuRom_ItemTablesB,X
+    ADC.l RDMPYL
+    STA.w !Menu_ItemDataPtrB
+    TAX
+    PLP
+    RTS
+
+; $C2:8900 — Menu_CountEquippedBy (79 bytes, $8900–$894E)
+; For each character of Menu_EquipChars (up to 7, stopping at the first
+; with bit 7 set): Menu_EquipFlags[n] = 1 when the byte of its
+; Menu_CharRecords record at the category's Menu_EquipSlotOffsets entry
+; equals Menu_ItemId (else 0), and Menu_EquipCount counts them. Uses
+; Menu_ItemCategory as left by an earlier Menu_ItemCategory.
+; Quirks, kept: Menu_Unk29AF's low byte is stored into Menu_Tmp02 and not
+; used; for category 4 the offset comes from the byte after the table
+; ($08, the next routine's PHP).
+; Callers (1 JSR site): unmatched ($C2:DDA6).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00-$02),
+;        DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-$02 changed
+; No calls.
+Menu_CountEquippedBy:
+    PHP
+    SEP #$30
+    LDX.w !Menu_ItemCategory
+    LDA.l Menu_EquipSlotOffsets,X
+    STA.b !Menu_Tmp00
+    STZ.b !Menu_Tmp01
+    STZ.w !Menu_EquipCount
+    LDX.b #0
+    LDA.b #!Menu_CharRecBytes
+    STA.l WRMPYA
+    LDA.w !Menu_Unk29AF
+    STA.b !Menu_Tmp02                   ; (not used)
+    REP #$10
+.char:
+    SEP #$20
+    LDA.w !Menu_EquipChars,X
+    BMI .done
+    STA.l WRMPYB
+    STZ.w !Menu_EquipFlags,X
+    REP #$31
+    LDA.b !Menu_Tmp00
+    ADC.l RDMPYL
+    TAY
+    SEP #$20
+    LDA.w !Menu_CharRecords,Y
+    CMP.w !Menu_ItemId
+    BNE .next
+    INC.w !Menu_EquipFlags,X
+    INC.w !Menu_EquipCount
+.next:
+    INX
+    CPX.w #!Menu_EquipChecks
+    BCC .char
+.done:
+    PLP
+    RTS
+
+; $C2:894F — Menu_EquipSlotOffsets (4 bytes, $894F–$8952)
+; The Menu_CharRec offset of the equipped item of categories 0-3 ($29,
+; $28, $27, $2A), as Menu_CountEquippedBy reads it (inferred from that
+; use only).
+Menu_EquipSlotOffsets:
+    db $29,$28,$27,$2A
+
+; $C2:8953 — Menu_ListEquipItems (137 bytes, $8953–$89DB)
+; Lists the inventory items of Menu_ListKind's id range
+; (Menu_EquipListRanges: 0 $00-$59, 1 $7B-$93, 2 $5A-$7A, 3 $94-$BB) that
+; Menu_Unk93A8 accepts (A non-zero), from slots 0-$F1, into
+; Menu_EquipList (ids, 0 after the last) and Menu_EquipListCounts, with
+; Menu_EquipListLen = the number; then sorts the list by
+; Menu_ItemSortKeys[id], largest first (each position takes the largest
+; key after it by swaps).
+; Quirk, kept: the inner sort loop ends at the first key of 0, which is
+; meant to be that of the end id 0 ($7E:7C00); an item whose key is 0
+; ends it early.
+; Callers (2 JSR sites): unmatched ($C2:9C61, $C2:A466).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00/01),
+;        DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_ItemId = the last id tested;
+;        Menu_Tmp00/01 changed
+; Calls: Menu_Unk93A8.
+Menu_ListEquipItems:
+    PHP
+    SEP #$30
+    STZ.w !Menu_EquipListLen
+    LDA.w !Menu_ListKind
+    ASL A
+    TAX
+    LDA.l Menu_EquipListRanges,X
+    STA.b !Menu_Tmp00                   ; first id
+    LDA.l Menu_EquipListRanges+1,X
+    STA.b !Menu_Tmp01                   ; past the last
+    LDY.b #0
+    TYX
+.slot:
+    LDA.w !Menu_InvIds,Y
+    BEQ .next
+    CMP.b !Menu_Tmp00
+    BCC .next
+    CMP.b !Menu_Tmp01
+    BCS .next
+    STA.w !Menu_ItemId
+    JSR Menu_Unk93A8
+    ORA.b #0
+    BEQ .next
+    LDA.w !Menu_ItemId
+    STA.w !Menu_EquipList,X
+    LDA.w !Menu_InvCounts,Y
+    STA.w !Menu_EquipListCounts,X
+    INC.w !Menu_EquipListLen
+    INX
+.next:
+    INY
+    CPY.b #!Menu_ItemIdEnd
+    BCC .slot
+    STZ.w !Menu_EquipList,X
+    STZ.b !Menu_Tmp01                   ; now the position being filled
+.position:
+    LDX.b !Menu_Tmp01
+    LDY.w !Menu_EquipList,X
+    BEQ .done
+    LDA.w !Menu_ItemSortKeys,Y
+    STA.b !Menu_Tmp00                   ; the largest key so far
+.scan:
+    INX
+    LDY.w !Menu_EquipList,X
+    LDA.w !Menu_ItemSortKeys,Y
+    BEQ .position_done
+    CMP.b !Menu_Tmp00
+    BCC .scan
+    STA.b !Menu_Tmp00                   ; larger or equal: swap it into the position
+    PHY
+    LDA.w !Menu_EquipListCounts,X
+    PHA
+    LDY.b !Menu_Tmp01
+    LDA.w !Menu_EquipList,Y
+    STA.w !Menu_EquipList,X
+    LDA.w !Menu_EquipListCounts,Y
+    STA.w !Menu_EquipListCounts,X
+    PLA
+    STA.w !Menu_EquipListCounts,Y
+    PLA
+    STA.w !Menu_EquipList,Y
+    BRA .scan
+.position_done:
+    INC.b !Menu_Tmp01
+    BRA .position
+.done:
+    PLP
+    RTS
+
+; $C2:89DC — Menu_EquipListRanges (8 bytes, $89DC–$89E3)
+; First id and end id of each Menu_ListKind (Menu_ListEquipItems).
+Menu_EquipListRanges:
+    db $00,$5A
+    db $7B,$94
+    db $5A,$7B
+    db $94,$BC
 
 ; ============================================================
 ; Menu setup: PPU and RAM init, DMA fill/copy helpers, new-game
