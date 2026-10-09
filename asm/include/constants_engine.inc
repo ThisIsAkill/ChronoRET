@@ -123,7 +123,8 @@ if !constants_engine_inc == 0
 !VramQueue_TileStep = $02                ; Field_VramQueueFlags bit 1: TileAnim_StepVramAddrs ready
 !VramQueue_TileAnim = $10                ; Field_VramQueueFlags bit 4: TileAnim_VramAddrs ready
 !Field_Unk53Bit7 = $80                   ; Field_Unk53 bit 7, set around one Field_EndOfFrameShort
-                                         ; before the battle (DefaultHandler)
+                                         ; before the battle (DefaultHandler) and around the two
+                                         ; EngFD_UnkC2C1 runs of Field_RefreshHdmaLong
 
 ; --- Pad ---
 !Pad_Start = $01                         ; Pad_Pressed bit 0: Start
@@ -1085,3 +1086,17 @@ endif
 !LayerDrift_Layer3 = $04                 ; LayerDrift_Flags bit 2: step layer 3
 !LayerDrift_FracMask = $0F               ; the 1/16-pixel part a fraction keeps
 !LayerDrift_FracNeg = $F0                ; ORed into a negative fraction's kept part (its sign)
+
+; --- Battle music cues (MusicCueDispatch / AudioFadeDispatch, $C0:1BAB-$C0:1CFB) ---
+!FieldBtl_EvtKeepMusic = $40             ; FieldBtl_EvtFlags bit 6: the music cues send only Audio_Cmd70
+                                         ; (keep the field music through the battle, probably)
+!Audio_Cmd14 = $14                       ; sound-driver command sent with a song in Audio_CmdArg0 (meaning
+                                         ; not traced: start a song, probably)
+!Audio_Cmd70 = $70                       ; sound-driver command, argument 1 before / 0 after a battle
+                                         ; (not traced)
+!Audio_Cmd11 = $11                       ; sound-driver command sent with Menu_Config1E after a battle
+                                         ; (not traced: the field music again, probably)
+!Audio_Cmd81Arg40 = $40                  ; Audio_CmdArg0 of an Audio_CmdUnk81 after a battle
+!Audio_Cmd81Arg80 = $80                  ; ... and after a lost one
+!Audio_Unk1E10Set = $FF                  ; Audio_Unk1E10 before a battle (0 after it)
+!Audio_SongUnk26 = $26                   ; Audio_Cmd14's argument after a lost battle (a song, probably)

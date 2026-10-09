@@ -540,7 +540,8 @@ if !ram_engine_inc == 0
 !Oam_Range3LoPtr = $DF                   ; 16-bit low-table write pointer for range 3 (starts $0710)
 
 ; --- Audio (dp) ---
-!Audio_SfxUnkFA = $FA                    ; 8-bit sound-effect id, $45 at load; no matched reader
+!Audio_SfxUnkFA = $FA                    ; 8-bit, $45 at load; MusicCueDispatch sends it with Audio_Cmd14
+                                         ; before a battle (the battle music, probably; not a sound effect)
 !Audio_SfxTileAnimB = $FB                ; 8-bit sound-effect id passed by Audio_PlayTileSfxB
                                          ; (DefaultHandler tile animation); $65 at load
 !Audio_SfxTileAnimA = $FC                ; 8-bit sound-effect id passed by Audio_PlayTileSfxA (Mode*
@@ -770,6 +771,8 @@ if !ram_engine_inc == 0
 !Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (the last byte of the block
                                          ; Audio_DriverCommand sends; bank $C2's C2Scene_QueueSoundCmd
                                          ; fills all four bytes $1E00-$1E03)
+!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after
+                                         ; (next to the Audio_Cmd* block; reader not traced)
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
                                          ; colours) that Pal_LoadUnkRow0 copies to Pal_CgramBuf, the

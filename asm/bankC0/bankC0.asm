@@ -5293,7 +5293,7 @@ Oam_UploadShadow:
 ;       target's RTL returns straight to that caller.
 ;   [0] $0000  BRA → GameLoop_Main  (warm restart)
 ;   [1] $0002  JSL → ScrollStepAccum  ($C0:2C41)
-;   [2] $0005  JSL → AudioDrvSync     ($C0:0AFF)
+;   [2] $0005  JSL → Field_RefreshHdmaLong ($C0:0AFF)
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
 ; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), Evt_OpE1_WarpNow (BRL
@@ -5310,7 +5310,7 @@ org $C00000
 ReentryVectors:
     BRA GameLoop_Main       ; [0] warm restart — skip init, enter frame loop
     BRL ScrollStepAccum     ; [1] $C0:2C41
-    BRL AudioDrvSync        ; [2] $C0:0AFF
+    BRL Field_RefreshHdmaLong ; [2] $C0:0AFF
     BRL MusicCueDispatch    ; [3] $C0:1BAB
     BRL AudioFadeDispatch   ; [4] $C0:1BE6
 
@@ -26947,6 +26947,49 @@ LocLoad_DrawMap:
 .done:
     RTS
 
+; ============================================================
+; $C0:0AFF — Field_RefreshHdmaLong (41 bytes, $0AFF–$0B27)
+; (was the stub AudioDrvSync; it touches no sound.) A JSL service for
+; other banks (ReentryVectors [2]): with DP_Field and DB=$00, sets
+; Field_Unk53Bit7, runs EngFD_UnkC2C1 twice (so both of its handler
+; tables run once, filling both HDMA table sets, probably), clears the
+; bit, sets up the HDMA channels (Hdma_InitChannelsFD) and returns
+; Field_HdmaEnable in A (the channel mask the NMI writes to HDMAEN;
+; what the caller does with it is not traced).
+; Callers (1 BRL site): ReentryVectors ($C0:0005).
+; Callers note: vector [2], reached by JSL $C0:0005 from $D1:F4E2
+;   (unmatched).
+; On entry: M=1 (8-bit A), X any (it sets X=1, then X=0), DP any
+;   (saved; set to DP_Field), DB any (saved; set to $00).
+; Exit: M=1, X=0, DP and DB restored (RTL); A = Field_HdmaEnable; X =
+;   the channel 7 table address (Hdma_InitChannelsFD); Y as the
+;   EngFD_UnkC2C1 handlers leave it; Field_Unk53 bit 0 back as it was
+;   (flipped twice).
+; ============================================================
+org $C00AFF
+Field_RefreshHdmaLong:
+    PHD
+    PHB
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$30
+    LDA.b #$00
+    PHA
+    PLB                                 ; DB = $00
+    LDA.b #!Field_Unk53Bit7
+    TSB.b !Field_Unk53
+    JSL EngFD_UnkC2C1
+    JSL EngFD_UnkC2C1
+    LDA.b #!Field_Unk53Bit7
+    TRB.b !Field_Unk53
+    REP #$10
+    JSL Hdma_InitChannelsFD
+    LDA.b !Field_HdmaEnable
+    PLB
+    PLD
+    RTL
+
 ; ------------------------------------------------------------
 ; $C0:74A6 — Map_InitOrigin (46 bytes, $74A6–$74D3)
 ; Sets the scroll origin for the leader's entry point: Map_InitOriginX
@@ -27521,6 +27564,211 @@ Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
     STA.w !Audio_CmdId
     JSL Audio_DriverCommand
     RTS
+
+; ============================================================
+; The battle music cues: ReentryVectors [3] and [4] ($C0:1BAB–$C0:1CFB)
+; Two JSL services for other banks (bank $D1 before a battle and the
+; battle's bank $CD after it, through ReentryVectors) that send sound
+; driver commands with Audio_DriverCommand. FieldBtl_EvtFlags bit 6
+; (FieldBtl_EvtKeepMusic) skips the music change, probably keeping the
+; field's music through the battle. Commands $14, $70 and $11 appear
+; nowhere else in bank $C0; what the driver does with them is not
+; traced, so the readings below (start the battle music, the game-over
+; music, the field music again) are guesses from where they are sent.
+; ============================================================
+
+org $C01BAB
+; ------------------------------------------------------------
+; $C0:1BAB — MusicCueDispatch (59 bytes, $1BAB–$1BE5)
+; Before a battle, probably: with FieldBtl_EvtKeepMusic clear,
+;   Audio_Unk1E10 = $FF and command Audio_Cmd14 with Audio_CmdArg0 =
+;   Audio_SfxUnkFA ($45 at load: the battle music, probably); with it
+;   set, Audio_Cmd70 with argument 1.
+; Callers (1 BRL site): ReentryVectors ($C0:0008).
+; Callers note: vector [3], reached by JSL $C0:0008 from $D1:F405
+;   (unmatched).
+; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
+;   DP any (saved; set to DP_Field), DB any (saved; set to $00 from
+;   DP_Field's low byte by PHA/PLB).
+; Exit: M=1, DP and DB restored (RTL); A clobbered; X and Y as
+;   Audio_DriverCommand leaves them; the Audio_Cmd* bytes written.
+; ------------------------------------------------------------
+MusicCueDispatch:
+    PHB
+    PHD
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    PHA                                 ; DP_Field's low byte: DB = $00
+    PLB
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtKeepMusic
+    BNE .keep
+    LDA.b #!Audio_Unk1E10Set
+    STA.w !Audio_Unk1E10
+    LDA.b !Audio_SfxUnkFA
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd14
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLD
+    PLB
+    RTL
+.keep:
+    LDA.b #$01
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd70
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLD
+    PLB
+    RTL
+
+; ------------------------------------------------------------
+; $C0:1BE6 — AudioFadeDispatch (278 bytes, $1BE6–$1CFB)
+; After a battle, probably, by FieldBtl_Result:
+; - 1 (wait for a button and restart: the party lost, probably) unless
+;   FieldBtl_EvtNoReset: Audio_Unk1E10 = 0; Audio_CmdUnk81 (0, 0,
+;   $FF); Audio_Cmd14 with $26 (Audio_SongUnk26); Audio_CmdUnk81 ($80,
+;   $FF, $FF); Audio_Cmd82 and Audio_Cmd83 (0, $FF).
+; - else (0, 2, or 1 with FieldBtl_EvtNoReset): with
+;   FieldBtl_EvtKeepMusic Audio_Cmd70 with argument 0; without it
+;   Audio_Unk1E10 = 0, Audio_CmdUnk81 (0, 0, $FF), Audio_Cmd11 with
+;   Menu_Config1E, Audio_CmdUnk81 ($40, $FF, $FF), Audio_Cmd82 and
+;   Audio_Cmd83 (0, $FF).
+; The DEC on the 2 path is dead (it branches to the same place either
+;   way). Quirk: it saves DB then D (PHB, PHD) but restores DB first
+;   (PLB, PLD): on return DB = the caller's D low byte and D = the
+;   caller's DB << 8 | its D high byte. That is harmless only when the
+;   caller has D = $0000 and DB = $00 (not traced at $CD:043E); kept
+;   as found.
+; Callers (1 BRL site): ReentryVectors ($C0:000B).
+; Callers note: vector [4], reached by JSL $C0:000B from $CD:043E
+;   (unmatched).
+; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
+;   DP any (saved; set to DP_Field), DB any (saved; set to $00).
+; Exit: M=1 (RTL); D and DB scrambled as above; A clobbered; X and Y as
+;   Audio_DriverCommand leaves them; the Audio_Cmd* bytes written.
+; ------------------------------------------------------------
+AudioFadeDispatch:
+    PHB
+    PHD
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    PHA                                 ; DP_Field's low byte: DB = $00
+    PLB
+    LDA.l !FieldBtl_Result
+    BEQ .field_music
+    DEC A
+    BEQ .result1
+    DEC A                               ; dead: both ways go on below
+    BRA .field_music
+.result1:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtNoReset
+    BNE .field_music
+    BRL .lost
+.field_music:
+    LDA.l !FieldBtl_EvtFlags
+    BIT.b #!FieldBtl_EvtKeepMusic
+    BNE .keep
+    LDA.b #$00
+    STA.w !Audio_Unk1E10
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #$00
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.l !Menu_Config1E
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd11
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd81Arg40
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
+.keep:
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd70
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
+.lost:
+    LDA.b #$00
+    STA.w !Audio_Unk1E10
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #$00
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_SongUnk26
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd14
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd81Arg80
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd81Arg
+    STA.w !Audio_CmdArg2
+    LDA.b #!Audio_CmdUnk81
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #$00
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    PLB                                 ; quirk: pulled in the wrong order
+    PLD
+    RTL
 
 ; ============================================================
 ; Field event hooks: window effects ($C0:21E1–$C0:274C)

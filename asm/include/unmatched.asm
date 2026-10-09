@@ -13,14 +13,8 @@
 
 ; --- Bank $C0 ---
 
-org $C00AFF
-AudioDrvSync:       ; JSL re-entry: force 2 audio driver ticks, restore DB/DP; RTL
 
-org $C01BAB
-MusicCueDispatch:   ; JSL re-entry: SPC start ($14) or fade ($70) per $7E2A1F bit 6; RTL
 
-org $C01BE6
-AudioFadeDispatch:  ; JSL re-entry: conditional SPC fade/start via $7F01EC counter; RTL
 
 
 org $C0ECCC

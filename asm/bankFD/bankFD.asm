@@ -3251,8 +3251,9 @@ EngFD_UnkC124:
 ; clear, else the set at $7F:1238; each set holds one $57-byte table per
 ; channel. Which channels run is up to !Field_HdmaEnable (the NMI writes
 ; HDMAEN).
-; Callers (10 JSL sites): Field_RestoreState ($C0:01B0), Scene_ResumeNmi ($C0:0B34), NmiHandler
-;   ($C0:EAEF, $C0:EB0F, $C0:EB26, $C0:EB3D, $C0:EB51, $C0:EB65, $C0:EC0F) and unmatched ($C0:0B1F).
+; Callers (10 JSL sites): Field_RestoreState ($C0:01B0), Field_RefreshHdmaLong ($C0:0B1F),
+;   Scene_ResumeNmi ($C0:0B34) and NmiHandler ($C0:EAEF, $C0:EB0F, $C0:EB26, $C0:EB3D, $C0:EB51,
+;   $C0:EB65, $C0:EC0F).
 ; Entry: M=1, X=0 (16-bit table addresses), DP any (saved), DB=$00 (reads
 ;        !DP_Field+!WinFx_Size and +!Field_Unk53 absolute)
 ; Exit:  M=1, X=0; DP restored; A clobbered; X = the channel 7 table
@@ -3371,8 +3372,8 @@ Hdma_InitChannelsFD:
 ; filling the two HDMA table sets in turn (Hdma_InitChannelsFD picks a
 ; set by !Field_Unk53; not traced). The handlers are not analysed.
 ; Callers (9 JSL sites): Field_EndOfFrame ($C0:00C7), Field_EndOfFrameShort ($C0:00E0),
-;   Field_RestoreState ($C0:01AA), Scene_ResumeNmi ($C0:0B2E), Field_PauseAndMenuInput ($C0:1905,
-;   $C0:194D), Field_FadeToBankC2Mode5 ($C0:19B6) and unmatched ($C0:0B11, $C0:0B15).
+;   Field_RestoreState ($C0:01AA), Field_RefreshHdmaLong ($C0:0B11, $C0:0B15), Scene_ResumeNmi
+;   ($C0:0B2E), Field_PauseAndMenuInput ($C0:1905, $C0:194D) and Field_FadeToBankC2Mode5 ($C0:19B6).
 ; Entry: M=1, X=1 (8-bit TAX of the doubled index), DP=$0100, DB=$00 at
 ;        all callers (what the handlers need is not traced)
 ; Exit:  M=1, X=1; !Field_Unk53 bit 0 flipped; A = 1; X and the rest as
