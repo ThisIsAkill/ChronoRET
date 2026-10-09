@@ -7007,6 +7007,176 @@ Trig_Sin1024:                   ; header: see Trig_Cos1024
     RTL
 
 ; ============================================================
+; Direction helpers ($C2:2273–$C2:232C)
+; ============================================================
+; Directions here have 256 steps per turn: 0 right, $40 down, $80 left,
+; $C0 up (the Rom_DirToFacing convention). The three keep their Unk names
+; because verified C2Scene_ObjBMateAim calls them by name; better names
+; once it is next edited: C2Scene_Cos256, C2Scene_Sin256 and
+; C2Scene_DirToPoint.
+
+; $C2:2273 — C2Scene_Unk2273 (42 bytes with C2Scene_Unk2277, $2273–$229C)
+; The cosine of direction A (adds a quarter turn and falls into the
+; sub-entry C2Scene_Unk2277, $C2:2277, the sine). The sine is
+; Rom_SineTable256's byte (127 x sin) sign-extended to a word, except at
+; directions $40 and $C0, which give +128 and -128 ($0080 / $FF80)
+; instead of the table's +127 / -127. Only the low byte of the direction
+; counts.
+; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and unmatched ($C6:E6EE).
+; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and unmatched ($C6:E71F).
+; Entry (both): M=0 (16-bit A: the .w immediates), X=0 (16-bit index;
+;        the index is below $100, so X=1 would read the same),
+;        DP any (no direct page), DB=$00 (the table is read absolute
+;        through the bank $00 mirror of $C0:F800); A = the direction
+; Exit (both):  M=0, X=0; A = the signed value (-128..+128); X = the
+;        direction's low byte (unchanged at directions $40 and $C0, which
+;        return before the TAX); Y, DP and DB unchanged
+; No calls.
+C2Scene_Unk2273:
+    CLC
+    ADC.w #!Dir_QuarterTurn             ; cos(d) = sin(d + a quarter turn)
+C2Scene_Unk2277:                        ; header: see C2Scene_Unk2273
+    AND.w #!Eng_LowByteMask
+    CMP.w #!Dir_QuarterTurn
+    BEQ .plus_max
+    CMP.w #!Dir_ThreeQuarters
+    BEQ .minus_max
+    TAX
+    LDA.w !Rom_SineTable256,X
+    BIT.w #!Dir_HalfTurn                ; the byte's sign bit
+    BNE .negative
+    AND.w #!Eng_LowByteMask             ; drop the next entry (read with it)
+    RTL
+.negative:
+    ORA.w #!Eng_HighByteMask            ; sign-extend
+    RTL
+.plus_max:
+    LDA.w #!C2Scene_SinMax
+    RTL
+.minus_max:
+    LDA.w #!C2Scene_SinMin
+    RTL
+
+; $C2:229D — C2Scene_Unk229D (144 bytes, $229D–$232C)
+; The direction (0-255) from the point (C2Tmp_08, C2Tmp_0A) to the point
+; (C2Tmp_0C, C2Tmp_0E) on the scene's wrapping map: each difference that
+; is half the map or more (Y 512 of 1024, X 768 of 1536 pixels) is taken
+; the other way round. The angle comes from Rom_AngleTable at
+; (|dy| / 4) x 32 + |dx| / 4, then is turned into the quarter the
+; vector lies in.
+; The differences are not scaled down (Obj_CalcDirection scales by 1/2
+; or 1/4): with |dx| of 128 or more the column runs into the next row,
+; and with |dy| of 128 or more the read goes past the 1 KB table (kept;
+; C2Scene_ObjBMateAim aims at nearby points).
+; A target straight right (angle byte 0) with dy >= 0 gives $0100, not
+; 0 (C2Scene_FullTurn - 0); the sine helpers use only the low byte.
+; Callers (1 JSR site): C2Scene_ObjBMateAim ($C2:5398).
+; Entry: M=0 (16-bit A: the .w immediates and word scratch), X=0 (the
+;        16-bit table index), DP=$0000 (C2Tmp_00-$0F), DB=$00 (the table
+;        is read absolute through the bank $00 mirror of $C0:F300);
+;        C2Tmp_08/0A = the start X/Y, C2Tmp_0C/0E = the target X/Y
+; Exit:  M=0, X=0; A = the direction (a word, $0000-$0100 while the read
+;        stays in the table); X = the table
+;        index, 0 when |dx| and |dy| are both below 4 (the caller's "there"
+;        test); C2Tmp_00 = start Y - target Y and C2Tmp_04 = start X -
+;        target X (after the wrap), C2Tmp_02 = |dy|, C2Tmp_06 = the
+;        table's angle (low byte; the high byte is 0); Y, DP and DB unchanged
+; No calls.
+!C2Scene_DirFromX = !C2Tmp_08          ; in: the start point
+!C2Scene_DirFromY = !C2Tmp_0A
+!C2Scene_DirToX = !C2Tmp_0C             ; in: the target point
+!C2Scene_DirToY = !C2Tmp_0E
+!C2Scene_AimDy = !C2Tmp_00              ; start Y - target Y, signed
+!C2Scene_AimAbsDy = !C2Tmp_02           ; |dy|
+!C2Scene_AimDx = !C2Tmp_04              ; start X - target X, signed
+!C2Scene_AimAbsDx = !C2Tmp_06           ; |dx|, then |dx| / 4, then the table's angle
+C2Scene_Unk229D:
+    SEC
+    LDA.b !C2Scene_DirFromY
+    SBC.b !C2Scene_DirToY
+    STA.b !C2Scene_AimDy
+    BPL .dy_pos
+    EOR.w #!Eng_Invert16
+    INC A
+.dy_pos:
+    STA.b !C2Scene_AimAbsDy
+    CMP.w #!C2Scene_MapHeightPx/2
+    BCC .dy_done
+    SEC                                 ; half the map or more: the other way round,
+    SBC.w #!C2Scene_MapHeightPx         ; |dy| = height - |dy| and dy negated
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimAbsDy
+    LDA.b !C2Scene_AimDy
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimDy
+.dy_done:
+    SEC
+    LDA.b !C2Scene_DirFromX
+    SBC.b !C2Scene_DirToX
+    STA.b !C2Scene_AimDx
+    BPL .dx_pos
+    EOR.w #!Eng_Invert16
+    INC A
+.dx_pos:
+    STA.b !C2Scene_AimAbsDx
+    CMP.w #!C2Scene_MapWidthPx/2
+    BCC .dx_done
+    SEC                                 ; the same for X
+    SBC.w #!C2Scene_MapWidthPx
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimAbsDx
+    LDA.b !C2Scene_AimDx
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimDx
+.dx_done:
+    LDA.b !C2Scene_AimAbsDx             ; column: |dx| / 4
+    LSR A
+    LSR A
+    STA.b !C2Scene_AimAbsDx
+    LDA.b !C2Scene_AimAbsDy             ; row: |dy| / 4, times 32
+    AND.w #!C2Scene_AimRiseMask
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !C2Scene_AimAbsDx
+    TAX
+    SEP #$20
+    LDA.w !Rom_AngleTable,X             ; 0 (along X) to $40 (along Y)
+    STA.b !C2Scene_AimAbsDx
+    REP #$20
+    LDA.b !C2Scene_AimDy
+    EOR.b !C2Scene_AimDx
+    BMI .signs_differ
+    LDA.b !C2Scene_AimDx
+    BMI .right_down
+    CLC                                 ; target up-left: $80 + angle
+    LDA.w #!Dir_HalfTurn
+    ADC.b !C2Scene_AimAbsDx
+    RTS
+.right_down:
+    LDA.b !C2Scene_AimAbsDx             ; target down-right: the angle
+    RTS
+.signs_differ:
+    LDA.b !C2Scene_AimDx
+    BMI .right_up
+    SEC                                 ; target down-left: $80 - angle
+    LDA.w #!Dir_HalfTurn
+    SBC.b !C2Scene_AimAbsDx
+    RTS
+.right_up:
+    SEC                                 ; target up-right: $100 - angle
+    LDA.w #!C2Scene_FullTurn
+    SBC.b !C2Scene_AimAbsDx
+    RTS
+    LDA.b !C2Scene_AimAbsDx             ; dead: no path reaches these 3 bytes
+    RTS                                 ; ($C2:232A-$232C; no reference found)
+
+; ============================================================
 ; Scene setup steps ($C2:232D–$C2:2335, $C2:26A8–$C2:274C)
 ; ============================================================
 

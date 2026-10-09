@@ -58,16 +58,6 @@ Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (tabl
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C22273
-C2Scene_Unk2273:    ; JSL from C2Scene_ObjBMateAim: probably the cosine of direction A (0-255): adds $40
-                    ; and runs into C2Scene_Unk2277 (not matched)
-org $C22277
-C2Scene_Unk2277:    ; JSL: probably the sine of direction A from Rom_SineTable256 (sign-extended; $0080 and
-                    ; $FF80 at $40 and $C0) through DB $00 (not matched)
-org $C2229D
-C2Scene_Unk229D:    ; JSR from C2Scene_ObjBMateAim: probably the direction (0-255) between the points
-                    ; (C2Tmp_08, $0A) and (C2Tmp_0C, $0E) on the wrapping map, through the angle table at
-                    ; $C0:F300 (DB $00); X = the table index, 0 within 4 pixels (not matched)
 org $C2631F
 C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and the tasks, loads from bank $C6,
                     ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6

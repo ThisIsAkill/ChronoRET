@@ -560,4 +560,11 @@ if !constants_menu_inc == 0
 !C2Scene_LabelPieces = 6                 ; the first byte of the frame at C2Scene_Unk8604 (probably its piece
                                          ; count)
 
+; --- Direction helpers (C2Scene_Unk2273 / Unk2277 / Unk229D) ---
+!C2Scene_SinMax = $0080                  ; C2Scene_Unk2277 at direction $40: +128 (the table holds 127)
+!C2Scene_SinMin = $FF80                  ; and at direction $C0: -128 (the table holds -127)
+!C2Scene_AimRiseMask = $FFFC             ; |dy| bits kept for the angle row (|dy| / 4 * 32 = this * 8)
+!C2Scene_FullTurn = $0100                ; a whole turn in direction units (256): C2Scene_Unk229D's
+                                         ; result for the up-right quarter is this - the angle
+
 endif
