@@ -613,4 +613,46 @@ if !constants_menu_inc == 0
 !C2Scene_Unk7F00AABit0 = $01
 !C2Scene_Unk7F019ABit3 = $08
 
+; --- The menu kernel (BankC2_MenuEntry, Menu_RunThreads) ---
+!Menu_StackTop = $09FF                   ; S of the menu's top level (BankC2_MenuEntry, Menu_RunThreads)
+!Menu_ResetStack = $06FF                 ; S Menu_ExitToGame leaves for GameLoop_Main (as StackTop)
+!Menu_NmiAndJoypad = $81                 ; NMITIMEN: NMI and auto-joypad read
+!Menu_JoypadOnly = $01                   ; NMITIMEN: auto-joypad read only
+!Menu_AudioCmd70 = $70                   ; sound-driver command Menu_Setup sends first (meaning not traced)
+!Menu_AudioArgFF = $FF                   ; the $FF argument of its $18, $19 and $82 commands
+!Menu_AudioCmd82Arg0 = $01               ; Audio_CmdArg0 of its $82 command
+!Menu_FillFF = $FFFF                     ; Menu_Setup's fill value
+!Menu_Unk9B76Bytes = $20                 ; bytes of Menu_Unk9B76
+!Menu_PartyListBytes = 9                 ; bytes of Menu_PartyList
+!Menu_Unk0D38Count = $0E                 ; Menu_Setup's loop end: Y = 2, 4, ... $0E (7 words)
+!Menu_Unk3FDivisor = 10
+!Menu_ActiveSlots = 3                    ; Menu_PartyOrder positions of the active party
+!Menu_ThreadSlots = $40                  ; 8 slots of 8 bytes
+!Menu_ThreadSlotBytes = 8
+!Menu_ThreadStackBase = $0A3F            ; S of slot 0 when it starts; slot n's is $40 x n higher
+!Menu_ThStFree = 0                       ; Menu_Thread.State values
+!Menu_ThStNew = 1
+!Menu_ThStWaiting = 2
+!Menu_ThStRunning = 3
+!Menu_ThNewWait1 = $0101                 ; .State = Menu_ThStNew with .Wait = 1, as one word
+!Menu_ThWait1 = $0102                    ; .State = Menu_ThStWaiting with .Wait = 1
+!Menu_MainThreadSlot = $0008             ; slot 1 (byte offset): Menu_MainThread
+!Menu_Thread3Slot = $0018                ; slot 3: Menu_UnkE91B
+!Menu_Unk58Init = $3020                  ; Menu_Unk58's value before thread 3 starts
+!Menu_FadeInSlot = $0000                 ; slot 0: Menu_FadeInThread
+!Menu_AllThreads = $FF                   ; Menu_KillThreads mask: every slot
+!Menu_RecBytes = 8                       ; bytes in one Menu_RecList record
+!Menu_FadeInStep = $02                   ; Menu_FadeInThread's brightness step
+!Menu_FadeOutStep = $FE                  ; Menu_FadeOut's (-2)
+!Menu_BrightnessMask = $0F               ; INIDISP bits 0-3: the brightness
+!Menu_Unk82E1First = $AE                 ; the range of Menu_CharRec.Unk2A values Menu_Unk82E1 marks
+!Menu_Unk82E1End = $B3
+!Menu_Unk2857Mark = $80
+!Menu_Unk2857Bytes = 5
+!Menu_CharRecBytes = $50                 ; bytes in one Menu_CharRecords record (Menu_CharRec)
+!Menu_CharRecCount = 7                   ; records Menu_InitSystems and Menu_Unk82E1 walk
+!Menu_Unk21BAGap = $001A                 ; bytes Menu_Unk834D skips after each member's 6 in Menu_Unk21BA
+!Menu_Unk21BASrcBank = $D1               ; source bank of its MVN
+!Menu_VectorBytes = 8                    ; bytes of Menu_InterruptVectors (two JMLs)
+
 endif

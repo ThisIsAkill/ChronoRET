@@ -5297,8 +5297,8 @@ Oam_UploadShadow:
 ;   [3] $0008  JSL → MusicCueDispatch ($C0:1BAB)
 ;   [4] $000B  JSL → AudioFadeDispatch($C0:1BE6)
 ; Callers (8 sites: 6 JML, 2 BRL): Field_SceneChangeTick (BRL $C0:0CC4), Evt_OpE1_WarpNow (BRL
-;   $C0:3B95), C2Scene_Mode2 (JML $C2:2505) and unmatched (JML $C2:8349, JML $FD:DA5B, JML $FD:DABA,
-;   JML $FD:DB19, JML $FD:DB93).
+;   $C0:3B95), C2Scene_Mode2 (JML $C2:2505), Menu_ExitRestart (JML $C2:8349) and unmatched (JML
+;   $FD:DA5B, JML $FD:DABA, JML $FD:DB19, JML $FD:DB93).
 ; Entry: each entry only branches, so the state is the target's: [0] as
 ;        GameLoop_Main expects (it sets DB itself); [1]-[4] the JSL
 ;        caller's state, passed through unchanged.

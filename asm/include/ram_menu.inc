@@ -401,6 +401,82 @@ endstruct align 8
 !Menu_DecompDest = $0303                 ; 16-bit WRAM destination address
 !Menu_DecompDestBank = $0305             ; 8-bit its bank ($7E or $7F; $00 for low WRAM)
 
+; --- The menu kernel (BankC2_MenuEntry and its thread scheduler) ---
+; The menu runs with DP=$0000 and DB=$7E; these are bank-$7E offsets.
+!Menu_JumpVec = $0000                    ; 16-bit scratch: JMP (abs) target of Menu_RunThreads and
+                                         ; Menu_MainThread
+!Menu_ListPtr = $0016                    ; 24-bit scratch: Menu_MainThread's pointer into Menu_ModeLists'
+                                         ; list for Menu_Mode
+!Menu_Unk51 = $0051                      ; 16-bit; zeroed by Menu_Setup, then the start offset of its
+                                         ; Menu_CharRecords division loop (set by the calls between; not traced)
+!Menu_Unk56 = $0056                      ; 16-bit; zeroed by Menu_Setup; use not traced
+!Menu_Unk58 = $0058                      ; 16-bit; set to $3020 by Menu_RunThreads before thread 3 starts
+                                         ; (written absolute); use not traced
+!Menu_Mode = $0067                       ; 8-bit; the menu's mode, from Menu_EntryModes by the entry
+                                         ; argument: picks Menu_MainThread's handler list
+!Menu_ThreadVar = $0068                  ; 8-bit; one byte per thread: Menu_RunThreads zeroes it when a
+                                         ; thread starts and keeps it in Menu_Thread.SavedVar while it
+                                         ; waits; the main thread's handler index (Menu_MainThread)
+!Menu_CurThread = $006E                  ; 8-bit byte offset of the running thread's Menu_Thread slot
+!Menu_EntryXCopy = $0071                 ; 16-bit; BankC2_MenuEntry copies Menu_EntryX here (use not traced)
+!Menu_PartyActive = $0073                ; 8-bit; members Menu_BuildPartyLists found in the first 3
+                                         ; Menu_PartyOrder positions
+!Menu_PartyTotal = $0075                 ; 8-bit; and in all 9
+!Menu_CallerSp = $0920                   ; 16-bit S at BankC2_MenuEntry (after its pushes); Menu_Exit returns
+                                         ; through it
+!Menu_EntryArg = $0A00                   ; 8-bit; BankC2_MenuEntry's A (0-6, Menu_EntryModes' index)
+!Menu_EntryX = $0A01                     ; 16-bit; BankC2_MenuEntry's X
+!Menu_RecList = $0C00                    ; 8-byte records Menu_AddRomRec / Menu_AddWramRec append (what
+                                         ; reads them is not traced; probably the menu NMI's upload)
+!Menu_FrameState = $0D01                 ; 8-bit; Menu_RunThreads waits for it to be non-zero, runs the
+                                         ; threads once and zeroes it (the menu NMI sets it to $FF after its
+                                         ; upload, $C2:8462)
+!Menu_Unk0D06 = $0D06                    ; 16-bit; set to $FFFF by Menu_Setup (with $0D0A and $0D0E)
+!Menu_Unk0D0A = $0D0A
+!Menu_Unk0D0E = $0D0E
+!Menu_Inidisp = $0D10                    ; 8-bit; what the menu NMI writes to INIDISP (0 = forced blank);
+                                         ; Menu_Fade steps its brightness bits
+!Menu_RecListEnd = $0D11                 ; 8-bit byte offset past the last Menu_RecList record
+!Menu_FadeStep = $0D20                   ; 8-bit signed brightness step of Menu_Fade
+!Menu_FadeFrames = $0D21                 ; 8-bit frames per step (Menu_Fade sets 1)
+!Menu_Unk0D38 = $0D38                    ; 7 words: Menu_Setup's quotients (word +$3F of seven
+                                         ; Menu_CharRecords) / 10; use not traced
+!Menu_PartyList = $0D5F                  ; 9 B: the character ids of Menu_PartyOrder that are present, in
+                                         ; order ($FF after them, Menu_Setup)
+!Menu_PartyListPos = $0D68               ; 9 B: the Menu_PartyOrder position of each
+!Menu_Unk21BA = $21BA                    ; 3 x $20 B; Menu_Unk834D copies 6 B from bank $D1 to the start of
+                                         ; each, one per active party member; use not traced
+!Menu_Unk0D00 = $0D00                    ; 8-bit; BankC2_MenuEntry's new-game path copies it into
+                                         ; Menu_Unk29AD (the menu NMI's direct page starts here, $C2:8420)
+!Menu_Unk04A4 = $04A4                    ; 5 B; Menu_Unk82E1 tests the byte for each value $AE-$B2
+!Menu_Unk2857 = $2857                    ; 5 B; Menu_Unk82E1 zeroes them and sets the byte of each value
+                                         ; $AE-$B2 that a record's +$2A holds while its Menu_Unk04A4 byte is
+                                         ; non-zero to $80
+!Menu_Unk9B76 = $9B76                    ; 32 B set to $FF by Menu_Setup; use not traced
+!Menu_SramUnk7FE1 = $307FE1              ; 8-bit in SRAM; zeroed (with $7FE2) by BankC2_MenuEntry's new-game
+!Menu_SramUnk7FE2 = $307FE2              ; path; use not traced
+!Menu_Unk29AD = $29AD                    ; 8-bit, Menu_Config+$1D; BankC2_MenuEntry's new-game path copies
+                                         ; $7E:0D00 into it
+
+; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
+struct Menu_Thread $00B0
+.State:     skip 1     ; 0 free, 1 to start at .Entry, 2 waiting, 3 running
+.Wait:      skip 1     ; frames left to wait (runs when it counts down to 0)
+.Entry:     skip 2     ; start address (Menu_StartThread)
+.SavedSp:   skip 2     ; S at its last yield
+.SavedVar:  skip 1     ; its Menu_ThreadVar at that yield
+            skip 1
+endstruct align 8
+
+; A Menu_CharRecords record ($50 B); only the fields read here.
+struct Menu_CharRec $0000
+            skip $2A
+.Unk2A:     skip 1     ; Menu_Unk82E1 looks for $AE-$B2 here
+            skip $14
+.Unk3F:     skip 2     ; Menu_Setup divides it by 10
+            skip $0F
+endstruct align $50
+
 ; Scene data unpacked into WRAM by the C2Scene_Load* routines (each name
 ; says what is inferred; "Unk" ones are only known by where they go).
 !C2Scene_Metatiles = $7E3000             ; 8 B per 16x16 metatile: tile words top-left, top-right,

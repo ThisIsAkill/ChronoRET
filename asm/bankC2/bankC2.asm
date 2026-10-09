@@ -20463,7 +20463,7 @@ org $C28000
 ; Three BRAs, the bank's second set of fixed entry points, each reached
 ; by JSL from other banks:
 ;   $8000 BankC2_Entry8000 → BankC2_MenuEntry (A = an argument chosen by
-;         the caller; the menu side is not matched)
+;         the caller, 0-6: the menu)
 ;   $8002 BankC2_Entry8002 → BankC2_ReadPadLong: the joypad reader
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
@@ -20501,6 +20501,844 @@ BankC2_ReadPadLong:
 BankC2_CommandLong:
     JSR Menu_Unk8C36
     RTL
+
+; ============================================================
+; The menu's entry and thread scheduler ($C2:800E–$C2:840D)
+; ============================================================
+; BankC2_MenuEntry sets the menu up and hands over to Menu_RunThreads, a
+; round-robin scheduler of 8 threads (Menu_Thread slots at $00B0, each
+; with a 64-byte stack from $0A00 on). Once a frame (when the menu NMI
+; has done its upload, Menu_FrameState) it runs every thread whose
+; .Wait counts down to 0 until that thread yields (Menu_Yield,
+; Menu_YieldFrames) or ends (Menu_ThreadEnd). Thread 1 is
+; Menu_MainThread, which calls one handler of the mode's list
+; (Menu_ModeLists) per frame. The menu leaves through Menu_Exit (back to
+; the caller of BankC2_Entry8000) or Menu_ExitToGame (to GameLoop_Main).
+; Everything here runs with DP=$0000 and DB=$7E unless stated.
+
+; $C2:800E — BankC2_MenuEntry (129 bytes, $800E–$808E)
+; The menu (reached by BRA from BankC2_Entry8000). Interrupts off,
+; native mode; saves DP, DB and P (Menu_Exit pops them); DB=$7E; keeps A
+; in Menu_EntryArg and X in Menu_EntryX; forced blank, NMI off (auto-
+; joypad on), DMA and HDMA off; keeps S in Menu_CallerSp.
+; - Argument 0 while Menu_DataInitDone is 0 (a new game): runs
+;   Menu_InitNewGameData, sets Menu_DataInitDone to 1, zeroes SRAM
+;   $30:7FE1/$7FE2, copies $7E:0D00 into Menu_Unk29AD and leaves through
+;   Menu_ExitRestart (to GameLoop_Main; no menu is shown).
+; - Otherwise: S = Menu_StackTop, Menu_InitSystems, play time running (Menu_PlayTimePaused = 0),
+;   Menu_Mode = Menu_EntryModes[argument], the pad repeat delay and timer
+;   1, NMI on, interrupts on, then Menu_RunThreads (never returns).
+;   Menu_EntryX is copied to Menu_EntryXCopy with M as Menu_InitSystems
+;   returns (M=0: a word, as far as traced).
+; Callers note: none direct (BRA from BankC2_Entry8000, whose JSL return
+;   address Menu_Exit returns to).
+; Entry: M, X any (SEP #$20 / REP #$10 here), DP any (saved; set to 0 by
+;        Menu_InitSystems), DB any (saved; set to $7E), emulation or
+;        native; A = the argument (low byte, 0-6), X = a word kept in
+;        Menu_EntryX (the field passes bits 5-0 of Field_BankC2Arg)
+; Exit:  does not return here: Menu_Exit later returns to the JSL caller
+;        (P, DB and DP as at the entry, interrupts disabled), or
+;        Menu_ExitRestart goes to GameLoop_Main
+; Calls: Menu_InitNewGameData, Menu_InitSystems; jumps to Menu_RunThreads
+;   or Menu_ExitRestart.
+org $C2800E
+BankC2_MenuEntry:
+    SEI
+    CLC
+    XCE                                 ; native mode
+    PHD
+    PHB
+    PHP
+    SEP #$20
+    REP #$10
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    STA.w !Menu_EntryArg
+    STX.w !Menu_EntryX
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    TSX
+    STX.w !Menu_CallerSp
+    LDA.w !Menu_EntryArg
+    BNE .menu
+    LDA.l !Menu_DataInitDone
+    BNE .menu
+    JSR Menu_InitNewGameData
+    LDA.b #1
+    STA.l !Menu_DataInitDone
+    LDA.b #$00
+    STA.l !Menu_SramUnk7FE2
+    STA.l !Menu_SramUnk7FE1
+    LDA.w !Menu_Unk0D00
+    STA.w !Menu_Unk29AD
+    JMP Menu_ExitRestart
+.menu:
+    LDX.w #!Menu_StackTop
+    TXS
+    JSR Menu_InitSystems
+    LDA.w !Menu_EntryX
+    STA.w !Menu_EntryXCopy              ; a word (M=0 after Menu_InitSystems)
+    SEP #$30
+    STZ.w !Menu_PlayTimePaused
+    LDX.w !Menu_EntryArg
+    LDA.l Menu_EntryModes,X
+    STA.b !Menu_Mode
+    LDA.b #1
+    STA.b !Menu_PadRepeatDelay
+    STA.b !Menu_PadRepeatTimer
+    LDA.b #!Menu_NmiAndJoypad
+    STA.l NMITIMEN
+    CLI
+    JMP Menu_RunThreads
+
+; $C2:808F — Menu_EntryModes (7 bytes, $808F–$8095)
+; Menu_Mode for each BankC2_MenuEntry argument 0-6 (an index into
+; Menu_ModeLists).
+Menu_EntryModes:
+    db $0E,$00,$0C,$0D,$0F,$07,$0B
+
+; $C2:8096 — Menu_InitSystems (212 bytes, $8096–$8169)
+; The menu's setup: DP=$0000; copies Menu_InterruptVectors (JML Menu_Nmi,
+; JML Menu_Irq) over NmiTrampoline/IrqTrampoline ($0500-$0507; the MVN
+; leaves DB=$7E); sends five sound-driver commands (Menu_AudioCmd70 with
+; argument 0, $18 with $FF/$80, $19 with the same, $82 with 1/$FF, $83;
+; meanings not traced); Menu_InitPpuAndRam; Menu_Unk0D06/0D0A/0D0E =
+; $FFFF; Menu_Unk51 = Menu_Unk56 = 0; Menu_Unk9B76 (32 bytes) and
+; Menu_PartyList (9 bytes) filled with $FF; then Menu_Unk968D,
+; Menu_UnkD156, Menu_Unk984A, Menu_Unk8663, Menu_BuildPartyLists,
+; Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875 (not traced); last, word
+; Menu_CharRec.Unk3F of seven Menu_CharRecords / 10 (WRDIV) into
+; Menu_Unk0D38, both offsets starting at Menu_Unk51 (the record offset
+; steps $50, the word offset 2; with Menu_Unk51 = 0 records 0-6 go to
+; $0D38-$0D45).
+; Callers (1 JSR site): BankC2_MenuEntry ($C2:8068).
+; Entry: M any (REP #$30 here), X=0 (it stays 16-bit), DP any (set to
+;        $0000), DB any (the MVN sets $7E before any absolute access)
+; Exit:  P as Menu_Unk9875 left it (the last part pushes and pulls it):
+;        M=0, X=0 as long as the callees keep P (all but Menu_Unk968D push
+;        it; Menu_Unk968D sets M=0, X=0; their ends not traced); DP=$0000,
+;        DB=$7E; A, X, Y clobbered
+; Calls: Audio_DriverCommand (JSL), Menu_InitPpuAndRam, Menu_Unk968D,
+;   Menu_UnkD156, Menu_Unk984A, Menu_Unk8663, Menu_BuildPartyLists,
+;   Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875.
+Menu_InitSystems:
+    REP #$30
+    PEA.w !Menu_Dp
+    PLD
+    LDX.w #Menu_InterruptVectors
+    LDY.w #!NmiTrampoline&$FFFF
+    LDA.w #!Menu_VectorBytes-1
+    MVN !Bank7E,bank(Menu_InterruptVectors) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.b #!Menu_AudioCmd70
+    STA.w !Audio_CmdId
+    STZ.w !Audio_CmdArg0
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd18
+    STA.w !Audio_CmdId
+    LDA.b #!Menu_AudioArgFF
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd18Arg1
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_CmdPlaySfx
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    LDA.b #!Menu_AudioCmd82Arg0
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    REP #$20
+    JSR Menu_InitPpuAndRam
+    LDA.w #!Menu_FillFF
+    STA.w !Menu_Unk0D06
+    STA.w !Menu_Unk0D0A
+    STA.w !Menu_Unk0D0E
+    STZ.b !Menu_Unk51
+    STZ.b !Menu_Unk56
+    LDA.w #!Menu_FillFF
+    STA.w !Menu_Unk9B76
+    LDX.w #!Menu_Unk9B76
+    LDY.w #!Menu_Unk9B76+2
+    LDA.w #!Menu_Unk9B76Bytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    STA.w !Menu_PartyList               ; A = $FFFF after the MVN
+    LDX.w #!Menu_PartyList
+    LDY.w #!Menu_PartyList+2
+    LDA.w #!Menu_PartyListBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    JSR Menu_Unk968D
+    JSR Menu_UnkD156
+    JSR Menu_Unk984A
+    JSR Menu_Unk8663
+    JSR Menu_BuildPartyLists
+    JSR Menu_Unk92F4
+    JSR Menu_UnkF3CA
+    JSR Menu_Unk9875
+    PHP
+    REP #$30
+    LDX.b !Menu_Unk51
+    TXY
+.divide:
+    LDA.w !Menu_CharRecords+Menu_CharRec.Unk3F,X
+    STA.l WRDIVL
+    SEP #$20
+    LDA.b #!Menu_Unk3FDivisor
+    STA.l WRDIVB
+    REP #$20
+    NOP                                 ; (with the next ones: the divider's 16 cycles)
+    TXA
+    CLC
+    ADC.w #!Menu_CharRecBytes
+    TAX
+    INY
+    INY
+    LDA.l RDDIVL
+    STA.w !Menu_Unk0D38-2,Y
+    CPY.w #!Menu_Unk0D38Count
+    BCC .divide
+    PLP
+    RTS
+
+; $C2:816A — Menu_BuildPartyLists (38 bytes, $816A–$818F)
+; Lists the characters of Menu_PartyOrder that are present (bit 7
+; clear) in Menu_PartyList, with their positions in Menu_PartyListPos,
+; and counts them: Menu_PartyActive (positions 0-2) and Menu_PartyTotal
+; (all 9).
+; Callers (2 JSR sites): Menu_InitSystems ($C2:8130) and unmatched ($C2:C725).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (the counts),
+;        DB=$7E (the lists)
+; Exit:  P restored; A = the last entry read; X = 9; Y = the number listed
+; No calls.
+Menu_BuildPartyLists:
+    PHP
+    SEP #$30
+    LDX.b #0
+    TXY
+    STX.b !Menu_PartyActive
+    STX.b !Menu_PartyTotal
+.entry:
+    LDA.w !Menu_PartyOrder,X
+    BMI .next
+    STA.w !Menu_PartyList,Y
+    TXA
+    STA.w !Menu_PartyListPos,Y
+    INY
+    CPX.b #!Menu_ActiveSlots
+    BCS .reserve
+    INC.b !Menu_PartyActive
+.reserve:
+    INC.b !Menu_PartyTotal
+.next:
+    INX
+    CPX.b #!Menu_PartyOrderSize
+    BCC .entry
+    PLP
+    RTS
+
+; $C2:8190 — Menu_RunThreads (185 bytes with its sub-entries, $8190–$8248)
+; The menu's scheduler; never returns. Frees all 8 Menu_Thread slots
+; (zeroes $00B0-$00EF), starts Menu_MainThreadStart in slot 1 and, with
+; Menu_Unk58 = $3020, Menu_UnkE91B in slot 3. Then for ever: S =
+; Menu_StackTop, DB=$7E, DP=$0000; wait until Menu_FrameState is
+; non-zero (the menu NMI's upload is done); for each slot in use (.State
+; non-zero) count .Wait down and run the thread when it reaches 0:
+; .State = running, Menu_CurThread = the slot;
+; - a new thread (.State 1): S = Menu_ThreadStackBase + slot x 8 (64
+;   bytes per slot), .SavedVar and Menu_ThreadVar zeroed (16-bit STZs,
+;   so the byte after each too), JMP (.Entry) with M=0, X=0;
+; - a waiting one (.State 2): S = .SavedSp, Menu_ThreadVar = .SavedVar,
+;   then PLD, PLP, PLY, PLX and RTS back into it after its yield.
+; After the last slot: Menu_FrameState = 0, next frame.
+; A thread gives the CPU back by jumping to one of three sub-entries,
+; each going on with the next slot (Menu_RunThreadsNext):
+; - Menu_ThreadEnd ($C2:8216, JMP): frees the slot;
+; - Menu_Yield ($C2:821E, JSR): waits one frame;
+; - Menu_YieldFrames ($C2:822B, JSR): waits A's low byte frames (0:
+;   256).
+; Both yields push X, Y, P and D (Menu_YieldSave, $C2:8236, keeps S in
+; .SavedSp and Menu_ThreadVar in .SavedVar; .State = waiting). On the
+; resume the thread has its X, Y, P and DP back but DB=$7E and A = its
+; Menu_ThreadVar (low byte; B = the high byte of its S).
+; Quirk, kept: there is no CLC before the stack's ADC. For slots 1-7 the
+; carry is that of the slot loop's CMP (clear); for slot 0 it is that of
+; the CMP that ended the previous frame's scan (set), so a new thread in
+; slot 0 (Menu_FadeInThread) starts with S = $0A40, one byte into slot
+; 1's stack area.
+; Callers (1 JMP site): BankC2_MenuEntry ($C2:808C).
+; Callers of Menu_ThreadEnd (5 JMP sites): Menu_FadeInThread ($C2:83C7) and unmatched ($C2:9044,
+;   $C2:CBE8, $C2:FA46, $C2:FAA2).
+; Callers of Menu_Yield (56 sites: 53 JSR, 3 JMP): Menu_MainThread (JSR $C2:826C), Menu_FadeInThread
+;   (JSR $C2:83BD), Menu_Fade (JMP $C2:8403) and unmatched (JSR $C2:89F5, JSR $C2:8A91, JSR
+;   $C2:8AB5, JSR $C2:8AF8, JSR $C2:8C30, JSR $C2:8FC3, JSR $C2:904C, JSR $C2:9C5B, JSR $C2:9E3C,
+;   JSR $C2:9EFD, JSR $C2:A04C, JSR $C2:A0AC, JSR $C2:A0BD, JSR $C2:A511, JSR $C2:A661, JSR
+;   $C2:A6DC, JSR $C2:A785, JSR $C2:A85F, JSR $C2:A88F, JSR $C2:A945, JSR $C2:AAFF, JSR $C2:AB4D,
+;   JSR $C2:AD7F, JSR $C2:ADA1, JSR $C2:AF5C, JSR $C2:AF6D, JSR $C2:B1A5, JSR $C2:B228, JSR
+;   $C2:B651, JSR $C2:B705, JSR $C2:B8F2, JSR $C2:BE98, JSR $C2:C337, JSR $C2:C7D0, JSR $C2:C936,
+;   JSR $C2:CA2D, JSR $C2:CA33, JSR $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55, JMP $C2:CF5B, JSR
+;   $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7, JSR $C2:D8CA, JSR $C2:E0CF, JSR $C2:E14B, JSR $C2:E906,
+;   JSR $C2:E91E, JSR $C2:E97F, JMP $C2:EB98, JSR $C2:F696, JSR $C2:FAA5).
+; Callers of Menu_YieldFrames (3 JSR sites): Menu_Fade ($C2:83F8) and unmatched ($C2:B4F9,
+;   $C2:CECB).
+; Entry: M, X any (REP #$30 here), DP=$0000 (the first .State clear is
+;        absolute but the slot records are read direct page; set again
+;        each frame), DB=$7E (set again each frame). The sub-entries are
+;        used from inside a thread (Menu_CurThread and the thread's
+;        stack), M and X any (SEP here), DB any: Menu_ThreadEnd with
+;        DP=$0000; Menu_Yield / Menu_YieldFrames with DP any (pushed,
+;        then set to $0000)
+; Exit:  never returns; Menu_Yield / Menu_YieldFrames return to their
+;        caller a frame or more later as above
+; Calls: Menu_StartThread; the threads (JMP (abs)).
+Menu_RunThreads:
+    REP #$30
+    STZ.w Menu_Thread[0].State
+    LDX.w #Menu_Thread[0].State
+    LDY.w #Menu_Thread[0].State+2
+    LDA.w #!Menu_ThreadSlots-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #Menu_MainThreadStart
+    LDX.w #!Menu_MainThreadSlot
+    JSR Menu_StartThread
+    LDA.w #!Menu_Unk58Init
+    STA.w !Menu_Unk58
+    LDA.w #Menu_UnkE91B
+    LDX.w #!Menu_Thread3Slot
+    JSR Menu_StartThread
+.frame:
+    REP #$10
+    LDX.w #!Menu_StackTop
+    TXS
+    SEP #$30
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    PEA.w !Menu_Dp
+    PLD
+.wait_nmi:
+    LDA.w !Menu_FrameState
+    BEQ .wait_nmi
+    LDX.b #0
+.slot:
+    LDY.b Menu_Thread[0].State,X
+    DEY
+    BMI Menu_RunThreadsNext             ; free
+    DEC.b Menu_Thread[0].Wait,X
+    BEQ Menu_RunThreadsNext_run
+Menu_RunThreadsNext:                    ; header: see Menu_RunThreads
+    TXA
+    CLC
+    ADC.b #!Menu_ThreadSlotBytes
+    TAX
+    CMP.b #!Menu_ThreadSlots
+    BCC Menu_RunThreads_slot
+    STZ.w !Menu_FrameState
+    BRA Menu_RunThreads_frame
+.run:
+    STX.b !Menu_CurThread
+    LDA.b #!Menu_ThStRunning
+    STA.b Menu_Thread[0].State,X
+    REP #$30
+    DEY
+    BEQ .resume                         ; it was waiting
+    TXA                                 ; new: its own stack
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!Menu_ThreadStackBase        ; no CLC (see the header)
+    TCS
+    STZ.b Menu_Thread[0].SavedVar,X
+    STZ.b !Menu_ThreadVar
+    LDA.b Menu_Thread[0].Entry,X
+    STA.b !Menu_JumpVec
+    JMP (!Menu_JumpVec)
+.resume:
+    LDA.b Menu_Thread[0].SavedSp,X
+    TCS
+    SEP #$30
+    LDX.b !Menu_CurThread
+    LDA.b Menu_Thread[0].SavedVar,X
+    STA.b !Menu_ThreadVar
+    PLD
+    PLP
+    PLY
+    PLX
+    RTS
+Menu_ThreadEnd:                         ; header: see Menu_RunThreads
+    SEP #$30
+    LDX.b !Menu_CurThread
+    STZ.b Menu_Thread[0].State,X
+    BRA Menu_RunThreadsNext
+Menu_Yield:                             ; header: see Menu_RunThreads
+    PHX
+    PHY
+    PHP
+    PHD
+    REP #$20
+    SEP #$10
+    LDA.w #!Menu_ThWait1
+    BRA Menu_YieldSave
+Menu_YieldFrames:                       ; header: see Menu_RunThreads
+    PHX
+    PHY
+    PHP
+    PHD
+    SEP #$30
+    XBA                                 ; .Wait = A
+    LDA.b #!Menu_ThStWaiting
+    REP #$20
+Menu_YieldSave:                         ; header: see Menu_RunThreads
+    PEA.w !Menu_Dp
+    PLD
+    LDX.b !Menu_CurThread
+    STA.b Menu_Thread[0].State,X        ; .State and .Wait
+    TSC
+    STA.b Menu_Thread[0].SavedSp,X
+    SEP #$30
+    LDA.b !Menu_ThreadVar
+    STA.b Menu_Thread[0].SavedVar,X
+    BRA Menu_RunThreadsNext
+
+; $C2:8249 — Menu_StartThread (12 bytes, $8249–$8254)
+; Puts a new thread in the slot at byte offset X: .Entry = A, .State =
+; new and .Wait = 1 (it starts on the scheduler's next pass).
+; Callers (12 sites: 11 JSR, 1 JMP): Menu_RunThreads (JSR $C2:81A7, JSR $C2:81B6), Menu_StartFadeIn
+;   (JMP $C2:83BA) and unmatched (JSR $C2:8A40, JSR $C2:8AAD, JSR $C2:8ADE, JSR $C2:8BA1, JSR
+;   $C2:8FBF, JSR $C2:CBBB, JSR $C2:F652, JSR $C2:F9AD, JSR $C2:FA96).
+; Entry: M any (P saved; REP #$20 here: A must hold the whole address),
+;        X = the slot offset (0, 8, ... $38), DP=$0000, DB any
+; Exit:  P restored; A = Menu_ThNewWait1; X, Y unchanged
+; No calls.
+Menu_StartThread:
+    PHP
+    REP #$20
+    STA.b Menu_Thread[0].Entry,X
+    LDA.w #!Menu_ThNewWait1
+    STA.b Menu_Thread[0].State,X
+    PLP
+    RTS
+
+; $C2:8255 — Menu_KillThreads (23 bytes, $8255–$826B)
+; Frees the slots whose bit is set in A's low byte (bit n: slot n).
+; Callers (14 sites: 10 JSR, 4 JMP): Menu_Exit (JSR $C2:82B8), Menu_ExitToGame (JSR $C2:8326) and
+;   unmatched (JSR $C2:9A6B, JSR $C2:9AA4, JMP $C2:9CF9, JMP $C2:AB11, JMP $C2:AB3B, JMP $C2:AB47,
+;   JSR $C2:B1DE, JSR $C2:B3C2, JSR $C2:B4BE, JSR $C2:C6F4, JSR $C2:D76F, JSR $C2:E261).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_JumpVec as
+;        scratch), DB any
+; Exit:  P restored; A = $40; X = the last slot freed (or unchanged); Y
+;        unchanged; Menu_JumpVec's low byte = 0
+; No calls.
+Menu_KillThreads:
+    PHP
+    SEP #$30
+    STA.b !Menu_JumpVec
+    LDA.b #0
+.slot:
+    LSR.b !Menu_JumpVec
+    BCC .keep
+    TAX
+    STZ.b Menu_Thread[0].State,X
+.keep:
+    CLC
+    ADC.b #!Menu_ThreadSlotBytes
+    CMP.b #!Menu_ThreadSlots
+    BCC .slot
+    PLP
+    RTS
+
+; $C2:826C — Menu_MainThread (37 bytes with Menu_MainThreadStart, $826C–$8290)
+; Thread 1 (Menu_RunThreads starts it at the sub-entry
+; Menu_MainThreadStart, $C2:826F): each frame calls handler
+; Menu_ThreadVar of Menu_Mode's list in Menu_ModeLists (a list of 16-bit
+; addresses in bank $C2) with M=1, X=0, pushing Menu_MainThread-1 so the
+; handler's RTS lands on Menu_MainThread, which waits a frame
+; (Menu_Yield) and dispatches again. Handlers change Menu_ThreadVar (or
+; Menu_Mode) to move on.
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000,
+;        DB=$7E), or by the handler's RTS (any M, X)
+; Exit:  never returns (each handler returns to Menu_MainThread)
+; Calls: Menu_Yield; the handler (JMP (abs)).
+Menu_MainThread:
+    JSR Menu_Yield
+Menu_MainThreadStart:                   ; header: see Menu_MainThread
+    SEP #$30
+    LDA.b #bank(Menu_ModeLists)
+    STA.b !Menu_ListPtr+2
+    LDA.b !Menu_ThreadVar
+    ASL A
+    TAY
+    LDA.b !Menu_Mode
+    ASL A
+    TAX
+    REP #$30
+    LDA.l Menu_ModeLists,X
+    STA.b !Menu_ListPtr
+    LDA.b [!Menu_ListPtr],Y
+    STA.b !Menu_JumpVec
+    PER Menu_MainThread-1               ; the handler's RTS goes to Menu_MainThread
+    SEP #$20
+    JMP (!Menu_JumpVec)
+
+; $C2:8291 — Menu_ModeNone (1 byte, $8291)
+; An RTS that Menu_ModeLists entries 8-10 point at as their list: read
+; as a list it gives handler $CA60 for index 0, so modes 8-10 are
+; probably not used.
+; Entry/Exit: any M, X, DP and DB; nothing changed (no reference as
+;        code found)
+; No calls.
+Menu_ModeNone:
+    RTS
+
+; $C2:8292 — Menu_ModeLists (32 bytes, $8292–$82B1)
+; One 16-bit address (bank $C2) per Menu_Mode $00-$0F: the list of
+; handler addresses Menu_MainThread indexes by Menu_ThreadVar.
+; BankC2_MenuEntry starts in modes $0E, $00, $0C, $0D, $0F, $07, $0B
+; (Menu_EntryModes).
+Menu_ModeLists:
+    dw Menu_Mode00List,Menu_Mode01List,Menu_Mode02List,Menu_Mode03List
+    dw Menu_Mode04List,Menu_Mode05List,Menu_Mode06List,Menu_Mode07List
+    dw Menu_ModeNone,Menu_ModeNone,Menu_ModeNone,Menu_Mode0BList
+    dw Menu_Mode0CList,Menu_Mode0DList,Menu_Mode0EList,Menu_Mode0FList
+
+; $C2:82B2 — Menu_Exit (47 bytes, $82B2–$82E0)
+; Leaves the menu back to the caller of BankC2_Entry8000: frees every
+; thread (Menu_KillThreads), Menu_Unk834D, fades out (Menu_FadeOut),
+; forced blank, NMI off (auto-joypad on), DMA and HDMA off, S =
+; Menu_CallerSp, pulls the P, DB and DP BankC2_MenuEntry pushed,
+; disables interrupts and returns with RTL.
+; Callers (6 JMP sites): unmatched ($C2:99D6, $C2:9A95, $C2:C802, $C2:D516, $C2:D588, $C2:E233).
+; Entry: from a menu thread (Menu_FadeOut yields), M, X any (SEP #$20 /
+;        REP #$10 here), DP=$0000, DB=$7E
+; Exit:  RTL to the JSL caller of BankC2_Entry8000 with its P (then
+;        I=1), DB and DP; A's low byte = the B byte before the XBA (what
+;        it holds is not traced; no result is meant, probably)
+; Calls: Menu_KillThreads, Menu_Unk834D, Menu_FadeOut.
+Menu_Exit:
+    REP #$10
+    SEP #$20
+    LDA.b #!Menu_AllThreads
+    JSR Menu_KillThreads
+    JSR Menu_Unk834D
+    JSR Menu_FadeOut
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    XBA
+    LDX.w !Menu_CallerSp
+    TXS
+    PLP
+    PLB
+    PLD
+    SEI
+    RTL
+
+; $C2:82E1 — Menu_Unk82E1 (63 bytes, $82E1–$831F)
+; Zeroes Menu_Unk2857 (5 bytes), then for each of the 7 Menu_CharRecords
+; whose Menu_CharRec.Unk2A is $AE-$B2: when the Menu_Unk04A4 byte of
+; that value (- $AE) is non-zero, sets the Menu_Unk2857 byte of the same
+; value to $80. What the values and bytes mean is not traced.
+; Callers (2 JSR sites): Menu_Unk834D ($C2:837F) and unmatched ($C2:B9AB).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E (absolute)
+; Exit:  P restored; A = X = $2830 (past the last record); Y = the last
+;        value marked (or unchanged)
+; No calls.
+Menu_Unk82E1:
+    PHP
+    REP #$30
+    STZ.w !Menu_Unk2857
+    LDX.w #!Menu_Unk2857
+    LDY.w #!Menu_Unk2857+2
+    LDA.w #!Menu_Unk2857Bytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_CharRecords
+.record:
+    LDA.w #0                            ; B = 0 for the TAY
+    SEP #$20
+    LDA.w Menu_CharRec.Unk2A,X
+    CMP.b #!Menu_Unk82E1First
+    BCC .next
+    CMP.b #!Menu_Unk82E1End
+    BCS .next
+    TAY
+    LDA.w !Menu_Unk04A4-!Menu_Unk82E1First,Y
+    BEQ .next
+    LDA.b #!Menu_Unk2857Mark
+    STA.w !Menu_Unk2857-!Menu_Unk82E1First,Y
+.next:
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Menu_CharRecBytes
+    TAX
+    CMP.w #!Menu_CharRecords+(!Menu_CharRecCount*!Menu_CharRecBytes)
+    BCC .record
+    PLP
+    RTS
+
+; $C2:8320 — Menu_ExitToGame (45 bytes with Menu_ExitRestart, $8320–$834C)
+; Leaves the menu for the game loop: frees every thread, Menu_Unk834D,
+; fades out, then the sub-entry Menu_ExitRestart ($C2:832F; also
+; BankC2_MenuEntry's new-game path): forced blank, NMI off (auto-joypad
+; on), DMA and HDMA off, S = Menu_ResetStack, JML to ReentryVectors
+; entry 0 (GameLoop_Main, the warm restart).
+; Callers (1 JMP site): unmatched ($C2:E6AB).
+; Callers of Menu_ExitRestart (1 JMP site): BankC2_MenuEntry ($C2:8061).
+; Entry: Menu_ExitToGame from a menu thread (Menu_FadeOut yields), M, X
+;        any (REP #$10 / SEP #$20 here), DP=$0000, DB=$7E;
+;        Menu_ExitRestart with M=1 and X=0 (16-bit LDX), DP and DB any
+;        (long stores)
+; Exit:  never returns (GameLoop_Main sets its own state)
+; Calls: Menu_KillThreads, Menu_Unk834D, Menu_FadeOut; jumps to
+;   ReentryVectors.
+Menu_ExitToGame:
+    REP #$10
+    SEP #$20
+    LDA.b #!Menu_AllThreads
+    JSR Menu_KillThreads
+    JSR Menu_Unk834D
+    JSR Menu_FadeOut
+Menu_ExitRestart:                       ; header: see Menu_ExitToGame
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    LDX.w #!Menu_ResetStack
+    TXS
+    JML ReentryVectors
+
+; $C2:834D — Menu_Unk834D (56 bytes, $834D–$8384)
+; For each active party member (Menu_PartyOrder positions 0-2 not
+; empty) copies the 6 bytes Menu_UnkF5ED picks for it (it returns the
+; MVN's source in bank $D1 and the count - 1) into Menu_Unk21BA, one
+; member after the other with Menu_Unk21BAGap bytes skipped after each
+; (a $20-byte stride); then BankFF_UnkF958 (JSL) and Menu_Unk82E1. Use
+; not traced.
+; Callers (3 JSR sites): Menu_Exit ($C2:82BB), Menu_ExitToGame ($C2:8329) and unmatched ($C2:8C4F).
+; Entry: M, X any (P and DB saved; SEP #$20 / REP #$10 here), DP any,
+;        DB any (set to $7E)
+; Exit:  P and DB restored; A, X, Y as BankFF_UnkF958 and Menu_Unk82E1
+;        leave them
+; Calls: Menu_UnkF5ED, BankFF_UnkF958 (JSL), Menu_Unk82E1.
+Menu_Unk834D:
+    PHB
+    PHP
+    REP #$10
+    SEP #$20
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDY.w #!Menu_Unk21BA
+    LDX.w #0
+.member:
+    SEP #$20
+    LDA.w !Menu_PartyOrder,X
+    BMI .next
+    PHX
+    JSR Menu_UnkF5ED
+    MVN !Bank7E,!Menu_Unk21BASrcBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    REP #$20
+    TYA
+    CLC
+    ADC.w #!Menu_Unk21BAGap
+    TAY
+.next:
+    INX
+    CPX.w #!Menu_ActiveSlots
+    BCC .member
+    JSL BankFF_UnkF958
+    JSR Menu_Unk82E1
+    PLP
+    PLB
+    RTS
+
+; $C2:8385 — Menu_AddRomRec (29 bytes with its sub-entries, $8385–$83A1)
+; Appends the 8-byte record at $C2:X to Menu_RecList (at
+; Menu_RecListEnd, which then goes up by 8); the sub-entry
+; Menu_AddWramRec ($C2:838E) does the same from $7E:X. Both MVNs go
+; through Menu_RecDest, then the shared tail Menu_AddRecTail ($C2:8395).
+; Callers (155 sites: 135 JSR, 20 JMP): unmatched (JSR $C2:8F76, JSR $C2:971E, JSR $C2:9813, JSR
+;   $C2:9A40, JSR $C2:9B4F, JMP $C2:9B80, JMP $C2:9C6A, JSR $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34,
+;   JSR $C2:9E6D, JSR $C2:9EAB, JSR $C2:9EEE, JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB, JSR
+;   $C2:A0A9, JSR $C2:A16B, JSR $C2:A26E, JSR $C2:A31C, JSR $C2:A375, JSR $C2:A37B, JSR $C2:A381,
+;   JSR $C2:A429, JSR $C2:A473, JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR
+;   $C2:A6A3, JSR $C2:A6A9, JSR $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB,
+;   JSR $C2:A901, JSR $C2:A94E, JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR
+;   $C2:AD9E, JSR $C2:ADB8, JSR $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1,
+;   JSR $C2:AF59, JSR $C2:B040, JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP
+;   $C2:B4DB, JSR $C2:B563, JSR $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955,
+;   JSR $C2:B95B, JSR $C2:B974, JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR
+;   $C2:BC90, JSR $C2:BEBD, JSR $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2,
+;   JMP $C2:C204, JSR $C2:C331, JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR
+;   $C2:C3DD, JSR $C2:C540, JSR $C2:C779, JSR $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E,
+;   JSR $C2:CAD5, JSR $C2:CB7A, JSR $C2:CB80, JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR
+;   $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA, JSR $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4,
+;   JSR $C2:D0D0, JSR $C2:D0D6, JSR $C2:D100, JSR $C2:D106, JSR $C2:D193, JSR $C2:D401, JSR
+;   $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP $C2:D712, JMP $C2:D775, JMP $C2:D828, JSR $C2:D875,
+;   JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C, JSR $C2:DB82, JSR $C2:DB88, JSR $C2:DB8E, JSR
+;   $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR $C2:DFF6, JSR $C2:DFFC, JSR $C2:E00D, JSR $C2:E053,
+;   JSR $C2:E103, JSR $C2:E185, JSR $C2:E293, JSR $C2:E454, JSR $C2:E50A, JSR $C2:E510, JSR
+;   $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR $C2:E5C2, JSR $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702,
+;   JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR
+;   $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE,
+;   JSR $C2:FEF4, JSR $C2:FF21).
+; Callers of Menu_AddWramRec (6 JSR sites): unmatched ($C2:E90C, $C2:F84D, $C2:F859, $C2:F86C,
+;   $C2:FB17, $C2:FB92).
+; Entry (all): M, X any (P saved; Menu_RecDest sets M=0, X=0), DP any,
+;        DB=$7E (Menu_RecListEnd is read absolute); X = the record's
+;        address (16-bit)
+; Exit (all):  P restored; DB=$7E (the MVN's destination bank); X, Y past
+;        the copied bytes; A = the new Menu_RecListEnd (low byte; B =
+;        $FF)
+; Calls: Menu_RecDest.
+Menu_AddRomRec:
+    PHP
+    JSR Menu_RecDest
+    MVN !Bank7E,bank(Menu_AddRomRec)    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    BRA Menu_AddRecTail
+Menu_AddWramRec:                        ; header: see Menu_AddRomRec
+    PHP
+    JSR Menu_RecDest
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+Menu_AddRecTail:                        ; header: see Menu_AddRomRec
+    SEP #$20
+    LDA.w !Menu_RecListEnd
+    CLC
+    ADC.b #!Menu_RecBytes
+    STA.w !Menu_RecListEnd
+    PLP
+    RTS
+
+; $C2:83A2 — Menu_RecDest (16 bytes, $83A2–$83B1)
+; Y = Menu_RecList + Menu_RecListEnd (the next record's address) and A =
+; 7 (the MVN count of 8 bytes).
+; Callers (2 JSR sites): Menu_AddRomRec ($C2:8386) and Menu_AddWramRec ($C2:838F).
+; Entry: M, X any (REP #$31 here: also C=0), DP any, DB=$7E
+; Exit:  M=0, X=0, C=0; A = 7; Y = the address; X unchanged
+; No calls.
+Menu_RecDest:
+    REP #$31
+    LDA.w !Menu_RecListEnd
+    AND.w #!Eng_LowByteMask
+    ADC.w #!Menu_RecList
+    TAY
+    LDA.w #!Menu_RecBytes-1
+    RTS
+
+; $C2:83B2 — Menu_StartFadeIn (11 bytes, $83B2–$83BC)
+; Starts Menu_FadeInThread in slot 0.
+; Callers (7 JMP sites): unmatched ($C2:9A18, $C2:C7DD, $C2:D503, $C2:D543, $C2:E1FE, $C2:E206,
+;   $C2:E618).
+; Entry: M, X any (REP #$30 here), DP=$0000 (Menu_StartThread), DB any
+; Exit:  M=0, X=0 (as Menu_StartThread leaves them); A = Menu_ThNewWait1;
+;        X = 0; Y unchanged
+; Calls: jumps to Menu_StartThread.
+Menu_StartFadeIn:
+    REP #$30
+    LDA.w #Menu_FadeInThread
+    LDX.w #!Menu_FadeInSlot
+    JMP Menu_StartThread
+
+; $C2:83BD — Menu_FadeInThread (13 bytes, $83BD–$83C9)
+; Thread: waits a frame, fades the brightness up by 2 a frame
+; (Menu_Fade) and ends.
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000,
+;        DB=$7E)
+; Exit:  does not return (Menu_ThreadEnd)
+; Calls: Menu_Yield, Menu_Fade; jumps to Menu_ThreadEnd.
+Menu_FadeInThread:
+    JSR Menu_Yield
+    SEP #$20
+    LDA.b #!Menu_FadeInStep
+    JSR Menu_Fade
+    JMP Menu_ThreadEnd
+
+; $C2:83CA — Menu_FadeOut (6 bytes, $83CA–$83CF)
+; Menu_Fade with a step of -2 (to black). The BRA goes to the next
+; instruction (an offset of 0).
+; Callers (4 sites: 3 JSR, 1 JMP): Menu_Exit (JSR $C2:82BE), Menu_ExitToGame (JSR $C2:832C) and
+;   unmatched (JSR $C2:CC20, JMP $C2:E264).
+; Entry: as Menu_Fade: from a menu thread, M any (SEP #$20 here), X any,
+;        DP=$0000, DB=$7E
+; Exit:  as Menu_Fade
+; Calls: Menu_Fade (BRA).
+Menu_FadeOut:
+    SEP #$20
+    LDA.b #!Menu_FadeOutStep
+    BRA Menu_Fade
+
+; $C2:83D0 — Menu_Fade (54 bytes, $83D0–$8405)
+; Fades the screen: Menu_FadeStep = A (signed), Menu_FadeFrames = 1;
+; then repeatedly adds the step to Menu_Inidisp's brightness (bits 0-3):
+; past 0 or down to it the brightness is left at 0 and the routine waits
+; one frame (a tail JMP to Menu_Yield) and returns; at 15 or more it is
+; set to 15 and the routine returns at once; else the new brightness is
+; set and it waits Menu_FadeFrames frames (Menu_YieldFrames) and goes on.
+; Callers (1 JSR site): Menu_FadeInThread ($C2:83C4).
+; Callers note: also reached by Menu_FadeOut's BRA.
+; Entry: from a menu thread, M any (SEP #$20 here), X any, DP=$0000
+;        (the yields), DB=$7E (Menu_Inidisp, Menu_FadeStep); A = the step
+; Exit:  M=1; A = the brightness before the last step + the step (when
+;        it reached 15), or as Menu_Yield returns (low byte the thread's
+;        Menu_ThreadVar); X, Y unchanged; Menu_Inidisp bits 0-3 = 0 or 15
+; Calls: Menu_YieldFrames; jumps to Menu_Yield.
+Menu_Fade:
+    SEP #$20
+    STA.w !Menu_FadeStep
+    LDA.b #1
+    STA.w !Menu_FadeFrames
+.step:
+    LDA.w !Menu_Inidisp
+    AND.b #!Menu_BrightnessMask
+    PHA
+    LDA.b #!Menu_BrightnessMask
+    TRB.w !Menu_Inidisp
+    PLA
+    CLC
+    ADC.w !Menu_FadeStep
+    BEQ .dark
+    BMI .dark
+    CMP.b #!Menu_BrightnessMask
+    BCS .full
+    TSB.w !Menu_Inidisp
+    LDA.w !Menu_FadeFrames
+    JSR Menu_YieldFrames
+    BRA .step
+.full:
+    LDA.b #!Menu_BrightnessMask
+    TSB.w !Menu_Inidisp
+    RTS
+.dark:
+    JMP Menu_Yield                      ; returns to our caller a frame later
+
+; $C2:8406 — Menu_InterruptVectors (8 bytes, $8406–$840D)
+; Copied over NmiTrampoline / IrqTrampoline ($0500-$0507) by
+; Menu_InitSystems: JML Menu_Nmi and JML Menu_Irq, the menu's interrupt
+; handlers. Never executed here.
+; Entry/Exit: not run in place; the copies run as the interrupt
+;        trampolines, any M, X, DP and DB (the JMLs change nothing)
+Menu_InterruptVectors:
+    JML Menu_Nmi
+    JML Menu_Irq
 
 ; ============================================================
 ; Joypad reader and play-time clock ($C2:84D2–$C2:85D5)
@@ -20748,8 +21586,7 @@ Menu_PlayTimeLimits:
 ; Menu_PartyOrder and Menu_Config).
 ; Quirk: X=0 is also stored to $4216-$4219 (RDMPYL/H and JOY1L/H), which
 ; are read-only; the stores do nothing.
-; Callers (1 JSR site): unmatched ($C2:80F0).
-; Callers note (1 JSR site, unmatched): $C2:80F0 in Menu_InitSystems.
+; Callers (1 JSR site): Menu_InitSystems ($C2:80F0).
 ; Entry: M any, X any (P saved; sets M=1, X=0 itself), DP any and DB any
 ;        (both saved, then DP=$2100/$4200 and DB=$00)
 ; Exit:  P, DP and DB restored; A, X and Y clobbered (X = Menu_DmaZeroWord,
@@ -20932,7 +21769,7 @@ Menu_DmaClearWram:
 ; Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank
 ; $7E at address X with DMA channel 0 (stepping source, one register:
 ; WMDATA). Unlike Menu_DmaClearWram it leaves HDMAEN alone.
-; Callers (2 JSR sites): unmatched ($C2:9698, $C2:96A4).
+; Callers (3 JSR sites): unmatched ($C2:9698, $C2:96A4, $C2:972D).
 ; Entry: M any, X any (P saved; sets M=0, X=0, then M=1), DP any (not
 ;        used), DB any (saved, then $00); A (16-bit) = source address in
 ;        bank $FF, X = WRAM address, Y = byte count
@@ -20974,9 +21811,7 @@ Menu_DmaCopyFFToWram:
 ; ($80), sets Menu_Unk29AF to $0080 and zeroes $2C7C-$2C99.
 ; Each zero or $80 fill stores the first word, then an overlapping MVN
 ; (source = destination - 2, or - 1 for the party list) copies it on.
-; Callers (3 JSR sites): unmatched ($C2:8048, $C2:8D7E, $C2:E65D).
-; Callers note (3 JSR sites, unmatched): $C2:8048 in BankC2_MenuEntry, $C2:8D7E
-;   and $C2:E65D.
+; Callers (3 JSR sites): BankC2_MenuEntry ($C2:8048) and unmatched ($C2:8D7E, $C2:E65D).
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (absolute stores; the MVNs also leave DB=$7E)
 ; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the last MVN

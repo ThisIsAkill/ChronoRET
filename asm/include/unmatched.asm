@@ -63,9 +63,58 @@ C2Scene_Unk631F:    ; JSR from C2Scene_Mode6: BG mode 7, OBSEL, clears VRAM and 
                     ; spawns task $C2:666C and script $C2:69F8, then runs frames until C2Scene_Mode is not 6
 org $C26A34
 C2Scene_Unk6A34:    ; JSR from C2Scene_Mode8: starts with C2Scene_ClearVram (not traced further)
-org $C2800E
-BankC2_MenuEntry:   ; BRA from BankC2_Entry8000: SEI, native mode, saves DP/DB/P, stores A at $0A00 and X
-                    ; at $0A01, forced blank, then the menu (not matched)
+org $C2840E
+Menu_Nmi:           ; the menu's NMI handler (JML from Menu_InterruptVectors, copied to NmiTrampoline;
+                    ; not matched here)
+org $C28472
+Menu_Irq:           ; the menu's IRQ handler (JML from Menu_InterruptVectors; not matched here)
+org $C28663
+Menu_Unk8663:       ; JSR from Menu_InitSystems (PHB/PHD/PHP first; not matched)
+org $C2968D
+Menu_Unk968D:       ; JSR from Menu_InitSystems (REP #$30 first; not matched)
+org $C2984A
+Menu_Unk984A:       ; JSR from Menu_InitSystems (not matched)
+org $C29875
+Menu_Unk9875:       ; JSR from Menu_InitSystems (PHP first; not matched)
+org $C292F4
+Menu_Unk92F4:       ; JSR from Menu_InitSystems (not matched)
+org $C2D156
+Menu_UnkD156:       ; JSR from Menu_InitSystems (not matched)
+org $C2E91B
+Menu_UnkE91B:       ; thread 3, started by Menu_RunThreads (not matched)
+org $C2F3CA
+Menu_UnkF3CA:       ; JSR from Menu_InitSystems (not matched)
+org $C2F5ED
+Menu_UnkF5ED:       ; JSR from Menu_Unk834D, A = a character id: returns X = $4B00 + 6 x a byte the
+                    ; character picks (via $CD:6CEC) and A = 5, the MVN source and count (not matched)
+org $FFF958
+BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
+org $C299CA
+Menu_Mode00List:    ; Menu_ModeLists entries: lists of handler addresses (not matched)
+org $C29C29
+Menu_Mode01List:
+org $C2AA34
+Menu_Mode02List:
+org $C2B353
+Menu_Mode03List:
+org $C2BF35
+Menu_Mode04List:
+org $C2C621
+Menu_Mode05List:
+org $C2CED4
+Menu_Mode06List:
+org $C2C7A6
+Menu_Mode07List:
+org $C2D4F0
+Menu_Mode0BList:
+org $C2D519
+Menu_Mode0CList:
+org $C2E1E3
+Menu_Mode0DList:
+org $C2E60B
+Menu_Mode0EList:
+org $C2FE0A
+Menu_Mode0FList:
 org $C28C36
 Menu_Unk8C36:       ; JSR from BankC2_CommandLong (the BankC2_Entry8004 vector), A = a command
 org $C6E74E
