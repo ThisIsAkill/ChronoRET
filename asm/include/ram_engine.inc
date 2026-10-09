@@ -737,7 +737,7 @@ if !ram_engine_inc == 0
                                          ; the NMI routine at $C0:EC77 DMAs the line there
 !Credits_DmaSize = $0BE7                 ; 16-bit byte count of that DMA ($C0:EC77)
 !Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState; Evt_Op29_StartCredits
-                                         ; sets 1 or 2 (no reader traced)
+                                         ; sets 1 or 2; LocLoad_DrawMap copies it to Map_Unk1D86 when nonzero
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
                                          ; (Field_SaveState / Field_RestoreState)
 !Audio_CmdId = $1E00                     ; 8-bit sound-driver command byte ($19 = play sound effect),

@@ -11708,7 +11708,7 @@ Evt_OpF2_WaitBrightness:
 ;   fixed colour (Fade_FixedColor, COLDATA-style: bits 5-7 the
 ;   channels, bits 0-4 the intensity).
 ;   - colour 0: Fade_FixedColor = Fade_FixedColorTarget =
-;     Fade_FixedColorInit (no channel, intensity 0) and Ppu_Unk0BE0 =
+;     Fade_FixedColorInit (all channels, intensity 0) and Ppu_Unk0BE0 =
 ;     Ppu_Unk0BDF (the location's CGADSUB value); X = Y + 2, C=1.
 ;   - else Fade_FixedColorTarget = colour and Fade_FixedColor takes its
 ;     channel bits (keeping its intensity). s bit 7 picks Ppu_Unk0BE0 =
@@ -12025,9 +12025,10 @@ Evt_OpE7_ScrollTo:
 ; Event opcode $F8 (1 byte): BankC2_Entry8004 commands 6 and 7
 ;   (BankC2Cmd_Unk06, BankC2Cmd_Unk07); X = Y + 1. Read from the ROM
 ;   (Menu_Unk8C36's table, unmatched): command 6 sets word +3 of each of
-;   the eight $50-byte records at Menu_CharRecords to its word +5 plus a
-;   bonus by byte +$2A ($A1: half, $A0: a quarter), capped at 999;
-;   command 7 copies byte +9 of each record to byte +7. Probably current
+;   the seven $50-byte records at Menu_CharRecords ($2600-$282F) to its
+;   word +5 plus a bonus by byte +$2A ($A1: half, $A0: a quarter),
+;   capped at 999; command 7 copies byte +9 of each record to byte +7
+;   (both loops step Y by $50 from $2600 and stop at CPY #$2830). Probably current
 ;   HP and MP refilled to their maximums (not established).
 ;   Evt_BankC2CmdTail (A = the command; EvtOp_SavedPos = the next
 ;   opcode) runs the command and returns; Evt_OpF9, Evt_OpFA and
@@ -12133,10 +12134,11 @@ Evt_OpFF9F_BankC2Cmd08:
 ;   Credits_BlockMask. Credits_TextPos = the offset in Credits_Text
 ;   past that many blocks (each ends at a byte with bit 7 set,
 ;   Credits_EndBlock). X = Y + 2, C=1 (the search ends on an equal CMP).
-;   No reader of Field_Unk0BE9 is traced.
+;   LocLoad_DrawMap reads Field_Unk0BE9 and, when it is nonzero, stores
+;   it in Map_Unk1D86.
 ; Reached through Evt_OpcodeTable (opcode $29).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the scratch is
-;   dp; Credits_LoadGfx's VramDma_* and DmaFill_* are dp), DB=$00
+;   dp; Credits_LoadGfx's VramDma_* are dp), DB=$00
 ;   (Map_*, Field_Unk0BE9 and Credits_TextPos absolute); Y = the
 ;   opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=1; A clobbered; Y
@@ -12959,7 +12961,7 @@ Evt_OpFF9D_ClearPush:
     RTS
 
 ; ============================================================
-; Event opcodes: character and sprite objects ($C0:41E4–$C0:458F)
+; Event opcodes: character and sprite objects ($C0:41E4–$C0:4866)
 ; Entered as the other opcode handlers (see the banner of the call
 ; opcodes at $C0:5F6E); run from an object's init function, they make
 ; Obj_Cur a playable character's object or give it a sprite. A sprite
@@ -13116,8 +13118,10 @@ Evt_InitCharTail:                       ; header: see Evt_Op6D_InitChar6
 ;   opcode's offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode (the
 ;   opcode's offset + 2 for $80, + 1 for the one-byte ones), C=1; Y =
-;   X on the member paths, X - 1 on the other; A clobbered; EvtChar_Id
-;   = char; Evt_LoadSpriteRec's writes on the member paths.
+;   X on the member paths, X - 1 on the other; A clobbered; dp $D9:
+;   EvtChar_Id = char on the not-in-party path; on the member paths
+;   Evt_LoadSpriteRec leaves EvtSpr_Idx (the same dp $D9, 16-bit) = the
+;   record's SprRec_Gfx index, with its other writes.
 ; ------------------------------------------------------------
 Evt_Op80_InitCharObj:
     INY
@@ -13615,8 +13619,9 @@ Evt_InitWramSprite:
 ;   ObjQ_Unk71Init, the game stops on colour Halt_ColorWramGfxFull
 ;   (Sys_HaltWithColor, never returns). On both paths ObjQ_Unk71 (as it
 ;   was before the unpack) is stored in the GfxOfs field of FieldBtlObj
-;   record 0, 1 or 2 by ObjQ_Unk73 (0, 1, 2 or more; what reads them
-;   there outside a battle is not traced) and ObjQ_Unk73 counts up.
+;   record 0, 1 or 2 by ObjQ_Unk73 (0, 1, 2-$80; the CMP #$01 / BMI
+;   also sends $81 and up to record 0; what reads them there outside a
+;   battle is not traced) and ObjQ_Unk73 counts up.
 ;   X = Y + 2, C=1.
 ; Reached through Evt_OpcodeTable (opcode $82).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, ObjQ_*,
