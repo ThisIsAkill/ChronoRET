@@ -269,13 +269,48 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    do). Open from these: what `Field_Unk0BE9`, `ObjX_Unk7F0F00`, `Field54_Unk80`,
    `FadeFlag_Unk10`, `Ppu_Unk0BE0` and the `FieldBtlObj[0-2].GfxOfs` stores of $82 are read
    by; the bank $C2 command $0A; the bank-$FD vectors `FdVec_FFE5/E8/EB/F1` ($FF $80-$8F);
-   whether the $2600 records' words +3/+5 are HP (commands 6/7). Next, in reach order: the
-   rest of the event opcode handlers, $C0:4867-$C0:4CD4 ($84, $87, $88, $2E at $C0:4A4E,
-   $89-$8E), then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all
-   have names;
-   and the party control callees `Party_Unk9E29` ($C0:9E84 first), `Party_UnkA26B`,
-   `Party_UnkA2CE` (with `$C0:9ED1`, `$C0:9F20`, `$C0:9F6F`). Open from it: what Field_Unk1F87
-   does with the message bytes (and whether `Field_Unk30` is the window's place), who clears
+   whether the $2600 records' words +3/+5 are HP (commands 6/7).
+   Also done (branch match-c0-evtops3): the last event opcode handlers $C0:4867-$C0:4D05 ($84
+   `Evt_Op84_SetUnk1B01`, $87 script period, $88 / $2E palette animations into free
+   `FieldAnimB` records with `Evt_FindFreeAnimB` ($C0:4B2C) or straight colour copies into
+   `Pal_Buf` / `Pal_CgramBuf`, $89/$8A speed, $8B/$8C place on a tile, $8D position, $8E
+   `Obj_OamFlags`, $90/$91/$7E/$7C/$7D `Obj_Unk1A81` with the shared tail `Evt_Op90_Store`) and
+   `Evt_OpcodeTable` ($C0:5D6E, 256 words, 32 unused opcodes); the party control callees
+   $C0:9E29-$C0:A33A: the leader's step log (`PartyLog_*` rings in bank $7F at
+   `Field_UnkAB`/`AC`/`AD`), `Party_LeaderAnim`, `Party_Member2Anim`/`3Anim`,
+   `Party_FollowerHoldAnim`, `Party_AnimTable` ($C0:9FF7, 65 words; the 65th unreachable) with
+   its 16 facing handlers and the row tails `Party_AnimWalk`/`Run`/`Idle`/`RowUnk19`/`RowUnk1B`,
+   and the followers `Party_UnkA26B`/`A2CE` (names kept for Evt_OpB0; better
+   `Party_LeaderStep`, `Party_FollowMember2/3`); the message window `Field_Unk1F87` ($C0:1F87,
+   better `Field_MessageStep`) with `Field_MsgClearBuf`/`MsgStart`/`MsgStep` (the text window
+   status codes 0/3/5-$C/$10 read from what the field does with them); `TileAnimList_*`
+   ($C0:28AA-$C0:29F6); `ScrollStepAccum` ($C0:2C41, the `LayerDrift_*` layer 2/3 steps copied to
+   `FieldBtlPpu.Scroll2`); the `ReentryVectors` services `Field_RefreshHdmaLong` ($C0:0AFF, was
+   the stub `AudioDrvSync`: no sound in it; ReentryVectors edited for the rename, back to
+   review), `MusicCueDispatch` / `AudioFadeDispatch` ($C0:1BAB-$C0:1CFB, the battle music cues);
+   and the field IRQ `IrqHandler` / `Irq_UploadTileAnim` ($C0:ECCC-$C0:F05D). Quirks recorded:
+   Evt_Op87's unmasked countdown, Evt_Op8B/8C/8D/8E's Map_TileAttrA -> Obj_PrioHigh (the other
+   way round from Obj_SetVelocityChecked), Evt_Op8C leaving Obj_PosX's low byte, the
+   `ObjX_PalAnimRec` left 0 at load (record 0 for an object never given one), Evt_FindFreeAnimB
+   searching only 8 of the 12 records, Party_Unk9E29's dead LDA, the dead CMP #$18 before
+   Party_AnimRowUnk1B, Party_UnkA2CE's second Obj_VelX/Y zeroing, Field_Unk1F87's LDA #$29 / DEC
+   open target, AudioFadeDispatch's PLB/PLD in the wrong order (DB and D scrambled unless the
+   caller has D = 0 and DB = 0) and its dead DEC, ScrollStepAccum's zero test on layer 2 X only,
+   TileAnimList_ApplyOne writing $E7 to the $E6 column's upper tile where the IRQ draws metatile
+   $1E5, IrqHandler's dead RTS. Next in bank $C0, the last unmatched code: `Irq_UnkF05E`
+   ($C0:F05E-$C0:F10F, run by the IRQ while `Field_Unk63` is not negative: VRAM writes at $1C02 /
+   $1C22, the choice cursor, probably) with its callees $C0:F110/F12B/F142/F159, then whatever
+   follows up to $C0:FCFF (not looked at: data, probably), and `FdVec_FFFD` (bank $FD, JMP
+   $FD:E022, the IRQ's other phase). Open from this batch: what reads `Audio_Unk1E10`,
+   `Field_Unk33`, `LayerDrift_*` writers, the sound commands $11/$14/$70, who sets
+   `Field_Unk0F` bit 7 (the IRQ does nothing then), `Field_Unk53Bit7`'s readers, the FieldAnimB
+   record fields (`EngFD_UnkE39C`, FdVec_FFF7), and whether the $E6 column's upper tile really
+   starts at $E4. Stale, not edited (fix at their next edit): Map_InitEntryTile calls
+   `ObjX_Unk7F0C00`-`7F0D80` "per-object tables ... not established" (they are the `PartyLog_*`
+   rings); the banners before Evt_OpB1_Yield ($C0:353F), Evt_Op7A_ArcToTile ($C0:4D06) and
+   Evt_UnusedOpcode ($C0:5F6E) still call `Evt_OpcodeTable` unmatched, and Evt_Op7F's callers
+   note describes the table's bytes; the banner before Evt_OpB1 says Field_Unk1F87 is "not
+   traced". Open from it: who clears
    `Field54_Push`, what lies at Evt_Data + `Evt_PushScriptPos` / `Evt_RedirectPos`, what
    `Eng_Unk7F0000` and `ObjX_Unk7F0A80` mean beyond the opcodes, and what `Obj_Unk1C80`/`1C81`
    bits beyond 0-1 do. Open from the hand-off: who
@@ -450,11 +485,8 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
    battle menu (they need a `bankCC.asm`).
 2. `$C1:0051`, 10 words: the $C10045 service dispatcher's table (`JSR (T,X)` at `$C1:004A`);
    services 1, 2 and 7 are matched, the rest need stubs.
-3. `$C0:5D6E` `Evt_OpcodeTable`, 256 words (`JSR (T,X)` at `$C0:5977` in Evt_RunObj0Func1, and
-   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 16
-   entries still have none ($2E, $7C-$7E, $84, $87-$8E, $90, $91).
-4. Dispatch tables right after (or near) their dispatcher, bank $C0 (`$C0:400E` is matched as
-   Evt_OpFFTable): `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
+3. Done: `$C0:5D6E` `Evt_OpcodeTable` (256 words) and `$C0:9FF7` `Party_AnimTable` (65 words).
+4. Done in bank $C0: `$C0:400E` Evt_OpFFTable and `$C0:7181` Obj_PalSlotHandlers are matched.
 5. Bank $C1 (`$C1:2D81`, `$C1:3216` and `$C1:3760` are matched as BattlePos_ModeTable,
    Battle_FxHandlerTable and Battle_EnemyMoverTable): `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

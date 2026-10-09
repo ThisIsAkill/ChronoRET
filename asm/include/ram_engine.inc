@@ -563,12 +563,12 @@ if !ram_engine_inc == 0
 !Field_TileStepY = $5E                   ; 8-bit map row for DefaultHandler's single-tile step
 !Field_VramQueueFlags = $5F              ; 8-bit; bit 4 = TileAnim_VramAddrs filled by a
                                          ; Mode*_Handler, bit 1 = TileAnim_StepVramAddrs filled by
-                                         ; DefaultHandler (inferred: picked up by the tilemap
-                                         ; uploader)
+                                         ; DefaultHandler; Irq_UploadTileAnim sends them and
+                                         ; clears the bit
 !TileAnim_PairCount = $60                ; 8-bit tiles changed / 2, minus 1: 0 for ModeE6 (2 tiles),
                                          ; 1 for ModeEC/EE (4), 2 for ModeFA/FC (6). Inferred from
-                                         ; the setters and the VRAM uploader at $C0:ED24, which
-                                         ; sends 8/16/24 VRAM words for 0/1/2 (not converted yet)
+                                         ; the setters and Irq_UploadTileAnim, which sends 8/16/24
+                                         ; VRAM words for 0/1/2
 !TileAnim_StepKind = $61                 ; 8-bit; DefaultHandler sets 0 when the stepped tile was
                                          ; $FE, 1 when it was $E0
 
