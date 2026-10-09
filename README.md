@@ -43,6 +43,7 @@ roms/chrono_trigger.sfc   ← place it here (gitignored, never committed)
 
 Target: US 1.0, unheadered, 4 MiB. SHA-256:
 `06d1c2b06b716052c5596aaa0c2e5632a027fee1a9a28439e509f813c30829a9`
+(also in `rom.sha256`, which CI checks; `sha256sum -c rom.sha256` checks yours)
 
 ## Requirements
 

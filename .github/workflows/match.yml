@@ -31,9 +31,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Restore a cached copy of the ROM (contributors upload it once as a
-      # GitHub Actions secret encoded in base64, then it's cached per-SHA).
-      # See docs/CI_SETUP.md for how to configure ROM_B64 as a repo secret.
+      # The expected SHA-256 of the US 1.0 ROM lives in rom.sha256 (in
+      # `sha256sum` format). It is checked first, with or without the ROM, so
+      # a missing or malformed hash file fails the job instead of silently
+      # skipping the comparison.
+      - name: Check the expected ROM hash file
+        run: |
+          if ! grep -qE '^[0-9a-f]{64}  roms/chrono_trigger\.sfc$' rom.sha256 2>/dev/null \
+             || [ "$(wc -l < rom.sha256)" -ne 1 ]; then
+            echo "::error::rom.sha256 is missing or malformed; it must hold one line: '<sha256>  roms/chrono_trigger.sfc'."
+            exit 1
+          fi
+
+      # The ROM comes from the ROM_B64 repository secret (the ROM, base64
+      # encoded). How to set it up: https://thisisakill.github.io/Kajar-site/CI_SETUP/
       - name: Restore ROM from secret
         env:
           ROM_B64: ${{ secrets.ROM_B64 }}
@@ -44,10 +55,8 @@ jobs:
             echo "SKIP_CHECK=1" >> "$GITHUB_ENV"
           else
             echo "$ROM_B64" | base64 -d > roms/chrono_trigger.sfc
-            SHA=$(sha256sum roms/chrono_trigger.sfc | cut -d' ' -f1)
-            EXPECTED=$(grep 'SHA256' docs/ROM_HASH.md | grep -oP '[0-9a-f]{64}' || true)
-            if [ -n "$EXPECTED" ] && [ "$SHA" != "$EXPECTED" ]; then
-              echo "::error::ROM checksum mismatch (got $SHA, expected $EXPECTED)"
+            if ! sha256sum --check --strict rom.sha256; then
+              echo "::error::ROM checksum mismatch (got $(sha256sum roms/chrono_trigger.sfc | cut -d' ' -f1), expected $(cut -d' ' -f1 rom.sha256))"
               exit 1
             fi
           fi
