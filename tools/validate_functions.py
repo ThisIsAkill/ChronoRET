@@ -7,7 +7,7 @@ regenerated first when stale (tools/generated.py). Without them (the CI
 readability job) only the review log is checked.
 
   - functions.csv: known columns, addresses `$BB:AAAA` strictly ascending,
-    status one of matched/readable/verified, notes on one line (<= 200 chars);
+    kind code/data, status one of matched/readable/verified, notes on one line (<= 200 chars);
   - the review log, symbols/reviews/ (tools/review_log.py): files named
     legacy.csv or rNNN.csv only, each with the known header line; rows with
     ISO dates, a reviewer, verdict approved or changes and a 12-hex
@@ -29,7 +29,7 @@ import review_log  # noqa: E402
 
 FUNCTIONS = Path('symbols/functions.csv')
 OLD_REVIEWS = Path('symbols/reviews.csv')
-F_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'status', 'source_hash', 'notes']
+F_COLS = ['address', 'end', 'size', 'name', 'bank', 'subsystem', 'kind', 'status', 'source_hash', 'notes']
 R_COLS = review_log.R_COLS
 ADDR = re.compile(r'^\$[0-9A-F]{2}:[0-9A-F]{4}$')
 
@@ -62,6 +62,8 @@ def main() -> int:
         last = addr_key(row['address'])
         if row['status'] not in ('matched', 'readable', 'verified'):
             errors.append(f'{where}: unknown status {row["status"]!r}')
+        if row['kind'] not in ('code', 'data'):
+            errors.append(f'{where}: unknown kind {row["kind"]!r}')
         if '\n' in row['notes'] or len(row['notes']) > 200:
             errors.append(f'{where}: notes must be one line, 200 characters at most')
 
