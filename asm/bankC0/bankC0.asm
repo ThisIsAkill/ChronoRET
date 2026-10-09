@@ -31872,8 +31872,10 @@ Evt_Op7B_ArcSteps:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
-;   else unchanged; Obj_Direction and
+;   Y = Obj_Cur on a first run when Obj_SetVelocityChecked probed a
+;   tile; on a first run without a probe Y's low byte as on entry (high
+;   byte cleared by Obj_SetVelocityChecked's SEP #$10); on later runs Y
+;   unchanged; Obj_Direction and
 ;   ObjFront_SavedY ($C7) written on a first run.
 ; ------------------------------------------------------------
 Evt_Op92_WalkDir:
@@ -31933,8 +31935,10 @@ Evt_Op92_WalkDir:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
-;   else unchanged; Obj_Direction and
+;   Y = Obj_Cur on a first run when Obj_SetVelocityChecked probed a
+;   tile; on a first run without a probe Y's low byte as on entry (high
+;   byte cleared by Obj_SetVelocityChecked's SEP #$10); on later runs Y
+;   unchanged; Obj_Direction and
 ;   ObjFront_SavedY ($C7) written on a first run.
 ; ------------------------------------------------------------
 Evt_Op9C_MoveDir:
@@ -31985,8 +31989,10 @@ Evt_Op9C_MoveDir:
 ;   scratch below are dp), DB=$00 (Obj_* tables absolute); Y = the
 ;   opcode's offset in Evt_Data (operands read long at Evt_Data + Y + n).
 ; Exit: M=1, X=0, DP and DB unchanged; X and C as above; A clobbered;
-;   Y = Obj_Cur on a first run (Obj_SetVelocityChecked probed a tile),
-;   else unchanged; Obj_Direction and
+;   Y = Obj_Cur on a first run when Obj_SetVelocityChecked probed a
+;   tile; on a first run without a probe Y's low byte as on entry (high
+;   byte cleared by Obj_SetVelocityChecked's SEP #$10); on later runs Y
+;   unchanged; Obj_Direction and
 ;   ObjFront_SavedY ($C7) written on a first run.
 ; ------------------------------------------------------------
 Evt_Op9D_MoveDirVar:
