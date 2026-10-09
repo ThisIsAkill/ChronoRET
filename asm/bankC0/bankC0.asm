@@ -5299,7 +5299,8 @@ Oam_UploadShadow:
 ; Reached through the RAM trampoline InstallIRQ writes (JML IrqHandler
 ;   at IrqTrampoline). Saves A, X, Y (16-bit), D and DB. Nothing more
 ;   happens when bit 7 of Field_Unk0F is set (TIMEUP is then not read,
-;   so the IRQ flag stays set; who sets that bit is not traced) or when
+;   so the IRQ flag stays set; Field_HookLeaveToBankC3 sets it, $80,
+;   at $C0:263F just before its JML to bank $C3) or when
 ;   TIMEUP bit 7 is clear (not a timer IRQ). Else: NMITIMEN =
 ;   NMITIMEN_NmiJoy (the V-count IRQ off until the next NMI), DB = $00,
 ;   a wait for H-blank (HVBJOY bit 6), INIDISP = FORCED_BLANK, HDMAEN =
