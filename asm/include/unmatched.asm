@@ -29,8 +29,9 @@ Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negat
 
 org $C10000
 EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
-org $C2F3CA
-Menu_UnkF3CA:       ; JSR from Menu_InitSystems (not matched)
+org $C2F871
+Menu_UnkF871:       ; JSR from Menu_SprThread for each object with .Flags18 = 0 (DP = its page);
+                    ; probably places its sprites in OAM (not analysed)
 org $FFF9BB
 BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
 org $FFF9C4

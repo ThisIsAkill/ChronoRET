@@ -945,4 +945,32 @@ if !constants_menu_inc == 0
 !Menu_OamFlipH = $40                     ; OAM attribute bit 6: horizontal flip
 !Menu_Unk0D9BAll = $FF                   ; TRB mask clearing Menu_Unk0D9B
 
+; --- Menu sprite objects ---
+!Menu_SprPageBytes = $0040
+!Menu_SprOff = $FF                       ; .Id of an unused object
+!Menu_SprNoFrame = $FF                   ; .PrevAnim / .LastFrame after Menu_SprLoad
+!Menu_SprDefBytes = 5                    ; bytes of a definition (kind-2 records are twice that)
+!Menu_SprKindLong = 2                    ; first .Kind with 10-byte records
+!Menu_SprDefSizeMask = $03               ; definition byte 4 bits 0-1: .TileCount (Menu_SprTileCounts)
+!Menu_SprDefKeepBit4 = $EF               ; TRB mask: byte 4 keeps only bit 4 (the second palette set)
+!Menu_SprNoDef = $FF                     ; definition byte 0: nothing to load
+!MenuRom_E4GfxPtrs = $E4FFE0             ; words in bank $E4 (= RomE4_PtrInit + 0, 2, 4, 6, 8): the
+!MenuRom_E4FramePtrs = $E4FFE2           ; addresses of its tables of graphics pointers (3 B each),
+!MenuRom_E4AnimFrames = $E4FFE4          ; frame-record pointers (3 B), animation frame lists and
+!MenuRom_E4AnimTimes = $E4FFE6           ; time lists (words) and palettes (words)
+!MenuRom_E4Palettes = $E4FFE8
+!Menu_SprPalAltOfs = $0200               ; palette offset with definition byte 4 bit 4
+!Menu_SprAttrPalMask = $0E00             ; .TileAttr palette bits
+!Menu_SprAttrTileMask = $01FF            ; .TileAttr tile bits
+!Menu_SprPageNumMask = $03C0             ; DP bits giving the object number (x $40)
+!Menu_SprNoDraw = $40                    ; .Flags18 of Menu_SprResetChars
+!Menu_SprSlot = $0028                    ; thread slot 5: Menu_SprThread
+!Menu_SprAnimMask = $007F
+!Menu_OpRtl = $6B                        ; RTL opcode (the end of Menu_NmiMoveCode)
+!Menu_SprTileCountHi = $0F00             ; .TileCount in the high byte of a word load of .Kind
+!Menu_SprTileNumMask = $07FF             ; tile list word: the tile number; bit 14: mirrored
+!Menu_SprVramBase = $4000                ; VRAM word address of sprite tile 0
+!Menu_SprUnitWords = $80                 ; VRAM words of 8 tiles
+!Menu_SprRowEvenMask = $FE
+
 endif

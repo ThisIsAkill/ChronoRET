@@ -454,7 +454,8 @@ endstruct align 8
 !Menu_PartyListPos = $0D68               ; 9 B: the Menu_PartyOrder position of each
 !Menu_Unk21BA = $21BA                    ; 3 x $20 B; Menu_Unk834D copies 6 B from bank $D1 to the start of
                                          ; each, one per active party member (picked by its weapon,
-                                         ; Menu_WeaponRecSrc); use not traced
+                                         ; Menu_WeaponRecSrc; probably its three colours, which
+                                         ; Menu_LoadCharPalettes also copies); use not traced
 !Menu_Unk04A4 = $04A4                    ; 5 B; Menu_Unk82E1 tests the byte for each value $AE-$B2
 !Menu_Unk2857 = $2857                    ; 5 B; Menu_Unk82E1 zeroes them and sets the byte of each value
                                          ; $AE-$B2 that a record's +$2A holds while its Menu_Unk04A4 byte is
@@ -987,7 +988,9 @@ endstruct
 !Menu_Bg3TileBuf = $4E00                 ; the BG3 (2bpp) tiles before upload; then reused for 4bpp tiles
 !Menu_Font2bppBuf = $5000                ; where MenuRom_Font2bpp is loaded (2bpp tile $20 of the above)
 !Menu_WinTileBuf = $8800                 ; the window style's tiles (Menu_LoadWindowGfx)
-!Menu_WinVramAddr = $9890                ; 16-bit; set to Menu_WinVramDest by Menu_LoadWindowGfx; use not traced
+!Menu_SprScratch = $9890                 ; Menu_LoadWindowGfx stores Menu_WinVramDest here (use not traced);
+                                         ; Menu_SprLoad copies a sprite definition (5 B) here and
+                                         ; Menu_SprAnimate a frame's tile list (up to $C0 B)
 !Menu_WinStyle = $0D8C                   ; 8-bit; window style (Menu_Config01 AND 7)
 !Menu_Unk0D47 = $0D47                    ; 16-bit; set to $0010 by Menu_LoadGraphics; bits 2-4 of its high
                                          ; byte pick Menu_LoadWindowPal's palette row
@@ -1007,6 +1010,48 @@ endstruct
                                          ; B byte 2 when its byte 1 has bit 6, else 0; 0 from category 4
 !Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id (probably name offsets; not traced)
 !Menu_GoldCopy = $9D96                   ; 3 B: copy of Menu_Unk2C53 (Menu_BuildItemTables)
+
+; --- Menu sprite objects (Menu_InitSprites ... Menu_SprUploadTiles) ---
+!Menu_SprPages = $1800                   ; pages of $40 B, one per object (Menu_SprThread visits 9) (struct Menu_Spr, DP = the page)
+!Menu_SprCounter = $0022                 ; 8-bit; Menu_InitSprites' object number (the byte
+                                         ; Menu_ReadSlotSummary calls Menu_SumPlace)
+!Menu_Tmp06 = $0006                      ; 16-bit scratch (absolute)
+!Menu_Unk0D2C = $0D2C                    ; 16-bit; Menu_Times64's last result
+!Menu_Unk0D2E = $0D2E                    ; 16-bit; zeroed by Menu_StartSprThread; use not traced
+!Menu_Unk0D30 = $0D30                    ; 16-bit; likewise
+!Menu_Unk0D72 = $0D72                    ; 16-bit; bit 7 and Menu_SprUploads (its high byte) pick the
+                                         ; WRAM tile buffer of Menu_SprUploadTiles
+!Menu_SprUploads = $0D73                 ; 8-bit; tile units queued this frame (Menu_SprThread zeroes it)
+!Menu_SprUploadMax = $0D75               ; 8-bit; Menu_SprThread starts no new frame at or above it
+!Menu_SprVramRec = $9A88                 ; a Menu_VramRec built by Menu_SprUploadTiles
+!Menu_SprUnpackBuf = $B000               ; $800 B per object: packed sprite graphics unpacked here
+!Menu_SprTileBuf = $8000                 ; the tiles Menu_SprUploadTiles builds (bank $7E)
+
+; An animated menu sprite (Menu_SprLoad, Menu_SprAnimate): dp offsets in
+; its $40-byte page at Menu_SprPages + n x $40.
+struct Menu_Spr $0000
+.Id:            skip 1  ; definition number; bit 7: off (Menu_SprOff)
+.Kind:          skip 1  ; 0: graphics used in place; 1-2: packed, unpacked by Menu_SprLoad
+.TileCount:     skip 1  ; frame size in units of 16 tiles (Menu_SprTileCounts)
+.LastFrame:     skip 1  ; frame number shown last ($FF: none)
+.GfxPtr:        skip 3  ; 24-bit: the tile graphics
+.FramePtr:      skip 3  ; 24-bit: the frame records
+.AnimFrames:    skip 2  ; bank-$E4 address of its animations' frame lists
+.AnimTimes:     skip 2  ; ... and time lists
+                skip 3
+.Anim:          skip 1  ; animation (bits 0-6); bit 7: loop to .LoopFrame at the end
+.PrevAnim:      skip 1
+.Timer:         skip 1  ; frames left on this frame
+.AnimLen:       skip 2  ; entries per direction
+.Frame:         skip 1  ; index in the lists
+.Dir:           skip 1  ; 0-3: which quarter of the frame list
+.Flags18:       skip 1  ; bit 7: not animated; non-zero: Menu_UnkF871 not called
+.TileAttr:      skip 2  ; OAM tile (bits 0-8) and attributes (palette bits 9-11)
+.FrameListPtr:  skip 3  ; 24-bit (bank $E4) pointer to the frame numbers
+.TimeListPtr:   skip 3  ; ... and to the times
+.LoopFrame:     skip 1
+.FrameData:     skip $1E ; the frame record's last .TileCount x 8 bytes
+endstruct
 
 ; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
 !Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers
