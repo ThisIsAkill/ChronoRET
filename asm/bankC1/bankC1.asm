@@ -26990,6 +26990,415 @@ BattleSys_RunPcAttack:
     RTS
 
 ; ==================================================================
+; Fixed fractions ($C1:C02A–$C1:C1DC)
+; ==================================================================
+; Eight routines that scale a number by a fixed fraction with shifts
+; and subtractions, result in DP $30/$31. The Byte forms take an 8-bit
+; value x in A (B = 0: XBA makes it x * 256, and a non-zero B would
+; come in as B / 256 on top) and keep the high byte of the 16-bit
+; result; the Word forms take a 16-bit A and keep all of it. Each
+; shifted term is made from the one before and truncated as it is
+; made, so the results can fall a little below the exact fraction.
+; The callers are in the unmatched effect code from $C1:E1E9 on; four
+; of the eight have no caller found.
+
+; $C1:C02A — Battle_ScaleByte20 (57 bytes, $C02A–$C062)
+; DP $30/$31 = about x / 5:
+;   x * 64 - x * 8 - x * 4 - x / 2 - x / 4 (= x * 51.25), / 256.
+; The result is the high byte (0-255 for x 0-255; DP $31 = 0).
+; Callers (1 JSR site): unmatched ($C1:E2C0).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A = x,
+;        B = 0
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+!Scale_Term = !BattleTmp_08             ; 2 B: the term being subtracted
+!Scale_Result = !BattleTmp_30           ; 2 B: the result
+org $C1C02A
+Battle_ScaleByte20:
+    REP #$20
+    XBA
+    LSR A
+    LSR A
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    AND.w #!Battle_HighByteMask
+    XBA
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C063 — Battle_ScaleByte30 (55 bytes, $C063–$C099)
+; DP $30/$31 = about x * 3 / 10:
+;   x * 128 - x * 32 - x * 16 - x * 2 - x (= x * 77), / 256.
+; The result is the high byte (0-255 for x 0-255; DP $31 = 0).
+; Callers (6 JSR sites): unmatched ($C1:E1E9, $C1:E263, $C1:E415, $C1:E4A4, $C1:E4FE, $C1:E565).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A = x,
+;        B = 0
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleByte30:
+    REP #$20
+    XBA
+    LSR A
+    TAY
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    AND.w #!Battle_HighByteMask
+    XBA
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C09A — Battle_ScaleByte60 (66 bytes, $C09A–$C0DB)
+; DP $30/$31 = about x * 3 / 5:
+;   x * 256 - x * 64 - x * 32 - x * 4 - x * 2 - x / 4 (= x * 153.75), / 256.
+; The result is the high byte (0-255 for x 0-255; DP $31 = 0).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A = x,
+;        B = 0
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleByte60:
+    REP #$20
+    XBA
+    TAY
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    AND.w #!Battle_HighByteMask
+    XBA
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C0DC — Battle_ScaleWord60 (61 bytes, $C0DC–$C118)
+; DP $30/$31 = about x * 3 / 5:
+;   x - x / 4 - x / 8 - x / 64 - x / 128 - x / 1024, all 16 bits.
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A =
+;        x (16-bit, B:A)
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleWord60:
+    REP #$20
+    TAY
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C119 — Battle_ScaleByte80 (55 bytes, $C119–$C14F)
+; DP $30/$31 = about x * 4 / 5:
+;   x * 256 - x * 32 - x * 16 - x * 2 - x (= x * 205), / 256.
+; The result is the high byte (0-255 for x 0-255; DP $31 = 0).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A = x,
+;        B = 0
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleByte80:
+    REP #$20
+    XBA
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    AND.w #!Battle_HighByteMask
+    XBA
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C150 — Battle_ScaleWord80 (50 bytes, $C150–$C181)
+; DP $30/$31 = about x * 4 / 5:
+;   x - x / 8 - x / 16 - x / 128 - x / 256, all 16 bits.
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A =
+;        x (16-bit, B:A)
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleWord80:
+    REP #$20
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C182 — Battle_ScaleByte10 (48 bytes, $C182–$C1B1)
+; DP $30/$31 = about x / 10:
+;   x * 32 - x * 4 - x * 2 - x / 4 (= x * 25.75), / 256.
+; The result is the high byte (0-255 for x 0-255; DP $31 = 0).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A = x,
+;        B = 0
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleByte10:
+    REP #$20
+    XBA
+    LSR A
+    LSR A
+    LSR A
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    AND.w #!Battle_HighByteMask
+    XBA
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:C1B2 — Battle_ScaleWord10 (43 bytes, $C1B2–$C1DC)
+; DP $30/$31 = about x / 10:
+;   x / 8 - x / 64 - x / 128 - x / 1024, all 16 bits.
+; Callers (2 JSR sites): unmatched ($C1:E3BA, $C1:EE44).
+; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A =
+;        x (16-bit, B:A)
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
+;        difference; DP $08/$09 = the last term; DP $30/$31 = the result
+Battle_ScaleWord10:
+    REP #$20
+    LSR A
+    LSR A
+    LSR A
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    TAY
+    LDA.b !Scale_Term
+    LSR A
+    LSR A
+    LSR A
+    STA.b !Scale_Term
+    TYA
+    SEC
+    SBC.b !Scale_Term
+    STA.b !Scale_Result
+    TDC
+    SEP #$20
+    RTS
+
+; ==================================================================
 ; Action target resolution ($C1:C1DD–$C1:C90A, table $C1:C95C)
 ; ==================================================================
 

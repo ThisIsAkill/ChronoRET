@@ -856,6 +856,7 @@ if !constants_battle_inc == 0
 !Battle_B1F5StopBit      = $80    ; bit 7 of the byte BattleSys_RunTechParts reads at $7E:B1F5 + the tech offset
 !Battle_B200StopBit      = $80    ; !Battle_UnkB200 bit 7: with the bit above, the tech's remaining parts are skipped
 !Battle_TechMpFail       = $FF    ; !Battle_UnkB3C8 from BattleSys_CheckTechMp: a user cannot take part
+!Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
 !Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 
 endif
