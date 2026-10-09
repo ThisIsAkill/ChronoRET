@@ -21,6 +21,7 @@ Don't spend review time on these. If one is wrong, the gate is wrong; report it.
 | A header's `(N bytes, $XXXX–$YYYY)` matches the routine | lint rule `SIZE` |
 | No header calls an address inside matched code "unmatched" | lint rule `UNMATCHED` |
 | Every Entry line states DP and DB | lint rule `DPDB` (that they are *right* is still yours) |
+| An Exit claim that X or Y is unchanged/kept/preserved/as on entry does not lose the high byte to an X-flag `SEP` (or `PLP`, or a callee returning with X=1) on any path, callees included, for X=0 callers | lint rule `INDEX` (`tools/index_claims.py --explain NAME`). Value changes (an `INY`, a `TAY`) and claims limited to one path are still yours |
 
 The generated Callers block is not reviewed: the tool writes it from
 `tools/xref.py`, and it is left out of the source hash, so new callers never

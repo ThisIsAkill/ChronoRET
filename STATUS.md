@@ -106,6 +106,11 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-09: lint rule `INDEX`: an Exit claim that X or Y is unchanged (kept, preserved, as on
+  entry) must hold for X=0 callers: no path, callees included, may set the X flag and leave the
+  register without its high byte (`tools/index_claims.py`). Requested by the maintainer after
+  the audit that corrected 23 such claims; no finding on the tree and nothing grandfathered.
+
 - 2026-10-08: lint rule `DPDB`: each routine header's Entry line states DP and DB (the standing
   review decision, now checked); "as X" or "see the banner" counts only if the text is in the
   same header. Requested by the maintainer. 60 findings in 59 verified routines are
