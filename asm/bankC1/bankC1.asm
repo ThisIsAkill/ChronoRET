@@ -27001,8 +27001,9 @@ BattleSys_RunPcAttack:
 ; result; the Word forms take a 16-bit A and keep all of it. Each
 ; shifted term is made from the one before and truncated as it is
 ; made, so the results can fall a little below the exact fraction.
-; The callers are in the unmatched effect code from $C1:E1E9 on; four
-; of the eight have no caller found.
+; The callers are in the unmatched effect code from $C1:E1E9 on; five
+; of the eight (ScaleByte60, ScaleWord60, ScaleByte80, ScaleWord80 and
+; ScaleByte10) have no caller found.
 
 ; $C1:C02A — Battle_ScaleByte20 (57 bytes, $C02A–$C062)
 ; DP $30/$31 = about x / 5:
@@ -27421,7 +27422,8 @@ Battle_ScaleWord10:
 ;      (through !Battle_UnkB1BE; a $FF id or slot ends the checks); an
 ;      enemy's is !Battle_ActUnkAE97, checked twice (quirk: the second
 ;      check reads !Battle_ActUnkAE97 again, so !Battle_ActUnkAE98 is
-;      never checked).
+;      never checked). A PC's item skips the partner checks (.item_mode
+;      jumps straight to step 3 once it has the mode).
 ;   2. The target mode (DP $00) and area number (DP $0C): for a PC's
 ;      tech !BattleRom_TechInfo bytes 0 (& $7F) and 1; for a PC's item
 ;      (BattleCmdRec.Kind of the record at DP $06 has
@@ -27476,7 +27478,14 @@ Battle_ScaleWord10:
 ;      !Battle_UnkAD8D and !BattleAi_TargetCount to the non-$FF entries
 ;      copied. Quirk: the copy starts at entry n * 11 for the record's
 ;      entry n, so from the second entry on it copies a single byte at
-;      index 11, 22, ... (past the 11 slots).
+;      index 11, 22, ... (past the 11 slots). Quirk: the DP aliases
+;      !C1DD_RecAddr ($3B, 2 bytes) and !C1DD_IsQuery ($3C) overlap, so
+;      the STZ $3C at $C1:C5DA (and the 1 stored there for a query)
+;      replaces the high byte of the record's address, and any entry
+;      after the first would be read from the wrong place; all 11 area
+;      records in the ROM have one entry, so it never matters. The
+;      copy's !Battle_UnkAF15 bit 7 test also runs on $FF entries
+;      (reading !Battle_UnkAF15 + $FC).
 ;   5. With an area record: unless kind 4, when !BattleTgt_Candidates[0]
 ;      and [1] are both $FF the action fails; a PC caster first plays a
 ;      tech action (caster = the PC, !Battle_ActKindTech, id
@@ -27512,8 +27521,9 @@ Battle_ScaleWord10:
 ;   $C1:A33A).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18B = the caster,
 ;        !Battle_UnkB18C = the action, !Battle_UnkB2AE = the chosen
-;        target, !Battle_TechUsers as the caller set it for an enemy;
-;        for a PC, DP $06 = its BattleCmdRec address and (item) DP $0C
+;        target; for an enemy, !Battle_ActUnkAE97 = its partner's slot
+;        ($FF for none; !Battle_TechUsers is no input, as
+;        BattleSys_LoadTechUsers at $C1:C1E4 overwrites it); for a PC, DP $06 = its BattleCmdRec address and (item) DP $0C
 ;        = 0
 ; Exit:  M=1, X=0, DP=0, DB=$7E; !Battle_UnkAF23 = 0 (go) or 1
 ;        (dropped); A, X, Y clobbered; !Battle_UnkAD8E/AD8D, and on the
@@ -28504,8 +28514,11 @@ BattleSys_UnkC1DD:
 ; A battler slot for a target: $FF stays $FF; a slot whose
 ; !Battler_UnkAEFF entry is present comes back as it is; an empty one
 ; comes back as its !Battle_UnkAE6D entry (BattleFD_UnkB223 fills that
-; with n for slot n; what else writes there, and so what the
-; replacement stands for, is not traced). Name from that use.
+; with n for slot n; BattleFD_RestoreEnemies sets entry e to e, e the
+; enemy entry 0-7, when it puts an enemy back; unmatched code also
+; stores there: $C1:9C12/$C1:9C17 swap two entries and $C1:9ED2 sets
+; entry e to e as BattleFD_RestoreEnemies does. What the replacement
+; stands for is not traced). Name from that use.
 ; Callers (4 JSR sites): BattleSys_UnkC1DD ($C1:C359, $C1:C3E5, $C1:C54A, $C1:C56D).
 ; Entry: M=1, X=0, DP any, DB=$7E; A = the slot, B = 0 (16-bit TAX)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = the slot to use; X = the
@@ -29038,9 +29051,6 @@ BattleSys_TechMpCost3:
 ; !BattleRom_TechUserSets; $FF = no user).
 ; Callers (5 JSR sites): BattleSys_UnkC1DD ($C1:C1E4, $C1:C756), BattleSys_UnkC96A ($C1:C9B6),
 ;   BattleSys_UnkCA1A ($C1:CA63) and BattleSys_UnkCCCB ($C1:CD18).
-; Callers note: both sites are in BattleSys_UnkC1DD: $C1:C1E4 at its
-;   start and $C1:C756 in its .load_user_slots ($C1:C74C), which it
-;   calls from $C1:C59A.
 ; Entry: M=1, X=0, DP=0, DB=$7E (.w stores); A = tech, B = 0 (16-bit
 ;        TAX)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = the third id, B = 0; X = set * 3;
