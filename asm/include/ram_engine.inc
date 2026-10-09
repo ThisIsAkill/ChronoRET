@@ -100,9 +100,11 @@ if !ram_engine_inc == 0
                                          ; Field_ExitMenuArg; nothing shows it picks a menu)
 !Field_Unk26 = $26                       ; 8-bit state index; EngFD_UnkC2C1 dispatches on it;
                                          ; Field_FadeToBankC2Mode5 toggles bits 0-1. 0: plain HDMA
-                                         ; tables, 1/2: a band at the top/bottom (FieldHdma_Build*)
+                                         ; tables, 1/2: a band at the top/bottom (FieldHdma_Build*);
+                                         ; the message window's place (Field_Unk1F87 sets 1 or 2)
 !Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState; half
-                                         ; the height of the FieldHdma band (0: no band)
+                                         ; the height of the FieldHdma band (0: no band); the message
+                                         ; window's opening, 0-40 (Field_Unk1F87 steps it to $28)
 !Field_HdmaEnable = $28                  ; 8-bit HDMA channel mask: the NMI handler writes it to HDMAEN
                                          ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
 !Field_Unk29 = $29                       ; 8-bit message state; Field_Unk1F87 dispatches on it;

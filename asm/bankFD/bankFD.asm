@@ -3436,9 +3436,15 @@ EngFD_UnkC2C1Table0:
 ; Field_Unk26 picks the layout: 0 a plain screen (two runs of 100 and
 ; 112 lines with the same data), 1 and 2 a band of 2 x Field_Unk27 lines
 ; centred on line 48 (1) or line 171 (2) with its own BGnSC, scroll, TM,
-; window and colour-math data. Probably the message window opening at
-; the top or bottom of the screen (the band's growth with Field_Unk27
-; and its position fit; not traced to the code that sets them).
+; window and colour-math data: the message window opening at the top
+; or bottom of the screen. Field_Unk1F87 (the message state step) sets
+; Field_Unk26 when a message opens, to Field_Unk30 when that is 1 or 2,
+; else to 1 or 2 by the screen Y of Field_Unk2E's object (probably the
+; speaker; the band goes to the other half), and Field_FadeToBankC2Mode5
+; flips it between 1 and 2; Field_Unk1F87's state 5 then opens
+; Field_Unk27 from 0 by up to 4 a frame to $28 (40) and state $0D
+; closes it back to 0. Matched code otherwise only clears them, so
+; Field_Unk27 (n below) is 0-40.
 ; Field_Unk1DF9 nonzero puts a per-line wave on BG3's H scroll
 ; (Hdma_WaveA/B), Map_Unk1DFD nonzero the same wave data on BG2's
 ; registers.
@@ -3471,10 +3477,13 @@ EngFD_UnkC2C1Table0:
 ;   ($FD:CFD4).
 ; Entry: M=1, X=1 (EngFD_UnkC2C1; it sets X=0 itself), DP=$0100 (.b
 ;        Field_Unk53, Fade_FixedColor), DB any (saved; $7F while it runs)
-; Exit:  M=1, X=1 (Y and X high bytes 0); DB restored; A = Ppu_Unk0BE0
-;        (bit 7 clear) or Hdma_Unk7F22C0 (bit 7 set); X clobbered; Y
-;        unchanged, except $A7 after FieldHdma_FillDataA's wave copy;
-;        Map_Unk1DFB as FieldHdma_FillDataA leaves it
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (bit 7 clear) or
+;        Hdma_Unk7F22C0 (bit 7 set); X clobbered (high byte 0); Y: bit 7
+;        clear, $A7 after FieldHdma_FillDataA's wave copy, else its low
+;        byte kept, high byte cleared (SEP #$30 at $FD:C6E5 in
+;        FieldHdma_FillDataA); bit 7 set, its low byte kept, high byte
+;        cleared (SEP #$30 at $FD:C427); Map_Unk1DFB as
+;        FieldHdma_FillDataA leaves it
 org $FDC2EB
 FieldHdma_BuildPlainA:
     PHB
@@ -4068,8 +4077,11 @@ FieldHdma_FillDataB:
 ; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100 (.b Field_Unk53,
 ;        Fade_FixedColor), DB any (saved; $7F while it runs)
 ; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (bit 7 clear) or
-;        Hdma_Unk7F22C0 (bit 7 set); X clobbered; Y unchanged, except
-;        $27 after FieldHdma_FillDataB's wave copy; Map_Unk1DFB as
+;        Hdma_Unk7F22C0 (bit 7 set); X clobbered (high byte 0); Y: bit 7
+;        clear, $27 after FieldHdma_FillDataB's wave copy, else its low
+;        byte kept, high byte cleared (SEP #$30 at $FD:C835 in
+;        FieldHdma_FillDataB); bit 7 set, its low byte kept, high byte
+;        cleared (SEP #$30 at $FD:C983); Map_Unk1DFB as
 ;        FieldHdma_FillDataB leaves it
 org $FDC847
 FieldHdma_BuildPlainB:
@@ -4233,8 +4245,9 @@ FieldHdma_BuildPlainB:
 ;     Hdma_ColorMath;
 ;   channel 7 and the data: FieldHdma_SetWin2A, FieldHdma_FillDataA
 ;     (whatever Field_Unk53 bit 7 is).
-; Field_Unk27 is read absolute (DB=$00) and long; its range is not
-; traced (41-n and 2n-1 make sense as line counts for n = 1-40).
+; Field_Unk27 is read absolute (DB=$00) and long. Field_Unk1F87 opens
+; it from 0 to $28 (40) and closes it back to 0 (see the banner), so
+; n = 1-40 here: 41-n and 2n-1 stay nonzero line counts.
 ; Callers note: EngFD_UnkC2C1Table1 entry 1 (JSR (table,X) in
 ;   EngFD_UnkC2C1).
 ; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100 (.b scratch and
@@ -4561,10 +4574,12 @@ FieldHdma_WaveRunsStart:
 ; A -= 16; a remainder r > 0 becomes an entry (r | $80) from the same
 ; place and HdmaWave_Line += r. So each run starts at the wave line its
 ; screen line falls on; a 16-line run from line p reads into
-; Hdma_WaveACopy. A = 0 is not handled (it would write $80, a 128-line
-; run); the callers pass 7, 30, 41, 88, 130-n, 42-n, 41-n or 40-n
-; (n = Field_Unk27, not 0 there), so 0 only if n reaches 40 or more
-; (its range is not traced).
+; Hdma_WaveACopy. A = 0 is not handled: it writes an $80 entry, a
+; 128-line repeat run. The callers pass 7, 30, 41, 88, 130-n, 42-n,
+; 41-n or 40-n (n = Field_Unk27, 1-40 there), and n does reach 40 when
+; the message window is fully open (Field_Unk1F87 opens Field_Unk27 to
+; $28), so FieldHdma_BuildBottomBandA's last run (40-n) passes A = 0
+; then and gets that $80 entry.
 ; Callers (8 JSR sites): FieldHdma_BuildTopBandA ($FD:CA8F, $FD:CA99, $FD:CAC0, $FD:CAC5) and
 ;   FieldHdma_BuildBottomBandA ($FD:D0CF, $FD:D0D4, $FD:D0DF, $FD:D107).
 ; Entry: M=1, X=0 (16-bit Y offset), DP=$0100 (HdmaWave_*), DB=$7F; A =
@@ -4639,7 +4654,9 @@ FieldHdma_SkipWaveLines:
 
 ; $FD:CCB8 — FieldHdma_AddWaveRunB (84 bytes, $CCB8–$CD0B)
 ; As FieldHdma_AddWaveRunA for set B's channel 3 table, from Hdma_WaveB
-; (and Hdma_WaveBCopy).
+; (and Hdma_WaveBCopy). The same A = 0 case: at n = Field_Unk27 = 40
+; (the window fully open) FieldHdma_BuildBottomBandB's last run (40-n)
+; passes A = 0 and gets an $80 entry, a 128-line repeat run.
 ; Callers (8 JSR sites): FieldHdma_BuildTopBandB ($FD:CE06, $FD:CE10, $FD:CE37, $FD:CE3C) and
 ;   FieldHdma_BuildBottomBandB ($FD:D37E, $FD:D383, $FD:D38E, $FD:D3B6).
 ; Entry: M=1, X=0 (16-bit Y offset), DP=$0100 (HdmaWave_*), DB=$7F; A =
@@ -4712,9 +4729,10 @@ FieldHdma_AddWaveRunB:
 ;   EngFD_UnkC2C1).
 ; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
 ;        Field_Unk27 read; saved, $7F while it runs)
-; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
-;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
-;        written; Map_Unk1DFB as FieldHdma_FillDataB leaves it
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (n = 0: as
+;        FieldHdma_BuildPlainB); X and Y clobbered (high bytes 0);
+;        $01D9-$01DB and, on the wave path, $01EE-$01EF written;
+;        Map_Unk1DFB as FieldHdma_FillDataB leaves it
 org $FDCD0C
 FieldHdma_BuildTopBandB:
     LDA.w !DP_Field+!Field_Unk27
@@ -5034,13 +5052,20 @@ FieldHdma_BuildTopBandB:
 ;     2n-1 lines of the gradient (Hdma_Unk7F1538) from pair (40-n) AND
 ;     $3F, 1 line of Hdma_Unk7F1530, 40-n lines of Hdma_ColorMath;
 ;   then FieldHdma_SetWin2A and FieldHdma_FillDataA.
+; At n = 40 (the message window fully open, Field_Unk1F87) the runs
+; after the band are 0 lines: channel 5's last run (41-n-1 | $80)
+; becomes $80, a 128-line repeat run, and so does channel 3's last wave
+; run (FieldHdma_AddWaveRunA with A = 0); channels 0, 1, 4, 6 and the
+; plain channel 3 get a 0 count there, an end byte, so their tables
+; stop after the band.
 ; Callers note: EngFD_UnkC2C1Table1 entry 2 (JSR (table,X) in
 ;   EngFD_UnkC2C1).
 ; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
 ;        Field_Unk27 read; saved, $7F while it runs)
-; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
-;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
-;        written; Map_Unk1DFB as FieldHdma_FillDataA leaves it
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (n = 0: as
+;        FieldHdma_BuildPlainA); X and Y clobbered (high bytes 0);
+;        $01D9-$01DB and, on the wave path, $01EE-$01EF written;
+;        Map_Unk1DFB as FieldHdma_FillDataA leaves it
 org $FDCFCF
 FieldHdma_BuildBottomBandA:
     LDA.w !DP_Field+!Field_Unk27
@@ -5339,14 +5364,18 @@ FieldHdma_BuildBottomBandA:
 ; As FieldHdma_BuildBottomBandA for table set B (Field_Unk26 = 2 on the
 ; frames Field_Unk53 bit 0 is clear; n = 0 goes to
 ; FieldHdma_BuildPlainB), with the set B data and helpers as in
-; FieldHdma_BuildTopBandB.
+; FieldHdma_BuildTopBandB. Its n = 40 case is BottomBandA's: channel
+; 5's last run (41-n-1 | $80) and the last wave run
+; (FieldHdma_AddWaveRunB with A = 0) become $80, 128-line repeat runs,
+; and the other channels' 40-n runs end their tables.
 ; Callers note: EngFD_UnkC2C1Table0 entry 2 (JSR (table,X) in
 ;   EngFD_UnkC2C1).
 ; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
 ;        Field_Unk27 read; saved, $7F while it runs)
-; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
-;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
-;        written; Map_Unk1DFB as FieldHdma_FillDataB leaves it
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (n = 0: as
+;        FieldHdma_BuildPlainB); X and Y clobbered (high bytes 0);
+;        $01D9-$01DB and, on the wave path, $01EE-$01EF written;
+;        Map_Unk1DFB as FieldHdma_FillDataB leaves it
 org $FDD27E
 FieldHdma_BuildBottomBandB:
     LDA.w !DP_Field+!Field_Unk27
@@ -5793,13 +5822,16 @@ EngFD_UnkD52D:
 ;          byte pairs (16 bytes; the list moves on 24).
 ; So each record but an $80 one adds 32 bytes at $7F:0400 on.
 ; The word stores to WMDATA-1 ($217F) are 16-bit: their high byte lands
-; in WMDATA, so XBA, STA, XBA, STA sends the word low byte first.
+; in WMDATA, so XBA, STA, XBA, STA sends the word low byte first. $217F
+; mirrors APU port 3 (APUIO3, $2143), so each of these kind 2 and 4
+; stores also writes A's low byte to that port.
 ; Callers (1 JMP site): FdVec_FFFA ($FD:FFFA).
 ; Entry: M=1 (its first LDA #0 is 8-bit), X any (P saved; it sets X=0),
 ;        DP any (saved), DB any (saved)
 ; Exit:  P, DP and DB restored; A = 0, X = list end, Y = $3C (16-bit
-;        values, with the caller's M/X back); $0510 and $0518 (DP $10,
-;        $18) written
+;        values, with the caller's M/X back); $0510, $0518 and $0519
+;        (DP $10, $18; the record count is stored 16-bit, so $0519 = 0)
+;        written; APU port 3 ($2143) written by the kind 2/4 word stores
 !FieldAnimA_Left  = $18                 ; 1 B dp (DP=$0500): records still to fill
 !FieldAnimA_Count = $10                 ; 1 B dp (DP=$0500): words or byte groups left in a copy
 org $FDDE98
