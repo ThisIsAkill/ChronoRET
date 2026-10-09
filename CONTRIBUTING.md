@@ -110,6 +110,13 @@ every tool that reads them regenerates them when they are stale, and
   about callers go on a `; Callers note:` line.
 - `make lint` also checks routine headers (`HEADER`, `CALLERS`, see STYLE.md): Entry and Exit
   lines, and that every Callers block is exactly what `tools/callers.py` generates.
+- With the ROM and asar the lint also runs `INDEX` (`tools/index_claims.py`): every Exit claim
+  that X or Y is unchanged is checked against the X flag, through the callees, for a caller
+  entering with X=0. It runs everywhere the lint does (pre-commit, `make gate`, pre-push, CI's
+  ROM job): the analysis takes a few seconds and is cached in `build/index_lint.json` by a hash
+  of `asm/`, the ROM and the tools, so an unchanged tree skips it.
+  `python3 tools/index_claims.py --explain NAME` prints what it concluded for one routine, and
+  `python3 tools/test_index_claims.py` tests it.
 
 - Data tables next to matched code (jump tables,
 pointer tables, lookup tables) are the cheapest bytes to match:
