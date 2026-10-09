@@ -43582,7 +43582,7 @@ BankC0_OldBuildLeftovers:
 ; Read by Obj_CalcDirection (LDA.w !Rom_AngleTable,X with DB $00 or
 ; $C0; through $00 that is the $00:F300 mirror) and Battle_CalcAngle (LDA.l
 ; !BattleRom_AngleTable,X, index (|dy| & ~7) x 4 + |dx| >> 3); also
-; by the unmatched C2Scene_Unk229D ($C2:229D, through DB $00) and LDA.l
+; by C2Scene_Unk229D ($C2:229D, through DB $00) and LDA.l
 ; at $CE:E85B and $CF:FAA7 (unmatched, not read here). The readers use
 ; the defines !Rom_AngleTable / !BattleRom_AngleTable, both = this
 ; address.
@@ -43697,7 +43697,7 @@ Rom_DirToFacing:
 ; $40.
 ; Read with LDA.w through DB=$00 by Obj_SetVelocity and
 ; Obj_SetVelocityChecked (sine at the direction, cosine at + $40;
-; define !Rom_SineTable256), and by the unmatched C2Scene_Unk2277
+; define !Rom_SineTable256), and by C2Scene_Unk2277
 ; ($C2:2277, through DB $00).
 ; ==================================================================
 Rom_SineTable256:
