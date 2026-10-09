@@ -1000,3 +1000,18 @@ endif
 !ObjSpr_SizeLarge = $03                  ; Obj_SprSize size class 3 (24 tiles, Spr_LoadLargeObj)
 !Halt_ColorWramGfxFull = $7C1F           ; Sys_HaltWithColor colour when ObjQ_Unk71 runs past the end
                                          ; of bank $7F (opcodes $82/$83)
+
+; --- Event opcodes $2E, $84, $87-$8E, $90/$91, $7C-$7E ($C0:4867-$C0:4D05) ---
+!EvtPal_Kind20 = $20                     ; Evt_Op88_ObjPalAnim operand: a FieldAnimB record of kind $20
+!EvtPal_Kind30 = $30                     ; ... of kind $30 (both: colours relative to the object's palette)
+!EvtPal_Kind40 = $40                     ; Evt_Op88 / Evt_Op2E operand high nibble: a 9-byte kind-$40 record
+!EvtPal_Kind50 = $50                     ; ... or kind $50 (FieldFD_LoadAnimSetB's "other" kinds)
+!EvtPal_NibbleMask = $0F                 ; low nibble of an Evt_Op88 / Evt_Op2E operand byte
+!EvtPal_Unk3Init = $08                   ; FieldAnimB.Unk3 the kind-$40/$50 records start with
+!EvtPal_SpriteColor0 = $80               ; CGRAM colour number of sprite palette 0's colour 0 (sprite
+                                         ; palettes are CGRAM $80-$FF; Obj_OamAttr x 8 + this = the
+                                         ; object's colour 0)
+!EvtPal_CopyFixed = 3                    ; Evt_Op88 / Evt_Op2E kind $8x: the length word less this is the
+                                         ; MVN count (length - 2 colour bytes are copied)
+!FieldAnimB_Searched = 8                 ; records Evt_FindFreeAnimB searches (of the 12)
+!ObjX_PalAnimNone = $FFFF                ; ObjX_PalAnimRec: the object has no FieldAnimB record

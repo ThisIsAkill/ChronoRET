@@ -14026,6 +14026,958 @@ Evt_Op83_InitEnemySprite:
     BRL .tile_slot
 
 ; ============================================================
+; Event opcodes: object settings and palette animations
+; ($C0:4867–$C0:4D05)
+; Handlers in Evt_OpcodeTable (unmatched) for the object's flags, speed,
+; place and priority bits, and the two opcodes that start the location's
+; palette animations: they fill a free FieldAnimB record (the 12-byte
+; records FieldFD_LoadAnimSetB fills from the location's list, worked on
+; each frame by FdVec_FFF7: not analysed, so the record fields keep Unk
+; names) or copy colours straight into Pal_Buf / Pal_CgramBuf. As the
+; other handlers: entered with Y = the opcode's offset in Evt_Data, they
+; return X = where the script goes on and C=1 (keep running) or C=0
+; (stop this object for this run). "a" / "b" name event words at
+; Evt_Unk7F0200 + a x 2 (their low byte is used).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:4867 — Evt_Op84_SetUnk1B01 (15 bytes, $4867–$4875)
+; Event opcode $84 (2 bytes: $84, value): Obj_Cur's Obj_Unk1B01 = value
+;   (bit 0: the object blocks the leader, Obj_Unk1B01Solid; bit 1: it
+;   can be pushed, Obj_Unk1B01Push). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $84).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   value; Y = the opcode + 2.
+; ------------------------------------------------------------
+Evt_Op84_SetUnk1B01:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1B01,X
+    INY
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4876 — Evt_Op87_SetScriptPeriod (28 bytes, $4876–$4891)
+; Event opcode $87 (2 bytes: $87, n): Obj_Cur's Obj_Unk1000 = (n + 1)
+;   | its old bit 7 (Obj_Unk1000Bit7 kept): the object's script runs
+;   every n + 1 frames (Vblank_Unk59D9 reloads Obj_Unk1001 from it), and
+;   Obj_Unk1001 (the countdown) gets the same value at once. Quirk: the
+;   countdown is not masked, so with bit 7 set it gets bit 7 too; n + 1
+;   is not masked either (n = $7F gives bit 7). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $87).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   scratch are dp), DB=$00 (Obj_* tables absolute); Y = the opcode's
+;   offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   new Obj_Unk1000; Y = the opcode + 1; Eng_Scratch ($D9) = n + 1.
+; ------------------------------------------------------------
+Evt_Op87_SetScriptPeriod:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    INC A
+    STA.b !Eng_Scratch
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7
+    ORA.b !Eng_Scratch
+    STA.w !Obj_Unk1000,X
+    STA.w !Obj_Unk1001,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4892 — Evt_Op88_ObjPalAnim (444 bytes, $4892–$4A4D)
+; Event opcode $88 ($88, kind, ...): palette animations on Obj_Cur's
+;   own palette (its colour 0 is EvtPal_Base = Obj_OamAttr x 8 +
+;   EvtPal_SpriteColor0: Obj_OamAttr holds the palette slot x 2). By
+;   the kind byte:
+; - 0 (2 bytes): undo: when ObjX_PalAnimRec is not ObjX_PalAnimNone,
+;   that record's FieldAnimB.Unk0 = 0 (free) and ObjX_PalAnimRec =
+;   ObjX_PalAnimNone, and the object's 12 colours are copied again
+;   from bank $E4 (Obj_PalSrc) into colours 1-12 of its rows in
+;   Pal_Buf and Pal_CgramBuf, as Obj_PalSlotFixed does. X = Y + 2, C=1
+;   (also when there was no record: nothing is copied then).
+; - $20 or $30 exactly (4 bytes: $88, kind, c, s): a free record (from
+;   Evt_FindFreeAnimB) gets .Unk0 = kind, .Unk1 = EvtPal_Base + (c >>
+;   4), .Unk2 = c & $0F, .Unk4 = 0, .Unk5 = s; ObjX_PalAnimRec = its
+;   offset (a record the object already had is not freed). X = Y + 4,
+;   C=1; with no record free X = Y + 4, C=0 (the opcode is dropped).
+; - $4x or $5x (5 bytes: $88, kind, c, d, s): a free record gets .Unk0
+;   = kind & $F0, .Unk6 = kind & $0F, .Unk1 / .Unk2 from c as above,
+;   .Unk3 = EvtPal_Unk3Init, .Unk4 = 0, .Unk5 = s, .Unk7 = d's high
+;   nibble in both nibbles, .Unk8 = d's low nibble in both; not linked
+;   to the object. X = Y + 5, C=1; no record free: X = Y + 5, C=0.
+; - $8x (2 + n bytes: $88, kind, the word n, n - 2 colour bytes): the
+;   colour bytes are copied (MVN from bank $7F) to Pal_CgramBuf and
+;   Pal_Buf from colour EvtPal_Base | (kind & $0F) on. X = Y + n + 2,
+;   C=1.
+; - any other kind (2 bytes): nothing; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $88).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and the
+;   EvtPal_* scratch are dp; EvtOp_SavedPos), DB=$00 (Obj_* tables and
+;   FieldAnimB absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged (DB saved around the MVNs); X and
+;   C as above; A and Y clobbered (Y = the record's offset on the
+;   record paths); EvtOp_SavedPos = the opcode's offset; EvtPal_Arg,
+;   EvtPal_Base / Src, EvtPal_Speeds / ColOfs and EvtPal_Count ($C1)
+;   written on the paths that use them.
+; ------------------------------------------------------------
+Evt_Op88_ObjPalAnim:
+    STY.b !EvtOp_SavedPos
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    BEQ .restore
+    STA.b !EvtPal_Arg
+    CMP.b #!EvtPal_Kind20
+    BEQ .linked
+    CMP.b #!EvtPal_Kind30
+    BEQ .linked
+    AND.b #!FieldAnimB_KindMask
+    CMP.b #!EvtPal_Kind40
+    BNE .not_40
+    BRL .cycle
+.not_40:
+    CMP.b #!EvtPal_Kind50
+    BNE .not_50
+    BRL .cycle
+.not_50:
+    CMP.b #!FieldAnimB_Kind80
+    BNE .ignored
+    BRL .copy
+.ignored:
+    INX
+    SEC
+    RTS
+.restore:
+    LDX.b !Obj_Cur
+    REP #$20
+    LDA.l !ObjX_PalAnimRec,X
+    BMI .no_record
+    TAY
+    LDA.w #!ObjX_PalAnimNone
+    STA.l !ObjX_PalAnimRec,X
+    SEP #$20
+    LDA.b #$00
+    STA.w FieldAnimB.Unk0,Y             ; free the record
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; slot x $20: its Pal_Buf row
+    INC A
+    INC A                               ; colour 1
+    CLC
+    ADC.w #!Pal_SpriteRows&$FFFF
+    TAY
+    PHB
+    PHY
+    LDA.w !Obj_PalSrc,X
+    TAX
+    PHX
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    PLA
+    CLC
+    ADC.w #!Pal_CgramBuf-!Pal_Buf       ; the same colours in Pal_CgramBuf
+    TAY
+    LDA.w #!ObjPal_CopyCount
+    MVN !Bank7E,!BankE4                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    SEC
+    RTS
+.no_record:
+    SEP #$20
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    SEC
+    RTS
+.linked:
+    JSR Evt_FindFreeAnimB
+    BCC .linked_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.linked_free:
+    REP #$20
+    TYA
+    LDX.b !Obj_Cur
+    STA.l !ObjX_PalAnimRec,X
+    SEP #$20
+    LDA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk0,Y
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg                   ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    INX
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk2,Y
+    LDA.b !EvtPal_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.b !EvtPal_Base
+    STA.w FieldAnimB.Unk1,Y
+    SEC
+    RTS
+.cycle:
+    JSR Evt_FindFreeAnimB
+    BCC .cycle_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.cycle_free:
+    LDA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    STA.w FieldAnimB.Unk0,Y
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk6,Y
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg                   ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Speeds                ; d
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    LDA.b #!EvtPal_Unk3Init
+    STA.w FieldAnimB.Unk3,Y
+    INX
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk2,Y
+    LDA.b !EvtPal_Arg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    CLC
+    ADC.b !EvtPal_Base
+    STA.w FieldAnimB.Unk1,Y
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk7,Y             ; d's high nibble, twice
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk8,Y             ; d's low nibble, twice
+    SEC
+    RTS
+.copy:
+    LDX.b !Obj_Cur
+    LDA.w !Obj_OamAttr,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b #!EvtPal_SpriteColor0
+    STA.b !EvtPal_Base
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Base                  ; the first colour
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    STA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    TAY
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; the word n
+    DEC A
+    DEC A
+    DEC A                               ; MVN count: n - 2 bytes
+    STA.b !EvtPal_Count
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr
+    STA.b !EvtPal_Src
+    TAX
+    LDA.b !EvtPal_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_Buf&$FFFF
+    TAY
+    LDX.b !EvtPal_Src
+    LDA.b !EvtPal_Count
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA                                 ; past the colour bytes
+    SEC
+    SBC.w #!Evt_DataAddr
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4A4E — Evt_Op2E_PalAnim (222 bytes, $4A4E–$4B2B)
+; Event opcode $2E ($2E, kind, ...): as Evt_Op88_ObjPalAnim's kinds
+;   $4x/$5x and $8x, with absolute colour numbers instead of the
+;   object's palette. By kind & $F0:
+; - $40 or $50 (6 bytes: $2E, kind, c, e, d, s): a free FieldAnimB
+;   record (Evt_FindFreeAnimB) gets .Unk0 = kind & $F0, .Unk6 = kind &
+;   $0F, .Unk1 = c, .Unk2 = e, .Unk3 = EvtPal_Unk3Init, .Unk4 = 0,
+;   .Unk5 = s, .Unk7 = d's high nibble in both nibbles, .Unk8 = d's low
+;   nibble in both. X = Y + 6, C=1; with no record free X = Y + 6, C=0
+;   (the opcode is dropped).
+; - $80 (3 + n bytes: $2E, kind, c, the word n, n - 2 colour bytes): the
+;   colour bytes are copied (MVN from bank $7F) to Pal_CgramBuf and
+;   Pal_Buf from colour c on. X = Y + n + 3, C=1.
+; - any other (2 bytes): nothing; X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $2E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (the EvtPal_*
+;   scratch and EvtOp_SavedPos are dp), DB=$00 (FieldAnimB absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged (DB saved around the MVNs); X and
+;   C as above; A and Y clobbered (Y = the record's offset on the
+;   record path); EvtOp_SavedPos = the opcode's offset; EvtPal_Arg,
+;   EvtPal_Speeds / ColOfs, EvtPal_Src and EvtPal_Count ($C1) written
+;   on the paths that use them.
+; ------------------------------------------------------------
+Evt_Op2E_PalAnim:
+    STY.b !EvtOp_SavedPos
+    TYX
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    CMP.b #!EvtPal_Kind40
+    BNE .not_40
+    BRL .cycle
+.not_40:
+    CMP.b #!EvtPal_Kind50
+    BNE .not_50
+    BRL .cycle
+.not_50:
+    CMP.b #!FieldAnimB_Kind80
+    BNE .ignored
+    BRL .copy
+.ignored:
+    INX
+    SEC
+    RTS
+.cycle:
+    JSR Evt_FindFreeAnimB
+    BCC .cycle_free
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    INX
+    INX
+    INX
+    INX
+    CLC
+    RTS
+.cycle_free:
+    LDA.b !EvtPal_Arg
+    AND.b #!FieldAnimB_KindMask
+    STA.w FieldAnimB.Unk0,Y
+    LDA.b !EvtPal_Arg
+    AND.b #!EvtPal_NibbleMask
+    STA.w FieldAnimB.Unk6,Y
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk1,Y             ; c
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk2,Y             ; e
+    INX
+    LDA.l !Evt_Data,X
+    STA.b !EvtPal_Speeds                ; d
+    INX
+    LDA.l !Evt_Data,X
+    STA.w FieldAnimB.Unk5,Y
+    LDA.b #$00
+    STA.w FieldAnimB.Unk4,Y
+    LDA.b #!EvtPal_Unk3Init
+    STA.w FieldAnimB.Unk3,Y
+    INX
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!FieldAnimB_KindMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk7,Y             ; d's high nibble, twice
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !EvtPal_Arg
+    LDA.b !EvtPal_Speeds
+    AND.b #!EvtPal_NibbleMask
+    ORA.b !EvtPal_Arg
+    STA.w FieldAnimB.Unk8,Y             ; d's low nibble, twice
+    SEC
+    RTS
+.copy:
+    LDX.b !EvtOp_SavedPos
+    INX
+    INX
+    LDA.l !Evt_Data,X                   ; c
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    STA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_CgramBuf&$FFFF
+    TAY
+    INX
+    LDA.l !Evt_Data,X                   ; the word n
+    DEC A
+    DEC A
+    DEC A                               ; MVN count: n - 2 bytes
+    STA.b !EvtPal_Count
+    INX
+    INX
+    TXA
+    CLC
+    ADC.w #!Evt_DataAddr
+    STA.b !EvtPal_Src
+    TAX
+    LDA.b !EvtPal_Count
+    PHB
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !EvtPal_ColOfs
+    CLC
+    ADC.w #!Pal_Buf&$FFFF
+    TAY
+    LDX.b !EvtPal_Src
+    LDA.b !EvtPal_Count
+    MVN !Bank7E,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    TXA                                 ; past the colour bytes
+    SEC
+    SBC.w #!Evt_DataAddr
+    TAX
+    SEP #$20
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B2C — Evt_FindFreeAnimB (29 bytes, $4B2C–$4B48)
+; Finds a free FieldAnimB record (.Unk0 = 0) among the first
+;   FieldAnimB_Searched (8) of the 12, from record 0 on; records 8-11
+;   are never handed out here.
+; Callers (3 JSR sites): Evt_Op88_ObjPalAnim ($C0:4919, $C0:4970) and Evt_Op2E_PalAnim ($C0:4A72).
+; On entry: M=1 (8-bit A), X=0 (16-bit Y), DP any (not used), DB=$00
+;   (FieldAnimB absolute).
+; Exit: M=1, X=0, DP and DB unchanged; C=0: Y = the free record's
+;   offset; C=1: none free, Y = FieldAnimB_Size x 8; A clobbered; X
+;   unchanged.
+; ------------------------------------------------------------
+Evt_FindFreeAnimB:
+    LDY.w #$0000
+.loop:
+    LDA.w FieldAnimB.Unk0,Y
+    BEQ .free
+    REP #$20
+    TYA
+    CLC
+    ADC.w #!FieldAnimB_Size
+    TAY
+    SEP #$20
+    CPY.w #!FieldAnimB_Size*!FieldAnimB_Searched
+    BCS .none
+    BRA .loop
+.free:
+    CLC
+    RTS
+.none:
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B49 — Evt_Op89_SetSpeed (15 bytes, $4B49–$4B57)
+; Event opcode $89 (2 bytes: $89, speed): Obj_Cur's Obj_Speed = speed
+;   (the step the Obj_SetVelocity* routines scale the direction by).
+;   X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $89).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   speed; Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op89_SetSpeed:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Speed,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B58 — Evt_Op8A_SetSpeedVar (28 bytes, $4B58–$4B73)
+; Event opcode $8A (2 bytes: $8A, a): as Evt_Op89_SetSpeed with the low
+;   byte of the event word a. X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $8A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A = the
+;   speed (B = a x 2 >> 8); Y = the opcode + 1.
+; ------------------------------------------------------------
+Evt_Op8A_SetSpeedVar:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Speed,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4B74 — Evt_Op8B_PlaceAtTile (79 bytes, $4B74–$4BC2)
+; Event opcode $8B (3 bytes: $8B, column, row): puts Obj_Cur on the
+;   tile: Obj_PosX = column << 8 | EvtChar_SubXCentre, Obj_PosY = row
+;   << 8 | EvtChar_SubYLower. When its Obj_OamFlags bit 7 is set
+;   (Obj_OamFlagsTilePrio) the priorities follow the tile: Obj_PrioHigh
+;   = (Map_TileAttrA & TileAttr_Prio) >> 2 | Oam_Prio2, Obj_PrioLow =
+;   the same from Map_TileAttrB. That is the other way round from
+;   Obj_SetVelocityChecked (A to PrioLow, B to PrioHigh); kept as found.
+;   The tile index is column | row << 8 unmasked (no Map_ColMask1).
+;   X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $8B).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_Pos are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A
+;   clobbered; Y = the opcode + 2; EvtTile_Pos ($D9/$DA) written.
+; ------------------------------------------------------------
+Evt_Op8B_PlaceAtTile:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileX,X
+    STA.b !EvtTile_Pos
+    LDA.b #!EvtChar_SubXCentre
+    STA.w !Obj_PosX,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileY,X
+    STA.b !EvtTile_Pos+1
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDX.b !EvtTile_Pos
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4BC3 — Evt_Op8C_PlaceAtTileVar (100 bytes, $4BC3–$4C26)
+; Event opcode $8C (3 bytes: $8C, a, b): as Evt_Op8B_PlaceAtTile with
+;   the column and row from the low bytes of the event words a and b,
+;   except that Obj_PosX's low byte is not set (only Obj_TileX; the
+;   object keeps its old place within the column). Priorities from the
+;   tile as there (Map_TileAttrA to Obj_PrioHigh). X = Y + 3, C=1.
+; Reached through Evt_OpcodeTable (opcode $8C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_Pos are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 3, C=1; A
+;   clobbered; Y = the opcode + 2; EvtTile_Pos ($D9/$DA) written.
+; ------------------------------------------------------------
+Evt_Op8C_PlaceAtTileVar:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileX,X
+    STA.b !EvtTile_Pos
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    SEP #$20
+    LDA.l !Evt_Unk7F0200,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_TileY,X
+    STA.b !EvtTile_Pos+1
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDX.b !EvtTile_Pos
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4C27 — Evt_Op8D_SetPos (77 bytes, $4C27–$4C73)
+; Event opcode $8D (5 bytes: $8D, the words x, y): Obj_Cur's Obj_PosX =
+;   x, Obj_PosY = y (16-bit: tile in the high byte); with Obj_OamFlags
+;   bit 7 set the priorities follow the new tile (Obj_TileY << 8 |
+;   Obj_TileX, unmasked) as in Evt_Op8B_PlaceAtTile (Map_TileAttrA to
+;   Obj_PrioHigh). X = Y + 5, C=1.
+; Reached through Evt_OpcodeTable (opcode $8D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and EvtTile_PrioA are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 5, C=1; A
+;   clobbered; Y = the opcode + 3; EvtTile_PrioA ($D9) written on the
+;   bit-7 path.
+; ------------------------------------------------------------
+Evt_Op8D_SetPos:
+    INY
+    TYX
+    REP #$20
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_PosX,X
+    INY
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_PosY,X
+    SEP #$20
+    LDA.w !Obj_OamFlags,X
+    BPL .done
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+.done:
+    TYX
+    INX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4C74 — Evt_Op8E_SetOamFlags (97 bytes, $4C74–$4CD4)
+; Event opcode $8E (2 bytes: $8E, flags): Obj_Cur's Obj_OamFlags =
+;   flags. With bit 7 (Obj_OamFlagsTilePrio) the priorities follow the
+;   object's tile as in Evt_Op8D_SetPos (Map_TileAttrA to Obj_PrioHigh);
+;   else they are fixed: Obj_PrioHigh = flags & $30
+;   (Obj_OamFlagsPrioMask), Obj_PrioLow = (flags << 4) & $30. Either way
+;   Obj_LastFrame = Obj_LastFrameNone and Obj_AnimTimer = 0 (the frame
+;   is built again, probably). X = Y + 2, C=1.
+; Reached through Evt_OpcodeTable (opcode $8E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: the 16-bit tile index),
+;   DP=$0100 (Obj_Cur and the scratch are dp), DB=$00 (Obj_* tables
+;   absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=1; A =
+;   Obj_LastFrameNone; Y = the opcode + 1; Eng_Scratch ($D9) written
+;   (EvtTile_PrioA or EvtPrio_Flags).
+; ------------------------------------------------------------
+Evt_Op8E_SetOamFlags:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_OamFlags,X
+    BIT.b #!Obj_OamFlagsTilePrio
+    BEQ .fixed
+    LDA.w !Obj_TileY,X
+    XBA
+    LDA.w !Obj_TileX,X
+    TAX
+    LDA.l !Map_TileAttrA,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    STA.b !EvtTile_PrioA
+    LDA.l !Map_TileAttrB,X
+    AND.b #!TileAttr_Prio
+    LSR A
+    LSR A
+    ORA.b #!Oam_Prio2
+    LDX.b !Obj_Cur
+    STA.w !Obj_PrioLow,X
+    LDA.b !EvtTile_PrioA
+    STA.w !Obj_PrioHigh,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    SEC
+    RTS
+.fixed:
+    STA.b !EvtPrio_Flags
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioHigh,X
+    LDA.b !EvtPrio_Flags
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    AND.b #!Obj_OamFlagsPrioMask
+    STA.w !Obj_PrioLow,X
+    LDA.b #!Obj_LastFrameNone
+    STA.w !Obj_LastFrame,X
+    STZ.w !Obj_AnimTimer,X
+    TYX
+    INX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4CD5 — Evt_Op90_SetUnk1A81On (11 bytes, $4CD5–$4CDF)
+; Event opcode $90 (1 byte): Obj_Cur's Obj_Unk1A81 = Obj_Unk1A81On (1:
+;   its frames are built, so it is probably shown). X = Y + 1, C=0 (the
+;   object's run ends here).
+; Evt_Op90_Store (the STA, X = Y + 1, C=0, with A = the value and X =
+;   the object) is the shared tail of Evt_Op91_ClearUnk1A81,
+;   Evt_Op7E_SetUnk1A81Bit7, Evt_Op7C_SetObjUnk1A81On and
+;   Evt_Op7D_ClearObjUnk1A81 (BRA).
+; Reached through Evt_OpcodeTable (opcode $90).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = the value
+;   stored; Y unchanged.
+; ------------------------------------------------------------
+Evt_Op90_SetUnk1A81On:
+    LDX.b !Obj_Cur
+    LDA.b #!Obj_Unk1A81On
+Evt_Op90_Store:                         ; header: see Evt_Op90_SetUnk1A81On
+    STA.w !Obj_Unk1A81,X
+    TYX
+    INX
+    CLC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4CE0 — Evt_Op91_ClearUnk1A81 (6 bytes, $4CE0–$4CE5)
+; Event opcode $91 (1 byte): Obj_Cur's Obj_Unk1A81 = 0 (no frame build:
+;   hidden, probably); X = Y + 1, C=0 through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $91).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = 0; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op91_ClearUnk1A81:
+    LDX.b !Obj_Cur
+    LDA.b #$00
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CE6 — Evt_Op7E_SetUnk1A81Bit7 (6 bytes, $4CE6–$4CEB)
+; Event opcode $7E (1 byte): Obj_Cur's Obj_Unk1A81 = $80 (bit 7 only,
+;   FieldBtl_ObjUnk1A81Bit: outside 1..$7F, so no frame build, and the
+;   battle hand-off treats the object specially); X = Y + 1, C=0
+;   through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7E).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur is dp),
+;   DB=$00 (Obj_* tables absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y + 1, C=0; A = $80; Y
+;   unchanged.
+; ------------------------------------------------------------
+Evt_Op7E_SetUnk1A81Bit7:
+    LDX.b !Obj_Cur
+    LDA.b #!FieldBtl_ObjUnk1A81Bit
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CEC — Evt_Op7C_SetObjUnk1A81On (13 bytes, $4CEC–$4CF8)
+; Event opcode $7C (2 bytes: $7C, slot): as Evt_Op90_SetUnk1A81On for
+;   the object in slot: Obj_Unk1A81 = Obj_Unk1A81On. X = Y + 2, C=0
+;   through Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 1;
+;   Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op7C_SetObjUnk1A81On:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #!Obj_Unk1A81On
+    BRA Evt_Op90_Store
+
+; ------------------------------------------------------------
+; $C0:4CF9 — Evt_Op7D_ClearObjUnk1A81 (13 bytes, $4CF9–$4D05)
+; Event opcode $7D (2 bytes: $7D, slot): as Evt_Op91_ClearUnk1A81 for
+;   the object in slot: Obj_Unk1A81 = 0. X = Y + 2, C=0 through
+;   Evt_Op90_Store.
+; Reached through Evt_OpcodeTable (opcode $7D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (its low byte
+;   must be 0: TDC/XBA sets B from it), DB=$00 (Obj_* tables absolute);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the opcode + 2, C=0; A = 0;
+;   Y = the opcode + 1; B = 0 (TDC/XBA).
+; ------------------------------------------------------------
+Evt_Op7D_ClearObjUnk1A81:
+    INY
+    TYX
+    TDC
+    XBA                                 ; B = 0 for the 16-bit TAX
+    LDA.l !Evt_Data,X
+    TAX
+    LDA.b #$00
+    BRA Evt_Op90_Store
+
+; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN

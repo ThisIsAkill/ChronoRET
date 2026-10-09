@@ -383,8 +383,25 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
-!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33 and
-                                         ; $C7-$D7: 16-bit, an Evt_Data offset kept across a call
+!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33,
+                                         ; $C7-$D7, $2E and $88: 16-bit, an Evt_Data offset (the
+                                         ; opcode's) kept across a call
+!EvtPal_Arg = $D9                        ; alias of Eng_Scratch in Evt_Op88_ObjPalAnim / Evt_Op2E_PalAnim:
+                                         ; 8-bit, the kind operand, then a colour / count operand
+!EvtPal_Base = $DB                       ; alias of Oam_Range1LoPtr's slot there: 8-bit, the object's
+                                         ; colour 0 (Obj_OamAttr x 8 + EvtPal_SpriteColor0)
+!EvtPal_Src = $DB                        ; the same slot in their kind-$8x copy: 16-bit, the address in
+                                         ; bank $7F of the colour bytes
+!EvtPal_Speeds = $DD                     ; alias of Oam_Range2LoPtr's slot there: 8-bit operand whose
+                                         ; nibbles go to FieldAnimB.Unk7 / .Unk8
+!EvtPal_ColOfs = $DD                     ; the same slot in the kind-$8x copy: 16-bit, colour number x 2
+!EvtPal_Count = $C1                      ; alias of Anim_RowAddr's slot there: 16-bit MVN count
+!EvtTile_Pos = $D9                       ; alias of Eng_Scratch in Evt_Op8B / Evt_Op8C: 16-bit, the tile
+                                         ; (column | row << 8), the map index of Map_TileAttrA/B; then
+                                         ; 8-bit, the priority bits from Map_TileAttrA
+!EvtTile_PrioA = $D9                     ; that 8-bit use (also in Evt_Op8D / Evt_Op8E)
+!EvtPrio_Flags = $D9                     ; alias of Eng_Scratch in Evt_Op8E_SetOamFlags: 8-bit, the
+                                         ; new Obj_OamFlags
 !EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6 and the character
                                          ; opcodes: the character (16-bit in $D3, else the low byte)
 !EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
@@ -1050,6 +1067,11 @@ if !ram_engine_inc == 0
                                          ; (then clears it again with the ObjX_* block)
 !ObjX_Unk7F0B80 = $7F0B80                ; 16-bit per object in bank $7F; Evt_InitObjects writes
                                          ; ObjX_Unk7F0B80Init twice, then clears it again
+!ObjX_PalAnimRec = $7F0B80               ; alias of ObjX_Unk7F0B80: 16-bit per object, the offset of
+                                         ; the FieldAnimB record Evt_Op88_ObjPalAnim gave it (kinds
+                                         ; $20/$30), ObjX_PalAnimNone when none (bit 15 tested);
+                                         ; 0 after a load (Evt_InitObjects' clear wipes its $FFFF),
+                                         ; which reads as record 0
 !ObjX_AnimLoops = $7F0B01                ; 8-bit per object in bank $7F: loops left for animation
                                          ; mode 2
 !AnimRom = $E40000                       ; bank $E4: object animation tables (frame numbers and
