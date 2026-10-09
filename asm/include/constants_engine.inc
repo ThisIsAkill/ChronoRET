@@ -350,9 +350,9 @@ if !constants_engine_inc == 0
 !Field54_MapReq = $0C                    ; Field_Unk54 bits 2-3: shifted left once into
                                          ; Field_MapRedrawDone bits 3-4, then Map_ClearBufC800
 !Field_Unk29Start = $01                  ; Field_Unk29 value Field_CheckTileInFront sets to start
-                                         ; Field_Unk1F87's sequence (not traced)
+                                         ; Field_Unk1F87's message sequence (clear, open, text)
 !Field_Unk29State0D = $0D                ; Field_Unk29 value set when the watched tile leaves the box
-                                         ; (Field_Unk1F87's state $0D; not traced)
+                                         ; (Field_Unk1F87's state $0D: the window closes)
 !MapRedraw_Step1 = $01                   ; Field_MapRedrawDone values 1-4 (DefaultHandler's redraw
 !MapRedraw_Step2 = $02                   ; steps): NmiHandler uploads Map_BufC800 (2 KB) to
 !MapRedraw_Step3 = $03                   ; Map_TilemapVram, Map_TilemapVram3, Map_TilemapVram2 and
@@ -1040,3 +1040,31 @@ endif
                                          ; Field_Unk62 = 2
 !ObjAnim_RowUnk1B = $1B                  ; Obj_AnimRow on a shape-$1E tile with a Y step
 !ObjAnim_RowIdle = $21                   ; Obj_AnimRow Party_AnimIdle picks now and then while standing
+
+; --- Field messages (Field_Unk1F87 and its callees, $C0:1F87-$C0:21E0) ---
+!Field_Unk29Text = $06                   ; Field_Unk29 state 6: a text step each frame (Field_MsgStep)
+!Field_Unk29Wait = $07                   ; state 7: wait (Field_Unk34 count / a press / the choice)
+!Field_Unk29Page = $08                   ; state 8: clear the lines for a new page
+!Field_Unk36Upload = $01                 ; Field_Unk36: the NMI sends the text line every frame
+!Field_Unk36Once = $81                   ; Field_Unk36: one more upload (bit 7: zeroed by the NMI)
+!FieldMsg_Place1 = $01                   ; Field_Unk26 / Field_Unk30: the window's place (1 for an object
+                                         ; in the lower half of the screen)
+!FieldMsg_Place2 = $02                   ; ... (2 for one in the upper half)
+!FieldMsg_OpenSize = $29                 ; Field_Unk27 opens to this less 1 (the LDA / DEC in Field_Unk1F87)
+!FieldMsg_ChoiceStart = $01              ; Field_Unk62 set by the message opcodes: start the choice cursor
+                                         ; at the end of the text (probably)
+!FieldMsg_ChoiceActive = $02             ; Field_Unk62 while Sub_1ADF moves Field_Unk63 (probably)
+!FieldMsg_ChoiceMade = $03               ; Field_Unk62: Field_Unk1F87 goes on to the next state
+!FieldMsg_StatusArg = $03                ; TextWin_Status after control code $03 (TextWin_Code3Arg): a wait
+!FieldMsg_StatusLineA = $05              ; TextWin_Status $05-$08: a new line (pen reset); 7/8 wait first
+!FieldMsg_StatusLineB = $06
+!FieldMsg_StatusLineWaitA = $07
+!FieldMsg_StatusLineWaitB = $08
+!FieldMsg_StatusPageA = $09              ; TextWin_Status $09-$0C: a new page; $0B/$0C wait first
+!FieldMsg_StatusPageB = $0A
+!FieldMsg_StatusPageWaitA = $0B
+!FieldMsg_StatusPageWaitB = $0C
+!FieldMsg_LastLine = $03                 ; Field_Unk31 of the last text line (lines 0-3)
+!FieldMsg_WaitUnit = 15                  ; frames per unit of TextWin_Code3Arg (Field_Unk34 = arg x this)
+!FieldMsg_TreasureStrs = $DEFF00         ; ROM: the string table TextWin_Init gets for a treasure message
+                                         ; (indexed by Field_Unk2A, the TreasureKind)

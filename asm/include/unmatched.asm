@@ -31,8 +31,6 @@ IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline her
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
 
-org $C01F87
-Field_Unk1F87:      ; per-frame JSL target (GameLoop_FrameBody); dispatches on dp $29 countdown, RTL
 org $C028AA
 TileAnimList_Clear: ; fills the 16-word list at $7F:1CC8 with $8080 (empty)
 org $C028C0

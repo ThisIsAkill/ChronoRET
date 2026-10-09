@@ -103,7 +103,7 @@ if !ram_engine_inc == 0
 !Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState
 !Field_HdmaEnable = $28                  ; 8-bit HDMA channel mask: the NMI handler writes it to HDMAEN
                                          ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
-!Field_Unk29 = $29                       ; 8-bit countdown; Field_Unk1F87 dispatches on it;
+!Field_Unk29 = $29                       ; 8-bit message state; Field_Unk1F87 dispatches on it;
                                          ; Field_SaveState forces it to 1 when nonzero
 !Field_Unk2A = $2A                       ; 8-bit; Field_CheckTileInFront stores the treasure outcome
                                          ; here (TreasureKind_*) as it starts Field_Unk29 = 1
@@ -116,15 +116,19 @@ if !ram_engine_inc == 0
 !Field_Unk30 = $30                       ; 8-bit; zeroed by Field_InitLoadState and by
                                          ; Field_CheckTileInFront as it starts Field_Unk29 = 1
 !Field_Unk31 = $31                       ; 8-bit; Field_UploadUnk5800 uploads to VRAM word
-                                         ; $5800 + this x $200 (no writer traced)
+                                         ; $5800 + this x $200; the message text line 0-3
+                                         ; (Field_Unk1F87 / Field_MsgStep step it)
 !Field_Unk32 = $32                       ; 8-bit; zeroed by Field_CheckTileInFront as it starts
                                          ; Field_Unk29 = 1
+!Field_Unk33 = $33                       ; 8-bit; zeroed by Field_Unk1F87 as the message window opens
+                                         ; (no reader traced)
 !Field_Unk34 = $34                       ; 16-bit; when $FFFF, Field_ActionButton swallows one press
                                          ; of Pad_Unk00F6 bit 7 and resets it to 0; Sub_1ADF
                                          ; clears it on button bit 7 of Pad_Unk00F6
 !Field_Unk36 = $36                       ; 8-bit; NmiHandler runs Field_UploadUnk5800 while it is
                                          ; nonzero: every frame while bit 7 is clear, once (it is
-                                         ; zeroed first) when bit 7 is set; no writer traced
+                                         ; zeroed first) when bit 7 is set; Field_Unk1F87 and
+                                         ; Field_MsgStep set it
 !Field_Unk38 = $38                       ; 8-bit step of Field_Unk885A (1, 2; it clears it when done);
                                          ; DefaultHandler sets it to 1. Field_DpadDispatch does
                                          ; nothing while it is nonzero

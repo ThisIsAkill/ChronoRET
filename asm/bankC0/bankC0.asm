@@ -8295,6 +8295,477 @@ Fade_StepFixedColor:
     RTS
 
 ; ============================================================
+; Field messages: the message window's frame step ($C0:1F87–$C0:21E0)
+; Field_Unk1F87 runs every frame (GameLoop_FrameBody) and steps the
+; sequence a treasure (Field_CheckTileInFront) or a message opcode
+; starts with Field_Unk29 = Field_Unk29Start. The text is drawn by bank
+; $C2's text window (TextWin_Init / TextWin_Step through
+; BankC2_Entry0003 / 0009, on the block at TextWin_Dp) into the 1 KB
+; buffer Field_Unk7EF000, one glyph per step; the NMI sends that buffer
+; to VRAM $5800 + Field_Unk31 x $200 (Field_UploadUnk5800) while
+; Field_Unk36 is set, so Field_Unk31 reads as the text line (0-3)
+; being written. Field_Unk26 / Field_Unk27 are the window's place and
+; how far it is open (EngFD_UnkC2C1 dispatches on Field_Unk26; not
+; analysed). The status codes come from the string (TextWin_Status:
+; the control codes $00 and $03-$0C set them): 0 = the end, 3 = a wait
+; of its argument x 15 frames, 5-8 = a new line (7/8 after a button
+; press), 9-$C = a new page ($B/$C after a button press), $10 = one
+; glyph drawn. That reading of the codes comes from what this code
+; does with them (Field_Unk34 = Field_Unk34Swallow waits for a press in
+; Field_ActionButton, probably). Field_Unk1F87 keeps its name for its
+; verified caller (better: Field_MessageStep).
+; ============================================================
+
+org $C01F87
+; ------------------------------------------------------------
+; $C0:1F87 — Field_Unk1F87 (299 bytes, $1F87–$20B1)
+; By Field_Unk29 (the message state):
+; - 0: nothing.
+; - 1 and 8 (start / new page): Field_MsgClearBuf, then the next state,
+;   Field_Unk31 = 0 and Field_Unk36 = Field_Unk36Upload (the NMI sends
+;   the cleared buffer to line 0).
+; - 2-4 and 9-11: the next state and line (the cleared buffer goes to
+;   lines 1-3 on the next frames).
+; - 5 (open): the first time (Field_Unk26 = 0) the window's place:
+;   Field_Unk26 = Field_Unk30 when that is 1 or 2, else by the low
+;   byte of Field_Unk2E's object's Obj_ScreenY: FieldMsg_Place2 below
+;   $80 (the upper half of the screen), FieldMsg_Place1 from $80 on
+;   (the window away from the object, probably); Field_Unk27 = 0,
+;   Field_Unk31 = 0, Field_Unk33 = 0, Field_Unk36 = 0, and
+;   Field_MsgStart. Later frames open it: Field_Unk27 + 1 up to four
+;   times, and when it reaches FieldMsg_OpenSize - 1 ($28), Field_Unk29
+;   = Field_Unk29Text and Field_MsgStep.
+; - 6 (text): Field_MsgStep.
+; - 7 (wait): with Field_Unk62 = 0 the wait below; 1: while
+;   TextWin_Status is nonzero the wait, at 0 Field_Unk63 = Field_Unk64
+;   and Field_Unk62 = 2 (the choice cursor starts, probably); 2:
+;   nothing (the cursor moves, Sub_1ADF); 3: the next state at once (a
+;   choice was made); other: nothing. The wait: Field_Unk34 =
+;   Field_Unk34Swallow: nothing (until a press, probably); other
+;   nonzero: count it down; 0: the next state by TextWin_Status: 9-$C
+;   Field_Unk29Page, 5-8 Field_Unk29Page when Field_Unk31 = 3 (the
+;   last line) else Field_Unk29Text, 3 Field_Unk29Text when
+;   TextWin_Code3Arg is nonzero, anything else (0: the end)
+;   Field_Unk29State0D.
+; - 12: Field_Unk29 = Field_Unk29Text and Field_MsgStep (the first line
+;   of a new page).
+; - $0D (close): Field_Unk27 - 1 up to four times; at 0 Field_Unk29 =
+;   0, Field_Unk26 = 0 and Field54_WatchBox in Field_Unk54 cleared.
+; - $0E and up: nothing.
+; Quirk: the opening test loads FieldMsg_OpenSize and decrements it
+;   before each compare (the target is $28); kept as found.
+; Callers (1 JSL site): GameLoop_FrameBody ($C0:00AD).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: Field_Unk34 and the
+;   callees' word loads), DP=$0100 (the Field_* bytes are dp), DB=$00
+;   (Obj_ScreenY, the TextWin_Dp block and the callees' registers
+;   absolute).
+; Exit: M=1, X=0, DP and DB unchanged (RTL); A, X and Y clobbered (Y
+;   by the callees); the Field_* bytes above and the callees' writes.
+; ------------------------------------------------------------
+Field_Unk1F87:
+    LDA.b !Field_Unk29
+    BNE .state
+    RTL
+.state:
+    DEC A
+    BEQ .clear_first                    ; 1
+    DEC A
+    BEQ .next_line                      ; 2
+    DEC A
+    BEQ .next_line                      ; 3
+    DEC A
+    BEQ .next_line                      ; 4
+    DEC A
+    BEQ .open                           ; 5
+    DEC A
+    BEQ .text                           ; 6
+    DEC A
+    BEQ .wait                           ; 7
+    DEC A
+    BEQ .clear_first                    ; 8
+    DEC A
+    BEQ .next_line                      ; 9
+    DEC A
+    BEQ .next_line                      ; 10
+    DEC A
+    BEQ .next_line                      ; 11
+    DEC A
+    BEQ .page_text                      ; 12
+    DEC A
+    BEQ .close                          ; $0D
+    RTL
+.clear_first:
+    JSR Field_MsgClearBuf
+    INC.b !Field_Unk29
+    STZ.b !Field_Unk31
+    LDA.b #!Field_Unk36Upload
+    STA.b !Field_Unk36
+    RTL
+.next_line:
+    INC.b !Field_Unk29
+    INC.b !Field_Unk31
+    RTL
+.page_text:
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    JSR Field_MsgStep
+    RTL
+.open:
+    LDA.b !Field_Unk26
+    BNE .opening
+    LDA.b !Field_Unk30
+    BEQ .by_object
+    CMP.b #!FieldMsg_Place1
+    BEQ .lower
+    CMP.b #!FieldMsg_Place2
+    BEQ .upper
+.by_object:
+    LDX.b !Field_Unk2E
+    LDA.w !Obj_ScreenY,X
+    BPL .upper
+.lower:
+    LDA.b #!FieldMsg_Place1
+    BRA .set_place
+.upper:
+    LDA.b #!FieldMsg_Place2
+.set_place:
+    STA.b !Field_Unk26
+    STZ.b !Field_Unk27
+    STZ.b !Field_Unk31
+    STZ.b !Field_Unk33
+    STZ.b !Field_Unk36
+    JSR Field_MsgStart
+    RTL
+.opening:
+    LDA.b #!FieldMsg_OpenSize
+    DEC A                               ; the target is one less (quirk)
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    INC.b !Field_Unk27
+    CMP.b !Field_Unk27
+    BEQ .opened
+    RTL
+.text:
+    JSR Field_MsgStep
+    RTL
+.wait:
+    LDA.b !Field_Unk62
+    BEQ .wait_count
+    CMP.b #!FieldMsg_ChoiceStart
+    BNE .choice_other
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BNE .wait_count
+    LDA.b !Field_Unk64
+    STA.b !Field_Unk63
+    LDA.b #!FieldMsg_ChoiceActive
+    STA.b !Field_Unk62
+    RTL
+.close:
+    LDA.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    BEQ .closed
+    DEC.b !Field_Unk27
+    RTL
+.opened:
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    JSR Field_MsgStep
+    RTL
+.closed:
+    STZ.b !Field_Unk29
+    STZ.b !Field_Unk26
+    LDA.b #!Field54_WatchBox
+    TRB.b !Field_Unk54
+    RTL
+.wait_count:
+    BRA .countdown
+.after_wait:
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BEQ .end
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .page
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .page
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .arg
+.end:
+    LDA.b #!Field_Unk29State0D
+    STA.b !Field_Unk29
+    RTL
+.page:
+    LDA.b #!Field_Unk29Page
+    STA.b !Field_Unk29
+    RTL
+.line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BEQ .page
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    RTL
+.arg:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .end
+    LDA.b #!Field_Unk29Text
+    STA.b !Field_Unk29
+    RTL
+.choice_other:
+    CMP.b #!FieldMsg_ChoiceMade
+    BEQ .after_wait
+    RTL
+.countdown:
+    LDX.b !Field_Unk34
+    BEQ .after_wait
+    CPX.w #!Field_Unk34Swallow
+    BEQ .hold
+    DEX
+    STX.b !Field_Unk34
+.hold:
+    RTL
+
+; ------------------------------------------------------------
+; $C0:20B2 — Field_MsgClearBuf (64 bytes, $20B2–$20F1)
+; Zeroes the 1 KB text buffer Field_Unk7EF000 ($7E:F000-$7E:F3FF) as
+;   Map_ClearBufC800 does: two MVNs copy the 32 zero bytes at
+;   GfxRom_D2 to its first 64 bytes, then each MVN copies the zeroed
+;   part to the bytes right after it (64, 128, 256, 512 bytes).
+; Callers (2 JSR sites): Field_Unk1F87 ($C0:1FB4) and Field_MsgStep ($C0:216A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP any (not used), DB any
+;   (saved; the MVNs set it to $7E).
+; Exit: M=1, X=0, DP and DB unchanged; A = $FFFF (B = $FF), X = $F200,
+;   Y = $F400.
+; ------------------------------------------------------------
+Field_MsgClearBuf:
+    PHB
+    LDX.w #!GfxRom_D2&$FFFF
+    LDY.w #!Field_Unk7EF000&$FFFF
+    REP #$20
+    LDA.w #!Map_ZeroChunk-1
+    MVN !Bank7E,!BankD2                 ; 32 zeros -> $7E:F000  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Map_ZeroChunk-1
+    LDX.w #!GfxRom_D2&$FFFF
+    MVN !Bank7E,!BankD2                 ; and again -> $F020  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*2-1
+    MVN !Bank7E,!Bank7E                 ; 128 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*4-1
+    MVN !Bank7E,!Bank7E                 ; 256 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*8-1
+    MVN !Bank7E,!Bank7E                 ; 512 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Field_Unk7EF000&$FFFF
+    LDA.w #!Map_ZeroChunk*16-1
+    MVN !Bank7E,!Bank7E                 ; 1,024 zeroed  lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    SEP #$20
+    RTS
+
+; ------------------------------------------------------------
+; $C0:20F2 — Field_MsgStart (52 bytes, $20F2–$2125)
+; Starts the text window on the message: TextWin_StrIndex =
+;   Field_Unk2A; the string table TextWin_StrTable = FieldMsg_TreasureStrs
+;   ($DE:FF00) while Field54_WatchBox is set in Field_Unk54 (a treasure
+;   message: Field_CheckTileInFront sets it with Field_Unk2A = the
+;   TreasureKind), else Field_Unk2B / Field_Unk2D (the pointer
+;   Evt_OpB8_SetMsgPtr set); TextWin_GfxBuf = Field_Unk7EF000,
+;   TextWin_Mode = 0; then TextWin_Init (BankC2_Entry0003).
+; Callers (1 JSR site): Field_Unk1F87 ($C0:1FF4).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: word stores), DP=$0100
+;   (Field_Unk2A-2D and Field_Unk54 are dp), DB=$00 (the TextWin_Dp
+;   block absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A, X and Y as TextWin_Init
+;   leaves them (it saves P, DP and DB); the TextWin_Dp block set up.
+; ------------------------------------------------------------
+Field_MsgStart:
+    LDA.b !Field_Unk2A
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    LDA.b !Field_Unk54
+    BIT.b #!Field54_WatchBox
+    BEQ .event_text
+    LDX.w #!FieldMsg_TreasureStrs&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b #!FieldMsg_TreasureStrs>>16
+    BRA .set_bank
+.event_text:
+    LDX.b !Field_Unk2B
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b !Field_Unk2D
+.set_bank:
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDX.w #!Field_Unk7EF000&$FFFF
+    STX.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.b #!Bank7E
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    LDA.b #$00
+    STA.w !TextWin_Dp+!TextWin_Mode
+    JSL BankC2_Entry0003
+    RTS
+
+; ------------------------------------------------------------
+; $C0:2126 — Field_MsgStep (187 bytes, $2126–$21E0)
+; One step of the message text. First by TextWin_Status (the last
+;   step's): 0: Field_Unk36 = 0 and nothing more (the text has ended);
+;   9-$C (new page): Field_Unk31 = 0; 5-8 (new line): Field_Unk31 + 1,
+;   or 0 after line 3; for both Field_Unk32 = 0 and Field_MsgClearBuf;
+;   3: with TextWin_Code3Arg 0, as status 0; other: no change. Then
+;   TextWin_StepCount = 1 and TextWin_Step (BankC2_Entry0009), and by
+;   the new status:
+; - $10 (a glyph drawn) and the others not below: Field_Unk36 =
+;   Field_Unk36Upload (the line goes to VRAM every frame).
+; - 0 (the end) and $B/$C: Field_Unk34 = Field_Unk34Swallow (wait for a
+;   press, probably), then as 9/$A.
+; - 9/$A: Field_Unk29 = Field_Unk29Wait and Field_Unk36 =
+;   Field_Unk36Once (one more upload).
+; - 7/8: Field_Unk34 = Field_Unk34Swallow and Field_Unk29 =
+;   Field_Unk29Wait, then as 5/6.
+; - 5/6: on the last line (Field_Unk31 = 3) as 9/$A, else Field_Unk36 =
+;   Field_Unk36Upload (Field_Unk29 unchanged: for 5/6 the text goes on
+;   next frame; for 7/8 it waits).
+; - 3: with TextWin_Code3Arg 0 as 9/$A; else Field_Unk34 =
+;   TextWin_Code3Arg x FieldMsg_WaitUnit (15) frames, Field_Unk29 =
+;   Field_Unk29Wait, Field_Unk36 = Field_Unk36Upload.
+; Callers (3 JSR sites): Field_Unk1F87 ($C0:1FC9, $C0:2018, $C0:2049).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y: Field_Unk34 and the
+;   product are words), DP=$0100 (the Field_* bytes are dp), DB=$00
+;   (the TextWin_Dp block and the multiplier absolute).
+; Exit: M=1, X=0, DP and DB unchanged; A clobbered; X, Y as
+;   TextWin_Step / Field_MsgClearBuf leave them, X = Field_Unk34 when it
+;   was set here; the Field_* bytes above.
+; ------------------------------------------------------------
+Field_MsgStep:
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BNE .status
+.idle:
+    STZ.b !Field_Unk36
+    RTS
+.status:
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .first_line
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .new_line
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .arg
+    BRA .step
+.arg:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .idle
+    BRA .step
+.new_line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BNE .line_down
+.first_line:
+    LDA.b #$00
+    BRA .set_line
+.line_down:
+    INC A
+.set_line:
+    STA.b !Field_Unk31
+    STZ.b !Field_Unk32
+    JSR Field_MsgClearBuf
+.step:
+    LDA.b #$01
+    STA.w !TextWin_Dp+!TextWin_StepCount
+    JSL BankC2_Entry0009
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BEQ .ended
+    CMP.b #!TextWin_StatusStepDone
+    BEQ .go_on
+    CMP.b #!FieldMsg_StatusPageA
+    BEQ .wait
+    CMP.b #!FieldMsg_StatusPageB
+    BEQ .wait
+    CMP.b #!FieldMsg_StatusPageWaitA
+    BEQ .ended
+    CMP.b #!FieldMsg_StatusPageWaitB
+    BEQ .ended
+    CMP.b #!FieldMsg_StatusLineA
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineB
+    BEQ .line
+    CMP.b #!FieldMsg_StatusLineWaitA
+    BEQ .line_wait
+    CMP.b #!FieldMsg_StatusLineWaitB
+    BEQ .line_wait
+    CMP.b #!FieldMsg_StatusArg
+    BEQ .timed
+.go_on:
+    LDA.b #!Field_Unk36Upload
+    STA.b !Field_Unk36
+    RTS
+.timed:
+    LDA.w !TextWin_Dp+!TextWin_Code3Arg
+    BEQ .wait
+    STA.w WRMPYA
+    LDA.b #!FieldMsg_WaitUnit
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+    LDX.w RDMPYL
+    STX.b !Field_Unk34
+    BRA .go_on
+.line_wait:
+    LDX.w #!Field_Unk34Swallow
+    STX.b !Field_Unk34
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+.line:
+    LDA.b !Field_Unk31
+    CMP.b #!FieldMsg_LastLine
+    BNE .go_on
+    BRA .wait
+.ended:
+    LDX.w #!Field_Unk34Swallow
+    STX.b !Field_Unk34
+.wait:
+    LDA.b #!Field_Unk29Wait
+    STA.b !Field_Unk29
+    LDA.b #!Field_Unk36Once
+    STA.b !Field_Unk36
+    RTS
+
+; ============================================================
 ; $C0:2DC8 — VramDma_Upload (41 bytes, $2DC8–$2DF0)
 ; Copies a block to VRAM with DMA channel 7: VMADDL = VramDma_Addr,
 ; VMAIN = increment after the high byte, DMAP7 = VramDma_Mode, B-bus
