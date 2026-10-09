@@ -8766,6 +8766,246 @@ Field_MsgStep:
     RTS
 
 ; ============================================================
+; $C0:2C41 — ScrollStepAccum (391 bytes, $2C41–$2DC7)
+; Steps the scroll positions of layers 2 and 3 by signed per-frame
+; speeds in 1/16 pixels, the copies of them that FieldBtlPpu.Scroll2
+; holds for the battle. For layer 2 when bit 1 of LayerDrift_Flags is
+; set (LayerDrift_Layer2), for layer 3 when bit 2 is (LayerDrift_Layer3);
+; for each axis: the speed is added to the 8-bit fraction (4.4 fixed
+; point, signed); its whole part (the fraction / 16, rounded toward 0)
+; is added to the 16-bit position (LayerDrift_L2X ...) and that is
+; stored to the FieldBtlPpu.Scroll2 word of the layer and axis
+; (+4/+6 layer 2 X/Y, +8/+$A layer 3); the fraction keeps its low
+; nibble with the sign (ORA $F0 when negative, unless the nibble is 0).
+; Only layer 2's X skips the update when the new fraction is 0 (the
+; other three add 0 then); kept as found. Who sets the speeds and flags
+; is not traced (unmatched code); the name is kept from the stub for
+; its verified callers (better: LayerDrift_Step, probably the battle
+; backgrounds' drift: bank $CD calls it through ReentryVectors [1]).
+; Callers (2 sites: 1 JSL, 1 BRL): ReentryVectors (BRL $C0:0002) and DefaultHandler (JSL $C0:1895).
+; Callers note: the BRL in ReentryVectors is vector [1], which bank $CD
+;   reaches by JSL $C0:0002 (at $CD:0C8C).
+; On entry: M=1 (8-bit A), X any (not used), DP any (saved; set to
+;   DP_Field for the scratch), DB any (saved; set to $7F for the
+;   LayerDrift_* bytes).
+; Exit: M=1, DP and DB restored (RTL); A clobbered; X and Y unchanged;
+;   LayerDrift_Scratch ($0100+$D9/$DA, Eng_Scratch) written on the
+;   negative paths.
+; ============================================================
+org $C02C41
+ScrollStepAccum:
+    PHD
+    PHB
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    LDA.w !LayerDrift_Flags
+    BIT.b #!LayerDrift_Layer2
+    BNE .layer2
+    BRL .layer3_test
+.layer2:
+    CLC
+    LDA.w !LayerDrift_L2SpeedX
+    ADC.w !LayerDrift_L2FracX
+    STA.w !LayerDrift_L2FracX
+    CLC
+    LDA.w !LayerDrift_L2SpeedY
+    ADC.w !LayerDrift_L2FracY
+    STA.w !LayerDrift_L2FracY
+    LDA.w !LayerDrift_L2FracX
+    BEQ .l2_y                           ; only this axis skips a 0 (quirk)
+    BMI .l2x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L2X
+    STA.w !LayerDrift_L2X
+    STA.l FieldBtlPpu.Scroll2+4
+    SEP #$20
+    BRA .l2x_frac
+.l2x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L2X
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L2X
+    STA.l FieldBtlPpu.Scroll2+4
+    SEP #$20
+.l2x_frac:
+    LDA.w !LayerDrift_L2FracX
+    AND.b #!LayerDrift_FracMask
+    BEQ .l2x_store
+    LDA.w !LayerDrift_L2FracX
+    BPL .l2x_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l2x_store
+.l2x_pos:
+    AND.b #!LayerDrift_FracMask
+.l2x_store:
+    STA.w !LayerDrift_L2FracX
+.l2_y:
+    LDA.w !LayerDrift_L2FracY
+    BMI .l2y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L2Y
+    STA.w !LayerDrift_L2Y
+    STA.l FieldBtlPpu.Scroll2+6
+    SEP #$20
+    BRA .l2y_frac
+.l2y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L2Y
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L2Y
+    STA.l FieldBtlPpu.Scroll2+6
+    SEP #$20
+.l2y_frac:
+    LDA.w !LayerDrift_L2FracY
+    AND.b #!LayerDrift_FracMask
+    BEQ .l2y_store
+    LDA.w !LayerDrift_L2FracY
+    BPL .l2y_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l2y_store
+.l2y_pos:
+    AND.b #!LayerDrift_FracMask
+.l2y_store:
+    STA.w !LayerDrift_L2FracY
+.layer3_test:
+    LDA.w !LayerDrift_Flags
+    BIT.b #!LayerDrift_Layer3
+    BNE .layer3
+    BRL .done
+.layer3:
+    CLC
+    LDA.w !LayerDrift_L3SpeedX
+    ADC.w !LayerDrift_L3FracX
+    STA.w !LayerDrift_L3FracX
+    CLC
+    LDA.w !LayerDrift_L3SpeedY
+    ADC.w !LayerDrift_L3FracY
+    STA.w !LayerDrift_L3FracY
+    LDA.w !LayerDrift_L3FracX
+    BMI .l3x_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L3X
+    STA.w !LayerDrift_L3X
+    STA.l FieldBtlPpu.Scroll2+8
+    SEP #$20
+    BRA .l3x_frac
+.l3x_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L3X
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L3X
+    STA.l FieldBtlPpu.Scroll2+8
+    SEP #$20
+.l3x_frac:
+    LDA.w !LayerDrift_L3FracX
+    AND.b #!LayerDrift_FracMask
+    BEQ .l3x_store
+    LDA.w !LayerDrift_L3FracX
+    BPL .l3x_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l3x_store
+.l3x_pos:
+    AND.b #!LayerDrift_FracMask
+.l3x_store:
+    STA.w !LayerDrift_L3FracX
+    LDA.w !LayerDrift_L3FracY
+    BMI .l3y_neg
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w !LayerDrift_L3Y
+    STA.w !LayerDrift_L3Y
+    STA.l FieldBtlPpu.Scroll2+10
+    SEP #$20
+    BRA .l3y_frac
+.l3y_neg:
+    EOR.b #!Eng_Invert8
+    INC A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !LayerDrift_Scratch
+    STZ.b !LayerDrift_Scratch+1
+    REP #$20
+    LDA.w !LayerDrift_L3Y
+    SEC
+    SBC.b !LayerDrift_Scratch
+    STA.w !LayerDrift_L3Y
+    STA.l FieldBtlPpu.Scroll2+10
+    SEP #$20
+.l3y_frac:
+    LDA.w !LayerDrift_L3FracY
+    AND.b #!LayerDrift_FracMask
+    BEQ .l3y_store
+    LDA.w !LayerDrift_L3FracY
+    BPL .l3y_pos
+    ORA.b #!LayerDrift_FracNeg
+    BRA .l3y_store
+.l3y_pos:
+    AND.b #!LayerDrift_FracMask
+.l3y_store:
+    STA.w !LayerDrift_L3FracY
+.done:
+    PLB
+    PLD
+    RTL
+
+; ============================================================
 ; $C0:2DC8 — VramDma_Upload (41 bytes, $2DC8–$2DF0)
 ; Copies a block to VRAM with DMA channel 7: VMADDL = VramDma_Addr,
 ; VMAIN = increment after the high byte, DMAP7 = VramDma_Mode, B-bus

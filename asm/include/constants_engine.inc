@@ -1079,3 +1079,9 @@ endif
 !TileAnim_Box3MidRight = $F8             ; ... middle-row right
 !TileAnim_Box3TopLeft = $F2              ; ... top-row left
 !TileAnim_Box3TopRight = $F4             ; ... top-row right
+
+; --- ScrollStepAccum ($C0:2C41) ---
+!LayerDrift_Layer2 = $02                 ; LayerDrift_Flags bit 1: step layer 2
+!LayerDrift_Layer3 = $04                 ; LayerDrift_Flags bit 2: step layer 3
+!LayerDrift_FracMask = $0F               ; the 1/16-pixel part a fraction keeps
+!LayerDrift_FracNeg = $F0                ; ORed into a negative fraction's kept part (its sign)

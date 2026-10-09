@@ -783,6 +783,22 @@ if !ram_engine_inc == 0
                                          ; bytes from entry + 2 to Pal_Buf row 0
 !FieldRom_Unk9CF0 = $FF9CF0              ; ROM: four 64-byte pieces Field_UploadUnk0000 sends to VRAM
 !FieldRom_Unk9260 = $FF9260              ; ROM: 64 bytes Field_UploadUnk57E0 sends to VRAM $57E0
+!LayerDrift_Flags = $7F3415              ; 8-bit: bit 1 / bit 2 make ScrollStepAccum step layer 2 / 3 (no
+                                         ; writer traced; the LayerDrift_* bytes are read with DB=$7F)
+!LayerDrift_L2SpeedX = $7F3417           ; 8-bit signed: layer 2's X speed in 1/16 pixels per call
+!LayerDrift_L2SpeedY = $7F3418           ; ... its Y speed
+!LayerDrift_L3SpeedX = $7F3419           ; ... layer 3's X speed
+!LayerDrift_L3SpeedY = $7F341A           ; ... layer 3's Y speed
+!LayerDrift_L2FracX = $7F341D            ; 8-bit signed fraction (1/16 pixels) carried between calls
+!LayerDrift_L2FracY = $7F341E
+!LayerDrift_L3FracX = $7F341F
+!LayerDrift_L3FracY = $7F3420
+!LayerDrift_L2X = $7F346B                ; 16-bit: layer 2's X position (copied to FieldBtlPpu.Scroll2+4)
+!LayerDrift_L2Y = $7F346D                ; ... Y (Scroll2+6)
+!LayerDrift_L3X = $7F346F                ; ... layer 3's X (Scroll2+8)
+!LayerDrift_L3Y = $7F3471                ; ... Y (Scroll2+$A)
+!LayerDrift_Scratch = $D9                ; alias of Eng_Scratch in ScrollStepAccum (DP_Field): 16-bit,
+                                         ; the whole pixels of a negative step
 !TileAnimList = $7F1CC8                  ; 16 words: Map_TileProps indexes (row << 8 | column) of the
                                          ; tiles animated at this location (TileAnimList_AddCurrent),
                                          ; re-applied by TileAnimList_ApplyAll after a reload

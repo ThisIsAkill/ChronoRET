@@ -22,8 +22,6 @@ MusicCueDispatch:   ; JSL re-entry: SPC start ($14) or fade ($70) per $7E2A1F bi
 org $C01BE6
 AudioFadeDispatch:  ; JSL re-entry: conditional SPC fade/start via $7F01EC counter; RTL
 
-org $C02C41
-ScrollStepAccum:    ; JSL re-entry: accumulate $7F341x scroll deltas into $7F341D/E; RTL
 
 org $C0ECCC
 IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline here
