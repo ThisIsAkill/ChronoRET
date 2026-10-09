@@ -30006,7 +30006,8 @@ BattleSys_EffRecArgs12C:
 ; high byte 0). What the effect routines make of them is not traced.
 ; Callers (2 JSR sites): BattleSys_Effect29 ($C1:D496) and BattleSys_Effect2A ($C1:D4BF).
 ; Entry: M=1, X=0, DP=0, DB any (long reads); B any (TDC first)
-; Exit:  M=1, X=0, DP=0; A = byte 1, B = 0; X = !Battle_UnkB18C * 4;
+; Exit:  M=1, X=0, DP=0; A = byte 1, B = 0; X = !Battle_UnkB18C * 4 (8-bit
+;        shifts: & $FF);
 ;        Y unchanged; DP $16-$1B as above
 !EffArg_16 = !BattleTmp_16              ; 2 B: first argument
 !EffArg_18 = !BattleTmp_18              ; 2 B: second argument
@@ -30039,7 +30040,7 @@ BattleSys_LoadEffectArgs:
 ; Callers (1 JSR site): BattleSys_Effect2A ($C1:D4B3).
 ; Entry: M=1, X=0, DP=0, DB any (long read); B = 0 (16-bit TAX of the
 ;        record offset)
-; Exit:  M=1, X=0, DP=0; A = the byte; X = !Battle_UnkB18C * 4; Y
+; Exit:  M=1, X=0, DP=0; A = the byte; X = (!Battle_UnkB18C * 4) & $FF; Y
 ;        unchanged; DP $16/$17 as above
 BattleSys_LoadEffectArg3:
     TDC
@@ -30059,7 +30060,7 @@ BattleSys_LoadEffectArg3:
 ; it was.
 ; Callers (1 JSR site): BattleSys_Effect2B ($C1:D4DC).
 ; Entry: M=1, X=0, DP=0, DB any (long reads); B = 0 (16-bit TAX)
-; Exit:  M=1, X=0, DP=0; A = byte 2; X = !Battle_UnkB18C * 4; Y
+; Exit:  M=1, X=0, DP=0; A = byte 2; X = (!Battle_UnkB18C * 4) & $FF; Y
 ;        unchanged; DP $16/$17 and $18 as above
 BattleSys_LoadEffectArgs12:
     TDC
