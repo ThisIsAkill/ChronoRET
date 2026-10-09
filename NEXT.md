@@ -248,10 +248,31 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Evt_Op94_WalkToObj ($C0:3548, now Evt_OpB5_FollowObj), Evt_Op95_WalkToPc ($C0:3551, now
    Evt_OpB6_FollowPc), Evt_HasActionTarget ($C0:304F, now Evt_OpB0_PartyControl); the
    `ObjX_LeaveView` define now names its writers (the message opcodes, so Obj_UpdateInView's
-   test reads as "the object's message is up"). Next, in reach order: the rest of the event opcode handlers,
-   $C0:326C-$C0:353E (opcodes $D9 at $C0:326C, $DA at $C0:345A) and $C0:3711-$C0:4CD4 ($33,
-   $C7-$FF, $29-$2F, $32, the one-line group $57/$5C/$62/$68/$6A/$6C/$6D at $C0:41E4, $80-$8E,
-   then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all have names;
+   test reads as "the object's message is up"). Also done (branch match-c0-evtops2): the event
+   opcodes $C0:326C-$C0:353E ($D9 `Evt_OpD9_PartyWalkToTiles`, $DA `Evt_OpDA_PartyGather`: the
+   `Map_Unk7F3700` blocks are event scripts, block 0 = `Evt_RedirectPos`, 1-3 the walk-to-tile
+   blocks, the fifth `Evt_PushScriptPos`) and $C0:3711-$C0:4866: $33 (palette), the items /
+   gold / characters / battle opcodes $C7-$D8 (bank $C1 services 0-5 and the bank $C2
+   `Menu_Unk8C36` commands 0-8, $0A, $0C read from the ROM and named as constants), the
+   locations / control / sound / fade / map opcodes $DC-$FA, the credits and layer-3 opcodes
+   $29-$2C, $2F, $32 with `Credits_LoadGfx` ($C0:6E27), the window effects $FE and $FF with
+   `Evt_OpFFTable` ($C0:400E, 20 words: sub-ops $90-$9F, $A0-$A3 unused), the character opcodes
+   $57/$5C/$62/$68/$6A/$6C/$6D and $80, and the sprite opcodes $81-$83 (`Evt_LoadSpriteRec`,
+   `Evt_InitWramSprite`, `RomE4_SprRec` / `RomE4_EnemySprRec`). Quirks recorded: the doubled
+   ObjX_Unk7F0C00/0D00 stores in $D9/$DA, $D4's move-up with no member 2, the handlers with no
+   SEC that end the run ($D0, $D1, $D3, $D5, $F8-$FA), $2C's dead STZ, the ADD of 0 to
+   Obj_PalSrc, the 16-bit `Obj_TileSlot` stores of the character opcodes, the unbounded $FF
+   sub-op. Verified headers edited (back to review with this batch): Field_UnkAF4E,
+   Field_EventHookDispatch, VramDma_Upload, MainInit (bank $FD), Spr_LoadLargeObj,
+   Evt_FindOrAddUnk0920 (their "unmatched" caller notes). Stale, not edited (fix at their next
+   edit): Field_HookWinC3E ("other code must" clear Field_EventHook: the $FF $92-$95 opcodes
+   do). Open from these: what `Field_Unk0BE9`, `ObjX_Unk7F0F00`, `Field54_Unk80`,
+   `FadeFlag_Unk10`, `Ppu_Unk0BE0` and the `FieldBtlObj[0-2].GfxOfs` stores of $82 are read
+   by; the bank $C2 command $0A; the bank-$FD vectors `FdVec_FFE5/E8/EB/F1` ($FF $80-$8F);
+   whether the $2600 records' words +3/+5 are HP (commands 6/7). Next, in reach order: the
+   rest of the event opcode handlers, $C0:4867-$C0:4CD4 ($84, $87, $88, $2E at $C0:4A4E,
+   $89-$8E), then $90/$91/$7C-$7E at $C0:4CD5), then `Evt_OpcodeTable` ($C0:5D6E) once all
+   have names;
    and the party control callees `Party_Unk9E29` ($C0:9E84 first), `Party_UnkA26B`,
    `Party_UnkA2CE` (with `$C0:9ED1`, `$C0:9F20`, `$C0:9F6F`). Open from it: what Field_Unk1F87
    does with the message bytes (and whether `Field_Unk30` is the window's place), who clears
@@ -430,11 +451,10 @@ dispatch sites below were checked by hand to be `TAX` ... `JSR (table,X)` sequen
 2. `$C1:0051`, 10 words: the $C10045 service dispatcher's table (`JSR (T,X)` at `$C1:004A`);
    services 1, 2 and 7 are matched, the rest need stubs.
 3. `$C0:5D6E` `Evt_OpcodeTable`, 256 words (`JSR (T,X)` at `$C0:5977` in Evt_RunObj0Func1, and
-   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 81
-   entries still have none ($29-$2C, $2E, $2F, $32, $33, $57, $5C, $62, $68, $6A, $6C, $6D,
-   $7C-$7E, $80-$84, $87-$8E, $90, $91, $C7-$DA, $DC-$E8, $EA-$EE, $F0-$F4, $F8-$FA, $FE, $FF).
-4. Dispatch tables right after (or near) their dispatcher, bank $C0: `$C0:400E` (16 words,
-   `$C0:4009`), `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
+   Evt_RunObjInit); ends at `$C0:5F6E`, `Evt_UnusedOpcode`. Needs a name per handler first: 16
+   entries still have none ($2E, $7C-$7E, $84, $87-$8E, $90, $91).
+4. Dispatch tables right after (or near) their dispatcher, bank $C0 (`$C0:400E` is matched as
+   Evt_OpFFTable): `$C0:7181` (12, `$C0:717D`), `$C0:9FF7` (65, `$C0:9ECD`).
 5. Bank $C1 (`$C1:2D81`, `$C1:3216` and `$C1:3760` are matched as BattlePos_ModeTable,
    Battle_FxHandlerTable and Battle_EnemyMoverTable): `$C1:B80D` (157, `$C1:874E`), `$C1:FA61` (21,
    `$C1:EB45`), `$C1:D126` (6, `$C1:CFE1`), `$C1:DA31` (4, `$C1:D783`).

@@ -141,7 +141,7 @@ if !ram_engine_inc == 0
                                          ; register)
 !WinFx_SizeLimit = $3D                   ; 8-bit; WinFx_Size limit for hooks 1 and 4
 !Field_Unk44 = $44                       ; 8-bit flags: the planes Field_UnkAF4E copies (MapCopy_*
-                                         ; bits); the event handler at $C0:3D97 stores it; zeroed at
+                                         ; bits); Evt_OpE4/Evt_OpE5 store it; zeroed at
                                          ; load (Field_InitLoadState)
 !Pad_Unk00F6Latch = $50                  ; 8-bit; GameLoop_FrameBody ORs Pad_Unk00F6 into it every
                                          ; frame
@@ -335,7 +335,7 @@ if !ram_engine_inc == 0
                                          ; first, the low byte stored with 8-bit X)
 !ObjFront_OtherHi = $EA                  ; high byte of ObjFront_Other
 !Evt_Unk0920Key = $E3                    ; 8-bit value Evt_FindOrAddUnk0920 looks up in Evt_Unk0920
-                                         ; (set by its callers, event code at $C0:4626 / $C0:4781)
+                                         ; (set by its callers, Evt_Op82 / Evt_Op83: a graphics index)
 !EvtArc_Gravity = $C1                    ; alias of Anim_RowAddr in Evt_Op7A_ArcToTile: 8-bit, its
                                          ; third operand (Obj_ArcGravity, and the frames when there
                                          ; is no distance)
@@ -383,6 +383,43 @@ if !ram_engine_inc == 0
                                          ; the bit operand (bit number in bits 0-3, page in bit 7)
 !EvtFollow_SavedY = $E3                  ; alias of Evt_Unk0920Key's slot in opcodes $B5/$B6: 16-bit,
                                          ; the opcode's offset (Y) across the walk opcode they run
+!EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33 and
+                                         ; $C7-$D7: 16-bit, an Evt_Data offset kept across a call
+!EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6 and the character
+                                         ; opcodes: the character (16-bit in $D3, else the low byte)
+!EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
+                                         ; character's object (Chr_ObjSlot)
+!EvtWarp_Word = $D9                      ; alias of Eng_Scratch in opcodes $DC-$E1: 16-bit location
+                                         ; operand (location in bits 0-8, facing in the high byte)
+!EvtFade_Arg = $D9                       ; alias of Eng_Scratch in Evt_OpF0_FadeBrightness: 8-bit
+                                         ; operand (brightness << 4 | frames)
+!EvtFade_Channels = $D9                  ; alias of Eng_Scratch in Evt_OpF1_FadeFixedColor: 8-bit
+                                         ; channel bits of the colour operand
+!EvtDrift_Layers = $D9                   ; alias of Eng_Scratch in Evt_OpE6_SetDrift: 8-bit layer bits
+!EvtDrift_Amount = $DB                   ; alias of Oam_Range1LoPtr's slot there: 16-bit x, y amounts
+!EvtCredits_Block = $D9                  ; alias of Eng_Scratch in Evt_Op29_StartCredits: 8-bit, the
+                                         ; Credits_Text block wanted
+!EvtCredits_Count = $DD                  ; alias of Oam_Range2LoPtr's slot there: 8-bit, blocks skipped
+!EvtQuad_Start = $F0                     ; alias of FieldBtl_RestOriginX in Evt_OpFE_WinQuad: 16-bit,
+                                         ; a start value x 256 (low byte 0)
+!EvtQuad_Frames = $F4                    ; alias of ObjDir_Index there: 8-bit, the frames operand
+!EvtQuad_Ofs = $F6                       ; alias of ObjDir_Run/Rise there: 16-bit offset into
+                                         ; WinFx_QuadPos / WinFx_QuadVel
+!EvtQuad_Left = $EE                      ; alias of FieldBtl_RecFlags's slot there: 8-bit values left
+!EvtFF_Sub = $DF                         ; alias of EvtCall_NewLevel's slot in Evt_OpFF_Misc: 8-bit,
+                                         ; the opcode's second byte
+!EvtSpr_RecOfs = $BF                     ; 16-bit dp scratch of Evt_LoadSpriteRec (and opcodes $82/$83):
+                                         ; the record number x its record size (no other use known)
+!EvtSpr_Idx = $D9                        ; alias of Eng_Scratch there: 16-bit record index byte
+!EvtSpr_SlotArg = $E1                   ; alias of EvtCall_SaveIdx's slot in Evt_Op83_InitEnemySprite:
+                                         ; 8-bit, the slot operand (bit 7: kind 6)
+!EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
+                                         ; 16-bit, the opcode's offset (Y)
+!EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
+                                         ; opcode's offset) across a member's redirect
+!EvtParty_Col = $DB                      ; alias of Oam_Range1LoPtr's slot in Evt_OpD9: 8-bit column
+                                         ; operand (bit 7 included)
+!EvtParty_Row = $DD                      ; alias of Oam_Range2LoPtr's slot there: 8-bit row operand
 !EvtCtl_SavedY = $C7                     ; alias of ObjFront_SavedY's slot in Evt_OpB0_PartyControl:
                                          ; 16-bit, the opcode's offset (Y) across its callees
 !EvtCopy_Count = $C1                     ; alias of Anim_RowAddr in Evt_Op4E_CopyData: 16-bit MVN count
@@ -571,7 +608,10 @@ if !ram_engine_inc == 0
 !ObjQ_Unk69 = $69                        ; 16-bit; Scene_PostLoadInit sets ObjQ_Unk69Init;
                                          ; Vblank_ReadScanlineCounters stops running scripts once the
                                          ; V counter reaches it (unless past line 240)
-!ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; no reader traced
+!ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; the next free
+                                         ; byte of a bank-$7F graphics area: Evt_InitWramSprite points
+                                         ; Obj_GfxOfs at it (opcodes $82/$83 unpack there and add the
+                                         ; length)
 !ObjQ_Unk73 = $73                        ; 8-bit; zeroed by Evt_InitObjects; no reader traced
 !ObjQ_Unk74 = $74                        ; 8-bit; ObjQ_Empty at load (Evt_InitObjects): the head of
                                          ; the list of objects whose script is due (linked through
@@ -680,7 +720,7 @@ if !ram_engine_inc == 0
                                          ; copied after the CGWSEL
                                          ; slot into $7E:2C6B by $C0:06AF (see Ppu_Unk0BD7)
 !Ppu_Unk0BE0 = $0BE0                     ; 8-bit; written with Ppu_Unk0BDF by Field_HookWinFixedB,
-                                         ; and by event code at $C0:3D2C-3D74; no reader traced
+                                         ; and by Evt_OpF1_FadeFixedColor; no reader traced
 !Field_Unk0BD9 = !Ppu_W12SelShadow       ; older name of Ppu_W12SelShadow, still used by
                                          ; Field_InitLoadState (rename there on its next edit)
 !Field_Unk0BDA = !Ppu_W34SelShadow       ; older name of Ppu_W34SelShadow (as Field_Unk0BD9)
@@ -696,7 +736,8 @@ if !ram_engine_inc == 0
 !Credits_VramAddr = $0BE5                ; 16-bit VRAM word address of the credits line just built;
                                          ; the NMI routine at $C0:EC77 DMAs the line there
 !Credits_DmaSize = $0BE7                 ; 16-bit byte count of that DMA ($C0:EC77)
-!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState, no other matched use
+!Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState; Evt_Op29_StartCredits
+                                         ; sets 1 or 2; LocLoad_DrawMap copies it to Map_Unk1D86 when nonzero
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
                                          ; (Field_SaveState / Field_RestoreState)
 !Audio_CmdId = $1E00                     ; 8-bit sound-driver command byte ($19 = play sound effect),
@@ -744,8 +785,8 @@ if !ram_engine_inc == 0
                                          ; (each unless FieldBtl_EvtFlags says not). Bank $C1 stores 1 at
                                          ; $C1:813C and 0 at $C1:817B/81FA/8358; who stores 2 is not
                                          ; found. AudioFadeDispatch also reads it
-!FieldBtl_EvtFlags = $7E2A1F             ; 8-bit; an event opcode copies it from the script
-                                         ; ($C0:3A9F). Bit 5 (FieldBtl_EvtNoReset) and bit 7
+!FieldBtl_EvtFlags = $7E2A1F             ; 8-bit; Evt_OpD8_StartBattle copies it from the script
+                                         ; (its second operand). Bit 5 (FieldBtl_EvtNoReset) and bit 7
                                          ; (FieldBtl_EvtUnk80) are tested by Scene_Unk0283 /
                                          ; Field_Unk034B, bit 4 probably meant to be (see
                                          ; Scene_Unk0283); MusicCueDispatch reads bit 6
@@ -766,8 +807,13 @@ if !ram_engine_inc == 0
                                          ; message)
 !Evt_Unk7F0200 = $7F0200                 ; alias of Treasure_ItemId: start of the Evt_Unk7F0200Bytes
                                          ; Evt_InitObjects clears at each location load
-!Field_Unk7F03FE = $7F03FE               ; 8-bit; when 1-2 Field_RestoreState stacks party members
-                                         ; 2/3 on the leader and sets it to 3
+!Evt_PartyWalkCount = $7F03FC           ; 8-bit, event word $FE's low byte: Evt_OpD9_PartyWalkToTiles'
+                                         ; count (0 = idle; 4 less the members sent, +1 by each
+                                         ; member's Map_Unk7F3700 block as it arrives)
+!Field_Unk7F03FE = $7F03FE               ; 8-bit, event word $FF's low byte; when 1-2 Field_RestoreState
+                                         ; stacks party members 2/3 on the leader and sets it to 3.
+                                         ; Evt_OpDA_PartyGather's count: 3 less the members sent,
+                                         ; +1 by Map_Unk7F3700's block 0 as each arrives
 !Rom_DirToFacing = $C0F700               ; 256 bytes in ROM: the Obj_Facing (0 up, 1 down, 2 left, 3
                                          ; right) for each Obj_Direction: $E0-$1F right, $20-$5F
                                          ; down, $60-$9F left, $A0-$DF up; read absolute through
@@ -808,14 +854,19 @@ if !ram_engine_inc == 0
                                          ; (LocLoad_InitUnk7F3700); Map_Unk7F3728/3748/3768/3781 lie
                                          ; inside them
 !Map_Unk7F3728 = $7F3728                 ; 16-bit; saved/restored around bank $C2 (Field_SaveState,
-                                         ; Field_RestoreState). An event opcode handler at $C0:3311
-                                         ; stores two script bytes AND $7F into its low and high
-                                         ; byte (an X/Y-like pair, inferred). Earlier notes called
-                                         ; it scroll X0; nothing shows it is a scroll value
-!Map_Unk7F3748 = $7F3748                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3398)
-!Map_Unk7F3768 = $7F3768                 ; 16-bit; as Map_Unk7F3728 (event handler at $C0:3421)
-!Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728; no event
-                                         ; handler stores it in matched or traced code
+                                         ; Field_RestoreState). The column / row operand of the $96
+                                         ; walk in Map_Unk7F3700's block 1 (the script
+                                         ; Evt_OpD9_PartyWalkToTiles sends the leader to), which
+                                         ; stores two operand bytes AND $7F here. Earlier notes
+                                         ; called it scroll X0; nothing shows it is a scroll value
+!Evt_PartyWalkFacing0 = $7F372B          ; 8-bit: the $A6 facing operand in block 1 (Evt_OpD9)
+!Map_Unk7F3748 = $7F3748                 ; 16-bit; as Map_Unk7F3728, block 2 (party member 2)
+!Evt_PartyWalkFacing1 = $7F374B          ; 8-bit: as Evt_PartyWalkFacing0, block 2
+!Map_Unk7F3768 = $7F3768                 ; 16-bit; as Map_Unk7F3728, block 3 (party member 3)
+!Evt_PartyWalkFacing2 = $7F376B          ; 8-bit: as Evt_PartyWalkFacing0, block 3
+!Map_Unk7F3781 = $7F3781                 ; 16-bit; saved/restored with Map_Unk7F3728: the $96
+                                         ; walk's column / row in the fifth block, which
+                                         ; Evt_PushTarget writes (Evt_PushTileOfs)
 !ObjX_Unk7F0580 = $7F0580                ; per-object word ($80-byte table in bank $7F), zeroed by
                                          ; Evt_RunObjInit. With the seven tables after it, one per
                                          ; Obj_Unk1C00 level (Evt_PrioStride apart):
@@ -833,6 +884,8 @@ if !ram_engine_inc == 0
 !ObjX_Unk7F0C80 = $7F0C80                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0D00 = $7F0D00                ; as ObjX_Unk7F0C00
 !ObjX_Unk7F0D80 = $7F0D80                ; as ObjX_Unk7F0C00
+!ObjX_Unk7F0F00 = $7F0F00                ; 8-bit; Evt_OpD9/Evt_OpDA zero its byte at Field_UnkAB with
+                                         ; those of ObjX_Unk7F0C00 / 7F0D00 (no reader traced)
 
 ; --- OAM shadow ---
 !Obj_PalPrev = $0B00                     ; 8-bit per object (index Obj_Cur): the object before it in
@@ -1134,6 +1187,11 @@ if !ram_engine_inc == 0
 !WinFx_QuadTablePtr = $0350              ; alias of WinFx_ArgX for hook 6: 16-bit table address for
                                          ; BankC3_Entry0011
 !WinFx_QuadTableBank = $0352             ; alias of WinFx_ArgY for hook 6: its bank byte
+!WinFx_C3EMode = $0350                   ; alias of WinFx_ArgX for hook 3: 16-bit mode word the $FF
+                                         ; $92-$95 opcodes give BankC3_Entry000E (WinFx_Busy is its
+                                         ; low byte)
+!WinFx_C3ETablePtr = $0352               ; alias of WinFx_ArgY for hook 3: 16-bit table address
+!WinFx_C3ETableBank = $0354              ; alias of WinFx_ArgSize for hook 3: its bank byte
 !WinFx_QuadPoints = $0360                ; 8 bytes for BankC3_Entry0011: X, Y of 4 points (the high
                                          ; bytes of WinFx_QuadPos); it picks the smallest Y first
 !WinFx_QuadTimer = $7F1CE8               ; 8-bit frames left for hook 6
@@ -1186,8 +1244,8 @@ if !ram_engine_inc == 0
 ; Map_Unk1D2E/1D30. That they are BG1-BG3 is likely, not traced.
 !Map_ScrollToMode = $1D00                ; 8-bit; nonzero makes Map_Unk91AC set Map_Unk1D2E/1D30 to
                                          ; +/-$10 towards Map_ScrollToX/Y; it stores 2 when both
-                                         ; have arrived (inferred: a scroll-to request; who sets it
-                                         ; is not traced)
+                                         ; have arrived (a scroll-to request: Evt_OpE7_ScrollTo
+                                         ; sets 1 and clears it once it reads 2)
 !Map_ScrollToDone = $1D01                ; 8-bit; bit 0 / bit 1 set by Map_Unk91AC when X / Y has
                                          ; arrived; zeroed when both have
 !Map_ScrollToX = $1D02                   ; 8-bit target compared with Map_TileOriginX's low byte

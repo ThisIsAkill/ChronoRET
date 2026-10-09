@@ -21027,8 +21027,9 @@ BankC1_BattleStartVec:
 ; $C1:D126 with argument Y, pulls them back and returns with RTL; service 1 is
 ; BankC1_AddItem, service 4 BankC1_AddGold (!BankC1Svc_AddItem /
 ; AddGold, as Field_CheckTileInFront uses them).
-; Callers (8 JSL sites): Field_CheckTileInFront ($C0:1E72, $C0:1E84) and unmatched ($C0:378E,
-;   $C0:37BF, $C0:37F1, $C0:3838, $C0:386C, $C0:3885).
+; Callers (8 JSL sites): Field_CheckTileInFront ($C0:1E72, $C0:1E84), Evt_OpC9_IfHasItem ($C0:378E),
+;   Evt_AddItemTail ($C0:37BF), Evt_OpCB_RemoveItem ($C0:37F1), Evt_OpCC_IfHasGold ($C0:3838),
+;   Evt_OpCD_AddGold ($C0:386C) and Evt_OpCE_RemoveGold ($C0:3885).
 ; Entry: M and X any (the service sets its own widths), DP and DB any;
 ;        A = service number, Y = argument
 ; Exit:  P, X, DP and DB as on entry; A = the service's result; Y as
