@@ -52,9 +52,9 @@ if !ram_menu_inc == 0
                                          ; colour set Pal_LoadUnkRow0 loads and Field_UploadUnk1F00's graphics set
 !Menu_Config1E = $7E29AE                 ; 8-bit; Menu_Config+$1E as a long address; C2Scene_LoadScene copies it
                                          ; to C2Scene_Unk02AE; use unknown
-!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; Menu_CmdJoin sets
-                                         ; the character's BankFF_CharBits bit in the low byte (probably
-                                         ; "has joined")
+!Menu_Unk29AF = $29AF                    ; 16-bit; set to $0080 by Menu_InitNewGameData; low byte bit 7 - n:
+                                         ; character n is recruited, probably (Menu_CmdJoin sets the
+                                         ; character's BankFF_CharBits bit; BattleSys_AwardReserveExp reads it)
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs);
                                          ; probably the gold (the C0 opcodes' gold sum; unmatched code at
                                          ; $C2:FDF1 caps it at 9,999,999)

@@ -653,7 +653,9 @@ C2Scene_VramQInit:
 ; Entry: M=1 (8-bit A), X=0, DP=$0000 (queue on the direct page), DB=$00
 ;        (absolute DMA and PPU registers)
 ; Exit:  M=1, X=0 (SEP #$10 for the loop, REP #$10 after); after a flush
-;        A = bank(C2Scene_VramQBuf) and X = its address; Y, DP and DB
+;        A = bank(C2Scene_VramQBuf) and X = its address, and Y's low byte
+;        kept, high byte cleared (SEP #$10 at $C2:040F; C2Scene_NmiHandler
+;        saves and restores Y itself); Y unchanged otherwise; DP and DB
 ;        unchanged
 ; No calls.
 org $C20405
@@ -1750,8 +1752,9 @@ C2Scene_EdgeRowSetup:
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
 ;        C2Scene_EdgeCol = the column's BG pixel X, C2Scene_ScrollVramMap
 ;        set
-; Exit:  M=0, X=0; A = the new buffer pointer; X = the entry's offset; Y
-;        unchanged; C2Scene_EdgeCol = the VRAM address
+; Exit:  M=0, X=0; A = the new buffer pointer; X = the entry's offset; Y's
+;        low byte kept, high byte cleared (SEP #$30 at $C2:0923);
+;        C2Scene_EdgeCol = the VRAM address
 ; No calls.
 C2Scene_QueueEdgeCol:
     LDA.b !C2Scene_EdgeCol
@@ -1805,7 +1808,8 @@ C2Scene_QueueEdgeCol:
 ; Entry: M=0, X=0, DP=$0000, DB=$00 (the queue, absolute);
 ;        C2Scene_EdgeRow = the row's BG pixel Y, C2Scene_ScrollVramMap set
 ; Exit:  M=0, X=0; A = the new buffer pointer; X = the first entry's
-;        offset; Y unchanged; C2Scene_EdgeCol / C2Scene_EdgeRow = the two
+;        offset; Y's low byte kept, high byte cleared (SEP #$30 at
+;        $C2:0972); C2Scene_EdgeCol / C2Scene_EdgeRow = the two
 ;        VRAM addresses
 ; No calls.
 C2Scene_QueueEdgeRow:
@@ -23536,8 +23540,8 @@ org $C28000
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
 ;   Field_RunBankC2Mode5 ($C0:19CE) and C2Scene_Mode5 ($C2:2552).
-; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), C2Scene_NmiHandler ($C2:031B)
-;   and unmatched ($C1:EE27, $CD:091A, $CD:09C6).
+; Callers of BankC2_Entry8002 (5 JSL sites): NmiHandler ($C0:EC15), BattleSys_HitModPlayTime
+;   ($C1:EE27), C2Scene_NmiHandler ($C2:031B) and unmatched ($CD:091A, $CD:09C6).
 ; Callers of BankC2_Entry8004 (15 JSL sites): GameLoop ($C0:0059), Evt_OpD7_GetItemCount ($C0:3807),
 ;   Evt_OpCF_IfCharListed ($C0:389B), Evt_OpD0_AddCharToReserve ($C0:38CC), Evt_OpD1_UnlistChar
 ;   ($C0:38E1), Evt_OpD2_IfCharInParty ($C0:38F6), Evt_OpD3_AddCharToParty ($C0:392B),
@@ -25115,8 +25119,9 @@ Menu_GradientSteps:
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E (the
 ;        inventory)
 ; Exit:  P and X restored; A = 0 (added), Menu_InvFull (no free slot) or
-;        the id (0, $5A, $7B, $94: not added); Y unchanged;
-;        Menu_ItemSlot as Menu_FindItem left it
+;        the id (0, $5A, $7B, $94: not added); Y unchanged with X=1 at
+;        entry; with X=0 its high byte is cleared by the SEP #$30
+;        ($C2:8793); Menu_ItemSlot as Menu_FindItem left it
 ; Calls: Menu_FindItem.
 Menu_AddItem:
     PHX
@@ -25167,7 +25172,8 @@ Menu_ItemSetCount:                      ; header: see Menu_AddItem
 ;   $C2:D7AA).
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E
 ; Exit:  P and X restored; A = 0 (taken or id 0), Menu_ItemShort or
-;        Menu_InvFull (not found); Y unchanged
+;        Menu_InvFull (not found); Y unchanged with X=1 at entry; with
+;        X=0 its high byte is cleared by the SEP #$30 ($C2:87D7)
 ; Calls: Menu_FindItem.
 Menu_RemoveItem:
     PHX

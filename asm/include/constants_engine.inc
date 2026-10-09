@@ -692,6 +692,19 @@ if !constants_engine_inc == 0
                                          ; bottom rows (30 tiles)
 !Field_Unk7EF000HiGrid = $29             ; Field_Unk2B78's high byte: priority, palette 2, tile bit 8
 !Field_Unk7EF000Run = $10                ; tiles per run in Field_Unk2B78
+; --- The choice cursor in the $1C00 tilemap (Irq_DrawChoiceCursor) ---
+!ChoiceCursor_VramRow0 = !Field_UploadVram1C00+$02 ; VRAM word address of the cursor's top-left tile
+                                         ; at choice row 0: column 2 of map row 0 of the tilemap
+                                         ; Field_UploadUnk1C00 sends to $1C00
+!ChoiceCursor_VramRowStep = $0040        ; VRAM words from one choice row to the next (2 map rows of 32)
+!ChoiceCursor_VramLine = $0020           ; VRAM words from a row's top tiles to its bottom ones (1 map row)
+!ChoiceCursor_TileTop = $28FC            ; tilemap word of the cursor's top-left tile: tile $0FC,
+                                         ; palette 2, priority; top-right is this + 1
+!ChoiceCursor_TileBottom = $28FE         ; bottom-left tile ($0FE); bottom-right is this + 1
+!ChoiceCursor_GridRow0 = (!Field_Unk7EF000HiGrid<<8)+$02 ; $2902: Field_Unk2B78's entry at column 2
+                                         ; of map row 0 (tile $102), put back where the cursor is not
+!ChoiceCursor_GridRowStep = $0040        ; Field_Unk2B78 tiles from map row 2j to row 2j + 2 (its run order)
+!ChoiceCursor_GridLine = $0010           ; Field_Unk2B78 tiles from map row 2j to row 2j + 1
 ; --- Field HDMA (Hdma_InitChannelsFD, EngFD_UnkC124, EngFD_UnkD52D, EngFD_UnkC2C1) ---
 !Hdma_TableSetA = $0F80                  ; bank-$7F address of the first set of 8 HDMA tables
 !Hdma_TableSetB = $1238                  ; ... of the second set

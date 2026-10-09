@@ -21103,7 +21103,8 @@ BankC1_Entry8003:
 ;          BattleSys_RunServiceVec (services 0, 3, 6, 8, 9),
 ;          Battle_RandRange, BattleSys_Unk8C09/8461/895B,
 ;          BattleSys_UnkB223/B3BB/B3D2/B3F9/B442/B4E9/B7F2/B093/B0B6/BC60,
-;          BattleSys_UnkEA9D/EAE8/F93E, BattleSys_UnkVecCD0021,
+;          BattleSys_ClearPcStatuses/ClearPcKo, BattleSys_AwardExpAndTp,
+;          BattleSys_UnkVecCD0021,
 ;          BattleSys_ListHandlerTable entries, BankC1_AddGold,
 ;          BankC1_AddItem, BattleSys_ExitVec (JMP)
 !BattleMain_Idx    = !BattleTmp_00      ; 1-2 B: loop index (PC, enemy, list)
@@ -21269,7 +21270,7 @@ BattleSys_Main:
     LDA.b !Battle_Unk24
     BEQ .check_enemies
     ; Defeat end.
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     JSR BattleSys_UnkB3BB
     LDA.b #1
     STA.l !Battle_Unk7F01EC
@@ -21307,7 +21308,7 @@ BattleSys_Main:
     STA.l !Battle_Unk7F01EC
     LDA.b #!Battle_EntryNone
     STA.w !Battle_UnkA5A9
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     LDA.b #!BattleSys_ServiceVictory
     JSR BattleSys_RunServiceVec
     JMP .victory
@@ -21370,11 +21371,11 @@ BattleSys_Main:
     JSL BattleFD_UnkAA98
     LDA.b #!Battle_EndUnkCD0021Arg
     JSL BattleSys_UnkVecCD0021
-    JSR BattleSys_UnkEA9D
+    JSR BattleSys_ClearPcStatuses
     JSR BattleSys_UnkB7F2
     LDA.b #!Battle_EndUnk895BArg
     JSR BattleSys_Unk895B
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
     JSR BattleSys_UnkB4E9
     JSR BattleSys_UnkB3BB
@@ -21626,10 +21627,10 @@ BattleSys_Main:
     LDA.w !Battle_UnkB2AF
     ORA.b #!Battle_RewardBitGold
     STA.w !Battle_UnkB2AF
-    JSR BattleSys_UnkF93E
+    JSR BattleSys_AwardExpAndTp
 .no_gold:
     JSL BattleFD_UnkAD17
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
     JSR BattleSys_UnkB4E9
     TDC
@@ -21661,8 +21662,8 @@ BattleSys_Main:
     STA.w BattlerStats[2].MaxHp
     TDC
     SEP #$20
-    JSR BattleSys_UnkEA9D
-    JSR BattleSys_UnkEAE8
+    JSR BattleSys_ClearPcStatuses
+    JSR BattleSys_ClearPcKo
     JSR BattleSys_UnkB442
 .end_common:
     LDA.b !Battle_RandIdx
@@ -24180,13 +24181,17 @@ BattleAi_NoteFirstTest:
 ;   BattleSys_RunTechParts ($C1:D67C), BattleSys_RestoreHpMp ($C1:DA7C, $C1:DB1A), BattleSys_RollHit
 ;   ($C1:DC94), BattleSys_CalcDamage ($C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4,
 ;   $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F), BattleSys_RollUpTo1A ($C1:E774), BattleSys_DrainHpMp
-;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), BattleSys_StealItem ($C1:E9F0), Battle_RandRangeLong
-;   ($C1:FDCB) and unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:EED8, $C1:EEFF,
-;   $C1:EF18, $C1:EFC9, $C1:F0A4, $C1:F141, $C1:FDDA).
+;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), BattleSys_StealItem ($C1:E9F0),
+;   BattleSys_HitModUnk47Status ($C1:EED8), BattleSys_HitModChanceStatus ($C1:EEFF),
+;   BattleSys_HitModLeaveOneHp ($C1:EF18), BattleSys_HitModRollDp1A ($C1:EFC9),
+;   BattleSys_HitModHalveHp ($C1:F0A4), BattleSys_HitModKoOrDrop ($C1:F141), Battle_RandRangeLong
+;   ($C1:FDCB) and unmatched ($C1:95E8, $C1:98D5, $C1:A48A, $C1:AB30, $C1:ABF6, $C1:FDDA).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
-;        back); Y unchanged; !Battle_RandMin and !Battle_UnkB31E written;
+;        back); Y's low byte kept, high byte cleared (the SEP #$10 at
+;        entry; REP #$10 does not restore it); !Battle_RandMin and
+;        !Battle_UnkB31E written;
 ;        on the divide path !Battle_RandIdx advanced and !Battle_MathA,
 ;        MathB, MathHi and MathRem changed (Battle_Div32; MathLo is
 ;        saved and put back)
@@ -24235,6 +24240,76 @@ Battle_RandRange:
     CLC
     ADC.b !Battle_RandMin
     INC.b !Battle_RandIdx
+.done:
+    REP #$10
+    PLX
+    STX.b !Battle_MathLo
+    RTS
+
+; $C1:AF79 — Battle_RandRangeAlt (89 bytes, $AF79–$AFD1)
+; Battle_RandRange with its own index: the same code, but the entry of
+; RandomTableFD is taken at !Battle_UnkB3E6 (not !Battle_RandIdx), and
+; !Battle_UnkB3E6 is the counter stepped. Its one caller,
+; BattleSys_HitModChanceMul, rolls 0-99 with it, so that roll does not
+; move the main sequence. The special cases and quirks are Battle_RandRange's:
+; low bound $FF returns A; !Battle_Unk2989 bit 5 returns the low bound;
+; high 0 returns 0 and high = low that value; a range of $FF returns the
+; raw entry without the low bound and without stepping !Battle_UnkB3E6;
+; Battle_Div32 also divides by whatever !Battle_MathHi holds.
+; Callers (1 JSR site): BattleSys_HitModChanceMul ($C1:ED95).
+; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
+;        bound, X = low bound
+; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
+;        back); Y's low byte kept, high byte cleared (the SEP #$10 at
+;        entry; REP #$10 does not restore it); !Battle_RandMin and
+;        !Battle_UnkB31E written;
+;        on the divide path !Battle_UnkB3E6 advanced and !Battle_MathA,
+;        MathB, MathHi and MathRem changed (Battle_Div32; MathLo is
+;        saved and put back)
+; Callee: Battle_Div32
+Battle_RandRangeAlt:
+    SEP #$10
+    STX.b !Battle_RandMin
+    REP #$10
+    LDX.b !Battle_MathLo
+    PHX
+    SEP #$10
+    LDX.b !Battle_RandMin
+    CPX.b #!Battle_EntryNone
+    BNE .bounds
+    BRA .done
+.bounds:
+    STA.w !Battle_UnkB31E
+    LDA.w !Battle_Unk2989
+    BIT.b #!Battle_2989Bit5
+    BEQ .random
+    TXA                                 ; bit 5: the low bound
+    BRA .done
+.random:
+    LDA.w !Battle_UnkB31E
+    CMP.b #0
+    BEQ .done
+    CMP.b !Battle_RandMin
+    BEQ .done
+    LDX.w !Battle_UnkB3E6
+    SEC
+    SBC.b !Battle_RandMin
+    CMP.b #!Battle_RandFullRange
+    BNE .divide
+    LDA.l RandomTableFD,X               ; range 256: the raw byte
+    BRA .done
+.divide:
+    STA.b !Battle_MathB
+    STZ.b !Battle_MathB+1
+    LDA.l RandomTableFD,X
+    TAX
+    STX.b !Battle_MathA
+    STZ.b !Battle_MathA+1
+    JSR Battle_Div32
+    LDA.b !Battle_MathRem
+    CLC
+    ADC.b !Battle_RandMin
+    INC.w !Battle_UnkB3E6
 .done:
     REP #$10
     PLX
@@ -26359,7 +26434,7 @@ BattleSys_UnkB967:
 ; is not known (the PC's .Kind bit 4 leads here).
 ; Callers (9 sites: 8 JSR, 1 JMP): BattleSys_Main (JSR $C1:8394, JSR $C1:839A, JSR $C1:83A0),
 ;   BattleSys_UpdateKo (JSR $C1:B300), BattleSys_UnkB967 (JMP $C1:BA62, JSR $C1:BA72, JSR $C1:BB43,
-;   JSR $C1:BB53) and unmatched (JSR $C1:EAF1).
+;   JSR $C1:BB53) and BattleSys_ClearPcKo (JSR $C1:EAF1).
 ; Callers note: BattleSys_Main's three sites ($C1:8394, $C1:839A,
 ;   $C1:83A0) are the debug win, for PCs 0-2.
 ; Entry: M=1, X=0, DP=0, DB=$7E (only the dead body depends on them);
@@ -27370,7 +27445,7 @@ Battle_ScaleByte10:
 ; $C1:C1B2 — Battle_ScaleWord10 (43 bytes, $C1B2–$C1DC)
 ; DP $30/$31 = about x / 10:
 ;   x / 8 - x / 64 - x / 128 - x / 1024, all 16 bits.
-; Callers (2 JSR sites): BattleSys_CalcDamage ($C1:E3BA) and unmatched ($C1:EE44).
+; Callers (2 JSR sites): BattleSys_CalcDamage ($C1:E3BA) and BattleSys_HitModPlayTime ($C1:EE44).
 ; Entry: M any (REP inside), X=0 (16-bit TAY), DP=0, DB any; A =
 ;        x (16-bit, B:A)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (B too); Y = the last
@@ -28570,10 +28645,13 @@ BattleSys_MapEmptyTarget:
 ;   Battle_HitEntryOffset ($C1:E8B5), BattleSys_CasterHitOffset ($C1:E8D6),
 ;   BattleSys_LoadCasterStats ($C1:E9AF), BattleSys_LoadTargetStats ($C1:E9CC), BattleSys_StealItem
 ;   ($C1:EA14), BattleSys_RunUnkB2CCHandler ($C1:EB28), Battle_SumHitSets ($C1:EB81),
-;   Battle_RecordHit ($C1:EC1D), Battle_SetupBattle ($C1:FCA6, $C1:FD75), Battle_Mul16Long
-;   ($C1:FDBF) and unmatched ($C1:EDA8, $C1:EDC5, $C1:EDEE, $C1:EE1E, $C1:EFA6, $C1:F0F8, $C1:F1DE,
-;   $C1:F47D, $C1:F5B2, $C1:F642, $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B, $C1:F770,
-;   $C1:FA11, $C1:FA2D).
+;   Battle_RecordHit ($C1:EC1D), BattleSys_HitModChanceMul ($C1:EDA8), BattleSys_HitModScale
+;   ($C1:EDC5), BattleSys_HitModUnk47Scale ($C1:EDEE), BattleSys_HitModPerEmptyPc ($C1:EE1E),
+;   BattleSys_HitModUnk6CScale ($C1:EFA6), BattleSys_HitModHpDigit ($C1:F0F8),
+;   BattleSys_HitModAltBoost ($C1:F1DE), BattleSys_TryNextTech ($C1:F47D), BattleSys_LearnComboTechs
+;   ($C1:F5B2), BattleSys_LevelUpStep ($C1:F642, $C1:F667, $C1:F69C, $C1:F6D1, $C1:F706, $C1:F73B,
+;   $C1:F770), BattleSys_AwardReserveExp ($C1:FA11, $C1:FA2D), Battle_SetupBattle ($C1:FCA6,
+;   $C1:FD75) and Battle_Mul16Long ($C1:FDBF).
 ; Callers note: 109 JSR sites, e.g. $C1:B329, $C1:B455, $C1:B4BC and
 ;   Battle_SetupBattle (xref; nearly all in unmatched code).
 ; Entry: M any, X=0 (LDX #16 is a 3-byte immediate), DP=0, DB any
@@ -28614,16 +28692,18 @@ Battle_Mul16:
 ; (it is shifted in first), not usable results. The remainder is kept
 ; in 16 bits, so a divisor of $8000 or more can give wrong results.
 ; Callers (59 JSR sites): BattleSys_ListHandler1 ($C1:8918), Battle_RandRange ($C1:AF69),
-;   BattleSys_ResetTechUsers ($C1:BE1A, $C1:BE94, $C1:BF11), BattleSys_Effect02 ($C1:D290),
-;   BattleSys_RestoreHpMp ($C1:DA6F, $C1:DB0D), BattleSys_RollHit ($C1:DC89), BattleSys_ApplyDamage
-;   ($C1:DCD6, $C1:DD2F, $C1:DD5C), BattleSys_AdjustHit ($C1:DEBF, $C1:DEE7), BattleSys_AdjustEvade
-;   ($C1:DF58, $C1:DF7F, $C1:DFA6, $C1:DFCB, $C1:DFED, $C1:DFF7), BattleSys_CalcDamage ($C1:E157,
-;   $C1:E16D, $C1:E1E0, $C1:E259, $C1:E2B6, $C1:E30B, $C1:E33C, $C1:E352, $C1:E3B1, $C1:E40C,
-;   $C1:E49B, $C1:E4F5, $C1:E560, $C1:E5A5, $C1:E5C9, $C1:E5F7, $C1:E619, $C1:E62F),
-;   BattleSys_AdjustDefence ($C1:E6A2, $C1:E6CC, $C1:E6F2, $C1:E716, $C1:E73A), BattleSys_DrainHpMp
-;   ($C1:E79E, $C1:E7B0), Battle_CalcUnk56 ($C1:FDB6) and unmatched ($C1:AFC1, $C1:EDD1, $C1:EE36,
-;   $C1:EFB3, $C1:F0EC, $C1:F104, $C1:F673, $C1:F6A8, $C1:F6DD, $C1:F712, $C1:F747, $C1:F77C,
-;   $C1:FA39).
+;   Battle_RandRangeAlt ($C1:AFC1), BattleSys_ResetTechUsers ($C1:BE1A, $C1:BE94, $C1:BF11),
+;   BattleSys_Effect02 ($C1:D290), BattleSys_RestoreHpMp ($C1:DA6F, $C1:DB0D), BattleSys_RollHit
+;   ($C1:DC89), BattleSys_ApplyDamage ($C1:DCD6, $C1:DD2F, $C1:DD5C), BattleSys_AdjustHit ($C1:DEBF,
+;   $C1:DEE7), BattleSys_AdjustEvade ($C1:DF58, $C1:DF7F, $C1:DFA6, $C1:DFCB, $C1:DFED, $C1:DFF7),
+;   BattleSys_CalcDamage ($C1:E157, $C1:E16D, $C1:E1E0, $C1:E259, $C1:E2B6, $C1:E30B, $C1:E33C,
+;   $C1:E352, $C1:E3B1, $C1:E40C, $C1:E49B, $C1:E4F5, $C1:E560, $C1:E5A5, $C1:E5C9, $C1:E5F7,
+;   $C1:E619, $C1:E62F), BattleSys_AdjustDefence ($C1:E6A2, $C1:E6CC, $C1:E6F2, $C1:E716, $C1:E73A),
+;   BattleSys_DrainHpMp ($C1:E79E, $C1:E7B0), BattleSys_HitModScale ($C1:EDD1),
+;   BattleSys_HitModPlayTime ($C1:EE36), BattleSys_HitModUnk6CScale ($C1:EFB3),
+;   BattleSys_HitModHpDigit ($C1:F0EC, $C1:F104), BattleSys_LevelUpStep ($C1:F673, $C1:F6A8,
+;   $C1:F6DD, $C1:F712, $C1:F747, $C1:F77C), BattleSys_AwardReserveExp ($C1:FA39) and
+;   Battle_CalcUnk56 ($C1:FDB6).
 ; Callers note: 59 JSR sites, e.g. $C1:8918, Battle_RandRange ($C1:AF69),
 ;   $C1:AFC1 and Battle_SetupBattle (xref; mostly unmatched code).
 ; Entry: M any, X any, DP=0, DB any; the caller's carry goes in as said
@@ -29918,8 +29998,8 @@ BankC1_FindItem:
 ; Quirk: with no empty entry, entry 0 (!Battle_SvcSlot's start value) is
 ; overwritten with the id and keeps its old count + 1.
 ; Callers note: BankC1_ServiceTable entry 1 (BankC1_RunService).
-; Callers (3 JSR sites): BattleSys_Main ($C1:840E), BankC1_AddItemLong ($C1:FDC3) and unmatched
-;   ($C1:F01E).
+; Callers (3 JSR sites): BattleSys_Main ($C1:840E), BattleSys_AddBattleItem ($C1:F01E) and
+;   BankC1_AddItemLong ($C1:FDC3).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = the item id (BankC1_RunService)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A as said; X = the entry's index (the
 ;        scan's $100 replaced by the empty entry's); Y unchanged;
@@ -31781,7 +31861,8 @@ BattleSys_TechMpCostTable:
 ; At the end !Battle_UnkAD9B = 0 and !Battle_UnkB2C7 is as it came
 ; (the + 1 for the MP part is taken back).
 ; Callers (5 JSR sites): BattleSys_Effect00 ($C1:D22A), BattleSys_Effect01 ($C1:D253),
-;   BattleSys_Effect29 ($C1:D499), BattleSys_Effect2A ($C1:D4C2) and unmatched ($C1:EB59).
+;   BattleSys_Effect29 ($C1:D499), BattleSys_Effect2A ($C1:D4C2) and BattleSys_ReviveHeal
+;   ($C1:EB59).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 (16-bit), $18 (16-bit) and $1A
 ;        as said (BattleSys_EffRecArgsUnk66: the caster's .Unk66,
 ;        effect byte 1 & $1F, effect byte 2; BattleSys_LoadEffectArgs
@@ -32016,7 +32097,8 @@ BattleSys_CureStatus:
 ; takes DP $16 = $80 (!Battle_EffResultMiss) for a miss, which never
 ; comes, so the STA $40 (85 40) was probably meant for DP $16 (85 16).
 ; Callers (6 JSR sites): BattleSys_Effect02 ($C1:D2B7), BattleSys_Effect2B ($C1:D4DF),
-;   BattleSys_UnkE976 ($C1:E989) and unmatched ($C1:EECC, $C1:EEF3, $C1:EF10).
+;   BattleSys_UnkE976 ($C1:E989), BattleSys_HitModRandomStatus ($C1:EECC),
+;   BattleSys_HitModUnk47Status ($C1:EEF3) and BattleSys_HitModChanceStatus ($C1:EF10).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 (DP $17 = 0, as the 16-bit
 ;        add needs) and DP $18 as said; !Battle_UnkB1F6 / B1FD set
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered, B = 0; X, Y clobbered
@@ -32139,8 +32221,9 @@ BattleSys_SetStatus:
 ; Callers (1 JSR site): BattleSys_Effect03 ($C1:D316).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $16 and DP $18 as said
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = DP $16's 16-bit
-;        value before the result (the chance); Y unchanged;
-;        DP $16 (0 or 1, DP $17 = 0) and DP $18 (the roll) written,
+;        value before the result (the chance); Y's low byte kept, high
+;        byte cleared (Battle_RandRange's SEP #$10); DP $16 (0 or 1,
+;        DP $17 = 0) and DP $18 (the roll) written,
 ;        plus the math DP bytes and !Battle_RandIdx (callees)
 !RollHit_Hit = !BattleTmp_16            ; 2 B: the caster's value, then the chance, then the result
 !RollHit_Evade = !BattleTmp_18          ; 1 B: the target's value, then the roll
@@ -33780,14 +33863,15 @@ BattleSys_AdjustDefence:
 ; $C1:E76E — BattleSys_RollUpTo1A (13 bytes, $E76E–$E77A)
 ; DP $1A = a random number from 0 to DP $1A (Battle_RandRange with the
 ; high bound DP $1A + 1); X is kept.
-; Callers (1 JSR site): unmatched ($C1:EEA3).
+; Callers (1 JSR site): BattleSys_HitModRandomStatus ($C1:EEA3).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $1A = the highest value wanted
 ;        (below $FE: $FE gives the bound $FF, Battle_RandRange's
 ;        full-range case, 0-255; $FF + 1 wraps to the bound 0, which
-;        returns 0); its only caller, BattleSys_UnkB2CCHandler06 at
-;        $C1:EE9F (unmatched), passes 100
-; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $1A = the number; X and Y
-;        unchanged; what Battle_RandRange changes
+;        returns 0); its only caller, BattleSys_HitModRandomStatus,
+;        passes 100
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $1A = the number; X unchanged
+;        (PHX/PLX); Y's low byte kept, high byte cleared (Battle_RandRange's
+;        SEP #$10); what else Battle_RandRange changes
 !RollUpTo_Value = !BattleTmp_1A         ; 1 B: the highest value, then the number
 BattleSys_RollUpTo1A:
     PHX
@@ -34008,7 +34092,7 @@ BattleSys_DrainHpMp:
 ; Callers (13 JSR sites): BattleSys_ListHandler1 ($C1:8924), BattleSys_ListHandler9 ($C1:8B90),
 ;   BattleSys_UpdateKo ($C1:B33B), BattleSys_Effect07 ($C1:D414), BattleSys_RestoreHpMp ($C1:DAB7,
 ;   $C1:DB42), BattleSys_ApplyDamage ($C1:DD72, $C1:DE65), BattleSys_DrainHpMp ($C1:E822),
-;   BattleSys_RecordMiss ($C1:E8FE, $C1:E92D, $C1:E956) and unmatched ($C1:F059).
+;   BattleSys_RecordMiss ($C1:E8FE, $C1:E92D, $C1:E956) and BattleSys_HitModRestore ($C1:F059).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A any (TDC first)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = DP $0E = the offset, DP $0F = 0;
 ;        X = 0, Y unchanged; !Battle_MathA = $2C, !Battle_MathLo/Hi =
@@ -34215,7 +34299,8 @@ BattleSys_UnkE976:
 ; Callers (11 JSR sites): BattleSys_Effect00 ($C1:D221), BattleSys_Effect01 ($C1:D23E),
 ;   BattleSys_Effect02 ($C1:D267), BattleSys_Effect03 ($C1:D2DE), BattleSys_Effect05 ($C1:D378),
 ;   BattleSys_Effect06 ($C1:D3BF), BattleSys_Effect29 ($C1:D490), BattleSys_Effect2A ($C1:D4AD),
-;   BattleSys_Effect2B ($C1:D4D6) and unmatched ($C1:EAA6, $C1:EAF4).
+;   BattleSys_Effect2B ($C1:D4D6), BattleSys_ClearPcStatuses ($C1:EAA6) and BattleSys_ClearPcKo
+;   ($C1:EAF4).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A any (TDC first)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too); X = the offset; Y
 ;        unchanged; !Battle_MathA = $80, !Battle_MathLo/Hi = the
@@ -34407,6 +34492,93 @@ BattleSys_RunUnkB2CCHandlers:
     RTS
     RTS                                 ; quirk: never reached
 
+; $C1:EA9D — BattleSys_ClearPcStatuses (75 bytes, $EA9D–$EAE7)
+; For PC slots 0-2 (!Battle_UnkB18B = the slot, BattleSys_LoadCasterStats):
+; .Status2 and .Unk4C-.Unk4C+7 = 0, .Status keeps only bit 7
+; (!Battle_StatusKo), .Unk2F bit 0 (!Battle_StatsUnk2FBit) is cleared, and
+; !Battle_UnkAE51[slot] = 0. BattleSys_Main runs it on every end of the
+; battle (defeat, victory, the !Battle_Unk99CD end, and the end shared by
+; defeat, the 99CD end and bit 5), so the battle statuses do not outlast
+; it, probably.
+; Callers (4 JSR sites): BattleSys_Main ($C1:8137, $C1:8183, $C1:8207, $C1:843A).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3, B = 0; X = 2; Y unchanged;
+;        !Battle_UnkB18B = 2, !Battle_UnkB1F4 = slot 2's offset; DP
+;        $16/$17 = 3; !Battle_MathA, MathB, MathLo/Hi written
+;        (BattleSys_LoadCasterStats)
+!EndClear_Slot = !BattleTmp_16          ; 2 B: the PC slot (0-2)
+BattleSys_ClearPcStatuses:
+    TDC
+    TAX
+    STX.b !EndClear_Slot
+.slot:
+    LDA.b !EndClear_Slot
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_LoadCasterStats
+    LDX.w !Battle_UnkB1F4
+    TDC
+    STA.w BattlerStats.Status2,X
+    STA.w BattlerStats.Unk4C,X
+    STA.w BattlerStats.Unk4C+1,X
+    STA.w BattlerStats.Unk4C+2,X
+    STA.w BattlerStats.Unk4C+3,X
+    STA.w BattlerStats.Unk4C+4,X
+    STA.w BattlerStats.Unk4C+5,X
+    STA.w BattlerStats.Unk4C+6,X
+    STA.w BattlerStats.Unk4C+7,X
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    STA.w BattlerStats.Status,X
+    LDA.w BattlerStats.Unk2F,X
+    AND.b #$FF^!Battle_StatsUnk2FBit
+    STA.w BattlerStats.Unk2F,X
+    LDA.b !EndClear_Slot
+    TAX
+    TDC
+    STA.w !Battle_UnkAE51,X
+    INC.b !EndClear_Slot
+    LDA.b !EndClear_Slot
+    CMP.b #!Battle_NumPcSlots
+    BCC .slot
+    RTS
+
+; $C1:EAE8 — BattleSys_ClearPcKo (38 bytes, $EAE8–$EB0D)
+; For PC slots 0-2 (!Battle_UnkB18B = the slot): BattleSys_UnkBC60
+; (which does nothing), BattleSys_LoadCasterStats, then .Status = 0, so
+; the KO bit BattleSys_ClearPcStatuses kept goes too. BattleSys_Main runs
+; it after the victory messages (BattleFD_UnkAD17) and on the shared
+; defeat / !Battle_Unk99CD / bit-5 end, after BattleSys_ClearPcStatuses.
+; Quirk: the KO bit is tested (AND #$80) and the BEQ after it goes to the
+; next instruction, so both ways do the same.
+; Callers (3 JSR sites): BattleSys_Main ($C1:8212, $C1:83F9, $C1:843D).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 3, B = 0; X = slot 2's offset; Y
+;        unchanged; !Battle_UnkB18B = 2, !Battle_UnkB1F4 as X; DP
+;        $16/$17 = 3; !Battle_MathA, MathB, MathLo/Hi written
+;        (BattleSys_LoadCasterStats)
+!EndKo_Slot = !BattleTmp_16             ; 2 B: the PC slot (0-2)
+BattleSys_ClearPcKo:
+    TDC
+    TAX
+    STX.b !EndKo_Slot
+.slot:
+    LDA.b !EndKo_Slot
+    STA.w !Battle_UnkB18B
+    JSR BattleSys_UnkBC60
+    JSR BattleSys_LoadCasterStats
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .clear                          ; quirk: goes to the next instruction
+.clear:
+    TDC
+    STA.w BattlerStats.Status,X
+    INC.b !EndKo_Slot
+    LDA.b !EndKo_Slot
+    CMP.b #!Battle_NumPcSlots
+    BCC .slot
+    RTS
+
 ; $C1:EB0E — BattleSys_CopyEffectBytes78 (14 bytes, $EB0E–$EB1B)
 ; !Battle_UnkAE4D = byte 7 and !Battle_UnkAE4E = byte 8 of the effect
 ; record in !Battle_UnkAEE6 (meaning unknown).
@@ -34426,14 +34598,17 @@ BattleSys_CopyEffectBytes78:
 ; $C1:EB1C — BattleSys_RunUnkB2CCHandler (45 bytes, $EB1C–$EB48)
 ; Reads record !Battle_UnkB2CC of !BattleRom_UnkCC2A05 (3 bytes): DP
 ; $1C = byte 1, DP $1E = byte 2, DP $20 = byte 0, and runs entry byte 0
-; of BattleSys_UnkB2CCHandlerTable (JSR (table,X), X = byte 0 * 2, 8
-; bits, B = 0 from Battle_Mul16). What the handlers do is not analysed.
+; of BattleSys_HitModTable (JSR (table,X), X = byte 0 * 2, 8 bits, B =
+; 0 from Battle_Mul16): one of the hit modifiers BattleSys_HitModChanceMul
+; to BattleSys_HitModSetBits (see their banner).
 ; Callers (3 JSR sites): BattleSys_StealItem ($C1:EA20) and BattleSys_RunUnkB2CCHandlers ($C1:EA7A,
 ;   $C1:EA92).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB2CC set; B any (TDC first)
-; Exit:  M=1, X=0 as the callers assume, DP=0, DB=$7E (the handlers
-;        are not analysed); DP $1C/$1E/$20 as said
-;        (DP $1D/$1F/$21 unchanged) unless the handler changes them
+; Exit:  M=1, X=0, DP=0, DB=$7E (every modifier returns so); DP $20 as
+;        said, DP $1C/$1E as said except that BattleSys_HitModChanceMul
+;        puts the caster's .Unk72 in DP $1C and BattleSys_HitModClearBits
+;        inverts DP $1E (DP $1D/$1F/$21 unchanged); A, X, Y and the rest
+;        as the modifier leaves them
 !Handler_Arg1 = !BattleTmp_1C           ; 1 B: record byte 1
 !Handler_Arg2 = !BattleTmp_1E           ; 1 B: record byte 2
 !Handler_Index = !BattleTmp_20          ; 1 B: record byte 0
@@ -34457,7 +34632,42 @@ BattleSys_RunUnkB2CCHandler:
     STA.b !Handler_Index
     ASL A
     TAX
-    JSR (BattleSys_UnkB2CCHandlerTable,X)
+    JSR (BattleSys_HitModTable,X)
+    RTS
+
+; $C1:EB49 — BattleSys_ReviveHeal (31 bytes, $EB49–$EB67)
+; Not called (xref finds no call; no table entry is known). An HP
+; restore of the current target by the caster's BattlerStats.Unk66 x 5
+; (BattleSys_RestoreHpMp: DP $16 = .Unk66, DP $18 = 5, DP $1A =
+; !Battle_RestoreHpBit), then .Unk4C+3 bit 7 (!Battle_Unk4C3ReviveBit)
+; cleared. Like BattleSys_UpdateKo's one-time revive (the same bit and
+; the same Unk66 x 5 base), probably an older form of it, but not the
+; same amount: UpdateKo stores Unk66 x 5 as it is, while
+; BattleSys_RestoreHpMp adds a random 0 .. Unk66 - 1 when the product
+; is not a multiple of 50 and caps a PC target at 999.
+; Quirk: the bit is cleared at $7E:5E4F, slot 0's byte, with an absolute
+; LDA / STA: the LDX !Battle_UnkB1F6 before them is not used.
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleSys_RestoreHpMp
+;        (!Battle_UnkAD8D, !Battle_UnkB1F6 / B1FD set), and
+;        !Battle_UnkB1F4 = the caster's offset; DP $17 and $19 = 0
+;        (only the low bytes of DP $16 and $18 are written here, and
+;        BattleSys_RestoreHpMp reads both as words)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = slot 0's new .Unk4C+3; X =
+;        !Battle_UnkB1F6; Y clobbered; DP $16, $18, $1A written; what
+;        BattleSys_RestoreHpMp changes
+BattleSys_ReviveHeal:
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Unk66,X
+    STA.b !Restore_Base
+    LDA.b #!Battle_ReviveHpMul
+    STA.b !Restore_Factor
+    LDA.b #!Battle_RestoreHpBit
+    STA.b !Restore_Bits
+    JSR BattleSys_RestoreHpMp
+    LDX.w !Battle_UnkB1F6               ; quirk: not used below
+    LDA.w BattlerStats.Unk4C+3
+    AND.b #$FF^!Battle_Unk4C3ReviveBit
+    STA.w BattlerStats.Unk4C+3
     RTS
 
 ; $C1:EB68 — Battle_SumHitSets (144 bytes, $EB68–$EBF7)
@@ -34565,7 +34775,7 @@ Battle_SumHitSets:
 ;   BattleSys_ListHandler9 ($C1:8BAC), BattleSys_UpdateKo ($C1:B35A), BattleSys_Effect07 ($C1:D40E),
 ;   BattleSys_Effect08 ($C1:D488), BattleSys_RestoreHpMp ($C1:DAB4, $C1:DB3F), BattleSys_ApplyDamage
 ;   ($C1:DD99, $C1:DDF4, $C1:DE58), BattleSys_DrainHpMp ($C1:E81F, $C1:E84B), BattleSys_RecordMiss
-;   ($C1:E91A, $C1:E949, $C1:E972) and unmatched ($C1:F053).
+;   ($C1:E91A, $C1:E949, $C1:E972) and BattleSys_HitModRestore ($C1:F053).
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = battler slot (0-10)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkB202, B = 0; X = 0; Y =
 ;        the entry's offset; !Battle_MathA = !Battle_UnkB2C7,
@@ -34824,33 +35034,2311 @@ Battle_ApplyHits:
     RTS
 
 
-; BattleSys_UnkB2CCHandlerTable ($C1FA61–$C1FA8A, 21 words)
-; The routines BattleSys_RunUnkB2CCHandler runs, by byte 0 of a
-; !BattleRom_UnkCC2A05 record (JSR (BattleSys_UnkB2CCHandlerTable,X)
-; at $C1:EB45). The handlers (from $C1:ED89 on) are not analysed.
+; ==================================================================
+; Hit modifiers ($C1:ED89–$C1:F204)
+; ==================================================================
+; The routines of BattleSys_HitModTable, run by BattleSys_RunUnkB2CCHandler
+; for record !Battle_UnkB2CC of !BattleRom_UnkCC2A05 (3 bytes: the
+; routine, DP $1C = byte 1, DP $1E = byte 2, the two arguments; DP $1D
+; and $1F are not set). BattleSys_ApplyDamage runs them (through
+; BattleSys_RunUnkB2CCHandlers) after it has worked out the damage in
+; !Battle_UnkAD89 and before the barrier cuts and the 9999 cap, so most
+; of them change that amount; others set a status on the target
+; (BattleSys_SetStatus, status byte 1: .Status2), change its HP or
+; bytes from .Unk2D on, or (modifier $0C) give BattleSys_StealItem its
+; DP $1A. "Roll" below is Battle_RandRange from 0 to 99, compared with
+; DP $1C ("roll <= DP $1C": BEQ / BCS, so a chance of DP $1C + 1 in
+; 100). !Battle_UnkB1F4 / B1F6 are the caster's / the target's
+; BattlerStats offsets, !Battle_UnkB1FD the target's slot. Every
+; Battle_Div32 here follows a Battle_Mul16 (the runner's, for the first
+; one in a modifier), so !Battle_MathHi holds that product's high word
+; and the 32-bit divide is the intended one.
+; Common entry, from BattleSys_RunUnkB2CCHandler's JSR (table,X):
+; M=1, X=0, DP=0, DB=$7E; A = X = the modifier number * 2 (B = 0); DP
+; $1C / $1E as said, DP $20 = the modifier number; !Battle_MathHi = 0
+; and !Battle_MathLo = !Battle_UnkB2CC * 3 (the runner's Battle_Mul16).
+
+; $C1:ED89 — BattleSys_HitModChanceMul (48 bytes, $ED89–$EDB8)
+; Modifier $00. Rolls 0-99 with Battle_RandRangeAlt (the second random
+; index, !Battle_UnkB3E6) against the caster's BattlerStats.Unk72 (stored
+; in DP $1C, over the record's byte 1); when the roll is at most that,
+; !Battle_UnkAD89 x DP $1E (16-bit product) and !Battle_ActUnkAE9B bit
+; 7 (!Battle_ActAltFlag) is set. BattleSys_HitModAltBoost acts on that
+; bit; together these look like a critical hit (probably: .Unk72 the
+; chance, the "Alt" records the critical's), not proven.
+; Callers note: BattleSys_HitModTable entry $00 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1E = the factor; !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; DP $1C = .Unk72; Y's low byte kept,
+;        high byte cleared (Battle_RandRangeAlt's SEP #$10); no
+;        multiply: A = the roll, X = !Battle_MathLo; multiply: A =
+;        !Battle_ActUnkAE9B, B = 0, X = the new amount, !Battle_MathA,
+;        MathB, MathLo/Hi written (Battle_Mul16); Battle_RandRangeAlt's
+;        changes either way
+BattleSys_HitModChanceMul:
+    LDX.w !Battle_UnkB1F4
+    LDA.w BattlerStats.Unk72,X
+    STA.b !Handler_Arg1
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRangeAlt
+    CMP.b !Handler_Arg1
+    BEQ .multiply
+    BCS .done
+.multiply:
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathA
+    LDA.b !Handler_Arg2
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    LDA.w !Battle_ActUnkAE9B
+    ORA.b #!Battle_ActAltFlag
+    STA.w !Battle_ActUnkAE9B
+.done:
+    RTS
+
+; $C1:EDB9 — BattleSys_HitModNone (1 byte, $EDB9)
+; Modifier $01: does nothing.
+; Callers note: BattleSys_HitModTable entry $01 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E (nothing depends on them)
+; Exit:  everything unchanged
+BattleSys_HitModNone:
+    RTS
+
+; $C1:EDBA — BattleSys_HitModScale (32 bytes, $EDBA–$EDD9)
+; Modifier $02: !Battle_UnkAD89 = !Battle_UnkAD89 x DP $1C / DP $1E
+; (Battle_Mul16, then Battle_Div32 of the 32-bit product; the low 16
+; bits of the quotient are kept). A DP $1E of 0 gives 0 (Battle_Div32
+; skips a divide by 0 with the quotient 0).
+; Callers (1 JSR site): BattleSys_HitModScaleThenUnk6C ($C1:EFBC).
+; Callers note: BattleSys_HitModTable entry $02 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = the new amount; Y
+;        unchanged; !Battle_MathA, MathB, MathLo, MathHi and MathRem
+;        written
+BattleSys_HitModScale:
+    TDC
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathA
+    LDA.b !Handler_Arg1
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDA.b !Handler_Arg2
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    RTS
+
+; $C1:EDDA — BattleSys_HitModUnk47Scale (35 bytes, $EDDA–$EDFC)
+; Modifier $03: when the target's BattlerStats.Unk47 has any of the
+; bits DP $1C, !Battle_UnkAD89 = !Battle_UnkAD89 x DP $1E / 2 (16-bit
+; product, halved). What the .Unk47 bits stand for is not known.
+; Callers note: BattleSys_HitModTable entry $03 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; !Battle_UnkB1F6
+;        set; B = 0 (the 16-bit TAX)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; Y unchanged; no bit: X
+;        = !Battle_UnkB1F6; else X = 0 and !Battle_MathA, MathB,
+;        MathLo/Hi written (Battle_Mul16)
+BattleSys_HitModUnk47Scale:
+    LDX.w !Battle_UnkB1F6
+    LDA.w BattlerStats.Unk47,X
+    AND.b !Handler_Arg1
+    BEQ .done
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathA
+    LDA.b !Handler_Arg2
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    REP #$20
+    LDA.b !Battle_MathLo
+    LSR A
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+.done:
+    RTS
+
+; $C1:EDFD — BattleSys_HitModPerEmptyPc (42 bytes, $EDFD–$EE26)
+; Modifier $04: !Battle_UnkAD89 x (1 + the number of PC slots 0-2 whose
+; !Battler_UnkAEFF is $FF, no PC there). The count is kept in
+; !Battle_EmptyPcCount. The record's arguments are not used.
+; Callers note: BattleSys_HitModTable entry $04 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = the new amount; Y
+;        unchanged; !Battle_EmptyPcCount as said; !Battle_MathA, MathB,
+;        MathLo/Hi written (Battle_Mul16)
+BattleSys_HitModPerEmptyPc:
+    TDC
+    TAX
+    STA.w !Battle_EmptyPcCount
+.slot:
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BNE .next
+    INC.w !Battle_EmptyPcCount
+.next:
+    INX
+    CPX.w #!Battle_NumPcSlots
+    BCC .slot
+    LDA.w !Battle_EmptyPcCount
+    INC A
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    RTS
+
+; $C1:EE27 — BattleSys_HitModPlayTime (120 bytes, $EE27–$EE9E)
+; Modifier $05: a factor picked by the play-time clock. Runs the pad
+; reader BankC2_Entry8002 (Menu_ReadPad, which also advances
+; Menu_PlayTime), then by Menu_PlayTime+1 (the group after the frames)
+; mod 10:
+;   0: !Battle_UnkAD89 = about / 10 (Battle_ScaleWord10);
+;   1-2: halved; 3-4: left as it is; 5-6: see the quirk;
+;   7-8: doubled; 9: tripled (all 16-bit, no cap here).
+; Quirk: for 5-6 the code adds half of the word at $0000 (DP $00/$01,
+; read with an absolute LDA, whatever the caller left there) to the
+; amount; the other cases make "x 1.5" (half of !Battle_UnkAD89 itself)
+; the likely intent. The record's arguments are not used.
+; Callers note: BattleSys_HitModTable entry $05 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_MathHi = 0 (the runner's
+;        Battle_Mul16; Battle_Div32 divides MathHi:MathA)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0 (B too) except for 3-4 (A = the
+;        remainder); X clobbered; Y = Battle_ScaleWord10's for 0, else
+;        unchanged; !Battle_MathA, MathB, MathLo, MathHi and MathRem
+;        written (Battle_Div32); for 0, DP $08/$09 and $30/$31 too
+BattleSys_HitModPlayTime:
+    JSL BankC2_Entry8002
+    LDA.w !Menu_PlayTime+1
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_PlayTimeDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDA.b !Battle_MathRem
+    BNE .halve
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    SEP #$20
+    JSR Battle_ScaleWord10
+    LDX.b !Scale_Result
+    STX.w !Battle_UnkAD89
+    BRA .done
+.halve:
+    CMP.b #!Battle_PlayTimeKeepFrom
+    BCS .keep
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    LSR A
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+    BRA .done
+.keep:
+    CMP.b #!Battle_PlayTimeAddFrom
+    BCS .add_half
+    BRA .done
+.add_half:
+    CMP.b #!Battle_PlayTimeDoubleFrom
+    BCS .double
+    REP #$20
+    LDA.w !BattleTmp_00                 ; quirk: DP $00, not !Battle_UnkAD89
+    LSR A
+    CLC
+    ADC.w !Battle_UnkAD89
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+    BRA .done
+.double:
+    CMP.b #!Battle_PlayTimeTripleFrom
+    BCS .triple
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    ASL A
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+    BRA .done
+.triple:
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    ASL A
+    CLC
+    ADC.w !Battle_UnkAD89
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+.done:
+    RTS
+
+; $C1:EE9F — BattleSys_HitModRandomStatus (49 bytes, $EE9F–$EECF)
+; Modifier $06: sets one of four .Status2 bits on the target, picked by
+; a roll from 0 to 100 (BattleSys_RollUpTo1A with 100): below 40 bit 2
+; ($04), 40-64 bit 7 ($80), 65-89 bit 1 ($02), 90-99 bit 6 ($40);
+; BattleSys_SetStatus with DP $16 = 1 (status byte 1) and DP $18 = the
+; bits. The record's arguments are not used.
+; Quirk: a roll of 100 (RollUpTo1A's range takes it in) passes the last
+; test too, and A, still 100 ($64), becomes the bits: bits 6, 5 and 2
+; at once.
+; Callers note: BattleSys_HitModTable entry $06 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $17 = 0 (BattleSys_SetStatus adds
+;        DP $16 as 16 bits; this routine writes only DP $16: BattleSys_
+;        ApplyDamage has zeroed DP $16/$17, BattleSys_StealItem's DP $17
+;        is as its caller left it); !Battle_UnkB1F6 / B1FD set
+; Exit:  M=1, X=0, DP=0, DB=$7E; as BattleSys_SetStatus leaves them (A
+;        clobbered, B = 0; X, Y clobbered); DP $16 = 0 (or 1 when
+;        refused); DP $18 = the bits; DP $1A = the roll
+BattleSys_HitModRandomStatus:
+    LDA.b #!Battle_StatusRollTop
+    STA.b !RollUpTo_Value
+    JSR BattleSys_RollUpTo1A
+    LDA.b #!Battle_StatusByte2
+    STA.b !SetStatus_Index
+    LDA.b !RollUpTo_Value
+    CMP.b #!Battle_StatusRoll1Below
+    BCS .roll2
+    LDA.b #!Battle_StatusRoll1Bits
+    BRA .set
+.roll2:
+    CMP.b #!Battle_StatusRoll2Below
+    BCS .roll3
+    LDA.b #!Battle_StatusRoll2Bits
+    BRA .set
+.roll3:
+    CMP.b #!Battle_StatusRoll3Below
+    BCS .roll4
+    LDA.b #!Battle_StatusRoll3Bits
+    BRA .set
+.roll4:
+    CMP.b #!Battle_StatusRoll4Below
+    BCS .set                            ; quirk: a roll of 100 sets bits $64
+    LDA.b #!Battle_StatusRoll4Bits
+.set:
+    STA.b !SetStatus_Bits
+    JSR BattleSys_SetStatus
+    RTS
+
+; $C1:EED0 — BattleSys_HitModUnk47Status (39 bytes, $EED0–$EEF6)
+; Modifier $07: on a roll <= 80, and when the target's
+; BattlerStats.Unk47 has any of the bits DP $1C, sets the .Status2 bits
+; DP $1E (BattleSys_SetStatus, DP $16 = 1). DP $16-$19 are zeroed first.
+; Callers note: BattleSys_HitModTable entry $07 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; !Battle_UnkB1F6
+;        / B1FD set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; set: as BattleSys_SetStatus leaves
+;        them (A clobbered, B = 0; X, Y clobbered; DP $16 = 0, or 1 when
+;        refused), DP $18 = DP $1E; else A = the roll or 0, X = !Battle_
+;        MathLo or !Battle_UnkB1F6, Y's low byte kept and high byte
+;        cleared (Battle_RandRange's SEP #$10), DP $16-$19 = 0;
+;        Battle_RandRange's changes either way
+BattleSys_HitModUnk47Status:
+    TDC
+    TAX
+    STX.b !SetStatus_Index
+    STX.b !SetStatus_Bits
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b #!Battle_Unk47StatusChance
+    BEQ .test
+    BCS .done
+.test:
+    LDX.w !Battle_UnkB1F6
+    LDA.w BattlerStats.Unk47,X
+    AND.b !Handler_Arg1
+    BEQ .done
+    LDA.b #!Battle_StatusByte2
+    STA.b !SetStatus_Index
+    LDA.b !Handler_Arg2
+    STA.b !SetStatus_Bits
+    JSR BattleSys_SetStatus
+.done:
+    RTS
+
+; $C1:EEF7 — BattleSys_HitModChanceStatus (29 bytes, $EEF7–$EF13)
+; Modifier $08: on a roll <= DP $1C, sets the .Status2 bits DP $1E on
+; the target (BattleSys_SetStatus, DP $16 = 1). DP $16-$19 are zeroed
+; first.
+; Callers note: BattleSys_HitModTable entry $08 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; !Battle_UnkB1F6
+;        / B1FD set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; set: as BattleSys_SetStatus leaves
+;        them (A clobbered, B = 0; X, Y clobbered; DP $16 = 0, or 1 when
+;        refused), DP $18 = DP $1E; else A = the roll, X = !Battle_
+;        MathLo, Y's low byte kept and high byte cleared
+;        (Battle_RandRange's SEP #$10), DP $16-$19 = 0;
+;        Battle_RandRange's changes either way
+BattleSys_HitModChanceStatus:
+    TDC
+    TAX
+    STX.b !SetStatus_Index
+    STX.b !SetStatus_Bits
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Handler_Arg1
+    BEQ .set
+    BCS .done
+.set:
+    LDA.b #!Battle_StatusByte2
+    STA.b !SetStatus_Index
+    LDA.b !Handler_Arg2
+    STA.b !SetStatus_Bits
+    JSR BattleSys_SetStatus
+.done:
+    RTS
+
+; $C1:EF14 — BattleSys_HitModLeaveOneHp (37 bytes, $EF14–$EF38)
+; Modifier $09: on a roll <= DP $1C, !Battle_UnkAD89 = the target's
+; .CurHp - 1 (so the hit leaves it 1 HP) and !Battle_UnkB1FC bit 0
+; (!Battle_B1FCBit0) is set, so BattleSys_ApplyDamage skips its x 7 / 10
+; barrier cuts. At 0 HP the amount is $FFFF (BattleSys_ApplyDamage caps
+; it at 9999, and leaves a target at 0 HP alone).
+; Callers note: BattleSys_HitModTable entry $09 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 set; B
+;        any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; Y's low byte kept, high byte cleared
+;        (Battle_RandRange's SEP #$10); done: A = !Battle_UnkB1FC,
+;        B = 0, X = !Battle_UnkB1F6; else A = the roll, X = !Battle_
+;        MathLo; Battle_RandRange's changes either way
+BattleSys_HitModLeaveOneHp:
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Handler_Arg1
+    BEQ .hit
+    BCS .done
+.hit:
+    LDX.w !Battle_UnkB1F6
+    REP #$20
+    LDA.w BattlerStats.CurHp,X
+    DEC A
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+    LDA.w !Battle_UnkB1FC
+    ORA.b #!Battle_B1FCBit0
+    STA.w !Battle_UnkB1FC
+.done:
+    RTS
+
+; $C1:EF39 — BattleSys_HitModUnk6CScale (131 bytes, $EF39–$EFBB)
+; Modifier $0A: the first of bits 7, 6, 5, 4 set in !Battle_UnkB190
+; (byte 1 of the action's !Battle_UnkB18C record) picks n = 0-3
+; (!Battle_Unk6CIndex); with none of them, nothing happens. The
+; target's BattlerStats.Unk6C+n byte (!Battle_Unk6CDivisor, 4 for a PC
+; per BattleFD_UnkB3FE) then scales the amount: bit 7 sets
+; !Battle_UnkB1FC bit 6 (!Battle_B1FCHealBit: BattleSys_ApplyDamage
+; gives the amount back as HP); bits 5-0 are the divisor, less 2 when
+; bit 6 is set; !Battle_UnkAD89 = !Battle_UnkAD89 x 4
+; (!Battle_Unk6CFactor) / the divisor. So 4 is "normal"; this looks
+; like four resistances by element (probably), not proven. A divisor
+; of 0 gives 0.
+; Quirks: the factor goes to !Battle_MathB with an 8-bit STA (the TAX
+; before it is wasted), so MathB's high byte is left from before; it is
+; 0 on both ways in (the runner's Battle_Mul16 by 3 leaves MathB below
+; $100, BattleSys_HitModScale's divide leaves its 8-bit divisor). DP
+; $2C is written with the bits before anything is decided (a scratch
+; copy, overwritten by the multiply). The record's arguments are not
+; used.
+; Callers (1 JSR site): BattleSys_HitModScaleThenUnk6C ($C1:EFBF).
+; Callers note: BattleSys_HitModTable entry $0A (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB190 and !Battle_UnkB1F6
+;        set; !Battle_MathB < $100 (as said); B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; no bit: A =
+;        !Battle_UnkB190 (BIT leaves A; its bits 7-4 clear), B = 0, X
+;        unchanged, DP $2C = !Battle_UnkB190 (8 bits); else A = 0, B =
+;        0, X = the new amount, !Battle_Unk6CIndex / Divisor / Factor
+;        and !Battle_MathA, MathB, MathLo, MathHi, MathRem written
+BattleSys_HitModUnk6CScale:
+    TDC
+    LDA.w !Battle_UnkB190
+    STA.b !Battle_MathLo                ; scratch, overwritten by the multiply
+    BIT.b #!Battle_B190Bit7
+    BEQ .bit6
+    TDC
+    BRA .index
+.bit6:
+    BIT.b #!Battle_B190Bit6
+    BEQ .bit5
+    LDA.b #1
+    BRA .index
+.bit5:
+    BIT.b #!Battle_B190Bit5
+    BEQ .bit4
+    LDA.b #2
+    BRA .index
+.bit4:
+    BIT.b #!Battle_B190Bit4
+    BEQ .done
+    LDA.b #3
+.index:
+    STA.w !Battle_Unk6CIndex
+    LDA.b #!Battle_Unk6CFactorValue
+    STA.w !Battle_Unk6CFactor
+    LDA.w !Battle_Unk6CIndex
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB1F6
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk6C,X
+    STA.w !Battle_Unk6CDivisor
+    BIT.b #!Battle_Unk6CHealBit
+    BEQ .value
+    LDA.w !Battle_UnkB1FC
+    ORA.b #!Battle_B1FCHealBit
+    STA.w !Battle_UnkB1FC
+.value:
+    LDA.w !Battle_Unk6CDivisor
+    AND.b #!Battle_Unk6CValueMask
+    STA.w !Battle_Unk6CDivisor
+    LDA.w BattlerStats.Unk6C,X
+    BIT.b #!Battle_Unk6CBit6
+    BEQ .scale
+    LDA.w !Battle_Unk6CDivisor
+    SEC
+    SBC.b #!Battle_Unk6CBit6Cut
+    STA.w !Battle_Unk6CDivisor
+.scale:
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathA
+    LDA.w !Battle_Unk6CFactor
+    TAX                                 ; wasted: the 8-bit STA follows
+    STA.b !Battle_MathB                 ; quirk: high byte left from before
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDA.w !Battle_Unk6CDivisor
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+.done:
+    RTS
+
+; $C1:EFBC — BattleSys_HitModScaleThenUnk6C (7 bytes, $EFBC–$EFC2)
+; Modifier $0B: BattleSys_HitModScale (x DP $1C / DP $1E), then
+; BattleSys_HitModUnk6CScale.
+; Callers note: BattleSys_HitModTable entry $0B (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; as BattleSys_HitModScale
+; Exit:  M=1, X=0, DP=0, DB=$7E; as BattleSys_HitModUnk6CScale (X = the
+;        amount or, with no bit, as BattleSys_HitModScale left it)
+BattleSys_HitModScaleThenUnk6C:
+    JSR BattleSys_HitModScale
+    JSR BattleSys_HitModUnk6CScale
+    RTS
+
+; $C1:EFC3 — BattleSys_HitModRollDp1A (16 bytes, $EFC3–$EFD2)
+; Modifier $0C: DP $1A = 1 when a roll is below DP $1C (strictly, unlike
+; the others), else 0. BattleSys_StealItem runs the modifier before it
+; takes an item and tries the enemy's second item (.ItemB) first when DP
+; $1A is not 0.
+; Callers note: BattleSys_HitModTable entry $0C (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the roll; X = !Battle_MathLo; Y's
+;        low byte kept, high byte cleared (Battle_RandRange's SEP #$10);
+;        DP $1A as said; Battle_RandRange's changes
+!HitMod_Dp1A = !BattleTmp_1A            ; 1 B: the result (BattleSys_StealItem's !Steal_Better)
+BattleSys_HitModRollDp1A:
+    STZ.b !HitMod_Dp1A
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Handler_Arg1
+    BCS .done
+    INC.b !HitMod_Dp1A
+.done:
+    RTS
+
+; $C1:EFD3 — BattleSys_AddBattleItem (99 bytes, $EFD3–$F035)
+; Adds one of item DP $06 to the battle's item list (Item_BattleList):
+; when an entry holds the id, its .Quantity + 1 (capped at 99). Else
+; BattleFD_AddItemEntry fills the first empty entry (.Id 0) with it and a
+; quantity of 1; when that refuses the id (!Battle_UnkAF23 set), it goes
+; to the inventory instead (BankC1_AddItem) and !Battle_UnkAF23 is
+; cleared. Nothing calls it (xref finds no call, and no table entry is
+; known); it sits between modifiers $0C and $0D.
+; Quirk: with no empty entry, DP $04 (the list offset to fill) gets Y
+; as it came in.
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $06 = the item id; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered (Y = the id with B as
+;        BattleFD_AddItemEntry leaves it, on the inventory path); DP $00,
+;        $02, $04, $08, $0A written; DP $0E = 1 when a new entry is
+;        made; plus what the callees change
+!AddItem_Ofs = !BattleTmp_04            ; 2 B: list offset of the scan, then the empty entry's
+!AddItem_Id = !BattleTmp_06             ; 1 B: the item id (argument)
+!AddItem_FoundEmpty = !BattleTmp_02     ; 1 B: 1 once an empty entry was found
+!AddItem_Qty = !BattleTmp_0E            ; 1 B: BattleFD_AddItemEntry's quantity
+BattleSys_AddBattleItem:
+    TDC
+    TAX
+    STX.b !BattleTmp_00
+    STX.b !AddItem_FoundEmpty
+    STX.b !AddItem_Ofs
+    STX.b !BattleTmp_08
+    STX.b !BattleTmp_0A
+.scan:
+    LDX.b !AddItem_Ofs
+    LDA.w Item_BattleList.Id,X
+    CMP.b !AddItem_Id
+    BEQ .one_more
+    CMP.b #0
+    BNE .next
+    LDA.b !AddItem_FoundEmpty
+    BNE .next
+    TXY
+    INC.b !AddItem_FoundEmpty
+.next:
+    REP #$20
+    LDA.b !AddItem_Ofs
+    CLC
+    ADC.w #!Battle_ItemEntrySize
+    STA.b !AddItem_Ofs
+    CMP.w #!Battle_ItemListBytes
+    BCS .new_entry
+    TDC
+    SEP #$20
+    BRA .scan
+.new_entry:
+    TDC
+    SEP #$20
+    STY.b !AddItem_Ofs
+    LDA.b #1
+    STA.b !AddItem_Qty
+    LDA.b !AddItem_Id
+    JSL BattleFD_AddItemEntry
+    LDA.w !Battle_UnkAF23
+    BEQ .done
+    LDA.b !AddItem_Id
+    TAY
+    JSR BankC1_AddItem
+    STZ.w !Battle_UnkAF23
+    BRA .done
+.one_more:
+    LDX.b !AddItem_Ofs
+    LDA.w Item_BattleList.Quantity,X
+    INC A
+    CMP.b #!Battle_ItemCountMax
+    BCC .store
+    LDA.b #!Battle_ItemCountMax
+.store:
+    STA.w Item_BattleList.Quantity,X
+.done:
+    RTS
+
+; $C1:F036 — BattleSys_HitModRestore (95 bytes, $F036–$F094)
+; Modifier $0D, by the bits of DP $1C:
+;   - bit 7: a full HP restore of the target, probably: !Battle_UnkAD89 =
+;     its .MaxHp, recorded by Battle_RecordHit for slot !Battle_UnkB1FD
+;     with !Battle_UnkB202 = !Battle_HitNegate (so the amount is stored
+;     negated, and !Battle_UnkAD89 stays -MaxHp); then !Battle_UnkAD9B =
+;     0 and the target's entry in !Battle_ActPcHitAmount set 0
+;     (Battle_HitEntryOffset) = .MaxHp with kind 1 (!Battle_ActHitKind1,
+;     an HP restore as BattleSys_ApplyDamage's heal path records it);
+;   - bit 6: the target's statuses cleared as BattleSys_CureStatus does
+;     (.Status keeps bits 7-6, .Status2 = 0, .Unk4C keeps bits 7, 6, 1),
+;     without its turn-list part.
+; Callers note: BattleSys_HitModTable entry $0D (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 /
+;        B1FD and !Battle_UnkB2C7 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered; X = !Battle_UnkB1F6 with
+;        bit 6, else the entry offset with bit 7, else unchanged; Y
+;        clobbered with bit 7 (Battle_RecordHit), else unchanged; bit 7:
+;        !Battle_UnkB202 = $80, !Battle_UnkAD9B = 0, DP $0E/$0F written,
+;        plus Battle_RecordHit's changes
+BattleSys_HitModRestore:
+    LDA.b !Handler_Arg1
+    BIT.b #!Battle_HitModRestoreHpBit
+    BEQ .cure
+    LDX.w !Battle_UnkB1F6
+    REP #$20
+    LDA.w BattlerStats.MaxHp,X
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+    LDA.w !Battle_UnkB1FD
+    TAY
+    LDA.b #!Battle_HitNegate
+    STA.w !Battle_UnkB202
+    JSR Battle_RecordHit
+    STZ.w !Battle_UnkAD9B
+    JSR Battle_HitEntryOffset
+    LDA.b !HitOffset_Result
+    TAX
+    REP #$20
+    LDA.w !Battle_UnkAD89
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.w !Battle_ActPcHitAmount,X
+    TDC
+    SEP #$20
+    LDA.b #!Battle_ActHitKind1
+    STA.w !Battle_ActPcHitKind,X
+.cure:
+    LDA.b !Handler_Arg1
+    BIT.b #!Battle_HitModCureBit
+    BEQ .done
+    LDX.w !Battle_UnkB1F6
+    LDA.w BattlerStats.Status,X
+    AND.b #!Battle_CureKeepStatus
+    STA.w BattlerStats.Status,X
+    LDA.w BattlerStats.Status2,X
+    AND.b #0
+    STA.w BattlerStats.Status2,X
+    LDA.w BattlerStats.Unk4C,X
+    AND.b #!Battle_CureKeepUnk4C
+    STA.w BattlerStats.Unk4C,X
+.done:
+    RTS
+
+; $C1:F095 — BattleSys_HitModHalveHp (40 bytes, $F095–$F0BC)
+; Modifier $0E: unless the target's BattlerStats.Unk46 has bit 7
+; (!Battle_Unk46Bit7: probably a resistance to this kind of attack), on
+; a roll <= DP $1C !Battle_UnkAD89 = the target's .CurHp / 2.
+; Callers note: BattleSys_HitModTable entry $0E (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 set;
+;        B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; bit 7: A = $80, X = !Battle_UnkB1F6,
+;        Y unchanged; when it rolls, Y's low byte kept and high byte
+;        cleared (Battle_RandRange's SEP #$10), then done: A = 0, B = 0,
+;        X = !Battle_UnkB1F6; else A = the roll, X = !Battle_MathLo;
+;        Battle_RandRange's changes when it rolls
+BattleSys_HitModHalveHp:
+    TDC
+    LDX.w !Battle_UnkB1F6
+    LDA.w BattlerStats.Unk46,X
+    AND.b #!Battle_Unk46Bit7
+    BNE .done
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Handler_Arg1
+    BEQ .halve
+    BCS .done
+.halve:
+    LDX.w !Battle_UnkB1F6
+    REP #$20
+    LDA.w BattlerStats.CurHp,X
+    LSR A
+    STA.w !Battle_UnkAD89
+    TDC
+    SEP #$20
+.done:
+    RTS
+
+; $C1:F0BD — BattleSys_HitModClearBits (28 bytes, $F0BD–$F0D8)
+; Modifier $0F: clears the bits DP $1E in the target's byte at
+; BattlerStats.Unk2D + DP $1C. DP $1E is left inverted.
+; Callers note: BattleSys_HitModTable entry $0F (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; !Battle_UnkB1F6
+;        set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the new byte, B = 0; X =
+;        !Battle_UnkB1F6 + DP $1C; Y unchanged; DP $1E = DP $1E ^ $FF
+BattleSys_HitModClearBits:
+    LDA.b !Handler_Arg2
+    EOR.b #!Battle_Invert8
+    STA.b !Handler_Arg2
+    TDC
+    LDA.b !Handler_Arg1
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB1F6
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk2D,X
+    AND.b !Handler_Arg2
+    STA.w BattlerStats.Unk2D,X
+    RTS
+
+; $C1:F0D9 — BattleSys_HitModHpDigit (52 bytes, $F0D9–$F10C)
+; Modifier $10: !Battle_UnkAD89 = !Battle_UnkAD89 x (the caster's .CurHp
+; mod 10, its last decimal digit) / DP $1E. A last digit of 0 gives 0,
+; and so does DP $1E = 0.
+; Callers note: BattleSys_HitModTable entry $10 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1E as said; !Battle_UnkB1F4 set;
+;        !Battle_MathHi = 0 (the runner's Battle_Mul16; the first
+;        Battle_Div32 divides MathHi:MathA); B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = the new amount; Y
+;        unchanged; !Battle_MathA, MathB, MathLo, MathHi and MathRem
+;        written
+BattleSys_HitModHpDigit:
+    TDC
+    LDX.w !Battle_UnkB1F4
+    REP #$20
+    LDA.w BattlerStats.CurHp,X
+    STA.b !Battle_MathA
+    TDC
+    SEP #$20
+    LDX.w #!Battle_HpDigitDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.b !Battle_MathRem
+    STX.b !Battle_MathA
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDA.b !Handler_Arg2
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    RTS
+
+; $C1:F10D — BattleSys_HitModZeroHp (37 bytes, $F10D–$F131)
+; Modifier $11: sets an HP to 0. DP $1E = 0: the caster's .CurHp
+; (probably an attack that costs the user its life). Else the target's
+; .CurHp, after !Battle_UnkAEB2 = 1 and !Battle_UnkAEB3[slot] = 1, as
+; BattleSys_ApplyDamage does when it knocks an enemy out.
+; Quirk: the slot is not checked: for a PC target (slots 0-2) the 1 goes
+; to !Battle_UnkAEB3Base + slot, the three bytes below !Battle_UnkAEB3
+; ($AEB0-$AEB2).
+; Callers note: BattleSys_HitModTable entry $11 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1E as said; !Battle_UnkB1F4 /
+;        B1F6 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = !Battle_UnkB1F4
+;        (caster) or !Battle_UnkB1F6 (target); Y = the target's slot
+;        (target), else unchanged
+BattleSys_HitModZeroHp:
+    LDA.b !Handler_Arg2
+    BNE .target
+    LDX.w !Battle_UnkB1F4
+    BRA .zero
+.target:
+    LDX.w !Battle_UnkB1F6
+    REP #$20
+    TXA
+    ASL A
+    XBA                                 ; offset / $80: the slot
+    TAY
+    TDC
+    SEP #$20
+    LDA.b #1
+    STA.w !Battle_UnkAEB3Base,Y
+    STA.w !Battle_UnkAEB2
+.zero:
+    TDC
+    STA.w BattlerStats.CurHp+1,X
+    STA.w BattlerStats.CurHp,X
+    RTS
+
+; $C1:F132 — BattleSys_HitModKoOrDrop (149 bytes, $F132–$F1C6)
+; Modifier $12: unless the target's BattlerStats.Unk46 has bit 7
+; (!Battle_Unk46Bit7), on a roll <= DP $1C its .CurHp = 0. Otherwise
+; (bit 7 set, or the roll fails) the target is dropped from the action:
+; !Battle_SavedTargetMasks = !Battle_ActMainMask | !Battle_ActTargetMask,
+; the target's bit (!BattleAi_MaskSlot0 >> slot) is cleared in both
+; masks and !Battle_UnkAD89 = 0. Either way, when !Battle_ActMainMask
+; is then empty, the first slot left in !Battle_ActTargetMask (the
+; highest bit) moves to it; when both are empty, !Battle_ActFlags bit 6
+; (!Battle_ActFlagSecond) is set.
+; Quirk: the scan for that slot ends at a mask of 0 (BRA to the flag),
+; which cannot happen, as the target mask was tested non-zero just
+; before.
+; Callers note: BattleSys_HitModTable entry $12 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C as said; !Battle_UnkB1F6 /
+;        B1FD set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X clobbered (a mask, or
+;        0); Y unchanged on the bit-7 path, low byte kept and high byte
+;        cleared when it rolls (Battle_RandRange's SEP #$10); drop path: DP $2C/$2D = the inverted bit,
+;        !Battle_UnkAD89 = 0, !Battle_SavedTargetMasks written; the
+;        masks and !Battle_ActFlags as said; Battle_RandRange's changes
+;        when it rolls
+BattleSys_HitModKoOrDrop:
+    TDC
+    LDX.w !Battle_UnkB1F6
+    LDA.w BattlerStats.Unk46,X
+    BIT.b #!Battle_Unk46Bit7
+    BNE .drop
+    TDC
+    TAX
+    LDA.b #!Battle_PercentRange
+    JSR Battle_RandRange
+    CMP.b !Handler_Arg1
+    BEQ .ko
+    BCS .drop
+.ko:
+    TDC
+    LDX.w !Battle_UnkB1F6
+    STZ.w BattlerStats.CurHp,X
+    STZ.w BattlerStats.CurHp+1,X
+    BRA .main_left
+.drop:
+    LDA.w !Battle_UnkB1FD
+    TAX
+    REP #$20
+    LDA.w !Battle_ActMainMask
+    ORA.w !Battle_ActTargetMask
+    STA.w !Battle_SavedTargetMasks
+    LDA.w #!BattleAi_MaskSlot0
+.shift:
+    CPX.w #0
+    BEQ .clear
+    LSR A
+    DEX
+    BRA .shift
+.clear:
+    EOR.w #!Battle_Invert16
+    STA.b !Battle_MathLo                ; scratch: the inverted bit
+    AND.w !Battle_ActMainMask
+    STA.w !Battle_ActMainMask
+    LDA.b !Battle_MathLo
+    AND.w !Battle_ActTargetMask
+    STA.w !Battle_ActTargetMask
+    TDC
+    TAX
+    STX.w !Battle_UnkAD89
+    SEP #$20
+.main_left:
+    LDX.w !Battle_ActMainMask
+    CPX.w #0
+    BNE .done
+    LDX.w !Battle_ActTargetMask
+    CPX.w #0
+    BEQ .none_left
+    REP #$20
+    LDA.w #!BattleAi_MaskSlot0
+.find:
+    BIT.w !Battle_ActTargetMask
+    BNE .promote
+    LSR A
+    CMP.w #0
+    BNE .find
+    BRA .none_left                      ; never taken (the mask is not 0)
+.promote:
+    STA.w !Battle_ActMainMask
+    EOR.w !Battle_ActTargetMask
+    STA.w !Battle_ActTargetMask
+    BRA .done
+.none_left:
+    TDC
+    SEP #$20
+    LDA.w !Battle_ActFlags
+    ORA.b #!Battle_ActFlagSecond
+    STA.w !Battle_ActFlags
+.done:
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:F1C7 — BattleSys_HitModAltBoost (40 bytes, $F1C7–$F1EE)
+; Modifier $13: only when !Battle_ActUnkAE9B bit 7 (!Battle_ActAltFlag,
+; set by BattleSys_HitModChanceMul) is set: DP $1E = 1 makes
+; !Battle_UnkAD89 9999 (!Battle_HitAmountMax), anything else doubles it
+; (16-bit, no cap here; BattleSys_ApplyDamage caps at 9999).
+; Callers note: BattleSys_HitModTable entry $13 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1E as said
+; Exit:  M=1, X=0, DP=0, DB=$7E; Y unchanged; bit clear: A =
+;        !Battle_ActUnkAE9B, X unchanged; DP $1E = 1: A = 1, X = 9999;
+;        double: A = 0, B = 0, X = the new amount, !Battle_MathA, MathB,
+;        MathLo/Hi written (Battle_Mul16)
+BattleSys_HitModAltBoost:
+    LDA.w !Battle_ActUnkAE9B
+    BIT.b #!Battle_ActAltFlag
+    BEQ .done
+    LDA.b !Handler_Arg2
+    CMP.b #!Battle_AltBoostMaxArg
+    BEQ .max
+    LDX.w !Battle_UnkAD89
+    STX.b !Battle_MathA
+    LDX.w #!Battle_AltBoostMul
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkAD89
+    BRA .done
+.max:
+    LDX.w #!Battle_HitAmountMax
+    STX.w !Battle_UnkAD89
+.done:
+    RTS
+
+; $C1:F1EF — BattleSys_HitModSetBits (22 bytes, $F1EF–$F204)
+; Modifier $14: sets the bits DP $1E in the target's byte at
+; BattlerStats.Unk2D + DP $1C (the counterpart of
+; BattleSys_HitModClearBits).
+; Callers note: BattleSys_HitModTable entry $14 (BattleSys_RunUnkB2CCHandler).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $1C / $1E as said; !Battle_UnkB1F6
+;        set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the new byte, B = 0; X =
+;        !Battle_UnkB1F6 + DP $1C; Y unchanged
+BattleSys_HitModSetBits:
+    TDC
+    LDA.b !Handler_Arg1
+    REP #$20
+    CLC
+    ADC.w !Battle_UnkB1F6
+    TAX
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk2D,X
+    ORA.b !Handler_Arg2
+    STA.w BattlerStats.Unk2D,X
+    RTS
+
+
+; ==================================================================
+; Experience, levels and tech points ($C1:F205–$C1:FA60)
+; ==================================================================
+; BattleSys_AwardExpAndTp, from BattleSys_Main's victory path after the
+; gold, hands out the battle's !Battle_UnkB28C (the sum of the defeated
+; enemies' BattleRom_EnemyReward.Unk0) and !Battle_UnkB2DB (.Unk6) and
+; sets the bits BattleFD_UnkAD17 shows its messages by. The readings
+; "experience" and "tech points" rest on what the code does with them:
+; B28C is added to a 24-bit total and, against !BattleRom_ExpToLevel,
+; raises PcStatBlk.Level; B2DB is paid against !BattleRom_TechTpCost
+; and sets the !Battle_TechBits1 bits the tech menus read. A PC's stat
+; block is PcStatBlk at BattlerStats[n].Unk2D ($5E2D, $5EAD, $5F2D); a
+; character not in the battle is levelled in its !Menu_CharRecords
+; record, which has the same layout. All of it runs with M=1, X=0,
+; DP=0, DB=$7E.
+
+; $C1:F205 — BattleSys_AwardTechPoints (214 bytes, $F205–$F2DA)
+; The tech points and the techs they teach. Sets !Battle_UnkB305 (10
+; bytes) and !Battle_UnkB310 to $FF and !Battle_UnkB30F to 0. Then for
+; each PC slot 0-2 with a character (!Battler_UnkAEFF not $FF):
+; !Battle_UnkB3CC = slot * 8 (its !Battle_UnkB3CE list), !Battle_UnkB1F4
+; = the slot (16-bit), DP $00 = its BattlerStats offset, and unless its
+; .Unk2F has bit 4 (!Battle_Unk2FAllTechs) BattleSys_SpendTechPoints for
+; its character (.Unk2D). Then BattleSys_BuildComboMasks, and for each
+; of the four masks (!Battle_RewardLoop 0-3) the first
+; !BattleRom_ComboTechs record with that mask (byte 0; the scan stops at
+; an $FF), unless its byte 1 is $FF: DP $00 = !Battle_TechBits2 + the
+; record's index, !Battle_ComboMask = the mask, !Battle_ComboTechId =
+; byte 1, !Battle_ComboTechsLeft = byte 2, DP $04 = bytes 3-4, and
+; BattleSys_LearnComboTechs, which flags its messages for the PC in
+; !Battle_UnkB1F4: the last slot with a character, as this loop left it.
+; Callers (1 JSR site): BattleSys_AwardExpAndTp ($C1:F9E3).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB2DB = the tech points; B
+;        any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 4, B = 0; X, Y clobbered;
+;        !Battle_UnkB1F4 = the last slot with a character (unchanged
+;        with none); !Battle_RewardLoop = 4; DP $00-$05, $08 written;
+;        plus what the callees change
+!AwardTp_Stats = !BattleTmp_00          ; 2 B: the PC's BattlerStats offset, then the combo's !Battle_TechBits2 byte
+!AwardTp_Rec = !BattleTmp_02            ; 2 B: address in bank $CC of the !BattleRom_ComboTechs record
+!AwardTp_Req = !BattleTmp_04            ; 2 B: address in bank $CC of its requirements
+!AwardTp_Mask = !BattleTmp_08           ; 1 B: the record's mask
+BattleSys_AwardTechPoints:
+    TDC
+    TAX
+    LDA.b #!Battle_EntryNone
+.clear:
+    STA.w !Battle_UnkB305,X
+    INX
+    CPX.w #!Battle_ComboMsgListLen
+    BCC .clear
+    STA.w !Battle_UnkB310
+    STZ.w !Battle_UnkB30F
+    TDC
+    STA.w !Battle_RewardLoop
+.pc:
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next_pc
+    LDA.w !Battle_RewardLoop
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    STX.w !Battle_UnkB3CC
+    LDA.w !Battle_RewardLoop
+    REP #$20
+    STA.w !Battle_UnkB1F4
+    XBA
+    LSR A                               ; slot * $80
+    TAX
+    STA.b !AwardTp_Stats
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Unk2F,X
+    AND.b #!Battle_Unk2FAllTechs
+    BNE .next_pc
+    LDA.w BattlerStats.Unk2D,X
+    STA.w !Battle_TpCharId
+    JSR BattleSys_SpendTechPoints
+.next_pc:
+    INC.w !Battle_RewardLoop
+    LDA.w !Battle_RewardLoop
+    CMP.b #!Battle_NumPcSlots
+    BCC .pc
+    JSR BattleSys_BuildComboMasks
+    TDC
+    STA.w !Battle_RewardLoop
+.combo:
+    TDC
+    LDX.w #!BattleRom_ComboTechs&$FFFF
+    STX.b !AwardTp_Rec
+    STZ.w !Battle_ComboRecIdx
+.find:
+    LDX.b !AwardTp_Rec
+    LDA.l !BattleRom_BankCC,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next_combo
+    STA.b !AwardTp_Mask
+    LDA.w !Battle_RewardLoop
+    TAY
+    LDA.b !AwardTp_Mask
+    CMP.w !Battle_ComboMasks,Y
+    BEQ .found
+    INX
+    INX
+    INX
+    INX
+    INX
+    STX.b !AwardTp_Rec
+    INC.w !Battle_ComboRecIdx
+    BRA .find
+.found:
+    LDX.b !AwardTp_Rec
+    LDA.l !BattleRom_BankCC+1,X
+    CMP.b #!Battle_ComboNone
+    BEQ .next_combo
+    TDC
+    LDA.w !Battle_ComboRecIdx
+    REP #$20
+    CLC
+    ADC.w #!Battle_TechBits2
+    STA.b !AwardTp_Stats
+    TDC
+    SEP #$20
+    LDA.w !Battle_RewardLoop
+    TAX
+    LDA.w !Battle_ComboMasks,X
+    STA.w !Battle_ComboMask
+    LDX.b !AwardTp_Rec
+    LDA.l !BattleRom_BankCC+1,X
+    STA.w !Battle_ComboTechId
+    LDX.b !AwardTp_Rec
+    LDA.l !BattleRom_BankCC+2,X
+    STA.w !Battle_ComboTechsLeft
+    LDX.b !AwardTp_Rec
+    REP #$20
+    LDA.l !BattleRom_BankCC+3,X
+    STA.b !AwardTp_Req
+    TDC
+    SEP #$20
+    JSR BattleSys_LearnComboTechs
+.next_combo:
+    INC.w !Battle_RewardLoop
+    LDA.w !Battle_RewardLoop
+    CMP.b #!Battle_ComboKinds
+    BCC .combo
+    RTS
+
+; $C1:F2DB — BattleSys_BuildComboMasks (191 bytes, $F2DB–$F399)
+; !Battle_ComboPcBit+n = $80 >> the character id of PC slot n (0 for an
+; empty slot, !Battler_UnkAEFF $FF), the three sorted from low to high
+; (three compare-and-swap steps); then !Battle_ComboMasks = bits 0|1,
+; 0|2, 1|2 and 0|1|2: the pairs and the trio of the party, in the bit
+; form !BattleRom_ComboTechs records use.
+; Callers (1 JSR site): BattleSys_AwardTechPoints ($C1:F258).
+; Entry: M=1, X=0, DP=0, DB=$7E; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_ComboMasks+3; X = the last
+;        value swapped, or unchanged; Y unchanged; DP $0A written
+!ComboBits_Bit = !BattleTmp_0A          ; 1 B: $80 shifted right by the id
+BattleSys_BuildComboMasks:
+    TDC
+    STA.w !Battle_ComboPcBit
+    STA.w !Battle_ComboPcBit+1
+    STA.w !Battle_ComboPcBit+2
+    LDA.b #!Battle_TechBit0
+    STA.b !ComboBits_Bit
+    LDA.w !Battler_UnkAEFF
+    CMP.b #!Battle_EntryNone
+    BEQ .pc1
+.shift0:
+    CMP.b #0
+    BEQ .store0
+    LSR.b !ComboBits_Bit
+    DEC A
+    BRA .shift0
+.store0:
+    LDA.b !ComboBits_Bit
+    STA.w !Battle_ComboPcBit
+.pc1:
+    LDA.b #!Battle_TechBit0
+    STA.b !ComboBits_Bit
+    LDA.w !Battler_UnkAEFF+1
+    CMP.b #!Battle_EntryNone
+    BEQ .pc2
+.shift1:
+    CMP.b #0
+    BEQ .store1
+    LSR.b !ComboBits_Bit
+    DEC A
+    BRA .shift1
+.store1:
+    LDA.b !ComboBits_Bit
+    STA.w !Battle_ComboPcBit+1
+.pc2:
+    LDA.b #!Battle_TechBit0
+    STA.b !ComboBits_Bit
+    LDA.w !Battler_UnkAEFF+2
+    CMP.b #!Battle_EntryNone
+    BEQ .sort
+.shift2:
+    CMP.b #0
+    BEQ .store2
+    LSR.b !ComboBits_Bit
+    DEC A
+    BRA .shift2
+.store2:
+    LDA.b !ComboBits_Bit
+    STA.w !Battle_ComboPcBit+2
+.sort:
+    LDA.w !Battle_ComboPcBit
+    CMP.w !Battle_ComboPcBit+1
+    BCC .sort02
+    LDA.w !Battle_ComboPcBit
+    TAX
+    LDA.w !Battle_ComboPcBit+1
+    STA.w !Battle_ComboPcBit
+    TXA
+    STA.w !Battle_ComboPcBit+1
+.sort02:
+    LDA.w !Battle_ComboPcBit
+    CMP.w !Battle_ComboPcBit+2
+    BCC .sort12
+    LDA.w !Battle_ComboPcBit
+    TAX
+    LDA.w !Battle_ComboPcBit+2
+    STA.w !Battle_ComboPcBit
+    TXA
+    STA.w !Battle_ComboPcBit+2
+.sort12:
+    LDA.w !Battle_ComboPcBit+1
+    CMP.w !Battle_ComboPcBit+2
+    BCC .masks
+    LDA.w !Battle_ComboPcBit+1
+    TAX
+    LDA.w !Battle_ComboPcBit+2
+    STA.w !Battle_ComboPcBit+1
+    TXA
+    STA.w !Battle_ComboPcBit+2
+.masks:
+    LDA.w !Battle_ComboPcBit
+    ORA.w !Battle_ComboPcBit+1
+    STA.w !Battle_ComboMasks
+    LDA.w !Battle_ComboPcBit
+    ORA.w !Battle_ComboPcBit+2
+    STA.w !Battle_ComboMasks+1
+    LDA.w !Battle_ComboPcBit+1
+    ORA.w !Battle_ComboPcBit+2
+    STA.w !Battle_ComboMasks+2
+    LDA.w !Battle_ComboPcBit
+    ORA.w !Battle_ComboPcBit+1
+    ORA.w !Battle_ComboPcBit+2
+    STA.w !Battle_ComboMasks+3
+    RTS
+
+; $C1:F39A — BattleSys_SpendTechPoints (197 bytes, $F39A–$F45E)
+; Pays the battle's tech points into character !Battle_TpCharId's
+; single techs (the PC whose BattlerStats offset is DP $00): the award
+; !Battle_UnkB2DB is kept in DP $30, then BattleSys_TryNextTech runs
+; until it pays for nothing (!Battle_TpLearned stays $FF) or .Unk2F has
+; bit 4 (all learned). After each tech paid for (DP $02 =
+; !Battle_TechCount + id, DP $04 = !BattleRom_CharTechs + id * 2 in
+; bank $CC): BattleSys_LearnSingleTech, then the next tech's cost
+; (!BattleRom_TechTpCost[id * 8 + the new count]) T is set against the
+; leftover L that TryNextTech left in .TechPtNeed: T < L makes
+; !Battle_UnkB2DB = L and .TechPtNeed = T (pay again from the leftover);
+; else .TechPtNeed = T - L. At the end !Battle_UnkB2DB is put back to
+; the award, which is added to the PC's 24-bit .TechPtTotal: when its
+; low word is then $967F or more and its high byte $98 or more, it is
+; set to 9,999,999.
+; Quirks: after T - L, the loop asks TryNextTech again with
+; !Battle_UnkB2DB as it stands (nothing in the loop resets it): the
+; award, or the leftover L that the last T < L step stored there. That
+; amount is taken off the new need a second time (and pays for the
+; next tech when it covers it). The cap misses a total whose high byte goes above $98 while its
+; low word is below $967F (from 9,999,999, an award of $6981 or more).
+; Callers (1 JSR site): BattleSys_AwardTechPoints ($C1:F24B).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TpCharId, DP $00, !Battle_UnkB2DB
+;        and !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = DP $00; Y as
+;        BattleSys_TryNextTech leaves it; !Battle_UnkB2DB = the award;
+;        DP $30/$31 = the award; DP $02-$05 and $0A/$0B written once a
+;        tech was paid for; DP $3B and !Battle_MathA, MathB, MathLo/Hi
+;        written (BattleSys_TryNextTech; MathA also keeps the cost); plus
+;        BattleSys_LearnSingleTech's changes
+!SpendTp_Stats = !BattleTmp_00          ; 2 B: the PC's BattlerStats offset (input)
+!SpendTp_Count = !BattleTmp_02          ; 2 B: address of the character's !Battle_TechCount byte
+!SpendTp_Techs = !BattleTmp_04          ; 2 B: address in bank $CC of its !BattleRom_CharTechs entry
+!SpendTp_CostOfs = !BattleTmp_0A        ; 2 B: id * 16, its !BattleRom_TechTpCost row
+!SpendTp_Award = !BattleTmp_30          ; 2 B: !Battle_UnkB2DB as it came
+BattleSys_SpendTechPoints:
+    LDX.w !Battle_UnkB2DB
+    STX.b !SpendTp_Award
+.try:
+    LDA.b #!Battle_EntryNone
+    STA.w !Battle_TpLearned
+    JSR BattleSys_TryNextTech
+    TDC
+    LDA.w !Battle_TpLearned
+    CMP.b #!Battle_EntryNone
+    BEQ .total
+    LDA.w !Battle_TpCharId
+    REP #$20
+    CLC
+    ADC.w #!Battle_TechCount
+    STA.b !SpendTp_Count
+    TDC
+    SEP #$20
+    LDA.w !Battle_TpCharId
+    ASL A
+    REP #$20
+    CLC
+    ADC.w #!BattleRom_CharTechs&$FFFF
+    STA.b !SpendTp_Techs
+    TDC
+    SEP #$20
+    LDX.b !SpendTp_Stats
+    LDA.w BattlerStats.Unk2F,X
+    AND.b #!Battle_Unk2FAllTechs
+    BNE .total
+    JSR BattleSys_LearnSingleTech
+    TDC
+    LDA.w !Battle_TpCharId
+    REP #$20
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !SpendTp_CostOfs
+    TDC
+    SEP #$20
+    LDX.b !SpendTp_Count
+    LDA.w !Battle_WramAbs,X             ; the new count
+    ASL A
+    REP #$20
+    CLC
+    ADC.b !SpendTp_CostOfs
+    TAX
+    LDA.l !BattleRom_TechTpCost,X
+    LDX.b !SpendTp_Stats
+    CMP.w BattlerStats.TechPtNeed,X
+    BCS .need_rest
+    STA.b !Battle_MathA                 ; scratch: the cost
+    LDA.w BattlerStats.TechPtNeed,X
+    STA.w !Battle_UnkB2DB
+    LDA.b !Battle_MathA
+    STA.w BattlerStats.TechPtNeed,X
+    BRA .again
+.need_rest:
+    SEC
+    SBC.w BattlerStats.TechPtNeed,X
+    STA.w BattlerStats.TechPtNeed,X
+.again:
+    TDC
+    SEP #$20
+    BRA .try
+.total:
+    LDX.b !SpendTp_Award
+    STX.w !Battle_UnkB2DB
+    TDC
+    REP #$20
+    LDA.w !Battle_UnkB2DB
+    LDX.b !SpendTp_Stats
+    CLC
+    ADC.w BattlerStats.TechPtTotal,X
+    STA.w BattlerStats.TechPtTotal,X
+    BCC .cap
+    SEP #$20
+    INC.w BattlerStats.TechPtTotal+2,X
+.cap:
+    SEP #$20
+    TDC
+    REP #$20
+    LDX.b !SpendTp_Stats
+    LDA.w BattlerStats.TechPtTotal,X
+    CMP.w #!Battle_TotalCapLo
+    BCC .done
+    SEP #$20
+    LDA.w BattlerStats.TechPtTotal+2,X
+    CMP.b #!Battle_TotalCapHi
+    BCC .done
+    LDA.b #!Battle_TotalCapLo&$FF
+    STA.w BattlerStats.TechPtTotal,X
+    LDA.b #!Battle_TotalCapLo>>8
+    STA.w BattlerStats.TechPtTotal+1,X
+    LDA.b #!Battle_TotalCapHi
+    STA.w BattlerStats.TechPtTotal+2,X
+.done:
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:F45F — BattleSys_TryNextTech (128 bytes, $F45F–$F4DE)
+; DP $3B = the character's first single tech id (!BattleRom_CharTechs);
+; the next tech is DP $3B + its !Battle_TechCount. When that tech's
+; BattleRom_TechRec.UserSet has bit 7 (!Battle_TechNeedsUnlock) and the
+; character's bit (1 << id) in !Battle_Unk7F01E0 is clear, nothing
+; happens (the tech is not open to it yet; probably magic). Otherwise
+; !Battle_UnkB2AF bit 4 (!Battle_RewardBitUnk6: show the tech points)
+; is set and the PC's .TechPtNeed is paid from !Battle_UnkB2DB: when it
+; is at most B2DB, !Battle_TpLearned = 0 and .TechPtNeed = B2DB - the
+; need (the leftover); else .TechPtNeed = the need - B2DB.
+; Callers (1 JSR site): BattleSys_SpendTechPoints ($C1:F3A4).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_TpCharId, DP $00 (the PC's
+;        BattlerStats offset) and !Battle_UnkB2DB set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = DP $00 when it paid
+;        in, else the tech's BattleRom_TechRec offset; Y = 0 after the
+;        unlock test (bit 7 set), else unchanged; DP $3B written;
+;        !Battle_TpLearned as said; !Battle_MathA, MathB, MathLo/Hi
+;        written (Battle_Mul16)
+!NextTech_First = !BattleTmp_3B         ; 1 B: the character's first tech id
+!NextTech_Stats = !BattleTmp_00         ; 2 B: the PC's BattlerStats offset (input)
+BattleSys_TryNextTech:
+    TDC
+    LDA.w !Battle_TpCharId
+    ASL A
+    TAX
+    LDA.l !BattleRom_CharTechs,X
+    STA.b !NextTech_First
+    LDA.w !Battle_TpCharId
+    TAX
+    LDA.w !Battle_TechCount,X
+    CLC
+    ADC.b !NextTech_First
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_TechRecSize
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    LDA.l BattleRom_TechRec.UserSet,X
+    AND.b #!Battle_TechNeedsUnlock
+    BEQ .pay
+    TDC
+    LDA.w !Battle_TpCharId
+    TAY
+    LDA.b #1
+.shift:
+    CPY.w #0
+    BEQ .test
+    ASL A
+    DEY
+    BRA .shift
+.test:
+    AND.l !Battle_Unk7F01E0
+    BNE .pay
+    BRA .done
+.pay:
+    LDA.w !Battle_UnkB2AF
+    ORA.b #!Battle_RewardBitUnk6
+    STA.w !Battle_UnkB2AF
+    TDC
+    LDX.b !NextTech_Stats
+    REP #$20
+    LDA.w BattlerStats.TechPtNeed,X
+    CMP.w !Battle_UnkB2DB
+    BEQ .learned
+    BCS .short
+.learned:
+    TDC
+    SEP #$20
+    LDA.b #0
+    STA.w !Battle_TpLearned
+    REP #$20
+    LDA.w !Battle_UnkB2DB
+    LDX.b !NextTech_Stats
+    SEC
+    SBC.w BattlerStats.TechPtNeed,X
+    STA.w BattlerStats.TechPtNeed,X
+    BRA .wide_done
+.short:
+    LDA.w BattlerStats.TechPtNeed,X
+    SEC
+    SBC.w !Battle_UnkB2DB
+    STA.w BattlerStats.TechPtNeed,X
+.wide_done:
+    TDC
+    SEP #$20
+.done:
+    RTS
+
+; $C1:F4DF — BattleSys_LearnSingleTech (84 bytes, $F4DF–$F532)
+; The character learns its next single tech: bit ($80 >> its
+; !Battle_TechCount) is set in its !Battle_TechBits1 byte, the PC's
+; !Battle_UnkB2B3 entry (!Battle_UnkB1F4) gets bit 3 (message 5), the
+; tech's id (count + DP $3B) goes to !Battle_UnkB3CE[!Battle_UnkB3CC++],
+; and the count goes up; when it reaches the character's number of
+; techs (!BattleRom_CharTechs byte 1), .Unk2F bit 4
+; (!Battle_Unk2FAllTechs) is set.
+; Callers (2 sites: 1 JSR, 1 JSL): BattleSys_SpendTechPoints (JSR $C1:F3D5) and unmatched (JSL
+;   $E7:7197).
+; Callers note: the JSL at $E7:7197 is not a real call, probably (this
+;   routine ends with RTS; bank $E7 is not known to hold code).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $02 = the address of the
+;        character's !Battle_TechCount byte, DP $04 = its
+;        !BattleRom_CharTechs address in bank $CC, DP $00 = the PC's
+;        BattlerStats offset, DP $3B = its first tech id;
+;        !Battle_TpCharId, !Battle_UnkB1F4 and !Battle_UnkB3CC set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = the new count (or .Unk2F with bit
+;        4); X = DP $04 or DP $00; Y unchanged; DP $0A = the tech's bit
+!LearnTech_Bit = !BattleTmp_0A          ; 1 B: $80 >> the count
+!LearnTech_Count = !BattleTmp_02        ; 2 B: address of the !Battle_TechCount byte
+!LearnTech_Techs = !BattleTmp_04        ; 2 B: address of the !BattleRom_CharTechs entry
+!LearnTech_Stats = !BattleTmp_00        ; 2 B: the PC's BattlerStats offset
+BattleSys_LearnSingleTech:
+    LDA.b #!Battle_TechBit0
+    STA.b !LearnTech_Bit
+    LDX.b !LearnTech_Count
+    LDA.w !Battle_WramAbs,X
+.shift:
+    BEQ .set
+    LSR.b !LearnTech_Bit
+    DEC A
+    BRA .shift
+.set:
+    LDX.b !LearnTech_Count
+    LDA.w !Battle_TechBits1-!Battle_TechCount,X
+    ORA.b !LearnTech_Bit
+    STA.w !Battle_TechBits1-!Battle_TechCount,X
+    LDX.w !Battle_UnkB1F4
+    LDA.w !Battle_UnkB2B3,X
+    ORA.b #!Battle_B2B3Msg5Bit
+    STA.w !Battle_UnkB2B3,X
+    LDA.w !Battle_TpCharId
+    TAX
+    LDA.w !Battle_TechCount,X
+    CLC
+    ADC.b !NextTech_First
+    LDX.w !Battle_UnkB3CC
+    STA.w !Battle_UnkB3CE,X
+    INC.w !Battle_UnkB3CC
+    LDX.b !LearnTech_Count
+    LDA.w !Battle_WramAbs,X
+    INC A
+    STA.w !Battle_WramAbs,X
+    LDX.b !LearnTech_Techs
+    CMP.l !BattleRom_BankCC+1,X
+    BCC .done
+    LDX.b !LearnTech_Stats
+    LDA.w BattlerStats.Unk2F,X
+    ORA.b #!Battle_Unk2FAllTechs
+    STA.w BattlerStats.Unk2F,X
+.done:
+    RTS
+
+; $C1:F533 — BattleSys_LearnComboTechs (240 bytes, $F533–$F622)
+; The double or triple techs of one !BattleRom_ComboTechs record. First
+; !Battle_ComboCounts = the !Battle_TechCount of each member (each set
+; bit of !Battle_ComboMask from bit 7, character ids 0-6), $FF-ended,
+; and DP $10 = the members. Then for each of the record's
+; !Battle_ComboTechsLeft techs (bit !Battle_ComboTechBit from $80 down
+; in the !Battle_TechBits2/3 byte at DP $00, id !Battle_ComboTechId
+; counting up, 3 requirement bytes at DP $04 moving on): when its bit is
+; still clear, every member's count is at least its requirement byte
+; (in member order) and the tech's BattleRom_TechRec.UserSet lacks bit
+; 7, the bit is set; then with 2 members the id is appended to
+; !Battle_UnkB305 (!Battle_UnkB30F counts) and the PC !Battle_UnkB1F4
+; gets !Battle_UnkB2B3 bit 2 (message 6), with 3 members
+; !Battle_UnkB310 = the id and bit 1 (message 7).
+; Quirk: !Battle_UnkB1F4 is whatever BattleSys_AwardTechPoints' PC loop
+; left (the last slot with a character), so the message bits go to that
+; PC, not to each member.
+; Callers (1 JSR site): BattleSys_AwardTechPoints ($C1:F2CD).
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $00, DP $04, !Battle_ComboMask,
+;        !Battle_ComboTechId, !Battle_ComboTechsLeft (1 or more: 0 would
+;        run 256 times) and !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X clobbered; Y unchanged; DP
+;        $04 moved on 3 per tech, DP $0C, $0E, $10, $12 written;
+;        !Battle_ComboTechId counted up, !Battle_ComboTechsLeft = 0;
+;        !Battle_MathA, MathB, MathLo/Hi written when Battle_Mul16 runs
+!ComboTech_Byte = !BattleTmp_00         ; 2 B: address of the !Battle_TechBits2/3 byte
+!ComboTech_Req = !BattleTmp_04          ; 2 B: address in bank $CC of the current tech's requirements
+!ComboTech_Mask = !BattleTmp_0C         ; 1 B: the mask, shifted left
+!ComboTech_Count = !BattleTmp_0E        ; 1 B: the member count being tested
+!ComboTech_Member = !BattleTmp_10       ; 1-2 B: member index (list position)
+!ComboTech_Char = !BattleTmp_12         ; 1-2 B: character id (0-6) of the mask scan
+BattleSys_LearnComboTechs:
+    TDC
+    TAX
+    STX.b !ComboTech_Member
+    STX.b !ComboTech_Char
+    LDA.w !Battle_ComboMask
+    STA.b !ComboTech_Mask
+.member:
+    LDA.b !ComboTech_Mask
+    ASL A
+    STA.b !ComboTech_Mask
+    BCC .next_char
+    LDX.b !ComboTech_Char
+    LDA.w !Battle_TechCount,X
+    LDX.b !ComboTech_Member
+    STA.w !Battle_ComboCounts,X
+    INC.b !ComboTech_Member
+.next_char:
+    INC.b !ComboTech_Char
+    LDA.b !ComboTech_Char
+    CMP.b #!Battle_NumCharIds
+    BCC .member
+    LDX.b !ComboTech_Member
+    LDA.b #!Battle_EntryNone
+    STA.w !Battle_ComboCounts,X
+    LDA.b #!Battle_TechBit0
+    STA.w !Battle_ComboTechBit
+.tech:
+    LDX.b !ComboTech_Byte
+    LDA.w !Battle_WramAbs,X
+    AND.w !Battle_ComboTechBit
+    BEQ .check
+    JMP .next_tech
+.check:
+    TDC
+    TAX
+    STX.b !ComboTech_Count
+    STX.b !ComboTech_Member
+    LDA.b #0
+    STA.w !Battle_ComboLacking
+.req:
+    LDX.b !ComboTech_Member
+    LDA.w !Battle_ComboCounts,X
+    CMP.b #!Battle_EntryNone
+    BEQ .all_met
+    STA.b !ComboTech_Count
+    REP #$20
+    LDA.b !ComboTech_Req
+    CLC
+    ADC.b !ComboTech_Member
+    TAX
+    TDC
+    SEP #$20
+    LDA.b !ComboTech_Count
+    CMP.l !BattleRom_BankCC,X
+    BCS .req_met
+    LDA.b #!Battle_EntryNone
+    STA.w !Battle_ComboLacking
+    BRA .next_tech
+.req_met:
+    INC.b !ComboTech_Member
+    BRA .req
+.all_met:
+    TDC
+    LDA.w !Battle_ComboTechId
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_TechRecSize
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    LDA.l BattleRom_TechRec.UserSet,X
+    AND.b #!Battle_TechNeedsUnlock
+    BNE .next_tech
+    LDX.b !ComboTech_Byte
+    LDA.w !Battle_WramAbs,X
+    ORA.w !Battle_ComboTechBit
+    STA.w !Battle_WramAbs,X
+    LDA.b !ComboTech_Member
+    CMP.b #!Battle_ComboDouble
+    BNE .triple
+    LDA.w !Battle_UnkB30F
+    TAX
+    LDA.w !Battle_ComboTechId
+    STA.w !Battle_UnkB305,X
+    INC.w !Battle_UnkB30F
+    LDX.w !Battle_UnkB1F4
+    LDA.w !Battle_UnkB2B3,X
+    ORA.b #!Battle_B2B3Msg6Bit
+    STA.w !Battle_UnkB2B3,X
+    BRA .next_tech
+.triple:
+    LDA.b !ComboTech_Member
+    CMP.b #!Battle_ComboTriple
+    BNE .next_tech
+    LDA.w !Battle_ComboTechId
+    STA.w !Battle_UnkB310
+    LDX.w !Battle_UnkB1F4
+    LDA.w !Battle_UnkB2B3,X
+    ORA.b #!Battle_B2B3Msg7Bit
+    STA.w !Battle_UnkB2B3,X
+.next_tech:
+    INC.w !Battle_ComboTechId
+    REP #$20
+    INC.b !ComboTech_Req
+    INC.b !ComboTech_Req
+    INC.b !ComboTech_Req
+    SEP #$20
+    LDA.w !Battle_ComboTechBit
+    LSR A
+    STA.w !Battle_ComboTechBit
+    DEC.w !Battle_ComboTechsLeft
+    LDA.w !Battle_ComboTechsLeft
+    CMP.b #0
+    BEQ .done
+    JMP .tech
+.done:
+    RTS
+
+; $C1:F623 — BattleSys_LevelUpStep (406 bytes, $F623–$F7B8)
+; One level step for the block at !Battle_ExpRec: BattleSys_ApplyExpStep;
+; when it raised the level (!Battle_NoLevelUp = 0), BattleSys_GrowHpMp,
+; then the stats from the character's 7-byte !BattleRom_StatGrowth
+; record (!Battle_GrowthRec = its address in bank $CC): .Unk0B = .GrowBase
+; + byte 0 x (level - 1) / 100 (8-bit sum; Battle_Mul16, Battle_Div32),
+; likewise .Unk0C from byte 1 and .GrowBase+1, .Unk0F from byte 3 and
+; +3, .Unk10 from byte 4 and +4, .Unk0E from byte 5 and +5, .Unk11 from
+; byte 6 and +6 (byte 2 and .GrowBase+2 are not used, .Unk0D is not
+; recomputed); then each of .Unk0B-.Unk11 is capped at 99 and .Unk0D at
+; 50.
+; Quirk: each step loads the base with TAX / STX !Battle_MathA before the
+; add; that store is never used.
+; Callers note: BattleSys_AwardExpAndTp (in a loop until
+; !Battle_UnkB28C is 0) and BattleSys_AwardReserveExp (once).
+; Callers (4 JSR sites): BattleSys_AwardExpAndTp ($C1:F968, $C1:F99E, $C1:F9D4) and
+;   BattleSys_AwardReserveExp ($C1:FA47).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_ExpRec, !Battle_UnkB28C and
+;        !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; B = 0; no level: A = $FF, X as
+;        BattleSys_ApplyExpStep leaves it, Y unchanged; level: A = 50
+;        (!Battle_GrowStat0DMax), X = !Battle_ExpRec, Y = 7,
+;        !Battle_GrowthRec written, !Battle_MathA, MathB, MathLo, MathHi
+;        and MathRem written, plus BattleSys_GrowHpMp's changes; what
+;        BattleSys_ApplyExpStep changes either way
+BattleSys_LevelUpStep:
+    JSR BattleSys_ApplyExpStep
+    LDA.w !Battle_NoLevelUp
+    CMP.b #0
+    BEQ .grow
+    JMP .done
+.grow:
+    JSR BattleSys_GrowHpMp
+    TDC
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.CharId,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w #!Battle_StatGrowthSize
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDA.b !Battle_MathLo
+    REP #$20
+    CLC
+    ADC.w #!BattleRom_StatGrowth&$FFFF
+    STA.w !Battle_GrowthRec
+    TDC
+    SEP #$20
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase,X
+    TAX
+    STX.b !Battle_MathA                 ; quirk: never used
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk0B,X
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC+1,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase+1,X
+    TAX
+    STX.b !Battle_MathA
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk0C,X
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC+3,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase+3,X
+    TAX
+    STX.b !Battle_MathA
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk0F,X
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC+4,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase+4,X
+    TAX
+    STX.b !Battle_MathA
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk10,X
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC+5,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase+5,X
+    TAX
+    STX.b !Battle_MathA
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk0E,X
+    LDX.w !Battle_GrowthRec
+    LDA.l !BattleRom_BankCC+6,X
+    TAX
+    STX.b !Battle_MathA
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    DEC A
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_GrowDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.GrowBase+6,X
+    TAX
+    STX.b !Battle_MathA
+    CLC
+    ADC.b !Battle_MathLo
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.Unk11,X
+    TDC
+    TAY
+    LDX.w !Battle_ExpRec
+.cap:
+    LDA.w PcStatBlk.Unk0B,X
+    CMP.b #!Battle_GrowStatMax
+    BCC .next_stat
+    LDA.b #!Battle_GrowStatMax
+    STA.w PcStatBlk.Unk0B,X
+.next_stat:
+    INX
+    INY
+    CPY.w #!Battle_StatGrowthSize
+    BCC .cap
+    LDA.b #!Battle_GrowStat0DMax
+    LDX.w !Battle_ExpRec
+    CMP.w PcStatBlk.Unk0D,X
+    BCS .done
+    LDA.b #!Battle_GrowStat0DMax
+    STA.w PcStatBlk.Unk0D,X
+.done:
+    RTS
+
+; $C1:F7B9 — BattleSys_ApplyExpStep (184 bytes, $F7B9–$F870)
+; !Battle_NoLevelUp = $FF; then, unless the block's .Status has bit 7
+; (KO'd; BattleSys_AwardExpAndTp never gets there, as a KO'd PC's
+; !Battler_UnkAEFF is $FF):
+;   - level 99 or more: !Battle_UnkB28C = 0 and !Battle_UnkB2AF bit 7
+;     (!Battle_RewardBitUnk0: show the experience) set; nothing else;
+;   - else bit 7 is set, and when !Battle_UnkB28C >= .ExpNeed: B28C -=
+;     .ExpNeed, !Battle_NoLevelUp = 0, .Level + 1 (capped at 99), the
+;     PC's !Battle_UnkB2B0 entry (!Battle_UnkB1F4) gets bit 7 (message
+;     4) and its !Battle_UnkB311 entry + 1, and .ExpNeed =
+;     !BattleRom_ExpToLevel[the new level]; when B28C is less, .ExpNeed
+;     -= B28C and B28C = 0.
+; Then (also for a KO'd block) a level of 99 or more makes .ExpNeed 0.
+; Quirk: the cap's LDX !Battle_UnkB1F4 at $C1:F830 is overwritten at
+; once.
+; Callers (1 JSR site): BattleSys_LevelUpStep ($C1:F623).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_ExpRec, !Battle_UnkB28C and
+;        !Battle_UnkB1F4 set
+; Exit:  M=1, X=0, DP=0, DB=$7E; B = 0; Y unchanged; level 99 or more
+;        on entry: A = !Battle_UnkB2AF, X = 0; else X = !Battle_ExpRec and
+;        A = the level, or 0 when it is (now) 99; !Battle_NoLevelUp,
+;        !Battle_UnkB28C, !Battle_UnkB2AF and the block as said
+BattleSys_ApplyExpStep:
+    LDA.b #!Battle_EntryNone
+    STA.w !Battle_NoLevelUp
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Status,X
+    AND.b #!Battle_StatusKo
+    BEQ .alive
+    JMP .need_cap
+.alive:
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    CMP.b #!Battle_LevelMax
+    BCC .gain
+    TDC
+    TAX
+    STX.w !Battle_UnkB28C
+    LDA.w !Battle_UnkB2AF
+    ORA.b #!Battle_RewardBitUnk0
+    STA.w !Battle_UnkB2AF
+    JMP .done
+.gain:
+    LDA.w !Battle_UnkB2AF
+    ORA.b #!Battle_RewardBitUnk0
+    STA.w !Battle_UnkB2AF
+    REP #$20
+    LDX.w !Battle_ExpRec
+    LDA.w !Battle_UnkB28C
+    CMP.w PcStatBlk.ExpNeed,X
+    BCC .short
+    TDC
+    SEP #$20
+    LDA.b #0
+    STA.w !Battle_NoLevelUp
+    REP #$20
+    LDA.w !Battle_UnkB28C
+    SEC
+    SBC.w PcStatBlk.ExpNeed,X
+    STA.w !Battle_UnkB28C
+    TDC
+    SEP #$20
+    LDA.w PcStatBlk.Level,X
+    INC A
+    STA.w PcStatBlk.Level,X
+    LDX.w !Battle_UnkB1F4
+    LDA.w !Battle_UnkB2B0,X
+    ORA.b #!Battle_B2B0Msg4Bit
+    STA.w !Battle_UnkB2B0,X
+    LDX.w !Battle_ExpRec
+    LDA.b #!Battle_LevelMax
+    CMP.w PcStatBlk.Level,X
+    BCS .next_need
+    STA.w PcStatBlk.Level,X
+    LDX.w !Battle_UnkB1F4               ; quirk: overwritten at once
+.next_need:
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !BattleRom_ExpToLevel,X
+    LDX.w !Battle_ExpRec
+    STA.w PcStatBlk.ExpNeed,X
+    LDX.w !Battle_UnkB1F4
+    INC.w !Battle_UnkB311,X
+    BRA .need_cap
+.short:
+    LDA.w PcStatBlk.ExpNeed,X
+    SEC
+    SBC.w !Battle_UnkB28C
+    STA.w PcStatBlk.ExpNeed,X
+    STZ.w !Battle_UnkB28C
+.need_cap:
+    TDC
+    SEP #$20
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.Level,X
+    CMP.b #!Battle_LevelMax
+    BCC .done
+    TDC
+    STA.w PcStatBlk.ExpNeed,X
+    STA.w PcStatBlk.ExpNeed+1,X
+.done:
+    RTS
+
+; $C1:F871 — BattleSys_GrowHpMp (151 bytes, $F871–$F907)
+; .MaxHp of the block at !Battle_ExpRec + the HP gain of the first pair
+; in the character's !BattleRom_HpGrowth row (8 bytes: (top level,
+; gain) pairs) whose top level is at least .Level, capped at 999; then
+; .MaxMp the same from !BattleRom_MpGrowth, capped at 99 (16-bit).
+; Quirk: a row with no top level up to .Level would be scanned past its
+; end (the tables presumably end each row with 99).
+; Callers (1 JSR site): BattleSys_LevelUpStep ($C1:F630).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_ExpRec set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X = !Battle_ExpRec; Y
+;        unchanged; DP $00/$01 = the MP pair's offset in the table, DP
+;        $10/$11 = its offset in the row
+!GrowHpMp_Ofs = !BattleTmp_00           ; 2 B: id * 8 + the pair's offset
+!GrowHpMp_Pair = !BattleTmp_10          ; 2 B: the pair's offset in the row (0, 2, 4, ...)
+BattleSys_GrowHpMp:
+    TDC
+    TAX
+    STX.b !GrowHpMp_Pair
+.hp_pair:
+    TDC
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.CharId,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !GrowHpMp_Pair
+    TAX
+    STX.b !GrowHpMp_Ofs
+    LDA.l !BattleRom_HpGrowth,X
+    LDX.w !Battle_ExpRec
+    CMP.w PcStatBlk.Level,X
+    BCC .hp_next
+    TDC
+    LDX.b !GrowHpMp_Ofs
+    LDA.l !BattleRom_HpGrowth+1,X
+    REP #$20
+    LDX.w !Battle_ExpRec
+    CLC
+    ADC.w PcStatBlk.MaxHp,X
+    STA.w PcStatBlk.MaxHp,X
+    CMP.w #!Battle_MaxHpCap
+    BCC .hp_done
+    LDA.w #!Battle_MaxHpCap
+    STA.w PcStatBlk.MaxHp,X
+.hp_done:
+    TDC
+    TAX
+    STX.b !GrowHpMp_Pair
+    BRA .mp
+.hp_next:
+    SEP #$20
+    INC.b !GrowHpMp_Pair
+    INC.b !GrowHpMp_Pair
+    BRA .hp_pair
+.mp:
+    TDC
+    SEP #$20
+.mp_pair:
+    TDC
+    LDX.w !Battle_ExpRec
+    LDA.w PcStatBlk.CharId,X
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !GrowHpMp_Pair
+    TAX
+    STX.b !GrowHpMp_Ofs
+    LDA.l !BattleRom_MpGrowth,X
+    LDX.w !Battle_ExpRec
+    CMP.w PcStatBlk.Level,X
+    BCC .mp_next
+    TDC
+    LDX.b !GrowHpMp_Ofs
+    LDA.l !BattleRom_MpGrowth+1,X
+    REP #$20
+    LDX.w !Battle_ExpRec
+    CLC
+    ADC.w PcStatBlk.MaxMp,X
+    STA.w PcStatBlk.MaxMp,X
+    CMP.w #!Battle_MaxMpCap
+    BCC .done
+    LDA.w #!Battle_MaxMpCap
+    STA.w PcStatBlk.MaxMp,X
+    BRA .done
+.mp_next:
+    SEP #$20
+    INC.b !GrowHpMp_Pair
+    INC.b !GrowHpMp_Pair
+    BRA .mp_pair
+.done:
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:F908 — BattleSys_AddExp (54 bytes, $F908–$F93D)
+; Adds !Battle_UnkB28C to the 24-bit .Exp of the block at X (carry
+; into the high byte); when the high byte is then $98 or more it is set
+; to $98, and a low word of $9680 or more to $967F (so at most
+; 9,999,999; a high byte above $98 loses the excess instead of
+; saturating).
+; Callers (4 JSR sites): BattleSys_AwardExpAndTp ($C1:F94D, $C1:F983, $C1:F9B9) and
+;   BattleSys_AwardReserveExp ($C1:FA44).
+; Entry: M=1, X=0, DP=0, DB=$7E; X = the block's address
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, B = 0; X, Y unchanged
+BattleSys_AddExp:
+    REP #$20
+    LDA.w PcStatBlk.Exp,X
+    CLC
+    ADC.w !Battle_UnkB28C
+    STA.w PcStatBlk.Exp,X
+    BCC .cap
+    SEP #$20
+    INC.w PcStatBlk.Exp+2,X
+.cap:
+    TDC
+    SEP #$20
+    LDA.w PcStatBlk.Exp+2,X
+    CMP.b #!Battle_TotalCapHi
+    BCC .done
+    LDA.b #!Battle_TotalCapHi
+    STA.w PcStatBlk.Exp+2,X
+    REP #$20
+    LDA.w PcStatBlk.Exp,X
+    CMP.w #!Battle_TotalCapLoOver
+    BCC .done
+    LDA.w #!Battle_TotalCapLo
+    STA.w PcStatBlk.Exp,X
+.done:
+    TDC
+    SEP #$20
+    RTS
+
+; $C1:F93E — BattleSys_AwardExpAndTp (173 bytes, $F93E–$F9EA)
+; The experience and tech points of a won battle. For each PC slot 0-2
+; whose !Battler_UnkAEFF is not negative (a KO'd PC has $FF): its
+; !Battle_UnkB311 entry = 0, BattleSys_AddExp on its block
+; (BattlerStats[n].Unk2D) with the whole !Battle_UnkB28C, then with
+; !Battle_UnkB1F4 = the slot, !Battle_ExpRec = the block and
+; !Battle_ExpRecOther1/2 = the other two blocks, BattleSys_LevelUpStep
+; until !Battle_UnkB28C is 0 (each step uses up some of it); B28C is put
+; back (it was pushed) before the next PC. Then BattleSys_AwardTechPoints
+; and BattleSys_AwardReserveExp. Each slot's !Battle_UnkB311 entry is
+; cleared before its test, so also for an empty slot. A second RTS at
+; $C1:F9EA is never reached.
+; Callers (1 JSR site): BattleSys_Main ($C1:83F2).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB28C and !Battle_UnkB2DB set
+; Exit:  M=1, X=0, DP=0, DB=$7E; as BattleSys_AwardReserveExp leaves
+;        A, X, Y; !Battle_UnkB28C as it came; !Battle_UnkB1F4 = 3; plus
+;        what the callees change
+BattleSys_AwardExpAndTp:
+    LDX.w !Battle_UnkB28C
+    PHX
+    STZ.w !Battle_UnkB311
+    LDA.w !Battler_UnkAEFF
+    BMI .pc1
+    LDX.w #BattlerStats.Unk2D
+    JSR BattleSys_AddExp
+.pc0_step:
+    LDX.w #0
+    STX.w !Battle_UnkB1F4
+    LDX.w #BattlerStats.Unk2D
+    STX.w !Battle_ExpRec
+    LDX.w #BattlerStats[1].Unk2D
+    STX.w !Battle_ExpRecOther1
+    LDX.w #BattlerStats[2].Unk2D
+    STX.w !Battle_ExpRecOther2
+    JSR BattleSys_LevelUpStep
+    LDX.w !Battle_UnkB28C
+    CPX.w #0
+    BNE .pc0_step
+.pc1:
+    PLX
+    STX.w !Battle_UnkB28C
+    PHX
+    STZ.w !Battle_UnkB311+1
+    LDA.w !Battler_UnkAEFF+1
+    BMI .pc2
+    LDX.w #BattlerStats[1].Unk2D
+    JSR BattleSys_AddExp
+.pc1_step:
+    LDX.w #1
+    STX.w !Battle_UnkB1F4
+    LDX.w #BattlerStats[1].Unk2D
+    STX.w !Battle_ExpRec
+    LDX.w #BattlerStats[2].Unk2D
+    STX.w !Battle_ExpRecOther1
+    LDX.w #BattlerStats.Unk2D
+    STX.w !Battle_ExpRecOther2
+    JSR BattleSys_LevelUpStep
+    LDX.w !Battle_UnkB28C
+    CPX.w #0
+    BNE .pc1_step
+.pc2:
+    PLX
+    STX.w !Battle_UnkB28C
+    PHX
+    STZ.w !Battle_UnkB311+2
+    LDA.w !Battler_UnkAEFF+2
+    BMI .rest
+    LDX.w #BattlerStats[2].Unk2D
+    JSR BattleSys_AddExp
+.pc2_step:
+    LDX.w #2
+    STX.w !Battle_UnkB1F4
+    LDX.w #BattlerStats[2].Unk2D
+    STX.w !Battle_ExpRec
+    LDX.w #BattlerStats.Unk2D
+    STX.w !Battle_ExpRecOther1
+    LDX.w #BattlerStats[1].Unk2D
+    STX.w !Battle_ExpRecOther2
+    JSR BattleSys_LevelUpStep
+    LDX.w !Battle_UnkB28C
+    CPX.w #0
+    BNE .pc2_step
+.rest:
+    PLX
+    STX.w !Battle_UnkB28C
+    JSR BattleSys_AwardTechPoints
+    JSR BattleSys_AwardReserveExp
+    RTS
+    RTS                                 ; quirk: never reached
+
+; $C1:F9EB — BattleSys_AwardReserveExp (118 bytes, $F9EB–$FA60)
+; Experience for the characters not in the battle: !Battle_UnkB1F4 = 3,
+; !Battle_RosterBits = the low byte of !Menu_Unk29AF (bit 7 = character
+; 0, shifted left per id); for each character id 0-6 whose bit is set
+; and whose !Battle_UnkB1BE entry is negative (no battle slot), with
+; !Battle_ExpRec = its !Menu_CharRecords record: !Battle_UnkB28C x 15 /
+; 20 is added (BattleSys_AddExp) and BattleSys_LevelUpStep runs once;
+; B28C is put back after each.
+; Quirks: one step only, so such a character gains at most one level per
+; battle, and the experience past that level is not carried into
+; .ExpNeed (it is in .Exp all the same). With !Battle_UnkB1F4 = 3 the
+; level-up marks go to !Battle_UnkB2B0+3 (= !Battle_UnkB2B3, slot 0's
+; message byte, bit 7, which BattleFD_UnkAD17 does not test) and
+; !Battle_UnkB311+3.
+; Callers (1 JSR site): BattleSys_AwardExpAndTp ($C1:F9E6).
+; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB28C set; B any (TDC first)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $07, B = 0; X clobbered; Y = $50,
+;        or 7 after BattleSys_LevelUpStep's level path, once a character
+;        was levelled, else unchanged;
+;        !Battle_UnkB1F4 = 3; !Battle_RosterBits shifted out; DP $02/$03
+;        = 7; plus what the callees change
+!Reserve_Char = !BattleTmp_02           ; 2 B: the character id (0-6)
+BattleSys_AwardReserveExp:
+    LDX.w #!Battle_NumPcSlots
+    STX.w !Battle_UnkB1F4
+    TDC
+    TAX
+    STX.w !Battle_RosterBits
+    STX.b !Reserve_Char
+    LDA.w !Menu_Unk29AF
+    STA.w !Battle_RosterBits
+.char:
+    LDA.w !Battle_RosterBits
+    BPL .next
+    LDX.b !Reserve_Char
+    LDA.w !Battle_UnkB1BE,X
+    BPL .next
+    STX.b !Battle_MathB
+    LDY.w #!Battle_CharRecordSize
+    STY.b !Battle_MathA
+    JSR Battle_Mul16
+    REP #$20
+    LDA.b !Battle_MathLo
+    CLC
+    ADC.w #!Menu_CharRecords
+    STA.w !Battle_ExpRec
+    TDC
+    SEP #$20
+    LDX.w !Battle_UnkB28C
+    PHX
+    STX.b !Battle_MathA
+    LDA.b #!Battle_ReserveExpMul
+    TAX
+    STX.b !Battle_MathB
+    JSR Battle_Mul16
+    LDX.b !Battle_MathLo
+    STX.b !Battle_MathA
+    LDX.w #!Battle_ReserveExpDiv
+    STX.b !Battle_MathB
+    JSR Battle_Div32
+    LDX.b !Battle_MathLo
+    STX.w !Battle_UnkB28C
+    LDX.w !Battle_ExpRec
+    JSR BattleSys_AddExp
+    JSR BattleSys_LevelUpStep
+    PLX
+    STX.w !Battle_UnkB28C
+    TDC
+    SEP #$20
+.next:
+    LDA.w !Battle_RosterBits
+    ASL A
+    STA.w !Battle_RosterBits
+    INC.b !Reserve_Char
+    LDA.b !Reserve_Char
+    CMP.b #!Battle_NumCharIds
+    BCC .char
+    RTS
+
+
+; BattleSys_HitModTable ($C1FA61–$C1FA8A, 21 words)
+; The hit modifiers BattleSys_RunUnkB2CCHandler runs, by byte 0 of a
+; !BattleRom_UnkCC2A05 record (JSR (BattleSys_HitModTable,X) at
+; $C1:EB45); see the banner before BattleSys_HitModChanceMul.
 org $C1FA61
-BattleSys_UnkB2CCHandlerTable:
-    dw BattleSys_UnkB2CCHandler00        ; $00
-    dw BattleSys_UnkB2CCHandler01        ; $01
-    dw BattleSys_UnkB2CCHandler02        ; $02
-    dw BattleSys_UnkB2CCHandler03        ; $03
-    dw BattleSys_UnkB2CCHandler04        ; $04
-    dw BattleSys_UnkB2CCHandler05        ; $05
-    dw BattleSys_UnkB2CCHandler06        ; $06
-    dw BattleSys_UnkB2CCHandler07        ; $07
-    dw BattleSys_UnkB2CCHandler08        ; $08
-    dw BattleSys_UnkB2CCHandler09        ; $09
-    dw BattleSys_UnkB2CCHandler0A        ; $0A
-    dw BattleSys_UnkB2CCHandler0B        ; $0B
-    dw BattleSys_UnkB2CCHandler0C        ; $0C
-    dw BattleSys_UnkB2CCHandler0D        ; $0D
-    dw BattleSys_UnkB2CCHandler0E        ; $0E
-    dw BattleSys_UnkB2CCHandler0F        ; $0F
-    dw BattleSys_UnkB2CCHandler10        ; $10
-    dw BattleSys_UnkB2CCHandler11        ; $11
-    dw BattleSys_UnkB2CCHandler12        ; $12
-    dw BattleSys_UnkB2CCHandler13        ; $13
-    dw BattleSys_UnkB2CCHandler14        ; $14
+BattleSys_HitModTable:
+    dw BattleSys_HitModChanceMul             ; $00
+    dw BattleSys_HitModNone                  ; $01
+    dw BattleSys_HitModScale                 ; $02
+    dw BattleSys_HitModUnk47Scale            ; $03
+    dw BattleSys_HitModPerEmptyPc            ; $04
+    dw BattleSys_HitModPlayTime              ; $05
+    dw BattleSys_HitModRandomStatus          ; $06
+    dw BattleSys_HitModUnk47Status           ; $07
+    dw BattleSys_HitModChanceStatus          ; $08
+    dw BattleSys_HitModLeaveOneHp            ; $09
+    dw BattleSys_HitModUnk6CScale            ; $0A
+    dw BattleSys_HitModScaleThenUnk6C        ; $0B
+    dw BattleSys_HitModRollDp1A              ; $0C
+    dw BattleSys_HitModRestore               ; $0D
+    dw BattleSys_HitModHalveHp               ; $0E
+    dw BattleSys_HitModClearBits             ; $0F
+    dw BattleSys_HitModHpDigit               ; $10
+    dw BattleSys_HitModZeroHp                ; $11
+    dw BattleSys_HitModKoOrDrop              ; $12
+    dw BattleSys_HitModAltBoost              ; $13
+    dw BattleSys_HitModSetBits               ; $14
 
 ; ==================================================================
 ; Battle setup ($C1:FA8B–$C1:FDBE)

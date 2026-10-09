@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:ECCC,IrqHandler,2026-10-09,rev102a,approved,3d1bc95a873c,"Fix checked: hook 11 STA.l $00010F of #$80 at $C0:263F before JML $C3:0000. Bytes, M/X/DP/DB, Unk53 phase (FD:C2C1 TSB/TRB), dead RTS $ED14, banner all match ROM."
