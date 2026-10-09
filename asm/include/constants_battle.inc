@@ -591,6 +591,28 @@ if !constants_battle_inc == 0
 !BattleAi_Unk4CBit7       = $80   ; the BattlerStats.Unk4C+2 / +7 bit for !BattleAi_ScriptUnk8D08
 !BattleAi_Status2Bit2     = $04   ; the BattlerStats.Status2 bit for !BattleAi_ScriptUnk8D1E (the same bit as
                                   ; !Battle_TurnNoReactBit)
+!BattleAi_TgtCodePcs      = $01   ; target code 1: the present PCs (BattleAi_TargetTable entry 1); test $02's choice
+!BattleAi_TgtCodeUnk16    = $16   ; target code $16 (handler not analysed): test $02's other choice
+!BattlePos_QueryWithin32  = 4     ; !BattlePos_Mode: subject within 32 pixels of other (test $0C)
+!BattlePos_QuerySameRow   = 5     ; !BattlePos_Mode: |dy| within !BattlePos_RowBand (test $0D)
+!BattlePos_QueryAbove     = 6     ; !BattlePos_Mode: subject above other; + 1 = left of other (test $0E)
+!BattlePos_QueryPathClear = 8     ; !BattlePos_Mode: path to the other is clear (test $0F)
+!BattlePos_QueryLowerHalf = 9     ; !BattlePos_Mode: subject in the lower half (test $10) ...
+!BattlePos_QueryUpperHalf = $0A   ; ... upper half
+!BattlePos_QueryRightPart = $0B   ; ... right part
+!BattlePos_QueryLeftPart  = $0C   ; ... left part
+!BattlePos_QueryWithin48  = $0E   ; !BattlePos_Mode: subject within 48 pixels of other (test $1F)
+!BattleAi_PathArgBit0     = $01   ; test $0F: !BattlePos_Arg = record byte 2 * 4 + this
+!BattleAi_PercentBound    = 100   ; Battle_RandRange high bound for a 0-99 roll (test $17, choose $04)
+!BattleAi_B19EKindMask    = $F0   ; !Battle_UnkB19E byte 0 bits tests $11/$12 compare
+!BattleAi_B19EKind0       = $40   ; ... with this when the record's selector is 0
+!BattleAi_B19EKind1       = $50   ; ... with this when it is 1
+!BattleAi_B19EBit4        = $10   ; !Battle_UnkB19E byte 0 bit tests $13/$14 look at
+!BattleAi_B19ELowMask     = $0F   ; !Battle_UnkB19E byte 0 low nibble (test $14: a battler slot, probably)
+!BattleAi_ChanceStep1     = 25    ; choose $04: rolls 0-99 below this take the next action ...
+!BattleAi_ChanceStep2     = 50    ; ... below this the one after it ...
+!BattleAi_ChanceStep3     = 75    ; ... below this the third; the rest the fourth
+!BattleAi_EffByte2Keep    = $F0   ; choose $04 keeps these bits of !Battle_UnkAEE6+2 and ORs DP $0E into the rest
 
 ; --- Battle setup (Battle_SetupBattle) ---
 !Battle_StatsUnk2DCalc56  = 5     ; BattlerStats.Unk2D value that makes Battle_SetupBattle derive .Unk56

@@ -1350,6 +1350,8 @@ endstruct
 !BattleAi_PcByteMask      = $AF1F ; 1 B: bits BattleAi_AddPcByByte wants in the PC's stat-block byte ($FF = any)
 !BattleAi_Marked40Count   = $AF20 ; 1 B: entries BattleAi_AddPcByByte marked $40 (PcStatBlk.Unk20 bit 5)
 !BattleAi_Marked80Count   = $AF21 ; 1 B: entries it marked $80 (PcStatBlk.Unk20 bit 4)
+!Battle_FrameCounter      = $96F1 ; 4 B: the counter a bank-$CF routine bumps (see !Battle_FramePending); a frame
+                                  ; count, probably; test $06 compares its low 3 bytes
 !Battle_UnkAEB2           = $AEB2 ; 1 B: zeroed with the 8 !Battle_UnkAEB3 bytes by BattleSys_Unk8461; meaning unknown
 !Battle_UnkAEC8           = $AEC8 ; 1 B: enemy index (slot - 3) BattleSys_Unk8461 works on
 !Battle_UnkAF23           = $AF23 ; 1 B: non-zero = BattleSys_Unk8461 sends a due PC to $C1:B575/$C1:BCE1, not the menu
@@ -1396,7 +1398,8 @@ endstruct
 struct PcStatBlk $0000
 .CharId:    skip 1      ; +$00 (= BattlerStats.Unk2D): the character id; the experience and tech-point code
                         ; indexes per-character tables with it (BattleSys_GrowHpMp, BattleSys_AwardTechPoints)
-            skip 4
+            skip 2
+.CurHp:     skip 2      ; +$03 (= BattlerStats.CurHp); tests $01/$08 compare it
 .MaxHp:     skip 2      ; +$05 (= BattlerStats.MaxHp); BattleSys_GrowHpMp adds to it, capped at 999
             skip 2
 .MaxMp:     skip 1      ; +$09 (= BattlerStats.MaxMp, 2 B with .Unk0A); BattleSys_GrowHpMp adds to it, capped at 99
@@ -1412,7 +1415,8 @@ struct PcStatBlk $0000
 .Exp:       skip 3      ; +$13: 24-bit experience total (BattleSys_AddExp adds !Battle_UnkB28C, capped)
             skip 7
 .Status:    skip 1      ; +$1D (= BattlerStats.Status): bit 7 = KO'd (BattleAi_AddPcByByte skips the PC)
-            skip 2
+.Status2:   skip 1      ; +$1E (= BattlerStats.Status2); test $01 reads it as the high byte of a 16-bit .Status
+            skip 1
 .Unk20:     skip 1      ; +$20 (= BattlerStats.Unk4C+1): bits 5 and 4 make BattleAi_AddPcByByte mark the entry
             skip 6
 .Unk27:     skip 1      ; +$27: an id from $7B up (BattleSys_UnkCE3A's third record; a helmet, probably)
@@ -1451,7 +1455,7 @@ struct PcStatBlk $0000
 .Unk72:     skip 1      ; +$72
 endstruct
 !BattleRom_PcStatBlock    = $FDA80B ; 2 B per PC slot: address of its stat block (BattlerStats[n].Unk2D; read as
-                                    ; $5E2D, $5EAD, $5F2D)
+                                    ; $5E2D, $5EAD, $5F2D); the table goes on for all 11 slots ($5E2D + n * $80)
 !BattleRom_UnkCC0000      = $CC0000 ; base of the LDA.l Battle_SetupBattle indexes with a RAM address (quirk)
 !BattleRom_ScriptBank     = $CC0000 ; bank $CC base: BattleSys_Unk8461 reads script bytes as LDA.l this,X with X = the
                                     ; address (probably the enemy behaviour scripts, from the $CC:8B08 pointer table)
