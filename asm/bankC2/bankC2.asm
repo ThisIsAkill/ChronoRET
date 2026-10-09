@@ -1059,8 +1059,8 @@ C2Scene_LayerVramMaps:
 ; loop (.hang), as in C2Scene_DrawBgLayer. 0 pixels does nothing.
 ; Callers (12 JSR sites): C2Script_ScrollFrames ($C2:168A, $C2:1691), C2Script_ScrollLayerFrames
 ;   ($C2:173C), C2Scene_LeaderStep ($C2:3702, $C2:3709), C2Scene_LeaderBoardX ($C2:38FB, $C2:3902),
-;   C2Scene_ObjAMove ($C2:468A, $C2:4691), C2Scene_ObjBMove ($C2:4F93, $C2:4F9A) and unmatched
-;   ($C2:785B).
+;   C2Scene_ObjAMove ($C2:468A, $C2:4691), C2Scene_ObjBMove ($C2:4F93, $C2:4F9A) and
+;   C2Scene_TaskBg1Pan ($C2:785B).
 ; Callers note: C2Scene_LeaderStep and C2Scene_LeaderBoardX call it for
 ;   layers 1 and 2 with the leader's X velocity, so the view follows the
 ;   walking leader.
@@ -2942,8 +2942,8 @@ C2Anim_OpEnd:
 ;   ($C2:4454), C2Scene_ObjAMove ($C2:4679), C2Scene_ObjALand ($C2:46FA), C2Scene_ObjBRise
 ;   ($C2:4D90), C2Scene_ObjBMove ($C2:4F82), C2Scene_ObjBLand ($C2:5002), C2Scene_ObjBMateRise
 ;   ($C2:5166), C2Scene_ObjBMateMove ($C2:5235), C2Scene_ObjBMateLand ($C2:5254),
-;   C2Scene_ObjBMateMarkRise ($C2:554D), C2Scene_ObjBMateMarkLand ($C2:55DC) and unmatched
-;   ($C2:7734, $C2:7824).
+;   C2Scene_ObjBMateMarkRise ($C2:554D), C2Scene_ObjBMateMarkLand ($C2:55DC), C2Scene_TaskBg3Slide
+;   ($C2:7734) and C2Scene_TaskBg3SlideFast ($C2:7824).
 ; Entry: M any (REP #$20 here), X=0, DP=$0000, DB with low WRAM at
 ;        $0000-$1FFF; C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y unchanged
@@ -6986,10 +6986,15 @@ C2Scene_MosaicInStep:
 ; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752), C2Scene_DialDrawHand ($C2:6D10),
 ;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and unmatched ($C6:E9FF).
 ; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B), C2Scene_DialDrawHand
-;   ($C2:6D17), C2Scene_SwirlInit ($C2:7062), C2Scene_SwirlStep ($C2:712D) and unmatched ($C2:76CB,
-;   $C2:77D9, $C2:7D33, $C2:7DB9, $C6:EA17).
-; Callers note: each matched caller takes both, e.g. C2Scene_DialDrawHand
-;   the cosine and the sine of the same angle ($C2:6D10, $C2:6D17).
+;   ($C2:6D17), C2Scene_SwirlInit ($C2:7062), C2Scene_SwirlStep ($C2:712D), C2Scene_TaskBg3Wave
+;   ($C2:76CB), C2Scene_TaskBg3LineWave ($C2:77D9), C2Scene_Bg2HWaveStep ($C2:7D33),
+;   C2Scene_Bg2VWaveStep ($C2:7DB9) and unmatched ($C6:EA17).
+; Callers note: each matched caller of the cosine (C2Scene_MapZoomMatrix,
+;   C2Scene_DialDrawHand, C2Scene_SwirlInit, C2Scene_SwirlStep) takes the
+;   sine too, e.g. C2Scene_DialDrawHand the cosine and the sine of the same
+;   angle ($C2:6D10, $C2:6D17); the wave routines (C2Scene_TaskBg3Wave,
+;   C2Scene_TaskBg3LineWave, C2Scene_Bg2HWaveStep, C2Scene_Bg2VWaveStep)
+;   take only the sine.
 ; Entry (both): M=0 (16-bit A, set by the caller; the immediates carry
 ;        an explicit .w), X=0 (16-bit: TAX / CPX.w take the whole index),
 ;        DP any (no direct page), DB any (table read with .l); A = angle
@@ -7012,6 +7017,178 @@ Trig_Sin1024:                   ; header: see Trig_Cos1024
     INC A                       ; two's complement negate (EOR + INC)
 .done:
     RTL
+
+; ============================================================
+; Direction helpers ($C2:2273–$C2:232C)
+; ============================================================
+; Directions here have 256 steps per turn: 0 right, $40 down, $80 left,
+; $C0 up (the Rom_DirToFacing convention). The three keep their Unk names
+; because verified C2Scene_ObjBMateAim calls them by name; better names
+; once it is next edited: C2Scene_Cos256, C2Scene_Sin256 and
+; C2Scene_DirToPoint.
+
+; $C2:2273 — C2Scene_Unk2273 (42 bytes with C2Scene_Unk2277, $2273–$229C)
+; The cosine of direction A (adds a quarter turn and falls into the
+; sub-entry C2Scene_Unk2277, $C2:2277, the sine). The sine is
+; Rom_SineTable256's byte (127 x sin) sign-extended to a word, except at
+; directions $40 and $C0, which give +128 and -128 ($0080 / $FF80)
+; instead of the table's +127 / -127. Only the low byte of the direction
+; counts.
+; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and unmatched ($C6:E6EE).
+; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and unmatched ($C6:E71F).
+; Entry (both): M=0 (16-bit A: the .w immediates), X=0 (16-bit index;
+;        the index is below $100, so X=1 would read the same),
+;        DP any (no direct page), DB=$00 (the table is read absolute
+;        through the bank $00 mirror of $C0:F800); A = the direction
+; Exit (both):  M=0, X=0; A = the signed value (-128..+128); X = the
+;        direction's low byte (unchanged at directions $40 and $C0, which
+;        return before the TAX); Y, DP and DB unchanged
+; No calls.
+C2Scene_Unk2273:
+    CLC
+    ADC.w #!Dir_QuarterTurn             ; cos(d) = sin(d + a quarter turn)
+C2Scene_Unk2277:                        ; header: see C2Scene_Unk2273
+    AND.w #!Eng_LowByteMask
+    CMP.w #!Dir_QuarterTurn
+    BEQ .plus_max
+    CMP.w #!Dir_ThreeQuarters
+    BEQ .minus_max
+    TAX
+    LDA.w !Rom_SineTable256,X
+    BIT.w #!Dir_HalfTurn                ; the byte's sign bit
+    BNE .negative
+    AND.w #!Eng_LowByteMask             ; drop the next entry (read with it)
+    RTL
+.negative:
+    ORA.w #!Eng_HighByteMask            ; sign-extend
+    RTL
+.plus_max:
+    LDA.w #!C2Scene_SinMax
+    RTL
+.minus_max:
+    LDA.w #!C2Scene_SinMin
+    RTL
+
+; $C2:229D — C2Scene_Unk229D (144 bytes, $229D–$232C)
+; The direction (0-255) from the point (C2Tmp_08, C2Tmp_0A) to the point
+; (C2Tmp_0C, C2Tmp_0E) on the scene's wrapping map: each difference that
+; is half the map or more (Y 512 of 1024, X 768 of 1536 pixels) is taken
+; the other way round. The angle comes from Rom_AngleTable at
+; (|dy| / 4) x 32 + |dx| / 4, then is turned into the quarter the
+; vector lies in.
+; The differences are not scaled down (Obj_CalcDirection scales by 1/2
+; or 1/4): with |dx| of 128 or more the column runs into the next row,
+; and with |dy| of 128 or more the read goes past the 1 KB table (kept;
+; C2Scene_ObjBMateAim aims at nearby points).
+; A target straight right (angle byte 0) with dy >= 0 gives $0100, not
+; 0 (C2Scene_FullTurn - 0); the sine helpers use only the low byte.
+; Callers (1 JSR site): C2Scene_ObjBMateAim ($C2:5398).
+; Entry: M=0 (16-bit A: the .w immediates and word scratch), X=0 (the
+;        16-bit table index), DP=$0000 (C2Tmp_00-$0F), DB=$00 (the table
+;        is read absolute through the bank $00 mirror of $C0:F300);
+;        C2Tmp_08/0A = the start X/Y, C2Tmp_0C/0E = the target X/Y
+; Exit:  M=0, X=0; A = the direction (a word, $0000-$0100 while the read
+;        stays in the table); X = the table
+;        index, 0 when |dx| and |dy| are both below 4 (the caller's "there"
+;        test); C2Tmp_00 = start Y - target Y and C2Tmp_04 = start X -
+;        target X, each only negated when it was half the map or more
+;        (the sign of the wrapped difference, but the size not wrapped);
+;        C2Tmp_02 = |dy| (wrapped), C2Tmp_06 = the table's angle (low
+;        byte; the high byte is 0); Y, DP and DB unchanged
+; No calls.
+!C2Scene_DirFromX = !C2Tmp_08          ; in: the start point
+!C2Scene_DirFromY = !C2Tmp_0A
+!C2Scene_DirToX = !C2Tmp_0C             ; in: the target point
+!C2Scene_DirToY = !C2Tmp_0E
+!C2Scene_AimDy = !C2Tmp_00              ; start Y - target Y, signed; only negated (size not wrapped) from half the map
+!C2Scene_AimAbsDy = !C2Tmp_02           ; |dy|
+!C2Scene_AimDx = !C2Tmp_04              ; start X - target X, signed; only negated (size not wrapped) from half the map
+!C2Scene_AimAbsDx = !C2Tmp_06           ; |dx|, then |dx| / 4, then the table's angle
+C2Scene_Unk229D:
+    SEC
+    LDA.b !C2Scene_DirFromY
+    SBC.b !C2Scene_DirToY
+    STA.b !C2Scene_AimDy
+    BPL .dy_pos
+    EOR.w #!Eng_Invert16
+    INC A
+.dy_pos:
+    STA.b !C2Scene_AimAbsDy
+    CMP.w #!C2Scene_MapHeightPx/2
+    BCC .dy_done
+    SEC                                 ; half the map or more: the other way round,
+    SBC.w #!C2Scene_MapHeightPx         ; |dy| = height - |dy| and dy negated
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimAbsDy
+    LDA.b !C2Scene_AimDy
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimDy
+.dy_done:
+    SEC
+    LDA.b !C2Scene_DirFromX
+    SBC.b !C2Scene_DirToX
+    STA.b !C2Scene_AimDx
+    BPL .dx_pos
+    EOR.w #!Eng_Invert16
+    INC A
+.dx_pos:
+    STA.b !C2Scene_AimAbsDx
+    CMP.w #!C2Scene_MapWidthPx/2
+    BCC .dx_done
+    SEC                                 ; the same for X
+    SBC.w #!C2Scene_MapWidthPx
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimAbsDx
+    LDA.b !C2Scene_AimDx
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !C2Scene_AimDx
+.dx_done:
+    LDA.b !C2Scene_AimAbsDx             ; column: |dx| / 4
+    LSR A
+    LSR A
+    STA.b !C2Scene_AimAbsDx
+    LDA.b !C2Scene_AimAbsDy             ; row: |dy| / 4, times 32
+    AND.w #!C2Scene_AimRiseMask
+    ASL A
+    ASL A
+    ASL A
+    CLC
+    ADC.b !C2Scene_AimAbsDx
+    TAX
+    SEP #$20
+    LDA.w !Rom_AngleTable,X             ; 0 (along X) to $40 (along Y)
+    STA.b !C2Scene_AimAbsDx
+    REP #$20
+    LDA.b !C2Scene_AimDy
+    EOR.b !C2Scene_AimDx
+    BMI .signs_differ
+    LDA.b !C2Scene_AimDx
+    BMI .right_down
+    CLC                                 ; target up-left: $80 + angle
+    LDA.w #!Dir_HalfTurn
+    ADC.b !C2Scene_AimAbsDx
+    RTS
+.right_down:
+    LDA.b !C2Scene_AimAbsDx             ; target down-right: the angle
+    RTS
+.signs_differ:
+    LDA.b !C2Scene_AimDx
+    BMI .right_up
+    SEC                                 ; target down-left: $80 - angle
+    LDA.w #!Dir_HalfTurn
+    SBC.b !C2Scene_AimAbsDx
+    RTS
+.right_up:
+    SEC                                 ; target up-right: $100 - angle
+    LDA.w #!C2Scene_FullTurn
+    SBC.b !C2Scene_AimAbsDx
+    RTS
+    LDA.b !C2Scene_AimAbsDx             ; dead: no path reaches these 3 bytes
+    RTS                                 ; ($C2:232A-$232C; no reference found)
 
 ; ============================================================
 ; Scene setup steps ($C2:232D–$C2:2335, $C2:26A8–$C2:274C)
@@ -7039,15 +7216,17 @@ C2Scene_ClearUnk1B30:
 ; $C2:2336 — C2Scene_Random (15 bytes, $2336–$2344)
 ; Returns the next byte of RandomTable ($C0:FE00): the one at index
 ; C2Scene_Unk1B30, which then goes up by one (wrapping at 256).
-; Callers (7 JSR sites): unmatched ($C2:7575, $C2:7598, $C2:79E0, $C2:7A0C, $C2:7A1F, $C2:7A31,
-;   $C2:7A44).
-; Callers note (7 JSR sites, all unmatched): $C2:7575, $C2:7598, $C2:79E0,
-;   $C2:7A0C, $C2:7A1F, $C2:7A31 and $C2:7A44 (xref also finds a doubtful
-;   one at $C2:754D).
+; Callers note: all eight sites are in the matched scene-effect routines,
+;   C2Scene_PlaceBelowView to C2Scene_RandYB; $C2:754D, once listed as
+;   doubtful, is C2Scene_PlaceBelowView's first instruction.
+; Callers (8 JSR sites): C2Scene_PlaceBelowView ($C2:754D), C2Scene_PlaceBelowViewAt178 ($C2:7575),
+;   C2Scene_RandomVelocity ($C2:7598), C2Scene_NudgeXRandom ($C2:79E0), C2Scene_RandPosA ($C2:7A0C),
+;   C2Scene_RandYA ($C2:7A1F), C2Scene_RandPosB ($C2:7A31) and C2Scene_RandYB ($C2:7A44).
 ; Entry: M, X any (SEP #$30 here), DP any, DB with low WRAM at
 ;        $0000-$1FFF (C2Scene_Unk1B30 is read absolute)
 ; Exit:  M=1, X=0; A = the random byte; X = the index used (8-bit, so
-;        its high byte is 0); Y unchanged; C2Scene_Unk1B30 + 1
+;        its high byte is 0); Y's low byte kept, its high byte cleared
+;        (the SEP #$30; REP #$10 does not restore it); C2Scene_Unk1B30 + 1
 ; No calls.
 C2Scene_Random:
     SEP #$30
@@ -21809,6 +21988,1080 @@ C2Scene_ScrDialPalCycle:
     db $1A : dw C2Scene_ScrDialPalCycle-1 ; C2Script_Jump: goes on at the start
 
 ; ============================================================
+; Screen effects and script routines ($C2:754D–$C2:7B59)
+; ============================================================
+; Small routines for the scene scripts and the tasks they start, none
+; referenced from bank $C2 code. The routines ending in RTS without a
+; task's C=0/C=1 meaning are called by script op $34 (C2Script_CallNear,
+; M=1 and X=0; found as "$34 lo hi" in the bank $C3 scene scripts, e.g.
+; $C3:8E67 calls C2Scene_PlaceBelowViewAt178); the task handlers are
+; started by op $35 (C2Script_SpawnTask, "$35 lo hi" at $C3:8BBD and on).
+; All run inside C2Scene_TaskRunAll (from the scene NMI), with DP=$0000
+; and DB=$00, C2Scene_TaskCur = the running task. The BG3 tasks wait while
+; object A is in scene mode 8 (C2Scene_ObjAInMode8) and also scroll BG3
+; by the leader's last move (C2Scene_Unk1BF1/1BF3), which they then zero.
+; The HDMA effects use C2Scene_HdmaTable records 0/1 (two runs of 112
+; lines, whose addresses the NMI copies from C2Scene_HdmaValues) in
+; indirect mode, pointing into the line buffers C2Scene_HandBufA/B and
+; C2Scene_SwirlCosA/B.
+
+org $C2754D
+; $C2:754D — C2Scene_PlaceBelowView (40 bytes, $754D–$7574)
+; Script routine: puts the task at a random X 64-191 pixels into BG2's
+; view (C2Scene_BgTileX+2 x 8 + a random 0-127 + 64) and 256 pixels below
+; the view's top (C2Scene_BgTileY+2 + 32 tile rows, x 8): just under the
+; screen.
+; Quirk, kept: the first ADC has no CLC; the carry is bit 13 of the tile
+; X shifted out by the third ASL, 0 for any tile X (0-191).
+; Entry: M=1 (the 8-bit AND/STZ; C2Scene_Random sets M=1 again), X=0,
+;        DP=$0000 (C2Tmp_08, the tile words), DB=$00 (the task record
+;        and C2Scene_Random's index); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
+;        C2Tmp_08 = the random part (a word); C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_PlaceBelowView:
+    JSR C2Scene_Random
+    AND.b #!C2Scene_PlaceRandMask
+    STA.b !C2Tmp_08
+    STZ.b !C2Tmp_09
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.b !C2Scene_BgTileX+2            ; BG2's tile X, x 8
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Tmp_08                     ; no CLC (see the header)
+    CLC
+    ADC.w #!C2Scene_PlaceMarginX
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_PlaceRowsDown
+    ASL A
+    ASL A
+    ASL A
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7575 — C2Scene_PlaceBelowViewAt178 (35 bytes, $7575–$7597)
+; Script routine: as C2Scene_PlaceBelowView, but X is pixel $178 (tile
+; column C2Scene_PlaceFixedCol) + a random 0-255, not relative to the
+; view; Y is again 256 pixels below the top of BG2's view.
+; Entry: M=1 (C2Scene_Random leaves M=1), X=0, DP=$0000, DB=$00;
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprY; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
+;        C2Tmp_08 = the random byte (a word); C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_PlaceBelowViewAt178:
+    JSR C2Scene_Random
+    STA.b !C2Tmp_08
+    STZ.b !C2Tmp_09
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.w #!C2Scene_PlaceFixedCol
+    ASL A
+    ASL A
+    ASL A
+    ADC.b !C2Tmp_08                     ; the carry is 0 here ($2F x 8 does not overflow)
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_BgTileY+2
+    CLC
+    ADC.w #!C2Scene_PlaceRowsDown
+    ASL A
+    ASL A
+    ASL A
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7598 — C2Scene_RandomVelocity (43 bytes, $7598–$75C2)
+; Script routine: gives the task one of 16 velocities at random: the
+; four words of entry (random AND 15) of C2SceneRom_RandVelocities go to
+; .XVelFrac, .XVel, .YVelFrac and .YVel.
+; Entry: M=1 (C2Scene_Random leaves M=1), X=0, DP=$0000 (C2Scene_TaskCur),
+;        DB=$00 (the task record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the entry x 8; Y = the task; A = the new .YVel;
+;        C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_RandomVelocity:
+    JSR C2Scene_Random
+    LDY.b !C2Scene_TaskCur
+    REP #$20
+    AND.w #!C2Scene_RandVelMask
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.l !C2SceneRom_RandVelocities,X
+    STA.w C2Scene_Task.XVelFrac,Y
+    LDA.l !C2SceneRom_RandVelocities+2,X
+    STA.w C2Scene_Task.XVel,Y
+    LDA.l !C2SceneRom_RandVelocities+4,X
+    STA.w C2Scene_Task.YVelFrac,Y
+    LDA.l !C2SceneRom_RandVelocities+6,X
+    STA.w C2Scene_Task.YVel,Y
+    RTS
+
+; $C2:75C3 — C2Scene_TaskBg3Drift (58 bytes, $75C3–$75FC)
+; Task handler (started by op $35 at $C3:8BBD): while object A is not
+; in mode 8, counts frames in .Var22 and moves BG3 one pixel left every
+; 4th frame and one pixel down every 8th; then adds the leader's last
+; move (C2Scene_Unk1BF1/1BF3) to BG3's scroll and zeroes it. Never ends.
+; Entry: M=1 (8-bit flag test), X=0, DP=$0000 (the scroll shadows),
+;        DB=$00 (C2Scene_Unk0294, the record, C2Scene_Unk1BF1/1BF3);
+;        C2Scene_TaskCur = the task
+; Exit:  C=0 (the task goes on); M=1 when object A is in mode 8 (nothing
+;        done), else M=0 with X = the task and A = C2Scene_Bg3VScroll;
+;        C2Scene_Bg3HScroll/VScroll, .Var22 and C2Scene_Unk1BF1/1BF3
+;        changed
+; No calls.
+C2Scene_TaskBg3Drift:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftHMask
+    BNE .no_left
+    DEC.b !C2Scene_Bg3HScroll
+.no_left:
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftVMask
+    BNE .no_down
+    INC.b !C2Scene_Bg3VScroll
+.no_down:
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:75FD — C2Scene_TaskBg3DriftWave (85 bytes, $75FD–$7651)
+; Task handler (op $35 at $C3:980D, next to C2Scene_TaskBg3Wave's at
+; $C3:9811): as C2Scene_TaskBg3Drift, but BG3 moves one pixel left and
+; one down together every 4th frame, and the leader's Y move also slides
+; the wave's start (C2Scene_HdmaValueA916) by that many lines (2 bytes
+; each), kept inside the first copy of the 64-line wave
+; (C2Scene_WaveBuf - C2Scene_WaveBufCopy - 1) by adding or subtracting
+; its 128 bytes. The ASL doubles C2Scene_Unk1BF3 in place before it is
+; zeroed. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = the new C2Scene_HdmaValueA916;
+;        C2Scene_Bg3HScroll/VScroll, .Var22, C2Scene_HdmaValueA916 and
+;        C2Scene_Unk1BF1/1BF3 changed
+; No calls.
+C2Scene_TaskBg3DriftWave:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.w #!C2Scene_DriftHMask
+    BNE .no_step
+    DEC.b !C2Scene_Bg3HScroll
+    INC.b !C2Scene_Bg3VScroll
+.no_step:
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    ASL.w !C2Scene_Unk1BF3              ; lines to bytes
+    LDA.l !C2Scene_HdmaValueA916
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    CMP.w #!C2Scene_WaveBuf&$FFFF
+    BCS .not_below
+    CLC
+    ADC.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+    BRA .store
+.not_below:
+    CMP.w #!C2Scene_WaveBufCopy&$FFFF
+    BCC .store
+    SEC
+    SBC.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+.store:
+    STA.l !C2Scene_HdmaValueA916
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7652 — C2Scene_TaskBg3Wave (176 bytes, $7652–$7701)
+; Task handler (op $35 at $C3:9811): a horizontal wave on BG3. In forced
+; blank (C2Scene_InidispShadow bit 7) it only turns HDMA channel 1 off;
+; while object A is in mode 8 it waits. Else, on its first frame
+; (.State 0 -> 1) it zeroes the phase .Var22 and starts the wave at
+; C2Scene_WaveBuf (C2Scene_HdmaValueA916). Each frame it sets up
+; C2Scene_HdmaTableA918 (three runs of 64 lines and one of 32, whose
+; addresses the NMI fills from C2Scene_HdmaValueA916, so every 64-line
+; band shows the same 64 words) as HDMA channel 1 to BG3HOFS (indirect,
+; one register written twice), turns the channel on, writes the 64
+; words of C2Scene_WaveBuf, C2Scene_Bg3HScroll + sin(phase + 16 x line)
+; / 4 (Trig_Sin1024: one period over the 64 lines, -64..+63 pixels),
+; with the phase taken before .Var22 goes up by one, and copies them to
+; C2Scene_WaveBufCopy. Never ends.
+; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it; not
+;        reloaded), DP=$0000 (C2Tmp_08-$12, the shadows), DB=$00 (the
+;        record, the DMA registers)
+; Exit:  C=0; M=1 (forced blank or mode 8: nothing else done) or M=0
+;        with A = $FFFF, X = $A9A5, Y = $AA25 (the MVN's ends) and DB
+;        unchanged (saved around the MVN); C2Tmp_08,
+;        $0A and $10-$12 changed
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_TaskBg3Wave:
+    LDA.b !C2Scene_InidispShadow
+    BPL .shown
+    LDA.b #DMA_CH1
+    TRB.b !C2Scene_HdmaenShadow
+    CLC
+    RTS
+.shown:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BEQ .run
+    CLC
+    RTS
+.run:
+    LDA.w C2Scene_EffectTask.State,X
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    STZ.w C2Scene_EffectTask.Var22,X
+    STZ.w C2Scene_EffectTask.Var22+1,X
+    REP #$20
+    LDA.w #!C2Scene_WaveBuf&$FFFF
+    STA.l !C2Scene_HdmaValueA916
+    SEP #$20
+.started:
+    LDA.b #!C2Scene_HdmaRun64
+    STA.l !C2Scene_HdmaTableA918
+    STA.l !C2Scene_HdmaTableA918+3
+    STA.l !C2Scene_HdmaTableA918+6
+    LDA.b #!C2Scene_HdmaRun32
+    STA.l !C2Scene_HdmaTableA918+9
+    TDC
+    STA.l !C2Scene_HdmaTableA918+12     ; end of the table
+    LDY.w #(!BBAD_BG3HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #!C2Scene_HdmaTableA918&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B                         ; bank of the indirect addresses
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDY.w #!C2Scene_WaveBuf&$FFFF
+    STY.b !C2Tmp_10
+    LDA.b #bank(!C2Scene_WaveBuf)
+    STA.b !C2Tmp_12
+    REP #$20
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.b !C2Tmp_0A
+    CLC
+    ADC.w #1
+    STA.w C2Scene_EffectTask.Var22,X
+    LDY.w #0
+.line:
+    LDA.b !C2Tmp_0A
+    JSL Trig_Sin1024
+    STA.b !C2Tmp_08
+    LDA.b !C2Tmp_0A
+    CLC
+    ADC.w #!C2Scene_WaveLineStep
+    STA.b !C2Tmp_0A
+    LDA.b !C2Tmp_08
+    BPL .positive
+    LSR A                               ; / 4, keeping the sign
+    LSR A
+    ORA.w #!C2Scene_WaveSignBits
+    BRA .add
+.positive:
+    LSR A
+    LSR A
+.add:
+    CLC
+    ADC.b !C2Scene_Bg3HScroll
+    STA.b [!C2Tmp_10],Y
+    INY
+    INY
+    CPY.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf
+    BNE .line
+    PHB
+    LDX.w #!C2Scene_WaveBuf&$FFFF
+    LDY.w #!C2Scene_WaveBufCopy&$FFFF
+    LDA.w #!C2Scene_WaveBufCopy-!C2Scene_WaveBuf-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    CLC
+    RTS
+
+; $C2:7702 — C2Scene_TaskBg3Slide (87 bytes, $7702–$7758)
+; Task handler (op $35 at $C3:9F92): while object A is not in mode 8,
+; moves BG3 by a fixed velocity, X about -3.46 and Y +2 pixels a frame
+; (set into .XVelFrac-.YVel on the first frame, .State 0 -> 1), through
+; the task's own position (.SprX/.SprY = the BG3 scroll, C2Scene_TaskMove,
+; back into the scroll, keeping the fractions in .XFrac/.YFrac); then
+; adds the leader's last move as C2Scene_TaskBg3Drift. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = C2Scene_Bg3VScroll; the scroll, the
+;        task's position and C2Scene_Unk1BF1/1BF3 changed
+; Calls: C2Scene_TaskMove.
+C2Scene_TaskBg3Slide:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.State,X
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    LDA.w #!C2Scene_SlideXVelFrac
+    STA.w C2Scene_Task.XVelFrac,X
+    LDA.w #!C2Scene_SlideXVel
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    LDA.w #!C2Scene_SlideYVel
+    STA.w C2Scene_Task.YVel,X
+.started:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_Bg3VScroll
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_TaskMove
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_Bg3HScroll
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_Bg3VScroll
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7759 — C2Scene_TaskBg3LineWave (153 bytes, $7759–$77F1)
+; Task handler (no reference found; laid out as C2Scene_TaskBg3Wave):
+; in forced blank only turns HDMA channel 1 off; waits while object A is
+; in mode 8. Else (on the first frame .State 0 -> 1 and .Var22 = 0) sets
+; up C2Scene_HdmaTable[0] as two runs of 112 lines on HDMA channel 1 to
+; BG3HOFS (indirect, one register twice) from C2Scene_HandBufA and its
+; second half, turns the channel on, and fills C2Scene_HandBufA: every
+; even line C2Scene_Bg3HScroll, every odd line C2Scene_Bg3HScroll +
+; sin(phase + n) (Trig_Sin1024, -255..+255 pixels; n = 0, 1, ... down
+; the odd lines), the phase going up by 4 each frame. Never ends.
+; Quirk, kept: after the even-line loop X is $1C0, not the task, so the
+; phase is read from and written to $0022 + $1C0 = C2Scene_Unk01E2 in
+; low WRAM; the .Var22 the first frame zeroes is never used.
+; Entry: M=1, X=0 with X = the task (as C2Scene_TaskRunAll calls it),
+;        DP=$0000, DB=$00 (the record, C2Scene_Unk01E2, the DMA
+;        registers)
+; Exit:  C=0; M=1 (forced blank or mode 8: nothing else done) or M=0
+;        with X = $01C2, Y = $01BE; C2Tmp_0A = the phase + 112;
+;        C2Scene_Unk01E2 + 4
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_TaskBg3LineWave:
+    LDA.b !C2Scene_InidispShadow
+    BPL .shown
+    LDA.b #DMA_CH1
+    TRB.b !C2Scene_HdmaenShadow
+    CLC
+    RTS
+.shown:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BEQ .run
+    CLC
+    RTS
+.run:
+    LDA.w C2Scene_EffectTask.State,X
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    STZ.w C2Scene_EffectTask.Var22,X
+    STZ.w C2Scene_EffectTask.Var22+1,X
+.started:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    REP #$20
+    LDA.w #!C2Scene_HandBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufA+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    LDY.w #(!BBAD_BG3HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    REP #$20
+    LDX.w #0
+.even:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.l !C2Scene_HandBufA,X
+    INX
+    INX
+    INX
+    INX
+    CPX.w #!C2Scene_HdmaBufBytes
+    BNE .even
+    LDA.w C2Scene_EffectTask.Var22,X    ; X = $1C0 here: C2Scene_Unk01E2 (see the header)
+    STA.b !C2Tmp_0A
+    CLC
+    ADC.w #!C2Scene_LineWaveStep
+    STA.w C2Scene_EffectTask.Var22,X
+    LDX.w #2
+.odd:
+    TXY
+    LDA.b !C2Tmp_0A
+    JSL Trig_Sin1024
+    INC.b !C2Tmp_0A
+    TYX
+    CLC
+    ADC.b !C2Scene_Bg3HScroll
+    STA.l !C2Scene_HandBufA,X
+    INX
+    INX
+    INX
+    INX
+    CPX.w #!C2Scene_HdmaBufBytes+2
+    BNE .odd
+    CLC
+    RTS
+
+; $C2:77F2 — C2Scene_TaskBg3SlideFast (87 bytes, $77F2–$7848)
+; Task handler (op $35 at $C3:AC92): C2Scene_TaskBg3Slide with the
+; velocity X about -17.32 and Y -10 pixels a frame. Never ends.
+; Entry: M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit:  C=0; M=1 when object A is in mode 8 (nothing done), else M=0
+;        with X = the task and A = C2Scene_Bg3VScroll; the scroll, the
+;        task's position and C2Scene_Unk1BF1/1BF3 changed
+; Calls: C2Scene_TaskMove.
+C2Scene_TaskBg3SlideFast:
+    LDA.w !C2Scene_Unk0294
+    BIT.b #!C2Scene_ObjAInMode8
+    BNE .done
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.State,X
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BNE .started
+    INC.w C2Scene_EffectTask.State,X
+    LDA.w #!C2Scene_SlideFastXVelFrac
+    STA.w C2Scene_Task.XVelFrac,X
+    LDA.w #!C2Scene_SlideFastXVel
+    STA.w C2Scene_Task.XVel,X
+    STZ.w C2Scene_Task.YVelFrac,X
+    LDA.w #!C2Scene_SlideFastYVel
+    STA.w C2Scene_Task.YVel,X
+.started:
+    LDA.b !C2Scene_Bg3HScroll
+    STA.w C2Scene_Task.SprX,X
+    LDA.b !C2Scene_Bg3VScroll
+    STA.w C2Scene_Task.SprY,X
+    JSR C2Scene_TaskMove
+    LDA.w C2Scene_Task.SprX,X
+    STA.b !C2Scene_Bg3HScroll
+    LDA.w C2Scene_Task.SprY,X
+    STA.b !C2Scene_Bg3VScroll
+    LDA.b !C2Scene_Bg3HScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF1
+    STA.b !C2Scene_Bg3HScroll
+    LDA.b !C2Scene_Bg3VScroll
+    CLC
+    ADC.w !C2Scene_Unk1BF3
+    STA.b !C2Scene_Bg3VScroll
+    STZ.w !C2Scene_Unk1BF1
+    STZ.w !C2Scene_Unk1BF3
+.done:
+    CLC
+    RTS
+
+; $C2:7849 — C2Scene_TaskBg1Pan (23 bytes, $7849–$785F)
+; Task handler (no op $35 reference found): counts frames in .Var22
+; (8-bit) and every 4th frame scrolls layer 1 one pixel
+; (C2Scene_Unk0568 with C2Scene_ScrollLayer = C2Scene_ScrollPx = 1),
+; which also builds the tile column that comes into view. Never ends.
+; Entry: M=1 (8-bit counter), X=0, DP=$0000, DB=$00 (the record and
+;        C2Scene_Unk0568's state); C2Scene_TaskCur = the task
+; Exit:  C=0; M=1, X=0; X = the task (no scroll) or as C2Scene_Unk0568
+;        leaves it; A, Y and C2Tmp_00-$1A as C2Scene_Unk0568 leaves them
+; Calls: C2Scene_Unk0568.
+C2Scene_TaskBg1Pan:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var22,X
+    LDA.w C2Scene_EffectTask.Var22,X
+    AND.b #!C2Scene_PanMask
+    BNE .done
+    LDA.b #1
+    STA.b !C2Scene_ScrollPx
+    STA.b !C2Scene_ScrollLayer          ; layer 1
+    JSR C2Scene_Unk0568
+.done:
+    CLC
+    RTS
+
+; $C2:7860 — C2Scene_ClearParty (15 bytes, $7860–$786E)
+; Script routine: marks all three Party_Members slots empty
+; (C2Scene_PartySlotEmpty).
+; Entry: M=1 (8-bit stores), X any, DP any, DB any (long stores)
+; Exit:  M=1; A = C2Scene_PartySlotEmpty; X, Y unchanged
+; No calls.
+C2Scene_ClearParty:
+    LDA.b #!C2Scene_PartySlotEmpty
+    STA.l !Party_Members
+    STA.l !Party_Members+1
+    STA.l !Party_Members+2
+    RTS
+
+; $C2:786F — C2Scene_SaveParty (25 bytes, $786F–$7887)
+; Script routine: copies the three Party_Members bytes to
+; C2Scene_PartySave (C2Scene_RestoreParty puts them back).
+; Entry: M=1, X any, DP any, DB any (long addressing throughout)
+; Exit:  M=1; A = the third member byte; X, Y unchanged
+; No calls.
+C2Scene_SaveParty:
+    LDA.l !Party_Members
+    STA.l !C2Scene_PartySave
+    LDA.l !Party_Members+1
+    STA.l !C2Scene_PartySave+1
+    LDA.l !Party_Members+2
+    STA.l !C2Scene_PartySave+2
+    RTS
+
+; $C2:7888 — C2Scene_RestoreParty (25 bytes, $7888–$78A0)
+; Script routine: copies C2Scene_PartySave back to Party_Members.
+; Entry: M=1, X any, DP any, DB any (long addressing throughout)
+; Exit:  M=1; A = the third member byte; X, Y unchanged
+; No calls.
+C2Scene_RestoreParty:
+    LDA.l !C2Scene_PartySave
+    STA.l !Party_Members
+    LDA.l !C2Scene_PartySave+1
+    STA.l !Party_Members+1
+    LDA.l !C2Scene_PartySave+2
+    STA.l !Party_Members+2
+    RTS
+
+; $C2:78A1 — C2Scene_TaskInView (66 bytes, $78A1–$78E2)
+; Script routine (op $34 at $C3:8E82, followed by an op $23 test of
+; $0000): C2Tmp_00 = 1 when the task is in BG2's view with a margin,
+; else 0. The position relative to the view plus 16 (.SprX -
+; C2Scene_Bg2HScroll + 16, wrapped by the map width when negative; Y the
+; same with the map height) must be below 288 (X) and 272 (Y): from 16
+; pixels left of / above the screen to 16 right of it and 32 below.
+; Entry: M=1 (REP #$20 here), X=0, DP=$0000 (the scroll shadows and
+;        C2Tmp), DB=$00 (the record); C2Scene_TaskCur = the task
+; Exit:  M=1, X=0; X = the task; C2Tmp_00 = 1 (in view) or 0 (8-bit;
+;        C2Tmp_01 unchanged); A = 1 in view, else the relative X (or Y
+;        when X passed) that failed the test (low byte in A, high byte
+;        in B); C2Tmp_08/0A = the relative X/Y; Y unchanged
+; No calls.
+C2Scene_TaskInView:
+    LDX.b !C2Scene_TaskCur
+    REP #$20
+    LDA.w C2Scene_Task.SprX,X
+    SEC
+    SBC.b !C2Scene_Bg2HScroll
+    CLC
+    ADC.w #!C2Scene_ViewMargin
+    BPL .x_done
+    CLC
+    ADC.w #!C2Scene_MapWidthPx
+.x_done:
+    STA.b !C2Tmp_08
+    LDA.w C2Scene_Task.SprY,X
+    SEC
+    SBC.b !C2Scene_Bg2VScroll
+    CLC
+    ADC.w #!C2Scene_ViewMargin
+    BPL .y_done
+    CLC
+    ADC.w #!C2Scene_MapHeightPx
+.y_done:
+    STA.b !C2Tmp_0A
+    LDA.b !C2Tmp_08
+    CMP.w #!C2Scene_ViewTestW
+    BCS .out
+    LDA.b !C2Tmp_0A
+    CMP.w #!C2Scene_ViewTestH
+    BCS .out
+    SEP #$20
+    LDA.b #1
+    STA.b !C2Tmp_00
+    RTS
+.out:
+    SEP #$20
+    STZ.b !C2Tmp_00
+    RTS
+
+; $C2:78E3 — C2Scene_Win1Init (116 bytes with C2Scene_Win1Step, $78E3–$7956)
+; Script routine: sets up C2Scene_HdmaTable[0] (two runs of 112 lines)
+; as HDMA channel 1 to WH0/WH1 (indirect, two registers), turns the
+; channel on, zeroes the buffer toggle .Var24 and falls into the
+; sub-entry C2Scene_Win1Step ($C2:7911; op $34 at $C3:9C06 calls it on
+; its own, probably once a frame): picks C2Scene_HandBufA (.Var24 even)
+; or C2Scene_HandBufB (odd), points both C2Scene_HdmaValues words and
+; WinFx_TablePtr (bank $7E) at it, adds one to .Var24, and has
+; BankC3_Entry0008 (A = WinFx_Mode0) build the window table there from
+; the task's .SprX, .SprY and .Var22 (low bytes, as WinFx_ArgX, ArgY and
+; ArgSize; the shape is not traced). The table written is the one the
+; next NMI shows, while the other stays on screen.
+; Entry (both): M any at C2Scene_Win1Init (SEP #$20 there), M=1 at
+;        C2Scene_Win1Step (the 8-bit toggle; op $34 calls it with M=1),
+;        X=0, DP=$0000 (the shadows and
+;        C2Scene_TaskCur), DB=$00 (the record, the DMA registers and
+;        WinFx_*); C2Scene_TaskCur = the task
+; Exit (both):  M=1, X=0 (as BankC3_Entry0008 returns, saving P); X, Y
+;        and A as BankC3_Entry0008 leaves them (not traced); .Var24 + 1;
+;        WinFx_* and C2Scene_HdmaValues words 0-1 changed
+; Calls: BankC3_Entry0008 (JSL).
+C2Scene_Win1Init:
+    SEP #$20
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_WH0<<8)|!DMAP_HdmaIndirect|DMA_MODE_2BYTE
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var24,X
+C2Scene_Win1Step:                       ; header: see C2Scene_Win1Init
+    LDX.b !C2Scene_TaskCur
+    LDA.w C2Scene_EffectTask.Var24,X
+    LSR A
+    REP #$20
+    BCC .buf_a
+    LDA.w #!C2Scene_HandBufB&$FFFF
+    LDY.w #(!C2Scene_HandBufB+!C2Scene_HdmaHalfBytes)&$FFFF
+    BRA .set
+.buf_a:
+    LDA.w #!C2Scene_HandBufA&$FFFF
+    LDY.w #(!C2Scene_HandBufA+!C2Scene_HdmaHalfBytes)&$FFFF
+.set:
+    STA.l !C2Scene_HdmaValues
+    STA.w !WinFx_TablePtr
+    TYA
+    STA.l !C2Scene_HdmaValues+2
+    SEP #$20
+    INC.w C2Scene_EffectTask.Var24,X
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !WinFx_ArgX
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !WinFx_ArgY
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.w !WinFx_ArgSize
+    LDA.b #bank(!C2Scene_HandBufA)
+    STA.w !WinFx_TableBank
+    TDC                                 ; A = WinFx_Mode0
+    JSL BankC3_Entry0008
+    RTS
+
+; $C2:7957 — C2Scene_Win2Init (42 bytes, $7957–$7980)
+; Script routine (op $34 at $C3:A937): sets up C2Scene_HdmaTable[1] (two
+; runs of 112 lines) as HDMA channel 2 to WH2/WH3 (indirect, two
+; registers) and turns the channel on. Unlike C2Scene_Win1Init it leaves
+; .Var24 alone and does not build a table (C2Scene_Win2Step does).
+; Entry: M any (SEP #$20 here), X=0 (16-bit STY), DP=$0000
+;        (C2Scene_HdmaenShadow), DB=$00 (the DMA registers)
+; Exit:  M=1, X=0; A = DMA_CH2; Y = C2Scene_HdmaTable[1]'s address; X
+;        unchanged
+; No calls.
+C2Scene_Win2Init:
+    SEP #$20
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[1].Count0
+    STA.l C2Scene_HdmaTable[1].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[1].End
+    LDY.w #(!BBAD_WH2<<8)|!DMAP_HdmaIndirect|DMA_MODE_2BYTE
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[1].Count0&$FFFF
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    RTS
+
+; $C2:7981 — C2Scene_Win2Step (71 bytes, $7981–$79C7)
+; Script routine (op $34 at $C3:A93E, right after C2Scene_Win2Init's):
+; adds one to .Var24 and picks C2Scene_SwirlCosB (now odd) or
+; C2Scene_SwirlCosA (even) as WinFx_TablePtr (bank $7E), has
+; BankC3_Entry0008 (A = WinFx_Mode1) build the window table there from
+; .SprX, .SprY and .Var22 as C2Scene_Win1Step does, then points
+; C2Scene_HdmaValues words 2-3 (C2Scene_HdmaTable[1]) at the buffer and
+; its second half.
+; Entry: M=1 (8-bit loads; op $34 calls it with M=1), X=0, DP=$0000,
+;        DB=$00; C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the buffer + C2Scene_HdmaHalfBytes; Y
+;        as BankC3_Entry0008 leaves it; .Var24 + 1; WinFx_* and
+;        C2Scene_HdmaValues words 2-3 changed
+; Calls: BankC3_Entry0008 (JSL).
+C2Scene_Win2Step:
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var24,X
+    LDA.w C2Scene_EffectTask.Var24,X
+    LSR A
+    BCS .buf_d
+    LDY.w #!C2Scene_SwirlCosA&$FFFF
+    BRA .set
+.buf_d:
+    LDY.w #!C2Scene_SwirlCosB&$FFFF
+.set:
+    STY.w !WinFx_TablePtr
+    LDA.b #bank(!C2Scene_SwirlCosA)
+    STA.w !WinFx_TableBank
+    LDA.w C2Scene_Task.SprX,X
+    STA.w !WinFx_ArgX
+    LDA.w C2Scene_Task.SprY,X
+    STA.w !WinFx_ArgY
+    LDA.w C2Scene_EffectTask.Var22,X
+    STA.w !WinFx_ArgSize
+    LDA.b #!WinFx_Mode1
+    JSL BankC3_Entry0008
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    LDA.w !WinFx_TablePtr
+    STA.l !C2Scene_HdmaValues+4
+    CLC
+    ADC.w #!C2Scene_HdmaHalfBytes
+    STA.l !C2Scene_HdmaValues+6
+    RTS
+
+; $C2:79C8 — C2Scene_AddGravity (24 bytes, $79C8–$79DF)
+; Script routine: adds 1/8 pixel a frame (C2Scene_GravityFrac) to the
+; task's Y velocity (.YVelFrac, carrying into .YVel).
+; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur), DB=$00
+;        (the record); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .YVel; Y unchanged
+; No calls.
+C2Scene_AddGravity:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_Task.YVelFrac,X
+    ADC.w #!C2Scene_GravityFrac
+    STA.w C2Scene_Task.YVelFrac,X
+    LDA.w C2Scene_Task.YVel,X
+    ADC.w #0
+    STA.w C2Scene_Task.YVel,X
+    RTS
+
+; $C2:79E0 — C2Scene_NudgeXRandom (44 bytes, $79E0–$7A0B)
+; Script routine (op $34 at $C3:B792 and $C3:CB7E): moves the task right
+; by a random 0-48 pixels: a random byte x C2Scene_NudgeRange / 256
+; (WRMPYA/B), rounded up when the low byte of the product has bit 7 set.
+; Entry: M=1 (8-bit multiply; C2Scene_Random leaves M=1), X=0,
+;        DP=$0000, DB=$00 (the multiplier registers and the record);
+;        C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; X = the task; A = the new .SprX; Y's high byte
+;        cleared (C2Scene_Random's SEP #$30), low byte kept;
+;        C2Scene_Unk1B30 + 1
+; Calls: C2Scene_Random.
+C2Scene_NudgeXRandom:
+    JSR C2Scene_Random
+    STA.w WRMPYA
+    LDA.b #!C2Scene_NudgeRange
+    STA.w WRMPYB
+    NOP                                 ; the multiplier's 8 cycles
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYL
+    BMI .round_up
+    LDA.w RDMPYH
+    BRA .add
+.round_up:
+    LDA.w RDMPYH
+    INC A
+.add:
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w C2Scene_Task.SprX,X
+    STA.w C2Scene_Task.SprX,X
+    RTS
+
+; $C2:7A0C — C2Scene_RandPosA (37 bytes with C2Scene_RandYA, $7A0C–$7A30)
+; Script routine: .SprX = $220 + a random 0-255, then falls into the
+; sub-entry C2Scene_RandYA ($C2:7A1F): .SprY = $38 + a random 0-255.
+; Entry (both): M=1 (C2Scene_Random leaves M=1; SEP #$20 before the
+;        sub-entry), X=0, DP=$0000, DB=$00 (the record and the random
+;        index); C2Scene_TaskCur = the task
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y's high
+;        byte cleared (C2Scene_Random's SEP #$30), low byte kept;
+;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYA)
+; Calls: C2Scene_Random.
+C2Scene_RandPosA:
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosAX
+    STA.w C2Scene_Task.SprX,X
+    SEP #$20
+C2Scene_RandYA:                         ; header: see C2Scene_RandPosA
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosAY
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7A31 — C2Scene_RandPosB (37 bytes with C2Scene_RandYB, $7A31–$7A55)
+; Script routine: as C2Scene_RandPosA with .SprX = $E0 + a random 0-255,
+; falling into the sub-entry C2Scene_RandYB ($C2:7A44): .SprY = -$48 + a
+; random 0-255.
+; Entry (both): M=1, X=0, DP=$0000, DB=$00; C2Scene_TaskCur = the task
+; Exit (both):  M=0, X=0; X = the task; A = the new .SprY; Y's high
+;        byte cleared (C2Scene_Random's SEP #$30), low byte kept;
+;        C2Scene_Unk1B30 + 2 (+1 through C2Scene_RandYB)
+; Calls: C2Scene_Random.
+C2Scene_RandPosB:
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosBX
+    STA.w C2Scene_Task.SprX,X
+    SEP #$20
+C2Scene_RandYB:                         ; header: see C2Scene_RandPosB
+    JSR C2Scene_Random
+    REP #$20
+    LDX.b !C2Scene_TaskCur
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!C2Scene_RandPosBY
+    STA.w C2Scene_Task.SprY,X
+    RTS
+
+; $C2:7A56 — C2Scene_NoiseInit (89 bytes, $7A56–$7AAE)
+; Script routine (op $34 at $C3:C953): sets up C2Scene_HdmaTable[0]
+; (two runs of 112 lines) as both HDMA channel 1 to BG1HOFS and channel
+; 2 to BG2HOFS (indirect, one register twice: both layers get the same
+; values) and turns them on. Fills C2Scene_HandBufA with the first $1C0
+; bytes of ROM bank $C0 (code, used as noise) and C2Scene_HandBufB with
+; C2Scene_Bg1HScroll on every line (one word stored, then copied up by
+; an overlapping MVN).
+; Quirk, kept: that MVN moves $1BF bytes, one more than the buffer's
+; rest, so the low byte of the scroll also lands at $7E:8FB6, the byte
+; after C2Scene_HandBufB. The table is pointed at a buffer by
+; C2Scene_NoiseShow / NoiseHide / NoiseStep.
+; Entry: M=1 (8-bit stores), X=0, DP=$0000 (C2Scene_Bg1HScroll,
+;        C2Scene_HdmaenShadow), DB=$00 (the DMA registers; saved around
+;        the MVNs)
+; Exit:  M=0, X=0; A = $FFFF, X = $8FB5, Y = $8FB7 (the last MVN's
+;        ends); DB unchanged
+; No calls.
+C2Scene_NoiseInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_BG1HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #(!BBAD_BG2HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH1|DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    REP #$20
+    PHB
+    LDX.w #0                            ; from $C0:0000
+    LDY.w #!C2Scene_HandBufA&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-1
+    MVN !Bank7E,!BankC0                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !C2Scene_Bg1HScroll
+    STA.l !C2Scene_HandBufB
+    LDX.w #!C2Scene_HandBufB&$FFFF
+    LDY.w #(!C2Scene_HandBufB+2)&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-2      ; one byte too many (see the header)
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7AAF — C2Scene_NoiseStep (43 bytes, $7AAF–$7AD9)
+; Script routine: moves both C2Scene_HdmaValues words 0-1 on by 32
+; lines (C2Scene_NoiseStep bytes), back to C2Scene_HandBufA when they
+; reach its end ($8D16), so the screen shows the next part of the noise
+; (the second word can end up before the first; each wraps on its own).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long addressing)
+; Exit:  M=0; A = the new word 1; X, Y unchanged
+; No calls.
+C2Scene_NoiseStep:
+    REP #$20
+    LDA.l !C2Scene_HdmaValues
+    CLC
+    ADC.w #!C2Scene_NoiseStep
+    CMP.w #(!C2Scene_HandBufA+!C2Scene_HdmaBufBytes)&$FFFF
+    BCC .store0
+    LDA.w #!C2Scene_HandBufA&$FFFF
+.store0:
+    STA.l !C2Scene_HdmaValues
+    LDA.l !C2Scene_HdmaValues+2
+    CLC
+    ADC.w #!C2Scene_NoiseStep
+    CMP.w #(!C2Scene_HandBufA+!C2Scene_HdmaBufBytes)&$FFFF
+    BCC .store1
+    LDA.w #!C2Scene_HandBufA&$FFFF
+.store1:
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7ADA — C2Scene_NoiseShow (17 bytes, $7ADA–$7AEA)
+; Script routine (op $34 at $C3:CA30): points C2Scene_HdmaValues words
+; 0-1 at C2Scene_HandBufA and its second half (the noise).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long stores)
+; Exit:  M=0; A = the second address; X, Y unchanged
+; No calls.
+C2Scene_NoiseShow:
+    REP #$20
+    LDA.w #!C2Scene_HandBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufA+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7AEB — C2Scene_NoiseHide (17 bytes, $7AEB–$7AFB)
+; Script routine (no reference found): points C2Scene_HdmaValues words
+; 0-1 at C2Scene_HandBufB and its second half (every line the plain
+; C2Scene_Bg1HScroll that C2Scene_NoiseInit stored).
+; Entry: M any (REP #$20 here), X any, DP any, DB any (long stores)
+; Exit:  M=0; A = the second address; X, Y unchanged
+; No calls.
+C2Scene_NoiseHide:
+    REP #$20
+    LDA.w #!C2Scene_HandBufB&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufB+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    RTS
+
+; $C2:7AFC — C2Scene_UnpackBgPack (36 bytes, $7AFC–$7B1F)
+; Script routine (op $34 at $C3:A130 and $C3:C16E): unpacks the
+; C2SceneRom_BgPacks entry at byte offset C2Tmp_08 (entry x 3, a word set
+; by the script) into C2Scene_DecompBuf.
+; Entry: M=1, X=0 (the 16-bit offset), DP=$0000 (C2Tmp_08), DB=$00
+;        (Menu_Decomp*)
+; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_UnpackBgPack:
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.b !C2Tmp_08
+    REP #$20
+    LDA.l !C2SceneRom_BgPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_BgPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B20 — C2Scene_UnpackBg3MapPack (36 bytes, $7B20–$7B43)
+; Script routine (no op $34 reference found): as C2Scene_UnpackBgPack
+; from C2SceneRom_Bg3MapPacks.
+; Entry: M=1, X=0, DP=$0000 (C2Tmp_08), DB=$00 (Menu_Decomp*)
+; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
+;        Menu_Decomp* changed
+; Calls: Decomp_ToWramVec (JSL).
+C2Scene_UnpackBg3MapPack:
+    LDA.b #bank(!C2Scene_DecompBuf)
+    STA.w !Menu_DecompDestBank
+    LDX.w #!C2Scene_DecompBuf&$FFFF
+    STX.w !Menu_DecompDest
+    LDX.b !C2Tmp_08
+    REP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks,X
+    STA.w !Menu_DecompSrc
+    SEP #$20
+    LDA.l !C2SceneRom_Bg3MapPacks+2,X
+    STA.w !Menu_DecompSrcBank
+    JSL Decomp_ToWramVec
+    RTS
+
+; $C2:7B44 — C2Scene_SetUnk7F00AABit0 (11 bytes, $7B44–$7B4E)
+; Script routine (op $34 at $C3:CCA3): sets bit 0 of C2Scene_Unk7F00AA
+; (a byte of Menu_FlagBlock7F; what it means is not traced).
+; Entry: M=1, X any, DP any, DB any (long addressing)
+; Exit:  M=1; A = the new byte; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00AABit0:
+    LDA.l !C2Scene_Unk7F00AA
+    ORA.b #!C2Scene_Unk7F00AABit0
+    STA.l !C2Scene_Unk7F00AA
+    RTS
+
+; $C2:7B4F — C2Scene_SetUnk7F019ABit3 (11 bytes, $7B4F–$7B59)
+; Script routine (op $34 at $C3:9238): sets bit 3 of C2Scene_Unk7F019A
+; (Menu_FlagBlock7F; meaning not traced).
+; Entry: M=1, X any, DP any, DB any (long addressing)
+; Exit:  M=1; A = the new byte; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F019ABit3:
+    LDA.l !C2Scene_Unk7F019A
+    ORA.b #!C2Scene_Unk7F019ABit3
+    STA.l !C2Scene_Unk7F019A
+    RTS
+
+; ============================================================
 ; Scene extra-graphics loaders ($C2:7B5A–$C2:7BC3)
 ; ============================================================
 ; Three fixed-entry pack loaders used only by C2Scene_LoadLocExtraGfx.
@@ -21879,6 +23132,394 @@ C2Scene_LoadUnkC600:
     STA.w !Menu_DecompSrcBank
     JSL Decomp_ToWramVec
     RTS
+; ============================================================
+; More script routines and the BG2 line waves ($C2:7BC4–$C2:7DE3)
+; ============================================================
+; As the routines at $C2:754D-$C2:7B59: called by script op $34 from the
+; bank $C3 scene scripts (M=1, X=0, DP=$0000, DB=$00, C2Scene_TaskCur =
+; the task), the result, where there is one, in C2Tmp_00 for the
+; script's next test.
+
+; $C2:7BC4 — C2Scene_TestUnk7F00F7Bit1 (13 bytes, $7BC4–$7BD0)
+; Script routine (op $34 at $C3:98F4): C2Tmp_00 = 1 when bit 1 of
+; C2Scene_Unk7F00F7 is set, else 0.
+; Entry: M=1 (8-bit), X any, DP=$0000 (C2Tmp_00), DB any (long read)
+; Exit:  M=1; A = C2Scene_Unk7F00F7; C2Tmp_00 = 0 or 1; X, Y unchanged
+; No calls.
+C2Scene_TestUnk7F00F7Bit1:
+    STZ.b !C2Tmp_00
+    LDA.l !C2Scene_Unk7F00F7
+    BIT.b #!C2Scene_Unk7F00F7Bit1
+    BEQ .done
+    INC.b !C2Tmp_00
+.done:
+    RTS
+
+; $C2:7BD1 — C2Scene_SetConfig1E (7 bytes, $7BD1–$7BD7)
+; Script routine (op $34 at $C3:B665 and $C3:C669): Menu_Config1E (the
+; byte LocLoad_AudioSetup keeps the music track in) = C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetConfig1E:
+    LDA.b !C2Tmp_00
+    STA.l !Menu_Config1E
+    RTS
+
+; $C2:7BD8 — C2Scene_BuildPatternTiles (80 bytes, $7BD8–$7C27)
+; Script routine (no op $34 reference found): builds ten 4bpp tiles at
+; C2Scene_PatternTiles ($7F:9000, the unpack buffer): zeroes the first
+; eight ($100 bytes) and sets the two after them (C2Scene_PatternSolid,
+; $40 bytes) to $FF (colour 15), each by storing one byte and copying it
+; up with an overlapping MVN; then writes the 32 bytes of
+; C2Scene_PatternRows as bit plane 0 of the eight tiles, 8 rows per
+; pair of tiles, both tiles of a pair alike. The patterns get denser
+; from pair to pair (probably the steps of a dissolve; who uploads the
+; tiles is not traced).
+; The MVNs set DB to $7F, so the plane stores are absolute in bank $7F;
+; DB is saved and restored around them.
+; Entry: M=1 (8-bit stores), X=0 (16-bit addresses), DP=$0000 (TDC for
+;        0), DB any (saved)
+; Exit:  M=1, X=0; X = $20, Y = $9100 (the end of the last tile pair);
+;        A = $9100 (low byte $00, B = $91: the last TYA/ADC); DB unchanged
+; No calls.
+C2Scene_BuildPatternTiles:
+    TDC
+    STA.l !C2Scene_PatternTiles
+    LDA.b #!C2Scene_PatternAllSet
+    STA.l !C2Scene_PatternSolid
+    PHB
+    REP #$20
+    LDX.w #!C2Scene_PatternTiles&$FFFF
+    TXY
+    INY
+    LDA.w #!C2Scene_PatternTileBytes-2
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!C2Scene_PatternSolid&$FFFF
+    TXY
+    INY
+    LDA.w #!C2Scene_PatternSolidBytes-2
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20                            ; DB = $7F from here
+    LDY.w #!C2Scene_PatternTiles&$FFFF
+    LDX.w #0
+.row:
+    LDA.l C2Scene_PatternRows,X
+    STA.w !Eng_PtrBase,Y                ; plane 0 of this row ...
+    STA.w !Eng_PtrBase+!C2Scene_Tile4bppBytes,Y ; ... and of the same row of the next tile
+    INX
+    INY
+    INY
+    REP #$20
+    TYA
+    AND.w #!C2Scene_TilePlanes01Mask
+    BNE .same_pair
+    CLC                                 ; 8 rows done: on to the next pair
+    TYA
+    ADC.w #!C2Scene_PatternNextPair
+    TAY
+.same_pair:
+    SEP #$20
+    CPX.w #!C2Scene_PatternRowCount
+    BCC .row
+    PLB
+    RTS
+
+; $C2:7C28 — C2Scene_PatternRows (32 bytes, $7C28–$7C47)
+; Bit plane 0 rows of the four tile pairs C2Scene_BuildPatternTiles
+; builds, 8 rows per pair, sparse to full.
+C2Scene_PatternRows:
+    db $00,$00,$00,$00,$88,$00,$22,$00
+    db $88,$22,$88,$22,$CC,$33,$CC,$33
+    db $EE,$BB,$EE,$BB,$EE,$FF,$FB,$BF
+    db $FF,$FF,$EF,$FF,$FF,$FF,$FF,$FF
+
+; $C2:7C48 — C2Scene_SetUnk7F00CE (7 bytes, $7C48–$7C4E)
+; Script routine (no op $34 reference found): C2Scene_Unk7F00CE =
+; C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00CE:
+    LDA.b !C2Tmp_00
+    STA.l !C2Scene_Unk7F00CE
+    RTS
+
+; $C2:7C4F — C2Scene_SetUnk7F00DA (7 bytes, $7C4F–$7C55)
+; Script routine (op $34 at $C3:C448): C2Scene_Unk7F00DA = C2Tmp_00.
+; Entry: M=1, X any, DP=$0000 (C2Tmp_00), DB any (long store)
+; Exit:  M=1; A = C2Tmp_00; X, Y unchanged
+; No calls.
+C2Scene_SetUnk7F00DA:
+    LDA.b !C2Tmp_00
+    STA.l !C2Scene_Unk7F00DA
+    RTS
+
+; $C2:7C56 — C2Scene_Bg2HWaveInit (65 bytes, $7C56–$7C96)
+; Script routine (op $34 at $C3:C18F): sets up C2Scene_HdmaTable[0] (two
+; runs of 112 lines) as HDMA channel 1 to BG2HOFS (indirect, one register
+; twice) and turns it on, zeroes the buffer toggle .Var26 and zeroes
+; $7E:8B56-$7E:8FB5 (C2Scene_HandBufA to the end of C2Scene_HandBufB,
+; with the $E0 bytes between them) for C2Scene_Bg2HWaveStep.
+; Entry: M=1 (8-bit stores), X=0, DP=$0000 (TDC for 0, the shadows),
+;        DB=$00 (the DMA registers and the record; saved around the MVN)
+; Exit:  M=0, X=0; A = $FFFF, X = $8FB5, Y = $8FB6 (the MVN's ends); DB
+;        unchanged
+; No calls.
+C2Scene_Bg2HWaveInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[0].Count0
+    STA.l C2Scene_HdmaTable[0].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[0].End
+    LDY.w #(!BBAD_BG2HOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP1
+    LDY.w #C2Scene_HdmaTable[0].Count0&$FFFF
+    STY.w A1T1L
+    LDA.b #!Bank7E
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #DMA_CH1
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var26,X
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_HandBufA
+    LDX.w #!C2Scene_HandBufA&$FFFF
+    TXY
+    INY
+    LDA.w #(!C2Scene_HandBufB+!C2Scene_HdmaBufBytes-!C2Scene_HandBufA)-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7C97 — C2Scene_Bg2VWaveInit (65 bytes, $7C97–$7CD7)
+; Script routine (no op $34 reference found): as C2Scene_Bg2HWaveInit
+; for BG2VOFS: C2Scene_HdmaTable[1] as HDMA channel 2, zeroes .Var26 and
+; $7E:9176-$7E:95D5 (C2Scene_SwirlCosA to the end of C2Scene_SwirlCosB)
+; for C2Scene_Bg2VWaveStep.
+; Entry: M=1, X=0, DP=$0000, DB=$00 (saved around the MVN)
+; Exit:  M=0, X=0; A = $FFFF, X = $95D5, Y = $95D6; DB unchanged
+; No calls.
+C2Scene_Bg2VWaveInit:
+    LDA.b #!C2Scene_HdmaRun112
+    STA.l C2Scene_HdmaTable[1].Count0
+    STA.l C2Scene_HdmaTable[1].Count1
+    TDC
+    STA.l C2Scene_HdmaTable[1].End
+    LDY.w #(!BBAD_BG2VOFS<<8)|!DMAP_HdmaIndirect|DMA_MODE_1BYTE_X2
+    STY.w DMAP2
+    LDY.w #C2Scene_HdmaTable[1].Count0&$FFFF
+    STY.w A1T2L
+    LDA.b #!Bank7E
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #DMA_CH2
+    TSB.b !C2Scene_HdmaenShadow
+    LDX.b !C2Scene_TaskCur
+    STZ.w C2Scene_EffectTask.Var26,X
+    REP #$20
+    PHB
+    TDC
+    STA.l !C2Scene_SwirlCosA
+    LDX.w #!C2Scene_SwirlCosA&$FFFF
+    TXY
+    INY
+    LDA.w #(!C2Scene_SwirlCosB+!C2Scene_HdmaBufBytes-!C2Scene_SwirlCosA)-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+    RTS
+
+; $C2:7CD8 — C2Scene_Bg2HWaveStep (134 bytes, $7CD8–$7D5D)
+; Script routine (op $34 at $C3:C1A1, probably once a frame): one step of
+; a wave that runs up BG2: adds one to .Var26 and, by its parity, shows
+; C2Scene_HandBufA (now even) or C2Scene_HandBufB (odd) through
+; C2Scene_HdmaValues words 0-1 and fills that buffer with the other one
+; moved up a line (lines 0-222 from 1-223, by MVN); the new line 223 is
+; sin(.Var24 + 16) x the amplitude .Var22 / 256 (Trig_Sin1024's
+; magnitude times .Var22 with WRMPYA/B, the sign put back), and .Var24
+; keeps the new phase. The value is the whole BG2HOFS (C2Scene_Bg2HScroll
+; is not added).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000 (C2Scene_TaskCur,
+;        C2Tmp_10-$12), DB=$00 (the record and the multiplier; saved
+;        around the MVN, which sets $7E); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = the new line's value; X = the sine; Y = the task;
+;        C2Tmp_10-$12 = the new line's address; C as Trig_Sin1024 left
+;        it (1 for the second half turn); DB unchanged
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_Bg2HWaveStep:
+    SEP #$20
+    PHB
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var26,X
+    LDA.w C2Scene_EffectTask.Var26,X
+    LSR A
+    REP #$20
+    BCS .buf_b
+    LDA.w #!C2Scene_HandBufA&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufA+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    LDX.w #(!C2Scene_HandBufB+2)&$FFFF
+    LDY.w #!C2Scene_HandBufA&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_HandBufA+!C2Scene_HdmaBufBytes-2)&$FFFF
+    BRA .new_line
+.buf_b:
+    LDA.w #!C2Scene_HandBufB&$FFFF
+    STA.l !C2Scene_HdmaValues
+    LDA.w #(!C2Scene_HandBufB+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+2
+    LDX.w #(!C2Scene_HandBufA+2)&$FFFF
+    LDY.w #!C2Scene_HandBufB&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_HandBufB+!C2Scene_HdmaBufBytes-2)&$FFFF
+.new_line:
+    STY.b !C2Tmp_10
+    PLB
+    LDY.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_EffectTask.Var24,Y
+    ADC.w #!C2Scene_WaveLineStep
+    STA.w C2Scene_EffectTask.Var24,Y
+    JSL Trig_Sin1024
+    TAX
+    PHP                                 ; keep the sign
+    BPL .magnitude
+    EOR.w #!Eng_Invert16
+    INC A
+.magnitude:
+    SEP #$20
+    STA.w WRMPYA
+    LDA.w C2Scene_EffectTask.Var22,Y
+    STA.w WRMPYB
+    LDA.b #bank(!C2Scene_HandBufA)
+    STA.b !C2Tmp_12
+    TDC                                 ; B = 0: the 8-bit load below gives a word
+    LDA.w RDMPYH
+    REP #$20
+    PLP
+    BPL .store
+    EOR.w #!Eng_Invert16
+    INC A
+.store:
+    STA.b [!C2Tmp_10]
+    RTS
+
+; $C2:7D5E — C2Scene_Bg2VWaveStep (134 bytes, $7D5E–$7DE3)
+; Script routine (no op $34 reference found): C2Scene_Bg2HWaveStep for
+; BG2VOFS: C2Scene_SwirlCosA (even) or C2Scene_SwirlCosB (odd) through
+; C2Scene_HdmaValues words 2-3 (C2Scene_HdmaTable[1]).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB=$00 (saved around the
+;        MVN); C2Scene_TaskCur = the task
+; Exit:  M=0, X=0; A = the new line's value; X = the sine; Y = the task;
+;        C2Tmp_10-$12 = the new line's address; C as Trig_Sin1024 left
+;        it; DB unchanged
+; Calls: Trig_Sin1024 (JSL).
+C2Scene_Bg2VWaveStep:
+    SEP #$20
+    PHB
+    LDX.b !C2Scene_TaskCur
+    INC.w C2Scene_EffectTask.Var26,X
+    LDA.w C2Scene_EffectTask.Var26,X
+    LSR A
+    REP #$20
+    BCS .buf_d
+    LDA.w #!C2Scene_SwirlCosA&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_SwirlCosA+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+6
+    LDX.w #(!C2Scene_SwirlCosB+2)&$FFFF
+    LDY.w #!C2Scene_SwirlCosA&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_SwirlCosA+!C2Scene_HdmaBufBytes-2)&$FFFF
+    BRA .new_line
+.buf_d:
+    LDA.w #!C2Scene_SwirlCosB&$FFFF
+    STA.l !C2Scene_HdmaValues+4
+    LDA.w #(!C2Scene_SwirlCosB+!C2Scene_HdmaHalfBytes)&$FFFF
+    STA.l !C2Scene_HdmaValues+6
+    LDX.w #(!C2Scene_SwirlCosA+2)&$FFFF
+    LDY.w #!C2Scene_SwirlCosB&$FFFF
+    LDA.w #!C2Scene_HdmaBufBytes-2-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #(!C2Scene_SwirlCosB+!C2Scene_HdmaBufBytes-2)&$FFFF
+.new_line:
+    STY.b !C2Tmp_10
+    PLB
+    LDY.b !C2Scene_TaskCur
+    CLC
+    LDA.w C2Scene_EffectTask.Var24,Y
+    ADC.w #!C2Scene_WaveLineStep
+    STA.w C2Scene_EffectTask.Var24,Y
+    JSL Trig_Sin1024
+    TAX
+    PHP
+    BPL .magnitude
+    EOR.w #!Eng_Invert16
+    INC A
+.magnitude:
+    SEP #$20
+    STA.w WRMPYA
+    LDA.w C2Scene_EffectTask.Var22,Y
+    STA.w WRMPYB
+    LDA.b #bank(!C2Scene_SwirlCosA)
+    STA.b !C2Tmp_12
+    TDC
+    LDA.w RDMPYH
+    REP #$20
+    PLP
+    BPL .store
+    EOR.w #!Eng_Invert16
+    INC A
+.store:
+    STA.b [!C2Tmp_10]
+    RTS
+
+; $C2:7DE4 — BankC2_FreeSpace7DE4 (540 bytes, $7DE4–$7FFF)
+; $FF fill up to $C2:8000, where the menu part of the bank starts
+; (BankC2_Entry8000). Not code; nothing reads it.
+BankC2_FreeSpace7DE4:
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+
 
 ; ============================================================
 ; Menu bank vectors ($C2:8000–$C2:800D)
@@ -21890,7 +23531,7 @@ org $C28000
 ; Three BRAs, the bank's second set of fixed entry points, each reached
 ; by JSL from other banks:
 ;   $8000 BankC2_Entry8000 → BankC2_MenuEntry (A = an argument chosen by
-;         the caller; the menu side is not matched)
+;         the caller, 0-6: the menu)
 ;   $8002 BankC2_Entry8002 → BankC2_ReadPadLong: the joypad reader
 ;   $8004 BankC2_Entry8004 → BankC2_CommandLong (A = a command)
 ; Callers (4 JSL sites): Field_SceneChangeTick ($C0:0D18), Field_PauseAndMenuInput ($C0:1960),
@@ -21930,10 +23571,859 @@ BankC2_CommandLong:
     RTL
 
 ; ============================================================
+; The menu's entry and thread scheduler ($C2:800E–$C2:840D)
+; ============================================================
+; BankC2_MenuEntry sets the menu up and hands over to Menu_RunThreads, a
+; round-robin scheduler of 8 threads (Menu_Thread slots at $00B0, each
+; with a 64-byte stack from $0A00 on). Once a frame (when the menu NMI
+; has done its upload, Menu_FrameReady) it runs every thread whose
+; .Wait counts down to 0 until that thread yields (Menu_Yield,
+; Menu_YieldFrames) or ends (Menu_ThreadEnd). Thread 1 is
+; Menu_MainThread, which calls one handler of the mode's list
+; (Menu_ModeLists) per frame. The menu leaves through Menu_Exit (back to
+; the caller of BankC2_Entry8000) or Menu_ExitToGame (to GameLoop_Main).
+; Everything here runs with DP=$0000 and DB=$7E unless stated.
+
+; $C2:800E — BankC2_MenuEntry (129 bytes, $800E–$808E)
+; The menu (reached by BRA from BankC2_Entry8000). Interrupts off,
+; native mode; saves DP, DB and P (Menu_Exit pops them); DB=$7E; keeps A
+; in Menu_EntryArg and X in Menu_EntryX; forced blank, NMI off (auto-
+; joypad on), DMA and HDMA off; keeps S in Menu_CallerSp.
+; - Argument 0 while Menu_DataInitDone is 0 (a new game): runs
+;   Menu_InitNewGameData, sets Menu_DataInitDone to 1, zeroes SRAM
+;   $30:7FE1/$7FE2, copies Menu_NmiFrames into Menu_Unk29AD and leaves through
+;   Menu_ExitRestart (to GameLoop_Main; no menu is shown).
+; - Otherwise: S = Menu_StackTop, Menu_InitSystems, play time running (Menu_PlayTimePaused = 0),
+;   Menu_Mode = Menu_EntryModes[argument], the pad repeat delay and timer
+;   1, NMI on, interrupts on, then Menu_RunThreads (never returns).
+;   Menu_EntryX is copied to Menu_CurMember with M as Menu_InitSystems
+;   returns (M=0: a word, as far as traced).
+; Callers note: none direct (BRA from BankC2_Entry8000, whose JSL return
+;   address Menu_Exit returns to).
+; Entry: M, X any (SEP #$20 / REP #$10 here), DP any (saved; set to 0 by
+;        Menu_InitSystems), DB any (saved; set to $7E), emulation or
+;        native; A = the argument (low byte, 0-6), X = a word kept in
+;        Menu_EntryX (the field passes bits 5-0 of Field_BankC2Arg)
+; Exit:  does not return here: Menu_Exit later returns to the JSL caller
+;        (P, DB and DP as at the entry, interrupts disabled), or
+;        Menu_ExitRestart goes to GameLoop_Main
+; Calls: Menu_InitNewGameData, Menu_InitSystems; jumps to Menu_RunThreads
+;   or Menu_ExitRestart.
+org $C2800E
+BankC2_MenuEntry:
+    SEI
+    CLC
+    XCE                                 ; native mode
+    PHD
+    PHB
+    PHP
+    SEP #$20
+    REP #$10
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    STA.w !Menu_EntryArg
+    STX.w !Menu_EntryX
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    TSX
+    STX.w !Menu_CallerSp
+    LDA.w !Menu_EntryArg
+    BNE .menu
+    LDA.l !Menu_DataInitDone
+    BNE .menu
+    JSR Menu_InitNewGameData
+    LDA.b #1
+    STA.l !Menu_DataInitDone
+    LDA.b #$00
+    STA.l !Menu_SramUnk7FE2
+    STA.l !Menu_SramUnk7FE1
+    LDA.w !Menu_NmiDp+!Menu_NmiFrames
+    STA.w !Menu_Unk29AD
+    JMP Menu_ExitRestart
+.menu:
+    LDX.w #!Menu_StackTop
+    TXS
+    JSR Menu_InitSystems
+    LDA.w !Menu_EntryX
+    STA.w !Menu_CurMember               ; a word (M=0 after Menu_InitSystems)
+    SEP #$30
+    STZ.w !Menu_PlayTimePaused
+    LDX.w !Menu_EntryArg
+    LDA.l Menu_EntryModes,X
+    STA.b !Menu_Mode
+    LDA.b #1
+    STA.b !Menu_PadRepeatDelay
+    STA.b !Menu_PadRepeatTimer
+    LDA.b #!Menu_NmiAndJoypad
+    STA.l NMITIMEN
+    CLI
+    JMP Menu_RunThreads
+
+; $C2:808F — Menu_EntryModes (7 bytes, $808F–$8095)
+; Menu_Mode for each BankC2_MenuEntry argument 0-6 (an index into
+; Menu_ModeLists).
+Menu_EntryModes:
+    db $0E,$00,$0C,$0D,$0F,$07,$0B
+
+; $C2:8096 — Menu_InitSystems (212 bytes, $8096–$8169)
+; The menu's setup: DP=$0000; copies Menu_InterruptVectors (JML Menu_Nmi,
+; JML Menu_Irq) over NmiTrampoline/IrqTrampoline ($0500-$0507; the MVN
+; leaves DB=$7E); sends five sound-driver commands (Menu_AudioCmd70 with
+; argument 0, $18 with $FF/$80, $19 with the same, $82 with 1/$FF, $83;
+; meanings not traced); Menu_InitPpuAndRam; Menu_Unk0D06/0D0A/0D0E =
+; $FFFF; Menu_Unk51 = Menu_Unk56 = 0; Menu_Unk9B76 (32 bytes) and
+; Menu_PartyList (9 bytes) filled with $FF; then Menu_Unk968D,
+; Menu_UnkD156, Menu_Unk984A, Menu_FlushVramQueue, Menu_BuildPartyLists,
+; Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875 (not traced); last, word
+; Menu_CharRec.Unk3F of seven Menu_CharRecords / 10 (WRDIV) into
+; Menu_Unk0D38, both offsets starting at Menu_Unk51 (the record offset
+; steps $50, the word offset 2; with Menu_Unk51 = 0 records 0-6 go to
+; $0D38-$0D45).
+; Callers (1 JSR site): BankC2_MenuEntry ($C2:8068).
+; Entry: M any (REP #$30 here), X=0 (it stays 16-bit), DP any (set to
+;        $0000), DB any (the MVN sets $7E before any absolute access)
+; Exit:  P as Menu_Unk9875 left it (the last part pushes and pulls it):
+;        M=0, X=0 as long as the callees keep P (all but Menu_Unk968D push
+;        it; Menu_Unk968D sets M=0, X=0; their ends not traced); DP=$0000,
+;        DB=$7E; A, X, Y clobbered
+; Calls: Audio_DriverCommand (JSL), Menu_InitPpuAndRam, Menu_Unk968D,
+;   Menu_UnkD156, Menu_Unk984A, Menu_FlushVramQueue, Menu_BuildPartyLists,
+;   Menu_Unk92F4, Menu_UnkF3CA, Menu_Unk9875.
+Menu_InitSystems:
+    REP #$30
+    PEA.w !Menu_Dp
+    PLD
+    LDX.w #Menu_InterruptVectors
+    LDY.w #!NmiTrampoline&$FFFF
+    LDA.w #!Menu_VectorBytes-1
+    MVN !Bank7E,bank(Menu_InterruptVectors) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.b #!Menu_AudioCmd70
+    STA.w !Audio_CmdId
+    STZ.w !Audio_CmdArg0
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd18
+    STA.w !Audio_CmdId
+    LDA.b #!Menu_AudioArgFF
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd18Arg1
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_CmdPlaySfx
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd82
+    STA.w !Audio_CmdId
+    LDA.b #!Menu_AudioCmd82Arg0
+    STA.w !Audio_CmdArg0
+    LDA.b #!Audio_Cmd82Arg1
+    STA.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    LDA.b #!Audio_Cmd83
+    STA.w !Audio_CmdId
+    JSL Audio_DriverCommand
+    REP #$20
+    JSR Menu_InitPpuAndRam
+    LDA.w #!Menu_FillFF
+    STA.w !Menu_Unk0D06
+    STA.w !Menu_Unk0D0A
+    STA.w !Menu_Unk0D0E
+    STZ.b !Menu_Unk51
+    STZ.b !Menu_Unk56
+    LDA.w #!Menu_FillFF
+    STA.w !Menu_Unk9B76
+    LDX.w #!Menu_Unk9B76
+    LDY.w #!Menu_Unk9B76+2
+    LDA.w #!Menu_Unk9B76Bytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    STA.w !Menu_PartyList               ; A = $FFFF after the MVN
+    LDX.w #!Menu_PartyList
+    LDY.w #!Menu_PartyList+2
+    LDA.w #!Menu_PartyListBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    JSR Menu_Unk968D
+    JSR Menu_UnkD156
+    JSR Menu_Unk984A
+    JSR Menu_FlushVramQueue
+    JSR Menu_BuildPartyLists
+    JSR Menu_Unk92F4
+    JSR Menu_UnkF3CA
+    JSR Menu_Unk9875
+    PHP
+    REP #$30
+    LDX.b !Menu_Unk51
+    TXY
+.divide:
+    LDA.w !Menu_CharRecords+Menu_CharRec.Unk3F,X
+    STA.l WRDIVL
+    SEP #$20
+    LDA.b #!Menu_Unk3FDivisor
+    STA.l WRDIVB
+    REP #$20
+    NOP                                 ; (with the next ones: the divider's 16 cycles)
+    TXA
+    CLC
+    ADC.w #!Menu_CharRecBytes
+    TAX
+    INY
+    INY
+    LDA.l RDDIVL
+    STA.w !Menu_Unk0D38-2,Y
+    CPY.w #!Menu_Unk0D38Count
+    BCC .divide
+    PLP
+    RTS
+
+; $C2:816A — Menu_BuildPartyLists (38 bytes, $816A–$818F)
+; Lists the characters of Menu_PartyOrder that are present (bit 7
+; clear) in Menu_PartyList, with their positions in Menu_PartyListPos,
+; and counts them: Menu_PartyActive (positions 0-2) and Menu_PartyTotal
+; (all 9).
+; Callers (2 JSR sites): Menu_InitSystems ($C2:8130) and unmatched ($C2:C725).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (the counts),
+;        DB=$7E (the lists)
+; Exit:  P restored; A = 8 when position 8 was listed (the TXA), else
+;        its entry ($80 or more); X = 9; Y = the number listed
+; No calls.
+Menu_BuildPartyLists:
+    PHP
+    SEP #$30
+    LDX.b #0
+    TXY
+    STX.b !Menu_PartyActive
+    STX.b !Menu_PartyTotal
+.entry:
+    LDA.w !Menu_PartyOrder,X
+    BMI .next
+    STA.w !Menu_PartyList,Y
+    TXA
+    STA.w !Menu_PartyListPos,Y
+    INY
+    CPX.b #!Menu_ActiveSlots
+    BCS .reserve
+    INC.b !Menu_PartyActive
+.reserve:
+    INC.b !Menu_PartyTotal
+.next:
+    INX
+    CPX.b #!Menu_PartyOrderSize
+    BCC .entry
+    PLP
+    RTS
+
+; $C2:8190 — Menu_RunThreads (185 bytes with its sub-entries, $8190–$8248)
+; The menu's scheduler; never returns. Frees all 8 Menu_Thread slots
+; (zeroes $00B0-$00EF), starts Menu_MainThreadStart in slot 1 and, with
+; Menu_Unk58 = $3020, Menu_UnkE91B in slot 3. Then for ever: S =
+; Menu_StackTop, DB=$7E, DP=$0000; wait until Menu_FrameReady is
+; non-zero (the menu NMI's upload is done); for each slot in use (.State
+; non-zero) count .Wait down and run the thread when it reaches 0:
+; .State = running, Menu_CurThread = the slot;
+; - a new thread (.State 1): S = Menu_ThreadStackBase + slot x 8 (64
+;   bytes per slot), .SavedVar and Menu_ThreadVar zeroed (16-bit STZs,
+;   so the byte after each too), JMP (.Entry) with M=0, X=0;
+; - a waiting one (.State 2): S = .SavedSp, Menu_ThreadVar = .SavedVar,
+;   then PLD, PLP, PLY, PLX and RTS back into it after its yield.
+; After the last slot: Menu_FrameReady = 0, next frame.
+; A thread gives the CPU back by jumping to one of three sub-entries,
+; each going on with the next slot (Menu_RunThreadsNext):
+; - Menu_ThreadEnd ($C2:8216, JMP): frees the slot;
+; - Menu_Yield ($C2:821E, JSR): waits one frame;
+; - Menu_YieldFrames ($C2:822B, JSR): waits A's low byte frames (0:
+;   256).
+; Both yields push X, Y, P and D (Menu_YieldSave, $C2:8236, keeps S in
+; .SavedSp and Menu_ThreadVar in .SavedVar; .State = waiting). On the
+; resume the thread has its X, Y, P and DP back and A = its
+; Menu_ThreadVar (low byte; B = the high byte of its S).
+; DB is set to $7E only at the start of each frame, never between
+; threads: a thread starts or resumes with the DB the thread run before
+; it in that frame yielded or ended with ($7E for the first one).
+; Quirk, kept (no effect): there is no CLC before the stack's ADC, but
+; the carry is always clear there: it is the bit the third ASL shifts out
+; of the slot offset (0-$38), so a new thread starts with S = $0A3F +
+; 64 x the slot.
+; Callers (1 JMP site): BankC2_MenuEntry ($C2:808C).
+; Callers of Menu_ThreadEnd (5 JMP sites): Menu_FadeInThread ($C2:83C7) and unmatched ($C2:9044,
+;   $C2:CBE8, $C2:FA46, $C2:FAA2).
+; Callers of Menu_Yield (56 sites: 53 JSR, 3 JMP): Menu_MainThread (JSR $C2:826C), Menu_FadeInThread
+;   (JSR $C2:83BD), Menu_Fade (JMP $C2:8403), Menu_CursorThreadA (JSR $C2:89F5), Menu_CursorThreadB
+;   (JSR $C2:8A91), Menu_CursorThreadC (JSR $C2:8AB5), Menu_CursorThreadD (JSR $C2:8AF8),
+;   Menu_ListArrowsThread (JSR $C2:8C30) and unmatched (JSR $C2:8FC3, JSR $C2:904C, JSR $C2:9C5B,
+;   JSR $C2:9E3C, JSR $C2:9EFD, JSR $C2:A04C, JSR $C2:A0AC, JSR $C2:A0BD, JSR $C2:A511, JSR
+;   $C2:A661, JSR $C2:A6DC, JSR $C2:A785, JSR $C2:A85F, JSR $C2:A88F, JSR $C2:A945, JSR $C2:AAFF,
+;   JSR $C2:AB4D, JSR $C2:AD7F, JSR $C2:ADA1, JSR $C2:AF5C, JSR $C2:AF6D, JSR $C2:B1A5, JSR
+;   $C2:B228, JSR $C2:B651, JSR $C2:B705, JSR $C2:B8F2, JSR $C2:BE98, JSR $C2:C337, JSR $C2:C7D0,
+;   JSR $C2:C936, JSR $C2:CA2D, JSR $C2:CA33, JSR $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55, JMP
+;   $C2:CF5B, JSR $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7, JSR $C2:D8CA, JSR $C2:E0CF, JSR $C2:E14B,
+;   JSR $C2:E906, JSR $C2:E91E, JSR $C2:E97F, JMP $C2:EB98, JSR $C2:F696, JSR $C2:FAA5).
+; Callers of Menu_YieldFrames (3 JSR sites): Menu_Fade ($C2:83F8) and unmatched ($C2:B4F9,
+;   $C2:CECB).
+; Entry: M, X any (REP #$30 here), DP=$0000 (the first .State clear is
+;        absolute but the slot records are read direct page; set again
+;        each frame), DB=$7E (set again each frame). The sub-entries are
+;        used from inside a thread (Menu_CurThread and the thread's
+;        stack), M and X any (SEP here), DB not changed: it must map low
+;        WRAM for the STZ.w of Menu_FrameReady ($0D01) when the scan
+;        ends, and the next thread run starts or resumes with it;
+;        Menu_ThreadEnd with DP=$0000; Menu_Yield / Menu_YieldFrames
+;        with DP any (pushed, then set to $0000)
+; Exit:  never returns; Menu_Yield / Menu_YieldFrames return to their
+;        caller a frame or more later as above
+; Calls: Menu_StartThread; the threads (JMP (abs)).
+Menu_RunThreads:
+    REP #$30
+    STZ.w Menu_Thread[0].State
+    LDX.w #Menu_Thread[0].State
+    LDY.w #Menu_Thread[0].State+2
+    LDA.w #!Menu_ThreadSlots-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #Menu_MainThreadStart
+    LDX.w #!Menu_MainThreadSlot
+    JSR Menu_StartThread
+    LDA.w #!Menu_Unk58Init
+    STA.w !Menu_Unk58
+    LDA.w #Menu_UnkE91B
+    LDX.w #!Menu_Thread3Slot
+    JSR Menu_StartThread
+.frame:
+    REP #$10
+    LDX.w #!Menu_StackTop
+    TXS
+    SEP #$30
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    PEA.w !Menu_Dp
+    PLD
+.wait_nmi:
+    LDA.w !Menu_NmiDp+!Menu_FrameReady
+    BEQ .wait_nmi
+    LDX.b #0
+.slot:
+    LDY.b Menu_Thread[0].State,X
+    DEY
+    BMI Menu_RunThreadsNext             ; free
+    DEC.b Menu_Thread[0].Wait,X
+    BEQ Menu_RunThreadsNext_run
+Menu_RunThreadsNext:                    ; header: see Menu_RunThreads
+    TXA
+    CLC
+    ADC.b #!Menu_ThreadSlotBytes
+    TAX
+    CMP.b #!Menu_ThreadSlots
+    BCC Menu_RunThreads_slot
+    STZ.w !Menu_NmiDp+!Menu_FrameReady
+    BRA Menu_RunThreads_frame
+.run:
+    STX.b !Menu_CurThread
+    LDA.b #!Menu_ThStRunning
+    STA.b Menu_Thread[0].State,X
+    REP #$30
+    DEY
+    BEQ .resume                         ; it was waiting
+    TXA                                 ; new: its own stack
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!Menu_ThreadStackBase        ; no CLC (see the header)
+    TCS
+    STZ.b Menu_Thread[0].SavedVar,X
+    STZ.b !Menu_ThreadVar
+    LDA.b Menu_Thread[0].Entry,X
+    STA.b !Menu_JumpVec
+    JMP (!Menu_JumpVec)
+.resume:
+    LDA.b Menu_Thread[0].SavedSp,X
+    TCS
+    SEP #$30
+    LDX.b !Menu_CurThread
+    LDA.b Menu_Thread[0].SavedVar,X
+    STA.b !Menu_ThreadVar
+    PLD
+    PLP
+    PLY
+    PLX
+    RTS
+Menu_ThreadEnd:                         ; header: see Menu_RunThreads
+    SEP #$30
+    LDX.b !Menu_CurThread
+    STZ.b Menu_Thread[0].State,X
+    BRA Menu_RunThreadsNext
+Menu_Yield:                             ; header: see Menu_RunThreads
+    PHX
+    PHY
+    PHP
+    PHD
+    REP #$20
+    SEP #$10
+    LDA.w #!Menu_ThWait1
+    BRA Menu_YieldSave
+Menu_YieldFrames:                       ; header: see Menu_RunThreads
+    PHX
+    PHY
+    PHP
+    PHD
+    SEP #$30
+    XBA                                 ; .Wait = A
+    LDA.b #!Menu_ThStWaiting
+    REP #$20
+Menu_YieldSave:                         ; header: see Menu_RunThreads
+    PEA.w !Menu_Dp
+    PLD
+    LDX.b !Menu_CurThread
+    STA.b Menu_Thread[0].State,X        ; .State and .Wait
+    TSC
+    STA.b Menu_Thread[0].SavedSp,X
+    SEP #$30
+    LDA.b !Menu_ThreadVar
+    STA.b Menu_Thread[0].SavedVar,X
+    BRA Menu_RunThreadsNext
+
+; $C2:8249 — Menu_StartThread (12 bytes, $8249–$8254)
+; Puts a new thread in the slot at byte offset X: .Entry = A, .State =
+; new and .Wait = 1 (it starts on the scheduler's next pass).
+; Callers (13 sites: 11 JSR, 2 JMP): Menu_RunThreads (JSR $C2:81A7, JSR $C2:81B6), Menu_StartFadeIn
+;   (JMP $C2:83BA), Menu_StartCursorA (JMP $C2:89EF), Menu_StartCursorB (JSR $C2:8A40),
+;   Menu_StartCursorC (JSR $C2:8AAD), Menu_StartCursorD (JSR $C2:8ADE), Menu_StartListArrows (JSR
+;   $C2:8BA1) and unmatched (JSR $C2:8FBF, JSR $C2:CBBB, JSR $C2:F652, JSR $C2:F9AD, JSR $C2:FA96).
+; Entry: M any (P saved; REP #$20 here: A must hold the whole address),
+;        X = the slot offset (0, 8, ... $38), DP=$0000, DB any
+; Exit:  P restored; A = Menu_ThNewWait1; X, Y unchanged
+; No calls.
+Menu_StartThread:
+    PHP
+    REP #$20
+    STA.b Menu_Thread[0].Entry,X
+    LDA.w #!Menu_ThNewWait1
+    STA.b Menu_Thread[0].State,X
+    PLP
+    RTS
+
+; $C2:8255 — Menu_KillThreads (23 bytes, $8255–$826B)
+; Frees the slots whose bit is set in A's low byte (bit n: slot n).
+; Callers (14 sites: 10 JSR, 4 JMP): Menu_Exit (JSR $C2:82B8), Menu_ExitToGame (JSR $C2:8326) and
+;   unmatched (JSR $C2:9A6B, JSR $C2:9AA4, JMP $C2:9CF9, JMP $C2:AB11, JMP $C2:AB3B, JMP $C2:AB47,
+;   JSR $C2:B1DE, JSR $C2:B3C2, JSR $C2:B4BE, JSR $C2:C6F4, JSR $C2:D76F, JSR $C2:E261).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_JumpVec as
+;        scratch), DB any
+; Exit:  P restored (the SEP #$30 has zeroed the high bytes of X and Y,
+;        which PLP cannot bring back); A = $40; X's low byte = the last
+;        slot freed (or kept); Y's low byte kept; Menu_JumpVec's low
+;        byte = 0
+; No calls.
+Menu_KillThreads:
+    PHP
+    SEP #$30
+    STA.b !Menu_JumpVec
+    LDA.b #0
+.slot:
+    LSR.b !Menu_JumpVec
+    BCC .keep
+    TAX
+    STZ.b Menu_Thread[0].State,X
+.keep:
+    CLC
+    ADC.b #!Menu_ThreadSlotBytes
+    CMP.b #!Menu_ThreadSlots
+    BCC .slot
+    PLP
+    RTS
+
+; $C2:826C — Menu_MainThread (37 bytes with Menu_MainThreadStart, $826C–$8290)
+; Thread 1 (Menu_RunThreads starts it at the sub-entry
+; Menu_MainThreadStart, $C2:826F): each frame calls handler
+; Menu_ThreadVar of Menu_Mode's list in Menu_ModeLists (a list of 16-bit
+; addresses in bank $C2) with M=1, X=0, pushing Menu_MainThread-1 so the
+; handler's RTS lands on Menu_MainThread, which waits a frame
+; (Menu_Yield) and dispatches again. Handlers change Menu_ThreadVar (or
+; Menu_Mode) to move on.
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000,
+;        DB=$7E), or by the handler's RTS (any M, X)
+; Exit:  never returns (each handler returns to Menu_MainThread)
+; Calls: Menu_Yield; the handler (JMP (abs)).
+Menu_MainThread:
+    JSR Menu_Yield
+Menu_MainThreadStart:                   ; header: see Menu_MainThread
+    SEP #$30
+    LDA.b #bank(Menu_ModeLists)
+    STA.b !Menu_ListPtr+2
+    LDA.b !Menu_ThreadVar
+    ASL A
+    TAY
+    LDA.b !Menu_Mode
+    ASL A
+    TAX
+    REP #$30
+    LDA.l Menu_ModeLists,X
+    STA.b !Menu_ListPtr
+    LDA.b [!Menu_ListPtr],Y
+    STA.b !Menu_JumpVec
+    PER Menu_MainThread-1               ; the handler's RTS goes to Menu_MainThread
+    SEP #$20
+    JMP (!Menu_JumpVec)
+
+; $C2:8291 — Menu_ModeNone (1 byte, $8291)
+; An RTS that Menu_ModeLists entries 8-10 point at as their list: read
+; as a list it gives handler $CA60 for index 0, so modes 8-10 are
+; probably not used.
+; Entry/Exit: any M, X, DP and DB; nothing changed (no reference as
+;        code found)
+; No calls.
+Menu_ModeNone:
+    RTS
+
+; $C2:8292 — Menu_ModeLists (32 bytes, $8292–$82B1)
+; One 16-bit address (bank $C2) per Menu_Mode $00-$0F: the list of
+; handler addresses Menu_MainThread indexes by Menu_ThreadVar.
+; BankC2_MenuEntry starts in modes $0E, $00, $0C, $0D, $0F, $07, $0B
+; (Menu_EntryModes).
+Menu_ModeLists:
+    dw Menu_Mode00List,Menu_Mode01List,Menu_Mode02List,Menu_Mode03List
+    dw Menu_Mode04List,Menu_Mode05List,Menu_Mode06List,Menu_Mode07List
+    dw Menu_ModeNone,Menu_ModeNone,Menu_ModeNone,Menu_Mode0BList
+    dw Menu_Mode0CList,Menu_Mode0DList,Menu_Mode0EList,Menu_Mode0FList
+
+; $C2:82B2 — Menu_Exit (47 bytes, $82B2–$82E0)
+; Leaves the menu back to the caller of BankC2_Entry8000: frees every
+; thread (Menu_KillThreads), Menu_Unk834D, fades out (Menu_FadeOut),
+; forced blank, NMI off (auto-joypad on), DMA and HDMA off, S =
+; Menu_CallerSp, pulls the P, DB and DP BankC2_MenuEntry pushed,
+; disables interrupts and returns with RTL.
+; Callers (6 JMP sites): unmatched ($C2:99D6, $C2:9A95, $C2:C802, $C2:D516, $C2:D588, $C2:E233).
+; Entry: from a menu thread (Menu_FadeOut yields), M, X any (SEP #$20 /
+;        REP #$10 here), DP=$0000, DB=$7E
+; Exit:  RTL to the JSL caller of BankC2_Entry8000 with its P (then
+;        I=1), DB and DP; A's low byte = the B byte before the XBA (what
+;        it holds is not traced; no result is meant, probably)
+; Calls: Menu_KillThreads, Menu_Unk834D, Menu_FadeOut.
+Menu_Exit:
+    REP #$10
+    SEP #$20
+    LDA.b #!Menu_AllThreads
+    JSR Menu_KillThreads
+    JSR Menu_Unk834D
+    JSR Menu_FadeOut
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    XBA
+    LDX.w !Menu_CallerSp
+    TXS
+    PLP
+    PLB
+    PLD
+    SEI
+    RTL
+
+; $C2:82E1 — Menu_Unk82E1 (63 bytes, $82E1–$831F)
+; Zeroes Menu_Unk2857 (5 bytes), then for each of the 7 Menu_CharRecords
+; whose Menu_CharRec.Unk2A is $AE-$B2: when the Menu_Unk04A4 byte of
+; that value (- $AE) is non-zero, sets the Menu_Unk2857 byte of the same
+; value to $80. What the values and bytes mean is not traced.
+; Callers (2 JSR sites): Menu_Unk834D ($C2:837F) and unmatched ($C2:B9AB).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E (absolute)
+; Exit:  P restored; A = X = $2830 (past the last record); Y = the last
+;        Unk2A value in $AE-$B2, marked or not (the TAY comes before the
+;        Menu_Unk04A4 test), or unchanged when there is none
+; No calls.
+Menu_Unk82E1:
+    PHP
+    REP #$30
+    STZ.w !Menu_Unk2857
+    LDX.w #!Menu_Unk2857
+    LDY.w #!Menu_Unk2857+2
+    LDA.w #!Menu_Unk2857Bytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_CharRecords
+.record:
+    LDA.w #0                            ; B = 0 for the TAY
+    SEP #$20
+    LDA.w Menu_CharRec.Unk2A,X
+    CMP.b #!Menu_Unk82E1First
+    BCC .next
+    CMP.b #!Menu_Unk82E1End
+    BCS .next
+    TAY
+    LDA.w !Menu_Unk04A4-!Menu_Unk82E1First,Y
+    BEQ .next
+    LDA.b #!Menu_Unk2857Mark
+    STA.w !Menu_Unk2857-!Menu_Unk82E1First,Y
+.next:
+    REP #$20
+    TXA
+    CLC
+    ADC.w #!Menu_CharRecBytes
+    TAX
+    CMP.w #!Menu_CharRecords+(!Menu_CharRecCount*!Menu_CharRecBytes)
+    BCC .record
+    PLP
+    RTS
+
+; $C2:8320 — Menu_ExitToGame (45 bytes with Menu_ExitRestart, $8320–$834C)
+; Leaves the menu for the game loop: frees every thread, Menu_Unk834D,
+; fades out, then the sub-entry Menu_ExitRestart ($C2:832F; also
+; BankC2_MenuEntry's new-game path): forced blank, NMI off (auto-joypad
+; on), DMA and HDMA off, S = Menu_ResetStack, JML to ReentryVectors
+; entry 0 (GameLoop_Main, the warm restart).
+; Callers (1 JMP site): unmatched ($C2:E6AB).
+; Callers of Menu_ExitRestart (1 JMP site): BankC2_MenuEntry ($C2:8061).
+; Entry: Menu_ExitToGame from a menu thread (Menu_FadeOut yields), M, X
+;        any (REP #$10 / SEP #$20 here), DP=$0000, DB=$7E;
+;        Menu_ExitRestart with M=1 and X=0 (16-bit LDX), DP and DB any
+;        (long stores)
+; Exit:  never returns (GameLoop_Main sets its own state)
+; Calls: Menu_KillThreads, Menu_Unk834D, Menu_FadeOut; jumps to
+;   ReentryVectors.
+Menu_ExitToGame:
+    REP #$10
+    SEP #$20
+    LDA.b #!Menu_AllThreads
+    JSR Menu_KillThreads
+    JSR Menu_Unk834D
+    JSR Menu_FadeOut
+Menu_ExitRestart:                       ; header: see Menu_ExitToGame
+    LDA.b #FORCED_BLANK
+    STA.l INIDISP
+    LDA.b #!Menu_JoypadOnly
+    STA.l NMITIMEN
+    LDA.b #$00
+    STA.l MDMAEN
+    STA.l HDMAEN
+    LDX.w #!Menu_ResetStack
+    TXS
+    JML ReentryVectors
+
+; $C2:834D — Menu_Unk834D (56 bytes, $834D–$8384)
+; For each active party member (Menu_PartyOrder positions 0-2 not
+; empty) copies the 6 bytes Menu_UnkF5ED picks for it (it returns the
+; MVN's source in bank $D1 and the count - 1) into Menu_Unk21BA, one
+; member after the other with Menu_Unk21BAGap bytes skipped after each
+; (a $20-byte stride); then BankFF_UnkF958 (JSL) and Menu_Unk82E1. Use
+; not traced.
+; Callers (3 JSR sites): Menu_Exit ($C2:82BB), Menu_ExitToGame ($C2:8329) and unmatched ($C2:8C4F).
+; Entry: M, X any (P and DB saved; SEP #$20 / REP #$10 here), DP any,
+;        DB any (set to $7E)
+; Exit:  P and DB restored; A, X, Y as BankFF_UnkF958 and Menu_Unk82E1
+;        leave them
+; Calls: Menu_UnkF5ED, BankFF_UnkF958 (JSL), Menu_Unk82E1.
+Menu_Unk834D:
+    PHB
+    PHP
+    REP #$10
+    SEP #$20
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDY.w #!Menu_Unk21BA
+    LDX.w #0
+.member:
+    SEP #$20
+    LDA.w !Menu_PartyOrder,X
+    BMI .next
+    PHX
+    JSR Menu_UnkF5ED
+    MVN !Bank7E,!Menu_Unk21BASrcBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLX
+    REP #$20
+    TYA
+    CLC
+    ADC.w #!Menu_Unk21BAGap
+    TAY
+.next:
+    INX
+    CPX.w #!Menu_ActiveSlots
+    BCC .member
+    JSL BankFF_UnkF958
+    JSR Menu_Unk82E1
+    PLP
+    PLB
+    RTS
+
+; $C2:8385 — Menu_QueueVramRom (29 bytes with its sub-entries, $8385–$83A1)
+; Appends the 8-byte VRAM upload (Menu_VramRec) at $C2:X to
+; Menu_VramQueue (at Menu_VramQueueEnd, which then goes up by 8;
+; Menu_FlushVramQueue sends them); the sub-entry
+; Menu_QueueVramWram ($C2:838E) does the same from $7E:X. Both MVNs go
+; through Menu_VramQueueSlot, then the shared tail Menu_QueueVramTail ($C2:8395).
+; Callers (155 sites: 135 JSR, 20 JMP): unmatched (JSR $C2:8F76, JSR $C2:971E, JSR $C2:9813, JSR
+;   $C2:9A40, JSR $C2:9B4F, JMP $C2:9B80, JMP $C2:9C6A, JSR $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34,
+;   JSR $C2:9E6D, JSR $C2:9EAB, JSR $C2:9EEE, JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB, JSR
+;   $C2:A0A9, JSR $C2:A16B, JSR $C2:A26E, JSR $C2:A31C, JSR $C2:A375, JSR $C2:A37B, JSR $C2:A381,
+;   JSR $C2:A429, JSR $C2:A473, JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR
+;   $C2:A6A3, JSR $C2:A6A9, JSR $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB,
+;   JSR $C2:A901, JSR $C2:A94E, JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR
+;   $C2:AD9E, JSR $C2:ADB8, JSR $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1,
+;   JSR $C2:AF59, JSR $C2:B040, JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP
+;   $C2:B4DB, JSR $C2:B563, JSR $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955,
+;   JSR $C2:B95B, JSR $C2:B974, JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR
+;   $C2:BC90, JSR $C2:BEBD, JSR $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2,
+;   JMP $C2:C204, JSR $C2:C331, JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR
+;   $C2:C3DD, JSR $C2:C540, JSR $C2:C779, JSR $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E,
+;   JSR $C2:CAD5, JSR $C2:CB7A, JSR $C2:CB80, JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR
+;   $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA, JSR $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4,
+;   JSR $C2:D0D0, JSR $C2:D0D6, JSR $C2:D100, JSR $C2:D106, JSR $C2:D193, JSR $C2:D401, JSR
+;   $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP $C2:D712, JMP $C2:D775, JMP $C2:D828, JSR $C2:D875,
+;   JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C, JSR $C2:DB82, JSR $C2:DB88, JSR $C2:DB8E, JSR
+;   $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR $C2:DFF6, JSR $C2:DFFC, JSR $C2:E00D, JSR $C2:E053,
+;   JSR $C2:E103, JSR $C2:E185, JSR $C2:E293, JSR $C2:E454, JSR $C2:E50A, JSR $C2:E510, JSR
+;   $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR $C2:E5C2, JSR $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702,
+;   JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR
+;   $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE,
+;   JSR $C2:FEF4, JSR $C2:FF21).
+; Callers of Menu_QueueVramWram (6 JSR sites): unmatched ($C2:E90C, $C2:F84D, $C2:F859, $C2:F86C,
+;   $C2:FB17, $C2:FB92).
+; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
+;        DB=$7E (Menu_VramQueueEnd is read absolute); X = the record's
+;        address (16-bit)
+; Exit (all):  P restored; DB=$7E (the MVN's destination bank); X, Y past
+;        the copied bytes; A = the new Menu_VramQueueEnd (low byte; B =
+;        $FF)
+; Calls: Menu_VramQueueSlot.
+Menu_QueueVramRom:
+    PHP
+    JSR Menu_VramQueueSlot
+    MVN !Bank7E,bank(Menu_QueueVramRom)    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    BRA Menu_QueueVramTail
+Menu_QueueVramWram:                        ; header: see Menu_QueueVramRom
+    PHP
+    JSR Menu_VramQueueSlot
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+Menu_QueueVramTail:                        ; header: see Menu_QueueVramRom
+    SEP #$20
+    LDA.w !Menu_VramQueueEnd
+    CLC
+    ADC.b #!Menu_VramRecBytes
+    STA.w !Menu_VramQueueEnd
+    PLP
+    RTS
+
+; $C2:83A2 — Menu_VramQueueSlot (16 bytes, $83A2–$83B1)
+; Y = Menu_VramQueue + Menu_VramQueueEnd (the next record's address) and A =
+; 7 (the MVN count of 8 bytes).
+; Callers (2 JSR sites): Menu_QueueVramRom ($C2:8386) and Menu_QueueVramWram ($C2:838F).
+; Entry: M, X any (REP #$31 here: also C=0), DP any, DB=$7E
+; Exit:  M=0, X=0, C=0; A = 7; Y = the address; X unchanged
+; No calls.
+Menu_VramQueueSlot:
+    REP #$31
+    LDA.w !Menu_VramQueueEnd
+    AND.w #!Eng_LowByteMask
+    ADC.w #!Menu_VramQueue
+    TAY
+    LDA.w #!Menu_VramRecBytes-1
+    RTS
+
+; $C2:83B2 — Menu_StartFadeIn (11 bytes, $83B2–$83BC)
+; Starts Menu_FadeInThread in slot 0.
+; Callers (7 JMP sites): unmatched ($C2:9A18, $C2:C7DD, $C2:D503, $C2:D543, $C2:E1FE, $C2:E206,
+;   $C2:E618).
+; Entry: M, X any (REP #$30 here), DP=$0000 (Menu_StartThread), DB any
+; Exit:  M=0, X=0 (as Menu_StartThread leaves them); A = Menu_ThNewWait1;
+;        X = 0; Y unchanged
+; Calls: jumps to Menu_StartThread.
+Menu_StartFadeIn:
+    REP #$30
+    LDA.w #Menu_FadeInThread
+    LDX.w #!Menu_FadeInSlot
+    JMP Menu_StartThread
+
+; $C2:83BD — Menu_FadeInThread (13 bytes, $83BD–$83C9)
+; Thread: waits a frame, fades the brightness up by 2 a frame
+; (Menu_Fade) and ends.
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000,
+;        DB=$7E)
+; Exit:  does not return (Menu_ThreadEnd)
+; Calls: Menu_Yield, Menu_Fade; jumps to Menu_ThreadEnd.
+Menu_FadeInThread:
+    JSR Menu_Yield
+    SEP #$20
+    LDA.b #!Menu_FadeInStep
+    JSR Menu_Fade
+    JMP Menu_ThreadEnd
+
+; $C2:83CA — Menu_FadeOut (6 bytes, $83CA–$83CF)
+; Menu_Fade with a step of -2 (to black). The BRA goes to the next
+; instruction (an offset of 0).
+; Callers (4 sites: 3 JSR, 1 JMP): Menu_Exit (JSR $C2:82BE), Menu_ExitToGame (JSR $C2:832C) and
+;   unmatched (JSR $C2:CC20, JMP $C2:E264).
+; Entry: as Menu_Fade: from a menu thread, M any (SEP #$20 here), X any,
+;        DP=$0000, DB=$7E
+; Exit:  as Menu_Fade
+; Calls: Menu_Fade (BRA).
+Menu_FadeOut:
+    SEP #$20
+    LDA.b #!Menu_FadeOutStep
+    BRA Menu_Fade
+
+; $C2:83D0 — Menu_Fade (54 bytes, $83D0–$8405)
+; Fades the screen: Menu_FadeStep = A (signed), Menu_FadeFrames = 1;
+; then repeatedly adds the step to Menu_InidispShadow's brightness (bits 0-3):
+; past 0 or down to it the brightness is left at 0 and the routine waits
+; one frame (a tail JMP to Menu_Yield) and returns; at 15 or more it is
+; set to 15 and the routine returns at once; else the new brightness is
+; set and it waits Menu_FadeFrames frames (Menu_YieldFrames) and goes on.
+; Callers (1 JSR site): Menu_FadeInThread ($C2:83C4).
+; Callers note: also reached by Menu_FadeOut's BRA.
+; Entry: from a menu thread, M any (SEP #$20 here), X any, DP=$0000
+;        (the yields), DB=$7E (Menu_InidispShadow, Menu_FadeStep); A = the step
+; Exit:  M=1; A = $0F (when it reached 15: the .full path's LDA), or
+;        as Menu_Yield returns (low byte the thread's Menu_ThreadVar);
+;        X, Y unchanged; Menu_InidispShadow bits 0-3 = 0 or 15
+; Calls: Menu_YieldFrames; jumps to Menu_Yield.
+Menu_Fade:
+    SEP #$20
+    STA.w !Menu_FadeStep
+    LDA.b #1
+    STA.w !Menu_FadeFrames
+.step:
+    LDA.w !Menu_NmiDp+!Menu_InidispShadow
+    AND.b #!Menu_BrightnessMask
+    PHA
+    LDA.b #!Menu_BrightnessMask
+    TRB.w !Menu_NmiDp+!Menu_InidispShadow
+    PLA
+    CLC
+    ADC.w !Menu_FadeStep
+    BEQ .dark
+    BMI .dark
+    CMP.b #!Menu_BrightnessMask
+    BCS .full
+    TSB.w !Menu_NmiDp+!Menu_InidispShadow
+    LDA.w !Menu_FadeFrames
+    JSR Menu_YieldFrames
+    BRA .step
+.full:
+    LDA.b #!Menu_BrightnessMask
+    TSB.w !Menu_NmiDp+!Menu_InidispShadow
+    RTS
+.dark:
+    JMP Menu_Yield                      ; returns to our caller a frame later
+
+; $C2:8406 — Menu_InterruptVectors (8 bytes, $8406–$840D)
+; Copied over NmiTrampoline / IrqTrampoline ($0500-$0507) by
+; Menu_InitSystems: JML Menu_Nmi and JML Menu_Irq, the menu's interrupt
+; handlers. Never executed here.
+; Entry/Exit: not run in place; the copies run as the interrupt
+;        trampolines, any M, X, DP and DB (the JMLs change nothing)
+Menu_InterruptVectors:
+    JML Menu_Nmi
+    JML Menu_Irq
+
+; ============================================================
 ; The menu's NMI ($C2:840E–$C2:84D1)
 ; ============================================================
-; The menu (BankC2_MenuEntry, not matched) runs with its own NMI and IRQ
-; code; the JMLs at $C2:8406/$C2:840A (not matched) lead here. Its
+; The menu (BankC2_MenuEntry) runs with its own NMI and IRQ code; the
+; JMLs at $C2:8406/$C2:840A (Menu_InterruptVectors) lead here. Its
 ; frame state is a direct page at Menu_NmiDp ($0D00).
 
 org $C2840E
@@ -21948,9 +24438,9 @@ org $C2840E
 ; ($C2:81CA). Then the pad and clock (Menu_NmiPad), BG mode Nmi_BgMode,
 ; INIDISP = Menu_InidispShadow (forced blank when it is 0), and
 ; Menu_NmiTimer - 1 unless 0. Restores everything and returns.
-; Callers note: the JML at $C2:8406 (not matched) is probably what the
-;   menu's NMI vector points at; nothing else jumps here.
-; Callers (1 JML site): unmatched ($C2:8406).
+; Callers note: the JML at $C2:8406 is in Menu_InterruptVectors, which
+;   Menu_InitSystems copies over NmiTrampoline; nothing else jumps here.
+; Callers (1 JML site): Menu_InterruptVectors ($C2:8406).
 ; Entry: an NMI in native mode; any M, X, DP, DB
 ; Exit:  RTI with A, X, Y, DP, DB, P and S as they were
 ; Calls: Menu_Unk85D6, Menu_NmiPad.
@@ -22015,11 +24505,10 @@ Menu_Nmi:
     RTI
 
 ; $C2:8472 — Menu_Irq (1 byte, $8472–$8472)
-; The menu's IRQ handler (through the JML at $C2:840A, not matched):
-; returns at once.
-; Callers note: the JML at $C2:840A (not matched), probably the menu's
-;   IRQ vector target.
-; Callers (1 JML site): unmatched ($C2:840A).
+; The menu's IRQ handler (through the JML at $C2:840A): returns at once.
+; Callers note: the JML at $C2:840A is in Menu_InterruptVectors, which
+;   Menu_InitSystems copies over IrqTrampoline.
+; Callers (1 JML site): Menu_InterruptVectors ($C2:840A).
 ; Entry: an IRQ; any M, X, DP and DB (nothing is touched)
 ; Exit:  RTI: everything as it was
 ; No calls.
@@ -22042,9 +24531,10 @@ Menu_Irq:
 ; Callers (1 JSR site): Menu_Nmi ($C2:844D).
 ; Entry: M any (SEP #$30 here), X any, DP = Menu_NmiDp, DB=$00 (the pad
 ;        bytes and registers absolute)
-; Exit:  P as on entry (PLP); A = the mask, X = the stage; Y, DP and DB
-;        unchanged; the pad bytes, Menu_PlayTime and Menu_Joy2Copy
-;        updated
+; Exit:  P as on entry (PLP); A = the mask, X = the stage (high byte
+;        0); Y's low byte kept, its high byte cleared (the SEP #$30;
+;        Menu_Nmi calls with X=0); DP and DB unchanged; the pad bytes,
+;        Menu_PlayTime and Menu_Joy2Copy updated
 ; Calls: Menu_PollPad, Menu_TickPlayTime.
 Menu_NmiPad:
     PHP
@@ -22154,7 +24644,8 @@ Menu_ReadPad:
 ; Entry: M any (SEP #$20 here), X=0 (16-bit X for the held word copy),
 ;        DP and DB any (set to $0000 and $00 here, not restored)
 ; Exit:  M=0, X=1; DP=$0000, DB=$00; A = the held buttons that were
-;        also held last frame, X = Menu_PadRepeatTimer; Y unchanged
+;        also held last frame, X = Menu_PadRepeatTimer; Y's low byte
+;        kept, high byte cleared (SEP #$10)
 ; No calls (JML Reset on the soft-reset buttons).
 Menu_PollPad:
     PEA.w !Menu_Dp
@@ -22286,7 +24777,8 @@ Menu_MapButtonsOne:             ; header: see Menu_MapButtons
 ; Callers (2 JSR sites): Menu_NmiPad ($C2:8490) and Menu_ReadPad ($C2:84E1).
 ; Entry: M, X any (SEP #$30 here), DP any (set to $0400 here, not
 ;        restored), DB any (the limits are read long)
-; Exit:  M=1, X=1; DP=$0400; A, X clobbered; Y and DB unchanged
+; Exit:  M=1, X=1; DP=$0400; A, X clobbered; Y's low byte kept, high
+;        byte cleared (the SEP #$30); DB unchanged
 ; No calls.
 Menu_TickPlayTime:
     SEP #$30
@@ -22317,6 +24809,1136 @@ Menu_PlayTimeLimits:
     db 60, 60, 10, 6, 10, 10
 
 ; ============================================================
+; Menu uploads, inventory and character helpers ($C2:8663–$C2:89E3)
+; ============================================================
+
+org $C28663
+; $C2:8663 — Menu_FlushVramQueue (70 bytes, $8663–$86A8)
+; Sends Menu_VramQueue to VRAM, newest record first, each by DMA channel
+; 7 to VMDATAL/H (two registers): VMADD = .Dest, from .SrcBank:.Src,
+; .Size bytes (the direct page walks the records), then empties the
+; queue (Menu_VramQueueEnd = 0). VMAIN is left as it is. Nothing is done
+; when the queue is empty.
+; Callers (5 JSR sites): Menu_InitSystems ($C2:812D) and unmatched ($C2:96EB, $C2:9721, $C2:9758,
+;   $C2:9816).
+; Entry: M, X any (P, DP and DB saved; SEP #$30 here), DP any, DB any
+;        (set to $00 for the DMA registers and the queue)
+; Exit:  P, DP and DB restored; A, X, Y clobbered
+; No calls.
+Menu_FlushVramQueue:
+    PHB
+    PHD
+    PHP
+    SEP #$30
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    LDX.w !Menu_VramQueueEnd
+    BEQ .done
+    STZ.w !Menu_VramQueueEnd
+    REP #$21                            ; (also C=0 for the ADC)
+    LDA.w #(!BBAD_VMDATAL<<8)|!DMAP_TwoRegs
+    STA.w DMAP7
+    TXA
+    ADC.w #!Menu_VramQueue-!Menu_VramRecBytes ; the last record
+    LDX.b #DMA_CH7
+.record:
+    TCD
+    LDA.b Menu_VramRec.Dest
+    STA.w VMADDL
+    LDA.b Menu_VramRec.Src
+    STA.w A1T7L
+    LDY.b Menu_VramRec.SrcBank          ; (8-bit Y: the bank only)
+    STY.w A1B7
+    LDA.b Menu_VramRec.Size
+    STA.w DAS7L
+    STX.w MDMAEN
+    TDC
+    SEC
+    SBC.w #!Menu_VramRecBytes
+    CMP.w #!Menu_VramQueue
+    BCS .record
+.done:
+    PLP
+    PLD
+    PLB
+    RTS
+
+; $C2:86A9 — Menu_UploadPalette (52 bytes, $86A9–$86DC)
+; When Menu_PalDirty is non-zero: zeroes it and sends the 512 bytes of
+; Menu_PalBuf ($7E:9480) to CGRAM from colour 0 by DMA channel 7.
+; Callers (2 JSR sites): unmatched ($C2:8651, $C2:9834).
+; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit LDX/STX
+;        immediates), DP any, DB any (set to $00)
+; Exit:  P and DB restored; A's low byte = $FF (Menu_PalDirtyAll, left
+;        by the TRB) when nothing was sent, $80 (DMA_CH7) after the DMA;
+;        X = Menu_PalBytes when sent; Y unchanged
+; No calls.
+Menu_UploadPalette:
+    PHB
+    PHP
+    SEP #$20
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    LDA.b #!Menu_PalDirtyAll
+    TRB.w !Menu_PalDirty
+    BEQ .done
+    LDX.w #!BBAD_CGDATA<<8              ; one register, CGDATA
+    STX.w DMAP7
+    LDX.w #!Menu_PalBuf
+    STX.w A1T7L
+    LDX.w #!Menu_PalBytes
+    STX.w DAS7L
+    LDA.b #!Bank7E
+    STA.w A1B7
+    LDA.b #$00
+    STA.w CGADD
+    LDA.b #DMA_CH7
+    STA.w MDMAEN
+.done:
+    PLP
+    PLB
+    RTS
+
+; $C2:86DD — Menu_BuildGradient (148 bytes, $86DD–$8770)
+; Builds an HDMA table of colour math lines for channel 0 (direct, two
+; registers: CGADSUB then COLDATA, set here; the table address is set by
+; the menu NMI from Menu_GradBufSel): copies Menu_GradientSteps to
+; Menu_GradTable, picks the buffer not built last (Menu_GradHdmaA or B,
+; Menu_GradBufSel toggles 0 / $100) and walks Menu_GradSpec's 2-byte
+; entries until one with bit 7 set:
+; - a non-zero first byte: 16 entries, one per Menu_GradTable word, each
+;   with the next step of an 8.8 line count that grows by the second
+;   byte x 16 (Menu_GradAccum keeps the fraction from entry to entry);
+; - a zero first byte: one entry of the second byte's line count with
+;   Menu_GradTableFlat (CGADSUB $02, COLDATA $E0: no change).
+; Quirks, kept: the buffer addresses loaded into A with the offsets are
+; never used; no end byte is written after the last entry.
+; Callers (8 JSR sites): unmatched ($C2:A0C0, $C2:ADA4, $C2:B94F, $C2:CA42, $C2:D0C5, $C2:DB73,
+;   $C2:E5A2, $C2:E7F6).
+; Entry: M, X any (P and DB saved; REP #$30 here), DP any (not used), DB
+;        any (the MVN sets $7E)
+; Exit:  P and DB restored; A, X, Y clobbered; Menu_GradBufSel,
+;        Menu_GradStep, Menu_GradAccum changed
+; No calls.
+Menu_BuildGradient:
+    PHP
+    PHB
+    REP #$30
+    LDX.w #Menu_GradientSteps
+    LDY.w #!Menu_GradTable
+    LDA.w #!Menu_GradTableBytes-1
+    MVN !Bank7E,bank(Menu_GradientSteps) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #(!BBAD_CGADSUB<<8)|!DMAP_TwoRegs
+    STA.l DMAP0
+    LDA.w #!Bank7E                      ; A1B0 = $7E, DAS0L = 0
+    STA.l A1B0
+    LDY.w #0
+    LDA.w #!Menu_GradHdmaA              ; (not used)
+    LDX.w !Menu_GradBufSel
+    BNE .use_a
+    LDY.w #!Menu_GradHdmaB-!Menu_GradHdmaA
+    LDA.w #!Menu_GradHdmaB              ; (not used)
+.use_a:
+    STY.w !Menu_GradBufSel
+    STZ.w !Menu_GradAccum
+    LDX.w #0
+.spec:
+    SEP #$20
+    LDA.w !Menu_GradSpec,X
+    BMI .done
+    REP #$20                            ; (the flags are still the 8-bit load's)
+    BEQ .flat
+    LDA.w !Menu_GradSpec+1,X
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.w !Menu_GradStep
+    PHX
+    LDX.w #0
+.line:
+    REP #$20
+    LDA.w !Menu_GradAccum
+    CLC
+    ADC.w !Menu_GradStep
+    STA.w !Menu_GradAccum
+    SEP #$20
+    XBA                                 ; the whole lines
+    STA.w !Menu_GradHdmaA,Y
+    STZ.w !Menu_GradAccum+1             ; keep the fraction
+    REP #$20
+    LDA.w !Menu_GradTable,X
+    STA.w !Menu_GradHdmaA+1,Y
+    INX
+    INX
+    INY
+    INY
+    INY
+    CPX.w #!Menu_GradTableBytes
+    BCC .line
+    PLX
+    BRA .next
+.flat:
+    LDA.w !Menu_GradSpec+1,X            ; the line count (and a byte overwritten next)
+    STA.w !Menu_GradHdmaA,Y
+    LDA.w !Menu_GradTableFlat
+    STA.w !Menu_GradHdmaA+1,Y
+    INY
+    INY
+    INY
+.next:
+    INX
+    INX
+    BRA .spec
+.done:
+    PLB
+    PLP
+    RTS
+
+; $C2:8771 — Menu_GradientSteps (32 bytes, $8771–$8790)
+; 16 CGADSUB / COLDATA pairs for Menu_BuildGradient: add (CGADSUB $02:
+; BG2) the fixed colour of intensity 8 down to 0 (COLDATA $E8-$E0, all
+; three channels), then subtract ($82) intensity 1 up to 7.
+Menu_GradientSteps:
+    db $02,$E8,$02,$E7,$02,$E6,$02,$E5,$02,$E4,$02,$E3,$02,$E2,$02,$E1
+    db $02,$E0,$82,$E1,$82,$E2,$82,$E3,$82,$E4,$82,$E5,$82,$E6,$82,$E7
+
+; $C2:8791 — Menu_AddItem (68 bytes, $8791–$87D4)
+; Adds Menu_ItemCount of item Menu_ItemId to the inventory: to its slot
+; (Menu_FindItem) or else to the first empty one (id stored, count 0),
+; the count capped at 99. Ids 0, $5A, $7B and $94 (the first id of
+; categories 0-3, Menu_ItemCategoryBounds) are not added. The tail
+; Menu_ItemSetCount ($C2:87CD; Menu_RemoveItem branches to it) stores A
+; as the slot's count and returns 0.
+; Callers (4 JSR sites): unmatched ($C2:8E09, $C2:9CCE, $C2:D62A, $C2:D79F).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E (the
+;        inventory)
+; Exit:  P and X restored; A = 0 (added), Menu_InvFull (no free slot) or
+;        the id (0, $5A, $7B, $94: not added); Y unchanged;
+;        Menu_ItemSlot as Menu_FindItem left it
+; Calls: Menu_FindItem.
+Menu_AddItem:
+    PHX
+    PHP
+    SEP #$30
+    LDA.w !Menu_ItemId
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat1First
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat2First
+    BEQ Menu_ItemSetCount_exit
+    CMP.b #!Menu_ItemCat3First
+    BEQ Menu_ItemSetCount_exit
+    JSR Menu_FindItem
+    BCC .add                            ; X = its slot
+.find_empty:                            ; (X = 0 here)
+    LDA.w !Menu_InvIds,X
+    BEQ .empty
+    INX
+    BNE .find_empty
+    LDA.b #!Menu_InvFull
+    BRA Menu_ItemSetCount_exit
+.empty:
+    LDA.w !Menu_ItemId
+    STA.w !Menu_InvIds,X
+    STZ.w !Menu_InvCounts,X
+.add:
+    LDA.w !Menu_InvCounts,X
+    CLC
+    ADC.w !Menu_ItemCount
+    CMP.b #!Menu_ItemMaxCount
+    BCC Menu_ItemSetCount
+    LDA.b #!Menu_ItemMaxCount
+Menu_ItemSetCount:                      ; header: see Menu_AddItem
+    STA.w !Menu_InvCounts,X
+    LDA.b #0
+.exit:
+    PLP
+    PLX
+    RTS
+
+; $C2:87D5 — Menu_RemoveItem (37 bytes, $87D5–$87F9)
+; Takes Menu_ItemCount of item Menu_ItemId from its slot: A =
+; Menu_ItemShort when it has fewer (nothing changed), Menu_InvFull when
+; it is not there; else the new count is stored (Menu_ItemSetCount) and,
+; at 0, the slot is emptied; A = 0. Id 0 returns 0 at once.
+; Callers (5 JSR sites): unmatched ($C2:8E13, $C2:9CD9, $C2:B331, $C2:D6A2, $C2:D7AA).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E
+; Exit:  P and X restored; A = 0 (taken or id 0), Menu_ItemShort or
+;        Menu_InvFull (not found); Y unchanged
+; Calls: Menu_FindItem.
+Menu_RemoveItem:
+    PHX
+    PHP
+    SEP #$30
+    LDA.w !Menu_ItemId
+    BEQ .exit
+    JSR Menu_FindItem
+    LDA.b #!Menu_InvFull
+    BCS .exit
+    LDA.w !Menu_InvCounts,X
+    SEC
+    SBC.w !Menu_ItemCount
+    BCC .short
+    BNE Menu_ItemSetCount
+    STZ.w !Menu_InvIds,X                ; none left: free the slot
+    BRA Menu_ItemSetCount
+.short:
+    LDA.b #!Menu_ItemShort
+.exit:
+    PLP
+    PLX
+    RTS
+
+; $C2:87FA — Menu_FindItem (28 bytes, $87FA–$8815)
+; Finds the slot of item A with a non-zero count: C=0 with X = the slot
+; and Menu_ItemSlot = X (a word), or C=1 with X = 0 (all 256 slots
+; looked at). A slot with the id but count 0 is passed over (A is
+; reloaded from Menu_ItemId after its count is read).
+; Callers (3 JSR sites): Menu_AddItem ($C2:87A6), Menu_RemoveItem ($C2:87DE) and unmatched
+;   ($C2:8E20).
+; Entry: M=1, X=1 (8-bit slot index), DP any, DB=$7E; A = Menu_ItemId
+; Exit:  M=1, X=1; C and X as above; A = the id or the count read last;
+;        Y unchanged
+; No calls.
+Menu_FindItem:
+    LDX.b #0
+.slot:
+    CMP.w !Menu_InvIds,X
+    BNE .next
+    LDA.w !Menu_InvCounts,X
+    BNE .found
+    LDA.w !Menu_ItemId
+.next:
+    INX
+    BNE .slot
+    SEC
+    RTS
+.found:
+    STX.w !Menu_ItemSlot
+    STZ.w !Menu_ItemSlot+1
+    CLC
+    RTS
+
+; $C2:8816 — Menu_LoadCharRec (10 bytes, $8816–$881F)
+; Menu_LoadCharRecA for character A, keeping P and X.
+; Callers (4 JSR sites): unmatched ($C2:99B9, $C2:BBA7, $C2:DC3A, $C2:DDDF).
+; Entry: M, X any (P and X saved; SEP #$20 here), DP=$0000, DB=$7E; A =
+;        the character id
+; Exit:  P and X restored; A and Y as Menu_LoadCharRecA leaves them
+; Calls: Menu_LoadCharRecA.
+Menu_LoadCharRec:
+    PHX
+    PHP
+    SEP #$20
+    JSR Menu_LoadCharRecA
+    PLP
+    PLX
+    RTS
+
+; $C2:8820 — Menu_LoadPartyCharRec (25 bytes, $8820–$8838)
+; Loads the character at Menu_PartyList[Menu_CurMember]
+; (Menu_LoadCharRecA); Menu_CurIsReserve = $FF when that index is past
+; the active members (Menu_PartyActive), else 0.
+; Callers (29 JSR sites): unmatched ($C2:8E5D, $C2:8F99, $C2:9DB9, $C2:A1C3, $C2:A244, $C2:A2DE,
+;   $C2:A336, $C2:AFFB, $C2:B28B, $C2:B2E0, $C2:B30E, $C2:B41F, $C2:B4B2, $C2:B507, $C2:B5D8,
+;   $C2:B696, $C2:B6DF, $C2:B82E, $C2:B89E, $C2:B9F2, $C2:BA78, $C2:BC9E, $C2:BE88, $C2:C8CB,
+;   $C2:CD9E, $C2:D7BE, $C2:E0C0, $C2:E131, $C2:E165).
+; Entry: M, X any (P, X and Y saved; SEP #$30 here), DP=$0000, DB=$7E
+; Exit:  P, X and Y restored; A as Menu_LoadCharRecA leaves it
+; Calls: Menu_LoadCharRecA.
+Menu_LoadPartyCharRec:
+    PHX
+    PHY
+    PHP
+    SEP #$30
+    STZ.b !Menu_CurIsReserve
+    LDX.b !Menu_CurMember
+    CPX.b !Menu_PartyActive
+    BCC .active
+    DEC.b !Menu_CurIsReserve
+.active:
+    LDA.w !Menu_PartyList,X
+    JSR Menu_LoadCharRecA
+    PLP
+    PLY
+    PLX
+    RTS
+
+; $C2:8839 — Menu_LoadCharRecA (72 bytes, $8839–$8880)
+; Copies the Menu_CharRecords record of character A (A x $50) to
+; Menu_CurCharRec (its address kept in Menu_CurCharRecPtr), then the
+; 6-byte Menu_Unk2C23 entry of the record's first byte AND 7 to
+; Menu_CurCharExtra right after it. A character id with bit 7 set (no
+; character) returns at once.
+; Callers (2 JSR sites): Menu_LoadCharRec ($C2:881A) and Menu_LoadPartyCharRec ($C2:8832).
+; Entry: M=1 (8-bit id; the ORA immediate), X any (REP #$31 sets X=0),
+;        DP=$0000, DB any (long multiplier; the MVNs set $7E); A = the id
+; Exit:  bit 7 set: M=1, A = the id, nothing else changed. Else M=0,
+;        X=0, DB=$7E; A = 0; X, Y past the second MVN
+; No calls.
+Menu_LoadCharRecA:
+    STA.l WRMPYA
+    ORA.b #0
+    BMI .done
+    LDA.b #!Menu_CharRecBytes
+    STA.l WRMPYB
+    NOP
+    REP #$31
+    LDA.w #!Menu_CharRecords
+    ADC.l RDMPYL
+    STA.b !Menu_CurCharRecPtr
+    TAX
+    LDY.w #!Menu_CurCharRec
+    LDA.w #!Menu_CharRecBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.w !Menu_CurCharRec
+    AND.b #!Menu_Unk2C23Mask
+    STA.l WRMPYA
+    LDA.b #!Menu_Unk2C23Bytes
+    STA.l WRMPYB
+    REP #$21
+    NOP
+    LDA.w #!Menu_Unk2C23
+    ADC.l RDMPYL
+    TAX
+    LDA.w #!Menu_Unk2C23Bytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    INC A                               ; $FFFF + 1 = 0
+.done:
+    RTS
+
+; $C2:8881 — Menu_ItemCategory (38 bytes, $8881–$88A6)
+; The category of item A by Menu_ItemCategoryBounds (0: below $5A, 1:
+; $5A-$7A, 2: $7B-$93, 3: $94-$BB, 4: from $BC) into Menu_ItemCategory,
+; and its index within the category (A - the category's first id) into
+; Menu_ItemIndex (both as words).
+; Callers (7 JSR sites): Menu_ItemDataPtrA ($C2:88B0) and unmatched ($C2:992D, $C2:9952, $C2:AF1C,
+;   $C2:B0B1, $C2:DDA3, $C2:DFAD).
+; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E; A =
+;        the item id
+; Exit:  P and X restored; A = the category (0-4, = Menu_ItemCategory's
+;        low byte; the TXA comes after the index store); Y's low byte
+;        kept, high byte cleared (SEP #$30)
+; No calls.
+Menu_ItemCategory:
+    PHX
+    PHP
+    SEP #$30
+    LDX.b #0
+.bound:
+    CMP.l Menu_ItemCategoryBounds+1,X
+    BCC .found
+    INX
+    CPX.b #!Menu_ItemLastCategory
+    BCC .bound
+.found:
+    SEC
+    SBC.l Menu_ItemCategoryBounds,X
+    STA.w !Menu_ItemIndex
+    STZ.w !Menu_ItemIndex+1
+    TXA
+    STA.w !Menu_ItemCategory
+    STZ.w !Menu_ItemCategory+1
+    PLP
+    PLX
+    RTS
+
+; $C2:88A7 — Menu_ItemCategoryBounds (6 bytes, $88A7–$88AC)
+; The first item id of categories 0-4, then the end of the ids ($F2, the
+; slot count Menu_ListEquipItems scans; not read by Menu_ItemCategory).
+Menu_ItemCategoryBounds:
+    db $00,$5A,$7B,$94,$BC,$F2
+
+; $C2:88AD — Menu_ItemDataPtrA (43 bytes, $88AD–$88D7)
+; Menu_ItemCategory for item A, then X = Menu_ItemDataPtr = the address
+; (bank $CC: the callers read the record with LDA $CC0000,X; only the
+; pointer and size tables are in bank $FF) of the item's record in its
+; category's table:
+; MenuRom_ItemTablesA[category] + index x MenuRom_ItemRecSizesA[category].
+; What the records hold is not traced.
+; Callers (1 JSR site): unmatched ($C2:98BB).
+; Entry: M any (P saved; SEP #$20 here), X any (the category is read as
+;        a byte or word; its high byte is 0), DP any, DB=$7E; A = the id
+; Exit:  P restored; A = X = the address; Y's low byte kept, high byte
+;        cleared (SEP #$30 in Menu_ItemCategory)
+; Calls: Menu_ItemCategory.
+Menu_ItemDataPtrA:
+    PHP
+    SEP #$20
+    JSR Menu_ItemCategory
+    LDA.w !Menu_ItemIndex
+    STA.l WRMPYA
+    LDX.w !Menu_ItemCategory
+    LDA.l !MenuRom_ItemRecSizesA,X
+    STA.l WRMPYB
+    REP #$30
+    TXA
+    ASL A                               ; (also C=0)
+    TAX
+    LDA.l !MenuRom_ItemTablesA,X
+    ADC.l RDMPYL
+    STA.w !Menu_ItemDataPtr
+    TAX
+    PLP
+    RTS
+
+; $C2:88D8 — Menu_ItemDataPtrB (40 bytes, $88D8–$88FF)
+; As Menu_ItemDataPtrA for the second set of per-category tables
+; (MenuRom_ItemTablesB, MenuRom_ItemRecSizesB), using the
+; Menu_ItemCategory / Menu_ItemIndex left by an earlier call; result in
+; Menu_ItemDataPtrB and X: again an address in bank $CC (the callers
+; read LDA $CC0000,X and $CC0001,X), not in bank $FF.
+; Callers (3 JSR sites): unmatched ($C2:9930, $C2:9955, $C2:B0C3).
+; Entry: M any (P saved; SEP #$20 here), X any, DP any, DB=$7E;
+;        Menu_ItemCategory and Menu_ItemIndex set
+; Exit:  P restored; A = X = the address; Y unchanged
+; No calls.
+Menu_ItemDataPtrB:
+    PHP
+    SEP #$20
+    LDA.w !Menu_ItemIndex
+    STA.l WRMPYA
+    LDX.w !Menu_ItemCategory
+    LDA.l !MenuRom_ItemRecSizesB,X
+    STA.l WRMPYB
+    REP #$30
+    TXA
+    ASL A
+    TAX
+    LDA.l !MenuRom_ItemTablesB,X
+    ADC.l RDMPYL
+    STA.w !Menu_ItemDataPtrB
+    TAX
+    PLP
+    RTS
+
+; $C2:8900 — Menu_CountEquippedBy (79 bytes, $8900–$894E)
+; For each character of Menu_EquipChars (up to 7, stopping at the first
+; with bit 7 set): Menu_EquipFlags[n] = 1 when the byte of its
+; Menu_CharRecords record at the category's Menu_EquipSlotOffsets entry
+; equals Menu_ItemId (else 0), and Menu_EquipCount counts them. Uses
+; Menu_ItemCategory as left by an earlier Menu_ItemCategory.
+; Quirks, kept: Menu_Unk29AF's low byte is stored into Menu_Tmp02 and not
+; used; for category 4 the offset comes from the byte after the table
+; ($08, the next routine's PHP).
+; Callers (1 JSR site): unmatched ($C2:DDA6).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00-$02),
+;        DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-$02 changed
+; No calls.
+Menu_CountEquippedBy:
+    PHP
+    SEP #$30
+    LDX.w !Menu_ItemCategory
+    LDA.l Menu_EquipSlotOffsets,X
+    STA.b !Menu_Tmp00
+    STZ.b !Menu_Tmp01
+    STZ.w !Menu_EquipCount
+    LDX.b #0
+    LDA.b #!Menu_CharRecBytes
+    STA.l WRMPYA
+    LDA.w !Menu_Unk29AF
+    STA.b !Menu_Tmp02                   ; (not used)
+    REP #$10
+.char:
+    SEP #$20
+    LDA.w !Menu_EquipChars,X
+    BMI .done
+    STA.l WRMPYB
+    STZ.w !Menu_EquipFlags,X
+    REP #$31
+    LDA.b !Menu_Tmp00
+    ADC.l RDMPYL
+    TAY
+    SEP #$20
+    LDA.w !Menu_CharRecords,Y
+    CMP.w !Menu_ItemId
+    BNE .next
+    INC.w !Menu_EquipFlags,X
+    INC.w !Menu_EquipCount
+.next:
+    INX
+    CPX.w #!Menu_EquipChecks
+    BCC .char
+.done:
+    PLP
+    RTS
+
+; $C2:894F — Menu_EquipSlotOffsets (4 bytes, $894F–$8952)
+; The Menu_CharRec offset of the equipped item of categories 0-3 ($29,
+; $28, $27, $2A), as Menu_CountEquippedBy reads it (inferred from that
+; use only).
+Menu_EquipSlotOffsets:
+    db $29,$28,$27,$2A
+
+; $C2:8953 — Menu_ListEquipItems (137 bytes, $8953–$89DB)
+; Lists the inventory items of Menu_ListKind's id range
+; (Menu_EquipListRanges: 0 $00-$59, 1 $7B-$93, 2 $5A-$7A, 3 $94-$BB) that
+; Menu_Unk93A8 accepts (A non-zero), from slots 0-$F1, into
+; Menu_EquipList (ids, 0 after the last) and Menu_EquipListCounts, with
+; Menu_EquipListLen = the number; then sorts the list by
+; Menu_ItemSortKeys[id], largest first (each position takes the largest
+; key after it by swaps).
+; Quirk, kept: the inner sort loop ends at the first key of 0, which is
+; meant to be that of the end id 0 ($7E:7C00); an item whose key is 0
+; ends it early.
+; Callers (2 JSR sites): unmatched ($C2:9C61, $C2:A466).
+; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00/01),
+;        DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_ItemId = the last id tested;
+;        Menu_Tmp00/01 changed
+; Calls: Menu_Unk93A8.
+Menu_ListEquipItems:
+    PHP
+    SEP #$30
+    STZ.w !Menu_EquipListLen
+    LDA.w !Menu_ListKind
+    ASL A
+    TAX
+    LDA.l Menu_EquipListRanges,X
+    STA.b !Menu_Tmp00                   ; first id
+    LDA.l Menu_EquipListRanges+1,X
+    STA.b !Menu_Tmp01                   ; past the last
+    LDY.b #0
+    TYX
+.slot:
+    LDA.w !Menu_InvIds,Y
+    BEQ .next
+    CMP.b !Menu_Tmp00
+    BCC .next
+    CMP.b !Menu_Tmp01
+    BCS .next
+    STA.w !Menu_ItemId
+    JSR Menu_Unk93A8
+    ORA.b #0
+    BEQ .next
+    LDA.w !Menu_ItemId
+    STA.w !Menu_EquipList,X
+    LDA.w !Menu_InvCounts,Y
+    STA.w !Menu_EquipListCounts,X
+    INC.w !Menu_EquipListLen
+    INX
+.next:
+    INY
+    CPY.b #!Menu_ItemIdEnd
+    BCC .slot
+    STZ.w !Menu_EquipList,X
+    STZ.b !Menu_Tmp01                   ; now the position being filled
+.position:
+    LDX.b !Menu_Tmp01
+    LDY.w !Menu_EquipList,X
+    BEQ .done
+    LDA.w !Menu_ItemSortKeys,Y
+    STA.b !Menu_Tmp00                   ; the largest key so far
+.scan:
+    INX
+    LDY.w !Menu_EquipList,X
+    LDA.w !Menu_ItemSortKeys,Y
+    BEQ .position_done
+    CMP.b !Menu_Tmp00
+    BCC .scan
+    STA.b !Menu_Tmp00                   ; larger or equal: swap it into the position
+    PHY
+    LDA.w !Menu_EquipListCounts,X
+    PHA
+    LDY.b !Menu_Tmp01
+    LDA.w !Menu_EquipList,Y
+    STA.w !Menu_EquipList,X
+    LDA.w !Menu_EquipListCounts,Y
+    STA.w !Menu_EquipListCounts,X
+    PLA
+    STA.w !Menu_EquipListCounts,Y
+    PLA
+    STA.w !Menu_EquipList,Y
+    BRA .scan
+.position_done:
+    INC.b !Menu_Tmp01
+    BRA .position
+.done:
+    PLP
+    RTS
+
+; $C2:89DC — Menu_EquipListRanges (8 bytes, $89DC–$89E3)
+; First id and end id of each Menu_ListKind (Menu_ListEquipItems).
+Menu_EquipListRanges:
+    db $00,$5A
+    db $7B,$94
+    db $5A,$7B
+    db $94,$BC
+
+; ============================================================
+; Menu cursors and list arrows ($C2:89E4–$C2:8C35)
+; ============================================================
+; Threads (Menu_RunThreads) that draw the menu's pointing-hand cursor
+; sprites, blinking, into OAM entries 29-31 of the copy at $0700
+; (Menu_OamCursor0-2: X, Y, tile, attributes; probably what the menu NMI
+; uploads, not traced), at the positions of Menu_CursorPos records; and
+; the up/down arrows of a scrolling list. Each cursor thread runs in slot
+; 6, the arrows in slot 4.
+
+; $C2:89E4 — Menu_StartCursorA (14 bytes, $89E4–$89F1)
+; Menu_CursorYOfs = 0 and starts Menu_CursorThreadA in slot 6.
+; Callers (1 JMP site): unmatched ($C2:AAAA).
+; Entry: M, X any (REP #$30 here), DP=$0000 (Menu_StartThread), DB=$7E
+; Exit:  M=0, X=0; as Menu_StartThread (A = Menu_ThNewWait1, X = $30)
+; Calls: jumps to Menu_StartThread.
+Menu_StartCursorA:
+    REP #$30
+    STZ.w !Menu_CursorYOfs
+    LDA.w #Menu_CursorThreadA
+    LDX.w #!Menu_CursorSlot
+    JMP Menu_StartThread
+
+; $C2:89F2 — Menu_CursorThreadA (8 bytes, $89F2–$89F9)
+; Thread: Menu_CursorStepA, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepA, Menu_Yield.
+Menu_CursorThreadA:
+    JSR Menu_CursorStepA
+    JSR Menu_Yield
+    BRA Menu_CursorThreadA
+
+; $C2:89FA — Menu_CursorStepA (55 bytes, $89FA–$8A30)
+; One frame of cursor A: blinks (Menu_CursorBlink) and, in the shown
+; phase, when row Menu_Unk0D9D - Menu_Unk0416 + Menu_CursorIndex is below
+; 10 (probably the row on screen of a scrolled list), puts sprite 0 at
+; that row's Menu_CursorPos (X + 2, Y - 1 + Menu_CursorYOfs) with tile and
+; attributes $2020. In the hidden phase nothing is written (the sprite
+; keeps its last place and tile).
+; Callers (1 JSR site): Menu_CursorThreadA ($C2:89F2).
+; Entry: M, X any (P saved; REP #$10 / SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A, X clobbered; Y unchanged; Menu_CursorBlink and
+;        Menu_BlinkTimers changed
+; Calls: Menu_CursorBlink, Menu_CursorRecOffset.
+Menu_CursorStepA:
+    PHP
+    REP #$10
+    SEP #$20
+    JSR Menu_CursorBlink
+    BCC .done
+    LDA.w !Menu_Unk0D9D
+    SEC
+    SBC.w !Menu_Unk0416
+    CLC
+    ADC.w !Menu_CursorIndex
+    CMP.b #!Menu_CursorRowsA
+    BCS .done
+    JSR Menu_CursorRecOffset
+    LDA.w Menu_CursorPos.X,X
+    INC A
+    INC A
+    STA.w !Menu_OamCursor0
+    LDA.w Menu_CursorPos.Y,X
+    DEC A
+    CLC
+    ADC.w !Menu_CursorYOfs
+    STA.w !Menu_OamCursor0+1
+    LDX.w #!Menu_CursorTileAttrA
+    STX.w !Menu_OamCursor0+2
+.done:
+    PLP
+    RTS
+
+; $C2:8A31 — Menu_StartCursorB (20 bytes, $8A31–$8A44)
+; Menu_CursorTileAttr = Menu_Unk0772 and starts Menu_CursorThreadB in
+; slot 6.
+; Callers (1 JMP site): unmatched ($C2:C6B0).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorB:
+    PHP
+    REP #$30
+    LDA.w !Menu_Unk0772
+    STA.w !Menu_CursorTileAttr
+    LDA.w #Menu_CursorThreadB
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8A45 — Menu_CursorThreadB (83 bytes, $8A45–$8A97)
+; Thread: each frame blinks (Menu_CursorBlink) and, in its phase with
+; bit 0 clear, puts sprite 0 at Menu_CursorIndex's Menu_CursorPos (X + 2;
+; Y - 1) with Menu_CursorTileAttr. From index 3 on the Y is moved by
+; (Menu_Unk0DA8 - Menu_Unk80) x 48 (a list scrolled by 48-pixel steps,
+; probably) and the cursor is not drawn when that leaves the screen
+; (past 255 going down; below $F0 after wrapping going up), then
+; Menu_CursorYOfs is added.
+; Quirk, kept: the PLP and RTS after the loop ($C2:8A96-$8A97) are never
+; reached.
+; Entry: from Menu_RunThreads: M any (SEP #$20 here), X=0 (the
+;        scheduler's REP #$30, kept across Menu_Yield; the 16-bit
+;        LDX.w/STX.w copy the whole Menu_CursorTileAttr word), DP=$0000,
+;        DB=$7E
+; Exit:  never returns
+; Calls: Menu_CursorBlink, Menu_CursorPosAB, Menu_Yield.
+Menu_CursorThreadB:
+    SEP #$20
+    JSR Menu_CursorBlink
+    BCS .wait
+    TDC                                 ; B = 0
+    LDA.w !Menu_CursorIndex
+    JSR Menu_CursorPosAB
+    STA.w !Menu_OamCursor0
+    LDA.w !Menu_CursorIndex
+    CMP.b #!Menu_CursorFixedRows
+    BCC .place                          ; (B = the Y)
+    LDA.b #!Menu_CursorRowStep
+    STA.l WRMPYA
+    LDA.w !Menu_Unk0DA8
+    SBC.b !Menu_Unk80                   ; (C=1 from the CMP)
+    STA.l WRMPYB
+    XBA                                 ; A = the Y
+    BCC .up
+    CLC
+    ADC.l RDMPYL
+    BCC .add_ofs
+    BRA .wait                           ; past the bottom
+.up:
+    ADC.l RDMPYL                        ; (C=0 from the SBC)
+    BCS .add_ofs
+    CMP.b #!Menu_CursorWrapMin
+    BCC .wait
+.add_ofs:
+    CLC
+    ADC.w !Menu_CursorYOfs
+    XBA
+.place:
+    XBA
+    STA.w !Menu_OamCursor0+1
+    LDX.w !Menu_CursorTileAttr
+    STX.w !Menu_OamCursor0+2
+.wait:
+    JSR Menu_Yield
+    BRA Menu_CursorThreadB
+    PLP                                 ; never reached
+    RTS
+
+; $C2:8A98 — Menu_StartCursorC (26 bytes, $8A98–$8AB1)
+; Menu_BlinkMask = $FC, Menu_CursorTileAttr = Menu_Unk0772, and starts
+; Menu_CursorThreadC in slot 6.
+; Callers (1 JSR site): unmatched ($C2:D533).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorC:
+    PHP
+    REP #$30
+    LDA.w #!Menu_BlinkMaskDefault
+    STA.w !Menu_BlinkMask
+    LDA.w !Menu_Unk0772
+    STA.w !Menu_CursorTileAttr
+    LDA.w #Menu_CursorThreadC
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8AB2 — Menu_CursorThreadC (8 bytes, $8AB2–$8AB9)
+; Thread: Menu_CursorStepC, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepC, Menu_Yield.
+Menu_CursorThreadC:
+    JSR Menu_CursorStepC
+    JSR Menu_Yield
+    BRA Menu_CursorThreadC
+
+; $C2:8ABA — Menu_CursorStepC (27 bytes, $8ABA–$8AD4)
+; One frame of cursor C: blinks with Menu_BlinkMask (Menu_CursorBlinkMasked)
+; and, in its phase with bit 0 clear, puts sprite 0 at Menu_CursorIndex's
+; Menu_CursorPos (X + 2, Y - 1) with Menu_CursorTileAttr.
+; Callers (1 JSR site): Menu_CursorThreadC ($C2:8AB2).
+; Entry: M, X any (P saved; SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A, X clobbered; Y unchanged
+; Calls: Menu_CursorBlinkMasked, Menu_CursorPosAB.
+Menu_CursorStepC:
+    PHP
+    SEP #$20
+    JSR Menu_CursorBlinkMasked
+    BCS .done
+    LDA.w !Menu_CursorIndex
+    JSR Menu_CursorPosAB
+    REP #$20
+    STA.w !Menu_OamCursor0              ; X and Y
+    LDA.w !Menu_CursorTileAttr
+    STA.w !Menu_OamCursor0+2
+.done:
+    PLP
+    RTS
+
+; $C2:8AD5 — Menu_StartCursorD (32 bytes, $8AD5–$8AF4)
+; Starts Menu_CursorThreadD in slot 6 with the three blink timers at 3,
+; 1 and 2 and Menu_CursorBlink = 2 (sprite 1 starts hidden).
+; Callers (2 JSR sites): unmatched ($C2:B1A2, $C2:B485).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = 2; X = $30; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartCursorD:
+    PHP
+    REP #$30
+    LDA.w #Menu_CursorThreadD
+    LDX.w #!Menu_CursorSlot
+    JSR Menu_StartThread
+    LDA.w #!Menu_BlinkTimersInit
+    STA.w !Menu_BlinkTimers             ; timers 0 and 1
+    SEP #$20
+    LDA.b #!Menu_BlinkTimer2Init
+    STA.w !Menu_BlinkTimers+2
+    LDA.b #!Menu_CursorBlinkDInit
+    STA.w !Menu_CursorBlink
+    PLP
+    RTS
+
+; $C2:8AF5 — Menu_CursorThreadD (8 bytes, $8AF5–$8AFC)
+; Thread: Menu_CursorStepD, wait a frame, for ever.
+; Entry: from Menu_RunThreads (M=0, X=0, DP=$0000, DB=$7E)
+; Exit:  never returns
+; Calls: Menu_CursorStepD, Menu_Yield.
+Menu_CursorThreadD:
+    JSR Menu_CursorStepD
+    JSR Menu_Yield
+    BRA Menu_CursorThreadD
+
+; $C2:8AFD — Menu_CursorStepD (108 bytes, $8AFD–$8B68)
+; One frame of cursor D, one blinking cursor per active party member
+; (Menu_PartyActive of them): tiles and attributes $3020 into all three
+; sprites (and $20 into Menu_Unk0D9B); each of the three Menu_BlinkTimers
+; counts 3..0 and toggles its bit of Menu_CursorBlink when it wraps;
+; then for member n (from Menu_CursorIndex on) whose bit is clear,
+; Menu_CursorPosAB's position goes to the sprite at Menu_OamCursor0 +
+; Menu_Unk51 + 4n.
+; Quirk, kept: Menu_CursorPosAB runs with M=0 here, so its 16-bit load of
+; the X word undoes the Y - 1: these cursors sit one pixel lower than
+; the others (X + 2 as a word).
+; Callers (1 JSR site): Menu_CursorThreadD ($C2:8AF5).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00-$04,
+;        Menu_Unk51, Menu_PartyActive), DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-$04 changed
+; Calls: Menu_CursorPosAB.
+Menu_CursorStepD:
+    PHP
+    REP #$30
+    LDA.w #!Menu_CursorTileAttrD
+    STA.w !Menu_OamCursor0+2
+    STA.w !Menu_OamCursor1+2
+    STA.w !Menu_OamCursor2+2
+    SEP #$20
+    STA.w !Menu_Unk0D9B                 ; (the low byte, $20)
+    LDA.b #!Menu_BlinkMaskDefault
+    TRB.w !Menu_BlinkTimers
+    TRB.w !Menu_BlinkTimers+1
+    TRB.w !Menu_BlinkTimers+2
+    LDA.b #0
+    DEC.w !Menu_BlinkTimers
+    BPL .timer1
+    ORA.b #!Menu_Blink0
+.timer1:
+    DEC.w !Menu_BlinkTimers+1
+    BPL .timer2
+    ORA.b #!Menu_Blink1
+.timer2:
+    DEC.w !Menu_BlinkTimers+2
+    BPL .toggle
+    ORA.b #!Menu_Blink2
+.toggle:
+    EOR.w !Menu_CursorBlink
+    STA.w !Menu_CursorBlink
+    LDA.w !Menu_CursorIndex
+    STA.b !Menu_Tmp04                   ; the member's index
+    REP #$30
+    LDA.w !Menu_CursorBlink
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_Tmp00                   ; the blink bits
+    LDA.b !Menu_PartyActive
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_Tmp02                   ; cursors left
+    LDY.b !Menu_Unk51
+.member:
+    LSR.b !Menu_Tmp00
+    BCS .next                           ; hidden this frame
+    LDA.b !Menu_Tmp04
+    JSR Menu_CursorPosAB
+    STA.w !Menu_OamCursor0,Y
+.next:
+    INY
+    INY
+    INY
+    INY
+    INC.b !Menu_Tmp04
+    DEC.b !Menu_Tmp02
+    BNE .member
+    PLP
+    RTS
+
+; $C2:8B69 — Menu_CursorBlinkMasked (28 bytes with Menu_CursorBlink, $8B69–$8B84)
+; Blink timer 0: clears the bits of Menu_BlinkTimers[0] that A has set
+; (Menu_CursorBlinkMasked passes Menu_BlinkMask; the sub-entry
+; Menu_CursorBlink, $C2:8B6E, $FC, leaving a count 0-3), counts it down
+; and, when it wraps, toggles bit 0 of Menu_CursorBlink: C = that bit.
+; Callers (1 JSR site): Menu_CursorStepC ($C2:8ABD).
+; Callers of Menu_CursorBlink (2 JSR sites): Menu_CursorStepA ($C2:89FF) and Menu_CursorThreadB
+;   ($C2:8A47).
+; Entry (both): M=1 (8-bit), X any, DP any, DB=$7E
+; Exit (both):  M=1; C = Menu_CursorBlink bit 0; A = Menu_CursorBlink / 2;
+;        X, Y unchanged
+; No calls.
+Menu_CursorBlinkMasked:
+    LDA.w !Menu_BlinkMask
+    BRA Menu_CursorBlink_mask
+Menu_CursorBlink:                       ; header: see Menu_CursorBlinkMasked
+    LDA.b #!Menu_BlinkMaskDefault
+.mask:
+    TRB.w !Menu_BlinkTimers
+    DEC.w !Menu_BlinkTimers
+    BPL .show
+    LDA.w !Menu_CursorBlink
+    EOR.b #!Menu_Blink0
+    STA.w !Menu_CursorBlink
+.show:
+    LDA.w !Menu_CursorBlink
+    LSR A
+    RTS
+
+; $C2:8B85 — Menu_CursorPosAB (14 bytes, $8B85–$8B92)
+; The sprite position for cursor index A: with M=1, A = X + 2 and B = Y -
+; 1 of its Menu_CursorPos record (X = the record offset,
+; Menu_CursorRecOffset). With M=0 (Menu_CursorStepD) the 16-bit loads
+; give A = the X/Y word + 2 instead (see there).
+; Callers (3 JSR sites): Menu_CursorThreadB ($C2:8A50), Menu_CursorStepC ($C2:8AC5) and
+;   Menu_CursorStepD ($C2:8B57).
+; Entry: M=1 (or 0 as above), X any, DP any, DB=$7E; A = the index (low
+;        byte)
+; Exit:  M as on entry; A (and B) as above; X = the record offset; Y
+;        unchanged
+; Calls: Menu_CursorRecOffset.
+Menu_CursorPosAB:
+    JSR Menu_CursorRecOffset
+    LDA.w Menu_CursorPos.Y,X
+    DEC A
+    XBA
+    LDA.w Menu_CursorPos.X,X
+    INC A
+    INC A
+    RTS
+
+; $C2:8B93 — Menu_StartListArrows (19 bytes, $8B93–$8BA5)
+; Menu_ArrowsOff = 0 and starts Menu_ListArrowsThread in slot 4.
+; Callers (7 JSR sites): unmatched ($C2:A193, $C2:A4A3, $C2:AE02, $C2:B9DA, $C2:CB5A, $C2:DCB3,
+;   $C2:DEC2).
+; Entry: M, X any (P saved; SEP #$20 / REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; A = Menu_ThNewWait1, X = $20; Y unchanged
+; Calls: Menu_StartThread.
+Menu_StartListArrows:
+    PHP
+    SEP #$20
+    STZ.w !Menu_ArrowsOff
+    REP #$30
+    LDA.w #Menu_ListArrowsThread
+    LDX.w #!Menu_ArrowsSlot
+    JSR Menu_StartThread
+    PLP
+    RTS
+
+; $C2:8BA6 — Menu_Times4 (18 bytes, $8BA6–$8BB7)
+; A = the low byte of A x 4, through the hardware multiplier (two XBAs
+; and a NOP as the wait).
+; Callers (6 JSR sites): unmatched ($C2:9F17, $C2:9FBE, $C2:A49A, $C2:B6F2, $C2:B7BA, $C2:BB76).
+; Entry: M=1 (8-bit), X any, DP any, DB any (long registers)
+; Exit:  M=1; A = (A x 4) AND $FF; B unchanged; X, Y unchanged
+; No calls.
+Menu_Times4:
+    STA.l WRMPYA
+    LDA.b #4
+    STA.l WRMPYB
+    XBA
+    XBA
+    NOP
+    LDA.l RDMPYL
+    RTS
+
+; $C2:8BB8 — Menu_ListArrowsThread (126 bytes, $8BB8–$8C35)
+; Thread (slot 4): each frame counts Menu_ArrowTimer (7..0) and toggles
+; bit 0 of Menu_ArrowBlink when it wraps. In the phase with the bit set,
+; unless Menu_ArrowsOff: the arrows' Y = Menu_ArrowY + the high byte of
+; Menu_ListTop x Menu_ArrowMulA + the low byte of Menu_ListTop x
+; Menu_ArrowMulB (the down arrow 8 lower, 9 when that sum carried: the
+; ADC has no CLC), at X = Menu_ArrowX; when
+; Menu_ListRows is 0 nothing more is done; else the up arrow (sprite 1)
+; is placed when Menu_ListTop is not 0, the down arrow (sprite 2) when
+; Menu_ListTop is below Menu_ListRows. Then (also in the other phase)
+; sprites 1 and 2 get tile $22 with attributes $30 and $B0 (the down
+; arrow flipped vertically). An arrow that is not placed keeps its last
+; position.
+; Quirks, kept: X and Y are loaded with $E000 (off screen) each frame
+; but that value is never stored; the down arrow's ADC has no CLC.
+; Entry: from Menu_RunThreads (any M; X=0: the 16-bit loads), DP=$0000
+;        (Menu_Tmp00-$03), DB=$7E
+; Exit:  never returns
+; Calls: Menu_Yield.
+Menu_ListArrowsThread:
+    SEP #$20
+    LDX.w #!Menu_ArrowHidden            ; (never stored)
+    TXY
+    LDA.b #!Menu_ArrowTimerMask
+    TRB.w !Menu_ArrowTimer
+    DEC.w !Menu_ArrowTimer
+    BPL .phase
+    LDA.w !Menu_ArrowBlink
+    EOR.b #!Menu_Blink0
+    STA.w !Menu_ArrowBlink
+.phase:
+    LDA.w !Menu_ArrowBlink
+    LSR A
+    BCC .tiles
+    LDA.w !Menu_ArrowsOff
+    BNE .wait
+    LDA.w !Menu_ListTop
+    STA.l WRMPYA
+    LDA.w !Menu_ArrowMulA
+    STA.l WRMPYB
+    LDA.w !Menu_ArrowX
+    STA.b !Menu_Tmp00                   ; up arrow X
+    STA.b !Menu_Tmp02                   ; down arrow X
+    LDA.l RDMPYH
+    PHA
+    LDA.w !Menu_ArrowMulB
+    STA.l WRMPYB
+    PLA
+    CLC
+    ADC.w !Menu_ArrowY
+    ADC.l RDMPYL
+    STA.b !Menu_Tmp01                   ; up arrow Y
+    ADC.b #!Menu_ArrowGap               ; no CLC (see the header)
+    STA.b !Menu_Tmp03                   ; down arrow Y
+    LDA.w !Menu_ListRows
+    BEQ .wait
+    LDA.w !Menu_ListTop
+    BEQ .no_up
+    LDX.b !Menu_Tmp00
+    STX.w !Menu_OamCursor1
+.no_up:
+    CMP.w !Menu_ListRows
+    BCS .tiles
+    LDY.b !Menu_Tmp02
+    STY.w !Menu_OamCursor2
+.tiles:
+    LDX.w #!Menu_ArrowUpTile
+    STX.w !Menu_OamCursor1+2
+    LDX.w #!Menu_ArrowDownTile
+    STX.w !Menu_OamCursor2+2
+.wait:
+    JSR Menu_Yield
+    JMP Menu_ListArrowsThread
+
+; ============================================================
 ; Menu setup: PPU and RAM init, DMA fill/copy helpers, new-game
 ; data ($C2:940D–$C2:960A)
 ; ============================================================
@@ -22343,8 +25965,7 @@ Menu_PlayTimeLimits:
 ; Menu_PartyOrder and Menu_Config).
 ; Quirk: X=0 is also stored to $4216-$4219 (RDMPYL/H and JOY1L/H), which
 ; are read-only; the stores do nothing.
-; Callers (1 JSR site): unmatched ($C2:80F0).
-; Callers note (1 JSR site, unmatched): $C2:80F0 in Menu_InitSystems.
+; Callers (1 JSR site): Menu_InitSystems ($C2:80F0).
 ; Entry: M any, X any (P saved; sets M=1, X=0 itself), DP any and DB any
 ;        (both saved, then DP=$2100/$4200 and DB=$00)
 ; Exit:  P, DP and DB restored; A, X and Y clobbered (X = Menu_DmaZeroWord,
@@ -22527,7 +26148,7 @@ Menu_DmaClearWram:
 ; Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank
 ; $7E at address X with DMA channel 0 (stepping source, one register:
 ; WMDATA). Unlike Menu_DmaClearWram it leaves HDMAEN alone.
-; Callers (2 JSR sites): unmatched ($C2:9698, $C2:96A4).
+; Callers (3 JSR sites): unmatched ($C2:9698, $C2:96A4, $C2:972D).
 ; Entry: M any, X any (P saved; sets M=0, X=0, then M=1), DP any (not
 ;        used), DB any (saved, then $00); A (16-bit) = source address in
 ;        bank $FF, X = WRAM address, Y = byte count
@@ -22569,9 +26190,7 @@ Menu_DmaCopyFFToWram:
 ; ($80), sets Menu_Unk29AF to $0080 and zeroes $2C7C-$2C99.
 ; Each zero or $80 fill stores the first word, then an overlapping MVN
 ; (source = destination - 2, or - 1 for the party list) copies it on.
-; Callers (3 JSR sites): unmatched ($C2:8048, $C2:8D7E, $C2:E65D).
-; Callers note (3 JSR sites, unmatched): $C2:8048 in BankC2_MenuEntry, $C2:8D7E
-;   and $C2:E65D.
+; Callers (3 JSR sites): BankC2_MenuEntry ($C2:8048) and unmatched ($C2:8D7E, $C2:E65D).
 ; Entry: M any, X any (P saved; sets M=0, X=0), DP any (not used), DB=$7E
 ;        (absolute stores; the MVNs also leave DB=$7E)
 ; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the last MVN
@@ -22650,5 +26269,32 @@ Menu_ClearConfigAndFlags:
     LDY.w #!Menu_Unk0408
     LDA.w #!Menu_Unk0408Size-1
     MVN !Bank7E,bank(!MenuRom_DefaultButtonMap) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; ============================================================
+; Menu cursor record offset ($C2:EA27–$C2:EA35)
+; ============================================================
+
+org $C2EA27
+; $C2:EA27 — Menu_CursorRecOffset (15 bytes, $EA27–$EA35)
+; X = (A AND $FF) x 6: the byte offset of a 6-byte Menu_CursorPos record.
+; Callers (5 JSR sites): Menu_CursorStepA ($C2:8A13), Menu_CursorPosAB ($C2:8B85) and unmatched
+;   ($C2:C9CF, $C2:E95F, $C2:EA08).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB any; A = the
+;        index (low byte)
+; Exit:  P restored; X = the offset; A = (A AND $FF) x 2 (both bytes);
+;        Y unchanged
+; No calls.
+Menu_CursorRecOffset:
+    PHP
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    PHA
+    ASL A
+    ADC.b 1,S                           ; x 4 + x 2 (C=0 from the ASL)
+    TAX
+    PLA
     PLP
     RTS
