@@ -5284,6 +5284,400 @@ Oam_UploadShadow:
     RTS
 
 ; ============================================================
+; The field's IRQ ($C0:ECCC–$C0:F05D)
+; NmiHandler enables the V-count IRQ each frame (Nmi_Nmitimen), and
+; Scene_ResumeNmi sets VTIMEL to Scene_VIrqLine (line 211), so the IRQ
+; fires near the bottom of the picture. It blanks the screen there and
+; uses the rest of the frame for VRAM writes the NMI does not do: the
+; tile animations' tilemap words and (through Irq_UnkF05E) something
+; that runs while Field_Unk63 is not negative (the message choice
+; cursor, probably; not analysed).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:ECCC — IrqHandler (73 bytes, $ECCC–$ED14)
+; Reached through the RAM trampoline InstallIRQ writes (JML IrqHandler
+;   at IrqTrampoline). Saves A, X, Y (16-bit), D and DB. Nothing more
+;   happens when bit 7 of Field_Unk0F is set (TIMEUP is then not read,
+;   so the IRQ flag stays set; who sets that bit is not traced) or when
+;   TIMEUP bit 7 is clear (not a timer IRQ). Else: NMITIMEN =
+;   NMITIMEN_NmiJoy (the V-count IRQ off until the next NMI), DB = $00,
+;   a wait for H-blank (HVBJOY bit 6), INIDISP = FORCED_BLANK, HDMAEN =
+;   0, and by Field_Unk53 bit 0 (Field_Unk53Phase, which
+;   EngFD_UnkC2C1 flips each frame): clear, Irq_UploadTileAnim; set,
+;   FdVec_FFFD (bank $FD, unmatched). So the tile writes happen every
+;   other frame. The RTS after the RTI ($ED14) is never reached.
+; Callers note: entered only as the IRQ (IrqTrampoline).
+; On entry: any state (an interrupt): it sets REP #$30 and then M=1;
+;   DP is the interrupted code's (Field_Unk0F and Field_Unk53 are read
+;   through DP_Field absolute / long, not dp); DB any until it sets
+;   $00.
+; Exit: RTI with A, X, Y, D, DB and P restored; Irq_UploadTileAnim /
+;   FdVec_FFFD's writes.
+; ------------------------------------------------------------
+IrqHandler:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHD
+    PHB
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk0F
+    BMI .done
+    LDA.l TIMEUP
+    BPL .done                           ; not the timer IRQ
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.l NMITIMEN
+    LDA.b #$00
+    PHA
+    PLB                                 ; DB = $00
+.wait_hblank:
+    LDA.w HVBJOY
+    BIT.b #!HVBJOY_HBlank
+    BEQ .wait_hblank
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    LDA.b #$00
+    STA.w HDMAEN
+    LDA.w !DP_Field+!Field_Unk53
+    AND.b #!Field_Unk53Phase
+    BNE .phase1
+    JSR Irq_UploadTileAnim
+    BRA .done
+.phase1:
+    JSL FdVec_FFFD
+.done:
+    REP #$30
+    PLB
+    PLD
+    PLY
+    PLX
+    PLA
+    RTI
+    RTS                                 ; dead: after the RTI
+
+; ------------------------------------------------------------
+; $C0:ED15 — Irq_UploadTileAnim (841 bytes, $ED15–$F05D)
+; With DP = DP_Field (set here and left set; IrqHandler restores D):
+;   Irq_UnkF05E when Field_Unk63 is not negative; then one queued
+;   tilemap job, by Field_VramQueueFlags:
+; - VramQueue_TileAnim (a Mode*_Handler ran): the new metatiles'
+;   four tilemap words (Map_Meta12TL/TR/BL/BR of metatile $100 + state,
+;   TileAnim_MetaPage) go to the VRAM addresses in TileAnim_VramAddrs,
+;   4 per map tile, by TileAnim_PairCount: 0, metatiles $1E7, $1E5
+;   (the lower and upper tile of an $E6 column); 1, $1ED, $1E9, $1EF,
+;   $1EB (a 2x2 block: bottom-left, top-left, bottom-right, top-right);
+;   2 or more, $1FB, $1F7, $1F3, $1FD, $1F9, $1F5 (a 2x3 block, left
+;   column bottom up, then the right one). The metatiles are fixed: the
+;   writes assume each tile's start state (TileAnim_ModeE6 /
+;   ColumnTop, ModeEC / EE / Box2*, ModeFA / FC / Box3*) plus 1, in
+;   the pass order the handlers fill TileAnim_VramAddrs (ModeEE / FC
+;   start from the right-hand tile; how their passes are ordered is not
+;   checked here). Then VramQueue_TileAnim is cleared.
+; - else VramQueue_TileStep (DefaultHandler's single tile): metatile
+;   $1FF (TileAnim_StepKind 0, from $FE) or $1E1 (kind 1, from $E0) to
+;   TileAnim_StepVramAddrs; VramQueue_TileStep cleared.
+; One job per call: a step queued with an animation waits for the next
+;   IRQ that runs this.
+; Callers (1 JSR site): IrqHandler ($C0:ED03).
+; On entry: M=1 (8-bit A), X any (not used), DP any (set here), DB=$00
+;   (VMAIN/VMADDL/VMDATAL and TileAnim_VramAddrs absolute; the
+;   metatiles long).
+; Exit: M=1, DP = DP_Field, DB unchanged; A clobbered; X and Y as
+;   Irq_UnkF05E leaves them; Field_VramQueueFlags bit cleared.
+; ------------------------------------------------------------
+Irq_UploadTileAnim:
+    REP #$20
+    LDA.w #!DP_Field
+    TCD
+    SEP #$20
+    LDA.b !Field_Unk63
+    BMI .tile_anim_test
+    JSR Irq_UnkF05E
+.tile_anim_test:
+    LDA.b !Field_VramQueueFlags
+    BIT.b #!VramQueue_TileAnim
+    BNE .tile_anim
+    BRL .step_test
+.tile_anim:
+    LDA.b !TileAnim_PairCount
+    BNE .more
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeE6+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ColumnTop+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.more:
+    DEC A
+    BEQ .four
+    BRL .six
+.four:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeEC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box2TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+16
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+18
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+20
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+22
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeEE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+24
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+26
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+28
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+30
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box2TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.six:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_VramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeFA+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+8
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+10
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+12
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+14
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3MidLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+16
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+18
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+20
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+22
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3TopLeft+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+24
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+26
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+28
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+30
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_ModeFC+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+32
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+34
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+36
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+38
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3MidRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+40
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+42
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+44
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_VramAddrs+46
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_Box3TopRight+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileAnim
+    TRB.b !Field_VramQueueFlags
+    RTS
+.step_test:
+    BIT.b #!VramQueue_TileStep
+    BNE .step
+    RTS
+.step:
+    LDA.b !TileAnim_StepKind
+    BNE .step_e0
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_StepVramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_StateFE+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileStep
+    TRB.b !Field_VramQueueFlags
+    RTS
+.step_e0:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    REP #$20
+    LDA.w !TileAnim_StepVramAddrs
+    STA.w VMADDL
+    LDA.l !Map_Meta12TL+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+2
+    STA.w VMADDL
+    LDA.l !Map_Meta12TR+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+4
+    STA.w VMADDL
+    LDA.l !Map_Meta12BL+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    LDA.w !TileAnim_StepVramAddrs+6
+    STA.w VMADDL
+    LDA.l !Map_Meta12BR+((!TileAnim_StateE0+1)*8)+!TileAnim_MetaPage
+    STA.w VMDATAL
+    SEP #$20
+    LDA.b #!VramQueue_TileStep
+    TRB.b !Field_VramQueueFlags
+    RTS
+
+; ============================================================
 ; $C0:0000 — ReentryVectors (14 bytes)
 ; Mid-game re-entry vector table at the start of the bank. The BRA/BRL
 ; tail-dispatches to the target routine.
@@ -28837,10 +29231,12 @@ Scene_ReloadStep:
 ; Map_TileProps before the map is drawn. An entry is a Map_TileProps
 ; index (row << 8 | column, as Field_TileAnimX/Y); TileAnimList_Empty
 ; ($8080, bit 15 set) marks the end. Map_TileProps states, from the
-; Mode*_Handlers: $E6 a 1x2 column (both tiles $E6); $EC / $EE the
-; bottom-left / bottom-right tile of a 2x2 block (top row $E8, $EA);
-; $FA / $FC the bottom-left / bottom-right tile of a 2x3 block (rows
-; above $F6 $F8, then $F2 $F4); a handler adds 1 to each tile's state.
+; Mode*_Handlers and the metatiles Irq_UploadTileAnim then draws: $E6
+; the lower tile of a 1x2 column (the upper one $E4, probably); $EC /
+; $EE the bottom-left / bottom-right tile of a 2x2 block (top row $E8,
+; $EA); $FA / $FC the bottom-left / bottom-right tile of a 2x3 block
+; (rows above $F6 $F8, then $F2 $F4); a handler adds 1 to each tile's
+; state.
 ; ============================================================
 
 org $C028AA
@@ -28940,7 +29336,10 @@ TileAnimList_ApplyAll:
 ;   rows up $F3 / $F5.
 ; Those are the states the Mode*_Handlers leave (each adds 1), so it
 ;   assumes the other tiles of the block are still at their start
-;   states.
+;   states. Except for the $E6 column's upper tile: ModeE6_Handler adds
+;   1 to it and Irq_UploadTileAnim draws metatile $1E5 there (state
+;   $E5), while this writes $E7; probably a slip of the original (not
+;   checked in play), kept as found.
 ; Callers (1 JSR site): TileAnimList_ApplyAll ($C0:28EC).
 ; On entry: M=0 (16-bit A: the Map_TileProps index), X=0 (16-bit X/Y),
 ;   DP any (not used), DB any (long accesses).

@@ -17,8 +17,9 @@
 
 
 
-org $C0ECCC
-IrqHandler:         ; real IRQ handler; InstallIRQ points the RAM trampoline here
+org $C0F05E
+Irq_UnkF05E:        ; JSR from Irq_UploadTileAnim while Field_Unk63 is not negative (the message
+                    ; choice cursor, probably); not analysed
 
 ; --- Bank $C0 field/scene callees (names from observed behavior; Unk
 ; --- where the body has not been read closely enough to say more) ---
@@ -90,6 +91,9 @@ org $FDFFE8
 FdVec_FFE8:         ; JMP $FD:DABE; JML target of Evt_OpFF_Misc for $FF $82
 org $FDFFEB
 FdVec_FFEB:         ; JMP $FD:DA5F; JML target of Evt_OpFF_Misc for $FF $81
+org $FDFFFD
+FdVec_FFFD:         ; JMP $FD:E022; JSL from IrqHandler on the frames Field_Unk53 bit 0 is set
+                    ; (not analysed)
 org $FDFFF1
 FdVec_FFF1:         ; JMP $FD:DA00; JML target of Evt_OpFF_Misc for $FF $80
 org $FDE39C

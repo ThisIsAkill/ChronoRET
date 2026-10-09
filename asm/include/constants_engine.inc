@@ -1100,3 +1100,10 @@ endif
 !Audio_Cmd81Arg80 = $80                  ; ... and after a lost one
 !Audio_Unk1E10Set = $FF                  ; Audio_Unk1E10 before a battle (0 after it)
 !Audio_SongUnk26 = $26                   ; Audio_Cmd14's argument after a lost battle (a song, probably)
+
+; --- The field's IRQ ($C0:ECCC-$C0:F05D) ---
+!HVBJOY_HBlank = $40                     ; HVBJOY bit 6: in H-blank (IrqHandler waits for it)
+!TileAnim_MetaPage = $0800               ; Map_Meta12 offset of metatile $100: the animated tiles use
+                                         ; metatiles $100 + their Map_TileProps state
+!TileAnim_ColumnTop = $E4                ; start state of an $E6 column's upper tile, probably: the IRQ
+                                         ; draws metatile $1E5 there after ModeE6_Handler adds 1
