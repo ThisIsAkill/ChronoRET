@@ -92,30 +92,102 @@ Menu_VramRecBg2:    ; Menu_VramRec in unmatched data: VRAM $6000 = $7E:3E00 (Men
 org $C2FBFF
 Menu_VramRecBg2B:   ; Menu_VramRec in unmatched data: VRAM $6040 = $7E:3E80, $680 bytes (its first byte
                     ; is the last of Menu_VramRecBg2)
-org $C29C29
-Menu_Mode01List:    ; Menu_ModeLists entries: lists of handler addresses (not matched)
-org $C2AA34
-Menu_Mode02List:
-org $C2B353
-Menu_Mode03List:
-org $C2BF35
-Menu_Mode04List:
-org $C2C621
-Menu_Mode05List:
-org $C2CED4
-Menu_Mode06List:
-org $C2C7A6
-Menu_Mode07List:
-org $C2D4F0
-Menu_Mode0BList:
-org $C2D519
-Menu_Mode0CList:
-org $C2E1E3
-Menu_Mode0DList:
-org $C2E60B
-Menu_Mode0EList:
-org $C2FE0A
-Menu_Mode0FList:
+org $C29C31
+Menu_Mode01H0:      ; Menu_Mode01List entry 0 (not analysed)
+org $C29C39
+Menu_Mode01H1:      ; Menu_Mode01List entry 1 (not analysed)
+org $C29C70
+Menu_Mode01H2:      ; Menu_Mode01List entry 2 (not analysed)
+org $C29CA5
+Menu_Mode01H3:      ; Menu_Mode01List entry 3 (not analysed)
+org $C2AA40
+Menu_Mode02H0:      ; Menu_Mode02List entry 0 (not analysed)
+org $C2AA4A
+Menu_Mode02H1:      ; Menu_Mode02List entry 1 (not analysed)
+org $C2AA86
+Menu_Mode02H2:      ; Menu_Mode02List entry 2 (not analysed)
+org $C2AAC8
+Menu_Mode02H3:      ; Menu_Mode02List entry 3 (not analysed)
+org $C2AB4A
+Menu_Mode02H4:      ; Menu_Mode02List entry 4 (not analysed)
+org $C2AC1D
+Menu_Mode02H5:      ; Menu_Mode02List entry 5 (not analysed)
+org $C2B35D
+Menu_Mode03H0:      ; Menu_Mode03List entry 0 (not analysed)
+org $C2B365
+Menu_Mode03H1:      ; Menu_Mode03List entry 1 (not analysed)
+org $C2B36D
+Menu_Mode03H2:      ; Menu_Mode03List entry 2 (not analysed)
+org $C2B3AE
+Menu_Mode03H3:      ; Menu_Mode03List entry 3 (not analysed)
+org $C2B48E
+Menu_Mode03H4:      ; Menu_Mode03List entry 4 (not analysed)
+org $C2BF3D
+Menu_Mode04H0:      ; Menu_Mode04List entry 0 (not analysed)
+org $C2BF45
+Menu_Mode04H1:      ; Menu_Mode04List entry 1 (not analysed)
+org $C2BF6D
+Menu_Mode04H2:      ; Menu_Mode04List entry 2 (not analysed)
+org $C2BF9F
+Menu_Mode04H3:      ; Menu_Mode04List entry 3 (not analysed)
+org $C2C627
+Menu_Mode05H0:      ; Menu_Mode05List entry 0 (not analysed)
+org $C2C65D
+Menu_Mode05H1:      ; Menu_Mode05List entry 1 (not analysed)
+org $C2C6B9
+Menu_Mode05H2:      ; Menu_Mode05List entry 2 (not analysed)
+org $C2C7AC
+Menu_Mode07H0:      ; Menu_Mode07List entry 0 (not analysed)
+org $C2C7E0
+Menu_Mode07H1:      ; Menu_Mode07List entry 1 (not analysed)
+org $C2CEDC
+Menu_Mode06H0:      ; Menu_Mode06List entry 0 (not analysed)
+org $C2CEFD
+Menu_Mode06H1:      ; Menu_Mode06List entry 1 (not analysed)
+org $C2CF61
+Menu_Mode06H2:      ; Menu_Mode06List entry 2 (not analysed)
+org $C2CF92
+Menu_Mode06H3:      ; Menu_Mode06List entry 3 (not analysed)
+org $C2D4F8
+Menu_Mode0BH0:      ; Menu_Mode0BList entry 0 (not analysed)
+org $C2D506
+Menu_Mode0BH1:      ; Menu_Mode0BList entry 1 (not analysed)
+org $C2D52B
+Menu_Mode0CH0:      ; Menu_Mode0CList entry 0 (not analysed)
+org $C2D546
+Menu_Mode0CH1:      ; Menu_Mode0CList entry 1 (not analysed)
+org $C2D58B
+Menu_Mode0CH2:      ; Menu_Mode0CList entry 2 (not analysed)
+org $C2D645
+Menu_Mode0CH3:      ; Menu_Mode0CList entry 3 (not analysed)
+org $C2D690
+Menu_Mode0CH4:      ; Menu_Mode0CList entry 4 (not analysed)
+org $C2D618
+Menu_Mode0CH5:      ; Menu_Mode0CList entry 5 (not analysed)
+org $C2D6C3
+Menu_Mode0CH6:      ; Menu_Mode0CList entry 6 (not analysed)
+org $C2D715
+Menu_Mode0CH7:      ; Menu_Mode0CList entry 7 (not analysed)
+org $C2D778
+Menu_Mode0CH8:      ; Menu_Mode0CList entry 8 (not analysed)
+org $C2E1ED
+Menu_Mode0DH0:      ; Menu_Mode0DList entry 0 (not analysed)
+org $C2E21E
+Menu_Mode0DH1:      ; Menu_Mode0DList entry 1 (not analysed)
+org $C2E236
+Menu_Mode0DH2:      ; Menu_Mode0DList entry 2 (not analysed)
+org $C2E201
+Menu_Mode0DH3:      ; Menu_Mode0DList entry 3 (not analysed)
+org $C2E209
+Menu_Mode0DH4:      ; Menu_Mode0DList entry 4 (not analysed)
+org $C2E613
+Menu_Mode0EH0:      ; Menu_Mode0EList entry 0 (not analysed)
+org $C2E61B
+Menu_Mode0EH1:      ; Menu_Mode0EList entry 1 (not analysed)
+org $C2E6AE
+Menu_Mode0EH2:      ; Menu_Mode0EList entry 2 (not analysed)
+org $C2E705
+Menu_Mode0EH3:      ; Menu_Mode0EList entry 3 (not analysed)
 org $C6E74E
 BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
                     ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for

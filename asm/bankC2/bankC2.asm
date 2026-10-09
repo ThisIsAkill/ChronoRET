@@ -27885,6 +27885,38 @@ Menu_MainIconSprites:
     RTS
 
 ; ============================================================
+; Menu mode handler lists, modes 1-4
+; ============================================================
+
+org $C29C29
+; $C2:9C29 — Menu_Mode01List (8 bytes, $9C29–$9C30)
+; Menu_ModeLists entry $01: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode01List:
+    dw Menu_Mode01H0, Menu_Mode01H1, Menu_Mode01H2, Menu_Mode01H3
+
+org $C2AA34
+; $C2:AA34 — Menu_Mode02List (12 bytes, $AA34–$AA3F)
+; Menu_ModeLists entry $02: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode02List:
+    dw Menu_Mode02H0, Menu_Mode02H1, Menu_Mode02H2, Menu_Mode02H3, Menu_Mode02H4, Menu_Mode02H5
+
+org $C2B353
+; $C2:B353 — Menu_Mode03List (10 bytes, $B353–$B35C)
+; Menu_ModeLists entry $03: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode03List:
+    dw Menu_Mode03H0, Menu_Mode03H1, Menu_Mode03H2, Menu_Mode03H3, Menu_Mode03H4
+
+org $C2BF35
+; $C2:BF35 — Menu_Mode04List (8 bytes, $BF35–$BF3C)
+; Menu_ModeLists entry $04: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode04List:
+    dw Menu_Mode04H0, Menu_Mode04H1, Menu_Mode04H2, Menu_Mode04H3
+
+; ============================================================
 ; Menu window style graphics ($C2:C511–$C2:C54F)
 ; ============================================================
 
@@ -27941,6 +27973,31 @@ Menu_WindowVramRec:
     db !Bank7E
     dw !Menu_WinStyleBytes
     db $20
+
+; ============================================================
+; Menu mode handler lists, modes 5-7
+; ============================================================
+
+org $C2C621
+; $C2:C621 — Menu_Mode05List (6 bytes, $C621–$C626)
+; Menu_ModeLists entry $05: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode05List:
+    dw Menu_Mode05H0, Menu_Mode05H1, Menu_Mode05H2
+
+org $C2C7A6
+; $C2:C7A6 — Menu_Mode07List (6 bytes, $C7A6–$C7AB)
+; Menu_ModeLists entry $07: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode07List:
+    dw Menu_Mode07H0, Menu_Mode07H1, Menu_Mode05H2
+
+org $C2CED4
+; $C2:CED4 — Menu_Mode06List (8 bytes, $CED4–$CEDB)
+; Menu_ModeLists entry $06: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode06List:
+    dw Menu_Mode06H0, Menu_Mode06H1, Menu_Mode06H2, Menu_Mode06H3
 
 ; ============================================================
 ; Save slot summaries ($C2:D156–$C2:D32B)
@@ -28277,6 +28334,38 @@ Menu_ShiftLabelRight:
 ; Times Menu_DrawSlotLabel shifts each slot's label right by 2 pixels.
 Menu_SlotLabelShifts:
     db 3, 2, 2
+
+; ============================================================
+; Menu mode handler lists, modes $0B-$0E
+; ============================================================
+
+org $C2D4F0
+; $C2:D4F0 — Menu_Mode0BList (8 bytes, $D4F0–$D4F7)
+; Menu_ModeLists entry $0B: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode0BList:
+    dw Menu_Mode0BH0, Menu_Mode0BH1, Menu_Mode06H2, Menu_Mode06H3
+
+org $C2D519
+; $C2:D519 — Menu_Mode0CList (18 bytes, $D519–$D52A)
+; Menu_ModeLists entry $0C: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode0CList:
+    dw Menu_Mode0CH0, Menu_Mode0CH1, Menu_Mode0CH2, Menu_Mode0CH3, Menu_Mode0CH4, Menu_Mode0CH5, Menu_Mode0CH6, Menu_Mode0CH7, Menu_Mode0CH8
+
+org $C2E1E3
+; $C2:E1E3 — Menu_Mode0DList (10 bytes, $E1E3–$E1EC)
+; Menu_ModeLists entry $0D: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode0DList:
+    dw Menu_Mode0DH0, Menu_Mode0DH1, Menu_Mode0DH2, Menu_Mode0DH3, Menu_Mode0DH4
+
+org $C2E60B
+; $C2:E60B — Menu_Mode0EList (8 bytes, $E60B–$E612)
+; Menu_ModeLists entry $0E: the handlers Menu_MainThread runs by
+; Menu_ThreadVar (not analysed; shared ones named after the first mode).
+Menu_Mode0EList:
+    dw Menu_Mode0EH0, Menu_Mode0EH1, Menu_Mode0EH2, Menu_Mode0EH3
 
 ; ============================================================
 ; Menu main cursor: thread 3 ($C2:E91B–$C2:E97B)
@@ -29333,3 +29422,14 @@ Menu_VramRecsWin:
     dw $1E00, $E55C
     db !MenuRom_DmaCopyBank
     dw $0380
+
+; ============================================================
+; Menu mode handler list, mode $0F
+; ============================================================
+
+org $C2FE0A
+; $C2:FE0A — Menu_Mode0FList (2 bytes, $FE0A–$FE0B)
+; Menu_ModeLists entry $0F: Menu_Exit alone (it never returns, so no
+; second entry is read; the bytes after it are not a list).
+Menu_Mode0FList:
+    dw Menu_Exit
