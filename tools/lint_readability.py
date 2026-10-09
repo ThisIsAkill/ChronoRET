@@ -55,6 +55,22 @@ asm/include/ and are exempt):
          unless another line of the same header states both. Tables and
          sub-entries are exempt, as for HEADER.
 
+  INDEX  an Exit claim that X or Y is unchanged (kept, preserved, intact,
+         as on entry, ...) holds for a caller entering with X=0: no path
+         through the routine or its callees sets the X flag (SEP #$10/#$30,
+         a PLP restoring X=1, a callee returning with X=1) and leaves the
+         register without its high byte. Wording that already says so
+         ("Y's low byte kept, high byte cleared", "with X=1 at entry") and
+         an Entry line declaring X=1 pass; a claim limited to some paths
+         ("else Y unchanged") fails only when no exit keeps the register.
+         Code the analysis cannot follow gives no finding. See
+         tools/index_claims.py (`--explain NAME` shows its reasoning). The
+         findings are cached in build/index_lint.json by a hash of asm/,
+         the ROM and the tools, so an unchanged tree costs nothing; the
+         analysis itself takes a few seconds. Needs the ROM and asar.
+         Opt out with `lint-ok:` on the label line or on a line of the
+         Exit paragraph.
+
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
 line. CALLERS cannot be opted out of.
@@ -452,6 +468,9 @@ def header_findings(path: Path):
     xr = _xref()
     if xr is None:
         return findings
+    for fpath, function, no, text in _index_findings():
+        if fpath == str(path):
+            findings.append((function, no, 'INDEX', text))
     import callers
     want = callers.Generator(xr).expected(regions)
     for r in regions:
@@ -461,6 +480,17 @@ def header_findings(path: Path):
                              f'{r.name}: the Callers block is not what tools/callers.py generates '
                              f'from the confirmed call sites: run tools/callers.py --update'))
     return findings
+
+
+_INDEX = []     # INDEX findings for the whole tree, computed once per run
+
+
+def _index_findings():
+    """INDEX (tools/index_claims.py), cached in build/ by source hash."""
+    if not _INDEX:
+        import index_claims
+        _INDEX.append(index_claims.findings(_xref) or [])
+    return _INDEX[0]
 
 
 def collect():
