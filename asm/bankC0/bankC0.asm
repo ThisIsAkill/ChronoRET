@@ -12938,6 +12938,648 @@ Evt_OpFF9D_ClearPush:
     RTS
 
 ; ============================================================
+; Event opcodes: character and sprite objects ($C0:41E4–$C0:458F)
+; Entered as the other opcode handlers (see the banner of the call
+; opcodes at $C0:5F6E); run from an object's init function, they make
+; Obj_Cur a playable character's object or give it a sprite. A sprite
+; record (RomE4_SprRec, SprRec_Bytes each; records 0-6 are the seven
+; characters, which the character opcodes load by their number) holds
+; five indexes: SprRec_Gfx into the 3-byte pointers at Field_E4Ptr0
+; (Obj_GfxOfs / Obj_GfxBank), SprRec_Frames into those at Field_E4Ptr1
+; (Obj_FrameOfs / Obj_FrameBank), SprRec_Pal x Pal_ObjColorBytes
+; (Obj_PalSrc), SprRec_Anim into the word tables at Field_E4Ptr2 /
+; Field_E4Ptr3 (Obj_AnimFrameTbl / Obj_AnimTimeTbl, with
+; Obj_AnimFacingStride = the gap to the next entry / 4), and
+; SprRec_Size (Obj_SprSize).
+; ============================================================
+
+; ------------------------------------------------------------
+; $C0:41E4 — Evt_Op57_InitChar0 (8 bytes, $41E4–$41EB)
+; Event opcode $57 (1 byte): Chr_ObjSlot[0] = Obj_Cur, then
+;   Evt_InitCharTail with character 0 (see Evt_Op80_InitCharObj). The
+;   opcodes $5C, $62, $68, $6A, $6C and $6D do the same for characters
+;   1, 2, 4, 3, 5 and 6 (the order Party_ReinitIfChanged re-runs them).
+; Reached through Evt_OpcodeTable (opcode $57).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur,
+;   Chr_ObjSlot and EvtChar_Id are dp), DB=$00 (as Evt_InitCharCommon);
+;   Y = the opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, the next opcode, C=1).
+; ------------------------------------------------------------
+Evt_Op57_InitChar0:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot
+    LDA.b #$00
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:41EC — Evt_Op5C_InitChar1 (8 bytes, $41EC–$41F3)
+; Event opcode $5C (1 byte): as Evt_Op57_InitChar0 for character 1.
+; Reached through Evt_OpcodeTable (opcode $5C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op5C_InitChar1:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+1
+    LDA.b #$01
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:41F4 — Evt_Op62_InitChar2 (8 bytes, $41F4–$41FB)
+; Event opcode $62 (1 byte): as Evt_Op57_InitChar0 for character 2.
+; Reached through Evt_OpcodeTable (opcode $62).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op62_InitChar2:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+2
+    LDA.b #$02
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:41FC — Evt_Op68_InitChar4 (8 bytes, $41FC–$4203)
+; Event opcode $68 (1 byte): as Evt_Op57_InitChar0 for character 4.
+; Reached through Evt_OpcodeTable (opcode $68).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op68_InitChar4:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+4
+    LDA.b #$04
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:4204 — Evt_Op6A_InitChar3 (8 bytes, $4204–$420B)
+; Event opcode $6A (1 byte): as Evt_Op57_InitChar0 for character 3.
+; Reached through Evt_OpcodeTable (opcode $6A).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op6A_InitChar3:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+3
+    LDA.b #$03
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:420C — Evt_Op6C_InitChar5 (8 bytes, $420C–$4213)
+; Event opcode $6C (1 byte): as Evt_Op57_InitChar0 for character 5.
+; Reached through Evt_OpcodeTable (opcode $6C).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op6C_InitChar5:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+5
+    LDA.b #$05
+    BRA Evt_InitCharTail
+
+; ------------------------------------------------------------
+; $C0:4214 — Evt_Op6D_InitChar6 (10 bytes, $4214–$421D; the store from
+;   $421A on is the sub-entry Evt_InitCharTail)
+; Event opcode $6D (1 byte): as Evt_Op57_InitChar0 for character 6, then
+;   falls into Evt_InitCharTail, which stores A (the character) in
+;   EvtChar_Id and BRAs to Evt_InitCharCommon; the other one-byte
+;   character opcodes BRA to it.
+; Reached through Evt_OpcodeTable (opcode $6D).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00; Y = the
+;   opcode's offset in Evt_Data. Evt_InitCharTail: A = the character.
+; Exit: as Evt_InitCharCommon (X = Y + 1, C=1).
+; ------------------------------------------------------------
+Evt_Op6D_InitChar6:
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+6
+    LDA.b #$06
+Evt_InitCharTail:                       ; header: see Evt_Op6D_InitChar6
+    STA.b !EvtChar_Id
+    BRA Evt_InitCharCommon
+
+; ------------------------------------------------------------
+; $C0:421E — Evt_Op80_InitCharObj (600 bytes, $421E–$4475; from $426A on
+;   the sub-entry Evt_InitCharCommon)
+; Event opcode $80 (2 bytes: $80, char): Chr_ObjSlot[char] = Obj_Cur
+;   (char 0-6; a larger one stores nothing), then Evt_InitCharCommon,
+;   which the one-byte character opcodes reach too (EvtChar_Id = the
+;   character, Y = the offset of the opcode's last byte):
+;   - not in Party_Members: Obj_Unk1100 = Obj_Unk1100Skip (its script is
+;     never queued), Obj_Unk1101 = char; X = Y + 1, C=1. No sprite.
+;   - party member k (0, 1, 2: the first of Party_Members, +1, +2 equal
+;     to char): Obj_Unk1100 = k, Obj_Unk1C80 = 0, Obj_Unk1A81 =
+;     Obj_Unk1A81On, Obj_Unk1B01 = Obj_Unk1B01Solid, Obj_Unk1101 = char,
+;     Party_ObjSlot / 1 / 2 (word) = Obj_Cur, Evt_LoadSpriteRec with
+;     record char; then Obj_TileSlot[1 + k] = Obj_Cur, Obj_VramTile =
+;     EvtChar_VramTile0/1/2, Obj_TileRecOfs = 0 / $20 / $40, Obj_Unk1000
+;     = its bit 7 | 1 (a script run every frame). Member 2 / 3 also: when
+;     ObjQ_Unk78 is nonzero it becomes ObjQ_Unk78Head and Obj_AnimTimer =
+;     0; Field_UnkAB/AC/AD = 0 (the step log reset, probably).
+;     Placement: a member 2 / 3 with a leader present takes the leader's
+;     Obj_PosX/Y and Obj_Facing (Obj_VelX = 0); the leader, or a member
+;     with none, goes to Loc_EntryX/Y with Obj_Facing = Loc_EntryFacing
+;     bits 0-1, the low byte of Obj_PosY $FF (bit 3 clear) or $7F (set)
+;     and that of Obj_PosX $80 (bit 2 clear) or $00 (set): where in the
+;     entry tile it stands. X = Y (after the record load's INY), C=1.
+; Quirk: Obj_TileSlot is written with a 16-bit STX, so the slot after
+;   1 + k gets Obj_CurHi (0) too; the next member's store overwrites it.
+; Reached through Evt_OpcodeTable (opcode $80); Evt_InitCharCommon by
+;   BRA from Evt_InitCharTail.
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur,
+;   Chr_ObjSlot, Party_ObjSlot*, Loc_Entry*, ObjQ_Unk78, Field_UnkAB-AD
+;   and the scratch are dp), DB=$00 (Obj_* tables absolute); Y = the
+;   opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = the next opcode (the
+;   opcode's offset + 2 for $80, + 1 for the one-byte ones), C=1; Y =
+;   X on the member paths, X - 1 on the other; A clobbered; EvtChar_Id
+;   = char; Evt_LoadSpriteRec's writes on the member paths.
+; ------------------------------------------------------------
+Evt_Op80_InitCharObj:
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    STA.b !EvtChar_Id
+    CMP.b #$00
+    BNE .not0
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot
+    BRA Evt_InitCharCommon
+.not0:
+    CMP.b #$01
+    BNE .not1
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+1
+    BRA Evt_InitCharCommon
+.not1:
+    CMP.b #$02
+    BNE .not2
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+2
+    BRA Evt_InitCharCommon
+.not2:
+    CMP.b #$03
+    BNE .not3
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+3
+    BRA Evt_InitCharCommon
+.not3:
+    CMP.b #$04
+    BNE .not4
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+4
+    BRA Evt_InitCharCommon
+.not4:
+    CMP.b #$05
+    BNE .not5
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+5
+    BRA Evt_InitCharCommon
+.not5:
+    CMP.b #$06
+    BNE Evt_InitCharCommon
+    LDA.b !Obj_Cur
+    STA.b !Chr_ObjSlot+6
+Evt_InitCharCommon:                     ; header: see Evt_Op80_InitCharObj
+    LDA.b !EvtChar_Id
+    CMP.l !Party_Members
+    BNE .not_leader
+    LDA.b #!Obj_Unk1100Leader
+    BRA .leader
+.not_leader:
+    CMP.l !Party_Members+1
+    BNE .not_member2
+    LDA.b #!Obj_Unk1100Member2
+    BRL .member2
+.not_member2:
+    CMP.l !Party_Members+2
+    BNE .not_member
+    LDA.b #!Obj_Unk1100Member3
+    BRL .member3
+.not_member:
+    LDA.b #!Obj_Unk1100Skip
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    LDA.b !EvtChar_Id
+    STA.w !Obj_Unk1101,X
+    TYX
+    INX
+    SEC
+    RTS
+.leader:
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    STZ.w !Obj_Unk1C80,X
+    LDA.b #!Obj_Unk1A81On
+    STA.w !Obj_Unk1A81,X
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    LDA.b !EvtChar_Id
+    STA.w !Obj_Unk1101,X
+    STX.b !Party_ObjSlot
+    JSR Evt_LoadSpriteRec
+    LDX.b !Obj_Cur
+    LDA.b !Loc_EntryX
+    STA.w !Obj_TileX,X
+    LDA.b !Loc_EntryY
+    STA.w !Obj_TileY,X
+    STX.w !Obj_TileSlot+1               ; 16-bit: slot 2 = 0 too (quirk)
+    REP #$20
+    LDA.w #!EvtChar_VramTile0
+    STA.w !Obj_VramTile,X
+    LDA.w #$0000
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7
+    ORA.b #!EvtChar_ScriptPeriod
+    STA.w !Obj_Unk1000,X
+    LDA.b !Loc_EntryFacing
+    AND.b #!Obj_FacingMask
+    STA.w !Obj_Facing,X
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubYBit
+    BNE .leader_y7f
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    BRA .leader_x
+.leader_y7f:
+    LDA.b #!EvtChar_SubYUpper
+    STA.w !Obj_PosY,X
+.leader_x:
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubXBit
+    BNE .leader_x00
+    LDA.b #!EvtChar_SubXCentre
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+.leader_x00:
+    LDA.b #$00
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+.member2:
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    STZ.w !Obj_Unk1C80,X
+    LDA.b #!Obj_Unk1A81On
+    STA.w !Obj_Unk1A81,X
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    LDA.b !EvtChar_Id
+    STA.w !Obj_Unk1101,X
+    STX.b !Party_ObjSlot1
+    JSR Evt_LoadSpriteRec
+    LDX.b !Obj_Cur
+    LDA.b !ObjQ_Unk78
+    BEQ .m2_slot
+    LDA.b #!ObjQ_Unk78Head
+    STA.b !ObjQ_Unk78
+    STZ.w !Obj_AnimTimer,X
+.m2_slot:
+    STX.w !Obj_TileSlot+2               ; 16-bit: slot 3 = 0 too (quirk)
+    REP #$20
+    LDA.w #!EvtChar_VramTile1
+    STA.w !Obj_VramTile,X
+    LDA.w #!EvtChar_TileRecOfs1
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7
+    ORA.b #!EvtChar_ScriptPeriod
+    STA.w !Obj_Unk1000,X
+    STZ.b !Field_UnkAB
+    STZ.b !Field_UnkAC
+    STZ.b !Field_UnkAD
+    LDA.b !Party_ObjSlot
+    BMI .m2_no_leader
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    TAX
+    LDA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot1
+    STA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_PosY,X
+    LDX.b !Party_ObjSlot1
+    STA.w !Obj_PosY,X
+    STZ.w !Obj_VelX,X
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    LDX.b !Party_ObjSlot1
+    STA.w !Obj_Facing,X
+    TYX
+    SEC
+    RTS
+.m2_no_leader:
+    LDA.b !Loc_EntryX
+    STA.w !Obj_TileX,X
+    LDA.b !Loc_EntryY
+    STA.w !Obj_TileY,X
+    LDA.b !Loc_EntryFacing
+    AND.b #!Obj_FacingMask
+    STA.w !Obj_Facing,X
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubYBit
+    BNE .m2_y7f
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    BRA .m2_x
+.m2_y7f:
+    LDA.b #!EvtChar_SubYUpper
+    STA.w !Obj_PosY,X
+.m2_x:
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubXBit
+    BNE .m2_x00
+    LDA.b #!EvtChar_SubXCentre
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+.m2_x00:
+    LDA.b #$00
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+.member3:
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    STZ.w !Obj_Unk1C80,X
+    LDA.b #!Obj_Unk1A81On
+    STA.w !Obj_Unk1A81,X
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    LDA.b !EvtChar_Id
+    STA.w !Obj_Unk1101,X
+    STX.b !Party_ObjSlot2
+    JSR Evt_LoadSpriteRec
+    LDX.b !Obj_Cur
+    LDA.b !ObjQ_Unk78
+    BEQ .m3_slot
+    LDA.b #!ObjQ_Unk78Head
+    STA.b !ObjQ_Unk78
+    STZ.w !Obj_AnimTimer,X
+.m3_slot:
+    STX.w !Obj_TileSlot+3               ; 16-bit: slot 4 = 0 too (quirk)
+    REP #$20
+    LDA.w #!EvtChar_VramTile2
+    STA.w !Obj_VramTile,X
+    LDA.w #!EvtChar_TileRecOfs2
+    STA.w !Obj_TileRecOfs,X
+    SEP #$20
+    LDA.w !Obj_Unk1000,X
+    AND.b #!Obj_Unk1000Bit7
+    ORA.b #!EvtChar_ScriptPeriod
+    STA.w !Obj_Unk1000,X
+    STZ.b !Field_UnkAB
+    STZ.b !Field_UnkAC
+    STZ.b !Field_UnkAD
+    LDA.b !Party_ObjSlot
+    BMI .m3_no_leader
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    TAX
+    LDA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot2
+    STA.w !Obj_PosX,X
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_PosY,X
+    LDX.b !Party_ObjSlot2
+    STA.w !Obj_PosY,X
+    STZ.w !Obj_VelX,X
+    SEP #$20
+    LDX.b !Party_ObjSlot
+    LDA.w !Obj_Facing,X
+    LDX.b !Party_ObjSlot2
+    STA.w !Obj_Facing,X
+    TYX
+    SEC
+    RTS
+.m3_no_leader:
+    LDA.b !Loc_EntryX
+    STA.w !Obj_TileX,X
+    LDA.b !Loc_EntryY
+    STA.w !Obj_TileY,X
+    LDA.b !Loc_EntryFacing
+    AND.b #!Obj_FacingMask
+    STA.w !Obj_Facing,X
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubYBit
+    BNE .m3_y7f
+    LDA.b #!EvtChar_SubYLower
+    STA.w !Obj_PosY,X
+    BRA .m3_x
+.m3_y7f:
+    LDA.b #!EvtChar_SubYUpper
+    STA.w !Obj_PosY,X
+.m3_x:
+    LDA.b !Loc_EntryFacing
+    BIT.b #!Loc_EntrySubXBit
+    BNE .m3_x00
+    LDA.b #!EvtChar_SubXCentre
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+.m3_x00:
+    LDA.b #$00
+    STA.w !Obj_PosX,X
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4476 — Evt_Op81_InitSprite (225 bytes, $4476–$4556; from $448D
+;   on the sub-entry Evt_LoadSpriteRec)
+; Event opcode $81 (2 bytes: $81, record): Obj_Cur becomes an object
+;   with sprite record `record`: Obj_Unk1100 = Obj_Unk1100Kind3,
+;   Obj_Unk1B01 = Obj_Unk1B01Solid, Obj_Unk1101 = record, then
+;   Evt_LoadSpriteRec. X = Y + 2, C=1.
+; Evt_LoadSpriteRec (A = the record number, Y = the offset of the byte
+;   before the next opcode; Evt_InitCharCommon JSRs it with a
+;   character's number) loads RomE4_SprRec record A into Obj_Cur's
+;   Obj_FrameOfs/FrameBank, Obj_PalSrc, Obj_AnimFacingStride /
+;   AnimFrameTbl / AnimTimeTbl, Obj_SprSize and Obj_GfxOfs/GfxBank (see
+;   the banner), sets Obj_PrioLow/High = EvtSpr_PrioInit (OAM priority
+;   bit 1 in both), Obj_AnimRow = Obj_AnimColumn = 0 and Obj_Facing =
+;   Obj_FacingDown; Y + 1 is kept in EvtOp_SavedPos and returned in X
+;   and Y, with C=1.
+; Quirk: the ADC of Obj_PalSrcBase ($0000) to the palette offset adds
+;   nothing.
+; Reached through Evt_OpcodeTable (opcode $81).
+; Callers of Evt_LoadSpriteRec (3 JSR sites): Evt_InitCharCommon ($C0:42B5, $C0:4329, $C0:43DC).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur, the
+;   Field_E4Ptr* pointers and the scratch are dp), DB=$00 (Obj_* tables
+;   and the multiplier absolute); Y = the opcode's offset in Evt_Data.
+; Exit: M=1, X=0, DP and DB unchanged; X = Y = EvtOp_SavedPos = the
+;   opcode + 2 (Evt_LoadSpriteRec: the entry Y + 1), C=1; A clobbered;
+;   EvtSpr_RecOfs and EvtSpr_Idx written.
+; ------------------------------------------------------------
+Evt_Op81_InitSprite:
+    LDA.b #!Obj_Unk1100Kind3
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    LDA.b #!Obj_Unk1B01Solid
+    STA.w !Obj_Unk1B01,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1101,X
+Evt_LoadSpriteRec:                      ; header: see Evt_Op81_InitSprite
+    STA.w WRMPYA
+    INY
+    LDA.b #!SprRec_Bytes
+    STA.w WRMPYB
+    STY.b !EvtOp_SavedPos
+    NOP                                 ; wait for the product
+    NOP
+    NOP
+    LDX.w RDMPYL
+    STX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_SprRec+!SprRec_Frames,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr1],Y
+    LDX.b !Obj_Cur
+    STA.w !Obj_FrameOfs,X
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr1],Y
+    STA.w !Obj_FrameBank,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_SprRec+!SprRec_Pal,X
+    STA.w WRMPYA
+    LDA.b #!Pal_ObjColorBytes
+    STA.w WRMPYB
+    NOP                                 ; wait for the product
+    NOP
+    NOP
+    REP #$20
+    LDA.w RDMPYL
+    CLC
+    ADC.w #!Obj_PalSrcBase              ; adds 0 (quirk)
+    LDX.b !Obj_Cur
+    STA.w !Obj_PalSrc,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_SprRec+!SprRec_Anim,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    INY
+    INY
+    LDA.b [!Field_E4Ptr2],Y             ; the next entry
+    SEC
+    DEY
+    DEY
+    SBC.b [!Field_E4Ptr2],Y
+    LSR A
+    LSR A
+    LDX.b !Obj_Cur
+    STA.w !Obj_AnimFacingStride,X
+    LDA.b [!Field_E4Ptr2],Y
+    STA.w !Obj_AnimFrameTbl,X
+    LDA.b [!Field_E4Ptr3],Y
+    STA.w !Obj_AnimTimeTbl,X
+    SEP #$20
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_SprRec+!SprRec_Size,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_SprSize,X
+    LDX.b !EvtSpr_RecOfs
+    LDA.l !RomE4_SprRec+!SprRec_Gfx,X
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    STA.b !EvtSpr_Idx
+    CLC
+    ADC.b !EvtSpr_Idx
+    ADC.b !EvtSpr_Idx                   ; x 3: a 24-bit pointer
+    TAY
+    LDA.b [!Field_E4Ptr0],Y
+    LDX.b !Obj_Cur
+    STA.w !Obj_GfxOfs,X
+    SEP #$20
+    INY
+    INY
+    LDA.b [!Field_E4Ptr0],Y
+    STA.w !Obj_GfxBank,X
+    REP #$20
+    LDA.w #!EvtSpr_PrioInit
+    STA.w !Obj_PrioLow,X                ; and Obj_PrioHigh
+    SEP #$20
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,X
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    LDY.b !EvtOp_SavedPos
+    TYX
+    SEC
+    RTS
+
+; ------------------------------------------------------------
+; $C0:4557 — Evt_InitWramSprite (57 bytes, $4557–$458F)
+; The common start of the event opcodes $82 and $83 (JSR from $C0:4592
+;   and $C0:46E1, with A = the Obj_Unk1100 kind, 4 or 5): Obj_Unk1100 =
+;   A, Obj_Unk1101 = the operand after the opcode (also left in WRMPYA
+;   for the caller's record product), Obj_GfxOfs = ObjQ_Unk71 with
+;   Obj_GfxBank = $7F (the graphics go to WRAM there, unpacked by the
+;   caller), Obj_PrioLow/High = EvtSpr_PrioInit, Obj_Facing =
+;   Obj_FacingDown, Obj_AnimRow = Obj_AnimColumn = 0. Returns Y = the
+;   opcode's offset + 2, C=0.
+; Callers (2 JSR sites): unmatched ($C0:4592, $C0:46E1).
+; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Obj_Cur and
+;   ObjQ_Unk71 are dp), DB=$00 (Obj_* tables and the multiplier
+;   absolute); Y = the opcode's offset in Evt_Data; A = the kind.
+; Exit: M=1, X=0, DP and DB unchanged; Y = the opcode + 2, C=0; X =
+;   Obj_Cur; A = 0.
+; ------------------------------------------------------------
+Evt_InitWramSprite:
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1100,X
+    INY
+    TYX
+    LDA.l !Evt_Data,X
+    LDX.b !Obj_Cur
+    STA.w !Obj_Unk1101,X
+    STA.w WRMPYA
+    REP #$20
+    LDA.b !ObjQ_Unk71
+    STA.w !Obj_GfxOfs,X
+    LDA.w #!EvtSpr_PrioInit
+    STA.w !Obj_PrioLow,X
+    SEP #$20
+    LDA.b #!Bank7F
+    STA.w !Obj_GfxBank,X
+    LDA.b #!Obj_FacingDown
+    STA.w !Obj_Facing,X
+    LDA.b #!ObjAnim_RowStand
+    STA.w !Obj_AnimRow,X
+    LDA.b #$00
+    STA.w !Obj_AnimColumn,X
+    INY
+    CLC
+    RTS
+
+; ============================================================
 ; $C0:75A0 — Map_ClearBufC800 (73 bytes, $75A0–$75E8)
 ; (was Map_Unk75A0.) Zeroes the 2 KB WRAM buffer Map_BufC800
 ; ($7E:C800–$7E:CFFF) that Field_BuildC800Mode1/2/4 fill: the first MVN

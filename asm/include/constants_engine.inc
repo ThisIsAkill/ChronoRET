@@ -890,8 +890,9 @@ endif
 !BankC2Cmd_Unlist = $05                  ; ... empty its place in Menu_PartyOrder
 !BankC2Cmd_Unk0A = $0A                   ; ... not traced (Y = a character, probably; X = an argument)
 !BankC2Cmd_ItemCount = $0C               ; ... A = the count of item X held (X, not Y)
-!ObjQ_Unk78Set1 = $01                    ; ObjQ_Unk78 value Evt_OpD3_AddCharToParty stores (only 2 is
-                                         ; tested by Obj_AnimTickAndQueue)
+!ObjQ_Unk78Set1 = $01                    ; ObjQ_Unk78 value Evt_OpD3_AddCharToParty stores; the next
+                                         ; member 2 / 3 Evt_InitCharCommon sets up turns it into
+                                         ; ObjQ_Unk78Head
 !Obj_Unk1100Leader = $00                 ; Obj_Unk1100 of the leader's object (Evt_OpB0_PartyControl's
                                          ; kind 0)
 !Obj_Unk1100Member2 = $01                ; ... of party member 2 (kind 1); member 3 is kind 2
@@ -952,3 +953,34 @@ endif
 !EvtFF_SubFFEB = $81                     ; ... JML FdVec_FFEB
 !EvtFF_SubFFE8 = $82                     ; ... JML FdVec_FFE8 ($83-$8F: FdVec_FFE5)
 !EvtFF_FadeLast = $01                    ; Evt_OpFF_Misc's fade steps while Fade_Brightness >= this
+
+; --- Event character and sprite-object opcodes ($57-$6D one-byte, $80, $81) ---
+!Obj_Unk1100Member3 = $02                ; Obj_Unk1100 of party member 3's object (kind 2)
+!Obj_Unk1100Kind3 = $03                  ; Obj_Unk1100 Evt_Op81_InitSprite gives its object
+!Obj_Unk1A81On = $01                     ; Obj_Unk1A81 the character opcodes set (frames built)
+!ObjQ_Unk78Head = $02                    ; ObjQ_Unk78: Obj_AnimTickAndQueue queues the next kind-1/2
+                                         ; object at the head once
+!Obj_FacingMask = $03                    ; Obj_Facing values 0-3 (Loc_EntryFacing bits 0-1)
+!Loc_EntrySubYBit = $08                  ; Loc_EntryFacing bit 3: Obj_PosY low byte EvtChar_SubYUpper
+!Loc_EntrySubXBit = $04                  ; Loc_EntryFacing bit 2: Obj_PosX low byte 0
+!EvtChar_SubYLower = $FF                 ; Obj_PosY low byte with bit 3 clear (the tile's last line)
+!EvtChar_SubYUpper = $7F                 ; ... with bit 3 set (half way down)
+!EvtChar_SubXCentre = $80                ; Obj_PosX low byte with bit 2 clear (half way across)
+!EvtChar_ScriptPeriod = $01              ; Obj_Unk1000 low bits for a party member: a run every frame
+!EvtChar_VramTile0 = $0008               ; Obj_VramTile of the leader's object
+!EvtChar_VramTile1 = $0020               ; ... of member 2's
+!EvtChar_VramTile2 = $0028               ; ... of member 3's
+!EvtChar_TileRecOfs1 = $0020             ; Obj_TileRecOfs of member 2's object (the leader's is 0)
+!EvtChar_TileRecOfs2 = $0040             ; ... of member 3's
+!RomE4_SprRec = $E4F000                  ; ROM: sprite records, SprRec_Bytes each (records 0-6: the
+                                         ; seven characters)
+!SprRec_Gfx = 0                          ; record byte: index of a 3-byte pointer at Field_E4Ptr0
+!SprRec_Frames = 1                       ; ... of a 3-byte pointer at Field_E4Ptr1
+!SprRec_Pal = 2                          ; ... palette number (x Pal_ObjColorBytes: Obj_PalSrc)
+!SprRec_Anim = 3                         ; ... of a word at Field_E4Ptr2 / Field_E4Ptr3
+!SprRec_Size = 4                         ; ... Obj_SprSize
+!SprRec_Bytes = 5                        ; bytes per RomE4_SprRec record
+!Pal_ObjColorBytes = $18                 ; bytes of one Obj_PalSrc colour set (12 colours)
+!Obj_PalSrcBase = $0000                  ; added to the palette offset (nothing)
+!EvtSpr_PrioInit = $2020                 ; Obj_PrioLow/High word: OAM attribute bit 5 (priority bit 1)
+                                         ; in both (FieldBtl_PcPrio's bit)

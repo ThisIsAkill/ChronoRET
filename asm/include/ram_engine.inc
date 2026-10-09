@@ -385,8 +385,8 @@ if !ram_engine_inc == 0
                                          ; the opcode's offset (Y) across the walk opcode they run
 !EvtOp_SavedPos = $C7                    ; alias of ObjFront_SavedY's slot in the opcodes $33 and
                                          ; $C7-$D7: 16-bit, an Evt_Data offset kept across a call
-!EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6: the character
-                                         ; operand (16-bit in $D3, low byte in $D4/$D6)
+!EvtChar_Id = $D9                        ; alias of Eng_Scratch in opcodes $D3/$D4/$D6 and the character
+                                         ; opcodes: the character (16-bit in $D3, else the low byte)
 !EvtChar_Obj = $DB                       ; alias of Oam_Range1LoPtr's slot in opcode $D3: 8-bit, the
                                          ; character's object (Chr_ObjSlot)
 !EvtWarp_Word = $D9                      ; alias of Eng_Scratch in opcodes $DC-$E1: 16-bit location
@@ -408,6 +408,9 @@ if !ram_engine_inc == 0
 !EvtQuad_Left = $EE                      ; alias of FieldBtl_RecFlags's slot there: 8-bit values left
 !EvtFF_Sub = $DF                         ; alias of EvtCall_NewLevel's slot in Evt_OpFF_Misc: 8-bit,
                                          ; the opcode's second byte
+!EvtSpr_RecOfs = $BF                     ; 16-bit dp scratch of Evt_LoadSpriteRec (and opcodes $82/$83):
+                                         ; the record number x its record size (no other use known)
+!EvtSpr_Idx = $D9                        ; alias of Eng_Scratch there: 16-bit record index byte
 !EvtParty_SavedY = $C7                   ; alias of ObjFront_SavedY's slot in Evt_OpD9/Evt_OpDA:
                                          ; 16-bit, the opcode's offset (Y)
 !EvtParty_SavedX = $C3                   ; alias of Spr_BaseX in Evt_OpDA_PartyGather: 16-bit X (the
@@ -603,7 +606,10 @@ if !ram_engine_inc == 0
 !ObjQ_Unk69 = $69                        ; 16-bit; Scene_PostLoadInit sets ObjQ_Unk69Init;
                                          ; Vblank_ReadScanlineCounters stops running scripts once the
                                          ; V counter reaches it (unless past line 240)
-!ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; no reader traced
+!ObjQ_Unk71 = $71                        ; 16-bit; Evt_InitObjects sets ObjQ_Unk71Init; the next free
+                                         ; byte of a bank-$7F graphics area: Evt_InitWramSprite points
+                                         ; Obj_GfxOfs at it (opcodes $82/$83 unpack there and add the
+                                         ; length)
 !ObjQ_Unk73 = $73                        ; 8-bit; zeroed by Evt_InitObjects; no reader traced
 !ObjQ_Unk74 = $74                        ; 8-bit; ObjQ_Empty at load (Evt_InitObjects): the head of
                                          ; the list of objects whose script is due (linked through
