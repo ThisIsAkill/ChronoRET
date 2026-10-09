@@ -69,7 +69,7 @@ if !ram_engine_inc == 0
                                          ; Field_SceneChangeTick
 
 ; --- Field state flags (dp) ---
-!Field_Unk0F = $0F                       ; 8-bit; only zeroed (Field_InitLoadState) in matched code
+!Field_Unk0F = $0F                       ; 8-bit; zeroed by Field_InitLoadState, set to $80 by Field_HookLeaveToBankC3; bit 7 stops IrqHandler
 !Field_Unk10 = $10                       ; 8-bit; must be 0 for the menu/pause entry paths in
                                          ; Field_PauseAndMenuInput and Field_FadeToBankC2Mode5
 !Field_Unk11 = $11                       ; 8-bit; must be 0 for the Start-pause loop in
