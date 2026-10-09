@@ -32,12 +32,6 @@ EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls i
 org $C293A8
 Menu_Unk93A8:       ; JSR from Menu_ListEquipItems with Menu_ItemId set: A = 0 leaves the item out of
                     ; the list (probably "the current character cannot equip it"; not matched)
-org $C2968D
-Menu_Unk968D:       ; JSR from Menu_InitSystems (REP #$30 first; not matched)
-org $C2984A
-Menu_Unk984A:       ; JSR from Menu_InitSystems (not matched)
-org $C29875
-Menu_Unk9875:       ; JSR from Menu_InitSystems (PHP first; not matched)
 org $C292F4
 Menu_Unk92F4:       ; JSR from Menu_InitSystems (not matched)
 org $C2D156
@@ -54,6 +48,12 @@ BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the charact
 org $FFF9C4
 BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves with DP=$0400: A = 0 or not for slot
                     ; Menu_SaveSlot ($0479); probably checks a save slot in SRAM (not analysed)
+org $C29137
+Menu_Unk9137:       ; JSR from Menu_RefreshAllChars after Menu_LoadCharRec (also from three other
+                    ; menu sites): works on Menu_CurCharRec, probably the character's derived stats
+                    ; (not analysed)
+org $FFF813
+BankFF_UnkF813:     ; JSL from Menu_BuildItemTables (not analysed)
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
 org $C299CA

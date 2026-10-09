@@ -830,4 +830,72 @@ if !constants_menu_inc == 0
 !Menu_EquipKeepChar = 5                  ; record whose category-0 byte Menu_CmdEquip's id-0 path keeps
 !Menu_EquipSlots = 4                     ; equipment bytes per record (categories 0-3)
 
+; --- Menu setup: tiles, graphics, OAM, item tables ($C2:960B-$C2:99C9, $C2:C511, $C2:ED08) ---
+!MenuRom_BankFF = $FF0000                ; bank $FF base for LDA.l this,X with X a bank-$FF address
+!Menu_Tile2bppBytes = $0010              ; bytes in one 2bpp 8x8 tile (= planes 0-1 of a 4bpp tile)
+!Menu_TileRows = 8                       ; rows of an 8x8 tile
+!Menu_TilePlane0 = $0000                 ; offsets in a 4bpp tile of row 0's plane 0, 1, 2 and 3 bytes
+!Menu_TilePlane1 = $0001
+!Menu_TilePlane2 = $0010
+!Menu_TilePlane3 = $0011
+!Menu_ColorBytes = 2                     ; bytes per CGRAM colour
+!MenuRom_Font2bpp = $FF8E60              ; $E00 B of 2bpp tiles (Menu_LoadGraphics step 1)
+!Menu_Font2bppBytes = $0E00
+!MenuRom_Font2bppB = $FFC9FC             ; $100 B (16 tiles) laid over its tiles $10-$1F
+!Menu_Font2bppBBytes = $0100
+!Menu_Font2bppBTile = $10
+!Menu_FontFirstTile = $10                ; first tile the 2bpp-to-4bpp loop copies (2bpp tile $10 of
+                                         ; Menu_Bg3TileBuf to 4bpp tile $10 of Menu_TileBuf)
+!Menu_FontTiles = $00F0                  ; tiles it copies
+!Menu_FontTile2F = $2F                   ; Menu_TileBuf tiles given plane 2 = 0 OR 1: $2F and $D4-$DD
+!Menu_FontTileD4 = $D4
+!Menu_FontTileDE = $DE
+!MenuRom_Tiles4bpp = $FFD5E4             ; $600 B of 4bpp tiles (step 2)
+!Menu_Tiles4bppBytes = $0600
+!MenuRom_Tiles3bpp = $FFDBE4             ; $95 3bpp tiles expanded after them
+!Menu_Tiles3bppCount = $0095
+!Menu_Tiles3bppOr3 = $0008               ; of those, the first 8 get plane 3 = OR
+!Menu_TilesBBytes = $12A0                ; bytes moved to Menu_TileBuf ($30 + $95 tiles)
+!MenuRom_WindowGfx = $FF9E10             ; 8 window styles of $280 B (20 4bpp tiles each)
+!Menu_WindowGfxBytes = $1400
+!Menu_WinStyleBytes = $0280
+!Menu_WinExtraTile = $88                 ; Menu_Bg3TileBuf tile copied after the window styles ...
+!Menu_WinExtraTiles = 13                 ; ... and how many
+!Menu_WinTilesOr3 = $00A4                ; tiles given plane 3 = OR in step 3
+!MenuRom_PalA = $FF9C68                  ; 4 colours, loaded to colours 0-3 and 4-7
+!MenuRom_PalB = $FF9C78                  ; 4 colours -> 16-19
+!MenuRom_PalC = $FFCBBC                  ; 4 colours -> 20-23
+!MenuRom_PalD = $FFCBC4                  ; 16 colours -> $70-$7F
+!MenuRom_ObjPal = $FF9DF0                ; 16 colours -> $80-$8F (the first sprite palette)
+!MenuRom_ObjTiles = $FF9CF0              ; 4 pieces of 64 B laid over sprite tiles $20, $30, $22, $32
+!Menu_ObjPieceBytes = $0040
+!Menu_ObjClearBytes = $1000              ; Menu_TileBuf bytes cleared before the sprite tiles
+!Menu_ObjExtraTile = $70                 ; Menu_Bg3TileBuf tile copied (twice 12 tiles) to tiles 4, $14
+!Menu_ObjExtraTiles = 12
+!Menu_ObjCopyBytes = $0400               ; Menu_TileBuf tiles 0-$1F copied to tile $20
+!Menu_TileBufBytes = $4000               ; Menu_TileBuf bytes cleared at the end
+!Menu_Unk0D47Init = $0010
+!Menu_WinStyleMask = $07                 ; Menu_Config01 bits 0-2: the window style
+!Menu_WinVramDest = $3DC0                ; VRAM word address of the window-style tiles
+!MenuRom_WindowPals = $FFB210            ; 16 B (8 colours) per window style
+!Menu_WinPalRowMask = $001C              ; Menu_Unk0D47 high-byte bits picking the palette row
+!Menu_OamHidden = $E000                  ; OAM entry X 0, Y $E0: off the screen
+!Menu_OamHighInit = $AAAA                ; OAM high-table bytes: every sprite large, X bit 8 clear
+!Oam_LowTableBytes = $0200               ; bytes of Oam_LowTable
+!Oam_HighTableBytes = $0020              ; bytes of Oam_HighTable
+!MenuRom_ItemRec0 = $CC0000              ; bytes 0-4 of an item record (X = Menu_ItemDataPtr or
+!MenuRom_ItemRec1 = $CC0001              ; Menu_ItemDataPtrB, an address in bank $CC)
+!MenuRom_ItemRec2 = $CC0002
+!MenuRom_ItemRec3 = $CC0003
+!MenuRom_ItemRec4 = $CC0004
+!Menu_ItemInfo0Mask = $1E                ; record A byte 0 bits kept in Menu_ItemInfo0
+!Menu_ItemInfo0Bit1 = $02                ; the Menu_ItemInfo0 bit cleared for item Menu_ItemIdC8
+!Menu_ItemIdC8 = $C8
+!Menu_ItemRecB1Bit6 = $40                ; record B byte 1 bit 6: byte 2 goes to Menu_ItemInfo4 (category 3)
+!Menu_ItemCat4First = $BC                ; first id of item category 4 (Menu_ItemCategoryBounds)
+!Menu_ItemNameFirst = $0B5E              ; first word of Menu_ItemNamePtrs ...
+!Menu_ItemNameBytes = $000B              ; ... and the step
+!Menu_Flag7F00BABit0 = $0001             ; Menu_Flag7F00BA bits Menu_BuildItemTables tests
+!Menu_Flag7F00BABit1 = $0002
+
 endif

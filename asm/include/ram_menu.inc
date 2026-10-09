@@ -496,7 +496,8 @@ endstruct
 !Menu_EquipListCounts = $0F62            ; ... and their counts
 !Menu_EquipListLen = $0FC6               ; 8-bit; how many it listed
 !Menu_ItemSortKeys = $7C00               ; 256 B: a sort key per item id (Menu_ListEquipItems sorts by it,
-                                         ; largest first); who fills it is not traced
+                                         ; largest first); Menu_BuildItemTables fills ids 0-$93 with
+                                         ; byte 0 of the item's record B
 !Menu_PalBuf = $9480                     ; 512 B: the menu's CGRAM copy (Menu_UploadPalette)
 !Menu_PalDirty = $0D15                   ; 8-bit; non-zero: Menu_UploadPalette sends Menu_PalBuf (and zeroes it)
 !Menu_GradTable = $9DE9                  ; 32 B: Menu_GradientSteps copied by Menu_BuildGradient
@@ -971,6 +972,30 @@ endstruct
 !Menu_NmiMoveDest = $9696                ; ... destination (Y) ...
 !Menu_NmiMoveSize = $9698                ; ... and byte count (who sets them is not traced)
 !Menu_GradBufSelHiLong = $7EA01E         ; Menu_GradBufSel's high byte as a long address (Menu_NmiUpload)
+
+; --- Menu setup: graphics and item tables (Menu_LoadGraphics, Menu_BuildItemTables) ---
+!Menu_TileBuf = $2E00                    ; $4000 B: tiles are assembled here, then queued to VRAM
+!Menu_Bg3TileBuf = $4E00                 ; the BG3 (2bpp) tiles before upload; then reused for 4bpp tiles
+!Menu_Font2bppBuf = $5000                ; where MenuRom_Font2bpp is loaded (2bpp tile $20 of the above)
+!Menu_WinTileBuf = $8800                 ; the window style's tiles (Menu_LoadWindowGfx)
+!Menu_WinVramAddr = $9890                ; 16-bit; set to Menu_WinVramDest by Menu_LoadWindowGfx; use not traced
+!Menu_WinStyle = $0D8C                   ; 8-bit; window style (Menu_Config01 AND 7)
+!Menu_Unk0D47 = $0D47                    ; 16-bit; set to $0010 by Menu_LoadGraphics; bits 2-4 of its high
+                                         ; byte pick Menu_LoadWindowPal's palette row
+!Menu_Unk0D7C = $0D7C                    ; 16-bit; $FFFF when Menu_Flag7F00BA bit 0 is set, else 0
+!Menu_Unk0D7E = $0D7E                    ; 16-bit; $FFFF when bit 0 is set and bit 1 clear, else 0
+!Menu_Unk0D32 = $0D32                    ; 16-bit; $FFFF when the menu was opened from a field location
+!Menu_Unk0D34 = $0D34                    ; 16-bit; $FFFF when so and Menu_Flag7F01CE bit 7 is clear
+!Menu_Unk0D36 = $0D36                    ; 16-bit; set to $FFFF by Menu_BuildItemTables
+!Menu_Flag7F00BA = $7F00BA               ; bytes of Menu_FlagBlock7F that Menu_BuildItemTables tests
+!Menu_Flag7F01CE = $7F01CE
+!Menu_ItemInfo0 = $7700                  ; 242 B: per item id, record A byte 0 AND $1E
+!Menu_ItemInfo1 = $7800                  ; 242 words: per item id, record A bytes 1-2
+!Menu_ItemInfo3 = $7A00                  ; 242 B: per item id, record A byte 3 (0 from category 4 on)
+!Menu_ItemInfo4 = $7B00                  ; 242 B: record A byte 4 below category 3; for category 3 record
+                                         ; B byte 2 when its byte 1 has bit 6, else 0; 0 from category 4
+!Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id (probably name offsets; not traced)
+!Menu_GoldCopy = $9D96                   ; 3 B: copy of Menu_Unk2C53 (Menu_BuildItemTables)
 
 ; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
 !Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers

@@ -23750,14 +23750,14 @@ Menu_InitSystems:
     LDY.w #!Menu_PartyList+2
     LDA.w #!Menu_PartyListBytes-3
     MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    JSR Menu_Unk968D
+    JSR Menu_LoadGraphics
     JSR Menu_UnkD156
-    JSR Menu_Unk984A
+    JSR Menu_ClearOam
     JSR Menu_FlushVramQueue
     JSR Menu_BuildPartyLists
     JSR Menu_Unk92F4
     JSR Menu_UnkF3CA
-    JSR Menu_Unk9875
+    JSR Menu_BuildItemTables
     PHP
     REP #$30
     LDX.b !Menu_Unk51
@@ -24259,31 +24259,31 @@ Menu_Unk834D:
 ; Menu_FlushVramQueue sends them); the sub-entry
 ; Menu_QueueVramWram ($C2:838E) does the same from $7E:X. Both MVNs go
 ; through Menu_VramQueueSlot, then the shared tail Menu_QueueVramTail ($C2:8395).
-; Callers (155 sites: 135 JSR, 20 JMP): unmatched (JSR $C2:8F76, JSR $C2:971E, JSR $C2:9813, JSR
-;   $C2:9A40, JSR $C2:9B4F, JMP $C2:9B80, JMP $C2:9C6A, JSR $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34,
-;   JSR $C2:9E6D, JSR $C2:9EAB, JSR $C2:9EEE, JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB, JSR
-;   $C2:A0A9, JSR $C2:A16B, JSR $C2:A26E, JSR $C2:A31C, JSR $C2:A375, JSR $C2:A37B, JSR $C2:A381,
-;   JSR $C2:A429, JSR $C2:A473, JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR
-;   $C2:A6A3, JSR $C2:A6A9, JSR $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB,
-;   JSR $C2:A901, JSR $C2:A94E, JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR
-;   $C2:AD9E, JSR $C2:ADB8, JSR $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1,
-;   JSR $C2:AF59, JSR $C2:B040, JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP
-;   $C2:B4DB, JSR $C2:B563, JSR $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955,
-;   JSR $C2:B95B, JSR $C2:B974, JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR
-;   $C2:BC90, JSR $C2:BEBD, JSR $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2,
-;   JMP $C2:C204, JSR $C2:C331, JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR
-;   $C2:C3DD, JSR $C2:C540, JSR $C2:C779, JSR $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E,
-;   JSR $C2:CAD5, JSR $C2:CB7A, JSR $C2:CB80, JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR
-;   $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA, JSR $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4,
-;   JSR $C2:D0D0, JSR $C2:D0D6, JSR $C2:D100, JSR $C2:D106, JSR $C2:D193, JSR $C2:D401, JSR
-;   $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP $C2:D712, JMP $C2:D775, JMP $C2:D828, JSR $C2:D875,
-;   JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C, JSR $C2:DB82, JSR $C2:DB88, JSR $C2:DB8E, JSR
-;   $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR $C2:DFF6, JSR $C2:DFFC, JSR $C2:E00D, JSR $C2:E053,
-;   JSR $C2:E103, JSR $C2:E185, JSR $C2:E293, JSR $C2:E454, JSR $C2:E50A, JSR $C2:E510, JSR
-;   $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR $C2:E5C2, JSR $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702,
-;   JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR
-;   $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE,
-;   JSR $C2:FEF4, JSR $C2:FF21).
+; Callers (155 sites: 135 JSR, 20 JMP): Menu_LoadGraphics (JSR $C2:971E, JSR $C2:9813),
+;   Menu_LoadWindowGfx (JSR $C2:C540) and unmatched (JSR $C2:8F76, JSR $C2:9A40, JSR $C2:9B4F, JMP
+;   $C2:9B80, JMP $C2:9C6A, JSR $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34, JSR $C2:9E6D, JSR $C2:9EAB,
+;   JSR $C2:9EEE, JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB, JSR $C2:A0A9, JSR $C2:A16B, JSR
+;   $C2:A26E, JSR $C2:A31C, JSR $C2:A375, JSR $C2:A37B, JSR $C2:A381, JSR $C2:A429, JSR $C2:A473,
+;   JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR $C2:A6A3, JSR $C2:A6A9, JSR
+;   $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB, JSR $C2:A901, JSR $C2:A94E,
+;   JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR $C2:AD9E, JSR $C2:ADB8, JSR
+;   $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1, JSR $C2:AF59, JSR $C2:B040,
+;   JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP $C2:B4DB, JSR $C2:B563, JSR
+;   $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955, JSR $C2:B95B, JSR $C2:B974,
+;   JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR $C2:BC90, JSR $C2:BEBD, JSR
+;   $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2, JMP $C2:C204, JSR $C2:C331,
+;   JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR $C2:C3DD, JSR $C2:C779, JSR
+;   $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E, JSR $C2:CAD5, JSR $C2:CB7A, JSR $C2:CB80,
+;   JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA, JSR
+;   $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4, JSR $C2:D0D0, JSR $C2:D0D6, JSR $C2:D100,
+;   JSR $C2:D106, JSR $C2:D193, JSR $C2:D401, JSR $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP
+;   $C2:D712, JMP $C2:D775, JMP $C2:D828, JSR $C2:D875, JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C,
+;   JSR $C2:DB82, JSR $C2:DB88, JSR $C2:DB8E, JSR $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR
+;   $C2:DFF6, JSR $C2:DFFC, JSR $C2:E00D, JSR $C2:E053, JSR $C2:E103, JSR $C2:E185, JSR $C2:E293,
+;   JSR $C2:E454, JSR $C2:E50A, JSR $C2:E510, JSR $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR
+;   $C2:E5C2, JSR $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702, JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8,
+;   JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR
+;   $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE, JSR $C2:FEF4, JSR $C2:FF21).
 ; Callers of Menu_QueueVramWram (6 JSR sites): unmatched ($C2:E90C, $C2:F84D, $C2:F859, $C2:F86C,
 ;   $C2:FB17, $C2:FB92).
 ; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
@@ -24911,8 +24911,8 @@ org $C28663
 ; .Size bytes (the direct page walks the records), then empties the
 ; queue (Menu_VramQueueEnd = 0). VMAIN is left as it is. Nothing is done
 ; when the queue is empty.
-; Callers (5 JSR sites): Menu_InitSystems ($C2:812D) and unmatched ($C2:96EB, $C2:9721, $C2:9758,
-;   $C2:9816).
+; Callers (5 JSR sites): Menu_InitSystems ($C2:812D) and Menu_LoadGraphics ($C2:96EB, $C2:9721,
+;   $C2:9758, $C2:9816).
 ; Entry: M, X any (P, DP and DB saved; SEP #$30 here), DP any, DB any
 ;        (set to $00 for the DMA registers and the queue)
 ; Exit:  P, DP and DB restored; A, X, Y clobbered
@@ -24959,7 +24959,7 @@ Menu_FlushVramQueue:
 ; $C2:86A9 — Menu_UploadPalette (52 bytes, $86A9–$86DC)
 ; When Menu_PalDirty is non-zero: zeroes it and sends the 512 bytes of
 ; Menu_PalBuf ($7E:9480) to CGRAM from colour 0 by DMA channel 7.
-; Callers (2 JSR sites): Menu_NmiUpload ($C2:8651) and unmatched ($C2:9834).
+; Callers (2 JSR sites): Menu_NmiUpload ($C2:8651) and Menu_LoadGraphics ($C2:9834).
 ; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit LDX/STX
 ;        immediates), DP any, DB any (set to $00)
 ; Exit:  P and DB restored; A's low byte = $FF (Menu_PalDirtyAll, left
@@ -25218,7 +25218,8 @@ Menu_FindItem:
 
 ; $C2:8816 — Menu_LoadCharRec (10 bytes, $8816–$881F)
 ; Menu_LoadCharRecA for character A, keeping P and X.
-; Callers (4 JSR sites): unmatched ($C2:99B9, $C2:BBA7, $C2:DC3A, $C2:DDDF).
+; Callers (4 JSR sites): Menu_RefreshAllChars ($C2:99B9) and unmatched ($C2:BBA7, $C2:DC3A,
+;   $C2:DDDF).
 ; Entry: M, X any (P and X saved; SEP #$20 here), DP=$0000, DB=$7E; A =
 ;        the character id
 ; Exit:  P and X restored; A and Y as Menu_LoadCharRecA leaves them
@@ -25310,8 +25311,9 @@ Menu_LoadCharRecA:
 ; $5A-$7A, 2: $7B-$93, 3: $94-$BB, 4: from $BC) into Menu_ItemCategory,
 ; and its index within the category (A - the category's first id) into
 ; Menu_ItemIndex (both as words).
-; Callers (8 JSR sites): Menu_ItemDataPtrA ($C2:88B0), Menu_CmdEquipItem ($C2:8DE3) and unmatched
-;   ($C2:992D, $C2:9952, $C2:AF1C, $C2:B0B1, $C2:DDA3, $C2:DFAD).
+; Callers (8 JSR sites): Menu_ItemDataPtrA ($C2:88B0), Menu_CmdEquipItem ($C2:8DE3),
+;   Menu_BuildItemTables ($C2:992D, $C2:9952) and unmatched ($C2:AF1C, $C2:B0B1, $C2:DDA3,
+;   $C2:DFAD).
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E; A =
 ;        the item id
 ; Exit:  P and X restored; A = the category (0-4, = Menu_ItemCategory's
@@ -25354,7 +25356,7 @@ Menu_ItemCategoryBounds:
 ; category's table:
 ; MenuRom_ItemTablesA[category] + index x MenuRom_ItemRecSizesA[category].
 ; What the records hold is not traced.
-; Callers (1 JSR site): unmatched ($C2:98BB).
+; Callers (1 JSR site): Menu_BuildItemTables ($C2:98BB).
 ; Entry: M any (P saved; SEP #$20 here), X any (the category is read as
 ;        a byte or word; its high byte is 0), DP any, DB=$7E; A = the id
 ; Exit:  P restored; A = X = the address; Y's low byte kept, high byte
@@ -25386,7 +25388,7 @@ Menu_ItemDataPtrA:
 ; Menu_ItemCategory / Menu_ItemIndex left by an earlier call; result in
 ; Menu_ItemDataPtrB and X: again an address in bank $CC (the callers
 ; read LDA $CC0000,X and $CC0001,X), not in bank $FF.
-; Callers (3 JSR sites): unmatched ($C2:9930, $C2:9955, $C2:B0C3).
+; Callers (3 JSR sites): Menu_BuildItemTables ($C2:9930, $C2:9955) and unmatched ($C2:B0C3).
 ; Entry: M any (P saved; SEP #$20 here), X any, DP any, DB=$7E;
 ;        Menu_ItemCategory and Menu_ItemIndex set
 ; Exit:  P restored; A = X = the address; Y unchanged
@@ -26688,8 +26690,8 @@ Menu_DmaZeroWord:
 ; Zeroes Y bytes of bank $7E from address X with DMA channel 0 (fixed
 ; source Menu_DmaZeroWord, one register: WMDATA). HDMA is switched off
 ; first; WMADDH is set to 0, so the block is always in bank $7E.
-; Callers (5 JSR sites): Menu_InitPpuAndRam ($C2:94F7, $C2:9500, $C2:9509) and unmatched ($C2:97A1,
-;   $C2:981F).
+; Callers (5 JSR sites): Menu_InitPpuAndRam ($C2:94F7, $C2:9500, $C2:9509) and Menu_LoadGraphics
+;   ($C2:97A1, $C2:981F).
 ; Entry: M any (P saved; sets M=1), X=0 (16-bit X and Y), DP any (not
 ;        used), DB any (saved, then $00); X = WRAM address, Y = byte count
 ;        (0 = 64 KiB)
@@ -26724,7 +26726,7 @@ Menu_DmaClearWram:
 ; Copies Y bytes from bank $FF (MenuRom_DmaCopyBank), address A, to bank
 ; $7E at address X with DMA channel 0 (stepping source, one register:
 ; WMDATA). Unlike Menu_DmaClearWram it leaves HDMAEN alone.
-; Callers (3 JSR sites): unmatched ($C2:9698, $C2:96A4, $C2:972D).
+; Callers (3 JSR sites): Menu_LoadGraphics ($C2:9698, $C2:96A4, $C2:972D).
 ; Entry: M any, X any (P saved; sets M=0, X=0, then M=1), DP any (not
 ;        used), DB any (saved, then $00); A (16-bit) = source address in
 ;        bank $FF, X = WRAM address, Y = byte count
@@ -26850,6 +26852,629 @@ Menu_ClearConfigAndFlags:
     RTS
 
 ; ============================================================
+; Menu setup: tile helpers, graphics, OAM and item tables
+; ($C2:960B–$C2:99C9)
+; ============================================================
+; Called by Menu_InitSystems (Menu_LoadGraphics, Menu_ClearOam,
+; Menu_BuildItemTables) and by menu code not matched yet. The tile
+; helpers work on 4bpp 8x8 tiles in bank $7E (32 bytes: planes 0-1 as
+; 8 byte pairs, then planes 2-3), as the SNES stores them.
+
+; $C2:960B — Menu_Expand3bppTiles (35 bytes, $960B–$962D)
+; Expands A 3bpp tiles (24 bytes: planes 0-1, then plane 2) from bank
+; $FF at X to 4bpp tiles in bank $7E at Y: the 16 bytes of planes 0-1
+; are copied (MVN), then each plane-2 byte is stored with plane 3 = 0.
+; Callers (1 JSR site): Menu_LoadGraphics ($C2:9703).
+; Entry: M=0, X=0, DP=$0000 (Menu_Tmp00/02), DB any (the MVN sets $7E
+;        before the stores); A = the tile count, X = the source in bank
+;        $FF, Y = the destination
+; Exit:  M=0, X=0, DB=$7E; X and Y past the last tile; A = the last
+;        plane-2 byte; Menu_Tmp00-03 = 0
+; No calls.
+Menu_Expand3bppTiles:
+    STA.b !Menu_Tmp02                   ; the tile count (a word)
+.tile:
+    LDA.w #!Menu_Tile2bppBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Menu_TileRows
+    STA.b !Menu_Tmp00
+.row:
+    LDA.l !MenuRom_BankFF,X
+    AND.w #!Eng_LowByteMask             ; plane 3 = 0
+    STA.w !Eng_PtrBase,Y
+    INX
+    INY
+    INY
+    DEC.b !Menu_Tmp00
+    BNE .row
+    DEC.b !Menu_Tmp02
+    BNE .tile
+    RTS
+
+; $C2:962E — Menu_TilesOrPlane3 (37 bytes, $962E–$9652)
+; For Y 4bpp tiles from X: each row's plane 3 = planes 0 OR 1 OR 2, so
+; every non-zero pixel gets colour + 8 (colours 1-7 become 9-15).
+; Callers (4 JSR sites): Menu_LoadGraphics ($C2:970C, $C2:9742, $C2:97CB) and Menu_LoadWindowGfx
+;   ($C2:C53A).
+; Entry: M any (P saved; SEP #$20 / REP #$21 here), X=0, DP=$0000
+;        (Menu_Tmp00), DB=$7E; X = the first tile, Y = the count
+; Exit:  P restored; X past the last tile, A = X; Y = 0; Menu_Tmp00 = 0
+; No calls.
+Menu_TilesOrPlane3:
+    PHP
+.tile:
+    SEP #$20
+    LDA.b #!Menu_TileRows
+    STA.b !Menu_Tmp00
+.row:
+    LDA.w !Menu_TilePlane0,X
+    ORA.w !Menu_TilePlane1,X
+    ORA.w !Menu_TilePlane2,X
+    STA.w !Menu_TilePlane3,X
+    INX
+    INX
+    DEC.b !Menu_Tmp00
+    BNE .row
+    REP #$21                            ; (also C=0)
+    TXA
+    ADC.w #!Menu_Tile2bppBytes          ; past planes 2-3
+    TAX
+    DEY
+    BNE .tile
+    PLP
+    RTS
+
+; $C2:9653 — Menu_TilesOrPlanes23 (37 bytes, $9653–$9677)
+; For Y 4bpp tiles from X: each row's planes 2 and 3 = planes 0 OR 1,
+; so colours 1-3 become 13-15.
+; Callers (2 JSR sites): Menu_LoadGraphics ($C2:9804, $C2:980D).
+; Entry: M any (P saved; SEP #$20 / REP #$21 here), X=0, DP=$0000
+;        (Menu_Tmp00), DB=$7E; X = the first tile, Y = the count
+; Exit:  P restored; X past the last tile, A = X; Y = 0; Menu_Tmp00 = 0
+; No calls.
+Menu_TilesOrPlanes23:
+    PHP
+.tile:
+    SEP #$20
+    LDA.b #!Menu_TileRows
+    STA.b !Menu_Tmp00
+.row:
+    LDA.w !Menu_TilePlane0,X
+    ORA.w !Menu_TilePlane1,X
+    STA.w !Menu_TilePlane2,X
+    STA.w !Menu_TilePlane3,X
+    INX
+    INX
+    DEC.b !Menu_Tmp00
+    BNE .row
+    REP #$21                            ; (also C=0)
+    TXA
+    ADC.w #!Menu_Tile2bppBytes
+    TAX
+    DEY
+    BNE .tile
+    PLP
+    RTS
+
+; $C2:9678 — Menu_TileOrPlane2 (21 bytes, $9678–$968C)
+; For the 4bpp tile at X: each row's plane 2 = planes 0 OR 1 and plane
+; 3 = 0 (one word store), so colours 1-3 become 5-7.
+; Callers (2 JSR sites): Menu_LoadGraphics ($C2:96C5, $C2:96CB).
+; Entry: M=0 (word loads and stores), X=0, DP any, DB=$7E; X = the tile
+; Exit:  M=0, X=0; X = the tile + 16 (planes 2-3); Y = 0; A = the last
+;        row's value
+; No calls.
+Menu_TileOrPlane2:
+    LDY.w #!Menu_TileRows
+.row:
+    LDA.w !Menu_TilePlane0,X
+    ORA.w !Menu_TilePlane1,X
+    AND.w #!Eng_LowByteMask             ; plane 3 = 0
+    STA.w !Menu_TilePlane2,X
+    INX
+    INX
+    DEY
+    BNE .row
+    RTS
+
+; $C2:968D — Menu_LoadGraphics (445 bytes, $968D–$9849)
+; Builds the menu's tiles in Menu_TileBuf / Menu_Bg3TileBuf and sends
+; them to VRAM through Menu_VramQueue (forced blank: Menu_InitSystems
+; runs it after Menu_InitPpuAndRam), then loads part of the palette.
+; Tile numbers below are 4bpp tiles from the buffer's start; bank-$FF
+; sources are MenuRom_* (what each picture is was not looked at):
+; 1. MenuRom_Font2bpp ($E00 B, 2bpp) to $7E:5000, MenuRom_Font2bppB
+;    ($100 B) over $5100. Its $F0 2bpp tiles from $4F00 (the first 16
+;    bytes still zero) become 4bpp tiles $10-$FF of Menu_TileBuf
+;    (planes 2-3 left as cleared), tile $2F and tiles $D4-$DD get plane
+;    2 = 0 OR 1 (Menu_TileOrPlane2). Menu_VramRecsFont: VRAM $0000 =
+;    Menu_TileBuf ($2000 B, BG1/BG2 tiles 0-255), VRAM $7000 =
+;    Menu_Bg3TileBuf ($1000 B, the BG3 tiles: the 2bpp font as loaded).
+; 2. MenuRom_Tiles4bpp ($600 B) to Menu_Bg3TileBuf, MenuRom_Tiles3bpp
+;    ($95 tiles) expanded after it (Menu_Expand3bppTiles), the first 8
+;    of those with plane 3 = OR (Menu_TilesOrPlane3); the $12A0 bytes
+;    moved to Menu_TileBuf; Menu_VramRecFontB: VRAM $1000 ($1300 B).
+; 3. MenuRom_WindowGfx ($1400 B: the 8 window styles) to Menu_TileBuf,
+;    $1A0 bytes of the expanded tiles (from tile $88 of Menu_Bg3TileBuf)
+;    after it, plane 3 = OR on all $A4 tiles; Menu_VramRecsWin: VRAM
+;    $2010 = $FF:0000 ($1F80 B), $3000 = Menu_TileBuf ($2000 B), $1E00
+;    = $FF:E55C ($380 B) (the queue is sent newest first).
+; 4. Palette colours 0-3 and 4-7 = MenuRom_PalA, 16-19 = MenuRom_PalB,
+;    20-23 = MenuRom_PalC, $70-$7F = MenuRom_PalD (Menu_PalBuf).
+; 5. Sprites: Menu_TileBuf cleared ($1000 B); 12 + 12 expanded tiles
+;    (from tile $70 of Menu_Bg3TileBuf) to tiles 4 and $14; the first
+;    $400 bytes copied to tile $20 with plane 3 = OR on $20 tiles; four
+;    64-byte pieces of MenuRom_ObjTiles over tiles $20, $22, $30, $32
+;    with planes 2-3 = OR (Menu_TilesOrPlanes23, 4 tiles each at $20 and
+;    $30); Menu_VramRecObj: VRAM $4000 (the sprite tiles) = $800 B.
+; 6. Menu_TileBuf cleared ($4000 B), colours $80-$8F = MenuRom_ObjPal,
+;    Menu_UploadPalette.
+; 7. Menu_Unk0D47 = $0010, Menu_WinStyle = Menu_Config01 AND 7, and the
+;    tail jump to Menu_LoadWindowGfx.
+; Callers (1 JSR site): Menu_InitSystems ($C2:8124).
+; Entry: M=0, X=0 (REP #$30 here), DP=$0000 (Menu_Tmp00), DB=$7E (the
+;        MVNs keep it); forced blank
+; Exit:  as Menu_LoadWindowGfx (P restored to M=1, X=0); DB=$7E; A, X,
+;        Y clobbered; Menu_Tmp00-03 changed (0); Menu_VramQueue holds
+;        Menu_WindowVramRec, not sent yet
+; Calls: Menu_DmaCopyFFToWram, Menu_TileOrPlane2, Menu_FlushVramQueue,
+;   Menu_Expand3bppTiles, Menu_TilesOrPlane3, Menu_QueueVramRom,
+;   Menu_DmaClearWram, Menu_TilesOrPlanes23, Menu_UploadPalette; jumps to
+;   Menu_LoadWindowGfx.
+Menu_LoadGraphics:
+    REP #$30
+    LDA.w #!MenuRom_Font2bpp&$FFFF
+    LDX.w #!Menu_Font2bppBuf
+    LDY.w #!Menu_Font2bppBytes
+    JSR Menu_DmaCopyFFToWram
+    LDA.w #!MenuRom_Font2bppB&$FFFF
+    LDX.w #!Menu_Font2bppBuf+(!Menu_Font2bppBTile*!Menu_Tile2bppBytes)
+    LDY.w #!Menu_Font2bppBBytes
+    JSR Menu_DmaCopyFFToWram
+    LDA.w #!Menu_FontTiles
+    STA.b !Menu_Tmp00
+    LDX.w #!Menu_Bg3TileBuf+(!Menu_FontFirstTile*!Menu_Tile2bppBytes)
+    LDY.w #!Menu_TileBuf+(!Menu_FontFirstTile*!Gfx_Tile4bppBytes)
+.font_tile:
+    LDA.w #!Menu_Tile2bppBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    TYA
+    CLC
+    ADC.w #!Menu_Tile2bppBytes          ; past planes 2-3
+    TAY
+    DEC.b !Menu_Tmp00
+    BNE .font_tile
+    LDX.w #!Menu_TileBuf+(!Menu_FontTile2F*!Gfx_Tile4bppBytes)
+    JSR Menu_TileOrPlane2
+    LDX.w #!Menu_TileBuf+(!Menu_FontTileD4*!Gfx_Tile4bppBytes)
+.plane2_tile:
+    JSR Menu_TileOrPlane2
+    TXA
+    CLC
+    ADC.w #!Menu_Tile2bppBytes
+    TAX
+    CPX.w #!Menu_TileBuf+(!Menu_FontTileDE*!Gfx_Tile4bppBytes)
+    BCC .plane2_tile
+    LDX.w #Menu_VramRecsFont
+    LDY.w #!Menu_VramQueue
+    LDA.w #(2*!Menu_VramRecBytes)-1
+    MVN !Bank7E,bank(Menu_VramRecsFont) ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #2*!Menu_VramRecBytes
+    STA.w !Menu_VramQueueEnd            ; (a word: also $0D12)
+    JSR Menu_FlushVramQueue
+    LDX.w #!MenuRom_Tiles4bpp&$FFFF
+    LDY.w #!Menu_Bg3TileBuf
+    LDA.w #!Menu_Tiles4bppBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #!Menu_Bg3TileBuf+!Menu_Tiles4bppBytes
+    LDX.w #!MenuRom_Tiles3bpp&$FFFF
+    LDA.w #!Menu_Tiles3bppCount
+    JSR Menu_Expand3bppTiles
+    LDX.w #!Menu_Bg3TileBuf+!Menu_Tiles4bppBytes
+    LDY.w #!Menu_Tiles3bppOr3
+    JSR Menu_TilesOrPlane3
+    LDX.w #!Menu_Bg3TileBuf
+    LDY.w #!Menu_TileBuf
+    LDA.w #!Menu_TilesBBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #Menu_VramRecFontB
+    JSR Menu_QueueVramRom
+    JSR Menu_FlushVramQueue
+    LDA.w #!MenuRom_WindowGfx&$FFFF
+    LDX.w #!Menu_TileBuf
+    LDY.w #!Menu_WindowGfxBytes
+    JSR Menu_DmaCopyFFToWram
+    LDX.w #!Menu_Bg3TileBuf+(!Menu_WinExtraTile*!Gfx_Tile4bppBytes)
+    LDY.w #!Menu_TileBuf+!Menu_WindowGfxBytes
+    LDA.w #(!Menu_WinExtraTiles*!Gfx_Tile4bppBytes)-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_TileBuf
+    LDY.w #!Menu_WinTilesOr3
+    JSR Menu_TilesOrPlane3
+    LDX.w #Menu_VramRecsWin
+    LDY.w #!Menu_VramQueue
+    LDA.w #(3*!Menu_VramRecBytes)-1
+    MVN !Bank7E,bank(Menu_VramRecsWin)  ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    SEP #$20
+    LDA.b #3*!Menu_VramRecBytes
+    STA.w !Menu_VramQueueEnd
+    JSR Menu_FlushVramQueue
+    REP #$30
+    LDX.w #!MenuRom_PalA&$FFFF
+    LDY.w #!Menu_PalBuf
+    LDA.w #(4*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!MenuRom_PalA&$FFFF
+    LDY.w #!Menu_PalBuf+(4*!Menu_ColorBytes)
+    LDA.w #(4*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!MenuRom_PalB&$FFFF
+    LDY.w #!Menu_PalBuf+(16*!Menu_ColorBytes)
+    LDA.w #(4*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!MenuRom_PalC&$FFFF
+    LDY.w #!Menu_PalBuf+(20*!Menu_ColorBytes)
+    LDA.w #(4*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!MenuRom_PalD&$FFFF
+    LDY.w #!Menu_PalBuf+($70*!Menu_ColorBytes)
+    LDA.w #(16*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    REP #$30
+    LDX.w #!Menu_TileBuf
+    LDY.w #!Menu_ObjClearBytes
+    JSR Menu_DmaClearWram
+    LDX.w #!Menu_Bg3TileBuf+(!Menu_ObjExtraTile*!Gfx_Tile4bppBytes)
+    LDY.w #!Menu_TileBuf+(4*!Gfx_Tile4bppBytes)
+    LDA.w #(!Menu_ObjExtraTiles*!Gfx_Tile4bppBytes)-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDY.w #!Menu_TileBuf+($14*!Gfx_Tile4bppBytes)
+    LDA.w #(!Menu_ObjExtraTiles*!Gfx_Tile4bppBytes)-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_TileBuf
+    LDY.w #!Menu_TileBuf+($20*!Gfx_Tile4bppBytes)
+    LDA.w #!Menu_ObjCopyBytes-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_TileBuf+($20*!Gfx_Tile4bppBytes)
+    LDY.w #!Menu_ObjCopyBytes/!Gfx_Tile4bppBytes
+    JSR Menu_TilesOrPlane3
+    LDX.w #!MenuRom_ObjTiles&$FFFF
+    LDY.w #!Menu_TileBuf+($20*!Gfx_Tile4bppBytes)
+    LDA.w #!Menu_ObjPieceBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #(!MenuRom_ObjTiles&$FFFF)+!Menu_ObjPieceBytes
+    LDY.w #!Menu_TileBuf+($30*!Gfx_Tile4bppBytes)
+    LDA.w #!Menu_ObjPieceBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #(!MenuRom_ObjTiles&$FFFF)+(2*!Menu_ObjPieceBytes)
+    LDY.w #!Menu_TileBuf+($22*!Gfx_Tile4bppBytes)
+    LDA.w #!Menu_ObjPieceBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #(!MenuRom_ObjTiles&$FFFF)+(3*!Menu_ObjPieceBytes)
+    LDY.w #!Menu_TileBuf+($32*!Gfx_Tile4bppBytes)
+    LDA.w #!Menu_ObjPieceBytes-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_TileBuf+($20*!Gfx_Tile4bppBytes)
+    LDY.w #4
+    JSR Menu_TilesOrPlanes23
+    LDX.w #!Menu_TileBuf+($30*!Gfx_Tile4bppBytes)
+    LDY.w #4
+    JSR Menu_TilesOrPlanes23
+    LDX.w #Menu_VramRecObj
+    JSR Menu_QueueVramRom
+    JSR Menu_FlushVramQueue
+    LDX.w #!Menu_TileBuf
+    LDY.w #!Menu_TileBufBytes
+    JSR Menu_DmaClearWram
+    LDX.w #!MenuRom_ObjPal&$FFFF
+    LDY.w #!Menu_PalBuf+($80*!Menu_ColorBytes)
+    LDA.w #(16*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #1
+    TSB.w !Menu_PalDirty
+    JSR Menu_UploadPalette
+    SEP #$20
+    LDX.w #!Menu_Unk0D47Init
+    STX.w !Menu_Unk0D47
+    LDA.w !Menu_Config+1               ; Menu_Config01
+    AND.b #!Menu_WinStyleMask
+    STA.w !Menu_WinStyle
+    JMP Menu_LoadWindowGfx
+
+; $C2:984A — Menu_ClearOam (43 bytes, $984A–$9874)
+; Hides every sprite of the OAM copy: all 128 low-table entries =
+; Menu_OamHidden (X 0, Y $E0, tile 0, attributes 0) and the 32 high-table
+; bytes = Menu_OamHighInit ($AA: every sprite large, X bit 8 clear).
+; Callers (6 JSR sites): Menu_InitSystems ($C2:812A) and unmatched ($C2:ADB2, $C2:CAFC, $C2:D0C2,
+;   $C2:DAD5, $C2:E926).
+; Entry: M, X any (P and DB saved; REP #$30 here), DP any, DB=$7E (the
+;        first store is absolute)
+; Exit:  P and DB restored; A = $FFFF, X = $091E, Y = $0920 (past the
+;        last MVN)
+; No calls.
+Menu_ClearOam:
+    PHB
+    PHP
+    REP #$30
+    LDA.w #!Menu_OamHidden
+    STA.w !Oam_LowTable
+    LDX.w #!Oam_LowTable
+    LDY.w #!Oam_LowTable+2
+    LDA.w #!Oam_LowTableBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Menu_OamHighInit
+    STA.w !Oam_HighTable
+    LDX.w #!Oam_HighTable
+    LDY.w #!Oam_HighTable+2
+    LDA.w #!Oam_HighTableBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    PLB
+    RTS
+
+; $C2:9875 — Menu_BuildItemTables (275 bytes, $9875–$9987)
+; Prepares the menu's item and character data:
+; - Menu_CleanInventory;
+; - Menu_Unk0D7C/0D7E: 0, or $FFFF when Menu_Flag7F00BA has bit 0 set
+;   (0D7C) and also bit 1 clear (0D7E); Menu_Unk0D32/0D34 = 0 and
+;   Menu_Unk0D36 = $FFFF; when Loc_Id is below Loc_FirstBankC2 (the menu
+;   opened from a field location) Menu_Unk0D32 = $FFFF, and then also
+;   Menu_Unk0D34 = $FFFF while Menu_Flag7F01CE has bit 7 clear (what
+;   the flags mean is not traced);
+; - for every item id below Menu_ItemIdEnd, from its record A
+;   (Menu_ItemDataPtrA, bank $CC): Menu_ItemInfo0[id] = byte 0 AND $1E,
+;   Menu_ItemInfo1[id] = word 1, Menu_ItemInfo3[id] = byte 3,
+;   Menu_ItemInfo4[id] = byte 4;
+; - Menu_ItemNamePtrs: the words from offset Menu_Unk51 to $1E3 =
+;   $0B5E, $0B69, ... (11 apart; one per item id when Menu_Unk51 is 0;
+;   probably 11-byte item names, not traced);
+; - Menu_ItemInfo3 from category 4 on and Menu_ItemInfo4 from category 3
+;   on zeroed; then for category 3 ($94-$BB), when byte 1 of record B
+;   (Menu_ItemDataPtrB) has bit 6 set, Menu_ItemInfo4[id] = its byte 2;
+; - Menu_ItemSortKeys[id] = byte 0 of record B for ids 0-$93;
+; - with Menu_Unk0D34 set, bit 1 of Menu_ItemInfo0[$C8] cleared;
+; - BankFF_UnkF813 (JSL), Menu_RefreshAllChars, and Menu_GoldCopy = the
+;   3 bytes of Menu_Unk2C53.
+; Callers (1 JSR site): Menu_InitSystems ($C2:8139).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00/01,
+;        Menu_Unk51), DB=$7E
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-03 changed
+; Calls: Menu_CleanInventory, Menu_ItemDataPtrA, Menu_ItemCategory,
+;   Menu_ItemDataPtrB, BankFF_UnkF813 (JSL), Menu_RefreshAllChars.
+Menu_BuildItemTables:
+    PHP
+    REP #$30
+    JSR Menu_CleanInventory
+    STZ.w !Menu_Unk0D7C
+    STZ.w !Menu_Unk0D7E
+    LDA.l !Menu_Flag7F00BA
+    BIT.w #!Menu_Flag7F00BABit0
+    BEQ .location
+    DEC.w !Menu_Unk0D7C
+    BIT.w #!Menu_Flag7F00BABit1
+    BNE .location
+    DEC.w !Menu_Unk0D7E
+.location:
+    STZ.w !Menu_Unk0D32
+    STZ.w !Menu_Unk0D34
+    LDA.w #!Menu_FillFF
+    STA.w !Menu_Unk0D36
+    LDA.w !DP_Field+!Loc_Id
+    CMP.w #!Loc_FirstBankC2
+    BCS .info
+    DEC.w !Menu_Unk0D32
+    LDA.l !Menu_Flag7F01CE
+    BMI .info
+    DEC.w !Menu_Unk0D34
+.info:
+    STZ.b !Menu_Tmp00                   ; the item id (a word)
+.info_item:
+    SEP #$20
+    LDA.b !Menu_Tmp00
+    JSR Menu_ItemDataPtrA
+    LDY.b !Menu_Tmp00
+    LDA.l !MenuRom_ItemRec0,X
+    AND.b #!Menu_ItemInfo0Mask
+    STA.w !Menu_ItemInfo0,Y
+    LDA.l !MenuRom_ItemRec3,X
+    STA.w !Menu_ItemInfo3,Y
+    LDA.l !MenuRom_ItemRec4,X
+    STA.w !Menu_ItemInfo4,Y
+    REP #$20
+    LDA.b !Menu_Tmp00
+    ASL A
+    TAY
+    LDA.l !MenuRom_ItemRec1,X
+    STA.w !Menu_ItemInfo1,Y
+    INC.b !Menu_Tmp00
+    LDA.b !Menu_Tmp00
+    CMP.w #!Menu_ItemIdEnd
+    BCC .info_item
+    LDA.w #!Menu_ItemNameFirst
+    STA.b !Menu_Tmp00
+    LDY.b !Menu_Unk51
+.name:
+    LDA.b !Menu_Tmp00
+    STA.w !Menu_ItemNamePtrs,Y
+    CLC
+    ADC.w #!Menu_ItemNameBytes
+    STA.b !Menu_Tmp00
+    INY
+    INY
+    CPY.w #2*!Menu_ItemIdEnd
+    BCC .name
+    STZ.w !Menu_ItemInfo3+!Menu_ItemCat4First
+    LDX.w #!Menu_ItemInfo3+!Menu_ItemCat4First
+    LDY.w #!Menu_ItemInfo3+!Menu_ItemCat4First+2
+    LDA.w #(!Menu_ItemIdEnd-!Menu_ItemCat4First)-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    STZ.w !Menu_ItemInfo4+!Menu_ItemCat3First
+    LDX.w #!Menu_ItemInfo4+!Menu_ItemCat3First
+    LDY.w #!Menu_ItemInfo4+!Menu_ItemCat3First+2
+    LDA.w #(!Menu_ItemIdEnd-!Menu_ItemCat3First)-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Menu_ItemCat3First
+    STA.b !Menu_Tmp00
+    SEP #$20
+.cat3_item:
+    LDA.b !Menu_Tmp00
+    JSR Menu_ItemCategory
+    JSR Menu_ItemDataPtrB
+    LDY.b !Menu_Tmp00
+    LDA.l !MenuRom_ItemRec1,X
+    BIT.b #!Menu_ItemRecB1Bit6
+    BEQ .cat3_next
+    LDA.l !MenuRom_ItemRec2,X
+    STA.w !Menu_ItemInfo4,Y
+.cat3_next:
+    INC.b !Menu_Tmp00
+    LDA.b !Menu_Tmp00
+    CMP.b #!Menu_ItemCat4First
+    BCC .cat3_item
+    STZ.b !Menu_Tmp00
+    STZ.b !Menu_Tmp01
+.sort_key:
+    LDA.b !Menu_Tmp00
+    JSR Menu_ItemCategory
+    JSR Menu_ItemDataPtrB
+    LDY.b !Menu_Tmp00
+    LDA.l !MenuRom_ItemRec0,X
+    STA.w !Menu_ItemSortKeys,Y
+    INC.b !Menu_Tmp00
+    LDA.b !Menu_Tmp00
+    CMP.b #!Menu_ItemCat3First
+    BCC .sort_key
+    LDA.w !Menu_Unk0D34
+    BEQ .chars
+    LDA.b #!Menu_ItemInfo0Bit1
+    TRB.w !Menu_ItemInfo0+!Menu_ItemIdC8
+.chars:
+    JSL BankFF_UnkF813
+    JSR Menu_RefreshAllChars
+    LDX.w !Menu_Unk2C53
+    STX.w !Menu_GoldCopy
+    LDA.w !Menu_Unk2C53+2
+    STA.w !Menu_GoldCopy+2
+    PLP
+    RTS
+
+; $C2:9988 — Menu_CleanInventory (42 bytes, $9988–$99B1)
+; Empties every inventory slot (id and count = 0) whose count is 0, or
+; whose id is 0, a category's "no item" id ($5A, $7B, $94) or
+; Menu_ItemIdEnd and above.
+; Callers (1 JSR site): Menu_BuildItemTables ($C2:9878).
+; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E
+; Exit:  P restored; X = 0 (256 slots, 8-bit); A clobbered; Y's high
+;        byte cleared when the caller runs with X=0 (the SEP #$30)
+; No calls.
+Menu_CleanInventory:
+    PHP
+    SEP #$30
+    LDX.b #0
+.slot:
+    LDA.w !Menu_InvCounts,X
+    BEQ .empty
+    LDA.w !Menu_InvIds,X
+    BEQ .empty
+    CMP.b #!Menu_ItemCat1First
+    BEQ .empty
+    CMP.b #!Menu_ItemCat2First
+    BEQ .empty
+    CMP.b #!Menu_ItemCat3First
+    BEQ .empty
+    CMP.b #!Menu_ItemIdEnd
+    BCC .next
+.empty:
+    STZ.w !Menu_InvIds,X
+    STZ.w !Menu_InvCounts,X
+.next:
+    INX
+    BNE .slot
+    PLP
+    RTS
+
+; $C2:99B2 — Menu_RefreshAllChars (24 bytes, $99B2–$99C9)
+; For characters 0-6: Menu_LoadCharRec, then Menu_Unk9137 (not
+; analysed: it works on the copy Menu_LoadCharRec made).
+; Callers (1 JSR site): Menu_BuildItemTables ($C2:9977).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp02),
+;        DB=$7E
+; Exit:  P restored; Menu_Tmp02-03 = 7; A, X, Y as the callees leave
+;        them
+; Calls: Menu_LoadCharRec, Menu_Unk9137.
+Menu_RefreshAllChars:
+    PHP
+    REP #$30
+    STZ.b !Menu_Tmp02                   ; the character (a word)
+.char:
+    LDA.b !Menu_Tmp02
+    JSR Menu_LoadCharRec
+    JSR Menu_Unk9137
+    INC.b !Menu_Tmp02
+    LDA.b !Menu_Tmp02
+    CMP.w #!Menu_CharRecCount
+    BCC .char
+    PLP
+    RTS
+
+; ============================================================
+; Menu window style graphics ($C2:C511–$C2:C54F)
+; ============================================================
+
+org $C2C511
+; $C2:C511 — Menu_LoadWindowGfx (55 bytes, $C511–$C547)
+; Loads the tiles of window style Menu_WinStyle (Menu_Config01 bits 0-2,
+; copied by Menu_LoadGraphics): Menu_WinVramAddr = $3DC0;
+; MenuRom_WindowGfx + style x $280 to Menu_WinTileBuf, plane 3 = OR on
+; its $14 tiles (Menu_TilesOrPlane3), Menu_WindowVramRec queued (VRAM
+; $3DC0 = Menu_WinTileBuf, $280 bytes; sent by a later
+; Menu_FlushVramQueue), then the style's colours (Menu_LoadWindowPal).
+; Quirk, harmless: the MVN count is $280, so $281 bytes are copied; the
+; extra byte lands past the $280 that are queued.
+; Callers (2 sites: 1 JSR, 1 JMP): Menu_LoadGraphics (JMP $C2:9847) and unmatched (JSR $C2:C13D).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00 of
+;        Menu_TilesOrPlane3), DB=$7E; Menu_WinStyle set (its low 3 bits are used: the AND of the word
+;        at $0D8B with $0700)
+; Exit:  P restored; DB=$7E; A, X, Y clobbered; Menu_Tmp00 = 0;
+;        Menu_PalDirty incremented
+; Calls: Menu_TilesOrPlane3, Menu_QueueVramRom, Menu_LoadWindowPal.
+Menu_LoadWindowGfx:
+    PHP
+    REP #$30
+    LDA.w #!Menu_WinVramDest
+    STA.w !Menu_WinVramAddr
+    LDA.w !Menu_WinStyle-1              ; the style in the high byte
+    AND.w #!Menu_WinStyleMask<<8
+    LSR A                               ; style x $80
+    PHA
+    ASL A
+    ASL A
+    ADC.b !Menu_StackTopByte,S          ; x $200 + x $80 = x $280 (C=0)
+    ADC.w #!MenuRom_WindowGfx&$FFFF
+    TAX
+    PLA
+    LDY.w #!Menu_WinTileBuf
+    LDA.w #!Menu_WinStyleBytes          ; (one more byte than the style)
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDX.w #!Menu_WinTileBuf
+    LDY.w #!Menu_WinStyleBytes/!Gfx_Tile4bppBytes
+    JSR Menu_TilesOrPlane3
+    LDX.w #Menu_WindowVramRec
+    JSR Menu_QueueVramRom
+    JSR Menu_LoadWindowPal
+    PLP
+    RTS
+
+; $C2:C548 — Menu_WindowVramRec (8 bytes, $C548–$C54F)
+; The Menu_VramRec of Menu_LoadWindowGfx: VRAM $3DC0 = $7E:8800
+; (Menu_WinTileBuf), $280 bytes; the last byte ($20) is not used.
+Menu_WindowVramRec:
+    dw !Menu_WinVramDest, !Menu_WinTileBuf
+    db !Bank7E
+    dw !Menu_WinStyleBytes
+    db $20
+
+; ============================================================
 ; Menu cursor record offset ($C2:EA27–$C2:EA35)
 ; ============================================================
 
@@ -26875,3 +27500,97 @@ Menu_CursorRecOffset:
     PLA
     PLP
     RTS
+
+; ============================================================
+; Menu window style palette ($C2:ED08–$C2:ED30)
+; ============================================================
+
+org $C2ED08
+; $C2:ED08 — Menu_LoadWindowPal (41 bytes, $ED08–$ED30)
+; Copies the 8 colours of window style Menu_WinStyle (bits 0-2) from
+; MenuRom_WindowPals (16 bytes per style) into colours 8-15 of palette
+; row n of Menu_PalBuf, n = bits 2-4 of Menu_Unk0D47's high byte ($0D48;
+; 0 after Menu_LoadGraphics), and increments Menu_PalDirty so the NMI
+; sends the palette.
+; Callers (2 JSR sites): Menu_LoadWindowGfx ($C2:C543) and unmatched ($C2:ED02).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E (C any: each
+;        ADC follows an ASL that leaves C=0)
+; Exit:  P restored; DB=$7E (the MVN); A = $FFFF; X, Y past the copy
+; No calls.
+Menu_LoadWindowPal:
+    PHP
+    REP #$30
+    LDA.w !Menu_WinStyle
+    AND.w #!Menu_WinStyleMask
+    ASL A
+    ASL A
+    ASL A
+    ASL A                               ; x 16 (C=0: the style is below 8)
+    ADC.w #!MenuRom_WindowPals&$FFFF
+    TAX
+    LDA.w !Menu_Unk0D47+1
+    AND.w #!Menu_WinPalRowMask
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!Menu_PalBuf+(8*!Menu_ColorBytes) ; (C=0 from the ASL)
+    TAY
+    LDA.w #(8*!Menu_ColorBytes)-1
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    INC.w !Menu_PalDirty
+    PLP
+    RTS
+
+; ============================================================
+; Menu VRAM upload lists ($C2:FC6F–$C2:FCA5)
+; ============================================================
+
+org $C2FC6F
+; $C2:FC6F — Menu_VramRecsFont (16 bytes, $FC6F–$FC7E)
+; Two Menu_VramRec records Menu_LoadGraphics copies into Menu_VramQueue:
+; VRAM $0000 = Menu_TileBuf ($2000 B) and VRAM $7000 = Menu_Bg3TileBuf
+; ($1000 B).
+Menu_VramRecsFont:
+    dw $0000, !Menu_TileBuf
+    db !Bank7E
+    dw $2000
+    db $00
+    dw $7000, !Menu_Bg3TileBuf
+    db !Bank7E
+    dw $1000
+    db $00
+
+; $C2:FC7F — Menu_VramRecFontB (8 bytes, $FC7F–$FC86)
+; VRAM $1000 = Menu_TileBuf, $1300 bytes (Menu_LoadGraphics step 2).
+Menu_VramRecFontB:
+    dw $1000, !Menu_TileBuf
+    db !Bank7E
+    dw $1300
+    db $00
+
+; $C2:FC87 — Menu_VramRecObj (8 bytes, $FC87–$FC8E)
+; VRAM $4000 (the sprite tiles) = Menu_TileBuf, $800 bytes
+; (Menu_LoadGraphics step 5).
+Menu_VramRecObj:
+    dw $4000, !Menu_TileBuf
+    db !Bank7E
+    dw $0800
+    db $00
+
+; $C2:FC8F — Menu_VramRecsWin (23 bytes, $FC8F–$FCA5)
+; Three records Menu_LoadGraphics copies (24 bytes: the third record's
+; unused last byte is the first byte of MenuRom_DefaultConfig, $C2:FCA6):
+; VRAM $2010 = $FF:0000 ($1F80 B), VRAM $3000 = Menu_TileBuf ($2000 B),
+; VRAM $1E00 = $FF:E55C ($380 B).
+Menu_VramRecsWin:
+    dw $2010, $0000
+    db !MenuRom_DmaCopyBank
+    dw $1F80
+    db $00
+    dw $3000, !Menu_TileBuf
+    db !Bank7E
+    dw $2000
+    db $00
+    dw $1E00, $E55C
+    db !MenuRom_DmaCopyBank
+    dw $0380
