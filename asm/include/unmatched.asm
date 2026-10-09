@@ -50,9 +50,6 @@ Party_UnkA26B:      ; JSR from Evt_OpB0_PartyControl for kind 1: moves Party_Obj
 org $C0A2CE
 Party_UnkA2CE:      ; as Party_UnkA26B for kind 2: Party_ObjSlot2's object, from Field_UnkAD (not
                     ; matched)
-org $C05D6E
-Evt_OpcodeTable:    ; word jump table of event-script opcode handlers (JSR (table,X) in
-                    ; Evt_RunObj0Func1 / Evt_RunObjInit); opcode $00 ends a function
 
 ; --- Other banks, called from bank $C0 ---
 

@@ -14028,7 +14028,7 @@ Evt_Op83_InitEnemySprite:
 ; ============================================================
 ; Event opcodes: object settings and palette animations
 ; ($C0:4867–$C0:4D05)
-; Handlers in Evt_OpcodeTable (unmatched) for the object's flags, speed,
+; Handlers in Evt_OpcodeTable for the object's flags, speed,
 ; place and priority bits, and the two opcodes that start the location's
 ; palette animations: they fill a free FieldAnimB record (the 12-byte
 ; records FieldFD_LoadAnimSetB fills from the location's list, worked on
@@ -32024,6 +32024,276 @@ LocLoad_Unk7F3700Init:
 .Rec4:
     db $96,$00,$00,$FF,$9D,$00
 
+; $C0:5D6E — Evt_OpcodeTable (512 bytes, $5D6E–$5F6D)
+; The event-script opcode handlers, one word per opcode $00-$FF (bank
+; $C0 addresses), indexed by opcode x 2: the script runners read the
+; opcode byte at Evt_Data + the script position, set Y = that offset,
+; double the opcode and JSR (Evt_OpcodeTable,X). The 32 unused opcodes ($01, $3A, $3D, $3E, $45,
+; $46, $6E, $70, $74, $78, $79, $85, $86, $93, $9B, $A2-$A5, $BE, $BF,
+; $C5, $C6, $DB, $E9, $EF, $F5-$F7, $FB-$FD) point at Evt_UnusedOpcode
+; (a halt through Sys_HaltWithColor). Its first two bytes are also read by
+; LocLoad_InitUnk7F3700's 32-byte copies (see LocLoad_Unk7F3700Init).
+; Read by JSR (Evt_OpcodeTable,X) at $C0:5910 (Evt_InitObjects),
+; $C0:5977 (Evt_RunObj0Func1), $C0:59A0 (Evt_RunObjInit) and $C0:5AB1
+; (Evt_RunObjScriptSteps).
+Evt_OpcodeTable:
+    dw Evt_Op00_Return              ; $00
+    dw Evt_UnusedOpcode             ; $01
+    dw Evt_Op02_CallObjFunc         ; $02
+    dw Evt_Op03_CallObjFuncRetry    ; $03
+    dw Evt_Op04_CallObjFuncWait     ; $04
+    dw Evt_Op05_CallPcFunc          ; $05
+    dw Evt_Op06_CallPcFuncRetry     ; $06
+    dw Evt_Op07_CallPcFuncWait      ; $07
+    dw Evt_Op08_BlockCalls          ; $08
+    dw Evt_Op09_AllowCalls          ; $09
+    dw Evt_Op0A_RemoveObj           ; $0A
+    dw Evt_Op0B_StopObjScript       ; $0B
+    dw Evt_Op0C_StartObjScript      ; $0C
+    dw Evt_Op0D_SetUnk1C80          ; $0D
+    dw Evt_Op0E_SetUnk1C81          ; $0E
+    dw Evt_Op0F_FaceUp              ; $0F
+    dw Evt_Op10_JumpFwd             ; $10
+    dw Evt_Op11_JumpBack            ; $11
+    dw Evt_Op12_IfVarByte           ; $12
+    dw Evt_Op13_IfVarWord           ; $13
+    dw Evt_Op14_IfVarVarByte        ; $14
+    dw Evt_Op15_IfVarVarWord        ; $15
+    dw Evt_Op16_IfMemByte           ; $16
+    dw Evt_Op17_FaceDown            ; $17
+    dw Evt_Op18_IfUnk7F0000Below    ; $18
+    dw Evt_Op19_SetUnk7F0A80Var     ; $19
+    dw Evt_Op1A_IfUnk7F0A80         ; $1A
+    dw Evt_Op1B_FaceLeft            ; $1B
+    dw Evt_Op1C_SetUnk7F0A80Mem     ; $1C
+    dw Evt_Op1D_FaceRight           ; $1D
+    dw Evt_Op1E_ObjFaceUp           ; $1E
+    dw Evt_Op1F_ObjFaceDown         ; $1F
+    dw Evt_Op20_GetPartyMember0     ; $20
+    dw Evt_Op21_GetObjTile          ; $21
+    dw Evt_Op22_GetPcTile           ; $22
+    dw Evt_Op23_GetObjFacing        ; $23
+    dw Evt_Op24_GetPcFacing         ; $24
+    dw Evt_Op25_ObjFaceLeft         ; $25
+    dw Evt_Op26_ObjFaceRight        ; $26
+    dw Evt_Op27_IfObjUnk0F00        ; $27
+    dw Evt_Op28_IfObjInsideScreen   ; $28
+    dw Evt_Op29_StartCredits        ; $29
+    dw Evt_Op2A_Field54Bit2         ; $2A
+    dw Evt_Op2B_Field54Bit3         ; $2B
+    dw Evt_Op2C_SetLayer3Pos        ; $2C
+    dw Evt_Op2D_IfAnyHeld           ; $2D
+    dw Evt_Op2E_PalAnim             ; $2E
+    dw Evt_Op2F_SetCreditsPos       ; $2F
+    dw Evt_Op30_IfMapHeldBit1       ; $30
+    dw Evt_Op31_IfMapHeldBit7       ; $31
+    dw Evt_Op32_CreditsLine         ; $32
+    dw Evt_Op33_SetPalette          ; $33
+    dw Evt_Op34_IfHeldA             ; $34
+    dw Evt_Op35_IfHeldB             ; $35
+    dw Evt_Op36_IfHeldX             ; $36
+    dw Evt_Op37_IfHeldY             ; $37
+    dw Evt_Op38_IfHeldL             ; $38
+    dw Evt_Op39_IfHeldR             ; $39
+    dw Evt_UnusedOpcode             ; $3A
+    dw Evt_Op3B_IfMapPressedBit1    ; $3B
+    dw Evt_Op3C_IfMapPressedBit7    ; $3C
+    dw Evt_UnusedOpcode             ; $3D
+    dw Evt_UnusedOpcode             ; $3E
+    dw Evt_Op3F_IfPressedA          ; $3F
+    dw Evt_Op40_IfPressedB          ; $40
+    dw Evt_Op41_IfPressedX          ; $41
+    dw Evt_Op42_IfPressedY          ; $42
+    dw Evt_Op43_IfPressedL          ; $43
+    dw Evt_Op44_IfPressedR          ; $44
+    dw Evt_UnusedOpcode             ; $45
+    dw Evt_UnusedOpcode             ; $46
+    dw Evt_Op47_SetScanlineLimit    ; $47
+    dw Evt_Op48_GetLongByte         ; $48
+    dw Evt_Op49_GetLongWord         ; $49
+    dw Evt_Op4A_SetLongByte         ; $4A
+    dw Evt_Op4B_SetLongWord         ; $4B
+    dw Evt_Op4C_SetLongVarByte      ; $4C
+    dw Evt_Op4D_SetLongVarWord      ; $4D
+    dw Evt_Op4E_CopyData            ; $4E
+    dw Evt_Op4F_SetVarByte          ; $4F
+    dw Evt_Op50_SetVarWord          ; $50
+    dw Evt_Op51_CopyVarByte         ; $51
+    dw Evt_Op52_CopyVarWord         ; $52
+    dw Evt_Op53_GetMemByte          ; $53
+    dw Evt_Op54_GetMemWord          ; $54
+    dw Evt_Op55_GetUnk7F0000        ; $55
+    dw Evt_Op56_SetMemByte          ; $56
+    dw Evt_Op57_InitChar0           ; $57
+    dw Evt_Op58_SetMemVarByte       ; $58
+    dw Evt_Op59_SetMemVarWord       ; $59
+    dw Evt_Op5A_SetUnk7F0000        ; $5A
+    dw Evt_Op5B_AddVarByte          ; $5B
+    dw Evt_Op5C_InitChar1           ; $5C
+    dw Evt_Op5D_AddVarVarByte       ; $5D
+    dw Evt_Op5E_AddVarVarWord       ; $5E
+    dw Evt_Op5F_SubVarByte          ; $5F
+    dw Evt_Op60_SubVarWord          ; $60
+    dw Evt_Op61_SubVarVarByte       ; $61
+    dw Evt_Op62_InitChar2           ; $62
+    dw Evt_Op63_SetVarBit           ; $63
+    dw Evt_Op64_ClearVarBit         ; $64
+    dw Evt_Op65_SetMemBit           ; $65
+    dw Evt_Op66_ClearMemBit         ; $66
+    dw Evt_Op67_AndVarByte          ; $67
+    dw Evt_Op68_InitChar4           ; $68
+    dw Evt_Op69_OrVarByte           ; $69
+    dw Evt_Op6A_InitChar3           ; $6A
+    dw Evt_Op6B_EorVarByte          ; $6B
+    dw Evt_Op6C_InitChar5           ; $6C
+    dw Evt_Op6D_InitChar6           ; $6D
+    dw Evt_UnusedOpcode             ; $6E
+    dw Evt_Op6F_ShrVarByte          ; $6F
+    dw Evt_UnusedOpcode             ; $70
+    dw Evt_Op71_IncVarByte          ; $71
+    dw Evt_Op72_IncVarWord          ; $72
+    dw Evt_Op73_DecVarByte          ; $73
+    dw Evt_UnusedOpcode             ; $74
+    dw Evt_Op75_SetVarByte1         ; $75
+    dw Evt_Op76_SetVarWord1         ; $76
+    dw Evt_Op77_ClearVarByte        ; $77
+    dw Evt_UnusedOpcode             ; $78
+    dw Evt_UnusedOpcode             ; $79
+    dw Evt_Op7A_ArcToTile           ; $7A
+    dw Evt_Op7B_ArcSteps            ; $7B
+    dw Evt_Op7C_SetObjUnk1A81On     ; $7C
+    dw Evt_Op7D_ClearObjUnk1A81     ; $7D
+    dw Evt_Op7E_SetUnk1A81Bit7      ; $7E
+    dw Evt_Op7F_RandomVarByte       ; $7F
+    dw Evt_Op80_InitCharObj         ; $80
+    dw Evt_Op81_InitSprite          ; $81
+    dw Evt_Op82_InitWramSprite      ; $82
+    dw Evt_Op83_InitEnemySprite     ; $83
+    dw Evt_Op84_SetUnk1B01          ; $84
+    dw Evt_UnusedOpcode             ; $85
+    dw Evt_UnusedOpcode             ; $86
+    dw Evt_Op87_SetScriptPeriod     ; $87
+    dw Evt_Op88_ObjPalAnim          ; $88
+    dw Evt_Op89_SetSpeed            ; $89
+    dw Evt_Op8A_SetSpeedVar         ; $8A
+    dw Evt_Op8B_PlaceAtTile         ; $8B
+    dw Evt_Op8C_PlaceAtTileVar      ; $8C
+    dw Evt_Op8D_SetPos              ; $8D
+    dw Evt_Op8E_SetOamFlags         ; $8E
+    dw Evt_Op8F_FollowPc            ; $8F
+    dw Evt_Op90_SetUnk1A81On        ; $90
+    dw Evt_Op91_ClearUnk1A81        ; $91
+    dw Evt_Op92_WalkDir             ; $92
+    dw Evt_UnusedOpcode             ; $93
+    dw Evt_Op94_WalkToObj           ; $94
+    dw Evt_Op95_WalkToPc            ; $95
+    dw Evt_Op96_WalkToTile          ; $96
+    dw Evt_Op97_WalkToTileVar       ; $97
+    dw Evt_Op98_WalkTowardObj       ; $98
+    dw Evt_Op99_WalkTowardPc        ; $99
+    dw Evt_Op9A_WalkTowardTile      ; $9A
+    dw Evt_UnusedOpcode             ; $9B
+    dw Evt_Op9C_MoveDir             ; $9C
+    dw Evt_Op9D_MoveDirVar          ; $9D
+    dw Evt_Op9E_MoveToObj           ; $9E
+    dw Evt_Op9F_MoveToPc            ; $9F
+    dw Evt_OpA0_MoveToTile          ; $A0
+    dw Evt_OpA1_MoveToTileVar       ; $A1
+    dw Evt_UnusedOpcode             ; $A2
+    dw Evt_UnusedOpcode             ; $A3
+    dw Evt_UnusedOpcode             ; $A4
+    dw Evt_UnusedOpcode             ; $A5
+    dw Evt_OpA6_Face                ; $A6
+    dw Evt_OpA7_FaceVar             ; $A7
+    dw Evt_OpA8_FaceObj             ; $A8
+    dw Evt_OpA9_FacePc              ; $A9
+    dw Evt_OpAA_SetAnimRow          ; $AA
+    dw Evt_OpAB_PlayAnimOnce        ; $AB
+    dw Evt_OpAC_ShowFrame           ; $AC
+    dw Evt_OpAD_WaitRuns            ; $AD
+    dw Evt_OpAE_AnimReset           ; $AE
+    dw Evt_OpAF_PartyControlOnce    ; $AF
+    dw Evt_OpB0_PartyControl        ; $B0
+    dw Evt_OpB1_Yield               ; $B1
+    dw Evt_OpB2_Halt                ; $B2
+    dw Evt_OpB3_AnimRow0            ; $B3
+    dw Evt_OpB4_AnimRow1            ; $B4
+    dw Evt_OpB5_FollowObj           ; $B5
+    dw Evt_OpB6_FollowPc            ; $B6
+    dw Evt_OpB7_PlayAnimLoops       ; $B7
+    dw Evt_OpB8_SetMsgPtr           ; $B8
+    dw Evt_OpB9_Wait4               ; $B9
+    dw Evt_OpBA_Wait8               ; $BA
+    dw Evt_OpBB_Msg                 ; $BB
+    dw Evt_OpBC_Wait16              ; $BC
+    dw Evt_OpBD_Wait32              ; $BD
+    dw Evt_UnusedOpcode             ; $BE
+    dw Evt_UnusedOpcode             ; $BF
+    dw Evt_OpC0_MsgChoice           ; $C0
+    dw Evt_OpC1_MsgUnk30_1          ; $C1
+    dw Evt_OpC2_MsgUnk30_2          ; $C2
+    dw Evt_OpC3_MsgChoiceUnk30_1    ; $C3
+    dw Evt_OpC4_MsgChoiceUnk30_2    ; $C4
+    dw Evt_UnusedOpcode             ; $C5
+    dw Evt_UnusedOpcode             ; $C6
+    dw Evt_OpC7_AddItemVar          ; $C7
+    dw Evt_OpC8_EnterBankC2         ; $C8
+    dw Evt_OpC9_IfHasItem           ; $C9
+    dw Evt_OpCA_AddItem             ; $CA
+    dw Evt_OpCB_RemoveItem          ; $CB
+    dw Evt_OpCC_IfHasGold           ; $CC
+    dw Evt_OpCD_AddGold             ; $CD
+    dw Evt_OpCE_RemoveGold          ; $CE
+    dw Evt_OpCF_IfCharListed        ; $CF
+    dw Evt_OpD0_AddCharToReserve    ; $D0
+    dw Evt_OpD1_UnlistChar          ; $D1
+    dw Evt_OpD2_IfCharInParty       ; $D2
+    dw Evt_OpD3_AddCharToParty      ; $D3
+    dw Evt_OpD4_MoveCharToReserve   ; $D4
+    dw Evt_OpD5_BankC2Cmd0A         ; $D5
+    dw Evt_OpD6_DropCharObj         ; $D6
+    dw Evt_OpD7_GetItemCount        ; $D7
+    dw Evt_OpD8_StartBattle         ; $D8
+    dw Evt_OpD9_PartyWalkToTiles    ; $D9
+    dw Evt_OpDA_PartyGather         ; $DA
+    dw Evt_UnusedOpcode             ; $DB
+    dw Evt_OpDC_SetPrevLoc          ; $DC
+    dw Evt_OpDD_SetLoc              ; $DD
+    dw Evt_OpDE_SetLocUnk1E         ; $DE
+    dw Evt_OpDF_WarpNowUnk1E        ; $DF
+    dw Evt_OpE0_Warp                ; $E0
+    dw Evt_OpE1_WarpNow             ; $E1
+    dw Evt_OpE2_WarpVars            ; $E2
+    dw Evt_OpE3_SetControl          ; $E3
+    dw Evt_OpE4_CopyMapRegion       ; $E4
+    dw Evt_OpE5_CopyMapRegionRedraw ; $E5
+    dw Evt_OpE6_SetDrift            ; $E6
+    dw Evt_OpE7_ScrollTo            ; $E7
+    dw Evt_OpE8_SoundCmd18          ; $E8
+    dw Evt_UnusedOpcode             ; $E9
+    dw Evt_OpEA_PlayMusic           ; $EA
+    dw Evt_OpEB_SoundCmds81To83     ; $EB
+    dw Evt_OpEC_SoundCmd            ; $EC
+    dw Evt_OpED_WaitApuio1          ; $ED
+    dw Evt_OpEE_WaitApuio3          ; $EE
+    dw Evt_UnusedOpcode             ; $EF
+    dw Evt_OpF0_FadeBrightness      ; $F0
+    dw Evt_OpF1_FadeFixedColor      ; $F1
+    dw Evt_OpF2_WaitBrightness      ; $F2
+    dw Evt_OpF3_WaitFixedColor      ; $F3
+    dw Evt_OpF4_SetShake            ; $F4
+    dw Evt_UnusedOpcode             ; $F5
+    dw Evt_UnusedOpcode             ; $F6
+    dw Evt_UnusedOpcode             ; $F7
+    dw Evt_OpF8_BankC2Cmd06And07    ; $F8
+    dw Evt_OpF9_BankC2Cmd06         ; $F9
+    dw Evt_OpFA_BankC2Cmd07         ; $FA
+    dw Evt_UnusedOpcode             ; $FB
+    dw Evt_UnusedOpcode             ; $FC
+    dw Evt_UnusedOpcode             ; $FD
+    dw Evt_OpFE_WinQuad             ; $FE
+    dw Evt_OpFF_Misc                ; $FF
+
 ; ============================================================
 ; Event opcodes: function calls and object control ($C0:5F6E–$C0:62B4)
 ; Handlers in Evt_OpcodeTable (unmatched), entered as the movement
@@ -35454,7 +35724,6 @@ Evt_Op77_ClearVarByte:
 ;   RandomTable byte: Field_Unk0400Copy is incremented and indexes it
 ;   (as Obj_SetVelocityChecked does); X = Y + 2, C=1.
 ; Reached through Evt_OpcodeTable (opcode $7F).
-; Callers (1 JMP site): unmatched ($C0:5E6B).
 ; Callers note: the JMP at $C0:5E6B is not code: it is Evt_OpcodeTable's
 ;   bytes (the $4C high byte of entry $7E, then entry $7F, $6D09).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100 (Field_Unk0400Copy /
