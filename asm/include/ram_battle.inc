@@ -274,7 +274,9 @@ struct BattlerStats $5E00
 .Unk6C:     skip 4      ; +$6C: 4 B set to 4 for each PC by BattleFD_UnkB3FE, one of them to 5 by .Unk2E; meaning unknown
             skip 2
 .Unk72:     skip 1      ; +$72: set to $32 by BattleFD_UnkB3EB; meaning unknown
-            skip 5
+.Unk73:     skip 1      ; +$73: the caster's byte BattleSys_UnkE976 copies to !Battle_UnkB29A unless $FF; meaning unknown
+.Unk74:     skip 1      ; +$74: read with .Unk73 by BattleSys_CasterUnk73; meaning unknown
+            skip 3
 .Unk78:     skip 1      ; +$78: bit 6 set = the slot may act in BattleFD_UnkAC6E (probably a counter-attack)
 .Unk79:     skip 1      ; +$79: bit 7 set = BattleFD_UnkB363 ORs .Unk7B into the status byte at .Status + .Unk7A
 .Unk7A:     skip 1      ; +$7A: BattleFD_UnkAC6E: bit 7 set = act at once, clear = set !Battler_UnkAFAB to 1;
@@ -1687,6 +1689,7 @@ endstruct
 !Battle_UnkB2ED           = $B2ED ; 1 B: !Battle_UnkAD8D kept over the parts (each starts with it again)
 !Battle_UnkAE4F           = $AE4F ; 1 B: zeroed before each effect routine; meaning unknown
 !Battle_UnkB29A           = $B29A ; 11 B: zeroed before each effect routine; meaning unknown
+!Battle_UnkAE57           = $AE57 ; 1 B: !Battle_UnkB2CC kept over BattleSys_Effect03 by BattleSys_Effect08
 !Battle_UnkAE5B           = $AE5B ; 2 B: BattleSys_CheckTechMp's scratch (a stats offset, then that battler's MP)
 
 endif

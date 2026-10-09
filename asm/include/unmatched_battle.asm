@@ -282,24 +282,24 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1D221
-BattleSys_Effect00:                     ; BattleSys_EffectTable entry $00; not analysed
-org $C1D23E
-BattleSys_Effect01:                     ; ... entry $01; not analysed
-org $C1D267
-BattleSys_Effect02:                     ; ... entry $02; not analysed
-org $C1D2DE
-BattleSys_Effect03:                     ; ... entry $03; not analysed
-org $C1D370
-BattleSys_Effect04:                     ; ... entry $04 (an RTS, probably: one byte before $C1:D371)
-org $C1D371
-BattleSys_Effect05:                     ; ... entry $05; not analysed
-org $C1D3BF
-BattleSys_Effect06:                     ; ... entry $06; not analysed
-org $C1D3F4
-BattleSys_Effect07:                     ; ... entry $07; not analysed
-org $C1D431
-BattleSys_Effect08:                     ; ... entry $08; not analysed
+org $C1DC64
+BattleSys_UnkDC64:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DCAD
+BattleSys_UnkDCAD:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DE87
+BattleSys_UnkDE87:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DE9E
+BattleSys_UnkDE9E:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1DEF0
+BattleSys_UnkDEF0:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E0F5
+BattleSys_UnkE0F5:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E65F
+BattleSys_UnkE65F:                      ; JSR from BattleSys_Effect03; not analysed
+org $C1E77B
+BattleSys_UnkE77B:                      ; JSR from BattleSys_Effect05; not analysed
+org $C1E9D5
+BattleSys_UnkE9D5:                      ; JSR from BattleSys_Effect03/06; not analysed
 org $C1DA37
 BattleSys_UnkDA37:                      ; JSR from BattleSys_Effect29/2A and $C1:D221-$C1:D48E; not analysed
 org $C1DB5E

@@ -863,6 +863,20 @@ if !constants_battle_inc == 0
 !Battle_AE4DBit5         = $20    ; !Battle_UnkAE4D bit 5; meaning unknown
 !Battle_EnemyPartNone    = $FF    ; an enemy record's part number: no effect
 !Battle_TechFlagsStopBit = $80    ; enemy record flags bit 7: with !Battle_UnkB200 bit 7, no hit set merge
+!Battle_EffByte1Mask     = $1F    ; effect byte 1 bits 4-0: DP $18 of BattleSys_EffRecArgsUnk66
+!Battle_EffResultMiss    = $80    ; DP $16 after $C1:DBAA in BattleSys_Effect02: a miss
+!Battle_EffResultMissFE  = $FE    ; DP $16 after $C1:E9D5 in BattleSys_Effect06: a miss
+!Battle_EffResultNoneFF  = $FF    ; ... $FF: !Battle_UnkB200 bit 7 (a dead store there)
+!Battle_AE4DBit4         = $10    ; !Battle_UnkAE4D bit 4: BattleSys_Effect03 skips its first test
+!Battle_AE4DBit2         = $04    ; bit 2: BattleSys_Effect03 also runs BattleSys_UnkE976
+!Battle_AE4DBit1         = $02    ; bit 1: BattleSys_Effect03 also runs $C1:E9D5
+!Battle_Eff05Bit7        = $80    ; BattleSys_Effect05: effect byte 1 bits that each run $C1:E77B
+!Battle_Eff05Bit6        = $40
+!Battle_Eff05Bit7Arg     = 3      ; DP $1A for the bit-7 run
+!Battle_Eff05Bit6Arg     = 7      ; DP $1A for the bit-6 run
+!Battle_Eff05Bit6Arg16   = 20     ; DP $16 for the bit-6 run
+!Battle_MissSecondBit7   = $80    ; effect byte 11 bits: BattleSys_RecordMiss also sets !Battle_ActFlagSecond (bit 7
+!Battle_MissSecondBit6   = $40    ;   with DP $1C = 0, bit 6 with DP $1C = 1)
 !Battle_HighByteMask     = $FF00  ; the high byte of a 16-bit value (the Battle_Scale* Byte forms keep it)
 !Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 
