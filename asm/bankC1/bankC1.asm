@@ -23648,8 +23648,9 @@ BattleAi_TestStatusBits:
 ;   in BattleAi_RunMainPart and BattleSys_Unk8461).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
 ;        !Battle_UnkB1D2 = the record, !Battle_UnkB252 = the enemy entry
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 2;
-;        with targets: DP $08 = the id, DP $06/$07 = the marked count,
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 2
+;        with targets (+ 1 without); with targets: DP $08 = the id, DP
+;        $06/$07 = the marked count,
 ;        !BattleAi_Targets and !BattleAi_TargetCount written; plus what
 ;        BattleAi_TestPassed changes when it runs
 BattleAi_TestTargetId:
@@ -23887,8 +23888,9 @@ BattleAi_TestUnkB320:
 ;   in BattleAi_RunMainPart and BattleSys_Unk8461).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
 ;        !Battle_UnkB1D2 = the record, !Battle_UnkB252 = the enemy entry
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 2;
-;        with targets: DP $08 = the value's low byte, DP $09 = 0, DP
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 2
+;        with targets (+ 1 without); with targets: DP $08 = the value's
+;        low byte, DP $09 = 0, DP
 ;        $0A/$0B = the count looked at, DP $0C/$0D = the marked count,
 ;        !BattleAi_Targets and !BattleAi_TargetCount written; plus what
 ;        BattleAi_TestPassed changes when it runs
@@ -23965,8 +23967,9 @@ BattleAi_TestHpAtMost:
 ;   in BattleAi_RunMainPart and BattleSys_Unk8461).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
 ;        !Battle_UnkB1D2 = the record, !Battle_UnkB252 = the enemy entry
-; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 3;
-;        with targets: DP $0A/$0B = the offset, DP $08 = the value, DP
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !Battle_UnkB1D2 + 3
+;        with targets (+ 1 without); with targets: DP $0A/$0B = the
+;        offset, DP $08 = the value, DP
 ;        $0E/$0F = the entry reached; plus what BattleAi_PickMarkedTarget
 ;        and BattleAi_TestPassed change when they run
 BattleAi_TestStatByteAtLeast:
@@ -25287,8 +25290,9 @@ BattleAi_TestUnkB158:
 ; runs later through BattleAi_RunTable. Several are a bare RTS.
 
 ; $C1:9810 — BattleAi_ChooseAnimTarget (42 bytes, $9810–$9839)
-; BattleAi_ChooseTable entry $00. Record [$00, target code, anim, ...].
-; BattleAi_ReadTargets (record byte 1); !BattleAi_ActArg = byte 2; then
+; BattleAi_ChooseTable entry $00. Record [$00, -, target code, anim]:
+; it steps !Battle_UnkB1D2 on by 1 itself, then BattleAi_ReadTargets
+; steps again and reads record byte 2; !BattleAi_ActArg = byte 3; then
 ; the enemy's !Enemy_AnimWanted = it and !Enemy_TargetWanted =
 ; !BattleAi_Targets[0].
 ; Callers note: none by call; BattleAi_ChooseTable entry $00 (JSR (T,X)
@@ -25297,7 +25301,7 @@ BattleAi_TestUnkB158:
 ;        !Battle_UnkB1D2 = the record, !Battle_UnkB252 = the enemy entry
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = !BattleAi_Targets[0]; X = the
 ;        enemy entry; Y as BattleAi_ReadTargets leaves it;
-;        !Battle_UnkB1D2 + 2; the RAM above written, plus what
+;        !Battle_UnkB1D2 + 3; the RAM above written, plus what
 ;        BattleAi_ReadTargets changes
 BattleAi_ChooseAnimTarget:
     LDX.w !Battle_UnkB1D2
@@ -26528,14 +26532,16 @@ BattleAi_RunNop0E:
     RTS
 
 ; $C1:9E63 — BattleAi_RunMessage (21 bytes, $9E63–$9E77)
-; BattleAi_RunTable entry $0F. Record [$0F, message]: a non-zero message
-; goes to BattleMsg_UnkVecCD0033; !BattleAi_RunMode = !BattleAi_RunNone.
+; BattleAi_RunTable entry $0F. Record [$0F, byte]: a non-zero byte goes
+; to BattleMsg_UnkVecCD0033; !BattleAi_RunMode = !BattleAi_RunNone. The
+; byte is a message, probably (hence the name): it only goes to that
+; vector, which is not analysed.
 ; Callers note: none by call; BattleAi_RunTable entry $0F (JSR (T,X)
 ;   in BattleAi_EnemyTurn).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
 ;        !Battle_UnkB1D2 = the record
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = !BattleAi_RunNone; X = the record,
-;        Y unchanged (unless the message vector changes them); plus what
+;        Y unchanged (unless the vector changes them); plus what
 ;        BattleMsg_UnkVecCD0033 changes when it runs
 BattleAi_RunMessage:
     LDX.w !Battle_UnkB1D2
@@ -27332,8 +27338,10 @@ BattleAi_AddStatByteAtY:
 ;   BattleAi_RunTech ($C1:9A8C, $C1:9AB2), BattleAi_RunSetStatsTech ($C1:A09B, $C1:A0C1),
 ;   BattleAi_RunAddUnkB158 ($C1:A14E) and BattleAi_RunAddStatsTech ($C1:A2E3, $C1:A309).
 ; Callers of BattleAi_ReadTargets_Code (1 JSR site): BattleAi_TestStatusBits ($C1:8F39).
-; Entry: M=1, X=0, DP any (not used), DB=$7E; !Battle_UnkB1D2 = the
-;        address just before the target code. Sub-entry: A = the code
+; Entry: M=1, X=0, DP=0 (for the target handlers: handler $09 at
+;        $C1:A541 does STX $0A, which BattleAi_TargetsByPcByte reads),
+;        DB=$7E; !Battle_UnkB1D2 = the address just before the target
+;        code. Sub-entry: A = the code
 ;        (0-$7F), B = 0 (the 16-bit TAX of code * 2)
 ; Exit:  M=1, X=0 (as the code assumes after the target handler, not
 ;        analysed), DB=$7E; A = !BattleAi_Targets[0]; X = the code's
@@ -29694,9 +29702,10 @@ BattleAi_ChooseTable:
 ; !BattleAi_RunMode for it (handler $00 sets 2: nothing is played):
 ; $01 an attack and $02 a tech (probably), $12/$15 the same tech path
 ; after setting / adding stat-block bytes; $07 swaps in a waiting
-; enemy, $09 and $0A take the enemy out, $10 and $16 bring enemies
-; back; $05 chooses again; $0B, $0C, $11, $14 change stat-block bytes,
-; $13 !Battle_UnkB158, $0D a few flags, $0F only shows a message;
+; enemy, it seems, $09 and $0A take the enemy out, $10 and $16 bring
+; enemies back; $05 chooses again; $0B, $0C, $11, $14 change stat-block
+; bytes, $13 !Battle_UnkB158, $0D a few flags, $0F only passes a byte
+; to BattleMsg_UnkVecCD0033 (a message, probably);
 ; $03, $04, $06, $08 and $0E do nothing.
 BattleAi_RunTable:
     dw BattleAi_RunNothing         ; $00
