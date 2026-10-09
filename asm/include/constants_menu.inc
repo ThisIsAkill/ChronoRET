@@ -522,7 +522,6 @@ if !constants_menu_inc == 0
 !C2Scene_MapGradLevels = $10             ; steps per half (blue 0-15, then 16-31)
 !C2Scene_MapGradRun = $F0                ; HDMA line-count byte: repeat (bit 7), 112 lines
 !C2Scene_MapLabelVram = $6200            ; VRAM word of sprite tile $20: where the label goes
-!C2SceneRom_MapLabelStrs = $C6F400       ; 16-bit string addresses (bank $C6), the label's TextWin_StrTable
 !C2Scene_MapLabelA = $6C                 ; label string replaced by C2Scene_MapLabelEarly while
 !C2Scene_MapLabelAFlag = $36             ; C2Scene_Flag0Copy is below this
 !C2Scene_MapLabelB = $6B                 ; label string replaced by it while C2Scene_FlagTailCopy+6
@@ -531,7 +530,6 @@ if !constants_menu_inc == 0
 !C2Scene_MapLabelGlyphs = $0C            ; TextWin_StepCount for the label's one TextWin_Step
 
 ; --- The dial (C2Scene_Dial, scene mode 8) ---
-!C2Scene_ModeDial = 8                    ; C2Scene_Mode8: C2Scene_Dial runs while the mode stays this
 !C2Scene_DialBg1X = $FF80                ; C2Scene_Bg1HScroll in the dial (-128)
 !C2Scene_DialBg1Y = $FF90                ; C2Scene_Bg1VScroll (-112)
 !C2Scene_M7OneHigh = $01                 ; high byte of 1.0 in a mode-7 matrix value
@@ -553,7 +551,7 @@ if !constants_menu_inc == 0
 !C2Scene_DialTurnStep = 4                ; hand angle units per frame
 !C2Scene_DialMarks = 7                   ; markers (and C2Scene_DialLocs entries)
 !C2Scene_DialLastSel = 6
-!C2Scene_DialNoDest = $FFFF              ; C2Scene_DialDest after a cancel
+!C2Scene_DialNoDest = $FFFF              ; C2Scene_ObjANextLoc after a cancel
 !C2Scene_DialSfxSame = $01               ; C2Scene_SoundCmd18 argument when the current location is picked
 !C2Scene_DialLateFlag = $CC              ; C2Scene_Flag0Copy from which C2Scene_DialLocsLate is used
 !C2Scene_DialHandBuf = $01               ; C2Scene_DialFlags bit 0: C2Scene_HandBufB is on screen
@@ -564,8 +562,6 @@ if !constants_menu_inc == 0
 !C2Scene_HandPointCount = 3              ; points (and edges) of the hand
 !C2Scene_SwirlPhase = $0080              ; added to the angle for the M7B/M7C sine (1/8 turn)
 !C2Scene_SwirlLineStep = 4               ; angle units per line (and per frame)
-!C2Scene_DialMarkAttr = $B0              ; C2Scene_Task.SprAttr of the markers: C2Scene_SprAttrScroll
-                                         ; and priority 3
 !C2Scene_DialPack0Bank = $C3             ; source bank of C2Scene_DialPacks entry 0
 !C2Scene_DialPack12Bank = $C6            ; and of entries 1 and 2
 !C2Scene_DialObjVramB = $6400            ; sprite tile $40
@@ -588,5 +584,99 @@ if !constants_menu_inc == 0
 !Menu_FrameDone = $FF                    ; Menu_FrameReady after the NMI's upload
 !Menu_StackTopByte = $01                 ; stack-relative offset of the byte pushed last
 !Menu_PadHeldNoBit0 = $FFFE              ; Menu_PadHeld bits that count as held for the repeat stage
+; --- Object A's tasks (C2Scene_ObjATask, C2Scene_ObjAMarkTask, C2Scene_ObjASpotWatch) ---
+!C2Scene_ObjAFlag5 = $20                 ; C2Scene_Unk0294 bit 5: object A goes up and is steered when the
+                                         ; party is in (else it starts mode 8 at once) and uses the other
+                                         ; animations; who sets it is not traced
+!C2Scene_ObjAInMode8 = $10               ; bit 4: set when object A starts scene mode C2Scene_ModeUnk8,
+                                         ; cleared when it goes on afterwards
+!C2Scene_ObjAOnSpot = $08                ; bit 3: object A overlaps the spot at C2Scene_SpotX/Y
+                                         ; (C2Scene_ObjASpotWatch)
+!C2Scene_ObjASpotBits = $0C              ; bits 2-3 (C2Scene_Unk0294Bit2 and C2Scene_ObjAOnSpot)
+!C2Scene_ModeUnk8 = 8                    ; C2Scene_Mode8: C2Scene_Dial runs while the mode stays this; set
+                                         ; by object A
+!C2Scene_ObjAStWait = 1                  ; C2Scene_ObjTask.State values of C2Scene_ObjATask
+!C2Scene_ObjAStFly = 3                   ; (C2Scene_ObjAStates)
+!C2Scene_ObjAStLand = 5
+!C2Scene_ObjAStMode8 = 6
+!C2Scene_ObjAStScript = 7
+!C2Scene_ObjAStWaitEmpty = 8
+!C2Scene_ObjAttrPrio2 = $A0              ; C2Scene_Task.SprAttr: C2Scene_SprAttrScroll and OAM priority 2
+!C2Scene_ObjAttrPrio3 = $B0              ; the same with priority 3 (attribute bits 4-5); also the dial's
+                                         ; markers (C2Scene_DialMarkInit)
+!C2Scene_AnimObjARest = $2D              ; object A's animation at rest
+!C2Scene_AnimObjARest5 = $18             ; and with C2Scene_ObjAFlag5
+!C2Scene_AnimObjARise = $19              ; while it goes up (C2Scene_ObjAWait)
+!C2Scene_AnimObjALand = $1A              ; while it comes down (C2Scene_ObjAFly)
+!C2Scene_AnimMarkAbove = $4E              ; the mark tasks' sprite above object A or B (or a mate)
+!C2Scene_AnimMarkBelow = $1F              ; and below it while it is up
+!C2Scene_SoundCmd86 = $86                ; sound command C2Scene_ObjAInit sends (arguments 0, 0); meaning not
+                                         ; traced
+!C2Scene_ObjASongArg = $13               ; C2Scene_SoundCmd10 argument of C2Scene_ObjASound (probably a song)
+!C2Scene_Flag0ObjAGo1DD = $D3            ; C2Scene_Flag0Copy value with which object A, once up, starts
+                                         ; C2Scene_ObjAScrGo1DD (meaning not traced)
+!C2Scene_RiseFrames = $30                ; frames the objects (and mates) move up at -0.5: 24 pixels
+!C2Scene_LandFrames = $31                ; frames they move down when landing
+!C2Scene_RiseAttrAt = 8                  ; .Frames at which a rising sprite gets OAM priority 3
+!C2Scene_LandAttrAt = $20                ; and a landing one priority 2 again
+!C2Scene_Lift = $0018                    ; 24 pixels: how far the objects' sprites go up
+!C2Scene_LiftUp = $FFE8                  ; -24
+!C2Scene_HalfPixel = $8000               ; a velocity fraction word: half a pixel a frame
+!C2Scene_ObjALandMask = $0707            ; property nibble bits 0-2 (two nibbles a word) that keep object A
+                                         ; from coming down
+!C2Scene_ObjAJumpPx = $0200              ; pixels C2Scene_ObjAJump moves the task in X
+!C2Scene_ObjALoc1D9 = $01D9              ; C2Scene_ObjANextLoc values C2Scene_ObjAAfterMode8 treats apart
+!C2Scene_ObjALoc1F7 = $01F7
+!C2Scene_ObjALoc1F2 = $01F2
+!C2Scene_ObjALoc1D8 = $01D8              ; and the ones it puts there instead
+!C2Scene_ObjALoc1B0 = $01B0
+!C2Scene_ObjALoc0F3 = $00F3
+!C2Scene_Tile7x8 = $0807                 ; Loc_EntryX/Y as a word: tile X 7, Y 8
+!C2Scene_Tile7x24 = $1807                ; X 7, Y 24
+!C2Scene_Tile8x12 = $0C08                ; X 8, Y 12
+!C2Scene_Unk7F00CCBit0 = $01             ; the C2Scene_Unk7F00CC bit set for C2Scene_ObjALoc1F2
+!C2Scene_Unk1B58Spot = $4C               ; C2Scene_Unk1B58 while object A is on the spot
+!C2SceneRom_ObjAPalA = $C6F5E0           ; 16 colors object A's scripts fade palettes to (bank $C6)
+!C2SceneRom_ObjAPalB = $C6F600           ; 16 colors C2Scene_ObjAScrLeave sets palette 0 to
+
+; --- Object B's tasks and its mates (C2Scene_ObjBTask, C2Scene_ObjBMateTask and their mark tasks) ---
+!C2Scene_ObjBLanding = $20               ; C2Scene_ObjBFlags bit 5: object B is coming down (set by
+                                         ; C2Scene_ObjBFly, cleared by C2Scene_ObjBLand); the mates go back
+!C2Scene_ObjBStWait = 1                  ; C2Scene_ObjTask.State values of C2Scene_ObjBTask
+!C2Scene_ObjBStFly = 3
+!C2Scene_ObjBStLand = 5
+!C2Scene_ObjBAttrPrio2 = $A8             ; object B's .SprAttr: palette 4 (bits 1-3), C2Scene_SprAttrScroll,
+!C2Scene_ObjBAttrPrio3 = $B8             ; OAM priority 2 or 3
+!C2Scene_AnimObjBRest = $24              ; object B's (and its mates') animation at rest
+!C2Scene_AnimObjBRise = $29              ; object B's while it goes up or down
+!C2Scene_AnimObjBDown = $25              ; C2Scene_ObjBFaceAnims' facing-down entry, loaded as a constant
+!C2Scene_ObjBNoLandCols = $0E            ; BankC6_UnkE74E's rectangle where object B does not come down:
+!C2Scene_ObjBNoLandRows = $34            ; 8x8 columns 0-13, rows 0-51
+!C2Scene_MateStWait = 1                  ; C2Scene_FollowTask.State values of the mate tasks
+!C2Scene_MateStFollow = 3
+!C2Scene_MateStLand = 5                  ; (C2Scene_ObjBMateTask)
+!C2Scene_MateMarkStLand = 4              ; (C2Scene_ObjBMateMarkTask)
+!C2Scene_NoFacing = $FF                  ; .PrevFacing that matches no facing (forces the animation)
+!C2Scene_SprAttrPrioMask = $30           ; C2Scene_Task.SprAttr bits 4-5: the OAM priority (3 when all set)
+!C2Scene_SprAttrPrio2 = $20              ; priority 2
+!C2Scene_AnimMate1Glide = $6F            ; slot 1's mate going up or back to object B
+!C2Scene_AnimMate2Glide = $74            ; slot 2's
+!C2Scene_MateAimFrames = 4               ; frames a mate moves before it aims again
+!C2Scene_MateGlideFrames = $30           ; frames C2Scene_ObjBMateGlideVel's velocity takes to the target
+!C2Scene_SignByte = $FF                  ; the high byte that sign-extends a negative byte
+!C2Scene_MateMarkDrop = $0030            ; 48 pixels: a mate's mark below the mate while up
+!C2Scene_MateMarkDropUp = $FFD0          ; -48
+
+; --- The label task (C2Scene_LabelTask) ---
+!C2Scene_LabelStWait = 1                 ; C2Scene_ObjTask.State of C2Scene_LabelWait
+!C2SceneRom_LabelStrings = $C6F400       ; the string table C2Scene_LabelTask draws from (bank $C6): 16-bit
+                                         ; string addresses; also C2Scene_MapViewLabel's TextWin_StrTable
+!C2Scene_LabelHalfOfs = $0200            ; buffer offset of the text's second half (the lower 8 rows)
+!C2Scene_LabelVramTop = $1E00            ; VRAM word addresses of the two halves
+!C2Scene_LabelVramBottom = $1F00
+!C2Scene_LabelDmaBytes = $0180           ; bytes uploaded per half (12 tiles of 32 bytes)
+!C2Scene_LabelBelowObjA = $0040          ; pixels below object A the label goes while the party is in it
+!C2Scene_LabelPieces = 6                 ; the first byte of the frame at C2Scene_Unk8604 (probably its piece
+                                         ; count)
 
 endif

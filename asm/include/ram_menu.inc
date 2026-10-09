@@ -338,6 +338,24 @@ endstruct align 8
 !C2Scene_Unk1B59 = $1B59                 ; 8-bit; zeroed by C2Scene_LoadScene; use unknown
 !C2Scene_Unk1BF7 = $1BF7                 ; 8-bit; zeroed by C2Scene_LoadScene and by C2Scene_LeaderInput
                                          ; when a step starts; use unknown
+!C2Scene_ObjANextLoc = $02AF            ; 16-bit; zeroed by object A before scene mode C2Scene_ModeUnk8;
+                                         ; the dial (C2Scene_Dial, mode 8) writes the Loc_Id it picked, or
+                                         ; C2Scene_DialNoDest on a cancel; C2Scene_ObjAAfterMode8 waits for
+                                         ; it: negative = none, else a Loc_Id the party leaves for
+!C2Scene_ObjAAloft = $1BEF               ; 8-bit; 1 while object A is up (C2Scene_ObjARise to
+                                         ; C2Scene_ObjAFly's landing), 0 otherwise (C2Scene_ObjAMarkShow)
+!C2Scene_SpotX = $02A2                   ; 16-bit centre X of the spot C2Scene_ObjASpotWatch tests
+                                         ; (who sets it is not traced)
+!C2Scene_SpotY = $02A4                   ; 16-bit centre Y
+!C2Scene_Unk7F00CC = $7F00CC             ; 8-bit in Menu_FlagBlock7F; bit 0 set by C2Scene_ObjAAfterMode8
+                                         ; (C2Scene_ObjALoc1F2); meaning not traced
+!C2Scene_Unk7F00CD = $7F00CD             ; 8-bit; zeroed by C2Scene_ObjAAfterMode8; meaning not traced
+!C2Scene_ObjBAloft = $1BF0               ; 8-bit; 1 while object B is up (C2Scene_ObjBRise to its landing),
+                                         ; 0 otherwise (C2Scene_ObjBMarkShow)
+!C2Scene_ObjBMate1X = $02A6              ; 16-bit position of slot 1's mate of object B
+!C2Scene_ObjBMate1Y = $02A8              ; (C2Scene_ObjBMateSavePos; its mark task follows it)
+!C2Scene_ObjBMate2X = $02AA              ; and of slot 2's
+!C2Scene_ObjBMate2Y = $02AC
 !C2Scene_Unk1BF1 = $1BF1                 ; 16-bit; the leader's .XVel after each frame of a step or a
                                          ; C2Scene_LeaderBoard move (read by unmatched code)
 !C2Scene_Unk1BF3 = $1BF3                 ; 16-bit; and its .YVel
@@ -394,11 +412,13 @@ endstruct align 8
 !C2Scene_ListB = $7E8300                 ; 3-byte entries; use unknown
 !C2Scene_ListD = $7E8480                 ; 2-byte entries: addresses of scripts in bank $7F (the scene
                                          ; script's, C2Scene_ScriptBuf), started by C2Scene_Mode3
-!C2Scene_Unk8600 = $7E8600               ; 4 B C2Scene_Unk5775 copies from C2Scene_Unk8600Init (use not traced)
-!C2Scene_Unk8604 = $7E8604               ; 25 B C2Scene_Unk5775 copies from C2Scene_Unk8604Init; probably
-                                         ; HDMA tables, as the area after them (unverified)
+!C2Scene_Unk8600 = $7E8600               ; 4 B C2Scene_Unk5775 copies from C2Scene_Unk8600Init: C2Scene_LabelTask's
+                                         ; animation script (shows the frame at C2Scene_Unk8604)
+!C2Scene_Unk8604 = $7E8604               ; 25 B C2Scene_Unk5775 copies from C2Scene_Unk8604Init: the sprite
+                                         ; frame of C2Scene_LabelTask (its first byte set to C2Scene_LabelPieces)
 !C2Scene_HdmaArea = $7E8621              ; $800 B $7E:8621-$8E20 zeroed by C2Scene_ClearHdmaArea (holds
-                                         ; C2Scene_HdmaValues and C2Scene_HdmaTable)
+                                         ; C2Scene_HdmaValues and C2Scene_HdmaTable); C2Scene_LabelTask
+                                         ; draws its text into the start of it
 !C2Scene_UnkB800 = $7EB800               ; C2Scene_LoadUnkB800's pack; use unknown
 !C2Scene_UnkC000 = $7EC000               ; C2Scene_LoadUnkC000's pack; use unknown
 !C2Scene_UnkC600 = $7EC600               ; C2Scene_LoadUnkC600's pack; use unknown
@@ -618,6 +638,27 @@ struct C2Scene_WalkTask $0000
             skip $12
 endstruct
 
+; Object A's task (C2Scene_ObjATask) and its mark task: the fields after
+; C2Scene_Task's motion words (+$22-$25 and the targets as C2Scene_WalkTask).
+struct C2Scene_ObjTask $0000
+            skip 2     ; +$00 .Handler
+.State:     skip 1     ; +$02 = C2Scene_Task.Unk02: the state (C2Scene_ObjAStates)
+            skip $1F   ; +$03-$21: as C2Scene_Task (.Frames counts a timed move)
+.PropUL:    skip 1     ; +$22 C2Scene_GetTileProps' nibbles, as C2Scene_WalkTask; the scripts
+.PropUR:    skip 1     ; also use +$22 as a loop count
+.PropDL:    skip 1
+.PropDR:    skip 1
+.Duration:  skip 1     ; +$26 frames C2Scene_ObjARise / C2Scene_ObjALand move
+.PrevFacing: skip 1    ; +$27 .Facing before the last change
+.Facing:    skip 1     ; +$28 0-3 (C2Scene_FacingUp...)
+            skip 1
+.TargetX:   skip 2     ; +$2A where the current step ends (C2Scene_SetStepTarget)
+.TargetY:   skip 2     ; +$2C
+.PropBL:    skip 1     ; +$2E the nibble of the tile below .PropDL (C2Scene_ObjAGetProps)
+.PropB:     skip 1     ; +$2F and of the tile below .PropDR
+            skip $10
+endstruct
+
 ; One node of the scene's sprite list (C2Scene_SprAdd, C2Scene_SprDrawNode),
 ; 16 B, at C2Scene_SprNodes + $10 * n. The list heads C2Scene_SprActiveHead
 ; and C2Scene_SprFreeHead are only .Prev and .Next.
@@ -673,8 +714,6 @@ endstruct
 !C2Scene_DialEdgeX = $1BDC               ; X, 8.8
 !C2Scene_DialEdgeLines = $1BE2           ; lines left - 1 (the low byte counts)
 !C2Scene_DialFlags = $1BF5               ; 8-bit; buffer flags C2Scene_DialHandBuf/SwirlBuf/FlagBit2
-!C2Scene_DialDest = $02AF                ; 16-bit; the Loc_Id the dial picked, or C2Scene_DialNoDest on a
-                                         ; cancel (who reads it is not traced)
 !C2Scene_HandBufA = $7E8B56              ; the two hand buffers: WH0/WH1 per line (C2Scene_HdmaBufBytes)
 !C2Scene_HandBufB = $7E8DF6
 !C2Scene_SwirlCosA = $7E9176             ; the swirl's M7A/M7D values per line, buffer A
