@@ -1,7 +1,5 @@
 # ChronoRET — Chrono Trigger (SNES) Matching Decompilation
 
-**[Documentation: Kajar](https://thisisakill.github.io/Kajar-site/)**
-
 A personal side project for learning 65816 assembly and SNES reverse engineering.
 I started this to understand how the game actually works at the machine level —
 it's just me working through the code as I go, not a professional or team effort.
