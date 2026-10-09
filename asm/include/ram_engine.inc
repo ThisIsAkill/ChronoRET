@@ -99,8 +99,12 @@ if !ram_engine_inc == 0
                                          ; ? 0 : 6). What bank $C2 does with it is not traced (was
                                          ; Field_ExitMenuArg; nothing shows it picks a menu)
 !Field_Unk26 = $26                       ; 8-bit state index; EngFD_UnkC2C1 dispatches on it;
-                                         ; Field_FadeToBankC2Mode5 toggles bits 0-1
-!Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState
+                                         ; Field_FadeToBankC2Mode5 toggles bits 0-1. 0: plain HDMA
+                                         ; tables, 1/2: a band at the top/bottom (FieldHdma_Build*);
+                                         ; the message window's place (Field_Unk1F87 sets 1 or 2)
+!Field_Unk27 = $27                       ; 8-bit; cleared with Field_Unk26 by Field_SaveState; half
+                                         ; the height of the FieldHdma band (0: no band); the message
+                                         ; window's opening, 0-40 (Field_Unk1F87 steps it to $28)
 !Field_HdmaEnable = $28                  ; 8-bit HDMA channel mask: the NMI handler writes it to HDMAEN
                                          ; ($C0:EC48); Field_InitLoadState sets $5F (was Field_Unk28)
 !Field_Unk29 = $29                       ; 8-bit message state; Field_Unk1F87 dispatches on it;
@@ -742,7 +746,8 @@ if !ram_engine_inc == 0
                                          ; copied after the CGWSEL
                                          ; slot into $7E:2C6B by $C0:06AF (see Ppu_Unk0BD7)
 !Ppu_Unk0BE0 = $0BE0                     ; 8-bit; written with Ppu_Unk0BDF by Field_HookWinFixedB,
-                                         ; and by Evt_OpF1_FadeFixedColor; no reader traced
+                                         ; and by Evt_OpF1_FadeFixedColor; FieldHdma_FillDataA/B copy
+                                         ; it to the CGADSUB byte of Hdma_ColorMath (HDMA channel 6)
 !Field_Unk0BD9 = !Ppu_W12SelShadow       ; older name of Ppu_W12SelShadow, still used by
                                          ; Field_InitLoadState (rename there on its next edit)
 !Field_Unk0BDA = !Ppu_W34SelShadow       ; older name of Ppu_W34SelShadow (as Field_Unk0BD9)
@@ -761,7 +766,8 @@ if !ram_engine_inc == 0
 !Field_Unk0BE9 = $0BE9                   ; 8-bit; zeroed by Field_InitLoadState; Evt_Op29_StartCredits
                                          ; sets 1 or 2; LocLoad_DrawMap copies it to Map_Unk1D86 when nonzero
 !Field_Unk1DF9 = $1DF9                   ; 8-bit; saved to SceneSave_Unk1DF9 around the menu
-                                         ; (Field_SaveState / Field_RestoreState)
+                                         ; (Field_SaveState / Field_RestoreState); nonzero puts the
+                                         ; per-line wave on BG3's HDMA scroll (FieldHdma_*)
 !Audio_CmdId = $1E00                     ; 8-bit sound-driver command byte ($19 = play sound effect),
                                          ; sent by Audio_DriverCommand
 !Audio_CmdArg0 = $1E01                   ; 8-bit first command argument (sound-effect id in
@@ -1289,6 +1295,53 @@ if !ram_engine_inc == 0
                                          ; channel 5)
 !Hdma_Unk7F1538 = $7F1538                ; $100 B: (CGADSUB, COLDATA) pairs built by EngFD_UnkD52D
 !Hdma_Unk7F1600 = $7F1600                ; $100 B: its copy (EngFD_UnkD52D's MVN)
+; The two sets of 8 HDMA indirect tables (Hdma_InitChannelsFD), by channel; the FieldHdma_*
+; builders write set A on the frames Field_Unk53 bit 0 is set, set B on the others.
+!HdmaA_Sc = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*0))   ; channel 0: BG1SC-BG4SC
+!HdmaA_Bg1 = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*1))  ; channel 1: BG1 H/V scroll
+!HdmaA_Bg2 = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*2))  ; channel 2: BG2 H/V scroll
+!HdmaA_Bg3 = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*3))  ; channel 3: BG3 H/V scroll
+!HdmaA_Tm = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*4))   ; channel 4: TM, TS, TMW, TSW
+!HdmaA_Win = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*5))  ; channel 5: WH0, WH1
+!HdmaA_Math = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*6)) ; channel 6: CGADSUB, COLDATA
+!HdmaA_Win2 = $7F0000|(!Hdma_TableSetA+(!Hdma_TableBytes*7)) ; channel 7: WH2 or WH3
+!HdmaB_Sc = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*0))   ; as HdmaA_*, set B
+!HdmaB_Bg1 = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*1))
+!HdmaB_Bg2 = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*2))
+!HdmaB_Bg3 = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*3))
+!HdmaB_Tm = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*4))
+!HdmaB_Win = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*5))
+!HdmaB_Math = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*6))
+!HdmaB_Win2 = $7F0000|(!Hdma_TableSetB+(!Hdma_TableBytes*7))
+!Hdma_Bg1Scroll = $7F1508                ; 8 B: BG1 (H, V) scroll words for set A's channel 1, then
+                                         ; set B's (FieldHdma_FillDataA/B copy Map_Unk1D87/1D89)
+!Hdma_Bg2Scroll = $7F1510                ; 8 B: the same for BG2 (Map_Unk1D8B/1D8D)
+!Hdma_Bg3Scroll = $7F1518                ; 8 B: the same for BG3 (Map_Unk1D8F/1D91; not refreshed
+                                         ; while the BG3 wave runs)
+!Hdma_ColorMath = $7F152C                ; 4 B: (CGADSUB, COLDATA) for set A's channel 6, then set
+                                         ; B's: Ppu_Unk0BE0 (or Hdma_Unk7F22C0) and Fade_FixedColor
+!Hdma_WaveA = $7F1D27                    ; $40 B: 16 lines of (BG3 H, BG3 V) words, H = Map_Unk1D8F
+                                         ; + a ScrollWaveA value, V = Map_Unk1D91 (FieldHdma_FillDataA)
+!Hdma_WaveACopy = $7F1D67                ; $40 B: its copy, so a repeat run may start at any line
+!Hdma_WaveB = $7F1DA7                    ; as Hdma_WaveA for set B (FieldHdma_FillDataB)
+!Hdma_WaveBCopy = $7F1DE7                ; as Hdma_WaveACopy for set B
+!Hdma_Unk7F0351 = $7F0351                ; 8-bit; bit 0 picks channel 7's data (FieldHdma_SetWin2A/B
+                                         ; read it with DB=$7F; no writer traced)
+!Hdma_Unk7F22C0 = $7F22C0                ; 8-bit; the CGADSUB byte FieldHdma_BuildPlainA/B use while
+                                         ; Field_Unk53 bit 7 is set (read with DB=$7F; no writer traced)
+!LayerDrift_L1X = $7F3467                ; 16-bit; probably layer 1's X (it sits before LayerDrift_L2X);
+                                         ; FieldHdma_BuildPlainA/B copy it to Hdma_Bg1Scroll while
+                                         ; Field_Unk53 bit 7 is set (no writer traced)
+!LayerDrift_L1Y = $7F3469                ; ... Y
+!HdmaBand_WinPtr = $D9                   ; alias of Eng_Scratch in FieldHdma_BuildTopBandA/B and
+                                         ; BottomBandA/B: 16-bit, the window-table address of the next run
+!HdmaBand_Run = $DB                      ; alias of Oam_Range1LoPtr's slot there: 8-bit, a run's lines
+!HdmaWave_Left = $D9                     ; alias of Eng_Scratch in FieldHdma_AddWaveRunA/B: 8-bit,
+                                         ; lines still to add (or of the entry just added)
+!HdmaWave_Line = $EE                     ; alias of Spr_NewFrame's slot in the band builders and their
+                                         ; wave helpers: lines covered so far (its low 4 bits are the
+                                         ; place in the 16-line wave); FieldHdma_WaveRunsStart zeroes
+                                         ; it as a word
 
 ; --- Staff credits (Field_ServiceUnk54) ---
 !Credits_Text = $FDA000                  ; ROM: staff credits in ASCII ("PRODUCER//KAZUHIKO
@@ -1595,8 +1648,10 @@ if !ram_engine_inc == 0
 !Map_EdgeSize2 = $1DE5                   ; 5 words; as Map_EdgeSize1 for layer 2
 !Map_EdgeSize3 = $1DEF                   ; 5 words; as Map_EdgeSize1 for layer 3
 !Map_Unk1DFB = $1DFB                     ; 8-bit; Map_Scroll3YInc / YDec add / subtract 4 per pixel
-                                         ; of layer-3 Y scroll; readers not traced
-!Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0
+                                         ; of layer-3 Y scroll; FieldHdma_FillDataA/B step it by 1 and
+                                         ; use it AND $3E as the wave phase
+!Map_Unk1DFD = $1DFD                     ; 8-bit; $11 during hook 12, 0 after; no reader in bank $C0;
+                                         ; nonzero: FieldHdma_SetBg2A/B give BG2 the BG3 wave data
 !Map_HookTimer = $1DFF                   ; 8-bit frame countdown for hook 12's loops
 
 ; --- Location map setup (LocLoad_UnkA33B and its callees, Map_LoadTreasureTiles; DP=$1D00).
@@ -1808,6 +1863,15 @@ endstruct
 
 ; --- Location animation records (FieldFD_LoadAnimSetA/B, the FdVec_FFFA/FFF4 routines) ---
 !DP_FieldAnim = $0500                    ; direct page of the bank-$FD vector routines (FieldFD_LoadAnimSetA/B)
+!PalAnimRom = $F60000                    ; ROM bank $F6 base: kinds 1 and 8 of PalAnim_TickAll copy colours
+                                         ; from here + FieldAnimB.Unk6 (as a word) + frame x count x 2
+!PalAnim_Save = $0C                      ; 2 B dp (DP=$0500): a Pal_Buf colour held across a rotation;
+                                         ; in the PalAnim_Scale* routines the colour's unscaled channels
+!PalAnim_SaveCgram = $0E                 ; 2 B dp: the Pal_CgramBuf colour held across a rotation
+!PalAnim_End = $10                       ; 2 B dp: the last offset a rotation reaches (colour x 2)
+!PalAnim_Span = $12                      ; 2 B dp: FieldAnimB.Unk2 x 2 in the rotations
+!PalAnim_Dest = $18                      ; 3 B dp: long Pal_CgramBuf address kinds 1 and 8 write
+                                         ; (kind 8 first uses it to read its list byte)
 ; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
 struct FieldAnimA $05B0
     .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
@@ -1817,17 +1881,19 @@ struct FieldAnimA $05B0
     .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
 endstruct
 ; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
-; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (not analysed).
+; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (PalAnim_TickAll).
 struct FieldAnimB $0520
     .Unk0: skip 1        ; list byte: high nibble = kind (0 = empty); low nibble = bytes skipped for kind 8
-    .Unk1: skip 1
-    .Unk2: skip 1
-    .Unk3: skip 1        ; 0
-    .Unk4: skip 1        ; 0
-    .Unk5: skip 1
-    .Unk6: skip 1        ; kinds 1 and 8 only
-    .Unk7: skip 1
-    .Unk8: skip 1
+                         ; (PalAnim_TickAll: frames - 1 for kinds 1 and 8)
+    .Unk1: skip 1        ; first colour the PalAnim_* kinds work on
+    .Unk2: skip 1        ; colour count
+    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 5/7)
+    .Unk4: skip 1        ; 0; frame counter up to .Unk5 (PalAnim_TickAll)
+    .Unk5: skip 1        ; frames between steps
+    .Unk6: skip 1        ; kinds 1 and 8 only; with .Unk7 the ROM offset of their colours; kinds
+                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel)
+    .Unk7: skip 1        ; kind 5 level, kind 7 phase
+    .Unk8: skip 1        ; kind 5 target level, kind 7 depth
     .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
 endstruct
 
