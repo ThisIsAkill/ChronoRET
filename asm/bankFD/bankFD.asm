@@ -3373,16 +3373,21 @@ Hdma_InitChannelsFD:
 ; Once a frame: runs entry !Field_Unk26 (0-2) of one of two handler
 ; tables and flips !Field_Unk53 bit 0. With bit 0 clear it runs
 ; EngFD_UnkC2C1Table0 and sets the bit; with it set, EngFD_UnkC2C1Table1
-; and clears it. So the two tables alternate frame by frame, probably
-; filling the two HDMA table sets in turn (Hdma_InitChannelsFD picks a
-; set by !Field_Unk53; not traced). The handlers are not analysed.
+; and clears it. So the two tables alternate frame by frame: the
+; Table1 handlers (FieldHdma_Build*A) write HDMA table set A, the Table0
+; ones (FieldHdma_Build*B) set B, and the flip makes the set just written
+; the one Hdma_InitChannelsFD picks while !Field_Unk53 bits 1-3 are
+; clear. Entry 0 builds a plain screen, 1 and 2 a band at the top or
+; bottom (see the FieldHdma banner).
 ; Callers (9 JSL sites): Field_EndOfFrame ($C0:00C7), Field_EndOfFrameShort ($C0:00E0),
 ;   Field_RestoreState ($C0:01AA), Field_RefreshHdmaLong ($C0:0B11, $C0:0B15), Scene_ResumeNmi
 ;   ($C0:0B2E), Field_PauseAndMenuInput ($C0:1905, $C0:194D) and Field_FadeToBankC2Mode5 ($C0:19B6).
 ; Entry: M=1, X=1 (8-bit TAX of the doubled index), DP=$0100, DB=$00 at
-;        all callers (what the handlers need is not traced)
-; Exit:  M=1, X=1; !Field_Unk53 bit 0 flipped; A = 1; X and the rest as
-;        the handler leaves them
+;        all callers (the handlers need DP=$0100, and DB=$00 for the
+;        band builders' absolute Field_Unk27 read)
+; Exit:  M=1, X=1; !Field_Unk53 bit 0 flipped; A = 1; DB as on entry; X,
+;        Y and DP $D9-$DB, $EE-$EF as the handler leaves them (see the
+;        FieldHdma_Build* headers)
 ; Callees: the 6 handlers of EngFD_UnkC2C1Table0/1 (JSR (table,X))
 org $FDC2C1
 EngFD_UnkC2C1:
@@ -3408,16 +3413,2233 @@ EngFD_UnkC2C1:
 ; $FD:C2DF — EngFD_UnkC2C1Table1 (6 bytes, $C2DF–$C2E4)
 ; EngFD_UnkC2C1's handlers by !Field_Unk26 when !Field_Unk53 bit 0 is set.
 EngFD_UnkC2C1Table1:
-    dw EngFD_UnkC2EB                    ; 0
-    dw EngFD_UnkC995                    ; 1
-    dw EngFD_UnkCFCF                    ; 2
+    dw FieldHdma_BuildPlainA            ; 0
+    dw FieldHdma_BuildTopBandA          ; 1
+    dw FieldHdma_BuildBottomBandA       ; 2
 
 ; $FD:C2E5 — EngFD_UnkC2C1Table0 (6 bytes, $C2E5–$C2EA)
 ; The same when !Field_Unk53 bit 0 is clear.
 EngFD_UnkC2C1Table0:
-    dw EngFD_UnkC847                    ; 0
-    dw EngFD_UnkCD0C                    ; 1
-    dw EngFD_UnkD27E                    ; 2
+    dw FieldHdma_BuildPlainB            ; 0
+    dw FieldHdma_BuildTopBandB          ; 1
+    dw FieldHdma_BuildBottomBandB       ; 2
+
+; ============================================================
+; Field HDMA table builders ($FD:C2EB–$FD:D52C)
+; EngFD_UnkC2C1's handlers and their helpers. Each frame one builder
+; rewrites one of Hdma_InitChannelsFD's two sets of 8 indirect tables
+; (the A builders set A at $7F:0F80, the B builders set B at $7F:1238)
+; and the data they point at, then EngFD_UnkC2C1 flips Field_Unk53
+; bit 0 so the set just built is the one Hdma_InitChannelsFD picks
+; (while bits 1-3 are clear). Entry k of a table is 3 bytes at +3k: a
+; line count (bit 7 = new data every line) and a bank-$7F address.
+; Field_Unk26 picks the layout: 0 a plain screen (two runs of 100 and
+; 112 lines with the same data), 1 and 2 a band of 2 x Field_Unk27 lines
+; centred on line 48 (1) or line 171 (2) with its own BGnSC, scroll, TM,
+; window and colour-math data. Probably the message window opening at
+; the top or bottom of the screen (the band's growth with Field_Unk27
+; and its position fit; not traced to the code that sets them).
+; Field_Unk1DF9 nonzero puts a per-line wave on BG3's H scroll
+; (Hdma_WaveA/B), Map_Unk1DFD nonzero the same wave data on BG2's
+; registers.
+; ============================================================
+
+; $FD:C2EB — FieldHdma_BuildPlainA (334 bytes, $C2EB–$C438)
+; EngFD_UnkC2C1's handler for Field_Unk26 = 0 on the frames Field_Unk53
+; bit 0 is set; FieldHdma_BuildTopBandA/BottomBandA come here while
+; Field_Unk27 is 0. Writes table set A for a plain screen:
+;   channel 0 (BGnSC): 100 + 112 lines of Hdma_Unk7F14F0;
+;   channel 1 (BG1 scroll): 100 + 112 lines of Hdma_Bg1Scroll;
+;   channel 2: FieldHdma_SetBg2A;
+;   channel 3 (BG3 scroll): Field_Unk1DF9 = 0: 100 + 112 lines of
+;     Hdma_Bg3Scroll; else 13 repeat runs of 16 lines, each from
+;     Hdma_WaveA (208 lines of the wave);
+;   channel 4 (TM...): 100 + 112 lines of Hdma_Unk7F1520;
+;   channel 5 (WH0/WH1): repeat runs of 100 and 112 lines from
+;     WinFx_TableA (2 bytes a line);
+;   channel 6 (CGADSUB/COLDATA): 100 + 112 lines of Hdma_ColorMath;
+;   channel 7: FieldHdma_SetWin2A.
+; Then, with Field_Unk53 bit 7 clear, FieldHdma_FillDataA fills the
+; data. With it set (around the battle hand-off and in
+; Field_RefreshHdmaLong) the scroll pairs come from LayerDrift_L1X-L3Y
+; instead, Hdma_ColorMath gets (Hdma_Unk7F22C0, Fade_FixedColor) and
+; Hdma_Unk7F1530 Hdma_Unk7F22C0; the wave data is then left as it was
+; and Map_Unk1DFB is not stepped.
+; Callers note: also EngFD_UnkC2C1Table1 entry 0 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Callers (2 BRL sites): FieldHdma_BuildTopBandA ($FD:C99A) and FieldHdma_BuildBottomBandA
+;   ($FD:CFD4).
+; Entry: M=1, X=1 (EngFD_UnkC2C1; it sets X=0 itself), DP=$0100 (.b
+;        Field_Unk53, Fade_FixedColor), DB any (saved; $7F while it runs)
+; Exit:  M=1, X=1 (Y and X high bytes 0); DB restored; A = Ppu_Unk0BE0
+;        (bit 7 clear) or Hdma_Unk7F22C0 (bit 7 set); X clobbered; Y
+;        unchanged, except $A7 after FieldHdma_FillDataA's wave copy;
+;        Map_Unk1DFB as FieldHdma_FillDataA leaves it
+org $FDC2EB
+FieldHdma_BuildPlainA:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Sc+6
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Bg1
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Bg1+3
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg1+6
+    JSR FieldHdma_SetBg2A
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Bg3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Bg3+3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg3+6
+    BRA .tm
+.bg3_wave:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaA_Bg3
+    STA.w !HdmaA_Bg3+3
+    STA.w !HdmaA_Bg3+6
+    STA.w !HdmaA_Bg3+9
+    STA.w !HdmaA_Bg3+12
+    STA.w !HdmaA_Bg3+15
+    STA.w !HdmaA_Bg3+18
+    STA.w !HdmaA_Bg3+21
+    STA.w !HdmaA_Bg3+24
+    STA.w !HdmaA_Bg3+27
+    STA.w !HdmaA_Bg3+30
+    STA.w !HdmaA_Bg3+33
+    STA.w !HdmaA_Bg3+36
+    STZ.w !HdmaA_Bg3+39
+    LDX.w #!Hdma_WaveA&$FFFF
+    STX.w !HdmaA_Bg3+1
+    STX.w !HdmaA_Bg3+4
+    STX.w !HdmaA_Bg3+7
+    STX.w !HdmaA_Bg3+10
+    STX.w !HdmaA_Bg3+13
+    STX.w !HdmaA_Bg3+16
+    STX.w !HdmaA_Bg3+19
+    STX.w !HdmaA_Bg3+22
+    STX.w !HdmaA_Bg3+25
+    STX.w !HdmaA_Bg3+28
+    STX.w !HdmaA_Bg3+31
+    STX.w !HdmaA_Bg3+34
+    STX.w !HdmaA_Bg3+37
+.tm:
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Tm+6
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaA_Win
+    LDX.w #!WinFx_TableA
+    STX.w !HdmaA_Win+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaA_Win+3
+    LDX.w #!WinFx_TableA+(!HdmaRun_Upper*2)
+    STX.w !HdmaA_Win+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Win+6
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Math
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Math+3
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Math+6
+    JSR FieldHdma_SetWin2A
+    LDA.b !Field_Unk53
+    BMI .layer_drift
+    JSR FieldHdma_FillDataA
+    PLB
+    RTS
+.layer_drift:
+    REP #$20
+    LDA.w !LayerDrift_L1X
+    STA.w !Hdma_Bg1Scroll
+    LDA.w !LayerDrift_L1Y
+    STA.w !Hdma_Bg1Scroll+2
+    LDA.w !LayerDrift_L2X
+    STA.w !Hdma_Bg2Scroll
+    LDA.w !LayerDrift_L2Y
+    STA.w !Hdma_Bg2Scroll+2
+    LDA.w !LayerDrift_L3X
+    STA.w !Hdma_Bg3Scroll
+    LDA.w !LayerDrift_L3Y
+    STA.w !Hdma_Bg3Scroll+2
+    SEP #$30
+    LDA.b !Fade_FixedColor
+    STA.w !Hdma_ColorMath+1
+    LDA.w !Hdma_Unk7F22C0
+    STA.w !Hdma_ColorMath
+    STA.w !Hdma_Unk7F1530
+    PLB
+    RTS
+
+; $FD:C439 — FieldHdma_SetWin2A (62 bytes, $C439–$C476)
+; Writes set A's channel 7 table (WH2 or WH3, one byte a line): repeat
+; runs of 100 and 112 lines from WinFx_TableA + WinFx_Ch7Alt ($E0) when
+; Hdma_Unk7F0351 bit 0 is clear, from WinFx_TableA when it is set.
+; Callers note: every caller calls FieldHdma_FillDataA right after (the
+;   bit 7 path of FieldHdma_BuildPlainA aside), whose first wave sum
+;   takes the carry this leaves.
+; Callers (3 JSR sites): FieldHdma_BuildPlainA ($FD:C3F5), FieldHdma_BuildTopBandA ($FD:CC50) and
+;   FieldHdma_BuildBottomBandA ($FD:D276).
+; Entry: M=1, X=0 (16-bit addresses), DP any (not used), DB=$7F
+; Exit:  M=1, X=0; A = 0 (the end byte); X = the second run's address;
+;        Y unchanged; C = Hdma_Unk7F0351 bit 0 (LSR)
+org $FDC439
+FieldHdma_SetWin2A:
+    LDA.w !Hdma_Unk7F0351
+    LSR A
+    BCS .bit0_set
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaA_Win2
+    LDX.w #!WinFx_TableA+!WinFx_Ch7Alt
+    STX.w !HdmaA_Win2+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaA_Win2+3
+    LDX.w #!WinFx_TableA+!WinFx_Ch7Alt+!HdmaRun_Upper
+    STX.w !HdmaA_Win2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Win2+6
+    RTS
+.bit0_set:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaA_Win2
+    LDX.w #!WinFx_TableA
+    STX.w !HdmaA_Win2+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaA_Win2+3
+    LDX.w #!WinFx_TableA+!HdmaRun_Upper
+    STX.w !HdmaA_Win2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Win2+6
+    RTS
+
+; $FD:C477 — FieldHdma_SetWin2B (62 bytes, $C477–$C4B4)
+; As FieldHdma_SetWin2A for set B's channel 7, with the test inverted:
+; WinFx_TableA + WinFx_Ch7Alt when Hdma_Unk7F0351 bit 0 is set,
+; WinFx_TableA when it is clear (both sets read WinFx_TableA's area).
+; Callers (3 JSR sites): FieldHdma_BuildPlainB ($FD:C951), FieldHdma_BuildTopBandB ($FD:CFC7) and
+;   FieldHdma_BuildBottomBandB ($FD:D525).
+; Entry: M=1, X=0 (16-bit addresses), DP any (not used), DB=$7F
+; Exit:  M=1, X=0; A = 0; X = the second run's address; Y unchanged;
+;        C = Hdma_Unk7F0351 bit 0 (FieldHdma_FillDataB takes it)
+org $FDC477
+FieldHdma_SetWin2B:
+    LDA.w !Hdma_Unk7F0351
+    LSR A
+    BCC .bit0_clear
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaB_Win2
+    LDX.w #!WinFx_TableA+!WinFx_Ch7Alt
+    STX.w !HdmaB_Win2+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaB_Win2+3
+    LDX.w #!WinFx_TableA+!WinFx_Ch7Alt+!HdmaRun_Upper
+    STX.w !HdmaB_Win2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Win2+6
+    RTS
+.bit0_clear:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaB_Win2
+    LDX.w #!WinFx_TableA
+    STX.w !HdmaB_Win2+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaB_Win2+3
+    LDX.w #!WinFx_TableA+!HdmaRun_Upper
+    STX.w !HdmaB_Win2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Win2+6
+    RTS
+
+; $FD:C4B5 — FieldHdma_SetBg2A (121 bytes, $C4B5–$C52D)
+; Writes set A's channel 2 table (BG2 H/V scroll): Map_Unk1DFD = 0:
+; 100 + 112 lines of Hdma_Bg2Scroll; else 13 repeat runs of 16 lines,
+; each from Hdma_WaveA, so BG2 gets BG3's wave data (Map_Unk1D8F + the
+; wave, Map_Unk1D91). Never banded.
+; Callers (3 JSR sites): FieldHdma_BuildPlainA ($FD:C328), FieldHdma_BuildTopBandA ($FD:CA36) and
+;   FieldHdma_BuildBottomBandA ($FD:D074).
+; Entry: M=1, X=0 (16-bit addresses), DP any (not used), DB=$7F
+; Exit:  M=1, X=0; A = 0 (Map_Unk1DFD = 0) or $90 (else; the end byte is
+;        an STZ); X = Hdma_Bg2Scroll's or Hdma_WaveA's address; Y and C
+;        unchanged
+org $FDC4B5
+FieldHdma_SetBg2A:
+    LDA.l !Map_Unk1DFD
+    BNE .wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Bg2
+    LDX.w #!Hdma_Bg2Scroll&$FFFF
+    STX.w !HdmaA_Bg2+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaA_Bg2+3
+    LDX.w #!Hdma_Bg2Scroll&$FFFF
+    STX.w !HdmaA_Bg2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg2+6
+    RTS
+.wave:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaA_Bg2
+    STA.w !HdmaA_Bg2+3
+    STA.w !HdmaA_Bg2+6
+    STA.w !HdmaA_Bg2+9
+    STA.w !HdmaA_Bg2+12
+    STA.w !HdmaA_Bg2+15
+    STA.w !HdmaA_Bg2+18
+    STA.w !HdmaA_Bg2+21
+    STA.w !HdmaA_Bg2+24
+    STA.w !HdmaA_Bg2+27
+    STA.w !HdmaA_Bg2+30
+    STA.w !HdmaA_Bg2+33
+    STA.w !HdmaA_Bg2+36
+    STZ.w !HdmaA_Bg2+39
+    LDX.w #!Hdma_WaveA&$FFFF
+    STX.w !HdmaA_Bg2+1
+    STX.w !HdmaA_Bg2+4
+    STX.w !HdmaA_Bg2+7
+    STX.w !HdmaA_Bg2+10
+    STX.w !HdmaA_Bg2+13
+    STX.w !HdmaA_Bg2+16
+    STX.w !HdmaA_Bg2+19
+    STX.w !HdmaA_Bg2+22
+    STX.w !HdmaA_Bg2+25
+    STX.w !HdmaA_Bg2+28
+    STX.w !HdmaA_Bg2+31
+    STX.w !HdmaA_Bg2+34
+    STX.w !HdmaA_Bg2+37
+    RTS
+
+; $FD:C52E — FieldHdma_SetBg2B (121 bytes, $C52E–$C5A6)
+; As FieldHdma_SetBg2A for set B: Hdma_Bg2Scroll+4 or Hdma_WaveB.
+; Callers (3 JSR sites): FieldHdma_BuildPlainB ($FD:C884), FieldHdma_BuildTopBandB ($FD:CDAD) and
+;   FieldHdma_BuildBottomBandB ($FD:D323).
+; Entry: M=1, X=0 (16-bit addresses), DP any (not used), DB=$7F
+; Exit:  M=1, X=0; A = 0 or $90 (as FieldHdma_SetBg2A); X = the data
+;        address; Y and C unchanged
+org $FDC52E
+FieldHdma_SetBg2B:
+    LDA.l !Map_Unk1DFD
+    BNE .wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Bg2
+    LDX.w #(!Hdma_Bg2Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg2+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Bg2+3
+    LDX.w #(!Hdma_Bg2Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg2+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg2+6
+    RTS
+.wave:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaB_Bg2
+    STA.w !HdmaB_Bg2+3
+    STA.w !HdmaB_Bg2+6
+    STA.w !HdmaB_Bg2+9
+    STA.w !HdmaB_Bg2+12
+    STA.w !HdmaB_Bg2+15
+    STA.w !HdmaB_Bg2+18
+    STA.w !HdmaB_Bg2+21
+    STA.w !HdmaB_Bg2+24
+    STA.w !HdmaB_Bg2+27
+    STA.w !HdmaB_Bg2+30
+    STA.w !HdmaB_Bg2+33
+    STA.w !HdmaB_Bg2+36
+    STZ.w !HdmaB_Bg2+39
+    LDX.w #!Hdma_WaveB&$FFFF
+    STX.w !HdmaB_Bg2+1
+    STX.w !HdmaB_Bg2+4
+    STX.w !HdmaB_Bg2+7
+    STX.w !HdmaB_Bg2+10
+    STX.w !HdmaB_Bg2+13
+    STX.w !HdmaB_Bg2+16
+    STX.w !HdmaB_Bg2+19
+    STX.w !HdmaB_Bg2+22
+    STX.w !HdmaB_Bg2+25
+    STX.w !HdmaB_Bg2+28
+    STX.w !HdmaB_Bg2+31
+    STX.w !HdmaB_Bg2+34
+    STX.w !HdmaB_Bg2+37
+    RTS
+
+; $FD:C5A7 — FieldHdma_FillDataA (336 bytes, $C5A7–$C6F6)
+; Fills the data set A's tables point at:
+;   - Hdma_Bg1Scroll = Map_Unk1D87, Map_Unk1D89; Hdma_Bg2Scroll =
+;     Map_Unk1D8B, Map_Unk1D8D;
+;   - with Field_Unk1DF9 and Map_Unk1DFD both 0 (each tested as a word,
+;     so $1DFA and $1DFE count too): Hdma_Bg3Scroll = Map_Unk1D8F,
+;     Map_Unk1D91;
+;   - else the wave: Map_Unk1DFB += 1, phase = it AND $3E; line k
+;     (0-15) of Hdma_WaveA gets H = ScrollWaveA[phase + 4k bytes] +
+;     Map_Unk1D8F and V = Map_Unk1D91; then the $40 bytes are copied to
+;     Hdma_WaveACopy (MVN), so a repeat run may start at any line;
+;   - Hdma_ColorMath = (Ppu_Unk0BE0, Fade_FixedColor) and
+;     Hdma_Unk7F1530 = Ppu_Unk0BE0 (so Ppu_Unk0BE0 goes to CGADSUB).
+; Quirk: no CLC before the 16 ADCs. Line 0 adds the carry in (bit 0 of
+; Hdma_Unk7F0351, from FieldHdma_SetWin2A's LSR at every call site) and
+; each later line the carry out of the line before (set when the 16-bit
+; sum wraps, e.g. a negative wave value with Map_Unk1D8F at least its
+; size), so such lines sit 1 pixel further; kept as found.
+; Callers (3 JSR sites): FieldHdma_BuildPlainA ($FD:C3FC), FieldHdma_BuildTopBandA ($FD:CC53) and
+;   FieldHdma_BuildBottomBandA ($FD:D279).
+; Entry: M=1, X=0 (16-bit index, MVN), DP=$0100 (.b Fade_FixedColor),
+;        DB=$7F; C = carry into the first wave sum
+; Exit:  M=1, X=1; A = Ppu_Unk0BE0; wave path: X = $67, Y = $A7 (the MVN
+;        end addresses, high bytes cleared), Map_Unk1DFB stepped; else X
+;        and Y keep their low bytes (high bytes cleared)
+org $FDC5A7
+FieldHdma_FillDataA:
+    REP #$20
+    LDA.l !Map_Unk1D87
+    STA.w !Hdma_Bg1Scroll
+    LDA.l !Map_Unk1D89
+    STA.w !Hdma_Bg1Scroll+2
+    LDA.l !Map_Unk1D8B
+    STA.w !Hdma_Bg2Scroll
+    LDA.l !Map_Unk1D8D
+    STA.w !Hdma_Bg2Scroll+2
+    LDA.l !Field_Unk1DF9
+    BNE .wave
+    LDA.l !Map_Unk1DFD
+    BNE .wave
+    LDA.l !Map_Unk1D8F
+    STA.w !Hdma_Bg3Scroll
+    LDA.l !Map_Unk1D91
+    STA.w !Hdma_Bg3Scroll+2
+    BRL .color_math
+.wave:
+    SEP #$20
+    LDA.l !Map_Unk1DFB
+    INC A
+    STA.l !Map_Unk1DFB
+    REP #$20
+    AND.w #!Hdma_WavePhaseMask
+    TAX
+    LDA.l ScrollWaveA,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA
+    LDA.l ScrollWaveA+4,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+4
+    LDA.l ScrollWaveA+8,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+8
+    LDA.l ScrollWaveA+12,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+12
+    LDA.l ScrollWaveA+16,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+16
+    LDA.l ScrollWaveA+20,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+20
+    LDA.l ScrollWaveA+24,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+24
+    LDA.l ScrollWaveA+28,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+28
+    LDA.l ScrollWaveA+32,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+32
+    LDA.l ScrollWaveA+36,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+36
+    LDA.l ScrollWaveA+40,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+40
+    LDA.l ScrollWaveA+44,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+44
+    LDA.l ScrollWaveA+48,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+48
+    LDA.l ScrollWaveA+52,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+52
+    LDA.l ScrollWaveA+56,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+56
+    LDA.l ScrollWaveA+60,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveA+60
+    LDA.l !Map_Unk1D91
+    STA.w !Hdma_WaveA+2
+    STA.w !Hdma_WaveA+6
+    STA.w !Hdma_WaveA+10
+    STA.w !Hdma_WaveA+14
+    STA.w !Hdma_WaveA+18
+    STA.w !Hdma_WaveA+22
+    STA.w !Hdma_WaveA+26
+    STA.w !Hdma_WaveA+30
+    STA.w !Hdma_WaveA+34
+    STA.w !Hdma_WaveA+38
+    STA.w !Hdma_WaveA+42
+    STA.w !Hdma_WaveA+46
+    STA.w !Hdma_WaveA+50
+    STA.w !Hdma_WaveA+54
+    STA.w !Hdma_WaveA+58
+    STA.w !Hdma_WaveA+62
+    PHB
+    LDX.w #!Hdma_WaveA&$FFFF
+    LDY.w #!Hdma_WaveACopy&$FFFF
+    LDA.w #!Hdma_WaveBytes-1
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+.color_math:
+    SEP #$30
+    LDA.b !Fade_FixedColor
+    STA.w !Hdma_ColorMath+1
+    LDA.l !Ppu_Unk0BE0
+    STA.w !Hdma_ColorMath
+    STA.w !Hdma_Unk7F1530
+    RTS
+
+; $FD:C6F7 — FieldHdma_FillDataB (336 bytes, $C6F7–$C846)
+; As FieldHdma_FillDataA for set B: Hdma_Bg1Scroll+4, Hdma_Bg2Scroll+4,
+; Hdma_Bg3Scroll+4, Hdma_WaveB (copied to Hdma_WaveBCopy),
+; Hdma_ColorMath+2/+3 and Hdma_Unk7F1530+2; Map_Unk1DFB is stepped here
+; too, so the wave moves one phase step every two frames. The same
+; missing CLC: the carry in is Hdma_Unk7F0351 bit 0 from
+; FieldHdma_SetWin2B, and each line adds the carry of the one before.
+; Callers (3 JSR sites): FieldHdma_BuildPlainB ($FD:C958), FieldHdma_BuildTopBandB ($FD:CFCA) and
+;   FieldHdma_BuildBottomBandB ($FD:D528).
+; Entry: M=1, X=0 (16-bit index, MVN), DP=$0100 (.b Fade_FixedColor),
+;        DB=$7F; C = carry into the first wave sum
+; Exit:  M=1, X=1; A = Ppu_Unk0BE0; wave path: X = $E7, Y = $27 (MVN end
+;        addresses $1DE7/$1E27, high bytes cleared), Map_Unk1DFB
+;        stepped; else X and Y keep their low bytes
+org $FDC6F7
+FieldHdma_FillDataB:
+    REP #$20
+    LDA.l !Map_Unk1D87
+    STA.w !Hdma_Bg1Scroll+4
+    LDA.l !Map_Unk1D89
+    STA.w !Hdma_Bg1Scroll+6
+    LDA.l !Map_Unk1D8B
+    STA.w !Hdma_Bg2Scroll+4
+    LDA.l !Map_Unk1D8D
+    STA.w !Hdma_Bg2Scroll+6
+    LDA.l !Field_Unk1DF9
+    BNE .wave
+    LDA.l !Map_Unk1DFD
+    BNE .wave
+    LDA.l !Map_Unk1D8F
+    STA.w !Hdma_Bg3Scroll+4
+    LDA.l !Map_Unk1D91
+    STA.w !Hdma_Bg3Scroll+6
+    BRL .color_math
+.wave:
+    SEP #$20
+    LDA.l !Map_Unk1DFB
+    INC A
+    STA.l !Map_Unk1DFB
+    REP #$20
+    AND.w #!Hdma_WavePhaseMask
+    TAX
+    LDA.l ScrollWaveA,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB
+    LDA.l ScrollWaveA+4,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+4
+    LDA.l ScrollWaveA+8,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+8
+    LDA.l ScrollWaveA+12,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+12
+    LDA.l ScrollWaveA+16,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+16
+    LDA.l ScrollWaveA+20,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+20
+    LDA.l ScrollWaveA+24,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+24
+    LDA.l ScrollWaveA+28,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+28
+    LDA.l ScrollWaveA+32,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+32
+    LDA.l ScrollWaveA+36,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+36
+    LDA.l ScrollWaveA+40,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+40
+    LDA.l ScrollWaveA+44,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+44
+    LDA.l ScrollWaveA+48,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+48
+    LDA.l ScrollWaveA+52,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+52
+    LDA.l ScrollWaveA+56,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+56
+    LDA.l ScrollWaveA+60,X
+    ADC.l !Map_Unk1D8F
+    STA.w !Hdma_WaveB+60
+    LDA.l !Map_Unk1D91
+    STA.w !Hdma_WaveB+2
+    STA.w !Hdma_WaveB+6
+    STA.w !Hdma_WaveB+10
+    STA.w !Hdma_WaveB+14
+    STA.w !Hdma_WaveB+18
+    STA.w !Hdma_WaveB+22
+    STA.w !Hdma_WaveB+26
+    STA.w !Hdma_WaveB+30
+    STA.w !Hdma_WaveB+34
+    STA.w !Hdma_WaveB+38
+    STA.w !Hdma_WaveB+42
+    STA.w !Hdma_WaveB+46
+    STA.w !Hdma_WaveB+50
+    STA.w !Hdma_WaveB+54
+    STA.w !Hdma_WaveB+58
+    STA.w !Hdma_WaveB+62
+    PHB
+    LDX.w #!Hdma_WaveB&$FFFF
+    LDY.w #!Hdma_WaveBCopy&$FFFF
+    LDA.w #!Hdma_WaveBytes-1
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLB
+.color_math:
+    SEP #$30
+    LDA.b !Fade_FixedColor
+    STA.w !Hdma_ColorMath+3
+    LDA.l !Ppu_Unk0BE0
+    STA.w !Hdma_ColorMath+2
+    STA.w !Hdma_Unk7F1530+2
+    RTS
+
+; $FD:C847 — FieldHdma_BuildPlainB (334 bytes, $C847–$C994)
+; As FieldHdma_BuildPlainA for table set B (Field_Unk26 = 0 on the
+; frames Field_Unk53 bit 0 is clear): Hdma_Bg1Scroll+4,
+; Hdma_Bg3Scroll+4 or Hdma_WaveB, WinFx_TableB for channel 5,
+; Hdma_ColorMath+2, FieldHdma_SetBg2B, FieldHdma_SetWin2B and
+; FieldHdma_FillDataB; channels 0 and 4 read the same data as set A.
+; With Field_Unk53 bit 7 set it fills the set B pairs from
+; LayerDrift_L1X-L3Y and Hdma_ColorMath+2 / Hdma_Unk7F1530+2 from
+; Hdma_Unk7F22C0.
+; Callers note: also EngFD_UnkC2C1Table0 entry 0 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Callers (2 BRL sites): FieldHdma_BuildTopBandB ($FD:CD11) and FieldHdma_BuildBottomBandB
+;   ($FD:D283).
+; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100 (.b Field_Unk53,
+;        Fade_FixedColor), DB any (saved; $7F while it runs)
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (bit 7 clear) or
+;        Hdma_Unk7F22C0 (bit 7 set); X clobbered; Y unchanged, except
+;        $27 after FieldHdma_FillDataB's wave copy; Map_Unk1DFB as
+;        FieldHdma_FillDataB leaves it
+org $FDC847
+FieldHdma_BuildPlainB:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Sc+6
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Bg1
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Bg1+3
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg1+6
+    JSR FieldHdma_SetBg2B
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Bg3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Bg3+3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg3+6
+    BRA .tm
+.bg3_wave:
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaB_Bg3
+    STA.w !HdmaB_Bg3+3
+    STA.w !HdmaB_Bg3+6
+    STA.w !HdmaB_Bg3+9
+    STA.w !HdmaB_Bg3+12
+    STA.w !HdmaB_Bg3+15
+    STA.w !HdmaB_Bg3+18
+    STA.w !HdmaB_Bg3+21
+    STA.w !HdmaB_Bg3+24
+    STA.w !HdmaB_Bg3+27
+    STA.w !HdmaB_Bg3+30
+    STA.w !HdmaB_Bg3+33
+    STA.w !HdmaB_Bg3+36
+    STZ.w !HdmaB_Bg3+39
+    LDX.w #!Hdma_WaveB&$FFFF
+    STX.w !HdmaB_Bg3+1
+    STX.w !HdmaB_Bg3+4
+    STX.w !HdmaB_Bg3+7
+    STX.w !HdmaB_Bg3+10
+    STX.w !HdmaB_Bg3+13
+    STX.w !HdmaB_Bg3+16
+    STX.w !HdmaB_Bg3+19
+    STX.w !HdmaB_Bg3+22
+    STX.w !HdmaB_Bg3+25
+    STX.w !HdmaB_Bg3+28
+    STX.w !HdmaB_Bg3+31
+    STX.w !HdmaB_Bg3+34
+    STX.w !HdmaB_Bg3+37
+.tm:
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Tm+6
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaB_Win
+    LDX.w #!WinFx_TableB
+    STX.w !HdmaB_Win+1
+    LDA.b #!Hdma_Repeat|!HdmaRun_Lower
+    STA.w !HdmaB_Win+3
+    LDX.w #!WinFx_TableB+(!HdmaRun_Upper*2)
+    STX.w !HdmaB_Win+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Win+6
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Math
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+1
+    LDA.b #!HdmaRun_Lower
+    STA.w !HdmaB_Math+3
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+4
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Math+6
+    JSR FieldHdma_SetWin2B
+    LDA.b !Field_Unk53
+    BMI .layer_drift
+    JSR FieldHdma_FillDataB
+    PLB
+    RTS
+.layer_drift:
+    REP #$20
+    LDA.w !LayerDrift_L1X
+    STA.w !Hdma_Bg1Scroll+4
+    LDA.w !LayerDrift_L1Y
+    STA.w !Hdma_Bg1Scroll+6
+    LDA.w !LayerDrift_L2X
+    STA.w !Hdma_Bg2Scroll+4
+    LDA.w !LayerDrift_L2Y
+    STA.w !Hdma_Bg2Scroll+6
+    LDA.w !LayerDrift_L3X
+    STA.w !Hdma_Bg3Scroll+4
+    LDA.w !LayerDrift_L3Y
+    STA.w !Hdma_Bg3Scroll+6
+    SEP #$30
+    LDA.b !Fade_FixedColor
+    STA.w !Hdma_ColorMath+3
+    LDA.w !Hdma_Unk7F22C0
+    STA.w !Hdma_ColorMath+2
+    STA.w !Hdma_Unk7F1530+2
+    PLB
+    RTS
+
+; $FD:C995 — FieldHdma_BuildTopBandA (707 bytes, $C995–$CC57)
+; EngFD_UnkC2C1's handler for Field_Unk26 = 1 on the frames Field_Unk53
+; bit 0 is set. With n = Field_Unk27 = 0 it is FieldHdma_BuildPlainA
+; (BRL). Else it writes set A with a band of 2n lines after 48 - n:
+;   channel 0: 7, 41-n lines of Hdma_Unk7F14F0, 2n of Hdma_Unk7F14F4,
+;     100-n and 30 of Hdma_Unk7F14F0;
+;   channel 1: the same runs with Hdma_Bg1Scroll, the band from
+;     Hdma_Unk7F14F8 (its first pair);
+;   channel 2: FieldHdma_SetBg2A (no band);
+;   channel 3: Field_Unk1DF9 = 0: as channel 1 with Hdma_Bg3Scroll, the
+;     band from Hdma_Unk7F14F8+4; else wave runs (FieldHdma_AddWaveRunA)
+;     of 7 and 41-n lines, the band (2n held lines of Hdma_Unk7F14F8+4;
+;     FieldHdma_SkipWaveLines keeps the wave in step), then wave runs of
+;     130-n and 30 lines;
+;   channel 4: 7, 41-n lines of Hdma_Unk7F1520; the band as a, b, a lines
+;     of Hdma_Unk7F1528, Hdma_Unk7F1524, Hdma_Unk7F1528 (n <= 10: a =
+;     n-1, b = 2; else a = 10, b = 2n-20); then 41-n, 100-n and 30 lines
+;     of Hdma_Unk7F1520. The 41-n run after the band is one more than
+;     channel 0 has (219-n lines in all); all three runs hold the same
+;     data, so it only lengthens the table. With n = 1, a = 0 is an end
+;     byte: the table stops before the band;
+;   channel 5: repeat runs of 7 and 41-n lines from WinFx_TableA, 2n
+;     held lines of Hdma_Unk7F1534 (WH0 = 0, WH1 = $FF as
+;     EngFD_UnkC124 leaves it), then repeat runs of 100-n and 71 lines
+;     from where the window table is after the band (HdmaBand_WinPtr);
+;   channel 6: 7, 41-n lines of Hdma_ColorMath; a repeat run of 2n-1
+;     lines from EngFD_UnkD52D's gradient (Hdma_Unk7F1538) at pair
+;     (40-n) AND $3F; 1 line of Hdma_Unk7F1530; 100-n and 30 lines of
+;     Hdma_ColorMath;
+;   channel 7 and the data: FieldHdma_SetWin2A, FieldHdma_FillDataA
+;     (whatever Field_Unk53 bit 7 is).
+; Field_Unk27 is read absolute (DB=$00) and long; its range is not
+; traced (41-n and 2n-1 make sense as line counts for n = 1-40).
+; Callers note: EngFD_UnkC2C1Table1 entry 1 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100 (.b scratch and
+;        Fade_FixedColor), DB=$00 (the absolute Field_Unk27 read; saved,
+;        $7F while it runs)
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0 (n = 0: as
+;        FieldHdma_BuildPlainA); X and Y clobbered (high bytes 0);
+;        HdmaBand_WinPtr, HdmaBand_Run and, on the wave path,
+;        HdmaWave_Line/HdmaWave_Left ($01D9-$01DB, $01EE-$01EF) written;
+;        Map_Unk1DFB as FieldHdma_FillDataA leaves it
+org $FDC995
+FieldHdma_BuildTopBandA:
+    LDA.w !DP_Field+!Field_Unk27
+    BNE .build
+    BRL FieldHdma_BuildPlainA
+.build:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaA_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Sc+6
+    LDX.w #!Hdma_Unk7F14F4&$FFFF
+    STX.w !HdmaA_Sc+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Sc+9
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaA_Sc+12
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Sc+15
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaA_Bg1
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Bg1+3
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg1+6
+    LDX.w #!Hdma_Unk7F14F8&$FFFF
+    STX.w !HdmaA_Bg1+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Bg1+9
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaA_Bg1+12
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg1+15
+    JSR FieldHdma_SetBg2A
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaA_Bg3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Bg3+3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg3+6
+    LDX.w #(!Hdma_Unk7F14F8+4)&$FFFF
+    STX.w !HdmaA_Bg3+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Bg3+9
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaA_Bg3+12
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg3+15
+    BRA .tm
+.bg3_wave:
+    JSR FieldHdma_WaveRunsStart
+    LDA.b #!HdmaBand_TopLead
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    JSR FieldHdma_AddWaveRunA
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg3,Y
+    REP #$20
+    LDA.w #(!Hdma_Unk7F14F8+4)&$FFFF
+    STA.w !HdmaA_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    JSR FieldHdma_SkipWaveLines
+    LDA.b #!HdmaRun_Upper+!HdmaBand_TopTail
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!HdmaBand_TopTail
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg3,Y
+.tm:
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaA_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+4
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_a_band
+    BCC .tm_a_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_a_set
+.tm_a_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_a_set:
+    STA.w !HdmaA_Tm+6
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaA_Tm+7
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_b_band
+    BCC .tm_b_band
+    ASL A
+    SEC
+    SBC.b #!HdmaBand_TmCap*2
+    BRA .tm_b_set
+.tm_b_band:
+    LDA.b #!HdmaBand_TmMin
+.tm_b_set:
+    STA.w !HdmaA_Tm+9
+    LDX.w #!Hdma_Unk7F1524&$FFFF
+    STX.w !HdmaA_Tm+10
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_c_band
+    BCC .tm_c_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_c_set
+.tm_c_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_c_set:
+    STA.w !HdmaA_Tm+12
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaA_Tm+13
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Tm+15
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+16
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Tm+18
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+19
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaA_Tm+21
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+22
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Tm+24
+    LDA.b #!Hdma_Repeat|!HdmaBand_TopLead
+    STA.w !HdmaA_Win
+    LDX.w #!WinFx_TableA
+    STX.w !HdmaA_Win+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Win+3
+    LDX.w #!WinFx_TableA+(!HdmaBand_TopLead*2)
+    STX.b !HdmaBand_WinPtr
+    STX.w !HdmaA_Win+4
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Win+6
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDX.w #!Hdma_Unk7F1534&$FFFF
+    STX.w !HdmaA_Win+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Win+9
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaA_Win+10
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.b #!HdmaBand_TopWinTail
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Win+12
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaA_Win+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Win+15
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaA_Math
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Math+3
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Math+6
+    LDA.b #!HdmaGrad_Lines
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    REP #$20
+    AND.w #!HdmaGrad_PairMask
+    ASL A
+    CLC
+    ADC.w #!Hdma_Unk7F1538&$FFFF
+    STA.w !HdmaA_Math+7
+    SEP #$20
+    LDA.b #!HdmaBand_EdgeLine
+    STA.w !HdmaA_Math+9
+    LDX.w #!Hdma_Unk7F1530&$FFFF
+    STX.w !HdmaA_Math+10
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaA_Math+12
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+13
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaA_Math+15
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+16
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Math+18
+    JSR FieldHdma_SetWin2A
+    JSR FieldHdma_FillDataA
+    PLB
+    RTS
+
+; $FD:CC58 — FieldHdma_WaveRunsStart (6 bytes, $CC58–$CC5D)
+; Starts a band builder's BG3 wave table: Y = 0 (offset of the first
+; entry) and HdmaWave_Line = 0 (a 16-bit store, so $01EF too).
+; Callers (4 JSR sites): FieldHdma_BuildTopBandA ($FD:CA8A), FieldHdma_BuildTopBandB ($FD:CE01),
+;   FieldHdma_BuildBottomBandA ($FD:D0CA) and FieldHdma_BuildBottomBandB ($FD:D379).
+; Entry: M=1, X=0 (LDY with a 16-bit immediate), DP=$0100, DB any
+; Exit:  M=1, X=0; Y = 0; A and X unchanged
+org $FDCC58
+FieldHdma_WaveRunsStart:
+    LDY.w #0
+    STY.b !HdmaWave_Line
+    RTS
+
+; $FD:CC5E — FieldHdma_AddWaveRunA (84 bytes, $CC5E–$CCB1)
+; Adds A lines (8-bit) of the BG3 wave to set A's channel 3 table at
+; offset Y: while A >= 16, an entry ($90: repeat, 16 lines) from
+; Hdma_WaveA + 4 x (HdmaWave_Line AND $F) with HdmaWave_Line += 16 and
+; A -= 16; a remainder r > 0 becomes an entry (r | $80) from the same
+; place and HdmaWave_Line += r. So each run starts at the wave line its
+; screen line falls on; a 16-line run from line p reads into
+; Hdma_WaveACopy. A = 0 is not handled (it would write $80, a 128-line
+; run); the callers pass 7, 30, 41, 88, 130-n, 42-n, 41-n or 40-n
+; (n = Field_Unk27, not 0 there), so 0 only if n reaches 40 or more
+; (its range is not traced).
+; Callers (8 JSR sites): FieldHdma_BuildTopBandA ($FD:CA8F, $FD:CA99, $FD:CAC0, $FD:CAC5) and
+;   FieldHdma_BuildBottomBandA ($FD:D0CF, $FD:D0D4, $FD:D0DF, $FD:D107).
+; Entry: M=1, X=0 (16-bit Y offset), DP=$0100 (HdmaWave_*), DB=$7F; A =
+;        lines (nonzero), Y = offset of the next entry
+; Exit:  M=1, X=0; Y = past the entries added (3 bytes each); A = the
+;        new HdmaWave_Line low byte, or 0 when the last entry was a full
+;        16; HdmaWave_Left written; X unchanged
+org $FDCC5E
+FieldHdma_AddWaveRunA:
+    CMP.b #!HdmaRun_Wave
+    BCS .full_run
+    STA.b !HdmaWave_Left
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Bg3,Y
+    LDA.b !HdmaWave_Line
+    REP #$20
+    AND.w #!HdmaWave_LineMask
+    ASL A
+    ASL A
+    CLC
+    ADC.w #!Hdma_WaveA&$FFFF
+    STA.w !HdmaA_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.b !HdmaWave_Line
+    CLC
+    ADC.b !HdmaWave_Left
+    STA.b !HdmaWave_Line
+.done:
+    RTS
+.full_run:
+    SEC
+    SBC.b #!HdmaRun_Wave
+    STA.b !HdmaWave_Left
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaA_Bg3,Y
+    LDA.b !HdmaWave_Line
+    REP #$20
+    AND.w #!HdmaWave_LineMask
+    ASL A
+    ASL A
+    CLC
+    ADC.w #!Hdma_WaveA&$FFFF
+    STA.w !HdmaA_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.b !HdmaWave_Line
+    CLC
+    ADC.b #!HdmaRun_Wave
+    STA.b !HdmaWave_Line
+    LDA.b !HdmaWave_Left
+    BEQ .done
+    BRA FieldHdma_AddWaveRunA
+
+; $FD:CCB2 — FieldHdma_SkipWaveLines (6 bytes, $CCB2–$CCB7)
+; HdmaWave_Line += A: steps the wave line count over the band's lines,
+; which the band builders write themselves (A and B alike).
+; Callers (4 JSR sites): FieldHdma_BuildTopBandA ($FD:CAB6), FieldHdma_BuildTopBandB ($FD:CE2D),
+;   FieldHdma_BuildBottomBandA ($FD:D0FC) and FieldHdma_BuildBottomBandB ($FD:D3AB).
+; Entry: M=1, X any, DP=$0100, DB any; A = lines
+; Exit:  M=1; A = the new HdmaWave_Line; X and Y unchanged
+org $FDCCB2
+FieldHdma_SkipWaveLines:
+    CLC
+    ADC.b !HdmaWave_Line
+    STA.b !HdmaWave_Line
+    RTS
+
+; $FD:CCB8 — FieldHdma_AddWaveRunB (84 bytes, $CCB8–$CD0B)
+; As FieldHdma_AddWaveRunA for set B's channel 3 table, from Hdma_WaveB
+; (and Hdma_WaveBCopy).
+; Callers (8 JSR sites): FieldHdma_BuildTopBandB ($FD:CE06, $FD:CE10, $FD:CE37, $FD:CE3C) and
+;   FieldHdma_BuildBottomBandB ($FD:D37E, $FD:D383, $FD:D38E, $FD:D3B6).
+; Entry: M=1, X=0 (16-bit Y offset), DP=$0100 (HdmaWave_*), DB=$7F; A =
+;        lines (nonzero), Y = offset of the next entry
+; Exit:  M=1, X=0; Y = past the entries added; A = the new HdmaWave_Line
+;        low byte, or 0 after a full 16; HdmaWave_Left written; X
+;        unchanged
+org $FDCCB8
+FieldHdma_AddWaveRunB:
+    CMP.b #!HdmaRun_Wave
+    BCS .full_run
+    STA.b !HdmaWave_Left
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Bg3,Y
+    LDA.b !HdmaWave_Line
+    REP #$20
+    AND.w #!HdmaWave_LineMask
+    ASL A
+    ASL A
+    CLC
+    ADC.w #!Hdma_WaveB&$FFFF
+    STA.w !HdmaB_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.b !HdmaWave_Line
+    CLC
+    ADC.b !HdmaWave_Left
+    STA.b !HdmaWave_Line
+.done:
+    RTS
+.full_run:
+    SEC
+    SBC.b #!HdmaRun_Wave
+    STA.b !HdmaWave_Left
+    LDA.b #!Hdma_Repeat|!HdmaRun_Wave
+    STA.w !HdmaB_Bg3,Y
+    LDA.b !HdmaWave_Line
+    REP #$20
+    AND.w #!HdmaWave_LineMask
+    ASL A
+    ASL A
+    CLC
+    ADC.w #!Hdma_WaveB&$FFFF
+    STA.w !HdmaB_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.b !HdmaWave_Line
+    CLC
+    ADC.b #!HdmaRun_Wave
+    STA.b !HdmaWave_Line
+    LDA.b !HdmaWave_Left
+    BEQ .done
+    BRA FieldHdma_AddWaveRunB
+
+; $FD:CD0C — FieldHdma_BuildTopBandB (707 bytes, $CD0C–$CFCE)
+; As FieldHdma_BuildTopBandA for table set B (Field_Unk26 = 1 on the
+; frames Field_Unk53 bit 0 is clear; n = 0 goes to
+; FieldHdma_BuildPlainB): the set B pairs (Hdma_Bg1Scroll+4,
+; Hdma_Bg3Scroll+4, Hdma_ColorMath+2, Hdma_Unk7F1530+2,
+; Hdma_Unk7F1534+2), WinFx_TableB, the gradient's copy at
+; Hdma_Unk7F1600, FieldHdma_SetBg2B, FieldHdma_AddWaveRunB,
+; FieldHdma_SetWin2B and FieldHdma_FillDataB. The band's BGnSC, scroll
+; and TM data are the same as set A's, and so are its quirks (the extra
+; 41-n TM run, a = 0 ending the TM table when n = 1).
+; Callers note: EngFD_UnkC2C1Table0 entry 1 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
+;        Field_Unk27 read; saved, $7F while it runs)
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
+;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
+;        written; Map_Unk1DFB as FieldHdma_FillDataB leaves it
+org $FDCD0C
+FieldHdma_BuildTopBandB:
+    LDA.w !DP_Field+!Field_Unk27
+    BNE .build
+    BRL FieldHdma_BuildPlainB
+.build:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaB_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Sc+6
+    LDX.w #!Hdma_Unk7F14F4&$FFFF
+    STX.w !HdmaB_Sc+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Sc+9
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaB_Sc+12
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Sc+15
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaB_Bg1
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Bg1+3
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg1+6
+    LDX.w #!Hdma_Unk7F14F8&$FFFF
+    STX.w !HdmaB_Bg1+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Bg1+9
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaB_Bg1+12
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg1+15
+    JSR FieldHdma_SetBg2B
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaB_Bg3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Bg3+3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg3+6
+    LDX.w #(!Hdma_Unk7F14F8+4)&$FFFF
+    STX.w !HdmaB_Bg3+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Bg3+9
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+10
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaB_Bg3+12
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg3+15
+    BRA .tm
+.bg3_wave:
+    JSR FieldHdma_WaveRunsStart
+    LDA.b #!HdmaBand_TopLead
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    JSR FieldHdma_AddWaveRunB
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg3,Y
+    REP #$20
+    LDA.w #(!Hdma_Unk7F14F8+4)&$FFFF
+    STA.w !HdmaB_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    JSR FieldHdma_SkipWaveLines
+    LDA.b #!HdmaRun_Upper+!HdmaBand_TopTail
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!HdmaBand_TopTail
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg3,Y
+.tm:
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaB_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+4
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_a_band
+    BCC .tm_a_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_a_set
+.tm_a_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_a_set:
+    STA.w !HdmaB_Tm+6
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaB_Tm+7
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_b_band
+    BCC .tm_b_band
+    ASL A
+    SEC
+    SBC.b #!HdmaBand_TmCap*2
+    BRA .tm_b_set
+.tm_b_band:
+    LDA.b #!HdmaBand_TmMin
+.tm_b_set:
+    STA.w !HdmaB_Tm+9
+    LDX.w #!Hdma_Unk7F1524&$FFFF
+    STX.w !HdmaB_Tm+10
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_c_band
+    BCC .tm_c_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_c_set
+.tm_c_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_c_set:
+    STA.w !HdmaB_Tm+12
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaB_Tm+13
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Tm+15
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+16
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Tm+18
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+19
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaB_Tm+21
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+22
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Tm+24
+    LDA.b #!Hdma_Repeat|!HdmaBand_TopLead
+    STA.w !HdmaB_Win
+    LDX.w #!WinFx_TableB
+    STX.w !HdmaB_Win+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Win+3
+    LDX.w #!WinFx_TableB+(!HdmaBand_TopLead*2)
+    STX.b !HdmaBand_WinPtr
+    STX.w !HdmaB_Win+4
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Win+6
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDX.w #(!Hdma_Unk7F1534+2)&$FFFF
+    STX.w !HdmaB_Win+7
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Win+9
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaB_Win+10
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.b #!HdmaBand_TopWinTail
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Win+12
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaB_Win+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Win+15
+    LDA.b #!HdmaBand_TopLead
+    STA.w !HdmaB_Math
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+1
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Math+3
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+4
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Math+6
+    LDA.b #!HdmaGrad_Lines
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    REP #$20
+    AND.w #!HdmaGrad_PairMask
+    ASL A
+    CLC
+    ADC.w #!Hdma_Unk7F1600&$FFFF
+    STA.w !HdmaB_Math+7
+    SEP #$20
+    LDA.b #!HdmaBand_EdgeLine
+    STA.w !HdmaB_Math+9
+    LDX.w #(!Hdma_Unk7F1530+2)&$FFFF
+    STX.w !HdmaB_Math+10
+    LDA.b #!HdmaRun_Upper
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    STA.w !HdmaB_Math+12
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+13
+    LDA.b #!HdmaBand_TopTail
+    STA.w !HdmaB_Math+15
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+16
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Math+18
+    JSR FieldHdma_SetWin2B
+    JSR FieldHdma_FillDataB
+    PLB
+    RTS
+
+; $FD:CFCF — FieldHdma_BuildBottomBandA (687 bytes, $CFCF–$D27D)
+; EngFD_UnkC2C1's handler for Field_Unk26 = 2 on the frames Field_Unk53
+; bit 0 is set. n = Field_Unk27 = 0: FieldHdma_BuildPlainA (BRL). Else
+; set A with a band of 2n lines after 171 - n:
+;   channel 0: 100, 29, 42-n lines of Hdma_Unk7F14F0, 2n of
+;     Hdma_Unk7F14F4, 40-n of Hdma_Unk7F14F0 (211 lines);
+;   channel 1: the same with Hdma_Bg1Scroll, the band from
+;     Hdma_Unk7F14F8+8 (its third pair);
+;   channel 2: FieldHdma_SetBg2A;
+;   channel 3: Field_Unk1DF9 = 0: as channel 1 with Hdma_Bg3Scroll, the
+;     band from Hdma_Unk7F14F8+12; else wave runs of 88, 41 and 42-n
+;     lines, the band (2n held lines of Hdma_Unk7F14F8+12, stepped over
+;     with FieldHdma_SkipWaveLines), a wave run of 40-n;
+;   channel 4: 100, 29, 42-n lines of Hdma_Unk7F1520, the band as in
+;     FieldHdma_BuildTopBandA (a, b, a lines; a = 0 ends the table when
+;     n = 1), 40-n lines of Hdma_Unk7F1520;
+;   channel 5: repeat runs of 100, 29 and 42-n lines from WinFx_TableA,
+;     2n held lines of Hdma_Unk7F1534, a repeat run of 40-n from where
+;     the window table is after the band;
+;   channel 6: 100, 29, 42-n lines of Hdma_ColorMath, a repeat run of
+;     2n-1 lines of the gradient (Hdma_Unk7F1538) from pair (40-n) AND
+;     $3F, 1 line of Hdma_Unk7F1530, 40-n lines of Hdma_ColorMath;
+;   then FieldHdma_SetWin2A and FieldHdma_FillDataA.
+; Callers note: EngFD_UnkC2C1Table1 entry 2 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
+;        Field_Unk27 read; saved, $7F while it runs)
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
+;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
+;        written; Map_Unk1DFB as FieldHdma_FillDataA leaves it
+org $FDCFCF
+FieldHdma_BuildBottomBandA:
+    LDA.w !DP_Field+!Field_Unk27
+    BNE .build
+    BRL FieldHdma_BuildPlainA
+.build:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaA_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaA_Sc+6
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Sc+9
+    LDX.w #!Hdma_Unk7F14F4&$FFFF
+    STX.w !HdmaA_Sc+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaA_Sc+12
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaA_Sc+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Sc+15
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Bg1
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaA_Bg1+3
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaA_Bg1+6
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg1+9
+    LDX.w #(!Hdma_Unk7F14F8+8)&$FFFF
+    STX.w !HdmaA_Bg1+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaA_Bg1+12
+    LDX.w #!Hdma_Bg1Scroll&$FFFF
+    STX.w !HdmaA_Bg1+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg1+15
+    JSR FieldHdma_SetBg2A
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Bg3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaA_Bg3+3
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaA_Bg3+6
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg3+9
+    LDX.w #(!Hdma_Unk7F14F8+12)&$FFFF
+    STX.w !HdmaA_Bg3+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaA_Bg3+12
+    LDX.w #!Hdma_Bg3Scroll&$FFFF
+    STX.w !HdmaA_Bg3+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg3+15
+    BRA .tm
+.bg3_wave:
+    JSR FieldHdma_WaveRunsStart
+    LDA.b #!HdmaBand_BotWaveLead
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!HdmaBand_Half
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    JSR FieldHdma_AddWaveRunA
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Bg3,Y
+    REP #$20
+    LDA.w #(!Hdma_Unk7F14F8+12)&$FFFF
+    STA.w !HdmaA_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    JSR FieldHdma_SkipWaveLines
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    JSR FieldHdma_AddWaveRunA
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Bg3,Y
+.tm:
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaA_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaA_Tm+6
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+7
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_a_band
+    BCC .tm_a_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_a_set
+.tm_a_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_a_set:
+    STA.w !HdmaA_Tm+9
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaA_Tm+10
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_b_band
+    BCC .tm_b_band
+    ASL A
+    SEC
+    SBC.b #!HdmaBand_TmCap*2
+    BRA .tm_b_set
+.tm_b_band:
+    LDA.b #!HdmaBand_TmMin
+.tm_b_set:
+    STA.w !HdmaA_Tm+12
+    LDX.w #!Hdma_Unk7F1524&$FFFF
+    STX.w !HdmaA_Tm+13
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_c_band
+    BCC .tm_c_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_c_set
+.tm_c_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_c_set:
+    STA.w !HdmaA_Tm+15
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaA_Tm+16
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaA_Tm+18
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaA_Tm+19
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Tm+21
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaA_Win
+    LDX.w #!WinFx_TableA
+    STX.w !HdmaA_Win+1
+    LDA.b #!Hdma_Repeat|!HdmaBand_BotLead2
+    STA.w !HdmaA_Win+3
+    LDX.w #!WinFx_TableA+(!HdmaRun_Upper*2)
+    STX.w !HdmaA_Win+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Win+6
+    LDX.w #!WinFx_TableA+((!HdmaRun_Upper+!HdmaBand_BotLead2)*2)
+    STX.w !HdmaA_Win+7
+    STX.b !HdmaBand_WinPtr
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaA_Win+9
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDX.w #!Hdma_Unk7F1534&$FFFF
+    STX.w !HdmaA_Win+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Win+12
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaA_Win+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Win+15
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaA_Math
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaA_Math+3
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaA_Math+6
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaA_Math+9
+    LDA.b #!HdmaGrad_Lines
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    REP #$20
+    AND.w #!HdmaGrad_PairMask
+    ASL A
+    CLC
+    ADC.w #!Hdma_Unk7F1538&$FFFF
+    STA.w !HdmaA_Math+10
+    SEP #$20
+    LDA.b #!HdmaBand_EdgeLine
+    STA.w !HdmaA_Math+12
+    LDX.w #!Hdma_Unk7F1530&$FFFF
+    STX.w !HdmaA_Math+13
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaA_Math+15
+    LDX.w #!Hdma_ColorMath&$FFFF
+    STX.w !HdmaA_Math+16
+    LDA.b #!Hdma_End
+    STA.w !HdmaA_Math+18
+    JSR FieldHdma_SetWin2A
+    JSR FieldHdma_FillDataA
+    PLB
+    RTS
+
+; $FD:D27E — FieldHdma_BuildBottomBandB (687 bytes, $D27E–$D52C)
+; As FieldHdma_BuildBottomBandA for table set B (Field_Unk26 = 2 on the
+; frames Field_Unk53 bit 0 is clear; n = 0 goes to
+; FieldHdma_BuildPlainB), with the set B data and helpers as in
+; FieldHdma_BuildTopBandB.
+; Callers note: EngFD_UnkC2C1Table0 entry 2 (JSR (table,X) in
+;   EngFD_UnkC2C1).
+; Entry: M=1, X=1 (it sets X=0 itself), DP=$0100, DB=$00 (the absolute
+;        Field_Unk27 read; saved, $7F while it runs)
+; Exit:  M=1, X=1; DB restored; A = Ppu_Unk0BE0; X and Y clobbered (high
+;        bytes 0); $01D9-$01DB and, on the wave path, $01EE-$01EF
+;        written; Map_Unk1DFB as FieldHdma_FillDataB leaves it
+org $FDD27E
+FieldHdma_BuildBottomBandB:
+    LDA.w !DP_Field+!Field_Unk27
+    BNE .build
+    BRL FieldHdma_BuildPlainB
+.build:
+    PHB
+    LDA.b #!Bank7F
+    PHA
+    PLB
+    REP #$10
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Sc
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaB_Sc+3
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaB_Sc+6
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Sc+9
+    LDX.w #!Hdma_Unk7F14F4&$FFFF
+    STX.w !HdmaB_Sc+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaB_Sc+12
+    LDX.w #!Hdma_Unk7F14F0&$FFFF
+    STX.w !HdmaB_Sc+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Sc+15
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Bg1
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaB_Bg1+3
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaB_Bg1+6
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg1+9
+    LDX.w #(!Hdma_Unk7F14F8+8)&$FFFF
+    STX.w !HdmaB_Bg1+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaB_Bg1+12
+    LDX.w #(!Hdma_Bg1Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg1+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg1+15
+    JSR FieldHdma_SetBg2B
+    LDA.l !Field_Unk1DF9
+    BNE .bg3_wave
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Bg3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaB_Bg3+3
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaB_Bg3+6
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg3+9
+    LDX.w #(!Hdma_Unk7F14F8+12)&$FFFF
+    STX.w !HdmaB_Bg3+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaB_Bg3+12
+    LDX.w #(!Hdma_Bg3Scroll+4)&$FFFF
+    STX.w !HdmaB_Bg3+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg3+15
+    BRA .tm
+.bg3_wave:
+    JSR FieldHdma_WaveRunsStart
+    LDA.b #!HdmaBand_BotWaveLead
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!HdmaBand_Half
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    JSR FieldHdma_AddWaveRunB
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Bg3,Y
+    REP #$20
+    LDA.w #(!Hdma_Unk7F14F8+12)&$FFFF
+    STA.w !HdmaB_Bg3+1,Y
+    SEP #$20
+    INY
+    INY
+    INY
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    JSR FieldHdma_SkipWaveLines
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    JSR FieldHdma_AddWaveRunB
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Bg3,Y
+.tm:
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Tm
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaB_Tm+3
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaB_Tm+6
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+7
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_a_band
+    BCC .tm_a_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_a_set
+.tm_a_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_a_set:
+    STA.w !HdmaB_Tm+9
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaB_Tm+10
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_b_band
+    BCC .tm_b_band
+    ASL A
+    SEC
+    SBC.b #!HdmaBand_TmCap*2
+    BRA .tm_b_set
+.tm_b_band:
+    LDA.b #!HdmaBand_TmMin
+.tm_b_set:
+    STA.w !HdmaB_Tm+12
+    LDX.w #!Hdma_Unk7F1524&$FFFF
+    STX.w !HdmaB_Tm+13
+    LDA.l !DP_Field+!Field_Unk27
+    CMP.b #!HdmaBand_TmCap
+    BEQ .tm_c_band
+    BCC .tm_c_band
+    LDA.b #!HdmaBand_TmCap
+    BRA .tm_c_set
+.tm_c_band:
+    LDA.l !DP_Field+!Field_Unk27
+    DEC A
+.tm_c_set:
+    STA.w !HdmaB_Tm+15
+    LDX.w #!Hdma_Unk7F1528&$FFFF
+    STX.w !HdmaB_Tm+16
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaB_Tm+18
+    LDX.w #!Hdma_Unk7F1520&$FFFF
+    STX.w !HdmaB_Tm+19
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Tm+21
+    LDA.b #!Hdma_Repeat|!HdmaRun_Upper
+    STA.w !HdmaB_Win
+    LDX.w #!WinFx_TableB
+    STX.w !HdmaB_Win+1
+    LDA.b #!Hdma_Repeat|!HdmaBand_BotLead2
+    STA.w !HdmaB_Win+3
+    LDX.w #!WinFx_TableB+(!HdmaRun_Upper*2)
+    STX.w !HdmaB_Win+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.b !HdmaBand_Run
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Win+6
+    LDX.w #!WinFx_TableB+((!HdmaRun_Upper+!HdmaBand_BotLead2)*2)
+    STX.w !HdmaB_Win+7
+    STX.b !HdmaBand_WinPtr
+    LDA.b !HdmaBand_Run
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    STA.w !HdmaB_Win+9
+    REP #$20
+    AND.w #!Hdma_LowByteMask
+    ASL A
+    CLC
+    ADC.b !HdmaBand_WinPtr
+    STA.b !HdmaBand_WinPtr
+    SEP #$20
+    LDX.w #(!Hdma_Unk7F1534+2)&$FFFF
+    STX.w !HdmaB_Win+10
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Win+12
+    LDX.b !HdmaBand_WinPtr
+    STX.w !HdmaB_Win+13
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Win+15
+    LDA.b #!HdmaRun_Upper
+    STA.w !HdmaB_Math
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+1
+    LDA.b #!HdmaBand_BotLead2
+    STA.w !HdmaB_Math+3
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+4
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    INC A
+    STA.w !HdmaB_Math+6
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+7
+    LDA.l !DP_Field+!Field_Unk27
+    ASL A
+    DEC A
+    ORA.b #!Hdma_Repeat
+    STA.w !HdmaB_Math+9
+    LDA.b #!HdmaGrad_Lines
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    REP #$20
+    AND.w #!HdmaGrad_PairMask
+    ASL A
+    CLC
+    ADC.w #!Hdma_Unk7F1600&$FFFF
+    STA.w !HdmaB_Math+10
+    SEP #$20
+    LDA.b #!HdmaBand_EdgeLine
+    STA.w !HdmaB_Math+12
+    LDX.w #(!Hdma_Unk7F1530+2)&$FFFF
+    STX.w !HdmaB_Math+13
+    LDA.b #!HdmaBand_Half
+    SEC
+    SBC.l !DP_Field+!Field_Unk27
+    DEC A
+    STA.w !HdmaB_Math+15
+    LDX.w #(!Hdma_ColorMath+2)&$FFFF
+    STX.w !HdmaB_Math+16
+    LDA.b #!Hdma_End
+    STA.w !HdmaB_Math+18
+    JSR FieldHdma_SetWin2B
+    JSR FieldHdma_FillDataB
+    PLB
+    RTS
 
 ; $FD:D52D — EngFD_UnkD52D (167 bytes, $D52D–$D5D3)
 ; EngFD_UnkC124's helper: builds a table of (CGADSUB, COLDATA) byte

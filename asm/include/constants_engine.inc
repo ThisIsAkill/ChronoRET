@@ -724,6 +724,31 @@ if !constants_engine_inc == 0
 !Hdma_GradAdd = $01                      ; CGADSUB byte of the first half: add, BG1
 !Hdma_GradSub = $81                      ; CGADSUB byte of the second half: subtract, BG1
 !Hdma_GradBytes = $0100                  ; bytes EngFD_UnkD52D copies to Hdma_Unk7F1600
+; --- Field HDMA table builders (FieldHdma_*, the EngFD_UnkC2C1 handlers) ---
+; An HDMA indirect table entry is 3 bytes: a line-count byte, then the 16-bit
+; bank-$7F address of the register data; a count byte of 0 ends the table.
+!Hdma_End = $00                          ; line-count byte that ends a table
+!Hdma_Repeat = $80                       ; line-count bit: new data every line (else held for the run)
+!HdmaRun_Upper = $64                     ; 100 lines: first run of a whole-screen table
+!HdmaRun_Lower = $70                     ; 112 lines: its second run (a run can be at most 127 lines)
+!HdmaRun_Wave = $10                      ; 16 lines: the length of the BG3 wave (Hdma_WaveA/B), one entry's
+                                         ; most in FieldHdma_AddWaveRunA/B
+!HdmaWave_LineMask = $000F               ; a line number's place in the 16-line wave
+!Hdma_WavePhaseMask = $003E              ; Map_Unk1DFB masked to an even ScrollWaveA offset (32 phases)
+!Hdma_WaveBytes = $0040                  ; bytes of one 16-line wave (4 per line: BG3 H and V words)
+!Hdma_LowByteMask = $00FF                ; keeps the low byte of a 16-bit A
+!WinFx_Ch7Alt = $00E0                    ; 224: offset from WinFx_TableA of channel 7's other data
+                                         ; (FieldHdma_SetWin2A/B, by Hdma_Unk7F0351 bit 0)
+!HdmaBand_TopLead = $07                  ; FieldHdma_BuildTopBandA/B: first run (7 lines)
+!HdmaBand_Half = $29                     ; 41: the runs next to a band are 41 - Field_Unk27 lines (+-1)
+!HdmaBand_TopTail = $1E                  ; top band: last run (30 lines)
+!HdmaBand_TopWinTail = $47               ; top band: last run of the window table (71 lines)
+!HdmaBand_BotLead2 = $1D                 ; bottom band: second run (29 lines, after HdmaRun_Upper)
+!HdmaBand_BotWaveLead = $58              ; bottom band, BG3 wave: first run (88 lines; 88 + 41 = 100 + 29)
+!HdmaBand_TmCap = $0A                    ; the TM band's side runs are Field_Unk27 - 1, at most 10
+!HdmaBand_TmMin = $02                    ; ... and its middle run is 2 lines while Field_Unk27 <= 10
+!HdmaBand_EdgeLine = $01                 ; 1 line: the colour-math run at the band's lower edge
+!HdmaGrad_PairMask = $003F               ; (40 - Field_Unk27) masked to a gradient pair index
 
 ; --- Location animation set-up (FieldFD_LoadAnimSetA/B) ---
 !FieldRom_AnimListAPtrs = $FDF290        ; 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA

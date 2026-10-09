@@ -103,18 +103,6 @@ org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
-org $FDC2EB
-EngFD_UnkC2EB:      ; EngFD_UnkC2C1Table1 entry 0 (Field_Unk26 = 0, Field_Unk53 bit 0 set); not analysed
-org $FDC995
-EngFD_UnkC995:      ; EngFD_UnkC2C1Table1 entry 1; not analysed
-org $FDCFCF
-EngFD_UnkCFCF:      ; EngFD_UnkC2C1Table1 entry 2; not analysed
-org $FDC847
-EngFD_UnkC847:      ; EngFD_UnkC2C1Table0 entry 0 (Field_Unk53 bit 0 clear); not analysed
-org $FDCD0C
-EngFD_UnkCD0C:      ; EngFD_UnkC2C1Table0 entry 1; not analysed
-org $FDD27E
-EngFD_UnkD27E:      ; EngFD_UnkC2C1Table0 entry 2; not analysed
 org $FDFFE5
 FdVec_FFE5:         ; JMP $FD:DB1D; JML target of Evt_OpFF_Misc for $FF $83-$8F
 org $FDFFE8
