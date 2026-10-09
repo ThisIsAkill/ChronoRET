@@ -282,16 +282,6 @@ org $C1AB9B
 BattleAi_Target37:                      ; BattleAi_TargetTable entry $37
 org $C1ABC9
 BattleAi_Target38:                      ; BattleAi_TargetTable entry $38
-org $C1DC64
-BattleSys_UnkDC64:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1DCAD
-BattleSys_UnkDCAD:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1DE87
-BattleSys_UnkDE87:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1DE9E
-BattleSys_UnkDE9E:                      ; JSR from BattleSys_Effect03; not analysed
-org $C1DEF0
-BattleSys_UnkDEF0:                      ; JSR from BattleSys_Effect03; not analysed
 org $C1E0F5
 BattleSys_UnkE0F5:                      ; JSR from BattleSys_Effect03; not analysed
 org $C1E65F
@@ -300,12 +290,6 @@ org $C1E77B
 BattleSys_UnkE77B:                      ; JSR from BattleSys_Effect05; not analysed
 org $C1E9D5
 BattleSys_UnkE9D5:                      ; JSR from BattleSys_Effect03/06; not analysed
-org $C1DA37
-BattleSys_UnkDA37:                      ; JSR from BattleSys_Effect29/2A and $C1:D221-$C1:D48E; not analysed
-org $C1DB5E
-BattleSys_UnkDB5E:                      ; JSR from BattleSys_Effect2A and $C1:D221-$C1:D48E; not analysed
-org $C1DBAA
-BattleSys_UnkDBAA:                      ; JSR from BattleSys_Effect2B and $C1:D221-$C1:D48E; not analysed
 org $C1CFC2
 BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
                                         ; table at $C1:D126 (6 entries) with argument Y; returns a result in A
@@ -313,6 +297,8 @@ org $C1D005
 BankC1_AddItem:                         ; BankC1_RunService service 1: add one of item Y to the inventory
 org $C1D0A2
 BankC1_AddGold:                         ; BankC1_RunService service 4: add Y to the gold sum
+org $C1EA6F
+BattleSys_RunUnkB2CCHandlers:            ; JSR from BattleSys_ApplyDamage; not analysed
 org $C1EA9D
 BattleSys_UnkEA9D:                      ; JSR from BattleSys_Main's end paths; not analysed
 org $C1EAE8
