@@ -741,9 +741,9 @@ if !constants_battle_inc == 0
 !Battle_CD0021Unk0D       = $0D   ; A for it with !Battle_UnkB3BF = $FF
 !Battle_UnkB3BFUnkFF      = $FF   ; the negative !Battle_UnkB3BF value that is acted on
 !Battle_UnkAEE6Bytes      = 17    ; bytes of !Battle_UnkAEE6: BattleSys_UnkBF81 copies them, BattleFD_UnkB555 zeroes them
-!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_UnkD490
-!Battle_Rec05CCBit2       = $04   ; ... BattleSys_UnkD4AD
-!Battle_Rec05CCBit6       = $40   ; ... BattleSys_UnkD4D6
+!Battle_Rec05CCBit7       = $80   ; !BattleRom_UnkCC05CC byte 0: BattleSys_Effect29
+!Battle_Rec05CCBit2       = $04   ; ... BattleSys_Effect2A
+!Battle_Rec05CCBit6       = $40   ; ... BattleSys_Effect2B
 !Battle_Unk1C48Stride     = 5     ; bytes per PC in !Battle_Unk1C48 (entries 0, 5, 10; BattleFD_UnkAEF2 fills 3)
 !Battle_InvSlots          = $0100 ; entries in !Battle_InvIds
 !Battle_InvKeepCount      = 2     ; BattleSys_UnkBC60: an inventory entry with this many or more is left alone
@@ -838,5 +838,24 @@ if !constants_battle_inc == 0
 !Battle_NoTargetTech1    = $7B    ; !Battle_ActId of the action a PC's area tech plays when the area finds no one:
 !Battle_NoTargetTech2    = $7C    ;   one user, two users, three users (probably a "nothing happens" display; not
 !Battle_NoTargetTech3    = $7D    ;   traced)
+
+
+; --- Action effects (BattleSys_RunTechParts, BattleSys_Effect*) ---
+!Battle_EffArg3Mask      = $3F    ; !BattleRom_UnkCC05CC byte 3 bits 5-0: DP $16 of BattleSys_LoadEffectArgs
+!Battle_EffArg2Mask      = $0F    ; byte 2 bits 3-0: its DP $18
+!Battle_EffArg3Bit6      = $40    ; byte 3 bit 6: BattleSys_Effect2A also runs BattleSys_LoadEffectArgs and $C1:DA37
+!Battle_StatusBit6       = $40    ; BattlerStats.Status bit 6: cleared by BattleSys_Effect2C; meaning unknown
+!Battle_TechParts        = 3      ; parts (users) of a tech: BattleRom_TechRec.Part1-3
+!Battle_TechPartNone     = $80    ; a .Part byte with bit 7: BattleSys_RunTechParts skips the part
+!Battle_TechFlagsBit6    = $40    ; BattleRom_TechRec.Flags bit 6: !Battle_UnkB2CA gets !Battle_B2CABit5
+!Battle_TechFlagsBit5    = $20    ; .Flags bit 5: !Battle_UnkB2CA gets !Battle_B2CABit4
+!Battle_TechFlagsMergeMask = $07  ; .Flags bits 2-0: the last !Battle_ActPcHitAmount set Battle_SumHitSets folds
+!Battle_B2CABit5         = $20    ; !Battle_UnkB2CA bits, ORed into !Battle_UnkAE4D for each part; meaning unknown
+!Battle_B2CABit4         = $10
+!Battle_EffectRecSize    = 12     ; bytes per effect record (!BattleRom_UnkCC213F, by part number)
+!Battle_B1F5StopBit      = $80    ; bit 7 of the byte BattleSys_RunTechParts reads at $7E:B1F5 + the tech offset
+!Battle_B200StopBit      = $80    ; !Battle_UnkB200 bit 7: with the bit above, the tech's remaining parts are skipped
+!Battle_TechMpFail       = $FF    ; !Battle_UnkB3C8 from BattleSys_CheckTechMp: a user cannot take part
+!Battle_HitAmountMax     = 9999   ; cap of the enemy amounts Battle_SumHitSets leaves in set 0
 
 endif

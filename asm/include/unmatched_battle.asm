@@ -286,15 +286,30 @@ org $C1D7C4
 BattleSys_UnkD7C4:                      ; JSR from BattleAi_EnemyTurn for action code 2; not analysed
 org $C1D8D1
 BattleSys_UnkD8D1:                      ; JSR from BattleAi_EnemyTurn for the other action codes; not analysed
-                                        ; and !Battle_TechUsers, may set !Battle_UnkAF23; not analysed
-org $C1D490
-BattleSys_UnkD490:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D4AD
-BattleSys_UnkD4AD:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D4D6
-BattleSys_UnkD4D6:                      ; JSR from BattleSys_UnkBF46; not analysed
-org $C1D523
-BattleSys_UnkD523:                      ; JSR from BattleSys_UnkBF79 (after !Battle_UnkAF23 = 0); not analysed
+org $C1D221
+BattleSys_Effect00:                     ; BattleSys_EffectTable entry $00; not analysed
+org $C1D23E
+BattleSys_Effect01:                     ; ... entry $01; not analysed
+org $C1D267
+BattleSys_Effect02:                     ; ... entry $02; not analysed
+org $C1D2DE
+BattleSys_Effect03:                     ; ... entry $03; not analysed
+org $C1D370
+BattleSys_Effect04:                     ; ... entry $04 (an RTS, probably: one byte before $C1:D371)
+org $C1D371
+BattleSys_Effect05:                     ; ... entry $05; not analysed
+org $C1D3BF
+BattleSys_Effect06:                     ; ... entry $06; not analysed
+org $C1D3F4
+BattleSys_Effect07:                     ; ... entry $07; not analysed
+org $C1D431
+BattleSys_Effect08:                     ; ... entry $08; not analysed
+org $C1DA37
+BattleSys_UnkDA37:                      ; JSR from BattleSys_Effect29/2A and $C1:D221-$C1:D48E; not analysed
+org $C1DB5E
+BattleSys_UnkDB5E:                      ; JSR from BattleSys_Effect2A and $C1:D221-$C1:D48E; not analysed
+org $C1DBAA
+BattleSys_UnkDBAA:                      ; JSR from BattleSys_Effect2B and $C1:D221-$C1:D48E; not analysed
 org $C1CFC2
 BankC1_RunService:                      ; JMP from BankC1_Entry8003: saves P/X/DP/DB, DB=$7E, DP=0, runs entry A of the
                                         ; table at $C1:D126 (6 entries) with argument Y; returns a result in A
