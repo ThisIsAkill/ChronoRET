@@ -16,14 +16,11 @@ Ship of Harkinian project for Ocarina of Time, but strictly one person learning.
 
 ## Status
 
-Current numbers are published on the [Kajar site](https://thisisakill.github.io/Kajar-site/); for local numbers, run `python3 tools/progress.py`.
-
-Matched regions so far include the full engine spine — reset vectors, hardware
-init, game loop, VBlank handler, per-frame state init, OAM culling — plus the
-complete sprite subsystem, the per-frame state machine and its mode handlers,
-the Sub_E12A tile-streaming cluster, the sprite slot allocators and init
-cluster, and — in the battle engine (Bank $C1) — math utilities, the
-status-bar UI, the whole battle command menu, and the targeting system.
+Work in progress. Every number (bytes and functions matched, readable and
+verified, per bank) is generated from the source, never typed into a doc: see
+the [Progress page](https://thisisakill.github.io/Kajar-site/PROGRESS/) on the
+Kajar site, or run `make progress` (`python3 tools/progress.py`) locally. The
+banks being worked on are listed under "Repo layout" below.
 
 Progress notes, the address map, the devlog and a function-level breakdown
 live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.
@@ -55,20 +52,28 @@ Target: US 1.0, unheadered, 4 MiB. SHA-256:
 ## Repo layout
 
 ```
-asm/        65816 source, organized by bank
-  bank00/   Bank $00 — boot, vectors, wave tables, ROM header
-  bankFD/   Bank $FD — MainInit (hardware init from reset)
-  bankC0/   Bank $C0 — core engine (game loop, sprite system, per-frame SM)
-  bankC1/   Bank $C1 — battle engine (math, status-bar UI, menu rendering)
+asm/        65816 source, organized by bank; main.asm includes them all
+  bank00/   Bank $00 — boot page: reset entry, vectors, wave tables, ROM header
+  bankC0/   Bank $C0 — core engine (game loop, VBlank, sprites, field,
+            event script, map scrolling)
+  bankC1/   Bank $C1 — battle engine (math, status bar, command menu,
+            targeting, action scripts)
+  bankC2/   Bank $C2 — menu/scene bank (entry vectors, scene engine and its
+            script, text windows)
   bankCC/   Bank $CC — battle helpers (a copy of the 8×8 multiply so far)
+  bankCF/   Bank $CF — battle support (a sine lookup, number formatting)
+  bankFD/   Bank $FD — MainInit (hardware init from reset), battle setup helpers
   bankFF/   Bank $FF — a copy of the bank $00 wave tables so far
-  data/     Non-code data: tables, compressed blobs
-  include/  Shared names: RAM (ram_*.inc), constants, unmatched-routine labels
-symbols/    review log and progress history (tracked); functions.csv (every
-            function and its status) and progress.json are generated on
-            demand by tools/progress.py and never committed
-src/        (future) matched/reorganized code once patterns stabilize
-tools/      Build scripts, diff tools, disassembler, session helpers
+  hardware.inc  SNES register names
+  include/  Shared names: RAM (ram_*.inc), constants, macros, unmatched-routine labels
+symbols/    review log (reviews/, one file per round) and progress history
+            (tracked); functions.csv (every function and its status) and
+            progress.json are generated on demand by tools/progress.py and
+            never committed
+tools/      Build, diff and verify scripts, lint, drafting and xref tools,
+            git hooks, session helpers
+rom.sha256  SHA-256 of the target ROM (checked by CI)
+roms/       Your own ROM goes here (gitignored)
 build/      Build output (gitignored)
 ```
 
