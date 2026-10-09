@@ -787,7 +787,7 @@ if !constants_menu_inc == 0
 !Menu_Unk2C23Mask = $07
 !Menu_Unk2C23Bytes = 6
 !Menu_EquipChecks = 7                    ; entries of Menu_EquipChars
-!MenuRom_ItemTablesA = $FFCF0E           ; 5 words: per item category, the address (bank $FF) of a table
+!MenuRom_ItemTablesA = $FFCF0E           ; 5 words: per item category, the address (bank $CC) of a table
 !MenuRom_ItemRecSizesA = $FFCF18         ; 5 bytes: its record size (Menu_ItemDataPtrA)
 !MenuRom_ItemTablesB = $FFCF1D           ; the same for a second set of tables (Menu_ItemDataPtrB)
 !MenuRom_ItemRecSizesB = $FFCF27

@@ -23844,11 +23844,10 @@ Menu_BuildPartyLists:
 ; DB is set to $7E only at the start of each frame, never between
 ; threads: a thread starts or resumes with the DB the thread run before
 ; it in that frame yielded or ended with ($7E for the first one).
-; Quirk, kept: there is no CLC before the stack's ADC. For slots 1-7 the
-; carry is that of the slot loop's CMP (clear); for slot 0 it is that of
-; the CMP that ended the previous frame's scan (set), so a new thread in
-; slot 0 (Menu_FadeInThread) starts with S = $0A40, one byte into slot
-; 1's stack area.
+; Quirk, kept (no effect): there is no CLC before the stack's ADC, but
+; the carry is always clear there: it is the bit the third ASL shifts out
+; of the slot offset (0-$38), so a new thread starts with S = $0A3F +
+; 64 x the slot.
 ; Callers (1 JMP site): BankC2_MenuEntry ($C2:808C).
 ; Callers of Menu_ThreadEnd (5 JMP sites): Menu_FadeInThread ($C2:83C7) and unmatched ($C2:9044,
 ;   $C2:CBE8, $C2:FA46, $C2:FAA2).
@@ -24645,7 +24644,8 @@ Menu_ReadPad:
 ; Entry: M any (SEP #$20 here), X=0 (16-bit X for the held word copy),
 ;        DP and DB any (set to $0000 and $00 here, not restored)
 ; Exit:  M=0, X=1; DP=$0000, DB=$00; A = the held buttons that were
-;        also held last frame, X = Menu_PadRepeatTimer; Y unchanged
+;        also held last frame, X = Menu_PadRepeatTimer; Y's low byte
+;        kept, high byte cleared (SEP #$10)
 ; No calls (JML Reset on the soft-reset buttons).
 Menu_PollPad:
     PEA.w !Menu_Dp
@@ -24777,7 +24777,8 @@ Menu_MapButtonsOne:             ; header: see Menu_MapButtons
 ; Callers (2 JSR sites): Menu_NmiPad ($C2:8490) and Menu_ReadPad ($C2:84E1).
 ; Entry: M, X any (SEP #$30 here), DP any (set to $0400 here, not
 ;        restored), DB any (the limits are read long)
-; Exit:  M=1, X=1; DP=$0400; A, X clobbered; Y and DB unchanged
+; Exit:  M=1, X=1; DP=$0400; A, X clobbered; Y's low byte kept, high
+;        byte cleared (the SEP #$30); DB unchanged
 ; No calls.
 Menu_TickPlayTime:
     SEP #$30
@@ -25221,7 +25222,8 @@ Menu_LoadCharRecA:
 ; Entry: M, X any (P and X saved; SEP #$30 here), DP any, DB=$7E; A =
 ;        the item id
 ; Exit:  P and X restored; A = the category (0-4, = Menu_ItemCategory's
-;        low byte; the TXA comes after the index store); Y unchanged
+;        low byte; the TXA comes after the index store); Y's low byte
+;        kept, high byte cleared (SEP #$30)
 ; No calls.
 Menu_ItemCategory:
     PHX
@@ -25262,7 +25264,8 @@ Menu_ItemCategoryBounds:
 ; Callers (1 JSR site): unmatched ($C2:98BB).
 ; Entry: M any (P saved; SEP #$20 here), X any (the category is read as
 ;        a byte or word; its high byte is 0), DP any, DB=$7E; A = the id
-; Exit:  P restored; A = X = the address; Y unchanged
+; Exit:  P restored; A = X = the address; Y's low byte kept, high byte
+;        cleared (SEP #$30 in Menu_ItemCategory)
 ; Calls: Menu_ItemCategory.
 Menu_ItemDataPtrA:
     PHP
