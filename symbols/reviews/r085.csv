@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:5628,C2Scene_LabelTask,2026-10-08,rev85a,approved,919ce0e98a7c,"Fix verified: 6 pieces Y $D0 (-48) so StartX/Y-48; in BusyA ObjAY+$40-48=+16, A's rest frame ($C3:E32D) spans -16..+16, so just under it. 1B58 sources, dispatch, M/X/DB ok"
