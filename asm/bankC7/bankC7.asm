@@ -429,8 +429,9 @@ Audio_CommandDone:                      ; header: see Audio_RunCommand
 ; Audio_CmdArg0. A song number not below Audio_SongCount ($53) does
 ; nothing. Otherwise:
 ;   1. Audio_AdjustSongCmd (no effect, as the list is empty), then
-;      Audio_StartSong sends the command to the APU; when the APU
-;      answers that it needs nothing more, the load ends there
+;      Audio_StartSong sends the command to the APU; when APUIO1
+;      bit 7 is set after the echo (probably: nothing more needed; not
+;      traced into the SPC700 program), the load ends there
 ;      (Audio_StartSong leaves to Audio_CommandDone itself).
 ;   2. Audio_SongLoading = the song (so further commands are ignored
 ;      until the end of Audio_SendSongData).

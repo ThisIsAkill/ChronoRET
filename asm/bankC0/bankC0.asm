@@ -28184,8 +28184,8 @@ LocLoad_AudioSetup:
 ; and Party_ObjSlot are dp), DB=$00; at Audio_PlaySfxAtLeader, A =
 ; effect id.
 ; Exit (both entries): M=1, X/Y 16-bit, DP and DB unchanged; A and Y
-; clobbered (Y = the leader's object), and whatever Audio_DriverCommand
-; (unmatched) changes.
+; clobbered (Y = the leader's object); Audio_DriverCommand keeps the
+; rest and leaves Audio_CmdId = 0.
 ; ============================================================
 org $C01B90
 Audio_PlayTileSfxA:
