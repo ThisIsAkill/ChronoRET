@@ -27540,7 +27540,8 @@ BattleAi_AddStatByteAtY:
 ; ==================================================================
 ; BattleAi_TargetTable entries $00-$38, run by BattleAi_ReadTargets_Code
 ; (JSR (T,X) at $C1:AC2E) with A = X = target code * 2. Each fills
-; !BattleAi_Targets (battler slots, $FF = empty; both callers of
+; !BattleAi_Targets (battler slots, except $2F's enemy entry numbers
+; 0-7; $FF = empty; both callers of
 ; BattleAi_ReadTargets_Code ran BattleAi_ClearTargets first, so the list
 ; starts all $FF) and !BattleAi_TargetCount. "Self" is the acting enemy:
 ; slot !Battle_UnkB252 + 3 in some handlers, slot !Battle_UnkB18B in
@@ -27567,8 +27568,9 @@ BattleAi_AddStatByteAtY:
 ;   - one pick: a random PC ($05), the nearest / farthest PC or enemy by
 ;     position query ($06, $07, $17, $18), the lowest HP ($08 PCs,
 ;     $19 enemies, $26 those but self), the highest HP PC ($37), a
-;     random enemy ($2F, $38), the slot in the enemy's
-;     !Battle_UnkB19E record ($04);
+;     random enemy but self ($38), a random entry number 0-7 (not a
+;     slot) among the enemies whose !Battle_UnkAF15 has bit 7 ($2F),
+;     the slot in the enemy's !Battle_UnkB19E record ($04);
 ;   - by a stat-block byte (PcStatBlk offset with BattleAi_AddPcByByte,
 ;     then BattleAi_PickPcTarget cuts the list to one): PCs $09-$14,
 ;     enemies $1A-$25 (with or without self).
