@@ -773,6 +773,8 @@ if !constants_engine_inc == 0
 !Col_GreenBlueMask = $7FE0               ; green and blue
 !Col_BlueHiMask = $7C                    ; blue in a colour's high byte (blue x 4)
 !Col_GreenScaledMask = $F8               ; green x 8 (as the scalers shift it) without the fraction bits
+!Col_GreenLoMask = $E0                   ; green bits 0-2 in a colour's low byte (PalAnim_WhitenR)
+!Col_GreenHiMask = $03                   ; green bits 3-4 in a colour's high byte (PalAnim_WhitenB)
 !FieldAnimA_Size = 5                     ; bytes per FieldAnimA record
 !FieldAnim_EndRecord = $80               ; FieldFD_LoadAnimSetA list byte: the record only gets .Unk3 = $80
 !FieldAnim_Kind2 = 2                     ; FieldFD_LoadAnimSetA record kinds with their own copy loops

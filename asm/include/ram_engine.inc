@@ -1868,6 +1868,8 @@ endstruct
 !PalAnim_Save = $0C                      ; 2 B dp (DP=$0500): a Pal_Buf colour held across a rotation;
                                          ; in the PalAnim_Scale* routines the colour's unscaled channels
 !PalAnim_SaveCgram = $0E                 ; 2 B dp: the Pal_CgramBuf colour held across a rotation
+!PalAnim_Green = $0E                     ; 1 B dp: alias of PalAnim_SaveCgram in the PalAnim_Whiten* routines:
+                                         ; the colour's green x 8 while it is lightened
 !PalAnim_End = $10                       ; 2 B dp: the last offset a rotation reaches (colour x 2)
 !PalAnim_Span = $12                      ; 2 B dp: FieldAnimB.Unk2 x 2 in the rotations
 !PalAnim_Dest = $18                      ; 3 B dp: long Pal_CgramBuf address kinds 1 and 8 write
@@ -1887,13 +1889,14 @@ struct FieldAnimB $0520
                          ; (PalAnim_TickAll: frames - 1 for kinds 1 and 8)
     .Unk1: skip 1        ; first colour the PalAnim_* kinds work on
     .Unk2: skip 1        ; colour count
-    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 5/7)
+    .Unk3: skip 1        ; 0; frame (kinds 1/8) or step (kinds 4-7)
     .Unk4: skip 1        ; 0; frame counter up to .Unk5 (PalAnim_TickAll)
     .Unk5: skip 1        ; frames between steps
     .Unk6: skip 1        ; kinds 1 and 8 only; with .Unk7 the ROM offset of their colours; kinds
-                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel)
-    .Unk7: skip 1        ; kind 5 level, kind 7 phase
-    .Unk8: skip 1        ; kind 5 target level, kind 7 depth
+                         ; 5/7: channels kept (bits 0-2 red, green, blue; PalAnim_ApplyLevel);
+                         ; kinds 4/6: channels lightened (PalAnim_ApplyWhiteLevel)
+    .Unk7: skip 1        ; kinds 4/5 level, kinds 6/7 phase
+    .Unk8: skip 1        ; kinds 4/5 target level, kinds 6/7 depth
     .Ptr: skip 3         ; kind 8: long address of the list bytes after the record's own
 endstruct
 
