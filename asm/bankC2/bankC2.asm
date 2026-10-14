@@ -46850,7 +46850,7 @@ Menu_CfgEntryText:
     PLP
     RTS
 
-; $C2:F9B2 — Menu_CfgTextThread (149 bytes with Menu_CfgValueThread, $F9B2–$FA48)
+; $C2:F9B2 — Menu_CfgTextThread (151 bytes with Menu_CfgValueThread, $F9B2–$FA48)
 ; A thread (slot 2, from Menu_CfgEntryText): Menu_Unk0DD0 = $80,
 ; Menu_TextDest = $4E0A, Menu_TextGlyphs and Menu_TextCol = 0,
 ; TextWin_GfxBuf and Menu_TextGfxSrc = $5E00, Menu_TextPenStart = 8,
@@ -46869,7 +46869,7 @@ Menu_CfgEntryText:
 ; Callers note: started by Menu_CfgEntryText (Menu_StartThread), at
 ;   Menu_CfgTextThread or at Menu_CfgValueThread.
 ; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000), DB
-;        as the scheduler leaves it: $7E from its PLB at $C2:81C1 each
+;        as the scheduler leaves it: $7E from its PEA $7E7E and PLB at $C2:81C1-$81C4 each
 ;        frame, unless a thread run before it this frame changed it
 ;        (DB=$7E assumed, as everywhere in the menu)
 ; Exit:  never returns (Menu_ThreadEnd)

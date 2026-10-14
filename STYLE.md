@@ -103,7 +103,9 @@ block). The lint requires:
   tables that dispatch to the routine and for fall-ins.
 
 - `SIZE`: a header claim `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout (the
-  routine alone, or with its sub-entries).
+  routine alone, or with its sub-entries). A combined claim `Name (N bytes with A and B,
+  $XXXX–$YYYY)` must give the range's size, start at the routine and end where a row of the
+  layout ends; every routine inside the range is named in it or is a `header: see` sub-entry.
 - `UNMATCHED`: no header or banner calls an address `unmatched` (`unmatched code at $C1:0027`,
   `$C1:3819 (unmatched)`) once that address lies inside matched code; name the routine instead.
 - `DPDB`: the Entry line states DP and DB itself (`DP any` and `DB any` are statements too).
