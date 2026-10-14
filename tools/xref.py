@@ -76,6 +76,11 @@ from disasm import _OPCODES  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
+# Source directories that are not 65816 code: their lines are left out of
+# the boundaries (as if their bytes were unmatched), so their instructions
+# never count as 65816 instruction starts here or in code_survey's opcode
+# statistics. asm/spc700/ is the SPC700 sound driver (tools/spc700.py).
+NOT_65816 = {('asm', 'spc700')}
 FUNCTIONS_CSV = Path('symbols/functions.csv')
 
 WINDOW = 64                      # sweep start offsets before a site
@@ -215,7 +220,7 @@ class Xref:
                         where[off] = (int(m.group(3), 16), int(m.group(4), 16))
         for off, (fid, no) in where.items():
             path = files.get(fid)
-            if path is None:
+            if path is None or Path(path).parts[:2] in NOT_65816:
                 continue
             if path not in texts:
                 p = Path(path)

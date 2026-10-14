@@ -395,12 +395,14 @@ def render(mem: bytes, base: int, start: int, stop: int, insns: dict[int, Insn],
 
 
 def source(mem: bytes, base: int, first: int, start: int, stop: int,
-           insns: dict[int, Insn]) -> list[str]:
-    """A complete asar snippet for ARAM start..stop-1 (org at its ROM address)."""
+           insns: dict[int, Insn], entries=()) -> list[str]:
+    """A complete asar snippet for ARAM start..stop-1 (org at its ROM address);
+    entries in the range that start an instruction get global labels."""
     rom_addr = 0xC00000 | first + start - base
+    labels = {e: f'Spc_{e:04X}' for e in entries if start <= e < stop and e in insns}
     return ([f'; ARAM ${start:04X}-${stop - 1:04X} (ROM ${rom_addr >> 16:02X}:{rom_addr & 0xFFFF:04X})',
              'hirom', f'org ${rom_addr:06X}', 'arch spc700', f'base ${start:04X}']
-            + render(mem, base, start, stop, insns) + ['base off', 'arch 65816'])
+            + render(mem, base, start, stop, insns, labels) + ['base off', 'arch 65816'])
 
 
 def check(lines: list[str], rom: bytes, first: int, base: int, start: int, stop: int) -> str | None:
@@ -443,11 +445,12 @@ def main(argv=None) -> int:
     if not (base <= start < stop <= base + size):
         print(f'error: range must lie in ${base:04X}-${base + size - 1:04X}', file=sys.stderr)
         return 2
+    entries = [parse(e) for e in args.entry] or driver_entries(mem, base)
     if args.linear:
         insns = linear(mem, base, start, stop)
     else:
-        insns = trace(mem, base, [parse(e) for e in args.entry] or driver_entries(mem, base))
-    lines = source(mem, base, first, start, stop, insns)
+        insns = trace(mem, base, entries)
+    lines = source(mem, base, first, start, stop, insns, entries)
     print('\n'.join(lines))
     if args.check:
         err = check(lines, rom, first, base, start, stop)

@@ -62,6 +62,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify  # noqa: E402
 from disasm import _OPCODES  # noqa: E402
+from xref import NOT_65816  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
@@ -172,8 +173,9 @@ class Facts:
                 m = re.match(r'^([0-9a-fA-F]{2}):([0-9a-fA-F]{4}) ([0-9a-fA-F]{4}):([0-9a-fA-F]{8})', line)
                 if m:
                     off = snes_to_offset(int(m.group(1), 16), int(m.group(2), 16))
-                    if off is not None:
-                        self.starts[off] = (files.get(int(m.group(3), 16)), int(m.group(4), 16))
+                    path = files.get(int(m.group(3), 16))
+                    if off is not None and (path is None or Path(path).parts[:2] not in NOT_65816):
+                        self.starts[off] = (path, int(m.group(4), 16))
         self._lines = {}
         # Global labels defined in bank files, by address, to name the
         # routine around a referencing site.
