@@ -1243,7 +1243,7 @@ endif
 ; --- Menu mode 1 (Menu_Mode01H0 ...) ---
 !Menu_LastMember = $0083                 ; 8-bit; Menu_CurMember at handler 1's last move (sound on a change)
 !Menu_Unk84 = $0084                      ; 8-bit; Menu_ListKind + Menu_CurMember at handler 2's last
-                                         ; Menu_UnkA45D ($FF: redo)
+                                         ; Menu_EquipListRefresh ($FF: redo)
 !Menu_RowCopyPos = $0026                 ; 16-bit; Menu_MemberScrollAnim's off-screen block position
 !Menu_RowScrollWord = $0022              ; 16-bit; the word Menu_MemberScrollAnim steps into Menu_Unk5D42
 !Menu_Unk0D26 = $0D26                    ; 16-bit; the Menu_CurCharRec offset handler 3 swaps (the
@@ -1255,6 +1255,24 @@ endif
 !Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
                                          ; Menu_ShiftItemListMap)
 !Menu_Unk5CC2 = $5CC2                    ; 12 tile words set to $40FF by Menu_EquipSlotsOpen
+
+; --- Menu mode 1: the slides, the item list and the stat compare ---
+!Menu_SlideWordA = $0022                 ; 16-bit; the item slides' word for Menu_Unk5CC2 (stepped)
+!Menu_SlideWordB = $0024                 ; 16-bit; ... for Menu_Unk5D42
+!Menu_SlideStep = $0026                  ; 16-bit; their step a frame (also lines moved between entries)
+!Menu_BandA = $0022                      ; 8-bit; the slot slides' band line counts (Menu_BandValueA ...)
+!Menu_BandB = $0024                      ; 8-bit
+!Menu_BandC = $0026                      ; 8-bit
+!Menu_DrawRowsLeft = $0022               ; 16-bit; Menu_DrawEquipList's row counter
+!Menu_ScrollBuildLines2 = $96A0          ; 8-bit; Menu_ScrollBuild entry 2's line count (item slides)
+!Menu_ScrollBuildLines3 = $96A3          ; 8-bit; entry 3's line count ...
+!Menu_ScrollBuildValue3 = $96A4          ; 16-bit; ... and value
+!Menu_EquipNameIds = $9890               ; 5 B: Menu_DrawEquipNames' item ids (the Menu_SprScratch RAM)
+!Menu_CompareAttrs = $0D4D               ; 9 B: Menu_EquipCompareStats' attribute bytes (the Menu_Unk0D4D RAM)
+!Menu_CompareHpAttr = $0D57              ; 8-bit; its byte for the max HP
+!Menu_SlotsClearA = $3044                ; 12 tile words Menu_EquipSlotsSlideOut zeroes ...
+!Menu_SlotsClearB = $3084                ; ... and 12 more two tile rows down
+!Menu_Unk5D40 = $5D40                    ; BG3 map row 61 ($80 B) zeroed by Menu_EquipSlotsSlideOut
 
 ; --- Bank $FF menu helpers ($FF:F548-$FF:FC66) ---
 !Menu_Tmp07 = $0007                      ; 8-bit scratch

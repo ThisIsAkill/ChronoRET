@@ -1127,7 +1127,7 @@ if !constants_menu_inc == 0
 !MenuRom_StatusList = $FFBE1C            ; Menu_DrawMemberStatus's draw list
 !Menu_Unk0D5DSet = $0004
 !Menu_Unk0D4DBit = $0020
-!Menu_StatusUnkMap = $30A2               ; X for Menu_UnkA6F0 (a tilemap address)
+!Menu_StatusUnkMap = $30A2               ; X for Menu_DrawEquipNames (a tilemap address)
 !Menu_StatusPortraitAttr = $0E           ; the portrait's attribute byte (palette 3)
 !Menu_StatusPortraitMap = $2EDE          ; tilemap address of the portrait
 !MenuRom_CharIconTiles = $FFCE88         ; words by Menu_CharIconIndex: first tile word of the icon
@@ -1185,6 +1185,54 @@ if !constants_menu_inc == 0
 !Menu_RefreshArrowXY = $6268             ; Menu_ArrowX $68, Menu_ArrowY $62
 !Menu_EquipArrowSpan = $1500             ; dividend of the item list's arrow factors
 !Menu_EquipPageRows = 8                  ; item list rows per page
+
+; --- Menu mode 1: the slides, the item list and the stat compare ---
+!MenuRom_ItemsSlideInList = $FFBEA4      ; draw list of Menu_EquipItemsSlideIn
+!MenuRom_ItemsSlideOutList = $FFBEBD     ; ... of Menu_EquipItemsSlideOut
+!MenuRom_SlotsSlideInList = $FFBE26      ; ... of Menu_EquipSlotsSlideIn
+!MenuRom_SlotsSlideOutList = $FFBE5B     ; ... of Menu_EquipSlotsSlideOut
+!MenuRom_CompareList = $FFBEE2           ; ... of Menu_EquipCompareStats
+!Menu_SlideHdmaBytes = $0010             ; the NMI move's size in the item slides (5 entries and the end)
+!Menu_SlideHdmaBits = $E5                ; Menu_HdmaenShadow in every slide frame (also put in Menu_ArrowsOff)
+!Menu_ItemsSlideInWordA = $60FF          ; Menu_SlideWordA at the item slide-in (also Menu_Unk5CC2's fill)
+!Menu_ItemsSlideInWordB = $402F          ; Menu_SlideWordB there
+!Menu_ItemsSlideInStep = $0004           ; Menu_SlideStep there (lines and word steps a frame)
+!Menu_ItemsSlideInLines = $70            ; the table's entry 2 lines at the start
+!Menu_ItemsSlideLines = $20              ; entry 3's lines when the slide-in ends
+!Menu_ItemsSlideRowBytes = $38           ; bytes Menu_EquipItemsSlideStep fills from Menu_Unk5D42 (28 words)
+!Menu_ItemsSlideOutWordA = $611F         ; Menu_SlideWordA at the item slide-out
+!Menu_ItemsSlideOutWordB = $404F         ; Menu_SlideWordB there
+!Menu_ItemsSlideOutStep = $FFFC          ; Menu_SlideStep there (-4)
+!Menu_ItemsSlideOutLines = $6F           ; entry 2's lines after the slide-out
+!Menu_BandValueA = $01E0                 ; HDMA values of the slide tables' bands (what they set is not traced)
+!Menu_BandValueB = $01F0
+!Menu_BandValueC = $01D0
+!Menu_BandValueTop = $01FF               ; the top band of Menu_EquipSlotsBackStep
+!Menu_HdmaCountMax = $7F                 ; largest line count of one HDMA entry (bit 7: repeat mode)
+!Menu_SlotsSlideInWord = $606F           ; Menu_Unk5CC2's fill at the slot slide-in
+!Menu_SlotsInBandA = $90                 ; Menu_BandA/B at the slot slide-in (Menu_BandC 0)
+!Menu_SlotsInBandB = $30
+!Menu_SlotsBandCMax = $90                ; Menu_BandC grows up to this
+!Menu_SlotsSlideLines = $D0              ; lines the slide-in's four bands add up to
+!Menu_SlotsOutBandA = $30                ; Menu_BandA/B/C at the slot slide-out
+!Menu_SlotsOutBandB = $90
+!Menu_SlotsOutBandC = $10
+!Menu_SlotsBackEdgeLines = $10           ; the slide-out's top and bottom bands
+!Menu_SlotsBackLines = $C0               ; Menu_BandA plus the band after it
+!Menu_SlotsSlideFrames = $18             ; frames of the slot slides
+!Menu_SlotsSlideRowFrames = 8            ; frames per member row (x Menu_Unk0412 or 3 - it)
+!Menu_SlideLineStep = 6                  ; lines a band or Menu_ScrollOfs moves a frame
+!Menu_SlideOfsMask = $01FF               ; the 9-bit value of Menu_Unk5CC2 / Menu_Unk5D42's words ...
+!Menu_SlideOfsBits = $6000               ; ... and the bits kept set above it
+!Menu_Bg3RowPairBytes = $0080            ; bytes Menu_EquipSlotsSlideOut zeroes from Menu_Unk5D40
+!Menu_EquipListMap = $4FC6               ; tilemap address of the item list's first row
+!Menu_ItemNameAttr = $2000               ; Menu_TextWord for item names (attribute byte $20)
+!Menu_EquipNameTiles = $0A               ; tiles of an item name in the list (the 11 bytes less the first)
+!Menu_EquipSlots = 4                     ; equipment slots (weapon, helmet, armour, accessory)
+!Menu_CompareCount = 9                   ; values Menu_EquipCompareStats compares (Menu_EquipCompareOfs)
+!Menu_CompareSame = $00                  ; Menu_CompareAttrs: unchanged ...
+!Menu_CompareUp = $08                    ; ... higher (palette 2) ...
+!Menu_CompareDown = $1C                  ; ... lower (palette 7)
 
 ; --- Bank $FF menu helpers ($FF:F548-$FF:FC66) ---
 !MenuRom_GlyphRows = $FFCAFC             ; 10 x 16 B: 2bpp tiles BankFF_BuildTileSets starts from
