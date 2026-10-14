@@ -2029,7 +2029,9 @@ Spc_CmdControl:
 ; $12DD — Spc_NullCommand (1 byte, $12DD–$12DD; ROM $C7:35A2–$35A2)
 ; A lone RET: the handler of the commands that do nothing ($12, $13,
 ; $16, $17, $1A-$1F in Spc_CmdTable10; $84, $8A-$8D, $8F, $F7, $FA, $FB
-; in Spc_CmdTable80).
+; in Spc_CmdTable80; and sequence commands $E5 and $E7, through the
+; words at $1596 and $159A of the sequence-command handler table at
+; $1554, indexed by command - $C4 from $073D).
 ; Callers note: reached only through those table entries.
 ; Entry: P=0
 ; Exit:  A, X, Y and PSW unchanged
