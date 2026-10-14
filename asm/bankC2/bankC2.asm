@@ -30790,8 +30790,8 @@ Menu_EquipCompareStats:
 ; defence and stats 0, 2, 5, 3, 1, 4, 6 (.Derived + 7, + 8, + 0 ...);
 ; its loop reads the first 9. The last two bytes ($03, $3F) are not
 ; read by it (no reader found); they equal the .Word3 and .Unk3F
-; offsets (probably current and maximum HP), the HP pair it compares
-; separately.
+; offsets (probably current and maximum HP); only the max HP word
+; (.Unk3F) is compared separately, against Menu_CurMaxHp.
 Menu_EquipCompareOfs:
     db Menu_CharRec.Derived+7, Menu_CharRec.Derived+8, Menu_CharRec.Derived+0
     db Menu_CharRec.Derived+2, Menu_CharRec.Derived+5, Menu_CharRec.Derived+3
@@ -31360,7 +31360,7 @@ Menu_MemberListHdma:
 ; end) then $7F lines; no caller passes it (the most is $C0).
 ; Callers (8 JSR sites): Menu_EquipSlotsSlideStep ($C2:A824, $C2:A830, $C2:A83A, $C2:A851) and
 ;   Menu_EquipSlotsBackStep ($C2:A9DA, $C2:A9E4, $C2:A9F1, $C2:A9FB).
-; Entry: M=1 (8-bit A; N from the caller's load of A), X any, DP=$0000
+; Entry: M=1 (8-bit A; N set by the caller's last load or ADC/SBC of A), X any, DP=$0000
 ;        (Menu_Tmp00/01), DB any (long stores); A = the line count
 ; Exit:  M=1; A = Menu_Tmp01; X, Y unchanged
 ; No calls.
