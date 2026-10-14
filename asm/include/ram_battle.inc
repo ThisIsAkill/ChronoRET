@@ -1812,8 +1812,8 @@ endstruct
                                   ; !Battler_SprBytes and more
 !Battle_Unk95D2           = $95D2 ; 1 B: $FF at set-up (also the byte after the $FF fill from !Tech_ListCode)
 !BattleMenu_UnkA6DC       = $A6DC ; 1 B: $FF at set-up (the byte after !BattleMenu_Roster)
-!Enemy_Unk988B            = $988B ; 1 B per enemy: $FF at set-up; Battle_InitSceneGfx ORs !Battle_SprAttrPriority2
-                                  ; to it for the attribute bytes of the enemy's !Battle_SprRec rows (so probably
+!Enemy_Unk988B            = $988B ; 1 B per enemy: $FF at set-up; Battle_InitSceneGfx adds !Battle_SprAttrPriority2
+                                  ; to it (CLC/ADC) for the attribute bytes of the enemy's !Battle_SprRec rows (so probably
                                   ; palette and priority bits; who sets it after the $FF is not traced)
 !Enemy_NameLineId         = $98FF ; 2 B per enemy-name line 0-2 (8 B set to $FF at set-up): the enemy id named on
                                   ; that line, $FFxx = none (Battle_InitScene fills the lines in order of first
@@ -1880,7 +1880,7 @@ endstruct
 !Battle_Unk0B24           = $0B24 ; 1 B each: for each battler present, $AA (!Battle_HiTableLarge4) in the byte at its
                                   ; slot and in 1-5 more after it by frame layout (Battle_InitSceneGfx; probably
                                   ; high-table bytes, from the value)
-!Battle_InitTileBuf       = $2F00 ; $800 B of tiles built at set-up inside !Battle_ActFrameBuf ($2D00 + $200): 16
+!Battle_InitTileBuf       = $2F00 ; $A00 B ($2F00-$38FF) of tiles built at set-up inside !Battle_ActFrameBuf ($2D00 + $200): 16
                                   ; 2bpp tiles widened to 4bpp, then 64 4bpp tiles; stage 3 uploads $2D00-$38FF
 !Battle_ActUnkAAFB        = $AAFB ; 1 B: zeroed by BattleAct_ResetState
 !Battle_UnkA2B7           = $A2B7 ; 1 B: zeroed by BattleAct_ResetState

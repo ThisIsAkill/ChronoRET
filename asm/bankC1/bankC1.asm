@@ -61,8 +61,8 @@ incsrc "../hardware.inc"
 ;     Battle_ReencodeText at $CC:F066 with A = 0).
 ; None of these instructions touches a register or flag.
 ; Callers note: the JSL sites named above are in unmatched code in banks
-;   $CC, $CD and $EF; BattleSys_RunServiceVec and BattleSys_ExitVec are
-;   listed above.
+;   $CD and $EF; the one at $CC:F066 is in Battle_ReencodeText;
+;   BattleSys_RunServiceVec and BattleSys_ExitVec are listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
 ;        has its own needs)
 ; Exit:  through the jump target; nothing is changed here
@@ -12418,7 +12418,7 @@ BattleAct_OpEndScript:
 ; Callers note: BattleAct_OpcodeTable entry $02 (BattleAct_OpLoopAnim);
 ;   BattleAct_StartAnim: BattleAct_OpPlayAnim ($C1:4E3E, $C1:4E5F,
 ;   $C1:4E87), BattleAct_OpShowAnimFrame ($C1:4EBE, $C1:4EDF, $C1:4F06)
-;   and the unmatched handler code at $C1:57A5, $C1:57C8 and $C1:57F2.
+;   and BattleAct_OpShowAnimEntry ($C1:57A5, $C1:57C8, $C1:57F2).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0; for
 ;        BattleAct_StartAnim DP $8E = the mode (1 or 2); the operand
 ;        byte after the opcode

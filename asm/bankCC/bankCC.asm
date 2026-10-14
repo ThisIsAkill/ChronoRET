@@ -258,15 +258,15 @@ Battle_InitUploadStep:
     RTL
 ; $CC:E22E — Battle_InitUploadObjTiles (98 bytes, $E22E–$E28F)
 ; Sends the first two 64-byte pieces of !BattleRom_ObjTilePieces (the four
-; pieces bank $C0's Field_UploadUnk0000 sends) to VRAM $0000 and $0100,
-; with the DMA channel 7 mode and target its caller set. It ends at the
+; pieces bank $C0's Field_UploadUnk0000 sends) to VRAM $0000 and $0100
+; over DMA channel 7, which it first sets itself to mode 1 (DMAP7 =
+; !DMAP_TwoRegs) with target VMDATAL (BBAD7). It ends at the
 ; RTS after the second piece: the uploads of the third and fourth pieces
 ; follow it as unreached code (Battle_InitUploadObjTilesDead).
 ; Callers (1 JSR site): Battle_InitUploadStep ($CC:E1A9).
-; Entry: M=1, X any, DP=0 (TDC as zero), DB any (registers written long);
-;        DMAP7/BBAD7 already set (stage 2 of Battle_InitUploadStep)
-; Exit:  RTS; M=1, X, Y unchanged; A clobbered; VMADDL/H, A1T7, A1B7, DAS7
-;        changed
+; Entry: M=1, X any, DP=0 (TDC as zero), DB any (registers written long)
+; Exit:  RTS; M=1, X, Y unchanged; A clobbered; DMAP7, BBAD7, VMADDL/H,
+;        A1T7, A1B7, DAS7 changed
 Battle_InitUploadObjTiles:
     LDA.b #!DMAP_TwoRegs
     STA.l DMAP7
@@ -2402,7 +2402,9 @@ Battle_BuildOccupiedCellMap:
 ; screen position of entries 0-2 (stopping at a negative entry).
 ; Callers (1 JSL site): BattleSys_RunAction ($C1:40A9).
 ; Entry: M=1, X=0 (16-bit index stores), DP=0 (scratch !BattleTmp_80-81),
-;        DB=$7E
+;        DB=$7E; B = 0 assumed: for a PC caster ASL A / TAX copies B into
+;        X's high byte before LDA.l !BattleRom_PcPartners,X (BattleSys_RunAction
+;        does not establish B)
 ; Exit:  RTL; M=1, X=0; A, X, Y and DP $80-$81 clobbered
 BattleAct_BuildBattlerList:
     LDA.w !Battle_ActUnkAE97

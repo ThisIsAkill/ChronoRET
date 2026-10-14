@@ -32,7 +32,7 @@ org $FFF548
 ;   - zeroes Menu_SprScratch $9890-$989F and copies glyphs 1 and 2 after
 ;     it ($98A0-$98BF); then builds three groups of ten tiles at
 ;     Menu_TileSetC: each byte is the Menu_SprScratch byte (0, glyph 1 or
-;     glyph 2, by group) shifted left 2 with bits 3-2 of glyph t's byte
+;     glyph 2, by group) shifted left 2 with bits 4-3 of glyph t's byte
 ;     below (probably 0-9, 10-19 and 20-29 in a narrower layout; not
 ;     traced); then zeroes the first 16 bytes of Menu_TileSetC.
 ; Menu_Unk51 is the start offset of both output loops, and of the glyph
@@ -109,7 +109,7 @@ BankFF_BuildTileSets:
     LDY.w #!Menu_SprScratch+!BankFF_ScratchClearBytes
     LDA.w #!BankFF_ScratchTableBytes-1
     MVN !Bank7E,!BankFF                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 3-2.
+    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 4-3.
     LDY.b !Menu_Unk51
     STZ.b !Menu_Tmp00
 .row_group:
@@ -163,9 +163,10 @@ BankFF_BuildTileSets:
 ; $FF:F628 — BankFF_LoadE4Palette (79 bytes, $F628–$F676)
 ; Copies a set of 12 colours from bank $E4 into Menu_PalBuf and marks it
 ; for upload (Menu_PalDirty counted up). DP $00 bits 0-2 pick the set (its
-; address is entry n of MenuRom_E4Palettes, a word in bank $E4), DP $00
-; bits 8-10 the place: Menu_PalBuf + $122 + row * 32 (colours $91-$9C of
-; palette 9 + row). When DP $02's high byte is non-zero each colour is
+; address is entry n of MenuRom_E4Palettes, a word in bank $E4), and the
+; same bits pick the place (XBA moves DP $00 into the high byte before the
+; AND #$0700; DP $01 is not used): Menu_PalBuf + $122 + n * 32 (colours
+; $91-$9C of palette 9 + n). When DP $02's high byte is non-zero each colour is
 ; halved first ((colour >> 1) & $3DEF).
 ; Callers (2 JSL sites): unmatched ($C2:E038, $C2:E093).
 ; Entry: M, X any (P and X saved; REP #$30 here), DP=0 (Menu_Tmp00 and
@@ -448,8 +449,10 @@ BankFF_WidenTiles:
 ; Callers (1 JSL site): Menu_BuildItemTables ($C2:9973).
 ; Entry: M=0, X=0 (Menu_BuildItemTables' REP #$30; P is saved, SEP #$30
 ;        here), DP=0 (Menu_Tmp00-08, Menu_ListPtr, Menu_PartyActive...),
-;        DB=$7E (absolute RAM)
-; Exit:  P restored; A, X, Y, DP $00-$08 and $16-$18 clobbered;
+;        DB=$7E (absolute RAM); DP $05 = 0 assumed, not established: in
+;        .line_tile X is 16-bit and LDX $04 reads DP $05 (never written
+;        here) as the high byte of the MenuRom_TechLineTiles index
+; Exit:  P restored; A, X, Y, DP $00-$04, $06-$09 and $16-$19 clobbered;
 ;        Menu_Unk85/86 set
 ; Calls: BankFF_UnkF958.
 BankFF_UnkF813:
@@ -700,8 +703,9 @@ BankFF_UnkF958:
 
 ; $FF:F9BB — BankFF_CharBits (9 bytes, $F9BB–$F9C3)
 ; $80 >> n for n = 0-7, then 0: a character id's bit (as in
-; !Menu_Unk29AF and the tech bytes); read by Menu_CmdJoin,
-; BankFF_UnkF813 and BankFF_UnkF958. Entry 8 (0) is reached by
+; !Menu_Unk29AF and the tech bytes); read by Menu_CmdJoin, Menu_CanEquip
+; (AND.l at $C2:93B8), BankFF_UnkF813, BankFF_UnkF958 and an LDA.l at
+; $C2:BC07 in unmatched code. Entry 8 (0) is reached by
 ; BankFF_UnkF813 when all eight bits of a byte are set.
 BankFF_CharBits:
     db $80,$40,$20,$10,$08,$04,$02,$01,$00

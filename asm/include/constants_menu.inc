@@ -1214,7 +1214,7 @@ if !constants_menu_inc == 0
 !BankFF_TileSetCGroups = 3               ; groups of tiles built at Menu_TileSetC
 !BankFF_ScratchClearBytes = $10          ; bytes zeroed from Menu_SprScratch
 !BankFF_ScratchTableBytes = $20          ; bytes copied after them
-!BankFF_PalRowMask = $0700               ; DP $00's high byte bits 0-2: the palette row
+!BankFF_PalRowMask = $0700               ; after XBA: DP $00 (low byte) bits 0-2, the palette row (same bits as the set)
 !BankFF_PalBufStart = $0122              ; offset of row 0 in Menu_PalBuf (colour $91)
 !BankFF_PalSetMask = $0007               ; DP $00's low bits: the colour set
 !BankFF_PalHalveFlag = $FF00             ; DP $02's high byte: non-zero = halve the colours
