@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$CD:3189,BattleCD_FxDrawShape,2026-10-09,rev154a,approved,1c450dacf2a6,"Fix right: HalfWidths 8-bit $47/$49/$51, builders 8-bit $47/$4B/$4D(+$4F/$51), copies 16-bit $45-$4C,$4F/50,$51/52 on top cut; $4E never; WMADD set+moved; r=0 path, kinds<=15 ok"
