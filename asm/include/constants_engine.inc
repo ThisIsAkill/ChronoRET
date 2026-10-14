@@ -61,6 +61,11 @@ if !constants_engine_inc == 0
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
 !Op_RTI = $40                            ; 65816 opcode RTI (Sys_HaltWithColor's trampolines)
+!Op_LdaImm = $A9                         ; 65816 opcodes C3_BuildCopyCode writes: LDA #imm,
+!Op_Tcd = $5B                            ; TCD,
+!Op_LdaAbs = $AD                         ; LDA abs,
+!Op_StaDp = $85                          ; STA dp
+!Op_Rts = $60                            ; and RTS
 
 ; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
@@ -150,10 +155,102 @@ if !constants_engine_inc == 0
 ; --- Audio ---
 !Audio_CmdPlaySfx = $19                  ; Audio_CmdId: play the sound effect in Audio_CmdArg0
 !Audio_CmdPlayMusic = $10                ; Audio_CmdId LocLoad_AudioSetup sends with LocRom.Music in
-                                         ; Audio_CmdArg0 (probably: start that music track)
+                                         ; Audio_CmdArg0: bank $C7 loads that song (Audio_CmdLoadSong)
 !Audio_CmdUnk81 = $81                    ; Audio_CmdId LocLoad_AudioSetup sends first, with
                                          ; arguments 0, Audio_Cmd81Arg, Audio_Cmd81Arg (not traced)
 !Audio_Cmd81Arg = $FF                    ; Audio_CmdArg1/Arg2 for Audio_CmdUnk81
+
+; --- Sound driver interface (bank $C7) ---
+; Commands as Audio_RunCommand sorts them (Audio_CmdId): 0 and $01-$0F nothing;
+; $10-$17 through Audio_SongCmdTable ($10, $11, $14, $15 load the song in
+; Audio_CmdArg0; $12, $13, $16, $17 nothing); $18-$2F and $80-$FF sent to the
+; APU as they are (Audio_CmdSend); $30-$3F become $10 (Audio_CmdSongAlias);
+; $70 and $71 handled here; $40-$6F and $72-$7F nothing.
+!Audio_CmdFirstSong = $10                ; first command of the Audio_SongCmdTable range
+!Audio_CmdFirstSend = $18                ; first command of the range sent as it is ($18-$2F)
+!Audio_CmdFirstAlias = $30               ; first command of the Audio_SongAliasTable range ($30-$3F)
+!Audio_CmdAliasEnd = $40                 ; first command after it
+!Audio_Cmd71 = $71                       ; replace the current song's first sample (Audio_CmdSwapSample)
+!Audio_CmdSetEcho = $FC                  ; sent as it is; then Audio_CmdArg0's low nibble is taken as
+                                         ; the new Audio_EchoDelay
+!Audio_CmdIndexMask = $0F                ; command bits that index Audio_SongCmdTable/AliasTable
+!Audio_CmdListedBit = $04                ; ORed into a $10/$11 command whose song is on
+                                         ; Audio_SongBit2List (making it $14/$15); the list is empty
+!Audio_SongMask = $007F                  ; Audio_CmdArg0 bits that index AudioRom_SongEcho
+!Audio_EchoDelayMask = $0F               ; the echo-delay nibble (AudioRom_SongEcho, command $FC)
+!Audio_EchoTopPage = $F1                 ; ARAM page just above the echo buffer, probably ($F100)
+!Audio_DefaultEchoDelay = $05            ; Audio_EchoDelay at boot
+!Audio_CarryIfNonzero = $FF             ; CLC / ADC of this: C = 1 iff the byte is nonzero (then ROL
+                                         ; turns it into 0/1)
+!Audio_SongIdle = $E0                    ; Audio_SongLoading when no song is being loaded (bit 7 set)
+!Audio_NumSlots = $0020                  ; 16 sample slots x 2 bytes (Audio_SlotSample/Len/Aram)
+!Audio_SlotSearchEnd = $0040             ; Audio_SendSampleDir's search end: 32 words from
+                                         ; Audio_SlotSample, so it runs on into Audio_SlotLen
+!Audio_SongListBytes = $0020             ; one song's AudioRom_SongSamples list: 16 words
+!Audio_DirBufBytes = $0040               ; Audio_DirBuf: 16 entries x 4 bytes
+!Audio_SongExtraSteps = $000C            ; AudioRom_SongExtra: 12 three-byte steps per song
+!Audio_SongRoom = $0F00                  ; song data at ARAM $2000 this long or longer reaches the
+                                         ; $2F00 block (Audio_BlockDirty)
+!Audio_PageBytes = $0100                 ; Audio_Boot clears this many bytes from !DP_Audio
+!Audio_BootDelay = $0800                 ; Audio_Boot's wait loop after starting the driver
+
+; APU port protocol (APUIO0-3). A transfer starts with a header step: ARAM address in
+; APUIO2/3, mode in APUIO1, Audio_Seq in APUIO0 (usually !Audio_SeqHeader); the driver
+; answers by echoing APUIO0, and APUIO1 = the mode when it accepts. Each data step puts 2 or 3 bytes in
+; APUIO1-3 and the next sequence value in APUIO0, then waits for the echo
+; (Audio_SendSeq). These meanings are read from the 65816 side only; the SPC700
+; program ($C7:24C3, uploaded to ARAM $0200) is not disassembled.
+!Audio_IplReady = $BBAA                  ; APUIO0/1 read as a word: the IPL ROM's ready signature
+!Audio_IplKick = $CC                     ; the IPL ROM's first transfer value (APUIO0 and APUIO1)
+!Audio_ResetKick0 = $FF                  ; APUIO0 and
+!Audio_ResetKick1 = $F0                  ; APUIO1 while Audio_Boot waits for the IPL: probably what makes
+                                         ; a running driver go back to the IPL ROM (not traced in the
+                                         ; SPC700 program)
+!Audio_NumBootBlocks = $000C             ; 6 boot blocks x 2 (Audio_BootBlockPtrs/Aram)
+!Audio_XferWords = $02                   ; mode: 2 bytes per step (APUIO1/2)
+!Audio_XferTriples = $03                 ; mode: 3 bytes per step (APUIO1-3)
+!Audio_XferLive = $05                    ; mode: 3 bytes per step, used after an !Audio_SeqLive step
+                                         ; by commands $70/$71 (while a song plays, probably)
+!Audio_XferMove = $07                    ; mode: per step a word in APUIO2/3: a sample's old ARAM
+                                         ; address, its new one and its length (a move in ARAM, probably)
+!Audio_SeqHeader = $E0                   ; Audio_Seq after each transfer (so the next header step's
+                                         ; APUIO0 value), and the final step's value (also in
+                                         ; APUIO1) that ends a load
+!Audio_SeqLive = $FE                     ; APUIO0 value commands $70/$71 send before their header
+!Audio_SeqMask = $7F                     ; sequence values count modulo $80
+!Audio_Timeout = $0400                   ; reads of APUIO0 before a wait for the echo gives up
+
+; ARAM addresses (bank $C7 sends them in APUIO2/3)
+!AudioAram_Driver = $0200                ; the SPC700 program (boot block 0) and its entry point
+!AudioAram_Dir = $1E00                   ; boot block 3: the sample directory, probably (4 bytes per
+                                         ; sample: start, loop start)
+!AudioAram_SongDir = $1E80               ; directory entries $20-$2F: the song's samples (Audio_DirBuf)
+!AudioAram_ParamA = $1F00                ; boot block 5: a word per directory entry (meaning not traced)
+!AudioAram_SongParamA = $1F40            ; its entries $20-$2F (AudioRom_SampleParamA)
+!AudioAram_ParamB = $1F80                ; boot block 4: a word per directory entry, probably the ADSR
+                                         ; pair (the song samples' values are mostly $FF,$E0)
+!AudioAram_SongParamB = $1FC0            ; its entries $20-$2F (AudioRom_SampleParamB)
+!AudioAram_Song = $2000                  ; where a song's data goes (Audio_SendSongData)
+!AudioAram_Block2F00 = $2F00             ; boot block 1 / AudioRom_Block2F00Alt
+!AudioAram_Block4700 = $4700             ; boot block 2; the sample slots start after it
+!AudioAram_SongExtra = $F120             ; where a song's AudioRom_SongExtra bytes go
+
+; Bank $C7 ROM data after the matched part (not matched yet; the SPC700 program and
+; the blocks are uploaded as they are). Each block starts with a 16-bit length.
+!AudioRom_SongSamples = $C70E11          ; 83 x 16 words: each song's samples (1-62), 0-ended
+!AudioRom_SongExtra = $C71871            ; 83 x 36 B: sent to ARAM $F120 at each song load (meaning
+                                         ; not traced)
+!AudioRom_SongEcho = $C7241D             ; 83 words: byte 0's low nibble = the song's echo delay
+                                         ; (Audio_CmdArg2), byte 1 = Audio_CmdArg1 (not traced)
+!AudioRom_SpcDriver = $C724C3            ; boot block 0: $1BEF bytes, the SPC700 program
+!AudioRom_Block4700 = $C740B4            ; boot block 2: $0201 bytes
+!AudioRom_Block1E00 = $C742B7            ; boot block 3: $0024 bytes (directory entries 0-8)
+!AudioRom_Block1F80 = $C742DD            ; boot block 4: $0014 bytes
+!AudioRom_Block1F00 = $C742F3            ; boot block 5: $0014 bytes
+!AudioRom_Block2F00 = $C74309            ; boot block 1: $1800 bytes; sent again while
+                                         ; Audio_Unk1E10 is 0
+!AudioRom_Block2F00Alt = $C75B0B         ; $1800 bytes sent to ARAM $2F00 instead while
+                                         ; Audio_Unk1E10 is nonzero (the battle cues set it)
 
 ; --- Generic ---
 !Eng_LowByteMask = $00FF                 ; AND mask that zero-extends a byte in 16-bit A
@@ -322,10 +419,12 @@ if !constants_engine_inc == 0
 !WinFx_TableB = $1AC8                    ; the same while Field_Unk53 is 0 (inferred: the two halves
                                          ; of a double buffer, as Hdma_InitChannelsFD picks its
                                          ; tables by Field_Unk53)
-!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10 (what the
-                                         ; mode selects is not traced)
-!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5
-!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12
+!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10: a full
+                                         ; circle, the rows outside emptied (WinFx_BuildCircle)
+!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5: the upper half,
+                                         ; then the lower half at half height
+!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12: a full circle, the
+                                         ; rows outside left as they are (WinFx_CircKeepRest)
 !WinFx_Hook3SizeMin = $02                ; hook 3 shuts the window off only when WinFx_Size < this
 !WinFx_FixedX = $7C                      ; WinFx_ArgX of hooks 7-10
 !WinFx_FixedY = $06                      ; WinFx_ArgY of hooks 7-10
@@ -1065,8 +1164,8 @@ endif
 !EventHook_LeaveToBankC3 = $0B           ; hook 11
 !EventHook_WinPulse = $0C                ; hook 12 (it ends at EventHook_Idle)
 !EventHook_WinShrink1Off = $0E           ; hook 14
-!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95
-!WinFx_C3EMode2 = $02                    ; (what BankC3_Entry000E does with them is not traced)
+!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95:
+!WinFx_C3EMode2 = $02                    ; WinFx_StepWipe raises every line value (1) or lowers it (2)
 !WinFx_SizeBit0 = $01                    ; WinFx_Size bit 0 (Hdma_InitChannelsFD's channel-7 choice)
 !WinFx_SizeBit1 = $02                    ; WinFx_Size bit 1: hook 3 leaves the window on when set
 !EvtFF_FirstSub = $90                    ; opcode $FF's second byte: first Evt_OpFFTable entry
@@ -1210,12 +1309,14 @@ endif
 ; --- Battle music cues (MusicCueDispatch / AudioFadeDispatch, $C0:1BAB-$C0:1CFB) ---
 !FieldBtl_EvtKeepMusic = $40             ; FieldBtl_EvtFlags bit 6: the music cues send only Audio_Cmd70
                                          ; (keep the field music through the battle, probably)
-!Audio_Cmd14 = $14                       ; sound-driver command sent with a song in Audio_CmdArg0 (meaning
-                                         ; not traced: start a song, probably)
-!Audio_Cmd70 = $70                       ; sound-driver command, argument 1 before / 0 after a battle
-                                         ; (not traced)
-!Audio_Cmd11 = $11                       ; sound-driver command sent with Menu_Config1E after a battle
-                                         ; (not traced: the field music again, probably)
+!Audio_Cmd14 = $14                       ; sound-driver command sent with a song in Audio_CmdArg0: bank
+                                         ; $C7 loads it as for $10 (Audio_CmdLoadSong); what the APU
+                                         ; does differently with $14 is not traced
+!Audio_Cmd70 = $70                       ; sound-driver command, argument 1 before / 0 after a battle:
+                                         ; picks the block at ARAM $2F00 (Audio_CmdBlockVariant)
+!Audio_Cmd11 = $11                       ; sound-driver command sent with Menu_Config1E after a battle:
+                                         ; bank $C7 loads that song as for $10 (the field music again,
+                                         ; probably)
 !Audio_Cmd81Arg40 = $40                  ; Audio_CmdArg0 of an Audio_CmdUnk81 after a battle
 !Audio_Cmd81Arg80 = $80                  ; ... and after a lost one
 !Audio_Unk1E10Set = $FF                  ; Audio_Unk1E10 before a battle (0 after it)
@@ -1227,3 +1328,70 @@ endif
                                          ; metatiles $100 + their Map_TileProps state
 !TileAnim_ColumnTop = $E4                ; start state of an $E6 column's upper tile, probably: the IRQ
                                          ; draws metatile $1E5 there after ModeE6_Handler adds 1
+
+; --- Bank $C3 kernel: the decompressor (Decomp_ToWram) and the module boot ---
+!Decomp_ModeMask = $C0                   ; first end-marker byte, bits 6-7: 0 = 12-bit offsets and
+                                         ; 4-bit lengths, else 11-bit offsets and 5-bit lengths
+!Decomp_GroupSize = 8                    ; items per control byte
+!Decomp_MarkerCountMask = $3F            ; end-marker bits 0-5: 0 = end of the data, else the items
+                                         ; in the next segment's first control byte
+!Decomp_RunBytes = 8                     ; literal bytes after a zero control byte
+!Decomp_Offset12Mask = $0FFF             ; back-reference distance, 12-bit mode
+!Decomp_Offset11Mask = $07FF             ; back-reference distance, 11-bit mode
+!Decomp_In = $0000                       ; base of Decomp_ToWram's reads of the packed data: X = the
+                                         ; offset in Decomp_SrcBank (DB = that bank), +1.. the bytes
+                                         ; after X
+!C3_BootIrqOn = $80                      ; C3_EntryArg bit 7: C3_BootModule runs the unpack with the
+                                         ; display on and the line-211 IRQ (Field_HookLeaveToBankC3's
+                                         ; BankC3_HookArg $85 sets it; event sub $00-$7F never does)
+
+; --- Bank $C3 window routines (WinFx_BuildCircle, WinFx_StepWipe, WinFx_BuildQuad) ---
+!WinFx_EmptyEntry = $0001                ; table entry left = 1, right = 0: the window covers
+                                         ; nothing on that line
+!WinFx_FillAllBytes = $01C0              ; WinFx_FillEmpty's count for the whole table: $1C1
+                                         ; bytes after the first entry (225 entries and one byte)
+!WinFx_Lines = $E0                       ; lines in a table (224)
+!WinFx_LastLine = $DF                    ; the last line (223)
+!WinFx_EdgeMax = $00FF                   ; right edges are clamped to this
+!WinFx_CircModeMask = $007F              ; mode bits 0-6: 0 = full circle, 1 = the lower half at
+                                         ; half height, else the upper half only
+!WinFx_CircKeepRest = $0080              ; mode bit 7: leave the rows outside the circle as they
+                                         ; are (else they are emptied)
+!WinFx_CircStepDiag = $000A              ; midpoint-circle step constant when x decreases
+                                         ; (4(y - x) + 10)
+!WinFx_WipeWorkOfs = $01C0               ; WinFx_StepWipe: the line array is at the table + this;
+                                         ; the two output buffers at + 0 and + WinFx_Lines
+!WinFx_WipeFrames = $20                  ; WinFx_StepWipe stops when its frame count reaches this
+!WinFx_WipeFillMode2 = $FF               ; first-frame value of every line in mode 2 (mode 1: 0)
+!WinFx_WipeRunMask = $1F                 ; random byte bits 0-4: run length - 3
+!WinFx_QuadTableRows = $0100             ; rows of a quad table (256): the rows after the bottom
+                                         ; one, up to $FF, are emptied (WinFx_BuildQuad)
+
+; --- Bank $C3 module services ---
+!DP_C3Zero = $0000                       ; direct page C3_ModuleFrame sets
+!C3Rom_PackBank = $FE                    ; bank of C3Rom_PackPtrs; source bank of C3_CopyFEto7E/7F
+!C3_SongArgs = $FFFF                     ; Audio_CmdArg1/Arg2 C3_SongCheck sends with the song
+!Eng_AddrMask16 = $FFFF                  ; AND mask: a label's bank-$00 mirror (C3_ReadPad's JML Reset)
+!C3_EntryNoSong = $20                    ; C3_EntryArg bit 5: C3_SongCheck sends nothing
+!C3_TaskListBytes = $20                  ; C3_TaskList / C3_TaskRun size
+!C3_PadAutoReadBusy = $01                ; HVBJOY bit 0: the auto-joypad read is still running
+!C3_PadSoftReset = $3030                 ; JOY1 with exactly L, R, Select and Start: soft reset
+!C3_PadStartHi = $0010                   ; C3_Pad+1 read as a word, bit 4: Start
+!C3_SndPause = $00F2                     ; Audio_CmdId (and Arg0 = 0) C3_ReadPad sends on pausing
+!C3_SndResume = $4418                    ; Audio_CmdId $18, Arg0 $44: sent on resuming
+!C3_SndResumeArg = $0080                 ; its Audio_CmdArg1/Arg2
+!C3_GenKStep = $20                       ; C3_BuildCopyCode: source step of the innermost loop
+!C3_CopyCodePasses = 8                   ; C3_CopyCodeOrder entries
+!C3Scale_SrcRowMask = $FFC0              ; C3_ScaleBitmap: (Acc >> 1) kept to 64-byte source rows
+!C3Scale_RowBytes = $0020                ; bytes per output row (64 pixels, 4 bit planes)
+!C3Script_OpFlow = $0080                 ; opcode bit 7: a flow / table opcode
+!C3Script_NibbleMask = $000F             ; opcode bits 0-3: variable, counter or table entry
+!C3Script_KindMask = $00F0               ; opcode bits 4-7
+!C3Script_FromVar = $0020                ; opcode bit 5: the operand is a variable byte
+!C3Script_VarIndexMask = $001E           ; variable operand: index x 2
+!C3Script_OpLoop = $0080                 ; opcodes $80-$8F: loop
+!C3Script_OpLoopYield = $0090            ; opcodes $90-$9F: loop, then yield
+!C3_ApuTimeout = $0200                   ; tries of C3_RunScript's dead APU send loop
+!C3_OamGroupMask = $0F                   ; Oam_LowTable offset bits 0-3: 0 after every 4 sprites
+!C3_ScreenRight = $0100                  ; C3_SprListLarge: X from here up is off screen
+!C3_OffscreenX = $9801                   ; ... and is stored as X $01 with bit 15 (so X bit 8) set

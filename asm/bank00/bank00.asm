@@ -16,8 +16,8 @@ hirom
 ; The CPU comes out of reset in emulation mode with I already set. Only
 ; CLC+XCE are needed to enter native mode; the SEI first is for the soft
 ; resets below, which arrive in native mode with interrupts possibly on.
-; Callers (3 JML sites): Menu_PollPad ($C2:8523), BattleCF_FrameUpdate ($CF:E702) and unmatched
-;   ($C3:0AB5).
+; Callers (3 JML sites): Menu_PollPad ($C2:8523), C3_ReadPad ($C3:0AB5) and BattleCF_FrameUpdate
+;   ($CF:E702).
 ; Callers note: besides the RESET vector, three JMLs restart the game through
 ; here: $C2:8523 (when JOY1 reads $3030, i.e. L+R+Select+Start held),
 ; $C3:0AB5 (JML $00FF00, after forced blank and NMI/HDMA off) and

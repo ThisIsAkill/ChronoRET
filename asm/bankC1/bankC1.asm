@@ -4188,7 +4188,8 @@ Battle_ClearPadEdges:
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (LDA.b !Battle_ArgSlot), DB=$7E;
 ;        !Battle_ArgSlot = battler slot
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered, plus whatever
-;        Audio_ProcessEntry (not matched yet) changes
+;        Audio_ProcessEntry changes in the $1E00 page (it keeps A, X,
+;        Y, P, DP and DB; !Sfx_Command = 0 after it)
 ; Callees: Audio_ProcessEntry
 org $C11B19
 BattleMenu_EnqueueReadyBattler:
@@ -4238,7 +4239,8 @@ BattleMenu_EnqueueReadyBattler:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as at every caller; the routine itself
 ;        only needs M=1 and DB=$7E for the .w stores)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered, plus whatever
-;        Audio_ProcessEntry (not matched yet) changes
+;        Audio_ProcessEntry changes in the $1E00 page (it keeps A, X,
+;        Y, P, DP and DB; !Sfx_Command = 0 after it)
 ; Callees: Audio_ProcessEntry
 org $C11B55
 Battle_PlaySfx0:
@@ -4816,8 +4818,8 @@ BattleTgt_PcByCharId4:
 ; clobbered; they read the pad edges with LDA.b. DP written: the
 ; enemy-anchored ones $80/$81 (SingleEnemy) plus the area routine's DP
 ; (AreaLine, AreaCircle, AreaRow, AreaPartyTriangle: see those headers),
-; and whatever Battle_PlaySfx0's Audio_ProcessEntry (not matched yet)
-; changes.
+; and what Battle_PlaySfx0's Audio_ProcessEntry changes in the $1E00
+; page (!Sfx_Command = 0 after it).
 
 ; BattleTgt_EnemyLineFromCaster ($C12169–$C121AE, 70 bytes)
 ; Entry/Exit: M=1, X=0, DP=0, DB=$7E, as in the area-mode notes above
@@ -44064,7 +44066,7 @@ BattleMenu_RemoveBattlerFromReady:
 ;        all return M=1, X=0, DP=0, DB=$7E with A, X, Y clobbered and the
 ;        pad edges cleared; DP: BuildTargetList's (the mode handler's DP, see its header), plus
 ;        CommitAction's $80/$82/$84 on confirm, plus whatever
-;        Battle_PlaySfx0's Audio_ProcessEntry (not matched yet) changes
+;        Battle_PlaySfx0's Audio_ProcessEntry changes in the $1E00 page
 ; Callees: BattleMenu_BuildTargetList, Battle_PlaySfx0,
 ;          BattleMenu_CommitAction, BattleMenu_TargetNext,
 ;          BattleMenu_TargetPrev, Battle_ClearPadEdges

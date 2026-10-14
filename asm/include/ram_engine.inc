@@ -777,8 +777,77 @@ if !ram_engine_inc == 0
 !Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (the last byte of the block
                                          ; Audio_DriverCommand sends; bank $C2's C2Scene_QueueSoundCmd
                                          ; fills all four bytes $1E00-$1E03)
-!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after
-                                         ; (next to the Audio_Cmd* block; reader not traced)
+!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after.
+                                         ; Read by bank $C7 (Audio_SendSongData, Audio_UploadBlock2F00;
+                                         ; Audio_CmdBlockVariant sets it from command $70's argument): nonzero picks
+                                         ; AudioRom_Block2F00Alt for ARAM $2F00 instead of
+                                         ; AudioRom_Block2F00
+!Audio_BlockInAram = $1E11               ; 8-bit 0/1: which of the two $2F00 blocks was last sent
+                                         ; (Audio_Unk1E10 != 0 when it was); a change makes bank $C7
+                                         ; send the other one
+
+; --- Sound driver page $1E00 (bank $C7, absolute; dp with DP = !DP_Audio) ---
+; Bank $C7 runs with DP = $1E00 and DB = 0. Its routines use these names as
+; dp operands written !Name-!DP_Audio. Audio_Boot clears the whole page.
+!DP_Audio = $1E00                        ; direct page of the bank $C7 routines (Audio_Boot and
+                                         ; Audio_RunCommand TCD it through the stack)
+!Audio_SongLoading = $1E05               ; 8-bit: $E0 (!Audio_SongIdle) when idle; the song id
+                                         ; while Audio_CmdLoadSong runs. Audio_RunCommand
+                                         ; ignores every command while bit 7 is clear
+!Audio_Unk1E0A = $1E0A                   ; 8-bit; zeroed by Audio_LoadNewSamples, no reader found
+!Audio_Count = $1E0C                     ; 16-bit scratch: an end index, a slot count or a byte
+                                         ; count (each user says which)
+!Audio_ListEnd = $1E0E                   ; 16-bit scratch: Audio_CmdLoadSong's end index into
+                                         ; AudioRom_SongSamples
+!Audio_Ptr = $1E12                       ; 3 B long pointer for [dp],Y reads; Audio_CmdLoadSong and
+                                         ; Audio_SendSampleDir use its first word as a pointer into
+                                         ; bank 0 for (dp) stores
+!Audio_Ptr2 = $1E14                      ; 16-bit (dp) store pointer in Audio_CmdLoadSong; overlaps
+                                         ; Audio_Ptr's bank byte
+!Audio_SaveX = $1E1C                     ; 16-bit: X kept across Audio_UploadSample (it reads it)
+!Audio_SaveY = $1E1E                     ; 16-bit: Y kept across Audio_UploadSample
+!Audio_SlotSample = $1E20                ; 16 words: the sample (1-62, AudioRom index + 1) held by
+                                         ; each ARAM sample slot, 0 = free; the slots in use come
+                                         ; first, in ARAM order
+!Audio_SlotLen = $1E40                   ; 16 words: each slot's sample length in bytes
+!Audio_SlotAram = $1E60                  ; 17 words: the ARAM address where slot n starts; entry
+                                         ; n+1 is where slot n ends. Entry 0 is the base Audio_Boot
+                                         ; sets (just after the $4700 block)
+!Audio_Tmp82 = $1E82                     ; 16-bit scratch: an index - 1 kept to multiply it by 3
+!Audio_Seq = $1E84                       ; 8-bit: the next value to write to APUIO0 in a transfer,
+                                         ; counting 1 up per step modulo $80 (Audio_SendSeq); set
+                                         ; to !Audio_SeqHeader after each transfer, so that is
+                                         ; usually the header step's value (Audio_StartSong leaves
+                                         ; (command + 1) & $7F instead)
+!Audio_XferMode = $1E86                  ; 8-bit: the transfer mode Audio_UploadBlock2F00 asked for
+!Audio_EchoDelay = $1EF0                 ; 8-bit, 5 at boot: the echo delay, probably (see
+                                         ; Audio_EchoPage); a song's AudioRom_SongEcho entry or
+                                         ; command $FC change it
+!Audio_Unk1EF1 = $1EF1                   ; 8-bit; zeroed by Audio_Boot, no other use found
+!Audio_EchoPage = $1EF2                  ; 8-bit: ARAM page !Audio_EchoTopPage - 8 x
+                                         ; Audio_EchoDelay: where an echo buffer of 2 KB per
+                                         ; delay step would start below $F100 (inferred from the
+                                         ; arithmetic, as the DSP's EDL/ESA work); samples ending
+                                         ; on or above it are dropped (Audio_DropEchoSlots)
+!Audio_BlockDirty = $1EF3                ; 8-bit: nonzero makes Audio_SendSongData send the $2F00
+                                         ; block again (a song longer than !Audio_SongRoom
+                                         ; overwrote it, or the variant changed)
+!Audio_FreeAram = $1EF6                  ; 16-bit: the ARAM address after the last loaded sample
+                                         ; (written by Audio_Boot and Audio_LoadNewSamples; no
+                                         ; reader found)
+!Audio_SampleBase = $1EF8                ; 16-bit: Audio_SlotAram's base, written once by
+                                         ; Audio_Boot (no reader found)
+!Audio_Unk1EFA = $1EFA                   ; 8-bit; set to 0 by Audio_Boot, no reader found
+!Audio_Unk1EFB = $1EFB                   ; 8-bit; set to $C7 by Audio_Boot, no reader found
+!Audio_FirstSlot = $1EFC                 ; 16-bit: the slot offset (slot x 2) holding the current
+                                         ; song's first sample (Audio_SendSampleDir); command $71
+                                         ; replaces that sample
+!Audio_SongSamples = $1F00               ; 16 words: the samples the song being loaded uses
+                                         ; (from AudioRom_SongSamples), 0-ended
+!Audio_NewSamples = $1F20                ; 16 words: those of them not yet in a slot, 0-ended
+!Audio_DirBuf = $1F80                    ; 16 x 4 B: for each of Audio_SongSamples its ARAM start
+                                         ; and loop address (0, 0 for one not found), sent to
+                                         ; ARAM !AudioAram_SongDir
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
                                          ; colours) that Pal_LoadUnkRow0 copies to Pal_CgramBuf, the
@@ -1688,6 +1757,135 @@ if !ram_engine_inc == 0
 !Decomp_OutLen = $0306                   ; 16-bit, read back after Decomp_ToWramVec: the unpacked
                                          ; length, or end offset (LocLoad_CheckEvtData limits it to
                                          ; Evt_DataMax; ram_battle.inc reads it as the end offset)
+!DP_Decomp = $0300                       ; direct page Decomp_ToWram sets (its block is the dp bytes
+                                         ; $00-$16); also the direct page of the bank $C3 window
+                                         ; effects (WinFx_Arg* at $50-$58, scratch at $F0-$F7)
+!Decomp_SegEnd = $0309                   ; 16-bit Decomp_ToWram scratch: offset (in the source bank)
+                                         ; of the current segment's end marker
+!Decomp_GroupLeft = $030B                ; 8-bit: items left in the current control group (8, or
+                                         ; the marker's count after a segment change)
+!Decomp_CtrlBits = $030D                 ; 8-bit: the control byte, shifted right once per item
+!Decomp_CopyLen = $030F                  ; 16-bit (the high byte $0310 is zeroed at the start): a
+                                         ; back-reference's length - 1, the count MVN takes
+!Decomp_SrcSave = $0315                  ; 16-bit: the source offset kept across a back-reference's
+                                         ; MVN (which uses X for the copy source)
+!C3_EntryArg = $0384                     ; 8-bit: the A BankC3_Entry0000 was entered with
+                                         ; (C3_BootModule); bit 7 = C3_BootIrqOn; the module reads
+                                         ; it (bits 0-4 index a table of its own, bits 5 and 7
+                                         ; are tested; seen in its unpacked code, not traced)
+!C3Rom_PackPtrs = $FE0000                ; 3 B per entry: long pointers to packed blocks; entry 0 is
+                                         ; $C3:1200, entry 1 the module $C3:1313 (C3_BootModule
+                                         ; reads entry 1's low word)
+!C3Mod_Code = $7E3000                    ; where C3_BootModule unpacks the bank $C3 module and jumps
+                                         ; (its first byte is the module's entry); alias of
+                                         ; LocGfx_Stage, which the field no longer uses by then
+!DP_WinFx = $0300                        ; direct page of the bank $C3 window routines
+                                         ; (WinFx_BuildCircle, WinFx_StepWipe, WinFx_BuildQuad): their
+                                         ; arguments are WinFx_Arg*.. and WinFx_Quad*, scratch $F0-$FD
+!WinFx_ArgXHi = $0351                    ; 8-bit: WinFx_BuildCircle zeroes it (and $0353, $0355) so
+                                         ; that WinFx_ArgX/ArgY/ArgSize read as 16-bit values
+!WinFx_ArgYHi = $0353
+!WinFx_ArgSizeHi = $0355
+!WinFx_Tmp = $03F0                       ; 16-bit scratch of the bank $C3 window routines: x or y
+                                         ; (circle), the first-frame fill byte (wipe), the chain
+                                         ; entry and then a fill count (quad)
+!WinFx_CircD = $03F2                     ; 16-bit: WinFx_BuildCircle's midpoint decision value;
+                                         ; after the loop the mode word (WinFx_CircMode)
+!WinFx_CircMode = $03F2                  ; alias: the mode WinFx_BuildCircle was called with
+!WinFx_CircRowPtr = $03F4                ; 16-bit: table address of the row being written above
+                                         ; the centre (moves up 2 bytes a step)
+!WinFx_CircHalfPtr = $03F6               ; 16-bit: (centre row's table address) / 2
+!WinFx_WipeFrame = $0351                 ; 8-bit: WinFx_StepWipe's frame count (1-$1F; 0 = first
+                                         ; call); alias of WinFx_ArgXHi
+!WinFx_NoisePtr = $0355                  ; 3 B long pointer WinFx_StepWipe walks RandomTable with:
+                                         ; low byte = the last byte read, then $FE, $C0
+!WinFx_WipeStep = $03F2                  ; 8-bit: amount added/subtracted in the current run
+!WinFx_WipeEnd = $03F4                   ; 16-bit: end of the line array (its start + WinFx_Lines)
+!WinFx_QuadX0 = $0353                    ; 16-bit (high byte cleared): WinFx_QuadEdge's start X
+!WinFx_QuadY0 = $0355                    ; 16-bit: start Y (swapped so that Y0 <= Y1)
+!WinFx_QuadX1 = $0357                    ; 16-bit: end X
+!WinFx_QuadY1 = $0359                    ; 16-bit: end Y
+!WinFx_QuadTopY = $0368                  ; 16-bit (high byte $0369 cleared): the smallest point Y
+!WinFx_QuadBottomY = $036A               ; 16-bit: Y0 of the first edge that goes up: the
+                                         ; lowest point (WinFx_BuildQuad)
+!WinFx_QuadEdgesLeft = $03F4             ; 16-bit: edges still to draw (4 at the start)
+!WinFx_QuadLeftSide = $03F6              ; 16-bit: nonzero while edges go down the left side; the
+                                         ; first rising edge clears it and moves to the right byte
+!WinFx_QuadRows = $03F2                  ; 8-bit: rows left on the current edge
+!WinFx_QuadDx = $03F8                    ; 16-bit: |X1 - X0|
+!WinFx_QuadDy = $03FA                    ; 16-bit (high byte $03FB cleared): Y1 - Y0
+!WinFx_QuadErr = $03FC                   ; 16-bit: the edge walk's error term
+!C3_RandSeed = $0386                     ; 8-bit: C3_RandomByte's running value (stored back each
+                                         ; call)
+!C3_FrameCount = $0008                   ; 16-bit: the module's frame counter (C3_ModuleNmi
+                                         ; increments it with DP=0); C3_RandomByte mixes it in
+!C3_ScratchF0 = $00F0                    ; three 16-bit words at $00F0-$00F5, the module's DP-0
+!C3_ScratchF2 = $00F2                    ; scratch: C3_RandomByte mixes them in; script opcode 0
+!C3_ScratchF4 = $00F4                    ; passes its word in C3_ScratchF0; C3_FindDivisor
+                                         ; compares with C3_ScratchF4
+!C3_ExitFlag = $0000                     ; 16-bit: script opcode $xF sets it to 1; the module's main
+                                         ; loop waits for it, then leaves for $C0:0000
+!C3_Pad = $0002                          ; 16-bit (dp, DP=0): JOY1 this frame (C3_ReadPad)
+!C3_SongBusy = $0388                     ; 8-bit: nonzero while C3_SongCheck sends; script opcode 6
+                                         ; skips its command while set
+!C3_SongCur = $0389                      ; 8-bit: the song last sent
+!C3_SongReq = $038A                      ; 8-bit: the song wanted; C3_SongCheck sends it when it
+                                         ; differs from C3_SongCur
+!C3_HdmaEnable = $038C                   ; 8-bit: HDMAEN value C3_ModuleFrame writes each frame
+!C3_Brightness = $038D                   ; 8-bit: INIDISP value C3_ModuleFrame writes (0 = $80)
+!C3_PauseAllowed = $0390                 ; 16-bit: nonzero lets Start toggle C3_Paused
+!C3_Paused = $0392                       ; 16-bit, 0 or 1: no task runs and the screen is at half
+                                         ; brightness (probably the pause; C3_ReadPad toggles it)
+!C3_PauseHeld = $0394                    ; 16-bit: set while Start is held, so a press toggles once
+!C3_NoSoftReset = $0396                  ; 8-bit: nonzero disables C3_ReadPad's soft reset
+!C3_TaskList = $0920                     ; 16 words: module task addresses (0 = free), copied to
+                                         ; C3_TaskRun each frame and run from there
+!C3_NmiTaskList = $0940                  ; 8 words: module tasks run in the forced blank of each
+                                         ; frame (C3Mod_RunNmiTasks)
+!C3_TaskRun = $0950                      ; 16 words: the copy C3Mod_RunTasks runs
+!C3Mod_AudioCommand = $7E377A            ; in the unpacked module (stub name): sends Audio_CmdId..
+                                         ; Arg2 to APUIO0-3 and waits for the echo
+!C3Mod_CallW = $7E37F3                   ; in the unpacked module (stub name): LDX #0 / JSR ($00F0,X)
+                                         ; / RTL: calls the module code at C3_ScratchF0
+!C3Mod_RunTasks = $7E398A                ; in the unpacked module (stub name): JSRs each nonzero
+                                         ; word of C3_TaskRun, saving DB, X, P and DP around each
+!C3Mod_RunNmiTasks = $7E39BE             ; in the unpacked module (stub name): the same for
+                                         ; C3_NmiTaskList, with DP=0 and M=1
+; Direct-page bytes of the module services (DP = the caller's; offsets):
+!C3Scale_Groups = $1F                    ; C3_ScaleBitmap: 16-pixel groups per row
+!C3Scale_SrcBase = $23                   ; 16-bit: the source bitmap (64-byte rows)
+!C3Scale_Rows = $25                      ; 16-bit: output rows + 1 (counted down)
+!C3Scale_YStep = $27                     ; 16-bit: added to C3Scale_Acc per output row
+!C3Scale_XStep = $29                     ; 16-bit 8.8: source pixels per output pixel
+!C3Scale_SrcLimit = $2B                  ; 16-bit: source offsets from this up end the image
+!C3Scale_Dest = $2D                      ; 16-bit: the current output row
+!C3Scale_DestPos = $2F                   ; 16-bit: the write position in it
+!C3Scale_SrcRow = $31                    ; 16-bit: the current source row
+!C3Scale_Acc = $33                       ; 16-bit: the row accumulator
+!C3Scale_GroupsLeft = $35                ; 16-bit: groups left in the row
+!C3Scale_PrevEnd = $37                   ; 16-bit: where the last image ended
+!C3Scale_Pixels = $3B                    ; 8 bytes: the 8 source pixels being packed
+!C3_MulA = $F0                           ; C3_MulSigned: 16-bit signed multiplicand
+!C3_MulB = $F2                           ; 8-bit signed multiplier
+!C3_MulProduct = $F4                     ; 32-bit signed product
+!C3_GenOrder = $F0                       ; C3_BuildCopyCode (DP=0): 16-bit C3_CopyCodeOrder entry
+!C3_GenI = $F2                           ; 16-bit: + 4 per i step
+!C3_GenJ = $F4                           ; 16-bit: + 2 per j step
+!C3_GenK = $F6                           ; 16-bit: + $20 per k step
+!C3_GenSrc = $F8                         ; 16-bit: the source base (Y on entry)
+!C3_GenDest = $FA                        ; 16-bit: the destination (X on entry)
+!C3_GenPage = $FB                        ; its high byte: the next direct page
+!C3Script_Vars = $00                     ; C3_RunScript (DP = the script's page): 16 words
+!C3Script_Ptr = $20                      ; 16-bit: the script pointer (bank DB)
+!C3Script_Counters = $22                 ; 16 words: loop counters of opcodes $8x/$9x
+!C3Script_Ret = $30                      ; 16-bit: return point of opcode 3 (= loop counter 7)
+!C3Script_Tmp = $F0                      ; 16-bit: the opcode, or the address of its variable
+!C3_OamPos = $11                         ; C3_Spr* (module DP, probably 0): Oam_LowTable offset of
+                                         ; the next sprite
+!C3_OamHiPtr = $13                       ; 16-bit: address of its Oam_HighTable byte
+!C3_SprBaseX = $15                       ; 16-bit: added to the sprites' X
+!C3_SprBaseY = $17                       ; 16-bit: added to the sprites' Y (low byte)
+!C3_SprLeft = $19                        ; 8-bit: list records left + 1
 !Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
                                          ; MapProps; LocRom.MapProps picks the entry
 !LocGfx_Lists = $F61C00                  ; 8 bytes per LocRom.Tileset12: graphics pack numbers ($FF =

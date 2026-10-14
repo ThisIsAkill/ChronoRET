@@ -32,18 +32,6 @@ org $CD0024
 BattleSys_VecCD0024:                    ; JSL vector (JMP $CD:0043): BattleCF_RemoveMarkedEnemies, A = the enemy's
                                         ; battler slot, after it moved the enemy to the special palette
 
-; --- Bank $C3 ---
-
-org $C30002
-Decomp_ToWramVec:                       ; JSL vector (JMP $C3:0557): unpacks the data at the long address in
-                                        ; !Battle_DecompSrc.. into WRAM at !Battle_DecompDest.. through WMADD/WMDATA
-                                        ; (inferred: a decompressor, from its header-driven copy loops); not analysed
-
-; --- Bank $C7 (audio) ---
-
-org $C70004
-Audio_ProcessEntry:                     ; JSL: run the APU command block !Sfx_Command..!Sfx_Param2
-
 ; --- Bank $CC (battle support, called from the action code) ---
 
 org $CCF06B
