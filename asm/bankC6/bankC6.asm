@@ -136,8 +136,8 @@ C6Scene_UnpackPalPackA:
 ; $2B0 bytes, $7E:8B56-$8E05 (C2Scene_HandBufA's area on). Each value is
 ; stored as a word and spread by an overlapping MVN (the zero high byte
 ; is overwritten). C6Scene_FadeGradStep then moves both addresses 8
-; lines on each frame (pack 3 runs it 58 times), so the gradient climbs
-; the screen and leaves it dark. That COLDATA is added to the picture
+; lines on at each call (pack 3 calls it 58 times, 464 lines), so the
+; gradient climbs the screen and leaves it dark. That COLDATA is added to the picture
 ; (CGADSUB) is not traced here.
 ; Entry: M any (SEP #$20 here), X=0 (16-bit index and MVN counts),
 ;        DP=$0000 (TDC as zero; C2Tmp_00/02/08, C2Scene_HdmaenShadow),
@@ -218,8 +218,9 @@ C6Scene_FadeGradInit:
 ; C6Scene_EdgeLineBase. .SprX is the left edge (second byte's bit 7
 ; clear) or the right edge (set) of the table entry .SprY - 8.
 ; Entry: M=1 (8-bit loads and multiply; op $4E calls it so), X any
-;        (SEP #$10, then REP #$10 here), DP=$0000 (C2Tmp_00/08/10, C2Scene_TaskCur), DB=$00 (the record,
-;        C2Scene_Unk1B30, the multiplier .w); C2Tmp_10-$12 = the table
+;        (SEP #$10, then REP #$10 here), DP=$0000 (C2Tmp_00/08/10,
+;        C2Scene_TaskCur), DB=$00 (the record, C2Scene_Unk1B30, the
+;        multiplier .w); C2Tmp_10-$12 = the table
 ; Exit:  M=0, X=0; X = the task; Y = C2Tmp_08; A = the new .SprX;
 ;        C2Tmp_00 = the second random byte (8-bit),
 ;        C2Tmp_08 = (.SprY - 8) x 2 (word); C2Scene_Unk1B30 + 2
@@ -440,7 +441,8 @@ C6Scene_GetFlagF2Bits:
 ;        .w, the record); C2Scene_TaskCur = the task
 ; Exit (both):  M=0, X=0 (BankC3_Entry000E restores P, A, X and Y); X =
 ;        the task; A = the second run's address; Y = .Var24
-;        (C6Scene_WipeWinInit) or as on entry (C6Scene_WipeWinStep); WinFx_* stepped by WinFx_StepWipe (C3_RandSeed and WMADD
+;        (C6Scene_WipeWinInit) or as on entry (C6Scene_WipeWinStep);
+;        WinFx_* stepped by WinFx_StepWipe (C3_RandSeed and WMADD
 ;        changed); C2Scene_HdmaValues words 2-3 changed
 ; Calls: BankC3_Entry000E (JSL).
 C6Scene_WipeWinInit:
@@ -644,11 +646,11 @@ C6Scene_Win2HdmaOn:
 ; not traced).
 ; Entry (all three): M any (REP #$20 at the first two, SEP #$20 at
 ;        C6Scene_EllipseBuild, which only they reach), X=0 (16-bit
-;        index; X = the task at C6Scene_EllipseBuild), DP=$0000 (TDC as zero; C2Tmp_00-$1A), DB=$00 (the record
-;        and WinFx_* .w; saved, $7E for the reshaping); C2Scene_TaskCur
-;        = the task
+;        index; X = the task at C6Scene_EllipseBuild), DP=$0000 (TDC as
+;        zero; C2Tmp_00-$1A), DB=$00 (the record and WinFx_* .w; saved,
+;        $7E for the reshaping); C2Scene_TaskCur = the task
 ; Exit (all three): M=0, X=0; A = WinFx_EmptyEntry; X = 0; Y past the
-;        last emptied line; DB unchanged; C2Tmp_00 = C2Tmp_02 = r/2,
+;        last emptied line; DB unchanged; C2Tmp_00 = 0, C2Tmp_02 = r/2,
 ;        C2Tmp_10/13/16/19 = the line pointers (words); .Var24 + 1;
 ;        WinFx_* changed (WinFx_BuildCircle zeroes WinFx_ArgXHi..); the
 ;        C2Scene_HdmaValues words changed
@@ -863,8 +865,8 @@ C6Scene_Win2HdmaOnB:
 ; values were not traced). Nothing keeps the lines inside the table.
 ; Entry (all three): M any (REP #$20 at the first two; M=0 at
 ;        C6Scene_CapsuleBuild, which only they reach), X=0 (X = the
-;        task at C6Scene_CapsuleBuild), DP=$0000
-;        (TDC as zero; C2Tmp_00/08), DB=$00 (the record and WinFx_* .w;
+;        task at C6Scene_CapsuleBuild), DP=$0000 (TDC as zero;
+;        C2Tmp_00/08), DB=$00 (the record and WinFx_* .w;
 ;        saved, $7E for the reshaping); C2Scene_TaskCur = the task
 ; Exit (all three): M=0, X=0; A = $FFFF (the MVN's end); X, Y = the
 ;        MVN's ends; DB unchanged; C2Tmp_08 = n (r = 0) or the entry of
@@ -982,8 +984,8 @@ C6Scene_CapsuleBuild:                   ; header: see C6Scene_Win1CapsuleStep
     RTL
 
 ; $C6:E568 — C6Scene_FadeGradStep (27 bytes, $E568–$E582)
-; Script routine (pack 3 +$0339, in a loop the script runs 58 times, one
-; frame each): moves C2Scene_HdmaValues words 0 and 1 on by
+; Script routine (pack 3 +$0339, in a loop the script runs 58 times, op
+; $1B, with an op $32 in each pass): moves C2Scene_HdmaValues words 0 and 1 on by
 ; C6Scene_GradStepBytes (8 lines of C6Scene_FadeGradInit's gradient).
 ; Entry: M any (REP #$20 here), X any, DP any, DB any (long addressing)
 ; Exit:  M=0; A = the new word 1; X, Y unchanged
