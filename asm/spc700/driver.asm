@@ -1276,7 +1276,8 @@ Spc_CmdStopSong:
 ;   fade-out in Spc_Unk1492 reaches 0). Both: Spc_CmdTable80 entry 18. C3_ReadPad
 ;   sends $F2 with Arg0 0 on pausing (!C3_SndPause).
 ; Entry: P=0 (Spc_CmdStopSfx: !Spc_CmdArg0 bit 0 picks the group)
-; Exit:  A clobbered; X = $1A; Y unchanged
+; Exit:  A clobbered; X = $1A (group A), or $16 when Arg0 bit 0 is set
+;        (through Spc_StopSfxB); Y unchanged
 ; Sub-entries: Spc_StopSfxA.
 Spc_CmdStopSfx:
     bbs.b !Spc_CmdArg0.0,Spc_StopSfxB
@@ -1440,8 +1441,9 @@ Spc_CmdPause:
 
 ; $100E — Spc_XferReceive (110 bytes, $100E–$107B; ROM $C7:32D3–$3340)
 ; Command $FE, and the song commands' load (Spc_StartSong): takes the
-; 65816's transfers (Audio_SendSampleDir, Audio_SendSongData,
-; Audio_UploadSample, Audio_CmdSwapSample, Audio_UploadBlock2F00).
+; 65816's transfers (Audio_CmdLoadSong, Audio_SendSampleDir,
+; Audio_SendSongData, Audio_UploadSample, Audio_CmdSwapSample,
+; Audio_UploadBlock2F00).
 ;   1. Waits for CPUIO0 = (the command's id + 1) & $7F, the 65816's next
 ;      sequence value, read until two reads agree; while it still reads
 ;      the id, echoes the id again.
@@ -1452,9 +1454,9 @@ Spc_CmdPause:
 ;      - Mode !SpcCmd_XferEnd ($E0): CPUIO1 = 0, CPUIO0 = the step's
 ;        value (echo), and leaves through Spc_ClearPorts01: the load is
 ;        over.
-;      - Else: CPUIO1 = the mode (accepted), CPUIO0 = the value (echo).
-;        An address below $1E00 (the driver) takes mode 0, whatever was
-;        asked; an address in $2Fxx (the effects block) first stops both
+;      - Else: CPUIO1 = the mode asked for, CPUIO0 = the value (echo).
+;        An address below $1E00 (the driver) takes mode 0 all the same
+;        (CPUIO1 still shows the mode asked for); an address in $2Fxx (the effects block) first stops both
 ;        effect groups. Pushes Spc_XferHeader and the mode's handler
 ;        (Spc_XferModeTable, mode & 7), waits for CPUIO0 to change and
 ;        settle (the first data step), sets CPUIO1 = !SpcCmd_XferBusy and
@@ -1469,7 +1471,7 @@ Spc_CmdPause:
 ; (!Audio_XferTriples); 5 Spc_XferLive (!Audio_XferLive); 7
 ; Spc_XferMove (!Audio_XferMove).
 ; Callers note: CALL from Spc_StartSong ($0C05); Spc_CmdTable80 entry 30.
-;   Spc_XferHeader: the return address pushed at $1057/$105A.
+;   Spc_XferHeader: the return address pushed at $1059/$105C.
 ; Entry: P=0; X = the command's id
 ; Exit:  through Spc_ClearPorts01: A = $E0, X = the last step's value,
 ;        Y = the last header's CPUIO3
@@ -1551,7 +1553,8 @@ Spc_XferHeader:                         ; header: see Spc_XferReceive
 ; Mode 3 (!Audio_XferTriples): three bytes per step, CPUIO1-3, stored
 ; at !Spc_XferAddr on. The store addresses are written into the three
 ; store instructions (.store1-3, self-modifying), indexed by Y; when Y
-; reaches $80 the bases move on by $80 and Y drops by $80. The echo is
+; passes $7F (it is then $80, $81 or $82) the bases move on by $80 and
+; Y drops by $80. The echo is
 ; written after CPUIO1 is read and before CPUIO2/3 are, so those two are
 ; read while the 65816 may already be on its next step (a timing
 ; assumption, as the code reads; not traced on the 65816 side).
@@ -1761,8 +1764,8 @@ Spc_XferWords:
 
 ; $11B2 — Spc_XferBytes (50 bytes, $11B2–$11E3; ROM $C7:3477–$34A8)
 ; Mode 1: one byte per step, CPUIO1, stored through (!Spc_XferAddr)+Y.
-; It echoes the step's value before it reads CPUIO1, and the first pass
-; echoes the header's value again. No 65816 caller uses mode 1 (its
+; It echoes the step's value before it reads CPUIO1. No 65816 caller
+; uses mode 1 (its
 ; transfer modes are 2, 3, 5 and 7: !Audio_Xfer*).
 ; Callers note: reached only through Spc_XferModeTable entry 1.
 ; Entry: P=0; X = the step's value (settled), !Spc_XferAddr set
@@ -1835,8 +1838,9 @@ Spc_XferSkip:
     ret
 
 ; $1206 — Spc_XferMove (111 bytes, $1206–$1274; ROM $C7:34CB–$3539)
-; Mode 7 (!Audio_XferMove): moves blocks inside ARAM (samples, when a
-; song's sample set changes: Audio_CmdSwapSample). The header's address
+; Mode 7 (!Audio_XferMove): moves blocks inside ARAM (Audio_CmdLoadSong's
+; compaction of the sample slots, when a song's sample set changes). The
+; header's address
 ; is the first block's source; then, each a step with a word in
 ; CPUIO2/3: the destination (!Spc_XferDest), the length (!Spc_Temp9B
 ; low, !Spc_Temp9C pages), and the next block's source, until a step
@@ -2022,7 +2026,7 @@ Spc_CmdControl:
     mov.b !SPC_CONTROL,#!SPC_CONTROL_IplRom
     jmp !SPC_IplRom
 
-; $12DD — Spc_NullCommand (1 byte)
+; $12DD — Spc_NullCommand (1 byte, $12DD–$12DD; ROM $C7:35A2–$35A2)
 ; A lone RET: the handler of the commands that do nothing ($12, $13,
 ; $16, $17, $1A-$1F in Spc_CmdTable10; $84, $8A-$8D, $8F, $F7, $FA, $FB
 ; in Spc_CmdTable80).

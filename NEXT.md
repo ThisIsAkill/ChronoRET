@@ -1510,6 +1510,15 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     renamed from `Spc_Unk0892`/`08CD`/`100E`, `!Spc_UnkD2` -> `!Spc_SongCond`), `Spc_WriteDsp`,
     `Spc_ClearPorts01` and `Spc_PollCommand` (callers and callee names).
 
+    For the next edit of these approved headers (review round 170 nits, not edited so their
+    approvals stand): `Spc_QueueCommand`'s Entry says X is the track being stepped, but at the
+    `$1308` call (Spc_Unk12F9's wait) X is the address of the count it waits on (kept either way);
+    `Spc_StartSong`: when Spc_RestoreSong brings back a song with no tracks it falls through to
+    the new-start path, and step 5 should say !Spc_Flags88 bit 1 "is left as it is" (Spc_Unk1316
+    may have cleared it) rather than "stays set"; `Spc_CmdFadeSong`: $83 marks only $30 (voices
+    5-4) in !Spc_UnkD0 although its group is tracks 8-13; `Spc_CmdMono`: with bit 0 set the pan
+    byte is $80, so the left side gets volume x $80 and the right x $7F, not exactly the same.
+
     **Next batches**, in the order they make the rest readable: the track pass (`$0377`-`$07A2`,
     `$07AF`-`$0891`, `$0903`-`$0B95`); the sequence command handlers (`$1722`-`$1D6C` with the
     tables `$1544`-`$1721`); echo and save/restore (`$12DE`-`$1543`); the tables
