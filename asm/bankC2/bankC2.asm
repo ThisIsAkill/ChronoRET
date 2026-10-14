@@ -46869,7 +46869,7 @@ Menu_CfgEntryText:
 ; Callers note: started by Menu_CfgEntryText (Menu_StartThread), at
 ;   Menu_CfgTextThread or at Menu_CfgValueThread.
 ; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000), DB
-;        as the scheduler leaves it: $7E from its PLB at $C2:81C1 each
+;        as the scheduler leaves it: $7E from its PEA $7E7E and PLB at $C2:81C1-$81C4 each
 ;        frame, unless a thread run before it this frame changed it
 ;        (DB=$7E assumed, as everywhere in the menu)
 ; Exit:  never returns (Menu_ThreadEnd)

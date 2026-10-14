@@ -113,6 +113,18 @@ class Combined(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertIn('also holds Quad1', out[0])
 
+    def test_end_in_gap(self):
+        parents = {n: 'Main' for n in ('MainTail', 'Quad1', 'Quad2', 'Quad3', 'SubA', 'After')}
+        out = findings(['Main (128 bytes with its sub-entries, $8010–$808F)'], parents)
+        self.assertEqual(len(out), 1)
+        self.assertIn('not the end of a row', out[0])
+
+    def test_unreadable_claim_reported(self):
+        out = findings(['Main (32 bytes with MainTail (a tail), $8010–$802F)'])
+        self.assertEqual(len(out), 1)
+        self.assertIn('cannot read', out[0])
+        self.assertEqual(findings(['Main is 24 bytes with MainTail; see $8020.']), [])
+
     def test_plain_claim_still_checked(self):
         self.assertEqual(findings(['Main (16 bytes, $8010–$801F)']), [])
         self.assertEqual(len(findings(['Main (17 bytes, $8010–$8020)'])), 1)

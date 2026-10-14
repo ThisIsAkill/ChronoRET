@@ -296,6 +296,9 @@ SIZE_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes?,
 COMBINED_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes? with ([^()$;]*?),\s*'
                             r'\$(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})\s*[–-]\s*'
                             r'\$?(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})\)')
+# Anything that looks like a combined claim with a range, so a claim
+# COMBINED_CLAIM cannot parse is reported instead of skipped.
+COMBINED_LIKE = re.compile(r'\((\d[\d,]*) bytes? with [^;]{0,160}?\$(?:[0-9A-Fa-f]{2}:)?[0-9A-Fa-f]{4,6}\s*[–-]')
 NAME_RANGE = re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*?)(\d+)-(\d+)\b')     # C6Scene_PerspQuad1-3
 LONG_ADDR = re.compile(r'\$([0-9A-Fa-f]{2}):?([0-9A-Fa-f]{4})(?![0-9A-Fa-f])((?:/[0-9A-Fa-f]{4}(?![0-9A-Fa-f]))*)')
 UNMATCHED_WORD = re.compile(r'\bunmatched\b', re.I)
@@ -361,11 +364,17 @@ def _mentioned(text):
 
 def combined_findings(r, lay, text, parent_of):
     """SIZE for `Name (N bytes with A and B, $XXXX–$YYYY)`: N is the range's
-    size, the range starts at the routine, ends on a row boundary of the
-    layout (the next row starts right after it, or a row ends there), and
+    size, the range starts at the routine, ends where a row of the
+    layout ends, and
     every row starting inside it is named in the claim or is a `header: see`
     sub-entry of the routine or of a named companion."""
     out = []
+    parsed = {m.start(2) for m in COMBINED_CLAIM.finditer(text)}
+    for m in COMBINED_LIKE.finditer(text):
+        if m.start(1) not in parsed:
+            out.append(f'{r.name}: header has a combined size claim the lint cannot read '
+                       f'("{m.group(0)[:60]}..."); write it as `Name (N bytes with A and B, '
+                       f'$XXXX–$YYYY)`')
     for m in COMBINED_CLAIM.finditer(text):
         name = m.group(1) if m.group(1) in lay.by_name else r.name
         if name not in lay.by_name:
@@ -382,7 +391,7 @@ def combined_findings(r, lay, text, parent_of):
             problems.append(f'${m.group(5).upper()}–${m.group(7).upper()} is {ce - cs + 1} bytes')
         if ce < end:
             problems.append(f'{name} alone runs to {_fmt(end)}')
-        elif ce + 1 not in lay.start_set and ce not in lay.end_set:
+        elif ce not in lay.end_set:
             who = lay.owner(ce)
             problems.append(f'{_fmt(ce)} is not the end of a row' +
                             (f' (it is inside {who}, {_fmt(lay.by_name[who][0])}–'

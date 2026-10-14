@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:F9B2,Menu_CfgTextThread,2026-10-09,rev166a,changes,ae84bbd5c934,"Entry says DB $7E 'from its PLB at $C2:81C1', but $81C1 is PEA $7E7E; the PLBs are at $C2:81C4/$81C5. Fix: 'its PEA/PLB at $C2:81C1'. Rest verified: 151 B $F9B2-$FA48, all stores, DP $26/$28, slot 2"
