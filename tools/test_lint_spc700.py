@@ -77,6 +77,11 @@ class Rules(unittest.TestCase):
         self.assertIn('OPCODE', [r for _, r in lint(GOOD.replace('    ret', '    db $6F ; ret'))])
         self.assertIn('PLUMB', [r for _, r in lint(GOOD.replace('    ret', '    print "x"\n    ret'))])
         self.assertIn('CALL', [r for _, r in lint(GOOD.replace('    bne .done', '    bbs.b !Spc_F.3,$0B9D'))])
+        # the negated bit forms spc700.py prints for opcodes $2A/$6A
+        for raw in ('    and1 c,!$1234.3', '    or1 c,!$1234.0'):
+            with self.subTest(raw=raw):
+                self.assertIn('ADDR', [r for _, r in lint(GOOD.replace('    ret', raw + '\n    ret'))])
+        self.assertEqual(lint(GOOD.replace('    ret', '    and1 c,!!Spc_Bit.3\n    ret')), [])
 
     def test_header(self):
         self.assertIn(('Spc_Poll', 'HEADER'), lint(GOOD.replace('; Exit:  X = CPUIO0\n', '')))
@@ -84,6 +89,11 @@ class Rules(unittest.TestCase):
                       lint(GOOD.replace('; Sub-entries: Spc_PollTail.\n', '')))
         self.assertIn(('Spc_Poll', 'STATE'), lint(GOOD.replace('; Entry: P=0', '; Entry: A any')))
         self.assertEqual(lint(GOOD.replace('; Entry: P=0', '; Entry: P any, A any')), [])
+        self.assertEqual(lint(GOOD.replace('; Entry: P=0', '; Entry: SP, P, A, X, Y any')), [])
+        self.assertEqual(lint(GOOD.replace('; Entry: P=0', '; Entry: P = 1')), [])
+        for loose in ('; Entry: A = P', '; Entry: P', '; Entry: the P flag as the caller left it'):
+            with self.subTest(loose=loose):
+                self.assertIn(('Spc_Poll', 'STATE'), lint(GOOD.replace('; Entry: P=0', loose)))
 
     def test_size(self):
         self.assertIn(('Spc_Poll', 'SIZE'), lint(GOOD.replace('(6 bytes', '(5 bytes')))
@@ -100,6 +110,15 @@ class Rules(unittest.TestCase):
         self.assertIn(('Spc_Poll', 'CALLERS'), lint(GOOD.replace(' ($0299)', '')))
         self.assertIn(('Spc_Poll', 'CALLERS'), lint(GOOD, sites={0x0B9A: [0x0400]}))
         self.assertEqual(lint(GOOD.replace(' ($0299)', ''), sites=None), [])
+        # only the Callers note lines (and their continuations) name callers
+        moved = GOOD.replace(' ($0299)', '').replace('; Reads port 0.', '; Reads port 0 (see $0299).')
+        self.assertIn(('Spc_Poll', 'CALLERS'), lint(moved))
+        wrapped = GOOD.replace(' ($0299)', ' and\n;   Spc_Other ($0299)')
+        self.assertEqual(lint(wrapped), [])
+        # CALLERS cannot be opted out of; the other header rules can
+        opted = GOOD.replace(' ($0299)', '').replace('Spc_Poll:\n', 'Spc_Poll: ; lint-ok: test\n')
+        self.assertEqual(lint(opted), [('Spc_Poll', 'CALLERS')])
+        self.assertEqual(lint(opted.replace('; Entry: P=0', '; Entry: A any')), [('Spc_Poll', 'CALLERS')])
 
 
 @unittest.skipUnless(READY, 'needs the ROM and asar')
@@ -120,6 +139,23 @@ class Pinned(unittest.TestCase):
                 r = rows[name]
                 self.assertEqual((r['address'], r['rom'], int(r['size'])), (aram, rom, size))
         self.assertNotIn('Spc_Start', {r['name'] for r in generated.function_rows()})
+        self.assertTrue(all(r['kind'] in ('code', 'data') for r in rows.values()))
+
+    def test_65816_figures_leave_the_driver_out(self):
+        import json
+        import generated
+        import spc700
+        generated.ensure()
+        data = json.loads(generated.PROGRESS_JSON.read_text())
+        rom = spc700.ROM_PATH.read_bytes()
+        first, base, size = spc700.driver_block(rom)
+        block = range(spc700.DRIVER_ROM, first + size)
+        for sl in data['slices']:
+            lo = int(sl['start'][1:3], 16) - 0xC0 << 16 | int(sl['start'][4:], 16)
+            if lo <= block[-1] and block[0] < lo + 0x1000 and not sl['functions']:
+                self.assertEqual(sl['emitted_bytes'], 0, sl['start'])
+        spc_code = sum(int(r['size']) for r in generated.spc700_rows())
+        self.assertEqual(data['spc700']['emitted_bytes'], spc_code)
 
 
 if __name__ == '__main__':

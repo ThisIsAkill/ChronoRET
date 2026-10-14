@@ -21,8 +21,8 @@ fails the gate like any other. The rules follow STYLE.md's, translated:
          <Parent>` naming a routine of the file whose header names it
          (tables exempt), as for the 65816 rule.
   STATE  the Entry line (with the lines continuing it) states P, the
-         direct-page flag (`P=0`, `P any`, ...): the SPC700's counterpart of
-         DPDB.
+         direct-page flag: `P=0`, `P=1`, or P in a list ending in `any`
+         (`P any`, `SP, P, A, X, Y any`); the SPC700's counterpart of DPDB.
   SIZE   a claim `Name (N bytes, $XXXX–$YYYY; ROM $C7:xxxx–$yyyy)` agrees
          with symbols/spc700_functions.csv: start, end and size of the
          routine (alone or with its `header: see` sub-entries) in ARAM, and
@@ -30,8 +30,9 @@ fails the gate like any other. The rules follow STYLE.md's, translated:
   CALLERS until a generator exists the callers are hand-written: every
          CALL, JMP or PCALL to the routine or its sub-entries from outside
          them (found by tools/spc700.py's trace of the whole driver, matched
-         or not) is named by its ARAM address ($XXXX) somewhere in the
-         header. Needs the ROM.
+         or not) is named by its ARAM address ($XXXX) on the header's
+         `Callers note:` lines (or the lines continuing them). Needs the
+         ROM. Like the 65816 CALLERS rule it cannot be opted out of.
 
 Opt out of one finding with `; lint-ok: <reason>` on the line (the label
 line for header rules), as for the 65816 rules.
@@ -59,13 +60,16 @@ PLUMBING = {'print', 'assert', 'warnpc', 'error'}
 GLOBAL_LABEL = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*):(.*)$')
 LOCAL_LABEL = re.compile(r'^(\.[A-Za-z0-9_]+|[+-]+):(.*)$')
 INSTR = re.compile(r'^([A-Za-z][A-Za-z0-9]*)(\.[bwBW])?(?:\s+(.*))?$')
-RAW_HEX = re.compile(r'(?<![A-Za-z0-9_!.])\$[0-9A-Fa-f]+')
+RAW_HEX = re.compile(r'(?<![A-Za-z0-9_.])\$[0-9A-Fa-f]+')     # `!$1234.3` (a negated bit) included
 NAME = re.compile(r'(?<![A-Za-z0-9_.$])[A-Za-z_][A-Za-z0-9_]*')
-STATE_P = re.compile(r'\bP\b')
+# `P=0` / `P = 1`, or P in a list ending in `any` (`P any`, `SP, P, A, X, Y any`)
+STATE_P = re.compile(r'\bP\s*=\s*[01]\b|\bP\b(?:\s*,\s*[A-Za-z]+)*\s+any\b')
 SIZE_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes?, '
                         r'\$([0-9A-Fa-f]{4})\s*[–-]\s*\$([0-9A-Fa-f]{4})'
                         r'(?:; ROM \$C7:([0-9A-Fa-f]{4})\s*[–-]\s*\$([0-9A-Fa-f]{4}))?')
 SITE = re.compile(r'\$([0-9A-Fa-f]{4})(?![0-9A-Fa-f])')
+CALLERS_NOTE = re.compile(r'^\s?Callers note:')
+CONTINUED = re.compile(r'^\s{2,}\S')
 
 
 def _split(line: str):
@@ -197,6 +201,19 @@ def _entry_blocks(comments):
     return blocks
 
 
+def callers_notes(region) -> list[str]:
+    """The header's `Callers note:` lines with the lines continuing them."""
+    out, inside = [], False
+    for c in region.header_comments(hand_written=True):
+        if CALLERS_NOTE.match(c):
+            inside = True
+        elif not CONTINUED.match(c):
+            inside = False
+        if inside:
+            out.append(c)
+    return out
+
+
 def driver_sites():
     """{target ARAM: [site ARAM, ...]} for every CALL, JMP and PCALL the
     trace of the driver finds, or None without the ROM."""
@@ -224,7 +241,8 @@ def header_findings(path: Path, rows=None, sites=None):
     out = []
 
     def report(r, rule, text):
-        if not _ok(_split(r.lines[r.label])[1]):
+        # CALLERS cannot be opted out of (as for the 65816 rule)
+        if rule == 'CALLERS' or not _ok(_split(r.lines[r.label])[1]):
             out.append((r.name, r.label + 1, rule, text))
 
     parent_of = {}
@@ -294,7 +312,7 @@ def header_findings(path: Path, rows=None, sites=None):
         if r.name not in lay or r.name in parent_of or is_table(r):
             continue
         lo, hi = span(r.name)
-        named = {int(x, 16) for x in SITE.findall(' '.join(r.header_comments(hand_written=True)))}
+        named = {int(x, 16) for x in SITE.findall(' '.join(callers_notes(r)))}
         members = [n for n in [r.name] + children.get(r.name, []) if n in lay]
         missing = sorted(s for n in members for s in sites.get(num(lay[n]['address']), [])
                          if not lo <= s <= hi and s not in named)

@@ -94,7 +94,10 @@ def main() -> int:
         last = int(row['address'][1:], 16)
         if row['status'] not in ('matched', 'readable', 'verified'):
             errors.append(f'{where}: unknown status {row["status"]!r}')
-        if row['kind'] not in ('code', 'data'):
+        if row['kind'] == 'mixed':
+            errors.append(f'{where}: runs across the driver\'s code and data ranges '
+                          f'(tools/spc700.py CODE_RANGES / DATA_RANGES): split it at the boundary')
+        elif row['kind'] not in ('code', 'data'):
             errors.append(f'{where}: unknown kind {row["kind"]!r}')
         if '\n' in row['notes'] or len(row['notes']) > 200:
             errors.append(f'{where}: notes must be one line, 200 characters at most')
@@ -113,6 +116,7 @@ def main() -> int:
             errors.append(f'{path}: header {cols}, expected {R_COLS}')
     reviews = review_log.read_rows()
     names = {row['name']: row for row in functions + spc_rows}
+    table_of = {**{r['name']: FUNCTIONS for r in functions}, **{r['name']: SPC700 for r in spc_rows}}
     latest = {}
     historical = 0
     for path, n, _, row in reviews:
@@ -136,9 +140,9 @@ def main() -> int:
         current = bool(review and review['verdict'] == 'approved'
                        and review['source_hash'] == row['source_hash'])
         if row['status'] == 'verified' and not current:
-            errors.append(f'{FUNCTIONS}: {name} is verified without a current approved review')
+            errors.append(f'{table_of[name]}: {name} is verified without a current approved review')
         if row['status'] == 'readable' and current:
-            errors.append(f'{FUNCTIONS}: {name} has a current approval; run tools/progress.py --update')
+            errors.append(f'{table_of[name]}: {name} has a current approval; run tools/progress.py --update')
 
     for e in errors:
         print(e)

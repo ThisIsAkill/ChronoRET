@@ -16,7 +16,9 @@ the review log, and writes:
 The SPC700 driver is counted apart from the 65816 code: its routines are
 rows of spc700_functions.csv (never of functions.csv), its share is taken
 of the driver's code bytes (tools/spc700.py, CODE_RANGES), and neither the
-65816 figure nor its denominator (symbols/code_survey.csv) includes it. Its
+65816 figure nor its denominator (symbols/code_survey.csv) includes it; the
+driver block's emitted bytes are left out of the banks' and slices'
+emitted_bytes too (they are spc700.emitted_bytes). Its
 statuses work the same way: the lint's SPC700 rules (tools/lint_spc700.py)
 and the same review log, keyed by routine name and source_hash.
 
@@ -270,6 +272,7 @@ def spc700_functions(emitted: set[int], aram: dict[str, int]) -> list[dict]:
     source = {r.name: r for r in asm_source.file_regions(SPC700_SOURCE)}
     starts = sorted((a, n) for n, a in aram.items() if n in source and base <= a < base + size)
     code = {a for lo, hi in spc700.CODE_RANGES for a in range(lo, hi + 1)}
+    data = {a for lo, hi in spc700.DATA_RANGES for a in range(lo, hi + 1)}
     rows = []
     for idx, (start, name) in enumerate(starts):
         off = first + start - base
@@ -283,7 +286,10 @@ def spc700_functions(emitted: set[int], aram: dict[str, int]) -> list[dict]:
         rows.append({
             'address': f'${start:04X}', 'end': f'${end - 1:04X}', 'size': end - start,
             'rom': offset_to_snes(off), 'rom_end': offset_to_snes(off + end - 1 - start),
-            'name': name, 'kind': 'code' if r.kind == 'code' and start in code else 'data',
+            # by the whole row: 'mixed' (rejected by validate_functions.py) when
+            # it runs across the code / data ranges
+            'name': name, 'kind': ('code' if set(range(start, end)) <= code
+                                   else 'data' if set(range(start, end)) <= data else 'mixed'),
             'status': 'matched', 'source_hash': r.source_hash,
             'notes': header_note(r.lines, r.label, name), 'file': r.file,
         })
@@ -295,6 +301,12 @@ def analyse() -> dict:
         emitted, addrs, aram = build_facts(Path(tmp))
     source = source_functions()
     spc_rows = spc700_functions(emitted, aram)
+    # The 65816 figures leave the driver block out: its bytes are counted
+    # under "spc700" only (the block is the length word and the program).
+    first, _, size = spc700.driver_block(ROM_PATH.read_bytes())
+    spc_block = set(range(spc700.DRIVER_ROM, first + size))
+    spc_emitted = len(emitted & spc_block)
+    emitted = emitted - spc_block
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)
     functions = []
@@ -383,7 +395,8 @@ def analyse() -> dict:
             'surveyed_code_bytes': surveyed_total,
             'totals': level_totals(functions), 'banks': bank_rows,
             'slices': slices, 'functions': functions,
-            'spc700': {'code_bytes': sum(hi - lo + 1 for lo, hi in spc700.CODE_RANGES),
+            'spc700': {'emitted_bytes': spc_emitted,
+                       'code_bytes': sum(hi - lo + 1 for lo, hi in spc700.CODE_RANGES),
                        'data_bytes': sum(hi - lo + 1 for lo, hi in spc700.DATA_RANGES),
                        'totals': level_totals(spc_rows)},
             'spc700_functions': spc_rows}
