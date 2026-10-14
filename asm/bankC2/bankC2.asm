@@ -8087,8 +8087,9 @@ C2Scene_LoadObjGfx:
 ; traced.
 ; Callers (1 JMP site): C2Scene_LoadVram ($C2:2D6D).
 ; Entry: M=1, X=0, DP any, DB=$00
-; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
-;        Menu_Decomp* changed
+; Exit:  M=1, X=0 (Decomp_ToWram restores P, A, X and Y); A = the
+;        pack's bank byte (B = the high byte of its address); X =
+;        C2Scene_UnkC800's address; Y unchanged; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
 C2Scene_LoadUnkC800:
     LDX.w #!C2Scene_UnkC800&$FFFF
@@ -22640,15 +22641,16 @@ C2Scene_TaskInView:
 ; WinFx_TablePtr (bank $7E) at it, adds one to .Var24, and has
 ; BankC3_Entry0008 (A = WinFx_Mode0) build the window table there from
 ; the task's .SprX, .SprY and .Var22 (low bytes, as WinFx_ArgX, ArgY and
-; ArgSize; the shape is not traced). The table written is the one the
+; ArgSize: a circle of that centre and radius, WinFx_BuildCircle). The table written is the one the
 ; next NMI shows, while the other stays on screen.
 ; Entry (both): M any at C2Scene_Win1Init (SEP #$20 there), M=1 at
 ;        C2Scene_Win1Step (the 8-bit toggle; op $34 calls it with M=1),
 ;        X=0, DP=$0000 (the shadows and
 ;        C2Scene_TaskCur), DB=$00 (the record, the DMA registers and
 ;        WinFx_*); C2Scene_TaskCur = the task
-; Exit (both):  M=1, X=0 (as BankC3_Entry0008 returns, saving P); X, Y
-;        and A as BankC3_Entry0008 leaves them (not traced); .Var24 + 1;
+; Exit (both):  M=1, X=0 (BankC3_Entry0008 restores P, A, X and Y); A =
+;        0 (the TDC); X = the task; Y = the buffer + C2Scene_HdmaHalfBytes;
+;        .Var24 + 1;
 ;        WinFx_* and C2Scene_HdmaValues words 0-1 changed
 ; Calls: BankC3_Entry0008 (JSL).
 C2Scene_Win1Init:
@@ -22739,7 +22741,7 @@ C2Scene_Win2Init:
 ; Entry: M=1 (8-bit loads; op $34 calls it with M=1), X=0, DP=$0000,
 ;        DB=$00; C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the buffer + C2Scene_HdmaHalfBytes; Y
-;        as BankC3_Entry0008 leaves it; .Var24 + 1; WinFx_* and
+;        = the buffer (BankC3_Entry0008 restores it); .Var24 + 1; WinFx_* and
 ;        C2Scene_HdmaValues words 2-3 changed
 ; Calls: BankC3_Entry0008 (JSL).
 C2Scene_Win2Step:
@@ -23001,8 +23003,9 @@ C2Scene_NoiseHide:
 ; by the script) into C2Scene_DecompBuf.
 ; Entry: M=1, X=0 (the 16-bit offset), DP=$0000 (C2Tmp_08), DB=$00
 ;        (Menu_Decomp*)
-; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
-;        Menu_Decomp* changed
+; Exit:  M=1, X=0 (Decomp_ToWram restores P, A, X and Y); A = the
+;        pack's bank byte (B = the high byte of its address); X =
+;        C2Tmp_08; Y unchanged; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
 C2Scene_UnpackBgPack:
     LDX.w #!C2Scene_DecompBuf&$FFFF
@@ -23020,11 +23023,15 @@ C2Scene_UnpackBgPack:
     RTS
 
 ; $C2:7B20 — C2Scene_UnpackBg3MapPack (36 bytes, $7B20–$7B43)
-; Script routine (no op $34 reference found): as C2Scene_UnpackBgPack
+; Script routine (op $34 in the unpacked C2SceneRom_ScriptPacks 2,
+; $C3:9F41, at +$0286 and 6, $C3:BF7B, at +$027E, each a few ops after
+; that pack's op $34 to C2Scene_UnpackBgPack; the bytes are split by
+; the packing, so no ROM address holds them): as C2Scene_UnpackBgPack
 ; from C2SceneRom_Bg3MapPacks.
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_08), DB=$00 (Menu_Decomp*)
-; Exit:  M=1, X=0; A, X, Y as Decomp_ToWramVec leaves them (not traced);
-;        Menu_Decomp* changed
+; Exit:  M=1, X=0 (Decomp_ToWram restores P, A, X and Y); A = the
+;        pack's bank byte (B = the high byte of its address); X =
+;        C2Tmp_08; Y unchanged; Menu_Decomp* changed
 ; Calls: Decomp_ToWramVec (JSL).
 C2Scene_UnpackBg3MapPack:
     LDA.b #bank(!C2Scene_DecompBuf)

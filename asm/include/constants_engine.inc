@@ -61,6 +61,11 @@ if !constants_engine_inc == 0
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
 !Op_RTI = $40                            ; 65816 opcode RTI (Sys_HaltWithColor's trampolines)
+!Op_LdaImm = $A9                         ; 65816 opcodes C3_BuildCopyCode writes: LDA #imm,
+!Op_Tcd = $5B                            ; TCD,
+!Op_LdaAbs = $AD                         ; LDA abs,
+!Op_StaDp = $85                          ; STA dp
+!Op_Rts = $60                            ; and RTS
 
 ; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
@@ -414,10 +419,12 @@ if !constants_engine_inc == 0
 !WinFx_TableB = $1AC8                    ; the same while Field_Unk53 is 0 (inferred: the two halves
                                          ; of a double buffer, as Hdma_InitChannelsFD picks its
                                          ; tables by Field_Unk53)
-!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10 (what the
-                                         ; mode selects is not traced)
-!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5
-!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12
+!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10: a full
+                                         ; circle, the rows outside emptied (WinFx_BuildCircle)
+!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5: the upper half,
+                                         ; then the lower half at half height
+!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12: a full circle, the
+                                         ; rows outside left as they are (WinFx_CircKeepRest)
 !WinFx_Hook3SizeMin = $02                ; hook 3 shuts the window off only when WinFx_Size < this
 !WinFx_FixedX = $7C                      ; WinFx_ArgX of hooks 7-10
 !WinFx_FixedY = $06                      ; WinFx_ArgY of hooks 7-10
@@ -1157,8 +1164,8 @@ endif
 !EventHook_LeaveToBankC3 = $0B           ; hook 11
 !EventHook_WinPulse = $0C                ; hook 12 (it ends at EventHook_Idle)
 !EventHook_WinShrink1Off = $0E           ; hook 14
-!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95
-!WinFx_C3EMode2 = $02                    ; (what BankC3_Entry000E does with them is not traced)
+!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95:
+!WinFx_C3EMode2 = $02                    ; WinFx_StepWipe raises every line value (1) or lowers it (2)
 !WinFx_SizeBit0 = $01                    ; WinFx_Size bit 0 (Hdma_InitChannelsFD's channel-7 choice)
 !WinFx_SizeBit1 = $02                    ; WinFx_Size bit 1: hook 3 leaves the window on when set
 !EvtFF_FirstSub = $90                    ; opcode $FF's second byte: first Evt_OpFFTable entry
@@ -1321,3 +1328,70 @@ endif
                                          ; metatiles $100 + their Map_TileProps state
 !TileAnim_ColumnTop = $E4                ; start state of an $E6 column's upper tile, probably: the IRQ
                                          ; draws metatile $1E5 there after ModeE6_Handler adds 1
+
+; --- Bank $C3 kernel: the decompressor (Decomp_ToWram) and the module boot ---
+!Decomp_ModeMask = $C0                   ; first end-marker byte, bits 6-7: 0 = 12-bit offsets and
+                                         ; 4-bit lengths, else 11-bit offsets and 5-bit lengths
+!Decomp_GroupSize = 8                    ; items per control byte
+!Decomp_MarkerCountMask = $3F            ; end-marker bits 0-5: 0 = end of the data, else the items
+                                         ; in the next segment's first control byte
+!Decomp_RunBytes = 8                     ; literal bytes after a zero control byte
+!Decomp_Offset12Mask = $0FFF             ; back-reference distance, 12-bit mode
+!Decomp_Offset11Mask = $07FF             ; back-reference distance, 11-bit mode
+!Decomp_In = $0000                       ; base of Decomp_ToWram's reads of the packed data: X = the
+                                         ; offset in Decomp_SrcBank (DB = that bank), +1.. the bytes
+                                         ; after X
+!C3_BootIrqOn = $80                      ; C3_EntryArg bit 7: C3_BootModule runs the unpack with the
+                                         ; display on and the line-211 IRQ (Field_HookLeaveToBankC3's
+                                         ; BankC3_HookArg $85 sets it; event sub $00-$7F never does)
+
+; --- Bank $C3 window routines (WinFx_BuildCircle, WinFx_StepWipe, WinFx_BuildQuad) ---
+!WinFx_EmptyEntry = $0001                ; table entry left = 1, right = 0: the window covers
+                                         ; nothing on that line
+!WinFx_FillAllBytes = $01C0              ; WinFx_FillEmpty's count for the whole table: $1C1
+                                         ; bytes after the first entry (225 entries and one byte)
+!WinFx_Lines = $E0                       ; lines in a table (224)
+!WinFx_LastLine = $DF                    ; the last line (223)
+!WinFx_EdgeMax = $00FF                   ; right edges are clamped to this
+!WinFx_CircModeMask = $007F              ; mode bits 0-6: 0 = full circle, 1 = the lower half at
+                                         ; half height, else the upper half only
+!WinFx_CircKeepRest = $0080              ; mode bit 7: leave the rows outside the circle as they
+                                         ; are (else they are emptied)
+!WinFx_CircStepDiag = $000A              ; midpoint-circle step constant when x decreases
+                                         ; (4(y - x) + 10)
+!WinFx_WipeWorkOfs = $01C0               ; WinFx_StepWipe: the line array is at the table + this;
+                                         ; the two output buffers at + 0 and + WinFx_Lines
+!WinFx_WipeFrames = $20                  ; WinFx_StepWipe stops when its frame count reaches this
+!WinFx_WipeFillMode2 = $FF               ; first-frame value of every line in mode 2 (mode 1: 0)
+!WinFx_WipeRunMask = $1F                 ; random byte bits 0-4: run length - 3
+!WinFx_QuadTableRows = $0100             ; rows of a quad table (256): the rows after the bottom
+                                         ; one, up to $FF, are emptied (WinFx_BuildQuad)
+
+; --- Bank $C3 module services ---
+!DP_C3Zero = $0000                       ; direct page C3_ModuleFrame sets
+!C3Rom_PackBank = $FE                    ; bank of C3Rom_PackPtrs; source bank of C3_CopyFEto7E/7F
+!C3_SongArgs = $FFFF                     ; Audio_CmdArg1/Arg2 C3_SongCheck sends with the song
+!Eng_AddrMask16 = $FFFF                  ; AND mask: a label's bank-$00 mirror (C3_ReadPad's JML Reset)
+!C3_EntryNoSong = $20                    ; C3_EntryArg bit 5: C3_SongCheck sends nothing
+!C3_TaskListBytes = $20                  ; C3_TaskList / C3_TaskRun size
+!C3_PadAutoReadBusy = $01                ; HVBJOY bit 0: the auto-joypad read is still running
+!C3_PadSoftReset = $3030                 ; JOY1 with exactly L, R, Select and Start: soft reset
+!C3_PadStartHi = $0010                   ; C3_Pad+1 read as a word, bit 4: Start
+!C3_SndPause = $00F2                     ; Audio_CmdId (and Arg0 = 0) C3_ReadPad sends on pausing
+!C3_SndResume = $4418                    ; Audio_CmdId $18, Arg0 $44: sent on resuming
+!C3_SndResumeArg = $0080                 ; its Audio_CmdArg1/Arg2
+!C3_GenKStep = $20                       ; C3_BuildCopyCode: source step of the innermost loop
+!C3_CopyCodePasses = 8                   ; C3_CopyCodeOrder entries
+!C3Scale_SrcRowMask = $FFC0              ; C3_ScaleBitmap: (Acc >> 1) kept to 64-byte source rows
+!C3Scale_RowBytes = $0020                ; bytes per output row (64 pixels, 4 bit planes)
+!C3Script_OpFlow = $0080                 ; opcode bit 7: a flow / table opcode
+!C3Script_NibbleMask = $000F             ; opcode bits 0-3: variable, counter or table entry
+!C3Script_KindMask = $00F0               ; opcode bits 4-7
+!C3Script_FromVar = $0020                ; opcode bit 5: the operand is a variable byte
+!C3Script_VarIndexMask = $001E           ; variable operand: index x 2
+!C3Script_OpLoop = $0080                 ; opcodes $80-$8F: loop
+!C3Script_OpLoopYield = $0090            ; opcodes $90-$9F: loop, then yield
+!C3_ApuTimeout = $0200                   ; tries of C3_RunScript's dead APU send loop
+!C3_OamGroupMask = $0F                   ; Oam_LowTable offset bits 0-3: 0 after every 4 sprites
+!C3_ScreenRight = $0100                  ; C3_SprListLarge: X from here up is off screen
+!C3_OffscreenX = $9801                   ; ... and is stored as X $01 with bit 15 (so X bit 8) set

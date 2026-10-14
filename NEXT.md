@@ -732,6 +732,28 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `SongExtra`, `SongEcho`) are plain data read only by this code and could be labelled the same
    way; from `$24C3` on (the SPC700 program, the upload blocks, the samples) is the SPC700 track.
 
+6. Bank $C3: the kernel `$C3:0000`-`$C3:10CA` is matched (vectors, `C3_BootModule` and its
+   NMI/IRQ handlers, the decompressor `Decomp_ToWram` with its packed format in the header, the
+   window builders `WinFx_BuildCircle`/`WinFx_StepWipe`/`WinFx_BuildQuad`, `C3_RandomByte`, and the
+   services of the packed module: `C3_ScaleBitmap`, `C3_ModuleNmi`/`C3_ModuleFrame`, the script
+   interpreter `C3_RunScript` and its task lists, the sprite builders, `C3_BuildCopyCode`,
+   `C3_ReadPad`, `C3_MulSigned`, `C3_FindDivisor`, the staff text, the "CODE END C3" marker).
+   The rest of the bank stays ROM bytes: the packs at `$C3:1200` and `$C3:1313`
+   (`BankC3_PackedModule`, the jet-bike race module, unpacked to `$7E:3000`-`$B57E`) and the
+   scene data after them. Next: the module itself needs a packer that rebuilds the exact packed
+   bytes (or matching it as data) before its code can be matched; the module routines the kernel
+   calls by address are stubs (`!C3Mod_AudioCommand`, `!C3Mod_CallW`, `!C3Mod_RunTasks`,
+   `!C3Mod_RunNmiTasks` in ram_engine.inc). Open: what `$C3:1200` (`C3Rom_PackPtrs` entry 0)
+   unpacks to and who reads it; the module's DP at the calls of `C3_MulSigned`, `C3_ScaleBitmap`
+   and the sprite builders (hedged "probably 0" / "the module's"); C3_EntryArg bits 0-4 and 5 as
+   the module reads them. Re-review needed (verified headers edited by this batch):
+   `C2Scene_LoadUnkC800`, `C2Scene_UnpackBgPack`, `C2Scene_UnpackBg3MapPack`, `C2Scene_Win1Init`,
+   `C2Scene_Win2Step` (exit registers now known) and `Field_HookWinGrow0` (the window-hook banner
+   over it). Quirks recorded: the circle's carry-in adds (start value, first row, edge +1s, the
+   d >= 0 step), the wipe's mode-2 extra 1 and B = $03 after a clamp, the quad's leftward error
+   start and its unbounded fill when the bottom is line $FF, the scaler's carry-ins, the stray
+   `$DB` after the script opcode table and the unreachable APU loop in `C3_RunScript`.
+
 ## Tables
 
 `make tables-scan BANK=C0` (or `C1`, `CC`) lists these with more; `tools/tables.py emit` drafts

@@ -33,13 +33,6 @@ BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleS
 org $CD0012
 BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
 
-; --- Bank $C3 ---
-
-org $C30002
-Decomp_ToWramVec:                       ; JSL vector (JMP $C3:0557): unpacks the data at the long address in
-                                        ; !Battle_DecompSrc.. into WRAM at !Battle_DecompDest.. through WMADD/WMDATA
-                                        ; (inferred: a decompressor, from its header-driven copy loops); not analysed
-
 ; --- Bank $CC (battle support, called from the action code) ---
 
 org $CCF06B
