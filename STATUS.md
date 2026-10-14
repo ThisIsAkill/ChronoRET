@@ -106,6 +106,22 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-14 (re-survey): `symbols/code_survey.csv` re-run with the current source, now that all
+  known 65816 code is matched. Same method (matched data, the `*OldBuildLeftovers` among it, was
+  already not code); the trace and the allowance find no unmatched code, so each bank's code
+  bytes are its matched code: 249,251 in all (was 239,779; low 249,251, high 268,398, the high
+  bound being isolated code-like blocks, which in the banks with code are data). The earlier
+  survey was high for `$FD` (+481) and `$FF` (+232), bytes since matched as data, and low for
+  `$C2`, `$C3`, `$C6`, `$C7`, `$CC`, `$CD`, `$CE`, `$CF` and `$D1`. The share of reachable 65816 code
+  in ROM is 100.00% (the old-build leftovers, about 4.7 KB that no code reaches, are matched as
+  data); the SPC700 driver (7,153 bytes) and the packed `$C3` module (26,393 bytes,
+  $857F unpacked, about half code-like per the PR #106 review) are counted apart and are not in it. The method returns
+  the matched total by construction once all exits of matched code land in matched code; the
+  evidence is the exit check and the separate checks listed in NEXT.md ("Code survey"), with
+  the per-bank figures and the assessment of what the high bound holds. The packed module's
+  size is corrected from 26,383 to 26,393 bytes (to its last end marker, `$C3:7A2B`). Held-out calibration now: `$C0` -2.4%, `$C1` -2.5%, `$C2` -20.5%, `$FD`
+  -0.8%.
+
 - 2026-10-14: the share of game code is measured against `symbols/code_survey.csv`
   (`tools/code_survey.py`) instead of the earlier one-off survey. The new total is 239,779
   65816 code bytes (low 232,629, high 262,780), down from 358,356; with 170,895 bytes matched

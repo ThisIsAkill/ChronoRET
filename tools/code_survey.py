@@ -36,19 +36,31 @@ Per bank, code_bytes = matched + traced + allowance:
 
 Calibration (--calibrate): treat every matched routine of $C0, $C1, $C2 or
 $FD as unmatched, run the same survey, and compare with the survey made with
-the source. On 2026-10-14 the trace reached 78% ($C0), 62% ($C1), 10% ($C2)
-and 74% ($FD) of the matched code and none of the matched data; with the
-allowance the estimate came out low every time: $C0 -2.3% (59,473 for
-60,857), $C1 -3.7% (60,740 for 63,058), $FD -4.0% (15,505 for 16,149, recall
-94%: trace + allowance count 94% of the matched code bytes) and $C2 -17.6%
-(46,776 for 56,791: its code is reached mostly through scene-op tables the
+the source. In the re-survey of 2026-10-14 (all of $C0, $C1 and $C2 and
+$FD:A8A5-$FFFF from source) the trace reached 78% ($C0), 65% ($C1), 14%
+($C2) and 79% ($FD) of the matched code and none of the matched data; with
+the allowance the estimate came out low every time: $C0 -2.4% (59,421 for
+60,857), $C1 -2.5% (61,140 for 62,682), $FD -0.8% (15,537 for 15,668, recall
+95%: trace + allowance count 95% of the matched code bytes) and $C2 -20.5%
+(48,235 for 60,695: its code is reached mostly through scene-op tables the
 trace cannot follow). So the estimate for unmatched code tends to be LOW,
 by a few percent where the trace reaches most of a bank and by much more
-where it does not, and a low code estimate makes the share of matched code
-HIGH. The headline share is therefore more likely too high than too low; the
-low/high totals give its range. The block scorer passes 87% of matched code
-blocks and 1-2% of the blocks of banks that hold no code (sound, graphics),
-which is why code-like blocks not joined to any code are left out.
+where it does not. The block scorer passes 87% of matched code blocks and
+under 1% of the blocks of banks that hold no code (sound, graphics), which
+is why code-like blocks not joined to any code are left out of code_bytes.
+
+Exit check (exit_check, printed and written to the CSV header): where the
+exits of matched code routines land. Since all known 65816 code is matched
+(2026-10-14), none lands on an unmatched byte: the trace adds nothing, no
+code-like block is joined to code, and code_bytes equals the matched code of
+each bank. That is what the method returns by construction once all exits
+land in matched code, so it is not by itself evidence that no code is left
+(NEXT.md, "Code survey", lists the other checks). What
+the survey still cannot see is code reached only indirectly that sits in
+blocks of data far from any code; the high bound (isolated code-like
+blocks: in the banks with code none is reached by a call, jump or pointer
+from matched code, and the highest-scoring ones are tables, tile maps and
+pointer lists; see NEXT.md, "Code survey") is the room left for it.
 
 Data known to sit inside banks with code (TABLES, e.g. the APU interface
 tables $C7:0A98-$0D52) is kept out of the trace and the allowance.
@@ -59,8 +71,9 @@ Not 65816 code, reported in their own columns and never in code_bytes:
                     $C7:0010/$C7:001C). Includes the driver's own tables.
   compressed_bytes  packed 65816 code: the module at $C3:1313 that $C3:0014
                     unpacks to $7E:3000 (via $C3:0557, the pointer at
-                    $FE:0003) and runs with JML $7E:3000. Its size is the
-                    packed-length word the decompressor reads, plus that word.
+                    $FE:0003) and runs with JML $7E:3000. Its size runs to
+                    the last end marker of the pack (pack_end): $C3:1313-
+                    $7A2B, 26,393 bytes, unpacking to $857F bytes.
 
 A bank with no matched or traced code gets 0 when no JSL/JML from matched
 or traced code reaches it (indirect transfers through RAM vectors are not
@@ -81,6 +94,7 @@ import csv
 import io
 import math
 import sys
+import textwrap
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -105,9 +119,10 @@ def off(text: str) -> int:
 # Ranges that are not 65816 code in the ROM image, with their evidence.
 SPC700 = [('$C7:24C3', '$C7:40B3', 'SPC700 driver: length word $1BEF at $C7:24C3, uploaded to ARAM $0200 '
            '(block 0 of the upload table at $C7:0010/$C7:001C)')]
-COMPRESSED = [('$C3:1313', '$C3:7A21', 'packed module: length word $670D at $C3:1313 (read by the '
-               'decompressor $C3:0557 as the packed length), unpacked to $7E:3000 by $C3:0014 '
-               '(pointer at $FE:0003) and run with JML $7E:3000 at $C3:0073')]
+COMPRESSED = [('$C3:1313', '$C3:7A2B', 'packed module (Decomp_ToWram format): segment 1 runs to its '
+               'end marker at $C3:1315 + $670D = $7A22 (m = 4, next marker at $C3:1313 + $6718), '
+               'segment 2 ends with the end marker $00 at $C3:7A2B; unpacked to $7E:3000 by '
+               '$C3:0014 (pointer at $FE:0003) and run with JML $7E:3000 at $C3:0073')]
 UPLOAD_TABLE = '$C7:0010'
 # Sound data: the sample table ($C7:0AEA, 62 long pointers) and the song
 # table ($C7:0D18, 83 long pointers); each item starts with its length word.
@@ -122,11 +137,12 @@ TABLES = [('$C7:0A98', '$C7:0D52', 'APU interface tables: the sample table $C7:0
 # or a pointer table. The sound tables $C7:0AEA/$C7:0D18 are read by the
 # unmatched sound driver ($C7:050F, $0666, $0773), not by matched code.
 CONTENT = {
-    '$C3': '$C3:0000-$10C8 kernel (ends at the ASCII marker "CODE END C3"); the trace does not '
-           'reach $0307-$0547 and $08B3-$0EF9: the NMI/IRQ code installed as JML $C3:0548 / '
-           '$C3:0529 at $0500/$0504, and routines presumably called from the packed module',
-    '$C6': '$C6:E000-$EE3F scene helpers (JSL from C2Scene_ObjAFly/ObjBFly; probably more via scene op $4E); '
-           '$C6:F560- scene tables read by matched code',
+    '$C3': '$C3:0000-$10CA kernel, all from source (ends with the ASCII marker "CODE END C3"); '
+           '$C3:1200-$1312 another pack (C3Rom_PackPtrs entry 0, user not traced; unpacks to data, '
+           'per an independent review, PR #106); the packed '
+           'module (compressed_bytes); data after it',
+    '$C6': 'code $C6:E000-$EE42 (scene helpers: JSL from bank $C2 and scene op $4E), then $00 fill to '
+           '$EFFF; the rest data (packs, headers, scene tables read by matched code)',
     '$C7': '$C7:0000-$0A97 APU interface (65816); $0A98-$0D52 tables, kept out of the allowance (the sample '
            'and song tables $0AEA/$0D18 are read by the unmatched driver at $C7:050F/$0666/$0773); '
            'SPC700 driver $24C3-$40B3; samples from $C7:730D (table $C7:0AEA)',
@@ -141,11 +157,11 @@ CONTENT = {
            'unexplained (counted as 0 code)',
     '$CC': '$CC:0000-$DFFF tables (320 long data reads from matched battle code); code '
            '$CC:E000-$F382; tables after (115 long reads into $CC:F383 and up)',
-    '$CD': 'code $CD:0000-$3FE5 with tables inside; $CD:4000- data (pointer tables at $CD:66F0 '
-           'score as code but nothing reaches them)',
-    '$CE': 'code $CE:E000-$F0DF (JSL from $CD and $D1 only); the rest data',
-    '$CF': 'code $CF:E300-$FFFC with tables; $CF:0000-$E2FF data',
-    '$D1': 'code $D1:E700-$FEBF with tables; $D1:0000-$E6FF data (battle window maps)',
+    '$CD': 'code $CD:0000-$3F9D with tables inside, $3F9E-$3FFF old-build leftovers (data); '
+           '$CD:4000- data (pointer tables at $CD:66F0 score as code but nothing reaches them)',
+    '$CE': 'code $CE:E000-$EF10 and $F066-$F0E5 (JSL from $CD and $D1 only); the rest data',
+    '$CF': 'code $CF:E300-$FE84 with tables, then data to $FFFF; $CF:0000-$E2FF data',
+    '$D1': 'code $D1:E70A-$FEF3 with tables, then $00 fill; $D1:0000-$E709 data (battle window maps)',
     '$DE': 'data read by TextWin_State0_Draw ($DE:FA00); the long pointer table at $E4:234E-$25A3 '
            'points into $DD, $DE and $E3 (and once into $E1)',
     '$E4': 'a word offset table at $E4:0000 (AnimRom, read by six routines, Menu_LoadCharPalettes '
@@ -160,10 +176,15 @@ CONTENT = {
     '$F8': '66 long pointers at $FC:FB3D point into it (packed data)',
     '$F9': '59 long pointers at $FC:FC03 point into it (packed data)',
     '$FC': 'pointer tables $FC:F9F0-$FEBB (read by LocLoad_Unk56D4) and the data they index',
-    '$FD': 'code and tables; $FD:0000-$A8A4 data (staff credits text at $FD:A000)',
-    '$FE': 'packed data: the pack pointer table at $FE:0000 (its entry $FE:0003 is the $C3:1313 '
-           'code module); whether any pack in $FE unpacks to code is not known',
-    '$FF': 'code $FF:F540-$FFFF with tables (called from C2 menu code); the rest data',
+    '$FD': '$FD:A8A5-$FFFF from source (code, tables, old-build leftovers $D5D4-$D9FF as data); '
+           '$FD:0000-$A8A4 data (packed credits graphics, staff credits text at $FD:A000, battle '
+           'tables $A800-$A8A4)',
+    '$FE': 'packed data: the pack pointer table C3Rom_PackPtrs at $FE:0000, 73 entries (entry 1 is '
+           'the $C3:1313 code module, entries 58-72 point into $FD); apart from the module, 13 raw '
+           'blocks and 2 empty packs they unpack to data, graphics and tile maps (independent '
+           'review, PR #106)',
+    '$FF': 'code $FF:F548-$FC66 with tables (called from C2 menu code), $FC67-$FFFF old-build '
+           'leftovers (data); the rest data',
 }
 
 # The 2026-09 survey's figures for the banks where this one finds far less
@@ -207,6 +228,30 @@ class Tracer(X.Xref):
                 return True
             o += ln
         return True
+
+    def decodes(self, start, end):
+        """Whether some entry state decodes the routine start..end on its own
+        instruction lines (the test _row_exits applies before it counts exits)."""
+        for m0, x0 in X.STATE_ORDER:
+            seen, work, ok = set(), [(start, (m0, x0, ()))], True
+            while work and ok:
+                o, st = work.pop()
+                if o is None or not start <= o <= end or (o, st) in seen:
+                    continue
+                seen.add((o, st))
+                b, d = self.boundaries.get(o), self._decode(o, st)
+                if not b or not b[2] or d is None or (d[0] + o <= end and d[0] + o not in self.boundaries):
+                    ok = False
+                    break
+                ln, nst, jumps, calls, falls, _ = d
+                work.extend((j, nst) for j in jumps)
+                if calls:
+                    nst = self._after_call(calls, nst) or nst
+                if falls:
+                    work.append((o + ln, nst))
+            if ok:
+                return True
+        return False
 
     def _table_targets(self, table):
         known = super()._table_targets(table)
@@ -287,6 +332,41 @@ class Tracer(X.Xref):
                 hit[o2:o2 + ln] = b'\1' * ln
             work.extend(nexts)
         return hit
+
+
+def exit_check(tr, code, data):
+    """Where the exits of matched code routines land: (Counter of landing kinds,
+    the exits that do not land on a matched instruction start, the code
+    routines no entry state decodes on their own source lines: their exits
+    are not counted, and the trace does not start from them).
+
+    An exit is a transfer out of a routine (branch, jump, call, falling off
+    its end) under an entry state whose decode keeps to the routine's
+    instruction lines (xref's _row_exits), counted once per routine, target
+    and M/X widths. Landing kinds: 'instruction start' (a source instruction
+    line), 'matched data', 'mid-instruction' (inside matched code, not on a
+    line start), 'unmatched'."""
+    kinds, odd, undecoded = collections.Counter(), [], []
+    for s, e, name in tr.rows:
+        if not code[s]:
+            continue
+        exits = {(t, st[0], st[1]) for t, st in tr._row_exits(s, e)}
+        if not tr.decodes(s, e):
+            undecoded.append(name)
+        for t, m, x in sorted(exits):
+            b = tr.boundaries.get(t)
+            if not tr.matched[t]:
+                k = 'unmatched'
+            elif data[t]:
+                k = 'matched data'
+            elif b and b[2]:
+                k = 'instruction start'
+            else:
+                k = 'mid-instruction'
+            kinds[k] += 1
+            if k != 'instruction start':
+                odd.append((name, t, m, x, k))
+    return kinds, odd, undecoded
 
 
 def trace(hide=()):
@@ -439,9 +519,21 @@ def upload_blocks(rom):
     return out
 
 
+def pack_end(rom, o):
+    """Last byte of the Decomp_ToWram pack at offset o: segment 1's end marker
+    is at o + 2 + W (W the word at o); a marker m, w with m AND $3F nonzero
+    puts the next marker at o + w; m AND $3F = 0 ends the pack (one byte)."""
+    p = o + 2 + (rom[o] | rom[o + 1] << 8)
+    while rom[p] & 0x3F:
+        p = o + (rom[p + 1] | rom[p + 2] << 8)
+    return p
+
+
 def exclusions(rom):
     """(SPC700, packed, sound data, union of those and TABLES) masks: bytes that are not 65816 code."""
     n = len(rom)
+    for s, e, _ in COMPRESSED:
+        assert pack_end(rom, off(s)) == off(e), f'{s}: the pack ends at {pack_end(rom, off(s)):X}'
     spc, packed, tables = ranges_mask(n, SPC700), ranges_mask(n, COMPRESSED), ranges_mask(n, TABLES)
     sound = bytearray(n)
     for s, e in sound_items(rom) + upload_blocks(rom)[1:]:
@@ -451,9 +543,11 @@ def exclusions(rom):
 
 
 def survey():
+    """(rows, exit_check of the matched code)."""
     strict, reached, xr = trace()
     rom, n = xr.rom, len(xr.rom)
     code, data = kinds_masks(n)
+    exits = exit_check(xr, code, data)
     spc, packed, sound, excl = exclusions(rom)
     scores = block_scores(xr)
     rows = []
@@ -471,6 +565,13 @@ def survey():
         if matched and not traced and not al and matched + sum(data[lo:hi]) == 0x10000:
             method = 'matched (bank fully covered by source)'
             unc = 'exact'
+        elif matched and not traced and not al:
+            # Trace and allowance (score >= 0) add nothing. The high bound still
+            # adds the allowance at score >= -0.5 and the isolated blocks.
+            method = 'matched (trace and allowance find no more)'
+            unc = f'-0/+{high - total}'
+            notes.append(f'high bound: allowance at score >= -0.5 {al_lo} + isolated code-like {iso_lo} '
+                         f'({iso} at score >= 0)')
         elif matched or traced:
             method = 'matched + trace + allowance'
             unc = f'-{total - low}/+{high - total}'
@@ -496,7 +597,7 @@ def survey():
                      'code_bytes_low': low if total else 0, 'code_bytes_high': high if total else iso_lo,
                      'spc700_bytes': spc_n, 'compressed_bytes': packed_n, 'method': method,
                      'uncertainty': unc, 'notes': '; '.join(notes)})
-    return rows
+    return rows, exits
 
 
 HEADER = """\
@@ -508,18 +609,29 @@ HEADER = """\
 # code_bytes_low/high bound the allowance. SPC700 and compressed code are
 # counted apart and are not in code_bytes. Re-run only to re-survey.
 # Uncertainty: the estimate for unmatched code tends to be LOW (held-out
-# tests, --calibrate: hiding $C0 -2.3%, $C1 -3.7%, $C2 -17.6%; $FD recall
-# 94%), and a low code estimate makes the share of matched code HIGH. The
-# share's range is matched code over the high and the low total.
+# tests, --calibrate: hiding $C0 -2.4%, $C1 -2.5%, $C2 -20.5%, $FD -0.8%).
+# Every bank's code_bytes is now its matched code: the trace and the
+# allowance find no unmatched code. code_bytes_high adds isolated code-like
+# blocks; those in the banks with code are data (NEXT.md, "Code survey").
 """
 
 
-def render(rows) -> str:
+def exits_line(exits) -> str:
+    kinds, _, undecoded = exits
+    return (f'Exits of matched code routines (once per routine, target and M/X widths): '
+            f'{sum(kinds.values()):,}; {kinds["instruction start"]:,} land on matched instruction starts, '
+            f'{kinds["mid-instruction"]} mid-instruction, {kinds["matched data"]} in matched data, '
+            f'{kinds["unmatched"]} on unmatched bytes. Routines no single entry state decodes '
+            f'(exits not counted): {", ".join(undecoded) or "none"}.')
+
+
+def render(rows, exits) -> str:
     buf = io.StringIO()
     buf.write(HEADER)
     buf.write(f'# Total: {sum(r["code_bytes"] for r in rows):,} code bytes '
               f'(low {sum(r["code_bytes_low"] for r in rows):,}, '
               f'high {sum(r["code_bytes_high"] for r in rows):,}).\n')
+    buf.write('# ' + '\n# '.join(textwrap.wrap(exits_line(exits), 76)) + '\n')
     w = csv.DictWriter(buf, fieldnames=COLS, lineterminator='\n')
     w.writeheader()
     w.writerows(rows)
@@ -538,7 +650,7 @@ CALIBRATE = ('$C0', '$C1', '$C2', '$FD')
 def calibrate():
     """Hide the matched routines of each bank in CALIBRATE from the trace and
     compare with the survey made with the source."""
-    full = {r['bank']: r for r in survey()}
+    full = {r['bank']: r for r in survey()[0]}
     for bank in CALIBRATE:
         b = int(bank[1:], 16) - 0xC0
         rows = [r for r in generated.function_rows() if r['bank'] == bank]
@@ -575,8 +687,8 @@ def main() -> int:
     if args.calibrate:
         calibrate()
         return 0
-    rows = survey()
-    text = render(rows)
+    rows, exits = survey()
+    text = render(rows, exits)
     if args.write:
         SURVEY_CSV.write_text(text)
         print(f'Wrote {SURVEY_CSV}')
@@ -591,6 +703,9 @@ def main() -> int:
     print(f'Total 65816 code bytes: {total:,} (low {sum(r["code_bytes_low"] for r in rows):,}, '
           f'high {sum(r["code_bytes_high"] for r in rows):,}); SPC700 '
           f'{sum(r["spc700_bytes"] for r in rows):,}; compressed {sum(r["compressed_bytes"] for r in rows):,}')
+    print(exits_line(exits))
+    for name, t, m, x, kind in exits[1]:
+        print(f'  {name}: exit to ${0xC0 + (t >> 16):02X}:{t & 0xFFFF:04X} (M={int(m)}, X={int(x)}) lands {kind}')
     return 0
 
 

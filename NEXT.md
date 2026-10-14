@@ -853,12 +853,10 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    BattleFD_UnkB7EB; `!BattleRom_CmdPtr` `$A849`; `!BattleRom_TechEntryPtr` `$A84F`;
    `!BattleRom_CharFirstTech` `$A89D`; `$A800`-`$A80A`, `$A821`-`$A848` and `$A855`-`$A89C` have
    no named reader yet). Those tables are the next cheap step; the credits need a text/graphics
-   format, not hand-written db. Survey note (C6 batch): no unmatched $FD byte is code any more:
-   tools/code_survey.py's trace and allowance count none of `$FD:0000`-`$A8A4` today, so the 481
-   "unmatched code" bytes progress.json shows ($FD's surveyed 16,149 less the 15,668 matched) are the
-   survey's allowance for bytes later matched as data (the old-build leftovers, animation lists and
-   tables), not code still to match; `symbols/code_survey.csv` is high for $FD by that much (left
-   as is; re-surveying is a separate step). Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
+   format, not hand-written db. Survey note: no unmatched $FD byte is code; the 481 bytes the
+   earlier survey counted over the matched code were its allowance for bytes since matched as data
+   (the old-build leftovers, animation lists and tables). Re-surveyed 2026-10-14 (see "Code
+   survey" below): $FD's code bytes are its 15,668 matched. Next in bank $FD: who writes `Hdma_Unk7F0351`, `Hdma_Unk7F22C0` and
    `LayerDrift_L1X/Y`; the battle code before `$FD:A982` (`$FD:A8CE`/`$A8FE` and the routines that call
    BattleSys_RefundItemLong at `$FD:A8D8`/`$A910`, among the `$FD:A8A5`-`$A95F` callees of B575/B967);
    which LocRom.Palette values occur (FieldAnimListBPtrs is taken as 88 entries because the lists start
@@ -1061,10 +1059,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    it from code; it holds two layers of older assemblies (a copy of the end of BankFF_GradValues,
    older copies of BankFF_SlotChecksum's end and of BankFF_BuildGradHdma with its table, a start-up
    fragment ending JML $00:0500, routines that copy from bank $E4 and call $C2:FE92 / $C2:FED9,
-   and two routines on DP $54/$F4 no matched code resembles). Survey note: `symbols/code_survey.csv`
-   counts 640 of these bytes ($FF:FC80-$FFDF, allowance blocks) as code; they are data, so the 232
-   "unmatched code" bytes progress.json shows for $FF are not code and $FF's code is fully matched
-   (left as is; the survey is not edited by hand). Header edited by it (back to review):
+   and two routines on DP $54/$F4 no matched code resembles). Survey note: the earlier survey counted
+   640 of these bytes ($FF:FC80-$FFDF, allowance blocks) as code; they are data. Re-surveyed
+   2026-10-14 (see "Code survey" below): $FF's code bytes are its 1,563 matched. Stale (verified
+   header, fix at its next edit): BankFF_OldBuildLeftovers' last note line, "symbols/code_survey.csv
+   counts part of these bytes as code"; the survey counts none of them now. Header edited by it (back to review):
    BankFF_BuildTileSets (the bank banner above it, which said these bytes stay as ROM bytes).
 
 10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
@@ -1368,9 +1367,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    -256 at sine index $200; PerspInit's HDMA words overwritten by the step it falls into; the
    tail's unused `.Unk2E` read; BankC6_UnkE797's unchecked Loc_Id; PerspStep's STA.w to C2Tmp_00.
    Entry states come from op $4E (M=1, X=0) inside C2Scene_TaskRunAll (DP=$0000, DB=$00); the
-   script values (.Var22/.Var24 counts and radii) were not traced. Survey note: the survey's $C6
-   note puts the code at `$C6:E000`-`$EE3F`; it ends at `$EE42`, and the survey's 2,673 code bytes
-   are low (3,619 matched; progress.py flags it). Headers edited: none verified in bank $C6 (all
+   script values (.Var22/.Var24 counts and radii) were not traced. Survey note: the earlier survey put
+   the code at `$C6:E000`-`$EE3F` with 2,673 code bytes; it ends at `$EE42` (3,619 matched), and
+   the re-survey of 2026-10-14 (see "Code survey" below) says so. Headers edited: none verified in bank $C6 (all
    new); the generated Callers blocks of Trig_Cos1024, C2Scene_Unk2273, BankC3_Entry0000 and
    Audio_DriverInit changed (not hashed). Open: what the scenes are (pack 0's Mode 7 flight, pack
    4's window and gradient effects), who reads `!C6Scene_Unk7F0062`, `!C2Scene_Unk7F00CD`, the
@@ -1382,6 +1381,85 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     on a row boundary of the layout, and every row inside is named or a `header: see` sub-entry.
     One was wrong: `Menu_CfgTextThread` said 149 bytes for `$F9B2–$FA48` (151; the range was
     right). Re-review needed (verified header edited): `Menu_CfgTextThread`.
+
+## Code survey
+
+Re-run 2026-10-14 (`python3 tools/code_survey.py --write`) once all known 65816 code was
+matched. The method did not change (data rows, the `*OldBuildLeftovers` among them, were already
+kept out of code); the tool only gained a method label for banks where the trace and the
+allowance add nothing, current per-bank notes, an exit check, and the packed module's true end
+(below). Exit check (`python3 tools/code_survey.py` prints it, with the 19 odd exits, and
+`symbols/code_survey.csv`'s header records it): of the 12,661 exits of matched code routines (counted once per routine, target and M/X widths, under the entry states that decode on the routine's own source lines), 12,642 land on matched instruction starts, none on unmatched bytes, and 19 (18 mid-instruction, 1 in matched data) are fall-throughs after an instruction decoded under the wrong width. Two
+routines decode under no single entry state, BattleSys_ApplyDamage and C2Scene_ObjAFly, so
+their exits are not counted; an independent review (PR #106) found every target in their source
+to be a matched label. So the trace reaches no unmatched byte, no code-like block is joined to
+code, and each bank's code bytes are its matched code: 249,251 in all (was 239,779, low 232,629, high
+262,780). The banks that changed: `$C1` 63,058 -> 62,682, `$C2` 56,791 -> 60,695, `$C3` 3,032
+-> 4,076, `$C6` 2,673 -> 3,619, `$C7` 2,526 -> 2,672, `$CC` 4,440 -> 4,995, `$CD` 14,533 ->
+15,824, `$CE` 3,075 -> 3,729, `$CF` 6,117 -> 7,013, `$D1` 4,733 -> 5,858, `$FD` 16,149 ->
+15,668, `$FF` 1,795 -> 1,563 (`$C0` 60,857 unchanged). The progress share is 100.00% of the
+reachable 65816 code in ROM: the old-build leftovers (the `*OldBuild*` rows, 4,694 bytes, partly
+routines) are matched as data, since no code reaches them, and the SPC700 driver (7,153 bytes)
+and the packed `$C3` module (26,393 bytes, unpacking to $857F bytes at `$7E:3000`, about half of
+it code-like per the PR #106 review) are counted apart and are not in it. No bank is "survey low" any more.
+
+By construction the method returns the matched total once every exit of matched code lands in
+matched code, so that result alone is no evidence that nothing is left. The evidence is the
+checks beside it: the exit check above (repeatable with the tool), the per-block reading of the
+high bound below, and these, from an independent review (PR #106): the unpacked `$C3` module's
+real JSL/JML into ROM all land on matched instruction starts; 171 of the 172 op-`$4E`
+(C2Script_CallLong) patterns in the unpacked scene scripts land on matched `$C6` starts (the
+other is an op `$1A` operand); the 73 entries of C3Rom_PackPtrs (`$FE:0000`; entry 73 is
+$000000, entries 58-72 point into `$FD:0000`-`$58E1`, the credits graphics): apart from entry 1
+(the module), 13 raw blocks (not in pack format, e.g. `$FE:4B9A`, `$FE:8D15`, `$FE:F91E`) and 2
+packs that unpack to 0 bytes, all unpack to data, graphics and tile maps (pack 71 at `$FD:57F0`
+scores 60 of 63 blocks code-like, but it is a `$10 $00` tile map; pack 61 at `$FD:055C` 10 of
+84, 4bpp graphics; pack 0 at `$C3:1200` 0 of 31); and a search for
+routine-shaped instruction runs over all unmatched ROM bytes finds none longer than 19
+instructions, all noise. Held-out calibration (`--calibrate`): hiding `$C0` -2.4%, `$C1`
+-2.5%, `$C2` -20.5%, `$FD` -0.8% (recall 97.0%, 96.8%, 78.9%, 94.7%).
+
+What is left is the high bound, 268,398 (+19,147): isolated code-like 32-byte blocks (score >=
+-0.5, not joined to code), all in unmatched ROM bytes outside the SPC700 driver, the packed
+module and the sound data. In banks with code they add `$C3` 192, `$C6` 256, `$CC` 384, `$CD`
+672, `$CE` 998, `$CF` 1,824, `$D1` 1,376, `$FD` 69, `$FF` 288; the other 13,088 are in banks
+with no code ($C4-$C5, $D0, $D2-$FC, $FE), at the scorer's rate on data (under 1% of blocks).
+Assessment, bank by bank (checked with xref's byte-pattern index and the matched data rows):
+no JSR/JMP/JSL/JML from an instruction of matched code and no word or long pointer in a matched
+table points into any of them (the few pattern hits are operand bytes of matched code, which the
+trace would otherwise have followed, or words in `*OldBuildLeftovers`), so all are survey noise:
+
+- `$C3`: `$1280` lies in pack 0 (`$C3:1200`-`$1312`, packed bytes); `$C1E0`, `$DCE0`, `$E1C0`,
+  `$EE60`, `$FE60` in the data after the packed module.
+- `$C6`: `$1B20`, `$2120`, `$3A60`, `$C9A0`, `$CB40`, `$D020` in the data before the code;
+  `$F400`-`$F43F` is a word table ($F000, $F001, $F00A, ...) in the data after it.
+- `$CC`: `$18E0`, `$2BE0` (small counts $10-$60), `$2EC0`-`$2EFF`, `$4040`, `$8C20`, `$CC20`,
+  `$DCC0`-`$DD1F` in the battle tables `$0000`-`$DFFF`; `$F700`, `$F800` in the tables after
+  the code.
+- `$CD`: `$6080` (word table $849D, $84B5, ...), `$6500`-`$6A7F` (the pointer tables at
+  `$CD:66F0`, $F077, $F079, ...), `$B620`, `$D0C0`: data of `$CD:4000`-`$FFFF`.
+- `$CE`: fourteen blocks in the scripts and object records `$CE:0000`-`$DFFF`; `$F060`-`$F065`
+  (the last 6 bytes of the tables `$CE:EF11`-`$F065`, before BattleCE_UnkF066); the rest in
+  `$CE:F820`-`$FFBF`, inside the tables after the code (repeating `$BD $A0 $89` records).
+- `$CF`: 31 runs in `$CF:5560`-`$DE9F`, inside the data `$CF:0000`-`$E2FF` (tile words such as
+  `$2996 $2998 ...` at `$8E80`; a 256-byte run of equal scores at `$A4C0`, a table).
+- `$D1`: 36 runs in the window maps `$D1:0000`-`$E709` (`$DA60`-`$DB1F` is `$22 $20` tile
+  pairs, `$DFE0` repeats `$4A $0A`).
+- `$FD`: `$1E00`, `$3120` in the packed credits graphics; `$A8A0`-`$A8A4`, the last bytes of
+  the battle tables before BattleFD_UnkA8A5 (counted isolated because a block that holds code
+  never joins itself).
+- `$FF`: `$0AE0`, `$5220`, `$8400` (word table $844E, $8474, ...), `$9680`, `$9740`,
+  `$B440`-`$B47F`, `$C4A0`, `$C860`: data of `$FF:0000`-`$F547`.
+
+Not in the code total: the packed module `$C3:1313`-`$7A2B` and the SPC700 driver, both counted
+apart. The other entries of C3Rom_PackPtrs (pack 0 at `$C3:1200`, the
+packs in `$FE` and `$FD`) unpack to data or are raw or empty (PR #106 review, above; the 73
+entries and entries 58-72 in `$FD` checked again from the ROM). The module's size is now taken to its last end marker: the earlier
+survey stopped at `$7A21` (the length word + 2, which is segment 1 only) and counted 26,383
+bytes; Decomp_ToWram's format puts segment 1's end marker at `$7A22` ($04, next marker at
+`$C3:1313` + $6718) and the final $00 at `$7A2B`, so 26,393 bytes, as
+`asm/include/unmatched.asm` and Decomp_ToWram's header say. The survey checks it
+(`pack_end`).
 
 ## Tables
 
