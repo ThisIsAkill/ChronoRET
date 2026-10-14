@@ -20,6 +20,17 @@ the [Progress page](https://thisisakill.github.io/Kajar-site/PROGRESS/) on the
 Kajar site, or run `make progress` (`python3 tools/progress.py`) locally. The
 banks being worked on are listed under "Repo layout" below.
 
+The share of game code is matched 65816 code bytes over the code bytes of
+`symbols/code_survey.csv`, one row per bank, written by `tools/code_survey.py`:
+matched code, plus unmatched code reached by a flow trace from matched code
+and the interrupt vectors (M/X widths tracked), plus an allowance for code
+reached only through indirect jumps (code-like blocks next to traced code),
+with a low/high range per bank. The SPC700 sound driver and the compressed
+code module in `$C3` are listed in their own columns and are not in the total.
+The survey is re-run on purpose (`--write`), not as code gets matched;
+`--calibrate` repeats it with the source of `$C0` or `$C1` hidden to show
+how close it comes.
+
 Progress notes, the address map, the devlog and a function-level breakdown
 live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.
 
@@ -64,8 +75,8 @@ asm/        65816 source, organized by bank; main.asm includes them all
   bankFF/   Bank $FF — a copy of the bank $00 wave tables so far
   hardware.inc  SNES register names
   include/  Shared names: RAM (ram_*.inc), constants, macros, unmatched-routine labels
-symbols/    review log (reviews/, one file per round) and progress history
-            (tracked); functions.csv (every function and its status) and
+symbols/    review log (reviews/, one file per round), progress history and the
+            per-bank code survey, code_survey.csv (tracked); functions.csv (every function and its status) and
             progress.json are generated on demand by tools/progress.py and
             never committed
 tools/      Build, diff and verify scripts, lint, drafting and xref tools,

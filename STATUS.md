@@ -106,6 +106,16 @@ review; bank $C0 is next.
 
 ## Decisions
 
+- 2026-10-14: the share of game code is measured against `symbols/code_survey.csv`
+  (`tools/code_survey.py`) instead of the earlier one-off survey. The new total is 239,811
+  65816 code bytes, down from 358,356. The earlier survey counted the song data in `$CA`/`$CB`
+  (91,801 bytes) as code, credited `$CC` with 27,226 code bytes where about 4,400 are code,
+  and gave code to `$DE`, `$E4`, `$E5`, `$F5`-`$F9`, `$FC` and `$FE`, where none is found:
+  nothing in the ROM transfers control into them, and the matched code that touches them reads
+  them as data.
+  SPC700 code (7,153 bytes) and the compressed module in `$C3` (26,383 bytes) are listed apart
+  and are not in the total.
+
 - 2026-10-09: lint rule `INDEX`: an Exit claim that X or Y is unchanged (kept, preserved, as on
   entry) must hold for X=0 callers: no path, callees included, may set the X flag and leave the
   register without its high byte (`tools/index_claims.py`). Added after
