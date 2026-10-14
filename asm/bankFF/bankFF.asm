@@ -32,7 +32,7 @@ org $FFF548
 ;   - zeroes Menu_SprScratch $9890-$989F and copies glyphs 1 and 2 after
 ;     it ($98A0-$98BF); then builds three groups of ten tiles at
 ;     Menu_TileSetC: each byte is the Menu_SprScratch byte (0, glyph 1 or
-;     glyph 2, by group) shifted left 2 with bits 4-3 of glyph t's byte
+;     glyph 2, by group) shifted left 2 with bits 3-2 of glyph t's byte
 ;     below (probably 0-9, 10-19 and 20-29 in a narrower layout; not
 ;     traced); then zeroes the first 16 bytes of Menu_TileSetC.
 ; Menu_Unk51 is the start offset of both output loops, and of the glyph
@@ -109,7 +109,7 @@ BankFF_BuildTileSets:
     LDY.w #!Menu_SprScratch+!BankFF_ScratchClearBytes
     LDA.w #!BankFF_ScratchTableBytes-1
     MVN !Bank7E,!BankFF                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 4-3.
+    ; Menu_TileSetC: three groups of ten tiles, (Menu_SprScratch byte << 2) | glyph bits 3-2.
     LDY.b !Menu_Unk51
     STZ.b !Menu_Tmp00
 .row_group:
@@ -1156,9 +1156,14 @@ BankFF_GradValues:
 ; BankFF_OldBuildLeftovers ($FF:FC67–$FF:FFFF, 921 bytes)
 ; ============================================================
 ; Not code that runs: tools/xref.py finds no call or jump into
-; $FF:FC67-$FFFF from code (every pattern it lists sits in the data
-; before $FF:F548 or in these bytes themselves). By their look they are
-; what older, longer assemblies of the end of the bank left behind, two
+; $FF:FC67-$FFFF from code. The patterns it lists sit in the data before
+; $FF:F548, in these bytes themselves, inside two instructions of
+; BankFF_BuildGradHdma (operand bytes at $FF:FC1E and $FC4E, DOUBTFUL),
+; or (JSL/JML byte patterns) in data banks $C4, $C5, $C7, $C9, $CA, $D4,
+; $E5, $E9, $EF and $F5; four of the last are marked CONFIRMED ($C4:00E1,
+; $C7:D0B8, $C7:EC99, $CA:0F21), all inside data (bank $C7's past its
+; matched code and tables, $0000-$0E10). By their look they are what
+; older, longer assemblies of the end of the bank left behind, two
 ; layers of them; kept as bytes (db), since they never run. The segments
 ; (code read by eye, not traced):
 ; - .grad_values_tail $FC67-$FC6D: $E1-$E7, the end of a copy of
@@ -1173,11 +1178,11 @@ BankFF_GradValues:
 ;   table ($FFE2) and the call ($C2:FED9).
 ; - .copy_e4_table $FD40-$FD52: its four words and the short handlers
 ;   they point at.
-; - .slot_checksum $FD53-$FD7A: an older copy of the end of
+; - .slot_checksum $FD53-$FD79: an older copy of the end of
 ;   BankFF_SetSlotOfs, BankFF_SlotSramOfs and BankFF_SlotChecksum
 ;   ($FF:FBDD-$FC03; the same up to the checksum's end, which here is
 ;   PLB, PLP, RTS).
-; - .startup $FD7B-$FDC0: DB = 0, screen off, NMITIMEN = 1, DMA and HDMA
+; - .startup $FD7A-$FDC0: SEP #$30, DB = 0, screen off, NMITIMEN = 1, DMA and HDMA
 ;   off, colour 0 = $001F (red), TM = 0, screen on at full brightness,
 ;   30 frames waited on HVBJOY, then JML $00:0500.
 ; - .grad_hdma $FDC1-$FE23: an older BankFF_BuildGradHdma and its table
@@ -1219,9 +1224,9 @@ BankFF_OldBuildLeftovers:
 .slot_checksum:
     db $FF,$85,$7B,$60,$00,$60,$00,$6A,$00,$74,$08,$8B,$C2,$30,$F4,$30
     db $30,$AB,$AB,$A5,$7B,$85,$00,$A0,$FE,$09,$A9,$00,$00,$18,$71,$00
-    db $88,$88,$10,$FA,$AB,$28,$60,$E2
+    db $88,$88,$10,$FA,$AB,$28,$60
 .startup:
-    db $30,$F4,$00,$00,$AB,$AB,$A9,$80,$8D,$00,$21,$A9,$01,$8D,$00,$42
+    db $E2,$30,$F4,$00,$00,$AB,$AB,$A9,$80,$8D,$00,$21,$A9,$01,$8D,$00,$42
     db $A9,$00,$8D,$0B,$42,$8D,$0C,$42,$A9,$00,$8D,$21,$21,$A9,$1F,$8D
     db $22,$21,$A9,$00,$8D,$22,$21,$A9,$00,$8D,$2C,$21,$A9,$0F,$8D,$00
     db $21,$A2,$00,$AD,$12,$42,$10,$FB,$AD,$12,$42,$30,$FB,$E8,$E0,$1E

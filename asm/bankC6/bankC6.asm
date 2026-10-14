@@ -100,9 +100,11 @@ C6Scene_UnpackObjPackA:
     RTL
 
 ; $C6:E04D — C6Scene_UnpackPalPackA (37 bytes, $E04D–$E071)
-; Script routine (right after C6Scene_UnpackObjPackA in each of its
-; scripts: pack 0 +$120D, pack 2 +$02A5 and +$08B0, pack 3 +$0308, pack
-; 4 +$0D3D and +$113C, pack 5 +$021F and +$02CA, pack 6 +$0A25): unpacks
+; Script routine (pack 0 +$120D, pack 2 +$02A5 and +$08B0, pack 3 +$0308,
+; pack 4 +$0D3D and +$113C, pack 5 +$021F and +$02CA, pack 6 +$0A25;
+; each two script ops after an object unpack, an op $03 on $7F:9000 and
+; an op $38 wait between: C6Scene_UnpackObjPackB at pack 4 +$0D3D,
+; C6Scene_UnpackObjPackA at the others): unpacks
 ; entry C6Scene_PalPackA of C2SceneRom_PalettePacks into
 ; C2Scene_PaletteStage.
 ; Entry: M=1, X=0, DP any (no direct page), DB=$00 (Menu_Decomp* .w)
@@ -211,8 +213,9 @@ C6Scene_FadeGradInit:
 ; Script routine (pack 3 +$05CB): puts the task on the edge of a shape
 ; drawn as a table of 2-byte line entries (left edge, right edge, by the
 ; use; pack 3 sets C2Tmp_10-$12 to $7E:9176 with op $13 just before,
-; and .Var22 to 4). Takes two RandomTable bytes at C2Scene_Unk1B30 (which
-; goes up by 2): with the first, r = byte x .Var22 / 256 (WRMPYA/B),
+; and .Var22 to 4). Takes two RandomTable bytes at C2Scene_Unk1B30 (an
+; 8-bit index, read and stored with X=1, so it goes up by 2 and wraps
+; at 256): with the first, r = byte x .Var22 / 256 (WRMPYA/B),
 ; rounded up when the product's low byte has bit 7 set and then lowered
 ; by one when it reached .Var22, so 0 to .Var22 - 1; .SprY = r +
 ; C6Scene_EdgeLineBase. .SprX is the left edge (second byte's bit 7
@@ -223,7 +226,7 @@ C6Scene_FadeGradInit:
 ;        multiplier .w); C2Tmp_10-$12 = the table
 ; Exit:  M=0, X=0; X = the task; Y = C2Tmp_08; A = the new .SprX;
 ;        C2Tmp_00 = the second random byte (8-bit),
-;        C2Tmp_08 = (.SprY - 8) x 2 (word); C2Scene_Unk1B30 + 2
+;        C2Tmp_08 = (.SprY - 8) x 2 (word); C2Scene_Unk1B30 + 2 (8-bit)
 ; No calls.
 !C6Scene_EdgeRand = !C2Tmp_00          ; 8-bit: the second random byte (bit 7: right edge)
 !C6Scene_EdgeOfs = !C2Tmp_08           ; 16-bit byte offset of the line's entry
@@ -600,7 +603,8 @@ C6Scene_Win1HdmaOnB:
 ; Script routine (pack 6 +$071A and +$08DF, each followed by
 ; C6Scene_Win2EllipseStep): sets up C2Scene_HdmaTable[1] (two runs of
 ; 112 lines) as HDMA channel 2 to WH2/WH3 (indirect, two registers) and
-; turns it on: C2Scene_Win2Init without its SEP #$20.
+; turns it on: C2Scene_Win2Init without its SEP #$20, and with RTL for
+; its RTS.
 ; C6Scene_Win2HdmaOnB ($C6:E470) is a byte-identical copy.
 ; Entry: M=1 (8-bit stores), X=0 (16-bit STY), DP=$0000 (TDC as zero,
 ;        C2Scene_HdmaenShadow), DB=$00 (the DMA registers .w)
@@ -637,8 +641,8 @@ C6Scene_Win2HdmaOn:
 ; bank $7E), which is then squeezed to half its height about line c =
 ; .SprY (the word): line c - 1 - k takes line c - 2 - 2k and line c + k
 ; takes line c + 1 + 2k, for k = 0 to r/2 - 1, and the r/2 + 1 lines past
-; each end are emptied (WinFx_EmptyEntry): an ellipse r wide and about
-; r/2 high, probably.
+; each end are emptied (WinFx_EmptyEntry): an ellipse about 2r wide and
+; r high (half-axes r and r/2), probably.
 ; Quirks, kept: the ADC that finds line c has no CLC (C = bit 15 of
 ; .SprY from the ASL, 0 for any line on screen); the copy loops count
 ; r/2 down with a 16-bit DEC and test only after it, so r below 2 would
@@ -849,7 +853,8 @@ C6Scene_Win2HdmaOnB:
 ; builds a circle from .SprX, .SprY and .Var22 (WinFx_ArgX/ArgY/ArgSize
 ; = Xc, Yc, r, written as words; bank $7E written as a word too, so
 ; $0359 = 0), then with n = .Var24:
-; - r = 0 (the circle routine empties the table): the n lines from
+; - r = 0 (tested on the whole .Var22 word, +$23 too; the circle
+;   routine empties the table): the n lines from
 ;   .SprY on get the entry (x, x), x = .SprX's low byte (the word
 ;   stored, then spread by an overlapping MVN of 2n - 1 bytes): a line
 ;   one pixel wide, probably;
@@ -1694,7 +1699,7 @@ C6Scene_MapCellPixels:
 ; and sets the view: .Angle 0, .Scale $80, .DepthA $A0, .DepthB $60,
 ; .CenterX $40, .CenterY $70, .Unk2E 0, .Ahead $70, .Tilt 0; then falls
 ; into the sub-entry C6Scene_PerspStep ($C6:E9F5; also called on its
-; own, pack 0 +$124C and 16 more sites to +$1483, most right after
+; own, pack 0 +$124C and 16 more sites to +$1483, 3 of them right after
 ; C6Scene_AddAngle): one frame of the view.
 ; - c = cos(.Angle) x .Scale and s = sin(.Angle) x .Scale (Trig_Cos1024
 ;   / Sin1024, magnitudes; their signs go to bits 0 and 1 of C2Tmp_10,
@@ -1945,13 +1950,13 @@ C6Scene_PerspQuadrants:
 
 ; $C6:EB23 — C6Scene_PerspTiltSteps (24 bytes, $EB23–$EB3A)
 ; The depth step t per line pair (8.8, so 0 to just under 1), read by
-; C6Scene_PerspStep at .Tilt (a byte offset; pack 0 steps it with op $0B
-; between turns). Rising faster towards the end, the last two $FF.
+; C6Scene_PerspStep at .Tilt (a byte offset; pack 0 steps it up with op
+; $0B and down with op $0C, e.g. +$1369, +$139B, +$1481, between turns). Rising faster towards the end, the last two $FF.
 C6Scene_PerspTiltSteps:
     db $00,$08,$11,$1A,$23,$2D,$36,$3F,$49,$53,$5D,$67
     db $71,$7C,$88,$93,$9F,$AC,$B9,$C8,$D6,$E6,$FF,$FF
 
-; $C6:EB3B — C6Scene_PerspQuad0 (458 bytes with C6Scene_PerspQuad1-3 and C6Scene_PerspTail, $EB3B–$ED04)
+; $C6:EB3B — C6Scene_PerspQuad0 (678 bytes with C6Scene_PerspQuad1-3 and C6Scene_PerspTail, $EB3B–$EDE0)
 ; The fills of C6Scene_PerspStep, one per quadrant (C6Scene_PerspQuad0
 ; and the sub-entries C6Scene_PerspQuad1 ($C6:EB96), C6Scene_PerspQuad2
 ; ($C6:EC09) and C6Scene_PerspQuad3 ($C6:EC7C), reached through
@@ -2356,8 +2361,11 @@ C6Scene_PerspDivide:
 
 ; $C6:EE23 — C6Scene_AddAngle (14 bytes, $EE23–$EE30)
 ; Script routine (pack 0 +$1248 and 14 more sites to +$146F, each before
-; C6Scene_PerspStep; the script sets C2Tmp_08/09 with op $13 first, e.g.
-; $FFFE): .Angle (+$22) + C2Tmp_08.
+; C6Scene_PerspStep): .Angle (+$22) + C2Tmp_08. The script sets C2Tmp_08
+; first with op $13 (C2Script_SetRamByte); at 3 sites (+$1248, +$1265,
+; +$1311) it sets C2Tmp_09 to $FF with op $13 too ($FFFE, $FFFE, $FFFF),
+; at the other 12 (e.g. +$129B, +$12B3) it clears C2Tmp_09 with op $10
+; (C2Script_ClearRamByte), so a turn of +2 to +9.
 ; Entry: M any (REP #$20 here), X=0, DP=$0000 (C2Tmp_08), DB=$00 (the
 ;        record .w); C2Scene_TaskCur = the task
 ; Exit:  M=0, X=0; X = the task; A = the new .Angle; Y unchanged
