@@ -68,17 +68,25 @@ HISTORY_CSV = SYMBOLS / 'progress_history.csv'
 DOCS = [Path('README.md'), Path('CONTRIBUTING.md'), Path('STATUS.md')]
 GENERATED_BLOCK = re.compile(r'<!-- (progress|status):start -->')
 
-# Code-byte denominators: re-surveyed only when the code/data boundary is.
-# A bank fully covered by source needs no survey: its code bytes are those
-# of its routines whose kind is code (functions.csv). $C0 is fully covered
-# (65,536 bytes) and its routines count 60,857 code bytes and 4,679 data
-# bytes; the one-off survey had 61,779 (it took some tables and fill for
-# code). CODE_BYTES['$C0'] is the counted figure, and CODE_BYTES_TOTAL moved
-# by the same difference (-922, from 359,278). $C1 is not fully covered yet
-# and keeps its survey. A bank whose matched code outgrows its survey is
-# reported against the matched figure and flagged "survey low".
-CODE_BYTES_TOTAL = 358356
-CODE_BYTES = {'$C0': 60857, '$C1': 63904}
+# Code-byte denominators: symbols/code_survey.csv, one row per bank, written
+# by tools/code_survey.py (matched code, plus unmatched code found by a flow
+# trace from matched code and the vectors, plus an allowance for code reached
+# only through indirect jumps; SPC700 and compressed code are counted apart).
+# They change only when the survey is re-run, not as code gets matched. A bank
+# fully covered by source needs no survey: its code bytes are those of its
+# routines whose kind is code. A bank whose matched code outgrows its survey
+# is reported against the matched figure and flagged "survey low"; the total
+# moves by the same differences.
+CODE_SURVEY = SYMBOLS / 'code_survey.csv'
+
+
+def read_code_survey(path: Path = CODE_SURVEY) -> dict[str, int]:
+    """65816 code bytes per bank ('$C0': n, ...) from the survey ('#' lines are comments)."""
+    with path.open() as f:
+        return {r['bank']: int(r['code_bytes'])
+                for r in csv.DictReader(line for line in f if not line.startswith('#'))}
+
+
 # progress.json: 2 had bytes per level; 3 splits them into code_bytes and
 # data_bytes, adds surveyed_code_bytes and per-bank survey_low.
 SCHEMA = 3
@@ -279,17 +287,25 @@ def analyse() -> dict:
                           'code_bytes': code, 'data_bytes': data}
         return out
 
-    banks = sorted({f'${0xC0 + (o >> 16):02X}' for o in emitted} | set(CODE_BYTES))
+    survey = read_code_survey()
+    banks = sorted({f'${0xC0 + (o >> 16):02X}' for o in emitted})
     bank_rows = []
     for b in banks:
         rows = [f for f in functions if f['bank'] == b]
         levels = level_totals(rows)
-        surveyed = CODE_BYTES.get(b)
+        surveyed = survey.get(b)
         matched_code = levels['matched']['code_bytes']
-        bank_rows.append({'bank': b, 'code_bytes': max(surveyed, matched_code) if surveyed else None,
+        emitted_b = sum(1 for o in emitted if f'${0xC0 + (o >> 16):02X}' == b)
+        if emitted_b == 0x10000:
+            code = matched_code                 # fully covered: counted, not surveyed
+        elif surveyed is not None:
+            code = max(surveyed, matched_code)
+        else:
+            code = None
+        bank_rows.append({'bank': b, 'code_bytes': code,
                           'surveyed_code_bytes': surveyed,
-                          'survey_low': bool(surveyed) and matched_code > surveyed,
-                          'emitted_bytes': sum(1 for o in emitted if f'${0xC0 + (o >> 16):02X}' == b),
+                          'survey_low': surveyed is not None and matched_code > surveyed,
+                          'emitted_bytes': emitted_b,
                           **levels})
 
     slices = []
@@ -303,11 +319,14 @@ def analyse() -> dict:
             })
     for f in functions:
         del f['_start']
-    # A surveyed bank whose matched code outgrows its survey was surveyed
-    # low: its share is taken against the matched code, and so is the total.
-    excess = sum(b['code_bytes'] - b['surveyed_code_bytes'] for b in bank_rows if b['survey_low'])
-    return {'emitted_bytes': len(emitted), 'code_bytes': CODE_BYTES_TOTAL + excess,
-            'surveyed_code_bytes': CODE_BYTES_TOTAL,
+    # A bank fully covered by source is counted, and a surveyed bank whose
+    # matched code outgrows its survey was surveyed low: its share is taken
+    # against the matched code. The total moves by the same differences.
+    surveyed_total = sum(survey.values())
+    moved = sum(b['code_bytes'] - b['surveyed_code_bytes'] for b in bank_rows
+                if b['code_bytes'] is not None and b['surveyed_code_bytes'] is not None)
+    return {'emitted_bytes': len(emitted), 'code_bytes': surveyed_total + moved,
+            'surveyed_code_bytes': surveyed_total,
             'totals': level_totals(functions), 'banks': bank_rows,
             'slices': slices, 'functions': functions}
 
