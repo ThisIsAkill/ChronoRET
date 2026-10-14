@@ -1099,4 +1099,9 @@ if !constants_menu_inc == 0
 !Menu_MapRecMask = $00F0                 ; Menu_DrawCmdMapRec: record address bits ...
 !Menu_MapRecBase = $9000                 ; ... x 8 + this: the record's tilemap buffer
 
+; --- Sprite placement ---
+!Menu_SprTileCountMask = $000F           ; Menu_Spr.TileCount bits Menu_SprPlaceOam uses
+!Menu_SprHiFirstBit = $01                ; the first sprite's X-high bit in its high-table byte
+!Menu_SprTileRowBit = $10                ; tile bit 4: set then cleared to step 16x16 tiles in a 16-wide sheet
+
 endif

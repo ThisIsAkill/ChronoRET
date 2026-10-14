@@ -1060,7 +1060,8 @@ endstruct
                                          ; Menu_ReadSlotSummary calls Menu_SumPlace)
 !Menu_Tmp06 = $0006                      ; 16-bit scratch (absolute)
 !Menu_Unk0D2C = $0D2C                    ; 16-bit; Menu_Times64's last result
-!Menu_Unk0D2E = $0D2E                    ; 16-bit; zeroed by Menu_StartSprThread; use not traced
+!Menu_Unk0D2E = $0D2E                    ; 16-bit; zeroed by Menu_StartSprThread; added to every object's X
+                                         ; (Menu_SprPlaceOam)
 !Menu_Unk0D30 = $0D30                    ; 16-bit; likewise
 !Menu_Unk0D72 = $0D72                    ; 16-bit; bit 7 and Menu_SprUploads (its high byte) pick the
                                          ; WRAM tile buffer of Menu_SprUploadTiles
@@ -1081,14 +1082,15 @@ struct Menu_Spr $0000
 .FramePtr:      skip 3  ; 24-bit: the frame records
 .AnimFrames:    skip 2  ; bank-$E4 address of its animations' frame lists
 .AnimTimes:     skip 2  ; ... and time lists
-                skip 3
+.ScreenY:       skip 1  ; the sprites' base Y (Menu_SprPlaceOam)
+.ScreenX:       skip 2  ; ... and X (16-bit: bit 8 goes to the OAM high table)
 .Anim:          skip 1  ; animation (bits 0-6); bit 7: loop to .LoopFrame at the end
 .PrevAnim:      skip 1
 .Timer:         skip 1  ; frames left on this frame
 .AnimLen:       skip 2  ; entries per direction
 .Frame:         skip 1  ; index in the lists
 .Dir:           skip 1  ; 0-3: which quarter of the frame list
-.Flags18:       skip 1  ; bit 7: not animated; non-zero: Menu_UnkF871 not called
+.Flags18:       skip 1  ; bit 7: not animated; non-zero: Menu_SprPlaceOam not called
 .TileAttr:      skip 2  ; OAM tile (bits 0-8) and attributes (palette bits 9-11)
 .FrameListPtr:  skip 3  ; 24-bit (bank $E4) pointer to the frame numbers
 .TimeListPtr:   skip 3  ; ... and to the times
@@ -1218,3 +1220,12 @@ endif
 !Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText (use not traced)
 !Menu_Unk0DCC = $0DCC                    ; 16-bit; set to $6840 by Menu_DrawDescText (use not traced)
 !Menu_Unk0DD0 = $0DD0                    ; 16-bit; set to $0080 by Menu_DrawDescText; Menu_UnkFA49 reads it
+
+; --- Sprite placement (Menu_SprPlaceOam; absolute, DB=$7E) ---
+!Menu_SprHiMask = $0000                  ; 8-bit; the high-table bit of the sprite being placed
+!Menu_SprObjNum = $0002                  ; 16-bit; the object number n
+!Menu_SprEnd = $0004                     ; 16-bit; .FrameData bytes to place (sprites x 2)
+!Menu_SprX = $0006                       ; 16-bit; .ScreenX + Menu_Unk0D2E (high byte reshuffled: bit 7 = bit 8)
+!Menu_SprTile = $0008                    ; 16-bit; tile offset of the next sprite
+!Menu_SprOam = $0800                     ; Oam_LowTable entry 64: the objects' 4 entries each
+!Menu_SprOamHigh = $0910                 ; Oam_HighTable byte of entries 64-67 (+ n for object n)

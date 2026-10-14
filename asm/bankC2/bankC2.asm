@@ -31558,7 +31558,7 @@ Menu_SprTileCounts:
 
 ; $C2:F566 — Menu_SprResetChars (34 bytes, $F566–$F587)
 ; Objects 6 down to 0: .Id = n, .Anim = 0, .Flags18 = $40 (animated by
-; Menu_SprThread but not handed to Menu_UnkF871).
+; Menu_SprThread but not handed to Menu_SprPlaceOam).
 ; Callers (7 JSR sites): unmatched ($C2:AF50, $C2:B1D9, $C2:B3CA, $C2:B4A6, $C2:B687, $C2:BA52,
 ;   $C2:BBDE).
 ; Entry: M, X any (P and DP saved; SEP #$30 / REP #$20 here), DP any
@@ -31767,13 +31767,13 @@ Menu_StartSprThread:
 ; after its decrement, the sub-entry Menu_SprNextFrame ($C2:F69B: .Frame
 ; + 1, then Menu_SprAnimate) runs, but only while Menu_SprUploads is
 ; below Menu_SprUploadMax (the rest wait a frame); then, with .Flags18
-; 0, Menu_UnkF871. Then Menu_Yield and again.
+; 0, Menu_SprPlaceOam. Then Menu_Yield and again.
 ; Callers note: started by Menu_StartSprThread (Menu_StartThread).
 ; Entry: Menu_SprThread from Menu_RunThreads (M=0, X=0, DP=$0000,
 ;        DB=$7E); Menu_SprNextFrame as Menu_SprAnimate
 ; Exit:  Menu_SprThread never returns; Menu_SprNextFrame as
 ;        Menu_SprAnimate
-; Calls: Menu_SprNextFrame, Menu_UnkF871, Menu_Yield.
+; Calls: Menu_SprNextFrame, Menu_SprPlaceOam, Menu_Yield.
 Menu_SprThread:
     REP #$30
     PEA.w !Menu_SprPages
@@ -31800,7 +31800,7 @@ Menu_SprThread:
 .draw:
     LDA.b Menu_Spr.Flags18
     BNE .next
-    JSR Menu_UnkF871
+    JSR Menu_SprPlaceOam
 .next:
     REP #$21                            ; (also C=0)
     TDC
@@ -32107,6 +32107,104 @@ Menu_SprUploadTiles:
     STA.w !Menu_SprVramRec+Menu_VramRec.Size+1
     LDX.w #!Menu_SprVramRec
     JSR Menu_QueueVramWram
+    PLP
+    RTS
+
+
+; $C2:F871 — Menu_SprPlaceOam (148 bytes, $F871–$F904)
+; Places object n's sprites (DP = its page, n = (DP - Menu_SprPages) /
+; $40) in the OAM copy from entry 64 + 4n (Menu_SprOam + 16n): .TileCount
+; x 4 16x16 sprites, each at the object's .ScreenX + Menu_Unk0D2E plus
+; the sprite's signed X offset, .ScreenY + its Y offset + Menu_Unk0D30
+; (the offset pairs are .FrameData), tile word .TileAttr + 0, 2, 4 ...
+; $0E, $20, $22 ... (the next 16x16 tile of a 16-tile-wide sheet each
+; time). When bit 8 of the X sum is set, the sprite's X-high bit is set
+; in high-table byte Menu_SprOamHigh + n (bits 0, 2, 4, 6; never
+; cleared here). Only 4 sprites fit those bits and entries: from the
+; fifth on (.TileCount 2 and up) the mask has shifted out and the
+; entries are the next objects' (which place theirs later in
+; Menu_SprThread's loop).
+; Callers (1 JSR site): Menu_SprThread ($C2:F687).
+; Entry: M, X any (P saved; REP #$20 / SEP #$30 / REP #$30 here), DP =
+;        the object's page (the TDC needs it), DB=$7E (the OAM copy and
+;        Menu_SprHiMask ... are absolute)
+; Exit:  P restored; A, X, Y clobbered; Menu_SprHiMask, Menu_SprObjNum,
+;        Menu_SprEnd, Menu_SprX, Menu_SprTile ($0000-$0009) changed
+; No calls.
+Menu_SprPlaceOam:
+    PHP
+    REP #$20
+    TDC
+    LSR A
+    LSR A                               ; low byte: n x 16
+    SEP #$30
+    TAY
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.w !Menu_SprObjNum
+    STZ.w !Menu_SprObjNum+1
+    REP #$30
+    LDA.b Menu_Spr.TileCount
+    AND.w #!Menu_SprTileCountMask
+    ASL A
+    ASL A
+    ASL A                               ; x 4 sprites x 2 bytes of offsets
+    STA.w !Menu_SprEnd
+    STZ.w !Menu_SprTile
+    LDA.b Menu_Spr.ScreenX
+    ADC.w !Menu_Unk0D2E                 ; (C=0 from the ASL)
+    STA.w !Menu_SprX
+    SEP #$20
+    LSR.w !Menu_SprX+1
+    ROR.w !Menu_SprX+1                  ; bit 7 = the X sum's bit 8
+    LDX.w #0
+    LDA.b #!Menu_SprHiFirstBit
+    STA.w !Menu_SprHiMask
+.sprite:
+    LDA.w !Menu_SprX
+    CLC
+    ADC.b Menu_Spr.FrameData,X          ; X offset
+    STA.w !Menu_SprOam,Y
+    ROR A                               ; bit 7 = the carry
+    EOR.b Menu_Spr.FrameData,X          ; ... with the offset's sign
+    EOR.w !Menu_SprX+1                  ; ... and X bit 8: the sum's bit 8
+    BPL .y
+    PHY
+    LDY.w !Menu_SprObjNum
+    LDA.w !Menu_SprOamHigh,Y
+    ORA.w !Menu_SprHiMask
+    STA.w !Menu_SprOamHigh,Y
+    PLY
+.y:
+    LDA.b Menu_Spr.ScreenY
+    CLC
+    ADC.b Menu_Spr.FrameData+1,X        ; Y offset
+    CLC
+    ADC.w !Menu_Unk0D30
+    STA.w !Menu_SprOam+1,Y
+    REP #$21
+    LDA.w !Menu_SprTile
+    ADC.b Menu_Spr.TileAttr
+    STA.w !Menu_SprOam+2,Y
+    REP #$21
+    TYA
+    ADC.w #4
+    TAY
+    SEP #$20
+    LDA.w !Menu_SprTile
+    ORA.b #!Menu_SprTileRowBit
+    INC A
+    INC A
+    AND.b #~!Menu_SprTileRowBit
+    STA.w !Menu_SprTile
+    ASL.w !Menu_SprHiMask
+    ASL.w !Menu_SprHiMask
+    INX
+    INX
+    CPX.w !Menu_SprEnd
+    BCC .sprite
     PLP
     RTS
 
