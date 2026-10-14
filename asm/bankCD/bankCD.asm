@@ -9754,7 +9754,10 @@ BattleCD_FxLineDeltas:
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = the slot, B = 0 (the 16-bit TAXs)
 ; Exit:  size AND $7F = 0: M=1, X=0; A = 0; X = the slot; Y unchanged.
 ;        Else as the handler leaves it (each one: M=1, X=0; A = 0, B =
-;        0; X, Y clobbered)
+;        0; X, Y clobbered); with the half widths, the builder and the
+;        copy together: DP $45-$4D and $4F-$51 written ($52 too after a
+;        cut at the top: the builders write $4D, unlike the copies),
+;        and WMADD moved
 BattleCD_FxDrawShape:
     STA.w !Battle_FxShapeSlot
     JSR BattleCD_FxCircleHalfWidths
