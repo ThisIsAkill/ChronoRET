@@ -37,7 +37,7 @@ org $FFF548
 ;     traced); then zeroes the first 16 bytes of Menu_TileSetC.
 ; Menu_Unk51 is the start offset of both output loops, and of the glyph
 ; reads of the second (the caller keeps it 0, probably; not traced).
-; Callers (1 JSL site): unmatched ($C2:DB5B).
+; Callers (1 JSL site): Menu_ShopInit ($C2:DB5B).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_Tmp00-07,
 ;        Menu_Unk51), DB any (the first MVN sets $7E before the absolute
 ;        accesses)
@@ -168,7 +168,7 @@ BankFF_BuildTileSets:
 ; AND #$0700; DP $01 is not used): Menu_PalBuf + $122 + n * 32 (colours
 ; $91-$9C of palette 9 + n). When DP $02's high byte is non-zero each colour is
 ; halved first ((colour >> 1) & $3DEF).
-; Callers (2 JSL sites): unmatched ($C2:E038, $C2:E093).
+; Callers (2 JSL sites): Menu_ShopToMembers ($C2:E038) and Menu_ShopDimMembers ($C2:E093).
 ; Entry: M, X any (P and X saved; REP #$30 here), DP=0 (Menu_Tmp00 and
 ;        Menu_Tmp02: the arguments), DB=$7E (Menu_PalDirty; the halved
 ;        path stores with STA abs,Y)
@@ -706,8 +706,9 @@ BankFF_UnkF958:
 ; !Menu_Unk29AF and the tech bytes). Read (long addressing; these are
 ; all nine references in the ROM) by Menu_CmdJoin ($C2:8C95),
 ; Menu_CanEquip (AND.l at $C2:93B8), BankFF_UnkF813 ($FF:F85A,
-; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), and in unmatched
-; code: LDA.l at $C2:BC07 and $C2:BCD0, AND.l at $C2:CD59. Entry 8 (0)
+; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), Menu_TechPartners
+; (LDA.l at $C2:BC07), Menu_TechListBytes (LDA.l at $C2:BCD0), and in
+; unmatched code: AND.l at $C2:CD59. Entry 8 (0)
 ; is reached by BankFF_UnkF813 when bit 0 of a Menu_TechShown byte is
 ; set (its bit search starts at 8 and stops at the first set bit).
 BankFF_CharBits:
@@ -858,7 +859,7 @@ BankFF_SaveRecords:
 ; Loads slot Menu_SlotIdx back: the same BankFF_SaveRecords blocks, read
 ; from SRAM (Menu_NmiMoveCode as MVN from bank $30, destination bank
 ; patched per record), from the slot's offset on. No checksum test here.
-; Callers (1 JSL site): unmatched ($C2:E657).
+; Callers (1 JSL site): Menu_Mode0EH1 ($C2:E657).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_SlotIdx,
 ;        Menu_SlotSramOfs, Menu_Tmp00, Menu_Unk51), DB=$7E (absolute RAM)
 ; Exit:  P restored; DB=$7E; A, X, Y, DP $00-$01 and $7B clobbered;
@@ -912,7 +913,7 @@ BankFF_LoadSlot:
 ; inventory slot (of $F2) whose item has Menu_ItemInfo0 bit 4, and sets
 ; Menu_Unk7F01CF to $10. Probably the start of a new game from a cleared
 ; save (items and names kept, equipment reset); not traced.
-; Callers (1 JSL site): unmatched ($C2:E6D8).
+; Callers (1 JSL site): Menu_Mode0EH2 ($C2:E6D8).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_SlotIdx,
 ;        Menu_SlotSramOfs, Menu_Tmp00-05, Menu_ListPtr, Menu_Unk51),
 ;        DB=$7E (absolute RAM)
@@ -1097,7 +1098,7 @@ BankFF_SlotChecksum:
 ; registers channel 1 writes is not set here (the values fit CGADSUB /
 ; COLDATA: colour math adding, then subtracting, a fixed colour stepping
 ; down and up; probably).
-; Callers (1 JSL site): unmatched ($C2:E503).
+; Callers (1 JSL site): Menu_NameInit ($C2:E503).
 ; Entry: M, X any (P saved; REP #$30 then SEP #$30 here), DP=0
 ;        (Menu_Tmp00-02), DB=$7E (Menu_GradHdma is absolute; A1T1L long)
 ; Exit:  P restored; A, X, Y and DP $00-$02 clobbered

@@ -628,14 +628,101 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_Mode01H1`, `H2`, `H3`, `Menu_EquipItemIdle`, `Menu_Icon0Redraw`, `Menu_Mode01Init`,
    `Menu_DrawMemberStatus`, `Menu_EquipSlotsClose`, `Menu_EquipItemsOpen`, `Menu_EquipListSetup`.
    Stubs added: `Menu_UnkB83E` (the HP / MP item's member cursor, in mode 3's range),
-   `Menu_VramRecBg3Rows0` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
+   `Menu_VramRecBg3Rows62` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
    slide HDMA tables feed; what `Menu_ItemInfo0` bit 3, the `$FF:B310` strings, record bytes
-   $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean. Still unmatched in bank $C2: $B35D-$BF34
-   (mode 3), $BF3D-$C510 (mode 4), $C550-$C620, $C627-$C7A5, $C7AC-$CED3, $CEDC-$D155 (modes 5-7),
-   $D32C-$D4EF, $D4F8-$D518, $D52B-$E1E2, $E1ED-$E60A, $E613-$E91A (modes $0B-$0E), $F905-$F90B,
-   $F943-$FC6E (`Menu_UnkFA49` and the VRAM records), $FCA6-$FE09 and $FE0C-$FFFF. Next in reach
-   order: mode 3 from `Menu_UnkB83E` ($B35D on), `Menu_UnkFA49` with the VRAM records, then modes
-   4-7 (`BankFF_UnkF9C4`/`F813`/`F958` are matched: item 9).
+   $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean.
+   Also matched (branch match-c2-modes34): mode 3, the tech screen, $C2:B35D-$BF34 (handlers
+   `Menu_Mode03H0`-`H4`, `Menu_Mode03Init`, `Menu_Icon2Preview`/`Redraw` (were `Menu_UnkB8DA`/
+   `B960`); the member window with its scroll `Menu_TechMemberScroll`/`ScrollAnim` and page
+   (`Menu_TechPage`, Left / Right: tech bytes 0-6, 7-21, 22-36 of `Menu_TechShown` by
+   `Menu_TechPages`, probably single / double / triple); the list `Menu_TechBuildList`
+   (`Menu_TechListBytes`, `Menu_TechListIds`, `Menu_TechFirstIds`), its rows, scroll and names
+   (`$CC:15C4`, 11 bytes); the MP cost `Menu_TechMpCost` (`$CC:253B`, combos through the bytes
+   `BankFF_UnkF813` builds at `Menu_TechMenuArea`) with `Menu_TechCostCut` (accessories $A2 halve,
+   $A3 quarter it); the combo partners `Menu_TechPartners`; the description through
+   `Menu_TechDescText`; the use of a tech with `Menu_TechInfo` (= `Menu_ItemInfo0` by tech id) bit 7
+   as the items' HP / MP restore (`$CC:2140` 12-byte records, `$CC:1ACB` target bit, the caster's
+   `.Derived+3` as the amount, the caster's copy object 7 animating), and `Menu_UseTargetCursor` /
+   `Menu_UseTargetCheck` (was the stub `Menu_UnkB83E`, shared with the items)); mode 4, the
+   settings screen, $C2:BF3D-$C510 (handlers `Menu_Mode04H0`-`H3`, `Menu_Mode04Init`,
+   `Menu_Icon3Preview`/`Redraw` (were `Menu_UnkC2FF`/`C397`), `Menu_CfgEntryRun` with
+   `Menu_CfgEntryTable` and its 12 entry routines over `Menu_CfgA3`-`Menu_CfgBMid`, the button map
+   editor `Menu_CfgMapCursor`/`Assign`/`Set`/`Swap`/`FixPages` with its clash lists, the marks,
+   selectors and entry icon); and $C2:F943-$FC6E: the text threads (`Menu_CfgEntryText` with
+   `Menu_CfgTextThread`/`Menu_CfgValueThread`, `Menu_StartDescText` (was `Menu_UnkFA49`) with
+   `Menu_DescTextThread`, the step loop `Menu_TextStepLoop` and `Menu_TextUpload`), the tile word
+   writers `Menu_PutTextTiles`/`Menu_PutTextTilesAttr` and all 23 VRAM records there (the stubs
+   `Menu_VramRecClock` ... `Menu_VramRecDigits` are real labels now). Found: slot 2 is the text
+   thread (`Menu_TextSlotBit`); `$0D18` in mode 3 is `Menu_RepeatFast`; `Menu_Unk0DC9`/`0DCC`/
+   `0DD0` are the text steps per frame, the text rows' VRAM address and size; `Menu_CfgButtonMap`
+   (`Menu_Unk0408`) is the map `Menu_CfgA4` selects. Quirks recorded: `Menu_TechDrawMembers` draws
+   the empty rows as many times as the rows drawn (not 3 minus them); `Menu_TechTargetRows` reads
+   `Menu_Unk0D38` by member row, not character; `Menu_TechMpCost` stores a word on pages 1-2;
+   `Menu_TechFirstIds`' last end is `Menu_TechPages`' first byte; `Menu_CfgMapClashPtrs` has 7
+   pointers for 8 lists, so an index of 7 reads `$C2:0107` (`Menu_CfgMapClash7` unreferenced);
+   `Menu_CfgToggleInvert`'s 11th byte is only a word's high byte; `Menu_VramRecTechLow`'s last byte
+   is an opcode. Re-review needed (verified headers or sources edited): `Menu_MainPreviewTable`,
+   `Menu_MainRedrawTable` (the icon 2/3 names), `Menu_UseItem`, `Menu_UseHealItem` with
+   `Menu_UseTargets` (the `Menu_UseTargetCursor` name), `Menu_DrawDescText` (the
+   `Menu_StartDescText` name; its Entry DP is $0000, needed by `Menu_StartThread`) and
+   `BankFF_CharBits` (two readers now matched). Stubs added: `Menu_UnkC54F` (its first byte is
+   `Menu_WindowVramRec`'s last: the map applied to `Menu_ButtonMap` and drawn), `Menu_UnkC57A`,
+   `Menu_UnkC5C7`. Open: what the settings bytes do in the game, sound command $F3
+   (`Menu_SoundCmdF3`, also sent by the load screen; probably stereo / mono), `Menu_CfgEntryByte`
+   entry 5 ($0D91), `Menu_TechUnk0F4E/0F51/0F73`, the draw lists of modes 3 and 4, `MenuRom_TechData`'s other bytes, the unreferenced VRAM records' users.
+   Also matched (branch match-c2-modes0b): menu modes $0B-$0E, $C2:D4F0-$C2:E913. Mode $0B
+   (`Menu_Mode0BH0`/`H1`; handlers 2-3 are mode 6's) is mode 6's save screen with a cancel that
+   leaves the menu, probably a save point's. Mode $0C is the shop ($C2:D52B-$C2:E1E2:
+   `Menu_Mode0CH0`-`H8`, `Menu_ShopInit`, the buy / sell lists
+   `Menu_ShopBuyOpen`/`SellOpen`/`BuyMove`/`SellMove`/`SellBuild`/`*DrawRow(s)`/`ShiftMap`, the
+   count window `Menu_ShopQtyOpen`/`QtyStep`/`QtyRight` (with `QtyLeft`/`Up`/`Down`)/`QtyClose`, the
+   member info `Menu_ShopMemberInfo`/`MemberNums`/`NumPair`, and a built-in equip view
+   `Menu_ShopEquipOpen`/`EquipNext`/`SlotRows`/`TryItem`/`Compare`). Mode $0D is the name entry
+   ($C2:E1ED-$C2:E60A: `Menu_Mode0DH0`-`H4`, `Menu_NameInit`, the grid steps, `Menu_NameFinish` with
+   `Menu_NameTrim`/`NameTaken`, and the choice before the first name,
+   `Menu_NameChoiceInit`/`ChoiceText`). Mode $0E is the title's load screen ($C2:E613-$C2:E913:
+   `Menu_Mode0EH0`-`H3`, `Menu_LoadInit`, `Menu_LoadCursor`, `Menu_LoadAskSlot`, the erase question
+   `Menu_LoadEraseOpen`/`EraseSlot`). Found: the `Menu_ItemInfo1` word is probably the price (sell
+   price half of it rounded up; buy price x `Menu_PriceFactor` / 256 rounded up, 1-65000);
+   `Menu_Unk2C53` is the gold (the 9,999,999 cap at $C2:FDDF); `Menu_ItemInfo0` bit 2 keeps an item
+   off the sell list; `Menu_EquipChars`/`Menu_EquipFlags` are the shop's member list; $0D0B is
+   BG2VOFS' high byte (`Menu_ScrollShadow`+7); `Menu_Unk0D4C` is row 3's validity on the load
+   screen; `Menu_NamedOnce` (Menu_Config+$0F) is zero only before the first name entry, whose first
+   choice sets or clears Menu_Config bit 6 (probably the battle mode); pad 2 holding Select and
+   Start on the load screen erases a slot; `Menu_SramUnk7FE2` enables a second choice on the load
+   screen's row 3 that loads part of a slot before a new game (probably New Game+). Quirks recorded:
+   `Menu_LoadEraseOpen`'s never-taken BCS; `Menu_ShopMemberSprites`' always-taken BCC and 16-bit
+   read of `Menu_CurMember` with $0072; `Menu_NameFinish` leaving the old name's first byte 0 when a
+   name is refused; `Menu_ShopShiftMap` reading the step's sign as bit 15 of the word at
+   `Menu_ScrollStep`-1; `Menu_ShopSellDrawRow`'s word store of `Menu_ItemId` (zeroes `Menu_Unk04CA`)
+   and its cut 16-bit ADC; `Menu_ShopQtyLeft`'s limit test that cannot fail; `Menu_ShopMemberInfo`'s
+   word store to `Menu_EquipSlotIdx`; `Menu_ShopQtyClose` setting `Menu_ShopLast` from the A an MVN
+   leaves; `Menu_NameInit`'s second `Menu_DrawString` from past the end of the grid text;
+   `Menu_ShopInit` filling 11 words of `Menu_Unk5D42` (icon 0 fills 12). Re-review needed (verified
+   headers edited, "not analysed" now false): `Menu_Mode0BList`, `Menu_Mode0CList`,
+   `Menu_Mode0DList`, `Menu_Mode0EList`. Stubs added: `Menu_Mode06H1Confirm` ($CF0A),
+   `Menu_UnkCFA2`, `Menu_UnkCFFB`, `Menu_UnkD0E5`, `Menu_DrawSlotWindows` ($D10D), `Menu_UnkD32C`,
+   `Menu_UnkD36C` (in the remaining $D32C-$D4EF), the shop's
+   `Menu_ShopBuyQtyInit`/`SellQtyInit`/`GainGold`/`PayGold` and `Menu_UnkFD58`/`FD68` ($FCB2-$FE09).
+   The tile strip writers and nine VRAM records this branch had as stubs are matched by
+   match-c2-modes34, and the merge points the calls at those labels: `Menu_DrawTileStrip`/`Attr` are
+   `Menu_PutTextTiles`/`Attr`;
+   `Menu_VramRecBg1Map`/`Bg1Row16`/`Bg1Row24`/`Bg2Row2`/`Bg3Row3`/`Labels`/`Tiles1800`/`RomEB88` are
+   `Menu_VramRecBg1Big`/`Bg1Rows16`/`Bg1Rows24`/`Bg2Rows2`/`Bg3Rows3`/`UnkFC53`/`UnkFC61`/`RomTiles`
+   (`Menu_VramRecBg3Full` kept its name); `Menu_VramRecBg3Rows0` is `Menu_VramRecBg3Rows62` and
+   `Menu_UnkFA49` is `Menu_StartDescText`; the defines
+   `Menu_NameTextBuf`/`NameTextBytes`/`NameTextVram`/`LoadSoundCmd` are
+   `Menu_TextGfxA`/`TextGfxBytes`/`TextTileDestA`/`SoundCmdF3`. Re-review needed after the merge
+   (verified headers edited, their loaders now named): `Menu_VramRecUnkFC53`, `Menu_VramRecUnkFC61`.
+   Of the modes $0B-$0E ranges only $D32C-$D4EF (mode 6's slot window and details,
+   `Menu_UnkD32C`/`D36C` with $D466, the tables at $D45F/$D4B4 and $D4BB/$D4D5, reached from modes 6
+   and $0E) and $E914-$E91A (an unreferenced 7-byte VRAM record: VRAM $5840 = $7E:2E80, $80 bytes)
+   are left. Open: what cursor C on record `Menu_ShopRecCursorC` marks; who sets `Menu_PriceFactor`;
+   readers of `Menu_NameUnk0F0A`/`0F0B`; the shop's and name screen's draw lists and HDMA bits.
+   Still unmatched in bank $C2: $C550-$C620 (mode 4's button map drawing), $C627-$C7A5, $C7AC-$CED3,
+   $CEDC-$D155 (modes 5-7), $D32C-$D4EF, $E914-$E91A, $F905-$F90B, $FCA6-$FE09 and $FE0C-$FFFF. Next
+   in reach order: `Menu_UnkC54F`-`C5C7` (the routine at $C54F starts on `Menu_WindowVramRec`'s last
+   byte), then modes 5-7 with $D32C-$D4EF (also reached from mode $0E) and the shop's $FCB2-$FE09.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:

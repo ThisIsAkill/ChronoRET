@@ -995,6 +995,69 @@ struct C2Scene_SwirlTask $0000
             skip $26
 endstruct
 
+; --- Menu modes $0B-$0E: the shop (mode $0C) ---
+!Menu_ShopIds = $1000                    ; 32 B: the shop's item ids (0 ends the list), from MenuRom_ShopLists
+!Menu_ShopHeld = $1020                   ; 32 B: per shop item, the count of its first inventory slot (0: none)
+!Menu_ShopBuyRow = $1040                 ; 8-bit; the buy list's cursor row (kept with Menu_CfgA5)
+!Menu_ShopBuyTop = $1041                 ; 8-bit; ... and its top entry
+!Menu_ShopSellRow = $1042                ; 8-bit; the same for the sell list
+!Menu_ShopSellTop = $1043                ; 8-bit
+!Menu_ShopPrice = $1044                  ; 24-bit: the price shown in a list row, then the count's total
+!Menu_ShopPriceHi = $1046                ; 8-bit; its third byte
+!Menu_ShopUnitPrice = $1047              ; 16-bit; the price of one (Menu_ShopBuyQtyInit / SellQtyInit)
+!Menu_ShopSellLen = $1049                ; 8-bit; entries of the sell list (Menu_ShopSellBuild)
+!Menu_ShopBuyLen = $104A                 ; 8-bit; entries of the buy list (Menu_ShopCountIds)
+!Menu_ShopMemberCount = $1055            ; 8-bit; members Menu_ShopListMembers put in Menu_EquipChars
+!Menu_ShopBuyPrices = $6E00              ; a word per item id: the buy price (Menu_ShopCalcPrices)
+!Menu_SellIds = $5600                    ; the sell list's ids (Menu_ShopSellBuild; 0 ends it)
+!Menu_SellCounts = $5700                 ; ... and their counts
+!Menu_ShopSavedPos = $9990               ; $48 B: Menu_CursorPos records 0-11 saved by Menu_ShopInit
+!Menu_PriceFactor = $7F01CD              ; 16-bit; the buy prices' factor in 256ths (Menu_ShopCalcPrices;
+                                         ; probably set per shop by the caller; not traced)
+!Menu_ShopQuot = $0036                   ; 3 B: the quotient Menu_ShopBuyQtyInit / SellQtyInit leave (the most
+                                         ; the gold pays for / can still take)
+!Menu_ShopProduct = $003E                ; 4 B: Menu_UnkFD58 / Menu_UnkFD68's product (probably)
+!Menu_ShopMulArg = $0004                 ; 3 B: the multiplicand of Menu_UnkFD68 (a price)
+!Menu_ShopMulLen = $0002                 ; 8-bit; its byte count (2 or 3)
+!Menu_ShopAttrArg = $0002                ; 16-bit; Menu_ShopMemberAttr's A: tiles per row (low byte) and
+                                         ; the attribute bits to set (high byte)
+!Menu_ShopIndex = $0004                  ; 16-bit; Menu_ShopToMembers' member index
+!Menu_ShopRow = $0022                    ; 8-bit; a shop list's row (or member) counter
+!Menu_ShopSlotOfs = $0022                ; 16-bit; Menu_ShopMemberInfo's record offset of the item's slot
+!Menu_ShopInfoOfs = $0061                ; 16-bit; Menu_ShopMemberInfo's map offset of the member (8 a member)
+!Menu_ShopLast = $0083                   ; 8-bit; the list entry shown last (the member info is redrawn on a
+                                         ; change; $FF: none), or the count before a step (Menu_ShopQtyStep)
+!Menu_ShopMemberSel = $0079              ; 8-bit; the member sprites' cursor record, kept for handler 6
+!Menu_ShopMenuSel = $0080                ; 8-bit; the top row's cursor record, kept while handler 6 runs
+!Menu_ShopListSel = $007F                ; 8-bit; the list's cursor record, kept while the count window shows
+
+; --- Menu modes $0B-$0E: the name entry (mode $0D) and the load screen (mode $0E) ---
+!Menu_NameBuf = $0F00                    ; 6 B: the name being entered (from the character's, then edited)
+!Menu_NameLen = $0F06                    ; 8-bit; characters entered (0-5; zeroed as a word with $0F07)
+!Menu_NameCol = $0F08                    ; 8-bit; the grid cursor's column (0-9) ...
+!Menu_NameRow = $0F09                    ; 8-bit; ... and row (0-7)
+!Menu_NameUnk0F0A = $0F0A                ; 8-bit; zeroed with each row step (reader not found)
+!Menu_NameUnk0F0B = $0F0B                ; 8-bit; the grid cursor's Y, as record 0's .Y (reader not found)
+!Menu_NameDest = $0F0C                   ; 16-bit; address of the character's 6 bytes in TextWin_CharNames
+!Menu_NamedOnce = $299F                  ; 8-bit, Menu_Config+$0F; ORed with the character in mode $0D's
+                                         ; handler 0 and then set to the HDMA bits (non-zero): zero only
+                                         ; before the first name entry
+!Menu_NameTrimmed = $9890                ; 6 B: Menu_NameTrim's result (the Menu_SprScratch RAM)
+!Menu_NameWork = $98A0                   ; 6 B: Menu_NameTrim's copy of Menu_NameBuf
+!Menu_NameGridText = $9890               ; Menu_NameGridBuild's string of the grid (the same RAM)
+!Menu_NamePrevPos = $007F                ; 16-bit; record 0's X and Y before a grid step
+!Menu_NameCursorOam = $0880              ; OAM copy entry 96 (X, Y, tile, attributes; entry 97 after it):
+                                         ; the two sprites Menu_NameCursorX places
+!Menu_LoadMsgShown = $0D84               ; 8-bit; non-zero while Menu_LoadAskSlot's question shows
+                                         ; (Menu_UnkD36C then draws no slot details)
+!Menu_LoadSavedRow = $0F00               ; 8-bit; the slot row under the erase question
+!Menu_LoadHiliteRow = $007F              ; 8-bit; the row + 1 AND 3 Menu_UnkCFFB reads (probably)
+!Menu_LoadMsgRows = $52C0                ; $100 B zeroed when the question goes
+!Menu_LoadDetailRows = $3200             ; $240 B zeroed by Menu_LoadCursor (a slot's details, probably)
+!Menu_LoadLineA = $5248                  ; 18 B copied from it (zeros) ...
+!Menu_LoadLineB = $5288                  ; ... and 18 more
+!Menu_EraseRec = $9890                   ; 8 B: the Menu_VramRec Menu_LoadEraseSlot builds and queues
+
 ; --- The menu's NMI (Menu_Nmi): dp offsets from Menu_NmiDp ($0D00) ---
 !Menu_NmiFrames = $00                    ; 8-bit; +1 every menu NMI
 !Menu_FrameReady = $01                   ; 8-bit; bit 7 clear: the NMI runs the upload (Menu_NmiUpload) and
@@ -1168,7 +1231,8 @@ endstruct
 !Menu_SumPlace = $0022                   ; 16-bit; its SRAM offset of the party place (low byte stepped)
 !Menu_SumLeft = $0024                    ; 8-bit; places left
 !Menu_SlotValid = $0D49                  ; 3 B: 1 when the slot passed BankFF_UnkF9C4, else 0
-!Menu_Unk0D4C = $0D4C                    ; 8-bit; set to $FF by Menu_LoadSlotSummaries; use not traced
+!Menu_Unk0D4C = $0D4C                    ; 8-bit; set to $FF by Menu_LoadSlotSummaries; Menu_LoadCursor
+                                         ; reads it as row 3's Menu_SlotValid (the byte after them)
 !Menu_SlotWinStyle = $0D79               ; 3 B: each slot's window style (its Menu_Config01 AND 7)
 !Menu_SlotSummaries = $7600              ; 3 x $40 B: Menu_ReadSlotSummary's blocks
 !Menu_SlotTextBufs = $7000               ; 3 x $200 B: each slot's text (Menu_DrawSlotText)
@@ -1248,9 +1312,11 @@ endif
 !Menu_MapBank7E = $7E0000                ; long base of the tilemaps (bank $7E)
 !Menu_Unk0D77 = $0D77                    ; 8-bit; the string Menu_DrawDescText set up last
 !Menu_Unk0D78 = $0D78                    ; 8-bit; bit 7 set: Menu_DrawDescText sets up again (it zeroes it)
-!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText (use not traced)
-!Menu_Unk0DCC = $0DCC                    ; 16-bit; set to $6840 by Menu_DrawDescText (use not traced)
-!Menu_Unk0DD0 = $0DD0                    ; 16-bit; set to $0080 by Menu_DrawDescText; Menu_UnkFA49 reads it
+!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText: Menu_TextSteps (the same byte)
+!Menu_Unk0DCC = $0DCC                    ; 16-bit; VRAM word address Menu_TextUpload sends the text rows to
+                                         ; (set to $6840 by Menu_DrawDescText)
+!Menu_Unk0DD0 = $0DD0                    ; 16-bit; bytes of the text rows Menu_StartDescText clears and
+                                         ; Menu_TextUpload sends (set to $0080 by Menu_DrawDescText)
 
 ; --- Sprite placement (Menu_SprPlaceOam; absolute, DB=$7E) ---
 !Menu_SprHiMask = $0000                  ; 8-bit; the high-table bit of the sprite being placed
@@ -1384,3 +1450,79 @@ endif
                                          ; Battle_Unk7F01E0); BankFF_UnkF813 marks the next single tech of a
                                          ; character with its bit set without BankFF_TechStepLimit's check
 !Menu_Unk7F01CF = $7F01CF                ; 8-bit; set to $10 by BankFF_LoadSlotPart
+
+; --- Menu mode 3: the tech screen ---
+!Menu_TechPage = $0418                   ; 8-bit; mode 3's page 0-2 (Left / Right; Menu_TechPages: probably single,
+                                         ; double and triple techs); the last byte of Menu_Unk0415
+!Menu_TechMemberRow = $0419              ; 8-bit; the member window's cursor row 0-2 (the Menu_Unk0419 byte)
+!Menu_TechMemberTop = $041A              ; 8-bit; the member in its top row (the Menu_Unk041A byte)
+!Menu_TechList = $0F00                   ; the listed tech ids (Menu_TechListIds), $FF after the last
+!Menu_TechByteOf = $0F30                 ; per Menu_TechList entry: its Menu_TechShown byte
+!Menu_TechListRow = $0F48                ; 8-bit; the list cursor's row 0-7 (Menu_CursorSel in handler 3),
+                                         ; kept for the next visit
+!Menu_TechCount = $0F49                  ; 8-bit; techs in Menu_TechList
+!Menu_TechListTop = $0F4A                ; 8-bit; the Menu_TechList entry in list row 0
+!Menu_TechId = $0F4C                     ; 8-bit; the tech under the list cursor (or the row being drawn)
+!Menu_TechCaster = $0F4D                 ; 8-bit; the member using the tech (Menu_Mode03H3)
+!Menu_TechUnk0F4E = $0F4E                ; 8-bit; set to $FF by Menu_Mode03H3 (no reader in mode 3's code)
+!Menu_TechUnk0F51 = $0F51                ; 16-bit; Menu_TechMembers+1/+2 copied by Menu_TechDrawRows (no reader
+                                         ; in mode 3's code)
+!Menu_TechCostIdx = $0F6F                ; 3 B: per member window row, the Menu_TechMpCost index of its member
+!Menu_TechUnk0F73 = $0F73                ; 16-bit; set to $0F75 by Menu_TechDescText (no reader in mode 3's code)
+!Menu_TechBytesList = $9890              ; the tech bytes (Menu_TechShown indexes) Menu_TechListBytes lists, $FF
+                                         ; after (the Menu_SprScratch RAM)
+!Menu_TechCost = $9890                   ; 8-bit (a word on pages 1-2); the MP cost Menu_TechMpCost found last
+                                         ; (the same RAM, after the list is built)
+!Menu_TechInfo = $7700                   ; Menu_ItemInfo0 indexed by tech id (mode 3): bit 7 usable in the menu
+                                         ; (Menu_ItemInfo0Unk80), bit 6 BankFF_UnkF813's mark (Menu_TechInfoLearnt)
+!Menu_TechCostIdxs = $1607               ; Menu_TechMenuArea ($1640) - $39: per character ($40 B) and double /
+                                         ; triple tech id ($39 on), its MenuRom_TechCosts index (Menu_TechMpCost)
+!Menu_TechMembers = $0016                ; 3 B: [0] the caster's character, [1]-[2] the partners a tech needs ($FF:
+                                         ; none); Menu_ListPtr's bytes (Menu_TechPartners)
+!Menu_TechSprRow = $0022                 ; 16-bit; the member row Menu_TechRowSprite places a sprite in (0-2; 3
+                                         ; above the window, 4 below)
+!Menu_TechScrollWord = $0024             ; 16-bit; the word Menu_TechMemberScrollAnim steps (as
+                                         ; Menu_RowScrollWord in mode 1)
+!Menu_TechRowsLeft = $0024               ; 16-bit; Menu_TechDrawMembers' row count
+!Menu_TechRowIdx = $0071                 ; 16-bit; Menu_TechDrawRows' row 0-2 (the Menu_CurMember byte and the next)
+!Menu_Unk0D5E = $0D5E                    ; 8-bit; Menu_TechDrawMemberRow: 4 when the member's MP is below
+                                         ; Menu_TechCost, else 0 (probably a colour byte for MenuRom_TechRowList)
+!Menu_TechTargetsBg3 = $5DE0             ; 12 tile words (Menu_Unk5DC2+$1E): $20C7 while the target window is
+                                         ; open, zeroed when it closes
+!Menu_TechUseCost = $0F4F                ; 8-bit; the MP cost of the tech being used (Menu_Mode03H3), taken from
+                                         ; the caster's MP after each use (Menu_Mode03H4)
+
+; --- Menu mode 4: the settings screen ---
+!Menu_CfgCursor = $0417                  ; 8-bit; mode 4's entry (cursor record 0-11), kept for the next visit (a
+                                         ; byte of Menu_Unk0415)
+!Menu_CfgPrevCursor = $007F              ; 8-bit; Menu_CfgCursor after the last Menu_CfgEntryRun (the Menu_Unk7F
+                                         ; byte)
+!Menu_CfgShown = $0F09                   ; 10 B: copy of Menu_CfgA3 ... Menu_CfgA7 for the marks
+                                         ; (Menu_CfgDrawToggles); bytes 4-6 are used as the three flags below
+!Menu_CfgCLowOpen = $0F0D                ; 8-bit; non-zero while handler 3 picks Menu_CfgCLow
+!Menu_CfgSubOpen = $0F0E                 ; 8-bit; 1 while the cursor is on entries 10-11 (opened from entry 5)
+!Menu_CfgStyleEdit = $0F0F               ; 8-bit; bit 0: entry 6 steps the window style (the cursor held)
+!Menu_CfgMapEdit = $0F00                 ; 9 B: the button map handler 2 edits (a copy of Menu_CfgButtonMap)
+!Menu_CfgButtonMap = $0408               ; 9 B: the button map Menu_CfgA4 selects (the Menu_Unk0408 bytes;
+                                         ; Menu_UnkC54F takes it for Menu_ButtonMap when Menu_CfgA4 is set)
+!Menu_CfgIconMap = $3446                 ; 2 x 2 tile words: the cursor entry's icon (Menu_CfgEntryIcon)
+!Menu_CfgBg3Row1 = $4E44                 ; Menu_Bg3TileBuf+$44: row 1, tile 2 of a 32-tile map ...
+!Menu_CfgBg3RowEnd = $4E5C               ; ... and its tiles 14-15
+!Menu_Unk0DCE = $0DCE                    ; 8-bit; Menu_CfgEntryIcon's entry: Menu_CfgEntryText's entry string
+!Menu_Unk0DCF = $0DCF                    ; 8-bit; the entry's value + Menu_CfgEntryStrBase: its value string
+
+; --- Menu text threads (Menu_StartDescText, Menu_CfgEntryText, Menu_TextStepLoop) ---
+!Menu_TextSteps = $0DC9                  ; 8-bit; TextWin_StepCount for each step of the text threads (the
+                                         ; Menu_Unk0DC9 byte)
+!Menu_TextCol = $0DC1                    ; 16-bit; byte offset from Menu_TextDest of the line being drawn
+                                         ; ($80 per line, two tile rows)
+!Menu_TextGlyphs = $0DC3                 ; 8-bit; TextWin_Unk17 (glyphs drawn) at the last Menu_TextUpload
+!Menu_TextTileWord = $0DC7               ; 16-bit; the tile word of the line's first glyph tile
+!Menu_TextPenStart = $0DD2               ; 8-bit (stored as a word); TextWin_PenX at the last tile write
+!Menu_TextTileDest = $0DD4               ; 16-bit; VRAM word address the glyph buffer is sent to
+!Menu_TextGfxSrc = $0DD6                 ; 16-bit; the glyph buffer (bank $7E; TextWin_GfxBuf)
+!Menu_TextRec = $9890                    ; 7 B: the Menu_VramRec Menu_TextUpload builds and queues (the
+                                         ; Menu_SprScratch RAM)
+!Menu_CfgTextRows = $4E00                ; the settings text's two tile rows ($80 B; Menu_Bg3TileBuf)
+!Menu_CfgValueDest = $0026               ; 16-bit; Menu_CfgTextThread's Menu_TextDest for the value string ...
+!Menu_CfgValueRow = $0028                ; 8-bit; ... and its line ((Menu_TextTileWord - 1) AND $0F)
