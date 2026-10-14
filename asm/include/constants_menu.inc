@@ -1023,8 +1023,37 @@ if !constants_menu_inc == 0
 !Menu_BoostFlagsMask = $FFFE
 
 ; --- List paging ---
-!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_UnkE984)
+!Menu_PadPageBits = $03                  ; Menu_PadAction bits 0-1: page on / back (set by Menu_PadInput)
 !Menu_PadPageBack = $02
+!Menu_PadPageOn = $01
+!Menu_PadConfirm = $80                   ; Menu_PadAction bit 7 (Menu_ButtonMap entry 0)
+!Menu_PadCancel = $40                    ; Menu_PadAction bit 6 (entry 1, or Menu_Unk0D83)
+!Menu_PadActionButtonCount = 2           ; Menu_PadActionButtons entries Menu_PadInput reads
+!Menu_ButtonPageBack = 6                 ; Menu_ButtonMap entry of Menu_PadPageBack
+!Menu_ButtonPageOn = 7                   ; ... and of Menu_PadPageOn
+!Menu_CursorNoDir = $80                  ; Menu_CursorDir: no direction
+!Menu_DirCount = 4                       ; D-pad bits Menu_CursorMove tests
+!Menu_CursorEdge = $80                   ; Menu_CursorPos neighbour / Menu_CursorDpad bit 7: an edge
+!Menu_SoundCursor = $00                  ; Menu_PlaySound0's id (probably the cursor sound)
+!Menu_SoundRefuse = $01                  ; Menu_PlaySound1's id (probably the refusal sound)
+!Menu_SoundPendBit1 = $02                ; Menu_Unk0DBC bit 1: sound Menu_SoundPend1
+!Menu_SoundPendBit0 = $01                ; Menu_Unk0DBC bit 0: sound Menu_SoundPend0
+!Menu_SoundPend1 = $06
+!Menu_SoundPend0 = $07
+!Menu_SoundGap = 3                       ; Menu_NmiTimer frames after a sound before the next is sent
+!Menu_ByteInvert = $FF                   ; EOR mask: n becomes -n - 1
+!Menu_ScrollRowLines = $0C               ; lines of the added Menu_ScrollTable entries
+!Menu_ScrollLastAdd = $0004              ; value step Menu_ListScrollInit gives the added entries
+!Menu_ScrollStepDown = $0003             ; Menu_ScrollStep values
+!Menu_ScrollStepUp = $FFFD
+!Menu_ScrollFrameCount = 4               ; Menu_ScrollFrames; Menu_PadRepeatTimer 5 is lowered to it
+!Menu_PortraitRows = 6                   ; Menu_DrawPortrait: 6 rows of 6 tiles
+!Menu_PortraitCharMask = $0007           ; MenuRom_PortraitPals has 8 entries
+!Menu_AttrPalMask = $001C                ; attribute byte bits 2-4: the palette
+!Menu_AttrKeepMask = $0F                 ; attribute bits Menu_SetRowAttr keeps
+!Menu_SlotWinAttrLow = $03               ; Menu_Unk0D47 high byte bits 0-1 Menu_LoadSlotWindowStyle sets
+!MenuRom_PortraitTiles = $FFCE70         ; 8 B: first tile per Menu_PortraitChar ($01 + 36 n; entry 7 = $01)
+!MenuRom_PortraitPals = $FFCE78          ; 8 words: bank-$FF address of 16 colours per entry
 !Menu_Unk81Set = $FF
 
 endif

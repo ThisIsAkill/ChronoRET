@@ -545,13 +545,50 @@ endstruct
 !Menu_BlinkMask = $0DA6                  ; 8-bit; Menu_CursorBlinkMasked's timer mask (Menu_StartCursorC: $FC)
 !Menu_Unk0DA8 = $0DA8                    ; 8-bit; see Menu_CursorThreadB
 
-; A cursor position record (6 bytes; Menu_CursorRecOffset); only X and Y
-; are read here.
+; A cursor position record (6 bytes; Menu_CursorRecOffset): the cursor's
+; X and Y, and the record Menu_CursorMove goes to per D-pad direction
+; (bit 7 set: an edge of the list, Menu_CursorEdge).
 struct Menu_CursorPos $9380
 .X:         skip 1
 .Y:         skip 1
-            skip 4
+.Up:        skip 1
+.Down:      skip 1
+.Left:      skip 1
+.Right:     skip 1
 endstruct align 6
+
+; --- Pad input and cursor movement (Menu_PadInput, Menu_CursorMove) ---
+!Menu_CursorMovedFrom = $0055            ; 8-bit; Menu_CursorSel before the last D-pad move (Menu_CursorMove)
+!Menu_ListMaxTop = $0057                 ; 8-bit; Menu_ListPageSetup's largest top row (0: the list fits its
+                                         ; page); Menu_ListCursorEdge tests it (Menu_Setup's word zeroing of
+                                         ; Menu_Unk56 covers it)
+!Menu_CursorDpad = $005A                 ; 8-bit; Menu_PadRepeat's D-pad bits at the last Menu_CursorMove
+                                         ; (Up, Down, Left, Right = bits 3-0); bit 7 set when that move hit
+                                         ; an edge (Menu_CursorToUp)
+!Menu_CursorDir = $0D1E                  ; 8-bit; the direction Menu_CursorMove found (0 Right, 1 Left, 2 Down,
+                                         ; 3 Up), $80 for none
+!Menu_CursorHold = $0D1F                 ; 8-bit; non-zero: Menu_CursorMove makes no move (it then zeroes it;
+                                         ; writer not traced)
+!Menu_Unk0D83 = $0D83                    ; 8-bit; non-zero: Menu_PadInput sets the cancel bit every call
+                                         ; (writer not traced)
+!Menu_Unk0DBC = $0DBC                    ; 8-bit; bits 1 and 0: sounds 6 and 7 for Menu_PlayPendingSound
+                                         ; (writer not traced)
+
+; --- List smooth scroll (Menu_ListScrollInit, Menu_ListScrollStep) ---
+!Menu_ScrollStep = $0D22                 ; 16-bit; lines added to Menu_ScrollOfs per frame (3 or -3)
+!Menu_ScrollFrames = $0D24               ; 16-bit; frames of the scroll (set to 4)
+!Menu_ScrollEntry = $0DA9                ; 8-bit byte offset in Menu_ScrollTable of the first entry built
+!Menu_ScrollRows = $0DAA                 ; 8-bit; entries of the table that scroll (set by the caller)
+!Menu_ScrollOfs = $0DAB                  ; 16-bit signed; lines scrolled so far (stepped by the callers)
+!Menu_ScrollBuild = $969A                ; the table Menu_ListScrollStep builds; Menu_NmiMoveSrc
+!Menu_ScrollSaved = $9710                ; a copy of the whole live table (Menu_ListScrollInit)
+!Menu_ScrollTable = $9790                ; 3-byte entries (line count, 16-bit value): an added row, then the
+                                         ; first Menu_ScrollRows live entries
+
+; --- Portraits and tilemap helpers ---
+!Menu_PortraitChar = $0D46               ; 8-bit; Menu_DrawPortrait's index (probably a character id)
+!Menu_MapPtr = $0061                     ; 16-bit; tilemap write address of the map helpers
+                                         ; (Menu_DrawPortrait, Menu_SetRowsAttr ...; = Menu_SumPtr)
 
 ; One thread slot of Menu_RunThreads: 8 slots of 8 bytes at $00B0-$00EF.
 struct Menu_Thread $00B0
@@ -969,7 +1006,8 @@ endstruct
                                          ; to 1 once, then clears it
 !Menu_RepeatStage = $19                  ; 8-bit index into Menu_RepeatDelays (1 after a release, 0
                                          ; after the first repeat); handled as a word by Menu_NmiPad
-!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0 (who sets it not traced)
+!Menu_NmiTimer = $76                     ; 8-bit; -1 per menu NMI down to 0; Menu_SendSound sets it to 3 and
+                                         ; sends no sound while it runs
 !Menu_Unk83 = $83                        ; 8-bit; Menu_NmiPad stores a held button mask here (use not
                                          ; traced)
 !Menu_NmiSavedSp = $1DFE                 ; 16-bit S at the menu NMI's entry
@@ -1073,7 +1111,8 @@ endstruct
 !Menu_PageMax = $0DDA                    ; 8-bit; the largest top row
 !Menu_PageCursorFirst = $0DDB            ; 8-bit; Menu_CursorSel when paging back past the start
 !Menu_PageCursorLast = $0DDC             ; 8-bit; ... and on past the end
-!Menu_Unk81 = $0081                      ; 8-bit; set to $FF when the page changes (use not traced)
+!Menu_Unk81 = $0081                      ; 8-bit; set to $FF when the page changes; Menu_CursorMove stores
+                                         ; Menu_CursorSel here before moving (handlers compare the two)
 
 ; --- Menu mode 0: the main menu ---
 !Menu_MainSel = $0411                    ; 8-bit; the main menu's icon (0-5); mode = it + 1 on confirm
@@ -1084,7 +1123,7 @@ endstruct
 !Menu_Unk041A = $041A
 !Menu_Unk7F = $007F                      ; 8-bit; zeroed by the main menu (use not traced)
 !Menu_UnkAF = $00AF                      ; 8-bit; likewise
-!Menu_PadAction = $0D1D                  ; 8-bit; bit 7 confirm, bit 6 cancel (set by Menu_UnkE984)
+!Menu_PadAction = $0D1D                  ; 8-bit; bit 7 confirm, bit 6 cancel (set by Menu_PadInput)
 !Menu_Unk0D17 = $0D17                    ; 8-bit; set to $FF on entering a submenu (use not traced)
 !Menu_MainFrame = $5780                  ; tilemap rows of $40 B: the main menu's 16 x 6 frame
 !Menu_MainFrameRow1 = $57C0

@@ -66,11 +66,11 @@ org $C2CAE6
 Menu_UnkCAE6:       ; Menu_MainRedrawTable entry 4 (not analysed)
 org $C2D0DB
 Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
-org $C2E984
-Menu_UnkE984:       ; JSR from Menu_MainMenuLoop: the menu's pad handling; moves Menu_CursorSel and sets
-                    ; Menu_PadAction bits 7/6 from the Menu_ButtonMap buttons (read from the ROM; not matched)
-org $C2EAC2
-Menu_UnkEAC2:       ; JSR/JMP from the main menu: A = 0, then JSR $C2:EB03 (not analysed)
+org $C2EDF6
+Menu_UnkEDF6:       ; JSR from Menu_LoadSlotWindowStyle (and $C2:D35A): probably draws a window frame at
+                    ; dp $63 sized by dp $5F/$60 from the tile word Menu_Unk0D47 (not matched)
+org $C2EE7F
+Menu_UnkEE7F:       ; JSR after Menu_UnkEDF6 (not analysed)
 org $C2ED31
 Menu_UnkED31:       ; JSR with X = a bank-$FF address: runs a list of command bytes there until one has
                     ; bit 7 set (DB=$FF while it runs; not analysed)

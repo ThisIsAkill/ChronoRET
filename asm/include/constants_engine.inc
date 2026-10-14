@@ -128,6 +128,8 @@ if !constants_engine_inc == 0
 
 ; --- Pad ---
 !Pad_Start = $01                         ; Pad_Pressed bit 0: Start
+!Pad_HiRight = $01                       ; high byte of Pad_Pressed, bit 0: Right
+!Pad_HiLeft = $02                        ; high byte of Pad_Pressed, bit 1: Left
 !Pad_HiDown = $04                        ; high byte of Pad_Pressed, bit 2: Down
 !Pad_HiUp = $08                          ; high byte of Pad_Pressed, bit 3: Up
 !Pad_DpadMask = $0F                      ; bits 0-3 of Pad_Unk00F9: Field_DpadDispatch's table index
