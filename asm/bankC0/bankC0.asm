@@ -43618,8 +43618,8 @@ BankC0_OldBuildLeftovers:
 ; $C0; through $00 that is the $00:F300 mirror) and Battle_CalcAngle (LDA.l
 ; !BattleRom_AngleTable,X, index (|dy| & ~7) x 4 + |dx| >> 3); also
 ; by C2Scene_Unk229D ($C2:229D, through DB $00) and LDA.l
-; at $CE:E85B and $CF:FAA7 (unmatched, not read here). The readers use
-; the defines !Rom_AngleTable / !BattleRom_AngleTable, both = this
+; at $CE:E85B (unmatched, not read here) and in Battle_CalcAngleCF.
+; The readers use the defines !Rom_AngleTable / !BattleRom_AngleTable, both = this
 ; address.
 ; ==================================================================
 Rom_AngleTable:
@@ -43703,7 +43703,7 @@ Rom_AngleTable:
 ; (Battle_UpdatePcFacing, Battle_FaceAllPcsNearestEnemy, the
 ; Battle_Mover* routines, the BattleAct_* move and face routines;
 ; define !BattleRom_FacingByAngle), by C2Scene_ObjBMateFaceDir
-; ($C2:5468), and at $CF:F47F and $CF:F910 (unmatched, not read here).
+; ($C2:5468), and in BattleCF_MoveCurve and BattleCF_ObjMoveCurve.
 ; ==================================================================
 Rom_DirToFacing:
     db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 ; $000
