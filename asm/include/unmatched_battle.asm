@@ -18,47 +18,14 @@ org $CFE300
 BattleCF_UnkE300:                       ; JML from $C1:0076 (vector $C1:0009)
 org $CFE58A
 BattleCF_UnkE58A:                       ; JML from $C1:007A (vector $C1:000C)
-org $CCE000
-BattleCC_UnkE000:                       ; JML from $C1:0072 (vector $C1:000F)
 org $CFFE20
 BattleCF_UnkFE20:                       ; JSL from BattleSys_Service6
-org $CCE2E4
-BattleCC_UnkE2E4:                       ; JSL from BattleSys_SceneSetup (first step)
-org $CCED87
-BattleCC_UnkED87:                       ; JSL from BattleSys_SceneSetup
 org $CD0003
 BattleSys_VecCD0003:                    ; JSL vector (JMP $CD:0399) from BattleSys_SceneSetup
 org $CD000C
 BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleSys_SceneSetup
 org $CD0012
 BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
-
-; --- Bank $CC (battle support, called from the action code) ---
-
-org $CCF06B
-BattleAct_ResetState:                   ; JSL: clears the action state ($5D80-$5E0C, $A124-$A1A7, $A1A8-$A1E7,
-                                        ; !Battle_ActScriptDone, !Battle_ActFrameHold and more); sets
-                                        ; !Battle_ActBattlers and $A437 to $FF
-
-org $CCF102
-BattleAct_ResetFxApplied:               ; JSL: sets !Battler_FxApplied of all 11 slots to $55
-
-org $CCF110
-Battle_BuildOccupiedCellMap:            ; JSL: copies !Battle_CellMap to $7CFD and marks the cell of each present
-                                        ; battler there with $40 (only enemies when $7E2989 bit 2 is set)
-
-org $CCF156
-BattleAct_BuildBattlerList:             ; JSL: builds !Battle_ActBattlers and !Battle_ActTargets from the action
-                                        ; block ($AE91, $AE95, $AE97-$AE99)
-
-org $CCF1E7
-BattleAct_StepPalettes:                 ; JSL: steps up to 4 palette sequences from the list at bank $CD + the
-                                        ; offset in $9882, copying colours from $D1:4100/$D1:4400 into
-                                        ; !Battle_PaletteLive (not analysed further)
-
-org $CCF278
-BattleAct_TickUnkA1A8:                  ; JSL: counts the timers of the 8 !Battle_ActUnkA1A8 entries down and runs
-                                        ; $CC:F2A9 for each that is set and at 0
 
 ; --- Bank $CD (battle messages / per-frame service) ---
 

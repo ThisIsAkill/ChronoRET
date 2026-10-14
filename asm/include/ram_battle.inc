@@ -631,8 +631,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; vector, counted up at $CD:0D8F/$CD:0E11 (unmatched); purpose unknown
 !Battle_UnkAB4E          = $AB4E ; 1 B: zeroed by service 4 after the script; set by opcode $6B, zeroed by opcode $6D:
                                  ; non-zero = $CF:E602 rotates colours (probably the palette cycle's on flag)
-!Battle_ActUnkA1A8       = $A1A8 ; 8 B lists ($A1A8 flags, $A1B0 timers, ...): $CC:F278 counts each set entry's
-                                 ; timer down and runs $CC:F2A9 at 0; service 4 clears 40 bytes from here
+!Battle_ActUnkA1A8       = $A1A8 ; 8 B lists ($A1A8 flags, $A1B0 timers, ...): BattleAct_TickUnkA1A8 counts each set entry's
+                                 ; timer down and runs BattleAct_StepObjAnim at 0; service 4 clears 40 bytes from here
 !Battle_ActBattlers      = $A014 ; list of battler slots, $FF-ended ($CC:F156): caster, the two slots from $AE97/$AE98
                                  ; (for a PC caster $FF there becomes the other two PCs), the main target, the others
 !Battle_ActMainTarget    = !Battle_ActBattlers+3 ; 1 B: entry 3 of !Battle_ActBattlers, the main target (the first set bit
@@ -695,11 +695,11 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battler_ActAnimStarted  = $A145 ; 1 B per battler slot: set when opcode $03 has started the battler's animation, cleared
                                  ; when it has ended (BattleAct_OpPlayAnim)
 !Battle_ActObjAnimTimer  = $A1B0 ; 1 B per object thread 0-7: timer of its object list (zeroed on start; the mode is
-                                 ; !Battle_ActUnkA1A8, stepped at $CC:F278, unmatched)
+                                 ; !Battle_ActUnkA1A8, stepped by BattleAct_TickUnkA1A8)
 !Battle_ActObjAnimEntry  = $A1B8 ; 1 B per object thread: current entry ($FF on start)
 !Battle_ActObjAnimStarted = $A1C0 ; 1 B per object thread: opcode $03's started flag (BattleAct_OpPlayAnim)
 !Battle_ActObjAnimStop   = $A1C8 ; 1 B per object thread: opcodes $04-$06's flag (BattleAct_OpShowAnimFrame); read at
-                                 ; $CC:F2DB (unmatched)
+                                 ; $CC:F2DB (BattleAct_StepObjAnim)
 !Battle_ActObjUnkA1D8    = $A1D8 ; 1 B per object thread: counted up by opcodes $6E and $70 and by opcode $03's start,
                                  ; zeroed by opcodes $6F and $71 and when opcode $03 ends; read at $CF:EDDF; purpose unknown
 !Battle_ActObjAnimList   = $A220 ; 2 B per object thread: !Battle_ActObjListStart of the object list it plays
@@ -795,7 +795,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActMoveUnitY     = $A882 ; 2 B: the same for y
 !Battle_MoveMajorDist    = $AAFE ; 1 B: the larger of |dx| and |dy| of the last BattleAct_CalcMoveStep (opcodes
                                  ; $D3/$D5 reuse it, 2 B, as a frame count)
-!Battler_DefMoveDelay    = $973F ; 1 B per battler slot: default !Battle_ActorMoveDelay (set at $CC:E3E8, unmatched)
+!Battler_DefMoveDelay    = $973F ; 1 B per battler slot: default !Battle_ActorMoveDelay (set at $CC:E3E8, Battle_InitScene)
 !Battler_DefMoveSpeed    = $98BF ; 1 B per battler slot: default !Battle_ActorMoveSpeed (set at $CC:E3E3)
 !Battle_DecompSrc        = $0300 ; 2 B: Decomp_ToWramVec source address (DP $00 of that routine, which sets DP=$0300)
 !Battle_DecompSrcBank    = $0302 ; 1 B: its bank
@@ -838,7 +838,7 @@ endstruct
 !Battle_HitNumStep       = $A3D2 ; 1 B: step in the bounce table ($CF:E786 reads it, $CF:E7AF counts it up)
 !Battle_HitNumSet        = $A3D3 ; 1 B: record set of the numbers shown (opcode & 7); no reader found in bank $C1
 !Battle_HitNumColoursA   = $999F ; 8 B: colour bytes copied to the start of !Battle_PaletteLive (the palette of
-                                 ; attribute !Battle_HitNumAttr); also written at $CC:EF0D (unmatched)
+                                 ; attribute !Battle_HitNumAttr); also written at $CC:EF0D (Battle_InitSceneGfx)
 !Battle_HitNumColoursB   = $99A7 ; 8 B: the same, copied to !Battle_PaletteLive+$80 (the palette of
                                  ; !Battle_HitNumAttrAlt)
 
@@ -1790,5 +1790,172 @@ endstruct
 !BattleRom_CharTechs      = $CC276A ; 2 B per character id: its first single tech id, then how many it has
 !BattleRom_ComboTechs     = $CC2778 ; 5 B per record, $FF-ended: the members' $80 >> id bits, the first tech id ($FF:
                                   ; none), the number of techs, and the address in bank $CC of their requirements
+
+; --- Battle set-up in bank $CC (Battle_InitScene, Battle_InitSceneGfx, Battle_InitUploadStep;
+;     $CC:E000-$CC:F062). "Set at set-up" means written by Battle_InitScene unless said otherwise;
+;     where no reader is named, none was traced. ---
+!BattleTmp_8F             = $8F   ; 1 B scratch
+!Battle_UnkE4             = $E4   ; 1 B DP: set to !Battle_UnkE4Init at set-up; reader not traced
+!Battle_InitUploadStage   = $98CA ; 1 B: next stage of Battle_InitUploadStep's VRAM uploads: 0 = none (zeroed at
+                                  ; $CF:FB83), 1-3 = run that stage at the next call, then count up; 4 on = done
+                                  ; (Battle_InitSceneGfx counts it from 0 to 1 and waits for 4)
+!Battle_Block1D00         = $1D00 ; 256 B ($1D00-$1DFF) zeroed at set-up; it holds !Battler_ScreenX/Y,
+                                  ; !Battler_Unk1D7F and more
+!Battle_Unk95D2           = $95D2 ; 1 B: $FF at set-up (also the byte after the $FF fill from !Tech_ListCode)
+!Battle_UnkA4EF           = $A4EF ; 1 B: $FF at set-up
+!BattleMenu_UnkA6DC       = $A6DC ; 1 B: $FF at set-up (the byte after !BattleMenu_Roster)
+!Enemy_Unk988B            = $988B ; 1 B per enemy: $FF at set-up; Battle_InitSceneGfx ORs !Battle_SprAttrPriority2
+                                  ; to it for the attribute bytes of the enemy's !Battle_SprRec rows (so probably
+                                  ; palette and priority bits; who sets it after the $FF is not traced)
+!Enemy_NameLineId         = $98FF ; 2 B per enemy-name line 0-2 (8 B set to $FF at set-up): the enemy id named on
+                                  ; that line, $FFxx = none (Battle_InitScene fills the lines in order of first
+                                  ; appearance)
+!Battle_Unk9919           = $9919 ; 7 B: $FF at set-up
+!Battle_UnkA112           = $A112 ; 1 B: 8 at set-up
+!Battle_UnkA113           = $A113 ; 1 B: 4 at set-up when an enemy has kind !Enemy_KindUnkA113 in
+                                  ; !BattleRom_EnemyKindList, else 0
+!Battle_Config0           = $2990 ; 1 B: first config byte (the menu's Menu_Config): bit 7 -> !BattleMenu_CfgInfoPanel,
+                                  ; bit 6 inverted -> !Battle_CfgBattleMode
+!Battle_Config1           = $2991 ; 1 B: second config byte: bit 6 -> !BattleMenu_CfgCursorMemory, bit 7 ->
+                                  ; !BattleMenu_CfgListMemory
+!Battle_Config2           = $2992 ; 1 B: third config byte: indexes !BattleRom_GaugeLayoutByCfg (0-2)
+!Battle_Unk9842           = $9842 ; 15 B: $FF at set-up
+!Battle_Unk9851           = $9851 ; 1 B: 0 at set-up
+!Battle_OamHiXClear       = $8C2D ; 512 B, index = an OAM low-table offset (sprite * 4): the high-table mask that
+                                  ; clears that sprite's x bit 8 ($FE/$FB/$EF/$BF by sprite & 3); probably, from the
+                                  ; values (readers not traced)
+!Battle_OamHiXBit         = $8E2D ; 512 B, same index: that sprite's x bit 8 in its high-table byte ($01/$04/$10/$40)
+!Battler_UnkA5C2          = $A5C2 ; 1 B per battler slot: $C0 at set-up; enemies with !Enemy_SprFlag80 get $80 here
+!Battle_OamHiByteIdx      = $902D ; 512 B: entry n = n / 16, the high-table byte of the sprite at low-table offset n
+                                  ; (probably; readers not traced)
+!Battle_FieldAttrA        = $2A23 ; 256 B: the field's tile attributes under the 16x16 cells (FieldBtl_AttrA); bit 7
+                                  ; goes to the !Battle_CellMap cell as bit 7
+!Battle_FieldAttrB        = $2B23 ; 256 B: FieldBtl_AttrB; bit 7 goes to the cell as bit 6 (!Battle_CellBlocked)
+!Battle_InitMapBuf        = $7FFD ; tilemap built at set-up ($7FFD-$82FC; the same RAM holds !Battler_PathMaps
+                                  ; later): blank cells, tile rows $00-$0F / $30-$3F / $10-$1F / $40-$4F in map rows 1
+                                  ; and 2, three rows from !BattleRom_InitMapRows; Battle_InitUploadStep sends $7FFD-$81FC
+!Battle_InitMapBufRow4    = $80FD ; !Battle_InitMapBuf + 4 map rows
+!Battle_InitMapBufTail    = $81BD ; !Battle_InitMapBuf + 7 map rows: the last $40 B uploaded, to a VRAM place of their own
+!Pc_CharNames             = $2C23 ; 6 B per character id 0-6: the character's name, 5 letters and an end byte (the
+                                  ; menu's TextWin_CharNames)
+!Pc_CharNameCopy          = $9430 ; 5 B per character id: the 5 letters of !Pc_CharNames
+!Pc_CharNameTiles         = $9453 ; 10 B per character id: 5 lower-row then 5 upper-row tiles of the name, as
+                                  ; !Pc_NameTiles has them per PC slot (from BattleMsg_ReencodeTextBuffer)
+!Pc_NameCopy              = $9403 ; 5 B per PC slot: the 5 letters of the PC's name
+struct Battle_SavedCursor $2C7C   ; 4 B per character id: cursor positions kept between battles
+.MenuRow:    skip 1     ; +0: !Pc_SavedMenuRow (used with !BattleMenu_CfgCursorMemory)
+.TechScroll: skip 1     ; +1: !Pc_SavedTechScroll (with !BattleMenu_CfgListMemory, as the next two)
+.TechRow:    skip 1     ; +2: !Pc_SavedTechRow
+.TechId:     skip 1     ; +3: !Pc_SavedTech; the two above are dropped when the list line they point to no longer
+                        ; holds this code
+endstruct
+!Battle_SavedItemScroll   = $2C98 ; 1 B: !BattleMenu_ItemScroll kept between battles (with !BattleMenu_CfgListMemory)
+!Battle_SavedItemRow      = $2C99 ; 1 B: !BattleMenu_ItemRow kept with it
+struct Battler_StartRec $96A4     ; 5 B per battler slot: copy of the FieldBtlPc / FieldBtlObj position bytes
+.TileX:      skip 1     ; +0: cell x; !Battler_ScreenX = .TileX * 16 + .SubX
+.TileY:      skip 1     ; +1: cell y; !Battler_ScreenY = .TileY * 16 + .SubY
+.SubX:       skip 1     ; +2
+.SubY:       skip 1     ; +3
+.Frame:      skip 1     ; +4: !Battler_StartFrame
+endstruct
+!Battler_Unk1D7F          = $1D7F ; 1 B per battler slot: $0F for PCs, !BattleRom_LayoutUnk1D7F by frame layout for
+                                  ; enemies (set at set-up)
+!Battler_Unk96E6          = $96E6 ; 1 B per battler slot: zeroed for each enemy at set-up
+!Enemy_SprFlags           = $9700 ; 1 B per enemy: BattleRom_EnemySpr.Flags of its enemy id
+!Battle_UnkAA63           = $AA63 ; 1 B: number of enemies with !Enemy_SprFlag08 (set-up)
+!Battle_UnkA002           = $A002 ; 1 B: the last enemy (0-7) with !Enemy_SprFlag08
+!Enemy_UnkA006            = $A006 ; 1 B per enemy: counted up for !Enemy_SprFlag20 at set-up
+!Battler_Unk9816          = $9816 ; 1 B per battler slot: for an enemy, BattleRom_EnemySpr.Move >> 4 (as
+                                  ; !Battler_DefMoveDelay)
+!Enemy_Id                 = $9853 ; 2 B per enemy (index enemy * 2): the enemy id from its BattleEnemyInit.Id
+!Enemy_UnkAA64            = $AA64 ; 1 B per enemy: when !Battle_UnkAA63 is non-zero, the enemy's !Battler_ScreenX minus
+                                  ; that of enemy !Battle_UnkA002 (set-up)
+!Enemy_UnkAA6C            = $AA6C ; 1 B per enemy: the same for !Battler_ScreenY
+; Set by Battle_InitSceneGfx:
+struct Battle_SprRec $11B0        ; 4 B per sprite record, 44 records ($11B0-$125F); the layout of an OAM entry
+.X:          skip 1     ; +0: 0 at set-up
+.Y:          skip 1     ; +1: 0 at set-up
+.Tile:       skip 1     ; +2: from !BattleRom_SprRecInit
+.Attr:       skip 1     ; +3: from !BattleRom_SprRecInit; records 12-43 are 4 per enemy row (see Battle_InitSceneGfx)
+endstruct
+!Battle_Unk0B24           = $0B24 ; 1 B each: for each battler present, $AA (!Battle_HiTableLarge4) in the byte at its
+                                  ; slot and in 1-5 more after it by frame layout (Battle_InitSceneGfx; probably
+                                  ; high-table bytes, from the value)
+!Battle_InitTileBuf       = $2F00 ; $800 B of tiles built at set-up inside !Battle_ActFrameBuf ($2D00 + $200): 16
+                                  ; 2bpp tiles widened to 4bpp, then 64 4bpp tiles; stage 3 uploads $2D00-$38FF
+!Battler_UnkA654          = $A654 ; 2 B per battler slot (A654, A66A, A680, A696, A6AC, A6C2: six such arrays), set
+!Battler_UnkA66A          = $A66A ; by Battle_InitSceneGfx for each battler present: by frame layout 2 (two fixed sets,
+!Battler_UnkA680          = $A680 ; one for slot 3) or from the !BattleRom_UnkA654... tables; the values look like
+!Battler_UnkA696          = $A696 ; VRAM word addresses ($64AD-$7AAD, $0080-$0B80); the readers are not traced
+!Battler_UnkA6AC          = $A6AC
+!Battler_UnkA6C2          = $A6C2
+!Battle_Unk9931           = $9931 ; 1 B: zeroed by BattleAct_ResetState
+!Battle_ActUnkAAFB        = $AAFB ; 1 B: zeroed by BattleAct_ResetState
+!Battle_UnkA2B7           = $A2B7 ; 1 B: zeroed by BattleAct_ResetState
+!Battle_ActObjUnkA2C0     = $A2C0 ; 1 B per object thread: the low 5 bits of the current object record's first
+                                  ; byte, | !Battle_ActObjUnkA2C0Stop when the record ended the list, |
+                                  ; !Battle_ActObjUnkA2C0Bit5 when its time byte had bit 7 (BattleAct_StepObjAnim)
+; Bank $CC tables read by the set-up (ROM; small tables left as ROM bytes):
+!BattleRom_GaugeLayoutByCfg = $CCFBC5 ; 3 B: !BattleUI_GaugeLayout for !Battle_Config2 = 0/1/2 (0, 2, 1)
+!BattleRom_PcPartners     = $CCFBC8 ; 2 B per PC slot: the other two PC slots (1,2 / 2,0 / 0,1)
+!BattleRom_Unk8E2DPattern = $CCF4C4 ; 4 B: $01 $04 $10 $40 (each byte stored 4 times, over and over, into !Battle_OamHiXBit)
+!BattleRom_Unk8C2DPattern = $CCF4CC ; 4 B: $FE $FB $EF $BF (the same into !Battle_OamHiXClear)
+!BattleRom_CellMapEdge    = $CCF694 ; 48 B of $C0: cell-map rows 0-1 (32 B) and 13-15 (48 B)
+!BattleRom_CellMapRow     = $CCF644 ; 16 B: cell-map rows 2-12: $C0 in columns 0-1 and 14-15, 0 between
+!BattleRom_CharTimes6     = $CCF846 ; 1 B per character id 0-6: id * 6, its !Pc_CharNames offset
+!BattleRom_LayoutUnk1D7F  = $CCF505 ; 1 B per frame layout 0-4: $0F $1F $2F $5F $7F, an enemy's !Battler_Unk1D7F
+!BattleRom_EnemyMoveInterval = $CCF544 ; 1 B per (move delay / 2) * 4 + move speed / 2: an enemy's !Enemy_MoveInterval
+!BattleRom_EnemyRecOfs    = $CCF939 ; 1 B per enemy 0-7: enemy * 12, its FieldBtlObj offset
+!BattleRom_UnkA654        = $CCF987 ; 2 B per battler slot (index slot * 2): !Battler_UnkA654 when the frame layout is
+!BattleRom_UnkA66A        = $CCF99D ; not 2; the same for the next three arrays
+!BattleRom_UnkA680        = $CCF9B3
+!BattleRom_UnkA696        = $CCF9C9
+!BattleRom_UnkA6AC        = $CCF9DF ; 2 B per frame layout 0-4: !Battler_UnkA6AC
+!BattleRom_UnkA6C2        = $CCF9E9 ; 2 B per frame layout 0-4: !Battler_UnkA6C2
+!BattleRom_SprRecInit     = $CCFAF3 ; 2 B per !Battle_SprRec record 0-43: its tile and attribute
+!BattleRom_EnemyNames     = $CC6500 ; 11 B per enemy id: the name (the menu's TextWinRom_EnemyNames)
+; Other banks:
+!BattleRom_InitGfxA       = $FF8C60 ; $1000 B: Battle_InitUploadStep stage 1 sends them to VRAM !Battle_InitGfxAVram
+!BattleRom_InitTilesB     = $D15EC2 ; $40 B: stage 1, to VRAM !Battle_InitTilesBVram
+!BattleRom_InitTilesC     = $D15E82 ; $40 B: stage 1, to VRAM !Battle_InitTilesCVram
+!BattleRom_InitTilesD     = $D15F02 ; $40 B: stage 2, sent twice (VRAM !Battle_InitTilesDVram and !Battle_InitTilesEVram)
+!BattleRom_ObjTilePieces  = $FF9CF0 ; four 64-B pieces (FieldRom_Unk9CF0); stage 2 sends the first two
+!BattleRom_InitMapRows    = $D15D50 ; $C0 B: three tilemap rows copied into !Battle_InitMapBuf + 4 rows
+!BattleRom_ColoursA       = $FF9C68 ; 8 B (4 colours; the menu's MenuRom_PalA): to !Battle_PaletteSavedLo + $10
+!BattleRom_ColoursB       = $FF9C70 ; 8 B (MenuRom_Mode01Pal): to !Battle_PaletteSavedLo + $18
+!BattleRom_ColoursC       = $FF9E0A ; 6 B (MenuRom_MainPalC): to !Battle_PaletteSavedLo + $13A
+!BattleRom_WeaponColourIdx = $CD6CEC ; 1 B per weapon id (the menu's MenuRom_WeaponUnkIdx): its !BattleRom_WeaponColours record
+!BattleRom_WeaponColours  = $D14B00 ; 6 B (3 colours) per record: copied into the PC's sprite palette at set-up
+!BattleRom_SprTilesPtr    = $E42000 ; 3 B per sprite set (character id for PCs): long pointer -> !Battler_TileGfxPtr
+!BattleRom_SprFramesPtr   = $E42300 ; 3 B per sprite set: long pointer -> !Battler_FramesPtr
+!BattleRom_SprAnimFrames  = $E42600 ; 2 B per animation set: offset of its frame-id lists -> !Battler_AnimFrameBase (bank
+                                  ; $E4); the next entry minus this, / 4, is the facing block size
+!BattleRom_SprAnimDurs    = $E42800 ; 2 B per animation set: offset of its duration lists -> !Battler_AnimDurBase
+struct BattleRom_EnemySpr $E4F600 ; 10 B per enemy id (RomE4_EnemySprRec; index id * 10)
+.Unk0:       skip 1     ; +0: not read here
+.FrameSet:   skip 1     ; +1: !BattleRom_SprFramesPtr entry -> !Battler_FramesPtr
+.Unk2:       skip 1     ; +2: not read here
+.AnimSet:    skip 1     ; +3: !BattleRom_SprAnimFrames / !BattleRom_SprAnimDurs entry
+.Flags:      skip 1     ; +4: -> !Enemy_SprFlags (bits !Enemy_SprFlag80/08/20/04 are tested at set-up)
+.OffsetX:    skip 1     ; +5: -> !Battler_ScreenOffsetX
+.OffsetY:    skip 1     ; +6: -> !Battler_ScreenOffsetY
+.HalfWidth:  skip 1     ; +7: -> !Battler_HalfWidth
+.Height:     skip 1     ; +8: -> !Battler_Height
+.Move:       skip 1     ; +9: bits 0-2 -> !Battler_DefMoveSpeed, bits 4-7 -> !Battler_DefMoveDelay / !Battler_Unk9816
+endstruct
+!BattleRom_EnemyKindList  = $E1DE00 ; 4 B records (enemy id, kind; 2 B each), ended by a negative id: kinds the set-up
+                                  ; acts on (!Enemy_KindLockMenus, !Enemy_KindUnkA113, any other -> !Battle_Unk99D2)
+!BattleRom_InitTiles2bpp  = $D14C80 ; 16 x 16 B: 2bpp tiles, widened to 4bpp in !Battle_InitTileBuf
+!BattleRom_InitTiles4bpp  = $D13900 ; 64 x 32 B: 4bpp tiles copied after them
+!BattleRom_HitNumColours  = $D14D80 ; 16 B: !Battle_HitNumColoursA and B
+!BattleRom_UnkColours38F2 = $D138F2 ; 6 B (3 colours) -> !Battle_PaletteLive + $5A
+!BattleRom_UnkColours38FA = $D138FA ; 6 B (3 colours) -> !Battle_PaletteLive + $7A
+struct BattleRom_ActObjRec $CE0000 ; 4 B object-list record (offset from !Battle_ActObjAnimList, BattleAct_StepObjAnim)
+.Flags:      skip 1     ; +0: bits 5-7 (!Battle_ActObjRecTypeMask) non-zero = the list ends here; bits 0-4 ->
+                        ; !Battle_ActObjUnkA2C0
+.OfsX:       skip 1     ; +1: signed -> !Battle_ActObjOfsX
+.OfsY:       skip 1     ; +2: signed -> !Battle_ActObjOfsY
+.Time:       skip 1     ; +3: bits 0-6 -> !Battle_ActObjAnimTimer; bit 7 -> !Battle_ActObjUnkA2C0Bit5
+endstruct
 
 endif
