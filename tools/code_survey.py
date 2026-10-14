@@ -138,7 +138,7 @@ TABLES = [('$C7:0A98', '$C7:0D52', 'APU interface tables: the sample table $C7:0
 # unmatched sound driver ($C7:050F, $0666, $0773), not by matched code.
 CONTENT = {
     '$C3': '$C3:0000-$10CA kernel, all from source (ends with the ASCII marker "CODE END C3"); '
-           '$C3:1200-$1312 another pack (C3Rom_PackPtrs entry 0, user not traced; unpacks to non-code, '
+           '$C3:1200-$1312 another pack (C3Rom_PackPtrs entry 0, user not traced; unpacks to data, '
            'per an independent review, PR #106); the packed '
            'module (compressed_bytes); data after it',
     '$C6': 'code $C6:E000-$EE42 (scene helpers: JSL from bank $C2 and scene op $4E), then $00 fill to '
@@ -179,8 +179,10 @@ CONTENT = {
     '$FD': '$FD:A8A5-$FFFF from source (code, tables, old-build leftovers $D5D4-$D9FF as data); '
            '$FD:0000-$A8A4 data (packed credits graphics, staff credits text at $FD:A000, battle '
            'tables $A800-$A8A4)',
-    '$FE': 'packed data: the pack pointer table at $FE:0000 (its entry $FE:0003 is the $C3:1313 '
-           'code module); the other packs unpack to non-code (independent review, PR #106)',
+    '$FE': 'packed data: the pack pointer table C3Rom_PackPtrs at $FE:0000, 73 entries (entry 1 is '
+           'the $C3:1313 code module, entries 58-72 point into $FD); apart from the module, 13 raw '
+           'blocks and 2 empty packs they unpack to data, graphics and tile maps (independent '
+           'review, PR #106)',
     '$FF': 'code $FF:F548-$FC66 with tables (called from C2 menu code), $FC67-$FFFF old-build '
            'leftovers (data); the rest data',
 }
