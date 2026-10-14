@@ -985,6 +985,38 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    NmiSetup, TickCDC9, ScrollStepL, NmiDispatch, InitHdmaDataL, LayerFx84, RestorePalRows,
    LoadLayerFx.
 
+12. Bank $CE code (branch match-ce-battle; new file `asm/bankCE/bankCE.asm`): `$CE:E000`-`$CE:EF10`
+   and `$CE:F066`-`$CE:F0E5` are matched (code, with the wave table `BattleCE_WaveTable` inside).
+   All of it is called by JSL from banks $CD and $D1 only: `BattleCE_CopyWindowEdges` (opcode $B2:
+   one window's pair copied from the other window table, 216 lines), `BattleCE_UnkE18E` (the layer-2
+   wave: a sliding window of `BattleCE_WaveTable` into `!BattleCE_Bg2WaveLines` `$7E:CD47`, which
+   channel 2's tables point at with `!Battle_Unk2A21` bit 0), `BattleCE_CopyWordsToLines` (256
+   unrolled LDA/STA pairs entered at `$E7C7` - 6n) with its JSL entry `BattleCE_RunCopyWords` (JMP
+   through DP $4B), `BattleCE_CalcAngle` (opcode $CC: Battle_CalcAngle with snapped points and
+   rounding), `BattleCE_PresetWinEdges` and `BattleCE_DrawHalfPlane` (opcode $97: the half of the
+   screen on one side of a line through the centre, point-symmetric), `BattleCE_UnkEE6E` (loads an
+   HDMA set: the first 30 bytes of the nine tables at `!Battle_HdmaTables` from
+   `!BattleRom_HdmaSetOfs` / `!BattleRom_HdmaSetRecs`) and `BattleCE_UnkF066` (parks sprites 4-127).
+   The three stub names are kept (matched bank-$CD code calls them by those names; better names
+   would be e.g. `BattleCE_StepBg2Wave`, `BattleCE_LoadHdmaSet`, `BattleCE_ParkSprites`, for a
+   change that may edit bank $CD's JSL lines). Entry states of the four entries called from bank $CD
+   past `$16B4` are read from the routines and hedged (B = 0 traced for DrawHalfPlane's TAY to
+   `$CD:30FC`). Quirks recorded: CalcAngle's snap changes the difference by 256 when the second
+   point wraps below 0, and its index runs past a row for differences of 252 or more;
+   DrawHalfPlane's STZ that clears the right edges of lines 0 on when the line ends at x = 0, and
+   angle 0 leaving the upper half's left edges unwritten; CopyWindowEdges' 8-bit X wraps for script
+   bytes over $4A. Headers edited (back to review): Rom_AngleTable (bank $C0, the `$CE:E85B` reader
+   named), BattleSys_VecCD0000 (bank $CD's file banner), BattleCD_StepWipe (the call and its Exit
+   line), BattleFx_ReloadCeSet (what the sets are). Open: the bank-$CD callers past `$16B4`
+   (opcodes $97, $B2, $CC and the helper at `$CD:3616` that runs the word copier) and with them
+   the entry states hedged here; what opcode $B2's byte and the copier's counts are in practice;
+   which sets `!BattleFx_CeSetBase` picks (0, 2, 8, $0C, $0E); who sets `!Battle_Unk2A21` bit 0.
+   Not matched in $CE: the data, i.e. `$CE:0000`-`$CE:DFFF` (scripts, object records),
+   `$CE:EF11`-`$CE:F065` (`!BattleRom_MsgStrings`, the dissolve and layer-effect tables read by
+   bank $CD, still defines) and `$CE:F0E6`-`$CE:FFFF` (opcode $80's tables, `$CE:F24E` /
+   `$CE:F28E` / `$CE:F58E` and the HDMA tables, `!BattleRom_AbsSine`). These could become labelled
+   data once bank $CD's readers can use labels.
+
 ## Tables
 
 `make tables-scan BANK=C0` (or `C1`, `CC`) lists these with more; `tools/tables.py emit` drafts

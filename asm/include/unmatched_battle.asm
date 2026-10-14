@@ -45,14 +45,3 @@ BattleCD_Unk3ECE:                       ; JSL from BattleFx_LoadBgSet: queues a 
 org $CD3ED2
 BattleCD_QueueVramDma:                  ; JSR: queues A:X to VRAM word address Y, DP $53 bytes, and waits frames until
                                         ; the NMI has sent it all (in pieces); !Battle_DmaQueueBusy meanwhile
-
-; --- Bank $CE battle code (called from banks $CD and $D1; none analysed) ---
-
-org $CEE18E
-BattleCE_UnkE18E:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
-org $CEEE6E
-BattleCE_UnkEE6E:                       ; JSL from BattleCD_StepWipe at an opening wipe's start, A = !BattleFx_CeSet,
-                                        ; and from BattleFx_Init / BattleFx_ReloadCeSet (A = the set); copies records
-                                        ; from bank $CE to $7E:C867 and on
-org $CEF066
-BattleCE_UnkF066:                       ; JSL from BattleCD_NmiMain unless !Battle_UnkCD2D / !Battle_UnkA028
