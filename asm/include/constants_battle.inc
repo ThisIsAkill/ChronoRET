@@ -1330,6 +1330,29 @@ if !constants_battle_inc == 0
 !BattleFx_BoxCentre       = $6A   ; BattleFx_GrowBox's centre line (106)
 
 ; ------------------------------------------------------------
+; Bank $CE: constants ($CE:E000-$CE:F0E5)
+; ------------------------------------------------------------
+!BattleCE_RomBank         = $CE   ; bank $CE: the source bank of BattleCE_UnkE18E's and BattleCE_UnkEE6E's MVNs
+!BattleCE_BlockLines      = 27    ; BattleCE_CopyWindowEdges: lines per block (eight blocks, 216 lines)
+!BattleCE_BlockBytes      = $006C ; ... bytes per block (27 lines x 4)
+!BattleCE_PresetLines     = 14    ; BattleCE_PresetWinEdges: lines per block (16 blocks, 224 lines)
+!BattleCE_PresetBytes     = $38   ; ... bytes per block (14 lines x 4): its 8-bit Y start
+!BattleCE_RunMask         = $0004 ; |dx| or |dy| bit 2: the half of 8 that rounds up
+!BattleCE_RoundUp         = $0008 ; added then
+!BattleCE_AngleMask       = $FFF8 ; |dy| & this = (|dy| / 8) x 8
+!BattleCE_HalfTurn        = $80   ; angle of half a turn
+!BattleCE_WaveSteps       = $1F   ; BattleCE_UnkE18E: the window's position mask (32 steps of one pair)
+!BattleCE_WaveBytes       = $0080 ; bytes it copies or zeroes (32 pairs of words)
+!BattleCE_EdgeMax         = $FF   ; an edge at x 255: a left edge there or a right edge 0 empties the window
+!BattleCE_MirrorX         = $FF   ; EOR mask: x -> 255 - x (the half mirrored about the screen centre)
+!BattleCE_LastLineOfs     = $037C ; byte offset of line 223 in a window table
+!BattleCE_HalfTableBytes  = $01C0 ; 112 lines: the upper half of a window table
+!BattleCE_HdmaHeadBytes   = $001E ; BattleCE_UnkEE6E: bytes copied into each of the nine tables (ten entries)
+!BattleCE_OamBlockBytes   = $10   ; BattleCE_UnkF066: bytes of four sprites, the loop's X start
+!BattleCE_OamHighBytes    = $20   ; bytes of the OAM high table (128 sprites)
+!BattleCE_OamHighAllLarge = $AAAA ; high-table word: eight sprites, each large with x bit 8 clear
+
+; ------------------------------------------------------------
 ; Bank $CD: constants ($CD:0000-$CD:16B4)
 ; ------------------------------------------------------------
 !Battle_2A21Bit0          = $01   ; !Battle_Unk2A21 bit 0 (see there)

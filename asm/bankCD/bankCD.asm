@@ -10,8 +10,8 @@ hirom
 ; read by bank $C1). Other banks reach the code through the JMP vectors
 ; at $CD:0000-$CD:0038; inside the bank it calls itself by JSR and, for
 ; a few routines, by JSL. Banks $CD, $CE and $D1 call each other; the
-; bank-$D1 routines are matched (bankD1.asm, BattleFx_*), the bank-$CE
-; ones and this bank's past $16B4 are not (stubs in
+; bank-$D1 and bank-$CE routines are matched (bankD1.asm, BattleFx_*;
+; bankCE.asm, BattleCE_*), this bank's past $16B4 are not (stubs in
 ; asm/include/unmatched_battle.asm).
 ;
 ; Unless a header says otherwise the code runs as the rest of the battle
@@ -1304,9 +1304,9 @@ BattleCD_WipeStepClose:
 ; frame), by !Battle_WipeMode:
 ;   - 0: nothing;
 ;   - !BattleCD_WipeOpen ($FF, set by BattleCD_StartOpenWipe): first
-;     !BattleFx_CeSetBase = 0 and JSL BattleCE_UnkEE6E ($CE:EE6E, not matched;
-;     A = !BattleFx_CeSet, set up the tables, probably), then the mode
-;     becomes 1;
+;     !BattleFx_CeSetBase = 0 and JSL BattleCE_UnkEE6E with A =
+;     !BattleFx_CeSet (loads that HDMA set's first entries into the nine
+;     tables at !Battle_HdmaTables), then the mode becomes 1;
 ;   - 1-$7F: while !Battle_WipeSteps is non-zero, BattleCD_WipeStepOpen
 ;     and a step less; when that reaches 0, !BattleFx_CeSetBase =
 ;     !BattleCD_CA25Unk02 and !BattleFx_CeSetReload + 1; on the next call (no
@@ -1316,8 +1316,8 @@ BattleCD_WipeStepClose:
 ;     0 (!Battle_UnkCE16 kept).
 ; Callers (2 JSR sites): BattleCD_NmiMain ($CD:08F5, $CD:08F8).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (as BattleCD_NmiMain sets it)
-; Exit:  M=1, X=0 (assumed after the bank-$CE call, not traced); A, X
-;        clobbered; Y unchanged unless that call changes it
+; Exit:  M=1, X=0 (BattleCE_UnkEE6E returns so too); A, X clobbered; Y
+;        unchanged, except after BattleCE_UnkEE6E's call (Y = $C9ED)
 BattleCD_StepWipe:
     LDA.w !Battle_WipeMode
     BEQ .done
