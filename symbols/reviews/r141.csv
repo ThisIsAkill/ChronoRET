@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev141a,approved,f56fc96f9736,"Fix ok: 9 reaches SetPtrA2 via PoseStep, skipped as IncludeKo=1; sets 0,3,4,8,9; addr sets, 6 route, Entry/Exit ok. nit: 4 also via LoadGfx4Vec/UnkVecCD0018; 0 via FrameTickVec"
