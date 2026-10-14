@@ -1366,6 +1366,8 @@ endstruct
                                   ; !Enemy_AnimWanted (BattleSys_Unk8461 clears it then); meaning unknown
 !Battle_ActMainMask       = $AE95 ; 2 B: main-target mask, bit 15 = slot 0 (read at $CC:F186); BattleSys_Unk895B
                                   ; sets $8000
+!Pc_UnkB03A               = $B03A ; 1 B per PC: zeroed with the gauge restart when the PC's command is dropped
+                                  ; (BattleFD_DropPcCommand); meaning unknown
 !Battle_UnkB188           = $B188 ; 1 B: zeroed by Battle_SetupBattle; with B189/B18A one byte per PC slot (indexed
                                   ; by slot in BattleSys_ResetTechUsers): the latched BattleCmd.State (BattleSys_Unk8461)
 !Battle_UnkB189           = $B189 ; 1 B: zeroed by Battle_SetupBattle
@@ -1403,7 +1405,8 @@ endstruct
 struct PcStatBlk $0000
 .CharId:    skip 1      ; +$00 (= BattlerStats.Unk2D): the character id; the experience and tech-point code
                         ; indexes per-character tables with it (BattleSys_GrowHpMp, BattleSys_AwardTechPoints)
-            skip 2
+.Unk01:     skip 1      ; +$01 (= BattlerStats.Unk2E): bit 3 picks a PC for target handler $14
+            skip 1
 .CurHp:     skip 2      ; +$03 (= BattlerStats.CurHp); tests $01/$08 compare it
 .MaxHp:     skip 2      ; +$05 (= BattlerStats.MaxHp); BattleSys_GrowHpMp adds to it, capped at 999
             skip 2
@@ -1418,12 +1421,15 @@ struct PcStatBlk $0000
 .Unk11:     skip 1
 .Level:     skip 1      ; +$12: the level (1-99): BattleSys_ApplyExpStep raises it, the growth uses it
 .Exp:       skip 3      ; +$13: 24-bit experience total (BattleSys_AddExp adds !Battle_UnkB28C, capped)
-            skip 7
+            skip 3
+.Unk19:     skip 1      ; +$19 (= BattlerStats.Unk46): bit 0 picks an enemy for target handler $25
+            skip 3
 .Status:    skip 1      ; +$1D (= BattlerStats.Status): bit 7 = KO'd (BattleAi_AddPcByByte skips the PC)
 .Status2:   skip 1      ; +$1E (= BattlerStats.Status2); test $01 reads it as the high byte of a 16-bit .Status
-            skip 1
+.Unk1F:     skip 1      ; +$1F (= BattlerStats.Unk4C): non-zero picks for target handlers $0B, $1E, $1F
 .Unk20:     skip 1      ; +$20 (= BattlerStats.Unk4C+1): bits 5 and 4 make BattleAi_AddPcByByte mark the entry
-            skip 6
+.Unk21:     skip 1      ; +$21 (= BattlerStats.Unk4C+2): tested by target handlers $0D, $11, $12, $23
+            skip 5
 .Unk27:     skip 1      ; +$27: an id from $7B up (BattleSys_UnkCE3A's third record; a helmet, probably)
 .Unk28:     skip 1      ; +$28: an id from $5A up (its second record; armour, probably)
 .Unk29:     skip 1      ; +$29 (= BattlerStats.Unk56)
@@ -1497,11 +1503,11 @@ endstruct
                                     ; copies 17 B at !Battle_UnkB18C * 17
 !BattleRom_UnkCC05CC      = $CC05CC ; 4 B per !Battle_UnkB18C: byte 0 bits 7, 2, 6 pick BattleSys_UnkBF46's callee
 !Battle_UnkAF22           = $AF22 ; 1 B: 1 while BattleSys_UnkB967 runs (set at its start, cleared on its way out)
-!Battle_CmdPcs            = $B3E7 ; 3 B, one per PC slot, probably read in bank $FD: BattleSys_UnkB967 sets 1 for the
+!Battle_CmdPcs            = $B3E7 ; 3 B, one per PC slot, read by BattleFD_UnkA93C / A95F: BattleSys_UnkB967 sets 1 for the
                                   ; PCs taking part in its command (the PC and its BattleCmd.Partners);
                                   ; BattleSys_UnkB575 for each PC of a group BattleFD_UnkA8A5 refused
 !Battle_UnkB3EA           = $B3EA ; 1 B: read after each BattleFD_UnkA8A5 call (A = a taking-part PC); non-zero =
-                                  ; BattleSys_UnkB967 drops the command (BattleFD_UnkA93C); written in bank $FD
+                                  ; BattleSys_UnkB967 drops the command (BattleFD_UnkA93C); written by BattleFD_UnkA8A5
 !Battle_UnkAE4C           = $AE4C ; 1 B: zeroed by BattleSys_UnkB967 before the command, and by BattleFD_UnkAB30
                                   ; before a PC's turn; meaning unknown
 !Battle_UnkB3C9           = $B3C9 ; 1 B: BattleCmd.Kind of the command BattleSys_UnkB967 runs; set to $80 when

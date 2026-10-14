@@ -13,7 +13,7 @@
 ;
 ; Total: 215 bytes ($FD:C000–$C0D6 inclusive).
 ;
-; Also matched: the battle helpers BattleFD_* ($FD:A982 on) that bank
+; Also matched: the battle helpers BattleFD_* ($FD:A8A5 on) that bank
 ; $C1 calls with JSL, RandomTableFD ($FD:BA61), a copy of bank $C0's
 ; RandomTable read by the battle engine, and Ppu_SetBgLayout right after
 ; MainInit ($FD:C0D7).
@@ -23,6 +23,203 @@ arch snes.cpu
 hirom
 
 incsrc "../hardware.inc"
+
+org $FDA8A5
+; ============================================================
+; Battle helpers, part 0: the PCs' command checks ($FD:A8A5–$FD:A981)
+; Called by BattleSys_UnkB967 and BattleSys_UnkB575 in bank $C1 (JSL),
+; with the battle's state (M=1, X=0, DP=0, DB=$7E). DP $14 (!BattleTmp_14)
+; carries the PC slot to the two drop routines, as in
+; BattleSys_RefundItem.
+; ============================================================
+
+; $FD:A8A5 — BattleFD_UnkA8A5 (41 bytes, $A8A5–$A8CD)
+; Checks whether PC A can act on its command: !Battle_UnkB3EA = 1 when
+; its BattlerStats.Status has bit 7 (KO'd), its .Unk4C+2 or .Unk4C+7
+; has bit 7 (!Battle_AutoEnemyBit, the bit that makes BattleFD_UnkAB30
+; send the PC at a random enemy), or its .Status2 has any of
+; !Battle_NoActMask2 (bits 7, 2, 1, the bits that make
+; BattleSys_UnkB3F9 drop a command); else 0. The callers drop the
+; command when it is 1 ("cannot act", probably).
+; Callers (6 JSL sites): BattleSys_UnkB575 ($C1:B640, $C1:B671, $C1:B6A2) and BattleSys_UnkB967
+;   ($C1:BA01, $C1:BA11, $C1:BA21).
+; Entry: M=1, X=0 (with X=1 the TAY keeps only the low byte, so slot 2's
+;        $100 becomes 0), DP=0 (the TDC at $FD:A8AD loads it as zero; the
+;        Exit B=0 holds only with DP=0), DB=$7E; A = the PC slot (0-2),
+;        B = 0 (XBA / LSR make slot * $80)
+; Exit:  M=1, DB=$7E; A = 1 when it cannot act, else the .Status2 byte
+;        (none of $86 set); B = 0; Y = slot * $80; X unchanged;
+;        !Battle_UnkB3EA written
+BattleFD_UnkA8A5:
+    STZ.w !Battle_UnkB3EA
+    REP #$20
+    XBA
+    LSR A
+    TAY                                 ; Y = slot * $80
+    TDC
+    SEP #$20
+    LDA.w BattlerStats.Status,Y
+    BIT.b #!Battle_StatusKo
+    BNE .cannot
+    LDA.w BattlerStats.Unk4C+2,Y
+    ORA.w BattlerStats.Unk4C+7,Y
+    BIT.b #!Battle_AutoEnemyBit
+    BNE .cannot
+    LDA.w BattlerStats.Status2,Y
+    BIT.b #!Battle_NoActMask2
+    BEQ .done
+.cannot:
+    LDA.b #1
+    STA.w !Battle_UnkB3EA
+.done:
+    RTL
+
+; $FD:A8CE — BattleFD_DropPcCommand (48 bytes, $A8CE–$A8FD)
+; Drops the command of PC DP $14: BattleSys_RefundItemLong (gives back
+; an item the command had taken), then its BattleCmd .State and .Kind =
+; 0 and .Partners = $FF, and its gauge restarts as in
+; BattleSys_UpdateKo: !Battler_UnkAFAB, !Pc_AtbCur and !Pc_AtbMax =
+; !Battle_UnkB158[pc]; !Battle_UnkB188[pc] (the latched .State) and
+; !Pc_UnkB03A[pc] = 0.
+; Callers (3 JSR sites): BattleFD_UnkA93C ($FD:A943, $FD:A94F, $FD:A95B).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $14), DB=$7E; DP $14 = the PC
+;        slot (0-2)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_UnkB158[pc] (B = 0); X =
+;        the slot; Y as BattleSys_RefundItem leaves it; DP $0E as it
+;        leaves it; the bytes above written
+!DropCmd_Pc = !BattleTmp_14             ; 1 B: the PC slot
+BattleFD_DropPcCommand:
+    TDC
+    LDA.b !DropCmd_Pc
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !DropCmd_Pc
+    TAX                                 ; X = slot * 7: the BattleCmd record
+    JSL BattleSys_RefundItemLong
+    STZ.w BattleCmd.State,X
+    STZ.w BattleCmd.Kind,X
+    LDA.b #!Battle_EntryNone
+    STA.w BattleCmd.Partners,X
+    TDC
+    LDA.b !DropCmd_Pc
+    TAX
+    LDA.w !Battle_UnkB158,X
+    STA.w !Battler_UnkAFAB,X
+    STA.w !Pc_AtbCur,X
+    STA.w !Pc_AtbMax,X
+    STZ.w !Battle_UnkB188,X
+    STZ.w !Pc_UnkB03A,X
+    RTS
+
+; $FD:A8FE — BattleFD_DropLatchedPcCommand (62 bytes, $A8FE–$A93B)
+; As BattleFD_DropPcCommand, but only when !Battle_UnkB188[pc] (the
+; latched BattleCmd.State) is non-zero, and it ends with
+; !Battle_ArgSlot = the PC and BattleSys_RemoveReadyLong (service 2:
+; the PC leaves the ready queue).
+; Callers (3 JSR sites): BattleFD_UnkA95F ($FD:A966, $FD:A972, $FD:A97E).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $14), DB=$7E; DP $14 = the PC
+;        slot (0-2)
+; Exit:  M=1, X=0, DP=0, DB=$7E; X = the slot; nothing dropped: A = 0
+;        (B = 0), Y unchanged; dropped: A, X, Y as
+;        BattleSys_RemoveReadyLong leaves them (the service puts them
+;        back: A = 2, X = the slot, Y as BattleSys_RefundItem left it),
+;        DP $0E as BattleSys_RefundItem leaves it, !Battle_ArgSlot =
+;        the slot, the bytes above written, plus what the service
+;        changes
+BattleFD_DropLatchedPcCommand:
+    TDC
+    LDA.b !DropCmd_Pc
+    TAX
+    LDA.w !Battle_UnkB188,X
+    BEQ .done
+    LDA.b !DropCmd_Pc
+    ASL A
+    ASL A
+    ASL A
+    SEC
+    SBC.b !DropCmd_Pc
+    TAX                                 ; X = slot * 7: the BattleCmd record
+    JSL BattleSys_RefundItemLong
+    STZ.w BattleCmd.State,X
+    STZ.w BattleCmd.Kind,X
+    LDA.b #!Battle_EntryNone
+    STA.w BattleCmd.Partners,X
+    TDC
+    LDA.b !DropCmd_Pc
+    STA.b !Battle_ArgSlot
+    TAX
+    LDA.w !Battle_UnkB158,X
+    STA.w !Battler_UnkAFAB,X
+    STA.w !Pc_AtbCur,X
+    STA.w !Pc_AtbMax,X
+    STZ.w !Battle_UnkB188,X
+    STZ.w !Pc_UnkB03A,X
+    JSL BattleSys_RemoveReadyLong
+.done:
+    RTS
+
+; $FD:A93C — BattleFD_UnkA93C (35 bytes, $A93C–$A95E)
+; BattleFD_DropPcCommand for each PC 0, 1, 2 whose !Battle_CmdPcs byte
+; is non-zero (the PCs of the command BattleSys_UnkB967 drops).
+; Callers (1 JSL site): BattleSys_UnkB967 ($C1:BA2C).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_CmdPcs+2 when it is 0, else
+;        as BattleFD_DropPcCommand leaves it; X, Y as the last
+;        BattleFD_DropPcCommand leaves them, or unchanged when none ran;
+;        DP $14 = the last PC dropped (unchanged when none); plus what
+;        BattleFD_DropPcCommand changes
+BattleFD_UnkA93C:
+    LDA.w !Battle_CmdPcs
+    BEQ .pc1
+    STZ.b !DropCmd_Pc
+    JSR BattleFD_DropPcCommand
+.pc1:
+    LDA.w !Battle_CmdPcs+1
+    BEQ .pc2
+    LDA.b #1
+    STA.b !DropCmd_Pc
+    JSR BattleFD_DropPcCommand
+.pc2:
+    LDA.w !Battle_CmdPcs+2
+    BEQ .done
+    LDA.b #2
+    STA.b !DropCmd_Pc
+    JSR BattleFD_DropPcCommand
+.done:
+    RTL
+
+; $FD:A95F — BattleFD_UnkA95F (35 bytes, $A95F–$A981)
+; BattleFD_DropLatchedPcCommand for each PC 0, 1, 2 whose
+; !Battle_CmdPcs byte is non-zero (the PCs of the groups
+; BattleSys_UnkB575 marked).
+; Callers (1 JSL site): BattleSys_UnkB575 ($C1:B6CC).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = !Battle_CmdPcs+2 when it is 0, else
+;        as BattleFD_DropLatchedPcCommand leaves it; X, Y as the last
+;        BattleFD_DropLatchedPcCommand leaves them, or unchanged when
+;        none ran; DP $14 = the last PC marked (unchanged when none);
+;        plus what BattleFD_DropLatchedPcCommand changes
+BattleFD_UnkA95F:
+    LDA.w !Battle_CmdPcs
+    BEQ .pc1
+    STZ.b !DropCmd_Pc
+    JSR BattleFD_DropLatchedPcCommand
+.pc1:
+    LDA.w !Battle_CmdPcs+1
+    BEQ .pc2
+    LDA.b #1
+    STA.b !DropCmd_Pc
+    JSR BattleFD_DropLatchedPcCommand
+.pc2:
+    LDA.w !Battle_CmdPcs+2
+    BEQ .done
+    LDA.b #2
+    STA.b !DropCmd_Pc
+    JSR BattleFD_DropLatchedPcCommand
+.done:
+    RTL
 
 ; ============================================================
 ; Battle helpers, part 1 ($FD:A982–$FD:AF7F)
@@ -2188,7 +2385,7 @@ BattleFD_ZeroStatBlock:
 ; 10: 60, 11: 120; list 12 (the battlers' turns) gets only its reload
 ; value, 105 (!Battle_AtbBase; the same value BattleFD_UnkB7EB starts
 ; from).
-; Callers (2 JSL sites): Battle_SetupBattle ($C1:FD02) and unmatched ($C1:FE96).
+; Callers (1 JSL site): Battle_SetupBattle ($C1:FD02).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0; A = 120 (B = 0); X = 11; Y unchanged
 org $FDB4E7

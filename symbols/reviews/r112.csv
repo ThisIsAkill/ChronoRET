@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0000,EngCall_BattleMain,2026-10-09,rev112a,approved,a241de4115b5,"Nine JMP targets, both JMLs, 6 of 9 cross-bank JSL (RTL: CF:E300, CF:E58A, CC:E000, $10E3, $0065; FB65 JMLs to $C1:8000); $0003/$0006/$0015 as listed; CC:F063 TDC gives A=0"
+$C1:0045,BattleSys_RunService,2026-10-09,rev112a,changes,dea7ac120019,"Exit 'checked for 1-5, 7-9' false: 1, 3, 4, 8, 9 also call unanalysed $C7/$CD code (Audio_ProcessEntry, FrameTickVec, PumpFrames' $CD:0036). Say so. nit: PLA sets N/Z; B not restored"
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev112a,changes,8bea1dd52651,"Banner's reaction-test B18B list is incomplete: after a reaction's EnemyTurn, BattleSys_UnkB223 ($C1:8787) -> UpdateKo can set B18B = a KO'd PC whose BattleCmd.Kind has bit 4. Add that case"
+$C1:ADA1,BattleAi_PickPcTarget,2026-10-09,rev112a,approved,b2c56d065a6e,"Entry DP=0 (TDC $ADB0, .any_mark, FarthestPc), scans, BPL $ADD1 hang, dead $AE0D-12 OK. nit: enemy lists ($1A-$25) hold slots 3-10; 8-10 never match EnemyOrder; quirk speaks of PCs only"
+$C1:FDD3,BankC1_OldBuildTail,2026-10-09,rev112a,approved,e8570ae61bdf,"Byte-compared each copy at its shift ($F/$18C/$1E7/$205/$22E): all differences are call/load operands; copy ends add up; $FFFD-FE B0 6B older tail; xref: no refs; $FFFF read by Main"
+$FD:A8A5,BattleFD_UnkA8A5,2026-10-09,rev112a,approved,64b4e9f05535,"Checks (Status $80, Unk4C+2|+7 $80, Status2 $86) match AB30/B3F9; Entry X=0, DP=0 (TDC $A8AD), B=0; Exit A/B/Y, X kept (B575 loop relies); callers read B3EA"

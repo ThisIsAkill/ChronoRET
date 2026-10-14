@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev124a,approved,303a78ac3156,"Fix OK: only $1A,$1C,$1E,$20-$26 read B18B. Rechecked banner: AC2E JSR, 8D01-07, 8826/8626/8637/8787, UpdateKo bit4, kinds list. nit: Each fills ..Count untrue for $00"

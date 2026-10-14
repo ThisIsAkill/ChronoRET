@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev115a,changes,c17eadd0d216,"Svc 0 list says only $CC/$CD JSLs, but Battle_StartPose (STZ IncludeKo) -> RunPcPose -> PoseStep JSLs $CF:FD9E BattleFx_SetPtrA2FromTable; name it. 1,2,4-9 OK"
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev115a,changes,c03473cc390c,"Banner calls B3B7 'the battler that last acted', but it is copied from B18B after .after_turn's UnkB223 ($C1:8626), so UpdateKo can make it a KO'd PC's slot too; say so. $8787/$05 OK"
+$C1:AC14,BattleAi_ReadTargets,2026-10-09,rev115a,approved,1e63d9817947,"Sub-entry claim OK: sole caller TestStatusBits JSRs ClearTargets at $8F2D, JSR _Code at $8F39 (B=0 from TDC). $80 path, AD8E copy, X/A exit, B2AE, $A541 STX $0A checked"

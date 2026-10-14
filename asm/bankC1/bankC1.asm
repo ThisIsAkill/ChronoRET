@@ -12,6 +12,230 @@ incsrc "../hardware.inc"
 ; ============================================================
 
 ; ============================================================
+; Callers (1 JSL site): DefaultHandler ($C0:18A7).
+; Callers of BattleSys_RunServiceVec (27 JSR sites): BattleSys_Main ($C1:802D, $C1:8129, $C1:8151,
+;   $C1:8161, $C1:8188, $C1:83A8), BattleSys_Unk8461 ($C1:856D), BattleAi_TestTargetWithin32
+;   ($C1:927B), BattleAi_TestAnySameRow ($C1:92D1), BattleAi_TestAnyAboveOrLeft ($C1:934A),
+;   BattleAi_TestPathClear ($C1:93C0), BattleAi_TestScreenArea ($C1:9417),
+;   BattleAi_TestTargetWithin48 ($C1:9783), BattleAi_TargetNearestPc ($C1:A4C2),
+;   BattleAi_TargetFarthestPc ($C1:A4F4), BattleAi_TargetNearestEnemy ($C1:A719),
+;   BattleAi_TargetFarthestEnemy ($C1:A747), BattleSys_UnkAC5E ($C1:AC7E), BattleSys_UnkB3F9
+;   ($C1:B43B), BattleSys_UnkB762 ($C1:B7D7), BattleSys_UnkB7F2 ($C1:B7F7, $C1:B800, $C1:B809),
+;   BattleSys_RemoveReadyLong ($C1:B963), BattleSys_UnkBFA4 ($C1:BFA6) and BattleSys_UnkC1DD
+;   ($C1:C73D, $C1:C748).
+; Callers of BattleSys_ExitVec (1 JMP site): BattleSys_Main ($C1:845E).
+; Callers of BankC1_VecCFE300 (1 JSL site): unmatched ($CD:08B4).
+; Callers of BankC1_VecCFE58A (2 JSL sites): unmatched ($CD:0997, $EF:523C).
+; Callers of BankC1_VecCCE000 (1 JSL site): unmatched ($CD:0AB4).
+; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
+; Callers of BankC1_VecLongDispatch (1 JSL site): unmatched ($CC:F066).
+; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
+; ============================================================
+
+; $C1:0000 — EngCall_BattleMain (35 bytes, $0000–$0022)
+; The bank's entry block: nine 3-byte JMPs, most of them reached from
+; other banks by JSL (those targets return with RTL or never return;
+; $0003, $0006 and $0015 are not, see the list), then the two JMLs out
+; of the bank they lead to. The name is the one bank $C0's
+; caller uses. By entry:
+;   - $0000 EngCall_BattleMain: JMP BankC1_EnterBattleJml ($001B), JML
+;     $CF:FB65, which starts the battle (it clears battle RAM and JMLs
+;     to BankC1_BattleStartVec, $C1:8000; see BattleSys_PumpFrames).
+;     JSL from DefaultHandler ($C0:18A7).
+;   - $0003 BattleSys_RunServiceVec: JMP BattleSys_RunService; reached
+;     by JSR inside bank $C1 (it returns with RTS, so not by JSL).
+;   - $0006 BattleSys_ExitVec: JMP BankC1_ExitBattleJml ($001F), JML
+;     $CF:FBE5 (not analysed); BattleSys_Main JMPs here at its end.
+;   - $0009 BankC1_VecCFE300: JMP $0076, JML $CF:E300 (JSL from $CD:08B4).
+;   - $000C BankC1_VecCFE58A: JMP $007A, JML $CF:E58A (JSL from $CD:0997
+;     and $EF:523C).
+;   - $000F BankC1_VecCCE000: JMP $0072, JML $CC:E000 (JSL from $CD:0AB4).
+;   - $0012 BankC1_VecRefreshMenu: JMP BattleMenu_RefreshIfDirtyL (which
+;     ends with RTL; JSL from $CD:3E78).
+;   - $0015 BankC1_VecRts: JMP BattleSys_RunService_Rts, an RTS; a JSL
+;     here would return wrongly. No caller found.
+;   - $0018 BankC1_VecLongDispatch: JMP BankC1_LongDispatch (JSL from
+;     $CC:F066 with A = 0).
+; None of these instructions touches a register or flag.
+; Callers note: the JSL sites named above are in unmatched code in banks
+;   $CC, $CD and $EF; BattleSys_RunServiceVec and BattleSys_ExitVec are
+;   listed above.
+; Entry: M any, X any, DP any, DB any (nothing is used here; each target
+;        has its own needs)
+; Exit:  through the jump target; nothing is changed here
+; Sub-entries: BattleSys_RunServiceVec, BattleSys_ExitVec,
+;   BankC1_VecCFE300, BankC1_VecCFE58A, BankC1_VecCCE000,
+;   BankC1_VecRefreshMenu, BankC1_VecRts, BankC1_VecLongDispatch,
+;   BankC1_EnterBattleJml, BankC1_ExitBattleJml.
+org $C10000
+EngCall_BattleMain:
+    JMP BankC1_EnterBattleJml
+BattleSys_RunServiceVec:                ; header: see EngCall_BattleMain
+    JMP BattleSys_RunService
+BattleSys_ExitVec:                      ; header: see EngCall_BattleMain
+    JMP BankC1_ExitBattleJml
+BankC1_VecCFE300:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCFE300
+BankC1_VecCFE58A:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCFE58A
+BankC1_VecCCE000:                       ; header: see EngCall_BattleMain
+    JMP BankC1_JmlCCE000
+BankC1_VecRefreshMenu:                  ; header: see EngCall_BattleMain
+    JMP BattleMenu_RefreshIfDirtyL
+BankC1_VecRts:                          ; header: see EngCall_BattleMain
+    JMP BattleSys_RunService_Rts
+BankC1_VecLongDispatch:                 ; header: see EngCall_BattleMain
+    JMP BankC1_LongDispatch
+BankC1_EnterBattleJml:                  ; header: see EngCall_BattleMain
+    JML BattleCF_EnterBattle
+BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
+    JML BattleCF_UnkFBE5
+
+; $C1:0023 — BattleSys_SceneSetup (34 bytes, $0023–$0044)
+; Service 0 (!BattleSys_ServiceUnk0), the first service BattleSys_Main
+; requests: the battle's display set-up, probably. In order:
+; BattleCC_UnkE2E4, BattleUI_BuildStatusBarFrame,
+; Battle_CacheBattlerCoordsAll, BattleCC_UnkED87,
+; Battle_DrawAllBattlerFrames, BattleSys_VecCD0003, BattleSys_VecCD000C,
+; then BattleSys_VecCD0012 again and again while it returns with Z
+; clear (a wait, probably), then JMP to Battle_StartPose, whose RTS
+; returns to BattleSys_RunService. What the bank-$CC/$CD callees do is
+; not analysed, so "scene set-up" rests on the bank-$C1 steps (status
+; bar frame, battler coordinates and frames, the start pose).
+; Callers note: none by call; BattleSys_ServiceTable entry 0 (JSR (T,X)
+;   in BattleSys_RunService).
+; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main requests it; the
+;        bank-$C1 callees assume them)
+; Exit:  as Battle_StartPose leaves it (M=1, X=0, DP=0, DB=$7E assumed
+;        after the bank-$CC/$CD callees, not analysed); A, X, Y
+;        clobbered (BattleSys_RunService restores them)
+BattleSys_SceneSetup:
+    JSL BattleCC_UnkE2E4
+    JSR BattleUI_BuildStatusBarFrame
+    JSR Battle_CacheBattlerCoordsAll
+    JSL BattleCC_UnkED87
+    JSR Battle_DrawAllBattlerFrames
+    JSL BattleSys_VecCD0003
+    JSL BattleSys_VecCD000C
+.wait:
+    JSL BattleSys_VecCD0012
+    BNE .wait
+    JMP Battle_StartPose
+
+; $C1:0045 — BattleSys_RunService (12 bytes, $0045–$0050)
+; The service dispatcher: runs BattleSys_ServiceTable entry A (JSR
+; (T,X) with X = A * 2) and puts A, X and Y back as they were. The
+; BattleSys_RunService_Rts sub-entry ($0050, its RTS) is the target of
+; BankC1_VecRts.
+; Callers note: also BattleSys_RunServiceVec (JMP at $C1:0003), the
+;   usual way in.
+; Callers (3 sites: 2 JSR, 1 JMP): BattleSys_RunServiceVec (JMP $C1:0003), Battle_UpdatePcFacing
+;   (JSR $C1:2F60) and Battle_FaceAllPcsNearestEnemy (JSR $C1:351E).
+; Callers of BattleSys_RunService_Rts (1 JMP site): BankC1_VecRts ($C1:0015).
+; Entry: M=1 (8-bit PHA/PLA and ASL), X=0 (16-bit PHX/PHY), DP=0,
+;        DB=$7E (what the services expect); A = the service number
+;        (0-9), B = 0 (the 16-bit TAX)
+; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
+;        holds only while the service returns with the same M and X).
+;        Checked only for services 2, 5 and 7, whose callees are all
+;        matched bank-$C1 code. The other seven reach code that is not
+;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
+;        BattleSys_SceneSetup, and BattleFx_SetPtrA2FromTable $CF:FD9E
+;        through Battle_StartPose / Battle_PoseStep), 1 (Audio_ProcessEntry,
+;        $C7:0004),
+;        3 (BattleSys_FrameTickVec $CD:0009,
+;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
+;        BattleSys_IdleVecCD0036 $CD:0036, $CF:FD9E through
+;        BattleMenu_UpdateWindows and BattleMenu_ConfirmCommand, and more
+;        cross-bank JSLs through the menu code),
+;        4 (BattleSys_PumpFrames,
+;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
+;        6 (BattleCF_UnkFE20), 8 (BattleSys_FrameTickVec,
+;        BattleSys_PumpFrames and the $CD/$CF JSLs of
+;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
+;        BattleSys_PumpFrames). B, P (N and Z from the PLA), DP, DB and
+;        memory as the service leaves them
+BattleSys_RunService:
+    PHA
+    PHX
+    PHY
+    ASL A
+    TAX
+    JSR (BattleSys_ServiceTable,X)
+    PLY
+    PLX
+    PLA
+BattleSys_RunService_Rts:               ; header: see BattleSys_RunService
+    RTS
+
+; $C1:0051 — BattleSys_ServiceTable (10 words, $0051–$0064)
+; The services of BattleSys_RunService, by number * 2.
+BattleSys_ServiceTable:
+    dw BattleSys_SceneSetup             ; 0 !BattleSys_ServiceUnk0
+    dw BattleMenu_EnqueueReadyBattler   ; 1 !BattleSys_ServiceEnqueue
+    dw BattleMenu_RemoveBattlerFromReady ; 2 !BattleSys_ServiceRemoveReady
+    dw BattleSys_UpkeepTwoFrames        ; 3 !BattleSys_ServiceUpkeep
+    dw BattleSys_RunAction              ; 4 !BattleSys_ServiceRunAction
+    dw BattlePos_Query                  ; 5 !BattleSys_ServicePosQuery
+    dw BattleSys_Service6               ; 6 !BattleSys_ServiceUnk6
+    dw BattleTgt_RunAreaQuery           ; 7 !BattleSys_ServiceAreaQuery
+    dw BattleSys_VictoryPose            ; 8 !BattleSys_ServiceVictory
+    dw BattleSys_DefeatPose             ; 9 !BattleSys_ServiceDefeat
+
+; $C1:0065 — BankC1_LongDispatch (6 bytes, $0065–$006A)
+; A long-callable dispatcher (through BankC1_VecLongDispatch): runs
+; BankC1_LongDispatchTable entry A, then RTL. The table has room for one
+; entry only (entry 0, BattleMsg_ReencodeTextBuffer): the bytes after it
+; are BattleSys_Service6's code, so A = 1 would run $2022 (quirk, or
+; never asked; the one caller, $CC:F066, passes A = 0).
+; Callers note: through BankC1_VecLongDispatch (JMP at $C1:0018).
+; Callers (1 JMP site): BankC1_VecLongDispatch ($C1:0018).
+; Entry: M=1 (8-bit ASL), X=0, DP=0, DB any (what
+;        BattleMsg_ReencodeTextBuffer needs); A = 0, B = 0 (the 16-bit
+;        TAX)
+; Exit:  RTL; M=1, X=0, DB=$7E (the MVN in BattleMsg_ReencodeTextBuffer);
+;        A, X, Y clobbered
+BankC1_LongDispatch:
+    ASL A
+    TAX
+    JSR (BankC1_LongDispatchTable,X)
+    RTL
+
+; $C1:006B — BankC1_LongDispatchTable (1 word, $006B–$006C)
+; BankC1_LongDispatch's table: entry 0 only (see there).
+BankC1_LongDispatchTable:
+    dw BattleMsg_ReencodeTextBuffer
+
+; $C1:006D — BattleSys_Service6 (5 bytes, $006D–$0071)
+; Service 6 (!BattleSys_ServiceUnk6): JSL BattleCF_UnkFE20 (not
+; analysed), RTS.
+; Callers note: none by call; BattleSys_ServiceTable entry 6 (JSR (T,X)
+;   in BattleSys_RunService).
+; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
+; Exit:  as BattleCF_UnkFE20 leaves it (not analysed)
+BattleSys_Service6:
+    JSL BattleCF_UnkFE20
+    RTS
+
+; $C1:0072 — BankC1_JmlCCE000 (12 bytes, $0072–$007D)
+; The JMLs behind three of the entry vectors (see EngCall_BattleMain):
+; $0072 to $CC:E000 (BankC1_VecCCE000), BankC1_JmlCFE300 ($0076) to
+; $CF:E300 (BankC1_VecCFE300) and BankC1_JmlCFE58A ($007A) to $CF:E58A
+; (BankC1_VecCFE58A). None of the three targets is analysed.
+; Callers (1 JMP site): BankC1_VecCCE000 ($C1:000F).
+; Callers of BankC1_JmlCFE300 (1 JMP site): BankC1_VecCFE300 ($C1:0009).
+; Callers of BankC1_JmlCFE58A (1 JMP site): BankC1_VecCFE58A ($C1:000C).
+; Entry: M any, X any, DP any, DB any (nothing is used here)
+; Exit:  through the target (which returns to the JSL caller)
+; Sub-entries: BankC1_JmlCFE300, BankC1_JmlCFE58A.
+BankC1_JmlCCE000:
+    JML BattleCC_UnkE000
+BankC1_JmlCFE300:                       ; header: see BankC1_JmlCCE000
+    JML BattleCF_UnkE300
+BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
+    JML BattleCF_UnkE58A
+
+; ============================================================
 ; Frame Wait ($C1:007E–$C1:0088)
 ; ============================================================
 
@@ -623,7 +847,7 @@ Battle_CalcAngle:
 ;        otherwise), set !BattleMenu_ActivePc, redraw every roster PC's
 ;        command list (BattleMenu_DrawCommandList) and the command-window
 ;        frames (BattleMenu_DrawCommandWindowFrames).
-; Callers (2 JSR sites): BattleMenu_UpdateMainWindow ($C1:0C5C) and unmatched ($C1:0027).
+; Callers (2 JSR sites): BattleSys_SceneSetup ($C1:0027) and BattleMenu_UpdateMainWindow ($C1:0C5C).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $80-$87, $8E and
 ;        $A2/$A3 used as temporaries, plus the callees' DP: $79-$7B,
@@ -3568,7 +3792,7 @@ Battle_DrawBattlerFrameAnyLayout:
 ; input, redraw cursor overlay). Returns with RTL (long return) since
 ; callers reach this via JSL through the $C10012 vector, not a
 ; same-bank JSR.
-; Callers (1 JMP site): unmatched ($C1:0012).
+; Callers (1 JMP site): BankC1_VecRefreshMenu ($C1:0012).
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
 ;        clobbered (see their headers; the JSL targets they reach are not
@@ -5812,11 +6036,11 @@ BattleTgt_AnyCandidate:
 ; ==================================================================
 ; Copies every present battler's screen position into its probe
 ; position and rebuilds its box.
-; Callers (4 JSR sites): BattleSys_UpkeepTwoFrames ($C1:10B8, $C1:10DF), BattleSys_RunAction
-;   ($C1:40C8) and unmatched ($C1:002A).
+; Callers (4 JSR sites): BattleSys_SceneSetup ($C1:002A), BattleSys_UpkeepTwoFrames ($C1:10B8,
+;   $C1:10DF) and BattleSys_RunAction ($C1:40C8).
 ; Callers note (JSR; scanned for JSR/JSL/JML/JMP/BRL, hits inside other
-; instructions discarded): BattleSys_UpkeepTwoFrames (twice), the
-; unmatched service 0 at $C1:002A and $C1:40C8.
+; instructions discarded): BattleSys_UpkeepTwoFrames (twice),
+; BattleSys_SceneSetup (service 0) and BattleSys_RunAction.
 ; Entry: M=1, X=0 (16-bit slot counter), DP=0 (TDC as zero), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X = 11; A clobbered; Y unchanged
 ; Callee: Battle_CalcBattlerBox
@@ -8105,7 +8329,7 @@ Battle_TickEnemyGroup:
 ; counts them down).
 ; !Pc_AnimTimer serves as the loop counter (16-bit store, 8-bit count)
 ; before it gets those values.
-; Callers (1 JSR site): unmatched ($C1:0031).
+; Callers (1 JSR site): BattleSys_SceneSetup ($C1:0031).
 ; Callers note (JSR; scanned as above): the battle set-up of service 0 at
 ; $C1:0031 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
@@ -8154,7 +8378,7 @@ Battle_DrawAllBattlerFrames:
 ; targetable PCs (animation 0 on the others) through Battle_RunPcPose,
 ; with !Battle_PoseUnk5DDD set and KO'd PCs left out. That this is the
 ; PCs' entry into battle is inferred from where it runs.
-; Callers (1 JMP site): unmatched ($C1:0042).
+; Callers (1 JMP site): BattleSys_SceneSetup ($C1:0042).
 ; Callers note (JMP; scanned for JSR/JSL/JML/JMP/BRL and word tables, hits
 ; inside other instructions discarded): service 0 at $C1:0042 only.
 ; Entry: M=1, X=0, DP=0, DB=$7E
@@ -27311,6 +27535,1799 @@ BattleAi_AddStatByteAtY:
     STA.b (!BattleTmp_0E),Y
     RTS
 
+; ==================================================================
+; Enemy behaviour scripts: the target handlers ($C1:A3F6–$C1:AC13)
+; ==================================================================
+; BattleAi_TargetTable entries $00-$38, run by BattleAi_ReadTargets_Code
+; (JSR (T,X) at $C1:AC2E) with A = X = target code * 2. Each fills
+; !BattleAi_Targets (battler slots, except $2F's enemy entry numbers
+; 0-7; $FF = empty; both callers of
+; BattleAi_ReadTargets_Code ran BattleAi_ClearTargets first, so the list
+; starts all $FF) and !BattleAi_TargetCount. "Self" is the acting enemy:
+; slot !Battle_UnkB252 + 3 in some handlers, slot !Battle_UnkB18B in
+; others. On the enemy's own turn the two agree (but see handler $05
+; below): BattleAi_EnemyTurn sets !Battle_UnkB252 = !Battle_UnkAEC8 and
+; !Battle_UnkB18B = that + 3 ($C1:8D01-$8D07). In the main-part pass
+; (BattleSys_Unk8C09, from BattleSys_Main and from BattleSys_Unk8461 at
+; $C1:8826) they differ: !Battle_UnkB252 steps through enemy entries 0-7,
+; but the loop does not set !Battle_UnkB18B to the enemy whose script
+; runs. It keeps whatever battler it last held, except that
+; BattleSys_UpdateKo (through target handler $05, below) can leave a
+; KO'd PC's slot there; whether the test and choose handlers reach any
+; other writer of it is not traced. So the handlers that use it
+; ($1A, $1C, $1E, $20-$26) treat that battler as "self", not the scripted enemy. In BattleSys_Unk8461's reaction tests they also differ:
+; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
+; holds !Battle_UnkB3B7, which BattleSys_Unk8461 copies from it at
+; $C1:8637 after the BattleSys_UnkB223 call at $C1:8626 (so the battler
+; that last acted, or a KO'd PC's slot left by that call's
+; BattleSys_UpdateKo, as below), or, once an
+; earlier reaction in the same pass has run BattleAi_EnemyTurn, that
+; enemy's slot, or a PC's slot: after each reaction's
+; BattleAi_EnemyTurn the loop runs BattleSys_UnkB223 (JSR at $C1:8787),
+; whose BattleSys_UpdateKo sets !Battle_UnkB18B = the slot of a PC
+; that is KO'd and whose BattleCmd.Kind has bit 4 (the last such PC,
+; slots 0-2 in order). Handler $05 (BattleAi_TargetRandomPc) also runs
+; BattleSys_UpdateKo for PCs 0-2, so the same write can come from an
+; earlier target read, on the enemy's own turn too (whether it occurs
+; is not traced). Kinds:
+;   - fixed lists: nothing ($00), the present PCs ($01), all present
+;     battlers ($02), the present enemies ($16) or those but self ($15),
+;     self ($03), one fixed slot ($27-$2E: 3-10, $30-$36: 0-6);
+;   - one pick: a random PC ($05), the nearest / farthest PC or enemy by
+;     position query ($06, $07, $17, $18), the lowest HP ($08 PCs,
+;     $19 enemies, $26 those but self), the highest HP PC ($37), a
+;     random enemy but self ($38), a random entry number 0-7 (not a
+;     slot) among the enemies whose !Battle_UnkAF15 has bit 7 ($2F),
+;     the slot in the enemy's !Battle_UnkB19E record ($04);
+;   - by a stat-block byte (PcStatBlk offset with BattleAi_AddPcByByte,
+;     then BattleAi_PickPcTarget cuts the list to one): PCs $09-$14,
+;     enemies $1A-$25 (with or without self).
+; Which of these the game's scripts mean as "ally", "weakest" and so on
+; is not traced; the names say what the code selects.
+!ByPcByte_Offset = !BattleTmp_0A        ; 2 B: PcStatBlk offset BattleAi_AddPcByByte tests (handlers $09-$14, $1A-$25)
+!ByEnemy_Index = !BattleTmp_0E          ; 2 B: slot * 2, the X for BattleAi_AddPcByByte (handlers $1A-$25)
+
+; $C1:A3F6 — BattleAi_TargetNone (1 byte, $A3F6–$A3F6)
+; BattleAi_TargetTable entry $00: returns at once, so the list stays as
+; it was (all $FF) and !BattleAi_TargetCount is not written.
+; Callers note: none by call; BattleAi_TargetTable entry $00 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M any, X any, DP any, DB any (nothing is read)
+; Exit:  everything as on entry
+org $C1A3F6
+BattleAi_TargetNone:
+    RTS
+
+; $C1:A3F7 — BattleAi_TargetPcs (26 bytes, $A3F7–$A410)
+; BattleAi_TargetTable entry $01: lists PC slots 0-2 whose
+; !Battler_UnkAEFF is not $FF (present), in slot order, from entry 0;
+; !BattleAi_TargetCount = how many (0-3).
+; Callers note: also BattleAi_TargetTable entry $01 (JSR (T,X) in
+;   BattleAi_ReadTargets_Code); BattleAi_TargetAll runs it first.
+; Callers (1 JSR site): BattleAi_TargetAll ($C1:A411).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = X = the count (B = 0); Y = 3;
+;        !BattleAi_Targets[0..count-1] and !BattleAi_TargetCount
+;        written
+BattleAi_TargetPcs:
+    TDC
+    TAX
+    TAY
+.slot:
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TYA
+    STA.w !BattleAi_Targets,X
+    INX
+.next:
+    INY
+    CPY.w #!Battle_NumPcSlots
+    BNE .slot
+    TXA
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A411 — BattleAi_TargetAll (29 bytes, $A411–$A42D)
+; BattleAi_TargetTable entry $02: the present PCs (BattleAi_TargetPcs),
+; then each enemy slot 3-10 whose !Battler_UnkAEFF is not $FF, appended
+; in slot order; !BattleAi_TargetCount = the total.
+; Callers note: none by call; BattleAi_TargetTable entry $02 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (BattleAi_TargetPcs's TDC), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = X = the count (B = 0); Y = 11;
+;        !BattleAi_Targets[0..count-1] and !BattleAi_TargetCount
+;        written
+BattleAi_TargetAll:
+    JSR BattleAi_TargetPcs
+    LDY.w #!Battle_FirstEnemySlot
+.slot:
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TYA
+    STA.w !BattleAi_Targets,X
+    INX
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .slot
+    TXA
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A42E — BattleAi_TargetSelf (15 bytes, $A42E–$A43C)
+; BattleAi_TargetTable entry $03: the acting enemy itself,
+; !BattleAi_Targets[0] = !Battle_UnkB252 + 3 (its slot), present or
+; not; !BattleAi_TargetCount = 1.
+; Callers note: none by call; BattleAi_TargetTable entry $03 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSelf:
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A43D — BattleAi_TargetFromUnkB19E (21 bytes, $A43D–$A451)
+; BattleAi_TargetTable entry $04: !BattleAi_Targets[0] = the low nibble
+; of the first byte of the acting enemy's 4-byte !Battle_UnkB19E record
+; (offset !Battle_UnkB252 * 4), taken as a slot without any check;
+; !BattleAi_TargetCount = 1. Who writes those records (tests $11-$15
+; read them) is not traced.
+; Callers note: none by call; BattleAi_TargetTable entry $04 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1; X = !Battle_UnkB252 * 4; Y
+;        unchanged; the two bytes above written
+BattleAi_TargetFromUnkB19E:
+    TDC
+    LDA.w !Battle_UnkB252
+    ASL A
+    ASL A
+    TAX
+    LDA.w !Battle_UnkB19E,X
+    AND.b #!BattleAi_TargetSlotMask
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A452 — BattleAi_TargetRandomPc (93 bytes, $A452–$A4AE)
+; BattleAi_TargetTable entry $05: one random present PC.
+; !BattleAi_TargetCount = 0, then nothing more when DP !Battle_Unk24 is
+; set (the battle is being lost: no PC left). Else BattleSys_UpdateKo
+; for PC slots 0, 1 and 2 (the KO check, which can put a PC back or
+; take it out); if none of the three has a !Battler_UnkAEFF entry
+; (all negative), the list stays empty. Else Battle_RandRange
+; (0 to !BattleAi_RandPcHigh - 1, 0-98) picks a PC in thirds: below
+; !BattleAi_RandPc1From PC 0, below !BattleAi_RandPc2From PC 1, else
+; PC 2. A picked PC without an entry sends it back to the three
+; BattleSys_UpdateKo calls and a new roll; a present one is
+; !BattleAi_Targets[0], !BattleAi_TargetCount = 1.
+; Quirk: with !Battle_Unk2989 bit 5 set, Battle_RandRange returns its
+; low bound 0 every time, so if PC 0 has no entry while another PC has
+; one the loop never ends (whether that case occurs is not traced).
+; Callers note: none by call; BattleAi_TargetTable entry $05 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero; the DP byte !Battle_Unk24 is read
+;        as LDA.w $0024 through DB), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E;
+;        - !Battle_Unk24 set: A = it; X, Y unchanged;
+;        - no PC entry: A = PC 2's entry (negative); X, Y as the last
+;          BattleSys_UpdateKo leaves them ($100 and 2 unless its revive
+;          path ran);
+;        - a pick: A = 1; X as Battle_RandRange leaves it; Y = the PC
+;          slot.
+;        !BattleAi_TargetCount (and on a pick !BattleAi_Targets[0])
+;        written; plus what BattleSys_UpdateKo and Battle_RandRange
+;        change
+BattleAi_TargetRandomPc:
+    STZ.w !BattleAi_TargetCount
+    LDA.w !Battle_Unk24
+    BNE .done
+.update:
+    LDX.w #0*!Battle_StatsStride
+    LDY.w #0
+    JSR BattleSys_UpdateKo
+    LDX.w #1*!Battle_StatsStride
+    LDY.w #1
+    JSR BattleSys_UpdateKo
+    LDX.w #2*!Battle_StatsStride
+    LDY.w #2
+    JSR BattleSys_UpdateKo
+    LDA.w !Battler_UnkAEFF
+    BPL .roll
+    LDA.w !Battler_UnkAEFF+1
+    BPL .roll
+    LDA.w !Battler_UnkAEFF+2
+    BPL .roll
+    BRA .done
+.roll:
+    TDC
+    TAX
+    LDA.b #!BattleAi_RandPcHigh
+    JSR Battle_RandRange
+    CMP.b #!BattleAi_RandPc1From
+    BCS .not_pc0
+    LDA.b #0
+    BRA .picked
+.not_pc0:
+    CMP.b #!BattleAi_RandPc2From
+    BCS .pc2
+    LDA.b #1
+    BRA .picked
+.pc2:
+    LDA.b #2
+.picked:
+    TAY
+    LDA.w !Battler_UnkAEFF,Y
+    BMI .update
+    TYA
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+.done:
+    RTS
+
+; $C1:A4AF — BattleAi_TargetNearestPc (49 bytes, $A4AF–$A4DF)
+; BattleAi_TargetTable entry $06: !BattleAi_TargetCount = 0, then
+; position query !BattlePos_QueryNearestPc (service 5) from the acting
+; enemy (!BattlePos_Subject = !Battle_UnkB252 + 3). When
+; !BattlePos_Found is not negative and that slot's !Battler_UnkAEFF is
+; not negative either: !BattleAi_Targets[0] = it,
+; !BattleAi_TargetCount = 1 and !Battle_UnkAD8D = 1. !BattlePos_Found
+; is not reset before the query, and the query leaves it as it was when
+; it finds no PC, so a stale value can come through the two checks.
+; Callers note: none by call; BattleAi_TargetTable entry $06 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 on a pick, else the value that
+;        failed its check; X = the found slot when it was not negative,
+;        else unchanged; Y unchanged (the service dispatcher saves A, X
+;        and Y around the query); !BattlePos_Subject, Mode, Other,
+;        Result and Found written (and the query's DP scratch); the
+;        bytes above on a pick
+BattleAi_TargetNearestPc:
+    TDC
+    STA.w !BattleAi_TargetCount
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !BattlePos_Subject
+    TDC
+    STA.w !BattlePos_Mode               ; !BattlePos_QueryNearestPc (0)
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunServiceVec
+    TDC
+    LDA.w !BattlePos_Found
+    BMI .done
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    BMI .done
+    LDA.w !BattlePos_Found
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STA.w !Battle_UnkAD8D
+.done:
+    RTS
+
+; $C1:A4E0 — BattleAi_TargetFarthestPc (40 bytes, $A4E0–$A507)
+; BattleAi_TargetTable entry $07: as BattleAi_TargetNearestPc with
+; position query !BattlePos_QueryFarthestPc, but only !BattlePos_Found
+; not negative is checked (no !Battler_UnkAEFF test). A stale Found can
+; come through in the same way.
+; Callers note: also BattleAi_TargetTable entry $07 (JSR (T,X) in
+;   BattleAi_ReadTargets_Code); BattleAi_PickPcTarget runs it for a pick
+;   with the $40 mark.
+; Callers (1 JSR site): BattleAi_PickPcTarget ($C1:AE08).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 on a pick, else Found (negative);
+;        X, Y unchanged (the service dispatcher saves them around the
+;        query); !BattlePos_Subject, Mode, Other, Result and Found
+;        written (and the query's DP scratch); on a pick
+;        !BattleAi_Targets[0], !BattleAi_TargetCount = 1 and
+;        !Battle_UnkAD8D = 1, else the count = 0
+BattleAi_TargetFarthestPc:
+    TDC
+    STA.w !BattleAi_TargetCount
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattlePos_QueryFarthestPc
+    STA.w !BattlePos_Mode
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunServiceVec
+    LDA.w !BattlePos_Found
+    BMI .done
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STA.w !Battle_UnkAD8D
+.done:
+    RTS
+
+; $C1:A508 — BattleAi_TargetLowestHpPc (57 bytes, $A508–$A540)
+; BattleAi_TargetTable entry $08: the PC with the lowest non-zero
+; BattlerStats.CurHp, meant over PC slots 0-2; presence is not checked.
+; !BattleAi_Targets[0] starts as 0, then slot 1 and slot 2 replace it
+; when their HP is non-zero and below the lowest so far (DP $02/$03);
+; !BattleAi_TargetCount = 1 whatever was found.
+; Quirk: the start value is meant to be PC 0's HP (LDY at $C1:A509), but
+; the CMP #0 after TDC always holds, so it is replaced by
+; !BattleAi_HpStartMin ($7FFF): PC 0 is never compared, only kept when
+; PC 1 and PC 2 both have HP 0 (or $7FFF and more).
+; Callers note: none by call; BattleAi_TargetTable entry $08 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 (B = 0); X unchanged; Y = PC 2's
+;        HP; DP $02 = the low byte of the lowest HP kept, DP $03 = 0;
+;        !BattleAi_Targets[0] and !BattleAi_TargetCount written
+!LowHp_Min = !BattleTmp_02              ; 2 B: lowest HP so far (high byte zeroed at the end)
+BattleAi_TargetLowestHpPc:
+    TDC
+    LDY.w BattlerStats[0].CurHp         ; dead: replaced just below (see the header)
+    CMP.b #0
+    BNE .have_start
+    LDY.w #!BattleAi_HpStartMin
+.have_start:
+    STY.b !LowHp_Min
+    STZ.w !BattleAi_Targets
+    LDY.w BattlerStats[1].CurHp
+    BEQ .pc2
+    CPY.b !LowHp_Min
+    BCS .pc2
+    STY.b !LowHp_Min
+    LDA.b #1
+    STA.w !BattleAi_Targets
+.pc2:
+    LDY.w BattlerStats[2].CurHp
+    BEQ .done
+    CPY.b !LowHp_Min
+    BCS .done
+    STY.b !LowHp_Min
+    LDA.b #2
+    STA.w !BattleAi_Targets
+.done:
+    TDC
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STZ.b !LowHp_Min+1
+    RTS
+
+; $C1:A541 — BattleAi_TargetPcStatus (10 bytes, $A541–$A54A)
+; BattleAi_TargetTable entry $09: BattleAi_TargetsByPcByte with DP $0A
+; = PcStatBlk.Status: the present PCs whose Status byte is non-zero
+; (any status), not KO'd, cut to one by BattleAi_PickPcTarget.
+; Handlers $0A-$0D below are the same with another offset.
+; Callers note: none by call; BattleAi_TargetTable entry $09 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $0A/$0B = the
+;        offset; plus what BattleAi_TargetsByPcByte changes
+BattleAi_TargetPcStatus:
+    TDC
+    LDA.b #PcStatBlk.Status
+    TAX
+    STX.b !ByPcByte_Offset
+    JSR BattleAi_TargetsByPcByte
+    RTS
+
+; $C1:A54B — BattleAi_TargetPcStatus2 (10 bytes, $A54B–$A554)
+; BattleAi_TargetTable entry $0A: as BattleAi_TargetPcStatus with
+; PcStatBlk.Status2 (any bit set).
+; Callers note: none by call; BattleAi_TargetTable entry $0A (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $0A/$0B = the
+;        offset; plus what BattleAi_TargetsByPcByte changes
+BattleAi_TargetPcStatus2:
+    TDC
+    LDA.b #PcStatBlk.Status2
+    TAX
+    STX.b !ByPcByte_Offset
+    JSR BattleAi_TargetsByPcByte
+    RTS
+
+; $C1:A555 — BattleAi_TargetPcUnk1F (10 bytes, $A555–$A55E)
+; BattleAi_TargetTable entry $0B: as BattleAi_TargetPcStatus with
+; PcStatBlk.Unk1F (= BattlerStats.Unk4C; any bit set).
+; Callers note: none by call; BattleAi_TargetTable entry $0B (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $0A/$0B = the
+;        offset; plus what BattleAi_TargetsByPcByte changes
+BattleAi_TargetPcUnk1F:
+    TDC
+    LDA.b #PcStatBlk.Unk1F
+    TAX
+    STX.b !ByPcByte_Offset
+    JSR BattleAi_TargetsByPcByte
+    RTS
+
+; $C1:A55F — BattleAi_TargetPcUnk20 (10 bytes, $A55F–$A568)
+; BattleAi_TargetTable entry $0C: as BattleAi_TargetPcStatus with
+; PcStatBlk.Unk20 (= BattlerStats.Unk4C+1; any bit set).
+; Callers note: none by call; BattleAi_TargetTable entry $0C (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $0A/$0B = the
+;        offset; plus what BattleAi_TargetsByPcByte changes
+BattleAi_TargetPcUnk20:
+    TDC
+    LDA.b #PcStatBlk.Unk20
+    TAX
+    STX.b !ByPcByte_Offset
+    JSR BattleAi_TargetsByPcByte
+    RTS
+
+; $C1:A569 — BattleAi_TargetPcUnk21 (10 bytes, $A569–$A572)
+; BattleAi_TargetTable entry $0D: as BattleAi_TargetPcStatus with
+; PcStatBlk.Unk21 (= BattlerStats.Unk4C+2; any bit set).
+; Callers note: none by call; BattleAi_TargetTable entry $0D (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $0A/$0B = the
+;        offset; plus what BattleAi_TargetsByPcByte changes
+BattleAi_TargetPcUnk21:
+    TDC
+    LDA.b #PcStatBlk.Unk21
+    TAX
+    STX.b !ByPcByte_Offset
+    JSR BattleAi_TargetsByPcByte
+    RTS
+
+; $C1:A573 — BattleAi_TargetPcStatus2Bit1 (48 bytes, $A573–$A5A2)
+; BattleAi_TargetTable entry $0E: the PCs (slots 0-2) whose
+; PcStatBlk.Status2 has bit 1 (!BattleAi_PcByteMask = $02), through
+; BattleAi_AddPcByByte (present, not KO'd, marked by .Unk20), cut to
+; one by BattleAi_PickPcTarget. !BattleAi_TargetCount and the two mark
+; counts start at 0. Handlers $0F-$14 below are the same with another
+; offset and mask. (Unlike BattleAi_TargetsByPcByte, !Battle_UnkAEC9 is
+; not zeroed.)
+; Callers note: none by call; BattleAi_TargetTable entry $0E (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcStatus2Bit1:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit1
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A5A3 — BattleAi_TargetPcStatus2Bit7 (48 bytes, $A5A3–$A5D2)
+; BattleAi_TargetTable entry $0F: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Status2 bit 7 (mask $80).
+; Callers note: none by call; BattleAi_TargetTable entry $0F (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcStatus2Bit7:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit7
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A5D3 — BattleAi_TargetPcStatus2Bit2 (48 bytes, $A5D3–$A602)
+; BattleAi_TargetTable entry $10: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Status2 bit 2 (mask $04).
+; Callers note: none by call; BattleAi_TargetTable entry $10 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcStatus2Bit2:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit2
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A603 — BattleAi_TargetPcUnk21Bit2 (48 bytes, $A603–$A632)
+; BattleAi_TargetTable entry $11: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Unk21 (= BattlerStats.Unk4C+2) bit 2 (mask $04).
+; Callers note: none by call; BattleAi_TargetTable entry $11 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcUnk21Bit2:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Unk21
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit2
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A633 — BattleAi_TargetPcUnk21Bit6 (48 bytes, $A633–$A662)
+; BattleAi_TargetTable entry $12: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Unk21 (= BattlerStats.Unk4C+2) bit 6 (mask $40).
+; Callers note: none by call; BattleAi_TargetTable entry $12 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcUnk21Bit6:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Unk21
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit6
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A663 — BattleAi_TargetPcUnk20Bit4 (48 bytes, $A663–$A692)
+; BattleAi_TargetTable entry $13: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Unk20 (= BattlerStats.Unk4C+1) bit 4 (mask $10).
+; (BattleAi_AddPcByByte also marks an entry $80 for this same bit.)
+; Callers note: none by call; BattleAi_TargetTable entry $13 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcUnk20Bit4:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Unk20
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit4
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A693 — BattleAi_TargetPcUnk01Bit3 (48 bytes, $A693–$A6C2)
+; BattleAi_TargetTable entry $14: as BattleAi_TargetPcStatus2Bit1 with
+; PcStatBlk.Unk01 (= BattlerStats.Unk2E) bit 3 (mask $08).
+; Callers note: none by call; BattleAi_TargetTable entry $14 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        2, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them; plus what
+;        BattleAi_PickPcTarget changes
+BattleAi_TargetPcUnk01Bit3:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    TAX
+    LDA.b #PcStatBlk.Unk01
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit3
+    STA.w !BattleAi_PcByteMask
+    STZ.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #1*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    LDX.w #2*2
+    INC.w !BattleAi_PcSlot
+    JSR BattleAi_AddPcByByte
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A6C3 — BattleAi_TargetOtherEnemies (42 bytes, $A6C3–$A6EC)
+; BattleAi_TargetTable entry $15: the enemy slots 3-10 whose
+; !Battler_UnkAEFF is not $FF (present), in slot order, leaving out the
+; acting enemy (slot !Battle_UnkB252 + 3, kept in DP $0A/$0B);
+; !BattleAi_TargetCount = how many.
+; Callers note: none by call; BattleAi_TargetTable entry $15 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = X = the count (B = 0); Y = 11; DP
+;        $0A = the acting enemy's slot, $0B = 0; !BattleAi_Targets and
+;        !BattleAi_TargetCount written
+!OtherEnemies_Self = !BattleTmp_0A      ; 2 B: the acting enemy's slot
+BattleAi_TargetOtherEnemies:
+    TDC
+    STZ.b !OtherEnemies_Self+1
+    TAX
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.b !OtherEnemies_Self
+    LDY.w #!Battle_FirstEnemySlot
+.slot:
+    CPY.b !OtherEnemies_Self
+    BEQ .next
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TYA
+    STA.w !BattleAi_Targets,X
+    INX
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .slot
+    TXA
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A6ED — BattleAi_TargetEnemies (28 bytes, $A6ED–$A708)
+; BattleAi_TargetTable entry $16: the enemy slots 3-10 whose
+; !Battler_UnkAEFF is not $FF (present), in slot order, the acting
+; enemy included; !BattleAi_TargetCount = how many. (Test $02 picks
+; this code, !BattleAi_TgtCodeUnk16, when it does not pick the PCs.)
+; Callers note: none by call; BattleAi_TargetTable entry $16 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code, also with the code from
+;   BattleAi_TestStatusBits).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = X = the count (B = 0); Y = 11;
+;        !BattleAi_Targets and !BattleAi_TargetCount written
+BattleAi_TargetEnemies:
+    TDC
+    TAX
+    LDY.w #!Battle_FirstEnemySlot
+.slot:
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TYA
+    STA.w !BattleAi_Targets,X
+    INX
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .slot
+    TXA
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:A709 — BattleAi_TargetNearestEnemy (46 bytes, $A709–$A736)
+; BattleAi_TargetTable entry $17: position query
+; !BattlePos_QueryNearestEnemy (service 5) from the acting enemy
+; (!BattlePos_Subject = !Battle_UnkB252 + 3). !BattlePos_Found equal to
+; the subject: !BattleAi_Targets[0] = $FF and !BattleAi_TargetCount =
+; 0; else !BattleAi_Targets[0] = Found and the count = 1, with no check
+; that Found is a slot. The query skips the subject and leaves Found
+; as it was when no other enemy qualifies, so the subject case can only
+; come from a stale Found, and a stale or $FF Found is taken as it is.
+; Callers note: none by call; BattleAi_TargetTable entry $17 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (the query), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $FF on the subject path, else 1;
+;        X, Y unchanged (the service dispatcher saves them around the
+;        query); !BattlePos_Subject, Mode, Other, Result and Found
+;        written (and the query's DP scratch); !BattleAi_Targets[0] and
+;        !BattleAi_TargetCount written
+BattleAi_TargetNearestEnemy:
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattlePos_QueryNearestEnemy
+    STA.w !BattlePos_Mode
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunServiceVec
+    LDA.w !BattlePos_Found
+    CMP.w !BattlePos_Subject
+    BNE .found
+    LDA.b #!Battle_EntryNone
+    STA.w !BattleAi_Targets
+    STZ.w !BattleAi_TargetCount
+    BRA .done
+.found:
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+.done:
+    RTS
+
+; $C1:A737 — BattleAi_TargetFarthestEnemy (46 bytes, $A737–$A764)
+; BattleAi_TargetTable entry $18: as BattleAi_TargetNearestEnemy with
+; position query !BattlePos_QueryFarthestEnemy. That query does not
+; skip the subject (its distance is 0), so Found is the subject when it
+; is the only enemy that qualifies, or the last slot tied at the
+; farthest; then the list is empty (count 0).
+; Callers note: none by call; BattleAi_TargetTable entry $18 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (the query), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = $FF on the subject path, else 1;
+;        X, Y unchanged (the service dispatcher saves them around the
+;        query); !BattlePos_Subject, Mode, Other, Result and Found
+;        written (and the query's DP scratch); !BattleAi_Targets[0] and
+;        !BattleAi_TargetCount written
+BattleAi_TargetFarthestEnemy:
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.w !BattlePos_Subject
+    LDA.b #!BattlePos_QueryFarthestEnemy
+    STA.w !BattlePos_Mode
+    LDA.b #!BattleSys_ServicePosQuery
+    JSR BattleSys_RunServiceVec
+    LDA.w !BattlePos_Found
+    CMP.w !BattlePos_Subject
+    BNE .found
+    LDA.b #!Battle_EntryNone
+    STA.w !BattleAi_Targets
+    STZ.w !BattleAi_TargetCount
+    BRA .done
+.found:
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+.done:
+    RTS
+
+; $C1:A765 — BattleAi_TargetLowestHpEnemy (68 bytes, $A765–$A7A8)
+; BattleAi_TargetTable entry $19: the present enemy (slots 3-10,
+; !Battler_UnkAEFF not $FF) with the lowest non-zero HP (PcStatBlk.CurHp
+; through !BattleRom_PcStatBlock), the acting enemy included; ties keep
+; the earlier slot. !BattleAi_Targets[0] is written only when one is
+; found (else it stays as it was, $FF after BattleAi_ClearTargets), but
+; !BattleAi_TargetCount = 1 either way.
+; Callers note: none by call; BattleAi_TargetTable entry $19 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $02/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 (B = 0); X, Y clobbered; DP $0E
+;        = 11; DP $02 = the low byte of the lowest HP (or $FF), $03 = 0;
+;        !BattleAi_TargetCount (and on a find !BattleAi_Targets[0])
+;        written
+!LowHpEnemy_Min = !BattleTmp_02         ; 2 B: lowest HP so far (high byte zeroed at the end)
+!LowHpEnemy_Slot = !BattleTmp_0E        ; 1 B: slot being examined
+BattleAi_TargetLowestHpEnemy:
+    LDY.w #!BattleAi_HpStartMinAll
+    STY.b !LowHpEnemy_Min
+    TDC
+    LDA.b #!Battle_FirstEnemySlot
+    STA.b !LowHpEnemy_Slot
+.slot:
+    LDA.b !LowHpEnemy_Slot
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    LDA.b !LowHpEnemy_Slot
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !BattleRom_PcStatBlock,X
+    TAX
+    LDY.w PcStatBlk.CurHp,X
+    BEQ .next
+    CPY.b !LowHpEnemy_Min
+    BCS .next
+    STY.b !LowHpEnemy_Min
+    SEP #$20
+    LDA.b !LowHpEnemy_Slot
+    STA.w !BattleAi_Targets
+.next:
+    SEP #$20
+    TDC
+    INC.b !LowHpEnemy_Slot
+    LDA.b !LowHpEnemy_Slot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STZ.b !LowHpEnemy_Min+1
+    RTS
+
+; $C1:A7A9 — BattleAi_TargetOtherEnemyStatus (60 bytes, $A7A9–$A7E4)
+; BattleAi_TargetTable entry $1A: the enemies (slots 3-10, through
+; BattleAi_AddPcByByte: present, not KO'd, marked by .Unk20) whose
+; PcStatBlk.Status byte is non-zero (!BattleAi_PcByteMask =
+; !BattleAi_PcMaskAny), leaving out slot !Battle_UnkB18B (the acting
+; battler), cut to one by BattleAi_PickPcTarget. !BattleAi_TargetCount
+; and the two mark counts start at 0; DP $0E/$0F holds the slot * 2
+; that BattleAi_AddPcByByte gets in X. Handlers $1B-$25 below are the
+; same with another offset and mask, some with self included.
+; BattleAi_PickPcTarget compares the slots with !Battle_EnemyOrder,
+; which holds enemy entries 0-7, so only slots 3-7 can match there;
+; with no match it keeps the first entry listed (see its header).
+; Callers note: none by call; BattleAi_TargetTable entry $1A (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatus:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A7E5 — BattleAi_TargetEnemyStatus (52 bytes, $A7E5–$A818)
+; BattleAi_TargetTable entry $1B: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status non-zero, self (slot !Battle_UnkB18B) included.
+; Callers note: none by call; BattleAi_TargetTable entry $1B (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetEnemyStatus:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    JSR BattleAi_AddPcByByte
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A819 — BattleAi_TargetOtherEnemyStatus2 (60 bytes, $A819–$A854)
+; BattleAi_TargetTable entry $1C: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status2 non-zero, leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $1C (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatus2:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A855 — BattleAi_TargetEnemyStatus2 (52 bytes, $A855–$A888)
+; BattleAi_TargetTable entry $1D: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status2 non-zero, self (slot !Battle_UnkB18B) included.
+; Callers note: none by call; BattleAi_TargetTable entry $1D (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetEnemyStatus2:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    JSR BattleAi_AddPcByByte
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A889 — BattleAi_TargetOtherEnemyUnk1F (60 bytes, $A889–$A8C4)
+; BattleAi_TargetTable entry $1E: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Unk1F (= BattlerStats.Unk4C) non-zero, leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $1E (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyUnk1F:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Unk1F
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A8C5 — BattleAi_TargetEnemyUnk1F (52 bytes, $A8C5–$A8F8)
+; BattleAi_TargetTable entry $1F: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Unk1F (= BattlerStats.Unk4C) non-zero, self (slot !Battle_UnkB18B) included.
+; Quirk: the loop stores the index back with STA (8-bit A) at $C1:A8E9,
+; not STX, so DP $0E gets the low byte of A as BattleAi_AddPcByByte
+; left it: slots 3 and 4 get the right X ($06, $08), each later slot
+; gets that A from two calls before, + 2, as its stat-block index
+; (DP $0F stays 0). Which blocks it then reads is not traced.
+; Callers note: none by call; BattleAi_TargetTable entry $1F (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = A's low byte from the last call / 0 (quirk);
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetEnemyUnk1F:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Unk1F
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_PcMaskAny
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    JSR BattleAi_AddPcByByte
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STA.b !ByEnemy_Index                ; quirk: STA, not STX (see the header)
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A8F9 — BattleAi_TargetOtherEnemyStatus2Bit1 (60 bytes, $A8F9–$A934)
+; BattleAi_TargetTable entry $20: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status2 bit 1 (mask $02), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $20 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatus2Bit1:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit1
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A935 — BattleAi_TargetOtherEnemyStatus2Bit7 (60 bytes, $A935–$A970)
+; BattleAi_TargetTable entry $21: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status2 bit 7 (mask $80), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $21 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatus2Bit7:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit7
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A971 — BattleAi_TargetOtherEnemyStatus2Bit2 (60 bytes, $A971–$A9AC)
+; BattleAi_TargetTable entry $22: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status2 bit 2 (mask $04), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $22 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatus2Bit2:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status2
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit2
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A9AD — BattleAi_TargetOtherEnemyUnk21Bit6 (60 bytes, $A9AD–$A9E8)
+; BattleAi_TargetTable entry $23: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Unk21 (= BattlerStats.Unk4C+2) bit 6 (mask $40), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $23 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyUnk21Bit6:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Unk21
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit6
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:A9E9 — BattleAi_TargetOtherEnemyStatusBit1 (60 bytes, $A9E9–$AA24)
+; BattleAi_TargetTable entry $24: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Status bit 1 (mask $02), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $24 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyStatusBit1:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Status
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit1
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:AA25 — BattleAi_TargetOtherEnemyUnk19Bit0 (60 bytes, $AA25–$AA60)
+; BattleAi_TargetTable entry $25: as BattleAi_TargetOtherEnemyStatus with
+; PcStatBlk.Unk19 (= BattlerStats.Unk46) bit 0 (mask $01), leaving out slot !Battle_UnkB18B.
+; Callers note: none by call; BattleAi_TargetTable entry $25 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; !BattleAi_PcSlot =
+;        11, !BattleAi_PcByteMask written; DP $0A = the offset, $0B-$0D
+;        as BattleAi_AddPcByByte leaves them, DP $0E/$0F = $16;
+;        plus what BattleAi_PickPcTarget changes
+BattleAi_TargetOtherEnemyUnk19Bit0:
+    STZ.w !BattleAi_TargetCount
+    STZ.w !BattleAi_Marked40Count
+    STZ.w !BattleAi_Marked80Count
+    TDC
+    LDA.b #!Battle_FirstEnemySlot*2
+    TAX
+    STX.b !ByEnemy_Index
+    LDA.b #PcStatBlk.Unk19
+    STA.b !ByPcByte_Offset
+    LDA.b #!BattleAi_TgtBit0
+    STA.w !BattleAi_PcByteMask
+    LDA.b #!Battle_FirstEnemySlot
+    STA.w !BattleAi_PcSlot
+.slot:
+    LDA.w !BattleAi_PcSlot
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    JSR BattleAi_AddPcByByte
+.next:
+    LDX.b !ByEnemy_Index
+    INX
+    INX
+    STX.b !ByEnemy_Index
+    INC.w !BattleAi_PcSlot
+    LDA.w !BattleAi_PcSlot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    JSR BattleAi_PickPcTarget
+    RTS
+
+; $C1:AA61 — BattleAi_TargetLowestHpOtherEnemy (74 bytes, $AA61–$AAAA)
+; BattleAi_TargetTable entry $26: as BattleAi_TargetLowestHpEnemy, but
+; slot !Battle_UnkB18B ("self"; see the BattleAi_TargetTable banner for whose
+; slot it holds in each pass) is left out.
+; !BattleAi_TargetCount = 1 whether or not one is found.
+; Callers note: none by call; BattleAi_TargetTable entry $26 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $02/$0E), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 (B = 0); X, Y clobbered; DP $0E
+;        = 11; DP $02 = the low byte of the lowest HP (or $FF), $03 = 0;
+;        !BattleAi_TargetCount (and on a find !BattleAi_Targets[0])
+;        written
+BattleAi_TargetLowestHpOtherEnemy:
+    LDY.w #!BattleAi_HpStartMinAll
+    STY.b !LowHpEnemy_Min
+    TDC
+    LDA.b #!Battle_FirstEnemySlot
+    STA.b !LowHpEnemy_Slot
+.slot:
+    LDA.b !LowHpEnemy_Slot
+    TAX
+    LDA.w !Battler_UnkAEFF,X
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TXA
+    CMP.w !Battle_UnkB18B
+    BEQ .next
+    LDA.b !LowHpEnemy_Slot
+    ASL A
+    TAX
+    REP #$20
+    LDA.l !BattleRom_PcStatBlock,X
+    TAX
+    LDY.w PcStatBlk.CurHp,X
+    BEQ .next
+    CPY.b !LowHpEnemy_Min
+    BCS .next
+    STY.b !LowHpEnemy_Min
+    SEP #$20
+    LDA.b !LowHpEnemy_Slot
+    STA.w !BattleAi_Targets
+.next:
+    SEP #$20
+    TDC
+    INC.b !LowHpEnemy_Slot
+    LDA.b !LowHpEnemy_Slot
+    CMP.b #!Battle_NumSlots
+    BCC .slot
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STZ.b !LowHpEnemy_Min+1
+    RTS
+
+; $C1:AAAB — BattleAi_TargetEnemy0 (11 bytes, $AAAB–$AAB5)
+; BattleAi_TargetTable entry $27: !BattleAi_Targets[0] = slot 3 (enemy
+; entry 0), present or not; !BattleAi_TargetCount = 1. Entries $28-$2E
+; below do the same for slots 4-10, $30-$36 for slots 0-6.
+; Callers note: none by call; BattleAi_TargetTable entry $27 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy0:
+    LDA.b #!Battle_FirstEnemySlot+0
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAB6 — BattleAi_TargetEnemy1 (11 bytes, $AAB6–$AAC0)
+; BattleAi_TargetTable entry $28: as BattleAi_TargetEnemy0 with slot 4 (entry 1).
+; Callers note: none by call; BattleAi_TargetTable entry $28 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy1:
+    LDA.b #!Battle_FirstEnemySlot+1
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAC1 — BattleAi_TargetEnemy2 (11 bytes, $AAC1–$AACB)
+; BattleAi_TargetTable entry $29: as BattleAi_TargetEnemy0 with slot 5 (entry 2).
+; Callers note: none by call; BattleAi_TargetTable entry $29 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy2:
+    LDA.b #!Battle_FirstEnemySlot+2
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AACC — BattleAi_TargetEnemy3 (11 bytes, $AACC–$AAD6)
+; BattleAi_TargetTable entry $2A: as BattleAi_TargetEnemy0 with slot 6 (entry 3).
+; Callers note: none by call; BattleAi_TargetTable entry $2A (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy3:
+    LDA.b #!Battle_FirstEnemySlot+3
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAD7 — BattleAi_TargetEnemy4 (11 bytes, $AAD7–$AAE1)
+; BattleAi_TargetTable entry $2B: as BattleAi_TargetEnemy0 with slot 7 (entry 4).
+; Callers note: none by call; BattleAi_TargetTable entry $2B (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy4:
+    LDA.b #!Battle_FirstEnemySlot+4
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAE2 — BattleAi_TargetEnemy5 (11 bytes, $AAE2–$AAEC)
+; BattleAi_TargetTable entry $2C: as BattleAi_TargetEnemy0 with slot 8 (entry 5).
+; Callers note: none by call; BattleAi_TargetTable entry $2C (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy5:
+    LDA.b #!Battle_FirstEnemySlot+5
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAED — BattleAi_TargetEnemy6 (11 bytes, $AAED–$AAF7)
+; BattleAi_TargetTable entry $2D: as BattleAi_TargetEnemy0 with slot 9 (entry 6).
+; Callers note: none by call; BattleAi_TargetTable entry $2D (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy6:
+    LDA.b #!Battle_FirstEnemySlot+6
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AAF8 — BattleAi_TargetEnemy7 (11 bytes, $AAF8–$AB02)
+; BattleAi_TargetTable entry $2E: as BattleAi_TargetEnemy0 with slot 10 (entry 7).
+; Callers note: none by call; BattleAi_TargetTable entry $2E (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetEnemy7:
+    LDA.b #!Battle_FirstEnemySlot+7
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB03 — BattleAi_TargetRandomUnkAF15 (75 bytes, $AB03–$AB4D)
+; BattleAi_TargetTable entry $2F: lists the enemy entries n (0-7) whose
+; !Battle_UnkAF15 byte has bit 7 (!Battle_AF15Bit7; such an enemy is
+; out of the fight, probably: BattleSys_UpdateKo treats it as KO'd and
+; BattleAi_UnkAED3 clears the bit when it puts one back). None: count
+; 0. One: count 1. Two or more: Battle_RandRange (0 to count - 1) picks
+; one into !BattleAi_Targets[0], entries 1-10 = $FF, count 1.
+; Note: the list holds the entry numbers 0-7 themselves, not the
+; battler slots (entry + 3) every other handler stores; whether the
+; script code that uses this target expects that is not traced.
+; Callers note: none by call; BattleAi_TargetTable entry $2F (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E;
+;        - none: A = 0 (B = 0); X = 8; Y = 0;
+;        - one: A = 1; X = 8; Y = 1;
+;        - a pick: A = 1; X = 11; Y's low byte = the count, high byte
+;          cleared (Battle_RandRange's SEP #$10).
+;        !BattleAi_Targets and !BattleAi_TargetCount written; on a pick
+;        plus what Battle_RandRange changes
+BattleAi_TargetRandomUnkAF15:
+    TDC
+    TAX
+    TAY
+.entry:
+    LDA.w !Battle_UnkAF15,X
+    BIT.b #!Battle_AF15Bit7
+    BEQ .next
+    TXA
+    STA.w !BattleAi_Targets,Y
+    INY
+.next:
+    INX
+    CPX.w #!Battle_NumEnemies
+    BCC .entry
+    CPY.w #0
+    BNE .some
+    TDC
+    STA.w !BattleAi_TargetCount
+    BRA .done
+.some:
+    TYA
+    STA.w !BattleAi_TargetCount
+    CMP.b #2
+    BCC .done
+    TDC
+    TAX
+    LDA.w !BattleAi_TargetCount
+    JSR Battle_RandRange
+    TAX
+    LDA.w !BattleAi_Targets,X
+    STA.w !BattleAi_Targets
+    LDX.w #1
+    LDA.b #!Battle_EntryNone
+.clear:
+    STA.w !BattleAi_Targets,X
+    INX
+    CPX.w #!Battle_NumSlots
+    BCC .clear
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+.done:
+    RTS
+
+; $C1:AB4E — BattleAi_TargetSlot0 (11 bytes, $AB4E–$AB58)
+; BattleAi_TargetTable entry $30: as BattleAi_TargetEnemy0 with slot 0.
+; Callers note: none by call; BattleAi_TargetTable entry $30 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot0:
+    LDA.b #0
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB59 — BattleAi_TargetSlot1 (11 bytes, $AB59–$AB63)
+; BattleAi_TargetTable entry $31: as BattleAi_TargetEnemy0 with slot 1.
+; Callers note: none by call; BattleAi_TargetTable entry $31 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot1:
+    LDA.b #1
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB64 — BattleAi_TargetSlot2 (11 bytes, $AB64–$AB6E)
+; BattleAi_TargetTable entry $32: as BattleAi_TargetEnemy0 with slot 2.
+; Callers note: none by call; BattleAi_TargetTable entry $32 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot2:
+    LDA.b #2
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB6F — BattleAi_TargetSlot3 (11 bytes, $AB6F–$AB79)
+; BattleAi_TargetTable entry $33: as BattleAi_TargetEnemy0 with slot 3.
+; Callers note: none by call; BattleAi_TargetTable entry $33 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot3:
+    LDA.b #3
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB7A — BattleAi_TargetSlot4 (11 bytes, $AB7A–$AB84)
+; BattleAi_TargetTable entry $34: as BattleAi_TargetEnemy0 with slot 4.
+; Callers note: none by call; BattleAi_TargetTable entry $34 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot4:
+    LDA.b #4
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB85 — BattleAi_TargetSlot5 (11 bytes, $AB85–$AB8F)
+; BattleAi_TargetTable entry $35: as BattleAi_TargetEnemy0 with slot 5.
+; Callers note: none by call; BattleAi_TargetTable entry $35 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot5:
+    LDA.b #5
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB90 — BattleAi_TargetSlot6 (11 bytes, $AB90–$AB9A)
+; BattleAi_TargetTable entry $36: as BattleAi_TargetEnemy0 with slot 6.
+; Callers note: none by call; BattleAi_TargetTable entry $36 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X any, DP any (not used), DB=$7E
+; Exit:  M=1, DB=$7E; A = 1; X, Y unchanged; the two bytes above
+;        written
+BattleAi_TargetSlot6:
+    LDA.b #6
+    STA.w !BattleAi_Targets
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    RTS
+
+; $C1:AB9B — BattleAi_TargetHighestHpPc (46 bytes, $AB9B–$ABC8)
+; BattleAi_TargetTable entry $37: the PC (slots 0-2) with the highest
+; BattlerStats.CurHp; presence and KO are not checked. Starts with PC
+; 0; PC 1 and then PC 2 replace it when their HP is at least the
+; highest so far (DP $02/$03), so ties go to the later slot.
+; !BattleAi_TargetCount = 1.
+; Callers note: none by call; BattleAi_TargetTable entry $37 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $02), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 (B = 0); X unchanged; Y = PC 2's
+;        HP; DP $02 = the low byte of the highest HP, DP $03 = 0;
+;        !BattleAi_Targets[0] and !BattleAi_TargetCount written
+!HighHp_Max = !BattleTmp_02             ; 2 B: highest HP so far (high byte zeroed at the end)
+BattleAi_TargetHighestHpPc:
+    TDC
+    LDY.w BattlerStats[0].CurHp
+    STY.b !HighHp_Max
+    STZ.w !BattleAi_Targets
+    LDY.w BattlerStats[1].CurHp
+    CPY.b !HighHp_Max
+    BCC .pc2
+    STY.b !HighHp_Max
+    LDA.b #1
+    STA.w !BattleAi_Targets
+.pc2:
+    LDY.w BattlerStats[2].CurHp
+    CPY.b !HighHp_Max
+    BCC .done
+    STY.b !HighHp_Max
+    LDA.b #2
+    STA.w !BattleAi_Targets
+.done:
+    TDC
+    LDA.b #1
+    STA.w !BattleAi_TargetCount
+    STZ.b !HighHp_Max+1
+    RTS
+
+; $C1:ABC9 — BattleAi_TargetRandomOtherEnemy (75 bytes, $ABC9–$AC13)
+; BattleAi_TargetTable entry $38: lists the present enemy slots 3-10
+; other than the acting enemy (as BattleAi_TargetOtherEnemies), then,
+; with two or more, Battle_RandRange (0 to count - 1) picks one into
+; !BattleAi_Targets[0] and !BattleAi_TargetCount = 1; with 0 or 1 the
+; count is that number.
+; Quirk: the clear after a pick compares X with 0 (CPX #0 at $C1:AC09),
+; which never branches back, so only entry 1 is set to $FF; entries 2
+; up to the old count keep their slots (the count of 1 still says one).
+; Callers note: none by call; BattleAi_TargetTable entry $38 (JSR (T,X)
+;   in BattleAi_ReadTargets_Code).
+; Entry: M=1, X=0, DP=0 (TDC as zero, DP $0A), DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; DP $0A = the acting enemy's slot, $0B
+;        = 0;
+;        - 0 or 1 listed: A = X = the count (B = 0); Y = 11;
+;        - a pick: A = 1; X = 2; Y = 11 with its high byte cleared
+;          (Battle_RandRange's SEP #$10; Y is $0B either way), plus
+;          what Battle_RandRange changes.
+;        !BattleAi_Targets and !BattleAi_TargetCount written
+BattleAi_TargetRandomOtherEnemy:
+    TDC
+    STZ.b !OtherEnemies_Self+1
+    TAX
+    LDA.w !Battle_UnkB252
+    CLC
+    ADC.b #!Battle_FirstEnemySlot
+    STA.b !OtherEnemies_Self
+    LDY.w #!Battle_FirstEnemySlot
+.slot:
+    CPY.b !OtherEnemies_Self
+    BEQ .next
+    LDA.w !Battler_UnkAEFF,Y
+    CMP.b #!Battle_EntryNone
+    BEQ .next
+    TYA
+    STA.w !BattleAi_Targets,X
+    INX
+.next:
+    INY
+    CPY.w #!Battle_NumSlots
+    BNE .slot
+    TXA
+    CMP.b #2
+    BCC .count
+    LDX.w #0
+    JSR Battle_RandRange
+    TAX
+    LDA.w !BattleAi_Targets,X
+    STA.w !BattleAi_Targets
+    LDA.b #!Battle_EntryNone
+    LDX.w #1
+.clear:
+    STA.w !BattleAi_Targets,X
+    INX
+    CPX.w #0
+    BCC .clear                          ; quirk: never taken (see the header)
+    LDA.b #1
+.count:
+    STA.w !BattleAi_TargetCount
+    RTS
+
 ; $C1:AC14 — BattleAi_ReadTargets (50 bytes, $AC14–$AC45)
 ; Reads the target code of a script record and fills !BattleAi_Targets:
 ; BattleAi_ClearTargets first, then !Battle_UnkB1D2 + 1 and the code
@@ -27324,8 +29341,10 @@ BattleAi_AddStatByteAtY:
 ; Either way !Battle_UnkB2AE = !BattleAi_Targets[0].
 ; Sub-entry BattleAi_ReadTargets_Code ($C1:AC2C): the second step alone,
 ; with the target code in A (called from $C1:8F39, in the test handler
-; BattleAi_TestStatusBits, which picks the code itself); !BattleAi_Targets is
-; not cleared first there. BattleAi_ReadTargets_Done ($C1:AC3F) is the
+; BattleAi_TestStatusBits, which picks the code itself); the sub-entry
+; does not clear !BattleAi_Targets itself, but its one caller has run
+; BattleAi_ClearTargets just before (JSR at $C1:8F2D), so the list
+; starts all $FF there too. BattleAi_ReadTargets_Done ($C1:AC3F) is the
 ; shared tail (global only because the sub-entry splits the routine).
 ; Callers (24 JSR sites): BattleAi_TestHpHalfOrLess ($C1:8EAB), BattleAi_TestTargetId ($C1:8F87),
 ;   BattleAi_TestHpAtMost ($C1:90BE), BattleAi_TestStatByteAtLeast ($C1:9130),
@@ -27343,8 +29362,8 @@ BattleAi_AddStatByteAtY:
 ;        DB=$7E; !Battle_UnkB1D2 = the address just before the target
 ;        code. Sub-entry: A = the code
 ;        (0-$7F), B = 0 (the 16-bit TAX of code * 2)
-; Exit:  M=1, X=0 (as the code assumes after the target handler, not
-;        analysed), DB=$7E; A = !BattleAi_Targets[0]; X = the code's
+; Exit:  M=1, X=0 (every target handler returns with M=1, X=0;
+;        BattleAi_TargetNone keeps them), DB=$7E; A = !BattleAi_Targets[0]; X = the code's
 ;        address on the $80 path, else 11; Y as the handler leaves it;
 ;        !Battle_UnkB1D2 + 1 (not on the sub-entry); the RAM above
 ;        written, plus whatever the target handler changes
@@ -27404,8 +29423,8 @@ BattleAi_ClearTargets:
 ;   BattleSys_UpdateKo ($C1:B376), BattleSys_UnkB967 ($C1:BB26, $C1:BC1E), BattleSys_RunPcAttack
 ;   ($C1:C00E) and BattleSys_UnkC1DD ($C1:C6A3).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-;        (the service dispatcher is not matched; the code assumes it
-;        keeps these)
+;        (BattleSys_RunService puts A, X and Y back, and service 4
+;        returns with these)
 ; Exit:  M=1, X=0 (as assumed after BattleFD_UnkACFD, the last callee of
 ;        Battle_ApplyHits; not analysed), DP=0, DB=$7E; A, X, Y
 ;        clobbered; plus what BattleSys_UnkBFA4 and Battle_ApplyHits change
@@ -27417,8 +29436,8 @@ BattleSys_UnkAC57:
 ; $C1:AC5E — BattleSys_UnkAC5E (39 bytes, $AC5E–$AC84)
 ; If !Battle_UnkAEB2 is set: !Battle_UnkAE85[n] = 1 for each enemy n
 ; (0-7) whose !Battle_UnkAEB3 entry is non-zero, then, unless
-; !Battle_Unk2989 has bit 5, service !BattleSys_ServiceUnk6 ($C1:006D,
-; not analysed). !Battle_UnkAEB2 = 0 in any case.
+; !Battle_Unk2989 has bit 5, service !BattleSys_ServiceUnk6 (BattleSys_Service6:
+; JSL $CF:FE20, not analysed). !Battle_UnkAEB2 = 0 in any case.
 ; Callers (1 JSR site): BattleSys_Unk8461 ($C1:881C).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X clobbered (and what service 6
@@ -27654,14 +29673,15 @@ BattleAi_SetTargetMask:
 ; then cuts the list to one with BattleAi_PickPcTarget. Before:
 ; !BattleAi_TargetCount, !BattleAi_Marked40Count, !BattleAi_Marked80Count
 ; and !Battle_UnkAEC9 (2 B) = 0.
-; Callers (5 JSR sites): unmatched ($C1:A547, $C1:A551, $C1:A55B, $C1:A565, $C1:A56F).
-; Callers note: $C1:A547, $C1:A551, $C1:A55B, $C1:A565, $C1:A56F (target
-;   handlers $09-$0D, which pass the offset; not matched).
+; Callers (5 JSR sites): BattleAi_TargetPcStatus ($C1:A547), BattleAi_TargetPcStatus2 ($C1:A551),
+;   BattleAi_TargetPcUnk1F ($C1:A55B), BattleAi_TargetPcUnk20 ($C1:A565) and BattleAi_TargetPcUnk21
+;   ($C1:A56F).
+; Callers note: the target handlers $09-$0D, which pass the offset.
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $0A = the stat-block offset
-; Exit:  M=1, X=0 (as assumed after BattleAi_PickPcTarget's callee),
+; Exit:  M=1, X=0 (BattleAi_PickPcTarget returns with X=0),
 ;        DP=0, DB=$7E; A, X, Y
 ;        clobbered; !BattleAi_PcSlot = 2; DP $0B, $0C and $0D written
-;        (BattleAi_AddPcByByte); plus what BattleAi_Target07 changes
+;        (BattleAi_AddPcByByte); plus what BattleAi_TargetFarthestPc changes
 ;        when BattleAi_PickPcTarget runs it
 org $C1AD68
 BattleAi_TargetsByPcByte:
@@ -27700,7 +29720,7 @@ BattleAi_TargetsByPcByte:
 ;     !BattleAi_Targets[0], marks and all. With !BattleAi_Marked80Count
 ;     non-zero only an entry marked $80 may be taken. Then, when
 ;     !BattleAi_Marked40Count is non-zero and the pick has the $40
-;     mark, BattleAi_Target07 runs and that is all; else .one.
+;     mark, BattleAi_TargetFarthestPc runs and that is all; else .one.
 ;   - .one: !BattleAi_TargetCount = 1 and the marks of
 ;     !BattleAi_Targets[0] are dropped.
 ; Quirks: with !BattleAi_Marked80Count set, a matching entry without
@@ -27710,16 +29730,25 @@ BattleAi_TargetsByPcByte:
 ; the BRA at $C1:AE0B): it would set the count to 0. The order only
 ; matches PC slots 0-2 that also are enemy entry numbers in
 ; !Battle_EnemyOrder, so with few enemies some PCs can never be taken.
-; Callers (20 JSR sites): BattleAi_TargetsByPcByte ($C1:AD9D) and unmatched ($C1:A59F, $C1:A5CF,
-;   $C1:A5FF, $C1:A62F, $C1:A65F, $C1:A68F, $C1:A6BF, $C1:A7E1, $C1:A815, $C1:A851, $C1:A885,
-;   $C1:A8C1, $C1:A8F5, $C1:A931, $C1:A96D, $C1:A9A9, $C1:A9E5, $C1:AA21, $C1:AA5D).
-; Callers note: 20 JSR sites: BattleAi_TargetsByPcByte ($C1:AD9D) and 19 in
-;   the target handlers, $C1:A59F to $C1:AA5D (not matched).
-; Entry: M=1, X=0, DP any (not used), DB=$7E
-; Exit:  M=1, X=0 (as assumed after BattleAi_Target07, not analysed),
+; Callers (20 JSR sites): BattleAi_TargetPcStatus2Bit1 ($C1:A59F), BattleAi_TargetPcStatus2Bit7
+;   ($C1:A5CF), BattleAi_TargetPcStatus2Bit2 ($C1:A5FF), BattleAi_TargetPcUnk21Bit2 ($C1:A62F),
+;   BattleAi_TargetPcUnk21Bit6 ($C1:A65F), BattleAi_TargetPcUnk20Bit4 ($C1:A68F),
+;   BattleAi_TargetPcUnk01Bit3 ($C1:A6BF), BattleAi_TargetOtherEnemyStatus ($C1:A7E1),
+;   BattleAi_TargetEnemyStatus ($C1:A815), BattleAi_TargetOtherEnemyStatus2 ($C1:A851),
+;   BattleAi_TargetEnemyStatus2 ($C1:A885), BattleAi_TargetOtherEnemyUnk1F ($C1:A8C1),
+;   BattleAi_TargetEnemyUnk1F ($C1:A8F5), BattleAi_TargetOtherEnemyStatus2Bit1 ($C1:A931),
+;   BattleAi_TargetOtherEnemyStatus2Bit7 ($C1:A96D), BattleAi_TargetOtherEnemyStatus2Bit2
+;   ($C1:A9A9), BattleAi_TargetOtherEnemyUnk21Bit6 ($C1:A9E5), BattleAi_TargetOtherEnemyStatusBit1
+;   ($C1:AA21), BattleAi_TargetOtherEnemyUnk19Bit0 ($C1:AA5D) and BattleAi_TargetsByPcByte
+;   ($C1:AD9D).
+; Callers note: BattleAi_TargetsByPcByte and 19 target handlers ($0E-$14,
+;   $1A-$25).
+; Entry: M=1, X=0, DP=0 (the TDC/TAX/TAY at $C1:ADB0 and at .any_mark
+;        use it as zero, and BattleAi_TargetFarthestPc needs DP=0), DB=$7E
+; Exit:  M=1, X=0 (BattleAi_TargetFarthestPc returns with X=0),
 ;        DB=$7E; A, X, Y clobbered; !BattleAi_Targets[0] and
 ;        !BattleAi_TargetCount written as above, plus what
-;        BattleAi_Target07 changes
+;        BattleAi_TargetFarthestPc changes
 BattleAi_PickPcTarget:
     TDC
     LDA.w !BattleAi_TargetCount
@@ -27781,7 +29810,7 @@ BattleAi_PickPcTarget:
     LDA.w !BattleAi_Targets
     BIT.b #!BattleAi_TargetMarked40
     BEQ .one
-    JSR BattleAi_Target07
+    JSR BattleAi_TargetFarthestPc
     BRA .done
     ; dead (see the header): no path reaches $C1:AE0D-$C1:AE12
     TDC
@@ -27883,14 +29912,21 @@ BattleAi_PickMarkedTarget:
 ; then marked by PcStatBlk.Unk20: bit 5 gives $40
 ; (!BattleAi_Marked40Count + 1), bit 4 gives $80
 ; (!BattleAi_Marked80Count + 1).
-; Callers (36 JSR sites): BattleAi_TargetsByPcByte ($C1:AD84, $C1:AD8F, $C1:AD9A) and unmatched
-;   ($C1:A58A, $C1:A593, $C1:A59C, $C1:A5BA, $C1:A5C3, $C1:A5CC, $C1:A5EA, $C1:A5F3, $C1:A5FC,
-;   $C1:A61A, $C1:A623, $C1:A62C, $C1:A64A, $C1:A653, $C1:A65C, $C1:A67A, $C1:A683, $C1:A68C,
-;   $C1:A6AA, $C1:A6B3, $C1:A6BC, $C1:A7CE, $C1:A802, $C1:A83E, $C1:A872, $C1:A8AE, $C1:A8E2,
-;   $C1:A91E, $C1:A95A, $C1:A996, $C1:A9D2, $C1:AA0E, $C1:AA4A).
-; Callers note: 36 JSR sites, e.g. BattleAi_TargetsByPcByte ($C1:AD84,
-;   $C1:AD8F, $C1:AD9A) and the target handlers from $C1:A58A (not
-;   matched).
+; Callers (36 JSR sites): BattleAi_TargetPcStatus2Bit1 ($C1:A58A, $C1:A593, $C1:A59C),
+;   BattleAi_TargetPcStatus2Bit7 ($C1:A5BA, $C1:A5C3, $C1:A5CC), BattleAi_TargetPcStatus2Bit2
+;   ($C1:A5EA, $C1:A5F3, $C1:A5FC), BattleAi_TargetPcUnk21Bit2 ($C1:A61A, $C1:A623, $C1:A62C),
+;   BattleAi_TargetPcUnk21Bit6 ($C1:A64A, $C1:A653, $C1:A65C), BattleAi_TargetPcUnk20Bit4 ($C1:A67A,
+;   $C1:A683, $C1:A68C), BattleAi_TargetPcUnk01Bit3 ($C1:A6AA, $C1:A6B3, $C1:A6BC),
+;   BattleAi_TargetOtherEnemyStatus ($C1:A7CE), BattleAi_TargetEnemyStatus ($C1:A802),
+;   BattleAi_TargetOtherEnemyStatus2 ($C1:A83E), BattleAi_TargetEnemyStatus2 ($C1:A872),
+;   BattleAi_TargetOtherEnemyUnk1F ($C1:A8AE), BattleAi_TargetEnemyUnk1F ($C1:A8E2),
+;   BattleAi_TargetOtherEnemyStatus2Bit1 ($C1:A91E), BattleAi_TargetOtherEnemyStatus2Bit7
+;   ($C1:A95A), BattleAi_TargetOtherEnemyStatus2Bit2 ($C1:A996), BattleAi_TargetOtherEnemyUnk21Bit6
+;   ($C1:A9D2), BattleAi_TargetOtherEnemyStatusBit1 ($C1:AA0E), BattleAi_TargetOtherEnemyUnk19Bit0
+;   ($C1:AA4A) and BattleAi_TargetsByPcByte ($C1:AD84, $C1:AD8F, $C1:AD9A).
+; Callers note: BattleAi_TargetsByPcByte and the target handlers $0E-$14
+;   (PC slots 0-2) and $1A-$25 (enemy slots 3-10, X = slot * 2; the
+;   !BattleRom_PcStatBlock table covers all 11 slots).
 ; Entry: M=1, X=0, DP=0, DB=$7E; X = !BattleAi_PcSlot * 2; DP $0A =
 ;        the offset (DP $0B is zeroed here)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A clobbered (B = 0); X = the stat-block
@@ -28047,17 +30083,18 @@ BattleAi_NoteFirstTest:
 ; routine sets only !Battle_MathA, so whatever !Battle_MathHi holds
 ; takes part (the result stays below high - low all the same). A high
 ; bound below the low one is not handled (the subtraction wraps).
-; Callers (38 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
-;   BattleAi_TestChance ($C1:95E8), BattleAi_ChooseByChance ($C1:98D5), BattleSys_UnkC1DD ($C1:C486,
-;   $C1:C867, $C1:C8D0), BattleSys_Effect02 ($C1:D29E), BattleSys_RunTechParts ($C1:D67C),
-;   BattleSys_RestoreHpMp ($C1:DA7C, $C1:DB1A), BattleSys_RollHit ($C1:DC94), BattleSys_CalcDamage
-;   ($C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4, $C1:E41F, $C1:E4AE, $C1:E508,
-;   $C1:E56F), BattleSys_RollUpTo1A ($C1:E774), BattleSys_DrainHpMp ($C1:E7BB), BattleSys_UnkE976
-;   ($C1:E97A), BattleSys_StealItem ($C1:E9F0), BattleSys_HitModUnk47Status ($C1:EED8),
-;   BattleSys_HitModChanceStatus ($C1:EEFF), BattleSys_HitModLeaveOneHp ($C1:EF18),
-;   BattleSys_HitModRollDp1A ($C1:EFC9), BattleSys_HitModHalveHp ($C1:F0A4),
-;   BattleSys_HitModKoOrDrop ($C1:F141), Battle_RandRangeLong ($C1:FDCB) and unmatched ($C1:A48A,
-;   $C1:AB30, $C1:ABF6, $C1:FDDA).
+; Callers (37 JSR sites): BattleSys_Main ($C1:807B, $C1:80B1), BattleAi_EnemyTurn ($C1:8DE8),
+;   BattleAi_TestChance ($C1:95E8), BattleAi_ChooseByChance ($C1:98D5), BattleAi_TargetRandomPc
+;   ($C1:A48A), BattleAi_TargetRandomUnkAF15 ($C1:AB30), BattleAi_TargetRandomOtherEnemy ($C1:ABF6),
+;   BattleSys_UnkC1DD ($C1:C486, $C1:C867, $C1:C8D0), BattleSys_Effect02 ($C1:D29E),
+;   BattleSys_RunTechParts ($C1:D67C), BattleSys_RestoreHpMp ($C1:DA7C, $C1:DB1A), BattleSys_RollHit
+;   ($C1:DC94), BattleSys_CalcDamage ($C1:E177, $C1:E1F3, $C1:E26D, $C1:E2CA, $C1:E35C, $C1:E3C4,
+;   $C1:E41F, $C1:E4AE, $C1:E508, $C1:E56F), BattleSys_RollUpTo1A ($C1:E774), BattleSys_DrainHpMp
+;   ($C1:E7BB), BattleSys_UnkE976 ($C1:E97A), BattleSys_StealItem ($C1:E9F0),
+;   BattleSys_HitModUnk47Status ($C1:EED8), BattleSys_HitModChanceStatus ($C1:EEFF),
+;   BattleSys_HitModLeaveOneHp ($C1:EF18), BattleSys_HitModRollDp1A ($C1:EFC9),
+;   BattleSys_HitModHalveHp ($C1:F0A4), BattleSys_HitModKoOrDrop ($C1:F141) and Battle_RandRangeLong
+;   ($C1:FDCB).
 ; Entry: M=1, X any (only X's low byte is used), DP=0, DB=$7E; A = high
 ;        bound, X = low bound
 ; Exit:  M=1, X=0; A = the number; X = !Battle_MathLo (saved and put
@@ -28643,9 +30680,10 @@ BattleSys_UnkB223:
 ;     !Battle_UnkAEB2 = 1 (for service 6, see BattleSys_UnkB762).
 ; The revive leaves the PC KO'd here; the next check clears the bit
 ; again with the healed HP (not traced further).
-; Callers (4 JSR sites): BattleSys_UnkB223 ($C1:B234) and unmatched ($C1:A460, $C1:A469, $C1:A472).
-; Callers note: the unmatched sites are probably all in one script
-;   handler (xref reaches them by decoding on from BattleAi_ReadTargets_Code).
+; Callers (4 JSR sites): BattleAi_TargetRandomPc ($C1:A460, $C1:A469, $C1:A472) and
+;   BattleSys_UnkB223 ($C1:B234).
+; Callers note: BattleAi_TargetRandomPc runs it for PC slots 0-2 before
+;   each roll.
 ; Entry: M=1, X=0, DP=0, DB=$7E; Y = slot (0-10), X = slot * $80
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; Y = the slot and X = slot *
 ;        $80, except after the revive path, which clobbers X, Y and
@@ -29179,14 +31217,18 @@ BattleSys_UnkB4E9:
 ; each PC in it (A = the slot) until one leaves !Battle_UnkB3EA
 ; non-zero; then that row's PC and every PC in the row get
 ; !Battle_CmdPcs = 1. Last,
-; BattleFD_UnkA95F (which reads the marks, probably). The reading
-; "cancel the commands of a group one of whose PCs can no longer act"
-; is a guess from the shape; bank $FD is not traced.
+; BattleFD_UnkA95F, which drops the latched command of each marked PC
+; (BattleFD_DropLatchedPcCommand: item refunded, BattleCmd cleared,
+; gauge restarted, out of the ready queue). So a group loses its
+; commands when one of its PCs fails BattleFD_UnkA8A5's check (KO'd,
+; or the Unk4C+2/+7 bit 7 or Status2 $86 bits; "can no longer act",
+; probably).
 ; Callers (3 JSR sites): BattleSys_Unk8461 ($C1:8538, $C1:8809) and BattleSys_Unk883D ($C1:884B).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  as BattleFD_UnkA95F leaves them (not analysed); before it, X =
-;        0-3 and A = 0, 1 or $FF. The loops assume BattleFD_UnkA8A5
-;        keeps X.
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y as BattleFD_UnkA95F leaves
+;        them (before it, X = 0-3 and A = 0, 1 or $FF; BattleFD_UnkA8A5
+;        keeps X, as the loops need); DP $14 and what BattleFD_UnkA95F
+;        changes
 BattleSys_UnkB575:
     TDC
     TAX
@@ -29385,8 +31427,8 @@ BattleSys_UnkB575:
 ; gets .Quantity + 1 (BattleMenu_CommitAction took one off when the
 ; command was committed). The byte after the RTS is a second RTS that
 ; nothing reaches.
-; Callers (6 JSR sites): BattleSys_UnkB3F9 ($C1:B43E), BattleSys_UnkB4E9 ($C1:B4ED, $C1:B4F4,
-;   $C1:B4FB), BattleSys_RefundItemLong ($C1:FDCF) and unmatched ($C1:FDDE).
+; Callers (5 JSR sites): BattleSys_UnkB3F9 ($C1:B43E), BattleSys_UnkB4E9 ($C1:B4ED, $C1:B4F4,
+;   $C1:B4FB) and BattleSys_RefundItemLong ($C1:FDCF).
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $14 = PC slot (0-2)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; X preserved (PHX/PLX); A clobbered
 ;        (B = 0); Y = the record number when the item was found, 256
@@ -29735,67 +31777,65 @@ BattleAi_RunTable:
 ; BattleAi_TargetTable ($C1:B8BB–$C1:B92C, 57 words)
 ; Handlers of the script's target codes $00-$38, by code * 2: JSR (T,X)
 ; in BattleAi_ReadTargets ($C1:AC2E). They fill !BattleAi_Targets and
-; !BattleAi_TargetCount: $00 does nothing, $01 lists the present PCs
-; (slots 0-2), $02 all present battlers, $03 the enemy itself
-; (!Battle_UnkB252 + 3); the others are not analysed.
+; !BattleAi_TargetCount; see the banner at $C1:A3F6 for the kinds.
 BattleAi_TargetTable:
-    dw BattleAi_Target00           ; $00
-    dw BattleAi_Target01           ; $01
-    dw BattleAi_Target02           ; $02
-    dw BattleAi_Target03           ; $03
-    dw BattleAi_Target04           ; $04
-    dw BattleAi_Target05           ; $05
-    dw BattleAi_Target06           ; $06
-    dw BattleAi_Target07           ; $07
-    dw BattleAi_Target08           ; $08
-    dw BattleAi_Target09           ; $09
-    dw BattleAi_Target0A           ; $0A
-    dw BattleAi_Target0B           ; $0B
-    dw BattleAi_Target0C           ; $0C
-    dw BattleAi_Target0D           ; $0D
-    dw BattleAi_Target0E           ; $0E
-    dw BattleAi_Target0F           ; $0F
-    dw BattleAi_Target10           ; $10
-    dw BattleAi_Target11           ; $11
-    dw BattleAi_Target12           ; $12
-    dw BattleAi_Target13           ; $13
-    dw BattleAi_Target14           ; $14
-    dw BattleAi_Target15           ; $15
-    dw BattleAi_Target16           ; $16
-    dw BattleAi_Target17           ; $17
-    dw BattleAi_Target18           ; $18
-    dw BattleAi_Target19           ; $19
-    dw BattleAi_Target1A           ; $1A
-    dw BattleAi_Target1B           ; $1B
-    dw BattleAi_Target1C           ; $1C
-    dw BattleAi_Target1D           ; $1D
-    dw BattleAi_Target1E           ; $1E
-    dw BattleAi_Target1F           ; $1F
-    dw BattleAi_Target20           ; $20
-    dw BattleAi_Target21           ; $21
-    dw BattleAi_Target22           ; $22
-    dw BattleAi_Target23           ; $23
-    dw BattleAi_Target24           ; $24
-    dw BattleAi_Target25           ; $25
-    dw BattleAi_Target26           ; $26
-    dw BattleAi_Target27           ; $27
-    dw BattleAi_Target28           ; $28
-    dw BattleAi_Target29           ; $29
-    dw BattleAi_Target2A           ; $2A
-    dw BattleAi_Target2B           ; $2B
-    dw BattleAi_Target2C           ; $2C
-    dw BattleAi_Target2D           ; $2D
-    dw BattleAi_Target2E           ; $2E
-    dw BattleAi_Target2F           ; $2F
-    dw BattleAi_Target30           ; $30
-    dw BattleAi_Target31           ; $31
-    dw BattleAi_Target32           ; $32
-    dw BattleAi_Target33           ; $33
-    dw BattleAi_Target34           ; $34
-    dw BattleAi_Target35           ; $35
-    dw BattleAi_Target36           ; $36
-    dw BattleAi_Target37           ; $37
-    dw BattleAi_Target38           ; $38
+    dw BattleAi_TargetNone              ; $00
+    dw BattleAi_TargetPcs               ; $01
+    dw BattleAi_TargetAll               ; $02
+    dw BattleAi_TargetSelf              ; $03
+    dw BattleAi_TargetFromUnkB19E       ; $04
+    dw BattleAi_TargetRandomPc          ; $05
+    dw BattleAi_TargetNearestPc         ; $06
+    dw BattleAi_TargetFarthestPc        ; $07
+    dw BattleAi_TargetLowestHpPc        ; $08
+    dw BattleAi_TargetPcStatus          ; $09
+    dw BattleAi_TargetPcStatus2         ; $0A
+    dw BattleAi_TargetPcUnk1F           ; $0B
+    dw BattleAi_TargetPcUnk20           ; $0C
+    dw BattleAi_TargetPcUnk21           ; $0D
+    dw BattleAi_TargetPcStatus2Bit1     ; $0E
+    dw BattleAi_TargetPcStatus2Bit7     ; $0F
+    dw BattleAi_TargetPcStatus2Bit2     ; $10
+    dw BattleAi_TargetPcUnk21Bit2       ; $11
+    dw BattleAi_TargetPcUnk21Bit6       ; $12
+    dw BattleAi_TargetPcUnk20Bit4       ; $13
+    dw BattleAi_TargetPcUnk01Bit3       ; $14
+    dw BattleAi_TargetOtherEnemies      ; $15
+    dw BattleAi_TargetEnemies           ; $16
+    dw BattleAi_TargetNearestEnemy      ; $17
+    dw BattleAi_TargetFarthestEnemy     ; $18
+    dw BattleAi_TargetLowestHpEnemy     ; $19
+    dw BattleAi_TargetOtherEnemyStatus  ; $1A
+    dw BattleAi_TargetEnemyStatus       ; $1B
+    dw BattleAi_TargetOtherEnemyStatus2 ; $1C
+    dw BattleAi_TargetEnemyStatus2      ; $1D
+    dw BattleAi_TargetOtherEnemyUnk1F   ; $1E
+    dw BattleAi_TargetEnemyUnk1F        ; $1F
+    dw BattleAi_TargetOtherEnemyStatus2Bit1; $20
+    dw BattleAi_TargetOtherEnemyStatus2Bit7; $21
+    dw BattleAi_TargetOtherEnemyStatus2Bit2; $22
+    dw BattleAi_TargetOtherEnemyUnk21Bit6; $23
+    dw BattleAi_TargetOtherEnemyStatusBit1; $24
+    dw BattleAi_TargetOtherEnemyUnk19Bit0; $25
+    dw BattleAi_TargetLowestHpOtherEnemy; $26
+    dw BattleAi_TargetEnemy0            ; $27
+    dw BattleAi_TargetEnemy1            ; $28
+    dw BattleAi_TargetEnemy2            ; $29
+    dw BattleAi_TargetEnemy3            ; $2A
+    dw BattleAi_TargetEnemy4            ; $2B
+    dw BattleAi_TargetEnemy5            ; $2C
+    dw BattleAi_TargetEnemy6            ; $2D
+    dw BattleAi_TargetEnemy7            ; $2E
+    dw BattleAi_TargetRandomUnkAF15     ; $2F
+    dw BattleAi_TargetSlot0             ; $30
+    dw BattleAi_TargetSlot1             ; $31
+    dw BattleAi_TargetSlot2             ; $32
+    dw BattleAi_TargetSlot3             ; $33
+    dw BattleAi_TargetSlot4             ; $34
+    dw BattleAi_TargetSlot5             ; $35
+    dw BattleAi_TargetSlot6             ; $36
+    dw BattleAi_TargetHighestHpPc       ; $37
+    dw BattleAi_TargetRandomOtherEnemy  ; $38
 
 ; ==================================================================
 ; Turn-list tables ($C1:B92D–$C1:B960)
@@ -29856,12 +31896,12 @@ BattleSys_ListOffsetTable:
 ; $C1:B961 — BattleSys_RemoveReadyLong (6 bytes, $B961–$B966)
 ; Service !BattleSys_ServiceRemoveReady (BattleMenu_RemoveBattlerFromReady)
 ; for bank-$FD code: a long-callable wrapper.
-; Callers (1 JSL site): unmatched ($FD:A937).
+; Callers (1 JSL site): BattleFD_DropLatchedPcCommand ($FD:A937).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the service needs; see its header);
 ;        !Battle_ArgSlot = the slot to remove
 ; Exit:  as BattleSys_RunService and the service leave them
-;        (BattleSys_RunService is not matched; its stub notes it saves
-;        A, X, Y); back with RTL
+;        (BattleSys_RunService puts A, X and Y back: A = the service
+;        number); back with RTL
 BattleSys_RemoveReadyLong:
     LDA.b #!BattleSys_ServiceRemoveReady
     JSR BattleSys_RunServiceVec
@@ -29877,8 +31917,9 @@ BattleSys_RemoveReadyLong:
 ;     and for each partner in its BattleCmd.Partners nibbles (a nibble
 ;     of $F = none). For each PC marked, in order 0-2, BattleFD_UnkA8A5
 ;     with A = the PC; as soon as !Battle_UnkB3EA comes back non-zero,
-;     BattleFD_UnkA93C and out through BattleSys_UnkBCE1_Done: the
-;     command is dropped and its records are not cleared.
+;     BattleFD_UnkA93C (each marked PC's command dropped: item given
+;     back, BattleCmd .State/.Kind = 0, gauge restarted) and out through
+;     BattleSys_UnkBCE1_Done, past BattleSys_UnkBCE1's own record clear.
 ;   - DP $00/$01 = 0, !Battle_UnkAE4C = 0, DP $06 = the PC's record
 ;     address (!BattleRom_CmdPtr), !Battle_UnkB3C9 = BattleCmdRec.Kind,
 ;     whose bits pick the path:
@@ -30873,8 +32914,8 @@ BattleSys_UnkBF81:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_RunAction needs; see its
 ;        header)
 ; Exit:  as BattleSys_RunService and BattleSys_RunAction leave them
-;        (BattleSys_RunService is not matched; its stub notes it saves
-;        A, X, Y)
+;        (BattleSys_RunService puts A, X and Y back: A = the service
+;        number)
 BattleSys_UnkBFA4:
     LDA.b #!BattleSys_ServiceRunAction
     JSR BattleSys_RunServiceVec
@@ -30895,8 +32936,7 @@ BattleSys_UnkBFA4:
 ; Quirk: !Battle_ActFlags is stored twice, the second time with
 ; BattleAi_SetMainMask's A (0 when the target is a slot, $FF when it is
 ; empty).
-; Callers (3 JSR sites): BattleSys_UnkB967 ($C1:BA7D), BattleSys_RunPcAttackLong ($C1:FDC7) and
-;   unmatched ($C1:FDD6).
+; Callers (2 JSR sites): BattleSys_UnkB967 ($C1:BA7D) and BattleSys_RunPcAttackLong ($C1:FDC7).
 ; Entry: M=1, X=0, DP=0, DB=$7E; !Battle_UnkB18B = the attacker,
 ;        !Battle_UnkAD8E = the target
 ; Exit:  M=1, X=0 (as assumed after the unanalysed callees), DP=0,
@@ -41735,7 +43775,8 @@ Battle_RandRangeLong:
 
 ; $C1:FDCF — BattleSys_RefundItemLong (4 bytes, $FDCF–$FDD2)
 ; JSL form of BattleSys_RefundItem.
-; Callers (2 JSL sites): unmatched ($FD:A8D8, $FD:A910).
+; Callers (2 JSL sites): BattleFD_DropPcCommand ($FD:A8D8) and BattleFD_DropLatchedPcCommand
+;   ($FD:A910).
 ; Entry: as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; DP $14 = PC
 ;        slot (0-2)
 ; Exit:  as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; X preserved;
@@ -41746,6 +43787,80 @@ org $C1FDCF
 BattleSys_RefundItemLong:
     JSR BattleSys_RefundItem
     RTL
+
+; ==================================================================
+; BankC1_OldBuildTail ($C1:FDD3–$C1:FFFE, 556 bytes) and
+; BankC1_DebugFlag ($C1:FFFF)
+; ==================================================================
+; Not code and, as far as found, never read: nothing calls or jumps
+; here, and the JSR byte patterns inside (e.g. $C1:FDDA, $C1:FDDE, a
+; copy of the veneers above) are data, not calls. Like
+; BankC1_OldBuildLeftovers at $C1:7C3D, these are the remains of
+; earlier, longer assemblies of the end of the bank: each later build
+; wrote over the start of the one before, so every copy is cut off at
+; the front. Each copy is the current Battle_SetupBattle tail /
+; Battle_CalcUnk56 (ending LDA $2C, CLC, ADC #$44, RTS) / the long
+; veneers (Battle_Mul16Long, BankC1_AddItemLong,
+; BattleSys_RunPcAttackLong, Battle_RandRangeLong and, in the newer
+; ones, BattleSys_RefundItemLong), shifted higher, with the call
+; operands of that build (for instance the $18C copy calls Battle_Mul16
+; at $CA81 and BankC1_AddItem at $D191; the current ones are $C90B and
+; $D005). Checked by comparing the bytes with the current code at each
+; shift; the order newest to oldest is probably the order below. Kept
+; as bytes; the code copies are given as db since they never run.
+; Entry/Exit: not code (data; never executed).
+org $C1FDD3
+BankC1_OldBuildTail:
+.veneers_f:                             ; $C1:FDD3-$C1:FDE1: the current $FDC4-$FDD2 $F higher (BankC1_AddItem then at $D014)
+    db $14,$D0,$6B,$20,$AA,$BF,$6B,$20,$22,$AF,$6B,$20,$D1,$B6,$6B
+.setup_18c:                             ; $C1:FDE2-$C1:FF5E: Battle_SetupBattle from the current $FC56 on, Battle_CalcUnk56 and the five veneers, $18C higher
+    db $28,$85,$2A,$85,$2C,$E2,$20,$B9,$37,$00,$85,$28,$B9,$48,$00,$85
+    db $2A,$B9,$70,$00,$C2,$20,$18,$65,$28,$65,$2A,$C9,$FF,$00,$90,$03
+    db $A9,$FF,$00,$E2,$20,$99,$3E,$00,$7B,$B9,$4C,$00,$89,$40,$F0,$12
+    db $B9,$4D,$00,$F0,$0D,$84,$00,$A0,$94,$26,$84,$0E,$22,$DF,$B0,$FD
+    db $A4,$00,$7B,$A6,$12,$BD,$29,$00,$AA,$86,$28,$A9,$06,$AA,$86,$2A
+    db $20,$81,$CA,$C2,$20,$A5,$2C,$18,$69,$62,$02,$AA,$A5,$10,$4A,$A8
+    db $7B,$85,$28,$85,$2A,$E2,$20,$B9,$FF,$AE,$C9,$01,$F0,$0D,$C9,$02
+    db $F0,$09,$A6,$12,$BD,$36,$00,$85,$28,$80,$07,$A6,$12,$BD,$3A,$00
+    db $85,$28,$BF,$00,$00,$CC,$85,$2A,$C2,$20,$A5,$28,$18,$65,$2A,$90
+    db $03,$A9,$FF,$00,$E2,$20,$9D,$3D,$00,$7B,$A6,$10,$E8,$E8,$86,$10
+    db $E0,$06,$00,$B0,$03,$4C,$D7,$FD,$22,$67,$B0,$FD,$22,$79,$B4,$FD
+    db $22,$7D,$B7,$FD,$22,$E7,$B4,$FD,$22,$C4,$B6,$FD,$22,$8F,$AC,$FD
+    db $7B,$AA,$20,$5E,$B0,$A2,$80,$00,$20,$5E,$B0,$A2,$00,$01,$20,$5E
+    db $B0,$C2,$20,$AD,$32,$5E,$8D,$16,$B3,$AD,$B2,$5E,$8D,$18,$B3,$AD
+    db $32,$5F,$8D,$1A,$B3,$7B,$E2,$20,$A0,$00,$00,$22,$F5,$B2,$FD,$A0
+    db $01,$00,$22,$F5,$B2,$FD,$A0,$02,$00,$22,$F5,$B2,$FD,$7B,$AA,$8E
+    db $C0,$B3,$8E,$C2,$B3,$8E,$C4,$B3,$86,$00,$7B,$A6,$00,$9D,$5D,$AE
+    db $BD,$02,$AF,$C9,$FF,$F0,$30,$AA,$86,$28,$A2,$07,$00,$86,$2A,$20
+    db $81,$CA,$A6,$2C,$86,$02,$A6,$02,$BF,$05,$60,$CC,$F0,$07,$A6,$00
+    db $A9,$80,$9D,$5D,$AE,$A6,$02,$BF,$04,$60,$CC,$F0,$0A,$A6,$00,$BD
+    db $5D,$AE,$09,$40,$9D,$5D,$AE,$E6,$00,$A5,$00,$C9,$08,$90,$BB,$22
+    db $B5,$B1,$FD,$22,$56,$AE,$FD,$60,$AA,$86,$28,$A2,$18,$00,$86,$2A
+    db $20,$A0,$CA,$A5,$2C,$18,$69,$44,$60,$20,$81,$CA,$6B,$20,$91,$D1
+    db $6B,$20,$20,$C1,$6B,$20,$ED,$AE,$6B,$20,$68,$B8,$6B
+.refund_tails:                          ; $C1:FF5F-$C1:FF64: the ends of two more RefundItem veneers (JSR $B86B / $B86E, RTL)
+    db $6B,$B8,$6B,$6E,$B8,$6B
+.setup_1e7:                             ; $C1:FF65-$C1:FFB5: a Battle_SetupBattle end, CalcUnk56 and four veneers, $1E7 higher
+    db $BF,$05,$60,$CC,$F0,$07,$A6,$00,$A9,$80,$9D,$5D,$AE,$A6,$02,$BF
+    db $04,$60,$CC,$F0,$0A,$A6,$00,$BD,$5D,$AE,$09,$40,$9D,$5D,$AE,$E6
+    db $00,$A5,$00,$C9,$08,$90,$BB,$22,$39,$B1,$FD,$22,$DA,$AD,$FD,$60
+    db $AA,$86,$28,$A2,$18,$00,$86,$2A,$20,$FB,$CA,$A5,$2C,$18,$69,$44
+    db $60,$20,$DC,$CA,$6B,$20,$EC,$D1,$6B,$20,$49,$C1,$6B,$20,$F0,$AE
+    db $6B
+.calc_older:                            ; $C1:FFB6-$C1:FFD3: the end of an older CalcUnk56 ($205 higher) and four veneers
+    db $A2,$18,$00,$86,$2A,$20,$06,$CB,$A5,$2C,$18,$69,$44,$60,$20,$E7
+    db $CA,$6B,$20,$F7,$D1,$6B,$20,$94,$C1,$6B,$20,$BB,$AF,$6B
+.setup_oldest:                          ; $C1:FFD4-$C1:FFFE: the oldest copy here ($22E higher): a Battle_SetupBattle end, CalcUnk56 and four veneers (to $FFFC); $FFFD-$FFFE ($B0,$6B) are the tail of a veneer from a still older copy
+    db $37,$B1,$FD,$22,$DA,$AD,$FD,$60,$AA,$86,$28,$A2,$18,$00,$86,$2A
+    db $20,$49,$CB,$A5,$2C,$18,$69,$44,$60,$20,$2A,$CB,$6B,$20,$3A,$D2
+    db $6B,$20,$D7,$C1,$6B,$20,$1E,$B0,$6B,$B0,$6B
+
+; $C1:FFFF — BankC1_DebugFlag (1 byte, $FFFF–$FFFF)
+; The last byte of the bank, read as !BattleRom_DebugFlag (LDA.l) by
+; BattleSys_Main: non-zero enables its pad-2 Select win. It is 0 here,
+; so that path never runs.
+BankC1_DebugFlag:
+    db $00
 
 
 ; ==================================================================

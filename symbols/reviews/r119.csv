@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:A3F6,BattleAi_TargetNone,2026-10-09,rev119a,changes,3ffd7fc7fb49,"$2F fix OK. Banner omits main-part pass: BattleSys_Unk8C09 runs tests with B252=loop entry, B18B untouched, so B18B handlers' self isn't that enemy. Add this case."

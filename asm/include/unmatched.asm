@@ -24,8 +24,6 @@
 
 ; --- Other banks, called from bank $C0 ---
 
-org $C10000
-EngCall_BattleMain: ; JSL target that enters the battle engine (bank $C1 calls it Battle_Main)
 org $FFF9BB
 BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
 org $FFF9C4
