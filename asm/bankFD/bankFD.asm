@@ -6475,16 +6475,17 @@ M7Scene_Irq:
     RTI
 
 ; ============================================================
-; Location animation set-up ($FD:DE98–$FD:E021, $FD:E292–$FD:E39B,
-; vectors $FD:FFF4–$FD:FFFC)
+; Location animation set-up ($FD:DE98–$FD:E39B, vectors $FD:FFEE–$FD:FFF0
+; and $FD:FFF4–$FD:FFFF)
 ; The last two steps of LoadLocation, reached through the bank's
 ; service vectors: FdVec_FFFA fills the 12 five-byte records at $05B0
 ; and their data at $7F:0400 from a list picked by the location's
 ; LocRom.Tileset12, FdVec_FFF4 the 12 twelve-byte records at $0520 from
 ; a list picked by its LocRom.Palette. Field_EndOfFrame runs FdVec_FFF7
 ; every frame, which works on the $0520 records (PalAnim_TickAll: they
-; are palette animations). So the $05B0 records are probably the
-; location's tile animations; what their bytes mean is not traced.
+; are palette animations). The field's IRQ runs FdVec_FFFD, which steps
+; the $05B0 records and sends their tiles to VRAM
+; (FieldFD_UploadTileAnims): they are the location's tile animations.
 ; ============================================================
 
 ; $FD:DE98 — FieldFD_LoadAnimSetA (394 bytes, $DE98–$E021)
@@ -6717,6 +6718,336 @@ FieldFD_LoadAnimSetA:
 .done:
     PLB
     PLD
+    PLP
+    RTL
+
+; $FD:E022 — FieldFD_UploadTileAnims (595 bytes, $E022–$E274)
+; FdVec_FFFD's routine, run from the field's IRQ (IrqHandler, on the
+; frames Field_Unk53 bit 0 is set) to step the FieldAnimA records and
+; send their tiles to VRAM. Saves P, DP and DB; DB=$00, DP=$0500; VMAIN
+; increments after the high byte, DMA channel 7 = VMDATAL/H (mode 1).
+; FieldAnimA_Phase += 1; when it is now even, records 0-5 are done, when
+; odd records 6-11 (so each record every other call). For each record
+; whose .Unk2/.Unk3 word (the VRAM address) is not negative (an $80
+; entry from FieldFD_LoadAnimSetA has .Unk3 = $80): VMADD = that word;
+; f = bits 9-11 of the .Unk0/.Unk1 word (a frame accumulator); the
+; accumulator += the record's step word f, and the DMA sends 128 bytes
+; from (.Bank, source word f) to VRAM; the record's step and source
+; words are the 32 bytes FieldFD_LoadAnimSetA wrote for it at
+; FieldAnimA_Data + 32 x n (8 steps, then 8 source addresses). The
+; source is picked with the frame from before the step. The DMAs run in
+; the IRQ's forced blank. Y = $80 serves as both the byte count and
+; MDMAEN's channel-7 bit.
+; Callers (1 JMP site): FdVec_FFFD ($FD:FFFD).
+; Entry: M=1 (LDA #0 and DMAP7's value are 8-bit), X=0 (LDX.w of the
+;        DP), DP any (saved), DB any (saved); from IrqHandler M=1, X=0,
+;        DB=$00
+; Exit:  P, DP and DB restored; A = 0, B = 0; X = the .Bank of the last
+;        record sent, 0 if none (high byte cleared: it runs with X=1); Y
+;        = $0080; FieldAnimA_Phase and the handled records' .Unk0/.Unk1
+;        advanced; VMAIN, VMADD and DMA channel 7 written
+org $FDE022
+FieldFD_UploadTileAnims:
+    PHP
+    PHD
+    PHB
+    LDA.b #0
+    PHA
+    PLB
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegs ; bit 6 has no effect on a DMA
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.w #!DP_FieldAnim
+    PHX
+    PLD
+    INC.b !FieldAnimA_Phase
+    SEP #$10
+    LDY.b #!FieldAnimA_TileBytes
+    LDA.b !FieldAnimA_Phase
+    LSR A
+    BCC .even
+    JMP .odd
+.even:
+    REP #$21
+    LDA.b FieldAnimA[0].Unk2-!DP_FieldAnim
+    BMI .rec1
+    STA.w VMADDL
+    LDA.b FieldAnimA[0].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[0].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data,X
+    STA.b FieldAnimA[0].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+16,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[0].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec1:
+    LDA.b FieldAnimA[1].Unk2-!DP_FieldAnim
+    BMI .rec2
+    STA.w VMADDL
+    LDA.b FieldAnimA[1].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[1].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+32,X
+    STA.b FieldAnimA[1].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+48,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[1].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec2:
+    LDA.b FieldAnimA[2].Unk2-!DP_FieldAnim
+    BMI .rec3
+    STA.w VMADDL
+    LDA.b FieldAnimA[2].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[2].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+64,X
+    STA.b FieldAnimA[2].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+80,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[2].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec3:
+    LDA.b FieldAnimA[3].Unk2-!DP_FieldAnim
+    BMI .rec4
+    STA.w VMADDL
+    LDA.b FieldAnimA[3].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[3].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+96,X
+    STA.b FieldAnimA[3].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+112,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[3].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec4:
+    LDA.b FieldAnimA[4].Unk2-!DP_FieldAnim
+    BMI .rec5
+    STA.w VMADDL
+    LDA.b FieldAnimA[4].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[4].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+128,X
+    STA.b FieldAnimA[4].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+144,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[4].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec5:
+    LDA.b FieldAnimA[5].Unk2-!DP_FieldAnim
+    BMI .done_even
+    STA.w VMADDL
+    LDA.b FieldAnimA[5].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[5].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+160,X
+    STA.b FieldAnimA[5].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+176,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[5].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.done_even:
+    LDA.w #0
+    SEP #$20
+    REP #$10
+    PLB
+    PLD
+    PLP
+    RTL
+.odd:
+    REP #$21
+    LDA.b FieldAnimA[6].Unk2-!DP_FieldAnim
+    BMI .rec7
+    STA.w VMADDL
+    LDA.b FieldAnimA[6].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[6].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+192,X
+    STA.b FieldAnimA[6].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+208,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[6].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec7:
+    LDA.b FieldAnimA[7].Unk2-!DP_FieldAnim
+    BMI .rec8
+    STA.w VMADDL
+    LDA.b FieldAnimA[7].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[7].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+224,X
+    STA.b FieldAnimA[7].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+240,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[7].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec8:
+    LDA.b FieldAnimA[8].Unk2-!DP_FieldAnim
+    BMI .rec9
+    STA.w VMADDL
+    LDA.b FieldAnimA[8].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[8].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+256,X
+    STA.b FieldAnimA[8].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+272,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[8].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec9:
+    LDA.b FieldAnimA[9].Unk2-!DP_FieldAnim
+    BMI .rec10
+    STA.w VMADDL
+    LDA.b FieldAnimA[9].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[9].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+288,X
+    STA.b FieldAnimA[9].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+304,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[9].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec10:
+    LDA.b FieldAnimA[10].Unk2-!DP_FieldAnim
+    BMI .rec11
+    STA.w VMADDL
+    LDA.b FieldAnimA[10].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[10].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+320,X
+    STA.b FieldAnimA[10].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+336,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[10].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.rec11:
+    LDA.b FieldAnimA[11].Unk2-!DP_FieldAnim
+    BMI .done_odd
+    STA.w VMADDL
+    LDA.b FieldAnimA[11].Unk0-!DP_FieldAnim
+    AND.w #!FieldAnimA_FrameMask
+    XBA
+    TAX
+    LDA.b FieldAnimA[11].Unk0-!DP_FieldAnim
+    CLC
+    ADC.l !FieldAnimA_Data+352,X
+    STA.b FieldAnimA[11].Unk0-!DP_FieldAnim
+    LDA.l !FieldAnimA_Data+368,X
+    STA.w A1T7L
+    LDX.b FieldAnimA[11].Bank-!DP_FieldAnim
+    STX.w A1B7
+    STZ.w DAS7L
+    STY.w DAS7L
+    STY.w MDMAEN
+.done_odd:
+    LDA.w #0
+    SEP #$20
+    REP #$10
+    PLB
+    PLD
+    PLP
+    RTL
+
+; $FD:E275 — PalAnim_StopAll (29 bytes, $E275–$E291)
+; FdVec_FFEE's routine: sets .Unk0 of all 12 FieldAnimB records to 0
+; (kind 0: PalAnim_TickAll leaves them alone), so every palette
+; animation stops. Saves P and DB; DB=$00. The SEP #$20 is redundant:
+; the LDA #0 before it is already the 8-bit form.
+; Callers note: FdVec_FFEE ($FD:FFEE) JMPs here; the JSL $FD:FFEE bytes
+;   at $C3:4D46 are in unmatched bank-$C3 code (xref: doubtful).
+; Callers (1 JMP site): FdVec_FFEE ($FD:FFEE).
+; Entry: M=1 (LDA #0 is 8-bit), X any (P saved; it sets X=1), DP any,
+;        DB any (saved)
+; Exit:  P and DB restored; A = $90; Y = $90 (high byte cleared)
+org $FDE275
+PalAnim_StopAll:
+    PHP
+    PHB
+    LDA.b #0
+    PHA
+    PLB
+    SEP #$20
+    SEP #$10
+    LDY.b #0
+.record:
+    LDA.b #0
+    STA.w FieldAnimB.Unk0,Y
+    TYA
+    CLC
+    ADC.b #!FieldAnimB_Bytes
+    TAY
+    CMP.b #!FieldAnim_NumRecs*!FieldAnimB_Bytes
+    BNE .record
+    PLB
     PLP
     RTL
 
@@ -9331,12 +9662,20 @@ FdVec_FFE8:
 FdVec_FFEB:
     JMP M7Scene_Run81
 
+; $FD:FFEE — FdVec_FFEE (3 bytes, $FFEE–$FFF0)
+; JMP to PalAnim_StopAll.
+; Callers note: no confirmed caller; the JSL $FD:FFEE bytes at $C3:4D46
+;   are in unmatched bank-$C3 code (xref: doubtful).
+; Entry: as PalAnim_StopAll: M=1, X any, DP any, DB any
+; Exit:  as PalAnim_StopAll
+FdVec_FFEE:
+    JMP PalAnim_StopAll
+
 ; $FD:FFF1 — FdVec_FFF1 (3 bytes, $FFF1–$FFF3)
 ; JMP to M7Scene_Run80 (event $FF $80; never returns).
 ; Callers (1 JML site): Evt_OpFF_Misc ($C0:3FE8).
 ; Entry: as M7Scene_Run80: M, X, DP, DB any (M7Scene_Init sets them)
 ; Exit:  never returns (as M7Scene_Run80)
-org $FDFFF1
 FdVec_FFF1:
     JMP M7Scene_Run80
 
@@ -9370,3 +9709,11 @@ FdVec_FFF7:
 ; Exit:  as FieldFD_LoadAnimSetA
 FdVec_FFFA:
     JMP FieldFD_LoadAnimSetA
+
+; $FD:FFFD — FdVec_FFFD (3 bytes, $FFFD–$FFFF)
+; JMP to FieldFD_UploadTileAnims (from the field's IRQ).
+; Callers (2 JSL sites): IrqHandler ($C0:ED08) and unmatched ($D1:FEDA).
+; Entry: as FieldFD_UploadTileAnims: M=1, X=0, DP any, DB any
+; Exit:  as FieldFD_UploadTileAnims
+FdVec_FFFD:
+    JMP FieldFD_UploadTileAnims

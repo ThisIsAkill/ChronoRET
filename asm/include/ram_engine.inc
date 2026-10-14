@@ -1876,12 +1876,17 @@ endstruct
                                          ; (kind 8 first uses it to read its list byte)
 ; 12 records of 5 B at $05B0, filled by FieldFD_LoadAnimSetA from the list LocRom.Tileset12 picks.
 struct FieldAnimA $05B0
-    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry)
+    .Unk0: skip 1        ; the list's kind byte, then set to 0 (left alone for an $80 entry); with
+                         ; .Unk1 a word FieldFD_UploadTileAnims steps: bits 9-11 pick the frame
     .Unk1: skip 1        ; 0
-    .Unk2: skip 1        ; list byte
-    .Unk3: skip 1        ; list byte, or $80 for an $80 entry
-    .Bank: skip 1        ; $7F (the data written to $7F:0400 on, probably)
+    .Unk2: skip 1        ; list byte; with .Unk3 the VRAM address the frames go to
+    .Unk3: skip 1        ; list byte, or $80 for an $80 entry (negative word: no upload)
+    .Bank: skip 1        ; $7F: the bank of the frames' source addresses
 endstruct
+!FieldAnimA_Phase = $1D                  ; 1 B dp (DP=$0500): FieldFD_UploadTileAnims' call count (bit 0
+                                         ; picks records 0-5 or 6-11)
+!FieldAnimA_Data = $7F0400               ; 32 B per FieldAnimA record (FieldFD_LoadAnimSetA): 8 step
+                                         ; words, then 8 frame source addresses
 ; 12 records of 12 B at $0520-$05AF, the first 6 filled by FieldFD_LoadAnimSetB from the list
 ; LocRom.Palette picks; Field_EndOfFrame's FdVec_FFF7 works on them every frame (PalAnim_TickAll).
 struct FieldAnimB $0520

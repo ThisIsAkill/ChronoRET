@@ -759,6 +759,9 @@ if !constants_engine_inc == 0
 !FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
 !FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
 !FieldAnimB_Bytes = $0C                  ; bytes per FieldAnimB record
+!FieldAnimA_FrameMask = $0E00            ; FieldAnimA .Unk0/.Unk1 bits 9-11: the frame (x 2 after XBA)
+!FieldAnimA_TileBytes = $80              ; bytes per tile-animation upload (4 tiles); the same
+                                         ; register value is MDMAEN's channel-7 bit
 ; --- Palette animation (PalAnim_TickAll and its kinds) ---
 !PalAnim_KindMask = $F0                  ; FieldAnimB.Unk0 high nibble: the kind (0 = none)
 !PalAnim_LenMask = $0F                   ; FieldAnimB.Unk0 low nibble: frames - 1 (kinds 1 and 8)

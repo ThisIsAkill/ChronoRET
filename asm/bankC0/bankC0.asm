@@ -5309,7 +5309,8 @@ Oam_UploadShadow:
 ;   a wait for H-blank (HVBJOY bit 6), INIDISP = FORCED_BLANK, HDMAEN =
 ;   0, and by Field_Unk53 bit 0 (Field_Unk53Phase, which
 ;   EngFD_UnkC2C1 flips each frame): clear, Irq_UploadTileAnim; set,
-;   FdVec_FFFD (bank $FD, unmatched). So the tile writes happen every
+;   FdVec_FFFD (FieldFD_UploadTileAnims, the FieldAnimA tiles). So the
+;   tile writes happen every
 ;   other frame. The RTS after the RTI ($ED14) is never reached.
 ; Callers note: entered only as the IRQ (IrqTrampoline).
 ; On entry: any state (an interrupt): it sets REP #$30 and then M=1;
