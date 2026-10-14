@@ -1106,8 +1106,8 @@ if !constants_menu_inc == 0
 
 ; --- Main menu icon 0 and the member list ---
 !MenuRom_Icon0List = $FFBD74             ; Menu_Icon0Preview's draw list
-!Menu_Icon0BlankTile = $61FF             ; tile word Menu_Icon0Preview fills its two rows with
-!Menu_Icon0RowBytes = 24                 ; ... 12 tiles each
+!Menu_Icon0BlankTile = $61FF             ; tile word Menu_Icon0Preview fills Menu_Unk5D42's row with
+!Menu_Icon0RowBytes = 24                 ; bytes in each of the two 12-tile rows it fills
 !Menu_Icon0HdmaBits = $64                ; Menu_HdmaenShadow on icon 0 (channels 2, 5, 6; not traced)
 !Menu_Mode01HdmaBits = $65               ; ... in mode 1 (and channel 0)
 !MenuRom_Icon0Pal = $FFCBAC              ; 4 colours -> $24-$27

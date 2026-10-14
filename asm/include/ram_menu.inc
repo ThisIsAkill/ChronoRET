@@ -573,7 +573,7 @@ endstruct align 6
                                          ; (writer not traced)
 
 ; --- List smooth scroll (Menu_ListScrollInit, Menu_ListScrollStep) ---
-!Menu_ScrollStep = $0D22                 ; 16-bit; lines added to Menu_ScrollOfs per frame (3 or -3)
+!Menu_ScrollStep = $0D22                 ; 16-bit; lines added to Menu_ScrollOfs per frame (3 or -3 in the item lists, 4 or -4 in the member list)
 !Menu_ScrollFrames = $0D24               ; 16-bit; frames of the scroll (set to 4)
 !Menu_ScrollEntry = $0DA9                ; 8-bit byte offset in Menu_ScrollTable of the first entry built
 !Menu_ScrollRows = $0DAA                 ; 8-bit; entries of the table that scroll (set by the caller)
@@ -1232,8 +1232,8 @@ endif
 !Menu_Unk85 = $0085                      ; 8-bit; the member count Menu_DrawMemberRows stops at and
                                          ; Menu_Icon0Preview's max top comes from (writer not traced)
 !Menu_MemberMaxTop = $0FC4               ; 8-bit; Menu_Unk85 - 3 (0 when below): the largest Menu_Unk0413
-!Menu_Unk5D42 = $5D42                    ; 12 tile words set to $61FF by Menu_Icon0Preview (and $5DC2)
-!Menu_Unk5DC2 = $5DC2
+!Menu_Unk5D42 = $5D42                    ; 12 tile words set to $61FF by Menu_Icon0Preview
+!Menu_Unk5DC2 = $5DC2                    ; 12 tile words set to $FFFF by Menu_Icon0Preview (A after an MVN)
 !Menu_DimPalBuf = $9500                  ; colours 0-23 at half brightness (Menu_Icon0Preview's Menu_DimPalette)
 !Menu_Unk3600 = $3600                    ; $800 B zeroed by Menu_Mode01Init (tilemap; VRAM $5C00 probably)
 !Menu_Unk0D4D = $0D4D                    ; 16-bit; Menu_MemberRowFlags: character id OR $20

@@ -28561,13 +28561,15 @@ Menu_EquipClearCharFlag:
 ; non-zero), an edge move (Menu_CursorDpad bit 7) scrolls it a row
 ; (Menu_MemberListScroll). When it fits: Menu_CursorSel at or past
 ; Menu_Unk85 becomes 0; an edge move from row 0 goes to Menu_Unk85 - 1,
-; from another row to 0. Then Menu_ScrollStep = 0,
-; Menu_HighlightMemberRow, Menu_Unk0412 = Menu_CursorSel, Menu_CurMember
+; from another row to 0. Then Menu_ScrollStep's low byte = 0 (an
+; 8-bit STZ: the high byte stays, so the word is $FF00 after an up
+; scroll's -4), Menu_HighlightMemberRow, Menu_Unk0412 = Menu_CursorSel, Menu_CurMember
 ; = it + Menu_Unk0413 (Menu_PlaySound0 when that differs from
 ; Menu_LastMember, which takes it), and a tail jump to
 ; Menu_DrawMemberStatus.
 ; Callers (1 JMP site): Menu_Mode01H1 ($C2:9C49).
-; Entry: M, X any (P saved; SEP #$30 here, restored before the jump),
+; Entry: M any (P saved; SEP #$30 here, restored before the jump), X=0
+;        (Menu_DrawMemberStatus's 16-bit LDX runs with the entry P),
 ;        DP=$0000, DB=$7E
 ; Exit:  as Menu_DrawMemberStatus
 ; Calls: Menu_MemberListScroll, Menu_HighlightMemberRow,
@@ -29015,7 +29017,8 @@ Menu_EquipItemIdle:
 ; on to $4F80 ($400 bytes, up); else $7E:4F80-$52FF down to $5000 (MVP)
 ; and the last two rows ($5380) to the top ($4F80).
 ; Callers (1 JSR site): Menu_EquipItemIdle ($C2:9FD2).
-; Entry: M any (REP #$20 here), X=0, DP any, DB any (the MVNs set $7E)
+; Entry: M any (REP #$20 here), X=0, DP any, DB=$7E (the absolute
+;        read of Menu_ScrollStep-1, $0D21, comes before the MVNs)
 ; Exit:  M=0, X=0; DB=$7E; A = $FFFF, X and Y past the last move
 ; No calls.
 Menu_ShiftItemListMap:
@@ -29107,8 +29110,9 @@ org $C2A051
 ; one frame more (its .Wait + 1); Menu_MemberMaxTop = Menu_Unk85 - 3 (0
 ; when below 3), Menu_Unk0413 lowered to it; Menu_Unk0412 lowered to
 ; Menu_PartyActive - 1 and copied to Menu_CursorSel. Then the draw list
-; MenuRom_Icon0List, the 12 tiles at Menu_Unk5D42 and at Menu_Unk5DC2
-; set to $61FF, Menu_VramRecBg3Rows60 queued, a frame's wait; the clock
+; MenuRom_Icon0List, the 12 tile words at Menu_Unk5D42 set to $61FF
+; and the 12 at Menu_Unk5DC2 to $FFFF (stored with the A an MVN leaves),
+; Menu_VramRecBg3Rows60 queued, a frame's wait; the clock
 ; (Menu_DrawClock of Menu_PlayTime+2 at Menu_MainClockTile), the member
 ; rows (Menu_DrawMemberRows), a frame's wait, Menu_BuildGradient, the
 ; selected member (Menu_DrawMemberStatus); Menu_HdmaenShadow =
@@ -29698,7 +29702,7 @@ Menu_DrawSlotName:
 ; $C2:A3BA — Menu_EquipSlotNames (40 bytes, $A3BA–$A3E1)
 ; The four slot names, 10 bytes each in the menu's text encoding ($FF
 ; blank, $A0 'A', $BA 'a'): "  Weapon  ", "  Helmet  ", "  Armor   ",
-; " Accessory" (the last ends with a 0 byte, which ends the string).
+; and "Accessory" followed by a 0 byte, which ends the string.
 Menu_EquipSlotNames:
     db $FF, $FF, $B6, $BE, $BA, $C9, $C8, $C7, $FF, $FF
     db $FF, $FF, $A7, $BE, $C5, $C6, $BE, $CD, $FF, $FF
@@ -30757,7 +30761,11 @@ Menu_ListPageSetup:
 ; Callers (4 JSR sites): Menu_Mode01H3 ($C2:9CDE) and unmatched ($C2:D635, $C2:D6AA, $C2:D7AF).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E or $00 (low
 ;        WRAM: the driver block and Menu_NmiTimer); A = the id
-; Exit:  P restored; as Menu_SendSound
+; Exit:  P restored; not sent: A's low byte = Menu_NmiTimer (non-zero),
+;        X = the command ($18), Y = the entry Y's low byte (the SEP #$30
+;        zeroes both high bytes, so for an X=0 caller X = $0018 and Y's
+;        high byte is 0); sent: A, X, Y as Audio_DriverCommand leaves them
+;        (not analysed)
 ; Calls: Menu_SendSound.
 Menu_PlaySound:
     PHP
@@ -30788,7 +30796,11 @@ Menu_PlaySound:
 ;   $C2:E30D, JSR $C2:E62C, JSR $C2:E643, JSR $C2:E647, JSR $C2:E6C1, JSR $C2:E6C5, JSR $C2:E6DF,
 ;   JSR $C2:E715, JSR $C2:E73A, JSR $C2:E777).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E or $00
-; Exit:  P restored; as Menu_SendSound
+; Exit:  P restored; not sent: A's low byte = Menu_NmiTimer (non-zero),
+;        X = the command ($18), Y = the entry Y's low byte (the SEP #$30
+;        zeroes both high bytes, so for an X=0 caller X = $0018 and Y's
+;        high byte is 0); sent: A, X, Y as Audio_DriverCommand leaves them
+;        (not analysed)
 ; Calls: Menu_SendSound.
 Menu_PlaySound0:
     PHP
@@ -30806,7 +30818,11 @@ Menu_PlaySound0:
 ;   $C2:B23D, JMP $C2:B38F, JMP $C2:B3EF, JMP $C2:B406, JMP $C2:B437, JMP $C2:B4E3, JMP $C2:C63A,
 ;   JMP $C2:CEF2, JMP $C2:D5D6, JMP $C2:D686, JMP $C2:D738, JSR $C2:E3FB).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E or $00
-; Exit:  P restored; as Menu_SendSound
+; Exit:  P restored; not sent: A's low byte = Menu_NmiTimer (non-zero),
+;        X = the command ($18), Y = the entry Y's low byte (the SEP #$30
+;        zeroes both high bytes, so for an X=0 caller X = $0018 and Y's
+;        high byte is 0); sent: A, X, Y as Audio_DriverCommand leaves them
+;        (not analysed)
 ; Calls: Menu_SendSound.
 Menu_PlaySound1:
     PHP
@@ -30914,7 +30930,9 @@ Menu_SendSoundArg:                      ; header: see Menu_SendSound
 ;        DB=$7E; from a menu thread (it yields)
 ; Exit:  a frame later, P as at entry; A = Menu_ThreadVar (as
 ;        Menu_Yield); X = Menu_ScrollEntry + 3 x the rows, Y = 3 x the
-;        rows (high bytes cleared when the caller's X flag is set); Menu_Tmp00/01 = 0
+;        rows (high bytes cleared when the caller's X flag is set);
+;        Menu_Tmp00/01 = 0 when it yields, but other threads run before
+;        it returns and may change them (Menu_ListArrowsThread does)
 ; Calls: jumps to Menu_Yield.
 Menu_ListScrollStep:
     PHP
@@ -31390,8 +31408,8 @@ Menu_DrawCmdTable:
 ; argument copy of Menu_RunDrawList as a routine.
 ; Callers note: no JSR/JMP reaches it ($ED6F or $ED70) and neither
 ;   address appears as bytes in bank $C2: unused, as far as is known.
-; Entry: M, X any (A's 16 bits are the count), DP any, DB any; X = the
-;        source in bank $FF less 1
+; Entry: M any (A's 16 bits are the count), X=0 (LDY.w #imm is 3
+;        bytes), DP any, DB any; X = the source in bank $FF less 1
 ; Exit:  DB=$7E (the MVN); A = $FFFF; X, Y past the copy
 ; No calls.
 Menu_CopyDrawArgsUnused:
@@ -31616,7 +31634,8 @@ Menu_FrameEdgeRow:
 ; $C2:EE58 — Menu_FrameSides (39 bytes, $EE58–$EE7E)
 ; Menu_DrawInnerH side rows from Menu_DrawAddr2: the left edge t (t =
 ; Menu_FrameTile) and the right edge t+1 (at + Menu_FrameRightOfs, an
-; indirect store), t EOR 3 for the next row (t+4/t+5, then t+6/t+7);
+; indirect store), (t+1) EOR 3 for the next row (t+4/t+5, then
+; t+6/t+7, then t+4/t+5 again);
 ; none when Menu_DrawInnerH is 0. Then Menu_FrameTile = (t OR 3) + 1
 ; (t+8) and Menu_DrawAddr2 the row after the sides.
 ; Callers (1 JSR site): Menu_DrawWindowFrame ($C2:EE1B).
@@ -31876,8 +31895,9 @@ Menu_DrawString:
 ; The string loop: a 0 byte ends it; codes $01-$0F run their
 ; Menu_TextCtrlTable routine (Menu_TextCtrl) and do not count; other
 ; bytes are put (Menu_PutChar) and counted down in Menu_TextLeft, which
-; ends the loop at 0. Control codes $04 and $05 run it again on a
-; sub-string, sharing the count.
+; ends the loop at 0. Control code $04 runs it again on a sub-string,
+; sharing the count; $05 (Menu_TextName) runs it with its own count of
+; 5 and restores Menu_TextLeft/Flags afterwards (PEI ... PLA/STA).
 ; Callers (3 JSR sites): Menu_DrawString ($C2:EF74), Menu_TextSubString ($C2:F02E) and Menu_TextName
 ;   ($C2:F04F).
 ; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB = the string's bank;
@@ -32500,7 +32520,8 @@ Menu_DrawHexDigits:
 ; 2.
 ; Callers (2 JSR sites): Menu_DrawHexDigits ($C2:F25C, $C2:F261).
 ; Entry: M=1, X=0 (saved: PHX/PLX), DP=$0000, DB=$7E; A = the digit (low
-;        nibble), Y = the tilemap address
+;        nibble) with B = 0 (the 16-bit TAX copies B too; Menu_DrawHexDigits'
+;        TDC clears it), Y = the tilemap address
 ; Exit:  M=1; A = Menu_TextAttr; Y + 2; X unchanged
 ; No calls.
 Menu_PutHexDigit:
@@ -32529,9 +32550,10 @@ Menu_HexDigitTiles:
 ; ============================================================
 
 ; $C2:F28D — Menu_DrawClock (63 bytes, $F28D–$F2CB)
-; Draws hours:minutes at $7E:X from the play-time digits at Y (callers
-; pass Menu_PlayTime+2: minute ones, minute tens, hour ones, hour tens,
-; then Menu_PlayTimeMaxed): Menu_ClockHours/Mins = the two-digit
+; Draws hours:minutes at $7E:X from the play-time digits at Y (minute
+; ones, minute tens, hour ones, hour tens, then a maxed flag: three
+; callers pass Menu_PlayTime+2, the unmatched one at $C2:D3AA passes
+; $98C9, a copy of the same layout, probably a save slot's): Menu_ClockHours/Mins = the two-digit
 ; values, or 99 and 59 when the byte at Y+4 is non-zero; each drawn as 2
 ; digits with leading zeros (Menu_DrawNumber, flags $91), with tile $2D
 ; (the colon, probably) between them in Menu_TextWord's attribute byte.
@@ -32601,7 +32623,8 @@ Menu_ClockPair:
 ; at $7E:X (two-row text). Probably an item's name (11-byte names at
 ; the addresses of Menu_ItemNamePtrs).
 ; Callers (3 JSR sites): unmatched ($C2:A70D, $C2:DD63, $C2:DFA4).
-; Entry: M any, X=0, DP=$0000, DB any; A = the id (low byte), X = the
+; Entry: M any, X=0, DP=$0000, DB=$7E (Menu_ItemNamePtr reads the
+;        table at $7D00 with LDA.w abs,Y); A = the id (low byte), X = the
 ;        tilemap address
 ; Exit:  as Menu_DrawString
 ; Calls: Menu_ItemNamePtr; jumps to Menu_DrawString.
@@ -32642,7 +32665,8 @@ Menu_ItemNamePtr:
 ;   JMP $C2:AAC5, JSR $C2:AD4B, JSR $C2:B347, JSR $C2:D80D, JSR $C2:D8F0, JMP $C2:E014, JSR
 ;   $C2:E0E4, JSR $C2:E1D7).
 ; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP any, DB=$7E
-;        (or $00: low WRAM); A = the string number
+;        (Menu_UnkFA49's STZ $0000,X writes $4E80, Menu_TextDest AND
+;        $FFC0, in bank DB); A = the string number
 ; Exit:  P restored; nothing drawn: A, X, Y unchanged; else X
 ;        clobbered and as Menu_UnkFA49 (not analysed)
 ; Calls: Menu_UnkFA49.
