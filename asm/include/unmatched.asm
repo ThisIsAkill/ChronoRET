@@ -206,7 +206,3 @@ BankC3_Entry000E:   ; JSL vector (JMP $01E4): DP=$0300; while $0350 != 0 steps a
 org $C30011
 BankC3_Entry0011:   ; JSL vector (JMP $0EFA): window table from 4 points at $0360-$0367
                     ; (Field_HookWinQuad); starts from the point with the smallest Y
-org $C70000
-Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
-org $C70004
-Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03

@@ -668,6 +668,48 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    values ($A0/$A1/$A9/$AB/$B3) and the PcStatBlk stats mean; who fills BattleEnemyInit ($29C4) and
    reads `!Battle_Unk7F01EE`; which records of the $7F:14F0 block the HDMA tables use.
 
+5. Bank $C7 (sound driver, 65816 side; new file `asm/bankC7/bankC7.asm`): matched are
+   `$C7:0000`-`$C7:0E10`: the entry block `Audio_DriverInit` with the vectors
+   `Audio_DriverCommand` / `Audio_ProcessEntry` (two labels on `$C7:0004`, the names the engine and
+   the battle code already used), `Audio_VecLoadNewSamples` and `Audio_VecSendSampleDir` (no
+   caller); the boot tables `Audio_BootBlockPtrs` / `Audio_BootBlockAram` and the unread
+   `Audio_TableDirectory` (`$0010`-`$0037`); all the 65816 code (`$0038`-`$0A97`): the IPL boot
+   `Audio_Boot`, `Audio_RunCommand` (with `_Dispatch` and the common exit `Audio_CommandDone`), the
+   song load `Audio_CmdLoadSong` -> `Audio_LoadNewSamples` -> `Audio_SendSampleDir` ->
+   `Audio_SendSongData`, `Audio_CmdSend` (commands $18-$2F, $80-$FF), `Audio_UploadSample`,
+   `Audio_CmdSongAlias` ($30-$3F), `Audio_AdjustSongCmd`, `Audio_CmdSwapSample` ($71),
+   `Audio_CmdBlockVariant` ($70), `Audio_UploadBlock2F00`, the port helpers `Audio_SendSeq` /
+   `Audio_AbortXfer`, `Audio_SetEchoDelay`, `Audio_DropEchoSlots` and `Audio_StartSong`; and the
+   tables it reads (`$0A98`-`$0E10`: `Audio_SongAliasTable`, the empty `Audio_SongBit2List`,
+   `Audio_SongCmdTable`, `Audio_SongCount`, the 62-sample `Audio_SampleTable` / `SampleLoop` /
+   `SampleParamA` / `SampleParamB` and the 83-song `Audio_SongTable`). The `$1E00` page is named
+   in ram_engine.inc (`!DP_Audio`, used as `!Name-!DP_Audio`), the commands, port protocol, ARAM
+   addresses and the ROM data after `$0E10` (`!AudioRom_*`) in constants_engine.inc. Quirks
+   recorded: Audio_SendSampleDir's slot search over 32 words (into Audio_SlotLen) and its
+   parameter reads for unused list entries landing in bank $C8 ($C8:0C1E / $C8:0C9A),
+   Audio_SendSongData's BPL step loop sending 1-3 bytes past the song data, Audio_AdjustSongCmd's
+   empty list (no effect), Audio_CmdSend's give-up test on Audio_CmdId that only an outside writer
+   could pass, Audio_DropEchoSlots clearing through $1E81 (Audio_SlotAram has 17 entries), and
+   the two mid-load vectors at $C7:0008/$000C that would unbalance the stack if called. Headers
+   edited by this batch (verified before, back to review: the "(unmatched)" / "(not matched yet)"
+   / "(not traced)" remarks on what the driver changes): LocLoad_AudioSetup,
+   Audio_PlaySfxAtLeader, Audio_PlayTileSfxB, Evt_OpE8_SoundCmd18, Evt_OpEA_PlayMusic,
+   Evt_OpEB_SoundCmds81To83, Evt_OpEC_SoundCmd, Battle_PlaySfx0, BattleMenu_EnqueueReadyBattler,
+   BattleMenu_TargetSelectInput, BattleTgt_EnemyLineFromCaster, C2Scene_WaitFrames,
+   C2Scene_ZoneSoundAtEntry. Stale, not edited (fix at their next edit): BattleSys_RunService
+   counts service 1's Audio_ProcessEntry among the code "not analysed" (it is matched: A, X, Y,
+   P, DP and DB come back as they were); the banner over C2Scene_ZoneSoundAtEntry calls command
+   $10 "probably play song" (Audio_CmdLoadSong loads the song in Arg0). Open: everything on the
+   SPC700 side (the meaning of the transfer modes 2/3/5/7, the step that Audio_AbortXfer sends,
+   APUIO1 bit 7 after a song command in Audio_StartSong, what commands $10/$11/$14/$15 and
+   $18-$2F/$80-$FF do there); what `!AudioRom_SongExtra` (36 bytes per song to ARAM $F120),
+   `AudioRom_SongEcho` byte 1 (sent as Arg1) and `Audio_SampleParamA` mean; whether
+   `Audio_SampleParamB` really is the ADSR pair and `Audio_EchoDelay` the DSP's EDL; and who
+   reads `Audio_FreeAram`, `Audio_SampleBase`, `Audio_Unk1EFA`/`1EFB`, `Audio_Unk1E0A` (none in
+   bank $C7). Next in bank $C7: the tables `$0E11`-`$24C2` (`!AudioRom_SongSamples`,
+   `SongExtra`, `SongEcho`) are plain data read only by this code and could be labelled the same
+   way; from `$24C3` on (the SPC700 program, the upload blocks, the samples) is the SPC700 track.
+
 ## Tables
 
 `make tables-scan BANK=C0` (or `C1`, `CC`) lists these with more; `tools/tables.py emit` drafts

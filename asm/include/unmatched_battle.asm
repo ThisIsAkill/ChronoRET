@@ -40,11 +40,6 @@ Decomp_ToWramVec:                       ; JSL vector (JMP $C3:0557): unpacks the
                                         ; !Battle_DecompSrc.. into WRAM at !Battle_DecompDest.. through WMADD/WMDATA
                                         ; (inferred: a decompressor, from its header-driven copy loops); not analysed
 
-; --- Bank $C7 (audio) ---
-
-org $C70004
-Audio_ProcessEntry:                     ; JSL: run the APU command block !Sfx_Command..!Sfx_Param2
-
 ; --- Bank $CC (battle support, called from the action code) ---
 
 org $CCF06B
