@@ -6151,9 +6151,9 @@ Field_IdleFrame:
 ; NOT called per frame — only when entering a new location/map.
 ; Callers (1 JSR site): GameLoop_LoadField ($C0:0088).
 ; On entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=$0100, DB=$00.
-; Exit: M=1, X=0, DP=$0100 as far as is known: the ten steps keep them,
-; the two bank-$FD vectors are unmatched, and GameLoop_LoadField carries
-; on without resetting any of them.
+; Exit: M=1, X=0, DP=$0100: the ten steps keep them, the two bank-$FD
+; vectors (FieldFD_LoadAnimSetA/B) restore P, DP and DB, and
+; GameLoop_LoadField carries on without resetting any of them.
 ; A, X and Y are not saved.
 ; ============================================================
 LoadLocation:
