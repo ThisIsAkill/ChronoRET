@@ -6095,6 +6095,95 @@ EngFD_UnkD52D:
     SEP #$20
     RTS
 
+; ============================================================
+; FieldHdma_OldBuildLeftovers ($FD:D5D4–$FD:D9FF, 1068 bytes)
+; ============================================================
+; Not code that runs: xref finds no call or jump to $FD:D5D4 or to the
+; segment starts below except the one JSR inside the first segment. The
+; bytes are what an earlier, longer assembly of the end of the field
+; HDMA builders left behind; EngFD_UnkD52D wrote over the start of the
+; first segment. Kept as bytes; the code copies are given as db since
+; they never run.
+; - $D5D4-$D7AC: the tail of an older FieldHdma_BuildBottomBandB. It is
+;   the current routine's bytes from $D2CD (the channel 0 table's last
+;   entry) to the end of the channel 4 (TM) table, the same except the
+;   call operands: JSR $CA0E where the current one calls
+;   FieldHdma_SetBg2B, $D07D for FieldHdma_WaveRunsStart, $D0DD for
+;   FieldHdma_AddWaveRunB and $D0D7 for FieldHdma_SkipWaveLines (the
+;   older build's addresses of those helpers, probably). It has no
+;   channel 5 (window) table, and its channel 6 table's fourth entry
+;   is 2 x Field_Unk27 lines (| $80) from $7F:15F8, where the current
+;   one has 2 x Field_Unk27 - 1 lines from inside the copy at $7F:1600
+;   and then a one-line entry from Hdma_Unk7F1530+2. It ends JSR $D848
+;   (the third segment), JSR $C93C, JSR $CBD4 (probably the older
+;   FieldHdma_SetWin2B and FieldHdma_FillDataB), PLB, RTS.
+; - $D7AD-$D847: an older EngFD_UnkD52D: the same gradient builder, but
+;   the line count it divides by 8 is Field_Unk27 (LDA.l $000127) instead
+;   of 40, the pairs go to $7F:1530, and it ends REP #$10, RTS (no MVN
+;   copy).
+; - $D848-$D8E2: the same as the second segment with the pairs at
+;   $7F:15F8 (the first segment's JSR $D848 calls it).
+; - $D8E3-$D9FF: $00 fill up to M7Scene_Run80 at $FD:DA00.
+; Entry/Exit: not code (data; never executed).
+org $FDD5D4
+FieldHdma_OldBuildLeftovers:
+.bottom_band_b:
+    db $A2,$F0,$14,$8E,$45,$12,$A9,$00,$8D,$47,$12,$A9,$64,$8D,$8F,$12
+    db $A2,$0C,$15,$8E,$90,$12,$A9,$1D,$8D,$92,$12,$A2,$0C,$15,$8E,$93
+    db $12,$A9,$29,$38,$EF,$27,$01,$00,$1A,$8D,$95,$12,$A2,$0C,$15,$8E
+    db $96,$12,$AF,$27,$01,$00,$0A,$8D,$98,$12,$A2,$00,$15,$8E,$99,$12
+    db $A9,$29,$38,$EF,$27,$01,$00,$3A,$8D,$9B,$12,$A2,$0C,$15,$8E,$9C
+    db $12,$A9,$00,$8D,$9E,$12,$20,$0E,$CA,$AF,$F9,$1D,$00,$D0,$4D,$A9
+    db $64,$8D,$3D,$13,$A2,$1C,$15,$8E,$3E,$13,$A9,$1D,$8D,$40,$13,$A2
+    db $1C,$15,$8E,$41,$13,$A9,$29,$38,$EF,$27,$01,$00,$1A,$8D,$43,$13
+    db $A2,$1C,$15,$8E,$44,$13,$AF,$27,$01,$00,$0A,$8D,$46,$13,$A2,$04
+    db $15,$8E,$47,$13,$A9,$29,$38,$EF,$27,$01,$00,$3A,$8D,$49,$13,$A2
+    db $1C,$15,$8E,$4A,$13,$A9,$00,$8D,$4C,$13,$80,$45,$20,$7D,$D0,$A9
+    db $58,$20,$DD,$D0,$A9,$29,$20,$DD,$D0,$A9,$29,$38,$EF,$27,$01,$00
+    db $1A,$20,$DD,$D0,$AF,$27,$01,$00,$0A,$99,$3D,$13,$C2,$20,$A9,$04
+    db $15,$99,$3E,$13,$E2,$20,$C8,$C8,$C8,$AF,$27,$01,$00,$0A,$20,$D7
+    db $D0,$A9,$29,$38,$EF,$27,$01,$00,$3A,$20,$DD,$D0,$A9,$00,$99,$3D
+    db $13,$A9,$64,$8D,$94,$13,$A2,$20,$15,$8E,$95,$13,$A9,$1D,$8D,$97
+    db $13,$A2,$20,$15,$8E,$98,$13,$A9,$29,$38,$EF,$27,$01,$00,$1A,$8D
+    db $9A,$13,$A2,$20,$15,$8E,$9B,$13,$AF,$27,$01,$00,$C9,$0A,$F0,$06
+    db $90,$04,$A9,$0A,$80,$05,$AF,$27,$01,$00,$3A,$8D,$9D,$13,$A2,$28
+    db $15,$8E,$9E,$13,$AF,$27,$01,$00,$C9,$0A,$F0,$08,$90,$06,$0A,$38
+    db $E9,$14,$80,$02,$A9,$02,$8D,$A0,$13,$A2,$24,$15,$8E,$A1,$13,$AF
+    db $27,$01,$00,$C9,$0A,$F0,$06,$90,$04,$A9,$0A,$80,$05,$AF,$27,$01
+    db $00,$3A,$8D,$A3,$13,$A2,$28,$15,$8E,$A4,$13,$A9,$29,$38,$EF,$27
+    db $01,$00,$3A,$8D,$A6,$13,$A2,$20,$15,$8E,$A7,$13,$A9,$00,$8D,$A9
+    db $13,$A9,$64,$8D,$42,$14,$A2,$2E,$15,$8E,$43,$14,$A9,$1D,$8D,$45
+    db $14,$A2,$2E,$15,$8E,$46,$14,$A9,$29,$38,$EF,$27,$01,$00,$1A,$8D
+    db $48,$14,$A2,$2E,$15,$8E,$49,$14,$AF,$27,$01,$00,$0A,$09,$80,$8D
+    db $4B,$14,$A2,$F8,$15,$8E,$4C,$14,$A9,$29,$38,$EF,$27,$01,$00,$3A
+    db $8D,$4E,$14,$A2,$2E,$15,$8E,$4F,$14,$A9,$00,$8D,$51,$14,$20,$48
+    db $D8,$20,$3C,$C9,$20,$D4,$CB,$AB,$60
+.gradient_1530:
+    db $AF,$27,$01,$00,$8F,$04,$42,$00,$A9,$00,$8F,$05,$42,$00,$A9,$08
+    db $8F,$06,$42,$00,$EA,$EA,$EA,$EA,$EA,$EA,$EA,$E2,$10,$A2,$00,$AF
+    db $14,$42,$00,$0A,$85,$DB,$85,$DD,$AF,$16,$42,$00,$0A,$85,$DF,$A9
+    db $E8,$85,$E1,$E4,$DB,$F0,$0E,$A5,$E1,$9D,$31,$15,$A9,$01,$9D,$30
+    db $15,$E8,$E8,$80,$EE,$A5,$DB,$18,$65,$DD,$85,$DB,$A5,$E1,$3A,$C9
+    db $E0,$F0,$02,$80,$DC,$A5,$DB,$18,$65,$DF,$85,$DB,$E4,$DB,$F0,$0E
+    db $A9,$E0,$9D,$31,$15,$A9,$81,$9D,$30,$15,$E8,$E8,$80,$EE,$A9,$E0
+    db $85,$E1,$80,$14,$85,$E1,$E4,$DB,$F0,$0E,$A5,$E1,$9D,$31,$15,$A9
+    db $81,$9D,$30,$15,$E8,$E8,$80,$EE,$A5,$DB,$18,$65,$DD,$85,$DB,$A5
+    db $E1,$C9,$E9,$F0,$03,$1A,$80,$DC,$C2,$10,$60
+.gradient_15f8:
+    db $AF,$27,$01,$00,$8F,$04,$42,$00,$A9,$00,$8F,$05,$42,$00,$A9,$08
+    db $8F,$06,$42,$00,$EA,$EA,$EA,$EA,$EA,$EA,$EA,$E2,$10,$A2,$00,$AF
+    db $14,$42,$00,$0A,$85,$DB,$85,$DD,$AF,$16,$42,$00,$0A,$85,$DF,$A9
+    db $E8,$85,$E1,$E4,$DB,$F0,$0E,$A5,$E1,$9D,$F9,$15,$A9,$01,$9D,$F8
+    db $15,$E8,$E8,$80,$EE,$A5,$DB,$18,$65,$DD,$85,$DB,$A5,$E1,$3A,$C9
+    db $E0,$F0,$02,$80,$DC,$A5,$DB,$18,$65,$DF,$85,$DB,$E4,$DB,$F0,$0E
+    db $A9,$E0,$9D,$F9,$15,$A9,$81,$9D,$F8,$15,$E8,$E8,$80,$EE,$A9,$E0
+    db $85,$E1,$80,$14,$85,$E1,$E4,$DB,$F0,$0E,$A5,$E1,$9D,$F9,$15,$A9
+    db $81,$9D,$F8,$15,$E8,$E8,$80,$EE,$A5,$DB,$18,$65,$DD,$85,$DB,$A5
+    db $E1,$C9,$E9,$F0,$03,$1A,$80,$DC,$C2,$10,$60
+.zero_fill:
+    fillbyte $00
+    fill $FDDA00-$FDD8E3
+
 
 ; ============================================================
 ; Mode 7 scene ($FD:DA00–$FD:DE97, $FD:EAA6–$FD:F28F)
