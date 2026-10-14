@@ -188,12 +188,6 @@ BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tm
 org $C6E797
 BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
                     ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up
-org $C30077
-WinFx_BuildCircle:  ; bank $C3 window circle builder (BankC3_Entry0008's target); not matched yet
-org $C301E4
-WinFx_StepFade:     ; BankC3_Entry000E's target; not matched yet
-org $C30EFA
-WinFx_BuildQuad:    ; BankC3_Entry0011's target; not matched yet
 org $C31313
 BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:1313-$C3:7A2B
                     ; (26,393 bytes): the bank $C3 module, 65816 code and its data, which

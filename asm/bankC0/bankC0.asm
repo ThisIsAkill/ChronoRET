@@ -28415,8 +28415,9 @@ AudioFadeDispatch:
 ; (5, or 7 for hook 3) in Field_HdmaEnable, and has a bank-$C3 routine
 ; build the shape: BankC3_Entry0008 from WinFx_ArgX/Y/Size (hooks
 ; 1, 2, 4, 5, 7-10 and 12), BankC3_Entry000E (hook 3) or BankC3_Entry0011
-; from four moving points (hook 6). The shapes those routines draw
-; are not traced, so the handlers keep neutral names. Field_EventHook
+; from four moving points (hook 6). Those routines draw a circle
+; (WinFx_BuildCircle), a per-line random wipe (WinFx_StepWipe) and a
+; four-sided shape (WinFx_BuildQuad); the handlers keep their names. Field_EventHook
 ; and WinFx_* are set by the event opcodes $FE (Evt_OpFE_WinQuad) and
 ; $FF $90-$9E (Evt_OpFFTable's handlers). The dp $39/$3A stores at $C0:A4C4-$C0:A4F3 are not more of
 ; them: they are LocLoad_UnkA33B's, with DP=$1D00 (Map_OwnStep3X/3Y).

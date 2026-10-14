@@ -1710,6 +1710,49 @@ if !ram_engine_inc == 0
 !C3Mod_Code = $7E3000                    ; where C3_BootModule unpacks the bank $C3 module and jumps
                                          ; (its first byte is the module's entry); alias of
                                          ; LocGfx_Stage, which the field no longer uses by then
+!DP_WinFx = $0300                        ; direct page of the bank $C3 window routines
+                                         ; (WinFx_BuildCircle, WinFx_StepWipe, WinFx_BuildQuad): their
+                                         ; arguments are WinFx_Arg*.. and WinFx_Quad*, scratch $F0-$FD
+!WinFx_ArgXHi = $0351                    ; 8-bit: WinFx_BuildCircle zeroes it (and $0353, $0355) so
+                                         ; that WinFx_ArgX/ArgY/ArgSize read as 16-bit values
+!WinFx_ArgYHi = $0353
+!WinFx_ArgSizeHi = $0355
+!WinFx_Tmp = $03F0                       ; 16-bit scratch of the bank $C3 window routines: x or y
+                                         ; (circle), the first-frame fill byte (wipe), the chain
+                                         ; entry and then a fill count (quad)
+!WinFx_CircD = $03F2                     ; 16-bit: WinFx_BuildCircle's midpoint decision value;
+                                         ; after the loop the mode word (WinFx_CircMode)
+!WinFx_CircMode = $03F2                  ; alias: the mode WinFx_BuildCircle was called with
+!WinFx_CircRowPtr = $03F4                ; 16-bit: table address of the row being written above
+                                         ; the centre (moves up 2 bytes a step)
+!WinFx_CircHalfPtr = $03F6               ; 16-bit: (centre row's table address) / 2
+!WinFx_WipeFrame = $0351                 ; 8-bit: WinFx_StepWipe's frame count (1-$1F; 0 = first
+                                         ; call); alias of WinFx_ArgXHi
+!WinFx_NoisePtr = $0355                  ; 3 B long pointer WinFx_StepWipe walks RandomTable with:
+                                         ; low byte = the last byte read, then $FE, $C0
+!WinFx_WipeStep = $03F2                  ; 8-bit: amount added/subtracted in the current run
+!WinFx_WipeEnd = $03F4                   ; 16-bit: end of the line array (its start + WinFx_Lines)
+!WinFx_QuadX0 = $0353                    ; 16-bit (high byte cleared): WinFx_QuadEdge's start X
+!WinFx_QuadY0 = $0355                    ; 16-bit: start Y (swapped so that Y0 <= Y1)
+!WinFx_QuadX1 = $0357                    ; 16-bit: end X
+!WinFx_QuadY1 = $0359                    ; 16-bit: end Y
+!WinFx_QuadTopY = $0368                  ; 16-bit (high byte $0369 cleared): the smallest point Y
+!WinFx_QuadBottomY = $036A               ; 16-bit: Y0 of the first edge that goes up: the
+                                         ; lowest point (WinFx_BuildQuad)
+!WinFx_QuadEdgesLeft = $03F4             ; 16-bit: edges still to draw (4 at the start)
+!WinFx_QuadLeftSide = $03F6              ; 16-bit: nonzero while edges go down the left side; the
+                                         ; first rising edge clears it and moves to the right byte
+!WinFx_QuadRows = $03F2                  ; 8-bit: rows left on the current edge
+!WinFx_QuadDx = $03F8                    ; 16-bit: |X1 - X0|
+!WinFx_QuadDy = $03FA                    ; 16-bit (high byte $03FB cleared): Y1 - Y0
+!WinFx_QuadErr = $03FC                   ; 16-bit: the edge walk's error term
+!C3_RandSeed = $0386                     ; 8-bit: C3_RandomByte's running value (stored back each
+                                         ; call)
+!C3_FrameCount = $0008                   ; 16-bit: the module's frame counter (C3_ModuleNmi
+                                         ; increments it with DP=0); C3_RandomByte mixes it in
+!C3_MixF0 = $00F0                        ; three 16-bit words C3_RandomByte adds in absolute (with
+!C3_MixF2 = $00F2                        ; DB=$00: direct-page scratch of DP-0 code); whatever is
+!C3_MixF4 = $00F4                        ; there
 !Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
                                          ; MapProps; LocRom.MapProps picks the entry
 !LocGfx_Lists = $F61C00                  ; 8 bytes per LocRom.Tileset12: graphics pack numbers ($FF =

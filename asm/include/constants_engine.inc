@@ -320,10 +320,12 @@ if !constants_engine_inc == 0
 !WinFx_TableB = $1AC8                    ; the same while Field_Unk53 is 0 (inferred: the two halves
                                          ; of a double buffer, as Hdma_InitChannelsFD picks its
                                          ; tables by Field_Unk53)
-!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10 (what the
-                                         ; mode selects is not traced)
-!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5
-!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12
+!WinFx_Mode0 = $00                       ; A for BankC3_Entry0008 from hooks 1-2 and 7-10: a full
+                                         ; circle, the rows outside emptied (WinFx_BuildCircle)
+!WinFx_Mode1 = $01                       ; A for BankC3_Entry0008 from hooks 4-5: the upper half,
+                                         ; then the lower half at half height
+!WinFx_Mode80 = $80                      ; A for BankC3_Entry0008 from hook 12: a full circle, the
+                                         ; rows outside left as they are (WinFx_CircKeepRest)
 !WinFx_Hook3SizeMin = $02                ; hook 3 shuts the window off only when WinFx_Size < this
 !WinFx_FixedX = $7C                      ; WinFx_ArgX of hooks 7-10
 !WinFx_FixedY = $06                      ; WinFx_ArgY of hooks 7-10
@@ -1000,8 +1002,8 @@ endif
 !EventHook_LeaveToBankC3 = $0B           ; hook 11
 !EventHook_WinPulse = $0C                ; hook 12 (it ends at EventHook_Idle)
 !EventHook_WinShrink1Off = $0E           ; hook 14
-!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95
-!WinFx_C3EMode2 = $02                    ; (what BankC3_Entry000E does with them is not traced)
+!WinFx_C3EMode1 = $01                    ; WinFx_C3EMode values of opcodes $FF $92/$94 and $93/$95:
+!WinFx_C3EMode2 = $02                    ; WinFx_StepWipe raises every line value (1) or lowers it (2)
 !WinFx_SizeBit0 = $01                    ; WinFx_Size bit 0 (Hdma_InitChannelsFD's channel-7 choice)
 !WinFx_SizeBit1 = $02                    ; WinFx_Size bit 1: hook 3 leaves the window on when set
 !EvtFF_FirstSub = $90                    ; opcode $FF's second byte: first Evt_OpFFTable entry
@@ -1178,3 +1180,25 @@ endif
 !C3_BootIrqOn = $80                      ; C3_EntryArg bit 7: C3_BootModule runs the unpack with the
                                          ; display on and the line-211 IRQ (Field_HookLeaveToBankC3's
                                          ; BankC3_HookArg $85 sets it; event sub $00-$7F never does)
+
+; --- Bank $C3 window routines (WinFx_BuildCircle, WinFx_StepWipe, WinFx_BuildQuad) ---
+!WinFx_EmptyEntry = $0001                ; table entry left = 1, right = 0: the window covers
+                                         ; nothing on that line
+!WinFx_FillAllBytes = $01C0              ; WinFx_FillEmpty's count for the whole table: $1C1
+                                         ; bytes after the first entry (225 entries and one byte)
+!WinFx_Lines = $E0                       ; lines in a table (224)
+!WinFx_LastLine = $DF                    ; the last line (223)
+!WinFx_EdgeMax = $00FF                   ; right edges are clamped to this
+!WinFx_CircModeMask = $007F              ; mode bits 0-6: 0 = full circle, 1 = the lower half at
+                                         ; half height, else the upper half only
+!WinFx_CircKeepRest = $0080              ; mode bit 7: leave the rows outside the circle as they
+                                         ; are (else they are emptied)
+!WinFx_CircStepDiag = $000A              ; midpoint-circle step constant when x decreases
+                                         ; (4(y - x) + 10)
+!WinFx_WipeWorkOfs = $01C0               ; WinFx_StepWipe: the line array is at the table + this;
+                                         ; the two output buffers at + 0 and + WinFx_Lines
+!WinFx_WipeFrames = $20                  ; WinFx_StepWipe stops when its frame count reaches this
+!WinFx_WipeFillMode2 = $FF               ; first-frame value of every line in mode 2 (mode 1: 0)
+!WinFx_WipeRunMask = $1F                 ; random byte bits 0-4: run length - 3
+!WinFx_QuadTableRows = $0100             ; rows of a quad table (256): the rows after the bottom
+                                         ; one, up to $FF, are emptied (WinFx_BuildQuad)

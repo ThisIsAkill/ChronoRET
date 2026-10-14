@@ -34,7 +34,7 @@ incsrc "../hardware.inc"
 ;         Field_HookLeaveToBankC3 and Evt_OpFF_Misc; never returns)
 ;   $0002 Decomp_ToWramVec → Decomp_ToWram (JSL)
 ;   $0008 BankC3_Entry0008 → WinFx_BuildCircle (JSL)
-;   $000E BankC3_Entry000E → WinFx_StepFade (JSL)
+;   $000E BankC3_Entry000E → WinFx_StepWipe (JSL)
 ;   $0011 BankC3_Entry0011 → WinFx_BuildQuad (JSL)
 ; $0005-$0007 and $000B-$000D hold the bytes $CE,$DE,$C2: not a JMP (no
 ; vector there; no reference to them was found), kept as data.
@@ -78,7 +78,7 @@ BankC3_Entry0008:               ; header: see BankC3_Entry0000
 .filler0B:
     db $CE,$DE,$C2              ; never executed
 BankC3_Entry000E:               ; header: see BankC3_Entry0000
-    JMP WinFx_StepFade
+    JMP WinFx_StepWipe
 BankC3_Entry0011:               ; header: see BankC3_Entry0000
     JMP WinFx_BuildQuad
 
@@ -152,6 +152,513 @@ C3_BootModule:
     STA.w !Decomp_SrcBank
     JSL Decomp_ToWram
     JML !C3Mod_Code
+
+; ============================================================
+; Window tables: the circle, the line wipe ($C3:0077–$C3:0306)
+; ============================================================
+
+; $C3:0077 — WinFx_BuildCircle (335 bytes, $0077–$01C5)
+; Writes a window table for a circle: one 2-byte entry per line (left
+; edge, right edge; WinFx_EmptyEntry = nothing on that line) at
+; WinFx_TablePtr, in bank $7F if WinFx_TableBank bit 0 is set, else $7E.
+; Centre (WinFx_ArgX, WinFx_ArgY) = (Xc, Yc), radius WinFx_ArgSize = r.
+; Radius 0 empties the whole table (WinFx_FillEmpty with
+; WinFx_FillAllBytes). Else a midpoint-circle walk (x from r down, y
+; from 0 up, while x >= the previous y) writes the rows above the
+; centre: row Yc - x with Xc - y .. Xc + y, and row Yc - 1 - y with
+; Xc - x .. Xc + x (left edges kept >= 0, right edges <= $FF). Then by
+; the mode in A (bits 0-6): 0 mirrors rows Yc-1, Yc-2, .. to Yc, Yc+1,
+; .. (r + 1 rows); 1 copies every second row instead ((r + 1) / 2
+; rows: the lower half at half height); any other value keeps only the
+; upper half and returns. Unless mode bit 7 (WinFx_CircKeepRest) is
+; set, modes 0 and 1 then empty the rows from Yc + r (mode 1: Yc + r/2)
+; to line $DF, and the rows from 0 to Yc - r - 1 (none when Yc - r <= 1;
+; with Yc - r = 1 row 0 is left as it was; the lower part only when
+; that first row is above line $DF), so the last mirrored row and the
+; walk's top row are overwritten. Nothing limits the rows to the table:
+; a circle that reaches above line 0 writes before WinFx_TablePtr.
+; Quirks (adds and subtracts with no CLC/SEC before them, which take the
+; carry the instruction before left; traced, kept):
+;   - d starts at 2 - 2r, not 3 - 2r ($C3:00B3: C=0 from the ASL).
+;   - the first pass writes row Yc - r - 1, not Yc - r, when the table
+;     address is even ($C3:00CA: C = bit 0 of it from the LSR); later
+;     passes have C=1 there.
+;   - right edges of the Xc +- y rows are Xc + y + 1 when 0 < y <= Xc
+;     ($C3:00DE: C from the ADC before); the left edge of the next row
+;     is Xc - x + 1 when that right edge reached $FF ($C3:00FE: C from
+;     the clamp's CMP).
+;   - the step when d >= 0, with v = y - x - 1 + c (c = 1 when the
+;     second right edge reached $FF, from its CMP): 4v + 10 for v >= 0,
+;     else 4v + 11 (C=1 out of the two ASLs), and one more when v is -1
+;     or -2 (the carry out of ADC #$000A reaches ADC WinFx_CircD). The
+;     d < 0 step 4y + 6 is exact.
+; Callers (1 JMP site): BankC3_Entry0008 ($C3:0008).
+; Callers of WinFx_Exit (3 JMP sites): WinFx_StepWipe ($C3:023F, $C3:02AB, $C3:02DA).
+; Callers note: the unpacked module JSLs here directly (from $7E:7338,
+;   $7E:734F and $7E:7FDE).
+; Entry: M, X any (P saved; REP #$30 here); DP any (saved; DP_WinFx
+;        inside); DB any (saved; the table bank inside); A = the mode
+;        (low byte; WinFx_Mode0/1/80 from the field hooks);
+;        WinFx_ArgX/ArgY/ArgSize, WinFx_TablePtr/TableBank set.
+; Exit:  P, DP, DB and A, X, Y (16-bit) restored; WinFx_ArgXHi,
+;        WinFx_ArgYHi, WinFx_ArgSizeHi = 0; WinFx_Tmp, WinFx_CircD,
+;        WinFx_CircRowPtr, WinFx_CircHalfPtr changed (radius 0: only
+;        WinFx_Tmp).
+; WinFx_Exit (sub-entry, $C3:01BD): the shared exit (REP #$30, pull Y,
+;   X, A, P, DP, DB, RTL), also jumped to by WinFx_StepWipe.
+; Calls: WinFx_FillEmpty, WinFx_FillEmptyFrom.
+WinFx_BuildCircle:
+    PHB
+    PHD
+    PHP
+    REP #$30
+    PHA
+    PHX
+    PHY
+    AND.w #!Eng_LowByteMask
+    PHA                                 ; the mode
+    LDA.w #!DP_WinFx
+    TCD
+    SEP #$20
+    STZ.b !WinFx_ArgXHi-!DP_WinFx
+    STZ.b !WinFx_ArgYHi-!DP_WinFx
+    STZ.b !WinFx_ArgSizeHi-!DP_WinFx
+    LDA.b !WinFx_TableBank-!DP_WinFx
+    LSR A
+    BCS .bank7F
+    LDA.b #!Bank7E
+    BRA .set_bank
+.bank7F:
+    LDA.b #!Bank7F
+.set_bank:
+    PHA
+    PLB
+    REP #$20
+    LDA.b !WinFx_ArgSize-!DP_WinFx
+    BNE .circle
+    PLA
+    LDA.w #!WinFx_FillAllBytes
+    JSR WinFx_FillEmpty
+    JMP WinFx_Exit
+.circle:
+    TAX                                 ; X = x = r
+    ASL A
+    STA.b !WinFx_CircD-!DP_WinFx
+    LDA.w #$0003
+    SBC.b !WinFx_CircD-!DP_WinFx        ; no SEC: C=0 (ASL of r < $100), so d = 2 - 2r
+    STA.b !WinFx_CircD-!DP_WinFx
+    LDY.w #$0000                        ; Y = y = 0
+    LDA.b !WinFx_ArgY-!DP_WinFx
+    ASL A
+    CLC
+    ADC.b !WinFx_TablePtr-!DP_WinFx
+    STA.b !WinFx_CircRowPtr-!DP_WinFx   ; the centre row's entry
+    PHA
+    LSR A
+    STA.b !WinFx_CircHalfPtr-!DP_WinFx
+.step:
+    STX.b !WinFx_Tmp-!DP_WinFx
+    LDA.b !WinFx_CircHalfPtr-!DP_WinFx
+    SBC.b !WinFx_Tmp-!DP_WinFx          ; no SEC: first pass C = bit 0 of the row address (row Yc-x-1
+                                        ; for an even table), later C=1 from the CPX (row Yc-x)
+    ASL A
+    TAX
+    TYA
+    EOR.w #!Eng_Invert16
+    INC A
+    ADC.b !WinFx_ArgX-!DP_WinFx         ; Xc - y (C=0 from the ASL)
+    BPL .left1_ok
+    LDA.w #$0000
+.left1_ok:
+    STA.w !Eng_PtrBase,X
+    TYA
+    ADC.b !WinFx_ArgX-!DP_WinFx         ; no CLC: + 1 when 0 < y <= Xc
+    CMP.w #!WinFx_EdgeMax
+    BMI .right1_ok
+    LDA.w #!WinFx_EdgeMax
+.right1_ok:
+    SEP #$20
+    STA.w !Eng_PtrBase+1,X
+    REP #$20
+    LDX.b !WinFx_Tmp-!DP_WinFx          ; X = x
+    STY.b !WinFx_Tmp-!DP_WinFx          ; WinFx_Tmp = y
+    LDY.b !WinFx_CircRowPtr-!DP_WinFx
+    DEY
+    DEY
+    STY.b !WinFx_CircRowPtr-!DP_WinFx   ; row Yc - 1 - y
+    TXA
+    EOR.w #!Eng_Invert16
+    INC A
+    ADC.b !WinFx_ArgX-!DP_WinFx         ; no CLC: C from the CMP above (1 if that edge reached $FF)
+    BPL .left2_ok
+    LDA.w #$0000
+.left2_ok:
+    STA.w !Eng_PtrBase,Y
+    TXA
+    CLC
+    ADC.b !WinFx_ArgX-!DP_WinFx
+    CMP.w #!WinFx_EdgeMax
+    BMI .right2_ok
+    LDA.w #!WinFx_EdgeMax
+.right2_ok:
+    SEP #$20
+    STA.w !Eng_PtrBase+1,Y
+    REP #$20
+    LDY.b !WinFx_Tmp-!DP_WinFx          ; Y = y
+    LDA.b !WinFx_CircD-!DP_WinFx
+    BPL .step_diag
+    TYA
+    ASL A
+    ASL A
+    ADC.w #$0006                        ; d += 4y + 6
+    BRA .step_add
+.step_diag:
+    TYA
+    STX.b !WinFx_Tmp-!DP_WinFx
+    DEX                                 ; x - 1
+    SBC.b !WinFx_Tmp-!DP_WinFx          ; no SEC: C from the CMP above
+    ASL A
+    ASL A
+    ADC.w #!WinFx_CircStepDiag          ; C from the second ASL
+.step_add:
+    ADC.b !WinFx_CircD-!DP_WinFx
+    STA.b !WinFx_CircD-!DP_WinFx
+    STY.b !WinFx_Tmp-!DP_WinFx
+    INY
+    CPX.b !WinFx_Tmp-!DP_WinFx
+    BPL .step                           ; while x >= the old y
+    PLY                                 ; Y = X = the centre row's entry
+    TYX
+    LDA.b !WinFx_ArgSize-!DP_WinFx
+    INC A
+    STA.b !WinFx_Tmp-!DP_WinFx          ; r + 1 rows
+    PLA
+    STA.b !WinFx_CircMode-!DP_WinFx
+    AND.w #!WinFx_CircModeMask
+    BEQ .mirror
+    CMP.w #!WinFx_Mode1
+    BNE WinFx_Exit                      ; other modes: the upper half only
+    LSR.b !WinFx_Tmp-!DP_WinFx
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    BMI WinFx_Exit
+    BEQ WinFx_Exit
+.mirror_half:
+    DEX
+    DEX
+    DEX
+    DEX
+    LDA.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    DEC.b !WinFx_Tmp-!DP_WinFx
+    BNE .mirror_half
+    LDA.b !WinFx_CircMode-!DP_WinFx
+    BIT.w #!WinFx_CircKeepRest
+    BNE WinFx_Exit
+    LDA.b !WinFx_ArgSize-!DP_WinFx
+    LSR A                               ; r / 2 rows below the centre
+    BRA .clear_below
+.mirror:
+    DEX
+    DEX
+    LDA.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    DEC.b !WinFx_Tmp-!DP_WinFx
+    BNE .mirror
+    LDA.b !WinFx_CircMode-!DP_WinFx
+    BIT.w #!WinFx_CircKeepRest
+    BNE WinFx_Exit
+    LDA.b !WinFx_ArgSize-!DP_WinFx
+.clear_below:
+    CLC
+    ADC.b !WinFx_ArgY-!DP_WinFx
+    CMP.w #!WinFx_LastLine
+    BPL .clear_above
+    STA.b !WinFx_Tmp-!DP_WinFx
+    ASL A
+    CLC
+    ADC.b !WinFx_TablePtr-!DP_WinFx
+    TAX
+    LDA.w #!WinFx_Lines
+    SEC
+    SBC.b !WinFx_Tmp-!DP_WinFx
+    DEC A
+    ASL A
+    DEC A                               ; 2 x ($DF - row) - 1: through line $DF
+    STA.b !WinFx_Tmp-!DP_WinFx
+    JSR WinFx_FillEmptyFrom
+.clear_above:
+    LDA.b !WinFx_ArgY-!DP_WinFx
+    SEC
+    SBC.b !WinFx_ArgSize-!DP_WinFx
+    CMP.w #$0001
+    BMI WinFx_Exit
+    BEQ WinFx_Exit                      ; Yc - r = 1: row 0 is not touched
+    DEC A
+    ASL A
+    DEC A                               ; rows 0 to Yc - r - 1
+    JSR WinFx_FillEmpty
+WinFx_Exit:                             ; header: see WinFx_BuildCircle
+    REP #$30
+    PLY
+    PLX
+    PLA
+    PLP
+    PLD
+    PLB
+    RTL
+
+; $C3:01C6 — WinFx_FillEmpty (30 bytes, $01C6–$01E3)
+; Fills window-table entries with WinFx_EmptyEntry: stores it at X and
+; copies it forward with an MVN of WinFx_Tmp + 1 bytes into X + 2 on
+; (the bank by WinFx_TableBank bit 0). WinFx_FillEmpty starts at
+; WinFx_TablePtr with A = the count (bytes after the first entry - 1);
+; WinFx_FillEmptyFrom (sub-entry, $C3:01CA) starts at X with the count
+; already in WinFx_Tmp.
+; Callers (2 JSR sites): WinFx_BuildCircle ($C3:00A6, $C3:01BA).
+; Callers of WinFx_FillEmptyFrom (1 JSR site): WinFx_BuildCircle ($C3:01A8).
+; Entry: M=0 (16-bit A: the entry is stored as a word, A is the MVN
+;        count), X=0, DP=DP_WinFx (WinFx_Tmp, WinFx_TablePtr and
+;        WinFx_TableBank are direct page), DB = the table's bank (the
+;        STA is absolute).
+; Exit:  M=0, X=0; DB = the table's bank (MVN sets it to the same); A =
+;        $FFFF (MVN); X, Y past the copied bytes; WinFx_Tmp = the count.
+WinFx_FillEmpty:
+    STA.b !WinFx_Tmp-!DP_WinFx
+    LDX.b !WinFx_TablePtr-!DP_WinFx
+WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
+    TXY
+    INY
+    INY
+    LDA.w #!WinFx_EmptyEntry
+    STA.w !Eng_PtrBase,X
+    LDA.b !WinFx_TableBank-!DP_WinFx
+    LSR A
+    BCS .bank7F
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes
+    RTS
+.bank7F:
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes
+    RTS
+
+; $C3:01E4 — WinFx_StepWipe (249 bytes, $01E4–$02DC)
+; One frame of a per-line wipe, run while WinFx_C3EMode is nonzero
+; (Field_HookWinC3E calls it once a frame through BankC3_Entry000E and
+; uses the result as HDMA data for window 2, probably one window edge
+; per line). Works on a line array of WinFx_Lines bytes at
+; WinFx_C3ETablePtr + WinFx_WipeWorkOfs in bank WinFx_C3ETableBank, and
+; writes it out each frame through WMDATA to one of two buffers: the
+; table itself on odd frames, + WinFx_Lines on even ones.
+;   - first call (WinFx_WipeFrame = 0): every line set to 0 (mode 1) or
+;     WinFx_WipeFillMode2 (any other mode), then the step below;
+;   - each call adds 1 to WinFx_WipeFrame; while it stays below
+;     WinFx_WipeFrames, each line moves by a random step: the lines go in runs of 3-34
+;     (random byte bits 0-4 + 3), each run with a step of 8-11 (next
+;     random byte bits 0-1 + 8). Mode 1 adds (to at most $FF), mode 2
+;     (WinFx_C3EMode2) subtracts (to at least 0);
+;   - when the count reaches WinFx_WipeFrames, WinFx_C3EMode (so
+;     WinFx_Busy) and WinFx_WipeFrame are cleared and nothing is
+;     written: Field_HookWinC3E sees the end that way.
+; The random bytes walk RandomTable: WinFx_NoisePtr starts at the entry
+; C3_RandomByte picks and each byte read is the index of the next.
+; Quirks (no SEC before the SBC, and a carry left by the CMP of the
+; mode): in mode 2 every line loses step + 1, i.e. 9-12 (C=0 there:
+; from the ADC #$08 of a run reload or from the CPX of the loop), and
+; the first run is 4-35 lines long (its ADC #$03 gets C=1 from the CMP
+; that found mode 2); mode 1 is exact. Once a value clamps to 0, the
+; TDC used for it leaves B = $03 (DP's high byte), so the next run
+; length (TAY) is $0303 or more: that run lasts to the end of the line.
+; The first-frame fill is in its own bank by WinFx_C3ETableBank bit 0
+; ($7E/$7F: STA.l + MVN), the steps read and write with DB =
+; WinFx_C3ETableBank and WMADDH = it (so it must be $7E or $7F).
+; Callers (1 JMP site): BankC3_Entry000E ($C3:000E).
+; Callers note: the unpacked module JSLs here directly (from $7E:6844).
+; Entry: M, X any (P saved; REP #$30 here); DP any and DB any (saved;
+;        DP_WinFx inside); WinFx_C3EMode, WinFx_C3ETablePtr/TableBank
+;        set; C3_RandomByte needs DB=$00 or another bank that maps the
+;        PPU registers and low WRAM (Field_HookWinC3E has $00).
+; Exit:  through WinFx_Exit: P, DP, DB and A, X, Y (16-bit) restored;
+;        WinFx_WipeFrame stepped (or 0 with WinFx_C3EMode at the end);
+;        WinFx_Tmp, WinFx_WipeStep, WinFx_WipeEnd, WinFx_NoisePtr and
+;        C3_RandSeed changed; WMADD left after the buffer written.
+; Calls: C3_RandomByte.
+WinFx_StepWipe:
+    PHB
+    PHD
+    PHP
+    REP #$30
+    PHA
+    PHX
+    PHY
+    LDA.w #!DP_WinFx
+    TCD
+    SEP #$20
+    LDA.b !WinFx_C3EMode-!DP_WinFx
+    BEQ .stop
+    LDA.b !WinFx_WipeFrame-!DP_WinFx
+    BNE .count
+    STZ.b !WinFx_Tmp-!DP_WinFx          ; first frame: fill the line array
+    LDA.b !WinFx_C3EMode-!DP_WinFx
+    CMP.b #!WinFx_C3EMode1
+    BEQ .fill
+    LDA.b #!WinFx_WipeFillMode2
+    STA.b !WinFx_Tmp-!DP_WinFx
+.fill:
+    REP #$21
+    LDA.b !WinFx_C3ETablePtr-!DP_WinFx
+    ADC.w #!WinFx_WipeWorkOfs
+    TAX
+    TXY
+    INY
+    PHB
+    LDA.b !WinFx_C3ETableBank-!DP_WinFx
+    LSR A
+    BCC .fill_7E
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    STA.l !Bank7F<<16,X
+    LDA.w #!WinFx_Lines-2
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes
+    BRA .filled
+.fill_7E:
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    STA.l !Bank7E<<16,X
+    LDA.w #!WinFx_Lines-2
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes
+.filled:
+    PLB
+    SEP #$20
+    TDC                                 ; A = 0 (DP's low byte)
+.count:
+    INC A
+    STA.b !WinFx_WipeFrame-!DP_WinFx
+    CMP.b #!WinFx_WipeFrames
+    BMI .run
+.stop:
+    STZ.b !WinFx_WipeFrame-!DP_WinFx
+    STZ.b !WinFx_C3EMode-!DP_WinFx
+    JMP WinFx_Exit
+.run:
+    LDA.b #bank(RandomTable)
+    STA.b !WinFx_NoisePtr+2-!DP_WinFx
+    LDA.b #RandomTable>>8&$FF
+    STA.b !WinFx_NoisePtr+1-!DP_WinFx
+    JSL C3_RandomByte
+    STA.b !WinFx_NoisePtr-!DP_WinFx
+    REP #$20
+    LDA.b !WinFx_C3ETablePtr-!DP_WinFx
+    CLC
+    ADC.w #!WinFx_WipeWorkOfs
+    TAX                                 ; X = the line array
+    CLC
+    ADC.w #!WinFx_Lines
+    STA.b !WinFx_WipeEnd-!DP_WinFx
+    LDA.b !WinFx_WipeFrame-!DP_WinFx
+    LSR A                               ; odd frame: the first buffer
+    LDA.b !WinFx_C3ETablePtr-!DP_WinFx
+    BCS .set_out
+    ADC.w #!WinFx_Lines
+.set_out:
+    STA.w WMADDL
+    SEP #$20
+    LDA.b !WinFx_C3ETableBank-!DP_WinFx
+    STA.w WMADDH
+    PHA
+    PLB
+    TDC
+    XBA                                 ; B = 0 (DP's low byte), for the TAYs
+    LDY.w #$0001
+    LDA.b !WinFx_C3EMode-!DP_WinFx
+    CMP.b #!WinFx_C3EMode2
+    BEQ .lower_line
+.raise_line:
+    DEY
+    BNE .raise
+    LDA.b [!WinFx_NoisePtr-!DP_WinFx]
+    STA.b !WinFx_NoisePtr-!DP_WinFx
+    AND.b #!WinFx_WipeRunMask
+    ADC.b #$03
+    TAY                                 ; the run length
+    LDA.b [!WinFx_NoisePtr-!DP_WinFx]
+    STA.b !WinFx_NoisePtr-!DP_WinFx
+    AND.b #$03
+    ADC.b #$08
+    STA.b !WinFx_WipeStep-!DP_WinFx
+.raise:
+    LDA.w !Eng_PtrBase,X
+    ADC.b !WinFx_WipeStep-!DP_WinFx
+    BCC .raised
+    LDA.b #!WinFx_EdgeMax
+.raised:
+    STA.l WMDATA
+    STA.w !Eng_PtrBase,X
+    INX
+    CPX.b !WinFx_WipeEnd-!DP_WinFx
+    BNE .raise_line
+    JMP WinFx_Exit
+.lower_line:
+    DEY
+    BNE .lower
+    LDA.b [!WinFx_NoisePtr-!DP_WinFx]
+    STA.b !WinFx_NoisePtr-!DP_WinFx
+    AND.b #!WinFx_WipeRunMask
+    ADC.b #$03                          ; first run: C=1 from the CMP (+ 1)
+    TAY
+    LDA.b [!WinFx_NoisePtr-!DP_WinFx]
+    STA.b !WinFx_NoisePtr-!DP_WinFx
+    AND.b #$03
+    ADC.b #$08
+    STA.b !WinFx_WipeStep-!DP_WinFx
+.lower:
+    LDA.w !Eng_PtrBase,X
+    SBC.b !WinFx_WipeStep-!DP_WinFx     ; no SEC: C=0 here, so step + 1
+    BPL .lowered
+    BCS .lowered
+    TDC                                 ; 0 (and B = $03: see the header)
+.lowered:
+    STA.l WMDATA
+    STA.w !Eng_PtrBase,X
+    INX
+    CPX.b !WinFx_WipeEnd-!DP_WinFx
+    BNE .lower_line
+    JMP WinFx_Exit
+
+; $C3:02DD — C3_RandomByte (42 bytes, $02DD–$0306)
+; Returns a new pseudo-random byte in A and keeps it in C3_RandSeed: A
+; (with C rotated in) plus C3_RandSeed, stored; then X's low byte, the
+; seed, C3_FrameCount, the H and V counters (latched by reading SLHV;
+; the CMP's result is not used), the seed again, C3_MixF0, C3_MixF2 (EOR)
+; and C3_MixF4 are added or subtracted in, each with the carry of the
+; step before, and the result stored back.
+; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
+; Callers note: the unpacked module also JSLs here (from $7E:3443).
+; Entry: M=1 (8-bit adds; WinFx_StepWipe has it, the module's site is
+;        not traced), X any (only its low byte is used), DP any (none
+;        used), DB = $00 or a bank that maps both low WRAM and the PPU
+;        registers (all operands are absolute).
+; Exit:  M as on entry; A = C3_RandSeed = the new value; flags from the
+;        last SBC; X, Y, DP, DB unchanged.
+C3_RandomByte:
+    ROL A
+    ADC.w !C3_RandSeed
+    STA.w !C3_RandSeed
+    TXA
+    ADC.w !C3_RandSeed
+    ADC.w !C3_FrameCount
+    CMP.w SLHV                          ; read for the latch
+    ADC.w OPHCT
+    SBC.w OPVCT
+    ADC.w !C3_RandSeed
+    ADC.w !C3_MixF0
+    EOR.w !C3_MixF2
+    ADC.w !C3_MixF4
+    SBC.w OPVCT
+    STA.w !C3_RandSeed
+    RTL
 
 ; $C3:0529 — C3_BootIrq (31 bytes, $0529–$0547)
 ; IRQ handler while the module is unpacked (C3_BootModule points the
@@ -704,6 +1211,342 @@ Decomp_ToWram:
     PLP
     PLD
     PLB
+    RTL
+
+; ============================================================
+; Window tables: the quadrilateral ($C3:0EFA–$C3:10BF)
+; ============================================================
+
+; $C3:0EFA — WinFx_BuildQuad (263 bytes, $0EFA–$1000)
+; Writes a window table (2 bytes per line: left edge, right edge) for
+; the four-sided shape through WinFx_QuadPoints (X, Y bytes of points
+; 0-3, in order) at WinFx_QuadTablePtr in bank WinFx_QuadTableBank
+; (bit 0: $7E/$7F). It starts from the point with the smallest Y (the
+; first one on a tie; WinFx_QuadTopY), then draws the four edges in
+; point order with WinFx_QuadEdge, through a chain of four blocks
+; (.from_p0-.from_p3, one per start point; entered with JMP
+; (WinFx_Tmp), the last block branches back to the first). Edges going
+; down write the left byte; the first edge going up switches to the
+; right byte (WinFx_QuadTablePtr + 1) and its start Y is the bottom
+; (WinFx_QuadBottomY). After the fourth edge the return address of its
+; JSR is dropped (PLA) and the rows outside are emptied
+; (WinFx_EmptyEntry): row 0, the bottom row and the rows after it up
+; to $FF, and rows 1 to the top Y (so the top row too) unless the top Y
+; is 0.
+; Quirks: WinFx_QuadTablePtr is moved back by one at the end even when
+; no edge went up (all four Y equal): it is then left one lower. The
+; BEQ on the fill count can never be taken (2 x ($FF - bottom) - 1 is
+; odd), and a bottom at line $FF would make it $FFFF, a 64 KB MVN; the
+; callers' points are not checked here.
+; Callers (1 JMP site): BankC3_Entry0011 ($C3:0011).
+; Callers note: the unpacked module JSLs here directly (from $7E:9A4F).
+; Entry: M any (SEP #$20 here), X=0 (16-bit LDY of the chain entry),
+;        DP any and DB any (both saved; DP_WinFx inside; the table is
+;        written long, WinFx_QuadEdge sets its own DB);
+;        WinFx_QuadPoints, WinFx_QuadTablePtr/TableBank set.
+; Exit:  through WinFx_QuadExit: P, DB, DP restored; A = $0003 (TDC/XBA
+;        with DP_WinFx); X, Y changed; WinFx_QuadTopY,
+;        WinFx_QuadBottomY, WinFx_QuadX0..Y1, WinFx_Tmp,
+;        WinFx_QuadRows/EdgesLeft/LeftSide/Dx/Dy/Err changed.
+; Calls: WinFx_QuadEdge (JSL).
+org $C30EFA
+WinFx_BuildQuad:
+    PHD
+    PHB
+    PHP
+    SEP #$20
+    PEA.w !DP_WinFx
+    PLD
+    STZ.b !WinFx_QuadTopY+1-!DP_WinFx
+    LDY.w #.from_p0
+    STY.b !WinFx_QuadLeftSide-!DP_WinFx ; nonzero: still on the left side
+    LDA.b !WinFx_QuadPoints+1-!DP_WinFx
+    CMP.b !WinFx_QuadPoints+3-!DP_WinFx
+    BCC .min1
+    LDY.w #.from_p1
+    LDA.b !WinFx_QuadPoints+3-!DP_WinFx
+.min1:
+    CMP.b !WinFx_QuadPoints+5-!DP_WinFx
+    BCC .min2
+    LDY.w #.from_p2
+    LDA.b !WinFx_QuadPoints+5-!DP_WinFx
+.min2:
+    CMP.b !WinFx_QuadPoints+7-!DP_WinFx
+    BCC .min3
+    LDY.w #.from_p3
+    LDA.b !WinFx_QuadPoints+7-!DP_WinFx
+.min3:
+    STA.b !WinFx_QuadTopY-!DP_WinFx
+    REP #$20
+    LDA.w #$0004
+    STA.b !WinFx_QuadEdgesLeft-!DP_WinFx
+    STY.b !WinFx_Tmp-!DP_WinFx
+    JMP (!WinFx_Tmp)
+.from_p0:
+    LDA.b !WinFx_QuadPoints-!DP_WinFx
+    STA.b !WinFx_QuadX0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+1-!DP_WinFx
+    STA.b !WinFx_QuadY0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+2-!DP_WinFx
+    STA.b !WinFx_QuadX1-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+3-!DP_WinFx
+    STA.b !WinFx_QuadY1-!DP_WinFx
+    JSR .edge
+.from_p1:
+    LDA.b !WinFx_QuadPoints+2-!DP_WinFx
+    STA.b !WinFx_QuadX0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+3-!DP_WinFx
+    STA.b !WinFx_QuadY0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+4-!DP_WinFx
+    STA.b !WinFx_QuadX1-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+5-!DP_WinFx
+    STA.b !WinFx_QuadY1-!DP_WinFx
+    JSR .edge
+.from_p2:
+    LDA.b !WinFx_QuadPoints+4-!DP_WinFx
+    STA.b !WinFx_QuadX0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+5-!DP_WinFx
+    STA.b !WinFx_QuadY0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+6-!DP_WinFx
+    STA.b !WinFx_QuadX1-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+7-!DP_WinFx
+    STA.b !WinFx_QuadY1-!DP_WinFx
+    JSR .edge
+.from_p3:
+    LDA.b !WinFx_QuadPoints+6-!DP_WinFx
+    STA.b !WinFx_QuadX0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+7-!DP_WinFx
+    STA.b !WinFx_QuadY0-!DP_WinFx
+    LDA.b !WinFx_QuadPoints-!DP_WinFx
+    STA.b !WinFx_QuadX1-!DP_WinFx
+    LDA.b !WinFx_QuadPoints+1-!DP_WinFx
+    STA.b !WinFx_QuadY1-!DP_WinFx
+    JSR .edge
+    BRA .from_p0
+.edge:
+    LDA.w #!Eng_HighByteMask
+    TRB.b !WinFx_QuadY0-!DP_WinFx       ; (the 16-bit loads took the next point's X)
+    TRB.b !WinFx_QuadY1-!DP_WinFx
+    LDA.b !WinFx_QuadY1-!DP_WinFx
+    CMP.b !WinFx_QuadY0-!DP_WinFx
+    BPL .draw
+    LDA.b !WinFx_QuadLeftSide-!DP_WinFx
+    BEQ .draw
+    INC.b !WinFx_QuadTablePtr-!DP_WinFx ; the first edge going up: right edges from here
+    LDA.b !WinFx_QuadY0-!DP_WinFx
+    STA.b !WinFx_QuadBottomY-!DP_WinFx
+    STZ.b !WinFx_QuadLeftSide-!DP_WinFx
+.draw:
+    JSL WinFx_QuadEdge
+    DEC.b !WinFx_QuadEdgesLeft-!DP_WinFx
+    BEQ .edges_done
+    RTS
+.edges_done:
+    PLA                                 ; drop the last block's return address
+    LDA.b !WinFx_QuadTableBank-!DP_WinFx
+    LSR A
+    PHP                                 ; C = bank $7F
+    DEC.b !WinFx_QuadTablePtr-!DP_WinFx
+    LDA.w #!WinFx_QuadTableRows
+    CLC
+    SBC.b !WinFx_QuadBottomY-!DP_WinFx  ; $FF - bottom
+    ASL A
+    DEC A
+    STA.b !WinFx_Tmp-!DP_WinFx
+    LDA.b !WinFx_QuadBottomY-!DP_WinFx
+    ASL A
+    CLC
+    ADC.b !WinFx_QuadTablePtr-!DP_WinFx
+    TAY
+    TAX                                 ; X = Y = the bottom row
+    LDA.w #!WinFx_EmptyEntry
+    STA.b [!WinFx_QuadTablePtr-!DP_WinFx] ; row 0
+    PLP
+    BCC .fill_7E
+    STA.l !Bank7F<<16,X
+    INY
+    INY
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    BEQ .filled                         ; never taken (the count is odd)
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; rows after the bottom
+    LDX.b !WinFx_QuadTablePtr-!DP_WinFx
+    TXY
+    INY
+    INY
+    LDA.b !WinFx_QuadTopY-!DP_WinFx
+    BEQ .filled
+    ASL A
+    DEC A
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes; rows 1 to the top Y
+    BRA .filled
+.fill_7E:
+    STA.l !Bank7E<<16,X
+    INY
+    INY
+    LDA.b !WinFx_Tmp-!DP_WinFx
+    BEQ .filled                         ; never taken
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes
+    LDX.b !WinFx_QuadTablePtr-!DP_WinFx
+    TXY
+    INY
+    INY
+    LDA.b !WinFx_QuadTopY-!DP_WinFx
+    BEQ .filled
+    ASL A
+    DEC A
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes
+.filled:
+    JMP WinFx_QuadExit
+WinFx_QuadEdgeFlat:                     ; header: see WinFx_QuadEdge
+    REP #$20
+    LDA.b !WinFx_QuadY0-!DP_WinFx
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    SEP #$20
+    LDA.b !WinFx_QuadX0-!DP_WinFx
+    CMP.b !WinFx_QuadX1-!DP_WinFx
+    BMI .x0_first
+    LDA.b !WinFx_QuadX1-!DP_WinFx
+    STA.b [!WinFx_QuadTablePtr-!DP_WinFx],Y
+    LDA.b !WinFx_QuadX0-!DP_WinFx
+    BRA .second
+.x0_first:
+    STA.b [!WinFx_QuadTablePtr-!DP_WinFx],Y
+    LDA.b !WinFx_QuadX1-!DP_WinFx
+.second:
+    INY
+    INY
+    STA.b [!WinFx_QuadTablePtr-!DP_WinFx],Y ; the next row
+    JMP WinFx_QuadExit
+
+; $C3:1025 — WinFx_QuadEdge (155 bytes, $1025–$10BF)
+; Draws one edge of WinFx_BuildQuad's shape into the table byte column
+; WinFx_QuadTablePtr points at (left bytes, or right bytes once it was
+; moved up by one): from (WinFx_QuadX0, WinFx_QuadY0) to (WinFx_QuadX1,
+; WinFx_QuadY1), swapped first so that Y0 <= Y1; for each row Y0 to
+; Y1 - 1 it stores the X of a DDA walk (error WinFx_QuadErr, steps by
+; WinFx_QuadDx and WinFx_QuadDy). Rightward the error starts at dx - dy;
+; per row, while it is >= 0, X moves one right and dy is taken off,
+; then dx is added. Leftward the same with X moving left and |dx| added,
+; but the error starts at dy - |dx| - 1 (quirk: the sign is the reverse
+; of the rightward start, and there is no SEC: C=0 from the borrow of
+; X1 - X0).
+; A flat edge (Y0 = Y1) is WinFx_QuadEdgeFlat (sub-entry, $C3:1001,
+; reached by BEQ): the smaller X goes to row Y0 and the larger to row
+; Y0 + 1 (two INYs: the next row, same byte column).
+; WinFx_QuadExit (sub-entry, $C3:10BA): TDC, XBA, then P, DB, DP pulled
+; and RTL; WinFx_BuildQuad ends there too.
+; Callers note: the JSR pattern at $C3:A153 lies in the data after the
+;   packed module (probably data, not a call of WinFx_QuadEdgeFlat).
+; Callers (1 JSL site): WinFx_BuildQuad ($C3:0F9C).
+; Callers of WinFx_QuadEdgeFlat (1 JSR site): unmatched ($C3:A153).
+; Callers of WinFx_QuadExit (1 JMP site): WinFx_BuildQuad ($C3:0FFE).
+; Entry: M, X any (P saved; SEP #$20 here, X=0 assumed: 16-bit LDX/LDY
+;        of the points; WinFx_BuildQuad has X=0), DP any and DB any
+;        (both saved; DP_WinFx and DB = WinFx_QuadTableBank inside).
+; Exit:  P, DB, DP restored; A = $0003; X, Y changed; WinFx_QuadX0..Y1
+;        (high bytes cleared, maybe swapped), WinFx_QuadRows, Dx, Dy,
+;        Err changed; the rows written.
+WinFx_QuadEdge:
+    PHD
+    PHB
+    PHP
+    SEP #$20
+    PEA.w !DP_WinFx
+    PLD
+    LDA.b !WinFx_QuadTableBank-!DP_WinFx
+    PHA
+    PLB
+    STZ.b !WinFx_QuadX0+1-!DP_WinFx
+    STZ.b !WinFx_QuadX1+1-!DP_WinFx
+    STZ.b !WinFx_QuadY0+1-!DP_WinFx
+    STZ.b !WinFx_QuadY1+1-!DP_WinFx
+    STZ.b !WinFx_QuadDy+1-!DP_WinFx
+    LDA.b !WinFx_QuadY1-!DP_WinFx
+    SEC
+    SBC.b !WinFx_QuadY0-!DP_WinFx
+    BEQ WinFx_QuadEdgeFlat
+    BCS .down
+    LDY.b !WinFx_QuadX1-!DP_WinFx       ; going up: swap the ends
+    LDX.b !WinFx_QuadX0-!DP_WinFx
+    STY.b !WinFx_QuadX0-!DP_WinFx
+    STX.b !WinFx_QuadX1-!DP_WinFx
+    LDY.b !WinFx_QuadY1-!DP_WinFx
+    LDX.b !WinFx_QuadY0-!DP_WinFx
+    STY.b !WinFx_QuadY0-!DP_WinFx
+    STX.b !WinFx_QuadY1-!DP_WinFx
+    TXA
+    SEC
+    SBC.b !WinFx_QuadY0-!DP_WinFx
+.down:
+    STA.b !WinFx_QuadDy-!DP_WinFx
+    STA.b !WinFx_QuadRows-!DP_WinFx
+    REP #$20
+    LDA.b !WinFx_QuadY0-!DP_WinFx
+    ASL A
+    CLC
+    ADC.b !WinFx_QuadTablePtr-!DP_WinFx
+    TAY                                 ; Y = row Y0's byte
+    LDX.b !WinFx_QuadX0-!DP_WinFx
+    LDA.b !WinFx_QuadX1-!DP_WinFx
+    SEC
+    SBC.b !WinFx_QuadX0-!DP_WinFx
+    BMI .leftward
+    STA.b !WinFx_QuadDx-!DP_WinFx
+    SEC
+    SBC.b !WinFx_QuadDy-!DP_WinFx
+    STA.b !WinFx_QuadErr-!DP_WinFx
+.right_row:
+    LDA.b !WinFx_QuadErr-!DP_WinFx
+    BMI .right_add
+.right_step:
+    INX
+    SBC.b !WinFx_QuadDy-!DP_WinFx
+    BPL .right_step
+.right_add:
+    ADC.b !WinFx_QuadDx-!DP_WinFx
+    STA.b !WinFx_QuadErr-!DP_WinFx
+    TXA
+    SEP #$20
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    DEC.b !WinFx_QuadRows-!DP_WinFx
+    REP #$20
+    BNE .right_row
+    BRA WinFx_QuadExit
+.leftward:
+    EOR.w #!Eng_Invert16
+    INC A
+    STA.b !WinFx_QuadDx-!DP_WinFx
+    LDA.b !WinFx_QuadDy-!DP_WinFx
+    SBC.b !WinFx_QuadDx-!DP_WinFx       ; no SEC: C=0, so dy - |dx| - 1
+    STA.b !WinFx_QuadErr-!DP_WinFx
+.left_row:
+    LDA.b !WinFx_QuadErr-!DP_WinFx
+    BMI .left_add
+.left_step:
+    DEX
+    SBC.b !WinFx_QuadDy-!DP_WinFx
+    BPL .left_step
+.left_add:
+    ADC.b !WinFx_QuadDx-!DP_WinFx
+    STA.b !WinFx_QuadErr-!DP_WinFx
+    TXA
+    SEP #$20
+    STA.w !Eng_PtrBase,Y
+    INY
+    INY
+    DEC.b !WinFx_QuadRows-!DP_WinFx
+    REP #$20
+    BNE .left_row
+WinFx_QuadExit:                         ; header: see WinFx_QuadEdge
+    TDC
+    XBA
+    PLP
+    PLB
+    PLD
     RTL
 
 ; ============================================================
