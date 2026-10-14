@@ -7023,7 +7023,8 @@ FieldFD_UploadTileAnims:
 ; animation stops. Saves P and DB; DB=$00. The SEP #$20 is redundant:
 ; the LDA #0 before it is already the 8-bit form.
 ; Callers note: FdVec_FFEE ($FD:FFEE) JMPs here; the JSL $FD:FFEE bytes
-;   at $C3:4D46 are in unmatched bank-$C3 code (xref: doubtful).
+;   at $C3:4D46 are probably data (xref: doubtful, plausible in 12 of 256
+;   sweeps; a BRK at $C3:4D42 precedes them).
 ; Callers (1 JMP site): FdVec_FFEE ($FD:FFEE).
 ; Entry: M=1 (LDA #0 is 8-bit), X any (P saved; it sets X=1), DP any,
 ;        DB any (saved)
@@ -8729,7 +8730,11 @@ M7Scene_InitPpu:
 ; 255). With the centre at $80 and radii up to $7F (M7Scene_IrisRadii)
 ; neither clamp, the TDC nor the cuts ever apply, and 255 lines are
 ; written. The widths are stored as words, so each store also writes the
-; next byte, which the next store replaces.
+; next byte, which the next store replaces, except after the last store
+; (at index r): it leaves a byte at M7Scene_IrisWidths[r+1], which for
+; r = $7F is $7F:70AC, the first byte of IrisBuf0, written even while
+; buffer 1 is built (never shown: the HDMA table and the NMI start 16
+; lines into the buffer).
 ; Callers (6 JSR sites): M7Scene_Run80 ($FD:DA45), M7Scene_Run81 ($FD:DAA4), M7Scene_Run82
 ;   ($FD:DB03), M7Scene_Run83 ($FD:DB7D) and M7Scene_Init ($FD:DCAA, $FD:DCAF).
 ; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (its variables; TDC needs the
@@ -8738,7 +8743,8 @@ M7Scene_InitPpu:
 ; Exit:  M=1, X=0 (it runs with X=1 inside, so X and Y return with their
 ;        high bytes cleared); A clobbered, B = 0 ($05 if the TDC ran);
 ;        X and Y clobbered; M7Scene_IrisX/Y, IrisBuf, Tmp, PosX, PosY,
-;        Ofs and M7Scene_IrisWidths written; WMADD left past the buffer
+;        Ofs and M7Scene_IrisWidths (and IrisWidths[r+1]) written; WMADD
+;        left past the buffer
 org $FDEB8B
 M7Scene_BuildIris:
     LDA.b #!M7Scene_IrisCentre
@@ -9665,7 +9671,8 @@ FdVec_FFEB:
 ; $FD:FFEE — FdVec_FFEE (3 bytes, $FFEE–$FFF0)
 ; JMP to PalAnim_StopAll.
 ; Callers note: no confirmed caller; the JSL $FD:FFEE bytes at $C3:4D46
-;   are in unmatched bank-$C3 code (xref: doubtful).
+;   are probably data (xref: doubtful, plausible in 12 of 256 sweeps; a
+;   BRK at $C3:4D42 precedes them).
 ; Entry: as PalAnim_StopAll: M=1, X any, DP any, DB any
 ; Exit:  as PalAnim_StopAll
 FdVec_FFEE:
