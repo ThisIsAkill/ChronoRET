@@ -1,0 +1,4 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C0:1B90,Audio_PlayTileSfxA,2026-10-09,rev128a,approved,b1e466766339,"Checked vs ROM: Arg0=$FC id, Y=$97 leader slot, Arg1=Obj_ScreenX low byte (M=1), CmdId=$19, JSL $C7:0004; shared tail, DP=$0100/DB=0, Exit and DriverCommand note true."
+$C7:01A1,Audio_CmdLoadSong,2026-10-09,rev128a,approved,bb5a4bf6658c,"Fix ok: APUIO1 bit 7 meaning now hedged. Rechecked: SongCount $53, empty AdjustSongCmd list, list copy (song x32), free/gap/compact steps, refusal reload of SlotAram 1-16, M per exit."
+$C7:0C9C,Audio_SampleParamB,2026-10-09,rev128a,approved,b7ee5df27ec5,"Fix ok: ROM bytes give first byte $FE/$FF, second $E0 or $EA-$F4 ($EA,$EC-$F0,$F3,$F4); 62 words; read by SendSampleDir/CmdSwapSample to SongParamB; ADSR guess hedged."
