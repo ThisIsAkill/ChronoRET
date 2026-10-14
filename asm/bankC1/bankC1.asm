@@ -149,28 +149,20 @@ BattleSys_SceneSetup:
 ;        Checked only for services 1, 2, 5 and 7: the callees of 2, 5
 ;        and 7 are all matched bank-$C1 code, and 1 calls only
 ;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
-;        DB. For the other six it is assumed: 0 (BattleSys_SceneSetup's
-;        bank-$CD JSLs reach BattleCD_SetNmiMode1, BattleCD_StartOpenWipe
-;        and BattleCD_WipeRunning, all matched and returning M=1 with
-;        X=0 kept, and its bank-$CC steps are matched, but the rest of
-;        its call tree is not checked here); the other five reach code
-;        that is not analysed:
-;        3 (BattleSys_FrameTickVec $CD:0009, whose BattleCD_FrameTick
-;        calls $CD:3B5F, $CD:3E44 and $D1:ECF3, also through
-;        BattleMenu_RefreshIfDirtyAndTick; BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, which calls $CD:3E44), 4
-;        (BattleSys_PumpFrames, and BattleCD_ActOp80 and the layer-effect
-;        code, which reach $D1:F67A, $CD:3E3B, $CD:3E75 and $CD:3ED2), 6
-;        (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies), 8
-;        (BattleSys_FrameTickVec and BattleSys_PumpFrames) and 9
-;        (BattleSys_FrameTickVec, BattleSys_PumpFrames). The call trees
-;        of BattleMenu_UpdateWindows and of
-;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027, BattleCD_ShowTechInfo)
-;        are all matched. BattleFx_SetPtrA2FromTable ($CF:FD9E),
-;        which services 0 (through Battle_StartPose / Battle_PoseStep)
-;        and 3 (through BattleMenu_UpdateWindows and
-;        BattleMenu_ConfirmCommand) reach, is matched and returns M=1,
-;        X=0. B, P (N and Z from the PLA), DP, DB and
+;        DB. For the other six it is assumed. Service 0's call tree is
+;        not checked here (its bank-$CD callees BattleCD_SetNmiMode1,
+;        BattleCD_StartOpenWipe and BattleCD_WipeRunning are matched, but
+;        StartOpenWipe calls the unmatched $CD:3B71 and $CD:3E7D). The
+;        other five reach these unmatched addresses (by way of
+;        BattleSys_FrameTickVec and BattleSys_PumpFrames, and for 4 also
+;        BattleCD_ActOp80, for 6 BattleSys_VecCD0024): $CD:3B5F, $CD:3E3B, $CD:3E44, $CD:3E75,
+;        $CD:3ED2 and $D1:ECF3 for services 3, 8 and 9; those and
+;        $D1:F67A for service 4; those and $CD:3B71 for service 6. The
+;        call trees of BattleMenu_UpdateWindows and of
+;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
+;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which services 0, 3, 4
+;        and 8 reach, is matched and returns M=1, X=0. B, P (N and Z
+;        from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA
