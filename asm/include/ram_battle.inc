@@ -1366,6 +1366,8 @@ endstruct
                                   ; !Enemy_AnimWanted (BattleSys_Unk8461 clears it then); meaning unknown
 !Battle_ActMainMask       = $AE95 ; 2 B: main-target mask, bit 15 = slot 0 (read at $CC:F186); BattleSys_Unk895B
                                   ; sets $8000
+!Pc_UnkB03A               = $B03A ; 1 B per PC: zeroed with the gauge restart when the PC's command is dropped
+                                  ; (BattleFD_DropPcCommand); meaning unknown
 !Battle_UnkB188           = $B188 ; 1 B: zeroed by Battle_SetupBattle; with B189/B18A one byte per PC slot (indexed
                                   ; by slot in BattleSys_ResetTechUsers): the latched BattleCmd.State (BattleSys_Unk8461)
 !Battle_UnkB189           = $B189 ; 1 B: zeroed by Battle_SetupBattle
@@ -1501,11 +1503,11 @@ endstruct
                                     ; copies 17 B at !Battle_UnkB18C * 17
 !BattleRom_UnkCC05CC      = $CC05CC ; 4 B per !Battle_UnkB18C: byte 0 bits 7, 2, 6 pick BattleSys_UnkBF46's callee
 !Battle_UnkAF22           = $AF22 ; 1 B: 1 while BattleSys_UnkB967 runs (set at its start, cleared on its way out)
-!Battle_CmdPcs            = $B3E7 ; 3 B, one per PC slot, probably read in bank $FD: BattleSys_UnkB967 sets 1 for the
+!Battle_CmdPcs            = $B3E7 ; 3 B, one per PC slot, read by BattleFD_UnkA93C / A95F: BattleSys_UnkB967 sets 1 for the
                                   ; PCs taking part in its command (the PC and its BattleCmd.Partners);
                                   ; BattleSys_UnkB575 for each PC of a group BattleFD_UnkA8A5 refused
 !Battle_UnkB3EA           = $B3EA ; 1 B: read after each BattleFD_UnkA8A5 call (A = a taking-part PC); non-zero =
-                                  ; BattleSys_UnkB967 drops the command (BattleFD_UnkA93C); written in bank $FD
+                                  ; BattleSys_UnkB967 drops the command (BattleFD_UnkA93C); written by BattleFD_UnkA8A5
 !Battle_UnkAE4C           = $AE4C ; 1 B: zeroed by BattleSys_UnkB967 before the command, and by BattleFD_UnkAB30
                                   ; before a PC's turn; meaning unknown
 !Battle_UnkB3C9           = $B3C9 ; 1 B: BattleCmd.Kind of the command BattleSys_UnkB967 runs; set to $80 when

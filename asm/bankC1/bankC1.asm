@@ -31170,14 +31170,18 @@ BattleSys_UnkB4E9:
 ; each PC in it (A = the slot) until one leaves !Battle_UnkB3EA
 ; non-zero; then that row's PC and every PC in the row get
 ; !Battle_CmdPcs = 1. Last,
-; BattleFD_UnkA95F (which reads the marks, probably). The reading
-; "cancel the commands of a group one of whose PCs can no longer act"
-; is a guess from the shape; bank $FD is not traced.
+; BattleFD_UnkA95F, which drops the latched command of each marked PC
+; (BattleFD_DropLatchedPcCommand: item refunded, BattleCmd cleared,
+; gauge restarted, out of the ready queue). So a group loses its
+; commands when one of its PCs fails BattleFD_UnkA8A5's check (KO'd,
+; or the Unk4C+2/+7 bit 7 or Status2 $86 bits; "can no longer act",
+; probably).
 ; Callers (3 JSR sites): BattleSys_Unk8461 ($C1:8538, $C1:8809) and BattleSys_Unk883D ($C1:884B).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  as BattleFD_UnkA95F leaves them (not analysed); before it, X =
-;        0-3 and A = 0, 1 or $FF. The loops assume BattleFD_UnkA8A5
-;        keeps X.
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y as BattleFD_UnkA95F leaves
+;        them (before it, X = 0-3 and A = 0, 1 or $FF; BattleFD_UnkA8A5
+;        keeps X, as the loops need); DP $14 and what BattleFD_UnkA95F
+;        changes
 BattleSys_UnkB575:
     TDC
     TAX
@@ -31845,7 +31849,7 @@ BattleSys_ListOffsetTable:
 ; $C1:B961 — BattleSys_RemoveReadyLong (6 bytes, $B961–$B966)
 ; Service !BattleSys_ServiceRemoveReady (BattleMenu_RemoveBattlerFromReady)
 ; for bank-$FD code: a long-callable wrapper.
-; Callers (1 JSL site): unmatched ($FD:A937).
+; Callers (1 JSL site): BattleFD_DropLatchedPcCommand ($FD:A937).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the service needs; see its header);
 ;        !Battle_ArgSlot = the slot to remove
 ; Exit:  as BattleSys_RunService and the service leave them
@@ -31866,8 +31870,9 @@ BattleSys_RemoveReadyLong:
 ;     and for each partner in its BattleCmd.Partners nibbles (a nibble
 ;     of $F = none). For each PC marked, in order 0-2, BattleFD_UnkA8A5
 ;     with A = the PC; as soon as !Battle_UnkB3EA comes back non-zero,
-;     BattleFD_UnkA93C and out through BattleSys_UnkBCE1_Done: the
-;     command is dropped and its records are not cleared.
+;     BattleFD_UnkA93C (each marked PC's command dropped: item given
+;     back, BattleCmd .State/.Kind = 0, gauge restarted) and out through
+;     BattleSys_UnkBCE1_Done, past BattleSys_UnkBCE1's own record clear.
 ;   - DP $00/$01 = 0, !Battle_UnkAE4C = 0, DP $06 = the PC's record
 ;     address (!BattleRom_CmdPtr), !Battle_UnkB3C9 = BattleCmdRec.Kind,
 ;     whose bits pick the path:
@@ -43724,7 +43729,8 @@ Battle_RandRangeLong:
 
 ; $C1:FDCF — BattleSys_RefundItemLong (4 bytes, $FDCF–$FDD2)
 ; JSL form of BattleSys_RefundItem.
-; Callers (2 JSL sites): unmatched ($FD:A8D8, $FD:A910).
+; Callers (2 JSL sites): BattleFD_DropPcCommand ($FD:A8D8) and BattleFD_DropLatchedPcCommand
+;   ($FD:A910).
 ; Entry: as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; DP $14 = PC
 ;        slot (0-2)
 ; Exit:  as BattleSys_RefundItem: M=1, X=0, DP=0, DB=$7E; X preserved;

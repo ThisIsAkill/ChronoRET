@@ -114,16 +114,6 @@ org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
                                         ; after a tech, A = 3 or $0D; not analysed
 
-; --- Bank $FD (called from BattleSys_UnkB575 and BattleSys_UnkB967; not analysed) ---
-
-org $FDA8A5
-BattleFD_UnkA8A5:                       ; JSL from BattleSys_UnkB967, A = a PC slot taking part; leaves !Battle_UnkB3EA
-org $FDA93C
-BattleFD_UnkA93C:                       ; JSL from BattleSys_UnkB967 when !Battle_UnkB3EA is non-zero
-org $FDA95F
-BattleFD_UnkA95F:                       ; JSL from BattleSys_UnkB575 after it set !Battle_CmdPcs
-
-
 ; --- Bank $CF (battle support) ---
 
 org $CFFAE2
