@@ -61,6 +61,11 @@ if !constants_engine_inc == 0
 ; --- Interrupt trampolines ---
 !Op_JML = $5C                            ; 65816 opcode JML long (written into the RAM trampolines)
 !Op_RTI = $40                            ; 65816 opcode RTI (Sys_HaltWithColor's trampolines)
+!Op_LdaImm = $A9                         ; 65816 opcodes C3_BuildCopyCode writes: LDA #imm,
+!Op_Tcd = $5B                            ; TCD,
+!Op_LdaAbs = $AD                         ; LDA abs,
+!Op_StaDp = $85                          ; STA dp
+!Op_Rts = $60                            ; and RTS
 
 ; --- OAM shadow ranges (Oam_BuildShadow, Field_InitLoadState, Field_RestoreState) ---
 !Oam_Range1Start = $0770                 ; low-table address where range 1 starts each frame (entry
@@ -1202,3 +1207,32 @@ endif
 !WinFx_WipeRunMask = $1F                 ; random byte bits 0-4: run length - 3
 !WinFx_QuadTableRows = $0100             ; rows of a quad table (256): the rows after the bottom
                                          ; one, up to $FF, are emptied (WinFx_BuildQuad)
+
+; --- Bank $C3 module services ---
+!DP_C3Zero = $0000                       ; direct page C3_ModuleFrame sets
+!C3Rom_PackBank = $FE                    ; bank of C3Rom_PackPtrs; source bank of C3_CopyFEto7E/7F
+!C3_SongArgs = $FFFF                     ; Audio_CmdArg1/Arg2 C3_SongCheck sends with the song
+!Eng_AddrMask16 = $FFFF                  ; AND mask: a label's bank-$00 mirror (C3_ReadPad's JML Reset)
+!C3_EntryNoSong = $20                    ; C3_EntryArg bit 5: C3_SongCheck sends nothing
+!C3_TaskListBytes = $20                  ; C3_TaskList / C3_TaskRun size
+!C3_PadAutoReadBusy = $01                ; HVBJOY bit 0: the auto-joypad read is still running
+!C3_PadSoftReset = $3030                 ; JOY1 with exactly L, R, Select and Start: soft reset
+!C3_PadStartHi = $0010                   ; C3_Pad+1 read as a word, bit 4: Start
+!C3_SndPause = $00F2                     ; Audio_CmdId (and Arg0 = 0) C3_ReadPad sends on pausing
+!C3_SndResume = $4418                    ; Audio_CmdId $18, Arg0 $44: sent on resuming
+!C3_SndResumeArg = $0080                 ; its Audio_CmdArg1/Arg2
+!C3_GenKStep = $20                       ; C3_BuildCopyCode: source step of the innermost loop
+!C3_CopyCodePasses = 8                   ; C3_CopyCodeOrder entries
+!C3Scale_SrcRowMask = $FFC0              ; C3_ScaleBitmap: (Acc >> 1) kept to 64-byte source rows
+!C3Scale_RowBytes = $0020                ; bytes per output row (64 pixels, 4 bit planes)
+!C3Script_OpFlow = $0080                 ; opcode bit 7: a flow / table opcode
+!C3Script_NibbleMask = $000F             ; opcode bits 0-3: variable, counter or table entry
+!C3Script_KindMask = $00F0               ; opcode bits 4-7
+!C3Script_FromVar = $0020                ; opcode bit 5: the operand is a variable byte
+!C3Script_VarIndexMask = $001E           ; variable operand: index x 2
+!C3Script_OpLoop = $0080                 ; opcodes $80-$8F: loop
+!C3Script_OpLoopYield = $0090            ; opcodes $90-$9F: loop, then yield
+!C3_ApuTimeout = $0200                   ; tries of C3_RunScript's dead APU send loop
+!C3_OamGroupMask = $0F                   ; Oam_LowTable offset bits 0-3: 0 after every 4 sprites
+!C3_ScreenRight = $0100                  ; C3_SprListLarge: X from here up is off screen
+!C3_OffscreenX = $9801                   ; ... and is stored as X $01 with bit 15 (so X bit 8) set

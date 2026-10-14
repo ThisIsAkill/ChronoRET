@@ -14,9 +14,10 @@
 ;
 ; The unpacked module calls back into this bank with JSL: the kernel
 ; routines in $C3:0307-$C3:0528 and $C3:08B3-$C3:0EF9 have no caller in
-; ROM outside it (their headers name the module's call sites, found by
-; unpacking it; those addresses are in WRAM bank $7E and are not checked
-; by any tool).
+; ROM outside it, apart from the bytes of its calls inside the packed
+; data (their headers name the module's call sites, found by unpacking
+; it; those addresses are in WRAM bank $7E and are not checked by any
+; tool).
 ; ============================================================
 
 arch snes.cpu
@@ -631,8 +632,8 @@ WinFx_StepWipe:
 ; Returns a new pseudo-random byte in A and keeps it in C3_RandSeed: A
 ; (with C rotated in) plus C3_RandSeed, stored; then X's low byte, the
 ; seed, C3_FrameCount, the H and V counters (latched by reading SLHV;
-; the CMP's result is not used), the seed again, C3_MixF0, C3_MixF2 (EOR)
-; and C3_MixF4 are added or subtracted in, each with the carry of the
+; the CMP's result is not used), the seed again, C3_ScratchF0, C3_ScratchF2 (EOR)
+; and C3_ScratchF4 are added or subtracted in, each with the carry of the
 ; step before, and the result stored back.
 ; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
 ; Callers note: the unpacked module also JSLs here (from $7E:3443).
@@ -653,12 +654,390 @@ C3_RandomByte:
     ADC.w OPHCT
     SBC.w OPVCT
     ADC.w !C3_RandSeed
-    ADC.w !C3_MixF0
-    EOR.w !C3_MixF2
-    ADC.w !C3_MixF4
+    ADC.w !C3_ScratchF0
+    EOR.w !C3_ScratchF2
+    ADC.w !C3_ScratchF4
     SBC.w OPVCT
     STA.w !C3_RandSeed
     RTL
+
+; ============================================================
+; Services of the unpacked module: bitmap scaler ($C3:0307–$C3:0528)
+; ============================================================
+
+; $C3:0307 — C3_ScaleBitmap (546 bytes, $0307–$0528)
+; Draws a scaled copy of a bitmap (one byte per pixel, bits 0-3 used,
+; 64-byte source rows from C3Scale_SrcBase) into rows of 4-bitplane
+; bytes, 32 bytes per output row from C3Scale_Dest. For each output row
+; (C3Scale_Rows - 1 of them) C3Scale_Acc += C3Scale_YStep picks the
+; source row ((Acc >> 1) AND $FFC0 bytes in; it stops early once that
+; reaches C3Scale_SrcLimit); a source row that repeats the last one is
+; copied from the output row before (MVN, 32 bytes). Else, for
+; C3Scale_Groups groups of 16 pixels, the source position X steps by
+; C3Scale_XStep (8.8 fixed point; X's high byte is the pixel), and each
+; 8 pixels become 4 bytes: byte k holds bit k of the 8 pixels, the
+; first pixel in bit 7 (the bit planes of an SNES tile row, here 4 in a
+; row). At the end, if the image is shorter than the last one
+; (C3Scale_PrevEnd), the bytes between are zeroed; C3Scale_PrevEnd =
+; the new end.
+; Purpose inferred from the arithmetic only: probably the scaled
+; sprites of the module (the bank $C3 module is the jet-bike race: its
+; staff text is BankC3_StaffText); the module sets C3Scale_Groups to 4
+; (64 pixels) at its three call sites.
+; Quirks (carries not set or cleared first):
+;   - the first C3Scale_Acc add takes the caller's carry; later ones get
+;     C=0 from the CLC/ADC that steps C3Scale_Dest;
+;   - each new source row's first step is C3Scale_XStep + 1 when the
+;     row address went up (C from the CMP with the last row);
+;   - the closing clear runs from the new end through the old end - 1
+;     when the row count ran out (C=0 from that same CLC/ADC), but
+;     through the old end itself when the source ran out (C=1 from the
+;     CMP with C3Scale_SrcLimit); with C=0 and a difference of 1 nothing
+;     is cleared.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:520D, $7E:82A0 and $7E:897F), with M=0 and DB=$7F (PEA/PLB).
+; Entry: M=0, X=0 (16-bit throughout), DP = the module's (the
+;        C3Scale_* direct-page bytes; its value at the call sites is not
+;        traced), DB = the bank of the source and the output ($7F at
+;        all three sites: STA abs,Y and MVN $7F,$7F).
+; Exit:  M=0, X=0, DB as on entry (the MVNs set it to $7F, the bank it
+;        already is at the call sites); A, X, Y changed; C3Scale_Acc, Rows,
+;        Dest, DestPos, SrcRow, GroupsLeft, PrevEnd, the Pixels bytes
+;        and the byte after them changed.
+; No calls.
+C3_ScaleBitmap:
+    STZ.b !C3Scale_Acc
+.row:
+    DEC.b !C3Scale_Rows
+    BEQ .finish
+    LDA.b !C3Scale_Acc
+    ADC.b !C3Scale_YStep                ; no CLC (see the header)
+    STA.b !C3Scale_Acc
+    LSR A
+    AND.w #!C3Scale_SrcRowMask
+    CMP.b !C3Scale_SrcLimit
+    BMI .src_row
+.finish:
+    LDA.b !C3Scale_PrevEnd
+    SBC.b !C3Scale_Dest                 ; no SEC (see the header)
+    BMI .no_clear
+    BEQ .no_clear
+    LDX.b !C3Scale_Dest
+    STZ.w !Eng_PtrBase,X
+    TXY
+    INY
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes
+.no_clear:
+    LDA.b !C3Scale_Dest
+    STA.b !C3Scale_PrevEnd
+    RTL
+.src_row:
+    CLC
+    ADC.b !C3Scale_SrcBase
+    CMP.b !C3Scale_SrcRow
+    BNE .new_row
+    LDA.b !C3Scale_Dest                 ; the same source row: copy the row above
+    TAY
+    SEC
+    SBC.w #!C3Scale_RowBytes
+    TAX
+    LDA.w #!C3Scale_RowBytes-1
+    MVN !Bank7F,!Bank7F                 ; lint-ok: MVN operands are bank bytes
+    JMP .next_row
+.new_row:
+    STA.b !C3Scale_SrcRow
+    LDX.w #$0000
+    LDA.b !C3Scale_Groups
+    STA.b !C3Scale_GroupsLeft
+.group:
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+1
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+2
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+3
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+4
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+5
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+6
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+7
+    LDY.b !C3Scale_DestPos
+    SEP #$20
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+1,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+2,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+3,Y
+    REP #$20
+    TYA
+    CLC
+    ADC.w #$0004
+    STA.b !C3Scale_DestPos
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+1
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+2
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+3
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+4
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+5
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+6
+    TXA
+    ADC.b !C3Scale_XStep
+    TAX
+    XBA
+    AND.w #!Eng_LowByteMask
+    TAY
+    LDA.b (!C3Scale_SrcRow),Y
+    STA.b !C3Scale_Pixels+7
+    LDY.b !C3Scale_DestPos
+    SEP #$20
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+1,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+2,Y
+    LSR.b !C3Scale_Pixels
+    ROL A
+    LSR.b !C3Scale_Pixels+1
+    ROL A
+    LSR.b !C3Scale_Pixels+2
+    ROL A
+    LSR.b !C3Scale_Pixels+3
+    ROL A
+    LSR.b !C3Scale_Pixels+4
+    ROL A
+    LSR.b !C3Scale_Pixels+5
+    ROL A
+    LSR.b !C3Scale_Pixels+6
+    ROL A
+    LSR.b !C3Scale_Pixels+7
+    ROL A
+    STA.w !Eng_PtrBase+3,Y
+    REP #$20
+    TYA
+    CLC
+    ADC.w #$0004
+    STA.b !C3Scale_DestPos
+    DEC.b !C3Scale_GroupsLeft
+    BEQ .next_row
+    JMP .group
+.next_row:
+    LDA.b !C3Scale_Dest
+    CLC
+    ADC.w #!C3Scale_RowBytes
+    STA.b !C3Scale_Dest
+    STA.b !C3Scale_DestPos
+    JMP .row
 
 ; $C3:0529 — C3_BootIrq (31 bytes, $0529–$0547)
 ; IRQ handler while the module is unpacked (C3_BootModule points the
@@ -1212,6 +1591,1088 @@ Decomp_ToWram:
     PLD
     PLB
     RTL
+
+; ============================================================
+; Services of the unpacked module: its NMI frame, multiply, copies,
+; song request, code builder and pad ($C3:08B3–$C3:0AFE)
+; ============================================================
+
+; $C3:08B3 — C3_ModuleNmi (22 bytes, $08B3–$08C8)
+; The module's NMI handler (C3_ModuleFrame points the NMI trampoline
+; here when it ends): saves A, X, Y, DP and DB, runs one frame
+; (C3_ModuleFrame), sends a pending song request (C3_SongCheck), and
+; returns from the interrupt.
+; Callers note: reached through !NmiTrampoline only (C3_ModuleFrame
+;   writes its address there).
+; Entry: interrupt: M, X, DP, DB any (REP #$30 here; the callee sets DP
+;        and DB)
+; Exit:  RTI: P restored; A, X, Y (16-bit), DP and DB restored.
+; Calls: C3_ModuleFrame (JSL), C3_SongCheck.
+C3_ModuleNmi:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHD
+    PHB
+    JSL C3_ModuleFrame
+    JSR C3_SongCheck
+    REP #$30
+    PLB
+    PLD
+    PLY
+    PLX
+    PLA
+    RTI
+
+; $C3:08C9 — C3_NmiBusy (7 bytes, $08C9–$08CF)
+; NMI handler while C3_ModuleFrame runs (it points the NMI trampoline
+; here first): acknowledges the NMI (RDNMI) and returns, so a frame
+; that overruns is not re-entered.
+; Callers note: reached through !NmiTrampoline only.
+; Entry: interrupt: M, X, DP any; DB any (the read is long)
+; Exit:  RTI: P restored; A's low byte, X, Y, DP, DB untouched (the
+;        CMP only sets flags).
+C3_NmiBusy:
+    SEP #$20
+    CMP.l RDNMI
+    RTI
+
+; $C3:08D0 — C3_ModuleFrame (117 bytes, $08D0–$0944)
+; One frame of the module, from its NMI: DP = DB = 0, acknowledges the
+; NMI, HDMA off, the NMI trampoline to C3_NmiBusy, interrupts on again
+; if C3_EntryArg has C3_BootIrqOn, forced blank; then, unless
+; C3_Paused, the module's NMI tasks (C3Mod_RunNmiTasks, the list at
+; C3_NmiTaskList); HDMAEN = C3_HdmaEnable and INIDISP =
+; C3_Brightness ($80, forced blank, when it is 0); C3_FrameCount + 1;
+; the task list C3_TaskList is copied to C3_TaskRun (32 bytes, MVN);
+; the pad (C3_ReadPad); then if C3_Paused, INIDISP = C3_Brightness / 2
+; (forced blank when that is 0) and no task runs, else the tasks run
+; (C3Mod_RunTasks, from C3_TaskRun); last the NMI trampoline back to
+; C3_ModuleNmi.
+; Callers (1 JSL site): C3_ModuleNmi ($C3:08BA).
+; Callers note: the unpacked module also JSLs it once at its start
+;   ($7E:3013), before it turns the NMI on.
+; Entry: M any (SEP #$20 here), X=0 (16-bit LDX of the handler
+;        addresses), DP any and DB any (set to 0 here, not restored).
+; Exit:  M=1, X=0, DP=0, DB=0; A, X, Y changed (Y = C3_TaskRun + $20
+;        after the MVN; the module's tasks may change more).
+; Calls: C3Mod_RunNmiTasks, C3Mod_RunTasks (JSL, in the unpacked
+;   module), C3_ReadPad.
+C3_ModuleFrame:
+    SEP #$20
+    PEA.w !DP_C3Zero
+    PLD
+    TDC
+    PHA
+    PLB
+    CMP.w RDNMI                         ; acknowledge
+    STZ.w HDMAEN
+    LDX.w #C3_NmiBusy
+    STX.w !NmiTrampoline+1
+    LDA.w !C3_EntryArg
+    BIT.b #!C3_BootIrqOn
+    BEQ .blank
+    CLI
+.blank:
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    LDA.w !C3_Paused
+    BNE .show
+    JSL !C3Mod_RunNmiTasks
+.show:
+    SEP #$20
+    LDA.w !C3_HdmaEnable
+    STA.w HDMAEN
+    LDA.w !C3_Brightness
+    BNE .set_bright
+    LDA.b #FORCED_BLANK
+.set_bright:
+    STA.w INIDISP
+    REP #$20
+    INC.b !C3_FrameCount
+    LDX.w #!C3_TaskList
+    LDY.w #!C3_TaskRun
+    LDA.w #!C3_TaskListBytes-1
+    MVN $00,$00                         ; lint-ok: MVN operands are bank bytes (low WRAM)
+    SEP #$20
+    JSR C3_ReadPad
+    LDA.w !C3_Paused
+    BEQ .run_tasks
+    SEP #$20
+    LDA.w !C3_Brightness
+    LSR A
+    BNE .set_dim
+    LDA.b #FORCED_BLANK
+.set_dim:
+    STA.w INIDISP
+    REP #$20
+    BRA .done
+.run_tasks:
+    JSL !C3Mod_RunTasks
+.done:
+    SEP #$20
+    LDX.w #C3_ModuleNmi
+    STX.w !NmiTrampoline+1
+    RTL
+
+; $C3:0945 — C3_IrqAck (7 bytes, $0945–$094B)
+; An IRQ handler that only acknowledges the IRQ (TIMEUP) and returns.
+; No reference to its address was found, in the kernel or in the
+; unpacked module (searched for the bytes $45 $09).
+; Entry: interrupt: M, X, DP any; DB any (the read is long)
+; Exit:  RTI: P restored; registers untouched.
+C3_IrqAck:
+    SEP #$20
+    CMP.l TIMEUP
+    RTI
+
+; $C3:094C — C3_MulSigned (80 bytes, $094C–$099B)
+; Signed multiply with the CPU multiplier: C3_MulA (16-bit) x C3_MulB
+; (8-bit) into C3_MulProduct (32-bit), all signed. Multiplies the
+; magnitudes (|MulB| x low byte, then x high byte, added at +1) and
+; negates the 32-bit result when the signs of MulA's high byte and
+; MulB differ.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:4D5C, $7E:4D6F, $7E:4D87, $7E:4D9A, $7E:4DBD, $7E:4DCF, $7E:4DEA
+;   and $7E:4DFC).
+; Entry: M any (P saved; SEP #$20 here), X=0 (the 16-bit LDX of the
+;        first partial product), DP = 0 (C3_MulA.. are direct page;
+;        probably the module's DP-0 scratch, its value at the call
+;        sites not traced), DB = a bank with the CPU registers
+;        ($00-$3F, $80-$BF; WRMPYA.. are absolute).
+; Exit:  P restored; A changed; X = |MulB| x the low byte of |MulA|; Y
+;        unchanged; C3_MulProduct written.
+; No calls.
+C3_MulSigned:
+    PHP
+    SEP #$20
+    LDA.b !C3_MulA+1
+    EOR.b !C3_MulB
+    PHP                                 ; N = the result's sign
+    LDA.b !C3_MulB
+    BPL .b_pos
+    EOR.b #!Eng_Invert8
+    INC A
+.b_pos:
+    STA.w WRMPYA
+    REP #$20
+    LDA.b !C3_MulA
+    BPL .a_pos
+    EOR.w #!Eng_Invert16
+    INC A
+.a_pos:
+    SEP #$20
+    STA.w WRMPYB                        ; x the low byte
+    STZ.b !C3_MulProduct+3
+    XBA
+    LDX.w RDMPYL
+    STA.w WRMPYB                        ; x the high byte
+    STX.b !C3_MulProduct
+    REP #$21
+    LDA.w RDMPYL
+    ADC.b !C3_MulProduct+1
+    STA.b !C3_MulProduct+1
+    PLP
+    BPL .done
+    REP #$21
+    LDA.b !C3_MulProduct
+    EOR.w #!Eng_Invert16
+    ADC.w #$0001
+    STA.b !C3_MulProduct
+    LDA.b !C3_MulProduct+2
+    EOR.w #!Eng_Invert16
+    ADC.w #$0000
+    STA.b !C3_MulProduct+2
+.done:
+    PLP
+    RTL
+
+; $C3:099C — C3_CopyFEto7E (4 bytes, $099C–$099F)
+; MVN from ROM bank $FE (C3Rom_PackPtrs' bank) to WRAM bank $7E, then
+; RTL: copies A + 1 bytes from $FE:X to $7E:Y.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:36C5), with A = the length - 1.
+; Entry: M any (MVN takes the whole 16-bit A), X=0 (16-bit X and Y), DP
+;        any, DB any; A = count - 1, X = source, Y = destination
+; Exit:  A = $FFFF; X, Y past the copied bytes; DB = $7E (MVN).
+C3_CopyFEto7E:
+    MVN !Bank7E,!C3Rom_PackBank         ; lint-ok: MVN operands are bank bytes (as asar orders them)
+    RTL
+
+; $C3:09A0 — C3_CopyFEto7F (4 bytes, $09A0–$09A3)
+; As C3_CopyFEto7E, to WRAM bank $7F.
+; Callers note: the unpacked module JSLs it (from $7E:36BC); the site
+;   at $C3:17D2 is that call's bytes inside BankC3_PackedModule (a
+;   literal of the packed stream), not code that runs from ROM.
+; Callers (1 JSL site): unmatched ($C3:17D2).
+; Entry: M any, X=0, DP any, DB any; A = count - 1, X = source, Y =
+;        destination
+; Exit:  A = $FFFF; X, Y past the copied bytes; DB = $7F (MVN).
+C3_CopyFEto7F:
+    MVN !Bank7F,!C3Rom_PackBank         ; lint-ok: MVN operands are bank bytes (as asar orders them)
+    RTL
+
+; $C3:09A4 — C3_SongCheck (53 bytes, $09A4–$09D8)
+; Sends a song change to the sound driver: unless C3_SongBusy is set
+; or C3_EntryArg has bit 5 (C3_EntryNoSong), and if C3_SongReq differs
+; from C3_SongCur, it copies the request to C3_SongCur and sends
+; Audio_CmdPlayMusic with the song in Audio_CmdArg0 and $FFFF in
+; Audio_CmdArg1/Arg2 (Audio_DriverCommand), C3_SongBusy set around the
+; call.
+; Callers (1 JSR site): C3_ModuleNmi ($C3:08BE).
+; Entry: M any (SEP #$20 here), X=0 (16-bit STX of $FFFF), DP any,
+;        DB=$00 (all absolute; C3_ModuleFrame leaves it)
+; Exit:  M=1, X=0; A changed; X = $FFFF when a song was sent, else
+;        unchanged; Y unchanged (and what Audio_DriverCommand changes).
+; Calls: Audio_DriverCommand (JSL).
+C3_SongCheck:
+    SEP #$20
+    LDA.w !C3_SongBusy
+    BNE .done
+    LDA.w !C3_EntryArg
+    BIT.b #!C3_EntryNoSong
+    BNE .done
+    LDA.w !C3_SongReq
+    CMP.w !C3_SongCur
+    BEQ .done
+    STA.w !C3_SongCur
+    INC.w !C3_SongBusy
+    LDA.b #!Audio_CmdPlayMusic
+    STA.w !Audio_CmdId
+    LDA.w !C3_SongReq
+    STA.w !Audio_CmdArg0
+    LDX.w #!C3_SongArgs
+    STX.w !Audio_CmdArg1
+    JSL Audio_DriverCommand
+    STZ.w !C3_SongBusy
+.done:
+    RTS
+
+; $C3:09D9 — C3_CopyCodeOrder (16 bytes, $09D9–$09E8)
+; Eight source offsets for C3_BuildCopyCode's outer passes: $000,
+; $200, $100, $300, $400, $600, $500, $700 (16-bit, indexed by the
+; pass x 2).
+C3_CopyCodeOrder:
+    dw $0000,$0200,$0100,$0300,$0400,$0600,$0500,$0700
+
+; $C3:09E9 — C3_BuildCopyCode (165 bytes, $09E9–$0A8D)
+; Writes a routine through WMDATA (WMADD set by the caller): 1,024
+; pairs LDA abs / STA dp (each a 16-bit word, so the routine runs with
+; M=0), with LDA #page / TCD before every 128 pairs, and a final RTS.
+; The stores go to consecutive words from X (the direct page starts at
+; X's high byte and moves up one page every 128 words: $800 bytes in
+; all). Word n's source is Y + C3_CopyCodeOrder[p] + 4i + 2j + $20k for
+; the passes p (0-7) > i (0-7) > j (0-1) > k (0-7), k fastest. With
+; C3_ScaleBitmap's 32-byte rows as the source that is, per 8-row band
+; (in the order of C3_CopyCodeOrder) and per 8-pixel column i, the
+; words of bit planes 0-1 for rows 0-7, then planes 2-3: the layout of
+; SNES 4bpp tiles. The module builds it at $7E:B574 with X = $0C00 and
+; Y = $0200 and JSRs $B574 right after C3_ScaleBitmap, so it probably
+; turns the scaled image into tiles (inferred from the arithmetic; the
+; module's use is not traced further).
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:3CFB, $7E:799D and $7E:8569).
+; Entry: M any (REP #$20 here), X=0; DP any and DB any (set to 0 here,
+;        not restored); X = the destination (low byte 0), Y = the
+;        source base; WMADDL/M/H = where the code goes.
+; Exit:  M=1, X=0, DP=0, DB=0; A = $60; X = the destination + $800; Y =
+;        $0010; C3_GenOrder..C3_GenPage ($F0-$FB) changed.
+; No calls.
+C3_BuildCopyCode:
+    REP #$20
+    LDA.w #$0000
+    TCD
+    STX.b !C3_GenDest
+    STY.b !C3_GenSrc
+    TAY                                 ; Y = the pass x 2
+    STA.b !C3_GenOrder
+    STA.b !C3_GenI
+    STA.b !C3_GenJ
+    STA.b !C3_GenK
+    SEP #$20
+    PHA
+    PLB
+.pass:
+    REP #$20
+    PHX
+    TYX
+    LDA.l C3_CopyCodeOrder,X
+    STA.b !C3_GenOrder
+    PLX
+    SEP #$20
+    PHY
+    STZ.b !C3_GenI
+    LDY.w #$0008
+.loop_i:
+    PHY
+    STZ.b !C3_GenJ
+    LDY.w #$0002
+.loop_j:
+    PHY
+    STZ.b !C3_GenK
+    LDY.w #$0008
+.loop_k:
+    TXA
+    BNE .no_page
+    LDA.b #!Op_LdaImm                   ; LDA #page<<8 / TCD
+    STA.w WMDATA
+    TDC
+    STA.w WMDATA
+    LDA.b !C3_GenPage
+    STA.w WMDATA
+    INC.b !C3_GenPage
+    LDA.b #!Op_Tcd
+    STA.w WMDATA
+.no_page:
+    LDA.b #!Op_LdaAbs
+    STA.w WMDATA
+    REP #$20
+    LDA.b !C3_GenOrder
+    CLC
+    ADC.b !C3_GenI
+    CLC
+    ADC.b !C3_GenJ
+    CLC
+    ADC.b !C3_GenK
+    CLC
+    ADC.b !C3_GenSrc
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b #!Op_StaDp
+    STA.w WMDATA
+    TXA
+    STA.w WMDATA
+    INX
+    INX
+    LDA.b !C3_GenK
+    CLC
+    ADC.b #!C3_GenKStep
+    STA.b !C3_GenK
+    DEY
+    BNE .loop_k
+    PLY
+    INC.b !C3_GenJ
+    INC.b !C3_GenJ
+    DEY
+    BNE .loop_j
+    PLY
+    LDA.b !C3_GenI
+    CLC
+    ADC.b #$04
+    STA.b !C3_GenI
+    DEY
+    BNE .loop_i
+    PLY
+    INY
+    INY
+    CPY.w #!C3_CopyCodePasses*2
+    BEQ .end
+    JMP .pass
+.end:
+    LDA.b #!Op_Rts
+    STA.w WMDATA
+    RTL
+
+; $C3:0A8E — C3_ReadPad (113 bytes, $0A8E–$0AFE)
+; The module's pad handling, once a frame: waits for the auto-joypad
+; read, keeps JOY1 in C3_Pad; L+R+Select+Start alone
+; (C3_PadSoftReset) resets the game (forced blank, NMI and HDMA off,
+; JML Reset) unless C3_NoSoftReset is set. If C3_PauseAllowed is set,
+; a Start press (C3_PadStartHi) toggles C3_Paused once per press
+; (C3_PauseHeld) and sends a sound command to the module's driver
+; routine C3Mod_AudioCommand: $F2 on pausing, $18 with arguments $44,
+; $80 on resuming (probably the music pause and resume; not traced).
+; Callers (1 JSR site): C3_ModuleFrame ($C3:091F).
+; Entry: M any (SEP #$20 here), X=0 (C3Mod_AudioCommand loads X with
+;        16 bits), DP=0 (C3_Pad is direct page), DB=$00 (the CPU
+;        registers and the module's bytes are absolute; C3_ModuleFrame
+;        sets both).
+; Exit:  the soft reset does not return; else M=0; A changed; X
+;        changed when C3Mod_AudioCommand was called (it counts X down),
+;        else unchanged; Y unchanged.
+; Calls: C3Mod_AudioCommand (JSL, in the unpacked module).
+C3_ReadPad:
+    SEP #$20
+.wait:
+    LDA.w HVBJOY
+    BIT.b #!C3_PadAutoReadBusy
+    BNE .wait
+    REP #$20
+    LDA.w JOY1L
+    STA.b !C3_Pad
+    CMP.w #!C3_PadSoftReset
+    BNE .pause
+    SEP #$20
+    LDA.w !C3_NoSoftReset
+    BNE .pause
+    LDA.b #FORCED_BLANK
+    STA.w INIDISP
+    STZ.w NMITIMEN
+    STZ.w HDMAEN
+    JML Reset&!Eng_AddrMask16           ; Reset's bank-$00 mirror ($00:FF00)
+.pause:
+    REP #$20
+    LDA.w !C3_PauseAllowed
+    BEQ .done
+    LDA.b !C3_Pad+1
+    BIT.w #!C3_PadStartHi
+    BEQ .released
+    LDA.w !C3_PauseHeld
+    BNE .done
+    INC.w !C3_PauseHeld
+    LDA.w !C3_Paused
+    INC A
+    AND.w #$0001
+    STA.w !C3_Paused
+    BEQ .resume
+    LDA.w #!C3_SndPause
+    STA.w !Audio_CmdId
+    JSL !C3Mod_AudioCommand
+    BRA .done
+.resume:
+    LDA.w #!C3_SndResume
+    STA.w !Audio_CmdId
+    LDA.w #!C3_SndResumeArg
+    STA.w !Audio_CmdArg1
+    JSL !C3Mod_AudioCommand
+    BRA .done
+.released:
+    STZ.w !C3_PauseHeld
+.done:
+    REP #$20
+    RTS
+
+; ============================================================
+; Services of the unpacked module: the script interpreter and its
+; task lists ($C3:0AFF–$C3:0D0D)
+; ============================================================
+
+; $C3:0AFF — C3_RunScript (441 bytes, $0AFF–$0CB7)
+; Runs a script of the module from C3Script_Ptr until an opcode yields.
+; All C3Script_* bytes are direct page: each script has its own page
+; (the module calls it with DP = $0A00 and $0B00). An opcode is a word
+; read at the pointer (only its low byte counts) and the pointer moves
+; on by one; operands follow:
+;   $00-$7F  variable n = bits 0-3 (C3Script_Vars + 2n):
+;            bits 4-7 = $0: var = word w; $2: var = var m (a byte, m x 2
+;            in bits 1-4); other values with bit 5 clear: var += word
+;            w; with bit 5 set: var += var m
+;   $80-$8F  loop on counter n (C3Script_Counters + 2n), word limit,
+;            word target: while the counter (0 at first) is 0 or below
+;            the limit, it goes up by one and the script jumps to the
+;            target; at the limit the counter is cleared and the script
+;            goes on after the operands. $90-$9F the same, then yields.
+;   $A0-$FF  by bits 0-3 (bits 4-6 are ignored), 
+;            0 sound w (C3Mod_PlaySound, w in C3_ScratchF0); 1 poke byte
+;            b at bank-$00 address w; 2 poke word; 3 call w (the return
+;            point goes to C3Script_Ret); 4 return; 5 wait until APUIO2's
+;            low nibble reaches byte b (else yield and retry the opcode
+;            next time); 6 driver command w1 to Audio_CmdId/Arg0, w2 to
+;            Arg1/Arg2 (Audio_DriverCommand, skipped while C3_SongBusy);
+;            7 / 8 remove / add w in C3_NmiTaskList; 9 / A the same in
+;            C3_TaskList; B write byte b to PPU register $2100 + byte r;
+;            C yield; D jump to w and yield; E jump to w; F end: sets
+;            C3_ExitFlag and yields without moving on (the module's main
+;            loop waits for that flag).
+; Quirks: C3Script_Ret is also loop counter 7; the bytes at $C3:0BEF-
+; $C3:0C18 (an APUIO0-3 send loop like the module's C3Mod_AudioCommand)
+; are reached by nothing (opcode 6 jumps over them to .skip2).
+; Callers note: the unpacked module JSLs it (from $7E:374F with DP =
+;   $0A00, and $7E:375A with DP = $0B00; both after PHK/PLB, so DB =
+;   $7E); the site at $C3:185C is one of those calls' bytes inside
+;   BankC3_PackedModule (a literal of the packed stream).
+; Callers (1 JSL site): unmatched ($C3:185C).
+; Entry: M=0, X=0 (16-bit opcodes, operands and indexes), DP = the
+;        script's page, DB = the script's bank ($7E; the pointer is
+;        16-bit, DP-indirect).
+; Exit:  M=0, X=0; A, X changed (Y as opcode 0's C3Mod_PlaySound and
+;        Audio_DriverCommand leave it); DP, DB unchanged; C3Script_Ptr at the next
+;        opcode (or at the same one for opcodes 5 and F).
+; Calls: C3Mod_PlaySound (JSL, in the unpacked module),
+;   Audio_DriverCommand (JSL), C3_TaskListAdd/Remove,
+;   C3_NmiListAdd/Remove.
+C3_RunScript:
+    JSR .run
+    RTL
+.run:
+    LDA.b (!C3Script_Ptr)
+    INC.b !C3Script_Ptr
+    BIT.w #!C3Script_OpFlow
+    BNE .flow
+    PHA
+    AND.w #!C3Script_NibbleMask
+    ASL A
+    STA.b !C3Script_Tmp
+    TDC
+    ADC.b !C3Script_Tmp                 ; the variable's address (C=0 from the ASL)
+    STA.b !C3Script_Tmp
+    PLA
+    AND.w #!C3Script_KindMask
+    BIT.w #!C3Script_FromVar
+    BNE .from_var
+    CMP.w #$0000
+    BNE .add_word
+    LDA.b (!C3Script_Ptr)
+    BRA .store_skip2
+.add_word:
+    LDA.b (!C3Script_Tmp)
+    CLC
+    ADC.b (!C3Script_Ptr)
+    BRA .store_skip2
+.from_var:
+    CMP.w #!C3Script_FromVar
+    BNE .add_var
+    LDA.b (!C3Script_Ptr)
+    AND.w #!C3Script_VarIndexMask
+    TAX
+    LDA.b !C3Script_Vars,X
+    BRA .store_skip1
+.add_var:
+    LDA.b (!C3Script_Ptr)
+    AND.w #!C3Script_VarIndexMask
+    TAX
+    LDA.b (!C3Script_Tmp)
+    CLC
+    ADC.b !C3Script_Vars,X
+    BRA .store_skip1
+.store_skip2:
+    INC.b !C3Script_Ptr
+.store_skip1:
+    INC.b !C3Script_Ptr
+    STA.b (!C3Script_Tmp)
+    BRA .run
+.flow:
+    STA.b !C3Script_Tmp
+    AND.w #!C3Script_KindMask
+    CMP.w #!C3Script_OpLoop
+    BNE .not_loop
+    JMP .op_loop
+.not_loop:
+    CMP.w #!C3Script_OpLoopYield
+    BNE .table_op
+    JMP .op_loop_yield
+.table_op:
+    LDA.b !C3Script_Tmp
+    AND.w #!C3Script_NibbleMask
+    ASL A
+    TAX
+    JMP (.op_table,X)
+.op_table:                              ; C3Script opcodes $A0-$FF by bits 0-3
+    dw .op_sound            ; 0
+    dw .op_poke8            ; 1
+    dw .op_poke16           ; 2
+    dw .op_call             ; 3
+    dw .op_return           ; 4
+    dw .op_wait_apu         ; 5
+    dw .op_driver           ; 6
+    dw .op_nmi_remove       ; 7
+    dw .op_nmi_add          ; 8
+    dw .op_task_remove      ; 9
+    dw .op_task_add         ; A
+    dw .op_ppu              ; B
+    dw .op_yield            ; C
+    dw .op_jump_yield       ; D
+    dw .op_jump             ; E
+    dw .op_end              ; F
+    db $DB                              ; a stray byte after the table: no entry or branch reaches it
+.op_end:
+    DEC.b !C3Script_Ptr                 ; stay on this opcode
+    LDA.w #$0001
+    STA.l !C3_ExitFlag
+    RTS
+.op_jump:
+    LDA.b (!C3Script_Ptr)
+    STA.b !C3Script_Ptr
+    JMP .run
+.op_jump_yield:
+    LDA.b (!C3Script_Ptr)
+    STA.b !C3Script_Ptr
+.op_yield:
+    RTS
+.op_task_add:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    JSR C3_TaskListAdd
+.skip2:
+    REP #$20
+    INC.b !C3Script_Ptr
+.skip1:
+    REP #$20
+    INC.b !C3Script_Ptr
+    JMP .run
+.op_task_remove:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    JSR C3_TaskListRemove
+    BRA .skip2
+.op_nmi_add:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    JSR C3_NmiListAdd
+    BRA .skip2
+.op_nmi_remove:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    JSR C3_NmiListRemove
+    BRA .skip2
+.op_driver:
+    LDA.b (!C3Script_Ptr)
+    STA.w !Audio_CmdId
+    INC.b !C3Script_Ptr
+    INC.b !C3Script_Ptr
+    LDA.b (!C3Script_Ptr)
+    STA.w !Audio_CmdArg1
+    SEP #$20
+    LDA.w !C3_SongBusy
+    BNE .skip2
+    JSL Audio_DriverCommand
+    BRA .skip2
+.dead_send:                             ; never reached (see the header)
+    LDX.w #!C3_ApuTimeout
+    LDA.w !Audio_CmdArg2
+    STA.l APUIO3
+    LDA.w !Audio_CmdArg1
+    STA.l APUIO2
+    LDA.w !Audio_CmdArg0
+    STA.l APUIO1
+    LDA.w !Audio_CmdId
+    STA.l APUIO0
+.dead_wait:
+    CMP.l APUIO0
+    BEQ .skip2
+    DEX
+    BNE .dead_wait
+    BRA .dead_send
+.op_poke8:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    INC.b !C3Script_Ptr
+    INC.b !C3Script_Ptr
+    SEP #$20
+    LDA.b (!C3Script_Ptr)
+    STA.l !Eng_PtrBase,X
+.to_skip1:
+    BRA .skip1
+.op_wait_apu:
+    SEP #$20
+    LDA.l APUIO2
+    CMP.l APUIO2
+    BNE .op_wait_apu                    ; until two reads agree
+    AND.b #!C3Script_NibbleMask
+    CMP.b (!C3Script_Ptr)
+    BPL .to_skip1
+    REP #$20
+    DEC.b !C3Script_Ptr                 ; back to the opcode: retried next time
+    RTS
+.op_poke16:
+    LDA.b (!C3Script_Ptr)
+    TAX
+    INC.b !C3Script_Ptr
+    INC.b !C3Script_Ptr
+    LDA.b (!C3Script_Ptr)
+    STA.l !Eng_PtrBase,X
+    JMP .skip2
+.op_sound:
+    REP #$20
+    LDA.b (!C3Script_Ptr)
+    STA.w !C3_ScratchF0
+    JSL !C3Mod_PlaySound
+    JMP .skip2
+.op_ppu:
+    SEP #$20
+    LDA.b (!C3Script_Ptr)
+    PHA
+    REP #$20
+    INC.b !C3Script_Ptr
+    LDA.b (!C3Script_Ptr)
+    AND.w #!Eng_LowByteMask
+    CLC
+    ADC.w #!DP_PPU
+    TAX
+    SEP #$20
+    PLA
+    STA.l !Eng_PtrBase,X
+    JMP .skip1
+.op_call:
+    LDA.b !C3Script_Ptr
+    INC A
+    INC A
+    STA.b !C3Script_Ret
+    JMP .op_jump
+.op_return:
+    LDA.b !C3Script_Ret
+    STA.b !C3Script_Ptr
+    JMP .run
+.op_loop:
+    JSR .op_loop_yield
+    JMP .run
+.op_loop_yield:
+    LDA.b !C3Script_Tmp
+    AND.w #!C3Script_NibbleMask
+    ASL A
+    TAX
+    LDA.b !C3Script_Counters,X
+    BEQ .loop_again
+    CMP.b (!C3Script_Ptr)
+    BMI .loop_again
+    STZ.b !C3Script_Counters,X          ; the limit: go on
+    LDA.b !C3Script_Ptr
+    CLC
+    ADC.w #$0004
+    STA.b !C3Script_Ptr
+    RTS
+.loop_again:
+    INC A
+    STA.b !C3Script_Counters,X
+    INC.b !C3Script_Ptr
+    INC.b !C3Script_Ptr
+    LDA.b (!C3Script_Ptr)
+    STA.b !C3Script_Ptr
+    RTS
+
+; $C3:0CB8 — C3_TaskListRemove (21 bytes, $0CB8–$0CCC)
+; Clears the first word of C3_TaskList equal to X. There is no bound: a
+; value that is not in the list is searched for past its end.
+; Callers (1 JSR site): C3_RunScript ($C3:0BBF).
+; Entry: M any (P saved; REP #$20 here), X=0 (16-bit), DP any, DB = a
+;        bank that maps low WRAM ($00 or $7E; the list is absolute); X =
+;        the value.
+; Exit:  P restored; A = the value; X = its offset in the list; Y
+;        unchanged.
+C3_TaskListRemove:
+    PHP
+    REP #$20
+    TXA
+    LDX.w #$0000
+.find:
+    CMP.w !C3_TaskList,X
+    BEQ .found
+    INX
+    INX
+    BRA .find
+.found:
+    STZ.w !C3_TaskList,X
+    PLP
+    RTS
+
+; $C3:0CCD — C3_NmiListRemove (21 bytes, $0CCD–$0CE1)
+; As C3_TaskListRemove, for C3_NmiTaskList.
+; Callers (1 JSR site): C3_RunScript ($C3:0BCF).
+; Entry: M any (P saved), X=0, DP any, DB = $00 or $7E; X = the value.
+; Exit:  P restored; A = the value; X = its offset; Y unchanged.
+C3_NmiListRemove:
+    PHP
+    REP #$20
+    TXA
+    LDX.w #$0000
+.find:
+    CMP.w !C3_NmiTaskList,X
+    BEQ .found
+    INX
+    INX
+    BRA .find
+.found:
+    STZ.w !C3_NmiTaskList,X
+    PLP
+    RTS
+
+; $C3:0CE2 — C3_TaskListAdd (22 bytes, $0CE2–$0CF7)
+; Stores X in the first zero word of C3_TaskList (no bound: a full
+; list is searched past its end).
+; Callers (1 JSR site): C3_RunScript ($C3:0BAE).
+; Entry: M any (P saved; REP #$20 here), X=0 (pushed and pulled as a
+;        word), DP any, DB = $00 or $7E; X = the value (a task address
+;        in the module, run by C3Mod_RunTasks).
+; Exit:  P restored; A = the value; X = its offset in the list; Y
+;        unchanged.
+C3_TaskListAdd:
+    PHP
+    PHX
+    LDX.w #$0000
+    REP #$20
+.find:
+    LDA.w !C3_TaskList,X
+    BEQ .found
+    INX
+    INX
+    BRA .find
+.found:
+    PLA
+    STA.w !C3_TaskList,X
+    PLP
+    RTS
+
+; $C3:0CF8 — C3_NmiListAdd (22 bytes, $0CF8–$0D0D)
+; As C3_TaskListAdd, for C3_NmiTaskList (run by C3Mod_RunNmiTasks).
+; Callers (1 JSR site): C3_RunScript ($C3:0BC7).
+; Entry: M any (P saved), X=0, DP any, DB = $00 or $7E; X = the value.
+; Exit:  P restored; A = the value; X = its offset; Y unchanged.
+C3_NmiListAdd:
+    PHP
+    PHX
+    LDX.w #$0000
+    REP #$20
+.find:
+    LDA.w !C3_NmiTaskList,X
+    BEQ .found
+    INX
+    INX
+    BRA .find
+.found:
+    PLA
+    STA.w !C3_NmiTaskList,X
+    PLP
+    RTS
+
+; ============================================================
+; Services of the unpacked module: sprites, a divide search, staff
+; text ($C3:0D0E–$C3:0EF9)
+; ============================================================
+
+; $C3:0D0E — C3_SprListSmall (80 bytes, $0D0E–$0D5D)
+; Adds a list of small sprites to the OAM shadow: the list (in bank
+; $7E at A, read through WMDATA) is a byte n + 1, then n records of
+; tile, attribute, X, Y. X and Y get C3_SprBaseX / C3_SprBaseY added
+; (8-bit, wrapping); each sprite goes to Oam_LowTable + C3_OamPos, and
+; its high-table byte (at C3_OamHiPtr, the next one after every 4
+; sprites) is shifted right by 2 when nonzero, so the new sprite's two
+; bits are 0 (X bit 8 clear, small size).
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:3A78, $7E:5155, $7E:5D0C, $7E:5D1B, $7E:5D2D, $7E:5D9A, $7E:5E2B
+;   and $7E:5E37).
+; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit X/Y), DP =
+;        the module's (C3_OamPos.. are direct page; probably 0, not
+;        traced), DB = $00 or $7E (the OAM shadow is absolute); A = the
+;        list's address.
+; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
+;        advanced); C3_SprLeft = 0; WMADD after the list.
+C3_SprListSmall:
+    STA.w WMADDL
+    SEP #$20
+    LDY.b !C3_OamPos
+    LDX.b !C3_OamHiPtr
+    STZ.w WMADDH                        ; bank $7E
+    LDA.w WMDATA
+    STA.b !C3_SprLeft
+.next:
+    DEC.b !C3_SprLeft
+    BEQ .done
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+2,Y             ; tile
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+3,Y             ; attribute
+    LDA.w WMDATA
+    CLC
+    ADC.b !C3_SprBaseX
+    STA.w !Oam_LowTable,Y
+    LDA.w WMDATA
+    CLC
+    ADC.b !C3_SprBaseY
+    STA.w !Oam_LowTable+1,Y
+    LDA.w !Eng_PtrBase,X
+    BEQ .hi_done
+    LSR A
+    LSR A
+    STA.w !Eng_PtrBase,X
+.hi_done:
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .next
+    INX
+    BRA .next
+.done:
+    REP #$20
+    STX.b !C3_OamHiPtr
+    STY.b !C3_OamPos
+    RTL
+
+; $C3:0D5E — C3_SprListLarge (94 bytes, $0D5E–$0DBB)
+; As C3_SprListSmall for large sprites with a 9-bit X: X = byte +
+; C3_SprBaseX (16-bit); from $100 up it is replaced by $101 (off
+; screen, through the word C3_OffscreenX: low byte $01, bit 15 set);
+; a negative X keeps its low byte and gets bit 8 set. The high-table
+; byte is always shifted right by 2 with size = 1 and X bit 8 put in.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:5044, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
+;   $7E:88B4 and $7E:9A07).
+; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (probably 0),
+;        DB = $00 or $7E; A = the list's address.
+; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
+;        advanced); C3_SprLeft = 0; WMADD after the list.
+C3_SprListLarge:
+    STA.w WMADDL
+    SEP #$20
+    LDY.b !C3_OamPos
+    LDX.b !C3_OamHiPtr
+    STZ.w WMADDH
+    LDA.w WMDATA
+    STA.b !C3_SprLeft
+.next:
+    DEC.b !C3_SprLeft
+    BEQ .done
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+2,Y
+    LDA.w WMDATA
+    STA.w !Oam_LowTable+3,Y
+    LDA.w WMDATA
+    REP #$21
+    AND.w #!Eng_LowByteMask
+    ADC.b !C3_SprBaseX
+    CMP.w #!C3_ScreenRight
+    BMI .x_ok
+    LDA.w #!C3_OffscreenX
+.x_ok:
+    STA.w !Oam_LowTable,Y               ; (the high byte is replaced by Y below)
+    ASL A                               ; C = X bit 8 (bit 15)
+    SEP #$20
+    LDA.w !Eng_PtrBase,X
+    ROR A
+    SEC
+    ROR A                               ; top bits: size 1, X bit 8
+    STA.w !Eng_PtrBase,X
+    LDA.w WMDATA
+    CLC
+    ADC.b !C3_SprBaseY
+    STA.w !Oam_LowTable+1,Y
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .next
+    INX
+    BRA .next
+.done:
+    REP #$20
+    STX.b !C3_OamHiPtr
+    STY.b !C3_OamPos
+    RTL
+
+; $C3:0DBC — C3_SprOneSmall (55 bytes, $0DBC–$0DF2)
+; Adds one small sprite from a 4-byte record in bank $7E at X (tile,
+; attribute, X, Y; X and Y + C3_SprBaseX / C3_SprBaseY, 8-bit) at
+; C3_OamPos; its high-table byte (through C3_OamHiPtr) is shifted right
+; by 2 when nonzero; after every 4 sprites C3_OamHiPtr moves on.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:5111, $7E:5137 and $7E:6629).
+; Entry: M=0 (the tile and attribute are moved as a word), X=0, DP =
+;        the module's (probably 0), DB = $00 or $7E; X = the record.
+; Exit:  P restored; A changed; Y = the new C3_OamPos; X unchanged.
+C3_SprOneSmall:
+    PHP
+    LDY.b !C3_OamPos
+    LDA.l !Bank7E<<16,X
+    STA.w !Oam_LowTable+2,Y             ; tile, attribute
+    SEP #$20
+    LDA.l (!Bank7E<<16)+2,X
+    CLC
+    ADC.b !C3_SprBaseX
+    STA.w !Oam_LowTable,Y
+    LDA.l (!Bank7E<<16)+3,X
+    CLC
+    ADC.b !C3_SprBaseY
+    STA.w !Oam_LowTable+1,Y
+    LDA.b (!C3_OamHiPtr)
+    BEQ .hi_done
+    LSR A
+    LSR A
+    STA.b (!C3_OamHiPtr)
+.hi_done:
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .store
+    INC.b !C3_OamHiPtr
+.store:
+    STY.b !C3_OamPos
+    PLP
+    RTL
+
+; $C3:0DF3 — C3_SprOneLarge (54 bytes, $0DF3–$0E28)
+; As C3_SprOneSmall for a large sprite: the high-table byte is always
+; shifted right by 2 with size = 1 and X bit 8 = 0. No reference to its
+; address was found in the kernel or in the unpacked module.
+; Entry: M=0, X=0, DP = the module's (probably 0), DB = $00 or $7E; X =
+;        the record.
+; Exit:  P restored; A changed; Y = the new C3_OamPos; X unchanged.
+C3_SprOneLarge:
+    PHP
+    LDY.b !C3_OamPos
+    LDA.l !Bank7E<<16,X
+    STA.w !Oam_LowTable+2,Y
+    SEP #$20
+    LDA.l (!Bank7E<<16)+2,X
+    CLC
+    ADC.b !C3_SprBaseX
+    STA.w !Oam_LowTable,Y
+    LDA.l (!Bank7E<<16)+3,X
+    CLC
+    ADC.b !C3_SprBaseY
+    STA.w !Oam_LowTable+1,Y
+    LDA.b (!C3_OamHiPtr)
+    LSR A
+    SEC
+    ROR A
+    STA.b (!C3_OamHiPtr)
+    INY
+    INY
+    INY
+    INY
+    TYA
+    AND.b #!C3_OamGroupMask
+    BNE .store
+    INC.b !C3_OamHiPtr
+.store:
+    STY.b !C3_OamPos
+    PLP
+    RTL
+
+; $C3:0E29 — C3_FindDivisor (13 bytes, $0E29–$0E35)
+; Counts the divisor up until the quotient falls below C3_ScratchF4:
+; each pass waits two NOPs, adds 1 to X, reads the quotient of the
+; division running (RDDIVL) and starts the next one with WRDIVB = X;
+; it stops when that quotient is below C3_ScratchF4. So on return A =
+; the first quotient below it (for divisor X - 1) and a division by X
+; has been started. The caller sets the dividend and the first divisor.
+; Callers note: no caller in ROM; the unpacked module JSLs it (from
+;   $7E:4F1C, with DP = $4200 and 8-bit X after SEP #$10).
+; Entry: M=0 (16-bit quotient), X=1 (8-bit divisor), DP = DP_CPU (the
+;        divider registers are direct page), DB = $00 or $7E
+;        (C3_ScratchF4 is absolute).
+; Exit:  M=0, X=1; A = the quotient; X = the divisor + 1; C=0.
+C3_FindDivisor:
+    NOP
+    NOP
+    INX
+    LDA.b RDDIVL-!DP_CPU
+    STX.b WRDIVB-!DP_CPU
+    CMP.w !C3_ScratchF4
+    BCS C3_FindDivisor
+    RTL
+
+; $C3:0E36 — BankC3_StaffText (196 bytes, $0E36–$0EF9)
+; ASCII, lines ended by $0A: the staff of the jet-bike race (the
+; module), as in the ROM ("JONNY" spelt so). No reader was found in the
+; kernel or the unpacked module (no reference to $0E36).
+BankC3_StaffText:
+    db $0A,"-- JET BIKE RACE --",$0A
+    db "BIKE OBJECT  :MAMI KAWAI",$0A
+    db "JONNY OBJECT :TAYZO INUKAI",$0A
+    db "MODE7 ROAD   :KANAME TANAKA",$0A
+    db "BACK GROUND  :AKANE HARUKI",$0A
+    db "PANEL & FONT :HIROTO YAMAMOTO",$0A
+    db "THANK YOU FOR 5(!) GRAPHIC DESIGNERS.",$0A
 
 ; ============================================================
 ; Window tables: the quadrilateral ($C3:0EFA–$C3:10BF)

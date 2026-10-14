@@ -1750,9 +1750,73 @@ if !ram_engine_inc == 0
                                          ; call)
 !C3_FrameCount = $0008                   ; 16-bit: the module's frame counter (C3_ModuleNmi
                                          ; increments it with DP=0); C3_RandomByte mixes it in
-!C3_MixF0 = $00F0                        ; three 16-bit words C3_RandomByte adds in absolute (with
-!C3_MixF2 = $00F2                        ; DB=$00: direct-page scratch of DP-0 code); whatever is
-!C3_MixF4 = $00F4                        ; there
+!C3_ScratchF0 = $00F0                    ; three 16-bit words at $00F0-$00F5, the module's DP-0
+!C3_ScratchF2 = $00F2                    ; scratch: C3_RandomByte mixes them in; script opcode 0
+!C3_ScratchF4 = $00F4                    ; passes its word in C3_ScratchF0; C3_FindDivisor
+                                         ; compares with C3_ScratchF4
+!C3_ExitFlag = $0000                     ; 16-bit: script opcode $xF sets it to 1; the module's main
+                                         ; loop waits for it, then leaves for $C0:0000
+!C3_Pad = $0002                          ; 16-bit (dp, DP=0): JOY1 this frame (C3_ReadPad)
+!C3_SongBusy = $0388                     ; 8-bit: nonzero while C3_SongCheck sends; script opcode 6
+                                         ; skips its command while set
+!C3_SongCur = $0389                      ; 8-bit: the song last sent
+!C3_SongReq = $038A                      ; 8-bit: the song wanted; C3_SongCheck sends it when it
+                                         ; differs from C3_SongCur
+!C3_HdmaEnable = $038C                   ; 8-bit: HDMAEN value C3_ModuleFrame writes each frame
+!C3_Brightness = $038D                   ; 8-bit: INIDISP value C3_ModuleFrame writes (0 = $80)
+!C3_PauseAllowed = $0390                 ; 16-bit: nonzero lets Start toggle C3_Paused
+!C3_Paused = $0392                       ; 16-bit, 0 or 1: no task runs and the screen is at half
+                                         ; brightness (probably the pause; C3_ReadPad toggles it)
+!C3_PauseHeld = $0394                    ; 16-bit: set while Start is held, so a press toggles once
+!C3_NoSoftReset = $0396                  ; 8-bit: nonzero disables C3_ReadPad's soft reset
+!C3_TaskList = $0920                     ; 16 words: module task addresses (0 = free), copied to
+                                         ; C3_TaskRun each frame and run from there
+!C3_NmiTaskList = $0940                  ; 8 words: module tasks run in the forced blank of each
+                                         ; frame (C3Mod_RunNmiTasks)
+!C3_TaskRun = $0950                      ; 16 words: the copy C3Mod_RunTasks runs
+!C3Mod_AudioCommand = $7E377A            ; in the unpacked module (stub name): sends Audio_CmdId..
+                                         ; Arg2 to APUIO0-3 and waits for the echo
+!C3Mod_PlaySound = $7E37F3               ; in the unpacked module (stub name): takes its argument
+                                         ; in C3_ScratchF0 (not analysed)
+!C3Mod_RunTasks = $7E398A                ; in the unpacked module (stub name): JSRs each nonzero
+                                         ; word of C3_TaskRun, saving DB, X, P and DP around each
+!C3Mod_RunNmiTasks = $7E39BE             ; in the unpacked module (stub name): the same for
+                                         ; C3_NmiTaskList, with DP=0 and M=1
+; Direct-page bytes of the module services (DP = the caller's; offsets):
+!C3Scale_Groups = $1F                    ; C3_ScaleBitmap: 16-pixel groups per row
+!C3Scale_SrcBase = $23                   ; 16-bit: the source bitmap (64-byte rows)
+!C3Scale_Rows = $25                      ; 16-bit: output rows + 1 (counted down)
+!C3Scale_YStep = $27                     ; 16-bit: added to C3Scale_Acc per output row
+!C3Scale_XStep = $29                     ; 16-bit 8.8: source pixels per output pixel
+!C3Scale_SrcLimit = $2B                  ; 16-bit: source offsets from this up end the image
+!C3Scale_Dest = $2D                      ; 16-bit: the current output row
+!C3Scale_DestPos = $2F                   ; 16-bit: the write position in it
+!C3Scale_SrcRow = $31                    ; 16-bit: the current source row
+!C3Scale_Acc = $33                       ; 16-bit: the row accumulator
+!C3Scale_GroupsLeft = $35                ; 16-bit: groups left in the row
+!C3Scale_PrevEnd = $37                   ; 16-bit: where the last image ended
+!C3Scale_Pixels = $3B                    ; 8 bytes: the 8 source pixels being packed
+!C3_MulA = $F0                           ; C3_MulSigned: 16-bit signed multiplicand
+!C3_MulB = $F2                           ; 8-bit signed multiplier
+!C3_MulProduct = $F4                     ; 32-bit signed product
+!C3_GenOrder = $F0                       ; C3_BuildCopyCode (DP=0): 16-bit C3_CopyCodeOrder entry
+!C3_GenI = $F2                           ; 16-bit: + 4 per i step
+!C3_GenJ = $F4                           ; 16-bit: + 2 per j step
+!C3_GenK = $F6                           ; 16-bit: + $20 per k step
+!C3_GenSrc = $F8                         ; 16-bit: the source base (Y on entry)
+!C3_GenDest = $FA                        ; 16-bit: the destination (X on entry)
+!C3_GenPage = $FB                        ; its high byte: the next direct page
+!C3Script_Vars = $00                     ; C3_RunScript (DP = the script's page): 16 words
+!C3Script_Ptr = $20                      ; 16-bit: the script pointer (bank DB)
+!C3Script_Counters = $22                 ; 16 words: loop counters of opcodes $8x/$9x
+!C3Script_Ret = $30                      ; 16-bit: return point of opcode 3 (= loop counter 7)
+!C3Script_Tmp = $F0                      ; 16-bit: the opcode, or the address of its variable
+!C3_OamPos = $11                         ; C3_Spr* (module DP, probably 0): Oam_LowTable offset of
+                                         ; the next sprite
+!C3_OamHiPtr = $13                       ; 16-bit: address of its Oam_HighTable byte
+!C3_SprBaseX = $15                       ; 16-bit: added to the sprites' X
+!C3_SprBaseY = $17                       ; 16-bit: added to the sprites' Y (low byte)
+!C3_SprLeft = $19                        ; 8-bit: list records left + 1
 !Map_PropsPtrs = $F61E00                 ; 3 bytes per entry: long pointer to a location's packed
                                          ; MapProps; LocRom.MapProps picks the entry
 !LocGfx_Lists = $F61C00                  ; 8 bytes per LocRom.Tileset12: graphics pack numbers ($FF =
