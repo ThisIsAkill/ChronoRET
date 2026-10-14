@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$FF:FC67,BankFF_OldBuildLeftovers,2026-10-09,rev162a,approved,29ef305773f6,"Fix OK: .unk_fe24 one PHP routine, JMP $FEA7 to 2nd PLP/RTL; copies/diffs, bounds, startup, xref claims checked vs ROM. nit: $FED3 table hits $FF0F/$FF16 (.sound_tail2)"
