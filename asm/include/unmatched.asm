@@ -103,14 +103,6 @@ org $C70000
 Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
 org $C70004
 Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03
-org $FDFFE5
-FdVec_FFE5:         ; JMP $FD:DB1D; JML target of Evt_OpFF_Misc for $FF $83-$8F
-org $FDFFE8
-FdVec_FFE8:         ; JMP $FD:DABE; JML target of Evt_OpFF_Misc for $FF $82
-org $FDFFEB
-FdVec_FFEB:         ; JMP $FD:DA5F; JML target of Evt_OpFF_Misc for $FF $81
 org $FDFFFD
 FdVec_FFFD:         ; JMP $FD:E022; JSL from IrqHandler on the frames Field_Unk53 bit 0 is set
                     ; (not analysed)
-org $FDFFF1
-FdVec_FFF1:         ; JMP $FD:DA00; JML target of Evt_OpFF_Misc for $FF $80

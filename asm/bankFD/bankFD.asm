@@ -5792,6 +5792,688 @@ EngFD_UnkD52D:
     SEP #$20
     RTS
 
+
+; ============================================================
+; Mode 7 scene ($FD:DA00–$FD:DE97, $FD:EAA6–$FD:F28F)
+; Event opcode $FF with sub $80-$83 (Evt_OpFF_Misc) leaves the field for
+; good and JMLs here through FdVec_FFF1/FFEB/FFE8/FFE5. The scene runs on
+; its own: M7Scene_Init takes the PPU over (BG mode 7, its own NMI and
+; IRQ handlers through the RAM trampolines, DP=$0500), draws a 128 x 128
+; Mode 7 plane of diagonal colour bands and a radial sprite pattern, and
+; sets up HDMA so the plane has a per-line Mode 7 scale (a floor and a
+; ceiling meeting at a horizon in the middle of the screen) and a
+; circular window (the "iris") around BG1. Each frame the plane scrolls,
+; the palette cycles and the iris opens or closes on a fixed frame
+; schedule; at the last frame the screen goes dark, the first 512 bytes
+; of $7F0000 are put back and the game re-enters through ReentryVectors.
+; Which scene of the game this is has not been traced.
+; ============================================================
+
+; $FD:DA00 — M7Scene_Run80 (95 bytes, $DA00–$DA5E)
+; Event $FF $80's scene, 768 frames: M7Scene_Init, then every frame:
+; wait for the NMI, M7Scene_UpdateScroll, then by M7Scene_Frame: below
+; $20 the iris opens (radius M7Scene_IrisRadii[frame], W12SEL = BG1
+; window 1 inverted: BG1 only inside the circle); below $2A0 no window;
+; below $2C0 it closes (radius M7Scene_IrisRadii[frame & $1F], window 1
+; not inverted: a growing black disc); after that window 2 (the whole
+; line) masks BG1. Then M7Scene_BuildIris and M7Scene_CyclePalette. On
+; the frame that sees M7Scene_Frame = $2FF: M7Scene_ScreenOff,
+; M7Scene_RestoreWram7F and JML ReentryVectors. Frames $1F and $2BF read
+; entry 31 of M7Scene_IrisRadii, which is the 0 that starts
+; M7Scene_OamInit: radius 0 masks all of BG1 for frame $1F and none of it
+; for frame $2BF. Only a frame with M7Scene_Frame exactly $2FF ends the
+; loop (the NMI counts every frame, so a slow frame could pass it).
+; Callers (1 JMP site): FdVec_FFF1 ($FD:FFF1).
+; Entry: M, X, DP, DB any (M7Scene_Init sets M=1, X=0, DP=$0500, DB=$00);
+;        from Evt_OpFF_Misc M=1, X=0, DP=$0100, DB=$00 with interrupts
+;        off and S = StackTop
+; Exit:  never returns (JML ReentryVectors) with M=1, X=0, DP=$0500,
+;        DB=$00, interrupts disabled, forced blank, NMI and HDMA off;
+;        A = the byte restored to $7F01FF, X = $0200
+org $FDDA00
+M7Scene_Run80:
+    JSR M7Scene_Init
+.frame:
+    JSR M7Scene_WaitNmi
+    JSR M7Scene_UpdateScroll
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_OpenFrames
+    BCS .not_opening
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1Inv
+    BRA .set_window
+.not_opening:
+    CPY.w #!M7Scene_Run80Close
+    BCS .not_open
+    STZ.b !M7Scene_IrisR
+    LDA.b #0
+    BRA .set_window
+.not_open:
+    CPY.w #!M7Scene_Run80Shut
+    BCS .closed
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1
+    BRA .set_window
+.closed:
+    STZ.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win2
+.set_window:
+    STA.w W12SEL
+    JSR M7Scene_BuildIris
+    JSR M7Scene_CyclePalette
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_Run80Last
+    BEQ .done
+    JMP .frame
+.done:
+    JSR M7Scene_ScreenOff
+    JSR M7Scene_RestoreWram7F
+    JML ReentryVectors
+
+; $FD:DA5F — M7Scene_Run81 (95 bytes, $DA5F–$DABD)
+; Event $FF $81's scene: as M7Scene_Run80 with a shorter schedule, 256
+; frames: the iris opens below $20, stays open below $A0, closes below
+; $C0, then BG1 is masked; it ends on the frame that sees M7Scene_Frame
+; = $FF. Frames $1F and $BF read the 0 past M7Scene_IrisRadii (see
+; M7Scene_Run80).
+; Callers (1 JMP site): FdVec_FFEB ($FD:FFEB).
+; Entry: as M7Scene_Run80: M, X, DP, DB any (M7Scene_Init sets M=1, X=0,
+;        DP=$0500, DB=$00)
+; Exit:  never returns (JML ReentryVectors) with M=1, X=0, DP=$0500,
+;        DB=$00, interrupts disabled, forced blank, NMI and HDMA off;
+;        A = the byte restored to $7F01FF, X = $0200
+org $FDDA5F
+M7Scene_Run81:
+    JSR M7Scene_Init
+.frame:
+    JSR M7Scene_WaitNmi
+    JSR M7Scene_UpdateScroll
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_OpenFrames
+    BCS .not_opening
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1Inv
+    BRA .set_window
+.not_opening:
+    CPY.w #!M7Scene_Run81Close
+    BCS .not_open
+    STZ.b !M7Scene_IrisR
+    LDA.b #0
+    BRA .set_window
+.not_open:
+    CPY.w #!M7Scene_Run81Shut
+    BCS .closed
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1
+    BRA .set_window
+.closed:
+    STZ.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win2
+.set_window:
+    STA.w W12SEL
+    JSR M7Scene_BuildIris
+    JSR M7Scene_CyclePalette
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_Run81Last
+    BEQ .done
+    JMP .frame
+.done:
+    JSR M7Scene_ScreenOff
+    JSR M7Scene_RestoreWram7F
+    JML ReentryVectors
+
+; $FD:DABE — M7Scene_Run82 (95 bytes, $DABE–$DB1C)
+; Event $FF $82's scene: as M7Scene_Run80 with a shorter schedule, 160
+; frames: the iris opens below $20, stays open below $40, closes below
+; $60, then BG1 is masked; it ends on the frame that sees M7Scene_Frame
+; = $9F. Frames $1F and $5F read the 0 past M7Scene_IrisRadii (see
+; M7Scene_Run80).
+; Callers (1 JMP site): FdVec_FFE8 ($FD:FFE8).
+; Entry: as M7Scene_Run80: M, X, DP, DB any (M7Scene_Init sets M=1, X=0,
+;        DP=$0500, DB=$00)
+; Exit:  never returns (JML ReentryVectors) with M=1, X=0, DP=$0500,
+;        DB=$00, interrupts disabled, forced blank, NMI and HDMA off;
+;        A = the byte restored to $7F01FF, X = $0200
+org $FDDABE
+M7Scene_Run82:
+    JSR M7Scene_Init
+.frame:
+    JSR M7Scene_WaitNmi
+    JSR M7Scene_UpdateScroll
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_OpenFrames
+    BCS .not_opening
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1Inv
+    BRA .set_window
+.not_opening:
+    CPY.w #!M7Scene_Run82Close
+    BCS .not_open
+    STZ.b !M7Scene_IrisR
+    LDA.b #0
+    BRA .set_window
+.not_open:
+    CPY.w #!M7Scene_Run82Shut
+    BCS .closed
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1
+    BRA .set_window
+.closed:
+    STZ.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win2
+.set_window:
+    STA.w W12SEL
+    JSR M7Scene_BuildIris
+    JSR M7Scene_CyclePalette
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_Run82Last
+    BEQ .done
+    JMP .frame
+.done:
+    JSR M7Scene_ScreenOff
+    JSR M7Scene_RestoreWram7F
+    JML ReentryVectors
+
+; $FD:DB1D — M7Scene_Run83 (122 bytes, $DB1D–$DB96)
+; Events $FF $83-$8F's scene: M7Scene_Run80's 768-frame schedule, plus a
+; flicker: each frame, after the NMI (which sets full brightness),
+; M7Scene_FlickerFrac += $98 and M7Scene_FlickerIdx steps by the carry
+; (wrapping at 32), and INIDISP = M7Scene_FlickerLevels[index] (the
+; brightness dips to 1 and climbs back to 15 once per 32 index steps,
+; about every 54 frames).
+; Callers (1 JMP site): FdVec_FFE5 ($FD:FFE5).
+; Entry: as M7Scene_Run80: M, X, DP, DB any (M7Scene_Init sets M=1, X=0,
+;        DP=$0500, DB=$00)
+; Exit:  never returns (JML ReentryVectors) with M=1, X=0, DP=$0500,
+;        DB=$00, interrupts disabled, forced blank, NMI and HDMA off;
+;        A = the byte restored to $7F01FF, X = $0200
+org $FDDB1D
+M7Scene_Run83:
+    JSR M7Scene_Init
+    STZ.b !M7Scene_FlickerFrac
+    STZ.b !M7Scene_FlickerIdx
+.frame:
+    JSR M7Scene_WaitNmi
+    LDA.b !M7Scene_FlickerFrac
+    CLC
+    ADC.b #!M7Scene_FlickerSpeed
+    STA.b !M7Scene_FlickerFrac
+    LDA.b !M7Scene_FlickerIdx
+    ADC.b #0
+    AND.b #!M7Scene_FlickerMask
+    STA.b !M7Scene_FlickerIdx
+    TAX
+    LDA.l M7Scene_FlickerLevels,X
+    STA.w INIDISP
+    JSR M7Scene_UpdateScroll
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_OpenFrames
+    BCS .not_opening
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1Inv
+    BRA .set_window
+.not_opening:
+    CPY.w #!M7Scene_Run80Close
+    BCS .not_open
+    STZ.b !M7Scene_IrisR
+    LDA.b #0
+    BRA .set_window
+.not_open:
+    CPY.w #!M7Scene_Run80Shut
+    BCS .closed
+    LDA.b !M7Scene_Frame
+    AND.b #!M7Scene_IrisStepMask
+    TAX
+    LDA.l M7Scene_IrisRadii,X
+    STA.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win1
+    BRA .set_window
+.closed:
+    STZ.b !M7Scene_IrisR
+    LDA.b #!W12SEL_Bg1Win2
+.set_window:
+    STA.w W12SEL
+    JSR M7Scene_BuildIris
+    JSR M7Scene_CyclePalette
+    LDY.b !M7Scene_Frame
+    CPY.w #!M7Scene_Run80Last
+    BEQ .done
+    JMP .frame
+.done:
+    JSR M7Scene_ScreenOff
+    JSR M7Scene_RestoreWram7F
+    JML ReentryVectors
+
+; $FD:DB97 — M7Scene_Init (294 bytes, $DB97–$DCBC)
+; Sets the scene up with interrupts off: DP=$0500, DB=$00, DMA and HDMA
+; off, forced blank, NMI off; M7Scene_Zero = 0; M7Scene_SetVectors,
+; M7Scene_InitPpu, M7Scene_SaveWram7F; copies M7Scene_PixelMasks to
+; M7Scene_BitMasks/ClearMasks. Mode 7 tiles: each of the 256 tiles gets
+; all 64 pixels = its own number (VMDATAH from VRAM word 0). Then
+; M7Scene_BuildTilemap, M7Scene_InitPalette, M7Scene_InitOam; the first
+; 16 sprites from M7Scene_OamInit, large (high table bytes 0-3 = $AA);
+; M7Scene_UploadTilemap; M7Scene_ClearSprGfx; then 65 rays into the
+; sprite bitmap: ray n (0-64) starts at (0, 0) and steps by (sin n, sin
+; (n + 64)) (Rom_SineTable256, 8.8 fixed point; a quarter turn, all
+; steps positive) until X or Y reaches 128, plotting each point with
+; M7Scene_PlotPixel in colour -(c & 15) where c is the high byte of
+; M7Scene_Acc; M7Scene_Acc starts at $0100 and grows each point by a
+; step that starts at $0100 + ((sin (16n) + $80) & $FF) / 8 and drops by
+; 1 a point; c skips multiples of 16 (colour 0, transparent). Then
+; M7Scene_UploadSprGfx; M7Scene_BuildIris twice with radius 0 (see the
+; quirk); M7Scene_InitHdma; M7Scene_ScreenOn (NMI on, interrupts on);
+; M7Scene_Frame = 0.
+; Quirk: M7Scene_IrisBuf is 0, then 1 after the first BuildIris, the INC
+; makes it 2 and the second BuildIris 3, so both calls write window
+; buffer 1 and buffer 0 is first written by the main loop; kept as found
+; (the NMI before that still selects buffer 1, which is ready).
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA00), M7Scene_Run81 ($FD:DA5F), M7Scene_Run82
+;   ($FD:DABE) and M7Scene_Run83 ($FD:DB1D).
+; Entry: M, X, DP, DB any (it sets M=1, X=0, DP=$0500, DB=$00 first)
+; Exit:  M=1, X=0, DP=$0500, DB=$00; interrupts and NMI enabled; A = 0,
+;        B = the low byte of the last Mode 7 scale word (M7Scene_WriteScale);
+;        X = $0100, Y clobbered; $0508-$0534 written (M7Scene_Frame = 0,
+;        M7Scene_IrisR = 0, M7Scene_IrisBuf = 3, the masks)
+org $FDDB97
+M7Scene_Init:
+    SEI
+    SEP #$20
+    REP #$10
+    LDX.w #!DP_M7Scene
+    PHX
+    PLD
+    LDA.b #0
+    PHA
+    PLB
+    STZ.w MDMAEN
+    STZ.w HDMAEN
+    LDA.b #!INIDISP_BlankFull
+    STA.w INIDISP
+    STZ.w NMITIMEN
+    LDX.w #0
+    STX.b !M7Scene_Zero
+    JSR M7Scene_SetVectors
+    JSR M7Scene_InitPpu
+    JSR M7Scene_SaveWram7F
+    LDX.b !M7Scene_Zero
+.masks:
+    LDA.l M7Scene_PixelMasks,X
+    STA.w !M7Scene_BitMasks,X
+    LDA.l M7Scene_PixelMasks+8,X
+    STA.w !M7Scene_ClearMasks,X
+    INX
+    CPX.w #8
+    BNE .masks
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    LDY.w #0
+    STY.w VMADDL
+.tile:
+    LDX.w #!M7Scene_TilePixels
+.pixel:
+    TYA
+    STA.w VMDATAH
+    DEX
+    BNE .pixel
+    INY
+    CPY.w #!M7Scene_Tiles
+    BNE .tile
+    JSR M7Scene_BuildTilemap
+    JSR M7Scene_InitPalette
+    JSR M7Scene_InitOam
+    LDX.b !M7Scene_Zero
+.oam:
+    LDA.l M7Scene_OamInit,X
+    STA.w !Oam_LowTable,X
+    INX
+    CPX.w #!M7Scene_OamInitBytes
+    BNE .oam
+    LDA.b #!M7Scene_OamHiLarge
+    STA.w !Oam_HighTable
+    STA.w !Oam_HighTable+1
+    STA.w !Oam_HighTable+2
+    STA.w !Oam_HighTable+3
+    JSR M7Scene_UploadTilemap
+    JSR M7Scene_ClearSprGfx
+    LDX.w #0
+.ray:
+    PHX
+    LDA.w !Rom_SineTable256,X
+    STA.b !M7Scene_DirX
+    STZ.b !M7Scene_DirX+1
+    TXA
+    CLC
+    ADC.b #!M7Scene_QuarterTurn
+    TAX
+    LDA.w !Rom_SineTable256,X
+    STA.b !M7Scene_DirY
+    STZ.b !M7Scene_DirY+1
+    TXA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    TAX
+    LDA.w !Rom_SineTable256,X
+    CLC
+    ADC.b #!M7Scene_SineBias
+    LSR A
+    LSR A
+    LSR A
+    STA.b !M7Scene_Step
+    LDA.b #1
+    STA.b !M7Scene_Step+1
+    LDX.w #0
+    STX.b !M7Scene_PosX
+    STX.b !M7Scene_PosY
+    LDX.w #!M7Scene_RayColourStart
+    STX.b !M7Scene_Acc
+.point:
+    LDA.b !M7Scene_Acc+1
+    AND.b #!M7Scene_ColourMask
+    EOR.b #!M7Scene_Invert
+    INC A
+    JSR M7Scene_PlotPixel
+    REP #$21
+    LDA.b !M7Scene_Acc
+    ADC.b !M7Scene_Step
+    STA.b !M7Scene_Acc
+    DEC.b !M7Scene_Step
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_Acc+1
+    AND.b #!M7Scene_ColourMask
+    BNE .step
+    INC.b !M7Scene_Acc+1
+.step:
+    REP #$21
+    LDA.b !M7Scene_PosX
+    ADC.b !M7Scene_DirX
+    STA.b !M7Scene_PosX
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_PosX+1
+    BMI .next_ray
+    REP #$21
+    LDA.b !M7Scene_PosY
+    ADC.b !M7Scene_DirY
+    STA.b !M7Scene_PosY
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_PosY+1
+    BPL .point
+.next_ray:
+    PLX
+    INX
+    CPX.w #!M7Scene_Rays
+    BEQ .rays_done
+    JMP .ray
+.rays_done:
+    JSR M7Scene_UploadSprGfx
+    STZ.b !M7Scene_IrisBuf
+    STZ.b !M7Scene_IrisR
+    JSR M7Scene_BuildIris
+    INC.b !M7Scene_IrisBuf
+    JSR M7Scene_BuildIris
+    JSR M7Scene_InitHdma
+    JSR M7Scene_ScreenOn
+    STZ.b !M7Scene_Frame
+    STZ.b !M7Scene_Frame+1
+    RTS
+
+; $FD:DCBD — M7Scene_UpdateScroll (217 bytes, $DCBD–$DD95)
+; Each frame: writes the M7Scene_Scroll records the HDMA channels 3 and
+; 4 send. Both halves: M7X = $0080. Top half: BG1HOFS = 0, BG1VOFS = (f
+; x 4) & $1FF, M7Y = that + $70; bottom half: BG1HOFS = 0, BG1VOFS =
+; ((255 - f) x 4 - $70) & $1FF, M7Y = that + $70, where f is the low
+; byte of M7Scene_Frame (so the two halves scroll opposite ways). Then
+; it rotates colours 1-15 of sprite palette 0 in Pal_Buf down by two
+; (each takes the colour two above it; 1 and 2 wrap to 14 and 15).
+; Dead code: the bytes at .unused_rotate (after the BRA) would rotate BG
+; colours 1-64 of Pal_Buf down by four; no path reaches them; kept.
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA06), M7Scene_Run81 ($FD:DA65), M7Scene_Run82
+;   ($FD:DAC4) and M7Scene_Run83 ($FD:DB3E).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (M7Scene_Frame, M7Scene_Zero),
+;        DB any (long addressing only)
+; Exit:  M=1, X=0; A = 0, B = 0; X = $001A; M7Scene_Acc and
+;        M7Scene_Step hold the two saved colours
+org $FDDCBD
+M7Scene_UpdateScroll:
+    LDA.b #!M7Scene_CentreX
+    STA.l !M7Scene_Scroll
+    STA.l !M7Scene_Scroll+4
+    LDA.b #0
+    STA.l !M7Scene_Scroll+1
+    STA.l !M7Scene_Scroll+5
+    STA.l !M7Scene_Scroll+8
+    STA.l !M7Scene_Scroll+9
+    STA.l !M7Scene_Scroll+12
+    STA.l !M7Scene_Scroll+13
+    LDA.b !M7Scene_Frame
+    REP #$20
+    ASL A
+    ASL A
+    AND.w #!M7Scene_ScrollMask
+    STA.l !M7Scene_Scroll+10
+    CLC
+    ADC.w #!M7Scene_CentreY
+    STA.l !M7Scene_Scroll+2
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_Frame
+    EOR.b #!M7Scene_Invert
+    REP #$20
+    ASL A
+    ASL A
+    SEC
+    SBC.w #!M7Scene_CentreY
+    AND.w #!M7Scene_ScrollMask
+    STA.l !M7Scene_Scroll+14
+    CLC
+    ADC.w #!M7Scene_CentreY
+    STA.l !M7Scene_Scroll+6
+    LDA.w #0
+    SEP #$20
+    BRA .rotate_sprites
+.unused_rotate:
+    LDX.b !M7Scene_Zero
+    REP #$20
+    LDA.l !Pal_Buf+2
+    STA.b !M7Scene_Acc
+    LDA.l !Pal_Buf+4
+    STA.b !M7Scene_Step
+    LDA.l !Pal_Buf+6
+    STA.b !M7Scene_DirX
+    LDA.l !Pal_Buf+8
+    STA.b !M7Scene_DirY
+.unused_shift:
+    LDA.l !Pal_Buf+10,X
+    STA.l !Pal_Buf+2,X
+    INX
+    INX
+    CPX.w #!M7Scene_UnusedRotBytes
+    BNE .unused_shift
+    LDA.b !M7Scene_Acc
+    STA.l !Pal_Buf+122
+    LDA.b !M7Scene_Step
+    STA.l !Pal_Buf+124
+    LDA.b !M7Scene_DirX
+    STA.l !Pal_Buf+126
+    LDA.b !M7Scene_DirY
+    STA.l !Pal_Buf+128
+    LDA.w #0
+    SEP #$20
+.rotate_sprites:
+    LDX.b !M7Scene_Zero
+    REP #$20
+    LDA.l !Pal_SpriteRows+2
+    STA.b !M7Scene_Acc
+    LDA.l !Pal_SpriteRows+4
+    STA.b !M7Scene_Step
+.shift:
+    LDA.l !Pal_SpriteRows+6,X
+    STA.l !Pal_SpriteRows+2,X
+    INX
+    INX
+    CPX.w #!M7Scene_SprRotBytes
+    BNE .shift
+    LDA.b !M7Scene_Acc
+    STA.l !Pal_SpriteRows+28
+    LDA.b !M7Scene_Step
+    STA.l !Pal_SpriteRows+30
+    LDA.w #0
+    SEP #$20
+    RTS
+
+; $FD:DD96 — M7Scene_IrisRadii (31 bytes, $DD96–$DDB4)
+; The iris radius for frames 0-30 of an opening or closing (indexed by
+; M7Scene_Frame & $1F): it grows from 2 to $7F, faster and faster. Index
+; 31 reads the next byte, the 0 that starts M7Scene_OamInit.
+M7Scene_IrisRadii:
+    db $02,$03,$03,$04,$05,$06,$07,$08,$09,$0B,$0C,$0E,$10,$12,$14,$16
+    db $19,$1C,$1F,$22,$26,$2A,$2F,$34,$3B,$42,$4A,$54,$60,$6E,$7F
+
+; $FD:DDB5 — M7Scene_OamInit (64 bytes, $DDB5–$DDF4)
+; OAM low-table entries (X, Y, tile, attributes) for sprites 0-15,
+; copied by M7Scene_Init; the attributes use all four flip combinations,
+; so the one bitmap is drawn mirrored.
+M7Scene_OamInit:
+    db $00,$30,$08,$F0, $40,$30,$00,$F0, $00,$F0,$88,$F0, $40,$F0,$80,$F0
+    db $80,$30,$00,$B0, $C0,$30,$08,$B0, $80,$F0,$80,$B0, $C0,$F0,$88,$B0
+    db $00,$70,$08,$70, $40,$70,$00,$70, $00,$B0,$88,$70, $40,$B0,$80,$70
+    db $80,$70,$00,$30, $C0,$70,$08,$30, $80,$B0,$80,$30, $C0,$B0,$88,$30
+
+; $FD:DDF5 — M7Scene_FlickerLevels (32 bytes, $DDF5–$DE14)
+; INIDISP brightness per flicker step (M7Scene_Run83): 15 down to 1,
+; back up to 15, then 15 for the last nine steps.
+M7Scene_FlickerLevels:
+    db $0F,$0E,$0C,$0A,$08,$06,$04,$02,$01,$01,$02,$03,$04,$05,$06,$07
+    db $08,$09,$0A,$0B,$0C,$0D,$0E,$0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F,$0F
+
+; $FD:DE15 — M7Scene_Nmi (114 bytes, $DE15–$DE86)
+; The scene's NMI handler (JML from NmiTrampoline, installed by
+; M7Scene_SetVectors). Saves A, X, Y (16-bit), DB and DP; DP=$0500, DB =
+; DP's low byte ($00); acknowledges the NMI (RDNMI); DMA and HDMA off and
+; forced blank; M7Scene_UploadPalette and M7Scene_UploadOam; points HDMA
+; channel 5's table (M7Scene_WinInd) at window buffer 0 (M7Scene_IrisBuf
+; bit 0 clear) or 1, skipping its first 16 lines; M7Scene_Frame += 1;
+; M7Scene_NmiFlag += 1; HDMA channels 1-5 on; INIDISP = full brightness.
+; Callers note: reached through NmiTrampoline only.
+; Entry: the interrupted code's state (any M, X, DP, DB)
+; Exit:  RTI with A, X, Y, DB and DP restored (P from the interrupt)
+org $FDDE15
+M7Scene_Nmi:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHB
+    PHD
+    REP #$10
+    SEP #$20
+    LDX.w #!DP_M7Scene
+    PHX
+    PLD
+    TDC
+    PHA
+    PLB
+    LDA.w RDNMI
+    STZ.w MDMAEN
+    STZ.w HDMAEN
+    LDA.b #!INIDISP_ForceBlank
+    STA.w INIDISP
+    JSR M7Scene_UploadPalette
+    JSR M7Scene_UploadOam
+    LDA.w !DP_M7Scene+!M7Scene_IrisBuf
+    LSR A
+    BCS .buffer1
+    REP #$20
+    LDA.w #(!M7Scene_IrisBuf0+(!M7Scene_SkipLines*2))&$FFFF
+    STA.l !M7Scene_WinInd+1
+    LDA.w #(!M7Scene_IrisBuf0+((!M7Scene_SkipLines+!M7Scene_HalfLines)*2))&$FFFF
+    STA.l !M7Scene_WinInd+4
+    LDA.w #0
+    SEP #$20
+    BRA .counters
+.buffer1:
+    REP #$20
+    LDA.w #(!M7Scene_IrisBuf1+(!M7Scene_SkipLines*2))&$FFFF
+    STA.l !M7Scene_WinInd+1
+    LDA.w #(!M7Scene_IrisBuf1+((!M7Scene_SkipLines+!M7Scene_HalfLines)*2))&$FFFF
+    STA.l !M7Scene_WinInd+4
+    LDA.w #0
+    SEP #$20
+.counters:
+    LDX.b !M7Scene_Frame
+    INX
+    STX.b !M7Scene_Frame
+    INC.b !M7Scene_NmiFlag
+    LDA.b #!HDMAEN_Ch1To5
+    STA.w HDMAEN
+    LDA.b #!Fade_BrightnessMax
+    STA.w INIDISP
+    REP #$30
+    PLD
+    PLB
+    PLY
+    PLX
+    PLA
+    RTI
+
+; $FD:DE87 — M7Scene_Irq (17 bytes, $DE87–$DE97)
+; The scene's IRQ handler (JML from IrqTrampoline, installed by
+; M7Scene_SetVectors): saves and restores A, X, Y, DB and DP and does
+; nothing else (the SEP #$20 is undone by the REP #$30 after it). The
+; scene never enables an IRQ (M7Scene_ScreenOn sets NMITIMEN to NMI and
+; joypad only).
+; Callers note: reached through IrqTrampoline only.
+; Entry: the interrupted code's state (any M, X, DP, DB)
+; Exit:  RTI with A, X, Y, DB and DP restored (P from the interrupt)
+org $FDDE87
+M7Scene_Irq:
+    REP #$30
+    PHA
+    PHX
+    PHY
+    PHB
+    PHD
+    SEP #$20
+    REP #$30
+    PLD
+    PLB
+    PLY
+    PLX
+    PLA
+    RTI
+
 ; ============================================================
 ; Location animation set-up ($FD:DE98–$FD:E021, $FD:E292–$FD:E39B,
 ; vectors $FD:FFF4–$FD:FFFC)
@@ -7524,10 +8206,1143 @@ PalAnim_WhitenRG:
     BNE .colour
     RTS
 
+; ============================================================
+; Mode 7 scene, continued ($FD:EAA6–$FD:F28F): its helpers and tables
+; (see the banner at M7Scene_Run80)
+; ============================================================
+; $FD:EAA6 — M7Scene_SaveWram7F (17 bytes, $EAA6–$EAB6)
+; Copies the 512 bytes at $7F0000 (the start of M7Scene_Tilemap, which
+; the scene overwrites; Eng_Unk7F0000 is among them) to M7Scene_Save7F.
+; Callers (1 JSR site): M7Scene_Init ($FD:DBBE).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (M7Scene_Zero = 0), DB any (long
+;        addressing)
+; Exit:  M=1, X=0; X = $0200; A = the byte at $7F01FF
+org $FDEAA6
+M7Scene_SaveWram7F:
+    LDX.b !M7Scene_Zero
+.copy:
+    LDA.l !M7Scene_Tilemap,X
+    STA.l !M7Scene_Save7F,X
+    INX
+    CPX.w #!M7Scene_SaveBytes
+    BNE .copy
+    RTS
+
+; $FD:EAB7 — M7Scene_RestoreWram7F (17 bytes, $EAB7–$EAC7)
+; Copies M7Scene_Save7F back to the 512 bytes at $7F0000.
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA58), M7Scene_Run81 ($FD:DAB7), M7Scene_Run82
+;   ($FD:DB16) and M7Scene_Run83 ($FD:DB90).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (M7Scene_Zero = 0), DB any (long
+;        addressing)
+; Exit:  M=1, X=0; X = $0200; A = the byte restored to $7F01FF
+org $FDEAB7
+M7Scene_RestoreWram7F:
+    LDX.b !M7Scene_Zero
+.copy:
+    LDA.l !M7Scene_Save7F,X
+    STA.l !M7Scene_Tilemap,X
+    INX
+    CPX.w #!M7Scene_SaveBytes
+    BNE .copy
+    RTS
+
+; $FD:EAC8 — M7Scene_ScreenOff (18 bytes, $EAC8–$EAD9)
+; DMA and HDMA off, forced blank, NMI and joypad reading off, then SEI.
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA55), M7Scene_Run81 ($FD:DAB4), M7Scene_Run82
+;   ($FD:DB13) and M7Scene_Run83 ($FD:DB8D).
+; Entry: M=1, X any, DP any, DB=$00 (absolute register stores)
+; Exit:  M=1; A = 0; interrupts disabled
+org $FDEAC8
+M7Scene_ScreenOff:
+    STZ.w MDMAEN
+    STZ.w HDMAEN
+    LDA.b #!INIDISP_ForceBlank
+    STA.w INIDISP
+    LDA.b #0
+    STA.w NMITIMEN
+    SEI
+    RTS
+
+; $FD:EADA — M7Scene_ScreenOn (17 bytes, $EADA–$EAEA)
+; Waits for the start of a vertical blank (RDNMI bit 7), then NMI and
+; joypad reading on, INIDISP = 0 (display on at brightness 0; the NMI
+; sets full brightness), CLI.
+; Callers (1 JSR site): M7Scene_Init ($FD:DCB5).
+; Entry: M=1, X any, DP any, DB=$00 (absolute register accesses)
+; Exit:  M=1; A = 0; interrupts enabled
+org $FDEADA
+M7Scene_ScreenOn:
+    LDA.w RDNMI
+    BPL M7Scene_ScreenOn
+    LDA.b #!NMITIMEN_NmiJoy
+    STA.w NMITIMEN
+    LDA.b #0
+    STA.w INIDISP
+    CLI
+    RTS
+
+; $FD:EAEB — M7Scene_WaitNmi (9 bytes, $EAEB–$EAF3)
+; Clears M7Scene_NmiFlag, waits until M7Scene_Nmi has incremented it,
+; and clears it again.
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA03), M7Scene_Run81 ($FD:DA62), M7Scene_Run82
+;   ($FD:DAC1) and M7Scene_Run83 ($FD:DB24).
+; Entry: M=1, X any, DP=$0500 (M7Scene_NmiFlag), DB any
+; Exit:  M=1; A = the flag's value after the NMI (non-zero), Z=0
+org $FDEAEB
+M7Scene_WaitNmi:
+    STZ.b !M7Scene_NmiFlag
+.wait:
+    LDA.b !M7Scene_NmiFlag
+    BEQ .wait
+    STZ.b !M7Scene_NmiFlag
+    RTS
+
+; $FD:EAF4 — M7Scene_SetVectors (31 bytes, $EAF4–$EB12)
+; Points NmiTrampoline at M7Scene_Nmi and IrqTrampoline at M7Scene_Irq
+; (a JML each).
+; Callers (1 JSR site): M7Scene_Init ($FD:DBB8).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (the trampolines, .w)
+; Exit:  M=1, X=0; A = $FD (the bank byte); X = M7Scene_Irq's address
+org $FDEAF4
+M7Scene_SetVectors:
+    LDA.b #!Op_JML
+    STA.w !NmiTrampoline
+    STA.w !IrqTrampoline
+    LDX.w #M7Scene_Nmi
+    STX.w !NmiTrampoline+1
+    LDA.b #bank(M7Scene_Nmi)
+    STA.w !NmiTrampoline+3
+    LDX.w #M7Scene_Irq
+    STX.w !IrqTrampoline+1
+    LDA.b #bank(M7Scene_Irq)
+    STA.w !IrqTrampoline+3
+    RTS
+
+; $FD:EB13 — M7Scene_InitPpu (120 bytes, $EB13–$EB8A)
+; DMA and HDMA off; sprites 32x32/64x64 with tiles at VRAM word $4000;
+; OAM address 0; BG mode 7, no mosaic; BG1SC $48 (unused in mode 7), BG
+; tile bases 0; windows: BG1 window 1 on (W12SEL = 3, inverted; the
+; frame loop rewrites it), windows 1 and 2 both 0-255 (the whole line;
+; HDMA channel 5 then sets window 1 per line), OR logic, no window for
+; the other layers or the colour window; main screen BG1, sub screen
+; sprites, TMW/TSW the same (only BG1 has a window); CGWSEL $22 (add the
+; sub screen; math blocked inside the colour window, which is not
+; enabled) and colour math on BG1, halved; fixed colour 0; SETINI 0;
+; WRIO all high; the H/V timer positions 0 (VTIMEH is not written).
+; Callers (1 JSR site): M7Scene_Init ($FD:DBBB).
+; Entry: M=1, X any, DP any, DB=$00 (absolute register stores)
+; Exit:  M=1; A = $FF
+org $FDEB13
+M7Scene_InitPpu:
+    STZ.w MDMAEN
+    STZ.w HDMAEN
+    LDA.b #!OBSEL_Size32And64_Base4000
+    STA.w OBSEL
+    STZ.w OAMADDL
+    STZ.w OAMADDH
+    LDA.b #!BGMODE_Mode7
+    STA.w BGMODE
+    STZ.w MOSAIC
+    LDA.b #!BG1SC_Map4800
+    STA.w BG1SC
+    STZ.w BG12NBA
+    STZ.w BG34NBA
+    LDA.b #!W12SEL_Bg1Win1Inv
+    STA.w W12SEL
+    STZ.w W34SEL
+    STZ.w WOBJSEL
+    STZ.w WH0
+    LDA.b #!WH_RightEdge
+    STA.w WH1
+    STZ.w WH2
+    STA.w WH3
+    STZ.w WBGLOG
+    STZ.w WOBJLOG
+    LDA.b #!TM_Bg1
+    STA.w TM
+    LDA.b #!TM_Obj
+    STA.w TS
+    LDA.b #!TM_Bg1
+    STA.w TMW
+    LDA.b #!TM_Obj
+    STA.w TSW
+    LDA.b #!CGWSEL_MathOutWin
+    STA.w CGWSEL
+    LDA.b #!CGADSUB_HalfAddBg1
+    STA.w CGADSUB
+    LDA.b #!COLDATA_AllZero
+    STA.w COLDATA
+    STZ.w SETINI
+    LDA.b #!WRIO_AllHigh
+    STA.w WRIO
+    STZ.w HTIMEL
+    STZ.w HTIMEH
+    STZ.w VTIMEL
+    RTS
+
+; $FD:EB8B — M7Scene_BuildIris (245 bytes, $EB8B–$EC7F)
+; Builds the iris window (a circle of radius M7Scene_IrisR around
+; M7Scene_IrisX, on line M7Scene_IrisY of the table) as 255 WH0/WH1
+; pairs in a window buffer: M7Scene_IrisX = M7Scene_IrisY = $80;
+; M7Scene_IrisBuf += 1, and its bit 0 picks buffer 1 ($7F72AC) or 0
+; ($7F70AC), written through WMDATA. Radius 0: 255 empty lines (WH0 =
+; $FF, WH1 = 0, M7Scene_IrisEmptyLines). Else the half-widths: with e =
+; the low byte of 256 / r (the divider) and x, y in 8.8 fixed point,
+; x = r + 1/2 and y = 0, then repeat: x -= e x int(y) / 256, stop when
+; x < 0, store int(x) at M7Scene_IrisWidths[int(y)], y += e x int(x) /
+; 256; this walks a quarter of the circle. Then: IrisY - r empty lines
+; (when r <= IrisY), lines with the widths at indices min(r, IrisY) - 1
+; down to 1, lines with the widths at 0 up to min(r, $FF - IrisY) - 1,
+; then (-r - IrisY) & $FF empty lines; WH0 = IrisX - w (0 when it would go below 0, by
+; TDC, which leaves B = $05), WH1 = IrisX + w ($FF when it would pass
+; 255). With the centre at $80 and radii up to $7F (M7Scene_IrisRadii)
+; neither clamp, the TDC nor the cuts ever apply, and 255 lines are
+; written. The widths are stored as words, so each store also writes the
+; next byte, which the next store replaces.
+; Callers (6 JSR sites): M7Scene_Run80 ($FD:DA45), M7Scene_Run81 ($FD:DAA4), M7Scene_Run82
+;   ($FD:DB03), M7Scene_Run83 ($FD:DB7D) and M7Scene_Init ($FD:DCAA, $FD:DCAF).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (its variables; TDC needs the
+;        low byte 0), DB=$00 (WMADD, the divider and multiplier); B = 0
+;        (radius 0: the 16-bit TAX of the count in IrisEmptyLines)
+; Exit:  M=1, X=0 (it runs with X=1 inside, so X and Y return with their
+;        high bytes cleared); A clobbered, B = 0 ($05 if the TDC ran);
+;        X and Y clobbered; M7Scene_IrisX/Y, IrisBuf, Tmp, PosX, PosY,
+;        Ofs and M7Scene_IrisWidths written; WMADD left past the buffer
+org $FDEB8B
+M7Scene_BuildIris:
+    LDA.b #!M7Scene_IrisCentre
+    STA.b !M7Scene_IrisX
+    STA.b !M7Scene_IrisY
+    INC.b !M7Scene_IrisBuf
+    LDA.b !M7Scene_IrisBuf
+    LSR A
+    BCS .buffer1
+    LDX.w #!M7Scene_IrisBuf0
+    STX.w WMADDL
+    BRA .bank
+.buffer1:
+    LDX.w #!M7Scene_IrisBuf1
+    STX.w WMADDL
+.bank:
+    LDA.b #!Bank7F
+    STA.w WMADDH
+    LDA.b !M7Scene_IrisR
+    STA.b !M7Scene_Tmp
+    BNE .circle
+    LDA.b #!M7Scene_IrisLines
+    JSR M7Scene_IrisEmptyLines
+    RTS
+.circle:
+    LDX.w #!M7Scene_IrisUnit
+    STX.w WRDIVL
+    LDA.b !M7Scene_Tmp
+    STA.w WRDIVB
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDDIVL
+    STA.w WRMPYA
+    LDA.b !M7Scene_Tmp
+    STA.b !M7Scene_PosX+1
+    LDA.b #!M7Scene_IrisHalf
+    STA.b !M7Scene_PosX
+    STZ.b !M7Scene_PosY
+    STZ.b !M7Scene_PosY+1
+    SEP #$10
+    REP #$20
+.width:
+    LDX.b !M7Scene_PosY+1
+    STX.w WRMPYB
+    LDA.b !M7Scene_PosX
+    SEC
+    SBC.w RDMPYL
+    STA.b !M7Scene_PosX
+    BMI .widths_done
+    XBA
+    STA.l !M7Scene_IrisWidths,X
+    LDY.b !M7Scene_PosX+1
+    STY.w WRMPYB
+    LDA.b !M7Scene_PosY
+    CLC
+    ADC.w RDMPYL
+    STA.b !M7Scene_PosY
+    BRA .width
+.widths_done:
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_IrisY
+    SEC
+    SBC.b !M7Scene_Tmp
+    BCC .top
+    JSR M7Scene_IrisEmptyLines
+.top:
+    LDY.b !M7Scene_IrisX
+    LDX.b !M7Scene_Tmp
+    CPX.b !M7Scene_IrisY
+    BCC .top_count
+    LDX.b !M7Scene_IrisY
+.top_count:
+    DEX
+.top_line:
+    TYA
+    SEC
+    SBC.l !M7Scene_IrisWidths,X
+    BCS .top_left
+    TDC
+.top_left:
+    STA.w WMDATA
+    TYA
+    CLC
+    ADC.l !M7Scene_IrisWidths,X
+    BCC .top_right
+    LDA.b #!WH_RightEdge
+.top_right:
+    STA.w WMDATA
+    DEX
+    BNE .top_line
+    LDY.b !M7Scene_IrisX
+    LDX.b !M7Scene_Tmp
+    LDA.b !M7Scene_IrisY
+    CMP.b #!M7Scene_IrisLastLine
+    BCS .done
+    CLC
+    ADC.b !M7Scene_Tmp
+    CMP.b #!M7Scene_IrisLastLine
+    BCC .bottom_count
+    LDA.b #!M7Scene_IrisLastLine
+    SEC
+    SBC.b !M7Scene_IrisY
+    TAX
+.bottom_count:
+    STX.b !M7Scene_Ofs
+    LDX.b !M7Scene_Zero
+.bottom_line:
+    TYA
+    SEC
+    SBC.l !M7Scene_IrisWidths,X
+    BCS .bottom_left
+    LDA.b #0
+.bottom_left:
+    STA.w WMDATA
+    TYA
+    CLC
+    ADC.l !M7Scene_IrisWidths,X
+    BCC .bottom_right
+    LDA.b #!WH_RightEdge
+.bottom_right:
+    STA.w WMDATA
+    INX
+    CPX.b !M7Scene_Ofs
+    BNE .bottom_line
+    LDA.b #0
+    SEC
+    SBC.b !M7Scene_Tmp
+    SEC
+    SBC.b !M7Scene_IrisY
+    JSR M7Scene_IrisEmptyLines
+.done:
+    REP #$10
+    RTS
+
+; $FD:EC80 — M7Scene_IrisEmptyLines (17 bytes, $EC80–$EC90)
+; Writes A (0: none) empty window lines (WH0 = $FF, WH1 = 0) through
+; WMDATA.
+; Callers (3 JSR sites): M7Scene_BuildIris ($FD:EBB3, $FD:EC0E, $FD:EC7A).
+; Entry: M=1, X either width (X=0 from the radius-0 call, with B = 0
+;        for the 16-bit TAX; X=1 from the others), DP any, DB=$00
+;        (WMDATA); A = the count
+; Exit:  M=1; X preserved (PHX/PLX at the caller's width); A = $FF (0
+;        when the count was 0)
+org $FDEC80
+M7Scene_IrisEmptyLines:
+    PHX
+    TAX
+    BEQ .done
+    LDA.b #!WH_RightEdge
+.line:
+    STA.w WMDATA
+    STZ.w WMDATA
+    DEX
+    BNE .line
+.done:
+    PLX
+    RTS
+
+; $FD:EC91 — M7Scene_UploadSprGfx (47 bytes, $EC91–$ECBF)
+; DMA channel 0: the 8 KB sprite bitmap M7Scene_SprGfx to VRAM word
+; $4000 (the sprite tiles), VMAIN incrementing after the high byte.
+; Callers (1 JSR site): M7Scene_Init ($FD:DCA3).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (registers)
+; Exit:  M=1, X=0; A = 1; X = $4000
+org $FDEC91
+M7Scene_UploadSprGfx:
+    LDA.b #!VMAIN_IncAfterHigh
+    STA.w VMAIN
+    STZ.w MDMAEN
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegs ; bit 6 has no effect on a DMA
+    STA.w DMAP0
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD0
+    LDA.b #!M7Scene_SprGfx>>16
+    STA.w A1B0
+    LDX.w #!M7Scene_SprGfx&$FFFF
+    STX.w A1T0L
+    LDX.w #!M7Scene_SprGfxBytes
+    STX.w DAS0L
+    LDX.w #!M7Scene_VramSprites
+    STX.w VMADDL
+    LDA.b #1
+    STA.w MDMAEN
+    RTS
+
+; $FD:ECC0 — M7Scene_ClearSprGfx (21 bytes, $ECC0–$ECD4)
+; Zeroes the 8 KB sprite bitmap M7Scene_SprGfx through WMDATA.
+; Callers (1 JSR site): M7Scene_Init ($FD:DC1B).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (WMADD, WMDATA)
+; Exit:  M=1, X=0; A = $7F; X = 0
+org $FDECC0
+M7Scene_ClearSprGfx:
+    LDX.w #!M7Scene_SprGfx&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7F
+    STA.w WMADDH
+    LDX.w #!M7Scene_SprGfxBytes
+.clear:
+    STZ.w WMDATA
+    DEX
+    BNE .clear
+    RTS
+
+; $FD:ECD5 — M7Scene_PlotPixel (164 bytes, $ECD5–$ED78)
+; Sets pixel (x, y) = (high byte of M7Scene_PosX, high byte of
+; M7Scene_PosY), both 0-127, of the sprite bitmap to colour A (bits 0-3,
+; one per bitplane). The bitmap is 16 tiles of 32 bytes per 8-line row:
+; byte offset = (y & 7) x 2 + (y >> 3) x $200 + (x >> 3) x 32 (kept in
+; M7Scene_Ofs on the way); the pixel's bit is M7Scene_BitMasks[x & 7];
+; planes 0-3 are the bytes at +0, +1, +$10 and +$11, each set (colour
+; bit 1) or cleared (with M7Scene_ClearMasks).
+; Callers (1 JSR site): M7Scene_Init ($FD:DC5D).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (its variables), DB=$00 (the
+;        masks, .w); B = 0 (the XBA makes it the low byte of the row
+;        offset); A = colour
+; Exit:  M=1, X=0; A = the last plane byte, B = 0; X = the byte offset, Y
+;        = x & 7; M7Scene_Tmp = colour >> 4, M7Scene_Ofs written
+org $FDECD5
+M7Scene_PlotPixel:
+    STA.b !M7Scene_Tmp
+    LDA.b !M7Scene_PosY+1
+    AND.b #!M7Scene_InTileMask
+    ASL A
+    STA.b !M7Scene_Ofs
+    STZ.b !M7Scene_Ofs+1
+    LDA.b !M7Scene_PosY+1
+    AND.b #!M7Scene_TileMask
+    LSR A
+    LSR A
+    XBA
+    REP #$21
+    ADC.b !M7Scene_Ofs
+    STA.b !M7Scene_Ofs
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_PosX+1
+    AND.b #!M7Scene_TileMask
+    REP #$20
+    ASL A
+    ASL A
+    CLC
+    ADC.b !M7Scene_Ofs
+    TAX
+    LDA.w #0
+    SEP #$20
+    LDA.b !M7Scene_PosX+1
+    AND.b #!M7Scene_InTileMask
+    TAY
+    LSR.b !M7Scene_Tmp
+    BCC .clear0
+    LDA.l !M7Scene_SprGfx,X
+    ORA.w !M7Scene_BitMasks,Y
+    STA.l !M7Scene_SprGfx,X
+    BRA .plane1
+.clear0:
+    LDA.l !M7Scene_SprGfx,X
+    AND.w !M7Scene_ClearMasks,Y
+    STA.l !M7Scene_SprGfx,X
+.plane1:
+    LSR.b !M7Scene_Tmp
+    BCC .clear1
+    LDA.l !M7Scene_SprGfx+1,X
+    ORA.w !M7Scene_BitMasks,Y
+    STA.l !M7Scene_SprGfx+1,X
+    BRA .plane2
+.clear1:
+    LDA.l !M7Scene_SprGfx+1,X
+    AND.w !M7Scene_ClearMasks,Y
+    STA.l !M7Scene_SprGfx+1,X
+.plane2:
+    LSR.b !M7Scene_Tmp
+    BCC .clear2
+    LDA.l !M7Scene_SprGfx+16,X
+    ORA.w !M7Scene_BitMasks,Y
+    STA.l !M7Scene_SprGfx+16,X
+    BRA .plane3
+.clear2:
+    LDA.l !M7Scene_SprGfx+16,X
+    AND.w !M7Scene_ClearMasks,Y
+    STA.l !M7Scene_SprGfx+16,X
+.plane3:
+    LSR.b !M7Scene_Tmp
+    BCC .clear3
+    LDA.l !M7Scene_SprGfx+17,X
+    ORA.w !M7Scene_BitMasks,Y
+    STA.l !M7Scene_SprGfx+17,X
+    BRA .done
+.clear3:
+    LDA.l !M7Scene_SprGfx+17,X
+    AND.w !M7Scene_ClearMasks,Y
+    STA.l !M7Scene_SprGfx+17,X
+.done:
+    RTS
+
+; $FD:ED79 — M7Scene_PixelMasks (16 bytes, $ED79–$ED88)
+; A pixel's bit in a plane byte ($80 >> n, n = x & 7), then the same
+; inverted; M7Scene_Init copies them to M7Scene_BitMasks/ClearMasks.
+M7Scene_PixelMasks:
+    db $80,$40,$20,$10,$08,$04,$02,$01
+    db $7F,$BF,$DF,$EF,$F7,$FB,$FD,$FE
+
+; $FD:ED89 — M7Scene_InitHdma (410 bytes, $ED89–$EF22)
+; Sets up HDMA channels 1-5 (all indirect; M7Scene_Nmi enables them):
+; 1 M7A/M7B and 2 M7C/M7D from M7Scene_M7AB / M7CD, 3 M7X/M7Y and 4
+; BG1HOFS/BG1VOFS from the M7Scene_Scroll records (each for two runs of
+; 112 lines), 5 WH0/WH1 from the iris buffer (M7Scene_WinInd, pointed at
+; buffer 0 here). The per-line tables skip their first 16 lines. Then
+; the Mode 7 matrix per line n (0-255): m = n for 0-127 and 255 - n
+; for 128-255 (EOR, not a negation), h = 2m x $E0 / 256, q = $FFFF /
+; ($F0 - h) (the dividend is written once, before the first line), and
+; M7Scene_WriteScale writes s = $FF x q / 64: M7A = s, M7B = 0 to
+; M7Scene_M7AB, M7C = 0, M7D = s to M7Scene_M7CD. So the scale is
+; smallest at lines 0 and 255 and largest at 127 and 128, the middle of
+; the screen. The first loop's LDA RDDIVL / STA WRMPYA is redundant:
+; WriteScale stores $FF to WRMPYA first.
+; Callers (1 JSR site): M7Scene_Init ($FD:DCB2).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (M7Scene_Zero, Tmp; WriteScale's
+;        variables), DB=$00 (the DMA registers, WMADD, the divider and
+;        multiplier)
+; Exit:  M=1, X=0; A = 0, B = the low byte of the last scale; X = $0100;
+;        Y clobbered; M7Scene_Tmp, Acc ($0C-$0F) and DirX written
+org $FDED89
+M7Scene_InitHdma:
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.w DMAP1
+    LDA.b #!BBAD_M7A
+    STA.w BBAD1
+    LDX.w #!M7Scene_HdmaInd&$FFFF
+    STX.w A1T1L
+    LDA.b #!Bank7F
+    STA.w A1B1
+    STA.w DAS1B
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.w DMAP2
+    LDA.b #!BBAD_M7C
+    STA.w BBAD2
+    LDX.w #(!M7Scene_HdmaInd+7)&$FFFF
+    STX.w A1T2L
+    LDA.b #!Bank7F
+    STA.w A1B2
+    STA.w DAS2B
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.w DMAP3
+    LDA.b #!BBAD_M7X
+    STA.w BBAD3
+    LDX.w #(!M7Scene_HdmaInd+14)&$FFFF
+    STX.w A1T3L
+    LDA.b #!Bank7F
+    STA.w A1B3
+    STA.w DAS3B
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegsTwice
+    STA.w DMAP4
+    LDA.b #!BBAD_BG1HOFS
+    STA.w BBAD4
+    LDX.w #(!M7Scene_HdmaInd+21)&$FFFF
+    STX.w A1T4L
+    LDA.b #!Bank7F
+    STA.w A1B4
+    STA.w DAS4B
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_TwoRegs
+    STA.w DMAP5
+    LDA.b #!BBAD_WH0
+    STA.w BBAD5
+    LDX.w #!M7Scene_WinInd&$FFFF
+    STX.w A1T5L
+    LDA.b #!Bank7F
+    STA.w A1B5
+    STA.w DAS5B
+    LDA.b #!M7Scene_HdmaRepeat112
+    STA.l !M7Scene_HdmaInd
+    STA.l !M7Scene_HdmaInd+3
+    STA.l !M7Scene_HdmaInd+7
+    STA.l !M7Scene_HdmaInd+10
+    STA.l !M7Scene_WinInd
+    STA.l !M7Scene_WinInd+3
+    LDA.b #!M7Scene_HalfLines
+    STA.l !M7Scene_HdmaInd+14
+    STA.l !M7Scene_HdmaInd+17
+    STA.l !M7Scene_HdmaInd+21
+    STA.l !M7Scene_HdmaInd+24
+    LDA.b #0
+    STA.l !M7Scene_HdmaInd+6
+    STA.l !M7Scene_HdmaInd+13
+    STA.l !M7Scene_HdmaInd+20
+    STA.l !M7Scene_HdmaInd+27
+    STA.l !M7Scene_WinInd+6
+    REP #$20
+    LDA.w #(!M7Scene_M7AB+(!M7Scene_SkipLines*4))&$FFFF
+    STA.l !M7Scene_HdmaInd+1
+    LDA.w #(!M7Scene_M7AB+((!M7Scene_SkipLines+!M7Scene_HalfLines)*4))&$FFFF
+    STA.l !M7Scene_HdmaInd+4
+    LDA.w #(!M7Scene_M7CD+(!M7Scene_SkipLines*4))&$FFFF
+    STA.l !M7Scene_HdmaInd+8
+    LDA.w #(!M7Scene_M7CD+((!M7Scene_SkipLines+!M7Scene_HalfLines)*4))&$FFFF
+    STA.l !M7Scene_HdmaInd+11
+    LDA.w #!M7Scene_Scroll&$FFFF
+    STA.l !M7Scene_HdmaInd+15
+    LDA.w #(!M7Scene_Scroll+4)&$FFFF
+    STA.l !M7Scene_HdmaInd+18
+    LDA.w #(!M7Scene_Scroll+8)&$FFFF
+    STA.l !M7Scene_HdmaInd+22
+    LDA.w #(!M7Scene_Scroll+12)&$FFFF
+    STA.l !M7Scene_HdmaInd+25
+    LDA.w #(!M7Scene_IrisBuf0+(!M7Scene_SkipLines*2))&$FFFF
+    STA.l !M7Scene_WinInd+1
+    LDA.w #(!M7Scene_IrisBuf0+((!M7Scene_SkipLines+!M7Scene_HalfLines)*2))&$FFFF
+    STA.l !M7Scene_WinInd+4
+    LDA.w #0
+    SEP #$20
+    LDX.w #!M7Scene_M7AB&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7F
+    STA.w WMADDH
+    LDX.w #!M7Scene_Dividend
+    STX.w WRDIVL
+    LDX.b !M7Scene_Zero
+.line_ab:
+    TXA
+    BPL .abs_ab
+    EOR.b #!M7Scene_Invert
+.abs_ab:
+    ASL A
+    STA.w WRMPYA
+    LDA.b #!M7Scene_DepthScale
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !M7Scene_Tmp
+    LDA.b #!M7Scene_DepthBase
+    SEC
+    SBC.b !M7Scene_Tmp
+    STA.w WRDIVB
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    LDA.w RDDIVL
+    STA.w WRMPYA
+    LDA.b #!M7Scene_ScaleFactor
+    JSR M7Scene_WriteScale
+    STZ.w WMDATA
+    STZ.w WMDATA
+    INX
+    CPX.w #!M7Scene_Lines
+    BNE .line_ab
+    LDX.w #!M7Scene_M7CD&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7F
+    STA.w WMADDH
+    LDX.b !M7Scene_Zero
+.line_cd:
+    TXA
+    BPL .abs_cd
+    EOR.b #!M7Scene_Invert
+.abs_cd:
+    ASL A
+    STA.w WRMPYA
+    LDA.b #!M7Scene_DepthScale
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !M7Scene_Tmp
+    LDA.b #!M7Scene_DepthBase
+    SEC
+    SBC.b !M7Scene_Tmp
+    STA.w WRDIVB
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    STZ.w WMDATA
+    STZ.w WMDATA
+    LDA.b #!M7Scene_ScaleFactor
+    JSR M7Scene_WriteScale
+    INX
+    CPX.w #!M7Scene_Lines
+    BNE .line_cd
+    RTS
+
+; $FD:EF23 — M7Scene_WriteScale (76 bytes, $EF23–$EF6E)
+; Writes (A x q) / 64 as a word (low byte first) through WMDATA, where q
+; is the quotient waiting in RDDIVL: A x q is built in M7Scene_Acc
+; ($0C-$0F, from the two 8 x 8 products of the multiplier) and shifted
+; right six times.
+; Callers (2 JSR sites): M7Scene_InitHdma ($FD:EED0, $FD:EF19).
+; Entry: M=1, X=0 (16-bit Y for the quotient), DP=$0500 (M7Scene_Acc,
+;        DirX), DB=$00 (the multiplier and divider); A = the factor
+; Exit:  M=1, X=0; A = 0, B = the low byte of the word written; X kept;
+;        Y = A x (q & $FF); M7Scene_DirX = q; M7Scene_Acc ($0C-$0F)
+;        written
+org $FDEF23
+M7Scene_WriteScale:
+    STA.w WRMPYA
+    LDY.w RDDIVL
+    STY.b !M7Scene_DirX
+    LDA.b !M7Scene_DirX
+    STA.w WRMPYB
+    STZ.b !M7Scene_Acc+2
+    STZ.b !M7Scene_Acc+3
+    NOP
+    LDY.w RDMPYL
+    STY.b !M7Scene_Acc
+    LDA.b !M7Scene_DirX+1
+    STA.w WRMPYB
+    NOP
+    REP #$21
+    LDA.b !M7Scene_Acc+1
+    ADC.w RDMPYL
+    STA.b !M7Scene_Acc+1
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LSR.b !M7Scene_Acc+2
+    ROR.b !M7Scene_Acc
+    LDA.b !M7Scene_Acc
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    LDA.b #0
+    RTS
+
+; $FD:EF6F — M7Scene_InitPalette (146 bytes, $EF6F–$F000)
+; Zeroes the 512 bytes of Pal_Buf, then (through WMDATA) colours 0-63:
+; red M7Scene_PalRed[n], blue M7Scene_PalBlue[n], green 0; colours
+; 64-127 stay black; colours 128-255 (the sprite palettes): blue
+; M7Scene_PalSprBlue[n & 15], red and green 0.
+; Callers (1 JSR site): M7Scene_Init ($FD:DBF5).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (M7Scene_Zero, Acc, Step),
+;        DB=$00 (WMADD)
+; Exit:  M=1, X=0; A = 0, B = 0; X = $1E, Y = 0; M7Scene_Acc = $80,
+;        M7Scene_Step written
+org $FDEF6F
+M7Scene_InitPalette:
+    LDX.w #!Pal_Buf&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7E
+    STA.w WMADDH
+    LDY.w #!Pal_BufBytes
+.clear:
+    STZ.w WMDATA
+    DEY
+    BNE .clear
+    LDX.w #!Pal_Buf&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7E
+    STA.w WMADDH
+    LDY.w #!M7Scene_BgColours
+    REP #$20
+    LDA.b !M7Scene_Zero
+    STA.b !M7Scene_Acc
+.bg_colour:
+    LDA.b !M7Scene_Acc
+    AND.w #!M7Scene_BgColours-1
+    ASL A
+    TAX
+    LDA.l M7Scene_PalRed,X
+    STA.b !M7Scene_Step
+    LDA.b !M7Scene_Acc
+    AND.w #!M7Scene_BgColours-1
+    ASL A
+    TAX
+    LDA.l M7Scene_PalBlue,X
+    XBA
+    ASL A
+    ASL A
+    ORA.b !M7Scene_Step
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    REP #$20
+    INC.b !M7Scene_Acc
+    DEY
+    BNE .bg_colour
+    LDA.w #0
+    SEP #$20
+    LDX.w #!Pal_SpriteRows&$FFFF
+    STX.w WMADDL
+    LDA.b #!Bank7E
+    STA.w WMADDH
+    LDY.w #!M7Scene_SprColours
+    REP #$20
+    LDA.b !M7Scene_Zero
+    STA.b !M7Scene_Acc
+.spr_colour:
+    LDA.b !M7Scene_Acc
+    AND.w #!M7Scene_SprRamp-1
+    ASL A
+    TAX
+    LDA.l M7Scene_PalSprBlue,X
+    XBA
+    ASL A
+    ASL A
+    SEP #$20
+    STA.w WMDATA
+    XBA
+    STA.w WMDATA
+    REP #$20
+    INC.b !M7Scene_Acc
+    DEY
+    BNE .spr_colour
+    LDA.w #0
+    SEP #$20
+    RTS
+
+; $FD:F001 — M7Scene_PalRed (128 bytes, $F001–$F080)
+; Red (0-$16) of BG colours 0-63 (M7Scene_InitPalette): 0 up to colour
+; 16, a ramp up and down over 17-46, then 0.
+M7Scene_PalRed:
+    dw $0000,$0000,$0000,$0000,$0000,$0000,$0000,$0000
+    dw $0000,$0000,$0000,$0000,$0000,$0000,$0000,$0000
+    dw $0000,$0001,$0002,$0003,$0004,$0005,$0006,$0007
+    dw $0008,$000A,$000C,$000E,$0010,$0012,$0014,$0016
+    dw $0016,$0014,$0012,$0010,$000E,$000C,$000A,$0008
+    dw $0007,$0006,$0005,$0004,$0003,$0002,$0001,$0000
+    dw $0000,$0000,$0000,$0000,$0000,$0000,$0000,$0000
+    dw $0000,$0000,$0000,$0000,$0000,$0000,$0000,$0000
+
+; $FD:F081 — M7Scene_PalBlue (128 bytes, $F081–$F100)
+; Blue (0-15) of BG colours 0-63: up from 0 to 15 and back, each value
+; twice.
+M7Scene_PalBlue:
+    dw $0000,$0000,$0001,$0001,$0002,$0002,$0003,$0003
+    dw $0004,$0004,$0005,$0005,$0006,$0006,$0007,$0007
+    dw $0008,$0008,$0009,$0009,$000A,$000A,$000B,$000B
+    dw $000C,$000C,$000D,$000D,$000E,$000E,$000F,$000F
+    dw $000F,$000F,$000E,$000E,$000D,$000D,$000C,$000C
+    dw $000B,$000B,$000A,$000A,$0009,$0009,$0008,$0008
+    dw $0007,$0007,$0006,$0006,$0005,$0005,$0004,$0004
+    dw $0003,$0003,$0002,$0002,$0001,$0001,$0000,$0000
+
+; $FD:F101 — M7Scene_PalSprBlue (34 bytes, $F101–$F122)
+; Blue of the sprite colours by n & 15 (M7Scene_InitPalette): 0, 0, then
+; up by 4 to $1F at 9 and back down to 8. The 17th word ($0004, at
+; $F121) completes the pattern but is never read.
+M7Scene_PalSprBlue:
+    dw $0000,$0000,$0004,$0008,$000C,$0010,$0014,$0018
+    dw $001C,$001F,$001C,$0018,$0014,$0010,$000C,$0008
+    dw $0004
+
+; $FD:F123 — M7Scene_CyclePalette (94 bytes, $F123–$F180)
+; Each frame, for BG colours 16-47 (n = 0-31 from colour 16): red = the
+; high byte of ((sin f + $80) & $FF) x M7Scene_CycleAmp[n], green = the
+; same with sin(255 - f) (f = the low byte of M7Scene_Frame), blue kept
+; from Pal_Buf. So red and green pulse out of step as f runs.
+; Callers (4 JSR sites): M7Scene_Run80 ($FD:DA48), M7Scene_Run81 ($FD:DAA7), M7Scene_Run82
+;   ($FD:DB06) and M7Scene_Run83 ($FD:DB80).
+; Entry: M=1, X=0 (16-bit X/Y), DP=$0500 (M7Scene_Frame, Zero, Step),
+;        DB=$00 (the multiplier; Rom_SineTable256 read through its bank
+;        $00 mirror); B = 0 (16-bit TAY of the frame byte)
+; Exit:  M=1, X=0; A = 0, B = 0; X = $40, Y = 255 - f; M7Scene_Step
+;        written
+org $FDF123
+M7Scene_CyclePalette:
+    LDX.b !M7Scene_Zero
+.colour:
+    LDA.b !M7Scene_Frame
+    TAY
+    LDA.w !Rom_SineTable256,Y
+    CLC
+    ADC.b #!M7Scene_SineBias
+    STA.w WRMPYA
+    LDA.l M7Scene_CycleAmp,X
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    STA.b !M7Scene_Step
+    STZ.b !M7Scene_Step+1
+    LDA.b !M7Scene_Frame
+    EOR.b #!M7Scene_Invert
+    TAY
+    LDA.w !Rom_SineTable256,Y
+    CLC
+    ADC.b #!M7Scene_SineBias
+    STA.w WRMPYA
+    LDA.l M7Scene_CycleAmp,X
+    STA.w WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.w RDMPYH
+    XBA
+    REP #$20
+    LSR A
+    LSR A
+    LSR A
+    ORA.b !M7Scene_Step
+    STA.b !M7Scene_Step
+    LDA.l !Pal_Buf+32,X
+    AND.w #!Col_BlueMask
+    ORA.b !M7Scene_Step
+    STA.l !Pal_Buf+32,X
+    LDA.w #0
+    SEP #$20
+    INX
+    INX
+    CPX.w #!M7Scene_CycleBytes
+    BNE .colour
+    RTS
+
+; $FD:F181 — M7Scene_CycleAmp (64 bytes, $F181–$F1C0)
+; Words read by their low byte (M7Scene_CyclePalette, X = n x 2): the
+; pulse depth of colour 16 + n, a ramp 0-$16 and back.
+M7Scene_CycleAmp:
+    dw $0000,$0001,$0002,$0003,$0004,$0005,$0006,$0007
+    dw $0008,$000A,$000C,$000E,$0010,$0012,$0014,$0016
+    dw $0016,$0014,$0012,$0010,$000E,$000C,$000A,$0008
+    dw $0007,$0006,$0005,$0004,$0003,$0002,$0001,$0000
+
+; $FD:F1C1 — M7Scene_UploadTilemap (44 bytes, $F1C1–$F1EC)
+; DMA channel 0: the 16 KB M7Scene_Tilemap to the low bytes of VRAM
+; words 0-$3FFF (the Mode 7 tilemap; VMAIN = 0, increment after the low
+; byte).
+; Callers (1 JSR site): M7Scene_Init ($FD:DC18).
+; Entry: M=1, X=0 (16-bit X), DP=$0500 (M7Scene_Zero), DB=$00
+;        (registers)
+; Exit:  M=1, X=0; A = 1; X = $4000
+org $FDF1C1
+M7Scene_UploadTilemap:
+    STZ.w VMAIN
+    STZ.w MDMAEN
+    LDA.b #!DMAP_HdmaIndirect ; mode 0; bit 6 has no effect on a DMA
+    STA.w DMAP0
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD0
+    LDA.b #!M7Scene_Tilemap>>16
+    STA.w A1B0
+    LDX.w #!M7Scene_Tilemap&$FFFF
+    STX.w A1T0L
+    LDX.b !M7Scene_Zero
+    STX.w VMADDL
+    LDX.w #!M7Scene_TilemapBytes
+    STX.w DAS0L
+    LDA.b #1
+    STA.w MDMAEN
+    RTS
+
+; $FD:F1ED — M7Scene_BuildTilemap (23 bytes, $F1ED–$F203)
+; Writes the 128 x 128 M7Scene_Tilemap through WMDATA (with DP=$2100
+; for the WRAM port): M7Scene_BuildTilemapHalf twice, so rows 64-127
+; repeat rows 0-63.
+; Callers (1 JSR site): M7Scene_Init ($FD:DBF2).
+; Entry: M=1, X=0 (16-bit X), DP any (saved), DB=$00 (Rom_SineTable256
+;        through its bank $00 mirror)
+; Exit:  M=1, X=0; DP restored; A = the last tile + 1; X = 0 and Y = 0
+;        (high bytes cleared: BuildTilemapHalf runs with X=1)
+org $FDF1ED
+M7Scene_BuildTilemap:
+    PHD
+    LDX.w #!DP_PPU
+    PHX
+    PLD
+    LDX.w #!M7Scene_Tilemap&$FFFF
+    STX.b WMADDL-!DP_PPU
+    LDA.b #!M7Scene_Tilemap>>16
+    STA.b WMADDH-!DP_PPU
+    JSR M7Scene_BuildTilemapHalf
+    JSR M7Scene_BuildTilemapHalf
+    PLD
+    RTS
+
+; $FD:F204 — M7Scene_BuildTilemapHalf (30 bytes, $F204–$F221)
+; 64 rows of 128 tiles through WMDATA: row r (0-63) holds tiles (s + c)
+; & $7F for columns c = 0-127, s = ((sin 4r + $80) & $FF) / 2. Tile t is
+; solid colour t (M7Scene_Init), so the rows are colour bands shifted by
+; a sine, giving wavy diagonal stripes.
+; Callers (2 JSR sites): M7Scene_BuildTilemap ($FD:F1FC, $FD:F1FF).
+; Entry: M=1, X=0 (it sets X=1 and REP #$10 at the end), DP=$2100
+;        (WMDATA as .b), DB=$00 (Rom_SineTable256 through its bank $00
+;        mirror)
+; Exit:  M=1, X=0; X = 0 and Y = 0 (high bytes cleared); A = the last
+;        tile + 1
+org $FDF204
+M7Scene_BuildTilemapHalf:
+    SEP #$10
+    LDX.b #0
+.row:
+    LDA.w !Rom_SineTable256,X
+    CLC
+    ADC.b #!M7Scene_SineBias
+    LSR A
+    LDY.b #!M7Scene_MapSide
+.tile:
+    AND.b #!M7Scene_MapSide-1
+    STA.b WMDATA-!DP_PPU
+    INC A
+    DEY
+    BNE .tile
+    INX
+    INX
+    INX
+    INX
+    BNE .row
+    REP #$10
+    RTS
+
+; $FD:F222 — M7Scene_UploadOam (42 bytes, $F222–$F24B)
+; DMA channel 0: the OAM shadow (Oam_LowTable and Oam_HighTable,
+; Oam_ShadowBytes) to OAM from address 0 (OAMADDH is not written).
+; Callers (1 JSR site): M7Scene_Nmi ($FD:DE39).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (registers)
+; Exit:  M=1, X=0; A = 1; X = Oam_ShadowBytes
+org $FDF222
+M7Scene_UploadOam:
+    STZ.w OAMADDL
+    STZ.w MDMAEN
+    LDA.b #!DMAP_HdmaIndirect ; mode 0; bit 6 has no effect on a DMA
+    STA.w DMAP0
+    LDA.b #!BBAD_OAMDATA
+    STA.w BBAD0
+    LDX.w #!Oam_LowTable
+    STX.w A1T0L
+    LDA.b #0
+    STA.w A1B0
+    STA.w DAS0B
+    LDX.w #!Oam_ShadowBytes
+    STX.w DAS0L
+    LDA.b #1
+    STA.w MDMAEN
+    RTS
+
+; $FD:F24C — M7Scene_InitOam (26 bytes, $F24C–$F265)
+; Hides all 128 sprites in the OAM shadow: each Y byte of Oam_LowTable =
+; $F0, each Oam_HighTable byte = $55 (X bit 8 set, small).
+; Callers (1 JSR site): M7Scene_Init ($FD:DBF8).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (the shadow, .w)
+; Exit:  M=1, X=0; A = $55; X = 0
+org $FDF24C
+M7Scene_InitOam:
+    LDX.w #!M7Scene_OamLowBytes
+    LDA.b #!M7Scene_HiddenY
+.y_byte:
+    STA.w !Oam_LowTable-3,X
+    DEX
+    DEX
+    DEX
+    DEX
+    BNE .y_byte
+    LDX.w #!M7Scene_OamHighBytes
+    LDA.b #!M7Scene_OamHiOffscreen
+.high:
+    STA.w !Oam_HighTable-1,X
+    DEX
+    BNE .high
+    RTS
+
+; $FD:F266 — M7Scene_UploadPalette (42 bytes, $F266–$F28F)
+; DMA channel 0: the 512 bytes of Pal_Buf to CGRAM from colour 0.
+; Callers (1 JSR site): M7Scene_Nmi ($FD:DE36).
+; Entry: M=1, X=0 (16-bit X), DP any, DB=$00 (registers)
+; Exit:  M=1, X=0; A = 1; X = Pal_BufBytes
+org $FDF266
+M7Scene_UploadPalette:
+    STZ.w CGADD
+    STZ.w MDMAEN
+    LDA.b #!DMAP_HdmaIndirect|!DMAP_OneRegTwice ; bit 6 has no effect on a DMA
+    STA.w DMAP0
+    LDA.b #!BBAD_CGDATA
+    STA.w BBAD0
+    LDX.w #!Pal_Buf&$FFFF
+    STX.w A1T0L
+    LDA.b #!Bank7E
+    STA.w A1B0
+    STA.w DAS0B
+    LDX.w #!Pal_BufBytes
+    STX.w DAS0L
+    LDA.b #1
+    STA.w MDMAEN
+    RTS
+
+; $FD:FFE5 — FdVec_FFE5 (3 bytes, $FFE5–$FFE7)
+; The bank's service vectors: JMPs at fixed addresses near the end of the
+; bank, so code in other banks can reach them by JSL or JML. This one:
+; JMP to M7Scene_Run83 (event $FF $83-$8F; never returns).
+; Callers (1 JML site): Evt_OpFF_Misc ($C0:3FFC).
+; Entry: as M7Scene_Run83: M, X, DP, DB any (M7Scene_Init sets them)
+; Exit:  never returns (as M7Scene_Run83)
+org $FDFFE5
+FdVec_FFE5:
+    JMP M7Scene_Run83
+
+; $FD:FFE8 — FdVec_FFE8 (3 bytes, $FFE8–$FFEA)
+; JMP to M7Scene_Run82 (event $FF $82; never returns).
+; Callers (1 JML site): Evt_OpFF_Misc ($C0:3FF8).
+; Entry: as M7Scene_Run82: M, X, DP, DB any (M7Scene_Init sets them)
+; Exit:  never returns (as M7Scene_Run82)
+FdVec_FFE8:
+    JMP M7Scene_Run82
+
+; $FD:FFEB — FdVec_FFEB (3 bytes, $FFEB–$FFED)
+; JMP to M7Scene_Run81 (event $FF $81; never returns).
+; Callers (1 JML site): Evt_OpFF_Misc ($C0:3FF0).
+; Entry: as M7Scene_Run81: M, X, DP, DB any (M7Scene_Init sets them)
+; Exit:  never returns (as M7Scene_Run81)
+FdVec_FFEB:
+    JMP M7Scene_Run81
+
+; $FD:FFF1 — FdVec_FFF1 (3 bytes, $FFF1–$FFF3)
+; JMP to M7Scene_Run80 (event $FF $80; never returns).
+; Callers (1 JML site): Evt_OpFF_Misc ($C0:3FE8).
+; Entry: as M7Scene_Run80: M, X, DP, DB any (M7Scene_Init sets them)
+; Exit:  never returns (as M7Scene_Run80)
+org $FDFFF1
+FdVec_FFF1:
+    JMP M7Scene_Run80
+
 ; $FD:FFF4 — FdVec_FFF4 (3 bytes, $FFF4–$FFF6)
-; The bank's service vectors: three JMPs at fixed addresses near the end
-; of the bank, so code in other banks can JSL them. The routines end with
-; RTL.
+; A service vector (see FdVec_FFE5): JMP to FieldFD_LoadAnimSetB, which
+; ends with RTL.
 ; Callers (1 JSL site): LoadLocation ($C0:0116).
 ; Entry: as FieldFD_LoadAnimSetB: M=1, X any, DP any, DB any
 ; Exit:  as FieldFD_LoadAnimSetB
