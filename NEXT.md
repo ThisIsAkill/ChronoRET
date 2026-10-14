@@ -571,10 +571,37 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BankC2_MenuEntry` stores only Menu_EntryX's low byte). Quirks recorded: `Menu_RunCommand`'s
    LDA #$00/XBA decoding as LDA #$EB00 after the M=0 handlers; `Menu_LoadWindowGfx` copies $281
    bytes; the dead byte in `Menu_ReadSlotSummary`; the dead INC in `Menu_SprAnimEnd`;
-   `Menu_SprAnimate`'s frame data running past the page for .TileCount 6. Next, in reach order:
-   the main menu's preview/redraw routines (`Menu_MainPreviewTable`, `Menu_MainRedrawTable`), the
-   menu pad handler `Menu_UnkE984`, `Menu_UnkED31`/`EAC2`/`F28D`, `Menu_UnkF871` (sprite OAM),
-   then the mode handlers `Menu_Mode01H0` on, and `BankFF_UnkF9C4`/`F813`/`F958`.
+   `Menu_SprAnimate`'s frame data running past the page for .TileCount 6.
+   Also matched (branch match-c2-menu-modes): the pad and cursor code $C2:E97C-$C2:ED07
+   (`Menu_PadInput`, was `Menu_UnkE984`, with `Menu_CursorMove` and the per-direction neighbour
+   steps, now `Menu_CursorPos.Up/Down/Left/Right`; `Menu_ListCursorEdge`, `Menu_ListPageSetup`; the
+   sound senders `Menu_PlaySound`/`PlaySound0` (was `Menu_UnkEAC2`)/`PlaySound1`/`SendSound`, at most one
+   command per 3 frames through `Menu_NmiTimer`; the list smooth scroll `Menu_ListScrollInit`/`Step`;
+   `Menu_DrawPortrait`, the attribute helpers, `Menu_LoadSlotWindowStyle`); the draw lists and text
+   $C2:ED31-$C2:F3C9 (`Menu_RunDrawList`, was `Menu_UnkED31`, with its 11 commands; window frame and
+   inside, block copy/swap; `Menu_DrawString` with control codes $01-$0C; decimal (BCD) and hex
+   numbers; `Menu_DrawClock`, was `Menu_UnkF28D`; `Menu_DrawItemName`, `Menu_DrawDescText`);
+   `Menu_SprPlaceOam` ($C2:F871, was `Menu_UnkF871`); and mode 1, the equipment screen (slot names
+   "Weapon/Helmet/Armor/Accessory" at $C2:A3BA), $C2:9C31-$C2:A4AE: `Menu_Mode01H0`-`H3`,
+   `Menu_Icon0Preview`/`Redraw` (were `Menu_UnkA051`/`A101`), the member list and its row scroll,
+   the slot list and the item list set-up. Found: $0D83 (`Menu_NmiDp`+`Menu_Unk83`) forces the cancel
+   bit; dp $C1/$C9 bumps are thread 2/3 `.Wait`; `Menu_ItemNamePtrs` holds bank-$CC addresses of
+   11-byte strings; `Menu_Unk51` is used as a zero start index (`Menu_BinToBcd`,
+   `Menu_DimPalette`). Quirks recorded: `Menu_CursorMove` loses the record offset's high byte
+   (records 43 on); `Menu_ListScrollStep`'s SBC of entry 0 instead of ,X; `Menu_CopyDrawArgsUnused`
+   and `Menu_DeadF362` unreached; `Menu_FillWindowInside` not testing a height of 0;
+   `Menu_TextCopyTile`'s uncounted 0; `Menu_EquipClearCharFlag` indexing by the cursor row alone;
+   `Menu_EquipItemsOpen` reading `Menu_EquipList[$25]`; `Menu_SprPlaceOam` placing more than 4
+   sprites into the next objects' entries; the second REP #$20 in `Menu_DrawClock`. Re-review
+   needed (verified headers edited): `Menu_MainMenuLoop`, `Menu_ReturnToMainMenu`,
+   `Menu_MainMenuIcons`, `Menu_MainPreviewTable`, `Menu_MainRedrawTable`, `Menu_Mode01List`,
+   `Menu_SprThread`, `Menu_SprResetChars`. Open: what the draw lists in bank $FF draw, the
+   mode 1 HDMA tables ($7E:9300) and HDMAEN values, who writes `Menu_Unk85` and `Menu_CursorHold`,
+   what `Menu_DrawDescText`'s strings at $CC:2EB1 are; the 7 bytes $C2:F905 (an entry into
+   `Menu_DrawText` with A=$81). Next, in reach order: the mode 1 helpers still stubbed
+   (`Menu_UnkA4AF`, `A569`, `A59A`, `A5C3`, `A64D`, `A6F0`, `A71E`, `A85C`, up to $C2:AA33), the
+   other icons' preview/redraw routines (`Menu_UnkAD50`/`ADC3` ...), `Menu_Unk90FC`/`9121`,
+   `Menu_UnkFA49`, then modes 2-7, and `BankFF_UnkF9C4`/`F813`/`F958`.
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:
