@@ -3961,7 +3961,7 @@ Battle_MergePendingEntries1580:
 ; the field's DefaultHandler) through the JML at $C1:001B. Saves P, DB,
 ; D, A, X and Y (16-bit) on the stack for BattleCF_ExitBattle, sets D = 0
 ; and DB = $7E, zeroes !Battle_FramePending, !Battle_Unk9F,
-; !Battle_VramQPending and !Battle_Unk98CA, sets !Battle_UnkEC to
+; !Battle_VramQPending and !Battle_InitUploadStage, sets !Battle_UnkEC to
 ; !Battle_Unk2989 bit 1, runs BattleSys_VecCD0000, then clears battle RAM
 ; ($7E:2D01-$ACEC by words) and DP $80-$EB, sets !Battle_UnkB9 to
 ; !Battle_UnkB9Init and !Battle_ActAttrBits to !Battle_ActAttrInit |
@@ -4001,7 +4001,7 @@ BattleCF_EnterBattle:
     STZ.b !Battle_FramePending
     STZ.b !Battle_Unk9F
     STZ.b !Battle_VramQPending
-    STZ.w !Battle_Unk98CA
+    STZ.w !Battle_InitUploadStage
     LDA.w !Battle_Unk2989
     AND.b #!Battle_2989Bit1
     LSR A
@@ -4057,7 +4057,7 @@ BattleCF_EnterBattle:
 ;   - writes the battlers' positions back for the field engine: for the
 ;     PCs Battle_FieldPc (screen x and y / 16, x and y & 15, the frame
 ;     shown), for the eight enemies Battle_FieldObj (the same fields);
-;   - keeps each present PC's menu rows in !Battle_MenuMemRow.. by
+;   - keeps each present PC's menu rows in Battle_SavedCursor by
 ;     character id: the menu row when !BattleMenu_CfgCursorMemory is set,
 ;     the tech scroll, row and tech when !BattleMenu_CfgListMemory is
 ;     set; with the latter also the item list's scroll and row;
@@ -4162,25 +4162,25 @@ BattleCF_ExitBattle:
     LDA.w !BattleMenu_CfgCursorMemory
     BEQ .memory_lists
     LDA.w !Pc_SavedMenuRow,X
-    STA.w !Battle_MenuMemRow,Y
+    STA.w Battle_SavedCursor.MenuRow,Y
 .memory_lists:
     LDA.w !BattleMenu_CfgListMemory
     BEQ .memory_next
     LDA.w !Pc_SavedTechScroll,X
-    STA.w !Battle_MenuMemTechScroll,Y
+    STA.w Battle_SavedCursor.TechScroll,Y
     LDA.w !Pc_SavedTechRow,X
-    STA.w !Battle_MenuMemTechRow,Y
+    STA.w Battle_SavedCursor.TechRow,Y
     LDA.w !Pc_SavedTech,X
-    STA.w !Battle_MenuMemTech,Y
+    STA.w Battle_SavedCursor.TechId,Y
 .memory_next:
     DEX
     BPL .memory
     LDA.w !BattleMenu_CfgListMemory
     BEQ .gfx_wait
     LDA.w !BattleMenu_ItemScroll
-    STA.w !Battle_MenuMemItemScroll
+    STA.w !Battle_SavedItemScroll
     LDA.w !BattleMenu_ItemRow
-    STA.w !Battle_MenuMemItemRow
+    STA.w !Battle_SavedItemRow
 .gfx_wait:
     STZ.b !Battle_UnkE5
     JSR BattleCF_WaitFrame

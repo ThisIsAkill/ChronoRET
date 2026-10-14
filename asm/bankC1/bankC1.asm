@@ -28,7 +28,7 @@ incsrc "../hardware.inc"
 ; Callers of BankC1_VecCFE58A (2 JSL sites): BattleCD_NmiMain ($CD:0997) and unmatched ($EF:523C).
 ; Callers of BankC1_VecCCE000 (1 JSL site): BattleCD_NmiSetup ($CD:0AB4).
 ; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
-; Callers of BankC1_VecLongDispatch (1 JSL site): unmatched ($CC:F066).
+; Callers of BankC1_VecLongDispatch (1 JSL site): Battle_ReencodeText ($CC:F066).
 ; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
 ; ============================================================
 
@@ -51,17 +51,18 @@ incsrc "../hardware.inc"
 ;     ($CF:E300; JSL from $CD:08B4).
 ;   - $000C BankC1_VecCFE58A: JMP $007A, JML BattleCF_FrameUpdate
 ;     ($CF:E58A; JSL from $CD:0997 and $EF:523C).
-;   - $000F BankC1_VecCCE000: JMP $0072, JML $CC:E000 (JSL from $CD:0AB4).
+;   - $000F BankC1_VecCCE000: JMP $0072, JML Battle_InitUploadStep
+;     ($CC:E000; JSL from BattleCD_NmiSetup, $CD:0AB4).
 ;   - $0012 BankC1_VecRefreshMenu: JMP BattleMenu_RefreshIfDirtyL (which
 ;     ends with RTL; JSL from $CD:3E78).
 ;   - $0015 BankC1_VecRts: JMP BattleSys_RunService_Rts, an RTS; a JSL
 ;     here would return wrongly. No caller found.
 ;   - $0018 BankC1_VecLongDispatch: JMP BankC1_LongDispatch (JSL from
-;     $CC:F066 with A = 0).
+;     Battle_ReencodeText at $CC:F066 with A = 0).
 ; None of these instructions touches a register or flag.
 ; Callers note: the JSL sites named above are in unmatched code in banks
-;   $CC, $CD and $EF; BattleSys_RunServiceVec and BattleSys_ExitVec are
-;   listed above.
+;   $CD and $EF; the one at $CC:F066 is in Battle_ReencodeText;
+;   BattleSys_RunServiceVec and BattleSys_ExitVec are listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
 ;        has its own needs)
 ; Exit:  through the jump target; nothing is changed here
@@ -96,29 +97,30 @@ BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
 ; $C1:0023 — BattleSys_SceneSetup (34 bytes, $0023–$0044)
 ; Service 0 (!BattleSys_ServiceUnk0), the first service BattleSys_Main
 ; requests: the battle's display set-up, probably. In order:
-; BattleCC_UnkE2E4, BattleUI_BuildStatusBarFrame,
-; Battle_CacheBattlerCoordsAll, BattleCC_UnkED87,
+; Battle_InitScene, BattleUI_BuildStatusBarFrame,
+; Battle_CacheBattlerCoordsAll, Battle_InitSceneGfx,
 ; Battle_DrawAllBattlerFrames, BattleSys_VecCD0003, BattleSys_VecCD000C,
 ; then BattleSys_VecCD0012 again and again while it returns with Z
 ; clear (the wait for the opening wipe), then JMP to Battle_StartPose,
-; whose RTS returns to BattleSys_RunService. The bank-$CD callees switch
-; the NMI to its main work (BattleCD_SetNmiMode1), start the opening wipe
-; (BattleCD_StartOpenWipe) and report whether it still runs
-; (BattleCD_WipeRunning); what the bank-$CC callees do is not analysed,
-; so "scene set-up" rests on the other steps (status bar frame, battler
-; coordinates and frames, the wipe, the start pose).
+; whose RTS returns to BattleSys_RunService. Battle_InitScene puts the
+; battle's RAM into its starting state (names, tech lists, positions,
+; sprite pointers, enemies) and Battle_InitSceneGfx sets up sprites and
+; tiles and waits for the staged VRAM uploads. The bank-$CD callees
+; switch the NMI to its main work (BattleCD_SetNmiMode1), start the
+; opening wipe (BattleCD_StartOpenWipe) and report whether it still
+; runs (BattleCD_WipeRunning).
 ; Callers note: none by call; BattleSys_ServiceTable entry 0 (JSR (T,X)
 ;   in BattleSys_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main requests it; the
 ;        bank-$C1 callees assume them)
 ; Exit:  as Battle_StartPose leaves it (M=1, X=0, DP=0, DB=$7E assumed
-;        after the bank-$CC callees, not analysed); A, X, Y
+;        after the bank-$CD callees; the bank-$CC steps return so); A, X, Y
 ;        clobbered (BattleSys_RunService restores them)
 BattleSys_SceneSetup:
-    JSL BattleCC_UnkE2E4
+    JSL Battle_InitScene
     JSR BattleUI_BuildStatusBarFrame
     JSR Battle_CacheBattlerCoordsAll
-    JSL BattleCC_UnkED87
+    JSL Battle_InitSceneGfx
     JSR Battle_DrawAllBattlerFrames
     JSL BattleSys_VecCD0003
     JSL BattleSys_VecCD000C
@@ -146,7 +148,8 @@ BattleSys_SceneSetup:
 ;        and 7 are all matched bank-$C1 code, and 1 calls only
 ;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
 ;        DB. The other six reach code that is not analysed, so for them
-;        it is assumed: 0 (bank-$CC/$CD JSLs, see BattleSys_SceneSetup),
+;        it is assumed: 0 (the bank-$CD JSLs of BattleSys_SceneSetup; its
+;        bank-$CC steps are matched),
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
 ;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
@@ -195,7 +198,8 @@ BattleSys_ServiceTable:
 ; BankC1_LongDispatchTable entry A, then RTL. The table has room for one
 ; entry only (entry 0, BattleMsg_ReencodeTextBuffer): the bytes after it
 ; are BattleSys_Service6's code, so A = 1 would run $2022 (quirk, or
-; never asked; the one caller, $CC:F066, passes A = 0).
+; never asked; the one caller, Battle_ReencodeText at $CC:F066, passes
+; A = 0).
 ; Callers note: through BankC1_VecLongDispatch (JMP at $C1:0018).
 ; Callers (1 JMP site): BankC1_VecLongDispatch ($C1:0018).
 ; Entry: M=1 (8-bit ASL), X=0, DP=0, DB any (what
@@ -232,9 +236,10 @@ BattleSys_Service6:
 
 ; $C1:0072 — BankC1_JmlCCE000 (12 bytes, $0072–$007D)
 ; The JMLs behind three of the entry vectors (see EngCall_BattleMain):
-; $0072 to $CC:E000 (BankC1_VecCCE000; not analysed), BankC1_JmlCFE300
-; ($0076) to BattleCF_VblankUploads (BankC1_VecCFE300) and
-; BankC1_JmlCFE58A ($007A) to BattleCF_FrameUpdate (BankC1_VecCFE58A).
+; $0072 to Battle_InitUploadStep ($CC:E000, BankC1_VecCCE000),
+; BankC1_JmlCFE300 ($0076) to BattleCF_VblankUploads ($CF:E300,
+; BankC1_VecCFE300) and BankC1_JmlCFE58A ($007A) to BattleCF_FrameUpdate
+; ($CF:E58A, BankC1_VecCFE58A).
 ; Callers (1 JMP site): BankC1_VecCCE000 ($C1:000F).
 ; Callers of BankC1_JmlCFE300 (1 JMP site): BankC1_VecCFE300 ($C1:0009).
 ; Callers of BankC1_JmlCFE58A (1 JMP site): BankC1_VecCFE58A ($C1:000C).
@@ -242,7 +247,7 @@ BattleSys_Service6:
 ; Exit:  through the target (which returns to the JSL caller)
 ; Sub-entries: BankC1_JmlCFE300, BankC1_JmlCFE58A.
 BankC1_JmlCCE000:
-    JML BattleCC_UnkE000
+    JML Battle_InitUploadStep
 BankC1_JmlCFE300:                       ; header: see BankC1_JmlCCE000
     JML BattleCF_VblankUploads
 BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
@@ -12407,8 +12412,8 @@ BattleAct_OpEndScript:
 ;     !Battle_ActObjAnimCount = its !Battle_ActObjMarkCount; then
 ;     !Battle_ActUnkA1A8 (mode), timer 0, entry and
 ;     !Battle_ActObjAnimUnkA2B8 $FF. These are stepped by the code at
-;     $CC:F278 (unmatched); that they play like the battlers' lists is
-;     inferred from the parallel layout.
+;     BattleAct_TickUnkA1A8 and BattleAct_StepObjAnim ($CC:F278,
+;     $CC:F2A9), which read them as object lists with a record per step.
 ; Quirk: the thread-4 loop has a TAX that is not used.
 ; Callers of BattleAct_StartAnim (9 sites: 3 JSR, 6 JMP): BattleAct_OpPlayAnim (JMP $C1:4E3E, JMP
 ;   $C1:4E5F, JSR $C1:4E87), BattleAct_OpShowAnimFrame (JMP $C1:4EBE, JMP $C1:4EDF, JSR $C1:4F06)
@@ -12416,7 +12421,7 @@ BattleAct_OpEndScript:
 ; Callers note: BattleAct_OpcodeTable entry $02 (BattleAct_OpLoopAnim);
 ;   BattleAct_StartAnim: BattleAct_OpPlayAnim ($C1:4E3E, $C1:4E5F,
 ;   $C1:4E87), BattleAct_OpShowAnimFrame ($C1:4EBE, $C1:4EDF, $C1:4F06)
-;   and the unmatched handler code at $C1:57A5, $C1:57C8 and $C1:57F2.
+;   and BattleAct_OpShowAnimEntry ($C1:57A5, $C1:57C8, $C1:57F2).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E, Y = 0, B = 0; for
 ;        BattleAct_StartAnim DP $8E = the mode (1 or 2); the operand
 ;        byte after the opcode
@@ -12765,7 +12770,7 @@ BattleAct_OpShowAnimFrame:
 ; Opcode $07: sets the actor's move delay and speed
 ; (!Battle_ActorMoveDelay / !Battle_ActorMoveSpeed) back to the
 ; battler's defaults (!Battler_DefMoveDelay / !Battler_DefMoveSpeed,
-; set at battle start by $CC:E3E3, unmatched); for thread 4 for every
+; set at battle start by Battle_InitScene); for thread 4 for every
 ; slot of the target set. Object threads are left alone. Advances 1.
 ; Callers note: BattleAct_OpcodeTable entry $07.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)

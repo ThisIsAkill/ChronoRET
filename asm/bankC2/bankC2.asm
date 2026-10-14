@@ -23554,7 +23554,7 @@ org $C28000
 ;   ($C0:38E1), Evt_OpD2_IfCharInParty ($C0:38F6), Evt_OpD3_AddCharToParty ($C0:392B),
 ;   Evt_OpD4_MoveCharToReserve ($C0:39DA), Evt_OpD5_BankC2Cmd0A ($C0:3A7C),
 ;   Evt_OpF8_BankC2Cmd06And07 ($C0:3E61), Evt_BankC2CmdTail ($C0:3E67), Scene_PostLoadInit
-;   ($C0:56CF) and unmatched ($FF:FB84, $FF:FB92, $FF:FB98).
+;   ($C0:56CF) and BankFF_LoadSlotPart ($FF:FB84, $FF:FB92, $FF:FB98).
 ; Entry/Exit: those of the routine each vector reaches.
 BankC2_Entry8000:
     BRA BankC2_MenuEntry
@@ -26406,9 +26406,9 @@ Menu_CmdSetSram7FE2:
 
 ; $C2:8D6A — Menu_CmdBootCheckSaves (37 bytes, $8D6A–$8D8E)
 ; Command 9 (BankC2_BootArg, from GameLoop at boot): runs BankFF_UnkF9C4
-; for Menu_SaveSlot = 0, 1, 2 until one returns A = 0. Probably the
-; save-slot check (it compares SRAM words at $30:7FF0/$7FF8 by slot;
-; not traced). One returned 0: Menu_ClearConfigAndFlags and
+; for Menu_SaveSlot = 0, 1, 2 until one returns A = 0: the save-slot
+; check (the slot's signature word and checksum in SRAM; with this DP
+; it also leaves its result in $0400). One returned 0: Menu_ClearConfigAndFlags and
 ; Menu_DataInitDone = 2; none: Menu_InitNewGameData and
 ; Menu_DataInitDone = 0.
 ; Callers note: command 9 of Menu_CommandTable.
@@ -27330,7 +27330,7 @@ Menu_DmaCopyFFToWram:
 ; Sets up the data of a new game (inferred from what it fills). The call
 ; at $C2:8048 runs only while Menu_DataInitDone is 0 in mode 0; the
 ; other two are not guarded by that flag: $C2:8D7E runs it when none of
-; three JSL $FF:F9C4 slot checks returns 0, then clears the flag, and
+; three BankFF_UnkF9C4 slot checks returns 0, then clears the flag, and
 ; $C2:E65D runs it and then sets the flag to 1. It: runs
 ; Menu_ClearConfigAndFlags, zeroes Menu_Unk2400 ($2400-$25FF), copies the
 ; $280 B of MenuRom_CharRecordInit ($CC:0000) to Menu_CharRecords
@@ -27812,7 +27812,8 @@ Menu_ClearOam:
 ; Callers (1 JSR site): Menu_InitSystems ($C2:8139).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00/01,
 ;        Menu_Unk51), DB=$7E
-; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-03 changed
+; Exit:  P restored; A, X, Y clobbered; Menu_Tmp00-08, Menu_ListPtr
+;        ($16-$18) and Menu_Unk85/86 changed (BankFF_UnkF813)
 ; Calls: Menu_CleanInventory, Menu_ItemDataPtrA, Menu_ItemCategory,
 ;   Menu_ItemDataPtrB, BankFF_UnkF813 (JSL), Menu_RefreshAllChars.
 Menu_BuildItemTables:
@@ -29977,9 +29978,10 @@ Menu_Mode06List:
 ; The menu's view of the three save slots in SRAM (bank $30). The
 ; offsets read suggest each slot holds a copy of $7E:2400 on (records at
 ; +$0200 for Menu_CharRecords at $2600, the party at +$0580 for
-; Menu_PartyOrder at $2980, +$0591 for Menu_Config01); probably, not
-; traced in the save code. Menu_SlotSramOfs is the slot's offset, as
-; BankFF_UnkF9C4 leaves it (not traced).
+; Menu_PartyOrder at $2980, +$0591 for Menu_Config01); the save code
+; (BankFF_SaveRecords) confirms it: $7E:2400-$29AF at +0, then the
+; names and more. Menu_SlotSramOfs is the slot's offset, as
+; BankFF_UnkF9C4 leaves it (BankFF_SetSlotOfs).
 
 org $C2D156
 ; $C2:D156 — Menu_LoadSlotSummaries (66 bytes, $D156–$D197)

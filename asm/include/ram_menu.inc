@@ -1161,7 +1161,7 @@ endstruct
 !Menu_LastWeapon = $041B                 ; 16-bit; the weapon id Menu_WeaponRecSrc read last
 !Menu_SlotIdx = $0079                    ; 8-bit (zeroed as a word); the slot Menu_LoadSlotSummaries works
                                          ; on (dp $79, which BankFF_UnkF9C4 reads)
-!Menu_SlotSramOfs = $007B                ; 16-bit; the slot's SRAM offset (set by BankFF_UnkF9C4, probably)
+!Menu_SlotSramOfs = $007B                ; 16-bit; the slot's SRAM offset (BankFF_SetSlotOfs)
 !Menu_SumPtr = $0061                     ; 16-bit; Menu_ReadSlotSummary's write pointer
 !Menu_SumPlace = $0022                   ; 16-bit; its SRAM offset of the party place (low byte stepped)
 !Menu_SumLeft = $0024                    ; 8-bit; places left
@@ -1255,3 +1255,46 @@ endif
 !Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
                                          ; Menu_ShiftItemListMap)
 !Menu_Unk5CC2 = $5CC2                    ; 12 tile words set to $40FF by Menu_EquipSlotsOpen
+
+; --- Bank $FF menu helpers ($FF:F548-$FF:FC66) ---
+!Menu_Tmp07 = $0007                      ; 8-bit scratch
+!Menu_Tmp08 = $0008                      ; 16-bit scratch
+!Menu_Unk86 = $0086                      ; 8-bit; zeroed by BankFF_UnkF813 next to Menu_Unk85
+!Menu_TechCombo = $04A0                  ; 8-bit (DP Menu_CmdDp); BankFF_UnkF958's combo counter 0-4
+!Menu_TechComboLeft = $04A1              ; 8-bit; members of the combo still to test
+!Menu_TechComboBit = $04A2               ; 8-bit; the member's tech bit number (1-based count - 1)
+!Menu_AbsentChars = $04A3                ; 8-bit; $FE with the bits (BankFF_CharBits) of the characters in
+                                         ; Menu_PartyOrder cleared: the characters not in the party
+!Menu_Unk0414 = $0414                    ; 8-bit; BankFF_SaveSlot stores the slot (DP $79) here
+!Menu_Unk0D0C = $0D0C                    ; 16-bit; counted up every 4th BankFF_StepWave call; the base its wave
+                                         ; values are added to
+!Menu_WavePhase = $0F10                  ; 8-bit; BankFF_StepWave's phase (up 1 per call, down 2 every 4th)
+!Menu_WaveTick = $0F11                   ; 8-bit; its call counter (every 4th call drifts)
+!Menu_WaveOut = $9240                    ; 32 B: BankFF_StepWave's output words (from DP Menu_Unk51 on)
+!Menu_TechBits = $2837                   ; 37 B: the tech bits (Battle_TechBits1 and the double / triple bytes
+                                         ; after it, as the battle code names them)
+!Menu_SaveCount = $299C                  ; 16-bit; counted up by each save (BankFF_SaveSlot), held at $FFFF
+!Menu_Unk299E = $299E                    ; 8-bit; compared with Menu_SramUnk7FE1 by BankFF_SaveSlot
+!Menu_GradHdma = $6E00                   ; HDMA table built by BankFF_BuildGradHdma (the same RAM as
+                                         ; Menu_SlotLabelArea); channel 1 is pointed at it
+!Menu_GradHdmaEnd = $6E93                ; its end byte (0)
+!Menu_TechShown = $7F00                  ; 37 B: copy of Menu_TechBits for the techs whose members
+                                         ; (MenuRom_TechByteMembers) are all in the party; BankFF_UnkF813 then
+                                         ; marks the next single tech of each character in it
+!Menu_NmiMoveDestBank = $9691            ; 8-bit; the destination bank byte of the MVN at Menu_NmiMoveCode
+!Menu_NmiMoveSrcBank = $9692             ; 8-bit; its source bank byte (then the RTL at $9693)
+!Menu_TileSetC = $BDC0                   ; tiles BankFF_BuildTileSets builds after its first two sets
+!Menu_ShadowTiles = $8E80                ; 10 tiles of 32 B built by BankFF_WidenTiles
+!Menu_Unk9100 = $9100                    ; 8 B: BankFF_ScreenColoursA copied here (reader not traced)
+!Menu_TechMenuArea = $7E1640             ; long: base of BankFF_UnkF813's writes through Menu_ListPtr
+!Menu_SramSlotSum = $7FF0                ; 2 B per slot in SRAM (absolute with DB=$30): the slot's checksum
+!Menu_SramSlotSign = $7FF8               ; 2 B per slot: BankFF_SlotSign when the slot holds a save
+!Menu_SramSlotSumLong = $307FF0          ; the same two, long
+!Menu_SramSlotSignLong = $307FF8
+!Menu_SramLastSlot = $307FE0             ; 8-bit; the slot saved last (BankFF_SaveSlot)
+!Menu_SramUnk07E3 = $3007E3              ; 8-bit at a slot's offset +$07E3 (X = Menu_SlotSramOfs): copied to
+                                         ; Menu_Unk7F01E0 by BankFF_LoadSlotPart
+!Menu_Unk7F01E0 = $7F01E0                ; 8-bit; bit n (1 << n) for character n (the battle code's
+                                         ; Battle_Unk7F01E0); BankFF_UnkF813 marks the next single tech of a
+                                         ; character with its bit set without BankFF_TechStepLimit's check
+!Menu_Unk7F01CF = $7F01CF                ; 8-bit; set to $10 by BankFF_LoadSlotPart
