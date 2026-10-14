@@ -32201,7 +32201,7 @@ Menu_DrawInvSlot:
 ; who can equip Menu_ItemId (Menu_ListEquipChars), its value and label
 ; (Menu_EquipValueLabel), the draw list MenuRom_EquipInfoList (which
 ; probably shows them), Menu_HdmaenShadow bit 2 set, Menu_VramRecBg1Low
-; and Menu_VramRecBg3Rows0 queued.
+; and Menu_VramRecBg3Rows62 queued.
 ; Callers (1 JSR site): Menu_Mode02H3 ($C2:AB36).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000,
 ;        DB=$7E
@@ -32220,7 +32220,7 @@ Menu_ShowEquipInfo:
     TSB.w !Menu_NmiDp+!Menu_HdmaenShadow
     LDX.w #Menu_VramRecBg1Low
     JSR Menu_QueueVramRom
-    LDX.w #Menu_VramRecBg3Rows0
+    LDX.w #Menu_VramRecBg3Rows62
     JSR Menu_QueueVramRom
     PLP
     RTS
@@ -32323,7 +32323,7 @@ Menu_EquipLabelPtrs:
 ; $C2:AF42 — Menu_UseTargetsOpen (67 bytes, $AF42–$AF84)
 ; Opens the member window of an item use: the draw list
 ; MenuRom_UseTargetsList; object 7 off (its .Id = $FF);
-; Menu_SprResetChars; Menu_ClearInfoRows; Menu_VramRecBg3Rows0 queued; a
+; Menu_SprResetChars; Menu_ClearInfoRows; Menu_VramRecBg3Rows62 queued; a
 ; frame's wait; Menu_PlaceMemberSprites; Menu_SprUploadMax = 1;
 ; Menu_HideCharSprites; Menu_StartSprThread; a frame's wait;
 ; Menu_SprUploadMax = 2; Menu_ShowCharSprites; Menu_UseTarget = 0,
@@ -32344,7 +32344,7 @@ Menu_UseTargetsOpen:
     STA.w !Menu_SprPages+(7*!Menu_SprPageBytes)+Menu_Spr.Id
     JSR Menu_SprResetChars
     JSR Menu_ClearInfoRows
-    LDX.w #Menu_VramRecBg3Rows0
+    LDX.w #Menu_VramRecBg3Rows62
     JSR Menu_QueueVramRom
     JSR Menu_Yield
     JSR Menu_PlaceMemberSprites
@@ -33223,8 +33223,9 @@ Menu_Mode03H2:                          ; header: see Menu_Mode03H1
 ; a frame more).
 ; Callers note: Menu_Mode03List entry 3 (run by Menu_MainThread).
 ; Entry: M=1 (8-bit loads and stores), X=0 (from Menu_MainThread),
-;        DP=$0000 (the TDCs: B = 0 for the TAXs), DB=$7E (the
-;        multiplier is written long); a menu thread (the callees yield)
+;        DP=$0000 (the TDCs: B = 0 for the TAXs), DB=$7E (the absolute
+;        RAM loads and stores; the multiplier is written long); a menu
+;        thread (the callees yield)
 ; Exit:  M=1, X=0 after the confirm's set-up; else as the routine it
 ;        ends in; A, X, Y clobbered
 ; Calls: Menu_PadInput, Menu_KillThreads, Menu_PlaySound0,
@@ -33482,7 +33483,7 @@ Menu_TechMemberCursor:
 ; 0, the incoming member's sprite row 3 (above the window,
 ; Menu_TechRowSprY), its row drawn at $7E:364A, copied to row $26,
 ; Menu_ScrollStep = -4, Menu_RowScrollWord-like word $24 = $211F; with
-; Down Menu_TechMemberTop + 1 unless the next top + 3 reaches
+; Down Menu_TechMemberTop + 1 unless the current top + 3 reaches
 ; Menu_Unk85, sprite row 4 (below), $7E:3ACA, row $20, step 4, $20EF;
 ; then Menu_TechMemberScrollAnim. Nothing when the top cannot move.
 ; Callers (1 JSR site): Menu_TechMemberCursor ($C2:B54A).
@@ -33766,8 +33767,9 @@ Menu_TechListIdle:
 ; tech that comes in (Menu_TechId = Menu_TechList[Menu_CursorSel +
 ; the new top]) drawn at $7E:3424 (the row after the eight;
 ; Menu_TechDrawRow), Menu_VramRecClock queued, Menu_PlaySound0. Unless
-; Menu_RepeatFast is negative (the member window was just scrolled
-; with the fast repeat), Menu_ListScrollStep frames until
+; Menu_RepeatFast is negative (Menu_ListCursorEdge's DEC this frame:
+; Pad_Start held; Menu_NmiPad zeroes it every frame), Menu_ListScrollStep
+; frames until
 ; Menu_ScrollFrames runs out (Menu_ScrollOfs += Menu_ScrollStep,
 ; Menu_ListTop + 1 or - 1 by its sign). Then Menu_TechShiftListMap,
 ; Menu_ScrollStep = 0, the VRAM queue emptied (Menu_VramQueueEnd = 0),
@@ -33861,6 +33863,9 @@ Menu_TechListScroll:
 ; (Menu_CopyMapRows, $16 bytes a row); else 14 rows down, from the one at $7E:3338 to $33B8 back up to the
 ; top (MVP, $16 bytes each; the pointers in Menu_Tmp00/02, Menu_Tmp04
 ; counting), and the two whole rows at $7E:33C0 ($80 bytes) to $2FC0.
+; Quirk: MVP takes X/Y as the last byte, so each down move covers bytes
+; $xx23-$xx38 (column 17's high byte to column 28's low byte) where the
+; up path moves $xx24-$xx39: column 28's high byte is never moved down.
 ; Callers (1 JSR site): Menu_TechListScroll ($C2:B7AC).
 ; Entry: M=0 (16-bit loads), X=0, DP=$0000 (Menu_DrawAddr ... and
 ;        Menu_Tmp00-05), DB=$7E (the absolute read of Menu_ScrollStep-1
@@ -34143,9 +34148,9 @@ Menu_Icon2Redraw:
 ; Menu_HdmaenShadow = Menu_TechHdmaBits; Menu_VramRecBg3Rows60,
 ; Menu_VramRecBg2B and Menu_VramRecBg3 queued; Menu_Unk82E1 and its 5
 ; bytes Menu_Unk2857 copied over the last 5 of Menu_TechShown ($7E:7F20;
-; Menu_Unk82E1 marks with $80 the values $AE-$B2 of the members'
-; accessory byte .Unk2A whose Menu_Unk04A4 combo is available:
-; probably the triple techs those accessories allow); the 12 words
+; Menu_Unk82E1 scans all 7 character records and marks with $80 each
+; value $AE-$B2 of their accessory byte .Unk2A whose Menu_Unk04A4 byte
+; is non-zero: probably the triple techs those accessories allow); the 12 words
 ; from Menu_Unk5D42+2 and from Menu_Unk5DC2+2 = $21FF; the list arrows
 ; (Menu_StartListArrows); then Menu_ResetMainCursor (a tail jump after
 ; the PLP).
@@ -34306,9 +34311,9 @@ Menu_TechDrawMemberRow:
 ; Menu_TechMemberTop x 12 and Menu_ListRows = Menu_ListRows x 12 (by
 ; the hardware multiplier, a NOP and two XBAs as the waits).
 ; Callers (2 JSR sites): Menu_Mode03H3 ($C2:B3DD) and Menu_Icon2Preview ($C2:B8F8).
-; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (16-bit LDX/LDY
-;        before the REP), DP=$0000, DB=$7E (the multiplier and divider
-;        registers are written long)
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X any (the LDX/LDY
+;        come after the REP #$30), DP=$0000, DB=$7E (the multiplier and
+;        divider registers are written long)
 ; Exit:  P restored; A, X, Y clobbered; Menu_CurMember past the last row
 ;        drawn; Menu_MapPtr past the last row; Menu_Tmp00/01 as
 ;        Menu_ListPageSetup leaves them
@@ -34405,9 +34410,10 @@ Menu_TechDrawMembers:
 ;        Menu_TechSprRow is read as a word: its high byte must be 0, as
 ;        the callers leave it), DP=$0000, DB=$7E; A = the character id
 ;        (low byte)
-; Exit:  P restored; A = the id (low byte; B = the page's high byte
-;        when the caller has M=1, see Menu_Times64); X =
-;        Menu_TechSprRow, Y = the page offset
+; Exit:  P restored; A's low byte = the row's .ScreenY (the last
+;        LDA.l Menu_TechRowSprY), B = the page's high byte (Menu_Times64
+;        runs after the SEP #$20); X = Menu_TechSprRow, Y = the page
+;        offset
 ; Calls: Menu_Times64.
 Menu_TechRowSprite:
     PHP
@@ -34439,8 +34445,8 @@ Menu_TechRowSprY:
 ; cost drawn at $7E:2F9A (Menu_DrawNumber: 1 byte, 2 digits, blank
 ; zeros); then the partner rows 1-2 (Menu_TechDrawRows from $7E:304A).
 ; Callers (1 JSR site): Menu_TechListIdle ($C2:B71E).
-; Entry: M=1 (8-bit TXA and store), X=0 (16-bit LDX/LDY after the REP),
-;        DP=$0000, DB=$7E; P saved
+; Entry: M=1 (8-bit TXA and store), X=0 (Menu_TechPartners' 16-bit
+;        LDX/STX of $FFFF), DP=$0000, DB=$7E; P saved
 ; Exit:  P restored; A, X, Y clobbered
 ; Calls: Menu_TechPartners, Menu_TechMpCost, Menu_DrawNumber; branches
 ;   to Menu_TechDrawRows.
@@ -34565,7 +34571,8 @@ Menu_TechDrawRows:                      ; header: see Menu_TechListOpen
 ; Entry: M any (P saved; SEP #$30 here), X=0 (the 16-bit LDX before
 ;        the SEP), DP=$0000 (Menu_Tmp00/01, Menu_TechMembers), DB=$7E
 ; Exit:  P restored; A = 0; X = the partners found (8-bit, high byte
-;        cleared), Y as Menu_SprResetChars leaves it
+;        cleared); Y's low byte unchanged, its high byte cleared by the
+;        SEP #$30 here
 ; Calls: Menu_SprResetChars.
 Menu_TechPartners:
     PHP
@@ -35080,11 +35087,11 @@ Menu_TechTextSetup:                     ; header: see Menu_TechDescText
 ; caster (Menu_TechMemberRow + Menu_TechMemberTop, a 16-bit store: the
 ; byte after Menu_CurMember = 0) loaded, its cost (Menu_TechMpCost),
 ; Menu_TextWord = 0 and its row at $7E:2ECA redrawn
-; (Menu_TechDrawMemberRow: the MP coloured when short); a frame's wait;
-; the 12 words at Menu_TechTargetsBg3 = $20C7; Menu_SprUploadMax = 3;
-; the target rows (Menu_TechTargetRows); Menu_Unk0DBC = 0;
-; Menu_VramRecTechRows, Menu_VramRecTechLow and Menu_VramRecBg3Rows60
-; queued.
+; (Menu_TechDrawMemberRow: probably the MP coloured when short); a
+; frame's wait; the 12 words at Menu_TechTargetsBg3 = $20C7;
+; Menu_SprUploadMax = 3; the target rows (Menu_TechTargetRows);
+; Menu_Unk0DBC = 0; Menu_VramRecTechRows, Menu_VramRecTechLow and
+; Menu_VramRecBg3Rows60 queued.
 ; Callers (2 sites: 1 JSR, 1 JMP): Menu_Mode03H3 (JSR $C2:B488) and Menu_Mode03H4 (JMP $C2:B516).
 ; Entry: M any (P saved; REP #$30 / SEP #$20 here), X any, DP=$0000,
 ;        DB=$7E; a menu thread (it yields)
@@ -35152,9 +35159,9 @@ Menu_VramRecTechLow:
 ; row); its sprite object (page Menu_Times64 of its id): .ScreenY /
 ; .ScreenX low byte = Menu_TechTargetSprYX[member], .Flags18 = 0, .Anim
 ; = 0 when Menu_Unk0D38 word [member] is below the record's .Word3, else
-; $12 (the weak pose of Menu_PlaceMemberSprites). The quotient is
-; indexed by the member's row, where Menu_MemberRowFlags indexes it by
-; the character id: a slip, probably (kept).
+; $12 (probably the weak pose, as in Menu_PlaceMemberSprites). The
+; quotient is indexed by the member's row, where Menu_MemberRowFlags
+; indexes it by the character id: a slip, probably (kept).
 ; Callers (1 JSR site): Menu_TechTargetsOpen ($C2:BEB4).
 ; Entry: M, X any (P saved; REP #$30 / SEP #$20 here), DP=$0000,
 ;        DB=$7E
@@ -35255,7 +35262,7 @@ Menu_Mode04H0:
 ; moved).
 ; Callers note: Menu_Mode04List entry 1 (run by Menu_MainThread).
 ; Entry: M=1 (8-bit loads and stores), X=0 (from Menu_MainThread),
-;        DP=$0000, DB=$7E; a menu thread (the callees yield)
+;        DP=$0000, DB=$7E
 ; Exit:  M=1; A, X, Y clobbered; or as Menu_ReturnToMainMenu
 ; Calls: Menu_PadInput, Menu_CfgEntryRun, Menu_PlaySound0,
 ;   Menu_PackConfig; jumps to Menu_ReturnToMainMenu.
@@ -35367,8 +35374,7 @@ Menu_Mode04H3:
 ; confirm.
 ; Callers (1 JSR site): Menu_Mode04H1 ($C2:BF52).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (the routines' 16-bit
-;        LDX), DP=$0000 (the TDC: B = 0 for the TAX), DB=$7E; a menu
-;        thread (Menu_CfgWinStyle's callees yield)
+;        LDX), DP=$0000 (the TDC: B = 0 for the TAX), DB=$7E
 ; Exit:  P restored; A, X, Y clobbered
 ; Calls: the Menu_CfgEntryTable routine, Menu_CfgEntryIcon,
 ;   Menu_CfgDrawToggles, Menu_QueueVramRom, Menu_PlaySound0.
@@ -35564,8 +35570,7 @@ Menu_CfgEntry5:
 ; confirm or cancel: Menu_CursorSel and Menu_CfgCursor = 5 (back to
 ; entry 5), Menu_CfgSubOpen = 0.
 ; Callers note: Menu_CfgEntryTable entry 10 (Menu_CfgEntryRun).
-; Entry: M=1 (8-bit), X=0 (16-bit LDX), DP=$0000, DB=$7E; a menu
-;        thread (Menu_CfgStepValue's callees)
+; Entry: M=1 (8-bit), X=0 (16-bit LDX), DP=$0000, DB=$7E
 ; Exit:  M=1; A, X, Y clobbered
 ; Calls: Menu_CfgStepValue.
 Menu_CfgEntry10:
@@ -35659,8 +35664,7 @@ Menu_CfgEntry8:
 ; the style row and back) and play Menu_PlaySound0. Then
 ; Menu_CursorHold = Menu_CfgStyleEdit (the cursor stays while editing).
 ; Callers note: Menu_CfgEntryTable entry 6 (Menu_CfgEntryRun).
-; Entry: M=1 (8-bit), X=0 (16-bit LDX), DP=$0000, DB=$7E; a menu
-;        thread (Menu_CfgStepValue's callees)
+; Entry: M=1 (8-bit), X=0 (16-bit LDX), DP=$0000, DB=$7E
 ; Exit:  M=1; A = Menu_CfgStyleEdit; X, Y clobbered
 ; Calls: Menu_CfgStepValue, Menu_LoadWindowGfx, Menu_PlaySound0.
 Menu_CfgEntry6:
@@ -35865,7 +35869,8 @@ Menu_CfgMapAssign:
 ;        (Menu_Tmp00-04), DB=$7E (the MVN sets $7E); X = the entry
 ;        (low byte), Menu_Tmp00 = its new button
 ; Exit:  P restored; DB=$7E; A, X, Y clobbered; Menu_Tmp01/02/04 as
-;        above
+;        above; Menu_Tmp03 = 0 (the 16-bit store of the count - 1; every
+;        count, $C2:0107's $07 too, is non-zero)
 ; Calls: Menu_CfgMapSwap.
 Menu_CfgMapSet:
     PHP
@@ -36330,7 +36335,8 @@ Menu_CfgEntryIcon:
 
 ; $C2:C4F9 — Menu_CfgEntryByte (12 bytes, $C4F9–$C504)
 ; Per entry 0-11: the offset from Menu_CfgA3 of its byte (entry 5's,
-; $0B, is $0D91, past the ten).
+; $0B, is $0D91, and entry 11's, $0A, is $0D90 (Menu_CfgBMid): both past
+; the ten).
 Menu_CfgEntryByte:
     db $00, $03, $02, $07, $08, $0B, $06, $04, $01, $09, $05, $0A
 
@@ -40296,7 +40302,10 @@ Menu_DrawText:
 ; text thread is not running (Menu_Thread[2].State 0) and Menu_Unk0DCF
 ; is not the value drawn last (Menu_Unk0D78), the two rows zeroed from
 ; column 5 + Menu_TextCol / 2 on, and Menu_CfgValueThread started in
-; slot 2.
+; slot 2. Quirk, kept: that clear runs X from Menu_TextCol to $3E at
+; $7E:4E0A and $4E4A, 5 tiles past each row's end: it also zeroes row
+; 1's tiles 0-4 ($4E40-$4E49) and $4E80-$4E89, past Menu_CfgTextRows'
+; $80 bytes.
 ; Callers (1 JSR site): Menu_CfgEntryIcon ($C2:C4F4).
 ; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (16-bit LDX),
 ;        DP=$0000 (Menu_StartThread), DB=$7E
@@ -40371,8 +40380,9 @@ Menu_CfgEntryText:
 ; Callers note: started by Menu_CfgEntryText (Menu_StartThread), at
 ;   Menu_CfgTextThread or at Menu_CfgValueThread.
 ; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000), DB
-;        as the scheduler leaves it (DB=$7E assumed, as everywhere in
-;        the menu)
+;        as the scheduler leaves it: $7E from its PLB at $C2:81C1 each
+;        frame, unless a thread run before it this frame changed it
+;        (DB=$7E assumed, as everywhere in the menu)
 ; Exit:  never returns (Menu_ThreadEnd)
 ; Calls: BankC2_Entry0003 (TextWin_Init, JSL), Menu_TextStepLoop;
 ;   jumps to Menu_ThreadEnd.
@@ -40685,8 +40695,9 @@ Menu_PutTextTiles:
 
 ; $C2:FBB4 — Menu_PutTextTilesAttr (26 bytes, $FBB4–$FBCD)
 ; As Menu_PutTextTiles with A's whole word: the first word = A AND $33EF
-; (attribute bits 2-7 and the tile's bit 4 cleared, so palette 0-1 and
-; priority are kept), then as there.
+; (high-byte bits 2-3 and 6-7 cleared: palette bits 0-1 and both flips,
+; and the tile's bit 4; tile bits 8-9, palette bit 2 and priority kept),
+; then as there.
 ; Callers (5 JSR sites): unmatched ($C2:CAC3, $C2:CACF, $C2:D13D, $C2:E86D, $C2:E879).
 ; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E; A = the
 ;        first tile word, X = the map address, Y = the count (0: 65536)
@@ -40713,8 +40724,10 @@ Menu_PutTextTilesAttr:
 ; Menu_VramRec records the menu code queues by address (Menu_QueueVramRom
 ; with an LDX #): .Dest (VRAM word address), .Src, .SrcBank, .Size,
 ; packed 7 bytes apart, so each one's unused .Unk7 is the first byte of
-; the next. Several have no reference in matched code (the unmatched
-; modes load them).
+; the next. Several have no reference in matched code: most are loaded
+; by an LDX # in unmatched $C2 code, but no loader was found in $C2 for
+; Menu_VramRecBg1High ($FBD5), Menu_VramRecBg3Rows4 ($FC22) and
+; Menu_VramRecBg3Rows16 ($FC30).
 ; ------------------------------------------------------------
 
 ; $C2:FBCE — Menu_VramRecBg1Big (7 bytes, $FBCE–$FBD4)
@@ -40823,9 +40836,9 @@ Menu_VramRecBg3Rows16:
     db !Bank7E
     dw $0400
 
-; $C2:FC37 — Menu_VramRecBg3Rows0 (7 bytes, $FC37–$FC3D)
+; $C2:FC37 — Menu_VramRecBg3Rows62 (7 bytes, $FC37–$FC3D)
 ; VRAM $6FC0 = $7E:4E00, $80 bytes.
-Menu_VramRecBg3Rows0:
+Menu_VramRecBg3Rows62:
     dw $6FC0, !Menu_Bg3TileBuf
     db !Bank7E
     dw $0080
@@ -40875,8 +40888,9 @@ Menu_VramRecUnkFC61:
     dw $0600
 
 ; $C2:FC68 — Menu_VramRecRomTiles (7 bytes, $FC68–$FC6E)
-; VRAM $2010 = MenuRom_VramTiles ($FF:EB88), $480 bytes; its last byte is
-; the first of Menu_VramRecsFont.
+; VRAM $2010 = MenuRom_VramTiles ($FF:EB88), $480 bytes; its last byte
+; ($FC6E) is .Size's high byte, so its .Unk7 (the byte after it, $FC6F)
+; is the first of Menu_VramRecsFont.
 Menu_VramRecRomTiles:
     dw $2010, !MenuRom_VramTiles&$FFFF
     db !MenuRom_VramTiles>>16

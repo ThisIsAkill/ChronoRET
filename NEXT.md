@@ -628,7 +628,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_Mode01H1`, `H2`, `H3`, `Menu_EquipItemIdle`, `Menu_Icon0Redraw`, `Menu_Mode01Init`,
    `Menu_DrawMemberStatus`, `Menu_EquipSlotsClose`, `Menu_EquipItemsOpen`, `Menu_EquipListSetup`.
    Stubs added: `Menu_UnkB83E` (the HP / MP item's member cursor, in mode 3's range),
-   `Menu_VramRecBg3Rows0` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
+   `Menu_VramRecBg3Rows62` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
    slide HDMA tables feed; what `Menu_ItemInfo0` bit 3, the `$FF:B310` strings, record bytes
    $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean.
    Also matched (branch match-c2-modes34): mode 3, the tech screen, $C2:B35D-$BF34 (handlers
