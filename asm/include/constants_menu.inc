@@ -1186,4 +1186,81 @@ if !constants_menu_inc == 0
 !Menu_EquipArrowSpan = $1500             ; dividend of the item list's arrow factors
 !Menu_EquipPageRows = 8                  ; item list rows per page
 
+; --- Bank $FF menu helpers ($FF:F548-$FF:FC66) ---
+!MenuRom_GlyphRows = $FFCAFC             ; 10 x 16 B: 2bpp tiles BankFF_BuildTileSets starts from
+!MenuRom_ScreenGfx = $FFE8DC             ; packed data BankFF_BuildScreenMap unpacks to Menu_SprUnpackBuf
+!MenuRom_ShadowTiles = $FF9390           ; 10 x 16 B: 2bpp tiles BankFF_WidenTiles copies
+!MenuRom_BankE4 = $E40000                ; bank $E4 base (LDA.l this,X with X an address there)
+!MenuRom_TechMenuRec = $CC24B3           ; 3 B per record 0-14 (BankFF_UnkF813 reads bytes 1 and 2 as offsets / 64)
+!MenuRom_TechMenuTiles = $CC28DB         ; 6 B per record 0-14: three pairs of bytes stored at those offsets
+!MenuRom_TechLineTiles = $CC2935         ; bytes stored one per set bit of MenuRom_TechLineBits, in order
+!MenuRom_TechLineBits = $CC2979          ; 1 B per record 0-14: bit masks walked from bit 7
+!MenuRom_ComboNeeds = $CC2953            ; 3 B per combo 0-4: 1-based tech bit numbers in Menu_TechBits
+!MenuRom_TechByteMembers = $CC2963       ; 1 B per Menu_TechBits byte (37): the characters (BankFF_CharBits)
+                                         ; it needs in the party
+!MenuRom_ComboMembers = $CC2983          ; 1 B per combo 0-4: the characters it needs in the party
+!Menu_ItemInfo0Unk80 = $80               ; Menu_ItemInfo0 bit BankFF_UnkF813 sets for nine fixed entries
+!Menu_ItemInfo0Unk10 = $10               ; Menu_ItemInfo0 bit: BankFF_LoadSlotPart removes such items
+!Menu_TechInfoLearnt = $40               ; bit BankFF_UnkF813 sets in a marked tech's Menu_ItemInfo0 byte
+!Menu_CmdIdRefillWord3 = 6               ; Menu_RunCommand command numbers
+!Menu_CmdIdRefillByte7 = 7
+!Menu_CmdIdEquip = $0A
+!BankFF_GlyphBytes = $10                 ; bytes of a 2bpp tile (and the gap after it in a 4bpp slot)
+!BankFF_GlyphCount = $0A                 ; tiles in MenuRom_GlyphRows
+!BankFF_GlyphRows = 8                    ; rows of a tile
+!BankFF_TileBytes = $20                  ; bytes of a 4bpp tile
+!BankFF_TileSetABytes = $0140            ; the 10 widened tiles at Menu_SprUnpackBuf
+!BankFF_TileSetACopies = $0C80           ; bytes copied on from there (10 more copies)
+!BankFF_TileSetCGroups = 3               ; groups of tiles built at Menu_TileSetC
+!BankFF_ScratchClearBytes = $10          ; bytes zeroed from Menu_SprScratch
+!BankFF_ScratchTableBytes = $20          ; bytes copied after them
+!BankFF_PalRowMask = $0700               ; DP $00's high byte bits 0-2: the palette row
+!BankFF_PalBufStart = $0122              ; offset of row 0 in Menu_PalBuf (colour $91)
+!BankFF_PalSetMask = $0007               ; DP $00's low bits: the colour set
+!BankFF_PalHalveFlag = $FF00             ; DP $02's high byte: non-zero = halve the colours
+!BankFF_PalColours = $0C                 ; colours per set
+!BankFF_PalBytes = $18                   ; bytes per set
+!BankFF_PalHalveMask = $3DEF             ; colour >> 1 with the bits shifted in from the next channel cleared
+!BankFF_ScreenGfxDest = $B000            ; where MenuRom_ScreenGfx is unpacked (Menu_SprUnpackBuf)
+!BankFF_Unk0D0EInit = $01FF              ; Menu_Unk0D0E set by BankFF_BuildScreenMap
+!BankFF_ScreenMapRows = 6                ; row pairs written from BankFF_ScreenMapTiles
+!BankFF_MapRowEntries = $10              ; entries per row written
+!BankFF_MapRowBytes = $20                ; bytes copied to the next row
+!BankFF_ScreenMapHead = $0180            ; bytes of the row pairs
+!BankFF_ScreenMapFill = $0680            ; bytes copied on after them (the pattern repeated)
+!BankFF_ScreenColoursBOfs = $30          ; colour $18 of Menu_PalBuf
+!BankFF_ScreenColoursABytes = 8
+!BankFF_ScreenColoursBBytes = $10
+!BankFF_WaveDriftMask = $03              ; every 4th call drifts the wave
+!BankFF_WavePhaseMask = $003E            ; phase * 2 wrapped to the 32-entry table
+!BankFF_WaveOutBytes = $20               ; bytes of Menu_WaveOut written (to Y = $20)
+!BankFF_ShadowTileCount = $0A            ; tiles BankFF_WidenTiles builds
+!BankFF_AllCharsMask = $FE               ; bits 7-1: characters 0-6
+!BankFF_PartySlots = 9                   ; Menu_PartyOrder entries
+!BankFF_TechBytes = $25                  ; bytes of Menu_TechBits / Menu_TechShown
+!BankFF_TechsPerChar = 8                 ; single techs per character (bits of a byte)
+!BankFF_HighByteMask = $FF00
+!BankFF_TechMenuRecs = $0F               ; records of MenuRom_TechMenuRec / MenuRom_TechLineBits
+!BankFF_ComboCount = 5                   ; combos BankFF_UnkF958 checks
+!BankFF_SramBanks = $3030                ; PEA value: DB = $30 (SRAM) after two PLBs
+!BankFF_SlotSign = $E41B                 ; Menu_SramSlotSign value of a used slot
+!BankFF_SlotNoSign = $8080               ; BankFF_UnkF9C4 result: no save in the slot
+!BankFF_SlotBadSum = $4040               ; result: the checksum does not match
+!BankFF_SaveMoveCode = $3054             ; Menu_NmiMoveCode word 0: MVN opcode, destination bank $30 (SRAM)
+!BankFF_SaveMoveCodeHi = $6B7E           ; word 1: source bank $7E, then RTL
+!BankFF_LoadMoveCodeHi = $6B30           ; word 1: source bank $30, then RTL
+!BankFF_SaveRecordBytes = 5              ; bytes of a BankFF_SaveRecords record
+!BankFF_SaveRecordsBytes = $28
+!BankFF_PartRecordBytes = 7              ; bytes of a BankFF_PartRecords record
+!BankFF_PartRecordsBytes = $0E
+!BankFF_InvSlots = $F2                   ; inventory slots BankFF_LoadSlotPart checks
+!BankFF_Unk7F01CFValue = $10             ; Menu_Unk7F01CF's value after BankFF_LoadSlotPart
+!BankFF_SlotMask = $0003                 ; slot number bits
+!BankFF_SlotSumBytes = $0A00             ; bytes a slot's checksum adds up (as words)
+!BankFF_GradHdmaHead = $0060             ; first HDMA entry: $60 lines ...
+!BankFF_GradHdmaHead2 = $00E0            ; ... its two value bytes $00, $E0 (stored as a word over them)
+!BankFF_GradHalf = 8                     ; groups 0-7 use $02 as the middle byte, 8-15 BankFF_GradValue2
+!BankFF_GradValue2 = $82
+!BankFF_GradGroups = $10                 ; groups of three 1-line entries
+
 endif

@@ -24,19 +24,9 @@
 
 ; --- Other banks, called from bank $C0 ---
 
-org $FFF9BB
-BankFF_CharBits:    ; 8 B read by Menu_CmdJoin: $80 >> character id, the character's Menu_Unk29AF bit
-org $FFF9C4
-BankFF_UnkF9C4:     ; JSL from Menu_CmdBootCheckSaves (DP=$0400) and Menu_LoadSlotSummaries (DP=0):
-                    ; A and dp $00 = 0 or not for the slot at dp $79; probably checks a save slot in
-                    ; SRAM and sets dp $7B to its offset (not analysed)
-org $FFF813
-BankFF_UnkF813:     ; JSL from Menu_BuildItemTables (not analysed)
 org $FFD024
 MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
                     ; SRAM +$0603 byte is the last entry not above it
-org $FFF958
-BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
 org $C2AD50
 Menu_UnkAD50:       ; Menu_MainPreviewTable entry 1 (not analysed)
 org $C2B8DA
