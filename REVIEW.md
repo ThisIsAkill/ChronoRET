@@ -97,8 +97,9 @@ never an append to an earlier one. It starts with the header line:
 address,name,date,reviewer,verdict,source_hash,notes
 ```
 
-- `source_hash` is copied from the packet (`symbols/functions.csv`), not
-  recomputed.
+- `source_hash` is copied from the packet (`symbols/functions.csv`, or
+  `symbols/spc700_functions.csv` for the SPC700 driver, whose `address`
+  is the ARAM one), not recomputed.
 - The notes are one quoted line of 200 characters at most:
   - For `changes`: what is wrong and the fix.
   - For `approved`: what was checked.

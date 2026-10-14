@@ -16,6 +16,12 @@ Examples:
 
 Output:
     Disassembly to stdout, summary (calls, jumps, returns) to stderr.
+
+SPC700 mode (the sound driver uploaded from bank $C7; tools/spc700.py):
+    python3 tools/disasm.py --spc700 [START [END]] [--entry ARAM ...] [--linear] [--check]
+
+    Prints asar `arch spc700` source for ARAM START-END of the driver
+    (default all of it, traced from its known entries).
 """
 
 import sys
@@ -736,6 +742,11 @@ class Disassembler:
 # ---------------------------------------------------------------------------
 def main() -> int:
     import argparse
+
+    if '--spc700' in sys.argv[1:]:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import spc700
+        return spc700.main([a for a in sys.argv[1:] if a != '--spc700'])
 
     parser = argparse.ArgumentParser(
         description='Recursive-descent 65816 disassembler for Chrono Trigger decomp.',

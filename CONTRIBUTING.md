@@ -34,7 +34,10 @@ now are structural, not just function-matching:
 ## Definition of done
 
 A routine goes to `main` only when it is **matched, readable and reviewed**. Its status in
-`symbols/functions.csv` is computed by `tools/progress.py`, never set by hand; each level
+`symbols/functions.csv` is computed by `tools/progress.py`, never set by hand (routines of the
+SPC700 sound driver, `asm/spc700/`, are rows of `symbols/spc700_functions.csv` instead, by ARAM
+and ROM address, with their own progress figure; the lint's SPC700 rules are in
+`tools/lint_spc700.py`, and their reviews are rows of the same log); each level
 includes the one before. (`functions.csv` and `progress.json` are generated and not tracked:
 every tool that reads them regenerates them when they are stale, and
 `python3 tools/progress.py --update` writes them on disk.)

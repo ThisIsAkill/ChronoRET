@@ -133,6 +133,32 @@ Two kinds of label are exempt from `HEADER`:
   BattleMenu_ItemListScrollUp_RenderTail:     ; header: see BattleMenu_ItemListScrollUp
   ```
 
+## SPC700 (the sound driver)
+
+The SPC700 program in bank $C7 (`asm/spc700/`) follows the same rules, checked by
+`tools/lint_spc700.py` (run by the lint), with the SPC700's state in place of the 65816's:
+
+- **Assembly.** asar's `arch spc700`; `%SpcOrg(aram)` puts the bytes at the ROM address of an
+  ARAM address while labels take the ARAM address. Every direct-page and absolute operand says
+  `.b` or `.w` (`mov.b !Spc_CurSong,a`, `mov.w !Spc_TrackF220+x,a`); branches, `call`, `jmp`,
+  `pcall`, `tcall` and the `mov1`-style bit instructions have one encoding and need none.
+- **Names.** `!SPC_*` for the I/O registers (`!SPC_CPUIO0`, `!SPC_DSPADDR`), `!DSP_*` for S-DSP
+  register numbers (`mov y,#!DSP_KOF`), `!Spc_*` for the driver's RAM, other values and
+  constants, `Spc_*` for labels; all in `asm/spc700/spc700.inc`, label-only stubs for what is
+  not matched yet in `asm/spc700/unmatched.asm`. The prefixes keep them apart from the 65816
+  names.
+- **Headers.** The title gives both addresses: `; $0B96 — Spc_PollCommand (22 bytes,
+  $0B96–$0BAB; ROM $C7:2E5B–$2E70)` (`SIZE` checks both against
+  `symbols/spc700_functions.csv`). The Entry line states P, the direct-page flag (`P=0`: direct
+  page $00xx, `P=1`: $01xx; `STATE`), where a 65816 header states DP and DB; Entry and Exit name
+  A, X, Y (YA for word values), SP when it moves, and the PSW flags a caller branches on. Where a
+  routine writes S-DSP registers a `; DSP:` line names them, and where it uses CPUIO0-3 a
+  `; Ports:` line gives the protocol and its 65816 counterpart (the `Audio_*` routine).
+- **Callers.** Until a generator exists they are hand-written on `; Callers note:` lines, and
+  the lint checks that every `call`, `jmp` and `pcall` site the driver's trace finds
+  (`tools/spc700.py`) outside the routine and its sub-entries is named there by its ARAM
+  address (`$0299`). Table dispatch (a pushed address and `ret`) is said in words.
+
 ## Layout
 
 - One file per bank, `asm/bank<NN>/bank<NN>.asm`, in address order, grouped by subsystem with a

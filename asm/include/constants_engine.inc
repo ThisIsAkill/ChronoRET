@@ -198,14 +198,15 @@ if !constants_engine_inc == 0
 ; APUIO2/3, mode in APUIO1, Audio_Seq in APUIO0 (usually !Audio_SeqHeader); the driver
 ; answers by echoing APUIO0, and APUIO1 = the mode when it accepts. Each data step puts 2 or 3 bytes in
 ; APUIO1-3 and the next sequence value in APUIO0, then waits for the echo
-; (Audio_SendSeq). These meanings are read from the 65816 side only; the SPC700
-; program ($C7:24C3, uploaded to ARAM $0200) is not disassembled.
+; (Audio_SendSeq). These meanings are read from the 65816 side; the SPC700 side
+; (asm/spc700/driver.asm) is matched in part: Spc_PollCommand / Spc_RunCommand
+; take the commands, the transfers ($FE, ARAM $100E) are not matched yet.
 !Audio_IplReady = $BBAA                  ; APUIO0/1 read as a word: the IPL ROM's ready signature
 !Audio_IplKick = $CC                     ; the IPL ROM's first transfer value (APUIO0 and APUIO1)
 !Audio_ResetKick0 = $FF                  ; APUIO0 and
-!Audio_ResetKick1 = $F0                  ; APUIO1 while Audio_Boot waits for the IPL: probably what makes
-                                         ; a running driver go back to the IPL ROM (not traced in the
-                                         ; SPC700 program)
+!Audio_ResetKick1 = $F0                  ; APUIO1 while Audio_Boot waits for the IPL: to a running
+                                         ; driver, command $FF with Arg0 $F0, which sets FLG = $E0,
+                                         ; maps the IPL ROM in and jumps to it (ARAM $12CC-$12DC)
 !Audio_NumBootBlocks = $000C             ; 6 boot blocks x 2 (Audio_BootBlockPtrs/Aram)
 !Audio_XferWords = $02                   ; mode: 2 bytes per step (APUIO1/2)
 !Audio_XferTriples = $03                 ; mode: 3 bytes per step (APUIO1-3)

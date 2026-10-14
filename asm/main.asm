@@ -20,6 +20,7 @@ incsrc "include/ram_battle.inc"
 incsrc "include/constants_menu.inc"
 incsrc "include/ram_menu.inc"
 incsrc "include/macros.inc"
+incsrc "spc700/spc700.inc"
 
 ; --- Bank includes ---
 ; As banks get mapped and functions get matched, include their
@@ -38,6 +39,7 @@ incsrc "bankC2/bankC2.asm"
 incsrc "bankC3/bankC3.asm"
 incsrc "bankC6/bankC6.asm"
 incsrc "bankC7/bankC7.asm"
+incsrc "spc700/driver.asm"
 incsrc "bankCF/bankCF.asm"
 incsrc "bankD1/bankD1.asm"
 ; incsrc "bank01/bank01.asm"
@@ -48,3 +50,4 @@ incsrc "bankFF/bankFF.asm"
 ; --- Names for not-yet-matched routines (label-only, no bytes) ---
 incsrc "include/unmatched.asm"
 incsrc "include/unmatched_battle.asm"
+incsrc "spc700/unmatched.asm"

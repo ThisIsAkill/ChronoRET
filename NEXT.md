@@ -1381,6 +1381,112 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
     on a row boundary of the layout, and every row inside is named or a `header: see` sub-entry.
     One was wrong: `Menu_CfgTextThread` said 149 bytes for `$F9B2–$FA48` (151; the range was
     right). Re-review needed (verified header edited): `Menu_CfgTextThread`.
+15. The SPC700 sound driver (branch match-c7-spc700; new files `asm/spc700/spc700.inc`,
+    `driver.asm` and `unmatched.asm`, included from `asm/main.asm`; `tools/spc700.py`). The plan,
+    then the first batch.
+
+    **(a) What is code.** Boot block 0 (`Audio_BootBlockPtrs`) is the length word $1BEF at
+    `$C7:24C3` and the program `$C7:24C5`-`$40B3`, sent to ARAM `$0200`-`$1DEE`; the IPL ROM
+    jumps to `$0200`. ROM = ARAM + $22C5. Traced from `$0200`, the six dispatch tables and the
+    two pushed return addresses (`$0768`, `$1029`) (`spc700.DISPATCH_TABLES` / `DRIVER_ENTRIES`;
+    the driver dispatches with PUSH, PUSH, RET only, there is no `JMP (abs+X)`), it splits into:
+
+    | ARAM | ROM | | Bytes | Content |
+    |---|---|---|---|---|
+    | `$0200`-`$1543` | `$C7:24C5`-`$3808` | code | 4,932 | start, main loop, track stepping, commands, transfers, echo |
+    | `$1544`-`$1721` | `$C7:3809`-`$39E6` | data | 478 | `$1544` transfer modes (8 words, APUIO1 & 7, read at `$105D`); `$1554` sequence commands $C4-$FF (60 words, `$0743`), `$15CC` their operand counts (60 bytes), `$1608` their second handlers (60 words, 0 = none); `$1680` CPU commands $10-$1F, `$16A0` run-first handlers, `$16C0` commands $80-$8F/$F0-$FF (16 + 16 + 32 words); `$1700` the 17 shadowed DSP registers, `$1711` their sources |
+    | `$1722`-`$1D6C` | `$C7:39E7`-`$4031` | code | 1,611 | sequence command handlers, helpers |
+    | `$1D6D`-`$1DEE` | `$C7:4032`-`$40B3` | data | 130 | `$1D6D` pitch table (13 words, read at `$06C9`), tables read at `$1D87+Y` (`$057A`), `$1D92+Y` (`$1844`; FIR sets, by their look) and `$1DB3+Y` (`$051C`); `$1DC2` the built-in BRR sample (directory entry $10, set by Spc_Start; `$1DCB` is rewritten each pass by `$0B5C`) |
+
+    The trace reaches every byte of the code ranges and none of the data ranges (6,543 + 608 =
+    7,151 bytes; `tools/test_spc700.py` pins it). Four branches land inside other instructions
+    (`$03BA`, `$0DB2`, `$129B`, `$192C`: a skipped `mov a,#imm` whose operand is the target
+    opcode). The other boot blocks are data: block 1 (`$C7:4309` -> `$2F00`, $1800 bytes) starts
+    with the sound-effect table (4 bytes per effect: two track pointers, read by Spc_StartSfx),
+    block 2 (`$40B4` -> `$4700`) is BRR sample blocks, 3-5 the directory and parameter words.
+    ARAM as the driver uses it: direct page `$00`-`$EF` (P=0 throughout; tracks indexed X = track
+    x 2), page 1 (`$0150`-`$018F` per track, the stack from `$01FF`), the driver `$0200`-`$1DEE`,
+    directory `$1E00`, ParamA/B `$1F00`/`$1F80`, song `$2000`, effects `$2F00`, samples from
+    `$4700`, the echo buffer below `$F100`, probably (`!Audio_EchoTopPage`), work area `$F100`-`$F7FF` (group volumes
+    `$F160`, the command queue `$F172`-`$F1B1`, per-track arrays `$F200`-`$F5xx`), and
+    `$F800`-`$FF8F`, where Spc_SaveSong keeps a song aside (`$13A9`).
+
+    **(b) Assembly.** asar's `arch spc700` with `base`: `%SpcOrg(aram)` in driver.asm does `base
+    off`, `org` the ROM address, `base aram`, so labels take ARAM values (the symbol file lists
+    them as `00:0200`, below $8000 in bank 0, which progress, xref and tables already drop as not
+    ROM) while the bytes and asar's address-to-line map use ROM addresses. `.b`/`.w` on every
+    direct-page and absolute operand. asar's syntax: `(x+)`, `(dp+x)`, `(dp)+y`, `or1 c,!m.b`
+    (not `/m.b`), `bbs.b dp.bit,label`; the tree assembles with left-to-right math, so expressions
+    in defines need parentheses. Unmatched driver bytes stay ROM bytes (not emitted); the length
+    word too until the last batch (then `dw` of the block's labels). Prototype: the whole block,
+    printed by `python3 tools/spc700.py`, reassembles to the ROM (`--check`), and `make gate`
+    passes with the batch below.
+
+    **(c) Tooling.** Done: `tools/spc700.py` (all 256 opcodes; recursive descent from the known
+    entries or `--linear`; labelled asar source; `--check` reassembles and compares;
+    `tools/disasm.py --spc700` runs it), `tools/test_spc700.py` in `make test-tools` (every opcode
+    against asar, the code/data split, the round trip); xref and tables leave the lines of
+    `asm/spc700/` out of the 65816 instruction starts (otherwise SPC700 instructions would count as
+    65816 ones in xref's verdicts and in code_survey's opcode statistics; the survey's numbers are
+    unchanged). The review path (added after the maintainer's
+    go-ahead): `tools/progress.py` writes `symbols/spc700_functions.csv` (generated, untracked:
+    ARAM and ROM range, size, kind, status, source_hash) and prints a separate SPC700 line
+    (`"spc700"` in progress.json), leaving the 65816 figure, its denominator and code_survey as
+    they were; `tools/lint_spc700.py` (run by the lint) applies ADDR, CALL, CONST, WIDTH, OPCODE,
+    PLUMB, HEADER and SIZE, STATE (the Entry line states P) for DPDB, and checks that each header
+    names every CALL/JMP/PCALL site the driver trace finds; review rows in `symbols/reviews/`
+    verify SPC700 routines by name and source_hash like the 65816 ones
+    (`tools/validate_functions.py` checks both tables); `tools/test_lint_spc700.py` tests the
+    rules. Still open: a generated Callers block, a split of code_survey's `spc700_bytes` (7,153
+    with the length word) into code 6,543 / data 608, and a `make spc-draft` that names operands
+    from `spc700.inc` the way draft.py does (now `tools/spc700.py START END` prints labelled
+    source with raw operands).
+
+    **(d) Header convention** (driver.asm's banner and STYLE.md, "SPC700 (the sound driver)"):
+    title `$ARAM — Name (N bytes, $XXXX–$YYYY; ROM
+    $C7:xxxx–$yyyy)`; `Entry:`/`Exit:` state P (direct page $00xx or $01xx), A, X, Y (YA for word
+    results), SP when moved, and the PSW flags callers branch on; `DSP:` the S-DSP registers
+    written; `Ports:` what goes through CPUIO0-3 and its 65816 counterpart (Audio_*);
+    `Callers note:` hand-written until a generator exists; `Callees:`. Names: `!SPC_*` I/O
+    registers, `!DSP_*` DSP registers, `!Spc_*` RAM, `!SpcCmd_*` / `!SpcSong_*` values, `Spc_*`
+    labels; data and code not matched yet are label-only in `asm/spc700/unmatched.asm`.
+
+    **Matched (first batch, 1,022 bytes):** `$0200`-`$0376` (`Spc_Start`, `Spc_MainLoop`),
+    `$07A3`-`$07AE` (`Spc_WriteDsp`, `Spc_ClearPorts01`) and `$0B96`-`$0E10` (the CPU-port side:
+    `Spc_PollCommand` / `Spc_RunCommand`, the song commands `Spc_CmdSong14`/`10`/`15`/`11`,
+    `Spc_StartSong`, `Spc_InitTrack`, `Spc_CmdSongCheck`, the effect commands
+    `Spc_CmdSfx18`/`19`, `Spc_StartSfx`, `Spc_RunHighCommand`). What it settles from item 5's
+    open list: a song command's APUIO1 answer is the song, or $FF when that song is already
+    playing (Spc_CmdSongCheck; then the 65816 skips the load); `!Audio_ResetKick0/1` is command
+    $FF with Arg0 $F0, which returns the driver to the IPL ROM (`$12CC`); $10/$11 start the
+    header's first or second set of 8 track pointers, $14/$15 first keep the playing song aside
+    (Spc_SaveSong) and a later request for it resumes it with a fade-in; $18/$19 start effect
+    (Arg0) on voices 7-6 / 5-4, Arg1 into each track's `$F281`; $FC sets the echo delay, $FD writes
+    DSP register Arg0 = Arg1, $FE takes the transfers; $12/$13/$16/$17 and $1A-$1F run a bare RET
+    and are never echoed. Does the 65816 send $1A-$1F (Audio_CmdSend would pass them on)? Every
+    store to `!Audio_CmdId` / `!Sfx_Command` in matched code was read (banks $C0, $C1, $C2, $C3,
+    $CD; $C7's own `Audio_CmdSongAlias` writes $10): the constant ones are $10, $11, $14, $18,
+    $19, $70, $80, $81, $82, $83, $86, $F2 (`!C3_SndPause`), $F3 and $F5
+    (`!BattleCD_ApuCmdPause`), none in $1A-$1F; the battle sound opcodes $78-$7B send $18/$19 only; Menu_ and
+    C2Scene_ senders use named constants of the same set. Three senders take the id from script
+    data and were not scanned (the scripts are packed or need their own parsers): event opcode
+    $EC (`Evt_OpEC_SoundCmd`, from `!Evt_Data`), scene op $4B (`C2Script_SoundCmd`, through
+    `C2Scene_QueueSoundCmd`) and the `$C3` module's script op 6 (`C3_RunScript .op_driver`). So
+    no code path sends $1A-$1F; whether any script byte does is open (headers unchanged). Each
+    pass the driver writes APUIO0 = 0, APUIO1 = the song's fade steps left, APUIO2/3 status bits
+    (unless `!Spc_Flags88` bit 7 is set: command $FF with Arg0 = 1 and Arg1 nonzero sets it);
+    commands other than $10-$17 and $FE that arrive while tracks are stepped are queued (16) and run
+    after the pass. Open in
+    the batch: most direct-page bytes are `Unk` names with what was observed (`!Spc_Unk24`/`25`,
+    `!Spc_Flags87`/`88`, the `$F2xx`-`$F4xx` track arrays); the callees are stubs.
+
+    **Next batches**, in the order they make the rest readable: `$0E11`-`$12DD`, the handlers of
+    $80-$8F/$F0-$FF and the transfer receiver `$100E` (Audio_SendSeq's counterpart, modes 2/3/5/7);
+    the track pass and command queue (`$0377`-`$07A2`, `$07AF`-`$0B95`); the sequence command
+    handlers (`$1722`-`$1D6C` with the tables `$1544`-`$1721`); echo and save/restore
+    (`$12DE`-`$1543`); the tables `$1D6D`-`$1DEE`, and the length word last. Headers to fix at
+    their next edit (verified, not edited here): `bankC7.asm`'s banner and Audio_Boot / Audio_StartSong
+    say the SPC700 side is not traced (now partly matched; the constants' comments are updated).
 
 ## Code survey
 
