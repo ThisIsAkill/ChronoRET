@@ -10035,6 +10035,567 @@ M7Scene_UploadPalette:
     STA.w MDMAEN
     RTS
 
+
+; ============================================================
+; Location animation lists ($FD:F290–$FD:FFE4)
+; What FieldFD_LoadAnimSetA and FieldFD_LoadAnimSetB read through the
+; !FieldRom_AnimList* defines, which hold these addresses: per location,
+; the tile animation records (by LocRom.Tileset12) and the palette
+; animation records (by LocRom.Palette).
+; ============================================================
+
+; $FD:F290 — FieldAnimListAPtrs (128 bytes, $F290–$F30F)
+; !FieldRom_AnimListAPtrs: one word per LocRom.Tileset12 & $3F ($00-$3F),
+; the offset of its list from FieldAnimListA. A list's label is named
+; after the first value that uses it.
+org $FDF290
+FieldAnimListAPtrs:
+    dw FieldAnimListA_set00-FieldAnimListA,FieldAnimListA_set01-FieldAnimListA ; $00, $01
+    dw FieldAnimListA_set01-FieldAnimListA,FieldAnimListA_set03-FieldAnimListA ; $02, $03
+    dw FieldAnimListA_set04-FieldAnimListA,FieldAnimListA_set05-FieldAnimListA ; $04, $05
+    dw FieldAnimListA_set06-FieldAnimListA,FieldAnimListA_set07-FieldAnimListA ; $06, $07
+    dw FieldAnimListA_set07-FieldAnimListA,FieldAnimListA_set09-FieldAnimListA ; $08, $09
+    dw FieldAnimListA_set0A-FieldAnimListA,FieldAnimListA_set0B-FieldAnimListA ; $0A, $0B
+    dw FieldAnimListA_set0C-FieldAnimListA,FieldAnimListA_set0D-FieldAnimListA ; $0C, $0D
+    dw FieldAnimListA_set0E-FieldAnimListA,FieldAnimListA_set0F-FieldAnimListA ; $0E, $0F
+    dw FieldAnimListA_set10-FieldAnimListA,FieldAnimListA_set10-FieldAnimListA ; $10, $11
+    dw FieldAnimListA_set12-FieldAnimListA,FieldAnimListA_set13-FieldAnimListA ; $12, $13
+    dw FieldAnimListA_set14-FieldAnimListA,FieldAnimListA_set14-FieldAnimListA ; $14, $15
+    dw FieldAnimListA_set14-FieldAnimListA,FieldAnimListA_set14-FieldAnimListA ; $16, $17
+    dw FieldAnimListA_set18-FieldAnimListA,FieldAnimListA_set18-FieldAnimListA ; $18, $19
+    dw FieldAnimListA_set1A-FieldAnimListA,FieldAnimListA_set1B-FieldAnimListA ; $1A, $1B
+    dw FieldAnimListA_set1C-FieldAnimListA,FieldAnimListA_set1D-FieldAnimListA ; $1C, $1D
+    dw FieldAnimListA_set1D-FieldAnimListA,FieldAnimListA_set1F-FieldAnimListA ; $1E, $1F
+    dw FieldAnimListA_set20-FieldAnimListA,FieldAnimListA_set21-FieldAnimListA ; $20, $21
+    dw FieldAnimListA_set22-FieldAnimListA,FieldAnimListA_set23-FieldAnimListA ; $22, $23
+    dw FieldAnimListA_set24-FieldAnimListA,FieldAnimListA_set25-FieldAnimListA ; $24, $25
+    dw FieldAnimListA_set26-FieldAnimListA,FieldAnimListA_set27-FieldAnimListA ; $26, $27
+    dw FieldAnimListA_set28-FieldAnimListA,FieldAnimListA_set28-FieldAnimListA ; $28, $29
+    dw FieldAnimListA_set28-FieldAnimListA,FieldAnimListA_set28-FieldAnimListA ; $2A, $2B
+    dw FieldAnimListA_set2C-FieldAnimListA,FieldAnimListA_set2D-FieldAnimListA ; $2C, $2D
+    dw FieldAnimListA_set2E-FieldAnimListA,FieldAnimListA_set2F-FieldAnimListA ; $2E, $2F
+    dw FieldAnimListA_set2F-FieldAnimListA,FieldAnimListA_set2F-FieldAnimListA ; $30, $31
+    dw FieldAnimListA_set2F-FieldAnimListA,FieldAnimListA_set33-FieldAnimListA ; $32, $33
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $34, $35
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $36, $37
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $38, $39
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $3A, $3B
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $3C, $3D
+    dw FieldAnimListA_set34-FieldAnimListA,FieldAnimListA_set34-FieldAnimListA ; $3E, $3F
+
+; $FD:F310 — FieldAnimListA (1719 bytes, $F310–$F9C6)
+; !FieldRom_AnimListA: FieldFD_LoadAnimSetA's lists. A list is the 12
+; records read in a row, one per FieldAnimA record:
+;   db $80: no animation (the record gets .Unk3 = $80 and nothing else);
+;   db n : dw vram : db steps : dw sources, with n steps and n sources
+;     (n = 2, 4 or 8; any first byte but $80, 2 and 4 is read as 8, and
+;     only 8 occurs): vram goes to .Unk2/.Unk3 (the VRAM address the
+;     frames are sent to), each step x 4 is a frame's step word and each
+;     source the bank-$7F address of a frame's tiles
+;     (FieldFD_UploadTileAnims); n = 2 and 4 are repeated to 8 of each.
+; Lists overlap where one ends with $80 records and the next starts with
+; them: .set00's last 3 records are .set01's first 3, and so on. Each
+; label's comment gives the LocRom.Tileset12 & $3F values that use it.
+FieldAnimListA:
+.set00:                           ; LocRom.Tileset12 & $3F = $00
+    db $04 : dw $3290 : db $80,$40,$40,$80 : dw $6000,$6060,$60C0,$6120
+    db $04 : dw $3390 : db $80,$40,$40,$80 : dw $6180,$6200,$6280,$6300
+    db $04 : dw $30C0 : db $80,$40,$40,$80 : dw $6380,$6400,$6480,$6500
+    db $04 : dw $4600 : db $80,$40,$40,$80 : dw $6580,$6600,$6680,$6700
+    db $04 : dw $4640 : db $80,$40,$40,$80 : dw $6780,$6800,$6880,$6900
+    db $04 : dw $4680 : db $80,$40,$40,$80 : dw $6980,$6A00,$6A80,$6B00
+    db $04 : dw $4500 : db $40,$40,$40,$40 : dw $6C40,$6CC0,$79C0,$7A40
+    db $04 : dw $4540 : db $40,$40,$40,$40 : dw $6D40,$6D80,$7AC0,$7B00
+    db $04 : dw $46C0 : db $40,$40,$40,$40 : dw $6B80,$6BE0,$7900,$7960
+.set01:                           ; LocRom.Tileset12 & $3F = $01, $02
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set03:                           ; LocRom.Tileset12 & $3F = $03
+    db $04 : dw $3B00 : db $40,$40,$40,$40 : dw $6000,$6080,$6100,$6180
+    db $04 : dw $3B40 : db $40,$40,$40,$40 : dw $6200,$6280,$6300,$6380
+    db $04 : dw $3B80 : db $40,$40,$40,$40 : dw $6400,$6480,$6500,$6580
+    db $04 : dw $3BC0 : db $40,$40,$40,$40 : dw $6600,$6680,$6700,$6780
+    db $04 : dw $3C00 : db $40,$40,$40,$40 : dw $6800,$6880,$6900,$6980
+    db $80,$80,$80,$80,$80,$80,$80
+.set04:                           ; LocRom.Tileset12 & $3F = $04
+    db $04 : dw $4E40 : db $2B,$2B,$2B,$2B : dw $6B00,$6B80,$6C00,$6C80
+    db $04 : dw $4E80 : db $2B,$2B,$2B,$2B : dw $6D00,$6D80,$6E00,$6E80
+    db $04 : dw $4E00 : db $2B,$2B,$2B,$2B : dw $6F00,$6F80,$7000,$7080
+    db $04 : dw $4F00 : db $40,$40,$40,$40 : dw $7100,$7180,$7200,$7280
+    db $04 : dw $4F40 : db $40,$40,$40,$40 : dw $7300,$7380,$7400,$7480
+    db $04 : dw $4F80 : db $40,$40,$40,$40 : dw $7500,$7580,$7600,$7680
+    db $04 : dw $4EC0 : db $40,$40,$40,$40 : dw $7700,$7760,$77C0,$7820
+    db $80,$80,$80,$80,$80
+.set05:                           ; LocRom.Tileset12 & $3F = $05
+    db $04 : dw $2600 : db $2B,$2B,$2B,$2B : dw $6F00,$6F80,$7000,$7080
+    db $02 : dw $2640 : db $2B,$2B : dw $7F00,$7F80
+    db $04 : dw $2700 : db $40,$40,$40,$40 : dw $7500,$7580,$7600,$7680
+    db $04 : dw $2740 : db $40,$40,$40,$40 : dw $7700,$7760,$77C0,$7820
+    db $80,$80,$80,$80,$80,$80,$80,$80
+.set06:                           ; LocRom.Tileset12 & $3F = $06
+    db $08 : dw $2050 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6300,$6380,$6400,$6480,$6300,$6380,$6400,$6480
+    db $08 : dw $2150 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6500,$6580,$6600,$6680,$6500,$6580,$6600,$6680
+    db $08 : dw $2250 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6700,$6780,$6800,$6880,$6700,$6780,$6800,$6880
+    db $08 : dw $2350 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6900,$6980,$6A00,$6A80,$6900,$6980,$6A00,$6A80
+.set07:                           ; LocRom.Tileset12 & $3F = $07, $08
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set09:                           ; LocRom.Tileset12 & $3F = $09
+    db $04 : dw $2600 : db $80,$80,$80,$80 : dw $6000,$6080,$6100,$6180
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set0A:                           ; LocRom.Tileset12 & $3F = $0A
+    db $04 : dw $3240 : db $40,$40,$40,$40 : dw $7480,$7500,$7580,$7600
+    db $04 : dw $3340 : db $40,$40,$40,$40 : dw $7680,$76C0,$7700,$7740
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set0B:                           ; LocRom.Tileset12 & $3F = $0B
+    db $02 : dw $3A40 : db $40,$40 : dw $6200,$6280
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set0C:                           ; LocRom.Tileset12 & $3F = $0C
+    db $04 : dw $3E00 : db $80,$80,$80,$80 : dw $7140,$71C0,$7240,$72C0
+    db $04 : dw $3E40 : db $80,$80,$80,$80 : dw $72C0,$7140,$71C0,$7240
+    db $04 : dw $3E80 : db $80,$80,$80,$80 : dw $7340,$73C0,$7440,$74C0
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80
+.set0D:                           ; LocRom.Tileset12 & $3F = $0D
+    db $02 : dw $4500 : db $40,$40 : dw $6DC0,$6E40
+    db $02 : dw $4760 : db $40,$40 : dw $6EC0,$6F40
+.set0E:                           ; LocRom.Tileset12 & $3F = $0E
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set0F:                           ; LocRom.Tileset12 & $3F = $0F
+    db $04 : dw $2D40 : db $40,$40,$40,$40 : dw $7400,$7480,$7500,$7580
+.set10:                           ; LocRom.Tileset12 & $3F = $10, $11
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set12:                           ; LocRom.Tileset12 & $3F = $12
+    db $04 : dw $4340 : db $80,$80,$80,$80 : dw $7780,$77C0,$7800,$7840
+    db $04 : dw $4440 : db $40,$40,$40,$40 : dw $7880,$7900,$7980,$7A00
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set13:                           ; LocRom.Tileset12 & $3F = $13
+    db $04 : dw $3E00 : db $80,$80,$80,$80 : dw $7140,$71C0,$7240,$72C0
+    db $04 : dw $3E40 : db $80,$80,$80,$80 : dw $72C0,$7140,$71C0,$7240
+    db $04 : dw $3E80 : db $80,$80,$80,$80 : dw $7340,$73C0,$7440,$74C0
+.set14:                           ; LocRom.Tileset12 & $3F = $14-$17
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set18:                           ; LocRom.Tileset12 & $3F = $18, $19
+    db $04 : dw $25C0 : db $80,$80,$80,$80 : dw $6000,$6080,$6100,$6180
+    db $04 : dw $26C0 : db $80,$80,$80,$80 : dw $6200,$6280,$6300,$6380
+    db $04 : dw $27C0 : db $80,$80,$80,$80 : dw $6400,$6480,$6500,$6580
+    db $04 : dw $2D00 : db $80,$80,$80,$80 : dw $6600,$6680,$6700,$6780
+    db $04 : dw $2D40 : db $80,$80,$80,$80 : dw $6800,$6880,$6900,$6980
+.set1A:                           ; LocRom.Tileset12 & $3F = $1A
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set1B:                           ; LocRom.Tileset12 & $3F = $1B
+    db $04 : dw $2C10 : db $40,$40,$40,$40 : dw $7600,$7660,$76C0,$7720
+    db $04 : dw $2D10 : db $40,$40,$40,$40 : dw $7780,$77E0,$7840,$78A0
+    db $04 : dw $2A90 : db $40,$40,$40,$40 : dw $7200,$7280,$7300,$7380
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80
+.set1C:                           ; LocRom.Tileset12 & $3F = $1C
+    db $02 : dw $4350 : db $40,$40 : dw $7540,$7A40
+    db $02 : dw $4390 : db $40,$40 : dw $75C0,$7AC0
+    db $02 : dw $43D0 : db $40,$40 : dw $7640,$7B40
+    db $02 : dw $4410 : db $40,$40 : dw $76C0,$7BC0
+    db $02 : dw $4450 : db $40,$40 : dw $7740,$7C40
+    db $02 : dw $4490 : db $40,$40 : dw $77C0,$7CC0
+    db $02 : dw $44D0 : db $40,$40 : dw $7840,$7D40
+    db $02 : dw $4510 : db $40,$40 : dw $78C0,$7DC0
+    db $02 : dw $4550 : db $40,$40 : dw $7940,$7E40
+    db $02 : dw $4590 : db $40,$40 : dw $79C0,$7EC0
+.set1D:                           ; LocRom.Tileset12 & $3F = $1D, $1E
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set1F:                           ; LocRom.Tileset12 & $3F = $1F
+    db $04 : dw $2890 : db $80,$80,$80,$80 : dw $6000,$6060,$60C0,$6120
+    db $04 : dw $2990 : db $80,$80,$80,$80 : dw $6120,$60C0,$6060,$6000
+.set20:                           ; LocRom.Tileset12 & $3F = $20
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set21:                           ; LocRom.Tileset12 & $3F = $21
+    db $04 : dw $3A60 : db $80,$80,$80,$80 : dw $6E40,$6EC0,$6F40,$6FC0
+    db $04 : dw $3B60 : db $80,$80,$80,$80 : dw $7040,$7080,$70C0,$7100
+    db $04 : dw $3C60 : db $80,$80,$80,$80 : dw $6EC0,$6F40,$6FC0,$6E40
+    db $04 : dw $3D60 : db $80,$80,$80,$80 : dw $7080,$70C0,$7100,$7040
+    db $80,$80,$80,$80,$80,$80,$80,$80
+.set22:                           ; LocRom.Tileset12 & $3F = $22
+    db $02 : dw $3000 : db $80,$80 : dw $6180,$6280
+    db $02 : dw $3040 : db $80,$80 : dw $6200,$6300
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set23:                           ; LocRom.Tileset12 & $3F = $23
+    db $04 : dw $3C00 : db $80,$80,$80,$80 : dw $6000,$6080,$6100,$6180
+    db $04 : dw $3C40 : db $80,$80,$80,$80 : dw $6200,$6280,$6300,$6380
+    db $04 : dw $3790 : db $80,$80,$80,$80 : dw $6600,$6680,$6700,$6780
+    db $02 : dw $3010 : db $80,$80 : dw $6880,$68C0
+    db $04 : dw $21C0 : db $80,$80,$80,$80 : dw $6900,$6940,$6980,$69C0
+    db $04 : dw $3470 : db $40,$40,$40,$40 : dw $6A00,$6A80,$6B00,$6B80
+    db $04 : dw $34F0 : db $40,$40,$40,$40 : dw $6C00,$6C20,$6C40,$6C60
+    db $02 : dw $3630 : db $40,$40 : dw $6C80,$6CE0
+    db $04 : dw $36C0 : db $40,$40,$40,$40 : dw $6D40,$6D80,$6DC0,$6E00
+    db $04 : dw $3670 : db $40,$40,$40,$40 : dw $6E00,$6DC0,$6D80,$6D40
+.set24:                           ; LocRom.Tileset12 & $3F = $24
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set25:                           ; LocRom.Tileset12 & $3F = $25
+    db $04 : dw $21C0 : db $80,$80,$80,$80 : dw $6900,$6940,$6980,$69C0
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set26:                           ; LocRom.Tileset12 & $3F = $26
+    db $04 : dw $2700 : db $40,$40,$40,$40 : dw $6FC0,$7040,$70C0,$7140
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set27:                           ; LocRom.Tileset12 & $3F = $27
+    db $08 : dw $2050 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6300,$6380,$6400,$6480,$6300,$6380,$6400,$6480
+    db $08 : dw $2150 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6500,$6580,$6600,$6680,$6500,$6580,$6600,$6680
+    db $08 : dw $2250 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6700,$6780,$6800,$6880,$6700,$6780,$6800,$6880
+    db $08 : dw $2350 : db $40,$2B,$2B,$40,$40,$40,$40,$40 : dw $6900,$6980,$6A00,$6A80,$6900,$6980,$6A00,$6A80
+.set28:                           ; LocRom.Tileset12 & $3F = $28-$2B
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set2C:                           ; LocRom.Tileset12 & $3F = $2C
+    db $04 : dw $40C0 : db $40,$40,$40,$40 : dw $7880,$7900,$7980,$7A00
+    db $04 : dw $41C0 : db $40,$40,$40,$40 : dw $7A80,$7B00,$7B80,$7C00
+    db $04 : dw $42C0 : db $40,$40,$40,$40 : dw $7C80,$7CE0,$7D40,$7DA0
+    db $04 : dw $43C0 : db $40,$40,$40,$40 : dw $7E00,$7E40,$7E80,$7EC0
+    db $04 : dw $4E40 : db $2B,$2B,$2B,$2B : dw $6B00,$6B80,$6C00,$6C80
+    db $04 : dw $4E80 : db $2B,$2B,$2B,$2B : dw $6D00,$6D80,$6E00,$6E80
+.set2D:                           ; LocRom.Tileset12 & $3F = $2D
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set2E:                           ; LocRom.Tileset12 & $3F = $2E
+    db $04 : dw $2A00 : db $1A,$20,$1A,$20 : dw $6E80,$6F00,$6F80,$7000
+    db $04 : dw $2A40 : db $1A,$20,$1A,$20 : dw $7080,$7100,$7180,$7200
+    db $04 : dw $2A80 : db $1A,$20,$1A,$20 : dw $7280,$7300,$7380,$7400
+.set2F:                           ; LocRom.Tileset12 & $3F = $2F-$32
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+.set33:                           ; LocRom.Tileset12 & $3F = $33
+    db $04 : dw $4340 : db $80,$80,$80,$80 : dw $7780,$77C0,$7800,$7840
+    db $04 : dw $4440 : db $40,$40,$40,$40 : dw $7880,$7900,$7980,$7A00
+.set34:                           ; LocRom.Tileset12 & $3F = $34-$3F
+    db $80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80
+
+; $FD:F9C7 — FieldAnimListBPtrs (176 bytes, $F9C7–$FA76)
+; !FieldRom_AnimListBPtrs: one word per LocRom.Palette ($00-$57), the
+; offset of its list from FieldAnimListB; labels named as for
+; FieldAnimListAPtrs. 88 entries is where FieldAnimListB begins; which
+; LocRom.Palette values the locations use is not checked.
+FieldAnimListBPtrs:
+    dw FieldAnimListB_pal00-FieldAnimListB,FieldAnimListB_pal00-FieldAnimListB ; $00, $01
+    dw FieldAnimListB_pal00-FieldAnimListB,FieldAnimListB_pal03-FieldAnimListB ; $02, $03
+    dw FieldAnimListB_pal04-FieldAnimListB,FieldAnimListB_pal04-FieldAnimListB ; $04, $05
+    dw FieldAnimListB_pal04-FieldAnimListB,FieldAnimListB_pal04-FieldAnimListB ; $06, $07
+    dw FieldAnimListB_pal04-FieldAnimListB,FieldAnimListB_pal09-FieldAnimListB ; $08, $09
+    dw FieldAnimListB_pal0A-FieldAnimListB,FieldAnimListB_pal0B-FieldAnimListB ; $0A, $0B
+    dw FieldAnimListB_pal0C-FieldAnimListB,FieldAnimListB_pal0D-FieldAnimListB ; $0C, $0D
+    dw FieldAnimListB_pal0E-FieldAnimListB,FieldAnimListB_pal0F-FieldAnimListB ; $0E, $0F
+    dw FieldAnimListB_pal10-FieldAnimListB,FieldAnimListB_pal11-FieldAnimListB ; $10, $11
+    dw FieldAnimListB_pal11-FieldAnimListB,FieldAnimListB_pal13-FieldAnimListB ; $12, $13
+    dw FieldAnimListB_pal14-FieldAnimListB,FieldAnimListB_pal15-FieldAnimListB ; $14, $15
+    dw FieldAnimListB_pal16-FieldAnimListB,FieldAnimListB_pal17-FieldAnimListB ; $16, $17
+    dw FieldAnimListB_pal18-FieldAnimListB,FieldAnimListB_pal19-FieldAnimListB ; $18, $19
+    dw FieldAnimListB_pal1A-FieldAnimListB,FieldAnimListB_pal1B-FieldAnimListB ; $1A, $1B
+    dw FieldAnimListB_pal1B-FieldAnimListB,FieldAnimListB_pal1D-FieldAnimListB ; $1C, $1D
+    dw FieldAnimListB_pal1E-FieldAnimListB,FieldAnimListB_pal1F-FieldAnimListB ; $1E, $1F
+    dw FieldAnimListB_pal20-FieldAnimListB,FieldAnimListB_pal21-FieldAnimListB ; $20, $21
+    dw FieldAnimListB_pal22-FieldAnimListB,FieldAnimListB_pal23-FieldAnimListB ; $22, $23
+    dw FieldAnimListB_pal23-FieldAnimListB,FieldAnimListB_pal23-FieldAnimListB ; $24, $25
+    dw FieldAnimListB_pal23-FieldAnimListB,FieldAnimListB_pal27-FieldAnimListB ; $26, $27
+    dw FieldAnimListB_pal28-FieldAnimListB,FieldAnimListB_pal29-FieldAnimListB ; $28, $29
+    dw FieldAnimListB_pal2A-FieldAnimListB,FieldAnimListB_pal2B-FieldAnimListB ; $2A, $2B
+    dw FieldAnimListB_pal2C-FieldAnimListB,FieldAnimListB_pal2D-FieldAnimListB ; $2C, $2D
+    dw FieldAnimListB_pal2D-FieldAnimListB,FieldAnimListB_pal2F-FieldAnimListB ; $2E, $2F
+    dw FieldAnimListB_pal30-FieldAnimListB,FieldAnimListB_pal31-FieldAnimListB ; $30, $31
+    dw FieldAnimListB_pal31-FieldAnimListB,FieldAnimListB_pal31-FieldAnimListB ; $32, $33
+    dw FieldAnimListB_pal31-FieldAnimListB,FieldAnimListB_pal31-FieldAnimListB ; $34, $35
+    dw FieldAnimListB_pal31-FieldAnimListB,FieldAnimListB_pal31-FieldAnimListB ; $36, $37
+    dw FieldAnimListB_pal38-FieldAnimListB,FieldAnimListB_pal39-FieldAnimListB ; $38, $39
+    dw FieldAnimListB_pal3A-FieldAnimListB,FieldAnimListB_pal3B-FieldAnimListB ; $3A, $3B
+    dw FieldAnimListB_pal3C-FieldAnimListB,FieldAnimListB_pal3D-FieldAnimListB ; $3C, $3D
+    dw FieldAnimListB_pal3E-FieldAnimListB,FieldAnimListB_pal3F-FieldAnimListB ; $3E, $3F
+    dw FieldAnimListB_pal40-FieldAnimListB,FieldAnimListB_pal40-FieldAnimListB ; $40, $41
+    dw FieldAnimListB_pal40-FieldAnimListB,FieldAnimListB_pal43-FieldAnimListB ; $42, $43
+    dw FieldAnimListB_pal44-FieldAnimListB,FieldAnimListB_pal45-FieldAnimListB ; $44, $45
+    dw FieldAnimListB_pal46-FieldAnimListB,FieldAnimListB_pal47-FieldAnimListB ; $46, $47
+    dw FieldAnimListB_pal48-FieldAnimListB,FieldAnimListB_pal49-FieldAnimListB ; $48, $49
+    dw FieldAnimListB_pal4A-FieldAnimListB,FieldAnimListB_pal4B-FieldAnimListB ; $4A, $4B
+    dw FieldAnimListB_pal4C-FieldAnimListB,FieldAnimListB_pal4D-FieldAnimListB ; $4C, $4D
+    dw FieldAnimListB_pal4E-FieldAnimListB,FieldAnimListB_pal4E-FieldAnimListB ; $4E, $4F
+    dw FieldAnimListB_pal50-FieldAnimListB,FieldAnimListB_pal51-FieldAnimListB ; $50, $51
+    dw FieldAnimListB_pal52-FieldAnimListB,FieldAnimListB_pal53-FieldAnimListB ; $52, $53
+    dw FieldAnimListB_pal53-FieldAnimListB,FieldAnimListB_pal55-FieldAnimListB ; $54, $55
+    dw FieldAnimListB_pal56-FieldAnimListB,FieldAnimListB_pal57-FieldAnimListB ; $56, $57
+
+; $FD:FA77 — FieldAnimListB (1202 bytes, $FA77–$FF28)
+; !FieldRom_AnimListB: FieldFD_LoadAnimSetB's lists, 6 records each (one
+; per FieldAnimB record 0-5), by the high nibble of the first byte:
+;   db $00-$0F: no animation (.Unk0 = 0);
+;   db k,first,count,delay (any other high nibble, 2-7 or 9-F; only 2
+;     and 3 occur): .Unk0, .Unk1 (the first colour), .Unk2 (the colour
+;     count), .Unk5 (frames per step);
+;   db k,first,count,delay : dw offset : db $F6 (kind 1, k = $1n): the
+;     same, then .Unk6/.Unk7 = the offset of the colours from PalAnimRom
+;     ($F6:0000) and .Unk8 = $F6 (in every kind 1 and 8 record; the
+;     colours' bank, probably, which the code takes from PalAnimRom
+;     instead); n + 1 frames;
+;   kind 8 (k = $8n): as kind 1, then the n + 1 frame bytes .Ptr points
+;     at.
+; Lists overlap as in FieldAnimListA (the shared records are mostly
+; empty ones). The three single $01 bytes, each after a copy of the
+; record $8B,$38,$04,$08 ($7580), look like a 13th frame its 12 leave
+; out; they are read as empty records. The $00 at $FD:FBC7 is in no list.
+FieldAnimListB:
+.pal00:                           ; LocRom.Palette = $00, $01, $02
+    db $00,$00,$00,$00,$00,$00
+.pal03:                           ; LocRom.Palette = $03
+    db $13,$11,$03,$09 : dw $7568 : db $F6
+.pal04:                           ; LocRom.Palette = $04-$08
+    db $00,$00,$00,$00,$00,$00
+.pal09:                           ; LocRom.Palette = $09
+    db $85,$39,$01,$08 : dw $7554 : db $F6
+    db $00,$01,$02,$03,$02,$01
+.pal0A:                           ; LocRom.Palette = $0A
+    db $13,$6F,$01,$08 : dw $7560 : db $F6
+.pal0B:                           ; LocRom.Palette = $0B
+    db $00,$00,$00,$00,$00,$00
+.pal0C:                           ; LocRom.Palette = $0C
+    db $15,$4F,$01,$04 : dw $73EE : db $F6
+    db $15,$4D,$01,$04 : dw $73FA : db $F6
+    db $12,$57,$04,$08 : dw $7406 : db $F6
+    db $11,$4E,$01,$02 : dw $7442 : db $F6
+    db $11,$2F,$01,$02 : dw $7442 : db $F6
+    db $00
+.pal0D:                           ; LocRom.Palette = $0D
+    db $17,$49,$03,$08 : dw $73A2 : db $F6
+    db $17,$3A,$01,$08 : dw $73D2 : db $F6
+    db $11,$24,$03,$02 : dw $744A : db $F6
+    db $30,$75,$05,$08
+    db $00,$00
+.pal0E:                           ; LocRom.Palette = $0E
+    db $17,$3C,$01,$07 : dw $7970 : db $F6
+.pal0F:                           ; LocRom.Palette = $0F
+    db $11,$11,$03,$08 : dw $791C : db $F6
+    db $00,$00,$00,$00,$00
+.pal10:                           ; LocRom.Palette = $10
+    db $20,$7D,$02,$0C
+    db $00,$00,$00,$00,$00
+.pal11:                           ; LocRom.Palette = $11, $12
+    db $20,$11,$02,$08
+.pal13:                           ; LocRom.Palette = $13
+    db $00,$00,$00,$00,$00,$00
+.pal14:                           ; LocRom.Palette = $14
+    db $20,$2A,$04,$08
+    db $00,$00,$00,$00,$00
+.pal15:                           ; LocRom.Palette = $15
+    db $30,$2D,$02,$0A
+    db $00,$00,$00,$00,$00
+.pal16:                           ; LocRom.Palette = $16
+    db $8F,$21,$05,$0E : dw $7868 : db $F6
+    db $00,$01,$02,$04,$03,$04,$03,$03,$03,$04,$01,$02,$04,$02,$02,$04
+    db $8F,$31,$05,$0E : dw $789A : db $F6
+    db $00,$01,$02,$05,$04,$05,$06,$06,$06,$05,$01,$03,$04,$07,$03,$06
+    db $30,$17,$03,$08
+    db $20,$1D,$02,$08
+.pal17:                           ; LocRom.Palette = $17
+    db $00,$00,$00,$00,$00,$00
+.pal18:                           ; LocRom.Palette = $18
+    db $8F,$27,$04,$10 : dw $7580 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$05,$05,$05,$05,$05,$04,$03,$02,$01
+    db $00,$00,$00,$00,$00
+.pal19:                           ; LocRom.Palette = $19
+    db $8F,$21,$0A,$10 : dw $75B0 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$05,$05,$05,$05,$05,$04,$03,$02,$01
+    db $00,$00,$00,$00,$00
+.pal1A:                           ; LocRom.Palette = $1A
+    db $8B,$38,$04,$08 : dw $7580 : db $F6
+    db $00,$01,$02,$03,$04,$05,$05,$05,$05,$04,$03,$02
+    db $01
+    db $8B,$28,$01,$10 : dw $7456 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$04,$04,$03,$02,$01
+    db $87,$62,$03,$10 : dw $7A34 : db $F6
+    db $00,$01,$02,$03,$04,$03,$02,$01
+    db $00,$00
+    db $00                           ; not in any list (no pointer reaches it)
+.pal1B:                           ; LocRom.Palette = $1B, $1C
+    db $20,$71,$07,$08
+    db $11,$79,$04,$06 : dw $7380 : db $F6
+    db $12,$15,$02,$08 : dw $785C : db $F6
+    db $20,$11,$02,$08
+.pal1D:                           ; LocRom.Palette = $1D
+    db $20,$5D,$02,$0A
+    db $20,$41,$07,$08
+.pal1E:                           ; LocRom.Palette = $1E
+    db $00,$00,$00,$00,$00,$00
+.pal1F:                           ; LocRom.Palette = $1F
+    db $8F,$69,$01,$0E : dw $7A82 : db $F6
+    db $00,$01,$02,$03,$04,$05,$06,$07,$07,$06,$05,$04,$03,$02,$01,$00
+    db $8F,$49,$03,$0E : dw $7A52 : db $F6
+    db $00,$01,$02,$03,$04,$05,$06,$07,$07,$06,$05,$04,$03,$02,$01,$00
+    db $8F,$55,$03,$0E : dw $7A52 : db $F6
+    db $00,$01,$02,$03,$04,$05,$06,$07,$07,$06,$05,$04,$03,$02,$01,$00
+    db $20,$15,$02,$08
+    db $20,$41,$07,$08
+    db $20,$5D,$02,$0A
+.pal20:                           ; LocRom.Palette = $20
+    db $20,$71,$07,$08
+    db $11,$11,$03,$08 : dw $78EA : db $F6
+    db $11,$15,$02,$08 : dw $78F6 : db $F6
+    db $00,$00,$00
+.pal21:                           ; LocRom.Palette = $21
+    db $30,$6B,$04,$02
+    db $8B,$3B,$04,$08 : dw $7490 : db $F6
+    db $00,$00,$01,$02,$03,$04,$05,$05,$04,$03,$02,$01
+    db $8F,$2B,$04,$06 : dw $74C0 : db $F6
+    db $00,$01,$01,$01,$02,$03,$04,$05,$06,$06,$06,$05,$04,$03,$02,$01
+    db $00,$00
+.pal22:                           ; LocRom.Palette = $22
+    db $00
+    db $89,$38,$07,$18 : dw $76CA : db $F6
+    db $00,$00,$01,$02,$03,$04,$04,$03,$02,$01
+    db $87,$5B,$04,$16 : dw $7710 : db $F6
+    db $00,$01,$02,$03,$04,$03,$02,$01
+    db $8F,$6B,$04,$08 : dw $7740 : db $F6
+    db $00,$00,$01,$02,$03,$04,$05,$06,$07,$07,$06,$05,$04,$03,$02,$01
+    db $8F,$41,$0A,$16 : dw $7780 : db $F6
+    db $00,$00,$01,$02,$03,$04,$05,$06,$07,$07,$06,$05,$04,$03,$02,$01
+.pal23:                           ; LocRom.Palette = $23-$26
+    db $00,$00,$00,$00,$00,$00
+.pal27:                           ; LocRom.Palette = $27
+    db $15,$32,$06,$03 : dw $7928 : db $F6
+.pal28:                           ; LocRom.Palette = $28
+    db $00,$00,$00,$00,$00,$00
+.pal29:                           ; LocRom.Palette = $29
+    db $83,$3D,$03,$0A : dw $7AC2 : db $F6
+    db $00,$01,$02,$01
+    db $87,$4D,$01,$08 : dw $7456 : db $F6
+    db $00,$01,$02,$03,$04,$03,$02,$01
+.pal2A:                           ; LocRom.Palette = $2A
+    db $00,$00,$00,$00,$00,$00
+.pal2B:                           ; LocRom.Palette = $2B
+    db $11,$11,$03,$08 : dw $791C : db $F6
+.pal2C:                           ; LocRom.Palette = $2C
+    db $00,$00,$00,$00,$00,$00
+.pal2D:                           ; LocRom.Palette = $2D, $2E
+    db $00,$00,$00,$00,$00,$00
+.pal2F:                           ; LocRom.Palette = $2F
+    db $83,$62,$05,$04 : dw $7A16 : db $F6
+    db $00,$01,$02,$01
+    db $00,$00,$00,$00,$00
+.pal30:                           ; LocRom.Palette = $30
+    db $20,$1D,$01,$01
+.pal31:                           ; LocRom.Palette = $31-$37
+    db $00,$00,$00,$00,$00,$00
+.pal38:                           ; LocRom.Palette = $38
+    db $20,$5D,$02,$09
+.pal39:                           ; LocRom.Palette = $39
+    db $00,$00,$00,$00,$00,$00
+.pal3A:                           ; LocRom.Palette = $3A
+    db $20,$19,$01,$02
+    db $00,$00,$00,$00,$00
+.pal3B:                           ; LocRom.Palette = $3B
+    db $11,$37,$05,$02 : dw $7540 : db $F6
+    db $20,$71,$02,$08
+    db $00,$00,$00,$00
+.pal3C:                           ; LocRom.Palette = $3C
+    db $30,$61,$07,$06
+    db $30,$69,$02,$06
+    db $00,$00,$00,$00
+.pal3D:                           ; LocRom.Palette = $3D
+    db $30,$51,$0D,$08
+    db $20,$11,$02,$10
+    db $00,$00,$00,$00
+.pal3E:                           ; LocRom.Palette = $3E
+    db $20,$2A,$04,$08
+    db $00,$00,$00,$00,$00
+.pal3F:                           ; LocRom.Palette = $3F
+    db $12,$77,$04,$06 : dw $76A0 : db $F6
+    db $8F,$32,$03,$02 : dw $7688 : db $F6
+    db $00,$00,$01,$01,$01,$02,$02,$03,$02,$03,$03,$01,$01,$01,$02,$02
+    db $8E,$68,$03,$02 : dw $76B8 : db $F6
+    db $00,$00,$00,$01,$01,$02,$02,$02,$00,$00,$00,$00,$02,$02,$02
+    db $30,$11,$02,$08
+.pal40:                           ; LocRom.Palette = $40, $41, $42
+    db $00,$00,$00,$00,$00,$00
+.pal43:                           ; LocRom.Palette = $43
+    db $20,$7D,$02,$0C
+.pal44:                           ; LocRom.Palette = $44
+    db $00,$00,$00,$00,$00,$00
+.pal45:                           ; LocRom.Palette = $45
+    db $8F,$27,$04,$10 : dw $7580 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$05,$05,$05,$05,$05,$04,$03,$02,$01
+    db $13,$7F,$01,$08 : dw $7560 : db $F6
+    db $00,$00,$00,$00
+.pal46:                           ; LocRom.Palette = $46
+    db $8F,$27,$04,$10 : dw $7580 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$05,$05,$05,$05,$05,$04,$03,$02,$01
+    db $00,$00,$00,$00,$00
+.pal47:                           ; LocRom.Palette = $47
+    db $8F,$21,$0A,$10 : dw $75B0 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$05,$05,$05,$05,$05,$04,$03,$02,$01
+    db $00,$00,$00,$00,$00
+.pal48:                           ; LocRom.Palette = $48
+    db $15,$4F,$01,$04 : dw $73EE : db $F6
+    db $15,$4D,$01,$04 : dw $73FA : db $F6
+    db $12,$57,$04,$08 : dw $7406 : db $F6
+    db $11,$4E,$01,$02 : dw $7442 : db $F6
+    db $11,$2F,$01,$02 : dw $7442 : db $F6
+    db $00
+.pal49:                           ; LocRom.Palette = $49
+    db $87,$11,$03,$08 : dw $78FE : db $F6
+    db $00,$01,$02,$00,$02,$00,$00,$01
+    db $87,$15,$02,$08 : dw $7910 : db $F6
+    db $00,$01,$02,$00,$02,$00,$00,$01
+    db $00,$00,$00,$00
+.pal4A:                           ; LocRom.Palette = $4A
+    db $20,$2A,$04,$08
+    db $00,$00,$00,$00,$00
+.pal4B:                           ; LocRom.Palette = $4B
+    db $8B,$28,$01,$10 : dw $7456 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$04,$04,$03,$02,$01
+    db $8F,$51,$08,$08 : dw $7628 : db $F6
+    db $00,$00,$00,$00,$00,$00,$01,$02,$03,$04,$05,$05,$04,$03,$02,$01
+    db $8B,$38,$04,$08 : dw $7580 : db $F6
+    db $00,$01,$02,$03,$04,$05,$05,$05,$05,$04,$03,$02
+    db $01
+    db $87,$62,$03,$10 : dw $7A34 : db $F6
+    db $00,$01,$02,$03,$04,$03,$02,$01
+.pal4C:                           ; LocRom.Palette = $4C
+    db $00,$00,$00,$00,$00,$00
+.pal4D:                           ; LocRom.Palette = $4D
+    db $20,$11,$02,$08
+    db $20,$2A,$04,$08
+    db $20,$7C,$03,$08
+.pal4E:                           ; LocRom.Palette = $4E, $4F
+    db $00,$00,$00,$00,$00,$00
+.pal50:                           ; LocRom.Palette = $50
+    db $20,$7D,$02,$0C
+.pal51:                           ; LocRom.Palette = $51
+    db $00,$00,$00,$00,$00,$00
+.pal52:                           ; LocRom.Palette = $52
+    db $8B,$11,$03,$08 : dw $7A92 : db $F6
+    db $00,$01,$02,$03,$04,$06,$07,$08,$06,$05,$03,$01
+.pal53:                           ; LocRom.Palette = $53, $54
+    db $00,$00,$00,$00,$00,$00
+.pal55:                           ; LocRom.Palette = $55
+    db $20,$51,$0D,$02
+    db $20,$61,$0D,$02
+    db $20,$71,$0D,$02
+.pal56:                           ; LocRom.Palette = $56
+    db $00,$00,$00,$00,$00,$00
+.pal57:                           ; LocRom.Palette = $57
+    db $8B,$38,$04,$08 : dw $7580 : db $F6
+    db $00,$01,$02,$03,$04,$05,$05,$05,$05,$04,$03,$02
+    db $01
+    db $8B,$28,$01,$10 : dw $7456 : db $F6
+    db $00,$00,$00,$01,$02,$03,$04,$04,$04,$03,$02,$01
+    db $00,$00,$00
+
+; $FD:FF29 — FieldAnimListBOldTail (188 bytes, $FF29–$FFE4)
+; Nothing found reads it (no matched code refers to it, xref finds no
+; call or jump into it), and it lies past the end of every list: the
+; same bytes as FieldAnimListB's $FE6C-$FF27 (from the frame bytes of
+; .pal4E's first record to the end). Probably what an
+; earlier, longer build of the lists left, $BD bytes higher; it runs up
+; to the service vectors at $FD:FFE5.
+FieldAnimListBOldTail:
+    db $00,$00,$00,$01,$02,$03,$04,$04,$04,$03,$02,$01,$8F,$51,$08,$08
+    db $28,$76,$F6,$00,$00,$00,$00,$00,$00,$01,$02,$03,$04,$05,$05,$04
+    db $03,$02,$01,$8B,$38,$04,$08,$80,$75,$F6,$00,$01,$02,$03,$04,$05
+    db $05,$05,$05,$04,$03,$02,$01,$87,$62,$03,$10,$34,$7A,$F6,$00,$01
+    db $02,$03,$04,$03,$02,$01,$00,$00,$00,$00,$00,$00,$20,$11,$02,$08
+    db $20,$2A,$04,$08,$20,$7C,$03,$08,$00,$00,$00,$00,$00,$00,$20,$7D
+    db $02,$0C,$00,$00,$00,$00,$00,$00,$8B,$11,$03,$08,$92,$7A,$F6,$00
+    db $01,$02,$03,$04,$06,$07,$08,$06,$05,$03,$01,$00,$00,$00,$00,$00
+    db $00,$20,$51,$0D,$02,$20,$61,$0D,$02,$20,$71,$0D,$02,$00,$00,$00
+    db $00,$00,$00,$8B,$38,$04,$08,$80,$75,$F6,$00,$01,$02,$03,$04,$05
+    db $05,$05,$05,$04,$03,$02,$01,$8B,$28,$01,$10,$56,$74,$F6,$00,$00
+    db $00,$01,$02,$03,$04,$04,$04,$03,$02,$01,$00,$00
+
 ; $FD:FFE5 — FdVec_FFE5 (3 bytes, $FFE5–$FFE7)
 ; The bank's service vectors: JMPs at fixed addresses near the end of the
 ; bank, so code in other banks can reach them by JSL or JML. This one:
