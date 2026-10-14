@@ -175,24 +175,24 @@ Spc_Start:
 ;      nibbles ORed, low nibble) OR !Spc_SfxVoices.
 ;   4. With !Spc_Flags87 bit 4 set, back to 1. Every 7th pass
 ;      (!Spc_FadeTimer) the fades (Spc_Unk1492); then the tempo step
-;      (Spc_Unk0377) and the queued commands (Spc_RunQueue); bit 4 again.
+;      (Spc_StepTracks) and the queued commands (Spc_RunQueue); bit 4 again.
 ;   5. The song's tracks (voice bits !Spc_SongTracks AND !Spc_Unk24,
-;      less !Spc_SfxVoices), X = 0, 2, ...: Spc_Unk0903, or Spc_Unk09F6
+;      less !Spc_SfxVoices), X = 0, 2, ...: Spc_TrackEffects, or Spc_WriteVoice
 ;      while any effect plays, with !Spc_GroupVolume = the song's volume;
 ;      Spc_QueueCommand after each.
 ;   6. The effect tracks (!Spc_SfxVoices AND !Spc_Unk25), X = $1E down:
 ;      tracks 15-14 with the second volume, 13-8 with the third,
-;      Spc_Unk0903 and Spc_QueueCommand for each.
+;      Spc_TrackEffects and Spc_QueueCommand for each.
 ;   7. Clears !Spc_UnkD0/!Spc_UnkD1, runs the queue again (Spc_RunQueue)
-;      and Spc_Unk0B5C, and goes back to 1.
+;      and Spc_AnimateBuiltin, and goes back to 1.
 ; Callers note: Spc_Start falls in; JMP from Spc_StartSong ($0CF3, with
 ;   SP reset); the pass loops back here (JMP $0374, BEQ/BBS inside).
 ; Entry: P=0; SP as Spc_Start or Spc_StartSong leaves it
 ; Exit:  does not return
 ; Ports: CPUIO0-3 as in 3; commands through Spc_PollCommand
 ; DSP:   the 17 shadowed registers each pass
-; Callees: Spc_PollCommand, Spc_Unk1438, Spc_Unk1492, Spc_Unk0377,
-;   Spc_RunQueue, Spc_Unk0903, Spc_Unk09F6, Spc_QueueCommand, Spc_Unk0B5C
+; Callees: Spc_PollCommand, Spc_Unk1438, Spc_Unk1492, Spc_StepTracks,
+;   Spc_RunQueue, Spc_TrackEffects, Spc_WriteVoice, Spc_QueueCommand, Spc_AnimateBuiltin
 Spc_MainLoop:
     call Spc_PollCommand
     mov.b y,!SPC_T0OUT
@@ -240,7 +240,7 @@ Spc_MainLoop:
     mov.b !Spc_FadeTimer,#!Spc_FadeTicks
     call Spc_Unk1492
 .no_fade:
-    call Spc_Unk0377
+    call Spc_StepTracks
     call Spc_RunQueue
     bbs.b !Spc_Flags87.4,Spc_MainLoop
     mov x,#$00
@@ -257,10 +257,10 @@ Spc_MainLoop:
     mov.b !Spc_CurTrack,x
     mov.b a,!Spc_SfxVoices
     bne .with_sfx
-    call Spc_Unk0903
+    call Spc_TrackEffects
     bra .song_stepped
 .with_sfx:
-    call Spc_Unk09F6
+    call Spc_WriteVoice
 .song_stepped:
     call Spc_QueueCommand
 .song_skip:
@@ -281,7 +281,7 @@ Spc_MainLoop:
     bra .sfx_a_next
 .sfx_a_track:
     mov.b !Spc_CurTrack,x
-    call Spc_Unk0903
+    call Spc_TrackEffects
     call Spc_QueueCommand
 .sfx_a_skip:
     dec x
@@ -298,7 +298,7 @@ Spc_MainLoop:
     bra .sfx_b_next
 .sfx_b_track:
     mov.b !Spc_CurTrack,x
-    call Spc_Unk0903
+    call Spc_TrackEffects
     call Spc_QueueCommand
 .sfx_b_skip:
     dec x
@@ -312,8 +312,784 @@ Spc_MainLoop:
     mov y,a
     movw.b !Spc_UnkD0,ya                ; and !Spc_UnkD1
     call Spc_RunQueue
-    call Spc_Unk0B5C
+    call Spc_AnimateBuiltin
     jmp Spc_MainLoop
+
+
+; ============================================================
+; Track stepping ($0377-$07A2)
+; ============================================================
+
+; $0377 — Spc_StepTracks (158 bytes, $0377–$0414; ROM $C7:263C–$26D9)
+; Steps the song's tracks and the effect tracks for one pass:
+;   1. Unless !Spc_Flags88 bit 5 is set (command $F6: every pass steps),
+;      the song's tempo: !Spc_Tempo, raised with !Spc_TempoAdjHi below $80
+;      (+ 2 x tempo x adj / 256, capped at $FF) or lowered with it from
+;      $80 up (tempo x adj / 256, at least 1), is added to
+;      !Spc_TempoAccum; without a carry the song does not step.
+;   2. Each track of !Spc_SongTracks (X = 0, 2, ...; !Spc_CurTrack): its
+;      wait counts down; at 0 Spc_TrackStep takes its next note (a track
+;      that ends there, !Spc_Flags88 bit 3, is not updated further). With
+;      the wait at 2, unless the voice is in !Spc_Unk5A (the next note
+;      follows on: a tie, or !Spc_Unk5C/60), the voice is cleared from
+;      !Spc_Unk24 and keyed off (!Spc_KofShadow), unless an effect holds
+;      it. Then Spc_TrackSlides and Spc_QueueCommand.
+;   3. After the song's tracks: Spc_StepSongFades, and the effect voices
+;      are cleared from !Spc_UnkD0 and !Spc_UnkD1.
+;   4. The effects' tempo: !Spc_SfxTempo ($81) added to
+;      !Spc_SfxTempoAccum (skipped, and the effects step, with bit 5 set);
+;      on the carry effect tracks 12-15 (X = $18 up, the voices of the high
+;      nibble of !Spc_SfxVoices) step as in 2, with !Spc_Unk5B and
+;      !Spc_Unk25 for !Spc_Unk5A and !Spc_Unk24. Effect tracks 8-11 are
+;      never stepped (effects only use voices 4-7).
+; Quirk (a byte shared by two instructions): for an effect track the BCS
+; lands on the operand byte of `mov a,#$FC`, which is `inc y`, so Y = 1
+; picks the effect bytes ($5B, $25) and Y = 0 the song's.
+; Callers note: CALL from Spc_MainLoop ($02EF).
+; Entry: P=0
+; Exit:  A, X, Y clobbered
+; Callees: Spc_TrackStep, Spc_TrackSlides, Spc_QueueCommand,
+;   Spc_StepSongFades
+Spc_StepTracks:
+    bbs.b !Spc_Flags88.5,.song
+    mov.b a,!Spc_Tempo
+    mov.b y,!Spc_TempoAdjHi
+    beq .add
+    mul ya
+    mov a,y
+    bbs.b !Spc_TempoAdjHi.7,.slower
+    asl a
+    clrc
+    adc.b a,!Spc_Tempo
+    bcc .add
+    mov a,#!Spc_TempoMax
+    bra .add
+.slower:
+    bne .add
+    inc a
+.add:
+    clrc
+    adc.b a,!Spc_TempoAccum
+    mov.b !Spc_TempoAccum,a
+    bcc .sfx_tempo
+.song:
+    mov x,#$00
+    mov.b !Spc_VoiceBit,#!Spc_VoiceBit0
+    mov.b !Spc_TrackBits,!Spc_SongTracks
+    bra .loop
+.track:
+    mov.b !Spc_CurTrack,x
+    dec.b !Spc_TrackWait+x
+    bne .waiting
+    clr1.b !Spc_Flags88.3
+    call Spc_TrackStep
+    bbc.b !Spc_Flags88.3,.update
+    bra .next
+.waiting:
+    mov y,#$00
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .sfx_y+1                        ; effect track: on the `inc y` inside .sfx_y
+.sfx_y:
+    mov a,#$FC                          ; lint-ok: $FC is the `inc y` the BCS above lands on
+    mov a,#$02
+    cbne.b !Spc_TrackWait+x,.update
+    mov.w a,!Spc_Unk5A+y
+    and.b a,!Spc_VoiceBit
+    bne .update
+    mov.b a,!Spc_VoiceBit
+    eor a,#!Spc_InvertBits
+    and.w a,!Spc_Unk24+y
+    mov.w !Spc_Unk24+y,a
+    mov a,y
+    bne .key_off
+    mov.b a,!Spc_SfxVoices
+    and.b a,!Spc_VoiceBit
+    bne .update
+.key_off:
+    or.b !Spc_KofShadow,!Spc_VoiceBit
+.update:
+    call Spc_TrackSlides
+    call Spc_QueueCommand
+.next:
+    inc x
+    inc x
+    asl.b !Spc_VoiceBit
+.loop:
+    lsr.b !Spc_TrackBits
+    bcs .track
+    bne .next
+    cmp x,#!Spc_TrackSfxStep
+    bcs .done
+    call Spc_StepSongFades
+    mov.b a,!Spc_SfxVoices
+    tclr.w !Spc_UnkD0,a
+    tclr.w !Spc_UnkD1,a
+.sfx_tempo:
+    bbs.b !Spc_Flags88.5,.sfx
+    mov a,#!Spc_SfxTempo
+    clrc
+    adc.b a,!Spc_SfxTempoAccum
+    mov.b !Spc_SfxTempoAccum,a
+    bcc .done
+.sfx:
+    mov x,#!Spc_TrackSfxStep
+    mov.b !Spc_VoiceBit,#!Spc_VoiceBit4
+    mov.b a,!Spc_SfxVoices
+    xcn a
+    mov.b !Spc_TrackBits,a
+    bra .loop
+.done:
+    ret
+
+; $0415 — Spc_LivePass (79 bytes, $0415–$0463; ROM $C7:26DA–$2728)
+; One pass of the song alone, for Spc_XferLive (mode 5) to run while it
+; waits for a step: unless paused (!Spc_Flags87 bit 4), writes the DSP
+; shadows (Spc_ShadowRegs, as Spc_MainLoop does) and clears the KON / KOF
+; shadows, counts !Spc_FadeTimer (Spc_Unk1492 every 7th pass), steps the
+; song (Spc_StepSongOnly), runs Spc_TrackEffects for the song's tracks
+; (!Spc_SongTracks and !Spc_Unk24, less !Spc_SfxVoices) with the song's
+; volume, and clears !Spc_UnkD0 / !Spc_UnkD1. No effect tracks, no
+; command queue, no port report.
+; Callers note: CALL from Spc_XferLive ($1124).
+; Entry: P=0
+; Exit:  A, X, Y clobbered (A = Y = 0 unless paused)
+; DSP:   the 17 shadowed registers
+; Callees: Spc_Unk1492, Spc_StepSongOnly, Spc_TrackEffects
+Spc_LivePass:
+    bbs.b !Spc_Flags87.4,.done
+    mov y,#!Spc_NumShadowRegs
+.write_dsp:
+    mov.w a,Spc_ShadowRegs-1+y
+    mov.b !SPC_DSPADDR,a
+    mov.w a,Spc_ShadowSources-1+y
+    mov x,a
+    mov a,(x)
+    mov.b !SPC_DSPDATA,a
+    dbnz y,.write_dsp
+    mov.b !Spc_KofShadow,y
+    mov.b !Spc_KonShadow,y
+    dec.b !Spc_FadeTimer
+    bne .no_fade
+    mov.b !Spc_FadeTimer,#!Spc_FadeTicks
+    call Spc_Unk1492
+.no_fade:
+    call Spc_StepSongOnly
+    mov x,#$00
+    mov.b !Spc_VoiceBit,#!Spc_VoiceBit0
+    mov.b a,!Spc_SfxVoices
+    eor a,#!Spc_InvertBits
+    and.b a,!Spc_SongTracks
+    and.b a,!Spc_Unk24
+    mov.b !Spc_TrackBits,a
+    mov.w a,!Spc_GroupVol+1
+    mov.b !Spc_GroupVolume,a
+    bra .loop
+.track:
+    mov.b !Spc_CurTrack,x
+    call Spc_TrackEffects
+.next:
+    inc x
+    inc x
+    asl.b !Spc_VoiceBit
+.loop:
+    lsr.b !Spc_TrackBits
+    bcs .track
+    bne .next
+    mov a,#$00
+    mov y,a
+    movw.b !Spc_UnkD0,ya
+.done:
+    ret
+
+; $0464 — Spc_StepSongOnly (99 bytes, $0464–$04C6; ROM $C7:2729–$278B)
+; Spc_StepTracks for the song alone (Spc_LivePass): the tempo step
+; (without the !Spc_Flags88 bit 5 bypass), the song's tracks with the
+; key-off two passes before a note's end (!Spc_Unk5A, !Spc_Unk24; no
+; Y-indexed form) and Spc_TrackSlides, then Spc_StepSongFades; no
+; Spc_QueueCommand.
+; Callers note: CALL from Spc_LivePass ($0436).
+; Entry: P=0
+; Exit:  A, X, Y clobbered
+; Callees: Spc_TrackStep, Spc_TrackSlides, Spc_StepSongFades
+Spc_StepSongOnly:
+    mov.b a,!Spc_Tempo
+    mov.b y,!Spc_TempoAdjHi
+    beq .add
+    mul ya
+    mov a,y
+    bbs.b !Spc_TempoAdjHi.7,.slower
+    asl a
+    clrc
+    adc.b a,!Spc_Tempo
+    bcc .add
+    mov a,#!Spc_TempoMax
+    bra .add
+.slower:
+    bne .add
+    inc a
+.add:
+    clrc
+    adc.b a,!Spc_TempoAccum
+    mov.b !Spc_TempoAccum,a
+    bcc .done
+    mov x,#$00
+    mov.b !Spc_VoiceBit,#!Spc_VoiceBit0
+    mov.b !Spc_TrackBits,!Spc_SongTracks
+    bra .loop
+.track:
+    mov.b !Spc_CurTrack,x
+    dec.b !Spc_TrackWait+x
+    bne .waiting
+    clr1.b !Spc_Flags88.3
+    call Spc_TrackStep
+    bbc.b !Spc_Flags88.3,.update
+    bra .next
+.waiting:
+    mov a,#$02
+    cbne.b !Spc_TrackWait+x,.update
+    mov.b a,!Spc_Unk5A
+    and.b a,!Spc_VoiceBit
+    bne .update
+    mov.b a,!Spc_VoiceBit
+    tclr.w !Spc_Unk24,a
+    mov.b a,!Spc_SfxVoices
+    and.b a,!Spc_VoiceBit
+    bne .update
+    or.b !Spc_KofShadow,!Spc_VoiceBit
+.update:
+    call Spc_TrackSlides
+.next:
+    inc x
+    inc x
+    asl.b !Spc_VoiceBit
+.loop:
+    lsr.b !Spc_TrackBits
+    bcs .track
+    bne .next
+    call Spc_StepSongFades
+.done:
+    ret
+
+; $04C7 — Spc_StepSongFades (64 bytes, $04C7–$0506; ROM $C7:278C–$27CB)
+; One step of each of the song's own fades that is running: the tempo
+; (!Spc_TempoWord += !Spc_TempoFadeDelta, !Spc_TempoFadeSteps), the echo
+; volume (!Spc_EchoVolWord, !Spc_EchoVolDelta, !Spc_EchoVolSteps), EFB
+; (!Spc_EfbWord, !Spc_EfbDelta, !Spc_EfbSteps) and the eight FIR
+; coefficients (!Spc_FirWord += !Spc_FirDelta, !Spc_FirSteps). The fades
+; are set by sequence commands (not matched; probably).
+; Callers note: CALL from Spc_StepTracks ($03F1) and Spc_StepSongOnly
+;   ($04C3).
+; Entry: P=0
+; Exit:  A, Y clobbered; X = 0 after a FIR step, else unchanged
+Spc_StepSongFades:
+    mov.b a,!Spc_TempoFadeSteps
+    beq .echo
+    dec.b !Spc_TempoFadeSteps
+    movw.b ya,!Spc_TempoFadeDelta
+    addw.b ya,!Spc_TempoWord
+    movw.b !Spc_TempoWord,ya
+.echo:
+    mov.b a,!Spc_EchoVolSteps
+    beq .efb
+    dec.b !Spc_EchoVolSteps
+    movw.b ya,!Spc_EchoVolDelta
+    addw.b ya,!Spc_EchoVolWord
+    movw.b !Spc_EchoVolWord,ya
+.efb:
+    mov.b a,!Spc_EfbSteps
+    beq .fir
+    dec.b !Spc_EfbSteps
+    movw.b ya,!Spc_EfbDelta
+    addw.b ya,!Spc_EfbWord
+    movw.b !Spc_EfbWord,ya
+.fir:
+    mov.b a,!Spc_FirSteps
+    beq .done
+    dec.b !Spc_FirSteps
+    mov x,#!Spc_FirBytes
+.fir_loop:
+    mov.b a,!Spc_FirWord-2+x
+    clrc
+    adc.w a,!Spc_FirDelta-2+x
+    mov.b !Spc_FirWord-2+x,a
+    mov.b a,!Spc_FirWord-2+1+x
+    adc.w a,!Spc_FirDelta-2+1+x
+    mov.b !Spc_FirWord-2+1+x,a
+    dec x
+    dec x
+    bne .fir_loop
+.done:
+    ret
+
+; $0507 — Spc_TrackStep (438 bytes, $0507–$06BC; ROM $C7:27CC–$2981)
+; (with its sub-entry Spc_TrackLookAhead)
+; Takes the next note of track X (!Spc_CurTrack = X, !Spc_VoiceBit its
+; voice). Sequence bytes $C4-$FF are commands (Spc_RunSeqCommand), run
+; until a byte below $C4 comes:
+;   - its length: when no command has set !Spc_TrackWait,
+;     Spc_DurationTable[byte % 14];
+;   - $B6-$C3: a rest: nothing more;
+;   - $A8-$B5: a tie: only Spc_TrackLookAhead;
+;   - $00-$A7: a note, index byte / 14 (0-11). Its note number: for a
+;     song track in drum mode (!Spc_Unk7C) Spc_DrumNote's, else the low
+;     byte of !Spc_TrackF200 + the index; + the transpose (!Spc_TrackF360
+;     high byte) - 10, kept in !Spc_TrackF3A0's high byte. Its pitch
+;     (Spc_NotePitch) goes to !Spc_TrackPitch. With a vibrato depth byte
+;     (!Spc_Track150 high byte): Spc_Unk18A2, and the depth in pitch units
+;     (!Spc_TrackF300) = pitch x Spc_VibDepthTable[0, or !Spc_TrackUnk110
+;     for an effect track] / 256 (the pitch itself when that byte is 0).
+;     With a tremolo byte (!Spc_Track170): Spc_Unk1960. Clears the vibrato
+;     offset, the tremolo phase and the pitch slide. A song track adds its
+;     voice to !Spc_Unk24 (an effect track to !Spc_Unk25); a song track
+;     whose voice an effect holds goes on to Spc_TrackLookAhead without a
+;     key-on. Key-on (!Spc_KonShadow) unless the voice is in !Spc_Unk5C
+;     (!Spc_Unk5D) and not !Spc_Unk60 (!Spc_Unk61) and was keyed on before
+;     (!Spc_Unk5E / 5F, set at the first): legato, probably. Then the voice
+;     is marked in !Spc_UnkD0 / !Spc_UnkD1 (volume and pitch rewritten) and
+;     Spc_Unk1AED writes its sample (and ADSR).
+; Spc_TrackLookAhead (188 bytes, $0601–$06BC) then finds the next note
+; (Spc_PeekNote): a tie sets the voice in !Spc_Unk5A (!Spc_Unk5B for
+; effects: no key-off before it); a rest clears it from !Spc_Unk5C/60
+; (5D/61); for a note or rest the !Spc_Unk5A bit is set from
+; !Spc_Unk5C | !Spc_Unk60. A pitch slide asked for (!Spc_Track150 low
+; byte, semitones) moves the note ahead by that much and sets the step
+; (!Spc_TrackF3C0 / !Spc_TrackF4E0, 24 bits) to (target - pitch) x 256 /
+; the slide's steps (!Spc_TrackF360 low byte; 0: the whole difference),
+; signed, then clears the request and the pitch fraction.
+; Callers note: CALL from Spc_StepTracks ($03AB) and Spc_StepSongOnly
+;   ($0495). Spc_TrackLookAhead: JMP from $052C (a tie, inside).
+; Entry: P=0; X = the track, !Spc_CurTrack = X, !Spc_VoiceBit its bit,
+;        !Spc_TrackWait+X = 0
+; Exit:  X = the track; A, Y clobbered
+; DSP:   SRCN, ADSR1/ADSR2 (Spc_Unk1AED)
+; Callees: Spc_ReadSeqByte, Spc_RunSeqCommand, Spc_DrumNote,
+;   Spc_NotePitch, Spc_Unk18A2, Spc_Unk1960, Spc_Unk1AED, Spc_PeekNote
+; Sub-entries: Spc_TrackLookAhead.
+Spc_TrackStep:
+    call Spc_ReadSeqByte
+    cmp a,#!Spc_SeqFirstCmd
+    bcc .byte
+    call Spc_RunSeqCommand
+    bra Spc_TrackStep
+.byte:
+    mov.b y,!Spc_TrackWait+x
+    bne .kind
+    mov x,#!Spc_NumDurations
+    div ya,x
+    mov.b x,!Spc_CurTrack
+    mov.w a,Spc_DurationTable+y
+    mov.b !Spc_TrackWait+x,a
+.kind:
+    mov.b a,!Spc_TempA5
+    cmp a,#!Spc_SeqFirstTie
+    bcc .note
+    cmp a,#!Spc_SeqFirstRest
+    bcc .tie
+    ret
+.tie:
+    jmp Spc_TrackLookAhead
+.note:
+    mov y,#$00
+    mov x,#!Spc_NumDurations
+    div ya,x
+    mov.b !Spc_TempA5,a
+    mov.b x,!Spc_CurTrack
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .tone
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Unk7C
+    beq .tone
+    call Spc_DrumNote
+    bra .transpose
+.tone:
+    mov.w a,!Spc_TrackF200+x
+    clrc
+    adc.b a,!Spc_TempA5
+.transpose:
+    clrc
+    adc.w a,!Spc_TrackF360+1+x
+    setc
+    sbc a,#!Spc_NoteBase
+    mov.w !Spc_TrackF3A0+1+x,a
+    call Spc_NotePitch
+    mov.b a,!Spc_Quotient
+    mov.w !Spc_TrackPitch+x,a
+    mov.b a,!Spc_Quotient+1
+    mov.w !Spc_TrackPitch+1+x,a
+    mov.w a,!Spc_Track150+1+x
+    beq .tremolo
+    mov.b !Spc_TempA5,a
+    call Spc_Unk18A2
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .sfx_vib
+    mov y,#$00
+    bra .vib
+.sfx_vib:
+    mov.w a,!Spc_TrackUnk110+x
+    mov y,a
+.vib:
+    mov.w a,Spc_VibDepthTable+y
+    mov y,a
+    bne .vib_scale
+    movw.b ya,!Spc_Quotient
+    bra .vib_set
+.vib_scale:
+    mov.b !Spc_Temp9D,y
+    mov.b a,!Spc_Quotient+1
+    mul ya
+    movw.b !Spc_Temp9B,ya
+    mov.b a,!Spc_Quotient
+    mov.b y,!Spc_Temp9D
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Temp9B
+.vib_set:
+    mov.w !Spc_TrackF300+x,a
+    mov a,y
+    mov.w !Spc_TrackF300+1+x,a
+.tremolo:
+    mov.w a,!Spc_Track170+x
+    beq .trem_set
+    mov.b !Spc_TempA5,a
+    call Spc_Unk1960
+    mov a,#$00
+.trem_set:
+    mov.w !Spc_TrackVibOffset+x,a
+    mov.w !Spc_TrackVibOffset+1+x,a
+    mov.w !Spc_TrackTremPhase+x,a
+    mov.w !Spc_TrackTremPhase+1+x,a
+    mov.w !Spc_TrackF3C0+x,a
+    mov.w !Spc_TrackF3C0+1+x,a
+    mov.w !Spc_TrackF4E0+x,a
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .sfx_key
+    or.b !Spc_Unk24,!Spc_VoiceBit
+    mov.b a,!Spc_SfxVoices
+    and.b a,!Spc_VoiceBit
+    bne Spc_TrackLookAhead
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Unk60
+    bne .key_on
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Unk5C
+    beq .key_on
+    and.b a,!Spc_Unk5E
+    bne .mark
+    or.b !Spc_Unk5E,!Spc_VoiceBit
+    bra .key_on
+.sfx_key:
+    or.b !Spc_Unk25,!Spc_VoiceBit
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Unk61
+    bne .key_on
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Unk5D
+    beq .key_on
+    and.b a,!Spc_Unk5F
+    bne .mark
+    or.b !Spc_Unk5F,!Spc_VoiceBit
+.key_on:
+    or.b !Spc_KonShadow,!Spc_VoiceBit
+.mark:
+    or.b !Spc_UnkD0,!Spc_VoiceBit
+    or.b !Spc_UnkD1,!Spc_VoiceBit
+    call Spc_Unk1AED
+Spc_TrackLookAhead:                     ; header: see Spc_TrackStep
+    call Spc_PeekNote
+    mov y,a
+    mov.b a,!Spc_VoiceBit
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .sfx_next
+    cmp y,#!Spc_SeqFirstRest
+    bcs .song_rest
+    cmp y,#!Spc_SeqFirstTie
+    bcc .song_note
+    tset.w !Spc_Unk5A,a
+    bra .slide
+.song_rest:
+    tclr.w !Spc_Unk5C,a
+    tclr.w !Spc_Unk60,a
+.song_note:
+    tclr.w !Spc_Unk5A,a
+    mov.b a,!Spc_Unk5C
+    or.b a,!Spc_Unk60
+    and.b a,!Spc_VoiceBit
+    tset.w !Spc_Unk5A,a
+    bra .slide
+.sfx_next:
+    cmp y,#!Spc_SeqFirstRest
+    bcs .sfx_rest
+    cmp y,#!Spc_SeqFirstTie
+    bcc .sfx_note
+    tset.w !Spc_Unk5B,a
+    bra .slide
+.sfx_rest:
+    tclr.w !Spc_Unk5D,a
+    tclr.w !Spc_Unk61,a
+.sfx_note:
+    tclr.w !Spc_Unk5B,a
+    mov.b a,!Spc_Unk5D
+    or.b a,!Spc_Unk61
+    and.b a,!Spc_VoiceBit
+    tset.w !Spc_Unk5B,a
+.slide:
+    mov.w a,!Spc_Track150+x
+    beq .done
+    clrc
+    adc.w a,!Spc_TrackF3A0+1+x
+    mov.w !Spc_TrackF3A0+1+x,a
+    call Spc_NotePitch
+    mov.w a,!Spc_TrackPitch+1+x
+    mov y,a
+    mov.w a,!Spc_TrackPitch+x
+    movw.b !Spc_Temp9B,ya
+    movw.b ya,!Spc_Quotient
+    setc
+    subw.b ya,!Spc_Temp9B
+    movw.b !Spc_Temp9B,ya
+    push p
+    bcs .slide_steps
+    eor.b !Spc_Temp9B,#!Spc_InvertBits
+    eor.b !Spc_Temp9C,#!Spc_InvertBits
+    incw.b !Spc_Temp9B
+.slide_steps:
+    mov.w a,!Spc_TrackF360+x
+    bne .slide_div
+    mov.b !Spc_Temp9D,#$00
+    bra .slide_sign
+.slide_div:
+    mov x,a
+    mov.b a,!Spc_Temp9C
+    mov y,#$00
+    div ya,x
+    mov.b !Spc_Temp9D,a
+    mov.b a,!Spc_Temp9B
+    div ya,x
+    mov.b !Spc_Temp9C,a
+    mov a,#$00
+    div ya,x
+    mov.b !Spc_Temp9B,a
+.slide_sign:
+    pop p
+    bcs .slide_set
+    eor.b !Spc_Temp9B,#!Spc_InvertBits
+    eor.b !Spc_Temp9C,#!Spc_InvertBits
+    eor.b !Spc_Temp9D,#!Spc_InvertBits
+    incw.b !Spc_Temp9B
+    bne .slide_set
+    inc.b !Spc_Temp9D
+.slide_set:
+    mov.b x,!Spc_CurTrack
+    mov.b a,!Spc_Temp9B
+    mov.w !Spc_TrackF4E0+x,a
+    mov.b a,!Spc_Temp9C
+    mov.w !Spc_TrackF3C0+x,a
+    mov.b a,!Spc_Temp9D
+    mov.w !Spc_TrackF3C0+1+x,a
+    mov a,#$00
+    mov.w !Spc_Track150+x,a
+    mov.w !Spc_TrackF4E0+1+x,a
+.done:
+    ret
+
+; $06BD — Spc_NotePitch (99 bytes, $06BD–$071F; ROM $C7:2982–$29E4)
+; The pitch of note A for track X: octave = A / 12, the semitone's word
+; from Spc_PitchTable; scaled by the sample's tuning (!Spc_TrackTuning:
+; its low byte plus the fine tune in !Spc_TrackF3A0's low byte, and its
+; high byte as a second factor when nonzero), then shifted left or right
+; by the octave's distance from 4. The exact scale was not checked
+; against the DSP's pitch units.
+; Callers note: CALL from Spc_TrackStep ($0557) and Spc_TrackLookAhead
+;   ($0657).
+; Entry: P=0; A = the note; !Spc_CurTrack = X = the track
+; Exit:  !Spc_Quotient = the pitch; X = the track; A, Y clobbered
+Spc_NotePitch:
+    mov x,#!Spc_NotesPerOctave
+    mov y,#$00
+    div ya,x
+    mov.b x,!Spc_CurTrack
+    mov.b !Spc_TempA4,a
+    mov a,y
+    asl a
+    mov y,a
+    mov.w a,Spc_PitchTable+y
+    mov.b !Spc_TempB7,a
+    mov.w a,Spc_PitchTable+1+y
+    mov.b !Spc_TempB7+1,a
+    mov y,a
+    mov.w a,!Spc_TrackTuning+x
+    clrc
+    adc.w a,!Spc_TrackF3A0+x
+    mov.b !Spc_Temp9B,a
+    mul ya
+    movw.b !Spc_Quotient,ya
+    mov.b y,!Spc_TempB7
+    mov.b a,!Spc_Temp9B
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Quotient
+    movw.b !Spc_Quotient,ya
+    mov.w a,!Spc_TrackTuning+1+x
+    beq .no_tuning_hi
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Quotient
+    bra .tuned
+.no_tuning_hi:
+    mov.b a,!Spc_Quotient
+.tuned:
+    bbs.b !Spc_Temp9B.7,.octave
+    addw.b ya,!Spc_TempB7
+.octave:
+    movw.b !Spc_Quotient,ya
+    mov a,#$04
+    mov.b y,!Spc_TempA4
+    bmi .down
+    beq .down
+    cmp.b a,!Spc_TempA4
+    bcs .down_test
+.up:
+    asl.b !Spc_Quotient
+    rol.b !Spc_Quotient+1
+    inc a
+    cbne.b !Spc_TempA4,.up
+    ret
+.down:
+    lsr.b !Spc_Quotient+1
+    ror.b !Spc_Quotient
+    dec a
+.down_test:
+    cbne.b !Spc_TempA4,.down
+    ret
+
+; $0720 — Spc_DrumNote (29 bytes, $0720–$073C; ROM $C7:29E5–$2A01)
+; A song track in drum mode: the note's index (!Spc_TempA5, 0-11) picks
+; a three-byte entry of the song's drum kit at !AudioAram_SongExtra
+; (the 36 bytes a song load sends there): byte 0 the sample
+; (Spc_SetTrackSample), byte 1 the note returned, byte 2 below $80: the
+; pan (x 2, into !Spc_TrackF280's high byte).
+; Callers note: CALL from Spc_TrackStep ($0542).
+; Entry: P=0; X = the track; !Spc_TempA5 = the index
+; Exit:  A = !Spc_TempA5 = the note; X kept; Y clobbered
+; Callees: Spc_SetTrackSample
+Spc_DrumNote:
+    mov.b a,!Spc_TempA5
+    mov y,#$03
+    mul ya
+    mov y,a
+    mov.w a,!AudioAram_SongExtra+2+y
+    bmi .no_pan
+    asl a
+    mov.w !Spc_TrackF280+1+x,a
+.no_pan:
+    mov.w a,!AudioAram_SongExtra+1+y
+    mov.b !Spc_TempA5,a
+    mov.w a,!AudioAram_SongExtra+y
+    call Spc_SetTrackSample
+    mov.b a,!Spc_TempA5
+    ret
+
+; $073D — Spc_RunSeqCommand (33 bytes, $073D–$075D; ROM $C7:2A02–$2A22)
+; (with its sub-entry Spc_ReadSeqByte)
+; Runs sequence command A ($C4-$FF) of track X: pushes its handler
+; (Spc_SeqCmdTable[A - $C4]); when it has operands
+; (Spc_SeqOperandCounts) reads the first into A (Spc_ReadSeqByte); RETs
+; into the handler. The SBC relies on C=1 from the caller's CMP.
+; Spc_ReadSeqByte (11 bytes, $0753–$075D): A = !Spc_TempA5 = the byte at
+; track X's !Spc_TrackPtr, which moves on by one.
+; Callers note: CALL from Spc_TrackStep ($050E). Spc_ReadSeqByte: CALL
+;   from Spc_TrackStep ($0507) and unmatched code, the sequence command
+;   handlers ($1736, $1775, $179E, $17D3, $17F6, $1809, $182A, $187D,
+;   $1885, $193B, $1943, $19AD, $1BEF, $1C0B, $1C10, $1D19, $1D1D).
+; Entry: P=0; X = the track; A = the command, C=1
+; Exit:  through the handler (RET); Spc_ReadSeqByte: A = the byte, Y
+;        unchanged, X unchanged
+; Callees: the handlers of Spc_SeqCmdTable (RET)
+; Sub-entries: Spc_ReadSeqByte.
+Spc_RunSeqCommand:
+    sbc a,#!Spc_SeqFirstCmd
+    mov.b !Spc_TempA5,a
+    asl a
+    mov y,a
+    mov.w a,Spc_SeqCmdTable+1+y
+    push a
+    mov.w a,Spc_SeqCmdTable+y
+    push a
+    mov.b y,!Spc_TempA5
+    mov.w a,Spc_SeqOperandCounts+y
+    bne Spc_ReadSeqByte
+    ret
+Spc_ReadSeqByte:                        ; header: see Spc_RunSeqCommand
+    mov.b a,(!Spc_TrackPtr+x)
+    mov.b !Spc_TempA5,a
+    inc.b !Spc_TrackPtr+x
+    bne .done
+    inc.b !Spc_TrackPtr+1+x
+.done:
+    ret
+
+; $075E — Spc_PeekNote (69 bytes, $075E–$07A2; ROM $C7:2A23–$2A67)
+; (with its sub-entry Spc_PeekNoteFrom)
+; Finds track X's next note byte without moving its pointer: from
+; !Spc_TrackPtr (copied to !Spc_Ptr93, with !Spc_TempBA = the track's
+; !Spc_TrackUnk27), skips commands: one with a second handler
+; (Spc_SeqCmdTable2) runs it (it reads at !Spc_Ptr93) and comes back to
+; Spc_PeekNoteFrom (its address is pushed first); the others are skipped
+; with their operands (Spc_SeqOperandCounts). Returns the first byte below
+; $C4, or $EB (!Spc_SeqEndTrack: the end, which counts as a rest).
+; Callers note: CALL from Spc_TrackLookAhead ($0601). Spc_PeekNoteFrom:
+;   the return address pushed at $0786/$0789.
+; Entry: P=0; X = the track
+; Exit:  A = the byte; Y = 0; X kept (as the second handlers leave it)
+; Callees: the handlers of Spc_SeqCmdTable2 (RET)
+; Sub-entries: Spc_PeekNoteFrom.
+Spc_PeekNote:
+    mov.b a,!Spc_TrackPtr+x
+    mov.b y,!Spc_TrackPtr+1+x
+    movw.b !Spc_Ptr93,ya
+    mov.b a,!Spc_TrackUnk27+x
+    mov.b !Spc_TempBA,a
+Spc_PeekNoteFrom:                       ; header: see Spc_PeekNote
+    mov y,#$00
+.byte:
+    mov.b a,(!Spc_Ptr93)+y
+    cmp a,#!Spc_SeqFirstCmd
+    bcc .done
+    incw.b !Spc_Ptr93
+    cmp a,#!Spc_SeqEndTrack
+    beq .done
+    setc
+    sbc a,#!Spc_SeqFirstCmd
+    mov.b !Spc_Temp92,a
+    asl a
+    mov y,a
+    mov.w a,Spc_SeqCmdTable2+1+y
+    beq .skip
+    mov.b !Spc_Temp9B,a
+    mov a,#Spc_PeekNoteFrom>>8
+    push a
+    mov a,#Spc_PeekNoteFrom&$FF
+    push a
+    mov.b a,!Spc_Temp9B
+    push a
+    mov.w a,Spc_SeqCmdTable2+y
+    push a
+    mov y,#$00
+    ret
+.skip:
+    mov.b y,!Spc_Temp92
+    mov.w a,Spc_SeqOperandCounts+y
+    beq Spc_PeekNoteFrom
+    mov y,a
+.operands:
+    incw.b !Spc_Ptr93
+    dbnz y,.operands
+    bra .byte
+.done:
+    ret
 
 ; ============================================================
 ; DSP and port helpers ($07A3-$07AE)
@@ -351,6 +1127,139 @@ Spc_ClearPorts01:
     mov.b !SPC_CONTROL,#!SPC_CONTROL_Timers01
     ret
 
+
+; ============================================================
+; Track slides ($07AF-$0891)
+; ============================================================
+
+; $07AF — Spc_TrackSlides (227 bytes, $07AF–$0891; ROM $C7:2A74–$2B56)
+; The per-pass slides of track X:
+;   - with P=1, counts down the vibrato and tremolo delays
+;     (!Spc_TrackVibDelay, !Spc_TrackTremDelay) when nonzero;
+;   - the volume slide: while !Spc_TrackF2C0's low byte counts down,
+;     !Spc_TrackF240 += !Spc_TrackVolDelta;
+;   - the pan slide: while its high byte counts down, !Spc_TrackF280 +=
+;     !Spc_TrackPanDelta;
+;   - the pitch slide: while the step (!Spc_TrackF3C0, !Spc_TrackF4E0's low
+;     byte) is nonzero, it is added to the pitch (!Spc_TrackPitch with the
+;     fraction in !Spc_TrackF4E0's high byte), counting !Spc_TrackF360's
+;     low byte down; at the last step the step is cleared;
+;   - the pan LFO (!Spc_Track170 high byte nonzero): !Spc_TrackF4C0 +=
+;     !Spc_TrackPanLfoDelta; when !Spc_TrackPanLfoTimer's counter runs out
+;     the step's sign flips and the counter reloads (a triangle).
+; A changed volume or pan (high byte) marks the voice in !Spc_UnkD0, a
+; pitch step in !Spc_UnkD1.
+; Callers note: CALL from Spc_StepTracks ($03DD) and Spc_StepSongOnly
+;   ($04B6).
+; Entry: P=0; X = the track, !Spc_VoiceBit its voice
+; Exit:  P=0; X kept; A, Y clobbered
+Spc_TrackSlides:
+    setp
+    mov.b a,!Spc_TrackVibDelay-!Spc_Page1+x
+    beq .trem_delay
+    dec.b !Spc_TrackVibDelay-!Spc_Page1+x
+.trem_delay:
+    mov.b a,!Spc_TrackTremDelay-!Spc_Page1+x
+    beq .p0
+    dec.b !Spc_TrackTremDelay-!Spc_Page1+x
+.p0:
+    clrp
+    mov.w a,!Spc_TrackF2C0+x
+    beq .pan
+    dec a
+    mov.w !Spc_TrackF2C0+x,a
+    mov.w a,!Spc_TrackF240+x
+    clrc
+    adc.w a,!Spc_TrackVolDelta+x
+    mov.w !Spc_TrackF240+x,a
+    mov.w a,!Spc_TrackF240+1+x
+    adc.w a,!Spc_TrackVolDelta+1+x
+    cmp.w a,!Spc_TrackF240+1+x
+    mov.w !Spc_TrackF240+1+x,a
+    beq .pan
+    or.b !Spc_UnkD0,!Spc_VoiceBit
+.pan:
+    mov.w a,!Spc_TrackF2C0+1+x
+    beq .pitch
+    dec a
+    mov.w !Spc_TrackF2C0+1+x,a
+    mov.w a,!Spc_TrackF280+x
+    clrc
+    adc.w a,!Spc_TrackPanDelta+x
+    mov.w !Spc_TrackF280+x,a
+    mov.w a,!Spc_TrackF280+1+x
+    adc.w a,!Spc_TrackPanDelta+1+x
+    cmp.w a,!Spc_TrackF280+1+x
+    mov.w !Spc_TrackF280+1+x,a
+    beq .pitch
+    or.b !Spc_UnkD0,!Spc_VoiceBit
+.pitch:
+    mov.w a,!Spc_TrackF4E0+x
+    mov.b !Spc_Temp9B,a
+    mov.w a,!Spc_TrackF3C0+x
+    mov.b !Spc_Temp9C,a
+    mov.w a,!Spc_TrackF3C0+1+x
+    mov.b !Spc_Temp9D,a
+    movw.b ya,!Spc_Temp9B
+    bne .pitch_step
+    mov.b a,!Spc_Temp9D
+    beq .pan_lfo
+.pitch_step:
+    mov.w a,!Spc_TrackF360+x
+    dec a
+    bne .pitch_add
+    mov.w !Spc_TrackF3C0+x,a
+    mov.w !Spc_TrackF3C0+1+x,a
+    mov.w !Spc_TrackF4E0+x,a
+.pitch_add:
+    mov.w !Spc_TrackF360+x,a
+    clrc
+    mov.w a,!Spc_TrackPitch+x
+    mov y,a
+    mov.w a,!Spc_TrackF4E0+1+x
+    addw.b ya,!Spc_Temp9B
+    mov.w !Spc_TrackF4E0+1+x,a
+    mov a,y
+    mov.w !Spc_TrackPitch+x,a
+    mov.b a,!Spc_Temp9D
+    adc.w a,!Spc_TrackPitch+1+x
+    mov.w !Spc_TrackPitch+1+x,a
+    or.b !Spc_UnkD1,!Spc_VoiceBit
+.pan_lfo:
+    mov.w a,!Spc_Track170+1+x
+    beq .done
+    mov.w a,!Spc_TrackPanLfoDelta+x
+    mov.b !Spc_Temp9B,a
+    mov.w a,!Spc_TrackPanLfoDelta+1+x
+    mov.b !Spc_Temp9C,a
+    mov.w a,!Spc_TrackF4C0+1+x
+    mov y,a
+    mov.b !Spc_Temp9D,a
+    mov.w a,!Spc_TrackF4C0+x
+    addw.b ya,!Spc_Temp9B
+    mov.w !Spc_TrackF4C0+x,a
+    mov a,y
+    cmp.w a,!Spc_TrackF4C0+1+x
+    mov.w !Spc_TrackF4C0+1+x,a
+    beq .pan_lfo_count
+    or.b !Spc_UnkD0,!Spc_VoiceBit
+.pan_lfo_count:
+    mov.w a,!Spc_TrackPanLfoTimer+1+x
+    dec a
+    bne .pan_lfo_set
+    eor.b !Spc_Temp9B,#!Spc_InvertBits
+    eor.b !Spc_Temp9C,#!Spc_InvertBits
+    incw.b !Spc_Temp9B
+    mov.b a,!Spc_Temp9B
+    mov.w !Spc_TrackPanLfoDelta+x,a
+    mov.b a,!Spc_Temp9C
+    mov.w !Spc_TrackPanLfoDelta+1+x,a
+    mov.w a,!Spc_TrackPanLfoTimer+x
+.pan_lfo_set:
+    mov.w !Spc_TrackPanLfoTimer+1+x,a
+.done:
+    ret
+
 ; ============================================================
 ; Command queue ($0892-$0902)
 ; ============================================================
@@ -365,9 +1274,11 @@ Spc_ClearPorts01:
 ; the last entry is overwritten), clears the port 0/1 latches and echoes
 ; the id. Spc_RunQueue runs the entries.
 ; Callers note: CALL from Spc_MainLoop ($031C, $0340, $035C) and
-;   unmatched code ($03E0 in Spc_Unk0377's track loop, $1308 in
+;   unmatched code ($03E0 in Spc_StepTracks's track loop, $1308 in
 ;   Spc_Unk12F9's wait).
-; Entry: P=0; X = the track being stepped (kept)
+; Entry: P=0; X any (kept): the track being stepped, except at the
+;        $1308 call, where it holds the address of the count Spc_Unk12F9
+;        waits on
 ; Exit:  A, Y clobbered (Y = the id when one was queued); X unchanged
 ; Ports: CPUIO0-3 read; CPUIO0 = the id (echo) when queued
 ; Callees: Spc_ClearPorts01
@@ -452,6 +1363,449 @@ Spc_RunQueue:
 .empty:
     mov.b !Spc_QueueEnd,a
     ret
+
+
+; ============================================================
+; Track LFOs and voice writes ($0903-$0B95)
+; ============================================================
+
+; $0903 — Spc_TrackEffects (243 bytes, $0903–$09F5; ROM $C7:2BC8–$2CBA)
+; (with its sub-entry Spc_TrackTremolo); then falls into Spc_WriteVoice.
+; The LFOs of track X for one pass:
+;   - vibrato, with a depth byte (!Spc_Track150 high byte) and, for a
+;     song track, its delay run out: !Spc_TrackVibPhase +=
+;     !Spc_TrackVibStep; when the phase's high byte changes, the offset
+;     !Spc_TrackVibOffset = the depth (!Spc_TrackF300) x the phase's high
+;     byte x 2 / 256, signed, and the pitch is marked (!Spc_UnkD1). When
+;     !Spc_TrackVibTimer's counter runs out, Spc_LfoRate gives the next
+;     step from !Spc_TrackVibRate and the vibrato's stage (!Spc_TrackF220
+;     high byte, bits 0-2), and the counter reloads;
+;   - Spc_TrackTremolo (97 bytes, $0995–$09F5): with a tremolo byte
+;     (!Spc_Track170) and its delay run out, the same with
+;     !Spc_TrackTremPhase / !Spc_TrackTremStep / !Spc_TrackTremTimer /
+;     !Spc_TrackTremRate (stage in bits 4-6); a change of the phase's high
+;     byte marks the volume (!Spc_UnkD0).
+; Callers note: CALL from Spc_MainLoop ($0314, $033D, $0359) and
+;   Spc_LivePass ($0451). Spc_TrackTremolo: JMP from $0913 (inside).
+; Entry: P=0; X = the track, !Spc_VoiceBit its voice, !Spc_GroupVolume
+;        its group's volume
+; Exit:  as Spc_WriteVoice
+; Callees: Spc_LfoRate; Spc_WriteVoice (fall-through)
+; Sub-entries: Spc_TrackTremolo.
+Spc_TrackEffects:
+    mov.w a,!Spc_Track150+1+x
+    beq .no_vibrato
+    mov.b !Spc_TempA5,a
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .vibrato
+    mov.w a,!Spc_TrackVibDelay+x
+    beq .vibrato
+.no_vibrato:
+    jmp Spc_TrackTremolo
+.vibrato:
+    mov.w a,!Spc_TrackVibStep+1+x
+    mov y,a
+    mov.w a,!Spc_TrackVibStep+x
+    movw.b !Spc_Quotient,ya
+    mov.w a,!Spc_TrackVibPhase+1+x
+    mov y,a
+    mov.w a,!Spc_TrackVibPhase+x
+    addw.b ya,!Spc_Quotient
+    movw.b !Spc_TempB7,ya
+    mov.w !Spc_TrackVibPhase+x,a
+    mov a,y
+    cmp.w a,!Spc_TrackVibPhase+1+x
+    beq .vib_count
+    mov.w !Spc_TrackVibPhase+1+x,a
+    asl.b !Spc_TempB7
+    rol.b !Spc_TempB7+1
+    mov.w a,!Spc_TrackF300+1+x
+    mov y,a
+    mov.w a,!Spc_TrackF300+x
+    movw.b !Spc_Temp9B,ya
+    mov.b a,!Spc_TempB7+1
+    mul ya
+    movw.b !Spc_Temp9D,ya
+    mov.b y,!Spc_Temp9B
+    mov.b a,!Spc_TempB7+1
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Temp9D
+    bbc.b !Spc_TempB7+1.7,.vib_set
+    subw.b ya,!Spc_Temp9B
+.vib_set:
+    mov.w !Spc_TrackVibOffset+x,a
+    mov a,y
+    mov.w !Spc_TrackVibOffset+1+x,a
+    or.b !Spc_UnkD1,!Spc_VoiceBit
+.vib_count:
+    mov.w a,!Spc_TrackVibTimer+1+x
+    dec a
+    bne .vib_count_set
+    mov.w a,!Spc_TrackVibRate+1+x
+    mov y,a
+    mov.w a,!Spc_TrackVibRate+x
+    movw.b !Spc_Temp9B,ya
+    mov.b a,!Spc_Quotient+1
+    mov.b !Spc_TempB7,a
+    mov.w a,!Spc_TrackF220+1+x
+    mov.b !Spc_Temp9E,a
+    and.b !Spc_Temp9E,#!Spc_TremStageMask
+    and a,#$07
+    call Spc_LfoRate
+    mov.w !Spc_TrackVibStep+x,a
+    mov a,y
+    mov.w !Spc_TrackVibStep+1+x,a
+    mov.b a,!Spc_Temp9D
+    or.b a,!Spc_Temp9E
+    mov.w !Spc_TrackF220+1+x,a
+    mov.w a,!Spc_TrackVibTimer+x
+.vib_count_set:
+    mov.w !Spc_TrackVibTimer+1+x,a
+Spc_TrackTremolo:                       ; header: see Spc_TrackEffects
+    mov.w a,!Spc_Track170+x
+    beq Spc_WriteVoice
+    mov.b !Spc_TempA5,a
+    mov.w a,!Spc_TrackTremDelay+x
+    bne Spc_WriteVoice
+    mov.w a,!Spc_TrackTremStep+1+x
+    mov y,a
+    mov.w a,!Spc_TrackTremStep+x
+    movw.b !Spc_Quotient,ya
+    mov.b !Spc_TempB7,y
+    mov.w a,!Spc_TrackTremPhase+1+x
+    mov y,a
+    mov.w a,!Spc_TrackTremPhase+x
+    addw.b ya,!Spc_Quotient
+    mov.w !Spc_TrackTremPhase+x,a
+    mov a,y
+    cmp.w a,!Spc_TrackTremPhase+1+x
+    beq .trem_count
+    mov.w !Spc_TrackTremPhase+1+x,a
+    or.b !Spc_UnkD0,!Spc_VoiceBit
+.trem_count:
+    mov.w a,!Spc_TrackTremTimer+1+x
+    dec a
+    bne .trem_count_set
+    mov.w a,!Spc_TrackTremRate+1+x
+    mov y,a
+    mov.w a,!Spc_TrackTremRate+x
+    movw.b !Spc_Temp9B,ya
+    mov.w a,!Spc_TrackF220+1+x
+    mov.b !Spc_Temp9E,a
+    and.b !Spc_Temp9E,#!Spc_VibStageMask
+    xcn a
+    and a,#$07
+    call Spc_LfoRate
+    mov.w !Spc_TrackTremStep+x,a
+    mov a,y
+    mov.w !Spc_TrackTremStep+1+x,a
+    mov.b a,!Spc_Temp9D
+    xcn a
+    or.b a,!Spc_Temp9E
+    mov.w !Spc_TrackF220+1+x,a
+    mov.w a,!Spc_TrackTremTimer+x
+.trem_count_set:
+    mov.w !Spc_TrackTremTimer+1+x,a
+
+; $09F6 — Spc_WriteVoice (232 bytes, $09F6–$0ADD; ROM $C7:2CBB–$2DA2)
+; (with its sub-entry Spc_WritePitch)
+; Writes track X's voice to the DSP when it is marked (nothing when
+; !Spc_UnkD0 and !Spc_UnkD1 are both 0):
+;   - volume (in !Spc_UnkD0): the pan byte is !Spc_PanCentre with
+;     !Spc_Flags87 bit 0 (mono), else the inverse of pan + pan LFO
+;     (!Spc_TrackF280, !Spc_TrackF4C0 high bytes, through Spc_Unk12DE);
+;     the volume is !Spc_TrackF240's high byte, raised by the tremolo
+;     phase below $80 (+ volume x phase x 2 / 256, capped at $7F on an
+;     overflow), x !Spc_GroupVolume / 256, and for a song track 0 when
+;     muted (!Spc_Mute), else x !Spc_TrackF220 x !Spc_Unk4D / 65536
+;     (!Spc_Unk4D: the song command's Arg1, a song volume probably). Left
+;     = volume x pan / 256, right = volume x (pan ^ $FF) / 256 (with mono:
+;     $80 and $7F), written to VOLL / VOLR and kept in !Spc_VoiceVol.
+;   - Spc_WritePitch (102 bytes, $0A78–$0ADD), pitch (in !Spc_UnkD1): the
+;     pitch plus the vibrato offset; a song track's is scaled by
+;     !Spc_PitchAdjHi (below $80: + pitch x adj x 2 / 256; from $80:
+;     pitch x adj / 256), tracks 14-15 by !Spc_SfxPitchAdj (+ pitch x adj
+;     x 2 / 256), tracks 8-13 not at all; written to PL / PH (the register
+;     in !Spc_Temp9C, which Spc_StartSong sets before it calls
+;     Spc_WritePitch).
+; Callers note: CALL from Spc_MainLoop ($0319). Spc_WritePitch: CALL
+;   from Spc_StartSong ($0C41).
+; Entry: P=0; X = the track, !Spc_VoiceBit its voice, !Spc_GroupVolume
+;        its group's volume (Spc_WritePitch: !Spc_Temp9C = the voice's PL
+;        register)
+; Exit:  X kept; A, Y clobbered
+; DSP:   VOLL, VOLR, PL, PH of the voice
+; Callees: Spc_Unk12DE
+; Sub-entries: Spc_WritePitch.
+Spc_WriteVoice:
+    movw.b ya,!Spc_UnkD0
+    bne .voice
+    ret
+.voice:
+    mov a,x
+    and a,#!Spc_LowNibble
+    mov.b !Spc_Temp9B,a
+    xcn a
+    lsr a
+    mov.b !Spc_Temp9C,a
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_UnkD0
+    beq .pitch
+    mov.b !Spc_Temp9D,#!Spc_PanCentre
+    bbs.b !Spc_Flags87.0,.volume
+    mov.w a,!Spc_TrackF280+1+x
+    mov y,a
+    mov.w a,!Spc_TrackF4C0+1+x
+    call Spc_Unk12DE
+    eor a,#!Spc_InvertBits
+    mov.b !Spc_Temp9D,a
+.volume:
+    mov.w a,!Spc_TrackF240+1+x
+    mov y,a
+    mov.b !Spc_Temp9E,a
+    mov.w a,!Spc_TrackTremPhase+1+x
+    beq .group
+    asl a
+    mul ya
+    bcs .group
+    mov a,y
+    adc.b a,!Spc_Temp9E
+    bpl .vol_capped
+    bcc .vol_capped
+    mov a,#!Spc_VolMax
+.vol_capped:
+    mov y,a
+.group:
+    mov.b a,!Spc_GroupVolume
+    mul ya
+    cmp x,#!Spc_TrackFirstSfx
+    bcs .sides
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_Mute
+    beq .song_vol
+    mov y,#$00
+    bra .sides
+.song_vol:
+    mov.w a,!Spc_TrackF220+x
+    mul ya
+    mov.b a,!Spc_Unk4D
+    mul ya
+.sides:
+    mov.b !Spc_Temp9E,y
+    mov.b a,!Spc_Temp9D
+.side:
+    mul ya
+    mov a,y
+    mov.b y,!Spc_Temp9B
+    mov.w !Spc_VoiceVol+y,a
+    mov.b y,!Spc_Temp9C
+    mov.b !SPC_DSPADDR,y
+    mov.b !SPC_DSPDATA,a
+    not1 !Spc_Temp9B.0
+    inc.b !Spc_Temp9C
+    bbs.b !Spc_Temp9C.1,.pitch
+    mov.b a,!Spc_Temp9D
+    eor a,#!Spc_InvertBits
+    mov.b y,!Spc_Temp9E
+    bra .side
+.pitch:
+    mov.b a,!Spc_VoiceBit
+    and.b a,!Spc_UnkD1
+    beq Spc_WritePitch_done
+    set1.b !Spc_Temp9C.1
+Spc_WritePitch:                         ; header: see Spc_WriteVoice
+    mov.w a,!Spc_TrackPitch+x
+    clrc
+    adc.w a,!Spc_TrackVibOffset+x
+    mov.b !Spc_Temp9D,a
+    mov.w a,!Spc_TrackPitch+1+x
+    adc.w a,!Spc_TrackVibOffset+1+x
+    mov.b !Spc_Temp9E,a
+    cmp x,#!Spc_TrackFirstSfx
+    bcc .song_pitch
+    cmp x,#!Spc_TrackSfxA
+    bcs .sfx_pitch
+.unscaled:
+    movw.b ya,!Spc_Temp9D
+    bra .write
+.sfx_pitch:
+    mov.b y,!Spc_SfxPitchAdj
+    beq .unscaled
+    mul ya
+    movw.b !Spc_Temp9F,ya
+    mov.b y,!Spc_SfxPitchAdj
+    mov.b a,!Spc_Temp9D
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Temp9F
+    asl a
+    mov.b !Spc_TempA1,a
+    mov a,y
+    rol a
+    mov y,a
+    mov.b a,!Spc_TempA1
+    addw.b ya,!Spc_Temp9D
+    bra .write
+.song_pitch:
+    mov.b y,!Spc_PitchAdjHi
+    mul ya
+    movw.b !Spc_Temp9F,ya
+    mov.b y,!Spc_PitchAdjHi
+    mov.b a,!Spc_Temp9D
+    mul ya
+    mov a,y
+    mov y,#$00
+    addw.b ya,!Spc_Temp9F
+    bbs.b !Spc_PitchAdjHi.7,.write
+    asl a
+    mov.b !Spc_TempA1,a
+    mov a,y
+    rol a
+    mov y,a
+    mov.b a,!Spc_TempA1
+    addw.b ya,!Spc_Temp9D
+.write:
+    mov.b !Spc_Temp9B,x
+    mov.b x,!Spc_Temp9C
+    mov.b !SPC_DSPADDR,x
+    mov.b !SPC_DSPDATA,a
+    inc x
+    mov.b !SPC_DSPADDR,x
+    mov.b !SPC_DSPDATA,y
+    mov.b x,!Spc_Temp9B
+.done:
+    ret
+
+; $0ADE — Spc_LfoRate (126 bytes, $0ADE–$0B5B; ROM $C7:2DA3–$2E20)
+; The next step of a vibrato or tremolo, from the depth byte in
+; !Spc_TempA5 (below $80, $80-$BF, $C0 up: three shapes), the step in
+; !Spc_Quotient, the base rate in !Spc_Temp9B/9C (a quarter of it is
+; used) and the stage in A (0 starts a turn): returns the new step in YA
+; and the next stage in !Spc_Temp9D. The shapes were not traced further
+; (rising, falling and a turn, probably).
+; Callers note: CALL from Spc_TrackEffects ($097E, $09DE).
+; Entry: P=0; A = the stage (0-7), !Spc_TempA5, !Spc_Quotient,
+;        !Spc_Temp9B/9C as above
+; Exit:  YA = the step; !Spc_Temp9D = the stage; X unchanged
+Spc_LfoRate:
+    mov.b !Spc_Temp9D,#$00
+    cmp.b !Spc_TempA5,#!Spc_LfoShapeC0
+    bcs .shape_c0
+    cmp.b !Spc_TempA5,#!Spc_LfoShape80
+    bcs .shape_80
+    eor.b !Spc_Quotient,#!Spc_InvertBits
+    eor.b !Spc_Quotient+1,#!Spc_InvertBits
+    incw.b !Spc_Quotient
+    mov y,a
+    beq .done
+    dec a
+    mov.b !Spc_Temp9D,a
+    bbs.b !Spc_Quotient+1.7,.done
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    movw.b ya,!Spc_Temp9B
+    addw.b ya,!Spc_Quotient
+    ret
+.shape_80:
+    eor.b !Spc_Quotient,#!Spc_InvertBits
+    eor.b !Spc_Quotient+1,#!Spc_InvertBits
+    incw.b !Spc_Quotient
+    mov y,a
+    beq .done
+    dec a
+    mov.b !Spc_Temp9D,a
+    bbc.b !Spc_Quotient+1.7,.done
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    eor.b !Spc_Temp9B,#!Spc_InvertBits
+    eor.b !Spc_Temp9C,#!Spc_InvertBits
+    incw.b !Spc_Temp9B
+    movw.b ya,!Spc_Temp9B
+    addw.b ya,!Spc_Quotient
+    ret
+.shape_c0:
+    mov y,a
+    beq .negate
+    dec a
+    mov.b !Spc_Temp9D,a
+    bbc.b !Spc_Quotient+1.7,.shape_c0_add
+    eor.b !Spc_Quotient,#!Spc_InvertBits
+    eor.b !Spc_Quotient+1,#!Spc_InvertBits
+    incw.b !Spc_Quotient
+.shape_c0_add:
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    lsr.b !Spc_Temp9C
+    ror.b !Spc_Temp9B
+    movw.b ya,!Spc_Temp9B
+    addw.b ya,!Spc_Quotient
+    movw.b !Spc_Quotient,ya
+    bbs.b !Spc_TempB7.7,.done
+.negate:
+    eor.b !Spc_Quotient,#!Spc_InvertBits
+    eor.b !Spc_Quotient+1,#!Spc_InvertBits
+    incw.b !Spc_Quotient
+.done:
+    movw.b ya,!Spc_Quotient
+    ret
+
+; $0B5C — Spc_AnimateBuiltin (58 bytes, $0B5C–$0B95; ROM $C7:2E21–$2E5A)
+; Changes one nibble of Spc_BuiltinSampleLoop each pass: !Spc_UnkD8
+; counts from !Spc_BuiltinFirst to !Spc_BuiltinLast (2 x the byte, bit 0
+; the nibble; BRR header bytes skipped), and the byte at !Spc_UnkD8 / 2
+; is XORed with $70 or $07. At the last step byte 1 of the loop is
+; flipped as well. The built-in sample (directory entry $10) so plays a
+; changing waveform, probably.
+; Callers note: CALL from Spc_MainLoop ($0371).
+; Entry: P=0
+; Exit:  A = the new !Spc_UnkD8; X = 9 or kept (kept when the count
+;        wraps); Y clobbered
+Spc_AnimateBuiltin:
+    mov.b a,!Spc_UnkD8
+    cmp a,#!Spc_BuiltinLast
+    beq .first
+.flip:
+    lsr a
+    mov y,a
+    mov a,#!Spc_BuiltinFlip
+    bcc .apply
+    xcn a
+.apply:
+    eor.w a,Spc_BuiltinSampleLoop+y
+    mov.w Spc_BuiltinSampleLoop+y,a
+    mov.b a,!Spc_UnkD8
+    inc a
+    cmp a,#!Spc_BuiltinLast+1
+    beq .wrap
+    push a
+    lsr a
+    mov y,#$00
+    mov x,#!Spc_BrrBlock
+    div ya,x
+    mov a,y
+    pop a
+    bne .set
+    inc a
+    inc a
+    bra .set
+.wrap:
+    mov a,#!Spc_BuiltinFirst
+.set:
+    mov.b !Spc_UnkD8,a
+    ret
+.first:
+    mov a,#!Spc_BuiltinFlip
+    eor.w a,Spc_BuiltinSampleLoop+1
+    mov.w Spc_BuiltinSampleLoop+1,a
+    mov.b a,!Spc_UnkD8
+    bra .flip
 
 ; ============================================================
 ; CPU commands ($0B96-$0E10)
@@ -569,9 +1923,10 @@ Spc_CmdSong11:                          ; header: see Spc_CmdSong14
 ;      !Spc_SongCond and !Spc_UnkD3.
 ;   4. When !Spc_SavedSong = !Spc_NewSong (the song asked for is the
 ;      one Spc_SaveSong kept): Spc_RestoreSong, and when the song has
-;      tracks, puts the noise clock back in FLG and, for each track 0-7,
+;      tracks (a restored song with none goes on as a new start, below),
+;      puts the noise clock back in FLG and, for each track 0-7,
 ;      adds 1 to its wait, writes its sample (Spc_Unk1AED), writes 0 to
-;      its voice's VOLL and VOLR and runs Spc_Unk0A78 with !Spc_Temp9C =
+;      its voice's VOLL and VOLR and runs Spc_WritePitch with !Spc_Temp9C =
 ;      the voice's next register number (PL); then clears $55/$57/$59,
 ;      keys on !Spc_Unk24 (!Spc_KonShadow), sets !Spc_KofShadow and
 ;      !Spc_Unk25 to 0 and marks the song's tracks in !Spc_UnkD0.
@@ -586,7 +1941,7 @@ Spc_CmdSong11:                          ; header: see Spc_CmdSong14
 ;   5. With !Spc_Flags88 bit 0 set, finishes the echo change: with bit 1
 ;      set, Spc_Unk12F9 on !Spc_Unk82, !Spc_Unk83 = 0 and echo writes on
 ;      (Spc_Unk1397); then Spc_Unk12F9 on !Spc_EchoDelay, and clears bit
-;      0 (bit 1 stays set).
+;      0 (bit 1 is left as it is).
 ;   6. Copies !Spc_SongEon/Non/Pmon to their shadows, resets SP and jumps
 ;      to Spc_MainLoop (with A = timer 0's count, discarding it).
 ; Callers note: Spc_CmdSong11 falls in; BRA from Spc_CmdSong10 ($0BDE).
@@ -596,14 +1951,14 @@ Spc_CmdSong11:                          ; header: see Spc_CmdSong14
 ; Exit:  does not return: SP = $FF, JMP Spc_MainLoop
 ; DSP:   KOF. On a resume, for voices 0-7: VOLL/VOLR, SRCN and ADSR1/ADSR2
 ;        (Spc_Unk1AED: with !Spc_SfxVoices just cleared it runs on into the
-;        ADSR writes at $1B0C) and PL/PH (Spc_Unk0A78). On an echo change
+;        ADSR writes at $1B0C) and PL/PH (Spc_WritePitch). On an echo change
 ;        (Spc_Unk1316, through $1352): FLG (echo writes off), EON, EFB,
 ;        EVOLL and EVOLR = 0, EDL = !Spc_EchoDelay, ESA; FLG again in
 ;        Spc_Unk1397. Spc_Unk12F9 may also run queued commands, with their
 ;        own writes
 ; Ports: through Spc_XferReceive and Spc_Unk12F9
 ; Callees: Spc_WriteDsp, Spc_Unk1316, Spc_XferReceive, Spc_RestoreSong,
-;   Spc_Unk1AED, Spc_Unk0A78, Spc_InitTrack, Spc_Unk12F9, Spc_Unk1397,
+;   Spc_Unk1AED, Spc_WritePitch, Spc_InitTrack, Spc_Unk12F9, Spc_Unk1397,
 ;   Spc_MainLoop (JMP)
 Spc_StartSong:
     mov a,#!DSP_KOF_All
@@ -651,7 +2006,7 @@ Spc_StartSong:
     call Spc_WriteDsp
     inc y
     mov.b !Spc_Temp9C,y
-    call Spc_Unk0A78
+    call Spc_WritePitch
     inc x
     inc x
     asl.b !Spc_VoiceBit
@@ -1089,8 +2444,9 @@ Spc_FadeDelta:
 ; !Spc_CmdArg1 over !Spc_CmdArg0 steps, compared as signed values: steps
 ; 0 or no difference sets it at once (fraction, delta and steps 0); else
 ; !Spc_TempoAdjSteps = steps, !Spc_TempoAdjDelta = Spc_FadeDelta, the
-; fraction 0. (Read by Spc_Unk0377 with !Spc_Tempo: a tempo change,
-; probably. C2Scene_ObjAInit sends $86 with 0, 0: no adjustment.)
+; fraction 0. Spc_StepTracks raises the tempo with it below $80 and
+; lowers it from $80 up. (C2Scene_ObjAInit sends $86 with 0, 0: no
+; adjustment.)
 ; Callers note: reached only through Spc_CmdTable80 entries 5 and 6.
 ; Entry: P=0; !Spc_CmdArg0 = the steps, !Spc_CmdArg1 = the value
 ; Exit:  A, X, Y clobbered
@@ -1126,8 +2482,8 @@ Spc_CmdTempo:                           ; header: see Spc_CmdTempoPitch
 ; Command $87 (and the first half of $85): fades !Spc_PitchAdj ($AF) as
 ; Spc_CmdTempo fades !Spc_TempoAdj (!Spc_PitchAdjSteps,
 ; !Spc_PitchAdjDelta), then !Spc_UnkD1 = $FF (every voice's pitch to be
-; rewritten, inferred). Spc_Unk0A78 scales a song track's pitch by $AF:
-; a pitch shift, probably.
+; rewritten, inferred). Spc_WritePitch scales a song track's pitch by $AF:
+; a pitch shift (up below $80, down from $80).
 ; Callers note: CALL from Spc_CmdTempoPitch ($0E7F); Spc_CmdTable80
 ;   entry 7.
 ; Entry: P=0; !Spc_CmdArg0 = the steps, !Spc_CmdArg1 = the value
@@ -1161,7 +2517,7 @@ Spc_CmdSongPitch:
 
 ; $0ED6 — Spc_CmdSfxPitch (16 bytes, $0ED6–$0EE5; ROM $C7:319B–$31AA)
 ; Command $89: !Spc_SfxPitchAdj = !Spc_CmdArg0 (the pitch adjustment of
-; effect tracks 14-15, Spc_Unk0A78); when it changed, the voices of
+; effect tracks 14-15, Spc_WritePitch); when it changed, the voices of
 ; group $C0 held by effects are marked in !Spc_UnkD1.
 ; Callers note: reached only through Spc_CmdTable80 entry 9.
 ; Entry: P=0; !Spc_CmdArg0 = the value
@@ -1205,8 +2561,8 @@ Spc_CmdVolumeBoost:
 ; $0F00 — Spc_CmdMono (14 bytes, $0F00–$0F0D; ROM $C7:31C5–$31D2)
 ; Command $F3: !Spc_Flags87 bit 0 = (!Spc_CmdArg0 != 0), then every
 ; voice's volume to be rewritten (!Spc_UnkD0 = $FF). With bit 0 set
-; Spc_Unk09F6 skips the pan and gives both sides the same volume ($0A0D):
-; mono (the menu sends it with its stereo / mono setting, Menu_CfgA3).
+; Spc_WriteVoice skips the pan and uses $80 ($0A0D): left = volume x $80,
+; right = volume x $7F, nearly the same: mono (the menu sends it with its stereo / mono setting, Menu_CfgA3).
 ; Callers note: reached only through Spc_CmdTable80 entry 19.
 ; Entry: P=0; !Spc_CmdArg0 = mono (nonzero) or stereo
 ; Exit:  A = Arg0; X, Y unchanged
@@ -1631,14 +2987,14 @@ Spc_XferTriples:
 ; $10EC — Spc_XferLive (123 bytes, $10EC–$1166; ROM $C7:33B1–$342B)
 ; Mode 5 (!Audio_XferLive): as Spc_XferTriples, but while it waits for a
 ; step it keeps the music going: when timer 0 has ticked, a pass of
-; Spc_Unk0415 (the stepping part of the main loop, probably). Commands
+; Spc_LivePass (the song alone, without effects or commands). Commands
 ; $70/$71 (Audio_CmdBlockVariant, Audio_CmdSwapSample) use this mode
 ; (!Audio_XferLive), so the song goes on while their data comes in.
 ; Callers note: reached only through Spc_XferModeTable entry 5.
 ; Entry: P=0; X = the step's value (settled), !Spc_XferAddr set
 ; Exit:  to Spc_XferHeader (RET); X = $E0; A, Y clobbered
 ; Ports: as Spc_XferTriples
-; Callees: Spc_Unk0415, Spc_CmdControl (JMP)
+; Callees: Spc_LivePass, Spc_CmdControl (JMP)
 Spc_XferLive:
     movw.b ya,!Spc_XferAddr
     mov.w .store1+1,a
@@ -1672,7 +3028,7 @@ Spc_XferLive:
     beq .no_tick
     push x
     push y
-    call Spc_Unk0415
+    call Spc_LivePass
     pop y
     pop x
 .no_tick:
@@ -1955,7 +3311,7 @@ Spc_XferNextStep:
 ; Command $F6: !Spc_Flags88 bit 5 = (!Spc_CmdArg0 != 0); timer 0's
 ; divider = !SPC_Timer0Fast (a main-loop pass every 125 us) when set,
 ; !SPC_Timer0Divider (5.25 ms) when clear, with timer 0 stopped and
-; started again around the write. With bit 5 set Spc_Unk0377 also steps
+; started again around the write. With bit 5 set Spc_StepTracks also steps
 ; the song every pass, without the tempo: a fast-forward, probably.
 ; Callers note: reached only through Spc_CmdTable80 entry 22.
 ; Entry: P=0; !Spc_CmdArg0 = on (nonzero) or off
