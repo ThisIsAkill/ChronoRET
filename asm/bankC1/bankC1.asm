@@ -146,7 +146,8 @@ BattleSys_SceneSetup:
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
 ;        BattleSys_IdleVecCD0036 $CD:0036, $CF:FD9E through
-;        Battle_PoseStep, and more cross-bank JSLs through the menu code),
+;        BattleMenu_UpdateWindows and BattleMenu_ConfirmCommand, and more
+;        cross-bank JSLs through the menu code),
 ;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
 ;        6 (BattleCF_UnkFE20), 8 (BattleSys_FrameTickVec,
@@ -27564,9 +27565,10 @@ BattleAi_AddStatByteAtY:
 ;     battlers ($02), the present enemies ($16) or those but self ($15),
 ;     self ($03), one fixed slot ($27-$2E: 3-10, $30-$36: 0-6);
 ;   - one pick: a random PC ($05), the nearest / farthest PC or enemy by
-;     position query ($06, $07, $17, $18), the lowest / highest HP
-;     ($08, $37 PCs; $19, $26 enemies), a random enemy ($2F, $38), the
-;     slot in the enemy's !Battle_UnkB19E record ($04);
+;     position query ($06, $07, $17, $18), the lowest HP ($08 PCs,
+;     $19 enemies, $26 those but self), the highest HP PC ($37), a
+;     random enemy ($2F, $38), the slot in the enemy's
+;     !Battle_UnkB19E record ($04);
 ;   - by a stat-block byte (PcStatBlk offset with BattleAi_AddPcByByte,
 ;     then BattleAi_PickPcTarget cuts the list to one): PCs $09-$14,
 ;     enemies $1A-$25 (with or without self).
