@@ -670,8 +670,9 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 
 5. Bank $C7 (sound driver, 65816 side; new file `asm/bankC7/bankC7.asm`): matched are
    `$C7:0000`-`$C7:0E10`: the entry block `Audio_DriverInit` with the vectors
-   `Audio_DriverCommand` / `Audio_ProcessEntry` (two labels on `$C7:0004`, the names the engine and
-   the battle code already used), `Audio_VecLoadNewSamples` and `Audio_VecSendSampleDir` (no
+   `Audio_DriverCommand` (`$C7:0004`; the battle code's name `Audio_ProcessEntry` is kept as
+   `Audio_ProcessEntry = $C70004`, since asar cannot alias a label and the tools want one label
+   per address), `Audio_VecLoadNewSamples` and `Audio_VecSendSampleDir` (no
    caller); the boot tables `Audio_BootBlockPtrs` / `Audio_BootBlockAram` and the unread
    `Audio_TableDirectory` (`$0010`-`$0037`); all the 65816 code (`$0038`-`$0A97`): the IPL boot
    `Audio_Boot`, `Audio_RunCommand` (with `_Dispatch` and the common exit `Audio_CommandDone`), the
