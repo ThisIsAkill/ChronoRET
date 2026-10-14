@@ -27555,7 +27555,7 @@ BattleAi_AddStatByteAtY:
 ; BattleSys_UpdateKo (through target handler $05, below) can leave a
 ; KO'd PC's slot there; whether the test and choose handlers reach any
 ; other writer of it is not traced. So the handlers that use it
-; ($1A-$26) treat that battler as "self", not the scripted enemy. In BattleSys_Unk8461's reaction tests they also differ:
+; ($1A, $1C, $1E, $20-$26) treat that battler as "self", not the scripted enemy. In BattleSys_Unk8461's reaction tests they also differ:
 ; !Battle_UnkB252 is the reacting enemy, while !Battle_UnkB18B still
 ; holds !Battle_UnkB3B7, which BattleSys_Unk8461 copies from it at
 ; $C1:8637 after the BattleSys_UnkB223 call at $C1:8626 (so the battler
