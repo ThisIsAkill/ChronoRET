@@ -27,26 +27,6 @@
 org $FFD024
 MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
                     ; SRAM +$0603 byte is the last entry not above it
-org $C2D065
-Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
-org $C2D0DB
-Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
-org $C2CEDC
-Menu_Mode06H0:      ; Menu_Mode06List entry 0 (not analysed)
-org $C2CEFD
-Menu_Mode06H1:      ; Menu_Mode06List entry 1 (not analysed)
-org $C2CF61
-Menu_Mode06H2:      ; Menu_Mode06List entry 2 (not analysed)
-org $C2CF92
-Menu_Mode06H3:      ; Menu_Mode06List entry 3 (not analysed)
-org $C2CF0A
-Menu_Mode06H1Confirm: ; Menu_Mode06H1 from its confirm on (also jumped to by Menu_Mode0BH1): saves to
-                    ; the slot, after a question when it holds a save (not matched)
-org $C2CFA2
-Menu_UnkCFA2:       ; JMP from Menu_Mode0BH1 (and Menu_Mode06H1) with neither button: the slot under
-                    ; the cursor (Menu_SlotIdx = Menu_CursorSel) shown, a sound on a change (not matched)
-org $C2D0E5
-Menu_UnkD0E5:       ; JSR from Menu_Mode0BH0 after Menu_UnkD065 (not analysed)
 org $C2FCB2
 Menu_ShopBuyQtyInit: ; JSR from Menu_Mode0CH2: Menu_ItemCount = 1, Menu_ShopPriceHi = 0, Menu_ShopPrice
                     ; and Menu_ShopUnitPrice = Menu_ShopBuyPrices[Menu_ItemId], then the gold divided by
@@ -67,18 +47,6 @@ Menu_ShopGainGold:  ; JSR from Menu_Mode0CH4: the gold (Menu_Unk2C53, 3 bytes) +
                     ; at 9,999,999 ($C2:FDDF) (not matched)
 org $C2FDBB
 Menu_ShopPayGold:   ; JSR from Menu_Mode0CH5: the gold - Menu_ShopPrice, then the same cap (not matched)
-org $C2CFFB
-Menu_UnkCFFB:       ; JSR from Menu_LoadCursor (and mode 6): builds an HDMA table at $7E:9720 from
-                    ; $C2:D044 and marks row Menu_LoadHiliteRow in it (probably the row highlight)
-org $C2D10D
-Menu_DrawSlotWindows: ; JSR from Menu_LoadInit: for slots 0-2 the label and text tile strips
-                    ; (Menu_PutTextTilesAttr / Menu_PutTextTiles), then $C2:D32C (not matched)
-org $C2D32C
-Menu_UnkD32C:       ; JSR from Menu_LoadEraseSlot: slot Menu_SlotIdx's window frame in its style
-                    ; (Menu_LoadSlotWindowStyle); in the unmatched $C2:D32C-$C2:D4EF
-org $C2D36C
-Menu_UnkD36C:       ; JSR from Menu_LoadCursor and Menu_LoadInit: the details of slot Menu_SlotIdx
-                    ; (none while Menu_LoadMsgShown is set); in the unmatched $C2:D32C-$C2:D4EF
 org $C6E74E
 BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
                     ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for

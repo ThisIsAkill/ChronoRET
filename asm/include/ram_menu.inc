@@ -1448,6 +1448,17 @@ endif
 !Menu_Unk04FB = $04FB                    ; 8-bit; Menu_XchgLeave's last sound argument when non-zero
                                          ; (writer not traced)
 
+; --- Save slot details (Menu_UnkD36C) and mode 6 ---
+!Menu_SlotDetail = $9890                 ; $40 B: the shown slot's Menu_SlotSummaries block (the
+                                         ; Menu_SprScratch RAM)
+!Menu_SlotHiliteBuf = $9720              ; 33 B: Menu_UnkCFFB's copy of Menu_SlotHiliteData
+!Menu_SlotMemberIdx = $0024              ; 16-bit; Menu_UnkD36C's party entry 0-2 (Menu_SlotMemberIcon reads
+                                         ; its low byte)
+!Menu_SlotTextWidth = $0026              ; 8-bit; TextWin_PenX after the slot's era string (its width in
+                                         ; pixels; reused while the string is unchanged)
+!C2Scene_Unk0299 = $0299                 ; 8-bit; Menu_Mode06H0 tests bit 6 with C2Scene_Unk0294 and
+                                         ; C2Scene_ObjBFlags (probably a third object's flags; use unknown)
+
 ; --- Menu mode 3: the tech screen ---
 !Menu_TechPage = $0418                   ; 8-bit; mode 3's page 0-2 (Left / Right; Menu_TechPages: probably single,
                                          ; double and triple techs); the last byte of Menu_Unk0415

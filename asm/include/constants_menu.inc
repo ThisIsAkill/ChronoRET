@@ -1811,6 +1811,51 @@ if !constants_menu_inc == 0
 !Menu_XchgBg3sc = $68                    ; BG3SC in mode 7 (map at VRAM $6800, 32 x 32)
 !Menu_XchgUnk0F12Bytes = $000C
 
+; --- Menu mode 6: the save screen, and the slot windows and details ---
+!MenuRom_SaveList = $FFC138              ; Menu_UnkD0E5's draw list
+!MenuRom_SaveAskList = $FFC16F           ; Menu_SaveAskOpen's draw list (the overwrite question)
+!MenuRom_SlotDetailList = $FFC15E        ; Menu_UnkD36C's draw lists: the details ...
+!MenuRom_SlotMemberList = $FFC168        ; ... and a member's row
+!MenuRom_SlotEraNibbles = $FFD296        ; a nibble per location (word +$32 of a summary): the string of
+                                         ; MenuRom_SlotEraStrings (probably the era)
+!MenuRom_SlotEraStrings = $FFD396        ; string table (TextWin_StrTable) of those strings
+!MenuRom_SlotIconPals = $FFCC84          ; 16 colours per character for its slot icon
+!Menu_SaveHdmaBits = $19                 ; Menu_HdmaenShadow on the save screen (not traced) ...
+!Menu_SaveAskHdmaBits = $75              ; ... under the overwrite question ...
+!Menu_SaveHdmaBitsB = $59                ; ... after it
+!Menu_SaveRecYes = 3                     ; the question's first cursor record (a confirm on it saves:
+                                         ; probably yes)
+!Menu_SaveSfx = $8A                      ; sound effect of a save (Audio_CmdPlaySfx) ...
+!Menu_SaveSfxArg = $80                   ; ... and its Audio_CmdArg1
+!Menu_SlotSaved = $FF                    ; Menu_SlotValid after a save
+!Menu_SaveClearMap = $3000               ; Menu_UnkD065 zeroes $600 bytes from here ...
+!Menu_SaveClearBytes = $0600
+!Menu_SaveUnk0D0E = $FFFF                ; ... and sets Menu_Unk0D0E to this
+!Menu_SlotHiliteBytes = $0021            ; bytes of Menu_SlotHiliteData
+!Menu_SlotHiliteMoveBytes = $0010        ; bytes of Menu_ScrollSaved copied and moved by the NMI
+!Menu_SlotHiliteLines = $20              ; line count of the highlighted entry
+!Menu_SlotHiliteHdmaBits = $C0           ; Menu_HdmaenShadow bits set: Menu_NmiMoveReq and channel 6
+!Menu_SlotWinMap = $4EC6                 ; Menu_DrawSlotWindows: slot 0's map address ($100 a slot)
+!Menu_SlotLabelAttr = $30                ; the label's attribute byte ...
+!Menu_SlotLabelTiles = $0002             ; ... its tiles
+!Menu_SlotTextTiles = $0010              ; tiles of a slot's text
+!Menu_SlotTextTile0 = $20                ; slot 0's first text tile (and the step to the next slot's)
+!Menu_SlotWinMapA = $3E8C                ; Menu_UnkD32C: slot 0's window address ($100 a slot) ...
+!Menu_SlotWinSize = $0418                ; ... its window, 24 x 4 tiles ...
+!Menu_SlotBoxCol = $0004                 ; ... and the box at column 2 of its first row ...
+!Menu_SlotBoxSize = $0404                ; ... 4 x 4 tiles
+!Menu_SlotDetailBytes = $0040
+!Menu_SlotClockMap = $3310               ; tilemap address of the slot's play time
+!Menu_SumTimeOfs = $39                   ; summary offsets: the play-time digits (as Menu_DrawClock reads them) ...
+!Menu_SumLocOfs = $32                    ; ... the location word (SRAM +$05F3 AND $1FF)
+!Menu_SlotEraWordMask = $01FF            ; the AND after the nibble table's word load
+!Menu_SlotEraMask = $0F                  ; a nibble: the string number
+!Menu_SlotEraVram = $7808                ; Menu_SlotEraVramRec: VRAM word address ...
+!Menu_SlotEraVramBytes = $01F0           ; ... and bytes
+!Menu_SlotMemberRowBytes = $00C0         ; three map rows a member
+!Menu_SlotIconOfs = $005E                ; the icon's offset from Menu_MapPtr (row 1, column 15)
+!Menu_SlotIconAttr = $11                 ; its attribute byte: tile bit 8, palette 4 (+ the member)
+
 ; --- Menu text threads ---
 !MenuRom_CfgTextTable = $FFD3FE          ; string table of the settings texts (entry, then value strings)
 !MenuRom_VramTiles = $FFEB88             ; $480 bytes Menu_VramRecRomTiles sends to VRAM $2010 (not traced)

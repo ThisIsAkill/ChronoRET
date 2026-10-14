@@ -43,10 +43,11 @@ incsrc "../hardware.inc"
 ;   ($C2:23F9), C2Scene_Mode2 ($C2:24F0, $C2:2501), C2Scene_Mode8 ($C2:264E),
 ;   C2Scene_ZoneSoundAtEntry ($C2:2F49), C2Scene_DialInput ($C2:6BE9), Menu_InitSystems ($C2:80B2,
 ;   $C2:80C5, $C2:80CE, $C2:80E1, $C2:80EA), Menu_CfgEntry0 ($C2:C033), Menu_XchgSendSound
-;   ($C2:CBF3), Menu_XchgSound81 ($C2:CC09), Menu_Mode0EH1_start ($C2:E6A1), Menu_SendSoundArg
-;   ($C2:EB1A), C3_SongCheck ($C3:09D1), C3_RunScript ($C3:0BE9), BattleCD_ApuCmd81 ($CD:03AB),
-;   BattleCD_RunEndFx ($CD:0D70, $CD:0D81), BattleCD_ApuCmd18 ($CD:3B7D), BattleCD_PauseWait
-;   ($CD:3E54, $CD:3E70) and unmatched ($C2:CF46, $FF:FC82, $FF:FC97, $FF:FF24, $FF:FF39).
+;   ($C2:CBF3), Menu_XchgSound81 ($C2:CC09), Menu_SaveToSlot ($C2:CF46), Menu_Mode0EH1_start
+;   ($C2:E6A1), Menu_SendSoundArg ($C2:EB1A), C3_SongCheck ($C3:09D1), C3_RunScript ($C3:0BE9),
+;   BattleCD_ApuCmd81 ($CD:03AB), BattleCD_RunEndFx ($CD:0D70, $CD:0D81), BattleCD_ApuCmd18
+;   ($CD:3B7D), BattleCD_PauseWait ($CD:3E54, $CD:3E70) and unmatched ($FF:FC82, $FF:FC97, $FF:FF24,
+;   $FF:FF39).
 ; Callers of Audio_VecSendSampleDir (1 JSL site): unmatched ($E6:F15C).
 ; Entry vectors and boot tables ($C7:0000–$C7:0037)
 ; ============================================================

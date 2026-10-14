@@ -772,7 +772,7 @@ BankFF_UnkF9C4:
 ; stored, Menu_SramLastSlot = the slot, and Menu_SramUnk7FE1 counts up
 ; when it equals Menu_Unk299E. The records are copied to Menu_SprScratch
 ; first and read from Menu_Unk51 on (0, probably).
-; Callers (1 JSL site): unmatched ($C2:CF51).
+; Callers (1 JSL site): Menu_SaveToSlot ($C2:CF51).
 ; Entry: M, X any (P saved; SEP #$20 / REP #$30 here), DP=0 (Menu_SlotIdx,
 ;        Menu_SlotSramOfs, Menu_Tmp00, Menu_Unk51), DB=$7E (absolute RAM;
 ;        saved around each move)
