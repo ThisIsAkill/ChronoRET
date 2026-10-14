@@ -155,10 +155,11 @@ BattleSys_SceneSetup:
 ;        X=0 kept, and its bank-$CC steps are matched, but the rest of
 ;        its call tree is not checked here); the other five reach code
 ;        that is not analysed:
-;        3 (BattleSys_FrameTickVec $CD:0009,
-;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
+;        3 (BattleSys_FrameTickVec $CD:0009, BattleSys_PumpFrames'
 ;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
-;        through the menu code),
+;        through the menu code; its BattleMsg_ShowFromTableCC3A09Vec
+;        $CD:0027 leads to BattleCD_ShowTechInfo, whose call tree is
+;        all matched),
 ;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
 ;        6 (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies),
