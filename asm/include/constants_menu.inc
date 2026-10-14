@@ -8,9 +8,10 @@ if !constants_menu_inc == 0
 !constants_menu_inc = 1
 
 ; --- ROM data read by matched bank-$C2 code (not matched itself yet) ---
-!MenuRom_DefaultConfig = $C2FCA6         ; 12 B copied to Menu_Config for a new game
-!MenuRom_DefaultButtonMap = $C2FCA9      ; = MenuRom_DefaultConfig+3: the 9 B from the button map on,
-                                         ; copied to Menu_Unk0408
+!MenuRom_DefaultConfig = MenuRom_DefaultConfig ; $C2:FCA6, 12 B copied to Menu_Config for a new game
+                                         ; (the label in bank $C2)
+!MenuRom_DefaultButtonMap = MenuRom_DefaultButtonMap ; $C2:FCA9 = MenuRom_DefaultConfig+3: the 9 B from
+                                         ; the button map on, copied to Menu_Unk0408 (the label)
 !MenuRom_CharRecordInit = $CC0000        ; $280 B copied to Menu_CharRecords for a new game
 
 ; --- DMA ---
@@ -1855,6 +1856,16 @@ if !constants_menu_inc == 0
 !Menu_SlotMemberRowBytes = $00C0         ; three map rows a member
 !Menu_SlotIconOfs = $005E                ; the icon's offset from Menu_MapPtr (row 1, column 15)
 !Menu_SlotIconAttr = $11                 ; its attribute byte: tile bit 8, palette 4 (+ the member)
+
+; --- The unreferenced VRAM record at $C2:E914 ---
+!Menu_VramRecE914Dest = $5840           ; Menu_VramRecUnkE914: VRAM word address ...
+!Menu_VramRecE914Src = $2E80             ; ... WRAM source ...
+!Menu_VramRecE914Bytes = $0080           ; ... and bytes
+
+; --- Shop arithmetic ($C2:FCB2-$C2:FE09) ---
+!Menu_GoldMax = $98967F                  ; 9,999,999: Menu_ShopCapGold's limit of the gold
+!Menu_GoldCapped = $FF                   ; Menu_ShopCapGold's X when it capped
+!Menu_ShopDivBits = $0018                ; Menu_ShopDivide's steps: a 24-bit dividend
 
 ; --- Menu text threads ---
 !MenuRom_CfgTextTable = $FFD3FE          ; string table of the settings texts (entry, then value strings)

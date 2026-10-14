@@ -56,8 +56,8 @@ if !ram_menu_inc == 0
                                          ; character n is recruited, probably (Menu_CmdJoin sets the
                                          ; character's BankFF_CharBits bit; BattleSys_AwardReserveExp reads it)
 !Menu_Unk2C53 = $2C53                    ; 3 B $2C53-$2C55 zeroed by Menu_InitNewGameData (two 16-bit STZs);
-                                         ; probably the gold (the C0 opcodes' gold sum; unmatched code at
-                                         ; $C2:FDF1 caps it at 9,999,999)
+                                         ; probably the gold (the C0 opcodes' gold sum; Menu_ShopCapGold
+                                         ; caps it at 9,999,999)
 !Menu_Unk2C7C = $2C7C                    ; 30 B $2C7C-$2C99 zeroed by Menu_InitNewGameData
 
 ; --- Joypad (Menu_PollPad / Menu_MapButtons), dp $F0-$FF with DP=$0000 ---
@@ -1016,6 +1016,7 @@ endstruct
                                          ; probably set per shop by the caller; not traced)
 !Menu_ShopQuot = $0036                   ; 3 B: the quotient Menu_ShopBuyQtyInit / SellQtyInit leave (the most
                                          ; the gold pays for / can still take)
+!Menu_ShopRem = $003A                    ; 4 B: Menu_ShopDivide's remainder
 !Menu_ShopProduct = $003E                ; 4 B: Menu_UnkFD58 / Menu_UnkFD68's product (probably)
 !Menu_ShopMulArg = $0004                 ; 3 B: the multiplicand of Menu_UnkFD68 (a price)
 !Menu_ShopMulLen = $0002                 ; 8-bit; its byte count (2 or 3)

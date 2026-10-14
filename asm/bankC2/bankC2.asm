@@ -1,5 +1,5 @@
 ; ============================================================
-; Bank $C2 — (mostly unmatched)
+; Bank $C2 — the menu and the bank-$C2 scene mode (all from source)
 ; File offset 0x020000 (bank $C2 = ROM offset $20000)
 ;
 ; The menu/scene bank. Other banks enter it only through fixed vectors:
@@ -4048,10 +4048,9 @@ C2Script_IfRamByteNonZero:
 ; $C2:14AD — C2Script_IfRamByteNe (37 bytes, $14AD–$14D1)
 ; Op $24, 5 bytes: if the RAM byte at arg 1-2 is not arg 3, branch by
 ; arg 4; else advance 5.
-; Callers (1 JSR site): unmatched ($C2:FFB4).
-; Callers note: none direct (C2Script_OpTable). xref's CONFIRMED JSR at
-;   $C2:FFB4 is not a call: those bytes are the operand of REP #$20 at
-;   $C2:FFB3 and the LDA $1814 after it (unmatched code).
+; Callers note: none direct (C2Script_OpTable). The JSR byte pattern at
+;   $C2:FFB4 is not a call: it lies in BankC2_OldBuildLeftovers (bytes
+;   kept as data).
 ; Entry: as C2Script_ClearRamByte: DP=$0000, DB=$00 (low WRAM)
 ; Exit:  M=0, X=0; A = 5, or the offset with C=0; X = the address; Y = 3
 ;        or 4
@@ -24295,7 +24294,7 @@ Menu_Unk834D:
 ; Menu_FlushVramQueue sends them); the sub-entry
 ; Menu_QueueVramWram ($C2:838E) does the same from $7E:X. Both MVNs go
 ; through Menu_VramQueueSlot, then the shared tail Menu_QueueVramTail ($C2:8395).
-; Callers (157 sites: 136 JSR, 21 JMP): Menu_ShowHealNumbers (JSR $C2:8F76), Menu_LoadGraphics (JSR
+; Callers (154 sites: 133 JSR, 21 JMP): Menu_ShowHealNumbers (JSR $C2:8F76), Menu_LoadGraphics (JSR
 ;   $C2:971E, JSR $C2:9813), Menu_MainMenuLoop (JSR $C2:9A40), Menu_MainMenuMaps (JSR $C2:9B4F),
 ;   Menu_MainMenuRedraw (JMP $C2:9B80), Menu_Mode01H1 (JMP $C2:9C6A), Menu_MemberScrollAnim (JSR
 ;   $C2:9DF4, JSR $C2:9DFA, JSR $C2:9E34, JSR $C2:9E6D), Menu_HighlightMemberRow (JSR $C2:9EAB),
@@ -24338,8 +24337,7 @@ Menu_Unk834D:
 ;   Menu_NameChoiceInit (JSR $C2:E5C2, JSR $C2:E5C8, JSR $C2:E5CE), Menu_Mode0EH2 (JMP $C2:E702),
 ;   Menu_Mode0EH3 (JMP $C2:E740), Menu_LoadCursor (JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE),
 ;   Menu_LoadInit (JSR $C2:E82A, JSR $C2:E830, JSR $C2:E836, JSR $C2:E83C), Menu_LoadAskSlot (JSR
-;   $C2:E87F, JSR $C2:E885), Menu_LoadEraseOpen (JSR $C2:E8AD, JSR $C2:E8B3) and unmatched (JSR
-;   $C2:FEEE, JSR $C2:FEF4, JSR $C2:FF21).
+;   $C2:E87F, JSR $C2:E885) and Menu_LoadEraseOpen (JSR $C2:E8AD, JSR $C2:E8B3).
 ; Callers of Menu_QueueVramWram (6 JSR sites): Menu_LoadEraseSlot ($C2:E90C), Menu_SprUploadTiles
 ;   ($C2:F84D, $C2:F859, $C2:F86C) and Menu_TextUpload ($C2:FB17, $C2:FB92).
 ; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
@@ -28060,7 +28058,7 @@ Menu_ClearConfigAndFlags:
 ; ($C2:960B–$C2:99C9)
 ; ============================================================
 ; Called by Menu_InitSystems (Menu_LoadGraphics, Menu_ClearOam,
-; Menu_BuildItemTables) and by menu code not matched yet. The tile
+; Menu_BuildItemTables) and by other menu code. The tile
 ; helpers work on 4bpp 8x8 tiles in bank $7E (32 bytes: planes 0-1 as
 ; 8 byte pairs, then planes 2-3), as the SNES stores them.
 
@@ -35637,7 +35635,8 @@ Menu_CfgEntry11:
 ; Callers note: Menu_CfgEntryTable entry 8 (Menu_CfgEntryRun).
 ; Entry: M=1 (8-bit), X=0 (16-bit LDX/LDY), DP=$0000 (the TDC: B = 0,
 ;        the MVN's count is 8), DB=$7E
-; Exit:  M=1; A, X, Y as Menu_UnkC54F leaves them (not analysed)
+; Exit:  M=1 (Menu_UnkC54F restores P); A, X, Y clobbered;
+;        Menu_Tmp00 = 6 (Menu_UnkC57A)
 ; Calls: Menu_UnkC54F.
 Menu_CfgEntry8:
     LDA.w !Menu_PadAction
@@ -35849,7 +35848,8 @@ Menu_CfgMapButtons:
 ; Callers (1 JSR site): Menu_CfgMapCursor ($C2:C1FA).
 ; Entry: M any, X any (REP #$30 / SEP #$30 here), DP=$0000
 ;        (Menu_Tmp00-04), DB=$7E; Menu_Tmp00 = the button
-; Exit:  as Menu_UnkC5C7 (not analysed)
+; Exit:  as Menu_UnkC5C7: M=1, X=1 (its PLP restores this routine's
+;        SEP #$30); A, X, Y clobbered; Menu_Tmp00 = $FFFF
 ; Calls: Menu_CfgMapSet (twice), Menu_CfgMapFixPages; jumps to
 ;   Menu_UnkC5C7.
 Menu_CfgMapAssign:
@@ -43179,6 +43179,15 @@ Menu_LoadEraseSlot:
     PLP
     RTS
 
+; $C2:E914 — Menu_VramRecUnkE914 (7 bytes, $E914–$E91A)
+; A Menu_VramRec: VRAM $5840 = $7E:2E80, $80 bytes (the first two rows
+; Menu_VramRecClock sends). No reference found (tools/xref.py finds
+; none to $C2:E914).
+Menu_VramRecUnkE914:
+    dw !Menu_VramRecE914Dest, !Menu_VramRecE914Src
+    db !Bank7E
+    dw !Menu_VramRecE914Bytes
+
 ; ============================================================
 ; Menu main cursor: thread 3 ($C2:E91B–$C2:E97B)
 ; ============================================================
@@ -47137,10 +47146,9 @@ Menu_PutTextTilesAttr:
 ; Menu_VramRec records the menu code queues by address (Menu_QueueVramRom
 ; with an LDX #): .Dest (VRAM word address), .Src, .SrcBank, .Size,
 ; packed 7 bytes apart, so each one's unused .Unk7 is the first byte of
-; the next. Several have no reference in matched code: most are loaded
-; by an LDX # in unmatched $C2 code, but no loader was found in $C2 for
-; Menu_VramRecBg1High ($FBD5), Menu_VramRecBg3Rows4 ($FC22) and
-; Menu_VramRecBg3Rows16 ($FC30).
+; the next. With all of bank $C2's code matched, three have no loader in
+; the bank: Menu_VramRecBg1High ($FBD5), Menu_VramRecBg3Rows4 ($FC22) and
+; Menu_VramRecBg3Rows16 ($FC30) (as Menu_VramRecUnkE914 at $C2:E914).
 ; ------------------------------------------------------------
 
 ; $C2:FBCE — Menu_VramRecBg1Big (7 bytes, $FBCE–$FBD4)
@@ -47366,6 +47374,318 @@ Menu_VramRecsWin:
     dw $0380
 
 ; ============================================================
+; Menu defaults and shop arithmetic ($C2:FCA6–$C2:FE09)
+; ============================================================
+
+; $C2:FCA6 — MenuRom_DefaultConfig (3 bytes, $FCA6–$FCA8)
+; The first of the 12 bytes Menu_ClearConfigAndFlags copies to
+; Menu_Config for a new game ($84, $A0, $01; MenuRom_DefaultButtonMap
+; follows as bytes 3-11). The !MenuRom_DefaultConfig define names this
+; label.
+MenuRom_DefaultConfig:
+    db $84, $A0, $01
+
+; $C2:FCA9 — MenuRom_DefaultButtonMap (9 bytes, $FCA9–$FCB1)
+; Bytes 3-11 of the new game's Menu_Config: the default button map as
+; JOY1 masks (A, B, X, B, Select, Y, R, L, X), also copied alone to
+; Menu_Unk0408 (Menu_ClearConfigAndFlags) and to Menu_ButtonMap
+; (Menu_UnkC54F). The !MenuRom_DefaultButtonMap define names this label.
+MenuRom_DefaultButtonMap:
+    db !Pad_A, !Pad_B, !Pad_X, !Pad_B, !Menu_PadSelect, !Pad_Y, !Pad_R, !Pad_L, !Pad_X
+
+; $C2:FCB2 — Menu_ShopBuyQtyInit (47 bytes, $FCB2–$FCE0)
+; The count window's start for a buy: Menu_ItemCount = 1,
+; Menu_ShopPriceHi = 0, Menu_ShopPrice and Menu_ShopUnitPrice =
+; Menu_ShopBuyPrices[Menu_ItemId] (a word; B = 0 from the TDC for the
+; index), and Menu_ShopQuot = the gold (Menu_Unk2C53, 3 bytes, into
+; Menu_Tmp00-02) / that price (Menu_ShopMulArg) by Menu_ShopDivide: the
+; most the gold pays for.
+; Callers (1 JSR site): Menu_Mode0CH2 ($C2:D5B1).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X any, DP=$0000
+;        (the TDC; Menu_Tmp00-05, Menu_ShopQuot), DB=$7E
+; Exit:  P restored; A, X clobbered; as Menu_ShopDivide leaves the
+;        direct page (Menu_ShopQuot, Menu_ShopRem)
+; Calls: Menu_ShopDivide.
+Menu_ShopBuyQtyInit:
+    PHP
+    SEP #$20
+    LDA.b #1
+    STA.w !Menu_ItemCount
+    STZ.w !Menu_ShopPriceHi
+    TDC                                 ; B = 0 for the index
+    LDA.w !Menu_ItemId
+    REP #$30
+    ASL A
+    TAX
+    LDA.w !Menu_ShopBuyPrices,X
+    STA.w !Menu_ShopPrice
+    STA.w !Menu_ShopUnitPrice
+    STA.b !Menu_ShopMulArg
+    LDA.w !Menu_Unk2C53
+    STA.b !Menu_Tmp00
+    SEP #$20
+    LDA.w !Menu_Unk2C53+2
+    STA.b !Menu_Tmp02
+    JSR Menu_ShopDivide
+    PLP
+    RTS
+
+; $C2:FCE1 — Menu_ShopSellQtyInit (60 bytes, $FCE1–$FD1C)
+; The same for a sale: the price is the Menu_ItemInfo1 word of
+; Menu_ItemId halved, rounded up (the LSR's carry added with the
+; Menu_Unk51 word, expected 0), and the dividend 9,999,999 - the gold
+; (Menu_GoldMax, 24-bit, into Menu_Tmp00-02): how many sales the gold
+; can still take. When the gold is above Menu_GoldMax (a borrow) there
+; is no division and Menu_ShopQuot keeps its old value. The 16-bit STZ
+; of Menu_Tmp00 before the subtraction is overwritten (harmless).
+; Callers (1 JSR site): Menu_Mode0CH3 ($C2:D661).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X any, DP=$0000
+;        (the TDC; Menu_Unk51, Menu_Tmp00-05), DB=$7E
+; Exit:  P restored; A, X clobbered; Menu_Tmp00-02 = the dividend; as
+;        Menu_ShopDivide leaves the direct page when it divides
+; Calls: Menu_ShopDivide.
+Menu_ShopSellQtyInit:
+    PHP
+    SEP #$20
+    LDA.b #1
+    STA.w !Menu_ItemCount
+    STZ.w !Menu_ShopPriceHi
+    TDC                                 ; B = 0 for the index
+    LDA.w !Menu_ItemId
+    REP #$30
+    ASL A
+    TAX
+    LDA.w !Menu_ItemInfo1,X
+    LSR A
+    ADC.b !Menu_Unk51                   ; + the carry: rounded up
+    STA.w !Menu_ShopPrice
+    STA.w !Menu_ShopUnitPrice
+    STA.b !Menu_ShopMulArg
+    STZ.b !Menu_Tmp00
+    LDA.w #!Menu_GoldMax&$FFFF
+    SEC
+    SBC.w !Menu_Unk2C53
+    STA.b !Menu_Tmp00
+    SEP #$20
+    LDA.b #!Menu_GoldMax>>16
+    SBC.w !Menu_Unk2C53+2
+    STA.b !Menu_Tmp02
+    BCC .done
+    JSR Menu_ShopDivide
+.done:
+    PLP
+    RTS
+
+; $C2:FD1D — Menu_ShopDivide (59 bytes, $FD1D–$FD57)
+; Menu_ShopQuot (3 bytes) = the 24-bit Menu_Tmp00-02 / the 16-bit
+; Menu_ShopMulArg, the remainder in Menu_ShopRem: the dividend goes to
+; Menu_ShopQuot+1 to +3 (two word stores; the second also writes
+; Menu_Tmp03 to Menu_ShopRem, which the STZs then clear), the 32-bit
+; Menu_ShopRem = 0, and 24 steps of shift and subtract shift the
+; quotient bits into the 4 bytes from Menu_ShopQuot from below as the
+; dividend's bits leave at the top. The byte at Menu_ShopQuot before
+; the call ends in Menu_ShopQuot+3. A divisor of 0 gives $FFFFFF.
+; Callers (2 JSR sites): Menu_ShopBuyQtyInit ($C2:FCDC) and Menu_ShopSellQtyInit ($C2:FD18).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00-05,
+;        Menu_ShopQuot, Menu_ShopRem), DB any
+; Exit:  P restored; A clobbered; X = 0; Y unchanged
+; Calls: none.
+Menu_ShopDivide:
+    PHP
+    REP #$30
+    LDA.b !Menu_Tmp00
+    STA.b !Menu_ShopQuot+1
+    LDA.b !Menu_Tmp02
+    STA.b !Menu_ShopQuot+3
+    STZ.b !Menu_ShopRem
+    STZ.b !Menu_ShopRem+2
+    LDX.w #!Menu_ShopDivBits
+    ASL.b !Menu_ShopQuot
+    ROL.b !Menu_ShopQuot+2
+.bit:
+    ROL.b !Menu_ShopRem
+    ROL.b !Menu_ShopRem+2
+    LDA.b !Menu_ShopRem+2
+    BNE .subtract
+    LDA.b !Menu_ShopRem
+    CMP.b !Menu_ShopMulArg
+    BCC .shift                          ; C=0: a 0 bit
+.subtract:
+    LDA.b !Menu_ShopRem
+    SEC
+    SBC.b !Menu_ShopMulArg
+    STA.b !Menu_ShopRem
+    LDA.b !Menu_ShopRem+2
+    SBC.w #0
+    STA.b !Menu_ShopRem+2               ; C=1: a 1 bit
+.shift:
+    ROL.b !Menu_ShopQuot
+    ROL.b !Menu_ShopQuot+2
+    DEX
+    BNE .bit
+    PLP
+    RTS
+
+; $C2:FD58 — Menu_UnkFD58 (16 bytes, $FD58–$FD67)
+; Menu_ShopProduct = the Menu_Tmp00 word x the Menu_ShopMulLen bytes at
+; Menu_ShopMulArg: Menu_UnkFD68 for the low byte, then the high byte
+; (Menu_Tmp01 into WRMPYA) through the rest of Menu_UnkFD68 (its .mul)
+; with Y = 1, its products added one byte further on. Quirk, kept: each
+; 16-bit add drops its carry, and in this second pass the word added
+; to can already be large, so a carry can be lost ($FFFF x $FFFF gives
+; $FEFE0001; whether the shop's values get there is not checked).
+; Callers (1 JSR site): Menu_ShopCalcPrices ($C2:DBC1).
+; Entry: M, X any (P saved here; the PLP is Menu_UnkFD68's), DP=$0000
+;        (Menu_Tmp00-05, Menu_Unk51, Menu_ShopProduct), DB=$7E
+;        (Menu_ShopProduct is written absolute, $003E,Y)
+; Exit:  P restored; as Menu_UnkFD68
+; Calls: Menu_UnkFD68; branches into it (.mul).
+Menu_UnkFD58:
+    PHP
+    JSR Menu_UnkFD68
+    SEP #$30
+    LDA.b !Menu_Tmp01
+    STA.l WRMPYA
+    LDY.b #1
+    BRA Menu_UnkFD68_mul
+
+; $C2:FD68 — Menu_UnkFD68 (47 bytes, $FD68–$FD96)
+; Menu_ShopProduct (4 bytes) = 0, then for each of the Menu_ShopMulLen
+; bytes of Menu_ShopMulArg (X from Menu_Unk51, expected 0; Y from the
+; Menu_Unk51 word) its hardware product with Menu_Tmp00's low byte
+; (WRMPYA) is added (16-bit, its carry dropped) to the word at
+; Menu_ShopProduct + Y, Y and X + 1 each time: Menu_Tmp00 x the
+; multi-byte value. The local .mul ($C2:FD79) is where Menu_UnkFD58
+; joins with Y = 1 for its second byte.
+; Callers (2 JSR sites): Menu_ShopQtyDown ($C2:DAB1) and Menu_UnkFD58 ($C2:FD59).
+; Entry: M, X any (P saved; REP #$30 / SEP #$30 here), DP=$0000
+;        (Menu_Tmp00-05, Menu_Unk51, Menu_ShopProduct), DB=$7E (the
+;        absolute $003E,Y)
+; Exit:  P restored; A = the last sum; X = Menu_ShopMulLen; Y's low
+;        byte = the last offset + 1 (the SEP #$30 clears the high bytes)
+; Calls: none.
+Menu_UnkFD68:
+    PHP
+    REP #$30
+    LDY.b !Menu_Unk51
+    STZ.b !Menu_ShopProduct
+    STZ.b !Menu_ShopProduct+2
+    SEP #$30
+    LDA.b !Menu_Tmp00
+    STA.l WRMPYA
+.mul:
+    LDX.b !Menu_Unk51
+.byte:
+    SEP #$20
+    LDA.b !Menu_ShopMulArg,X
+    STA.l WRMPYB
+    REP #$21                            ; C=0 for the ADC
+    LDA.w !Menu_ShopProduct,Y
+    ADC.l RDMPYL
+    STA.w !Menu_ShopProduct,Y
+    INY
+    INX
+    CPX.b !Menu_ShopMulLen
+    BNE .byte
+    PLP
+    RTS
+
+; $C2:FD97 — Menu_ShopGainGold (36 bytes, $FD97–$FDBA)
+; The gold (Menu_Unk2C53, 3 bytes) + Menu_ShopPrice (3 bytes); a carry
+; out of the third byte sets it to Menu_GoldMax's ($98), never in
+; practice (at most 9,999,999 + 99 x 65,000 is below 2^24); then the cap
+; (Menu_ShopCapGold).
+; Callers (1 JSR site): Menu_Mode0CH4 ($C2:D6A5).
+; Entry: M, X any (P saved; REP #$20 / SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A clobbered; X as Menu_ShopCapGold leaves it ($FF
+;        when capped, else 0)
+; Calls: Menu_ShopCapGold.
+Menu_ShopGainGold:
+    PHP
+    REP #$20
+    LDA.w !Menu_Unk2C53
+    CLC
+    ADC.w !Menu_ShopPrice
+    STA.w !Menu_Unk2C53
+    SEP #$20
+    LDA.w !Menu_Unk2C53+2
+    ADC.w !Menu_ShopPriceHi
+    STA.w !Menu_Unk2C53+2
+    BCC .cap
+    LDA.b #!Menu_GoldMax>>16
+    STA.w !Menu_Unk2C53+2
+.cap:
+    JSR Menu_ShopCapGold
+    PLP
+    RTS
+
+; $C2:FDBB — Menu_ShopPayGold (36 bytes, $FDBB–$FDDE)
+; The gold - Menu_ShopPrice (3 bytes); a borrow sets the third byte to
+; $98 as Menu_ShopGainGold's carry does, so paying more than the gold
+; would leave $98xxxx (then capped at 9,999,999 or not) instead of 0
+; (quirk, kept; the count window's limit, Menu_ShopQuot, keeps the
+; price within the gold); then Menu_ShopCapGold.
+; Callers (1 JSR site): Menu_Mode0CH5 ($C2:D62D).
+; Entry: M, X any (P saved; REP #$20 / SEP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A clobbered; X as Menu_ShopCapGold leaves it
+; Calls: Menu_ShopCapGold.
+Menu_ShopPayGold:
+    PHP
+    REP #$20
+    LDA.w !Menu_Unk2C53
+    SEC
+    SBC.w !Menu_ShopPrice
+    STA.w !Menu_Unk2C53
+    SEP #$20
+    LDA.w !Menu_Unk2C53+2
+    SBC.w !Menu_ShopPriceHi
+    STA.w !Menu_Unk2C53+2
+    BCS .cap
+    LDA.b #!Menu_GoldMax>>16
+    STA.w !Menu_Unk2C53+2
+.cap:
+    JSR Menu_ShopCapGold
+    PLP
+    RTS
+
+; $C2:FDDF — Menu_ShopCapGold (43 bytes, $FDDF–$FE09)
+; Caps the gold (Menu_Unk2C53, 3 bytes) at Menu_GoldMax (9,999,999):
+; when it is at or above it, it becomes Menu_GoldMax and X =
+; Menu_GoldCapped (also for exactly 9,999,999, stored again); else X =
+; 0. So Menu_Unk2C53 is
+; probably the gold, as the shop shows it with 7 digits.
+; Callers (2 JSR sites): Menu_ShopGainGold ($C2:FDB6) and Menu_ShopPayGold ($C2:FDDA).
+; Entry: M, X any (P saved; SEP #$30 / REP #$20 here), DP any, DB=$7E
+; Exit:  P restored; A clobbered; X = $FF when capped, else 0 (its
+;        high byte cleared by the SEP #$30); Y's high byte cleared
+; Calls: none.
+Menu_ShopCapGold:
+    PHP
+    SEP #$30
+    LDX.b #0
+    LDA.w !Menu_Unk2C53+2
+    CMP.b #!Menu_GoldMax>>16
+    REP #$20                            ; (the flags of the CMP are kept)
+    BEQ .low
+    BCS .cap
+    PLP
+    RTS
+.low:
+    LDA.w !Menu_Unk2C53
+    CMP.w #!Menu_GoldMax&$FFFF
+    BCC .done
+.cap:
+    LDA.w #!Menu_GoldMax&$FFFF
+    STA.w !Menu_Unk2C53
+    SEP #$20
+    LDA.b #!Menu_GoldMax>>16
+    STA.w !Menu_Unk2C53+2
+    LDX.b #!Menu_GoldCapped
+.done:
+    PLP
+    RTS
+
+; ============================================================
 ; Menu mode handler list, mode $0F
 ; ============================================================
 
@@ -47375,3 +47695,71 @@ org $C2FE0A
 ; second entry is read; the bytes after it are not a list).
 Menu_Mode0FList:
     dw Menu_Exit
+
+; ==================================================================
+; BankC2_OldBuildLeftovers ($C2:FE0C–$C2:FFFF, 500 bytes)
+; ==================================================================
+; Not code and, as far as found, never read: tools/xref.py, run on every
+; address of $C2:FE0C-$FFFF, finds no call or jump from matched code.
+; Its CONFIRMED hits are the JSRs inside these bytes ($C2:FE28,
+; $C2:FE95, $C2:FEB9, $C2:FF35) and JSLs in unmatched banks ($C7, $C9,
+; $E8, $E9, $FF at $FF:FD02 and on), not checked; its DOUBTFUL ones are
+; operand bytes of matched code or sweeps of unmatched bytes. The first
+; 225 bytes are tails of the code just before them, as with
+; BankC0_OldBuildLeftovers: each segment repeats the bytes of a stretch
+; of the current code that ends at $C2:FE0B (Menu_ShopPayGold,
+; Menu_ShopCapGold and Menu_Mode0FList), with the JSR to
+; Menu_ShopCapGold pointing where that copy's own Menu_ShopCapGold lies
+; (the copy's offset added: $FE2D = $FDDF + $4E, $FEBE = $FDDF + $DF;
+; of the + $7E copy only the operand's high byte is left). Probably what
+; earlier, longer assemblies of the end of the bank left behind, each
+; later build cutting off the front of the one before; that the builds
+; were longer is inferred from the offsets, not known. The other 277
+; bytes ($FEEB on) are not found in the current code of the bank (a
+; byte search): they read as code (JSRs to Menu_QueueVramRom ($C2:8385),
+; an RTL at $C2:FF25, MVNs from bank $D1 to $7E:95BA, stores to the
+; Menu_SprPages objects at $1800 / $1900) and repeat themselves: $FFA8-
+; $FFDD = $FF6E-$FFA3, $FFE0-$FFE9 = $FF96-$FF9F, $FFEE-$FFFF =
+; $FF8C-$FF9D; probably what is left of still older builds. Kept as
+; bytes since they never run.
+; Entry/Exit: not code (data; never executed).
+BankC2_OldBuildLeftovers:
+.copyEnd:                               ; $C2:FE0C-$FE11: as $C2:FE06-$FE0B
+    db $A2,$FF,$28,$60,$B2,$82 ; $FE0C
+.copy4E:                                ; $C2:FE12-$FE59: as $C2:FDC4-$FE0B with the JSR operand + $4E
+    db $10,$8D,$53,$2C,$E2,$20,$AD,$55,$2C,$ED,$46,$10,$8D,$55,$2C,$B0 ; $FE12
+    db $05,$A9,$98,$8D,$55,$2C,$20,$2D,$FE,$28,$60,$08,$E2,$30,$A2,$00 ; $FE22
+    db $AD,$55,$2C,$C9,$98,$C2,$20,$F0,$04,$B0,$0A,$28,$60,$AD,$53,$2C ; $FE32
+    db $C9,$7F,$96,$90,$0F,$A9,$7F,$96,$8D,$53,$2C,$E2,$20,$A9,$98,$8D ; $FE42
+    db $55,$2C,$A2,$FF,$28,$60,$B2,$82 ; $FE52
+.copy7E:                                ; $C2:FE5A-$FE89: as $C2:FDDC-$FE0B with the operand byte + $7E
+    db $FE,$28,$60,$08,$E2,$30,$A2,$00,$AD,$55,$2C,$C9,$98,$C2,$20,$F0 ; $FE5A
+    db $04,$B0,$0A,$28,$60,$AD,$53,$2C,$C9,$7F,$96,$90,$0F,$A9,$7F,$96 ; $FE6A
+    db $8D,$53,$2C,$E2,$20,$A9,$98,$8D,$55,$2C,$A2,$FF,$28,$60,$B2,$82 ; $FE7A
+.copyDF:                                ; $C2:FE8A-$FEEA: as $C2:FDAB-$FE0B with the JSR operands + $DF
+    db $10,$8D,$55,$2C,$90,$05,$A9,$98,$8D,$55,$2C,$20,$BE,$FE,$28,$60 ; $FE8A
+    db $08,$C2,$20,$AD,$53,$2C,$38,$ED,$44,$10,$8D,$53,$2C,$E2,$20,$AD ; $FE9A
+    db $55,$2C,$ED,$46,$10,$8D,$55,$2C,$B0,$05,$A9,$98,$8D,$55,$2C,$20 ; $FEAA
+    db $BE,$FE,$28,$60,$08,$E2,$30,$A2,$00,$AD,$55,$2C,$C9,$98,$C2,$20 ; $FEBA
+    db $F0,$04,$B0,$0A,$28,$60,$AD,$53,$2C,$C9,$7F,$96,$90,$0F,$A9,$7F ; $FECA
+    db $96,$8D,$53,$2C,$E2,$20,$A9,$98,$8D,$55,$2C,$A2,$FF,$28,$60,$B2 ; $FEDA
+    db $82 ; $FEEA
+.other:                                 ; $C2:FEEB-$FFFF: not found in the current code
+    db $B2,$82,$FA,$20,$85,$83,$A2,$89,$FA,$20,$85,$83,$28,$4C,$7B,$E7 ; $FEEB
+    db $08,$E2,$20,$A9,$FE,$1C,$01,$01,$C2,$30,$A2,$E8,$BF,$20,$89,$EB ; $FEFB
+    db $A5,$54,$29,$FF,$00,$0A,$AA,$BF,$EA,$FB,$FF,$AA,$E2,$20,$A9,$04 ; $FF0B
+    db $9D,$01,$2E,$A2,$3C,$FA,$20,$85,$83,$28,$6B,$08,$E2,$20,$AD,$02 ; $FF1B
+    db $0F,$8D,$00,$18,$8D,$00,$19,$20,$6F,$F4,$20,$87,$FF,$EE,$15,$0D ; $FF2B
+    db $AD,$00,$0F,$8D,$11,$18,$AD,$01,$0F,$8D,$17,$18,$0B,$F4,$00,$18 ; $FF3B
+    db $2B,$20,$92,$F2,$64,$16,$2B,$A2,$98,$88,$AD,$02,$18,$C9,$06,$90 ; $FF4B
+    db $03,$A2,$A8,$A8,$8E,$0E,$18,$7B,$A2,$00,$18,$A0,$00,$19,$A9,$3F ; $FF5B
+    db $54,$7E,$7E,$A2,$98,$C8,$8E,$0E,$19,$A9,$40,$8D,$19,$19,$C2,$20 ; $FF6B
+    db $AD,$14,$18,$4A,$4A,$E2,$20,$8D,$05,$0F,$28,$60,$08,$C2,$30,$A0 ; $FF7B
+    db $BA,$95,$A9,$05,$00,$54,$7E,$D1,$A2,$BA,$95,$A0,$3A,$96,$A9,$05 ; $FF8B
+    db $00,$54,$7E,$7E,$EE,$15,$0D,$28,$60,$15,$0D,$28,$60,$A2,$98,$C8 ; $FF9B
+    db $8E,$0E,$19,$A9,$40,$8D,$19,$19,$C2,$20,$AD,$14,$18,$4A,$4A,$E2 ; $FFAB
+    db $20,$8D,$05,$0F,$28,$60,$08,$C2,$30,$A0,$BA,$95,$A9,$05,$00,$54 ; $FFBB
+    db $7E,$D1,$A2,$BA,$95,$A0,$3A,$96,$A9,$05,$00,$54,$7E,$7E,$EE,$15 ; $FFCB
+    db $0D,$28,$60,$28,$60,$A0,$3A,$96,$A9,$05,$00,$54,$7E,$7E,$EE,$14 ; $FFDB
+    db $0D,$28,$60,$95,$A9,$05,$00,$54,$7E,$D1,$A2,$BA,$95,$A0,$3A,$96 ; $FFEB
+    db $A9,$05,$00,$54,$7E ; $FFFB
