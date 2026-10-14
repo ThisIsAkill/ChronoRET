@@ -147,13 +147,6 @@ org $C2E6AE
 Menu_Mode0EH2:      ; Menu_Mode0EList entry 2 (not analysed)
 org $C2E705
 Menu_Mode0EH3:      ; Menu_Mode0EList entry 3 (not analysed)
-org $C6E74E
-BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
-                    ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for
-                    ; left / right / above / below (not matched)
-org $C6E797
-BankC6_UnkE797:     ; JSL from C2Scene_ObjAFly before object A comes down: takes the task's 8x8 tile
-                    ; and dispatches on Loc_Id - $1F0 through a table at $C6:E7BA; C=1 keeps it up
 org $C31313
 BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:1313-$C3:7A2B
                     ; (26,393 bytes): the bank $C3 module, 65816 code and its data, which

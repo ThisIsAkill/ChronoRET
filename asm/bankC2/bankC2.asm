@@ -6988,11 +6988,11 @@ C2Scene_MosaicInStep:
 ; table and the same negate, but the angle is used as given (no × 4) and
 ; the signed value is returned in A instead of being multiplied.
 ; Callers (5 JSL sites): C2Scene_MapZoomMatrix ($C2:6752), C2Scene_DialDrawHand ($C2:6D10),
-;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and unmatched ($C6:E9FF).
+;   C2Scene_SwirlInit ($C2:704F), C2Scene_SwirlStep ($C2:711D) and C6Scene_PerspStep ($C6:E9FF).
 ; Callers of Trig_Sin1024 (9 JSL sites): C2Scene_MapZoomMatrix ($C2:673B), C2Scene_DialDrawHand
 ;   ($C2:6D17), C2Scene_SwirlInit ($C2:7062), C2Scene_SwirlStep ($C2:712D), C2Scene_TaskBg3Wave
 ;   ($C2:76CB), C2Scene_TaskBg3LineWave ($C2:77D9), C2Scene_Bg2HWaveStep ($C2:7D33),
-;   C2Scene_Bg2VWaveStep ($C2:7DB9) and unmatched ($C6:EA17).
+;   C2Scene_Bg2VWaveStep ($C2:7DB9) and C6Scene_PerspStep ($C6:EA17).
 ; Callers note: each matched caller of the cosine (C2Scene_MapZoomMatrix,
 ;   C2Scene_DialDrawHand, C2Scene_SwirlInit, C2Scene_SwirlStep) takes the
 ;   sine too, e.g. C2Scene_DialDrawHand the cosine and the sine of the same
@@ -7038,8 +7038,9 @@ Trig_Sin1024:                   ; header: see Trig_Cos1024
 ; directions $40 and $C0, which give +128 and -128 ($0080 / $FF80)
 ; instead of the table's +127 / -127. Only the low byte of the direction
 ; counts.
-; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and unmatched ($C6:E6EE).
-; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and unmatched ($C6:E71F).
+; Callers (2 JSL sites): C2Scene_ObjBMateAim ($C2:53A6) and C6Scene_NudgeRandomDir ($C6:E6EE).
+; Callers of C2Scene_Unk2277 (2 JSL sites): C2Scene_ObjBMateAim ($C2:53B1) and
+;   C6Scene_NudgeRandomDir ($C6:E71F).
 ; Entry (both): M=0 (16-bit A: the .w immediates), X=0 (16-bit index;
 ;        the index is below $100, so X=1 would read the same),
 ;        DP any (no direct page), DB=$00 (the table is read absolute
