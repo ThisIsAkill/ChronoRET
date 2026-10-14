@@ -157,7 +157,8 @@ Spc_Start:
 ; $0299 — Spc_MainLoop (222 bytes, $0299–$0376; ROM $C7:255E–$263B)
 ; The driver's loop: one pass per tick of timer 0 (5.25 ms).
 ;   1. Spc_PollCommand until timer 0 has ticked (a command that came in
-;      runs at once).
+;      runs at once). Reading T0OUT clears its count, so ticks beyond the
+;      first are dropped: a late pass is not made up.
 ;   2. Writes the 17 DSP registers of Spc_ShadowRegs from their shadows
 ;      (Spc_ShadowSources: FIR7 ... FIR0 from !Spc_FirShadow, EFB, EVOLR
 ;      and EVOLL from !Spc_EvolShadow, EON, KOF, FLG, NON, PMON, KON last),
@@ -354,7 +355,8 @@ Spc_ClearPorts01:
 ; The 65816 writes a command's arguments to APUIO1-3 and its id to APUIO0
 ; (Audio_RunCommand / Audio_CmdSend / Audio_StartSong), then waits for
 ; APUIO0 to read the id back. Ids $80-$FF and $00-$0F / $20-$7F are
-; echoed here at once; $10-$1F are echoed by their handlers.
+; echoed here at once; $10, $11, $14, $15, $18 and $19 by their handlers;
+; the rest of $10-$1F run Spc_NullCommand and are never echoed.
 
 ; $0B96 — Spc_PollCommand (22 bytes, $0B96–$0BAB; ROM $C7:2E5B–$2E70)
 ; Takes a command if one is waiting: when CPUIO0 is nonzero, reads it
@@ -364,8 +366,9 @@ Spc_ClearPorts01:
 ; Spc_RunCommand (44 bytes, $0BAC–$0BD7) runs the command in !Spc_CmdId:
 ;   - $80-$FF: echoed (CPUIO0 = the id), then Spc_RunHighCommand;
 ;   - $10-$1F: Spc_CmdTable10's handler, with Spc_CmdFirstTable10's
-;     (when nonzero) run first: both are pushed and the RET runs the
-;     second, which returns into the first. Not echoed here;
+;     (when its high byte is nonzero: only that byte is tested) run first:
+;     both are pushed and the RET runs the second, which returns into the
+;     first. Not echoed here;
 ;   - $00-$0F, $20-$7F: echoed only.
 ; Callers note: CALL from Spc_MainLoop ($0299); Spc_RunCommand is also
 ;   called by Spc_Unk08CD ($08E6) for the queued commands.
@@ -465,7 +468,8 @@ Spc_CmdSong11:                          ; header: see Spc_CmdSong14
 ;      adds 1 to its wait, writes its sample (Spc_Unk1AED), writes 0 to
 ;      its voice's VOLL and VOLR and runs Spc_Unk0A78 with !Spc_Temp9C =
 ;      the voice's next register number (PL); then clears $55/$57/$59,
-;      keys on !Spc_Unk24 and marks the song's tracks in !Spc_UnkD0.
+;      keys on !Spc_Unk24 (!Spc_KonShadow), sets !Spc_KofShadow and
+;      !Spc_Unk25 to 0 and marks the song's tracks in !Spc_UnkD0.
 ;      Else a new start: clears !Spc_SongTracks, the EON/NON/PMON words,
 ;      the KON/KOF shadows, !Spc_Unk24/25, !Spc_Unk5A, 5C, 60, 7C and 7B,
 ;      sets tempo 1 with the accumulator at $FF, copies the chosen set of 8 track pointers of
@@ -485,8 +489,13 @@ Spc_CmdSong11:                          ; header: see Spc_CmdSong14
 ;        AudioRom_SongEcho word, !Spc_CmdArg2 = the echo delay (low
 ;        nibble); !Spc_SongHeaderSet set
 ; Exit:  does not return: SP = $FF, JMP Spc_MainLoop
-; DSP:   KOF; on a resume VOLL/VOLR of voices 0-7 and SRCN (Spc_Unk1AED);
-;        FLG / EDL through the echo change routines
+; DSP:   KOF. On a resume, for voices 0-7: VOLL/VOLR, SRCN and ADSR1/ADSR2
+;        (Spc_Unk1AED: with !Spc_SfxVoices just cleared it runs on into the
+;        ADSR writes at $1B0C) and PL/PH (Spc_Unk0A78). On an echo change
+;        (Spc_Unk1316, through $1352): FLG (echo writes off), EON, EFB,
+;        EVOLL and EVOLR = 0, EDL = !Spc_EchoDelay, ESA; FLG again in
+;        Spc_Unk1397. Spc_Unk12F9 may also run queued commands, with their
+;        own writes
 ; Ports: through Spc_Unk100E and Spc_Unk12F9
 ; Callees: Spc_WriteDsp, Spc_Unk1316, Spc_Unk100E, Spc_RestoreSong,
 ;   Spc_Unk1AED, Spc_Unk0A78, Spc_InitTrack, Spc_Unk12F9, Spc_Unk1397,
@@ -751,8 +760,10 @@ Spc_CmdSfx19:                           ; header: see Spc_CmdSfx18
 ; Entry: P=0; X = the first track, !Spc_VoiceBit its voice bit,
 ;        !Spc_CmdArg2 = the group's voice bits, !Spc_CmdArg0/1 as in
 ;        Spc_CmdSfx18
-; Exit:  A = the new voice bits; X = $16; Y = $FF (with !Spc_Flags87
-;        bit 4 set: A, X, Y as on entry)
+; Exit:  A = the new voice bits; X = $16; Y = $FF when no voice was ended,
+;        else the value of $57 (!Spc_SongNon+1) after the last Spc_EndTrack
+;        (it reaches `mov y,$57` at $1A51 through $1A68 and $1A48); with
+;        !Spc_Flags87 bit 4 set: A, X, Y as on entry
 ; Callees: Spc_InitTrack, Spc_SetTrackSample, Spc_EndTrack
 Spc_StartSfx:
     bbc.b !Spc_Flags87.4,.start

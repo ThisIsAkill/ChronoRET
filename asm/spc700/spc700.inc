@@ -102,7 +102,8 @@
 !Spc_SfxVoices = $86                     ; voice bits taken by sound effects (set by Spc_StartSfx)
 !Spc_Flags87 = $87                       ; bit 3: echo volume doubled; bit 4: no song step or new
                                          ; effect (Spc_MainLoop, Spc_StartSfx); other bits not traced
-!Spc_Flags88 = $88                       ; bits 0/1: echo change to finish (Spc_StartSong); bit 5:
+!Spc_Flags88 = $88                       ; bits 0/1: echo change to finish (Spc_StartSong; Spc_Unk1316
+                                         ; clears bit 1 when the old EDL was 0); bit 5:
                                          ; $0377 steps the song every pass, without the tempo; bit 7:
                                          ; Spc_MainLoop leaves CPUIO0-3 to $1438 (not traced)
 !Spc_EonShadow = $89                     ; EON for the next pass
