@@ -28042,22 +28042,22 @@ Menu_MainMenuInit:
 ; $C2:9A1B — Menu_MainMenuLoop (125 bytes, $9A1B–$9A97)
 ; Handler 1 of mode 0, every frame: Menu_CursorSel = Menu_MainSel,
 ; Menu_PadInput (the pad: it moves Menu_CursorSel and sets
-; Menu_PadAction). Confirm (bit 7): Menu_UnkED31
-; runs the command list at MenuRom_MainConfirmList (what its commands do
-; is not analysed), Menu_Mode =
+; Menu_PadAction). Confirm (bit 7): Menu_RunDrawList
+; runs the draw list at MenuRom_MainConfirmList (Menu_MapPtr = $3E00,
+; then a 16 x 6 tile block copy), Menu_Mode =
 ; Menu_MainSel + 1, Menu_ThreadVar = 0, colours $80-$8F =
 ; MenuRom_ObjPal, Menu_Unk0D17 = $FF. Cancel (bit 6): Menu_Exit. Else,
 ; a new Menu_CursorSel: Menu_MainSel = it, with Menu_CfgA5 clear the
 ; bytes Menu_Unk0412/0413 and $0415-$041A zeroed; Menu_Unk7F = Menu_Unk80
 ; = 0, the threads of Menu_SubThreads killed, Menu_UnkAF = 0,
 ; Menu_MainMenuPreview and Menu_PlaySound0. Unchanged on icon 0:
-; Menu_UnkF28D draws the clock (Menu_PlayTime+2 on) at
+; Menu_DrawClock draws the clock (Menu_PlayTime+2 on) at
 ; Menu_MainClockTile and Menu_VramRecClock is queued, every frame.
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
 ; Exit:  RTS to Menu_MainThread with A, X, Y clobbered (or Menu_Exit,
 ;        which does not return here)
-; Calls: Menu_PadInput, Menu_UnkF28D, Menu_QueueVramRom,
-;   Menu_KillThreads, Menu_MainMenuPreview, Menu_PlaySound0, Menu_UnkED31;
+; Calls: Menu_PadInput, Menu_DrawClock, Menu_QueueVramRom,
+;   Menu_KillThreads, Menu_MainMenuPreview, Menu_PlaySound0, Menu_RunDrawList;
 ;   jumps to Menu_Exit.
 Menu_MainMenuLoop:
     LDA.w !Menu_MainSel
@@ -28073,7 +28073,7 @@ Menu_MainMenuLoop:
     BPL .done
     LDX.w #!Menu_MainClockTile
     LDY.w #!Menu_PlayTime+2
-    JSR Menu_UnkF28D
+    JSR Menu_DrawClock
     LDX.w #Menu_VramRecClock
     JSR Menu_QueueVramRom
     BRA .done
@@ -28101,7 +28101,7 @@ Menu_MainMenuLoop:
     RTS
 .confirm:
     LDX.w #!MenuRom_MainConfirmList&$FFFF
-    JSR Menu_UnkED31
+    JSR Menu_RunDrawList
     LDA.w !Menu_MainSel
     INC A
     STA.b !Menu_Mode
@@ -28259,7 +28259,7 @@ Menu_MainRedrawTable:
     dw Menu_UnkCAE6, Menu_UnkD0DB
 
 ; $C2:9B8F — Menu_MainMenuIcons (79 bytes, $9B8F–$9BDD)
-; Menu_UnkED31 with MenuRom_MainIconList; Menu_HdmaenShadow |=
+; Menu_RunDrawList with MenuRom_MainIconList; Menu_HdmaenShadow |=
 ; Menu_MainHdmaBits (HDMA channels 0 and 1 and Menu_NmiMoveReq: the
 ; NMI copies Menu_NmiMoveSize = $1E bytes from $7E:9750 to $7E:9080;
 ; what they are is not traced); Menu_CursorSel = Menu_MainSel;
@@ -28270,12 +28270,12 @@ Menu_MainRedrawTable:
 ; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0, DP=$0000,
 ;        DB=$7E
 ; Exit:  P restored; A, X, Y clobbered; DB=$7E
-; Calls: Menu_UnkED31, Menu_MainIconSprites.
+; Calls: Menu_RunDrawList, Menu_MainIconSprites.
 Menu_MainMenuIcons:
     PHP
     SEP #$20
     LDX.w #!MenuRom_MainIconList&$FFFF
-    JSR Menu_UnkED31
+    JSR Menu_RunDrawList
     LDA.b #!Menu_MainHdmaBits
     TSB.w !Menu_NmiDp+!Menu_HdmaenShadow
     LDA.w !Menu_MainSel
@@ -29731,7 +29731,7 @@ Menu_SetRowAttr:
 ; $C2:ECDB — Menu_LoadSlotWindowStyle (45 bytes, $ECDB–$ED07)
 ; With DB=$7E: Menu_Unk0D47 low byte = Menu_WinStyle x 20, high byte =
 ; (Menu_SlotIdx + 1) x 4 + 3 (bits 2-4 the palette row, so row slot +
-; 1); then Menu_UnkEDF6, Menu_UnkEE7F and Menu_LoadWindowPal (the
+; 1); then Menu_DrawWindowFrame, Menu_FillWindowInside and Menu_LoadWindowPal (the
 ; style's colours into that row). Its one caller, $C2:D348, has just
 ; copied the slot's Menu_SlotWinStyle into Menu_WinStyle: probably a
 ; save slot's window in its own style.
@@ -29739,8 +29739,8 @@ Menu_SetRowAttr:
 ; Entry: M, X any (P saved; SEP #$20 here), DP=$0000 (Menu_SlotIdx), DB
 ;        any (saved; $7E here)
 ; Exit:  P and DB restored; A, X, Y clobbered (Menu_LoadWindowPal: A =
-;        $FFFF); and what Menu_UnkEDF6 / Menu_UnkEE7F change
-; Calls: Menu_UnkEDF6, Menu_UnkEE7F, Menu_LoadWindowPal.
+;        $FFFF); and what Menu_DrawWindowFrame / Menu_FillWindowInside change
+; Calls: Menu_DrawWindowFrame, Menu_FillWindowInside, Menu_LoadWindowPal.
 Menu_LoadSlotWindowStyle:
     PHB
     PHP
@@ -29763,8 +29763,8 @@ Menu_LoadSlotWindowStyle:
     ASL A
     ORA.b #!Menu_SlotWinAttrLow
     STA.w !Menu_Unk0D47+1
-    JSR Menu_UnkEDF6
-    JSR Menu_UnkEE7F
+    JSR Menu_DrawWindowFrame
+    JSR Menu_FillWindowInside
     JSR Menu_LoadWindowPal
     PLP
     PLB
@@ -29807,6 +29807,1497 @@ Menu_LoadWindowPal:
     LDA.w #(8*!Menu_ColorBytes)-1
     MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
     INC.w !Menu_PalDirty
+    PLP
+    RTS
+
+; ============================================================
+; Menu draw lists and window drawing ($C2:ED31–$C2:EF47)
+; ============================================================
+; The menu builds its screens in tilemaps in bank $7E (rows of $40
+; bytes) from draw lists in bank $FF: a command byte (an even number:
+; it is the byte offset into Menu_DrawCmdTable) and its arguments, which
+; Menu_RunDrawList copies to Menu_DrawArg0 (dp $5B) on; a byte with bit 7
+; set ends the list. Positions (Menu_DrawArg2) are a column (bits 0-4)
+; and a row (the high byte) from Menu_MapPtr (Menu_DrawPosToAddr).
+
+; $C2:ED31 — Menu_RunDrawList (40 bytes, $ED31–$ED58)
+; Runs the draw list at $FF:X: for each command byte c below $80, the
+; MenuRom_DrawArgLens[c] + 1 bytes after it go to Menu_DrawArg0 on (an
+; MVN, so DB = $7E while the command runs) and Menu_DrawCmdTable's
+; routine at byte offset c runs (X = c). Returns at the first byte with
+; bit 7 set.
+; Callers (56 sites: 53 JSR, 3 JMP): Menu_MainMenuLoop (JSR $C2:9A7A), Menu_MainMenuIcons (JSR
+;   $C2:9B95) and unmatched (JSR $C2:A082, JSR $C2:A14C, JMP $C2:A1EC, JMP $C2:A21C, JSR $C2:A24D,
+;   JSR $C2:A2EA, JSR $C2:A327, JSR $C2:A423, JSR $C2:A4B5, JSR $C2:A637, JSR $C2:A69D, JSR
+;   $C2:A724, JSR $C2:A865, JSR $C2:AD56, JSR $C2:ADD9, JSR $C2:AEA0, JSR $C2:B008, JSR $C2:B368,
+;   JSR $C2:B8E0, JSR $C2:B96E, JSR $C2:B97F, JSR $C2:BA4A, JSR $C2:BAA8, JSR $C2:BBA2, JSR
+;   $C2:BDFD, JSR $C2:BEF5, JSR $C2:C33D, JSR $C2:C3C2, JSR $C2:CA6A, JSR $C2:CAF9, JSR $C2:D06B,
+;   JSR $C2:D0EF, JSR $C2:D3A1, JSR $C2:D43A, JSR $C2:D4C5, JSR $C2:D4DB, JSR $C2:D5EC, JSR
+;   $C2:D70C, JSR $C2:DADB, JSR $C2:DC8E, JSR $C2:DEA4, JSR $C2:DFBA, JSR $C2:E007, JSR $C2:E04D,
+;   JSR $C2:E0C6, JSR $C2:E137, JSR $C2:E1D1, JMP $C2:E313, JSR $C2:E416, JSR $C2:E59F, JSR
+;   $C2:E7C9, JSR $C2:E7F0, JSR $C2:E802, JSR $C2:E8A7).
+; Entry: M, X any (P and DB saved; SEP #$20 / REP #$10 here), DP=$0000
+;        (Menu_DrawArg0 on; the TDC loads B = 0 from it), DB any; X = the
+;        list's address in bank $FF
+; Exit:  P and DB restored; X = the end byte's address; A, Y and the
+;        commands' work bytes clobbered (each command saves its own P or
+;        runs at M=1, X=0)
+; Calls: Menu_DrawCmdTable's routines.
+Menu_RunDrawList:
+    PHB
+    PHP
+.next:
+    SEP #$20
+    REP #$10
+    LDA.b #!MenuRom_DmaCopyBank
+    PHA
+    PLB
+    TDC                                 ; B = 0 for the TAY and the MVN count
+    LDA.w !Eng_PtrBase,X
+    BMI .done
+    INX
+    TAY
+    LDA.w !MenuRom_DrawArgLensAbs,Y
+    PHY
+    LDY.w #!Menu_DrawArg0
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLY
+    PHX
+    TYX
+    JSR (Menu_DrawCmdTable,X)
+    PLX
+    BRA .next
+.done:
+    PLP
+    PLB
+    RTS
+
+; $C2:ED59 — Menu_DrawCmdTable (22 bytes, $ED59–$ED6E)
+; Menu_RunDrawList's command routines by byte offset: commands $00-$14
+; (even). $0A and $0E are the same routine.
+Menu_DrawCmdTable:
+    dw Menu_DrawCmdFill, Menu_DrawCmdCopyBlock, Menu_DrawCmdWindow, Menu_DrawCmdString
+    dw Menu_DrawCmdSetMap, Menu_DrawCmdCopyRom, Menu_DrawCmdMapRec, Menu_DrawCmdCopyRom
+    dw Menu_DrawCmdSwapBlocks, Menu_DrawCmdFrame, Menu_DrawCmdInside
+
+; $C2:ED6F — Menu_CopyDrawArgsUnused (8 bytes, $ED6F–$ED76)
+; INX, then an MVN of A + 1 bytes from $FF:X to Menu_DrawArg0: the
+; argument copy of Menu_RunDrawList as a routine.
+; Callers note: no JSR/JMP reaches it ($ED6F or $ED70) and neither
+;   address appears as bytes in bank $C2: unused, as far as is known.
+; Entry: M, X any (A's 16 bits are the count), DP any, DB any; X = the
+;        source in bank $FF less 1
+; Exit:  DB=$7E (the MVN); A = $FFFF; X, Y past the copy
+; No calls.
+Menu_CopyDrawArgsUnused:
+    INX
+    LDY.w #!Menu_DrawArg0
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    RTS
+
+; $C2:ED77 — Menu_DrawCmdFill (25 bytes, $ED77–$ED8F)
+; Command $00 (4 argument bytes): fills Menu_DrawArg0 bytes (a word,
+; at least 3) from Menu_MapPtr with the word Menu_DrawArg2, which is also
+; kept in Menu_TextWord.
+; Entry: from Menu_RunDrawList: M=1, X=0 (P saved; REP #$20 here),
+;        DP=$0000, DB=$7E
+; Exit:  P restored; DB=$7E; A = $FFFF; X, Y past the fill
+; No calls.
+Menu_DrawCmdFill:
+    PHP
+    REP #$20
+    LDX.b !Menu_MapPtr
+    LDA.b !Menu_DrawArg2
+    STA.b !Menu_TextWord
+    STA.w !Eng_PtrBase,X
+    TXY
+    INY
+    INY
+    LDA.b !Menu_DrawArg0
+    DEC A
+    DEC A
+    DEC A
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; $C2:ED90 — Menu_DrawPosToAddr (26 bytes, $ED90–$EDA9)
+; Menu_DrawAddr = Menu_MapPtr + row x $40 + column x 2, from
+; Menu_DrawArg2 (column = bits 0-4, row = the high byte).
+; Callers (6 JSR sites): Menu_DrawWindowSetup ($C2:EDF1), Menu_DrawCmdCopyBlock ($C2:EF18,
+;   $C2:EF23), Menu_DrawCmdString ($C2:EF4B) and Menu_DrawCmdSwapBlocks ($C2:F37B, $C2:F386).
+; Entry: M any (P saved; REP #$20 here), X any, DP=$0000, DB any
+; Exit:  P restored; A = Menu_DrawAddr (16 bits); X, Y unchanged
+; No calls.
+Menu_DrawPosToAddr:
+    PHP
+    REP #$20
+    LDA.b !Menu_DrawArg2
+    AND.w #!Menu_PosRowMask
+    LSR A
+    LSR A                               ; row x $40
+    STA.b !Menu_DrawAddr
+    LDA.b !Menu_DrawArg2
+    AND.w #!Menu_PosColMask
+    ASL A
+    ORA.b !Menu_DrawAddr
+    ADC.b !Menu_MapPtr                  ; (C=0 from the ASL)
+    STA.b !Menu_DrawAddr
+    PLP
+    RTS
+
+; $C2:EDAA — Menu_DrawCmdWindow (6 bytes, $EDAA–$EDAF)
+; Command $04 (6 argument bytes): Menu_DrawCmdFrame (the frame), then
+; Menu_FillWindowInside (with the inside size the frame left).
+; Entry: from Menu_RunDrawList: M=1, X=0, DP=$0000, DB=$7E
+; Exit:  as Menu_FillWindowInside
+; Calls: Menu_DrawCmdFrame; jumps to Menu_FillWindowInside.
+Menu_DrawCmdWindow:
+    JSR Menu_DrawCmdFrame
+    JMP Menu_FillWindowInside
+
+; $C2:EDB0 — Menu_DrawCmdFrame (6 bytes, $EDB0–$EDB5)
+; Command $12 (6 argument bytes: style, attribute byte, position, width,
+; height): Menu_DrawWindowSetup, then Menu_DrawWindowFrame.
+; Callers (1 JSR site): Menu_DrawCmdWindow ($C2:EDAA).
+; Entry: M, X any (the callees save P), DP=$0000, DB=$7E
+; Exit:  as Menu_DrawWindowFrame
+; Calls: Menu_DrawWindowSetup; jumps to Menu_DrawWindowFrame.
+Menu_DrawCmdFrame:
+    JSR Menu_DrawWindowSetup
+    JMP Menu_DrawWindowFrame
+
+; $C2:EDB6 — Menu_DrawCmdInside (29 bytes, $EDB6–$EDD2)
+; Command $14 (6 argument bytes, as Menu_DrawCmdFrame): the inside of a
+; window only: Menu_DrawWindowSetup, Menu_DrawInnerW = (width AND $1F)
+; - 2, Menu_DrawInnerH = (height AND $3F) - 2, Menu_FillWindowInside.
+; Entry: from Menu_RunDrawList: M=1, X=0 (P saved; REP #$30 here),
+;        DP=$0000, DB=$7E
+; Exit:  P restored; as Menu_FillWindowInside
+; Calls: Menu_DrawWindowSetup, Menu_FillWindowInside.
+Menu_DrawCmdInside:
+    PHP
+    REP #$30
+    JSR Menu_DrawWindowSetup
+    LDA.b !Menu_DrawArg4
+    AND.w #!Menu_WinWidthMask
+    DEC A
+    DEC A
+    STA.b !Menu_DrawInnerW
+    LDA.b !Menu_DrawArg5
+    AND.w #!Menu_WinHeightMask
+    DEC A
+    DEC A
+    STA.b !Menu_DrawInnerH
+    JSR Menu_FillWindowInside
+    PLP
+    RTS
+
+; $C2:EDD3 — Menu_DrawWindowSetup (35 bytes, $EDD3–$EDF5)
+; The window's first tile: Menu_Unk0D47 low byte = style x 20 (the
+; style is Menu_DrawArg0 AND $3F when its bit 7 is set, else
+; Menu_WinStyle AND 7; 20 tiles per style), high byte = Menu_DrawArg1
+; (its attribute byte); then Menu_DrawPosToAddr.
+; Callers (2 JSR sites): Menu_DrawCmdFrame ($C2:EDB0) and Menu_DrawCmdInside ($C2:EDB9).
+; Entry: M any (P saved; SEP #$20 here), X any, DP=$0000, DB=$7E
+;        (Menu_DrawArg0/1 and Menu_WinStyle read absolute)
+; Exit:  P restored; A = Menu_DrawAddr (16 bits); Menu_Tmp00 = style x
+;        4; X, Y unchanged
+; Calls: Menu_DrawPosToAddr.
+Menu_DrawWindowSetup:
+    PHP
+    SEP #$20
+    LDA.w !Menu_DrawArg0
+    BMI .given
+    LDA.w !Menu_WinStyle
+    AND.b #!Menu_WinStyleMask
+.given:
+    ASL A
+    ASL A                               ; bits 6-7 drop out
+    STA.b !Menu_Tmp00
+    ASL A
+    ASL A
+    ADC.b !Menu_Tmp00                   ; x 16 + x 4 (C=0 from the ASL)
+    STA.w !Menu_Unk0D47
+    LDA.w !Menu_DrawArg1
+    STA.w !Menu_Unk0D47+1
+    JSR Menu_DrawPosToAddr
+    PLP
+    RTS
+
+; $C2:EDF6 — Menu_DrawWindowFrame (45 bytes, $EDF6–$EE22)
+; Draws the frame of a window at Menu_DrawAddr, Menu_DrawArg4 AND $1F
+; tiles wide (w) and Menu_DrawArg5 AND $3F tall (h), from tile word t =
+; Menu_Unk0D47: the top row (Menu_FrameEdgeRow: t, then t+1 / t+2 by
+; turns, t+3 at the right), the h - 2 side rows (Menu_FrameSides: t+4 /
+; t+5 and t+6 / t+7 on alternate rows) and the bottom row (t+8 ...
+; t+11). Leaves Menu_DrawInnerW = w - 2 and Menu_DrawInnerH = h - 2 for
+; Menu_FillWindowInside.
+; Callers (3 sites: 2 JSR, 1 JMP): Menu_LoadSlotWindowStyle (JSR $C2:ECFC), Menu_DrawCmdFrame (JMP
+;   $C2:EDB3) and unmatched (JSR $C2:D35A).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E (the map)
+; Exit:  P restored; Menu_DrawAddr2 = the row below the frame;
+;        Menu_FrameTile = t + 12; Menu_FrameRightOfs, A, X, Y clobbered
+; Calls: Menu_FrameEdgeRow (twice), Menu_FrameSides.
+Menu_DrawWindowFrame:
+    PHP
+    REP #$30
+    LDA.b !Menu_DrawAddr
+    STA.b !Menu_DrawAddr2
+    LDA.b !Menu_DrawArg4
+    AND.w #!Menu_WinWidthMask
+    DEC A
+    STA.b !Menu_FrameRightOfs
+    DEC A
+    STA.b !Menu_DrawInnerW
+    ASL.b !Menu_FrameRightOfs           ; (w - 1) x 2: the right edge
+    LDA.b !Menu_DrawArg5
+    AND.w #!Menu_WinHeightMask
+    DEC A
+    DEC A
+    STA.b !Menu_DrawInnerH
+    LDA.w !Menu_Unk0D47
+    STA.b !Menu_FrameTile
+    JSR Menu_FrameEdgeRow
+    JSR Menu_FrameSides
+    JSR Menu_FrameEdgeRow
+    PLP
+    RTS
+
+; $C2:EE23 — Menu_FrameEdgeRow (53 bytes, $EE23–$EE57)
+; One edge row of the frame at Menu_DrawAddr2: tiles t, t+1, t+2 (t =
+; Menu_FrameTile), the pair t+1 / t+2 repeated by an MVN up to column w
+; - 2 (none when Menu_DrawInnerW is below 2), then t OR 3 at the right
+; edge (column w - 1, t being a multiple of 4: t+3); Menu_FrameTile =
+; t+4 and Menu_DrawAddr2 one row down.
+; Callers (2 JSR sites): Menu_DrawWindowFrame ($C2:EE18, $C2:EE1E).
+; Entry: from Menu_DrawWindowFrame: M=0, X=0, DP=$0000, DB=$7E
+; Exit:  M=0, X=0; DB=$7E; A = Menu_DrawAddr2; X, Y clobbered
+; No calls.
+Menu_FrameEdgeRow:
+    LDX.b !Menu_DrawAddr2
+    LDA.b !Menu_FrameTile
+    STA.w !Eng_PtrBase,X
+    INC A
+    STA.w !Eng_PtrBase+2,X
+    INC A
+    STA.w !Eng_PtrBase+4,X
+    INX
+    INX
+    TXY
+    INY
+    INY
+    INY
+    INY
+    LDA.b !Menu_DrawInnerW
+    DEC A
+    DEC A
+    ASL A
+    DEC A
+    BMI .corner
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+.corner:
+    LDA.b !Menu_FrameTile
+    ORA.w #!Menu_FrameCornerBits
+    STA.w !Eng_PtrBase,Y
+    INC A
+    STA.b !Menu_FrameTile
+    LDA.b !Menu_DrawAddr2
+    CLC
+    ADC.w #!Menu_MapRowBytes
+    STA.b !Menu_DrawAddr2
+    RTS
+
+; $C2:EE58 — Menu_FrameSides (39 bytes, $EE58–$EE7E)
+; Menu_DrawInnerH side rows from Menu_DrawAddr2: the left edge t (t =
+; Menu_FrameTile) and the right edge t+1 (at + Menu_FrameRightOfs, an
+; indirect store), t EOR 3 for the next row (t+4/t+5, then t+6/t+7);
+; none when Menu_DrawInnerH is 0. Then Menu_FrameTile = (t OR 3) + 1
+; (t+8) and Menu_DrawAddr2 the row after the sides.
+; Callers (1 JSR site): Menu_DrawWindowFrame ($C2:EE1B).
+; Entry: from Menu_DrawWindowFrame: M=0, X=0, DP=$0000, DB=$7E
+; Exit:  M=0, X=0; A = Menu_FrameTile; X = 0 and Y = the next row's
+;        address after rows, else X = 0 and Y unchanged
+; No calls.
+Menu_FrameSides:
+    LDX.b !Menu_DrawInnerH
+    BEQ .next_tile
+    LDY.b !Menu_DrawAddr2
+.row:
+    LDA.b !Menu_FrameTile
+    STA.w !Eng_PtrBase,Y
+    INC A
+    STA.b (!Menu_FrameRightOfs),Y
+    EOR.w #!Menu_FrameCornerBits
+    STA.b !Menu_FrameTile
+    TYA
+    CLC
+    ADC.w #!Menu_MapRowBytes
+    TAY
+    DEX
+    BNE .row
+    STA.b !Menu_DrawAddr2
+.next_tile:
+    LDA.b !Menu_FrameTile
+    ORA.w #!Menu_FrameCornerBits
+    INC A
+    STA.b !Menu_FrameTile
+    RTS
+
+; $C2:EE7F — Menu_FillWindowInside (118 bytes, $EE7F–$EEF4)
+; Fills the inside of the window at Menu_DrawAddr (from one row down
+; and one column right: + $42), Menu_DrawInnerW tiles wide and
+; Menu_DrawInnerH tall, with the 4 x 4 pattern Menu_WinFillPattern
+; added to Menu_Unk0D47's tile byte (its attribute byte kept): t+12 ...
+; t+19. The first pattern row draws 4 tiles and copies them on with an
+; MVN; the other three are drawn tile by tile; after four rows the rest
+; of the rows are copies of the row four above (Menu_CopyMapRows, with
+; Menu_DrawAddr moved to the first inside row and Menu_DrawInnerW
+; turned into its byte count - 1). A Menu_DrawInnerH of 0 is not
+; tested: the DEC makes it 65535 rows.
+; Callers (4 sites: 3 JSR, 1 JMP): Menu_LoadSlotWindowStyle (JSR $C2:ECFF), Menu_DrawCmdWindow (JMP
+;   $C2:EDAD), Menu_DrawCmdInside (JSR $C2:EDCE) and unmatched (JSR $C2:D35D).
+; Entry: M, X any (P saved; REP #$31 here: C=0 for the first ADC),
+;        DP=$0000, DB=$7E (the map)
+; Exit:  P restored; DB=$7E; Menu_DrawAddr2, Menu_DrawInnerH (0),
+;        Menu_Tmp06/08/0A, A, X, Y changed; after four rows also
+;        Menu_DrawAddr and Menu_DrawInnerW
+; Calls: Menu_CopyMapRows.
+Menu_FillWindowInside:
+    PHP
+    REP #$31
+    LDA.b !Menu_DrawAddr
+    ADC.w #!Menu_WinInsideOfs
+    STA.b !Menu_DrawAddr2
+    LDA.w !Menu_Unk0D47
+    STA.b !Menu_FrameTile
+    STZ.b !Menu_FillPatRow
+.row:
+    LDA.b !Menu_DrawInnerW
+    STA.b !Menu_FillLeft
+    LDY.b !Menu_DrawAddr2
+    LDX.b !Menu_FillPatRow
+.tile:
+    SEP #$20
+    LDA.l Menu_WinFillPattern,X
+    ADC.b !Menu_FrameTile               ; (C=0: no tile sum carries)
+    STA.w !Eng_PtrBase,Y
+    LDA.b !Menu_FrameTile+1
+    STA.w !Eng_PtrBase+1,Y
+    INY
+    INY
+    REP #$20
+    DEC.b !Menu_FillLeft
+    BEQ .row_done
+    TXA
+    INC A
+    AND.w #!Menu_WinFillColMask
+    ORA.b !Menu_FillPatRow
+    TAX
+    BNE .tile
+    TYA                                 ; pattern row 0, after 4 tiles:
+    SEC
+    SBC.w #!Menu_WinFillRewind
+    TAX
+    LDA.b !Menu_FillLeft
+    ASL A
+    DEC A
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+.row_done:
+    LDA.b !Menu_DrawAddr2
+    CLC
+    ADC.w #!Menu_MapRowBytes
+    STA.b !Menu_DrawAddr2
+    LDA.b !Menu_FillPatRow
+    ADC.w #!Menu_WinFillRowStep         ; (C=0 from the ADC above)
+    AND.w #!Menu_WinFillRowMask
+    STA.b !Menu_FillPatRow
+    BEQ .four_rows
+    DEC.b !Menu_DrawInnerH
+    BNE .row
+    PLP
+    RTS
+.four_rows:
+    DEC.b !Menu_DrawInnerH
+    BEQ .done
+    ASL.b !Menu_DrawInnerW
+    DEC.b !Menu_DrawInnerW
+    LDA.b !Menu_DrawAddr
+    ADC.w #!Menu_WinInsideOfs           ; (C=0)
+    STA.b !Menu_DrawAddr
+    JSR Menu_CopyMapRows
+.done:
+    PLP
+    RTS
+
+; $C2:EEF5 — Menu_WinFillPattern (16 bytes, $EEF5–$EF04)
+; Tile offsets of the window inside, 4 rows of 4 (Menu_FillWindowInside
+; adds them to the style's first tile).
+Menu_WinFillPattern:
+    db $0C, $0D, $10, $11
+    db $0E, $0F, $12, $13
+    db $10, $11, $0C, $0D
+    db $12, $13, $0E, $0F
+
+; $C2:EF05 — Menu_DrawCmdCopyBlock (38 bytes, $EF05–$EF2A)
+; Command $02 (6 argument bytes): copies a block of Menu_DrawArg4 tiles
+; by Menu_DrawArg5 rows from position Menu_DrawArg0 to position
+; Menu_DrawArg2 (both through Menu_DrawPosToAddr; Menu_DrawArg2 is
+; overwritten with Menu_DrawArg0 on the way), with Menu_CopyMapRows.
+; Callers (9 JSR sites): unmatched ($C2:9DE2, $C2:9DEE, $C2:9E48, $C2:9E55, $C2:B5FC, $C2:B65D,
+;   $C2:C6A5, $C2:C8EB, $C2:C928).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E (the map)
+; Exit:  P restored; DB=$7E; Menu_DrawAddr/Addr2 one row below the
+;        blocks, Menu_DrawInnerW = 2 x tiles - 1, Menu_DrawInnerH = 0,
+;        Menu_DrawArg2 = Menu_DrawArg0; A, X, Y clobbered
+; Calls: Menu_DrawPosToAddr (twice), Menu_CopyMapRows.
+Menu_DrawCmdCopyBlock:
+    PHP
+    REP #$30
+    LDA.b !Menu_DrawArg5
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_DrawInnerH
+    LDA.b !Menu_DrawArg4
+    AND.w #!Eng_LowByteMask
+    ASL A
+    DEC A
+    STA.b !Menu_DrawInnerW
+    JSR Menu_DrawPosToAddr
+    LDA.b !Menu_DrawAddr
+    STA.b !Menu_DrawAddr2               ; the destination
+    LDA.b !Menu_DrawArg0
+    STA.b !Menu_DrawArg2
+    JSR Menu_DrawPosToAddr              ; the source
+    JSR Menu_CopyMapRows
+    PLP
+    RTS
+
+; $C2:EF2B — Menu_CopyMapRows (29 bytes, $EF2B–$EF47)
+; Menu_DrawInnerH times: Menu_DrawInnerW + 1 bytes from Menu_DrawAddr
+; to Menu_DrawAddr2 (MVN in bank $7E), both moved one row ($40) down.
+; Callers (3 JSR sites): Menu_FillWindowInside ($C2:EEF0), Menu_DrawCmdCopyBlock ($C2:EF26) and
+;   unmatched ($C2:B7E5).
+; Entry: M=0, X=0 (16-bit count and addresses), DP=$0000, DB any (the
+;        MVN sets $7E); Menu_DrawInnerH non-zero (0: 65536 rows)
+; Exit:  M=0, X=0; DB=$7E; Menu_DrawInnerH = 0; A, X, Y clobbered
+; No calls.
+Menu_CopyMapRows:
+    LDX.b !Menu_DrawAddr
+    LDY.b !Menu_DrawAddr2
+    LDA.b !Menu_DrawInnerW
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.b !Menu_DrawAddr2
+    CLC
+    ADC.w #!Menu_MapRowBytes
+    STA.b !Menu_DrawAddr2
+    LDA.b !Menu_DrawAddr
+    ADC.w #!Menu_MapRowBytes            ; (C=0 from the ADC above)
+    STA.b !Menu_DrawAddr
+    DEC.b !Menu_DrawInnerH
+    BNE Menu_CopyMapRows
+    RTS
+
+; ============================================================
+; Menu strings: tile text with control codes ($C2:EF48–$C2:F113)
+; ============================================================
+; A string is a byte list: 0 ends it, $01-$0F are control codes
+; (Menu_TextCtrlTable, with their argument bytes), $10 and above are
+; tiles put with the attribute byte Menu_TextAttr. Text is two tile rows
+; high unless Menu_TextFlags bit 7 is set: a tile $FF (probably the
+; blank) is then also put one row above, and a new line moves two rows.
+
+; $C2:EF48 — Menu_DrawCmdString (29 bytes, $EF48–$EF64)
+; Command $06 (5 argument bytes): Menu_DrawString of string Menu_DrawArg0
+; (a word index into MenuRom_StringPtrs, strings in bank $FF) at
+; position Menu_DrawArg2, with Menu_DrawArg4 as the count and flags
+; byte.
+; Entry: from Menu_RunDrawList: M=1, X=0 (P saved; REP #$30 here),
+;        DP=$0000, DB=$7E
+; Exit:  P restored; as Menu_DrawString
+; Calls: Menu_DrawPosToAddr, Menu_DrawString.
+Menu_DrawCmdString:
+    PHP
+    REP #$30
+    JSR Menu_DrawPosToAddr
+    LDA.b !Menu_DrawArg0
+    ASL A
+    TAX
+    LDA.l !MenuRom_StringPtrs,X
+    TAY
+    LDX.b !Menu_DrawAddr
+    SEP #$20
+    LDA.b #!MenuRom_DmaCopyBank         ; B = the strings' bank
+    XBA
+    LDA.b !Menu_DrawArg4
+    JSR Menu_DrawString
+    PLP
+    RTS
+
+; $C2:EF65 — Menu_DrawString (25 bytes, $EF65–$EF7D)
+; Draws the string at B:Y to the tilemap at $7E:X: Menu_TextFlags = A's
+; low byte, Menu_TextLeft = it AND $7F (tiles to put; 0: 256),
+; Menu_DrawAddr2 = X (the line start), DB = B, Menu_DrawStringLoop;
+; then Menu_TextAttr AND= ~$DC (only bits 0, 1 and 5 kept: tile high
+; bits and priority).
+; Callers (13 sites: 10 JSR, 3 JMP): Menu_DrawCmdString (JSR $C2:EF60), Menu_DrawItemName (JMP
+;   $C2:F2DF) and unmatched (JSR $C2:A3A9, JSR $C2:A5AF, JSR $C2:A5BC, JSR $C2:B061, JSR $C2:B09A,
+;   JMP $C2:B0A8, JMP $C2:BDAF, JSR $C2:BDE6, JSR $C2:DD77, JSR $C2:E429, JSR $C2:E430).
+; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit addresses),
+;        DP=$0000 (Menu_Text*), DB any; A = count and flags, B = the
+;        string's bank, Y = its address, X = the tilemap address
+; Exit:  P and DB restored; X past the last tile put, Y at the end byte
+;        (0) or past the last tile counted; A clobbered
+; Calls: Menu_DrawStringLoop.
+Menu_DrawString:
+    PHB
+    PHP
+    SEP #$20
+    STA.b !Menu_TextFlags
+    AND.b #!Menu_TextCountMask
+    STA.b !Menu_TextLeft
+    STX.b !Menu_DrawAddr2
+    XBA
+    PHA
+    PLB
+    JSR Menu_DrawStringLoop
+    LDA.b #!Menu_TextAttrClear
+    TRB.b !Menu_TextAttr
+    PLP
+    PLB
+    RTS
+
+; $C2:EF7E — Menu_DrawStringLoop (25 bytes, $EF7E–$EF96)
+; The string loop: a 0 byte ends it; codes $01-$0F run their
+; Menu_TextCtrlTable routine (Menu_TextCtrl) and do not count; other
+; bytes are put (Menu_PutChar) and counted down in Menu_TextLeft, which
+; ends the loop at 0. Control codes $04 and $05 run it again on a
+; sub-string, sharing the count.
+; Callers (3 JSR sites): Menu_DrawString ($C2:EF74), Menu_TextSubString ($C2:F02E) and Menu_TextName
+;   ($C2:F04F).
+; Entry: M any (SEP #$20 here), X=0, DP=$0000, DB = the string's bank;
+;        Y = the string, X = the tilemap address
+; Exit:  M=1; X past the last tile, Y at the 0 or past the last tile;
+;        A = 0 or the last tile
+; Calls: Menu_TextCtrl, Menu_PutChar.
+Menu_DrawStringLoop:
+    SEP #$20
+    LDA.w !Eng_PtrBase,Y
+    BEQ .done
+    INY
+    CMP.b #!Menu_TextFirstTile
+    BCS .tile
+    JSR Menu_TextCtrl
+    BRA Menu_DrawStringLoop
+.tile:
+    JSR Menu_PutChar
+    DEC.b !Menu_TextLeft
+    BNE Menu_DrawStringLoop
+.done:
+    RTS
+
+; $C2:EF97 — Menu_PutChar (39 bytes, $EF97–$EFBD)
+; Puts tile A with attribute Menu_TextAttr at $7E:X (long stores) and X
+; += 2. In two-row text (Menu_TextFlags bit 7 clear) a tile $FF is also
+; put at $7E:X - $40, one row up.
+; Callers (3 JSR sites): Menu_DrawStringLoop ($C2:EF8F), Menu_TextName ($C2:F058) and
+;   Menu_TextBlanks ($C2:F09A).
+; Entry: M any (P saved; SEP #$20 here), X=0, DP=$0000, DB any; A = the
+;        tile
+; Exit:  P restored; X + 2; A = the tile; Y unchanged
+; No calls.
+Menu_PutChar:
+    PHP
+    SEP #$20
+    BIT.b !Menu_TextFlags
+    BMI .put
+    CMP.b #!Menu_BlankTile
+    BNE .put
+    XBA
+    LDA.b #!Menu_BlankTile
+    STA.l !Menu_TextRowAbove,X
+    LDA.b !Menu_TextAttr
+    STA.l !Menu_TextRowAbove+1,X
+    XBA
+.put:
+    STA.l !Menu_MapBank7E,X
+    LDA.b !Menu_TextAttr
+    STA.l !Menu_MapBank7E+1,X
+    INX
+    INX
+    PLP
+    RTS
+
+; $C2:EFBE — Menu_TextCtrl (21 bytes, $EFBE–$EFD2)
+; Runs control code A's Menu_TextCtrlTable routine: JMP (Menu_TextVec)
+; with the return address pushed by PER so that its RTS lands on
+; Menu_TextCtrlRet, whose RTS returns to Menu_DrawStringLoop.
+; Callers (1 JSR site): Menu_DrawStringLoop ($C2:EF8A).
+; Entry: from Menu_DrawStringLoop: M=1, X=0, DP=$0000, DB = the
+;        string's bank; A = the code; Y past it
+; Exit:  as the routine (they return with M=0 or M=1)
+; Calls: the code's routine (JMP (abs)).
+Menu_TextCtrl:
+    PHX
+    REP #$20
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAX
+    LDA.l Menu_TextCtrlTable,X
+    STA.b !Menu_TextVec
+    PLX
+    PER Menu_TextCtrlRet-1
+    JMP (!Menu_TextVec)
+
+Menu_TextCtrlRet:                       ; header: see Menu_TextCtrl
+    RTS
+
+; $C2:EFD4 — Menu_TextCtrlTable (32 bytes, $EFD4–$EFF3)
+; Menu_TextCtrl's routine per control code $00-$0F; $00 (never
+; dispatched: 0 ends a string) and $0D-$0F are Menu_TextCtrlRet (no
+; effect).
+Menu_TextCtrlTable:
+    dw Menu_TextCtrlRet, Menu_TextNewLine, Menu_TextSetPos, Menu_TextNumber
+    dw Menu_TextSubString, Menu_TextName, Menu_TextPalFrom, Menu_TextCopyTile
+    dw Menu_TextBlanks, Menu_TextSetFlags, Menu_TextSetAttr, Menu_TextHex
+    dw Menu_TextNumberOrBar, Menu_TextCtrlRet, Menu_TextCtrlRet, Menu_TextCtrlRet
+
+; $C2:EFF4 — Menu_TextNewLine (17 bytes, $EFF4–$F004)
+; Code $01: Menu_DrawAddr2 (the line start) += $80 (two rows), or $40
+; with Menu_TextFlags bit 7 set; X = it.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB any
+; Exit:  M=0; A = X = the new line start; Y unchanged
+; No calls.
+Menu_TextNewLine:
+    LDA.w #2*!Menu_MapRowBytes
+    BIT.b !Menu_TextLeft                ; bit 15: Menu_TextFlags bit 7
+    BPL .add
+    LDA.w #!Menu_MapRowBytes
+.add:
+    CLC
+    ADC.b !Menu_DrawAddr2
+    STA.b !Menu_DrawAddr2
+    TAX
+    RTS
+
+; $C2:F005 — Menu_TextSetPos (12 bytes, $F005–$F010)
+; Code $02 (a word): Menu_DrawAddr2 = X = Menu_MapPtr + the word. Its
+; tail Menu_TextSkip2 ($F00E: Y += 2) ends codes $03-$05, $07 and $0B.
+; Callers of Menu_TextSkip2 (1 JMP site): Menu_TextCopyTile ($C2:F08A).
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's
+;        bank; Y = the argument
+; Exit:  M=0; A = X = the new position; Y past the word
+; No calls.
+Menu_TextSetPos:
+    LDA.w !Eng_PtrBase,Y
+    CLC
+    ADC.b !Menu_MapPtr
+    STA.b !Menu_DrawAddr2
+    TAX
+Menu_TextSkip2:                         ; header: see Menu_TextSetPos
+    INY
+    INY
+    RTS
+
+; $C2:F011 — Menu_TextNumber (17 bytes, $F011–$F021)
+; Code $03 (4 bytes: the value's address, then the Menu_DrawNumber word:
+; flags, bank): Menu_DrawNumber at X. Its tail Menu_TextSkip4 ($F01E: Y
+; += 4) also ends code $0B.
+; Callers of Menu_TextSkip4 (1 JMP site): Menu_TextHex ($C2:F0CE).
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  as Menu_DrawNumber (X past the digits); Y past the 4 bytes
+; Calls: Menu_DrawNumber.
+Menu_TextNumber:
+    PHY
+    LDA.w !Eng_PtrBase,Y
+    PHA
+    LDA.w !Eng_PtrBase+2,Y
+    PLY
+    JSR Menu_DrawNumber
+    PLY
+Menu_TextSkip4:                         ; header: see Menu_TextNumber
+    INY
+    INY
+    BRA Menu_TextSkip2
+
+; $C2:F022 — Menu_TextSubString (20 bytes, $F022–$F035)
+; Code $04 (a 24-bit pointer): Menu_DrawStringLoop on the string there
+; (DB = its bank byte), sharing Menu_TextLeft.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; DB as at entry; X past the tiles; Y past the 3 bytes
+; Calls: Menu_DrawStringLoop.
+Menu_TextSubString:
+    PHY
+    PHB
+    LDA.w !Eng_PtrBase+1,Y
+    PHA
+    LDA.w !Eng_PtrBase,Y
+    TAY
+    PLB                                 ; (the middle byte, then)
+    PLB                                 ; DB = the bank byte
+    JSR Menu_DrawStringLoop
+    PLB
+    PLY
+    INY
+    BRA Menu_TextSkip2
+
+; $C2:F036 — Menu_TextName (50 bytes, $F036–$F067)
+; Code $05 (a word): the string at $7E:word as one-row text of at most 5
+; tiles (Menu_TextLeft/Flags = 5 / $80 meanwhile), padded with tile $FF
+; to 5; then Menu_TextLeft/Flags back and X = the start + 10. A
+; 5-tile name in RAM: probably a character's name.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=0 (P restored); DB as at entry; X = the start + 10; Y past
+;        the word; A = Menu_TextLeft/Flags
+; Calls: Menu_DrawStringLoop, Menu_PutChar.
+Menu_TextName:
+    PEI.b (!Menu_TextLeft)
+    PHY
+    PHB
+    PHP
+    TXA
+    CLC
+    ADC.w #2*!Menu_TextNameLen
+    PHA
+    LDA.w #!Menu_TextNameFlags
+    STA.b !Menu_TextLeft                ; and Menu_TextFlags
+    LDA.w !Eng_PtrBase,Y
+    TAY
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    JSR Menu_DrawStringLoop
+    LDA.b !Menu_TextLeft                ; M=1 from the loop
+    BEQ .done
+.pad:
+    LDA.b #!Menu_BlankTile
+    JSR Menu_PutChar
+    DEC.b !Menu_TextLeft
+    BNE .pad
+.done:
+    PLX
+    PLP
+    PLB
+    PLY
+    PLA
+    STA.b !Menu_TextLeft
+    BRA Menu_TextSkip2
+
+; $C2:F068 — Menu_TextSetAttr (9 bytes, $F068–$F070)
+; Code $0A (a byte): Menu_TextAttr = it.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; A = the byte; Y past it
+; No calls.
+Menu_TextSetAttr:
+    SEP #$20
+    LDA.w !Eng_PtrBase,Y
+    STA.b !Menu_TextAttr
+    INY
+    RTS
+
+; $C2:F071 — Menu_TextCopyTile (28 bytes, $F071–$F08C)
+; Code $07 (a word): the tile word at $7E:word is copied to the map at X
+; (X += 2) and counted in Menu_TextLeft. Should that count reach 0
+; here, Menu_DrawStringLoop does not notice (it tests only after a
+; tile): the next tile wraps it.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; X + 2; Y past the word; A clobbered
+; Calls: jumps to Menu_TextSkip2.
+Menu_TextCopyTile:
+    PHY
+    PHB
+    LDA.w !Eng_PtrBase,Y
+    TAY
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDA.w !Eng_PtrBase,Y
+    STA.w !Eng_PtrBase,X
+    PLB
+    PLY
+    SEP #$20
+    INX
+    INX
+    DEC.b !Menu_TextLeft
+    JMP Menu_TextSkip2
+
+; $C2:F08D — Menu_TextBlanks (21 bytes, $F08D–$F0A1)
+; Code $08 (a byte n): n tiles $FF (Menu_PutChar; 0: 65536), not
+; counted in Menu_TextLeft.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; X + 2n; Y past the byte; A = $FF
+; Calls: Menu_PutChar.
+Menu_TextBlanks:
+    LDA.w !Eng_PtrBase,Y
+    INY
+    PHY
+    AND.w #!Eng_LowByteMask
+    TAY
+    SEP #$20
+.blank:
+    LDA.b #!Menu_BlankTile
+    JSR Menu_PutChar
+    DEY
+    BNE .blank
+    PLY
+    RTS
+
+; $C2:F0A2 — Menu_TextPalFrom (22 bytes, $F0A2–$F0B7)
+; Code $06 (a word): Menu_TextAttr's palette bits (2-4) = those of the
+; byte at $7E:word.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; A = the byte's palette bits; X unchanged; Y past the word
+; No calls.
+Menu_TextPalFrom:
+    SEP #$20
+    PHX
+    LDX.w !Eng_PtrBase,Y
+    INY
+    INY
+    LDA.b #!Menu_AttrPalMask
+    TRB.b !Menu_TextAttr
+    LDA.l !Menu_MapBank7E,X
+    AND.b #!Menu_AttrPalMask
+    TSB.b !Menu_TextAttr
+    PLX
+    RTS
+
+; $C2:F0B8 — Menu_TextSetFlags (9 bytes, $F0B8–$F0C0)
+; Code $09 (a byte): Menu_TextFlags = it.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; A = the byte; Y past it
+; No calls.
+Menu_TextSetFlags:
+    SEP #$20
+    LDA.w !Eng_PtrBase,Y
+    STA.b !Menu_TextFlags
+    INY
+    RTS
+
+; $C2:F0C1 — Menu_TextHex (16 bytes, $F0C1–$F0D0)
+; Code $0B (4 bytes, as code $03): Menu_DrawHex at X.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  as Menu_DrawHex (X past the digits); Y past the 4 bytes
+; Calls: Menu_DrawHex; jumps to Menu_TextSkip4.
+Menu_TextHex:
+    PHY
+    LDA.w !Eng_PtrBase,Y
+    PHA
+    LDA.w !Eng_PtrBase+2,Y
+    PLY
+    JSR Menu_DrawHex
+    PLY
+    JMP Menu_TextSkip4
+
+; $C2:F0D1 — Menu_TextNumberOrBar (67 bytes, $F0D1–$F113)
+; Code $0C (3 bytes: a limit index k, then a word address in bank $7E):
+; the byte there as 2 digits with leading zeros blank (Menu_DrawNumber,
+; flags $11) while it is below MenuRom_NumLimits[k] ($63 = 99, or $10
+; for k = 1); else two tiles $2F with Menu_TextAttr.
+; Entry: from Menu_TextCtrl: M=0, X=0, DP=$0000, DB = the string's bank
+; Exit:  M=1; DB as at entry; X past the 2 tiles; Y past the 3 bytes
+; Calls: Menu_DrawNumber.
+Menu_TextNumberOrBar:
+    PHB
+    PHY
+    PHX
+    LDA.w !Eng_PtrBase,Y
+    AND.w #!Eng_LowByteMask
+    TAX
+    LDA.w !Eng_PtrBase+1,Y
+    TAY
+    SEP #$20
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDA.w !Eng_PtrBase,Y
+    CMP.l !MenuRom_NumLimits,X
+    PLX
+    BCS .bar
+    LDA.b #!Bank7E
+    XBA
+    LDA.b #!Menu_NumFlags2Digits
+    JSR Menu_DrawNumber
+    BRA .done
+.bar:
+    LDA.b #!Menu_BarTile
+    STA.w !Eng_PtrBase,X
+    STA.w !Eng_PtrBase+2,X
+    LDA.b !Menu_TextAttr
+    STA.w !Eng_PtrBase+1,X
+    STA.w !Eng_PtrBase+3,X
+    INX
+    INX
+    INX
+    INX
+.done:
+    PLY
+    PLB
+    INY
+    INY
+    INY
+    RTS
+
+; ============================================================
+; Menu numbers: decimal and hex digits as tiles ($C2:F114–$C2:F28C)
+; ============================================================
+
+; $C2:F114 — Menu_DrawNumber (43 bytes, $F114–$F13E)
+; Draws the 1-3 byte value at B:Y (B = A's high byte) in decimal at
+; $7E:X. A's low byte holds the flags: bits 0-1 the byte count
+; (Menu_NumBytes; 0 would be 65536), bits 4-6 the digit count - 1
+; (Menu_NumDigits), bit 3 set: a zero ones digit is blanked too, bit 7
+; set: leading zeros are drawn as 0 (clear: as tile $FF). Menu_BinToBcd,
+; then Menu_DrawBcdDigits with Y = X.
+; Callers (10 JSR sites): Menu_TextNumber ($C2:F01A), Menu_TextNumberOrBar ($C2:F0F5),
+;   Menu_DrawClock ($C2:F2AF, $C2:F2C7) and unmatched ($C2:B077, $C2:BB43, $C2:DD6C, $C2:DDC7,
+;   $C2:DDD3, $C2:DFF0).
+; Entry: M any, X=0 (P and DB saved; REP #$30 / SEP #$20 here), DP=$0000
+;        (dp $8A-$93), DB any; A = bank and flags, Y = the value's
+;        address, X = the tilemap address
+; Exit:  P and DB restored; X past the digits; Y = the value's address
+;        + the byte count; A clobbered; Menu_NumBcd, Menu_NumDigits,
+;        Menu_NumFlags, Menu_NumPos, Menu_NumBytes (0) changed
+; Calls: Menu_BinToBcd, Menu_DrawBcdDigits.
+Menu_DrawNumber:
+    PHB
+    PHP
+    REP #$30
+    PHA
+    PLB
+    PLB                                 ; DB = A's high byte
+    STX.b !Menu_NumPos
+    SEP #$20
+    PHA
+    AND.b #!Menu_NumBytesMask
+    STA.b !Menu_NumBytes
+    STZ.b !Menu_NumBytes+1
+    JSR Menu_BinToBcd
+    PLA
+    EOR.b #!Menu_NumShowZeros
+    STA.b !Menu_NumFlags
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    AND.b #!Menu_NumDigitsMask
+    STA.b !Menu_NumDigits
+    PHY
+    JSR Menu_DrawBcdDigits
+    TYX
+    PLY
+    PLP
+    PLB
+    RTS
+
+; $C2:F13F — Menu_BinToBcd (59 bytes, $F13F–$F179)
+; Menu_NumBcd (4 bytes, BCD) = the Menu_NumBytes-byte value at Y
+; (lowest byte first): for each set bit, its value in BCD from
+; Menu_BcdBitValues is added in decimal mode. The table offset starts at
+; Menu_Unk51 (LDX dp $51): a right result needs it 0 (it is zeroed by
+; Menu_InitSystems; other menu code also uses dp $51 as a zero start
+; index).
+; Callers (3 JSR sites): Menu_DrawNumber ($C2:F126) and unmatched ($C2:8FDC, $C2:9000).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB = the value's
+;        bank; Y = its address; Menu_NumBytes (16-bit) = its byte count
+; Exit:  P restored; D flag clear; Y + the byte count; X past the
+;        table entries used; Menu_NumBytes = 0, Menu_NumDigits clobbered
+; No calls.
+Menu_BinToBcd:
+    PHP
+    REP #$30
+    STZ.b !Menu_NumBcd
+    STZ.b !Menu_NumBcd+2
+    LDX.b !Menu_Unk51
+.byte:
+    PHY
+    LDA.w !Eng_PtrBase,Y
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_NumDigits               ; the bits left to test
+    LDY.w #8
+.bit:
+    LSR.b !Menu_NumDigits
+    BCC .next
+    SED
+    CLC
+    LDA.l Menu_BcdBitValues,X
+    ADC.b !Menu_NumBcd
+    STA.b !Menu_NumBcd
+    LDA.l Menu_BcdBitValues+2,X
+    ADC.b !Menu_NumBcd+2
+    STA.b !Menu_NumBcd+2
+    CLD
+.next:
+    INX
+    INX
+    INX
+    INX
+    DEY
+    BNE .bit
+    PLY
+    INY
+    DEC.b !Menu_NumBytes
+    BNE .byte
+    PLP
+    RTS
+
+; $C2:F17A — Menu_BcdBitValues (96 bytes, $F17A–$F1D9)
+; 2^0 to 2^23 as 4-byte BCD numbers (lowest byte first), for
+; Menu_BinToBcd.
+Menu_BcdBitValues:
+    dd $00000001, $00000002, $00000004, $00000008
+    dd $00000016, $00000032, $00000064, $00000128
+    dd $00000256, $00000512, $00001024, $00002048
+    dd $00004096, $00008192, $00016384, $00032768
+    dd $00065536, $00131072, $00262144, $00524288
+    dd $01048576, $02097152, $04194304, $08388608
+
+; $C2:F1DA — Menu_DrawBcdDigits (49 bytes, $F1DA–$F20A)
+; With DB=$7E, draws Menu_NumDigits + 1 digits of Menu_NumBcd at
+; Menu_NumPos (Y), highest first (from byte Menu_NumDigits / 2, its high
+; nibble only when Menu_NumDigits is odd), with Menu_PutBcdDigit. Before
+; the ones digit Menu_NumFlags is cleared unless it has bit 3 (so the
+; ones digit is shown even when 0).
+; Callers (1 JSR site): Menu_DrawNumber ($C2:F137).
+; Entry: from Menu_DrawNumber: M any (SEP #$20 here), X=0, DP=$0000, DB
+;        any (set to $7E)
+; Exit:  M=1; DB=$7E; Y past the digits; X = $FFFF; A clobbered
+; Calls: Menu_PutBcdDigit.
+Menu_DrawBcdDigits:
+    SEP #$20
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDY.b !Menu_NumPos
+    LDA.b #0
+    XBA                                 ; B = 0 for the TAX
+    LDA.b !Menu_NumDigits
+    LSR A
+    TAX
+    BCC .ones_check
+.high:
+    LDA.b !Menu_NumBcd,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Menu_PutBcdDigit
+.ones_check:
+    CPX.w #0
+    BNE .low
+    LDA.b !Menu_NumFlags
+    AND.b #!Menu_NumBlankZeroOnes
+    BNE .low
+    STZ.b !Menu_NumFlags
+.low:
+    LDA.b !Menu_NumBcd,X
+    JSR Menu_PutBcdDigit
+    DEX
+    BPL .high
+    RTS
+
+; $C2:F20B — Menu_PutBcdDigit (28 bytes, $F20B–$F226)
+; Puts digit A AND $0F at Y (tile $D4 + digit, Menu_TextAttr), Y += 2.
+; A zero while Menu_NumFlags bit 7 is set (leading zeros) is tile $FF
+; instead; every digit put as a digit clears Menu_NumFlags.
+; Callers (2 JSR sites): Menu_DrawBcdDigits ($C2:F1F2, $C2:F204).
+; Entry: M=1, X any, DP=$0000, DB=$7E; A = the digit (low nibble), Y =
+;        the tilemap address
+; Exit:  M=1; A = Menu_TextAttr; Y + 2; X unchanged
+; No calls.
+Menu_PutBcdDigit:
+    AND.b #!Menu_LowNibble
+    BNE .digit
+    BIT.b !Menu_NumFlags
+    BPL .digit
+    LDA.b #!Menu_BlankTile
+    BRA .put
+.digit:
+    STZ.b !Menu_NumFlags
+    CLC
+    ADC.b #!Menu_DigitTile0
+.put:
+    STA.w !Eng_PtrBase,Y
+    LDA.b !Menu_TextAttr
+    STA.w !Eng_PtrBase+1,Y
+    INY
+    INY
+    RTS
+
+; $C2:F227 — Menu_DrawHex (37 bytes, $F227–$F24B)
+; Draws the 4 bytes at B:Y (B = A's high byte) in hex at $7E:X: A's
+; low byte + 1 digits (Menu_DrawHexDigits); Menu_NumDigits/Flags = A
+; (as a word).
+; Callers (1 JSR site): Menu_TextHex ($C2:F0CA).
+; Entry: M any, X=0 (P, DB and Y saved; REP #$30 here), DP=$0000, DB
+;        any; A = bank and digit count - 1, Y = the value's address, X =
+;        the tilemap address
+; Exit:  P, DB and Y restored; X past the digits; A clobbered
+; Calls: Menu_DrawHexDigits.
+Menu_DrawHex:
+    PHY
+    PHB
+    PHP
+    REP #$30
+    PHA
+    PLB
+    PLB                                 ; DB = A's high byte
+    STX.b !Menu_NumPos
+    STA.b !Menu_NumDigits               ; and Menu_NumFlags
+    LDA.w !Eng_PtrBase,Y
+    STA.b !Menu_NumBcd
+    LDA.w !Eng_PtrBase+2,Y
+    STA.b !Menu_NumBcd+2
+    PEA.w !Bank7E<<8|!Bank7E
+    PLB
+    PLB
+    LDY.b !Menu_NumPos
+    JSR Menu_DrawHexDigits
+    TYX
+    PLP
+    PLB
+    PLY
+    RTS
+
+; $C2:F24C — Menu_DrawHexDigits (29 bytes, $F24C–$F268)
+; Menu_NumDigits + 1 hex digits of the 4 bytes at Menu_NumBcd at Y,
+; highest first (as Menu_DrawBcdDigits, no zero blanking).
+; Callers (1 JSR site): Menu_DrawHex ($C2:F244).
+; Entry: M any (P saved; SEP #$20 here), X=0, DP=$0000 (the TDC: A = 0),
+;        DB=$7E; Y = the tilemap address
+; Exit:  P restored; Y past the digits; X = $FFFF; A clobbered
+; Calls: Menu_PutHexDigit.
+Menu_DrawHexDigits:
+    PHP
+    SEP #$20
+    TDC                                 ; B = 0 for the TAX
+    LDA.b !Menu_NumDigits
+    LSR A
+    TAX
+    BCC .low
+.high:
+    LDA.b !Menu_NumBcd,X
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR Menu_PutHexDigit
+.low:
+    LDA.b !Menu_NumBcd,X
+    JSR Menu_PutHexDigit
+    DEX
+    BPL .high
+    PLP
+    RTS
+
+; $C2:F269 — Menu_PutHexDigit (20 bytes, $F269–$F27C)
+; Puts tile Menu_HexDigitTiles[A AND $0F] with Menu_TextAttr at Y, Y +=
+; 2.
+; Callers (2 JSR sites): Menu_DrawHexDigits ($C2:F25C, $C2:F261).
+; Entry: M=1, X=0 (saved: PHX/PLX), DP=$0000, DB=$7E; A = the digit (low
+;        nibble), Y = the tilemap address
+; Exit:  M=1; A = Menu_TextAttr; Y + 2; X unchanged
+; No calls.
+Menu_PutHexDigit:
+    PHX
+    AND.b #!Menu_LowNibble
+    TAX
+    LDA.l Menu_HexDigitTiles,X
+    STA.w !Eng_PtrBase,Y
+    LDA.b !Menu_TextAttr
+    STA.w !Eng_PtrBase+1,Y
+    INY
+    INY
+    PLX
+    RTS
+
+; $C2:F27D — Menu_HexDigitTiles (16 bytes, $F27D–$F28C)
+; The tiles of hex digits 0-F (Menu_PutHexDigit): $73-$7C for 0-9, then
+; $F1 $F2 $36 $7D $38 $34 for A-F.
+Menu_HexDigitTiles:
+    db $73, $74, $75, $76, $77, $78, $79, $7A
+    db $7B, $7C, $F1, $F2, $36, $7D, $38, $34
+
+; ============================================================
+; Menu clock, item names, description text and the remaining draw
+; commands ($C2:F28D–$C2:F3C9)
+; ============================================================
+
+; $C2:F28D — Menu_DrawClock (63 bytes, $F28D–$F2CB)
+; Draws hours:minutes at $7E:X from the play-time digits at Y (callers
+; pass Menu_PlayTime+2: minute ones, minute tens, hour ones, hour tens,
+; then Menu_PlayTimeMaxed): Menu_ClockHours/Mins = the two-digit
+; values, or 99 and 59 when the byte at Y+4 is non-zero; each drawn as 2
+; digits with leading zeros (Menu_DrawNumber, flags $91), with tile $2D
+; (the colon, probably) between them in Menu_TextWord's attribute byte.
+; The second REP #$20 ($C2:F2BF) is redundant (M is already 0).
+; Callers (4 JSR sites): Menu_MainMenuLoop ($C2:9A3A) and unmatched ($C2:A0B7, $C2:A238, $C2:D3AA).
+; Entry: M any (P saved; SEP #$20 / REP #$20 here), X=0, DP=$0000, DB=$7E
+;        (the digits and the map); X = the tilemap address, Y = the
+;        digits
+; Exit:  P restored; X past the clock; Y = Menu_ClockMins + 1; A
+;        clobbered; Menu_ClockHours/Mins and Menu_DrawNumber's dp bytes
+;        changed
+; Calls: Menu_ClockPair, Menu_DrawNumber.
+Menu_DrawClock:
+    PHP
+    SEP #$20
+    LDA.b #!Menu_ClockMaxHours
+    STA.b !Menu_ClockHours
+    LDA.b #!Menu_ClockMaxMins
+    STA.b !Menu_ClockMins
+    LDA.w !Eng_PtrBase+4,Y
+    BNE .draw
+    JSR Menu_ClockPair
+    STA.b !Menu_ClockMins
+    JSR Menu_ClockPair
+    STA.b !Menu_ClockHours
+.draw:
+    REP #$20
+    LDY.w #!Menu_ClockHours
+    LDA.w #!Bank7E<<8|!Menu_ClockNumFlags
+    JSR Menu_DrawNumber
+    LDA.b !Menu_TextWord
+    AND.w #!Menu_AttrByteMask
+    ORA.w #!Menu_ClockColonTile
+    STA.w !Eng_PtrBase,X
+    INX
+    INX
+    REP #$20
+    LDY.w #!Menu_ClockMins
+    LDA.w #!Bank7E<<8|!Menu_ClockNumFlags
+    JSR Menu_DrawNumber
+    PLP
+    RTS
+
+; $C2:F2CC — Menu_ClockPair (16 bytes, $F2CC–$F2DB)
+; A = byte Y+1 x 10 + byte Y (tens and ones), Y += 2; Menu_NumBcd's
+; first byte = tens x 2.
+; Callers (2 JSR sites): Menu_DrawClock ($C2:F29D, $C2:F2A2).
+; Entry: M=1, X=0, DP=$0000, DB=$7E; Y = the ones digit (C any: the
+;        ASLs leave C=0 for digits)
+; Exit:  M=1; A = the value; Y + 2; X unchanged
+; No calls.
+Menu_ClockPair:
+    LDA.w !Eng_PtrBase+1,Y
+    ASL A
+    STA.b !Menu_NumBcd
+    ASL A
+    ASL A
+    ADC.b !Menu_NumBcd                  ; x 8 + x 2
+    ADC.w !Eng_PtrBase,Y
+    INY
+    INY
+    RTS
+
+; $C2:F2DC — Menu_DrawItemName (6 bytes, $F2DC–$F2E1)
+; Menu_ItemNamePtr for id A, then Menu_DrawString: 11 tiles of bank $CC
+; at $7E:X (two-row text). Probably an item's name (11-byte names at
+; the addresses of Menu_ItemNamePtrs).
+; Callers (3 JSR sites): unmatched ($C2:A70D, $C2:DD63, $C2:DFA4).
+; Entry: M any, X=0, DP=$0000, DB any; A = the id (low byte), X = the
+;        tilemap address
+; Exit:  as Menu_DrawString
+; Calls: Menu_ItemNamePtr; jumps to Menu_DrawString.
+Menu_DrawItemName:
+    JSR Menu_ItemNamePtr
+    JMP Menu_DrawString
+
+; $C2:F2E2 — Menu_ItemNamePtr (17 bytes, $F2E2–$F2F2)
+; Y = Menu_ItemNamePtrs[A AND $FF] (a bank-$CC address), A = $CC0B (the
+; bank and Menu_DrawString's count, 11).
+; Callers (2 JSR sites): Menu_DrawItemName ($C2:F2DC) and unmatched ($C2:A5AA).
+; Entry: M any (P saved; REP #$30 here), X any, DP any, DB=$7E (the
+;        table); A = the id
+; Exit:  P restored; A = $CC0B (16 bits, or A = $0B and B = $CC at
+;        M=1); Y = the address; X unchanged
+; No calls.
+Menu_ItemNamePtr:
+    PHP
+    REP #$30
+    AND.w #!Eng_LowByteMask
+    ASL A
+    TAY
+    LDA.w !Menu_ItemNamePtrs,Y
+    TAY
+    LDA.w #!MenuRom_ItemNameBank<<8|!Menu_ItemNameLen
+    PLP
+    RTS
+
+; $C2:F2F3 — Menu_DrawDescText (63 bytes, $F2F3–$F331)
+; Draws string A of the table at $CC:2EB1 with the text-window decoder
+; (Menu_UnkFA49), unless it is the string drawn last (A =
+; Menu_Unk0D77) and Menu_Unk0D78 bit 7 is clear: then nothing. Else
+; Menu_Unk0D77 = A, Menu_Unk0D78 = 0, TextWin_StrIndex = A,
+; TextWin_StrTable = $CC:2EB1, Menu_TextDest = $4E84, Menu_Unk0DCC =
+; $6840, Menu_Unk0DC9 = 1, Menu_Unk0DD0 = $0080 and Menu_UnkFA49. What
+; the strings are is not traced (a description line, probably).
+; Callers (10 sites: 8 JSR, 2 JMP): unmatched (JSR $C2:A44A, JSR $C2:A5E2, JMP $C2:AAC5, JSR
+;   $C2:AD4B, JSR $C2:B347, JSR $C2:D80D, JSR $C2:D8F0, JMP $C2:E014, JSR $C2:E0E4, JSR $C2:E1D7).
+; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP any, DB=$7E
+;        (or $00: low WRAM); A = the string number
+; Exit:  P restored; nothing drawn: A, X, Y unchanged; else X
+;        clobbered and as Menu_UnkFA49 (not analysed)
+; Calls: Menu_UnkFA49.
+Menu_DrawDescText:
+    PHP
+    SEP #$20
+    REP #$10
+    BIT.w !Menu_Unk0D78
+    BMI .draw
+    CMP.w !Menu_Unk0D77
+    BEQ .done
+.draw:
+    STA.w !Menu_Unk0D77
+    STZ.w !Menu_Unk0D78
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    LDX.w #!Menu_DescTextDest
+    STX.w !Menu_TextDest
+    LDX.w #!Menu_DescUnk0DCC
+    STX.w !Menu_Unk0DCC
+    LDX.w #!MenuRom_DescStrTable&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDA.b #!MenuRom_DescStrTable>>16
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDA.b #1
+    STA.w !Menu_Unk0DC9
+    LDX.w #!Menu_DescUnk0DD0
+    STX.w !Menu_Unk0DD0
+    JSR Menu_UnkFA49
+.done:
+    PLP
+    RTS
+
+; $C2:F332 — Menu_DrawCmdSetMap (5 bytes, $F332–$F336)
+; Command $08 (2 argument bytes): Menu_MapPtr = Menu_DrawArg0.
+; Entry: from Menu_RunDrawList: M=1, X=0, DP=$0000, DB=$7E
+; Exit:  X = Menu_MapPtr; A, Y unchanged
+; No calls.
+Menu_DrawCmdSetMap:
+    LDX.b !Menu_DrawArg0
+    STX.b !Menu_MapPtr
+    RTS
+
+; $C2:F337 — Menu_DrawCmdMapRec (43 bytes, $F337–$F361)
+; Command $0C (4 argument bytes): with DB=$00, fills the 8-byte record
+; at Menu_DrawArg0 (low WRAM) as a Menu_VramRec: .Dest = Menu_DrawArg2,
+; .Src = $9000 + (Menu_DrawArg0 AND $F0) x 8, .SrcBank and the byte after
+; .Size = $7E (.Size itself untouched), and points Menu_MapPtr at that
+; source: probably a tilemap buffer per record, sent to VRAM later.
+; Entry: from Menu_RunDrawList: M=1, X=0 (P and DB saved), DP=$0000, DB
+;        any (set to $00)
+; Exit:  P and DB restored; A = the source address (16 bits), Y =
+;        Menu_DrawArg0; X unchanged
+; No calls.
+Menu_DrawCmdMapRec:
+    PHB
+    PHP
+    PEA.w !Bank00<<8|!Bank00
+    PLB
+    PLB
+    LDY.b !Menu_DrawArg0
+    LDA.b #!Bank7E
+    STA.w Menu_VramRec.SrcBank,Y
+    STA.w Menu_VramRec.Unk7,Y
+    REP #$20
+    LDA.b !Menu_DrawArg2
+    STA.w Menu_VramRec.Dest,Y
+    LDA.b !Menu_DrawArg0
+    AND.w #!Menu_MapRecMask
+    ASL A
+    ASL A
+    ASL A
+    ADC.w #!Menu_MapRecBase             ; (C=0 from the ASL)
+    STA.b !Menu_MapPtr
+    STA.w Menu_VramRec.Src,Y
+    PLP
+    PLB
+    RTS
+
+; $C2:F362 — Menu_DeadF362 (2 bytes, $F362–$F363)
+; REP #$10 that no code reaches: Menu_DrawCmdMapRec ends with RTS before
+; it, Menu_DrawCmdTable points at $F364, and no JSR/JMP or pointer to
+; $F362 was found. Kept as it is in the ROM.
+; Entry: never entered (X=0 would follow), DP any, DB any
+; Exit:  falls into Menu_DrawCmdCopyRom
+; No calls.
+Menu_DeadF362:
+    REP #$10
+
+; $C2:F364 — Menu_DrawCmdCopyRom (20 bytes, $F364–$F377)
+; Commands $0A and $0E (2 argument bytes): copies the n bytes after the
+; count byte n at $FF:Menu_DrawArg0 to Menu_MapPtr (MVN; n = 0: 256).
+; Entry: from Menu_RunDrawList: M=1 (8-bit count), X=0, DP=$0000 (the
+;        TDC: B = 0), DB any (set to $FF)
+; Exit:  P restored; DB=$7E (the MVN); A = $FFFF; X, Y past the copy
+; No calls.
+Menu_DrawCmdCopyRom:
+    PHP
+    LDA.b #!MenuRom_DmaCopyBank
+    PHA
+    PLB
+    TDC
+    LDX.b !Menu_DrawArg0
+    LDA.w !Eng_PtrBase,X
+    DEC A
+    INX
+    LDY.b !Menu_MapPtr
+    MVN !Bank7E,!MenuRom_DmaCopyBank    ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; $C2:F378 — Menu_DrawCmdSwapBlocks (82 bytes, $F378–$F3C9)
+; Command $10 (6 argument bytes): swaps the block of Menu_DrawArg4 AND
+; $1F tiles by Menu_DrawArg5 AND $3F rows at position Menu_DrawArg2 with
+; the one at Menu_DrawArg0 (Menu_DrawArg2 is overwritten with
+; Menu_DrawArg0 on the way), tile word by tile word.
+; Callers (1 JSR site): unmatched ($C2:C773).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E (the map)
+; Exit:  P restored; Menu_DrawAddr/Addr2 one row below the blocks,
+;        Menu_DrawInnerH = 0, Menu_DrawInnerW = the width, Menu_Tmp00
+;        = 0; A, X, Y clobbered
+; Calls: Menu_DrawPosToAddr (twice).
+Menu_DrawCmdSwapBlocks:
+    PHP
+    REP #$30
+    JSR Menu_DrawPosToAddr
+    LDA.b !Menu_DrawAddr
+    STA.b !Menu_DrawAddr2
+    LDA.b !Menu_DrawArg0
+    STA.b !Menu_DrawArg2
+    JSR Menu_DrawPosToAddr
+    LDA.b !Menu_DrawArg4
+    AND.w #!Menu_WinWidthMask
+    STA.b !Menu_DrawInnerW
+    LDA.b !Menu_DrawArg5
+    AND.w #!Menu_WinHeightMask
+    STA.b !Menu_DrawInnerH
+.row:
+    LDX.b !Menu_DrawAddr
+    LDY.b !Menu_DrawAddr2
+    LDA.b !Menu_DrawInnerW
+    STA.b !Menu_Tmp00
+.tile:
+    LDA.w !Eng_PtrBase,X
+    PHA
+    LDA.w !Eng_PtrBase,Y
+    STA.w !Eng_PtrBase,X
+    PLA
+    STA.w !Eng_PtrBase,Y
+    INX
+    INX
+    INY
+    INY
+    DEC.b !Menu_Tmp00
+    BNE .tile
+    LDA.b !Menu_DrawAddr
+    CLC
+    ADC.w #!Menu_MapRowBytes
+    STA.b !Menu_DrawAddr
+    LDA.b !Menu_DrawAddr2
+    ADC.w #!Menu_MapRowBytes            ; (C=0 from the ADC above)
+    STA.b !Menu_DrawAddr2
+    DEC.b !Menu_DrawInnerH
+    BNE .row
     PLP
     RTS
 

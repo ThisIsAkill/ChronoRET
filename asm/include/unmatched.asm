@@ -66,17 +66,9 @@ org $C2CAE6
 Menu_UnkCAE6:       ; Menu_MainRedrawTable entry 4 (not analysed)
 org $C2D0DB
 Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
-org $C2EDF6
-Menu_UnkEDF6:       ; JSR from Menu_LoadSlotWindowStyle (and $C2:D35A): probably draws a window frame at
-                    ; dp $63 sized by dp $5F/$60 from the tile word Menu_Unk0D47 (not matched)
-org $C2EE7F
-Menu_UnkEE7F:       ; JSR after Menu_UnkEDF6 (not analysed)
-org $C2ED31
-Menu_UnkED31:       ; JSR with X = a bank-$FF address: runs a list of command bytes there until one has
-                    ; bit 7 set (DB=$FF while it runs; not analysed)
-org $C2F28D
-Menu_UnkF28D:       ; JSR from Menu_MainMenuLoop with X = a tilemap address and Y = clock bytes: draws
-                    ; hours:minutes (99:59 when the byte at Y+4 is set; not matched)
+org $C2FA49
+Menu_UnkFA49:       ; JSR from Menu_DrawDescText: clears a buffer row at Menu_TextDest, sets TextWin_*
+                    ; and Menu_Unk0DC7-0DD7, then TextWin_Init (JSL BankC2_Entry0003) (not matched)
 org $C2FBE3
 Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
                     ; Menu_MainMenuLoop after the clock is drawn)

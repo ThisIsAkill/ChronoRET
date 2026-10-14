@@ -975,7 +975,7 @@ if !constants_menu_inc == 0
 
 ; --- Menu mode 0 ---
 !Menu_SubThreads = $74                   ; Menu_KillThreads mask: slots 2, 4, 5, 6
-!MenuRom_MainConfirmList = $FFBD51       ; Menu_UnkED31 lists of the main menu
+!MenuRom_MainConfirmList = $FFBD51       ; Menu_RunDrawList lists of the main menu
 !MenuRom_MainIconList = $FFBD2E
 !MenuRom_MainIconOam = $FFBD5C           ; 6 OAM entries: the icons
 !MenuRom_MainPalA = $FFCC14              ; 8 colours -> $80-$87
@@ -1055,5 +1055,48 @@ if !constants_menu_inc == 0
 !MenuRom_PortraitTiles = $FFCE70         ; 8 B: first tile per Menu_PortraitChar ($01 + 36 n; entry 7 = $01)
 !MenuRom_PortraitPals = $FFCE78          ; 8 words: bank-$FF address of 16 colours per entry
 !Menu_Unk81Set = $FF
+
+; --- Draw lists, windows, strings and numbers ---
+!MenuRom_DrawArgLens = $FFBD18           ; per command byte: argument bytes - 1 (Menu_RunDrawList)
+!MenuRom_DrawArgLensAbs = !MenuRom_DrawArgLens&$FFFF ; the same as an absolute address (read with DB=$FF)
+!Menu_LowNibble = $0F                    ; AND mask: a digit's low nibble
+!MenuRom_StringPtrs = $FFC457            ; words: bank-$FF string addresses (Menu_DrawCmdString)
+!MenuRom_NumLimits = $FFCF33             ; bytes: Menu_TextNumberOrBar's limits ($63, $10, $63 ...)
+!MenuRom_DescStrTable = $CC2EB1          ; string table Menu_DrawDescText gives the text-window decoder
+!MenuRom_ItemNameBank = $CC              ; bank of the Menu_ItemNamePtrs strings
+!Menu_ItemNameLen = $0B                  ; their length (Menu_DrawString's count)
+!Menu_PosRowMask = $FF00                 ; Menu_DrawArg2: the row
+!Menu_PosColMask = $001F                 ; Menu_DrawArg2: the column
+!Menu_WinWidthMask = $001F               ; Menu_DrawArg4 bits used as a width
+!Menu_WinHeightMask = $003F              ; Menu_DrawArg5 bits used as a height
+!Menu_FrameCornerBits = $0003            ; frame tile bits: t OR 3 is the corner, EOR 3 the other side pair
+!Menu_WinInsideOfs = $0042               ; one row down and one tile right
+!Menu_WinFillColMask = $0003             ; Menu_WinFillPattern column bits
+!Menu_WinFillRewind = $0008              ; 4 tiles back: the pattern row to copy on
+!Menu_WinFillRowStep = $0004             ; Menu_FillPatRow step ...
+!Menu_WinFillRowMask = $000C             ; ... and its bits (4 rows)
+!Menu_TextCountMask = $7F                ; Menu_TextFlags bits that are the count
+!Menu_TextAttrClear = $DC                ; Menu_TextAttr bits cleared after a string (palette, flips, bit 3)
+!Menu_TextFirstTile = $10                ; string bytes below this (and above 0) are control codes
+!Menu_BlankTile = $FF                    ; the tile put for blanks (padding, leading zeros)
+!Menu_TextNameLen = 5                    ; Menu_TextName's tiles
+!Menu_TextNameFlags = $8005              ; Menu_TextLeft/Flags meanwhile: 5 tiles, one row
+!Menu_BarTile = $2F                      ; Menu_TextNumberOrBar's tile at or above the limit
+!Menu_NumFlags2Digits = $11              ; Menu_DrawNumber flags: 1 byte, 2 digits, zeros blanked
+!Menu_NumBytesMask = $03                 ; Menu_DrawNumber flags bits 0-1: the byte count
+!Menu_NumShowZeros = $80                 ; flags bit 7: show leading zeros (Menu_NumFlags gets it inverted)
+!Menu_NumDigitsMask = $07                ; flags bits 4-6 (shifted down): digits - 1
+!Menu_NumBlankZeroOnes = $08             ; Menu_NumFlags bit 3: a zero ones digit stays blank
+!Menu_DigitTile0 = $D4                   ; tile of digit 0 (1-9 follow)
+!Menu_ClockMaxHours = 99                 ; Menu_DrawClock once the play time maxed out
+!Menu_ClockMaxMins = 59
+!Menu_ClockNumFlags = $91                ; 1 byte, 2 digits, leading zeros shown
+!Menu_AttrByteMask = $FF00               ; the attribute byte of a tile word
+!Menu_ClockColonTile = $002D             ; the tile between hours and minutes (probably a colon)
+!Menu_DescTextDest = $4E84               ; Menu_DrawDescText's settings
+!Menu_DescUnk0DCC = $6840
+!Menu_DescUnk0DD0 = $0080
+!Menu_MapRecMask = $00F0                 ; Menu_DrawCmdMapRec: record address bits ...
+!Menu_MapRecBase = $9000                 ; ... x 8 + this: the record's tilemap buffer
 
 endif

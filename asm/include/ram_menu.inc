@@ -473,7 +473,7 @@ struct Menu_VramRec $0000
 .Src:       skip 2     ; source address
 .SrcBank:   skip 1     ; its bank
 .Size:      skip 2     ; byte count
-            skip 1
+.Unk7:      skip 1     ; set to $7E by Menu_DrawCmdMapRec (use not traced)
 endstruct
 
 ; The inventory and the current character (Menu_AddItem ... Menu_LoadCharRec).
@@ -1050,7 +1050,8 @@ endstruct
                                          ; BankFF_CharBits; inferred from Menu_CanEquip)
 !Menu_ItemInfo4 = $7B00                  ; 242 B: record A byte 4 below category 3; for category 3 record
                                          ; B byte 2 when its byte 1 has bit 6, else 0; 0 from category 4
-!Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id (probably name offsets; not traced)
+!Menu_ItemNamePtrs = $7D00               ; 242 words $0B5E + 11 x id: bank-$CC addresses of 11-byte strings
+                                         ; (Menu_ItemNamePtr; probably the item names)
 !Menu_GoldCopy = $9D96                   ; 3 B: copy of Menu_Unk2C53 (Menu_BuildItemTables)
 
 ; --- Menu sprite objects (Menu_InitSprites ... Menu_SprUploadTiles) ---
@@ -1133,7 +1134,7 @@ endstruct
 !Menu_MainMoveDest = $9080               ; ... (use not traced)
 !Menu_OamArrowA = $0718                  ; OAM copy entries 6 and 7: the arrows at the selected icon
 !Menu_OamArrowB = $071C
-!Menu_MainClockTile = $3390              ; tilemap address Menu_UnkF28D draws the clock at
+!Menu_MainClockTile = $3390              ; tilemap address Menu_DrawClock draws the clock at
 
 ; --- Menu commands (Menu_RunCommand, DP = Menu_CmdDp) ---
 !Menu_CmdDp = $0400                      ; direct page of Menu_RunCommand and its handlers
@@ -1182,3 +1183,38 @@ endstruct
 !Menu_SramUnk0793 = $300793
 
 endif
+
+; --- Draw lists, windows, strings and numbers (Menu_RunDrawList ...) ---
+!Menu_DrawArg0 = $005B                   ; 16-bit; a draw command's argument bytes start here (Menu_RunDrawList
+!Menu_DrawArg1 = $005C                   ; copies them); Arg0/1: a style and attribute, a source position,
+!Menu_DrawArg2 = $005D                   ; a string id or an address; Arg2 (16-bit) usually a position
+                                         ; (column bits 0-4, row the high byte; Menu_DrawPosToAddr)
+!Menu_DrawArg4 = $005F                   ; 8-bit; a width (tiles) or a string's count and flags
+!Menu_DrawArg5 = $0060                   ; 8-bit; a height (rows)
+!Menu_DrawAddr = $0063                   ; 16-bit; Menu_DrawPosToAddr's tilemap address
+!Menu_DrawAddr2 = $0065                  ; 16-bit; a second address: copy destination, frame row, line start
+!Menu_TextWord = $007D                   ; 16-bit; Menu_DrawCmdFill's word; its high byte is ...
+!Menu_TextAttr = $007E                   ; 8-bit; ... the attribute byte strings and numbers are put with
+!Menu_TextLeft = $0087                   ; 8-bit; tiles a string may still put (Menu_DrawStringLoop)
+!Menu_TextFlags = $0088                  ; 8-bit; bit 7: one-row text (Menu_PutChar, Menu_TextNewLine)
+!Menu_DrawInnerW = $008A                 ; 16-bit; window inside width (or a copy's byte count - 1)
+!Menu_DrawInnerH = $008C                 ; 16-bit; window inside height (or rows to copy)
+!Menu_TextVec = $008A                    ; 16-bit; Menu_TextCtrl's JMP (abs) target
+!Menu_NumBcd = $008A                     ; 4 B; Menu_BinToBcd's BCD result (Menu_DrawHex: the raw bytes)
+!Menu_NumDigits = $008E                  ; 8-bit; digits to draw - 1
+!Menu_NumFlags = $008F                   ; 8-bit; bit 7: zeros still blanked; bit 3: blank a zero ones digit
+!Menu_NumPos = $0090                     ; 16-bit; tilemap address of the number
+!Menu_NumBytes = $0092                   ; 16-bit; bytes of the value Menu_BinToBcd converts
+!Menu_FrameRightOfs = $0006              ; 16-bit; Menu_DrawWindowFrame: the right edge's offset (w - 1) x 2
+!Menu_FillLeft = $0006                   ; 16-bit; Menu_FillWindowInside: tiles left in the row
+!Menu_FrameTile = $0008                  ; 16-bit; the next frame tile word (Menu_DrawWindowFrame ...)
+!Menu_FillPatRow = $000A                 ; 16-bit; Menu_FillWindowInside's pattern row offset (0, 4, 8, 12)
+!Menu_ClockHours = $0022                 ; 8-bit; Menu_DrawClock's hours ...
+!Menu_ClockMins = $0023                  ; 8-bit; ... and minutes
+!Menu_TextRowAbove = $7DFFC0             ; $7E:0000 - $40: long base one tilemap row above X (Menu_PutChar)
+!Menu_MapBank7E = $7E0000                ; long base of the tilemaps (bank $7E)
+!Menu_Unk0D77 = $0D77                    ; 8-bit; the string Menu_DrawDescText set up last
+!Menu_Unk0D78 = $0D78                    ; 8-bit; bit 7 set: Menu_DrawDescText sets up again (it zeroes it)
+!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText (use not traced)
+!Menu_Unk0DCC = $0DCC                    ; 16-bit; set to $6840 by Menu_DrawDescText (use not traced)
+!Menu_Unk0DD0 = $0DD0                    ; 16-bit; set to $0080 by Menu_DrawDescText; Menu_UnkFA49 reads it
