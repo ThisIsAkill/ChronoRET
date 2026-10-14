@@ -1229,3 +1229,15 @@ endif
 !Menu_SprTile = $0008                    ; 16-bit; tile offset of the next sprite
 !Menu_SprOam = $0800                     ; Oam_LowTable entry 64: the objects' 4 entries each
 !Menu_SprOamHigh = $0910                 ; Oam_HighTable byte of entries 64-67 (+ n for object n)
+
+; --- Main menu icon 0 and the member list (Menu_Icon0Preview ...) ---
+!Menu_Unk85 = $0085                      ; 8-bit; the member count Menu_DrawMemberRows stops at and
+                                         ; Menu_Icon0Preview's max top comes from (writer not traced)
+!Menu_MemberMaxTop = $0FC4               ; 8-bit; Menu_Unk85 - 3 (0 when below): the largest Menu_Unk0413
+!Menu_Unk5D42 = $5D42                    ; 12 tile words set to $61FF by Menu_Icon0Preview (and $5DC2)
+!Menu_Unk5DC2 = $5DC2
+!Menu_DimPalBuf = $9500                  ; colours 0-23 at half brightness (Menu_Icon0Preview's Menu_DimPalette)
+!Menu_Unk3600 = $3600                    ; $800 B zeroed by Menu_Mode01Init (tilemap; VRAM $5C00 probably)
+!Menu_Unk0D4D = $0D4D                    ; 16-bit; Menu_MemberRowFlags: character id OR $20
+!Menu_Unk0D5D = $0D5D                    ; 16-bit; Menu_MemberRowFlags: 4 or 0
+!Menu_CharIconMap = $2EEC                ; tilemap: Menu_DrawCharIcon's 6 x 2 tiles (and + $40)

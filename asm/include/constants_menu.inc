@@ -1104,4 +1104,33 @@ if !constants_menu_inc == 0
 !Menu_SprHiFirstBit = $01                ; the first sprite's X-high bit in its high-table byte
 !Menu_SprTileRowBit = $10                ; tile bit 4: set then cleared to step 16x16 tiles in a 16-wide sheet
 
+; --- Main menu icon 0 and the member list ---
+!MenuRom_Icon0List = $FFBD74             ; Menu_Icon0Preview's draw list
+!Menu_Icon0BlankTile = $61FF             ; tile word Menu_Icon0Preview fills its two rows with
+!Menu_Icon0RowBytes = 24                 ; ... 12 tiles each
+!Menu_Icon0HdmaBits = $64                ; Menu_HdmaenShadow on icon 0 (channels 2, 5, 6; not traced)
+!Menu_Mode01HdmaBits = $65               ; ... in mode 1 (and channel 0)
+!MenuRom_Icon0Pal = $FFCBAC              ; 4 colours -> $24-$27
+!MenuRom_Icon0RedrawPal = $FFCBC4        ; 8 colours -> $70-$77
+!MenuRom_Mode01Pal = $FF9C70             ; 4 colours -> $70-$73 and $74-$77
+!MenuRom_Mode01List = $FFBDCD            ; Menu_Mode01Init's draw list
+!Menu_HalfColourMask = $3DEF             ; a colour >> 1 without the bits shifted in from the next channel
+!Menu_Unk3600Bytes = $0800
+!Menu_MemberRowLines = 12                ; lines per member row (list arrows)
+!Menu_MemberArrowSpan = $7400            ; dividend of Menu_MemberArrows' arrow factors
+!Menu_MemberArrowXY = $1268              ; Menu_ArrowX $68, Menu_ArrowY $12
+!Menu_MemberMapFirst = $2E00             ; tilemap address of the first member row
+!Menu_MemberRowBytes = $0180             ; 6 tilemap rows per member
+!Menu_MemberMapEnd = $3280               ; past the third row
+!MenuRom_MemberRowList = $FFBE0E         ; draw list of a member row
+!MenuRom_EmptyRowList = $FFBE15          ; ... of an empty one
+!MenuRom_StatusList = $FFBE1C            ; Menu_DrawMemberStatus's draw list
+!Menu_Unk0D5DSet = $0004
+!Menu_Unk0D4DBit = $0020
+!Menu_StatusUnkMap = $30A2               ; X for Menu_UnkA6F0 (a tilemap address)
+!Menu_StatusPortraitAttr = $0E           ; the portrait's attribute byte (palette 3)
+!Menu_StatusPortraitMap = $2EDE          ; tilemap address of the portrait
+!MenuRom_CharIconTiles = $FFCE88         ; words by Menu_CharIconIndex: first tile word of the icon
+!MenuRom_CharIconPals = $FFCE92          ; words by Menu_CharIconIndex: bank-$FF address of 16 colours
+
 endif

@@ -39,8 +39,6 @@ MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the st
                     ; SRAM +$0603 byte is the last entry not above it
 org $FFF958
 BankFF_UnkF958:     ; JSL from Menu_Unk834D (not analysed)
-org $C2A051
-Menu_UnkA051:       ; Menu_MainPreviewTable entry 0 (icon 0's preview; not analysed)
 org $C2AD50
 Menu_UnkAD50:       ; Menu_MainPreviewTable entry 1 (not analysed)
 org $C2B8DA
@@ -51,8 +49,6 @@ org $C2C9E5
 Menu_UnkC9E5:       ; Menu_MainPreviewTable entry 4 (not analysed)
 org $C2D065
 Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
-org $C2A101
-Menu_UnkA101:       ; Menu_MainRedrawTable entry 0 (not analysed)
 org $C2ADC3
 Menu_UnkADC3:       ; Menu_MainRedrawTable entry 1 (not analysed)
 org $C2B960
@@ -66,6 +62,16 @@ Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
 org $C2FA49
 Menu_UnkFA49:       ; JSR from Menu_DrawDescText: clears a buffer row at Menu_TextDest, sets TextWin_*
                     ; and Menu_Unk0DC7-0DD7, then TextWin_Init (JSL BankC2_Entry0003) (not matched)
+org $C290FC
+Menu_Unk90FC:       ; JSR from Menu_Mode01Init (not analysed)
+org $C29121
+Menu_Unk9121:       ; JSR from Menu_Icon0Redraw (not analysed)
+org $C29E76
+Menu_Unk9E76:       ; JSR from Menu_Icon0Preview (mode 1 code; not matched)
+org $C2A6F0
+Menu_UnkA6F0:       ; JSR from Menu_DrawMemberStatus with X = a tilemap address (not analysed)
+org $C2FC3E
+Menu_VramRecBg3Rows60: ; Menu_VramRec in unmatched data: VRAM $6F80 (BG3 map row 60) = $7E:5D00, $100 bytes
 org $C2FBE3
 Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
                     ; Menu_MainMenuLoop after the clock is drawn)
