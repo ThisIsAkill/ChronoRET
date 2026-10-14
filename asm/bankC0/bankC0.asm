@@ -27596,8 +27596,8 @@ LocLoad_DrawMap:
 ; Field_HdmaEnable in A (the channel mask the NMI writes to HDMAEN;
 ; what the caller does with it is not traced).
 ; Callers (1 BRL site): ReentryVectors ($C0:0005).
-; Callers note: vector [2], reached by JSL $C0:0005 from $D1:F4E2
-;   (unmatched).
+; Callers note: vector [2], reached by JSL $C0:0005 from BattleFx_NmiAlt
+;   ($D1:F4E2), which writes the returned A to HDMAEN.
 ; On entry: M=1 (8-bit A), X any (it sets X=1, then X=0), DP any
 ;   (saved; set to DP_Field), DB any (saved; set to $00).
 ; Exit: M=1, X=0, DP and DB restored (RTL); A = Field_HdmaEnable; X =
@@ -28226,8 +28226,8 @@ org $C01BAB
 ;   Audio_SfxUnkFA ($45 at load: the battle music, probably); with it
 ;   set, Audio_Cmd70 with argument 1.
 ; Callers (1 BRL site): ReentryVectors ($C0:0008).
-; Callers note: vector [3], reached by JSL $C0:0008 from $D1:F405
-;   (unmatched).
+; Callers note: vector [3], reached by JSL $C0:0008 from BattleFx_Init
+;   ($D1:F405), the battle-effect set-up run at the start of a battle.
 ; On entry: M=1 (8-bit A: the PHA pushes one byte), X any (not used),
 ;   DP any (saved; set to DP_Field), DB any (saved; set to $00 from
 ;   DP_Field's low byte by PHA/PLB).

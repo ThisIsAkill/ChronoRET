@@ -66,3 +66,28 @@ BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-z
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
                                         ; after a tech, A = 3 or $0D; not analysed
+
+; --- Bank $CD/$CE routines called from bank $D1 (the battle-effect code; none analysed) ---
+; Direct JSL targets inside bank $CD/$CE rather than vectors; the names keep the
+; BattleSys_VecCDxxxx form of the stubs above.
+org $CD09CE
+BattleSys_VecCD09CE:                    ; JSL from BattleFx_NmiAlt: DMA of $200 bytes from $7E:2200 to CGRAM
+                                        ; (channel 7; absolute register stores, so DB must map I/O)
+org $CD0235
+BattleSys_VecCD0235:                    ; JSL from BattleFx_Init: zeroes eight $80-byte blocks from $7E:B480
+org $CD0C89
+BattleSys_VecCD0C89:                    ; JSL from BattleFx_Nmi / Init / NmiAlt: JSL $C0:0002 (ScrollStepAccum)
+                                        ; with DB, DP and P saved, then TDC
+org $CD0C95
+BattleSys_VecCD0C95:                    ; JSL from BattleFx_Nmi: the NMI work, JSR ($CD:0C83,X) by DP $7E
+org $CD0C9D
+BattleSys_VecCD0C9D:                    ; JSL from BattleFx_Init: copies FieldBtlPpu bytes to $7E:BC85-
+org $CD38B2
+BattleSys_VecCD38B2:                    ; JSL from BattleFx_RasterQuad: A = line; points WMADD at that line
+                                        ; of the window table picked by the frame and !BattleFx_QuadSlot
+org $CD3ECE
+BattleSys_VecCD3ECE:                    ; JSL from BattleFx_LoadBgSet: queues a VRAM upload (X = source,
+                                        ; A = its bank, Y = VRAM word address, DP $53 = bytes)
+org $CEEE6E
+BattleSys_VecCEEE6E:                    ; JSL from BattleFx_Init / ReloadLayerSet: A = set; copies records
+                                        ; from bank $CE to $7E:C867 and on

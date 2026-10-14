@@ -2150,4 +2150,192 @@ endstruct
                                   ; menu's Menu_CharRec.Word3, probably the current HP)
 !BattleRom_CharRecOffset  = $CCFC1E ; 2 B per character id 0-6: id * $50, the record's offset
 
+; ============================================================
+; Bank $D1's battle-effect code (BattleFx_*): the battle's second engine in bank $CD (not
+; matched) shares these. Read with DB=$7E unless a line says otherwise. Names that say Unk
+; are only zeroed or set by BattleFx_Init in bank $D1 and used by bank $CD (not traced).
+; ============================================================
+; --- Direct page (D = 0) ---
+!BattleFx_Slope02         = $03   ; 2 B DP: BattleFx_QuadSlopes: x step per line (8.8) from quad point 0 to 2
+!BattleFx_Slope23         = $05   ; 2 B DP: ... from point 2 to 3
+!BattleFx_Slope01         = $07   ; 2 B DP: ... from point 0 to 1
+!BattleFx_Slope13         = $09   ; 2 B DP: ... from point 1 to 3
+!BattleFx_SlopeXTo        = $0B   ; 1 B DP: BattleFx_EdgeSlope's end x
+!BattleFx_SlopeXFrom      = $0C   ; 1 B DP: its start x
+!BattleFx_SlopeDy         = $0D   ; 1 B DP: its line count (the divisor)
+!BattleFx_QuadTop         = $0F   ; 1 B DP: the quad's top line (y of point 0 after the sort)
+!BattleFx_QuadX0          = $12   ; 1 B DP: BattleFx_DrawQuad's points, x then y (BattleFx_SortQuadByY swaps
+!BattleFx_QuadY0          = $13   ;   whole 2-byte points)
+!BattleFx_QuadX1          = $14   ;
+!BattleFx_QuadY1          = $15   ;
+!BattleFx_QuadX2          = $16   ;
+!BattleFx_QuadY2          = $17   ;
+!BattleFx_QuadX3          = $18   ;
+!BattleFx_QuadY3          = $19   ;
+!BattleFx_ArgPtr          = $40   ; 3 B DP: long pointer to the bank-$CD command's argument bytes ([$40]); the
+                                  ; BattleFx_* helpers read them through it (inferred from the reads)
+!BattleFx_RecOfs          = $43   ; 2 B DP: offset of the record BattleFx_RandomShake and BattleFx_StepBounce use
+                                  ; (bank $CD sets it; values not traced)
+!BattleFx_Tmp45           = $45   ; 1-2 B DP scratch (also read long as $00:0045 by BattleFx_NmiAlt for INIDISP)
+!BattleFx_Tmp46           = $46   ; 1 B DP scratch
+!BattleFx_Tmp47           = $47   ; 1-2 B DP scratch
+!BattleFx_Tmp49           = $49   ; 1 B DP scratch
+!BattleFx_Tmp4A           = $4A   ; 1 B DP scratch
+!BattleFx_Tmp4B           = $4B   ; 1 B DP scratch (the wave windows' first radius)
+!BattleFx_Tmp4D           = $4D   ; 1 B DP scratch (the wave windows' second radius)
+!BattleFx_Tmp4F           = $4F   ; 2 B DP scratch (the wave windows' first offset)
+!BattleFx_Tmp51           = $51   ; 2 B DP scratch (the wave windows' second offset)
+!BattleFx_Tmp53           = $53   ; 2 B DP scratch (BattleFx_Init's run counter)
+!BattleFx_Tmp55           = $55   ; 2 B DP scratch (BattleFx_Init's entry value)
+!BattleFx_Tmp5B           = $5B   ; 1 B DP scratch
+!BattleFx_UploadBytes     = $53   ; 2 B DP: byte count BattleSys_VecCD3ECE takes (inferred from BattleFx_LoadBgSet)
+!BattleFx_GradStepA       = $53   ; 2 B DP: BattleFx_BuildGradHdma's falling value (high byte used)
+!BattleFx_GradStepB       = $55   ; 2 B DP: its rising value (high byte used)
+!BattleFx_FrameCount      = $7C   ; 2 B DP: frames counted by BattleFx_Nmi while not paused; bit 0 picks the window
+                                  ; table written this frame (!BattleFx_WinTable1 when set) and the IRQ's job
+!BattleFx_NmiMode         = $7E   ; 1 B DP: picks bank $CD's NMI work ($CD:0C83 table: 0 = $CD:09F1, 1 and 2 =
+                                  ; $CD:088D); BattleFx_Nmi reads Start only in mode 1
+!BattleFx_IntBusy         = $7F   ; 1 B DP: non-zero while BattleFx_Nmi's work or BattleFx_Irq runs; BattleFx_Nmi
+                                  ; does nothing while it is set
+!BattleFx_LineAddA        = $00   ; DP offset with D = $0A00 (BattleFx_AddLineOffsets): 64 bytes added to the first
+                                  ; pairs, one per line ($7E:0A00)
+!BattleFx_LineAddB0       = $20   ; DP offset with D = $0A00: 64 bytes added to the second pairs of window table 0
+!BattleFx_LineAddB1       = $40   ; DP offset with D = $0A00: the same for window table 1
+; --- WRAM ---
+!Battle_Unk2A21           = $2A21 ; 1 B: the field's byte two after FieldBtl_EvtFlags; bit 0 sets !BattleFx_UnkCD46
+                                  ; to $FD, bit 1 keeps the sprite palette animations and flips one in
+                                  ; BattleFx_SwapObjPalettes (who sets it is not traced)
+!Battle_PpuScroll2        = $2C70 ; 12 B: FieldBtlPpu.Scroll2 read .w with DB=$7E: BG1-BG3 x/y scroll words that
+                                  ; BattleFx_NmiAlt writes to BG1HOFS-BG3VOFS
+!BattleFx_UnkBB01         = $BB01 ; 2 B: zeroed by BattleFx_Init
+!BattleFx_UnkBB03         = $BB03 ; 2 B: zeroed by BattleFx_Init
+!BattleFx_UnkBB05         = $BB05 ; $180 B: zeroed by BattleFx_Init
+!BattleFx_UnkBE89         = $BE89 ; 2 B: copied to !BattleFx_UnkBE8D by BattleFx_Nmi
+!BattleFx_UnkBE8B         = $BE8B ; 2 B: copied to !BattleFx_UnkBE8F by BattleFx_Nmi
+!BattleFx_UnkBE8D         = $BE8D ; 2 B: see !BattleFx_UnkBE89
+!BattleFx_UnkBE8F         = $BE8F ; 2 B: see !BattleFx_UnkBE8B
+!BattleFx_UnkBE91         = $BE91 ; 2 B: copied to !BattleFx_UnkBE95 by BattleFx_Nmi
+!BattleFx_UnkBE93         = $BE93 ; 2 B: copied to !BattleFx_UnkBE97 by BattleFx_Nmi
+!BattleFx_UnkBE95         = $BE95 ; 2 B: see !BattleFx_UnkBE91
+!BattleFx_UnkBE97         = $BE97 ; 2 B: see !BattleFx_UnkBE93
+!BattleFx_UnkBE9B         = $BE9B ; 16 B: eight words BattleFx_Init sets ($7878, $7878, 0, $77, 0, $FFDF, 0, $77)
+!BattleFx_UnkBEAB         = $BEAB ; $C0 B: 48 entries of 4 B (word 0, word $FFFC/0/4/8) built by BattleFx_Init
+!BattleFx_UnkBF6B         = $BF6B ; $C0 B: the same entries with the second word less $98
+!BattleFx_UnkC02B         = $C02B ; 4 B: two words set to $0505 by BattleFx_Init
+!BattleFx_GradHdmaA       = $C030 ; $60 B: 24 entries of 4 B built by BattleFx_BuildGradHdma (1, falling value);
+                                  ; the clear starts one byte before it
+!BattleFx_GradHdmaB       = $C090 ; $60 B: 24 entries ($81, rising value)
+!BattleFx_GradHdmaC       = $C0F0 ; $30 B: 12 entries (1, falling value)
+!BattleFx_GradHdmaD       = $C120 ; $30 B: 12 entries ($81, rising value)
+!BattleFx_WinTable0       = $C161 ; $380 B: window table 0, 4 B per line 0-223: left and right edge of the first
+                                  ; window, then of the second (the "pairs"); the bytes just before it (from
+                                  ; $C14F) are set by BattleFx_Init and reached by some writers (line -1)
+!BattleFx_WinTable1       = $C4E1 ; $380 B: window table 1, the same layout (BattleSys_VecCD38B2's base table at
+                                  ; $CD:38AA gives these two bases and +2 for the second pair)
+!BattleFx_UnkC861         = $C861 ; 2 B: zeroed by BattleFx_Init
+!BattleFx_UnkC863         = $C863 ; 3 B: zeroed by BattleFx_Init
+!BattleFx_UnkCA02         = $CA02 ; 20 B: five pairs of words; BattleFx_Init zeroes the first of each and sets
+                                  ; the second ($FF27, $D7, $D7, $0D, $BD)
+!BattleFx_UnkCA16         = $CA16 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCA17         = $CA17 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCA1D         = $CA1D ; 1 B: set to $FF by BattleFx_Init
+!BattleFx_UnkCA1E         = $CA1E ; 1 B: zeroed by BattleFx_Init
+!BattleFx_FrameWait       = $CA20 ; 1 B: zeroed by BattleFx_Nmi after its work; $CD:3E58 counts it up and waits for 0
+!BattleFx_CeSetWant       = $CA21 ; 1 B: set wanted by BattleFx_ReloadCeSet (!Battle_UnkEC bit 0 at set-up)
+!BattleFx_CeSet           = $CA22 ; 1 B: set BattleFx_ReloadCeSet last loaded
+!BattleFx_UnkCA23         = $CA23 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_CeSetReload     = $CA24 ; 1 B: non-zero = BattleFx_ReloadCeSet reloads the set; 1 at set-up, counted up
+                                  ; when BattleFx_Nmi's timer ends
+!BattleFx_CeSetBase       = $CA25 ; 1 B: added to the set by BattleFx_ReloadCeSet; 8 at set-up
+!BattleFx_UnkCA26         = $CA26 ; 1 B: zeroed by BattleFx_Init ($CD:3EDB waits for it to be 0)
+!BattleFx_UnkCA32         = $CA32 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_BounceDir       = $CA52 ; 2 B per record (X = !BattleFx_RecOfs): 0 = rising, else falling
+!BattleFx_BounceBase      = $CA54 ; 2 B per record: the rest position
+!BattleFx_ShakeX          = $CA5A ; 2 B per record: -(random x) of BattleFx_RandomShake
+!BattleFx_ShakeY          = $CA5C ; 2 B per record: -(random y)
+!BattleFx_UnkCA5E         = $CA5E ; 2 B: added to !BattleFx_ShakeX for the wave windows' first offset
+!BattleFx_BounceOut       = $CA60 ; 2 B per record: base +/- position, from BattleFx_StepBounce
+!BattleFx_BounceSpeed     = $CA7A ; 2 B per record
+!BattleFx_BounceAccel     = $CA7C ; 2 B per record
+!BattleFx_BouncePos       = $CA7E ; 4 B per record: 32-bit position, the high word used
+!BattleFx_UnkCA92         = $CA92 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCAD3         = $CAD3 ; 1 B: zeroed and then counted up by BattleFx_Init (set-up done, probably)
+!BattleFx_CalcCopy        = $CAEA ; 12 B: two interleaved copies of !Battle_ActCalcResult (BattleFx_SaveCalcPoints)
+!BattleFx_QuadSlot        = $CC64 ; 1 B: the quad BattleFx_DrawQuad draws; bit 0 = the second pair of each line
+!BattleFx_NmiDpSave       = $CC65 ; 43 B: DP $00-$2A saved over BattleFx_Nmi's work
+!BattleFx_UnkCCA1         = $CCA1 ; 1 B: !Battle_UnkEC bit 0 at set-up
+!BattleFx_UnkCCA4         = $CCA4 ; 12 B: six words zeroed by BattleFx_Init
+!BattleFx_Op80Regs        = $CCB0 ; $26 B: settings written by battle-script opcode $80 (BattleFx_Op80*): two
+                                  ; 8-byte groups at +0/+8, +$10, and two 12-byte groups at +$11/+$1D
+!BattleFx_Op80Count       = $CCE5 ; 1 B: counted up by BattleFx_Op80Kind0; zeroed at set-up
+!BattleFx_UnkCCEA         = $CCEA ; 1 B: zeroed by BattleFx_Init
+!BattleFx_TimerFrames     = $CCEB ; 1 B: frames left of BattleFx_Nmi's timer ($CD:04F6 sets it)
+!BattleFx_UnkCCEC         = $CCEC ; 1 B: added to the set by BattleFx_ReloadCeSet; zeroed when the timer ends
+!BattleFx_TimerOn         = $CCED ; 1 B: non-zero = BattleFx_Nmi runs the timer ($CD:04F9 counts it up)
+!BattleFx_UnkCCEE         = $CCEE ; 16 B: colours 8-15 of saved background row 1, copied at set-up
+!BattleFx_Paused          = $CD02 ; 1 B: non-zero = BattleFx_Nmi skips the frame count, the layer drift and the
+                                  ; timer, and BattleFx_Irq the tile animations (the pause; Start flips it)
+!BattleFx_StartLatch      = $CD03 ; 1 B: non-zero while the Start press that flipped the pause is held
+!BattleFx_UnkCD05         = $CD05 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCD06         = $CD06 ; 1 B: set to $FF by BattleFx_Init
+!BattleFx_UnkCD07         = $CD07 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCD0A         = $CD0A ; 2 B: zeroed by BattleFx_Init
+!BattleFx_UnkCD0C         = $CD0C ; 1 B: zeroed by BattleFx_Init
+!BattleFx_Quads           = $CD0D ; 16 B: two interleaved quads: byte k*2 + n is coordinate k (x0, y0, x1, y1, x2,
+                                  ; y2, x3, y3) of quad n (BattleFx_DrawQuad)
+!BattleFx_UnkCD1D         = $CD1D ; 2 B: zeroed by BattleFx_Init; when set as the timer ends, !BattleFx_UnkCE17 = $FF
+!BattleFx_UnkCD23         = $CD23 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_Unk2989Copy     = $CD27 ; 1 B: !Battle_Unk2989 at set-up; bit 5 (!Battle_2989NoPause) blocks the pause
+!BattleFx_UnkCD29         = $CD29 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCD2D         = $CD2D ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCD2E         = $CD2E ; 1 B: zeroed by BattleFx_Init
+!BattleFx_SavedKinds      = $CD2F ; 8 B: FieldAnimB .Unk0 of records 0-7, put back by BattleFx_HoldAnimsTick
+!BattleFx_BoxHalfHeight   = $CD38 ; 1 B: BattleFx_GrowBox's half height (lines)
+!BattleFx_BoxInset        = $CD39 ; 1 B: BattleFx_GrowBox's left edge (and 255 - it the right)
+!BattleFx_CountA          = $CD3A ; 1 B: a counter several window helpers grow (GrowBand's half width, RampWin2,
+                                  ; the wave windows' radius loss)
+!BattleFx_CountB          = $CD3B ; 1 B: another (GrowBand's half height, BattleFx_WaveWindowB's angle)
+!BattleFx_UnkCD3C         = $CD3C ; 1 B: zeroed by BattleFx_Init
+!BattleFx_BgPackIdx       = $CD3D ; 2 B: BattleFx_LoadBgSet's index into BattleFx_BgSetPacks
+!BattleFx_BgPackVram      = $CD3F ; 2 B: its VRAM word address for the next pack
+!BattleFx_BgPackCount     = $CD41 ; 1 B: its pack count (0-4)
+!BattleFx_BgSet           = $CD42 ; 1 B: the set it loads
+!BattleFx_BgLoading       = $CD43 ; 1 B: non-zero while it runs ($CD:04CC does not start another then)
+!BattleFx_BgRequest       = $CD44 ; 2 B: non-zero = $CD:04C7 loads set $CD45 (byte 2); zeroed at set-up
+!BattleFx_UnkCD46         = $CD46 ; 1 B: $FF at set-up, $FD with !Battle_Unk2A21 bit 0
+!BattleFx_UnkCDC7         = $CDC7 ; 2 B: zeroed by BattleFx_Init
+!BattleFx_UnkCDC8         = $CDC8 ; 1 B: zeroed by BattleFx_MoveBgRowsUp, counted up by BattleFx_LoadBgRows2To4
+!BattleFx_GradStart       = $CDC9 ; 1 B: BattleFx_FindGradStart's result: rotation index of the gradient tables
+!BattleFx_GradColours     = $CDCC ; 56 B: the gradient's 14 colours as shown, then a copy of them
+!BattleFx_GradFading      = $CE0A ; 1 B: non-zero while BattleFx_HpGradientTick fades
+!BattleFx_GradLevel       = $CE0B ; 1 B: the level the fade goes to (1-8)
+!BattleFx_GradShown       = $CE0C ; 1 B: the level shown; 8 at set-up
+!BattleFx_GradSteps       = $CE0D ; 1 B: fade steps left
+!BattleFx_GradForce       = $CE0E ; 1 B: bit 7 set = the level is bits 0-6 instead of the HP's (set in bank $CD)
+!BattleFx_UnkCE0F         = $CE0F ; 1 B: counted up by BattleFx_LoadBgRows2To4; $CD:3EF8 tests it
+!BattleFx_GradRotRaw      = $CE10 ; 1 B: non-zero = rows rotate by the table value, 0 = by 14 minus it
+!BattleFx_UnkCE11         = $CE11 ; 1 B: zeroed by BattleFx_Init ($CD:3ED2 counts it up)
+!BattleFx_AnimsHeld       = $CE12 ; 1 B: non-zero = !BattleFx_SavedKinds is to be put back when
+                                  ; !BattleFx_HoldAnims is clear (BattleFx_HoldAnimsTick)
+!BattleFx_GradTickMask    = $CE13 ; 1 B: bank $CD runs BattleFx_HpGradientTick when frame count & it = 0; 7 at set-up
+!BattleFx_UnkCE15         = $CE15 ; 1 B: zeroed by BattleFx_Init
+!BattleFx_UnkCE16         = $CE16 ; 1 B: non-zero blocks the pause; $FF at set-up
+!BattleFx_UnkCE17         = $CE17 ; 1 B: $FF at set-up; set to $FF when the timer ends with !BattleFx_UnkCD1D set
+!BattleFx_SlowCount       = $CE19 ; 2 B: frames counted by the debug slow motion (BattleFx_Nmi); zeroed at set-up
+!BattleFx_HoldAnims       = $CFFF ; 1 B: non-zero = BattleFx_HoldAnimsTick holds the palette animations
+!BattleFx_WaveBaseX       = $E500 ; 2 B per step of 8: words BattleFx_WaveWindowA adds the wave to (filled in bank
+                                  ; $CD, probably; not traced)
+; --- ROM ---
+!BattleRom_DebugSlowMo    = $CD3FFF ; 1 B: non-zero enables BattleFx_Nmi's debug slow motion; 0 in this ROM
+!BattleRom_Op80RegsA      = $CEF0E6 ; 8 B per kind 0-3 (16 apart): copied to !BattleFx_Op80Regs+$12
+!BattleRom_Op80RegsB      = $CEF0EE ; 8 B per kind 0-3 (16 apart): copied to !BattleFx_Op80Regs+$1E
+!BattleRom_Op80PairA      = $CEF126 ; 4 B per value 0-7: two byte pairs (BattleFx_Op80Kind0)
+!BattleRom_Op80PairB      = $CEF146 ; 2 B per value 0-7 (BattleFx_Op80Kind0)
+!BattleRom_AbsSine        = $CEF48E ; 256 B: entry n is about 255 x |sin(n x 180 / 128 degrees)| (0 at 0 and $80,
+                                    ; $FF around $40 and $C0; checked against the ROM)
+!BattleRom_BgMapPtrs      = $D0E000 ; 3 B per background set: long pointer to its packed map
+!BattleRom_BgSetPalettes  = $D0FA00 ; background sets' palette rows (BattleFx_BgSetPalOfs gives the offsets)
+!BattleRom_GradColours    = $D0FBE2 ; 9 sets of 14 colours, $20 apart (BattleFx_GradLevelOfs)
+!BattleRom_BgRows2To4     = $D0FD00 ; 48 colours BattleFx_LoadBgRows2To4 loads into background rows 2-4
+
 endif

@@ -10656,7 +10656,7 @@ FdVec_FFF4:
 ; animation records at $0520 (Field_EndOfFrame calls it every frame).
 ; Callers (10 JSL sites): Field_EndOfFrame ($C0:00CD), Field_EndOfFrameShort ($C0:00E6),
 ;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793),
-;   Evt_OpFF_Misc ($C0:3FC6) and unmatched ($CD:09BF, $CD:0AD6, $D1:F54D).
+;   Evt_OpFF_Misc ($C0:3FC6), BattleFx_NmiAlt ($D1:F54D) and unmatched ($CD:09BF, $CD:0AD6).
 ; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
 ;        banks $CD and $D1 not traced); PalAnim_TickAll needs X=0 and a
 ;        DP whose low byte is 0 (it becomes DB, and DB=$00 is needed)
@@ -10674,7 +10674,7 @@ FdVec_FFFA:
 
 ; $FD:FFFD — FdVec_FFFD (3 bytes, $FFFD–$FFFF)
 ; JMP to FieldFD_UploadTileAnims (from the field's IRQ).
-; Callers (2 JSL sites): IrqHandler ($C0:ED08) and unmatched ($D1:FEDA).
+; Callers (2 JSL sites): IrqHandler ($C0:ED08) and BattleFx_Irq ($D1:FEDA).
 ; Entry: as FieldFD_UploadTileAnims: M=1, X=0, DP any, DB any
 ; Exit:  as FieldFD_UploadTileAnims
 FdVec_FFFD:

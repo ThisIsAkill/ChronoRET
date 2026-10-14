@@ -875,6 +875,35 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Menu_InitNewGameData, Menu_BuildItemTables, Menu_LoadSlotSummaries (the slot-layout note above
    it).
 
+10. Bank $D1 code (branch match-d1-battle; new file `asm/bankD1/bankD1.asm`): `$D1:E70A`-`$D1:FFFF`
+   is matched (the code `$E70A`-`$FEF3` with its tables, and the `$FF` fill `BankD1_EndFill`).
+   It is code that works with the battle code in bank $CD (`BattleFx_*`): the battle's NMI and
+   IRQ handlers `BattleFx_Nmi` / `BattleFx_Irq` (pause on Start, the frame count, a debug slow
+   motion gated by `$CD:3FFF`, 0 in this ROM; `BattleFx_RestoreMathRegs`), the second NMI
+   handler `BattleFx_NmiAlt` (installed by `$CD:041E`), the set-up `BattleFx_Init` (vector
+   `$CD:0000`), palette moves (`BattleFx_SwapObjPalettes`, `WhitenRows`, `MoveBgRowsUp`,
+   `LoadBgRows2To4`, `HoldAnimsTick`), the gradient that follows battler 3's HP
+   (`BattleFx_HpGradientTick`), background set loads (`BattleFx_LoadBgSet`), the window-table
+   shapes (bands, boxes, waves, fills, copies, and the quad rasteriser `BattleFx_DrawQuad` /
+   `RasterQuad`), random shakes and bounces, and opcode $80's settings (`BattleFx_Op80*`).
+   New RAM names (`!BattleFx_*`, many `Unk` ones only zeroed or set by `BattleFx_Init`) are in
+   one block at the end of `ram_battle.inc`; constants likewise in `constants_battle.inc`; the
+   bank-$CD/$CE targets have label-only stubs in their own block of `unmatched_battle.asm`
+   (`BattleSys_VecCD0235`, `VecCD09CE`, `VecCD0C89`, `VecCD0C95`, `VecCD0C9D`, `VecCD38B2`,
+   `VecCD3ECE`, `VecCEEE6E`). Almost every caller is unmatched bank-$CD code, mostly one-line
+   command handlers (JSL, RTS), so entry states are read from the routines and hedged (B = 0 is
+   assumed where a TAX takes it in). Quirks recorded: the carry chaining (no CLC) in
+   `BattleFx_AddLineOffsets` and `BattleFx_RandomByte`; the second store of 9 in `BattleFx_Init`;
+   the dead `LDA` in `BattleFx_GrowBox`; `BattleFx_EdgeSlope` not checking a zero line count.
+   Open: what bank $CD's commands and NMI work do with all this (the HDMA set-up that reads the
+   window tables and `!BattleFx_GradHdmaA-D`, the `!BattleFx_Op80Regs` groups, the
+   `BattleSys_VecCEEE6E` sets); the meaning of the `!BattleFx_Unk*` bytes, `!Battle_Unk2A21` (who
+   sets it), `$7E:E500` and `$7E:0A00` (who fills them), and the tables `BattleFx_UnkTableEC5F`
+   and `BattleFx_UnkTableEE99` (read by bank $CD only). When bank $CD is matched, its callers'
+   entry states can replace the hedges here, and the stubs above go. `$D1:0000`-`$D1:E709` is
+   data, still ROM bytes. Headers edited (back to review): Field_RefreshHdmaLong and
+   MusicCueDispatch (their Callers notes now name `BattleFx_NmiAlt` / `BattleFx_Init`).
+
 ## Tables
 
 `make tables-scan BANK=C0` (or `C1`, `CC`) lists these with more; `tools/tables.py emit` drafts
