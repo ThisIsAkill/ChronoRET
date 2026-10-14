@@ -1369,11 +1369,31 @@ if !constants_battle_inc == 0
 ; ------------------------------------------------------------
 ; Bank $CD: the helpers $CD:3B5F-$CD:3FFF and the script opcodes ($CD:16B5 on)
 ; ------------------------------------------------------------
-!BattleCD_QuarterTurn     = $40   ; a quarter turn (256 per turn): cos(a) = sin(a + this)
 !BattleCD_Div16Bits       = $0010 ; quotient bits of BattleCD_Div16 (one pass each)
 !BattleCD_ApuCmdPause     = $F5   ; APU command of BattleCD_PauseWait (sent as it is; argument $F5 on pausing, 0 on
                                   ; resuming: the music's pause, probably)
 !BattleCD_DmaPieceLarge   = $1000 ; BattleCD_QueueVramDma's piece while !Battle_CgramPending is set
 !BattleCD_DmaPieceSmall   = $0400 ; ... and otherwise
+!BattleCD_ScrollWavesBg3Mode = 3   ; !Battle_LayerFxMode of layer 3's wave scroll (BattleCD_ScrollModeTable entry 3)
+!BattleCD_FxWaveKeep      = $FF   ; script opcode $E7's operand that keeps !Battle_FxWaveOfs
+!BattleCD_HighNibble      = $F0   ; a byte's high nibble
+!BattleCD_LowNibble       = $0F   ; a byte's low nibble
+!BattleCD_FxVarMask       = $7F   ; script opcode $D8's variable number (bit 7 = clear it)
+!BattleCD_FxDriftPick     = $0B   ; script opcode $D7: operand bits that pick the work bytes
+!BattleCD_FxDriftAdd      = $40   ; ... operand bit 6: add (else subtract)
+!BattleCD_FxDriftMask     = $1F   ; ... the random steps' range (0-31)
+!BattleCD_FxDivMax        = $FF   ; both bytes of the dividend $FFFF (script opcode $CD)
+!BattleCD_ScreenXMin      = 8     ; BattleCD_ClampX's range
+!BattleCD_ScreenXMax      = $F8
+!BattleCD_ScreenYMin      = 8     ; BattleCD_ClampY's range
+!BattleCD_ScreenYMax      = $D4
+!BattleCD_99D2Mask        = $7F   ; !Battle_Unk99D2 without bit 7 (script opcode $CB)
+!BattleCD_PaletteFlip     = $08   ; !Battler_Palette bit 3 (script opcode $C9 flips it)
+!BattleCD_FxEnemyLine     = $6F   ; the line script opcodes $C7/$C8 measure the first enemy's y from
+!BattleCD_FxWobbleAmpXY   = $20   ; script opcode $C6's swing of the x and y angles
+!BattleCD_FxWobbleAmpZ    = $24   ; ... of the z angle
+!BattleCD_FxCircleX       = $80   ; the centre of script opcode $C4's circles
+!BattleCD_FxCircleY       = $87
+!BattleCD_FxModel2        = $20   ; !BattleCD_FxModelOfs of model 2 (script opcode $BE)
 
 endif

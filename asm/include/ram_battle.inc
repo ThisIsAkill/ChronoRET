@@ -754,8 +754,8 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjFollow     = $A437 ; 1 B per object thread: what the object follows ($CF:ECC2 copies its position each
                                  ; frame): a battler slot, or !Battle_ActFollowObj + object thread; $FF = nothing
                                  ; (set by BattleAct_ResetState)
-!Battle_ActUnkCFFF       = $CFFF ; 1 B: set to 1 by opcode $2D, to 0 by opcode $2E; also written at $CD:18C4
-                                 ; (unmatched); purpose unknown
+!Battle_ActUnkCFFF       = $CFFF ; 1 B: set to 1 by opcode $2D, to 0 by opcode $2E; also set by layer-effect script
+                                 ; opcode $E6 (BattleCD_FxOpSetCFFF); purpose unknown
 !Battler_UnkA4A4         = $A4A4 ; 1 B per battler slot: zeroed by opcode $2B; used by the movers in bank $CF ($CF:F21D and
                                  ; others); purpose unknown
 !Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; stepped by opcodes $C4/$C5); the arc
@@ -2269,7 +2269,7 @@ endstruct
 !Battle_FxScrollAddY      = $CA60 ; 2 B: added to !Battle_FxScrollY
 !Battle_UnkCD38           = $CD38 ; 2 B: zeroed by BattleCD_LoadLayerFx; use not traced
 !Battle_UnkCD3A           = $CD3A ; 2 B: the same
-!Battle_UnkCD28           = $CD28 ; 1 B: zeroed by BattleCD_LoadLayerFx; use not traced
+!Battle_UnkCD28           = $CD28 ; 1 B: zeroed by BattleCD_LoadLayerFx; the growing radius of script opcode $C4
 !Battle_UnkCD3C           = $CD3C ; 1 B: the same
 !Battle_UnkCD04           = $CD04 ; 1 B: set to !BattleCD_CD04Init by BattleCD_LoadLayerFx; use not traced
 !Battle_FxRecord          = $C9FC ; 6 B: the effect's !BattleRom_FxRecords entry: byte 0 the block count (bits 0-5;
@@ -2364,9 +2364,9 @@ endstruct
 !Battle_UnkCA23           = $CA23 ; 1 B: set while the toggle button stays held (one toggle per press)
 !Battle_UnkCD27           = $CD27 ; 1 B: bit 5 set = the toggle button is ignored; writer not traced
 !Battle_UnkCE13           = $CE13 ; 1 B: frame mask: BattleD1_UnkEA4B runs on frames where it ANDs the count to 0
-!Battle_UnkCD2D           = $CD2D ; 1 B: non-zero skips BattleCE_UnkF066 in the NMI; writer not traced
-!Battle_UnkCD2E           = $CD2E ; 1 B: non-zero skips the BattleCD_WaitScanline call in the NMI; writer not traced
-!Battle_UnkCD29           = $CD29 ; 1 B: copied to !Battle_UnkA028 every frame by BattleCD_NmiMain
+!Battle_UnkCD2D           = $CD2D ; 1 B: non-zero skips BattleCE_UnkF066 in the NMI; set by script opcode $E0
+!Battle_UnkCD2E           = $CD2E ; 1 B: non-zero skips the BattleCD_WaitScanline call in the NMI; set by script opcode $E2
+!Battle_UnkCD29           = $CD29 ; 1 B: copied to !Battle_UnkA028 every frame by BattleCD_NmiMain; set by script opcode $DE
 !Battle_UnkCAD3           = $CAD3 ; 1 B: non-zero = BattleCD_NmiSetup runs BankC1_VecCCE000; writer not traced
 !Battle_UnkCD43           = $CD43 ; 1 B: non-zero holds the BattleD1_UnkECF3 call of BattleCD_FrameTick
 !Battle_UnkCD44           = $CD44 ; 1 B: non-zero = BattleCD_FrameTick calls BattleD1_UnkECF3 once (then cleared)
@@ -2443,5 +2443,65 @@ endstruct
 !BattleCD_RotAngleY       = $4B   ; 1 B DP: ... about the y axis (applied first)
 !BattleCD_RotAngleZ       = $4D   ; 1 B DP: ... about the z axis (applied last)
 !BattleRom_SinAbsTable    = $CEF48E ; 256 B: |sin| per angle (256 per turn), 0-255 for 0-1; index bit 7 = the negative half
+!Battle_WramAbs           = $0000 ; base 0 of bank $7E for "STA abs,X" (DB=$7E) where X is the full address
+!Battle_UnkCE10           = $CE10 ; 1 B: script opcode $F6 waits until it is non-zero, then clears it; writer not traced
+!Battle_UnkCD46           = $CD46 ; 1 B: set by script opcode $F5; reader not traced
+!Battle_FxValues          = $CAA4 ; 1 B per index (operand): values the script opcodes set, step and test (from
+                                  ; opcode $F0 on)
+!Battle_FxWaveOfs         = $CD37 ; 1 B: the offset script opcode $E7 builds layer 3's wave lines from
+!Battle_FxTriX0           = $CAEA ; 1 B per object 0-1 (2 B apart, X = the object): its triangle's first point x
+!Battle_FxTriY0           = $CAEC ; ... first point y
+!Battle_FxTriX1           = $CAEE ; ... second point x
+!Battle_FxTriY1           = $CAF0 ; ... second point y
+!Battle_FxTriX2           = $CAF2 ; ... third point x
+!Battle_FxTriY2           = $CAF4 ; ... third point y
+!Battle_WaveOffsets2      = $0A80 ; entries 32-63 of !Battle_WaveOffsets (script opcode $E7 fills them with the negated
+                                  ; offset)
+!Battle_ActVar09          = $5D89 ; 1 B: variable $09 of !Battle_ActVars (the script opcodes that read it by number)
+!Battle_ActVar0A          = $5D8A ; 1 B: variable $0A
+!Battle_ActVar0C          = $5D8C ; 1 B: variable $0C
+!Battle_ActVar0E          = $5D8E ; 1 B: variable $0E
+!Battle_ActVar0F          = $5D8F ; 1 B: variable $0F
+!Battle_FxAngle           = $CD08 ; 1 B: the angle BattleCD_CalcAngle got from two points (BattleCE_UnkE7CF's DP $45)
+!Battle_FxTriObject       = $CC64 ; 1 B: the object (0-1) BattleCD_FillTriangle fills for (set by the triangle opcodes)
+!Battle_FxChanWork        = $CA7A ; 8 B per script channel (X = the channel's offset, 16 apart): work bytes of the
+                                  ; opcodes: $D7's six random steps (0-5), $C4/$C5's three angles (5-7), $CD's words
+!Battle_FxChanUnk52       = $CA52 ; 2 B per channel: zeroed by script opcode $CD; reader not traced
+!Battle_FxChanUnk54       = $CA54 ; 2 B per channel: set to the channel's !Battle_FxScrollAddY by opcode $CD; reader
+                                  ; not traced
+!Battle_FxObjUnkD1        = $CAD1 ; 1 B per object 0-1: set by script opcode $BD; reader not traced
+!Battle_FxObjCentreX      = $CAD4 ; 1 B per object 0-1 (2 B apart, X = the object): the screen x its model is drawn
+                                  ; around (and its triangle scaled towards)
+!Battle_FxObjCentreY      = $CAD6 ; ... the screen y
+!Battle_FxObjDepth        = $CAD8 ; ... added to the model's z before the rotation
+!Battle_FxObjUnkDA        = $CADA ; ... stepped by script opcode $C2 under a limit; reader not traced
+!Battle_FxObjUnkDC        = $CADC ; ... the same
+!Battle_FxObjUnkDE        = $CADE ; ... the same
+!Battle_FxObjPhaseA       = $CAE4 ; ... phase of the wobble of !Battle_FxObjAngleX (script opcode $C6)
+!Battle_FxObjPhaseB       = $CAE6 ; ... of !Battle_FxObjAngleY
+!Battle_FxObjPhaseC       = $CAE8 ; ... of !Battle_FxObjAngleZ
+!Battle_FxObjAngleX       = $CAF6 ; ... the model's angle about the x axis (BattleCD_Rotate3d)
+!Battle_FxObjAngleY       = $CAF8 ; ... about the y axis
+!Battle_FxObjAngleZ       = $CAFA ; ... about the z axis
+!Battle_FxObjScale        = $CAFC ; ... the triangle's scale towards the centre (/256; $FF = whole)
+!BattleRom_FxModels       = $D1EC5F ; 16 B per model: three vertices of 4 B (x, y, z signed; unused), 4 B unused
+!BattleCD_FxChannel       = $43   ; 1-2 B DP: the channel's offset BattleCD_RunFxOp keeps while a handler runs
+!BattleCD_TriX0           = $12   ; 1 B DP: BattleCD_FillTriangle's first point x
+!BattleCD_TriY0           = $13   ; 1 B DP: ... its y
+!BattleCD_TriX1           = $14   ; 1 B DP: the second point x
+!BattleCD_TriY1           = $15   ; 1 B DP: ... its y
+!BattleCD_TriX2           = $16   ; 1 B DP: the third point x
+!BattleCD_TriY2           = $17   ; 1 B DP: ... its y
+!BattleCD_TriUnk20        = $20   ; 1 B DP (stored .w): zeroed before BattleCD_FillTriangle; meaning not traced
+!BattleCD_FxScale         = $21   ; 2 B DP: an object's !Battle_FxObjScale (BattleCD_FxRotateVertex,
+                                  ; BattleCD_FxOpFillTriangle)
+!BattleCD_FxRadius1X      = $49   ; 1 B DP: the layer-3 circle's first x radius (BattleCD_FxCircleStep)
+!BattleCD_FxRadius1Y      = $4A   ; 1 B DP: its first y radius
+!BattleCD_FxRadius2X      = $4B   ; 1 B DP: the second x radius
+!BattleCD_FxRadius2Y      = $4C   ; 1 B DP: the second y radius
+!BattleCD_FxCentreX       = $4D   ; 1 B DP: the circle's centre x
+!BattleCD_FxCentreY       = $4E   ; 1 B DP: its centre y
+!BattleCD_FxModelOfs      = $4F   ; 1 B DP: the model's offset in !BattleRom_FxModels (model * 16)
+!BattleCD_FxDepth         = $51   ; 1 B DP: added to each vertex's z (BattleCD_FxRotateVertex)
 
 endif
