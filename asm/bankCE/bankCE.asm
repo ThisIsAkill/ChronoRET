@@ -158,7 +158,10 @@ BattleCE_WaveTable:
 ; !BattleCE_Bg2WaveLines).
 ; Callers (1 JSL site): BattleCD_NmiMain ($CD:097A).
 ; Entry: M=1, X=0, DP=0 (TDC as zero), DB=$7E (BattleCD_NmiMain calls it
-;        so, with !Battle_Unk2A21 bit 0 set)
+;        so, with !Battle_Unk2A21 bit 0 set); B = 0 assumed: the copy
+;        path's 16-bit ASL/ADC/TAX after the 8-bit AND uses it (from
+;        BattleCD_NmiMain's TDC, if its earlier callees keep it; not
+;        traced)
 ; Exit:  M=1, X=0, DB unchanged (PHB/PLB around the MVN); A = 0; zeroing:
 ;        X = !BattleCE_WaveBytes, Y unchanged; copying: X = the end of
 ;        the source, Y = !BattleCE_Bg2WaveLines + $80
