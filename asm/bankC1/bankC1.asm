@@ -153,12 +153,15 @@ BattleSys_SceneSetup:
 ;        DB. For the other six it is assumed. Service 0's call tree is
 ;        not checked here (its bank-$CD callees BattleCD_SetNmiMode1,
 ;        BattleCD_StartOpenWipe and BattleCD_WipeRunning, and the bank-$CD
-;        helpers they call, are matched). The other five reach these
-;        unmatched addresses (services 3, 4, 8 and 9 by way of
-;        BattleSys_FrameTickVec and BattleSys_PumpFrames, 4 also
-;        BattleCD_ActOp80; service 6 only through BattleSys_VecCD0024):
-;        $D1:ECF3 (JSL in BattleCD_FrameTick) for services 3, 6, 8 and 9;
-;        it and $D1:F67A for service 4. The
+;        helpers they call, are matched). The other five (services 3,
+;        4, 8 and 9 by way of BattleSys_FrameTickVec and
+;        BattleSys_PumpFrames, 4 also BattleCD_ActOp80; service 6 only
+;        through BattleSys_VecCD0024) reach no unmatched address; the
+;        last two they reached, $D1:ECF3 (BattleFx_LoadBgSet, JSL in
+;        BattleCD_FrameTick; services 3, 4, 6, 8 and 9) and $D1:F67A
+;        (BattleFx_Op80Dispatch; service 4), are matched, and so is all
+;        they call (a walk of the JSR/JSL/JMP, branch and jump-table
+;        targets of services 0, 3, 4, 6, 8 and 9 finds no stub). The
 ;        call trees of BattleMenu_UpdateWindows and of
 ;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
 ;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which the call trees of
@@ -14590,26 +14593,28 @@ BattleAct_OpUnkRevive:
 ; ==================================================================
 ; BattleAct_OpSetUnkCFFF ($C158DC–$C158E3, 8 bytes)
 ; ==================================================================
-; Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
+; Opcode $2D: !BattleFx_HoldAnims = 1 (BattleFx_HoldAnimsTick holds the
+; palette animations); advances 1.
 ; Callers note: BattleAct_OpcodeTable entry $2D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
 BattleAct_OpSetUnkCFFF:
     LDA.b #1
-    STA.w !Battle_ActUnkCFFF
+    STA.w !BattleFx_HoldAnims
     JMP BattleAct_AdvanceScript     ; by the 1 just stored
 
 ; ==================================================================
 ; BattleAct_OpClearUnkCFFF ($C158E4–$C158EB, 8 bytes)
 ; ==================================================================
-; Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
+; Opcode $2E: !BattleFx_HoldAnims = 0 (BattleFx_HoldAnimsTick lets the
+; held palette animations run again); advances 1.
 ; Callers note: BattleAct_OpcodeTable entry $2E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
 BattleAct_OpClearUnkCFFF:
-    STZ.w !Battle_ActUnkCFFF
+    STZ.w !BattleFx_HoldAnims
     LDA.b #1
     JMP BattleAct_AdvanceScript
 

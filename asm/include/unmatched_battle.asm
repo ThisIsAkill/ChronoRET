@@ -8,7 +8,7 @@
 ; the comment says what the call site expects.
 ; ============================================================
 
-; --- Bank $CD after the matched part (script opcode handlers and the code they call) ---
+; --- Bank $CD after the matched part (script opcode handlers and the code the matched $CD/$D1 code calls) ---
 
 org $CD2A4A
 BattleCD_FxOp80:                        ; script opcode $80 handler (BattleCD_FxOpTable)
@@ -17,13 +17,13 @@ BattleCD_FxOp81:                        ; script opcode $81 handler (BattleCD_Fx
 org $CD2DD6
 BattleCD_FxOp82:                        ; script opcode $82 handler (BattleCD_FxOpTable)
 org $CD2E13
-BattleCD_FxAddScrollY:                  ; JSR/JMP: the channel ($43)'s !Battle_FxScrollAddY + the word at DP $45 (opcode $82's helper)
+BattleCD_FxAddScrollY:                  ; JSR/JMP: the channel ($43)'s !BattleFx_BounceOut + the word at DP $45 (opcode $82's helper)
 org $CD2E3C
 BattleCD_FxSubScrollX:                  ; JMP: the channel's !Battle_FxScrollAddX - the word at DP $45
 org $CD2E4D
 BattleCD_FxAddScrollX:                  ; JMP: the channel's !Battle_FxScrollAddX + the word at DP $45
 org $CD2E78
-BattleCD_FxSubScrollY:                  ; JSR: the channel's !Battle_FxScrollAddY - the word at DP $45
+BattleCD_FxSubScrollY:                  ; JSR: the channel's !BattleFx_BounceOut - the word at DP $45
 org $CD2EA2
 BattleCD_FxOp83:                        ; script opcode $83 handler (BattleCD_FxOpTable)
 org $CD2EB5
@@ -78,64 +78,17 @@ org $CD3657
 BattleCD_Unk3657:                       ; JSR from BattleCD_FxOp3657 (script opcode $A1) with A = the operand
 org $CD367C
 BattleCD_FillTriangle:                  ; JSR/JMP: fills the triangle of the three points in DP $12-$17 for object
-                                        ; !Battle_FxTriObject, probably (it sorts them by y first, with DB = $00; not analysed)
+                                        ; !BattleFx_QuadSlot, probably (it sorts them by y first, with DB = $00; not analysed)
+org $CD38B2
+BattleCD_Unk38B2:                       ; JSL from BattleFx_RasterQuad: A = line; points WMADD at that line
+                                        ; of the window table picked by the frame and !BattleFx_QuadSlot
 org $CD38E5
 BattleCD_Unk38E5:                       ; JSR from BattleCD_FxOpTriCentre (DB = $00): DP $0B/$0C two y, DP $0D an x distance;
                                         ; returns a slope in Y, probably
 org $CD3924
 BattleCD_Unk3924:                       ; JSR from BattleCD_FxOp3924 (script opcode $B8) with A = the operand
 
-; --- Bank $D1 battle code (called from bank $CD; none analysed) ---
-
-org $D1E70A
-BattleD1_UnkE70A:                       ; JSL from BattleCD_FxOpD1E70A (script opcode $E1)
-org $D1E8D9
-BattleD1_UploadPage:                    ; JSL from BattleCD_NmiUploadText: A:X = a tilemap page, DP $45 = a VRAM address
-org $D1EA4B
-BattleD1_UnkEA4B:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
-org $D1EBFF
-BattleD1_UnkEBFF:                       ; JSL from BattleCD_FxOpD1EBFF (script opcode $F4)
-org $D1ECF3
-BattleD1_UnkECF3:                       ; JSL from BattleCD_FrameTick, A = !Battle_UnkCD45
-org $D1EDCD
-BattleD1_UnkEDCD:                       ; JSL from BattleCD_FxOpD1EDCD (script opcode $EE)
-org $D1EEA5
-BattleD1_UnkEEA5:                       ; JSL from BattleCD_FxOpD1EEA5 (script opcode $EC)
-org $D1EEC4
-BattleD1_UnkEEC4:                       ; JSL from BattleCD_FxOpD1EEC4 (script opcode $ED)
-org $D1EFD0
-BattleD1_UnkEFD0:                       ; JSL from BattleCD_FxOpD1EFD0 (script opcode $F3)
-org $D1EFE3
-BattleD1_UnkEFE3:                       ; JSL from BattleCD_FxOpD1EFE3 (script opcode $EB)
-org $D1F1B0
-BattleD1_InitBattle:                    ; JSL from BattleCD_EnterBattle: sets DB=$7E, DP=0, the NMI/IRQ trampolines
-                                        ; and many bank-$CD variables
-org $D1F426
-BattleD1_UnkF426:                       ; JSL from BattleCD_NmiMain and BattleCD_NmiSetup
-org $D1F47C
-BattleD1_UnkF47C:                       ; JSL from BattleCD_FxOpD1F47C (script opcode $DF)
-org $D1F4C0
-BattleD1_NmiExit:                       ; the NMI trampoline's target BattleCD_ExitBattle installs (JML at $0500)
-org $D1F559
-BattleD1_UnkF559:                       ; JSL from BattleCD_FxOpD1F559 (script opcode $CE)
-org $D1F5CD
-BattleD1_UnkF5CD:                       ; JSL from BattleCD_FxOpD1F5CD (script opcode $DD)
-org $D1F5F5
-BattleD1_UnkF5F5:                       ; JSL from BattleCD_FxOpD1F5F5 (script opcode $DB)
-org $D1F67A
-BattleD1_ActOp80:                       ; JSL from BattleCD_ActOp80 (action opcode $80)
-org $D1F9AF
-BattleD1_UnkF9AF:                       ; JSL from BattleCD_FxOpBeam: the four corners in !Battle_FxQuadX0-Y3 (draws the quad, probably)
-org $D1FB68
-BattleD1_UnkFB68:                       ; JSL from BattleCD_FxOpD1FB68 (script opcode $E9)
-org $D1FB72
-BattleD1_UnkFB72:                       ; JSL from BattleCD_FxOpD1FB72 (script opcode $E8)
-org $D1FBCE
-BattleD1_UnkFBCE:                       ; JSL from BattleCD_FxOpD1FBCE (script opcode $88) with A, X = the operand * 2
-org $D1FD7E
-BattleD1_UnkFD7E:                       ; JSL from BattleCD_FxOpD1FD7E (script opcode $CF)
-
-; --- Bank $CE battle code (called from bank $CD; none analysed) ---
+; --- Bank $CE battle code (called from banks $CD and $D1; none analysed) ---
 
 org $CEE000
 BattleCE_UnkE000:                       ; JSL from BattleCD_FxOpCEE000 (script opcode $B2)
@@ -144,6 +97,8 @@ BattleCE_UnkE18E:                       ; JSL from BattleCD_NmiMain (with !Battl
 org $CEE7CF
 BattleCE_UnkE7CF:                       ; JSL from BattleCD_CalcAngle: two points in DP $23-$26; leaves an angle in DP $45, probably
 org $CEEE6E
-BattleCE_UnkEE6E:                       ; JSL from BattleCD_StepWipe at an opening wipe's start, A = !Battle_UnkCA22
+BattleCE_UnkEE6E:                       ; JSL from BattleCD_StepWipe at an opening wipe's start, A = !BattleFx_CeSet,
+                                        ; and from BattleFx_Init / BattleFx_ReloadCeSet (A = the set); copies records
+                                        ; from bank $CE to $7E:C867 and on
 org $CEF066
 BattleCE_UnkF066:                       ; JSL from BattleCD_NmiMain unless !Battle_UnkCD2D / !Battle_UnkA028

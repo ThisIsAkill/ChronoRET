@@ -52,8 +52,8 @@ incsrc "../hardware.inc"
 ;   ($C2:2A6D), C2Scene_LoadPartyGfx ($C2:2B7C), C2Scene_DialUnpack ($C2:721B), C2Scene_UnpackBgPack
 ;   ($C2:7B1B), C2Scene_UnpackBg3MapPack ($C2:7B3F), C2Scene_LoadExtraObjPack ($C2:7B7A),
 ;   C2Scene_LoadExtraPalette ($C2:7B9A), C2Scene_LoadUnkC600 ($C2:7BBF), Menu_SprLoad ($C2:F542),
-;   BankFF_BuildScreenMap ($FF:F690) and unmatched ($C6:E048, $C6:E06D, $C6:E66A, $C6:E68F,
-;   $D1:ED38, $D1:EDB4).
+;   BattleFx_LoadBgSet ($D1:ED38, $D1:EDB4), BankFF_BuildScreenMap ($FF:F690) and unmatched
+;   ($C6:E048, $C6:E06D, $C6:E66A, $C6:E68F).
 ; Callers of BankC3_Entry0008 (13 sites: 2 JSR, 11 JSL): Field_HookWinGrow0 (JSL $C0:225C),
 ;   Field_HookWinShrink0 (JSL $C0:22B7), Field_HookWinGrow1 (JSL $C0:237D), Field_HookWinShrink1
 ;   (JSL $C0:23DD), Field_HookWinFixedA (JSL $C0:2579), Field_HookWinFixedB (JSL $C0:25FE),

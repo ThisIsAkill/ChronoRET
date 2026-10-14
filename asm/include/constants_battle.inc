@@ -1239,6 +1239,96 @@ if !constants_battle_inc == 0
 !Battle_FieldObjKind6Flag = $40   ; Battle_FieldObj.Flags bit 6 (the field's FieldBtl_ObjKind6Flag): the enemy stays
                                   ; present when service 6 removes it
 
+; --- Bank $D1's battle-effect code (BattleFx_*) ---
+!Battle_JoyStartHi        = $10   ; JOY1H bit 4: Start
+!Battle_JoyRLo            = $10   ; JOY1L bit 4: R
+!Battle_JoyLLo            = $20   ; JOY1L bit 5: L
+!Battle_2989NoPause       = $20   ; !Battle_Unk2989 bit 5 (via !BattleFx_Unk2989Copy): Start does not pause, and
+                                  ; BattleCD_NmiMain's toggle button is off
+!BattleFx_NmiDpSaveLen    = $2A   ; MVN count - 1: DP $00-$2A (43 bytes)
+!BattleFx_UnkCE17Set      = $FF   ; !Battle_LastScriptMsg when the timer ends with !Battle_ScriptMsgUp set
+!BattleFx_White           = $7FFF ; colour: white
+!BattleFx_Anim7ColourBit  = $40   ; FieldAnimB[7].Unk1 bit flipped by BattleFx_SwapObjPalettes (64 colours)
+!BattleFx_MapRowBytes     = $20   ; bytes per row of BattleFx_UploadMapBlock (16 map words)
+!BattleFx_MapRows         = 16    ; rows it sends
+!BattleFx_MapRowWords     = $20   ; VRAM words from one row to the next (a 32-word-wide map)
+!BattleFx_AnimKind3       = $30   ; FieldAnimB .Unk0 value the palette moves give: kind 3, no skip
+!BattleFx_AnimUnk4Init    = $0100 ; FieldAnimB .Unk4/.Unk5 (word) set by BattleFx_LoadBgRows2To4: 0 and 1
+!BattleFx_GradCount       = 14    ; colours in the HP gradient
+!BattleFx_GradBytes       = 28    ; bytes of them
+!BattleFx_GradFadeSteps   = $20   ; steps of a gradient fade
+!BattleFx_GradForceLevel  = $7F   ; !BattleFx_GradForce bits 0-6: the forced level
+!BattleFx_RedMask         = $1F   ; colour bits 0-4: red
+!BattleFx_GreenMask       = $03E0 ; colour bits 5-9: green
+!BattleFx_GreenStep       = $20   ; one unit of green
+!BattleFx_BlueMaskHi      = $7C   ; colour bits 10-14 in the high byte: blue (one unit = 4)
+!BattleFx_SwayAmp         = 40    ; BattleFx_SwayQuad's sway: 40 x the sine / 256
+!BattleFx_SwayLeft        = $B0   ; its top edge's left x before the sway
+!BattleFx_SwaySize        = $20   ; its top and bottom edges' width
+!BattleFx_SwayHalf        = $10   ; half of that, left of the point
+!BattleFx_BgTilesVram     = $2000 ; VRAM word address of a background set's first pack
+!BattleFx_BgPackWords     = $0800 ; VRAM words from one pack to the next
+!BattleFx_BgPackBytes     = $1000 ; bytes uploaded per pack
+!BattleFx_BgPackNone      = $FF   ; BattleFx_BgSetPacks entry: no pack in this slot
+!BattleFx_DecompBuf       = $D000 ; $7E:D000: where BattleFx_LoadBgSet unpacks before the upload
+!BattleFx_BgMapBytes      = $0800 ; bytes of a set's map uploaded
+!BattleFx_BgMapVram       = $6800 ; VRAM word address of the map
+!BattleFx_WinLines        = 212   ; lines BattleFx_GrowBand's row band is held to
+!BattleFx_WinQuarterBytes = $D4   ; bytes of 53 lines (212 / 4 lines x 4 B): BattleFx_GrowBand's four blocks
+!BattleFx_BandRowsMax     = 9     ; !BattleFx_CountB stops counting at this in BattleFx_GrowBand
+!BattleFx_WinFull         = $FF00 ; a window pair word: left 0, right 255 (the whole line)
+!BattleFx_WinEmpty        = $00FF ; a window pair word: left 255, right 0 (nothing)
+!BattleFx_RampBottom      = $C0   ; BattleFx_RampWin2's start: $C0 - !BattleFx_CountA
+!BattleFx_WaveRadius      = $60   ; the wave windows' radius before !BattleFx_CountA is taken off
+!BattleFx_WinUsedBytes    = $0350 ; bytes of the wave windows' 212 lines (4 B each)
+!BattleFx_SignExtend      = $FF00 ; ORA that sign-extends a negative 8-bit offset
+!BattleFx_WaveBPhase      = $A8   ; added to !BattleFx_CountB for BattleFx_WaveWindowB's angles
+!BattleFx_LineAddDp       = $0A00 ; D for BattleFx_AddLineOffsets: its per-line bytes at $7E:0A00
+!BattleFx_InitFF          = $FF   ; value BattleFx_Init stores to several bytes (meaning not traced)
+!BattleFx_IrqLine         = $D3   ; VTIMEL: the battle IRQ at line 211
+!BattleFx_UnkBE9BInit     = $7878 ; !BattleFx_UnkBE9B+0/+2 at set-up
+!BattleFx_UnkBEA1Init     = $0077 ; !BattleFx_UnkBE9B+6/+$E at set-up
+!BattleFx_UnkBEA5Init     = $FFDF ; !BattleFx_UnkBE9B+$A at set-up
+!BattleFx_UnkCA04Init     = $FF27 ; !BattleFx_UnkCA02+2 at set-up
+!BattleFx_UnkCA08Init     = $00D7 ; !BattleFx_UnkCA02+6/+$A at set-up
+!BattleFx_UnkCA10Init     = $000D ; !BattleFx_UnkCA02+$E at set-up
+!BattleFx_UnkCA14Init     = $00BD ; !BattleFx_UnkCA02+$12 at set-up
+!BattleFx_UnkC02BInit     = $0505 ; the two words of !BattleFx_UnkC02B at set-up
+!BattleFx_UnkC14FInit     = 9     ; the byte at !BattleFx_WinTable0-$12 at set-up
+!BattleFx_UnkCD46Alt      = $FD   ; !BattleFx_UnkCD46 when !Battle_Unk2A21 bit 0 is set
+!BattleFx_UnkBEABRun1     = 19    ; !BattleFx_UnkBEAB entries with the first value
+!BattleFx_UnkBEABRun      = 12    ; entries per later value
+!BattleFx_UnkBEABStart    = $FFFC ; the first value (-4); each run adds 4
+!BattleFx_UnkBF6BOfs      = $0098 ; !BattleFx_UnkBF6B's values are !BattleFx_UnkBEAB's less this
+!BattleFx_UnkBEABBytes    = $C0   ; bytes of the 48 entries
+!BattleFx_WinTableBytes   = $0380 ; bytes of a window table (224 lines x 4)
+!BattleFx_UnkBB05Bytes    = $0180 ; bytes of !BattleFx_UnkBB05
+!BattleFx_UnkCCEEBytes    = $10   ; bytes of !Battle_PalRowSave (8 colours)
+!BattleFx_HighNibble      = $F0   ; mask: a byte's high nibble
+!BattleFx_LowNibble       = $0F   ; mask: a byte's low nibble
+!BattleFx_BounceMirrorOfs = $10   ; !BattleFx_RecOfs whose output is base - position
+!BattleFx_WinBlockBytes   = $70   ; bytes of 28 window table lines (a table is eight such blocks)
+!BattleFx_Op80Bits8Mask   = $1C   ; opcode $80 argument bits 2-4 (BattleFx_Op80Bits8)
+!BattleFx_Op80BitsHiMask  = $E0   ; bits 5-7 (BattleFx_Op80BitsHi)
+!BattleFx_Op80SwapBit     = $40   ; argument byte 1 bit 6 (BattleFx_Op80Kind0)
+!BattleFx_Op80PairMask    = $38   ; argument byte 1 bits 3-5 (BattleFx_Op80Kind0)
+!BattleFx_UnkCCC1Base     = $40   ; byte 0 of both !Battle_PalAnimRecs89 records: its base value
+!BattleFx_UnkCCC1Swap     = $10   ; or'd into it with bit 6 of the argument
+!BattleFx_UnkCCC8Bit7     = $80   ; the value BattleFx_Op80Kind0 gives !Battle_PalAnimRecs89+7/+8/+$13/+$14
+!BattleFx_GradStartA      = $E8   ; BattleFx_BuildGradHdma: the falling lists' first value
+!BattleFx_GradStartB      = $E0   ; the rising lists' first value (and the end entries' value)
+!BattleFx_GradFracA1      = $AB   ; fraction byte of the first falling value
+!BattleFx_GradFracB1      = $55   ; ... of the first rising value
+!BattleFx_GradFracA2      = $56   ; ... of the second falling value
+!BattleFx_GradFracB2      = $AA   ; ... of the second rising value
+!BattleFx_GradStep1       = $0055 ; step per entry of lists A and B
+!BattleFx_GradStep2       = $00AA ; step per entry of lists C and D
+!BattleFx_GradRepeat1     = $81   ; first byte of the B and D entries
+!BattleFx_GradHdmaBytes   = $0120 ; bytes BattleFx_BuildGradHdma zeroes
+!BattleFx_GradPart1Bytes  = $60   ; bytes of 24 entries
+!BattleFx_GradPart2Bytes  = $30   ; bytes of 12 entries
+!BattleFx_BoxCentre       = $6A   ; BattleFx_GrowBox's centre line (106)
+
 ; ------------------------------------------------------------
 ; Bank $CD: constants ($CD:0000-$CD:16B4)
 ; ------------------------------------------------------------
@@ -1246,7 +1336,6 @@ if !constants_battle_inc == 0
 !Battle_2A21Bit4          = $10   ; !Battle_Unk2A21 bit 4: the enemy exit goes straight to the dissolve
 !Battle_A01DBit0          = $01   ; !Battler_UnkA01D bit 0: the enemy exit runs !BattleCD_FxExit38
 !Battle_PalAnimCopy10     = $80   ; !Battle_PalAnimCopy bit 7: copy !Battle_PalAnimRec10
-!Battle_CD27Bit5          = $20   ; !Battle_UnkCD27 bit 5: the NMI's toggle button is off
 !BattleCD_PalAnimClearB      = $7F   ; clears !Battle_PalAnimCopy10
 !BattleCD_PalAnimClearA      = $FE   ; clears bit 0 after the !Battle_PalAnimRecs89 copy
 !BattleCD_FxExit40        = $40   ; layer effect after an enemy's dissolve (the first exit path); meaning unknown
@@ -1268,7 +1357,7 @@ if !constants_battle_inc == 0
 !BattleCD_DissolveSlot6   = $0006 ; the slot whose layout 2 is treated as layout 5
 !BattleCD_DissolveRowBits = $0038 ; !Battle_DissolvePhase bits 3-5: the pixel row
 !BattleCD_TilePlanes23    = $0010 ; offset of bit planes 2-3 in a 4bpp tile
-!BattleCD_MsgNoSfx        = $FF   ; !BattleRom_MsgSfx: no sound
+!BattleCD_MsgNoSfx        = $FF   ; BattleFx_MsgSfx: no sound
 !BattleCD_MsgFixedWait    = 60    ; frames message !Battle_EndUnkCD0021Arg stays up
 !BattleCD_MsgShownOn      = $10   ; !Battle_MsgShown while a message is up
 !BattleCD_TextStepCount   = $40   ; TextWin_StepCount of the first step: the whole string, probably
@@ -1280,7 +1369,7 @@ if !constants_battle_inc == 0
 !BattleCD_TextVramB       = $5980 ; ... of its second half
 !BattleCD_PadDelayFirst   = $000F ; !Battle_PadDelay after nothing was held
 !BattleCD_PadDelayRepeat  = $18   ; !Battle_PadDelay after a press of the button in bit 7
-!BattleCD_PadToggleBit    = $01   ; !Battle_PadHeld bit the NMI toggles !Battle_UnkCA21 with
+!BattleCD_PadToggleBit    = $01   ; !Battle_PadHeld bit the NMI toggles !BattleFx_CeSetWant with
 !BattleCD_Cmd81Arg1       = $10   ; first argument of BattleCD_ApuCmd81's !Audio_CmdUnk81
 !BattleCD_ApuCmd80        = $80   ; APU command of BattleCD_RunEndFx (sent as it is); meaning unknown
 !BattleCD_Cmd80Arg2       = $FF   ; its second argument
@@ -1289,7 +1378,7 @@ if !constants_battle_inc == 0
 !BattleCD_FxPalDelayLong  = 31    ; frames waited after BattleCD_LoadFxPalB with !Battle_Unk2A21 bit 0
 !BattleCD_EvtBit6         = $40   ; FieldBtl_EvtFlags bit 6 (MusicCueDispatch reads it): keeps the music, probably
 !BattleCD_EvtNoBit6       = $BF   ; clears it
-!BattleCD_CA25Unk02       = 2     ; !Battle_UnkCA25 at the end of the opening wipe
+!BattleCD_CA25Unk02       = 2     ; !BattleFx_CeSetBase at the end of the opening wipe
 !BattleCD_CA25Unk08       = 8     ; ... at the last battle-end step
 !BattleCD_CA25Unk0C       = $0C   ; ... at the start of the closing wipe
 !BattleCD_CA25Unk0E       = $0E   ; ... after the closing wipe
@@ -1306,7 +1395,7 @@ if !constants_battle_inc == 0
 !BattleCD_ScrollFillEnd   = $80   ; 32 entries of 4 bytes
 !BattleCD_AllHdma         = $FF   ; HDMAEN: all eight channels
 !BattleCD_NmiWaitLine     = $40   ; the scanline BattleCD_NmiMain waits for (BattleCD_WaitScanline); why is not traced
-!BattleCD_CDC9Period      = $0D   ; !Battle_UnkCDC9's reload
+!BattleCD_CDC9Period      = $0D   ; !BattleFx_GradStart's reload
 !BattleCD_PalAnimBytes    = $0C   ; bytes per FieldAnimB record
 !BattleCD_PalAnims8To11   = $0030 ; four FieldAnimB records (8-11)
 !BattleCD_ShakeYRandSeed  = $40   ; A the y shake passes to BattleCD_RandByte
@@ -1318,7 +1407,7 @@ if !constants_battle_inc == 0
 !BattleCD_NoScript        = $FF   ; !Battle_FxScriptIds entry: none
 !BattleCD_FxEnd87         = $0087 ; battle-end layer effect of BattleCD_LayerFx87
 !BattleCD_FxEnd84         = $0084 ; battle-end layer effect of BattleCD_LayerFx84
-!BattleCD_CE0EInit        = $80   ; !Battle_UnkCE0E set by BattleCD_LayerFx84
+!BattleCD_CE0EInit        = $80   ; !BattleFx_GradForce set by BattleCD_LayerFx84
 !BattleCD_EndFxDelay      = $80   ; frames BattleCD_LayerFx84 waits before its effect
 !BattleCD_PalRowOfs       = $30   ; byte offset of colour 24 in a palette buffer
 !BattleCD_PalRowBytes     = $0010 ; colours 24-31
@@ -1376,8 +1465,6 @@ if !constants_battle_inc == 0
 !BattleCD_DmaPieceSmall   = $0400 ; ... and otherwise
 !BattleCD_ScrollWavesBg3Mode = 3   ; !Battle_LayerFxMode of layer 3's wave scroll (BattleCD_ScrollModeTable entry 3)
 !BattleCD_FxWaveKeep      = $FF   ; script opcode $E7's operand that keeps !Battle_FxWaveOfs
-!BattleCD_HighNibble      = $F0   ; a byte's high nibble
-!BattleCD_LowNibble       = $0F   ; a byte's low nibble
 !BattleCD_FxVarMask       = $7F   ; script opcode $D8's variable number (bit 7 = clear it)
 !BattleCD_FxDriftPick     = $0B   ; script opcode $D7: operand bits that pick the work bytes
 !BattleCD_FxDriftAdd      = $40   ; ... operand bit 6: add (else subtract)
@@ -1401,7 +1488,6 @@ if !constants_battle_inc == 0
 !BattleCD_FxWaveAmpY      = $0F   ; ... the y swing
 !BattleCD_FxWaveBaseY     = $20   ; ... added to the y
 !BattleCD_FxWaveTableEnd  = $0350 ; 106 entries of 8 bytes
-!BattleCD_SignExtend      = $FF00 ; ORed into a negative byte widened to 16 bits
 !BattleCD_HighByteMask    = $FF00 ; keeps a 16-bit A's high byte
 !BattleCD_FxScaleWhole    = $FF   ; !Battle_FxObjScale: (nearly) unscaled
 !BattleCD_FxNear          = 4     ; BattleCD_FxOpTriCentre: midpoints closer than this are moved apart by it
