@@ -23023,7 +23023,10 @@ C2Scene_UnpackBgPack:
     RTS
 
 ; $C2:7B20 — C2Scene_UnpackBg3MapPack (36 bytes, $7B20–$7B43)
-; Script routine (no op $34 reference found): as C2Scene_UnpackBgPack
+; Script routine (op $34 in the unpacked C2SceneRom_ScriptPacks 2,
+; $C3:9F41, at +$0286 and 6, $C3:BF7B, at +$027E, each a few ops after
+; that pack's op $34 to C2Scene_UnpackBgPack; the bytes are split by
+; the packing, so no ROM address holds them): as C2Scene_UnpackBgPack
 ; from C2SceneRom_Bg3MapPacks.
 ; Entry: M=1, X=0, DP=$0000 (C2Tmp_08), DB=$00 (Menu_Decomp*)
 ; Exit:  M=1, X=0 (Decomp_ToWram restores P, A, X and Y); A = the

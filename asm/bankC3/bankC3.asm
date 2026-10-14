@@ -109,9 +109,11 @@ BankC3_Entry0011:               ; header: see BankC3_Entry0000
 ;        Evt_OpFF_Misc the event's sub $00-$7F; both set S = StackTop.
 ; Exit:  never returns: JML C3Mod_Code with M=1, X=0, DP and DB as on
 ;        entry, A = $30C3 (the bank byte and the low byte of
-;        C3Mod_Code's address), X = C3_BootNmi's address, Y as on
-;        entry; C3_EntryArg = the argument; Decomp_OutLen = the module's
-;        length ($857F).
+;        C3Mod_Code's address), X = C3_BootNmi's address when
+;        C3_BootIrqOn (bit 7) of the argument is clear, else
+;        Scene_VIrqLine ($00D3, from the VTIMEL write; so with
+;        Field_HookLeaveToBankC3's $85), Y as on entry; C3_EntryArg =
+;        the argument; Decomp_OutLen = the module's length ($857F).
 ; Calls: Decomp_ToWram.
 C3_BootModule:
     SEI
@@ -164,7 +166,7 @@ C3_BootModule:
 ; WinFx_TablePtr, in bank $7F if WinFx_TableBank bit 0 is set, else $7E.
 ; Centre (WinFx_ArgX, WinFx_ArgY) = (Xc, Yc), radius WinFx_ArgSize = r.
 ; Radius 0 empties the whole table (WinFx_FillEmpty with
-; WinFx_FillAllBytes). Else a midpoint-circle walk (x from r down, y
+; WinFx_FillAllBytes: $1C3 bytes, so 3 bytes past a 224-line table). Else a midpoint-circle walk (x from r down, y
 ; from 0 up, while x >= the previous y) writes the rows above the
 ; centre: row Yc - x with Xc - y .. Xc + y, and row Yc - 1 - y with
 ; Xc - x .. Xc + x (left edges kept >= 0, right edges <= $FF). Then by
@@ -175,8 +177,12 @@ C3_BootModule:
 ; set, modes 0 and 1 then empty the rows from Yc + r (mode 1: Yc + r/2)
 ; to line $DF, and the rows from 0 to Yc - r - 1 (none when Yc - r <= 1;
 ; with Yc - r = 1 row 0 is left as it was; the lower part only when
-; that first row is above line $DF), so the last mirrored row and the
-; walk's top row are overwritten. Nothing limits the rows to the table:
+; that first row is above line $DF). The lower fill overwrites the last
+; mirrored row, except in mode 1 with an even r (rows Yc .. Yc + r/2 - 1
+; are mirrored, the fill starts at Yc + r/2). The upper fill overwrites
+; the walk's top row only when the table address is even (that row is
+; then Yc - r - 1, see the quirks); with an odd address the top row is
+; Yc - r and the fill stops just above it. Nothing limits the rows to the table:
 ; a circle that reaches above line 0 writes before WinFx_TablePtr.
 ; Quirks (adds and subtracts with no CLC/SEC before them, which take the
 ; carry the instruction before left; traced, kept):
@@ -473,7 +479,8 @@ WinFx_FillEmptyFrom:                    ; header: see WinFx_FillEmpty
 ; the first run is 4-35 lines long (its ADC #$03 gets C=1 from the CMP
 ; that found mode 2); mode 1 is exact. Once a value clamps to 0, the
 ; TDC used for it leaves B = $03 (DP's high byte), so the next run
-; length (TAY) is $0303 or more: that run lasts to the end of the line.
+; length (TAY) is $0303 or more: that run lasts to the end of the line
+; array.
 ; The first-frame fill is in its own bank by WinFx_C3ETableBank bit 0
 ; ($7E/$7F: STA.l + MVN), the steps read and write with DB =
 ; WinFx_C3ETableBank and WMADDH = it (so it must be $7E or $7F).
@@ -631,10 +638,14 @@ WinFx_StepWipe:
 ; $C3:02DD — C3_RandomByte (42 bytes, $02DD–$0306)
 ; Returns a new pseudo-random byte in A and keeps it in C3_RandSeed: A
 ; (with C rotated in) plus C3_RandSeed, stored; then X's low byte, the
-; seed, C3_FrameCount, the H and V counters (latched by reading SLHV;
-; the CMP's result is not used), the seed again, C3_ScratchF0, C3_ScratchF2 (EOR)
-; and C3_ScratchF4 are added or subtracted in, each with the carry of the
-; step before, and the result stored back.
+; seed, C3_FrameCount, the H counter's low byte (OPHCT; the counters are
+; latched by the CMP that reads SLHV, and that CMP's carry, A against
+; the open-bus value SLHV returns, goes into this ADC), minus the V
+; counter's low byte (first OPVCT read), the seed again, C3_ScratchF0,
+; C3_ScratchF2 (EOR), C3_ScratchF4, and minus the V counter's high byte
+; (second OPVCT read: bit 0 = V bit 8, the rest open bus) are added or
+; subtracted in, each with the carry of the step before, and the result
+; stored back.
 ; Callers (1 JSL site): WinFx_StepWipe ($C3:024A).
 ; Callers note: the unpacked module also JSLs here (from $7E:3443).
 ; Entry: M=1 (8-bit adds; WinFx_StepWipe has it, the module's site is
@@ -678,22 +689,28 @@ C3_RandomByte:
 ; 8 pixels become 4 bytes: byte k holds bit k of the 8 pixels, the
 ; first pixel in bit 7 (the bit planes of an SNES tile row, here 4 in a
 ; row). At the end, if the image is shorter than the last one
-; (C3Scale_PrevEnd), the bytes between are zeroed; C3Scale_PrevEnd =
+; (C3Scale_PrevEnd), the bytes from the new end on are zeroed, through
+; the old end or one byte past it (see the quirks); C3Scale_PrevEnd =
 ; the new end.
 ; Purpose inferred from the arithmetic only: probably the scaled
 ; sprites of the module (the bank $C3 module is the jet-bike race: its
-; staff text is BankC3_StaffText); the module sets C3Scale_Groups to 4
-; (64 pixels) at its three call sites.
+; staff text is BankC3_StaffText). The module sets C3Scale_Groups to 4
+; (64 pixels) right before the calls at $7E:82A0 and $7E:897F; at
+; $7E:520D it comes from a 14-byte MVN copy of a record at $1400 or
+; $140E into $1F-$2C, whose first word the module sets to 4
+; ($7E:502A) and 3 ($7E:50B6) respectively (other writes to those
+; words, at $7E:9B2B, $7E:8BA5 and $7E:9E15, not traced to this use).
 ; Quirks (carries not set or cleared first):
 ;   - the first C3Scale_Acc add takes the caller's carry; later ones get
 ;     C=0 from the CLC/ADC that steps C3Scale_Dest;
 ;   - each new source row's first step is C3Scale_XStep + 1 when the
 ;     row address went up (C from the CMP with the last row);
-;   - the closing clear runs from the new end through the old end - 1
-;     when the row count ran out (C=0 from that same CLC/ADC), but
-;     through the old end itself when the source ran out (C=1 from the
-;     CMP with C3Scale_SrcLimit); with C=0 and a difference of 1 nothing
-;     is cleared.
+;   - the closing clear (a 16-bit STZ at the new end, then an MVN of
+;     A + 1 bytes from there to one byte on, A = old end - new end - 1
+;     + C) zeroes the new end through the old end when the row count
+;     ran out (C=0 from that same CLC/ADC), and through the old end + 1
+;     when the source ran out (C=1 from the CMP with C3Scale_SrcLimit);
+;     with C=0 and a difference of 1 nothing is cleared.
 ; Callers note: no caller in ROM; the unpacked module JSLs it (from
 ;   $7E:520D, $7E:82A0 and $7E:897F), with M=0 and DB=$7F (PEA/PLB).
 ; Entry: M=0, X=0 (16-bit throughout), DP = the module's (the
@@ -1040,8 +1057,11 @@ C3_ScaleBitmap:
     JMP .row
 
 ; $C3:0529 — C3_BootIrq (31 bytes, $0529–$0547)
-; IRQ handler while the module is unpacked (C3_BootModule points the
-; IRQ trampoline here; the module later installs its own). Acknowledges
+; IRQ handler of the bank $C3 module, during its unpacking and after:
+; C3_BootModule points the IRQ trampoline here, and no write to the
+; trampolines ($0500-$0507) was found in the unpacked module, which
+; turns the V-count IRQ on itself (NMITIMEN = $A1 at $7E:3017), so this
+; stays its IRQ handler as far as traced. Acknowledges
 ; the timer IRQ (TIMEUP), waits for the end of the current H-blank and
 ; the start of the next one, and forces blank (INIDISP = $80, brightness
 ; 0): with the V-count IRQ at line 211, the picture is cut off from
@@ -1100,9 +1120,11 @@ C3_BootNmi:
 ; written in Decomp_OutLen. The format (an LZ77 variant; checked by a
 ; Python transcription of this routine, which unpacks the module at
 ; $C3:1313, 26,393 bytes, to $857F bytes ending exactly on its last end
-; marker, and the C2SceneRom_* graphics, palette and map packs to
-; $2000/$1000/$800/$100/$3000-byte results, each pack ending where the
-; next begins):
+; marker, and the packs of the C2SceneRom_* tables (graphics,
+; palettes, maps, lists and scripts) to results of $13 to $3000 bytes;
+; most end right where the next pack begins, but not Obj pack 13 (ends
+; at $C6:1E70, the next starts at $C6:2411) nor the last pack before a
+; bank boundary):
 ;   +0  16-bit W: segment 1's items run from +2 to +2+W-1; its end
 ;       marker is at +2+W.
 ;   Items come in groups. Each group starts with a control byte c:
@@ -1127,9 +1149,10 @@ C3_BootNmi:
 ;     later markers' bits 6-7 are not read.
 ; The routine is four copies of the same loop, one per mode and WRAM
 ; bank (Decomp_DestBank bit 0: 0 = $7E, 1 = $7F; the bank byte goes to
-; WMADDH, and the back-references are MVNs inside that bank, so bank
-; $00 acts as $7E and only low WRAM is reachable that way). After each
-; MVN, WMADD is set again from Y (WMADDL/M; WMADDH is not rewritten).
+; WMADDH, and the back-references are MVNs inside that bank; any 16-bit
+; Decomp_Dest works, so C3_BootModule's bank byte $00 with Dest $3000
+; writes $7E:3000 on). After each MVN, WMADD is set again from Y
+; (WMADDL/M; WMADDH is not rewritten).
 ; Callers (2 sites: 1 JSL, 1 JMP): Decomp_ToWramVec (JMP $C3:0002) and C3_BootModule (JSL $C3:006F).
 ; Callers note: the other callers go through Decomp_ToWramVec (listed in
 ;   BankC3_Entry0000's header); the unpacked module also JSLs here
@@ -2066,7 +2089,9 @@ C3_ReadPad:
 ;            target; at the limit the counter is cleared and the script
 ;            goes on after the operands. $90-$9F the same, then yields.
 ;   $A0-$FF  by bits 0-3 (bits 4-6 are ignored), 
-;            0 sound w (C3Mod_PlaySound, w in C3_ScratchF0); 1 poke byte
+;            0 call module routine w (C3Mod_CallW with w in
+;            C3_ScratchF0: LDX #0 / JSR ($00F0,X) / RTL at $7E:37F3,
+;            so w is a $7E address, e.g. $7E:7EE8); 1 poke byte
 ;            b at bank-$00 address w; 2 poke word; 3 call w (the return
 ;            point goes to C3Script_Ret); 4 return; 5 wait until APUIO2's
 ;            low nibble reaches byte b (else yield and retry the opcode
@@ -2088,10 +2113,14 @@ C3_ReadPad:
 ; Entry: M=0, X=0 (16-bit opcodes, operands and indexes), DP = the
 ;        script's page, DB = the script's bank ($7E; the pointer is
 ;        16-bit, DP-indirect).
-; Exit:  M=0, X=0; A, X changed (Y as opcode 0's C3Mod_PlaySound and
-;        Audio_DriverCommand leave it); DP, DB unchanged; C3Script_Ptr at the next
-;        opcode (or at the same one for opcodes 5 and F).
-; Calls: C3Mod_PlaySound (JSL, in the unpacked module),
+; Exit:  M=0, X=0; A, X changed; Y as Audio_DriverCommand and opcode
+;        0's module routine leave it; DP and DB unchanged by this
+;        routine itself, but an opcode 0 routine (module code, not
+;        checked here; $7E:7EE8's MVNs set DB to $7E) may change them,
+;        and the X flag (M is set again by the REP #$20 after it);
+;        C3Script_Ptr at the next opcode (or at the same
+;        one for opcodes 5 and F).
+; Calls: C3Mod_CallW (JSL, in the unpacked module),
 ;   Audio_DriverCommand (JSL), C3_TaskListAdd/Remove,
 ;   C3_NmiListAdd/Remove.
 C3_RunScript:
@@ -2161,7 +2190,7 @@ C3_RunScript:
     TAX
     JMP (.op_table,X)
 .op_table:                              ; C3Script opcodes $A0-$FF by bits 0-3
-    dw .op_sound            ; 0
+    dw .op_call_w           ; 0
     dw .op_poke8            ; 1
     dw .op_poke16           ; 2
     dw .op_call             ; 3
@@ -2275,11 +2304,11 @@ C3_RunScript:
     LDA.b (!C3Script_Ptr)
     STA.l !Eng_PtrBase,X
     JMP .skip2
-.op_sound:
+.op_call_w:
     REP #$20
     LDA.b (!C3Script_Ptr)
     STA.w !C3_ScratchF0
-    JSL !C3Mod_PlaySound
+    JSL !C3Mod_CallW
     JMP .skip2
 .op_ppu:
     SEP #$20
@@ -2445,7 +2474,11 @@ C3_NmiListAdd:
 ;   and $7E:5E37).
 ; Entry: M=0 (A stored to WMADDL/M as a word), X=0 (16-bit X/Y), DP =
 ;        the module's (C3_OamPos.. are direct page; probably 0, not
-;        traced), DB = $00 or $7E (the OAM shadow is absolute); A = the
+;        traced), DB = a bank that maps the I/O registers and low WRAM
+;        ($00-$3F or $80-$BF: WMADDL/WMADDH/WMDATA and the OAM shadow
+;        are absolute; with DB=$7E the port accesses would hit WRAM
+;        $7E:2180-$2183 instead). The site at $7E:3A78 has DB=$00 (PEA
+;        $007E, PLB, PLB); the other sites' DB is not traced. A = the
 ;        list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
@@ -2503,7 +2536,9 @@ C3_SprListSmall:
 ;   $7E:5042, $7E:50CE, $7E:514E, $7E:56F8, $7E:5D3F, $7E:8245, $7E:88A0,
 ;   $7E:88B4 and $7E:9A07).
 ; Entry: as C3_SprListSmall: M=0, X=0, DP = the module's (probably 0),
-;        DB = $00 or $7E; A = the list's address.
+;        DB = a bank that maps the I/O registers and low WRAM ($00-$3F
+;        or $80-$BF: WMADDL/H, WMDATA and the OAM shadow are absolute;
+;        the module sites' DB is not traced); A = the list's address.
 ; Exit:  M=0, X=0; A changed; X = C3_OamHiPtr, Y = C3_OamPos (both
 ;        advanced); C3_SprLeft = 0; WMADD after the list.
 C3_SprListLarge:
@@ -2662,8 +2697,9 @@ C3_FindDivisor:
     RTL
 
 ; $C3:0E36 — BankC3_StaffText (196 bytes, $0E36–$0EF9)
-; ASCII, lines ended by $0A: the staff of the jet-bike race (the
-; module), as in the ROM ("JONNY" spelt so). No reader was found in the
+; ASCII, lines ended by $0A (the text starts with a $0A, so its first
+; line is empty): the staff of the jet-bike race (the module), as in
+; the ROM ("JONNY" spelt so). No reader was found in the
 ; kernel or the unpacked module (no reference to $0E36).
 BankC3_StaffText:
     db $0A,"-- JET BIKE RACE --",$0A
@@ -2683,7 +2719,8 @@ BankC3_StaffText:
 ; the four-sided shape through WinFx_QuadPoints (X, Y bytes of points
 ; 0-3, in order) at WinFx_QuadTablePtr in bank WinFx_QuadTableBank
 ; (bit 0: $7E/$7F). It starts from the point with the smallest Y (the
-; first one on a tie; WinFx_QuadTopY), then draws the four edges in
+; last one on a tie: CMP/BCC also switches when equal; WinFx_QuadTopY),
+; then draws the four edges in
 ; point order with WinFx_QuadEdge, through a chain of four blocks
 ; (.from_p0-.from_p3, one per start point; entered with JMP
 ; (WinFx_Tmp), the last block branches back to the first). Edges going
@@ -2894,8 +2931,11 @@ WinFx_QuadEdgeFlat:                     ; header: see WinFx_QuadEdge
 ; of the rightward start, and there is no SEC: C=0 from the borrow of
 ; X1 - X0).
 ; A flat edge (Y0 = Y1) is WinFx_QuadEdgeFlat (sub-entry, $C3:1001,
-; reached by BEQ): the smaller X goes to row Y0 and the larger to row
-; Y0 + 1 (two INYs: the next row, same byte column).
+; reached by BEQ): X0 goes to row Y0 and X1 to row Y0 + 1 (two INYs:
+; the next row, same byte column) when the 8-bit X0 - X1 has bit 7 set,
+; else the other way round. That puts the smaller X first only while
+; the two are close; quirk (CMP then BMI, a signed test): the larger X
+; goes first when X1 - X0 >= $81 or X0 - X1 >= $80.
 ; WinFx_QuadExit (sub-entry, $C3:10BA): TDC, XBA, then P, DB, DP pulled
 ; and RTL; WinFx_BuildQuad ends there too.
 ; Callers note: the JSR pattern at $C3:A153 lies in the data after the
@@ -3015,7 +3055,8 @@ WinFx_QuadExit:                         ; header: see WinFx_QuadEdge
 ; ============================================================
 
 ; $C3:10C0 — BankC3_EndMarker (11 bytes, $10C0–$10CA)
-; ASCII "CODE END C3" right after the kernel's last RTL (WinFx_BuildQuad),
+; ASCII "CODE END C3" right after the kernel's last RTL ($C3:10BF,
+; WinFx_QuadExit's, where WinFx_QuadEdge and WinFx_BuildQuad end),
 ; probably left by the build to mark the end of the code. Followed by
 ; $00 fill up to the packed block at $C3:1200 (not emitted here).
 org $C310C0

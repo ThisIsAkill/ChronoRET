@@ -1776,8 +1776,8 @@ if !ram_engine_inc == 0
 !C3_TaskRun = $0950                      ; 16 words: the copy C3Mod_RunTasks runs
 !C3Mod_AudioCommand = $7E377A            ; in the unpacked module (stub name): sends Audio_CmdId..
                                          ; Arg2 to APUIO0-3 and waits for the echo
-!C3Mod_PlaySound = $7E37F3               ; in the unpacked module (stub name): takes its argument
-                                         ; in C3_ScratchF0 (not analysed)
+!C3Mod_CallW = $7E37F3                   ; in the unpacked module (stub name): LDX #0 / JSR ($00F0,X)
+                                         ; / RTL: calls the module code at C3_ScratchF0
 !C3Mod_RunTasks = $7E398A                ; in the unpacked module (stub name): JSRs each nonzero
                                          ; word of C3_TaskRun, saving DB, X, P and DP around each
 !C3Mod_RunNmiTasks = $7E39BE             ; in the unpacked module (stub name): the same for
