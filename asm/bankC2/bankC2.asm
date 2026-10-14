@@ -46850,7 +46850,7 @@ Menu_CfgEntryText:
     PLP
     RTS
 
-; $C2:F9B2 — Menu_CfgTextThread (149 bytes with Menu_CfgValueThread, $F9B2–$FA48)
+; $C2:F9B2 — Menu_CfgTextThread (151 bytes with Menu_CfgValueThread, $F9B2–$FA48)
 ; A thread (slot 2, from Menu_CfgEntryText): Menu_Unk0DD0 = $80,
 ; Menu_TextDest = $4E0A, Menu_TextGlyphs and Menu_TextCol = 0,
 ; TextWin_GfxBuf and Menu_TextGfxSrc = $5E00, Menu_TextPenStart = 8,

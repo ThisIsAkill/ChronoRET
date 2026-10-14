@@ -1377,6 +1377,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `C6Scene_PerspTiltSteps` values' origin, and what `.Unk2E` was meant for. Not matched in $C6:
    the data, `$C6:0000`-`$DFFF` and `$C6:F000`-`$FFFF` (packs, headers, the tables the bank-$C2
    code reads by define).
+14. Lint: the SIZE rule now checks combined claims `Name (N bytes with A and B, $XXXX–$YYYY)`
+    (wrapped or not; 39 in the tree): N is the range's size, the range starts at the routine, ends
+    on a row boundary of the layout, and every row inside is named or a `header: see` sub-entry.
+    One was wrong: `Menu_CfgTextThread` said 149 bytes for `$F9B2–$FA48` (151; the range was
+    right). Re-review needed (verified header edited): `Menu_CfgTextThread`.
 
 ## Tables
 

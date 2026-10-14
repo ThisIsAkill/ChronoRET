@@ -42,8 +42,14 @@ asm/include/ and are exempt):
   SIZE   a header claim `Name (N bytes, $XXXX–$YYYY)` (or `(N bytes, $XXXX–
          $YYYY)` about the routine itself) agrees with the assembled
          layout (symbols/functions.csv): the routine's start, end and size,
-         or those of the routine with its `header: see` sub-entries. Needs
-         the ROM and asar; skipped without them.
+         or those of the routine with its `header: see` sub-entries. A
+         combined claim `Name (N bytes with A and B, $XXXX–$YYYY)` (wrapped
+         across lines or not, `Name1-3` naming a run) holds when N is the
+         range's size, the range starts at the routine, ends where a row of
+         the layout ends (the next row starts right after it, or a gap or
+         the bank end follows), and every row starting inside it is named
+         in the claim or is a `header: see` sub-entry of the routine or of
+         a named row. Needs the ROM and asar; skipped without them.
   UNMATCHED no header or banner text calls an address unmatched when it lies
          inside matched code: a bank-qualified address ($BB:AAAA, $BBAAAA,
          `/AAAA` continuations) in the clause after the word "unmatched", or
@@ -285,6 +291,12 @@ def _has_entry_exit(region) -> bool:
 SIZE_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes?, '
                         r'\$(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})'
                         r'(?:\s*[–-]\s*\$?(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4}))?')
+# `Name (N bytes with Companion and Other, $XXXX–$YYYY)`: the routine together
+# with the rows after it (a fall-through, its sub-entries, a table).
+COMBINED_CLAIM = re.compile(r'(?:\b([A-Za-z_][A-Za-z0-9_]*)\s+)?\((\d[\d,]*) bytes? with ([^()$;]*?),\s*'
+                            r'\$(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})\s*[–-]\s*'
+                            r'\$?(?:([0-9A-Fa-f]{2}):)?([0-9A-Fa-f]{4})\)')
+NAME_RANGE = re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*?)(\d+)-(\d+)\b')     # C6Scene_PerspQuad1-3
 LONG_ADDR = re.compile(r'\$([0-9A-Fa-f]{2}):?([0-9A-Fa-f]{4})(?![0-9A-Fa-f])((?:/[0-9A-Fa-f]{4}(?![0-9A-Fa-f]))*)')
 UNMATCHED_WORD = re.compile(r'\bunmatched\b', re.I)
 BEFORE_LIST = re.compile(r'((?:\$[0-9A-Fa-f]{2}:[0-9A-Fa-f]{4}(?:/[0-9A-Fa-f]{4})*'
@@ -305,6 +317,8 @@ class Layout:
         self.spans = sorted((off(r['address']), off(r['end']), r['name']) for r in rows)
         self.by_name = {n: (s, e) for s, e, n in self.spans}
         self.starts = [s for s, _, _ in self.spans]
+        self.start_set = set(self.starts)
+        self.end_set = {e for _, e, _ in self.spans}
 
     def owner(self, o):
         import bisect
@@ -331,10 +345,66 @@ def _fmt(o: int) -> str:
     return f'${0xC0 + (o >> 16):02X}:{o & 0xFFFF:04X}'
 
 
-def size_findings(r, lay, family_end):
-    """SIZE: `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout."""
+def _claim_offset(bank_text, addr_text, bank):
+    return (int(bank_text, 16) - 0xC0 if bank_text else bank) << 16 | int(addr_text, 16)
+
+
+def _mentioned(text):
+    """The names a companion list mentions, `Name1-3` expanded."""
+    names = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', text))
+    for m in NAME_RANGE.finditer(text):
+        lo, hi = int(m.group(2)), int(m.group(3))
+        if lo <= hi <= lo + 64:
+            names.update(f'{m.group(1)}{i}' for i in range(lo, hi + 1))
+    return names
+
+
+def combined_findings(r, lay, text, parent_of):
+    """SIZE for `Name (N bytes with A and B, $XXXX–$YYYY)`: N is the range's
+    size, the range starts at the routine, ends on a row boundary of the
+    layout (the next row starts right after it, or a row ends there), and
+    every row starting inside it is named in the claim or is a `header: see`
+    sub-entry of the routine or of a named companion."""
     out = []
-    for m in SIZE_CLAIM.finditer(' '.join(r.header_comments(hand_written=True))):
+    for m in COMBINED_CLAIM.finditer(text):
+        name = m.group(1) if m.group(1) in lay.by_name else r.name
+        if name not in lay.by_name:
+            continue
+        start, end = lay.by_name[name]
+        size = int(m.group(2).replace(',', ''))
+        cs = _claim_offset(m.group(4), m.group(5), start >> 16)
+        ce = _claim_offset(m.group(6), m.group(7), cs >> 16)
+        claim = f'{name} ({m.group(2)} bytes with ..., ${m.group(5).upper()}–${m.group(7).upper()})'
+        problems = []
+        if cs != start:
+            problems.append(f'{name} starts at {_fmt(start)}')
+        if size != ce - cs + 1:
+            problems.append(f'${m.group(5).upper()}–${m.group(7).upper()} is {ce - cs + 1} bytes')
+        if ce < end:
+            problems.append(f'{name} alone runs to {_fmt(end)}')
+        elif ce + 1 not in lay.start_set and ce not in lay.end_set:
+            who = lay.owner(ce)
+            problems.append(f'{_fmt(ce)} is not the end of a row' +
+                            (f' (it is inside {who}, {_fmt(lay.by_name[who][0])}–'
+                             f'{_fmt(lay.by_name[who][1])})' if who else ''))
+        else:
+            named = _mentioned(m.group(3)) | {name}
+            stray = [n for s, _, n in lay.spans if cs < s <= ce
+                     and n not in named and parent_of.get(n) not in named]
+            if stray:
+                problems.append(f'the range also holds {", ".join(stray)}, which the claim '
+                                f'does not name')
+        if problems:
+            out.append(f'{r.name}: header says {claim}, but ' + '; '.join(problems))
+    return out
+
+
+def size_findings(r, lay, family_end, parent_of=None):
+    """SIZE: `Name (N bytes, $XXXX–$YYYY)` agrees with the assembled layout;
+    so does `Name (N bytes with ..., $XXXX–$YYYY)` (combined_findings)."""
+    text = re.sub(r'\s+', ' ', ' '.join(r.header_comments(hand_written=True)))
+    out = combined_findings(r, lay, text, parent_of or {})
+    for m in SIZE_CLAIM.finditer(text):
         name = m.group(1) if m.group(1) in lay.by_name else r.name
         if name not in lay.by_name:
             continue
@@ -459,7 +529,7 @@ def header_findings(path: Path):
                                       lay.by_name[r.name][1])
         for r in regions:
             if 'SIZE' in CLAIM_RULES:
-                for text in size_findings(r, lay, family_end):
+                for text in size_findings(r, lay, family_end, parent_of):
                     report(r, 'SIZE', text)
             if 'UNMATCHED' in CLAIM_RULES:
                 for text in unmatched_findings(r, lay):
