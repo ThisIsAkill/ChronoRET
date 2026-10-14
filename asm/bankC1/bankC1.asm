@@ -27,7 +27,7 @@ incsrc "../hardware.inc"
 ; Callers of BankC1_VecCFE300 (1 JSL site): BattleCD_NmiMain ($CD:08B4).
 ; Callers of BankC1_VecCFE58A (2 JSL sites): BattleCD_NmiMain ($CD:0997) and unmatched ($EF:523C).
 ; Callers of BankC1_VecCCE000 (1 JSL site): BattleCD_NmiSetup ($CD:0AB4).
-; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
+; Callers of BankC1_VecRefreshMenu (1 JSL site): BattleCD_WaitFrameRefresh ($CD:3E78).
 ; Callers of BankC1_VecLongDispatch (1 JSL site): Battle_ReencodeText ($CC:F066).
 ; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
 ; ============================================================
@@ -61,8 +61,9 @@ incsrc "../hardware.inc"
 ;     Battle_ReencodeText at $CC:F066 with A = 0).
 ; None of these instructions touches a register or flag.
 ; Callers note: of the JSL sites named above, $CD:08B4 and $CD:0997 are
-;   in BattleCD_NmiMain and $CD:0AB4 in BattleCD_NmiSetup; $CD:3E78 and
-;   $EF:523C are in unmatched code; the one at $CC:F066 is in
+;   in BattleCD_NmiMain and $CD:0AB4 in BattleCD_NmiSetup; $CD:3E78 is
+;   in BattleCD_WaitFrameRefresh; $EF:523C is in unmatched code; the one
+;   at $CC:F066 is in
 ;   Battle_ReencodeText;
 ;   BattleSys_RunServiceVec and BattleSys_ExitVec are listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
@@ -151,21 +152,30 @@ BattleSys_SceneSetup:
 ;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
 ;        DB. For the other six it is assumed. Service 0's call tree is
 ;        not checked here (its bank-$CD callees BattleCD_SetNmiMode1,
-;        BattleCD_StartOpenWipe and BattleCD_WipeRunning are matched, but
-;        StartOpenWipe calls the unmatched $CD:3B71 and $CD:3E7D). The
-;        other five reach these unmatched addresses (services 3, 4, 8
-;        and 9 by way of BattleSys_FrameTickVec and BattleSys_PumpFrames,
-;        4 also BattleCD_ActOp80; service 6 only through
-;        BattleSys_VecCD0024): $CD:3B5F, $CD:3E3B, $CD:3E44, $CD:3E75,
-;        $CD:3ED2 and $D1:ECF3 for services 3, 8 and 9; those and
-;        $D1:F67A for service 4; those and $CD:3B71 for service 6. The
+;        BattleCD_StartOpenWipe and BattleCD_WipeRunning, and the bank-$CD
+;        helpers they call, are matched). The other five (services 3,
+;        4, 8 and 9 by way of BattleSys_FrameTickVec and
+;        BattleSys_PumpFrames, 4 also BattleCD_ActOp80 and, through
+;        BattleAct_LoadCommon, BattleAnim_LoadGfx4Vec,
+;        BattleAnim_LoadGfx2Vec and BattleAnim_UnkVecCD0018; service 6
+;        only through BattleSys_VecCD0024) reach no unmatched address; the
+;        last two they reached, $D1:ECF3 (BattleFx_LoadBgSet, JSL in
+;        BattleCD_FrameTick; services 3, 4, 6, 8 and 9) and $D1:F67A
+;        (BattleFx_Op80Dispatch; service 4), are matched, and so is all
+;        they call (a walk of the JSR/JSL/JMP, branch and jump-table
+;        targets of services 0, 3, 4, 6, 8 and 9 finds no stub). The
 ;        call trees of BattleMenu_UpdateWindows and of
 ;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
 ;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which the call trees of
-;        services 0, 3, 4, 8 and 9 contain (9 through Battle_PoseStep,
-;        which skips it while !Battle_PoseIncludeKo is set), is matched
-;        and returns M=1, X=0. B, P (N and Z
-;        from the PLA), DP, DB and
+;        services 0, 3, 4, 6, 8 and 9 contain (6 through
+;        BattleSys_VecCD0024 -> BattleCD_EnemyDissolve ->
+;        BattleCD_WaitFrameRefresh -> BankC1_VecRefreshMenu ->
+;        BattleMenu_RefreshIfDirtyL -> BattleMenu_UpdateWindows; 9
+;        through Battle_PoseStep, which skips it while
+;        !Battle_PoseIncludeKo is set, and through BattleSys_FrameTickVec
+;        -> BattleCD_FrameTick -> BattleCD_EndLayerFx ->
+;        BattleCD_WaitFrameRefresh and on by the same route), is matched
+;        and returns M=1, X=0. B, P (N and Z from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA
@@ -271,7 +281,7 @@ BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
 ; JMP $001B -> JML $CFFB65, which clears battle RAM and JMLs to
 ; $C1:8000.)
 ; The $CD0036 callee (BattleCD_IdleTick) waits there while the battle is
-; paused (BattleCD_PauseWait, not matched).
+; paused (BattleCD_PauseWait).
 ; Callers (20 JSR sites): BattleSys_UpkeepTwoFrames ($C1:109D, $C1:10BD), BattleSys_DefeatPose
 ;   ($C1:3554), BattleSys_VictoryPose ($C1:358E, $C1:3596, $C1:359E), Battle_RunPcPose ($C1:3686),
 ;   BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
@@ -14590,26 +14600,28 @@ BattleAct_OpUnkRevive:
 ; ==================================================================
 ; BattleAct_OpSetUnkCFFF ($C158DC–$C158E3, 8 bytes)
 ; ==================================================================
-; Opcode $2D: !Battle_ActUnkCFFF = 1; advances 1.
+; Opcode $2D: !BattleFx_HoldAnims = 1 (BattleFx_HoldAnimsTick holds the
+; palette animations); advances 1.
 ; Callers note: BattleAct_OpcodeTable entry $2D.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
 BattleAct_OpSetUnkCFFF:
     LDA.b #1
-    STA.w !Battle_ActUnkCFFF
+    STA.w !BattleFx_HoldAnims
     JMP BattleAct_AdvanceScript     ; by the 1 just stored
 
 ; ==================================================================
 ; BattleAct_OpClearUnkCFFF ($C158E4–$C158EB, 8 bytes)
 ; ==================================================================
-; Opcode $2E: !Battle_ActUnkCFFF = 0; advances 1.
+; Opcode $2E: !BattleFx_HoldAnims = 0 (BattleFx_HoldAnimsTick lets the
+; held palette animations run again); advances 1.
 ; Callers note: BattleAct_OpcodeTable entry $2E.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as from BattleAct_RunThread)
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0; X, Y unchanged
 ; Callees: BattleAct_AdvanceScript (JMP)
 BattleAct_OpClearUnkCFFF:
-    STZ.w !Battle_ActUnkCFFF
+    STZ.w !BattleFx_HoldAnims
     LDA.b #1
     JMP BattleAct_AdvanceScript
 

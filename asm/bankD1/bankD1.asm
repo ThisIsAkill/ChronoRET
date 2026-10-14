@@ -39,16 +39,18 @@ org $D1E70A
 ; !Battle_Unk2A21 bit 1 is set, flips bit 6 of FieldAnimB[7].Unk1 (the
 ; first colour of palette animation 7 moves 64 colours, four rows: to
 ; follow the swapped rows, probably). At the end it steps the 16-bit
-; !BattleCD_FxScriptPtr back by one (why is not traced: probably to undo a
-; step past an argument byte this command does not have; the bank-$CD
-; handler that ends just before the JSL, at $CD:1B95, has the same
-; 16-bit DEC).
-; Callers note: the JSL at $CD:1B9A is followed by RTS, the shape of
-;   bank $CD's script command handlers (past $CD:16B4, not matched).
-; Callers (1 JSL site): unmatched ($CD:1B9A).
+; !BattleCD_FxScriptPtr back by one: script opcode $E1 has no operand,
+; and BattleCD_RunFxScript moves DP $40 one byte on after every handler
+; (the bank-$CD handler that ends just before the JSL, at $CD:1B95, has
+; the same 16-bit DEC).
+; Callers note: the JSL at $CD:1B9A and an RTS are the whole handler of
+;   layer-effect script opcode $E1, which BattleCD_RunFxOp runs with B = 0;
+;   the operand-less opcode explains the step back of DP $40 (the script
+;   loop moves it one byte on after every handler).
+; Callers (1 JSL site): BattleCD_FxOpSwapObjPalettes ($CD:1B9A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0 (DP $40), DB=$7E (the
-;        palettes and flags are read .w); the bank-$CD caller is not
-;        matched, so this is from the code, not traced there
+;        palettes and flags are read .w), as BattleCD_RunFxOp runs the
+;        handler
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (TDC with DP=0); X =
 ;        !Battle_RowBytes; Y = the last colour moved (16-bit);
 ;        !BattleCD_FxScriptPtr's low word one less
@@ -142,8 +144,8 @@ BattleFx_SwapObjPalettes:
 ;     !Battle_Paused is 0 (run) on one frame in four if L is held, else
 ;     non-zero;
 ;   - restores DP $00-$2A, zeroes !BattleFx_IntBusy and
-;     !BattleFx_FrameWait (bank $CD waits for that, probably: $CD:3E58
-;     counts it up and loops until it reads 0).
+;     !BattleFx_FrameWait (bank $CD waits for that: BattleCD_WaitFrame
+;     and BattleCD_PauseWait count it up and loop until it reads 0).
 ; Callers note: no call site; reached through !NmiTrampoline.
 ; Entry: an NMI; any M, X, DP and DB (it sets M=0, X=0, then M=1, DP=0
 ;        and DB itself; the interrupted DP and DB are saved)
@@ -894,12 +896,12 @@ BattleFx_GradWriteRow:
 ; byte of !Battle_FrameCount (!BattleRom_AbsSine, negated for angles
 ; $80-$FF, so s sways between -39 and 39); its bottom edge runs from the
 ; point's x - $10 to x + $10 on the point's line. Then BattleFx_DrawQuad.
-; Callers note: the JSL at $CD:1805 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1805).
+; Callers note: the JSL at $CD:1805 and an RTS are the whole handler of
+;   layer-effect script opcode $F4, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpSwayQuad ($CD:1805).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument, DP $7C),
-;        DB=$7E; B (A's high byte) = 0 assumed: the two TAX copy it into
-;        X (not traced at the bank-$CD caller)
+;        DB=$7E; B (A's high byte) = 0, as BattleCD_RunFxOp runs the
+;        handler: the two TAX copy it into X
 ; Exit:  as BattleFx_DrawQuad (X = the argument)
 BattleFx_SwayQuad:
     LDA.b #!BattleFx_SwayAmp
@@ -946,12 +948,14 @@ BattleFx_SwayQuad:
     JSL BattleFx_DrawQuad
     RTL
 
-; $D1:EC5F — BattleFx_UnkTableEC5F (112 bytes, $EC5F–$ECCE)
-; 4-byte entries read by bank $CD (not matched): $CD:1EFE loads bytes 0,
-; 1 and 2 of entry (A * 4 + DP $4F) into $7E:CB06, $CB08 and (plus DP
-; $51) $CB0A. Nothing in bank $D1 reads it; its meaning is not traced.
+; $D1:EC5F — BattleFx_FxModels (112 bytes, $EC5F–$ECCE)
+; The 3D models of the layer-effect objects, read by bank $CD
+; (BattleCD_FxRotateVertex, $CD:1EFE on: bytes 0, 1 and 2 of entry A * 4
+; + DP $4F into !Battle_FxRotInX/Y/Z, z plus DP $51): seven models of 16
+; bytes, each three vertices of 4 bytes (x, y, z signed, one unused
+; byte) and 4 unused bytes. Nothing in bank $D1 reads it.
 ; Shown as 7 rows of 4 entries.
-BattleFx_UnkTableEC5F:
+BattleFx_FxModels:
     db $00,$B7,$00,$00,$40,$25,$25,$00,$C0,$25,$25,$00,$00,$00,$00,$00
     db $00,$E3,$00,$00,$19,$0E,$0F,$00,$E7,$0E,$0F,$00,$00,$00,$00,$00
     db $00,$DC,$00,$00,$20,$12,$13,$00,$E0,$12,$13,$00,$00,$00,$00,$00
@@ -985,7 +989,7 @@ BattleFx_BgSetPacks:
 ; for each of the set's four entries in BattleFx_BgSetPacks that is not
 ; !BattleFx_BgPackNone, unpacks that graphics pack (!LocGfx_PackPtrs)
 ; to $7E:D000 (Decomp_ToWramVec) and queues its !BattleFx_BgPackBytes to
-; VRAM word $2000, $2800, $3000 or $3800 (by slot; BattleCD_Unk3ECE);
+; VRAM word $2000, $2800, $3000 or $3800 (by slot; BattleCD_QueueVramDmaL);
 ; then copies the set's three palette rows (!BattleRom_BgSetPalettes +
 ; BattleFx_BgSetPalOfs) to saved background rows 2-4 (not the live
 ; ones), and unpacks the set's map (!BattleRom_BgMapPtrs, 3 bytes per
@@ -999,8 +1003,8 @@ BattleFx_BgSetPacks:
 ;        id * 3 are formed 16-bit; not traced at the caller), DP=0 (DP
 ;        $53 is the upload size), DB=$7E (the Decomp_ToWramVec block at
 ;        $0300 and the variables are written .w)
-; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (as
-;        BattleCD_Unk3ECE leaves them; not analysed);
+; Exit:  M=1, X=0, DP and DB unchanged; A = 1 (B = 0), X and Y
+;        clobbered (as BattleCD_QueueVramDmaL leaves them);
 ;        !BattleFx_BgLoading = 0; !BattleFx_BgSet = the set; DP $53 =
 ;        !BattleFx_BgMapBytes
 BattleFx_LoadBgSet:
@@ -1040,7 +1044,7 @@ BattleFx_LoadBgSet:
     LDY.w !BattleFx_BgPackVram
     LDX.w #!BattleFx_DecompBuf
     LDA.b #!Bank7E
-    JSL BattleCD_Unk3ECE
+    JSL BattleCD_QueueVramDmaL
 .next_pack:
     REP #$20
     LDA.w !BattleFx_BgPackVram
@@ -1095,7 +1099,7 @@ BattleFx_LoadBgSet:
     LDY.w #!BattleFx_BgMapVram
     LDX.w #!BattleFx_DecompBuf
     LDA.b #!Bank7E
-    JSL BattleCD_Unk3ECE
+    JSL BattleCD_QueueVramDmaL
     STZ.w !BattleFx_BgLoading
     RTL
 
@@ -1112,9 +1116,9 @@ BattleFx_LoadBgSet:
 ;     not including the last, get !BattleFx_WinFull in their second pair
 ;     (left 0, right 255); nothing when the two meet.
 ;     !BattleFx_CountB counts up to !BattleFx_BandRowsMax (9).
-; Callers note: the JSL at $CD:1850 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1850).
+; Callers note: the JSL at $CD:1850 and an RTS are the whole handler of
+;   layer-effect script opcode $EE, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpGrowBand ($CD:1850).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X clobbered; Y unchanged;
 ;        DP $45/$46 written
@@ -1263,11 +1267,11 @@ BattleFx_MsgSfx:
 ; table into !BattleFx_WinTable1 (up to $7E:C55C). The final INC.w runs
 ; with M=0, so a !BattleFx_CountA of $FF carries into !BattleFx_CountB
 ; ($CD3B).
-; Callers note: the JSL at $CD:185A is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:185A).
-; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 assumed (n * 4 is formed 16-bit
-;        after the 8-bit subtraction; not traced at the caller)
+; Callers note: the JSL at $CD:185A and an RTS are the whole handler of
+;   layer-effect script opcode $EC, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpRampWin2 ($CD:185A).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0, as BattleCD_RunFxOp runs the
+;        handler (n * 4 is formed 16-bit after the 8-bit subtraction)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X unchanged; Y clobbered;
 ;        the word at !BattleFx_CountA incremented
 BattleFx_RampWin2:
@@ -1308,9 +1312,9 @@ BattleFx_RampWin2:
 ;     + !BattleFx_BounceOut) (BattleFx_WaveRight).
 ; The sines are !BattleRom_AbsSine x the radius / 256, negated for
 ; angles $80-$FF. Who fills $7E:E500 is not traced (bank $CD).
-; Callers note: the JSL at $CD:1855 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1855).
+; Callers note: the JSL at $CD:1855 and an RTS are the whole handler of
+;   layer-effect script opcode $ED, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpWaveWindowA ($CD:1855).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument; DP
 ;        $45-$52 scratch), DB=$7E; DP $46/$48 get A's high byte (B) from
 ;        the 16-bit STX, which nothing here reads
@@ -1478,10 +1482,11 @@ BattleFx_WaveLeftA:
 ; Both then grow !BattleFx_CountA by the argument byte and write the
 ; table.
 ; Callers note: the JSLs at $CD:184B (BattleFx_WaveWindowB) and $CD:185F
-;   (BattleFx_WaveWindowB_ByFrame) are each followed by RTS (bank-$CD
-;   script command handlers, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:184B).
-; Callers of BattleFx_WaveWindowB_ByFrame (1 JSL site): unmatched ($CD:185F).
+;   (BattleFx_WaveWindowB_ByFrame), each with an RTS, are the whole
+;   handlers of layer-effect script opcodes $F3 and $EB, which
+;   BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpWaveWindowB ($CD:184B).
+; Callers of BattleFx_WaveWindowB_ByFrame (1 JSL site): BattleCD_FxOpWaveWindowBByFrame ($CD:185F).
 ; Entry (both): M=1, X=0, DP=0 (DP $40 long pointer to the argument; DP
 ;        $45-$52 scratch), DB=$7E; DP $46/$48 get B from the 16-bit STX,
 ;        which nothing here reads
@@ -1679,8 +1684,10 @@ BattleFx_WaveRight:
 ; get $0A00 + n added to both edges of their first pair, and $0A20 + n
 ; (table 0) or $0A40 + n (table 1) to both edges of their second pair.
 ; There is no CLC: each ADC also adds the carry of the one before (the
-; first one the carry the caller left); kept as found. Who fills $0A00
-; is not traced (bank $CD).
+; first one the carry the caller left); kept as found. $0A00 is also
+; !Battle_WaveOffsets, which bank $CD's script opcodes $E7 and $8F
+; (BattleCD_FxOpWaveBg3, BattleCD_FxOpWaves) write; whether anything
+; fills it for this use is not traced.
 ; Callers note: the JSL at $CD:2B64 is followed by RTS (a bank-$CD
 ;   script command handler, probably; not matched).
 ; Callers (1 JSL site): unmatched ($CD:2B64).
@@ -1917,7 +1924,7 @@ BattleFx_Init:
     STA.w !BattleFx_UnkCD46
     STZ.w !Battle_WipeMode
     STZ.w !BattleFx_FrameWait
-    STZ.w !BattleFx_UnkCA26
+    STZ.w !Battle_DmaQueueReq
     STZ.w !Battle_Unk5D9B
     STZ.w !Battle_FxChannels
     LDA.b #$01
@@ -2185,12 +2192,12 @@ BattleFx_RandomByte:
 ; !BattleFx_ShakeY at X = !BattleFx_RecOfs. The random bytes are
 ; BattleFx_RandomByte at mask + frame count and at x + frame count (each
 ; with the carry left before). Then moves !BattleCD_FxScriptPtr on by 2.
-; Callers note: the JSL at $CD:1913 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1913).
+; Callers note: the JSL at $CD:1913 and an RTS are the whole handler of
+;   layer-effect script opcode $DF, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpRandomShake ($CD:1913).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the arguments, DP $43),
-;        DB=$7E; B = 0 assumed (BattleFx_RandomByte's TAX; not traced at
-;        the caller); C is used by the first random index
+;        DB=$7E; B = 0, as BattleCD_RunFxOp runs the handler
+;        (BattleFx_RandomByte's TAX); C is used by the first random index
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = !BattleFx_RecOfs; Y
 ;        = the new low word of !BattleCD_FxScriptPtr; DP $45, $47, $49
 ;        written
@@ -2333,9 +2340,9 @@ BattleFx_NmiAlt:
 ;   - !BattleFx_BounceOut = !BattleFx_BounceBase + the high word of the
 ;     position, or minus it for record !BattleFx_BounceMirrorOfs ($10).
 ; "Bounce" is inferred from the motion (slows down, turns, speeds up).
-; Callers note: the JSL at $CD:1AE6 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1AE6).
+; Callers note: the JSL at $CD:1AE6 and an RTS are the whole handler of
+;   layer-effect script opcode $CE, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpStepBounce ($CD:1AE6).
 ; Entry: M=1, X=0, DP=0 (DP $43), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = !BattleFx_RecOfs; Y
 ;        unchanged
@@ -2402,11 +2409,11 @@ BattleFx_StepBounce:
 ; X (X = the argument byte), two bytes apart: bytes 0, 2, 4 (the x of
 ; the three points, probably) to +0, +4, +8, bytes 1, 3, 5 to +2, +6,
 ; +$A. X = 0 and 1 give two interleaved copies.
-; Callers note: the JSL at $CD:191E is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:191E).
+; Callers note: the JSL at $CD:191E and an RTS are the whole handler of
+;   layer-effect script opcode $DD, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpSaveCalcPoints ($CD:191E).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument), DB=$7E;
-;        B = 0 assumed (TAX; not traced at the caller)
+;        B = 0, as BattleCD_RunFxOp runs the handler (TAX)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = !Battle_ActCalcResult+5; X =
 ;        the argument; Y unchanged
 BattleFx_SaveCalcPoints:
@@ -2431,9 +2438,9 @@ BattleFx_SaveCalcPoints:
 ; the second pair of the other: table 0 into table 1 when bit 0 of
 ; !Battle_FrameCount is set (the table this frame writes), table 1
 ; into table 0 when clear.
-; Callers note: the JSL at $CD:1932 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1932).
+; Callers note: the JSL at $CD:1932 and an RTS are the whole handler of
+;   layer-effect script opcode $DB, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpCopyWin1ToWin2 ($CD:1932).
 ; Entry: M=1, X any (set to 1 here), DP=0 (TDC as 0, DP $7C), DB=$7E
 ; Exit:  M=1, X=0 (REP #$10), DP and DB unchanged; A = 0; X =
 ;        !BattleFx_WinBlockBytes; Y's low byte kept, high byte cleared
@@ -3078,9 +3085,9 @@ BattleFx_EdgeSlope:
 ; DB=$00 (saved and restored around it). X = 0 and 1 are two
 ; interleaved quads; bit 0 of !BattleFx_QuadSlot makes
 ; BattleCD_Unk38B2 aim at the second pair of each line.
-; Callers note: also the JSL at $CD:24E9 (not matched), after REP #$10
-;   with X its quad.
-; Callers (2 JSL sites): BattleFx_SwayQuad ($D1:EC5A) and unmatched ($CD:24E9).
+; Callers note: also the JSL at $CD:24E9 (BattleCD_FxOpBeamQuad, script
+;   opcodes $AC and $D9), after REP #$10 with X its quad (the object).
+; Callers (2 JSL sites): BattleCD_FxOpBeamQuad ($CD:24E9) and BattleFx_SwayQuad ($D1:EC5A).
 ; Entry: M=1, X=0, X = the quad, DP=0, DB=$7E (the quads are read .w)
 ; Exit:  M=1, X=0, DP unchanged, DB restored; A = 0; X and Y clobbered;
 ;        DP $03-$19 and $45-$4A written; the window table lines written;
@@ -3374,9 +3381,9 @@ BattleFx_RasterQuad:
 
 ; $D1:FB68 — BattleFx_AddBoxInset (10 bytes, $FB68–$FB71)
 ; Adds the argument byte to !BattleFx_BoxInset.
-; Callers note: the JSL at $CD:1879 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1879).
+; Callers note: the JSL at $CD:1879 and an RTS are the whole handler of
+;   layer-effect script opcode $E9, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpAddBoxInset ($CD:1879).
 ; Entry: M=1, DP=0 (DP $40 long pointer to the argument), DB=$7E
 ; Exit:  M=1; A = the new inset; X, Y unchanged
 BattleFx_AddBoxInset:
@@ -3393,12 +3400,12 @@ BattleFx_AddBoxInset:
 ; 255 - !BattleFx_BoxInset: a box centred on line 106. Nothing when h
 ; is 0. The table-0 path loads !BattleFx_WinFull and at once overwrites
 ; it (a dead load, kept as found).
-; Callers note: the JSL at $CD:1874 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1874).
+; Callers note: the JSL at $CD:1874 and an RTS are the whole handler of
+;   layer-effect script opcode $E8, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpGrowBox ($CD:1874).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument), DB=$7E;
-;        B = 0 assumed ((line * 4) is formed 16-bit after the 8-bit
-;        subtraction; not traced at the caller)
+;        B = 0, as BattleCD_RunFxOp runs the handler ((line * 4) is
+;        formed 16-bit after the 8-bit subtraction)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X clobbered; Y unchanged;
 ;        DP $45/$46, $49, $4A written
 BattleFx_GrowBox:
@@ -3460,9 +3467,9 @@ BattleFx_GrowBox:
 ; $D1:FBCE — BattleFx_FillWindow (4 bytes, $FBCE–$FBD1)
 ; Runs BattleFx_FillTable's handler X: 0 all empty, 2 first pairs empty,
 ; 4 second pairs empty, 6 first pairs full (in this frame's table).
-; Callers note: the only caller, $CD:29DE (not matched), passes X = the
-;   argument byte * 2 (LDA [$40] / ASL / TAX).
-; Callers (1 JSL site): unmatched ($CD:29DE).
+; Callers note: the only caller, $CD:29DE (BattleCD_FxOpFillWindow, script
+;   opcode $88), passes X = the argument byte * 2 (LDA [$40] / ASL / TAX).
+; Callers (1 JSL site): BattleCD_FxOpFillWindow ($CD:29DE).
 ; Entry: M=1, X=0, X = 0, 2, 4 or 6, DP=0, DB=$7E
 ; Exit:  as the handler: M=1, X=0; A = its fill word's low byte (B the
 ;        high byte); X = 0; Y's low byte kept, high byte cleared
@@ -3719,9 +3726,9 @@ BattleFx_FillAllEmpty:
 ; 255 - left), and for 28 lines of each of the eight 28-line blocks
 ; starting at byte offset X = the argument byte * 2 (8-bit) in the
 ; block: line offset 0-27 for an argument of 0.
-; Callers note: the JSL at $CD:1AE1 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:1AE1).
+; Callers note: the JSL at $CD:1AE1 and an RTS are the whole handler of
+;   layer-effect script opcode $CF, which BattleCD_RunFxOp runs with B = 0.
+; Callers (1 JSL site): BattleCD_FxOpMirrorWin1ToWin2 ($CD:1AE1).
 ; Entry: M=1, X=0, DP=0 (DP $40 long pointer to the argument, DP $45),
 ;        DB=$7E; B does not matter (X is cut to 8 bits before use)
 ; Exit:  M=1, X=0 (REP #$10), DP and DB unchanged; A = 0; X = the end

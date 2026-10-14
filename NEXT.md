@@ -876,7 +876,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    it).
 
 10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
-   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:16B4` (the CD battle batch):
+   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:2A49` and `$CD:3B5F`-`$CD:3FFF`.
+   First `$CD:0000`-`$CD:16B4` (the CD battle batch):
    - the entry block (19 JMP vectors; the names the callers used are kept: `BattleSys_VecCD0000`
      ... `BattleSys_IdleVecCD0036`; new `BattleSys_VecCD000F`, `BattleSys_VecCD001E`, no caller
      found for either) and `BattleCD_EnterBattle` / `BattleCD_ActOp80` (JSLs into bank $D1);
@@ -927,22 +928,103 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    New stubs: the bank-$CD helpers past `$16B4` (`BattleCD_FxOpTable` `$CD:16B5`,
    `BattleCD_PlayPendingSfx` `$3B5F`, `ApuCmd18` `$3B71`, `Unk3B82`, `WaitFrames` `$3E3B`,
    `PauseWait` `$3E44`, `WaitFrameRefresh` `$3E75`, `WaitFrame` `$3E7D`, `DmaToVram` `$3E8E`,
-   `RunQueuedDma` `$3EB4`, `QueueVramDma` `$3ED2`), bank $D1 (seven; gone since the merge with
+   `RunQueuedDma` `$3EB4`, `QueueVramDma` `$3ED2`; matched in batch 2 below), bank $D1 (seven;
+   gone since the merge with
    the bank-$D1 batch, item 11, which matched them) and bank $CE (`BattleCE_UnkE18E`,
-   `UnkEE6E`, `UnkF066`).
+   `UnkEE6E`, `UnkF066`; gone since the merge with the bank-$CE batch, item 12, which matched
+   them under those names).
    Back to review (verified headers edited): `AudioFadeDispatch` (bank $C0), `BattleCF_VblankUploads`,
    `BattleCF_FrameUpdate`, `BattleCF_RemoveMarkedEnemies`, `BattleSys_SceneSetup`,
    `BattleSys_Service6`, `BattleSys_PumpFrames`, `BattleMenu_RefreshIfDirtyAndTick`,
    `BattleMenu_ChooseAttack`, `BattleMenu_UpdateCursorOverlay`, `BattleAi_RunMessage`.
-   Open: the 122 script opcodes (`BattleCD_FxOpTable` and its handlers `$CD:17A9` on) and the rest
-   of the bank's code to `$3FE5` (the helpers stubbed above among it); who else sets
-   `!Battle_HdmaEnable` and `!Battle_TilePageSlot`, the effect scroll (`!BattleFx_ShakeX/Y`),
-   the wave flags and `!Battle_WaveOffsets`, `!Battle_BgTileSave`, `!Battle_Unk2A21`; who reads
-   `!Battle_UnkCA1B`. (Since the merge with the bank-$D1 batch, item 11: `!Battle_Paused`,
-   `!Battle_CgramPending`, the shake bytes, `!Battle_PalAnimRecs89` and `!Battle_PalRowSave`
-   are set there, and `!BattleFx_CeSetReload` / `CeSetBase` / `CeSetWant`, `!BattleFx_GradStart`
-   and `!Battle_UnkCE16` read there.) Next in this bank:
-   `$CD:16B5` (the opcode table, 122 words) and the handlers from `$CD:17A9` up.
+   CD battle batch 2 (branch match-cd-battle2): matched `$CD:16B5`-`$CD:2A49` and
+   `$CD:3B5F`-`$CD:3FFF`:
+   - the helpers: `BattleCD_PlayPendingSfx`, `ApuCmd18`, `BattleCD_WaitScanline` (was
+     `BattleCD_Unk3B82`: busy-waits for a scanline; its NMI argument `!BattleCD_NmiWaitLine`, was
+     `!BattleCD_Unk3B82Arg`), `BattleCD_Div16`, `Mul8x16`, the sine products `BattleCD_CosMul` /
+     `SinMul`, `CosMulStart` / `SinMulStart`, `HalfSinMul`, `HalfSinMul2` (on `!BattleRom_AbsSine`
+     `$CE:F48E`), `BattleCD_Rotate3d`, the unreferenced `BattleCD_Mul8Unused`, `WaitFrames`,
+     `PauseWait`, `WaitFrameRefresh`, `WaitFrame`, `DmaToVram`, `RunQueuedDma`, `QueueVramDma`
+     (+ `QueueVramDmaL`, JSL'd from bank $D1; was the stub `BattleCD_Unk3ECE`), and
+     `BattleCD_OldBuildLeftovers` (`$3F9E`-`$3FFF`:
+     the tail of an older `QueueVramDma`, `$FF` fill, `!BattleRom_DebugSlowMo`);
+   - the layer-effect script's opcode table `BattleCD_FxOpTable` (122 words, `$80`-`$F9`) and the
+     handlers `$CD:17A9`-`$CD:2A41` (94 of the 121 handler addresses, 95 opcodes; a banner before
+     the table: operand conventions, branches, the shared action variables), with their helpers
+     and tables:
+     `BattleCD_FxBranchBack2`, `ClampCalcAngle` (+ `CalcAngle`), `ClampX/Y`, `ClampCalcPair`
+     (+ `01`), `SinMul45`, `ScrollToCalc`, `FxCircleRadii` / `FxCircleFromTable` (+ `FxCircleStep`),
+     `FxDrawModel`, `FxRotateVertex` (models `BattleFx_FxModels` `$D1:EC5F`, was `!BattleRom_FxModels`), `FxWaveStoreX/Y`,
+     `ScaleToCentre`, `NormaliseDiv`, `FxObjSaveOfs`, `FxRing3dTriangle`, `FxRingVertex`,
+     `FxEllipseTriangle`, `FxRegToWorkTable` / `FxWorkToRegTable` with their eight handlers,
+     `FxPalAnimRecs`. Groups: variables and `!Battle_FxValues` tests/branches, jumps and switches,
+     sounds, palette and colour sets, layer-3 scroll (to a point, circles, drift, waves), the screen
+     shake, and two "objects" (0/1: centre, depth, three angles, scale, phases, radii) drawn as
+     filled triangles from 3D models, rings, beams, wedges and the PCs' positions.
+   New sub-entry in a verified routine: `BattleCD_LoadLayerFx_colours` (`$CD:1004`, opcodes $B9/$D2
+   jump there). Quirks recorded: opcode $F9 steps DP $40 one byte short; `BattleCD_FxOpWaveTable`
+   reads an operand it overwrites; `BattleCD_ScaleToCentre`'s 16-bit multiplier path (writes
+   WRDIVL, reads JOY1L); `BattleCD_Mul8x16`'s 16-bit WRMPYB store; `BattleCD_FxOpDrift` adds DP $45
+   with a stale $46; `BattleCD_FxOpCircleGrow` negates only the scroll's low bytes and with k = 0
+   overwrites its growing radii; opcode $CC run through the table takes its points from
+   `!Battle_ActCalcResult+$98`; `BattleCD_Mul8Unused`'s double REP; opcodes $FA-$FE have no entry.
+   New stubs: the handlers `$2A4A` on (`BattleCD_FxOp80`-`86`, `89`-`8B`, `90`-`A0`, by opcode),
+   `BattleCD_FxAddScrollY` / `SubScrollX` / `AddScrollX` / `SubScrollY` (`$2E13`-`$2E78`, opcode
+   $82's), `BattleCD_FillTriangle` `$367C`, `Unk35A5`, `Unk38E5`, `Unk3657`, `Unk3924`; bank $CE
+   `UnkE000`, `UnkE7CF` (gone since the merge with item 12: opcode $B2's handler
+   `BattleCD_FxOpCEE000` calls `BattleCE_CopyWindowEdges`, `BattleCD_CalcAngle` calls
+   `BattleCE_CalcAngle` and names its DP arguments `!BattleCE_AngleAX`-`BY` / `!BattleCE_Angle`;
+   headers edited in that merge: this batch's `BattleCD_FxOpCEE000`, `ClampCalcAngle`,
+   `FxOpWedge`, `FxOpBeam` (not yet reviewed), and, back to review, bank $CE's
+   `BattleCE_CopyWindowEdges` and `BattleCE_CalcAngle` (their callers named and entry states
+   traced from them)). The sixteen bank-$D1 stubs this batch had (`$D1:E70A`, `EBFF`, `EDCD`,
+   `EEA5`, `EEC4`, `EFD0`, `EFE3`, `F47C`, `F559`, `F5CD`, `F5F5`, `F9AF`, `FB68`, `FB72`, `FBCE`,
+   `FD7E`) are gone since the merge with item 11: the handlers call the matched `BattleFx_*`
+   routines (`SwapObjPalettes`, `SwayQuad`, `GrowBand`, `RampWin2`, `WaveWindowA`, `WaveWindowB`
+   (+ `_ByFrame`), `RandomShake`, `StepBounce`, `SaveCalcPoints`, `CopyWin1ToWin2`, `DrawQuad`,
+   `AddBoxInset`, `GrowBox`, `FillWindow`, `MirrorWin1ToWin2`). In that merge the RAM both
+   batches named got one name each (the bank-$D1 batch's where it had one, e.g.
+   `!BattleFx_ShakeX/Y`, `!BattleFx_BounceOut`, `!BattleFx_RecOfs`, `!BattleFx_QuadSlot`,
+   `!BattleFx_BounceDir/Base`, `!BattleFx_FrameWait`, `!BattleRom_AbsSine`; this batch's
+   `!Battle_DmaQueueReq` for `$CA26`); `!Battle_FxQuadX0-Y3`, `!Battle_FxTriX0-Y2` and the bounce
+   words are now fields of `!BattleFx_Quads`, `!BattleFx_CalcCopy` and `!Battle_FxChanWork`.
+   Also in that merge: the one-line handlers are named after their callees
+   (`BattleCD_FxOpSwayQuad`, `GrowBand`, `RampWin2`, `WaveWindowA/B`, `WaveWindowBByFrame`,
+   `GrowBox`, `AddBoxInset`, `RandomShake`, `SaveCalcPoints`, `CopyWin1ToWin2`,
+   `MirrorWin1ToWin2`, `StepBounce`, `SwapObjPalettes`, `FillWindow`; were `FxOpD1xxxx`),
+   `FxOpCallD1ECF3` / `WaitD1ECF3` are `FxOpRequestBgSet` / `WaitBgSet`, `FxOpSetupCD` is
+   `FxOpSetupBounce` (it sets up `BattleFx_StepBounce`), `FxOpSetCFFF` is `FxOpSetHoldAnims`
+   (`$CFFF` is `!BattleFx_HoldAnims`, was also `!Battle_ActUnkCFFF`), and the models
+   `!BattleRom_FxModels` are the label `BattleFx_FxModels` (was `BattleFx_UnkTableEC5F`). Back
+   to review (verified headers edited in the merge): `BattleAct_OpSetUnkCFFF`,
+   `BattleAct_OpClearUnkCFFF`, `BattleSys_RunService` (bank $C1); `BattleSys_VecCD0000`,
+   `BattleCD_NmiMain`, `BattleCD_LoadLayerFx`, `BattleCD_RunFxOp` (this batch's edits); and in
+   bank $D1 the callees of the handlers (their Callers notes and entry hedges: `BattleFx_SwapObjPalettes`,
+   `SwayQuad`, `GrowBand`, `RampWin2`, `WaveWindowA`, `WaveWindowB`, `RandomShake`, `StepBounce`,
+   `SaveCalcPoints`, `CopyWin1ToWin2`, `DrawQuad`, `AddBoxInset`, `GrowBox`, `FillWindow`,
+   `MirrorWin1ToWin2`), `BattleFx_Nmi` (who waits on `!BattleFx_FrameWait`), `BattleFx_FxModels`,
+   `BattleFx_LoadBgSet` (its Exit), `BattleFx_AddLineOffsets` (`$0A00`) and `BattleFx_Init`
+   (`!Battle_DmaQueueReq`).
+   Back to review (verified headers edited in batch 2): `BattleSys_VecCD0000` (the bank banner it
+   carries), `BattleCD_NmiMain` (the rename), `BattleCD_LoadLayerFx` (the sub-entry),
+   `BattleCD_RunFxOp`, and in bank $C1 `EngCall_BattleMain` (Callers note: `$CD:3E78`),
+   `BattleSys_PumpFrames` (PauseWait no longer unmatched) and `BattleSys_RunService` (its list of
+   unmatched addresses each service reaches: none since the merge with item 11, which
+   matched the last two, `$D1:ECF3` and `$D1:F67A`).
+   Open: the handlers from `$CD:2A4A` (opcode $80's dispatcher and its 29-word table at `$2A51`,
+   the loop opcodes $83-$86 on the channel's `$CA72`/`$CA74`, the scroll steps $81/$82, $89-$8B,
+   $90-$A0, the last at `$30BE`) and the code to `$3B5E` they and the matched handlers call
+   (`BattleCD_FillTriangle` and the window-table builders); what DP $20, `!BattleFx_GradRotRaw`,
+   `!BattleFx_UnkCD46`, `!Battle_FxObjUnkD1`, `!BattleFx_BounceDir/Base`, `!Battle_FxChanReg`,
+   `!Battle_FxWinLines` and `!Battle_FxWaveTable` feed; whether any script uses opcodes $F9, $CC
+   or $FA-$FE (the scripts at `!BattleRom_FxScriptPtrs` were not decoded); who else sets
+   `!Battle_HdmaEnable`, `!Battle_BgTileSave`, `!Battle_Unk2A21`; who reads `!Battle_UnkCA1B`.
+   (Since the merge with item 11, `!Battle_Paused`, `!Battle_CgramPending`, `!Battle_PalAnimRecs89`
+   and `!Battle_PalRowSave` are set in bank $D1, `!BattleFx_FrameWait` is cleared by
+   `BattleFx_Nmi`, and `!BattleFx_CeSetReload` / `CeSetBase` / `CeSetWant`, `!BattleFx_GradStart`
+   and `!Battle_UnkCE16` are read there.) Next in this bank: `$CD:2A4A` (opcode $80 and its
+   table) and the handlers up to `$30BE`, then `$CD:30C4`-`$CD:3B5E` (with `BattleCD_Unk38B2`,
+   which `BattleFx_RasterQuad` JSLs).
 
 11. Bank $D1 code (branch match-d1-battle; new file `asm/bankD1/bankD1.asm`): `$D1:E70A`-`$D1:FFFF`
    is matched (the code `$E70A`-`$FEF3` with its tables, and the `$FF` fill `BankD1_EndFill`).
@@ -961,20 +1043,23 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    (`BattleCD_UploadCgram`, `ClearTextGfxL`, `ScrollStepL`, `NmiDispatch`, `InitHdmaDataL`;
    `BattleFx_Init`, `Op80Dispatch`, `NmiAlt`, `UploadMapBlock`, `HpGradientTick`, `LoadBgSet`,
    `HoldAnimsTick`); the stubs left are `BattleCD_Unk38B2` (`$CD:38B2`), `BattleCD_Unk3ECE`
-   (`$CD:3ECE`) and `BattleCE_UnkEE6E`. The bytes both banks use got one name each (the
+   (`$CD:3ECE`) and `BattleCE_UnkEE6E` (since the merge with CD battle batch 2, item 10,
+   `$CD:3ECE` is the matched `BattleCD_QueueVramDmaL`; `BattleCD_Unk38B2` is still a stub;
+   `BattleCE_UnkEE6E` is matched by item 12). The bytes both banks use got one name each (the
    bank-$CD names where they said more, e.g. `!Battle_Paused`, `!Battle_MsgTimer`,
    `!Battle_ShakeXOn`..., the bank-$D1 ones otherwise, e.g. `!BattleFx_CeSetWant`,
    `!BattleFx_GradStart`); opcode $80's groups are the screen shake (`!Battle_ShakeXOn` on) and
    palette-animation records 8/9 (`!Battle_PalAnimRecs89`), and `$D1:EE99` is the message sound
-   table (`BattleFx_MsgSfx`, was `!BattleRom_MsgSfx`). Most remaining callers are unmatched
-   bank-$CD script command handlers (`$CD:17A9` on: one-line JSL, RTS), so entry states are
-   read from the routines and hedged (B = 0 is assumed where a TAX takes it in). Quirks recorded: the carry chaining (no CLC) in
+   table (`BattleFx_MsgSfx`, was `!BattleRom_MsgSfx`). Most remaining callers were then unmatched
+   bank-$CD script command handlers (`$CD:17A9` on: one-line JSL, RTS; matched since by CD
+   battle batch 2, item 10), so entry states are read from the routines and hedged (B = 0 is assumed where a TAX takes it in). Quirks recorded: the carry chaining (no CLC) in
    `BattleFx_AddLineOffsets` and `BattleFx_RandomByte`; the second store of 9 in `BattleFx_Init`;
    the dead `LDA` in `BattleFx_GrowBox`; `BattleFx_EdgeSlope` not checking a zero line count.
    Open: which HDMA channels read the window tables and `!BattleFx_GradHdmaA-D`; the
    `BattleCE_UnkEE6E` sets; the meaning of the `!BattleFx_Unk*` bytes, `!Battle_Unk2A21` (who
    sets it), `$7E:E500` and `$7E:0A00` (who fills them), and the table `BattleFx_UnkTableEC5F`
-   (read by bank $CD past `$16B4` only). When the rest of bank $CD is matched, its callers'
+   (read by bank $CD past `$16B4` only; since CD battle batch 2 `BattleFx_FxModels`, the
+   layer-effect objects' 3D models). When the rest of bank $CD is matched, its callers'
    entry states can replace the hedges here. `$D1:0000`-`$D1:E709` is data, still ROM bytes.
    Headers edited (back to review): Field_RefreshHdmaLong and MusicCueDispatch (their Callers
    notes now name `BattleFx_NmiAlt` / `BattleFx_Init`); in the merge with bank $CD also these
@@ -999,17 +1084,20 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `!BattleRom_HdmaSetOfs` / `!BattleRom_HdmaSetRecs`) and `BattleCE_UnkF066` (parks sprites 4-127).
    The three stub names are kept (matched bank-$CD code calls them by those names; better names
    would be e.g. `BattleCE_StepBg2Wave`, `BattleCE_LoadHdmaSet`, `BattleCE_ParkSprites`, for a
-   change that may edit bank $CD's JSL lines). Entry states of the four entries called from bank $CD
-   past `$16B4` are read from the routines and hedged (B = 0 traced for DrawHalfPlane's TAY to
-   `$CD:30FC`). Quirks recorded: CalcAngle's snap changes the difference by 256 when the second
-   point wraps below 0, and its index runs past a row for differences of 252 or more;
+   change that may edit bank $CD's JSL lines). Entry states of the two entries called from
+   unmatched bank-$CD code (`$CD:2A4A`-`$CD:3B5E`: RunCopyWords, DrawHalfPlane) are read from the
+   routines and hedged (B = 0 traced for DrawHalfPlane's TAY to `$CD:30FC`); since the merge with
+   CD battle batch 2 (item 10) CopyWindowEdges' and CalcAngle's are traced from their matched
+   callers `BattleCD_FxOpCEE000` (opcode $B2) and `BattleCD_CalcAngle` (opcode $CC's handler).
+   Quirks recorded: CalcAngle's snap changes the difference by 256 when the second point wraps
+   below 0, and its index runs past a row for differences of 252 or more;
    DrawHalfPlane's STZ that clears the right edges of lines 0 on when the line ends at x = 0, and
    angle 0 leaving the upper half's left edges unwritten; CopyWindowEdges' 8-bit X wraps for script
    bytes over $4A. Headers edited (back to review): Rom_AngleTable (bank $C0, the `$CE:E85B` reader
    named), BattleSys_VecCD0000 (bank $CD's file banner), BattleCD_StepWipe (the call and its Exit
-   line), BattleFx_ReloadCeSet (what the sets are). Open: the bank-$CD callers past `$16B4`
-   (opcodes $97, $B2, $CC and the helper at `$CD:3616` that runs the word copier) and with them
-   the entry states hedged here; what opcode $B2's byte and the copier's counts are in practice;
+   line), BattleFx_ReloadCeSet (what the sets are). Open: the bank-$CD callers still unmatched
+   (opcode $97 and the helper at `$CD:3616` that runs the word copier) and with them the entry
+   states hedged here; what opcode $B2's byte and the copier's counts are in practice;
    which sets `!BattleFx_CeSetBase` picks (0, 2, 8, $0C, $0E); who sets `!Battle_Unk2A21` bit 0.
    Not matched in $CE: the data, i.e. `$CE:0000`-`$CE:DFFF` (scripts, object records),
    `$CE:EF11`-`$CE:F065` (`!BattleRom_MsgStrings`, the dissolve and layer-effect tables read by

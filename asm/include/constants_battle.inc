@@ -1417,7 +1417,7 @@ if !constants_battle_inc == 0
 !BattleCD_ScrollPassBytes = $0010 ; four scroll entries (one pass of BattleCD_ScrollFill)
 !BattleCD_ScrollFillEnd   = $80   ; 32 entries of 4 bytes
 !BattleCD_AllHdma         = $FF   ; HDMAEN: all eight channels
-!BattleCD_Unk3B82Arg      = $40   ; A for BattleCD_Unk3B82 in the NMI; meaning unknown
+!BattleCD_NmiWaitLine     = $40   ; the scanline BattleCD_NmiMain waits for (BattleCD_WaitScanline); why is not traced
 !BattleCD_CDC9Period      = $0D   ; !BattleFx_GradStart's reload
 !BattleCD_PalAnimBytes    = $0C   ; bytes per FieldAnimB record
 !BattleCD_PalAnims8To11   = $0030 ; four FieldAnimB records (8-11)
@@ -1477,5 +1477,53 @@ if !constants_battle_inc == 0
 !BattleCD_FxNoPage        = $7F   ; script byte: a step with no page
 !BattleCD_FxEnd           = $FF   ; script byte: the end
 !BattleCD_WaitShort       = 16    ; frames of BattleCD_Wait16Frames
+
+; ------------------------------------------------------------
+; Bank $CD: the helpers $CD:3B5F-$CD:3FFF and the script opcodes ($CD:16B5 on)
+; ------------------------------------------------------------
+!BattleCD_Div16Bits       = $0010 ; quotient bits of BattleCD_Div16 (one pass each)
+!BattleCD_ApuCmdPause     = $F5   ; APU command of BattleCD_PauseWait (sent as it is; argument $F5 on pausing, 0 on
+                                  ; resuming: the music's pause, probably)
+!BattleCD_DmaPieceLarge   = $1000 ; BattleCD_QueueVramDma's piece while !Battle_CgramPending is set
+!BattleCD_DmaPieceSmall   = $0400 ; ... and otherwise
+!BattleCD_ScrollWavesBg3Mode = 3   ; !Battle_LayerFxMode of layer 3's wave scroll (BattleCD_ScrollModeTable entry 3)
+!BattleCD_FxWaveKeep      = $FF   ; script opcode $E7's operand that keeps !Battle_FxWaveOfs
+!BattleCD_FxVarMask       = $7F   ; script opcode $D8's variable number (bit 7 = clear it)
+!BattleCD_FxDriftPick     = $0B   ; script opcode $D7: operand bits that pick the work bytes
+!BattleCD_FxDriftAdd      = $40   ; ... operand bit 6: add (else subtract)
+!BattleCD_FxDriftMask     = $1F   ; ... the random steps' range (0-31)
+!BattleCD_FxDivMax        = $FF   ; both bytes of the dividend $FFFF (script opcode $CD)
+!BattleCD_ScreenXMin      = 8     ; BattleCD_ClampX's range
+!BattleCD_ScreenXMax      = $F8
+!BattleCD_ScreenYMin      = 8     ; BattleCD_ClampY's range
+!BattleCD_ScreenYMax      = $D4
+!BattleCD_99D2Mask        = $7F   ; !Battle_Unk99D2 without bit 7 (script opcode $CB)
+!BattleCD_PaletteFlip     = $08   ; !Battler_Palette bit 3 (script opcode $C9 flips it)
+!BattleCD_FxEnemyLine     = $6F   ; the line script opcodes $C7/$C8 measure the first enemy's y from
+!BattleCD_FxWobbleAmpXY   = $20   ; script opcode $C6's swing of the x and y angles
+!BattleCD_FxWobbleAmpZ    = $24   ; ... of the z angle
+!BattleCD_FxCircleX       = $80   ; the centre of script opcode $C4's circles
+!BattleCD_FxCircleY       = $87
+!BattleCD_FxModel2        = $20   ; !BattleCD_FxModelOfs of model 2 (script opcode $BE)
+!BattleCD_FxEdgeMax       = $FF   ; the band's right edge at most (script opcodes $B5/$B6)
+!BattleCD_FxWinLastWord   = $00FE ; offset of !Battle_FxWinLines' last word before the middle
+!BattleCD_FxWaveAmpX      = $32   ; script opcode $B3: the x swing
+!BattleCD_FxWaveAmpY      = $0F   ; ... the y swing
+!BattleCD_FxWaveBaseY     = $20   ; ... added to the y
+!BattleCD_FxWaveTableEnd  = $0350 ; 106 entries of 8 bytes
+!BattleCD_HighByteMask    = $FF00 ; keeps a 16-bit A's high byte
+!BattleCD_FxScaleWhole    = $FF   ; !Battle_FxObjScale: (nearly) unscaled
+!BattleCD_FxNear          = 4     ; BattleCD_FxOpTriCentre: midpoints closer than this are moved apart by it
+!BattleCD_FxNearNeg       = $FC   ; ... -4 as a byte
+!BattleCD_FxWaveFrameMask = $1F   ; script opcode $8F's first operand: the frame mask of the phase step
+!BattleCD_FxWaveSpeedMask = $7F   ; ... its third operand without bit 7 (64 entries)
+!BattleCD_FxSignByte      = $FF   ; the high byte of a negative byte widened to a word
+!BattleCD_ScrollWavesMode = 2     ; !Battle_LayerFxMode of the wave scroll (BattleCD_ScrollModeTable entry 2)
+!BattleCD_FxObjBytes      = $002A ; bytes of the two objects' fields (!Battle_FxObjCentreX on)
+!BattleCD_FxPhaseA        = $C0   ; the flat ring's starting phases (script opcode $A2): a third of a turn apart
+!BattleCD_FxPhaseB        = $15
+!BattleCD_FxPhaseC        = $6A
+!BattleCD_FxPalAnimPick   = $07   ; script opcode $8E: the record bits of its sixth byte
+!BattleCD_FxPalAnimStep   = $F8   ; ... the bits that go to .Unk3
 
 endif
