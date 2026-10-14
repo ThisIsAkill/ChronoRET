@@ -139,18 +139,18 @@ BattleSys_SceneSetup:
 ;        (0-9), B = 0 (the 16-bit TAX)
 ; Exit:  A, X, Y as on entry (8-bit A, 16-bit X and Y pulled back; this
 ;        holds only while the service returns with the same M and X).
-;        Checked only for services 2, 5 and 7, whose callees are all
-;        matched bank-$C1 code. The other seven reach code that is not
-;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
-;        BattleSys_SceneSetup), 1 (Audio_ProcessEntry,
-;        $C7:0004),
+;        Checked only for services 1, 2, 5 and 7: the callees of 2, 5
+;        and 7 are all matched bank-$C1 code, and 1 calls only
+;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
+;        DB. The other six reach code that is not analysed, so for them
+;        it is assumed: 0 (bank-$CC/$CD JSLs, see BattleSys_SceneSetup),
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
 ;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
 ;        through the menu code),
 ;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
-;        6 (BattleCF_RemoveMarkedEnemies, BattleSys_VecCD0024),
+;        6 (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies),
 ;        8 (BattleSys_FrameTickVec,
 ;        BattleSys_PumpFrames and the $CD/$CF JSLs of
 ;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
