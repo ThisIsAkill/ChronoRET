@@ -2263,14 +2263,16 @@ endstruct
                                   ; the two script channels (16 B each, see the bank-$CD banner)
 !Battle_FxScriptIds       = $CA93 ; 4 B: the effect's two channel scripts and two colour sets ($FF = none)
 !Battle_FxScrollX         = $CA5A ; 2 B: layer 3's x while the effect scrolls it (BattleCD_ScrollFxBg3), inside the
-                                  ; channel blocks; writer not traced (an opcode, probably)
+                                  ; channel blocks (channel 0's; each channel has a copy 16 B on): written by the
+                                  ; script opcodes ($AA, $B4, $C4, $C5)
 !Battle_FxScrollY         = $CA5C ; 2 B: its y
 !Battle_FxScrollAddX      = $CA5E ; 2 B: added to !Battle_FxScrollX
 !Battle_FxScrollAddY      = $CA60 ; 2 B: added to !Battle_FxScrollY
 !Battle_UnkCD38           = $CD38 ; 2 B: zeroed by BattleCD_LoadLayerFx; use not traced
 !Battle_UnkCD3A           = $CD3A ; 2 B: the same
 !Battle_UnkCD28           = $CD28 ; 1 B: zeroed by BattleCD_LoadLayerFx; the growing radius of script opcode $C4
-!Battle_UnkCD3C           = $CD3C ; 1 B: the same
+!Battle_UnkCD3C           = $CD3C ; 1 B: zeroed by BattleCD_LoadLayerFx; counted by script opcode $EF (the palette
+                                  ; animations 8-11 stop when it wraps)
 !Battle_UnkCD04           = $CD04 ; 1 B: set to !BattleCD_CD04Init by BattleCD_LoadLayerFx; use not traced
 !Battle_FxRecord          = $C9FC ; 6 B: the effect's !BattleRom_FxRecords entry: byte 0 the block count (bits 0-5;
                                   ; bit 6 goes into the tile word), byte 1 the tile set
@@ -2290,10 +2292,11 @@ endstruct
 !Battle_WaveBg1           = $CC91 ; 2 B: non-zero = layer 1's x gets the !Battle_WaveOffsets lines (mode 2/3)
 !Battle_WaveBg2           = $CC93 ; 2 B: the same for layer 2
 !Battle_WaveBg3           = $CC95 ; 2 B: the same for layer 3
-!Battle_WaveOffsets       = $0A00 ; 2 B per scroll entry: per-line x offsets (mode 2/3 scroll); writer not traced
+!Battle_WaveOffsets       = $0A00 ; 2 B per scroll entry: per-line x offsets (mode 2/3 scroll); written by script
+                                  ; opcodes $E7 and $8F
 !Battle_TilePageReq       = $CA17 ; 1 B: + 1 by a script's page step: BattleCD_NmiUploadText sends the page and clears it
 !Battle_TilePageSlot      = $CA16 ; 1 B: which BattleCD_TileUploadVram address the page goes to; zeroed with the upload
-                                  ; (set by code not matched)
+                                  ; (set by script opcode $B7)
 !Battle_TilePageSrc       = $CA18 ; 2 B: the page's address in bank $7E ($D000 + page * $200)
 !Battle_LastPageSlot      = $CD1F ; 1 B: !Battle_TilePageSlot * 2 of the last page sent
 !Battle_LastPageSrc       = $CD20 ; 2 B: !Battle_TilePageSrc of the last page sent
@@ -2335,7 +2338,8 @@ endstruct
 !Battle_ShakeOfs2Y        = $CCAA ; 2 B: ... layer 2's y
 !Battle_ShakeOfs3X        = $CCAC ; 2 B: ... layer 3's x
 !Battle_ShakeOfs3Y        = $CCAE ; 2 B: ... layer 3's y
-!Battle_ShakeXOn          = $CCB0 ; 1 B: non-zero = the x shake runs (zeroed when its amplitude falls to 0)
+!Battle_ShakeXOn          = $CCB0 ; 1 B: non-zero = the x shake runs (zeroed when its amplitude falls to 0); the shake
+                                  ; bytes are set by script opcode $C0
 !Battle_ShakeXRand        = $CCB1 ; 1 B: its random factor
 !Battle_ShakeXRandTime    = $CCB2 ; 1 B: frames since the last random draw
 !Battle_ShakeXRandPeriod  = $CCB3 ; 1 B: frames between draws
@@ -2369,16 +2373,19 @@ endstruct
 !Battle_UnkCD29           = $CD29 ; 1 B: copied to !Battle_UnkA028 every frame by BattleCD_NmiMain; set by script opcode $DE
 !Battle_UnkCAD3           = $CAD3 ; 1 B: non-zero = BattleCD_NmiSetup runs BankC1_VecCCE000; writer not traced
 !Battle_UnkCD43           = $CD43 ; 1 B: non-zero holds the BattleD1_UnkECF3 call of BattleCD_FrameTick
-!Battle_UnkCD44           = $CD44 ; 1 B: non-zero = BattleCD_FrameTick calls BattleD1_UnkECF3 once (then cleared)
-!Battle_UnkCD45           = $CD45 ; 1 B: A for that call
-!Battle_SfxPending        = $CD23 ; 1 B: non-zero = BattleCD_PlayPendingSfx plays a sound (from $CD24/$CD25)
+!Battle_UnkCD44           = $CD44 ; 1 B: non-zero = BattleCD_FrameTick calls BattleD1_UnkECF3 once (then cleared); + 1
+                                  ; by script opcode $F2, which $F1 waits on
+!Battle_UnkCD45           = $CD45 ; 1 B: A for that call (script opcode $F2's operand)
+!Battle_SfxPending        = $CD23 ; 1 B: non-zero = BattleCD_PlayPendingSfx plays a sound (!Battle_SfxPendingId/Arg);
+                                  ; set by script opcodes $DC/$E4
 !Battle_WipeMode          = $CA1E ; 1 B: 0 none, $FF opening (first step), 1-$7F opening, $80-$FE closing
 !Battle_WipeSteps         = $CA1F ; 1 B: wipe steps left
 !Battle_UnkCE16           = $CE16 ; 1 B: 1 from the closing wipe's start, 0 at the end of an opening wipe; reader
                                   ; not traced
 !Battle_UnkCE0A           = $CE0A ; 1 B: BattleCD_LayerFx84 waits for it to be 0; writer not traced
 !Battle_UnkCE0B           = $CE0B ; 1 B: BattleCD_LayerFx84 waits for it to be below 2; writer not traced
-!Battle_UnkCE0E           = $CE0E ; 1 B: set to !BattleCD_CE0EInit by BattleCD_LayerFx84; reader not traced
+!Battle_UnkCE0E           = $CE0E ; 1 B: set to !BattleCD_CE0EInit by BattleCD_LayerFx84 and by script opcode $F7;
+                                  ; reader not traced
 !Battle_UnkA017           = $A017 ; 1 B: 7 picks effect !BattleCD_FxByBattle+1 (BattleCD_LoadLayerFx); writer not traced
 !Battle_UnkA018           = $A018 ; 1 B: 7 picks effect !BattleCD_FxByBattle itself
 
@@ -2474,9 +2481,10 @@ endstruct
                                   ; around (and its triangle scaled towards)
 !Battle_FxObjCentreY      = $CAD6 ; ... the screen y
 !Battle_FxObjDepth        = $CAD8 ; ... added to the model's z before the rotation
-!Battle_FxObjUnkDA        = $CADA ; ... stepped by script opcode $C2 under a limit; reader not traced
-!Battle_FxObjUnkDC        = $CADC ; ... the same
-!Battle_FxObjUnkDE        = $CADE ; ... the same
+!Battle_FxObjUnkDA        = $CADA ; ... the first vertex's radius of the ring opcodes ($A2-$A4, $A8); also stepped by
+                                  ; opcode $C2 under a limit
+!Battle_FxObjUnkDC        = $CADC ; ... the second vertex's
+!Battle_FxObjUnkDE        = $CADE ; ... the third vertex's
 !Battle_FxObjPhaseA       = $CAE4 ; ... phase of the wobble of !Battle_FxObjAngleX (script opcode $C6)
 !Battle_FxObjPhaseB       = $CAE6 ; ... of !Battle_FxObjAngleY
 !Battle_FxObjPhaseC       = $CAE8 ; ... of !Battle_FxObjAngleZ
@@ -2523,5 +2531,20 @@ endstruct
 !BattleCD_SlopeB          = $47   ; 2 B DP: the second line's slope
 !BattleCD_BaseA           = $49   ; 2 B DP: the first line's y at x = 0
 !BattleCD_BaseB           = $4B   ; 2 B DP: the second line's
+!Battle_FxQuadX0          = $CD0D ; 1 B per object 0-1 (2 B apart): the beam's first corner x (script opcode $AC)
+!Battle_FxQuadY0          = $CD0F ; ... first corner y
+!Battle_FxQuadX1          = $CD11 ; ... second corner x
+!Battle_FxQuadY1          = $CD13 ; ... second corner y
+!Battle_FxQuadX2          = $CD15 ; ... third corner x
+!Battle_FxQuadY2          = $CD17 ; ... third corner y
+!Battle_FxQuadX3          = $CD19 ; ... fourth corner x
+!Battle_FxQuadY3          = $CD1B ; ... fourth corner y
+!Battle_WavePhase         = $CC90 ; 1 B: the wave scroll's phase (script opcode $8F)
+!Battle_FxObjSquashX      = $CAE0 ; 1 B per object 0-1 (2 B apart): an angle whose |sin| scales the flat ring's x
+                                  ; (BattleCD_FxEllipseTriangle)
+!Battle_FxObjSquashY      = $CAE2 ; ... the same for its y
+!Battle_FxObjSaves        = $CB0E ; 8 slots of $2A B: copies of the objects' fields (script opcodes $A5/$A6)
+!Battle_FxChanReg         = $CA77 ; 2 B per channel (X = the channel's offset): the word script opcodes $8C/$8D copy to
+                                  ; and from the work words; other readers not traced
 
 endif

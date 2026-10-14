@@ -1406,5 +1406,15 @@ if !constants_battle_inc == 0
 !BattleCD_FxScaleWhole    = $FF   ; !Battle_FxObjScale: (nearly) unscaled
 !BattleCD_FxNear          = 4     ; BattleCD_FxOpTriCentre: midpoints closer than this are moved apart by it
 !BattleCD_FxNearNeg       = $FC   ; ... -4 as a byte
+!BattleCD_FxWaveFrameMask = $1F   ; script opcode $8F's first operand: the frame mask of the phase step
+!BattleCD_FxWaveSpeedMask = $7F   ; ... its third operand without bit 7 (64 entries)
+!BattleCD_FxSignByte      = $FF   ; the high byte of a negative byte widened to a word
+!BattleCD_ScrollWavesMode = 2     ; !Battle_LayerFxMode of the wave scroll (BattleCD_ScrollModeTable entry 2)
+!BattleCD_FxObjBytes      = $002A ; bytes of the two objects' fields (!Battle_FxObjCentreX on)
+!BattleCD_FxPhaseA        = $C0   ; the flat ring's starting phases (script opcode $A2): a third of a turn apart
+!BattleCD_FxPhaseB        = $15
+!BattleCD_FxPhaseC        = $6A
+!BattleCD_FxPalAnimPick   = $07   ; script opcode $8E: the record bits of its sixth byte
+!BattleCD_FxPalAnimStep   = $F8   ; ... the bits that go to .Unk3
 
 endif

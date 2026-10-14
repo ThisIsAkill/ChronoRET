@@ -876,7 +876,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    it).
 
 10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
-   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:16B4` (the CD battle batch):
+   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:2A49` and `$CD:3B5F`-`$CD:3FFF`.
+   First `$CD:0000`-`$CD:16B4` (the CD battle batch):
    - the entry block (19 JMP vectors; the names the callers used are kept: `BattleSys_VecCD0000`
      ... `BattleSys_IdleVecCD0036`; new `BattleSys_VecCD000F`, `BattleSys_VecCD001E`, no caller
      found for either) and `BattleCD_EnterBattle` / `BattleCD_ActOp80` (JSLs into bank $D1);
@@ -934,15 +935,59 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleCF_FrameUpdate`, `BattleCF_RemoveMarkedEnemies`, `BattleSys_SceneSetup`,
    `BattleSys_Service6`, `BattleSys_PumpFrames`, `BattleMenu_RefreshIfDirtyAndTick`,
    `BattleMenu_ChooseAttack`, `BattleMenu_UpdateCursorOverlay`, `BattleAi_RunMessage`.
-   Open: the 122 script opcodes (`BattleCD_FxOpTable` and its handlers `$CD:17A9` on) and the rest
-   of the bank's code to `$3FE5` (the helpers stubbed above among it); who sets `!Battle_Paused`,
-   `!Battle_CgramPending`, `!Battle_HdmaEnable`, `!Battle_TilePageSlot`, the effect scroll
-   (`!Battle_FxScrollX/Y`), the wave flags and `!Battle_WaveOffsets`, the shake bytes,
-   `!Battle_PalAnimRecs89`, `!Battle_PalRowSave`, `!Battle_BgTileSave`, `!Battle_Unk2A21`; who
-   reads `!Battle_UnkCA24`/`CA25`, `!Battle_UnkCDC9`, `!Battle_UnkCE16`, `!Battle_UnkCA1B`; what
-   `!Battle_UnkEC` / `!Battle_UnkCA21` toggle (a button in the NMI flips them); the bank-$D1 NMI
-   handler (`$D1:E77C`) and the code it and `BattleD1_InitBattle` reach. Next in this bank:
-   `$CD:16B5` (the opcode table, 122 words) and the handlers from `$CD:17A9` up.
+   CD battle batch 2 (branch match-cd-battle2): matched `$CD:16B5`-`$CD:2A49` and
+   `$CD:3B5F`-`$CD:3FFF`:
+   - the helpers: `BattleCD_PlayPendingSfx`, `ApuCmd18`, `BattleCD_WaitScanline` (was
+     `BattleCD_Unk3B82`: busy-waits for a scanline; its NMI argument `!BattleCD_NmiWaitLine`, was
+     `!BattleCD_Unk3B82Arg`), `BattleCD_Div16`, `Mul8x16`, the sine products `BattleCD_CosMul` /
+     `SinMul`, `CosMulStart` / `SinMulStart`, `HalfSinMul`, `HalfSinMul2` (on `!BattleRom_SinAbsTable`
+     `$CE:F48E`), `BattleCD_Rotate3d`, the unreferenced `BattleCD_Mul8Unused`, `WaitFrames`,
+     `PauseWait`, `WaitFrameRefresh`, `WaitFrame`, `DmaToVram`, `RunQueuedDma`, `QueueVramDma`
+     (+ `QueueVramDmaL`, JSL'd from bank $D1), and `BattleCD_OldBuildLeftovers` (`$3F9E`-`$3FFF`:
+     the tail of an older `QueueVramDma`, `$FF` fill, `!BattleRom_PauseFullBright`);
+   - the layer-effect script's opcode table `BattleCD_FxOpTable` (122 words, `$80`-`$F9`) and the
+     handlers `$CD:17A9`-`$CD:2A41` (94 of the 121 handler addresses, 95 opcodes; a banner before
+     the table: operand conventions, branches, the shared action variables), with their helpers
+     and tables:
+     `BattleCD_FxBranchBack2`, `ClampCalcAngle` (+ `CalcAngle`), `ClampX/Y`, `ClampCalcPair`
+     (+ `01`), `SinMul45`, `ScrollToCalc`, `FxCircleRadii` / `FxCircleFromTable` (+ `FxCircleStep`),
+     `FxDrawModel`, `FxRotateVertex` (models `!BattleRom_FxModels` `$D1:EC5F`), `FxWaveStoreX/Y`,
+     `ScaleToCentre`, `NormaliseDiv`, `FxObjSaveOfs`, `FxRing3dTriangle`, `FxRingVertex`,
+     `FxEllipseTriangle`, `FxRegToWorkTable` / `FxWorkToRegTable` with their eight handlers,
+     `FxPalAnimRecs`. Groups: variables and `!Battle_FxValues` tests/branches, jumps and switches,
+     sounds, palette and colour sets, layer-3 scroll (to a point, circles, drift, waves), the screen
+     shake, and two "objects" (0/1: centre, depth, three angles, scale, phases, radii) drawn as
+     filled triangles from 3D models, rings, beams, wedges and the PCs' positions.
+   New sub-entry in a verified routine: `BattleCD_LoadLayerFx_colours` (`$CD:1004`, opcodes $B9/$D2
+   jump there). Quirks recorded: opcode $F9 steps DP $40 one byte short; `BattleCD_FxOpWaveTable`
+   reads an operand it overwrites; `BattleCD_ScaleToCentre`'s 16-bit multiplier path (writes
+   WRDIVL, reads JOY1L); `BattleCD_Mul8x16`'s 16-bit WRMPYB store; `BattleCD_FxOpDrift` adds DP $45
+   with a stale $46; `BattleCD_FxOpCircleGrow` negates only the scroll's low bytes and with k = 0
+   overwrites its growing radii; opcode $CC run through the table takes its points from
+   `!Battle_ActCalcResult+$98`; `BattleCD_Mul8Unused`'s double REP; opcodes $FA-$FE have no entry.
+   New stubs: the handlers `$2A4A` on (`BattleCD_FxOp80`-`86`, `89`-`8B`, `90`-`A0`, by opcode),
+   `BattleCD_FxAddScrollY` / `SubScrollX` / `AddScrollX` / `SubScrollY` (`$2E13`-`$2E78`, opcode
+   $82's), `BattleCD_FillTriangle` `$367C`, `Unk35A5`, `Unk38E5`, `Unk3657`, `Unk3924`; bank $D1
+   `UnkE70A`, `EBFF`, `EDCD`, `EEA5`, `EEC4`, `EFD0`, `EFE3`, `F47C`, `F559`, `F5CD`, `F5F5`,
+   `F9AF`, `FB68`, `FB72`, `FBCE`, `FD7E`; bank $CE `UnkE000`, `UnkE7CF`.
+   Back to review (verified headers edited in batch 2): `BattleSys_VecCD0000` (the bank banner it
+   carries), `BattleCD_NmiMain` (the rename), `BattleCD_LoadLayerFx` (the sub-entry),
+   `BattleCD_RunFxOp`, and in bank $C1 `EngCall_BattleMain` (Callers note: `$CD:3E78`),
+   `BattleSys_PumpFrames` (PauseWait no longer unmatched) and `BattleSys_RunService` (its list of
+   unmatched $CD addresses: now only `$D1:ECF3` and `$D1:F67A` remain).
+   Open: the handlers from `$CD:2A4A` (opcode $80's dispatcher and its 29-word table at `$2A51`,
+   the loop opcodes $83-$86 on the channel's `$CA72`/`$CA74`, the scroll steps $81/$82, $89-$8B,
+   $90-$A0, the last at `$30BE`) and the code to `$3B5E` they and the matched handlers call
+   (`BattleCD_FillTriangle` and the window-table builders); what DP $20, `!Battle_UnkCE10`,
+   `!Battle_UnkCD46`, `!Battle_FxObjUnkD1`, `!Battle_FxChanUnk52/54`, `!Battle_FxChanReg`,
+   `!Battle_FxWinLines` and `!Battle_FxWaveTable` feed; whether any script uses opcodes $F9, $CC
+   or $FA-$FE (the scripts at `!BattleRom_FxScriptPtrs` were not decoded); who sets `!Battle_Paused`,
+   `!Battle_CgramPending`, `!Battle_HdmaEnable`, `!Battle_PalAnimRecs89`, `!Battle_PalRowSave`,
+   `!Battle_BgTileSave`, `!Battle_Unk2A21`; who clears `!Battle_FrameWait` (the bank-$D1 NMI,
+   probably); who reads `!Battle_UnkCA24`/`CA25`, `!Battle_UnkCDC9`, `!Battle_UnkCE16`,
+   `!Battle_UnkCA1B`; what `!Battle_UnkEC` / `!Battle_UnkCA21` toggle; the bank-$D1 NMI handler
+   (`$D1:E77C`) and the code it and `BattleD1_InitBattle` reach. Next in this bank: `$CD:2A4A`
+   (opcode $80 and its table) and the handlers up to `$30BE`, then `$CD:30C4`-`$CD:3B5E`.
 
 ## Tables
 

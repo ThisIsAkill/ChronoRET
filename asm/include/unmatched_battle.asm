@@ -9,46 +9,7 @@
 ; ============================================================
 
 ; --- Bank $CD after the matched part (script opcode handlers and the code they call) ---
-org $CD2433
-BattleCD_ClampCalcPair:                 ; JSR: clamps the two points at !Battle_ActCalcResult+X to the screen (X kept)
-org $CD2436
-BattleCD_ClampCalcPair01:               ; JSR: the same for entries 0 and 1 (X = 0 inside; X kept)
-org $CD2460
-BattleCD_FxOpBeam:                      ; script opcode $AC handler (BattleCD_FxOpTable)
-org $CD2466
-BattleCD_FxOpBeamQuad:                  ; JMP from BattleCD_FxOpBeamFromPair: the rest of script opcode $AC
-org $CD24F3
-BattleCD_FxOpAB:                        ; script opcode $AB handler (BattleCD_FxOpTable)
-org $CD2518
-BattleCD_FxOpA9:                        ; script opcode $A9 handler (BattleCD_FxOpTable)
-org $CD253B
-BattleCD_FxOp8F:                        ; script opcode $8F handler (BattleCD_FxOpTable)
-org $CD2660
-BattleCD_FxOpA7:                        ; script opcode $A7 handler (BattleCD_FxOpTable)
-org $CD2687
-BattleCD_FxOp87:                        ; script opcode $87 handler (BattleCD_FxOpTable)
-org $CD2690
-BattleCD_FxOpA5:                        ; script opcode $A5 handler (BattleCD_FxOpTable)
-org $CD26C0
-BattleCD_FxOpA6:                        ; script opcode $A6 handler (BattleCD_FxOpTable)
-org $CD26E0
-BattleCD_FxOpA4:                        ; script opcode $A4 handler (BattleCD_FxOpTable)
-org $CD2717
-BattleCD_FxOpA3:                        ; script opcode $A3 handler (BattleCD_FxOpTable)
-org $CD278E
-BattleCD_FxOpA2:                        ; script opcode $A2 handler (BattleCD_FxOpTable)
-org $CD27CA
-BattleCD_FxOpA8:                        ; script opcode $A8 handler (BattleCD_FxOpTable)
-org $CD2952
-BattleCD_FxOpA1:                        ; script opcode $A1 handler (BattleCD_FxOpTable)
-org $CD2958
-BattleCD_FxOp8C:                        ; script opcode $8C handler (BattleCD_FxOpTable)
-org $CD2999
-BattleCD_FxOp8D:                        ; script opcode $8D handler (BattleCD_FxOpTable)
-org $CD29DA
-BattleCD_FxOp88:                        ; script opcode $88 handler (BattleCD_FxOpTable)
-org $CD29E3
-BattleCD_FxOp8E:                        ; script opcode $8E handler (BattleCD_FxOpTable)
+
 org $CD2A4A
 BattleCD_FxOp80:                        ; script opcode $80 handler (BattleCD_FxOpTable)
 org $CD2DCB
@@ -113,6 +74,8 @@ org $CD30BE
 BattleCD_FxOp97:                        ; script opcode $97 handler (BattleCD_FxOpTable)
 org $CD35A5
 BattleCD_Unk35A5:                       ; JSR from BattleCD_FxOpWindowBand after it fills !Battle_FxWinLines
+org $CD3657
+BattleCD_Unk3657:                       ; JSR from BattleCD_FxOp3657 (script opcode $A1) with A = the operand
 org $CD367C
 BattleCD_FillTriangle:                  ; JSR/JMP: fills the triangle of the three points in DP $12-$17 for object
                                         ; !Battle_FxTriObject, probably (it sorts them by y first, with DB = $00; not analysed)
@@ -123,6 +86,7 @@ org $CD3924
 BattleCD_Unk3924:                       ; JSR from BattleCD_FxOp3924 (script opcode $B8) with A = the operand
 
 ; --- Bank $D1 battle code (called from bank $CD; none analysed) ---
+
 org $D1E70A
 BattleD1_UnkE70A:                       ; JSL from BattleCD_FxOpD1E70A (script opcode $E1)
 org $D1E8D9
@@ -160,14 +124,19 @@ org $D1F5F5
 BattleD1_UnkF5F5:                       ; JSL from BattleCD_FxOpD1F5F5 (script opcode $DB)
 org $D1F67A
 BattleD1_ActOp80:                       ; JSL from BattleCD_ActOp80 (action opcode $80)
+org $D1F9AF
+BattleD1_UnkF9AF:                       ; JSL from BattleCD_FxOpBeam: the four corners in !Battle_FxQuadX0-Y3 (draws the quad, probably)
 org $D1FB68
 BattleD1_UnkFB68:                       ; JSL from BattleCD_FxOpD1FB68 (script opcode $E9)
 org $D1FB72
 BattleD1_UnkFB72:                       ; JSL from BattleCD_FxOpD1FB72 (script opcode $E8)
+org $D1FBCE
+BattleD1_UnkFBCE:                       ; JSL from BattleCD_FxOpD1FBCE (script opcode $88) with A, X = the operand * 2
 org $D1FD7E
 BattleD1_UnkFD7E:                       ; JSL from BattleCD_FxOpD1FD7E (script opcode $CF)
 
 ; --- Bank $CE battle code (called from bank $CD; none analysed) ---
+
 org $CEE000
 BattleCE_UnkE000:                       ; JSL from BattleCD_FxOpCEE000 (script opcode $B2)
 org $CEE18E
