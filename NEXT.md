@@ -714,15 +714,70 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_NameTextBuf`/`NameTextBytes`/`NameTextVram`/`LoadSoundCmd` are
    `Menu_TextGfxA`/`TextGfxBytes`/`TextTileDestA`/`SoundCmdF3`. Re-review needed after the merge
    (verified headers edited, their loaders now named): `Menu_VramRecUnkFC53`, `Menu_VramRecUnkFC61`.
-   Of the modes $0B-$0E ranges only $D32C-$D4EF (mode 6's slot window and details,
-   `Menu_UnkD32C`/`D36C` with $D466, the tables at $D45F/$D4B4 and $D4BB/$D4D5, reached from modes 6
-   and $0E) and $E914-$E91A (an unreferenced 7-byte VRAM record: VRAM $5840 = $7E:2E80, $80 bytes)
-   are left. Open: what cursor C on record `Menu_ShopRecCursorC` marks; who sets `Menu_PriceFactor`;
+   Open: what cursor C on record `Menu_ShopRecCursorC` marks; who sets `Menu_PriceFactor`;
    readers of `Menu_NameUnk0F0A`/`0F0B`; the shop's and name screen's draw lists and HDMA bits.
-   Still unmatched in bank $C2: $C550-$C620 (mode 4's button map drawing), $C627-$C7A5, $C7AC-$CED3,
-   $CEDC-$D155 (modes 5-7), $D32C-$D4EF, $E914-$E91A, $F905-$F90B, $FCA6-$FE09 and $FE0C-$FFFF. Next
-   in reach order: `Menu_UnkC54F`-`C5C7` (the routine at $C54F starts on `Menu_WindowVramRec`'s last
-   byte), then modes 5-7 with $D32C-$D4EF (also reached from mode $0E) and the shop's $FCB2-$FE09.
+   Also matched (branch match-c2-modes57): the rest of bank $C2, which is now all from source.
+   Mode 4's button map rows $C2:C54F-$C620 (`Menu_UnkC54F` applies the map: `MenuRom_DefaultButtonMap`,
+   or `Menu_CfgButtonMap` with `Menu_CfgA4`; `Menu_UnkC57A` draws the six rows' letters through
+   `Menu_ButtonLetter` (font letters A X L R B Y S at `MenuRom_ButtonLetters`, $FF:D554) and
+   `Menu_CfgMapRowOfs`; `Menu_UnkC5C7` marks the rows the edit changes); `Menu_WindowVramRec` is 7
+   bytes now (its old 8th byte is `Menu_UnkC54F`'s JSR opcode). Modes 5 and 7, the party order
+   ($C2:C621-$CED3: `Menu_Mode05H0`-`H2`, `Menu_Mode07H0`/`H1`, the picks `Menu_XchgFirstFree`/
+   `PickFirst`/`ClearPicks`/`Swap`/`BlockPos`, the cursor `Menu_XchgCursor`/`Edge`/`Skip`, the reserve
+   list scroll `Menu_XchgScroll`/`ShiftSprites`, the rows `Menu_XchgBuildRows`/`PlaceSprites`/
+   `AddSprite`/`PlaceAll`/`PlaceOne`/`HideSprites`/`Poses`/`DimLocked`/`DimChar` with
+   `Menu_XchgRowMaps`/`SprPos`, icon 4's preview and redraw `Menu_UnkC9E5`/`CAE6` with
+   `Menu_XchgPreviewTable`/`PreviewA`/`PreviewB`, `Menu_XchgInit`, mode 7's music
+   `Menu_XchgMusic`/`MusicThread`/`SendSound`/`Sound81`/`Leave` and screen `Menu_XchgScreenMap`/
+   `StartWave`/`WaveThread`); `Menu_DrawText4bpp` ($C2:F905, mode $81 into `Menu_DrawText`'s new
+   `.mode`). Mode 6, the save screen ($C2:CEDC-$D155: `Menu_Mode06H0`-`H3` with
+   `Menu_Mode06H1Confirm`, `Menu_SaveRedraw`, `Menu_SaveToSlot`, `Menu_Mode06Leave`,
+   `Menu_SaveAskBack`; the slot cursor `Menu_UnkCFA2` and highlight `Menu_UnkCFFB` with
+   `Menu_SlotHiliteData`; icon 5's preview and redraw `Menu_UnkD065`/`D0DB`; `Menu_UnkD0E5`;
+   `Menu_DrawSlotWindows`/`DrawSlotWindow`) and the slot windows and details ($C2:D32C-$D4EF:
+   `Menu_UnkD32C` frame, `Menu_UnkD36C` details, `Menu_SlotMemberIcon` with `Menu_SlotIconTiles`,
+   `Menu_SaveAskOpen`/`Close`, `Menu_SlotEraVramRec`); `Menu_VramRecUnkE914` ($C2:E914, no
+   reference); `MenuRom_DefaultConfig`/`DefaultButtonMap` as labels ($C2:FCA6; the `!` defines now
+   name them); the shop's arithmetic $C2:FCB2-$FE09 (`Menu_ShopBuyQtyInit`/`SellQtyInit`,
+   `Menu_ShopDivide` (24 by 16 bits), `Menu_UnkFD58`/`FD68` (multiply), `Menu_ShopGainGold`/
+   `PayGold`, `Menu_ShopCapGold`); and `BankC2_OldBuildLeftovers` ($C2:FE0C-$FFFF: three tails of the
+   shop code from earlier builds, then 277 bytes not in the current code). The stub names kept their
+   `Unk` names (`Menu_UnkC54F`/`C57A`/`C5C7`/`C9E5`/`CAE6`/`CFA2`/`CFFB`/`D065`/`D0DB`/`D0E5`/`D32C`/
+   `D36C`/`FD58`/`FD68`) because verified headers name them; better names once those are next edited:
+   `Menu_CfgMapApply`/`CfgMapDraw`/`CfgMapMarks`, `Menu_Icon4Preview`/`Redraw`, `Menu_SaveCursor`,
+   `Menu_SlotHilite`, `Menu_Icon5Preview`/`Redraw`, `Menu_SaveInit`, `Menu_DrawSlotFrame`,
+   `Menu_DrawSlotDetails`, `Menu_ShopMul16`/`Mul8`. Found: icon 4 (mode 5) and BankC2_MenuEntry
+   argument 5 (mode 7) are the party order screen: `Menu_Unk0D36` non-zero (`$FFFF` from
+   `Menu_BuildItemTables`, so always in mode 5; mode 7 takes the entry's X) shows only the party
+   (probably the in-menu reorder), mode 7 with X = 0 the reserve too (probably an event's party
+   exchange; it plays song $3E and resumes `Menu_XchgSong` with `Audio_Cmd11`); `Menu_Unk7F01DF` has
+   the `BankFF_CharBits` of characters that cannot be moved; object n of `Menu_SprPages` is
+   character n; `Menu_Unk0D34` / object busy bits (`C2Scene_Unk0294`/`0299`/`ObjBFlags` bit 6) refuse
+   the save screen; the slot details show the play time, a string per location nibble
+   (`MenuRom_SlotEraNibbles`/`SlotEraStrings`, probably the era) and the members with 2 x 2 icons;
+   `Menu_Unk2C53` is capped at 9,999,999 (`Menu_GoldMax`). Quirks recorded: `Menu_XchgBuildRows`' dead
+   `LDA #$40` (BEQ after BNE); `Menu_XchgSwap`'s absolute stores to `Menu_DrawArg2`; the redundant MVN
+   in `Menu_UnkC9E5` (overwritten by `Menu_DimPalette`); `Menu_XchgPoses` reading
+   `Menu_PartyOrder + $40` with no row to pick; `Menu_UnkD36C`'s 16-bit STZ of $25 zeroing
+   `Menu_SlotTextWidth` after the question's path; `Menu_DrawSlotWindows`' absolute INC of $0062;
+   `Menu_UnkFD58` losing a carry in its second pass; `Menu_ShopPayGold` turning a borrow into $98xxxx;
+   `Menu_ShopGainGold`'s never-taken carry; `Menu_ShopSellQtyInit`'s overwritten STZ;
+   `Menu_Mode06H3` probably unreached (nothing sets handler 3). Re-review needed (verified headers or
+   sources edited): `Menu_LoadWindowGfx` (banner range), `Menu_WindowVramRec` (7 bytes),
+   `Menu_Mode05List`, `Menu_Mode06List`, `Menu_Mode07List` ("not analysed" gone),
+   `Menu_MainPreviewTable`, `Menu_MainRedrawTable` (icons 4 and 5 named), `Menu_CfgEntry8` and
+   `Menu_CfgMapAssign` (Exit lines), `Menu_DrawText` (the `.mode` label and its banner),
+   `Menu_DrawClock` (the D3AA caller), `Menu_VramRecBg1Big` (the banner's loader note),
+   `C2Script_IfRamByteNe` (its $FFB4 note) and `BankFF_CharBits` (its $CD59 reader), and the bank
+   header line of bank $C2 (now "all from source") and the menu setup banner before
+   `Menu_Expand3bppTiles`. Stale, left for the branch that owns them (headers in $D4F8-$E913): the
+   `Menu_Mode0BH0` header ("both not matched": `Menu_UnkD065`, `Menu_UnkD0E5`) and the
+   `Menu_LoadCursor` header (`Menu_UnkCFFB` "not matched"); the mode 3/4 lists' "not analysed". Open:
+   what `Menu_XchgUnk0F12`, `Menu_Unk04FB` and `C2Scene_Unk0299` are; what the strings of
+   `MenuRom_NameStrings` 4/5 and `MenuRom_SlotEraStrings` say; what `Menu_UnkCFFB`'s HDMA table
+   drives; who calls `$C2:FF00` (a JSL at $C9:6E49, unmatched bank) and what the 277 leftover bytes
+   were; who loads `Menu_VramRecBg1High`, `Bg3Rows4`, `Bg3Rows16` and `Menu_VramRecUnkE914` (no
+   loader in bank $C2).
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:

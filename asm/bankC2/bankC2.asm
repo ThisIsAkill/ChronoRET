@@ -37783,7 +37783,9 @@ Menu_XchgLeave:
 ; the character's sprite colours (Menu_XchgDimChar; nothing for an
 ; empty row) and 6 map rows of its block, on Menu_XchgMap and on
 ; Menu_Bg2Map ($1000 on), with Menu_SetRowsAttr: Menu_XchgDimAttr
-; (14 tiles from Menu_XchgDimMap, attribute bits $10 set), or with only
+; (14 tiles from Menu_XchgDimMap; each attribute byte keeps bits 0-3
+; and gets $10: palette + 4, probably the halved colours that
+; Menu_DimPalette puts at Menu_DimPalBuf, colour $40 on), or with only
 ; the party shown Menu_XchgAloneDimAttr (16 tiles from
 ; Menu_XchgAloneDimMap; then also the .X of cursor records 0-2 =
 ; Menu_XchgAloneCursorX). The map address (Menu_Tmp04) moves 6 rows
@@ -38197,8 +38199,8 @@ Menu_XchgSprPos:
 ; BankFF_BuildScreenMap, Menu_XchgScreenVramRec queued, then a tail jump
 ; to Menu_QueueVramRom with Menu_VramRecBg3Full.
 ; Callers (1 JSR site): Menu_Mode07H0 ($C2:C7C8).
-; Entry: M any, X=0 (16-bit LDX), DP=$0000 (as BankFF_BuildScreenMap
-;        needs), DB=$7E
+; Entry: M=1, X=0 (16-bit LDX), DP=$0000, DB=$7E (as
+;        BankFF_BuildScreenMap needs them)
 ; Exit:  as Menu_QueueVramRom
 ; Calls: BankFF_BuildScreenMap (JSL), Menu_QueueVramRom; jumps to
 ;   Menu_QueueVramRom.
