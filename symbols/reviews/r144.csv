@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$D1:F4C0,BattleFx_NmiAlt,2026-10-09,rev144a,approved,9bf6b626b6ea,"Traced all DB=$7E writes: only STA.w HDMAEN + UploadCgram .w stores hit WRAM; InitChannelsFD DP $4300, PalAnim DB=$00 (rotates PLB $7E, no regs), ScrollStepAccum none; $CD:041A/0420 ok"
