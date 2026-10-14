@@ -97,11 +97,13 @@ every tool that reads them regenerates them when they are stale, and
   (asar's address-to-line map). Unmatched code is judged first by decoding onward from matched
   code (`flow`: branches, jumps, calls and matched jump tables, with M/X tracked through
   REP/SEP, PHP/PLP and the exit widths of each routine called), and where that does not reach,
-  by decoding forward from the 64 bytes before the hit under each M/X start state and voting
-  (`sweep`). Both are heuristics: read a CONFIRMED hit in unmatched code before you rely on
+  by decoding forward from the 64 bytes before the hit (from the source's instruction lines in
+  matched code, and only from after matched data when the window holds some) under each M/X
+  start state and voting (`sweep`). Both are heuristics: read a CONFIRMED hit in unmatched code before you rely on
   it. `tools/callers.py`, the lint and the library default (`Xref()`) use both (`--sweep-only`
   shows the sweep's verdicts alone); `python3 tools/test_xref.py` checks the verdicts against
-  known sites and the source.
+  known sites and the source (`make test-tools` runs it and `tools/test_index_claims.py`; so
+  does CI's ROM job).
 - `python3 tools/callers.py --update` rewrites the `; Callers (...)` block of every header from
   xref's CONFIRMED sites (`--show NAME` prints one, `--check` lists the ones that differ). Run
   it after matching code and after merging `origin/main`: new routines change other routines'
