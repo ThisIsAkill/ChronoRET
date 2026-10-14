@@ -34406,10 +34406,11 @@ Menu_TechDrawMembers:
 ; = $1C, .ScreenY = Menu_TechRowSprY[Menu_TechSprRow].
 ; Callers (4 JSR sites): Menu_TechMemberScrollAnim ($C2:B5E0, $C2:B69C), Menu_TechDrawMembers
 ;   ($C2:BA82) and Menu_TechDrawRows ($C2:BBAD).
-; Entry: M any (P saved; SEP #$20 here), X any (with X=0
-;        Menu_TechSprRow is read as a word: its high byte must be 0, as
-;        the callers leave it), DP=$0000, DB=$7E; A = the character id
-;        (low byte)
+; Entry: M any (P saved; SEP #$20 here), X=0 (Menu_Times64's PLP
+;        gives back the caller's X: with X=1 it would clear the high byte
+;        of Y, the page offset $100-$180 of characters 4-6; Menu_TechSprRow
+;        is then read as a word, its high byte 0 as the callers leave
+;        it), DP=$0000, DB=$7E; A = the character id (low byte)
 ; Exit:  P restored; A's low byte = the row's .ScreenY (the last
 ;        LDA.l Menu_TechRowSprY), B = the page's high byte (Menu_Times64
 ;        runs after the SEP #$20); X = Menu_TechSprRow, Y = the page
