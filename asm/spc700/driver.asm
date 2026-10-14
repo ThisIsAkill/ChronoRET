@@ -124,7 +124,7 @@ Spc_Start:
     mov.b !Spc_FadeTimer,#!Spc_FadeTicks
     mov x,#6                            ; groups 2, 1, 0 (X = 2 x (group + 1))
 .groups:
-    mov a,#$FF
+    mov a,#!Spc_GroupVolStart
     mov.w !Spc_GroupVol+1-2+x,a         ; the volume (high byte)
     inc a
     mov.w !Spc_GroupFadeSteps-2+x,a     ; no fade running
@@ -218,7 +218,7 @@ Spc_MainLoop:
     mov.b a,!Spc_SongTracks
     xcn a
     or.b a,!Spc_SongTracks
-    and a,#$0F                          ; voice n or n+4
+    and a,#!Spc_LowNibble               ; voice n or n+4
     or.b a,!Spc_SfxVoices
     mov y,a
     mov.b a,!Spc_UnkD3
@@ -244,7 +244,7 @@ Spc_MainLoop:
     mov x,#$00
     mov.b !Spc_VoiceBit,#!Spc_VoiceBit0
     mov.b a,!Spc_SfxVoices
-    eor a,#$FF
+    eor a,#!Spc_InvertBits
     and.b a,!Spc_SongTracks
     and.b a,!Spc_Unk24
     mov.b !Spc_TrackBits,a
@@ -567,7 +567,7 @@ Spc_StartSong:
     mov.b !Spc_Unk7C,a
     mov.b !Spc_Unk7B,a
     mov.b !Spc_Tempo,#!Spc_StartTempo
-    mov.b !Spc_TempoAccum,#$FF          ; the first pass steps
+    mov.b !Spc_TempoAccum,#!Spc_TempoAccumStart
     mov.b y,!Spc_SongHeaderSet
     mov x,#!Spc_NumSongTracks
 .copy_set:
@@ -599,7 +599,7 @@ Spc_StartSong:
     mov.b !Spc_TrackPtr+x,a
     mov.b !Spc_TrackPtr+1+x,y
     call Spc_InitTrack
-    mov a,#$FF
+    mov a,#!Spc_TrackF220Start
     mov.w !Spc_TrackF220+x,a
 .no_track:
     dec x
@@ -797,7 +797,7 @@ Spc_StartSfx:
     dec x
     lsr.b !Spc_VoiceBit
 .skip:
-    mov a,#$DC                          ; $DC: the `dec y` the BEQ above lands on
+    mov a,#$DC                          ; lint-ok: $DC is the `dec y` opcode the BEQ above lands on
     dec y
     bpl .pointer
     mov.b a,!Spc_SfxVoices

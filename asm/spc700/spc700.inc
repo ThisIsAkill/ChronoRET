@@ -174,6 +174,11 @@
 !Spc_QueueEntry = 4                      ; bytes per !Spc_CmdQueue entry
 !Spc_StartEchoDelay = $05                ; the echo delay Spc_Start sets (as Audio_Boot's
                                          ; !Audio_DefaultEchoDelay on the 65816 side)
+!Spc_GroupVolStart = $FF                 ; each !Spc_GroupVol volume after Spc_Start (full)
+!Spc_TempoAccumStart = $FF               ; !Spc_TempoAccum at a song's start: the first pass steps
+!Spc_TrackF220Start = $FF                ; !Spc_TrackF220 at a song track's start
+!Spc_LowNibble = $0F                     ; the low nibble
+!Spc_InvertBits = $FF                    ; EOR mask: all eight bits inverted
 !Spc_StartTempo = $01                    ; !Spc_Tempo at a song's start (a step every 256 passes until
                                          ; the song sets its own, probably)
 !Spc_FadeTicks = 7                       ; passes per !Spc_FadeTimer round

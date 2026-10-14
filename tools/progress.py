@@ -7,10 +7,20 @@ method), reads label addresses from asar, applies the readability lint and
 the review log, and writes:
 
   symbols/functions.csv         one row per function: where, how big, kind, status
-  symbols/progress.json         totals, per bank, per 4 KB address-map slice
+  symbols/spc700_functions.csv  the same for the SPC700 sound driver (asm/spc700/),
+                                by ARAM and ROM address
+  symbols/progress.json         totals, per bank, per 4 KB address-map slice, and the
+                                SPC700 driver's figure apart (key "spc700")
   symbols/progress_history.csv  one row per working day (--update-history)
 
-functions.csv and progress.json are not tracked: every tool that reads them
+The SPC700 driver is counted apart from the 65816 code: its routines are
+rows of spc700_functions.csv (never of functions.csv), its share is taken
+of the driver's code bytes (tools/spc700.py, CODE_RANGES), and neither the
+65816 figure nor its denominator (symbols/code_survey.csv) includes it. Its
+statuses work the same way: the lint's SPC700 rules (tools/lint_spc700.py)
+and the same review log, keyed by routine name and source_hash.
+
+functions.csv, spc700_functions.csv and progress.json are not tracked: every tool that reads them
 regenerates them when they are stale (tools/generated.py), and the docs
 carry no generated numbers. Run `--update` to have them on disk (the wiki
 sync reads them from here). Never type a count or percentage by hand.
@@ -56,12 +66,15 @@ import asm_source  # noqa: E402
 import generated  # noqa: E402
 import lint_readability  # noqa: E402
 import review_log  # noqa: E402
+import spc700  # noqa: E402
 import verify  # noqa: E402
 
 ROM_PATH = Path('roms/chrono_trigger.sfc')
 MAIN_ASM = Path('asm/main.asm')
 SYMBOLS = Path('symbols')
 FUNCTIONS_CSV = generated.FUNCTIONS_CSV
+SPC700_CSV = generated.SPC700_CSV
+SPC700_SOURCE = Path('asm/spc700/driver.asm')
 PROGRESS_JSON = generated.PROGRESS_JSON
 HISTORY_CSV = SYMBOLS / 'progress_history.csv'
 # Docs that once carried generated blocks; --check keeps them out.
@@ -223,7 +236,7 @@ def read_reviews() -> dict[str, dict]:
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
-def build_facts(work: Path) -> tuple[set[int], dict[str, int]]:
+def build_facts(work: Path) -> tuple[set[int], dict[str, int], dict[str, int]]:
     rom = ROM_PATH.read_bytes()
     lo = verify.assemble_onto(0x00, work)
     hi = verify.assemble_onto(0xFF, work)
@@ -234,20 +247,54 @@ def build_facts(work: Path) -> tuple[set[int], dict[str, int]]:
     subprocess.run(['asar', '--no-title-check', '--fix-checksum=off', '--symbols=wla',
                     f'--symbols-path={sym}', str(MAIN_ASM), str(rom_copy)],
                    check=True, capture_output=True)
-    addrs = {}
+    addrs, aram = {}, {}
     for line in sym.read_text().splitlines():
         m = re.match(r'^([0-9A-F]{2}):([0-9A-F]{4}) (\S+)$', line)
         if m:
             off = snes_to_offset(int(m.group(1), 16), int(m.group(2), 16))
             if off is not None:
                 addrs[m.group(3)] = off
-    return emitted, addrs
+            elif m.group(1) == '00':
+                aram[m.group(3)] = int(m.group(2), 16)     # SPC700 labels: ARAM addresses
+    return emitted, addrs, aram
+
+
+def spc700_functions(emitted: set[int], aram: dict[str, int]) -> list[dict]:
+    """Rows for the SPC700 driver's labels (asm/spc700/driver.asm), as
+    analyse() makes them for the 65816 code: from each label, the bytes the
+    source emits, up to the next label."""
+    if not SPC700_SOURCE.exists():
+        return []
+    rom = ROM_PATH.read_bytes()
+    first, base, size = spc700.driver_block(rom)
+    source = {r.name: r for r in asm_source.file_regions(SPC700_SOURCE)}
+    starts = sorted((a, n) for n, a in aram.items() if n in source and base <= a < base + size)
+    code = {a for lo, hi in spc700.CODE_RANGES for a in range(lo, hi + 1)}
+    rows = []
+    for idx, (start, name) in enumerate(starts):
+        off = first + start - base
+        if off not in emitted:
+            continue
+        nxt = starts[idx + 1][0] if idx + 1 < len(starts) else base + size
+        end = start
+        while end < nxt and first + end - base in emitted:
+            end += 1
+        r = source[name]
+        rows.append({
+            'address': f'${start:04X}', 'end': f'${end - 1:04X}', 'size': end - start,
+            'rom': offset_to_snes(off), 'rom_end': offset_to_snes(off + end - 1 - start),
+            'name': name, 'kind': 'code' if r.kind == 'code' and start in code else 'data',
+            'status': 'matched', 'source_hash': r.source_hash,
+            'notes': header_note(r.lines, r.label, name), 'file': r.file,
+        })
+    return rows
 
 
 def analyse() -> dict:
     with tempfile.TemporaryDirectory() as tmp:
-        emitted, addrs = build_facts(Path(tmp))
+        emitted, addrs, aram = build_facts(Path(tmp))
     source = source_functions()
+    spc_rows = spc700_functions(emitted, aram)
 
     starts = sorted((off, name) for name, off in addrs.items() if name in source)
     functions = []
@@ -266,9 +313,16 @@ def analyse() -> dict:
         })
 
     # The layout is known now; the lint's caller checks read it from here.
-    with generated.generating([dict(f) for f in functions]):
+    with generated.generating([dict(f) for f in functions], [dict(f) for f in spc_rows]):
         lint = lint_readability.blocking(lint_readability.by_function(lint_readability.collect()))
     reviews = read_reviews()
+    for f in spc_rows:
+        if f'{f["file"]}:{f["name"]}' not in lint:
+            f['status'] = 'readable'
+            review = reviews.get(f['name'])
+            if review and review['verdict'] == 'approved' and review['source_hash'] == f['source_hash']:
+                f['status'] = 'verified'
+        del f['file']
     for f in functions:
         src = source[f['name']]
         if f'{src["file"]}:{f["name"]}' not in lint:
@@ -328,7 +382,11 @@ def analyse() -> dict:
     return {'emitted_bytes': len(emitted), 'code_bytes': surveyed_total + moved,
             'surveyed_code_bytes': surveyed_total,
             'totals': level_totals(functions), 'banks': bank_rows,
-            'slices': slices, 'functions': functions}
+            'slices': slices, 'functions': functions,
+            'spc700': {'code_bytes': sum(hi - lo + 1 for lo, hi in spc700.CODE_RANGES),
+                       'data_bytes': sum(hi - lo + 1 for lo, hi in spc700.DATA_RANGES),
+                       'totals': level_totals(spc_rows)},
+            'spc700_functions': spc_rows}
 
 
 # ── Outputs ──────────────────────────────────────────────────────────────────
@@ -345,9 +403,24 @@ def render_functions_csv(result) -> str:
     return buf.getvalue()
 
 
+SPC700_COLS = ['address', 'end', 'size', 'rom', 'rom_end', 'name', 'kind', 'status', 'source_hash',
+               'notes']
+
+
+def render_spc700_csv(result) -> str:
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=SPC700_COLS, lineterminator='\n')
+    w.writeheader()
+    w.writerows(result['spc700_functions'])
+    return buf.getvalue()
+
+
 def render_progress_json(result) -> str:
+    # "spc700" (added beside schema 3's keys; nothing else changed): the
+    # driver's code and data bytes and its totals per level, apart from the
+    # 65816 figures.
     data = {k: result[k] for k in ('emitted_bytes', 'code_bytes', 'surveyed_code_bytes', 'totals',
-                                   'banks', 'slices')}
+                                   'banks', 'slices', 'spc700')}
     return json.dumps({'schema': SCHEMA, **data}, indent=2) + '\n'
 
 
@@ -392,9 +465,21 @@ def render_status_line(result) -> str:
             f'{t["verified"]["functions"]} are verified by independent review.')
 
 
+def render_spc700_line(result) -> str:
+    s = result['spc700']
+    t, code = s['totals'], s['code_bytes']
+    return (f'SPC700 sound driver (counted apart): {t["matched"]["code_bytes"]:,} of {code:,} code bytes '
+            f'matched byte-exact ({pct(t["matched"]["code_bytes"], code)}, {t["matched"]["functions"]} '
+            f'routines, plus {t["matched"]["data_bytes"]:,} of {s["data_bytes"]:,} bytes of data); '
+            f'{t["readable"]["functions"]} of those meet the readability standard and '
+            f'{t["verified"]["functions"]} are verified by independent review.')
+
+
 def write_generated(result) -> None:
-    """Write symbols/functions.csv and progress.json (tools/generated.py)."""
+    """Write symbols/functions.csv, spc700_functions.csv and progress.json
+    (tools/generated.py)."""
     generated.write_outputs({FUNCTIONS_CSV: render_functions_csv(result),
+                             SPC700_CSV: render_spc700_csv(result),
                              PROGRESS_JSON: render_progress_json(result)})
 
 
@@ -475,6 +560,7 @@ def main() -> int:
     print(render_summary(result))
     print()
     print(render_status_line(result))
+    print(render_spc700_line(result))
     return 0
 
 

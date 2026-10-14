@@ -77,6 +77,11 @@ asm/include/ and are exempt):
          Opt out with `lint-ok:` on the label line or on a line of the
          Exit paragraph.
 
+SPC700 (asm/spc700/*.asm, the sound driver): the same rules where they
+apply (ADDR, CALL, CONST, WIDTH, OPCODE, PLUMB, HEADER, SIZE), STATE in
+place of DPDB (the Entry line states P, the direct-page flag), and a check
+of the hand-written callers in place of CALLERS. See tools/lint_spc700.py.
+
 A line can opt out of one finding with `; lint-ok: <reason>` (the reason is
 mandatory and is what review checks); for HEADER that line is the label
 line. CALLERS cannot be opted out of.
@@ -577,7 +582,8 @@ def collect():
     for path in sorted(Path('.').glob(ASM_GLOB)):
         for function, no, rule, text in lint_file(path) + header_findings(path):
             findings.append((str(path), function, no, rule, text))
-    return findings
+    import lint_spc700          # the SPC700 driver, asm/spc700/ (its rules: lint_spc700.py)
+    return findings + lint_spc700.collect()
 
 
 def by_function(findings):
