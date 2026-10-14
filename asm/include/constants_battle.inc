@@ -1526,4 +1526,52 @@ if !constants_battle_inc == 0
 !BattleCD_FxPalAnimPick   = $07   ; script opcode $8E: the record bits of its sixth byte
 !BattleCD_FxPalAnimStep   = $F8   ; ... the bits that go to .Unk3
 
+!BattleCD_FxDropStep      = $0010 ; script opcode $80 sub-op $16: a marked !BattleFx_WaveBaseX word goes down by this
+!BattleCD_FxWaveClearBytes = $06A0 ; sub-op $15: bytes zeroed from !BattleFx_WaveBaseX (it and !BattleFx_WaveMoving)
+!BattleCD_FxMiscFrame     = $0040 ; sub-op $14: the !Battle_FrameCount it sets
+!BattleCD_FxCalcYMin      = $31   ; sub-op $12: the least y of !Battle_ActCalcResult entry 0
+!BattleCD_99D2Bit7        = $80   ; !Battle_Unk99D2 bit 7 (sub-op $11 sets it)
+!BattleCD_BgColours       = $80   ; the background palettes' 128 colours (sub-op $11 runs records 10/11 up to the last)
+!BattleCD_FxBandBytes     = $80   ; bytes of one colour-band table (32 entries of 4 B)
+!BattleCD_FxBandHalfBytes = $40   ; ... its first 16 entries (the rising half)
+!BattleCD_FxBandsLast     = $017C ; offset of the last of the 96 band entries (the three tables in a row)
+!BattleCD_FxBandLines     = 4     ; lines per band entry (sub-ops $00, $0E)
+!BattleCD_FxBandLinesTall = $14   ; ... (sub-op $13)
+!BattleCD_FxSineAmp       = $0C   ; sub-op $0C: the sine's amplitude (12 pixels)
+!BattleCD_FxOamFirst      = $10   ; sub-op $09: byte offset of OAM entry 4 in the low table
+!BattleCD_FxOamMoveSrcEnd = $08BF ; ... the MVP moving entries 4-111 to 20-127: last source byte
+!BattleCD_FxOamMoveDstEnd = $08FF ; ... its last destination byte
+!BattleCD_FxOamMoveBytes  = $01B0 ; ... its byte count (108 entries)
+!BattleCD_FxOamHiSrcEnd   = $091B ; ... the MVP for their high-table bytes: last source byte
+!BattleCD_FxOamHiDstEnd   = $091F ; ... last destination byte
+!BattleCD_FxOamHiBytes    = $001B ; ... byte count
+!BattleCD_FxSprBytes      = $0040 ; ... bytes of the 16 template sprites
+!BattleCD_FxSprYMax       = $D5   ; ... a y below 256 from this on is moved off the screen
+!BattleCD_FxSprPriority   = $30   ; ... attribute bits ORed in: priority 3
+!BattleCD_FxScreenMidX    = $80   ; sub-op $02: x of the screen's middle
+!BattleCD_FxTriLowY       = $9F   ; sub-op $06: the second point's y
+!BattleCD_FxTriTipX       = $C0   ; ... the third point
+!BattleCD_FxTriTipY       = $50
+!BattleCD_FxScrollStepMask = $1F  ; script opcode $82: the step's bits (step - 1)
+!BattleCD_FxScrollDirMask = $E0   ; ... the direction's bits
+!BattleCD_FxMosaicMax     = $0F   ; script opcode $90: the largest mosaic size
+!BattleCD_FxW12Bit3       = $08   ; script opcode $94: W12SEL bit 3 (window 2 on for BG1)
+!BattleCD_FxEdgesNone     = $00FF ; !Battle_UnkC155/C157 values: bytes $FF, $00
+!BattleCD_FxEdgesAll      = $FF00 ; ... bytes $00, $FF
+!BattleCD_FxEdgesFF       = $FFFF ; ... bytes $FF, $FF (script opcode $98, bit 7)
+!BattleCD_FxShapeYMax     = $D3   ; script opcode $89: the largest shape centre y
+!BattleCD_ColIntensity    = $1F   ; COLDATA bits 0-4: the intensity (script opcode $9C)
+!BattleCD_ColChannels     = $E0   ; COLDATA bits 5-7: the channels
+!BattleCD_FxWBgLogBits45  = $30   ; script opcode $98: its operand's bits 4-5
+!BattleCD_FxWBgLogMask    = $3F   ; ... the bits stored to WBGLOG
+!BattleCD_HalfPlaneWin2   = $02   ; script opcode $97's flags bit 1: the channel's second angle and window 2
+!BattleCD_HalfPlaneArgMask = $7F  ; ... the flags passed to BattleCE_DrawHalfPlane (without bit 7)
+!BattleCD_FxScreenCentre  = $7080 ; a point word (x $80, y $70): the screen's centre
+!BattleCD_FxShapeSizeMask = $7F   ; BattleCD_FxCircleHalfWidths: the size's radius bits
+!BattleCD_FxUpperLast     = $FE   ; offset of !Battle_FxWinLines' last word before the middle (8-bit X)
+!BattleCD_FxDomeCountInit = $FF   ; BattleCD_FxBuildDome's line counter before its first INC
+!BattleCD_FxMidWord       = $0080 ; index of !Battle_FxWinLines' middle word
+!BattleCD_FxShapeLineEnd  = $00DE ; the shape copies cut lines from line 222 on
+!BattleCD_CopyWordsEnd    = $E7C7 ; the RTS ending BattleCE_CopyWordsToLines (its entry for n = 0)
+
 endif
