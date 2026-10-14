@@ -35,8 +35,12 @@
 !SPC_CONTROL_ClearPorts = $30            ; clear all four port latches, timers off, IPL ROM off
 !SPC_CONTROL_Timers01 = $03              ; timers 0 and 1 on, IPL ROM off
 !SPC_CONTROL_ClearPorts01 = $13          ; the same plus clear the port 0/1 latches
+!SPC_CONTROL_Timer1 = $02                ; timer 1 on, timer 0 off (stopped to take a new divider)
+!SPC_CONTROL_IplRom = $80                ; the IPL ROM mapped at $FFC0, timers off
+!SPC_IplRom = $FFC0                      ; the IPL ROM's entry
 !SPC_Timer0Divider = $2A                 ; 42 x 125 us = 5.25 ms: one pass of the main loop
 !SPC_Timer1Divider = $80                 ; 128 x 125 us = 16 ms
+!SPC_Timer0Fast = $01                    ; timer 0 divider under command $F6: a pass every 125 us
 
 ; --- S-DSP registers (per voice: + $10 x voice) ---
 !DSP_GAIN = $07                          ; voice 0's GAIN
@@ -47,6 +51,13 @@
 !DSP_EVOLR = $3C                         ; echo volume right
 !DSP_KOF = $5C                           ; key off (a bit per voice)
 !DSP_DIR = $5D                           ; sample directory page
+!DSP_VOLL = $00                          ; voice 0's volume left (VOLR is the next register)
+!DSP_ADSR1 = $05                         ; voice 0's ADSR1 (bit 7: ADSR on, else GAIN)
+!DSP_FLG = $6C                           ; reset, mute, echo-write disable, noise clock
+!DSP_ADSR_OnBit = $80                    ; ADSR1 bit 7
+!DSP_ADSR_OffMask = $7F                  ; ADSR1 without bit 7
+!DSP_FLG_ResetMute = $E0                 ; FLG: soft reset, mute, echo writes off
+!DSP_MVOL_Boost = $7F                    ; main volume command $8E sets (Spc_CmdVolumeBoost)
 
 !DSP_GAIN_Start = $A0                    ; GAIN Spc_Start gives every voice (bits 7-5 = %101:
                                          ; exponential decrease; rate 0: the envelope does not move)
@@ -116,10 +127,26 @@
 !Spc_CmdArg1 = $8F                       ; APUIO2 (Audio_CmdArg1)
 !Spc_CmdArg2 = $90                       ; APUIO3 (Audio_CmdArg2)
 !Spc_VoiceBit = $91                      ; the voice bit of the track in hand (X)
+!Spc_XferAddr = $97                      ; word: a transfer's ARAM address (its header's APUIO2/3);
+                                         ; also the placeholder operand of the stores
+                                         ; Spc_XferTriples / Live / Words rewrite
+!Spc_XferDest = $99                      ; word: Spc_XferMove's destination
 !Spc_Ptr93 = $93                         ; word: a pointer (Spc_StartSfx: the effect's entry in the
                                          ; table at !AudioAram_Block2F00)
 !Spc_Temp9B = $9B                        ; scratch byte
 !Spc_Temp9C = $9C                        ; scratch byte
+!Spc_Mute = $A7                          ; voice bits: song tracks on these voices get volume 0
+                                         ; (Spc_Unk09F6 at $0A40); commands $F4, $F8, $F9
+!Spc_TempoAdj = $A9                      ; word: $AA = a tempo adjustment (signed; Spc_Unk0377 scales
+                                         ; !Spc_Tempo by it, probably), $A9 its fraction
+!Spc_TempoAdjDelta = $AB                 ; word: added to !Spc_TempoAdj each fade step
+!Spc_TempoAdjSteps = $AD                 ; fade steps left
+!Spc_PitchAdj = $AE                      ; word: $AF = the song tracks' pitch adjustment (signed;
+                                         ; Spc_Unk0A78 scales the pitch by it), $AE its fraction
+!Spc_SfxPitchAdj = $B1                   ; the same for effect tracks 14-15 (Spc_Unk0A78, X >= $1C)
+!Spc_PitchAdjDelta = $B2                 ; word: added to !Spc_PitchAdj each fade step
+!Spc_PitchAdjSteps = $B4                 ; fade steps left
+!Spc_Quotient = $B5                      ; word: Spc_FadeDelta's result
 !Spc_TrackBits = $A3                     ; the voice bits a loop over tracks has still to visit
 !Spc_TempA4 = $A4                        ; scratch byte
 !Spc_TempA5 = $A5                        ; scratch byte
@@ -134,8 +161,11 @@
 !Spc_UnkD0 = $D0                         ; voice bits; set to the song's tracks on a resume, cleared
                                          ; on a new start and each pass; $1492 ORs in the tracks whose
                                          ; group volume changed (inferred: volumes to rewrite)
-!Spc_UnkD1 = $D1                         ; cleared with !Spc_UnkD0
-!Spc_UnkD2 = $D2                         ; cleared at a song's start
+!Spc_UnkD1 = $D1                         ; voice bits; cleared with !Spc_UnkD0; Spc_Unk09F6 rewrites the
+                                         ; pitch of these voices ($0A72; inferred: pitches to rewrite)
+!Spc_SongCond = $D2                      ; compared with sequence command operands to choose a branch
+                                         ; ($1D05, $1D2E); command $88 sets it; 0 at a song's start
+!Spc_VoiceVol = $BE                      ; 16 bytes: each voice's last VOLL/VOLR (Spc_Unk09F6, $0A57)
 !Spc_UnkD3 = $D3                         ; high nibble of what Spc_MainLoop writes to CPUIO2
 !Spc_QueueEnd = $D7                      ; offset of the first free !Spc_CmdQueue entry
 !Spc_UnkD8 = $D8                         ; 2 after Spc_Start
@@ -151,6 +181,7 @@
                                          ; $FF after Spc_Start. Inferred: $1492 fades them and marks
                                          ; the group's tracks in !Spc_UnkD0
 !Spc_GroupFadeSteps = $F166              ; 3 words: steps of each group's fade still to run (low byte)
+!Spc_GroupFadeDelta = $F16C              ; 3 words: each group's volume step (signed, x 256)
 !Spc_CmdQueue = $F172                    ; 16 x 4 bytes: commands received while the tracks are
                                          ; stepped ($0892), run later by $08CD; id 0 = free
 !Spc_TrackF200 = $F200                   ; word per track: low byte $48 at an effect's start (Spc_StartSfx),
@@ -202,6 +233,20 @@
 !Spc_VoiceBit5 = $20                     ; voice 5's bit
 !Spc_SfxGroupA = $C0                     ; command $18's voices (7, 6)
 !Spc_SfxGroupB = $30                     ; command $19's voices (5, 4)
+!Spc_SongVolMarks = $7F                  ; the bits command $81 sets in !Spc_UnkD0 (voices 0-6: voice 7
+                                         ; is left out)
+!Spc_GroupSong = 0                       ; X of a !Spc_GroupVol group: the song
+!Spc_GroupSfxA = 2                       ; effect tracks 14-15
+!Spc_GroupSfxB = 4                       ; effect tracks 8-13
+!Spc_SignBias = $80                      ; EOR that turns a signed byte into an ordered unsigned one
+!Spc_NumVoiceVol = $10                   ; bytes of !Spc_VoiceVol
+!Spc_StopWait = $02                      ; !Spc_TrackWait of a track pointed at Spc_TrackEndCmd
+!Spc_AllBits = $FF                       ; every voice bit
+!Spc_XferLowPage = $1E                   ; a transfer to an address below $1E00 (the driver) is
+                                         ; refused: its data is taken and dropped (Spc_XferSkip)
+!Spc_XferSfxPage = $2F                   ; a transfer to $2Fxx (the effects block) stops effects first
+!Spc_XferModeMask = $07                  ; APUIO1's mode bits (Spc_XferModeTable)
+!Spc_TestCarry = $FF                     ; CLC / ADC of this: C = 1 iff the byte is nonzero
 !Spc_BuiltinDirEntry = $10               ; the directory entry Spc_Start fills itself
 ; its directory entry ($1E40), ParamA word ($1F20) and ParamB word ($1FA0)
 !Spc_BuiltinDir = !AudioAram_Dir+(4*!Spc_BuiltinDirEntry)
@@ -222,6 +267,15 @@
 !SpcCmd_HighIndexMask = $1F              ; $80-$8F -> 0-15, $F0-$FF -> 16-31
 !SpcCmd_SongIndexMask = $0F              ; $10-$1F -> 0-15
 !SpcCmd_EchoDelayMask = $0F              ; the delay in !Spc_CmdArg2 / !Spc_CmdArg0 (EDL: 0-15)
+!SpcCmd_FirstNotQueued = $18            ; $10-$17 are not queued while tracks are stepped
+!SpcCmd_Xfer = $FE                       ; take transfers (Spc_XferReceive); not queued either
+!SpcCmd_SeqMask = $7F                    ; sequence values count modulo $80 (as !Audio_SeqMask)
+!SpcCmd_XferEnd = $E0                    ; APUIO1 of a header, or APUIO0 of a step, that ends a
+                                         ; transfer (the 65816's !Audio_SeqHeader)
+!SpcCmd_XferBusy = $EE                   ; CPUIO1 while a transfer is taken
+!SpcCmd_Control = $FF                    ; command $FF (Spc_CmdControl), also honoured mid-transfer
+!SpcCmd_ControlReset = $F0               ; its Arg0 for: back to the IPL ROM (!Audio_ResetKick1)
+!SpcCmd_ControlReport = $01              ; its Arg0 for: !Spc_Flags88 bit 7 = Arg1 != 0
 !SpcCmd_SameSong = $FF                   ; CPUIO1 after a song command asking for the song already
                                          ; playing (the 65816 then skips the load: Audio_StartSong)
 

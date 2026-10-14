@@ -1,0 +1,7 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$0F3C,Spc_CmdStopSfx,2026-10-09,rev171a,approved,ea6ec80a7a5d,"r170 X fixed: $1A via A (X $1E-2x2), $16 via BBS to B; table80[18]=$0F3C; calls $0F11/$104A/$14F3; $1DC1=$EB->$1D4A->EndTrack. nit: 'Both:' unclear, say entry 18 falls in"
+$100E,Spc_XferReceive,2026-10-09,rev171a,approved,afdc7232fc66,"Echo-again true: $0D33/$0BB1 echo X, X kept to $100E (SaveSong, $1316 skip X); wait/settle, $1E/$2F pages, push $1029, mode tbl $1544, $E0 exit A/X/Y, Ports checked"
+$107C,Spc_XferTriples,2026-10-09,rev171a,approved,acef21297a71,"Checked: SMC stores, Y hits $80/$81/$82 then -$80 with bases +$80 (EOR/INC page), echo after CPUIO1 (hedged), $E0 RET X=$E0, $FF+$F0 to CmdControl, table entry 3"
+$11B2,Spc_XferBytes,2026-10-09,rev171a,approved,8abad4976772,"r170 clause dropped. Checked: echo before CPUIO1 read, (XferAddr)+Y with page INC, $E0/$FF handling, X=$E0 exit; 65816 sends only modes 2,3,5,7 (!Audio_Xfer*); entry 1"
+$1206,Spc_XferMove,2026-10-09,rev171a,approved,b806fc83e864,"r170 name fixed: mode 7 only from Audio_CmdLoadSong compaction (src hdr, dest, len steps). Pages up then rest down (decw, Y n..1), NextStep C=1 exit X=$E0 Y=$60, BRA $1272"
+$12DD,Spc_NullCommand,2026-10-09,rev171a,changes,33cba35cc676,"'reached only through those table entries' false: sequence-command table $1554 (Spc_073D, cmd-$C4) sends $E5 and $E7 to $12DD ($1596/$159A). Add them to the text and the Callers note"
