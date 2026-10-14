@@ -1,0 +1,5 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$0299,Spc_MainLoop,2026-10-09,rev169a,approved,e54caa0744dc,"T0OUT read-clear drops extra ticks; 17-reg order vs $1700/$1711 (KON last); EVOL doubling/$7F cap; CPUIO0-3 values; 7-pass fade ($1492 counts $F166); track loops X/groups; callers"
+$0B96,Spc_PollCommand,2026-10-09,rev169a,approved,a71efa8bc8c3,"Double-read of CPUIO0, port copy; RunCommand $0BAC-$0BD7 (44 bytes); echo only $00-$0F/$20-$7F and $80-$FF; $16A0 high-byte-only BEQ, push/RET order; Exit A=X; callers $0299/$08E6"
+$0BE6,Spc_StartSong,2026-10-09,rev169a,approved,0c4af26a565c,"r168 fixed: DSP line now has SRCN+ADSR ($1AED->$1B0C, $86=0), PL/PH ($0A78), $1352 FLG/EON/EFB/EVOL/EDL/ESA, $1397 FLG; resume step clears Kof/Unk25. Steps 1-6, Exit SP=$FF ok"
+$0D5B,Spc_StartSfx,2026-10-09,rev169a,approved,5777aabe6f53,"r168 fixed: EndTrack->$1A68->$1A48 sets Y=$57 (after its tclr), $1AB5/$1A2C/$1A21 keep X,Y; so X=$16, Y=$FF or $57. Entry table x4, skip quirk Y-=2, steps 2-3 masks ok"
