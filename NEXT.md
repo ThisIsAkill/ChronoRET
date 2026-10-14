@@ -1387,14 +1387,31 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
 Re-run 2026-10-14 (`python3 tools/code_survey.py --write`) once all known 65816 code was
 matched. The method did not change (data rows, the `*OldBuildLeftovers` among them, were already
 kept out of code); the tool only gained a method label for banks where the trace and the
-allowance add nothing, and current per-bank notes. Result: every exit of matched code lands in
-matched code, so the trace reaches no unmatched byte, no code-like block is joined to code, and
-each bank's code bytes are its matched code: 249,251 in all (was 239,779, low 232,629, high
+allowance add nothing, current per-bank notes, an exit check, and the packed module's true end
+(below). Exit check (`python3 tools/code_survey.py` prints it, with the 19 odd exits, and
+`symbols/code_survey.csv`'s header records it): of the 12,661 exits of matched code routines (counted once per routine, target and M/X widths, under the entry states that decode on the routine's own source lines), 12,642 land on matched instruction starts, none on unmatched bytes, and 19 (18 mid-instruction, 1 in matched data) are fall-throughs after an instruction decoded under the wrong width. Two
+routines decode under no single entry state, BattleSys_ApplyDamage and C2Scene_ObjAFly, so
+their exits are not counted; an independent review (PR #106) found every target in their source
+to be a matched label. So the trace reaches no unmatched byte, no code-like block is joined to
+code, and each bank's code bytes are its matched code: 249,251 in all (was 239,779, low 232,629, high
 262,780). The banks that changed: `$C1` 63,058 -> 62,682, `$C2` 56,791 -> 60,695, `$C3` 3,032
 -> 4,076, `$C6` 2,673 -> 3,619, `$C7` 2,526 -> 2,672, `$CC` 4,440 -> 4,995, `$CD` 14,533 ->
 15,824, `$CE` 3,075 -> 3,729, `$CF` 6,117 -> 7,013, `$D1` 4,733 -> 5,858, `$FD` 16,149 ->
-15,668, `$FF` 1,795 -> 1,563 (`$C0` 60,857 unchanged). The progress share is 100.00%, and no
-bank is "survey low" any more. Held-out calibration (`--calibrate`): hiding `$C0` -2.4%, `$C1`
+15,668, `$FF` 1,795 -> 1,563 (`$C0` 60,857 unchanged). The progress share is 100.00% of the
+65816 code that sits in ROM as plain code; the SPC700 driver (7,153 bytes) and the packed `$C3`
+module (26,393 bytes, unpacking to $857F bytes at `$7E:3000`, about half of it code-like per the PR #106 review) are
+counted apart and are not in it. No bank is "survey low" any more.
+
+By construction the method returns the matched total once every exit of matched code lands in
+matched code, so that result alone is no evidence that nothing is left. The evidence is the
+checks beside it: the exit check above (repeatable with the tool), the per-block reading of the
+high bound below, and these, from an independent review (PR #106): the unpacked `$C3` module's
+real JSL/JML into ROM all land on matched instruction starts; 171 of the 172 op-`$4E`
+(C2Script_CallLong) patterns in the unpacked scene scripts land on matched `$C6` starts (the
+other is an op `$1A` operand); all 48 entries in the `$FE`/`$C3` pack-pointer tables unpack to
+non-code (at most 8 of 127 blocks code-like; pack 0 at `$C3:1200` 0 of 31); and a search for
+routine-shaped instruction runs over all unmatched ROM bytes finds none longer than 19
+instructions, all noise. Held-out calibration (`--calibrate`): hiding `$C0` -2.4%, `$C1`
 -2.5%, `$C2` -20.5%, `$FD` -0.8% (recall 97.0%, 96.8%, 78.9%, 94.7%).
 
 What is left is the high bound, 268,398 (+19,147): isolated code-like 32-byte blocks (score >=
@@ -1429,11 +1446,14 @@ trace would otherwise have followed, or words in `*OldBuildLeftovers`), so all a
 - `$FF`: `$0AE0`, `$5220`, `$8400` (word table $844E, $8474, ...), `$9680`, `$9740`,
   `$B440`-`$B47F`, `$C4A0`, `$C860`: data of `$FF:0000`-`$F547`.
 
-Not in the code total and still possibly code: the packed module `$C3:1313` (26,383 bytes,
-counted apart), what pack 0 at `$C3:1200` and the packs in `$FE` unpack to (not known), and the
-SPC700 driver (7,153 bytes, counted apart). Also noticed: the survey sizes the packed module as
-`$C3:1313`-`$7A21` (its length word + 2) while `asm/include/unmatched.asm` gives `$7A2B`; not
-checked.
+Not in the code total: the packed module `$C3:1313`-`$7A2B` and the SPC700 driver, both counted
+apart. The other packs (pack 0 at `$C3:1200`, the packs of the `$FE` table) unpack to non-code
+(PR #106 review, above). The module's size is now taken to its last end marker: the earlier
+survey stopped at `$7A21` (the length word + 2, which is segment 1 only) and counted 26,383
+bytes; Decomp_ToWram's format puts segment 1's end marker at `$7A22` ($04, next marker at
+`$C3:1313` + $6718) and the final $00 at `$7A2B`, so 26,393 bytes, as
+`asm/include/unmatched.asm` and Decomp_ToWram's header say. The survey checks it
+(`pack_end`).
 
 ## Tables
 

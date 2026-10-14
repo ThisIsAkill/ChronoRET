@@ -358,7 +358,7 @@ def render_summary(result) -> str:
     """
     t, code = result['totals'], result['code_bytes']
     lines = [f'{"":<10}{"Functions":>10}{"Code bytes":>12}{"Data bytes":>12}'
-             f'  Share of game code ({code:,} code bytes)']
+             f'  Share of 65816 code in ROM ({code:,} code bytes)']
     for level in LEVELS:
         lines.append(f'{level.capitalize():<10}{t[level]["functions"]:>10}'
                      f'{t[level]["code_bytes"]:>12,}{t[level]["data_bytes"]:>12,}'
@@ -384,7 +384,8 @@ def render_summary(result) -> str:
 
 def render_status_line(result) -> str:
     t, code = result['totals'], result['code_bytes']
-    return (f'{t["matched"]["code_bytes"]:,} of {code:,} bytes of game code are matched byte-exact '
+    return (f'{t["matched"]["code_bytes"]:,} of {code:,} bytes of 65816 code in ROM (the SPC700 driver and the '
+            f'packed $C3 module counted apart) are matched byte-exact '
             f'({pct(t["matched"]["code_bytes"], code)}, {t["matched"]["functions"]} functions, '
             f'plus {t["matched"]["data_bytes"]:,} bytes of data); '
             f'{t["readable"]["functions"]} of those meet the readability standard and '

@@ -20,7 +20,7 @@ the [Progress page](https://thisisakill.github.io/Kajar-site/PROGRESS/) on the
 Kajar site, or run `make progress` (`python3 tools/progress.py`) locally. The
 banks being worked on are listed under "Repo layout" below.
 
-The share of game code is matched 65816 code bytes over the code bytes of
+The share of game code (65816 code in ROM) is matched 65816 code bytes over the code bytes of
 `symbols/code_survey.csv`, one row per bank, written by `tools/code_survey.py`:
 matched code, plus unmatched code reached by a flow trace from matched code
 and the interrupt vectors (M/X widths tracked), plus an allowance for code
@@ -35,16 +35,30 @@ The estimate for unmatched code tends to be LOW: with a bank's source
 hidden it came out `$C0` -2.4%, `$C1` -2.5%, `$C2` -20.5% (its code is
 reached mostly through tables the trace cannot follow) and `$FD` -0.8%.
 Since the re-survey of 2026-10-14, made once all known 65816 code was
-matched, every bank's code bytes are its matched code: the trace finds no
-unmatched code reachable from matched code or the vectors, and the
-allowance finds no code-like block joined to code. The total is 249,251
-code bytes; the high bound, 268,398, adds every isolated code-like block
-(about 19,000 bytes, spread over the data banks); in the banks with code
-no call, jump or pointer from matched code reaches any of them, and the
-highest-scoring ones are tables, tile maps and pointer lists (NEXT.md,
-"Code survey"). Code reached only indirectly from data far from any code
-would hide there; packs other than the `$C3` module are not known to hold
-code.
+matched, every bank's code bytes are its matched code: 249,251 in all. The
+share is then 100% of the 65816 code that sits in ROM as plain code; the
+SPC700 driver (7,153 bytes) and the packed `$C3` module (26,393 bytes, $857F
+unpacked, about half of it code-like per the PR #106 review) are counted apart and are not in it.
+
+Once every exit of matched code lands in matched code, the method returns
+the matched total by construction, so the 100% rests on separate checks:
+- `tools/code_survey.py` checks the exits: of 12,661 exits of matched
+  routines (once per routine, target and widths) 12,642 land on matched
+  instruction starts and none on unmatched bytes; the other 19 are
+  fall-throughs after an instruction decoded under the wrong width.
+  BattleSys_ApplyDamage and C2Scene_ObjAFly decode under no single entry
+  state; the PR #106 review found their source's targets all matched labels.
+- The high bound, 268,398, adds every isolated code-like block (about 19,000
+  bytes, spread over the data banks). In the banks with code no call, jump
+  or pointer from matched code reaches any of them, and the highest-scoring
+  ones are tables, tile maps and pointer lists (NEXT.md, "Code survey").
+- From an independent review (PR #106): the unpacked `$C3` module's real
+  JSL/JML into ROM all land on matched instruction starts; 171 of 172
+  op-`$4E` patterns in the unpacked scene scripts land on matched `$C6`
+  starts (the other is an op `$1A` operand); all 48 entries of the `$FE`/`$C3`
+  pack tables unpack to non-code (at most 8 of 127 blocks code-like; pack 0
+  at `$C3:1200` 0 of 31); and the longest routine-shaped run of
+  instructions in unmatched ROM is 19 instructions, all noise.
 
 Progress notes, the address map, the devlog and a function-level breakdown
 live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.
