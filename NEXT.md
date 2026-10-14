@@ -875,7 +875,76 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    Menu_InitNewGameData, Menu_BuildItemTables, Menu_LoadSlotSummaries (the slot-layout note above
    it).
 
-10. Bank $D1 code (branch match-d1-battle; new file `asm/bankD1/bankD1.asm`): `$D1:E70A`-`$D1:FFFF`
+10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
+   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:16B4` (the CD battle batch):
+   - the entry block (19 JMP vectors; the names the callers used are kept: `BattleSys_VecCD0000`
+     ... `BattleSys_IdleVecCD0036`; new `BattleSys_VecCD000F`, `BattleSys_VecCD001E`, no caller
+     found for either) and `BattleCD_EnterBattle` / `BattleCD_ActOp80` (JSLs into bank $D1);
+   - an enemy's exit `BattleCD_EnemyDissolve` (+ `BattleCD_EnemyDissolveFx`, JSL'd mid-routine)
+     with `BattleCD_DissolveStep`: a pixel dissolve of the enemy's decoded frame, or a layer
+     effect ($38/$40);
+   - the messages: `BattleCD_ShowMessage` (vector $0021; waits, button skips), `ShowMessageTimed`
+     ($001E), `ShowScriptMessage` ($0033), the info panels `ShowEnemyInfo` / `ShowTargetInfo`
+     ($0030/$002D) and `ShowTechInfo` ($0027), on bank $C2's text window (`BattleCD_StartText`,
+     `ShowText`, `StepText`, `ClearTextGfx`, `GetMsgTime` with `BattleCD_MsgTimeTable`: the
+     message-speed setting, config byte $2991 bits 3-5);
+   - `BattleCD_PadRepeat` (pad auto-repeat into `!Battle_PadEdgeButtons`), `BattleCD_SetNmiMode1`,
+     `BattleCD_ApuCmd81`, the battle's end `BattleCD_ExitBattle` (closing wipe, end effects $84/$87
+     by `FieldBtl_Result`, NMI switched to `$D1:F4C0`, AudioFadeDispatch with P/D/DB saved),
+     `BattleCD_WaitNmiAck`, `BattleCD_FrameTick` (vector $0009), `BattleCD_IdleTick` ($0036);
+   - the window wipe: `BattleCD_StartOpenWipe` / `StartCloseWipe` / `WipeRunning` / `StepWipe` /
+     `WipeStepOpen` / `WipeStepClose` (line counts of the nine indirect HDMA tables at `$C867`);
+   - the NMI work: `BattleCD_NmiDispatch` (from the bank-$D1 NMI handler, by `!Battle_NmiMode`,
+     `BattleCD_NmiTable`), `BattleCD_NmiSetup` (HDMA channels 0-6), `BattleCD_NmiMain`,
+     `NmiUploadText` (text halves, tilemap pages), `UploadCgram`, `SetWh0Table`, the scroll data
+     `NmiLayerScroll` / `BattleCD_ScrollModeTable` / `ScrollPlain` (+ `ScrollFill`) /
+     `ScrollFxBg3` / `ScrollWaves` / `ScrollWavesBg3`, the screen shake `BattleCD_StepShake`
+     (+ the palette-animation record copies) with `BattleCD_RandByte`, `ClampPalAnims` (FieldAnimB
+     records 8-11), `TickCDC9`, `ScrollStepL`, `InitHdmaData` (+ `RestoreScreen`) and its `L`
+     wrapper;
+   - the layer effects (layer-3 background animations: tech effects, the enemy exits, the battle
+     end): `BattleCD_StartLayerFx` (vector $0018), `RunLayerFx`, `RunEndFx`, `LayerFx84/87`,
+     `WaitLayerFxIdle`, `EndLayerFx`, `LayerFxSetsScreen`, `LoadLayerFx` with `LoadFxRecord`,
+     `LoadFxTiles` and the 2bpp tile copiers (`TileCopy2`, `TileHFlip2` + `TileReverse2`,
+     `TileVFlip2`, `TileVHFlip2`, `BattleCD_TileHandlers2`), `FillFxTilemaps`, `BuildFxTilemap`,
+     `RestorePalRows`, `FxRecSetup`, `LoadFxPalA` (+ `LoadFxPalB`); the script channels
+     `StartFxChannels` / `StartFxChannel` / `StepFxChannels` / `RunFxScript` / `RunFxOp`;
+   - the action graphics `BattleCD_LoadFxGfx2` (+ `LoadFxGfx4`; vectors $002A/$0015) with
+     `ConvertFxGfx`, `PickPlaneBits` / `BattleCD_FieldShifts` / `ShiftField6` (+ 4/2/0), the 4bpp
+     builders `Tile4Copy`, `Tile4Planes`, `Tile4HFlip` (+ `TileReverse4`), `Tile4VFlip`,
+     `Tile4VHFlip`, `BattleCD_TileHandlers4`, `BattleCD_PlaneMasks`, `BattleCD_FxGfxVram`; and the
+     small tables `BattleCD_TileUploadVram`, `BattleCD_ZeroWord`.
+   Found on the way: `$BB00` (`!Battle_DemoQuitTimer`) is the INIDISP brightness the NMI writes
+   (`!Battle_Brightness`), so the demo's quit count is a fade; `$0580`-`$05AF` are FieldAnimB
+   palette-animation records 8-11 the battle fills; `$5D9B` is set while a layer effect's channels
+   run; `$C867` holds nine indirect HDMA tables whose line data are at `$BC85` (BG1SC-BG4SC),
+   `$BC89`/`$BD09`/`$BD89` (layer scroll), `$BE89` (TM-TSW), `$BE91` (CGWSEL-SETINI), `$BE99`.
+   Quirks recorded: `BattleCD_ShowScriptMessage` counts `!Battle_ScriptMsgUp` up even when it
+   shows nothing; the info panels test it as a word (with `$CD1E`); `BattleCD_StepShake`'s x draw
+   passes a stale A to `BattleCD_RandByte`; `BattleCD_LoadFxRecord`'s dead store to the channel
+   block; `BattleCD_DissolveStep`'s slot-6 layout case; the paused screen is always dimmed (the
+   ROM byte `$CD:3FFF` is 0).
+   New stubs: the bank-$CD helpers past `$16B4` (`BattleCD_FxOpTable` `$CD:16B5`,
+   `BattleCD_PlayPendingSfx` `$3B5F`, `ApuCmd18` `$3B71`, `Unk3B82`, `WaitFrames` `$3E3B`,
+   `PauseWait` `$3E44`, `WaitFrameRefresh` `$3E75`, `WaitFrame` `$3E7D`, `DmaToVram` `$3E8E`,
+   `RunQueuedDma` `$3EB4`, `QueueVramDma` `$3ED2`), bank $D1 (seven; gone since the merge with
+   the bank-$D1 batch, item 11, which matched them) and bank $CE (`BattleCE_UnkE18E`,
+   `UnkEE6E`, `UnkF066`).
+   Back to review (verified headers edited): `AudioFadeDispatch` (bank $C0), `BattleCF_VblankUploads`,
+   `BattleCF_FrameUpdate`, `BattleCF_RemoveMarkedEnemies`, `BattleSys_SceneSetup`,
+   `BattleSys_Service6`, `BattleSys_PumpFrames`, `BattleMenu_RefreshIfDirtyAndTick`,
+   `BattleMenu_ChooseAttack`, `BattleMenu_UpdateCursorOverlay`, `BattleAi_RunMessage`.
+   Open: the 122 script opcodes (`BattleCD_FxOpTable` and its handlers `$CD:17A9` on) and the rest
+   of the bank's code to `$3FE5` (the helpers stubbed above among it); who else sets
+   `!Battle_HdmaEnable` and `!Battle_TilePageSlot`, the effect scroll (`!BattleFx_ShakeX/Y`),
+   the wave flags and `!Battle_WaveOffsets`, `!Battle_BgTileSave`, `!Battle_Unk2A21`; who reads
+   `!Battle_UnkCA1B`. (Since the merge with the bank-$D1 batch, item 11: `!Battle_Paused`,
+   `!Battle_CgramPending`, the shake bytes, `!Battle_PalAnimRecs89` and `!Battle_PalRowSave`
+   are set there, and `!BattleFx_CeSetReload` / `CeSetBase` / `CeSetWant`, `!BattleFx_GradStart`
+   and `!Battle_UnkCE16` read there.) Next in this bank:
+   `$CD:16B5` (the opcode table, 122 words) and the handlers from `$CD:17A9` up.
+
+11. Bank $D1 code (branch match-d1-battle; new file `asm/bankD1/bankD1.asm`): `$D1:E70A`-`$D1:FFFF`
    is matched (the code `$E70A`-`$FEF3` with its tables, and the `$FF` fill `BankD1_EndFill`).
    It is code that works with the battle code in bank $CD (`BattleFx_*`): the battle's NMI and
    IRQ handlers `BattleFx_Nmi` / `BattleFx_Irq` (pause on Start, the frame count, a debug slow
@@ -887,22 +956,34 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    shapes (bands, boxes, waves, fills, copies, and the quad rasteriser `BattleFx_DrawQuad` /
    `RasterQuad`), random shakes and bounces, and opcode $80's settings (`BattleFx_Op80*`).
    New RAM names (`!BattleFx_*`, many `Unk` ones only zeroed or set by `BattleFx_Init`) are in
-   one block at the end of `ram_battle.inc`; constants likewise in `constants_battle.inc`; the
-   bank-$CD/$CE targets have label-only stubs in their own block of `unmatched_battle.asm`
-   (`BattleSys_VecCD0235`, `VecCD09CE`, `VecCD0C89`, `VecCD0C95`, `VecCD0C9D`, `VecCD38B2`,
-   `VecCD3ECE`, `VecCEEE6E`). Almost every caller is unmatched bank-$CD code, mostly one-line
-   command handlers (JSL, RTS), so entry states are read from the routines and hedged (B = 0 is
-   assumed where a TAX takes it in). Quirks recorded: the carry chaining (no CLC) in
+   their own block of `ram_battle.inc`; constants likewise in `constants_battle.inc`.
+   Merged with the bank-$CD batch (item 10): the calls both ways use the matched labels
+   (`BattleCD_UploadCgram`, `ClearTextGfxL`, `ScrollStepL`, `NmiDispatch`, `InitHdmaDataL`;
+   `BattleFx_Init`, `Op80Dispatch`, `NmiAlt`, `UploadMapBlock`, `HpGradientTick`, `LoadBgSet`,
+   `HoldAnimsTick`); the stubs left are `BattleCD_Unk38B2` (`$CD:38B2`), `BattleCD_Unk3ECE`
+   (`$CD:3ECE`) and `BattleCE_UnkEE6E`. The bytes both banks use got one name each (the
+   bank-$CD names where they said more, e.g. `!Battle_Paused`, `!Battle_MsgTimer`,
+   `!Battle_ShakeXOn`..., the bank-$D1 ones otherwise, e.g. `!BattleFx_CeSetWant`,
+   `!BattleFx_GradStart`); opcode $80's groups are the screen shake (`!Battle_ShakeXOn` on) and
+   palette-animation records 8/9 (`!Battle_PalAnimRecs89`), and `$D1:EE99` is the message sound
+   table (`BattleFx_MsgSfx`, was `!BattleRom_MsgSfx`). Most remaining callers are unmatched
+   bank-$CD script command handlers (`$CD:17A9` on: one-line JSL, RTS), so entry states are
+   read from the routines and hedged (B = 0 is assumed where a TAX takes it in). Quirks recorded: the carry chaining (no CLC) in
    `BattleFx_AddLineOffsets` and `BattleFx_RandomByte`; the second store of 9 in `BattleFx_Init`;
    the dead `LDA` in `BattleFx_GrowBox`; `BattleFx_EdgeSlope` not checking a zero line count.
-   Open: what bank $CD's commands and NMI work do with all this (the HDMA set-up that reads the
-   window tables and `!BattleFx_GradHdmaA-D`, the `!BattleFx_Op80Regs` groups, the
-   `BattleSys_VecCEEE6E` sets); the meaning of the `!BattleFx_Unk*` bytes, `!Battle_Unk2A21` (who
-   sets it), `$7E:E500` and `$7E:0A00` (who fills them), and the tables `BattleFx_UnkTableEC5F`
-   and `BattleFx_UnkTableEE99` (read by bank $CD only). When bank $CD is matched, its callers'
-   entry states can replace the hedges here, and the stubs above go. `$D1:0000`-`$D1:E709` is
-   data, still ROM bytes. Headers edited (back to review): Field_RefreshHdmaLong and
-   MusicCueDispatch (their Callers notes now name `BattleFx_NmiAlt` / `BattleFx_Init`).
+   Open: which HDMA channels read the window tables and `!BattleFx_GradHdmaA-D`; the
+   `BattleCE_UnkEE6E` sets; the meaning of the `!BattleFx_Unk*` bytes, `!Battle_Unk2A21` (who
+   sets it), `$7E:E500` and `$7E:0A00` (who fills them), and the table `BattleFx_UnkTableEC5F`
+   (read by bank $CD past `$16B4` only). When the rest of bank $CD is matched, its callers'
+   entry states can replace the hedges here. `$D1:0000`-`$D1:E709` is data, still ROM bytes.
+   Headers edited (back to review): Field_RefreshHdmaLong and MusicCueDispatch (their Callers
+   notes now name `BattleFx_NmiAlt` / `BattleFx_Init`); in the merge with bank $CD also these
+   bank-$CD headers (the bank-$D1 code named as matched, or the shared bytes renamed):
+   BattleSys_VecCD0000, BattleCD_EnterBattle, ActOp80, GetMsgTime, ShowMessage, ClearTextGfxL,
+   ShowText, ShowEnemyInfo, ShowTargetInfo, ShowTechInfo, ExitBattle, WaitNmiAck, FrameTick,
+   StartCloseWipe, StepWipe, NmiUploadText, ScrollFxBg3, ScrollWaves, NmiMain, UploadCgram,
+   NmiSetup, TickCDC9, ScrollStepL, NmiDispatch, InitHdmaDataL, LayerFx84, RestorePalRows,
+   LoadLayerFx.
 
 ## Tables
 

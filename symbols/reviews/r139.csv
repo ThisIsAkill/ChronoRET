@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev139a,changes,9a5b26ea7334,"Svc 3 never calls BattleMenu_RefreshIfDirtyAndTick; svc 4 does: move that path and $CD:3B5F/$D1:ECF3 to 4. FrameTick also reaches $CD:3E3B/3E75/3ED2 via BattleCD_EndLayerFx: name for 3, 8, 9."

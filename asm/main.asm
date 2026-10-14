@@ -31,6 +31,7 @@ incsrc "bank00/bank00.asm"
 incsrc "bankC0/bankC0.asm"
 incsrc "bankC1/bankC1.asm"
 incsrc "bankCC/bankCC.asm"
+incsrc "bankCD/bankCD.asm"
 
 incsrc "bankC2/bankC2.asm"
 incsrc "bankC3/bankC3.asm"

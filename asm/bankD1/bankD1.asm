@@ -6,20 +6,21 @@
 ; readers matched so far, the battle's packed sprite frames, palette
 ; sets and the menu's window maps (the !BattleRom_* names at $D1xxxx).
 ; From $D1:E70A to $D1:FEF3 the bank holds code that works with the
-; battle code in bank $CD (not matched): the battle's NMI and IRQ
+; battle code in bank $CD (bankCD.asm): the battle's NMI and IRQ
 ; handlers while that code runs, its set-up at the battle's start
 ; (BattleFx_Init, through the vector $CD:0000), and helpers bank $CD
 ; calls by JSL, most of them from one-line command handlers (JSL, RTS)
 ; whose argument bytes they read through the long pointer at DP $40
-; (!BattleFx_ArgPtr): palette moves, a background colour gradient that
+; (!BattleCD_FxScriptPtr): palette moves, a background colour gradient that
 ; follows an enemy's HP, window shapes drawn into the two window tables
 ; at $7E:C161 and $7E:C4E1 (!BattleFx_WinTable0/1; the one written is
-; picked by bit 0 of !BattleFx_FrameCount), background set loads and the
+; picked by bit 0 of !Battle_FrameCount), background set loads and the
 ; settings of battle-script opcode $80. The window tables hold 4 bytes
 ; per screen line: the left and right edge of a first and of a second
 ; window. That they feed the window registers WH0-WH3 by HDMA is
-; inferred from that layout; the HDMA set-up is in bank $CD and not
-; traced. $D1:FEF4-$FFFF is $FF fill.
+; inferred from that layout (BattleCD_NmiSetup sets up HDMA channels
+; 0-6; which of them read these tables is not traced here). $D1:FEF4-
+; $FFFF is $FF fill.
 ; ============================================================
 
 arch snes.cpu
@@ -38,19 +39,19 @@ org $D1E70A
 ; !Battle_Unk2A21 bit 1 is set, flips bit 6 of FieldAnimB[7].Unk1 (the
 ; first colour of palette animation 7 moves 64 colours, four rows: to
 ; follow the swapped rows, probably). At the end it steps the 16-bit
-; !BattleFx_ArgPtr back by one (why is not traced: probably to undo a
+; !BattleCD_FxScriptPtr back by one (why is not traced: probably to undo a
 ; step past an argument byte this command does not have; the bank-$CD
 ; handler that ends just before the JSL, at $CD:1B95, has the same
 ; 16-bit DEC).
 ; Callers note: the JSL at $CD:1B9A is followed by RTS, the shape of
-;   bank $CD's script command handlers (not matched).
+;   bank $CD's script command handlers (past $CD:16B4, not matched).
 ; Callers (1 JSL site): unmatched ($CD:1B9A).
 ; Entry: M=1 (8-bit A), X=0 (16-bit X/Y), DP=0 (DP $40), DB=$7E (the
 ;        palettes and flags are read .w); the bank-$CD caller is not
 ;        matched, so this is from the code, not traced there
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0 (TDC with DP=0); X =
 ;        !Battle_RowBytes; Y = the last colour moved (16-bit);
-;        !BattleFx_ArgPtr's low word one less
+;        !BattleCD_FxScriptPtr's low word one less
 BattleFx_SwapObjPalettes:
     STZ.w !Battle_UnkA101
     LDA.w !Battle_Unk2A21
@@ -97,7 +98,7 @@ BattleFx_SwapObjPalettes:
     INX
     CPX.w #!Battle_RowBytes
     BNE .colour
-    DEC.b !BattleFx_ArgPtr              ; 16-bit: the argument pointer one byte back
+    DEC.b !BattleCD_FxScriptPtr         ; 16-bit: the argument pointer one byte back
     TDC
     SEP #$20
     RTL
@@ -110,34 +111,35 @@ BattleFx_SwapObjPalettes:
 ; !BattleFx_IntBusy is set (the IRQ handler or an earlier NMI has not
 ; finished) it does nothing more. Otherwise, with !BattleFx_IntBusy set:
 ;   - saves DP $00-$2A to !BattleFx_NmiDpSave (MVN, which leaves DB=$7E)
-;     and copies the words !BattleFx_UnkBE89/8B/91/93 to
+;     and copies the words !Battle_HdmaScreens, !BattleFx_UnkBE8B,
+;     !Battle_HdmaColour and !Battle_HdmaColData to
 ;     !BattleFx_UnkBE8D/8F/95/97;
 ;   - with DB=$00: HDMA off again, reads STAT78, forced blank (INIDISP)
-;     and VMAIN = $80 (the same value), then JSL BattleSys_VecCD0C95,
-;     bank $CD's NMI work (picked by !BattleFx_NmiMode, not analysed);
+;     and VMAIN = $80 (the same value), then JSL BattleCD_NmiDispatch,
+;     bank $CD's NMI work (picked by !Battle_NmiMode);
 ;   - the rest uses .w operands in bank $7E, so it needs that call to
-;     leave DB=$7E: its two handlers ($CD:088D and $CD:09F1, through the
-;     table at $CD:0C83) do set DB=$7E with PLB on the paths looked at;
-;     not traced to every exit;
-;   - unless !BattleFx_Paused: JSL BattleSys_VecCD0C89 (the layer drift,
-;     ScrollStepAccum), !BattleFx_FrameCount + 1, and while
-;     !BattleFx_TimerOn is set one frame off !BattleFx_TimerFrames; when
-;     it reaches 0: !BattleFx_UnkCE17 = $FF if !BattleFx_UnkCD1D was
-;     set, then !BattleFx_UnkCD1D, !BattleFx_UnkCCEC and
-;     !BattleFx_TimerOn zeroed and !BattleFx_CeSetReload counted up;
-;   - pause: only when !BattleFx_NmiMode is 1. If !Battle_2989NoPause is
-;     set in !BattleFx_Unk2989Copy or !BattleFx_UnkCE16 is non-zero,
-;     !BattleFx_Paused and !BattleFx_StartLatch are zeroed; otherwise a
-;     new press of Start (JOY1H) sets !BattleFx_Paused to (it + 1) & 1
+;     leave DB=$7E: its two handlers (BattleCD_NmiMain and
+;     BattleCD_NmiSetup, through BattleCD_NmiTable) do set DB=$7E with
+;     PLB on the paths looked at; not traced to every exit;
+;   - unless !Battle_Paused: JSL BattleCD_ScrollStepL (the layer drift,
+;     ScrollStepAccum), !Battle_FrameCount + 1, and while
+;     !Battle_MsgTiming is set one frame off !Battle_MsgTimer; when
+;     it reaches 0: !Battle_LastScriptMsg = $FF if !Battle_ScriptMsgUp was
+;     set, then !Battle_ScriptMsgUp, !Battle_MsgShown and
+;     !Battle_MsgTiming zeroed and !BattleFx_CeSetReload counted up;
+;   - pause: only when !Battle_NmiMode is 1. If !Battle_2989NoPause is
+;     set in !BattleFx_Unk2989Copy or !Battle_UnkCE16 is non-zero,
+;     !Battle_Paused and !BattleFx_StartLatch are zeroed; otherwise a
+;     new press of Start (JOY1H) sets !Battle_Paused to (it + 1) & 1
 ;     (bit 0 flipped, the rest cleared), and
 ;     !BattleFx_StartLatch holds the button until it is let go (that
-;     !BattleFx_Paused pauses the battle is inferred from what it skips
+;     !Battle_Paused pauses the battle is inferred from what it skips
 ;     here and in BattleFx_Irq);
 ;   - BattleFx_RestoreMathRegs;
 ;   - a debug slow motion, run only when !BattleRom_DebugSlowMo ($CD:3FFF)
 ;     is non-zero (it is 0 in this ROM): R held unpauses; while
 ;     !BattleFx_StartLatch is set, !BattleFx_SlowCount counts frames and
-;     !BattleFx_Paused is 0 (run) on one frame in four if L is held, else
+;     !Battle_Paused is 0 (run) on one frame in four if L is held, else
 ;     non-zero;
 ;   - restores DP $00-$2A, zeroes !BattleFx_IntBusy and
 ;     !BattleFx_FrameWait (bank $CD waits for that, probably: $CD:3E58
@@ -173,13 +175,13 @@ BattleFx_Nmi:
     LDY.w #!BattleFx_NmiDpSave
     LDA.w #!BattleFx_NmiDpSaveLen
     MVN !Bank7E,!Bank7E                ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    LDA.w !BattleFx_UnkBE89
+    LDA.w !Battle_HdmaScreens
     STA.w !BattleFx_UnkBE8D
     LDA.w !BattleFx_UnkBE8B
     STA.w !BattleFx_UnkBE8F
-    LDA.w !BattleFx_UnkBE91
+    LDA.w !Battle_HdmaColour
     STA.w !BattleFx_UnkBE95
-    LDA.w !BattleFx_UnkBE93
+    LDA.w !Battle_HdmaColData
     STA.w !BattleFx_UnkBE97
     TDC
     SEP #$20
@@ -190,50 +192,50 @@ BattleFx_Nmi:
     LDA.b #!INIDISP_ForceBlank
     STA.w INIDISP
     STA.w VMAIN                         ; the same $80: !VMAIN_IncAfterHigh
-    JSL BattleSys_VecCD0C95
-    LDA.w !BattleFx_Paused              ; DB as BattleSys_VecCD0C95 left it ($7E, see the header)
+    JSL BattleCD_NmiDispatch
+    LDA.w !Battle_Paused                ; DB as BattleCD_NmiDispatch left it ($7E, see the header)
     BNE .pause_input
-    JSL BattleSys_VecCD0C89
-    LDX.b !BattleFx_FrameCount
+    JSL BattleCD_ScrollStepL
+    LDX.b !Battle_FrameCount
     INX
-    STX.b !BattleFx_FrameCount
-    LDA.w !BattleFx_TimerOn
+    STX.b !Battle_FrameCount
+    LDA.w !Battle_MsgTiming
     BEQ .pause_input
-    DEC.w !BattleFx_TimerFrames
+    DEC.w !Battle_MsgTimer
     BNE .pause_input
-    LDA.w !BattleFx_UnkCD1D
+    LDA.w !Battle_ScriptMsgUp
     BEQ .timer_end
     LDA.b #!BattleFx_UnkCE17Set
-    STA.w !BattleFx_UnkCE17
+    STA.w !Battle_LastScriptMsg
 .timer_end:
-    STZ.w !BattleFx_UnkCD1D
-    STZ.w !BattleFx_UnkCCEC
-    STZ.w !BattleFx_TimerOn
+    STZ.w !Battle_ScriptMsgUp
+    STZ.w !Battle_MsgShown
+    STZ.w !Battle_MsgTiming
     INC.w !BattleFx_CeSetReload
 .pause_input:
     ; Start pauses, in mode 1 only.
-    LDA.b !BattleFx_NmiMode
+    LDA.b !Battle_NmiMode
     CMP.b #$01
     BNE .start_up
     LDA.w !BattleFx_Unk2989Copy
     AND.b #!Battle_2989NoPause
     BNE .no_pause
-    LDA.w !BattleFx_UnkCE16
+    LDA.w !Battle_UnkCE16
     BNE .no_pause
     LDA.l JOY1H
     AND.b #!Battle_JoyStartHi
     BEQ .start_up
     LDA.w !BattleFx_StartLatch
     BNE .math
-    LDA.w !BattleFx_Paused
+    LDA.w !Battle_Paused
     INC A
     AND.b #$01
-    STA.w !BattleFx_Paused
+    STA.w !Battle_Paused
     LDA.b #$01
     STA.w !BattleFx_StartLatch
     BRA .math
 .no_pause:
-    STZ.w !BattleFx_Paused
+    STZ.w !Battle_Paused
 .start_up:
     STZ.w !BattleFx_StartLatch
 .math:
@@ -244,7 +246,7 @@ BattleFx_Nmi:
     LDA.l JOY1L
     AND.b #!Battle_JoyRLo
     BEQ .slow_motion
-    STZ.w !BattleFx_Paused
+    STZ.w !Battle_Paused
     STZ.w !BattleFx_StartLatch
     BRA .restore_dp
 .slow_motion:
@@ -263,7 +265,7 @@ BattleFx_Nmi:
     LSR A
     LSR A
 .set_paused:
-    STA.w !BattleFx_Paused
+    STA.w !Battle_Paused
 .restore_dp:
     REP #$30
     ; Restore DP $00-$2A.
@@ -349,9 +351,10 @@ BattleFx_WhitenObjRows5To7:
 ; other in the source, to VRAM word address DP $45, $45 + $20, $45 + $40,
 ; ... (each row one row of a 32-word-wide map, so the block is half a
 ; map's width). VMAIN is not written: the caller's setting is used.
-; Callers note: the only caller, $CD:0644 (not matched), passes A = $7E
-;   and X = $7E:CA18.
-; Callers (1 JSL site): unmatched ($CD:0644).
+; Callers note: the only caller, BattleCD_NmiUploadText, passes A = $7E
+;   and X = !Battle_TilePageSrc (a tilemap page), DP $45 = a
+;   BattleCD_TileUploadVram word.
+; Callers (1 JSL site): BattleCD_NmiUploadText ($CD:0644).
 ; Entry: M=1, X=0 (X is stored 16-bit to A1T7L/H), A = source bank, X =
 ;        source address, DP $45 = the first VRAM word address (DP=0),
 ;        DB any (saved; set to $00 for the registers); needs vertical or
@@ -379,15 +382,15 @@ BattleFx_UploadMapBlock:
     LDY.b #!BattleFx_MapRowBytes
     LDX.b #!MDMAEN_Ch7
     LDA.w #!BattleFx_MapRows
-    STA.b !BattleFx_Tmp47
-    LDA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp47
+    LDA.b !BattleCD_Tmp45
 .row:
     STA.w VMADDL
     STY.w DAS7L                         ; 8-bit Y: DAS7L only (DAS7H zeroed above)
     STX.w MDMAEN                        ; 8-bit X: !MDMAEN_Ch7
     CLC
     ADC.w #!BattleFx_MapRowWords
-    DEC.b !BattleFx_Tmp47
+    DEC.b !BattleCD_Tmp47
     BNE .row
     TDC
     SEP #$20
@@ -464,7 +467,7 @@ BattleFx_MoveBgRowsUp:
     RTL
 
 ; $D1:E984 — BattleFx_LoadBgRows2To4 (107 bytes, $E984–$E9EE)
-; Counts up !BattleFx_UnkCDC8 and !BattleFx_UnkCE0F, loads background
+; Counts up !BattleFx_UnkCDC8 and !Battle_CgramPending, loads background
 ; palette rows 2-4 (saved and live) from !BattleRom_BgRows2To4 ($D0:FD00,
 ; 48 colours), copies FieldAnimB records 0-2 over records 3-5 and moves
 ; those back three rows (.Unk1 - 48), sets their .Unk4/.Unk5 to 0/1 and
@@ -479,7 +482,7 @@ BattleFx_MoveBgRowsUp:
 ;        !BattleFx_AnimUnk4Init ($0100); Y unchanged
 BattleFx_LoadBgRows2To4:
     INC.w !BattleFx_UnkCDC8
-    INC.w !BattleFx_UnkCE0F
+    INC.w !Battle_CgramPending
     REP #$20
     TDC
     TAX
@@ -597,7 +600,7 @@ BattleFx_GradRotC:
 ; $D1:EA4B — BattleFx_HpGradientTick (389 bytes, $EA4B–$EBCF)
 ; One step of a background colour gradient that follows the HP of
 ; battler slot 3 (the first enemy). Bank $CD's NMI work calls it on the
-; frames where (!BattleFx_FrameCount & !BattleFx_GradTickMask) is 0
+; frames where (!Battle_FrameCount & !BattleFx_GradTickMask) is 0
 ; (every 8th frame with the mask's set-up value 7). It returns at once
 ; while !Battle_Unk5D9B or .Unk0 of any of FieldAnimB records 8-11 is
 ; non-zero.
@@ -619,9 +622,10 @@ BattleFx_GradRotC:
 ;     !BattleFx_GradRotRaw is 0).
 ; That it is a background sky that changes with a boss's HP is a guess
 ; from the reads; which battles use it is not traced.
-; Callers note: the JSL at $CD:0985 is in bank $CD's NMI work (not
-;   matched).
-; Callers (1 JSL site): unmatched ($CD:0985).
+; Callers note: the JSL at $CD:0985 is in BattleCD_NmiMain, with
+;   !Battle_Unk2A21 bit 0 set, on the frames where !Battle_FrameCount AND
+;   !BattleFx_GradTickMask is 0.
+; Callers (1 JSL site): BattleCD_NmiMain ($CD:0985).
 ; Entry: M=1, X=0, DP=0 (DP $45/$47 scratch, TDC as 0), DB=$7E; B (A's
 ;        high byte) = 0 assumed on the fading path, whose first TAX
 ;        takes it in (not traced at the caller; the other TAXs follow a
@@ -653,10 +657,10 @@ BattleFx_HpGradientTick:
 .colour:
     LDA.l !BattleRom_GradColours,X
     AND.b #!BattleFx_RedMask
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.w !BattleFx_GradColours,Y
     AND.b #!BattleFx_RedMask
-    CMP.b !BattleFx_Tmp45
+    CMP.b !BattleCD_Tmp45
     BEQ .green
     BCC .red_up
     LDA.w !BattleFx_GradColours,Y
@@ -671,10 +675,10 @@ BattleFx_HpGradientTick:
     REP #$20
     LDA.l !BattleRom_GradColours,X
     AND.w #!BattleFx_GreenMask
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.w !BattleFx_GradColours,Y
     AND.w #!BattleFx_GreenMask
-    CMP.b !BattleFx_Tmp45
+    CMP.b !BattleCD_Tmp45
     BEQ .blue
     BCC .green_up
     LDA.w !BattleFx_GradColours,Y
@@ -692,10 +696,10 @@ BattleFx_HpGradientTick:
     SEP #$20
     LDA.l !BattleRom_GradColours+1,X
     AND.b #!BattleFx_BlueMaskHi
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.w !BattleFx_GradColours+1,Y
     AND.b #!BattleFx_BlueMaskHi
-    CMP.b !BattleFx_Tmp45
+    CMP.b !BattleCD_Tmp45
     BEQ .next_colour
     BCC .blue_up
     LDA.w !BattleFx_GradColours+1,Y
@@ -738,17 +742,17 @@ BattleFx_HpGradientTick:
     LDA.w !BattleFx_GradStart
     TAX
     LDA.l BattleFx_GradRotA,X
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDY.w #$0000
     JSR BattleFx_GradRotation
     JSR BattleFx_GradWriteRow
     LDA.l BattleFx_GradRotB,X
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDY.w #!Battle_RowBytes
     JSR BattleFx_GradRotation
     JSR BattleFx_GradWriteRow
     LDA.l BattleFx_GradRotC,X
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDY.w #2*!Battle_RowBytes
     JSR BattleFx_GradRotation
     JSR BattleFx_GradWriteRow
@@ -760,16 +764,16 @@ BattleFx_HpGradientTick:
     LSR A
     LSR A
     LSR A
-    STA.b !BattleFx_Tmp45
-    STA.b !BattleFx_Tmp47
+    STA.b !BattleCD_Tmp45
+    STA.b !BattleCD_Tmp47
 .count:
     LDA.w BattlerStats[3].CurHp
-    CMP.b !BattleFx_Tmp45
+    CMP.b !BattleCD_Tmp45
     BCC .counted
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     CLC
-    ADC.b !BattleFx_Tmp47
-    STA.b !BattleFx_Tmp45
+    ADC.b !BattleCD_Tmp47
+    STA.b !BattleCD_Tmp45
     INX
     CPX.w #$0008
     BNE .count
@@ -836,12 +840,12 @@ BattleFx_HpGradientTick:
 BattleFx_GradRotation:
     LDA.w !BattleFx_GradRotRaw
     BEQ .reversed
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BRA .done
 .reversed:
     LDA.b #!BattleFx_GradCount
     SEC
-    SBC.b !BattleFx_Tmp45
+    SBC.b !BattleCD_Tmp45
 .done:
     RTS
 
@@ -860,7 +864,7 @@ BattleFx_GradWriteRow:
     ASL A
     TAX
     LDA.w #!BattleFx_GradCount
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
 .colour:
     LDA.w !BattleFx_GradColours,X
     STA.w !Battle_PaletteSavedLo+(5*!Battle_RowBytes)+2,Y
@@ -869,7 +873,7 @@ BattleFx_GradWriteRow:
     INX
     INY
     INY
-    DEC.b !BattleFx_Tmp45
+    DEC.b !BattleCD_Tmp45
     BNE .colour
     TDC
     SEP #$20
@@ -886,7 +890,7 @@ BattleFx_GradWriteRow:
 ; a beam from the top of the screen down to the point in
 ; !Battle_ActCalcResult. Its top edge runs from x = $B0 + s to $B0 + s +
 ; $20 on line 0, where s = !BattleFx_SwayAmp (40) x the sine of the low
-; byte of !BattleFx_FrameCount (!BattleRom_AbsSine, negated for angles
+; byte of !Battle_FrameCount (!BattleRom_AbsSine, negated for angles
 ; $80-$FF, so s sways between -39 and 39); its bottom edge runs from the
 ; point's x - $10 to x + $10 on the point's line. Then BattleFx_DrawQuad.
 ; Callers note: the JSL at $CD:1805 is followed by RTS (a bank-$CD
@@ -899,13 +903,13 @@ BattleFx_GradWriteRow:
 BattleFx_SwayQuad:
     LDA.b #!BattleFx_SwayAmp
     STA.l WRMPYA
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     BMI .negative
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYB
     NOP                                 ; wait for the multiply
-    LDA.b [!BattleFx_ArgPtr]
+    LDA.b [!BattleCD_FxScriptPtr]
     TAX
     LDA.l RDMPYH
     BRA .store
@@ -914,7 +918,7 @@ BattleFx_SwayQuad:
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYB
     NOP                                 ; wait for the multiply
-    LDA.b [!BattleFx_ArgPtr]
+    LDA.b [!BattleCD_FxScriptPtr]
     TAX
     LDA.l RDMPYH
     EOR.b #!Battle_Invert8
@@ -980,22 +984,22 @@ BattleFx_BgSetPacks:
 ; for each of the set's four entries in BattleFx_BgSetPacks that is not
 ; !BattleFx_BgPackNone, unpacks that graphics pack (!LocGfx_PackPtrs)
 ; to $7E:D000 (Decomp_ToWramVec) and queues its !BattleFx_BgPackBytes to
-; VRAM word $2000, $2800, $3000 or $3800 (by slot; BattleSys_VecCD3ECE);
+; VRAM word $2000, $2800, $3000 or $3800 (by slot; BattleCD_Unk3ECE);
 ; then copies the set's three palette rows (!BattleRom_BgSetPalettes +
 ; BattleFx_BgSetPalOfs) to saved background rows 2-4 (not the live
 ; ones), and unpacks the set's map (!BattleRom_BgMapPtrs, 3 bytes per
 ; set) to $7E:D000 and queues !BattleFx_BgMapBytes of it to VRAM word
 ; $6800. "Background" is inferred from the tiles plus map plus palette.
-; Callers note: the only caller, $CD:04D4 (not matched), passes A =
-;   $7E:CD45 when $7E:CD44 is set and !BattleFx_BgLoading is clear, and
-;   zeroes $7E:CD44 after it (!BattleFx_BgRequest).
-; Callers (1 JSL site): unmatched ($CD:04D4).
+; Callers note: the only caller, BattleCD_FrameTick, passes A =
+;   !Battle_UnkCD45 when !BattleFx_BgRequest is set and
+;   !BattleFx_BgLoading is clear, and zeroes !BattleFx_BgRequest after it.
+; Callers (1 JSL site): BattleCD_FrameTick ($CD:04D4).
 ; Entry: M=1, X=0, A = the set, B = 0 assumed (A * 4 and the first pack
 ;        id * 3 are formed 16-bit; not traced at the caller), DP=0 (DP
 ;        $53 is the upload size), DB=$7E (the Decomp_ToWramVec block at
 ;        $0300 and the variables are written .w)
 ; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (as
-;        BattleSys_VecCD3ECE leaves them; not analysed);
+;        BattleCD_Unk3ECE leaves them; not analysed);
 ;        !BattleFx_BgLoading = 0; !BattleFx_BgSet = the set; DP $53 =
 ;        !BattleFx_BgMapBytes
 BattleFx_LoadBgSet:
@@ -1035,7 +1039,7 @@ BattleFx_LoadBgSet:
     LDY.w !BattleFx_BgPackVram
     LDX.w #!BattleFx_DecompBuf
     LDA.b #!Bank7E
-    JSL BattleSys_VecCD3ECE
+    JSL BattleCD_Unk3ECE
 .next_pack:
     REP #$20
     LDA.w !BattleFx_BgPackVram
@@ -1090,14 +1094,14 @@ BattleFx_LoadBgSet:
     LDY.w #!BattleFx_BgMapVram
     LDX.w #!BattleFx_DecompBuf
     LDA.b #!Bank7E
-    JSL BattleSys_VecCD3ECE
+    JSL BattleCD_Unk3ECE
     STZ.w !BattleFx_BgLoading
     RTL
 
 ; $D1:EDCD — BattleFx_GrowBand (204 bytes, $EDCD–$EE98)
 ; Draws a band around the point in !Battle_ActCalcResult into the window
 ; table of this frame (!BattleFx_WinTable1 when bit 0 of
-; !BattleFx_FrameCount is set, else !BattleFx_WinTable0), one step wider
+; !Battle_FrameCount is set, else !BattleFx_WinTable0), one step wider
 ; per call. The argument byte picks the kind:
 ;   - 0: a column. Left = point x - !BattleFx_CountA (at least 0), right
 ;     = point x + !BattleFx_CountA (at most 255); the first pair of every
@@ -1114,7 +1118,7 @@ BattleFx_LoadBgSet:
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X clobbered; Y unchanged;
 ;        DP $45/$46 written
 BattleFx_GrowBand:
-    LDA.b [!BattleFx_ArgPtr]
+    LDA.b [!BattleCD_FxScriptPtr]
     BNE .rows
     LDA.w !Battle_ActCalcResult
     SEC
@@ -1122,7 +1126,7 @@ BattleFx_GrowBand:
     BCS .left_ok
     TDC
 .left_ok:
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.w !Battle_ActCalcResult
     CLC
     ADC.w !BattleFx_CountA
@@ -1138,10 +1142,10 @@ BattleFx_GrowBand:
     TDC
     TAX
     REP #$20
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.w #$0001
     BEQ .buffer0
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
 .column_buf1:
     STA.w !BattleFx_WinTable1,X
     STA.w !BattleFx_WinTable1+212,X
@@ -1155,7 +1159,7 @@ BattleFx_GrowBand:
     BNE .column_buf1
     BRA .done
 .buffer0:
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
 .column_buf0:
     STA.w !BattleFx_WinTable0,X
     STA.w !BattleFx_WinTable0+212,X
@@ -1178,7 +1182,7 @@ BattleFx_GrowBand:
     BCS .top_ok
     TDC
 .top_ok:
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.w !Battle_ActCalcResult+1
     CLC
     ADC.w !BattleFx_CountB
@@ -1196,7 +1200,7 @@ BattleFx_GrowBand:
 .fill_rows:
     TDC
     TAX
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     REP #$20
     ASL A
     ASL A
@@ -1205,10 +1209,10 @@ BattleFx_GrowBand:
     AND.w #!Battle_LowByteMask
     ASL A
     ASL A
-    STA.b !BattleFx_Tmp45
-    CPX.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
+    CPX.b !BattleCD_Tmp45
     BEQ .rows_done
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.w #$0001
     BEQ .rows_buf0
     LDA.w #!BattleFx_WinFull
@@ -1218,7 +1222,7 @@ BattleFx_GrowBand:
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .row_buf1
     BRA .rows_done
 .rows_buf0:
@@ -1229,18 +1233,18 @@ BattleFx_GrowBand:
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .row_buf0
 .rows_done:
     TDC
     SEP #$20
     RTL
 
-; $D1:EE99 — BattleFx_UnkTableEE99 (12 bytes, $EE99–$EEA4)
-; Read by bank $CD (not matched): $CD:01C3 loads entry X and calls
-; $CD:3B71 with X = $80 unless it is $FF. Nothing in bank $D1 reads it;
-; its meaning is not traced.
-BattleFx_UnkTableEE99:
+; $D1:EE99 — BattleFx_MsgSfx (12 bytes, $EE99–$EEA4)
+; 1 byte per battle message: the sound BattleCD_ShowMessage plays for it
+; (through BattleCD_ApuCmd18, unless !BattleCD_MsgNoSfx, $FF). Nothing in
+; bank $D1 reads it.
+BattleFx_MsgSfx:
     db $FF,$FF,$FF,$FF,$89,$88,$88,$88,$FF,$FF,$FF,$FF
 
 ; $D1:EEA5 — BattleFx_RampWin2 (31 bytes, $EEA5–$EEC3)
@@ -1287,7 +1291,7 @@ BattleFx_RampWin2:
 ; !BattleFx_WinTable0-4 + Y and + Y: the line before line 0 to line 210).
 ; !BattleFx_CountA grows by the argument byte; r1 = !BattleFx_WaveRadius
 ; ($60) - !BattleFx_CountA and r2 = r1 / 2. Two angles start at
-; !BattleFx_FrameCount * 2 and * 4 (low bytes) and count up once per
+; !Battle_FrameCount * 2 and * 4 (low bytes) and count up once per
 ; step. For each step:
 ;   - first pair: the word at !BattleFx_WaveBaseX + Y ($7E:E500 + Y)
 ;     plus r1 x the sine of the first angle (BattleFx_WaveLeftA);
@@ -1306,28 +1310,28 @@ BattleFx_RampWin2:
 BattleFx_WaveWindowA:
     LDA.w !BattleFx_CountA
     CLC
-    ADC.b [!BattleFx_ArgPtr]
+    ADC.b [!BattleCD_FxScriptPtr]
     STA.w !BattleFx_CountA
     LDA.b #!BattleFx_WaveRadius
     SEC
     SBC.w !BattleFx_CountA
-    STA.b !BattleFx_Tmp4B
+    STA.b !BattleCD_Tmp4B
     LSR A
-    STA.b !BattleFx_Tmp4D
-    LDA.b !BattleFx_FrameCount
+    STA.b !BattleCD_Tmp4D
+    LDA.b !Battle_FrameCount
     ASL A
     ASL A
     TAX
-    STX.b !BattleFx_Tmp45
-    LDA.b !BattleFx_FrameCount
+    STX.b !BattleCD_Tmp45
+    LDA.b !Battle_FrameCount
     ASL A
     TAX
-    STX.b !BattleFx_Tmp47
+    STX.b !BattleCD_Tmp47
     REP #$20
     LDA.w !BattleFx_ShakeX
     CLC
-    ADC.w !BattleFx_UnkCA5E
-    STA.b !BattleFx_Tmp4F
+    ADC.w !Battle_FxScrollAddX
+    STA.b !BattleCD_Tmp4F
     LDA.w !BattleFx_ShakeY
     CLC
     ADC.w !BattleFx_BounceOut
@@ -1337,12 +1341,12 @@ BattleFx_WaveWindowA:
     TDC
     TAY
 .pair:
-    LDA.b !BattleFx_Tmp47
+    LDA.b !BattleCD_Tmp47
     BPL .left_positive
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4B
+    LDA.b !BattleCD_Tmp4B
     STA.l WRMPYB
     NOP
     NOP
@@ -1362,7 +1366,7 @@ BattleFx_WaveWindowA:
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4B
+    LDA.b !BattleCD_Tmp4B
     STA.l WRMPYB
     NOP
     NOP
@@ -1374,8 +1378,8 @@ BattleFx_WaveWindowA:
     LDA.l RDMPYH
     JSR BattleFx_WaveRight
 .next:
-    INC.b !BattleFx_Tmp45
-    INC.b !BattleFx_Tmp47
+    INC.b !BattleCD_Tmp45
+    INC.b !BattleCD_Tmp47
     REP #$20
     TYA
     CLC
@@ -1408,12 +1412,12 @@ BattleFx_WaveLeftA:
     STA.w !BattleFx_WinTable0,Y
     TDC
     SEP #$20
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BPL .next_positive
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     SEC
     RTS
@@ -1421,7 +1425,7 @@ BattleFx_WaveLeftA:
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     CLC
     RTS
@@ -1432,12 +1436,12 @@ BattleFx_WaveLeftA:
     STA.w !BattleFx_WinTable0,Y
     TDC
     SEP #$20
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BPL .next_positive2
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     SEC
     RTS
@@ -1445,7 +1449,7 @@ BattleFx_WaveLeftA:
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     CLC
     RTS
@@ -1453,11 +1457,11 @@ BattleFx_WaveLeftA:
 ; $D1:EFD0 — BattleFx_WaveWindowB (174 bytes, $EFD0–$F07D)
 ; Like BattleFx_WaveWindowA, but with r1 = r2 = !BattleFx_WaveRadius -
 ; !BattleFx_CountA, and the first pair is r1 x the sine plus
-; (!BattleFx_ShakeX + !BattleFx_UnkCA5E) instead of the $7E:E500 words
+; (!BattleFx_ShakeX + !Battle_FxScrollAddX) instead of the $7E:E500 words
 ; (BattleFx_WaveLeftB). Two entries pick the angles:
 ;   - BattleFx_WaveWindowB: from !BattleFx_CountB + !BattleFx_WaveBPhase
 ;     ($A8), times 2 and times 4; !BattleFx_CountB counts up;
-;   - BattleFx_WaveWindowB_ByFrame: from !BattleFx_FrameCount, times 2
+;   - BattleFx_WaveWindowB_ByFrame: from !Battle_FrameCount, times 2
 ;     and times 4, as BattleFx_WaveWindowA.
 ; Both then grow !BattleFx_CountA by the argument byte and write the
 ; table.
@@ -1477,35 +1481,35 @@ BattleFx_WaveWindowB:
     ADC.b #!BattleFx_WaveBPhase
     ASL A
     TAX
-    STX.b !BattleFx_Tmp47
+    STX.b !BattleCD_Tmp47
     ASL A
     TAX
-    STX.b !BattleFx_Tmp45
+    STX.b !BattleCD_Tmp45
     INC.w !BattleFx_CountB
     BRA BattleFx_WaveWindowB_ByFrame_build
 BattleFx_WaveWindowB_ByFrame:        ; header: see BattleFx_WaveWindowB
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     ASL A
     TAX
-    STX.b !BattleFx_Tmp47
+    STX.b !BattleCD_Tmp47
     ASL A
     TAX
-    STX.b !BattleFx_Tmp45
+    STX.b !BattleCD_Tmp45
 .build:
     LDA.w !BattleFx_CountA
     CLC
-    ADC.b [!BattleFx_ArgPtr]
+    ADC.b [!BattleCD_FxScriptPtr]
     STA.w !BattleFx_CountA
     LDA.b #!BattleFx_WaveRadius
     SEC
     SBC.w !BattleFx_CountA
-    STA.b !BattleFx_Tmp4B
-    STA.b !BattleFx_Tmp4D
+    STA.b !BattleCD_Tmp4B
+    STA.b !BattleCD_Tmp4D
     REP #$20
     LDA.w !BattleFx_ShakeX
     CLC
-    ADC.w !BattleFx_UnkCA5E
-    STA.b !BattleFx_Tmp4F
+    ADC.w !Battle_FxScrollAddX
+    STA.b !BattleCD_Tmp4F
     LDA.w !BattleFx_ShakeY
     CLC
     ADC.w !BattleFx_BounceOut
@@ -1515,12 +1519,12 @@ BattleFx_WaveWindowB_ByFrame:        ; header: see BattleFx_WaveWindowB
     TDC
     TAY
 .pair:
-    LDA.b !BattleFx_Tmp47
+    LDA.b !BattleCD_Tmp47
     BPL .left_positive
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4B
+    LDA.b !BattleCD_Tmp4B
     STA.l WRMPYB
     NOP
     NOP
@@ -1540,7 +1544,7 @@ BattleFx_WaveWindowB_ByFrame:        ; header: see BattleFx_WaveWindowB
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4B
+    LDA.b !BattleCD_Tmp4B
     STA.l WRMPYB
     NOP
     NOP
@@ -1552,8 +1556,8 @@ BattleFx_WaveWindowB_ByFrame:        ; header: see BattleFx_WaveWindowB
     LDA.l RDMPYH
     JSR BattleFx_WaveRight
 .next:
-    INC.b !BattleFx_Tmp45
-    INC.b !BattleFx_Tmp47
+    INC.b !BattleCD_Tmp45
+    INC.b !BattleCD_Tmp47
     REP #$20
     TYA
     CLC
@@ -1577,17 +1581,17 @@ BattleFx_WaveLeftB:
     BPL .positive
     REP #$21
     ORA.w #!BattleFx_SignExtend
-    ADC.b !BattleFx_Tmp4F
+    ADC.b !BattleCD_Tmp4F
     STA.w !BattleFx_WinTable0-4,Y
     STA.w !BattleFx_WinTable0,Y
     TDC
     SEP #$20
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BPL .next_positive
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     SEC
     RTS
@@ -1595,23 +1599,23 @@ BattleFx_WaveLeftB:
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     CLC
     RTS
 .positive:
     REP #$21
-    ADC.b !BattleFx_Tmp4F
+    ADC.b !BattleCD_Tmp4F
     STA.w !BattleFx_WinTable0-4,Y
     STA.w !BattleFx_WinTable0,Y
     TDC
     SEP #$20
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BPL .next_positive2
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     SEC
     RTS
@@ -1619,7 +1623,7 @@ BattleFx_WaveLeftB:
     TAX
     LDA.l !BattleRom_AbsSine,X
     STA.l WRMPYA
-    LDA.b !BattleFx_Tmp4D
+    LDA.b !BattleCD_Tmp4D
     STA.l WRMPYB
     CLC
     RTS
@@ -1654,7 +1658,7 @@ BattleFx_WaveRight:
 ; $D1:F108 — BattleFx_AddLineOffsets (168 bytes, $F108–$F1AF)
 ; Adds per-line bytes from $7E:0A00 (DP=$0A00 meanwhile) to lines 48-111
 ; and 112-175 of this frame's window table (by bit 0 of
-; !BattleFx_FrameCount): for n = 0-63, line 48 + n and line 112 + n each
+; !Battle_FrameCount): for n = 0-63, line 48 + n and line 112 + n each
 ; get $0A00 + n added to both edges of their first pair, and $0A20 + n
 ; (table 0) or $0A40 + n (table 1) to both edges of their second pair.
 ; There is no CLC: each ADC also adds the carry of the one before (the
@@ -1677,7 +1681,7 @@ BattleFx_AddLineOffsets:
     SEP #$10
     LDY.b #$00
     TYX
-    LDA.w !BattleFx_FrameCount          ; $7E:007C (DP is $0A00 here)
+    LDA.w !Battle_FrameCount            ; $7E:007C (DP is $0A00 here)
     AND.b #$01
     BEQ .line_buf0
 .line_buf1:
@@ -1761,15 +1765,15 @@ BattleFx_AddLineOffsets:
 ; and leaves them so. In order:
 ;   - JML BattleFx_Nmi and JML BattleFx_Irq into !NmiTrampoline and
 ;     !IrqTrampoline;
-;   - JSL BattleSys_VecCD0C89 (the layer drift) and BattleSys_VecCD0C9D;
+;   - JSL BattleCD_ScrollStepL (the layer drift) and BattleCD_InitHdmaDataL;
 ;   - !BattleFx_UnkCCA1, !BattleFx_CeSetWant and !BattleFx_CeSet =
 ;     !Battle_UnkEC bit 0;
 ;   - zeroes most of its variables (byte and word stores, the words with
-;     X = 0), !Battle_Unk99D2, !BattleFx_NmiMode, !BattleFx_IntBusy,
-;     !BattleFx_FrameCount, !BattleFx_Paused and the HP gradient's
+;     X = 0), !Battle_Unk99D2, !Battle_NmiMode, !BattleFx_IntBusy,
+;     !Battle_FrameCount, !Battle_Paused and the HP gradient's
 ;     state, then !BattleFx_GradShown = 8, !BattleFx_Unk2989Copy =
-;     !Battle_Unk2989, $FF to !BattleFx_UnkCD06, !BattleFx_UnkCE16,
-;     !BattleFx_UnkCE17, !BattleFx_UnkCA1D and !BattleFx_UnkCD46,
+;     !Battle_Unk2989, $FF to !Battle_InfoKey, !Battle_UnkCE16,
+;     !Battle_LastScriptMsg, !Battle_HdmaEnable and !BattleFx_UnkCD46,
 ;     !BattleFx_CeSetBase = 8, !BattleFx_HoldAnims = 0, the V-count IRQ
 ;     at line !BattleFx_IrqLine (211), !BattleFx_CeSetReload = 1, the
 ;     words !BattleFx_UnkBE9B+0/+2 = $7878; BattleFx_FindGradStart;
@@ -1789,15 +1793,15 @@ BattleFx_AddLineOffsets:
 ;     word 0 then a word v ($FFFC for 19 entries, then 0, 4 and 8 for 12
 ;     each, 5 of the 8 fitting) and v - $98;
 ;   - both window tables all !BattleFx_WinEmpty, !BattleFx_UnkBB05
-;     zeroed, !BattleFx_UnkCCEE = colours 8-15 of saved background row 1;
-;   - JSL BattleSys_VecCEEE6E with A = 8, BattleFx_BuildGradHdma,
-;     BattleSys_VecCD0235, and ReentryVectors [3] (MusicCueDispatch, the
+;     zeroed, !Battle_PalRowSave = colours 8-15 of saved background row 1;
+;   - JSL BattleCE_UnkEE6E with A = 8, BattleFx_BuildGradHdma,
+;     BattleCD_ClearTextGfxL, and ReentryVectors [3] (MusicCueDispatch, the
 ;     battle music cue, probably) with DB, DP and P saved around it;
-;   - A = 0 and !BattleFx_UnkCAD3 counted up.
+;   - A = 0 and !Battle_UnkCAD3 counted up.
 ; Callers note: reached by JSL from $CD:0039, the target of the vector
 ;   JMP at $CD:0000 (BattleSys_VecCD0000), which BattleCF_EnterBattle
 ;   calls.
-; Callers (1 JSL site): unmatched ($CD:0039).
+; Callers (1 JSL site): BattleCD_EnterBattle ($CD:0039).
 ; Entry: M=1 (8-bit immediates), X=0 (16-bit index loads), DP any and DB
 ;        any (both set here)
 ; Exit:  M=1, X=0, DP=0 and DB=$7E (set, not restored); A = 0; X and Y
@@ -1820,8 +1824,8 @@ BattleFx_Init:
     LDA.b #!Op_JML
     STA.w !NmiTrampoline
     STA.w !IrqTrampoline
-    JSL BattleSys_VecCD0C89
-    JSL BattleSys_VecCD0C9D
+    JSL BattleCD_ScrollStepL
+    JSL BattleCD_InitHdmaDataL
     LDA.b !Battle_UnkEC
     AND.b #$01
     STA.w !BattleFx_UnkCCA1
@@ -1829,50 +1833,50 @@ BattleFx_Init:
     STA.w !BattleFx_CeSet
     TDC
     TAX
-    STZ.w !BattleFx_UnkCA16
-    STZ.w !BattleFx_UnkCA17
+    STZ.w !Battle_TilePageSlot
+    STZ.w !Battle_TilePageReq
     STZ.w !BattleFx_IntBusy             ; the same byte as DP $7F (DP=0)
-    STZ.w !BattleFx_UnkCA23
-    STZ.w !BattleFx_UnkCD23
-    STZ.w !BattleFx_Op80Regs
-    STZ.w !BattleFx_UnkCD29
-    STZ.w !BattleFx_UnkCD2D
-    STZ.w !BattleFx_Op80Regs+8
-    STZ.w !BattleFx_Op80Regs+16
-    STX.w !BattleFx_UnkCCA4
-    STX.w !BattleFx_UnkCCA4+2
-    STX.w !BattleFx_UnkCCA4+4
-    STX.w !BattleFx_UnkCCA4+6
-    STX.w !BattleFx_UnkCCA4+8
-    STX.w !BattleFx_UnkCCA4+10
-    STZ.w !BattleFx_UnkCD2E
-    STZ.w !BattleFx_Op80Count
-    STZ.w !BattleFx_UnkCCEA
-    STZ.w !BattleFx_TimerFrames
-    STX.w !BattleFx_UnkCCEC
-    STX.w !BattleFx_Paused
-    STZ.w !BattleFx_UnkCD05
-    STZ.w !BattleFx_UnkCD07
+    STZ.w !Battle_UnkCA23
+    STZ.w !Battle_SfxPending
+    STZ.w !Battle_ShakeXOn
+    STZ.w !Battle_UnkCD29
+    STZ.w !Battle_UnkCD2D
+    STZ.w !Battle_ShakeYOn
+    STZ.w !Battle_ShakeLayers
+    STX.w !Battle_ShakeOfs1X
+    STX.w !Battle_ShakeOfs1X+2
+    STX.w !Battle_ShakeOfs1X+4
+    STX.w !Battle_ShakeOfs1X+6
+    STX.w !Battle_ShakeOfs1X+8
+    STX.w !Battle_ShakeOfs1X+10
+    STZ.w !Battle_UnkCD2E
+    STZ.w !Battle_PalAnimCopy
+    STZ.w !Battle_BgFxEnded
+    STZ.w !Battle_MsgTimer
+    STX.w !Battle_MsgShown
+    STX.w !Battle_Paused
+    STZ.w !Battle_TextStepping
+    STZ.w !Battle_UnkCD07
     STX.w !Battle_Unk99D2
     STX.w !BattleFx_UnkCD0A
-    STX.w !BattleFx_UnkBB01
-    STX.w !BattleFx_UnkBB03
-    STZ.w !BattleFx_UnkCD0C
-    STZ.w !BattleFx_UnkCE11
-    STX.w !BattleFx_UnkCD1D
-    STZ.b !BattleFx_NmiMode
-    STZ.w !BattleFx_UnkCAD3
-    STZ.w !BattleFx_UnkCA92
-    STX.w !BattleFx_FrameCount          ; the same word as DP $7C (DP=0)
+    STX.w !Battle_ScrollAddX
+    STX.w !Battle_ScrollAddY
+    STZ.w !Battle_LayerFxLoaded
+    STZ.w !Battle_DmaQueueBusy
+    STX.w !Battle_ScriptMsgUp
+    STZ.b !Battle_NmiMode
+    STZ.w !Battle_UnkCAD3
+    STZ.w !Battle_LayerFxMode
+    STX.w !Battle_FrameCount            ; the same word as DP $7C (DP=0)
     STX.w !BattleFx_BgRequest
     STX.w !BattleFx_UnkCDC7
-    STZ.w !BattleFx_UnkCD3C
+    STZ.w !Battle_UnkCD3C
     STZ.w !BattleFx_BgLoading
     STX.w !BattleFx_GradFading
     STX.w !BattleFx_GradShown
     STX.w !BattleFx_SlowCount
     STZ.w !BattleFx_GradForce
-    STZ.w !BattleFx_UnkCE0F
+    STZ.w !Battle_CgramPending
     STZ.w !BattleFx_GradRotRaw
     STZ.w !BattleFx_UnkCE15
     STZ.w !BattleFx_AnimsHeld
@@ -1881,9 +1885,9 @@ BattleFx_Init:
     LDA.w !Battle_Unk2989
     STA.w !BattleFx_Unk2989Copy
     LDA.b #!BattleFx_InitFF
-    STA.w !BattleFx_UnkCD06
-    STA.w !BattleFx_UnkCE16
-    STA.w !BattleFx_UnkCE17
+    STA.w !Battle_InfoKey
+    STA.w !Battle_UnkCE16
+    STA.w !Battle_LastScriptMsg
     LDA.b #$08
     STA.w !BattleFx_CeSetBase
     STZ.w !BattleFx_HoldAnims
@@ -1892,22 +1896,22 @@ BattleFx_Init:
     LDA.b #$00
     STA.l VTIMEH
     LDA.b #!BattleFx_InitFF
-    STA.w !BattleFx_UnkCA1D
+    STA.w !Battle_HdmaEnable
     STA.w !BattleFx_UnkCD46
-    STZ.w !BattleFx_UnkCA1E
+    STZ.w !Battle_WipeMode
     STZ.w !BattleFx_FrameWait
     STZ.w !BattleFx_UnkCA26
     STZ.w !Battle_Unk5D9B
-    STZ.w !BattleFx_UnkCA32
+    STZ.w !Battle_FxChannels
     LDA.b #$01
     STA.w !BattleFx_CeSetReload
     LDX.w #!BattleFx_UnkBE9BInit
     STX.w !BattleFx_UnkBE9B
     LDX.w #!BattleFx_UnkBE9BInit
     STX.w !BattleFx_UnkBE9B+2
-    STZ.w !BattleFx_UnkC863
-    STZ.w !BattleFx_UnkC863+1
-    STZ.w !BattleFx_UnkC863+2
+    STZ.w !Battle_WinRegs+2
+    STZ.w !Battle_WinRegs+3
+    STZ.w !Battle_WinRegs+4
     JSR BattleFx_FindGradStart
     LDA.b #$07
     STA.w !BattleFx_GradTickMask
@@ -1947,8 +1951,8 @@ BattleFx_Init:
     STX.w !BattleFx_WinTable0-6
     STX.w !BattleFx_WinTable0-4
     STX.w !BattleFx_WinTable0-2
-    STZ.w !BattleFx_UnkC861
-    STZ.w !BattleFx_UnkC861+1
+    STZ.w !Battle_WinRegs
+    STZ.w !Battle_WinRegs+1
     LDA.w !Battle_Unk2A21
     AND.b #$01
     BEQ .unk_c14f
@@ -1980,19 +1984,19 @@ BattleFx_Init:
     JSR BattleFx_SaveAnimKinds
     REP #$20
     LDA.w #!BattleFx_UnkBEABRun1
-    STA.b !BattleFx_Tmp53
+    STA.b !BattleCD_Tmp53
     LDA.w #!BattleFx_UnkBEABStart
-    STA.b !BattleFx_Tmp55
+    STA.b !BattleCD_Tmp55
     TDC
     TAX
     BRA .entry
 .run12:
     LDA.w #!BattleFx_UnkBEABRun
-    STA.b !BattleFx_Tmp53
+    STA.b !BattleCD_Tmp53
 .entry:
     STZ.w !BattleFx_UnkBEAB,X
     STZ.w !BattleFx_UnkBF6B,X
-    LDA.b !BattleFx_Tmp55
+    LDA.b !BattleCD_Tmp55
     STA.w !BattleFx_UnkBEAB+2,X
     SEC
     SBC.w #!BattleFx_UnkBF6BOfs
@@ -2003,12 +2007,12 @@ BattleFx_Init:
     INX
     CPX.w #!BattleFx_UnkBEABBytes
     BEQ .windows
-    DEC.b !BattleFx_Tmp53
+    DEC.b !BattleCD_Tmp53
     BNE .entry
-    LDA.b !BattleFx_Tmp55
+    LDA.b !BattleCD_Tmp55
     CLC
     ADC.w #$0004
-    STA.b !BattleFx_Tmp55
+    STA.b !BattleCD_Tmp55
     BRA .run12
 .windows:
     TDC
@@ -2033,7 +2037,7 @@ BattleFx_Init:
     TAX
 .copy_colours:
     LDA.w !Battle_PaletteSavedLo+(1*!Battle_RowBytes)+16,X
-    STA.w !BattleFx_UnkCCEE,X
+    STA.w !Battle_PalRowSave,X
     INX
     INX
     CPX.w #!BattleFx_UnkCCEEBytes
@@ -2041,9 +2045,9 @@ BattleFx_Init:
     TDC
     SEP #$20
     LDA.b #$08
-    JSL BattleSys_VecCEEE6E
+    JSL BattleCE_UnkEE6E
     JSL BattleFx_BuildGradHdma
-    JSL BattleSys_VecCD0235
+    JSL BattleCD_ClearTextGfxL
     PHB
     PHD
     PHP
@@ -2052,7 +2056,7 @@ BattleFx_Init:
     PLD
     PLB
     TDC
-    INC.w !BattleFx_UnkCAD3
+    INC.w !Battle_UnkCAD3
     RTL
 
 ; $D1:F411 — BattleFx_SaveAnimKinds (21 bytes, $F411–$F425)
@@ -2088,8 +2092,8 @@ BattleFx_SaveAnimKinds:
 ;     the kinds of records 0-7 back from !BattleFx_SavedKinds;
 ;   - otherwise nothing.
 ; Callers note: the JSLs at $CD:09BB and $CD:0AD2 are in bank $CD's NMI
-;   work (not matched).
-; Callers (2 JSL sites): unmatched ($CD:09BB, $CD:0AD2).
+;   work, every frame.
+; Callers (2 JSL sites): BattleCD_NmiMain ($CD:09BB) and BattleCD_NmiSetup ($CD:0AD2).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (unchanged
 ;        when nothing is done)
@@ -2144,14 +2148,14 @@ BattleFx_HoldAnimsTick:
     RTL
 
 ; $D1:F474 — BattleFx_RandomByte (8 bytes, $F474–$F47B)
-; A = RandomTable entry A + !BattleFx_FrameCount (low byte) + C. No CLC:
+; A = RandomTable entry A + !Battle_FrameCount (low byte) + C. No CLC:
 ; the carry the caller left is added too.
 ; Callers (2 JSR sites): BattleFx_RandomShake ($D1:F483, $D1:F490).
 ; Entry: M=1, X=0, A = the base, B = 0 (TAX makes the 16-bit index;
 ;        see BattleFx_RandomShake), DP=0, DB any (the table is read long)
 ; Exit:  M=1; A = the byte; X = the index; Y unchanged
 BattleFx_RandomByte:
-    ADC.b !BattleFx_FrameCount          ; no CLC: the caller's carry is added too
+    ADC.b !Battle_FrameCount            ; no CLC: the caller's carry is added too
     TAX
     LDA.l RandomTable,X
     RTS
@@ -2162,7 +2166,7 @@ BattleFx_RandomByte:
 ; and stores -x and -y (16-bit) to !BattleFx_ShakeX and
 ; !BattleFx_ShakeY at X = !BattleFx_RecOfs. The random bytes are
 ; BattleFx_RandomByte at mask + frame count and at x + frame count (each
-; with the carry left before). Then moves !BattleFx_ArgPtr on by 2.
+; with the carry left before). Then moves !BattleCD_FxScriptPtr on by 2.
 ; Callers note: the JSL at $CD:1913 is followed by RTS (a bank-$CD
 ;   script command handler, probably; not matched).
 ; Callers (1 JSL site): unmatched ($CD:1913).
@@ -2170,55 +2174,55 @@ BattleFx_RandomByte:
 ;        DB=$7E; B = 0 assumed (BattleFx_RandomByte's TAX; not traced at
 ;        the caller); C is used by the first random index
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = !BattleFx_RecOfs; Y
-;        = the new low word of !BattleFx_ArgPtr; DP $45, $47, $49
+;        = the new low word of !BattleCD_FxScriptPtr; DP $45, $47, $49
 ;        written
 BattleFx_RandomShake:
     LDY.w #$0002
-    LDA.b [!BattleFx_ArgPtr],Y
-    STA.b !BattleFx_Tmp49
+    LDA.b [!BattleCD_FxScriptPtr],Y
+    STA.b !BattleCD_Tmp49
     JSR BattleFx_RandomByte
-    AND.b !BattleFx_Tmp49
+    AND.b !BattleCD_Tmp49
     CLC
-    ADC.b [!BattleFx_ArgPtr]
-    STA.b !BattleFx_Tmp45
+    ADC.b [!BattleCD_FxScriptPtr]
+    STA.b !BattleCD_Tmp45
     LDY.w #$0001
     JSR BattleFx_RandomByte
-    AND.b !BattleFx_Tmp49
+    AND.b !BattleCD_Tmp49
     CLC
-    ADC.b [!BattleFx_ArgPtr],Y
-    STA.b !BattleFx_Tmp47
+    ADC.b [!BattleCD_FxScriptPtr],Y
+    STA.b !BattleCD_Tmp47
     LDX.b !BattleFx_RecOfs
     REP #$20
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     AND.w #!Battle_LowByteMask
     EOR.w #!Battle_Invert16
     INC A
     STA.w !BattleFx_ShakeX,X
-    LDA.b !BattleFx_Tmp47
+    LDA.b !BattleCD_Tmp47
     AND.w #!Battle_LowByteMask
     EOR.w #!Battle_Invert16
     INC A
     STA.w !BattleFx_ShakeY,X
     TDC
     SEP #$20
-    LDY.b !BattleFx_ArgPtr
+    LDY.b !BattleCD_FxScriptPtr
     INY
     INY
-    STY.b !BattleFx_ArgPtr
+    STY.b !BattleCD_FxScriptPtr
     RTL
 
 ; $D1:F4C0 — BattleFx_NmiAlt (153 bytes, $F4C0–$F558)
-; A second NMI handler of the battle: bank $CD installs it ($CD:041E
-; stores its address to !NmiTrampoline+1; not matched, so when is not
-; traced). It saves A, X, Y, DB and DP, sets DP=0, turns HDMA off, reads
-; RDNMI, writes !Nmi_Nmitimen, zeroes DP $47, then:
-; JSL BattleSys_VecCD09CE (the CGRAM upload), ReentryVectors [2]
+; A second NMI handler of the battle: BattleCD_ExitBattle installs it
+; at the battle's end, after the closing wipe ($CD:041E stores its
+; address to !NmiTrampoline+1). It saves A, X, Y, DB and DP, sets DP=0,
+; turns HDMA off, reads RDNMI, writes !Nmi_Nmitimen, zeroes DP $47, then:
+; JSL BattleCD_UploadCgram (the CGRAM upload), ReentryVectors [2]
 ; (Field_RefreshHdmaLong, whose A it writes to HDMAEN), INIDISP = DP $45
 ; (read long), BG1-BG3 scroll from !Battle_PpuScroll2 (with DB=$7E,
-; each register written low then high), JSL BattleSys_VecCD0C89 (the
+; each register written low then high), JSL BattleCD_ScrollStepL (the
 ; layer drift) and FdVec_FFF7 (PalAnim_TickAll). Unlike BattleFx_Nmi it
 ; has no busy flag and does not restore the math registers.
-; The HDMAEN store here and the register stores in BattleSys_VecCD09CE
+; The HDMAEN store here and the register stores in BattleCD_UploadCgram
 ; are absolute with the interrupted code's DB, so that code must run
 ; with a DB that maps I/O; not traced.
 ; Callers note: no call site; reached through !NmiTrampoline.
@@ -2240,11 +2244,11 @@ BattleFx_NmiAlt:
     LDA.l RDNMI                         ; acknowledge the NMI
     LDA.b #!Nmi_Nmitimen
     STA.l NMITIMEN
-    STZ.b !BattleFx_Tmp47
-    JSL BattleSys_VecCD09CE
+    STZ.b !BattleCD_Tmp47
+    JSL BattleCD_UploadCgram
     JSL ReentryVectors+5                ; ReentryVectors [2]: Field_RefreshHdmaLong
     STA.w HDMAEN                        ; absolute: the interrupted code's DB
-    LDA.l !BattleFx_Tmp45               ; DP $45 read long
+    LDA.l !BattleCD_Tmp45               ; DP $45 read long
     STA.l INIDISP
     LDA.b #!Bank7E
     PHA
@@ -2273,7 +2277,7 @@ BattleFx_NmiAlt:
     STA.l BG3VOFS
     LDA.w !Battle_PpuScroll2+11
     STA.l BG3VOFS
-    JSL BattleSys_VecCD0C89
+    JSL BattleCD_ScrollStepL
     JSL FdVec_FFF7
     REP #$30
     PLD
@@ -2372,7 +2376,7 @@ BattleFx_StepBounce:
 ; Exit:  M=1, X=0, DP and DB unchanged; A = !Battle_ActCalcResult+5; X =
 ;        the argument; Y unchanged
 BattleFx_SaveCalcPoints:
-    LDA.b [!BattleFx_ArgPtr]
+    LDA.b [!BattleCD_FxScriptPtr]
     TAX
     LDA.w !Battle_ActCalcResult
     STA.w !BattleFx_CalcCopy,X
@@ -2391,7 +2395,7 @@ BattleFx_SaveCalcPoints:
 ; $D1:F5F5 — BattleFx_CopyWin1ToWin2 (133 bytes, $F5F5–$F679)
 ; Copies the first pair of every line (0-223) of one window table into
 ; the second pair of the other: table 0 into table 1 when bit 0 of
-; !BattleFx_FrameCount is set (the table this frame writes), table 1
+; !Battle_FrameCount is set (the table this frame writes), table 1
 ; into table 0 when clear.
 ; Callers note: the JSL at $CD:1932 is followed by RTS (a bank-$CD
 ;   script command handler, probably; not matched).
@@ -2405,7 +2409,7 @@ BattleFx_CopyWin1ToWin2:
     TAX
     REP #$20
     SEP #$10
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.w #$0001
     BEQ .line_buf0
 .line_buf1:
@@ -2472,7 +2476,7 @@ BattleFx_CopyWin1ToWin2:
 ; Callers note: reached by JSL from $CD:003E (then RTL), the target of
 ;   the vector JMP at $CD:001B (BattleAct_UnkVecCD001B), which
 ;   BattleAct_OpRunVecCD001B calls.
-; Callers (1 JSL site): unmatched ($CD:003E).
+; Callers (1 JSL site): BattleCD_ActOp80 ($CD:003E).
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (as BattleAct_OpRunVecCD001B
 ;        leaves them; the vector code in bank $CD only jumps)
 ; Exit:  as the handler: M=1, X=0, DP=0, DB=$7E; A, X and Y as it
@@ -2501,15 +2505,16 @@ BattleFx_Op80Table:
 
 ; $D1:F692 — BattleFx_Op80Clear (10 bytes, $F692–$F69B)
 ; Op80 handler 5 (BattleFx_Op80Table), also run first by
-; BattleFx_Op80Kind4: zeroes !BattleFx_Op80Regs+0, +8 and +$10.
+; BattleFx_Op80Kind4: zeroes !Battle_ShakeXOn, !Battle_ShakeYOn and
+; !Battle_ShakeLayers (the screen shake off).
 ; Callers note: also BattleFx_Op80Table entry 5.
 ; Callers (1 JSR site): BattleFx_Op80Kind4 ($D1:F6B4).
 ; Entry: M=1, DP any, DB=$7E
 ; Exit:  M=1; A, X, Y unchanged
 BattleFx_Op80Clear:
-    STZ.w !BattleFx_Op80Regs
-    STZ.w !BattleFx_Op80Regs+8
-    STZ.w !BattleFx_Op80Regs+16
+    STZ.w !Battle_ShakeXOn
+    STZ.w !Battle_ShakeYOn
+    STZ.w !Battle_ShakeLayers
     RTS
 
 ; $D1:F69C — BattleFx_Op80Bits8 (8 bytes, $F69C–$F6A3)
@@ -2526,7 +2531,7 @@ BattleFx_Op80BitsHi:
 
 ; $D1:F6AC — BattleFx_Op80OrA (4 bytes, $F6AC–$F6AF)
 ; BattleFx_Op80Kind4: by bits 0-1 of the first argument byte, the bits
-; ORed into !BattleFx_Op80Regs+$10 ($00, $28, $A0, $A8).
+; ORed into !Battle_ShakeLayers ($00, $28, $A0, $A8).
 BattleFx_Op80OrA:
     db $00,$28,$A0,$A8
 
@@ -2537,16 +2542,18 @@ BattleFx_Op80OrB:
     db $00,$14,$50,$54
 
 ; $D1:F6B4 — BattleFx_Op80Kind4 (153 bytes, $F6B4–$F74C)
-; Op80 handler 4: BattleFx_Op80Clear, then fills two 8-byte groups of
-; !BattleFx_Op80Regs from the argument bytes 1-4 (!Battle_ActOp80Args+1
-; to +4). For byte 1 (group at +0) and byte 3 (group at +8):
+; Op80 handler 4: BattleFx_Op80Clear, then fills the two 8-byte groups
+; from !Battle_ShakeXOn (x) and !Battle_ShakeYOn (y) from the argument
+; bytes 1-4 (!Battle_ActOp80Args+1 to +4). For byte 1 (group at +0) and
+; byte 3 (group at +8):
 ;   +3 = BattleFx_Op80Bits8[bits 2-4], +2 = 0,
 ;   +5 = BattleFx_Op80BitsHi[bits 5-7], +4 = 0,
 ;   +0 = bits 0-1;
 ; and from byte 2 (group +0) and byte 4 (group +8): +7 = its low nibble,
-; +6 = its high nibble. +$10 = BattleFx_Op80OrA[byte 1 bits 0-1] |
-; BattleFx_Op80OrB[byte 3 bits 0-1]. What the groups drive is not traced
-; (bank $CD reads them).
+; +6 = its high nibble. +$10 (!Battle_ShakeLayers) =
+; BattleFx_Op80OrA[byte 1 bits 0-1] | BattleFx_Op80OrB[byte 3 bits 0-1].
+; These are the screen shake's settings (on, random period, step period,
+; amplitude, target), which BattleCD_StepShake runs.
 ; Callers note: BattleFx_Op80Table entry 4.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (BattleFx_Op80Dispatch)
 ; Exit:  M=1, X=0; A = the last value stored; X clobbered; Y unchanged;
@@ -2559,8 +2566,8 @@ BattleFx_Op80Kind4:
     LSR A
     TAX
     LDA.l BattleFx_Op80Bits8,X
-    STA.w !BattleFx_Op80Regs+3
-    STZ.w !BattleFx_Op80Regs+2
+    STA.w !Battle_ShakeXRandPeriod
+    STZ.w !Battle_ShakeXRandTime
     LDA.b !Battle_ActOp80Args+1
     AND.b #!BattleFx_Op80BitsHiMask
     LSR A
@@ -2570,26 +2577,26 @@ BattleFx_Op80Kind4:
     LSR A
     TAX
     LDA.l BattleFx_Op80BitsHi,X
-    STA.w !BattleFx_Op80Regs+5
-    STZ.w !BattleFx_Op80Regs+4
+    STA.w !Battle_ShakeXStepPeriod
+    STZ.w !Battle_ShakeXStepTime
     LDA.b !Battle_ActOp80Args+2
     AND.b #!BattleFx_LowNibble
-    STA.w !BattleFx_Op80Regs+7
+    STA.w !Battle_ShakeXTarget
     LDA.b !Battle_ActOp80Args+2
     AND.b #!BattleFx_HighNibble
     LSR A
     LSR A
     LSR A
     LSR A
-    STA.w !BattleFx_Op80Regs+6
+    STA.w !Battle_ShakeXAmp
     LDA.b !Battle_ActOp80Args+3
     AND.b #!BattleFx_Op80Bits8Mask
     LSR A
     LSR A
     TAX
     LDA.l BattleFx_Op80Bits8,X
-    STA.w !BattleFx_Op80Regs+11
-    STZ.w !BattleFx_Op80Regs+10
+    STA.w !Battle_ShakeYRandPeriod
+    STZ.w !Battle_ShakeYRandTime
     LDA.b !Battle_ActOp80Args+3
     AND.b #!BattleFx_Op80BitsHiMask
     LSR A
@@ -2599,56 +2606,56 @@ BattleFx_Op80Kind4:
     LSR A
     TAX
     LDA.l BattleFx_Op80BitsHi,X
-    STA.w !BattleFx_Op80Regs+13
-    STZ.w !BattleFx_Op80Regs+12
+    STA.w !Battle_ShakeYStepPeriod
+    STZ.w !Battle_ShakeYStepTime
     LDA.b !Battle_ActOp80Args+4
     AND.b #!BattleFx_LowNibble
-    STA.w !BattleFx_Op80Regs+15
+    STA.w !Battle_ShakeYTarget
     LDA.b !Battle_ActOp80Args+4
     AND.b #!BattleFx_HighNibble
     LSR A
     LSR A
     LSR A
     LSR A
-    STA.w !BattleFx_Op80Regs+14
+    STA.w !Battle_ShakeYAmp
     LDA.b !Battle_ActOp80Args+1
     AND.b #$03
     TAX
     LDA.l BattleFx_Op80OrA,X
-    STA.b !BattleFx_Tmp5B
+    STA.b !BattleCD_Tmp5B
     LDA.b !Battle_ActOp80Args+3
     AND.b #$03
     TAX
     LDA.l BattleFx_Op80OrB,X
-    ORA.b !BattleFx_Tmp5B
-    STA.w !BattleFx_Op80Regs+16
+    ORA.b !BattleCD_Tmp5B
+    STA.w !Battle_ShakeLayers
     LDA.b !Battle_ActOp80Args+1
     AND.b #$03
-    STA.w !BattleFx_Op80Regs
+    STA.w !Battle_ShakeXOn
     LDA.b !Battle_ActOp80Args+3
     AND.b #$03
-    STA.w !BattleFx_Op80Regs+8
+    STA.w !Battle_ShakeYOn
     RTS
 
 ; $D1:F74D — BattleFx_Op80Kind0 (240 bytes, $F74D–$F83C)
-; Op80 handlers 0-3: the high nibble n of the first argument byte picks
-; 8 bytes of !BattleRom_Op80RegsA and of !BattleRom_Op80RegsB (+ n *
-; 16), copied to !BattleFx_Op80Regs+$12 and +$1E. Then, from argument
-; byte 1 (!Battle_ActOp80Args+1):
-;   - +$11 and +$1D = !BattleFx_UnkCCC1Base ($40), or'd with
-;     !BattleFx_UnkCCC1Swap when bit 6 is set;
-;   - +$17 and +$23 = bits 0-2;
-;   - +$15/+$16 and +$21/+$22 = the four bytes of !BattleRom_Op80PairA
-;     at (bits 3-5) * 4; +$14 and +$20 = the two of !BattleRom_Op80PairB
-;     at (bits 3-5) * 2;
-;   - bit 7 set, bit 6 clear: each of +$18, +$19, +$24, +$25 that is
-;     non-zero becomes $80;
+; Op80 handlers 0-3: builds the two FieldAnimB records of
+; !Battle_PalAnimRecs89 (record 8 at +0, record 9 at +12; offsets below
+; are within each record). The high nibble n of the first argument byte
+; picks 8 bytes of !BattleRom_Op80RegsA and of !BattleRom_Op80RegsB
+; (+ n * 16), copied to +1 of record 8 and of record 9. Then, from
+; argument byte 1 (!Battle_ActOp80Args+1), in both records:
+;   - +0 = !BattleFx_UnkCCC1Base ($40), or'd with !BattleFx_UnkCCC1Swap
+;     when bit 6 is set;
+;   - +6 = bits 0-2;
+;   - +4/+5 = two of the four bytes of !BattleRom_Op80PairA at
+;     (bits 3-5) * 4; +3 = one of the two of !BattleRom_Op80PairB at
+;     (bits 3-5) * 2;
+;   - bit 7 set, bit 6 clear: each +7 and +8 that is non-zero becomes $80;
 ;   - bit 7 set, bit 6 set: each of them that is zero becomes $80, then
 ;     as bit 6 alone;
-;   - bit 6 set: +$18 and +$19 swap, and +$24 and +$25.
-; Then counts !BattleFx_Op80Count up. $40 in +$11 is the HDMA indirect
-; bit of a DMAP value, so these may be two HDMA channel set-ups; not
-; traced.
+;   - bit 6 set: +7 and +8 swap.
+; Then counts !Battle_PalAnimCopy up, so BattleCD_StepShake copies the
+; records to FieldAnimB records 8 and 9 (palette animations).
 ; Callers note: BattleFx_Op80Table entries 0-3.
 ; Entry: M=1, X=0, DP=0, DB=$7E, B = 0 (BattleFx_Op80Dispatch)
 ; Exit:  M=1, X=0; A, X and Y clobbered
@@ -2660,9 +2667,9 @@ BattleFx_Op80Kind0:
     TAY
 .copy:
     LDA.l !BattleRom_Op80RegsA,X
-    STA.w !BattleFx_Op80Regs+18,Y
+    STA.w !Battle_PalAnimRecs89+1,Y
     LDA.l !BattleRom_Op80RegsB,X
-    STA.w !BattleFx_Op80Regs+30,Y
+    STA.w !Battle_PalAnimRecs89+13,Y
     INX
     INY
     CPY.w #$0008
@@ -2673,98 +2680,98 @@ BattleFx_Op80Kind0:
     LDA.b #!BattleFx_UnkCCC1Swap
 .store_c1:
     ORA.b #!BattleFx_UnkCCC1Base
-    STA.w !BattleFx_Op80Regs+17
-    STA.w !BattleFx_Op80Regs+29
+    STA.w !Battle_PalAnimRecs89
+    STA.w !Battle_PalAnimRecs89+12
     LDA.b !Battle_ActOp80Args+1
     AND.b #$07
-    STA.w !BattleFx_Op80Regs+23
-    STA.w !BattleFx_Op80Regs+35
+    STA.w !Battle_PalAnimRecs89+6
+    STA.w !Battle_PalAnimRecs89+18
     LDA.b !Battle_ActOp80Args+1
     AND.b #!BattleFx_Op80PairMask
     LSR A
     TAX
     LDA.l !BattleRom_Op80PairA,X
-    STA.w !BattleFx_Op80Regs+21
+    STA.w !Battle_PalAnimRecs89+4
     LDA.l !BattleRom_Op80PairA+1,X
-    STA.w !BattleFx_Op80Regs+22
+    STA.w !Battle_PalAnimRecs89+5
     LDA.l !BattleRom_Op80PairA+2,X
-    STA.w !BattleFx_Op80Regs+33
+    STA.w !Battle_PalAnimRecs89+16
     LDA.l !BattleRom_Op80PairA+3,X
-    STA.w !BattleFx_Op80Regs+34
+    STA.w !Battle_PalAnimRecs89+17
     LDA.b !Battle_ActOp80Args+1
     AND.b #!BattleFx_Op80PairMask
     LSR A
     LSR A
     TAX
     LDA.l !BattleRom_Op80PairB,X
-    STA.w !BattleFx_Op80Regs+20
+    STA.w !Battle_PalAnimRecs89+3
     LDA.l !BattleRom_Op80PairB+1,X
-    STA.w !BattleFx_Op80Regs+32
+    STA.w !Battle_PalAnimRecs89+15
     LDA.b !Battle_ActOp80Args+1
     BPL .swap
     LDA.b !Battle_ActOp80Args+1
     AND.b #!BattleFx_Op80SwapBit
     BNE .set_bits
-    LDA.w !BattleFx_Op80Regs+24
+    LDA.w !Battle_PalAnimRecs89+7
     BEQ .store_c8
     LDA.b #!BattleFx_UnkCCC8Bit7
 .store_c8:
-    STA.w !BattleFx_Op80Regs+24
-    LDA.w !BattleFx_Op80Regs+25
+    STA.w !Battle_PalAnimRecs89+7
+    LDA.w !Battle_PalAnimRecs89+8
     BEQ .store_c9
     LDA.b #!BattleFx_UnkCCC8Bit7
 .store_c9:
-    STA.w !BattleFx_Op80Regs+25
-    LDA.w !BattleFx_Op80Regs+36
+    STA.w !Battle_PalAnimRecs89+8
+    LDA.w !Battle_PalAnimRecs89+19
     BEQ .store_d4
     LDA.b #!BattleFx_UnkCCC8Bit7
 .store_d4:
-    STA.w !BattleFx_Op80Regs+36
-    LDA.w !BattleFx_Op80Regs+37
+    STA.w !Battle_PalAnimRecs89+19
+    LDA.w !Battle_PalAnimRecs89+20
     BEQ .store_d5
     LDA.b #!BattleFx_UnkCCC8Bit7
 .store_d5:
-    STA.w !BattleFx_Op80Regs+37
+    STA.w !Battle_PalAnimRecs89+20
     JMP .done
 .set_bits:
-    LDA.w !BattleFx_Op80Regs+24
+    LDA.w !Battle_PalAnimRecs89+7
     BNE .set_c8
     ORA.b #!BattleFx_UnkCCC8Bit7
 .set_c8:
-    STA.w !BattleFx_Op80Regs+24
-    LDA.w !BattleFx_Op80Regs+25
+    STA.w !Battle_PalAnimRecs89+7
+    LDA.w !Battle_PalAnimRecs89+8
     BNE .set_c9
     ORA.b #!BattleFx_UnkCCC8Bit7
 .set_c9:
-    STA.w !BattleFx_Op80Regs+25
-    LDA.w !BattleFx_Op80Regs+36
+    STA.w !Battle_PalAnimRecs89+8
+    LDA.w !Battle_PalAnimRecs89+19
     BNE .set_d4
     ORA.b #!BattleFx_UnkCCC8Bit7
 .set_d4:
-    STA.w !BattleFx_Op80Regs+36
-    LDA.w !BattleFx_Op80Regs+37
+    STA.w !Battle_PalAnimRecs89+19
+    LDA.w !Battle_PalAnimRecs89+20
     BNE .set_d5
     ORA.b #!BattleFx_UnkCCC8Bit7
 .set_d5:
-    STA.w !BattleFx_Op80Regs+37
+    STA.w !Battle_PalAnimRecs89+20
 .swap:
     LDA.b !Battle_ActOp80Args+1
     AND.b #!BattleFx_Op80SwapBit
     BEQ .done
-    LDA.w !BattleFx_Op80Regs+24
+    LDA.w !Battle_PalAnimRecs89+7
     PHA
-    LDA.w !BattleFx_Op80Regs+25
-    STA.w !BattleFx_Op80Regs+24
+    LDA.w !Battle_PalAnimRecs89+8
+    STA.w !Battle_PalAnimRecs89+7
     PLA
-    STA.w !BattleFx_Op80Regs+25
-    LDA.w !BattleFx_Op80Regs+36
+    STA.w !Battle_PalAnimRecs89+8
+    LDA.w !Battle_PalAnimRecs89+19
     PHA
-    LDA.w !BattleFx_Op80Regs+37
-    STA.w !BattleFx_Op80Regs+36
+    LDA.w !Battle_PalAnimRecs89+20
+    STA.w !Battle_PalAnimRecs89+19
     PLA
-    STA.w !BattleFx_Op80Regs+37
+    STA.w !Battle_PalAnimRecs89+20
 .done:
-    INC.w !BattleFx_Op80Count
+    INC.w !Battle_PalAnimCopy
     RTS
 
 ; ============================================================
@@ -2783,8 +2790,8 @@ BattleFx_Op80Kind0:
 ; then the last entry of B and of D becomes (0, !BattleFx_GradStartB
 ; ($E0)), with the byte before it and the one after it zeroed. $E0-$E8 read as
 ; COLDATA values (all three channels, intensity 0-8), so this is
-; probably a fixed-colour gradient; the HDMA channels are set up in
-; bank $CD (not traced).
+; probably a fixed-colour gradient; which HDMA channel reads these
+; lists is not traced.
 ; Callers note: called only by BattleFx_Init (JSL).
 ; Callers (1 JSL site): BattleFx_Init ($D1:F3FA).
 ; Entry: M=1, X=0, DP=0 (DP $53-$56 accumulators; TDC as 0), DB=$7E
@@ -3036,7 +3043,7 @@ BattleFx_EdgeSlope:
 ; DP $12-$19, BattleFx_SortQuadByY, then BattleFx_RasterQuad with
 ; DB=$00 (saved and restored around it). X = 0 and 1 are two
 ; interleaved quads; bit 0 of !BattleFx_QuadSlot makes
-; BattleSys_VecCD38B2 aim at the second pair of each line.
+; BattleCD_Unk38B2 aim at the second pair of each line.
 ; Callers note: also the JSL at $CD:24E9 (not matched), after REP #$10
 ;   with X its quad.
 ; Callers (2 JSL sites): BattleFx_SwayQuad ($D1:EC5A) and unmatched ($CD:24E9).
@@ -3074,7 +3081,7 @@ BattleFx_DrawQuad:
 ; $D1:F9E7 — BattleFx_RasterQuad (385 bytes, $F9E7–$FB67)
 ; Rasterises the y-sorted quad in DP $12-$19 into the window table
 ; through the WRAM port: BattleFx_QuadSlopes, then JSL
-; BattleSys_VecCD38B2 with A = !BattleFx_QuadTop aims WMADD at that line
+; BattleCD_Unk38B2 with A = !BattleFx_QuadTop aims WMADD at that line
 ; of the table, and each line is written as left edge, right edge (the
 ; integer bytes of two 8.8 edges, written with a 16-bit STA to WMDATA-1
 ; so the high byte lands in WMDATA), then two 16-bit reads that each
@@ -3131,12 +3138,12 @@ BattleFx_RasterQuad:
 .trapezoid:
     JSR BattleFx_QuadSlopes
     LDA.b !BattleFx_QuadTop
-    JSL BattleSys_VecCD38B2
+    JSL BattleCD_Unk38B2
     LDA.b !BattleFx_QuadY2
     SEC
     SBC.b !BattleFx_QuadY1
     TAX
-    STX.b !BattleFx_Tmp45
+    STX.b !BattleCD_Tmp45
     LDA.b !BattleFx_QuadX0
     REP #$21
     XBA
@@ -3145,7 +3152,7 @@ BattleFx_RasterQuad:
     AND.w #!Battle_LowByteMask
     XBA
     TAY
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BEQ .trap_done
     CLC
 .trap_line:
@@ -3159,7 +3166,7 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1                      ; two reads of WMDATA step past the other pair
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp45
+    DEC.b !BattleCD_Tmp45
     BNE .trap_line
     TDC
 .trap_done:
@@ -3167,28 +3174,28 @@ BattleFx_RasterQuad:
     RTS
 .left_bend_draw:
     LDA.b !BattleFx_QuadTop
-    JSL BattleSys_VecCD38B2
+    JSL BattleCD_Unk38B2
     LDA.b !BattleFx_QuadY1
     SEC
     SBC.b !BattleFx_QuadY0
     TAX
-    STX.b !BattleFx_Tmp45
+    STX.b !BattleCD_Tmp45
     LDA.b !BattleFx_QuadY2
     SEC
     SBC.b !BattleFx_QuadY1
     TAX
-    STX.b !BattleFx_Tmp47
+    STX.b !BattleCD_Tmp47
     LDA.b !BattleFx_QuadY3
     SEC
     SBC.b !BattleFx_QuadY2
     TAX
-    STX.b !BattleFx_Tmp49
+    STX.b !BattleCD_Tmp49
     LDA.b !BattleFx_QuadX0
     REP #$20
     XBA
     TAX
     TAY
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BEQ .lb_part2
     CLC
 .lb_seg1:
@@ -3202,10 +3209,10 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp45
+    DEC.b !BattleCD_Tmp45
     BNE .lb_seg1
 .lb_part2:
-    LDA.b !BattleFx_Tmp47
+    LDA.b !BattleCD_Tmp47
     BEQ .lb_part3
     CLC
 .lb_seg2:
@@ -3219,10 +3226,10 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp47
+    DEC.b !BattleCD_Tmp47
     BNE .lb_seg2
 .lb_part3:
-    LDA.b !BattleFx_Tmp49
+    LDA.b !BattleCD_Tmp49
     BEQ .lb_done
     CLC
 .lb_seg3:
@@ -3236,7 +3243,7 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp49
+    DEC.b !BattleCD_Tmp49
     BNE .lb_seg3
     TDC
 .lb_done:
@@ -3244,28 +3251,28 @@ BattleFx_RasterQuad:
     RTS
 .right_bend_draw:
     LDA.b !BattleFx_QuadTop
-    JSL BattleSys_VecCD38B2
+    JSL BattleCD_Unk38B2
     LDA.b !BattleFx_QuadY2
     SEC
     SBC.b !BattleFx_QuadY0
     TAX
-    STX.b !BattleFx_Tmp45
+    STX.b !BattleCD_Tmp45
     LDA.b !BattleFx_QuadY1
     SEC
     SBC.b !BattleFx_QuadY2
     TAX
-    STX.b !BattleFx_Tmp47
+    STX.b !BattleCD_Tmp47
     LDA.b !BattleFx_QuadY3
     SEC
     SBC.b !BattleFx_QuadY1
     TAX
-    STX.b !BattleFx_Tmp49
+    STX.b !BattleCD_Tmp49
     LDA.b !BattleFx_QuadX0
     REP #$20
     XBA
     TAX
     TAY
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     BEQ .rb_part2
     CLC
 .rb_seg1:
@@ -3279,10 +3286,10 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp45
+    DEC.b !BattleCD_Tmp45
     BNE .rb_seg1
 .rb_part2:
-    LDA.b !BattleFx_Tmp47
+    LDA.b !BattleCD_Tmp47
     BEQ .rb_part3
     CLC
 .rb_seg2:
@@ -3296,10 +3303,10 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp47
+    DEC.b !BattleCD_Tmp47
     BNE .rb_seg2
 .rb_part3:
-    LDA.b !BattleFx_Tmp49
+    LDA.b !BattleCD_Tmp49
     BEQ .rb_done
     CLC
 .rb_seg3:
@@ -3313,7 +3320,7 @@ BattleFx_RasterQuad:
     STA.w WMDATA-1
     LDA.w WMDATA-1
     LDA.w WMDATA-1
-    DEC.b !BattleFx_Tmp49
+    DEC.b !BattleCD_Tmp49
     BNE .rb_seg3
     TDC
 .rb_done:
@@ -3334,7 +3341,7 @@ BattleFx_RasterQuad:
 BattleFx_AddBoxInset:
     LDA.w !BattleFx_BoxInset
     CLC
-    ADC.b [!BattleFx_ArgPtr]
+    ADC.b [!BattleCD_FxScriptPtr]
     STA.w !BattleFx_BoxInset
     RTL
 
@@ -3356,16 +3363,16 @@ BattleFx_AddBoxInset:
 BattleFx_GrowBox:
     LDA.w !BattleFx_BoxHalfHeight
     CLC
-    ADC.b [!BattleFx_ArgPtr]
+    ADC.b [!BattleCD_FxScriptPtr]
     STA.w !BattleFx_BoxHalfHeight
     LDA.w !BattleFx_BoxInset
-    STA.b !BattleFx_Tmp49
+    STA.b !BattleCD_Tmp49
     EOR.b #!Battle_Invert8
     STA.b !BattleFx_Tmp4A
     LDA.w !BattleFx_BoxHalfHeight
     CLC
     ADC.b #!BattleFx_BoxCentre
-    STA.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
     LDA.b #!BattleFx_BoxCentre
     SEC
     SBC.w !BattleFx_BoxHalfHeight
@@ -3373,36 +3380,36 @@ BattleFx_GrowBox:
     ASL A
     ASL A
     TAX
-    LDA.b !BattleFx_Tmp45
+    LDA.b !BattleCD_Tmp45
     AND.w #!Battle_LowByteMask
     ASL A
     ASL A
-    STA.b !BattleFx_Tmp45
-    CPX.b !BattleFx_Tmp45
+    STA.b !BattleCD_Tmp45
+    CPX.b !BattleCD_Tmp45
     BEQ .done
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.w #$0001
     BEQ .buffer0
-    LDA.b !BattleFx_Tmp49
+    LDA.b !BattleCD_Tmp49
 .line_buf1:
     STA.w !BattleFx_WinTable1,X
     INX
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .line_buf1
     BRA .done
 .buffer0:
     LDA.w #!BattleFx_WinFull            ; dead load: overwritten at once (kept as found)
-    LDA.b !BattleFx_Tmp49
+    LDA.b !BattleCD_Tmp49
 .line_buf0:
     STA.w !BattleFx_WinTable0,X
     INX
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .line_buf0
 .done:
     TDC
@@ -3439,7 +3446,7 @@ BattleFx_FillTable:
 ; Exit:  M=1, X=0 (REP #$10); A = $00 and B = $FF; X = 0; Y's low byte
 ;        kept, high byte cleared (SEP #$10)
 BattleFx_FillWin1Full:
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.b #$01
     BEQ .buffer0
     REP #$20
@@ -3494,7 +3501,7 @@ BattleFx_FillWin1Full:
 ; Exit:  M=1, X=0; A = $FF and B = $00; X = 0; Y's low byte kept, high
 ;        byte cleared (SEP #$10)
 BattleFx_FillWin1Empty:
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.b #$01
     BEQ .buffer0
     REP #$20
@@ -3549,7 +3556,7 @@ BattleFx_FillWin1Empty:
 ; Exit:  M=1, X=0; A = $FF and B = $00; X = 0; Y's low byte kept, high
 ;        byte cleared (SEP #$10)
 BattleFx_FillWin2Empty:
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.b #$01
     BEQ .buffer0
     REP #$20
@@ -3605,7 +3612,7 @@ BattleFx_FillWin2Empty:
 ; Exit:  M=1, X=0; A = $FF and B = $00; X = 0; Y's low byte kept, high
 ;        byte cleared (SEP #$10)
 BattleFx_FillAllEmpty:
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.b #$01
     BEQ .buffer0
     REP #$20
@@ -3680,7 +3687,7 @@ BattleFx_FillAllEmpty:
 ;        offset; Y's low byte kept, high byte cleared (SEP #$10); DP
 ;        $45/$46 written
 BattleFx_MirrorWin1ToWin2:
-    LDA.b [!BattleFx_ArgPtr]
+    LDA.b [!BattleCD_FxScriptPtr]
     ASL A
     TAX
     REP #$20
@@ -3688,8 +3695,8 @@ BattleFx_MirrorWin1ToWin2:
     TXA
     CLC
     ADC.w #!BattleFx_WinBlockBytes
-    STA.b !BattleFx_Tmp45
-    LDA.b !BattleFx_FrameCount
+    STA.b !BattleCD_Tmp45
+    LDA.b !Battle_FrameCount
     AND.w #$0001
     BEQ .line_buf0
 .line_buf1:
@@ -3729,7 +3736,7 @@ BattleFx_MirrorWin1ToWin2:
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .line_buf1
     BRA .done
 .line_buf0:
@@ -3769,7 +3776,7 @@ BattleFx_MirrorWin1ToWin2:
     INX
     INX
     INX
-    CPX.b !BattleFx_Tmp45
+    CPX.b !BattleCD_Tmp45
     BNE .line_buf0
 .done:
     TDC
@@ -3784,14 +3791,14 @@ BattleFx_MirrorWin1ToWin2:
 ; $D1:FE4C — BattleFx_ReloadCeSet (37 bytes, $FE4C–$FE70)
 ; When !BattleFx_CeSetWant differs from !BattleFx_CeSet (which then
 ; takes it), or else when !BattleFx_CeSetReload is set: JSL
-; BattleSys_VecCEEE6E with A = !BattleFx_CeSetBase + !BattleFx_CeSet +
-; !BattleFx_UnkCCEC, and !BattleFx_CeSetReload = 0. What the sets are
-; is not traced (BattleSys_VecCEEE6E copies records from bank $CE to
+; BattleCE_UnkEE6E with A = !BattleFx_CeSetBase + !BattleFx_CeSet +
+; !Battle_MsgShown, and !BattleFx_CeSetReload = 0. What the sets are
+; is not traced (BattleCE_UnkEE6E copies records from bank $CE to
 ; $7E:C867 on; not analysed).
 ; Callers (1 JSR site): BattleFx_Irq ($D1:FECE).
 ; Entry: M=1, X=0, DP=0, DB=$7E (BattleFx_Irq sets it just before)
 ; Exit:  M=1; A, X and Y clobbered on the reload path (as
-;        BattleSys_VecCEEE6E leaves them), else A = the flag tested
+;        BattleCE_UnkEE6E leaves them), else A = the flag tested
 BattleFx_ReloadCeSet:
     LDA.w !BattleFx_CeSetWant
     CMP.w !BattleFx_CeSet
@@ -3806,8 +3813,8 @@ BattleFx_ReloadCeSet:
     CLC
     ADC.w !BattleFx_CeSet
     CLC
-    ADC.w !BattleFx_UnkCCEC
-    JSL BattleSys_VecCEEE6E
+    ADC.w !Battle_MsgShown
+    JSL BattleCE_UnkEE6E
     STZ.w !BattleFx_CeSetReload
 .done:
     RTS
@@ -3849,8 +3856,8 @@ BattleFx_RestoreMathRegs:
 ; set), reads TIMEUP, writes !NMITIMEN_NmiAutoJoy (no more V-count IRQ
 ; until BattleFx_Nmi writes !Nmi_Nmitimen again), then with DB=$00 turns
 ; HDMA off, waits for H-blank and forces blank from there on. On frames
-; with bit 0 of !BattleFx_FrameCount clear it runs BattleFx_ReloadCeSet
-; (with DB=$7E); on the others, unless !BattleFx_Paused, JSL FdVec_FFFD
+; with bit 0 of !Battle_FrameCount clear it runs BattleFx_ReloadCeSet
+; (with DB=$7E); on the others, unless !Battle_Paused, JSL FdVec_FFFD
 ; (FieldFD_UploadTileAnims) with P saved. Then DP=0 again, M=1,
 ; BattleFx_RestoreMathRegs, !BattleFx_IntBusy = 0, and it returns.
 ; Callers note: no call site; reached through !IrqTrampoline.
@@ -3882,7 +3889,7 @@ BattleFx_Irq:
     BEQ .wait_hblank
     LDA.b #!INIDISP_ForceBlank
     STA.w INIDISP
-    LDA.b !BattleFx_FrameCount
+    LDA.b !Battle_FrameCount
     AND.b #$01
     BNE .buffer1
     LDA.b #!Bank7E
@@ -3891,7 +3898,7 @@ BattleFx_Irq:
     JSR BattleFx_ReloadCeSet
     BRA .math
 .buffer1:
-    LDA.l (!Bank7E<<16)|!BattleFx_Paused
+    LDA.l (!Bank7E<<16)|!Battle_Paused
     BNE .math
     PHP
     JSL FdVec_FFFD                      ; FieldFD_UploadTileAnims

@@ -24,9 +24,9 @@ incsrc "../hardware.inc"
 ;   BattleSys_RemoveReadyLong ($C1:B963), BattleSys_UnkBFA4 ($C1:BFA6) and BattleSys_UnkC1DD
 ;   ($C1:C73D, $C1:C748).
 ; Callers of BattleSys_ExitVec (1 JMP site): BattleSys_Main ($C1:845E).
-; Callers of BankC1_VecCFE300 (1 JSL site): unmatched ($CD:08B4).
-; Callers of BankC1_VecCFE58A (2 JSL sites): unmatched ($CD:0997, $EF:523C).
-; Callers of BankC1_VecCCE000 (1 JSL site): unmatched ($CD:0AB4).
+; Callers of BankC1_VecCFE300 (1 JSL site): BattleCD_NmiMain ($CD:08B4).
+; Callers of BankC1_VecCFE58A (2 JSL sites): BattleCD_NmiMain ($CD:0997) and unmatched ($EF:523C).
+; Callers of BankC1_VecCCE000 (1 JSL site): BattleCD_NmiSetup ($CD:0AB4).
 ; Callers of BankC1_VecRefreshMenu (1 JSL site): unmatched ($CD:3E78).
 ; Callers of BankC1_VecLongDispatch (1 JSL site): Battle_ReencodeText ($CC:F066).
 ; Entry vectors and the service dispatcher ($C1:0000–$C1:007D)
@@ -52,7 +52,7 @@ incsrc "../hardware.inc"
 ;   - $000C BankC1_VecCFE58A: JMP $007A, JML BattleCF_FrameUpdate
 ;     ($CF:E58A; JSL from $CD:0997 and $EF:523C).
 ;   - $000F BankC1_VecCCE000: JMP $0072, JML Battle_InitUploadStep
-;     ($CC:E000; JSL from $CD:0AB4).
+;     ($CC:E000; JSL from BattleCD_NmiSetup, $CD:0AB4).
 ;   - $0012 BankC1_VecRefreshMenu: JMP BattleMenu_RefreshIfDirtyL (which
 ;     ends with RTL; JSL from $CD:3E78).
 ;   - $0015 BankC1_VecRts: JMP BattleSys_RunService_Rts, an RTS; a JSL
@@ -60,8 +60,10 @@ incsrc "../hardware.inc"
 ;   - $0018 BankC1_VecLongDispatch: JMP BankC1_LongDispatch (JSL from
 ;     Battle_ReencodeText at $CC:F066 with A = 0).
 ; None of these instructions touches a register or flag.
-; Callers note: the JSL sites named above are in unmatched code in banks
-;   $CD and $EF; the one at $CC:F066 is in Battle_ReencodeText;
+; Callers note: of the JSL sites named above, $CD:08B4 and $CD:0997 are
+;   in BattleCD_NmiMain and $CD:0AB4 in BattleCD_NmiSetup; $CD:3E78 and
+;   $EF:523C are in unmatched code; the one at $CC:F066 is in
+;   Battle_ReencodeText;
 ;   BattleSys_RunServiceVec and BattleSys_ExitVec are listed above.
 ; Entry: M any, X any, DP any, DB any (nothing is used here; each target
 ;        has its own needs)
@@ -101,19 +103,20 @@ BankC1_ExitBattleJml:                   ; header: see EngCall_BattleMain
 ; Battle_CacheBattlerCoordsAll, Battle_InitSceneGfx,
 ; Battle_DrawAllBattlerFrames, BattleSys_VecCD0003, BattleSys_VecCD000C,
 ; then BattleSys_VecCD0012 again and again while it returns with Z
-; clear (a wait, probably), then JMP to Battle_StartPose, whose RTS
-; returns to BattleSys_RunService. Battle_InitScene puts the battle's
-; RAM into its starting state (names, tech lists, positions, sprite
-; pointers, enemies) and Battle_InitSceneGfx sets up sprites and tiles
-; and waits for the staged VRAM uploads; what the bank-$CD callees do is
-; not analysed.
+; clear (the wait for the opening wipe), then JMP to Battle_StartPose,
+; whose RTS returns to BattleSys_RunService. Battle_InitScene puts the
+; battle's RAM into its starting state (names, tech lists, positions,
+; sprite pointers, enemies) and Battle_InitSceneGfx sets up sprites and
+; tiles and waits for the staged VRAM uploads. The bank-$CD callees
+; switch the NMI to its main work (BattleCD_SetNmiMode1), start the
+; opening wipe (BattleCD_StartOpenWipe) and report whether it still
+; runs (BattleCD_WipeRunning).
 ; Callers note: none by call; BattleSys_ServiceTable entry 0 (JSR (T,X)
 ;   in BattleSys_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleSys_Main requests it; the
 ;        bank-$C1 callees assume them)
 ; Exit:  as Battle_StartPose leaves it (M=1, X=0, DP=0, DB=$7E assumed
-;        after the bank-$CD callees, not analysed; the bank-$CC steps
-;        return so); A, X, Y
+;        after the bank-$CD callees; the bank-$CC steps return so); A, X, Y
 ;        clobbered (BattleSys_RunService restores them)
 BattleSys_SceneSetup:
     JSL Battle_InitScene
@@ -146,24 +149,23 @@ BattleSys_SceneSetup:
 ;        Checked only for services 1, 2, 5 and 7: the callees of 2, 5
 ;        and 7 are all matched bank-$C1 code, and 1 calls only
 ;        Audio_ProcessEntry ($C7:0004), which keeps A, X, Y, P, DP and
-;        DB. The other six reach code that is not analysed, so for them
-;        it is assumed: 0 (the bank-$CD JSLs of BattleSys_SceneSetup; its
-;        bank-$CC steps are matched),
-;        3 (BattleSys_FrameTickVec $CD:0009,
-;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
-;        through the menu code),
-;        4 (BattleSys_PumpFrames,
-;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
-;        6 (BattleSys_VecCD0024, through BattleCF_RemoveMarkedEnemies),
-;        8 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames and the $CD/$CF JSLs of
-;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames). BattleFx_SetPtrA2FromTable ($CF:FD9E),
-;        which services 0 (through Battle_StartPose / Battle_PoseStep)
-;        and 3 (through BattleMenu_UpdateWindows and
-;        BattleMenu_ConfirmCommand) reach, is matched and returns M=1,
-;        X=0. B, P (N and Z from the PLA), DP, DB and
+;        DB. For the other six it is assumed. Service 0's call tree is
+;        not checked here (its bank-$CD callees BattleCD_SetNmiMode1,
+;        BattleCD_StartOpenWipe and BattleCD_WipeRunning are matched, but
+;        StartOpenWipe calls the unmatched $CD:3B71 and $CD:3E7D). The
+;        other five reach these unmatched addresses (services 3, 4, 8
+;        and 9 by way of BattleSys_FrameTickVec and BattleSys_PumpFrames,
+;        4 also BattleCD_ActOp80; service 6 only through
+;        BattleSys_VecCD0024): $CD:3B5F, $CD:3E3B, $CD:3E44, $CD:3E75,
+;        $CD:3ED2 and $D1:ECF3 for services 3, 8 and 9; those and
+;        $D1:F67A for service 4; those and $CD:3B71 for service 6. The
+;        call trees of BattleMenu_UpdateWindows and of
+;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
+;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which the call trees of
+;        services 0, 3, 4, 8 and 9 contain (9 through Battle_PoseStep,
+;        which skips it while !Battle_PoseIncludeKo is set), is matched
+;        and returns M=1, X=0. B, P (N and Z
+;        from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA
@@ -228,7 +230,7 @@ BankC1_LongDispatchTable:
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
 ; Exit:  as BattleCF_RemoveMarkedEnemies leaves it: M=1, X=0, DP=0,
 ;        DB=$7E; A, Y clobbered; X = 2; DP $80 and $82-$83 written; and
-;        what BattleSys_VecCD0024 changes (not analysed)
+;        what BattleSys_VecCD0024 changes (see BattleCD_EnemyDissolve)
 BattleSys_Service6:
     JSL BattleCF_RemoveMarkedEnemies
     RTS
@@ -259,14 +261,17 @@ BankC1_JmlCFE58A:                       ; header: see BankC1_JmlCCE000
 ; $C1:007E — BattleSys_PumpFrames (11 bytes, $007E–$0088)
 ; Waits for the next frame: sets !Battle_FramePending, then calls
 ; BattleSys_IdleVecCD0036 again and again until something else clears
-; the flag. The likely clearer is the STZ $9E at $CF:E77B, just before
-; the RTL of a bank-$CF routine that reads JOY1 ($CF:E6E0, $CF:E70B) and
-; bumps a 32-bit counter at $96F1, which reads as per-frame work; its
-; entry and who calls it are not traced, so "wait for the frame" is
-; inferred, not proven. ($CF:FB65 also zeroes $9E, but it is the battle
-; entry, reached once from the field: JSL $C10000 at $C0:18A7 -> JMP
-; $001B -> JML $CFFB65, which clears battle RAM and JMLs to $C1:8000.)
-; What the $CD0036 callee does meanwhile is not analysed.
+; the flag. The clearer is the STZ !Battle_FramePending at $CF:E77B,
+; at the end of BattleCF_FrameUpdate (the battle's once-a-frame work),
+; which BattleCD_NmiMain JSLs (through BankC1_VecCFE58A) at $CD:0997 on
+; every NMI in modes 1 and 2 except paused ones (the paused path returns
+; before it). The vector's other JSL, at $EF:523C, is in unmatched code.
+; (BattleCF_EnterBattle at $CF:FB65 also zeroes $9E, but it is the
+; battle entry, reached once from the field: JSL $C10000 at $C0:18A7 ->
+; JMP $001B -> JML $CFFB65, which clears battle RAM and JMLs to
+; $C1:8000.)
+; The $CD0036 callee (BattleCD_IdleTick) waits there while the battle is
+; paused (BattleCD_PauseWait, not matched).
 ; Callers (20 JSR sites): BattleSys_UpkeepTwoFrames ($C1:109D, $C1:10BD), BattleSys_DefeatPose
 ;   ($C1:3554), BattleSys_VictoryPose ($C1:358E, $C1:3596, $C1:359E), Battle_RunPcPose ($C1:3686),
 ;   BattleSys_RunAction ($C1:405F, $C1:40A0, $C1:40B0, $C1:40E1, $C1:4116, $C1:414B, $C1:41B4,
@@ -290,7 +295,7 @@ BattleSys_PumpFrames:
 .wait:
     JSL BattleSys_IdleVecCD0036
     LDA.b !Battle_FramePending
-    BNE .wait                   ; cleared elsewhere (likely $CF:E77B)
+    BNE .wait                   ; cleared by BattleCF_FrameUpdate ($CF:E77B)
     RTS
 
 ; ============================================================
@@ -3843,8 +3848,8 @@ BattleMenu_RefreshIfDirtyL:
 ;   ($C1:485E, $C1:4867, $C1:4890) and BattleAct_UnpackFrames ($C1:4946).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y and the callees' DP scratch
-;        clobbered, plus whatever BattleSys_FrameTickVec (not matched yet)
-;        changes
+;        clobbered, plus whatever BattleSys_FrameTickVec
+;        (BattleCD_FrameTick) changes
 ; Callees: BattleMenu_DequeueReadyBattler, BattleMenu_UpdateWindows,
 ;          BattleMenu_ProcessInput, BattleMenu_UpdateCursorOverlay,
 ;          BattleSys_FrameTickVec
@@ -4313,7 +4318,8 @@ BattleMenu_ConfirmCommand:
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  tail-jumps to Battle_ClearPadEdges: M=1, X=0, DP=0, DB=$7E; A, X,
 ;        Y clobbered, plus BuildTargetList's (see its header) and
-;        whatever BattleMsg_ShowMsg0BIfKeyChangedVec (not matched yet) changes
+;        whatever BattleMsg_ShowMsg0BIfKeyChangedVec (BattleCD_ShowTargetInfo)
+;        changes
 ; Callees: BattleMsg_ShowMsg0BIfKeyChangedVec,
 ;          BattleMenu_BuildTargetList, Battle_ClearPadEdges
 org $C1129C
@@ -26781,8 +26787,9 @@ BattleAi_RunNop0E:
 ; $C1:9E63 — BattleAi_RunMessage (21 bytes, $9E63–$9E77)
 ; BattleAi_RunTable entry $0F. Record [$0F, byte]: a non-zero byte goes
 ; to BattleMsg_UnkVecCD0033; !BattleAi_RunMode = !BattleAi_RunNone. The
-; byte is a message, probably (hence the name): it only goes to that
-; vector, which is not analysed.
+; byte is a message (hence the name): it only goes to that vector,
+; BattleCD_ShowScriptMessage, which shows that string of
+; !BattleRom_ScriptMsgStrings.
 ; Callers note: none by call; BattleAi_RunTable entry $0F (JSR (T,X)
 ;   in BattleAi_EnemyTurn).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A = code * 2, B = 0;
@@ -45058,10 +45065,11 @@ BattleMenu_ItemListScrollDown_SkipRender:   ; header: see BattleMenu_ItemListScr
 ; Entry: M=1 (8-bit A), X=0 (16-bit), DP=0 (TDC as zero; STZ.b/STY.b), DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; pad-edge bytes cleared (shared tail, same as
 ;        Battle_ClearPadEdges elsewhere); A, X, Y clobbered; DP $80-$83 and
-;        $EC written, plus whatever the JSL targets (not matched yet) change
+;        $EC written, plus whatever the JSL targets change (the message
+;        vectors: DP $53 and the message state, see BattleCD_ShowEnemyInfo)
 ; Callees: Battle_ShiftRight4, BattleMenu_ClearTechCursorTiles,
 ;          BattleMenu_DrawCursorSprites, BattleMsg_ShowMsg0BIfKeyChangedVec,
-;          BattleMsg_UnkVecCD0030 (sibling message vector, not analysed),
+;          BattleMsg_UnkVecCD0030 (BattleCD_ShowEnemyInfo, the sibling),
 ;          Battle_QueueVramUpload_0E80
 ; Direct-page roles:
 !BattleMenu_OverlayChanged = !BattleTmp_80 ; 1 B: item path: non-zero when arrows or row cursor changed
