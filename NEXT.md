@@ -602,10 +602,40 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `Menu_SprThread`, `Menu_SprResetChars`. Open: what the draw lists in bank $FF draw, the
    mode 1 HDMA tables ($7E:9300) and HDMAEN values, who writes `Menu_Unk85` and `Menu_CursorHold`,
    what `Menu_DrawDescText`'s strings at $CC:2EB1 are; the 7 bytes $C2:F905 (an entry into
-   `Menu_DrawText` with A=$81). Next, in reach order: the mode 1 helpers still stubbed
-   (`Menu_UnkA4AF`, `A569`, `A59A`, `A5C3`, `A64D`, `A6F0`, `A71E`, `A85C`, up to $C2:AA33), the
-   other icons' preview/redraw routines (`Menu_UnkAD50`/`ADC3` ...), `Menu_Unk90FC`/`9121`,
-   `Menu_UnkFA49`, then modes 2-7 (`BankFF_UnkF9C4`/`F813`/`F958` are matched: item 9).
+   `Menu_DrawText` with A=$81).
+   Also matched (branch match-c2-menu-tail): the mode 1 helpers $C2:A4AF-$C2:AA33 (the slot and
+   item window slides with their HDMA band tables `Menu_EquipSlotsSlideIn/Out`,
+   `Menu_EquipItemsSlideIn/Out` and steps, `Menu_PutHdmaEntry`, `Menu_MemberListHdma`; the item
+   list `Menu_DrawEquipList`/`Menu_DrawEquipItem`; `Menu_EquipPreviewItem` with
+   `Menu_EquipCompareStats`/`Menu_EquipCompareOfs`; `Menu_EquipItemsClose`; `Menu_DrawEquipNames`);
+   mode 2, the item screen, $C2:AA40-$C2:B352 (handlers `Menu_Mode02H0`-`H5`, `Menu_Icon1Preview`/
+   `Redraw`, `Menu_Mode02Init`, the list cursor and scroll, `Menu_SortInventory` with its group
+   tables, the equipment info, the item use `Menu_UseItem` with `Menu_UseKindTable`, the heal, full,
+   random ($C9) and stat ($CD/$CE ...) items, `Menu_AfterItemUse`); and the item use's effect
+   $C2:8E2D-$C2:9136 (`Menu_ApplyHeal`, `Menu_HealHp/Mp`, `Menu_CalcHealAmounts`, the rising
+   numbers `Menu_ShowHealNumbers` / `Menu_HealNumbersThread` / `Menu_HealBounce` /
+   `Menu_HealNumberSprites`, `Menu_StashInventory`/`Menu_UnstashInventory`). With them
+   $C2:0000-$C2:B35C is all from source. Renamed stubs: `Menu_UnkA4AF/A569/A59A/A5C3/A64D/A6F0/
+   A71E/A85C/AD50/ADC3/90FC/9121`; sub-entry `Menu_CalcUnk0D38` ($C2:813C) added in
+   `Menu_InitSystems`. Quirks recorded: `Menu_EquipSlotsSlideOut`'s 16-bit DEC of
+   `Menu_ArrowsOff`, `Menu_EquipSlotsBackStep`'s unused bands, `Menu_ItemListCursor` leaving
+   `Menu_CursorYOfs` $FF00 when the scroll frames are skipped going up, `Menu_UseLeave`'s never-taken
+   BVC, `Menu_UseKindTable` entries pointing at an RTS, `Menu_StatCountOfs` read from - 1 (entry 0
+   is the RTS before), `Menu_CalcHealAmounts`' unreachable negation and RandomTable read past its
+   end, the dead INY in `Menu_SortInventory`, the unread last bytes of `Menu_EquipCompareOfs`,
+   `Menu_SortGroupCount` and `Menu_RandomItemOdds`. Re-review needed (verified headers or sources
+   edited): `Menu_InitSystems`, `Menu_MainPreviewTable`, `Menu_MainRedrawTable`, `Menu_Mode02List`,
+   `Menu_Mode01H1`, `H2`, `H3`, `Menu_EquipItemIdle`, `Menu_Icon0Redraw`, `Menu_Mode01Init`,
+   `Menu_DrawMemberStatus`, `Menu_EquipSlotsClose`, `Menu_EquipItemsOpen`, `Menu_EquipListSetup`.
+   Stubs added: `Menu_UnkB83E` (the HP / MP item's member cursor, in mode 3's range),
+   `Menu_VramRecBg3Rows0` ($C2:FC37), `Menu_VramRecDigits` ($C2:FC5A). Open: which register the
+   slide HDMA tables feed; what `Menu_ItemInfo0` bit 3, the `$FF:B310` strings, record bytes
+   $2F-$34 (`.StatCounts`) and `Menu_Unk0D7E` mean. Still unmatched in bank $C2: $B35D-$BF34
+   (mode 3), $BF3D-$C510 (mode 4), $C550-$C620, $C627-$C7A5, $C7AC-$CED3, $CEDC-$D155 (modes 5-7),
+   $D32C-$D4EF, $D4F8-$D518, $D52B-$E1E2, $E1ED-$E60A, $E613-$E91A (modes $0B-$0E), $F905-$F90B,
+   $F943-$FC6E (`Menu_UnkFA49` and the VRAM records), $FCA6-$FE09 and $FE0C-$FFFF. Next in reach
+   order: mode 3 from `Menu_UnkB83E` ($B35D on), `Menu_UnkFA49` with the VRAM records, then modes
+   4-7 (`BankFF_UnkF9C4`/`F813`/`F958` are matched: item 9).
 
 4. Bank $FD: matched are the battle helpers `$FD:A982`-`$FD:B956` (every `BattleFD_*` callee of
    BattleSys_Main, Battle_SetupBattle and the turn lists, plus the gap routines between them:

@@ -27,8 +27,6 @@
 org $FFD024
 MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
                     ; SRAM +$0603 byte is the last entry not above it
-org $C2AD50
-Menu_UnkAD50:       ; Menu_MainPreviewTable entry 1 (not analysed)
 org $C2B8DA
 Menu_UnkB8DA:       ; Menu_MainPreviewTable entry 2 (not analysed)
 org $C2C2FF
@@ -37,8 +35,6 @@ org $C2C9E5
 Menu_UnkC9E5:       ; Menu_MainPreviewTable entry 4 (not analysed)
 org $C2D065
 Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
-org $C2ADC3
-Menu_UnkADC3:       ; Menu_MainRedrawTable entry 1 (not analysed)
 org $C2B960
 Menu_UnkB960:       ; Menu_MainRedrawTable entry 2 (not analysed)
 org $C2C397
@@ -50,10 +46,6 @@ Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
 org $C2FA49
 Menu_UnkFA49:       ; JSR from Menu_DrawDescText: clears a buffer row at Menu_TextDest, sets TextWin_*
                     ; and Menu_Unk0DC7-0DD7, then TextWin_Init (JSL BankC2_Entry0003) (not matched)
-org $C290FC
-Menu_Unk90FC:       ; JSR from Menu_Mode01Init (not analysed)
-org $C29121
-Menu_Unk9121:       ; JSR from Menu_Icon0Redraw (not analysed)
 org $C2FC3E
 Menu_VramRecBg3Rows60: ; Menu_VramRec in unmatched data: VRAM $6F80 (BG3 map row 60) = $7E:5D00, $100 bytes
 org $C2FBEA
@@ -64,6 +56,13 @@ org $C2FC1B
 Menu_VramRecBg3:    ; Menu_VramRec in unmatched data: VRAM $6800 (BG3 map) = $7E:4E00, $680 bytes
 org $C2FC45
 Menu_VramRecBg3Rows58: ; Menu_VramRec in unmatched data: VRAM $6F40 (BG3 map row 58) = $7E:5C80, $100 bytes
+org $C2FC37
+Menu_VramRecBg3Rows0: ; Menu_VramRec in unmatched data: VRAM $6FC0 (BG3 map row 62) = $7E:4E00 (rows 0-1), $80 bytes
+org $C2FC5A
+Menu_VramRecDigits: ; Menu_VramRec in unmatched data: VRAM $5740 = $7E:8E80 (Menu_ShadowTiles), $140 bytes
+org $C2B83E
+Menu_UnkB83E:       ; JSR from Menu_UseHealItem (and $C2:B826): the HP / MP item's member cursor (with
+                    ; Menu_UseKind bit 3 all members), sets Menu_UseTarget and Menu_Unk0DBC (not matched)
 org $C2FBE3
 Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
                     ; Menu_MainMenuLoop after the clock is drawn)
@@ -72,18 +71,6 @@ Menu_VramRecBg2:    ; Menu_VramRec in unmatched data: VRAM $6000 = $7E:3E00 (Men
 org $C2FBFF
 Menu_VramRecBg2B:   ; Menu_VramRec in unmatched data: VRAM $6040 = $7E:3E80, $680 bytes (its first byte
                     ; is the last of Menu_VramRecBg2)
-org $C2AA40
-Menu_Mode02H0:      ; Menu_Mode02List entry 0 (not analysed)
-org $C2AA4A
-Menu_Mode02H1:      ; Menu_Mode02List entry 1 (not analysed)
-org $C2AA86
-Menu_Mode02H2:      ; Menu_Mode02List entry 2 (not analysed)
-org $C2AAC8
-Menu_Mode02H3:      ; Menu_Mode02List entry 3 (not analysed)
-org $C2AB4A
-Menu_Mode02H4:      ; Menu_Mode02List entry 4 (not analysed)
-org $C2AC1D
-Menu_Mode02H5:      ; Menu_Mode02List entry 5 (not analysed)
 org $C2B35D
 Menu_Mode03H0:      ; Menu_Mode03List entry 0 (not analysed)
 org $C2B365

@@ -386,7 +386,7 @@ ScrollWaveFF_B:         ; $FF:F799 (32 × sint16: A's second period)
 ; $1E) to plane 0 | plane 1 of the same row, so every drawn pixel also
 ; gets colour bit 2 (plane 3, offsets $11 ... $1F, is not written). What
 ; the tiles are is not traced.
-; Callers (1 JSL site): unmatched ($C2:8F6F).
+; Callers (1 JSL site): Menu_ShowHealNumbers ($C2:8F6F).
 ; Entry: M, X any (P saved; REP #$30 here), DP=0 (Menu_Tmp00-02), DB any
 ;        (the first MVN sets $7E before the absolute accesses)
 ; Exit:  P restored; DB=$7E; A, X, Y and DP $00-$02 clobbered
