@@ -706,8 +706,9 @@ BankFF_UnkF958:
 ; !Menu_Unk29AF and the tech bytes). Read (long addressing; these are
 ; all nine references in the ROM) by Menu_CmdJoin ($C2:8C95),
 ; Menu_CanEquip (AND.l at $C2:93B8), BankFF_UnkF813 ($FF:F85A,
-; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), and in unmatched
-; code: LDA.l at $C2:BC07 and $C2:BCD0, AND.l at $C2:CD59. Entry 8 (0)
+; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), Menu_TechPartners
+; (LDA.l at $C2:BC07), Menu_TechListBytes (LDA.l at $C2:BCD0), and in
+; unmatched code: AND.l at $C2:CD59. Entry 8 (0)
 ; is reached by BankFF_UnkF813 when bit 0 of a Menu_TechShown byte is
 ; set (its bit search starts at 8 and stops at the first set bit).
 BankFF_CharBits:
