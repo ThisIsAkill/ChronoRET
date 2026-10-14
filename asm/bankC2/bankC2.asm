@@ -35,9 +35,10 @@ incsrc "../hardware.inc"
 ; $0003/$0009 vectors are JSL targets.
 ; Callers (1 JML site): GameLoop_Main ($C0:006E).
 ; Callers of BankC2_Entry0003 (6 JSL sites): Field_MsgStart ($C0:2121), Menu_DrawText ($C2:F91F),
-;   BattleCD_StartText ($CD:0278) and unmatched ($C2:F9E4, $C2:FA3F, $C2:FA99).
+;   Menu_CfgTextThread ($C2:F9E4), Menu_CfgValueThread ($C2:FA3F), Menu_StartDescText ($C2:FA99) and
+;   BattleCD_StartText ($CD:0278).
 ; Callers of BankC2_Entry0009 (5 JSL sites): Field_MsgStep ($C0:2172), Menu_DrawText ($C2:F928),
-;   BattleCD_ShowText ($CD:0282), BattleCD_StepText ($CD:04E9) and unmatched ($C2:FAB2).
+;   Menu_TextStepLoop ($C2:FAB2), BattleCD_ShowText ($CD:0282) and BattleCD_StepText ($CD:04E9).
 ; Entry/Exit: those of the routine each vector jumps to.
 org $C20000
 BankC2_Entry0000:
@@ -23870,7 +23871,8 @@ Menu_BuildPartyLists:
 ; 64 x the slot.
 ; Callers (1 JMP site): BankC2_MenuEntry ($C2:808C).
 ; Callers of Menu_ThreadEnd (5 JMP sites): Menu_FadeInThread ($C2:83C7), Menu_HealNumbersThread
-;   ($C2:9044) and unmatched ($C2:CBE8, $C2:FA46, $C2:FAA2).
+;   ($C2:9044), Menu_CfgValueThread ($C2:FA46), Menu_DescTextThread ($C2:FAA2) and unmatched
+;   ($C2:CBE8).
 ; Callers of Menu_Yield (56 sites: 53 JSR, 3 JMP): Menu_MainThread (JSR $C2:826C), Menu_FadeInThread
 ;   (JSR $C2:83BD), Menu_Fade (JMP $C2:8403), Menu_CursorThreadA (JSR $C2:89F5), Menu_CursorThreadB
 ;   (JSR $C2:8A91), Menu_CursorThreadC (JSR $C2:8AB5), Menu_CursorThreadD (JSR $C2:8AF8),
@@ -23885,10 +23887,10 @@ Menu_BuildPartyLists:
 ;   Menu_UseStatItem (JSR $C2:B228), Menu_TechMemberScrollAnim (JSR $C2:B651), Menu_TechListIdle
 ;   (JSR $C2:B705), Menu_Icon2Preview (JSR $C2:B8F2), Menu_TechTargetsOpen (JSR $C2:BE98),
 ;   Menu_Icon3Preview (JSR $C2:C337), Menu_MainCursorThread (JSR $C2:E91E), Menu_PadInputThread (JSR
-;   $C2:E97F), Menu_ListScrollStep (JMP $C2:EB98), Menu_SprThread (JSR $C2:F696) and unmatched (JSR
-;   $C2:C7D0, JSR $C2:C936, JSR $C2:CA2D, JSR $C2:CA33, JSR $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55,
-;   JMP $C2:CF5B, JSR $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7, JSR $C2:D8CA, JSR $C2:E0CF, JSR
-;   $C2:E14B, JSR $C2:E906, JSR $C2:FAA5).
+;   $C2:E97F), Menu_ListScrollStep (JMP $C2:EB98), Menu_SprThread (JSR $C2:F696), Menu_TextStepWait
+;   (JSR $C2:FAA5) and unmatched (JSR $C2:C7D0, JSR $C2:C936, JSR $C2:CA2D, JSR $C2:CA33, JSR
+;   $C2:CBC7, JSR $C2:CC2E, JSR $C2:CF55, JMP $C2:CF5B, JSR $C2:D07E, JSR $C2:D0AA, JSR $C2:D7E7,
+;   JSR $C2:D8CA, JSR $C2:E0CF, JSR $C2:E14B, JSR $C2:E906).
 ; Callers of Menu_YieldFrames (3 JSR sites): Menu_Fade ($C2:83F8), Menu_Mode03H4 ($C2:B4F9) and
 ;   unmatched ($C2:CECB).
 ; Entry: M, X any (REP #$30 here), DP=$0000 (the first .State clear is
@@ -24018,8 +24020,9 @@ Menu_YieldSave:                         ; header: see Menu_RunThreads
 ; Callers (13 sites: 11 JSR, 2 JMP): Menu_RunThreads (JSR $C2:81A7, JSR $C2:81B6), Menu_StartFadeIn
 ;   (JMP $C2:83BA), Menu_StartCursorA (JMP $C2:89EF), Menu_StartCursorB (JSR $C2:8A40),
 ;   Menu_StartCursorC (JSR $C2:8AAD), Menu_StartCursorD (JSR $C2:8ADE), Menu_StartListArrows (JSR
-;   $C2:8BA1), Menu_ShowHealNumbers (JSR $C2:8FBF), Menu_StartSprThread (JSR $C2:F652) and unmatched
-;   (JSR $C2:CBBB, JSR $C2:F9AD, JSR $C2:FA96).
+;   $C2:8BA1), Menu_ShowHealNumbers (JSR $C2:8FBF), Menu_StartSprThread (JSR $C2:F652),
+;   Menu_CfgEntryText (JSR $C2:F9AD), Menu_StartDescText (JSR $C2:FA96) and unmatched (JSR
+;   $C2:CBBB).
 ; Entry: M any (P saved; REP #$20 here: A must hold the whole address),
 ;        X = the slot offset (0, 8, ... $38), DP=$0000, DB any
 ; Exit:  P restored; A = Menu_ThNewWait1; X, Y unchanged
@@ -24327,8 +24330,8 @@ Menu_Unk834D:
 ;   JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR $C2:E836, JSR
 ;   $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE, JSR $C2:FEF4,
 ;   JSR $C2:FF21).
-; Callers of Menu_QueueVramWram (6 JSR sites): Menu_SprUploadTiles ($C2:F84D, $C2:F859, $C2:F86C)
-;   and unmatched ($C2:E90C, $C2:FB17, $C2:FB92).
+; Callers of Menu_QueueVramWram (6 JSR sites): Menu_SprUploadTiles ($C2:F84D, $C2:F859, $C2:F86C),
+;   Menu_TextUpload ($C2:FB17, $C2:FB92) and unmatched ($C2:E90C).
 ; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
 ;        DB=$7E (Menu_VramQueueEnd is read absolute); X = the record's
 ;        address (16-bit)
@@ -33193,7 +33196,7 @@ Menu_Mode03H2:                          ; header: see Menu_Mode03H1
 ; Handler 3, every frame, the tech list: Menu_HdmaenShadow =
 ; Menu_TechHdmaBits, Menu_PadInput. Neither button: a tail jump to
 ; Menu_TechListIdle. Cancel: the text thread (slot 2, where
-; Menu_UnkFA49 starts the description's decoder) killed,
+; Menu_StartDescText starts the description's decoder) killed,
 ; Menu_PlaySound0, Menu_ThreadVar - 1 (handler 2), Menu_SprResetChars,
 ; object 8's .Flags18 = $FF, Menu_CursorSel = the member's row record
 ; (Menu_TechMemberRow + $0B), Menu_TechId = 0, the member rows again
@@ -35004,8 +35007,8 @@ Menu_TechDescIfNew:
 ; of the tech text table, through Menu_TechDescText's set-up
 ; (Menu_TechTextSetup; nothing when it was drawn last).
 ; Callers (1 JSR site): Menu_TechMemberCursor ($C2:B55B).
-; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP any,
-;        DB=$7E
+; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP=$0000
+;        (Menu_StartDescText's Menu_StartThread), DB=$7E
 ; Exit:  P restored; as Menu_TechTextSetup
 ; Calls: branches to Menu_TechTextSetup.
 Menu_TechPageTitle:
@@ -35031,14 +35034,15 @@ Menu_TechPageTitle:
 ; Menu_Unk0D77 = A, TextWin_StrIndex = A, Menu_Unk0D78 = 0,
 ; Menu_Unk0DCC = $6AA0, Menu_TechUnk0F73 = $0F75 (not read in this
 ; mode's code), TextWin_StrTable = MenuRom_TechTextTable, Menu_Unk0DD0
-; = $0080 and Menu_UnkFA49 (the text-window decoder).
+; = $0080 and Menu_StartDescText (the description's text thread).
 ; Callers (1 JSR site): Menu_TechDescIfNew ($C2:BE11).
-; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP any,
-;        DB=$7E; Menu_TechTextSetup: from Menu_TechPageTitle, P saved
-;        there, A = the string
-; Exit:  P restored; A = the string, X clobbered; when it draws, as
-;        Menu_UnkFA49 (not analysed)
-; Calls: Menu_UnkFA49.
+; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000
+;        (Menu_StartDescText's Menu_StartThread), DB=$7E;
+;        Menu_TechTextSetup: from Menu_TechPageTitle, P saved there, A =
+;        the string
+; Exit:  P restored; A = the string, X clobbered; when it draws, A, X
+;        (= TextWin_Dp) and Y as Menu_StartDescText leaves them
+; Calls: Menu_StartDescText.
 Menu_TechDescText:
     PHP
     SEP #$20
@@ -35066,7 +35070,7 @@ Menu_TechTextSetup:                     ; header: see Menu_TechDescText
     STA.w !TextWin_Dp+!TextWin_StrTable+2
     LDX.w #!Menu_DescUnk0DD0
     STX.w !Menu_Unk0DD0
-    JSR Menu_UnkFA49
+    JSR Menu_StartDescText
 .done:
     PLP
     RTS
@@ -36005,7 +36009,7 @@ Menu_CfgMapClash7:
 ; Menu_MainPreviewTable entry 3: thread 3's .Wait + 1; the draw list
 ; MenuRom_Icon3List; the 14 words from Menu_Bg3TileBuf+$44 (row 1,
 ; tile 2 of a 32-tile map) = $21FF, then its tiles 14-15 = $21FB;
-; Menu_VramRecUnkFC4C queued (VRAM $6E00 from Menu_Bg3TileBuf);
+; Menu_VramRecBg3Rows48 queued (VRAM $6E00 from Menu_Bg3TileBuf);
 ; Menu_CfgCopyShown; a frame's wait; the draw list MenuRom_Icon3ListB;
 ; the marks (Menu_CfgDrawToggles), the selectors
 ; (Menu_CfgDrawSelectors), Menu_CfgDrawCLow and the button map
@@ -36038,7 +36042,7 @@ Menu_Icon3Preview:
     LDY.w #!Menu_CfgBg3RowEnd+2
     LDA.w #1
     MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
-    LDX.w #Menu_VramRecUnkFC4C
+    LDX.w #Menu_VramRecBg3Rows48
     JSR Menu_QueueVramRom
     JSR Menu_CfgCopyShown
     JSR Menu_Yield
@@ -36288,12 +36292,12 @@ Menu_CfgDrawCLow:
 ; Menu_CfgIconMap from MenuRom_CfgIcons[Menu_CfgCursor] (the word, then
 ; + 1, + 2, + 3); Menu_Unk0DCE = Menu_CfgCursor and Menu_Unk0DCF =
 ; Menu_CfgA3[Menu_CfgEntryByte[entry]] + Menu_CfgEntryStrBase[entry]
-; (the entry's value picks its string, probably); then Menu_UnkF943.
+; (the entry's value picks its string, probably); then Menu_CfgEntryText.
 ; Callers (2 JSR sites): Menu_Mode04H3 ($C2:BFB5) and Menu_CfgEntryRun ($C2:BFE9).
 ; Entry: M any (P saved; REP #$30 / SEP #$20 here), X any, DP=$0000
 ;        (the TDC: B = 0 for the TAX), DB=$7E
-; Exit:  P restored; A, X, Y as Menu_UnkF943 leaves them (not analysed)
-; Calls: Menu_UnkF943.
+; Exit:  P restored; A, X, Y as Menu_CfgEntryText leaves them
+; Calls: Menu_CfgEntryText.
 Menu_CfgEntryIcon:
     PHP
     REP #$30
@@ -36320,7 +36324,7 @@ Menu_CfgEntryIcon:
     CLC
     ADC.l Menu_CfgEntryStrBase,X
     STA.w !Menu_Unk0DCF
-    JSR Menu_UnkF943
+    JSR Menu_CfgEntryText
     PLP
     RTS
 
@@ -39128,22 +39132,23 @@ Menu_ItemNamePtr:
 
 ; $C2:F2F3 — Menu_DrawDescText (63 bytes, $F2F3–$F331)
 ; Draws string A of the table at $CC:2EB1 with the text-window decoder
-; (Menu_UnkFA49), unless it is the string drawn last (A =
+; (Menu_StartDescText), unless it is the string drawn last (A =
 ; Menu_Unk0D77) and Menu_Unk0D78 bit 7 is clear: then nothing. Else
 ; Menu_Unk0D77 = A, Menu_Unk0D78 = 0, TextWin_StrIndex = A,
 ; TextWin_StrTable = $CC:2EB1, Menu_TextDest = $4E84, Menu_Unk0DCC =
-; $6840, Menu_Unk0DC9 = 1, Menu_Unk0DD0 = $0080 and Menu_UnkFA49. What
+; $6840, Menu_Unk0DC9 = 1, Menu_Unk0DD0 = $0080 and Menu_StartDescText. What
 ; the strings are is not traced (a description line, probably).
 ; Callers (10 sites: 8 JSR, 2 JMP): Menu_EquipItemsOpen (JSR $C2:A44A), Menu_EquipPreviewItem (JSR
 ;   $C2:A5E2), Menu_Mode02H2 (JMP $C2:AAC5), Menu_ItemListSelect (JSR $C2:AD4B), Menu_AfterItemUse
 ;   (JSR $C2:B347) and unmatched (JSR $C2:D80D, JSR $C2:D8F0, JMP $C2:E014, JSR $C2:E0E4, JSR
 ;   $C2:E1D7).
-; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP any, DB=$7E
-;        (Menu_UnkFA49's STZ $0000,X writes $4E80, Menu_TextDest AND
+; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP=$0000
+;        (Menu_StartDescText's Menu_StartThread), DB=$7E
+;        (Menu_StartDescText's STZ $0000,X writes $4E80, Menu_TextDest AND
 ;        $FFC0, in bank DB); A = the string number
-; Exit:  P restored; nothing drawn: A, X, Y unchanged; else X
-;        clobbered and as Menu_UnkFA49 (not analysed)
-; Calls: Menu_UnkFA49.
+; Exit:  P restored; nothing drawn: A, X, Y unchanged; else A, X (=
+;        TextWin_Dp) and Y clobbered (Menu_StartDescText)
+; Calls: Menu_StartDescText.
 Menu_DrawDescText:
     PHP
     SEP #$20
@@ -39168,7 +39173,7 @@ Menu_DrawDescText:
     STA.w !Menu_Unk0DC9
     LDX.w #!Menu_DescUnk0DD0
     STX.w !Menu_Unk0DD0
-    JSR Menu_UnkFA49
+    JSR Menu_StartDescText
 .done:
     PLP
     RTS
@@ -40266,6 +40271,616 @@ Menu_DrawText:
 .done:
     PLP
     RTS
+
+; ============================================================
+; Menu text threads and VRAM records ($C2:F943–$C2:FC6E)
+; ============================================================
+; Text drawn a few glyphs a frame by a thread in slot 2: the decoder
+; (TextWin_Init, then TextWin_Step with TextWin_StepCount =
+; Menu_TextSteps a frame) draws 2bpp glyphs into the buffer at
+; TextWin_GfxBuf; after each step Menu_TextUpload queues that buffer
+; (Menu_TextTileDest from Menu_TextGfxSrc, $400 bytes) and, for the
+; tiles the pen has passed, writes tile words into the tilemap row pair
+; at Menu_TextDest + Menu_TextCol (from Menu_TextTileWord: the glyph's
+; upper tile, and the one 16 tiles on below it) and queues that row
+; pair (VRAM Menu_Unk0DCC, Menu_Unk0DD0 bytes).
+
+; $C2:F943 — Menu_CfgEntryText (111 bytes, $F943–$F9B1)
+; The settings screen's text for entry Menu_Unk0DCE with value string
+; Menu_Unk0DCF (strings of MenuRom_CfgTextTable): TextWin_Mode = 0,
+; TextWin_GfxBuf's bank = $7E, TextWin_StrTable = MenuRom_CfgTextTable,
+; Menu_TextSteps = 1, Menu_Unk0DCC = $6900. A new entry (not
+; Menu_Unk0D77, which takes it, as TextWin_StrIndex too): the two rows
+; at Menu_CfgTextRows ($80 bytes) zeroed and Menu_CfgTextThread started
+; in slot 2 (the entry's string, then its value's). Same entry: when the
+; text thread is not running (Menu_Thread[2].State 0) and Menu_Unk0DCF
+; is not the value drawn last (Menu_Unk0D78), the two rows zeroed from
+; column 5 + Menu_TextCol / 2 on, and Menu_CfgValueThread started in
+; slot 2.
+; Callers (1 JSR site): Menu_CfgEntryIcon ($C2:C4F4).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (16-bit LDX),
+;        DP=$0000 (Menu_StartThread), DB=$7E
+; Exit:  P restored; A, X, Y clobbered
+; Calls: Menu_StartThread.
+Menu_CfgEntryText:
+    PHP
+    SEP #$20
+    STZ.w !TextWin_Dp+!TextWin_Mode
+    LDA.b #!Bank7E
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    LDA.b #!MenuRom_CfgTextTable>>16
+    STA.w !TextWin_Dp+!TextWin_StrTable+2
+    LDA.b #1
+    STA.w !Menu_TextSteps
+    LDX.w #!MenuRom_CfgTextTable&$FFFF
+    STX.w !TextWin_Dp+!TextWin_StrTable
+    LDX.w #!Menu_CfgTextUnk0DCC
+    STX.w !Menu_Unk0DCC
+    LDA.w !Menu_Unk0DCE
+    CMP.w !Menu_Unk0D77
+    BEQ .same
+    STA.w !Menu_Unk0D77
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    REP #$30
+    STZ.w !Menu_CfgTextRows
+    LDX.w #!Menu_CfgTextRows
+    LDY.w #!Menu_CfgTextRows+2
+    LDA.w #!Menu_CfgTextRowsBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #Menu_CfgTextThread
+    BRA .start
+.same:
+    LDA.w Menu_Thread[2].State
+    BNE .done
+    LDA.w !Menu_Unk0DCF
+    CMP.w !Menu_Unk0D78
+    BEQ .done
+    REP #$30
+    LDX.w !Menu_TextCol
+.clear:
+    STZ.w !Menu_CfgTextRows+!Menu_CfgNameOfs,X
+    STZ.w !Menu_CfgTextRows+!Menu_MapRowBytes+!Menu_CfgNameOfs,X
+    INX
+    INX
+    CPX.w #!Menu_MapRowBytes
+    BCC .clear
+    LDA.w #Menu_CfgValueThread
+.start:
+    LDX.w #!Menu_TextSlot
+    JSR Menu_StartThread
+.done:
+    PLP
+    RTS
+
+; $C2:F9B2 — Menu_CfgTextThread (149 bytes with Menu_CfgValueThread, $F9B2–$FA48)
+; A thread (slot 2, from Menu_CfgEntryText): Menu_Unk0DD0 = $80,
+; Menu_TextDest = $4E0A, Menu_TextGlyphs and Menu_TextCol = 0,
+; TextWin_GfxBuf and Menu_TextGfxSrc = $5E00, Menu_TextPenStart = 8,
+; Menu_TextTileDest = $7800, Menu_TextTileWord = $3101; TextWin_Init
+; and the steps (Menu_TextStepLoop) draw the entry's string. Then
+; Menu_TextCol = (Menu_TextPenStart AND $F8) / 4 + 2 (one tile after
+; the string), the word at DP $26 = Menu_TextDest and the byte at DP
+; $28 = (Menu_TextTileWord - 1) AND $0F; and on into the value (sub-entry
+; Menu_CfgValueThread, $C2:FA06, which Menu_CfgEntryText also starts by
+; itself, using the DP $26 / $28 an earlier run left):
+; TextWin_StrIndex and Menu_Unk0D78 = Menu_Unk0DCF; Menu_TextGlyphs = 0;
+; Menu_TextDest = DP $26 + 2 x DP $28; Menu_TextTileWord = $3941,
+; Menu_TextPenStart = 8, Menu_TextTileDest = $7A00, Menu_TextGfxSrc and
+; TextWin_GfxBuf = $6200; TextWin_Init, the steps, and the thread ends
+; (Menu_ThreadEnd).
+; Callers note: started by Menu_CfgEntryText (Menu_StartThread), at
+;   Menu_CfgTextThread or at Menu_CfgValueThread.
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000), DB
+;        as the scheduler leaves it (DB=$7E assumed, as everywhere in
+;        the menu)
+; Exit:  never returns (Menu_ThreadEnd)
+; Calls: BankC2_Entry0003 (TextWin_Init, JSL), Menu_TextStepLoop;
+;   jumps to Menu_ThreadEnd.
+Menu_CfgTextThread:
+    REP #$30
+    LDA.w #!Menu_DescUnk0DD0
+    STA.w !Menu_Unk0DD0
+    LDX.w #!Menu_CfgTextRows+!Menu_CfgNameOfs
+    STX.w !Menu_TextDest
+    STZ.w !Menu_TextGlyphs
+    STZ.w !Menu_TextCol
+    LDA.w #!Menu_TextGfxA
+    STA.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.w #!Menu_TextPenFirst
+    STA.w !Menu_TextPenStart
+    LDA.w #!Menu_TextTileDestA
+    STA.w !Menu_TextTileDest
+    LDA.w #!Menu_TextGfxA
+    STA.w !Menu_TextGfxSrc
+    LDA.w #!Menu_TextTileWordA
+    STA.w !Menu_TextTileWord
+    JSL BankC2_Entry0003
+    JSR Menu_TextStepLoop
+    SEP #$20
+    LDA.w !Menu_TextPenStart
+    AND.b #!Menu_TextTileMask
+    LSR A
+    LSR A
+    INC A
+    INC A
+    STA.w !Menu_TextCol
+    LDX.w !Menu_TextDest
+    STX.b !Menu_CfgValueDest
+    LDA.w !Menu_TextTileWord
+    DEC A
+    AND.b #!Menu_CfgValueRowMask
+    STA.b !Menu_CfgValueRow
+Menu_CfgValueThread:                    ; header: see Menu_CfgTextThread
+    SEP #$20
+    LDA.w !Menu_Unk0DCF
+    STA.w !TextWin_Dp+!TextWin_StrIndex
+    STA.w !Menu_Unk0D78
+    REP #$30
+    STZ.w !Menu_TextGlyphs
+    LDA.b !Menu_CfgValueRow
+    AND.w #!Eng_LowByteMask
+    ASL A
+    ADC.b !Menu_CfgValueDest            ; (C=0 from the ASL)
+    STA.w !Menu_TextDest
+    LDA.w #!Menu_TextTileWordB
+    STA.w !Menu_TextTileWord
+    LDA.w #!Menu_TextPenFirst
+    STA.w !Menu_TextPenStart
+    LDA.w #!Menu_TextTileDestB
+    STA.w !Menu_TextTileDest
+    LDA.w #!Menu_TextGfxB
+    STA.w !Menu_TextGfxSrc
+    LDA.w #!Menu_TextGfxB
+    STA.w !TextWin_Dp+!TextWin_GfxBuf
+    JSL BankC2_Entry0003
+    JSR Menu_TextStepLoop
+    JMP Menu_ThreadEnd
+
+; $C2:FA49 — Menu_StartDescText (86 bytes, $FA49–$FA9E)
+; Starts the text-window decoder on the string the caller set up
+; (TextWin_StrIndex / StrTable) for Menu_DescTextThread: TextWin_Mode =
+; 0, TextWin_GfxBuf's bank = $7E, Menu_TextGlyphs and Menu_TextCol = 0;
+; Menu_Unk0DD0 bytes zeroed from the start of Menu_TextDest's tile row
+; (Menu_TextDest AND $FFC0, written in bank DB); TextWin_GfxBuf and
+; Menu_TextGfxSrc = $5E00, Menu_TextTileWord = $3101, Menu_TextPenStart
+; = 8, Menu_TextTileDest = $7800; Menu_DescTextThread started in slot 2;
+; then TextWin_Init (here, not in the thread).
+; Callers (3 JSR sites): Menu_TechTextSetup ($C2:BE74), Menu_DrawDescText ($C2:F32D) and unmatched
+;   ($C2:E606).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X any, DP=$0000
+;        (Menu_StartThread), DB=$7E (the clear's first STZ is DB-relative;
+;        the MVN sets $7E); Menu_Unk0DD0 at least 3
+; Exit:  P restored; DB=$7E; A, X (= TextWin_Dp), Y clobbered
+; Calls: Menu_StartThread, BankC2_Entry0003 (TextWin_Init, JSL).
+Menu_StartDescText:
+    PHP
+    SEP #$20
+    STZ.w !TextWin_Dp+!TextWin_Mode
+    LDA.b #!Bank7E
+    STA.w !TextWin_Dp+!TextWin_GfxBuf+2
+    STZ.w !Menu_TextGlyphs
+    REP #$30
+    STZ.w !Menu_TextCol
+    LDA.w !Menu_TextDest
+    AND.w #!Menu_TextRowMask
+    TAX
+    TAY
+    STZ.w !Eng_PtrBase,X
+    INY
+    INY
+    LDA.w !Menu_Unk0DD0
+    DEC A
+    DEC A
+    DEC A
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Menu_TextGfxA
+    STA.w !TextWin_Dp+!TextWin_GfxBuf
+    LDA.w #!Menu_TextTileWordA
+    STA.w !Menu_TextTileWord
+    LDA.w #!Menu_TextPenFirst
+    STA.w !Menu_TextPenStart
+    LDA.w #!Menu_TextTileDestA
+    STA.w !Menu_TextTileDest
+    LDA.w #!Menu_TextGfxA
+    STA.w !Menu_TextGfxSrc
+    LDA.w #Menu_DescTextThread
+    LDX.w #!Menu_TextSlot
+    JSR Menu_StartThread
+    JSL BankC2_Entry0003
+    PLP
+    RTS
+
+; $C2:FA9F — Menu_DescTextThread (6 bytes, $FA9F–$FAA4)
+; A thread (slot 2, from Menu_StartDescText): the steps
+; (Menu_TextStepLoop), then the thread ends (Menu_ThreadEnd).
+; Callers note: started by Menu_StartDescText (Menu_StartThread).
+; Entry: from Menu_RunThreads as a new thread (M=0, X=0, DP=$0000), DB
+;        as the scheduler leaves it (DB=$7E assumed)
+; Exit:  never returns (Menu_ThreadEnd)
+; Calls: Menu_TextStepLoop; jumps to Menu_ThreadEnd.
+Menu_DescTextThread:
+    JSR Menu_TextStepLoop
+    JMP Menu_ThreadEnd
+
+; $C2:FAA5 — Menu_TextStepWait (68 bytes with Menu_TextStepLoop, $FAA5–$FAE8)
+; The step loop of the text threads, entered at Menu_TextStepLoop
+; ($C2:FAA8; Menu_TextStepWait, a frame's wait first, is where it goes
+; on after each step): TextWin_StepCount = Menu_TextSteps, TextWin_Step
+; (BankC2_Entry0009), Menu_TextUpload; then by TextWin_Status: 0 (done)
+; returns; Menu_TextLineBreak starts a new line (Menu_TextCol = (it AND
+; $E0) + $80, two tile rows on; Menu_TextTileWord's low byte = (it AND
+; $C0) + $41; Menu_TextGlyphs = 0; Menu_TextTileDest + $200;
+; Menu_TextPenStart = 8); any status but 0 waits a frame and steps
+; again.
+; Callers of Menu_TextStepLoop (3 JSR sites): Menu_CfgTextThread ($C2:F9E8), Menu_CfgValueThread
+;   ($C2:FA43) and Menu_DescTextThread ($C2:FA9F).
+; Entry: M, X any (SEP #$20 / REP #$10 here), DP any, DB=$7E (the
+;        absolute text RAM; TextWin_Step's stores); a menu thread (it
+;        yields)
+; Exit:  M=1, X=0; A = 0 (TextWin_Status); X, Y as Menu_TextUpload
+;        leaves them
+; Calls: Menu_Yield, BankC2_Entry0009 (TextWin_Step, JSL),
+;   Menu_TextUpload.
+Menu_TextStepWait:
+    JSR Menu_Yield
+Menu_TextStepLoop:                      ; header: see Menu_TextStepWait
+    REP #$10
+    SEP #$20
+    LDA.w !Menu_TextSteps
+    STA.w !TextWin_Dp+!TextWin_StepCount
+    JSL BankC2_Entry0009
+    JSR Menu_TextUpload
+    LDA.w !TextWin_Dp+!TextWin_Status
+    BEQ .done
+    CMP.b #!Menu_TextLineBreak
+    BNE Menu_TextStepWait
+    LDA.w !Menu_TextCol
+    AND.b #!Menu_TextLineMask
+    CLC
+    ADC.b #!Menu_TextLineBytes
+    STA.w !Menu_TextCol
+    LDA.w !Menu_TextTileWord
+    AND.b #!Menu_TextTileLineMask
+    CLC
+    ADC.b #!Menu_TextTileLineFirst
+    STA.w !Menu_TextTileWord
+    STZ.w !Menu_TextGlyphs
+    INC.w !Menu_TextTileDest+1
+    INC.w !Menu_TextTileDest+1
+    LDA.b #!Menu_TextPenFirst
+    STA.w !Menu_TextPenStart
+    BRA Menu_TextStepWait
+.done:
+    RTS
+
+; $C2:FAE9 — Menu_TextUpload (174 bytes, $FAE9–$FB96)
+; After a decoder step, when TextWin_Unk17 (glyphs drawn) is not
+; Menu_TextGlyphs (which takes it): Menu_TextRec (at Menu_SprScratch)
+; = VRAM Menu_TextTileDest from $7E:Menu_TextGfxSrc, $400 bytes, queued
+; (Menu_QueueVramWram); then tile words for the tiles from the one
+; Menu_TextPenStart is in up to the one before TextWin_PenX rounded up
+; (n = ceil(TextWin_PenX / 8) - that tile, Menu_Tmp00/02 holding the two
+; tile numbers, absolute) at Menu_TextDest + Menu_TextCol + 2 x the
+; first tile: Menu_TextTileWord + first - 1 + $10 and on, the upper row
+; with bit 4 cleared and the row below ($40 bytes on) with it set (the
+; glyph's lower half 16 tiles on); Menu_TextPenStart = TextWin_PenX.
+; Always: Menu_TextRec = VRAM Menu_Unk0DCC from $7E:Menu_TextDest AND
+; $FFC0 (its tile row's start), Menu_Unk0DD0 bytes, queued.
+; Callers (1 JSR site): Menu_TextStepLoop ($C2:FAB6).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (the 16-bit LDX
+;        before the REP #$30), DP any, DB=$7E (absolute RAM, the tile
+;        words stored abs,X)
+; Exit:  P restored; DB=$7E; A, X, Y as Menu_QueueVramWram leaves them;
+;        Menu_Tmp00-03 (absolute, so bank $7E's first bytes) changed
+;        when the tiles are written
+; Calls: Menu_QueueVramWram (twice).
+Menu_TextUpload:
+    PHP
+    SEP #$20
+    LDA.w !TextWin_Dp+!TextWin_Unk17
+    CMP.w !Menu_TextGlyphs
+    BNE .tiles
+    JMP .map
+.tiles:
+    STA.w !Menu_TextGlyphs
+    REP #$20
+    LDA.w !Menu_TextTileDest
+    STA.w !Menu_TextRec+Menu_VramRec.Dest
+    LDA.w !Menu_TextGfxSrc
+    STA.w !Menu_TextRec+Menu_VramRec.Src
+    LDA.w #!Bank7E
+    STA.w !Menu_TextRec+Menu_VramRec.SrcBank
+    LDA.w #!Menu_TextGfxBytes
+    STA.w !Menu_TextRec+Menu_VramRec.Size
+    LDX.w #!Menu_TextRec
+    JSR Menu_QueueVramWram
+    SEP #$20
+    LDA.w !TextWin_Dp+!TextWin_PenX
+    LSR A
+    ADC.b #0
+    LSR A
+    ADC.b #0
+    LSR A
+    ADC.b #0
+    STA.w !Menu_Tmp00
+    STZ.w !Menu_Tmp01
+    REP #$30
+    LDA.w !Menu_TextPenStart
+    AND.w #!Menu_TextTileMask
+    LSR A
+    LSR A
+    PHA
+    ADC.w !Menu_TextCol                 ; (C=0 from the LSRs)
+    ADC.w !Menu_TextDest
+    TAX
+    PLA
+    LSR A
+    STA.w !Menu_Tmp02
+    LDA.w !Menu_Tmp00
+    SEC
+    SBC.w !Menu_Tmp02
+    TAY
+    LDA.w !Menu_Tmp02
+    DEC A
+    CLC
+    ADC.w !Menu_TextTileWord
+    ADC.w #!Menu_TextLowerTile
+.tile:
+    AND.w #!Menu_TextUpperMask
+    STA.w !Eng_PtrBase,X
+    ORA.w #!Menu_TextLowerTile
+    STA.w !Eng_PtrBase+!Menu_MapRowBytes,X
+    INC A
+    INX
+    INX
+    DEY
+    BNE .tile
+    SEP #$20
+    LDA.w !TextWin_Dp+!TextWin_PenX
+    STA.w !Menu_TextPenStart
+.map:
+    REP #$30
+    LDA.w !Menu_Unk0DCC
+    STA.w !Menu_TextRec+Menu_VramRec.Dest
+    LDA.w !Menu_TextDest
+    AND.w #!Menu_TextRowMask
+    STA.w !Menu_TextRec+Menu_VramRec.Src
+    LDA.w #!Bank7E
+    STA.w !Menu_TextRec+Menu_VramRec.SrcBank
+    LDA.w !Menu_Unk0DD0
+    STA.w !Menu_TextRec+Menu_VramRec.Size
+    LDX.w #!Menu_TextRec
+    JSR Menu_QueueVramWram
+    PLP
+    RTS
+
+; $C2:FB97 — Menu_PutTextTiles (29 bytes, $FB97–$FBB3)
+; Y tile words from $7E:X on, a row pair as Menu_TextUpload writes them:
+; the first word = (A AND $EF) OR $3100 (A's low byte the tile, attribute
+; byte $31), the row below ($40 bytes on) the same with bit 4 set; then
+; + 1 with bit 4 cleared, and so on.
+; Callers (4 JSR sites): unmatched ($C2:D150, $C2:D3FB, $C2:E4F1, $C2:E4FC).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E; A = the
+;        first tile (low byte), X = the map address, Y = the count (0:
+;        65536)
+; Exit:  P restored; A = the next word, X past the last word, Y = 0
+; No calls.
+Menu_PutTextTiles:
+    PHP
+    REP #$30
+    AND.w #!Menu_TextTileLowMask
+    ORA.w #!Menu_TextTileAttr
+.tile:
+    STA.w !Eng_PtrBase,X
+    ORA.w #!Menu_TextLowerTile
+    STA.w !Eng_PtrBase+!Menu_MapRowBytes,X
+    INC A
+    AND.w #!Menu_TextUpperMask
+    INX
+    INX
+    DEY
+    BNE .tile
+    PLP
+    RTS
+
+; $C2:FBB4 — Menu_PutTextTilesAttr (26 bytes, $FBB4–$FBCD)
+; As Menu_PutTextTiles with A's whole word: the first word = A AND $33EF
+; (attribute bits 2-7 and the tile's bit 4 cleared, so palette 0-1 and
+; priority are kept), then as there.
+; Callers (5 JSR sites): unmatched ($C2:CAC3, $C2:CACF, $C2:D13D, $C2:E86D, $C2:E879).
+; Entry: M, X any (P saved; REP #$30 here), DP any, DB=$7E; A = the
+;        first tile word, X = the map address, Y = the count (0: 65536)
+; Exit:  P restored; A = the next word, X past the last word, Y = 0
+; No calls.
+Menu_PutTextTilesAttr:
+    PHP
+    REP #$30
+    AND.w #!Menu_TextAttrKeep
+.tile:
+    STA.w !Eng_PtrBase,X
+    ORA.w #!Menu_TextLowerTile
+    STA.w !Eng_PtrBase+!Menu_MapRowBytes,X
+    INC A
+    AND.w #!Menu_TextUpperMask
+    INX
+    INX
+    DEY
+    BNE .tile
+    PLP
+    RTS
+
+; ------------------------------------------------------------
+; Menu_VramRec records the menu code queues by address (Menu_QueueVramRom
+; with an LDX #): .Dest (VRAM word address), .Src, .SrcBank, .Size,
+; packed 7 bytes apart, so each one's unused .Unk7 is the first byte of
+; the next. Several have no reference in matched code (the unmatched
+; modes load them).
+; ------------------------------------------------------------
+
+; $C2:FBCE — Menu_VramRecBg1Big (7 bytes, $FBCE–$FBD4)
+; VRAM $5800 = $7E:2E00, $C00 bytes.
+Menu_VramRecBg1Big:
+    dw $5800, $2E00
+    db !Bank7E
+    dw $0C00
+
+; $C2:FBD5 — Menu_VramRecBg1High (7 bytes, $FBD5–$FBDB)
+; VRAM $5800 = $7E:2E00, $800 bytes (the half before Menu_VramRecBg1Low's).
+Menu_VramRecBg1High:
+    dw $5800, $2E00
+    db !Bank7E
+    dw $0800
+
+; $C2:FBDC — Menu_VramRecBg1Rows16 (7 bytes, $FBDC–$FBE2)
+; VRAM $5A00 = $7E:3200, $240 bytes.
+Menu_VramRecBg1Rows16:
+    dw $5A00, $3200
+    db !Bank7E
+    dw $0240
+
+; $C2:FBE3 — Menu_VramRecClock (7 bytes, $FBE3–$FBE9)
+; VRAM $5840 = $7E:2E80, $640 bytes (queued after the clock is drawn,
+; Menu_MainMenuLoop, and by most menu screens).
+Menu_VramRecClock:
+    dw $5840, $2E80
+    db !Bank7E
+    dw $0640
+
+; $C2:FBEA — Menu_VramRecBg1Low (7 bytes, $FBEA–$FBF0)
+; VRAM $5C00 = $7E:3600, $800 bytes.
+Menu_VramRecBg1Low:
+    dw $5C00, $3600
+    db !Bank7E
+    dw $0800
+
+; $C2:FBF1 — Menu_VramRecBg1Rows24 (7 bytes, $FBF1–$FBF7)
+; VRAM $5B00 = $7E:3400, $600 bytes.
+Menu_VramRecBg1Rows24:
+    dw $5B00, $3400
+    db !Bank7E
+    dw $0600
+
+; $C2:FBF8 — Menu_VramRecBg2 (7 bytes, $FBF8–$FBFE)
+; VRAM $6000 = $7E:3E00 (Menu_Bg2Map), $1000 bytes.
+Menu_VramRecBg2:
+    dw $6000, !Menu_Bg2Map
+    db !Bank7E
+    dw $1000
+
+; $C2:FBFF — Menu_VramRecBg2B (7 bytes, $FBFF–$FC05)
+; VRAM $6040 = $7E:3E80, $680 bytes.
+Menu_VramRecBg2B:
+    dw $6040, !Menu_Bg2Map+$80
+    db !Bank7E
+    dw $0680
+
+; $C2:FC06 — Menu_VramRecBg2Low (7 bytes, $FC06–$FC0C)
+; VRAM $6400 = $7E:4600, $800 bytes.
+Menu_VramRecBg2Low:
+    dw $6400, $4600
+    db !Bank7E
+    dw $0800
+
+; $C2:FC0D — Menu_VramRecBg2Rows2 (7 bytes, $FC0D–$FC13)
+; VRAM $6040 = $7E:3E80, $300 bytes.
+Menu_VramRecBg2Rows2:
+    dw $6040, !Menu_Bg2Map+$80
+    db !Bank7E
+    dw $0300
+
+; $C2:FC14 — Menu_VramRecBg3Full (7 bytes, $FC14–$FC1A)
+; VRAM $6800 = $7E:4E00, $1000 bytes.
+Menu_VramRecBg3Full:
+    dw $6800, !Menu_Bg3TileBuf
+    db !Bank7E
+    dw $1000
+
+; $C2:FC1B — Menu_VramRecBg3 (7 bytes, $FC1B–$FC21)
+; VRAM $6800 = $7E:4E00, $680 bytes.
+Menu_VramRecBg3:
+    dw $6800, !Menu_Bg3TileBuf
+    db !Bank7E
+    dw $0680
+
+; $C2:FC22 — Menu_VramRecBg3Rows4 (7 bytes, $FC22–$FC28)
+; VRAM $6880 = $7E:4F00, $480 bytes.
+Menu_VramRecBg3Rows4:
+    dw $6880, !Menu_Bg3TileBuf+$100
+    db !Bank7E
+    dw $0480
+
+; $C2:FC29 — Menu_VramRecBg3Rows3 (7 bytes, $FC29–$FC2F)
+; VRAM $6860 = $7E:4EC0, $440 bytes.
+Menu_VramRecBg3Rows3:
+    dw $6860, !Menu_Bg3TileBuf+$C0
+    db !Bank7E
+    dw $0440
+
+; $C2:FC30 — Menu_VramRecBg3Rows16 (7 bytes, $FC30–$FC36)
+; VRAM $6A00 = $7E:5200, $400 bytes.
+Menu_VramRecBg3Rows16:
+    dw $6A00, !Menu_Bg3TileBuf+$400
+    db !Bank7E
+    dw $0400
+
+; $C2:FC37 — Menu_VramRecBg3Rows0 (7 bytes, $FC37–$FC3D)
+; VRAM $6FC0 = $7E:4E00, $80 bytes.
+Menu_VramRecBg3Rows0:
+    dw $6FC0, !Menu_Bg3TileBuf
+    db !Bank7E
+    dw $0080
+
+; $C2:FC3E — Menu_VramRecBg3Rows60 (7 bytes, $FC3E–$FC44)
+; VRAM $6F80 = $7E:5D00, $100 bytes.
+Menu_VramRecBg3Rows60:
+    dw $6F80, $5D00
+    db !Bank7E
+    dw $0100
+
+; $C2:FC45 — Menu_VramRecBg3Rows58 (7 bytes, $FC45–$FC4B)
+; VRAM $6F40 = $7E:5C80, $100 bytes.
+Menu_VramRecBg3Rows58:
+    dw $6F40, $5C80
+    db !Bank7E
+    dw $0100
+
+; $C2:FC4C — Menu_VramRecBg3Rows48 (7 bytes, $FC4C–$FC52)
+; VRAM $6E00 = $7E:4E00, $400 bytes.
+Menu_VramRecBg3Rows48:
+    dw $6E00, !Menu_Bg3TileBuf
+    db !Bank7E
+    dw $0400
+
+; $C2:FC53 — Menu_VramRecUnkFC53 (7 bytes, $FC53–$FC59)
+; VRAM $7800 = $7E:6E00, $800 bytes (the text threads send their glyph
+; tiles to VRAM $7800 / $7A00 from elsewhere; what this one sends is not
+; traced).
+Menu_VramRecUnkFC53:
+    dw $7800, $6E00
+    db !Bank7E
+    dw $0800
+
+; $C2:FC5A — Menu_VramRecDigits (7 bytes, $FC5A–$FC60)
+; VRAM $5740 = $7E:8E80 (Menu_ShadowTiles), $140 bytes.
+Menu_VramRecDigits:
+    dw $5740, !Menu_ShadowTiles
+    db !Bank7E
+    dw $0140
+
+; $C2:FC61 — Menu_VramRecUnkFC61 (7 bytes, $FC61–$FC67)
+; VRAM $1800 = $7E:3600, $600 bytes.
+Menu_VramRecUnkFC61:
+    dw $1800, $3600
+    db !Bank7E
+    dw $0600
+
+; $C2:FC68 — Menu_VramRecRomTiles (7 bytes, $FC68–$FC6E)
+; VRAM $2010 = MenuRom_VramTiles ($FF:EB88), $480 bytes; its last byte is
+; the first of Menu_VramRecsFont.
+Menu_VramRecRomTiles:
+    dw $2010, !MenuRom_VramTiles&$FFFF
+    db !MenuRom_VramTiles>>16
+    dw $0480
 
 ; ============================================================
 ; Menu VRAM upload lists ($C2:FC6F–$C2:FCA5)

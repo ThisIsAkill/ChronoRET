@@ -1217,9 +1217,11 @@ endif
 !Menu_MapBank7E = $7E0000                ; long base of the tilemaps (bank $7E)
 !Menu_Unk0D77 = $0D77                    ; 8-bit; the string Menu_DrawDescText set up last
 !Menu_Unk0D78 = $0D78                    ; 8-bit; bit 7 set: Menu_DrawDescText sets up again (it zeroes it)
-!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText (use not traced)
-!Menu_Unk0DCC = $0DCC                    ; 16-bit; set to $6840 by Menu_DrawDescText (use not traced)
-!Menu_Unk0DD0 = $0DD0                    ; 16-bit; set to $0080 by Menu_DrawDescText; Menu_UnkFA49 reads it
+!Menu_Unk0DC9 = $0DC9                    ; 8-bit; set to 1 by Menu_DrawDescText: Menu_TextSteps (the same byte)
+!Menu_Unk0DCC = $0DCC                    ; 16-bit; VRAM word address Menu_TextUpload sends the text rows to
+                                         ; (set to $6840 by Menu_DrawDescText)
+!Menu_Unk0DD0 = $0DD0                    ; 16-bit; bytes of the text rows Menu_StartDescText clears and
+                                         ; Menu_TextUpload sends (set to $0080 by Menu_DrawDescText)
 
 ; --- Sprite placement (Menu_SprPlaceOam; absolute, DB=$7E) ---
 !Menu_SprHiMask = $0000                  ; 8-bit; the high-table bit of the sprite being placed
@@ -1411,5 +1413,21 @@ endif
 !Menu_CfgIconMap = $3446                 ; 2 x 2 tile words: the cursor entry's icon (Menu_CfgEntryIcon)
 !Menu_CfgBg3Row1 = $4E44                 ; Menu_Bg3TileBuf+$44: row 1, tile 2 of a 32-tile map ...
 !Menu_CfgBg3RowEnd = $4E5C               ; ... and its tiles 14-15
-!Menu_Unk0DCE = $0DCE                    ; 8-bit; Menu_CfgEntryIcon's entry (Menu_UnkF943 reads it, not analysed)
-!Menu_Unk0DCF = $0DCF                    ; 8-bit; the entry's value + Menu_CfgEntryStrBase (likewise)
+!Menu_Unk0DCE = $0DCE                    ; 8-bit; Menu_CfgEntryIcon's entry: Menu_CfgEntryText's entry string
+!Menu_Unk0DCF = $0DCF                    ; 8-bit; the entry's value + Menu_CfgEntryStrBase: its value string
+
+; --- Menu text threads (Menu_StartDescText, Menu_CfgEntryText, Menu_TextStepLoop) ---
+!Menu_TextSteps = $0DC9                  ; 8-bit; TextWin_StepCount for each step of the text threads (the
+                                         ; Menu_Unk0DC9 byte)
+!Menu_TextCol = $0DC1                    ; 16-bit; byte offset from Menu_TextDest of the line being drawn
+                                         ; ($80 per line, two tile rows)
+!Menu_TextGlyphs = $0DC3                 ; 8-bit; TextWin_Unk17 (glyphs drawn) at the last Menu_TextUpload
+!Menu_TextTileWord = $0DC7               ; 16-bit; the tile word of the line's first glyph tile
+!Menu_TextPenStart = $0DD2               ; 8-bit (stored as a word); TextWin_PenX at the last tile write
+!Menu_TextTileDest = $0DD4               ; 16-bit; VRAM word address the glyph buffer is sent to
+!Menu_TextGfxSrc = $0DD6                 ; 16-bit; the glyph buffer (bank $7E; TextWin_GfxBuf)
+!Menu_TextRec = $9890                    ; 7 B: the Menu_VramRec Menu_TextUpload builds and queues (the
+                                         ; Menu_SprScratch RAM)
+!Menu_CfgTextRows = $4E00                ; the settings text's two tile rows ($80 B; Menu_Bg3TileBuf)
+!Menu_CfgValueDest = $0026               ; 16-bit; Menu_CfgTextThread's Menu_TextDest for the value string ...
+!Menu_CfgValueRow = $0028                ; 8-bit; ... and its line ((Menu_TextTileWord - 1) AND $0F)

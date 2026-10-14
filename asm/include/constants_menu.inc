@@ -1449,7 +1449,7 @@ if !constants_menu_inc == 0
 !Menu_TechHdmaBits = $6D                 ; Menu_HdmaenShadow in mode 3 (not traced)
 !Menu_TechScrollHdmaBits = $6B           ; ... during the member window's scroll
 !Menu_Icon2HdmaBits = $01                ; ... on icon 2
-!Menu_TextSlotBit = $04                  ; Menu_KillThreads mask: slot 2 (Menu_UnkFA49's text thread)
+!Menu_TextSlotBit = $04                  ; Menu_KillThreads mask: slot 2 (the text threads)
 !Menu_TechCastAnim = $90                 ; .Anim of the caster's copy during a use (animation $10, looping)
 !Menu_TechCastFrames = $0A               ; frames it plays before the restore
 !Menu_TechPageCount = 3
@@ -1542,5 +1542,33 @@ if !constants_menu_inc == 0
 !Menu_CfgCLowMap = $3064                 ; tilemap address of Menu_CfgCLow's row
 !Menu_CfgCLowAttr = $0C09                ; Menu_SetAttr2Rows: 9 tiles, $0C ...
 !Menu_CfgCLowLitAttr = $0003             ; ... the chosen value's 3 tiles, 0
+
+; --- Menu text threads ---
+!MenuRom_CfgTextTable = $FFD3FE          ; string table of the settings texts (entry, then value strings)
+!MenuRom_VramTiles = $FFEB88             ; $480 bytes Menu_VramRecRomTiles sends to VRAM $2010 (not traced)
+!Menu_CfgTextUnk0DCC = $6900             ; Menu_Unk0DCC of the settings text
+!Menu_CfgTextRowsBytes = $0080           ; two tile rows
+!Menu_CfgNameOfs = $000A                 ; Menu_TextDest of the entry string: 5 tiles into the rows
+!Menu_TextSlot = $0010                   ; thread slot 2 (byte offset): the text threads
+!Menu_TextGfxA = $5E00                   ; glyph buffer of the description / entry string ...
+!Menu_TextGfxB = $6200                   ; ... and of the settings value string
+!Menu_TextTileDestA = $7800              ; VRAM word address of buffer A ...
+!Menu_TextTileDestB = $7A00              ; ... and of buffer B
+!Menu_TextTileWordA = $3101              ; first tile word of buffer A's text ...
+!Menu_TextTileWordB = $3941              ; ... and of buffer B's
+!Menu_TextPenFirst = $0008               ; TextWin_PenX a line starts at (Menu_TextPenStart)
+!Menu_TextTileMask = $00F8               ; pen bits of the tile (x 8)
+!Menu_TextLineMask = $E0                 ; Menu_TextCol bits kept at a line break ...
+!Menu_TextLineBytes = $80                ; ... and the step (two tile rows)
+!Menu_TextTileLineMask = $C0             ; Menu_TextTileWord low byte bits kept at a line break ...
+!Menu_TextTileLineFirst = $41            ; ... and added
+!Menu_TextGfxBytes = $0400               ; bytes of the glyph buffer sent each time
+!Menu_TextLowerTile = $0010              ; tile word bit 4: the glyph's lower tile (16 tiles on)
+!Menu_TextUpperMask = $FFEF              ; ... cleared for the upper one
+!Menu_TextRowMask = $FFC0                ; start of a 32-tile map row
+!Menu_TextTileLowMask = $00EF            ; Menu_PutTextTiles: the tile byte without bit 4 ...
+!Menu_TextTileAttr = $3100               ; ... and its attribute byte
+!Menu_TextAttrKeep = $33EF               ; Menu_PutTextTilesAttr's mask
+!Menu_CfgValueRowMask = $0F              ; Menu_CfgValueRow's bits of (Menu_TextTileWord - 1)
 
 endif
