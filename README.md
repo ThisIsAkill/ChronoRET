@@ -32,12 +32,19 @@ The survey is re-run on purpose (`--write`), not as code gets matched;
 hidden to show how close it comes.
 
 The estimate for unmatched code tends to be LOW: with a bank's source
-hidden it came out `$C0` -2.3%, `$C1` -3.7%, `$C2` -17.6% (its code is
-reached mostly through tables the trace cannot follow) and `$FD` -4.0%
-(recall 94%). A low code estimate makes the share HIGH: on 2026-10-14 the
-share was 71.27% of 239,779 code bytes, with a range of about 65-73%
-(65.0% against the high total of 262,780, 73.5% against the low total of
-232,629), and the true figure is more likely below 71% than above it.
+hidden it came out `$C0` -2.4%, `$C1` -2.5%, `$C2` -20.5% (its code is
+reached mostly through tables the trace cannot follow) and `$FD` -0.8%.
+Since the re-survey of 2026-10-14, made once all known 65816 code was
+matched, every bank's code bytes are its matched code: the trace finds no
+unmatched code reachable from matched code or the vectors, and the
+allowance finds no code-like block joined to code. The total is 249,251
+code bytes; the high bound, 268,398, adds every isolated code-like block
+(about 19,000 bytes, spread over the data banks); in the banks with code
+no call, jump or pointer from matched code reaches any of them, and the
+highest-scoring ones are tables, tile maps and pointer lists (NEXT.md,
+"Code survey"). Code reached only indirectly from data far from any code
+would hide there; packs other than the `$C3` module are not known to hold
+code.
 
 Progress notes, the address map, the devlog and a function-level breakdown
 live in the companion wiki, **[Kajar](https://thisisakill.github.io/Kajar-site/)**.

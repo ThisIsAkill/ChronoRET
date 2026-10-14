@@ -36,19 +36,27 @@ Per bank, code_bytes = matched + traced + allowance:
 
 Calibration (--calibrate): treat every matched routine of $C0, $C1, $C2 or
 $FD as unmatched, run the same survey, and compare with the survey made with
-the source. On 2026-10-14 the trace reached 78% ($C0), 62% ($C1), 10% ($C2)
-and 74% ($FD) of the matched code and none of the matched data; with the
-allowance the estimate came out low every time: $C0 -2.3% (59,473 for
-60,857), $C1 -3.7% (60,740 for 63,058), $FD -4.0% (15,505 for 16,149, recall
-94%: trace + allowance count 94% of the matched code bytes) and $C2 -17.6%
-(46,776 for 56,791: its code is reached mostly through scene-op tables the
+the source. In the re-survey of 2026-10-14 (all of $C0, $C1 and $C2 and
+$FD:A8A5-$FFFF from source) the trace reached 78% ($C0), 65% ($C1), 14%
+($C2) and 79% ($FD) of the matched code and none of the matched data; with
+the allowance the estimate came out low every time: $C0 -2.4% (59,421 for
+60,857), $C1 -2.5% (61,140 for 62,682), $FD -0.8% (15,537 for 15,668, recall
+95%: trace + allowance count 95% of the matched code bytes) and $C2 -20.5%
+(48,235 for 60,695: its code is reached mostly through scene-op tables the
 trace cannot follow). So the estimate for unmatched code tends to be LOW,
 by a few percent where the trace reaches most of a bank and by much more
-where it does not, and a low code estimate makes the share of matched code
-HIGH. The headline share is therefore more likely too high than too low; the
-low/high totals give its range. The block scorer passes 87% of matched code
-blocks and 1-2% of the blocks of banks that hold no code (sound, graphics),
-which is why code-like blocks not joined to any code are left out.
+where it does not. The block scorer passes 87% of matched code blocks and
+under 1% of the blocks of banks that hold no code (sound, graphics), which
+is why code-like blocks not joined to any code are left out of code_bytes.
+
+Since all known 65816 code is matched (2026-10-14), every exit of matched
+code lands in matched code: the trace adds nothing, no code-like block is
+joined to code, and code_bytes equals the matched code of each bank. What
+the survey still cannot see is code reached only indirectly that sits in
+blocks of data far from any code; the high bound (isolated code-like
+blocks: in the banks with code none is reached by a call, jump or pointer
+from matched code, and the highest-scoring ones are tables, tile maps and
+pointer lists; see NEXT.md, "Code survey") is the room left for it.
 
 Data known to sit inside banks with code (TABLES, e.g. the APU interface
 tables $C7:0A98-$0D52) is kept out of the trace and the allowance.
@@ -122,11 +130,11 @@ TABLES = [('$C7:0A98', '$C7:0D52', 'APU interface tables: the sample table $C7:0
 # or a pointer table. The sound tables $C7:0AEA/$C7:0D18 are read by the
 # unmatched sound driver ($C7:050F, $0666, $0773), not by matched code.
 CONTENT = {
-    '$C3': '$C3:0000-$10C8 kernel (ends at the ASCII marker "CODE END C3"); the trace does not '
-           'reach $0307-$0547 and $08B3-$0EF9: the NMI/IRQ code installed as JML $C3:0548 / '
-           '$C3:0529 at $0500/$0504, and routines presumably called from the packed module',
-    '$C6': '$C6:E000-$EE3F scene helpers (JSL from C2Scene_ObjAFly/ObjBFly; probably more via scene op $4E); '
-           '$C6:F560- scene tables read by matched code',
+    '$C3': '$C3:0000-$10CA kernel, all from source (ends with the ASCII marker "CODE END C3"); '
+           '$C3:1200-$1312 another pack (C3Rom_PackPtrs entry 0, user not traced); the packed '
+           'module (compressed_bytes); data after it',
+    '$C6': 'code $C6:E000-$EE42 (scene helpers: JSL from bank $C2 and scene op $4E), then $00 fill to '
+           '$EFFF; the rest data (packs, headers, scene tables read by matched code)',
     '$C7': '$C7:0000-$0A97 APU interface (65816); $0A98-$0D52 tables, kept out of the allowance (the sample '
            'and song tables $0AEA/$0D18 are read by the unmatched driver at $C7:050F/$0666/$0773); '
            'SPC700 driver $24C3-$40B3; samples from $C7:730D (table $C7:0AEA)',
@@ -141,11 +149,11 @@ CONTENT = {
            'unexplained (counted as 0 code)',
     '$CC': '$CC:0000-$DFFF tables (320 long data reads from matched battle code); code '
            '$CC:E000-$F382; tables after (115 long reads into $CC:F383 and up)',
-    '$CD': 'code $CD:0000-$3FE5 with tables inside; $CD:4000- data (pointer tables at $CD:66F0 '
-           'score as code but nothing reaches them)',
-    '$CE': 'code $CE:E000-$F0DF (JSL from $CD and $D1 only); the rest data',
-    '$CF': 'code $CF:E300-$FFFC with tables; $CF:0000-$E2FF data',
-    '$D1': 'code $D1:E700-$FEBF with tables; $D1:0000-$E6FF data (battle window maps)',
+    '$CD': 'code $CD:0000-$3F9D with tables inside, $3F9E-$3FFF old-build leftovers (data); '
+           '$CD:4000- data (pointer tables at $CD:66F0 score as code but nothing reaches them)',
+    '$CE': 'code $CE:E000-$EF10 and $F066-$F0E5 (JSL from $CD and $D1 only); the rest data',
+    '$CF': 'code $CF:E300-$FE84 with tables, then data to $FFFF; $CF:0000-$E2FF data',
+    '$D1': 'code $D1:E70A-$FEF3 with tables, then $00 fill; $D1:0000-$E709 data (battle window maps)',
     '$DE': 'data read by TextWin_State0_Draw ($DE:FA00); the long pointer table at $E4:234E-$25A3 '
            'points into $DD, $DE and $E3 (and once into $E1)',
     '$E4': 'a word offset table at $E4:0000 (AnimRom, read by six routines, Menu_LoadCharPalettes '
@@ -160,10 +168,13 @@ CONTENT = {
     '$F8': '66 long pointers at $FC:FB3D point into it (packed data)',
     '$F9': '59 long pointers at $FC:FC03 point into it (packed data)',
     '$FC': 'pointer tables $FC:F9F0-$FEBB (read by LocLoad_Unk56D4) and the data they index',
-    '$FD': 'code and tables; $FD:0000-$A8A4 data (staff credits text at $FD:A000)',
+    '$FD': '$FD:A8A5-$FFFF from source (code, tables, old-build leftovers $D5D4-$D9FF as data); '
+           '$FD:0000-$A8A4 data (packed credits graphics, staff credits text at $FD:A000, battle '
+           'tables $A800-$A8A4)',
     '$FE': 'packed data: the pack pointer table at $FE:0000 (its entry $FE:0003 is the $C3:1313 '
            'code module); whether any pack in $FE unpacks to code is not known',
-    '$FF': 'code $FF:F540-$FFFF with tables (called from C2 menu code); the rest data',
+    '$FF': 'code $FF:F548-$FC66 with tables (called from C2 menu code), $FC67-$FFFF old-build '
+           'leftovers (data); the rest data',
 }
 
 # The 2026-09 survey's figures for the banks where this one finds far less
@@ -471,6 +482,11 @@ def survey():
         if matched and not traced and not al and matched + sum(data[lo:hi]) == 0x10000:
             method = 'matched (bank fully covered by source)'
             unc = 'exact'
+        elif matched and not traced and not al:
+            # Trace and allowance add nothing: only isolated blocks remain (high bound).
+            method = 'matched (trace and allowance find no more)'
+            unc = f'-0/+{high - total}'
+            notes.append(f'isolated code-like {iso} (at score >= -0.5: {iso_lo})')
         elif matched or traced:
             method = 'matched + trace + allowance'
             unc = f'-{total - low}/+{high - total}'
@@ -508,9 +524,10 @@ HEADER = """\
 # code_bytes_low/high bound the allowance. SPC700 and compressed code are
 # counted apart and are not in code_bytes. Re-run only to re-survey.
 # Uncertainty: the estimate for unmatched code tends to be LOW (held-out
-# tests, --calibrate: hiding $C0 -2.3%, $C1 -3.7%, $C2 -17.6%; $FD recall
-# 94%), and a low code estimate makes the share of matched code HIGH. The
-# share's range is matched code over the high and the low total.
+# tests, --calibrate: hiding $C0 -2.4%, $C1 -2.5%, $C2 -20.5%, $FD -0.8%).
+# Every bank's code_bytes is now its matched code: the trace and the
+# allowance find no unmatched code. code_bytes_high adds isolated code-like
+# blocks; those in the banks with code are data (NEXT.md, "Code survey").
 """
 
 
