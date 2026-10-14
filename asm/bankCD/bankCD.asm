@@ -1126,7 +1126,7 @@ BattleCD_FrameTick:
 ; TextWin_Status after it (0 once the string is done, so the stepping
 ; stops); !Battle_MsgTimer = BattleCD_GetMsgTime and !Battle_MsgTiming +
 ; 1 (the NMI closes the panel when the time is up).
-; Callers (2 JSR sites): BattleCD_FrameTick ($CD:04DB) and unmatched ($CD:3E89).
+; Callers (2 JSR sites): BattleCD_FrameTick ($CD:04DB) and BattleCD_WaitFrame ($CD:3E89).
 ; Entry: M=1, X=0, DP=0, DB=$7E
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered (after a step A =
 ;        the frame count and X = the setting, see BattleCD_GetMsgTime;
@@ -1805,8 +1805,8 @@ BattleCD_ScrollWaves:
 ;     BattleD1_UnkEA4B (not matched);
 ;   - unless !Battle_UnkCD2D or !Battle_UnkA028: JSL BattleCE_UnkF066;
 ;     BankC1_VecCFE58A (the bank-$CF frame update); unless !Battle_UnkCD2E
-;     or !Battle_UnkA028, while an action runs, BattleCD_Unk3B82 with A =
-;     !BattleCD_Unk3B82Arg;
+;     or !Battle_UnkA028, while an action runs, BattleCD_WaitScanline with A =
+;     !BattleCD_NmiWaitLine;
 ;   - the layer effect's script channels (BattleCD_StepFxChannels);
 ;     !Battle_UnkA028 = !Battle_UnkCD29; BattleCD_ClampPalAnims; JSL
 ;     BattleD1_UnkF426 (not matched) and FdVec_FFF7 (the palette
@@ -1941,8 +1941,8 @@ BattleCD_NmiMain:
     BEQ .channels
     LDA.w !Battle_UnkA028
     BNE .channels
-    LDA.b #!BattleCD_Unk3B82Arg
-    JSR BattleCD_Unk3B82
+    LDA.b #!BattleCD_NmiWaitLine
+    JSR BattleCD_WaitScanline
 .channels:
     JSR BattleCD_StepFxChannels
     LDA.w !Battle_UnkCD29
@@ -4252,3 +4252,825 @@ BattleCD_RunFxOp:
     JSR (BattleCD_FxOpTable,X)
     LDX.b !BattleCD_Tmp43
     RTS
+
+; ============================================================
+; Sound, scanline wait and math helpers ($CD:3B5F–$CD:3E3A)
+; ============================================================
+; The math helpers serve the layer effect's script opcodes: an 8-bit
+; sine scale (BattleCD_SinMul and its relatives, on the 256-entry
+; |sin| table !BattleRom_SinAbsTable in bank $CE: one turn is 256
+; steps, 255 stands for 1), a 3D rotation built on them
+; (BattleCD_Rotate3d), and a 16-bit division and an 8 x 16
+; multiplication on DP $23-$29.
+
+org $CD3B5F
+; $CD:3B5F — BattleCD_PlayPendingSfx (18 bytes, $3B5F–$3B70)
+; Plays the sound a script opcode left pending: when
+; !Battle_SfxPending is set, clears it and sends
+; !Battle_SfxPendingId with X = !Battle_SfxPendingArg through
+; BattleCD_ApuCmd18 (tail jump).
+; Callers (1 JSR site): BattleCD_FrameTick ($CD:04AF).
+; Entry: M=1, X=0, DP any, DB=$7E
+; Exit:  M=1, X=0. Nothing pending: A = 0, X and Y unchanged. Else as
+;        BattleCD_ApuCmd18 leaves it: A = !Battle_SfxPendingArg's low
+;        byte, X = !Battle_SfxPendingArg, Y unchanged;
+;        !Battle_SfxPending = 0
+BattleCD_PlayPendingSfx:
+    LDA.w !Battle_SfxPending
+    BEQ .done
+    STZ.w !Battle_SfxPending
+    LDA.w !Battle_SfxPendingId
+    LDX.w !Battle_SfxPendingArg
+    JMP BattleCD_ApuCmd18
+.done:
+    RTS
+
+; $CD:3B71 — BattleCD_ApuCmd18 (17 bytes, $3B71–$3B81)
+; Sends APU command !Sfx_CmdUnk18 (Audio_ProcessEntry) with
+; !Sfx_Param1 = A and !Sfx_Param2 = X's low byte: a sound, probably
+; (the callers pass the dissolve's and the wipe's sounds and the
+; script opcodes' sound ids; X is a screen position or
+; !BattleCD_SfxArgCentre, so the pan, probably).
+; Callers (4 sites: 3 JSR, 1 JMP): BattleCD_EnemyDissolve (JSR $CD:009D), BattleCD_ShowMessage (JSR
+;   $CD:01CE), BattleCD_StartOpenWipe (JSR $CD:0502) and BattleCD_PlayPendingSfx (JMP $CD:3B6D).
+; Entry: M=1, X any, DP any, DB=$7E; A = the first argument, X's low
+;        byte the second
+; Exit:  M=1; A = X's low byte (TXA at 8 bits; B unchanged); X, Y
+;        unchanged (Audio_ProcessEntry keeps A, X, Y, P, DP and DB)
+BattleCD_ApuCmd18:
+    STA.w !Sfx_Param1
+    LDA.b #!Sfx_CmdUnk18
+    STA.w !Sfx_Command
+    TXA
+    STA.w !Sfx_Param2
+    JSL Audio_ProcessEntry
+    RTS
+
+; $CD:3B82 — BattleCD_WaitScanline (41 bytes, $3B82–$3BAA)
+; Busy-waits for scanline A: past the vertical blank (HVBJOY bit 7),
+; then at the end of each H-blank latches the counters (SLHV, STAT78
+; resets the read order) and reads OPVCT's low byte, until it is at
+; least A. BattleCD_NmiMain calls it with !BattleCD_NmiWaitLine while
+; an action runs, and script opcode $C1 (BattleCD_FxOpWaitLine) with
+; its operand; why they wait is not traced.
+; Callers (2 sites: 1 JSR, 1 JMP): BattleCD_NmiMain (JSR $CD:09AC) and unmatched (JMP $CD:1D95).
+; Entry: M=1, X any, DP=0, DB any (the registers are read long); A =
+;        the line (0-255; the counter's high bit is not read)
+; Exit:  M=1; A = the line reached (low byte); X, Y unchanged; DP $45 =
+;        the line asked for; C=1
+BattleCD_WaitScanline:
+    STA.b !BattleCD_Tmp45
+.vblank:
+    LDA.l HVBJOY
+    BMI .vblank
+.hblank:
+    LDA.l HVBJOY
+    AND.b #!HVBJOY_HBlank
+    BEQ .hblank
+.line:
+    LDA.l HVBJOY
+    AND.b #!HVBJOY_HBlank
+    BNE .line
+    LDA.l SLHV
+    LDA.l STAT78
+    LDA.l OPVCT
+    CMP.b !BattleCD_Tmp45
+    BCC .line
+    RTS
+
+; $CD:3BAB — BattleCD_Div16 (41 bytes, $3BAB–$3BD3)
+; 16-bit unsigned division by shift and subtract: !BattleCD_MathOut
+; = !BattleCD_MathA / !BattleCD_MathB, !BattleCD_MathOutHi the
+; remainder. Either operand 0 gives 0 and 0.
+; Callers (2 JSR sites): unmatched ($CD:234F, $CD:2361).
+; Entry: M=0 (16-bit LDA/ROL/SBC), X=0 (the 16-bit LDX), DP=0, DB any;
+;        !BattleCD_MathA (DP $23) the dividend, !BattleCD_MathB (DP $25)
+;        the divisor
+; Exit:  M=0, X=0; DP $27 the quotient, DP $29 the remainder; DP $23
+;        shifted out (clobbered); A = the remainder (0 when an operand
+;        is 0); X = 0, or unchanged when an operand is 0; Y unchanged
+BattleCD_Div16:
+    STZ.b !BattleCD_MathOut
+    STZ.b !BattleCD_MathOutHi
+    LDA.b !BattleCD_MathA
+    BEQ .done
+    LDA.b !BattleCD_MathB
+    BEQ .done
+    LDX.w #!BattleCD_Div16Bits
+.bit:
+    ROL.b !BattleCD_MathA
+    ROL.b !BattleCD_MathOutHi
+    SEC
+    LDA.b !BattleCD_MathOutHi
+    SBC.b !BattleCD_MathB
+    STA.b !BattleCD_MathOutHi
+    BCS .fits
+    LDA.b !BattleCD_MathOutHi
+    ADC.b !BattleCD_MathB
+    STA.b !BattleCD_MathOutHi
+    CLC
+.fits:
+    ROL.b !BattleCD_MathOut
+    DEX
+    BNE .bit
+.done:
+    RTS
+
+; $CD:3BD4 — BattleCD_Mul8x16 (41 bytes, $3BD4–$3BFC)
+; 8 x 16-bit unsigned multiplication on the CPU's multiplier: the
+; 24-bit DP $27-$29 = DP $23 (a byte) * the word at DP $25, as $23 *
+; $25 plus $23 * $26 shifted left 8. Quirk: the second WRMPYB store is
+; 16-bit, so it also writes DP $27's old byte to WRDIVL (harmless: no
+; division follows).
+; Callers (5 JSR sites): unmatched ($CD:22C3, $CD:22D7, $CD:22FC, $CD:2310, $CD:2377).
+; Entry: M=1, X=0 (16-bit TAX/STX), DP=0, DB any (the registers are
+;        accessed long); DP $23 the byte, DP $25-$26 the word
+; Exit:  M=1, X=0; DP $27-$29 the product; A = 0 (B = 0, TDC); X = $23
+;        * $25 (the low partial product); Y unchanged
+BattleCD_Mul8x16:
+    LDA.b !BattleCD_MathA
+    STA.l WRMPYA
+    LDA.b !BattleCD_MathB
+    STA.l WRMPYB
+    STZ.b !BattleCD_MathOutHi
+    REP #$21
+    LDA.l RDMPYL
+    TAX
+    LDA.b !BattleCD_MathB+1
+    STA.l WRMPYB
+    STX.b !BattleCD_MathOut
+    LDA.b !BattleCD_MathOut+1
+    ADC.l RDMPYL
+    STA.b !BattleCD_MathOut+1
+    TDC
+    SEP #$20
+    RTS
+
+; $CD:3BFD — BattleCD_CosMul (3 bytes, $3BFD–$3BFF)
+; A = Y * cos(A) / 256: adds a quarter turn ($40) and falls into
+; BattleCD_SinMul ($3C00), which gives A = Y * sin(A) / 256 with the
+; sine from !BattleRom_SinAbsTable (255 for 1; table index bit 7 =
+; the negative half). The magnitudes are multiplied on WRMPYA/WRMPYB
+; and the product's high byte (RDMPYH) is taken, then negated when
+; exactly one of sin and Y is negative (so the result is rounded
+; toward 0).
+; Sub-entry: BattleCD_SinMul.
+; Callers (6 JSR sites): unmatched ($CD:1952, $CD:1960, $CD:1CFD, $CD:1D15, $CD:247B, $CD:2489).
+; Callers of BattleCD_SinMul (7 JSR sites): unmatched ($CD:1959, $CD:1967, $CD:1BC6, $CD:1D09,
+;   $CD:1D33, $CD:2482, $CD:2490).
+; Entry: M=1, X=1 (the 8-bit TAX: the table index), DP any, DB any (the
+;        registers and the table are read long); A = the angle (256 per
+;        turn), Y = the factor (signed byte)
+; Exit:  M=1, X=1; A = the signed product; X = the angle used (+ $40
+;        for BattleCD_CosMul); Y unchanged; N and Z from A only on the
+;        negated paths (else from RDMPYH's load)
+BattleCD_CosMul:
+    CLC
+    ADC.b #!BattleCD_QuarterTurn
+BattleCD_SinMul:                        ; header: see BattleCD_CosMul
+    TAX
+    BPL .sin_positive
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    TYA
+    BPL .negate_product
+    EOR.b #!Battle_Invert8
+    INC A
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    RTS
+.negate_product:
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    RTS
+.sin_positive:
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    TYA
+    BPL .positive
+    EOR.b #!Battle_Invert8
+    INC A
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    RTS
+.positive:
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    RTS
+
+; $CD:3C55 — BattleCD_CosMulStart (3 bytes, $3C55–$3C57)
+; The first half of BattleCD_CosMul / BattleCD_SinMul for
+; BattleCD_Rotate3d: adds a quarter turn and falls into
+; BattleCD_SinMulStart ($3C58), which starts |sin(A)| * |Y| on the
+; multiplier and returns C=1 when the product is to be negated. The
+; caller reads RDMPYH itself.
+; Sub-entry: BattleCD_SinMulStart.
+; Callers (6 JSR sites): BattleCD_Rotate3d ($CD:3C94, $CD:3CDB, $CD:3D05, $CD:3D2C, $CD:3D56,
+;   $CD:3D7D).
+; Callers of BattleCD_SinMulStart (6 JSR sites): BattleCD_Rotate3d ($CD:3CA7, $CD:3CC8, $CD:3CF2,
+;   $CD:3D19, $CD:3D43, $CD:3D6A).
+; Entry: M=1, X=1 (the 8-bit TAX), DP any, DB any (long accesses); A =
+;        the angle, Y = the factor (signed byte)
+; Exit:  M=1, X=1; C=1: negate the product (exactly one of sin and Y is
+;        negative), C=0: keep it; A = |Y|; X = the angle used; Y
+;        unchanged; the product is in RDMPYL/RDMPYH 8 cycles later
+BattleCD_CosMulStart:
+    CLC
+    ADC.b #!BattleCD_QuarterTurn
+BattleCD_SinMulStart:                   ; header: see BattleCD_CosMulStart
+    TAX
+    BPL .sin_positive
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    TYA
+    BPL .negate_product
+    EOR.b #!Battle_Invert8
+    INC A
+    STA.l WRMPYB
+    CLC
+    RTS
+.negate_product:
+    STA.l WRMPYB
+    SEC
+    RTS
+.sin_positive:
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    TYA
+    BPL .positive
+    EOR.b #!Battle_Invert8
+    INC A
+    STA.l WRMPYB
+    SEC
+    RTS
+.positive:
+    STA.l WRMPYB
+    CLC
+    RTS
+
+; $CD:3C8F — BattleCD_Rotate3d (257 bytes, $3C8F–$3D8F)
+; Rotates the point !Battle_FxRotInX/Y/Z (signed bytes) into
+; !Battle_FxRotOutX/Y/Z: first by the angle in DP $4B about the y axis
+; (x' = cos*x + sin*z, z' = cos*z - sin*x), then by DP $49 about the x
+; axis (y'' = cos*y - sin*z', z'' = cos*z' + sin*y), last by DP $4D
+; about the z axis (y''' = cos*y'' + sin*x', x'' = cos*x' - sin*y'').
+; Each product is BattleCD_SinMulStart / BattleCD_CosMulStart's high
+; byte, so sin and cos are scaled by 255/256, and the sums wrap at 8
+; bits. The second product of the last two steps reuses Y, which still
+; holds the coordinate before the step (the old y, then the old y'').
+; Callers (2 JSR sites): unmatched ($CD:1F35, $CD:28CD).
+; Entry: M=1, X=1 (the 8-bit LDY of the coordinates and the callees'
+;        8-bit TAX), DP=0, DB=$7E; DP $49, $4B, $4D the angles about x,
+;        y and z
+; Exit:  M=1, X=1; !Battle_FxRotOutX/Y/Z written; A = !Battle_FxRotOutX;
+;        X = DP $4D + $40; Y = x' (!Battle_FxRotOutX before the last
+;        step); DP $47 written
+BattleCD_Rotate3d:
+    LDY.w !Battle_FxRotInX
+    LDA.b !BattleCD_RotAngleY
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .y1
+    EOR.b #!Battle_Invert8
+    INC A
+.y1:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotInZ
+    LDA.b !BattleCD_RotAngleY
+    JSR BattleCD_SinMulStart
+    LDA.l RDMPYH
+    BCC .y2
+    EOR.b #!Battle_Invert8
+    INC A
+    CLC
+.y2:
+    ADC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutX
+    LDA.w !Battle_FxRotInY
+    STA.w !Battle_FxRotOutY
+    LDA.w !Battle_FxRotInX
+    EOR.b #!Battle_Invert8
+    INC A
+    TAY
+    LDA.b !BattleCD_RotAngleY
+    JSR BattleCD_SinMulStart
+    LDA.l RDMPYH
+    BCC .y3
+    EOR.b #!Battle_Invert8
+    INC A
+.y3:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotInZ
+    LDA.b !BattleCD_RotAngleY
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .y4
+    EOR.b #!Battle_Invert8
+    INC A
+    CLC
+.y4:
+    ADC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutZ
+    LDY.w !Battle_FxRotOutZ
+    LDA.b !BattleCD_RotAngleX
+    JSR BattleCD_SinMulStart
+    LDA.l RDMPYH
+    BCC .x1
+    EOR.b #!Battle_Invert8
+    INC A
+.x1:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotOutY
+    LDA.b !BattleCD_RotAngleX
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .x2
+    EOR.b #!Battle_Invert8
+    INC A
+.x2:
+    SEC
+    SBC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutY
+    LDA.b !BattleCD_RotAngleX
+    JSR BattleCD_SinMulStart            ; Y = the old y
+    LDA.l RDMPYH
+    BCC .x3
+    EOR.b #!Battle_Invert8
+    INC A
+.x3:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotOutZ
+    LDA.b !BattleCD_RotAngleX
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .x4
+    EOR.b #!Battle_Invert8
+    INC A
+    CLC
+.x4:
+    ADC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutZ
+    LDY.w !Battle_FxRotOutX
+    LDA.b !BattleCD_RotAngleZ
+    JSR BattleCD_SinMulStart
+    LDA.l RDMPYH
+    BCC .z1
+    EOR.b #!Battle_Invert8
+    INC A
+.z1:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotOutY
+    LDA.b !BattleCD_RotAngleZ
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .z2
+    EOR.b #!Battle_Invert8
+    INC A
+    CLC
+.z2:
+    ADC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutY
+    LDA.b !BattleCD_RotAngleZ
+    JSR BattleCD_SinMulStart            ; Y = the old y''
+    LDA.l RDMPYH
+    BCC .z3
+    EOR.b #!Battle_Invert8
+    INC A
+.z3:
+    STA.b !BattleCD_Tmp47
+    LDY.w !Battle_FxRotOutX
+    LDA.b !BattleCD_RotAngleZ
+    JSR BattleCD_CosMulStart
+    LDA.l RDMPYH
+    BCC .z4
+    EOR.b #!Battle_Invert8
+    INC A
+.z4:
+    SEC
+    SBC.b !BattleCD_Tmp47
+    STA.w !Battle_FxRotOutX
+    RTS
+
+; $CD:3D90 — BattleCD_HalfSinMul (51 bytes, $3D90–$3DC2)
+; A = sin(A) / 2 * DP $47 / 256: the |sin| entry halved (LSR) times the
+; unsigned byte at DP $47 on the multiplier, the high byte, negated
+; for angles $80-$FF.
+; Callers (2 JSR sites): unmatched ($CD:28A6, $CD:28AD).
+; Entry: M=1, X=1 (8-bit PHX/TAX/PLX), DP=0, DB any (long accesses); A
+;        = the angle, DP $47 = the factor (unsigned)
+; Exit:  M=1, X=1; A = the signed result; X, Y unchanged
+BattleCD_HalfSinMul:
+    PHX
+    TAX
+    BPL .positive
+    LDA.l !BattleRom_SinAbsTable,X
+    LSR A
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp47
+    STA.l WRMPYB
+    PLX
+    NOP
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    RTS
+.positive:
+    LDA.l !BattleRom_SinAbsTable,X
+    LSR A
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp47
+    STA.l WRMPYB
+    PLX
+    NOP
+    LDA.l RDMPYH
+    RTS
+
+; $CD:3DC3 — BattleCD_HalfSinMul2 (94 bytes, $3DC3–$3E20)
+; As BattleCD_HalfSinMul, then the result's magnitude times |sin(DP
+; $45)| (DP $49) / 256: A = sin(A) / 2 * DP $47 / 256 * |sin(DP $45)| /
+; 256, negated for angles A of $80-$FF (the sign of sin(DP $45) is
+; not used).
+; Callers (6 JSR sites): unmatched ($CD:28E2, $CD:28F7, $CD:290C, $CD:2923, $CD:2935, $CD:2947).
+; Entry: M=1, X=1 (8-bit PHX/TAX/TYX/PLX), DP=0, DB any (long
+;        accesses); A = the angle, DP $45 = the second angle, DP $47 =
+;        the factor (unsigned)
+; Exit:  M=1, X=1; A = the signed result; X unchanged; Y = the angle
+;        (A on entry); DP $49 = |sin(DP $45)|
+BattleCD_HalfSinMul2:
+    PHX
+    TAY
+    LDA.b !BattleCD_Tmp45
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.b !BattleCD_Tmp49
+    TYX
+    BPL .positive
+    LDA.l !BattleRom_SinAbsTable,X
+    LSR A
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp47
+    STA.l WRMPYB
+    PLX
+    LDA.l RDMPYH
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp49
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    RTS
+.positive:
+    LDA.l !BattleRom_SinAbsTable,X
+    LSR A
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp47
+    STA.l WRMPYB
+    PLX
+    NOP
+    LDA.l RDMPYH
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp49
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    RTS
+
+; $CD:3E21 — BattleCD_Mul8Unused (26 bytes, $3E21–$3E3A)
+; DP $49 = DP $45 * DP $47 (8 x 8-bit, on the multiplier). Nothing
+; calls it (no site found by tools/xref.py, and the code before it
+; ends in RTS). Quirk: REP #$20 twice.
+; Entry: M=1, X any, DP=0, DB any (long accesses); DP $45 and DP $47
+;        the factors
+; Exit:  M=1; DP $49-$4A = the product; A = 0 (B = 0, TDC); X, Y
+;        unchanged
+BattleCD_Mul8Unused:
+    LDA.b !BattleCD_Tmp45
+    STA.l WRMPYA
+    LDA.b !BattleCD_Tmp47
+    STA.l WRMPYB
+    REP #$20
+    REP #$20
+    LDA.l RDMPYL
+    STA.b !BattleCD_Tmp49
+    TDC
+    SEP #$20
+    RTS
+
+; ============================================================
+; Frame waits and VRAM uploads ($CD:3E3B–$CD:3FFF)
+; ============================================================
+
+; $CD:3E3B — BattleCD_WaitFrames (9 bytes, $3E3B–$3E43)
+; Waits A frames: BattleCD_WaitFrameRefresh A times (A = 0 waits 256).
+; Callers (7 sites: 6 JSR, 1 JMP): BattleCD_EnemyDissolveFx (JSR $CD:00C1), BattleCD_ShowMessage
+;   (JSR $CD:01E7), BattleCD_ShowScriptMessage (JSR $CD:02B5), BattleCD_ApuCmd81 (JMP $CD:03B1),
+;   BattleCD_EndLayerFx (JSR $CD:0494) and BattleCD_LoadLayerFx (JSR $CD:0F09, JSR $CD:0F25).
+; Entry: M=1, X=0, DP=0, DB=$7E (what BattleCD_WaitFrameRefresh needs);
+;        A = the frame count
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 0, Z=1; X, Y clobbered (as
+;        BattleCD_WaitFrameRefresh leaves them)
+BattleCD_WaitFrames:
+    PHA
+    JSR BattleCD_WaitFrameRefresh
+    PLA
+    DEC A
+    BNE BattleCD_WaitFrames
+    RTS
+
+; $CD:3E44 — BattleCD_PauseWait (49 bytes, $3E44–$3E74)
+; Holds the battle while !Battle_Paused is set: APU command
+; !BattleCD_ApuCmdPause with argument !BattleCD_ApuCmdPause (and
+; !Field_FadeBusy set to the same value), then frame by frame
+; (!Battle_FrameWait set, waited back to 0) until !Battle_Paused is
+; cleared, then !Field_FadeBusy = 0 and the command again with
+; argument 0 (the music paused and resumed, probably). Returns at once
+; when not paused.
+; Callers (3 JSR sites): BattleCD_IdleTick ($CD:04A6), BattleCD_FrameTick ($CD:04B2) and
+;   BattleCD_WaitFrame ($CD:3E81).
+; Entry: M=1, X any, DP any, DB=$7E
+; Exit:  M=1; A = 0 when not paused, else !BattleCD_ApuCmdPause; X, Y
+;        unchanged (Audio_ProcessEntry keeps them)
+BattleCD_PauseWait:
+    LDA.w !Battle_Paused
+    BEQ .done
+    LDA.b #!BattleCD_ApuCmdPause
+    STA.w !Sfx_Command
+    STA.w !Sfx_Param1
+    STA.w !Field_FadeBusy
+    JSL Audio_ProcessEntry
+.frame:
+    INC.w !Battle_FrameWait
+.wait:
+    LDA.w !Battle_FrameWait
+    BNE .wait
+    LDA.w !Battle_Paused
+    BNE .frame
+    STZ.w !Field_FadeBusy
+    LDA.b #!BattleCD_ApuCmdPause
+    STA.w !Sfx_Command
+    STZ.w !Sfx_Param1
+    JSL Audio_ProcessEntry
+.done:
+    RTS
+
+; $CD:3E75 — BattleCD_WaitFrameRefresh (8 bytes, $3E75–$3E7C)
+; One frame (BattleCD_WaitFrame), then the battle menu's refresh
+; (BankC1_VecRefreshMenu: BattleMenu_RefreshIfDirtyL).
+; Callers (16 JSR sites): BattleCD_EnemyDissolve ($CD:0046), BattleCD_ShowMessage ($CD:01EF),
+;   BattleCD_Wait16Frames ($CD:020D), BattleCD_ShowMessageTimed ($CD:0231),
+;   BattleCD_ShowScriptMessage ($CD:02C7), BattleCD_EndLayerFx ($CD:048C, $CD:04A2),
+;   BattleCD_WaitLayerFxIdle ($CD:0DFF), BattleCD_RunLayerFx ($CD:0E19), BattleCD_LoadLayerFx
+;   ($CD:0F33, $CD:0F3F), BattleCD_LoadFxGfx4 ($CD:132E), BattleCD_WaitFrames ($CD:3E3C) and
+;   BattleCD_QueueVramDma ($CD:3EE0, $CD:3F1D, $CD:3F67).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered (A = 0 when the menu
+;        was not dirty)
+BattleCD_WaitFrameRefresh:
+    JSR BattleCD_WaitFrame
+    JSL BankC1_VecRefreshMenu
+    RTS
+
+; $CD:3E7D — BattleCD_WaitFrame (17 bytes, $3E7D–$3E8D)
+; Waits for the next frame: !Battle_FrameWait + 1, then
+; BattleCD_PauseWait until it is back to 0 (the bank-$D1 NMI handler
+; clears it, probably: no matched code does), then the text step
+; (BattleCD_StepText).
+; Callers (17 JSR sites): BattleCD_ShowText ($CD:0286, $CD:0289), BattleCD_ExitBattle ($CD:03DA,
+;   $CD:03EB, $CD:0415), BattleCD_StartOpenWipe ($CD:0505, $CD:0512), BattleCD_StartCloseWipe
+;   ($CD:051B, $CD:0526), BattleCD_RunEndFx ($CD:0D74), BattleCD_LayerFx87 ($CD:0D99, $CD:0DA8),
+;   BattleCD_LayerFx84 ($CD:0DB4, $CD:0DCC, $CD:0DD8, $CD:0DDB) and BattleCD_WaitFrameRefresh
+;   ($CD:3E75).
+; Entry: M=1, X=0, DP=0, DB=$7E
+; Exit:  M=1, X=0, DP=0, DB=$7E; A unchanged (PHA/PLA); X, Y clobbered
+;        when BattleCD_StepText steps the text, else unchanged
+BattleCD_WaitFrame:
+    PHA
+    INC.w !Battle_FrameWait
+.wait:
+    JSR BattleCD_PauseWait
+    LDA.w !Battle_FrameWait
+    BNE .wait
+    JSR BattleCD_StepText
+    PLA
+    RTS
+
+; $CD:3E8E — BattleCD_DmaToVram (38 bytes, $3E8E–$3EB3)
+; DMA channel 7 from A:X to VRAM word address Y, DP $45 bytes (mode 1:
+; VMDATAL/VMDATAH), with DB = $00 inside and put back. VMAIN is not
+; set here.
+; Callers (3 sites: 1 JSR, 2 JMP): BattleCD_NmiUploadText (JMP $CD:06A4, JMP $CD:06AF) and
+;   BattleCD_RunQueuedDma (JSR $CD:3EC7).
+; Entry: M=1, X=0 (16-bit STY/STX/LDX), DP=0, DB any; A:X = the source,
+;        Y = the VRAM word address, DP $45 = the byte count
+; Exit:  M=1, X=0, DB as on entry; A = !MDMAEN_Ch7; X = the byte count;
+;        Y unchanged
+BattleCD_DmaToVram:
+    PHB
+    PHA
+    LDA.b #0
+    PHA
+    PLB
+    PLA
+    STY.w VMADDL
+    STX.w A1T7L
+    STA.w A1B7
+    LDA.b #!DMAP_TwoRegs
+    STA.w DMAP7
+    LDA.b #!BBAD_VMDATAL
+    STA.w BBAD7
+    LDX.b !BattleCD_Tmp45
+    STX.w DAS7L
+    LDA.b #!MDMAEN_Ch7
+    STA.w MDMAEN
+    PLB
+    RTS
+
+; $CD:3EB4 — BattleCD_RunQueuedDma (26 bytes, $3EB4–$3ECD)
+; The NMI's half of BattleCD_QueueVramDma: when !Battle_DmaQueueReq is
+; set, sends the queued piece (!Battle_DmaQueueSrc / Bank to
+; !Battle_DmaQueueVram, !Battle_DmaQueuePiece bytes) through
+; BattleCD_DmaToVram and clears the request.
+; Callers (2 JSR sites): BattleCD_NmiMain ($CD:089B, $CD:08AC).
+; Entry: M=1, X=0, DP=0, DB=$7E (BattleCD_NmiMain sets it first)
+; Exit:  M=1, X=0, DB=$7E; nothing queued: A = 0, X, Y unchanged; else
+;        A = !MDMAEN_Ch7, X = the piece's size, Y = its VRAM address,
+;        DP $45 = the size
+BattleCD_RunQueuedDma:
+    LDA.w !Battle_DmaQueueReq
+    BEQ .done
+    LDX.w !Battle_DmaQueuePiece
+    STX.b !BattleCD_Tmp45
+    LDX.w !Battle_DmaQueueSrc
+    LDY.w !Battle_DmaQueueVram
+    LDA.w !Battle_DmaQueueBank
+    JSR BattleCD_DmaToVram
+    STZ.w !Battle_DmaQueueReq
+.done:
+    RTS
+
+; $CD:3ECE — BattleCD_QueueVramDmaL (4 bytes, $3ECE–$3ED1)
+; BattleCD_QueueVramDma for long callers (bank $D1), RTL.
+; Callers (2 JSL sites): unmatched ($D1:ED49, $D1:EDC5).
+; Entry: as BattleCD_QueueVramDma (M=1, X=0, DP=0, DB=$7E)
+; Exit:  as BattleCD_QueueVramDma (RTL)
+BattleCD_QueueVramDmaL:
+    JSR BattleCD_QueueVramDma
+    RTL
+
+; $CD:3ED2 — BattleCD_QueueVramDma (204 bytes, $3ED2–$3F9D)
+; Uploads A:X to VRAM word address Y, DP $53 bytes, through the NMI
+; (BattleCD_RunQueuedDma), in pieces of at most $1000 bytes while
+; !Battle_CgramPending is set and $400 bytes else (re-checked before
+; each piece), waiting frames (BattleCD_WaitFrameRefresh) until each
+; piece is sent. First waits until an earlier request is done.
+; !Battle_DmaQueueBusy is set meanwhile (BattleCD_FrameTick then skips
+; its effect work); !Battle_DmaQueueLast marks the last piece. After
+; the last piece the source, address and count are still stepped by a
+; full piece (unused).
+; Callers (6 JSR sites): BattleCD_EnemyDissolveFx ($CD:00F8), BattleCD_EndLayerFx ($CD:0460),
+;   BattleCD_LoadLayerFx ($CD:0FDA, $CD:0FFD), BattleCD_LoadFxGfx4 ($CD:1356) and
+;   BattleCD_QueueVramDmaL ($CD:3ECE).
+; Entry: M=1, X=0, DP=0, DB=$7E; A:X = the source, Y = the VRAM word
+;        address, DP $53 = the byte count (a count of 0 is sent as one
+;        piece of 0, which DMA takes as $10000 bytes)
+; Exit:  M=1, X=0, DP=0, DB=$7E; A = 1 (B = 0); X, Y clobbered;
+;        !Battle_DmaQueueBusy = 0
+BattleCD_QueueVramDma:
+    INC.w !Battle_DmaQueueBusy
+    PHX
+    PHY
+    PHA
+    LDX.b !BattleCD_Tmp53
+    PHX
+.wait_free:
+    LDA.w !Battle_DmaQueueReq
+    BEQ .start
+    JSR BattleCD_WaitFrameRefresh
+    BRA .wait_free
+.start:
+    PLX
+    STX.w !Battle_DmaQueueLeft
+    PLA
+    STA.w !Battle_DmaQueueBank
+    PLY
+    STY.w !Battle_DmaQueueVram
+    PLX
+    STX.w !Battle_DmaQueueSrc
+    STZ.w !Battle_DmaQueueLast
+.piece:
+    LDA.w !Battle_CgramPending
+    BEQ .small
+    REP #$20
+    LDA.w !Battle_DmaQueueLeft
+    CMP.w #!BattleCD_DmaPieceLarge
+    BEQ .large_last
+    BCC .large_last
+    LDA.w #!BattleCD_DmaPieceLarge
+    STA.w !Battle_DmaQueuePiece
+    BRA .large_send
+.large_last:
+    STA.w !Battle_DmaQueuePiece
+    INC.w !Battle_DmaQueueLast
+.large_send:
+    TDC
+    SEP #$20
+    INC.w !Battle_DmaQueueReq
+.large_wait:
+    JSR BattleCD_WaitFrameRefresh
+    LDA.w !Battle_DmaQueueReq
+    BNE .large_wait
+    REP #$20
+    LDA.w !Battle_DmaQueueSrc
+    CLC
+    ADC.w #!BattleCD_DmaPieceLarge
+    STA.w !Battle_DmaQueueSrc
+    LDA.w !Battle_DmaQueueVram
+    CLC
+    ADC.w #!BattleCD_DmaPieceLarge/2
+    STA.w !Battle_DmaQueueVram
+    LDA.w !Battle_DmaQueueLeft
+    SEC
+    SBC.w #!BattleCD_DmaPieceLarge
+    STA.w !Battle_DmaQueueLeft
+    BRA .next
+.small:
+    REP #$20
+    LDA.w !Battle_DmaQueueLeft
+    CMP.w #!BattleCD_DmaPieceSmall
+    BEQ .small_last
+    BCC .small_last
+    LDA.w #!BattleCD_DmaPieceSmall
+    STA.w !Battle_DmaQueuePiece
+    BRA .small_send
+.small_last:
+    STA.w !Battle_DmaQueuePiece
+    INC.w !Battle_DmaQueueLast
+.small_send:
+    TDC
+    SEP #$20
+    INC.w !Battle_DmaQueueReq
+.small_wait:
+    JSR BattleCD_WaitFrameRefresh
+    LDA.w !Battle_DmaQueueReq
+    BNE .small_wait
+    REP #$20
+    LDA.w !Battle_DmaQueueSrc
+    CLC
+    ADC.w #!BattleCD_DmaPieceSmall
+    STA.w !Battle_DmaQueueSrc
+    LDA.w !Battle_DmaQueueVram
+    CLC
+    ADC.w #!BattleCD_DmaPieceSmall/2
+    STA.w !Battle_DmaQueueVram
+    LDA.w !Battle_DmaQueueLeft
+    SEC
+    SBC.w #!BattleCD_DmaPieceSmall
+    STA.w !Battle_DmaQueueLeft
+.next:
+    TDC
+    SEP #$20
+    LDA.w !Battle_DmaQueueLast
+    BNE .done
+    JMP .piece
+.done:
+    STZ.w !Battle_DmaQueueBusy
+    RTS
+
+; $CD:3F9E — BattleCD_OldBuildLeftovers (98 bytes, $3F9E–$3FFF)
+; No code reaches these bytes. $3F9E-$3FE3 (70 bytes) are the last 70
+; bytes of BattleCD_QueueVramDma again ($3F58-$3F9D: from the last
+; byte of the $400-piece path's STA to the RTS), with the two internal
+; addresses $46 higher (JSR $3EBB for $3E75, JMP $3F3E for $3EF8): the
+; tail of an older assembly of the bank in which the routine sat $46
+; bytes later, probably. Then $FF fill ($3FE4-$3FFE), and
+; !BattleRom_PauseFullBright at $3FFF (0; BattleCD_NmiMain reads it).
+BattleCD_OldBuildLeftovers:
+    db $CA,$80,$06,$8D,$2C,$CA,$EE,$30,$CA,$7B,$E2,$20,$EE,$26,$CA,$20
+    db $BB,$3E,$AD,$26,$CA,$D0,$F8,$C2,$20,$AD,$27,$CA,$18,$69,$00,$04
+    db $8D,$27,$CA,$AD,$2A,$CA,$18,$69,$00,$02,$8D,$2A,$CA,$AD,$2E,$CA
+    db $38,$E9,$00,$04,$8D,$2E,$CA,$7B,$E2,$20,$AD,$30,$CA,$D0,$03,$4C
+    db $3E,$3F,$9C,$11,$CE,$60
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+    db $00                              ; $3FFF: !BattleRom_PauseFullBright

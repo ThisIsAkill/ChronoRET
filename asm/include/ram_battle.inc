@@ -2365,7 +2365,7 @@ endstruct
 !Battle_UnkCD27           = $CD27 ; 1 B: bit 5 set = the toggle button is ignored; writer not traced
 !Battle_UnkCE13           = $CE13 ; 1 B: frame mask: BattleD1_UnkEA4B runs on frames where it ANDs the count to 0
 !Battle_UnkCD2D           = $CD2D ; 1 B: non-zero skips BattleCE_UnkF066 in the NMI; writer not traced
-!Battle_UnkCD2E           = $CD2E ; 1 B: non-zero skips the BattleCD_Unk3B82 call in the NMI; writer not traced
+!Battle_UnkCD2E           = $CD2E ; 1 B: non-zero skips the BattleCD_WaitScanline call in the NMI; writer not traced
 !Battle_UnkCD29           = $CD29 ; 1 B: copied to !Battle_UnkA028 every frame by BattleCD_NmiMain
 !Battle_UnkCAD3           = $CAD3 ; 1 B: non-zero = BattleCD_NmiSetup runs BankC1_VecCCE000; writer not traced
 !Battle_UnkCD43           = $CD43 ; 1 B: non-zero holds the BattleD1_UnkECF3 call of BattleCD_FrameTick
@@ -2414,5 +2414,34 @@ endstruct
 !BattleRom_FxGfxColours   = $CFE000 ; 2 B per action graphics set: four 2-bit colour fields per byte
 !BattleRom_FxGfxSrc       = $D00000 ; the action graphics' source tiles (2bpp, or 2bpp + a third plane)
 !BattleRom_FxScriptPtrs   = $D1646C ; 2 B per channel script: its address in bank $D1
+
+; ------------------------------------------------------------
+; Bank $CD: the helpers $CD:3B5F-$CD:3FFF and the script opcodes ($CD:16B5 on)
+; ------------------------------------------------------------
+!Battle_SfxPendingId      = $CD24 ; 1 B: the sound BattleCD_PlayPendingSfx plays (BattleCD_ApuCmd18's first argument)
+!Battle_SfxPendingArg     = $CD25 ; 2 B: its X (the low byte is the second argument)
+!Battle_FrameWait         = $CA20 ; 1 B: set by BattleCD_WaitFrame / PauseWait, which wait until it is 0 again (the
+                                  ; bank-$D1 NMI handler clears it, probably: no matched code does)
+!Battle_DmaQueueReq       = $CA26 ; 1 B: non-zero = BattleCD_RunQueuedDma (NMI) sends the piece below, then clears it
+!Battle_DmaQueueSrc       = $CA27 ; 2 B: the piece's source address
+!Battle_DmaQueueBank      = $CA29 ; 1 B: its source bank
+!Battle_DmaQueueVram      = $CA2A ; 2 B: its VRAM word address
+!Battle_DmaQueuePiece     = $CA2C ; 2 B: its size in bytes
+!Battle_DmaQueueLeft      = $CA2E ; 2 B: bytes of the upload not sent yet (BattleCD_QueueVramDma)
+!Battle_DmaQueueLast      = $CA30 ; 1 B: non-zero = the piece queued is the last
+!Battle_FxRotOutX         = $CAFE ; 1 B (2 B apart): BattleCD_Rotate3d's result x
+!Battle_FxRotOutY         = $CB00 ; 1 B: its y
+!Battle_FxRotOutZ         = $CB02 ; 1 B: its z
+!Battle_FxRotInX          = $CB06 ; 1 B (stored 16-bit by the callers): the point BattleCD_Rotate3d rotates, x
+!Battle_FxRotInY          = $CB08 ; 1 B: its y
+!Battle_FxRotInZ          = $CB0A ; 1 B: its z
+!BattleCD_MathA           = $23   ; 2 B DP: BattleCD_Div16's dividend / BattleCD_Mul8x16's byte factor
+!BattleCD_MathB           = $25   ; 2 B DP: BattleCD_Div16's divisor / BattleCD_Mul8x16's word factor
+!BattleCD_MathOut         = $27   ; 2 B DP: BattleCD_Div16's quotient / BattleCD_Mul8x16's product bits 0-15
+!BattleCD_MathOutHi       = $29   ; 2 B DP: BattleCD_Div16's remainder / the product's bits 16-23 (1 B)
+!BattleCD_RotAngleX       = $49   ; 1 B DP: BattleCD_Rotate3d's angle about the x axis (256 per turn)
+!BattleCD_RotAngleY       = $4B   ; 1 B DP: ... about the y axis (applied first)
+!BattleCD_RotAngleZ       = $4D   ; 1 B DP: ... about the z axis (applied last)
+!BattleRom_SinAbsTable    = $CEF48E ; 256 B: |sin| per angle (256 per turn), 0-255 for 0-1; index bit 7 = the negative half
 
 endif

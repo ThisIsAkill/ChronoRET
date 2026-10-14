@@ -1305,7 +1305,7 @@ if !constants_battle_inc == 0
 !BattleCD_ScrollPassBytes = $0010 ; four scroll entries (one pass of BattleCD_ScrollFill)
 !BattleCD_ScrollFillEnd   = $80   ; 32 entries of 4 bytes
 !BattleCD_AllHdma         = $FF   ; HDMAEN: all eight channels
-!BattleCD_Unk3B82Arg      = $40   ; A for BattleCD_Unk3B82 in the NMI; meaning unknown
+!BattleCD_NmiWaitLine     = $40   ; the scanline BattleCD_NmiMain waits for (BattleCD_WaitScanline); why is not traced
 !BattleCD_CDC9Period      = $0D   ; !Battle_UnkCDC9's reload
 !BattleCD_PalAnimBytes    = $0C   ; bytes per FieldAnimB record
 !BattleCD_PalAnims8To11   = $0030 ; four FieldAnimB records (8-11)
@@ -1365,5 +1365,15 @@ if !constants_battle_inc == 0
 !BattleCD_FxNoPage        = $7F   ; script byte: a step with no page
 !BattleCD_FxEnd           = $FF   ; script byte: the end
 !BattleCD_WaitShort       = 16    ; frames of BattleCD_Wait16Frames
+
+; ------------------------------------------------------------
+; Bank $CD: the helpers $CD:3B5F-$CD:3FFF and the script opcodes ($CD:16B5 on)
+; ------------------------------------------------------------
+!BattleCD_QuarterTurn     = $40   ; a quarter turn (256 per turn): cos(a) = sin(a + this)
+!BattleCD_Div16Bits       = $0010 ; quotient bits of BattleCD_Div16 (one pass each)
+!BattleCD_ApuCmdPause     = $F5   ; APU command of BattleCD_PauseWait (sent as it is; argument $F5 on pausing, 0 on
+                                  ; resuming: the music's pause, probably)
+!BattleCD_DmaPieceLarge   = $1000 ; BattleCD_QueueVramDma's piece while !Battle_CgramPending is set
+!BattleCD_DmaPieceSmall   = $0400 ; ... and otherwise
 
 endif
