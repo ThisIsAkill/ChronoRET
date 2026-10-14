@@ -9,8 +9,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `ScrollWaveFF_A/B`) are matched. Relocation-tolerant (`make duplicates-reloc`: absolute/long operands masked, fragments of
    6+ instructions, at most 3 operands differing, outside matched code), ranked by size; all
    checked by disassembly to be code. "part" = a run inside the source routine, not all of it.
-   1. `$CF:FDC8` 78 B: `BattleMsg_FormatNumberDigits` (part, routine 85 B); 3 differ (digit
-      table `$CC:F903` -> `$CC:F90D`)
+   1. `$CF:FDC8` 78 B: `BattleMsg_FormatNumberDigits` (part, routine 85 B): matched, inside
+      `BattleMsg_FormatNumber4Digits`
    2. `$C0:2848` 36 B: `Field_FadeInAfterReload` (whole); 1 differs (`JSR Field_EndOfFrameShort`
       -> `JSR Field_EndOfFrame`): the sibling routine right after it
    3. `$C0:58FD` 33 B: `Evt_RunObjInit+$10` (part); 0 differ
@@ -20,7 +20,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    6. `$CC:F365` 30 B: `Battle_Mul8` (whole, byte-identical); 0 differ
    7. `$C1:6699` 26 B: `Battle_CalcAngle+$1A` (part); 0 differ
    8. `$C0:2DD9` 24 B: `ClearRAMDMA+$15` (part, DMA channel 7 setup tail); 0 differ
-   9. `$CF:F9FB` 24 B: `Battle_SinLookup` (part, routine 41 B); 0 differ
+   9. `$CF:F9FB` 24 B: `Battle_SinLookup` (part, routine 41 B): matched (`Battle_SinLookupCF`)
    10. `$FD:C0FE` 24 B: `MainInit+$60` (part); 0 differ
    11. `$C1:4A11` 24 B: `BattleTgt_AreaLine+$F` (part); 1 differs (`JSR Battle_CalcAngle` ->
        `JSR $C1:2AE3`)
@@ -140,7 +140,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    $05 (endless loop with !Battle_Unk2989 bit 5), $08 (PC 0 never compared), $1F (STA for STX),
    $2F (entry numbers, not slots), $38 (one-entry clear); whether !Battle_UnkB252 + 3 and
    !Battle_UnkB18B always name the same enemy; what the bank-$CC/$CD/$CF callees of service 0 and
-   the vectors do (stubs `BattleCC_*`, `BattleCF_*`, `BattleSys_VecCD00xx`). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
+   the vectors do (stubs `BattleCC_*` and `BattleSys_VecCD00xx`; the bank-$CF ones are matched, item 5). Open in the scripts: what the action codes and `!BattleAi_RunMode` values do
    (`!BattleRom_AiActLength` `$FD:BA4A` gives lengths $FF for codes 4/5), what the fixed scripts
    `$CC:8D08`/`$CC:8D1E` stand for (BattleAi_PickScript's BattlerStats bits;
    BattleSys_UnkB0B6 sets `!BattleAi_ChosenBlock` to $FF when Status2 bit 2 changes), and the
@@ -190,20 +190,13 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    the thread banner before BattleAct_RunThreads still calls `BattleAct_OpcodeTable` unmatched;
    the "Actions: service 4" banner before BattleSys_RunAction says the script interpreter (the
    threads BattleAct_RunThreads runs) "is not matched yet", though it is.
-   Open readers, all out of this bank: the movers in bank $CF (dispatch `$CF:EFC4`, kind table
-   `$CF:F01E`: straight `$CF:F040`, arc `$CF:F087`, heading `$CF:F194` with its edge test
-   `$CF:FADD`, circle `$CF:F1F8`, kind 4 `$CF:F23D` with its near test `$CF:F957`, ellipse
-   `$CF:F354`, shake `$CF:F39F`, curving `$CF:F405`; the objects' movers read the circle arrays at
-   `$CF:F6B6`/`$CF:F858`), the position-history recorder `$CF:ED1D`, the path walk stepper
-   `$CF:EC78`, the object follower `$CF:ECC2`, the hit-number bounce `$CF:E781` and the sprites'
-   use at `$CF:EEA5`, the attribute values at `$CF:EEF8`/`$CF:FE36` (filled at `$CC:E3FC`), the
-   colour rotation `$CF:E600`, the object links at `$CF:EDD4`/`$CF:F81D`, and in bank $CC
-   `BattleAct_StepPalettes` `$CC:F1E7` and the action helpers `$CC:F06B`-`$CC:F2A9` (object lists
-   stepped at `$CC:F278`). Not found: who draws the position history and who reads
-   `!Battler_PosHistUnkAB7D/AB88`, `!Battler_UnkA5D8` and the battlers' `!Battle_ActorCircleX/Y`.
+   The bank-$CF readers of the action state are matched now (item 5: the movers, position
+   history, path walk, object follower, hit-number bounce, colour rotation, object links and
+   the attribute values). Still open out of this bank: in bank $CC `BattleAct_StepPalettes`
+   `$CC:F1E7` and the action helpers `$CC:F06B`-`$CC:F2A9` (object lists stepped at
+   `$CC:F278`); no reader found of the battlers' `!Battle_ActorCircleX/Y`.
    Still open from service 4: the code at `$C1:ACF0` that fills the action block
-   `$AE91`-`$AE9B`. Open from the movers: the stepper at `$CF:F978` (`!Enemy_Stepping`), and who
-   writes `!Enemy_TargetWanted` (`$5E15`).
+   `$AE91`-`$AE9B`. Open: who writes `!Enemy_TargetWanted` (`$5E15`).
 2. Done: the main loop's per-frame calls (`Field_FrameUpdate` $C0:881E–$C0:8901,
    `Field_ActionButton` $C0:1AAC, the event-hook window effects $C0:21E1–$C0:274C,
    `Field_ServiceUnk54` $C0:274D) and the first of their callees: `Field_FindObjInFront` and
@@ -753,6 +746,81 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    d >= 0 step), the wipe's mode-2 extra 1 and B = $03 after a clamp, the quad's leftward error
    start and its unbounded fill when the bottom is line $FF, the scaler's carry-ins, the stray
    `$DB` after the script opcode table and the unreachable APU loop in `C3_RunScript`.
+
+7. Bank $CF: `$CF:E300`-`$CF:FFFF` is matched (the CF battle batch): all of the bank's code
+   and the data around it, 7,424 bytes from source. `$CF:0000`-`$CF:E2FF` is data and stays as
+   ROM bytes (not looked at). By cluster:
+   - `BattleCF_VblankUploads` (`$CF:E300`, vector `$C1:0009`): the DMA uploads (OAM, the queued
+     window map, the command window, CGRAM, the battlers' frame tiles in four graphics steps,
+     the decoded frame of `!Battle_FrameSlot`).
+   - `BattleCF_FrameUpdate` (`$CF:E58A`, vector `$C1:000C`) with `BattleCF_BounceHitNumbers`
+     and `BattleCF_StepFxColourCycle`: blink toggle, cursor glow, frame counter, the colour
+     rotation of opcode `$6B` (`$CF:E600` on), the demo battle's restart, L+R hold, then the
+     movers, path walks, object follow, position history, enemy parts and the sprite build;
+     it clears `!Battle_FramePending`.
+   - The sprite builder `BattleCF_BuildSprites` (`$CF:E83A`, D = `$1D00`) and its callees
+     (`BattleCF_DrawPosHistory`/`DrawPosHistRecord`, `DrawUnkA5D8Sprite`, `DrawBattler`,
+     `CopySprTiles`, `DrawFrontLayer`, `DrawBackObjects`, `DrawFxOverlay`, `DrawHitNumbers`,
+     `DrawActObj`), `BattleCF_StepPathWalks`, `BattleCF_FollowObjects`,
+     `BattleCF_RecordPosHistory`.
+   - The movers: `BattleCF_RunMovers` with `BattleCF_MoverTable` / `BattleCF_ObjMoverTable`
+     (`$CF:F01E`/`$F02E`), the eight battler movers (`BattleCF_Move*`, `BattleCF_ShakeStep`),
+     the seven object movers (`BattleCF_ObjMove*`), `BattleCF_PointsNear`,
+     `BattleCF_StepEnemies` (the enemy movers' 8-pixel stepper), `BattleCF_PlaceEnemyParts`,
+     `BankCF_DeadShift3` (4 unreached bytes), `Battle_SinLookupCF` with its new sub-entry
+     `Battle_Mul8x16CF`, `Battle_CalcAngleCF`, `BattleCF_PixelToCell`.
+   - `Battle_MergePendingEntries1580`, `BattleCF_EnterBattle` (`$C1:001B`),
+     `BattleCF_ExitBattle` (`$C1:001F`), `BattleCF_PixelToTile`, `BattleCF_WaitFrame`, the
+     three `Battle_QueueVramUpload_*`, `BattleFx_SetPtrA2FromTable`,
+     `BattleCF_RemoveMarkedEnemies` (service 6), `BankCF_EndFill` and
+     `BattleCF_ActForceBytes` (`$CF:FFFD`-`$FFFF`).
+   Renamed stubs: `BattleCF_UnkE300` -> `BattleCF_VblankUploads`, `BattleCF_UnkE58A` ->
+   `BattleCF_FrameUpdate`, `BattleCF_UnkFBE5` -> `BattleCF_ExitBattle`, `BattleCF_UnkFE20` ->
+   `BattleCF_RemoveMarkedEnemies`; the callers' names `Battle_MergePendingEntries1580`,
+   `Battle_QueueVramUpload_*` and `BattleFx_SetPtrA2FromTable` are kept. New stubs:
+   `BattleSys_VecCD0000`, `BattleSys_VecCD0006`, `BattleSys_VecCD0024`.
+   Found on the way: the battlers' sprites are drawn at `!Battler_ScreenX/Y` plus the signed
+   display offsets `!Battler_UnkA4A4/A4AF` (what the circle, shake and arc movers write) plus
+   the per-sprite offset words in `!Battler_FrameExtra`; `!Battler_UnkA5CD` non-zero draws the
+   battler in front of the others; `!Battle_ActObjLinks` bit 7 = object in front of its
+   battler, bit 6 = behind; `!Battler_PosHistUnkAB7D/AB88` time the position history's
+   drawing; `!Battler_UnkA5D8` puts a tile-2 sprite over the battler; `!Battler_Palette` holds
+   OAM palette bits (palette * 2).
+   Quirks recorded: `BattleCF_FrameUpdate`'s background rotation (one pass past the last row;
+   65535 moves when the first colour is 15), `BattleCF_StepFxColourCycle`'s 16-bit Y after the
+   special-palette skip, `BattleCF_MoveKind4`'s dead -h store, the object table's kind 6 being
+   the battlers' shake mover, `BattleCF_PointsNear`'s signed-byte distance,
+   `BattleCF_StepEnemies` ending only at exactly 8, `Battle_CalcAngleCF`'s 16-bit index store
+   over `!Battle_HitNumActive` (`$AC5A`), `Battle_MergePendingEntries1580` with an empty
+   record or a full list, `BattleCF_EnterBattle`'s clear starting at `$2D01`,
+   `BattleCF_BuildSprites` with no battler, `BattleCF_DrawHitNumbers`' whole high-table byte.
+   Back to review (verified headers or code lines edited): `EngCall_BattleMain` (header and
+   `BankC1_ExitBattleJml`'s JML), `BankC1_JmlCCE000` (header and its sub-entries' JMLs),
+   `BattleSys_RunService`, `BattleSys_Service6`, `BattleSys_UnkAC5E`, `BankC1_BattleStartVec`,
+   `BattleMenu_UpdateWindows`, `BattleMenu_UpdateMainWindow`, `BattleMenu_DrawTechCursorRow`,
+   `BattleMenu_ProcessInput`, `BattleMenu_ConfirmCommand`, `BattleMenu_OpenItemList`,
+   `Battle_FxReset` (the effect handlers' banner), `Battle_TickEnemyMovers`,
+   `BattleAct_OpMoveTo`, `BattleAct_OpCurveTo`, `BattleAct_OpPathTo`, `BattleAct_OpFollow`,
+   `BattleAct_OpStartPalCycle`, `BattleAct_OpArcToCalc`, `BattleAct_OpMoveAlongHeading`,
+   `BattleAct_OpCircleToCalc`, `BattleAct_OpEllipseToCalc`, `BattleAct_OpMoveKind4ToCalc`,
+   `BattleAct_OpShake`, `Rom_AngleTable`, `Rom_DirToFacing` and `Battle_SinLookupCF` (header:
+   the sub-entry, the Callers note).
+   Stale, not edited (verified headers, fix at their next edit): `BattleSys_PumpFrames` still
+   calls the `$CF:E77B` clear of `!Battle_FramePending` "inferred, not proven" (it is
+   `BattleCF_FrameUpdate`'s end); `BattleAct_OpClearUnkA4A4` (opcode `$2B`) says the
+   `!Battler_UnkA4A4/A4AF` meaning is not known (they are display offsets); `BattleMsg_FormatNumber4Digits`'
+   Callers note calls `$C1:5BB9` unmatched; `BattleAct_OpLinkObjBit7`'s "what the link does is
+   not traced (read at `$CF:EDD4` and `$CF:F81D`)": bit 7 / bit 6 draw the object in front of /
+   behind the battler (`BattleCF_DrawFrontLayer`, `BattleCF_DrawBackObjects`).
+   Open: who fills `!Battler_FrameDma*` (`$A654`-`$A6D7`), the tile-word lists at `$11B0`
+   (`!BattleRom_SprTileListPtr`), `!Battler_SprBytes` (`$1D7F`), `!Battle_OamHighIdx`/`XBit`
+   (`$902D`/`$8E2D`), `!Battle_ActObjFrame` (`$A2C0`), `!Battle_DemoQuitTimer` (`$BB00`) and
+   `!Battle_PartsAnchor`/`!Enemy_PartOfs*` with `!Battle_EnemyPartsOn`; who sets
+   `!Battle_UnkA113` (slot 9 mirrors slot 3), `!Battle_UnkA101` and `!Battle_UnkE5`; what the
+   bank-$CD vectors `$CD:0000`/`0006`/`0024` do (the last after an enemy is moved to the special
+   palette: a fade-out, probably); the meaning of `!Battle_Unk9F`, `!Battle_UnkB9`,
+   `!Battle_Unk98CA`, `!Battle_UnkA0A6`, `!Battle_UnkBB80`. Next in this bank: the data
+   `$CF:0000`-`$CF:E2FF` (what reads it is not traced).
 
 ## Tables
 

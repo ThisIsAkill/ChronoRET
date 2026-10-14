@@ -73,9 +73,9 @@ if !ram_battle_inc == 0
                                  ; the PCs; copied to !Battle_Unk993B around the tick and copied back if that changed it
                                  ; (BattleSys_UpkeepTwoFrames); set to 1 during each Battle_PoseStep; who sets it otherwise
                                  ; is not traced
-!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames, which waits for it to clear; likely cleared once a frame by
-                                 ; the STZ $9E at $CF:E77B, before the RTL of a bank-$CF routine that reads JOY1 and bumps the
-                                 ; 32-bit counter at $96F1 (entry not traced); also zeroed once by the battle entry $CF:FB65
+!Battle_FramePending     = $9E   ; 1 B: set by BattleSys_PumpFrames and BattleCF_WaitFrame, which wait for it to clear;
+                                 ; cleared once a frame at the end of BattleCF_FrameUpdate (the $C1:000C vector's target);
+                                 ; also zeroed once by the battle entry BattleCF_EnterBattle
 !Battle_ArgSlot          = $A1   ; 1 B: battler slot argument of the $C10045 services (Enqueue/RemoveBattlerFromReady; same-bank JSR only)
 !Battle_UnkE5            = $E5   ; 1 B: zeroed by both menu dirty-flag gates before the menu rebuild; purpose unknown
                                  ; Battle_PoseStep, which steps only when it finds 1 (every second frame); purpose unknown
@@ -389,7 +389,7 @@ endstruct
                                  ; (Battle_TickEnemyMovers), negative = none either
 !Enemy_MoveTarget        = $9752 ; 1 B per enemy: battler slot the movers steer by (copy of !Enemy_TargetWanted)
 !Enemy_MoveAngle         = $9786 ; 1 B per enemy: heading of the current 8-pixel step (256 units per turn); the
-                                 ; unmatched stepper at $CF:F978 moves the enemy along it
+                                 ; stepper BattleCF_StepEnemies moves the enemy along it
 !Enemy_Detour            = $9791 ; 1 B per enemy: non-zero = the last step was blocked and !Enemy_MoveAngle was turned
                                  ; a quarter; the next step keeps that heading instead of aiming again
 !Enemy_AnimTicks         = $9799 ; 8 B per enemy (index enemy * 8): frames per list entry, 0 = end of the list
@@ -419,8 +419,8 @@ endstruct
 !Enemy_MoveTimer         = $9897 ; 1 B per enemy: frames until its mover runs again (Battle_TickEnemyMovers); battle
                                  ; init writes it at $CC:E3F3/$CC:EBFA
 !Enemy_MoveInterval      = $989F ; 1 B per enemy: reload value of !Enemy_MoveTimer (battle init, $CC:EBF4)
-!Enemy_Stepping          = $98A7 ; 1 B per enemy: non-zero = an 8-pixel step is under way: the unmatched stepper at
-                                 ; $CF:F978 moves the enemy from !Enemy_StepStartX/Y along !Enemy_MoveAngle and clears
+!Enemy_Stepping          = $98A7 ; 1 B per enemy: non-zero = an 8-pixel step is under way: the stepper
+                                 ; BattleCF_StepEnemies moves the enemy from !Enemy_StepStartX/Y along !Enemy_MoveAngle and clears
                                  ; it after 8 pixels. Set by the movers, cleared by BattleSys_VictoryPose
 !Enemy_StepStartX        = $98AF ; 1 B per enemy: screen x the current step starts from (the stepper adds to it)
 !Enemy_StepStartY        = $98B7 ; 1 B per enemy: screen y the current step starts from
@@ -488,7 +488,8 @@ endstruct
 !Battle_Unk9F38          = $9F38 ; 1 B per PC: ORed into BattleCmd.Kind; cleared when the PC's menu opens
 !BattleMenu_CursorPalette = $9F46 ; 1 B: palette bits merged into the cursor sprite attribute (flash cycle, inferred)
 !Battler_FrameExtra      = $9F47 ; 16 B per battler slot (offset BattleRom_SlotTimes16): the signed bytes after the
-                                 ; frame's tilemap, sign-extended to words; meaning not traced. Layouts 1-4 write
+                                 ; frame's tilemap, sign-extended to words: the x and y offset word of each of the
+                                 ; frame's sprites (BattleCF_DrawBattler adds them to the position). Layouts 1-4 write
                                  ; more than 16 B, running into the next slots' blocks (as found)
 !Battler_Unk9FF7         = $9FF7 ; 1 B per battler slot: bit 7 set = skipped by every target scan; meaning unknown
 !Battle_DivBusy          = $A029 ; 1 B: non-zero while Battle_Divide runs
@@ -561,7 +562,8 @@ endstruct
                                  ; at $CC:E968/$CC:EAA1). Lies inside !Battler_FxOverlayFrame, one slot up; the overlay
                                  ; handlers run only after the start frames are drawn (inferred)
 !BattleMenu_TargetMoved  = $A4EE ; 1 B: set when a target list opens or the cursor moves (UpdateCursorOverlay)
-!Battler_UnkA5CD         = $A5CD ; 1 B per battler slot: bit 7 set = ignored by Battle_BoxOverlapsOthers; meaning unknown
+!Battler_UnkA5CD         = $A5CD ; 1 B per battler slot: bit 7 set = ignored by Battle_BoxOverlapsOthers; non-zero = drawn
+                                 ; in front of the other battlers (BattleCF_BuildSprites); meaning otherwise unknown
 !Enemy_RingGoalX         = $A5E4 ; 1 B per enemy: x of the point on the ring around the target that the ring movers
                                  ; (Battle_MoverKeepRange, Battle_MoverOrbit) head for
 !Enemy_RingGoalY         = $A5EC ; 1 B per enemy: y of that point
@@ -619,7 +621,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; skip the first thread group and start the second; cleared (low byte) after use
 !Battle_ActRunning       = $A013 ; 1 B: counted up when service 4 starts the script, zeroed when it returns
 !Battle_ActFrameHold     = $A012 ; 1 B: set to 2 when BattleAct_StepBattlerAnims decodes a frame; non-zero = it decodes
-                                 ; none (zeroed by service 4 and $CC:F0EF, counted down at $CF:E775, unmatched)
+                                 ; none (zeroed by service 4 and $CC:F0EF, counted down by BattleCF_FrameUpdate)
 !Battle_UnkA028          = $A028 ; 1 B: non-zero = BattleAct_StepBattlerAnims decodes no frame; purpose unknown
 !Battle_ActScriptDone    = $9876 ; 1 B: non-zero = the action's script has ended (counted up at $C1:4D00 in
                                  ; BattleAct_OpEndScript, zeroed by BattleAct_ResetState); service 4 waits for it
@@ -757,7 +759,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
                                  ; others); purpose unknown
 !Battler_UnkA4AF         = $A4AF ; 1 B per actor: the same ($CF:F158 and others; stepped by opcodes $C4/$C5); the arc
                                  ; mover writes its height here (see the arc moves below)
-; The curving move (opcodes $13-$15, mover kind 7 at $CF:F405, unmatched):
+; The curving move (opcodes $13-$15, mover kind 7, BattleCF_MoveCurve):
 !Battle_ActorHeading     = $AC11 ; 1 B per actor: heading angle of a curving move; the opcode sets the start heading,
                                  ; the mover turns it towards the point by up to !Battle_ActorMoveSpeed per step and
                                  ; moves along it (sine lookups at $CF:F48D)
@@ -771,7 +773,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActorUnkA5AA     = $A5AA ; 1 B per actor: start heading of a curving move whose operand is $FF; for the objects
                                  ; ($A5B5, !Battle_ActObjUnkA5B5) the straight move stores its angle there, so probably
                                  ; the last heading; written by many unmatched handlers ($C1:60BF and on)
-; The path walk (opcodes $16-$18, stepped by $CF:EC78, unmatched):
+; The path walk (opcodes $16-$18, stepped by BattleCF_StepPathWalks):
 !Battler_PathMaps        = $7FFD ; 256 B per battler slot (offset !BattleRom_SlotTimes256): the battler's copy of
                                  ; !Battle_PathMap with its path marked, kept for the whole walk
 !Battle_PathWalkMap      = $8AFD ; 256 B: the walking battler's map, copied back from !Battler_PathMaps before each step
@@ -816,7 +818,7 @@ function BattleMenu_TechAttr(row, col) = $A6E2+(row*$40)+(col*2)
 !Battle_ActObjUnkA07B    = $A07B ; 1 B per action object: set to 1 by BattleAct_LoadCommon; meaning unknown
 
 ; Hit numbers (opcodes $50-$55, BattleAct_OpShowHitNumbers): up to four
-; digit sprites per battler slot, then bounced by $CF:E781 (unmatched).
+; digit sprites per battler slot, then bounced by BattleCF_BounceHitNumbers.
 ; "Number" is inferred from the digit tiles BattleMsg_FormatNumber4Digits
 ; gives; that they show damage is inferred from !Battle_ActPcHitAmount.
 struct Battle_HitNumSprite $922D ; 4 B per sprite, 4 sprites (16 B) per battler slot, 11 slots ($B0 B); the same
@@ -827,7 +829,7 @@ struct Battle_HitNumSprite $922D ; 4 B per sprite, 4 sprites (16 B) per battler 
 .Attr:      skip 1      ; +3: attribute byte
 endstruct
 !Battle_HitNumHigh       = $92DD ; 1 B per battler slot: OAM high-table bits of its four number sprites (2 bits each;
-                                 ; read at $CF:EEB0, unmatched)
+                                 ; read by BattleCF_DrawHitNumbers)
 !Battler_HitNumShown     = $A3D4 ; 1 B per battler slot: set to 1 when numbers were built for it (read at $CF:EEA5)
 !Battler_HitNumAltBounce = $A0DC ; 1 B per battler slot: set to 1 for hit kinds other than 1, 3 and 5; $CF:E794 then
                                  ; takes the bounce steps from $D1:5E49 instead of $D1:5E10
@@ -870,21 +872,24 @@ endstruct
 !Battle_ActFacingOut     = $A2B4 ; 1 B: facing left by the BattleAct_CalcFacing handlers
 !Battle_ActObjLinkSlot   = $AB4F ; 1 B per object thread: battler slot opcodes $73/$74 linked it to
 !Battle_ActObjLinks      = $A3DF ; 11 B per object thread (index thread * 11 + battler slot): opcodes $73/$74 store
-                                 ; the object thread with bit 7 or bit 6 there; read at $CF:EDD4 and $CF:F81D (unmatched)
+                                 ; the object thread with bit 7 or bit 6 there: bit 7 = the object is drawn in front of
+                                 ; the battler, bit 6 = behind it (BattleCF_DrawFrontLayer / BattleCF_DrawBackObjects;
+                                 ; BattleCF_ObjMoveOrbit switches them)
 !Battle_ActHeadToX       = $A5BE ; 1 B: opcode $76: x of the point the heading is taken to
 !Battle_ActHeadFromCalc  = $A5BF ; 1 B: opcode $76: calc handler of the point it is taken from
 !Battle_ActHeadToY       = $A5C0 ; 1 B: opcode $76: y of the point it is taken to
 !Battle_ActOp80Args      = $53   ; up to 15 B (DP): bytes opcode $80 copies from its script (from its length byte on)
                                  ; for BattleAct_UnkVecCD001B
 
-; Arc moves (opcodes $98-$9D, mover kind !Battle_MoveKindArc at $CF:F087, unmatched). The mover adds the
+; Arc moves (opcodes $98-$9D, mover kind !Battle_MoveKindArc at $CF:F087). The mover adds the
 ; step to the offset like the straight mover and, !Battle_ActorMoveSpeed times per step, steps a speed and a
 ; height: rising, the speed drops by the accel and the height grows by the speed; once the speed would go
 ; below 0 it falls: the speed grows back by the accel and the height shrinks by it; once the speed would pass
 ; $FFFF it is reset to the start speed and rises again. It writes 0 - the height in pixels (+ it, see
 ; !Battle_ActorArcDown) to !Battler_UnkA4AF, doubled when !Battle_ActorArcMode is 0, and ends the move when
-; !Battle_ActorArcSteps runs out. "Arc" is inferred from that rise and fall (probably a jump; how
-; !Battler_UnkA4AF shows on screen is not traced; $CF:ED1D adds it to the y it records).
+; !Battle_ActorArcSteps runs out. "Arc" is inferred from that rise and fall (probably a jump;
+; !Battler_UnkA4AF is the battler's y display offset: BattleCF_DrawBattler adds it to the y it draws at).
+; The mover is BattleCF_MoveArc.
 !Battle_ActorArcSteps    = $ABFE ; 1 B per actor (11 battler slots, then object threads): steps left of an arc move;
                                  ; the mover ($CF:F186) sets the done flag at 0
 !Battle_ActorArcDown     = $AA2A ; 1 B per actor: 0 = the height is subtracted (opcodes $98/$99/$9C/$9D), non-zero =
@@ -899,7 +904,7 @@ endstruct
 !Battle_ActorArcFalling  = $A9DE ; 2 B per actor: 0 = rising, 1 = falling
 !Battle_ActorArcSpeed0   = $AA3D ; 2 B per actor: the start speed; the mover reloads it when the falling speed passes
                                  ; $FFFF
-; Heading moves (opcodes $A2, $A8, $A9, mover kind !Battle_MoveKindHeading at $CF:F194, unmatched): the mover
+; Heading moves (opcodes $A2, $A8, $A9, mover kind !Battle_MoveKindHeading, BattleCF_MoveHeading): the mover
 ; adds !Battle_ActorMoveSpeed to !Battle_ActorUnkA311 each step and puts the actor at its start + that
 ; distance along the angle; it ends the move when !Battle_ActorHeadSteps runs out or when $CF:FADD gives 0, $0E (y)
 ; or $0F (x) for the position (probably the cell row / column at the screen's edge; not traced).
@@ -914,7 +919,7 @@ endstruct
 !Battle_ActUnkAAFC       = $AAFC ; 1 B: set to !Battle_ActUnkAAFCStart; read and written at $C1:7327-$C1:7357
 !Battle_ActUnkAAFD       = $AAFD ; 1 B: zeroed with it; read at $C1:735A and $C1:B74C
 ; Circle moves (opcodes $C0-$C3, BattleAct_OpCircleToCalc; mover kinds !Battle_MoveKindCircle at $CF:F1F8 and
-; !Battle_MoveKindEllipse at $CF:F354, unmatched): each step the mover adds the angle step to the angle and
+; !Battle_MoveKindEllipse at $CF:F354; BattleCF_MoveCircle, BattleCF_MoveEllipse): each step the mover adds the angle step to the angle and
 ; writes radius * sin(angle) to !Battler_UnkA4AF and radius * cos(angle) to !Battler_UnkA4A4 (kind 5: the
 ; sine with half the radius), counts the steps down and sets the done flag at 0. All are 1 B per actor
 ; (11 battler slots, then object threads 0-7 from index 11) unless said.
@@ -928,17 +933,18 @@ endstruct
 !Battle_ActorUnkAB00     = $AB00 ; 1 B per actor: zeroed by opcode $D2; the kind-4 mover ($CF:F25A) sets it when it
                                  ; ends the move near the point and then tests the point with a 1-pixel margin
                                  ; instead of 16 (also read in bank $CC, $CC:D88B, maybe for something else)
-!Battler_UnkA5D8         = $A5D8 ; 1 B per battler slot: counted up by opcode $D0, zeroed by opcode $D1; no reader
-                                 ; found
-; Shake (opcode $D8, mover kind !Battle_MoveKindShake at $CF:F39F, unmatched), 1 B per battler slot:
+!Battler_UnkA5D8         = $A5D8 ; 1 B per battler slot: counted up by opcode $D0, zeroed by opcode $D1; non-zero =
+                                 ; BattleCF_DrawUnkA5D8Sprite puts a sprite (tile 2) over the battler
+; Shake (opcode $D8, mover kind !Battle_MoveKindShake, BattleCF_MoveShake), 1 B per battler slot:
 !Battler_ShakeFrames     = $AB13 ; frames left + 1; at 0 the mover zeroes the offset and !Battle_ActorMoving
 !Battler_ShakeAmp        = $AB1E ; distance of the offset, along !Battle_ActorUnkA5AA
 !Battler_ShakeTimer      = $AB29 ; frames to the next toggle
 !Battler_ShakePeriod     = $AB34 ; frames between toggles (reloads the timer)
 !Battler_ShakeOff        = $AB3F ; toggled each time: 0 = the offset is set (sin/cos of the heading), 1 = zeroed
 ; Per-actor attribute bits (opcodes $D9/$DA). Battle init ($CC:E3FC) fills both copies with
-; !Battle_ActAttrBits, so probably sprite attribute bits; $CF:EEF8 loads the objects' current value into DP $A1
-; while building their sprites and $CF:FE36 tests the battlers' for non-zero (neither traced further).
+; !Battle_ActAttrBits: OAM attribute bits. BattleCF_DrawBattler ORs the battler's value with its !Battler_Palette
+; into its sprites' palette and priority bits; BattleCF_DrawActObj puts the object's into its sprites' priority
+; bits; BattleCF_RemoveMarkedEnemies only fades an enemy whose value is non-zero.
 !Battle_ActSavedX        = $99AF ; 3 B: !Battler_ScreenX of !Battle_ActBattlers entries 0-2, copied at $CC:F1CE (when
                                  ; that runs is not traced; probably the action's start); read by BattleAct_CalcSavedPos
 !Battle_ActSavedY        = $99B2 ; 3 B: their !Battler_ScreenY, copied there too
@@ -946,14 +952,17 @@ endstruct
 !Battler_ActAttrInit     = $9F3B ; 1 B per battler slot: initial value (opcode $DA copies it back)
 !Battle_ActObjAttrInit   = $AB57 ; 1 B per object thread: initial value
 !Battle_ActObjAttr       = $AB5F ; 1 B per object thread: current value
-; Position history (opcodes $A4/$A5; recorded by $CF:ED1D, unmatched): every !Battler_PosHistDelay frames the
-; four records shift one place and record 0 gets !Battler_ScreenX/Y + !Battler_UnkA4A4/A4AF (probably for
-; after-images; who draws them is not traced).
+; Position history (opcodes $A4/$A5; recorded by BattleCF_RecordPosHistory): every !Battler_PosHistDelay frames
+; the four records shift one place and record 0 gets !Battler_ScreenX/Y + !Battler_UnkA4A4/A4AF.
+; BattleCF_DrawPosHistory draws copies of the battler at all four every !Battler_PosHistUnkAB7D frames
+; (flickering after-images, probably).
 !Battler_PosHistOn       = $A192 ; 1 B per battler slot: non-zero = record (opcode $A4 sets 3, $A5 0)
 !Battler_PosHistDelay    = $AB67 ; 1 B per battler slot: frames between records (opcode $A4's first operand)
 !Battler_PosHistTimer    = $AB72 ; 1 B per battler slot: frames to the next record (1 on start)
-!Battler_PosHistUnkAB7D  = $AB7D ; 1 B per battler slot: opcode $A4's second operand; no reader found
-!Battler_PosHistUnkAB88  = $AB88 ; 1 B per battler slot: set to 1 with it; no reader found
+!Battler_PosHistUnkAB7D  = $AB7D ; 1 B per battler slot: opcode $A4's second operand: frames between the drawings of
+                                 ; the history (BattleCF_DrawPosHistory)
+!Battler_PosHistUnkAB88  = $AB88 ; 1 B per battler slot: set to 1 with it; frames to the next drawing (counted down by
+                                 ; BattleCF_DrawPosHistory)
 !Battler_PosHistX        = $AB93 ; 4 records of 22 B (11 x, then 11 y; record k at + k * 22): x per battler slot
 !Battler_PosHistY        = $AB9E ; the y part of record 0
 
@@ -1355,7 +1364,7 @@ endstruct
 !BattleAi_PcByteMask      = $AF1F ; 1 B: bits BattleAi_AddPcByByte wants in the PC's stat-block byte ($FF = any)
 !BattleAi_Marked40Count   = $AF20 ; 1 B: entries BattleAi_AddPcByByte marked $40 (PcStatBlk.Unk20 bit 5)
 !BattleAi_Marked80Count   = $AF21 ; 1 B: entries it marked $80 (PcStatBlk.Unk20 bit 4)
-!Battle_FrameCounter      = $96F1 ; 4 B: the counter a bank-$CF routine bumps (see !Battle_FramePending); a frame
+!Battle_FrameCounter      = $96F1 ; 4 B: counted up once a frame by BattleCF_FrameUpdate; a frame
                                   ; count, probably; test $06 compares its low 3 bytes
 !Battle_UnkAEB2           = $AEB2 ; 1 B: zeroed with the 8 !Battle_UnkAEB3 bytes by BattleSys_Unk8461; meaning unknown
 !Battle_UnkAEC8           = $AEC8 ; 1 B: enemy index (slot - 3) BattleSys_Unk8461 works on
@@ -1790,5 +1799,207 @@ endstruct
 !BattleRom_CharTechs      = $CC276A ; 2 B per character id: its first single tech id, then how many it has
 !BattleRom_ComboTechs     = $CC2778 ; 5 B per record, $FF-ended: the members' $80 >> id bits, the first tech id ($FF:
                                   ; none), the number of techs, and the address in bank $CC of their requirements
+
+
+; --- Bank $CF: vblank uploads and the per-frame update ($CF:E300-$CF:E839) ---
+!Battle_VramQPending      = $A0   ; 1 B DP: $80 = the VRAM upload described below waits for BattleCF_VblankUploads,
+                                  ; which runs it and clears this (set by the Battle_QueueVramUpload_* routines)
+!Battle_VramQDmap         = $9EEA ; 1 B: DMAP value of the queued upload. The nine bytes of the queued upload lie 6 B
+                                  ; apart ($9EEA-$9F1A); the queue routines write them with X = 0 and the upload reads
+                                  ; only these (what the other five bytes of each 6 B group are is not traced)
+!Battle_VramQBbad         = $9EF0 ; 1 B: its BBAD value
+!Battle_VramQSrcLo        = $9EF6 ; 1 B: source address low byte
+!Battle_VramQSrcHi        = $9EFC ; 1 B: source address high byte
+!Battle_VramQSrcBank      = $9F02 ; 1 B: source bank
+!Battle_VramQSizeLo       = $9F08 ; 1 B: byte count low byte
+!Battle_VramQSizeHi       = $9F0E ; 1 B: byte count high byte
+!Battle_VramQAddrLo       = $9F14 ; 1 B: VRAM word address low byte (VMADDL)
+!Battle_VramQAddrHi       = $9F1A ; 1 B: VRAM word address high byte (VMADDH)
+!Battler_FrameDmaSrcA     = $A654 ; 2 B per battler slot (index slot * 2): bank $7E address of the first tile block of
+                                  ; the slot's decoded frame, sent by BattleCF_VblankUploads; who fills these six word
+                                  ; arrays is not traced
+!Battler_FrameDmaSrcB     = $A66A ; 2 B per battler slot: the second block's address
+!Battler_FrameDmaVramA    = $A680 ; 2 B per battler slot: VRAM word address of the first block
+!Battler_FrameDmaVramB    = $A696 ; 2 B per battler slot: VRAM word address of the second block
+!Battler_FrameDmaSizeA    = $A6AC ; 2 B per battler slot: bytes in the first block
+!Battler_FrameDmaSizeB    = $A6C2 ; 2 B per battler slot: bytes in the second block
+!BattleRom_GfxStepSrcA    = $CCF957 ; 2 B per graphics step 0-3: bank $7E source of the step's first block
+                                    ; ($64AD, $6BAD, $70AD, $77AD) (BattleCF_VblankUploads)
+!BattleRom_GfxStepSrcB    = $CCF95F ; 2 B per step: source of the second block
+!BattleRom_GfxStepVramA   = $CCF967 ; 2 B per step: VRAM word address of the first block
+!BattleRom_GfxStepVramB   = $CCF96F ; 2 B per step: VRAM word address of the second block
+!BattleRom_GfxStepSizeA   = $CCF977 ; 2 B per step: bytes in the first block
+!BattleRom_GfxStepSizeB   = $CCF97F ; 2 B per step: bytes in the second block; 0 = none (step 3)
+!BattleCF_TmpC6           = $C6   ; 2 B DP scratch of the bank-$CF frame code (D = 0); the movers keep the actor here
+!BattleCF_TmpC8           = $C8   ; 2 B DP scratch; the movers keep actor * 2 here
+!BattleCF_TmpCA           = $CA   ; 2 B DP scratch; the movers keep actor * 4 here
+!Battle_UnkA112           = $A112 ; 1 B: frames to the next toggle of !BattleUI_UnkA110 (BattleCF_FrameUpdate reloads
+                                  ; it with !Battle_BlinkFrames)
+!Battle_UnkA113           = $A113 ; 1 B: non-zero = battler slot 9 copies slot 3's palette (BattleCF_FrameUpdate) and
+                                  ; shake offsets (BattleCF_MoveShake); who sets it is not traced
+!Battle_UnkA101           = $A101 ; 1 B: non-zero = the cursor glow goes to the other OBJ palette and the status colour
+                                  ; cycle stops (BattleCF_FrameUpdate, BattleCF_StepFxColourCycle); not traced further
+!Battle_CursorGlowStep    = $A4EF ; 1 B: step 0-$3D in !BattleRom_CursorGlow (BattleCF_FrameUpdate)
+!BattleRom_CursorGlow     = $D15980 ; 2 B per step 0-$3D: colour written to colour 14 of OBJ palette 1 or 5 each
+                                    ; frame ("glow" is inferred: a cycling colour in the cursor's palette)
+!Battle_GlowColourA       = $233C ; 2 B: colour 14 of OBJ palette 1 (!Battle_PaletteLive+$3C)
+!Battle_GlowColourB       = $23BC ; 2 B: colour 14 of OBJ palette 5 (!Battle_PaletteLive+$BC)
+!Battle_RotObjFirst       = $2382 ; 2 B: colour 1 of OBJ palette 4 (!Battle_PaletteLive+$82): the first colour the
+                                  ; colour rotation moves to
+!Battle_RotObjLast        = $2398 ; 2 B: colour 12 of that palette, the one that wraps round to colour 1
+!Battle_DemoKeyHit        = $A097 ; 1 B: set to 1 once a button is pressed in the !Battle_Unk2989 bit 5 battle
+                                  ; (BattleCF_FrameUpdate); then !Battle_DemoQuitTimer runs
+!Battle_DemoQuitTimer     = $BB00 ; 1 B: frames left before that battle restarts the game (JML Reset); who loads it is
+                                  ; not traced
+!Battle_UnkBB80           = $BB80 ; 1 B: set to $80 just before that restart; reader not traced
+!Battle_FrameCount8       = $9931 ; 1 B: counted up each frame by BattleCF_FrameUpdate, which bumps !BattleMenu_Dirty
+                                  ; every fourth
+!Battle_EnemyPartsOn      = $AA63 ; 1 B: non-zero = BattleCF_PlaceEnemyParts keeps the enemies at offsets from one
+                                  ; of them (who sets it is not traced)
+!Battler_HitNumDelta      = $A0E7 ; 1 B per battler slot: this frame's bounce step for its hit numbers
+                                  ; (BattleCF_BounceHitNumbers)
+!BattleRom_HitNumBounce   = $D15E10 ; 1 B per step: y added to the hit numbers; !Battle_HitNumBounceEnd ends
+!BattleRom_HitNumBounceAlt = $D15E49 ; 1 B per step: the same for !Battler_HitNumAltBounce slots (the end is still
+                                     ; taken from !BattleRom_HitNumBounce)
+!BattleRom_FxCycleList    = $CCF754 ; 2 B per !Battler_FxWanted value: offset in !BattleRom_FxCycleColours of the
+                                    ; effect's colour list (BattleCF_StepFxColourCycle adds the step)
+!BattleRom_FxCycleColours = $CE0100 ; 2 B per colour: the status colour-cycle colours
+
+; --- Bank $CF: the sprite builder (BattleCF_BuildSprites, $CF:E83A-$CF:EFAE) ---
+; It runs with D = !BattleSpr_Page and works on battlers by sprite index = slot + !Battle_SprIdxBias (12-22),
+; so its per-index arrays are per-slot arrays less 12 (the slot arrays at $1D0C/$1D23 are !Battler_ScreenX/Y).
+!BattleSpr_Page           = $1D00 ; direct page of BattleCF_BuildSprites and its callees
+!BattleSpr_X              = $1D00 ; per sprite index: !Battler_ScreenX - 12 (only indexes 12-22 are used)
+!BattleSpr_Y              = $1D17 ; per sprite index: !Battler_ScreenY - 12
+!Battler_SprDrawState     = $1D45 ; 1 B per battler slot: copy of !Battler_UnkA5CD, made 1 when non-zero, $80 once the
+                                  ; battler is drawn this frame (BattleCF_BuildSprites)
+!BattleSpr_DrawState      = $1D39 ; per sprite index: !Battler_SprDrawState - 12
+!Battler_SprBytes         = $1D7F ; 1 B per battler slot: OAM bytes of the battler's sprites - 1 ((n + 1) / 16 groups
+                                  ; of four sprites are copied); 0 = not drawn. Who sets it is not traced
+!BattleSpr_Bytes          = $1D73 ; per sprite index: !Battler_SprBytes - 12
+!BattleSpr_Keys           = $1D8A ; 1 B per list entry: sort key (the battler's screen y, or !Battle_SprKeyTop)
+!BattleSpr_List           = $1DA1 ; 1 B per list entry: sprite index (| !Battle_SprListBattler for the battler's own
+                                  ; entry); !Battle_SprListEnd after the last
+!BattleSpr_LastEntry      = $1D30 ; 2 B: list entries - 1 (only while sorting; then !BattleSpr_BaseY)
+!BattleSpr_BaseX          = $1D2E ; 2 B: x the sprites are placed from
+!BattleSpr_BaseY          = $1D30 ; 2 B: y the sprites are placed from
+!BattleSpr_SprX           = $1D32 ; 2 B: x of the sprite being placed
+!BattleSpr_HistX          = $1D32 ; 1 B: x of the history record being drawn (before the sprites are placed)
+!BattleSpr_HistY          = $1D33 ; 1 B: its y
+!BattleSpr_HistXHi        = $1D34 ; 1 B: its x high byte (only the sign is used)
+!BattleSpr_HistYHi        = $1D35 ; 1 B: its y high byte
+!BattleSpr_SprCount       = $1D34 ; 2 B: sprites left to place
+!BattleSpr_AttrWord       = $1D36 ; 2 B: high byte = palette and priority bits put into each sprite's attribute
+!BattleSpr_SprY           = $1D38 ; 2 B: y of the sprite being placed
+!BattleSpr_OfsX           = $1D3A ; 2 B: signed x offset added to the base
+!BattleSpr_OfsY           = $1D3C ; 2 B: signed y offset
+!BattleSpr_ExtraOfs       = $1D42 ; 2 B: offset in !Battler_FrameExtra of the sprite's x/y words
+!BattleSpr_Pos            = $1DC3 ; 1 B (stored 16-bit): list entry being drawn
+!BattleSpr_Index          = $1DC5 ; 1 B (stored 16-bit): sprite index of that entry
+!BattleSpr_ByteCount      = $1DC7 ; 1 B (stored 16-bit): its !Battler_SprBytes
+!BattleSpr_OamOfs         = $1DC9 ; 2 B: offset in BattleOam of the next free sprite ($10 at the start: sprite 4)
+!BattleSpr_SavedIdx       = $1DCB ; 2 B: BattleCF_DrawPosHistory's sprite index
+!BattleSpr_Groups         = $1DCD ; 2 B: groups of four sprites left for BattleCF_CopySprTiles
+!BattleRom_SprTileListPtr = $CCF84D ; 2 B per sprite index: address of the battler's 4-byte sprite records whose
+                                    ; bytes 2-3 (tile, attribute) BattleCF_CopySprTiles copies ($11B0 + slot * 16 for
+                                    ; indexes 12-22; who fills them is not traced)
+!BattleRom_LayoutSprites  = $CCF50A ; 1 B read at frame layout * 2: sprites of a frame of that layout (4, 8, 12, $18,
+                                    ; $20); the bytes between belong to something else (not traced)
+!Battle_OamHighIdx        = $902D ; 1 B per OAM low-table byte offset: offset in !BattleOam_HighTable of that sprite's
+                                  ; bits (a RAM table; who builds it is not traced)
+!Battle_OamHighXBit       = $8E2D ; 1 B per OAM low-table byte offset: the sprite's x bit 8 in its high-table byte
+!Battler_PosHistXHi       = $AC64 ; 4 records of 22 B, as !Battler_PosHistX: high byte of the recorded x (0 or $FF)
+!Battler_PosHistYHi       = $AC6F ; the y part of that record 0
+!BattleRom_PathStepDX     = $CCF494 ; 1 B per path step kind * 8 + frame: signed x added each frame of a path step
+!BattleRom_PathStepDY     = $CCF594 ; the same for y
+!Battle_ActObjFrame       = $A2C0 ; 1 B per object thread: bits 0-5 = action frame (0-31) the object shows
+                                  ; (BattleCF_DrawActObj); who sets it is not traced
+!BattleCF_TmpCC           = $CC   ; 1-2 B DP scratch of the bank-$CF frame code (D = 0)
+!BattleCF_TmpCD           = $CD   ; 1 B DP scratch
+!BattleCF_TmpCE           = $CE   ; 1-2 B DP scratch
+!BattleCF_TmpCF           = $CF   ; 1 B DP scratch
+!BattleCF_TmpD0           = $D0   ; 1-2 B DP scratch
+!BattleCF_TmpD1           = $D1   ; 1 B DP scratch
+
+; A sprite record as the OAM buffer holds it, for lists addressed through X or Y (BattleCF_CopySprTiles).
+struct BattleSprRec $0000
+.X:         skip 1      ; +0: x
+.Y:         skip 1      ; +1: y
+.Tile:      skip 1      ; +2: tile (with .Attr, the word BattleCF_CopySprTiles copies)
+.Attr:      skip 1      ; +3: attribute
+endstruct align 4
+
+; The status overlay's sprites (BattleCF_DrawFxOverlay): 4 B per record, record = !Battler_FxOverlayBase / 4 + frame.
+struct BattleRom_FxOverlaySpr $CCF6D4
+.DX:        skip 1      ; +0: x added to !Battler_ScreenX (8-bit)
+.DY:        skip 1      ; +1: y added to !Battler_ScreenY
+.Tile:      skip 1      ; +2: tile
+.Attr:      skip 1      ; +3: attribute (| !Battle_ActAttrBits)
+endstruct
+
+; --- Bank $CF: movers and helpers ($CF:EFAF-$CF:FADC) ---
+!BattleCF_NearX1          = $CC   ; 1 B DP: x of the first point of BattleCF_PointsNear
+!BattleCF_NearY1          = $CD   ; 1 B DP: its y
+!BattleCF_NearX2          = $CE   ; 1 B DP: x of the second point
+!BattleCF_NearY2          = $CF   ; 1 B DP: its y
+!BattleCF_NearMargin      = $D1   ; 1 B DP: the distance (exclusive) per axis
+!BattleCF_Near            = $D0   ; 1 B DP: result, 1 = near, 0 = not
+; Battle_CalcAngleCF's variables: the same layout as !Battle_GeoOriginX.. ($D3-$E3), in WRAM.
+!BattleCF_GeoOriginX      = $AC4A ; 1 B: x of the point the angle is measured from
+!BattleCF_GeoOriginY      = $AC4B ; 1 B: its y
+!BattleCF_GeoPointX       = $AC4C ; 1 B: x of the point the angle is measured to
+!BattleCF_GeoPointY       = $AC4D ; 1 B: its y
+!BattleCF_GeoDeltaX       = $AC4E ; 2 B: signed OriginX - PointX
+!BattleCF_GeoDeltaY       = $AC50 ; 2 B: signed OriginY - PointY
+!BattleCF_GeoAngle        = $AC52 ; 1 B: the result angle
+!BattleCF_GeoTmp          = $AC53 ; 2 B: |dx| >> 3
+!BattleCF_GeoAbsDeltaX    = $AC55 ; 2 B: |dx|
+!BattleCF_GeoAbsDeltaY    = $AC57 ; 2 B: |dy|
+!BattleCF_GeoAngleIndex   = $AC59 ; 2 B: the table index; its high byte is $AC5A, !Battle_HitNumActive (see
+                                  ; Battle_CalcAngleCF)
+!Enemy_StepTimer          = $9819 ; 1 B per enemy: frames to the next move of its step (BattleCF_StepEnemies reloads it
+                                  ; from !Battler_DefMoveDelay)
+!Battle_PartsAnchor       = $A002 ; 1 B: enemy (0-7) the others are placed from by BattleCF_PlaceEnemyParts
+!Enemy_PartOfsX           = $AA64 ; 1 B per enemy: x offset from the anchor enemy (BattleCF_PlaceEnemyParts)
+!Enemy_PartOfsY           = $AA6C ; 1 B per enemy: y offset
+
+; --- Bank $CF: battle entry and exit ($CF:FAE2-$CF:FE84) ---
+!Battle_Unk9F             = $9F   ; 1 B DP: zeroed by BattleCF_EnterBattle; no other use found in bank $CF
+!Battle_UnkB9             = $B9   ; 1 B DP: set to !Battle_UnkB9Init by BattleCF_EnterBattle; reader not traced
+!Battle_Unk98CA           = $98CA ; 1 B: zeroed by BattleCF_EnterBattle; reader not traced
+!Battle_UnkA0A6           = $A0A6 ; 1 B: !Battle_Flag7F00BA bit 0 at the battle's start (BattleCF_EnterBattle);
+                                  ; reader not traced
+!Battle_Flag7F00BA        = $7F00BA ; 1 B (long): field flags byte (the menu's Menu_Flag7F00BA); bit 0 = the PCs'
+                                    ; !Battler_Untargetable come from !Battle_Unk7F00B4, bit 1 clear = !BattleMenu_Lock
+!Battle_Unk7F00B4         = $7F00B4 ; 1 B (long) per character id: copied to the PC's !Battler_Untargetable when
+                                    ; !Battle_Flag7F00BA bit 0 is set (the menu's Menu_Unk7F00B4)
+; Positions written back for the field engine at the battle's end (the field's FieldBtlPc / FieldBtlObj records).
+struct Battle_FieldPc $29B0       ; 5 B per PC slot 0-2
+.TileX:     skip 1      ; +0: screen x / 16
+.TileY:     skip 1      ; +1: screen y / 16
+.SubX:      skip 1      ; +2: screen x & 15
+.SubY:      skip 1      ; +3: screen y & 15
+.Frame:     skip 1      ; +4: !Battler_FrameShown
+endstruct
+struct Battle_FieldObj $29BF      ; 12 B per enemy 0-7 (the field's other objects)
+.TileX:     skip 1      ; +0: screen x / 16
+.TileY:     skip 1      ; +1: screen y / 16
+.SubX:      skip 1      ; +2: screen x & 15
+.SubY:      skip 1      ; +3: screen y & 15
+.Frame:     skip 1      ; +4: !Battler_FrameShown
+            skip 2
+.Flags:     skip 1      ; +7: the field's flags (!Battle_FieldObjFlags); bit 6 = !Battle_FieldObjKind6Flag
+            skip 4
+endstruct
+!Battle_MenuMemRow        = $2C7C ; 1 B per character id (4 B apart): the menu row kept between battles (the menu's
+                                  ; Menu_Unk2C7C block); BattleCF_ExitBattle writes these four
+!Battle_MenuMemTechScroll = $2C7D ; 1 B per character id (4 B apart): the tech list scroll kept
+!Battle_MenuMemTechRow    = $2C7E ; 1 B per character id (4 B apart): the tech list row kept
+!Battle_MenuMemTech       = $2C7F ; 1 B per character id (4 B apart): the tech kept
+!Battle_MenuMemItemScroll = $2C98 ; 1 B: the item list scroll kept
+!Battle_MenuMemItemRow    = $2C99 ; 1 B: the item list row kept
+!Battle_CharRecWord3      = $2603 ; 2 B per character record (index = record offset): word 3 of the record (the
+                                  ; menu's Menu_CharRec.Word3, probably the current HP)
+!BattleRom_CharRecOffset  = $CCFC1E ; 2 B per character id 0-6: id * $50, the record's offset
 
 endif

@@ -8,20 +8,10 @@
 ; the comment says what the call site expects.
 ; ============================================================
 
-; --- Long targets of bank $C1's entry block and service 0 (EngCall_BattleMain,
-;     BattleSys_SceneSetup, BattleSys_Service6; none analysed) ---
-org $CFFB65
-BattleCF_EnterBattle:                   ; JML from $C1:001B: clears battle RAM and JMLs to $C1:8000
-org $CFFBE5
-BattleCF_UnkFBE5:                       ; JML from $C1:001F (BattleSys_ExitVec's way out of the battle)
-org $CFE300
-BattleCF_UnkE300:                       ; JML from $C1:0076 (vector $C1:0009)
-org $CFE58A
-BattleCF_UnkE58A:                       ; JML from $C1:007A (vector $C1:000C)
+; --- Long targets of bank $C1's entry block and service 0 (BattleSys_SceneSetup;
+;     none analysed) ---
 org $CCE000
 BattleCC_UnkE000:                       ; JML from $C1:0072 (vector $C1:000F)
-org $CFFE20
-BattleCF_UnkFE20:                       ; JSL from BattleSys_Service6
 org $CCE2E4
 BattleCC_UnkE2E4:                       ; JSL from BattleSys_SceneSetup (first step)
 org $CCED87
@@ -32,6 +22,15 @@ org $CD000C
 BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleSys_SceneSetup
 org $CD0012
 BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
+
+; --- Bank $CD vectors called from bank $CF (none analysed) ---
+org $CD0000
+BattleSys_VecCD0000:                    ; JSL vector (JMP $CD:0039): BattleCF_EnterBattle, before it clears battle RAM
+org $CD0006
+BattleSys_VecCD0006:                    ; JSL vector (JMP $CD:03B4): BattleCF_ExitBattle, just before it returns
+org $CD0024
+BattleSys_VecCD0024:                    ; JSL vector (JMP $CD:0043): BattleCF_RemoveMarkedEnemies, A = the enemy's
+                                        ; battler slot, after it moved the enemy to the special palette
 
 ; --- Bank $CC (battle support, called from the action code) ---
 
@@ -101,20 +100,3 @@ BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-z
 org $CD0021
 BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
                                         ; after a tech, A = 3 or $0D; not analysed
-
-; --- Bank $CF (battle support) ---
-
-org $CFFAE2
-Battle_MergePendingEntries1580:         ; JSL: called first every frame by BattleMenu_ProcessInput
-
-org $CFFD02
-Battle_QueueVramUpload_0CC0:            ; JSL: queue the status-bar map ($0CC0) for VRAM upload
-
-org $CFFD36
-Battle_QueueVramUpload_A6E1:            ; JSL: queue the tech window map ($A6E1) for VRAM upload
-
-org $CFFD6A
-Battle_QueueVramUpload_0E80:            ; JSL: queue the item list map ($0E80) for VRAM upload
-
-org $CFFD9E
-BattleFx_SetPtrA2FromTable:             ; JSL: A = PC slot; loads a per-slot pointer (name from the reference)
