@@ -703,10 +703,13 @@ BankFF_UnkF958:
 
 ; $FF:F9BB — BankFF_CharBits (9 bytes, $F9BB–$F9C3)
 ; $80 >> n for n = 0-7, then 0: a character id's bit (as in
-; !Menu_Unk29AF and the tech bytes); read by Menu_CmdJoin, Menu_CanEquip
-; (AND.l at $C2:93B8), BankFF_UnkF813, BankFF_UnkF958 and an LDA.l at
-; $C2:BC07 in unmatched code. Entry 8 (0) is reached by
-; BankFF_UnkF813 when all eight bits of a byte are set.
+; !Menu_Unk29AF and the tech bytes). Read (long addressing; these are
+; all nine references in the ROM) by Menu_CmdJoin ($C2:8C95),
+; Menu_CanEquip (AND.l at $C2:93B8), BankFF_UnkF813 ($FF:F85A,
+; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), and in unmatched
+; code: LDA.l at $C2:BC07 and $C2:BCD0, AND.l at $C2:CD59. Entry 8 (0)
+; is reached by BankFF_UnkF813 when bit 0 of a Menu_TechShown byte is
+; set (its bit search starts at 8 and stops at the first set bit).
 BankFF_CharBits:
     db $80,$40,$20,$10,$08,$04,$02,$01,$00
 

@@ -1,0 +1,9 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0000,EngCall_BattleMain,2026-10-09,rev134a,approved,a3fc95e1f0bd,"Fix ok: note names Battle_ReencodeText ($CC:F066, A=0 via TDC). Checked 9 JMPs/2 JMLs, $CF:FB65 clears RAM and JMLs $C1:8000, VecRts RTS, no $0015 caller."
+$C1:4D04,BattleAct_OpLoopAnim,2026-10-09,rev134a,approved,5d6bd9ec16a2,"Fix ok (OpShowAnimEntry). Checked all 3 paths, mode 1 no-advance, A=0 via AdvanceScript, table entry $02. nit: $81 never written; LDY.w reads $A2B7 (assumed 0)"
+$CC:E22E,Battle_InitUploadObjTiles,2026-10-09,rev134a,approved,c44279454874,"Fix ok: DMAP7=1/BBAD7=$18 set first and listed in Exit. Checked ROM bytes: $FF:9CF0/$9D30 x $40 to VRAM $0000/$0100, X/Y kept, A=0/1 via TDC/INC."
+$CC:F156,BattleAct_BuildBattlerList,2026-10-09,rev134a,approved,62c82158c2f0,"Fix ok: B=0 assumed for ASL/TAX into PcPartners ($CC:FBC8 = 01 02 / 02 00 / 00 01). Checked main bit scan, $FF-ended set, Targets copy, SavedX/Y loop."
+$FF:F548,BankFF_BuildTileSets,2026-10-09,rev134a,approved,9d315dc71628,"Fix ok: 4 ASL+ROL then ASL+ROL = glyph bits 4-3. Checked copy sizes ($B000-$BDBF), <<5 OR into 100 tiles, $9890 scratch, 3 groups, final 16-byte clear. nit: $03/$05 not written"
+$FF:F628,BankFF_LoadE4Palette,2026-10-09,rev134a,approved,b21a283a227e,"Fix ok: XBA/AND #$0700 uses DP $00 bits 0-2; $95A2+n*32. Checked halve path, DB/Exit. nit: set address is a double indirection (word at $E4:FFE8 -> table $E4:2A00, entry n); say so"
+$FF:F813,BankFF_UnkF813,2026-10-09,rev134a,approved,a23e32a4ac20,"Fix ok: DP $05=0 assumption stated, $09/$19 listed. Checked TSB list, absent mask, tech-step loop, ItemInfo0 bits, 15 records, line bits. nit: callee F958 writes $04A0-$04A8"
+$FF:F9BB,BankFF_CharBits,2026-10-09,rev134a,changes,51529af46af0,"Reader list still incomplete: unmatched LDA.l at $C2:BCD0 (JSR'd from $C2:BCC5) and AND.l at $C2:CD59 also read it. Add them or say 'among others'. nit: entry 8 = bit 0 set"
