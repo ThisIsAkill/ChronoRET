@@ -1164,4 +1164,26 @@ if !constants_menu_inc == 0
 !Menu_ItemListShift = $0080              ; two tile rows: one item
 !Menu_ItemListBytes = $0400
 
+; --- Menu mode 1: slots and item list set-up ---
+!MenuRom_SlotsCloseList = $FFBDEF        ; draw list of Menu_EquipSlotsClose
+!MenuRom_SlotsOpenList = $FFBE6D         ; ... of Menu_EquipSlotsOpen
+!MenuRom_ItemsOpenList = $FFBEEC         ; ... of Menu_EquipItemsOpen
+!Menu_Mode01HdmaTable = $9300            ; the NMI move's destination in mode 1 (an HDMA table, probably)
+!Menu_Mode01HdmaBytesA = $0013           ; its size with the member list ...
+!Menu_Mode01HdmaBytesB = $0025           ; ... and with the slot and item lists
+!Menu_SlotsBlankTile = $40FF
+!Menu_SlotsHdmaBits = $C5                ; Menu_HdmaenShadow in handler 2's set-up (not traced)
+!Menu_ItemsHdmaBits = $DF                ; ... in handler 3's
+!Menu_SlotNameMap = $3086                ; where Menu_DrawSlotName draws
+!Menu_SlotNameLen = $0A                  ; 10 tiles, two-row text
+!Menu_SlotNameRows = $3040               ; the two tile rows it copies ...
+!Menu_SlotNameCopyOfs = $0800            ; ... this far on
+!Menu_SlotRowsMap = $3062                ; the first slot row
+!Menu_SlotRowDimAttr = $1C0B             ; Menu_SetAttr2Rows' A: 11 tiles, attribute $1C (palette 7) ...
+!Menu_SlotRowLitAttr = $000B             ; ... or 0 (the selected slot)
+!Menu_ItemsArrowXY = $4268               ; Menu_ArrowX $68, Menu_ArrowY $42
+!Menu_RefreshArrowXY = $6268             ; Menu_ArrowX $68, Menu_ArrowY $62
+!Menu_EquipArrowSpan = $1500             ; dividend of the item list's arrow factors
+!Menu_EquipPageRows = 8                  ; item list rows per page
+
 endif

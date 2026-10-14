@@ -24278,28 +24278,29 @@ Menu_Unk834D:
 ;   $C2:9E34, JSR $C2:9E6D), Menu_HighlightMemberRow (JSR $C2:9EAB), Menu_EquipSlotIdle (JSR
 ;   $C2:9EEE), Menu_EquipItemIdle (JMP $C2:9F2C, JSR $C2:9F8A, JMP $C2:9FDB), Menu_Icon0Preview (JSR
 ;   $C2:A0A9), Menu_Mode01Init (JSR $C2:A16B), Menu_DrawMemberStatus (JSR $C2:A26E),
+;   Menu_EquipSlotsClose (JSR $C2:A31C), Menu_EquipSlotsOpen (JSR $C2:A375, JSR $C2:A37B, JSR
+;   $C2:A381), Menu_EquipItemsOpen (JSR $C2:A429), Menu_EquipListSetup (JSR $C2:A473),
 ;   Menu_LoadWindowGfx (JSR $C2:C540), Menu_LoadSlotSummaries (JSR $C2:D193) and unmatched (JSR
-;   $C2:8F76, JSR $C2:A31C, JSR $C2:A375, JSR $C2:A37B, JSR $C2:A381, JSR $C2:A429, JSR $C2:A473,
-;   JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR $C2:A6A3, JSR $C2:A6A9, JSR
-;   $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB, JSR $C2:A901, JSR $C2:A94E,
-;   JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR $C2:AD9E, JSR $C2:ADB8, JSR
-;   $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1, JSR $C2:AF59, JSR $C2:B040,
-;   JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP $C2:B4DB, JSR $C2:B563, JSR
-;   $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955, JSR $C2:B95B, JSR $C2:B974,
-;   JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR $C2:BC90, JSR $C2:BEBD, JSR
-;   $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2, JMP $C2:C204, JSR $C2:C331,
-;   JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR $C2:C3DD, JSR $C2:C779, JSR
-;   $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E, JSR $C2:CAD5, JSR $C2:CB7A, JSR $C2:CB80,
-;   JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA, JSR
-;   $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4, JSR $C2:D0D0, JSR $C2:D0D6, JSR $C2:D100,
-;   JSR $C2:D106, JSR $C2:D401, JSR $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP $C2:D712, JMP
-;   $C2:D775, JMP $C2:D828, JSR $C2:D875, JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C, JSR $C2:DB82,
-;   JSR $C2:DB88, JSR $C2:DB8E, JSR $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR $C2:DFF6, JSR
-;   $C2:DFFC, JSR $C2:E00D, JSR $C2:E053, JSR $C2:E103, JSR $C2:E185, JSR $C2:E293, JSR $C2:E454,
-;   JSR $C2:E50A, JSR $C2:E510, JSR $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR $C2:E5C2, JSR
-;   $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702, JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR $C2:E7BE,
-;   JSR $C2:E82A, JSR $C2:E830, JSR $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885, JSR
-;   $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE, JSR $C2:FEF4, JSR $C2:FF21).
+;   $C2:8F76, JSR $C2:A4DF, JSR $C2:A4E5, JSR $C2:A549, JSR $C2:A63D, JSR $C2:A6A3, JSR $C2:A6A9,
+;   JSR $C2:A73C, JSR $C2:A742, JSR $C2:A78E, JSR $C2:A88C, JSR $C2:A8FB, JSR $C2:A901, JSR
+;   $C2:A94E, JSR $C2:AB08, JSR $C2:AB56, JMP $C2:AC6B, JSR $C2:ACB6, JSR $C2:AD9E, JSR $C2:ADB8,
+;   JSR $C2:ADBE, JSR $C2:AE18, JSR $C2:AE3B, JSR $C2:AEAB, JSR $C2:AEB1, JSR $C2:AF59, JSR
+;   $C2:B040, JMP $C2:B1F5, JMP $C2:B3A8, JMP $C2:B3E3, JSR $C2:B4D5, JMP $C2:B4DB, JSR $C2:B563,
+;   JSR $C2:B602, JSR $C2:B649, JSR $C2:B72A, JSR $C2:B77D, JSR $C2:B955, JSR $C2:B95B, JSR
+;   $C2:B974, JSR $C2:B99C, JSR $C2:B9A2, JSR $C2:B9A8, JSR $C2:BBD1, JSR $C2:BC90, JSR $C2:BEBD,
+;   JSR $C2:BEC3, JSR $C2:BEC9, JMP $C2:BF9C, JSR $C2:BFBE, JSR $C2:BFF2, JMP $C2:C204, JSR
+;   $C2:C331, JSR $C2:C38C, JSR $C2:C392, JSR $C2:C3B0, JSR $C2:C3D7, JSR $C2:C3DD, JSR $C2:C779,
+;   JSR $C2:C92E, JSR $C2:CA52, JSR $C2:CA58, JSR $C2:CA5E, JSR $C2:CAD5, JSR $C2:CB7A, JSR
+;   $C2:CB80, JSR $C2:CB86, JSR $C2:CE8D, JMP $C2:CE93, JSR $C2:CF27, JMP $C2:CF2D, JSR $C2:CFEA,
+;   JSR $C2:CFF0, JSR $C2:CFF6, JSR $C2:D074, JSR $C2:D0A4, JSR $C2:D0D0, JSR $C2:D0D6, JSR
+;   $C2:D100, JSR $C2:D106, JSR $C2:D401, JSR $C2:D4D0, JSR $C2:D4EB, JSR $C2:D5F2, JMP $C2:D712,
+;   JMP $C2:D775, JMP $C2:D828, JSR $C2:D875, JMP $C2:D90B, JSR $C2:D958, JSR $C2:DB7C, JSR
+;   $C2:DB82, JSR $C2:DB88, JSR $C2:DB8E, JSR $C2:DCB9, JMP $C2:DEC9, JSR $C2:DFC0, JSR $C2:DFF6,
+;   JSR $C2:DFFC, JSR $C2:E00D, JSR $C2:E053, JSR $C2:E103, JSR $C2:E185, JSR $C2:E293, JSR
+;   $C2:E454, JSR $C2:E50A, JSR $C2:E510, JSR $C2:E516, JSR $C2:E51C, JSR $C2:E522, JSR $C2:E5C2,
+;   JSR $C2:E5C8, JSR $C2:E5CE, JMP $C2:E702, JMP $C2:E740, JSR $C2:E7B2, JSR $C2:E7B8, JSR
+;   $C2:E7BE, JSR $C2:E82A, JSR $C2:E830, JSR $C2:E836, JSR $C2:E83C, JSR $C2:E87F, JSR $C2:E885,
+;   JSR $C2:E8AD, JSR $C2:E8B3, JSR $C2:FEEE, JSR $C2:FEF4, JSR $C2:FF21).
 ; Callers of Menu_QueueVramWram (6 JSR sites): Menu_SprUploadTiles ($C2:F84D, $C2:F859, $C2:F86C)
 ;   and unmatched ($C2:E90C, $C2:FB17, $C2:FB92).
 ; Entry (all): M, X any (P saved; Menu_VramQueueSlot sets M=0, X=0), DP any,
@@ -25256,10 +25257,10 @@ Menu_LoadCharRec:
 ; (Menu_LoadCharRecA); Menu_CurIsReserve = $FF when that index is past
 ; the active members (Menu_PartyActive), else 0.
 ; Callers (29 JSR sites): Menu_MemberScrollAnim ($C2:9DB9), Menu_DrawMemberRows ($C2:A1C3),
-;   Menu_DrawMemberStatus ($C2:A244) and unmatched ($C2:8E5D, $C2:8F99, $C2:A2DE, $C2:A336,
-;   $C2:AFFB, $C2:B28B, $C2:B2E0, $C2:B30E, $C2:B41F, $C2:B4B2, $C2:B507, $C2:B5D8, $C2:B696,
-;   $C2:B6DF, $C2:B82E, $C2:B89E, $C2:B9F2, $C2:BA78, $C2:BC9E, $C2:BE88, $C2:C8CB, $C2:CD9E,
-;   $C2:D7BE, $C2:E0C0, $C2:E131, $C2:E165).
+;   Menu_DrawMemberStatus ($C2:A244), Menu_EquipSlotsClose ($C2:A2DE), Menu_EquipSlotsOpen
+;   ($C2:A336) and unmatched ($C2:8E5D, $C2:8F99, $C2:AFFB, $C2:B28B, $C2:B2E0, $C2:B30E, $C2:B41F,
+;   $C2:B4B2, $C2:B507, $C2:B5D8, $C2:B696, $C2:B6DF, $C2:B82E, $C2:B89E, $C2:B9F2, $C2:BA78,
+;   $C2:BC9E, $C2:BE88, $C2:C8CB, $C2:CD9E, $C2:D7BE, $C2:E0C0, $C2:E131, $C2:E165).
 ; Entry: M, X any (P, X and Y saved; SEP #$30 here), DP=$0000, DB=$7E
 ; Exit:  P, X and Y restored; A as Menu_LoadCharRecA leaves it
 ; Calls: Menu_LoadCharRecA.
@@ -25502,7 +25503,7 @@ Menu_EquipSlotOffsets:
 ; Quirk, kept: the inner sort loop ends at the first key of 0, which is
 ; meant to be that of the end id 0 ($7E:7C00); an item whose key is 0
 ; ends it early.
-; Callers (2 JSR sites): Menu_Mode01H1 ($C2:9C61) and unmatched ($C2:A466).
+; Callers (2 JSR sites): Menu_Mode01H1 ($C2:9C61) and Menu_EquipListSetup ($C2:A466).
 ; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00/01),
 ;        DB=$7E
 ; Exit:  P restored; A, X, Y clobbered; Menu_ItemId = the last id tested;
@@ -25946,8 +25947,8 @@ Menu_CursorPosAB:
 
 ; $C2:8B93 — Menu_StartListArrows (19 bytes, $8B93–$8BA5)
 ; Menu_ArrowsOff = 0 and starts Menu_ListArrowsThread in slot 4.
-; Callers (7 JSR sites): Menu_MemberArrows ($C2:A193) and unmatched ($C2:A4A3, $C2:AE02, $C2:B9DA,
-;   $C2:CB5A, $C2:DCB3, $C2:DEC2).
+; Callers (7 JSR sites): Menu_MemberArrows ($C2:A193), Menu_EquipListSetup ($C2:A4A3) and unmatched
+;   ($C2:AE02, $C2:B9DA, $C2:CB5A, $C2:DCB3, $C2:DEC2).
 ; Entry: M, X any (P saved; SEP #$20 / REP #$30 here), DP=$0000, DB=$7E
 ; Exit:  P restored; A = Menu_ThNewWait1, X = $20; Y unchanged
 ; Calls: Menu_StartThread.
@@ -25965,8 +25966,8 @@ Menu_StartListArrows:
 ; $C2:8BA6 — Menu_Times4 (18 bytes, $8BA6–$8BB7)
 ; A = the low byte of A x 4, through the hardware multiplier (two XBAs
 ; and a NOP as the wait).
-; Callers (6 JSR sites): Menu_EquipItemIdle ($C2:9F17, $C2:9FBE) and unmatched ($C2:A49A, $C2:B6F2,
-;   $C2:B7BA, $C2:BB76).
+; Callers (6 JSR sites): Menu_EquipItemIdle ($C2:9F17, $C2:9FBE), Menu_EquipListSetup ($C2:A49A) and
+;   unmatched ($C2:B6F2, $C2:B7BA, $C2:BB76).
 ; Entry: M=1 (8-bit), X any, DP any, DB any (long registers)
 ; Exit:  M=1; A = (A x 4) AND $FF; B unchanged; X, Y unchanged
 ; No calls.
@@ -28379,8 +28380,8 @@ Menu_Mode01List:
 ; picks a member (the list of Menu_Icon0Preview), handler 2 one of the
 ; character's slots (Menu_ListKind), handler 3 an item from
 ; Menu_EquipList for it, which confirming swaps with the character's
-; record byte (Menu_AddItem / Menu_RemoveItem): probably the equipment
-; screen.
+; record byte (Menu_AddItem / Menu_RemoveItem): the equipment screen
+; (the slots are named by Menu_EquipSlotNames).
 
 org $C29C31
 ; $C2:9C31 — Menu_Mode01H0 (8 bytes, $9C31–$9C38)
@@ -28398,14 +28399,14 @@ Menu_Mode01H0:
 ; $C2:9C39 — Menu_Mode01H1 (55 bytes, $9C39–$9C6F)
 ; Handler 1, every frame: Menu_PadInput. Right on the D-pad (bit 0 of
 ; Menu_CursorDpad) or confirm: Menu_Unk84 = $FF, Menu_ThreadVar + 1 (to
-; handler 2), Menu_PlaySound0, Menu_UnkA71E, Menu_UnkA321, a frame's
+; handler 2), Menu_PlaySound0, Menu_UnkA71E, Menu_EquipSlotsOpen, a frame's
 ; wait, Menu_PlaySound0, Menu_ListEquipItems, Menu_UnkA569 and
 ; Menu_VramRecBg3 queued (a tail jump). Cancel: back to the main menu
 ; (Menu_ReturnToMainMenu). Else Menu_MemberCursor (a tail jump).
 ; Callers note: Menu_Mode01List entry 1 (run by Menu_MainThread).
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
 ; Exit:  as the routine it ends in
-; Calls: Menu_PadInput, Menu_PlaySound0, Menu_UnkA71E, Menu_UnkA321,
+; Calls: Menu_PadInput, Menu_PlaySound0, Menu_UnkA71E, Menu_EquipSlotsOpen,
 ;   Menu_Yield, Menu_ListEquipItems, Menu_UnkA569; jumps to
 ;   Menu_QueueVramRom, Menu_ReturnToMainMenu or Menu_MemberCursor.
 Menu_Mode01H1:
@@ -28423,7 +28424,7 @@ Menu_Mode01H1:
     INC.b !Menu_ThreadVar
     JSR Menu_PlaySound0
     JSR Menu_UnkA71E
-    JSR Menu_UnkA321
+    JSR Menu_EquipSlotsOpen
     JSR Menu_Yield
     JSR Menu_PlaySound0
     JSR Menu_ListEquipItems
@@ -28436,15 +28437,15 @@ Menu_Mode01H1:
 ; $C2:9C70 — Menu_Mode01H2 (53 bytes, $9C70–$9CA4)
 ; Handler 2, every frame: Menu_PadInput. Left (Menu_CursorDpad bit 1)
 ; or cancel: Menu_ThreadVar = 1 (handler 1), Menu_PlaySound0,
-; Menu_UnkA85C and a tail jump to Menu_UnkA2CD. Confirm: Menu_CursorSel
+; Menu_UnkA85C and a tail jump to Menu_EquipSlotsClose. Confirm: Menu_CursorSel
 ; = Menu_ListKind; with Menu_EquipListLen 0, Menu_PlaySound1 only (a
 ; tail jump); else Menu_PlaySound0, Menu_ThreadVar + 1 (handler 3) and a
-; tail jump to Menu_UnkA41A. Else Menu_EquipSlotIdle (a tail jump).
+; tail jump to Menu_EquipItemsOpen. Else Menu_EquipSlotIdle (a tail jump).
 ; Callers note: Menu_Mode01List entry 2 (run by Menu_MainThread).
 ; Entry: M=1, X=0 (from Menu_MainThread), DP=$0000, DB=$7E
 ; Exit:  as the routine it ends in
 ; Calls: Menu_PadInput, Menu_PlaySound0, Menu_UnkA85C; jumps to
-;   Menu_UnkA2CD, Menu_PlaySound1, Menu_UnkA41A or Menu_EquipSlotIdle.
+;   Menu_EquipSlotsClose, Menu_PlaySound1, Menu_EquipItemsOpen or Menu_EquipSlotIdle.
 Menu_Mode01H2:
     JSR Menu_PadInput
     LDA.b !Menu_CursorDpad
@@ -28463,13 +28464,13 @@ Menu_Mode01H2:
 .open:
     JSR Menu_PlaySound0
     INC.b !Menu_ThreadVar
-    JMP Menu_UnkA41A
+    JMP Menu_EquipItemsOpen
 .back:
     LDA.b #1
     STA.b !Menu_ThreadVar
     JSR Menu_PlaySound0
     JSR Menu_UnkA85C
-    JMP Menu_UnkA2CD
+    JMP Menu_EquipSlotsClose
 
 ; $C2:9CA5 — Menu_Mode01H3 (87 bytes, $9CA5–$9CFB)
 ; Handler 3, every frame: Menu_PadInput. Neither confirm nor cancel:
@@ -28779,8 +28780,8 @@ Menu_MemberScrollAnim:
 ; where Menu_Icon0Preview puts the dimmed colours) except on row
 ; Menu_Unk0412 (the cursor's), whose bits 4-7 are cleared
 ; (Menu_SetMemberRowAttr); then Menu_VramRecBg2B queued.
-; Callers (4 JSR sites): Menu_MemberCursor ($C2:9D40), Menu_Icon0Preview ($C2:A0DC) and unmatched
-;   ($C2:A316, $C2:A8A1).
+; Callers (4 JSR sites): Menu_MemberCursor ($C2:9D40), Menu_Icon0Preview ($C2:A0DC),
+;   Menu_EquipSlotsClose ($C2:A316) and unmatched ($C2:A8A1).
 ; Entry: M, X any (P saved; REP #$30 here), DP=$0000 (Menu_Tmp00-05),
 ;        DB=$7E
 ; Exit:  P restored; A, X, Y clobbered; Menu_MapPtr, Menu_Tmp00-07
@@ -28843,22 +28844,22 @@ Menu_SetMemberRowAttr:
     JMP Menu_SetRowsAttr
 
 ; $C2:9ECD — Menu_EquipSlotIdle (56 bytes, $9ECD–$9F04)
-; Handler 2's frame without confirm or cancel: Menu_UnkA38B,
+; Handler 2's frame without confirm or cancel: Menu_DrawSlotName,
 ; Menu_MemberPageSwitch, Menu_PlaySound0 when Menu_CursorSel differs
-; from Menu_Unk0FC5 (which takes it), Menu_UnkA3E2, Menu_HdmaenShadow =
+; from Menu_Unk0FC5 (which takes it), Menu_HighlightSlot, Menu_HdmaenShadow =
 ; Menu_EquipHdmaBits, Menu_VramRecClock queued; when Menu_ListKind +
 ; Menu_CurMember differs from Menu_Unk84 (which takes it), a frame's
-; wait and Menu_UnkA45D.
+; wait and Menu_EquipListRefresh.
 ; Callers (1 JMP site): Menu_Mode01H2 ($C2:9C80).
 ; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000,
 ;        DB=$7E; from a menu thread (it may yield)
 ; Exit:  P restored; A, X, Y clobbered
-; Calls: Menu_UnkA38B, Menu_MemberPageSwitch, Menu_PlaySound0,
-;   Menu_UnkA3E2, Menu_QueueVramRom, Menu_Yield, Menu_UnkA45D.
+; Calls: Menu_DrawSlotName, Menu_MemberPageSwitch, Menu_PlaySound0,
+;   Menu_HighlightSlot, Menu_QueueVramRom, Menu_Yield, Menu_EquipListRefresh.
 Menu_EquipSlotIdle:
     PHP
     SEP #$20
-    JSR Menu_UnkA38B
+    JSR Menu_DrawSlotName
     JSR Menu_MemberPageSwitch
     LDA.b !Menu_CursorSel
     CMP.w !Menu_Unk0FC5
@@ -28866,7 +28867,7 @@ Menu_EquipSlotIdle:
     BEQ .same
     JSR Menu_PlaySound0
 .same:
-    JSR Menu_UnkA3E2
+    JSR Menu_HighlightSlot
     LDA.b #!Menu_EquipHdmaBits
     STA.w !Menu_NmiDp+!Menu_HdmaenShadow
     LDX.w #Menu_VramRecClock
@@ -28878,7 +28879,7 @@ Menu_EquipSlotIdle:
     STA.b !Menu_Unk84
     BEQ .done
     JSR Menu_Yield
-    JSR Menu_UnkA45D
+    JSR Menu_EquipListRefresh
 .done:
     PLP
     RTS
@@ -29042,13 +29043,13 @@ Menu_ShiftItemListMap:
 ; wraps to 0), bit 0 the one before (0 wraps to Menu_Unk85 - 1). A new
 ; Menu_CurMember is also stored in Menu_Unk0412 and, from member 2 on,
 ; split as Menu_Unk0413 = it - 2 and Menu_Unk0412 = 2 (Menu_Unk0413 =
-; 0 below); then Menu_PlaySound0, Menu_RedrawMember, Menu_UnkA3E2 and a
+; 0 below); then Menu_PlaySound0, Menu_RedrawMember, Menu_HighlightSlot and a
 ; frame's wait.
 ; Callers (1 JSR site): Menu_EquipSlotIdle ($C2:9ED3).
 ; Entry: M, X any (P saved; SEP #$30 here), DP=$0000, DB=$7E; from a
 ;        menu thread (it may yield)
 ; Exit:  P restored; A, X, Y clobbered
-; Calls: Menu_PlaySound0, Menu_RedrawMember, Menu_UnkA3E2, Menu_Yield.
+; Calls: Menu_PlaySound0, Menu_RedrawMember, Menu_HighlightSlot, Menu_Yield.
 Menu_MemberPageSwitch:
     PHP
     SEP #$30
@@ -29084,7 +29085,7 @@ Menu_MemberPageSwitch:
 .redraw:
     JSR Menu_PlaySound0
     JSR Menu_RedrawMember
-    JSR Menu_UnkA3E2
+    JSR Menu_HighlightSlot
     JSR Menu_Yield
 .done:
     PLP
@@ -29290,7 +29291,7 @@ Menu_Mode01Init:
 ; $7400 / that (RDDIV), Menu_StartListArrows (which also waits out the
 ; division), Menu_ArrowX/Y = $68 / $12, Menu_ListTop = 12 x
 ; Menu_Unk0413.
-; Callers (2 JSR sites): Menu_Mode01Init ($C2:A15D) and unmatched ($C2:A2ED).
+; Callers (2 JSR sites): Menu_Mode01Init ($C2:A15D) and Menu_EquipSlotsClose ($C2:A2ED).
 ; Entry: M=1 (8-bit stores to the multiplier), X=0 (16-bit LDX/STX),
 ;        DP=$0000, DB any (P and DB saved; DB=$00 here)
 ; Exit:  P and DB restored; A, X clobbered (as Menu_StartListArrows
@@ -29415,7 +29416,7 @@ Menu_MemberRowFlags:
 ; Menu_MemberRowFlags, then the draw list MenuRom_MemberRowList (a
 ; tail jump).
 ; Callers (6 JSR sites): Menu_MemberScrollAnim ($C2:9DBE), Menu_DrawMemberRows ($C2:A1CF),
-;   Menu_RedrawMember ($C2:A22A) and unmatched ($C2:A33E, $C2:A65B, $C2:CDAD).
+;   Menu_RedrawMember ($C2:A22A), Menu_EquipSlotsOpen ($C2:A33E) and unmatched ($C2:A65B, $C2:CDAD).
 ; Entry: M any, X=0 (16-bit LDX), DP=$0000, DB=$7E
 ; Exit:  as Menu_RunDrawList
 ; Calls: Menu_MemberRowFlags; jumps to Menu_RunDrawList.
@@ -29544,6 +29545,316 @@ Menu_DrawCharIcon:
 ; MenuRom_CharIconPals (Menu_DrawCharIcon).
 Menu_CharIconIndex:
     db $00, $04, $06, $08, $04, $08, $02
+
+; ============================================================
+; Menu mode 1: the slot list and the item list set-up
+; ($C2:A2CD–$C2:A4AE)
+; ============================================================
+; The four slots of handler 2 are named by Menu_EquipSlotNames ("Weapon",
+; "Helmet", "Armor", "Accessory" in the menu's text encoding), and each
+; has a byte of the character record (Menu_EquipSlotRecOfs): mode 1 is
+; the equipment screen.
+
+; $C2:A2CD — Menu_EquipSlotsClose (84 bytes, $A2CD–$A320)
+; Back from handler 2 to handler 1: Menu_ScrollStep's low byte = 0,
+; Menu_CursorSel = Menu_Unk0412, Menu_CurMember = it + Menu_Unk0413 and
+; loaded (Menu_LoadPartyCharRec), Menu_UnkA6F0 (X = $30A2), the draw
+; list MenuRom_SlotsCloseList, the member list arrows
+; (Menu_MemberArrows), the NMI move set to Menu_ScrollBuild ->
+; Menu_Mode01HdmaTable ($13 bytes), Menu_Unk5D42's 12 words = $61FF,
+; Menu_HighlightMemberRow and Menu_VramRecClock queued.
+; Callers (1 JMP site): Menu_Mode01H2 ($C2:9CA2).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X=0 (16-bit LDX),
+;        DP=$0000, DB=$7E
+; Exit:  P restored; DB=$7E; A, X, Y clobbered
+; Calls: Menu_LoadPartyCharRec, Menu_UnkA6F0, Menu_RunDrawList,
+;   Menu_MemberArrows, Menu_HighlightMemberRow, Menu_QueueVramRom.
+Menu_EquipSlotsClose:
+    PHP
+    SEP #$20
+    STZ.w !Menu_ScrollStep
+    LDA.w !Menu_Unk0412
+    STA.b !Menu_CursorSel
+    CLC
+    ADC.w !Menu_Unk0413
+    STA.b !Menu_CurMember
+    JSR Menu_LoadPartyCharRec
+    LDX.w #!Menu_StatusUnkMap
+    JSR Menu_UnkA6F0
+    LDX.w #!MenuRom_SlotsCloseList&$FFFF
+    JSR Menu_RunDrawList
+    JSR Menu_MemberArrows
+    REP #$30
+    LDA.w #!Menu_ScrollBuild
+    STA.w !Menu_NmiMoveSrc
+    LDA.w #!Menu_Mode01HdmaTable
+    STA.w !Menu_NmiMoveDest
+    LDA.w #!Menu_Mode01HdmaBytesA
+    STA.w !Menu_NmiMoveSize
+    LDA.w #!Menu_Icon0BlankTile
+    STA.w !Menu_Unk5D42
+    LDX.w #!Menu_Unk5D42
+    LDY.w #!Menu_Unk5D42+2
+    LDA.w #!Menu_Icon0RowBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    JSR Menu_HighlightMemberRow
+    LDX.w #Menu_VramRecClock
+    JSR Menu_QueueVramRom
+    PLP
+    RTS
+
+; $C2:A321 — Menu_EquipSlotsOpen (106 bytes, $A321–$A38A)
+; From handler 1 to handler 2: the draw list MenuRom_SlotsOpenList,
+; Menu_CurMember = Menu_Unk0412 + Menu_Unk0413 loaded and its row drawn
+; at the top of the BG1 map ($7E:2E00, Menu_DrawMemberRow), the 12 tile
+; words at $7E:5CC2 = $40FF, the NMI move Menu_ScrollBuild ->
+; Menu_Mode01HdmaTable ($25 bytes), Menu_CursorSel = 0 and its slot
+; name (Menu_DrawSlotName), the palette flagged, Menu_ArrowsOff - 1 (the
+; list arrows off), Menu_VramRecClock, Menu_VramRecBg2B and
+; Menu_VramRecBg3Rows58 queued, Menu_HdmaenShadow = Menu_SlotsHdmaBits.
+; Callers (1 JSR site): Menu_Mode01H1 ($C2:9C58).
+; Entry: M, X any (P saved; REP #$30 / SEP #$20 here), DP=$0000, DB=$7E
+; Exit:  P restored; DB=$7E; A, X, Y clobbered
+; Calls: Menu_RunDrawList, Menu_LoadPartyCharRec, Menu_DrawMemberRow,
+;   Menu_DrawSlotName, Menu_QueueVramRom.
+Menu_EquipSlotsOpen:
+    PHP
+    REP #$30
+    LDX.w #!MenuRom_SlotsOpenList&$FFFF
+    JSR Menu_RunDrawList
+    LDA.w !Menu_Unk0412
+    CLC
+    ADC.w !Menu_Unk0413
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_CurMember
+    JSR Menu_LoadPartyCharRec
+    LDA.w #!Menu_MemberMapFirst
+    STA.b !Menu_MapPtr
+    JSR Menu_DrawMemberRow
+    LDA.w #!Menu_SlotsBlankTile
+    STA.w !Menu_Unk5CC2
+    LDX.w #!Menu_Unk5CC2
+    LDY.w #!Menu_Unk5CC2+2
+    LDA.w #!Menu_Icon0RowBytes-3
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    LDA.w #!Menu_ScrollBuild
+    STA.w !Menu_NmiMoveSrc
+    LDA.w #!Menu_Mode01HdmaTable
+    STA.w !Menu_NmiMoveDest
+    LDA.w #!Menu_Mode01HdmaBytesB
+    STA.w !Menu_NmiMoveSize
+    SEP #$20
+    STZ.b !Menu_CursorSel
+    JSR Menu_DrawSlotName
+    INC.w !Menu_PalDirty
+    DEC.w !Menu_ArrowsOff
+    LDX.w #Menu_VramRecClock
+    JSR Menu_QueueVramRom
+    LDX.w #Menu_VramRecBg2B
+    JSR Menu_QueueVramRom
+    LDX.w #Menu_VramRecBg3Rows58
+    JSR Menu_QueueVramRom
+    LDA.b #!Menu_SlotsHdmaBits
+    STA.w !Menu_NmiDp+!Menu_HdmaenShadow
+    PLP
+    RTS
+
+; $C2:A38B — Menu_DrawSlotName (47 bytes, $A38B–$A3B9)
+; Menu_ListKind = Menu_CursorSel (the slot) and its name,
+; Menu_EquipSlotNames[slot] (10 tiles, bank $C2), drawn at $7E:3086 with
+; Menu_TextWord = 0 (Menu_DrawString); then the two tile rows at
+; $7E:3040 are copied to $7E:3840.
+; Callers (2 JSR sites): Menu_EquipSlotIdle ($C2:9ED0) and Menu_EquipSlotsOpen ($C2:A369).
+; Entry: M any (P saved; SEP #$20 / REP #$30 here), X any, DP=$0000 (the
+;        TDC: B = 0), DB=$7E
+; Exit:  P restored; DB=$7E; A = $FFFF, X and Y past the copy;
+;        Menu_Tmp00 = slot x 2
+; Calls: Menu_DrawString.
+Menu_DrawSlotName:
+    PHP
+    SEP #$20
+    TDC                                 ; B = 0
+    LDA.b !Menu_CursorSel
+    STA.w !Menu_ListKind
+    REP #$30
+    ASL A
+    STA.b !Menu_Tmp00
+    ASL A
+    ASL A
+    ADC.b !Menu_Tmp00                   ; x 10 (C=0 from the ASLs)
+    ADC.w #Menu_EquipSlotNames&$FFFF    ; (C=0)
+    TAY
+    STZ.b !Menu_TextWord
+    LDX.w #!Menu_SlotNameMap
+    LDA.w #(Menu_EquipSlotNames>>16)<<8|!Menu_SlotNameLen ; bank $C2
+    JSR Menu_DrawString
+    LDX.w #!Menu_SlotNameRows
+    LDY.w #!Menu_SlotNameRows+!Menu_SlotNameCopyOfs
+    LDA.w #(2*!Menu_MapRowBytes)-1
+    MVN !Bank7E,!Bank7E                 ; lint-ok: MVN operands are bank bytes; asar rejects a width suffix on MVN
+    PLP
+    RTS
+
+; $C2:A3BA — Menu_EquipSlotNames (40 bytes, $A3BA–$A3E1)
+; The four slot names, 10 bytes each in the menu's text encoding ($FF
+; blank, $A0 'A', $BA 'a'): "  Weapon  ", "  Helmet  ", "  Armor   ",
+; " Accessory" (the last ends with a 0 byte, which ends the string).
+Menu_EquipSlotNames:
+    db $FF, $FF, $B6, $BE, $BA, $C9, $C8, $C7, $FF, $FF
+    db $FF, $FF, $A7, $BE, $C5, $C6, $BE, $CD, $FF, $FF
+    db $FF, $FF, $A0, $CB, $C6, $C8, $CB, $FF, $FF, $FF
+    db $A0, $BC, $BC, $BE, $CC, $CC, $C8, $CB, $D2, $00
+
+; $C2:A3E2 — Menu_HighlightSlot (11 bytes, $A3E2–$A3EC)
+; Menu_SetSlotRowsAttr from $7E:3062.
+; Callers (3 JSR sites): Menu_EquipSlotIdle ($C2:9EE3), Menu_MemberPageSwitch ($C2:A049) and
+;   unmatched ($C2:A65E).
+; Entry: M, X any (P saved; REP #$30 here), DP=$0000, DB=$7E
+; Exit:  P restored; as Menu_SetSlotRowsAttr
+; Calls: Menu_SetSlotRowsAttr.
+Menu_HighlightSlot:
+    PHP
+    REP #$30
+    LDX.w #!Menu_SlotRowsMap
+    JSR Menu_SetSlotRowsAttr
+    PLP
+    RTS
+
+; $C2:A3ED — Menu_SetSlotRowsAttr (45 bytes, $A3ED–$A419)
+; For the 4 slot rows (two tile rows each, $80 bytes apart) from X:
+; the attribute byte of 11 tiles in both tile rows (Menu_SetAttr2Rows)
+; = $1C (palette 7) except on row Menu_ListKind (the selected slot): 0.
+; Callers (2 JSR sites): Menu_HighlightSlot ($C2:A3E8) and unmatched ($C2:E15D).
+; Entry: M=0, X=0 (16-bit), DP=$0000 (Menu_Tmp00-03, Menu_MapPtr),
+;        DB=$7E; X = the first row's map address
+; Exit:  M=0, X=0; A = 4; Menu_MapPtr 4 rows on; X, Y as
+;        Menu_SetAttr2Rows leaves them; Menu_Tmp00/02 changed
+; Calls: Menu_SetAttr2Rows.
+Menu_SetSlotRowsAttr:
+    STX.b !Menu_MapPtr
+    LDA.w !Menu_ListKind
+    AND.w #!Eng_LowByteMask
+    STA.b !Menu_Tmp00
+    STZ.b !Menu_Tmp02
+.row:
+    LDA.w #!Menu_SlotRowDimAttr
+    LDX.b !Menu_Tmp00
+    CPX.b !Menu_Tmp02
+    BNE .set
+    LDA.w #!Menu_SlotRowLitAttr
+.set:
+    JSR Menu_SetAttr2Rows
+    INC.b !Menu_Tmp02
+    LDA.b !Menu_MapPtr
+    CLC
+    ADC.w #2*!Menu_MapRowBytes
+    STA.b !Menu_MapPtr
+    LDA.b !Menu_Tmp02
+    CMP.w #4
+    BCC .row
+    RTS
+
+; $C2:A41A — Menu_EquipItemsOpen (67 bytes, $A41A–$A45C)
+; From handler 2 to handler 3: Menu_UnkA4AF, the draw list
+; MenuRom_ItemsOpenList, Menu_VramRecBg2B queued, Menu_ArrowX/Y = $68 /
+; $42, Menu_EquipListSetup, the NMI move Menu_ScrollBuild ->
+; Menu_Mode01HdmaTable ($25 bytes), Menu_DrawDescText of
+; Menu_EquipList[$25] (X still holds the $25 just stored as the move
+; size; probably meant to be the first entry), thread 2's .Wait + 1,
+; Menu_HdmaenShadow = Menu_ItemsHdmaBits, Menu_CursorSel = 4 (the list's
+; first row), and a tail jump to Menu_PlaySound0.
+; Callers (1 JMP site): Menu_Mode01H2 ($C2:9C95).
+; Entry: M any (P saved; SEP #$20 here), X=0 (16-bit LDX), DP=$0000,
+;        DB=$7E
+; Exit:  P restored; as Menu_PlaySound0
+; Calls: Menu_UnkA4AF, Menu_RunDrawList, Menu_QueueVramRom,
+;   Menu_EquipListSetup, Menu_DrawDescText; jumps to Menu_PlaySound0.
+Menu_EquipItemsOpen:
+    PHP
+    SEP #$20
+    JSR Menu_UnkA4AF
+    LDX.w #!MenuRom_ItemsOpenList&$FFFF
+    JSR Menu_RunDrawList
+    LDX.w #Menu_VramRecBg2B
+    JSR Menu_QueueVramRom
+    LDX.w #!Menu_ItemsArrowXY
+    STX.w !Menu_ArrowX                  ; and Menu_ArrowY
+    JSR Menu_EquipListSetup
+    LDX.w #!Menu_ScrollBuild
+    STX.w !Menu_NmiMoveSrc
+    LDX.w #!Menu_Mode01HdmaTable
+    STX.w !Menu_NmiMoveDest
+    LDX.w #!Menu_Mode01HdmaBytesB
+    STX.w !Menu_NmiMoveSize
+    LDA.w !Menu_EquipList,X             ; X = $25 (see the header)
+    JSR Menu_DrawDescText
+    INC.w Menu_Thread[2].Wait
+    LDA.b #!Menu_ItemsHdmaBits
+    STA.w !Menu_NmiDp+!Menu_HdmaenShadow
+    LDA.b #!Menu_EquipListFirstRec
+    STA.b !Menu_CursorSel
+    PLP
+    JMP Menu_PlaySound0
+
+; $C2:A45D — Menu_EquipListRefresh (6 bytes, $A45D–$A462)
+; Menu_ArrowX/Y = $68 / $62, then falls into Menu_EquipListSetup.
+; Callers (2 JSR sites): Menu_EquipSlotIdle ($C2:9F00) and unmatched ($C2:A667).
+; Entry: M any, X=0 (16-bit LDX), DP=$0000, DB=$7E
+; Exit:  as Menu_EquipListSetup
+; No calls (falls into Menu_EquipListSetup).
+Menu_EquipListRefresh:
+    LDX.w #!Menu_RefreshArrowXY
+    STX.w !Menu_ArrowX                  ; and Menu_ArrowY
+
+; $C2:A463 — Menu_EquipListSetup (72 bytes, $A463–$A4AA)
+; The item list of slot Menu_ListKind: Menu_ListEquipItems, WRDIVL/H =
+; $1500 (the dividend of Menu_ListPageSetup's arrow factors),
+; Menu_VramRecBg3 queued; Menu_EquipListTop = 0, Menu_Unk0D26 =
+; Menu_EquipSlotRecOfs[slot] (a word); paging of Menu_EquipListLen
+; entries 8 rows a page from cursor record 4 (Menu_PageCursorFirst = 4,
+; Menu_ListPageSetup); Menu_ListRows x 4, Menu_ListTop = 0, the list
+; arrows started (Menu_StartListArrows) and Menu_UnkA569.
+; Callers (2 JSR sites): Menu_EquipItemsOpen ($C2:A432) and unmatched ($C2:E0FD).
+; Callers note: Menu_EquipListRefresh falls into it.
+; Entry: M, X any (P saved; REP #$30 / SEP #$30 here), DP=$0000
+;        (Menu_Tmp00/01), DB=$7E
+; Exit:  P restored; A, X, Y clobbered
+; Calls: Menu_ListEquipItems, Menu_QueueVramRom, Menu_ListPageSetup,
+;   Menu_Times4, Menu_StartListArrows, Menu_UnkA569.
+Menu_EquipListSetup:
+    PHP
+    REP #$30
+    JSR Menu_ListEquipItems
+    LDA.w #!Menu_EquipArrowSpan
+    STA.l WRDIVL
+    LDX.w #Menu_VramRecBg3
+    JSR Menu_QueueVramRom
+    SEP #$30
+    STZ.w !Menu_EquipListTop
+    STZ.w !Menu_Unk0D26+1
+    LDX.w !Menu_ListKind
+    LDA.l Menu_EquipSlotRecOfs,X
+    STA.w !Menu_Unk0D26
+    LDA.b #!Menu_EquipListFirstRec
+    STA.w !Menu_PageCursorFirst
+    LDA.b #!Menu_EquipPageRows
+    STA.b !Menu_Tmp00
+    LDY.w !Menu_EquipListLen
+    JSR Menu_ListPageSetup
+    LDA.w !Menu_ListRows
+    JSR Menu_Times4
+    STA.w !Menu_ListRows
+    STZ.w !Menu_ListTop
+    JSR Menu_StartListArrows
+    JSR Menu_UnkA569
+    PLP
+    RTS
+
+; $C2:A4AB — Menu_EquipSlotRecOfs (4 bytes, $A4AB–$A4AE)
+; Per slot (Menu_ListKind 0-3): the character record's byte that holds
+; it (Menu_Unk0D26; Menu_Mode01H3 swaps that byte with the inventory).
+Menu_EquipSlotRecOfs:
+    db $29, $27, $28, $2A
 
 org $C2AA34
 ; $C2:AA34 — Menu_Mode02List (12 bytes, $AA34–$AA3F)
@@ -30400,7 +30711,8 @@ Menu_ListCursorEdge:
 ; WRDIVB, dividing the 16-bit value the caller left in WRDIVL/H; the
 ; quotient goes to Menu_ArrowMulA/B (the list arrows' factors; $FFFF
 ; when the list is exactly one page: a division by 0).
-; Callers (4 JSR sites): unmatched ($C2:A494, $C2:ADF9, $C2:BACB, $C2:BB70).
+; Callers (4 JSR sites): Menu_EquipListSetup ($C2:A494) and unmatched ($C2:ADF9, $C2:BACB,
+;   $C2:BB70).
 ; Entry: M, X any (P saved; SEP #$30 here), DP=$0000 (Menu_Tmp00/01,
 ;        Menu_ListMaxTop), DB=$7E (and WRDIVL/H set); Menu_Tmp00 = rows
 ;        per page, Y = the entry count (low byte)
@@ -30462,19 +30774,19 @@ Menu_PlaySound:
 ;   $C2:9AAA), Menu_Mode01H0 (JSR $C2:9C31), Menu_Mode01H1 (JSR $C2:9C52, JSR $C2:9C5E),
 ;   Menu_Mode01H2 (JSR $C2:9C90, JSR $C2:9C9C), Menu_Mode01H3 (JSR $C2:9CBD, JSR $C2:9CE4),
 ;   Menu_MemberCursor (JSR $C2:9D54), Menu_EquipSlotIdle (JSR $C2:9EE0), Menu_EquipItemIdle (JSR
-;   $C2:9F26, JSR $C2:9F8D), Menu_MemberPageSwitch (JSR $C2:A043) and unmatched (JMP $C2:A45A, JSR
-;   $C2:AA5A, JSR $C2:AA5E, JSR $C2:AA99, JSR $C2:AAAD, JSR $C2:AAD5, JSR $C2:AC65, JSR $C2:ACB9,
-;   JSR $C2:B1C9, JSR $C2:B288, JSR $C2:B386, JSR $C2:B392, JSR $C2:B3C5, JSR $C2:B43A, JSR
-;   $C2:B49C, JSR $C2:B71B, JSR $C2:B780, JSR $C2:B88A, JSR $C2:BF5B, JSR $C2:BF8C, JSR $C2:BFC1,
-;   JMP $C2:BFD1, JSR $C2:BFFA, JSR $C2:C15A, JSR $C2:C17F, JSR $C2:C18C, JSR $C2:C1B2, JSR
-;   $C2:C1FD, JSR $C2:C642, JSR $C2:C670, JSR $C2:C674, JSR $C2:C6CC, JSR $C2:C6DE, JSR $C2:C7F3,
-;   JSR $C2:C944, JSR $C2:CEF5, JSR $C2:CF11, JSR $C2:CF71, JSR $C2:CF88, JSR $C2:CFAF, JSR
-;   $C2:D566, JSR $C2:D570, JSR $C2:D5C6, JSR $C2:D5E3, JSR $C2:D638, JSR $C2:D676, JSR $C2:D6B0,
-;   JSR $C2:D6D9, JSR $C2:D6DD, JSR $C2:D6E6, JSR $C2:D72B, JSR $C2:D73B, JSR $C2:D745, JSR
-;   $C2:D78E, JSR $C2:D7BB, JSR $C2:D822, JSR $C2:D878, JSR $C2:D905, JSR $C2:D95B, JSR $C2:DA30,
-;   JSR $C2:E12E, JSR $C2:E20E, JSR $C2:E248, JSR $C2:E287, JSR $C2:E30D, JSR $C2:E62C, JSR
-;   $C2:E643, JSR $C2:E647, JSR $C2:E6C1, JSR $C2:E6C5, JSR $C2:E6DF, JSR $C2:E715, JSR $C2:E73A,
-;   JSR $C2:E777).
+;   $C2:9F26, JSR $C2:9F8D), Menu_MemberPageSwitch (JSR $C2:A043), Menu_EquipItemsOpen (JMP
+;   $C2:A45A) and unmatched (JSR $C2:AA5A, JSR $C2:AA5E, JSR $C2:AA99, JSR $C2:AAAD, JSR $C2:AAD5,
+;   JSR $C2:AC65, JSR $C2:ACB9, JSR $C2:B1C9, JSR $C2:B288, JSR $C2:B386, JSR $C2:B392, JSR
+;   $C2:B3C5, JSR $C2:B43A, JSR $C2:B49C, JSR $C2:B71B, JSR $C2:B780, JSR $C2:B88A, JSR $C2:BF5B,
+;   JSR $C2:BF8C, JSR $C2:BFC1, JMP $C2:BFD1, JSR $C2:BFFA, JSR $C2:C15A, JSR $C2:C17F, JSR
+;   $C2:C18C, JSR $C2:C1B2, JSR $C2:C1FD, JSR $C2:C642, JSR $C2:C670, JSR $C2:C674, JSR $C2:C6CC,
+;   JSR $C2:C6DE, JSR $C2:C7F3, JSR $C2:C944, JSR $C2:CEF5, JSR $C2:CF11, JSR $C2:CF71, JSR
+;   $C2:CF88, JSR $C2:CFAF, JSR $C2:D566, JSR $C2:D570, JSR $C2:D5C6, JSR $C2:D5E3, JSR $C2:D638,
+;   JSR $C2:D676, JSR $C2:D6B0, JSR $C2:D6D9, JSR $C2:D6DD, JSR $C2:D6E6, JSR $C2:D72B, JSR
+;   $C2:D73B, JSR $C2:D745, JSR $C2:D78E, JSR $C2:D7BB, JSR $C2:D822, JSR $C2:D878, JSR $C2:D905,
+;   JSR $C2:D95B, JSR $C2:DA30, JSR $C2:E12E, JSR $C2:E20E, JSR $C2:E248, JSR $C2:E287, JSR
+;   $C2:E30D, JSR $C2:E62C, JSR $C2:E643, JSR $C2:E647, JSR $C2:E6C1, JSR $C2:E6C5, JSR $C2:E6DF,
+;   JSR $C2:E715, JSR $C2:E73A, JSR $C2:E777).
 ; Entry: M, X any (P saved; SEP #$30 here), DP any, DB=$7E or $00
 ; Exit:  P restored; as Menu_SendSound
 ; Calls: Menu_SendSound.
@@ -30865,8 +31177,8 @@ Menu_SetRowsAttr:
 ; $C2:ECAC — Menu_SetAttr2Rows (22 bytes, $ECAC–$ECC1)
 ; Sets the attribute byte of A's low byte tiles (0: 256) at Menu_MapPtr
 ; and of the ones a row ($40 bytes) below to A's high byte.
-; Callers (7 JSR sites): unmatched ($C2:A405, $C2:B6B9, $C2:B6CE, $C2:C480, $C2:C490, $C2:C4A0,
-;   $C2:C4B7).
+; Callers (7 JSR sites): Menu_SetSlotRowsAttr ($C2:A405) and unmatched ($C2:B6B9, $C2:B6CE,
+;   $C2:C480, $C2:C490, $C2:C4A0, $C2:C4B7).
 ; Entry: M, X any (P saved; SEP #$30 / REP #$10 here), DP=$0000
 ;        (Menu_MapPtr), DB=$7E (the map); A = the count (low byte) and
 ;        the attribute byte (high byte)
@@ -31020,15 +31332,16 @@ Menu_LoadWindowPal:
 ; bit 7 set.
 ; Callers (56 sites: 53 JSR, 3 JMP): Menu_MainMenuLoop (JSR $C2:9A7A), Menu_MainMenuIcons (JSR
 ;   $C2:9B95), Menu_Icon0Preview (JSR $C2:A082), Menu_Mode01Init (JSR $C2:A14C), Menu_DrawEmptyRow
-;   (JMP $C2:A1EC), Menu_DrawMemberRow (JMP $C2:A21C), Menu_DrawMemberStatus (JSR $C2:A24D) and
-;   unmatched (JSR $C2:A2EA, JSR $C2:A327, JSR $C2:A423, JSR $C2:A4B5, JSR $C2:A637, JSR $C2:A69D,
-;   JSR $C2:A724, JSR $C2:A865, JSR $C2:AD56, JSR $C2:ADD9, JSR $C2:AEA0, JSR $C2:B008, JSR
-;   $C2:B368, JSR $C2:B8E0, JSR $C2:B96E, JSR $C2:B97F, JSR $C2:BA4A, JSR $C2:BAA8, JSR $C2:BBA2,
-;   JSR $C2:BDFD, JSR $C2:BEF5, JSR $C2:C33D, JSR $C2:C3C2, JSR $C2:CA6A, JSR $C2:CAF9, JSR
-;   $C2:D06B, JSR $C2:D0EF, JSR $C2:D3A1, JSR $C2:D43A, JSR $C2:D4C5, JSR $C2:D4DB, JSR $C2:D5EC,
-;   JSR $C2:D70C, JSR $C2:DADB, JSR $C2:DC8E, JSR $C2:DEA4, JSR $C2:DFBA, JSR $C2:E007, JSR
-;   $C2:E04D, JSR $C2:E0C6, JSR $C2:E137, JSR $C2:E1D1, JMP $C2:E313, JSR $C2:E416, JSR $C2:E59F,
-;   JSR $C2:E7C9, JSR $C2:E7F0, JSR $C2:E802, JSR $C2:E8A7).
+;   (JMP $C2:A1EC), Menu_DrawMemberRow (JMP $C2:A21C), Menu_DrawMemberStatus (JSR $C2:A24D),
+;   Menu_EquipSlotsClose (JSR $C2:A2EA), Menu_EquipSlotsOpen (JSR $C2:A327), Menu_EquipItemsOpen
+;   (JSR $C2:A423) and unmatched (JSR $C2:A4B5, JSR $C2:A637, JSR $C2:A69D, JSR $C2:A724, JSR
+;   $C2:A865, JSR $C2:AD56, JSR $C2:ADD9, JSR $C2:AEA0, JSR $C2:B008, JSR $C2:B368, JSR $C2:B8E0,
+;   JSR $C2:B96E, JSR $C2:B97F, JSR $C2:BA4A, JSR $C2:BAA8, JSR $C2:BBA2, JSR $C2:BDFD, JSR
+;   $C2:BEF5, JSR $C2:C33D, JSR $C2:C3C2, JSR $C2:CA6A, JSR $C2:CAF9, JSR $C2:D06B, JSR $C2:D0EF,
+;   JSR $C2:D3A1, JSR $C2:D43A, JSR $C2:D4C5, JSR $C2:D4DB, JSR $C2:D5EC, JSR $C2:D70C, JSR
+;   $C2:DADB, JSR $C2:DC8E, JSR $C2:DEA4, JSR $C2:DFBA, JSR $C2:E007, JSR $C2:E04D, JSR $C2:E0C6,
+;   JSR $C2:E137, JSR $C2:E1D1, JMP $C2:E313, JSR $C2:E416, JSR $C2:E59F, JSR $C2:E7C9, JSR
+;   $C2:E7F0, JSR $C2:E802, JSR $C2:E8A7).
 ; Entry: M, X any (P and DB saved; SEP #$20 / REP #$10 here), DP=$0000
 ;        (Menu_DrawArg0 on; the TDC loads B = 0 from it), DB any; X = the
 ;        list's address in bank $FF
@@ -31531,9 +31844,10 @@ Menu_DrawCmdString:
 ; Menu_DrawAddr2 = X (the line start), DB = B, Menu_DrawStringLoop;
 ; then Menu_TextAttr AND= ~$DC (only bits 0, 1 and 5 kept: tile high
 ; bits and priority).
-; Callers (13 sites: 10 JSR, 3 JMP): Menu_DrawCmdString (JSR $C2:EF60), Menu_DrawItemName (JMP
-;   $C2:F2DF) and unmatched (JSR $C2:A3A9, JSR $C2:A5AF, JSR $C2:A5BC, JSR $C2:B061, JSR $C2:B09A,
-;   JMP $C2:B0A8, JMP $C2:BDAF, JSR $C2:BDE6, JSR $C2:DD77, JSR $C2:E429, JSR $C2:E430).
+; Callers (13 sites: 10 JSR, 3 JMP): Menu_DrawSlotName (JSR $C2:A3A9), Menu_DrawCmdString (JSR
+;   $C2:EF60), Menu_DrawItemName (JMP $C2:F2DF) and unmatched (JSR $C2:A5AF, JSR $C2:A5BC, JSR
+;   $C2:B061, JSR $C2:B09A, JMP $C2:B0A8, JMP $C2:BDAF, JSR $C2:BDE6, JSR $C2:DD77, JSR $C2:E429,
+;   JSR $C2:E430).
 ; Entry: M any (P and DB saved; SEP #$20 here), X=0 (16-bit addresses),
 ;        DP=$0000 (Menu_Text*), DB any; A = count and flags, B = the
 ;        string's bank, Y = its address, X = the tilemap address
@@ -32324,8 +32638,9 @@ Menu_ItemNamePtr:
 ; TextWin_StrTable = $CC:2EB1, Menu_TextDest = $4E84, Menu_Unk0DCC =
 ; $6840, Menu_Unk0DC9 = 1, Menu_Unk0DD0 = $0080 and Menu_UnkFA49. What
 ; the strings are is not traced (a description line, probably).
-; Callers (10 sites: 8 JSR, 2 JMP): unmatched (JSR $C2:A44A, JSR $C2:A5E2, JMP $C2:AAC5, JSR
-;   $C2:AD4B, JSR $C2:B347, JSR $C2:D80D, JSR $C2:D8F0, JMP $C2:E014, JSR $C2:E0E4, JSR $C2:E1D7).
+; Callers (10 sites: 8 JSR, 2 JMP): Menu_EquipItemsOpen (JSR $C2:A44A) and unmatched (JSR $C2:A5E2,
+;   JMP $C2:AAC5, JSR $C2:AD4B, JSR $C2:B347, JSR $C2:D80D, JSR $C2:D8F0, JMP $C2:E014, JSR
+;   $C2:E0E4, JSR $C2:E1D7).
 ; Entry: M any (P saved; SEP #$20 / REP #$10 here), X any, DP any, DB=$7E
 ;        (or $00: low WRAM); A = the string number
 ; Exit:  P restored; nothing drawn: A, X, Y unchanged; else X

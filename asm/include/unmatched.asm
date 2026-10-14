@@ -70,18 +70,6 @@ org $C2A6F0
 Menu_UnkA6F0:       ; JSR from Menu_DrawMemberStatus with X = a tilemap address (not analysed)
 org $C2FC3E
 Menu_VramRecBg3Rows60: ; Menu_VramRec in unmatched data: VRAM $6F80 (BG3 map row 60) = $7E:5D00, $100 bytes
-org $C2A2CD
-Menu_UnkA2CD:       ; JMP from Menu_Mode01H2 (back to handler 1; not analysed)
-org $C2A321
-Menu_UnkA321:       ; JSR from Menu_Mode01H1 (not analysed)
-org $C2A38B
-Menu_UnkA38B:       ; JSR from Menu_EquipSlotIdle (not analysed)
-org $C2A3E2
-Menu_UnkA3E2:       ; JSR from Menu_EquipSlotIdle and Menu_MemberPageSwitch (not analysed)
-org $C2A41A
-Menu_UnkA41A:       ; JMP from Menu_Mode01H2 (opens the item list; not analysed)
-org $C2A45D
-Menu_UnkA45D:       ; JSR from Menu_EquipSlotIdle (not analysed)
 org $C2A569
 Menu_UnkA569:       ; JSR from Menu_Mode01H1 and Menu_EquipItemIdle (not analysed)
 org $C2A59A
@@ -102,6 +90,8 @@ org $C2FC1B
 Menu_VramRecBg3:    ; Menu_VramRec in unmatched data: VRAM $6800 (BG3 map) = $7E:4E00, $680 bytes
 org $C2FC45
 Menu_VramRecBg3Rows58: ; Menu_VramRec in unmatched data: VRAM $6F40 (BG3 map row 58) = $7E:5C80, $100 bytes
+org $C2A4AF
+Menu_UnkA4AF:       ; JSR from Menu_EquipItemsOpen (not analysed)
 org $C2FBE3
 Menu_VramRecClock:  ; Menu_VramRec in unmatched data: VRAM $5840 = $7E:2E80, $640 bytes (queued by
                     ; Menu_MainMenuLoop after the clock is drawn)

@@ -1254,3 +1254,4 @@ endif
 !Menu_Unk7F00B4 = $7F00B4                ; 6 B, one per character id 0-5: zeroed by Menu_EquipClearCharFlag
 !Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
                                          ; Menu_ShiftItemListMap)
+!Menu_Unk5CC2 = $5CC2                    ; 12 tile words set to $40FF by Menu_EquipSlotsOpen
