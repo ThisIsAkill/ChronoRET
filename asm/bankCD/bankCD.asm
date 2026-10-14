@@ -664,8 +664,10 @@ BattleCD_ShowText:
 ; BattleCD_GetMsgTime, !Battle_LastScriptMsg = the message,
 ; !Battle_MsgTiming + 1 (the NMI closes it), one more frame.
 ; Quirk: !Battle_ScriptMsgUp goes up even when the message is the same
-; as the last one and nothing is shown; then nothing closes it here
-; (what clears it then is not traced). Kept as found.
+; as the last one and nothing is shown; then nothing closes it here.
+; BattleFx_Nmi's message timer (when !Battle_MsgTimer runs out while
+; !Battle_MsgTiming is set) and BattleFx_Init (at the battle's start)
+; clear it. Kept as found.
 ; Callers (1 JMP site): BattleMsg_UnkVecCD0033 ($CD:0033).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the enemy-script run handlers run);
 ;        A = the message (non-zero)

@@ -630,8 +630,9 @@ BattleFx_GradRotC:
 ;        high byte) = 0 assumed on the fading path, whose first TAX
 ;        takes it in (not traced at the caller; the other TAXs follow a
 ;        TDC)
-; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (unchanged
-;        on the first early return); DP $45-$48 written
+; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (X and Y
+;        unchanged on the first early return; A clobbered, holding the
+;        non-zero OR of the flags read); DP $45-$48 written
 BattleFx_HpGradientTick:
     LDA.w !Battle_Unk5D9B
     ORA.w FieldAnimB[11].Unk0           ; palette animations 8-11 running?
@@ -1248,19 +1249,27 @@ BattleFx_MsgSfx:
     db $FF,$FF,$FF,$FF,$89,$88,$88,$88,$FF,$FF,$FF,$FF
 
 ; $D1:EEA5 — BattleFx_RampWin2 (31 bytes, $EEA5–$EEC3)
-; With n = !BattleFx_RampBottom ($C0) - !BattleFx_CountA: unless n is
-; negative as a 16-bit value, stores the words 0, 1, 2, ... to
+; With n = !BattleFx_RampBottom ($C0) - !BattleFx_CountA (an 8-bit
+; subtraction, so n is 0-255), stores the words 0, 1, 2, ... to
 ; !BattleFx_WinTable0-2 + 4n, + 4(n-1), ... down to + 0, i.e. to the
 ; second pair of line n-1, n-2, ... up to the line before line 0 (the
 ; bytes just before the table): left edges 0, 1, 2, ... going up, right
 ; edges 0. Then counts !BattleFx_CountA up. Always table 0, whatever the
 ; frame.
+; Quirks: the BMI after TAY looks like a guard for n < 0, but with B = 0
+; n * 4 is at most $3FC and it never fires (only bit 5 of B set would
+; make it). Once !BattleFx_CountA passes $C0, n wraps (CountA $C1-$DF
+; gives n $FF-$E1) and the loop writes past the end of the $380-byte
+; table into !BattleFx_WinTable1 (up to $7E:C55C). The final INC.w runs
+; with M=0, so a !BattleFx_CountA of $FF carries into !BattleFx_CountB
+; ($CD3B).
 ; Callers note: the JSL at $CD:185A is followed by RTS (a bank-$CD
 ;   script command handler, probably; not matched).
 ; Callers (1 JSL site): unmatched ($CD:185A).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 assumed (n * 4 is formed 16-bit
 ;        after the 8-bit subtraction; not traced at the caller)
-; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X unchanged; Y clobbered
+; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X unchanged; Y clobbered;
+;        the word at !BattleFx_CountA incremented
 BattleFx_RampWin2:
     LDA.b #!BattleFx_RampBottom
     SEC
@@ -1400,7 +1409,10 @@ BattleFx_WaveWindowA:
 ; caller negates the product).
 ; Callers (2 JSR sites): BattleFx_WaveWindowA ($D1:EF1B, $D1:EF42).
 ; Entry: M=1, X=0, A = the offset with N set from it, Y = the step's
-;        byte offset, DP=0, DB=$7E; the sum is done with C cleared
+;        byte offset, DP=0, DB=$7E; B (A's high byte) = 0, which the
+;        positive path's 16-bit ADC takes as the offset's high byte (the
+;        TDCs in BattleFx_WaveWindowA guarantee it); the sum is done
+;        with C cleared
 ; Exit:  M=1, X=0; A = DP $4D; X = the angle; Y unchanged; C as above;
 ;        WRMPYA/WRMPYB written (the multiply runs)
 BattleFx_WaveLeftA:
@@ -1574,7 +1586,9 @@ BattleFx_WaveWindowB_ByFrame:        ; header: see BattleFx_WaveWindowB
 ; in place of the !BattleFx_WaveBaseX words.
 ; Callers (2 JSR sites): BattleFx_WaveWindowB_ByFrame ($D1:F036, $D1:F05D).
 ; Entry: M=1, X=0, A = the offset with N set from it, Y = the step's
-;        byte offset, DP=0, DB=$7E
+;        byte offset, DP=0, DB=$7E; B (A's high byte) = 0, which the
+;        positive path's 16-bit ADC takes as the offset's high byte (the
+;        TDCs in BattleFx_WaveWindowB guarantee it)
 ; Exit:  M=1, X=0; A = DP $4D; X = the angle; Y unchanged; C = 1 when
 ;        the angle in DP $45 is $80-$FF; WRMPYA/WRMPYB written
 BattleFx_WaveLeftB:
@@ -1634,9 +1648,12 @@ BattleFx_WaveLeftB:
 ; !BattleFx_WinTable0+2 + Y.
 ; Callers (4 JSR sites): BattleFx_WaveWindowA ($D1:EF27, $D1:EF4B) and BattleFx_WaveWindowB_ByFrame
 ;   ($D1:F042, $D1:F066).
-; Entry: M=1, A = the offset with N set from it, Y = the step's byte
-;        offset, DP=0, DB=$7E
-; Exit:  M=1; A = the low byte of the sum and B its high byte (no TDC);
+; Entry: M=1, X=0 (Y is a 16-bit offset, up to $348), A = the offset
+;        with N set from it, Y = the step's byte offset, DP=0, DB=$7E;
+;        B (A's high byte) = 0, which the positive path's 16-bit ADC
+;        takes as the offset's high byte (BattleFx_WaveLeftA/B's TDC
+;        leaves it 0)
+; Exit:  M=1, X=0; A = the low byte of the sum and B its high byte (no TDC);
 ;        X and Y unchanged
 BattleFx_WaveRight:
     BPL .positive
@@ -2095,8 +2112,9 @@ BattleFx_SaveAnimKinds:
 ;   work, every frame.
 ; Callers (2 JSL sites): BattleCD_NmiMain ($CD:09BB) and BattleCD_NmiSetup ($CD:0AD2).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E
-; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (unchanged
-;        when nothing is done)
+; Exit:  M=1, X=0, DP and DB unchanged; A, X and Y clobbered (when
+;        nothing is done X and Y are unchanged and A = the flag read
+;        last: !BattleFx_AnimsHeld)
 BattleFx_HoldAnimsTick:
     LDA.w !BattleFx_HoldAnims
     BEQ .release
@@ -2213,21 +2231,34 @@ BattleFx_RandomShake:
 
 ; $D1:F4C0 — BattleFx_NmiAlt (153 bytes, $F4C0–$F558)
 ; A second NMI handler of the battle: BattleCD_ExitBattle installs it
-; at the battle's end, after the closing wipe ($CD:041E stores its
-; address to !NmiTrampoline+1). It saves A, X, Y, DB and DP, sets DP=0,
-; turns HDMA off, reads RDNMI, writes !Nmi_Nmitimen, zeroes DP $47, then:
-; JSL BattleCD_UploadCgram (the CGRAM upload), ReentryVectors [2]
-; (Field_RefreshHdmaLong, whose A it writes to HDMAEN), INIDISP = DP $45
-; (read long), BG1-BG3 scroll from !Battle_PpuScroll2 (with DB=$7E,
-; each register written low then high), JSL BattleCD_ScrollStepL (the
-; layer drift) and FdVec_FFF7 (PalAnim_TickAll). Unlike BattleFx_Nmi it
-; has no busy flag and does not restore the math registers.
-; The HDMAEN store here and the register stores in BattleCD_UploadCgram
-; are absolute with the interrupted code's DB, so that code must run
-; with a DB that maps I/O; not traced.
+; at the battle's end, after the closing wipe (the STX at $CD:0420
+; stores its address to !NmiTrampoline+1, the STA at $CD:041A the bank
+; byte to +3). It saves A, X, Y, DB and DP, sets DP=0, turns HDMA off
+; (STA.l), reads RDNMI, writes !Nmi_Nmitimen, zeroes DP $47, then: JSL
+; BattleCD_UploadCgram (meant as the CGRAM upload), ReentryVectors [2]
+; (Field_RefreshHdmaLong, whose A it stores with STA.w HDMAEN), INIDISP
+; = DP $45 (read long), BG1-BG3 scroll from !Battle_PpuScroll2 (with
+; DB=$7E, each register written low then high), JSL
+; BattleCD_ScrollStepL (the layer drift) and FdVec_FFF7
+; (PalAnim_TickAll). Unlike BattleFx_Nmi it has no busy flag and does
+; not restore the math registers.
+; Quirk: the STA.w HDMAEN here and BattleCD_UploadCgram's .w register
+; stores use the interrupted code's DB (neither routine sets DB before
+; them; Field_RefreshHdmaLong restores it). The NMIs it is installed
+; for interrupt BattleCD_ExitBattle, which runs with DB=$7E (its own .w
+; accesses to $2A1F, $2A21 and $BB00 around the waits need it): in its
+; BattleCD_WaitNmiAck waits (and the instructions between the install
+; and the first wait) those stores land in WRAM ($7E:420C, $7E:420B,
+; $7E:2121, $7E:4370-$4377), not on the registers. So there the palette
+; is not uploaded and HDMA stays off (the STA.l above zeroed HDMAEN);
+; only NMITIMEN, INIDISP and the scroll registers (all written long)
+; reach the hardware. An NMI that lands in AudioFadeDispatch, or after
+; ExitBattle returns while this handler is still installed, gets that
+; code's DB; not traced.
 ; Callers note: no call site; reached through !NmiTrampoline.
 ; Entry: an NMI; any M, X and DP (it sets M=0, X=0, then M=1 and DP=0);
-;        DB the interrupted code's (see above; saved, then set to $7E)
+;        DB the interrupted code's ($7E in BattleCD_ExitBattle's waits;
+;        see above; saved, then set to $7E)
 ; Exit:  RTI with A, X, Y (16-bit), DB, DP and P restored
 BattleFx_NmiAlt:
     REP #$30
@@ -3049,7 +3080,9 @@ BattleFx_EdgeSlope:
 ; Callers (2 JSL sites): BattleFx_SwayQuad ($D1:EC5A) and unmatched ($CD:24E9).
 ; Entry: M=1, X=0, X = the quad, DP=0, DB=$7E (the quads are read .w)
 ; Exit:  M=1, X=0, DP unchanged, DB restored; A = 0; X and Y clobbered;
-;        DP $03-$19 and $45-$4A written; the window table lines written
+;        DP $03-$19 and $45-$4A written; the window table lines written;
+;        APU port 3 ($2143) written by BattleFx_RasterQuad's word stores
+;        to WMDATA-1 ($217F)
 BattleFx_DrawQuad:
     TXA
     STA.w !BattleFx_QuadSlot
@@ -3086,7 +3119,11 @@ BattleFx_DrawQuad:
 ; integer bytes of two 8.8 edges, written with a 16-bit STA to WMDATA-1
 ; so the high byte lands in WMDATA), then two 16-bit reads that each
 ; read WMDATA once and step past the other pair. The edges are stepped
-; before each line. Three shapes:
+; before each line. $217F (WMDATA-1) mirrors APU port 3 (APUIO3,
+; $2143), so each of these word stores also writes A's low byte (the
+; edge's fraction) to that port. Each segment clears C once before its
+; loop, so the carry out of each edge's ADC feeds the next one (kept as
+; found). Three shapes:
 ;   - y0 = y1 (flat top): points 0/1 and 2/3 put left to right; y2 - y1
 ;     lines with the left edge from x0 along !BattleFx_Slope02 and the
 ;     right edge from x1 along !BattleFx_Slope13;
@@ -3098,7 +3135,8 @@ BattleFx_DrawQuad:
 ; Entry: M=1, X=0, B = 0 (from BattleFx_DrawQuad's TDC), DP=0, DB=$00
 ;        (WMDATA and the divider are absolute)
 ; Exit:  M=1, X=0; A = 0; X and Y = the last edges (8.8); DP $03-$0F,
-;        $45-$4A written
+;        $45-$4A written; APU port 3 ($2143) written by the word stores
+;        to WMDATA-1
 BattleFx_RasterQuad:
     LDA.b !BattleFx_QuadY0
     CMP.b !BattleFx_QuadY1

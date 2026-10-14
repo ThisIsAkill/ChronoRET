@@ -27594,10 +27594,13 @@ LocLoad_DrawMap:
 ; tables run once, filling both HDMA table sets, probably), clears the
 ; bit, sets up the HDMA channels (Hdma_InitChannelsFD) and returns
 ; Field_HdmaEnable in A (the channel mask the NMI writes to HDMAEN;
-; what the caller does with it is not traced).
+; for what its one caller does with it, see the Callers note).
 ; Callers (1 BRL site): ReentryVectors ($C0:0005).
 ; Callers note: vector [2], reached by JSL $C0:0005 from BattleFx_NmiAlt
-;   ($D1:F4E2), which writes the returned A to HDMAEN.
+;   ($D1:F4E2), which stores the returned A with STA.w HDMAEN through
+;   the interrupted code's DB: during BattleCD_ExitBattle's waits, where
+;   that handler is installed, DB=$7E, so it lands in $7E:420C (WRAM),
+;   not on the register (see BattleFx_NmiAlt).
 ; On entry: M=1 (8-bit A), X any (it sets X=1, then X=0), DP any
 ;   (saved; set to DP_Field), DB any (saved; set to $00).
 ; Exit: M=1, X=0, DP and DB restored (RTL); A = Field_HdmaEnable; X =
