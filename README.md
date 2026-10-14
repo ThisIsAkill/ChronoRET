@@ -60,9 +60,9 @@ the matched total by construction, so the 100% rests on separate checks:
   starts (the other is an op `$1A` operand); the 73 entries of
   C3Rom_PackPtrs (`$FE:0000`; entries 58-72 point into `$FD`): apart from
   entry 1 (the module), 13 raw blocks and 2 empty packs, all unpack to data,
-  graphics and tile maps (pack 71 at `$FD:57F0` scores 60 of 63 blocks code-
-  like, but it is a `$10 $00` tile map; pack 0 at `$C3:1200` 0 of 31); and
-  the longest routine-shaped run of instructions in unmatched ROM is 19
+  graphics and tile maps (pack 71 at `$FD:57F0` scores 60 of 63 blocks
+  code-like, but it is a `$10 $00` tile map; pack 0 at `$C3:1200` 0 of 31);
+  and the longest routine-shaped run of instructions in unmatched ROM is 19
   instructions, all noise.
 
 Progress notes, the address map, the devlog and a function-level breakdown
