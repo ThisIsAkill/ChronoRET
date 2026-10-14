@@ -876,7 +876,7 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    it).
 
 10. Bank $CD (new file `asm/bankCD/bankCD.asm`; the survey puts code at `$CD:0000`-`$3FE5` with
-   tables inside, data from `$CD:4000`): matched `$CD:0000`-`$CD:2A49` and `$CD:3B5F`-`$CD:3FFF`.
+   tables inside, data from `$CD:4000`): `$CD:0000`-`$CD:3FFF` is matched in full (three batches).
    First `$CD:0000`-`$CD:16B4` (the CD battle batch):
    - the entry block (19 JMP vectors; the names the callers used are kept: `BattleSys_VecCD0000`
      ... `BattleSys_IdleVecCD0036`; new `BattleSys_VecCD000F`, `BattleSys_VecCD001E`, no caller
@@ -1011,20 +1011,53 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleSys_PumpFrames` (PauseWait no longer unmatched) and `BattleSys_RunService` (its list of
    unmatched addresses each service reaches: none since the merge with item 11, which
    matched the last two, `$D1:ECF3` and `$D1:F67A`).
-   Open: the handlers from `$CD:2A4A` (opcode $80's dispatcher and its 29-word table at `$2A51`,
-   the loop opcodes $83-$86 on the channel's `$CA72`/`$CA74`, the scroll steps $81/$82, $89-$8B,
-   $90-$A0, the last at `$30BE`) and the code to `$3B5E` they and the matched handlers call
-   (`BattleCD_FillTriangle` and the window-table builders); what DP $20, `!BattleFx_GradRotRaw`,
-   `!BattleFx_UnkCD46`, `!Battle_FxObjUnkD1`, `!BattleFx_BounceDir/Base`, `!Battle_FxChanReg`,
-   `!Battle_FxWinLines` and `!Battle_FxWaveTable` feed; whether any script uses opcodes $F9, $CC
-   or $FA-$FE (the scripts at `!BattleRom_FxScriptPtrs` were not decoded); who else sets
-   `!Battle_HdmaEnable`, `!Battle_BgTileSave`, `!Battle_Unk2A21`; who reads `!Battle_UnkCA1B`.
-   (Since the merge with item 11, `!Battle_Paused`, `!Battle_CgramPending`, `!Battle_PalAnimRecs89`
-   and `!Battle_PalRowSave` are set in bank $D1, `!BattleFx_FrameWait` is cleared by
-   `BattleFx_Nmi`, and `!BattleFx_CeSetReload` / `CeSetBase` / `CeSetWant`, `!BattleFx_GradStart`
-   and `!Battle_UnkCE16` are read there.) Next in this bank: `$CD:2A4A` (opcode $80 and its
-   table) and the handlers up to `$30BE`, then `$CD:30C4`-`$CD:3B5E` (with `BattleCD_Unk38B2`,
-   which `BattleFx_RasterQuad` JSLs).
+   CD battle batch 3 (branch match-cd-battle3): matched `$CD:2A4A`-`$CD:3B5E`, so bank $CD's
+   `$CD:0000`-`$CD:3FFF` is now matched in full:
+   - script opcode $80 (`BattleCD_FxOpMisc`, was the stub `BattleCD_FxOp80`) with its 29-word
+     `BattleCD_FxMiscTable` and sub-handlers `BattleCD_FxMisc*` (colour bands `!Battle_FxBandsBlue`/
+     `Green`/`Red` in `!BattleFx_UnkBB05`, fading by `!Battle_UnkCD04`; object 0's triangle presets;
+     OAM entries 4-19 from `!Battle_FxSprTemplate`; a sine into `!Battle_WaveOffsets` for
+     `BattleFx_AddLineOffsets`; the `!BattleFx_WaveBaseX` words `BattleFx_WaveWindowA` reads,
+     zeroed and lowered at random through `!BattleFx_WaveMoving`; the bob steps
+     `!BattleRom_FxBobSteps`; and JSLs into bank $D1);
+   - the handlers of opcodes $81-$86, $89-$8B and $90-$A0, renamed by what they do (was
+     `BattleCD_FxOpNN`): period, scroll step (+ `BattleCD_FxScrollDirTable` and its eight
+     helpers, four of them the old stubs `BattleCD_FxAddScrollY` / `SubScrollX` / `AddScrollX` /
+     `SubScrollY`), loops (`!Battle_FxLoopPtr` / `LoopCount`, the page loop on the channel's page
+     base), call / return (`!Battle_FxReturnPtr`), mosaic, the window and colour-math registers
+     (TM/TS/TMW/TSW and CGADSUB masked by `!BattleFx_UnkCD46`), COLDATA steps, the window shapes
+     ($89-$8B) and the half-plane window ($97, `BattleCD_FxOpHalfPlane`, with
+     `BattleCD_FxLineDeltas` and `!BattleRom_HalfPlaneEdge`);
+   - the window shapes: `BattleCD_FxDrawShape` / `BattleCD_FxShapeTable` (six kinds), the circle
+     half widths `BattleCD_FxCircleHalfWidths` (`!Battle_FxHalfWidths`), the builders
+     `BattleCD_FxBuildCircle` / `BuildDome` / `BuildWide`, the copies `BattleCD_FxCopyShape` (was
+     `BattleCD_Unk35A5`) / `CopyShapeTall` / `CopyShapeDome` / `CopyShapeHanging` and
+     `BattleCD_FxCopyLines` (`$CD:3616`, which runs `BattleCE_RunCopyWords`);
+   - the filled triangles: `BattleCD_FillObjTriangle` (was `BattleCD_Unk3657`) falling into
+     `BattleCD_FillTriangle`, `BattleCD_FillHangingTriangle` (was `BattleCD_Unk3924`) with
+     `BattleCD_AimWinTopFill`, `BattleCD_WinLineBases`, `BattleCD_AimWinLine` and its JSL entry
+     `BattleCD_AimWinLineL` (was `BattleCD_Unk38B2`), `BattleCD_EdgeSlope` (was
+     `BattleCD_Unk38E5`; DP `!BattleCD_SlopeTo/From/Div`, were `SlopeEndY/StartY/Dx`).
+   Also renamed: the opcode $A1/$B8 handlers `BattleCD_FxOpFillObjTriangle` /
+   `BattleCD_FxOpFillHangingTriangle` (were `FxOp3657` / `FxOp3924`). Found: `!BattleFx_UnkCD46` is
+   a layer mask; `!Battle_FxObjUnkD1` is the shape kind; `!Battle_FxChanReg`'s two bytes are opcode
+   $97's angles; every opcode handler returns M=1, X=0. Quirks recorded: the colour bands' dead
+   TXA; random marks past the 212 `!BattleFx_WaveMoving` words; the copies' end tests after the
+   copy (a hanging shape with centre y 0 would run through the bank); the bottom cut of
+   `BattleCD_FxCopyShape` reckoned before the top cut; opcode $97's dead TDC/TAX; the triangles'
+   word stores to WMDATA-1 (APU port 3) and carry chaining, as in bank $D1. Open: whether any
+   script uses opcode $80 sub-ops past $1C or shape kinds past 5; B after opcode $97 (and so a
+   page byte right after it or after $88); who fills `!Battle_FxSprTemplate`, who reads
+   `!Battle_Unk5D9A`, `!Battle_UnkC151`-`C157`, the colour bands and `!Battle_FxWaveTable`
+   (which HDMA channels); what DP $20 (`!BattleCD_TriUnk20`) is for (zeroed, never read here).
+   Back to review (verified headers edited in batch 3): `BattleSys_VecCD0000` (the bank
+   banner), `BattleCD_StepFxChannels`, `BattleCD_RunFxScript`, `BattleCD_RunFxOp`,
+   `BattleCD_FxOpTable` (the banner before it), `BattleCD_FxOpWedge`, `FxOpDrift`,
+   `FxOpScrollYToEnemy`, `FxOpSetObjD1`, `FxOpFillHangingTriangle` (was `FxOp3924`),
+   `FxOpWindowBand`, `FxOpFillTriangle`, `FxOpTriCentre`, `FxOpFillObjTriangle` (was `FxOp3657`);
+   in bank $CE `BattleCE_CopyWindowEdges` (the bank banner), `CopyWordsToLines`, `RunCopyWords`,
+   `DrawHalfPlane`; in bank $D1 `BattleFx_WhitenRows`, `MoveBgRowsUp`, `LoadBgRows2To4`,
+   `WaveWindowA`, `AddLineOffsets`, `DrawQuad`, `RasterQuad` (the rename of `BattleCD_Unk38B2`).
 
 11. Bank $D1 code (branch match-d1-battle; new file `asm/bankD1/bankD1.asm`): `$D1:E70A`-`$D1:FFFF`
    is matched (the code `$E70A`-`$FEF3` with its tables, and the `$FF` fill `BankD1_EndFill`).
@@ -1044,7 +1077,8 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    `BattleFx_Init`, `Op80Dispatch`, `NmiAlt`, `UploadMapBlock`, `HpGradientTick`, `LoadBgSet`,
    `HoldAnimsTick`); the stubs left are `BattleCD_Unk38B2` (`$CD:38B2`), `BattleCD_Unk3ECE`
    (`$CD:3ECE`) and `BattleCE_UnkEE6E` (since the merge with CD battle batch 2, item 10,
-   `$CD:3ECE` is the matched `BattleCD_QueueVramDmaL`; `BattleCD_Unk38B2` is still a stub;
+   `$CD:3ECE` is the matched `BattleCD_QueueVramDmaL`; `BattleCD_Unk38B2` is matched by CD battle
+   batch 3 as `BattleCD_AimWinLineL`;
    `BattleCE_UnkEE6E` is matched by item 12). The bytes both banks use got one name each (the
    bank-$CD names where they said more, e.g. `!Battle_Paused`, `!Battle_MsgTimer`,
    `!Battle_ShakeXOn`..., the bank-$D1 ones otherwise, e.g. `!BattleFx_CeSetWant`,
@@ -1057,10 +1091,11 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    the dead `LDA` in `BattleFx_GrowBox`; `BattleFx_EdgeSlope` not checking a zero line count.
    Open: which HDMA channels read the window tables and `!BattleFx_GradHdmaA-D`; the
    `BattleCE_UnkEE6E` sets; the meaning of the `!BattleFx_Unk*` bytes, `!Battle_Unk2A21` (who
-   sets it), `$7E:E500` and `$7E:0A00` (who fills them), and the table `BattleFx_UnkTableEC5F`
+   sets it), `$7E:E500` and `$7E:0A00` (who fills them: since CD battle batch 3, item 10, script
+   opcode $80's sub-ops $15/$16 and $0C), and the table `BattleFx_UnkTableEC5F`
    (read by bank $CD past `$16B4` only; since CD battle batch 2 `BattleFx_FxModels`, the
-   layer-effect objects' 3D models). When the rest of bank $CD is matched, its callers'
-   entry states can replace the hedges here. `$D1:0000`-`$D1:E709` is data, still ROM bytes.
+   layer-effect objects' 3D models). Bank $CD is matched in full since CD battle batch 3: its
+   callers' entry states can replace the remaining hedges here. `$D1:0000`-`$D1:E709` is data, still ROM bytes.
    Headers edited (back to review): Field_RefreshHdmaLong and MusicCueDispatch (their Callers
    notes now name `BattleFx_NmiAlt` / `BattleFx_Init`); in the merge with bank $CD also these
    bank-$CD headers (the bank-$D1 code named as matched, or the shared bytes renamed):
@@ -1095,9 +1130,10 @@ The queue, in order. Take the first item and run it to the end (CONTRIBUTING.md,
    angle 0 leaving the upper half's left edges unwritten; CopyWindowEdges' 8-bit X wraps for script
    bytes over $4A. Headers edited (back to review): Rom_AngleTable (bank $C0, the `$CE:E85B` reader
    named), BattleSys_VecCD0000 (bank $CD's file banner), BattleCD_StepWipe (the call and its Exit
-   line), BattleFx_ReloadCeSet (what the sets are). Open: the bank-$CD callers still unmatched
-   (opcode $97 and the helper at `$CD:3616` that runs the word copier) and with them the entry
-   states hedged here; what opcode $B2's byte and the copier's counts are in practice;
+   line), BattleFx_ReloadCeSet (what the sets are). Open (the bank-$CD callers, opcode $97's
+   `BattleCD_FxOpHalfPlane` and the word copier's `BattleCD_FxCopyLines`, are matched since CD
+   battle batch 3, item 10, and the entry states here read from them): what opcode $B2's byte
+   and the copier's counts are in practice;
    which sets `!BattleFx_CeSetBase` picks (0, 2, 8, $0C, $0E); who sets `!Battle_Unk2A21` bit 0.
    Not matched in $CE: the data, i.e. `$CE:0000`-`$CE:DFFF` (scripts, object records),
    `$CE:EF11`-`$CE:F065` (`!BattleRom_MsgStrings`, the dissolve and layer-effect tables read by

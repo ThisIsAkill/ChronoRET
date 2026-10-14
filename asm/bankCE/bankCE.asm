@@ -11,10 +11,9 @@
 ;
 ; $CE:E000-$CE:EF10 and $CE:F066-$CE:F0E5 are code with one table
 ; (BattleCE_WaveTable) inside it. The calls found are JSLs from banks
-; $CD and $D1: two of the entries are called from bank-$CD code in
-; $CD:2A4A-$CD:3B5E (not matched; layer-effect opcode $97's handler and
-; the helper at $CD:3616 that BattleCD_Unk35A5 calls), two from matched
-; layer-effect code (BattleCD_FxOpCopyWindowEdges, opcode $B2, and
+; $CD and $D1: four of the entries from the layer-effect code
+; (BattleCD_FxOpHalfPlane, opcode $97; BattleCD_FxCopyLines, the window
+; shapes' line copy; BattleCD_FxOpCopyWindowEdges, opcode $B2; and
 ; BattleCD_CalcAngle, part of opcode $CC's handler), the others from BattleCD_NmiMain,
 ; BattleCD_StepWipe, BattleFx_Init and BattleFx_ReloadCeSet.
 ; (tools/xref.py's other hits into this range, from $C7:CCEA, $C7:E0CC,
@@ -213,14 +212,15 @@ BattleCE_UnkE18E:
 ; RTS. It is entered part way: BattleCE_RunCopyWords jumps to $E7C7 -
 ; 6n (each pair is 6 bytes), which runs the last n pairs: word k of the
 ; source at Y goes to X + 4k for k = n-1 down to 0, i.e. one word a
-; line into a 4-byte-per-line table. The bank-$CD callers (not matched;
-; $CD:3640 and $CD:3652) pass X = !BattleFx_WinTable1 or WinTable0 (by
-; the frame bit) plus a line's offset and Y in $7E:B900 on; n and the
-; source are theirs, not traced.
+; line into a 4-byte-per-line table. Its one caller, BattleCD_FxCopyLines
+; (through BattleCE_RunCopyWords), passes X = !BattleFx_WinTable1 or
+; WinTable0 (by the frame bit) plus a line's offset and the window's
+; byte, Y in !Battle_FxWinLines ($7E:B900 on), and n = the lines of a
+; window shape (BattleCD_FxCopyShape and its kin).
 ; Callers note: none by call; entered through BattleCE_RunCopyWords'
 ;   JMP (!BattleCE_CopyEntry), at any multiple of 6 before $E7C7.
-; Entry: M=0 (16-bit words; the callers' code is 16-bit there, read
-;        from it), X=0, DP any (no DP operand), DB=$7E (both sides .w)
+; Entry: M=0 (16-bit words; BattleCD_FxCopyLines runs 16-bit), X=0, DP
+;        any (no DP operand), DB=$7E (both sides .w)
 ; Exit:  RTS (to BattleCE_RunCopyWords); M, X, DB unchanged; A = the
 ;        source's word 0 (n > 0); X and Y unchanged
 BattleCE_CopyWordsToLines:
@@ -743,13 +743,13 @@ BattleCE_CopyWordsToLines:
 ; (!BattleCE_CopyEntry), so that the copy's RTS comes back here for the
 ; RTL. JMP (abs) reads its pointer from bank $00, so the callers' store
 ; to DP $4B (DP=0) is what it reads.
-; Callers note: both JSLs ($CD:3640, $CD:3652) are in one bank-$CD
-;   routine (not matched) that picks the window table by the frame bit.
-; Callers (2 JSL sites): unmatched ($CD:3640, $CD:3652).
+; Callers note: both JSLs ($CD:3640, $CD:3652) are in
+;   BattleCD_FxCopyLines, one per window table (by the frame bit).
+; Callers (2 JSL sites): BattleCD_FxCopyLines ($CD:3640, $CD:3652).
 ; Entry: M=0 (as BattleCE_CopyWordsToLines), X=0, DP=0 (the pointer at
 ;        $00:004B is DP $4B), DB=$7E; X, Y and !BattleCE_CopyEntry as
-;        BattleCE_CopyWordsToLines takes them; read from the code, the
-;        callers are not matched
+;        BattleCE_CopyWordsToLines takes them (BattleCD_FxCopyLines
+;        enters so)
 ; Exit:  as BattleCE_CopyWordsToLines: M, X, DB unchanged; A = the
 ;        source's word 0; X and Y unchanged
 BattleCE_RunCopyWords:
@@ -1148,9 +1148,9 @@ BattleCE_PresetWinEdges:
 ; table (WinTable1 when bit 0 of !Battle_FrameCount is set, else
 ; WinTable0; the two halves of the code are the same but for the table)
 ; becomes the half of the screen on one side of a line through the
-; screen centre. The bank-$CD handler (not matched) has set the line:
-; !BattleCE_LineP1/P2 are a point read by angle from a table at
-; $CE:F28E (on the screen's edge: angle 0 at (255, 112), $40 at the
+; screen centre. The bank-$CD handler BattleCD_FxOpHalfPlane has set the
+; line: !BattleCE_LineP1/P2 are a point read by angle from
+; !BattleRom_HalfPlaneEdge ($CE:F28E, on the screen's edge: angle 0 at (255, 112), $40 at the
 ; bottom, $80 at (0, 112), $C0 at the top) and the centre (128, 112),
 ; the upper one first; !BattleCE_LineDirX, !BattleCE_LineAbsDX/DY and
 ; !BattleCE_LineAngle (the angle); DP !BattleCE_LineX/Y = P1. Steps:
@@ -1181,14 +1181,15 @@ BattleCE_PresetWinEdges:
 ;        mirrored.
 ;   So the window is the part right of the line (angles $00-$7F) or
 ;   left of it ($80-$FF), point-symmetric about the centre.
-; Callers note: the JSL at $CD:3129 is in opcode $97's handler ($CD:30BE,
-;   not matched), with A = the script byte & $7F; B = 0 there (TDC at
-;   $CD:30FC, then only 8-bit code).
-; Callers (1 JSL site): unmatched ($CD:3129).
+; Callers note: the JSL at $CD:3129 is in opcode $97's handler
+;   (BattleCD_FxOpHalfPlane), with A = the script byte & $7F; B = 0 there
+;   (TDC at $CD:30FC, then only 8-bit code, BattleCD_FxLineDeltas
+;   included).
+; Callers (1 JSL site): BattleCD_FxOpHalfPlane ($CD:3129).
 ; Entry: M=1, X=0, DP=0 (DP operands; TDC as zero), DB=$7E (the tables
 ;        and line bytes .w); A = !BattleCE_EdgeOfs: 0 or 2, the window's
 ;        left edge byte (bit 1 picks the window in step 4; other values
-;        are not checked), B = 0 (the 16-bit TAY); read from the code
+;        are not checked), B = 0 (the 16-bit TAY)
 ; Exit:  M=1, X=0; A, X, Y clobbered; DB unchanged; DP $45-$4C written
 BattleCE_DrawHalfPlane:
     JSR .main

@@ -2210,7 +2210,7 @@ endstruct
 !BattleFx_WinTable0       = $C161 ; $380 B: window table 0, 4 B per line 0-223: left and right edge of the first
                                   ; window, then of the second (the "pairs"); the bytes just before it (from
                                   ; $C14F) are set by BattleFx_Init and reached by some writers (line -1)
-!BattleFx_WinTable1       = $C4E1 ; $380 B: window table 1, the same layout (BattleCD_Unk38B2's base table at
+!BattleFx_WinTable1       = $C4E1 ; $380 B: window table 1, the same layout (BattleCD_AimWinLine's base table at
                                   ; $CD:38AA gives these two bases and +2 for the second pair)
 !BattleFx_UnkCA02         = $CA02 ; 20 B: five pairs of words; BattleFx_Init zeroes the first of each and sets
                                   ; the second ($FF27, $D7, $D7, $0D, $BD)
@@ -2270,7 +2270,9 @@ endstruct
 !BattleFx_BgRequest       = $CD44 ; 1 B: non-zero = BattleCD_FrameTick calls BattleFx_LoadBgSet once with A =
                                   ; !Battle_UnkCD45 (then cleared); zeroed as a word at set-up; + 1 by script opcode $F2,
                                   ; which $F1 waits on
-!BattleFx_UnkCD46         = $CD46 ; 1 B: $FF at set-up, $FD with !Battle_Unk2A21 bit 0; set by script opcode $F5
+!BattleFx_UnkCD46         = $CD46 ; 1 B: $FF at set-up, $FD with !Battle_Unk2A21 bit 0; set by script opcode $F5;
+                                  ; a mask of layer bits ANDed into the TM/TS/TMW/TSW/CGADSUB values of script
+                                  ; opcodes $93, $9B and $9D-$A0 ($FD drops BG2)
 !BattleFx_UnkCDC7         = $CDC7 ; 2 B: zeroed by BattleFx_Init; the low byte is the layer-2 wave's step count
                                   ; (BattleCE_UnkE18E: + 1 a call, / 4 & 31 = the window's position)
 !BattleFx_UnkCDC8         = $CDC8 ; 1 B: zeroed by BattleFx_MoveBgRowsUp, counted up by BattleFx_LoadBgRows2To4;
@@ -2294,8 +2296,8 @@ endstruct
 !BattleFx_SlowCount       = $CE19 ; 2 B: frames counted by the debug slow motion (BattleFx_Nmi); zeroed at set-up
 !BattleFx_HoldAnims       = $CFFF ; 1 B: non-zero = BattleFx_HoldAnimsTick holds the palette animations; set to 1 by
                                   ; action opcode $2D, to 0 by $2E, to a value by layer-effect script opcode $E6
-!BattleFx_WaveBaseX       = $E500 ; 2 B per step of 8: words BattleFx_WaveWindowA adds the wave to (filled in bank
-                                  ; $CD, probably; not traced)
+!BattleFx_WaveBaseX       = $E500 ; 2 B per step of 8: words BattleFx_WaveWindowA adds the wave to; zeroed by script
+                                  ; opcode $80 sub-op $15, lowered (4 B apart) by sub-op $16
 ; --- ROM ---
 !BattleRom_DebugSlowMo    = $CD3FFF; 1 B: non-zero enables BattleFx_Nmi's debug slow motion and would keep
                                   ; BattleCD_NmiMain's paused screen at full brightness; 0 in this ROM
@@ -2485,7 +2487,8 @@ endstruct
 !Battle_UnkCD28           = $CD28 ; 1 B: zeroed by BattleCD_LoadLayerFx; the growing radius of script opcode $C4
 !Battle_UnkCD3C           = $CD3C ; 1 B: zeroed by BattleCD_LoadLayerFx and BattleFx_Init; counted by script opcode $EF
                                   ; (the palette animations 8-11 stop when it wraps)
-!Battle_UnkCD04           = $CD04 ; 1 B: set to !BattleCD_CD04Init by BattleCD_LoadLayerFx; use not traced
+!Battle_UnkCD04           = $CD04 ; 1 B: set to !BattleCD_CD04Init by BattleCD_LoadLayerFx; the fade of script opcode
+                                  ; $80's colour bands (BattleCD_FxMiscTallBands: - 1 a build down to 0)
 !Battle_FxRecord          = $C9FC ; 6 B: the effect's !BattleRom_FxRecords entry: byte 0 the block count (bits 0-5;
                                   ; bit 6 goes into the tile word), byte 1 the tile set
 !Battle_FxRecMap          = $C9FE ; 2 B: record bytes 2-3: the first map number (counted up per block)
@@ -2546,8 +2549,8 @@ endstruct
                                   ; COLDATA value for !Battle_HdmaColData; BattleFx_Init zeroes the first five
 !Battle_UnkC151           = $C151 ; 2 B: copied from !Battle_UnkC155 every frame by BattleCD_NmiMain; use not traced
 !Battle_UnkC153           = $C153 ; 2 B: copied from !Battle_UnkC157 the same way
-!Battle_UnkC155           = $C155 ; 2 B: see !Battle_UnkC151
-!Battle_UnkC157           = $C157 ; 2 B: see !Battle_UnkC153
+!Battle_UnkC155           = $C155 ; 2 B: see !Battle_UnkC151; set to $00FF or $FF00 by script opcodes $94 and $98
+!Battle_UnkC157           = $C157 ; 2 B: see !Battle_UnkC153; set by script opcodes $94 ($00FF/$FF00) and $98 ($FFFF)
 !Battle_ScrollAddX        = $BB01 ; 2 B: added to layer 1's x in the scroll data; zeroed by BattleFx_Init
 !Battle_ScrollAddY        = $BB03 ; 2 B: added to layer 1's y; zeroed by BattleFx_Init
 !Battle_ShakeOfs1X        = $CCA4 ; 2 B: shake offset added to layer 1's x (BattleCD_StepShake); BattleFx_Init zeroes
@@ -2662,7 +2665,8 @@ endstruct
 !BattleCD_RotAngleY       = $4B   ; 1 B DP: ... about the y axis (applied first)
 !BattleCD_RotAngleZ       = $4D   ; 1 B DP: ... about the z axis (applied last)
 !Battle_FxValues          = $CAA4 ; 1 B per index (operand): values the script opcodes set, step and test (from
-                                  ; opcode $F0 on)
+                                  ; opcode $F0 on); entries n, n+2, n+4 are shape slot n's size, centre x and y
+                                  ; (opcodes $89, $8A, $8B)
 !Battle_FxWaveOfs         = $CD37 ; 1 B: the offset script opcode $E7 builds layer 3's wave lines from
 !Battle_FxTriX0           = !BattleFx_CalcCopy ; 1 B per object 0-1 (2 B apart, X = the object): its triangle's first point x
 !Battle_FxTriY0           = !BattleFx_CalcCopy+2 ; ... first point y
@@ -2678,7 +2682,8 @@ endstruct
 !Battle_ActVar0E          = $5D8E ; 1 B: variable $0E
 !Battle_ActVar0F          = $5D8F ; 1 B: variable $0F
 !Battle_FxAngle           = $CD08 ; 1 B: the angle BattleCD_CalcAngle got from two points (BattleCE_CalcAngle's !BattleCE_Angle, DP $45)
-!Battle_FxObjUnkD1        = $CAD1 ; 1 B per object 0-1: set by script opcode $BD; reader not traced
+!Battle_FxObjUnkD1        = $CAD1 ; 1 B per object 0-1: set by script opcodes $BD and $8A; shape slot n's kind
+                                  ; (BattleCD_FxDrawShape, BattleCD_FxShapeTable)
 !Battle_FxObjCentreX      = $CAD4 ; 1 B per object 0-1 (2 B apart, X = the object): the screen x its model is drawn
                                   ; around (and its triangle scaled towards)
 !Battle_FxObjCentreY      = $CAD6 ; ... the screen y
@@ -2700,7 +2705,8 @@ endstruct
 !BattleCD_TriY1           = $15   ; 1 B DP: ... its y
 !BattleCD_TriX2           = $16   ; 1 B DP: the third point x
 !BattleCD_TriY2           = $17   ; 1 B DP: ... its y
-!BattleCD_TriUnk20        = $20   ; 1 B DP (stored .w): zeroed before BattleCD_FillTriangle; meaning not traced
+!BattleCD_TriUnk20        = $20   ; 1 B DP (stored .w): zeroed before BattleCD_FillTriangle and by
+                                  ; BattleCD_FillObjTriangle / FillHangingTriangle; none of them reads it; meaning not traced
 !BattleCD_FxScale         = $21   ; 2 B DP: an object's !Battle_FxObjScale (BattleCD_FxRotateVertex,
                                   ; BattleCD_FxOpFillTriangle)
 !BattleCD_FxRadius1X      = $49   ; 1 B DP: the layer-3 circle's first x radius (BattleCD_FxCircleStep)
@@ -2711,8 +2717,9 @@ endstruct
 !BattleCD_FxCentreY       = $4E   ; 1 B DP: its centre y
 !BattleCD_FxModelOfs      = $4F   ; 1 B DP: the model's offset in BattleFx_FxModels (model * 16)
 !BattleCD_FxDepth         = $51   ; 1 B DP: added to each vertex's z (BattleCD_FxRotateVertex)
-!Battle_FxWinLines        = $B900 ; 256 words: byte pairs per line (a left and a right edge, probably) that script
-                                  ; opcodes $B5/$B6 fill around the middle; reader not traced
+!Battle_FxWinLines        = $B900 ; 256 words: byte pairs per line (a left and a right edge) that script opcodes
+                                  ; $B5/$B6 and the shape builders (BattleCD_FxBuildCircle...) fill around the middle;
+                                  ; copied into the window table by BattleCD_FxCopyShape and its kin
 !Battle_FxWinLinesMid     = $BA00 ; its middle line
 !Battle_FxWaveTable       = $C15D ; 106 entries of 8 B (x word, y word, twice) built each frame by script opcode $B3;
                                   ; reader not traced (an HDMA table, probably)
@@ -2724,9 +2731,10 @@ endstruct
 !BattleCD_LineBY0         = $17   ; ... start y
 !BattleCD_LineBX1         = $18   ; ... end x (point 1)
 !BattleCD_LineBY1         = $19   ; ... end y
-!BattleCD_SlopeEndY       = $0B   ; 1 B DP: BattleCD_Unk38E5's end y
-!BattleCD_SlopeStartY     = $0C   ; 1 B DP: its start y
-!BattleCD_SlopeDx         = $0D   ; 1 B DP: its x distance
+!BattleCD_SlopeTo         = $0B   ; 1 B DP: BattleCD_EdgeSlope's end value (an x for the triangles, a y for
+                                  ; BattleCD_FxOpTriCentre)
+!BattleCD_SlopeFrom       = $0C   ; 1 B DP: its start value
+!BattleCD_SlopeDiv        = $0D   ; 1 B DP: its divisor (the line count; TriCentre's x distance)
 !BattleCD_SlopeA          = $45   ; 2 B DP: the first line's slope (BattleCD_FxOpTriCentre)
 !BattleCD_SlopeB          = $47   ; 2 B DP: the second line's slope
 !BattleCD_BaseA           = $49   ; 2 B DP: the first line's y at x = 0
@@ -2745,6 +2753,38 @@ endstruct
 !Battle_FxObjSquashY      = $CAE2 ; ... the same for its y
 !Battle_FxObjSaves        = $CB0E ; 8 slots of $2A B: copies of the objects' fields (script opcodes $A5/$A6)
 !Battle_FxChanReg         = $CA77 ; 2 B per channel (X = the channel's offset): the word script opcodes $8C/$8D copy to
-                                  ; and from the work words; other readers not traced
+                                  ; and from the work words; its two bytes are also opcode $97's two angles
+!Battle_FxLoopPtr         = $CA72 ; 2 B per channel: the operand address of the channel's last loop opcode $83/$85
+!Battle_FxLoopCount       = $CA74 ; 1 B per channel: passes of that loop left (opcodes $84/$86 count it down)
+!Battle_FxReturnPtr       = $CA75 ; 2 B per channel: script opcode $91's return address - 1 (opcode $92 goes back)
+!Battle_FxBobStep         = $CA79 ; 1 B per channel: index into !BattleRom_FxBobSteps (script opcode $80 sub-ops $0A/$0B)
+!Battle_FxShapeSlot       = $CAAA ; 1 B: the shape slot BattleCD_FxDrawShape draws (its !Battle_FxValues index)
+!Battle_FxHalfWidths      = $B800 ; 1 B per line: BattleCD_FxCircleHalfWidths' circle half widths, then a 0
+!Battle_FxBandsBlue       = $BB06 ; $80 B: 32 entries of 4 B (+0 a line count, +1 a COLDATA value with !COLDATA_Blue;
+                                  ; +2/+3 not written) built by script opcode $80 sub-ops $00, $0E, $13; inside
+                                  ; !BattleFx_UnkBB05; HDMA line data for COLDATA, probably (the reader is not traced)
+!Battle_FxBandsGreen      = $BB86 ; $80 B: the same with !COLDATA_Green
+!Battle_FxBandsRed        = $BC06 ; $80 B: the same with !COLDATA_Red (it ends where !Battle_HdmaTilemaps starts)
+!Battle_FxSprTemplate     = $4500 ; 64 B: 16 sprites (x, y, tile, attribute) script opcode $80 sub-op $09 puts into
+                                  ; OAM entries 4-19; who fills them is not traced
+!Battle_Unk5D9A           = $5D9A ; 1 B: set to 1 by script opcode $80 sub-op $13; no reader found (no absolute
+                                  ; access to it in the ROM)
+!BattleFx_WaveMoving      = $E850 ; 2 B per !BattleFx_WaveBaseX entry (4 B apart, 212 entries): non-zero = script
+                                  ; opcode $80 sub-op $16 lowers that entry; + 1 for random entries; zeroed by sub-op $15
+!BattleCE_LineDirY        = $CAA0 ; 1 B: the half-plane line's y direction from P1 to P2 ($FF up, 0, 1 down), set by
+                                  ; BattleCD_FxLineDeltas; BattleCE_DrawHalfPlane does not read it
+!BattleCD_TriSign         = $00   ; 1 B DP: BattleCD_FillTriangle: the sign (BattleCD_EdgeSlope's A) of the 0-1 slope
+!BattleCD_TriLines        = $01   ; 2 B DP: lines left in the segment being drawn (high byte zeroed)
+!BattleCD_TriSlopeA       = $03   ; 2 B DP: the first edge's x step per line (8.8)
+!BattleCD_TriSlopeB       = $05   ; 2 B DP: the second edge's
+!BattleCD_TriSlopeC       = $07   ; 2 B DP: the third edge's (taken over at the middle point)
+!BattleCD_TriTop          = $0F   ; 1 B DP: the triangle's top line
+!BattleCD_TriBottom       = $10   ; 1 B DP: the line it ends at
+!BattleCD_TriMid          = $11   ; 1 B DP: the line where the third edge takes over
+; --- ROM ---
+!BattleRom_FxBobSteps     = $CEF1D2 ; 256 B: signed steps script opcode $80 sub-ops $0A/$0B add to or take from a
+                                    ; channel's !BattleFx_BounceOut, by !Battle_FxBobStep
+!BattleRom_HalfPlaneEdge  = $CEF28E ; 2 B per angle 0-255: (x, y) of a point on the screen's edge (script opcode $97,
+                                    ; BattleCE_DrawHalfPlane); it ends where !BattleRom_AbsSine begins
 
 endif

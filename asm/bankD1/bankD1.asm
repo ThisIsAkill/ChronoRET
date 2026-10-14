@@ -292,9 +292,9 @@ BattleFx_Nmi:
 ; Fills background palette rows 2-7 ($2040-$20FF of
 ; !Battle_PaletteSavedLo and $2240-$22FF of !Battle_PaletteLiveLo) and
 ; OBJ palette rows 1-3 (saved and live) with !BattleFx_White ($7FFF).
-; Callers note: the JSL at $CD:2A9C is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:2A9C).
+; Callers note: the JSL at $CD:2A9C and an RTS are the whole of
+;   BattleCD_FxMiscWhitenRows, layer-effect script opcode $80's sub-op $1A.
+; Callers (1 JSL site): BattleCD_FxMiscWhitenRows ($CD:2A9C).
 ; Entry: M=1, X=0, DP=0 (TDC gives the start index 0), DB=$7E (the
 ;        palettes are written .w)
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = 3*!Battle_RowBytes;
@@ -327,7 +327,7 @@ BattleFx_WhitenRows:
 ; Fills OBJ palette rows 5-7 (saved and live) with !BattleFx_White.
 ; Callers note: the JSL at $CD:2A97 is followed by RTS (as
 ;   BattleFx_WhitenRows).
-; Callers (1 JSL site): unmatched ($CD:2A97).
+; Callers (1 JSL site): BattleCD_FxMiscWhitenObjRows ($CD:2A97).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A = 0; X = 3*!Battle_RowBytes;
 ;        Y unchanged
@@ -412,9 +412,9 @@ BattleFx_UploadMapBlock:
 ;     and !BattleFx_AnimsHeld is counted up, so that the next
 ;     BattleFx_HoldAnimsTick with !BattleFx_HoldAnims clear puts those
 ;     kinds back (records 0-2 running, 3-5 stopped).
-; Callers note: the JSL at $CD:2AA5 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:2AA5).
+; Callers note: the JSL at $CD:2AA5 and an RTS are the whole of
+;   BattleCD_FxMiscMoveBgRows, layer-effect script opcode $80's sub-op $18.
+; Callers (1 JSL site): BattleCD_FxMiscMoveBgRows ($CD:2AA5).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A = !BattleFx_AnimKind3; X =
 ;        3*!FieldAnimB_Size; Y unchanged
@@ -476,9 +476,9 @@ BattleFx_MoveBgRowsUp:
 ; their .Unk0 to !BattleFx_AnimKind3, sets !BattleFx_SavedKinds+3..5 to
 ; $30 and counts up !BattleFx_AnimsHeld (see BattleFx_MoveBgRowsUp,
 ; whose records 0-2 this copies back).
-; Callers note: the JSL at $CD:2AAA is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:2AAA).
+; Callers note: the JSL at $CD:2AAA and an RTS are the whole of
+;   BattleCD_FxMiscLoadBgRows, layer-effect script opcode $80's sub-op $17.
+; Callers (1 JSL site): BattleCD_FxMiscLoadBgRows ($CD:2AAA).
 ; Entry: M=1, X=0, DP=0 (TDC as 0), DB=$7E
 ; Exit:  M=1, X=0, DP and DB unchanged; A = !BattleFx_AnimKind3; X =
 ;        !BattleFx_AnimUnk4Init ($0100); Y unchanged
@@ -1311,7 +1311,9 @@ BattleFx_RampWin2:
 ;   - second pair: r2 x the sine of the second angle plus (!BattleFx_ShakeY
 ;     + !BattleFx_BounceOut) (BattleFx_WaveRight).
 ; The sines are !BattleRom_AbsSine x the radius / 256, negated for
-; angles $80-$FF. Who fills $7E:E500 is not traced (bank $CD).
+; angles $80-$FF. In bank $CD, script opcode $80's sub-op $15 zeroes the
+; words at $7E:E500 and sub-op $16 lowers marked ones by 16
+; (BattleCD_FxMiscClearWaveBase / BattleCD_FxMiscDropWaveBase).
 ; Callers note: the JSL at $CD:1855 and an RTS are the whole handler of
 ;   layer-effect script opcode $ED, which BattleCD_RunFxOp runs with B = 0.
 ; Callers (1 JSL site): BattleCD_FxOpWaveWindowA ($CD:1855).
@@ -1684,13 +1686,16 @@ BattleFx_WaveRight:
 ; get $0A00 + n added to both edges of their first pair, and $0A20 + n
 ; (table 0) or $0A40 + n (table 1) to both edges of their second pair.
 ; There is no CLC: each ADC also adds the carry of the one before (the
-; first one the carry the caller left); kept as found. $0A00 is also
-; !Battle_WaveOffsets, which bank $CD's script opcodes $E7 and $8F
-; (BattleCD_FxOpWaveBg3, BattleCD_FxOpWaves) write; whether anything
-; fills it for this use is not traced.
-; Callers note: the JSL at $CD:2B64 is followed by RTS (a bank-$CD
-;   script command handler, probably; not matched).
-; Callers (1 JSL site): unmatched ($CD:2B64).
+; first one the carry the caller left: 0 from its one caller); kept as
+; found. $0A00 is also !Battle_WaveOffsets, which bank $CD's script
+; opcodes $E7 and $8F (BattleCD_FxOpWaveBg3, BattleCD_FxOpWaves) write;
+; for this use script opcode $80's sub-op $0C (BattleCD_FxMiscSineOffsets)
+; fills its 256 bytes with a sine of amplitude 12, probably (which bytes a
+; script has there when it runs sub-op $0D is not traced).
+; Callers note: the JSL at $CD:2B64 and an RTS are the whole of
+;   BattleCD_FxMiscAddLineOffsets, script opcode $80's sub-op $0D, entered
+;   with C = 0 (the dispatcher's ASL of a sub-op below $80).
+; Callers (1 JSL site): BattleCD_FxMiscAddLineOffsets ($CD:2B64).
 ; Entry: M=1, X=0 (it loads $0A00 16-bit, then sets X=1), DP any (saved;
 ;        set to !BattleFx_LineAddDp), DB=$7E (the frame count is read as
 ;        $7E:007C and the tables .w)
@@ -3084,7 +3089,7 @@ BattleFx_EdgeSlope:
 ; DP $12-$19, BattleFx_SortQuadByY, then BattleFx_RasterQuad with
 ; DB=$00 (saved and restored around it). X = 0 and 1 are two
 ; interleaved quads; bit 0 of !BattleFx_QuadSlot makes
-; BattleCD_Unk38B2 aim at the second pair of each line.
+; BattleCD_AimWinLineL aim at the second pair of each line.
 ; Callers note: also the JSL at $CD:24E9 (BattleCD_FxOpBeamQuad, script
 ;   opcodes $AC and $D9), after REP #$10 with X its quad (the object).
 ; Callers (2 JSL sites): BattleCD_FxOpBeamQuad ($CD:24E9) and BattleFx_SwayQuad ($D1:EC5A).
@@ -3124,7 +3129,7 @@ BattleFx_DrawQuad:
 ; $D1:F9E7 — BattleFx_RasterQuad (385 bytes, $F9E7–$FB67)
 ; Rasterises the y-sorted quad in DP $12-$19 into the window table
 ; through the WRAM port: BattleFx_QuadSlopes, then JSL
-; BattleCD_Unk38B2 with A = !BattleFx_QuadTop aims WMADD at that line
+; BattleCD_AimWinLineL with A = !BattleFx_QuadTop aims WMADD at that line
 ; of the table, and each line is written as left edge, right edge (the
 ; integer bytes of two 8.8 edges, written with a 16-bit STA to WMDATA-1
 ; so the high byte lands in WMDATA), then two 16-bit reads that each
@@ -3186,7 +3191,7 @@ BattleFx_RasterQuad:
 .trapezoid:
     JSR BattleFx_QuadSlopes
     LDA.b !BattleFx_QuadTop
-    JSL BattleCD_Unk38B2
+    JSL BattleCD_AimWinLineL
     LDA.b !BattleFx_QuadY2
     SEC
     SBC.b !BattleFx_QuadY1
@@ -3222,7 +3227,7 @@ BattleFx_RasterQuad:
     RTS
 .left_bend_draw:
     LDA.b !BattleFx_QuadTop
-    JSL BattleCD_Unk38B2
+    JSL BattleCD_AimWinLineL
     LDA.b !BattleFx_QuadY1
     SEC
     SBC.b !BattleFx_QuadY0
@@ -3299,7 +3304,7 @@ BattleFx_RasterQuad:
     RTS
 .right_bend_draw:
     LDA.b !BattleFx_QuadTop
-    JSL BattleCD_Unk38B2
+    JSL BattleCD_AimWinLineL
     LDA.b !BattleFx_QuadY2
     SEC
     SBC.b !BattleFx_QuadY0
