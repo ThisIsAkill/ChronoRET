@@ -612,7 +612,9 @@ struct Menu_CharRec $0000
 .Unk28:     skip 1     ; ... category 1
 .Unk29:     skip 1     ; the weapon (Menu_EquipSlotOffsets category 0; Menu_WeaponRecSrc)
 .Unk2A:     skip 1     ; the accessory (category 3); Menu_Unk82E1 looks for $AE-$B2 here
-            skip $0B
+            skip 4
+.StatCounts: skip 6    ; Menu_ApplyStatItem counts up to 99 here (Menu_StatCountOfs order)
+            skip 1
 .Derived:   skip 9     ; Menu_CharRecalc's copy of Menu_CurStats, Menu_CurAttack, Menu_CurDefense
 .Unk3F:     skip 2     ; ... and Menu_CurMaxHp; Menu_Setup divides it by 10
             skip $0F
@@ -1243,7 +1245,7 @@ endif
 ; --- Menu mode 1 (Menu_Mode01H0 ...) ---
 !Menu_LastMember = $0083                 ; 8-bit; Menu_CurMember at handler 1's last move (sound on a change)
 !Menu_Unk84 = $0084                      ; 8-bit; Menu_ListKind + Menu_CurMember at handler 2's last
-                                         ; Menu_UnkA45D ($FF: redo)
+                                         ; Menu_EquipListRefresh ($FF: redo)
 !Menu_RowCopyPos = $0026                 ; 16-bit; Menu_MemberScrollAnim's off-screen block position
 !Menu_RowScrollWord = $0022              ; 16-bit; the word Menu_MemberScrollAnim steps into Menu_Unk5D42
 !Menu_Unk0D26 = $0D26                    ; 16-bit; the Menu_CurCharRec offset handler 3 swaps (the
@@ -1255,6 +1257,59 @@ endif
 !Menu_ItemListMap = $4F80                ; tilemap rows of the item list ($400 bytes moved by
                                          ; Menu_ShiftItemListMap)
 !Menu_Unk5CC2 = $5CC2                    ; 12 tile words set to $40FF by Menu_EquipSlotsOpen
+
+; --- Menu mode 1: the slides, the item list and the stat compare ---
+!Menu_SlideWordA = $0022                 ; 16-bit; the item slides' word for Menu_Unk5CC2 (stepped)
+!Menu_SlideWordB = $0024                 ; 16-bit; ... for Menu_Unk5D42
+!Menu_SlideStep = $0026                  ; 16-bit; their step a frame (also lines moved between entries)
+!Menu_BandA = $0022                      ; 8-bit; the slot slides' band line counts (Menu_BandValueA ...)
+!Menu_BandB = $0024                      ; 8-bit
+!Menu_BandC = $0026                      ; 8-bit
+!Menu_DrawRowsLeft = $0022               ; 16-bit; Menu_DrawEquipList's row counter
+!Menu_ScrollBuildLines2 = $96A0          ; 8-bit; Menu_ScrollBuild entry 2's line count (item slides)
+!Menu_ScrollBuildLines3 = $96A3          ; 8-bit; entry 3's line count ...
+!Menu_ScrollBuildValue3 = $96A4          ; 16-bit; ... and value
+!Menu_EquipNameIds = $9890               ; 5 B: Menu_DrawEquipNames' item ids (the Menu_SprScratch RAM)
+!Menu_CompareAttrs = $0D4D               ; 9 B: Menu_EquipCompareStats' attribute bytes (the Menu_Unk0D4D RAM)
+!Menu_CompareHpAttr = $0D57              ; 8-bit; its byte for the max HP
+!Menu_SlotsClearA = $3044                ; 12 tile words Menu_EquipSlotsSlideOut zeroes ...
+!Menu_SlotsClearB = $3084                ; ... and 12 more two tile rows down
+!Menu_Unk5D40 = $5D40                    ; BG3 map row 61 ($80 B) zeroed by Menu_EquipSlotsSlideOut
+
+; --- Menu mode 2: the item screen and item use ---
+!Menu_ItemsCursor = $0415                ; 8-bit; the item list's cursor row (the Menu_Unk0415 byte)
+!Menu_ItemsTop = $0416                   ; 8-bit; its top slot (the Menu_Unk0416 byte)
+!Menu_ItemsPicked = $0F00                ; 16-bit; the slot picked in handler 2 ($FFFF: none)
+!Menu_SortHave = $9890                   ; 256 B: Menu_SortInventory's id marks ...
+!Menu_SortCounts = $9990                 ; 256 B: ... and merged counts
+!Menu_EquipCharNames = $9890             ; 42 B: Menu_ListEquipChars' 6-byte entries
+!Menu_InfoLabel = $9990                  ; 13 B: Menu_EquipValueLabel's label, a blank and the end
+!Menu_InfoValue = $0D4D                  ; 8-bit; Menu_EquipValueLabel's value (Menu_ItemSortKeys)
+!Menu_RowItemId = $0D4D                  ; 8-bit; the id and ...
+!Menu_RowItemCount = $0D4E               ; ... the count Menu_DrawInvEntry draws
+!Menu_ItemsBg3Clear = $4E80              ; BG3 map from row 2 ($200 B zeroed by Menu_Icon1Preview)
+!Menu_InfoRowA = $4E1E                   ; BG3 map row 0 column 15 (Menu_ClearInfoRows) ...
+!Menu_InfoRowB = $4E5E                   ; ... row 1 column 15
+!Menu_UseTileClear = $5080               ; $400 B zeroed when the use window closes
+!Menu_UseRowFirst = $0DBB                ; 8-bit; cursor record of the first member row
+!Menu_UseKind = $0DBD                    ; 8-bit; the effect bits (HP 7, MP 6, all 3) or a stat kind 1-6
+!Menu_UseTarget = $0DBE                  ; 8-bit; the member the cursor is on
+!Menu_UseAmountA = $0DBF                 ; 8-bit; the amount (bit 7: fixed, else plus a random part)
+!Menu_UseAmountB = $0DC0                 ; 8-bit; its multiplier; bit 6: to the maximum
+!Menu_HealAmounts = $0022                ; 6 words: HP amounts of members 0-2, then MP
+!Menu_HealShown = $0F63                  ; 6 words: the amounts applied, then their BCD (packed)
+!Menu_HealCount = $0F53                  ; 16-bit; members with a number to show
+!Menu_HealPos = $0F57                    ; words: .ScreenY / .ScreenX low byte per shown member
+!Menu_HealParts = $0F5D                  ; 16-bit; bit 0 HP, bit 1 MP numbers to show
+!Menu_HealStep = $0F60                   ; 8-bit; MenuRom_HealBounce index
+!Menu_HealDigits = $0F61                 ; 8-bit; digits - 1
+!Menu_HealValueOfs = $0016               ; 8-bit; 0 (HP) or 6 (MP) into Menu_HealShown
+!Menu_Tmp05 = $0005                      ; 8-bit scratch
+!Menu_HealCountLeft = $0022              ; 16-bit; Menu_HealBounce's member counter
+!Menu_HealPosIdx = $0019                 ; 16-bit; its Menu_HealPos offset
+!Menu_OamHighHeal = $0908                ; OAM high-table bytes of entries 32-43
+!Menu_OamHealDigits = $0780              ; OAM entry 32 in the copy at $0700: the digit sprites
+!Menu_InvStash = $9B96                   ; $200 B: the inventory while stashed
 
 ; --- Bank $FF menu helpers ($FF:F548-$FF:FC66) ---
 !Menu_Tmp07 = $0007                      ; 8-bit scratch

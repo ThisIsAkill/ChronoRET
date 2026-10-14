@@ -1,0 +1,3 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:A642,Menu_EquipCompareOfs,2026-10-09,rev151a,approved,3b68ae4deb93,"r150 fixed: header now says only .Unk3F is compared, vs Menu_CurMaxHp (CPX at A626). ROM 3D 3E 36 38 3B 39 37 3A 3C 03 3F = .Derived+7.. ($36); CompareCount 9; no other reader"
+$C2:AA19,Menu_PutHdmaEntry,2026-10-09,rev151a,approved,9ea45f827232,"ROM/logic: BPL; INC/AND $7F = A-$7F then $7F; $FF quirk; long stores, DP Tmp00/01; 8 callers set N by LDA/SBC/ADC+BMI, max $C0. nit: A=0 also writes the 2 value bytes after the 0"
