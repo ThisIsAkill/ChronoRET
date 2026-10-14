@@ -777,8 +777,77 @@ if !ram_engine_inc == 0
 !Audio_CmdArg2 = $1E03                   ; 8-bit third command argument (the last byte of the block
                                          ; Audio_DriverCommand sends; bank $C2's C2Scene_QueueSoundCmd
                                          ; fills all four bytes $1E00-$1E03)
-!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after
-                                         ; (next to the Audio_Cmd* block; reader not traced)
+!Audio_Unk1E10 = $1E10                   ; 8-bit; the battle music cues set $FF before a battle, 0 after.
+                                         ; Read by bank $C7 (Audio_SendSongData, Audio_UploadBlock2F00;
+                                         ; Audio_CmdBlockVariant sets it from command $70's argument): nonzero picks
+                                         ; AudioRom_Block2F00Alt for ARAM $2F00 instead of
+                                         ; AudioRom_Block2F00
+!Audio_BlockInAram = $1E11               ; 8-bit 0/1: which of the two $2F00 blocks was last sent
+                                         ; (Audio_Unk1E10 != 0 when it was); a change makes bank $C7
+                                         ; send the other one
+
+; --- Sound driver page $1E00 (bank $C7, absolute; dp with DP = !DP_Audio) ---
+; Bank $C7 runs with DP = $1E00 and DB = 0. Its routines use these names as
+; dp operands written !Name-!DP_Audio. Audio_Boot clears the whole page.
+!DP_Audio = $1E00                        ; direct page of the bank $C7 routines (Audio_Boot and
+                                         ; Audio_RunCommand TCD it through the stack)
+!Audio_SongLoading = $1E05               ; 8-bit: $E0 (!Audio_SongIdle) when idle; the song id
+                                         ; while Audio_CmdLoadSong runs. Audio_RunCommand
+                                         ; ignores every command while bit 7 is clear
+!Audio_Unk1E0A = $1E0A                   ; 8-bit; zeroed by Audio_LoadNewSamples, no reader found
+!Audio_Count = $1E0C                     ; 16-bit scratch: an end index, a slot count or a byte
+                                         ; count (each user says which)
+!Audio_ListEnd = $1E0E                   ; 16-bit scratch: Audio_CmdLoadSong's end index into
+                                         ; AudioRom_SongSamples
+!Audio_Ptr = $1E12                       ; 3 B long pointer for [dp],Y reads; Audio_CmdLoadSong and
+                                         ; Audio_SendSampleDir use its first word as a pointer into
+                                         ; bank 0 for (dp) stores
+!Audio_Ptr2 = $1E14                      ; 16-bit (dp) store pointer in Audio_CmdLoadSong; overlaps
+                                         ; Audio_Ptr's bank byte
+!Audio_SaveX = $1E1C                     ; 16-bit: X kept across Audio_UploadSample (it reads it)
+!Audio_SaveY = $1E1E                     ; 16-bit: Y kept across Audio_UploadSample
+!Audio_SlotSample = $1E20                ; 16 words: the sample (1-62, AudioRom index + 1) held by
+                                         ; each ARAM sample slot, 0 = free; the slots in use come
+                                         ; first, in ARAM order
+!Audio_SlotLen = $1E40                   ; 16 words: each slot's sample length in bytes
+!Audio_SlotAram = $1E60                  ; 17 words: the ARAM address where slot n starts; entry
+                                         ; n+1 is where slot n ends. Entry 0 is the base Audio_Boot
+                                         ; sets (just after the $4700 block)
+!Audio_Tmp82 = $1E82                     ; 16-bit scratch: an index - 1 kept to multiply it by 3
+!Audio_Seq = $1E84                       ; 8-bit: the next value to write to APUIO0 in a transfer,
+                                         ; counting 1 up per step modulo $80 (Audio_SendSeq); set
+                                         ; to !Audio_SeqHeader after each transfer, so that is
+                                         ; usually the header step's value (Audio_StartSong leaves
+                                         ; (command + 1) & $7F instead)
+!Audio_XferMode = $1E86                  ; 8-bit: the transfer mode Audio_UploadBlock2F00 asked for
+!Audio_EchoDelay = $1EF0                 ; 8-bit, 5 at boot: the echo delay, probably (see
+                                         ; Audio_EchoPage); a song's AudioRom_SongEcho entry or
+                                         ; command $FC change it
+!Audio_Unk1EF1 = $1EF1                   ; 8-bit; zeroed by Audio_Boot, no other use found
+!Audio_EchoPage = $1EF2                  ; 8-bit: ARAM page !Audio_EchoTopPage - 8 x
+                                         ; Audio_EchoDelay: where an echo buffer of 2 KB per
+                                         ; delay step would start below $F100 (inferred from the
+                                         ; arithmetic, as the DSP's EDL/ESA work); samples ending
+                                         ; on or above it are dropped (Audio_DropEchoSlots)
+!Audio_BlockDirty = $1EF3                ; 8-bit: nonzero makes Audio_SendSongData send the $2F00
+                                         ; block again (a song longer than !Audio_SongRoom
+                                         ; overwrote it, or the variant changed)
+!Audio_FreeAram = $1EF6                  ; 16-bit: the ARAM address after the last loaded sample
+                                         ; (written by Audio_Boot and Audio_LoadNewSamples; no
+                                         ; reader found)
+!Audio_SampleBase = $1EF8                ; 16-bit: Audio_SlotAram's base, written once by
+                                         ; Audio_Boot (no reader found)
+!Audio_Unk1EFA = $1EFA                   ; 8-bit; set to 0 by Audio_Boot, no reader found
+!Audio_Unk1EFB = $1EFB                   ; 8-bit; set to $C7 by Audio_Boot, no reader found
+!Audio_FirstSlot = $1EFC                 ; 16-bit: the slot offset (slot x 2) holding the current
+                                         ; song's first sample (Audio_SendSampleDir); command $71
+                                         ; replaces that sample
+!Audio_SongSamples = $1F00               ; 16 words: the samples the song being loaded uses
+                                         ; (from AudioRom_SongSamples), 0-ended
+!Audio_NewSamples = $1F20                ; 16 words: those of them not yet in a slot, 0-ended
+!Audio_DirBuf = $1F80                    ; 16 x 4 B: for each of Audio_SongSamples its ARAM start
+                                         ; and loop address (0, 0 for one not found), sent to
+                                         ; ARAM !AudioAram_SongDir
 !Field_Unk7E2000 = $7E2000               ; 16-bit; zeroed by Field_InitLoadState, no other matched use
 !Pal_Buf = $7E2000                       ; alias of Field_Unk7E2000: a palette (16 rows of 16 BGR555
                                          ; colours) that Pal_LoadUnkRow0 copies to Pal_CgramBuf, the

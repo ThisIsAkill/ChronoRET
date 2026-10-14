@@ -201,7 +201,3 @@ BankC3_PackedModule: ; packed data (Decomp_ToWram's format, 12-bit mode), $C3:13
                     ; bytes: matching its code needs it unpacked (and a packer that rebuilds
                     ; these exact bytes). $C3:1200-$C3:1312 before it is another pack
                     ; (C3Rom_PackPtrs entry 0; $400 bytes unpacked; user not traced).
-org $C70000
-Audio_DriverInit:   ; sound driver bank $C7: init, from GameLoop (at boot and on each $C0:02CA re-entry)
-org $C70004
-Audio_DriverCommand: ; sound driver bank $C7: send the command block at $1E00-$1E03

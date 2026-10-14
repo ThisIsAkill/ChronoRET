@@ -12810,7 +12810,8 @@ Evt_OpE3_SetControl:
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=0; A clobbered; Y =
 ;   EvtOp_SavedPos = the opcode + 1; the Audio_Cmd* bytes written, and
-;   whatever Audio_DriverCommand (unmatched) changes.
+;   what Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+;   Audio_CmdId = 0 after it).
 ; ------------------------------------------------------------
 Evt_OpE8_SoundCmd18:
     INY
@@ -12840,7 +12841,8 @@ Evt_OpE8_SoundCmd18:
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = Y + 2, C=0; A clobbered; Y =
 ;   EvtOp_SavedPos = the opcode + 1; the Audio_Cmd* bytes written, and
-;   whatever Audio_DriverCommand (unmatched) changes.
+;   what Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+;   Audio_CmdId = 0 after it).
 ; ------------------------------------------------------------
 Evt_OpEA_PlayMusic:
     INY
@@ -12871,7 +12873,8 @@ Evt_OpEA_PlayMusic:
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = Y + 3, C=0; A clobbered; Y =
 ;   the opcode + 1; EvtOp_SavedPos = Y + 2; the Audio_Cmd* bytes written,
-;   and whatever Audio_DriverCommand (unmatched) changes.
+;   and what Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+;   Audio_CmdId = 0 after it).
 ; ------------------------------------------------------------
 Evt_OpEB_SoundCmds81To83:
     INY
@@ -12917,7 +12920,8 @@ Evt_OpEB_SoundCmds81To83:
 ;   offset in Evt_Data.
 ; Exit: M=1, X=0, DP and DB unchanged; X = EvtOp_SavedPos = Y + 4, C=0;
 ;   A clobbered; Y = the opcode + 1; the Audio_Cmd* bytes written, and
-;   whatever Audio_DriverCommand (unmatched) changes.
+;   what Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+;   Audio_CmdId = 0 after it).
 ; ------------------------------------------------------------
 Evt_OpEC_SoundCmd:
     INY
@@ -28134,8 +28138,9 @@ Oam_EndRange3:              ; header: see Oam_BuildShadow
 ; On entry: M=1 (8-bit A), X=0 (16-bit X: Loc_RecOfs), DP=$0100
 ; (Loc_RecOfs), DB=$00 (the Audio_Cmd* block is absolute).
 ; Exit: M=1, X=0, DP and DB unchanged; A clobbered, X = Loc_RecOfs on
-; the LocRom path; the Audio_Cmd* block written, and whatever
-; Audio_DriverCommand (unmatched) changes.
+; the LocRom path; the Audio_Cmd* block written, and what
+; Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+; Audio_CmdId = 0 after it).
 ; ============================================================
 org $C01B53
 LocLoad_AudioSetup:
@@ -28179,8 +28184,8 @@ LocLoad_AudioSetup:
 ; and Party_ObjSlot are dp), DB=$00; at Audio_PlaySfxAtLeader, A =
 ; effect id.
 ; Exit (both entries): M=1, X/Y 16-bit, DP and DB unchanged; A and Y
-; clobbered (Y = the leader's object), and whatever Audio_DriverCommand
-; (unmatched) changes.
+; clobbered (Y = the leader's object); Audio_DriverCommand keeps the
+; rest and leaves Audio_CmdId = 0.
 ; ============================================================
 org $C01B90
 Audio_PlayTileSfxA:
@@ -28189,7 +28194,8 @@ Audio_PlayTileSfxA:
 ; and Audio_PlayTileSfxB branches here (BRA at $C0:1BA9).
 ; On entry: A = effect id, M=1, X/Y 16-bit, DP=$0100, DB=$00.
 ; Exit: M=1, X/Y 16-bit, DP and DB unchanged; A and Y clobbered (Y = the
-; leader's object), and whatever Audio_DriverCommand (unmatched) changes.
+; leader's object), and what Audio_DriverCommand changes (it keeps A, X,
+; Y, P, DP and DB; Audio_CmdId = 0 after it).
 Audio_PlaySfxAtLeader:   ; ← entry for Audio_PlayTileSfxB, A = effect id
     STA.w !Audio_CmdArg0
     LDY.b !Party_ObjSlot ; leader's object
@@ -40441,8 +40447,9 @@ DefaultHandler:
 ; On entry: M=1 (A 8-bit), X=0 (X/Y 16-bit), DP=$0100
 ; (Audio_SfxTileAnimB is dp), DB=$00.
 ; Exit (through Audio_PlaySfxAtLeader): M=1, X/Y 16-bit, DP and DB
-; unchanged; A and Y clobbered (Y = the leader's object), and whatever
-; Audio_DriverCommand (unmatched) changes.
+; unchanged; A and Y clobbered (Y = the leader's object), and what
+; Audio_DriverCommand changes (it keeps A, X, Y, P, DP and DB;
+; Audio_CmdId = 0 after it).
 ; ============================================================
 org $C01BA7
 Audio_PlayTileSfxB:

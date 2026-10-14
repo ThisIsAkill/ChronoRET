@@ -33,11 +33,6 @@ BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleS
 org $CD0012
 BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
 
-; --- Bank $C7 (audio) ---
-
-org $C70004
-Audio_ProcessEntry:                     ; JSL: run the APU command block !Sfx_Command..!Sfx_Param2
-
 ; --- Bank $CC (battle support, called from the action code) ---
 
 org $CCF06B
