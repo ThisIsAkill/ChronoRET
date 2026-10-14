@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C3:0077,WinFx_BuildCircle,2026-10-09,rev130a,approved,fa694f980c92,"Odd-table fix right (sim $17C8/$17C9: Xc+-y writes 1 byte low, fill hits top). Carry quirks, mirror/mode-1 rows, both fills, r=0 $1C3 bytes, Entry/Exit, DP/DB checked."
