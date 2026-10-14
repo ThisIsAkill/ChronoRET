@@ -179,10 +179,13 @@ C3_BootModule:
 ; with Yc - r = 1 row 0 is left as it was; the lower part only when
 ; that first row is above line $DF). The lower fill overwrites the last
 ; mirrored row, except in mode 1 with an even r (rows Yc .. Yc + r/2 - 1
-; are mirrored, the fill starts at Yc + r/2). The upper fill overwrites
-; the walk's top row only when the table address is even (that row is
-; then Yc - r - 1, see the quirks); with an odd address the top row is
-; Yc - r and the fill stops just above it. Nothing limits the rows to the table:
+; are mirrored, the fill starts at Yc + r/2). For an even table address
+; the upper fill overwrites the walk's top row (Yc - r - 1, see the
+; quirks). With an odd address the Xc +- y rows are written through
+; (RowPtr >> 1 - x) * 2, an even address, so one byte low: each left
+; edge lands in the right-edge byte of the row above and each right
+; edge in the left-edge byte of its row (the entries straddle two rows,
+; and the upper fill overwrites part of the top one). Nothing limits the rows to the table:
 ; a circle that reaches above line 0 writes before WinFx_TablePtr.
 ; Quirks (adds and subtracts with no CLC/SEC before them, which take the
 ; carry the instruction before left; traced, kept):
