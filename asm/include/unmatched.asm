@@ -27,32 +27,10 @@
 org $FFD024
 MenuRom_SlotLocBounds: ; 26 rising bytes from 0 read by Menu_SlotLocName: the string of a save's
                     ; SRAM +$0603 byte is the last entry not above it
-org $C2C9E5
-Menu_UnkC9E5:       ; Menu_MainPreviewTable entry 4 (not analysed)
 org $C2D065
 Menu_UnkD065:       ; Menu_MainPreviewTable entry 5 (not analysed)
-org $C2CAE6
-Menu_UnkCAE6:       ; Menu_MainRedrawTable entry 4 (not analysed)
 org $C2D0DB
 Menu_UnkD0DB:       ; Menu_MainRedrawTable entry 5 (not analysed)
-org $C2C54F
-Menu_UnkC54F:       ; JSR from mode 4: Menu_ButtonMap = MenuRom_DefaultButtonMap, or Menu_CfgButtonMap with
-                    ; Menu_CfgA4 set, then the map drawn (Menu_UnkC57A); its first byte is Menu_WindowVramRec's
-                    ; last (not matched)
-org $C2C57A
-Menu_UnkC57A:       ; JSR from Menu_Icon3Preview: the six button map rows' button tiles (not matched)
-org $C2C5C7
-Menu_UnkC5C7:       ; JMP from Menu_CfgMapAssign (not matched)
-org $C2C627
-Menu_Mode05H0:      ; Menu_Mode05List entry 0 (not analysed)
-org $C2C65D
-Menu_Mode05H1:      ; Menu_Mode05List entry 1 (not analysed)
-org $C2C6B9
-Menu_Mode05H2:      ; Menu_Mode05List entry 2 (not analysed)
-org $C2C7AC
-Menu_Mode07H0:      ; Menu_Mode07List entry 0 (not analysed)
-org $C2C7E0
-Menu_Mode07H1:      ; Menu_Mode07List entry 1 (not analysed)
 org $C2CEDC
 Menu_Mode06H0:      ; Menu_Mode06List entry 0 (not analysed)
 org $C2CEFD

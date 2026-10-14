@@ -1420,6 +1420,34 @@ endif
                                          ; character with its bit set without BankFF_TechStepLimit's check
 !Menu_Unk7F01CF = $7F01CF                ; 8-bit; set to $10 by BankFF_LoadSlotPart
 
+; --- Menu modes 5 and 7: the party order (Menu_Mode05H0 ...) ---
+!Menu_XchgPick = $0F00                   ; 8-bit; the first row picked: its Menu_XchgRows entry (the
+                                         ; position); Menu_XchgNoPick for none
+!Menu_XchgPick2 = $0F01                  ; 8-bit; the second (Menu_XchgSwap swaps the two positions)
+!Menu_XchgRows = $0F02                   ; 9 B: per row an entry: bits 0-3 the Menu_PartyOrder position,
+                                         ; bit 6 locked (Menu_XchgLockedBit), $80 empty; rows 0-2 the party
+!Menu_XchgReserveRows = $0F05            ; 6 B: the reserve rows (positions 3-8 with a character, in order)
+!Menu_XchgPartyCount = $0F0B             ; 8-bit; party rows that can be picked (not locked)
+!Menu_XchgReserveCount = $0F0C           ; 8-bit; reserve rows (kept from before with Menu_Unk0D36 set)
+!Menu_XchgCurEntry = $0F0D               ; 8-bit; the Menu_XchgRows entry under the cursor
+!Menu_XchgSong = $0F0E                   ; 8-bit; mode 7: the song to play again on leaving
+!Menu_XchgMusicOn = $0F0F                ; 8-bit; mode 7: non-zero when Menu_XchgMusic changed the music
+!Menu_XchgUnk0F12 = $0F12                ; 12 B copied from MenuRom_XchgUnkD57A (reader not traced)
+!Menu_XchgLastRow = $007F                ; 8-bit; the cursor's row at the last Menu_XchgCursor (the
+                                         ; Menu_Unk7F byte the main menu zeroes)
+!Menu_XchgSprIdx = $0022                 ; 16-bit; table entry x 2 of Menu_XchgRowMaps / Menu_XchgSprPos
+                                         ; (Menu_XchgAddSprite reads it as a word)
+!Menu_XchgRowIdx = $0024                 ; 8-bit; Menu_XchgPlaceSprites' row
+!Menu_XchgScrollPos = $0024              ; 16-bit; Menu_XchgScroll's draw position (column, row) of the
+                                         ; scrolling block
+!Menu_Unk7F01DF = $7F01DF                ; 8-bit; a BankFF_CharBits bit set: that character cannot be
+                                         ; moved in the party order (Menu_XchgBuildRows; writer not traced)
+!Menu_CharPalettes = $95A2               ; Menu_PalBuf colour $91: sprite palettes 1-7 from colour 1, $20 B a
+                                         ; character (Menu_LoadCharPalettes; Menu_XchgDimChar halves them)
+!Menu_Config1EAbs = $29AE                ; Menu_Config1E's byte, read absolute (Menu_XchgMusic)
+!Menu_Unk04FB = $04FB                    ; 8-bit; Menu_XchgLeave's last sound argument when non-zero
+                                         ; (writer not traced)
+
 ; --- Menu mode 3: the tech screen ---
 !Menu_TechPage = $0418                   ; 8-bit; mode 3's page 0-2 (Left / Right; Menu_TechPages: probably single,
                                          ; double and triple techs); the last byte of Menu_Unk0415
@@ -1472,6 +1500,7 @@ endif
 !Menu_CfgSubOpen = $0F0E                 ; 8-bit; 1 while the cursor is on entries 10-11 (opened from entry 5)
 !Menu_CfgStyleEdit = $0F0F               ; 8-bit; bit 0: entry 6 steps the window style (the cursor held)
 !Menu_CfgMapEdit = $0F00                 ; 9 B: the button map handler 2 edits (a copy of Menu_CfgButtonMap)
+!Menu_CfgMapOld = $9890                  ; 8 B: Menu_UnkC5C7's copy of Menu_CfgButtonMap (the Menu_SprScratch RAM)
 !Menu_CfgButtonMap = $0408               ; 9 B: the button map Menu_CfgA4 selects (the Menu_Unk0408 bytes;
                                          ; Menu_UnkC54F takes it for Menu_ButtonMap when Menu_CfgA4 is set)
 !Menu_CfgIconMap = $3446                 ; 2 x 2 tile words: the cursor entry's icon (Menu_CfgEntryIcon)

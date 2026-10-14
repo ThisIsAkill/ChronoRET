@@ -228,7 +228,7 @@ BankFF_LoadE4Palette:
 ; over the next $680 ($4F80-$55FF: the pattern repeated). Last it copies
 ; BankFF_ScreenColoursB to Menu_PalBuf + $30 and BankFF_ScreenColoursA to
 ; Menu_Unk9100. What screen this is for is not traced.
-; Callers (1 JSL site): unmatched ($C2:CE86).
+; Callers (1 JSL site): Menu_XchgScreenMap ($C2:CE86).
 ; Entry: M=1 (the first two stores are 8-bit LDA/STA before the REP), X
 ;        any, DP=0 (Menu_Tmp00-05), DB=$7E (the Decomp_* arguments at
 ;        $0300 and Menu_Unk0D0E are absolute)
@@ -318,7 +318,7 @@ BankFF_ScreenColoursB:
 ; loops), but the first ADC takes the C the 16-bit ASL of $0F10/$0F11 left
 ; (bit 7 of Menu_WaveTick). Kept as found; what the words drive is not
 ; traced ("Scroll" follows the bank $00 copy's guessed name).
-; Callers (1 JSL site): unmatched ($C2:CECE).
+; Callers (1 JSL site): Menu_XchgWaveStart ($C2:CECE).
 ; Entry: M any (SEP #$20 here), X any, DP=0 (Menu_Tmp00, Menu_Unk51),
 ;        DB=$7E (absolute RAM)
 ; Exit:  P restored; A, X, Y and DP $00-$01 clobbered
@@ -707,8 +707,8 @@ BankFF_UnkF958:
 ; all nine references in the ROM) by Menu_CmdJoin ($C2:8C95),
 ; Menu_CanEquip (AND.l at $C2:93B8), BankFF_UnkF813 ($FF:F85A,
 ; $FF:F89B), BankFF_UnkF958 ($FF:F96B, $FF:F99D), Menu_TechPartners
-; (LDA.l at $C2:BC07), Menu_TechListBytes (LDA.l at $C2:BCD0), and in
-; unmatched code: AND.l at $C2:CD59. Entry 8 (0)
+; (LDA.l at $C2:BC07), Menu_TechListBytes (LDA.l at $C2:BCD0) and
+; Menu_XchgBuildRows (AND.l at $C2:CD59). Entry 8 (0)
 ; is reached by BankFF_UnkF813 when bit 0 of a Menu_TechShown byte is
 ; set (its bit search starts at 8 and stops at the first set bit).
 BankFF_CharBits:
