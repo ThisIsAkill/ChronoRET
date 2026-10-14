@@ -142,21 +142,23 @@ BattleSys_SceneSetup:
 ;        Checked only for services 2, 5 and 7, whose callees are all
 ;        matched bank-$C1 code. The other seven reach code that is not
 ;        analysed, so for them it is assumed: 0 (bank-$CC/$CD JSLs, see
-;        BattleSys_SceneSetup, and BattleFx_SetPtrA2FromTable $CF:FD9E
-;        through Battle_StartPose / Battle_PoseStep), 1 (Audio_ProcessEntry,
+;        BattleSys_SceneSetup), 1 (Audio_ProcessEntry,
 ;        $C7:0004),
 ;        3 (BattleSys_FrameTickVec $CD:0009,
 ;        BattleMsg_ShowFromTableCC3A09Vec $CD:0027, BattleSys_PumpFrames'
-;        BattleSys_IdleVecCD0036 $CD:0036, $CF:FD9E through
-;        BattleMenu_UpdateWindows and BattleMenu_ConfirmCommand, and more
-;        cross-bank JSLs through the menu code),
+;        BattleSys_IdleVecCD0036 $CD:0036, and more cross-bank JSLs
+;        through the menu code),
 ;        4 (BattleSys_PumpFrames,
 ;        BattleAct_ResetState $CC:F06B and other cross-bank JSLs),
 ;        6 (BattleCF_RemoveMarkedEnemies, BattleSys_VecCD0024),
 ;        8 (BattleSys_FrameTickVec,
 ;        BattleSys_PumpFrames and the $CD/$CF JSLs of
 ;        BattleMenu_UpdateWindows) and 9 (BattleSys_FrameTickVec,
-;        BattleSys_PumpFrames). B, P (N and Z from the PLA), DP, DB and
+;        BattleSys_PumpFrames). BattleFx_SetPtrA2FromTable ($CF:FD9E),
+;        which services 0 (through Battle_StartPose / Battle_PoseStep)
+;        and 3 (through BattleMenu_UpdateWindows and
+;        BattleMenu_ConfirmCommand) reach, is matched and returns M=1,
+;        X=0. B, P (N and Z from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA
@@ -211,13 +213,16 @@ BankC1_LongDispatchTable:
 
 ; $C1:006D — BattleSys_Service6 (5 bytes, $006D–$0071)
 ; Service 6 (!BattleSys_ServiceUnk6): JSL BattleCF_RemoveMarkedEnemies
-; (the enemies marked in !Battle_UnkAEB3 leave), RTS.
+; (the enemies marked in !Battle_UnkAEB3 leave, !Battler_Present
+; cleared, except one with !Battler_Unk9FF7 0, !Battler_ActAttr non-zero
+; and !Battle_FieldObjKind6Flag set in its Battle_FieldObj record, which
+; stays present; see there), RTS.
 ; Callers note: none by call; BattleSys_ServiceTable entry 6 (JSR (T,X)
 ;   in BattleSys_RunService).
 ; Entry: M=1, X=0, DP=0, DB=$7E (as the callers of service 6 run)
 ; Exit:  as BattleCF_RemoveMarkedEnemies leaves it: M=1, X=0, DP=0,
-;        DB=$7E; A, Y clobbered; X = 2; DP $80-$83 written; and what
-;        BattleSys_VecCD0024 changes (not analysed)
+;        DB=$7E; A, Y clobbered; X = 2; DP $80 and $82-$83 written; and
+;        what BattleSys_VecCD0024 changes (not analysed)
 BattleSys_Service6:
     JSL BattleCF_RemoveMarkedEnemies
     RTS
@@ -17476,8 +17481,8 @@ BattleAct_OpArcDownToUnkPoint:
 ;     any is. Quirk, kept: on the frame that starts the whole set the
 ;     test loop starts at the set's end, so it advances at once
 ;     without testing; the start loop never sets !Battle_ActorMoving
-;     (only the test loop does), and the mover at $CF:EFC4 skips actors
-;     with it 0, so none of the set moves: the opcode only sets angle,
+;     (only the test loop does), and BattleCF_RunMovers skips actors
+;     with it 0 (its test at $CF:EFC4), so none of the set moves: the opcode only sets angle,
 ;     facing and move state;
 ;   - threads 8-15, object j: as a battler with the object's entries
 ;     (index 11 + j), its position !Battle_ActObjX/Y, and
@@ -19611,7 +19616,8 @@ BattleAct_OpPointTowardCalc:
 ; !Battler_ShakeFrames = f + 1, !Battler_ShakeTimer and
 ; !Battler_ShakeOff = 1, !Battle_ActorMoveDelay and
 ; !Battle_ActorMoveTimer = 1 (the mover runs every frame) and
-; !Battle_ActorMoving = 1. The mover (read, not matched) toggles the
+; !Battle_ActorMoving = 1. The mover (BattleCF_MoveShake, through
+; BattleCF_ShakeStep) toggles the
 ; offset (!Battler_UnkA4A4/A4AF) between 0 and a pixels along
 ; !Battle_ActorUnkA5AA every p frames and ends the move itself (offset
 ; and !Battle_ActorMoving zeroed) after f frames, so probably a shake

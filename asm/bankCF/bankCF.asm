@@ -343,11 +343,15 @@ BattleCF_VblankUploads:
 ; first pass, so with !Battle_Unk99D3 in the last row (colours 112-127)
 ; it still turns colours 1-15 of row 8 (OBJ palette 0, the start of
 ; !Battle_PaletteLive). And with !Battle_Unk99D3 at colour 15 of a row
-; the first row's move count is 0, which the 16-bit DEC turns into 65535
-; moves (not guarded).
+; the first row's move count is 0: one move runs before the 16-bit DEC,
+; which then wraps it, so the loop makes 65536 moves (not guarded).
 ; Callers (1 JML site): BankC1_JmlCFE58A ($C1:007A).
 ; Entry: M=1, X=0, DP=0, DB=$7E; A's high byte is used as is by the first
-;        pass of BattleCF_StepFxColourCycle (see there)
+;        pass of BattleCF_StepFxColourCycle (see there), and again by the
+;        glow index (ASL/TAX at $CF:E5B8) when neither that routine reached
+;        its TDC (no PC slot with !Battler_FxCycleOn set while
+;        !Battle_UnkA101 is clear) nor !Battle_CursorGlowStep wrapped to 0
+;        (the TDC here); the caller's value is not traced
 ; Exit:  M=1, X=0, DP=0, DB=$7E; A, X, Y clobbered; DP $00-$06 and
 ;        $C6-$D1 (here and in the callees) and $7E:1D2E-$1DCE
 ;        (BattleCF_BuildSprites' direct page) written; !Battle_ArgSlot as
@@ -762,9 +766,11 @@ BattleCF_StepFxColourCycle:
 ;      whose !Battler_SprBytes is not 0: BattleCF_DrawFrontLayer, the
 ;      battler's tile words (BattleCF_CopySprTiles), its positions
 ;      (BattleCF_DrawBattler), BattleCF_DrawBackObjects, and a state of 1
-;      becomes $80; then, for every entry, BattleCF_DrawUnkA5D8Sprite; and
-;      while an action runs, for an entry with !Battle_SprListBattler whose
-;      battler has !Battler_PosHistOn, BattleCF_DrawPosHistory.
+;      becomes $80 and the entry branches past the next step; every other
+;      entry (drawn with state 0, or skipped) gets
+;      BattleCF_DrawUnkA5D8Sprite; and while an action runs, for every
+;      entry with !Battle_SprListBattler whose battler has
+;      !Battler_PosHistOn, BattleCF_DrawPosHistory.
 ; So a battler with !Battler_UnkA5CD set is drawn at its key-$FE entry,
 ; which sorts first: its sprites come first in OAM and show in front of
 ; the others (the lower OAM entry wins); its own entry is then skipped
@@ -778,8 +784,11 @@ BattleCF_StepFxColourCycle:
 ; Entry: M=1, X=0, DP any (set here), DB=$7E
 ; Exit:  M=1, X=0, DP=0 (PLD of 0 at the end), DB=$7E; A, X, Y clobbered;
 ;        $7E:1D2E-$1DCE (this direct page), DP $C6-$D1 (D = 0) and
-;        BattleOam from sprite 4 written; !Battler_SprDrawState of the
-;        drawn battlers left at $80
+;        BattleOam from sprite 4 written; DP $A1 (!Battle_ArgSlot, D = 0)
+;        overwritten by BattleCF_DrawActObj (through
+;        BattleCF_DrawFrontLayer and BattleCF_DrawBackObjects);
+;        !Battler_SprDrawState of a state-1 battler that was drawn
+;        (!Battler_SprBytes not 0) left at $80, others as collected
 ; Callees: BattleCF_DrawFrontLayer, BattleCF_CopySprTiles,
 ;          BattleCF_DrawBattler, BattleCF_DrawBackObjects,
 ;          BattleCF_DrawUnkA5D8Sprite, BattleCF_DrawPosHistory
@@ -927,11 +936,19 @@ BattleCF_BuildSprites:
 ; between it draws none, so the copies flicker (after-images, probably,
 ; as the opcode $A4/$A5 notes guess).
 ; Callers (1 JSR site): BattleCF_BuildSprites ($CF:E91E).
+; Quirk: BattleCF_BuildSprites sets !BattleSpr_ByteCount only for an
+; entry it draws. For an entry it skipped (state $80, as a battler's own
+; entry after its key-$FE entry was drawn, or !Battler_SprBytes 0) the
+; count is still the last drawn battler's (0 if none yet), and
+; BattleCF_DrawPosHistRecord takes the group count it gives
+; BattleCF_CopySprTiles from it: the copies get that battler's count.
 ; Entry: M=1, X=0, DP=$1D00 (!BattleSpr_Page), DB=$7E; X = sprite index
-;        (slot + 12); !BattleSpr_Index and !BattleSpr_ByteCount still the
-;        battler's
+;        (slot + 12); !BattleSpr_Index the battler's; !BattleSpr_ByteCount
+;        the battler's only when this entry was drawn (see the quirk)
 ; Exit:  M=1, X=0, DP=$1D00, DB=$7E; A, X, Y clobbered; !BattleSpr_OamOfs
-;        moved past the sprites drawn
+;        moved past the sprites drawn; $7E:1DCB-$1DCC (!BattleSpr_SavedIdx)
+;        written, and on a drawing frame $7E:1D2E-$1D43 and $1DCD-$1DCE
+;        (!BattleSpr_Groups) by BattleCF_DrawPosHistRecord
 ; Callees: BattleCF_DrawPosHistRecord
 org $CFE92C
 BattleCF_DrawPosHistory:
@@ -988,7 +1005,7 @@ BattleCF_DrawPosHistory:
 ; their sign is used: negative = the high byte is $FF): its tile words
 ; (BattleCF_CopySprTiles), then each sprite at that position plus the
 ; battler's !Battler_FrameExtra offsets, as BattleCF_DrawBattler does
-; (see there for the attribute and the off-screen bit). A battler whose
+; (see there for the attribute and when x bit 8 is set). A battler whose
 ; !Battler_Unk9FF7 is non-zero gets the tile words but no positions.
 ; The display offsets (!Battler_UnkA4A4/A4AF) are not added: they were
 ; already added when the record was taken.
@@ -997,7 +1014,7 @@ BattleCF_DrawPosHistory:
 ;        and !BattleSpr_OamOfs set
 ; Exit:  M=1, X=0, DP=$1D00, DB=$7E; A, X, Y clobbered; !BattleSpr_OamOfs
 ;        moved past the sprites drawn (not moved when !Battler_Unk9FF7 is
-;        set); $7E:1D2E-$1D43 written
+;        set); $7E:1D2E-$1D43 and $1DCD-$1DCE (!BattleSpr_Groups) written
 ; Callees: BattleCF_CopySprTiles
 org $CFE99C
 BattleCF_DrawPosHistRecord:
@@ -1190,9 +1207,14 @@ BattleCF_DrawUnkA5D8Sprite:
 ; !Battler_ActAttr into the attribute's palette and priority bits
 ; (keeping the flips and the tile), and sets the sprite's x bit 8 in the
 ; high table (!Battle_OamHighIdx / !Battle_OamHighXBit, RAM tables built
-; elsewhere) when x is off the 0-255 range, or when y is off it and its
-; low byte is below $F0: that hides the sprite. A battler whose
-; !Battler_Unk9FF7 is non-zero gets no positions (nor any OAM step).
+; elsewhere) when y's high byte is not 0 and its low byte is below $F0,
+; or when y's high byte is 0 and x's high byte is not 0; with y's high
+; byte not 0 and its low byte $F0 or more, x is not tested. Only x's low
+; byte goes to OAM, so with bit 8 set the sprite is at that low byte
+; - 256: off the left edge unless the low byte is near 255 and the sprite
+; reaches past it; for a negative x ($FFxx) that is its true place, so
+; it shows partly at the left edge rather than being hidden. A battler
+; whose !Battler_Unk9FF7 is non-zero gets no positions (nor any OAM step).
 ; Callers (1 JSR site): BattleCF_BuildSprites ($CF:E8F4).
 ; Entry: M=0 (16-bit A: the first LDA #$0000 is 3 bytes; BattleCF_CopySprTiles
 ;        returns so), X=0, DP=$1D00, DB=$7E; !BattleSpr_Index,
@@ -1489,13 +1511,13 @@ BattleCF_StepPathWalks:
 ; (high bytes 0); with !Battle_ActFollowObj set, bits 0-2 name another
 ; object thread, whose x and y words are copied. Negative = follows
 ; nothing. Threads are done from 7 down, so a thread following a lower
-; one takes that one's position of this frame, one following a higher
-; one its position from before.
+; one takes that one's position from before (not yet updated this
+; frame), one following a higher one its position of this frame.
 ; Runs with 8-bit X and Y.
 ; Callers (1 JSR site): BattleCF_FrameUpdate ($CF:E753).
 ; Entry: M=1, X=0, DP=0, DB=$7E
-; Exit:  M=1, X=0 (REP #$10 at the end); A, X, Y clobbered (high bytes
-;        0); DP $C6 = $FF, $C7 = 0
+; Exit:  M=1, X=0 (REP #$10 at the end); A clobbered (its high byte as
+;        on entry); X, Y clobbered (high bytes 0); DP $C6 = $FF, $C7 = 0
 ; No calls.
 org $CFECC2
 BattleCF_FollowObjects:
@@ -1693,9 +1715,12 @@ BattleCF_DrawFrontLayer:
 ; !Battle_ActObjUnkA1D8 is non-zero (BattleCF_DrawActObj).
 ; Callers (1 JSR site): BattleCF_BuildSprites ($CF:E8F7).
 ; Entry: M=1, X=0, DP=$1D00, DB=$7E; !BattleSpr_Index = the battler's
-;        sprite index
-; Exit:  M=1, X=0, DP=$1D00, DB=$7E; A, X, Y clobbered (X = $58 after the
-;        scan); !BattleSpr_OamOfs moved past what was drawn
+;        sprite index; A's high byte 0 (the TAXs use it; BattleCF_DrawBattler
+;        leaves it so, and BattleCF_DrawActObj returns with it 0)
+; Exit:  M=1, X=0, DP=$1D00, DB=$7E; A, X, Y clobbered (X = $58 + the
+;        battler's slot (0-10) after the scan: it steps by 11 from the slot
+;        until $58 or more); !BattleSpr_OamOfs moved past what was drawn;
+;        DP $A1, $C6-$D1 (D = 0) written by BattleCF_DrawActObj
 ; Callees: BattleCF_DrawActObj
 org $CFEDF7
 BattleCF_DrawBackObjects:
@@ -4443,20 +4468,27 @@ BattleMsg_FormatNumber4Digits:
 ; $CF:FE20 — BattleCF_RemoveMarkedEnemies (101 bytes, $FE20–$FE84)
 ; Service 6 (BattleSys_Service6): for enemy slots 10 down to 3 marked in
 ; !Battle_UnkAEB3 (BattleSys_Main's debug win marks each enemy it
-; removes): unless the enemy's !Battler_Unk9FF7 is set, counts its
-; !Battler_KoFlag up and clears the mark and its !Enemy_Stepping; then,
-; when its !Battler_ActAttr is non-zero and its Battle_FieldObj record
-; lacks !Battle_FieldObjKind6Flag, copies !Battle_SpecialPalLen colour
-; bytes (from byte 2) of its palette unit into the !Battle_SpecialPalette
-; unit, live and saved, switches the enemy to that palette and runs
-; BattleSys_VecCD0024 with A = the slot (a fade-out, probably; not
-; traced). Every marked enemy whose record has that flag clear ends with
-; !Battler_Present cleared; with the flag set it stays present (and
-; marked as KO).
+; removes), by path:
+;   - !Battler_Unk9FF7 set: only !Battler_Present is cleared (the mark
+;     in !Battle_UnkAEB3 stays, !Battler_KoFlag is not counted, the
+;     Battle_FieldObj flag is not tested);
+;   - else counts !Battler_KoFlag up and clears the mark and the enemy's
+;     !Enemy_Stepping; then with !Battler_ActAttr 0 clears
+;     !Battler_Present (the flag again not tested);
+;   - else, when its Battle_FieldObj record has !Battle_FieldObjKind6Flag
+;     set, the enemy stays present (marked as KO);
+;   - else copies !Battle_SpecialPalLen colour bytes (from byte 2) of its
+;     palette unit into the !Battle_SpecialPalette unit, live and saved,
+;     switches the enemy to that palette, runs BattleSys_VecCD0024 with
+;     A = the slot (a fade-out, probably; not traced) and clears
+;     !Battler_Present.
+; So a marked enemy stays present only when !Battler_Unk9FF7 is 0,
+; !Battler_ActAttr is non-zero and the record has the flag set.
 ; Callers (1 JSL site): BattleSys_Service6 ($C1:006D).
 ; Entry: M=1, X=0, DP=0 (DP $80-$83), DB=$7E
-; Exit:  M=1, X=0, DP=0, DB=$7E; X = 2; A, Y clobbered; DP $80-$83
-;        written; and what BattleSys_VecCD0024 changes (not traced)
+; Exit:  M=1, X=0, DP=0, DB=$7E; X = 2; A, Y clobbered; DP $80 and
+;        $82-$83 (the 16-bit STX) written; and what BattleSys_VecCD0024
+;        changes (not traced)
 ; Callees: BattleSys_VecCD0024
 org $CFFE20
 BattleCF_RemoveMarkedEnemies:
