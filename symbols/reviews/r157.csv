@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C2:BAFC,Menu_TechRowSprite,2026-10-09,rev157a,approved,2e3d67dbe227,"Fix OK: Entry X=0 (all 4 callers REP #$30/X=0; PLP in Menu_Times64 would cut Y). Struct offsets 0/$18/$0F/$0E, $1C, table, $22 word hi=0, Exit A/B/X/Y, DP/DB checked."
