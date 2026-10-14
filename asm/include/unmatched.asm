@@ -61,46 +61,46 @@ org $C2CF61
 Menu_Mode06H2:      ; Menu_Mode06List entry 2 (not analysed)
 org $C2CF92
 Menu_Mode06H3:      ; Menu_Mode06List entry 3 (not analysed)
-org $C2D4F8
-Menu_Mode0BH0:      ; Menu_Mode0BList entry 0 (not analysed)
-org $C2D506
-Menu_Mode0BH1:      ; Menu_Mode0BList entry 1 (not analysed)
-org $C2D52B
-Menu_Mode0CH0:      ; Menu_Mode0CList entry 0 (not analysed)
-org $C2D546
-Menu_Mode0CH1:      ; Menu_Mode0CList entry 1 (not analysed)
-org $C2D58B
-Menu_Mode0CH2:      ; Menu_Mode0CList entry 2 (not analysed)
-org $C2D645
-Menu_Mode0CH3:      ; Menu_Mode0CList entry 3 (not analysed)
-org $C2D690
-Menu_Mode0CH4:      ; Menu_Mode0CList entry 4 (not analysed)
-org $C2D618
-Menu_Mode0CH5:      ; Menu_Mode0CList entry 5 (not analysed)
-org $C2D6C3
-Menu_Mode0CH6:      ; Menu_Mode0CList entry 6 (not analysed)
-org $C2D715
-Menu_Mode0CH7:      ; Menu_Mode0CList entry 7 (not analysed)
-org $C2D778
-Menu_Mode0CH8:      ; Menu_Mode0CList entry 8 (not analysed)
-org $C2E1ED
-Menu_Mode0DH0:      ; Menu_Mode0DList entry 0 (not analysed)
-org $C2E21E
-Menu_Mode0DH1:      ; Menu_Mode0DList entry 1 (not analysed)
-org $C2E236
-Menu_Mode0DH2:      ; Menu_Mode0DList entry 2 (not analysed)
-org $C2E201
-Menu_Mode0DH3:      ; Menu_Mode0DList entry 3 (not analysed)
-org $C2E209
-Menu_Mode0DH4:      ; Menu_Mode0DList entry 4 (not analysed)
-org $C2E613
-Menu_Mode0EH0:      ; Menu_Mode0EList entry 0 (not analysed)
-org $C2E61B
-Menu_Mode0EH1:      ; Menu_Mode0EList entry 1 (not analysed)
-org $C2E6AE
-Menu_Mode0EH2:      ; Menu_Mode0EList entry 2 (not analysed)
-org $C2E705
-Menu_Mode0EH3:      ; Menu_Mode0EList entry 3 (not analysed)
+org $C2CF0A
+Menu_Mode06H1Confirm: ; Menu_Mode06H1 from its confirm on (also jumped to by Menu_Mode0BH1): saves to
+                    ; the slot, after a question when it holds a save (not matched)
+org $C2CFA2
+Menu_UnkCFA2:       ; JMP from Menu_Mode0BH1 (and Menu_Mode06H1) with neither button: the slot under
+                    ; the cursor (Menu_SlotIdx = Menu_CursorSel) shown, a sound on a change (not matched)
+org $C2D0E5
+Menu_UnkD0E5:       ; JSR from Menu_Mode0BH0 after Menu_UnkD065 (not analysed)
+org $C2FCB2
+Menu_ShopBuyQtyInit: ; JSR from Menu_Mode0CH2: Menu_ItemCount = 1, Menu_ShopPriceHi = 0, Menu_ShopPrice
+                    ; and Menu_ShopUnitPrice = Menu_ShopBuyPrices[Menu_ItemId], then the gold divided by
+                    ; it into Menu_ShopQuot (24 by 16 bits, by $C2:FD1D) (not matched)
+org $C2FCE1
+Menu_ShopSellQtyInit: ; JSR from Menu_Mode0CH3: the same with the sell price (Menu_ItemInfo1 / 2, rounded
+                    ; up) and 9,999,999 - the gold as the dividend; no division (Menu_ShopQuot not
+                    ; written) when the gold is above it (not matched)
+org $C2FD58
+Menu_UnkFD58:       ; JSR from Menu_ShopCalcPrices: probably Menu_ShopProduct = the Menu_Tmp00 word x
+                    ; the Menu_ShopMulArg word, by Menu_UnkFD68 and a second pass (not matched)
+org $C2FD68
+Menu_UnkFD68:       ; JSR from Menu_ShopQtyRight: Menu_ShopProduct = 0, then for each of the
+                    ; Menu_ShopMulLen bytes of Menu_ShopMulArg its product with Menu_Tmp00 added at
+                    ; the byte's place (16-bit adds) (not matched)
+org $C2FD97
+Menu_ShopGainGold:  ; JSR from Menu_Mode0CH4: the gold (Menu_Unk2C53, 3 bytes) + Menu_ShopPrice, capped
+                    ; at 9,999,999 ($C2:FDDF) (not matched)
+org $C2FDBB
+Menu_ShopPayGold:   ; JSR from Menu_Mode0CH5: the gold - Menu_ShopPrice, then the same cap (not matched)
+org $C2CFFB
+Menu_UnkCFFB:       ; JSR from Menu_LoadCursor (and mode 6): builds an HDMA table at $7E:9720 from
+                    ; $C2:D044 and marks row Menu_LoadHiliteRow in it (probably the row highlight)
+org $C2D10D
+Menu_DrawSlotWindows: ; JSR from Menu_LoadInit: for slots 0-2 the label and text tile strips
+                    ; (Menu_PutTextTilesAttr / Menu_PutTextTiles), then $C2:D32C (not matched)
+org $C2D32C
+Menu_UnkD32C:       ; JSR from Menu_LoadEraseSlot: slot Menu_SlotIdx's window frame in its style
+                    ; (Menu_LoadSlotWindowStyle); in the unmatched $C2:D32C-$C2:D4EF
+org $C2D36C
+Menu_UnkD36C:       ; JSR from Menu_LoadCursor and Menu_LoadInit: the details of slot Menu_SlotIdx
+                    ; (none while Menu_LoadMsgShown is set); in the unmatched $C2:D32C-$C2:D4EF
 org $C6E74E
 BankC6_UnkE74E:     ; JSL from C2Scene_ObjBFly: C2Tmp_06 = 0 when the tile (C2Tmp_00, $01) is inside
                     ; columns C2Tmp_04 to $05 - 1 and rows C2Tmp_02 to $03 - 1, else bits 0-3 for
