@@ -1395,5 +1395,16 @@ if !constants_battle_inc == 0
 !BattleCD_FxCircleX       = $80   ; the centre of script opcode $C4's circles
 !BattleCD_FxCircleY       = $87
 !BattleCD_FxModel2        = $20   ; !BattleCD_FxModelOfs of model 2 (script opcode $BE)
+!BattleCD_FxEdgeMax       = $FF   ; the band's right edge at most (script opcodes $B5/$B6)
+!BattleCD_FxWinLastWord   = $00FE ; offset of !Battle_FxWinLines' last word before the middle
+!BattleCD_FxWaveAmpX      = $32   ; script opcode $B3: the x swing
+!BattleCD_FxWaveAmpY      = $0F   ; ... the y swing
+!BattleCD_FxWaveBaseY     = $20   ; ... added to the y
+!BattleCD_FxWaveTableEnd  = $0350 ; 106 entries of 8 bytes
+!BattleCD_SignExtend      = $FF00 ; ORed into a negative byte widened to 16 bits
+!BattleCD_HighByteMask    = $FF00 ; keeps a 16-bit A's high byte
+!BattleCD_FxScaleWhole    = $FF   ; !Battle_FxObjScale: (nearly) unscaled
+!BattleCD_FxNear          = 4     ; BattleCD_FxOpTriCentre: midpoints closer than this are moved apart by it
+!BattleCD_FxNearNeg       = $FC   ; ... -4 as a byte
 
 endif

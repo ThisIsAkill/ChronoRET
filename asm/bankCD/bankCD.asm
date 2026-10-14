@@ -4334,16 +4334,16 @@ BattleCD_FxOpTable:
     dw BattleCD_FxOpScrollToCalc       ; $AA
     dw BattleCD_FxOpAB                 ; $AB
     dw BattleCD_FxOpBeam               ; $AC
-    dw BattleCD_FxOpAD                 ; $AD
+    dw BattleCD_FxOpTriCentre          ; $AD
     dw BattleCD_FxOpFillTriangle       ; $AE
-    dw BattleCD_FxOpAF                 ; $AF
-    dw BattleCD_FxOpB0                 ; $B0
-    dw BattleCD_FxOpB1                 ; $B1
-    dw BattleCD_FxOpB2                 ; $B2
-    dw BattleCD_FxOpB3                 ; $B3
-    dw BattleCD_FxOpB4                 ; $B4
-    dw BattleCD_FxOpB5                 ; $B5
-    dw BattleCD_FxOpB5                 ; $B6
+    dw BattleCD_FxOpTriangleOfPcs      ; $AF
+    dw BattleCD_FxOpBgMode             ; $B0
+    dw BattleCD_FxOpScaleObj           ; $B1
+    dw BattleCD_FxOpCEE000             ; $B2
+    dw BattleCD_FxOpWaveTable          ; $B3
+    dw BattleCD_FxOpCentreAndScroll    ; $B4
+    dw BattleCD_FxOpWindowBand         ; $B5
+    dw BattleCD_FxOpWindowBand         ; $B6
     dw BattleCD_FxOpTilePageSlot       ; $B7
     dw BattleCD_FxOp3924               ; $B8
     dw BattleCD_FxOpColours            ; $B9
@@ -6113,6 +6113,858 @@ BattleCD_FxOpTilePageSlot:
     STA.w !Battle_TilePageSlot
     RTS
 
+; $CD:1F53 — BattleCD_FxOpWindowBand (77 bytes, $1F53–$1F9F)
+; Opcodes $B5 and $B6 (index): a band of !Battle_FxWinLines around the
+; middle line. With v = !Battle_FxValues entry index and c = entry
+; index + 2: when v is not 0, the v words from the middle
+; (!Battle_FxWinLinesMid) on and the v words before it all get the
+; byte pair (c - v, not below 0; c + v, at most $FF): a left and a
+; right edge, probably; then !Battle_FxValues+6 = 0 and
+; BattleCD_Unk35A5 (not matched). With v = 0 nothing is written.
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX and the doubled
+;        v); DP $40 at the operand
+; Exit:  v = 0: M=1, X=0; A = 0; X = the index; Y unchanged. Else as
+;        BattleCD_Unk35A5 leaves it (not traced). DP $45-$49 written
+BattleCD_FxOpWindowBand:
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAX
+    LDA.w !Battle_FxValues+2,X
+    STA.b !BattleCD_Tmp49
+    LDA.w !Battle_FxValues,X
+    STA.b !BattleCD_Tmp45
+    STA.b !BattleCD_Tmp45+1
+    LDA.b !BattleCD_Tmp49
+    SEC
+    SBC.b !BattleCD_Tmp45
+    BCS .low
+    TDC
+.low:
+    STA.b !BattleCD_Tmp45
+    LDA.b !BattleCD_Tmp45+1
+    CLC
+    ADC.b !BattleCD_Tmp49
+    BCC .high
+    LDA.b #!BattleCD_FxEdgeMax
+.high:
+    STA.b !BattleCD_Tmp45+1
+    LDA.w !Battle_FxValues,X
+    BEQ .done
+    REP #$20
+    ASL A
+    STA.b !BattleCD_Tmp47
+    TDC
+    TAX
+    LDY.w #!BattleCD_FxWinLastWord
+    LDA.b !BattleCD_Tmp45
+.line:
+    STA.w !Battle_FxWinLinesMid,X
+    STA.w !Battle_FxWinLines,Y
+    INX
+    INX
+    DEY
+    DEY
+    CPX.b !BattleCD_Tmp47
+    BNE .line
+    TDC
+    SEP #$20
+    STZ.w !Battle_FxValues+6
+    JSR BattleCD_Unk35A5
+.done:
+    RTS
+
+; $CD:1FA0 — BattleCD_FxOpCentreAndScroll (40 bytes, $1FA0–$1FC7)
+; Opcode $B4 (object): the object's centre from its triangle
+; (BattleCD_FxOpTriCentre, same operand), then layer 3 scrolled so that
+; the centre is its origin: the channel's !Battle_FxScrollX/Y =
+; -!Battle_FxObjCentreX, -!Battle_FxObjCentreY (16-bit).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0; DP $40 at the operand, DP $43 =
+;        the channel
+; Exit:  M=1, X=0; A = 0 (B = 0); X = the channel; Y = the object;
+;        written as BattleCD_FxOpTriCentre writes
+BattleCD_FxOpCentreAndScroll:
+    JSR BattleCD_FxOpTriCentre
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAY
+    LDX.b !BattleCD_FxChannel
+    REP #$20
+    LDA.w !Battle_FxObjCentreX,Y
+    AND.w #!Battle_LowByteMask
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.w !Battle_FxScrollX,X
+    LDA.w !Battle_FxObjCentreY,Y
+    AND.w #!Battle_LowByteMask
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.w !Battle_FxScrollY,X
+    TDC
+    SEP #$20
+    RTS
+
+; $CD:1FC8 — BattleCD_FxOpWaveTable (131 bytes, $1FC8–$204A)
+; Opcode $B3 (an operand byte, stored to DP $45 and overwritten: not
+; used): fills the 106 entries of !Battle_FxWaveTable (8 bytes each: an
+; x word and a y word, twice) for this frame. With f =
+; !Battle_FrameCount and entry i: x = sin(4f + i) * !BattleCD_FxWaveAmpX
+; / 256 (signed, BattleCD_FxWaveStoreX), y = channel 0's
+; !Battle_FxScrollY + !Battle_FxScrollAddY + $20 + sin(f + i) *
+; !BattleCD_FxWaveAmpY / 256 (BattleCD_FxWaveStoreY). The sines are
+; taken on the multiplier from !BattleRom_SinAbsTable. What reads the
+; table is not traced (an HDMA table, probably).
+; Entry: M=1, X=0, DP=0, DB=$7E (the multiplier is accessed long); B = 0
+;        (the 16-bit TAX/STX of the frame count)
+; Exit:  M=1, X=0; A = 0 (B = 0); X = the last y angle; Y =
+;        !BattleCD_FxWaveTableEnd; DP $45-$4A written
+BattleCD_FxOpWaveTable:
+    LDA.b [!BattleCD_FxScriptPtr]
+    STA.b !BattleCD_Tmp45
+    REP #$20
+    LDA.w !Battle_FxScrollY
+    CLC
+    ADC.w !Battle_FxScrollAddY
+    STA.b !BattleCD_Tmp49
+    TDC
+    SEP #$20
+    LDA.b !Battle_FrameCount
+    TAX
+    STX.b !BattleCD_Tmp45
+    ASL A
+    ASL A
+    TAX
+    STX.b !BattleCD_Tmp47
+    TDC
+    TAY
+.entry:
+    LDA.b !BattleCD_Tmp47
+    BPL .x_positive
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpX
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    JSR BattleCD_FxWaveStoreX
+    BCC .y_positive
+.y_negative:
+    LDA.l RDMPYH
+    EOR.b #!Battle_Invert8
+    INC A
+    JSR BattleCD_FxWaveStoreY
+    BRA .next
+.x_positive:
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpX
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    JSR BattleCD_FxWaveStoreX
+    BCS .y_negative
+.y_positive:
+    LDA.l RDMPYH
+    JSR BattleCD_FxWaveStoreY
+.next:
+    INC.b !BattleCD_Tmp45
+    INC.b !BattleCD_Tmp47
+    REP #$20
+    TYA
+    CLC
+    ADC.w #8
+    TAY
+    TDC
+    SEP #$20
+    CPY.w #!BattleCD_FxWaveTableEnd
+    BNE .entry
+    RTS
+
+; $CD:204B — BattleCD_FxWaveStoreX (102 bytes, $204B–$20B0)
+; BattleCD_FxOpWaveTable's x: stores A (signed, widened to 16 bits) as
+; entry Y's two x words, then starts |sin(DP $45)| *
+; !BattleCD_FxWaveAmpY on the multiplier for the y and returns C=1 when
+; that sine is negative (DP $45 = $80-$FF).
+; Callers (2 JSR sites): BattleCD_FxOpWaveTable ($CD:2003, $CD:202A).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0; A = the x, Y = the entry's
+;        offset, DP $45 = the y angle
+; Exit:  M=1, X=0; C = the y sine's sign; A = !BattleCD_FxWaveAmpY; X =
+;        DP $45; Y unchanged
+BattleCD_FxWaveStoreX:
+    BPL .positive
+    REP #$20
+    ORA.w #!BattleCD_SignExtend
+    STA.w !Battle_FxWaveTable,Y
+    STA.w !Battle_FxWaveTable+4,Y
+    TDC
+    SEP #$20
+    LDA.b !BattleCD_Tmp45
+    BPL .neg_sin_positive
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpY
+    STA.l WRMPYB
+    SEC
+    RTS
+.neg_sin_positive:
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpY
+    STA.l WRMPYB
+    CLC
+    RTS
+.positive:
+    REP #$20
+    STA.w !Battle_FxWaveTable,Y
+    STA.w !Battle_FxWaveTable+4,Y
+    SEP #$20
+    LDA.b !BattleCD_Tmp45
+    BPL .pos_sin_positive
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpY
+    STA.l WRMPYB
+    SEC
+    RTS
+.pos_sin_positive:
+    TAX
+    LDA.l !BattleRom_SinAbsTable,X
+    STA.l WRMPYA
+    LDA.b #!BattleCD_FxWaveAmpY
+    STA.l WRMPYB
+    CLC
+    RTS
+
+; $CD:20B1 — BattleCD_FxWaveStoreY (34 bytes, $20B1–$20D2)
+; BattleCD_FxOpWaveTable's y: A + $20, widened to 16 bits as signed,
+; plus DP $49, stored as entry Y's two y words.
+; Callers (2 JSR sites): BattleCD_FxOpWaveTable ($CD:200F, $CD:2033).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0; A = the signed offset, Y = the
+;        entry's offset, DP $49 = the base (16-bit)
+; Exit:  M=1, X=0; A = the y's low byte (B = its high byte); X, Y
+;        unchanged
+BattleCD_FxWaveStoreY:
+    CLC
+    ADC.b #!BattleCD_FxWaveBaseY
+    BPL .positive
+    REP #$21
+    ORA.w #!BattleCD_SignExtend
+    ADC.b !BattleCD_Tmp49
+    STA.w !Battle_FxWaveTable+2,Y
+    STA.w !Battle_FxWaveTable+6,Y
+    SEP #$20
+    RTS
+.positive:
+    REP #$21
+    ADC.b !BattleCD_Tmp49
+    STA.w !Battle_FxWaveTable+2,Y
+    STA.w !Battle_FxWaveTable+6,Y
+    SEP #$20
+    RTS
+
+; $CD:20D3 — BattleCD_FxOpCEE000 (5 bytes, $20D3–$20D7)
+; Opcode $B2 (one operand byte, not read here): JSL BattleCE_UnkE000
+; (not matched).
+; Entry: M=1, X=0, DP=0, DB=$7E (what the bank-$CE routine needs is not
+;        traced)
+; Exit:  as BattleCE_UnkE000 leaves it (not traced)
+BattleCD_FxOpCEE000:
+    JSL BattleCE_UnkE000
+    RTS
+
+; $CD:20D8 — BattleCD_FxOpScaleObj (21 bytes, $20D8–$20EC)
+; Opcode $B1 (object, step): the object's !Battle_FxObjScale + step.
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
+;        operands
+; Exit:  M=1, X=0; A = the new scale; X = the object; Y = DP $40 + 1
+;        (two operand bytes)
+BattleCD_FxOpScaleObj:
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAX
+    LDY.w #1
+    LDA.w !Battle_FxObjScale,X
+    CLC
+    ADC.b [!BattleCD_FxScriptPtr],Y
+    STA.w !Battle_FxObjScale,X
+    LDY.b !BattleCD_FxScriptPtr
+    INY
+    STY.b !BattleCD_FxScriptPtr
+    RTS
+
+; $CD:20ED — BattleCD_FxOpBgMode (6 bytes, $20ED–$20F2)
+; Opcode $B0 (value): !Battle_HdmaMode (the BGMODE line data) = the
+; value.
+; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operand
+; Exit:  M=1, X=0; A = the value; X, Y unchanged
+BattleCD_FxOpBgMode:
+    LDA.b [!BattleCD_FxScriptPtr]
+    STA.w !Battle_HdmaMode
+    RTS
+
+; $CD:20F3 — BattleCD_FxOpTriangleOfPcs (40 bytes, $20F3–$211A)
+; Opcode $AF (object): the object's triangle (!Battle_FxTriX0-Y2) = the
+; screen positions of PC slots 0, 1 and 2 (!Battler_ScreenX/Y).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
+;        operand
+; Exit:  M=1, X=0; A = slot 2's y; X = the object; Y unchanged
+BattleCD_FxOpTriangleOfPcs:
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAX
+    LDA.w !Battler_ScreenX
+    STA.w !Battle_FxTriX0,X
+    LDA.w !Battler_ScreenX+1
+    STA.w !Battle_FxTriX1,X
+    LDA.w !Battler_ScreenX+2
+    STA.w !Battle_FxTriX2,X
+    LDA.w !Battler_ScreenY
+    STA.w !Battle_FxTriY0,X
+    LDA.w !Battler_ScreenY+1
+    STA.w !Battle_FxTriY1,X
+    LDA.w !Battler_ScreenY+2
+    STA.w !Battle_FxTriY2,X
+    RTS
+
+; $CD:211B — BattleCD_ScaleToCentre (88 bytes, $211B–$2172)
+; A = c + (A - c) * DP $21 / 256, with c = DP $47 (the centre): moves a
+; coordinate towards the centre by the scale (BattleCD_FxOpFillTriangle).
+; The difference is taken 16-bit (DP $45 = A, DP $48 = 0), its
+; magnitude multiplied on the CPU's multiplier. Quirk: the non-negative
+; path stays at 16 bits for the multiplier (the store to WRMPYA also
+; writes WRMPYB, the scale's store also writes DP $22 to WRDIVL, and the
+; read takes JOY1L as the high byte); only the low byte is returned, so
+; the result is the same.
+; Callers (6 JSR sites): BattleCD_FxOpFillTriangle ($CD:2188, $CD:2190, $CD:2198, $CD:21A5,
+;   $CD:21AD, $CD:21B5).
+; Entry: M=1, X=0, DP=0, DB any (the registers are accessed long); B =
+;        0 (the 16-bit TAY); A = the coordinate, DP $47 = the centre, DP
+;        $21 = the scale
+; Exit:  M=1, X=0; A = the moved coordinate (B = 0); X unchanged; Y = the
+;        coordinate; DP $45-$4C written
+BattleCD_ScaleToCentre:
+    TAY
+    STY.b !BattleCD_Tmp45
+    STZ.b !BattleCD_Tmp47+1
+    REP #$20
+    LDA.b !BattleCD_Tmp45
+    SEC
+    SBC.b !BattleCD_Tmp47
+    STA.b !BattleCD_Tmp49
+    LDA.b !BattleCD_Tmp49
+    BPL .positive
+    EOR.w #!Battle_Invert16
+    INC A
+    SEP #$20
+    STA.l WRMPYA
+    LDA.b !BattleCD_FxScale
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    REP #$20
+    EOR.w #!Battle_Invert16
+    INC A
+    CLC
+    ADC.b !BattleCD_Tmp47
+    STA.b !BattleCD_Tmp4B
+    TDC
+    SEP #$20
+    LDA.b !BattleCD_Tmp4B
+    RTS
+.positive:
+    STA.l WRMPYA
+    LDA.b !BattleCD_FxScale
+    STA.l WRMPYB
+    NOP
+    NOP
+    NOP
+    LDA.l RDMPYH
+    REP #$20
+    CLC
+    ADC.b !BattleCD_Tmp47
+    STA.b !BattleCD_Tmp4B
+    TDC
+    SEP #$20
+    LDA.b !BattleCD_Tmp4B
+    RTS
+
+; $CD:2173 — BattleCD_FxOpFillTriangle (77 bytes, $2173–$21BF)
+; Opcode $AE (b): fills the triangle of object (b AND 1)
+; (!Battle_FxTriObject = it): its three points, each moved towards
+; !Battle_FxObjCentreX/Y by !Battle_FxObjScale (BattleCD_ScaleToCentre),
+; into DP $12-$17; DP $20 = 0; then BattleCD_FillTriangle (tail jump).
+; Also the tail of BattleCD_FxDrawModel.
+; Callers (1 JMP site): BattleCD_FxDrawModel ($CD:1EF4).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
+;        operand
+; Exit:  as BattleCD_FillTriangle leaves it (not traced); DP $12-$17,
+;        $20, $21 and $45-$4C written
+BattleCD_FxOpFillTriangle:
+    LDA.b [!BattleCD_FxScriptPtr]
+    AND.b #1
+    STA.w !Battle_FxTriObject
+    TAX
+    LDA.w !Battle_FxObjScale,X
+    STA.b !BattleCD_FxScale
+    LDA.w !Battle_FxObjCentreX,X
+    STA.b !BattleCD_Tmp47
+    LDA.w !Battle_FxTriX0,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriX0
+    LDA.w !Battle_FxTriX1,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriX1
+    LDA.w !Battle_FxTriX2,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriX2
+    LDA.w !Battle_FxObjCentreY,X
+    STA.b !BattleCD_Tmp47
+    LDA.w !Battle_FxTriY0,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriY0
+    LDA.w !Battle_FxTriY1,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriY1
+    LDA.w !Battle_FxTriY2,X
+    JSR BattleCD_ScaleToCentre
+    STA.b !BattleCD_TriY2
+    STZ.w !BattleCD_TriUnk20
+    JMP BattleCD_FillTriangle
+
+; $CD:21C0 — BattleCD_FxOpTriCentre (461 bytes, $21C0–$238C)
+; Opcode $AD (object): the object's !Battle_FxObjScale = $FF and its
+; centre !Battle_FxObjCentreX/Y = where two medians of its triangle
+; meet (the centroid): the line from the midpoint of points 0-1 to
+; point 2 and the one from the midpoint of points 0-2 to point 1 (DP
+; $12-$19; each midpoint rounded towards the second point; when the
+; first midpoint's x, or y, is -4 to +3 from the second's, it is moved
+; 4 right, or down). With DB = $00, each line's end points are put in x
+; order and its slope taken by BattleCD_Unk38E5 (not matched; DP $0B =
+; the end y, $0C = the start y, $0D = the x distance; it returns the
+; slope in Y, 256 per pixel, probably); each line's value at x = 0 is b
+; = y - x * slope / 256 (BattleCD_Mul8x16); x = (b2 - b1) / (s1 - s2)
+; with both normalised for an 8.8 quotient (BattleCD_NormaliseDiv,
+; BattleCD_Div16, the sign put back), y = x * s1 / 256 + b1.
+; Callers (1 JSR site): BattleCD_FxOpCentreAndScroll ($CD:1FA0).
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
+;        operand
+; Exit:  M=1, X=0, DB=$7E (restored); A = the centre y; X = the object;
+;        Y as BattleCD_Unk38E5 left it (the second slope, probably); DP
+;        $0B-$0D, $12-$19, $23-$2A, $45-$4C written
+BattleCD_FxOpTriCentre:
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAX
+    LDA.b #!BattleCD_FxScaleWhole
+    STA.w !Battle_FxObjScale,X
+    LDA.w !Battle_FxTriX0,X
+    SEC
+    SBC.w !Battle_FxTriX1,X
+    BCS .mid01x_down
+    EOR.b #!Battle_Invert8
+    INC A
+    LSR A
+    EOR.b #!Battle_Invert8
+    INC A
+    BRA .mid01x
+.mid01x_down:
+    LSR A
+.mid01x:
+    CLC
+    ADC.w !Battle_FxTriX1,X
+    STA.b !BattleCD_LineAX0
+    LDA.w !Battle_FxTriY0,X
+    SEC
+    SBC.w !Battle_FxTriY1,X
+    BCS .mid01y_down
+    EOR.b #!Battle_Invert8
+    INC A
+    LSR A
+    EOR.b #!Battle_Invert8
+    INC A
+    BRA .mid01y
+.mid01y_down:
+    LSR A
+.mid01y:
+    CLC
+    ADC.w !Battle_FxTriY1,X
+    STA.b !BattleCD_LineAY0
+    LDA.w !Battle_FxTriX2,X
+    STA.b !BattleCD_LineAX1
+    LDA.w !Battle_FxTriY2,X
+    STA.b !BattleCD_LineAY1
+    LDA.w !Battle_FxTriX0,X
+    SEC
+    SBC.w !Battle_FxTriX2,X
+    BCS .mid02x_down
+    EOR.b #!Battle_Invert8
+    INC A
+    LSR A
+    EOR.b #!Battle_Invert8
+    INC A
+    BRA .mid02x
+.mid02x_down:
+    LSR A
+.mid02x:
+    CLC
+    ADC.w !Battle_FxTriX2,X
+    STA.b !BattleCD_LineBX0
+    LDA.w !Battle_FxTriY0,X
+    SEC
+    SBC.w !Battle_FxTriY2,X
+    BCS .mid02y_down
+    EOR.b #!Battle_Invert8
+    INC A
+    LSR A
+    EOR.b #!Battle_Invert8
+    INC A
+    BRA .mid02y
+.mid02y_down:
+    LSR A
+.mid02y:
+    CLC
+    ADC.w !Battle_FxTriY2,X
+    STA.b !BattleCD_LineBY0
+    LDA.w !Battle_FxTriX1,X
+    STA.b !BattleCD_LineBX1
+    LDA.w !Battle_FxTriY1,X
+    STA.b !BattleCD_LineBY1
+    PHB
+    TDC
+    PHA
+    PLB
+    LDA.b !BattleCD_LineAX0
+    SEC
+    SBC.b !BattleCD_LineBX0
+    CMP.b #!BattleCD_FxNearNeg
+    BCS .nudge_x
+    CMP.b #!BattleCD_FxNear
+    BCS .check_y
+.nudge_x:
+    LDA.b !BattleCD_LineAX0
+    CLC
+    ADC.b #!BattleCD_FxNear
+    STA.b !BattleCD_LineAX0
+.check_y:
+    LDA.b !BattleCD_LineAY0
+    SEC
+    SBC.b !BattleCD_LineBY0
+    CMP.b #!BattleCD_FxNearNeg
+    BCS .nudge_y
+    CMP.b #!BattleCD_FxNear
+    BCS .order_a
+.nudge_y:
+    LDA.b !BattleCD_LineAY0
+    CLC
+    ADC.b #!BattleCD_FxNear
+    STA.b !BattleCD_LineAY0
+.order_a:
+    LDA.b !BattleCD_LineAX0
+    CMP.b !BattleCD_LineAX1
+    BCC .order_b
+    LDX.b !BattleCD_LineAX0
+    LDY.b !BattleCD_LineAX1
+    STY.b !BattleCD_LineAX0
+    STX.b !BattleCD_LineAX1
+.order_b:
+    LDA.b !BattleCD_LineBX0
+    CMP.b !BattleCD_LineBX1
+    BCC .slopes
+    LDX.b !BattleCD_LineBX0
+    LDY.b !BattleCD_LineBX1
+    STY.b !BattleCD_LineBX0
+    STX.b !BattleCD_LineBX1
+.slopes:
+    LDA.b !BattleCD_LineAY1
+    STA.b !BattleCD_SlopeEndY
+    LDA.b !BattleCD_LineAY0
+    STA.b !BattleCD_SlopeStartY
+    LDA.b !BattleCD_LineAX1
+    SEC
+    SBC.b !BattleCD_LineAX0
+    STA.b !BattleCD_SlopeDx
+    JSR BattleCD_Unk38E5
+    STY.b !BattleCD_SlopeA
+    LDA.b !BattleCD_LineBY1
+    STA.b !BattleCD_SlopeEndY
+    LDA.b !BattleCD_LineBY0
+    STA.b !BattleCD_SlopeStartY
+    LDA.b !BattleCD_LineBX1
+    SEC
+    SBC.b !BattleCD_LineBX0
+    STA.b !BattleCD_SlopeDx
+    JSR BattleCD_Unk38E5
+    STY.b !BattleCD_SlopeB
+    LDA.b !BattleCD_LineAX0
+    STA.b !BattleCD_MathA
+    REP #$20
+    LDA.b !BattleCD_SlopeA
+    BPL .a_positive
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathB
+    SEP #$20
+    TDC
+    JSR BattleCD_Mul8x16
+    REP #$20
+    LDA.b !BattleCD_MathOut+1
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathOut+1
+    BRA .a_base
+.a_positive:
+    STA.b !BattleCD_MathB
+    SEP #$20
+    TDC
+    JSR BattleCD_Mul8x16
+    REP #$20
+.a_base:
+    LDA.b !BattleCD_LineAY0
+    AND.w #!Battle_LowByteMask
+    SEC
+    SBC.b !BattleCD_MathOut+1
+    STA.b !BattleCD_BaseA
+    TDC
+    SEP #$20
+    LDA.b !BattleCD_LineBX0
+    STA.b !BattleCD_MathA
+    REP #$20
+    LDA.b !BattleCD_SlopeB
+    BPL .b_positive
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathB
+    SEP #$20
+    TDC
+    JSR BattleCD_Mul8x16
+    REP #$20
+    LDA.b !BattleCD_MathOut+1
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathOut+1
+    BRA .b_base
+.b_positive:
+    STA.b !BattleCD_MathB
+    SEP #$20
+    TDC
+    JSR BattleCD_Mul8x16
+    REP #$20
+.b_base:
+    LDA.b !BattleCD_LineBY0
+    AND.w #!Battle_LowByteMask
+    SEC
+    SBC.b !BattleCD_MathOut+1
+    STA.b !BattleCD_BaseB
+    LDA.b !BattleCD_BaseB
+    SEC
+    SBC.b !BattleCD_BaseA
+    BPL .rise_positive
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_SlopeA
+    SEC
+    SBC.b !BattleCD_SlopeB
+    BPL .divide_negated
+    EOR.w #!Battle_Invert16
+    INC A
+    BRA .divide
+.divide_negated:
+    STA.b !BattleCD_MathB
+    BRA .negated
+.rise_positive:
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_SlopeA
+    SEC
+    SBC.b !BattleCD_SlopeB
+    BPL .divide
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathB
+.negated:
+    JSR BattleCD_NormaliseDiv
+    JSR BattleCD_Div16
+    LDA.b !BattleCD_MathOut
+    EOR.w #!Battle_Invert16
+    INC A
+    STA.b !BattleCD_MathOut
+    BRA .centre
+.divide:
+    STA.b !BattleCD_MathB
+    JSR BattleCD_NormaliseDiv
+    JSR BattleCD_Div16
+.centre:
+    TDC
+    SEP #$20
+    PLB
+    LDA.b [!BattleCD_FxScriptPtr]
+    TAX
+    LDA.b !BattleCD_MathOut
+    STA.w !Battle_FxObjCentreX,X
+    PHX
+    STA.b !BattleCD_MathA
+    LDX.b !BattleCD_SlopeA
+    STX.b !BattleCD_MathB
+    JSR BattleCD_Mul8x16
+    REP #$20
+    LDA.b !BattleCD_MathOut+1
+    CLC
+    ADC.b !BattleCD_BaseA
+    STA.b !BattleCD_MathOut+1
+    TDC
+    SEP #$20
+    PLX
+    LDA.b !BattleCD_MathOut+1
+    STA.w !Battle_FxObjCentreY,X
+    RTS
+
+; $CD:238D — BattleCD_NormaliseDiv (166 bytes, $238D–$2432)
+; Prepares BattleCD_Div16 for a quotient scaled by 256: shifts the
+; dividend DP $23 left by n, its leading zero bits (at most 8), and the
+; divisor DP $25 right by 8 - n. Laid out as a JMP to the test ladder
+; at the end, with one shift step per case before it.
+; Callers (2 JSR sites): BattleCD_FxOpTriCentre ($CD:234C, $CD:235E).
+; Entry: M=0 (16-bit shifts and masks), X any, DP=0, DB any; DP $23 the
+;        dividend, DP $25 the divisor
+; Exit:  M=0; DP $23 and $25 shifted; A = the last value shifted; X, Y
+;        unchanged
+BattleCD_NormaliseDiv:
+    JMP .ladder
+.lead2:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead1:
+    LDA.b !BattleCD_MathA
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead0:
+    LDA.b !BattleCD_MathB
+    XBA
+    AND.w #!Battle_LowByteMask
+    STA.b !BattleCD_MathB
+    RTS
+.ladder:
+    LDA.b !BattleCD_MathA
+    ASL A
+    BCS .lead0
+    ASL A
+    BCS .lead1
+    ASL A
+    BCS .lead2
+    ASL A
+    BCS .lead3
+    ASL A
+    BCS .lead4
+    ASL A
+    BCS .lead5
+    ASL A
+    BCS .lead6
+    ASL A
+    BCS .lead7
+    LDA.b !BattleCD_MathA
+    XBA
+    AND.w #!BattleCD_HighByteMask
+    STA.b !BattleCD_MathA
+    RTS
+.lead7:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead6:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead5:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead4:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+.lead3:
+    LDA.b !BattleCD_MathA
+    ASL A
+    ASL A
+    ASL A
+    STA.b !BattleCD_MathA
+    LDA.b !BattleCD_MathB
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    STA.b !BattleCD_MathB
+    RTS
+
 ; ============================================================
 ; Sound, scanline wait and math helpers ($CD:3B5F–$CD:3E3A)
 ; ============================================================
@@ -6203,7 +7055,7 @@ BattleCD_WaitScanline:
 ; 16-bit unsigned division by shift and subtract: !BattleCD_MathOut
 ; = !BattleCD_MathA / !BattleCD_MathB, !BattleCD_MathOutHi the
 ; remainder. Either operand 0 gives 0 and 0.
-; Callers (2 JSR sites): unmatched ($CD:234F, $CD:2361).
+; Callers (2 JSR sites): BattleCD_FxOpTriCentre ($CD:234F, $CD:2361).
 ; Entry: M=0 (16-bit LDA/ROL/SBC), X=0 (the 16-bit LDX), DP=0, DB any;
 ;        !BattleCD_MathA (DP $23) the dividend, !BattleCD_MathB (DP $25)
 ;        the divisor
@@ -6243,7 +7095,7 @@ BattleCD_Div16:
 ; $25 plus $23 * $26 shifted left 8. Quirk: the second WRMPYB store is
 ; 16-bit, so it also writes DP $27's old byte to WRDIVL (harmless: no
 ; division follows).
-; Callers (5 JSR sites): unmatched ($CD:22C3, $CD:22D7, $CD:22FC, $CD:2310, $CD:2377).
+; Callers (5 JSR sites): BattleCD_FxOpTriCentre ($CD:22C3, $CD:22D7, $CD:22FC, $CD:2310, $CD:2377).
 ; Entry: M=1, X=0 (16-bit TAX/STX), DP=0, DB any (the registers are
 ;        accessed long); DP $23 the byte, DP $25-$26 the word
 ; Exit:  M=1, X=0; DP $27-$29 the product; A = 0 (B = 0, TDC); X = $23

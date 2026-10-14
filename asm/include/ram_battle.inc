@@ -2503,5 +2503,25 @@ endstruct
 !BattleCD_FxCentreY       = $4E   ; 1 B DP: its centre y
 !BattleCD_FxModelOfs      = $4F   ; 1 B DP: the model's offset in !BattleRom_FxModels (model * 16)
 !BattleCD_FxDepth         = $51   ; 1 B DP: added to each vertex's z (BattleCD_FxRotateVertex)
+!Battle_FxWinLines        = $B900 ; 256 words: byte pairs per line (a left and a right edge, probably) that script
+                                  ; opcodes $B5/$B6 fill around the middle; reader not traced
+!Battle_FxWinLinesMid     = $BA00 ; its middle line
+!Battle_FxWaveTable       = $C15D ; 106 entries of 8 B (x word, y word, twice) built each frame by script opcode $B3;
+                                  ; reader not traced (an HDMA table, probably)
+!BattleCD_LineAX0         = $12   ; 1 B DP: BattleCD_FxOpTriCentre's first line: start x (the 0-1 midpoint)
+!BattleCD_LineAY0         = $13   ; ... start y
+!BattleCD_LineAX1         = $14   ; ... end x (point 2)
+!BattleCD_LineAY1         = $15   ; ... end y
+!BattleCD_LineBX0         = $16   ; ... the second line: start x (the 0-2 midpoint)
+!BattleCD_LineBY0         = $17   ; ... start y
+!BattleCD_LineBX1         = $18   ; ... end x (point 1)
+!BattleCD_LineBY1         = $19   ; ... end y
+!BattleCD_SlopeEndY       = $0B   ; 1 B DP: BattleCD_Unk38E5's end y
+!BattleCD_SlopeStartY     = $0C   ; 1 B DP: its start y
+!BattleCD_SlopeDx         = $0D   ; 1 B DP: its x distance
+!BattleCD_SlopeA          = $45   ; 2 B DP: the first line's slope (BattleCD_FxOpTriCentre)
+!BattleCD_SlopeB          = $47   ; 2 B DP: the second line's slope
+!BattleCD_BaseA           = $49   ; 2 B DP: the first line's y at x = 0
+!BattleCD_BaseB           = $4B   ; 2 B DP: the second line's
 
 endif

@@ -9,24 +9,6 @@
 ; ============================================================
 
 ; --- Bank $CD after the matched part (script opcode handlers and the code they call) ---
-org $CD1F53
-BattleCD_FxOpB5:                        ; script opcode $B5/$B6 handler (BattleCD_FxOpTable)
-org $CD1FA0
-BattleCD_FxOpB4:                        ; script opcode $B4 handler (BattleCD_FxOpTable)
-org $CD1FC8
-BattleCD_FxOpB3:                        ; script opcode $B3 handler (BattleCD_FxOpTable)
-org $CD20D3
-BattleCD_FxOpB2:                        ; script opcode $B2 handler (BattleCD_FxOpTable)
-org $CD20D8
-BattleCD_FxOpB1:                        ; script opcode $B1 handler (BattleCD_FxOpTable)
-org $CD20ED
-BattleCD_FxOpB0:                        ; script opcode $B0 handler (BattleCD_FxOpTable)
-org $CD20F3
-BattleCD_FxOpAF:                        ; script opcode $AF handler (BattleCD_FxOpTable)
-org $CD2173
-BattleCD_FxOpFillTriangle:              ; script opcode $AE; JMP from BattleCD_FxDrawModel
-org $CD21C0
-BattleCD_FxOpAD:                        ; script opcode $AD handler (BattleCD_FxOpTable)
 org $CD2433
 BattleCD_ClampCalcPair:                 ; JSR: clamps the two points at !Battle_ActCalcResult+X to the screen (X kept)
 org $CD2436
@@ -129,9 +111,14 @@ org $CD30B8
 BattleCD_FxOp99:                        ; script opcode $99 handler (BattleCD_FxOpTable)
 org $CD30BE
 BattleCD_FxOp97:                        ; script opcode $97 handler (BattleCD_FxOpTable)
+org $CD35A5
+BattleCD_Unk35A5:                       ; JSR from BattleCD_FxOpWindowBand after it fills !Battle_FxWinLines
 org $CD367C
 BattleCD_FillTriangle:                  ; JSR/JMP: fills the triangle of the three points in DP $12-$17 for object
                                         ; !Battle_FxTriObject, probably (it sorts them by y first, with DB = $00; not analysed)
+org $CD38E5
+BattleCD_Unk38E5:                       ; JSR from BattleCD_FxOpTriCentre (DB = $00): DP $0B/$0C two y, DP $0D an x distance;
+                                        ; returns a slope in Y, probably
 org $CD3924
 BattleCD_Unk3924:                       ; JSR from BattleCD_FxOp3924 (script opcode $B8) with A = the operand
 
@@ -181,6 +168,8 @@ org $D1FD7E
 BattleD1_UnkFD7E:                       ; JSL from BattleCD_FxOpD1FD7E (script opcode $CF)
 
 ; --- Bank $CE battle code (called from bank $CD; none analysed) ---
+org $CEE000
+BattleCE_UnkE000:                       ; JSL from BattleCD_FxOpCEE000 (script opcode $B2)
 org $CEE18E
 BattleCE_UnkE18E:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
 org $CEE7CF
