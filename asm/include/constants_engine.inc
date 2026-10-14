@@ -753,10 +753,10 @@ if !constants_engine_inc == 0
 !HdmaGrad_PairMask = $003F               ; (40 - Field_Unk27) masked to a gradient pair index
 
 ; --- Location animation set-up (FieldFD_LoadAnimSetA/B) ---
-!FieldRom_AnimListAPtrs = $FDF290        ; 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA
-!FieldRom_AnimListA = $FDF310            ; the lists FieldFD_LoadAnimSetA reads
-!FieldRom_AnimListBPtrs = $FDF9C7        ; 2 B per LocRom.Palette: offset of its list from FieldRom_AnimListB
-!FieldRom_AnimListB = $FDFA77            ; the lists FieldFD_LoadAnimSetB reads
+!FieldRom_AnimListAPtrs = $FDF290        ; FieldAnimListAPtrs: 2 B per LocRom.Tileset12 & $3F: offset of its list from FieldRom_AnimListA
+!FieldRom_AnimListA = $FDF310            ; FieldAnimListA: the lists FieldFD_LoadAnimSetA reads
+!FieldRom_AnimListBPtrs = $FDF9C7        ; FieldAnimListBPtrs: 2 B per LocRom.Palette: offset of its list from FieldRom_AnimListB
+!FieldRom_AnimListB = $FDFA77            ; FieldAnimListB: the lists FieldFD_LoadAnimSetB reads
 !LocRom_AnimSetMask = $3F                ; LocRom.Tileset12 bits that pick FieldFD_LoadAnimSetA's list
 !FieldAnimA_Wram = $0400                 ; WMADD (with WMADDH = bank $7F) FieldFD_LoadAnimSetA writes from
 !FieldAnim_NumRecs = 12                  ; records of FieldAnimA (and of FieldAnimB)
