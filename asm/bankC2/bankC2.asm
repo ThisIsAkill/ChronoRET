@@ -31634,10 +31634,11 @@ Menu_FrameEdgeRow:
 ; $C2:EE58 — Menu_FrameSides (39 bytes, $EE58–$EE7E)
 ; Menu_DrawInnerH side rows from Menu_DrawAddr2: the left edge t (t =
 ; Menu_FrameTile) and the right edge t+1 (at + Menu_FrameRightOfs, an
-; indirect store), (t+1) EOR 3 for the next row (t+4/t+5, then
-; t+6/t+7, then t+4/t+5 again);
-; none when Menu_DrawInnerH is 0. Then Menu_FrameTile = (t OR 3) + 1
-; (t+8) and Menu_DrawAddr2 the row after the sides.
+; indirect store), (t+1) EOR 3 for the next row. Menu_FrameEdgeRow
+; leaves t = the window's base tile + 4 (low two bits 0), so the rows
+; go t/t+1, then t+2/t+3, then t/t+1 again;
+; none when Menu_DrawInnerH is 0. Then Menu_FrameTile = (its value OR
+; 3) + 1 (t+4) and Menu_DrawAddr2 the row after the sides.
 ; Callers (1 JSR site): Menu_DrawWindowFrame ($C2:EE1B).
 ; Entry: from Menu_DrawWindowFrame: M=0, X=0, DP=$0000, DB=$7E
 ; Exit:  M=0, X=0; A = Menu_FrameTile; X = 0 and Y = the next row's
