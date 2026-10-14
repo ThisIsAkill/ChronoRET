@@ -1,0 +1,2 @@
+address,name,date,reviewer,verdict,source_hash,notes
+$C1:0045,BattleSys_RunService,2026-10-09,rev140a,changes,a043b4b0f78b,"Svc 9 also reaches BattleFx_SetPtrA2FromTable: DefeatPose BRA Battle_RunPcPose ($C1:356B) -> Battle_PoseStep JSL $C1:36B4. Say 0,3,4,8,9. Addr sets ok. nit: 6 skips FrameTick/Pump"

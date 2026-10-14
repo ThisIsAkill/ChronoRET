@@ -8,61 +8,61 @@
 ; the comment says what the call site expects.
 ; ============================================================
 
-; --- Long targets of BattleSys_SceneSetup (service 0; none analysed) ---
-org $CD0003
-BattleSys_VecCD0003:                    ; JSL vector (JMP $CD:0399) from BattleSys_SceneSetup
-org $CD000C
-BattleSys_VecCD000C:                    ; JSL vector (JMP $CD:04FD) from BattleSys_SceneSetup
-org $CD0012
-BattleSys_VecCD0012:                    ; JSL vector (JMP $CD:0534): BattleSys_SceneSetup repeats it while Z is clear
+; --- Bank $CD after the matched part ($CD:16B5 on; helpers of the matched code) ---
 
-; --- Bank $CD vectors called from bank $CF (none analysed) ---
-org $CD0000
-BattleSys_VecCD0000:                    ; JSL vector (JMP $CD:0039): BattleCF_EnterBattle, before it clears battle RAM
-org $CD0006
-BattleSys_VecCD0006:                    ; JSL vector (JMP $CD:03B4): BattleCF_ExitBattle, just before it returns
-org $CD0024
-BattleSys_VecCD0024:                    ; JSL vector (JMP $CD:0043): BattleCF_RemoveMarkedEnemies, A = the enemy's
-                                        ; battler slot, after it moved the enemy to the special palette
+org $CD16B5
+BattleCD_FxOpTable:                     ; 122 words: the layer-effect script's opcode handlers $80-$F9
+                                        ; (JSR (T,X) in BattleCD_RunFxOp); the handlers are at $CD:17A9 on
+org $CD3B5F
+BattleCD_PlayPendingSfx:                ; JSR: when !Battle_SfxPending is set, clears it and runs
+                                        ; BattleCD_ApuCmd18 with A = $CD24, X = $CD25
+org $CD3B71
+BattleCD_ApuCmd18:                      ; JSR: APU command !Sfx_CmdUnk18 with !Sfx_Param1 = A and !Sfx_Param2 = X's low
+                                        ; byte (Audio_ProcessEntry): a sound, probably
+org $CD3B82
+BattleCD_Unk3B82:                       ; JSR from BattleCD_NmiMain with A = $40; not analysed
+org $CD3E3B
+BattleCD_WaitFrames:                    ; JSR: A frames of BattleCD_WaitFrameRefresh (A = 0 at the end)
+org $CD3E44
+BattleCD_PauseWait:                     ; JSR: while !Battle_Paused is set, sends APU command $F5 and waits until it
+                                        ; is cleared (frame by frame through $CA20); returns at once otherwise
+org $CD3E75
+BattleCD_WaitFrameRefresh:              ; JSR: BattleCD_WaitFrame, then BankC1_VecRefreshMenu (A kept)
+org $CD3E7D
+BattleCD_WaitFrame:                     ; JSR: waits until $CA20 is cleared (BattleCD_PauseWait meanwhile), then
+                                        ; BattleCD_StepText; A kept (PHA/PLA)
+org $CD3E8E
+BattleCD_DmaToVram:                     ; JSR/JMP: DMA channel 7 (DB = $00 inside) from A:X to VRAM word address Y,
+                                        ; DP $45 bytes
+org $CD3EB4
+BattleCD_RunQueuedDma:                  ; JSR from the NMI: runs the upload BattleCD_QueueVramDma queued ($CA26-$CA2D)
+org $CD3ED2
+BattleCD_QueueVramDma:                  ; JSR: queues A:X to VRAM word address Y, DP $53 bytes, and waits frames until
+                                        ; the NMI has sent it all (in pieces); !Battle_DmaQueueBusy meanwhile
 
-; --- Bank $CD (battle messages / per-frame service) ---
+; --- Bank $D1 battle code (called from bank $CD; none analysed) ---
 
-org $CD0009
-BattleSys_FrameTickVec:                 ; JSL vector: per-frame service tick (BattleMenu_RefreshIfDirtyAndTick)
+org $D1E8D9
+BattleD1_UploadPage:                    ; JSL from BattleCD_NmiUploadText: A:X = a tilemap page, DP $45 = a VRAM address
+org $D1EA4B
+BattleD1_UnkEA4B:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
+org $D1ECF3
+BattleD1_UnkECF3:                       ; JSL from BattleCD_FrameTick, A = !Battle_UnkCD45
+org $D1F1B0
+BattleD1_InitBattle:                    ; JSL from BattleCD_EnterBattle: sets DB=$7E, DP=0, the NMI/IRQ trampolines
+                                        ; and many bank-$CD variables
+org $D1F426
+BattleD1_UnkF426:                       ; JSL from BattleCD_NmiMain and BattleCD_NmiSetup
+org $D1F4C0
+BattleD1_NmiExit:                       ; the NMI trampoline's target BattleCD_ExitBattle installs (JML at $0500)
+org $D1F67A
+BattleD1_ActOp80:                       ; JSL from BattleCD_ActOp80 (action opcode $80)
 
-org $CD0036
-BattleSys_IdleVecCD0036:                ; JSL vector (JMP $CD:04A6 -> JSR $CD:3E44): called over and over while
-                                        ; BattleSys_PumpFrames waits; not analysed
+; --- Bank $CE battle code (called from bank $CD; none analysed) ---
 
-org $CD0015
-BattleAnim_LoadGfx4Vec:                 ; JSL vector (JMP $CD:1323): A = graphics set; loads sets A..A+3 as parts
-                                        ; 0-3 through the $7E:2D00 buffer, $400 bytes each (inferred; not analysed)
-
-org $CD002A
-BattleAnim_LoadGfx2Vec:                 ; JSL vector (JMP $CD:1314): A = graphics set; the same for sets A, A+1
-                                        ; as parts 4-5
-
-org $CD001B
-BattleAct_UnkVecCD001B:                 ; JSL vector (JMP $CD:003E, which calls $D1:F67A): run by opcode $80 after
-                                        ; it copied its bytes to !Battle_ActOp80Args; not analysed
-
-org $CD0018
-BattleAnim_UnkVecCD0018:                ; JSL vector (JMP $CD:0D28): A = !Battle_ActUnkArg987C; zeroes
-                                        ; !Battle_Unk5D9B and starts something by that number; not analysed
-
-org $CD0027
-BattleMsg_ShowFromTableCC3A09Vec:       ; JSL vector: info panel for the tech under the cursor (A = tech id)
-
-org $CD002D
-BattleMsg_ShowMsg0BIfKeyChangedVec:     ; JSL vector: battle message / info panel (A = key, $FF = none)
-
-org $CD0030
-BattleMsg_UnkVecCD0030:                 ; JSL vector: sibling of $CD002D, used for enemy targets; not analysed
-
-org $CD0033
-BattleMsg_UnkVecCD0033:                 ; JSL vector (JMP $CD:0295): A = a non-zero script byte (!Battle_UnkB3C7);
-                                        ; run by the enemy-script run handlers; a battle message, probably; not analysed
-
-org $CD0021
-BattleSys_UnkVecCD0021:                 ; JSL vector: BattleSys_Main's !Battle_Unk99CD end, A = 8; BattleSys_UnkB967
-                                        ; after a tech, A = 3 or $0D; not analysed
+org $CEE18E
+BattleCE_UnkE18E:                       ; JSL from BattleCD_NmiMain (with !Battle_Unk2A21 bit 0)
+org $CEEE6E
+BattleCE_UnkEE6E:                       ; JSL from BattleCD_StepWipe at an opening wipe's start, A = !Battle_UnkCA22
+org $CEF066
+BattleCE_UnkF066:                       ; JSL from BattleCD_NmiMain unless !Battle_UnkCD2D / !Battle_UnkA028

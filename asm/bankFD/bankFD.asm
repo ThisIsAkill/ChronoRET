@@ -10656,7 +10656,8 @@ FdVec_FFF4:
 ; animation records at $0520 (Field_EndOfFrame calls it every frame).
 ; Callers (10 JSL sites): Field_EndOfFrame ($C0:00CD), Field_EndOfFrameShort ($C0:00E6),
 ;   Scene_Unk0283 ($C0:02BA, $C0:02E1), Field_SceneChangeTick ($C0:0CE1), DefaultHandler ($C0:1793),
-;   Evt_OpFF_Misc ($C0:3FC6) and unmatched ($CD:09BF, $CD:0AD6, $D1:F54D).
+;   Evt_OpFF_Misc ($C0:3FC6), BattleCD_NmiMain ($CD:09BF), BattleCD_NmiSetup ($CD:0AD6) and
+;   unmatched ($D1:F54D).
 ; Entry: M=1, X=0, DP=$0100, DB=$00 at the field callers (the callers in
 ;        banks $CD and $D1 not traced); PalAnim_TickAll needs X=0 and a
 ;        DP whose low byte is 0 (it becomes DB, and DB=$00 is needed)
