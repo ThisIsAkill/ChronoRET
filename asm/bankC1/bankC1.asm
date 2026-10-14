@@ -155,8 +155,10 @@ BattleSys_SceneSetup:
 ;        BattleCD_StartOpenWipe and BattleCD_WipeRunning, and the bank-$CD
 ;        helpers they call, are matched). The other five (services 3,
 ;        4, 8 and 9 by way of BattleSys_FrameTickVec and
-;        BattleSys_PumpFrames, 4 also BattleCD_ActOp80; service 6 only
-;        through BattleSys_VecCD0024) reach no unmatched address; the
+;        BattleSys_PumpFrames, 4 also BattleCD_ActOp80 and, through
+;        BattleAct_LoadCommon, BattleAnim_LoadGfx4Vec,
+;        BattleAnim_LoadGfx2Vec and BattleAnim_UnkVecCD0018; service 6
+;        only through BattleSys_VecCD0024) reach no unmatched address; the
 ;        last two they reached, $D1:ECF3 (BattleFx_LoadBgSet, JSL in
 ;        BattleCD_FrameTick; services 3, 4, 6, 8 and 9) and $D1:F67A
 ;        (BattleFx_Op80Dispatch; service 4), are matched, and so is all
@@ -165,10 +167,15 @@ BattleSys_SceneSetup:
 ;        call trees of BattleMenu_UpdateWindows and of
 ;        BattleMsg_ShowFromTableCC3A09Vec ($CD:0027) are all matched.
 ;        BattleFx_SetPtrA2FromTable ($CF:FD9E), which the call trees of
-;        services 0, 3, 4, 8 and 9 contain (9 through Battle_PoseStep,
-;        which skips it while !Battle_PoseIncludeKo is set), is matched
-;        and returns M=1, X=0. B, P (N and Z
-;        from the PLA), DP, DB and
+;        services 0, 3, 4, 6, 8 and 9 contain (6 through
+;        BattleSys_VecCD0024 -> BattleCD_EnemyDissolve ->
+;        BattleCD_WaitFrameRefresh -> BankC1_VecRefreshMenu ->
+;        BattleMenu_RefreshIfDirtyL -> BattleMenu_UpdateWindows; 9
+;        through Battle_PoseStep, which skips it while
+;        !Battle_PoseIncludeKo is set, and through BattleSys_FrameTickVec
+;        -> BattleCD_FrameTick -> BattleCD_EndLayerFx ->
+;        BattleCD_WaitFrameRefresh and on by the same route), is matched
+;        and returns M=1, X=0. B, P (N and Z from the PLA), DP, DB and
 ;        memory as the service leaves them
 BattleSys_RunService:
     PHA

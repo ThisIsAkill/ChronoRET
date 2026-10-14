@@ -39,10 +39,10 @@ org $D1E70A
 ; !Battle_Unk2A21 bit 1 is set, flips bit 6 of FieldAnimB[7].Unk1 (the
 ; first colour of palette animation 7 moves 64 colours, four rows: to
 ; follow the swapped rows, probably). At the end it steps the 16-bit
-; !BattleCD_FxScriptPtr back by one (why is not traced: probably to undo a
-; step past an argument byte this command does not have; the bank-$CD
-; handler that ends just before the JSL, at $CD:1B95, has the same
-; 16-bit DEC).
+; !BattleCD_FxScriptPtr back by one: script opcode $E1 has no operand,
+; and BattleCD_RunFxScript moves DP $40 one byte on after every handler
+; (the bank-$CD handler that ends just before the JSL, at $CD:1B95, has
+; the same 16-bit DEC).
 ; Callers note: the JSL at $CD:1B9A and an RTS are the whole handler of
 ;   layer-effect script opcode $E1, which BattleCD_RunFxOp runs with B = 0;
 ;   the operand-less opcode explains the step back of DP $40 (the script

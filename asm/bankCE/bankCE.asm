@@ -14,7 +14,7 @@
 ; $CD and $D1: two of the entries are called from bank-$CD code in
 ; $CD:2A4A-$CD:3B5E (not matched; layer-effect opcode $97's handler and
 ; the helper at $CD:3616 that BattleCD_Unk35A5 calls), two from matched
-; layer-effect code (BattleCD_FxOpCEE000, opcode $B2, and
+; layer-effect code (BattleCD_FxOpCopyWindowEdges, opcode $B2, and
 ; BattleCD_CalcAngle, part of opcode $CC's handler), the others from BattleCD_NmiMain,
 ; BattleCD_StepWipe, BattleFx_Init and BattleFx_ReloadCeSet.
 ; (tools/xref.py's other hits into this range, from $C7:CCEA, $C7:E0CC,
@@ -59,12 +59,12 @@ org $CEE000
 ; script bytes used are not traced. The ASL drops bit 7 of the byte.
 ; Lines 216-223 are not copied.
 ; Callers note: the JSL at $CD:20D3 is the whole handler of layer-effect
-;   script opcode $B2 (BattleCD_FxOpCEE000, BattleCD_FxOpTable entry
-;   $32; JSL, RTS).
-; Callers (1 JSL site): BattleCD_FxOpCEE000 ($CD:20D3).
+;   script opcode $B2 (BattleCD_FxOpCopyWindowEdges, BattleCD_FxOpTable
+;   entry $32; JSL, RTS).
+; Callers (1 JSL site): BattleCD_FxOpCopyWindowEdges ($CD:20D3).
 ; Entry: M=1, X=0, DP=0 (DP operands; TDC as zero), DB=$7E (the tables
 ;        .w); the script pointer at DP $40, at the operand byte
-;        (BattleCD_FxOpCEE000 calls it so)
+;        (BattleCD_FxOpCopyWindowEdges calls it so)
 ; Exit:  M=1, X=0; A = 0; X = (s + $6C) & $FF; Y's low byte kept, high
 ;        byte cleared (SEP #$10); DP $45-$46 = s + $6C; DB unchanged
 BattleCE_CopyWindowEdges:

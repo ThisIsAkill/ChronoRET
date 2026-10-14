@@ -5,8 +5,10 @@ hirom
 ; Bank $CD — battle display, messages and background effects
 ; File offset 0x0D0000 (bank $CD = ROM offset $D0000)
 ;
-; $CD:0000-$CD:3FE5 is battle-engine code with tables inside it; from
-; $CD:4000 on the bank is data (the action scripts and their tables,
+; $CD:0000-$CD:3FE3 is battle-engine code with tables inside it (it
+; ends with unreached leftover code, BattleCD_OldBuildLeftovers, whose
+; RTS is at $3FE3); $3FE4-$3FFE is $FF fill and $3FFF the data byte
+; !BattleRom_DebugSlowMo. From $CD:4000 on the bank is data (the action scripts and their tables,
 ; read by bank $C1). Other banks reach the code through the JMP vectors
 ; at $CD:0000-$CD:0038; inside the bank it calls itself by JSR and, for
 ; a few routines, by JSL. Banks $CD, $CE and $D1 call each other; the
@@ -4310,7 +4312,7 @@ BattleCD_FxOpTable:
     dw BattleCD_FxOp84                 ; $84
     dw BattleCD_FxOp85                 ; $85
     dw BattleCD_FxOp86                 ; $86
-    dw BattleCD_FxOpBumpCA24           ; $87
+    dw BattleCD_FxOpReloadCeSet        ; $87
     dw BattleCD_FxOpFillWindow             ; $88
     dw BattleCD_FxOp89                 ; $89
     dw BattleCD_FxOp8A                 ; $8A
@@ -4353,7 +4355,7 @@ BattleCD_FxOpTable:
     dw BattleCD_FxOpTriangleOfPcs      ; $AF
     dw BattleCD_FxOpBgMode             ; $B0
     dw BattleCD_FxOpScaleObj           ; $B1
-    dw BattleCD_FxOpCEE000             ; $B2
+    dw BattleCD_FxOpCopyWindowEdges    ; $B2
     dw BattleCD_FxOpWaveTable          ; $B3
     dw BattleCD_FxOpCentreAndScroll    ; $B4
     dw BattleCD_FxOpWindowBand         ; $B5
@@ -4975,7 +4977,8 @@ BattleCD_FxOpWedge:
 ; 2n+1 of !Battle_ActCalcResult clamped to the screen
 ; (BattleCD_ClampCalcPair) and their angle (BattleCD_CalcAngle), then
 ; BattleCD_FxOpBeamQuad (the rest of BattleCD_FxOpBeam, tail jump).
-; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operands
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX of n * 4); DP
+;        $40 at the operands
 ; Exit:  as BattleCD_FxOpBeam
 BattleCD_FxOpBeamFromPair:
     LDY.w #1
@@ -4992,9 +4995,10 @@ BattleCD_FxOpBeamFromPair:
 ; bit 7 set, variable n AND $7F = 0 instead (the value is skipped).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
 ;        operands
-; Exit:  M=1, X=0; A = the variable's new value (0 for a clear); X = DP
-;        $40 + 1 (two operand bytes, stepped through X); Y = 1 on the add
-;        path, else unchanged; DP $45 = the value on the add path
+; Exit:  M=1, X=0; A = the new value (add path) or n AND $7F (clear
+;        path); X = DP $40 + 1 (two operand bytes, stepped through X);
+;        Y = 1 on the add path, else unchanged; DP $45 = the value on the
+;        add path
 BattleCD_FxOpAddVar:
     LDA.b [!BattleCD_FxScriptPtr]
     BMI .clear
@@ -5243,7 +5247,8 @@ BattleCD_FxOpSwitchLow:                 ; header: see BattleCD_FxOpSwitchHigh
 ; $CD:1AE1 — BattleCD_FxOpMirrorWin1ToWin2 (5 bytes, $1AE1–$1AE5)
 ; Opcode $CF (offset): JSL BattleFx_MirrorWin1ToWin2, which reads the
 ; operand through DP $40: as opcode $DB, mirrored left to right, for 28
-; lines of each 28-line block from line offset the operand.
+; lines of each 28-line block, starting at byte offset the operand * 2
+; in the block (line operand / 2; an odd operand misaligns the pairs).
 ; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (the 16-bit TAX); DP $40 at the
 ;        operand
 ; Exit:  as BattleFx_MirrorWin1ToWin2 leaves it: M=1, X=0; A = 0; X = the
@@ -5622,10 +5627,12 @@ BattleCD_FxOpCircleAtCalc:
 ; growing radii are then overwritten); else BattleCD_FxCircleStep. On
 ; odd frames the low bytes of the channel's !BattleFx_ShakeX/Y are
 ; negated afterwards (8-bit: the high bytes stay).
-; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operand, DP $43 = the
+; Entry: M=1, X=0, DP=0, DB=$7E; B = 0 (BattleCD_FxCircleFromTable's
+;        16-bit TAX on k = 0); DP $40 at the operand, DP $43 = the
 ;        channel
 ; Exit:  M=1, X=0; A = the frame count AND 1, or the negated x; X = the
-;        channel; Y = DP $4C (high byte 0); DP $45-$4E written
+;        channel; Y = DP $4C (high byte 0); DP $45, $47 and $49-$4E
+;        written
 BattleCD_FxOpCircleGrow:
     LDA.b #!BattleCD_FxCircleX
     STA.b !BattleCD_FxCentreX
@@ -6412,17 +6419,19 @@ BattleCD_FxWaveStoreY:
     SEP #$20
     RTS
 
-; $CD:20D3 — BattleCD_FxOpCEE000 (5 bytes, $20D3–$20D7)
+; $CD:20D3 — BattleCD_FxOpCopyWindowEdges (5 bytes, $20D3–$20D7)
 ; Opcode $B2 (one operand byte, not read here; BattleCE_CopyWindowEdges
 ; reads it): JSL BattleCE_CopyWindowEdges, which copies one window's
-; edge pair of lines 0-215 (the operand x 2 picks it) from the window
-; table not written this frame into the one that is.
+; edge pair of lines s/4 to s/4 + 215, with s = the operand x 2 (the
+; byte offset: s = 0 is window 1 of line 0, s = 2 window 2; a larger s,
+; with s + $6C > $100, wraps: see the CE header), from the window table
+; not written this frame into the one that is.
 ; Entry: M=1, X=0, DP=0, DB=$7E (as BattleCE_CopyWindowEdges needs it);
 ;        DP $40 at the operand
 ; Exit:  M=1, X=0; A = 0; X = (operand x 2 + $6C) & $FF; Y's high byte
 ;        cleared; DP $45-$46 written (as BattleCE_CopyWindowEdges leaves
 ;        them)
-BattleCD_FxOpCEE000:
+BattleCD_FxOpCopyWindowEdges:
     JSL BattleCE_CopyWindowEdges
     RTS
 
@@ -6875,8 +6884,9 @@ BattleCD_FxOpTriCentre:
 ; $CD:238D — BattleCD_NormaliseDiv (166 bytes, $238D–$2432)
 ; Prepares BattleCD_Div16 for a quotient scaled by 256: shifts the
 ; dividend DP $23 left by n, its leading zero bits (at most 8), and the
-; divisor DP $25 right by 8 - n. Laid out as a JMP to the test ladder
-; at the end, with one shift step per case before it.
+; divisor DP $25 right by 8 - n. Laid out as a JMP over the n = 2, 1, 0
+; cases to the test ladder in the middle (its fall-through is the n = 8
+; case), with the n = 7 to 3 cases after it; each case ends in an RTS.
 ; Callers (2 JSR sites): BattleCD_FxOpTriCentre ($CD:234C, $CD:235E).
 ; Entry: M=0 (16-bit shifts and masks), X any, DP=0, DB any; DP $23 the
 ;        dividend, DP $25 the divisor
@@ -7401,12 +7411,13 @@ BattleCD_FxOpSetObjAngles:
     STY.b !BattleCD_FxScriptPtr
     RTS
 
-; $CD:2687 — BattleCD_FxOpBumpCA24 (9 bytes, $2687–$268F)
-; Opcode $87 (value): !BattleFx_CeSetBase = the value and !BattleFx_CeSetReload +
-; 1 (as the message and wipe code bump them).
+; $CD:2687 — BattleCD_FxOpReloadCeSet (9 bytes, $2687–$268F)
+; Opcode $87 (value): !BattleFx_CeSetBase = the value and
+; !BattleFx_CeSetReload + 1 (as the message and wipe code bump them), so
+; BattleFx_ReloadCeSet reloads the set.
 ; Entry: M=1, X=0, DP=0, DB=$7E; DP $40 at the operand
 ; Exit:  M=1, X=0; A = the value; X, Y unchanged
-BattleCD_FxOpBumpCA24:
+BattleCD_FxOpReloadCeSet:
     LDA.b [!BattleCD_FxScriptPtr]
     STA.w !BattleFx_CeSetBase
     INC.w !BattleFx_CeSetReload
@@ -7890,7 +7901,8 @@ BattleCD_FxRegToWorkTable:
 ; Work word 0 (!Battle_FxChanWork) of channel Y = its !Battle_FxChanReg.
 ; Callers note: BattleCD_FxRegToWorkTable entry 0 (JMP (T,X) in
 ;   BattleCD_FxOpRegToWork), as the next three are entries 1-3.
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxRegToWork0:
     REP #$20
@@ -7903,7 +7915,8 @@ BattleCD_FxRegToWork0:
 ; $CD:2975 — BattleCD_FxRegToWork1 (12 bytes, $2975–$2980)
 ; Work word 1 (!Battle_FxChanWork+2) of channel Y = its
 ; !Battle_FxChanReg.
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxRegToWork1:
     REP #$20
@@ -7916,7 +7929,8 @@ BattleCD_FxRegToWork1:
 ; $CD:2981 — BattleCD_FxRegToWork2 (12 bytes, $2981–$298C)
 ; Work word 2 (!Battle_FxChanWork+4) of channel Y = its
 ; !Battle_FxChanReg.
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxRegToWork2:
     REP #$20
@@ -7929,7 +7943,8 @@ BattleCD_FxRegToWork2:
 ; $CD:298D — BattleCD_FxRegToWork3 (12 bytes, $298D–$2998)
 ; Work word 3 (!Battle_FxChanWork+6) of channel Y = its
 ; !Battle_FxChanReg.
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxRegToWork3:
     REP #$20
@@ -7965,7 +7980,8 @@ BattleCD_FxWorkToRegTable:
 ; !Battle_FxChanReg of channel Y = its work word 0 (!Battle_FxChanWork).
 ; Callers note: BattleCD_FxWorkToRegTable entry 0 (JMP (T,X) in
 ;   BattleCD_FxOpWorkToReg), as the next three are entries 1-3.
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxWork0ToReg:
     REP #$20
@@ -7977,7 +7993,8 @@ BattleCD_FxWork0ToReg:
 
 ; $CD:29B6 — BattleCD_FxWork1ToReg (12 bytes, $29B6–$29C1)
 ; !Battle_FxChanReg of channel Y = its work word 1 (!Battle_FxChanWork+2).
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxWork1ToReg:
     REP #$20
@@ -7989,7 +8006,8 @@ BattleCD_FxWork1ToReg:
 
 ; $CD:29C2 — BattleCD_FxWork2ToReg (12 bytes, $29C2–$29CD)
 ; !Battle_FxChanReg of channel Y = its work word 2 (!Battle_FxChanWork+4).
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxWork2ToReg:
     REP #$20
@@ -8001,7 +8019,8 @@ BattleCD_FxWork2ToReg:
 
 ; $CD:29CE — BattleCD_FxWork3ToReg (12 bytes, $29CE–$29D9)
 ; !Battle_FxChanReg of channel Y = its work word 3 (!Battle_FxChanWork+6).
-; Entry: M=1, X any, DP any, DB=$7E; Y = the channel
+; Entry: M=1, X any, DP=0 (the TDC loads zero from it; BattleCD_RunFxOp
+;        provides it), DB=$7E; Y = the channel
 ; Exit:  M=1; A = 0 (B = 0); X, Y unchanged
 BattleCD_FxWork3ToReg:
     REP #$20
@@ -8148,11 +8167,14 @@ BattleCD_ApuCmd18:
 
 ; $CD:3B82 — BattleCD_WaitScanline (41 bytes, $3B82–$3BAA)
 ; Busy-waits for scanline A: past the vertical blank (HVBJOY bit 7),
-; then at the end of each H-blank latches the counters (SLHV, STAT78
-; resets the read order) and reads OPVCT's low byte, until it is at
-; least A. BattleCD_NmiMain calls it with !BattleCD_NmiWaitLine while
-; an action runs, and script opcode $C1 (BattleCD_FxOpWaitLine) with
-; its operand; why they wait is not traced.
+; then into an H-blank and out of it; then, skipping H-blanks, latches
+; the counters (SLHV, STAT78 resets the read order) and reads OPVCT's
+; low byte until it is at least A. Only the first pass waits for the
+; end of an H-blank: later passes latch as soon as the beam is not in
+; H-blank, so OPVCT is polled many times per scanline. BattleCD_NmiMain
+; calls it with !BattleCD_NmiWaitLine while an action runs, and script
+; opcode $C1 (BattleCD_FxOpWaitLine) with its operand; why they wait is
+; not traced.
 ; Callers (2 sites: 1 JSR, 1 JMP): BattleCD_NmiMain (JSR $CD:09AC) and BattleCD_FxOpWaitLine (JMP
 ;   $CD:1D95).
 ; Entry: M=1, X any, DP=0, DB any (the registers are read long); A =
@@ -8696,9 +8718,9 @@ BattleCD_WaitFrameRefresh:
 
 ; $CD:3E7D — BattleCD_WaitFrame (17 bytes, $3E7D–$3E8D)
 ; Waits for the next frame: !BattleFx_FrameWait + 1, then
-; BattleCD_PauseWait until it is back to 0 (the bank-$D1 NMI handler
-; clears it, probably: no matched code does), then the text step
-; (BattleCD_StepText).
+; BattleCD_PauseWait until it is back to 0 (BattleFx_Nmi, $D1:E77C,
+; clears it at the end of its work: TDC, STA.l $7E:CA20; BattleFx_Init
+; also clears it, STZ), then the text step (BattleCD_StepText).
 ; Callers (17 JSR sites): BattleCD_ShowText ($CD:0286, $CD:0289), BattleCD_ExitBattle ($CD:03DA,
 ;   $CD:03EB, $CD:0415), BattleCD_StartOpenWipe ($CD:0505, $CD:0512), BattleCD_StartCloseWipe
 ;   ($CD:051B, $CD:0526), BattleCD_RunEndFx ($CD:0D74), BattleCD_LayerFx87 ($CD:0D99, $CD:0DA8),
